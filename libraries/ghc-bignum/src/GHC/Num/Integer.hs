@@ -194,7 +194,7 @@ integerToWord !i = W# (integerToWord# i)
 integerFromNatural :: Natural -> Integer
 {-# NOINLINE integerFromNatural #-}
 integerFromNatural (NS x) = integerFromWord# x
-integerFromNatural (NB x) = integerFromBigNat# x
+integerFromNatural (NB x) = IP x
 
 -- | Convert a list of Word into an Integer
 integerFromWordList :: Bool -> [Word] -> Integer
@@ -1269,3 +1269,270 @@ integerPowMod# !b !e !m
 
      -- e > 0 by cases above
    | True = (# Backend.integer_powmod b (integerToNatural e) m | #)
+
+
+{-
+Note [Optimising conversions between numeric types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Converting between numeric types is very common in Haskell codes.  Suppose that
+we have N inter-convertible numeric types (Word, Word8, Word32, Int, etc.).
+
+- We don't want to have to use one conversion function per pair of types as that
+would require N^2 functions: wordToWord8, wordToInt, word8ToWord32...
+
+- The following kind of class would allow us to have a single conversion
+function but at the price of N^2 instances and of the use of
+MultiParamTypeClasses extension.
+
+    class Convert a b where
+      convert :: a -> b
+
+So what we do instead is that we use the Integer type (signed, unbounded) as a
+passthrough type to perform every conversion. Hence we only need to define two
+functions per numeric type:
+
+  class Integral a where
+    toInteger :: a -> Integer
+
+  class Num a where
+    fromInteger :: Integer -> a
+
+These classes have a single parameter and can be derived automatically (e.g. for
+newtypes). So we don't even have to define 2*N instances. For example, all the
+instances for the types in Foreign.C.Types (CChar, CShort, CInt, CUInt, etc.)
+are automatically derived from the instances for Word, Int, Word8, Word16, etc.
+
+Finally we can define a generic conversion function:
+
+  -- in the Prelude
+  fromIntegral :: (Integral a, Num b) => a -> b
+  fromIntegral = fromInteger . toInteger
+
+Efficient conversions
+~~~~~~~~~~~~~~~~~~~~~
+
+An issue with this approach is that performance might be terrible. E.g.
+converting an Int into a Word, which is a no-op at the machine level, becomes
+costly when performed via `fromIntegral` or any similar function because an
+intermediate Integer has to be allocated in the heap to perform the conversion.
+
+A solution is to bless one particular `fromIntegral`-like function and to use
+rewrite rules to replace it with a more efficient function when both types are
+known. This is what was done in the past, see next section. We use another
+approach nowadays:
+
+Notice that the set of primitive operations to convert from and to Integer and
+Natural is pretty small:
+
+  - Natural <-> Word#/BigNat#
+  - Integer <-> Int#/Word#/Natural/BigNat# (+ Int64#/Word64# on 32-bit arch)
+
+For example, we have the following primitives:
+  - integerToWord#   :: Integer -> Word#
+  - integerFromWord# :: Word# -> Integer
+  - integerToInt#    :: Integer -> Int#
+  - ...
+
+Compared to optimising `fromIntegral :: (Integral a, Num b) => a -> b` where `a`
+and `b` are arbitrary, we only have to write rewrite rules for the concrete
+types that can be converted from and to Natural/Integer. All the other ones
+necessarily pass through these concrete types!
+
+For example we have the following rules:
+    integerToWord# (integerFromWord# x) ===> x
+    integerToInt# (integerFromWord# x)  ===> word2Int# x
+
+But we don't need rules to handle conversion from/to e.g. Word32# because there
+is no Word32#-to-Integer primitive: Word32# must be converted into something
+else first (e.g. Word#) for which we have rules.
+
+We rely on inlining of fromInteger/toInteger and on other transformations (e.g.
+float-in) to make these rules likely to fire. It seems to work well in practice.
+
+Example 1: converting an Int into a Word
+
+  fromIntegral @Int @Word x
+
+  ===> {inline fromIntegral}
+  fromInteger @Word (toInteger @Int x)
+
+  ===> {inline fromInteger and toInteger}
+  W# (integerToWord# (case x of { I# x# -> IS x# }))
+
+  ===> {float-in}
+  case x of { I# x# -> W# (integerToWord# (IS x#)) }
+
+  ===> {rewrite rule for "integerToWord# . IS"}
+  case x of { I# x# -> W# (int2Word# x#) }
+
+
+Example 2: converting an Int8 into a Word32
+
+  fromIntegral @Int8 @Word32 x
+
+  ===> {inline fromIntegral}
+  fromInteger @Word32 (toInteger @Int8 x)
+
+  ===> {inline fromInteger and toInteger}
+  W32# (wordToWord32# (integerToWord# (case x of { I8# x# -> IS (int8ToInt# x#) })))
+
+  ===> {float-in}
+  case x of { I8# x# -> W32# (wordToWord32# (integerToWord# (IS (int8ToInt# x#)))) }
+
+  ===> {rewrite rule for "integerToWord# . IS"}
+  case x of { I8# x# -> W32# (wordToWord32# (int2Word# (int8ToInt# x#))) }
+
+  Notice that in the resulting expression the value passes through types Int#
+  and Word# with native machine word size: it is first sign-extended from Int8#
+  to Int#, then cast into Word#, and finally truncated into Word32#. These are
+  all very cheap operations that are performed in registers without allocating
+  anything in the heap.
+
+
+
+Historical fromIntegral optimisations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+In the past, `fromIntegral` function in the Prelude was special because many
+rewrite rules were mentioning it explicitly. For example to replace a call to
+`fromIntegral :: Int -> Word`, which allocates an intermediate Integer, with a
+call to `intToWord`, which is a no-op when compiled into machine code. Nowadays
+`fromIntegral` isn't a special function anymore and we just INLINE it (see above).
+
+- first `fromIntegral` was specialized (SPECIALIZE pragma). However it would
+need N^2 pragmas to cover every case and it wouldn't cover user defined numeric
+types which don't belong to base.
+
+- `-fwarn-identities` enables a warning to detect useless conversions via
+fromIntegral (since 0656c72a8f):
+
+  > fromIntegral (1 :: Int) :: Int
+
+  <interactive>:3:21: warning: [-Widentities]
+      Call of fromIntegral :: Int -> Int
+        can probably be omitted
+
+
+- many rules were added (e.g. in e0c787c10f) to perform float-in transformations
+explicitly (to allow more fromIntegral rules to fire) and to replace some
+fromIntegral calls with faster operations:
+
+    "fromIntegral/Int8->Int8" fromIntegral = id :: Int8 -> Int8
+    "fromIntegral/a->Int8"    fromIntegral = \x -> case fromIntegral x of I# x# -> I8# (intToInt8# x#)
+    "fromIntegral/Int8->a"    fromIntegral = \(I8# x#) -> fromIntegral (I# x#)
+
+It worked but there were still some issues with this approach:
+
+1. These rules only work for `fromIntegral`. If we wanted to define our own
+   similar function (e.g. using other type-classes), we would also have to redefine
+   all the rules to get similar performance.
+
+2. `fromIntegral` had to be marked `NOINLINE [1]`:
+    - NOINLINE to allow rules to match
+    - [1] to allow inlining in later phases to avoid incurring a function call
+      overhead for such a trivial operation
+
+   Users of the function had to be careful because a simple helper without an
+   INLINE pragma like:
+
+      toInt :: Integral a => a -> Int
+      toInt = fromIntegral
+
+   had the following unfolding:
+
+      toInt = integerToInt . toInteger
+
+   which doesn't mention `fromIntegral` anymore. Hence `fromIntegral` rules
+   wouldn't fire for codes using `toInt` while they would if they had used
+   `fromIntegral` directly!
+   For this reason, a bunch of rules for bignum primitives as we have now were
+   already present to handle these cases.
+
+3. These rewrite rules were tedious to write and error-prone (cf #19345).
+
+For these reasons, it is simpler to not consider fromIntegral special at all and
+to only rely on rewrite rules for bignum functions.
+
+-}
+
+-- See Note [Optimising conversions between numeric types]
+{-# RULES
+"Word# -> Natural -> Integer"
+  forall x. integerFromNatural (NS x) = integerFromWord# x
+
+"BigNat# -> Natural -> Integer"
+  forall x. integerFromNatural (NB x) = IP x
+
+"Int# -> Integer -> Int#"
+  forall x. integerToInt# (IS x) = x
+
+"Word# -> Integer -> Word#"
+  forall x. integerToWord# (integerFromWord# x) = x
+
+"Natural -> Integer -> Natural (wrap)"
+  forall x. integerToNatural (integerFromNatural x) = x
+
+"Natural -> Integer -> Natural (throw)"
+  forall x. integerToNaturalThrow (integerFromNatural x) = x
+
+"Natural -> Integer -> Natural (clamp)"
+  forall x. integerToNaturalClamp (integerFromNatural x) = x
+
+"Int# -> Integer -> Word#"
+  forall x. integerToWord# (IS x) = int2Word# x
+
+"Word# -> Integer -> Int#"
+  forall x. integerToInt# (integerFromWord# x) = word2Int# x
+
+"Word# -> Integer -> Natural (wrap)"
+  forall x. integerToNatural (integerFromWord# x) = NS x
+
+"Word# -> Integer -> Natural (throw)"
+  forall x. integerToNaturalThrow (integerFromWord# x) = NS x
+
+"Word# -> Integer -> Natural (clamp)"
+  forall x. integerToNaturalClamp (integerFromWord# x) = NS x
+
+#-}
+
+#if WORD_SIZE_IN_BITS == 32
+{-# RULES
+
+"Int64# -> Integer -> Int64#"
+  forall x. integerToInt64# (integerFromInt64# x) = x
+
+"Word64# -> Integer -> Word64#"
+  forall x. integerToWord64# (integerFromWord64# x) = x
+
+"Int64# -> Integer -> Word64#"
+  forall x. integerToWord64# (integerFromInt64# x) = int64ToWord64# x
+
+"Word64# -> Integer -> Int64#"
+  forall x. integerToInt64# (integerFromWord64# x) = word64ToInt64# x
+
+"Word# -> Integer -> Word64#"
+  forall x. integerToWord64# (integerFromWord# x) = wordToWord64# x
+
+"Word64# -> Integer -> Word#"
+  forall x. integerToWord# (integerFromWord64# x) = word64ToWord# x
+
+"Int# -> Integer -> Int64#"
+  forall x. integerToInt64# (IS x) = intToInt64# x
+
+"Int64# -> Integer -> Int#"
+  forall x. integerToInt# (integerFromInt64# x) = int64ToInt# x
+
+"Int# -> Integer -> Word64#"
+  forall x. integerToWord64# (IS x) = int64ToWord64# (intToInt64# x)
+
+"Int64# -> Integer -> Word#"
+  forall x. integerToWord# (integerFromInt64# x) = int2Word# (int64ToInt# x)
+
+"Word# -> Integer -> Int64#"
+  forall x. integerToInt64# (integerFromWord# x) = word64ToInt64# (wordToWord64# x)
+
+"Word64# -> Integer -> Int#"
+  forall x. integerToInt# (integerFromWord64# x) = word2Int# (word64ToWord# x)
+
+#-}
+#endif

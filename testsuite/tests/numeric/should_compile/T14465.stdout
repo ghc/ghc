@@ -1,14 +1,14 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 34, types: 14, coercions: 0, joins: 0/0}
+  = {terms: 35, types: 14, coercions: 0, joins: 0/0}
 
--- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 ten :: Natural
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 100 0}]
-ten = 10
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+ten = GHC.Num.Natural.NS 10##
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 M.$trModule4 :: GHC.Prim.Addr#

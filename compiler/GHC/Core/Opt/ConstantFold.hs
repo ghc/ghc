@@ -1413,9 +1413,6 @@ getPlatform = roPlatform <$> getRuleOpts
 getRuleOpts :: RuleM RuleOpts
 getRuleOpts = RuleM $ \rule_opts _ _ _ -> Just rule_opts
 
-getEnv :: RuleM InScopeEnv
-getEnv = RuleM $ \_ env _ _ -> Just env
-
 liftMaybe :: Maybe a -> RuleM a
 liftMaybe Nothing = mzero
 liftMaybe (Just x) = return x
@@ -1447,20 +1444,6 @@ getInScopeEnv = RuleM $ \_ iu _ _ -> Just iu
 
 getFunction :: RuleM Id
 getFunction = RuleM $ \_ _ fn _ -> Just fn
-
-exprIsVarApp_maybe :: InScopeEnv -> CoreExpr -> Maybe (Id,CoreArg)
-exprIsVarApp_maybe env@(_, id_unf) e = case e of
-  App (Var f) a -> Just (f, a)
-  Var v
-    | Just rhs <- expandUnfolding_maybe (id_unf v)
-    -> exprIsVarApp_maybe env rhs
-  _ -> Nothing
-
--- | Looks into the expression or its unfolding to find "App (Var f) x"
-isVarApp :: InScopeEnv -> CoreExpr -> RuleM (Id,CoreArg)
-isVarApp env e = case exprIsVarApp_maybe env e of
-  Nothing -> mzero
-  Just r  -> pure r
 
 isLiteral :: CoreExpr -> RuleM Literal
 isLiteral e = do
@@ -1970,7 +1953,6 @@ builtinBignumRules =
   , integer_to_natural "Integer -> Natural (wrap)"  integerToNaturalName      False False
   , integer_to_natural "Integer -> Natural (throw)" integerToNaturalThrowName True False
 
-  , lit_to_natural  "Word# -> Natural"         naturalNSName
   , natural_to_word "Natural -> Word# (wrap)"  naturalToWordName      False
   , natural_to_word "Natural -> Word# (clamp)" naturalToWordClampName True
 
@@ -2050,83 +2032,6 @@ builtinBignumRules =
   -- See Note [Optimising conversions between numeric types]
   --
 
-  , small_passthrough_id "Word# -> Natural -> Word#"
-      naturalNSName naturalToWordName
-  , small_passthrough_id "Word# -> Natural -> Word# (clamp)"
-      naturalNSName naturalToWordClampName
-
-  , small_passthrough_id "Int# -> Integer -> Int#"
-      integerISName integerToIntName
-  , small_passthrough_id "Word# -> Integer -> Word#"
-      integerFromWordName integerToWordName
-  , small_passthrough_id "Int64# -> Integer -> Int64#"
-      integerFromInt64Name integerToInt64Name
-  , small_passthrough_id "Word64# -> Integer -> Word64#"
-      integerFromWord64Name integerToWord64Name
-  , small_passthrough_id "Natural -> Integer -> Natural (wrap)"
-      integerFromNaturalName integerToNaturalName
-  , small_passthrough_id "Natural -> Integer -> Natural (throw)"
-      integerFromNaturalName integerToNaturalThrowName
-  , small_passthrough_id "Natural -> Integer -> Natural (clamp)"
-      integerFromNaturalName integerToNaturalClampName
-
-  , small_passthrough_app "Int# -> Integer -> Word#"
-        integerISName integerToWordName   (mkPrimOpId IntToWordOp)
-  , small_passthrough_app "Int# -> Integer -> Float#"
-        integerISName integerToFloatName  (mkPrimOpId IntToFloatOp)
-  , small_passthrough_app "Int# -> Integer -> Double#"
-        integerISName integerToDoubleName (mkPrimOpId IntToDoubleOp)
-
-  , small_passthrough_app "Word# -> Integer -> Int#"
-        integerFromWordName integerToIntName (mkPrimOpId WordToIntOp)
-  , small_passthrough_app "Word# -> Integer -> Float#"
-        integerFromWordName integerToFloatName (mkPrimOpId WordToFloatOp)
-  , small_passthrough_app "Word# -> Integer -> Double#"
-        integerFromWordName integerToDoubleName (mkPrimOpId WordToDoubleOp)
-  , small_passthrough_app "Word# -> Integer -> Natural (wrap)"
-        integerFromWordName integerToNaturalName naturalNSId
-  , small_passthrough_app "Word# -> Integer -> Natural (throw)"
-        integerFromWordName integerToNaturalThrowName naturalNSId
-  , small_passthrough_app "Word# -> Integer -> Natural (clamp)"
-        integerFromWordName integerToNaturalClampName naturalNSId
-
-  , small_passthrough_app "Word# -> Natural -> Float#"
-        naturalNSName naturalToFloatName  (mkPrimOpId WordToFloatOp)
-  , small_passthrough_app "Word# -> Natural -> Double#"
-        naturalNSName naturalToDoubleName (mkPrimOpId WordToDoubleOp)
-
-  , small_passthrough_id "Int64# -> Integer -> Int64#"
-      integerFromInt64Name integerToInt64Name
-  , small_passthrough_id "Word64# -> Integer -> Word64#"
-      integerFromWord64Name integerToWord64Name
-
-  , small_passthrough_app "Int64# -> Integer -> Word64#"
-        integerFromInt64Name integerToWord64Name   (mkPrimOpId Int64ToWord64Op)
-  , small_passthrough_app "Word64# -> Integer -> Int64#"
-        integerFromWord64Name integerToInt64Name   (mkPrimOpId Word64ToInt64Op)
-
-  , small_passthrough_app "Word# -> Integer -> Word64#"
-        integerFromWordName integerToWord64Name (mkPrimOpId WordToWord64Op)
-  , small_passthrough_app "Word64# -> Integer -> Word#"
-        integerFromWord64Name integerToWordName (mkPrimOpId Word64ToWordOp)
-  , small_passthrough_app "Int# -> Integer -> Int64#"
-        integerISName integerToInt64Name (mkPrimOpId IntToInt64Op)
-  , small_passthrough_app "Int64# -> Integer -> Int#"
-        integerFromInt64Name integerToIntName (mkPrimOpId Int64ToIntOp)
-
-  , small_passthrough_custom "Int# -> Integer -> Word64#"
-        integerISName integerToWord64Name
-          (\x -> Var (mkPrimOpId Int64ToWord64Op) `App` (Var (mkPrimOpId IntToInt64Op) `App` x))
-  , small_passthrough_custom "Word64# -> Integer -> Int#"
-        integerFromWord64Name integerToIntName
-          (\x -> Var (mkPrimOpId WordToIntOp) `App` (Var (mkPrimOpId Word64ToWordOp) `App` x))
-  , small_passthrough_custom "Word# -> Integer -> Int64#"
-        integerFromWordName integerToInt64Name
-          (\x -> Var (mkPrimOpId Word64ToInt64Op) `App` (Var (mkPrimOpId WordToWord64Op) `App` x))
-  , small_passthrough_custom "Int64# -> Integer -> Word#"
-        integerFromInt64Name integerToWordName
-          (\x -> Var (mkPrimOpId IntToWordOp) `App` (Var (mkPrimOpId Int64ToIntOp) `App` x))
-
     -- Bits.bit
   , bignum_bit "integerBit" integerBitName mkLitInteger
   , bignum_bit "naturalBit" naturalBitName mkLitNatural
@@ -2162,27 +2067,6 @@ builtinBignumRules =
   , integer_encode_float "integerEncodeDouble" integerEncodeDoubleName mkDoubleLitDouble
   ]
   where
-    -- The rule is matching against an occurrence of a data constructor in a
-    -- Core expression. It must match either its worker name or its wrapper
-    -- name, /not/ the DataCon name itself, which is different.
-    -- See Note [Data Constructor Naming] in GHC.Core.DataCon and #19892
-    --
-    -- But data constructor wrappers deliberately inline late; See Note
-    -- [Activation for data constructor wrappers] in GHC.Types.Id.Make.
-    -- Suppose there is a wrapper and the rule matches on the worker: the
-    -- wrapper won't be inlined until rules have finished firing and the rule
-    -- will never fire.
-    --
-    -- Hence the rule must match on the wrapper, if there is one, otherwise on
-    -- the worker. That is exactly the dataConWrapId for the data constructor.
-    -- The data constructor may or may not have a wrapper, but if not
-    -- dataConWrapId will return the worker
-    --
-    integerISId   = dataConWrapId integerISDataCon
-    naturalNSId   = dataConWrapId naturalNSDataCon
-    integerISName = idName integerISId
-    naturalNSName = idName naturalNSId
-
     mkRule str name nargs f = BuiltinRule
       { ru_name = fsLit str
       , ru_fn = name
@@ -2221,13 +2105,6 @@ builtinBignumRules =
         -- convert any numeric literal into an Integer literal
         LitNumber _ i -> pure (Lit (mkLitInteger i))
         _             -> mzero
-
-    lit_to_natural str name = mkRule str name 1 $ do
-      [a0] <- getArgs
-      isLiteral a0 >>= \case
-        -- convert any *positive* numeric literal into a Natural literal
-        LitNumber _ i | i >= 0 -> pure (Lit (mkLitNatural i))
-        _                      -> mzero
 
     integer_binop str name op = mkRule str name 2 $ do
       [a0,a1] <- getArgs
@@ -2289,19 +2166,6 @@ builtinBignumRules =
       [a0] <- getArgs
       x <- isNumberLiteral a0
       pure $ Lit (mk_lit platform (fromIntegral (popCount x)))
-
-    small_passthrough_id str from_x to_x =
-      small_passthrough_custom str from_x to_x id
-
-    small_passthrough_app str from_x to_y x_to_y =
-      small_passthrough_custom str from_x to_y (App (Var x_to_y))
-
-    small_passthrough_custom str from_x to_y x_to_y = mkRule str to_y 1 $ do
-      [a0] <- getArgs
-      env <- getEnv
-      (f,x) <- isVarApp env a0
-      guard (idName f == from_x)
-      pure $ x_to_y x
 
     bignum_bit str name mk_lit = mkRule str name 1 $ do
       [a0] <- getArgs
@@ -3267,126 +3131,4 @@ Hence caseRules returns (AltCon -> Maybe AltCon), with Nothing indicating
 an alternative that is unreachable.
 
 You may wonder how this can happen: check out #15436.
-
-
-Note [Optimising conversions between numeric types]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Converting between numeric types is very common in Haskell codes.  Suppose that
-we have N inter-convertible numeric types (Word, Word8, Int, Integer, etc.).
-
-- We don't want to have to use one conversion function per pair of types as that
-would require N^2 functions: wordToWord8, wordToInt, wordToInteger...
-
-- The following kind of class would allow us to have a single conversion
-function at the price of N^2 instances and of the use of MultiParamTypeClasses
-extension.
-
-    class Convert a b where
-      convert :: a -> b
-
-What we do instead is that we use the Integer type (signed, unbounded) as a
-passthrough type to perform every conversion. Hence we only need to define two
-functions per numeric type:
-
-  class Integral a where
-    toInteger :: a -> Integer
-
-  class Num a where
-    fromInteger :: Integer -> a
-
-These classes have a single parameter and can be derived automatically (e.g. for
-newtypes). So we don't even have to define 2*N instances.
-
-fromIntegral
-------------
-
-We can now define a generic conversion function:
-
-  -- in the Prelude
-  fromIntegral :: (Integral a, Num b) => a -> b
-  fromIntegral = fromInteger . toInteger
-
-The trouble with this approach is that performance might be terrible. E.g.
-converting an Int into a Word, which is a no-op at the machine level, becomes
-costly when performed via `fromIntegral` because an Integer has to be allocated.
-
-To alleviate this:
-
-- first `fromIntegral` was specialized (SPECIALIZE pragma). However it would
-need N^2 pragmas to cover every case and it wouldn't cover user defined numeric
-types which don't belong to base.
-
-- while writing this note I discovered that we have a `-fwarn-identities` warning
-to detect useless conversions (since 0656c72a8f):
-
-  > fromIntegral (1 :: Int) :: Int
-
-  <interactive>:3:21: warning: [-Widentities]
-      Call of fromIntegral :: Int -> Int
-        can probably be omitted
-
-- but more importantly, many rules were added (e.g. in e0c787c10f):
-
-    "fromIntegral/Int8->Int8" fromIntegral = id :: Int8 -> Int8
-    "fromIntegral/a->Int8"    fromIntegral = \x -> case fromIntegral x of I# x# -> I8# (intToInt8# x#)
-    "fromIntegral/Int8->a"    fromIntegral = \(I8# x#) -> fromIntegral (I# x#)
-
-  The idea was to ensure that only cheap conversions ended up being used. E.g.:
-
-      foo :: Int8 --> {- Integer -> -} -> Word8
-      foo = fromIntegral
-
-    ====> {Some fromIntegral rule for Int8}
-
-      foo :: Int8 -> {- Int -> Integer -} -> Word8
-      foo = fromIntegral . int8ToInt
-
-    ====> {Some fromIntegral rule for Word8}
-
-      foo :: Int8 -> {- Int -> Integer -> Word -} -> Word8
-      foo = wordToWord8 . fromIntegral . int8ToInt
-
-    ====> {Some fromIntegral rule for Int/Word}
-
-      foo :: Int8 -> {- Int -> Word -} -> Word8
-      foo = wordToWord8 . intToWord . int8ToInt
-      -- not passing through Integer anymore!
-
-
-It worked but there were still some issues with this approach:
-
-1. These rules only work for `fromIntegral`. If we wanted to define our own
-   similar function (e.g. using other type-classes), we would also have to redefine
-   all the rules to get similar performance.
-
-2. `fromIntegral` had to be marked `NOINLINE [1]`:
-    - NOINLINE to allow rules to match
-    - [1] to allow inlining in later phases to avoid incurring a function call
-      overhead for such a trivial operation
-
-   Users of the function had to be careful because a simple helper without an
-   INLINE pragma like:
-
-      toInt :: Integral a => a -> Int
-      toInt = fromIntegral
-
-   has the following unfolding:
-
-      toInt = integerToInt . toInteger
-
-   which doesn't mention `fromIntegral` anymore. Hence `fromIntegral` rules
-   wouldn't be triggered for any user of `toInt`. For this reason, we also have
-   a bunch of rules for bignum primitives such as `integerToInt`.
-
-3. These rewrite rules are tedious to write and error-prone (cf #19345).
-
-
-For these reasons, it is simpler to only rely on built-in rewrite rules for
-bignum primitives. There aren't so many conversion primitives:
-  - Natural <-> Word
-  - Integer <-> Int/Word/Natural (+ Int64/Word64 on 32-bit arch)
-
-All the built-in "small_passthrough_*" rules are used to avoid passing through
-Integer/Natural. We now always inline `fromIntegral`.
-
 -}

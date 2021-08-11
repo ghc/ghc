@@ -72,6 +72,7 @@ naturalIsPowerOf2# (NB w) = bigNatIsPowerOf2# w
 
 -- | Create a Natural from a BigNat# (respect the invariants)
 naturalFromBigNat# :: BigNat# -> Natural
+{-# NOINLINE naturalFromBigNat# #-}
 naturalFromBigNat# x = case bigNatSize# x of
    0# -> naturalZero
    1# -> NS (bigNatIndex# x 0#)
@@ -79,6 +80,7 @@ naturalFromBigNat# x = case bigNatSize# x of
 
 -- | Convert a Natural into a BigNat#
 naturalToBigNat# :: Natural -> BigNat#
+{-# NOINLINE naturalToBigNat# #-}
 naturalToBigNat# (NS w)  = bigNatFromWord# w
 naturalToBigNat# (NB bn) = bn
 
@@ -112,7 +114,7 @@ naturalToWord !n = W# (naturalToWord# n)
 
 -- | Convert a Natural into a Word# clamping to (maxBound :: Word#).
 naturalToWordClamp# :: Natural -> Word#
-{-# NOINLINE naturalToWordClamp #-}
+{-# NOINLINE naturalToWordClamp# #-}
 naturalToWordClamp# (NS x) = x
 naturalToWordClamp# (NB _) = WORD_MAXBOUND##
 
@@ -585,3 +587,18 @@ naturalFromByteArray# :: Word# -> ByteArray# -> Word# -> Bool# -> State# s -> (#
 {-# NOINLINE naturalFromByteArray# #-}
 naturalFromByteArray# sz ba off e s = case bigNatFromByteArray# sz ba off e s of
    (# s', a #) -> (# s', naturalFromBigNat# a #)
+
+
+
+-- See Note [Optimising conversions between numeric types]
+-- in GHC.Num.Integer
+{-# RULES
+"Word# -> Natural -> Word#"
+  forall x. naturalToWord# (NS x) = x
+
+"Word# -> Natural -> Word# (clamp)"
+  forall x. naturalToWordClamp# (NS x) = x
+
+"BigNat# -> Natural -> BigNat#"
+  forall x. naturalToBigNat# (naturalFromBigNat# x) = x
+#-}

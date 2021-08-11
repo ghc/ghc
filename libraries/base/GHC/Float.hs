@@ -1587,3 +1587,29 @@ foreign import prim "stg_doubleToWord64zh"
 #else
     stgDoubleToWord64 :: Double# -> Word64#
 #endif
+
+
+
+-- See Note [Optimising conversions between numeric types]
+-- in GHC.Num.Integer
+{-# RULES
+
+"Int# -> Integer -> Float#"
+  forall x. integerToFloat# (IS x) = int2Float# x
+
+"Int# -> Integer -> Double#"
+  forall x. integerToDouble# (IS x) = int2Double# x
+
+"Word# -> Integer -> Float#"
+  forall x. integerToFloat# (integerFromWord# x) = word2Float# x
+
+"Word# -> Integer -> Double#"
+  forall x. integerToDouble# (integerFromWord# x) = word2Double# x
+
+"Word# -> Natural -> Float#"
+  forall x. naturalToFloat# (NS x) = word2Float# x
+
+"Word# -> Natural -> Double#"
+  forall x. naturalToDouble# (NS x) = word2Double# x
+
+#-}
