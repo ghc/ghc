@@ -100,6 +100,7 @@ import Data.Data
 import qualified Data.Semigroup as Semi
 import Data.Functor.Classes (Eq1 (..))
 import Data.Bits
+import Data.Coerce
 
 -- for UNIQUE_TAG_BITS. @mix@ will silently fail if this isn't included and
 -- you'll get panics.
