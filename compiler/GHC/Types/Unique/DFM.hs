@@ -80,7 +80,6 @@ import Data.Data
 import Data.Functor.Classes (Eq1 (..))
 import Data.List (sortBy)
 import Data.Function (on)
-import qualified Data.Semigroup as Semi
 import GHC.Types.Unique.FM (UniqFM, getMixedKey, getUnmixedUnique, nonDetUFMToList, ufmToIntMap, unsafeIntMapToUFM)
 import Unsafe.Coerce
 import qualified GHC.Data.Word64Set as W
