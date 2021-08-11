@@ -67,6 +67,9 @@ module TysWiredIn (
         nothingDataCon, nothingDataConName, promotedNothingDataCon,
         justDataCon, justDataConName, promotedJustDataCon,
 
+        -- * JSVal
+        jsvalTyCon, jsvalDataCon, jsvalTy, jsvalTyConName,
+
         -- * Tuples
         mkTupleTy, mkTupleTy1, mkBoxedTupleTy, mkTupleStr,
         tupleTyCon, tupleDataCon, tupleTyConName, tupleDataConName,
@@ -229,6 +232,7 @@ wiredInTyCons = [ -- Units are not treated like other tuples, because they
                 , listTyCon
                 , orderingTyCon
                 , maybeTyCon
+                , jsvalTyCon
                 , heqTyCon
                 , eqTyCon
                 , coercibleTyCon
@@ -303,6 +307,10 @@ nothingDataConName = mkWiredInDataConName UserSyntax gHC_MAYBE (fsLit "Nothing")
                                           nothingDataConKey nothingDataCon
 justDataConName    = mkWiredInDataConName UserSyntax gHC_MAYBE (fsLit "Just")
                                           justDataConKey justDataCon
+
+jsvalTyConName, jsvalDataConName :: Name
+jsvalTyConName     = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "JSVal") jsvalTyConKey jsvalTyCon
+jsvalDataConName   = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "JSVal") jsvalDataConKey jsvalDataCon
 
 wordTyConName, wordDataConName, word8TyConName, word8DataConName :: Name
 wordTyConName      = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Word")   wordTyConKey     wordTyCon
@@ -1428,6 +1436,18 @@ doubleTyCon = pcTyCon doubleTyConName
 
 doubleDataCon :: DataCon
 doubleDataCon = pcDataCon doubleDataConName [] [doublePrimTy] doubleTyCon
+
+jsvalTy :: Type
+jsvalTy = mkTyConTy jsvalTyCon
+
+jsvalTyCon :: TyCon
+jsvalTyCon = pcTyCon jsvalTyConName
+                     (Just (CType NoSourceText Nothing
+                            (NoSourceText,fsLit "HsJSVal"))) []
+                     [jsvalDataCon]
+
+jsvalDataCon :: DataCon
+jsvalDataCon = pcDataCon jsvalDataConName [] [byteArrayPrimTy] jsvalTyCon
 
 {-
 ************************************************************************
