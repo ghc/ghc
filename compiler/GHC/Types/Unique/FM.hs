@@ -21,6 +21,7 @@ of arguments of combining function.
 -}
 
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -87,7 +88,7 @@ module GHC.Types.Unique.FM (
         pprUniqFM, pprUFM, pprUFMWithKeys, pluralUFM
     ) where
 
-import GHC.Prelude
+import GHC.Prelude hiding ( shiftR )
 
 import GHC.Types.Unique ( Uniquable(..), Unique, getKey, mkUniqueGrimily )
 import GHC.Utils.Outputable
