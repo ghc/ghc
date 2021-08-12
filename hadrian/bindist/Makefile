@@ -30,19 +30,25 @@ define installscript
 # to it. This implementation is a bit hacky and depends on consistency
 # of program names. For hadrian build this will work as programs have a
 # consistent naming procedure.
-	rm -f '$2'
-	$(CREATE_SCRIPT) '$2'
-	@echo "#!$(SHELL)" >>  '$2'
-	@echo "exedir=\"$4\"" >> '$2'
-	@echo "exeprog=\"$1\"" >> '$2'
-	@echo "executablename=\"$5\"" >> '$2'
-	@echo "bindir=\"$3\"" >> '$2'
-	@echo "libdir=\"$6\"" >> '$2'
-	@echo "docdir=\"$7\"" >> '$2'
-	@echo "includedir=\"$8\"" >> '$2'
-	@echo "" >> '$2'
-	cat wrappers/$1 >> '$2'
-	$(EXECUTABLE_FILE) '$2' ;
+	if [ -L wrappers/$1 ]; then echo "$1 is a symlink"; fi
+	@if [ -L wrappers/$1 ]; then \
+		cp -P wrappers/$1 $2; \
+	else								 \
+		rm -f '$2' && 		 \
+		$(CREATE_SCRIPT) '$2' && \
+		echo "#!$(SHELL)" >>  '$2'  && \
+		echo "exedir=\"$4\"" >> '$2'  && \
+		echo "exeprog=\"$1\"" >> '$2'  && \
+		echo "executablename=\"$5\"" >> '$2'  && \
+		echo "bindir=\"$3\"" >> '$2'  && \
+		echo "libdir=\"$6\"" >> '$2'  && \
+		echo "docdir=\"$7\"" >> '$2'  && \
+		echo "includedir=\"$8\"" >> '$2'  && \
+		echo "" >> '$2'  && \
+		cat wrappers/$1 >> '$2'  && \
+		$(EXECUTABLE_FILE) '$2' ; \
+	fi
+	@echo "$1 installed to $2"
 endef
 
 # Hacky function to patch up the 'haddock-interfaces' and 'haddock-html'
@@ -79,7 +85,7 @@ install_bin: install_bin_libdir install_wrappers
 endif
 
 install: install_bin install_lib install_includes
-install: install_docs install_ghci update_package_db
+install: install_docs update_package_db
 
 ActualBinsDir=${ghclibdir}/bin
 ifeq "$(TargetOS_CPP)" "mingw32"
@@ -102,13 +108,6 @@ install_bin_direct:
 	@echo "Copying binaries to $(WrapperBinsDir)"
 	$(INSTALL_DIR) "$(WrapperBinsDir)"
 	cp ./bin/* "$(WrapperBinsDir)/"
-
-install_ghci:
-	@echo "Copying and installing ghci"
-	$(CREATE_SCRIPT) '$(WrapperBinsDir)/ghci'
-	@echo "#!$(SHELL)" >>  '$(WrapperBinsDir)/ghci'
-	cat wrappers/ghci-script >> '$(WrapperBinsDir)/ghci'
-	$(EXECUTABLE_FILE) '$(WrapperBinsDir)/ghci'
 
 LIBRARIES = $(wildcard ./lib/*)
 install_lib:

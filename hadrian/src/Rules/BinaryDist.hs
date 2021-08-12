@@ -129,7 +129,7 @@ bindistRules = do
         (lib_targets, bin_targets) <- partitionEithers <$> mapM pkgTarget all_pkgs
         cross <- flag CrossCompiling
         iserv_targets <- if cross then pure [] else iservBins
-        need (lib_targets ++ (map fst (bin_targets ++ iserv_targets)))
+        need (lib_targets ++ (map (\(_, p, _) -> p) (bin_targets ++ iserv_targets)))
 
         version        <- setting ProjectVersion
         targetPlatform <- setting TargetPlatformFull
@@ -148,7 +148,7 @@ bindistRules = do
         createDirectory (bindistFilesDir -/- "bin")
         createDirectory (bindistFilesDir -/- "lib")
         -- Also create wrappers with version suffixes (#20074)
-        forM_ (bin_targets ++ iserv_targets) $ \(prog_path, ver) -> do
+        forM_ (bin_targets ++ iserv_targets) $ \(_pkg, prog_path, ver) -> do
             let orig_filename = takeFileName prog_path
                 (name, ext) = splitExtensions orig_filename
                 version_prog = name ++ "-" ++ ver ++ ext
@@ -208,8 +208,19 @@ bindistRules = do
           -- other machine.
           need $ map (bindistFilesDir -/-)
                     (["configure", "Makefile"] ++ bindistInstallFiles)
-          wrappers <- fmap concat (sequence [ pkgToWrappers p | p <- all_pkgs, isProgram p])
-          need $ map ((bindistFilesDir -/- "wrappers") -/-) wrappers
+          forM_ bin_targets $ \(pkg, _, ver) -> do
+            needed_wrappers <- pkgToWrappers pkg
+            forM_ needed_wrappers $ \wrapper_name -> do
+              wrapper_content <- wrapper wrapper_name
+              let unversioned_wrapper_path = bindistFilesDir -/- "wrappers" -/- wrapper_name
+                  versioned_wrapper = wrapper_name ++ "-" ++ ver
+                  versioned_wrapper_path = bindistFilesDir -/- "wrappers" -/- versioned_wrapper
+              -- Write the wrapper to the versioned path
+              writeFile' versioned_wrapper_path wrapper_content
+              -- Create a symlink from the non-versioned to the versioned.
+              liftIO $ do
+                IO.removeFile unversioned_wrapper_path <|> return ()
+                IO.createFileLink versioned_wrapper unversioned_wrapper_path
 
 
     let buildBinDist :: Compressor -> Action ()
@@ -253,9 +264,6 @@ bindistRules = do
         top <- topDirectory
         copyFile (top -/- "hadrian" -/- "bindist" -/- "Makefile") makefilePath
 
-    root -/- "bindist" -/- "ghc-*" -/- "wrappers/*" %> \wrapperPath -> do
-        content <- wrapper (takeFileName wrapperPath)
-        writeFile' wrapperPath content
 
     -- Copy various configure-related files needed for a working
     -- './configure [...] && make install' workflow
@@ -297,20 +305,20 @@ bindistInstallFiles =
 -- for all libraries and programs that are needed for a complete build.
 -- For libraries, it returns the path to the @.conf@ file in the package
 -- database. For programs, it returns the path to the compiled executable.
-pkgTarget :: Package -> Action (Either FilePath (FilePath, String))
+pkgTarget :: Package -> Action (Either FilePath (Package, FilePath, String))
 pkgTarget pkg
     | isLibrary pkg = Left <$> pkgConfFile (vanillaContext Stage1 pkg)
     | otherwise     = do
         path <- programPath =<< programContext Stage1 pkg
         version <- version <$> readPackageData pkg
-        return (Right (path, version))
+        return (Right (pkg, path, version))
 
 
 -- | Which wrappers point to a specific package
 pkgToWrappers :: Package -> Action [String]
 pkgToWrappers pkg
   -- ghc also has the ghci script wrapper
-  | pkg == ghc = pure ["ghc", "ghci-script"]
+  | pkg == ghc = pure ["ghc", "ghci"]
   -- These are the packages which we want to expose to the user and hence
   -- there are wrappers installed in the bindist.
   | pkg `elem` [hpcBin, haddock, hp2ps, hsc2hs, runGhc, ghc, ghcPkg]
@@ -321,7 +329,7 @@ pkgToWrappers pkg
 wrapper :: FilePath -> Action String
 wrapper "ghc"         = ghcWrapper
 wrapper "ghc-pkg"     = ghcPkgWrapper
-wrapper "ghci-script" = ghciScriptWrapper
+wrapper "ghci" = ghciScriptWrapper
 wrapper "haddock"     = haddockWrapper
 wrapper "hsc2hs"      = hsc2hsWrapper
 wrapper "runghc"      = runGhcWrapper
@@ -372,11 +380,11 @@ ghciScriptWrapper = pure $ unlines
 --   the package to be built, since here we're generating 3 different
 --   executables out of just one package, so we need to specify all 3 contexts
 --   explicitly and 'need' the result of building them.
-iservBins :: Action [(FilePath, String)]
+iservBins :: Action [(Package, FilePath, String)]
 iservBins = do
   rtsways <- interpretInContext (vanillaContext Stage1 ghc) getRtsWays
   ver <- version <$> readPackageData iserv
-  traverse (fmap (,ver) . programPath)
+  traverse (fmap (\p -> (iserv, p, ver)) . programPath)
       [ Context Stage1 iserv w
       | w <- [vanilla, profiling, dynamic]
       , w `elem` rtsways
