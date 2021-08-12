@@ -131,8 +131,7 @@ The goal of this pass is to prepare for code generation.
 9.  Replace (lazy e) by e.  See Note [lazyId magic] in GHC.Types.Id.Make
     Also replace (noinline e) by e.
 
-10. Convert bignum literals (LitNatural and LitInteger) into their
-    core representation.
+10. Convert bignum literals into their core representation.
 
 11. Uphold tick consistency while doing this: We move ticks out of
     (non-type) applications where we can, and make sure that we
@@ -2146,36 +2145,8 @@ mkConvertNumLiteral hsc_env = do
 
    let
       convertNumLit nt i = case nt of
-         LitNumInteger -> Just (convertInteger i)
-         LitNumNatural -> Just (convertNatural i)
+         LitNumBigNat  -> Just (convertBignatPrim i)
          _             -> Nothing
-
-      convertInteger i
-         | platformInIntRange platform i -- fit in a Int#
-         = mkConApp integerISDataCon [Lit (mkLitInt platform i)]
-
-         | otherwise -- build a BigNat and embed into IN or IP
-         = let con = if i > 0 then integerIPDataCon else integerINDataCon
-           in mkBigNum con (convertBignatPrim (abs i))
-
-      convertNatural i
-         | platformInWordRange platform i -- fit in a Word#
-         = mkConApp naturalNSDataCon [Lit (mkLitWord platform i)]
-
-         | otherwise --build a BigNat and embed into NB
-         = mkBigNum naturalNBDataCon (convertBignatPrim i)
-
-      -- we can't simply generate:
-      --
-      --    NB (bigNatFromWordList# [W# 10, W# 20])
-      --
-      -- using `mkConApp` because it isn't in ANF form. Instead we generate:
-      --
-      --    case bigNatFromWordList# [W# 10, W# 20] of ba { DEFAULT -> NB ba }
-      --
-      -- via `mkCoreApps`
-
-      mkBigNum con ba = mkCoreApps (Var (dataConWorkId con)) [ba]
 
       convertBignatPrim i =
          let

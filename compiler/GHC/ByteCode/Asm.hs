@@ -488,8 +488,7 @@ assembleI platform i = case i of
       LitNumWord32  -> int32 (fromIntegral i)
       LitNumInt64   -> int64 (fromIntegral i)
       LitNumWord64  -> int64 (fromIntegral i)
-      LitNumInteger -> panic "GHC.ByteCode.Asm.literal: LitNumInteger"
-      LitNumNatural -> panic "GHC.ByteCode.Asm.literal: LitNumNatural"
+      LitNumBigNat  -> panic "GHC.ByteCode.Asm.literal: LitNumBigNat"
 
     -- We can lower 'LitRubbish' to an arbitrary constant, but @NULL@ is most
     -- likely to elicit a crash (rather than corrupt memory) in case absence

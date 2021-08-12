@@ -386,10 +386,9 @@ coreToStgExpr
 -- on these components, but it in turn is not scrutinised as the basis for any
 -- decisions.  Hence no black holes.
 
--- No LitInteger's or LitNatural's should be left by the time this is called.
+-- No bignum literal should be left by the time this is called.
 -- CorePrep should have converted them all to a real core representation.
-coreToStgExpr (Lit (LitNumber LitNumInteger _)) = panic "coreToStgExpr: LitInteger"
-coreToStgExpr (Lit (LitNumber LitNumNatural _)) = panic "coreToStgExpr: LitNatural"
+coreToStgExpr (Lit (LitNumber LitNumBigNat _))  = panic "coreToStgExpr: LitNumBigNat"
 coreToStgExpr (Lit l)                           = return (StgLit l)
 coreToStgExpr (Var v) = coreToStgApp v [] []
 coreToStgExpr (Coercion _)

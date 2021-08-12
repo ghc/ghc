@@ -108,7 +108,7 @@ dsLit l = do
     HsDoublePrim _ fl -> return (Lit (LitDouble (rationalFromFractionalLit fl)))
     HsChar _ c       -> return (mkCharExpr c)
     HsString _ str   -> mkStringExprFS str
-    HsInteger _ i _  -> return (mkIntegerExpr i)
+    HsInteger _ i _  -> return (mkIntegerExpr platform i)
     HsInt _ i        -> return (mkIntExpr platform (il_value i))
     HsRat _ fl ty    -> dsFractionalLitToRational fl ty
 
@@ -199,15 +199,17 @@ dsFractionalLitToRational :: FractionalLit -> Type -> DsM CoreExpr
 dsFractionalLitToRational fl@FL{ fl_signi = signi, fl_exp = exp, fl_exp_base = base } ty
   -- We compute "small" rationals here and now
   | abs exp <= 100
-  = let !val   = rationalFromFractionalLit fl
-        !num   = mkIntegerExpr (numerator val)
-        !denom = mkIntegerExpr (denominator val)
+  = do
+    platform <- targetPlatform <$> getDynFlags
+    let !val   = rationalFromFractionalLit fl
+        !num   = mkIntegerExpr platform (numerator val)
+        !denom = mkIntegerExpr platform (denominator val)
         (ratio_data_con, integer_ty)
             = case tcSplitTyConApp ty of
                     (tycon, [i_ty]) -> assert (isIntegerTy i_ty && tycon `hasKey` ratioTyConKey)
                                        (head (tyConDataCons tycon), i_ty)
                     x -> pprPanic "dsLit" (ppr x)
-    in return $! (mkCoreConApps ratio_data_con [Type integer_ty, num, denom])
+    return $! (mkCoreConApps ratio_data_con [Type integer_ty, num, denom])
   -- Large rationals will be computed at runtime.
   | otherwise
   = do
@@ -216,14 +218,16 @@ dsFractionalLitToRational fl@FL{ fl_signi = signi, fl_exp = exp, fl_exp_base = b
                              Base10 -> mkRationalBase10Name
       mkRational <- dsLookupGlobalId mkRationalName
       litR <- dsRational signi
-      let litE = mkIntegerExpr exp
+      platform <- targetPlatform <$> getDynFlags
+      let litE = mkIntegerExpr platform exp
       return (mkCoreApps (Var mkRational) [litR, litE])
 
 dsRational :: Rational -> DsM CoreExpr
 dsRational (n :% d) = do
+  platform <- targetPlatform <$> getDynFlags
   dcn <- dsLookupDataCon ratioDataConName
-  let cn = mkIntegerExpr n
-  let dn = mkIntegerExpr d
+  let cn = mkIntegerExpr platform n
+  let dn = mkIntegerExpr platform d
   return $ mkCoreConApps dcn [Type integerTy, cn, dn]
 
 

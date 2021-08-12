@@ -31,7 +31,7 @@ module GHC.Types.Literal
         , mkLitWord64, mkLitWord64Wrap, mkLitWord64Unchecked
         , mkLitFloat, mkLitDouble
         , mkLitChar, mkLitString
-        , mkLitInteger, mkLitNatural
+        , mkLitBigNat
         , mkLitNumber, mkLitNumberWrap
 
         -- ** Operations on Literals
@@ -67,7 +67,6 @@ module GHC.Types.Literal
 import GHC.Prelude
 
 import GHC.Builtin.Types.Prim
-import {-# SOURCE #-} GHC.Builtin.Types
 import GHC.Core.Type
 import GHC.Utils.Outputable
 import GHC.Data.FastString
@@ -162,8 +161,7 @@ data Literal
 
 -- | Numeric literal type
 data LitNumType
-  = LitNumInteger -- ^ @Integer@ (see Note [BigNum literals])
-  | LitNumNatural -- ^ @Natural@ (see Note [BigNum literals])
+  = LitNumBigNat  -- ^ @Bignat@ (see Note [BigNum literals])
   | LitNumInt     -- ^ @Int#@ - according to target machine
   | LitNumInt8    -- ^ @Int8#@ - exactly 8 bits
   | LitNumInt16   -- ^ @Int16#@ - exactly 16 bits
@@ -179,8 +177,7 @@ data LitNumType
 -- | Indicate if a numeric literal type supports negative numbers
 litNumIsSigned :: LitNumType -> Bool
 litNumIsSigned nt = case nt of
-  LitNumInteger -> True
-  LitNumNatural -> False
+  LitNumBigNat  -> False
   LitNumInt     -> True
   LitNumInt8    -> True
   LitNumInt16   -> True
@@ -195,8 +192,7 @@ litNumIsSigned nt = case nt of
 -- | Number of bits
 litNumBitSize :: Platform -> LitNumType -> Maybe Word
 litNumBitSize platform nt = case nt of
-  LitNumInteger -> Nothing
-  LitNumNatural -> Nothing
+  LitNumBigNat  -> Nothing
   LitNumInt     -> Just (fromIntegral (platformWordSizeInBits platform))
   LitNumInt8    -> Just 8
   LitNumInt16   -> Just 16
@@ -217,16 +213,28 @@ instance Binary LitNumType where
 {-
 Note [BigNum literals]
 ~~~~~~~~~~~~~~~~~~~~~~
-GHC supports 2 kinds of arbitrary precision integers (a.k.a BigNum):
+GHC supports 2 kinds of arbitrary precision numbers (a.k.a BigNum):
 
-   * Natural: natural represented as a Word# or as a BigNat
+   * data Natural = NS Word# | NB BigNat#
 
-   * Integer: integer represented a an Int# or as a BigNat (Integer's
-   constructors indicate the sign)
+   * data Integer = IS Int# | IN BigNat# | IP BigNat#
 
-BigNum literal instances are removed from Core during the CorePrep phase. They
-are replaced with expression to build them at runtime from machine literals
-(Word#, Int#, etc.) or from a list of Word#s.
+In the past, we had Core constructors to represent Integer and Natural literals.
+These literals were then lowered into their real Core representation only in
+Core prep. The issue with this approach is that literals have two
+representations and we have to ensure that we handle them the same everywhere
+(in every optimisation, etc.).
+
+For example (0 :: Integer) was representable in Core with both:
+
+    Lit (LitNumber LitNumInteger 0)                          -- literal
+    App (Var integerISDataCon) (Lit (LitNumber LitNumInt 0)) -- real representation
+
+Nowadays we always use the real representation for Integer and Natural literals.
+However we still have two representations for BigNat# literals. BigNat# literals
+are still lowered in Core prep into a call to a constructor function (BigNat# is
+ByteArray# and we don't have ByteArray# literals yet so we have to build them at
+runtime).
 
 Note [String literals]
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -340,9 +348,8 @@ mkLitNumberWrap platform nt i = case nt of
   LitNumWord16  -> wrap @Word16
   LitNumWord32  -> wrap @Word32
   LitNumWord64  -> wrap @Word64
-  LitNumInteger -> LitNumber nt i
-  LitNumNatural
-    | i < 0     -> panic "mkLitNumberWrap: trying to create a negative Natural"
+  LitNumBigNat
+    | i < 0     -> panic "mkLitNumberWrap: trying to create a negative BigNat"
     | otherwise -> LitNumber nt i
   where
     wrap :: forall a. (Integral a, Num a) => Literal
@@ -389,8 +396,7 @@ litNumRange platform nt = case nt of
      LitNumWord16  -> bounded_range @Word16
      LitNumWord32  -> bounded_range @Word32
      LitNumWord64  -> bounded_range @Word64
-     LitNumNatural -> (Just 0, Nothing)
-     LitNumInteger -> (Nothing, Nothing)
+     LitNumBigNat  -> (Just 0, Nothing)
   where
     bounded_range :: forall a . (Integral a, Bounded a) => (Maybe Integer,Maybe Integer)
     bounded_range = case boundedRange @a of
@@ -572,19 +578,13 @@ mkLitString :: String -> Literal
 -- stored UTF-8 encoded
 mkLitString s = LitString (bytesFS $ mkFastString s)
 
-mkLitInteger :: Integer -> Literal
-mkLitInteger x = LitNumber LitNumInteger x
-
-mkLitNatural :: Integer -> Literal
-mkLitNatural x = assertPpr (inNaturalRange x) (integer x)
-                    (LitNumber LitNumNatural x)
+mkLitBigNat :: Integer -> Literal
+mkLitBigNat x = assertPpr (x >= 0) (integer x)
+                    (LitNumber LitNumBigNat x)
 
 isLitRubbish :: Literal -> Bool
 isLitRubbish (LitRubbish {}) = True
 isLitRubbish _               = False
-
-inNaturalRange :: Integer -> Bool
-inNaturalRange x = x >= 0
 
 inBoundedRange :: forall a. (Bounded a, Integral a) => Integer -> Bool
 inBoundedRange x  = x >= toInteger (minBound :: a) &&
@@ -606,8 +606,7 @@ isMinBound platform (LitNumber nt i)   = case nt of
    LitNumWord16  -> i == 0
    LitNumWord32  -> i == 0
    LitNumWord64  -> i == 0
-   LitNumNatural -> i == 0
-   LitNumInteger -> False
+   LitNumBigNat  -> i == 0
 isMinBound _        _                  = False
 
 isMaxBound :: Platform -> Literal -> Bool
@@ -623,8 +622,7 @@ isMaxBound platform (LitNumber nt i)   = case nt of
    LitNumWord16  -> i == toInteger (maxBound :: Word16)
    LitNumWord32  -> i == toInteger (maxBound :: Word32)
    LitNumWord64  -> i == toInteger (maxBound :: Word64)
-   LitNumNatural -> False
-   LitNumInteger -> False
+   LitNumBigNat  -> False
 isMaxBound _        _                  = False
 
 inCharRange :: Char -> Bool
@@ -645,7 +643,7 @@ isOneLit (LitDouble 1)   = True
 isOneLit _               = False
 
 -- | Returns the 'Integer' contained in the 'Literal', for when that makes
--- sense, i.e. for 'Char', 'Int', 'Word', 'LitInteger' and 'LitNatural'.
+-- sense, i.e. for 'Char' and numbers.
 litValue  :: Literal -> Integer
 litValue l = case isLitValue_maybe l of
    Just x  -> x
@@ -769,8 +767,7 @@ litIsTrivial :: Literal -> Bool
 --      c.f. GHC.Core.Utils.exprIsTrivial
 litIsTrivial (LitString _)    = False
 litIsTrivial (LitNumber nt _) = case nt of
-  LitNumInteger -> False
-  LitNumNatural -> False
+  LitNumBigNat  -> False
   LitNumInt     -> True
   LitNumInt8    -> True
   LitNumInt16   -> True
@@ -787,9 +784,8 @@ litIsTrivial _                  = True
 litIsDupable :: Platform -> Literal -> Bool
 --      c.f. GHC.Core.Utils.exprIsDupable
 litIsDupable platform x = case x of
-   (LitNumber nt i) -> case nt of
-      LitNumInteger -> platformInIntRange platform i
-      LitNumNatural -> platformInWordRange platform i
+   LitNumber nt i -> case nt of
+      LitNumBigNat  -> i <= platformMaxWord platform * 8 -- arbitrary, reasonable
       LitNumInt     -> True
       LitNumInt8    -> True
       LitNumInt16   -> True
@@ -800,8 +796,8 @@ litIsDupable platform x = case x of
       LitNumWord16  -> True
       LitNumWord32  -> True
       LitNumWord64  -> True
-   (LitString _) -> False
-   _             -> True
+   LitString _ -> False
+   _           -> True
 
 litFitsInChar :: Literal -> Bool
 litFitsInChar (LitNumber _ i) = i >= toInteger (ord minBound)
@@ -810,8 +806,7 @@ litFitsInChar _               = False
 
 litIsLifted :: Literal -> Bool
 litIsLifted (LitNumber nt _) = case nt of
-  LitNumInteger -> True
-  LitNumNatural -> True
+  LitNumBigNat  -> True
   LitNumInt     -> False
   LitNumInt8    -> False
   LitNumInt16   -> False
@@ -839,8 +834,7 @@ literalType (LitFloat _)      = floatPrimTy
 literalType (LitDouble _)     = doublePrimTy
 literalType (LitLabel _ _ _)  = addrPrimTy
 literalType (LitNumber lt _)  = case lt of
-   LitNumInteger -> integerTy
-   LitNumNatural -> naturalTy
+   LitNumBigNat  -> byteArrayPrimTy
    LitNumInt     -> intPrimTy
    LitNumInt8    -> int8PrimTy
    LitNumInt16   -> int16PrimTy
@@ -889,10 +883,9 @@ pprLiteral _       (LitString s)   = pprHsBytes s
 pprLiteral _       (LitNullAddr)   = text "__NULL"
 pprLiteral _       (LitFloat f)    = float (fromRat f) <> primFloatSuffix
 pprLiteral _       (LitDouble d)   = double (fromRat d) <> primDoubleSuffix
-pprLiteral add_par (LitNumber nt i)
+pprLiteral _       (LitNumber nt i)
    = case nt of
-       LitNumInteger -> pprIntegerVal add_par i
-       LitNumNatural -> pprIntegerVal add_par i
+       LitNumBigNat  -> integer i
        LitNumInt     -> pprPrimInt i
        LitNumInt8    -> pprPrimInt8 i
        LitNumInt16   -> pprPrimInt16 i
@@ -911,17 +904,12 @@ pprLiteral add_par (LitLabel l mb fod) =
 pprLiteral _       (LitRubbish rep)
   = text "RUBBISH" <> parens (ppr rep)
 
-pprIntegerVal :: (SDoc -> SDoc) -> Integer -> SDoc
--- See Note [Printing of literals in Core].
-pprIntegerVal add_par i | i < 0     = add_par (integer i)
-                        | otherwise = integer i
-
 {-
 Note [Printing of literals in Core]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The function `add_par` is used to wrap parenthesis around negative integers
-(`LitInteger`) and labels (`LitLabel`), if they occur in a context requiring
-an atomic thing (for example function application).
+The function `add_par` is used to wrap parenthesis around labels (`LitLabel`),
+if they occur in a context requiring an atomic thing (for example function
+application).
 
 Although not all Core literals would be valid Haskell, we are trying to stay
 as close as possible to Haskell syntax in the printing of Core, to make it
@@ -949,7 +937,7 @@ LitWord          1##
 LitWordN         1##N
 LitFloat        -1.0#
 LitDouble       -1.0##
-LitInteger      -1                 (-1)
+LitBigNat       1
 LitLabel        "__label" ...      ("__label" ...)
 LitRubbish      "RUBBISH[...]"
 

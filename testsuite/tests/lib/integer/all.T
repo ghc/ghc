@@ -5,12 +5,7 @@ test('plusMinusInteger', [omit_ways(['ghci'])], compile_and_run, [''])
 test('integerConstantFolding', normal, makefile_test, ['integerConstantFolding'])
 test('naturalConstantFolding', normal, makefile_test, ['naturalConstantFolding'])
 
-# we ignore_stderr because there are 2 overlapping rules that are reported in
-# debug mode:
-#   Rules.findBest: rule overlap (Rule 1 wins)
-#     Rule 1: "Integer -> Int# (wrap)"
-#     Rule 2: "Int# -> Integer -> Int#"
-test('fromToInteger', [ignore_stderr], makefile_test, ['fromToInteger'])
+test('fromToInteger', normal, makefile_test, ['fromToInteger'])
 
 test('IntegerConversionRules', [], makefile_test, ['IntegerConversionRules'])
 test('gcdInteger', normal, compile_and_run, [''])

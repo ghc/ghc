@@ -8,4 +8,4 @@ w8 = GHC.Word.W8# 0##8
 w16 = GHC.Word.W16# 0##16
 w32 = GHC.Word.W32# 0##32
 w64 = GHC.Word.W64# 0##
-z = 0
+z = GHC.Num.Integer.IS 0#

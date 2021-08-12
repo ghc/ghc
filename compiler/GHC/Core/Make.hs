@@ -304,12 +304,17 @@ mkWordExpr :: Platform -> Integer -> CoreExpr
 mkWordExpr platform w = mkCoreConApps wordDataCon [mkWordLit platform w]
 
 -- | Create a 'CoreExpr' which will evaluate to the given @Integer@
-mkIntegerExpr  :: Integer -> CoreExpr  -- Result :: Integer
-mkIntegerExpr i = Lit (mkLitInteger i)
+mkIntegerExpr  :: Platform -> Integer -> CoreExpr  -- Result :: Integer
+mkIntegerExpr platform i
+  | platformInIntRange platform i = mkCoreConApps integerISDataCon [mkIntLit platform i]
+  | i < 0                         = mkCoreConApps integerINDataCon [Lit (mkLitBigNat (negate i))]
+  | otherwise                     = mkCoreConApps integerIPDataCon [Lit (mkLitBigNat i)]
 
 -- | Create a 'CoreExpr' which will evaluate to the given @Natural@
-mkNaturalExpr  :: Integer -> CoreExpr
-mkNaturalExpr i = Lit (mkLitNatural i)
+mkNaturalExpr  :: Platform -> Integer -> CoreExpr
+mkNaturalExpr platform w
+  | platformInWordRange platform w = mkCoreConApps naturalNSDataCon [mkWordLit platform w]
+  | otherwise                      = mkCoreConApps naturalNBDataCon [Lit (mkLitBigNat w)]
 
 -- | Create a 'CoreExpr' which will evaluate to the given @Float@
 mkFloatExpr :: Float -> CoreExpr

@@ -4,8 +4,6 @@
 -}
 
 
-{-# LANGUAGE MultiWayIf #-}
-
 module GHC.Core.SimpleOpt (
         SimpleOpts (..), defaultSimpleOpts,
 
@@ -1284,36 +1282,15 @@ than the ordinary arity of the dfun: see Note [DFun unfoldings] in GHC.Core
 exprIsLiteral_maybe :: InScopeEnv -> CoreExpr -> Maybe Literal
 -- Same deal as exprIsConApp_maybe, but much simpler
 -- Nevertheless we do need to look through unfoldings for
--- Integer and string literals, which are vigorously hoisted to top level
+-- string literals, which are vigorously hoisted to top level
 -- and not subsequently inlined
 exprIsLiteral_maybe env@(_, id_unf) e
   = case e of
       Lit l     -> Just l
       Tick _ e' -> exprIsLiteral_maybe env e' -- dubious?
-      Var v
-         | Just rhs <- expandUnfolding_maybe (id_unf v)
-         , Just l   <- exprIsLiteral_maybe env rhs
-         -> Just l
-      Var v
-         | Just rhs <- expandUnfolding_maybe (id_unf v)
-         , Just b <- matchBignum env rhs
-         -> Just b
-      e
-         | Just b <- matchBignum env e
-         -> Just b
-
-         | otherwise
-         -> Nothing
-  where
-    matchBignum env e
-         | Just (_env,_fb,dc,_tys,[arg]) <- exprIsConApp_maybe env e
-         , Just (LitNumber _ i) <- exprIsLiteral_maybe env arg
-         = if
-            | dc == naturalNSDataCon -> Just (mkLitNatural i)
-            | dc == integerISDataCon -> Just (mkLitInteger i)
-            | otherwise              -> Nothing
-         | otherwise
-         = Nothing
+      Var v     -> expandUnfolding_maybe (id_unf v)
+                    >>= exprIsLiteral_maybe env
+      _         -> Nothing
 
 {-
 Note [exprIsLambda_maybe]

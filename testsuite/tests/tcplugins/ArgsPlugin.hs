@@ -22,13 +22,15 @@ import GHC.Core.Type
 import GHC.Plugins
   ( Plugin )
 import GHC.Tc.Plugin
-  ( TcPluginM )
+  ( TcPluginM, getTargetPlatform )
 import GHC.Tc.Types
   ( TcPluginSolveResult(..) )
 import GHC.Tc.Types.Constraint
   ( Ct(..) )
 import GHC.Tc.Types.Evidence
   ( EvBindsVar, EvTerm(EvExpr) )
+import GHC.Platform
+  ( Platform )
 
 -- common
 import Common
@@ -62,11 +64,12 @@ solver args defs _ev _gs _ds ws = do
     argsVal = case args of
       arg : _ -> read arg
       _       -> error "ArgsPlugin: expected at least one argument"
-  solved <- catMaybes <$> traverse ( solveCt defs argsVal ) ws
+  platform <- getTargetPlatform
+  solved <- catMaybes <$> traverse ( solveCt platform defs argsVal ) ws
   pure $ TcPluginOk solved []
 
-solveCt :: PluginDefs -> Integer -> Ct -> TcPluginM ( Maybe (EvTerm, Ct) )
-solveCt ( PluginDefs {..} ) i ct@( CDictCan { cc_class, cc_tyargs } )
+solveCt :: Platform -> PluginDefs -> Integer -> Ct -> TcPluginM ( Maybe (EvTerm, Ct) )
+solveCt platform ( PluginDefs {..} ) i ct@( CDictCan { cc_class, cc_tyargs } )
   | className cc_class == className myClass
   , [tyArg] <- cc_tyargs
   , tyArg `eqType` integerTy
@@ -74,6 +77,6 @@ solveCt ( PluginDefs {..} ) i ct@( CDictCan { cc_class, cc_tyargs } )
       evTerm :: EvTerm
       evTerm = EvExpr $
         mkCoreConApps ( classDataCon cc_class )
-         [ Type integerTy, mkIntegerExpr i ]
+         [ Type integerTy, mkIntegerExpr platform i ]
   = pure $ Just ( evTerm, ct )
-solveCt _ _ ct = pure Nothing
+solveCt _ _ _ ct = pure Nothing

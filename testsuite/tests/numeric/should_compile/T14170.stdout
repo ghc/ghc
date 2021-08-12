@@ -1,7 +1,7 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 16, types: 6, coercions: 0, joins: 0/0}
+  = {terms: 17, types: 6, coercions: 0, joins: 0/0}
 
 NatVal.$trModule4 :: GHC.Prim.Addr#
 [GblId,
@@ -37,8 +37,8 @@ NatVal.$trModule
 foo :: Integer
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 100 0}]
-foo = 0
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+foo = GHC.Num.Integer.IS 0#
 
 
 

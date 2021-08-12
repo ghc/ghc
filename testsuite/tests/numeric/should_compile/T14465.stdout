@@ -1,7 +1,7 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 35, types: 14, coercions: 0, joins: 0/0}
+  = {terms: 37, types: 14, coercions: 0, joins: 0/0}
 
 ten :: Natural
 [GblId,
@@ -42,8 +42,8 @@ M.$trModule = GHC.Types.Module M.$trModule3 M.$trModule1
 M.minusOne1 :: Natural
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 100 0}]
-M.minusOne1 = 1
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+M.minusOne1 = GHC.Num.Natural.NS 1##
 
 minusOne :: Natural
 [GblId,
@@ -58,8 +58,8 @@ minusOne
 twoTimesTwo :: Natural
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 100 0}]
-twoTimesTwo = 4
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+twoTimesTwo = GHC.Num.Natural.NS 4##
 
 plusOne :: Natural -> Natural
 [GblId,

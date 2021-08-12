@@ -1,6 +1,7 @@
 {-# LANGUAGE ApplicativeDo       #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE ViewPatterns        #-}
+{-# LANGUAGE MultiWayIf          #-}
 
 -- | Domain types used in "GHC.HsToCore.Pmc.Solver".
 -- The ultimate goal is to define 'Nabla', which models normalised refinement
@@ -49,6 +50,7 @@ import GHC.Core.DataCon
 import GHC.Core.ConLike
 import GHC.Utils.Outputable
 import GHC.Utils.Panic.Plain
+import GHC.Utils.Misc (lastMaybe)
 import GHC.Data.List.SetOps (unionLists)
 import GHC.Data.Maybe
 import GHC.Core.Type
@@ -620,17 +622,24 @@ coreExprAsPmLit e = case collectArgs e of
     | Just dc <- isDataConWorkId_maybe x
     , dc `elem` [intDataCon, wordDataCon, charDataCon, floatDataCon, doubleDataCon]
     -> literalToPmLit (exprType e) l
-  (Var x, [_ty, Lit n, Lit d])
+  (Var x, [Lit (LitNumber _ l)])
+    | Just (ty,l) <- bignum_lit_maybe x l
+    -> Just (PmLit ty (PmLitInt l))
+  (Var x, [_ty, n_arg, d_arg])
     | Just dc <- isDataConWorkId_maybe x
     , dataConName dc == ratioDataConName
+    , Just (PmLit _ (PmLitInt n)) <- coreExprAsPmLit n_arg
+    , Just (PmLit _ (PmLitInt d)) <- coreExprAsPmLit d_arg
     -- HACK: just assume we have a literal double. This case only occurs for
     --       overloaded lits anyway, so we immediately override type information
-    -> literalToPmLit (exprType e) (mkLitDouble (litValue n % litValue d))
+    -> literalToPmLit (exprType e) (mkLitDouble (n % d))
+
   (Var x, args)
     -- See Note [Detecting overloaded literals with -XRebindableSyntax]
     | is_rebound_name x fromIntegerName
-    , [Lit l] <- dropWhile (not . is_lit) args
-    -> literalToPmLit (literalType l) l >>= overloadPmLit (exprType e)
+    , Just arg <- lastMaybe args
+    , Just (_ty,l) <- bignum_conapp_maybe arg
+    -> Just (PmLit integerTy (PmLitInt l)) >>= overloadPmLit (exprType e)
   (Var x, args)
     -- See Note [Detecting overloaded literals with -XRebindableSyntax]
     -- fromRational <expr>
@@ -644,16 +653,16 @@ coreExprAsPmLit e = case collectArgs e of
     -- See Note [Dealing with rationals with large exponents]
     -- mkRationalBase* <rational> <exponent>
     | Just exp_base <- is_larg_exp_ratio x
-    , [r, Lit exp] <- dropWhile (not . is_ratio) args
-    , (Var x, [_ty, Lit n, Lit d]) <- collectArgs r
+    , [r, exp] <- dropWhile (not . is_ratio) args
+    , (Var x, [_ty, n_arg, d_arg]) <- collectArgs r
     , Just dc <- isDataConWorkId_maybe x
     , dataConName dc == ratioDataConName
+    , Just (PmLit _ (PmLitInt n)) <- coreExprAsPmLit n_arg
+    , Just (PmLit _ (PmLitInt d)) <- coreExprAsPmLit d_arg
+    , Just (_exp_ty,exp') <- bignum_conapp_maybe exp
     -> do
-      n' <- isLitValue_maybe n
-      d' <- isLitValue_maybe d
-      exp' <- isLitValue_maybe exp
-      let rational = (abs n') :% d'
-      let neg = if n' < 0 then 1 else 0
+      let rational = (abs n) :% d
+      let neg = if n < 0 then 1 else 0
       let frac = mkFractionalLit NoSourceText False rational exp' exp_base
       Just $ PmLit (exprType e) (PmLitOverRat neg frac)
 
@@ -675,8 +684,20 @@ coreExprAsPmLit e = case collectArgs e of
 
   _ -> Nothing
   where
-    is_lit Lit{} = True
-    is_lit _     = False
+    bignum_conapp_maybe (App (Var x) (Lit (LitNumber _ l)))
+      = bignum_lit_maybe x l
+    bignum_conapp_maybe _ = Nothing
+
+    bignum_lit_maybe x l
+      | Just dc <- isDataConWorkId_maybe x
+      = if | dc == integerISDataCon -> Just (integerTy,l)
+           | dc == integerIPDataCon -> Just (integerTy,l)
+           | dc == integerINDataCon -> Just (integerTy,negate l)
+           | dc == naturalNSDataCon -> Just (naturalTy,l)
+           | dc == naturalNBDataCon -> Just (naturalTy,l)
+           | otherwise              -> Nothing
+    bignum_lit_maybe _ _ = Nothing
+
     is_ratio (Type _) = False
     is_ratio r
       | Just (tc, _) <- splitTyConApp_maybe (exprType r)

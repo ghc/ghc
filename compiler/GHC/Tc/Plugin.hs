@@ -24,6 +24,7 @@ module GHC.Tc.Plugin (
 
         -- * Getting the TcM state
         getTopEnv,
+        getTargetPlatform,
         getEnvs,
         getInstEnvs,
         getFamInstEnvs,
@@ -50,6 +51,8 @@ module GHC.Tc.Plugin (
     ) where
 
 import GHC.Prelude
+
+import GHC.Platform (Platform)
 
 import qualified GHC.Tc.Utils.Monad     as TcM
 import qualified GHC.Tc.Solver.Monad    as TcS
@@ -131,6 +134,10 @@ tcLookupId = unsafeTcPluginTcM . TcM.tcLookupId
 
 getTopEnv :: TcPluginM HscEnv
 getTopEnv = unsafeTcPluginTcM TcM.getTopEnv
+
+getTargetPlatform :: TcPluginM Platform
+getTargetPlatform = unsafeTcPluginTcM TcM.getPlatform
+
 
 getEnvs :: TcPluginM (TcGblEnv, TcLclEnv)
 getEnvs = unsafeTcPluginTcM TcM.getEnvs

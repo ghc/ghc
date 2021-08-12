@@ -1716,11 +1716,9 @@ pushLiteral padded lit =
           LitNumWord32  -> code Word32Rep
           LitNumInt64   -> code Int64Rep
           LitNumWord64  -> code Word64Rep
-          -- No LitInteger's or LitNatural's should be left by the time this is
-          -- called. CorePrep should have converted them all to a real core
-          -- representation.
-          LitNumInteger -> panic "pushAtom: LitInteger"
-          LitNumNatural -> panic "pushAtom: LitNatural"
+          -- No LitNumBigNat should be left by the time this is called. CorePrep
+          -- should have converted them all to a real core representation.
+          LitNumBigNat  -> panic "pushAtom: LitNumBigNat"
 
 -- | Push an atom for constructor (i.e., PACK instruction) onto the stack.
 -- This is slightly different to @pushAtom@ due to the fact that we allow

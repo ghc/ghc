@@ -1422,7 +1422,9 @@ repTy (HsIParamTy _ n t) = do
 repTy ty                      = notHandled (ThExoticFormOfType ty)
 
 repTyLit :: HsTyLit -> MetaM (Core (M TH.TyLit))
-repTyLit (HsNumTy _ i) = rep2 numTyLitName [mkIntegerExpr i]
+repTyLit (HsNumTy _ i) = do
+                         platform <- getPlatform
+                         rep2 numTyLitName [mkIntegerExpr platform i]
 repTyLit (HsStrTy _ s) = do { s' <- mkStringExprFS s
                             ; rep2 strTyLitName [s']
                             }
@@ -2174,7 +2176,8 @@ globalVar name
         ; rep2_nwDsM mk_varg [pkg,mod,occ] }
   | otherwise
   = do  { MkC occ <- nameLit name
-        ; MkC uni <- coreIntegerLit (toInteger $ getKey (getUnique name))
+        ; platform <- targetPlatform <$> getDynFlags
+        ; let uni = mkIntegerExpr platform (toInteger $ getKey (getUnique name))
         ; rep2_nwDsM mkNameLName [occ,uni] }
   where
       mod = assert (isExternalName name) nameModule name
@@ -3034,9 +3037,6 @@ coreNothingList elt_ty = coreNothing' (mkListTy elt_ty)
 coreIntLit :: Int -> MetaM (Core Int)
 coreIntLit i = do platform <- getPlatform
                   return (MkC (mkIntExprInt platform i))
-
-coreIntegerLit :: MonadThings m => Integer -> m (Core Integer)
-coreIntegerLit i = pure (MkC (mkIntegerExpr i))
 
 coreVar :: Id -> Core TH.Name   -- The Id has type Name
 coreVar id = MkC (Var id)

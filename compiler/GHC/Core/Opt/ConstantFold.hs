@@ -47,7 +47,7 @@ import GHC.Types.Basic
 import GHC.Core
 import GHC.Core.Make
 import GHC.Core.SimpleOpt (  exprIsConApp_maybe, exprIsLiteral_maybe )
-import GHC.Core.DataCon ( dataConTagZ, dataConTyCon, dataConWrapId, dataConWorkId )
+import GHC.Core.DataCon ( DataCon,dataConTagZ, dataConTyCon, dataConWrapId, dataConWorkId )
 import GHC.Core.Utils  ( eqExpr, cheapEqExpr, exprIsHNF, exprType
                        , stripTicksTop, stripTicksTopT, mkTicks )
 import GHC.Core.Multiplicity
@@ -1452,30 +1452,52 @@ isLiteral e = do
         Nothing -> mzero
         Just l  -> pure l
 
+-- | Match Integer and Natural literals
+isBignumLiteral :: CoreExpr -> RuleM Integer
+isBignumLiteral e = isIntegerLiteral e <|> isNaturalLiteral e
+
+-- | Match numeric literals
 isNumberLiteral :: CoreExpr -> RuleM Integer
 isNumberLiteral e = isLiteral e >>= \case
   LitNumber _ x -> pure x
   _             -> mzero
 
+-- | Match the application of a DataCon to a numeric literal.
+--
+-- Can be used to match e.g.:
+--  IS 123#
+--  IP bigNatLiteral
+--  W# 123##
+isLitNumConApp :: CoreExpr -> RuleM (DataCon,Integer)
+isLitNumConApp e = do
+  env <- getInScopeEnv
+  case exprIsConApp_maybe env e of
+    Just (_env,_fb,dc,_tys,[arg]) -> case exprIsLiteral_maybe env arg of
+      Just (LitNumber _ i) -> pure (dc,i)
+      _                    -> mzero
+    _ -> mzero
+
 isIntegerLiteral :: CoreExpr -> RuleM Integer
-isIntegerLiteral e = isLiteral e >>= \case
-  LitNumber LitNumInteger x -> pure x
-  _                         -> mzero
+isIntegerLiteral e = do
+  (dc,i) <- isLitNumConApp e
+  if | dc == integerISDataCon -> pure i
+     | dc == integerINDataCon -> pure (negate i)
+     | dc == integerIPDataCon -> pure i
+     | otherwise              -> mzero
+
+isBigIntegerLiteral :: CoreExpr -> RuleM Integer
+isBigIntegerLiteral e = do
+  (dc,i) <- isLitNumConApp e
+  if | dc == integerINDataCon -> pure (negate i)
+     | dc == integerIPDataCon -> pure i
+     | otherwise              -> mzero
 
 isNaturalLiteral :: CoreExpr -> RuleM Integer
-isNaturalLiteral e = isLiteral e >>= \case
-  LitNumber LitNumNatural x -> pure x
-  _                         -> mzero
-
-isWordLiteral :: CoreExpr -> RuleM Integer
-isWordLiteral e = isLiteral e >>= \case
-  LitNumber LitNumWord x -> pure x
-  _                      -> mzero
-
-isIntLiteral :: CoreExpr -> RuleM Integer
-isIntLiteral e = isLiteral e >>= \case
-  LitNumber LitNumInt x -> pure x
-  _                     -> mzero
+isNaturalLiteral e = do
+  (dc,i) <- isLitNumConApp e
+  if | dc == naturalNSDataCon -> pure i
+     | dc == naturalNBDataCon -> pure i
+     | otherwise              -> mzero
 
 -- return the n-th argument of this rule, if it is a literal
 -- argument indices start from 0
@@ -2003,17 +2025,18 @@ builtinBignumRules =
         y <- isNaturalLiteral a1
         -- return an unboxed sum: (# (# #) | Natural #)
         let ret n v = pure $ mkCoreUbxSum 2 n [unboxedUnitTy,naturalTy] v
+        platform <- getPlatform
         if x < y
             then ret 1 $ Var voidPrimId
-            else ret 2 $ Lit (mkLitNatural (x - y))
+            else ret 2 $ mkNaturalExpr platform (x - y)
 
     -- unary operations
-  , bignum_unop "integerNegate"     integerNegateName     mkLitInteger negate
-  , bignum_unop "integerAbs"        integerAbsName        mkLitInteger abs
-  , bignum_unop "integerSignum"     integerSignumName     mkLitInteger signum
-  , bignum_unop "integerComplement" integerComplementName mkLitInteger complement
+  , bignum_unop "integerNegate"     integerNegateName     mkIntegerExpr negate
+  , bignum_unop "integerAbs"        integerAbsName        mkIntegerExpr abs
+  , bignum_unop "integerSignum"     integerSignumName     mkIntegerExpr signum
+  , bignum_unop "integerComplement" integerComplementName mkIntegerExpr complement
 
-  , bignum_unop "naturalSignum"     naturalSignumName     mkLitNatural signum
+  , bignum_unop "naturalSignum"     naturalSignumName     mkNaturalExpr signum
 
   , mkRule "naturalNegate" naturalNegateName 1 $ do
         [a0] <- getArgs
@@ -2033,30 +2056,30 @@ builtinBignumRules =
   --
 
     -- Bits.bit
-  , bignum_bit "integerBit" integerBitName mkLitInteger
-  , bignum_bit "naturalBit" naturalBitName mkLitNatural
+  , bignum_bit "integerBit" integerBitName mkIntegerExpr
+  , bignum_bit "naturalBit" naturalBitName mkNaturalExpr
 
     -- Bits.testBit
   , bignum_testbit "integerTestBit" integerTestBitName
   , bignum_testbit "naturalTestBit" naturalTestBitName
 
     -- Bits.shift
-  , bignum_shift "integerShiftL" integerShiftLName shiftL mkLitInteger
-  , bignum_shift "integerShiftR" integerShiftRName shiftR mkLitInteger
-  , bignum_shift "naturalShiftL" naturalShiftLName shiftL mkLitNatural
-  , bignum_shift "naturalShiftR" naturalShiftRName shiftR mkLitNatural
+  , bignum_shift "integerShiftL" integerShiftLName shiftL mkIntegerExpr
+  , bignum_shift "integerShiftR" integerShiftRName shiftR mkIntegerExpr
+  , bignum_shift "naturalShiftL" naturalShiftLName shiftL mkNaturalExpr
+  , bignum_shift "naturalShiftR" naturalShiftRName shiftR mkNaturalExpr
 
     -- division
-  , divop_one  "integerQuot"    integerQuotName    quot    mkLitInteger
-  , divop_one  "integerRem"     integerRemName     rem     mkLitInteger
-  , divop_one  "integerDiv"     integerDivName     div     mkLitInteger
-  , divop_one  "integerMod"     integerModName     mod     mkLitInteger
-  , divop_both "integerDivMod"  integerDivModName  divMod  mkLitInteger integerTy
-  , divop_both "integerQuotRem" integerQuotRemName quotRem mkLitInteger integerTy
+  , divop_one  "integerQuot"    integerQuotName    quot    mkIntegerExpr
+  , divop_one  "integerRem"     integerRemName     rem     mkIntegerExpr
+  , divop_one  "integerDiv"     integerDivName     div     mkIntegerExpr
+  , divop_one  "integerMod"     integerModName     mod     mkIntegerExpr
+  , divop_both "integerDivMod"  integerDivModName  divMod  mkIntegerExpr integerTy
+  , divop_both "integerQuotRem" integerQuotRemName quotRem mkIntegerExpr integerTy
 
-  , divop_one  "naturalQuot"    naturalQuotName    quot    mkLitNatural
-  , divop_one  "naturalRem"     naturalRemName     rem     mkLitNatural
-  , divop_both "naturalQuotRem" naturalQuotRemName quotRem mkLitNatural naturalTy
+  , divop_one  "naturalQuot"    naturalQuotName    quot    mkNaturalExpr
+  , divop_one  "naturalRem"     naturalRemName     rem     mkNaturalExpr
+  , divop_both "naturalQuotRem" naturalQuotRemName quotRem mkNaturalExpr naturalTy
 
     -- conversions from Rational for Float/Double literals
   , rational_to "rationalToFloat"  rationalToFloatName  mkFloatExpr
@@ -2080,7 +2103,9 @@ builtinBignumRules =
     integer_to_lit str name convert = mkRule str name 1 $ do
       [a0] <- getArgs
       platform <- getPlatform
-      x <- isIntegerLiteral a0
+      -- we only match on Big Integer literals. Small literals
+      -- are matched by the "Int# -> Integer -> *" rules
+      x <- isBigIntegerLiteral a0
       pure (convert platform x)
 
     natural_to_word str name clamp = mkRule str name 1 $ do
@@ -2094,36 +2119,40 @@ builtinBignumRules =
     integer_to_natural str name thrw clamp = mkRule str name 1 $ do
       [a0] <- getArgs
       x <- isIntegerLiteral a0
-      if | x >= 0    -> pure $ Lit $ mkLitNatural x
+      platform <- getPlatform
+      if | x >= 0    -> pure $ mkNaturalExpr platform x
          | thrw      -> mzero
-         | clamp     -> pure $ Lit $ mkLitNatural 0       -- clamp to 0
-         | otherwise -> pure $ Lit $ mkLitNatural (abs x) -- negate/wrap
+         | clamp     -> pure $ mkNaturalExpr platform 0       -- clamp to 0
+         | otherwise -> pure $ mkNaturalExpr platform (abs x) -- negate/wrap
 
     lit_to_integer str name = mkRule str name 1 $ do
       [a0] <- getArgs
-      isLiteral a0 >>= \case
-        -- convert any numeric literal into an Integer literal
-        LitNumber _ i -> pure (Lit (mkLitInteger i))
-        _             -> mzero
+      platform <- getPlatform
+      i <- isNumberLiteral a0 <|> isBignumLiteral a0
+      -- convert any numeric literal into an Integer literal
+      pure (mkIntegerExpr platform i)
 
     integer_binop str name op = mkRule str name 2 $ do
       [a0,a1] <- getArgs
       x <- isIntegerLiteral a0
       y <- isIntegerLiteral a1
-      pure (Lit (mkLitInteger (x `op` y)))
+      platform <- getPlatform
+      pure (mkIntegerExpr platform (x `op` y))
 
     natural_binop str name op = mkRule str name 2 $ do
       [a0,a1] <- getArgs
       x <- isNaturalLiteral a0
       y <- isNaturalLiteral a1
-      pure (Lit (mkLitNatural (x `op` y)))
+      platform <- getPlatform
+      pure (mkNaturalExpr platform (x `op` y))
 
     natural_sub str name = mkRule str name 2 $ do
       [a0,a1] <- getArgs
       x <- isNaturalLiteral a0
       y <- isNaturalLiteral a1
       guard (x >= y)
-      pure (Lit (mkLitNatural (x - y)))
+      platform <- getPlatform
+      pure (mkNaturalExpr platform (x - y))
 
     integer_cmp str name op = mkRule str name 2 $ do
       platform <- getPlatform
@@ -2145,8 +2174,8 @@ builtinBignumRules =
 
     bignum_compare str name = mkRule str name 2 $ do
       [a0,a1] <- getArgs
-      x <- isNumberLiteral a0
-      y <- isNumberLiteral a1
+      x <- isBignumLiteral a0
+      y <- isBignumLiteral a1
       pure $ case x `compare` y of
               LT -> ltVal
               EQ -> eqVal
@@ -2154,8 +2183,9 @@ builtinBignumRules =
 
     bignum_unop str name mk_lit op = mkRule str name 1 $ do
       [a0] <- getArgs
-      x <- isNumberLiteral a0
-      pure $ Lit (mk_lit (op x))
+      x <- isBignumLiteral a0
+      platform <- getPlatform
+      pure $ mk_lit platform (op x)
 
     bignum_popcount str name mk_lit = mkRule str name 1 $ do
       platform <- getPlatform
@@ -2164,7 +2194,7 @@ builtinBignumRules =
       -- by the target. So we disable this rule if sizes don't match.
       guard (platformWordSizeInBits platform == finiteBitSize (0 :: Word))
       [a0] <- getArgs
-      x <- isNumberLiteral a0
+      x <- isBignumLiteral a0
       pure $ Lit (mk_lit platform (fromIntegral (popCount x)))
 
     bignum_bit str name mk_lit = mkRule str name 1 $ do
@@ -2178,12 +2208,12 @@ builtinBignumRules =
       guard (n >= 0 && n <= fromIntegral (platformWordSizeInBits platform))
       -- it's safe to convert a target Int value into a host Int value
       -- to perform the "bit" operation because n is very small (<= 64).
-      pure $ Lit (mk_lit (bit (fromIntegral n)))
+      pure $ mk_lit platform (bit (fromIntegral n))
 
     bignum_testbit str name = mkRule str name 2 $ do
       [a0,a1] <- getArgs
       platform <- getPlatform
-      x <- isNumberLiteral a0
+      x <- isBignumLiteral a0
       n <- isNumberLiteral a1
       -- ensure that we can store 'n' in a host Int
       guard (n >= 0 && n <= fromIntegral (maxBound :: Int))
@@ -2193,34 +2223,37 @@ builtinBignumRules =
 
     bignum_shift str name shift_op mk_lit = mkRule str name 2 $ do
       [a0,a1] <- getArgs
-      x <- isNumberLiteral a0
-      n <- isWordLiteral a1
+      x <- isBignumLiteral a0
+      n <- isNumberLiteral a1
       -- See Note [Guarding against silly shifts]
       -- Restrict constant-folding of shifts on Integers, somewhat arbitrary.
       -- We can get huge shifts in inaccessible code (#15673)
       guard (n <= 4)
-      pure $ Lit (mk_lit (x `shift_op` fromIntegral n))
+      platform <- getPlatform
+      pure $ mk_lit platform (x `shift_op` fromIntegral n)
 
     divop_one str name divop mk_lit = mkRule str name 2 $ do
       [a0,a1] <- getArgs
-      n <- isNumberLiteral a0
-      d <- isNumberLiteral a1
+      n <- isBignumLiteral a0
+      d <- isBignumLiteral a1
       guard (d /= 0)
-      pure $ Lit (mk_lit (n `divop` d))
+      platform <- getPlatform
+      pure $ mk_lit platform (n `divop` d)
 
     divop_both str name divop mk_lit ty = mkRule str name 2 $ do
       [a0,a1] <- getArgs
-      n <- isNumberLiteral a0
-      d <- isNumberLiteral a1
+      n <- isBignumLiteral a0
+      d <- isBignumLiteral a1
       guard (d /= 0)
       let (r,s) = n `divop` d
-      pure $ mkCoreUbxTup [ty,ty] [Lit (mk_lit r), Lit (mk_lit s)]
+      platform <- getPlatform
+      pure $ mkCoreUbxTup [ty,ty] [mk_lit platform r, mk_lit platform s]
 
     integer_encode_float :: RealFloat a => String -> Name -> (a -> CoreExpr) -> CoreRule
     integer_encode_float str name mk_lit = mkRule str name 2 $ do
       [a0,a1] <- getArgs
       x <- isIntegerLiteral a0
-      y <- isIntLiteral a1
+      y <- isNumberLiteral a1
       -- check that y (a target Int) is in the host Int range
       guard (y <= fromIntegral (maxBound :: Int))
       pure (mk_lit $ encodeFloat x (fromInteger y))
