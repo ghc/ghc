@@ -87,7 +87,9 @@ endif
 UseIntreeGmp = NO
 ifneq "$(HaveLibGmp)" "YES"
 ifneq "$(HaveFrameworkGMP)" "YES"
+ifneq "$(TargetArch_CPP)" "js"
 UseIntreeGmp = YES
+endif
 endif
 endif
 
