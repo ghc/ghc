@@ -148,7 +148,7 @@ bindistRules = do
         createDirectory (bindistFilesDir -/- "bin")
         createDirectory (bindistFilesDir -/- "lib")
         -- Also create wrappers with version suffixes (#20074)
-        forM_ (bin_targets ++ iserv_targets) $ \(_pkg, prog_path, ver) -> do
+        forM_ (bin_targets ++ iserv_targets) $ \(pkg, prog_path, ver) -> do
             let orig_filename = takeFileName prog_path
                 (name, ext) = splitExtensions orig_filename
                 version_prog = name ++ "-" ++ ver ++ ext
@@ -168,6 +168,27 @@ bindistRules = do
                 -- we need to create a relative symlink.
                 IO.removeFile unversioned_install_path <|> return ()
                 IO.createFileLink version_prog unversioned_install_path
+
+            -- If we have runghc, also need runhaskell (#19571)
+            -- Make links for both versioned and unversioned runhaskell to
+            -- normal runghc
+            when (pkg == runGhc) $ do
+              let unversioned_runhaskell_path =
+                    bindistFilesDir -/- "bin" -/- "runhaskell" ++ ext
+                  versioned_runhaskell_path =
+                    bindistFilesDir -/- "bin" -/- "runhaskell" ++ "-" ++ ver ++ ext
+              if windowsHost
+                then do
+                  createVersionWrapper version_prog unversioned_runhaskell_path
+                  createVersionWrapper version_prog versioned_runhaskell_path
+                else liftIO $ do
+                  -- Unversioned
+                  IO.removeFile unversioned_runhaskell_path <|> return ()
+                  IO.createFileLink version_prog unversioned_runhaskell_path
+                  -- Versioned
+                  IO.removeFile versioned_runhaskell_path <|> return ()
+                  IO.createFileLink version_prog versioned_runhaskell_path
+
         copyDirectory (ghcBuildDir -/- "lib") bindistFilesDir
         copyDirectory (rtsIncludeDir)         bindistFilesDir
 
@@ -319,9 +340,10 @@ pkgToWrappers :: Package -> Action [String]
 pkgToWrappers pkg
   -- ghc also has the ghci script wrapper
   | pkg == ghc = pure ["ghc", "ghci"]
+  | pkg == runGhc = pure ["runghc", "runhaskell"]
   -- These are the packages which we want to expose to the user and hence
   -- there are wrappers installed in the bindist.
-  | pkg `elem` [hpcBin, haddock, hp2ps, hsc2hs, runGhc, ghc, ghcPkg]
+  | pkg `elem` [hpcBin, haddock, hp2ps, hsc2hs, ghc, ghcPkg]
     = (:[]) <$> (programName =<< programContext Stage1 pkg)
   | otherwise = pure []
 
@@ -333,6 +355,7 @@ wrapper "ghci" = ghciScriptWrapper
 wrapper "haddock"     = haddockWrapper
 wrapper "hsc2hs"      = hsc2hsWrapper
 wrapper "runghc"      = runGhcWrapper
+wrapper "runhaskell"  = runGhcWrapper
 wrapper _             = commonWrapper
 
 -- | Wrapper scripts for different programs. Common is default wrapper.
