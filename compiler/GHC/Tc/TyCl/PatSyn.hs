@@ -781,6 +781,7 @@ tcPatSynMatcher (L loc name) lpat prag_fn
        ; let matcher_tau   = mkVisFunTysMany [pat_ty, cont_ty, fail_ty] res_ty
              matcher_sigma = mkInfSigmaTy (rr_tv:res_tv:univ_tvs) req_theta matcher_tau
              matcher_id    = mkExportedVanillaId matcher_name matcher_sigma
+             patsyn_id     = mkExportedVanillaId name matcher_sigma
                              -- See Note [Exported LocalIds] in GHC.Types.Id
 
              inst_wrap = mkWpEvApps prov_dicts <.> mkWpTyApps ex_tys
@@ -808,7 +809,7 @@ tcPatSynMatcher (L loc name) lpat prag_fn
                        , mg_ext = MatchGroupTc (map unrestricted [pat_ty, cont_ty, fail_ty]) res_ty
                        , mg_origin = Generated
                        }
-             match = mkMatch (mkPrefixFunRhs (L loc name)) []
+             match = mkMatch (mkPrefixFunRhs (L loc patsyn_id)) []
                              (mkHsLams (rr_tv:res_tv:univ_tvs)
                                        req_dicts body')
                              (EmptyLocalBinds noExtField)

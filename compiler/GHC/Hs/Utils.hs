@@ -174,7 +174,7 @@ mkSimpleMatch :: (Anno (Match (GhcPass p) (LocatedA (body (GhcPass p))))
                         ~ SrcSpanAnnA,
                   Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p))))
                         ~ SrcSpan)
-              => HsMatchContext (NoGhcTc (GhcPass p))
+              => HsMatchContext (GhcPass p)
               -> [LPat (GhcPass p)] -> LocatedA (body (GhcPass p))
               -> LMatch (GhcPass p) (LocatedA (body (GhcPass p)))
 mkSimpleMatch ctxt pats rhs
@@ -913,7 +913,7 @@ mkPrefixFunRhs n = FunRhs { mc_fun = n
 
 ------------
 mkMatch :: forall p. IsPass p
-        => HsMatchContext (NoGhcTc (GhcPass p))
+        => HsMatchContext (GhcPass p)
         -> [LPat (GhcPass p)]
         -> LHsExpr (GhcPass p)
         -> HsLocalBinds (GhcPass p)

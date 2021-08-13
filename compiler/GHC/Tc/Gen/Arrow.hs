@@ -275,7 +275,7 @@ tc_cmd env
         ; return (mkHsCmdWrap (mkWpCastN co) cmd') }
   where
     n_pats     = length pats
-    match_ctxt = (LambdaExpr :: HsMatchContext GhcRn)    -- Maybe KappaExpr?
+    match_ctxt = LambdaExpr    -- Maybe KappaExpr?
     pg_ctxt    = PatGuard match_ctxt
 
     tc_grhss (GRHSs x grhss binds) stk_ty res_ty

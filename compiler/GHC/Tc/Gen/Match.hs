@@ -91,12 +91,12 @@ is used in error messages.  It checks that all the equations have the
 same number of arguments before using @tcMatches@ to do the work.
 -}
 
-tcMatchesFun :: LocatedN Name
+tcMatchesFun :: LocatedN Id -- MatchContext Id
              -> MatchGroup GhcRn (LHsExpr GhcRn)
              -> ExpRhoType    -- Expected type of function
              -> TcM (HsWrapper, MatchGroup GhcTc (LHsExpr GhcTc))
                                 -- Returns type of body
-tcMatchesFun fn@(L _ fun_name) matches exp_ty
+tcMatchesFun fun_id matches exp_ty
   = do  {  -- Check that they all have the same no of arguments
            -- Location is in the monad, set the caller so that
            -- any inter-equation error messages get some vaguely
@@ -118,12 +118,18 @@ tcMatchesFun fn@(L _ fun_name) matches exp_ty
           -- a multiplicity argument, and scale accordingly.
           tcMatches match_ctxt pat_tys rhs_ty matches }
   where
+    fun_name = idName (unLoc fun_id)
     arity  = matchGroupArity matches
     herald = text "The equation(s) for"
              <+> quotes (ppr fun_name) <+> text "have"
     ctxt   = GenSigCtxt  -- Was: FunSigCtxt fun_name True
                          -- But that's wrong for f :: Int -> forall a. blah
-    what   = FunRhs { mc_fun = fn, mc_fixity = Prefix, mc_strictness = strictness }
+    what   = FunRhs { mc_fun = fun_id, mc_fixity = Prefix, mc_strictness = strictness }
+                    -- Careful: this fun_id could be an unfilled
+                    -- thunk from fixM in tcMonoBinds, so we're
+                    -- not allowed to look at it, except for
+                    -- idName.
+                    -- See Note [fixM for rhs_ty in tcMonoBinds]
     match_ctxt = MC { mc_what = what, mc_body = tcBody }
     strictness
       | [L _ match] <- unLoc $ mg_alts matches
@@ -186,7 +192,7 @@ tcGRHSsPat grhss res_ty
 ********************************************************************* -}
 
 data TcMatchCtxt body   -- c.f. TcStmtCtxt, also in this module
-  = MC { mc_what :: HsMatchContext GhcRn,  -- What kind of thing this is
+  = MC { mc_what :: HsMatchContext GhcTc,  -- What kind of thing this is
          mc_body :: LocatedA (body GhcRn)  -- Type checker for a body of
                                            -- an alternative
                  -> ExpRhoType
@@ -345,13 +351,13 @@ type TcExprStmtChecker = TcStmtChecker HsExpr ExpRhoType
 type TcCmdStmtChecker  = TcStmtChecker HsCmd  TcRhoType
 
 type TcStmtChecker body rho_type
-  =  forall thing. HsStmtContext GhcRn
+  =  forall thing. HsStmtContext GhcTc
                 -> Stmt GhcRn (LocatedA (body GhcRn))
                 -> rho_type                 -- Result type for comprehension
                 -> (rho_type -> TcM thing)  -- Checker for what follows the stmt
                 -> TcM (Stmt GhcTc (LocatedA (body GhcTc)), thing)
 
-tcStmts :: (AnnoBody body) => HsStmtContext GhcRn
+tcStmts :: (AnnoBody body) => HsStmtContext GhcTc
         -> TcStmtChecker body rho_type   -- NB: higher-rank type
         -> [LStmt GhcRn (LocatedA (body GhcRn))]
         -> rho_type
@@ -361,7 +367,7 @@ tcStmts ctxt stmt_chk stmts res_ty
                         const (return ())
        ; return stmts' }
 
-tcStmtsAndThen :: (AnnoBody body) => HsStmtContext GhcRn
+tcStmtsAndThen :: (AnnoBody body) => HsStmtContext GhcTc
                -> TcStmtChecker body rho_type    -- NB: higher-rank type
                -> [LStmt GhcRn (LocatedA (body GhcRn))]
                -> rho_type
@@ -999,7 +1005,7 @@ join :: tn -> res_ty
 -}
 
 tcApplicativeStmts
-  :: HsStmtContext GhcRn
+  :: HsStmtContext GhcTc
   -> [(SyntaxExpr GhcRn, ApplicativeArg GhcRn)]
   -> ExpRhoType                         -- rhs_ty
   -> (TcRhoType -> TcM t)               -- thing_inside

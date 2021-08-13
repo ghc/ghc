@@ -1892,9 +1892,10 @@ pprMatchInCtxt match  = hang (text "In" <+> pprMatchContext (m_ctxt match)
 
 pprStmtInCtxt :: (OutputableBndrId idL,
                   OutputableBndrId idR,
+                  OutputableBndrId ctx,
                   Outputable body,
                  Anno (StmtLR (GhcPass idL) (GhcPass idR) body) ~ SrcSpanAnnA)
-              => HsStmtContext (GhcPass idL)
+              => HsStmtContext (GhcPass ctx)
               -> StmtLR (GhcPass idL) (GhcPass idR) body
               -> SDoc
 pprStmtInCtxt ctxt (LastStmt _ e _ _)

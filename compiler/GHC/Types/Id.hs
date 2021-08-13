@@ -296,8 +296,7 @@ mkVanillaGlobalWithInfo = mkGlobalId VanillaId
 
 -- | For an explanation of global vs. local 'Id's, see "GHC.Types.Var#globalvslocal"
 mkLocalId :: HasDebugCallStack => Name -> Mult -> Type -> Id
-mkLocalId name w ty = assert (not (isCoVarType ty)) $
-                      mkLocalIdWithInfo name w ty vanillaIdInfo
+mkLocalId name w ty = mkLocalIdWithInfo name w (assert (not (isCoVarType ty)) ty) vanillaIdInfo
 
 -- | Make a local CoVar
 mkLocalCoVar :: Name -> Type -> CoVar
@@ -318,8 +317,8 @@ mkLocalIdOrCoVar name w ty
 
     -- proper ids only; no covars!
 mkLocalIdWithInfo :: HasDebugCallStack => Name -> Mult -> Type -> IdInfo -> Id
-mkLocalIdWithInfo name w ty info = assert (not (isCoVarType ty)) $
-                                   Var.mkLocalVar VanillaId name w ty info
+mkLocalIdWithInfo name w ty info =
+  Var.mkLocalVar VanillaId name w (assert (not (isCoVarType ty)) ty) info
         -- Note [Free type variables]
 
 -- | Create a local 'Id' that is marked as exported.

@@ -1067,7 +1067,7 @@ type LMatch id body = XRec id (Match id body)
 data Match p body
   = Match {
         m_ext :: XCMatch p body,
-        m_ctxt :: HsMatchContext (NoGhcTc p),
+        m_ctxt :: HsMatchContext p,
           -- See note [m_ctxt in Match]
         m_pats :: [LPat p], -- The patterns
         m_grhss :: (GRHSs p body)

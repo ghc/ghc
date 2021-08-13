@@ -622,7 +622,7 @@ tcPolyCheck prag_fn
                 --    See Note [Relevant bindings and the binder stack]
 
                 setSrcSpanA bind_loc $
-                tcMatchesFun (L nm_loc mono_name) matches
+                tcMatchesFun (L nm_loc mono_id) matches
                              (mkCheckExpType rho_ty)
 
        -- We make a funny AbsBinds, abstracting over nothing,
@@ -1189,15 +1189,19 @@ tcMonoBinds is_rec sig_fn no_gen
   | NonRecursive <- is_rec   -- ...binder isn't mentioned in RHS
   , Nothing <- sig_fn name   -- ...with no type signature
   = setSrcSpanA b_loc    $
-    do  { ((co_fn, matches'), rhs_ty)
-            <- tcInfer $ \ exp_ty ->
-               tcExtendBinderStack [TcIdBndr_ExpType name exp_ty NotTopLevel] $
-                  -- We extend the error context even for a non-recursive
-                  -- function so that in type error messages we show the
-                  -- type of the thing whose rhs we are type checking
-               tcMatchesFun (L nm_loc name) matches exp_ty
+    do  { ((co_fn, matches'), mono_id, _) <- fixM $ \ ~(_, _, rhs_ty) ->
+                                          -- See Note [fixM for rhs_ty in tcMonoBinds]
+            do  { mono_id <- newLetBndr no_gen name Many rhs_ty
+                ; (matches', rhs_ty')
+                    <- tcInfer $ \ exp_ty ->
+                       tcExtendBinderStack [TcIdBndr_ExpType name exp_ty NotTopLevel] $
+                          -- We extend the error context even for a non-recursive
+                          -- function so that in type error messages we show the
+                          -- type of the thing whose rhs we are type checking
+                       tcMatchesFun (L nm_loc mono_id) matches exp_ty
+                ; return (matches', mono_id, rhs_ty')
+                }
 
-        ; mono_id <- newLetBndr no_gen name Many rhs_ty
         ; return (unitBag $ L b_loc $
                      FunBind { fun_id = L nm_loc mono_id,
                                fun_matches = matches',
@@ -1309,6 +1313,20 @@ Here we want to push p's signature inwards, i.e. /checking/, to
 correctly elaborate 'id'. But we want to /infer/ q's higher rank
 type.  There seems to be no way to do this.  So currently we only
 switch to inference when we have no signature for any of the binders.
+
+Note [fixM for rhs_ty in tcMonoBinds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In order to create mono_id we need rhs_ty but we don't have it yet,
+we only get it from tcMatchesFun later (which needs mono_id to put
+into HsMatchContext for pretty printing). To solve this, create
+a thunk of rhs_ty with fixM that we fill in later.
+
+This is fine only because neither newLetBndr or tcMatchesFun look
+at the varType field of the Id. tcMatchesFun only looks at idName
+of mono_id.
+
+Also see #20415 for the bigger picture of why tcMatchesFun needs
+mono_id in the first place.
 -}
 
 
@@ -1436,7 +1454,7 @@ tcRhs (TcFunBind info@(MBI { mbi_sig = mb_sig, mbi_mono_id = mono_id })
   = tcExtendIdBinderStackForRhs [info]  $
     tcExtendTyVarEnvForRhs mb_sig       $
     do  { traceTc "tcRhs: fun bind" (ppr mono_id $$ ppr (idType mono_id))
-        ; (co_fn, matches') <- tcMatchesFun (L (noAnnSrcSpan loc) (idName mono_id))
+        ; (co_fn, matches') <- tcMatchesFun (L (noAnnSrcSpan loc) mono_id)
                                  matches (mkCheckExpType $ idType mono_id)
         ; return ( FunBind { fun_id = L (noAnnSrcSpan loc) mono_id
                            , fun_matches = matches'

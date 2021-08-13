@@ -220,7 +220,7 @@ data SkolemInfo
   | FamInstSkol         -- Bound at a family instance decl
   | PatSkol             -- An existential type variable bound by a pattern for
       ConLike           -- a data constructor with an existential type.
-      (HsMatchContext GhcRn)
+      (HsMatchContext GhcTc)
              -- e.g.   data T = forall a. Eq a => MkT a
              --        f (MkT x) = ...
              -- The pattern MkT x will allocate an existential type

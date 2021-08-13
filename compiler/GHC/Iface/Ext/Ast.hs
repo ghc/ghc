@@ -933,7 +933,13 @@ instance ( HiePass p
         HieRn -> makeNodeA m span
 
 instance HiePass p => ToHie (HsMatchContext (GhcPass p)) where
-  toHie (FunRhs{mc_fun=name}) = toHie $ C MatchBind name
+  toHie (FunRhs{mc_fun=name}) = toHie $ C MatchBind name'
+    where
+      -- See a paragraph about Haddock in #20415.
+      name' :: LocatedN Name
+      name' = case hiePass @p of
+        HieRn -> name
+        HieTc -> mapLoc varName name
   toHie (StmtCtxt a) = toHie a
   toHie _ = pure []
 
