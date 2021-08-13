@@ -397,6 +397,9 @@ void freeSegments(ObjectCode *oc);
 #elif defined(darwin_HOST_OS) || defined(ios_HOST_OS)
 #  define OBJFORMAT_MACHO
 #  include "linker/MachOTypes.h"
+#elif defined(ghcjs_HOST_OS)
+#  define OBJFORMAT_JS
+#  include "linker/JsTypes.h"
 #else
 #error "Unknown OBJECT_FORMAT for HOST_OS"
 #endif
