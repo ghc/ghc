@@ -124,6 +124,7 @@ libraries/integer-gmp/gmp/libgmp.a libraries/integer-gmp/gmp/gmp.h:
 	cat $(GMP_TARBALL) | $(BZIP2_CMD) -d | { cd libraries/integer-gmp/gmp && $(TAR_CMD) -xf - ; }
 	mv libraries/integer-gmp/gmp/$(GMP_DIR) libraries/integer-gmp/gmp/gmpbuild
 	cd libraries/integer-gmp/gmp && $(PATCH_CMD) -p0 < gmpsrc.patch
+	cp config.sub libraries/integer-gmp/gmp/gmpbuild
 	chmod +x libraries/integer-gmp/gmp/ln
 
 	# Note: We must pass `TARGETPLATFORM` to the `--host` argument of GMP's
