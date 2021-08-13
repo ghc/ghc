@@ -18,16 +18,16 @@ import GHC.Plugins
 import GHC.Tc.Plugin
   ( TcPluginM )
 import GHC.Tc.Types
-  ( TcPluginResult(..) )
+  ( TcPluginSolveResult(..) )
 import GHC.Tc.Types.Constraint
   ( Ct(..) )
 import GHC.Tc.Types.Evidence
-  ( EvTerm(EvExpr) )
+  ( EvBindsVar, EvTerm(EvExpr) )
 
 -- common
 import Common
   ( PluginDefs(..)
-  , mkPlugin
+  , mkPlugin, don'tRewrite
   )
 
 --------------------------------------------------------------------------------
@@ -38,13 +38,13 @@ import Common
 -- in which case we provide evidence (a nullary dictionary).
 
 plugin :: Plugin
-plugin = mkPlugin solver
+plugin = mkPlugin solver don'tRewrite
 
 -- Solve "Nullary".
 solver :: [String]
-       -> PluginDefs -> [Ct] -> [Ct] -> [Ct]
-       -> TcPluginM TcPluginResult
-solver _args defs _gs _ds ws = do
+       -> PluginDefs -> EvBindsVar -> [Ct] -> [Ct] -> [Ct]
+       -> TcPluginM TcPluginSolveResult
+solver _args defs _ev _gs _ds ws = do
   solved <- catMaybes <$> traverse ( solveCt defs ) ws
   pure $ TcPluginOk solved []
 

@@ -205,6 +205,7 @@ import GHC.Types.SrcLoc
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
 import GHC.Types.Name.Ppr
+import GHC.Types.Unique.FM ( emptyUFM )
 import GHC.Types.Unique.Supply
 import GHC.Types.Annotations
 import GHC.Types.Basic( TopLevelFlag, TypeOrKind(..) )
@@ -348,7 +349,8 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
                 tcg_safe_infer     = infer_var,
                 tcg_safe_infer_reasons = infer_reasons_var,
                 tcg_dependent_files = dependent_files_var,
-                tcg_tc_plugins     = [],
+                tcg_tc_plugin_solvers   = [],
+                tcg_tc_plugin_rewriters = emptyUFM,
                 tcg_hf_plugins     = [],
                 tcg_top_loc        = loc,
                 tcg_static_wc      = static_wc_var,

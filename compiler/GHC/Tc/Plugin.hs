@@ -47,7 +47,6 @@ module GHC.Tc.Plugin (
         -- * Manipulating evidence bindings
         newEvVar,
         setEvBind,
-        getEvBindsTcPluginM
     ) where
 
 import GHC.Prelude
@@ -62,30 +61,30 @@ import qualified GHC.Unit.Finder        as Finder
 
 import GHC.Core.FamInstEnv     ( FamInstEnv )
 import GHC.Tc.Utils.Monad      ( TcGblEnv, TcLclEnv, TcPluginM
-                               , unsafeTcPluginTcM, getEvBindsTcPluginM
+                               , unsafeTcPluginTcM
                                , liftIO, traceTc )
 import GHC.Tc.Types.Constraint ( Ct, CtLoc, CtEvidence(..), ctLocOrigin )
 import GHC.Tc.Utils.TcMType    ( TcTyVar, TcType )
 import GHC.Tc.Utils.Env        ( TcTyThing )
 import GHC.Tc.Types.Evidence   ( CoercionHole, EvTerm(..)
-                               , EvExpr, EvBind, mkGivenEvBind )
+                               , EvExpr, EvBindsVar, EvBind, mkGivenEvBind )
 import GHC.Types.Var           ( EvVar )
 
-import GHC.Unit.Module
-import GHC.Types.Name
-import GHC.Types.TyThing
+import GHC.Unit.Module    ( ModuleName, Module )
+import GHC.Types.Name     ( OccName, Name )
+import GHC.Types.TyThing  ( TyThing )
 import GHC.Core.Reduction ( Reduction )
-import GHC.Core.TyCon
-import GHC.Core.DataCon
-import GHC.Core.Class
-import GHC.Driver.Config.Finder
-import GHC.Driver.Env
-import GHC.Utils.Outputable
-import GHC.Core.Type
-import GHC.Types.Id
-import GHC.Core.InstEnv
-import GHC.Data.FastString
-import GHC.Types.Unique
+import GHC.Core.TyCon     ( TyCon )
+import GHC.Core.DataCon   ( DataCon )
+import GHC.Core.Class     ( Class )
+import GHC.Driver.Config.Finder ( initFinderOpts )
+import GHC.Driver.Env       ( HscEnv(..), hsc_home_unit, hsc_units )
+import GHC.Utils.Outputable ( SDoc )
+import GHC.Core.Type        ( Kind, Type, PredType )
+import GHC.Types.Id         ( Id )
+import GHC.Core.InstEnv     ( InstEnvs )
+import GHC.Data.FastString  ( FastString )
+import GHC.Types.Unique     ( Unique )
 
 
 -- | Perform some IO, typically to interact with an external tool.
@@ -162,9 +161,8 @@ zonkTcType = unsafeTcPluginTcM . TcM.zonkTcType
 zonkCt :: Ct -> TcPluginM Ct
 zonkCt = unsafeTcPluginTcM . TcM.zonkCt
 
-
 -- | Create a new wanted constraint.
-newWanted  :: CtLoc -> PredType -> TcPluginM CtEvidence
+newWanted :: CtLoc -> PredType -> TcPluginM CtEvidence
 newWanted loc pty
   = unsafeTcPluginTcM (TcM.newWanted (ctLocOrigin loc) Nothing pty)
 
@@ -172,26 +170,29 @@ newWanted loc pty
 newDerived :: CtLoc -> PredType -> TcPluginM CtEvidence
 newDerived loc pty = return CtDerived { ctev_pred = pty, ctev_loc = loc }
 
--- | Create a new given constraint, with the supplied evidence.  This
--- must not be invoked from 'tcPluginInit' or 'tcPluginStop', or it
--- will panic.
-newGiven :: CtLoc -> PredType -> EvExpr -> TcPluginM CtEvidence
-newGiven loc pty evtm = do
+-- | Create a new given constraint, with the supplied evidence.
+--
+-- This should only be invoked within 'tcPluginSolve'.
+newGiven :: EvBindsVar -> CtLoc -> PredType -> EvExpr -> TcPluginM CtEvidence
+newGiven tc_evbinds loc pty evtm = do
    new_ev <- newEvVar pty
-   setEvBind $ mkGivenEvBind new_ev (EvExpr evtm)
+   setEvBind tc_evbinds $ mkGivenEvBind new_ev (EvExpr evtm)
    return CtGiven { ctev_pred = pty, ctev_evar = new_ev, ctev_loc = loc }
 
 -- | Create a fresh evidence variable.
+--
+-- This should only be invoked within 'tcPluginSolve'.
 newEvVar :: PredType -> TcPluginM EvVar
 newEvVar = unsafeTcPluginTcM . TcM.newEvVar
 
 -- | Create a fresh coercion hole.
+-- This should only be invoked within 'tcPluginSolve'.
 newCoercionHole :: PredType -> TcPluginM CoercionHole
 newCoercionHole = unsafeTcPluginTcM . TcM.newCoercionHole
 
--- | Bind an evidence variable.  This must not be invoked from
--- 'tcPluginInit' or 'tcPluginStop', or it will panic.
-setEvBind :: EvBind -> TcPluginM ()
-setEvBind ev_bind = do
-    tc_evbinds <- getEvBindsTcPluginM
+-- | Bind an evidence variable.
+--
+-- This should only be invoked within 'tcPluginSolve'.
+setEvBind :: EvBindsVar -> EvBind -> TcPluginM ()
+setEvBind tc_evbinds ev_bind = do
     unsafeTcPluginTcM $ TcM.addTcEvBind tc_evbinds ev_bind

@@ -12,6 +12,10 @@ module GHC.Tc.Solver.Rewrite(
 import GHC.Prelude
 
 import GHC.Core.TyCo.Ppr ( pprTyVar )
+import GHC.Tc.Types ( TcGblEnv(tcg_tc_plugin_rewriters),
+                      TcPluginRewriter, TcPluginRewriteResult(..),
+                      RewriteEnv(..),
+                      runTcPluginM )
 import GHC.Tc.Types.Constraint
 import GHC.Core.Predicate
 import GHC.Tc.Utils.TcType
@@ -21,6 +25,7 @@ import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep   -- performs delicate algorithm on types
 import GHC.Core.Coercion
 import GHC.Core.Reduction
+import GHC.Types.Unique.FM
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
@@ -45,12 +50,6 @@ import Data.List.NonEmpty ( NonEmpty(..) )
 *                                                                      *
 ************************************************************************
 -}
-
-data RewriteEnv
-  = FE { fe_loc     :: !CtLoc             -- See Note [Rewriter CtLoc]
-       , fe_flavour :: !CtFlavour
-       , fe_eq_rel  :: !EqRel             -- See Note [Rewriter EqRels]
-       }
 
 -- | The 'RewriteM' monad is a wrapper around 'TcS' with a 'RewriteEnv'
 newtype RewriteM a
@@ -97,6 +96,10 @@ runRewrite loc flav eq_rel thing_inside
 traceRewriteM :: String -> SDoc -> RewriteM ()
 traceRewriteM herald doc = liftTcS $ traceTcS herald doc
 {-# INLINE traceRewriteM #-}  -- see Note [INLINE conditional tracing utilities]
+
+getRewriteEnv :: RewriteM RewriteEnv
+getRewriteEnv
+  = mkRewriteM $ \env -> return env
 
 getRewriteEnvField :: (RewriteEnv -> a) -> RewriteM a
 getRewriteEnvField accessor
@@ -698,9 +701,16 @@ Note [How to normalise a family application]
 Given an exactly saturated family application, how should we normalise it?
 This Note spells out the algorithm and its reasoning.
 
-STEP 1. Try the famapp-cache. If we get a cache hit, jump to FINISH.
+First, we attempt to directly rewrite the type family application,
+without simplifying any of the arguments first, in an attempt to avoid
+doing unnecessary work.
 
-STEP 2. Try top-level instances. Note that we haven't simplified the arguments
+STEP 1a. Call the rewriting plugins. If any plugin rewrites the type family
+application, jump to FINISH.
+
+STEP 1b. Try the famapp-cache. If we get a cache hit, jump to FINISH.
+
+STEP 1c. Try top-level instances. Remember: we haven't simplified the arguments
   yet. Example:
     type instance F (Maybe a) = Int
     target: F (Maybe (G Bool))
@@ -709,27 +719,31 @@ STEP 2. Try top-level instances. Note that we haven't simplified the arguments
 
   If an instance is found, jump to FINISH.
 
-STEP 3. Rewrite all arguments. This might expose more information so that we
-  can use a top-level instance.
+STEP 2: At this point we rewrite all arguments. This might expose more
+  information, which might allow plugins to make progress, or allow us to
+  pick up a top-level instance.
 
-  Continue to the next step.
-
-STEP 4. Try the inerts. Note that we try the inerts *after* rewriting the
+STEP 3. Try the inerts. Note that we try the inerts *after* rewriting the
   arguments, because the inerts will have rewritten LHSs.
 
   If an inert is found, jump to FINISH.
 
-STEP 5. Try the famapp-cache again. Now that we've revealed more information
-  in the arguments, the cache might be helpful.
+Next, we try STEP 1 again, as we might be able to make further progress after
+having rewritten the arguments:
+
+STEP 4a. Query the rewriting plugins again.
+
+  If any plugin supplies a rewriting, jump to FINISH.
+
+STEP 4b. Try the famapp-cache again.
 
   If we get a cache hit, jump to FINISH.
 
-STEP 6. Try top-level instances, which might trigger now that we know more
-  about the argumnents.
+STEP 4c. Try top-level instances again.
 
   If an instance is found, jump to FINISH.
 
-STEP 7. No progress to be made. Return what we have. (Do not do FINISH.)
+STEP 5: GIVEUP. No progress to be made. Return what we have. (Do not FINISH.)
 
 FINISH 1. We've made a reduction, but the new type may still have more
   work to do. So rewrite the new type.
@@ -737,11 +751,11 @@ FINISH 1. We've made a reduction, but the new type may still have more
 FINISH 2. Add the result to the famapp-cache, connecting the type we started
   with to the one we ended with.
 
-Because STEP 1/2 and STEP 5/6 happen the same way, they are abstracted into
+Because STEP 1{a,b,c} and STEP 4{a,b,c} happen the same way, they are abstracted into
 try_to_reduce.
 
 FINISH is naturally implemented in `finish`. But, Note [rewrite_exact_fam_app performance]
-tells us that we should not add to the famapp-cache after STEP 1/2. So `finish`
+tells us that we should not add to the famapp-cache after STEP 1. So `finish`
 is inlined in that case, and only FINISH 1 is performed.
 
 -}
@@ -768,15 +782,19 @@ rewrite_exact_fam_app :: TyCon -> [TcType] -> RewriteM Reduction
 rewrite_exact_fam_app tc tys
   = do { checkStackDepth (mkTyConApp tc tys)
 
-       -- STEP 1/2. Try to reduce without reducing arguments first.
-       ; result1 <- try_to_reduce tc tys
+       -- Query the typechecking plugins for all their rewriting functions
+       -- which apply to a type family application headed by the TyCon 'tc'.
+       ; tc_rewriters <- getTcPluginRewritersForTyCon tc
+
+       -- STEP 1. Try to reduce without reducing arguments first.
+       ; result1 <- try_to_reduce tc tys tc_rewriters
        ; case result1 of
              -- Don't use the cache;
              -- See Note [rewrite_exact_fam_app performance]
          { Just redn -> finish False redn
          ; Nothing ->
 
-        -- That didn't work. So reduce the arguments, in STEP 3.
+        -- That didn't work. So reduce the arguments, in STEP 2.
     do { eq_rel <- getEqRel
           -- checking eq_rel == NomEq saves ~0.5% in T9872a
        ; ArgsReductions (Reductions cos xis) kind_co <-
@@ -808,7 +826,11 @@ rewrite_exact_fam_app tc tys
                     (args_co `mkTransRedn` redn)
                     kind_co
 
-         -- STEP 4: try the inerts
+              give_up :: Reduction
+              give_up = homogenise $ mkReflRedn role reduced
+                where reduced = mkTyConApp tc xis
+
+         -- STEP 3: try the inerts
        ; result2 <- liftTcS $ lookupFamAppInert tc xis
        ; flavour <- getFlavour
        ; case result2 of
@@ -828,14 +850,12 @@ rewrite_exact_fam_app tc tys
 
          ; _ ->
 
-         -- inert didn't work. Try to reduce again, in STEP 5/6.
-    do { result3 <- try_to_reduce tc xis
+         -- inerts didn't work. Try to reduce again, in STEP 4.
+    do { result3 <- try_to_reduce tc xis tc_rewriters
        ; case result3 of
            Just redn -> finish True (homogenise redn)
-           Nothing   -> -- we have made no progress at all: STEP 7.
-                        return (homogenise $ mkReflRedn role reduced)
-             where
-               reduced = mkTyConApp tc xis }}}}}
+           -- we have made no progress at all: STEP 5 (GIVEUP).
+           _         -> return give_up }}}}}
   where
       -- call this if the above attempts made progress.
       -- This recursively rewrites the result and then adds to the cache
@@ -858,17 +878,21 @@ rewrite_exact_fam_app tc tys
 
 -- Returned coercion is input ~r output, where r is the role in the RewriteM monad
 -- See Note [How to normalise a family application]
-try_to_reduce :: TyCon -> [TcType] -> RewriteM (Maybe Reduction)
-try_to_reduce tc tys
-  = do { result <- liftTcS $ firstJustsM [ lookupFamAppCache tc tys  -- STEP 5
-                                         , matchFam tc tys ]         -- STEP 6
-       ; downgrade result }
+try_to_reduce :: TyCon -> [TcType] -> [TcPluginRewriter]
+              -> RewriteM (Maybe Reduction)
+try_to_reduce tc tys tc_rewriters
+  = do { rewrite_env <- getRewriteEnv
+       ; result <-
+            liftTcS $ firstJustsM
+              [ runTcPluginRewriters rewrite_env tc_rewriters tys -- STEP 1a & STEP 4a
+              , lookupFamAppCache tc tys                          -- STEP 1b & STEP 4b
+              , matchFam tc tys ]                                 -- STEP 1c & STEP 4c
+       ; traverse downgrade result }
   where
     -- The result above is always Nominal. We might want a Representational
     -- coercion; this downgrades (and prints, out of convenience).
-    downgrade :: Maybe Reduction -> RewriteM (Maybe Reduction)
-    downgrade Nothing = return Nothing
-    downgrade result@(Just redn)
+    downgrade :: Reduction -> RewriteM Reduction
+    downgrade redn
       = do { traceRewriteM "Eager T.F. reduction success" $
              vcat [ ppr tc
                   , ppr tys
@@ -878,8 +902,45 @@ try_to_reduce tc tys
               -- manually doing it this way avoids allocation in the vastly
               -- common NomEq case
            ; case eq_rel of
-               NomEq  -> return result
-               ReprEq -> return $ Just (mkSubRedn redn) }
+               NomEq  -> return redn
+               ReprEq -> return $ mkSubRedn redn }
+
+-- Retrieve all type-checking plugins that can rewrite a (saturated) type-family application
+-- headed by the given 'TyCon`.
+getTcPluginRewritersForTyCon :: TyCon -> RewriteM [TcPluginRewriter]
+getTcPluginRewritersForTyCon tc
+  = liftTcS $ do { rewriters <- tcg_tc_plugin_rewriters <$> getGblEnv
+                 ; return (lookupWithDefaultUFM rewriters [] tc) }
+
+-- Run a collection of rewriting functions obtained from type-checking plugins,
+-- querying in sequence if any plugin wants to rewrite the type family
+-- applied to the given arguments.
+--
+-- Note that the 'TcPluginRewriter's provided all pertain to the same type family
+-- (the 'TyCon' of which has been obtained ahead of calling this function).
+runTcPluginRewriters :: RewriteEnv
+                     -> [TcPluginRewriter]
+                     -> [TcType]
+                     -> TcS (Maybe Reduction)
+runTcPluginRewriters rewriteEnv rewriterFunctions tys
+  | null rewriterFunctions
+  = return Nothing -- short-circuit for common case
+  | otherwise
+  = do { givens <- getInertGivens
+       ; runRewriters givens rewriterFunctions }
+  where
+  runRewriters :: [Ct] -> [TcPluginRewriter] -> TcS (Maybe Reduction)
+  runRewriters _ []
+    = return Nothing
+  runRewriters givens (rewriter:rewriters)
+    = do
+        rewriteResult <- wrapTcS . runTcPluginM $ rewriter rewriteEnv givens tys
+        case rewriteResult of
+           TcPluginRewriteTo
+             { tcPluginReduction    = redn
+             , tcRewriterNewWanteds = wanteds
+             } -> do { emitWork wanteds; return $ Just redn }
+           TcPluginNoRewrite {} -> runRewriters givens rewriters
 
 {-
 ************************************************************************

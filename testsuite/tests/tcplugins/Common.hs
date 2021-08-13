@@ -4,6 +4,7 @@
 module Common
   ( PluginDefs(..)
   , mkPlugin
+  , don'tSolve, don'tRewrite
   )
   where
 
@@ -28,11 +29,17 @@ import GHC.Tc.Plugin
   , tcLookupClass, tcLookupDataCon, tcLookupTyCon
   )
 import GHC.Tc.Types
-  ( TcPlugin(..), TcPluginResult )
+  ( TcPlugin(..), TcPluginSolveResult(..), TcPluginRewriteResult(..)
+  , TcPluginRewriter
+  )
 import GHC.Tc.Types.Constraint
   ( Ct )
+import GHC.Tc.Types.Evidence
+  ( EvBindsVar )
 import GHC.Types.Name.Occurrence
   ( mkClsOcc, mkDataOcc, mkTcOcc )
+import GHC.Types.Unique.FM
+  ( UniqFM, emptyUFM )
 import GHC.Unit.Finder
   ( FindResult(..) )
 import GHC.Unit.Module
@@ -81,19 +88,28 @@ lookupDefs = do
   add                           <- tcLookupTyCon   =<< lookupOrig defs ( mkTcOcc   "Add"      )
   pure ( PluginDefs { .. } )
 
-mkPlugin :: ( [String] -> PluginDefs -> [Ct] -> [Ct] -> [Ct] -> TcPluginM TcPluginResult )
+mkPlugin :: ( [String] -> PluginDefs -> EvBindsVar -> [Ct] -> [Ct] -> [Ct] -> TcPluginM TcPluginSolveResult )
+         -> ( [String] -> PluginDefs -> UniqFM TyCon TcPluginRewriter )
          -> Plugin
-mkPlugin solve =
+mkPlugin solve rewrite =
   defaultPlugin
-    { tcPlugin        = \ args -> Just $ mkTcPlugin ( solve args )
+    { tcPlugin        = \ args -> Just $ mkTcPlugin ( solve args ) ( rewrite args )
     , pluginRecompile = purePlugin
     }
 
-mkTcPlugin :: ( PluginDefs -> [Ct] -> [Ct] -> [Ct] -> TcPluginM TcPluginResult )
+mkTcPlugin :: ( PluginDefs -> EvBindsVar -> [Ct] -> [Ct] -> [Ct] -> TcPluginM TcPluginSolveResult )
+           -> ( PluginDefs -> UniqFM TyCon TcPluginRewriter )
            -> TcPlugin
-mkTcPlugin solve =
+mkTcPlugin solve rewrite =
   TcPlugin
-    { tcPluginInit  = lookupDefs
-    , tcPluginSolve = solve
-    , tcPluginStop  = \ _ -> pure ()
+    { tcPluginInit    = lookupDefs
+    , tcPluginSolve   = solve
+    , tcPluginRewrite = rewrite
+    , tcPluginStop    = \ _ -> pure ()
     }
+
+don'tSolve :: [String] -> s -> EvBindsVar -> [Ct] -> [Ct] -> [Ct] -> TcPluginM TcPluginSolveResult
+don'tSolve _ _ _ _ _ _ = pure $ TcPluginOk [] []
+
+don'tRewrite :: [String] -> s -> UniqFM TyCon TcPluginRewriter
+don'tRewrite _ _ = emptyUFM

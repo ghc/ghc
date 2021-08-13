@@ -52,3 +52,40 @@ test('TcPlugin_TyFam'
         ]
       ,'-dynamic -package ghc' if have_dynamic() else '-package ghc']
     )
+
+# See RewritePlugin.hs for a description of this plugin.
+test('TcPlugin_Rewrite'
+    , [ extra_files(
+        [ 'Definitions.hs'
+        , 'Common.hs'
+        , 'RewritePlugin.hs'
+        , 'TcPlugin_Rewrite.hs'
+        ])
+      ]
+    , multi_compile
+    , [ 'TcPlugin_Rewrite.hs'
+      , [ ('Definitions.hs', '')
+        , ('Common.hs', '')
+        , ('RewritePlugin.hs', '')
+        ]
+      ,'-dynamic -package ghc' if have_dynamic() else '-package ghc']
+    )
+
+# See RewritePerfPlugin.hs for a description of this plugin.
+test('TcPlugin_RewritePerf'
+    , [ extra_files(
+        [ 'RewritePerfDefs.hs'
+        , 'RewritePerfPlugin.hs'
+        , 'TcPlugin_RewritePerf.hs'
+        ])
+      , only_ways(['normal'])
+      , collect_compiler_stats('bytes allocated', 1)
+      , high_memory_usage
+      ]
+    , multi_compile_fail
+    , [ 'TcPlugin_RewritePerf.hs'
+      , [ ('RewritePerfDefs.hs', '')
+        , ('RewritePerfPlugin.hs', '')
+        ]
+      ,'-dynamic -package ghc' if have_dynamic() else '-package ghc']
+    )

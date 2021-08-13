@@ -1255,7 +1255,7 @@ traceTcS herald doc = wrapTcS (TcM.traceTc herald doc)
 {-# INLINE traceTcS #-}  -- see Note [INLINE conditional tracing utilities]
 
 runTcPluginTcS :: TcPluginM a -> TcS a
-runTcPluginTcS m = wrapTcS . runTcPluginM m =<< getTcEvBindsVar
+runTcPluginTcS = wrapTcS . runTcPluginM
 
 instance HasDynFlags TcS where
     getDynFlags = wrapTcS getDynFlags
