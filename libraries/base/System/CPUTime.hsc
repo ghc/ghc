@@ -1,5 +1,8 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP, CApiFFI #-}
+##if defined(ghcjs_HOST_OS)
+{-# LANGUAGE JavaScriptFFI #-}
+##endif
 
 -----------------------------------------------------------------------------
 -- |
@@ -31,6 +34,28 @@ module System.CPUTime
 import System.IO.Unsafe (unsafePerformIO)
 
 -- Here is where we decide which backend to use
+##if defined(ghcjs_HOST_OS)
+import qualified System.CPUTime.Unsupported as I
+
+cpuTimePrecision :: Integer
+cpuTimePrecision = toInteger js_cpuTimePrecision
+
+getCPUTime :: IO Integer
+getCPUTime = do
+  t <- js_getCPUTime
+  if t == -1 then I.getCPUTime
+             else pure (1000 * round t)
+
+foreign import javascript unsafe
+  "h$cpuTimePrecision()"
+  js_cpuTimePrecision :: Int
+
+foreign import javascript unsafe
+  "h$getCPUTime()"
+  js_getCPUTime :: IO Double
+
+##else
+
 #if defined(mingw32_HOST_OS)
 import qualified System.CPUTime.Windows as I
 
@@ -65,3 +90,5 @@ cpuTimePrecision = unsafePerformIO I.getCpuTimePrecision
 -- implementation-dependent.
 getCPUTime :: IO Integer
 getCPUTime = I.getCPUTime
+
+##endif

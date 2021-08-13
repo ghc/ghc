@@ -9,6 +9,9 @@
 {-# LANGUAGE RebindableSyntax #-}
 {-# LANGUAGE NegativeLiterals #-}
 {-# LANGUAGE ExplicitForAll #-}
+#if defined(ghcjs_HOST_OS)
+{-# LANGUAGE JavaScriptFFI #-}
+#endif
 
 -- |
 -- Module      :  GHC.Integer.Type
@@ -186,6 +189,14 @@ mkInteger :: Bool   -- ^ sign of integer ('True' if non-negative)
                     --   significant first (ideally these would be machine-word
                     --   'Word's rather than 31-bit truncated 'Int's)
           -> Integer
+#if defined(ghcjs_HOST_OS)
+mkInteger nonNegative is =
+  seqList is `seq` unsafeCoerce# (js_mkInteger nonNegative (unsafeCoerce# is))
+  where
+    seqList []     = ()
+    seqList (x:xs) = x `seq` seqList xs
+foreign import javascript unsafe "h$ghcjsbn_mkInteger($1,$2)" js_mkInteger :: Bool -> Any -> Any
+#else
 mkInteger nonNegative is
   | nonNegative = f is
   | True        = negateInteger (f is)
@@ -193,6 +204,7 @@ mkInteger nonNegative is
     f [] = S# 0#
     f (I# i : is') = smallInteger (i `andI#` 0x7fffffff#) `orInteger`
                          shiftLInteger (f is') 31#
+#endif
 {-# CONSTANT_FOLDED mkInteger #-}
 
 -- | Test whether all internal invariants are satisfied by 'Integer' value
@@ -218,6 +230,10 @@ smallInteger i# = S# i#
 
 #if WORD_SIZE_IN_BITS < 64
 int64ToInteger :: Int64# -> Integer
+#if defined(ghcjs_HOST_OS)
+int64ToInteger i = unsafeCoerce# (js_int64ToInteger i)
+foreign import javascript unsafe "h$integer_int64ToInteger($1_1,$1_2)" js_int64ToInteger :: Int64# -> Any
+#else
 int64ToInteger i
   | isTrue# (i `leInt64#` intToInt64#  0x7FFFFFFF#)
   , isTrue# (i `geInt64#` intToInt64# -0x80000000#)
@@ -226,6 +242,7 @@ int64ToInteger i
     = Jp# (word64ToBigNat (int64ToWord64# i))
   | True
     = Jn# (word64ToBigNat (int64ToWord64# (negateInt64# i)))
+#endif
 {-# CONSTANT_FOLDED int64ToInteger #-}
 
 word64ToInteger :: Word64# -> Integer
@@ -249,7 +266,18 @@ integerToWord64 (Jn# bn)
     = int64ToWord64# (negateInt64# (word64ToInt64# (bigNatToWord64 bn)))
 {-# CONSTANT_FOLDED integerToWord64 #-}
 
-#if GMP_LIMB_BITS == 32
+#if defined(ghcjs_HOST_OS)
+word64ToBigNat :: Word64# -> BigNat
+word64ToBigNat w64 = BN# (js_word64ToBigNat w64)
+
+bigNatToWord64 :: BigNat -> Word64#
+bigNatToWord64 (BN# bn) = js_bigNatToWord64 bn
+
+foreign import javascript unsafe "h$ghcjsbn_mkBigNat_ww($1_1, $1_2)"
+     js_word64ToBigNat :: Word64# -> ByteArray#
+foreign import javascript unsafe "$r1 = h$ghcjsbn_toWord64_b($1); $r2 = h$ret1;" -- fixme tuple returns
+     js_bigNatToWord64 :: ByteArray# -> Word64#
+#elif GMP_LIMB_BITS == 32
 word64ToBigNat :: Word64# -> BigNat
 word64ToBigNat w64 = wordToBigNat2 wh# wl#
   where
@@ -528,18 +556,28 @@ timesInt2Integer x# y# = case (# isTrue# (x# >=# 0#), isTrue# (y# >=# 0#) #) of
         (# h  ,l #) -> Jp# (wordToBigNat2 h l)
 
 bigNatToInteger :: BigNat -> Integer
+#ifdef ghcjs_HOST_OS
+bigNatToInteger (BN# bn) = unsafeCoerce# (js_bigNatToInteger bn)
+foreign import javascript unsafe "h$ghcjsbn_toInteger_b($1)" js_bigNatToInteger :: ByteArray# -> Any
+#else
 bigNatToInteger bn
   | isTrue# ((sizeofBigNat# bn ==# 1#) `andI#` (i# >=# 0#)) = S# i#
   | True                                                    = Jp# bn
   where
     i# = word2Int# (bigNatToWord bn)
+#endif
 
 bigNatToNegInteger :: BigNat -> Integer
+#ifdef ghcjs_HOST_OS
+bigNatToNegInteger (BN# bn) = unsafeCoerce# (js_bigNatToNegInteger bn)
+foreign import javascript unsafe "h$ghcjsbn_toNegInteger_b($1)" js_bigNatToNegInteger :: ByteArray# -> Any
+#else
 bigNatToNegInteger bn
   | isTrue# ((sizeofBigNat# bn ==# 1#) `andI#` (i# <=# 0#)) = S# i#
   | True                                                    = Jn# bn
   where
     i# = negateInt# (word2Int# (bigNatToWord bn))
+#endif
 
 -- | Count number of set bits. For negative arguments returns negative
 -- population count of negated argument.
@@ -809,6 +847,10 @@ gcdInteger (Jp# a) (S# b#)
 
 -- | Compute least common multiple.
 lcmInteger :: Integer -> Integer -> Integer
+-- #if defined(ghcjs_HOST_OS)
+-- lcmInteger x y = unsafeCoerce (js_lcmInteger (unsafeCoerce x) (unsafeCoerce y))
+-- foreign import javascript unsafe "h$integer_lcmInteger($1,$2)" js_lcmInteger :: Any -> Any -> Any
+-- #else
 lcmInteger (S# 0#) !_  = S# 0#
 lcmInteger (S# 1#)  b  = absInteger b
 lcmInteger (S# -1#) b  = absInteger b
@@ -819,6 +861,7 @@ lcmInteger a b = (aa `quotInteger` (aa `gcdInteger` ab)) `timesInteger` ab
   where
     aa = absInteger a
     ab = absInteger b
+-- #endif
 {-# CONSTANT_FOLDED lcmInteger #-}
 
 -- | Compute greatest common divisor.
@@ -839,6 +882,13 @@ gcdWord = gcdWord#
 -- BigNat operations
 
 compareBigNat :: BigNat -> BigNat -> Ordering
+#ifdef ghcjs_HOST_OS
+compareBigNat (BN# x#) (BN# y#) = case (js_compareBigNat x# y#) of
+  0# -> LT
+  1# -> EQ
+  _  -> GT
+foreign import javascript unsafe "h$ghcjsbn_cmp_bb($1,$2)" js_compareBigNat :: ByteArray# -> ByteArray# -> Int#
+#else
 compareBigNat x@(BN# x#) y@(BN# y#)
   | isTrue# (nx# ==# ny#)
       = compareInt# (narrowCInt# (c_mpn_cmp x# y# nx#)) 0#
@@ -847,76 +897,150 @@ compareBigNat x@(BN# x#) y@(BN# y#)
   where
     nx# = sizeofBigNat# x
     ny# = sizeofBigNat# y
+#endif
 
 compareBigNatWord :: BigNat -> GmpLimb# -> Ordering
+#ifdef ghcjs_HOST_OS
+compareBigNatWord (BN# bn#) w# = case js_compareBigNatWord bn# w# of
+  0# -> LT
+  1# -> EQ
+  _  -> GT
+foreign import javascript unsafe "h$ghcjsbn_cmp_bw($1,$2)" js_compareBigNatWord :: ByteArray# -> Word# -> Int#
+#else
 compareBigNatWord bn w#
   | isTrue# (sizeofBigNat# bn ==# 1#) = cmpW# (bigNatToWord bn) w#
   | True                              = GT
+#endif
 
 gtBigNatWord# :: BigNat -> GmpLimb# -> Int#
+#ifdef ghcjs_HOST_OS
+gtBigNatWord# (BN# bn#) w# = case js_gtBigNatWord bn# w# of
+                               False -> 0#
+                               _     -> 1#
+foreign import javascript unsafe "h$ghcjsbn_gt_bw($1,$2)" js_gtBigNatWord :: ByteArray# -> Word# -> Bool
+#else
 gtBigNatWord# bn w#
     = (sizeofBigNat# bn ># 1#) `orI#` (bigNatToWord bn `gtWord#` w#)
+#endif
 
 eqBigNat :: BigNat -> BigNat -> Bool
+#ifdef ghcjs_HOST_OS
+eqBigNat (BN# x#) (BN# y#) = js_eqBigNat x# y#
+foreign import javascript unsafe "h$ghcjsbn_eq_bb($1,$2)" js_eqBigNat :: ByteArray# -> ByteArray# -> Bool
+#else
 eqBigNat x y = isTrue# (eqBigNat# x y)
+#endif
 
 eqBigNat# :: BigNat -> BigNat -> Int#
+#ifdef ghcjs_HOST_OS
+eqBigNat# (BN# x#) (BN# y#) = case js_eqBigNat x# y# of
+                                False -> 0#
+                                _     -> 1#
+#else
 eqBigNat# x@(BN# x#) y@(BN# y#)
   | isTrue# (nx# ==# ny#) = c_mpn_cmp x# y# nx# ==# 0#
   | True                  = 0#
   where
     nx# = sizeofBigNat# x
     ny# = sizeofBigNat# y
+#endif
 
 neqBigNat# :: BigNat -> BigNat -> Int#
+#ifdef ghcjs_HOST_OS
+neqBigNat# (BN# x#) (BN# y#) = case js_neqBigNat x# y# of
+                                 False -> 0#
+                                 _     -> 1#
+foreign import javascript unsafe "h$ghcjsbn_neq_bb($1,$2)" js_neqBigNat :: ByteArray# -> ByteArray# -> Bool
+#else
 neqBigNat# x@(BN# x#) y@(BN# y#)
   | isTrue# (nx# ==# ny#) = c_mpn_cmp x# y# nx# /=# 0#
   | True                  = 1#
   where
     nx# = sizeofBigNat# x
     ny# = sizeofBigNat# y
+#endif
 
 eqBigNatWord :: BigNat -> GmpLimb# -> Bool
+#ifdef ghcjs_HOST_OS
+eqBigNatWord (BN# bn#) w# = js_eqBigNatWord bn# w#
+foreign import javascript unsafe "h$ghcjsbn_eq_bw($1,$2)" js_eqBigNatWord :: ByteArray# -> GmpLimb# -> Bool
+#else
 eqBigNatWord bn w# = isTrue# (eqBigNatWord# bn w#)
+#endif
 
 eqBigNatWord# :: BigNat -> GmpLimb# -> Int#
+#ifdef ghcjs_HOST_OS
+eqBigNatWord# (BN# bn#) w# = case js_eqBigNatWord bn# w# of
+                               False -> 0#
+                               _     -> 1#
+#else
 eqBigNatWord# bn w#
     = (sizeofBigNat# bn ==# 1#) `andI#` (bigNatToWord bn `eqWord#` w#)
-
+#endif
 
 -- | Same as @'indexBigNat#' bn 0\#@
 bigNatToWord :: BigNat -> Word#
+#ifdef ghcjs_HOST_OS
+bigNatToWord (BN# bn#) = js_bigNatToWord bn#
+foreign import javascript unsafe "h$ghcjsbn_toWord_b($1)" js_bigNatToWord :: ByteArray# -> Word#
+#else
 bigNatToWord bn = indexBigNat# bn 0#
+#endif
 
 -- | Equivalent to @'word2Int#' . 'bigNatToWord'@
 bigNatToInt :: BigNat -> Int#
+#ifdef ghcjs_HOST_OS
+bigNatToInt (BN# bn#) = js_bigNatToInt bn#
+foreign import javascript unsafe "h$ghcjsbn_toInt_b($1)" js_bigNatToInt :: ByteArray# -> Int#
+#else
 bigNatToInt (BN# ba#) = indexIntArray# ba# 0#
+#endif
 
 -- | CAF representing the value @0 :: BigNat@
 zeroBigNat :: BigNat
+#ifdef ghcjs_HOST_OS
+zeroBigNat = BN# (js_zeroBigNat 0#)
+foreign import javascript unsafe "$r = h$ghcjsbn_zero_b;" js_zeroBigNat :: Int# -> ByteArray#
+#else
 zeroBigNat = runS $ do
     mbn <- newBigNat# 1#
     _ <- svoid (writeBigNat# mbn 0# 0##)
     unsafeFreezeBigNat# mbn
+#endif
 {-# NOINLINE zeroBigNat #-}
 
 -- | Test if 'BigNat' value is equal to zero.
 isZeroBigNat :: BigNat -> Bool
+#ifdef ghcjs_HOST_OS
+isZeroBigNat (BN# b#) = js_isZeroBigNat b#
+foreign import javascript unsafe "h$ghcjsbn_isZero_b($1)" js_isZeroBigNat :: ByteArray# -> Bool
+#else
 isZeroBigNat bn = eqBigNatWord bn 0##
+#endif
 
 -- | CAF representing the value @1 :: BigNat@
 oneBigNat :: BigNat
+#ifdef ghcjs_HOST_OS
+oneBigNat = BN# (js_oneBigNat 0#)
+foreign import javascript unsafe "$r = h$ghcjsbn_one_b;" js_oneBigNat :: Int# -> ByteArray#
+#else
 oneBigNat = runS $ do
     mbn <- newBigNat# 1#
     _ <- svoid (writeBigNat# mbn 0# 1##)
     unsafeFreezeBigNat# mbn
+#endif
 {-# NOINLINE oneBigNat #-}
 
 czeroBigNat :: BigNat
+#ifdef ghcjs_HOST_OS
+czeroBigNat = BN# (js_czeroBigNat 0#)
+foreign import javascript unsafe "$r = h$ghcjsbn_czero_b;" js_czeroBigNat :: Int# -> ByteArray#
+#else
 czeroBigNat = runS $ do
     mbn <- newBigNat# 1#
     _ <- svoid (writeBigNat# mbn 0# (not# 0##))
     unsafeFreezeBigNat# mbn
+#endif
 {-# NOINLINE czeroBigNat #-}
 
 -- | Special 0-sized bigNat returned in case of arithmetic underflow
@@ -933,15 +1057,29 @@ czeroBigNat = runS $ do
 --
 -- NB: @isValidBigNat# nullBigNat@ is false
 nullBigNat :: BigNat
+#ifdef ghcjs_HOST_OS
+nullBigNat = BN# (js_nullBigNat 0#)
+foreign import javascript unsafe "$r = h$ghcjsbn_null_b;" js_nullBigNat :: Int# -> ByteArray#
+#else
 nullBigNat = runS (newBigNat# 0# >>= unsafeFreezeBigNat#)
+#endif
 {-# NOINLINE nullBigNat #-}
 
 -- | Test for special 0-sized 'BigNat' representing underflows.
 isNullBigNat# :: BigNat -> Int#
+#ifdef ghcjs_HOST_OS
+isNullBigNat# (BN# ba#) = js_isNullBigNat# ba#
+foreign import javascript unsafe "h$ghcjsbn_isNull_b($1)" js_isNullBigNat# :: ByteArray# -> Int#
+#else
 isNullBigNat# (BN# ba#) = sizeofByteArray# ba# ==# 0#
+#endif
 
 -- | Construct 1-limb 'BigNat' from 'Word#'
 wordToBigNat :: Word# -> BigNat
+#ifdef ghcjs_HOST_OS
+wordToBigNat w# = BN# (js_wordToBigNat w#)
+foreign import javascript unsafe "h$ghcjsbn_mkBigNat_w($1)" js_wordToBigNat :: Word# -> ByteArray#
+#else
 wordToBigNat 0## = zeroBigNat
 wordToBigNat 1## = oneBigNat
 wordToBigNat w#
@@ -950,18 +1088,28 @@ wordToBigNat w#
     mbn <- newBigNat# 1#
     _ <- svoid (writeBigNat# mbn 0# w#)
     unsafeFreezeBigNat# mbn
+#endif
 
 -- | Construct BigNat from 2 limbs.
 -- The first argument is the most-significant limb.
 wordToBigNat2 :: Word# -> Word# -> BigNat
+#ifdef ghcjs_HOST_OS
+wordToBigNat2 hw# lw# = BN# (js_wordToBigNat2 hw# lw#)
+foreign import javascript unsafe "h$ghcjsbn_mkBigNat_ww($1,$2)" js_wordToBigNat2 :: Word# -> Word# -> ByteArray#
+#else
 wordToBigNat2 0## lw# = wordToBigNat lw#
 wordToBigNat2 hw# lw# = runS $ do
     mbn <- newBigNat# 2#
     _ <- svoid (writeBigNat# mbn 0# lw#)
     _ <- svoid (writeBigNat# mbn 1# hw#)
     unsafeFreezeBigNat# mbn
+#endif
 
 plusBigNat :: BigNat -> BigNat -> BigNat
+#ifdef ghcjs_HOST_OS
+plusBigNat (BN# x#) (BN# y#) = BN# (js_plusBigNat x# y#)
+foreign import javascript unsafe "h$ghcjsbn_add_bb($1,$2)" js_plusBigNat :: ByteArray# -> ByteArray# -> ByteArray#
+#else
 plusBigNat x y
   | isTrue# (eqBigNatWord# x 0##) = y
   | isTrue# (eqBigNatWord# y 0##) = x
@@ -977,9 +1125,14 @@ plusBigNat x y
 
     nx# = sizeofBigNat# x
     ny# = sizeofBigNat# y
+#endif
 
 plusBigNatWord :: BigNat -> GmpLimb# -> BigNat
 plusBigNatWord x          0## = x
+#ifdef ghcjs_HOST_OS
+plusBigNatWord (BN# x#) y#    = BN# (js_plusBigNatWord x# y#)
+foreign import javascript unsafe "h$ghcjsbn_add_bw($1,$2)" js_plusBigNatWord :: ByteArray# -> GmpLimb# -> ByteArray#
+#else
 plusBigNatWord x@(BN# x#) y# = runS $ do
     mbn@(MBN# mba#) <- newBigNat# nx#
     (W# c#) <- liftIO (c_mpn_add_1 mba# x# nx# y#)
@@ -988,9 +1141,14 @@ plusBigNatWord x@(BN# x#) y# = runS $ do
         _   -> unsafeSnocFreezeBigNat# mbn c#
   where
     nx# = sizeofBigNat# x
+#endif
 
 -- | Returns 'nullBigNat' (see 'isNullBigNat#') in case of underflow
 minusBigNat :: BigNat -> BigNat -> BigNat
+#ifdef ghcjs_HOST_OS
+minusBigNat (BN# x#) (BN# y#) = BN# (js_minusBigNat x# y#)
+foreign import javascript unsafe "h$ghcjsbn_sub_bb($1,$2)" js_minusBigNat :: ByteArray# -> ByteArray# -> ByteArray#
+#else
 minusBigNat x@(BN# x#) y@(BN# y#)
   | isZeroBigNat y = x
   | isTrue# (nx# >=# ny#) = runS $ do
@@ -1004,10 +1162,15 @@ minusBigNat x@(BN# x#) y@(BN# y#)
   where
     nx# = sizeofBigNat# x
     ny# = sizeofBigNat# y
+#endif
 
 -- | Returns 'nullBigNat' (see 'isNullBigNat#') in case of underflow
 minusBigNatWord :: BigNat -> GmpLimb# -> BigNat
 minusBigNatWord x 0## = x
+#ifdef ghcjs_HOST_OS
+minusBigNatWord (BN# x#) y# = BN# (js_minusBigNatWord x# y#)
+foreign import javascript unsafe "h$ghcjsbn_sub_bw($1,$2)" js_minusBigNatWord :: ByteArray# -> Word# -> ByteArray#
+#else
 minusBigNatWord x@(BN# x#) y# = runS $ do
     mbn@(MBN# mba#) <- newBigNat# nx#
     (W# b#) <- liftIO $ c_mpn_sub_1 mba# x# nx# y#
@@ -1016,12 +1179,16 @@ minusBigNatWord x@(BN# x#) y# = runS $ do
         _   -> return nullBigNat
   where
     nx# = sizeofBigNat# x
-
+#endif
 
 timesBigNat :: BigNat -> BigNat -> BigNat
 timesBigNat x y
   | isZeroBigNat x = zeroBigNat
   | isZeroBigNat y = zeroBigNat
+#ifdef ghcjs_HOST_OS
+  | True           = case x of (BN# x#) -> case y of (BN# y#) -> BN# (js_timesBigNat x# y#)
+foreign import javascript unsafe "h$ghcjsbn_mul_bb($1,$2)" js_timesBigNat :: ByteArray# -> ByteArray# -> ByteArray#
+#else
   | isTrue# (nx# >=# ny#) = go x nx# y ny#
   | True                  = go y ny# x nx#
   where
@@ -1035,15 +1202,25 @@ timesBigNat x y
 
     nx# = sizeofBigNat# x
     ny# = sizeofBigNat# y
+#endif
 
 -- | Square 'BigNat'
 sqrBigNat :: BigNat -> BigNat
 sqrBigNat x
   | isZeroBigNat x = zeroBigNat
   -- TODO: 1-limb BigNats below sqrt(maxBound::GmpLimb)
+#ifdef ghcjs_HOST_OS
+sqrBigNat (BN# x#) = BN# (js_sqrBigNat x#)
+foreign import javascript unsafe "h$ghcjsnb_sqr_b($1)" js_sqrBigNat :: ByteArray# -> ByteArray#
+#else
 sqrBigNat x = timesBigNat x x -- TODO: mpn_sqr
+#endif
 
 timesBigNatWord :: BigNat -> GmpLimb# -> BigNat
+#ifdef ghcjs_HOST_OS
+timesBigNatWord (BN# x#) y# = BN# (js_timesBigNatWord x# y#)
+foreign import javascript unsafe "h$ghcjsbn_mul_bw($1,$2)" js_timesBigNatWord :: ByteArray# -> GmpLimb# -> ByteArray#
+#else
 timesBigNatWord !_ 0## = zeroBigNat
 timesBigNatWord x 1## = x
 timesBigNatWord x@(BN# x#) y#
@@ -1059,6 +1236,7 @@ timesBigNatWord x@(BN# x#) y#
 
   where
     nx# = sizeofBigNat# x
+#endif
 
 -- | Specialised version of
 --
@@ -1069,6 +1247,10 @@ bitBigNat :: Int# -> BigNat
 bitBigNat i#
   | isTrue# (i#  <#  0#) = zeroBigNat -- or maybe 'nullBigNat'?
   | isTrue# (i# ==#  0#) = oneBigNat
+#ifdef ghcjs_HOST_OS
+  | True = BN# (js_bitBigNat i#)
+foreign import javascript unsafe "h$ghcjsbn_bitBigNat($1)" js_bitBigNat :: Int# -> ByteArray#
+#else
   | True = runS $ do
       mbn@(MBN# mba#) <- newBigNat# (li# +# 1#)
       -- FIXME: do we really need to zero-init MBAs returned by 'newByteArray#'?
@@ -1079,8 +1261,13 @@ bitBigNat i#
       unsafeFreezeBigNat# mbn
   where
     !(# li#, bi# #) = quotRemInt# i# GMP_LIMB_BITS#
+#endif
 
 testBitBigNat :: BigNat -> Int# -> Bool
+#ifdef ghcjs_HOST_OS
+testBitBigNat (BN# bn#) i# = js_testBitBigNat bn# i#
+foreign import javascript unsafe "h$ghcjsbn_testBit_b($1,$2)" js_testBitBigNat :: ByteArray# -> Int# -> Bool
+#else
 testBitBigNat bn i#
   | isTrue# (i#  <#  0#) = False
   | isTrue# (li# <# nx#) = isTrue# (testBitWord# (indexBigNat# bn li#) bi#)
@@ -1088,8 +1275,13 @@ testBitBigNat bn i#
   where
     !(# li#, bi# #) = quotRemInt# i# GMP_LIMB_BITS#
     nx# = sizeofBigNat# bn
+#endif
 
 testBitNegBigNat :: BigNat -> Int# -> Bool
+#ifdef ghcjs_HOST_OS
+testBitNegBigNat (BN# bn#) i# = js_testBitNegBigNat bn# i#
+foreign import javascript unsafe "h$ghcjsbn_testBitNeg_b($1,$2)" js_testBitNegBigNat :: ByteArray# -> Int# -> Bool
+#else
 testBitNegBigNat bn i#
   | isTrue# (i#  <#  0#)  = False
   | isTrue# (li# >=# nx#) = True
@@ -1103,9 +1295,12 @@ testBitNegBigNat bn i#
     allZ 0# = True
     allZ j | isTrue# (indexBigNat# bn (j -# 1#) `eqWord#` 0##) = allZ (j -# 1#)
            | True                 = False
-
+#endif
 
 clearBitBigNat :: BigNat -> Int# -> BigNat
+#ifdef ghcjs_HOST_OS
+clearBitBigNat _ _ = nullBigNat -- undefined -- error "clearBitBigNat"
+#else
 clearBitBigNat bn i#
   | not (inline testBitBigNat bn i#) = bn
   | isTrue# (nx# ==# 1#)        = wordToBigNat (bigNatToWord bn `xor#` bitWord# bi#)
@@ -1134,10 +1329,13 @@ clearBitBigNat bn i#
   where
     !(# li#, bi# #) = quotRemInt# i# GMP_LIMB_BITS#
     nx# = sizeofBigNat# bn
-
+#endif
 
 
 setBitBigNat :: BigNat -> Int# -> BigNat
+#ifdef ghcjs_HOST_OS
+setBitBigNat _ _ = nullBigNat -- undefined -- error "setBitBigNat"
+#else
 setBitBigNat bn i#
   | inline testBitBigNat bn i# = bn
   | isTrue# (d# ># 0#) = runS $ do -- result BigNat will have more limbs
@@ -1158,7 +1356,7 @@ setBitBigNat bn i#
     !(# li#, bi# #) = quotRemInt# i# GMP_LIMB_BITS#
     nx# = sizeofBigNat# bn
     d# = li# +# 1# -# nx#
-
+#endif
 
 complementBitBigNat :: BigNat -> Int# -> BigNat
 complementBitBigNat bn i#
@@ -1166,11 +1364,20 @@ complementBitBigNat bn i#
   | True                = setBitBigNat bn i#
 
 popCountBigNat :: BigNat -> Int#
+#ifdef ghcjs_HOST_OS
+popCountBigNat (BN# bn#) = js_popCountBigNat bn#
+foreign import javascript unsafe "h$ghcjsbn_popCount_b($1)" js_popCountBigNat :: ByteArray# -> Int#
+#else
 popCountBigNat bn@(BN# ba#) = word2Int# (c_mpn_popcount ba# (sizeofBigNat# bn))
+#endif
 
 
 shiftLBigNat :: BigNat -> Int# -> BigNat
 shiftLBigNat x 0# = x
+#ifdef ghcjs_HOST_OS
+shiftLBigNat (BN# bn#) x# = BN# (js_shiftLBigNat bn# x#)
+foreign import javascript unsafe "h$ghcjsbn_shl_b($1,$2)" js_shiftLBigNat :: ByteArray# -> Int# -> ByteArray#
+#else
 shiftLBigNat x _ | isZeroBigNat x = zeroBigNat
 shiftLBigNat x@(BN# xba#) n# = runS $ do
     ymbn@(MBN# ymba#) <- newBigNat# yn#
@@ -1182,11 +1389,15 @@ shiftLBigNat x@(BN# xba#) n# = runS $ do
     xn# = sizeofBigNat# x
     yn# = xn# +# nlimbs# +# (nbits# /=# 0#)
     !(# nlimbs#, nbits# #) = quotRemInt# n# GMP_LIMB_BITS#
-
+#endif
 
 
 shiftRBigNat :: BigNat -> Int# -> BigNat
 shiftRBigNat x 0# = x
+#ifdef ghcjs_HOST_OS
+shiftRBigNat (BN# x#) n# = BN# (js_shiftRBigNat x# n#)
+foreign import javascript unsafe "h$ghcjsbn_shr_b($1,$2)" js_shiftRBigNat :: ByteArray# -> Int# -> ByteArray#
+#else
 shiftRBigNat x _ | isZeroBigNat x = zeroBigNat
 shiftRBigNat x@(BN# xba#) n#
   | isTrue# (nlimbs# >=# xn#) = zeroBigNat
@@ -1200,9 +1411,14 @@ shiftRBigNat x@(BN# xba#) n#
     xn# = sizeofBigNat# x
     yn# = xn# -# nlimbs#
     nlimbs# = quotInt# n# GMP_LIMB_BITS#
+#endif
 
 shiftRNegBigNat :: BigNat -> Int# -> BigNat
 shiftRNegBigNat x 0# = x
+#ifdef ghcjs_HOST_OS
+shiftRNegBigNat (BN# x#) n# = BN# (js_shiftRNegBigNat x# n#)
+foreign import javascript unsafe "h$ghcjsbn_shr_neg_b($1,$2)" js_shiftRNegBigNat :: ByteArray# -> Int# -> ByteArray#
+#else
 shiftRNegBigNat x _ | isZeroBigNat x = zeroBigNat
 shiftRNegBigNat x@(BN# xba#) n#
   | isTrue# (nlimbs# >=# xn#) = zeroBigNat
@@ -1216,9 +1432,13 @@ shiftRNegBigNat x@(BN# xba#) n#
     xn# = sizeofBigNat# x
     yn# = xn# -# nlimbs#
     nlimbs# = quotInt# (n# -# 1#) GMP_LIMB_BITS#
-
+#endif
 
 orBigNat :: BigNat -> BigNat -> BigNat
+#ifdef ghcjs_HOST_OS
+orBigNat (BN# x#) (BN# y#) = BN# (js_orBigNat x# y#)
+foreign import javascript unsafe "h$ghcjsbn_or_bb($1,$2)" js_orBigNat :: ByteArray# -> ByteArray# -> ByteArray#
+#else
 orBigNat x@(BN# x#) y@(BN# y#)
   | isZeroBigNat x = y
   | isZeroBigNat y = x
@@ -1235,9 +1455,13 @@ orBigNat x@(BN# x#) y@(BN# y#)
 
     nx# = sizeofBigNat# x
     ny# = sizeofBigNat# y
-
+#endif
 
 xorBigNat :: BigNat -> BigNat -> BigNat
+#ifdef ghcjs_HOST_OS
+xorBigNat (BN# x#) (BN# y#) = BN# (js_xorBigNat x# y#)
+foreign import javascript unsafe "h$ghcjsbn_xor_bb($1,$2)" js_xorBigNat :: ByteArray# -> ByteArray# -> ByteArray#
+#else
 xorBigNat x@(BN# x#) y@(BN# y#)
   | isZeroBigNat x = y
   | isZeroBigNat y = x
@@ -1254,9 +1478,14 @@ xorBigNat x@(BN# x#) y@(BN# y#)
 
     nx# = sizeofBigNat# x
     ny# = sizeofBigNat# y
+#endif
 
 -- | aka @\x y -> x .&. (complement y)@
 andnBigNat :: BigNat -> BigNat -> BigNat
+#ifdef ghcjs_HOST_OS
+andnBigNat (BN# x#) (BN# y#) = BN# (js_andnBigNat x# y#)
+foreign import javascript unsafe "h$ghcjsbn_andn_bb($1,$2)" js_andnBigNat :: ByteArray# -> ByteArray# -> ByteArray#
+#else
 andnBigNat x@(BN# x#) y@(BN# y#)
   | isZeroBigNat x = zeroBigNat
   | isZeroBigNat y = x
@@ -1272,9 +1501,13 @@ andnBigNat x@(BN# x#) y@(BN# y#)
        | True                 = ny#
     nx# = sizeofBigNat# x
     ny# = sizeofBigNat# y
-
+#endif
 
 andBigNat :: BigNat -> BigNat -> BigNat
+#ifdef ghcjs_HOST_OS
+andBigNat (BN# x#) (BN# y#) = BN# (js_andBigNat x# y#)
+foreign import javascript unsafe "h$ghcjsbn_and_bb($1,$2)" js_andBigNat :: ByteArray# -> ByteArray# -> ByteArray#
+#else
 andBigNat x@(BN# x#) y@(BN# y#)
   | isZeroBigNat x = zeroBigNat
   | isZeroBigNat y = zeroBigNat
@@ -1287,6 +1520,7 @@ andBigNat x@(BN# x#) y@(BN# y#)
        | True                 = ny#
     nx# = sizeofBigNat# x
     ny# = sizeofBigNat# y
+#endif
 
 -- | If divisor is zero, @(\# 'nullBigNat', 'nullBigNat' \#)@ is returned
 quotRemBigNat :: BigNat -> BigNat -> (# BigNat,BigNat #)
@@ -1294,6 +1528,10 @@ quotRemBigNat n@(BN# nba#) d@(BN# dba#)
   | isZeroBigNat d     = (# nullBigNat, nullBigNat #)
   | eqBigNatWord d 1## = (# n, zeroBigNat #)
   | n < d              = (# zeroBigNat, n #)
+#ifdef ghcjs_HOST_OS
+  | True = case js_quotRemBigNat nba# dba# of (# q, r #) -> (# BN# q, BN# r #)
+foreign import javascript unsafe "$r1 = []; $r2 = []; h$ghcjsbn_quotRem_bb($r1,$r2,$1,$2);" js_quotRemBigNat :: ByteArray# -> ByteArray# -> (# ByteArray#, ByteArray# #)
+#else
   | True = case runS go of (!q,!r) -> (# q, r #)
   where
     nn# = sizeofBigNat# n
@@ -1310,12 +1548,17 @@ quotRemBigNat n@(BN# nba#) d@(BN# dba#)
       q <- unsafeRenormFreezeBigNat# qmbn
       r <- unsafeRenormFreezeBigNat# rmbn
       return (q, r)
+#endif
 
 quotBigNat :: BigNat -> BigNat -> BigNat
 quotBigNat n@(BN# nba#) d@(BN# dba#)
   | isZeroBigNat d     = nullBigNat
   | eqBigNatWord d 1## = n
   | n < d              = zeroBigNat
+#ifdef ghcjs_HOST_OS
+  | True               = BN# (js_quotBigNat nba# dba#)
+foreign import javascript unsafe "h$ghcjsbn_quot_bb($1,$2)" js_quotBigNat :: ByteArray# -> ByteArray# -> ByteArray#
+#else
   | True = runS $ do
       let nn# = sizeofBigNat# n
       let dn# = sizeofBigNat# d
@@ -1323,23 +1566,34 @@ quotBigNat n@(BN# nba#) d@(BN# dba#)
       qmbn@(MBN# qmba#) <- newBigNat# qn#
       _ <- liftIO (c_mpn_tdiv_q qmba# nba# nn# dba# dn#)
       unsafeRenormFreezeBigNat# qmbn
+#endif
 
 remBigNat :: BigNat -> BigNat -> BigNat
 remBigNat n@(BN# nba#) d@(BN# dba#)
   | isZeroBigNat d     = nullBigNat
   | eqBigNatWord d 1## = zeroBigNat
   | n < d              = n
+#ifdef ghcjs_HOST_OS
+  | True               = BN# (js_remBigNat nba# dba#)
+foreign import javascript unsafe "h$ghcjsbn_rem_bb($1,$2)" js_remBigNat :: ByteArray# -> ByteArray# -> ByteArray#
+#else
   | True = runS $ do
       let nn# = sizeofBigNat# n
       let dn# = sizeofBigNat# d
       rmbn@(MBN# rmba#) <- newBigNat# dn#
       _ <- liftIO (c_mpn_tdiv_r rmba# nba# nn# dba# dn#)
       unsafeRenormFreezeBigNat# rmbn
+#endif
 
 -- | Note: Result of div/0 undefined
 quotRemBigNatWord :: BigNat -> GmpLimb# -> (# BigNat, GmpLimb# #)
 quotRemBigNatWord !_           0## = (# nullBigNat, 0## #)
 quotRemBigNatWord n            1## = (# n,          0## #)
+#ifdef ghcjs_HOST_OS
+quotRemBigNatWord (BN# nba#) d# =
+  case js_quotRemBigNatWord nba# d# of (# ba, w #) -> (# BN# ba, w #)
+foreign import javascript unsafe "$r1 = []; $r2 = h$ghcjsbn_quotRem_bw($r1,$1,$2);" js_quotRemBigNatWord :: ByteArray# -> Word#  -> (# ByteArray#, Word# #)
+#else
 quotRemBigNatWord n@(BN# nba#) d# = case compareBigNatWord n d# of
     LT -> (# zeroBigNat, bigNatToWord n #)
     EQ -> (# oneBigNat, 0## #)
@@ -1351,21 +1605,36 @@ quotRemBigNatWord n@(BN# nba#) d# = case compareBigNatWord n d# of
       r <- liftIO (c_mpn_divrem_1 qmba# 0# nba# nn# d#)
       q <- unsafeRenormFreezeBigNat# qmbn
       return (q,r)
+#endif
 
 quotBigNatWord :: BigNat -> GmpLimb# -> BigNat
 quotBigNatWord n d# = case inline quotRemBigNatWord n d# of (# q, _ #) -> q
 
 -- | div/0 not checked
 remBigNatWord :: BigNat -> GmpLimb# -> Word#
+#ifdef ghcjs_HOST_OS
+remBigNatWord (BN# ba#) w# = js_remBigNatWord ba# w#
+foreign import javascript unsafe "h$ghcjsbn_rem_bw($1,$2)" js_remBigNatWord :: ByteArray# -> Word# -> Word#
+#else
 remBigNatWord n@(BN# nba#) d# = c_mpn_mod_1 nba# (sizeofBigNat# n) d#
+#endif
 
 gcdBigNatWord :: BigNat -> Word# -> Word#
+#ifdef ghcjs_HOST_OS
+gcdBigNatWord (BN# ba#) w# = js_gcdBigNatWord ba# w#
+foreign import javascript unsafe "h$ghcjsbn_gcd_bw($1,$2)" js_gcdBigNatWord :: ByteArray# -> Word# -> Word#
+#else
 gcdBigNatWord bn@(BN# ba#) = c_mpn_gcd_1# ba# (sizeofBigNat# bn)
+#endif
 
 gcdBigNat :: BigNat -> BigNat -> BigNat
 gcdBigNat x@(BN# x#) y@(BN# y#)
   | isZeroBigNat x = y
   | isZeroBigNat y = x
+#ifdef ghcjs_HOST_OS
+  | True           = BN# (js_gcdBigNat x# y#)
+foreign import javascript unsafe "h$ghcjsbn_gcd_bb($1,$2)" js_gcdBigNat :: ByteArray# -> ByteArray# -> ByteArray#
+#else
   | isTrue# (nx# >=# ny#) = runS (gcd' x# nx# y# ny#)
   | True                  = runS (gcd' y# ny# x# nx#)
   where
@@ -1379,6 +1648,7 @@ gcdBigNat x@(BN# x#) y@(BN# y#)
 
     nx# = sizeofBigNat# x
     ny# = sizeofBigNat# y
+#endif
 
 -- | Extended euclidean algorithm.
 --
@@ -1398,6 +1668,20 @@ gcdExtInteger a b = case gcdExtSBigNat a' b' of
 
 -- internal helper
 gcdExtSBigNat :: SBigNat -> SBigNat -> (# BigNat, SBigNat #)
+#ifdef ghcjs_HOST_OS
+gcdExtSBigNat x y =
+  case js_gcdExtSBigNat xPos x# yPos y# of
+    (# b1#, b2#, False #) -> (# BN# b1#, NegBN (BN# b2#) #)
+    (# b1#, b2#, _     #) -> (# BN# b1#, PosBN (BN# b2#) #)
+  where
+    xPos = case x of (NegBN {}) -> False
+                     _          -> True
+    yPos = case y of (NegBN {}) -> False
+                     _          -> True
+    !(BN# x#) = absSBigNat x
+    !(BN# y#) = absSBigNat y
+foreign import javascript unsafe "$r1 = []; $r2 = []; $r3 = h$ghcjsbn_gcdExtSBigNat($r1,$r2,$1,$2,$3,$4)" js_gcdExtSBigNat :: Bool -> ByteArray# -> Bool -> ByteArray# -> (# ByteArray#, ByteArray#, Bool #)
+#else
 gcdExtSBigNat x y = case runS go of (g,s) -> (# g, s #)
   where
     go = do
@@ -1420,6 +1704,7 @@ gcdExtSBigNat x y = case runS go of (g,s) -> (# g, s #)
     yn# = ssizeofSBigNat# y
 
     gn0# = minI# (absI# xn#) (absI# yn#)
+#endif
 
 ----------------------------------------------------------------------------
 -- modular exponentiation
@@ -1499,6 +1784,17 @@ foreign import ccall unsafe "integer_gmp_powm_word"
 
 -- internal non-exported helper
 powModSBigNat :: SBigNat -> SBigNat -> BigNat -> BigNat
+#ifdef ghcjs_HOST_OS
+powModSBigNat b e (BN# m#) = BN# (js_powModSBigNat bPos b# ePos e# m#)
+  where
+    bPos = case b of NegBN {} -> False
+                     _        -> True
+    ePos = case e of NegBN {} -> False
+                     _        -> True
+    !(BN# b#) = absSBigNat b
+    !(BN# e#) = absSBigNat e
+foreign import javascript unsafe "h$ghcjsbn_powModSBigNat($1,$2,$3,$4,$5)" js_powModSBigNat :: Bool -> ByteArray# -> Bool -> ByteArray# -> ByteArray# -> ByteArray#
+#else
 powModSBigNat b e m@(BN# m#) = runS $ do
     r@(MBN# r#) <- newBigNat# mn#
     I# rn_# <- liftIO (integer_gmp_powm# r# b# bn# e# en# m# mn#)
@@ -1517,9 +1813,20 @@ foreign import ccall unsafe "integer_gmp_powm"
   integer_gmp_powm# :: MutableByteArray# RealWorld
                        -> ByteArray# -> GmpSize# -> ByteArray# -> GmpSize#
                        -> ByteArray# -> GmpSize# -> IO GmpSize
-
+#endif
 -- internal non-exported helper
 powModSBigNatWord :: SBigNat -> SBigNat -> GmpLimb# -> GmpLimb#
+#ifdef ghcjs_HOST_OS
+powModSBigNatWord b e m# = js_powModSBigNatWord bPos b# ePos e# m#
+  where
+    bPos = case b of NegBN {} -> False
+                     _        -> True
+    ePos = case e of NegBN {} -> False
+                     _        -> True
+    !(BN# b#) = absSBigNat b
+    !(BN# e#) = absSBigNat e
+foreign import javascript unsafe "h$ghcjsbn_powModSBigNatWord($1,$2,$3,$4,$5)" js_powModSBigNatWord :: Bool -> ByteArray# -> Bool -> ByteArray# -> Word# -> Word#
+#else
 powModSBigNatWord b e m# = integer_gmp_powm1# b# bn# e# en# m#
   where
     !(BN# b#) = absSBigNat b
@@ -1530,9 +1837,13 @@ powModSBigNatWord b e m# = integer_gmp_powm1# b# bn# e# en# m#
 foreign import ccall unsafe "integer_gmp_powm1"
   integer_gmp_powm1# :: ByteArray# -> GmpSize# -> ByteArray# -> GmpSize#
                         -> GmpLimb# -> GmpLimb#
+#endif
 
 -- internal non-exported helper
 powModSecSBigNat :: SBigNat -> SBigNat -> BigNat -> BigNat
+#ifdef ghcjs_HOST_OS
+powModSecSBigNat _ _ _ = nullBigNat -- undefined -- error "powModSecSBigNat"
+#else
 powModSecSBigNat b e m@(BN# m#) = runS $ do
     r@(MBN# r#) <- newBigNat# mn#
     I# rn_# <- liftIO (integer_gmp_powm_sec# r# b# bn# e# en# m# mn#)
@@ -1551,7 +1862,7 @@ foreign import ccall unsafe "integer_gmp_powm_sec"
   integer_gmp_powm_sec# :: MutableByteArray# RealWorld
                            -> ByteArray# -> GmpSize# -> ByteArray# -> GmpSize#
                            -> ByteArray# -> GmpSize# -> IO GmpSize
-
+#endif
 
 -- | \"@'recipModInteger' /x/ /m/@\" computes the inverse of @/x/@ modulo @/m/@. If
 -- the inverse exists, the return value @/y/@ will satisfy @0 < /y/ <
@@ -1572,7 +1883,12 @@ recipModInteger x m = bigNatToInteger (recipModSBigNat x' m')
 --
 -- @since 1.0.0.0
 recipModBigNat :: BigNat -> BigNat -> BigNat
+#ifdef ghcjs_HOST_OS
+recipModBigNat (BN# x#) (BN# m#) = BN# (js_recipModBigNat x# m#)
+foreign import javascript unsafe "h$ghcjsbn_recipMod_bb($1,$2)" js_recipModBigNat :: ByteArray# -> ByteArray# -> ByteArray#
+#else
 recipModBigNat x m = inline recipModSBigNat (PosBN x) m
+#endif
 
 -- | Version of 'recipModInteger' operating on 'Word#'s
 --
@@ -1582,6 +1898,11 @@ foreign import ccall unsafe "integer_gmp_invert_word"
 
 -- internal non-exported helper
 recipModSBigNat :: SBigNat -> BigNat -> BigNat
+#ifdef ghcjs_HOST_OS
+recipModSBigNat (PosBN (BN# x#)) (BN# y#) = BN# (js_recipModSBigNat True  x# y#)
+recipModSBigNat (NegBN (BN# x#)) (BN# y#) = BN# (js_recipModSBigNat False x# y#)
+foreign import javascript unsafe "h$ghcjsbn_recipModS_bb($1,$2,$3)" js_recipModSBigNat :: Bool -> ByteArray# -> ByteArray# -> ByteArray#
+#else
 recipModSBigNat x m@(BN# m#) = runS $ do
     r@(MBN# r#) <- newBigNat# mn#
     I# rn_# <- liftIO (integer_gmp_invert# r# x# xn# m# mn#)
@@ -1598,6 +1919,7 @@ foreign import ccall unsafe "integer_gmp_invert"
   integer_gmp_invert# :: MutableByteArray# RealWorld
                          -> ByteArray# -> GmpSize#
                          -> ByteArray# -> GmpSize# -> IO GmpSize
+#endif
 
 ----------------------------------------------------------------------------
 -- Conversions to/from floating point
@@ -1619,11 +1941,19 @@ foreign import ccall unsafe "__int_encodeDouble"
 
 encodeDoubleInteger :: Integer -> Int# -> Double#
 encodeDoubleInteger (S# m#) 0# = int2Double# m#
+#ifdef ghcjs_HOST_OS
+encodeDoubleInteger (S# m#) e#         = js_encodeDoubleInt m# e#
+encodeDoubleInteger (Jp# (BN# bn#)) e# = js_encodeDoubleBigNat True  bn# e#
+encodeDoubleInteger (Jn# (BN# bn#)) e# = js_encodeDoubleBigNat False bn# e#
+foreign import javascript unsafe "h$ghcjsbn_encodeDouble_s($1,$2)" js_encodeDoubleInt :: Int# -> Int# -> Double#
+foreign import javascript unsafe "h$ghcjsbn_encodeDouble_b($1,$2,$3)" js_encodeDoubleBigNat :: Bool -> ByteArray# -> Int# -> Double#
+#else
 encodeDoubleInteger (S# m#) e# = int_encodeDouble# m# e#
 encodeDoubleInteger (Jp# bn@(BN# bn#)) e#
     = c_mpn_get_d bn# (sizeofBigNat# bn) e#
 encodeDoubleInteger (Jn# bn@(BN# bn#)) e#
     = c_mpn_get_d bn# (negateInt# (sizeofBigNat# bn)) e#
+#endif
 {-# CONSTANT_FOLDED encodeDoubleInteger #-}
 
 -- double integer_gmp_mpn_get_d (const mp_limb_t sp[], const mp_size_t sn)
@@ -1632,10 +1962,16 @@ foreign import ccall unsafe "integer_gmp_mpn_get_d"
 
 doubleFromInteger :: Integer -> Double#
 doubleFromInteger (S# m#) = int2Double# m#
+#ifdef ghcjs_HOST_OS
+doubleFromInteger (Jp# (BN# bn#)) = js_doubleFromBigNat True  bn#
+doubleFromInteger (Jn# (BN# bn#)) = js_doubleFromBigNat False bn#
+foreign import javascript unsafe "h$ghcjsbn_toDouble_b($1,$2)" js_doubleFromBigNat :: Bool -> ByteArray# -> Double#
+#else
 doubleFromInteger (Jp# bn@(BN# bn#))
     = c_mpn_get_d bn# (sizeofBigNat# bn) 0#
 doubleFromInteger (Jn# bn@(BN# bn#))
     = c_mpn_get_d bn# (negateInt# (sizeofBigNat# bn)) 0#
+#endif
 {-# CONSTANT_FOLDED doubleFromInteger #-}
 
 -- TODO: Not sure if it's worth to write 'Float' optimized versions here
@@ -1648,8 +1984,12 @@ encodeFloatInteger m e = double2Float# (encodeDoubleInteger m e)
 ----------------------------------------------------------------------------
 -- FFI ccall imports
 
+#ifdef ghcjs_HOST_OS
+foreign import javascript unsafe "h$ghcjsbn_gcd_ww($1,$2)" gcdWord# :: Word# -> Word# -> Word#
+#else
 foreign import ccall unsafe "integer_gmp_gcd_word"
   gcdWord# :: GmpLimb# -> GmpLimb# -> GmpLimb#
+#endif
 
 foreign import ccall unsafe "integer_gmp_mpn_gcd_1"
   c_mpn_gcd_1# :: ByteArray# -> GmpSize# -> GmpLimb# -> GmpLimb#
@@ -1781,9 +2121,16 @@ foreign import ccall unsafe "gmp.h __gmpn_popcount"
 --
 -- The result is always @>= 1@ since even zero is encoded with 1 limb.
 sizeofBigNat# :: BigNat -> GmpSize#
+#ifdef ghcjs_HOST_OS
+-- returns number of words instead
+sizeofBigNat# (BN# x#) = js_sizeofBigNat x#
+foreign import javascript unsafe "h$ghcjsbn_sizeof_b($1)" js_sizeofBigNat :: ByteArray# -> Int#
+#else
 sizeofBigNat# (BN# x#)
     = sizeofByteArray# x# `uncheckedIShiftRL#` GMP_LIMB_SHIFT#
+#endif
 
+#ifndef ghcjs_HOST_OS
 data MutBigNat s = MBN# !(MutableByteArray# s)
 
 getSizeofMutBigNat# :: MutBigNat s -> State# s -> (# State# s, GmpSize# #)
@@ -1799,12 +2146,19 @@ newBigNat# limbs# s =
 
 writeBigNat# :: MutBigNat s -> GmpSize# -> GmpLimb# -> State# s -> State# s
 writeBigNat# (MBN# mba#) = writeWordArray# mba#
+#endif
 
 -- | Extract /n/-th (0-based) limb in 'BigNat'.
 -- /n/ must be less than size as reported by 'sizeofBigNat#'.
 indexBigNat# :: BigNat -> GmpSize# -> GmpLimb#
+#ifdef ghcjs_HOST_OS
+indexBigNat# (BN# ba#) w# = js_indexBigNat ba# w#
+foreign import javascript unsafe "h$ghcjsbn_index_b($1,$2)" js_indexBigNat :: ByteArray# -> Int# -> Word#
+#else
 indexBigNat# (BN# ba#) = indexWordArray# ba#
+#endif
 
+#ifndef ghcjs_HOST_OS
 unsafeFreezeBigNat# :: MutBigNat s -> S s BigNat
 unsafeFreezeBigNat# (MBN# mba#) s = case unsafeFreezeByteArray# mba# s of
                                       (# s', ba# #) -> (# s', BN# ba# #)
@@ -1901,7 +2255,7 @@ normSizeofMutBigNat'# (MBN# mba) = go
     go i0# s = case readWordArray# mba (i0# -# 1#) s of
         (# s', 0## #) -> go (i0# -# 1#) s'
         (# s', _  #) -> (# s', i0# #)
-
+#endif
 -- | Construct 'BigNat' from existing 'ByteArray#' containing /n/
 -- 'GmpLimb's in least-significant-first order.
 --
@@ -1911,6 +2265,10 @@ normSizeofMutBigNat'# (MBN# mba) = go
 -- Note: size parameter (times @sizeof(GmpLimb)@) must be less or
 -- equal to its 'sizeofByteArray#'.
 byteArrayToBigNat# :: ByteArray# -> GmpSize# -> BigNat
+#ifdef ghcjs_HOST_OS
+byteArrayToBigNat# ba# n# = BN# (js_byteArrayToBigNat ba# n#)
+foreign import javascript unsafe "h$ghcjsbn_byteArrayToBigNat($1, $2)" js_byteArrayToBigNat :: ByteArray# -> GmpSize# -> ByteArray#
+#else
 byteArrayToBigNat# ba# n0#
   | isTrue# (n#  ==# 0#)    = zeroBigNat
   | isTrue# (baszr# ==# 0#) -- i.e. ba# is multiple of limb-size
@@ -1925,6 +2283,7 @@ byteArrayToBigNat# ba# n0#
     !(# baszq#, baszr# #) = quotRemInt# (sizeofByteArray# ba#) GMP_LIMB_BYTES#
 
     n#  = fmssl (BN# ba#) (n0# -# 1#)
+#endif
 
 -- | Read 'Integer' (without sign) from memory location at @/addr/@ in
 -- base-256 representation.
@@ -1942,6 +2301,11 @@ importIntegerFromAddr addr len msbf = IO $ do
 -- | Version of 'importIntegerFromAddr' constructing a 'BigNat'
 importBigNatFromAddr :: Addr# -> Word# -> Int# -> IO BigNat
 importBigNatFromAddr _ 0## _ = IO (\s -> (# s, zeroBigNat #))
+#ifdef ghcjs_HOST_OS
+importBigNatFromAddr addr len msbf = IO $ \s ->
+  case js_importBigNatFromAddr addr len msbf s of (# s', ba #) -> (# s', BN# ba #)
+foreign import javascript unsafe "h$ghcjsbn_importBigNatFromAddr($1_1, $1_2, $2, $3)" js_importBigNatFromAddr :: Addr# -> Word# -> Int# -> State# s -> (# State# s,  ByteArray# #)
+#else
 importBigNatFromAddr addr len0 1# = IO $ do -- MSBF
     W# ofs <- liftIO (c_scan_nzbyte_addr addr 0## len0)
     let len = len0 `minusWord#` ofs
@@ -1971,6 +2335,7 @@ importBigNatFromAddr# addr len msbf = do
 foreign import ccall unsafe "integer_gmp_mpn_import"
     c_mpn_import_addr :: MutableByteArray# RealWorld -> Addr# -> Word# -> Word#
                       -> Int# -> IO ()
+#endif
 
 -- | Read 'Integer' (without sign) from byte-array in base-256 representation.
 --
@@ -1995,6 +2360,11 @@ importIntegerFromByteArray ba ofs len msbf
 -- | Version of 'importIntegerFromByteArray' constructing a 'BigNat'
 importBigNatFromByteArray :: ByteArray# -> Word# -> Word# -> Int# -> BigNat
 importBigNatFromByteArray _  _    0##  _  = zeroBigNat
+#ifdef ghcjs_HOST_OS
+importBigNatFromByteArray ba ofs len msbf =
+  BN# (js_importBigNatFromByteArray ba ofs len msbf)
+foreign import javascript unsafe "h$ghcjsbn_importBigNatFromByteArray($1,$2,$3,$4)" js_importBigNatFromByteArray :: ByteArray# -> Word# -> Word# -> Int# -> ByteArray#
+#else
 importBigNatFromByteArray ba ofs0 len0 1# = runS $ do -- MSBF
     W# ofs <- liftIO (c_scan_nzbyte_bytearray ba ofs0 len0)
     let len = (len0 `plusWord#` ofs0) `minusWord#` ofs
@@ -2024,6 +2394,7 @@ importBigNatFromByteArray# ba ofs len msbf = do
 foreign import ccall unsafe "integer_gmp_mpn_import"
     c_mpn_import_bytearray :: MutableByteArray# RealWorld -> ByteArray# -> Word#
                            -> Word# -> Int# -> IO ()
+#endif
 
 -- | Test whether all internal invariants are satisfied by 'BigNat' value
 --
@@ -2032,6 +2403,10 @@ foreign import ccall unsafe "integer_gmp_mpn_import"
 -- This operation is mostly useful for test-suites and/or code which
 -- constructs 'Integer' values directly.
 isValidBigNat# :: BigNat -> Int#
+#ifdef ghcjs_HOST_OS
+isValidBigNat# (BN# bn#) = js_isValidBigNat bn#
+foreign import javascript unsafe "h$ghcjsbn_isValid_b($1)" js_isValidBigNat :: ByteArray# -> Int#
+#else
 isValidBigNat# (BN# ba#)
   = (szq# ># 0#) `andI#` (szr# ==# 0#) `andI#` isNorm#
   where
@@ -2042,11 +2417,16 @@ isValidBigNat# (BN# ba#)
     sz# = sizeofByteArray# ba#
 
     !(# szq#, szr# #) = quotRemInt# sz# GMP_LIMB_BYTES#
+#endif
 
 -- | Version of 'nextPrimeInteger' operating on 'BigNat's
 --
 -- @since 1.0.0.0
 nextPrimeBigNat :: BigNat -> BigNat
+#ifdef ghcjs_HOST_OS
+nextPrimeBigNat (BN# bn#) = BN# (js_nextPrimeBigNat bn#)
+foreign import javascript unsafe "h$ghcjsbn_nextPrime_b($1)" js_nextPrimeBigNat :: ByteArray# -> ByteArray#
+#else
 nextPrimeBigNat bn@(BN# ba#) = runS $ do
     mbn@(MBN# mba#) <- newBigNat# n#
     (W# c#) <- liftIO (nextPrime# mba# ba# n#)
@@ -2059,7 +2439,7 @@ nextPrimeBigNat bn@(BN# ba#) = runS $ do
 foreign import ccall unsafe "integer_gmp_next_prime"
   nextPrime# :: MutableByteArray# RealWorld -> ByteArray# -> GmpSize#
                 -> IO GmpLimb
-
+#endif
 ----------------------------------------------------------------------------
 -- monadic combinators for low-level state threading
 
@@ -2114,10 +2494,12 @@ absSBigNat :: SBigNat -> BigNat
 absSBigNat (NegBN bn) = bn
 absSBigNat (PosBN bn) = bn
 
+#ifndef ghcjs_HOST_OS
 -- | /Signed/ limb count. Negative sizes denote negative integers
 ssizeofSBigNat# :: SBigNat -> GmpSize#
 ssizeofSBigNat# (NegBN bn) = negateInt# (sizeofBigNat# bn)
 ssizeofSBigNat# (PosBN bn) = sizeofBigNat# bn
+#endif
 
 -- | Construct 'SBigNat' from 'Int#' value
 intToSBigNat# :: Int# -> SBigNat

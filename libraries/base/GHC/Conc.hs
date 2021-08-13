@@ -93,14 +93,14 @@ module GHC.Conc
         , asyncWriteBA
 #endif
 
-#if !defined(mingw32_HOST_OS)
+#if !defined(mingw32_HOST_OS) || defined(ghcjs_HOST_OS)
         , Signal, HandlerFun, setHandler, runHandlers
 #endif
 
         , ensureIOManagerIsRunning
         , ioManagerCapabilitiesChanged
 
-#if defined(mingw32_HOST_OS)
+#if defined(mingw32_HOST_OS) && !defined(ghcjs_HOST_OS)
         , ConsoleEvent(..)
         , win32ConsoleHandler
         , toWin32ConsoleEvent
@@ -114,6 +114,6 @@ module GHC.Conc
 import GHC.Conc.IO
 import GHC.Conc.Sync
 
-#if !defined(mingw32_HOST_OS)
+#if !defined(mingw32_HOST_OS) || defined(ghcjs_HOST_OS)
 import GHC.Conc.Signal
 #endif

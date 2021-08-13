@@ -382,23 +382,25 @@ Library
         other-modules:
             System.CPUTime.Windows
     else
-        exposed-modules:
-            GHC.Event
-        other-modules:
-            GHC.Event.Arr
-            GHC.Event.Array
-            GHC.Event.Control
-            GHC.Event.EPoll
-            GHC.Event.IntTable
-            GHC.Event.Internal
-            GHC.Event.KQueue
-            GHC.Event.Manager
-            GHC.Event.PSQ
-            GHC.Event.Poll
-            GHC.Event.Thread
-            GHC.Event.TimerManager
-            GHC.Event.Unique
+        if !os(ghcjs)
+            exposed-modules:
+                GHC.Event
+            other-modules:
+                GHC.Event.Arr
+                GHC.Event.Array
+                GHC.Event.Control
+                GHC.Event.EPoll
+                GHC.Event.IntTable
+                GHC.Event.Internal
+                GHC.Event.KQueue
+                GHC.Event.Manager
+                GHC.Event.PSQ
+                GHC.Event.Poll
+                GHC.Event.Thread
+                GHC.Event.TimerManager
+                GHC.Event.Unique
 
+        other-modules:
             System.CPUTime.Posix.ClockGetTime
             System.CPUTime.Posix.Times
             System.CPUTime.Posix.RUsage
@@ -409,6 +411,12 @@ Library
     -- See /usr/ports/Mk/Uses/iconv.mk
     if os(freebsd)
         cc-options: -DLIBICONV_PLUG
+    
+    if os(ghcjs)
+        exposed-modules:
+            GHCJS.Prim
+            GHCJS.Prim.Internal
+            GHCJS.Prim.Internal.Build
 
     -- We need to set the unit id to base (without a version number)
     -- as it's magic.

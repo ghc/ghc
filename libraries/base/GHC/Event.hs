@@ -1,5 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE CPP #-}
 
 -- ----------------------------------------------------------------------------
 -- | This module provides scalable event notification for file
@@ -10,6 +11,9 @@
 -- ----------------------------------------------------------------------------
 
 module GHC.Event
+#ifdef ghcjs_HOST_OS
+    ( ) where
+#else
     ( -- * Types
       EventManager
     , TimerManager
@@ -44,3 +48,4 @@ import GHC.Event.TimerManager (TimeoutCallback, TimeoutKey, registerTimeout,
                                updateTimeout, unregisterTimeout, TimerManager)
 import GHC.Event.Thread (getSystemEventManager, getSystemTimerManager)
 
+#endif

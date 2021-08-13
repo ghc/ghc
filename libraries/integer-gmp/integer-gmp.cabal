@@ -67,8 +67,13 @@ library
   cc-options: -std=c99 -Wall
 
   include-dirs: include
-  c-sources:
-    cbits/wrappers.c
+  
+  if(!os(ghcjs))
+    c-sources:
+      cbits/wrappers.c
+
+  js-sources:
+    jsbits/ghcjsbn.js.pp
 
   exposed-modules:
     GHC.Integer

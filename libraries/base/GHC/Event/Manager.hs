@@ -19,6 +19,9 @@
 -- polling if available. Otherwise we use multi-shot polling.
 
 module GHC.Event.Manager
+#ifdef ghcjs_HOST_OS
+    () where
+#else
     ( -- * Types
       EventManager
 
@@ -522,3 +525,6 @@ nullToNothing xs@(_:_) = Just xs
 
 unless :: Monad m => Bool -> m () -> m ()
 unless p = when (not p)
+
+#endif
+

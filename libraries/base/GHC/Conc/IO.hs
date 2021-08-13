@@ -64,19 +64,21 @@ import qualified GHC.Conc.Windows as Windows
 import GHC.Conc.Windows (asyncRead, asyncWrite, asyncDoProc, asyncReadBA,
                          asyncWriteBA, ConsoleEvent(..), win32ConsoleHandler,
                          toWin32ConsoleEvent)
-#else
+#elif !defined(ghcjs_HOST_OS)
 import qualified GHC.Event.Thread as Event
 #endif
 
 ensureIOManagerIsRunning :: IO ()
-#if !defined(mingw32_HOST_OS)
-ensureIOManagerIsRunning = Event.ensureIOManagerIsRunning
-#else
+#if defined(mingw32_HOST_OS)
 ensureIOManagerIsRunning = Windows.ensureIOManagerIsRunning
+#elif defined(ghcjs_HOST_OS)
+ensureIOManagerIsRunning = pure ()
+#else
+ensureIOManagerIsRunning = Event.ensureIOManagerIsRunning
 #endif
 
 ioManagerCapabilitiesChanged :: IO ()
-#if !defined(mingw32_HOST_OS)
+#if !defined(mingw32_HOST_OS) && !defined(ghcjs_HOST_OS)
 ioManagerCapabilitiesChanged = Event.ioManagerCapabilitiesChanged
 #else
 ioManagerCapabilitiesChanged = return ()
@@ -90,7 +92,7 @@ ioManagerCapabilitiesChanged = return ()
 -- that has been used with 'threadWaitRead', use 'closeFdWith'.
 threadWaitRead :: Fd -> IO ()
 threadWaitRead fd
-#if !defined(mingw32_HOST_OS)
+#if !defined(mingw32_HOST_OS) && !defined(ghcjs_HOST_OS)
   | threaded  = Event.threadWaitRead fd
 #endif
   | otherwise = IO $ \s ->
@@ -106,7 +108,7 @@ threadWaitRead fd
 -- that has been used with 'threadWaitWrite', use 'closeFdWith'.
 threadWaitWrite :: Fd -> IO ()
 threadWaitWrite fd
-#if !defined(mingw32_HOST_OS)
+#if !defined(mingw32_HOST_OS) && !defined(ghcjs_HOST_OS)
   | threaded  = Event.threadWaitWrite fd
 #endif
   | otherwise = IO $ \s ->
@@ -120,7 +122,7 @@ threadWaitWrite fd
 -- in the file descriptor.
 threadWaitReadSTM :: Fd -> IO (Sync.STM (), IO ())
 threadWaitReadSTM fd
-#if !defined(mingw32_HOST_OS)
+#if !defined(mingw32_HOST_OS) && !defined(ghcjs_HOST_OS)
   | threaded  = Event.threadWaitReadSTM fd
 #endif
   | otherwise = do
@@ -139,7 +141,7 @@ threadWaitReadSTM fd
 -- in the file descriptor.
 threadWaitWriteSTM :: Fd -> IO (Sync.STM (), IO ())
 threadWaitWriteSTM fd
-#if !defined(mingw32_HOST_OS)
+#if !defined(mingw32_HOST_OS) && !defined(ghcjs_HOST_OS)
   | threaded  = Event.threadWaitWriteSTM fd
 #endif
   | otherwise = do
@@ -164,7 +166,7 @@ closeFdWith :: (Fd -> IO ()) -- ^ Low-level action that performs the real close.
             -> Fd            -- ^ File descriptor to close.
             -> IO ()
 closeFdWith close fd
-#if !defined(mingw32_HOST_OS)
+#if !defined(mingw32_HOST_OS) && !defined(ghcjs_HOST_OS)
   | threaded  = Event.closeFdWith close fd
 #endif
   | otherwise = close fd
@@ -180,7 +182,7 @@ threadDelay :: Int -> IO ()
 threadDelay time
 #if defined(mingw32_HOST_OS)
   | threaded  = Windows.threadDelay time
-#else
+#elif !defined(ghcjs_HOST_OS)
   | threaded  = Event.threadDelay time
 #endif
   | otherwise = IO $ \s ->
@@ -196,7 +198,7 @@ registerDelay :: Int -> IO (TVar Bool)
 registerDelay usecs
 #if defined(mingw32_HOST_OS)
   | threaded = Windows.registerDelay usecs
-#else
+#elif !defined(ghcjs_HOST_OS)
   | threaded = Event.registerDelay usecs
 #endif
   | otherwise = errorWithoutStackTrace "registerDelay: requires -threaded"

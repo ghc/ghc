@@ -142,8 +142,11 @@ mkGlobal x = unsafePerformIO $ do
 
 -- | @since 4.5.0.0
 initLocaleEncoding, initFileSystemEncoding, initForeignEncoding :: TextEncoding
-
-#if !defined(mingw32_HOST_OS)
+#if defined(ghcjs_HOST_OS)
+initLocaleEncoding     = utf8
+initFileSystemEncoding = utf8
+initForeignEncoding    = utf8
+#elif !defined(mingw32_HOST_OS)
 -- It is rather important that we don't just call Iconv.mkIconvEncoding here
 -- because some iconvs (in particular GNU iconv) will brokenly UTF-8 encode
 -- lone surrogates without complaint.

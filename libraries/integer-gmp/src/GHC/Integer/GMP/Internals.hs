@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
+
 {-# LANGUAGE CApiFFI #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE UnboxedTuples #-}
@@ -202,10 +203,15 @@ sizeInBaseInteger (Jn# bn) = sizeInBaseBigNat bn
 --
 -- @since 1.0.0.0
 sizeInBaseBigNat :: BigNat -> Int# -> Word#
+#ifdef ghcjs_HOST_OS
+sizeInBaseBigNat (BN# ba#) = js_sizeInBaseBigNat ba#
+foreign import javascript unsafe "h$ghcjsbn_sizeInBase_b($1,$2)" js_sizeInBaseBigNat :: ByteArray# -> Int# -> Word#
+#else
 sizeInBaseBigNat bn@(BN# ba#) = c_mpn_sizeinbase# ba# (sizeofBigNat# bn)
 
 foreign import ccall unsafe "integer_gmp_mpn_sizeinbase"
   c_mpn_sizeinbase# :: ByteArray# -> GmpSize# -> Int# -> Word#
+#endif
 
 -- | Version of 'sizeInBaseInteger' operating on 'Word#'
 --
@@ -227,21 +233,31 @@ exportIntegerToAddr (Jn# bn) = exportBigNatToAddr bn
 
 -- | Version of 'exportIntegerToAddr' operating on 'BigNat's.
 exportBigNatToAddr :: BigNat -> Addr# -> Int# -> IO Word
+#ifdef ghcjs_HOST_OS
+exportBigNatToAddr (BN# ba#) addr# e# = js_exportBigNatToAddr ba# addr# e#
+foreign import javascript unsafe "h$ghcjsbn_exportToAddr_b($1,$2_1,$2_2,$3)" js_exportBigNatToAddr :: ByteArray# -> Addr# -> Int# -> IO Word
+#else
 exportBigNatToAddr bn@(BN# ba#) addr e
   = c_mpn_exportToAddr# ba# (sizeofBigNat# bn) addr 0# e
 
 foreign import ccall unsafe "integer_gmp_mpn_export"
   c_mpn_exportToAddr# :: ByteArray# -> GmpSize# -> Addr# -> Int# -> Int#
                          -> IO Word
+#endif
 
 -- | Version of 'exportIntegerToAddr' operating on 'Word's.
 exportWordToAddr :: Word -> Addr# -> Int# -> IO Word
+#ifdef ghcjs_HOST_OS
+exportWordToAddr (W# w#) addr# e# = js_exportWordToAddr w# addr# e#
+foreign import javascript unsafe "h$ghcjsbn_exportToAddr_w($1,$2_1,$2_2,$3)" js_exportWordToAddr :: Word# -> Addr# -> Int# -> IO Word
+#else
 exportWordToAddr (W# w#) addr
   = c_mpn_export1ToAddr# w# addr 0# -- TODO: we don't calling GMP for that
 
 foreign import ccall unsafe "integer_gmp_mpn_export1"
   c_mpn_export1ToAddr# :: GmpLimb# -> Addr# -> Int# -> Int#
                           -> IO Word
+#endif
 
 -- | Dump 'Integer' (without sign) to mutable byte-array in base-256
 -- representation.
@@ -283,6 +299,10 @@ exportIntegerToMutableByteArray (Jn# bn) = exportBigNatToMutableByteArray bn
 -- @since 1.0.0.0
 exportBigNatToMutableByteArray :: BigNat -> MutableByteArray# RealWorld -> Word#
                                -> Int# -> IO Word
+#ifdef ghcjs_HOST_OS
+exportBigNatToMutableByteArray (BN# ba#) mba# off# msbf# = js_exportBigNatToMutableByteArray ba# mba# off# msbf#
+foreign import javascript unsafe "h$ghcjsbn_exportToMutableByteArray_b($1,$2,$3,$4)" js_exportBigNatToMutableByteArray :: ByteArray# -> MutableByteArray# RealWorld -> Word# -> Int# -> IO Word
+#else
 exportBigNatToMutableByteArray bn@(BN# ba#)
   = c_mpn_exportToMutableByteArray# ba# (sizeofBigNat# bn)
 
@@ -290,18 +310,23 @@ foreign import ccall unsafe "integer_gmp_mpn_export"
   c_mpn_exportToMutableByteArray# :: ByteArray# -> GmpSize#
                                   -> MutableByteArray# RealWorld -> Word#
                                   -> Int# -> IO Word
+#endif
 
 -- | Version of 'exportIntegerToMutableByteArray' operating on 'Word's.
 --
 -- @since 1.0.0.0
 exportWordToMutableByteArray :: Word -> MutableByteArray# RealWorld -> Word#
                              -> Int# -> IO Word
+#ifdef ghcjs_HOST_OS
+exportWordToMutableByteArray (W# w#) mba# off# msbf# = js_exportWordToMutableByteArray w# mba# off# msbf#
+foreign import javascript unsafe "h$ghcjsbn_exportToMutableByteArray_w($1,$2,$3,$4)" js_exportWordToMutableByteArray :: Word# -> MutableByteArray# RealWorld -> Word# -> Int# -> IO Word
+#else
 exportWordToMutableByteArray (W# w#) = c_mpn_export1ToMutableByteArray# w#
 
 foreign import ccall unsafe "integer_gmp_mpn_export1"
   c_mpn_export1ToMutableByteArray# :: GmpLimb# -> MutableByteArray# RealWorld
                                    -> Word# -> Int# -> IO Word
-
+#endif
 
 -- | Probalistic Miller-Rabin primality test.
 --
@@ -329,17 +354,27 @@ testPrimeInteger (Jn# n) = testPrimeBigNat n
 --
 -- @since 1.0.0.0
 testPrimeBigNat :: BigNat -> Int# -> Int#
+#ifdef ghcjs_HOST_OS
+testPrimeBigNat (BN# ba#) r# = js_testPrimeBigNat ba# r#
+foreign import javascript unsafe "h$ghcjsbn_testPrime_b($1,$2)" js_testPrimeBigNat :: ByteArray# -> Int# -> Int#
+#else
 testPrimeBigNat bn@(BN# ba#) = c_integer_gmp_test_prime# ba# (sizeofBigNat# bn)
 
 foreign import ccall unsafe "integer_gmp_test_prime"
   c_integer_gmp_test_prime# :: ByteArray# -> GmpSize# -> Int# -> Int#
+#endif
 
 -- | Version of 'testPrimeInteger' operating on 'Word#'s
 --
 -- @since 1.0.0.0
+#ifdef ghcjs_HOST_OS
+testPrimeWord# :: GmpLimb# -> Int# -> Int#
+testPrimeWord# w# r# = js_testPrimeWord w# r#
+foreign import javascript unsafe "h$ghcjsbn_testPrime_w($1,$2)" js_testPrimeWord :: Word# -> Int# -> Int#
+#else
 foreign import ccall unsafe "integer_gmp_test_prime1"
   testPrimeWord# :: GmpLimb# -> Int# -> Int#
-
+#endif
 
 -- | Compute next prime greater than @/n/@ probalistically.
 --

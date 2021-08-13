@@ -40,7 +40,9 @@ module GHC.Types (
 
         -- * Runtime type representation
         Module(..), TrName(..), TyCon(..), TypeLitSort(..),
-        KindRep(..), KindBndr
+        KindRep(..), KindBndr,
+
+        JSVal(..)
     ) where
 
 import GHC.Prim
@@ -496,3 +498,16 @@ data TyCon = TyCon WORD64_TY WORD64_TY   -- Fingerprint
                    TrName                -- Type constructor name
                    Int#                  -- How many kind variables do we accept?
                    KindRep               -- A representation of the type's kind
+
+{-
+  JSVal is a boxed type that can be used as FFI
+  argument or result.
+-}
+-- XXX we should probably use a new primitive type for this
+-- #ifdef ghcjs_HOST_OS
+data JSVal  = JSVal ByteArray#
+type JSVal# = ByteArray#
+-- #else
+-- data JSVal  = JSVal Addr#
+-- type JSVal# = Addr#
+-- #endif

@@ -19,6 +19,9 @@
 
 -- #not-home
 module GHC.Conc.Windows
+#ifdef ghcjs_HOST_OS
+       () where
+#else
        ( ensureIOManagerIsRunning
 
        -- * Waiting
@@ -339,3 +342,4 @@ foreign import ccall unsafe "sendIOManagerEvent" -- in the RTS (ThrIOManager.c)
 foreign import WINDOWS_CCONV "WaitForSingleObject"
    c_WaitForSingleObject :: HANDLE -> DWORD -> IO DWORD
 
+#endif

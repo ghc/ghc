@@ -21,6 +21,10 @@
 -----------------------------------------------------------------------------
 
 module GHC.Windows (
+#ifdef ghcjs_HOST_OS
+                   ) where
+
+#else
         -- * Types
         BOOL,
         LPBOOL,
@@ -194,3 +198,5 @@ foreign import WINDOWS_CCONV unsafe "windows.h LocalFree"
 -- | Get the last system error produced in the current thread.
 foreign import WINDOWS_CCONV unsafe "windows.h GetLastError"
     getLastError :: IO ErrCode
+
+#endif

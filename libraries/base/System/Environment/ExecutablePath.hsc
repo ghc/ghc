@@ -18,6 +18,13 @@
 
 module System.Environment.ExecutablePath ( getExecutablePath ) where
 
+##if defined(ghcjs_HOST_OS)
+
+getExecutablePath :: IO FilePath
+getExecutablePath = return "a.jsexe"
+
+##else
+
 -- The imports are purposely kept completely disjoint to prevent edits
 -- to one OS implementation from breaking another.
 
@@ -297,3 +304,5 @@ getExecutablePath =
 --------------------------------------------------------------------------------
 
 #endif
+
+##endif

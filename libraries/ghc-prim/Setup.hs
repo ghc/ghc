@@ -11,6 +11,9 @@ import Distribution.Simple
 import Distribution.Simple.LocalBuildInfo
 import Distribution.Simple.Program
 import Distribution.Simple.Utils
+import Distribution.Simple.Setup
+import Distribution.Simple.Register
+import Distribution.Simple.Install
 import Distribution.Text
 import System.Cmd
 import System.FilePath
@@ -23,6 +26,7 @@ main = do let hooks = simpleUserHooks {
                           $ regHook simpleUserHooks,
                   buildHook = build_primitive_sources
                             $ buildHook simpleUserHooks,
+                  instHook = myInstHook,
                   haddockHook = addPrimModuleForHaddock
                               $ build_primitive_sources
                               $ haddockHook simpleUserHooks }
@@ -58,22 +62,48 @@ addPrimModuleToPD pd =
 
 build_primitive_sources :: Hook a -> Hook a
 build_primitive_sources f pd lbi uhs x
- = do when (compilerFlavor (compiler lbi) == GHC) $ do
-          let genprimopcode = joinPath ["..", "..", "utils",
-                                        "genprimopcode", "genprimopcode"]
-              primops = joinPath ["..", "..", "compiler", "prelude",
-                                  "primops.txt"]
-              primhs = joinPath ["GHC", "Prim.hs"]
-              primopwrappers = joinPath ["GHC", "PrimopWrappers.hs"]
-              primhs_tmp = addExtension primhs "tmp"
-              primopwrappers_tmp = addExtension primopwrappers "tmp"
-          maybeExit $ system (genprimopcode ++ " --make-haskell-source < "
-                           ++ primops ++ " > " ++ primhs_tmp)
-          maybeUpdateFile primhs_tmp primhs
-          maybeExit $ system (genprimopcode ++ " --make-haskell-wrappers < "
-                           ++ primops ++ " > " ++ primopwrappers_tmp)
-          maybeUpdateFile primopwrappers_tmp primopwrappers
-      f pd lbi uhs x
+ = do
+    let genprimopcode = joinPath ["..", "..", "utils",
+                                "genprimopcode", "genprimopcode"]
+        primops = joinPath ["..", "..", "compiler", "prelude",
+                            "primops.txt"]
+        primhs = joinPath ["GHC", "Prim.hs"]
+        primopwrappers = joinPath ["GHC", "PrimopWrappers.hs"]
+        primhs_tmp = addExtension primhs "tmp"
+        primopwrappers_tmp = addExtension primopwrappers "tmp"
+    when (compilerFlavor (compiler lbi) == GHC) $ do
+        maybeExit $ system (genprimopcode ++ " --make-haskell-source < "
+                        ++ primops ++ " > " ++ primhs_tmp)
+        maybeUpdateFile primhs_tmp primhs
+        maybeExit $ system (genprimopcode ++ " --make-haskell-wrappers < "
+                        ++ primops ++ " > " ++ primopwrappers_tmp)
+        maybeUpdateFile primopwrappers_tmp primopwrappers
+    when (compilerFlavor (compiler lbi) == GHCJS) $ do
+        copyFile (joinPath ["..", "..", "data", "Prim.hs"])
+                primhs_tmp
+        copyFile (joinPath ["..", "..", "data", "PrimopWrappers.hs"])
+                primopwrappers_tmp
+        maybeUpdateFile primhs_tmp primhs
+        maybeUpdateFile primopwrappers_tmp primopwrappers
+    f pd lbi uhs x
+
+myInstHook :: PackageDescription -> LocalBuildInfo
+                   -> UserHooks -> InstallFlags -> IO ()
+myInstHook pkg_descr localbuildinfo uh flags = do
+  let copyFlags = defaultCopyFlags {
+                      copyDistPref   = installDistPref flags,
+                      copyDest       = toFlag NoCopyDest,
+                      copyVerbosity  = installVerbosity flags
+                  }
+  install pkg_descr localbuildinfo copyFlags
+  let registerFlags = defaultRegisterFlags {
+                          regDistPref  = installDistPref flags,
+                          regInPlace   = installInPlace flags,
+                          regPackageDB = installPackageDB flags,
+                          regVerbosity = installVerbosity flags
+                      }
+  when (hasLibs pkg_descr) $ addPrimModule (\pd lbi _ -> register pd lbi)
+     pkg_descr localbuildinfo uh registerFlags
 
 -- Replace a file only if the new version is different from the old.
 -- This prevents make from doing unnecessary work after we run 'setup makefile'

@@ -15,7 +15,7 @@
 -- @since 4.5.0.0
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE UnboxedTuples, MagicHash, NoImplicitPrelude #-}
+{-# LANGUAGE UnboxedTuples, MagicHash, NoImplicitPrelude, CPP #-}
 module GHC.Stack.CCS (
     -- * Call stacks
     currentCallStack,
@@ -75,6 +75,22 @@ getCCSOf obj = IO $ \s ->
 clearCCS :: IO a -> IO a
 clearCCS (IO m) = IO $ \s -> clearCCS## m s
 
+##if defined(ghcjs_HOST_OS)
+ccsCC :: Ptr CostCentreStack -> IO (Ptr CostCentre)
+ccsCC p = peekByteOff p 4
+
+ccsParent :: Ptr CostCentreStack -> IO (Ptr CostCentreStack)
+ccsParent p = peekByteOff p 8
+
+ccLabel :: Ptr CostCentre -> IO CString
+ccLabel p = peekByteOff p 4
+
+ccModule :: Ptr CostCentre -> IO CString
+ccModule p = peekByteOff p 8
+
+ccSrcSpan :: Ptr CostCentre -> IO CString
+ccSrcSpan p = peekByteOff p 12
+##else
 -- | Get the 'CostCentre' at the head of a 'CostCentreStack'.
 ccsCC :: Ptr CostCentreStack -> IO (Ptr CostCentre)
 ccsCC p = (# peek CostCentreStack, cc) p
@@ -94,6 +110,7 @@ ccModule p = (# peek CostCentre, module) p
 -- | Get the source span of a 'CostCentre'.
 ccSrcSpan :: Ptr CostCentre -> IO CString
 ccSrcSpan p = (# peek CostCentre, srcloc) p
+##endif
 
 -- | Returns a @[String]@ representing the current call stack.  This
 -- can be useful for debugging.

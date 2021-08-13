@@ -4,6 +4,9 @@
 {-# LANGUAGE UnliftedFFITypes #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE BangPatterns #-}
+#ifdef ghcjs_HOST_OS
+{-# LANGUAGE GHCForeignImportPrim #-}
+#endif
 
 module GHC.Integer.Logarithms
     ( wordLog2#
@@ -24,6 +27,9 @@ module GHC.Integer.Logarithms
 import GHC.Integer.Type
 
 import GHC.Prim
+#ifdef ghcjs_HOST_OS
+import GHC.Types
+#endif
 
 default ()
 
@@ -41,6 +47,10 @@ default ()
 --
 -- Note: Internally uses 'integerLog2#' for base 2
 integerLogBase# :: Integer -> Integer -> Int#
+-- #if defined(ghcjs_HOST_OS)
+-- integerLogBase# x y = js_integerLogBase (unsafeCoerce x) (unsafeCoerce y)
+-- foreign import javascript unsafe "h$integer_integerLogBase($1,$2)" js_integerLogBase :: Any -> Any -> Int#
+-- #else
 integerLogBase# (S# 2#) m = integerLog2# m
 integerLogBase# b m = e'
   where
@@ -50,7 +60,7 @@ integerLogBase# b m = e'
     go pw = case go (sqrInteger pw) of
               (# q, e #) | q `ltInteger` pw -> (# q, 2# *# e #)
               (# q, e #) -> (# q `quotInteger` pw, 2# *# e +# 1# #)
-
+-- #endif
 
 -- | Calculate the integer base 2 logarithm of an 'Integer'.  The
 -- calculation is more efficient than for the general case, on
@@ -58,6 +68,10 @@ integerLogBase# b m = e'
 --
 -- The argument must be strictly positive, that condition is /not/ checked.
 integerLog2# :: Integer -> Int#
+#if defined(ghcjs_HOST_OS)
+integerLog2# x = js_integerLog2 (unsafeCoerce# x)
+foreign import javascript unsafe "h$ghcjsbn_integerLog2($1)" js_integerLog2 :: Any -> Int#
+#else
 integerLog2# (S# i#) = wordLog2# (int2Word# i#)
 integerLog2# (Jn#  _) = -1#
 integerLog2# (Jp# bn) = go (s -# 1#)
@@ -66,6 +80,7 @@ integerLog2# (Jp# bn) = go (s -# 1#)
     go i = case indexBigNat# bn i of
                0## -> go (i -# 1#)
                w   -> wordLog2# w +# (uncheckedIShiftL# i LD_WORD_SIZE_IN_BITS#)
+#endif
 
 -- | Compute base-2 log of 'Word#'
 --

@@ -8,6 +8,9 @@
   #-}
 
 module GHC.Event.TimerManager
+#ifdef ghcjs_HOST_OS
+    () where
+#else
     ( -- * Types
       TimerManager
 
@@ -266,3 +269,5 @@ editTimeouts mgr g = do
                       -- minimum element didn't change.
                       t0 /= t1
                     _ -> True
+
+#endif
