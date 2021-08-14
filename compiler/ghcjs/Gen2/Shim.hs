@@ -48,7 +48,7 @@ import           Data.Text (Text)
 import           Data.Aeson
 -- import qualified Data.Yaml       as Yaml
 
-import           System.FilePath ((<.>), (</>), isExtensionOf)
+import           System.FilePath ((<.>), (</>), isExtensionOf, takeExtensions)
 import           System.Directory (doesFileExist, canonicalizePath)
 
 import           Text.Parsec
@@ -154,10 +154,7 @@ jsCppOpts opts = filter (/="-traditional") (removeCabalMacros opts)
 
 readShimsArchive :: DynFlags -> FilePath -> IO B.ByteString
 readShimsArchive dflags archive = do
-  -- 
-  -- meta <- Ar.readMeta archive
   Ar.Archive entries <- Ar.loadAr archive
-  -- srcs <- Ar.readAllSources archive
   let s       = toolSettings dflags
       s1      = s { toolSettings_pgm_P = 
                         ( fst (toolSettings_pgm_P s)
@@ -165,7 +162,7 @@ readShimsArchive dflags archive = do
                   , toolSettings_opt_P = jsCppOpts (toolSettings_opt_P s)
                   }
       dflags1 = dflags { toolSettings = s1 }
-  srcs' <- forM entries $ \e ->
+  srcs' <- forM (filter isJsSourceEntry entries) $ \e ->
     if needsCpp (Ar.filename e)
     then do
       infile  <- FileCleanup.newTempName dflags FileCleanup.TFL_CurrentModule "jspp"
@@ -174,7 +171,11 @@ readShimsArchive dflags archive = do
       Utils.doCpp dflags1 True infile outfile
       B.readFile outfile
     else pure (Ar.filedata e)
-  return (mconcat srcs')
+  return (B.intercalate "\n" srcs')
+
+isJsSourceEntry :: Ar.ArchiveEntry -> Bool
+isJsSourceEntry entry = takeExtensions (Ar.filename entry) `elem`
+                        [".js", ".js.pp", ".mjs", ".mjs.pp"]
 
 readShim :: FilePath -> (Pkg, Version) -> IO (Maybe Shim)
 readShim base (pkgName, _pkgVer) = do
