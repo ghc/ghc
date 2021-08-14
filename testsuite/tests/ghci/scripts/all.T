@@ -344,3 +344,4 @@ test('T19650',
      ['T19650.script'])
 test('T20019', normal, ghci_script, ['T20019.script'])
 test('T20101', normal, ghci_script, ['T20101.script'])
+test('T20206', normal, ghci_script, ['T20206.script'])
