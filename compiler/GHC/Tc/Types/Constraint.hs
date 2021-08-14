@@ -43,7 +43,7 @@ module GHC.Tc.Types.Constraint (
         isSolvedWC, andWC, unionsWC, mkSimpleWC, mkImplicWC,
         addInsols, dropMisleading, addSimples, addImplics, addHoles,
         tyCoVarsOfWC, dropDerivedWC, dropDerivedSimples,
-        tyCoVarsOfWCList, insolubleCt, insolubleEqCt,
+        tyCoVarsOfWCList, insolubleWantedCt, insolubleEqCt, insolubleCt,
         isDroppableCt, insolubleImplic,
         arisesFromGivens,
 
@@ -1129,7 +1129,7 @@ dropMisleading :: WantedConstraints -> WantedConstraints
 --   for why this function is so strange, treating the 'simples'
 --   and the implications differently.  Sigh.
 dropMisleading (WC { wc_simple = simples, wc_impl = implics, wc_holes = holes })
-  = WC { wc_simple = filterBag insolubleCt simples
+  = WC { wc_simple = filterBag insolubleWantedCt simples
        , wc_impl   = mapBag drop_implic implics
        , wc_holes  = filterBag isOutOfScopeHole holes }
   where
@@ -1158,19 +1158,20 @@ insolubleImplic ic = isInsolubleStatus (ic_status ic)
 
 insolubleWC :: WantedConstraints -> Bool
 insolubleWC (WC { wc_impl = implics, wc_simple = simples, wc_holes = holes })
-  =  anyBag insolubleCt simples
+  =  anyBag insolubleWantedCt simples
   || anyBag insolubleImplic implics
   || anyBag isOutOfScopeHole holes  -- See Note [Insoluble holes]
 
-insolubleCt :: Ct -> Bool
+insolubleWantedCt :: Ct -> Bool
 -- Definitely insoluble, in particular /excluding/ type-hole constraints
--- Namely: a) an equality constraint
---         b) that is insoluble
---         c) and does not arise from a Given
-insolubleCt ct
-  | not (insolubleEqCt ct) = False
-  | arisesFromGivens ct    = False              -- See Note [Given insolubles]
-  | otherwise              = True
+-- Namely:
+--   a) an insoluble constraint as per 'insolubleCt', i.e. either
+--        - an insoluble equality constraint (e.g. Int ~ Bool), or
+--        - a custom type error constraint, TypeError msg :: Constraint
+--   b) that does not arise from a Given
+--
+-- See Note [Given insolubles].
+insolubleWantedCt ct = insolubleCt ct && not (arisesFromGivens ct)
 
 insolubleEqCt :: Ct -> Bool
 -- Returns True of /equality/ constraints
@@ -1189,6 +1190,34 @@ insolubleEqCt :: Ct -> Bool
 --               (where F is an arity-1 type function)
 insolubleEqCt (CIrredCan { cc_reason = reason }) = isInsolubleReason reason
 insolubleEqCt _                                  = False
+
+-- | Returns True of equality constraints that are definitely insoluble,
+-- as well as TypeError constraints.
+-- Can return 'True' for Given constraints, unlike 'insolubleWantedCt'.
+--
+-- This function is critical for accurate pattern-match overlap warnings.
+-- See Note [Pattern match warnings with insoluble Givens] in GHC.Tc.Solver
+--
+-- Note that this does not traverse through the constraint to find
+-- nested custom type errors: it only detects @TypeError msg :: Constraint@,
+-- and not e.g. @Eq (TypeError msg)@.
+insolubleCt :: Ct -> Bool
+insolubleCt ct
+  | Just _ <- userTypeError_maybe (ctPred ct)
+  -- Don't use 'isUserTypeErrorCt' here, as that function is too eager:
+  -- the TypeError might appear inside a type family application
+  -- which might later reduce, but we only want to return 'True'
+  -- for constraints that are definitely insoluble.
+  --
+  -- Test case: T11503, with the 'Assert' type family:
+  --
+  -- > type Assert :: Bool -> Constraint -> Constraint
+  -- > type family Assert check errMsg where
+  -- >   Assert 'True  _errMsg = ()
+  -- >   Assert _check errMsg  = errMsg
+  = True
+  | otherwise
+  = insolubleEqCt ct
 
 -- | Does this hole represent an "out of scope" error?
 -- See Note [Insoluble holes]

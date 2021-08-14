@@ -824,10 +824,16 @@ getInnermostGivenEqLevel = do { inert <- getInertCans
                               ; return (inert_given_eq_lvl inert) }
 
 getInertInsols :: TcS Cts
--- Returns insoluble equality constraints
--- specifically including Givens
+-- Returns insoluble equality constraints and TypeError constraints,
+-- specifically including Givens.
+--
+-- Note that this function only inspects irreducible constraints;
+-- a DictCan constraint such as 'Eq (TypeError msg)' is not
+-- considered to be an insoluble constraint by this function.
+--
+-- See Note [Pattern match warnings with insoluble Givens] in GHC.Tc.Solver.
 getInertInsols = do { inert <- getInertCans
-                    ; return (filterBag insolubleEqCt (inert_irreds inert)) }
+                    ; return $ filterBag insolubleCt (inert_irreds inert) }
 
 getInertGivens :: TcS [Ct]
 -- Returns the Given constraints in the inert set

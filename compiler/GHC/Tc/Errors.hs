@@ -583,7 +583,7 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_impl = implics
     -- report1: ones that should *not* be suppressed by
     --          an insoluble somewhere else in the tree
     -- It's crucial that anything that is considered insoluble
-    -- (see GHC.Tc.Utils.insolubleCt) is caught here, otherwise
+    -- (see GHC.Tc.Utils.insolublWantedCt) is caught here, otherwise
     -- we might suppress its error message, and proceed on past
     -- type checking to get a Lint error later
     report1 = [ ("custom_error", unblocked is_user_type_error, True,  mkUserTypeErrorReporter)

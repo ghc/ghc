@@ -1,0 +1,4 @@
+
+TypeRepCon.hs:12:1: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match has inaccessible right hand side
+    In an equation for ‘isApp’: isApp (Con _) = ...

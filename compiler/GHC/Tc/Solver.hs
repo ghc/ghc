@@ -806,9 +806,74 @@ simplifyDefault theta
        ; return (isEmptyWC unsolved) }
 
 ------------------
+{- Note [Pattern match warnings with insoluble Givens]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A pattern match on a GADT can introduce new type-level information, which needs
+to be analysed in order to get the expected pattern match warnings.
+
+For example:
+
+> type IsBool :: Type -> Constraint
+> type family IsBool a where
+>   IsBool Bool = ()
+>   IsBool b    = b ~ Bool
+>
+> data T a where
+>   MkTInt  :: Int -> T Int
+>   MkTBool :: IsBool b => b -> T b
+>
+> f :: T Int -> Int
+> f (MkTInt i) = i
+
+The pattern matching performed by `f` is complete: we can't ever call
+`f (MkTBool b)`, as type-checking that application would require producing
+evidence for `Int ~ Bool`, which can't be done.
+
+The pattern match checker uses `tcCheckGivens` to accumulate all the Given
+constraints, and relies on `tcCheckGivens` to return Nothing if the
+Givens become insoluble.   `tcCheckGivens` in turn relies on `insolubleCt`
+to identify these insoluble constraints.  So the precise definition of
+`insolubleCt` has a big effect on pattern match overlap warnings.
+
+To detect this situation, we check whether there are any insoluble Given
+constraints. In the example above, the insoluble constraint was an
+equality constraint, but it is also important to detect custom type errors:
+
+> type NotInt :: Type -> Constraint
+> type family NotInt a where
+>   NotInt Int = TypeError (Text "That's Int, silly.")
+>   NotInt _   = ()
+>
+> data R a where
+>   MkT1 :: a -> R a
+>   MkT2 :: NotInt a => R a
+>
+> foo :: R Int -> Int
+> foo (MkT1 x) = x
+
+To see that we can't call `foo (MkT2)`, we must detect that `NotInt Int` is insoluble
+because it is a custom type error.
+Failing to do so proved quite inconvenient for users, as evidence by the
+tickets #11503 #14141 #16377 #20180.
+Test cases: T11503, T14141.
+
+Examples of constraints that tcCheckGivens considers insoluble:
+  - Int ~ Bool,
+  - Coercible Float Word,
+  - TypeError msg.
+
+Non-examples:
+  - constraints which we know aren't satisfied,
+    e.g. Show (Int -> Int) when no such instance is in scope,
+  - Eq (TypeError msg),
+  - C (Int ~ Bool), with @class C (c :: Constraint)@.
+-}
+
 tcCheckGivens :: InertSet -> Bag EvVar -> TcM (Maybe InertSet)
 -- ^ Return (Just new_inerts) if the Givens are satisfiable, Nothing if definitely
--- contradictory
+-- contradictory.
+--
+-- See Note [Pattern match warnings with insoluble Givens] above.
 tcCheckGivens inerts given_ids = do
   (sat, new_inerts) <- runTcSInerts inerts $ do
     traceTcS "checkGivens {" (ppr inerts <+> ppr given_ids)

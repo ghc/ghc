@@ -1,10 +1,9 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE GADTs #-}
 
 {-# OPTIONS_GHC -O2 -funbox-strict-fields #-}
-{-# OPTIONS_GHC -Wno-orphans #-}
+{-# OPTIONS_GHC -Wno-orphans -Wincomplete-patterns #-}
 #if MIN_VERSION_base(4,16,0)
 #define HAS_TYPELITCHAR
 #endif
@@ -19,7 +18,7 @@ import GHC.Prelude
 
 import GHC.Utils.Binary
 
-import GHC.Exts (TYPE, RuntimeRep(..), VecCount(..), VecElem(..))
+import GHC.Exts (RuntimeRep(..), VecCount(..), VecElem(..))
 #if __GLASGOW_HASKELL__ >= 901
 import GHC.Exts (Levity(Lifted, Unlifted))
 #endif
@@ -49,7 +48,6 @@ getSomeTypeRep bh = do
         1 -> do con <- get bh :: IO TyCon
                 ks <- get bh :: IO [SomeTypeRep]
                 return $ SomeTypeRep $ mkTrCon con ks
-
         2 -> do SomeTypeRep f <- getSomeTypeRep bh
                 SomeTypeRep x <- getSomeTypeRep bh
                 case typeRepKind f of
@@ -68,20 +66,8 @@ getSomeTypeRep bh = do
                        [ "    Applied type: " ++ show f
                        , "    To argument:  " ++ show x
                        ]
-        3 -> do SomeTypeRep arg <- getSomeTypeRep bh
-                SomeTypeRep res <- getSomeTypeRep bh
-                if
-                  | App argkcon _ <- typeRepKind arg
-                  , App reskcon _ <- typeRepKind res
-                  , Just HRefl <- argkcon `eqTypeRep` tYPErep
-                  , Just HRefl <- reskcon `eqTypeRep` tYPErep
-                  -> return $ SomeTypeRep $ Fun arg res
-                  | otherwise -> failure "Kind mismatch" []
         _ -> failure "Invalid SomeTypeRep" []
   where
-    tYPErep :: TypeRep TYPE
-    tYPErep = typeRep
-
     failure description info =
         fail $ unlines $ [ "Binary.getSomeTypeRep: "++description ]
                       ++ map ("    "++) info
@@ -201,10 +187,7 @@ instance Binary TypeLitSort where
           _ -> fail "Binary.putTypeLitSort: invalid tag"
 
 putTypeRep :: BinHandle -> TypeRep a -> IO ()
--- Special handling for TYPE, (->), and RuntimeRep due to recursive kind
--- relations.
--- See Note [Mutually recursive representations of primitive types]
-putTypeRep bh rep
+putTypeRep bh rep -- Handle Type specially since it's so common
   | Just HRefl <- rep `eqTypeRep` (typeRep :: TypeRep Type)
   = put_ bh (0 :: Word8)
 putTypeRep bh (Con' con ks) = do

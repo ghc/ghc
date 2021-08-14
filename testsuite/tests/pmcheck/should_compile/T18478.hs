@@ -505,11 +505,8 @@ type family FailOnNestedBigMapsFound (enabled :: Bool) :: Constraint where
     TypeError ('Text "Nested BigMaps are not allowed")
   FailOnNestedBigMapsFound 'False = ()
 
--- | This is like 'HasNoOp', it raises a more human-readable error
--- when @t@ type is concrete, but GHC cannot make any conclusions
--- from such constraint as it can for 'HasNoOp'.
--- Though, hopefully, it will someday:
--- <https://gitlab.haskell.org/ghc/ghc/issues/11503 #11503>.
+-- | This is like 'HasNoOp', but raises a more human-readable error
+-- when the @t@ type is concrete.
 --
 -- Use this constraint in our eDSL.
 type ForbidOp t = FailOnOperationFound (ContainsOp t)
@@ -523,12 +520,8 @@ type ForbidNestedBigMaps t = FailOnNestedBigMapsFound (ContainsNestedBigMaps t)
 -- | Evidence of that 'HasNoOp' is deducable from 'ForbidOp'.
 forbiddenOpEvi :: forall t. (SingI t, ForbidOp t) :- HasNoOp t
 forbiddenOpEvi = Sub $
-  -- It's not clear now to proof GHC that @HasNoOp t@ is implication of
-  -- @ForbidOp t@, so we use @error@ below and also disable
-  -- "-Wredundant-constraints" extension.
   case checkOpPresence (sing @t) of
     OpAbsent -> Dict
-    OpPresent -> error "impossible"
 
 -- | Reify 'HasNoOp' constraint from 'ForbidOp'.
 --
@@ -544,13 +537,11 @@ forbiddenBigMapEvi :: forall t. (SingI t, ForbidBigMap t) :- HasNoBigMap t
 forbiddenBigMapEvi = Sub $
   case checkBigMapPresence (sing @t) of
     BigMapAbsent -> Dict
-    BigMapPresent -> error "impossible"
 
 forbiddenNestedBigMapsEvi :: forall t. (SingI t, ForbidNestedBigMaps t) :- HasNoNestedBigMaps t
 forbiddenNestedBigMapsEvi = Sub $
   case checkNestedBigMapsPresence (sing @t) of
     NestedBigMapsAbsent -> Dict
-    NestedBigMapsPresent -> error "impossible"
 
 forbiddenBigMap
   :: forall t a.
@@ -572,7 +563,6 @@ forbiddenContractTypeEvi
 forbiddenContractTypeEvi = Sub $
   case checkContractTypePresence (sing @t) of
     ContractAbsent -> Dict
-    ContractPresent -> error "impossible"
 
 -- | Reify 'HasNoContract' constraint from 'ForbidContract'.
 forbiddenContractType

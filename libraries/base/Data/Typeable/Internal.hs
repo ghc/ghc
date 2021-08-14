@@ -95,7 +95,8 @@ import Data.Type.Equality
 import GHC.List ( splitAt, foldl', elem )
 import GHC.Word
 import GHC.Show
-import GHC.TypeLits ( KnownChar, charVal', KnownSymbol, symbolVal', AppendSymbol )
+import GHC.TypeLits ( KnownChar, charVal', KnownSymbol, symbolVal'
+                    , TypeError, ErrorMessage(..) )
 import GHC.TypeNats ( KnownNat, Nat, natVal' )
 import Unsafe.Coerce ( unsafeCoerce )
 
@@ -507,14 +508,16 @@ data AppOrCon (a :: k) where
     IsApp :: forall k k' (f :: k' -> k) (x :: k'). ()
           => TypeRep f %1 -> TypeRep x %1 -> AppOrCon (f x)
     -- See Note [Con evidence]
-    IsCon :: IsApplication a ~ "" => TyCon %1 -> [SomeTypeRep] %1 -> AppOrCon a
+    IsCon :: NotApplication a => TyCon %1 -> [SomeTypeRep] %1 -> AppOrCon a
 
-type family IsApplication (x :: k) :: Symbol where
-  IsApplication (_ _) = "An error message about this unifying with \"\" "
-     `AppendSymbol` "means that you tried to match a TypeRep with Con or "
-     `AppendSymbol` "Con' when the represented type was known to be an "
-     `AppendSymbol` "application."
-  IsApplication _ = ""
+type family NotApplication (x :: k) :: Constraint where
+  NotApplication (f a)
+    = TypeError
+      (     'Text "Cannot match this TypeRep with Con or Con': it is an application:"
+      ':$$: 'Text "  " ':<>: 'ShowType (f a)
+      )
+  NotApplication _
+    = ()
 
 splitApp :: forall k (a :: k). ()
          => TypeRep a
@@ -524,7 +527,7 @@ splitApp (TrApp {trAppFun = f, trAppArg = x}) = IsApp f x
 splitApp rep@(TrFun {trFunArg=a, trFunRes=b}) = IsApp (mkTrApp arr a) b
   where arr = bareArrow rep
 splitApp (TrTyCon{trTyCon = con, trKindVars = kinds})
-  = case unsafeCoerce Refl :: IsApplication a :~: "" of
+  = case unsafeCoerce Refl :: NotApplication a :~: (() :: Constraint) of
       Refl -> IsCon con kinds
 
 -- | Use a 'TypeRep' as 'Typeable' evidence.
@@ -545,7 +548,7 @@ withTypeable rep k = withDict @(TypeRep a) @(Typeable a) rep k
 
 -- | Pattern match on a type constructor
 pattern Con :: forall k (a :: k). ()
-            => IsApplication a ~ "" -- See Note [Con evidence]
+            => NotApplication a -- See Note [Con evidence]
             => TyCon -> TypeRep a
 pattern Con con <- (splitApp -> IsCon con _)
 
@@ -567,7 +570,7 @@ pattern Con con <- (splitApp -> IsCon con _)
 -- @
 --
 pattern Con' :: forall k (a :: k). ()
-             => IsApplication a ~ "" -- See Note [Con evidence]
+             => NotApplication a -- See Note [Con evidence]
              => TyCon -> [SomeTypeRep] -> TypeRep a
 pattern Con' con ks <- (splitApp -> IsCon con ks)
 
@@ -576,30 +579,17 @@ pattern Con' con ks <- (splitApp -> IsCon con ks)
 {-# COMPLETE Fun, App, Con' #-}
 
 {- Note [Con evidence]
-    ~~~~~~~~~~~~~~~~~~~
-
-Matching TypeRep t on Con or Con' fakes up evidence that
-
-  IsApplication t ~ "".
+~~~~~~~~~~~~~~~~~~~~~~
+Matching TypeRep t on Con or Con' fakes up evidence of NotApplication t.
 
 Why should anyone care about the value of strange internal type family?
 Well, almost nobody cares about it, but the pattern checker does!
 For example, suppose we have TypeRep (f x) and we want to get
 TypeRep f and TypeRep x. There is no chance that the Con constructor
 will match, because (f x) is not a constructor, but without the
-IsApplication evidence, omitting it will lead to an incomplete pattern
+NotApplication evidence, omitting it will lead to an incomplete pattern
 warning. With the evidence, the pattern checker will see that
 Con wouldn't typecheck, so everything works out as it should.
-
-Why do we use Symbols? We would really like to use something like
-
-  type family NotApplication (t :: k) :: Constraint where
-    NotApplication (f a) = TypeError ...
-    NotApplication _ = ()
-
-Unfortunately, #11503 means that the pattern checker and type checker
-will fail to actually reject the mistaken patterns. So we describe the
-error in the result type. It's a horrible hack.
 -}
 
 ----------------- Observation ---------------------

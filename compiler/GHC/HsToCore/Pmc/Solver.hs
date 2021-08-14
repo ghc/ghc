@@ -617,6 +617,8 @@ addTyCts nabla@MkNabla{ nabla_ty_st = ty_st } new_ty_cs = do
 
 -- | Add some extra type constraints to the 'TyState'; return 'Nothing' if we
 -- find a contradiction (e.g. @Int ~ Bool@).
+--
+-- See Note [Pattern match warnings with insoluble Givens] in GHC.Tc.Solver.
 tyOracle :: TyState -> Bag PredType -> DsM (Maybe TyState)
 tyOracle ty_st@(TySt n inert) cts
   | isEmptyBag cts

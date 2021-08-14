@@ -1,0 +1,8 @@
+
+T14141.hs:27:1: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match has inaccessible right hand side
+    In an equation for ‘f’: f MkD = ...
+
+T14141.hs:42:1: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In an equation for ‘exhaustive’: exhaustive B = ...
