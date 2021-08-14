@@ -42,6 +42,7 @@ import qualified Data.HashMap.Strict      as HM
 import           Data.Int
 import           Data.IntSet              (IntSet)
 import qualified Data.IntSet              as IS
+import           Data.IORef
 import           Data.List
   (partition, nub, foldl', intercalate, group, sort, groupBy, isSuffixOf, find)
 import           Data.Map.Strict          (Map)
@@ -122,6 +123,11 @@ data LinkResult = LinkResult
 
 instance Binary LinkResult
 
+
+newtype ArchiveState = ArchiveState { loadedArchives :: IORef (Map FilePath Ar.Archive) }
+
+emptyArchiveState :: IO ArchiveState
+emptyArchiveState = ArchiveState <$> newIORef M.empty
 
 -- | link and write result to disk (jsexe directory)
 link :: DynFlags
@@ -459,16 +465,18 @@ collectDeps _dflags lookup packages base roots units = do
                       map (\(p,m,n) -> ((p,m),IS.singleton n)) (S.toList allDeps)
       lookupByPkg :: Map Package [(Deps, DepsLocation)]
       lookupByPkg = M.fromListWith (++) (map (\((p,_m),v) -> (p,[v])) (M.toList lookup))
+  ar_state <- emptyArchiveState
   code <- fmap (catMaybes . concat) . forM packages' $ \pkg ->
-    mapM (uncurry $ extractDeps unitsByModule)
+    mapM (uncurry $ extractDeps ar_state unitsByModule)
          (fromMaybe [] $ M.lookup (mkPackage pkg) lookupByPkg)
   return (allDeps, code)
 
-extractDeps :: Map (Package, Module) IntSet
+extractDeps :: ArchiveState
+            -> Map (Package, Module) IntSet
             -> Deps
             -> DepsLocation
             -> IO (Maybe (Package, Module, JStat, Text, [ClosureInfo], [StaticInfo], [ForeignRef]))
-extractDeps units deps loc =
+extractDeps ar_state units deps loc =
   case M.lookup (pkg, mod) units of
     Nothing       -> return Nothing
     Just modUnits -> do
@@ -477,7 +485,7 @@ extractDeps units deps loc =
         ObjectFile o  -> collectCode =<< readObjectFileKeys selector o
         ArchiveFile a -> collectCode =<<
                             (readObjectKeys (a ++ ':':T.unpack mod) selector <$>
-                              readArObject mod a)
+                              readArObject ar_state mod a)
                             --  error ("Ar.readObject: " ++ a ++ ':' : T.unpack mod))
                             -- Ar.readObject (mkModuleName $ T.unpack mod) a)
         InMemory n b  -> collectCode $
@@ -496,10 +504,15 @@ extractDeps units deps loc =
                             , concatMap oiFImports l)
                     in evaluate (rnf x) >> return (Just x)
 
-readArObject :: Text -> FilePath -> IO BL.ByteString
-readArObject mod_name ar_file = do
-  ar@(Ar.Archive entries) <- Ar.loadAr ar_file
-  putStrLn ("reading archive: " ++ ar_file ++ " (" ++ T.unpack mod_name ++ ")")
+readArObject :: ArchiveState -> Text -> FilePath -> IO BL.ByteString
+readArObject ar_state mod_name ar_file = do
+  loaded_ars <- readIORef (loadedArchives ar_state)
+  ar@(Ar.Archive entries) <- case M.lookup ar_file loaded_ars of
+    Just a -> pure a
+    Nothing -> do
+      a <- Ar.loadAr ar_file
+      modifyIORef (loadedArchives ar_state) (M.insert ar_file a)
+      pure a
   let tag = Object.moduleNameTag mod_name
       matchTag entry
         | Right hdr <- Object.getHeader (BL.fromStrict $ Ar.filedata entry)
