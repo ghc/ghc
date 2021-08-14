@@ -1,1 +1,4 @@
+[1 of 4] Compiling Common           ( Common.hs, Common.o )
+[2 of 4] Compiling Definitions      ( Definitions.hs, Definitions.o )
+[3 of 4] Compiling RewritePlugin    ( RewritePlugin.hs, RewritePlugin.o )
 [4 of 4] Compiling TcPlugin_Rewrite ( TcPlugin_Rewrite.hs, TcPlugin_Rewrite.o )

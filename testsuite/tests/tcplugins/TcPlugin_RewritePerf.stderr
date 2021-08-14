@@ -1,3 +1,5 @@
+[1 of 3] Compiling RewritePerfDefs  ( RewritePerfDefs.hs, RewritePerfDefs.o )
+[2 of 3] Compiling RewritePerfPlugin ( RewritePerfPlugin.hs, RewritePerfPlugin.o )
 [3 of 3] Compiling Main             ( TcPlugin_RewritePerf.hs, TcPlugin_RewritePerf.o )
 
 TcPlugin_RewritePerf.hs:25:8: error:

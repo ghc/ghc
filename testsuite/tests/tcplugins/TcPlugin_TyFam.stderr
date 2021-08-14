@@ -1,1 +1,4 @@
+[1 of 4] Compiling Common           ( Common.hs, Common.o )
+[2 of 4] Compiling Definitions      ( Definitions.hs, Definitions.o )
+[3 of 4] Compiling TyFamPlugin      ( TyFamPlugin.hs, TyFamPlugin.o )
 [4 of 4] Compiling TcPlugin_TyFam   ( TcPlugin_TyFam.hs, TcPlugin_TyFam.o )

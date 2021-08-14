@@ -8,13 +8,9 @@ test('TcPlugin_Nullary'
         , 'TcPlugin_Nullary.hs'
         ])
       ]
-    , multi_compile
+    , multimod_compile
     , [ 'TcPlugin_Nullary.hs'
-      , [ ('Definitions.hs', '')
-        , ('Common.hs', '')
-        , ('NullaryPlugin.hs', '')
-        ]
-      ,'-dynamic -package ghc' if have_dynamic() else '-package ghc']
+      , '-dynamic -package ghc' if have_dynamic() else '-package ghc' ]
     )
 
 # See ArgsPlugin.hs for a description of this plugin.
@@ -26,13 +22,9 @@ test('TcPlugin_Args'
         , 'TcPlugin_Args.hs'
         ])
       ]
-    , multi_compile_and_run
+    , multimod_compile_and_run
     , [ 'TcPlugin_Args.hs'
-      , [ ('Definitions.hs', '')
-        , ('Common.hs', '')
-        , ('ArgsPlugin.hs', '')
-        ]
-      ,'-dynamic -package ghc' if have_dynamic() else '-package ghc']
+      , '-dynamic -package ghc' if have_dynamic() else '-package ghc' ]
     )
 
 # See TyFamPlugin.hs for a description of this plugin.
@@ -44,13 +36,9 @@ test('TcPlugin_TyFam'
         , 'TcPlugin_TyFam.hs'
         ])
       ]
-    , multi_compile
+    , multimod_compile
     , [ 'TcPlugin_TyFam.hs'
-      , [ ('Definitions.hs', '')
-        , ('Common.hs', '')
-        , ('TyFamPlugin.hs', '')
-        ]
-      ,'-dynamic -package ghc' if have_dynamic() else '-package ghc']
+      , '-dynamic -package ghc' if have_dynamic() else '-package ghc' ]
     )
 
 # See RewritePlugin.hs for a description of this plugin.
@@ -62,13 +50,9 @@ test('TcPlugin_Rewrite'
         , 'TcPlugin_Rewrite.hs'
         ])
       ]
-    , multi_compile
+    , multimod_compile
     , [ 'TcPlugin_Rewrite.hs'
-      , [ ('Definitions.hs', '')
-        , ('Common.hs', '')
-        , ('RewritePlugin.hs', '')
-        ]
-      ,'-dynamic -package ghc' if have_dynamic() else '-package ghc']
+      , '-dynamic -package ghc' if have_dynamic() else '-package ghc ' ]
     )
 
 # See RewritePerfPlugin.hs for a description of this plugin.
@@ -82,10 +66,7 @@ test('TcPlugin_RewritePerf'
       , collect_compiler_stats('bytes allocated', 1)
       , high_memory_usage
       ]
-    , multi_compile_fail
+    , multimod_compile_fail
     , [ 'TcPlugin_RewritePerf.hs'
-      , [ ('RewritePerfDefs.hs', '')
-        , ('RewritePerfPlugin.hs', '')
-        ]
-      ,'-dynamic -package ghc' if have_dynamic() else '-package ghc']
+      , '-dynamic -package ghc' if have_dynamic() else '-package ghc' ]
     )
