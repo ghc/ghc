@@ -386,11 +386,11 @@ lookupRule :: RuleOpts -> InScopeEnv
 
 -- See Note [Extra args in rule matching]
 -- See comments on matchRule
-lookupRule opts in_scope is_active fn args rules
+lookupRule opts rule_env@(in_scope,_) is_active fn args rules
   = -- pprTrace "matchRules" (ppr fn <+> ppr args $$ ppr rules ) $
     case go [] rules of
         []     -> Nothing
-        (m:ms) -> Just (findBest (fn,args') m ms)
+        (m:ms) -> Just (findBest in_scope (fn,args') m ms)
   where
     rough_args = map roughTopName args
 
@@ -403,7 +403,7 @@ lookupRule opts in_scope is_active fn args rules
     go :: [(CoreRule,CoreExpr)] -> [CoreRule] -> [(CoreRule,CoreExpr)]
     go ms [] = ms
     go ms (r:rs)
-      | Just e <- matchRule opts in_scope is_active fn args' rough_args r
+      | Just e <- matchRule opts rule_env is_active fn args' rough_args r
       = go ((r,mkTicks ticks e):ms) rs
       | otherwise
       = -- pprTrace "match failed" (ppr r $$ ppr args $$
@@ -413,16 +413,16 @@ lookupRule opts in_scope is_active fn args rules
         --       , isCheapUnfolding unf] )
         go ms rs
 
-findBest :: (Id, [CoreExpr])
+findBest :: InScopeSet -> (Id, [CoreExpr])
          -> (CoreRule,CoreExpr) -> [(CoreRule,CoreExpr)] -> (CoreRule,CoreExpr)
 -- All these pairs matched the expression
 -- Return the pair the most specific rule
 -- The (fn,args) is just for overlap reporting
 
-findBest _      (rule,ans)   [] = (rule,ans)
-findBest target (rule1,ans1) ((rule2,ans2):prs)
-  | rule1 `isMoreSpecific` rule2 = findBest target (rule1,ans1) prs
-  | rule2 `isMoreSpecific` rule1 = findBest target (rule2,ans2) prs
+findBest _        _      (rule,ans)   [] = (rule,ans)
+findBest in_scope target (rule1,ans1) ((rule2,ans2):prs)
+  | isMoreSpecific in_scope rule1 rule2 = findBest in_scope target (rule1,ans1) prs
+  | isMoreSpecific in_scope rule2 rule1 = findBest in_scope target (rule2,ans2) prs
   | debugIsOn = let pp_rule rule
                       = ifPprDebug (ppr rule)
                                    (doubleQuotes (ftext (ruleName rule)))
@@ -432,12 +432,12 @@ findBest target (rule1,ans1) ((rule2,ans2):prs)
                                  <+> sep (map ppr args)
                                , text "Rule 1:" <+> pp_rule rule1
                                , text "Rule 2:" <+> pp_rule rule2]) $
-                findBest target (rule1,ans1) prs
-  | otherwise = findBest target (rule1,ans1) prs
+                findBest in_scope target (rule1,ans1) prs
+  | otherwise = findBest in_scope target (rule1,ans1) prs
   where
     (fn,args) = target
 
-isMoreSpecific :: CoreRule -> CoreRule -> Bool
+isMoreSpecific :: InScopeSet -> CoreRule -> CoreRule -> Bool
 -- This tests if one rule is more specific than another
 -- We take the view that a BuiltinRule is less specific than
 -- anything else, because we want user-define rules to "win"
@@ -448,17 +448,16 @@ isMoreSpecific :: CoreRule -> CoreRule -> Bool
 --      {-# RULES "truncate/Double->Int" truncate = double2Int #-}
 --      double2Int :: Double -> Int
 --   We want the specific RULE to beat the built-in class-op rule
-isMoreSpecific (BuiltinRule {}) _                = False
-isMoreSpecific (Rule {})        (BuiltinRule {}) = True
-isMoreSpecific (Rule { ru_bndrs = bndrs1, ru_args = args1 })
-               (Rule { ru_bndrs = bndrs2, ru_args = args2
-                     , ru_name = rule_name2, ru_rhs = rhs })
-  = isJust (matchN (in_scope, id_unfolding_fun) rule_name2 bndrs2 args2 args1 rhs)
+isMoreSpecific _        (BuiltinRule {}) _                = False
+isMoreSpecific _        (Rule {})        (BuiltinRule {}) = True
+isMoreSpecific in_scope (Rule { ru_bndrs = bndrs1, ru_args = args1 })
+                        (Rule { ru_bndrs = bndrs2, ru_args = args2
+                              , ru_name = rule_name2, ru_rhs = rhs2 })
+  = isJust (matchN (full_in_scope, id_unfolding_fun)
+                   rule_name2 bndrs2 args2 args1 rhs2)
   where
    id_unfolding_fun _ = NoUnfolding     -- Don't expand in templates
-   in_scope = mkInScopeSet (mkVarSet bndrs1)
-        -- Actually we should probably include the free vars
-        -- of rule1's args, but I can't be bothered
+   full_in_scope = in_scope `extendInScopeSetList` bndrs1
 
 noBlackList :: Activation -> Bool
 noBlackList _ = False           -- Nothing is black listed
@@ -515,12 +514,12 @@ matchRule opts rule_env _is_active fn args _rough_args
         Nothing   -> Nothing
         Just expr -> Just expr
 
-matchRule _ in_scope is_active _ args rough_args
+matchRule _ rule_env is_active _ args rough_args
           (Rule { ru_name = rule_name, ru_act = act, ru_rough = tpl_tops
                 , ru_bndrs = tpl_vars, ru_args = tpl_args, ru_rhs = rhs })
   | not (is_active act)               = Nothing
   | ruleCantMatch tpl_tops rough_args = Nothing
-  | otherwise = matchN in_scope rule_name tpl_vars tpl_args args rhs
+  | otherwise = matchN rule_env rule_name tpl_vars tpl_args args rhs
 
 
 -- | Initialize RuleOpts from DynFlags
