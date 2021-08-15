@@ -589,7 +589,7 @@ readSystemDeps :: DynFlags
 readSystemDeps dflags depsName requiredFor file
   -- hardcode contents to get rid of yaml dep
   -- XXX move runTHServer to some suitable wired-in package
-  | True = pure ([], mempty) -- XXX to fix booting
+  -- | True = pure ([], mempty) -- XXX to fix booting
   | file == "thdeps.yaml" = pure ( [stringToInstalledUnitId "base"]
                                  , S.fromList $ d "base" "GHCJS.Prim.TH.Eval" ["runTHServer"])
   | file == "rtsdeps.yaml" = pure ( [stringToInstalledUnitId "base"
@@ -614,7 +614,11 @@ readSystemDeps dflags depsName requiredFor file
                                   )
   | otherwise = pure ([], mempty)
   where
-    d pkg m syms = map (Fun (Package pkg) m) syms
+    d pkg m syms = map (\s -> (Fun (Package $ T.pack pkg) m) (mkHaskellSym (stringToInstalledUnitId pkg) m s)) syms
+    zenc  = T.pack . zEncodeString . T.unpack
+    mkHaskellSym :: InstalledUnitId -> Text -> Text -> Text
+    mkHaskellSym p m s = "h$" <> zenc (T.pack (encodeInstalledUnitId dflags p) <> ":" <> m <> "." <> s)
+
 {-
   b  <- readBinaryFile (getLibDir dflags </> file)
   wi <- readSystemWiredIn dflags
@@ -729,12 +733,8 @@ loadArchiveDeps' :: [FilePath]
                        )
 loadArchiveDeps' archives = do
   archDeps <- forM archives $ \file -> do
-    putStrLn ("loading archive: " ++ file)
     ar@(Ar.Archive entries) <- Ar.loadAr file
     pure (catMaybes $ map (readEntry file) entries)
-{-    Ar.withAllObjects file $ \modulename h _len -> do
-        (,ArchiveFile file) <$>
-          hReadDeps (file ++ ':':moduleNameString modulename) h -}
   return (prepareLoadedDeps $ concat archDeps)
     where
       readEntry :: FilePath -> Ar.ArchiveEntry -> Maybe (Deps, DepsLocation)
