@@ -140,7 +140,7 @@ needsCpp file = "pp" `isExtensionOf` file
 
 -- suppress line numbers and enable extended syntax
 jsCppPgmOpts :: [Option] -> [Option]
-jsCppPgmOpts opts = (Option "-P") : filter (/=(Option "-traditional")) opts
+jsCppPgmOpts opts = Option "-P" : Option "-CC" : filter (/=(Option "-traditional")) opts
 
 jsCppOpts :: [String] -> [String]
 jsCppOpts opts = filter (/="-traditional") (removeCabalMacros opts)
@@ -171,7 +171,7 @@ readShimsArchive dflags archive = do
       Utils.doCpp dflags1 True infile outfile
       B.readFile outfile
     else pure (Ar.filedata e)
-  return (B.intercalate "\n" srcs')
+  return (mconcat $ map (<> "\n") srcs')
 
 isJsSourceEntry :: Ar.ArchiveEntry -> Bool
 isJsSourceEntry entry = takeExtensions (Ar.filename entry) `elem`
