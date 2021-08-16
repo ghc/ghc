@@ -319,7 +319,7 @@ ld-options:
 */
 #if defined(darwin_HOST_OS)
          , "-Wl,-search_paths_first"
-         , "-Wl,-u,___darwin_check_fd_set_overflow"
+         , "-Wl,-U,___darwin_check_fd_set_overflow"
 #endif
 
 #if defined(darwin_HOST_OS) && !defined(x86_64_HOST_ARCH) && !defined(aarch64_HOST_ARCH)
