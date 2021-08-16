@@ -1,4 +1,6 @@
+{-# LANGUAGE ExplicitForAll    #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RankNTypes        #-}
 
 -- | Minimal JSON / RFC 7159 support
 --
@@ -12,48 +14,59 @@ module Haddock.Utils.Json
     , encodeToString
     , encodeToBuilder
     , ToJSON(toJSON)
+
+    , Parser(..)
+    , Result(..)
+    , FromJSON(parseJSON)
+    , withObject
+    , withArray
+    , withString
+    , withDouble
+    , withBool
+    , fromJSON
+    , parse
+    , parseEither
+    , (.:)
+    , (.:?)
+    , decode
+    , decodeWith
+    , eitherDecode
+    , eitherDecodeWith
+    , decodeFile
+    , eitherDecodeFile
     )
     where
 
+import Control.Applicative (Alternative (..))
+import Control.Monad (MonadPlus (..), zipWithM, (>=>))
+import qualified Control.Monad as Monad
+import qualified Control.Monad.Fail as Fail
+
+import qualified Data.ByteString.Lazy as BSL
+import Data.ByteString.Builder (Builder)
+import qualified Data.ByteString.Builder as BB
 import Data.Char
 import Data.Int
-import Data.String
 import Data.Word
 import Data.List (intersperse)
 import Data.Monoid
 
-import Data.ByteString.Builder (Builder)
-import qualified Data.ByteString.Builder as BB
+import GHC.Natural
 
 -- TODO: We may want to replace 'String' with 'Text' or 'ByteString'
 
--- | A JSON value represented as a Haskell value.
-data Value = Object !Object
-           | Array  [Value]
-           | String  String
-           | Number !Double
-           | Bool   !Bool
-           | Null
-           deriving (Eq, Read, Show)
+import qualified Text.Parsec.ByteString.Lazy as Parsec.Lazy
+import qualified Text.ParserCombinators.Parsec as Parsec
 
--- | A key\/value pair for an 'Object'
-type Pair = (String, Value)
+import Haddock.Utils.Json.Types
+import Haddock.Utils.Json.Parser
 
--- | A JSON \"object\" (key/value map).
-type Object = [Pair]
 
 infixr 8 .=
 
 -- | A key-value pair for encoding a JSON object.
 (.=) :: ToJSON v => String -> v -> Pair
 k .= v  = (k, toJSON v)
-
--- | Create a 'Value' from a list of name\/value 'Pair's.
-object :: [Pair] -> Value
-object = Object
-
-instance IsString Value where
-  fromString = String
 
 
 -- | A type that can be converted to JSON.
@@ -223,3 +236,324 @@ escapeString s
 
     -- unescaped = %x20-21 / %x23-5B / %x5D-10FFFF
     needsEscape c = ord c < 0x20 || c `elem` ['\\','"']
+
+------------------------------------------------------------------------------
+-- FromJSON
+
+-- | Elements of a JSON path used to describe the location of an
+-- error.
+data JSONPathElement
+  = Key String
+  -- ^ JSON path element of a key into an object,
+  -- \"object.key\".
+  | Index !Int
+  -- ^ JSON path element of an index into an
+  -- array, \"array[index]\".
+  deriving (Eq, Show, Ord)
+
+type JSONPath = [JSONPathElement]
+
+-- | Failure continuation.
+type Failure f r   = JSONPath -> String -> f r
+
+-- | Success continuation.
+type Success a f r = a -> f r
+
+newtype Parser a = Parser {
+      runParser :: forall f r.
+                   JSONPath
+                -> Failure f r
+                -> Success a f r
+                -> f r
+    }
+
+modifyFailure :: (String -> String) -> Parser a -> Parser a
+modifyFailure f (Parser p) = Parser $ \path kf ks ->
+    p path (\p' m -> kf p' (f m)) ks
+
+prependFailure :: String -> Parser a -> Parser a
+prependFailure = modifyFailure . (++)
+
+prependContext :: String -> Parser a -> Parser a
+prependContext name = prependFailure ("parsing " ++ name ++ " failed, ")
+
+typeMismatch :: String -> Value -> Parser a
+typeMismatch expected actual =
+    fail $ "expected " ++ expected ++ ", but encountered " ++ typeOf actual
+
+instance Monad.Monad Parser where
+    m >>= g = Parser $ \path kf ks ->
+      runParser m path kf
+                       (\a -> runParser (g a) path kf ks)
+    return = pure
+
+instance Fail.MonadFail Parser where
+    fail msg = Parser $ \path kf _ks -> kf (reverse path) msg
+
+instance Functor Parser where
+    fmap f m = Parser $ \path kf ks ->
+      let ks' a = ks (f a)
+      in runParser m path kf ks'
+
+instance Applicative Parser where
+    pure a = Parser $ \_path _kf ks -> ks a
+    (<*>) = apP
+
+instance Alternative Parser where
+    empty = fail "empty"
+    (<|>) = mplus
+
+instance MonadPlus Parser where
+    mzero = fail "mzero"
+    mplus a b = Parser $ \path kf ks ->
+      runParser a path (\_ _ -> runParser b path kf ks) ks
+
+instance Semigroup (Parser a) where
+    (<>) = mplus
+
+instance Monoid (Parser a) where
+    mempty  = fail "mempty"
+    mappend = (<>)
+
+apP :: Parser (a -> b) -> Parser a -> Parser b
+apP d e = do
+  b <- d
+  b <$> e
+
+(<?>) :: Parser a -> JSONPathElement -> Parser a
+p <?> pathElem = Parser $ \path kf ks -> runParser p (pathElem:path) kf ks
+
+parseIndexedJSON :: (Value -> Parser a) -> Int -> Value -> Parser a
+parseIndexedJSON p idx value = p value <?> Index idx
+
+unexpected :: Value -> Parser a
+unexpected actual = fail $ "unexpected " ++ typeOf actual
+
+withObject :: String -> (Object -> Parser a) -> Value -> Parser a
+withObject _    f (Object obj) = f obj
+withObject name _ v            = prependContext name (typeMismatch "Object" v)
+
+withArray :: String -> ([Value] -> Parser a) -> Value -> Parser a
+withArray _    f (Array arr) = f arr
+withArray name _ v           = prependContext name (typeMismatch "Array" v)
+
+withString :: String -> (String -> Parser a) -> Value -> Parser a
+withString _    f (String txt) = f txt
+withString name _ v            = prependContext name (typeMismatch "String" v)
+
+withDouble :: String -> (Double -> Parser a) -> Value -> Parser a
+withDouble _    f (Number duble) = f duble
+withDouble name _ v              = prependContext name (typeMismatch "Number" v)
+
+withBool :: String -> (Bool -> Parser a) -> Value -> Parser a
+withBool _    f (Bool arr) = f arr
+withBool name _ v          = prependContext name (typeMismatch "Boolean" v)
+
+class FromJSON a where
+    parseJSON     :: Value -> Parser a
+
+    parseJSONList :: Value -> Parser [a]
+    parseJSONList = withArray "[]" (zipWithM (parseIndexedJSON parseJSON) [0..])
+
+instance FromJSON Bool where
+    parseJSON (Bool b)  = pure b
+    parseJSON v = typeMismatch "Bool" v
+
+instance FromJSON () where
+    parseJSON =
+      withArray "()" $ \v ->
+        if null v
+          then pure ()
+          else prependContext "()" $ fail "expected an empty array"
+
+instance FromJSON Char where
+    parseJSON = withString "Char" parseChar
+
+    parseJSONList (String s) = pure s
+    parseJSONList v = typeMismatch "String" v
+
+parseChar :: String -> Parser Char
+parseChar t =
+    if length t == 1
+      then pure $ head t
+      else prependContext "Char" $ fail "expected a string of length 1"
+
+parseRealFloat :: RealFloat a => String -> Value -> Parser a
+parseRealFloat _    (Number s) = pure $ realToFrac s
+parseRealFloat _    Null       = pure (0/0)
+parseRealFloat name v          = prependContext name (unexpected v)
+
+instance FromJSON Double where
+    parseJSON = parseRealFloat "Double"
+
+instance FromJSON Float where
+    parseJSON = parseRealFloat "Float"
+
+parseNatural :: Integer -> Parser Natural
+parseNatural integer =
+    if integer < 0 then
+        fail $ "parsing Natural failed, unexpected negative number " <> show integer
+    else
+        pure $ fromIntegral integer
+
+parseIntegralFromDouble :: Integral a => Double -> Parser a
+parseIntegralFromDouble d =
+    let r = toRational d
+        x = truncate r
+    in if toRational x == r
+         then pure $ x
+         else fail $ "unexpected floating number " <> show d
+
+parseIntegral :: Integral a => String -> Value -> Parser a
+parseIntegral name = withDouble name parseIntegralFromDouble
+
+instance FromJSON Integer where
+    parseJSON = parseIntegral "Integer"
+
+instance FromJSON Natural where
+    parseJSON = withDouble "Natural"
+                  (parseIntegralFromDouble >=> parseNatural)
+
+instance FromJSON Int where
+    parseJSON = parseIntegral "Int"
+
+instance FromJSON Int8 where
+    parseJSON = parseIntegral "Int8"
+
+instance FromJSON Int16 where
+    parseJSON = parseIntegral "Int16"
+
+instance FromJSON Int32 where
+    parseJSON = parseIntegral "Int32"
+
+instance FromJSON Int64 where
+    parseJSON = parseIntegral "Int64"
+
+instance FromJSON Word where
+    parseJSON = parseIntegral "Word"
+
+instance FromJSON Word8 where
+    parseJSON = parseIntegral "Word8"
+
+instance FromJSON Word16 where
+    parseJSON = parseIntegral "Word16"
+
+instance FromJSON Word32 where
+    parseJSON = parseIntegral "Word32"
+
+instance FromJSON Word64 where
+    parseJSON = parseIntegral "Word64"
+
+instance FromJSON a => FromJSON [a] where
+    parseJSON = parseJSONList
+
+data Result a = Error String
+              | Success a
+                deriving (Eq, Show)
+
+fromJSON :: FromJSON a => Value -> Result a
+fromJSON = parse parseJSON
+
+parse :: (a -> Parser b) -> a -> Result b
+parse m v = runParser (m v) [] (const Error) Success
+
+parseEither :: (a -> Parser b) -> a -> Either String b
+parseEither m v = runParser (m v) [] onError Right
+  where onError path msg = Left (formatError path msg)
+
+formatError :: JSONPath -> String -> String
+formatError path msg = "Error in " ++ formatPath path ++ ": " ++ msg
+
+formatPath :: JSONPath -> String
+formatPath path = "$" ++ formatRelativePath path
+
+formatRelativePath :: JSONPath -> String
+formatRelativePath path = format "" path
+  where
+    format :: String -> JSONPath -> String
+    format pfx []                = pfx
+    format pfx (Index idx:parts) = format (pfx ++ "[" ++ show idx ++ "]") parts
+    format pfx (Key key:parts)   = format (pfx ++ formatKey key) parts
+
+    formatKey :: String -> String
+    formatKey key
+       | isIdentifierKey key = "." ++ key
+       | otherwise           = "['" ++ escapeKey key ++ "']"
+
+    isIdentifierKey :: String -> Bool
+    isIdentifierKey []     = False
+    isIdentifierKey (x:xs) = isAlpha x && all isAlphaNum xs
+
+    escapeKey :: String -> String
+    escapeKey = concatMap escapeChar
+
+    escapeChar :: Char -> String
+    escapeChar '\'' = "\\'"
+    escapeChar '\\' = "\\\\"
+    escapeChar c    = [c]
+
+explicitParseField :: (Value -> Parser a) -> Object -> String -> Parser a
+explicitParseField p obj key =
+    case key `lookup` obj of
+      Nothing -> fail $ "key " ++ key ++ " not found"
+      Just v  -> p v <?> Key key
+
+(.:) :: FromJSON a => Object -> String -> Parser a
+(.:) = explicitParseField parseJSON
+
+explicitParseFieldMaybe :: (Value -> Parser a) -> Object -> String -> Parser (Maybe a)
+explicitParseFieldMaybe p obj key =
+    case key `lookup` obj of
+      Nothing -> pure Nothing
+      Just v  -> Just <$> p v <?> Key key
+
+(.:?) :: FromJSON a => Object -> String -> Parser (Maybe a)
+(.:?) = explicitParseFieldMaybe parseJSON
+
+
+decodeWith :: (Value -> Result a) -> BSL.ByteString -> Maybe a
+decodeWith decoder bsl =
+   case Parsec.parse parseJSONValue "<input>" bsl of
+     Left  _    -> Nothing
+     Right json ->
+       case decoder json of
+         Success a -> Just a
+         Error _   -> Nothing
+
+decode :: FromJSON a => BSL.ByteString -> Maybe a
+decode = decodeWith fromJSON
+
+eitherDecodeWith :: (Value -> Result a) -> BSL.ByteString -> Either String a
+eitherDecodeWith decoder bsl =
+    case Parsec.parse parseJSONValue "<input>" bsl of
+      Left parsecError -> Left (show parsecError)
+      Right json ->
+        case decoder json of
+          Success a -> Right a
+          Error err -> Left  err
+
+eitherDecode :: FromJSON a => BSL.ByteString -> Either String a
+eitherDecode = eitherDecodeWith fromJSON
+
+
+decodeFile :: FromJSON a => FilePath -> IO (Maybe a)
+decodeFile filePath = do
+    parsecResult <- Parsec.Lazy.parseFromFile parseJSONValue filePath
+    case parsecResult of
+      Right r ->
+        case fromJSON r of
+          Success a -> return (Just a)
+          Error   _ -> return Nothing
+      Left _ -> return Nothing
+
+
+eitherDecodeFile :: FromJSON a => FilePath -> IO (Either String a)
+eitherDecodeFile filePath = do
+    parsecResult <- Parsec.Lazy.parseFromFile parseJSONValue filePath
+    case parsecResult of
+      Right r ->
+        case fromJSON r of
+          Success a -> return (Right a)
+          Error err -> return (Left err)
+      Left err -> return $ Left (show err)
+

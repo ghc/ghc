@@ -17,6 +17,7 @@ module Haddock.Backends.Xhtml.Themes (
     where
 
 import Haddock.Options
+import Haddock.Backends.Xhtml.Types ( BaseURL, withBaseURL )
 
 import Control.Monad (liftM)
 import Data.Char (toLower)
@@ -176,13 +177,13 @@ cssFiles :: Themes -> [String]
 cssFiles ts = nub $ concatMap themeFiles ts
 
 
-styleSheet :: Themes -> Html
-styleSheet ts = toHtml $ zipWith mkLink rels ts
+styleSheet :: BaseURL -> Themes -> Html
+styleSheet base_url ts = toHtml $ zipWith mkLink rels ts
   where
     rels = "stylesheet" : repeat "alternate stylesheet"
     mkLink aRel t =
       thelink
-        ! [ href (themeHref t),  rel aRel, thetype "text/css",
+        ! [ href (withBaseURL base_url (themeHref t)),  rel aRel, thetype "text/css",
             XHtml.title (themeName t)
           ]
         << noHtml

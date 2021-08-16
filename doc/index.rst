@@ -12,6 +12,7 @@ Contents:
    intro
    invoking
    markup
+   multi-components
 
 
 Indices and tables

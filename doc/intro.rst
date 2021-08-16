@@ -125,6 +125,7 @@ please contact us.
 -  Luke Plant
 -  Malcolm Wallace
 -  Manuel Chakravarty
+-  Marcin Szamotulski
 -  Mark Lentczner
 -  Mark Shields
 -  Mateusz Kowalczyk

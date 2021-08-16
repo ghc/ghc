@@ -11,10 +11,11 @@
 -- Stability   :  experimental
 -- Portability :  portable
 -----------------------------------------------------------------------------
-{-# LANGUAGE CPP, NamedFieldPuns #-}
+{-# LANGUAGE CPP, NamedFieldPuns, TupleSections, TypeApplications #-}
 module Haddock.Backends.Xhtml (
   ppHtml, copyHtmlBits,
   ppHtmlIndex, ppHtmlContents,
+  ppJsonIndex
 ) where
 
 
@@ -38,12 +39,16 @@ import Haddock.GhcUtils
 
 import Control.Monad         ( when, unless )
 import qualified Data.ByteString.Builder as Builder
+import Data.Bifunctor        ( bimap )
 import Data.Char             ( toUpper, isSpace )
+import Data.Either           ( partitionEithers )
+import Data.Foldable         ( traverse_)
 import Data.List             ( sortBy, isPrefixOf, intersperse )
 import Data.Maybe
 import System.Directory
 import System.FilePath hiding ( (</>) )
 import qualified System.IO as IO
+import qualified System.FilePath as FilePath
 import Data.Map              ( Map )
 import qualified Data.Map as Map hiding ( Map )
 import qualified Data.Set as Set hiding ( Set )
@@ -68,6 +73,7 @@ ppHtml :: UnitState
        -> Maybe String                 -- ^ The mathjax URL (--mathjax)
        -> SourceURLs                   -- ^ The source URL (--source)
        -> WikiURLs                     -- ^ The wiki URL (--wiki)
+       -> BaseURL                      -- ^ The base URL (--base-url)
        -> Maybe String                 -- ^ The contents URL (--use-contents)
        -> Maybe String                 -- ^ The index URL (--use-index)
        -> Bool                         -- ^ Whether to use unicode in output (--use-unicode)
@@ -79,7 +85,7 @@ ppHtml :: UnitState
 
 ppHtml state doctitle maybe_package ifaces reexported_ifaces odir prologue
         themes maybe_mathjax_url maybe_source_url maybe_wiki_url
-        maybe_contents_url maybe_index_url unicode
+        maybe_base_url maybe_contents_url maybe_index_url unicode
         pkg qual debug withQuickjump = do
   let
     visible_ifaces = filter visible ifaces
@@ -97,12 +103,12 @@ ppHtml state doctitle maybe_package ifaces reexported_ifaces odir prologue
       themes maybe_mathjax_url maybe_contents_url maybe_source_url maybe_wiki_url
       (map toInstalledIface visible_ifaces ++ reexported_ifaces) debug
 
-    when withQuickjump $
-      ppJsonIndex odir maybe_source_url maybe_wiki_url unicode pkg qual
-        visible_ifaces
+  when withQuickjump $
+    ppJsonIndex odir maybe_source_url maybe_wiki_url unicode pkg qual
+      visible_ifaces []
 
   mapM_ (ppHtmlModule odir doctitle themes
-           maybe_mathjax_url maybe_source_url maybe_wiki_url
+           maybe_mathjax_url maybe_source_url maybe_wiki_url maybe_base_url
            maybe_contents_url maybe_index_url unicode pkg qual debug) visible_ifaces
 
 
@@ -119,16 +125,23 @@ copyHtmlBits odir libdir themes withQuickjump = do
   return ()
 
 
-headHtml :: String -> Themes -> Maybe String -> Html
-headHtml docTitle themes mathjax_url =
-  header <<
+headHtml :: String -> Themes -> Maybe String -> Maybe String -> Html
+headHtml docTitle themes mathjax_url base_url =
+      header ! (maybe [] (\url -> [identifier "head", strAttr "data-base-url" url ]) base_url)
+    <<
     [ meta ! [ httpequiv "Content-Type", content "text/html; charset=UTF-8"]
     , meta ! [ XHtml.name "viewport", content "width=device-width, initial-scale=1"]
     , thetitle << docTitle
-    , styleSheet themes
-    , thelink ! [ rel "stylesheet", thetype "text/css", href quickJumpCssFile] << noHtml
+    , styleSheet base_url themes
+    , thelink ! [ rel "stylesheet"
+                , thetype "text/css"
+                , href (withBaseURL base_url quickJumpCssFile) ]
+             << noHtml
     , thelink ! [ rel "stylesheet", thetype "text/css", href fontUrl] << noHtml
-    , script ! [src haddockJsFile, emptyAttr "async", thetype "text/javascript"] << noHtml
+    , script ! [ src (withBaseURL base_url haddockJsFile)
+               , emptyAttr "async"
+               , thetype "text/javascript" ]
+            << noHtml
     , script ! [thetype "text/x-mathjax-config"] << primHtml mjConf
     , script ! [src mjUrl, thetype "text/javascript"] << noHtml
     ]
@@ -281,7 +294,7 @@ ppHtmlContents state odir doctitle _maybe_package
          | iface <- ifaces
          , instIsSig iface]
       html =
-        headHtml doctitle themes mathjax_url +++
+        headHtml doctitle themes mathjax_url Nothing +++
         bodyHtml doctitle Nothing
           maybe_source_url maybe_wiki_url
           Nothing maybe_index_url << [
@@ -361,6 +374,35 @@ mkNode pkg qual ss p (Node s leaf _pkg srcPkg short ts) =
 -- * Generate the index
 --------------------------------------------------------------------------------
 
+data JsonIndexEntry = JsonIndexEntry {
+      jieHtmlFragment :: String,
+      jieName         :: String,
+      jieModule       :: String,
+      jieLink         :: String
+    }
+  deriving Show
+
+instance ToJSON JsonIndexEntry where
+    toJSON JsonIndexEntry
+        { jieHtmlFragment
+        , jieName
+        , jieModule
+        , jieLink } =
+      Object
+        [ "display_html" .= String jieHtmlFragment
+        , "name"         .= String jieName
+        , "module"       .= String jieModule
+        , "link"         .= String jieLink
+        ]
+
+instance FromJSON JsonIndexEntry where
+    parseJSON = withObject "JsonIndexEntry" $ \v ->
+      JsonIndexEntry
+        <$> v .: "display_html"
+        <*> v .: "name"
+        <*> v .: "module"
+        <*> v .: "link"
+
 ppJsonIndex :: FilePath
            -> SourceURLs                   -- ^ The source URL (--source)
            -> WikiURLs                     -- ^ The wiki URL (--wiki)
@@ -368,34 +410,50 @@ ppJsonIndex :: FilePath
            -> Maybe Package
            -> QualOption
            -> [Interface]
+           -> [FilePath]                   -- ^ file paths to interface files
+                                           -- (--read-interface)
            -> IO ()
-ppJsonIndex odir maybe_source_url maybe_wiki_url unicode pkg qual_opt ifaces = do
+ppJsonIndex odir maybe_source_url maybe_wiki_url unicode pkg qual_opt ifaces installedIfacesPaths = do
   createDirectoryIfMissing True odir
-  IO.withBinaryFile (joinPath [odir, indexJsonFile]) IO.WriteMode $ \h -> do
-    Builder.hPutBuilder h (encodeToBuilder modules)
+  (errors, installedIndexes) <-
+    partitionEithers
+      <$> traverse
+            (\ifaceFile ->
+              let indexFile = takeDirectory ifaceFile
+                    FilePath.</> "doc-index.json" in
+                  bimap (indexFile,) (map (fixLink ifaceFile))
+              <$> eitherDecodeFile @[JsonIndexEntry] indexFile)
+            installedIfacesPaths
+  traverse_ (\(indexFile, err) -> putStrLn $ "haddock: Coudn't parse " ++ indexFile ++ ": " ++ err)
+            errors
+  IO.withBinaryFile (joinPath [odir, indexJsonFile]) IO.WriteMode $ \h ->
+      Builder.hPutBuilder
+        h (encodeToBuilder (encodeIndexes (concat installedIndexes)))
   where
-    modules :: Value
-    modules = Array (concatMap goInterface ifaces)
+    encodeIndexes :: [JsonIndexEntry] -> Value
+    encodeIndexes installedIndexes =
+      toJSON
+        (concatMap fromInterface ifaces
+         ++ installedIndexes)
 
-    goInterface :: Interface -> [Value]
-    goInterface iface =
-        concatMap (goExport mdl qual) (ifaceRnExportItems iface)
+    fromInterface :: Interface -> [JsonIndexEntry]
+    fromInterface iface =
+        mkIndex mdl qual `mapMaybe` ifaceRnExportItems iface
       where
         aliases = ifaceModuleAliases iface
         qual    = makeModuleQual qual_opt aliases mdl
         mdl     = ifaceMod iface
 
-    goExport :: Module -> Qualification -> ExportItem DocNameI -> [Value]
-    goExport mdl qual item
+    mkIndex :: Module -> Qualification -> ExportItem DocNameI -> Maybe JsonIndexEntry
+    mkIndex mdl qual item
       | Just item_html <- processExport True links_info unicode pkg qual item
-      = [ Object
-            [ "display_html" .= String (showHtmlFragment item_html)
-            , "name"         .= String (unwords (map getOccString names))
-            , "module"       .= String (moduleString mdl)
-            , "link"         .= String (fromMaybe "" (listToMaybe (map (nameLink mdl) names)))
-            ]
-        ]
-      | otherwise = []
+      = Just JsonIndexEntry
+          { jieHtmlFragment = showHtmlFragment item_html
+          , jieName         = unwords (map getOccString names)
+          , jieModule       = moduleString mdl
+          , jieLink         = fromMaybe "" (listToMaybe (map (nameLink mdl) names))
+          }
+      | otherwise = Nothing
       where
         names = exportName item ++ exportSubs item
 
@@ -412,6 +470,13 @@ ppJsonIndex odir maybe_source_url maybe_wiki_url unicode pkg qual_opt ifaces = d
     nameLink mdl = moduleNameUrl' (moduleName mdl) . nameOccName . getName
 
     links_info = (maybe_source_url, maybe_wiki_url)
+
+    -- update link using relative path to output directory
+    fixLink :: FilePath
+            -> JsonIndexEntry -> JsonIndexEntry
+    fixLink ifaceFile jie = 
+      jie { jieLink = makeRelative odir (takeDirectory ifaceFile)
+                        FilePath.</> jieLink jie }
 
 ppHtmlIndex :: FilePath
             -> String
@@ -441,7 +506,7 @@ ppHtmlIndex odir doctitle _maybe_package themes
 
   where
     indexPage showLetters ch items =
-      headHtml (doctitle ++ " (" ++ indexName ch ++ ")") themes maybe_mathjax_url +++
+      headHtml (doctitle ++ " (" ++ indexName ch ++ ")") themes maybe_mathjax_url Nothing +++
       bodyHtml doctitle Nothing
         maybe_source_url maybe_wiki_url
         maybe_contents_url Nothing << [
@@ -541,11 +606,11 @@ ppHtmlIndex odir doctitle _maybe_package themes
 
 ppHtmlModule
         :: FilePath -> String -> Themes
-        -> Maybe String -> SourceURLs -> WikiURLs
+        -> Maybe String -> SourceURLs -> WikiURLs -> BaseURL
         -> Maybe String -> Maybe String -> Bool -> Maybe Package -> QualOption
         -> Bool -> Interface -> IO ()
 ppHtmlModule odir doctitle themes
-  maybe_mathjax_url maybe_source_url maybe_wiki_url
+  maybe_mathjax_url maybe_source_url maybe_wiki_url maybe_base_url
   maybe_contents_url maybe_index_url unicode pkg qual debug iface = do
   let
       mdl = ifaceMod iface
@@ -563,7 +628,7 @@ ppHtmlModule odir doctitle themes
         = toHtml mdl_str
       real_qual = makeModuleQual qual aliases mdl
       html =
-        headHtml mdl_str_annot themes maybe_mathjax_url +++
+        headHtml mdl_str_annot themes maybe_mathjax_url maybe_base_url +++
         bodyHtml doctitle (Just iface)
           maybe_source_url maybe_wiki_url
           maybe_contents_url maybe_index_url << [

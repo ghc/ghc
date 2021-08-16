@@ -111,6 +111,8 @@ executable haddock
       Haddock.Parser
       Haddock.Utils
       Haddock.Utils.Json
+      Haddock.Utils.Json.Parser
+      Haddock.Utils.Json.Types
       Haddock.Backends.Xhtml
       Haddock.Backends.Xhtml.Decl
       Haddock.Backends.Xhtml.DocMarkup

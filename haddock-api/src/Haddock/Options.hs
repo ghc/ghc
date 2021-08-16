@@ -24,6 +24,7 @@ module Haddock.Options (
   optSourceCssFile,
   sourceUrls,
   wikiUrls,
+  baseUrl,
   optParCount,
   optDumpInterfaceFile,
   optShowInterfaceFile,
@@ -72,6 +73,7 @@ data Flag
   | Flag_SourceEntityURL  String
   | Flag_SourceLEntityURL String
   | Flag_WikiBaseURL   String
+  | Flag_BaseURL       String
   | Flag_WikiModuleURL String
   | Flag_WikiEntityURL String
   | Flag_LaTeX
@@ -157,6 +159,8 @@ options backwardsCompat =
       "URL for a source code link for each entity.\nUsed if name links are unavailable, eg. for TH splices.",
     Option []  ["comments-base"]   (ReqArg Flag_WikiBaseURL "URL")
       "URL for a comments link on the contents\nand index pages",
+    Option [] ["base-url"] (ReqArg Flag_BaseURL "URL")
+      "Base URL for static assets (eg. css, javascript, json files etc.).\nWhen given statis assets will not be copied.",
     Option []  ["comments-module"]  (ReqArg Flag_WikiModuleURL "URL")
       "URL for a comments link for each module\n(using the %{MODULE} var)",
     Option []  ["comments-entity"]  (ReqArg Flag_WikiEntityURL "URL")
@@ -300,6 +304,9 @@ wikiUrls flags =
   ,optLast [str | Flag_WikiModuleURL str <- flags]
   ,optLast [str | Flag_WikiEntityURL str <- flags])
 
+
+baseUrl :: [Flag] -> Maybe String
+baseUrl flags = optLast [str | Flag_BaseURL str <- flags]
 
 optDumpInterfaceFile :: [Flag] -> Maybe FilePath
 optDumpInterfaceFile flags = optLast [ str | Flag_DumpInterface str <- flags ]
