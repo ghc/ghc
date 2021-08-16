@@ -373,7 +373,7 @@ writeRunner settings dflags out =
   else do
     src <- readBinaryFile (cd </> srcFile)
     -- let pgm = TE.encodeUtf8 (T.pack $ nodeProgram nodeSettings)
-    B.writeFile runner ("#!" <> TE.encodeUtf8 (T.pack nodePgm) <> "\n" <> src)
+    B.writeFile runner ("#!/usr/bin/env " <> TE.encodeUtf8 (T.pack nodePgm) <> "\n" <> src)
     Cabal.setFileExecutable runner
 
 -- | write the manifest.webapp file that for firefox os
