@@ -322,7 +322,7 @@ validate-x86_64-linux-deb9-hadrian:
   rules:
     - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
 
-validate-x86_64-linux-deb9-unreg-hadrian:
+.validate-x86_64-linux-deb9-unreg-hadrian:
   extends: .validate-linux-hadrian
   stage: full-build
   variables:
@@ -932,7 +932,7 @@ nightly-x86_64-linux-deb9:
     TEST_TYPE: slowtest
 
 # N.B. Has DEBUG assertions enabled in stage2
-validate-x86_64-linux-deb9-debug:
+.validate-x86_64-linux-deb9-debug:
   extends: .build-x86_64-linux-deb9
   stage: full-build
   variables:
@@ -1253,7 +1253,7 @@ release-x86_64-linux-fedora27-dwarf:
   cache:
     key: "x86_64-windows-$WINDOWS_TOOLCHAIN_VERSION"
 
-validate-x86_64-windows-hadrian:
+.validate-x86_64-windows-hadrian:
   extends: .build-x86_64-windows-hadrian
 
 .build-windows-make:
@@ -1320,7 +1320,7 @@ release-x86_64-windows-integer-simple:
 # Packaging
 ############################################################
 
-doc-tarball:
+.doc-tarball:
   stage: packaging
   needs: [validate-x86_64-linux-deb9-debug, validate-x86_64-windows-hadrian, validate-x86_64-linux-deb9-unreg-hadrian]
   tags:
@@ -1423,9 +1423,6 @@ nightly-hackage:
 ############################################################
 
 perf-nofib:
-  # This needs to be reverted, and is only
-  # an attempt to unbreak master
-  allow_failure: true
   stage: testing
   needs: [validate-x86_64-linux-deb9-dwarf, doc-tarball]
   dependencies:
@@ -1452,6 +1449,7 @@ perf-nofib:
     - export BOOT_HC=$GHC
     - cabal install -w "$BOOT_HC" --lib regex-compat
     - export PATH=$root/bin:$PATH
+    - cabal install -w "$root/bin/ghc"  --lib unboxed-ref
     - make -C nofib boot mode=fast -j$CPUS
     - "make -C nofib EXTRA_RUNTEST_OPTS='-cachegrind +RTS -V0 -RTS' NoFibRuns=1 mode=fast -j$CPUS 2>&1 | tee nofib.log"
   artifacts:
@@ -1497,7 +1495,7 @@ perf:
     paths:
       - out
   rules:
-    - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
+    #    - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
 
 
 ############################################################
