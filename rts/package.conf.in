@@ -314,8 +314,12 @@ ld-options:
  *  path.  This is important to use the static gmp in preference on Mac OS.
  *  The used option is specific to the Darwin linker.
  */
+/*
+ * See Note [fd_set_overflow]
+*/
 #if defined(darwin_HOST_OS)
          , "-Wl,-search_paths_first"
+         , "-Wl,-U,___darwin_check_fd_set_overflow"
 #endif
 
 #if defined(darwin_HOST_OS) && !defined(x86_64_HOST_ARCH) && !defined(aarch64_HOST_ARCH)
