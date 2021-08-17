@@ -277,7 +277,6 @@ Library
         GHC.Stats
         GHC.Storable
         GHC.TopHandler
-        GHC.TypeError
         GHC.TypeLits
         GHC.TypeLits.Internal
         GHC.TypeNats

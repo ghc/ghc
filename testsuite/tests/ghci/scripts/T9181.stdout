@@ -6,6 +6,16 @@ type family GHC.TypeLits.CharToNat a
 type GHC.TypeLits.ConsSymbol :: Char
                                 -> GHC.Types.Symbol -> GHC.Types.Symbol
 type family GHC.TypeLits.ConsSymbol a b
+type GHC.TypeLits.ErrorMessage :: *
+data GHC.TypeLits.ErrorMessage
+  = GHC.TypeLits.Text GHC.Types.Symbol
+  | forall t. GHC.TypeLits.ShowType t
+  | GHC.TypeLits.ErrorMessage
+    GHC.TypeLits.:<>:
+    GHC.TypeLits.ErrorMessage
+  | GHC.TypeLits.ErrorMessage
+    GHC.TypeLits.:$$:
+    GHC.TypeLits.ErrorMessage
 type GHC.TypeLits.KnownChar :: Char -> Constraint
 class GHC.TypeLits.KnownChar n where
   GHC.TypeLits.charSing :: GHC.TypeLits.SChar n
@@ -26,6 +36,9 @@ data GHC.TypeLits.SomeSymbol
   = forall (n :: GHC.Types.Symbol).
     GHC.TypeLits.KnownSymbol n =>
     GHC.TypeLits.SomeSymbol (Data.Proxy.Proxy n)
+type GHC.TypeLits.TypeError :: forall b.
+                               GHC.TypeLits.ErrorMessage -> b
+type family GHC.TypeLits.TypeError a where
 type GHC.TypeLits.UnconsSymbol :: GHC.Types.Symbol
                                   -> Maybe (Char, GHC.Types.Symbol)
 type family GHC.TypeLits.UnconsSymbol a
@@ -64,11 +77,9 @@ type family (GHC.TypeNats.+) a b
 type (GHC.TypeNats.-) :: GHC.Num.Natural.Natural
                          -> GHC.Num.Natural.Natural -> GHC.Num.Natural.Natural
 type family (GHC.TypeNats.-) a b
-type (Data.Type.Ord.<=) :: forall {t}. t -> t -> Constraint
+type (Data.Type.Ord.<=) :: forall {k}. k -> k -> Constraint
 type (Data.Type.Ord.<=) x y =
-  GHC.TypeError.Assert
-    (x Data.Type.Ord.<=? y) (Data.Type.Ord.LeErrMsg x y)
-  :: Constraint
+  (x Data.Type.Ord.<=? y) ~ 'True :: Constraint
 type (Data.Type.Ord.<=?) :: forall k. k -> k -> Bool
 type (Data.Type.Ord.<=?) m n =
   Data.Type.Ord.OrdCond
@@ -85,16 +96,6 @@ type family GHC.TypeLits.Internal.CmpSymbol a b
 type GHC.TypeNats.Div :: GHC.Num.Natural.Natural
                          -> GHC.Num.Natural.Natural -> GHC.Num.Natural.Natural
 type family GHC.TypeNats.Div a b
-type GHC.TypeError.ErrorMessage :: *
-data GHC.TypeError.ErrorMessage
-  = GHC.TypeError.Text GHC.Types.Symbol
-  | forall t. GHC.TypeError.ShowType t
-  | GHC.TypeError.ErrorMessage
-    GHC.TypeError.:<>:
-    GHC.TypeError.ErrorMessage
-  | GHC.TypeError.ErrorMessage
-    GHC.TypeError.:$$:
-    GHC.TypeError.ErrorMessage
 type GHC.TypeNats.KnownNat :: GHC.TypeNats.Nat -> Constraint
 class GHC.TypeNats.KnownNat n where
   GHC.TypeNats.natSing :: GHC.TypeNats.SNat n
@@ -130,9 +131,6 @@ data GHC.TypeNats.SomeNat
     GHC.TypeNats.SomeNat (Data.Proxy.Proxy n)
 type GHC.Types.Symbol :: *
 data GHC.Types.Symbol
-type GHC.TypeError.TypeError :: forall b.
-                                GHC.TypeError.ErrorMessage -> b
-type family GHC.TypeError.TypeError a where
 type (GHC.TypeNats.^) :: GHC.Num.Natural.Natural
                          -> GHC.Num.Natural.Natural -> GHC.Num.Natural.Natural
 type family (GHC.TypeNats.^) a b

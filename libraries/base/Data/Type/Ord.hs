@@ -3,7 +3,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE PolyKinds #-}
-{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE Safe #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -35,7 +35,6 @@ module Data.Type.Ord (
   ) where
 
 import GHC.Show(Show(..))
-import GHC.TypeError
 import GHC.TypeLits.Internal
 import GHC.TypeNats.Internal
 import Data.Bool
@@ -63,47 +62,25 @@ data OrderingI a b where
 deriving instance Show (OrderingI a b)
 deriving instance Eq   (OrderingI a b)
 
+
 infix 4 <=?, <=, >=?, >=, <?, <, >?, >
-
-{-
-Note [delaying custom type errors]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The type errors for the different boolean comparison type operators are
-currently defined as type families instead of synyonyms. This is because of the
-call to checkUserTypeError in GHC.Tc.Validity.checkValidType, which is applied
-to the RHS of type synyonms.
-
-These families can be replaced with synyonyms when issue #20181 is fixed.
-See: https://gitlab.haskell.org/ghc/ghc/-/issues/20181.
--}
 
 -- | Comparison (<=) of comparable types, as a constraint.
 -- @since 4.16.0.0
-type x <= y = Assert (x <=? y) (LeErrMsg x y)
-type family LeErrMsg x y where
-  LeErrMsg x y = TypeError ('Text "Cannot satisfy: " ':<>: 'ShowType x ':<>: 'Text " <= " ':<>: 'ShowType y)
-  -- See Note [delaying custom type errors]
+type x <= y = (x <=? y) ~ 'True
 
 -- | Comparison (>=) of comparable types, as a constraint.
 -- @since 4.16.0.0
-type x >= y = Assert (x >=? y) (GeErrMsg x y)
-type family GeErrMsg x y where
-  GeErrMsg x y = TypeError ('Text "Cannot satisfy: " ':<>: 'ShowType x ':<>: 'Text " >= " ':<>: 'ShowType y)
-  -- See Note [delaying custom type errors]
+type x >= y = (x >=? y) ~ 'True
 
 -- | Comparison (<) of comparable types, as a constraint.
 -- @since 4.16.0.0
-type x < y = Assert (x <? y) (LtErrMsg x y)
-type family LtErrMsg x y where
-  LtErrMsg x y = TypeError ('Text "Cannot satisfy: " ':<>: 'ShowType x ':<>: 'Text " < " ':<>: 'ShowType y)
-  -- See Note [delaying custom type errors]
+type x < y = (x >? y) ~ 'True
 
 -- | Comparison (>) of comparable types, as a constraint.
 -- @since 4.16.0.0
-type x > y = Assert (x >? y) (GtErrMsg x y)
-type family GtErrMsg x y where
-  GtErrMsg x y = TypeError ('Text "Cannot satisfy: " ':<>: 'ShowType x ':<>: 'Text " > " ':<>: 'ShowType y)
-  -- See Note [delaying custom type errors]
+type x > y = (x >? y) ~ 'True
+
 
 -- | Comparison (<=) of comparable types, as a function.
 -- @since 4.16.0.0

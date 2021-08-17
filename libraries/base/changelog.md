@@ -47,10 +47,6 @@
   * `fromInteger :: Integer -> Float/Double` now consistently round to the
     nearest value, with ties to even.
 
-  * Add `GHC.TypeError` module to contain functionality related to custom type
-    errors. `TypeError` is re-exported from `GHC.TypeLits` for backwards
-    compatibility.
-
 ## 4.15.0.0 *TBA*
 
   * `openFile` now calls the `open` system call with an `interruptible` FFI
