@@ -331,16 +331,18 @@ Both can_fail and has_side_effects mean that the primop has
 some effect that is not captured entirely by its result value.
 
 ----------  has_side_effects ---------------------
-A primop "has_side_effects" if it has some *write* effect, visible
-elsewhere
-    - writing to the world (I/O)
-    - writing to a mutable data structure (writeIORef)
+A primop "has_side_effects" if it has some side effect, visible
+elsewhere, apart from the result it returns
+    - reading or writing to the world (I/O)
+    - reading or writing to a mutable data structure (writeIORef)
     - throwing a synchronous Haskell exception
 
 Often such primops have a type like
    State -> input -> (State, output)
-so the state token guarantees ordering.  In general we rely *only* on
-data dependencies of the state token to enforce write-effect ordering
+so the state token guarantees ordering.  In general we rely on
+data dependencies of the state token to enforce write-effect ordering,
+but as the notes below make clear, the matter is a bit more complicated
+than that.
 
  * NB1: if you inline unsafePerformIO, you may end up with
    side-effecting ops whose 'state' output is discarded.
@@ -353,10 +355,20 @@ data dependencies of the state token to enforce write-effect ordering
    "can_fail".  We must be careful about not discarding such things;
    see the paper "A semantics for imprecise exceptions".
 
- * NB3: *Read* effects (like reading an IORef) don't count here,
-   because it doesn't matter if we don't do them, or do them more than
-   once.  *Sequencing* is maintained by the data dependency of the state
-   token.
+ * NB3: *Read* effects on *mutable* cells (like reading an IORef or a
+   MutableArray#) /are/ included.  You may find this surprising because it
+   doesn't matter if we don't do them, or do them more than once.  *Sequencing*
+   is maintained by the data dependency of the state token.  But see
+   "Duplication" below under
+   Note [Transformations affected by can_fail and has_side_effects]
+
+   Note that read operations on *immutable* values (like indexArray#) do not
+   have has_side_effects.   (They might be marked can_fail, however, because
+   you might index out of bounds.)
+
+   Using has_side_effects in this way is a bit of a blunt instrument.  We could
+   be more refined by splitting read and write effects (see comments with #3207
+   and #20195)
 
 ----------  can_fail ----------------------------
 A primop "can_fail" if it can fail with an *unchecked* exception on

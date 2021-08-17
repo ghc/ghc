@@ -1532,6 +1532,7 @@ primop CasArrayOp  "casArray#" GenPrimOp
    with
    out_of_line = True
    has_side_effects = True
+   can_fail = True -- Might index out of bounds
 
 
 ------------------------------------------------------------------------
@@ -1710,6 +1711,7 @@ primop CasSmallArrayOp  "casSmallArray#" GenPrimOp
    with
    out_of_line = True
    has_side_effects = True
+   can_fail = True -- Might index out of bounds
 
 ------------------------------------------------------------------------
 section "Byte Arrays"
