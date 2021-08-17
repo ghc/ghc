@@ -471,7 +471,7 @@ test ('T9198',
       [''])
 
 test('T11545',
-     [ collect_compiler_stats('all', 10) ],
+     [ collect_compiler_stats('all', 15) ],
      compile, ['-O'])
 
 test('T15304',

@@ -150,7 +150,7 @@ pmcMatches
   -> [LMatch GhcTc (LHsExpr GhcTc)]  -- ^ List of matches
   -> DsM [(Nablas, NonEmpty Nablas)] -- ^ One covered 'Nablas' per Match and
                                      --   GRHS, for long distance info.
-pmcMatches ctxt vars matches = do
+pmcMatches ctxt vars matches = {-# SCC "pmcMatches" #-} do
   -- We have to force @missing@ before printing out the trace message,
   -- otherwise we get interleaved output from the solver. This function
   -- should be strict in @missing@ anyway!
@@ -169,10 +169,12 @@ pmcMatches ctxt vars matches = do
       formatReportWarnings cirbsEmptyCase ctxt vars result
       return []
     Just matches -> do
-      matches <- noCheckDs $ desugarMatches vars matches
-      result <- unCA (checkMatchGroup matches) missing
+      matches <- {-# SCC "desugarMatches" #-}
+                 noCheckDs $ desugarMatches vars matches
+      result  <- {-# SCC "checkMatchGroup" #-}
+                 unCA (checkMatchGroup matches) missing
       tracePm "}: " (ppr (cr_uncov result))
-      formatReportWarnings cirbsMatchGroup ctxt vars result
+      {-# SCC "formatReportWarnings" #-} formatReportWarnings cirbsMatchGroup ctxt vars result
       return (NE.toList (ldiMatchGroup (cr_ret result)))
 
 {- Note [pmcPatBind only checks PatBindRhs]
