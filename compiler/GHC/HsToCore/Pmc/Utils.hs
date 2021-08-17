@@ -4,7 +4,7 @@
 -- | Utility module for the pattern-match coverage checker.
 module GHC.HsToCore.Pmc.Utils (
 
-        tracePm, mkPmId,
+        tracePm, traceWhenFailPm, mkPmId,
         allPmCheckWarnings, overlapping, exhaustive, redundantBang,
         exhaustiveWarningFlag,
         isMatchContextPmChecked, needToRunPmCheck
@@ -19,6 +19,7 @@ import GHC.Hs
 import GHC.Core.Type
 import GHC.Data.FastString
 import GHC.Data.IOEnv
+import GHC.Data.Maybe
 import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Unique.Supply
@@ -28,6 +29,8 @@ import GHC.Utils.Outputable
 import GHC.Utils.Logger
 import GHC.HsToCore.Monad
 
+import Control.Monad
+
 tracePm :: String -> SDoc -> DsM ()
 tracePm herald doc = do
   logger  <- getLogger
@@ -35,6 +38,13 @@ tracePm herald doc = do
   liftIO $ putDumpFileMaybe' logger printer
             Opt_D_dump_ec_trace "" FormatText (text herald $$ (nest 2 doc))
 {-# INLINE tracePm #-}  -- see Note [INLINE conditional tracing utilities]
+
+traceWhenFailPm :: String -> SDoc -> MaybeT DsM a -> MaybeT DsM a
+traceWhenFailPm herald doc act = MaybeT $ do
+  mb_a <- runMaybeT act
+  when (isNothing mb_a) $ tracePm herald doc
+  pure mb_a
+{-# INLINE traceWhenFailPm #-}  -- see Note [INLINE conditional tracing utilities]
 
 -- | Generate a fresh `Id` of a given type
 mkPmId :: Type -> DsM Id

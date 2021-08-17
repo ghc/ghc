@@ -36,7 +36,7 @@ module GHC.HsToCore.Pmc.Solver (
 import GHC.Prelude
 
 import GHC.HsToCore.Pmc.Types
-import GHC.HsToCore.Pmc.Utils (tracePm, mkPmId)
+import GHC.HsToCore.Pmc.Utils (tracePm, traceWhenFailPm, mkPmId)
 
 import GHC.Driver.Session
 import GHC.Driver.Config
@@ -70,6 +70,7 @@ import GHC.Core.DataCon
 import GHC.Core.PatSyn
 import GHC.Core.TyCon
 import GHC.Core.TyCon.RecWalk
+import GHC.Builtin.Names
 import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim (tYPETyCon)
 import GHC.Core.TyCo.Rep
@@ -93,6 +94,9 @@ import Data.Monoid   (Any(..))
 import Data.List     (sortBy, find)
 import qualified Data.List.NonEmpty as NE
 import Data.Ord      (comparing)
+
+import GHC.Utils.Trace
+_ = pprTrace -- to silence unused import warnings
 
 --
 -- * Main exports
@@ -324,23 +328,23 @@ pmTopNormaliseType :: TyState -> Type -> DsM TopNormaliseTypeResult
 -- NB: Normalisation can potentially change kinds, if the head of the type
 -- is a type family with a variable result kind. I (Richard E) can't think
 -- of a way to cause trouble here, though.
-pmTopNormaliseType (TySt _ inert) typ
-  = do env <- dsGetFamInstEnvs
-       tracePm "normalise" (ppr typ)
-       -- Before proceeding, we chuck typ into the constraint solver, in case
-       -- solving for given equalities may reduce typ some. See
-       -- "Wrinkle: local equalities" in Note [Type normalisation].
-       typ' <- initTcDsForSolver $ tcNormalise inert typ
-       -- Now we look with topNormaliseTypeX through type and data family
-       -- applications and newtypes, which tcNormalise does not do.
-       -- See also 'TopNormaliseTypeResult'.
-       pure $ case topNormaliseTypeX (stepper env) comb typ' of
-         Nothing                -> NormalisedByConstraints typ'
-         Just ((ty_f,tm_f), ty) -> HadRedexes src_ty newtype_dcs core_ty
-           where
-             src_ty = eq_src_ty ty (typ' : ty_f [ty])
-             newtype_dcs = tm_f []
-             core_ty = ty
+pmTopNormaliseType (TySt _ inert) typ = {-# SCC "pmTopNormaliseType" #-} do
+  env <- dsGetFamInstEnvs
+  tracePm "normalise" (ppr typ)
+  -- Before proceeding, we chuck typ into the constraint solver, in case
+  -- solving for given equalities may reduce typ some. See
+  -- "Wrinkle: local equalities" in Note [Type normalisation].
+  typ' <- initTcDsForSolver $ tcNormalise inert typ
+  -- Now we look with topNormaliseTypeX through type and data family
+  -- applications and newtypes, which tcNormalise does not do.
+  -- See also 'TopNormaliseTypeResult'.
+  pure $ case topNormaliseTypeX (stepper env) comb typ' of
+    Nothing                -> NormalisedByConstraints typ'
+    Just ((ty_f,tm_f), ty) -> HadRedexes src_ty newtype_dcs core_ty
+      where
+        src_ty = eq_src_ty ty (typ' : ty_f [ty])
+        newtype_dcs = tm_f []
+        core_ty = ty
   where
     -- Find the first type in the sequence of rewrites that is a data type,
     -- newtype, or a data family application (not the representation tycon!).
@@ -620,8 +624,9 @@ tyOracle ty_st@(TySt n inert) cts
   | isEmptyBag cts
   = pure (Just ty_st)
   | otherwise
-  = do { evs <- traverse nameTyCt cts
-       ; tracePm "tyOracle" (ppr cts $$ ppr inert)
+  = {-# SCC "tyOracle" #-}
+    do { evs <- traverse nameTyCt cts
+       ; tracePm "tyOracle" (ppr n $$ ppr cts $$ ppr inert)
        ; mb_new_inert <- initTcDsForSolver $ tcCheckGivens inert evs
          -- return the new inert set and increment the sequence number n
        ; return (TySt (n+1) <$> mb_new_inert) }
@@ -711,7 +716,7 @@ addNotConCt nabla x nalt = do
     -- otherwise return updated entry and `Just x'` if `x` should be marked dirty,
     -- where `x'` is the representative of `x`.
     go :: VarInfo -> MaybeT DsM (Maybe Id, VarInfo)
-    go vi@(VI x' pos neg _ rcm) = do
+    go vi@(VI x' _ pos neg _ rcm) = do
       -- 1. Bail out quickly when nalt contradicts a solution
       let contradicts nalt sol = eqPmAltCon (paca_con sol) nalt == Equal
       guard (not (any (contradicts nalt) pos))
@@ -751,7 +756,7 @@ hasRequiredTheta _                 = False
 -- See Note [TmState invariants].
 addConCt :: Nabla -> Id -> PmAltCon -> [TyVar] -> [Id] -> MaybeT DsM Nabla
 addConCt nabla@MkNabla{ nabla_tm_st = ts@TmSt{ ts_facts=env } } x alt tvs args = do
-  let vi@(VI _ pos neg bot _) = lookupVarInfo ts x
+  let vi@(VI _ _ pos neg bot _) = lookupVarInfo ts x
   -- First try to refute with a negative fact
   guard (not (elemPmAltConSet alt neg))
   -- Then see if any of the other solutions (remember: each of them is an
@@ -764,8 +769,6 @@ addConCt nabla@MkNabla{ nabla_tm_st = ts@TmSt{ ts_facts=env } } x alt tvs args =
     Just (PACA _con other_tvs other_args) -> do
       -- We must unify existentially bound ty vars and arguments!
       let ty_cts = equateTys (map mkTyVarTy tvs) (map mkTyVarTy other_tvs)
-      when (length args /= length other_args) $
-        lift $ tracePm "error" (ppr x <+> ppr alt <+> ppr args <+> ppr other_args)
       nabla' <- MaybeT $ addPhiCts nabla (listToBag ty_cts)
       let add_var_ct nabla (a, b) = addVarCt nabla a b
       foldlM add_var_ct nabla' $ zipEqual "addConCt" args other_args
@@ -1175,7 +1178,7 @@ traverseAll f ts@TmSt{ts_facts = env} = do
 -- The \(∇ ⊢ x inh\) judgment form in Figure 8 of the LYG paper.
 inhabitationTest :: Int -> TyState -> Nabla -> MaybeT DsM Nabla
 inhabitationTest 0     _         nabla             = pure nabla
-inhabitationTest fuel  old_ty_st nabla@MkNabla{ nabla_tm_st = ts } = do
+inhabitationTest fuel  old_ty_st nabla@MkNabla{ nabla_tm_st = ts } = {-# SCC "inhabitationTest" #-} do
   -- lift $ tracePm "inhabitation test" $ vcat
   --   [ ppr fuel
   --   , ppr old_ty_st
@@ -1190,34 +1193,48 @@ inhabitationTest fuel  old_ty_st nabla@MkNabla{ nabla_tm_st = ts } = do
   where
     nabla_not_dirty = nabla{ nabla_tm_st = ts{ts_dirty=emptyDVarSet} }
     test_one :: VarInfo -> MaybeT DsM VarInfo
-    test_one vi =
-      lift (varNeedsTesting old_ty_st nabla vi) >>= \case
-        True -> do
+    test_one vi = do
+      (need_test, vi') <- lift (varNeedsTesting old_ty_st nabla vi)
+      if need_test
+        then do
           -- lift $ tracePm "test_one" (ppr vi)
           -- No solution yet and needs testing
           -- We have to test with a Nabla where all dirty bits are cleared
-          instantiate (fuel-1) nabla_not_dirty vi
-        _ -> pure vi
+          instantiate (fuel-1) nabla_not_dirty vi'
+        else pure vi'
 
 -- | Checks whether the given 'VarInfo' needs to be tested for inhabitants.
 -- Returns `False` when we can skip the inhabitation test, presuming it would
 -- say "yes" anyway. See Note [Shortcutting the inhabitation test].
-varNeedsTesting :: TyState -> Nabla -> VarInfo -> DsM Bool
+varNeedsTesting :: TyState -> Nabla -> VarInfo -> DsM (Bool, VarInfo)
 varNeedsTesting _         MkNabla{nabla_tm_st=tm_st}     vi
-  | elemDVarSet (vi_id vi) (ts_dirty tm_st) = pure True
+  | elemDVarSet (vi_id vi) (ts_dirty tm_st) = pure (True, vi)
 varNeedsTesting _         _                              vi
-  | notNull (vi_pos vi)                     = pure False
-varNeedsTesting old_ty_st MkNabla{nabla_ty_st=new_ty_st} _
+  | notNull (vi_pos vi)                     = pure (False, vi)
+varNeedsTesting old_ty_st MkNabla{nabla_ty_st=new_ty_st} vi
   -- Same type state => still inhabited
-  | not (tyStateRefined old_ty_st new_ty_st) = pure False
-varNeedsTesting old_ty_st MkNabla{nabla_ty_st=new_ty_st} vi = do
+  | not (tyStateRefined old_ty_st new_ty_st) = pure (False, vi)
+varNeedsTesting old_ty_st MkNabla{nabla_ty_st=new_ty_st} vi = {-# SCC "varNeedsTesting" #-} do
   -- These normalisations are relatively expensive, but still better than having
   -- to perform a full inhabitation test
-  (_, _, old_norm_ty) <- tntrGuts <$> pmTopNormaliseType old_ty_st (idType $ vi_id vi)
-  (_, _, new_norm_ty) <- tntrGuts <$> pmTopNormaliseType new_ty_st (idType $ vi_id vi)
-  if old_norm_ty `eqType` new_norm_ty
-    then pure False
-    else pure True
+  -- First check whether the cached (and potentially outdated) vi_norm_ty is
+  -- already equal to the new one, in which case we saved normalisation with
+  -- the old_ty_st
+  (_, _, new_norm_ty) <- tntrGuts <$> pmTopNormaliseType new_ty_st (vi_norm_ty vi)
+  let vi' = vi{vi_norm_ty=new_norm_ty}
+  let no_change = vi_norm_ty vi `eqType` new_norm_ty
+  --tracePm "varNeedsTesting1" (ppr (not no_change) $$ ppr (idType (vi_id vi)) $$ ppr (vi_norm_ty vi) $$ ppr new_norm_ty)
+  if no_change
+    then pure (False, vi')
+    else do
+      -- Now try to normalise vi_norm_ty again with old_ty_st, maybe it wasn't
+      -- up to date.
+      (_, _, old_norm_ty) <- tntrGuts <$> pmTopNormaliseType old_ty_st (vi_norm_ty vi)
+      let no_change = old_norm_ty `eqType` new_norm_ty
+      --tracePm "varNeedsTesting2" (ppr (not no_change) $$ ppr old_norm_ty $$ ppr new_norm_ty)
+      if no_change
+        then pure (False, vi')
+        else pure (True, vi')
 
 -- | Returns (Just vi) if at least one member of each ConLike in the COMPLETE
 -- set satisfies the oracle
@@ -1228,11 +1245,12 @@ varNeedsTesting old_ty_st MkNabla{nabla_ty_st=new_ty_st} vi = do
 --     remain that do not statisfy it.  This lazy approach just
 --     avoids doing unnecessary work.
 instantiate :: Int -> Nabla -> VarInfo -> MaybeT DsM VarInfo
-instantiate fuel nabla vi = instBot fuel nabla vi <|> instCompleteSets fuel nabla vi
+instantiate fuel nabla vi = {-# SCC "instantiate" #-}
+  (instBot fuel nabla vi <|> instCompleteSets fuel nabla vi)
 
 -- | The \(⊢_{Bot}\) rule from the paper
 instBot :: Int -> Nabla -> VarInfo -> MaybeT DsM VarInfo
-instBot _fuel nabla vi = do
+instBot _fuel nabla vi = {-# SCC "instBot" #-} do
   _nabla' <- addBotCt nabla (vi_id vi)
   pure vi
 
@@ -1249,7 +1267,7 @@ addNormalisedTypeMatches nabla@MkNabla{ nabla_ty_st = ty_st } x
       rcm' <- case splitReprTyConApp_maybe env norm_res_ty of
         Just (rep_tc, _args, _co)  -> addTyConMatches rep_tc rcm
         Nothing                    -> addCompleteMatches rcm
-      pure (rcm', vi{ vi_rcm = rcm' })
+      pure (rcm', vi{ vi_rcm = rcm', vi_norm_ty = norm_res_ty })
 
 -- | Does a 'splitTyConApp_maybe' and then tries to look through a data family
 -- application to find the representation TyCon, to which the data constructors
@@ -1266,7 +1284,7 @@ splitReprTyConApp_maybe env ty =
 -- where all the attempted ConLike instantiations have been purged from the
 -- 'ResidualCompleteMatches', which functions as a cache.
 instCompleteSets :: Int -> Nabla -> VarInfo -> MaybeT DsM VarInfo
-instCompleteSets fuel nabla vi = do
+instCompleteSets fuel nabla vi = {-# SCC "instCompleteSets" #-} do
   let x = vi_id vi
   (rcm, nabla) <- lift (addNormalisedTypeMatches nabla x)
   nabla <- foldM (\nabla cls -> instCompleteSet fuel nabla x cls) nabla (getRcm rcm)
@@ -1297,7 +1315,7 @@ instCompleteSet fuel nabla x cs
   | not (completeMatchAppliesAtType (varType x) cs)
   = pure nabla
   | otherwise
-  = go nabla (sorted_candidates cs)
+  = {-# SCC "instCompleteSet" #-} go nabla (sorted_candidates cs)
   where
     vi = lookupVarInfo (nabla_tm_st nabla) x
 
@@ -1347,12 +1365,17 @@ dataConUnliftedFieldTys =
   filter ((== Just True) . isLiftedType_maybe) . map scaledThing . dataConOrigArgTys
 
 isTyConTriviallyInhabited :: TyCon -> Bool
-isTyConTriviallyInhabited tc = elementOfUniqSet tc triviallyInhabitedTyCons
+isTyConTriviallyInhabited tc = elementOfUniqSet (getUnique tc) triviallyInhabitedTyConKeys
 
 -- | All these types are trivially inhabited
-triviallyInhabitedTyCons :: UniqSet TyCon
-triviallyInhabitedTyCons = mkUniqSet [
-    charTyCon, doubleTyCon, floatTyCon, intTyCon, wordTyCon, word8TyCon
+triviallyInhabitedTyConKeys :: UniqSet Unique
+triviallyInhabitedTyConKeys = mkUniqSet [
+    charTyConKey, doubleTyConKey, floatTyConKey,
+    intTyConKey, int8TyConKey, int16TyConKey, int32TyConKey, int64TyConKey,
+    intPrimTyConKey, int8PrimTyConKey, int16PrimTyConKey, int32PrimTyConKey, int64PrimTyConKey,
+    wordTyConKey, word8TyConKey, word16TyConKey, word32TyConKey, word64TyConKey,
+    wordPrimTyConKey, word8PrimTyConKey, word16PrimTyConKey, word32PrimTyConKey, word64PrimTyConKey,
+    trTyConTyConKey
   ]
 
 compareConLikeTestability :: ConLike -> ConLike -> Ordering
@@ -1384,9 +1407,12 @@ compareConLikeTestability (RealDataCon a) (RealDataCon b) = mconcat
 --
 -- See Note [Instantiating a ConLike].
 instCon :: Int -> Nabla -> Id -> ConLike -> MaybeT DsM Nabla
-instCon fuel nabla@MkNabla{nabla_ty_st = ty_st} x con = MaybeT $ do
+instCon fuel nabla@MkNabla{nabla_ty_st = ty_st} x con = {-# SCC "instCon" #-} MaybeT $ do
+  let hdr what = "instCon " ++ show fuel ++ " " ++ what
   env <- dsGetFamInstEnvs
   let match_ty = idType x
+  tracePm (hdr "{") $
+    ppr con <+> text "... <-" <+> ppr x <+> dcolon <+> ppr match_ty
   norm_match_ty <- normaliseSourceTypeWHNF ty_st match_ty
   mb_sigma_univ <- matchConLikeResTy env ty_st norm_match_ty con
   case mb_sigma_univ of
@@ -1403,28 +1429,46 @@ instCon fuel nabla@MkNabla{nabla_ty_st = ty_st} x con = MaybeT $ do
       -- (4) Instantiate fresh term variables as arguments to the constructor
       let field_tys' = substTys sigma_ex $ map scaledThing field_tys
       arg_ids <- mapM mkPmId field_tys'
-      tracePm "instCon" $ vcat
+      tracePm (hdr "(cts)") $ vcat
         [ ppr x <+> dcolon <+> ppr match_ty
         , text "In WHNF:" <+> ppr (isSourceTypeInWHNF match_ty) <+> ppr norm_match_ty
         , ppr con <+> dcolon <+> text "... ->" <+> ppr _con_res_ty
         , ppr (map (\tv -> ppr tv <+> char '↦' <+> ppr (substTyVar sigma_univ tv)) _univ_tvs)
         , ppr gammas
         , ppr (map (\x -> ppr x <+> dcolon <+> ppr (idType x)) arg_ids)
-        , ppr fuel
         ]
       -- (5) Finally add the new constructor constraint
       runMaybeT $ do
         -- Case (2) of Note [Strict fields and variables of unlifted type]
         let alt = PmAltConLike con
-        nabla' <- addPhiTmCt nabla (PhiConCt x alt ex_tvs gammas arg_ids)
-        let branching_factor = length $ filterUnliftedFields alt arg_ids
+        let ct = PhiConCt x alt ex_tvs gammas arg_ids
+        nabla1 <- traceWhenFailPm (hdr "(ct unsatisfiable) }") (ppr ct) $
+                  addPhiTmCt nabla ct
+        let branching_factor = length (filterUnliftedFields alt arg_ids) +
+                               length gammas
         -- See Note [Fuel for the inhabitation test]
         let new_fuel
               | branching_factor <= 1 = fuel
               | otherwise             = min fuel 2
-        inhabitationTest new_fuel (nabla_ty_st nabla) nabla'
-    Nothing -> pure (Just nabla) -- Matching against match_ty failed. Inhabited!
-                                 -- See Note [Instantiating a ConLike].
+        lift $ tracePm (hdr "(ct satisfiable)") $ vcat
+          [ ppr ct
+          , ppr x <+> dcolon <+> ppr match_ty
+          , text "In WHNF:" <+> ppr (isSourceTypeInWHNF match_ty) <+> ppr norm_match_ty
+          , ppr con <+> dcolon <+> text "... ->" <+> ppr _con_res_ty
+          , ppr (map (\tv -> ppr tv <+> char '↦' <+> ppr (substTyVar sigma_univ tv)) _univ_tvs)
+          , ppr gammas
+          , ppr (map (\x -> ppr x <+> dcolon <+> ppr (idType x)) arg_ids)
+          , ppr branching_factor
+          , ppr new_fuel
+          ]
+        nabla2 <- traceWhenFailPm (hdr "(inh test failed) }") (ppr nabla1) $
+                  inhabitationTest new_fuel (nabla_ty_st nabla) nabla1
+        lift $ tracePm (hdr "(inh test succeeded) }") (ppr nabla2)
+        pure nabla2
+    Nothing -> do
+      tracePm (hdr "(match_ty not instance of res_ty) }") empty
+      pure (Just nabla) -- Matching against match_ty failed. Inhabited!
+                        -- See Note [Instantiating a ConLike].
 
 -- | @matchConLikeResTy _ _ ty K@ tries to match @ty@ against the result
 -- type of @K@, @res_ty@. It returns a substitution @s@ for @K@'s universal
@@ -1439,7 +1483,7 @@ matchConLikeResTy env _              ty (RealDataCon dc) = pure $ do
   if rep_tc == dataConTyCon dc
     then Just (zipTCvSubst (dataConUnivTyVars dc) tc_args)
     else Nothing
-matchConLikeResTy _   (TySt _ inert) ty (PatSynCon ps) = runMaybeT $ do
+matchConLikeResTy _   (TySt _ inert) ty (PatSynCon ps) = {-# SCC "matchConLikeResTy" #-} runMaybeT $ do
   let (univ_tvs,req_theta,_,_,_,con_res_ty) = patSynSig ps
   subst <- MaybeT $ pure $ tcMatchTy con_res_ty ty
   guard $ all (`elemTCvSubst` subst) univ_tvs -- See the Note about T11336b
@@ -1454,7 +1498,7 @@ matchConLikeResTy _   (TySt _ inert) ty (PatSynCon ps) = runMaybeT $ do
 
 {- Note [Soundness and completeness]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Soundness and completeness of the pattern-match checker depends entirely on the
+Soundness and completeness of the pattern-match checker depend entirely on the
 soundness and completeness of the inhabitation test.
 
 Achieving both soundness and completeness at the same time is undecidable.
@@ -1573,7 +1617,7 @@ instantiation and requires an inductive argument, which `inhabitationTest`
 currently isn't equipped to do.
 
 In order to prevent endless instantiation attempts in @inhabitationTest@, we
-use the fuel as an upper bound such attempts.
+use the fuel as an upper bound on such attempts.
 
 The same problem occurs with recursive newtypes, like in the following code:
 
@@ -1711,8 +1755,8 @@ See Note [Matching against a ConLike result type].
 If matching /fails/, it trivially (and conservatively) reports "inhabited" by
 returning the unrefined input Nabla. After all, the match might have failed due
 to incomplete type information in Nabla.
-(Type refinement from unpacking GADT constructors might monomorphise `match_ty`
-so much that `res_ty` ultimately subsumes it.)
+(Later type refinement from unpacking GADT constructors might monomorphise
+`match_ty` so much that `res_ty` ultimately subsumes it.)
 
 If matching /succeeds/, we get a substitution σ for the (universal)
 tyvars `us`. After applying σ, we get
@@ -1756,7 +1800,7 @@ generateInhabitingPatterns _      0 _     = pure []
 generateInhabitingPatterns []     _ nabla = pure [nabla]
 generateInhabitingPatterns (x:xs) n nabla = do
   tracePm "generateInhabitingPatterns" (ppr n <+> ppr (x:xs) $$ ppr nabla)
-  let VI _ pos neg _ _ = lookupVarInfo (nabla_tm_st nabla) x
+  let VI _ _ pos neg _ _ = lookupVarInfo (nabla_tm_st nabla) x
   case pos of
     _:_ -> do
       -- All solutions must be valid at once. Try to find candidates for their

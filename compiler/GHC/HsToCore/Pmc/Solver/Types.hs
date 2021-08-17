@@ -159,6 +159,12 @@ data VarInfo
   -- ^ The 'Id' in question. Important for adding new constraints relative to
   -- this 'VarInfo' when we don't easily have the 'Id' available.
 
+  , vi_norm_ty :: !Type
+  -- ^ A cached (and perhaps out of date) version of @'idType' vi_id@,
+  -- normalised according to the accompanying 'TyState'. It speeds up type
+  -- normalisation a bit and speeds up 'varNeedsTesting' in case the the cached
+  -- type conincides with the new normalised type after 'TyState' refinement.
+
   , vi_pos :: ![PmAltConApp]
   -- ^ Positive info: 'PmAltCon' apps it is (i.e. @x ~ [Just y, PatSyn z]@), all
   -- at the same time (i.e. conjunctive).  We need a list because of nested
@@ -228,10 +234,10 @@ instance Outputable TmState where
 
 -- | Not user-facing.
 instance Outputable VarInfo where
-  ppr (VI x pos neg bot cache)
+  ppr (VI x ty pos neg bot cache)
     = braces (hcat (punctuate comma [pp_x, pp_pos, pp_neg, ppr bot, pp_cache]))
     where
-      pp_x = ppr x <> dcolon <> ppr (idType x)
+      pp_x = ppr x <> dcolon <> ppr ty -- ty is a refinement of idType x
       pp_pos
         | [] <- pos  = underscore
         | [p] <- pos = char '~' <> ppr p -- suppress outer [_] if singleton
@@ -287,6 +293,7 @@ emptyVarInfo :: Id -> VarInfo
 emptyVarInfo x
   = VI
   { vi_id = x
+  , vi_norm_ty = idType x
   , vi_pos = []
   , vi_neg = emptyPmAltConSet
   -- Case (3) in Note [Strict fields and fields of unlifted type]
