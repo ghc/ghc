@@ -840,8 +840,22 @@ getWanted verbose os tmpdir gccProgram gccFlags nmProgram mobjdumpProgram
                  | otherwise -> return v
                 Nothing -> die ("Can't find " ++ show name)
 
+          ghcjsHardCoded :: Map String Integer
+          ghcjsHardCoded = Map.fromList [ ("WORD_SIZE", 4)
+                                        , ("DOUBLE_SIZE", 8)
+                                        , ("CINT_SIZE", 4)
+                                        , ("CLONG_SIZE", 4)
+                                        , ("CLONG_LONG_SIZE", 8)
+                                        ]
+
           lookupResult :: Map String Integer -> (Where, What Fst)
                        -> IO (Where, What Snd)
+          -- XXX some hardcoded values
+          lookupResult _  (w, GetWord nm _)
+             | os == "ghcjs"
+             , Just res <- Map.lookup nm ghcjsHardCoded
+             = return (w, GetWord nm (Snd res))
+          -- XXX
           lookupResult m (w, GetWord name _)
               = do v <- lookupSmall m name
                    return (w, GetWord name (Snd (v - 1)))
