@@ -111,7 +111,7 @@ function h$base_fstat(fd, stat, stat_off, c) {
     if(h$isNode) {
         h$fs.fstat(fd, function(err, fs) {
             if(err) {
-                h$handlErrnoC(err, -1, 0, c);
+                h$handleErrnoC(err, -1, 0, c);
             } else {
                 h$base_fillStat(fs, stat, stat_off);
                 c(0);
@@ -260,7 +260,7 @@ function h$base_stat(file, file_off, stat, stat_off, c) {
     if(h$isNode) {
         h$fs.stat(h$decodeUtf8z(file, file_off), function(err, fs) {
             if(err) {
-                h$handlErrnoC(err, -1, 0, c);
+                h$handleErrnoC(err, -1, 0, c);
             } else {
                 h$base_fillStat(fs, stat, stat_off);
                 c(0);
