@@ -778,7 +778,8 @@ summariseRequirement pn mod_name = do
         ms_iface_date = hi_timestamp,
         ms_hie_date = hie_timestamp,
         ms_srcimps = [],
-        ms_textual_imps = extra_sig_imports,
+        ms_obj_imps = extra_sig_imports,
+        ms_tc_imps = [],
         ms_ghc_prim_import = False,
         ms_parsed_mod = Just (HsParsedModule {
                 hpm_module = L loc (HsModule {
@@ -868,9 +869,15 @@ hsModuleToModSummary pn hsc_src modname
           = partition ((/= moduleName gHC_PRIM) . unLoc . ideclName . unLoc)
               ord_idecls
 
+        (tc_imps, obj_imps)
+          = partition (ideclSplice . unLoc)
+              ordinary_imps
+
         implicit_prelude = xopt LangExt.ImplicitPrelude dflags
         implicit_imports = mkPrelImports modname loc
                                          implicit_prelude imps
+        convImport :: (GenLocated l (ImportDecl pass)
+                  -> (Maybe FastString, XRec pass ModuleName))
         convImport (L _ i) = (fmap sl_fs (ideclPkgQual i), ideclName i)
 
     extra_sig_imports <- liftIO $ findExtraSigImports hsc_env hsc_src modname
@@ -896,7 +903,8 @@ hsModuleToModSummary pn hsc_src modname
             ms_hspp_buf = Nothing,
             ms_srcimps = map convImport src_idecls,
             ms_ghc_prim_import = not (null ghc_prim_import),
-            ms_textual_imps = normal_imports
+            ms_tc_imps = map convImport tc_imps,
+            ms_obj_imps = map convImport obj_imps
                            -- We have to do something special here:
                            -- due to merging, requirements may end up with
                            -- extra imports

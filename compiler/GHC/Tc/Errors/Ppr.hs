@@ -95,6 +95,8 @@ instance Diagnostic TcRnMessage where
       -> mkSimpleDecorated $
            vcat [ text "Illegal `..' notation for constructor" <+> quotes (ppr con)
                 , nest 2 (text "The constructor has no labelled fields") ]
+    TcRnSpliceImportError gre ->
+      mkSimpleDecorated $ vcat [text "Splice import", ppr gre]
 
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -142,6 +144,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnIllegalWildcardsInConstructor{}
       -> ErrorWithoutFlag
+    TcRnSpliceImportError {}
+      -> ErrorWithoutFlag
 
   diagnosticHints = \case
     TcRnUnknownMessage m
@@ -188,6 +192,8 @@ instance Diagnostic TcRnMessage where
     TcRnCharLiteralOutOfRange{}
       -> noHints
     TcRnIllegalWildcardsInConstructor{}
+      -> noHints
+    TcRnSpliceImportError {}
       -> noHints
 
 messageWithInfoDiagnosticMessage :: UnitState

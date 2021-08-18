@@ -87,6 +87,7 @@ data ImportDecl pass
       ideclName      :: XRec pass ModuleName, -- ^ Module name.
       ideclPkgQual   :: Maybe StringLiteral,  -- ^ Package qualifier.
       ideclSource    :: IsBootInterface,      -- ^ IsBoot <=> {-\# SOURCE \#-} import
+      ideclSplice    :: Bool,          -- ^ True => splice import
       ideclSafe      :: Bool,          -- ^ True => safe import
       ideclQualified :: ImportDeclQualifiedStyle, -- ^ If/how the import is qualified.
       ideclImplicit  :: Bool,          -- ^ True => implicit import (of Prelude)
@@ -128,6 +129,7 @@ type instance Anno [LocatedA (IE (GhcPass p))] = SrcSpanAnnL
 data EpAnnImportDecl = EpAnnImportDecl
   { importDeclAnnImport    :: EpaLocation
   , importDeclAnnPragma    :: Maybe (EpaLocation, EpaLocation)
+  , importDeclAnnSplice    :: Maybe EpaLocation
   , importDeclAnnSafe      :: Maybe EpaLocation
   , importDeclAnnQualified :: Maybe EpaLocation
   , importDeclAnnPackage   :: Maybe EpaLocation
@@ -143,6 +145,7 @@ simpleImportDecl mn = ImportDecl {
       ideclName      = noLoc mn,
       ideclPkgQual   = Nothing,
       ideclSource    = NotBoot,
+      ideclSplice    = False,
       ideclSafe      = False,
       ideclImplicit  = False,
       ideclQualified = NotQualified,

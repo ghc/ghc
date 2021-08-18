@@ -19,7 +19,7 @@ module GHC.Unit.Module.ModSummary
    , msDynObjFilePath
    , isBootSummary
    , findTarget
-   )
+   ,ms_imps_detailed,ms_home_imps_detailed, ImportType(..))
 where
 
 import GHC.Prelude
@@ -87,8 +87,12 @@ data ModSummary
           -- ^ Timestamp of hie file, if we have one
         ms_srcimps      :: [(Maybe FastString, Located ModuleName)],
           -- ^ Source imports of the module
-        ms_textual_imps :: [(Maybe FastString, Located ModuleName)],
+        ms_obj_imps :: [(Maybe FastString, Located ModuleName)],
           -- ^ Non-source imports of the module from the module *text*
+          -- who will definitely have object files when the module is compiled.
+        ms_tc_imps :: [(Maybe FastString, Located ModuleName)],
+          -- ^ Non-source imports of the module from the module *text*
+          -- where we can't assume that object files are available for.
         ms_ghc_prim_import :: Bool,
           -- ^ Whether the special module GHC.Prim was imported explicitliy
         ms_parsed_mod   :: Maybe HsParsedModule,
@@ -114,14 +118,22 @@ ms_mod_name = moduleName . ms_mod
 
 -- | Textual imports, plus plugin imports but not SOURCE imports.
 ms_imps :: ModSummary -> [(Maybe FastString, Located ModuleName)]
-ms_imps ms =
-  ms_textual_imps ms ++
-  map mk_additional_import (dynFlagDependencies (ms_hspp_opts ms))
-  where
-    mk_additional_import mod_nm = (Nothing, noLoc mod_nm)
+ms_imps ms = map (\(a, (b, _c)) -> (a, b)) (ms_imps_detailed ms)
 
-home_imps :: [(Maybe FastString, Located ModuleName)] -> [Located ModuleName]
-home_imps imps = [ lmodname |  (mb_pkg, lmodname) <- imps,
+data ImportType = NeedObj | NeedTC deriving (Show, Eq)
+
+-- | Textual imports, plus plugin imports but not SOURCE imports.
+ms_imps_detailed :: ModSummary -> [(Maybe FastString, (Located ModuleName, ImportType))]
+ms_imps_detailed ms =
+  map mk_additional_import (dynFlagDependencies (ms_hspp_opts ms)) ++
+  map (augment NeedTC) (ms_tc_imps ms) ++
+  map (augment NeedObj) (ms_obj_imps ms)
+  where
+    augment c (a,b) = (a, (b, c))
+    mk_additional_import mod_nm = (Nothing, (noLoc mod_nm, NeedObj))
+
+home_imps :: [(Maybe FastString, a)] -> [a]
+home_imps imps = [ (lmodname) |  (mb_pkg, lmodname) <- imps,
                                   isLocal mb_pkg ]
   where isLocal Nothing = True
         isLocal (Just pkg) | pkg == fsLit "this" = True -- "this" is special
@@ -129,7 +141,7 @@ home_imps imps = [ lmodname |  (mb_pkg, lmodname) <- imps,
 
 -- | Like 'ms_home_imps', but for SOURCE imports.
 ms_home_srcimps :: ModSummary -> [Located ModuleName]
-ms_home_srcimps = home_imps . ms_srcimps
+ms_home_srcimps = map snd . ms_srcimps
 
 -- | All of the (possibly) home module imports from a
 -- 'ModSummary'; that is to say, each of these module names
@@ -138,6 +150,9 @@ ms_home_srcimps = home_imps . ms_srcimps
 -- imports, which are guaranteed not to be home imports.)
 ms_home_imps :: ModSummary -> [Located ModuleName]
 ms_home_imps = home_imps . ms_imps
+
+ms_home_imps_detailed :: ModSummary -> [(Located ModuleName, ImportType)]
+ms_home_imps_detailed = home_imps . ms_imps_detailed
 
 -- The ModLocation contains both the original source filename and the
 -- filename of the cleaned-up source file after all preprocessing has been
@@ -170,7 +185,8 @@ instance Outputable ModSummary where
              nest 3 (sep [text "ms_hs_hash = " <> text (show (ms_hs_hash ms)),
                           text "ms_mod =" <+> ppr (ms_mod ms)
                                 <> text (hscSourceString (ms_hsc_src ms)) <> comma,
-                          text "ms_textual_imps =" <+> ppr (ms_textual_imps ms),
+                          text "ms_obj_imps =" <+> ppr (ms_obj_imps ms),
+                          text "ms_tc_imps =" <+> ppr (ms_tc_imps ms),
                           text "ms_srcimps =" <+> ppr (ms_srcimps ms)]),
              char '}'
             ]

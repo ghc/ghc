@@ -3640,6 +3640,7 @@ xFlagsDeps = [
          "You can't turn off RelaxedPolyRec any more",
   flagSpec "RoleAnnotations"                  LangExt.RoleAnnotations,
   flagSpec "ScopedTypeVariables"              LangExt.ScopedTypeVariables,
+  flagSpec "SpliceImports"                    LangExt.SpliceImports,
   flagSpec "StandaloneDeriving"               LangExt.StandaloneDeriving,
   flagSpec "StarIsType"                       LangExt.StarIsType,
   flagSpec "StaticPointers"                   LangExt.StaticPointers,

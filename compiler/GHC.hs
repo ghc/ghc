@@ -1382,6 +1382,7 @@ availsToGlobalRdrEnv mod_name avails
     imp_spec = ImpSpec { is_decl = decl, is_item = ImpAll}
     decl = ImpDeclSpec { is_mod = mod_name, is_as = mod_name,
                          is_qual = False,
+                         is_splice = False , -- TODO: MP
                          is_dloc = srcLocSpan interactiveSrcLoc }
 
 

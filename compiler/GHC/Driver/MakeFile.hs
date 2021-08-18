@@ -419,7 +419,7 @@ pprCycle summaries = pp_group (CyclicSCC summaries)
           pp_ms loop_breaker $$ vcat (map pp_group groups)
         where
           (boot_only, others) = partition is_boot_only mss
-          is_boot_only ms = not (any in_group (map snd (ms_imps ms)))
+          is_boot_only ms = not (any in_group (map snd $ ms_imps ms))
           in_group (L _ m) = m `elem` group_mods
           group_mods = map (moduleName . ms_mod) mss
 

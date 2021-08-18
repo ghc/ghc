@@ -1514,7 +1514,7 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
      where
         -- TODO(@Ericson2314): Probably want to include backpack instantiations
         -- in the map eventually for uniformity
-        calcDeps (ExtendedModSummary ms _bkp_deps) = msDeps ms
+        calcDeps (ExtendedModSummary ms _bkp_deps) = map snd $ msDeps ms
 
         dflags = hsc_dflags hsc_env
         logger = hsc_logger hsc_env
@@ -1687,9 +1687,9 @@ enableCodeGenWhen logger tmpfs condition should_modify staticLife dynLife bcknd 
 
     -- find the set of all transitive dependencies of a list of modules.
     transitive_deps_set :: [ModSummary] -> Set.Set Module
-    transitive_deps_set modSums = foldl' go Set.empty modSums
+    transitive_deps_set modSums = foldl' (go False) Set.empty modSums
       where
-        go marked_mods ms@ModSummary{ms_mod}
+        go in_splice_mod marked_mods ms@ModSummary{ms_mod}
           | ms_mod `Set.member` marked_mods = marked_mods
           | otherwise =
             let deps =
@@ -1697,14 +1697,15 @@ enableCodeGenWhen logger tmpfs condition should_modify staticLife dynLife bcknd 
                   -- If a module imports a boot module, msDeps helpfully adds a
                   -- dependency to that non-boot module in it's result. This
                   -- means we don't have to think about boot modules here.
-                  | dep <- msDeps ms
+                  | (is_splice, dep) <- msDeps ms
+                  , is_splice == NeedObj || in_splice_mod
                   , NotBoot == gwib_isBoot dep
                   , dep_ms_0 <- toList $ modNodeMapLookup (unLoc <$> dep) nodemap
                   , dep_ms_1 <- toList $ dep_ms_0
                   , (ExtendedModSummary { emsModSummary = dep_ms }) <- toList $ dep_ms_1
                   ]
                 new_marked_mods = Set.insert ms_mod marked_mods
-            in foldl' go new_marked_mods deps
+            in foldl' (go True) new_marked_mods deps
 
 mkRootMap
   :: [ExtendedModSummary]
@@ -1722,15 +1723,15 @@ mkRootMap summaries = ModNodeMap $ Map.insertListWith
 -- modules always contains B.hs if it contains B.hs-boot.
 -- Remember, this pass isn't doing the topological sort.  It's
 -- just gathering the list of all relevant ModSummaries
-msDeps :: ModSummary -> [GenWithIsBoot (Located ModuleName)]
-msDeps s = [ d
+msDeps :: ModSummary -> [(ImportType, GenWithIsBoot (Located ModuleName))]
+msDeps s = [ (NeedObj, d)
            | m <- ms_home_srcimps s
            , d <- [ GWIB { gwib_mod = m, gwib_isBoot = IsBoot }
                   , GWIB { gwib_mod = m, gwib_isBoot = NotBoot }
                   ]
            ]
-        ++ [ GWIB { gwib_mod = m, gwib_isBoot = NotBoot }
-           | m <- ms_home_imps s
+        ++ [ (is_splice, GWIB { gwib_mod = m, gwib_isBoot = NotBoot })
+           | (m, is_splice) <- ms_home_imps_detailed s
            ]
 
 -----------------------------------------------------------------------------
@@ -2003,7 +2004,7 @@ makeNewModSummary hsc_env MakeNewModSummary{..} = do
   hie_timestamp <- modificationTimeIfExists (ml_hie_file nms_location)
 
   extra_sig_imports <- findExtraSigImports hsc_env nms_hsc_src pi_mod_name
-  (implicit_sigs, inst_deps) <- implicitRequirementsShallow hsc_env pi_theimps
+  (implicit_sigs, inst_deps) <- implicitRequirementsShallow hsc_env (pi_tc_imps ++  pi_o_imps)
 
   return $ ExtendedModSummary
     { emsModSummary =
@@ -2017,10 +2018,11 @@ makeNewModSummary hsc_env MakeNewModSummary{..} = do
         , ms_parsed_mod = Nothing
         , ms_srcimps = pi_srcimps
         , ms_ghc_prim_import = pi_ghc_prim_import
-        , ms_textual_imps =
+        , ms_obj_imps =
             extra_sig_imports ++
             ((,) Nothing . noLoc <$> implicit_sigs) ++
-            pi_theimps
+            pi_o_imps
+        , ms_tc_imps = pi_tc_imps
         , ms_hs_hash = nms_src_hash
         , ms_iface_date = hi_timestamp
         , ms_hie_date = hie_timestamp
@@ -2034,7 +2036,8 @@ data PreprocessedImports
   = PreprocessedImports
       { pi_local_dflags :: DynFlags
       , pi_srcimps  :: [(Maybe FastString, Located ModuleName)]
-      , pi_theimps  :: [(Maybe FastString, Located ModuleName)]
+      , pi_o_imps  :: [(Maybe FastString, Located ModuleName)]
+      , pi_tc_imps  :: [(Maybe FastString, Located ModuleName)]
       , pi_ghc_prim_import :: Bool
       , pi_hspp_fn  :: FilePath
       , pi_hspp_buf :: StringBuffer
@@ -2055,11 +2058,12 @@ getPreprocessedImports hsc_env src_fn mb_phase maybe_buf = do
   (pi_local_dflags, pi_hspp_fn)
       <- ExceptT $ preprocess hsc_env src_fn (fst <$> maybe_buf) mb_phase
   pi_hspp_buf <- liftIO $ hGetStringBuffer pi_hspp_fn
-  (pi_srcimps, pi_theimps, pi_ghc_prim_import, L pi_mod_name_loc pi_mod_name)
+  (pi_srcimps, pi_o_imps, pi_tc_imps, pi_ghc_prim_import, L pi_mod_name_loc pi_mod_name)
       <- ExceptT $ do
           let imp_prelude = xopt LangExt.ImplicitPrelude pi_local_dflags
+              splice_imports = xopt LangExt.SpliceImports pi_local_dflags
               popts = initParserOpts pi_local_dflags
-          mimps <- getImports popts imp_prelude pi_hspp_buf pi_hspp_fn src_fn
+          mimps <- getImports popts imp_prelude splice_imports pi_hspp_buf pi_hspp_fn src_fn
           return (first (mkMessages . fmap mkDriverPsHeaderMessage . getMessages) mimps)
   return PreprocessedImports {..}
 

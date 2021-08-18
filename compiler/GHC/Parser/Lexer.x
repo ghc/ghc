@@ -871,6 +871,9 @@ data Token
     -- represents a qualified quasi-quote of the form
     -- [Qual.quoter| quote |]
 
+  -- Splice imports
+  | ITsplice
+
   -- Arrow notation extension
   | ITproc
   | ITrec
@@ -1018,7 +1021,8 @@ reservedWordsFM = listToUFM $
 
          ( "rec",            ITrec,           xbit ArrowsBit .|.
                                               xbit RecursiveDoBit),
-         ( "proc",           ITproc,          xbit ArrowsBit)
+         ( "proc",           ITproc,          xbit ArrowsBit),
+         ( "splice",         ITsplice,        xbit SpliceImportsBit)
      ]
 
 {-----------------------------------
@@ -2721,6 +2725,7 @@ data ExtBits
   | ArrowsBit
   | ThBit
   | ThQuotesBit
+  | SpliceImportsBit
   | IpBit
   | OverloadedLabelsBit -- #x overloaded labels
   | ExplicitForallBit -- the 'forall' keyword
@@ -2843,6 +2848,7 @@ mkParserOpts extensionFlags diag_opts supported
       .|. NoLexicalNegationBit        `xoptNotBit` LangExt.LexicalNegation -- See Note [Why not LexicalNegationBit]
       .|. OverloadedRecordDotBit      `xoptBit` LangExt.OverloadedRecordDot
       .|. OverloadedRecordUpdateBit   `xoptBit` LangExt.OverloadedRecordUpdate  -- Enable testing via 'getBit OverloadedRecordUpdateBit' in the parser (RecordDotSyntax parsing uses that information).
+      .|. SpliceImportsBit            `xoptBit` LangExt.SpliceImports
     optBits =
           HaddockBit        `setBitIf` isHaddock
       .|. RawTokenStreamBit `setBitIf` rawTokStream

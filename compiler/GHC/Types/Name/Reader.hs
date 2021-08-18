@@ -1179,6 +1179,7 @@ shadowName env new_name
         id_spec      = ImpDeclSpec { is_mod = old_mod_name
                                    , is_as = old_mod_name
                                    , is_qual = True
+                                   , is_splice = False -- TODO: MP
                                    , is_dloc = greDefinitionSrcSpan old_gre }
 
     shadow_is :: ImportSpec -> Maybe ImportSpec
@@ -1220,6 +1221,7 @@ data ImpDeclSpec
                                    -- should be a Maybe UnitId here too.
         is_as       :: ModuleName, -- ^ Import alias, e.g. from @as M@ (or @Muggle@ if there is no @as@ clause)
         is_qual     :: Bool,       -- ^ Was this import qualified?
+        is_splice   :: Bool,       -- ^ Was this a splice import?
         is_dloc     :: SrcSpan     -- ^ The location of the entire import declaration
     } deriving (Eq, Data)
 

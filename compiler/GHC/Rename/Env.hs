@@ -1310,13 +1310,29 @@ lookupGlobalOccRn_overloaded dup_fields_ok fos rdr_name =
     do { res <- lookupGreRn_helper fos rdr_name
        ; case res of
            GreNotFound -> fmap UnambiguousGre <$> lookupOneQualifiedNameGHCi fos rdr_name
-           OneNameMatch gre -> return $ Just (UnambiguousGre (gre_name gre))
+           OneNameMatch gre -> do
+            checkIsSpliceImported gre
+            return $ Just (UnambiguousGre (gre_name gre))
            MultipleNames gres
              | all isRecFldGRE gres
              , dup_fields_ok == DuplicateRecordFields -> return $ Just AmbiguousFields
              | otherwise -> do
                   addNameClashErrRn rdr_name gres
                   return (Just (UnambiguousGre (gre_name (NE.head gres)))) }
+
+checkIsSpliceImported :: GlobalRdrElt -> RnM ()
+checkIsSpliceImported gre = do
+  dflags <- getDynFlags
+  -- SpliceImports is enabled
+  when (xopt LangExt.SpliceImports dflags) $ do
+    st <- getStage
+    -- Inside a splice
+    when (thLevel st == 0) $ do
+      -- Must come from a splice import
+      unless (any (is_splice . is_decl) (gre_imp gre) ) $ do
+        addErr (TcRnSpliceImportError gre)
+
+
 
 
 -- | Result of looking up an occurrence that might be an ambiguous field.
@@ -1690,7 +1706,8 @@ lookupOneQualifiedNameGHCi fos rdr_name = do
     -- field name multiple times (see
     -- Note [DuplicateRecordFields and -fimplicit-import-qualified]).
     toGRE gname = GRE { gre_name = gname, gre_par = NoParent, gre_lcl = False, gre_imp = [is] }
-    is = ImpSpec { is_decl = ImpDeclSpec { is_mod = mod, is_as = mod, is_qual = True, is_dloc = noSrcSpan }
+    is = ImpSpec { is_decl = ImpDeclSpec { is_mod = mod, is_as = mod, is_splice = undefined --TODO_MP
+                 , is_qual = True, is_dloc = noSrcSpan }
                  , is_item = ImpAll }
     -- If -fimplicit-import-qualified succeeded, the name must be qualified.
     (mod, _) = fromMaybe (pprPanic "lookupOneQualifiedNameGHCi" (ppr rdr_name)) (isQual_maybe rdr_name)

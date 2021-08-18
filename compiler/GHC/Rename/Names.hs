@@ -304,6 +304,7 @@ rnImportDecl  :: Module -> (LImportDecl GhcPs, SDoc)
 rnImportDecl this_mod
              (L loc decl@(ImportDecl { ideclName = loc_imp_mod_name
                                      , ideclPkgQual = mb_pkg
+                                     , ideclSplice = mod_splice
                                      , ideclSource = want_boot, ideclSafe = mod_safe
                                      , ideclQualified = qual_style, ideclImplicit = implicit
                                      , ideclAs = as_mod, ideclHiding = imp_details }), import_reason)
@@ -381,8 +382,8 @@ rnImportDecl this_mod
 
     let
         qual_mod_name = fmap unLoc as_mod `orElse` imp_mod_name
-        imp_spec  = ImpDeclSpec { is_mod = imp_mod_name, is_qual = qual_only,
-                                  is_dloc = locA loc, is_as = qual_mod_name }
+        imp_spec  = ImpDeclSpec { is_mod = imp_mod_name, is_qual = qual_only
+                                , is_splice = mod_splice, is_dloc = locA loc, is_as = qual_mod_name }
 
     -- filter the imports according to the import declaration
     (new_imp_details, gres) <- filterImports iface imp_spec imp_details
@@ -406,6 +407,7 @@ rnImportDecl this_mod
         imv = ImportedModsVal
             { imv_name        = qual_mod_name
             , imv_span        = locA loc
+            , imv_is_splice   = mod_splice
             , imv_is_safe     = mod_safe'
             , imv_is_hiding   = is_hiding
             , imv_all_exports = potential_gres

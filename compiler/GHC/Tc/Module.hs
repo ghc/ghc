@@ -279,7 +279,7 @@ tcRnModuleTcRnM hsc_env mod_sum
                                                      ++ import_decls))
         ; let { mkImport (Nothing, L _ mod_name) = noLocA
                 $ (simpleImportDecl mod_name)
-                  { ideclHiding = Just (False, noLocA [])}
+                  { ideclHiding = Just (False, noLocA []) }
               ; mkImport _ = panic "mkImport" }
         ; let { withReason t imps = map (,text t) imps }
         ; let { all_imports = withReason "is implicitly imported" prel_imports

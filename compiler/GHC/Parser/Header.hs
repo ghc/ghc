@@ -65,6 +65,7 @@ import Text.Read (readPrec)
 -- Throws a 'SourceError' if parsing fails.
 getImports :: ParserOpts   -- ^ Parser options
            -> Bool         -- ^ Implicit Prelude?
+           -> Bool         -- ^ Splice imports?
            -> StringBuffer -- ^ Parse this.
            -> FilePath     -- ^ Filename the buffer came from.  Used for
                            --   reporting parse error locations.
@@ -72,13 +73,14 @@ getImports :: ParserOpts   -- ^ Parser options
                            --   in the function result)
            -> IO (Either
                (Messages PsMessage)
-               ([(Maybe FastString, Located ModuleName)],
-                [(Maybe FastString, Located ModuleName)],
+               ([(Maybe FastString, Located ModuleName)], -- Src
+                [(Maybe FastString, Located ModuleName)], -- O
+                [(Maybe FastString, Located ModuleName)], -- TC
                 Bool, -- Is GHC.Prim imported or not
                 Located ModuleName))
               -- ^ The source imports and normal imports (with optional package
               -- names from -XPackageImports), and the module name.
-getImports popts implicit_prelude buf filename source_filename = do
+getImports popts implicit_prelude splice_imports buf filename source_filename = do
   let loc  = mkRealSrcLoc (mkFastString filename) 1 1
   case unP parseHeader (initParserState popts buf loc) of
     PFailed pst ->
@@ -105,12 +107,17 @@ getImports popts implicit_prelude buf filename source_filename = do
                                   . ideclName . unLoc)
                                  ord_idecls
 
+                (o_imps, tc_imps)
+                  | splice_imports = partition (ideclSplice . unLoc) ordinary_imps
+                  | otherwise = (ordinary_imps, [])
+
                 implicit_imports = mkPrelImports (unLoc mod) main_loc
                                                  implicit_prelude imps
                 convImport (L _ i) = (fmap sl_fs (ideclPkgQual i), ideclName i)
               in
               return (map convImport src_idecls
-                     , map convImport (implicit_imports ++ ordinary_imps)
+                     , map convImport (implicit_imports ++ o_imps)
+                     , map convImport tc_imps
                      , not (null ghc_prim_import)
                      , mod)
 
@@ -148,6 +155,7 @@ mkPrelImports this_mod loc implicit_prelude import_decls
                                 ideclName      = L loc pRELUDE_NAME,
                                 ideclPkgQual   = Nothing,
                                 ideclSource    = NotBoot,
+                                ideclSplice    = True,   -- Implicit prelude import is a splice import
                                 ideclSafe      = False,  -- Not a safe import
                                 ideclQualified = NotQualified,
                                 ideclImplicit  = True,   -- Implicit!

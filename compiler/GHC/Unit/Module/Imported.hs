@@ -37,6 +37,8 @@ data ImportedModsVal = ImportedModsVal
    , imv_span        :: SrcSpan
       -- ^ the source span of the whole import
 
+   , imv_is_splice   :: Bool
+
    , imv_is_safe     :: IsSafeImport
       -- ^ whether this is a safe import
 

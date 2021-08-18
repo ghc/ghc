@@ -712,7 +712,9 @@ tc_infer_id id_name
                -> do { check_local_id id
                      ; return_id id }
 
-             AGlobal (AnId id) -> return_id id
+             AGlobal (AnId id) -> do
+              --checkSpliceImport id
+              return_id id
                -- A global cannot possibly be ill-staged
                -- nor does it need the 'lifting' treatment
                -- Hence no checkTh stuff here

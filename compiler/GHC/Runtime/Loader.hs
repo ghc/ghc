@@ -275,6 +275,7 @@ lookupRdrNameInModuleForPlugins hsc_env mod_name rdr_name = do
                 Just iface -> do
                     -- Try and find the required name in the exports
                     let decl_spec = ImpDeclSpec { is_mod = mod_name, is_as = mod_name
+                                                , is_splice = False -- TODO: MP
                                                 , is_qual = False, is_dloc = noSrcSpan }
                         imp_spec = ImpSpec decl_spec ImpAll
                         env = mkGlobalRdrEnv (gresFromAvails (Just imp_spec) (mi_exports iface))

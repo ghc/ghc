@@ -695,6 +695,7 @@ mergeSignatures
                                             is_mod  = mod_name,
                                             is_as   = mod_name,
                                             is_qual = False,
+                                            is_splice = False, -- TODO: MP
                                             is_dloc = locA loc
                                           } ImpAll
                                 rdr_env = mkGlobalRdrEnv (gresFromAvails (Just ispec) as1)

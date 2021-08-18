@@ -321,6 +321,9 @@ data TcRnMessage where
   -}
   TcRnIllegalWildcardsInConstructor :: !Name -> TcRnMessage
 
+  {-| -}
+  TcRnSpliceImportError :: !GlobalRdrElt -> TcRnMessage
+
 -- | Which parts of a record field are affected by a particular error or warning.
 data RecordFieldPart
   = RecordFieldConstructor !Name
