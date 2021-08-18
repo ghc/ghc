@@ -180,9 +180,11 @@ depanalE excluded_mods allow_dup_roots = do
     (errs, mod_graph) <- depanalPartial excluded_mods allow_dup_roots
     if isEmptyMessages errs
       then do
-        warnMissingHomeModules hsc_env mod_graph
+        let unused_home_mod_err = warnMissingHomeModules hsc_env mod_graph
+            unused_pkg_err = warnUnusedPackages hsc_env mod_graph
+        logDiagnostics (GhcDriverMessage <$> (unused_home_mod_err `unionMessages` unused_pkg_err))
         setSession hsc_env { hsc_mod_graph = mod_graph }
-        pure (errs, mod_graph)
+        pure (emptyMessages, mod_graph)
       else do
         -- We don't have a complete module dependency graph,
         -- The graph may be disconnected and is unusable.
@@ -268,10 +270,11 @@ instantiationNodes unit_state = InstantiationNode <$> iuids_to_check
 -- about module "C" not being listed in a command line.
 --
 -- The warning in enabled by `-Wmissing-home-modules`. See #13129
-warnMissingHomeModules :: GhcMonad m => HscEnv -> ModuleGraph -> m ()
+warnMissingHomeModules :: HscEnv -> ModuleGraph -> DriverMessages
 warnMissingHomeModules hsc_env mod_graph =
-    when (not (null missing)) $
-        logDiagnostics (GhcDriverMessage <$> warn)
+  if null missing
+    then emptyMessages
+    else warn
   where
     dflags = hsc_dflags hsc_env
     targets = map targetId (hsc_targets hsc_env)
@@ -339,7 +342,6 @@ load :: GhcMonad m => LoadHowMuch -> m SuccessFlag
 load how_much = do
     (errs, mod_graph) <- depanalE [] False                        -- #17459
     success <- load' how_much (Just batchMsg) mod_graph
-    warnUnusedPackages mod_graph
     if isEmptyMessages errs
       then pure success
       else throwErrors (fmap GhcDriverMessage errs)
@@ -351,30 +353,29 @@ load how_much = do
 -- actually loaded packages. All the packages, specified on command line,
 -- but never loaded, are probably unused dependencies.
 
-warnUnusedPackages :: GhcMonad m => ModuleGraph -> m ()
-warnUnusedPackages mod_graph = do
-    hsc_env <- getSession
-
+warnUnusedPackages :: HscEnv -> ModuleGraph -> DriverMessages
+warnUnusedPackages hsc_env mod_graph =
     let dflags = hsc_dflags hsc_env
         state  = hsc_units  hsc_env
         diag_opts = initDiagOpts dflags
         us = hsc_units hsc_env
 
     -- Only need non-source imports here because SOURCE imports are always HPT
-    let loadedPackages = concat $
+        loadedPackages = concat $
           mapMaybe (\(fs, mn) -> lookupModulePackage us (unLoc mn) fs)
             $ concatMap ms_imps (mgModSummaries mod_graph)
 
-    let requestedArgs = mapMaybe packageArg (packageFlags dflags)
+        requestedArgs = mapMaybe packageArg (packageFlags dflags)
 
         unusedArgs
           = filter (\arg -> not $ any (matching state arg) loadedPackages)
                    requestedArgs
 
-    let warn = singleMessage $ mkPlainMsgEnvelope diag_opts noSrcSpan (DriverUnusedPackages unusedArgs)
+        warn = singleMessage $ mkPlainMsgEnvelope diag_opts noSrcSpan (DriverUnusedPackages unusedArgs)
 
-    when (not (null unusedArgs)) $
-      logDiagnostics (GhcDriverMessage <$> warn)
+    in if null unusedArgs
+        then emptyMessages
+        else warn
 
     where
         packageArg (ExposePackage _ arg _) = Just arg

@@ -1,0 +1,5 @@
+
+Foo.hs-boot:1:1: error:
+    File name does not match module name:
+    Saw     : ‘Main’
+    Expected: ‘Foo’
