@@ -1327,8 +1327,9 @@ Currently, it is used in GHC.Core.Rules.match, and is required to make
 "map coerce = coerce" match.
 -}
 
-exprIsLambda_maybe :: InScopeEnv -> CoreExpr
-                      -> Maybe (Var, CoreExpr,[CoreTickish])
+exprIsLambda_maybe :: HasDebugCallStack
+                   => InScopeEnv -> CoreExpr
+                   -> Maybe (Var, CoreExpr,[CoreTickish])
     -- See Note [exprIsLambda_maybe]
 
 -- The simple case: It is a lambda already

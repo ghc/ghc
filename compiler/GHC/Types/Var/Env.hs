@@ -64,7 +64,7 @@ module GHC.Types.Var.Env (
         rnOccL, rnOccR, inRnEnvL, inRnEnvR, rnOccL_maybe, rnOccR_maybe,
         rnBndrL, rnBndrR, nukeRnEnvL, nukeRnEnvR, rnSwap,
         delBndrL, delBndrR, delBndrsL, delBndrsR,
-        addRnInScopeSet,
+        extendRnInScopeSetList,
         rnEtaL, rnEtaR,
         rnInScope, rnInScopeSet, lookupRnInScope,
         rnEnvL, rnEnvR,
@@ -260,10 +260,10 @@ mkRnEnv2 vars = RV2     { envL     = emptyVarEnv
                         , envR     = emptyVarEnv
                         , in_scope = vars }
 
-addRnInScopeSet :: RnEnv2 -> VarSet -> RnEnv2
-addRnInScopeSet env vs
-  | isEmptyVarSet vs = env
-  | otherwise        = env { in_scope = extendInScopeSetSet (in_scope env) vs }
+extendRnInScopeSetList :: RnEnv2 -> [Var] -> RnEnv2
+extendRnInScopeSetList env vs
+  | null vs   = env
+  | otherwise = env { in_scope = extendInScopeSetList (in_scope env) vs }
 
 rnInScope :: Var -> RnEnv2 -> Bool
 rnInScope x env = x `elemInScopeSet` in_scope env
