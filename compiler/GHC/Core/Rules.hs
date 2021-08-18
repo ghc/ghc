@@ -700,7 +700,7 @@ rvInScopeEnv renv = (rnInScopeSet (rv_lcl renv), rv_unf renv)
 data RuleSubst = RS { rs_tv_subst :: TvSubstEnv   -- Range is the
                     , rs_id_subst :: IdSubstEnv   --   template variables
                     , rs_binds    :: BindWrapper  -- Floated bindings
-                    , rs_bndrs    :: VarSet       -- Variables bound by floated lets
+                    , rs_bndrs    :: [Var]        -- Variables bound by floated lets
                     }
 
 type BindWrapper = CoreExpr -> CoreExpr
@@ -709,7 +709,7 @@ type BindWrapper = CoreExpr -> CoreExpr
 
 emptyRuleSubst :: RuleSubst
 emptyRuleSubst = RS { rs_tv_subst = emptyVarEnv, rs_id_subst = emptyVarEnv
-                    , rs_binds = \e -> e, rs_bndrs = emptyVarSet }
+                    , rs_binds = \e -> e, rs_bndrs = [] }
 
 --      At one stage I tried to match even if there are more
 --      template args than real args.
@@ -772,16 +772,19 @@ match renv subst e1 (Let bind e2)
   | -- pprTrace "match:Let" (vcat [ppr bind, ppr $ okToFloat (rv_lcl renv) (bindFreeVars bind)]) $
     not (isJoinBind bind) -- can't float join point out of argument position
   , okToFloat (rv_lcl renv) (bindFreeVars bind) -- See Note [Matching lets]
-  = match (renv { rv_fltR = flt_subst' })
+  = match (renv { rv_fltR = flt_subst'
+                , rv_lcl  = rv_lcl renv `extendRnInScopeSetList` new_bndrs })
+                -- We are floating the let-binding out, as if it had enclosed
+                -- the entire target from Day 1.  So we must add its binders to
+                -- the in-scope set (#20200)
           (subst { rs_binds = rs_binds subst . Let bind'
-                 , rs_bndrs = extendVarSetList (rs_bndrs subst) new_bndrs })
+                 , rs_bndrs = new_bndrs ++ rs_bndrs subst })
           e1 e2
   | otherwise
   = Nothing
   where
-    flt_subst = addInScopeSet (rv_fltR renv) (rs_bndrs subst)
-    (flt_subst', bind') = substBind flt_subst bind
-    new_bndrs = bindersOf bind'
+    (flt_subst', bind') = substBind (rv_fltR renv) bind
+    new_bndrs           = bindersOf bind'
 
 {- Disabled: see Note [Matching cases] below
 match renv (tv_subst, id_subst, binds) e1
@@ -808,15 +811,14 @@ match renv subst (App f1 a1) (App f2 a2)
 
 match renv subst (Lam x1 e1) e2
   | Just (x2, e2, ts) <- exprIsLambda_maybe (rvInScopeEnv renv) e2
-  = let renv' = renv { rv_lcl = rnBndr2 (rv_lcl renv) x1 x2
-                     , rv_fltR = delBndr (rv_fltR renv) x2 }
+  = let renv'  = rnMatchBndr2 renv x1 x2
         subst' = subst { rs_binds = rs_binds subst . flip (foldr mkTick) ts }
     in  match renv' subst' e1 e2
 
 match renv subst (Case e1 x1 ty1 alts1) (Case e2 x2 ty2 alts2)
   = do  { subst1 <- match_ty renv subst ty1 ty2
         ; subst2 <- match renv subst1 e1 e2
-        ; let renv' = rnMatchBndr2 renv subst x1 x2
+        ; let renv' = rnMatchBndr2 renv x1 x2
         ; match_alts renv' subst2 alts1 alts2   -- Alts are both sorted
         }
 
@@ -879,14 +881,11 @@ match_cos _ subst [] [] = Just subst
 match_cos _ _ cos1 cos2 = pprTrace "match_cos: not same length" (ppr cos1 $$ ppr cos2) Nothing
 
 -------------
-rnMatchBndr2 :: RuleMatchEnv -> RuleSubst -> Var -> Var -> RuleMatchEnv
-rnMatchBndr2 renv subst x1 x2
-  = renv { rv_lcl  = rnBndr2 rn_env x1 x2
+rnMatchBndr2 :: RuleMatchEnv -> Var -> Var -> RuleMatchEnv
+rnMatchBndr2 renv x1 x2
+  = renv { rv_lcl  = rnBndr2 (rv_lcl renv) x1 x2
          , rv_fltR = delBndr (rv_fltR renv) x2 }
-  where
-    rn_env = addRnInScopeSet (rv_lcl renv) (rs_bndrs subst)
-    -- Typically this is a no-op, but it may matter if
-    -- there are some floated let-bindings
+
 
 ------------------------------------------
 match_alts :: RuleMatchEnv
@@ -902,7 +901,7 @@ match_alts renv subst (Alt c1 vs1 r1:alts1) (Alt c2 vs2 r2:alts2)
         ; match_alts renv subst1 alts1 alts2 }
   where
     renv' = foldl' mb renv (vs1 `zip` vs2)
-    mb renv (v1,v2) = rnMatchBndr2 renv subst v1 v2
+    mb renv (v1,v2) = rnMatchBndr2 renv v1 v2
 
 match_alts _ _ _ _
   = Nothing
@@ -984,7 +983,7 @@ match_tmpl_var renv@(RV { rv_lcl = rn_env, rv_fltR = flt_env })
        ; return (subst' { rs_id_subst = id_subst' }) }
   where
     -- e2' is the result of applying flt_env to e2
-    e2' | isEmptyVarSet let_bndrs = e2
+    e2' | null let_bndrs = e2
         | otherwise = substExpr flt_env e2
 
     id_subst' = extendVarEnv (rs_id_subst subst) v1' e2'

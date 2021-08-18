@@ -24,7 +24,7 @@ module GHC.Core.Subst (
         emptySubst, mkEmptySubst, mkSubst, mkOpenSubst, substInScope, isEmptySubst,
         extendIdSubst, extendIdSubstList, extendTCvSubst, extendTvSubstList,
         extendSubst, extendSubstList, extendSubstWithVar, zapSubstEnv,
-        addInScopeSet, extendInScope, extendInScopeList, extendInScopeIds,
+        extendInScope, extendInScopeList, extendInScopeIds,
         isInScope, setInScope, getTCvSubst, extendTvSubst, extendCvSubst,
         delBndr, delBndrs,
 
@@ -290,12 +290,6 @@ mkOpenSubst in_scope pairs = Subst in_scope
 ------------------------------
 isInScope :: Var -> Subst -> Bool
 isInScope v (Subst in_scope _ _ _) = v `elemInScopeSet` in_scope
-
--- | Add the 'Var' to the in-scope set, but do not remove
--- any existing substitutions for it
-addInScopeSet :: Subst -> VarSet -> Subst
-addInScopeSet (Subst in_scope ids tvs cvs) vs
-  = Subst (in_scope `extendInScopeSetSet` vs) ids tvs cvs
 
 -- | Add the 'Var' to the in-scope set: as a side effect,
 -- and remove any existing substitutions for it

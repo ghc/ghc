@@ -1685,7 +1685,7 @@ pushCoValArg co
     Pair tyL tyR = coercionKind co
 
 pushCoercionIntoLambda
-    :: InScopeSet -> Var -> CoreExpr -> CoercionR -> Maybe (Var, CoreExpr)
+    :: HasDebugCallStack => InScopeSet -> Var -> CoreExpr -> CoercionR -> Maybe (Var, CoreExpr)
 -- This implements the Push rule from the paper on coercions
 --    (\x. e) |> co
 -- ===>
