@@ -535,6 +535,7 @@ data WarningFlag =
    | Opt_WarnImplicitLift                 -- Since 9.2
    | Opt_WarnMissingKindSignatures        -- Since 9.2
    | Opt_WarnMissingExportedPatternSynonymSignatures -- since 9.2
+   | Opt_WarnRedundantStrictnessFlags     -- Since 9.4
    deriving (Eq, Show, Enum)
 
 -- | Return the names of a WarningFlag
@@ -615,6 +616,7 @@ warnFlagNames wflag = case wflag of
   Opt_WarnUnusedRecordWildcards                   -> "unused-record-wildcards" :| []
   Opt_WarnRedundantBangPatterns                   -> "redundant-bang-patterns" :| []
   Opt_WarnRedundantRecordWildcards                -> "redundant-record-wildcards" :| []
+  Opt_WarnRedundantStrictnessFlags                -> "redundant-strictness-flags" :| []
   Opt_WarnWrongDoBind                             -> "wrong-do-bind" :| []
   Opt_WarnMissingPatternSynonymSignatures         -> "missing-pattern-synonym-signatures" :| []
   Opt_WarnMissingDerivingStrategies               -> "missing-deriving-strategies" :| []

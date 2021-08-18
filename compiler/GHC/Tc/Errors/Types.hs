@@ -916,6 +916,17 @@ data TcRnMessage where
 
   TcRnFamInstNotInjective :: InjectivityErrReason -> TyCon -> NE.NonEmpty CoAxBranch -> TcRnMessage
 
+  {-| TcRnBangOnUnliftedType is a warning (controlled by -Wredundant-strictness-flags) that
+      occurs when a strictness annotation is applied to an unlifted type.
+
+      Example(s):
+      data T = MkT !Int# -- Strictness flag has no effect on unlifted types
+
+     Test cases: typecheck/should_compile/T20187a
+                 typecheck/should_compile/T20187b
+  -}
+  TcRnBangOnUnliftedType :: !Type -> TcRnMessage
+
 -- | Which parts of a record field are affected by a particular error or warning.
 data RecordFieldPart
   = RecordFieldConstructor !Name

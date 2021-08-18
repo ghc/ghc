@@ -303,6 +303,9 @@ instance Diagnostic TcRnMessage where
          in mkSimpleDecorated $ pprWithExplicitKindsWhen show_kinds $
               hang herald
                 2 (vcat (map (pprCoAxBranchUser fam_tc) (eqn1 : rest_eqns)))
+    TcRnBangOnUnliftedType ty
+      -> mkSimpleDecorated $
+           text "Strictness flag has no effect on unlifted type" <+> quotes (ppr ty)
 
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -432,6 +435,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnFamInstNotInjective{}
       -> ErrorWithoutFlag
+    TcRnBangOnUnliftedType{}
+      -> WarningWithFlag Opt_WarnRedundantStrictnessFlags
 
   diagnosticHints = \case
     TcRnUnknownMessage m
@@ -577,6 +582,8 @@ instance Diagnostic TcRnMessage where
              -> [suggestExtension LangExt.UndecidableInstances]
              | otherwise
              -> noHints
+    TcRnBangOnUnliftedType{}
+      -> noHints
 
 messageWithInfoDiagnosticMessage :: UnitState
                                  -> ErrInfo

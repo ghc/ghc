@@ -1917,6 +1917,20 @@ of ``-W(no-)*``.
 
     would report that the ``P{x, y, ..}`` match has a redundant use of ``..``.
 
+.. ghc-flag:: -Wredundant-strictness-flags
+    :shortdesc: Warn about redundant strictness flags.
+    :type: dynamic
+    :reverse: -Wno-redundant-strictness-flags
+    :category:
+
+    :since: 9.4
+
+    Report strictness flags applied to unlifted types. An unlifted type is
+    always strict, and applying a strictness flag has no effect.
+
+    For example: ::
+
+        data T = T !Int#
 
 .. ghc-flag:: -Wwrong-do-bind
     :shortdesc: warn about do bindings that appear to throw away monadic values

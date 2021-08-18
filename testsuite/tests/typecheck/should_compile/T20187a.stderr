@@ -1,0 +1,5 @@
+
+T20187a.hs:7:10: warning: [-Wredundant-strictness-flags]
+    • Strictness flag has no effect on unlifted type ‘Int#’
+    • In the definition of data constructor ‘T’
+      In the data type declaration for ‘T’

@@ -4396,8 +4396,8 @@ checkValidDataCon dflags existential_ok tc con
           -- E.g.  reject   data T = MkT {-# UNPACK #-} Int     -- No "!"
           --                data T = MkT {-# UNPACK #-} !a      -- Can't unpack
         ; hsc_env <- getTopEnv
-        ; let check_bang :: HsSrcBang -> HsImplBang -> Int -> TcM ()
-              check_bang bang rep_bang n
+        ; let check_bang :: Type -> HsSrcBang -> HsImplBang -> Int -> TcM ()
+              check_bang orig_arg_ty bang rep_bang n
                | HsSrcBang _ _ SrcLazy <- bang
                , not (xopt LangExt.StrictData dflags)
                = addErrTc $ TcRnUnknownMessage $ mkPlainError noHints $
@@ -4405,8 +4405,15 @@ checkValidDataCon dflags existential_ok tc con
 
                | HsSrcBang _ want_unpack strict_mark <- bang
                , isSrcUnpacked want_unpack, not (is_strict strict_mark)
+               , not (isUnliftedType orig_arg_ty)
                = addDiagnosticTc $ TcRnUnknownMessage $
                    mkPlainDiagnostic WarningWithoutFlag noHints (bad_bang n (text "UNPACK pragma lacks '!'"))
+
+               -- Warn about a redundant ! on an unlifted type
+               -- e.g.   data T = MkT !Int#
+               | HsSrcBang _ _ SrcStrict <- bang
+               , isUnliftedType orig_arg_ty
+               = addDiagnosticTc $ TcRnBangOnUnliftedType orig_arg_ty
 
                | HsSrcBang _ want_unpack _ <- bang
                , isSrcUnpacked want_unpack
@@ -4428,7 +4435,8 @@ checkValidDataCon dflags existential_ok tc con
                | otherwise
                = return ()
 
-        ; zipWith3M_ check_bang (dataConSrcBangs con) (dataConImplBangs con) [1..]
+        ; void $ zipWith4M check_bang (map scaledThing $ dataConOrigArgTys con)
+          (dataConSrcBangs con) (dataConImplBangs con) [1..]
 
           -- Check the dcUserTyVarBinders invariant
           -- See Note [DataCon user type variable binders] in GHC.Core.DataCon

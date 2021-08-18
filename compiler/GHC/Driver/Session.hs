@@ -3222,6 +3222,7 @@ wWarningFlagsDeps = mconcat [
   warnSpec    Opt_WarnUnusedRecordWildcards,
   warnSpec    Opt_WarnRedundantBangPatterns,
   warnSpec    Opt_WarnRedundantRecordWildcards,
+  warnSpec    Opt_WarnRedundantStrictnessFlags,
   warnSpec    Opt_WarnWrongDoBind,
   warnSpec    Opt_WarnMissingPatternSynonymSignatures,
   warnSpec    Opt_WarnMissingDerivingStrategies,

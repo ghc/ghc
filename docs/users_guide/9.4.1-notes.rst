@@ -3,6 +3,12 @@
 Version 9.4.1
 ==============
 
+Compiler
+~~~~~~~~
+
+- New :ghc-flag:`-Wredundant-strictness-flags` that checks for strictness flags
+  (``!``) applied to unlifted types, which are always strict.
+
 ``base`` library
 ~~~~~~~~~~~~~~~~
 
