@@ -1,0 +1,12 @@
+cabal-version:      2.4
+name:               BootNoHeader
+version:            0.1.0.0
+
+executable BootNoHeader
+    main-is:          Main.hs
+    other-modules:    Foo
+    build-depends:    base
+    hs-source-dirs:   .
+    default-language: Haskell2010
+
+    ghc-options:      -Werror=unused-packages

@@ -177,7 +177,11 @@ depanalE excluded_mods allow_dup_roots = do
     (errs, mod_graph) <- depanalPartial excluded_mods allow_dup_roots
     if isEmptyBag errs
       then do
-        warnMissingHomeModules hsc_env mod_graph
+        let unused_home_mod_err = warnMissingHomeModules hsc_env mod_graph
+            unused_pkg_err = warnUnusedPackages hsc_env mod_graph
+            warns = unused_home_mod_err ++ unused_pkg_err
+        when (not $ null warns) $
+          logWarnings (listToBag warns)
         setSession hsc_env { hsc_mod_graph = mod_graph }
         pure (errs, mod_graph)
       else do
@@ -266,10 +270,11 @@ instantiationNodes unit_state = InstantiationNode <$> iuids_to_check
 -- about module "C" not being listed in a command line.
 --
 -- The warning in enabled by `-Wmissing-home-modules`. See #13129
-warnMissingHomeModules :: GhcMonad m => HscEnv -> ModuleGraph -> m ()
+warnMissingHomeModules :: HscEnv -> ModuleGraph -> [MsgEnvelope DecoratedSDoc]
 warnMissingHomeModules hsc_env mod_graph =
-    when (wopt Opt_WarnMissingHomeModules dflags && not (null missing)) $
-        logWarnings (listToBag [warn])
+    if (wopt Opt_WarnMissingHomeModules dflags && not (null missing))
+    then [warn]
+    else []
   where
     dflags = hsc_dflags hsc_env
     targets = map targetId (hsc_targets hsc_env)
@@ -349,7 +354,6 @@ load :: GhcMonad m => LoadHowMuch -> m SuccessFlag
 load how_much = do
     (errs, mod_graph) <- depanalE [] False                        -- #17459
     success <- load' how_much (Just batchMsg) mod_graph
-    warnUnusedPackages mod_graph
     if isEmptyBag errs
       then pure success
       else throwErrors errs
@@ -361,25 +365,23 @@ load how_much = do
 -- actually loaded packages. All the packages, specified on command line,
 -- but never loaded, are probably unused dependencies.
 
-warnUnusedPackages :: GhcMonad m => ModuleGraph -> m ()
-warnUnusedPackages mod_graph = do
-    hsc_env <- getSession
-
+warnUnusedPackages :: HscEnv -> ModuleGraph -> [MsgEnvelope DecoratedSDoc]
+warnUnusedPackages hsc_env mod_graph =
     let dflags = hsc_dflags hsc_env
         state  = hsc_units hsc_env
 
     -- Only need non-source imports here because SOURCE imports are always HPT
-    let loadedPackages = concat $
+        loadedPackages = concat $
           mapMaybe (\(fs, mn) -> lookupModulePackage state (unLoc mn) fs)
             $ concatMap ms_imps (mgModSummaries mod_graph)
 
-    let requestedArgs = mapMaybe packageArg (packageFlags dflags)
+        requestedArgs = mapMaybe packageArg (packageFlags dflags)
 
         unusedArgs
           = filter (\arg -> not $ any (matching state arg) loadedPackages)
                    requestedArgs
 
-    let warn = makeIntoWarning
+        warn = makeIntoWarning
           (Reason Opt_WarnUnusedPackages)
           (mkPlainMsgEnvelope noSrcSpan msg)
         msg = vcat [ text "The following packages were specified" <+>
@@ -387,8 +389,9 @@ warnUnusedPackages mod_graph = do
                    , text "but were not needed for compilation:"
                    , nest 2 (vcat (map (withDash . pprUnusedArg) unusedArgs)) ]
 
-    when (wopt Opt_WarnUnusedPackages dflags && not (null unusedArgs)) $
-      logWarnings (listToBag [warn])
+    in if not (null unusedArgs) && wopt Opt_WarnUnusedPackages dflags
+       then [warn]
+       else []
 
     where
         packageArg (ExposePackage _ arg _) = Just arg
