@@ -15,8 +15,6 @@ import Target
 import Utilities
 import qualified System.Directory.Extra as IO
 import Data.Either
-import Hadrian.Oracles.Cabal
-import Hadrian.Haskell.Cabal.Type
 
 {-
 Note [Binary distributions]
@@ -129,7 +127,7 @@ bindistRules = do
         (lib_targets, bin_targets) <- partitionEithers <$> mapM pkgTarget all_pkgs
         cross <- flag CrossCompiling
         iserv_targets <- if cross then pure [] else iservBins
-        need (lib_targets ++ (map (\(_, p, _) -> p) (bin_targets ++ iserv_targets)))
+        need (lib_targets ++ (map (\(_, p) -> p) (bin_targets ++ iserv_targets)))
 
         version        <- setting ProjectVersion
         targetPlatform <- setting TargetPlatformFull
@@ -148,10 +146,13 @@ bindistRules = do
         createDirectory (bindistFilesDir -/- "bin")
         createDirectory (bindistFilesDir -/- "lib")
         -- Also create wrappers with version suffixes (#20074)
-        forM_ (bin_targets ++ iserv_targets) $ \(pkg, prog_path, ver) -> do
+        forM_ (bin_targets ++ iserv_targets) $ \(pkg, prog_path) -> do
             let orig_filename = takeFileName prog_path
                 (name, ext) = splitExtensions orig_filename
-                version_prog = name ++ "-" ++ ver ++ ext
+                suffix = if useGhcPrefix pkg
+                          then "ghc-" ++ version
+                          else version
+                version_prog = name ++ "-" ++ suffix ++ ext
                 -- Install the actual executable with a version suffix
                 install_path = bindistFilesDir -/- "bin" -/- version_prog
                 -- The wrapper doesn't have a version
@@ -176,7 +177,7 @@ bindistRules = do
               let unversioned_runhaskell_path =
                     bindistFilesDir -/- "bin" -/- "runhaskell" ++ ext
                   versioned_runhaskell_path =
-                    bindistFilesDir -/- "bin" -/- "runhaskell" ++ "-" ++ ver ++ ext
+                    bindistFilesDir -/- "bin" -/- "runhaskell" ++ "-" ++ version ++ ext
               if windowsHost
                 then do
                   createVersionWrapper version_prog unversioned_runhaskell_path
@@ -236,12 +237,15 @@ bindistRules = do
           -- other machine.
           need $ map (bindistFilesDir -/-)
                     (["configure", "Makefile"] ++ bindistInstallFiles)
-          forM_ bin_targets $ \(pkg, _, ver) -> do
+          forM_ bin_targets $ \(pkg, _) -> do
             needed_wrappers <- pkgToWrappers pkg
             forM_ needed_wrappers $ \wrapper_name -> do
+              let suffix = if useGhcPrefix pkg
+                             then "ghc-" ++ version
+                             else version
               wrapper_content <- wrapper wrapper_name
               let unversioned_wrapper_path = bindistFilesDir -/- "wrappers" -/- wrapper_name
-                  versioned_wrapper = wrapper_name ++ "-" ++ ver
+                  versioned_wrapper = wrapper_name ++ "-" ++ suffix
                   versioned_wrapper_path = bindistFilesDir -/- "wrappers" -/- versioned_wrapper
               -- Write the wrapper to the versioned path
               writeFile' versioned_wrapper_path wrapper_content
@@ -333,13 +337,20 @@ bindistInstallFiles =
 -- for all libraries and programs that are needed for a complete build.
 -- For libraries, it returns the path to the @.conf@ file in the package
 -- database. For programs, it returns the path to the compiled executable.
-pkgTarget :: Package -> Action (Either FilePath (Package, FilePath, String))
+pkgTarget :: Package -> Action (Either FilePath (Package, FilePath))
 pkgTarget pkg
     | isLibrary pkg = Left <$> pkgConfFile (vanillaContext Stage1 pkg)
     | otherwise     = do
         path <- programPath =<< programContext Stage1 pkg
-        version <- version <$> readPackageData pkg
-        return (Right (pkg, path, version))
+        return (Right (pkg, path))
+
+useGhcPrefix :: Package -> Bool
+useGhcPrefix pkg
+  | pkg == ghc    = False
+  | pkg == runGhc = False
+  | pkg == ghcPkg = False
+  | pkg == ghciWrapper = False
+  | otherwise = True
 
 
 -- | Which wrappers point to a specific package
@@ -410,11 +421,10 @@ ghciScriptWrapper = pure $ unlines
 --   the package to be built, since here we're generating 3 different
 --   executables out of just one package, so we need to specify all 3 contexts
 --   explicitly and 'need' the result of building them.
-iservBins :: Action [(Package, FilePath, String)]
+iservBins :: Action [(Package, FilePath)]
 iservBins = do
   rtsways <- interpretInContext (vanillaContext Stage1 ghc) getRtsWays
-  ver <- version <$> readPackageData iserv
-  traverse (fmap (\p -> (iserv, p, ver)) . programPath)
+  traverse (fmap (\p -> (iserv, p)) . programPath)
       [ Context Stage1 iserv w
       | w <- [vanilla, profiling, dynamic]
       , w `elem` rtsways

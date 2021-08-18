@@ -2216,6 +2216,8 @@ def normalise_errmsg(s: str) -> str:
     s = re.sub('runghc-[0-9.]+', 'runghc', s)
     s = re.sub('hpc-[0-9.]+', 'hpc', s)
     s = re.sub('ghc-pkg-[0-9.]+', 'ghc-pkg', s)
+    # hpc executable is given ghc suffix
+    s = re.sub('hpc-ghc', 'hpc', s)
 
     # Error messages sometimes contain ghc-bignum implementation package
     s = re.sub('ghc-bignum-[0-9.]+', 'ghc-bignum-<VERSION>', s)
