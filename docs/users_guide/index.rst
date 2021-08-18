@@ -18,6 +18,7 @@ Contents:
    8.10.4-notes
    8.10.5-notes
    8.10.6-notes
+   8.10.7-notes
    ghci
    runghc
    usage
