@@ -1,0 +1,16 @@
+
+T20241b.hs:16:8: error:
+    • Boom
+    • In the type signature:
+        foo :: ((TypeError (Text "Boom") :: (Type -> Type)
+                                            -> Type -> Constraint) IO) a =>
+               Proxy a -> ()
+
+T20241b.hs:20:8: error:
+    • Boom
+    • In the type signature:
+        bar :: ((c :: Constraint
+                      -> Type -> Constraint) (((TypeError (Text "Boom") :: (Type -> Type)
+                                                                           -> Type
+                                                                              -> Constraint) IO) a)) a =>
+               Proxy a -> ()

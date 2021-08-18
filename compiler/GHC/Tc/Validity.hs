@@ -241,10 +241,16 @@ wantAmbiguityCheck ctxt
       StandaloneKindSigCtxt{} -> False
       _            -> True
 
-checkUserTypeError :: UserTypeCtxt -> Type -> TcM ()
--- Check to see if the type signature mentions "TypeError blah"
--- anywhere in it, and fail if so.
+-- | Check whether the type signature contains custom type errors,
+-- and fail if so.
 --
+-- Note that some custom type errors are acceptable:
+--
+--   - in the RHS of a type synonym, e.g. to allow users to define
+--     type synonyms for custom type errors with large messages (#20181),
+--   - inside a type family application, as a custom type error
+--     might evaporate after performing type family reduction (#20241).
+checkUserTypeError :: UserTypeCtxt -> Type -> TcM ()
 -- Very unsatisfactorily (#11144) we need to tidy the type
 -- because it may have come from an /inferred/ signature, not a
 -- user-supplied one.  This is really only a half-baked fix;
@@ -258,12 +264,14 @@ checkUserTypeError ctxt ty
   = check ty
   where
   check ty
-    | Just msg     <- userTypeError_maybe ty      = fail_with msg
-    | Just (_,ts)  <- splitTyConApp_maybe ty      = mapM_ check ts
-    | Just (t1,t2) <- splitAppTy_maybe ty         = check t1 >> check t2
-    | Just (_,t1)  <- splitForAllTyCoVar_maybe ty = check t1
-    | otherwise                                   = return ()
+    | Just msg    <- userTypeError_maybe ty      = fail_with msg
+    | Just (_,t1) <- splitForAllTyCoVar_maybe ty = check t1
+    | let (_,tys) =  splitAppTys ty              = mapM_ check tys
+    -- splitAppTys keeps type family applications saturated.
+    -- This means we don't go looking for user type errors
+    -- inside type family arguments (see #20241).
 
+  fail_with :: Type -> TcM ()
   fail_with msg = do { env0 <- tcInitTidyEnv
                      ; let (env1, tidy_msg) = tidyOpenType env0 msg
                      ; failWithTcM (env1

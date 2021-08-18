@@ -795,4 +795,4 @@ test('T17817b', normal, compile, [''])
 test('T20033', normal, compile, [''])
 test('TypeRepCon', normal, compile, ['-Woverlapping-patterns'])
 test('T20181', normal, compile, [''])
-
+test('T20241', normal, compile, [''])
