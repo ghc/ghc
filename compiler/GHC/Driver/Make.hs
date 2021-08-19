@@ -919,6 +919,7 @@ data MakeEnv = MakeEnv { hsc_env :: HscEnv -- The basic HscEnv which will be aug
                        , old_hpt :: HomePackageTable -- A cache of old interface files
                        , compile_sem :: AbstractSem
                        , lqq_var :: TVar LogQueueQueue
+                       , env_messager :: Maybe Messager
                        }
 
 type RunMakeM a = ReaderT MakeEnv (MaybeT IO) a
@@ -1027,9 +1028,9 @@ upsweep
     -> (NodeKey -> [NodeKey]) -- A function which computes the direct dependencies of a NodeKey
     -> [BuildPlan]
     -> IO (SuccessFlag, HscEnv)
-upsweep n_jobs hsc_env _mHscMessage old_hpt direct_deps build_plan = do
+upsweep n_jobs hsc_env mHscMessage old_hpt direct_deps build_plan = do
     (cycle, pipelines, collect_result) <- interpretBuildPlan direct_deps build_plan
-    runPipelines n_jobs hsc_env old_hpt pipelines
+    runPipelines n_jobs hsc_env old_hpt mHscMessage pipelines
     res <- collect_result
 
     let completed = [m | Just (Just m) <- res]
@@ -2251,7 +2252,8 @@ executeInstantiationNode k n wait_deps iu = do
         -- Output of the logger is mediated by a central worker to
         -- avoid output interleaving
         let lcl_hsc_env = setHPT deps hsc_env
-        lift $ MaybeT $ wrapAction lcl_hsc_env $ upsweep_inst lcl_hsc_env (Just batchMsg) k n iu
+        msg <- asks env_messager
+        lift $ MaybeT $ wrapAction lcl_hsc_env $ upsweep_inst lcl_hsc_env msg k n iu
 
 executeCompileNode :: Int
   -> Int
@@ -2281,7 +2283,7 @@ executeCompileNode k n wait_deps mknot_var mod = do
              hsc_env { hsc_type_env_vars = knotVarsFromModuleEnv knot_var }
      -- Compile the module, locking with a semphore to avoid too many modules
      -- being compiled at the same time leading to high memory usage.
-     lift $ MaybeT (withAbstractSem compile_sem $ wrapAction lcl_hsc_env $ upsweep_mod lcl_hsc_env (Just batchMsg) old_hpt mod k n)
+     lift $ MaybeT (withAbstractSem compile_sem $ wrapAction lcl_hsc_env $ upsweep_mod lcl_hsc_env env_messager old_hpt mod k n)
 
 executeTypecheckLoop :: IO HomePackageTable -- Dependencies of the loop
   -> RunMakeM [HomeModInfo] -- The loop itself
@@ -2348,9 +2350,10 @@ label_self thread_name = do
 runPipelines :: Int              -- ^ How many capabilities to use
              -> HscEnv           -- ^ The basic HscEnv which is augmented with specific info for each module
              -> HomePackageTable -- ^ The old HPT which is used as a cache (TODO: The cache should be from the ActionMap)
+             -> Maybe Messager   -- ^ Optional custom messager to use to report progress
              -> [MakeAction]  -- ^ The build plan for all the module nodes
              -> IO ()
-runPipelines n_jobs orig_hsc_env old_hpt all_pipelines = do
+runPipelines n_jobs orig_hsc_env old_hpt mHscMessager all_pipelines = do
 
   liftIO $ label_self "main --make thread"
 
@@ -2394,6 +2397,7 @@ runPipelines n_jobs orig_hsc_env old_hpt all_pipelines = do
                     , old_hpt = old_hpt
                     , lqq_var = log_queue_queue_var
                     , compile_sem = abstract_sem
+                    , env_messager = mHscMessager
                     }
 
   MC.bracket updNumCapabilities resetNumCapabilities $ \_ ->
