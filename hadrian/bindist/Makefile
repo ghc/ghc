@@ -95,6 +95,70 @@ ActualLibsDir=${ghclibdir}/lib
 endif
 WrapperBinsDir=${bindir}
 
+# N.B. this is duplicated from includes/ghc.mk.
+lib/settings :
+	$(call removeFiles,$@)
+	@echo '[("GCC extra via C opts", "$(GccExtraViaCOpts)")' >> $@
+	@echo ',("C compiler command", "$(SettingsCCompilerCommand)")' >> $@
+	@echo ',("C compiler flags", "$(SettingsCCompilerFlags)")' >> $@
+	@echo ',("C++ compiler flags", "$(SettingsCxxCompilerFlags)")' >> $@
+	@echo ',("C compiler link flags", "$(SettingsCCompilerLinkFlags)")' >> $@
+	@echo ',("C compiler supports -no-pie", "$(SettingsCCompilerSupportsNoPie)")' >> $@
+	@echo ',("Haskell CPP command", "$(SettingsHaskellCPPCommand)")' >> $@
+	@echo ',("Haskell CPP flags", "$(SettingsHaskellCPPFlags)")' >> $@
+	@echo ',("ld command", "$(SettingsLdCommand)")' >> $@
+	@echo ',("ld flags", "$(SettingsLdFlags)")' >> $@
+	@echo ',("ld supports compact unwind", "$(LdHasNoCompactUnwind)")' >> $@
+	@echo ',("ld supports build-id", "$(LdHasBuildId)")' >> $@
+	@echo ',("ld supports filelist", "$(LdHasFilelist)")' >> $@
+	@echo ',("ld is GNU ld", "$(LdIsGNULd)")' >> $@
+	@echo ',("Merge objects command", "$(SettingsMergeObjectsCommand)")' >> $@
+	@echo ',("Merge objects flags", "$(SettingsMergeObjectsFlags)")' >> $@
+	@echo ',("ar command", "$(SettingsArCommand)")' >> $@
+	@echo ',("ar flags", "$(ArArgs)")' >> $@
+	@echo ',("ar supports at file", "$(ArSupportsAtFile)")' >> $@
+	@echo ',("ranlib command", "$(SettingsRanlibCommand)")' >> $@
+	@echo ',("otool command", "$(SettingsOtoolCommand)")' >> $@
+	@echo ',("install_name_tool command", "$(SettingsInstallNameToolCommand)")' >> $@
+	@echo ',("touch command", "$(SettingsTouchCommand)")' >> $@
+	@echo ',("dllwrap command", "$(SettingsDllWrapCommand)")' >> $@
+	@echo ',("windres command", "$(SettingsWindresCommand)")' >> $@
+	@echo ',("libtool command", "$(SettingsLibtoolCommand)")' >> $@
+	@echo ',("unlit command", "$$topdir/bin/unlit")' >> $@
+	@echo ',("cross compiling", "$(CrossCompiling)")' >> $@
+	@echo ',("target platform string", "$(TARGETPLATFORM)")' >> $@
+	@echo ',("target os", "$(HaskellTargetOs)")' >> $@
+	@echo ',("target arch", "$(HaskellTargetArch)")' >> $@
+	@echo ',("target word size", "$(TargetWordSize)")' >> $@
+	@echo ',("target word big endian", "$(TargetWordBigEndian)")' >> $@
+	@echo ',("target has GNU nonexec stack", "$(TargetHasGnuNonexecStack)")' >> $@
+	@echo ',("target has .ident directive", "$(TargetHasIdentDirective)")' >> $@
+	@echo ',("target has subsections via symbols", "$(TargetHasSubsectionsViaSymbols)")' >> $@
+	@echo ',("target has RTS linker", "$(TargetHasRTSLinker)")' >> $@
+	@echo ',("Unregisterised", "$(GhcUnregisterised)")' >> $@
+	@echo ',("LLVM target", "$(LLVMTarget_CPP)")' >> $@
+	@echo ',("LLVM llc command", "$(SettingsLlcCommand)")' >> $@
+	@echo ',("LLVM opt command", "$(SettingsOptCommand)")' >> $@
+	@echo ',("LLVM clang command", "$(SettingsClangCommand)")' >> $@
+	@echo
+	@echo ',("bignum backend", "$(BIGNUM_BACKEND)")' >> $@
+	@echo ',("Use interpreter", "$(GhcWithInterpreter)")' >> $@
+	@echo ',("Support SMP", "$(GhcWithSMP)")' >> $@
+	@echo ',("RTS ways", "$(GhcRTSWays)")' >> $@
+	@echo ',("Tables next to code", "$(TablesNextToCode)")' >> $@
+	@echo ',("Leading underscore", "$(LeadingUnderscore)")' >> $@
+	@echo ',("Use LibFFI", "$(UseLibffiForAdjustors)")' >> $@
+# Note that GhcThreaded just reflects the Makefile variable setting. In
+# particular, the stage1 compiler is never actually compiled with -threaded, but
+# it will nevertheless have cGhcThreaded = True. The "+RTS --info" output will
+# show what RTS GHC is really using.
+	@echo ",(\"Use Threads\", \"$(GhcThreaded)\")" >> $@
+	@echo ",(\"Use Debugging\", \"$(GhcDebugged)\")" >> $@
+	@echo ",(\"RTS expects libdw\", \"$(GhcRtsWithLibdw)\")" >> $@
+	@echo "]" >> $@
+
+
+
 # We need to install binaries relative to libraries.
 BINARIES = $(wildcard ./bin/*)
 install_bin_libdir:
@@ -110,7 +174,7 @@ install_bin_direct:
 	cp ./bin/* "$(WrapperBinsDir)/"
 
 LIBRARIES = $(wildcard ./lib/*)
-install_lib:
+install_lib: lib/settings
 	@echo "Copying libraries to $(ActualLibsDir)"
 	$(INSTALL_DIR) "$(ActualLibsDir)"
 	for i in $(LIBRARIES); do \

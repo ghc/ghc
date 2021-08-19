@@ -211,6 +211,7 @@ $(eval $(call includesHeaderPlatform,1))
 
 includes_SETTINGS = includes/dist/build/settings
 
+# N.B. this is duplicated in hadrian/bindist/Makefile.
 $(includes_SETTINGS) : includes/Makefile | $$(dir $$@)/.
 	$(call removeFiles,$@)
 	@echo '[("GCC extra via C opts", "$(GccExtraViaCOpts)")' >> $@
