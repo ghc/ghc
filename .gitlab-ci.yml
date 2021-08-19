@@ -1401,9 +1401,6 @@ release-x86_64-windows-integer-simple:
     branch: "master"
     strategy: "depend"
 
-.hackage:
-  extends: .hackage
-  when: manual
 
 .hackage-label:
   extends: .hackage
