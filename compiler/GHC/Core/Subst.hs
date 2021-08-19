@@ -61,6 +61,7 @@ import GHC.Types.Unique.Supply
 import GHC.Builtin.Names
 import GHC.Data.Maybe
 
+import GHC.Utils.Trace
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -255,9 +256,10 @@ lookupIdSubst (Subst in_scope ids _ _) v
   | Just e  <- lookupVarEnv ids       v = e
   | Just v' <- lookupInScope in_scope v = Var v'
         -- Vital! See Note [Extending the Subst]
-        -- If v isn't in the InScopeSet, we panic, because
-        -- it's a bad bug and we reallly want to know
-  | otherwise = pprPanic "lookupIdSubst" (ppr v $$ ppr in_scope)
+        -- See #20200
+  | otherwise = warnPprTrace True (text "GHC.Core.Subst.lookupIdSubst" <+> ppr v
+                            $$ ppr in_scope) $
+                Var v
 
 -- | Find the substitution for a 'TyVar' in the 'Subst'
 lookupTCvSubst :: Subst -> TyVar -> Type
