@@ -209,6 +209,10 @@ function set_toolchain_paths() {
   export ALEX
 }
 
+function cabal_update() {
+  "$CABAL" update --index="$HACKAGE_INDEX_STATE"
+}
+
 # Extract GHC toolchain
 function setup() {
   echo "=== TIMINGS ===" > ci-timings
@@ -223,7 +227,7 @@ function setup() {
     time_it "setup" setup_toolchain
   fi
 
-  "$CABAL" update --index="$HACKAGE_INDEX_STATE"
+  cabal_update
 
   # Make sure that git works
   git config user.email "ghc-ci@gitlab-haskell.org"
@@ -314,8 +318,9 @@ function fetch_cabal() {
 function setup_toolchain() {
   fetch_ghc
   fetch_cabal
+  cabal_update
 
-  cabal_install="$CABAL v2-install \
+  local cabal_install="$CABAL v2-install \
     --with-compiler=$GHC \
     --index-state=$HACKAGE_INDEX_STATE \
     --installdir=$toolchain/bin \
