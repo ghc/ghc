@@ -1,13 +1,13 @@
 [1 of 3] Processing common
   Instantiating common
-[1 of 1] Compiling Class            ( common/Class.hs, bkp60.out/common/Class.o )
+  [1 of 1] Compiling Class            ( common/Class.hs, bkp60.out/common/Class.o )
 [2 of 3] Processing consumer-impl
   Instantiating consumer-impl
   [1 of 1] Including common
-[1 of 3] Compiling Impl[boot]       ( consumer-impl/Impl.hs-boot, bkp60.out/consumer-impl/Impl.o-boot )
-[2 of 3] Compiling Downstream       ( consumer-impl/Downstream.hs, bkp60.out/consumer-impl/Downstream.o )
-[3 of 3] Compiling Impl             ( consumer-impl/Impl.hs, bkp60.out/consumer-impl/Impl.o )
+  [1 of 3] Compiling Impl[boot]       ( consumer-impl/Impl.hs-boot, bkp60.out/consumer-impl/Impl.o-boot )
+  [2 of 3] Compiling Downstream       ( consumer-impl/Downstream.hs, bkp60.out/consumer-impl/Downstream.o )
+  [3 of 3] Compiling Impl             ( consumer-impl/Impl.hs, bkp60.out/consumer-impl/Impl.o )
 [3 of 3] Processing tie
   Instantiating tie
   [1 of 1] Including consumer-impl
-[1 of 1] Compiling Tie              ( tie/Tie.hs, bkp60.out/tie/Tie.o )
+  [1 of 1] Compiling Tie              ( tie/Tie.hs, bkp60.out/tie/Tie.o )
