@@ -1354,7 +1354,7 @@ release-x86_64-windows-integer-simple:
     - ls -lh
     - mv docs/*.tar.xz docs/index.html .
 
-source-tarball:
+.source-tarball:
   stage: packaging
   needs: [validate-x86_64-linux-deb9-unreg-hadrian]
   tags:
