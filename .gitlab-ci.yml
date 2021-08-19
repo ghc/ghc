@@ -1401,16 +1401,16 @@ release-x86_64-windows-integer-simple:
     branch: "master"
     strategy: "depend"
 
-hackage:
+.hackage:
   extends: .hackage
   when: manual
 
-hackage-label:
+.hackage-label:
   extends: .hackage
   rules:
     - if: '$CI_MERGE_REQUEST_LABELS =~ /.*user-facing.*/'
 
-nightly-hackage:
+.nightly-hackage:
   rules:
     - if: $NIGHTLY
   extends: .hackage
