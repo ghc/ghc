@@ -32,7 +32,7 @@ define installscript
 # consistent naming procedure.
 	if [ -L wrappers/$1 ]; then echo "$1 is a symlink"; fi
 	@if [ -L wrappers/$1 ]; then \
-		cp -P wrappers/$1 $2; \
+		cp -RP wrappers/$1 $2; \
 	else								 \
 		rm -f '$2' && 		 \
 		$(CREATE_SCRIPT) '$2' && \
