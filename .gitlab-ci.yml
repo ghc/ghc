@@ -1128,6 +1128,7 @@ release-x86_64-linux-fedora33-dwarf:
     SPHINXBUILD: "/mingw64/bin/sphinx-build.exe"
     CABAL_INSTALL_VERSION: "3.2.0.0"
     GHC_VERSION: "8.10.4"
+    CONFIGURE_ARGS: "--enable-native-io-manager"
   cache:
     paths:
       - cabal-cache
