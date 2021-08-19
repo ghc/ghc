@@ -14,7 +14,7 @@ import Numeric          (showIntAtBase)
 --   yields the same word.
 -- Takes the bit reversion function as an argument so different word types
 -- can be used with their own functions.
-test :: (FiniteBits a, Integral a, Show a) => (a -> a) -> a -> Bool
+test :: (FiniteBits a, Integral a) => (a -> a) -> a -> Bool
 test bitReverter x =
     let -- These zeroes are to left-pad the base-2 representation of
         -- @x@ so that the string has one ASCII character per bit in the
