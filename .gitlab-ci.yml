@@ -996,7 +996,7 @@ validate-x86_64-linux-deb9-dwarf:
     TEST_ENV: "x86_64-linux-deb9-dwarf"
     BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-deb9-linux-dwarf.tar.xz"
   rules:
-    - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
+    #    - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
 
 #################################
 # x86_64-linux-deb10
