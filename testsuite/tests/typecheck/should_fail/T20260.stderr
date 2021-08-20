@@ -1,0 +1,6 @@
+
+T20260.hs:8:3: error:
+    • Mismatched type name in type family instance.
+        Expected: Foo
+          Actual: Bar
+    • In the type family declaration for ‘Foo’
