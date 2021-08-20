@@ -1,0 +1,51 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 68, types: 58, coercions: 0, joins: 0/0}
+
+wi8 = word8ToInt8#
+
+wi16 = word16ToInt16#
+
+wi32 = word32ToInt32#
+
+wi64 = \ x -> intToInt64# (word2Int# (word64ToWord# x))
+
+iw8 = int8ToWord8#
+
+iw16 = int16ToWord16#
+
+iw32 = int32ToWord32#
+
+iw64 = \ x -> wordToWord64# (int2Word# (int64ToInt# x))
+
+i8 = \ x -> x
+
+i16 = \ x -> x
+
+i32 = \ x -> x
+
+i64 = \ x -> intToInt64# (int64ToInt# x)
+
+w8 = \ x -> x
+
+w16 = \ x -> x
+
+w32 = \ x -> x
+
+w64 = \ x -> wordToWord64# (word64ToWord# x)
+
+w = \ x -> x
+
+i = \ x -> x
+
+wiw64 = \ x -> x
+
+iwi64 = \ x -> x
+
+ww64i = word2Int#
+
+ii64w = int2Word#
+
+
+

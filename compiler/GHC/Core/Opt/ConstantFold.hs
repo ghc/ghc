@@ -558,13 +558,10 @@ primOpRules nm = \case
    Int32ToIntOp   -> mkPrimOpRule nm 1 [ liftLitPlatform extendIntLit ]
    Int64ToIntOp   -> mkPrimOpRule nm 1 [ liftLitPlatform extendIntLit ]
    IntToInt8Op    -> mkPrimOpRule nm 1 [ liftLit narrowInt8Lit
-                                       , semiInversePrimOp Int8ToIntOp
                                        , narrowSubsumesAnd IntAndOp IntToInt8Op 8 ]
    IntToInt16Op   -> mkPrimOpRule nm 1 [ liftLit narrowInt16Lit
-                                       , semiInversePrimOp Int16ToIntOp
                                        , narrowSubsumesAnd IntAndOp IntToInt16Op 16 ]
    IntToInt32Op   -> mkPrimOpRule nm 1 [ liftLit narrowInt32Lit
-                                       , semiInversePrimOp Int32ToIntOp
                                        , narrowSubsumesAnd IntAndOp IntToInt32Op 32 ]
    IntToInt64Op   -> mkPrimOpRule nm 1 [ liftLit narrowInt64Lit ]
 
@@ -580,37 +577,24 @@ primOpRules nm = \case
    Word64ToWordOp -> mkPrimOpRule nm 1 [ liftLitPlatform extendWordLit ]
 
    WordToWord8Op  -> mkPrimOpRule nm 1 [ liftLit narrowWord8Lit
-                                       , semiInversePrimOp Word8ToWordOp
                                        , narrowSubsumesAnd WordAndOp WordToWord8Op 8 ]
    WordToWord16Op -> mkPrimOpRule nm 1 [ liftLit narrowWord16Lit
-                                       , semiInversePrimOp Word16ToWordOp
                                        , narrowSubsumesAnd WordAndOp WordToWord16Op 16 ]
    WordToWord32Op -> mkPrimOpRule nm 1 [ liftLit narrowWord32Lit
-                                       , semiInversePrimOp Word32ToWordOp
                                        , narrowSubsumesAnd WordAndOp WordToWord32Op 32 ]
    WordToWord64Op -> mkPrimOpRule nm 1 [ liftLit narrowWord64Lit ]
 
-   Word8ToInt8Op  -> mkPrimOpRule nm 1 [ liftLitPlatform (litNumCoerce LitNumInt8)
-                                       , semiInversePrimOp Int8ToWord8Op ]
-   Int8ToWord8Op  -> mkPrimOpRule nm 1 [ liftLitPlatform (litNumCoerce LitNumWord8)
-                                       , semiInversePrimOp Word8ToInt8Op ]
-   Word16ToInt16Op-> mkPrimOpRule nm 1 [ liftLitPlatform (litNumCoerce LitNumInt16)
-                                       , semiInversePrimOp Int16ToWord16Op ]
-   Int16ToWord16Op-> mkPrimOpRule nm 1 [ liftLitPlatform (litNumCoerce LitNumWord16)
-                                       , semiInversePrimOp Word16ToInt16Op ]
-   Word32ToInt32Op-> mkPrimOpRule nm 1 [ liftLitPlatform (litNumCoerce LitNumInt32)
-                                       , semiInversePrimOp Int32ToWord32Op ]
-   Int32ToWord32Op-> mkPrimOpRule nm 1 [ liftLitPlatform (litNumCoerce LitNumWord32)
-                                       , semiInversePrimOp Word32ToInt32Op ]
-   Word64ToInt64Op-> mkPrimOpRule nm 1 [ liftLitPlatform (litNumCoerce LitNumInt64)
-                                       , semiInversePrimOp Int64ToWord64Op ]
-   Int64ToWord64Op-> mkPrimOpRule nm 1 [ liftLitPlatform (litNumCoerce LitNumWord64)
-                                       , semiInversePrimOp Word64ToInt64Op ]
+   Word8ToInt8Op  -> mkPrimOpRule nm 1 [ liftLitPlatform (litNumCoerce LitNumInt8) ]
+   Int8ToWord8Op  -> mkPrimOpRule nm 1 [ liftLitPlatform (litNumCoerce LitNumWord8) ]
+   Word16ToInt16Op-> mkPrimOpRule nm 1 [ liftLitPlatform (litNumCoerce LitNumInt16) ]
+   Int16ToWord16Op-> mkPrimOpRule nm 1 [ liftLitPlatform (litNumCoerce LitNumWord16) ]
+   Word32ToInt32Op-> mkPrimOpRule nm 1 [ liftLitPlatform (litNumCoerce LitNumInt32) ]
+   Int32ToWord32Op-> mkPrimOpRule nm 1 [ liftLitPlatform (litNumCoerce LitNumWord32) ]
+   Word64ToInt64Op-> mkPrimOpRule nm 1 [ liftLitPlatform (litNumCoerce LitNumInt64) ]
+   Int64ToWord64Op-> mkPrimOpRule nm 1 [ liftLitPlatform (litNumCoerce LitNumWord64) ]
 
-   WordToIntOp    -> mkPrimOpRule nm 1 [ liftLitPlatform (litNumCoerce LitNumInt)
-                                       , semiInversePrimOp IntToWordOp ]
-   IntToWordOp    -> mkPrimOpRule nm 1 [ liftLitPlatform (litNumCoerce LitNumWord)
-                                       , semiInversePrimOp WordToIntOp ]
+   WordToIntOp    -> mkPrimOpRule nm 1 [ liftLitPlatform (litNumCoerce LitNumInt) ]
+   IntToWordOp    -> mkPrimOpRule nm 1 [ liftLitPlatform (litNumCoerce LitNumWord) ]
 
    Narrow8IntOp   -> mkPrimOpRule nm 1 [ liftLitPlatform (litNumNarrow LitNumInt8)
                                        , subsumedByPrimOp Narrow8IntOp

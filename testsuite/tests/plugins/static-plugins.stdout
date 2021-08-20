@@ -3,6 +3,7 @@ parsePlugin()
 interfacePlugin: Prelude
 interfacePlugin: GHC.Base
 interfacePlugin: GHC.Float
+interfacePlugin: GHC.Prim.Ext
 interfacePlugin: System.IO
 typeCheckPlugin (rn)
 interfacePlugin: GHC.Prim

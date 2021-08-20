@@ -14,3 +14,4 @@ test('T20062', [ grep_errmsg(r'integer') ], compile, ['-ddump-simpl -O -dsuppres
 test('T20245', normal, compile, ['-ddump-simpl -O -dsuppress-all -dno-typeable-binds'])
 test('T20376', normal, compile, ['-ddump-simpl -O -dsuppress-all -dsuppress-uniques -dno-typeable-binds'])
 test('T20374', normal, compile, ['-ddump-simpl -O -dsuppress-all -dno-typeable-binds -dsuppress-uniques'])
+test('T19769', normal, compile, ['-ddump-simpl -O -dsuppress-all -dno-typeable-binds -dsuppress-uniques'])
