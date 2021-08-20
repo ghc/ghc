@@ -172,22 +172,16 @@ Strict functions are your dear friends:
 
     The former will result in far better code.
 
-    A less contrived example shows the use of ``cases`` instead of
+    A less contrived example shows the use of ``BangPatterns`` on
     ``lets`` to get stricter code (a good thing):
 
     ::
 
-        f (Wibble x y)  # beautiful but slow
+        f (Wibble x y)
               = let
-                    (a1, b1, c1) = unpackFoo x
-                    (a2, b2, c2) = unpackFoo y
+                    !(a1, b1, c1) = unpackFoo x
+                    !(a2, b2, c2) = unpackFoo y
                 in ...
-
-        f (Wibble x y)  # ugly, and proud of it
-              = case (unpackFoo x) of { (a1, b1, c1) ->
-                    case (unpackFoo y) of { (a2, b2, c2) ->
-                        ...
-              }}
 
 GHC loves single-constructor data-types:
     It's all the better if a function is strict in a single-constructor
