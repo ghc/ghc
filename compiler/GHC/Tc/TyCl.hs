@@ -2985,32 +2985,19 @@ kcTyFamInstEqn tc_fam_tc
            , text "fam_tc ="     <+> ppr tc_fam_tc <+> dcolon <+> ppr (tyConKind tc_fam_tc)
            , text "feqn_bndrs =" <+> ppr outer_bndrs
            , text "feqn_pats ="  <+> ppr hs_pats ])
-          -- this check reports an arity error instead of a kind error; easier for user
-       ; let vis_pats = numVisibleArgs hs_pats
 
-       -- First, check if we're dealing with a closed type family equation, and
-       -- if so, ensure that each equation's type constructor is for the right
-       -- type family.  E.g. barf on
-       --    type family F a where { G Int = Bool }
-       ; checkTc (tc_fam_tc_name == eqn_tc_name) $
-         wrongTyFamName tc_fam_tc_name eqn_tc_name
-
-       ; checkTc (vis_pats == vis_arity) $
-                  wrongNumberOfParmsErr vis_arity
+       ; checkTyFamInstEqn tc_fam_tc eqn_tc_name hs_pats
 
        ; discardResult $
          bindOuterFamEqnTKBndrs_Q_Tv outer_bndrs $
          do { (_fam_app, res_kind) <- tcFamTyPats tc_fam_tc hs_pats
             ; tcCheckLHsType hs_rhs_ty (TheKind res_kind) }
-             -- Why "_Tv" here?  Consider (#14066
+             -- Why "_Tv" here?  Consider (#14066)
              --  type family Bar x y where
              --      Bar (x :: a) (y :: b) = Int
              --      Bar (x :: c) (y :: d) = Bool
              -- During kind-checking, a,b,c,d should be TyVarTvs and unify appropriately
     }
-  where
-    vis_arity = length (tyConVisibleTyVars tc_fam_tc)
-    tc_fam_tc_name = getName tc_fam_tc
 
 --------------------------
 tcTyFamInstEqn :: TcTyCon -> AssocInstInfo -> LTyFamInstEqn GhcRn
@@ -3019,7 +3006,8 @@ tcTyFamInstEqn :: TcTyCon -> AssocInstInfo -> LTyFamInstEqn GhcRn
 -- (typechecked here) have TyFamInstEqns
 
 tcTyFamInstEqn fam_tc mb_clsinfo
-    (L loc (FamEqn { feqn_bndrs  = outer_bndrs
+    (L loc (FamEqn { feqn_tycon  = L _ eqn_tc_name
+                   , feqn_bndrs  = outer_bndrs
                    , feqn_pats   = hs_pats
                    , feqn_rhs    = hs_rhs_ty }))
   = setSrcSpanA loc $
@@ -3030,15 +3018,8 @@ tcTyFamInstEqn fam_tc mb_clsinfo
                   NotAssociated {} -> empty
                   InClsInst { ai_class = cls } -> text "class" <+> ppr cls <+> pprTyVars (classTyVars cls) ]
 
-       -- First, check the arity of visible arguments
-       -- If we wait until validity checking, we'll get kind errors
-       -- below when an arity error will be much easier to understand.
-       -- Note that for closed type families, kcTyFamInstEqn has already
-       -- checked the arity previously.
-       ; let vis_arity = length (tyConVisibleTyVars fam_tc)
-             vis_pats  = numVisibleArgs hs_pats
-       ; checkTc (vis_pats == vis_arity) $
-         wrongNumberOfParmsErr vis_arity
+       ; checkTyFamInstEqn fam_tc eqn_tc_name hs_pats
+
        ; (qtvs, pats, rhs_ty) <- tcTyFamInstEqnGuts fam_tc mb_clsinfo
                                       outer_bndrs hs_pats hs_rhs_ty
        -- Don't print results they may be knot-tied
@@ -3046,6 +3027,24 @@ tcTyFamInstEqn fam_tc mb_clsinfo
        ; return (mkCoAxBranch qtvs [] [] pats rhs_ty
                               (map (const Nominal) qtvs)
                               (locA loc)) }
+
+checkTyFamInstEqn :: TcTyCon -> Name -> [HsArg tm ty] -> TcM ()
+checkTyFamInstEqn tc_fam_tc eqn_tc_name hs_pats =
+  do { -- Ensure that each equation's type constructor is for the right
+       -- type family.  E.g. barf on
+       --    type family F a where { G Int = Bool }
+       let tc_fam_tc_name = getName tc_fam_tc
+     ; checkTc (tc_fam_tc_name == eqn_tc_name) $
+               wrongTyFamName tc_fam_tc_name eqn_tc_name
+
+       -- Check the arity of visible arguments
+       -- If we wait until validity checking, we'll get kind errors
+       -- below when an arity error will be much easier to understand.
+     ; let vis_arity = length (tyConVisibleTyVars tc_fam_tc)
+           vis_pats  = numVisibleArgs hs_pats
+     ; checkTc (vis_pats == vis_arity) $
+               wrongNumberOfParmsErr vis_arity
+     }
 
 {- Note [Instantiating a family tycon]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
