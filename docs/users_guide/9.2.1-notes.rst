@@ -134,12 +134,12 @@ Language
   and ``of``) was always assumed to have a multiplicity of ``Many``. Now, GHC
   will allow the scrutinee to have a multiplicity of ``One``, using its best-effort
   inference algorithm.
-       
+
 Compiler
 ~~~~~~~~
 
-- Performance of the compiler in :ghc-flag:`--make` mode with
-   :ghc-flag:`-j[⟨n⟩]` is significantly improved by improvements to the parallel
+- Performance of the compiler in :ghc-flag:`--make` mode with :ghc-flag:`-j[⟨n⟩]`
+  is significantly improved by improvements to the parallel
   garbage collector noted below.
 
   Benchmarks show a 20% decrease in wall clock time, and a 40% decrease in cpu
