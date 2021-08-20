@@ -1458,7 +1458,7 @@ perf-nofib:
     paths:
       - nofib.log
   rules:
-    - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
+    #    - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
 
 ############################################################
 # Ad-hoc performance testing
@@ -1495,7 +1495,7 @@ perf:
     paths:
       - out
   rules:
-    #    - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
+    - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
 
 
 ############################################################
