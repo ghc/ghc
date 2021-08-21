@@ -80,7 +80,7 @@
 	ignore = untracked
 [submodule "libraries/unix"]
 	path = libraries/unix
-	url = https://gitlab.haskell.org/ghc/packages/unix.git
+	url = https://github.com/ghcjs/unix.git
 	ignore = untracked
 	branch = 2.7
 [submodule "libraries/stm"]
