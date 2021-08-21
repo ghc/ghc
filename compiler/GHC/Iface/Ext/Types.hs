@@ -155,6 +155,7 @@ type HieTypeFlat = HieType TypeIndex
 
 -- | Roughly isomorphic to the original core 'Type'.
 newtype HieTypeFix = Roll (HieType (HieTypeFix))
+  deriving Eq
 
 instance Binary (HieType TypeIndex) where
   put_ bh (HTyVarTy n) = do
