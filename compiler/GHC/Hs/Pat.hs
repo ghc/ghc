@@ -142,7 +142,7 @@ type instance XNPat GhcPs = EpAnn [AddEpAnn]
 type instance XNPat GhcRn = EpAnn [AddEpAnn]
 type instance XNPat GhcTc = Type
 
-type instance XNPlusKPat GhcPs = EpAnn [AddEpAnn]
+type instance XNPlusKPat GhcPs = EpAnn EpaLocation -- Of the "+"
 type instance XNPlusKPat GhcRn = NoExtField
 type instance XNPlusKPat GhcTc = Type
 

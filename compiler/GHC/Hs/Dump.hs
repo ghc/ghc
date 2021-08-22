@@ -62,6 +62,7 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
               `extQ` annotationEpAnnImportDecl
               `extQ` annotationAnnParen
               `extQ` annotationTrailingAnn
+              `extQ` annotationEpaLocation
               `extQ` addEpAnn
               `extQ` lit `extQ` litr `extQ` litt
               `extQ` sourceText
@@ -253,6 +254,9 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
 
             annotationTrailingAnn :: EpAnn TrailingAnn -> SDoc
             annotationTrailingAnn = annotation' (text "EpAnn TrailingAnn")
+
+            annotationEpaLocation :: EpAnn EpaLocation -> SDoc
+            annotationEpaLocation = annotation' (text "EpAnn EpaLocation")
 
             annotation' :: forall a .(Data a, Typeable a)
                        => SDoc -> EpAnn a -> SDoc

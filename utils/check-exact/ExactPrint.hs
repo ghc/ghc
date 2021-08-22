@@ -427,6 +427,9 @@ printStringAtMkw :: Maybe EpaLocation -> String -> EPP ()
 printStringAtMkw (Just aa) s = printStringAtAA aa s
 printStringAtMkw Nothing s = printStringAtLsDelta (SameLine 1) s
 
+printStringAtAnn :: EpAnn a -> (a -> EpaLocation) -> String -> EPP ()
+printStringAtAnn EpAnnNotUsed  _ _  = return ()
+printStringAtAnn (EpAnn _ a _) f str = printStringAtAA (f a) str
 
 printStringAtAA :: EpaLocation -> String -> EPP ()
 printStringAtAA (EpaSpan r) s = printStringAtKw' r s
@@ -3695,12 +3698,17 @@ instance ExactPrint (Pat GhcPs) where
     markAnnotated ol
 
   -- | NPlusKPat an n lit1 lit2 _ _)
+  exact (NPlusKPat an n k _lit2 _ _) = do
+    markAnnotated n
+    printStringAtAnn an id "+"
+    markAnnotated k
+
+
   exact (SigPat an pat sig) = do
     markAnnotated pat
     markEpAnn an AnnDcolon
     markAnnotated sig
-  -- exact x = withPpr x
-  exact x = error $ "missing match for Pat:" ++ showAst x
+  -- exact x = error $ "missing match for Pat:" ++ showAst x
 
 -- instance Annotate (GHC.Pat GHC.GhcPs) where
 --   markAST loc typ = do
