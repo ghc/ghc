@@ -169,3 +169,5 @@ test('PprT13747', ignore_stderr, makefile_test, ['PprT13747'])
 test('PprBracesSemiDataDecl', ignore_stderr, makefile_test, ['PprBracesSemiDataDecl'])
 test('PprUnicodeSyntax', ignore_stderr, makefile_test, ['PprUnicodeSyntax'])
 test('PprCommentPlacement2', ignore_stderr, makefile_test, ['PprCommentPlacement2'])
+
+test('Test20258', ignore_stderr, makefile_test, ['Test20258'])
