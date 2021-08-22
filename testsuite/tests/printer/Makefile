@@ -728,3 +728,8 @@ PprUnicodeSyntax:
 PprCommentPlacement2:
 	$(CHECK_PPR)   $(LIBDIR) PprCommentPlacement2.hs
 	$(CHECK_EXACT) $(LIBDIR) PprCommentPlacement2.hs
+
+.PHONY: Test20258
+Test20258:
+	$(CHECK_PPR)   $(LIBDIR) Test20258.hs
+	$(CHECK_EXACT) $(LIBDIR) Test20258.hs

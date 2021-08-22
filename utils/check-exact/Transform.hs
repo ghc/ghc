@@ -271,7 +271,7 @@ captureMatchLineSpacing (L l (ValD x (FunBind a b (MG c (L d ms ) e) f)))
 captureMatchLineSpacing d = d
 
 captureLineSpacing :: Monoid t
-                   => [LocatedAn t e] -> [GenLocated (SrcSpanAnn' (EpAnn t)) e]
+                   => [LocatedAn t e] -> [LocatedAn t e]
 captureLineSpacing [] = []
 captureLineSpacing [d] = [d]
 captureLineSpacing (de1:d2:ds) = de1:captureLineSpacing (d2':ds)
@@ -600,7 +600,7 @@ balanceCommentsList (a:b:ls) = do
   r <- balanceCommentsList (b':ls)
   return (a':r)
 
--- |The relatavise phase puts all comments appearing between the end of one AST
+-- |The GHC parser puts all comments appearing between the end of one AST
 -- item and the beginning of the next as 'annPriorComments' for the second one.
 -- This function takes two adjacent AST items and moves any 'annPriorComments'
 -- from the second one to the 'annFollowingComments' of the first if they belong
@@ -610,7 +610,6 @@ balanceComments :: (Monad m)
   => LHsDecl GhcPs -> LHsDecl GhcPs
   -> TransformT m (LHsDecl GhcPs, LHsDecl GhcPs)
 balanceComments first second = do
-  -- ++AZ++ : replace the nested casts with appropriate gmapM
   -- logTr $ "balanceComments entered"
   -- logDataWithAnnsTr "first" first
   case first of
@@ -626,14 +625,37 @@ balanceCommentsFB :: (Monad m)
   => LHsBind GhcPs -> LocatedA b -> TransformT m (LHsBind GhcPs, LocatedA b)
 balanceCommentsFB (L lf (FunBind x n (MG mx (L lm matches) o) t)) second = do
   logTr $ "balanceCommentsFB entered: " ++ showGhc (ss2range $ locA lf)
-  matches' <- balanceCommentsList' matches
-  let (m,ms) = case reverse matches' of
-                 (m':ms') -> (m',ms')
+  -- There are comments on lf.  We need to
+  -- + Keep the prior ones here
+  -- + move the interior ones to the first match,
+  -- + move the trailing ones to the last match.
+  let
+    split = splitCommentsEnd (realSrcSpan $ locA lf) (epAnnComments $ ann lf)
+    split2 = splitCommentsStart (realSrcSpan $ locA lf)  (EpaComments (sort $ priorComments split))
+
+    before = sort $ priorComments split2
+    middle = sort $ getFollowingComments split2
+    after  = sort $ getFollowingComments split
+
+    lf' = setCommentsSrcAnn lf (EpaComments before)
+  logTr $ "balanceCommentsFB (before, after): " ++ showAst (before, after)
+  let matches' = case matches of
+                    (L lm' m':ms') ->
+                      (L (addCommentsToSrcAnn lm' (EpaComments middle )) m':ms')
+                    _ -> error "balanceCommentsFB"
+  matches'' <- balanceCommentsList' matches'
+  let (m,ms) = case reverse matches'' of
+                 (L lm' m':ms') ->
+                   (L (addCommentsToSrcAnn lm' (EpaCommentsBalanced [] after)) m',ms')
                  _ -> error "balanceCommentsFB"
   (m',second') <- balanceComments' m second
   m'' <- balanceCommentsMatch m'
+  let (m''',lf'') = case ms of
+        [] -> moveLeadingComments m'' lf'
+        _  -> (m'',lf')
   logTr $ "balanceCommentsMatch done"
-  return (L lf (FunBind x n (MG mx (L lm (reverse (m'':ms))) o) t), second')
+  -- return (L lf'' (FunBind x n (MG mx (L lm (reverse (m''':ms))) o) t), second')
+  balanceComments' (L lf'' (FunBind x n (MG mx (L lm (reverse (m''':ms))) o) t)) second'
 balanceCommentsFB f s = balanceComments' f s
 
 -- | Move comments on the same line as the end of the match into the
@@ -642,10 +664,11 @@ balanceCommentsMatch :: (Monad m)
   => LMatch GhcPs (LHsExpr GhcPs) -> TransformT m (LMatch GhcPs (LHsExpr GhcPs))
 balanceCommentsMatch (L l (Match am mctxt pats (GRHSs xg grhss binds))) = do
   logTr $ "balanceCommentsMatch: (loc1)=" ++ showGhc (ss2range (locA l))
-  logTr $ "balanceCommentsMatch: (move',stay')=" ++ showAst (move',stay')
+  -- logTr $ "balanceCommentsMatch: (move',stay')=" ++ showAst (move',stay')
   logTr $ "balanceCommentsMatch: (logInfo)=" ++ showAst (logInfo)
-  logTr $ "balanceCommentsMatch: (loc1)=" ++ showGhc (ss2range (locA l))
+  -- logTr $ "balanceCommentsMatch: (loc1)=" ++ showGhc (ss2range (locA l))
   logTr $ "balanceCommentsMatch: (anc1,cs1f)=" ++ showAst (anc1,cs1f)
+  logTr $ "balanceCommentsMatch: (move,stay)=" ++ showAst (move,stay)
   logTr $ "balanceCommentsMatch: (l'', grhss')=" ++ showAst (l'', grhss')
   return (L l'' (Match am mctxt pats (GRHSs xg grhss' binds')))
   where
@@ -670,7 +693,7 @@ balanceCommentsMatch (L l (Match am mctxt pats (GRHSs xg grhss binds))) = do
               -- ---------------------------------
 
               (EpAnn anc an lgc) = ag
-              lgc' = splitComments (realSrcSpan lg) $ addCommentOrigDeltas lgc
+              lgc' = splitCommentsEnd (realSrcSpan lg) $ addCommentOrigDeltas lgc
               ag' = if moved
                       then EpAnn anc an lgc'
                       else EpAnn anc an (lgc' <> (EpaCommentsBalanced [] move))
@@ -688,7 +711,7 @@ pushTrailingComments w cs lb@(HsValBinds an _)
     (an', decls') = case reverse decls of
       [] -> (addCommentsToEpAnn (spanHsLocaLBinds lb) an cs, decls)
       (L la d:ds) -> (an, L (addCommentsToSrcAnn la cs) d:ds)
-    (vb,_ws2) = case runTransform mempty (replaceDeclsValbinds w lb decls') of
+    (vb,_ws2) = case runTransform mempty (replaceDeclsValbinds w lb (reverse decls')) of
       ((HsValBinds _ vb'), _, ws2') -> (vb', ws2')
       _ -> (ValBinds NoAnnSortKey emptyBag [], [])
 
@@ -711,11 +734,11 @@ balanceCommentsList' (a:b:ls) = do
 balanceComments' :: (Monad m) => LocatedA a -> LocatedA b -> TransformT m (LocatedA a, LocatedA b)
 balanceComments' la1 la2 = do
   logTr $ "balanceComments': (loc1,loc2)=" ++ showGhc (ss2range loc1,ss2range loc2)
-  logTr $ "balanceComments': (anchorFromLocatedA la1)=" ++ showGhc (anchorFromLocatedA la1)
-  logTr $ "balanceComments': (sort cs2b)=" ++ showAst (sort cs2b)
-  logTr $ "balanceComments': (move',stay')=" ++ showAst (move',stay')
-  logTr $ "balanceComments': (move'',stay'')=" ++ showAst (move'',stay'')
-  logTr $ "balanceComments': (move,stay)=" ++ showAst (move,stay)
+  logTr $ "balanceComments': (anc1)=" ++ showAst (anc1)
+  logTr $ "balanceComments': (cs1s)=" ++ showAst (cs1s)
+  logTr $ "balanceComments': (sort cs1f)=" ++ showAst (sort cs1f)
+  logTr $ "balanceComments': (cs1stay,cs1move)=" ++ showAst (cs1stay,cs1move)
+  logTr $ "balanceComments': (an1',an2')=" ++ showAst (an1',an2')
   return (la1', la2')
   where
     simpleBreak n (r,_) = r > n
@@ -723,19 +746,27 @@ balanceComments' la1 la2 = do
     L (SrcSpanAnn an2 loc2) s = la2
     anc1 = addCommentOrigDeltas $ epAnnComments an1
     anc2 = addCommentOrigDeltas $ epAnnComments an2
-    cs1f = getFollowingComments anc1
-    cs2b = priorComments anc2
-    (stay'',move') = break (simpleBreak 1) (priorCommentsDeltas (anchorFromLocatedA la2) cs2b)
+
+    cs1s = splitCommentsEnd (anchorFromLocatedA la1) anc1
+    cs1p = priorCommentsDeltas    (anchorFromLocatedA la1) (priorComments        cs1s)
+    cs1f = trailingCommentsDeltas (anchorFromLocatedA la1) (getFollowingComments cs1s)
+
+    cs2s = splitCommentsEnd (anchorFromLocatedA la2) anc2
+    cs2p = priorCommentsDeltas    (anchorFromLocatedA la2) (priorComments        cs2s)
+    cs2f = trailingCommentsDeltas (anchorFromLocatedA la2) (getFollowingComments cs2s)
+
+    -- Split cs1f into those that belong on an1 and ones that must move to an2
+    (cs1move,cs1stay) = break (simpleBreak 1) cs1f
+
+    (stay'',move') = break (simpleBreak 1) cs2p
     -- Need to also check for comments more closely attached to la1,
     -- ie trailing on the same line
     (move'',stay') = break (simpleBreak 0) (trailingCommentsDeltas (anchorFromLocatedA la1) (map snd stay''))
-    move = map snd (move'' ++ move')
-    stay = map snd stay'
-    cs1 = setFollowingComments anc1 (sort $ cs1f ++ move)
-    cs2 = setPriorComments anc2 stay
+    move = sort $ map snd (cs1move ++ move'' ++ move')
+    stay = sort $ map snd (cs1stay ++ stay')
 
-    an1' = setCommentsSrcAnn (getLoc la1) cs1
-    an2' = setCommentsSrcAnn (getLoc la2) cs2
+    an1' = setCommentsSrcAnn (getLoc la1) (EpaCommentsBalanced (map snd cs1p) move)
+    an2' = setCommentsSrcAnn (getLoc la2) (EpaCommentsBalanced stay (map snd cs2f))
     la1' = L an1' f
     la2' = L an2' s
 
@@ -769,20 +800,53 @@ priorCommentsDeltas anc cs = go anc (reverse $ sort cs)
 
 -- | Split comments into ones occuring before the end of the reference
 -- span, and those after it.
-splitComments :: RealSrcSpan -> EpAnnComments -> EpAnnComments
-splitComments p (EpaComments cs) = cs'
+splitCommentsEnd :: RealSrcSpan -> EpAnnComments -> EpAnnComments
+splitCommentsEnd p (EpaComments cs) = cs'
   where
-    cmp (L (Anchor l _) _) = ss2pos l < ss2posEnd p
+    cmp (L (Anchor l _) _) = ss2pos l > ss2posEnd p
     (before, after) = break cmp cs
     cs' = case after of
       [] -> EpaComments cs
       _ -> EpaCommentsBalanced before after
-splitComments p (EpaCommentsBalanced cs ts) = EpaCommentsBalanced cs' ts'
+splitCommentsEnd p (EpaCommentsBalanced cs ts) = EpaCommentsBalanced cs' ts'
   where
-    cmp (L (Anchor l _) _) = ss2pos l < ss2posEnd p
+    cmp (L (Anchor l _) _) = ss2pos l > ss2posEnd p
     (before, after) = break cmp cs
     cs' = before
     ts' = after <> ts
+
+-- | Split comments into ones occuring before the start of the reference
+-- span, and those after it.
+splitCommentsStart :: RealSrcSpan -> EpAnnComments -> EpAnnComments
+splitCommentsStart p (EpaComments cs) = cs'
+  where
+    cmp (L (Anchor l _) _) = ss2pos l > ss2pos p
+    (before, after) = break cmp cs
+    cs' = case after of
+      [] -> EpaComments cs
+      _ -> EpaCommentsBalanced before after
+splitCommentsStart p (EpaCommentsBalanced cs ts) = EpaCommentsBalanced cs' ts'
+  where
+    cmp (L (Anchor l _) _) = ss2pos l > ss2pos p
+    (before, after) = break cmp cs
+    cs' = before
+    ts' = after <> ts
+
+moveLeadingComments :: (Data t, Data u, Monoid t, Monoid u)
+  => LocatedAn t a -> SrcAnn u -> (LocatedAn t a, SrcAnn u)
+moveLeadingComments from@(L (SrcSpanAnn EpAnnNotUsed _) _) to = (from, to)
+moveLeadingComments (L la a) lb = (L la' a, lb')
+  `debug` ("moveLeadingComments: (before, after, la', lb'):" ++ showAst (before, after, la', lb'))
+  where
+    split = splitCommentsEnd (realSrcSpan $ locA la) (epAnnComments $ ann la)
+    before = sort $ priorComments split
+    after = sort $ getFollowingComments split
+
+    -- TODO: need to set an entry delta on lb' to zero, and move the
+    -- original spacing to the first comment.
+
+    la' = setCommentsSrcAnn la (EpaComments after)
+    lb' = addCommentsToSrcAnn lb (EpaCommentsBalanced before [])
 
 -- | A GHC comment includes the span of the preceding (non-comment)
 -- token.  Takes an original list of comments, and converts the
@@ -814,7 +878,6 @@ anchorFromLocatedA (L (SrcSpanAnn an loc) _)
 -- `MovedAnchor` operation based on the original location, only if it
 -- does not already have one.
 commentOrigDelta :: LEpaComment -> LEpaComment
--- commentOrigDelta c@(L (GHC.Anchor _ (GHC.MovedAnchor _)) _) = c
 commentOrigDelta (L (GHC.Anchor la _) (GHC.EpaComment t pp))
   = (L (GHC.Anchor la op) (GHC.EpaComment t pp))
   where
@@ -922,6 +985,13 @@ anchorEof (L l m@(HsModule an _lo _mn _exps _imps _decls _ _)) = L l (m { hsmodA
 
 -- ---------------------------------------------------------------------
 
+commentsOrigDeltasDecl :: LHsDecl GhcPs -> LHsDecl GhcPs
+commentsOrigDeltasDecl (L (SrcSpanAnn an l) d) = L (SrcSpanAnn an' l) d
+  where
+    an' = addCommentOrigDeltasAnn an
+
+-- ---------------------------------------------------------------------
+
 -- | Take an anchor and a preceding location, and generate an
 -- equivalent one with a 'MovedAnchor' delta.
 deltaAnchor :: Anchor -> RealSrcSpan -> Anchor
@@ -983,7 +1053,9 @@ insertAt :: (HasDecls ast)
               -> Transform ast
 insertAt f t decl = do
   oldDecls <- hsDecls t
-  replaceDecls t (f decl oldDecls)
+  oldDeclsb <- balanceCommentsList oldDecls
+  let oldDecls' = map commentsOrigDeltasDecl oldDeclsb
+  replaceDecls t (f decl oldDecls')
 
 -- |Insert a declaration at the beginning or end of the subdecls of the given
 -- AST item

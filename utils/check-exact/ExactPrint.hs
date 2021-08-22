@@ -268,15 +268,31 @@ enterAnn (Entry anchor' cs) a = do
   withOffset st (advance edp >> exact a)
 
   when ((getFollowingComments cs) /= []) $ do
-    -- debugM $ "starting trailing comments:" ++ showAst (getFollowingComments cs)
+    debugM $ "starting trailing comments:" ++ showAst (getFollowingComments cs)
     mapM_ printOneComment (map tokComment $ getFollowingComments cs)
-    -- debugM $ "ending trailing comments"
+    debugM $ "ending trailing comments"
 
 -- ---------------------------------------------------------------------
 
 addCommentsA :: [LEpaComment] -> EPP ()
 addCommentsA csNew = addComments (map tokComment csNew)
 
+{-
+TODO: When we addComments, some may have an anchor that is no longer
+valid, as it has been moved and has an anchor_op.
+
+Does an Anchor even make sense for a comment, perhaps it should be an
+EpaLocation?
+
+How do we sort them? do we assign a location based on when we add them
+to the list, based on the current output pos?  Except the offset is a
+delta compared to a reference location.  Need to nail the concept of
+the reference location.
+
+By definition it is the current anchor, so work against that. And that
+also means that the first entry comment that has moved should not have
+a line offset.
+-}
 addComments :: [Comment] -> EPP ()
 addComments csNew = do
   debugM $ "addComments:" ++ show csNew
@@ -1185,12 +1201,6 @@ instance (ExactPrint tm, ExactPrint ty, Outputable tm, Outputable ty)
   exact (HsValArg tm)    = markAnnotated tm
   exact (HsTypeArg ss ty) = printStringAtSs ss "@" >> markAnnotated ty
   exact x@(HsArgPar _sp)   = withPpr x -- Does not appear in original source
-
--- ---------------------------------------------------------------------
-
--- instance ExactPrint [LHsTyVarBndr () GhcPs] where
---   getAnnotationEntry = const NoEntryVal
---   exact bs = mapM_ markAnnotated bs
 
 -- ---------------------------------------------------------------------
 
@@ -3911,7 +3921,7 @@ printString layout str = do
       cr = getDeltaLine strDP
   p <- getPosP
   colOffset <- getLayoutOffsetP
-  debugM $ "printString:(p,colOffset,strDP,cr)="  ++ show (p,colOffset,strDP,cr)
+  -- debugM $ "printString:(p,colOffset,strDP,cr)="  ++ show (p,colOffset,strDP,cr)
   if cr == 0
     then setPosP (undelta p strDP colOffset)
     else setPosP (undelta p strDP 1)
