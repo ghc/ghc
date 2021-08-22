@@ -134,3 +134,5 @@ test('Test19834', ignore_stderr, makefile_test, ['Test19834'])
 test('Test19839', ignore_stderr, makefile_test, ['Test19839'])
 test('Test19840', ignore_stderr, makefile_test, ['Test19840'])
 test('Test19850', ignore_stderr, makefile_test, ['Test19850'])
+
+test('Test20243', ignore_stderr, makefile_test, ['Test20243'])
