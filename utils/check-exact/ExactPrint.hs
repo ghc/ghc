@@ -193,8 +193,6 @@ enterAnn :: (ExactPrint a) => Entry -> a -> Annotated ()
 enterAnn NoEntryVal a = do
   p <- getPosP
   debugM $ "enterAnn:NO ANN:(p,a) =" ++ show (p, astId a) ++ " starting"
-  -- curAnchor <- getAnchorU
-  -- printComments curAnchor
   exact a
   debugM $ "enterAnn:NO ANN:p =" ++ show (p, astId a) ++ " done"
 enterAnn (Entry anchor' cs) a = do
@@ -274,17 +272,42 @@ enterAnn (Entry anchor' cs) a = do
 
 addCommentsA :: [LEpaComment] -> EPP ()
 addCommentsA csNew = addComments (map tokComment csNew)
-  -- cs <- getUnallocatedComments
-  -- -- AZ:TODO: sortedlist?
-  -- putUnallocatedComments (sort $ (map tokComment csNew) ++ cs)
 
+{-
+TODO: When we addComments, some may have an anchor that is no longer
+valid, as it has been moved and has an anchor_op.
+
+Does an Anchor even make sense for a comment, perhaps it should be an
+EpaLocation?
+
+How do we sort them? do we assign a location based on when we add them
+to the list, based on the current output pos?  Except the offset is a
+delta compared to a reference location.  Need to nail the concept of
+the reference location.
+
+By definition it is the current anchor, so work against that. And that
+also means that the first entry comment that has moved should not have
+a line offset.
+-}
 addComments :: [Comment] -> EPP ()
 addComments csNew = do
   debugM $ "addComments:" ++ show csNew
   cs <- getUnallocatedComments
-  let cmp (Comment _ l1 _) (Comment _ l2 _) = compare (anchor l1) (anchor l2)
+  -- Must compare without span filenames, for CPP injected comments with fake filename
+  let cmp (Comment _ l1 _) (Comment _ l2 _) = compare (ss2pos $ anchor l1) (ss2pos $ anchor l2)
   -- AZ:TODO: sortedlist?
   putUnallocatedComments (sortBy cmp $ csNew ++ cs)
+
+-- ---------------------------------------------------------------------
+
+-- | Just before we print out the EOF comments, flush the remaining
+-- ones in the state.
+flushComments :: EPP ()
+flushComments = do
+  cs <- getUnallocatedComments
+  -- Must compare without span filenames, for CPP injected comments with fake filename
+  let cmp (Comment _ l1 _) (Comment _ l2 _) = compare (ss2pos $ anchor l1) (ss2pos $ anchor l2)
+  mapM_ printOneComment (sortBy cmp cs)
 
 -- ---------------------------------------------------------------------
 
@@ -367,8 +390,6 @@ instance ExactPrint HsModule where
       Nothing -> return ()
       Just (L ln mn) -> do
         markEpAnn' an am_main AnnModule
-        -- debugM $ "HsModule name: (ss,ln)=" ++ show (ss2pos ss,ss2pos (realSrcSpan ln))
-        -- printStringAtSs ln (moduleNameString mn)
         markAnnotated (L ln mn)
 
         -- forM_ mdeprec markLocated
@@ -381,11 +402,12 @@ instance ExactPrint HsModule where
 
 
     markAnnList' False (am_decls $ anns an) $ do
-
       markTopLevelList imports
-
       markTopLevelList decls
 
+    -- In the weird case of an empty file with comments, make sure
+    -- they print
+    flushComments
 
 -- ---------------------------------------------------------------------
 
@@ -652,7 +674,11 @@ printOneComment c@(Comment _str loc _mo) = do
 commentAllocation :: RealSrcSpan -> EPP [Comment]
 commentAllocation ss = do
   cs <- getUnallocatedComments
-  let (earlier,later) = partition (\(Comment _str loc _mo) -> anchor loc <= ss) cs
+  -- Note: The CPP comment injection may change the file name in the
+  -- RealSrcSpan, which affects comparison, as the Ord instance for
+  -- RealSrcSpan compares the file first. So we sort via ss2pos
+  -- TODO: this is inefficient, use Pos all the way through
+  let (earlier,later) = partition (\(Comment _str loc _mo) -> (ss2pos $ anchor loc) <= (ss2pos ss)) cs
   putUnallocatedComments later
   -- debugM $ "commentAllocation:(ss,earlier,later)" ++ show (rs2range ss,earlier,later)
   return earlier
@@ -1152,12 +1178,6 @@ instance (ExactPrint tm, ExactPrint ty, Outputable tm, Outputable ty)
 
 -- ---------------------------------------------------------------------
 
--- instance ExactPrint [LHsTyVarBndr () GhcPs] where
---   getAnnotationEntry = const NoEntryVal
---   exact bs = mapM_ markAnnotated bs
-
--- ---------------------------------------------------------------------
-
 instance ExactPrint (ClsInstDecl GhcPs) where
   getAnnotationEntry cid = fromAnn (fst $ cid_ext cid)
 
@@ -1492,25 +1512,7 @@ instance ExactPrint HsIPName where
   exact (HsIPName fs) = printStringAdvance ("?" ++ (unpackFS fs))
 
 -- ---------------------------------------------------------------------
-
--- instance ExactPrint (HsValBindsLR GhcPs GhcPs) where
---   getAnnotationEntry _ = NoEntryVal
-
---   exact (ValBinds sortKey binds sigs) = do
---     -- printStringAdvance "ValBinds"
---     setLayoutBoth $ withSortKey sortKey
---        (prepareListAnnotationA (bagToList binds)
---      ++ prepareListAnnotationA sigs
---        )
-
--- ---------------------------------------------------------------------
 -- Managing lists which have been separated, e.g. Sigs and Binds
-
-
--- AZ:TODO: generalise this, and the next one
--- prepareListAnnotationFamilyD :: [LFamilyDecl GhcPs] -> [(RealSrcSpan,EPP ())]
--- prepareListAnnotationFamilyD ls
---   = map (\b -> (realSrcSpan $ getLocA b,exactFamilyDecl NotTopLevel (unLoc b))) ls
 
 prepareListAnnotationF :: (a -> EPP ()) -> [LocatedAn an a] -> [(RealSrcSpan,EPP ())]
 prepareListAnnotationF f ls
@@ -1519,10 +1521,6 @@ prepareListAnnotationF f ls
 prepareListAnnotationA :: ExactPrint (LocatedAn an a)
   => [LocatedAn an a] -> [(RealSrcSpan,EPP ())]
 prepareListAnnotationA ls = map (\b -> (realSrcSpan $ getLocA b,markAnnotated b)) ls
-
-
--- applyListAnnotations :: [(RealSrcSpan, EPP ())] -> EPP ()
--- applyListAnnotations ls = withSortKey ls
 
 withSortKey :: AnnSortKey -> [(RealSrcSpan, EPP ())] -> EPP ()
 withSortKey annSortKey xs = do
@@ -1874,9 +1872,9 @@ instance ExactPrint (HsExpr GhcPs) where
     printStringAtSs ss "@"
     markAnnotated arg
   exact (OpApp _an e1 e2 e3) = do
-    exact e1
-    exact e2
-    exact e3
+    markAnnotated e1
+    markAnnotated e2
+    markAnnotated e3
 
   exact (NegApp an e _) = do
     markEpAnn an AnnMinus
@@ -2303,14 +2301,6 @@ instance ExactPrint (HsCmd GhcPs) where
   getAnnotationEntry (HsCmdDo an _)             = fromAnn an
 
 
--- ppr_cmd (HsCmdArrApp _ arrow arg HsFirstOrderApp True)
---   = hsep [ppr_lexpr arrow, larrowt, ppr_lexpr arg]
--- ppr_cmd (HsCmdArrApp _ arrow arg HsFirstOrderApp False)
---   = hsep [ppr_lexpr arg, arrowt, ppr_lexpr arrow]
--- ppr_cmd (HsCmdArrApp _ arrow arg HsHigherOrderApp True)
---   = hsep [ppr_lexpr arrow, larrowtt, ppr_lexpr arg]
--- ppr_cmd (HsCmdArrApp _ arrow arg HsHigherOrderApp False)
---   = hsep [ppr_lexpr arg, arrowtt, ppr_lexpr arrow]
 
   exact (HsCmdArrApp an arr arg _o isRightToLeft) = do
     if isRightToLeft
@@ -2322,24 +2312,6 @@ instance ExactPrint (HsCmd GhcPs) where
         markAnnotated arg
         markKw (anns an)
         markAnnotated arr
---   markAST _ (GHC.HsCmdArrApp _ e1 e2 o isRightToLeft) = do
---         -- isRightToLeft True  => right-to-left (f -< arg)
---         --               False => left-to-right (arg >- f)
---     if isRightToLeft
---       then do
---         markLocated e1
---         case o of
---           GHC.HsFirstOrderApp  -> mark GHC.Annlarrowtail
---           GHC.HsHigherOrderApp -> mark GHC.AnnLarrowtail
---       else do
---         markLocated e2
---         case o of
---           GHC.HsFirstOrderApp  -> mark GHC.Annrarrowtail
---           GHC.HsHigherOrderApp -> mark GHC.AnnRarrowtail
-
---     if isRightToLeft
---       then markLocated e2
---       else markLocated e1
 
   exact (HsCmdArrForm an e fixity _mf [arg1,arg2]) = do
     markLocatedMAA an al_open
@@ -2353,29 +2325,12 @@ instance ExactPrint (HsCmd GhcPs) where
         markAnnotated arg1
         markAnnotated arg2
     markLocatedMAA an al_close
---   markAST _ (GHC.HsCmdArrForm _ e fixity _mf cs) = do
---     -- The AnnOpen should be marked for a prefix usage, not for a postfix one,
---     -- due to the way checkCmd maps both HsArrForm and OpApp to HsCmdArrForm
 
---     let isPrefixOp = case fixity of
---           GHC.Infix  -> False
---           GHC.Prefix -> True
---     when isPrefixOp $ mark GHC.AnnOpenB -- "(|"
-
---     -- This may be an infix operation
---     applyListAnnotationsContexts (LC (Set.singleton PrefixOp) (Set.singleton PrefixOp)
---                                      (Set.singleton InfixOp) (Set.singleton InfixOp))
---                        (prepareListAnnotation [e]
---                          ++ prepareListAnnotation cs)
---     when isPrefixOp $ mark GHC.AnnCloseB -- "|)"
-
---   markAST _ (GHC.HsCmdApp _ e1 e2) = do
---     markLocated e1
---     markLocated e2
+  exact (HsCmdApp _an e1 e2) = do
+    markAnnotated e1
+    markAnnotated e2
 
   exact (HsCmdLam _ match) = markAnnotated match
---   markAST l (GHC.HsCmdLam _ match) = do
---     setContext (Set.singleton LambdaExpr) $ do markMatchGroup l match
 
   exact (HsCmdPar an e) = do
     markOpeningParen an
@@ -2390,21 +2345,6 @@ instance ExactPrint (HsCmd GhcPs) where
     markEpAnnAll an hsCaseAnnsRest AnnSemi
     markAnnotated alts
     markEpAnn' an hsCaseAnnsRest AnnCloseC
-    -- markEpAnn an AnnCase
-    -- markAnnotated e1
-    -- markEpAnn an AnnOf
-    -- markEpAnn an AnnOpenC
-    -- markAnnotated matches
-    -- markEpAnn an AnnCloseC
-
---   markAST l (GHC.HsCmdCase _ e1 matches) = do
---     mark GHC.AnnCase
---     markLocated e1
---     mark GHC.AnnOf
---     markOptional GHC.AnnOpenC
---     setContext (Set.singleton CaseAlt) $ do
---       markMatchGroup l matches
---     markOptional GHC.AnnCloseC
 
 --   markAST _ (GHC.HsCmdIf _ _ e1 e2 e3) = do
 --     mark GHC.AnnIf
@@ -3433,19 +3373,6 @@ instance ExactPrint (LocatedP CType) where
     markLocatedAALS an apr_rest AnnVal (Just (toSourceTextWithSuffix stct (unpackFS ct) ""))
     markAnnCloseP an
 
--- instance Annotate GHC.CType where
---   markAST _ (GHC.CType src mh f) = do
---     -- markWithString GHC.AnnOpen src
---     markAnnOpen src ""
---     case mh of
---       Nothing -> return ()
---       Just (GHC.Header srcH _h) ->
---          -- markWithString GHC.AnnHeader srcH
---          markWithString GHC.AnnHeader (toSourceTextWithSuffix srcH "" "")
---     -- markWithString GHC.AnnVal (fst f)
---     markSourceText  (fst f) (GHC.unpackFS $ snd f)
---     markWithString GHC.AnnClose "#-}"
-
 -- ---------------------------------------------------------------------
 
 instance ExactPrint (SourceText, RuleName) where
@@ -3679,12 +3606,6 @@ instance ExactPrint (Pat GhcPs) where
     markAnnotated pat
     markAnnKwAll an sumPatVbarsAfter AnnVbar
     markLocatedAAL an sumPatParens AnnClosePH
-      -- markPat _ (GHC.SumPat _ pat alt arity) = do
-      --   markWithString GHC.AnnOpen "(#"
-      --   replicateM_ (alt - 1) $ mark GHC.AnnVbar
-      --   markLocated pat
-      --   replicateM_ (arity - alt) $ mark GHC.AnnVbar
-      --   markWithString GHC.AnnClose "#)"
 
   -- | ConPat an con args)
   exact (ConPat an con details) = exactUserCon an con details
@@ -4095,10 +4016,6 @@ adjustDeltaForOffsetM dp = do
   colOffset <- gets dLHS
   return (adjustDeltaForOffset 0 colOffset dp)
 
--- adjustDeltaForOffset :: Int -> LayoutStartCol -> DeltaPos -> DeltaPos
--- adjustDeltaForOffset _ _colOffset                      dp@(DP (0,_)) = dp -- same line
--- adjustDeltaForOffset d (LayoutStartCol colOffset) (DP (l,c)) = DP (l,c - colOffset - d)
-
 -- ---------------------------------------------------------------------
 -- Printing functions
 
@@ -4115,7 +4032,7 @@ printString layout str = do
       cr = getDeltaLine strDP
   p <- getPosP
   colOffset <- getLayoutOffsetP
-  debugM $ "printString:(p,colOffset,strDP,cr)="  ++ show (p,colOffset,strDP,cr)
+  -- debugM $ "printString:(p,colOffset,strDP,cr)="  ++ show (p,colOffset,strDP,cr)
   if cr == 0
     then setPosP (undelta p strDP colOffset)
     else setPosP (undelta p strDP 1)

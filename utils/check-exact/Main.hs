@@ -142,7 +142,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/exactprin
  -- "../../testsuite/tests/printer/Ppr055.hs" Nothing
  -- "../../testsuite/tests/printer/PprRecordDotSyntax1.hs" Nothing
  -- "../../testsuite/tests/printer/PprRecordDotSyntax2.hs" Nothing
- -- "../../testsuite/tests/printer/PprRecordDotSyntax3.hs" Nothing
+ "../../testsuite/tests/printer/PprRecordDotSyntax3.hs" Nothing
  -- "../../testsuite/tests/printer/PprRecordDotSyntax4.hs" Nothing
  -- "../../testsuite/tests/printer/PprRecordDotSyntaxA.hs" Nothing
  -- "../../testsuite/tests/printer/StarBinderAnns.hs" Nothing
@@ -194,7 +194,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/exactprin
  -- "../../testsuite/tests/printer/PprLinearArrow.hs" Nothing
  -- "../../testsuite/tests/printer/PprSemis.hs" Nothing
  -- "../../testsuite/tests/printer/PprEmptyMostly.hs" Nothing
- "../../testsuite/tests/parser/should_compile/DumpSemis.hs" Nothing
+ -- "../../testsuite/tests/parser/should_compile/DumpSemis.hs" Nothing
 
 -- cloneT does not need a test, function can be retired
 
@@ -465,6 +465,7 @@ changeAddDecl1 libdir top = do
   return p'
 
 -- ---------------------------------------------------------------------
+
 changeAddDecl2 :: Changer
 changeAddDecl2 libdir top = do
   Right decl <- withDynFlags libdir (\df -> parseDecl df "<interactive>" "nn = n2")
@@ -486,9 +487,10 @@ changeAddDecl3 libdir top = do
 
   let (p',(_,_),_) = runTransform mempty doAddDecl
       doAddDecl = everywhereM (mkM replaceTopLevelDecls) top
-      f d (l1:l2:ls) = l1:d:l2':ls
+      f d (l1:l2:ls) = (l1:d:l2':ls)
         where
           l2' = setEntryDP' l2 (DifferentLine 2 0)
+
       replaceTopLevelDecls :: ParsedSource -> Transform ParsedSource
       replaceTopLevelDecls m = insertAt f m decl'
   return p'
@@ -560,9 +562,9 @@ changeWhereIn3a :: Changer
 changeWhereIn3a _libdir (L l p) = do
   let decls0 = hsmodDecls p
       (decls,(_,_),w) = runTransform mempty (balanceCommentsList decls0)
-      (_de0:_:de1:_d2:_) = decls
+  --     (_de0:_:de1:_d2:_) = decls
   debugM $ unlines w
-  debugM $ "changeWhereIn3a:de1:" ++ showAst de1
+  -- debugM $ "changeWhereIn3a:de1:" ++ showAst de1
   let p2 = p { hsmodDecls = decls}
   return (L l p2)
 
@@ -713,9 +715,10 @@ rmDecl1 _libdir lp = do
   let doRmDecl = do
          tlDecs0 <- hsDecls lp
          tlDecs <- balanceCommentsList $ captureLineSpacing tlDecs0
-         let (de1:_s1:_d2:ds) = tlDecs
+         let (de1:_s1:_d2:d3:ds) = tlDecs
+         let d3' = setEntryDP' d3 (DifferentLine 2 0)
 
-         replaceDecls lp (de1:ds)
+         replaceDecls lp (de1:d3':ds)
 
   (lp',(_,_),_w) <- runTransformT mempty doRmDecl
   debugM $ "log:[\n" ++ intercalate "\n" _w ++ "]log end\n"

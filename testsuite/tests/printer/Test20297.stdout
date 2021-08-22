@@ -49,7 +49,14 @@
                  (AnnListItem
                   [])
                  (EpaComments
-                  [])) { Test20297.hs:(5,1)-(7,7) })
+                  [(L
+                    (Anchor
+                     { Test20297.hs:7:9-19 }
+                     (UnchangedAnchor))
+                    (EpaComment
+                     (EpaLineComment
+                      "-- comment1")
+                     { Test20297.hs:7:3-7 }))])) { Test20297.hs:(5,1)-(7,7) })
     (ValD
      (NoExtField)
      (FunBind
@@ -142,14 +149,7 @@
                  (AnnListItem
                   [])
                  (EpaComments
-                  [(L
-                    (Anchor
-                     { Test20297.hs:7:9-19 }
-                     (UnchangedAnchor))
-                    (EpaComment
-                     (EpaLineComment
-                      "-- comment1")
-                     { Test20297.hs:7:3-7 }))])) { Test20297.hs:(9,1)-(11,26) })
+                  [])) { Test20297.hs:(9,1)-(11,26) })
     (ValD
      (NoExtField)
      (FunBind
@@ -395,7 +395,14 @@
                  (AnnListItem
                   [])
                  (EpaComments
-                  [])) { Test20297.hs:(5,1)-(7,7) })
+                  [(L
+                    (Anchor
+                     { Test20297.hs:7:9-19 }
+                     (UnchangedAnchor))
+                    (EpaComment
+                     (EpaLineComment
+                      "-- comment1")
+                     { Test20297.hs:7:3-7 }))])) { Test20297.hs:(5,1)-(7,7) })
     (ValD
      (NoExtField)
      (FunBind
@@ -488,14 +495,7 @@
                  (AnnListItem
                   [])
                  (EpaComments
-                  [(L
-                    (Anchor
-                     { Test20297.hs:7:9-19 }
-                     (UnchangedAnchor))
-                    (EpaComment
-                     (EpaLineComment
-                      "-- comment1")
-                     { Test20297.hs:7:3-7 }))])) { Test20297.hs:(9,1)-(11,26) })
+                  [])) { Test20297.hs:(9,1)-(11,26) })
     (ValD
      (NoExtField)
      (FunBind
@@ -1391,7 +1391,14 @@
                  (AnnListItem
                   [])
                  (EpaComments
-                  [])) { Test20297.hs:(5,1)-(7,7) })
+                  [(L
+                    (Anchor
+                     { Test20297.hs:7:9-19 }
+                     (UnchangedAnchor))
+                    (EpaComment
+                     (EpaLineComment
+                      "-- comment1")
+                     { Test20297.hs:7:3-7 }))])) { Test20297.hs:(5,1)-(7,7) })
     (ValD
      (NoExtField)
      (FunBind
@@ -1484,14 +1491,7 @@
                  (AnnListItem
                   [])
                  (EpaComments
-                  [(L
-                    (Anchor
-                     { Test20297.hs:7:9-19 }
-                     (UnchangedAnchor))
-                    (EpaComment
-                     (EpaLineComment
-                      "-- comment1")
-                     { Test20297.hs:7:3-7 }))])) { Test20297.hs:(9,1)-(11,26) })
+                  [])) { Test20297.hs:(9,1)-(11,26) })
     (ValD
      (NoExtField)
      (FunBind
@@ -1737,7 +1737,14 @@
                  (AnnListItem
                   [])
                  (EpaComments
-                  [])) { Test20297.hs:(5,1)-(7,7) })
+                  [(L
+                    (Anchor
+                     { Test20297.hs:7:9-19 }
+                     (UnchangedAnchor))
+                    (EpaComment
+                     (EpaLineComment
+                      "-- comment1")
+                     { Test20297.hs:7:3-7 }))])) { Test20297.hs:(5,1)-(7,7) })
     (ValD
      (NoExtField)
      (FunBind
@@ -1830,14 +1837,7 @@
                  (AnnListItem
                   [])
                  (EpaComments
-                  [(L
-                    (Anchor
-                     { Test20297.hs:7:9-19 }
-                     (UnchangedAnchor))
-                    (EpaComment
-                     (EpaLineComment
-                      "-- comment1")
-                     { Test20297.hs:7:3-7 }))])) { Test20297.hs:(9,1)-(11,26) })
+                  [])) { Test20297.hs:(9,1)-(11,26) })
     (ValD
      (NoExtField)
      (FunBind
@@ -2083,7 +2083,14 @@
                  (AnnListItem
                   [])
                  (EpaComments
-                  [])) { Test20297.ppr.hs:(5,1)-(7,7) })
+                  [(L
+                    (Anchor
+                     { Test20297.ppr.hs:7:9-19 }
+                     (UnchangedAnchor))
+                    (EpaComment
+                     (EpaLineComment
+                      "-- comment1")
+                     { Test20297.ppr.hs:7:3-7 }))])) { Test20297.ppr.hs:(5,1)-(7,7) })
     (ValD
      (NoExtField)
      (FunBind
@@ -2176,14 +2183,7 @@
                  (AnnListItem
                   [])
                  (EpaComments
-                  [(L
-                    (Anchor
-                     { Test20297.ppr.hs:7:9-19 }
-                     (UnchangedAnchor))
-                    (EpaComment
-                     (EpaLineComment
-                      "-- comment1")
-                     { Test20297.ppr.hs:7:3-7 }))])) { Test20297.ppr.hs:(9,1)-(11,26) })
+                  [])) { Test20297.ppr.hs:(9,1)-(11,26) })
     (ValD
      (NoExtField)
      (FunBind
@@ -2429,7 +2429,14 @@
                  (AnnListItem
                   [])
                  (EpaComments
-                  [])) { Test20297.ppr.hs:(5,1)-(7,7) })
+                  [(L
+                    (Anchor
+                     { Test20297.ppr.hs:7:9-19 }
+                     (UnchangedAnchor))
+                    (EpaComment
+                     (EpaLineComment
+                      "-- comment1")
+                     { Test20297.ppr.hs:7:3-7 }))])) { Test20297.ppr.hs:(5,1)-(7,7) })
     (ValD
      (NoExtField)
      (FunBind
@@ -2522,14 +2529,7 @@
                  (AnnListItem
                   [])
                  (EpaComments
-                  [(L
-                    (Anchor
-                     { Test20297.ppr.hs:7:9-19 }
-                     (UnchangedAnchor))
-                    (EpaComment
-                     (EpaLineComment
-                      "-- comment1")
-                     { Test20297.ppr.hs:7:3-7 }))])) { Test20297.ppr.hs:(9,1)-(11,26) })
+                  [])) { Test20297.ppr.hs:(9,1)-(11,26) })
     (ValD
      (NoExtField)
      (FunBind

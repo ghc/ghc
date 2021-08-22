@@ -1061,9 +1061,9 @@ qcname  :: { LocatedN RdrName }  -- Variable or type constructor
 -- top handles the fact that these may be optional.
 
 -- One or more semicolons
-semis1  :: { [TrailingAnn] }
-semis1  : semis1 ';'  { if isZeroWidthSpan (gl $2) then $1 else (AddSemiAnn (glAA $2) : $1) }
-        | ';'         { msemi $1 }
+semis1  :: { Located [TrailingAnn] }
+semis1  : semis1 ';'  { sLL $1 $> $ if isZeroWidthSpan (gl $2) then (unLoc $1) else (AddSemiAnn (glAA $2) : (unLoc $1)) }
+        | ';'         { sL1 $1 $ msemi $1 }
 
 -- Zero or more semicolons
 semis   :: { [TrailingAnn] }
@@ -1080,7 +1080,7 @@ importdecls
 importdecls_semi :: { [LImportDecl GhcPs] }
 importdecls_semi
         : importdecls_semi importdecl semis1
-                                {% do { i <- amsA $2 (reverse $3)
+                                {% do { i <- amsAl $2 (comb2 (reLoc $2) $3) (reverse $ unLoc $3)
                                       ; return (i : $1)} }
         | {- empty -}           { [] }
 
@@ -1181,7 +1181,7 @@ topdecls :: { OrdList (LHsDecl GhcPs) }
 
 -- May have trailing semicolons, can be empty
 topdecls_semi :: { OrdList (LHsDecl GhcPs) }
-        : topdecls_semi topdecl semis1 {% do { t <- amsA $2 (reverse $3)
+        : topdecls_semi topdecl semis1 {% do { t <- amsAl $2 (comb2 (reLoc $2) $3) (reverse $ unLoc $3)
                                              ; return ($1 `snocOL` t) }}
         | {- empty -}                  { nilOL }
 
@@ -1194,7 +1194,7 @@ topdecls_cs :: { OrdList (LHsDecl GhcPs) }
 
 -- May have trailing semicolons, can be empty
 topdecls_cs_semi :: { OrdList (LHsDecl GhcPs) }
-        : topdecls_cs_semi topdecl_cs semis1 {% do { t <- amsA $2 (reverse $3)
+        : topdecls_cs_semi topdecl_cs semis1 {% do { t <- amsAl $2 (comb2 (reLoc $2) $3) (reverse $ unLoc $3)
                                                    ; return ($1 `snocOL` t) }}
         | {- empty -}                  { nilOL }
 
@@ -4254,6 +4254,11 @@ acsExpr a = do { expr :: (LHsExpr GhcPs) <- runPV $ acsa a
 amsA :: MonadP m => LocatedA a -> [TrailingAnn] -> m (LocatedA a)
 amsA (L l a) bs = do
   cs <- getCommentsFor (locA l)
+  return (L (addAnnsA l bs cs) a)
+
+amsAl :: MonadP m => LocatedA a -> SrcSpan -> [TrailingAnn] -> m (LocatedA a)
+amsAl (L l a) loc bs = do
+  cs <- getCommentsFor loc
   return (L (addAnnsA l bs cs) a)
 
 amsrc :: MonadP m => Located a -> AnnContext -> m (LocatedC a)
