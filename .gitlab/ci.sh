@@ -363,9 +363,11 @@ function configure() {
   fi
 
   start_section "configuring"
+  # See https://stackoverflow.com/questions/7577052 for a rationale for the
+  # args[@] symbol-soup below.
   run ./configure \
     --enable-tarballs-autodownload \
-    "${args[@]}" \
+    "${args[@]+"${args[@]}"}" \
     GHC="$GHC" \
     HAPPY="$HAPPY" \
     ALEX="$ALEX" \
