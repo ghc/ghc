@@ -13,7 +13,7 @@ module GHC.Parser.Annotation (
 
   -- * In-tree Exact Print Annotations
   AddEpAnn(..),
-  EpaLocation(..), epaLocationRealSrcSpan,
+  EpaLocation(..), epaLocationRealSrcSpan, epaLocationFromSrcAnn,
   DeltaPos(..), deltaPos, getDeltaLine,
 
   EpAnn(..), Anchor(..), AnchorOperation(..),
@@ -439,6 +439,10 @@ getDeltaLine (DifferentLine r _) = r
 epaLocationRealSrcSpan :: EpaLocation -> RealSrcSpan
 epaLocationRealSrcSpan (EpaSpan r) = r
 epaLocationRealSrcSpan (EpaDelta _) = panic "epaLocationRealSrcSpan"
+
+epaLocationFromSrcAnn :: SrcAnn ann -> EpaLocation
+epaLocationFromSrcAnn (SrcSpanAnn EpAnnNotUsed l) = EpaSpan (realSrcSpan l)
+epaLocationFromSrcAnn (SrcSpanAnn (EpAnn anc _ _) _) = EpaSpan (anchor anc)
 
 instance Outputable EpaLocation where
   ppr (EpaSpan r) = text "EpaSpan" <+> ppr r

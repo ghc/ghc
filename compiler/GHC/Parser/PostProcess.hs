@@ -1146,11 +1146,12 @@ checkAPat loc e0 = do
    -- n+k patterns
    PatBuilderOpApp
            (L _ (PatBuilderVar (L nloc n)))
-           (L _ plus)
+           (L l plus)
            (L lloc (PatBuilderOverLit lit@(OverLit {ol_val = HsIntegral {}})))
-           anns
+           (EpAnn anc _ cs)
                      | nPlusKPatterns && (plus == plus_RDR)
-                     -> return (mkNPlusKPat (L nloc n) (L (locA lloc) lit) anns)
+                     -> return (mkNPlusKPat (L nloc n) (L (locA lloc) lit)
+                                (EpAnn anc (epaLocationFromSrcAnn l) cs))
 
    -- Improve error messages for the @-operator when the user meant an @-pattern
    PatBuilderOpApp _ op _ _ | opIsAt (unLoc op) -> do

@@ -309,7 +309,7 @@ mkHsCompAnns   :: HsDoFlavour -> [ExprLStmt GhcPs] -> LHsExpr GhcPs
 
 mkNPat      :: Located (HsOverLit GhcPs) -> Maybe (SyntaxExpr GhcPs) -> EpAnn [AddEpAnn]
             -> Pat GhcPs
-mkNPlusKPat :: LocatedN RdrName -> Located (HsOverLit GhcPs) -> EpAnn [AddEpAnn]
+mkNPlusKPat :: LocatedN RdrName -> Located (HsOverLit GhcPs) -> EpAnn EpaLocation
             -> Pat GhcPs
 
 -- NB: The following functions all use noSyntaxExpr: the generated expressions
