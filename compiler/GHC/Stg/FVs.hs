@@ -48,7 +48,7 @@ import GHC.Prelude hiding (mod)
 
 import GHC.Stg.Syntax
 import GHC.Types.Id
-import GHC.Types.Name (Name, nameIsExternalFrom)
+import GHC.Types.Name (Name, nameIsLocalOrFrom)
 import GHC.Types.Name.Env
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -204,9 +204,11 @@ bindingFVs bounds env body_fv b =
         pairs' = zip bndrs rhss
         id_sets = delDVarSetList (unionDVarSets (body_fv:rhs_id_sets)) bndrs
   where
-    var_fvs :: Var -> TopIds
-    var_fvs v | nameIsExternalFrom (mod env) (idName v) = unitVarSet v
-              | otherwise                               = emptyVarSet
+    var_fvs :: NestedIds -> Var -> TopIds
+    var_fvs bounds v
+      | not (elemVarSet v bounds)
+      , nameIsLocalOrFrom (mod env) (idName v) = unitVarSet v
+      | otherwise                              = emptyVarSet
 
 
     exprFVs :: NestedIds -> Env -> StgExpr -> (CgStgExpr, TopIds, DIdSet)
@@ -215,7 +217,7 @@ bindingFVs bounds env body_fv b =
         go (StgApp f as)
           | (args_fvs, id_set) <- argsFVs bounds env as
           = ( StgApp f as
-            , var_fvs f `unionVarSet` args_fvs
+            , var_fvs bounds f `unionVarSet` args_fvs
             , unionDVarSet (id_set `dVarSetIntersectVarSet` locals env) (mkFreeVarSet env [f]))
         go (StgLit lit) = (StgLit lit, emptyVarSet, emptyDVarSet)
         go (StgConApp dc n as tys)
@@ -265,12 +267,12 @@ bindingFVs bounds env body_fv b =
       = (StgRhsCon ccs dc mu ts bs, fvs, id_set)
 
     argsFVs :: NestedIds -> Env -> [StgArg] -> (TopIds, DIdSet)
-    argsFVs _ env = foldl' f (emptyVarSet, emptyDVarSet)
+    argsFVs bounds env = foldl' f (emptyVarSet, emptyDVarSet)
       where
-        f (fvs,ids) StgLitArg{}  = (fvs, ids )
-        f (fvs,ids) (StgVarArg v)  = (fvs', ids')
+        f (fvs,ids) StgLitArg{} = (fvs, ids)
+        f (fvs,ids) (StgVarArg v) = (fvs', ids')
           where
-            !fvs' = var_fvs v `unionVarSet` fvs
+            !fvs' = var_fvs bounds v `unionVarSet` fvs
             !ids' | v `elemVarSet` locals env
                   = extendDVarSet ids v
                   | otherwise = ids

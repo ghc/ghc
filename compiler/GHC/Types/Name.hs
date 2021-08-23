@@ -64,7 +64,7 @@ module GHC.Types.Name (
         isWiredInName, isWiredIn, isBuiltInSyntax,
         isHoleName,
         wiredInNameTyThing_maybe,
-        nameIsLocalOrFrom, nameIsExternalFrom, nameIsHomePackage,
+        nameIsLocalOrFrom, nameIsExternalOrFrom, nameIsHomePackage,
         nameIsHomePackageImport, nameIsFromExternalPackage,
         stableNameCmp,
 
@@ -357,10 +357,10 @@ nameIsLocalOrFrom from name
   | Just mod <- nameModule_maybe name = is_interactive_or_from from mod
   | otherwise                         = True
 
-nameIsExternalFrom :: Module -> Name -> Bool
--- ^ Returns True if the name is external or from the 'interactive package
+nameIsExternalOrFrom :: Module -> Name -> Bool
+-- ^ Returns True if the name is external or from the 'interactive' package
 -- See documentation of `nameIsLocalOrFrom` function
-nameIsExternalFrom from name
+nameIsExternalOrFrom from name
   | Just mod <- nameModule_maybe name = is_interactive_or_from from mod
   | otherwise                         = False
 
