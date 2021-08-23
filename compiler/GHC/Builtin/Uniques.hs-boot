@@ -23,18 +23,16 @@ mkPreludeClassUnique   :: Int -> Unique
 mkPrimOpIdUnique       :: Int -> Unique
 mkPrimOpWrapperUnique  :: Int -> Unique
 mkPreludeMiscIdUnique  :: Int -> Unique
-mkCoVarUnique          :: Int -> Unique
 
-mkPseudoUniqueD, mkPseudoUniqueE, mkPseudoUniqueH,
-  mkBuiltinUnique :: Int -> Unique
+mkPseudoUniqueE, mkBuiltinUnique :: Int -> Unique
 
 mkRegSingleUnique, mkRegPairUnique, mkRegSubUnique, mkRegClassUnique :: Int -> Unique
 mkVarOccUnique, mkDataOccUnique, mkTvOccUnique, mkTcOccUnique :: FastString -> Unique
 
-initExitJoinUnique, initTyVarUnique :: Unique
+initExitJoinUnique :: Unique
 
 mkPreludeTyConUnique   :: Int -> Unique
 tyConRepNameUnique :: Unique -> Unique
 
-mkPreludeDataConUnique :: Arity -> Unique
+mkPreludeDataConUnique :: Int -> Unique
 dataConTyRepNameUnique, dataConWorkerUnique :: Unique -> Unique

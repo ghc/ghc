@@ -273,14 +273,7 @@ instance Uniquable Unique where
 showUnique :: Unique -> String
 showUnique uniq
   = case unpkUnique uniq of
-      (tag, u) -> finish_show tag u (iToBase62 u)
-
-finish_show :: Char -> Int -> String -> String
-finish_show 't' u _pp_u | u < 26
-  = -- Special case to make v common tyvars, t1, t2, ...
-    -- come out as a, b, ... (shorter, easier to read)
-    [chr (ord 'a' + u)]
-finish_show tag _ pp_u = tag : pp_u
+      (tag, u) -> tag : iToBase62 u
 
 pprUniqueAlways :: Unique -> SDoc
 -- The "always" means regardless of -dsuppress-uniques
