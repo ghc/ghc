@@ -10,18 +10,22 @@ module GHC.Tc.Errors.Ppr (
 import GHC.Prelude
 
 import GHC.Core.Class (Class(..))
-import GHC.Core.TyCo.Ppr (pprKind, pprParendType, pprType, pprWithTYPE)
+import GHC.Core.Coercion (pprCoAxBranchUser)
+import GHC.Core.Coercion.Axiom (coAxiomTyCon, coAxiomSingleBranch)
+import GHC.Core.FamInstEnv (famInstAxiom)
+import GHC.Core.InstEnv
+import GHC.Core.TyCo.Ppr (pprKind, pprParendType, pprType, pprWithTYPE, pprWithExplicitKindsWhen)
 import GHC.Core.Type
 import GHC.Data.Bag
 import GHC.Tc.Errors.Types
 import GHC.Tc.Types.Rank (Rank(..))
 import GHC.Tc.Utils.TcType (tcSplitForAllTyVars)
 import GHC.Types.Error
-import GHC.Types.Name (pprPrefixName)
+import GHC.Types.Name
 import GHC.Types.Name.Reader (pprNameProvenance)
 import GHC.Types.SrcLoc (GenLocated(..))
-import GHC.Types.Name.Occurrence (occName)
 import GHC.Types.Var.Env (emptyTidyEnv)
+import GHC.Types.Var.Set (pprVarSet, pluralVarSet)
 import GHC.Driver.Flags
 import GHC.Hs
 import GHC.Utils.Outputable
@@ -79,11 +83,13 @@ instance Diagnostic TcRnMessage where
       -> mkSimpleDecorated $
            vcat [text "Multiple warning declarations for" <+> quotes (ppr rdr_name),
                  text "also at " <+> ppr (getLocA d)]
-    TcRnSimplifierTooManyIterations limit wc
+    TcRnSimplifierTooManyIterations simples limit wc
       -> mkSimpleDecorated $
            hang (text "solveWanteds: too many iterations"
                    <+> parens (text "limit =" <+> ppr limit))
-                2 (text "Unsolved:" <+> ppr wc)
+                2 (vcat [ text "Unsolved:" <+> ppr wc
+                        , text "Simples:"  <+> ppr simples
+                        ])
     TcRnIllegalPatSynDecl rdrname
       -> mkSimpleDecorated $
            hang (text "Illegal pattern synonym declaration for" <+> quotes (ppr rdrname))
@@ -245,6 +251,58 @@ instance Diagnostic TcRnMessage where
                MonoTypeConstraint -> text "A constraint must be a monotype"
                _                  -> empty
          in mkSimpleDecorated $ vcat [hang herald 2 (pprType ty), extra]
+    TcRnMonomorphicBindings bindings
+      -> let pp_bndrs = pprBindings bindings
+         in mkSimpleDecorated $
+              sep [ text "The Monomorphism Restriction applies to the binding"
+                  <> plural bindings
+                  , text "for" <+> pp_bndrs ]
+    TcRnOrphanInstance inst
+      -> mkSimpleDecorated $
+           hsep [ text "Orphan instance:"
+                , pprInstanceHdr inst
+                ]
+    TcRnFunDepConflict unit_state sorted
+      -> let herald = text "Functional dependencies conflict between instance declarations:"
+         in mkSimpleDecorated $
+              pprWithUnitState unit_state $ (hang herald 2 (pprInstances $ NE.toList sorted))
+    TcRnDupInstanceDecls unit_state sorted
+      -> let herald = text "Duplicate instance declarations:"
+         in mkSimpleDecorated $
+              pprWithUnitState unit_state $ (hang herald 2 (pprInstances $ NE.toList sorted))
+    TcRnConflictingFamInstDecls sortedNE
+      -> let sorted = NE.toList sortedNE
+         in mkSimpleDecorated $
+              hang (text "Conflicting family instance declarations:")
+                 2 (vcat [ pprCoAxBranchUser (coAxiomTyCon ax) (coAxiomSingleBranch ax)
+                         | fi <- sorted
+                         , let ax = famInstAxiom fi ])
+    TcRnFamInstNotInjective rea fam_tc (eqn1 NE.:| rest_eqns)
+      -> let (herald, show_kinds) = case rea of
+               InjErrRhsBareTyVar tys ->
+                 (injectivityErrorHerald $$
+                  text "RHS of injective type family equation is a bare" <+>
+                  text "type variable" $$
+                  text "but these LHS type and kind patterns are not bare" <+>
+                  text "variables:" <+> pprQuotedList tys, False)
+               InjErrRhsCannotBeATypeFam ->
+                 (injectivityErrorHerald $$
+                   text "RHS of injective type family equation cannot" <+>
+                   text "be a type family:", False)
+               InjErrRhsOverlap ->
+                  (text "Type family equation right-hand sides overlap; this violates" $$
+                   text "the family's injectivity annotation:", False)
+               InjErrCannotInferFromRhs tvs has_kinds _ ->
+                 let show_kinds = has_kinds == YesHasKinds
+                     what = if show_kinds then text "Type/kind" else text "Type"
+                     body = sep [ what <+> text "variable" <>
+                                  pluralVarSet tvs <+> pprVarSet tvs (pprQuotedList . scopedSort)
+                                , text "cannot be inferred from the right-hand side." ]
+                     in (injectivityErrorHerald $$ body $$ text "In the type family equation:", show_kinds)
+
+         in mkSimpleDecorated $ pprWithExplicitKindsWhen show_kinds $
+              hang herald
+                2 (vcat (map (pprCoAxBranchUser fam_tc) (eqn1 : rest_eqns)))
 
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -361,6 +419,18 @@ instance Diagnostic TcRnMessage where
     TcRnBadAssociatedType{}
       -> ErrorWithoutFlag
     TcRnForAllRankErr{}
+      -> ErrorWithoutFlag
+    TcRnMonomorphicBindings{}
+      -> WarningWithFlag Opt_WarnMonomorphism
+    TcRnOrphanInstance{}
+      -> WarningWithFlag Opt_WarnOrphans
+    TcRnFunDepConflict{}
+      -> ErrorWithoutFlag
+    TcRnDupInstanceDecls{}
+      -> ErrorWithoutFlag
+    TcRnConflictingFamInstDecls{}
+      -> ErrorWithoutFlag
+    TcRnFamInstNotInjective{}
       -> ErrorWithoutFlag
 
   diagnosticHints = \case
@@ -485,6 +555,28 @@ instance Diagnostic TcRnMessage where
            MonoTypeSynArg     -> [suggestExtension LangExt.LiberalTypeSynonyms]
            MonoTypeConstraint -> [suggestExtension LangExt.QuantifiedConstraints]
            _                  -> noHints
+    TcRnMonomorphicBindings bindings
+      -> case bindings of
+          []     -> noHints
+          (x:xs) -> [SuggestAddTypeSignatures $ NamedBindings (x NE.:| xs)]
+    TcRnOrphanInstance{}
+      -> [SuggestFixOrphanInstance]
+    TcRnFunDepConflict{}
+      -> noHints
+    TcRnDupInstanceDecls{}
+      -> noHints
+    TcRnConflictingFamInstDecls{}
+      -> noHints
+    TcRnFamInstNotInjective rea _ _
+      -> case rea of
+           InjErrRhsBareTyVar{}      -> noHints
+           InjErrRhsCannotBeATypeFam -> noHints
+           InjErrRhsOverlap          -> noHints
+           InjErrCannotInferFromRhs _ _ suggestUndInst
+             | YesSuggestUndecidableInstaces <- suggestUndInst
+             -> [suggestExtension LangExt.UndecidableInstances]
+             | otherwise
+             -> noHints
 
 messageWithInfoDiagnosticMessage :: UnitState
                                  -> ErrInfo
@@ -556,3 +648,10 @@ pprRecordFieldPart = \case
   RecordFieldConstructor{} -> text "construction"
   RecordFieldPattern{}     -> text "pattern"
   RecordFieldUpdate        -> text "update"
+
+pprBindings :: [Name] -> SDoc
+pprBindings = pprWithCommas (quotes . ppr)
+
+injectivityErrorHerald :: SDoc
+injectivityErrorHerald =
+  text "Type family equation violates the family's injectivity annotation."

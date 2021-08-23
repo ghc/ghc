@@ -7,6 +7,11 @@ module GHC.Tc.Errors.Types (
   , LevityCheckProvenance(..)
   , ShadowedNameProvenance(..)
   , RecordFieldPart(..)
+  , InjectivityErrReason(..)
+  , HasKinds(..)
+  , hasKinds
+  , SuggestUndecidableInstances(..)
+  , suggestUndecidableInstances
   ) where
 
 import GHC.Prelude
@@ -22,13 +27,17 @@ import GHC.Types.SrcLoc
 import GHC.Unit.Types (Module)
 import GHC.Utils.Outputable
 import GHC.Core.Class (Class)
+import GHC.Core.Coercion.Axiom (CoAxBranch)
+import GHC.Core.FamInstEnv (FamInst)
+import GHC.Core.InstEnv (ClsInst)
+import GHC.Core.TyCon (TyCon, TyConFlavour)
 import GHC.Core.Type (Kind, Type, Var)
-import GHC.Core.TyCon (TyConFlavour)
 import GHC.Unit.State (UnitState)
 import GHC.Types.Basic
+import GHC.Types.Var.Set (TyVarSet)
 
 import qualified Data.List.NonEmpty as NE
-import           Data.Typeable
+import           Data.Typeable hiding (TyCon)
 
 {-
 Note [Migrating TcM Messages]
@@ -237,7 +246,8 @@ data TcRnMessage where
      Test cases:
         None.
   -}
-  TcRnSimplifierTooManyIterations :: !IntWithInf
+  TcRnSimplifierTooManyIterations :: Cts
+                                  -> !IntWithInf
                                   -- ^ The limit.
                                   -> WantedConstraints
                                   -> TcRnMessage
@@ -802,6 +812,110 @@ data TcRnMessage where
   -}
   TcRnForAllRankErr :: !Rank -> !Type -> TcRnMessage
 
+  {-| TcRnMonomorphicBindings is a warning (controlled by -Wmonomorphism-restriction)
+      that arise when the monomorphism restriction applies to the given bindings.
+
+      Examples(s):
+        {-# OPTIONS_GHC -Wmonomorphism-restriction #-}
+
+        bar = 10
+
+        foo :: Int
+        foo = bar
+
+        main :: IO ()
+        main = print foo
+
+      The example above emits the warning (for 'bar'), because without monomorphism
+      restriction the inferred type for 'bar' is 'bar :: Num p => p'. This warning tells us
+      that /if/ we were to enable '-XMonomorphismRestriction' we would make 'bar'
+      less polymorphic, as its type would become 'bar :: Int', so GHC warns us about that.
+
+      Test cases: typecheck/should_compile/T13785
+  -}
+  TcRnMonomorphicBindings :: [Name] -> TcRnMessage
+
+  {-| TcRnOrphanInstance is a warning (controlled by -Wwarn-orphans)
+      that arises when a typeclass instance is an \"orphan\", i.e. if it appears
+      in a module in which neither the class nor the type being instanced are
+      declared in the same module.
+
+      Examples(s): None
+
+      Test cases: warnings/should_compile/T9178
+                  typecheck/should_compile/T4912
+  -}
+  TcRnOrphanInstance :: ClsInst -> TcRnMessage
+
+  {-| TcRnFunDepConflict is an error that occurs when there are functional dependencies
+      conflicts between instance declarations.
+
+      Examples(s): None
+
+      Test cases: typecheck/should_fail/T2307
+                  typecheck/should_fail/tcfail096
+                  typecheck/should_fail/tcfail202
+  -}
+  TcRnFunDepConflict :: !UnitState -> NE.NonEmpty ClsInst -> TcRnMessage
+
+  {-| TcRnDupInstanceDecls is an error that occurs when there are duplicate instance
+      declarations.
+
+      Examples(s):
+        class Foo a where
+          foo :: a -> Int
+
+        instance Foo Int where
+          foo = id
+
+        instance Foo Int where
+          foo = const 42
+
+      Test cases: cabal/T12733/T12733
+                  typecheck/should_fail/tcfail035
+                  typecheck/should_fail/tcfail023
+                  backpack/should_fail/bkpfail18
+                  typecheck/should_fail/TcNullaryTCFail
+                  typecheck/should_fail/tcfail036
+                  typecheck/should_fail/tcfail073
+                  module/mod51
+                  module/mod52
+                  module/mod44
+  -}
+  TcRnDupInstanceDecls :: !UnitState -> NE.NonEmpty ClsInst -> TcRnMessage
+
+  {-| TcRnConflictingFamInstDecls is an error that occurs when there are conflicting
+      family instance declarations.
+
+      Examples(s): None.
+
+      Test cases: indexed-types/should_fail/ExplicitForAllFams4b
+                  indexed-types/should_fail/NoGood
+                  indexed-types/should_fail/Over
+                  indexed-types/should_fail/OverDirectThisMod
+                  indexed-types/should_fail/OverIndirectThisMod
+                  indexed-types/should_fail/SimpleFail11a
+                  indexed-types/should_fail/SimpleFail11b
+                  indexed-types/should_fail/SimpleFail11c
+                  indexed-types/should_fail/SimpleFail11d
+                  indexed-types/should_fail/SimpleFail2a
+                  indexed-types/should_fail/SimpleFail2b
+                  indexed-types/should_fail/T13092/T13092
+                  indexed-types/should_fail/T13092c/T13092c
+                  indexed-types/should_fail/T14179
+                  indexed-types/should_fail/T2334A
+                  indexed-types/should_fail/T2677
+                  indexed-types/should_fail/T3330b
+                  indexed-types/should_fail/T4246
+                  indexed-types/should_fail/T7102a
+                  indexed-types/should_fail/T9371
+                  polykinds/T7524
+                  typecheck/should_fail/UnliftedNewtypesOverlap
+  -}
+  TcRnConflictingFamInstDecls :: NE.NonEmpty FamInst -> TcRnMessage
+
+  TcRnFamInstNotInjective :: InjectivityErrReason -> TyCon -> NE.NonEmpty CoAxBranch -> TcRnMessage
+
 -- | Which parts of a record field are affected by a particular error or warning.
 data RecordFieldPart
   = RecordFieldConstructor !Name
@@ -830,3 +944,29 @@ data LevityCheckProvenance
   | LevityCheckInFunUse !(LHsExpr GhcTc)
   | LevityCheckInValidDataCon
   | LevityCheckInValidClass
+
+-- | Why the particular injectivity error arose together with more information,
+-- if any.
+data InjectivityErrReason
+  = InjErrRhsBareTyVar [Type]
+  | InjErrRhsCannotBeATypeFam
+  | InjErrRhsOverlap
+  | InjErrCannotInferFromRhs !TyVarSet !HasKinds !SuggestUndecidableInstances
+
+data HasKinds
+  = YesHasKinds
+  | NoHasKinds
+  deriving (Show, Eq)
+
+hasKinds :: Bool -> HasKinds
+hasKinds True  = YesHasKinds
+hasKinds False = NoHasKinds
+
+data SuggestUndecidableInstances
+  = YesSuggestUndecidableInstaces
+  | NoSuggestUndecidableInstaces
+  deriving (Show, Eq)
+
+suggestUndecidableInstances :: Bool -> SuggestUndecidableInstances
+suggestUndecidableInstances True  = YesSuggestUndecidableInstaces
+suggestUndecidableInstances False = NoSuggestUndecidableInstaces

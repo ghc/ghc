@@ -1410,8 +1410,7 @@ decideMonoTyVars infer_mode name_taus psigs candidates
 
            -- Warn about the monomorphism restriction
        ; when (case infer_mode of { ApplyMR -> True; _ -> False}) $ do
-           let dia = TcRnUnknownMessage $
-                 mkPlainDiagnostic (WarningWithFlag Opt_WarnMonomorphism) noHints mr_msg
+           let dia = TcRnMonomorphicBindings (map fst name_taus)
            diagnosticTc (constrained_tvs `intersectsVarSet` tyCoVarsOfTypes taus) dia
 
        ; traceTc "decideMonoTyVars" $ vcat
@@ -1440,15 +1439,6 @@ decideMonoTyVars infer_mode name_taus psigs candidates
       = isInteractiveClass ovl_strings cls
       | otherwise
       = False
-
-    pp_bndrs = pprWithCommas (quotes . ppr . fst) name_taus
-    mr_msg =
-         hang (sep [ text "The Monomorphism Restriction applies to the binding"
-                     <> plural name_taus
-                   , text "for" <+> pp_bndrs ])
-            2 (hsep [ text "Consider giving"
-                    , text (if isSingleton name_taus then "it" else "them")
-                    , text "a type signature"])
 
 -------------------
 defaultTyVarsAndSimplify :: TcLevel
@@ -1860,7 +1850,7 @@ maybe_simplify_again n limit unif_happened wc@(WC { wc_simple = simples })
          -- Typically if we blow the limit we are going to report some other error
          -- (an unsolved constraint), and we don't want that error to suppress
          -- the iteration limit warning!
-         addErrTcS $ TcRnSimplifierTooManyIterations limit wc
+         addErrTcS $ TcRnSimplifierTooManyIterations simples limit wc
        ; return wc }
 
   | unif_happened

@@ -93,7 +93,8 @@ import GHC.Utils.Outputable
 import GHC.Unit.State
 import GHC.Unit.External
 
-import Data.List ( sortBy, mapAccumL )
+import Data.List ( mapAccumL )
+import qualified Data.List.NonEmpty as NE
 import Control.Monad( unless )
 import Data.Function ( on )
 
@@ -826,20 +827,8 @@ newClsInst overlap_mode dfun_name tvs theta clas tys
 
        ; oflag <- getOverlapFlag overlap_mode
        ; let inst = mkLocalInstance dfun oflag tvs' clas tys'
-       ; warnIf (isOrphan (is_orphan inst)) (instOrphWarn inst)
+       ; warnIf (isOrphan (is_orphan inst)) (TcRnOrphanInstance inst)
        ; return inst }
-
-instOrphWarn :: ClsInst -> TcRnMessage
-instOrphWarn inst
-  = TcRnUnknownMessage $ mkPlainDiagnostic (WarningWithFlag Opt_WarnOrphans) noHints $
-    hang (text "Orphan instance:") 2 (pprInstanceHdr inst)
-    $$ text "To avoid this"
-    $$ nest 4 (vcat possibilities)
-  where
-    possibilities =
-      text "move the instance declaration to the module of the class or of the type, or" :
-      text "wrap the type with a newtype and declare the instance on the new type." :
-      []
 
 tcExtendLocalInstEnv :: [ClsInst] -> TcM a -> TcM a
   -- Add new locally-defined instances
@@ -965,22 +954,21 @@ traceDFuns ispecs
 
 funDepErr :: ClsInst -> [ClsInst] -> TcRn ()
 funDepErr ispec ispecs
-  = addClsInstsErr (text "Functional dependencies conflict between instance declarations:")
-                    (ispec : ispecs)
+  = addClsInstsErr TcRnFunDepConflict (ispec NE.:| ispecs)
 
 dupInstErr :: ClsInst -> ClsInst -> TcRn ()
 dupInstErr ispec dup_ispec
-  = addClsInstsErr (text "Duplicate instance declarations:")
-                    [ispec, dup_ispec]
+  = addClsInstsErr TcRnDupInstanceDecls (ispec NE.:| [dup_ispec])
 
-addClsInstsErr :: SDoc -> [ClsInst] -> TcRn ()
-addClsInstsErr herald ispecs = do
+addClsInstsErr :: (UnitState -> NE.NonEmpty ClsInst -> TcRnMessage)
+               -> NE.NonEmpty ClsInst
+               -> TcRn ()
+addClsInstsErr mkErr ispecs = do
    unit_state <- hsc_units <$> getTopEnv
-   setSrcSpan (getSrcSpan (head sorted)) $
-      addErr $ TcRnUnknownMessage $ mkPlainError noHints $
-      pprWithUnitState unit_state $ (hang herald 2 (pprInstances sorted))
+   setSrcSpan (getSrcSpan (NE.head sorted)) $
+      addErr $ mkErr unit_state sorted
  where
-   sorted = sortBy (SrcLoc.leftmost_smallest `on` getSrcSpan) ispecs
+   sorted = NE.sortBy (SrcLoc.leftmost_smallest `on` getSrcSpan) ispecs
    -- The sortBy just arranges that instances are displayed in order
    -- of source location, which reduced wobbling in error messages,
    -- and is better for users

@@ -18,6 +18,7 @@ import GHC.Unit.Types
 import GHC.Utils.Outputable
 
 import Data.List (intersperse)
+import qualified Data.List.NonEmpty as NE
 
 instance Outputable GhcHint where
   ppr = \case
@@ -63,8 +64,19 @@ instance Outputable GhcHint where
       -> text "Use parentheses."
     SuggestIncreaseMaxPmCheckModels
       -> text "Increase the limit or resolve the warnings to suppress this message."
-    SuggestAddTypeSignature
-      -> text "Add a type signature."
+    SuggestAddTypeSignatures bindings
+      -> case bindings of
+          -- This might happen when we have bindings which are /too complicated/,
+          -- see for example 'DsCannotMixPolyAndUnliftedBindings' in 'GHC.HsToCore.Errors.Types'.
+          -- In this case, we emit a generic message.
+          UnnamedBinding   -> text "Add a type signature."
+          NamedBindings (x NE.:| xs) ->
+            let nameList = case xs of
+                  [] -> quotes . ppr $ x
+                  _  -> pprWithCommas (quotes . ppr) xs <+> text "and" <+> quotes (ppr x)
+            in hsep [ text "Consider giving"
+                    , nameList
+                    , text "a type signature"]
     SuggestBindToWildcard rhs
       -> hang (text "Suppress this warning by saying") 2 (quotes $ text "_ <-" <+> ppr rhs)
     SuggestAddInlineOrNoInlinePragma lhs_id rule_act
@@ -104,6 +116,10 @@ instance Outputable GhcHint where
          in case mb_mod of
               Nothing -> header <+> text "the hsig file."
               Just mod -> header <+> ppr (moduleName mod) <> text "'s hsig file."
+    SuggestFixOrphanInstance
+      -> vcat [ text "Move the instance declaration to the module of the class or of the type, or"
+              , text "wrap the type with a newtype and declare the instance on the new type."
+              ]
 
 perhapsAsPat :: SDoc
 perhapsAsPat = text "Perhaps you meant an as-pattern, which must not be surrounded by whitespace"
