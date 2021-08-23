@@ -1,6 +1,4 @@
-
-<no location info>: error:
-    Could not load module ‘RuleDefiningPlugin’
+<command line>: Could not load module ‘RuleDefiningPlugin’
 It is a member of the hidden package ‘rule-defining-plugin-0.1’.
 You can run ‘:set -package rule-defining-plugin’ to expose it.
 (Note: this unloads all the modules in the current scope.)
