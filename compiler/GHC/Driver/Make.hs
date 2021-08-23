@@ -148,6 +148,7 @@ import Control.Monad.Trans.Class
 import GHC.Driver.Env.KnotVars
 import Control.Concurrent.STM
 import Control.Monad.Trans.Maybe
+import GHC.Runtime.Loader
 
 
 -- -----------------------------------------------------------------------------
@@ -2366,10 +2367,11 @@ runPipelines n_jobs orig_hsc_env old_hpt mHscMessager all_pipelines = do
   -- Thread which coordinates the printing of logs
   wait_log_thread <- logThread (hsc_logger orig_hsc_env) stopped_var log_queue_queue_var
 
+  plugins_hsc_env <- initializePlugins orig_hsc_env Nothing
 
   -- Make the logger thread-safe, in case there is some output which isn't sent via the LogQueue.
   thread_safe_logger <- liftIO $ makeThreadSafe (hsc_logger orig_hsc_env)
-  let thread_safe_hsc_env = orig_hsc_env { hsc_logger = thread_safe_logger }
+  let thread_safe_hsc_env = plugins_hsc_env { hsc_logger = thread_safe_logger }
 
   let updNumCapabilities = liftIO $ do
           n_capabilities <- getNumCapabilities
