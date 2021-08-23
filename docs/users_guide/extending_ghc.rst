@@ -555,11 +555,12 @@ is defined thus:
 
     type TcPluginRewriter = RewriteEnv -> [Ct] -> [Type] -> TcPluginM TcPluginRewriteResult
 
-    data TcPluginResult
-      = TcPluginContradiction [Ct]
-      | TcPluginOk
-        { tcPluginSolvedCts :: [(EvTerm,Ct)]
-        , tcPluginNewCts :: [Ct] }
+  data TcPluginSolveResult
+    = TcPluginSolveResult
+        { tcPluginInsolubleCts :: [Ct]
+        , tcPluginSolvedCts    :: [(EvTerm, Ct)]
+        , tcPluginNewCts       :: [Ct]
+        }
 
     data TcPluginRewriteResult
       = TcPluginNoRewrite
@@ -634,19 +635,20 @@ The two ways can be distinguished by checking the Wanted constraints: in the
 first case (and the first case only), the plugin will be passed an empty list
 of Wanted constraints.
 
-The plugin is then expected to respond in either of the following ways:
+The plugin can then respond with:
 
-* return ``TcPluginOk`` with lists of solved and new constraints, or
+* solved constraints, which will be removed from the inert set,
 
-* return ``TcPluginContradiction`` with a list of impossible
-  constraints, so they can be turned into errors.
+* new constraints, which will be added to the work list,
 
-In both cases, the plugin must respond with constraints of the same flavour,
+* insoluble constraints, which will be reported as errors.
+
+The plugin must respond with constraints of the same flavour,
 i.e. in (1) it should return only Givens, and for (2) it should return only
 Wanteds (or Deriveds); all other constraints will be ignored.
 
 If the plugin cannot make any progress, it should return
-``TcPluginOk [] []``. Otherwise, if there were any new constraints, the
+``TcPluginSolveResult [] [] []``. Otherwise, if there were any new constraints, the
 main constraint solver will be re-invoked to simplify them, then the
 plugin will be invoked again. The plugin is responsible for making sure
 that this process eventually terminates.

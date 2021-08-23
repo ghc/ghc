@@ -287,15 +287,18 @@ runTcPluginSolvers solvers all_cts
         return $ progress p result
 
     progress :: TcPluginProgress -> TcPluginSolveResult -> TcPluginProgress
-    progress p (TcPluginContradiction bad_cts) =
-       p { pluginInputCts = discard bad_cts (pluginInputCts p)
-         , pluginBadCts   = bad_cts ++ pluginBadCts p
-         }
-    progress p (TcPluginOk solved_cts new_cts) =
-      p { pluginInputCts  = discard (map snd solved_cts) (pluginInputCts p)
-        , pluginSolvedCts = add solved_cts (pluginSolvedCts p)
-        , pluginNewCts    = new_cts ++ pluginNewCts p
+    progress p
+      (TcPluginSolveResult
+        { tcPluginInsolubleCts = bad_cts
+        , tcPluginSolvedCts    = solved_cts
+        , tcPluginNewCts       = new_cts
         }
+      ) =
+        p { pluginInputCts  = discard (bad_cts ++ map snd solved_cts) (pluginInputCts p)
+          , pluginSolvedCts = add solved_cts (pluginSolvedCts p)
+          , pluginNewCts    = new_cts ++ pluginNewCts p
+          , pluginBadCts    = bad_cts ++ pluginBadCts p
+          }
 
     initialProgress = TcPluginProgress all_cts ([], [], []) [] []
 

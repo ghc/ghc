@@ -3,6 +3,7 @@
 {-# LANGUAGE ExistentialQuantification  #-}
 {-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE PatternSynonyms            #-}
 
 {-
 (c) The University of Glasgow 2006-2012
@@ -74,7 +75,9 @@ module GHC.Tc.Types(
         getPlatform,
 
         -- Constraint solver plugins
-        TcPlugin(..), TcPluginSolveResult(..), TcPluginRewriteResult(..),
+        TcPlugin(..),
+        TcPluginSolveResult(TcPluginContradiction, TcPluginOk, ..),
+        TcPluginRewriteResult(..),
         TcPluginSolver, TcPluginRewriter,
         TcPluginM(runTcPluginM), unsafeTcPluginTcM,
 
@@ -1774,23 +1777,48 @@ data TcPlugin = forall s. TcPlugin
    -- ^ Clean up after the plugin, when exiting the type-checker.
   }
 
+-- | The plugin found a contradiction.
+-- The returned constraints are removed from the inert set,
+-- and recorded as insoluble.
+--
+-- The returned list of constraints should never be empty.
+pattern TcPluginContradiction :: [Ct] -> TcPluginSolveResult
+pattern TcPluginContradiction insols
+  = TcPluginSolveResult
+  { tcPluginInsolubleCts = insols
+  , tcPluginSolvedCts    = []
+  , tcPluginNewCts       = [] }
+
+-- | The plugin has not found any contradictions,
+--
+-- The first field is for constraints that were solved.
+-- The second field contains new work, that should be processed by
+-- the constraint solver.
+pattern TcPluginOk :: [(EvTerm, Ct)] -> [Ct] -> TcPluginSolveResult
+pattern TcPluginOk solved new
+  = TcPluginSolveResult
+  { tcPluginInsolubleCts = []
+  , tcPluginSolvedCts    = solved
+  , tcPluginNewCts       = new }
+
+-- | Result of running a solver plugin.
 data TcPluginSolveResult
-  = TcPluginContradiction [Ct]
-    -- ^ The plugin found a contradiction.
-    -- The returned constraints are removed from the inert set,
-    -- and recorded as insoluble.
+  = TcPluginSolveResult
+  { -- | Insoluble constraints found by the plugin.
     --
-    -- The returned list of constraints should never be empty.
-
-  | TcPluginOk
-    { tcPluginSolvedCts :: [(EvTerm,Ct)]
-    , tcPluginNewCts :: [Ct] }
-    -- ^ The first field is for constraints that were solved.
-    -- These are removed from the inert set,
-    -- and the evidence for them is recorded.
-    -- The second field contains new work, that should be processed by
-    -- the constraint solver.
-
+    -- These constraints will be added to the inert set,
+    -- and reported as insoluble to the user.
+    tcPluginInsolubleCts :: [Ct]
+    -- | Solved constraints, together with their evidence.
+    --
+    -- These are removed from the inert set, and the
+    -- evidence for them is recorded.
+  , tcPluginSolvedCts :: [(EvTerm, Ct)]
+    -- | New constraints that the plugin wishes to emit.
+    --
+    -- These will be added to the work list.
+  , tcPluginNewCts :: [Ct]
+  }
 
 data TcPluginRewriteResult
   =
