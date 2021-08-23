@@ -47,7 +47,7 @@
   [(L
     (SrcSpanAnn (EpAnn
                  (Anchor
-                  { DumpSemis.hs:5:1-16 }
+                  { DumpSemis.hs:5:1-19 }
                   (UnchangedAnchor))
                  (AnnListItem
                   [(AddSemiAnn
@@ -57,7 +57,7 @@
                   ,(AddSemiAnn
                     (EpaSpan { DumpSemis.hs:6:5 }))])
                  (EpaComments
-                  [])) { DumpSemis.hs:5:1-16 })
+                  [])) { DumpSemis.hs:5:1-19 })
     (ImportDecl
      (EpAnn
       (Anchor
@@ -82,7 +82,25 @@
      (NotQualified)
      (False)
      (Nothing)
-     (Nothing)))
+     (Just
+      ((,)
+       (False)
+       (L
+        (SrcSpanAnn (EpAnn
+                     (Anchor
+                      { DumpSemis.hs:5:18-19 }
+                      (UnchangedAnchor))
+                     (AnnList
+                      (Nothing)
+                      (Just
+                       (AddEpAnn AnnOpenP (EpaSpan { DumpSemis.hs:5:18 })))
+                      (Just
+                       (AddEpAnn AnnCloseP (EpaSpan { DumpSemis.hs:5:19 })))
+                      []
+                      [])
+                     (EpaComments
+                      [])) { DumpSemis.hs:5:18-19 })
+        [])))))
   ,(L
     (SrcSpanAnn (EpAnn
                  (Anchor

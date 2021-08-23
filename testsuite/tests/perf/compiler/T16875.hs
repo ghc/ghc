@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-compat-unqualified-imports #-}
 module T16875 where
 
 import Control.Applicative

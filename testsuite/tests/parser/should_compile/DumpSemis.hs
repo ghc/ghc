@@ -2,7 +2,7 @@ module DumpSemis where
 
 -- Make sure we get all the semicolons in statements
 ;;;;  ;;
-import Data.List
+import Data.List ()
 ; ; ;
 import Data.Kind
    ; ;;

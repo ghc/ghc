@@ -79,9 +79,6 @@
   * `fromInteger :: Integer -> Float/Double` now consistently round to the
     nearest value, with ties to even.
 
-  * Functions in `Data.List` are specialized to list.
-    `Data.OldList` and `GHC.List` modules are removed.
-
   * Add `GHC.TypeError` module to contain functionality related to custom type
     errors. `TypeError` is re-exported from `GHC.TypeLits` for backwards
     compatibility.

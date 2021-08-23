@@ -19,7 +19,7 @@ import Data.Map (Map)
 import Data.Bifunctor (second)
 import Packed.Bytes (Bytes)
 import qualified Data.Char
-import qualified Data.List as L
+import qualified GHC.OldList as L
 import qualified Packed.Bytes.Parser as P
 import qualified Packed.Bytes as B
 import qualified Data.Semigroup as SG

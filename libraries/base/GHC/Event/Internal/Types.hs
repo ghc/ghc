@@ -33,7 +33,7 @@ module GHC.Event.Internal.Types
     , Timeout(..)
     ) where
 
-import Data.List (foldl', filter, intercalate, null)
+import Data.OldList (foldl', filter, intercalate, null)
 
 import Data.Bits ((.|.), (.&.))
 import Data.Semigroup.Internal (stimesMonoid)

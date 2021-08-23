@@ -8,5 +8,5 @@ pure :: Applicative f => a -> f a
 pure = (_t4::Applicative f => a -> f a)
 mempty = (_t5::Monoid a => a)
 mappend = (_t6::Monoid a => a -> a -> a)
-foldl' = (_t7::(b -> a -> b) -> b -> [a] -> b)
+foldl' = (_t7::Foldable t => (b -> a -> b) -> b -> t a -> b)
 f = (_t8::(forall a. a -> a) -> b -> b)

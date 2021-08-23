@@ -1,0 +1,5 @@
+
+T17244A.hs:6:8: warning: [-Wcompat-unqualified-imports (in -Wcompat)]
+    To ensure compatibility with future core libraries changes
+    imports to Data.List should be
+    either qualified or have an explicit import list.

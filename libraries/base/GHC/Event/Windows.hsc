@@ -104,7 +104,7 @@ import GHC.Exception as E
 import GHC.IORef
 import GHC.Maybe
 import GHC.Word
-import Data.List (deleteBy)
+import GHC.OldList (deleteBy)
 import Foreign
 import qualified GHC.Event.Array    as A
 import GHC.Base

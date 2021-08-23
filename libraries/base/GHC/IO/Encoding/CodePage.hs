@@ -27,7 +27,7 @@ import GHC.IO.Encoding.Types
 import GHC.IO.Buffer
 import Data.Bits
 import Data.Maybe
-import Data.List (lookup)
+import Data.OldList (lookup)
 
 import qualified GHC.IO.Encoding.CodePage.API as API
 import GHC.IO.Encoding.CodePage.Table

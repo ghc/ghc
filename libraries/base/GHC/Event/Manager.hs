@@ -67,7 +67,7 @@ import Data.Functor (void)
 import Data.IORef (IORef, atomicModifyIORef', mkWeakIORef, newIORef, readIORef,
                    writeIORef)
 import Data.Maybe (maybe)
-import Data.List (partition)
+import Data.OldList (partition)
 import GHC.Arr (Array, (!), listArray)
 import GHC.Base
 import GHC.Conc.Sync (yield)
