@@ -217,7 +217,7 @@ endif
 # Whether to use libffi for adjustors (foreign import "wrapper") or
 # not.  If we have built-in support (rts/Adjustor.c) then we use that,
 # otherwise we fall back on libffi, which is slightly slower.
-ArchHasAdjustorSupport = $(if $(findstring $(TargetArch_CPP),i386 x86_64),YES,NO)
+ArchHasAdjustorSupport = $(if $(findstring $(TargetArch_CPP),i386 x86_64 js),YES,NO)
 ifeq "$(ArchHasAdjustorSupport)" "YES"
 UseLibFFIForAdjustors=NO
 else
@@ -292,10 +292,15 @@ GhcRTSWays += debug
 
 # We always have the threaded versions, but note that SMP support may be disabled
 # (see GhcWithSMP).
+
+ArchHasThreadSupport = $(if $(findstring $(TargetArch_CPP),js),NO,YES)
+
+ifeq "$(ArchHasThreadSupport)" "YES"
 GhcRTSWays += thr thr_debug thr_l
 GhcRTSWays += $(if $(findstring p, $(GhcLibWays)),thr_p,)
 GhcRTSWays += $(if $(findstring dyn, $(GhcLibWays)),dyn debug_dyn thr_dyn thr_debug_dyn l_dyn thr_l_dyn,)
 GhcRTSWays += $(if $(findstring p, $(GhcLibWays)),thr_debug_p debug_p,)
+endif
 
 # We can only build GHCi threaded if we have a threaded RTS:
 GhcThreaded = $(if $(findstring thr,$(GhcRTSWays)),YES,NO)
