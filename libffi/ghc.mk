@@ -57,6 +57,8 @@ $(libffi_STAMP_CONFIGURE): $(TOUCH_DEP)
 # update config.guess/config.sub
 	$(CP) "$(TOP)/config.guess" libffi/build/config.guess
 	$(CP) "$(TOP)/config.sub"   libffi/build/config.sub
+	$(CP) "$(TOP)/configure.host"   libffi/build/configure.host
+
 
 # We have to fake a non-working ln for configure, so that the fallback
 # option (cp -p) gets used instead.  Otherwise the libffi build system
