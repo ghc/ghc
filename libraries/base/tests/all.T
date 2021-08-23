@@ -45,6 +45,7 @@ test('inits', normal, compile_and_run, [''])
 test('genericNegative001', extra_run_opts('-1'), compile_and_run, [''])
 test('ix001', normal, compile_and_run, [''])
 test('isValidNatural', normal, compile_and_run, [''])
+test('read-show-solo', normal, compile_and_run, [''])
 
 # need to add -K64m to the compiler opts, so that GHCi gets it too
 test('ioref001',

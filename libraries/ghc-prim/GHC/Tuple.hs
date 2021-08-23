@@ -29,7 +29,55 @@ data () = ()
 -- The desugarer uses 1-tuples,
 -- but "()" is already used up for 0-tuples
 -- See Note [One-tuples] in GHC.Builtin.Types
-data Solo a = Solo a
+
+-- | @Solo@ is the canonical lifted 1-tuple, just like '(,)' is the canonical
+-- lifted 2-tuple (pair) and '(,,)' is the canonical lifted 3-tuple (triple).
+--
+-- The most important feature of @Solo@ is that it is possible to force its
+-- "outside" (usually by pattern matching) without forcing its "inside",
+-- because it is defined as a datatype rather than a newtype. One situation
+-- where this can be useful is when writing a function to extract a value from
+-- a data structure. Suppose you write an implementation of arrays and offer
+-- only this function to index into them:
+--
+-- @
+-- index :: Array a -> Int -> a
+-- @
+--
+-- Now imagine that someone wants to extract a value from an array and store it
+-- in a lazy-valued finite map/dictionary:
+--
+-- @
+-- insert "hello" (arr `index` 12) m
+-- @
+--
+-- This can actually lead to a space leak. The value is not actually extracted
+-- from the array until that value (now buried in a map) is forced. That means
+-- the entire array may be kept live by just that value!  Often, the solution
+-- is to use a strict map, or to force the value before storing it, but for
+-- some purposes that's undesirable.
+--
+-- One common solution is to include an indexing function that can produce its
+-- result in an arbitrary @Applicative@ context:
+--
+-- @
+-- indexA :: Applicative f => Array a -> Int -> f a
+-- @
+--
+-- When using @indexA@ in a /pure/ context, @Solo@ serves as a handy
+-- @Applicative@ functor to hold the result. You could write a non-leaky
+-- version of the above example thus:
+--
+-- @
+-- case arr `indexA` 12 of
+--   Solo a -> insert "hello" a m
+-- @
+--
+-- While such simple extraction functions are the most common uses for
+-- unary tuples, they can also be useful for fine-grained control of
+-- strict-spined data structure traversals, and for unifying the
+-- implementations of lazy and strict mapping functions.
+data Solo a = Solo { getSolo :: a }
 
 data (a,b) = (a,b)
 data (a,b,c) = (a,b,c)
