@@ -233,3 +233,10 @@ test('test-hooks-plugin',
      ['-package-db hooks-plugin/pkg.hooks-plugin/local.package.conf '+ config.plugin_way_flags])
 
 test('plugins-ghci', [extra_files(['HomePackagePlugin.hs']), only_ways(['ghci'])], compile_and_run, ['-package ghc'])
+
+test('plugin-recomp-change-2',
+     [extra_files(['plugin-recomp/', 'plugin-recomp-test.hs', 'PluginRecompTest.hs']),
+      only_ways([config.ghc_plugin_way]),
+      pre_cmd('$MAKE -s --no-print-directory -C plugin-recomp package.plugins01 TOP={top}')
+      ],
+     makefile_test, [])

@@ -139,3 +139,10 @@ T19926:
 .PHONY: HoleFitPlugin
 HoleFitPlugin:
 	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) -v0 HoleFitPlugin.hs -package-db hole-fit-plugin/pkg.hole-fit-plugin/local.package.conf
+
+# Should recompile the module because the plugin changed
+.PHONY: plugin-recomp-change-2
+plugin-recomp-change-2:
+	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) -v0 plugin-recomp-test.hs PluginRecompTest.hs -package-db plugin-recomp/pkg.plugins01/local.package.conf -fplugin PurePlugin
+	"$(MAKE)" -s --no-print-directory -C plugin-recomp package.plugins01 TOP=$(TOP) RUN=-DRUN2
+	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) -v0 plugin-recomp-test.hs PluginRecompTest.hs -package-db plugin-recomp/pkg.plugins01/local.package.conf -fplugin PurePlugin
