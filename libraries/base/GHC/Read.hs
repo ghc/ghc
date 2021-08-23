@@ -669,7 +669,25 @@ instance Read () where
   readList     = readListDefault
 
 -- | @since 4.15
-deriving instance Read a => Read (Solo a)
+instance Read a => Read (Solo a) where
+  -- Since our `show` doesn't show record syntax, we want to accept non-record
+  -- syntax. Since Solo is actually a record, it only seems fair to accept
+  -- record syntax as well.
+  readPrec = parens $
+     (prec appPrec $
+        do expectP (L.Ident "Solo")
+           x <- step readPrec
+           return (Solo x))
+     +++
+      (prec appPrec1
+             (do expectP (L.Ident "Solo")
+                 expectP (L.Punc "{")
+                 x <- readField
+                              "getSolo" (reset readPrec)
+                 expectP (L.Punc "}")
+                 return (Solo x)))
+
+  readListPrec = readListPrecDefault
 
 -- | @since 2.01
 instance (Read a, Read b) => Read (a,b) where

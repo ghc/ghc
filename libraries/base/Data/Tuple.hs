@@ -16,7 +16,8 @@
 -----------------------------------------------------------------------------
 
 module Data.Tuple
-  ( fst
+  ( Solo (..)
+  , fst
   , snd
   , curry
   , uncurry
@@ -24,6 +25,7 @@ module Data.Tuple
   ) where
 
 import GHC.Base ()      -- Note [Depend on GHC.Tuple]
+import GHC.Tuple (Solo (..))
 
 default ()              -- Double isn't available yet
 
