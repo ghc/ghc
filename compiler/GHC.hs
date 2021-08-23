@@ -1493,7 +1493,7 @@ getNameToInstancesIndex visible_mods mods_to_load = do
              let doc = text "Need interface for reporting instances in scope"
              in initIfaceTcRn $ mapM_ (loadSysInterface doc) mods
 
-       ; InstEnvs {ie_global, ie_local} <- tcGetInstEnvs
+       ; InstEnvs {ie_global, ie_local_obj, ie_local_tc} <- tcGetInstEnvs
        ; let visible_mods' = mkModuleSet visible_mods
        ; (pkg_fie, home_fie) <- tcGetFamInstEnvs
        -- We use Data.Sequence.Seq because we are creating left associated
@@ -1501,7 +1501,7 @@ getNameToInstancesIndex visible_mods mods_to_load = do
        -- cls_index and fam_index below are adapted from GHC.Tc.Module.lookupInsts
        ; let cls_index = Map.fromListWith mappend
                  [ (n, Seq.singleton ispec)
-                 | ispec <- instEnvElts ie_local ++ instEnvElts ie_global
+                 | ispec <- instEnvElts ie_local_tc ++ instEnvElts ie_local_obj ++ instEnvElts ie_global
                  , instIsVisible visible_mods' ispec
                  , n <- nameSetElemsStable $ orphNamesOfClsInst ispec
                  ]

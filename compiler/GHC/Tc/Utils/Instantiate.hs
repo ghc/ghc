@@ -851,20 +851,22 @@ tcExtendLocalInstEnv dfuns thing_inside
       -- there are a very small number of TcGblEnv. Keeping a TcGblEnv
       -- alive is quite dangerous because it contains reference to many
       -- large data structures.
-      ; let !init_inst_env = tcg_inst_env env
+      ; let !init_obj_inst_env = tcg_obj_inst_env env
+            !init_tc_inst_env  = tcg_tc_inst_env env
+
             !init_insts = tcg_insts env
-      ; (inst_env', cls_insts') <- foldlM addLocalInst
-                                          (init_inst_env, init_insts)
+      ; (inst_env', cls_insts') <- foldlM (addLocalInst init_obj_inst_env)
+                                          (init_tc_inst_env, init_insts)
                                           dfuns
       ; let env' = env { tcg_insts    = cls_insts'
-                       , tcg_inst_env = inst_env' }
+                       , tcg_tc_inst_env = inst_env' }
       ; setGblEnv env' thing_inside }
 
-addLocalInst :: (InstEnv, [ClsInst]) -> ClsInst -> TcM (InstEnv, [ClsInst])
+addLocalInst :: InstEnv -> (InstEnv, [ClsInst]) -> ClsInst -> TcM (InstEnv, [ClsInst])
 -- Check that the proposed new instance is OK,
 -- and then add it to the home inst env
 -- If overwrite_inst, then we can overwrite a direct match
-addLocalInst (home_ie, my_insts) ispec
+addLocalInst home_obj_ie (home_tc_ie, my_insts) ispec
    = do {
              -- Load imported instances, so that we report
              -- duplicates correctly
@@ -879,13 +881,17 @@ addLocalInst (home_ie, my_insts) ispec
            -- In GHCi, we *override* any identical instances
            -- that are also defined in the interactive context
            -- See Note [Override identical instances in GHCi]
-         ; let home_ie'
-                 | isGHCi    = deleteFromInstEnv home_ie ispec
-                 | otherwise = home_ie
+         ; let home_obj_ie'
+                 | isGHCi    = deleteFromInstEnv home_obj_ie ispec
+                 | otherwise = home_obj_ie
+               home_tc_ie'
+                 | isGHCi    = deleteFromInstEnv home_tc_ie ispec
+                 | otherwise = home_tc_ie
 
                global_ie = eps_inst_env eps
                inst_envs = InstEnvs { ie_global  = global_ie
-                                    , ie_local   = home_ie'
+                                    , ie_local_obj = home_obj_ie'
+                                    , ie_local_tc  = home_tc_ie'
                                     , ie_visible = tcVisibleOrphanMods tcg_env }
 
              -- Check for inconsistent functional dependencies
@@ -895,12 +901,13 @@ addLocalInst (home_ie, my_insts) ispec
 
              -- Check for duplicate instance decls.
          ; let (_tvs, cls, tys) = instanceHead ispec
-               (matches, _, _)  = lookupInstEnv False inst_envs cls tys
+               -- TODO: MP check callsite
+               (matches, _, _)  = lookupInstEnv False False inst_envs cls tys
                dups             = filter (identicalClsInstHead ispec) (map fst matches)
          ; unless (null dups) $
            dupInstErr ispec (head dups)
 
-         ; return (extendInstEnv home_ie' ispec, ispec : my_insts) }
+         ; return (extendInstEnv home_tc_ie' ispec, ispec : my_insts) }
 
 {-
 Note [Signature files and type class instances]

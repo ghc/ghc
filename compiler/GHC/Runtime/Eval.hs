@@ -1073,8 +1073,8 @@ getDictionaryBindings theta = do
 -- Find instances where the head unifies with the provided type
 findMatchingInstances :: Type -> TcM [(ClsInst, [DFunInstType])]
 findMatchingInstances ty = do
-  ies@(InstEnvs {ie_global = ie_global, ie_local = ie_local}) <- tcGetInstEnvs
-  let allClasses = instEnvClasses ie_global ++ instEnvClasses ie_local
+  ies@(InstEnvs {ie_global = ie_global, ie_local_obj = ie_local, ie_local_tc = ie_local_tc }) <- tcGetInstEnvs
+  let allClasses = instEnvClasses ie_global ++ instEnvClasses ie_local ++ instEnvClasses ie_local_tc
   return $ concatMap (try_cls ies) allClasses
   where
   {- Check that a class instance is well-kinded.
@@ -1085,7 +1085,8 @@ findMatchingInstances ty = do
     | Just (_, arg_kind, res_kind) <- splitFunTy_maybe (tyConKind $ classTyCon cls)
     , tcIsConstraintKind res_kind
     , Type.typeKind ty `eqType` arg_kind
-    , (matches, _, _) <- lookupInstEnv True ies cls [ty]
+    -- TODO: Check site MP
+    , (matches, _, _) <- lookupInstEnv True False ies cls [ty]
     = matches
     | otherwise
     = []

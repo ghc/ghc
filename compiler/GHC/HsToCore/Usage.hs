@@ -69,9 +69,7 @@ mkDependencies :: HomeUnit -> Module -> ImportAvails -> [Module] -> Dependencies
 mkDependencies home_unit mod imports plugin_mods =
   let (home_plugins, external_plugins) = partition (isHomeUnit home_unit . moduleUnit) plugin_mods
       plugin_units = map (toUnitId . moduleUnit) external_plugins
-      all_direct_mods = foldr (\mn m -> addToUFM m mn (GWIB mn NotBoot))
-                              (imp_direct_dep_mods imports)
-                              (map moduleName home_plugins)
+      all_direct_mods = imp_direct_dep_mods imports
 
       direct_mods = modDepsElts (delFromUFM all_direct_mods (moduleName mod))
             -- M.hi-boot can be in the imp_dep_mods, but we must remove
@@ -80,6 +78,8 @@ mkDependencies home_unit mod imports plugin_mods =
             --  loadHiBootInterface can see if M's direct imports depend
             --  on M.hi-boot, and hence that we should do the hi-boot consistency
             --  check.)
+
+      direct_splice_mods = modDepsElts (imp_direct_dep_splice_mods imports)
 
       dep_orphs = filter (/= mod) (imp_orphs imports)
             -- We must also remove self-references from imp_orphs. See
@@ -98,6 +98,8 @@ mkDependencies home_unit mod imports plugin_mods =
       sig_mods = filter (/= (moduleName mod)) $ imp_sig_mods imports
 
   in Deps { dep_direct_mods  = direct_mods
+          , dep_direct_splice_mods = direct_splice_mods
+          , dep_plugin_mods  = Set.fromList (map moduleName home_plugins)
           , dep_direct_pkgs  = direct_pkgs
           , dep_sig_mods     = sort sig_mods
           , dep_trusted_pkgs = trust_pkgs

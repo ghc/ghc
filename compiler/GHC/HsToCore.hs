@@ -115,7 +115,7 @@ deSugar hsc_env
                             tcg_th_splice_used = tc_splice_used,
                             tcg_rdr_env      = rdr_env,
                             tcg_fix_env      = fix_env,
-                            tcg_inst_env     = inst_env,
+                            tcg_obj_inst_env  = inst_env,
                             tcg_fam_inst_env = fam_inst_env,
                             tcg_merged       = merged,
                             tcg_warns        = warns,

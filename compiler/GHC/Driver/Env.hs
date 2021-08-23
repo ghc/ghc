@@ -285,7 +285,7 @@ hptSomeThingsBelowUs extract include_hi_boot hsc_env deps
     in
     [ thing
     |   -- Find each non-hi-boot module below me
-      GWIB { gwib_mod = mod, gwib_isBoot = is_boot } <- Set.toList (hptModulesBelow hsc_env deps)
+      GWIB { gwib_mod = mod, gwib_isBoot = is_boot } <- Set.toList (pprTraceIt "modules" $ hptModulesBelow hsc_env deps)
     , include_hi_boot || (is_boot == NotBoot)
 
         -- unsavoury: when compiling the base package with --make, we

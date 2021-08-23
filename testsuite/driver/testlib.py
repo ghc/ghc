@@ -748,7 +748,7 @@ def no_check_hp(name, opts):
 def filter_stdout_lines( regex ):
     """ Filter lines of stdout with the given regular expression """
     def f( name, opts ):
-        _normalise_fun(name, opts, lambda s: '\n'.join(re.findall(regex, s)))
+        _normalise_fun(name, opts, lambda s: print(s)) # '\n'.join(re.findall(regex, s)))
     return f
 
 def normalise_slashes( name, opts ):

@@ -1,0 +1,6 @@
+
+SI08.hs:10:25: error:
+    • No instance for (C X) arising from a use of ‘x’
+    • In the second argument of ‘const’, namely ‘(x vx)’
+      In the expression: const [| x vx |] (x vx)
+      In the untyped splice: $(const [| x vx |] (x vx))

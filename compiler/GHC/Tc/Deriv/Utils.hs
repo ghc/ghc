@@ -1036,8 +1036,8 @@ extendLocalInstEnv :: [ClsInst] -> TcM a -> TcM a
 -- for functional dependency errors -- that'll happen in GHC.Tc.TyCl.Instance
 extendLocalInstEnv dfuns thing_inside
  = do { env <- getGblEnv
-      ; let  inst_env' = extendInstEnvList (tcg_inst_env env) dfuns
-             env'      = env { tcg_inst_env = inst_env' }
+      ; let  inst_env' = extendInstEnvList (tcg_tc_inst_env env) dfuns
+             env'      = env { tcg_tc_inst_env = inst_env' }
       ; setGblEnv env' thing_inside }
 
 {-

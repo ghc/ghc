@@ -1,0 +1,11 @@
+
+SI05.hs:9:11: error:
+    • Ambiguous occurrence ‘sid’
+      It could refer to
+         either ‘SI01A.sid’,
+                imported from ‘SI01A’ at SI05.hs:5:1-12
+                (and originally defined at SI01A.hs:3:1-3)
+             or ‘SI05A.sid’,
+                imported from ‘SI05A’ at SI05.hs:6:1-19
+                (and originally defined at SI05A.hs:3:1-3)
+    • In the untyped splice: $(sid [| pure () |])

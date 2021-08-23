@@ -1711,7 +1711,8 @@ reifyInstances' th_nm th_tys
             Just (tc, tys)                 -- See #7910
                | Just cls <- tyConClass_maybe tc
                -> do { inst_envs <- tcGetInstEnvs
-                     ; let (matches, unifies, _) = lookupInstEnv False inst_envs cls tys
+                      -- MP: Check call site
+                     ; let (matches, unifies, _) = lookupInstEnv False False inst_envs cls tys
                      ; traceTc "reifyInstances'1" (ppr matches)
                      ; return $ Left (cls, map fst matches ++ unifies) }
                | isOpenFamilyTyCon tc

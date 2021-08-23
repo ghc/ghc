@@ -144,7 +144,8 @@ checkHsigIface tcg_env gr sig_iface
     -- checking instance satisfiability
     -- TODO: this should not be necessary
     tcg_env <- getGblEnv
-    setGblEnv tcg_env { tcg_inst_env = emptyInstEnv,
+    setGblEnv tcg_env { tcg_tc_inst_env = emptyInstEnv,
+                        tcg_obj_inst_env =  emptyInstEnv,
                         tcg_fam_inst_env = emptyFamInstEnv,
                         tcg_insts = [],
                         tcg_fam_insts = [] } $ do
@@ -895,7 +896,7 @@ mergeSignatures
                 -- see Note [Signature merging DFuns]
                 = (inst:insts, extendInstEnv inst_env inst)
             (insts, inst_env) = foldl' merge_inst
-                                    (tcg_insts tcg_env, tcg_inst_env tcg_env)
+                                    (tcg_insts tcg_env, tcg_tc_inst_env tcg_env)
                                     (md_insts details)
             -- This is a HACK to prevent calculateAvails from including imp_mod
             -- in the listing.  We don't want it because a module is NOT
@@ -903,9 +904,9 @@ mergeSignatures
             iface' = iface { mi_final_exts = (mi_final_exts iface){ mi_orphan = False, mi_finsts = False } }
             home_unit = hsc_home_unit hsc_env
             avails = plusImportAvails (tcg_imports tcg_env) $
-                        calculateAvails home_unit iface' False NotBoot ImportedBySystem
+                        calculateAvails home_unit iface' False NotBoot False ImportedBySystem
         return tcg_env {
-            tcg_inst_env = inst_env,
+            tcg_tc_inst_env = inst_env,
             tcg_insts    = insts,
             tcg_imports  = avails,
             tcg_merged   =
@@ -993,7 +994,7 @@ checkImplements impl_mod req_mod@(Module uid mod_name) = do
                          (dep_orphs (mi_deps impl_iface))
 
     let avails = calculateAvails home_unit
-                    impl_iface False{- safe -} NotBoot ImportedBySystem
+                    impl_iface False{- safe -} NotBoot False ImportedBySystem
         fix_env = mkNameEnv [ (greMangledName rdr_elt, FixItem occ f)
                             | (occ, f) <- mi_fixities impl_iface
                             , rdr_elt <- lookupGlobalRdrEnv impl_gr occ ]

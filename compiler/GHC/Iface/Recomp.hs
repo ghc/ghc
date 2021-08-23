@@ -455,6 +455,7 @@ checkDependencies hsc_env summary iface
     res <- liftIO $ traverse (\(mb_pkg, L _ mod) ->
               let reason = moduleNameString mod ++ " changed"
               in classify reason <$> findImportedModule fc fopts units home_unit mod (mb_pkg))
+              -- MP: TODO
               (ms_imps summary ++ ms_srcimps summary)
     case sequence (res ++ [Right (fake_ghc_prim_import)| ms_ghc_prim_import summary]) of
       Left recomp -> return recomp
@@ -1196,6 +1197,8 @@ getOrphanHashes hsc_env mods = do
 sortDependencies :: Dependencies -> Dependencies
 sortDependencies d
  = Deps { dep_direct_mods  = dep_direct_mods d,
+          dep_direct_splice_mods = dep_direct_splice_mods d,
+          dep_plugin_mods  = dep_plugin_mods d,
           dep_direct_pkgs  = dep_direct_pkgs d,
           dep_sig_mods     = sort (dep_sig_mods d),
           dep_trusted_pkgs = dep_trusted_pkgs d,

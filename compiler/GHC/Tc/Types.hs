@@ -450,7 +450,8 @@ data TcGblEnv
                 -- bound in this module when dealing with hi-boot recursions
                 -- Updated at intervals (e.g. after dealing with types and classes)
 
-        tcg_inst_env     :: !InstEnv,
+        tcg_obj_inst_env     :: !InstEnv,
+        tcg_tc_inst_env  :: !InstEnv,
           -- ^ Instance envt for all /home-package/ modules;
           -- Includes the dfuns in tcg_insts
           -- NB. BangPattern is to fix a leak, see #15111
@@ -1390,6 +1391,9 @@ data ImportAvails
 
         imp_direct_dep_mods :: ModuleNameEnv ModuleNameWithIsBoot,
           -- ^ Home-package modules directly imported by the module being compiled.
+        imp_direct_dep_splice_mods :: ModuleNameEnv ModuleNameWithIsBoot,
+          -- ^ Home-package modules directly splice imported by the module being compiled.
+
 
         imp_dep_direct_pkgs :: Set UnitId,
           -- ^ Packages directly needed by the module being compiled
@@ -1456,6 +1460,7 @@ modDepsElts = S.fromList . nonDetEltsUFM
 emptyImportAvails :: ImportAvails
 emptyImportAvails = ImportAvails { imp_mods          = emptyModuleEnv,
                                    imp_direct_dep_mods = emptyUFM,
+                                   imp_direct_dep_splice_mods = emptyUFM,
                                    imp_dep_direct_pkgs = S.empty,
                                    imp_sig_mods      = [],
                                    imp_trust_pkgs    = S.empty,
@@ -1473,6 +1478,7 @@ plusImportAvails ::  ImportAvails ->  ImportAvails ->  ImportAvails
 plusImportAvails
   (ImportAvails { imp_mods = mods1,
                   imp_direct_dep_mods = ddmods1,
+                  imp_direct_dep_splice_mods = ddsplicemods1,
                   imp_dep_direct_pkgs = ddpkgs1,
                   imp_boot_mods = srs1,
                   imp_sig_mods = sig_mods1,
@@ -1480,6 +1486,7 @@ plusImportAvails
                   imp_orphs = orphs1, imp_finsts = finsts1 })
   (ImportAvails { imp_mods = mods2,
                   imp_direct_dep_mods = ddmods2,
+                  imp_direct_dep_splice_mods = ddsplicemods2,
                   imp_dep_direct_pkgs = ddpkgs2,
                   imp_boot_mods = srcs2,
                   imp_sig_mods = sig_mods2,
@@ -1487,6 +1494,7 @@ plusImportAvails
                   imp_orphs = orphs2, imp_finsts = finsts2 })
   = ImportAvails { imp_mods          = plusModuleEnv_C (++) mods1 mods2,
                    imp_direct_dep_mods = ddmods1 `plusModDeps` ddmods2,
+                   imp_direct_dep_splice_mods = ddsplicemods1 `plusModDeps` ddsplicemods2,
                    imp_dep_direct_pkgs      = ddpkgs1 `S.union` ddpkgs2,
                    imp_trust_pkgs    = tpkgs1 `S.union` tpkgs2,
                    imp_trust_own_pkg = tself1 || tself2,

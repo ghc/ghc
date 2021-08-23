@@ -181,6 +181,7 @@ import Data.Data ( Data )
 import qualified Data.Set as S
 import Control.DeepSeq
 import Control.Monad
+import GHC.Utils.Trace
 
 {-
 ************************************************************************
@@ -371,8 +372,11 @@ tcRnImports hsc_env import_decls
   = do  { (rn_imports, rdr_env, imports, hpc_info) <- rnImports import_decls ;
 
         ; this_mod <- getModule
-        ; let { dep_mods :: ModuleNameEnv ModuleNameWithIsBoot
+        ; let { splice_imports = xopt LangExt.SpliceImports (hsc_dflags hsc_env)
+              ; dep_mods, dep_splice_mods :: ModuleNameEnv ModuleNameWithIsBoot
               ; dep_mods = imp_direct_dep_mods imports
+
+              ; dep_splice_mods = imp_direct_dep_splice_mods imports
 
                 -- We want instance declarations from all home-package
                 -- modules below this one, including boot modules, except
@@ -381,9 +385,21 @@ tcRnImports hsc_env import_decls
                 -- filtering also ensures that we don't see instances from
                 -- modules batch (@--make@) compiled before this one, but
                 -- which are not below this one.
-              ; (home_insts, home_fam_insts) = hptInstancesBelow hsc_env (moduleName this_mod)
+              ; (home_tc_insts, home_tc_fam_insts) = hptInstancesBelow hsc_env (moduleName this_mod)
                                                                  (S.fromList (eltsUFM dep_mods))
+
+              ; (home_obj_insts, home_obj_fam_insts)
+                    | splice_imports = hptInstancesBelow hsc_env (moduleName this_mod)
+                                                                 (S.fromList (eltsUFM dep_splice_mods))
+                    | otherwise =  assert (isNullUFM dep_splice_mods) (home_tc_insts, [])
+
+
+              ; home_fam_insts =  home_obj_fam_insts ++ home_tc_fam_insts
               } ;
+
+              ; pprTraceM "home_insts" (ppr dep_mods $$ ppr dep_splice_mods)
+              ; pprTraceM "home_insts" (ppr home_obj_insts $$ ppr home_tc_insts)
+
 
                 -- Record boot-file info in the EPS, so that it's
                 -- visible to loadHiBootInterface in tcRnSrcDecls,
@@ -398,7 +414,8 @@ tcRnImports hsc_env import_decls
               tcg_rdr_env      = tcg_rdr_env gbl `plusGlobalRdrEnv` rdr_env,
               tcg_imports      = tcg_imports gbl `plusImportAvails` imports,
               tcg_rn_imports   = rn_imports,
-              tcg_inst_env     = extendInstEnvList (tcg_inst_env gbl) home_insts,
+              tcg_obj_inst_env = extendInstEnvList (tcg_obj_inst_env gbl) home_obj_insts,
+              tcg_tc_inst_env  = extendInstEnvList (tcg_tc_inst_env gbl) home_tc_insts,
               tcg_fam_inst_env = extendFamInstEnvList (tcg_fam_inst_env gbl)
                                                       home_fam_insts,
               tcg_hpc          = hpc_info
@@ -1705,7 +1722,8 @@ tcMissingParentClassWarn warnFlag isName shouldName
     checkShouldInst isClass shouldClass isInst
       = do { instEnv <- tcGetInstEnvs
            ; let (instanceMatches, shouldInsts, _)
-                    = lookupInstEnv False instEnv shouldClass (is_tys isInst)
+                    -- MP: Check call site
+                    = lookupInstEnv False False instEnv shouldClass (is_tys isInst)
 
            ; traceTc "tcMissingParentClassWarn/checkShouldInst"
                      (hang (ppr isInst) 4
@@ -2060,8 +2078,8 @@ runTcInteractive hsc_env thing_inside
        ; let gbl_env' = gbl_env {
                            tcg_rdr_env      = ic_rn_gbl_env icxt
                          , tcg_type_env     = type_env
-                         , tcg_inst_env     = extendInstEnvList
-                                               (extendInstEnvList (tcg_inst_env gbl_env) ic_insts)
+                         , tcg_obj_inst_env = extendInstEnvList
+                                               (extendInstEnvList (tcg_obj_inst_env gbl_env) ic_insts)
                                                home_insts
                          , tcg_fam_inst_env = extendFamInstEnvList
                                                (extendFamInstEnvList (tcg_fam_inst_env gbl_env)
@@ -2871,7 +2889,7 @@ tcRnGetInfo hsc_env name
 -- could be changed to consult that index.
 lookupInsts :: TyThing -> TcM ([ClsInst],[FamInst])
 lookupInsts (ATyCon tc)
-  = do  { InstEnvs { ie_global = pkg_ie, ie_local = home_ie, ie_visible = vis_mods } <- tcGetInstEnvs
+  = do  { InstEnvs { ie_global = pkg_ie, ie_local_obj = home_ie, ie_local_tc = home_ie_tc, ie_visible = vis_mods } <- tcGetInstEnvs
         ; (pkg_fie, home_fie) <- tcGetFamInstEnvs
                 -- Load all instances for all classes that are
                 -- in the type environment (which are all the ones
@@ -2881,7 +2899,7 @@ lookupInsts (ATyCon tc)
           -- the instances whose head contains the thing's name.
         ; let cls_insts =
                  [ ispec        -- Search all
-                 | ispec <- instEnvElts home_ie ++ instEnvElts pkg_ie
+                 | ispec <- instEnvElts home_ie ++ instEnvElts pkg_ie ++ instEnvElts home_ie_tc
                  , instIsVisible vis_mods ispec
                  , tc_name `elemNameSet` orphNamesOfClsInst ispec ]
         ; let fam_insts =

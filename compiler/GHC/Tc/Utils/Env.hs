@@ -346,7 +346,8 @@ tcGetInstEnvs :: TcM InstEnvs
 tcGetInstEnvs = do { eps <- getEps
                    ; env <- getGblEnv
                    ; return (InstEnvs { ie_global  = eps_inst_env eps
-                                      , ie_local   = tcg_inst_env env
+                                      , ie_local_obj   = tcg_obj_inst_env env
+                                      , ie_local_tc    = tcg_tc_inst_env env
                                       , ie_visible = tcVisibleOrphanMods env }) }
 
 instance MonadThings (IOEnv (Env TcGblEnv TcLclEnv)) where

@@ -723,8 +723,8 @@ instance ExactPrint (LocatedP WarningTxt) where
 
 instance ExactPrint (ImportDecl GhcPs) where
   getAnnotationEntry idecl = fromAnn (ideclExt idecl)
-  exact x@(ImportDecl EpAnnNotUsed _ _ _ _ _ _ _ _ _) = withPpr x
-  exact (ImportDecl ann@(EpAnn _ an _) msrc (L lm modname) mpkg _src safeflag qualFlag _impl mAs hiding) = do
+  exact x@(ImportDecl EpAnnNotUsed _ _ _ _ _ _ _ _ _ _) = withPpr x
+  exact (ImportDecl ann@(EpAnn _ an _) msrc (L lm modname) mpkg _src _splice safeflag qualFlag _impl mAs hiding) = do
 
     markAnnKw ann importDeclAnnImport AnnImport
 

@@ -47,6 +47,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Misc( splitAtList, fstOf3 )
 
 import Data.Maybe
+import GHC.Utils.Trace
 
 {- *******************************************************************
 *                                                                    *
@@ -162,10 +163,16 @@ matchGlobalInst dflags short_cut clas tys
 matchInstEnv :: DynFlags -> Bool -> Class -> [Type] -> TcM ClsInstResult
 matchInstEnv dflags short_cut_solver clas tys
    = do { instEnvs <- tcGetInstEnvs
+        ; st <- getStage
+        ; let in_splice = case st of
+                            Splice {} -> True
+                            _ -> False
+        ; pprTraceM "matchInstEnv" (ppr st)
         ; let safeOverlapCheck = safeHaskell dflags `elem` [Sf_Safe, Sf_Trustworthy]
-              (matches, unify, unsafeOverlaps) = lookupInstEnv True instEnvs clas tys
+              -- MP: TODO check callsite, probably needs to change
+              (matches, unify, unsafeOverlaps) = lookupInstEnv True in_splice instEnvs clas tys
               safeHaskFail = safeOverlapCheck && not (null unsafeOverlaps)
-        ; traceTc "matchInstEnv" $
+        ; pprTraceM "matchInstEnv" $
             vcat [ text "goal:" <+> ppr clas <+> ppr tys
                  , text "matches:" <+> ppr matches
                  , text "unify:" <+> ppr unify ]

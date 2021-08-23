@@ -53,6 +53,7 @@ import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
+import GHC.Utils.Trace
 
 {-
 ************************************************************************
@@ -395,7 +396,8 @@ type InstEnv = UniqDFM Class ClsInstEnv      -- Maps Class to instances for that
 -- directly imported) used to test orphan instance visibility.
 data InstEnvs = InstEnvs {
         ie_global  :: InstEnv,               -- External-package instances
-        ie_local   :: InstEnv,               -- Home-package instances
+        ie_local_obj   :: InstEnv,           -- Home-package instances available in top-level splices
+        ie_local_tc    :: InstEnv,           -- Home-package instances available outside top-level splice
         ie_visible :: VisibleOrphanModules   -- Set of all orphan modules transitively
                                              -- reachable from the module being compiled
                                              -- See Note [Instance lookup and orphan instances]
@@ -446,8 +448,8 @@ instIsVisible vis_mods ispec
                | otherwise                   -> True
 
 classInstances :: InstEnvs -> Class -> [ClsInst]
-classInstances (InstEnvs { ie_global = pkg_ie, ie_local = home_ie, ie_visible = vis_mods }) cls
-  = get home_ie ++ get pkg_ie
+classInstances (InstEnvs { ie_global = pkg_ie, ie_local_obj = home_obj_ie, ie_local_tc = home_tc_ie, ie_visible = vis_mods }) cls
+  = get home_tc_ie ++ get home_obj_ie ++ get pkg_ie
   where
     get env = case lookupUDFM env cls of
                 Just (ClsIE insts) -> filter (instIsVisible vis_mods) insts
@@ -796,11 +798,13 @@ anyone noticing, so it's manifestly not ruining anyone's day.)
 -- |Look up an instance in the given instance environment. The given class application must match exactly
 -- one instance and the match may not contain any flexi type variables.  If the lookup is unsuccessful,
 -- yield 'Left errorMessage'.
+
+-- MP: TODO, check callsite
 lookupUniqueInstEnv :: InstEnvs
                     -> Class -> [Type]
                     -> Either SDoc (ClsInst, [Type])
 lookupUniqueInstEnv instEnv cls tys
-  = case lookupInstEnv False instEnv cls tys of
+  = case lookupInstEnv False False instEnv cls tys of
       ([(inst, inst_tys)], _, _)
              | noFlexiVar -> Right (inst, inst_tys')
              | otherwise  -> Left $ text "flexible type variable:" <+>
@@ -879,25 +883,31 @@ lookupInstEnv' ie vis_mods cls tys
 ---------------
 -- This is the common way to call this function.
 lookupInstEnv :: Bool              -- Check Safe Haskell overlap restrictions
+              -> Bool              -- True iff in top-level splice
               -> InstEnvs          -- External and home package inst-env
               -> Class -> [Type]   -- What we are looking for
               -> ClsInstLookupResult
 -- ^ See Note [Rules for instance lookup]
 -- ^ See Note [Safe Haskell Overlapping Instances] in "GHC.Tc.Solver"
 -- ^ See Note [Safe Haskell Overlapping Instances Implementation] in "GHC.Tc.Solver"
-lookupInstEnv check_overlap_safe
+lookupInstEnv check_overlap_safe is_splice_context
               (InstEnvs { ie_global = pkg_ie
-                        , ie_local = home_ie
+                        , ie_local_obj = home_obj_ie
+                        , ie_local_tc  = home_tc_ie
                         , ie_visible = vis_mods })
               cls
               tys
   = -- pprTrace "lookupInstEnv" (ppr cls <+> ppr tys $$ ppr home_ie) $
-    (final_matches, final_unifs, unsafe_overlapped)
+    (pprTraceIt "insts" final_matches, final_unifs, unsafe_overlapped)
   where
-    (home_matches, home_unifs) = lookupInstEnv' home_ie vis_mods cls tys
+    (home_obj_matches, home_unifs) = lookupInstEnv' home_obj_ie vis_mods cls tys
+    (home_tc_matches, home_tc_unifs) = lookupInstEnv' home_tc_ie vis_mods cls tys
+    home_matches
+      | is_splice_context  = home_obj_matches
+      | otherwise = home_tc_matches
     (pkg_matches,  pkg_unifs)  = lookupInstEnv' pkg_ie  vis_mods cls tys
     all_matches = home_matches ++ pkg_matches
-    all_unifs   = home_unifs   ++ pkg_unifs
+    all_unifs   = home_tc_unifs ++ home_unifs   ++ pkg_unifs
     final_matches = foldr insert_overlapping [] all_matches
         -- Even if the unifs is non-empty (an error situation)
         -- we still prune the matches, so that the error message isn't

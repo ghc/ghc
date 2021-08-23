@@ -1715,6 +1715,8 @@ mkRootMap summaries = ModNodeMap $ Map.insertListWith
   [ (msKey $ emsModSummary s, [Right s]) | s <- summaries ]
   Map.empty
 
+
+
 -- | Returns the dependencies of the ModSummary s.
 -- A wrinkle is that for a {-# SOURCE #-} import we return
 --      *both* the hs-boot file

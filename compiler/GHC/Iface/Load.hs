@@ -1187,6 +1187,8 @@ pprUsageImport usage usg_mod'
 -- | Pretty-print unit dependencies
 pprDeps :: UnitState -> Dependencies -> SDoc
 pprDeps unit_state (Deps { dep_direct_mods = dmods
+                         , dep_direct_splice_mods = splice_mods
+                         , dep_plugin_mods = plugin_mods
                          , dep_boot_mods = bmods
                          , dep_orphs = orphs
                          , dep_direct_pkgs = pkgs
@@ -1195,6 +1197,8 @@ pprDeps unit_state (Deps { dep_direct_mods = dmods
                          })
   = pprWithUnitState unit_state $
     vcat [text "direct module dependencies:"  <+> ppr_set ppr_mod dmods,
+          text "direct splice module dependencies" <+> ppr_set ppr_mod splice_mods,
+          text "direct plugin module dependencies" <+> ppr_set ppr plugin_mods,
           text "boot module dependencies:"    <+> ppr_set ppr bmods,
           text "direct package dependencies:" <+> ppr_set ppr pkgs,
           if null tps

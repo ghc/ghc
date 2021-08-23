@@ -74,7 +74,7 @@ import GHC.Utils.FV ( fvVarList, unionFV )
 
 import GHC.Data.Bag
 import GHC.Data.FastString
-import GHC.Utils.Trace (pprTraceUserWarning)
+import GHC.Utils.Trace (pprTraceUserWarning, pprTraceM)
 import GHC.Data.List.SetOps ( equivClasses )
 import GHC.Data.Maybe
 import qualified GHC.Data.Strict as Strict
@@ -2400,8 +2400,13 @@ mkDictErr :: ReportErrCtxt -> [Ct] -> TcM Report
 mkDictErr ctxt cts
   = assert (not (null cts)) $
     do { inst_envs <- tcGetInstEnvs
+       ; st <- getStage
+       ; pprTraceM "mkDictErr" (ppr st)
+       ; let in_splice = case st of
+                          Splice{} -> True
+                          _ -> False
        ; let min_cts = elim_superclasses cts
-             lookups = map (lookup_cls_inst inst_envs) min_cts
+             lookups = map (lookup_cls_inst inst_envs in_splice) min_cts
              (no_inst_cts, overlap_cts) = partition is_no_inst lookups
 
        -- Report definite no-instance errors,
@@ -2419,9 +2424,10 @@ mkDictErr ctxt cts
       && null matches
       && (null unifiers || all (not . isAmbiguousTyVar) (tyCoVarsOfCtList ct))
 
-    lookup_cls_inst inst_envs ct
+    lookup_cls_inst inst_envs in_splice ct
                 -- Note [Flattening in error message generation]
-      = (ct, lookupInstEnv True inst_envs clas (flattenTys emptyInScopeSet tys))
+      -- TODO: MP check callsite
+      = (ct, lookupInstEnv True in_splice inst_envs clas (flattenTys emptyInScopeSet tys))
       where
         (clas, tys) = getClassPredTys (ctPred ct)
 

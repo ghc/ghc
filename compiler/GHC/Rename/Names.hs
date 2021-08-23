@@ -413,7 +413,7 @@ rnImportDecl this_mod
             , imv_all_exports = potential_gres
             , imv_qualified   = qual_only
             }
-        imports = calculateAvails home_unit iface mod_safe' want_boot (ImportedByUser imv)
+        imports = calculateAvails home_unit iface mod_safe' want_boot mod_splice (ImportedByUser imv)
 
     -- Complain if we import a deprecated module
     case mi_warns iface of
@@ -435,15 +435,18 @@ rnImportDecl this_mod
 
     return (new_imp_decl, gbl_env, imports, mi_hpc iface)
 
+type IsSpliceImport = Bool
+
 -- | Calculate the 'ImportAvails' induced by an import of a particular
 -- interface, but without 'imp_mods'.
 calculateAvails :: HomeUnit
                 -> ModIface
                 -> IsSafeImport
                 -> IsBootInterface
+                -> IsSpliceImport
                 -> ImportedBy
                 -> ImportAvails
-calculateAvails home_unit iface mod_safe' want_boot imported_by =
+calculateAvails home_unit iface mod_safe' want_boot is_splice imported_by =
   let imp_mod    = mi_module iface
       imp_sem_mod= mi_semantic_module iface
       orph_iface = mi_orphan (mi_final_exts iface)
@@ -506,7 +509,11 @@ calculateAvails home_unit iface mod_safe' want_boot imported_by =
                         then S.empty
                         else S.singleton ipkg
 
-      direct_mods = mkModDeps $ if isHomeUnit home_unit pkg
+      direct_mods = mkModDeps $ if isHomeUnit home_unit pkg && not is_splice
+                      then S.singleton (GWIB (moduleName imp_mod) want_boot)
+                      else S.empty
+
+      direct_splice_mods = mkModDeps $ if isHomeUnit home_unit pkg && is_splice
                       then S.singleton (GWIB (moduleName imp_mod) want_boot)
                       else S.empty
 
@@ -533,6 +540,7 @@ calculateAvails home_unit iface mod_safe' want_boot imported_by =
           imp_finsts     = finsts,
           imp_sig_mods   = sig_mods,
           imp_direct_dep_mods = direct_mods,
+          imp_direct_dep_splice_mods = direct_splice_mods,
           imp_dep_direct_pkgs = dependent_pkgs,
           imp_boot_mods = boot_mods,
 

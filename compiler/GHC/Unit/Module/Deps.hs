@@ -31,6 +31,12 @@ data Dependencies = Deps
    { dep_direct_mods :: Set ModuleNameWithIsBoot
       -- ^ All home-package modules which are directly imported by this one.
 
+   , dep_direct_splice_mods :: Set ModuleNameWithIsBoot
+      -- ^ All home-package modules which are splice imported by this one
+
+   , dep_plugin_mods :: Set ModuleName
+      -- ^ All home-package plugins which are imported by this one
+
    , dep_direct_pkgs :: Set UnitId
       -- ^ All packages directly imported by this module
       -- I.e. packages to which this module's direct imports belong.
@@ -76,6 +82,8 @@ data Dependencies = Deps
 
 instance Binary Dependencies where
     put_ bh deps = do put_ bh (dep_direct_mods deps)
+                      put_ bh (dep_direct_splice_mods deps)
+                      put_ bh (dep_plugin_mods deps)
                       put_ bh (dep_direct_pkgs deps)
                       put_ bh (dep_trusted_pkgs deps)
                       put_ bh (dep_sig_mods deps)
@@ -84,6 +92,8 @@ instance Binary Dependencies where
                       put_ bh (dep_finsts deps)
 
     get bh = do dms <- get bh
+                spms <- get bh
+                plugins <- get bh
                 dps <- get bh
                 tps <- get bh
                 hsigms <- get bh
@@ -91,6 +101,8 @@ instance Binary Dependencies where
                 os <- get bh
                 fis <- get bh
                 return (Deps { dep_direct_mods = dms
+                             , dep_direct_splice_mods = spms
+                             , dep_plugin_mods = plugins
                              , dep_direct_pkgs = dps
                              , dep_sig_mods = hsigms
                              , dep_boot_mods = sms
@@ -101,6 +113,8 @@ instance Binary Dependencies where
 noDependencies :: Dependencies
 noDependencies = Deps
   { dep_direct_mods  = Set.empty
+  , dep_direct_splice_mods = Set.empty
+  , dep_plugin_mods = Set.empty
   , dep_direct_pkgs  = Set.empty
   , dep_sig_mods     = []
   , dep_boot_mods    = Set.empty
