@@ -37,6 +37,9 @@ AC_DEFUN([FIND_LD],[
                    FP_CC_LINKER_FLAG_TRY(gold, $2)
                    if test "$cross_compiling" = "yes"; then
                        AC_MSG_NOTICE([Using ld.gold and assuming that it is not affected by binutils issue 22266]);
+                       AC_MSG_NOTICE([Using ld.gold and assuming that it is not affected by binutils issue 23856]);
+                   else
+                       FP_BINUTILS_T23856()
                    fi
                    ;;
               "LLD"*)
