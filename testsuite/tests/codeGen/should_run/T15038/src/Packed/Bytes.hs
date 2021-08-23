@@ -27,7 +27,7 @@ import Data.Primitive (ByteArray(..))
 import Data.Word (Word8)
 import Control.Monad.ST (runST, ST)
 import qualified Data.Primitive as PM
-import qualified Data.List as L
+import qualified GHC.OldList as L
 
 data Bytes = Bytes
   {-# UNPACK #-} !ByteArray -- payload

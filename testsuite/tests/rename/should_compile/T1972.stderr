@@ -6,6 +6,7 @@ T1972.hs:13:3: warning: [-Wname-shadowing (in -Wall)]
 T1972.hs:15:3: warning: [-Wname-shadowing (in -Wall)]
     This binding for ‘mapAccumL’ shadows the existing bindings
       imported from ‘Data.List’ at T1972.hs:8:19-27
+      (and originally defined in ‘Data.Traversable’)
       defined at T1972.hs:17:1
 
 T1972.hs:21:10: warning: [-Wunused-local-binds (in -Wextra, -Wunused-binds)]

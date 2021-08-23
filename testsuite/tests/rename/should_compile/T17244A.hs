@@ -2,8 +2,7 @@
 
 module T17244A (hello) where
 
--- This should NOT warn with -Wcompat-unqualified-imports,
--- Instead this just fails.
+-- This should warn with -Wcompat-unqualified-imports.
 import Data.List
 
 hello :: [Int] -> Int

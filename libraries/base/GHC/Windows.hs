@@ -76,7 +76,7 @@ module GHC.Windows (
 
 import Data.Bits (finiteBitSize, shiftL, shiftR, (.|.), (.&.))
 import Data.Char
-import Data.List (dropWhileEnd)
+import Data.OldList
 import Data.Maybe
 import Data.Word
 import Data.Int

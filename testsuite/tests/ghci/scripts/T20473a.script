@@ -1,5 +1,5 @@
 :{
-import Data.List
+import Data.List (sort)
 
 xs :: [Int]
 xs = sort [2,1]

@@ -5,7 +5,7 @@
 
 module Main where
 
-import Data.List
+import Data.List (foldl')
 import Data.Bits
 import GHC.Ptr
 import Foreign.Ptr

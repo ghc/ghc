@@ -1,4 +1,3 @@
-import Prelude hiding (foldr)
 import Data.List (foldr)
 
 {-

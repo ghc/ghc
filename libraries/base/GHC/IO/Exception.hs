@@ -54,7 +54,7 @@ import GHC.Show
 import GHC.Read
 import GHC.Exception
 import GHC.IO.Handle.Types
-import Data.List ( intercalate )
+import GHC.OldList ( intercalate )
 import {-# SOURCE #-} GHC.Stack.CCS
 import Foreign.C.Types
 

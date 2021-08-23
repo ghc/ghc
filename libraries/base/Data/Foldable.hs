@@ -2454,7 +2454,9 @@ elements in a single pass.
 -- The more general methods of the 'Foldable' class are now exported by the
 -- "Prelude" in place of the original List-specific methods (see the
 -- [FTP Proposal](https://wiki.haskell.org/Foldable_Traversable_In_Prelude)).
--- The List-specific variants are still available in "Data.List".
+-- The List-specific variants are for now still available in "GHC.OldList", but
+-- that module is intended only as a transitional aid, and may be removed in
+-- the future.
 --
 -- Surprises can arise from the @Foldable@ instance of the 2-tuple @(a,)@ which
 -- now behaves as a 1-element @Foldable@ container in its second slot.  In

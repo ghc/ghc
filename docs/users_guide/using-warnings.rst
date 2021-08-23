@@ -275,8 +275,13 @@ of ``-W(no-)*``.
     :since: 8.10
 
     Warns on qualified imports of core library modules which are subject to
-    change in future GHC releases. Currently there are no modules
-    covered by this warning.
+    change in future GHC releases. Currently the following modules are covered
+    by this warning:
+
+     - ``Data.List`` due to the future addition of ``Data.List.singleton`` and
+       specialisation of exports to the ``[]`` type. See the
+       `mailing list <https://groups.google.com/forum/#!topic/haskell-core-libraries/q3zHLmzBa5E>`_
+       for details.
 
     This warning can be addressed by either adding an explicit import list or
     using a ``qualified`` import.

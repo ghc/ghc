@@ -1,2 +1,2 @@
-import Data.List; xs = sort [2, 1]
+import Data.List (sort); xs = sort [2, 1]
 xs

@@ -1,2 +1,2 @@
-import Data.List; import Data.Function
+import Data.List (sort); import Data.Function
 on (==) sort [1,2] [2,1]
