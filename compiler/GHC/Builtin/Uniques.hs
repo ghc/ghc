@@ -29,16 +29,13 @@ module GHC.Builtin.Uniques
     , mkPrimOpIdUnique, mkPrimOpWrapperUnique
     , mkPreludeMiscIdUnique, mkPreludeDataConUnique
     , mkPreludeTyConUnique, mkPreludeClassUnique
-    , mkCoVarUnique
 
     , mkVarOccUnique, mkDataOccUnique, mkTvOccUnique, mkTcOccUnique
     , mkRegSingleUnique, mkRegPairUnique, mkRegClassUnique, mkRegSubUnique
     , mkCostCentreUnique
 
     , mkBuiltinUnique
-    , mkPseudoUniqueD
     , mkPseudoUniqueE
-    , mkPseudoUniqueH
 
       -- ** Deriving uniquesc
       -- *** From TyCon name uniques
@@ -46,7 +43,6 @@ module GHC.Builtin.Uniques
       -- *** From DataCon name uniques
     , dataConWorkerUnique, dataConTyRepNameUnique
 
-    , initTyVarUnique
     , initExitJoinUnique
 
     ) where
@@ -290,7 +286,7 @@ getTupleDataConName boxity n =
 Note [Uniques for wired-in prelude things and known masks]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Allocation of unique supply characters:
-        v,t,u : for renumbering value-, type- and usage- vars.
+        v,u: for renumbering value-, and usage- vars.
         B:   builtin
         C-E: pseudo uniques     (used in native-code generator)
         I:   GHCi evaluation
@@ -306,7 +302,6 @@ Allocation of unique supply characters:
         c       StgToCmm/Renamer
         d       desugarer
         f       AbsC flattener
-        g       SimplStg
         i       TypeChecking interface files
         j       constraint tuple superclass selectors
         k       constraint tuple tycons
@@ -325,10 +320,8 @@ mkPrimOpIdUnique       :: Int -> Unique
 -- See Note [Primop wrappers] in GHC.Builtin.PrimOps.
 mkPrimOpWrapperUnique  :: Int -> Unique
 mkPreludeMiscIdUnique  :: Int -> Unique
-mkCoVarUnique          :: Int -> Unique
 
 mkAlphaTyVarUnique   i = mkUnique '1' i
-mkCoVarUnique        i = mkUnique 'g' i
 mkPreludeClassUnique i = mkUnique '2' i
 
 --------------------------------------------------
@@ -336,19 +329,10 @@ mkPrimOpIdUnique op         = mkUnique '9' (2*op)
 mkPrimOpWrapperUnique op    = mkUnique '9' (2*op+1)
 mkPreludeMiscIdUnique  i    = mkUnique '0' i
 
--- The "tyvar uniques" print specially nicely: a, b, c, etc.
--- See pprUnique for details
-
-initTyVarUnique :: Unique
-initTyVarUnique = mkUnique 't' 0
-
-mkPseudoUniqueD, mkPseudoUniqueE, mkPseudoUniqueH,
-  mkBuiltinUnique :: Int -> Unique
+mkPseudoUniqueE, mkBuiltinUnique :: Int -> Unique
 
 mkBuiltinUnique i = mkUnique 'B' i
-mkPseudoUniqueD i = mkUnique 'D' i -- used in NCG for getUnique on RealRegs
 mkPseudoUniqueE i = mkUnique 'E' i -- used in NCG spiller to create spill VirtualRegs
-mkPseudoUniqueH i = mkUnique 'H' i -- used in NCG spiller to create spill VirtualRegs
 
 mkRegSingleUnique, mkRegPairUnique, mkRegSubUnique, mkRegClassUnique :: Int -> Unique
 mkRegSingleUnique = mkUnique 'R'
@@ -388,7 +372,7 @@ tyConRepNameUnique  u = incrUnique u
 --    * u+2: the TyConRepName of the promoted TyCon
 -- Prelude data constructors are too simple to need wrappers.
 
-mkPreludeDataConUnique :: Arity -> Unique
+mkPreludeDataConUnique :: Int -> Unique
 mkPreludeDataConUnique i              = mkUnique '6' (3*i)    -- Must be alphabetic
 
 --------------------------------------------------
