@@ -64,7 +64,7 @@ module GHC.Types.Name (
         isWiredInName, isWiredIn, isBuiltInSyntax,
         isHoleName,
         wiredInNameTyThing_maybe,
-        nameIsLocalOrFrom, nameIsHomePackage,
+        nameIsLocalOrFrom, nameIsExternalFrom, nameIsHomePackage,
         nameIsHomePackageImport, nameIsFromExternalPackage,
         stableNameCmp,
 
@@ -327,6 +327,9 @@ nameModule_maybe (Name { n_sort = External mod})    = Just mod
 nameModule_maybe (Name { n_sort = WiredIn mod _ _}) = Just mod
 nameModule_maybe _                                  = Nothing
 
+is_interactive_or_from :: Module -> Module -> Bool
+is_interactive_or_from from mod = from == mod || isInteractiveModule mod
+
 nameIsLocalOrFrom :: Module -> Name -> Bool
 -- ^ Returns True if the name is
 --   (a) Internal
@@ -351,8 +354,15 @@ nameIsLocalOrFrom :: Module -> Name -> Bool
 -- See Note [The interactive package] in "GHC.Runtime.Context"
 
 nameIsLocalOrFrom from name
-  | Just mod <- nameModule_maybe name = from == mod || isInteractiveModule mod
+  | Just mod <- nameModule_maybe name = is_interactive_or_from from mod
   | otherwise                         = True
+
+nameIsExternalFrom :: Module -> Name -> Bool
+-- ^ Returns True if the name is external or from the 'interactive package
+-- See documentation of `nameIsLocalOrFrom` function
+nameIsExternalFrom from name
+  | Just mod <- nameModule_maybe name = is_interactive_or_from from mod
+  | otherwise                         = False
 
 nameIsHomePackage :: Module -> Name -> Bool
 -- True if the Name is defined in module of this package
