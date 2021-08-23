@@ -11,7 +11,6 @@ module GHC.Tc.Solver.Interact (
 import GHC.Prelude
 import GHC.Types.Basic ( SwapFlag(..),
                          infinity, IntWithInf, intGtLimit )
-import GHC.Types.Error
 import GHC.Tc.Solver.Canonical
 import GHC.Types.Var.Set
 import GHC.Core.Type as Type
@@ -122,13 +121,7 @@ solveSimpleWanteds simples
     go :: Int -> IntWithInf -> WantedConstraints -> TcS (Int, WantedConstraints)
     go n limit wc
       | n `intGtLimit` limit
-      = failTcS $ TcRnUnknownMessage $ mkPlainError noHints $
-          (hang (text "solveSimpleWanteds: too many iterations"
-                       <+> parens (text "limit =" <+> ppr limit))
-                    2 (vcat [ text "Set limit with -fconstraint-solver-iterations=n; n=0 for no limit"
-                            , text "Simples =" <+> ppr simples
-                            , text "WC ="      <+> ppr wc ]))
-
+      = failTcS $ TcRnSimplifierTooManyIterations simples limit wc
      | isEmptyBag (wc_simple wc)
      = return (n,wc)
 

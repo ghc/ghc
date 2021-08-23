@@ -304,7 +304,7 @@ instance Diagnostic DsMessage where
     DsNotYetHandledByTH{}                       -> noHints
     DsAggregatedViewExpressions{}               -> noHints
     DsUnbangedStrictPatterns{}                  -> noHints
-    DsCannotMixPolyAndUnliftedBindings{}        -> [SuggestAddTypeSignature]
+    DsCannotMixPolyAndUnliftedBindings{}        -> [SuggestAddTypeSignatures UnnamedBinding]
     DsWrongDoBind rhs _                         -> [SuggestBindToWildcard rhs]
     DsUnusedDoBind rhs _                        -> [SuggestBindToWildcard rhs]
     DsRecBindsNotAllowedForUnliftedTys{}        -> noHints

@@ -25,7 +25,6 @@ import GHC.Core.Coercion.Axiom
 import GHC.Core.DataCon ( dataConName )
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.FVs
-import GHC.Core.TyCo.Ppr ( pprWithExplicitKindsWhen )
 
 import GHC.Iface.Load
 
@@ -42,7 +41,6 @@ import GHC.Unit.Module.ModDetails
 import GHC.Unit.Module.Deps
 import GHC.Unit.Home.ModInfo
 
-import GHC.Types.Error
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.Name.Reader
 import GHC.Types.Name
@@ -58,9 +56,8 @@ import GHC.Data.Bag( Bag, unionBags, unitBag )
 import GHC.Data.Maybe
 
 import Control.Monad
-import Data.Bifunctor ( second )
-import Data.List ( sortBy )
 import Data.List.NonEmpty ( NonEmpty(..) )
+import qualified Data.List.NonEmpty as NE
 import Data.Function ( on )
 
 import qualified GHC.LanguageExtensions  as LangExt
@@ -908,8 +905,8 @@ unusedInjTvsInRHS :: DynFlags
                   -> [Type] -- LHS arguments
                   -> Type   -- the RHS
                   -> ( TyVarSet
-                     , Bool   -- True <=> one or more variable is used invisibly
-                     , Bool ) -- True <=> suggest -XUndecidableInstances
+                     , HasKinds                     -- YesHasKinds <=> one or more variable is used invisibly
+                     , SuggestUndecidableInstances) -- YesSuggestUndecidableInstaces <=> suggest -XUndecidableInstances
 -- See Note [Verifying injectivity annotation] in GHC.Core.FamInstEnv.
 -- This function implements check (4) described there, further
 -- described in Note [Coverage condition for injective type families].
@@ -920,7 +917,7 @@ unusedInjTvsInRHS :: DynFlags
 -- precise names of variables that are not mentioned in the RHS.
 unusedInjTvsInRHS dflags tycon@(tyConInjectivityInfo -> Injective inj_list) lhs rhs =
   -- Note [Coverage condition for injective type families], step 5
-  (bad_vars, any_invisible, suggest_undec)
+  (bad_vars, hasKinds any_invisible, suggestUndecidableInstances suggest_undec)
     where
       undec_inst = xopt LangExt.UndecidableInstances dflags
 
@@ -941,7 +938,7 @@ unusedInjTvsInRHS dflags tycon@(tyConInjectivityInfo -> Injective inj_list) lhs 
                       (lhs_vars `subVarSet` fvVarSet (injectiveVarsOfType True rhs))
 
 -- When the type family is not injective in any arguments
-unusedInjTvsInRHS _ _ _ _ = (emptyVarSet, False, False)
+unusedInjTvsInRHS _ _ _ _ = (emptyVarSet, NoHasKinds, NoSuggestUndecidableInstaces)
 
 ---------------------------------------
 -- Producing injectivity error messages
@@ -952,88 +949,55 @@ unusedInjTvsInRHS _ _ _ _ = (emptyVarSet, False, False)
 reportConflictingInjectivityErrs :: TyCon -> [CoAxBranch] -> CoAxBranch -> TcM ()
 reportConflictingInjectivityErrs _ [] _ = return ()
 reportConflictingInjectivityErrs fam_tc (confEqn1:_) tyfamEqn
-  = addErrs [second mk_err $ buildInjectivityError fam_tc herald (confEqn1 :| [tyfamEqn])]
-  where
-    herald = text "Type family equation right-hand sides overlap; this violates" $$
-             text "the family's injectivity annotation:"
-
--- | Injectivity error herald common to all injectivity errors.
-injectivityErrorHerald :: SDoc
-injectivityErrorHerald =
-  text "Type family equation violates the family's injectivity annotation."
-
+  = addErrs [buildInjectivityError (TcRnFamInstNotInjective InjErrRhsOverlap)
+                                   fam_tc
+                                   (confEqn1 :| [tyfamEqn])]
 
 -- | Report error message for equation with injective type variables unused in
 -- the RHS. Note [Coverage condition for injective type families], step 6
 reportUnusedInjectiveVarsErr :: TyCon
                              -> TyVarSet
-                             -> Bool   -- True <=> print invisible arguments
-                             -> Bool   -- True <=> suggest -XUndecidableInstances
+                             -> HasKinds                    -- YesHasKinds <=> print invisible arguments
+                             -> SuggestUndecidableInstances -- YesSuggestUndecidableInstaces <=> suggest -XUndecidableInstances
                              -> CoAxBranch
                              -> TcM ()
 reportUnusedInjectiveVarsErr fam_tc tvs has_kinds undec_inst tyfamEqn
-  = let (loc, doc) = buildInjectivityError fam_tc
-                                  (injectivityErrorHerald $$
-                                   herald $$
-                                   text "In the type family equation:")
-                                  (tyfamEqn :| [])
-    in addErrAt loc (mk_err $ pprWithExplicitKindsWhen has_kinds doc)
-    where
-      herald = sep [ what <+> text "variable" <>
-                  pluralVarSet tvs <+> pprVarSet tvs (pprQuotedList . scopedSort)
-                , text "cannot be inferred from the right-hand side." ]
-               $$ extra
-
-      what | has_kinds = text "Type/kind"
-           | otherwise = text "Type"
-
-      extra | undec_inst = text "Using UndecidableInstances might help"
-            | otherwise  = empty
+  = let reason     = InjErrCannotInferFromRhs tvs has_kinds undec_inst
+        (loc, dia) = buildInjectivityError (TcRnFamInstNotInjective reason) fam_tc (tyfamEqn :| [])
+    in addErrAt loc dia
 
 -- | Report error message for equation that has a type family call at the top
 -- level of RHS
 reportTfHeadedErr :: TyCon -> CoAxBranch -> TcM ()
 reportTfHeadedErr fam_tc branch
-  = addErrs [second mk_err $ buildInjectivityError fam_tc
-               (injectivityErrorHerald $$
-                 text "RHS of injective type family equation cannot" <+>
-                 text "be a type family:")
-               (branch :| [])]
+  = addErrs [buildInjectivityError (TcRnFamInstNotInjective InjErrRhsCannotBeATypeFam)
+                                   fam_tc
+                                   (branch :| [])]
 
 -- | Report error message for equation that has a bare type variable in the RHS
 -- but LHS pattern is not a bare type variable.
 reportBareVariableInRHSErr :: TyCon -> [Type] -> CoAxBranch -> TcM ()
 reportBareVariableInRHSErr fam_tc tys branch
-  = addErrs [second mk_err $ buildInjectivityError fam_tc
-                 (injectivityErrorHerald $$
-                  text "RHS of injective type family equation is a bare" <+>
-                  text "type variable" $$
-                  text "but these LHS type and kind patterns are not bare" <+>
-                  text "variables:" <+> pprQuotedList tys)
-                 (branch :| [])]
+  = addErrs [buildInjectivityError (TcRnFamInstNotInjective (InjErrRhsBareTyVar tys))
+                                   fam_tc
+                                   (branch :| [])]
 
-mk_err :: SDoc -> TcRnMessage
-mk_err = TcRnUnknownMessage . mkPlainError noHints
-
-buildInjectivityError :: TyCon -> SDoc -> NonEmpty CoAxBranch -> (SrcSpan, SDoc)
-buildInjectivityError fam_tc herald (eqn1 :| rest_eqns)
-  = ( coAxBranchSpan eqn1
-    , hang herald
-         2 (vcat (map (pprCoAxBranchUser fam_tc) (eqn1 : rest_eqns))) )
+buildInjectivityError :: (TyCon -> NonEmpty CoAxBranch -> TcRnMessage)
+                      -> TyCon
+                      -> NonEmpty CoAxBranch
+                      -> (SrcSpan, TcRnMessage)
+buildInjectivityError mkErr fam_tc branches
+  = ( coAxBranchSpan (NE.head branches), mkErr fam_tc branches )
 
 reportConflictInstErr :: FamInst -> [FamInstMatch] -> TcRn ()
 reportConflictInstErr _ []
   = return ()  -- No conflicts
 reportConflictInstErr fam_inst (match1 : _)
   | FamInstMatch { fim_instance = conf_inst } <- match1
-  , let sorted  = sortBy (SrcLoc.leftmost_smallest `on` getSpan) [fam_inst, conf_inst]
-        fi1     = head sorted
+  , let sorted  = NE.sortBy (SrcLoc.leftmost_smallest `on` getSpan) (fam_inst NE.:| [conf_inst])
+        fi1     = NE.head sorted
         span    = coAxBranchSpan (coAxiomSingleBranch (famInstAxiom fi1))
-  = setSrcSpan span $ addErr $ TcRnUnknownMessage $ mkPlainError noHints $
-    hang (text "Conflicting family instance declarations:")
-       2 (vcat [ pprCoAxBranchUser (coAxiomTyCon ax) (coAxiomSingleBranch ax)
-               | fi <- sorted
-               , let ax = famInstAxiom fi ])
+  = setSrcSpan span $ addErr $ TcRnConflictingFamInstDecls sorted
  where
    getSpan = getSrcSpan . famInstAxiom
    -- The sortBy just arranges that instances are displayed in order

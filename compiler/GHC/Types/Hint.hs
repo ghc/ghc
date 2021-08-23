@@ -2,6 +2,7 @@
 
 module GHC.Types.Hint (
     GhcHint(..)
+  , AvailableBindings(..)
   , InstantiationSuggestion(..)
   , LanguageExtensionHint(..)
   , suggestExtension
@@ -13,6 +14,8 @@ module GHC.Types.Hint (
   ) where
 
 import GHC.Prelude
+
+import qualified Data.List.NonEmpty as NE
 
 import GHC.Utils.Outputable
 import qualified GHC.LanguageExtensions as LangExt
@@ -27,6 +30,12 @@ import {-# SOURCE #-} Language.Haskell.Syntax.Expr
   -- This {-# SOURCE #-} import should be removable once
   -- 'Language.Haskell.Syntax.Bind' no longer depends on 'GHC.Tc.Types.Evidence'.
 
+-- | The bindings we have available in scope when
+-- suggesting an explicit type signature.
+data AvailableBindings
+  = NamedBindings  (NE.NonEmpty Name)
+  | UnnamedBinding
+  -- ^ An unknown binding (i.e. too complicated to turn into a 'Name')
 
 data LanguageExtensionHint
   = -- | Suggest to enable the input extension. If the input 'SDoc'
@@ -177,7 +186,7 @@ data GhcHint
     {-| Suggests adding a type signature, typically to resolve ambiguity or help GHC inferring types.
 
     -}
-  | SuggestAddTypeSignature
+  | SuggestAddTypeSignatures AvailableBindings
     {-| Suggests to explicitly discard the result of a monadic action by binding the result to
         the '_' wilcard.
 
@@ -251,6 +260,14 @@ data GhcHint
         Test case(s): parser/should_fail/T3811
     -}
   | SuggestTypeSignatureForm
+
+    {-| Suggests to move an orphan instance or to newtype-wrap it.
+
+        Triggered by: 'GHC.Tc.Errors.Types.TcRnOrphanInstance'
+        Test cases(s): warnings/should_compile/T9178
+                       typecheck/should_compile/T4912
+    -}
+  | SuggestFixOrphanInstance
 
 -- | An 'InstantiationSuggestion' for a '.hsig' file. This is generated
 -- by GHC in case of a 'DriverUnexpectedSignature' and suggests a way
