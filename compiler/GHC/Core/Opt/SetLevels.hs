@@ -79,21 +79,16 @@ import GHC.Prelude
 
 import GHC.Core
 import GHC.Core.Opt.Monad ( FloatOutSwitches(..) )
-import GHC.Core.Utils   ( exprType, exprIsHNF
-                        , exprOkForSpeculation
-                        , exprIsTopLevelBindable
-                        , isExprLevPoly
-                        , collectMakeStaticArgs
-                        , mkLamTypes
-                        )
+import GHC.Core.Utils
 import GHC.Core.Opt.Arity   ( exprBotStrictness_maybe )
 import GHC.Core.FVs     -- all of it
 import GHC.Core.Subst
-import GHC.Core.Make    ( sortQuantVars )
+import GHC.Core.DataCon
+import GHC.Core.Make    ( sortQuantVars, mkUbxTup )
 import GHC.Core.Type    ( Type, splitTyConApp_maybe, tyCoVarsOfType
                         , mightBeUnliftedType, closeOverKindsDSet )
-import GHC.Core.Multiplicity     ( pattern Many )
-import GHC.Core.DataCon ( dataConOrigResTy )
+import GHC.Core.TyCon
+import GHC.Core.Multiplicity     ( pattern Many, scaledThing )
 
 import GHC.Types.Id
 import GHC.Types.Id.Info
@@ -111,7 +106,7 @@ import GHC.Types.Unique       ( hasKey )
 import GHC.Types.Tickish      ( tickishIsCode )
 import GHC.Types.Unique.Supply
 import GHC.Types.Unique.DFM
-import GHC.Types.Basic  ( Arity, RecFlag(..), isRec )
+import GHC.Types.Basic  ( Arity, Boxity(..), RecFlag(..), isRec )
 
 import GHC.Builtin.Types
 import GHC.Builtin.Names      ( runRWKey )
@@ -711,6 +706,39 @@ lvlMFE env strict_ctxt ann_expr
              use_expr = Case (mkVarApps (Var var) abs_vars)
                              (stayPut l1u bx_bndr) expr_ty
                              [Alt (DataAlt dc) [stayPut l1u ubx_bndr] (Var ubx_bndr)]
+       ; return (Let (NonRec (TB var (FloatMe dest_lvl)) float_rhs)
+                     use_expr) }
+
+  | escapes_value_lam
+  , not expr_ok_for_spec -- Boxing/unboxing isn't worth it for cheap expressions
+                         -- See Note [Test cheapness with exprOkForSpeculation]
+  , Just (tc, tc_args) <- splitTyConApp_maybe expr_ty
+  , isUnboxedTupleTyCon tc
+  , let ubx_dc  = tyConSingleDataCon tc
+        arity   = dataConRepArity ubx_dc
+        arg_tys = scaledThing <$> dataConInstArgTys ubx_dc tc_args
+        bx_dc   = tupleDataCon Boxed arity
+  , not $ any mightBeUnliftedType arg_tys -- for now
+  = do { expr1 <- lvlExpr rhs_env ann_expr
+       ; let bx_expr = mkConApp2 bx_dc arg_tys fld_bndrs
+             bx_ty   = exprType bx_expr
+             (bx_bndr:ubx_bndr:fld_bndrs) = mkTemplateLocals (bx_ty:expr_ty:arg_tys)
+             l1r       = incMinorLvlFrom rhs_env
+
+             float_rhs = mkLams abs_vars_w_lvls $
+                         Case expr1 (stayPut l1r ubx_bndr) bx_ty
+                             [Alt (DataAlt ubx_dc)
+                                  (map (stayPut l1r) fld_bndrs)
+                                  (mkConApp2 bx_dc arg_tys fld_bndrs)]
+
+       ; var <- newLvlVar float_rhs Nothing is_mk_static
+       ; let l1u      = incMinorLvlFrom env
+             use_expr = Case (mkVarApps (Var var) abs_vars)
+                             (stayPut l1u bx_bndr) expr_ty
+                             [Alt (DataAlt bx_dc)
+                                  (map (stayPut l1u) fld_bndrs)
+                                  (mkUbxTup fld_bndrs)]
+
        ; return (Let (NonRec (TB var (FloatMe dest_lvl)) float_rhs)
                      use_expr) }
 

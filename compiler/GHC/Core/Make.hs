@@ -24,7 +24,7 @@ module GHC.Core.Make (
         FloatBind(..), wrapFloat, wrapFloats, floatBindings,
 
         -- * Constructing small tuples
-        mkCoreVarTupTy, mkCoreTup, mkCoreUbxTup, mkCoreUbxSum,
+        mkCoreVarTupTy, mkCoreTup, mkCoreUbxTup, mkUbxTup, mkCoreUbxSum,
         mkCoreTupBoxity, unitExpr,
 
         -- * Constructing big tuples
@@ -430,6 +430,17 @@ mkCoreUbxTup tys exps
   = assert (tys `equalLength` exps) $
     mkCoreConApps (tupleDataCon Unboxed (length tys))
              (map (Type . getRuntimeRep) tys ++ map Type tys ++ exps)
+
+-- | Build a small unboxed tuple holding the specified binders.
+-- Does /not/ flatten one-tuples; see Note [Flattening one-tuples]
+mkUbxTup :: [Var] -> Expr b
+mkUbxTup arg_ids
+  = mkConApp2 (tupleDataCon Unboxed (length tys))
+              (reps ++ tys)
+              arg_ids
+  where
+    tys  = map idType arg_ids
+    reps = map getRuntimeRep tys
 
 -- | Make a core tuple of the given boxity; don't flatten 1-tuples
 mkCoreTupBoxity :: Boxity -> [CoreExpr] -> CoreExpr
