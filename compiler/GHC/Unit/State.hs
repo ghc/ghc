@@ -10,6 +10,7 @@ module GHC.Unit.State (
 
         -- * Reading the package config, and processing cmdline args
         UnitState(..),
+        PreloadUnitClosure,
         UnitDatabase (..),
         UnitErr (..),
         emptyUnitState,
