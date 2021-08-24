@@ -1558,12 +1558,12 @@ emitPrimOp dflags primop = case primop of
     else Right genericIntMul2Op
 
   FloatFabsOp -> \args -> opCallishHandledLater args $
-    if (ncg && x86ish || ppc) || llvm
+    if (ncg && (x86ish || ppc || aarch64)) || llvm
     then Left MO_F32_Fabs
     else Right $ genericFabsOp W32
 
   DoubleFabsOp -> \args -> opCallishHandledLater args $
-    if (ncg && x86ish || ppc) || llvm
+    if (ncg && (x86ish || ppc || aarch64)) || llvm
     then Left MO_F64_Fabs
     else Right $ genericFabsOp W64
 
@@ -1776,6 +1776,7 @@ emitPrimOp dflags primop = case primop of
           ArchPPC      -> True
           ArchPPC_64 _ -> True
           _            -> False
+  aarch64 = platformArch platform == ArchAArch64
 
 data PrimopCmmEmit
   -- | Out of line fake primop that's actually just a foreign call to other

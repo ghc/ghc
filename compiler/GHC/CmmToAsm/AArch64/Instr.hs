@@ -128,6 +128,7 @@ regUsageOfInstr platform instr = case instr of
   FCVT dst src             -> usage (regOp src, regOp dst)
   SCVTF dst src            -> usage (regOp src, regOp dst)
   FCVTZS dst src           -> usage (regOp src, regOp dst)
+  FABS dst src             -> usage (regOp src, regOp dst)
 
   _ -> panic "regUsageOfInstr"
 
@@ -252,6 +253,7 @@ patchRegsOfInstr instr env = case instr of
     FCVT o1 o2     -> FCVT (patchOp o1) (patchOp o2)
     SCVTF o1 o2    -> SCVTF (patchOp o1) (patchOp o2)
     FCVTZS o1 o2   -> FCVTZS (patchOp o1) (patchOp o2)
+    FABS o1 o2     -> FABS (patchOp o1) (patchOp o2)
 
     _ -> pprPanic "patchRegsOfInstr" (text $ show instr)
     where
@@ -616,6 +618,8 @@ data Instr
     | SCVTF Operand Operand
     -- Float ConVerT to Zero Signed
     | FCVTZS Operand Operand
+    -- Float ABSolute value
+    | FABS Operand Operand
 
 instance Show Instr where
     show (LDR _f o1 o2) = "LDR " ++ show o1 ++ ", " ++ show o2

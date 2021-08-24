@@ -1134,6 +1134,13 @@ genCCall target dest_regs arg_regs bid = do
             `appOL` moveStackUp (stackSpace `div` 8)
       return (code, Nothing)
 
+    PrimTarget MO_F32_Fabs
+      | [arg_reg] <- arg_regs, [dest_reg] <- dest_regs ->
+        unaryFloatOp W32 (\d x -> unitOL $ FABS d x) arg_reg dest_reg
+    PrimTarget MO_F64_Fabs
+      | [arg_reg] <- arg_regs, [dest_reg] <- dest_regs ->
+        unaryFloatOp W64 (\d x -> unitOL $ FABS d x) arg_reg dest_reg
+
     -- or a possibly side-effecting machine operation
     -- mop :: CallishMachOp (see GHC.Cmm.MachOp)
     PrimTarget mop -> do
@@ -1184,7 +1191,7 @@ genCCall target dest_regs arg_regs bid = do
         MO_F32_Log1P -> mkCCall "log1pf"
         MO_F32_Exp   -> mkCCall "expf"
         MO_F32_ExpM1 -> mkCCall "expm1f"
-        MO_F32_Fabs  -> mkCCall "fasbf"
+        MO_F32_Fabs  -> mkCCall "fabsf"
         MO_F32_Sqrt  -> mkCCall "sqrtf"
 
         -- 64-bit primops
@@ -1416,3 +1423,10 @@ genCCall target dest_regs arg_regs bid = do
       if isFloatFormat format
         then readResults (gpReg:gpRegs) fpRegs dsts (fpReg:accumRegs) (accumCode `snocOL` MOV (OpReg w r_dst) (OpReg w fpReg))
         else readResults gpRegs (fpReg:fpRegs) dsts (gpReg:accumRegs) (accumCode `snocOL` MOV (OpReg w r_dst) (OpReg w gpReg))
+
+    unaryFloatOp w op arg_reg dest_reg = do
+      platform <- getPlatform
+      (reg_fx, _format_x, code_fx) <- getFloatReg arg_reg
+      let dst = getRegisterReg platform (CmmLocal dest_reg)
+      let code = code_fx `appOL` op (OpReg w dst) (OpReg w reg_fx)
+      return (code, Nothing)
