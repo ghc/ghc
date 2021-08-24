@@ -554,10 +554,11 @@ pprInstr platform instr = case instr of
 
   -- 8. Synchronization Instructions -------------------------------------------
   DMBSY -> text "\tdmb sy"
-  -- 8. Synchronization Instructions -------------------------------------------
+  -- 9. Floating Point Instructions --------------------------------------------
   FCVT o1 o2 -> text "\tfcvt" <+> pprOp platform o1 <> comma <+> pprOp platform o2
   SCVTF o1 o2 -> text "\tscvtf" <+> pprOp platform o1 <> comma <+> pprOp platform o2
   FCVTZS o1 o2 -> text "\tfcvtzs" <+> pprOp platform o1 <> comma <+> pprOp platform o2
+  FABS o1 o2 -> text "\tfabs" <+> pprOp platform o1 <> comma <+> pprOp platform o2
 
 pprBcond :: Cond -> SDoc
 pprBcond c = text "b." <> pprCond c
