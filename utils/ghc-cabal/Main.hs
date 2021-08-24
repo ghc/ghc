@@ -449,6 +449,7 @@ generate directory distdir config_args
                 variablePrefix ++ "_S_SRCS = " ++ unwords (asmSources bi),
                 variablePrefix ++ "_C_SRCS  = " ++ unwords (cSources bi),
                 variablePrefix ++ "_CMM_SRCS = " ++ unwords (cmmSources bi),
+                variablePrefix ++ "_JS_SRCS  = " ++ unwords (jsSources bi),
                 variablePrefix ++ "_DATA_FILES = "    ++ unwords (dataFiles pd),
                 -- XXX This includes things it shouldn't, like:
                 -- -odir dist-bootstrapping/build
