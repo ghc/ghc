@@ -19,13 +19,13 @@ import GHC.Core.Type
 import GHC.Data.Bag
 import GHC.Tc.Errors.Types
 import GHC.Tc.Types.Rank (Rank(..))
-import GHC.Tc.Utils.TcType (tcSplitForAllTyVars)
+import GHC.Tc.Utils.TcType (TcType, tcSplitForAllTyVars)
 import GHC.Types.Error
-import GHC.Types.FieldLabel (flIsOverloaded, flSelector)
+import GHC.Types.FieldLabel (FieldLabelString, flIsOverloaded, flSelector)
 import GHC.Types.Id (isRecordSelector)
 import GHC.Types.Name
 import GHC.Types.Name.Reader (GreName(..), pprNameProvenance)
-import GHC.Types.SrcLoc (GenLocated(..))
+import GHC.Types.SrcLoc (GenLocated(..), unLoc)
 import GHC.Types.TyThing
 import GHC.Types.Var.Env (emptyTidyEnv)
 import GHC.Types.Var.Set (pprVarSet, pluralVarSet)
@@ -398,6 +398,79 @@ instance Diagnostic TcRnMessage where
         ppr_name (FieldGreName fl) | flIsOverloaded fl = ppr fl
                                    | otherwise         = ppr (flSelector fl)
         ppr_name (NormalGreName name) = ppr name
+    TcRnAmbiguousField rupd parent_type
+      -> mkSimpleDecorated $
+          vcat [ text "The record update" <+> ppr rupd
+                   <+> text "with type" <+> ppr parent_type
+                   <+> text "is ambiguous."
+               , text "This will not be supported by -XDuplicateRecordFields in future releases of GHC."
+               ]
+    TcRnMissingFields con fields
+      -> mkSimpleDecorated $ vcat [header, nest 2 rest]
+         where
+           rest | null fields = empty
+                | otherwise   = vcat (fmap pprField fields)
+           header = text "Fields of" <+> quotes (ppr con) <+>
+                    text "not initialised" <>
+                    if null fields then empty else colon
+    TcRnFieldUpdateInvalidType prs
+      -> mkSimpleDecorated $
+           hang (text "Record update for insufficiently polymorphic field"
+                   <> plural prs <> colon)
+              2 (vcat [ ppr f <+> dcolon <+> ppr ty | (f,ty) <- prs ])
+    TcRnNoConstructorHasAllFields conflictingFields
+      -> mkSimpleDecorated $
+           hang (text "No constructor has all these fields:")
+              2 (pprQuotedList conflictingFields)
+    TcRnMixedSelectors data_name data_sels pat_name pat_syn_sels
+      -> mkSimpleDecorated $
+           text "Cannot use a mixture of pattern synonym and record selectors" $$
+           text "Record selectors defined by"
+             <+> quotes (ppr data_name)
+             <> colon
+             <+> pprWithCommas ppr data_sels $$
+           text "Pattern synonym selectors defined by"
+             <+> quotes (ppr pat_name)
+             <> colon
+             <+> pprWithCommas ppr pat_syn_sels
+    TcRnMissingStrictFields con fields
+      -> mkSimpleDecorated $ vcat [header, nest 2 rest]
+         where
+           rest | null fields = empty  -- Happens for non-record constructors
+                                       -- with strict fields
+                | otherwise   = vcat (fmap pprField fields)
+
+           header = text "Constructor" <+> quotes (ppr con) <+>
+                    text "does not have the required strict field(s)" <>
+                    if null fields then empty else colon
+    TcRnNoPossibleParentForFields rbinds
+      -> mkSimpleDecorated $
+           hang (text "No type has all these fields:")
+              2 (pprQuotedList fields)
+         where fields = map (hfbLHS . unLoc) rbinds
+    TcRnBadOverloadedRecordUpdate _rbinds
+      -> mkSimpleDecorated $
+           text "Record update is ambiguous, and requires a type signature"
+    TcRnStaticFormNotClosed name reason
+      -> mkSimpleDecorated $
+           quotes (ppr name)
+             <+> text "is used in a static form but it is not closed"
+             <+> text "because it"
+             $$ sep (causes reason)
+         where
+          causes :: NotClosedReason -> [SDoc]
+          causes NotLetBoundReason = [text "is not let-bound."]
+          causes (NotTypeClosed vs) =
+            [ text "has a non-closed type because it contains the"
+            , text "type variables:" <+>
+              pprVarSet vs (hsep . punctuate comma . map (quotes . ppr))
+            ]
+          causes (NotClosed n reason) =
+            let msg = text "uses" <+> quotes (ppr n) <+> text "which"
+             in case reason of
+                  NotClosed _ _ -> msg : causes reason
+                  _   -> let (xs0, xs1) = splitAt 1 $ causes reason
+                          in fmap (msg <+>) xs0 ++ xs1
 
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -552,6 +625,24 @@ instance Diagnostic TcRnMessage where
     TcRnExportedParentChildMismatch{}
       -> ErrorWithoutFlag
     TcRnConflictingExports{}
+      -> ErrorWithoutFlag
+    TcRnAmbiguousField{}
+      -> WarningWithFlag Opt_WarnAmbiguousFields
+    TcRnMissingFields{}
+      -> WarningWithFlag Opt_WarnMissingFields
+    TcRnFieldUpdateInvalidType{}
+      -> ErrorWithoutFlag
+    TcRnNoConstructorHasAllFields{}
+      -> ErrorWithoutFlag
+    TcRnMixedSelectors{}
+      -> ErrorWithoutFlag
+    TcRnMissingStrictFields{}
+      -> ErrorWithoutFlag
+    TcRnNoPossibleParentForFields{}
+      -> ErrorWithoutFlag
+    TcRnBadOverloadedRecordUpdate{}
+      -> ErrorWithoutFlag
+    TcRnStaticFormNotClosed{}
       -> ErrorWithoutFlag
 
   diagnosticHints = \case
@@ -724,6 +815,24 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnConflictingExports{}
       -> noHints
+    TcRnAmbiguousField{}
+      -> noHints
+    TcRnMissingFields{}
+      -> noHints
+    TcRnFieldUpdateInvalidType{}
+      -> noHints
+    TcRnNoConstructorHasAllFields{}
+      -> noHints
+    TcRnMixedSelectors{}
+      -> noHints
+    TcRnMissingStrictFields{}
+      -> noHints
+    TcRnNoPossibleParentForFields{}
+      -> noHints
+    TcRnBadOverloadedRecordUpdate{}
+      -> noHints
+    TcRnStaticFormNotClosed{}
+      -> noHints
 
 messageWithInfoDiagnosticMessage :: UnitState
                                  -> ErrInfo
@@ -789,6 +898,8 @@ pprLevityPolyInType ty prov =
           -> empty
   in formatLevPolyErr ty $$ extra
 
+pprField :: (FieldLabelString, TcType) -> SDoc
+pprField (f,ty) = ppr f <+> dcolon <+> ppr ty
 
 pprRecordFieldPart :: RecordFieldPart -> SDoc
 pprRecordFieldPart = \case

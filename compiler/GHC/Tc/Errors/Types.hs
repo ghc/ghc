@@ -12,6 +12,7 @@ module GHC.Tc.Errors.Types (
   , hasKinds
   , SuggestUndecidableInstances(..)
   , suggestUndecidableInstances
+  , NotClosedReason(..)
   ) where
 
 import GHC.Prelude
@@ -20,15 +21,20 @@ import GHC.Hs
 import {-# SOURCE #-} GHC.Tc.Types (TcIdSigInfo)
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Rank (Rank)
+import GHC.Tc.Utils.TcType (TcType)
 import GHC.Types.Error
+import GHC.Types.FieldLabel (FieldLabelString)
 import GHC.Types.Name (Name, OccName)
 import GHC.Types.Name.Reader
 import GHC.Types.SrcLoc
 import GHC.Types.TyThing (TyThing)
+import GHC.Types.Var (Id)
+import GHC.Types.Var.Set (TyVarSet, VarSet)
 import GHC.Unit.Types (Module)
 import GHC.Utils.Outputable
 import GHC.Core.Class (Class)
 import GHC.Core.Coercion.Axiom (CoAxBranch)
+import GHC.Core.ConLike (ConLike)
 import GHC.Core.FamInstEnv (FamInst)
 import GHC.Core.InstEnv (ClsInst)
 import GHC.Core.TyCon (TyCon, TyConFlavour)
@@ -36,7 +42,6 @@ import GHC.Core.Type (Kind, Type, Var)
 import GHC.Unit.State (UnitState)
 import GHC.Unit.Module.Name (ModuleName)
 import GHC.Types.Basic
-import GHC.Types.Var.Set (TyVarSet)
 
 import qualified Data.List.NonEmpty as NE
 import           Data.Typeable hiding (TyCon)
@@ -1097,6 +1102,135 @@ data TcRnMessage where
     -> IE GhcPs -- ^ Export decl of second export
     -> TcRnMessage
 
+  {-| TcRnAmbiguousField is a warning controlled by -Wambiguous-fields occurring
+      when a record update's type cannot be precisely determined. This will not
+      be supported by -XDuplicateRecordFields in future releases.
+
+      Example(s):
+      data Person  = MkPerson  { personId :: Int, name :: String }
+      data Address = MkAddress { personId :: Int, address :: String }
+      bad1 x = x { personId = 4 } :: Person -- ambiguous
+      bad2 (x :: Person) = x { personId = 4 } -- ambiguous
+      good x = (x :: Person) { personId = 4 } -- not ambiguous
+
+     Test cases: overloadedrecflds/should_fail/overloadedrecfldsfail06
+  -}
+  TcRnAmbiguousField
+    :: HsExpr GhcRn -- ^ Field update
+    -> TyCon -- ^ Record type
+    -> TcRnMessage
+
+  {-| TcRnMissingFields is a warning controlled by -Wmissing-fields occurring
+      when the intialisation of a record is missing one or more (lazy) fields.
+
+      Example(s):
+      data Rec = Rec { a :: Int, b :: String, c :: Bool }
+      x = Rec { a = 1, b = "two" } -- missing field 'c'
+
+     Test cases: deSugar/should_compile/T13870
+                 deSugar/should_compile/ds041
+                 patsyn/should_compile/T11283
+                 rename/should_compile/T5334
+                 rename/should_compile/T12229
+                 rename/should_compile/T5892a
+                 warnings/should_fail/WerrorFail2
+  -}
+  TcRnMissingFields :: ConLike -> [(FieldLabelString, TcType)] -> TcRnMessage
+
+  {-| TcRnFieldUpdateInvalidType is an error occurring when an updated field's
+      type mentions something that is outside the universally quantified variables
+      of the data constructor, such as an existentially quantified type.
+
+      Example(s):
+      data X = forall a. MkX { f :: a }
+      x = (MkX ()) { f = False }
+
+      Test cases: patsyn/should_fail/records-exquant
+                  typecheck/should_fail/T3323
+  -}
+  TcRnFieldUpdateInvalidType :: [(FieldLabelString,TcType)] -> TcRnMessage
+
+  {-| TcRnNoConstructorHasAllFields is an error that occurs when a record update
+      has fields that no single constructor encompasses.
+
+      Example(s):
+      data Foo = A { x :: Bool }
+               | B { y :: Int }
+      foo = (A False) { x = True, y = 5 }
+
+     Test cases: overloadedrecflds/should_fail/overloadedrecfldsfail08
+                 patsyn/should_fail/mixed-pat-syn-record-sels
+                 typecheck/should_fail/T7989
+  -}
+  TcRnNoConstructorHasAllFields :: [FieldLabelString] -> TcRnMessage
+
+  {- TcRnMixedSelectors is an error for when a mixture of pattern synonym and
+      record selectors are used in the same record update block.
+
+      Example(s):
+      data Rec = Rec { foo :: Int, bar :: String }
+      pattern Pat { f1, f2 } = Rec { foo = f1, bar = f2 }
+      illegal :: Rec -> Rec
+      illegal r = r { f1 = 1, bar = "two" }
+
+     Test cases: patsyn/should_fail/records-mixing-fields
+  -}
+  TcRnMixedSelectors
+    :: Name -- ^ Record
+    -> [Id] -- ^ Record selectors
+    -> Name -- ^ Pattern synonym
+    -> [Id] -- ^ Pattern selectors
+    -> TcRnMessage
+
+  {- TcRnMissingStrictFields is an error occurring when a record field marked
+     as strict is omitted when constructing said record.
+
+     Example(s):
+     data R = R { strictField :: !Bool, nonStrict :: Int }
+     x = R { nonStrict = 1 }
+
+    Test cases: typecheck/should_fail/T18869
+                typecheck/should_fail/tcfail085
+                typecheck/should_fail/tcfail112
+  -}
+  TcRnMissingStrictFields :: ConLike -> [(FieldLabelString, TcType)] -> TcRnMessage
+
+  {- TcRnNoPossibleParentForFields is an error thrown when the fields used in a
+     record update block do not all belong to any one type.
+
+     Example(s):
+     data R1 = R1 { x :: Int, y :: Int }
+     data R2 = R2 { y :: Int, z :: Int }
+     update r = r { x = 1, y = 2, z = 3 }
+
+    Test cases: overloadedrecflds/should_fail/overloadedrecfldsfail01
+                overloadedrecflds/should_fail/overloadedrecfldsfail14
+  -}
+  TcRnNoPossibleParentForFields :: [LHsRecUpdField GhcRn] -> TcRnMessage
+
+  {- TcRnBadOverloadedRecordUpdate is an error for a record update that cannot
+     be pinned down to any one constructor and thus must be given a type signature.
+
+     Example(s):
+     data R1 = R1 { x :: Int }
+     data R2 = R2 { x :: Int }
+     update r = r { x = 1 } -- needs a type signature
+
+    Test cases: overloadedrecflds/should_fail/overloadedrecfldsfail01
+  -}
+  TcRnBadOverloadedRecordUpdate :: [LHsRecUpdField GhcRn] -> TcRnMessage
+
+  {- TcRnStaticFormNotClosed is an error pertaining to terms that are marked static
+     using the -XStaticPointers extension but which are not closed terms.
+
+     Example(s):
+     f x = static x
+
+    Test cases: rename/should_fail/RnStaticPointersFail01
+                rename/should_fail/RnStaticPointersFail03
+  -}
+  TcRnStaticFormNotClosed :: Name -> NotClosedReason -> TcRnMessage
+
 -- | Which parts of a record field are affected by a particular error or warning.
 data RecordFieldPart
   = RecordFieldConstructor !Name
@@ -1151,3 +1285,9 @@ data SuggestUndecidableInstances
 suggestUndecidableInstances :: Bool -> SuggestUndecidableInstances
 suggestUndecidableInstances True  = YesSuggestUndecidableInstaces
 suggestUndecidableInstances False = NoSuggestUndecidableInstaces
+
+-- | A data type to describe why a variable is not closed.
+-- See Note [Not-closed error messages] in GHC.Tc.Gen.Expr
+data NotClosedReason = NotLetBoundReason
+                     | NotTypeClosed VarSet
+                     | NotClosed Name NotClosedReason

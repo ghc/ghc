@@ -738,7 +738,7 @@ tcExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = Left rbnds }) res_
               con1_tv_set  = mkVarSet con1_tvs
               bad_fld (fld, ty) = fld `elem` upd_fld_occs &&
                                       not (tyCoVarsOfType ty `subVarSet` con1_tv_set)
-        ; checkTc (null bad_upd_flds) (badFieldTypes bad_upd_flds)
+        ; checkTc (null bad_upd_flds) (TcRnFieldUpdateInvalidType bad_upd_flds)
 
         -- STEP 4  Note [Type of a record update]
         -- Figure out types for the scrutinee and result
@@ -1218,7 +1218,7 @@ disambiguateRecordBinds record_expr record_rho rbnds res_ty
     identifyParent fam_inst_envs possible_parents
       = case foldr1 intersect possible_parents of
         -- No parents for all fields: record update is ill-typed
-        []  -> failWithTc (noPossibleParents rbnds)
+        []  -> failWithTc (TcRnNoPossibleParentForFields rbnds)
 
         -- Exactly one datatype with all the fields: use that
         [p] -> return p
@@ -1237,7 +1237,7 @@ disambiguateRecordBinds record_expr record_rho rbnds res_ty
                   ; return (RecSelData tc) }
 
         -- Nothing else we can try...
-        _ -> failWithTc badOverloadedUpdate
+        _ -> failWithTc (TcRnBadOverloadedRecordUpdate rbnds)
 
     -- Make a field unambiguous by choosing the given parent.
     -- Emits an error if the field cannot have that parent,
@@ -1286,13 +1286,7 @@ disambiguateRecordBinds record_expr record_rho rbnds res_ty
     -- See Note [Deprecating ambiguous fields] in GHC.Tc.Gen.Head
     reportAmbiguousField :: TyCon -> TcM ()
     reportAmbiguousField parent_type =
-        setSrcSpan loc $ addDiagnostic $
-          TcRnUnknownMessage $ mkPlainDiagnostic (WarningWithFlag Opt_WarnAmbiguousFields) noHints $
-          vcat [ text "The record update" <+> ppr rupd
-                   <+> text "with type" <+> ppr parent_type
-                   <+> text "is ambiguous."
-               , text "This will not be supported by -XDuplicateRecordFields in future releases of GHC."
-               ]
+        setSrcSpan loc $ addDiagnostic $ TcRnAmbiguousField rupd parent_type
       where
         rupd = RecordUpd { rupd_expr = record_expr, rupd_flds = Left rbnds, rupd_ext = noExtField }
         loc  = getLocA (head rbnds)
@@ -1401,13 +1395,10 @@ checkMissingFields con_like rbinds arg_tys
                         -- But C{} is still valid if no strict fields
   = if any isBanged field_strs then
         -- Illegal if any arg is strict
-        addErrTc (missingStrictFields con_like [])
+        addErrTc (TcRnMissingStrictFields con_like [])
     else do
         when (notNull field_strs && null field_labels) $ do
-          let msg = TcRnUnknownMessage $
-                mkPlainDiagnostic (WarningWithFlag Opt_WarnMissingFields)
-                                  noHints
-                                  (missingFields con_like [])
+          let msg = TcRnMissingFields con_like []
           (diagnosticTc True msg)
 
   | otherwise = do              -- A record
@@ -1415,7 +1406,7 @@ checkMissingFields con_like rbinds arg_tys
         fs <- zonk_fields missing_s_fields
         -- It is an error to omit a strict field, because
         -- we can't substitute it with (error "Missing field f")
-        addErrTc (missingStrictFields con_like fs)
+        addErrTc (TcRnMissingStrictFields con_like fs)
 
     warn <- woptM Opt_WarnMissingFields
     when (warn && notNull missing_ns_fields) $ do
@@ -1423,10 +1414,7 @@ checkMissingFields con_like rbinds arg_tys
         -- It is not an error (though we may want) to omit a
         -- lazy field, because we can always use
         -- (error "Missing field f") instead.
-        let msg = TcRnUnknownMessage $
-              mkPlainDiagnostic (WarningWithFlag Opt_WarnMissingFields)
-                                noHints
-                                (missingFields con_like fs)
+        let msg = TcRnMissingFields con_like fs
         diagnosticTc True msg
 
   where
@@ -1468,22 +1456,13 @@ fieldCtxt :: FieldLabelString -> SDoc
 fieldCtxt field_name
   = text "In the" <+> quotes (ppr field_name) <+> text "field of a record"
 
-badFieldTypes :: [(FieldLabelString,TcType)] -> TcRnMessage
-badFieldTypes prs
-  = TcRnUnknownMessage $ mkPlainError noHints $
-    hang (text "Record update for insufficiently polymorphic field"
-                         <> plural prs <> colon)
-       2 (vcat [ ppr f <+> dcolon <+> ppr ty | (f,ty) <- prs ])
-
 badFieldsUpd
   :: [LHsFieldBind GhcTc (LAmbiguousFieldOcc GhcTc) (LHsExpr GhcRn)]
                -- Field names that don't belong to a single datacon
   -> [ConLike] -- Data cons of the type which the first field name belongs to
   -> TcRnMessage
 badFieldsUpd rbinds data_cons
-  = TcRnUnknownMessage $ mkPlainError noHints $
-    hang (text "No constructor has all these fields:")
-       2 (pprQuotedList conflictingFields)
+  = TcRnNoConstructorHasAllFields conflictingFields
           -- See Note [Finding the conflicting fields]
   where
     -- A (preferably small) set of fields such that no constructor contains
@@ -1554,59 +1533,11 @@ a decent stab, no more.  See #7989.
 
 mixedSelectors :: [Id] -> [Id] -> TcRnMessage
 mixedSelectors data_sels@(dc_rep_id:_) pat_syn_sels@(ps_rep_id:_)
-  = TcRnUnknownMessage $ mkPlainError noHints $
-    text "Cannot use a mixture of pattern synonym and record selectors" $$
-    text "Record selectors defined by"
-      <+> quotes (ppr (tyConName rep_dc))
-      <> colon
-      <+> pprWithCommas ppr data_sels $$
-    text "Pattern synonym selectors defined by"
-      <+> quotes (ppr (patSynName rep_ps))
-      <> colon
-      <+> pprWithCommas ppr pat_syn_sels
+  = TcRnMixedSelectors (tyConName rep_dc) data_sels (patSynName rep_ps) pat_syn_sels
   where
     RecSelPatSyn rep_ps = recordSelectorTyCon ps_rep_id
     RecSelData rep_dc = recordSelectorTyCon dc_rep_id
 mixedSelectors _ _ = panic "GHC.Tc.Gen.Expr: mixedSelectors emptylists"
-
-
-missingStrictFields :: ConLike -> [(FieldLabelString, TcType)] -> TcRnMessage
-missingStrictFields con fields
-  = TcRnUnknownMessage $ mkPlainError noHints $ vcat [header, nest 2 rest]
-  where
-    pprField (f,ty) = ppr f <+> dcolon <+> ppr ty
-    rest | null fields = Outputable.empty  -- Happens for non-record constructors
-                                           -- with strict fields
-         | otherwise   = vcat (fmap pprField fields)
-
-    header = text "Constructor" <+> quotes (ppr con) <+>
-             text "does not have the required strict field(s)" <>
-             if null fields then Outputable.empty else colon
-
-missingFields :: ConLike -> [(FieldLabelString, TcType)] -> SDoc
-missingFields con fields
-  = vcat [header, nest 2 rest]
-  where
-    pprField (f,ty) = ppr f <+> text "::" <+> ppr ty
-    rest | null fields = Outputable.empty
-         | otherwise   = vcat (fmap pprField fields)
-    header = text "Fields of" <+> quotes (ppr con) <+>
-             text "not initialised" <>
-             if null fields then Outputable.empty else colon
-
--- callCtxt fun args = text "In the call" <+> parens (ppr (foldl' mkHsApp fun args))
-
-noPossibleParents :: [LHsRecUpdField GhcRn] -> TcRnMessage
-noPossibleParents rbinds
-  = TcRnUnknownMessage $ mkPlainError noHints $
-    hang (text "No type has all these fields:")
-       2 (pprQuotedList fields)
-  where
-    fields = map (hfbLHS . unLoc) rbinds
-
-badOverloadedUpdate :: TcRnMessage
-badOverloadedUpdate = TcRnUnknownMessage $ mkPlainError noHints $
-  text "Record update is ambiguous, and requires a type signature"
 
 {-
 ************************************************************************
@@ -1615,11 +1546,6 @@ badOverloadedUpdate = TcRnUnknownMessage $ mkPlainError noHints $
 *                                                                      *
 ************************************************************************
 -}
-
--- | A data type to describe why a variable is not closed.
-data NotClosedReason = NotLetBoundReason
-                     | NotTypeClosed VarSet
-                     | NotClosed Name NotClosedReason
 
 -- | Checks if the given name is closed and emits an error if not.
 --
@@ -1686,25 +1612,7 @@ checkClosedInStaticForm name = do
     -- when the final node has a non-closed type.
     --
     explain :: Name -> NotClosedReason -> TcRnMessage
-    explain name reason = TcRnUnknownMessage $ mkPlainError noHints $
-      quotes (ppr name) <+> text "is used in a static form but it is not closed"
-                        <+> text "because it"
-                        $$
-                        sep (causes reason)
-
-    causes :: NotClosedReason -> [SDoc]
-    causes NotLetBoundReason = [text "is not let-bound."]
-    causes (NotTypeClosed vs) =
-      [ text "has a non-closed type because it contains the"
-      , text "type variables:" <+>
-        pprVarSet vs (hsep . punctuate comma . map (quotes . ppr))
-      ]
-    causes (NotClosed n reason) =
-      let msg = text "uses" <+> quotes (ppr n) <+> text "which"
-       in case reason of
-            NotClosed _ _ -> msg : causes reason
-            _   -> let (xs0, xs1) = splitAt 1 $ causes reason
-                    in fmap (msg <+>) xs0 ++ xs1
+    explain = TcRnStaticFormNotClosed
 
 -- Note [Not-closed error messages]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
