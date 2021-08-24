@@ -1,0 +1,5 @@
+
+[;1mColour.hs:1:8: [;1m[31merror:[0m[0m[;1m[0m[0m[;1m
+    • Couldn't match expected type ‘IO ()’ with actual type ‘()’
+    • In the expression: () :: IO ()
+      In an equation for ‘main’: main = () :: IO ()[0m[0m

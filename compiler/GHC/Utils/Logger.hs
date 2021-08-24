@@ -402,7 +402,7 @@ defaultLogActionHPutStrDoc :: LogFlags -> Bool -> Handle -> SDoc -> IO ()
 defaultLogActionHPutStrDoc logflags asciiSpace h d
   -- Don't add a newline at the end, so that successive
   -- calls to this log-action can output all on the same line
-  = printSDoc (log_default_dump_context logflags) (Pretty.PageMode asciiSpace) h d
+  = printSDoc (log_default_user_context logflags) (Pretty.PageMode asciiSpace) h d
 
 --
 -- Note [JSON Error Messages]

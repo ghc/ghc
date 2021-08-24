@@ -15,3 +15,4 @@ test('CaretDiagnostics1',
      compile_fail,
      ['-fdiagnostics-show-caret -ferror-spans'])
 test('CaretDiagnostics2', normal, compile_fail, ['-fdiagnostics-show-caret'])
+test('Colour', normal, compile_fail, ['-fdiagnostics-color=always'])
