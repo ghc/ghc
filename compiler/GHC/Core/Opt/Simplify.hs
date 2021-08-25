@@ -2166,16 +2166,6 @@ rebuildCall env fun_info
   | isSimplified dup_flag     -- See Note [Avoid redundant simplification]
   = rebuildCall env (addValArgTo fun_info arg fun_ty) cont
 
-  -- Strict arguments
-  | isStrictArgInfo fun_info
-  , sm_case_case (getMode env)
-  = -- pprTrace "Strict Arg" (ppr arg $$ ppr (seIdSubst env) $$ ppr (seInScope env)) $
-    simplExprF (arg_se `setInScopeFromE` env) arg
-               (StrictArg { sc_fun = fun_info, sc_fun_ty = fun_ty
-                          , sc_dup = Simplified
-                          , sc_cont = cont })
-                -- Note [Shadowing]
-
   -- Lazy arguments
   | otherwise
         -- DO NOT float anything outside, hence simplExprC
