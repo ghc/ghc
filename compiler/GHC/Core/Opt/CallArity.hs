@@ -525,7 +525,7 @@ callArityAnal arity int (Case scrut bndr ty alts)
       (final_ae, Case scrut' bndr ty alts')
   where
     (alt_aes, alts') = unzip $ map go alts
-    go (Alt dc bndrs e) = let (ae, e') = callArityAnal arity int e
+    go (Alt dc bndrs e) = let (ae, e') = callArityAnal arity (int `delVarSetList` (bndr:bndrs)) e
                           in  (ae, Alt dc bndrs e')
     alt_ae = lubRess alt_aes
     (scrut_ae, scrut') = callArityAnal 0 int scrut
