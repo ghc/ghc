@@ -192,7 +192,7 @@ If we have
 
 where f is strict in y, we might get a more efficient loop by w/w'ing
 f.  But that would make a new unfolding which would overwrite the old
-one! So the function would no longer be INLNABLE, and in particular
+one! So the function would no longer be INLINABLE, and in particular
 will not be specialised at call sites in other modules.
 
 This comes in practice (#6056).
@@ -312,7 +312,7 @@ the wrapper (or later).  That is necessary to allow the wrapper to
 inline into the worker's unfolding: see GHC.Core.Opt.Simplify.Utils
 Note [Simplifying inside stable unfoldings].
 
-If the original is NOINLINE, it's important that the work inherit the
+If the original is NOINLINE, it's important that the worker inherits the
 original activation. Consider
 
   {-# NOINLINE expensive #-}
@@ -413,24 +413,16 @@ Note [Wrapper activation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 When should the wrapper inlining be active?
 
-1. It must not be active earlier than the current Activation of the
-   Id
+1. It must not be active earlier than the current Activation of the Id,
+   because we must give rewrite rules mentioning the wrapper and
+   specialisation a chance toire.
+   See Note [Worker/wrapper for INLINABLE functions]
+   and Note [Worker activation]
 
 2. It should be active at some point, despite (1) because of
    Note [Worker/wrapper for NOINLINE functions]
 
-3. For ordinary functions with no pragmas we want to inline the
-   wrapper as early as possible (#15056).  Suppose another module
-   defines    f x = g x x
-   and suppose there is some RULE for (g True True).  Then if we have
-   a call (f True), we'd expect to inline 'f' and the RULE will fire.
-   But if f is w/w'd (which it might be), we want the inlining to
-   occur just as if it hadn't been.
-
-   (This only matters if f's RHS is big enough to w/w, but small
-   enough to inline given the call site, but that can happen.)
-
-4. We do not want to inline the wrapper before specialisation.
+3. We do not want to inline the wrapper before specialisation.
          module Foo where
            f :: Num a => a -> Int -> a
            f n 0 = n              -- Strict in the Int, hence wrapper
@@ -448,26 +440,40 @@ When should the wrapper inlining be active?
    In module Bar we want to give specialisations a chance to fire
    before inlining f's wrapper.
 
-   Historical note: At one stage I tried making the wrapper inlining
-   always-active, and that had a very bad effect on nofib/imaginary/x2n1;
-   a wrapper was inlined before the specialisation fired.
-
 Reminder: Note [Don't w/w INLINE things], so we don't need to worry
           about INLINE things here.
 
 Conclusion:
-  - If the user said NOINLINE[n], respect that
+  - If the user said NOINLINE[n] or INLINABLE[n], respect that by putting
+    INLINE[n] on the wrapper (and NOINLINE[n]/INLINABLE[n] on the worker)
 
-  - If the user said NOINLINE, inline the wrapper only after
-    phase 0, the last user-visible phase.  That means that all
-    rules will have had a chance to fire.
+  - If the user said NOINLINE or INLINABLE, inline the wrapper only *after*
+    phase 0, the last user-visible phase (and put the original pragma on the
+    worker). That means that all rules will have had a chance to fire.
 
     What phase is after phase 0?  Answer: FinalPhase, that's the reason it
     exists. NB: Similar to InitialPhase, users can't write INLINE[Final] f;
-    it's syntactically illegal.
+    it's syntactically illegal. See Note [Compiler phases].
 
   - Otherwise inline wrapper in phase Final.  That allows the
     'gentle' simplification pass to apply specialisation rules
+
+Historical note: At one stage I tried making the wrapper inlining
+always-active (in an attempt to fix #15056), and that had a very bad effect on
+nofib/imaginary/x2n1; a wrapper was inlined before the specialisation fired.
+
+Inlining wrappers early sounds tempting when we have an ordinary function f
+without a pragma (see #15056 for something compilable):
+
+> module A where
+> f xs = ... foldr k z xs ...
+
+and we want a call `f (build ...)` in module B to inline to do foldr/build
+fusion. But if f is w/w'd (which it might be), we only inline f (and its worker)
+much later, after `build` has been inlined and the RULE can't fire anymore.
+Inlining the wrapper early recovers the rewrite opportunity. (This only matters
+if f's RHS is big enough to w/w, but small enough to inline given the call site,
+but that can happen.)
 
 Note [Wrapper NoUserInlinePrag]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -830,7 +836,7 @@ mkStrWrapperInlinePrag (InlinePragma { inl_act = act, inl_rule = rule_info })
                    ActiveAfter {}  -> act
                    ActiveBefore {} -> activateAfterInitial
                    AlwaysActive    -> activateAfterInitial
-      -- For the last two cases, see (4) in Note [Wrapper activation]
+      -- For the last two cases, see (3) in Note [Wrapper activation]
       -- NB: the (ActiveBefore n) isn't quite right. We really want
       -- it to be active *after* Initial but *before* n.  We don't have
       -- a way to say that, alas.
