@@ -1,13 +1,13 @@
 
 PluralS.hs:15:17: warning: [-Wtype-defaults (in -Wall)]
-    • Defaulting the following constraint to type ‘Integer’
+    • Defaulting the type variable ‘a0’ to type ‘Integer’ in the following constraint
         Num a0 arising from the literal ‘123’
     • In the first argument of ‘seq’, namely ‘123’
       In the expression: 123 `seq` ()
       In an equation for ‘defaultingNum’: defaultingNum = 123 `seq` ()
 
 PluralS.hs:17:24: warning: [-Wtype-defaults (in -Wall)]
-    • Defaulting the following constraints to type ‘Integer’
+    • Defaulting the type variable ‘a0’ to type ‘Integer’ in the following constraints
         (Show a0) arising from a use of ‘show’ at PluralS.hs:17:24-27
         (Num a0) arising from the literal ‘123’ at PluralS.hs:17:29-31
     • In the expression: show 123

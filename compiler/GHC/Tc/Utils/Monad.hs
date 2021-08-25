@@ -351,6 +351,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
                 tcg_dependent_files = dependent_files_var,
                 tcg_tc_plugin_solvers   = [],
                 tcg_tc_plugin_rewriters = emptyUFM,
+                tcg_defaulting_plugins  = [],
                 tcg_hf_plugins     = [],
                 tcg_top_loc        = loc,
                 tcg_static_wc      = static_wc_var,

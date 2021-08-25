@@ -1,0 +1,5 @@
+test-defaulting-plugin-fail.hs:25:19:
+     Cannot satisfy: 5 <= a0
+     In the second argument of ‘(+)’, namely ‘e’
+      In the second argument of ‘($)’, namely ‘q + w + e’
+      In a stmt of a 'do' block: print $ q + w + e

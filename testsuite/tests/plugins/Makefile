@@ -163,3 +163,12 @@ T20218:
 T20218b:
 	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) T20218b.hs -package-db simple-plugin/pkg.T20218b/local.package.conf -fplugin Simple.ReplacePlugin -package simple-plugin -v0
 	./T20218b
+
+.PHONY: test-defaulting-plugin
+test-defaulting-plugin:
+	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) -v0 test-defaulting-plugin.hs -package-db defaulting-plugin/pkg.test-defaulting-plugin/local.package.conf
+
+.PHONY: test-defaulting-plugin-fail
+test-defaulting-plugin-fail:
+	-"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) -v0 test-defaulting-plugin-fail.hs -package-db defaulting-plugin/pkg.test-defaulting-plugin-fail/local.package.conf
+

@@ -82,6 +82,10 @@ module GHC.Tc.Types(
         TcPluginSolver, TcPluginRewriter,
         TcPluginM(runTcPluginM), unsafeTcPluginTcM,
 
+        -- Defaulting plugin
+        DefaultingPlugin(..), DefaultingProposal(..),
+        FillDefaulting, DefaultingPluginResult,
+
         -- Role annotations
         RoleAnnotEnv, emptyRoleAnnotEnv, mkRoleAnnotEnv,
         lookupRoleAnnot, getRoleAnnots,
@@ -620,6 +624,9 @@ data TcGblEnv
         tcg_tc_plugin_rewriters :: UniqFM TyCon [TcPluginRewriter],
         -- ^ A collection of all the user-defined type-checking plugins for rewriting
         -- type family applications, collated by their type family 'TyCon's.
+
+        tcg_defaulting_plugins :: [FillDefaulting],
+        -- ^ A list of user-defined plugins for type defaulting plugins.
 
         tcg_hf_plugins :: [HoleFitPlugin],
         -- ^ A list of user-defined plugins for hole fit suggestions.
@@ -1766,6 +1773,36 @@ data TcPluginRewriteResult
     { tcPluginReduction    :: !Reduction
     , tcRewriterNewWanteds :: [Ct]
     }
+
+-- | A collection of candidate default types for a type variable.
+data DefaultingProposal
+  = DefaultingProposal
+    { deProposalTyVar :: TcTyVar
+      -- ^ The type variable to default.
+    , deProposalCandidates :: [Type]
+      -- ^ Candidate types to default the type variable to.
+    , deProposalCts :: [Ct]
+      -- ^ The constraints against which defaults are checked.
+    }
+
+instance Outputable DefaultingProposal where
+  ppr p = text "DefaultingProposal"
+          <+> ppr (deProposalTyVar p)
+          <+> ppr (deProposalCandidates p)
+          <+> ppr (deProposalCts p)
+
+type DefaultingPluginResult = [DefaultingProposal]
+type FillDefaulting = WantedConstraints -> TcPluginM DefaultingPluginResult
+
+-- | A plugin for controlling defaulting.
+data DefaultingPlugin = forall s. DefaultingPlugin
+  { dePluginInit :: TcPluginM s
+    -- ^ Initialize plugin, when entering type-checker.
+  , dePluginRun :: s -> FillDefaulting
+    -- ^ Default some types
+  , dePluginStop :: s -> TcPluginM ()
+   -- ^ Clean up after the plugin, when exiting the type-checker.
+  }
 
 {- *********************************************************************
 *                                                                      *

@@ -2592,6 +2592,17 @@ applyDefaultingRules wanteds
   = do { info@(default_tys, _) <- getDefaultInfo
        ; wanteds               <- TcS.zonkWC wanteds
 
+       ; tcg_env <- TcS.getGblEnv
+       ; let plugins = tcg_defaulting_plugins tcg_env
+
+       ; plugin_defaulted <- if null plugins then return [] else
+           do {
+             ; traceTcS "defaultingPlugins {" (ppr wanteds)
+             ; defaultedGroups <- mapM (run_defaulting_plugin wanteds) plugins
+             ; traceTcS "defaultingPlugins }" (ppr defaultedGroups)
+             ; return defaultedGroups
+             }
+
        ; let groups = findDefaultableGroups info wanteds
 
        ; traceTcS "applyDefaultingRules {" $
@@ -2603,7 +2614,20 @@ applyDefaultingRules wanteds
 
        ; traceTcS "applyDefaultingRules }" (ppr something_happeneds)
 
-       ; return (or something_happeneds) }
+       ; return $ or something_happeneds || or plugin_defaulted }
+    where run_defaulting_plugin wanteds p =
+            do { groups <- runTcPluginTcS (p wanteds)
+               ; defaultedGroups <-
+                    filterM (\g -> disambigGroup
+                                   (deProposalCandidates g)
+                                   (deProposalTyVar g, deProposalCts g))
+                    groups
+               ; traceTcS "defaultingPlugin " $ ppr defaultedGroups
+               ; case defaultedGroups of
+                 [] -> return False
+                 _  -> return True
+               }
+
 
 findDefaultableGroups
     :: ( [Type]
@@ -2665,8 +2689,7 @@ findDefaultableGroups (default_tys, (ovl_strings, extended_defaults)) wanteds
 
 ------------------------------
 disambigGroup :: [Type]            -- The default types
-              -> (TcTyVar, [Ct])   -- All classes of the form (C a)
-                                   --  sharing same type variable
+              -> (TcTyVar, [Ct])   -- All constraints sharing same type variable
               -> TcS Bool   -- True <=> something happened, reflected in ty_binds
 
 disambigGroup [] _
@@ -2680,7 +2703,7 @@ disambigGroup (default_ty:default_tys) group@(the_tv, wanteds)
        ; if success then
              -- Success: record the type variable binding, and return
              do { unifyTyVar the_tv default_ty
-                ; wrapWarnTcS $ warnDefaulting wanteds default_ty
+                ; wrapWarnTcS $ warnDefaulting the_tv wanteds default_ty
                 ; traceTcS "disambigGroup succeeded }" (ppr default_ty)
                 ; return True }
          else
@@ -2694,7 +2717,8 @@ disambigGroup (default_ty:default_tys) group@(the_tv, wanteds)
       = do { lcl_env <- TcS.getLclEnv
            ; tc_lvl <- TcS.getTcLevel
            ; let loc = mkGivenLoc tc_lvl UnkSkol lcl_env
-           ; wanted_evs <- mapM (newWantedEvVarNC loc . substTy subst . ctPred)
+           -- Equality constraints are possible due to type defaulting plugins
+           ; wanted_evs <- mapM (newWantedNC loc . substTy subst . ctPred)
                                 wanteds
            ; fmap isEmptyWC $
              solveSimpleWanteds $ listToBag $

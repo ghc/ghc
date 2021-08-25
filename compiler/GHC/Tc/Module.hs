@@ -204,7 +204,9 @@ tcRnModule hsc_env mod_sum save_rn_syntax
               (text "Renamer/typechecker"<+>brackets (ppr this_mod))
               (const ()) $
    initTc hsc_env hsc_src save_rn_syntax this_mod real_loc $
-          withTcPlugins hsc_env $ withHoleFitPlugins hsc_env $
+          withTcPlugins hsc_env $
+          withDefaultingPlugins hsc_env $
+          withHoleFitPlugins hsc_env $
 
           tcRnModuleTcRnM hsc_env mod_sum parsedModule pair
 
@@ -2033,7 +2035,8 @@ runTcInteractive :: HscEnv -> TcRn a -> IO (Messages TcRnMessage, Maybe a)
 -- Initialise the tcg_inst_env with instances from all home modules.
 -- This mimics the more selective call to hptInstances in tcRnImports
 runTcInteractive hsc_env thing_inside
-  = initTcInteractive hsc_env $ withTcPlugins hsc_env $ withHoleFitPlugins hsc_env $
+  = initTcInteractive hsc_env $ withTcPlugins hsc_env $
+    withDefaultingPlugins hsc_env $ withHoleFitPlugins hsc_env $
     do { traceTc "setInteractiveContext" $
             vcat [ text "ic_tythings:" <+> vcat (map ppr (ic_tythings icxt))
                  , text "ic_insts:" <+> vcat (map (pprBndr LetBind . instanceDFunId) ic_insts)
@@ -3086,12 +3089,12 @@ Type Checker Plugins
 
 withTcPlugins :: HscEnv -> TcM a -> TcM a
 withTcPlugins hsc_env m =
-    case getTcPlugins hsc_env of
+    case catMaybes $ mapPlugins hsc_env tcPlugin of
        []      -> m  -- Common fast case
        plugins -> do
                 ev_binds_var <- newTcEvBinds
                 (solvers, rewriters, stops) <-
-                  unzip3 `fmap` mapM (startPlugin ev_binds_var) plugins
+                  unzip3 `fmap` mapM (start_plugin ev_binds_var) plugins
                 let
                   rewritersUniqFM :: UniqFM TyCon [TcPluginRewriter]
                   !rewritersUniqFM = sequenceUFMList rewriters
@@ -3105,19 +3108,33 @@ withTcPlugins hsc_env m =
                   Left _ -> failM
                   Right res -> return res
   where
-  startPlugin ev_binds_var (TcPlugin start solve rewrite stop) =
+  start_plugin ev_binds_var (TcPlugin start solve rewrite stop) =
     do s <- runTcPluginM start
        return (solve s ev_binds_var, rewrite s, stop s)
 
-getTcPlugins :: HscEnv -> [GHC.Tc.Utils.Monad.TcPlugin]
-getTcPlugins hsc_env = catMaybes $ mapPlugins hsc_env (\p args -> tcPlugin p args)
-
+withDefaultingPlugins :: HscEnv -> TcM a -> TcM a
+withDefaultingPlugins hsc_env m =
+  do case catMaybes $ mapPlugins hsc_env defaultingPlugin of
+       [] -> m  -- Common fast case
+       plugins  -> do (plugins,stops) <- mapAndUnzipM start_plugin plugins
+                      -- This ensures that dePluginStop is called even if a type
+                      -- error occurs during compilation
+                      eitherRes <- tryM $ do
+                        updGblEnv (\e -> e { tcg_defaulting_plugins = plugins }) m
+                      mapM_ runTcPluginM stops
+                      case eitherRes of
+                        Left _ -> failM
+                        Right res -> return res
+  where
+  start_plugin (DefaultingPlugin start fill stop) =
+    do s <- runTcPluginM start
+       return (fill s, stop s)
 
 withHoleFitPlugins :: HscEnv -> TcM a -> TcM a
 withHoleFitPlugins hsc_env m =
-  case getHfPlugins hsc_env of
+  case catMaybes $ mapPlugins hsc_env holeFitPlugin of
     [] -> m  -- Common fast case
-    plugins -> do (plugins,stops) <- unzip `fmap` mapM startPlugin plugins
+    plugins -> do (plugins,stops) <- mapAndUnzipM start_plugin plugins
                   -- This ensures that hfPluginStop is called even if a type
                   -- error occurs during compilation.
                   eitherRes <- tryM $
@@ -3127,13 +3144,9 @@ withHoleFitPlugins hsc_env m =
                     Left _ -> failM
                     Right res -> return res
   where
-    startPlugin (HoleFitPluginR init plugin stop) =
+    start_plugin (HoleFitPluginR init plugin stop) =
       do ref <- init
          return (plugin ref, stop ref)
-
-getHfPlugins :: HscEnv -> [HoleFitPluginR]
-getHfPlugins hsc_env =
-  catMaybes $ mapPlugins hsc_env (\p args -> holeFitPlugin p args)
 
 
 runRenamerPlugin :: TcGblEnv

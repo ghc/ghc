@@ -9,6 +9,11 @@ Compiler
 - New :ghc-flag:`-Wredundant-strictness-flags` that checks for strictness flags
   (``!``) applied to unlifted types, which are always strict.
 
+- A new type of plugin: defaulting plugins. These plugins can propose
+  defaults for ambiguous variables that would otherwise cause errors
+  just like the built-in defaulting mechanism.
+
+
 ``base`` library
 ~~~~~~~~~~~~~~~~
 

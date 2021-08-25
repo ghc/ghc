@@ -1,6 +1,6 @@
 
 tcfail204.hs:10:7: error: [-Wtype-defaults (in -Wall), -Werror=type-defaults]
-    • Defaulting the following constraints to type ‘Double’
+    • Defaulting the type variable ‘a0’ to type ‘Double’ in the following constraints
         (RealFrac a0)
           arising from a use of ‘ceiling’ at tcfail204.hs:10:7-13
         (Fractional a0)

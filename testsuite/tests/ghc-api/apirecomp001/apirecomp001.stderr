@@ -4,7 +4,7 @@ B.hs:4:1: warning: [-Wmissing-signatures (in -Wall)]
       answer_to_live_the_universe_and_everything :: Int
 
 B.hs:5:13: warning: [-Wtype-defaults (in -Wall)]
-    • Defaulting the following constraints to type ‘Integer’
+    • Defaulting the type variable ‘a0’ to type ‘Integer’ in the following constraints
         (Num a0) arising from the literal ‘1’ at B.hs:5:13
         (Enum a0)
           arising from the arithmetic sequence ‘1 .. 23 * 2’ at B.hs:5:12-20
@@ -20,7 +20,7 @@ B.hs:4:1: warning: [-Wmissing-signatures (in -Wall)]
       answer_to_live_the_universe_and_everything :: Int
 
 B.hs:5:13: warning: [-Wtype-defaults (in -Wall)]
-    • Defaulting the following constraints to type ‘Integer’
+    • Defaulting the type variable ‘a0’ to type ‘Integer’ in the following constraints
         (Num a0) arising from the literal ‘1’ at B.hs:5:13
         (Enum a0)
           arising from the arithmetic sequence ‘1 .. 23 * 2’ at B.hs:5:12-20

@@ -3151,19 +3151,26 @@ discardMsg = text "(Some bindings suppressed;" <+>
              text "use -fmax-relevant-binds=N or -fno-max-relevant-binds)"
 
 -----------------------
-warnDefaulting :: [Ct] -> Type -> TcM ()
-warnDefaulting wanteds default_ty
+warnDefaulting :: TcTyVar -> [Ct] -> Type -> TcM ()
+warnDefaulting the_tv wanteds default_ty
   = do { warn_default <- woptM Opt_WarnTypeDefaults
        ; env0 <- tcInitTidyEnv
        ; let tidy_env = tidyFreeTyCoVars env0 $
                         tyCoVarsOfCtsList (listToBag wanteds)
              tidy_wanteds = map (tidyCt tidy_env) wanteds
+             tidy_tv = lookupVarEnv (snd tidy_env) the_tv
              (loc, ppr_wanteds) = pprWithArising tidy_wanteds
              warn_msg =
-                hang (hsep [ text "Defaulting the following"
-                           , text "constraint" <> plural tidy_wanteds
-                           , text "to type"
-                           , quotes (ppr default_ty) ])
+                hang (hsep $ [ text "Defaulting" ]
+                             ++
+                             (case tidy_tv of
+                                 Nothing -> []
+                                 Just tv -> [text "the type variable"
+                                            , quotes (ppr tv)])
+                             ++
+                             [ text "to type"
+                             , quotes (ppr default_ty)
+                             , text "in the following constraint" <> plural tidy_wanteds ])
                      2
                      ppr_wanteds
        ; let diag = TcRnUnknownMessage $

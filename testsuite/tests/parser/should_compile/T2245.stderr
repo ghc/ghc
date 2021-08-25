@@ -12,7 +12,7 @@ T2245.hs:5:10: warning: [-Wmissing-methods (in -Wdefault)]
     • In the instance declaration for ‘Fractional T’
 
 T2245.hs:7:27: warning: [-Wtype-defaults (in -Wall)]
-    • Defaulting the following constraints to type ‘T’
+    • Defaulting the type variable ‘b0’ to type ‘T’ in the following constraints
         (Ord b0) arising from a use of ‘<’ at T2245.hs:7:27
         (Fractional b0)
           arising from the literal ‘1e400’ at T2245.hs:7:29-33
