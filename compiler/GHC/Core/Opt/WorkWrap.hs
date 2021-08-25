@@ -192,19 +192,19 @@ If we have
 
 where f is strict in y, we might get a more efficient loop by w/w'ing
 f.  But that would make a new unfolding which would overwrite the old
-one! So the function would no longer be INLNABLE, and in particular
+one! So the function would no longer be INLINABLE, and in particular
 will not be specialised at call sites in other modules.
 
-This comes in practice (#6056).
+This comes up in practice (#6056).
 
 Solution: do the w/w for strictness analysis, but transfer the Stable
 unfolding to the *worker*.  So we will get something like this:
 
-  {-# INLINE[0] f #-}
+  {-# INLINE[2] f #-}
   f :: Ord a => [a] -> Int -> a
   f d x y = case y of I# y' -> fw d x y'
 
-  {-# INLINABLE[0] fw #-}
+  {-# INLINABLE[2] fw #-}
   fw :: Ord a => [a] -> Int# -> a
   fw d x y' = let y = I# y' in ...f...
 
@@ -312,7 +312,7 @@ the wrapper (or later).  That is necessary to allow the wrapper to
 inline into the worker's unfolding: see GHC.Core.Opt.Simplify.Utils
 Note [Simplifying inside stable unfoldings].
 
-If the original is NOINLINE, it's important that the work inherit the
+If the original is NOINLINE, it's important that the worker inherits the
 original activation. Consider
 
   {-# NOINLINE expensive #-}
@@ -324,9 +324,9 @@ If expensive's worker inherits the wrapper's activation,
 we'll get this (because of the compromise in point (2) of
 Note [Wrapper activation])
 
-  {-# NOINLINE[0] $wexpensive #-}
+  {-# NOINLINE[Final] $wexpensive #-}
   $wexpensive x = x + 1
-  {-# INLINE[0] expensive #-}
+  {-# INLINE[Final] expensive #-}
   expensive x = $wexpensive x
 
   f y = let z = expensive y in ...
@@ -413,17 +413,20 @@ Note [Wrapper activation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 When should the wrapper inlining be active?
 
-1. It must not be active earlier than the current Activation of the
-   Id
+1. It must not be active earlier than the current Activation of the Id,
+   because we must give rewrite rules mentioning the wrapper and
+   specialisation a chance to fire.
+   See Note [Worker/wrapper for INLINABLE functions]
+   and Note [Worker activation]
 
 2. It should be active at some point, despite (1) because of
    Note [Worker/wrapper for NOINLINE functions]
 
 3. For ordinary functions with no pragmas we want to inline the
    wrapper as early as possible (#15056).  Suppose another module
-   defines    f x = g x x
-   and suppose there is some RULE for (g True True).  Then if we have
-   a call (f True), we'd expect to inline 'f' and the RULE will fire.
+   defines    f !x xs = ... foldr k z xs ...
+   and suppose we have the usual foldr/build RULE.  Then if we have
+   a call `f x [1..x]`, we'd expect to inline f and the RULE will fire.
    But if f is w/w'd (which it might be), we want the inlining to
    occur just as if it hadn't been.
 
@@ -456,21 +459,23 @@ Reminder: Note [Don't w/w INLINE things], so we don't need to worry
           about INLINE things here.
 
 Conclusion:
-  - If the user said NOINLINE[n], respect that
+  - If the user said NOINLINE[n] or INLINABLE[n], respect that by putting
+    INLINE[n] on the wrapper (and NOINLINE[n]/INLINABLE[n] on the worker).
 
-  - If the user said NOINLINE, inline the wrapper only after
-    phase 0, the last user-visible phase.  That means that all
-    rules will have had a chance to fire.
+  - If the user said NOINLINE, inline the wrapper only in
+    FinalPhase, which is after all the numbered, user-visible phases (and put
+    the original pragma on the worker). That means that all rules will have had
+    a chance to fire.
+    NB: Similar to InitialPhase, users can't write INLINE[Final] f;
+    it's syntactically illegal. See Note [Compiler phases].
 
-    What phase is after phase 0?  Answer: FinalPhase, that's the reason it
-    exists. NB: Similar to InitialPhase, users can't write INLINE[Final] f;
-    it's syntactically illegal.
-
-  - Otherwise inline wrapper in phase Final.  That allows the
-    'gentle' simplification pass to apply specialisation rules
+  - Otherwise (no pragma or INLINABLE) inline the wrapper in the first phase
+    *after* InitialPhase. We run InitialPhase before the specialiser so that
+    will not inline the wrapper before specialisation; but it will do so
+    immediately afterwards.
 
 Note [Wrapper NoUserInlinePrag]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We use NoUserInlinePrag on the wrapper, to say that there is no
 user-specified inline pragma. (The worker inherits that; see Note
 [Worker/wrapper for INLINABLE functions].)  The wrapper has no pragma

@@ -5,7 +5,7 @@ test 0 = True
 test n = test (n-1)
 
 foo :: Foldable t => Int -> t Int -> Int
-foo n xs | test n
+foo n xs | test n && test (n+1)
          = foldr (+) n xs
          | otherwise
          = n+7
