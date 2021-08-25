@@ -354,6 +354,9 @@ Library
     cmm-sources:
         cbits/CastFloatWord.cmm
 
+    js-sources:
+        jsbits/base.js.pp
+
     include-dirs: include
     includes:
         HsBase.h
