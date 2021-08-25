@@ -61,7 +61,6 @@ import GHC.Types.Unique.Supply
 import GHC.Builtin.Names
 import GHC.Data.Maybe
 
-import GHC.Utils.Trace
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -255,11 +254,10 @@ lookupIdSubst s@(Subst in_scope ids _ _) v
   | not (isLocalId v) = Var v
   | Just e  <- lookupVarEnv ids       v = e
   | Just v' <- lookupInScope in_scope v = Var v'
-        -- Vital! See Note [Extending the Subst]
+        -- If v isn't in the InScopeSet, we panic, because
+        -- it's a bad bug and we reallly want to know
         -- See #20200
-  | otherwise = warnPprTrace True (text "GHC.Core.Subst.lookupIdSubst" <+> ppr v
-                            $$ ppr s) $
-                Var v
+  | otherwise = pprPanic "lookupIdSubst" (ppr v $$ ppr s $$ ppr in_scope)
 
 delBndr :: Subst -> Var -> Subst
 delBndr (Subst in_scope ids tvs cvs) v
