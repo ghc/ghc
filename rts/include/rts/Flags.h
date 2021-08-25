@@ -147,6 +147,7 @@ typedef struct _PROFILING_FLAGS {
     Time        heapProfileInterval; /* time between samples */
     uint32_t    heapProfileIntervalTicks; /* ticks between samples (derived) */
     bool        startHeapProfileAtStartup; /* true if we start profiling from program startup */
+    bool        generateHpFile; /* Do we want to generate a .hp file with profile data. */
 
 
     bool        showCCSOnException;

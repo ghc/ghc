@@ -214,6 +214,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.ProfFlags.doHeapProfile      = false;
     RtsFlags.ProfFlags.heapProfileInterval = USToTime(100000); // 100ms
     RtsFlags.ProfFlags.startHeapProfileAtStartup = true;
+    RtsFlags.ProfFlags.generateHpFile = true;
 
 #if defined(PROFILING)
     RtsFlags.ProfFlags.showCCSOnException = false;
@@ -959,6 +960,11 @@ error = true;
                               &rts_argv[arg][2])) {
                       OPTION_UNSAFE;
                       RtsFlags.MiscFlags.generate_dump_file = true;
+                  }
+                  else if (strequal("disable-hp-generation",
+                              &rts_argv[arg][2])) {
+                      OPTION_SAFE;
+                      RtsFlags.ProfFlags.generateHpFile = false;
                   }
                   else if (strequal("machine-readable",
                                &rts_argv[arg][2])) {

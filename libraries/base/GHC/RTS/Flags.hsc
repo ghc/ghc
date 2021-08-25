@@ -293,6 +293,7 @@ data ProfFlags = ProfFlags
     , heapProfileInterval      :: RtsTime -- ^ time between samples
     , heapProfileIntervalTicks :: Word    -- ^ ticks between samples (derived)
     , startHeapProfileAtStartup :: Bool
+    , generateHpFile           :: Bool
     , showCCSOnException       :: Bool
     , maxRetainerSetSize       :: Word
     , ccsLength                :: Word
@@ -591,6 +592,8 @@ getProfFlags = do
             <*> #{peek PROFILING_FLAGS, heapProfileIntervalTicks} ptr
             <*> (toBool <$>
                   (#{peek PROFILING_FLAGS, startHeapProfileAtStartup} ptr :: IO CBool))
+            <*> (toBool <$>
+                  (#{peek PROFILING_FLAGS, generateHpFile} ptr :: IO CBool))
             <*> (toBool <$>
                   (#{peek PROFILING_FLAGS, showCCSOnException} ptr :: IO CBool))
             <*> #{peek PROFILING_FLAGS, maxRetainerSetSize} ptr

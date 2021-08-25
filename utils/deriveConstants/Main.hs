@@ -571,6 +571,8 @@ wanteds os = concat
 
           ,structField_ C "RtsFlags_ProfFlags_doHeapProfile"
                           "RTS_FLAGS" "ProfFlags.doHeapProfile"
+          ,structField_ C "RtsFlags_ProfFlags_generateHpFile"
+                          "RTS_FLAGS" "ProfFlags.generateHpFile"
           ,structField_ C "RtsFlags_ProfFlags_showCCSOnException"
                           "RTS_FLAGS" "ProfFlags.showCCSOnException"
           ,structField_ C "RtsFlags_DebugFlags_apply"

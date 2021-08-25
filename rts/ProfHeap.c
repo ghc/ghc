@@ -434,7 +434,7 @@ initHeapProfiling(void)
     }
 #endif
 
-  if (RtsFlags.ProfFlags.doHeapProfile) {
+  if (RtsFlags.ProfFlags.doHeapProfile & RtsFlags.ProfFlags.generateHpFile) {
     /* Initialise the log file name */
     hp_filename = stgMallocBytes(strlen(prog) + 6, "hpFileName");
     sprintf(hp_filename, "%s.hp", prog);
@@ -490,31 +490,33 @@ initHeapProfiling(void)
     }
     initEra( &censuses[era] );
 
-    /* initProfilingLogFile(); */
-    fprintf(hp_file, "JOB \"");
-    printEscapedString(prog_name);
+    if(RtsFlags.ProfFlags.generateHpFile) {
+        /* initProfilingLogFile(); */
+        fprintf(hp_file, "JOB \"");
+        printEscapedString(prog_name);
 
 #if defined(PROFILING)
-    for (int i = 1; i < prog_argc; ++i) {
-        fputc(' ', hp_file);
-        printEscapedString(prog_argv[i]);
-    }
-    fprintf(hp_file, " +RTS");
-    for (int i = 0; i < rts_argc; ++i) {
-        fputc(' ', hp_file);
-        printEscapedString(rts_argv[i]);
-    }
+        for (int i = 1; i < prog_argc; ++i) {
+            fputc(' ', hp_file);
+            printEscapedString(prog_argv[i]);
+        }
+        fprintf(hp_file, " +RTS");
+        for (int i = 0; i < rts_argc; ++i) {
+            fputc(' ', hp_file);
+            printEscapedString(rts_argv[i]);
+        }
 #endif /* PROFILING */
 
-    fprintf(hp_file, "\"\n" );
+        fprintf(hp_file, "\"\n" );
 
-    fprintf(hp_file, "DATE \"%s\"\n", time_str());
+        fprintf(hp_file, "DATE \"%s\"\n", time_str());
 
-    fprintf(hp_file, "SAMPLE_UNIT \"seconds\"\n");
-    fprintf(hp_file, "VALUE_UNIT \"bytes\"\n");
+        fprintf(hp_file, "SAMPLE_UNIT \"seconds\"\n");
+        fprintf(hp_file, "VALUE_UNIT \"bytes\"\n");
 
-    printSample(true, 0);
-    printSample(false, 0);
+        printSample(true, 0);
+        printSample(false, 0);
+    }
 
 #if defined(PROFILING)
     if (doingRetainerProfiling()) {
@@ -567,9 +569,11 @@ endHeapProfiling(void)
     getRTSStats(&stats);
     Time mut_time = stats.mutator_cpu_ns;
     StgDouble seconds = TimeToSecondsDbl(mut_time);
-    printSample(true, seconds);
-    printSample(false, seconds);
-    fclose(hp_file);
+    if(RtsFlags.ProfFlags.generateHpFile) {
+        printSample(true, seconds);
+        printSample(false, seconds);
+        fclose(hp_file);
+    }
 
     restore_locale();
 }
@@ -826,9 +830,12 @@ dumpCensus( Census *census )
     counter *ctr;
     ssize_t count;
 
-    set_prof_locale();
+    if(RtsFlags.ProfFlags.generateHpFile) {
+        set_prof_locale();
 
-    printSample(true, census->time);
+        printSample(true, census->time);
+    }
+
 
 
     if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_LDV) {
@@ -844,19 +851,22 @@ dumpCensus( Census *census )
     /* change typecast to uint64_t to remove
      * print formatting warning. See #12636 */
     if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_LDV) {
-        fprintf(hp_file, "VOID\t%" FMT_Word64 "\n",
-                (uint64_t)(census->void_total *
-                                     sizeof(W_)));
-        fprintf(hp_file, "LAG\t%" FMT_Word64 "\n",
-                (uint64_t)((census->not_used - census->void_total) *
-                                     sizeof(W_)));
-        fprintf(hp_file, "USE\t%" FMT_Word64 "\n",
-                (uint64_t)((census->used - census->drag_total) *
-                                     sizeof(W_)));
-        fprintf(hp_file, "INHERENT_USE\t%" FMT_Word64 "\n",
-                (uint64_t)(census->prim * sizeof(W_)));
-        fprintf(hp_file, "DRAG\t%" FMT_Word64 "\n",
-                (uint64_t)(census->drag_total * sizeof(W_)));
+        if(RtsFlags.ProfFlags.generateHpFile) {
+            fprintf(hp_file, "VOID\t%" FMT_Word64 "\n",
+                    (uint64_t)(census->void_total *
+                                        sizeof(W_)));
+            fprintf(hp_file, "LAG\t%" FMT_Word64 "\n",
+                    (uint64_t)((census->not_used - census->void_total) *
+                                        sizeof(W_)));
+            fprintf(hp_file, "USE\t%" FMT_Word64 "\n",
+                    (uint64_t)((census->used - census->drag_total) *
+                                        sizeof(W_)));
+            fprintf(hp_file, "INHERENT_USE\t%" FMT_Word64 "\n",
+                    (uint64_t)(census->prim * sizeof(W_)));
+            fprintf(hp_file, "DRAG\t%" FMT_Word64 "\n",
+                    (uint64_t)(census->drag_total * sizeof(W_)));
+            printSample(false, census->time);
+            }
 
 
         // Eventlog
@@ -874,7 +884,6 @@ dumpCensus( Census *census )
                 (census->drag_total * sizeof(W_)));
 
         traceHeapProfSampleEnd(era);
-        printSample(false, census->time);
         return;
     }
 #endif
@@ -904,27 +913,35 @@ dumpCensus( Census *census )
 
         switch (RtsFlags.ProfFlags.doHeapProfile) {
         case HEAP_BY_CLOSURE_TYPE:
-            fprintf(hp_file, "%s", (char *)ctr->identity);
+            if(RtsFlags.ProfFlags.generateHpFile) {
+                fprintf(hp_file, "%s", (char *)ctr->identity);
+            }
             traceHeapProfSampleString(0, (char *)ctr->identity,
                                       count * sizeof(W_));
             break;
         case HEAP_BY_INFO_TABLE:
-            fprintf(hp_file, "%p", ctr->identity);
+            if(RtsFlags.ProfFlags.generateHpFile) {
+                fprintf(hp_file, "%p", ctr->identity);
+            }
             char str[100];
             sprintf(str, "%p", ctr->identity);
             traceHeapProfSampleString(0, str, count * sizeof(W_));
             break;
 #if defined(PROFILING)
         case HEAP_BY_CCS:
-            fprint_ccs(hp_file, (CostCentreStack *)ctr->identity,
-                       RtsFlags.ProfFlags.ccsLength);
+            if(RtsFlags.ProfFlags.generateHpFile) {
+                fprint_ccs(hp_file, (CostCentreStack *)ctr->identity,
+                        RtsFlags.ProfFlags.ccsLength);
+            }
             traceHeapProfSampleCostCentre(0, (CostCentreStack *)ctr->identity,
                                           count * sizeof(W_));
             break;
         case HEAP_BY_MOD:
         case HEAP_BY_DESCR:
         case HEAP_BY_TYPE:
-            fprintf(hp_file, "%s", (char *)ctr->identity);
+            if(RtsFlags.ProfFlags.generateHpFile) {
+                fprintf(hp_file, "%s", (char *)ctr->identity);
+            }
             traceHeapProfSampleString(0, (char *)ctr->identity,
                                       count * sizeof(W_));
             break;
@@ -933,6 +950,7 @@ dumpCensus( Census *census )
             RetainerSet *rs = (RetainerSet *)ctr->identity;
 
             // it might be the distinguished retainer set rs_MANY:
+            if(RtsFlags.ProfFlags.generateHpFile) {
             if (rs == &rs_MANY) {
                 fprintf(hp_file, "MANY");
                 break;
@@ -949,21 +967,24 @@ dumpCensus( Census *census )
 
             // report in the unit of bytes: * sizeof(StgWord)
             printRetainerSetShort(hp_file, rs, (W_)count * sizeof(W_)
-                                             , RtsFlags.ProfFlags.ccsLength);
+                                             , RtsFlags.ProfFlags.ccsLength, RtsFlags.ProfFlags.generateHpFile);
             break;
         }
 #endif
         default:
             barf("dumpCensus; doHeapProfile");
         }
-
-        fprintf(hp_file, "\t%" FMT_Word "\n", (W_)count * sizeof(W_));
+        if(RtsFlags.ProfFlags.generateHpFile) {
+            fprintf(hp_file, "\t%" FMT_Word "\n", (W_)count * sizeof(W_));
+        }
     }
 
     traceHeapProfSampleEnd(era);
-    printSample(false, census->time);
 
-    restore_locale();
+    if(RtsFlags.ProfFlags.generateHpFile) {
+        printSample(false, census->time);
+        restore_locale();
+    }
 }
 
 inline counter*

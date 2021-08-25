@@ -206,7 +206,7 @@ printRetainer(FILE *f, retainer ccs)
  *  a given retainer set regardless of the time of invocation.
  * -------------------------------------------------------------------------- */
 void
-printRetainerSetShort(FILE *f, RetainerSet *rs, W_ total_size, uint32_t max_length)
+printRetainerSetShort(FILE *f, RetainerSet *rs, W_ total_size, uint32_t max_length, bool withHpFile)
 {
     char tmp[max_length + 1];
     uint32_t size;
@@ -237,7 +237,9 @@ printRetainerSetShort(FILE *f, RetainerSet *rs, W_ total_size, uint32_t max_leng
             // size = strlen(tmp);
         }
     }
-    fputs(tmp, f);
+    if(withHpFile) {
+        fputs(tmp, f);
+    }
     traceHeapProfSampleString(0, tmp, total_size);
 }
 

@@ -900,6 +900,13 @@ There are three more options which relate to heap profiling:
     option is enabled, it's expected that the user will manually start heap
     profiling or request specific samples using functions from ``GHC.Profiling``.
 
+.. rts-flag:: --disable-hp-generation
+
+    :since: 9.4.0
+
+    Don't generate a .hp file when heap profiling. Only useful when emiting profiling
+    data via the eventlog.
+
 .. rts-flag:: -L ⟨num⟩
 
     Sets the maximum length of a cost-centre stack name in a heap
