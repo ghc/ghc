@@ -1,12 +1,12 @@
 function h$hsprimitive_memcpy(dst_d, dst_o, doff, src_d, src_o, soff, len) {
-  return h$primitive_memmove(dst_d, dst_o, doff, src_d, src_o, len);
+  return h$primitive_memmove(dst_d, dst_o, doff, src_d, src_o, soff, len);
 }
 
 function h$hsprimitive_memmove(dst_d, dst_o, doff, src_d, src_o, soff, len) {
   if(len === 0) return;
   var du8 = dst_d.u8, su8 = src_d.u8;
   for(var i=len-1;i>=0;i--) {
-    du8[dst_o+i] = su8[src_o+i];
+    du8[dst_o+doff+i] = su8[src_o+soff+i];
   }
 }
 
