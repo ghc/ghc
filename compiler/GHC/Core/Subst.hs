@@ -17,7 +17,7 @@ module GHC.Core.Subst (
         deShadowBinds, substRuleInfo, substRulesForImportedIds,
         substTy, substCo, substExpr, substExprSC, substBind, substBindSC,
         substUnfolding, substUnfoldingSC,
-        lookupIdSubst, lookupTCvSubst, substIdType, substIdOcc,
+        lookupIdSubst, substIdType, substIdOcc,
         substTickish, substDVarSet, substIdInfo,
 
         -- ** Operations on substitutions
@@ -251,23 +251,15 @@ extendSubstList subst ((var,rhs):prs) = extendSubstList (extendSubst subst var r
 
 -- | Find the substitution for an 'Id' in the 'Subst'
 lookupIdSubst :: HasDebugCallStack => Subst -> Id -> CoreExpr
-lookupIdSubst (Subst in_scope ids _ _) v
+lookupIdSubst s@(Subst in_scope ids _ _) v
   | not (isLocalId v) = Var v
   | Just e  <- lookupVarEnv ids       v = e
   | Just v' <- lookupInScope in_scope v = Var v'
         -- Vital! See Note [Extending the Subst]
         -- See #20200
   | otherwise = warnPprTrace True (text "GHC.Core.Subst.lookupIdSubst" <+> ppr v
-                            $$ ppr in_scope) $
+                            $$ ppr s) $
                 Var v
-
--- | Find the substitution for a 'TyVar' in the 'Subst'
-lookupTCvSubst :: Subst -> TyVar -> Type
-lookupTCvSubst (Subst _ _ tvs cvs) v
-  | isTyVar v
-  = lookupVarEnv tvs v `orElse` Type.mkTyVarTy v
-  | otherwise
-  = mkCoercionTy $ lookupVarEnv cvs v `orElse` mkCoVarCo v
 
 delBndr :: Subst -> Var -> Subst
 delBndr (Subst in_scope ids tvs cvs) v
@@ -703,13 +695,21 @@ substRule subst subst_ru_fn rule@(Rule { ru_bndrs = bndrs, ru_args = args
     (subst', bndrs') = substBndrs subst bndrs
 
 ------------------
-substDVarSet :: Subst -> DVarSet -> DVarSet
-substDVarSet subst fvs
-  = mkDVarSet $ fst $ foldr (subst_fv subst) ([], emptyVarSet) $ dVarSetElems fvs
+substDVarSet :: HasDebugCallStack => Subst -> DVarSet -> DVarSet
+substDVarSet subst@(Subst _ _ tv_env cv_env) fvs
+  = mkDVarSet $ fst $ foldr subst_fv ([], emptyVarSet) $ dVarSetElems fvs
   where
-  subst_fv subst fv acc
-     | isId fv = expr_fvs (lookupIdSubst subst fv) isLocalVar emptyVarSet $! acc
-     | otherwise = tyCoFVsOfType (lookupTCvSubst subst fv) (const True) emptyVarSet $! acc
+  subst_fv :: Var -> ([Var], VarSet) -> ([Var], VarSet)
+  subst_fv fv acc
+     | isTyVar fv
+     , let fv_ty = lookupVarEnv tv_env fv `orElse` mkTyVarTy fv
+     = tyCoFVsOfType fv_ty (const True) emptyVarSet $! acc
+     | isCoVar fv
+     , let fv_co = lookupVarEnv cv_env fv `orElse` mkCoVarCo fv
+     = tyCoFVsOfCo fv_co (const True) emptyVarSet $! acc
+     | otherwise
+     , let fv_expr = lookupIdSubst subst fv
+     = expr_fvs fv_expr isLocalVar emptyVarSet $! acc
 
 ------------------
 substTickish :: Subst -> CoreTickish -> CoreTickish

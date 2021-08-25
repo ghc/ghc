@@ -1,0 +1,4 @@
+
+T20200b.hs:8:1: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match has inaccessible right hand side
+    In an equation for ‘xrecTuple’: xrecTuple (a :& (b :& _)) = ...
