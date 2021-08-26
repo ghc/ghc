@@ -967,12 +967,10 @@ instance Enum Natural where
       | i >= 0    = naturalFromWord# (int2Word# i#)
       | otherwise = errorWithoutStackTrace "toEnum: unexpected negative Int"
 
-    fromEnum (NS w)
-      | i >= 0    = i
-      | otherwise = errorWithoutStackTrace "fromEnum: out of Int range"
+    fromEnum (NS w) | i >= 0 = i
       where
         i = I# (word2Int# w)
-    fromEnum n = fromEnum (integerFromNatural n)
+    fromEnum _ = errorWithoutStackTrace "fromEnum: out of Int range"
 
     enumFrom x        = enumDeltaNatural      x 1
     enumFromThen x y
