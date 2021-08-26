@@ -951,9 +951,10 @@ dumpCensus( Census *census )
 
             // it might be the distinguished retainer set rs_MANY:
             if(RtsFlags.ProfFlags.generateHpFile) {
-            if (rs == &rs_MANY) {
-                fprintf(hp_file, "MANY");
-                break;
+                if (rs == &rs_MANY) {
+                    fprintf(hp_file, "MANY");
+                    break;
+                }
             }
 
             // Mark this retainer set by negating its id, because it
