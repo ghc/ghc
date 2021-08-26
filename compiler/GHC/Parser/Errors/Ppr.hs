@@ -469,6 +469,7 @@ instance Diagnostic PsMessage where
             [ text "Parse error" <> colon <+> quotes (ppr arr)
             , text "Record constructors in GADTs must use an ordinary, non-linear arrow."
             ]
+    PsErrInvalidCApiImport {} -> mkSimpleDecorated $ vcat [ text "Wrapper stubs can't be used with CApiFFI."]
 
   diagnosticReason  = \case
     PsUnknownMessage m                            -> diagnosticReason m
@@ -580,6 +581,7 @@ instance Diagnostic PsMessage where
     PsErrInvalidPackageName{}                     -> ErrorWithoutFlag
     PsErrParseRightOpSectionInPat{}               -> ErrorWithoutFlag
     PsErrIllegalGadtRecordMultiplicity{}          -> ErrorWithoutFlag
+    PsErrInvalidCApiImport {}                     -> ErrorWithoutFlag
 
   diagnosticHints  = \case
     PsUnknownMessage m                            -> diagnosticHints m
@@ -737,6 +739,7 @@ instance Diagnostic PsMessage where
     PsErrUnexpectedTypeInDecl{}                   -> noHints
     PsErrInvalidPackageName{}                     -> noHints
     PsErrIllegalGadtRecordMultiplicity{}          -> noHints
+    PsErrInvalidCApiImport {}                     -> noHints
 
 psHeaderMessageDiagnostic :: PsHeaderMessage -> DecoratedSDoc
 psHeaderMessageDiagnostic = \case

@@ -2528,9 +2528,13 @@ mkImport :: Located CCallConv
          -> P (EpAnn [AddEpAnn] -> HsDecl GhcPs)
 mkImport cconv safety (L loc (StringLiteral esrc entity _), v, ty) =
     case unLoc cconv of
-      CCallConv          -> mkCImport
-      CApiConv           -> mkCImport
-      StdCallConv        -> mkCImport
+      CCallConv          -> returnSpec =<< mkCImport
+      CApiConv           -> do
+        imp <- mkCImport
+        if isCWrapperImport imp
+          then addFatalError $ mkPlainErrorMsgEnvelope loc PsErrInvalidCApiImport
+          else returnSpec imp
+      StdCallConv        -> returnSpec =<< mkCImport
       PrimCallConv       -> mkOtherImport
       JavaScriptCallConv -> mkOtherImport
   where
@@ -2543,7 +2547,10 @@ mkImport cconv safety (L loc (StringLiteral esrc entity _), v, ty) =
       case parseCImport cconv safety (mkExtName (unLoc v)) e (L loc esrc) of
         Nothing         -> addFatalError $ mkPlainErrorMsgEnvelope loc $
                              PsErrMalformedEntityString
-        Just importSpec -> returnSpec importSpec
+        Just importSpec -> return importSpec
+
+    isCWrapperImport (CImport _ _ _ CWrapper _) = True
+    isCWrapperImport _ = False
 
     -- currently, all the other import conventions only support a symbol name in
     -- the entity string. If it is missing, we use the function name instead.

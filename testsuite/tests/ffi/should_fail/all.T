@@ -24,3 +24,5 @@ test('UnsafeReenter',
      [omit_ways(threaded_ways), exit_code(1)],
      compile_and_run,
      ['UnsafeReenterC.c'])
+
+test('capi_wrapper', normal, compile_fail, [''])

@@ -440,6 +440,8 @@ data PsMessage
    -- | Illegal linear arrow or multiplicity annotation in GADT record syntax
    | PsErrIllegalGadtRecordMultiplicity !(HsArrow GhcPs)
 
+   | PsErrInvalidCApiImport
+
 newtype StarIsType = StarIsType Bool
 
 -- | Extra details about a parse error, which helps
