@@ -118,7 +118,7 @@ isMember(retainer r, RetainerSet *rs)
 RetainerSet *addElement(retainer, RetainerSet *);
 
 // Prints a single retainer set.
-void printRetainerSetShort(FILE *, RetainerSet *, W_, uint32_t);
+void printRetainerSetShort(FILE *, RetainerSet *, W_, uint32_t, bool);
 
 // Print the statistics on all the retainer sets.
 // store the sum of all costs and the number of all retainer sets.
