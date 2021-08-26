@@ -1,0 +1,3 @@
+
+capi_wrapper.hs:4:21: error:
+    Wrapper stubs can't be used with CApiFFI.
