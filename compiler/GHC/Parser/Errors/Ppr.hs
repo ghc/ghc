@@ -584,6 +584,9 @@ pp_err = \case
    PsErrLinearFunction
       -> text "Enable LinearTypes to allow linear functions"
 
+   PsErrInvalidCApiImport {}
+      -> text "Wrapper stubs can't be used with CApiFFI."
+
    PsErrMultiWayIf
       -> text "Multi-way if-expressions need MultiWayIf turned on"
 

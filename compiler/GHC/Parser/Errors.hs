@@ -367,6 +367,9 @@ data PsErrorDesc
    | PsErrLinearFunction
       -- ^ Linear function found but LinearTypes not enabled
 
+   | PsErrInvalidCApiImport
+      -- ^ Invalid CApi import
+
    | PsErrMultiWayIf
       -- ^ Multi-way if-expression found but MultiWayIf not enabled
 
