@@ -87,7 +87,7 @@ import GHC.Data.Maybe      ( expectJust )
 import GHC.Data.StringBuffer
 import qualified GHC.LanguageExtensions as LangExt
 
-import GHC.Utils.Exception ( AsyncException(..), evaluate )
+import GHC.Utils.Exception ( evaluate, throwIO, SomeAsyncException )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
@@ -122,7 +122,7 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified GHC.Data.FiniteMap as Map ( insertListWith )
 
-import Control.Concurrent ( forkIO, newQSem, waitQSem, signalQSem )
+import Control.Concurrent ( forkIO, newQSem, waitQSem, signalQSem, ThreadId, killThread, forkIOWithUnmask )
 import qualified GHC.Conc as CC
 import Control.Concurrent.MVar
 import Control.Monad
@@ -2223,26 +2223,28 @@ wrapAction hsc_env k = do
           Just (err :: SourceError)
             -> logg err
           Nothing -> case fromException exc of
-                        Just ThreadKilled -> return ()
-                        -- Don't print ThreadKilled exceptions: they are used
-                        -- to kill the worker thread in the event of a user
-                        -- interrupt, and the user doesn't have to be informed
-                        -- about that.
+                        -- ThreadKilled in particular needs to actually kill the thread.
+                        -- So rethrow that and the other async exceptions
+                        Just (err :: SomeAsyncException) -> throwIO err
                         _ -> errorMsg lcl_logger (text (show exc))
         return Nothing
 
 withParLog :: Int -> (HscEnv -> RunMakeM a) -> RunMakeM a
 withParLog k cont  = do
   MakeEnv{lqq_var, hsc_env} <- ask
-  -- Make a new log queue
-  lq <- liftIO $ newLogQueue k
-  -- Add it into the LogQueueQueue
-  liftIO $ atomically $ initLogQueue lqq_var lq
-  -- Modify the logger to use the log queue
-  let lcl_logger = pushLogHook (const (parLogAction lq)) (hsc_logger hsc_env)
-      hsc_env' = hsc_env { hsc_logger = lcl_logger }
-  -- Run continuation with modified logger and then clean-up
-  cont hsc_env' `MC.finally` liftIO (finishLogQueue lq)
+  let init_log = liftIO $ do
+        -- Make a new log queue
+        lq <- newLogQueue k
+        -- Add it into the LogQueueQueue
+        atomically $ initLogQueue lqq_var lq
+        return lq
+      finish_log lq = liftIO (finishLogQueue lq)
+  MC.bracket init_log finish_log $ \lq -> do
+    -- Modify the logger to use the log queue
+    let lcl_logger = pushLogHook (const (parLogAction lq)) (hsc_logger hsc_env)
+        hsc_env' = hsc_env { hsc_logger = lcl_logger }
+    -- Run continuation with modified logger
+    cont hsc_env'
 
 -- Executing compilation graph nodes
 
@@ -2433,23 +2435,29 @@ withLocalTmpFS act = do
 -- | Run the given actions and then wait for them all to finish.
 runAllPipelines :: Int -> MakeEnv -> [MakeAction] -> IO ()
 runAllPipelines n_jobs env acts = do
-  if n_jobs == 1
-    then runLoop id env acts
-    else do
-      runLoop (void . forkIO) env acts
-  mapM_ waitMakeAction acts
+  let spawn_actions :: IO [ThreadId]
+      spawn_actions = if n_jobs == 1
+        then (:[]) <$> (forkIOWithUnmask $ \unmask -> void $ runLoop (\io -> io unmask) env acts)
+        else runLoop forkIOWithUnmask env acts
+
+      kill_actions :: [ThreadId] -> IO ()
+      kill_actions tids = mapM_ killThread tids
+
+  MC.bracket spawn_actions kill_actions $ \_ -> do
+    mapM_ waitMakeAction acts
 
 -- | Execute each action in order, limiting the amount of parrelism by the given
 -- semaphore.
-runLoop :: (IO () -> IO ()) -> MakeEnv -> [MakeAction] -> IO ()
-runLoop _ _env [] = return ()
+runLoop :: (((forall a. IO a -> IO a) -> IO ()) -> IO a) -> MakeEnv -> [MakeAction] -> IO [a]
+runLoop _ _env [] = return []
 runLoop fork_thread env (MakeAction act res_var :acts) = do
-  _new_thread <-
-    fork_thread $ (do
-            mres <- (run_pipeline (withLocalTmpFS act))
+  new_thread <-
+    fork_thread $ \unmask -> (do
+            mres <- (unmask $ run_pipeline (withLocalTmpFS act))
                       `MC.onException` (putMVar res_var Nothing) -- Defensive: If there's an unhandled exception then still signal the failure.
             putMVar res_var mres)
-  runLoop fork_thread env acts
+  threads <- runLoop fork_thread env acts
+  return (new_thread : threads)
   where
       run_pipeline :: RunMakeM a -> IO (Maybe a)
       run_pipeline p = runMaybeT (runReaderT p env)
