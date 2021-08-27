@@ -108,7 +108,17 @@ depSort = concatMap get_binds . depAnal defs uses
 
 data Env
   = Env
-  { locals :: IdSet
+  { -- | Set of locally-bound, not-top-level binders in scope.
+    -- That is, variables bound by a let (but not let-no-escape), a lambda
+    -- (in a StgRhsClsoure), a case binder, or a case alternative.  These
+    -- are the variables that must be captured in a function closure, if they
+    -- are free in the RHS. Example
+    --   f = \x. let g = \y. x+1
+    --           let h = \z. g z + 1
+    --           in h x
+    -- In the body of h we have locals = {x, g, z}.  Note that f is top level
+    -- and does not appear in locals.
+    locals :: IdSet
   , mod    :: Module
   }
 
@@ -126,34 +136,12 @@ data Env
 --      body to analyse the RHSs. No way to do this without some
 --      knot-tying.
 
-emptyEnv :: Module -> Env
-emptyEnv = Env emptyVarSet
-
 addLocals :: [Id] -> Env -> Env
 addLocals bndrs env
   = env { locals = extendVarSetList (locals env) bndrs }
 
-mkFreeVarSet :: Env -> [Id] -> DIdSet
-mkFreeVarSet env = mkDVarSet . filter (`elemVarSet` locals env)
-
-boundIds :: StgBinding -> [Id]
-boundIds (StgNonRec b _) = [b]
-boundIds (StgRec pairs)  = map fst pairs
-
 --------------------------------------------------------------------------------
 -- * Dependency analysis
-
--- | Set of locally-bound, not-top-level binders in scope.
--- That is, variables bound by a let (but not let-no-escape), a lambda
--- (in a StgRhsClsoure), a case binder, or a case alternative.  These
--- are the variables that must be captured in a function closure, if they
--- are free in the RHS. Example
---   f = \x. let g = \y. x+1
---           let h = \z. g z + 1
---           in h x
--- In the body of h we have NestedIds = {x, g, z}.  Note that f is top level
--- and does not appear in NestedIds
-type NestedIds = VarSet
 
 -- | Set of variables that are:
 --    (a) bound at the top level of this module, and
@@ -180,57 +168,56 @@ annStgFVs this_mod bs = map go bs
   where
     go (StgTopStringLit id bs) = (StgTopStringLit id bs, emptyVarSet)
     go (StgTopLifted bind)
-      | (bind', fvs, _) <- bindingFVs emptyVarSet (emptyEnv this_mod) emptyDVarSet bind
+      | (bind', fvs, _) <- bindingFVs (Env emptyVarSet this_mod) emptyDVarSet bind
       = (StgTopLifted bind', fvs)
 
 annBindingFreeVars :: Module -> StgBinding -> CgStgBinding
-annBindingFreeVars this_mod = fstOf3 . bindingFVs emptyVarSet (emptyEnv this_mod) emptyDVarSet
+annBindingFreeVars this_mod = fstOf3 . bindingFVs (Env emptyVarSet this_mod) emptyDVarSet
 
-bindingFVs :: NestedIds -> Env -> DIdSet -> StgBinding -> (CgStgBinding, TopIds, DIdSet)
-bindingFVs bounds env body_fv b =
+bindingFVs :: Env -> DIdSet -> StgBinding -> (CgStgBinding, TopIds, DIdSet)
+bindingFVs env body_fv b =
   case b of
     StgNonRec bndr r -> (StgNonRec bndr r', fvs, id_set)
       where
         -- See Note [Tracking local binders]
-        (r', fvs, rhs_id_set) = rhsFVs bounds env r
+        (r', fvs, rhs_id_set) = rhsFVs env r
         id_set = delDVarSet body_fv bndr `unionDVarSet` rhs_id_set
     StgRec pairs -> (StgRec pairs', fvs, id_sets)
       where
         -- See Note [Tracking local binders]
         bndrs = map fst pairs
-        bounds' = extendVarSetList bounds bndrs
-        (rhss, rhs_fvss, rhs_id_sets) = mapAndUnzip3 (rhsFVs bounds' env . snd) pairs
+        env' = addLocals bndrs env
+        (rhss, rhs_fvss, rhs_id_sets) = mapAndUnzip3 (rhsFVs env' . snd) pairs
         fvs = unionVarSets rhs_fvss
         pairs' = zip bndrs rhss
         id_sets = delDVarSetList (unionDVarSets (body_fv:rhs_id_sets)) bndrs
   where
-    var_fvs :: NestedIds -> Var -> TopIds
-    var_fvs bounds v
-      | not (elemVarSet v bounds)
+    var_fvs :: Env -> Id -> TopIds
+    var_fvs env v
+      | not (elemVarSet v (locals env))
       , nameIsLocalOrFrom (mod env) (idName v) = unitVarSet v
       | otherwise                              = emptyVarSet
 
-
-    exprFVs :: NestedIds -> Env -> StgExpr -> (CgStgExpr, TopIds, DIdSet)
-    exprFVs bounds env = go
+    exprFVs :: Env -> StgExpr -> (CgStgExpr, TopIds, DIdSet)
+    exprFVs env = go
       where
         go (StgApp f as)
-          | (args_fvs, id_set) <- argsFVs bounds env as
+          | (args_fvs, id_set) <- argsFVs env as
           = ( StgApp f as
-            , var_fvs bounds f `unionVarSet` args_fvs
-            , unionDVarSet (id_set `dVarSetIntersectVarSet` locals env) (mkFreeVarSet env [f]))
+            , var_fvs env f `unionVarSet` args_fvs
+            , if f `elemVarSet` locals env then extendDVarSet id_set f else id_set)
         go (StgLit lit) = (StgLit lit, emptyVarSet, emptyDVarSet)
         go (StgConApp dc n as tys)
-          | (args_fvs, id_set) <- argsFVs bounds env as
+          | (args_fvs, id_set) <- argsFVs env as
           = (StgConApp dc n as tys, args_fvs, id_set)
         go (StgOpApp op as ty)
-          | (fvs, id_set) <- argsFVs bounds env as
+          | (fvs, id_set) <- argsFVs env as
           = (StgOpApp op as ty, fvs, id_set)
         go (StgCase scrut bndr ty alts)
-          | (scrut',scrut_fvs,scrut_id_set) <- exprFVs bounds env scrut
+          | (scrut',scrut_fvs,scrut_id_set) <- exprFVs env scrut
           -- See Note [Tracking local binders]
           , (alts',alts_fvss,alts_id_sets)
-              <- mapAndUnzip3 (altFVs (extendVarSet bounds bndr) (addLocals [bndr] env)) alts
+              <- mapAndUnzip3 (altFVs (addLocals [bndr] env)) alts
           , fvs' <- scrut_fvs `unionVarSet` unionVarSets alts_fvss
           , alts_id_set <- unionDVarSets alts_id_sets
           , id_set' <- delDVarSet (unionDVarSet scrut_id_set alts_id_set) bndr
@@ -238,7 +225,7 @@ bindingFVs bounds env body_fv b =
         go (StgLet ext bind body) = go_bind (StgLet ext) bind body
         go (StgLetNoEscape ext bind body) = go_bind (StgLetNoEscape ext) bind body
         go (StgTick tick e)
-          | (e',fvs, id_set) <- exprFVs bounds env e
+          | (e',fvs, id_set) <- exprFVs env e
           , id_set' <- unionDVarSet (tickish tick) id_set
           = (StgTick tick e', fvs, id_set')
             where
@@ -248,38 +235,38 @@ bindingFVs bounds env body_fv b =
         go_bind dc bind body = (dc bind' body', fvs, id_set)
           where
             -- See Note [Tracking local binders]
-            env' = addLocals (boundIds bind) env
+            env' = addLocals (bindersOf bind) env
             (body', body_fvs, body_set_ids)
-                = exprFVs (extendVarSetList bounds (bindersOf bind)) env' body
+                = exprFVs env' body
             (bind', bind_fvs, id_set)
-                = bindingFVs bounds env' body_set_ids bind
+                = bindingFVs env' body_set_ids bind
             fvs = bind_fvs `unionVarSet` body_fvs
 
 
-    rhsFVs :: NestedIds -> Env -> StgRhs -> (CgStgRhs, TopIds, DIdSet)
-    rhsFVs bounds env (StgRhsClosure _ ccs uf bs body)
+    rhsFVs :: Env -> StgRhs -> (CgStgRhs, TopIds, DIdSet)
+    rhsFVs env (StgRhsClosure _ ccs uf bs body)
       | (body', fvss, id_set)
-        <- exprFVs (extendVarSetList bounds bs) (addLocals bs env) body
+        <- exprFVs (addLocals bs env) body
       , id_set' <- delDVarSetList id_set bs
       = (StgRhsClosure id_set' ccs uf bs body', fvss, id_set')
-    rhsFVs bounds env (StgRhsCon ccs dc mu ts bs)
-      | (fvs, id_set) <- argsFVs bounds env bs
+    rhsFVs env (StgRhsCon ccs dc mu ts bs)
+      | (fvs, id_set) <- argsFVs env bs
       = (StgRhsCon ccs dc mu ts bs, fvs, id_set)
 
-    argsFVs :: NestedIds -> Env -> [StgArg] -> (TopIds, DIdSet)
-    argsFVs bounds env = foldl' f (emptyVarSet, emptyDVarSet)
+    argsFVs :: Env -> [StgArg] -> (TopIds, DIdSet)
+    argsFVs env = foldl' f (emptyVarSet, emptyDVarSet)
       where
         f (fvs,ids) StgLitArg{} = (fvs, ids)
         f (fvs,ids) (StgVarArg v) = (fvs', ids')
           where
-            !fvs' = var_fvs bounds v `unionVarSet` fvs
+            !fvs' = var_fvs env v `unionVarSet` fvs
             !ids' | v `elemVarSet` locals env
                   = extendDVarSet ids v
                   | otherwise = ids
 
-    altFVs :: NestedIds -> Env -> StgAlt -> (CgStgAlt, TopIds, DIdSet)
-    altFVs bounds env (con,bndrs,e)
+    altFVs :: Env -> StgAlt -> (CgStgAlt, TopIds, DIdSet)
+    altFVs env (con,bndrs,e)
       | (e', fvs, id_set)
-        <- exprFVs (extendVarSetList bounds bndrs) (addLocals bndrs env) e
+        <- exprFVs (addLocals bndrs env) e
       , id_set' <- delDVarSetList id_set bndrs
       = ((con,bndrs, e'), fvs, id_set')
