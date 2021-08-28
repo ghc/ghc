@@ -1,0 +1,153 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 290, types: 141, coercions: 0, joins: 0/0}
+
+bitOrTwoVarInt
+  = \ x y ->
+      case x of { I# x# ->
+      case y of { I# x#1 -> I# (orI# 255# (orI# x# x#1)) }
+      }
+
+bitAndTwoVarInt
+  = \ x y ->
+      case x of { I# x# ->
+      case y of { I# x#1 -> I# (andI# 170# (andI# x# x#1)) }
+      }
+
+bitOrInt = \ x -> case x of { I# x# -> I# (orI# 255# x#) }
+
+bitAndInt = \ x -> case x of { I# x# -> I# (andI# 170# x#) }
+
+bitOrTwoVarInt8
+  = \ x y ->
+      case x of { I8# x# ->
+      case y of { I8# x#1 ->
+      I8#
+        (word8ToInt8#
+           (orWord8# 17##8 (orWord8# (int8ToWord8# x#) (int8ToWord8# x#1))))
+      }
+      }
+
+bitAndInt1 = I8# 0#8
+
+bitAndTwoVarInt8
+  = \ x y ->
+      case x of { I8# x# -> case y of { I8# x#1 -> bitAndInt1 } }
+
+bitOrInt8
+  = \ x ->
+      case x of { I8# x# ->
+      I8# (word8ToInt8# (orWord8# 17##8 (int8ToWord8# x#)))
+      }
+
+bitAndInt8 = \ x -> case x of { I8# x# -> bitAndInt1 }
+
+bitOrTwoVarInt16
+  = \ x y ->
+      case x of { I16# x# ->
+      case y of { I16# x#1 ->
+      I16#
+        (word16ToInt16#
+           (orWord16#
+              255##16 (orWord16# (int16ToWord16# x#) (int16ToWord16# x#1))))
+      }
+      }
+
+bitAndTwoVarInt16
+  = \ x y ->
+      case x of { I16# x# ->
+      case y of { I16# x#1 ->
+      I16#
+        (word16ToInt16#
+           (andWord16#
+              170##16 (andWord16# (int16ToWord16# x#) (int16ToWord16# x#1))))
+      }
+      }
+
+bitOrInt16
+  = \ x ->
+      case x of { I16# x# ->
+      I16# (word16ToInt16# (orWord16# 255##16 (int16ToWord16# x#)))
+      }
+
+bitAndInt16
+  = \ x ->
+      case x of { I16# x# ->
+      I16# (word16ToInt16# (andWord16# 170##16 (int16ToWord16# x#)))
+      }
+
+bitOrTwoVarInt32
+  = \ x y ->
+      case x of { I32# x# ->
+      case y of { I32# x#1 ->
+      I32#
+        (intToInt32#
+           (orI#
+              (int32ToInt# (intToInt32# (orI# (int32ToInt# x#) 250#)))
+              (int32ToInt# (intToInt32# (orI# (int32ToInt# x#1) 175#)))))
+      }
+      }
+
+bitAndTwoVarInt32
+  = \ x y ->
+      case x of { I32# x# ->
+      case y of { I32# x#1 ->
+      I32#
+        (intToInt32#
+           (andI#
+              (int32ToInt# (intToInt32# (andI# (int32ToInt# x#) 250#)))
+              (int32ToInt# (intToInt32# (andI# (int32ToInt# x#1) 175#)))))
+      }
+      }
+
+bitOrInt32
+  = \ x ->
+      case x of { I32# x# ->
+      I32#
+        (intToInt32#
+           (orI#
+              (int32ToInt# (intToInt32# (orI# (int32ToInt# x#) 250#))) 175#))
+      }
+
+bitAndInt32
+  = \ x ->
+      case x of { I32# x# ->
+      I32#
+        (intToInt32#
+           (andI#
+              (int32ToInt# (intToInt32# (andI# (int32ToInt# x#) 250#))) 175#))
+      }
+
+bitOrTwoVarInt64
+  = \ x y ->
+      case x of { I64# x# ->
+      case y of { I64# x#1 ->
+      I64#
+        (word64ToInt64#
+           (or64# 255##64 (or64# (int64ToWord64# x#) (int64ToWord64# x#1)))) 
+      }
+      }
+
+bitAndTwoVarInt64
+  = \ x y ->
+      case x of { I64# x# ->
+      case y of { I64# x#1 ->
+      I64#
+        (word64ToInt64#
+           (and64# 170##64 (and64# (int64ToWord64# x#) (int64ToWord64# x#1)))) 
+      }
+      }
+
+bitOrInt64
+  = / x ->
+      case x of { I64# x# ->
+      I64# (word64ToInt64# (or64# 255##64 (int64ToWord64# x#)))
+      }
+ 
+bitAndInt64
+  = / x ->
+      case x of { I64# x# ->
+      I64# (word64ToInt64# (and64# 170##64 (int64ToWord64# x#)))
+      }
+

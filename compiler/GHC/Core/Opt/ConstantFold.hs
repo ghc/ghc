@@ -78,7 +78,7 @@ import Data.Functor (($>))
 import qualified Data.ByteString as BS
 import Data.Ratio
 import Data.Word
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, fromJust)
 
 {-
 Note [Constant folding]
@@ -158,11 +158,13 @@ primOpRules nm = \case
                                     , idempotent
                                     , zeroElem
                                     , sameArgIdempotentCommut Word8AndOp
+                                    , andFoldingRules word8Ops
                                     ]
    Word8OrOp   -> mkPrimOpRule nm 2 [ binaryLit (word8Op2 (.|.))
                                     , idempotent
                                     , identity zeroW8
                                     , sameArgIdempotentCommut Word8OrOp
+                                    , orFoldingRules word8Ops
                                     ]
    Word8XorOp  -> mkPrimOpRule nm 2 [ binaryLit (word8Op2 xor)
                                     , identity zeroW8
@@ -229,11 +231,13 @@ primOpRules nm = \case
                                     , idempotent
                                     , zeroElem
                                     , sameArgIdempotentCommut Word16AndOp
+                                    , andFoldingRules word16Ops
                                     ]
    Word16OrOp  -> mkPrimOpRule nm 2 [ binaryLit (word16Op2 (.|.))
                                     , idempotent
                                     , identity zeroW16
                                     , sameArgIdempotentCommut Word16OrOp
+                                    , orFoldingRules word16Ops
                                     ]
    Word16XorOp -> mkPrimOpRule nm 2 [ binaryLit (word16Op2 xor)
                                     , identity zeroW16
@@ -300,11 +304,13 @@ primOpRules nm = \case
                                     , idempotent
                                     , zeroElem
                                     , sameArgIdempotentCommut Word32AndOp
+                                    , andFoldingRules word32Ops
                                     ]
    Word32OrOp  -> mkPrimOpRule nm 2 [ binaryLit (word32Op2 (.|.))
                                     , idempotent
                                     , identity zeroW32
                                     , sameArgIdempotentCommut Word32OrOp
+                                    , orFoldingRules word32Ops
                                     ]
    Word32XorOp -> mkPrimOpRule nm 2 [ binaryLit (word32Op2 xor)
                                     , identity zeroW32
@@ -370,11 +376,13 @@ primOpRules nm = \case
                                     , idempotent
                                     , zeroElem
                                     , sameArgIdempotentCommut Word64AndOp
+                                    , andFoldingRules word64Ops
                                     ]
    Word64OrOp  -> mkPrimOpRule nm 2 [ binaryLit (word64Op2 (.|.))
                                     , idempotent
                                     , identity zeroW64
                                     , sameArgIdempotentCommut Word64OrOp
+                                    , orFoldingRules word64Ops
                                     ]
    Word64XorOp -> mkPrimOpRule nm 2 [ binaryLit (word64Op2 xor)
                                     , identity zeroW64
@@ -416,11 +424,13 @@ primOpRules nm = \case
                                     , idempotent
                                     , zeroElem
                                     , sameArgIdempotentCommut IntAndOp
+                                    , andFoldingRules intOps
                                     ]
    IntOrOp     -> mkPrimOpRule nm 2 [ binaryLit (intOp2 (.|.))
                                     , idempotent
                                     , identityPlatform zeroi
                                     , sameArgIdempotentCommut IntOrOp
+                                    , orFoldingRules intOps
                                     ]
    IntXorOp    -> mkPrimOpRule nm 2 [ binaryLit (intOp2 xor)
                                     , identityPlatform zeroi
@@ -465,11 +475,13 @@ primOpRules nm = \case
                                     , idempotent
                                     , zeroElem
                                     , sameArgIdempotentCommut WordAndOp
+                                    , andFoldingRules wordOps
                                     ]
    WordOrOp    -> mkPrimOpRule nm 2 [ binaryLit (wordOp2 (.|.))
                                     , idempotent
                                     , identityPlatform zerow
                                     , sameArgIdempotentCommut WordOrOp
+                                    , orFoldingRules wordOps
                                     ]
    WordXorOp   -> mkPrimOpRule nm 2 [ binaryLit (wordOp2 xor)
                                     , identityPlatform zerow
@@ -2506,8 +2518,8 @@ match_inline _ = Nothing
 --       B: (10+x) + 5  ==> 15+x
 --       C: (5+a)-(5-b) ==> 0+(a+b)
 --
--- R2) * simplification
---    ops = *, two literals (not siblings)
+-- R2) *, `and`, `or`  simplification
+--    ops = *, `and`, `or` two literals (not siblings)
 --
 --    Examples:
 --       A: 5 * (10*x)  ==> 50*x
@@ -2591,6 +2603,27 @@ mulFoldingRules op num_ops = do
       (mulFoldingRules' platform arg1 arg2 num_ops
        <|> mulFoldingRules' platform arg2 arg1 num_ops)
 
+andFoldingRules :: NumOps -> RuleM CoreExpr
+andFoldingRules num_ops = do
+   env <- getRuleOpts
+   guard (roNumConstantFolding env)
+   [arg1,arg2] <- getArgs
+   platform <- getPlatform
+   liftMaybe
+      -- commutativity for `and` is handled here
+      (andFoldingRules' platform arg1 arg2 num_ops
+       <|> andFoldingRules' platform arg2 arg1 num_ops)
+
+orFoldingRules :: NumOps -> RuleM CoreExpr
+orFoldingRules num_ops = do
+   env <- getRuleOpts
+   guard (roNumConstantFolding env)
+   [arg1,arg2] <- getArgs
+   platform <- getPlatform
+   liftMaybe
+      -- commutativity for `or` is handled here
+      (orFoldingRules' platform arg1 arg2 num_ops
+       <|> orFoldingRules' platform arg2 arg1 num_ops)
 
 addFoldingRules' :: Platform -> CoreExpr -> CoreExpr -> NumOps -> Maybe CoreExpr
 addFoldingRules' platform arg1 arg2 num_ops = case (arg1, arg2) of
@@ -2819,29 +2852,76 @@ mulFoldingRules' platform arg1 arg2 num_ops = case (arg1,arg2) of
       sub x y = BinOpApp x (numSub num_ops) y
       mul x y = BinOpApp x (numMul num_ops) y
 
+andFoldingRules' :: Platform -> CoreExpr -> CoreExpr -> NumOps -> Maybe CoreExpr
+andFoldingRules' platform arg1 arg2 num_ops = case (arg1, arg2) of
+    -- R2) * `or` `and` simplications
+    -- l1 and (l2 and x) ==> (l1 and l2) and x
+    (L l1, is_lit_and num_ops -> Just (l2, x))
+       -> Just (mkL (l1 .&. l2) `and` x)
+
+    -- l1 and (l2 or x) ==> (l1 and l2) or (l1 and x)
+    -- does not decrease operations
+
+    -- (l1 and x) and (l2 and y) ==> (l1 and l2) and (x and y)
+    (is_lit_and num_ops -> Just (l1, x), is_lit_and num_ops -> Just (l2, y))
+       -> Just (mkL (l1 .&. l2) `and` (x `and` y))
+
+    -- (l1 and x) and (l2 or y) ==> (l1 and l2 and x) or (l1 and x and y)
+    -- (l1 or x) and (l2 or y) ==> (l1 and l2) or (x and l2) or (l1 and y) or (x and y)
+    -- increase operation numbers
+
+    _ -> Nothing
+    where
+      mkL = Lit . mkNumLiteral platform num_ops
+      and x y = BinOpApp x (fromJust (numAnd num_ops)) y
+
+orFoldingRules' :: Platform -> CoreExpr -> CoreExpr -> NumOps -> Maybe CoreExpr
+orFoldingRules' platform arg1 arg2 num_ops = case (arg1, arg2) of
+    -- R2) *  `or` `and` simplications
+    -- l1 or (l2 or x) ==> (l1 or l2) or x
+    (L l1, is_lit_or num_ops -> Just (l2, x))
+       -> Just (mkL (l1 .|. l2) `or` x)
+
+    -- l1 or (l2 and x) ==> (l1 or l2) and (l1 and x)
+    -- does not decrease operations
+
+    -- (l1 or x) or (l2 or y) ==> (l1 or l2) or (x or y)
+    (is_lit_or num_ops -> Just (l1, x), is_lit_or num_ops -> Just (l2, y))
+       -> Just (mkL (l1 .|. l2) `or` (x `or` y))
+
+    -- (l1 and x) or (l2 or y) ==> (l1 and l2 and x) or (l1 and x and y)
+    -- (l1 and x) or (l2 and y) ==> (l1 and l2) or (x and l2) or (l1 and y) or (x and y)
+    -- increase operation numbers
+
+    _ -> Nothing
+    where
+      mkL = Lit . mkNumLiteral platform num_ops
+      or x y = BinOpApp x (fromJust (numOr num_ops)) y
+
 is_op :: PrimOp -> CoreExpr -> Maybe (Arg CoreBndr, Arg CoreBndr)
 is_op op e = case e of
  BinOpApp x op' y | op == op' -> Just (x,y)
  _                            -> Nothing
 
-is_add, is_sub, is_mul :: NumOps -> CoreExpr -> Maybe (Arg CoreBndr, Arg CoreBndr)
+is_add, is_sub, is_mul, is_and, is_or :: NumOps -> CoreExpr -> Maybe (Arg CoreBndr, Arg CoreBndr)
 is_add num_ops = is_op (numAdd num_ops)
 is_sub num_ops = is_op (numSub num_ops)
 is_mul num_ops = is_op (numMul num_ops)
+is_and num_ops = is_op (fromJust (numAnd num_ops))
+is_or  num_ops = is_op (fromJust (numOr num_ops))
 
--- match addition with a literal (handles commutativity)
-is_lit_add :: NumOps -> CoreExpr -> Maybe (Integer, Arg CoreBndr)
-is_lit_add num_ops e = case is_add num_ops e of
-   Just (L l, x  ) -> Just (l,x)
-   Just (x  , L l) -> Just (l,x)
-   _               -> Nothing
+-- match operation with a literal (handles commutativity)
+is_lit_add, is_lit_mul, is_lit_and, is_lit_or :: NumOps -> CoreExpr -> Maybe (Integer, Arg CoreBndr)
+is_lit_add num_ops e = is_lit' is_add num_ops e
+is_lit_mul num_ops e = is_lit' is_mul num_ops e
+is_lit_and num_ops e = is_lit' is_and num_ops e
+is_lit_or  num_ops e = is_lit' is_or  num_ops e
 
--- match multiplication with a literal (handles commutativity)
-is_lit_mul :: NumOps -> CoreExpr -> Maybe (Integer, Arg CoreBndr)
-is_lit_mul num_ops e = case is_mul num_ops e of
-   Just (L l, x  ) -> Just (l,x)
-   Just (x  , L l) -> Just (l,x)
-   _               -> Nothing
+is_lit' :: (NumOps -> CoreExpr -> Maybe (Arg CoreBndr, Arg CoreBndr)) -> NumOps -> CoreExpr -> Maybe (Integer, Arg CoreBndr)
+is_lit' f num_ops e = case f num_ops e of
+  Just (L l, x  ) -> Just (l,x)
+  Just (x  , L l) -> Just (l,x)
+  _               -> Nothing
 
 -- match given "x": return 1
 -- match "lit * x": return lit value (handles commutativity)
@@ -2875,6 +2955,8 @@ data NumOps = NumOps
    , numSub     :: !PrimOp     -- ^ Sub two numbers
    , numMul     :: !PrimOp     -- ^ Multiply two numbers
    , numLitType :: !LitNumType -- ^ Literal type
+   , numAnd     :: !(Maybe PrimOp) -- ^ And two numbers
+   , numOr      :: !(Maybe PrimOp) -- ^ Or two numbers
    }
 
 -- | Create a numeric literal
@@ -2887,6 +2969,8 @@ int8Ops = NumOps
    , numSub     = Int8SubOp
    , numMul     = Int8MulOp
    , numLitType = LitNumInt8
+   , numAnd     = Nothing
+   , numOr      = Nothing
    }
 
 word8Ops :: NumOps
@@ -2894,6 +2978,8 @@ word8Ops = NumOps
    { numAdd     = Word8AddOp
    , numSub     = Word8SubOp
    , numMul     = Word8MulOp
+   , numAnd     = Just Word8AndOp
+   , numOr      = Just Word8OrOp
    , numLitType = LitNumWord8
    }
 
@@ -2903,6 +2989,8 @@ int16Ops = NumOps
    , numSub     = Int16SubOp
    , numMul     = Int16MulOp
    , numLitType = LitNumInt16
+   , numAnd     = Nothing
+   , numOr      = Nothing
    }
 
 word16Ops :: NumOps
@@ -2910,6 +2998,8 @@ word16Ops = NumOps
    { numAdd     = Word16AddOp
    , numSub     = Word16SubOp
    , numMul     = Word16MulOp
+   , numAnd     = Just Word16AndOp
+   , numOr      = Just Word16OrOp
    , numLitType = LitNumWord16
    }
 
@@ -2919,6 +3009,8 @@ int32Ops = NumOps
    , numSub     = Int32SubOp
    , numMul     = Int32MulOp
    , numLitType = LitNumInt32
+   , numAnd     = Nothing
+   , numOr      = Nothing
    }
 
 word32Ops :: NumOps
@@ -2926,6 +3018,8 @@ word32Ops = NumOps
    { numAdd     = Word32AddOp
    , numSub     = Word32SubOp
    , numMul     = Word32MulOp
+   , numAnd     = Just Word32AndOp
+   , numOr      = Just Word32OrOp
    , numLitType = LitNumWord32
    }
 
@@ -2935,6 +3029,8 @@ int64Ops = NumOps
    , numSub     = Int64SubOp
    , numMul     = Int64MulOp
    , numLitType = LitNumInt64
+   , numAnd     = Nothing
+   , numOr      = Nothing
    }
 
 word64Ops :: NumOps
@@ -2942,6 +3038,8 @@ word64Ops = NumOps
    { numAdd     = Word64AddOp
    , numSub     = Word64SubOp
    , numMul     = Word64MulOp
+   , numAnd     = Just Word64AndOp
+   , numOr      = Just Word64OrOp
    , numLitType = LitNumWord64
    }
 
@@ -2950,6 +3048,8 @@ intOps = NumOps
    { numAdd     = IntAddOp
    , numSub     = IntSubOp
    , numMul     = IntMulOp
+   , numAnd     = Just IntAndOp
+   , numOr      = Just IntOrOp
    , numLitType = LitNumInt
    }
 
@@ -2958,6 +3058,8 @@ wordOps = NumOps
    { numAdd     = WordAddOp
    , numSub     = WordSubOp
    , numMul     = WordMulOp
+   , numAnd     = Just WordAndOp
+   , numOr      = Just WordOrOp
    , numLitType = LitNumWord
    }
 
