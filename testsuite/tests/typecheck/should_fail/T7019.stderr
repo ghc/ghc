@@ -2,5 +2,5 @@
 T7019.hs:11:1: error:
     • Illegal polymorphic type: forall a. c (Free c a)
       A constraint must be a monotype
-      Perhaps you intended to use QuantifiedConstraints
     • In the type synonym declaration for ‘C’
+    Suggested fix: Perhaps you intended to use QuantifiedConstraints

@@ -1,0 +1,8 @@
+
+T16474.hs:6:1:
+    Quantified predicate must have a class or type variable head:
+       forall a. A t a => A t [a]
+    In the quantified constraint ‘forall a. A t a => A t [a]’
+     In the context: forall a. A t a => A t [a]
+     While checking the super-classes of class ‘B’
+     In the class declaration for ‘B’

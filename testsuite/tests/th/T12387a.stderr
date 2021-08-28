@@ -1,0 +1,5 @@
+
+T12387a.hs:11:2:
+    Class ‘Eq’ does not have an associated type ‘Rep’
+    In the type instance declaration for ‘Rep’
+        In the instance declaration for ‘Eq Foo’

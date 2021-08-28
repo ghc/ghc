@@ -1,8 +1,8 @@
 
 T12083a.hs:6:1: error:
     • Illegal qualified type: Num a => a
-      Perhaps you intended to use RankNTypes
     • In the type synonym declaration for ‘Constrd’
+    Suggested fix: Perhaps you intended to use RankNTypes
 
 T12083a.hs:10:26: error:
     • Data constructor ‘ExistentiallyLost’ has existential type variables, a context, or a specialised result type

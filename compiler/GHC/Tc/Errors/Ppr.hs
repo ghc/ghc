@@ -9,10 +9,13 @@ module GHC.Tc.Errors.Ppr (
 
 import GHC.Prelude
 
-import GHC.Core.TyCo.Ppr (pprWithTYPE)
+import GHC.Core.Class (Class(..))
+import GHC.Core.TyCo.Ppr (pprKind, pprParendType, pprType, pprWithTYPE)
 import GHC.Core.Type
 import GHC.Data.Bag
 import GHC.Tc.Errors.Types
+import GHC.Tc.Types.Rank (Rank(..))
+import GHC.Tc.Utils.TcType (tcSplitForAllTyVars)
 import GHC.Types.Error
 import GHC.Types.Name (pprPrefixName)
 import GHC.Types.Name.Reader (pprNameProvenance)
@@ -169,6 +172,79 @@ instance Diagnostic TcRnMessage where
       -> mkSimpleDecorated $
            hang (text "Overloaded signature conflicts with monomorphism restriction")
               2 (ppr sig)
+    TcRnTupleConstraintInst _
+      -> mkSimpleDecorated $ text "You can't specify an instance for a tuple constraint"
+    TcRnAbstractClassInst clas
+      -> mkSimpleDecorated $
+           text "Cannot define instance for abstract class" <+>
+           quotes (ppr (className clas))
+    TcRnNoClassInstHead tau
+      -> mkSimpleDecorated $
+           hang (text "Instance head is not headed by a class:") 2 (pprType tau)
+    TcRnUserTypeError ty
+      -> mkSimpleDecorated (pprUserTypeErrorTy ty)
+    TcRnConstraintInKind ty
+      -> mkSimpleDecorated $
+           text "Illegal constraint in a kind:" <+> pprType ty
+    TcRnUnboxedTupleTypeFuncArg ty
+      -> mkSimpleDecorated $
+           sep [ text "Illegal unboxed tuple type as function argument:"
+               , pprType ty ]
+    TcRnLinearFuncInKind ty
+      -> mkSimpleDecorated $
+           text "Illegal linear function in a kind:" <+> pprType ty
+    TcRnForAllEscapeError ty kind
+      -> mkSimpleDecorated $ vcat
+           [ hang (text "Quantified type's kind mentions quantified type variable")
+                2 (text "type:" <+> quotes (ppr ty))
+           , hang (text "where the body of the forall has this kind:")
+                2 (quotes (pprKind kind)) ]
+    TcRnVDQInTermType ty
+      -> mkSimpleDecorated $ vcat
+           [ hang (text "Illegal visible, dependent quantification" <+>
+                   text "in the type of a term:")
+                2 (pprType ty)
+           , text "(GHC does not yet support this)" ]
+    TcRnIllegalEqualConstraints ty
+      -> mkSimpleDecorated $
+           text "Illegal equational constraint" <+> pprType ty
+    TcRnBadQuantPredHead ty
+      -> mkSimpleDecorated $
+           hang (text "Quantified predicate must have a class or type variable head:")
+              2 (pprType ty)
+    TcRnIllegalTupleConstraint ty
+      -> mkSimpleDecorated $
+           text "Illegal tuple constraint:" <+> pprType ty
+    TcRnNonTypeVarArgInConstraint ty
+      -> mkSimpleDecorated $
+           hang (text "Non type-variable argument")
+              2 (text "in the constraint:" <+> pprType ty)
+    TcRnIllegalImplicitParam ty
+      -> mkSimpleDecorated $
+           text "Illegal implicit parameter" <+> quotes (pprType ty)
+    TcRnIllegalConstraintSynonymOfKind kind
+      -> mkSimpleDecorated $
+           text "Illegal constraint synonym of kind:" <+> quotes (pprKind kind)
+    TcRnIllegalClassInst tcf
+      -> mkSimpleDecorated $
+           vcat [ text "Illegal instance for a" <+> ppr tcf
+                , text "A class instance must be for a class" ]
+    TcRnOversaturatedVisibleKindArg ty
+      -> mkSimpleDecorated $
+           text "Illegal oversaturated visible kind argument:" <+>
+           quotes (char '@' <> pprParendType ty)
+    TcRnBadAssociatedType clas tc
+      -> mkSimpleDecorated $
+           hsep [ text "Class", quotes (ppr clas)
+                , text "does not have an associated type", quotes (ppr tc) ]
+    TcRnForAllRankErr rank ty
+      -> let herald = case tcSplitForAllTyVars ty of
+               ([], _) -> text "Illegal qualified type:"
+               _       -> text "Illegal polymorphic type:"
+             extra = case rank of
+               MonoTypeConstraint -> text "A constraint must be a monotype"
+               _                  -> empty
+         in mkSimpleDecorated $ vcat [hang herald 2 (pprType ty), extra]
 
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -247,6 +323,44 @@ instance Diagnostic TcRnMessage where
     TcRnPolymorphicBinderMissingSig{}
       -> WarningWithFlag Opt_WarnMissingLocalSignatures
     TcRnOverloadedSig{}
+      -> ErrorWithoutFlag
+    TcRnTupleConstraintInst{}
+      -> ErrorWithoutFlag
+    TcRnAbstractClassInst{}
+      -> ErrorWithoutFlag
+    TcRnNoClassInstHead{}
+      -> ErrorWithoutFlag
+    TcRnUserTypeError{}
+      -> ErrorWithoutFlag
+    TcRnConstraintInKind{}
+      -> ErrorWithoutFlag
+    TcRnUnboxedTupleTypeFuncArg{}
+      -> ErrorWithoutFlag
+    TcRnLinearFuncInKind{}
+      -> ErrorWithoutFlag
+    TcRnForAllEscapeError{}
+      -> ErrorWithoutFlag
+    TcRnVDQInTermType{}
+      -> ErrorWithoutFlag
+    TcRnIllegalEqualConstraints{}
+      -> ErrorWithoutFlag
+    TcRnBadQuantPredHead{}
+      -> ErrorWithoutFlag
+    TcRnIllegalTupleConstraint{}
+      -> ErrorWithoutFlag
+    TcRnNonTypeVarArgInConstraint{}
+      -> ErrorWithoutFlag
+    TcRnIllegalImplicitParam{}
+      -> ErrorWithoutFlag
+    TcRnIllegalConstraintSynonymOfKind{}
+      -> ErrorWithoutFlag
+    TcRnIllegalClassInst{}
+      -> ErrorWithoutFlag
+    TcRnOversaturatedVisibleKindArg{}
+      -> ErrorWithoutFlag
+    TcRnBadAssociatedType{}
+      -> ErrorWithoutFlag
+    TcRnForAllRankErr{}
       -> ErrorWithoutFlag
 
   diagnosticHints = \case
@@ -327,6 +441,50 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnOverloadedSig{}
       -> noHints
+    TcRnTupleConstraintInst{}
+      -> noHints
+    TcRnAbstractClassInst{}
+      -> noHints
+    TcRnNoClassInstHead{}
+      -> noHints
+    TcRnUserTypeError{}
+      -> noHints
+    TcRnConstraintInKind{}
+      -> noHints
+    TcRnUnboxedTupleTypeFuncArg{}
+      -> [suggestExtension LangExt.UnboxedTuples]
+    TcRnLinearFuncInKind{}
+      -> noHints
+    TcRnForAllEscapeError{}
+      -> noHints
+    TcRnVDQInTermType{}
+      -> noHints
+    TcRnIllegalEqualConstraints{}
+      -> [suggestAnyExtension [LangExt.GADTs, LangExt.TypeFamilies]]
+    TcRnBadQuantPredHead{}
+      -> noHints
+    TcRnIllegalTupleConstraint{}
+      -> [suggestExtension LangExt.ConstraintKinds]
+    TcRnNonTypeVarArgInConstraint{}
+      -> [suggestExtension LangExt.FlexibleContexts]
+    TcRnIllegalImplicitParam{}
+      -> noHints
+    TcRnIllegalConstraintSynonymOfKind{}
+      -> [suggestExtension LangExt.ConstraintKinds]
+    TcRnIllegalClassInst{}
+      -> noHints
+    TcRnOversaturatedVisibleKindArg{}
+      -> noHints
+    TcRnBadAssociatedType{}
+      -> noHints
+    TcRnForAllRankErr rank _
+      -> case rank of
+           LimitedRank{}      -> [suggestExtension LangExt.RankNTypes]
+           MonoTypeRankZero   -> [suggestExtension LangExt.RankNTypes]
+           MonoTypeTyConArg   -> [suggestExtension LangExt.ImpredicativeTypes]
+           MonoTypeSynArg     -> [suggestExtension LangExt.LiberalTypeSynonyms]
+           MonoTypeConstraint -> [suggestExtension LangExt.QuantifiedConstraints]
+           _                  -> noHints
 
 messageWithInfoDiagnosticMessage :: UnitState
                                  -> ErrInfo

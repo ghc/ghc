@@ -1,4 +1,4 @@
-Found 282 GHC.Parser module dependencies
+Found 283 GHC.Parser module dependencies
 GHC.Builtin.Names
 GHC.Builtin.PrimOps
 GHC.Builtin.Types
@@ -172,6 +172,7 @@ GHC.Tc.Types
 GHC.Tc.Types.Constraint
 GHC.Tc.Types.Evidence
 GHC.Tc.Types.Origin
+GHC.Tc.Types.Rank
 GHC.Tc.Utils.TcType
 GHC.Types.Annotations
 GHC.Types.Avail

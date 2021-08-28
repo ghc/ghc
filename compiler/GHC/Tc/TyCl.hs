@@ -2501,7 +2501,7 @@ tcClassATs :: Name                    -- The class name (not knot-tied)
            -> TcM [ClassATItem]
 tcClassATs class_name cls ats at_defs
   = do {  -- Complain about associated type defaults for non associated-types
-         sequence_ [ failWithTc (badATErr class_name n)
+         sequence_ [ failWithTc (TcRnBadAssociatedType class_name n)
                    | n <- map at_def_tycon at_defs
                    , not (n `elemNameSet` at_names) ]
        ; mapM tc_at ats }

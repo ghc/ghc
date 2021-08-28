@@ -14,13 +14,16 @@ import GHC.Prelude
 import GHC.Hs
 import {-# SOURCE #-} GHC.Tc.Types (TcIdSigInfo)
 import GHC.Tc.Types.Constraint
+import GHC.Tc.Types.Rank (Rank)
 import GHC.Types.Error
 import GHC.Types.Name (Name, OccName)
 import GHC.Types.Name.Reader
 import GHC.Types.SrcLoc
 import GHC.Unit.Types (Module)
 import GHC.Utils.Outputable
-import GHC.Core.Type (Type, Var)
+import GHC.Core.Class (Class)
+import GHC.Core.Type (Kind, Type, Var)
+import GHC.Core.TyCon (TyConFlavour)
 import GHC.Unit.State (UnitState)
 import GHC.Types.Basic
 
@@ -61,7 +64,6 @@ any use of SDoc in the diagnostic reporting of GHC, we can surely revisit the us
 existence of these two types, which for now remain a "necessary evil".
 
 -}
-
 
 -- The majority of TcRn messages come with extra context about the error,
 -- and this newtype captures it. See Note [Migrating TcM messages].
@@ -509,6 +511,297 @@ data TcRnMessage where
   -}
   TcRnOverloadedSig :: TcIdSigInfo -> TcRnMessage
 
+  {-| TcRnTupleConstraintInst is an error that occurs whenever an instance
+      for a tuple constraint is specified.
+
+      Examples(s):
+        class C m a
+        class D m a
+        f :: (forall a. Eq a => (C m a, D m a)) => m a
+        f = undefined
+
+      Test cases: quantified-constraints/T15334
+  -}
+  TcRnTupleConstraintInst :: !Class -> TcRnMessage
+
+  {-| TcRnAbstractClassInst is an error that occurs whenever an instance
+      of an abstract class is specified.
+
+      Examples(s):
+        -- A.hs-boot
+        module A where
+        class C a
+
+        -- B.hs
+        module B where
+        import {-# SOURCE #-} A
+        instance C Int where
+
+        -- A.hs
+        module A where
+        import B
+        class C a where
+          f :: a
+
+        -- Main.hs
+        import A
+        main = print (f :: Int)
+
+      Test cases: typecheck/should_fail/T13068
+  -}
+  TcRnAbstractClassInst :: !Class -> TcRnMessage
+
+  {-| TcRnNoClassInstHead is an error that occurs whenever an instance
+      head is not headed by a class.
+
+      Examples(s):
+        instance c
+
+      Test cases: typecheck/rename/T5513
+                  typecheck/rename/T16385
+  -}
+  TcRnNoClassInstHead :: !Type -> TcRnMessage
+
+  {-| TcRnUserTypeError is an error that occurs due to a user's custom type error,
+      which can be triggered by adding a `TypeError` constraint in a type signature
+      or typeclass instance.
+
+      Examples(s):
+        f :: TypeError (Text "This is a type error")
+        f = undefined
+
+      Test cases: typecheck/should_fail/CustomTypeErrors02
+                  typecheck/should_fail/CustomTypeErrors03
+  -}
+  TcRnUserTypeError :: !Type -> TcRnMessage
+
+  {-| TcRnConstraintInKind is an error that occurs whenever a constraint is specified
+      in a kind.
+
+      Examples(s):
+        data Q :: Eq a => Type where {}
+
+      Test cases: dependent/should_fail/T13895
+                  polykinds/T16263
+                  saks/should_fail/saks_fail004
+                  typecheck/should_fail/T16059a
+                  typecheck/should_fail/T18714
+  -}
+  TcRnConstraintInKind :: !Type -> TcRnMessage
+
+  {-| TcRnUnboxedTupleTypeFuncArg is an error that occurs whenever an unboxed tuple type
+      is specified as a function argument.
+
+      Examples(s):
+        -- T15073.hs
+        import T15073a
+        newtype Foo a = MkFoo a
+          deriving P
+
+        -- T15073a.hs
+        class P a where
+          p :: a -> (# a #)
+
+      Test cases: deriving/should_fail/T15073.hs
+                  deriving/should_fail/T15073a.hs
+                  typecheck/should_fail/T16059d
+  -}
+  TcRnUnboxedTupleTypeFuncArg :: !Type -> TcRnMessage
+
+  {-| TcRnLinearFuncInKind is an error that occurs whenever a linear function is
+      specified in a kind.
+
+      Examples(s):
+        data A :: * %1 -> *
+
+      Test cases: linear/should_fail/LinearKind
+                  linear/should_fail/LinearKind2
+                  linear/should_fail/LinearKind3
+  -}
+  TcRnLinearFuncInKind :: !Type -> TcRnMessage
+
+  {-| TcRnForAllEscapeError is an error that occurs whenever a quantified type's kind
+      mentions quantified type variable.
+
+      Examples(s):
+        type T :: TYPE (BoxedRep l)
+        data T = MkT
+
+      Test cases: unlifted-datatypes/should_fail/UnlDataNullaryPoly
+  -}
+  TcRnForAllEscapeError :: !Type -> !Kind -> TcRnMessage
+
+  {-| TcRnVDQInTermType is an error that occurs whenever a visible dependent quantification
+      is specified in the type of a term.
+
+      Examples(s):
+        a = (undefined :: forall k -> k -> Type) @Int
+
+      Test cases: dependent/should_fail/T15859
+                  dependent/should_fail/T16326_Fail1
+                  dependent/should_fail/T16326_Fail2
+                  dependent/should_fail/T16326_Fail3
+                  dependent/should_fail/T16326_Fail4
+                  dependent/should_fail/T16326_Fail5
+                  dependent/should_fail/T16326_Fail6
+                  dependent/should_fail/T16326_Fail7
+                  dependent/should_fail/T16326_Fail8
+                  dependent/should_fail/T16326_Fail9
+                  dependent/should_fail/T16326_Fail10
+                  dependent/should_fail/T16326_Fail11
+                  dependent/should_fail/T16326_Fail12
+                  dependent/should_fail/T17687
+                  dependent/should_fail/T18271
+  -}
+  TcRnVDQInTermType :: !Type -> TcRnMessage
+
+  {-| TcRnIllegalEqualConstraints is an error that occurs whenever an illegal equational
+      constraint is specified.
+
+      Examples(s):
+        blah :: (forall a. a b ~ a c) => b -> c
+        blah = undefined
+
+      Test cases: typecheck/should_fail/T17563
+  -}
+  TcRnIllegalEqualConstraints :: !Type -> TcRnMessage
+
+  {-| TcRnBadQuantPredHead is an error that occurs whenever a quantified predicate
+      lacks a class or type variable head.
+
+      Examples(s):
+        class (forall a. A t a => A t [a]) => B t where
+          type A t a :: Constraint
+
+      Test cases: quantified-constraints/T16474
+  -}
+  TcRnBadQuantPredHead :: !Type -> TcRnMessage
+
+  {-| TcRnIllegalTupleConstraint is an error that occurs whenever an illegal tuple
+      constraint is specified.
+
+      Examples(s):
+        g :: ((Show a, Num a), Eq a) => a -> a
+        g = undefined
+
+      Test cases: typecheck/should_fail/tcfail209a
+  -}
+  TcRnIllegalTupleConstraint :: !Type -> TcRnMessage
+
+  {-| TcRnNonTypeVarArgInConstraint is an error that occurs whenever a non type-variable
+      argument is specified in a constraint.
+
+      Examples(s):
+        data T
+        instance Eq Int => Eq T
+
+      Test cases: ghci/scripts/T13202
+                  ghci/scripts/T13202a
+                  polykinds/T12055a
+                  typecheck/should_fail/T10351
+                  typecheck/should_fail/T19187
+                  typecheck/should_fail/T6022
+                  typecheck/should_fail/T8883
+  -}
+  TcRnNonTypeVarArgInConstraint :: !Type -> TcRnMessage
+
+  {-| TcRnIllegalImplicitParam is an error that occurs whenever an illegal implicit
+      parameter is specified.
+
+      Examples(s):
+        type Bla = ?x::Int
+        data T = T
+        instance Bla => Eq T
+
+      Test cases: polykinds/T11466
+                  typecheck/should_fail/T8912
+                  typecheck/should_fail/tcfail041
+                  typecheck/should_fail/tcfail211
+                  typecheck/should_fail/tcrun045
+  -}
+  TcRnIllegalImplicitParam :: !Type -> TcRnMessage
+
+  {-| TcRnIllegalConstraintSynonymOfKind is an error that occurs whenever an illegal constraint
+      synonym of kind is specified.
+
+      Examples(s):
+        type Showish = Show
+        f :: (Showish a) => a -> a
+        f = undefined
+
+      Test cases: typecheck/should_fail/tcfail209
+  -}
+  TcRnIllegalConstraintSynonymOfKind :: !Type -> TcRnMessage
+
+  {-| TcRnIllegalClassInst is an error that occurs whenever a class instance is specified
+      for a non-class.
+
+      Examples(s):
+        type C1 a = (Show (a -> Bool))
+        instance C1 Int where
+
+      Test cases: polykinds/T13267
+  -}
+  TcRnIllegalClassInst :: !TyConFlavour -> TcRnMessage
+
+  {-| TcRnOversaturatedVisibleKindArg is an error that occurs whenever an illegal oversaturated
+      visible kind argument is specified.
+
+      Examples(s):
+        type family
+          F2 :: forall (a :: Type). Type where
+          F2 @a = Maybe a
+
+      Test cases: typecheck/should_fail/T15793
+                  typecheck/should_fail/T16255
+  -}
+  TcRnOversaturatedVisibleKindArg :: !Type -> TcRnMessage
+
+  {-| TcRnBadAssociatedType is an error that occurs whenever a class doesn't have an
+      associated type.
+
+      Examples(s):
+        $(do d <- instanceD (cxt []) (conT ''Eq `appT` conT ''Foo)
+                    [tySynInstD $ tySynEqn Nothing (conT ''Rep `appT` conT ''Foo) (conT ''Maybe)]
+             return [d])
+        ======>
+        instance Eq Foo where
+          type Rep Foo = Maybe
+
+      Test cases: th/T12387a
+  -}
+  TcRnBadAssociatedType :: {-Class-} !Name -> {-TyCon-} !Name -> TcRnMessage
+
+  {-| TcRnForAllRankErr is an error that occurs whenever an illegal ranked type
+      is specified.
+
+      Examples(s):
+        foo :: (a,b) -> (a~b => t) -> (a,b)
+        foo p x = p
+
+      Test cases:
+        - ghci/should_run/T15806
+        - indexed-types/should_fail/SimpleFail15
+        - typecheck/should_fail/T11355
+        - typecheck/should_fail/T12083a
+        - typecheck/should_fail/T12083b
+        - typecheck/should_fail/T16059c
+        - typecheck/should_fail/T16059e
+        - typecheck/should_fail/T17213
+        - typecheck/should_fail/T18939_Fail
+        - typecheck/should_fail/T2538
+        - typecheck/should_fail/T5957
+        - typecheck/should_fail/T7019
+        - typecheck/should_fail/T7019a
+        - typecheck/should_fail/T7809
+        - typecheck/should_fail/T9196
+        - typecheck/should_fail/tcfail127
+        - typecheck/should_fail/tcfail184
+        - typecheck/should_fail/tcfail196
+        - typecheck/should_fail/tcfail197
+  -}
+  TcRnForAllRankErr :: !Rank -> !Type -> TcRnMessage
+
 -- | Which parts of a record field are affected by a particular error or warning.
 data RecordFieldPart
   = RecordFieldConstructor !Name
@@ -537,4 +830,3 @@ data LevityCheckProvenance
   | LevityCheckInFunUse !(LHsExpr GhcTc)
   | LevityCheckInValidDataCon
   | LevityCheckInValidClass
-

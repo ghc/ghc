@@ -29,10 +29,10 @@ instance Outputable GhcHint where
             (text "Perhaps you intended to use" <+> ppr ext) $$ extraUserInfo
           SuggestAnyExtension extraUserInfo exts ->
             let header = text "Enable any of the following extensions:"
-            in  header <+> hsep (intersperse (char ',') (map ppr exts)) $$ extraUserInfo
+            in  header <+> hcat (intersperse (text ", ") (map ppr exts)) $$ extraUserInfo
           SuggestExtensions extraUserInfo exts ->
             let header = text "Enable all of the following extensions:"
-            in  header <+> hsep (intersperse (char ',') (map ppr exts)) $$ extraUserInfo
+            in  header <+> hcat (intersperse (text ", ") (map ppr exts)) $$ extraUserInfo
     SuggestMissingDo
       -> text "Possibly caused by a missing 'do'?"
     SuggestLetInDo

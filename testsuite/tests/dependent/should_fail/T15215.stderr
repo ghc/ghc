@@ -1,9 +1,9 @@
 
 T15215.hs:10:3: error:
     • Non type-variable argument in the constraint: Show (Maybe a)
-      (Use FlexibleContexts to permit this)
     • In the definition of data constructor ‘MkA’
       In the data type declaration for ‘A’
+    Suggested fix: Perhaps you intended to use FlexibleContexts
 
 T15215.hs:17:14: error:
     • Data constructor ‘MkB’ cannot be used here

@@ -1,4 +1,4 @@
 
 <interactive>:1:1: error:
     Illegal polymorphic type: forall a. a -> a
-    Perhaps you intended to use ImpredicativeTypes
+    Suggested fix: Perhaps you intended to use ImpredicativeTypes

@@ -1,15 +1,15 @@
 
 T2538.hs:7:6: error:
     • Illegal qualified type: Eq a => a -> a
-      Perhaps you intended to use RankNTypes
     • In the type signature: f :: (Eq a => a -> a) -> Int
+    Suggested fix: Perhaps you intended to use RankNTypes
 
 T2538.hs:10:6: error:
     • Illegal qualified type: Eq a => a -> a
-      Perhaps you intended to use ImpredicativeTypes
     • In the type signature: g :: [Eq a => a -> a] -> Int
+    Suggested fix: Perhaps you intended to use ImpredicativeTypes
 
 T2538.hs:13:6: error:
     • Illegal qualified type: Eq a => a -> a
-      Perhaps you intended to use ImpredicativeTypes
     • In the type signature: h :: Ix (Eq a => a -> a) => Int
+    Suggested fix: Perhaps you intended to use ImpredicativeTypes

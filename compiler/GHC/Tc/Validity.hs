@@ -9,13 +9,13 @@
 -}
 
 module GHC.Tc.Validity (
-  Rank, UserTypeCtxt(..), checkValidType, checkValidMonoType,
+  Rank(..), UserTypeCtxt(..), checkValidType, checkValidMonoType,
   checkValidTheta,
   checkValidInstance, checkValidInstHead, validDerivPred,
   checkTySynRhs,
   checkValidCoAxiom, checkValidCoAxBranch,
   checkValidTyFamEqn, checkValidAssocTyFamDeflt, checkConsistentFamInst,
-  badATErr, arityErr,
+  arityErr,
   checkTyConTelescope,
   allDistinctTyVars
   ) where
@@ -42,6 +42,7 @@ import GHC.Core.Class
 import GHC.Core.TyCon
 import GHC.Core.Predicate
 import GHC.Tc.Types.Origin
+import GHC.Tc.Types.Rank
 import GHC.Tc.Errors.Types
 
 -- others:
@@ -70,7 +71,6 @@ import GHC.Builtin.Uniques  ( mkAlphaTyVarUnique )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
-import Data.Bifunctor
 import Data.Foldable
 import Data.Function
 import Data.List        ( (\\), nub )
@@ -274,9 +274,7 @@ checkUserTypeError ctxt ty
   fail_with :: Type -> TcM ()
   fail_with msg = do { env0 <- tcInitTidyEnv
                      ; let (env1, tidy_msg) = tidyOpenType env0 msg
-                     ; failWithTcM (env1
-                                   , TcRnUnknownMessage $
-                                       mkPlainError noHints (pprUserTypeErrorTy tidy_msg))
+                     ; failWithTcM (env1, TcRnUserTypeError tidy_msg)
                      }
 
 
@@ -355,10 +353,9 @@ checkValidType ctxt ty
                         | otherwise  = r
 
              rank1 = gen_rank r1
-             rank0 = gen_rank r0
+             rank0 = gen_rank MonoTypeRankZero
 
-             r0 = rankZeroMonoType
-             r1 = LimitedRank True r0
+             r1 = LimitedRank True MonoTypeRankZero
 
              rank
                = case ctxt of
@@ -371,7 +368,7 @@ checkValidType ctxt ty
                  KindSigCtxt    -> rank1
                  StandaloneKindSigCtxt{} -> rank1
                  TypeAppCtxt | impred_flag -> ArbitraryRank
-                             | otherwise   -> tyConArgMonoType
+                             | otherwise   -> MonoTypeTyConArg
                     -- Normally, ImpredicativeTypes is handled in check_arg_type,
                     -- but visible type applications don't go through there.
                     -- So we do this check here.
@@ -434,47 +431,14 @@ checkTySynRhs ctxt ty
                     (do { dflags <- getDynFlags
                         ; expand <- initialExpandMode
                         ; check_pred_ty emptyTidyEnv dflags ctxt expand ty })
-         else addErrTcM (constraintSynErr emptyTidyEnv actual_kind) }
+         else addErrTcM ( emptyTidyEnv
+                        , TcRnIllegalConstraintSynonymOfKind (tidyKind emptyTidyEnv actual_kind)
+                        ) }
 
   | otherwise
   = return ()
   where
     actual_kind = tcTypeKind ty
-
-{-
-Note [Higher rank types]
-~~~~~~~~~~~~~~~~~~~~~~~~
-Technically
-            Int -> forall a. a->a
-is still a rank-1 type, but it's not Haskell 98 (#5957).  So the
-validity checker allow a forall after an arrow only if we allow it
-before -- that is, with Rank2Types or RankNTypes
--}
-
-data Rank = ArbitraryRank         -- Any rank ok
-
-          | LimitedRank   -- Note [Higher rank types]
-                 Bool     -- Forall ok at top
-                 Rank     -- Use for function arguments
-
-          | MonoType SDoc   -- Monotype, with a suggestion of how it could be a polytype
-
-          | MustBeMonoType  -- Monotype regardless of flags
-
-instance Outputable Rank where
-  ppr ArbitraryRank  = text "ArbitraryRank"
-  ppr (LimitedRank top_forall_ok r)
-                     = text "LimitedRank" <+> ppr top_forall_ok
-                                          <+> parens (ppr r)
-  ppr (MonoType msg) = text "MonoType" <+> parens msg
-  ppr MustBeMonoType = text "MustBeMonoType"
-
-rankZeroMonoType, tyConArgMonoType, synArgMonoType, constraintMonoType :: Rank
-rankZeroMonoType   = MonoType (text "Perhaps you intended to use RankNTypes")
-tyConArgMonoType   = MonoType (text "Perhaps you intended to use ImpredicativeTypes")
-synArgMonoType     = MonoType (text "Perhaps you intended to use LiberalTypeSynonyms")
-constraintMonoType = MonoType (vcat [ text "A constraint must be a monotype"
-                                    , text "Perhaps you intended to use QuantifiedConstraints" ])
 
 funArgResRank :: Rank -> (Rank, Rank)             -- Function argument and result
 funArgResRank (LimitedRank _ arg_rank) = (arg_rank, LimitedRank (forAllAllowed arg_rank) arg_rank)
@@ -743,7 +707,7 @@ check_type ve@(ValidityEnv{ ve_tidy_env = env, ve_ctxt = ctxt
                           , ve_rank = rank, ve_expand = expand }) ty
   | not (null tvbs && null theta)
   = do  { traceTc "check_type" (ppr ty $$ ppr rank)
-        ; checkTcM (forAllAllowed rank) (forAllTyErr env rank ty)
+        ; checkTcM (forAllAllowed rank) (env, TcRnForAllRankErr rank (tidyType env ty))
                 -- Reject e.g. (Maybe (?x::Int => Int)),
                 -- with a decent error message
 
@@ -753,7 +717,7 @@ check_type ve@(ValidityEnv{ ve_tidy_env = env, ve_ctxt = ctxt
 
         ; checkTcM (all (isInvisibleArgFlag . binderArgFlag) tvbs
                          || vdqAllowed ctxt)
-                   (illegalVDQTyErr env ty)
+                   (env, TcRnVDQInTermType (tidyType env ty))
                 -- Reject visible, dependent quantification in the type of a
                 -- term (e.g., `f :: forall a -> a -> Maybe a`)
 
@@ -774,7 +738,7 @@ check_type (ve@ValidityEnv{ ve_tidy_env = env, ve_ctxt = ctxt
                           , ve_rank = rank })
            ty@(FunTy _ mult arg_ty res_ty)
   = do  { failIfTcM (not (linearityAllowed ctxt) && not (isManyDataConTy mult))
-                     (linearFunKindErr env ty)
+                     (env, TcRnLinearFuncInKind (tidyType env ty))
         ; check_type (ve{ve_rank = arg_rank}) arg_ty
         ; check_type (ve{ve_rank = res_rank}) res_ty }
   where
@@ -874,10 +838,10 @@ field to False.
 check_ubx_tuple :: ValidityEnv -> KindOrType -> [KindOrType] -> TcM ()
 check_ubx_tuple (ve@ValidityEnv{ve_tidy_env = env}) ty tys
   = do  { ub_tuples_allowed <- xoptM LangExt.UnboxedTuples
-        ; checkTcM ub_tuples_allowed (ubxArgTyErr env ty)
+        ; checkTcM ub_tuples_allowed (env, TcRnUnboxedTupleTypeFuncArg (tidyType env ty))
 
         ; impred <- xoptM LangExt.ImpredicativeTypes
-        ; let rank' = if impred then ArbitraryRank else tyConArgMonoType
+        ; let rank' = if impred then ArbitraryRank else MonoTypeTyConArg
                 -- c.f. check_arg_type
                 -- However, args are allowed to be unlifted, or
                 -- more unboxed tuples, so can't use check_arg_ty
@@ -912,10 +876,10 @@ check_arg_type type_syn (ve@ValidityEnv{ve_ctxt = ctxt, ve_rank = rank}) ty
         ; let rank' = case rank of          -- Predictive => must be monotype
                         -- Rank-n arguments to type synonyms are OK, provided
                         -- that LiberalTypeSynonyms is enabled.
-                        _ | type_syn       -> synArgMonoType
+                        _ | type_syn       -> MonoTypeSynArg
                         MustBeMonoType     -> MustBeMonoType  -- Monotype, regardless
                         _other | impred    -> ArbitraryRank
-                               | otherwise -> tyConArgMonoType
+                               | otherwise -> MonoTypeTyConArg
                         -- Make sure that MustBeMonoType is propagated,
                         -- so that we don't suggest -XImpredicativeTypes in
                         --    (Ord (forall a.a)) => a -> a
@@ -933,20 +897,6 @@ check_arg_type type_syn (ve@ValidityEnv{ve_ctxt = ctxt, ve_rank = rank}) ty
         ; check_type (ve{ve_ctxt = ctxt', ve_rank = rank'}) ty }
 
 ----------------------------------------
-forAllTyErr :: TidyEnv -> Rank -> Type -> (TidyEnv, TcRnMessage)
-forAllTyErr env rank ty
-   = ( env
-     , TcRnUnknownMessage $ mkPlainError noHints $
-       vcat [ hang herald 2 (ppr_tidy env ty)
-            , suggestion ] )
-  where
-    (tvs, _rho) = tcSplitForAllTyVars ty
-    herald | null tvs  = text "Illegal qualified type:"
-           | otherwise = text "Illegal polymorphic type:"
-    suggestion = case rank of
-                   LimitedRank {} -> text "Perhaps you intended to use RankNTypes"
-                   MonoType d     -> d
-                   _              -> Outputable.empty -- Polytype is always illegal
 
 -- | Reject type variables that would escape their escape through a kind.
 -- See @Note [Type variables escaping through kinds]@.
@@ -967,15 +917,10 @@ checkEscapingKind env tvbs theta tau =
 forAllEscapeErr :: TidyEnv -> [TyVarBinder] -> ThetaType -> Type -> Kind
                 -> (TidyEnv, TcRnMessage)
 forAllEscapeErr env tvbs theta tau tau_kind
-  = ( env
-    , TcRnUnknownMessage $ mkPlainError noHints $
-      vcat [ hang (text "Quantified type's kind mentions quantified type variable")
-                2 (text "type:" <+> quotes (ppr (mkSigmaTy tvbs theta tau)))
-                -- NB: Don't tidy this type since the tvbs were already tidied
-                -- previously, and re-tidying them will make the names of type
-                -- variables different from tau_kind.
-           , hang (text "where the body of the forall has this kind:")
-                2 (quotes (ppr_tidy env tau_kind)) ] )
+  -- NB: Don't tidy the sigma type since the tvbs were already tidied
+  -- previously, and re-tidying them will make the names of type
+  -- variables different from tau_kind.
+  = (env, TcRnForAllEscapeError (mkSigmaTy tvbs theta tau) (tidyKind env tau_kind))
 
 {-
 Note [Type variables escaping through kinds]
@@ -996,14 +941,6 @@ its binding site! This is not desirable, so we establish a validity check
 kinds in this way.
 -}
 
-ubxArgTyErr :: TidyEnv -> Type -> (TidyEnv, TcRnMessage)
-ubxArgTyErr env ty
-  = ( env
-    , TcRnUnknownMessage $ mkPlainError noHints $
-      vcat [ sep [ text "Illegal unboxed tuple type as function argument:"
-                 , ppr_tidy env ty ]
-                 , text "Perhaps you intended to use UnboxedTuples" ] )
-
 checkConstraintsOK :: ValidityEnv -> ThetaType -> Type -> TcM ()
 checkConstraintsOK ve theta ty
   | null theta                         = return ()
@@ -1011,28 +948,8 @@ checkConstraintsOK ve theta ty
   | otherwise
   = -- We are in a kind, where we allow only equality predicates
     -- See Note [Constraints in kinds] in GHC.Core.TyCo.Rep, and #16263
-    checkTcM (all isEqPred theta) $
-    constraintTyErr (ve_tidy_env ve) ty
-
-constraintTyErr :: TidyEnv -> Type -> (TidyEnv, TcRnMessage)
-constraintTyErr env ty
-  = (env
-    , TcRnUnknownMessage $ mkPlainError noHints $
-        text "Illegal constraint in a kind:" <+> ppr_tidy env ty)
-
--- | Reject a use of visible, dependent quantification in the type of a term.
-illegalVDQTyErr :: TidyEnv -> Type -> (TidyEnv, TcRnMessage)
-illegalVDQTyErr env ty =
-  (env, TcRnUnknownMessage $ mkPlainError noHints $ vcat
-  [ hang (text "Illegal visible, dependent quantification" <+>
-          text "in the type of a term:")
-       2 (ppr_tidy env ty)
-  , text "(GHC does not yet support this)" ] )
-
--- | Reject uses of linear function arrows in kinds.
-linearFunKindErr :: TidyEnv -> Type -> (TidyEnv, TcRnMessage)
-linearFunKindErr env ty =
-  (env, TcRnUnknownMessage $ mkPlainError noHints $ text "Illegal linear function in a kind:" <+> ppr_tidy env ty)
+    checkTcM (all isEqPred theta) (env, TcRnConstraintInKind (tidyType env ty))
+  where env = ve_tidy_env ve
 
 {-
 Note [Liberal type synonyms]
@@ -1123,15 +1040,8 @@ check_valid_theta _ _ _ []
   = return ()
 check_valid_theta env ctxt expand theta
   = do { dflags <- getDynFlags
-       ; let dia m = TcRnUnknownMessage $
-               mkPlainDiagnostic (WarningWithFlag Opt_WarnDuplicateConstraints) noHints m
-       ; diagnosticTcM (notNull dups) (second dia (dupPredWarn env dups))
        ; traceTc "check_valid_theta" (ppr theta)
        ; mapM_ (check_pred_ty env dflags ctxt expand) theta }
-  where
-    (_,dups) = removeDups nonDetCmpType theta
-    -- It's OK to use nonDetCmpType because dups only appears in the
-    -- warning
 
 -------------------------
 {- Note [Validity checking for constraints]
@@ -1169,7 +1079,7 @@ check_pred_ty env dflags ctxt expand pred
     rank | xopt LangExt.QuantifiedConstraints dflags
          = ArbitraryRank
          | otherwise
-         = constraintMonoType
+         = MonoTypeConstraint
 
     ve :: ValidityEnv
     ve = ValidityEnv{ ve_tidy_env = env
@@ -1203,7 +1113,7 @@ check_pred_help under_syn env dflags ctxt pred
               -- in Note [Lift equality constraints when quantifying] in GHC.Tc.Utils.TcType
 
       ForAllPred _ theta head -> check_quant_pred env dflags ctxt pred theta head
-      IrredPred {}            -> check_irred_pred under_syn env dflags pred
+      _                       -> return ()
 
 check_eq_pred :: TidyEnv -> DynFlags -> PredType -> TcM ()
 check_eq_pred env dflags pred
@@ -1211,7 +1121,7 @@ check_eq_pred env dflags pred
             -- families are permitted
     checkTcM (xopt LangExt.TypeFamilies dflags
               || xopt LangExt.GADTs dflags)
-             (eqPredTyErr env pred)
+             (env, TcRnIllegalEqualConstraints (tidyType env pred))
 
 check_quant_pred :: TidyEnv -> DynFlags -> UserTypeCtxt
                  -> PredType -> ThetaType -> PredType -> TcM ()
@@ -1229,7 +1139,7 @@ check_quant_pred env dflags ctxt pred theta head_pred
                                -- in check_pred_ty
             IrredPred {}      | hasTyVarHead head_pred
                               -> return ()
-            _                 -> failWithTcM (badQuantHeadErr env pred)
+            _                 -> failWithTcM (env, TcRnBadQuantPredHead (tidyType env pred))
 
          -- Check for termination
        ; unless (xopt LangExt.UndecidableInstances dflags) $
@@ -1240,22 +1150,10 @@ check_tuple_pred :: Bool -> TidyEnv -> DynFlags -> UserTypeCtxt -> PredType -> [
 check_tuple_pred under_syn env dflags ctxt pred ts
   = do { -- See Note [ConstraintKinds in predicates]
          checkTcM (under_syn || xopt LangExt.ConstraintKinds dflags)
-                  (predTupleErr env pred)
+                  (env, TcRnIllegalTupleConstraint (tidyType env pred))
        ; mapM_ (check_pred_help under_syn env dflags ctxt) ts }
     -- This case will not normally be executed because without
     -- -XConstraintKinds tuple types are only kind-checked as *
-
-check_irred_pred :: Bool -> TidyEnv -> DynFlags -> PredType -> TcM ()
-check_irred_pred under_syn env dflags pred
-    -- The predicate looks like (X t1 t2) or (x t1 t2) :: Constraint
-    -- where X is a type function
-  =      -- If it looks like (x t1 t2), require ConstraintKinds
-         --   see Note [ConstraintKinds in predicates]
-         -- But (X t1 t2) is always ok because we just require ConstraintKinds
-         -- at the definition site (#9838)
-    failIfTcM (not under_syn && not (xopt LangExt.ConstraintKinds dflags)
-                            && hasTyVarHead pred)
-              (predIrredErr env pred)
 
 {- Note [ConstraintKinds in predicates]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1278,12 +1176,12 @@ check_class_pred env dflags ctxt pred cls tys
 
   | isIPClass cls
   = do { check_arity
-       ; checkTcM (okIPCtxt ctxt) (badIPPred env pred) }
+       ; checkTcM (okIPCtxt ctxt) (env, TcRnIllegalImplicitParam (tidyType env pred)) }
 
   | otherwise     -- Includes Coercible
   = do { check_arity
        ; checkSimplifiableClassConstraint env dflags ctxt cls tys
-       ; checkTcM arg_tys_ok (predTyVarErr env pred) }
+       ; checkTcM arg_tys_ok (env, TcRnNonTypeVarArgInConstraint (tidyType env pred)) }
   where
     check_arity = checkTc (tys `lengthIs` classArity cls)
                           (tyConArityErr (classTyCon cls) tys)
@@ -1428,58 +1326,6 @@ checkThetaCtxt ctxt theta env
            , vcat [ text "In the context:" <+> pprTheta (tidyTypes env theta)
                   , text "While checking" <+> pprUserTypeCtxt ctxt ] )
 
-eqPredTyErr, predTupleErr, predIrredErr,
-   badQuantHeadErr :: TidyEnv -> PredType -> (TidyEnv, TcRnMessage)
-badQuantHeadErr env pred
-  = ( env
-    , TcRnUnknownMessage $ mkPlainError noHints $
-      hang (text "Quantified predicate must have a class or type variable head:")
-         2 (ppr_tidy env pred) )
-eqPredTyErr  env pred
-  = ( env
-    , TcRnUnknownMessage $ mkPlainError noHints $
-      text "Illegal equational constraint" <+> ppr_tidy env pred $$
-      parens (text "Use GADTs or TypeFamilies to permit this") )
-predTupleErr env pred
-  = ( env
-    , TcRnUnknownMessage $ mkPlainError noHints $
-      hang (text "Illegal tuple constraint:" <+> ppr_tidy env pred)
-         2 (parens constraintKindsMsg) )
-predIrredErr env pred
-  = ( env
-    , TcRnUnknownMessage $ mkPlainError noHints $
-      hang (text "Illegal constraint:" <+> ppr_tidy env pred)
-         2 (parens constraintKindsMsg) )
-
-predTyVarErr :: TidyEnv -> PredType -> (TidyEnv, TcRnMessage)
-predTyVarErr env pred
-  = (env
-    , TcRnUnknownMessage $ mkPlainError noHints $
-      vcat [ hang (text "Non type-variable argument")
-                2 (text "in the constraint:" <+> ppr_tidy env pred)
-           , parens (text "Use FlexibleContexts to permit this") ])
-
-badIPPred :: TidyEnv -> PredType -> (TidyEnv, TcRnMessage)
-badIPPred env pred
-  = ( env
-    , TcRnUnknownMessage $ mkPlainError noHints $
-      text "Illegal implicit parameter" <+> quotes (ppr_tidy env pred) )
-
-constraintSynErr :: TidyEnv -> Type -> (TidyEnv, TcRnMessage)
-constraintSynErr env kind
-  = ( env
-    , TcRnUnknownMessage $ mkPlainError noHints $
-      hang (text "Illegal constraint synonym of kind:" <+> quotes (ppr_tidy env kind))
-         2 (parens constraintKindsMsg) )
-
-dupPredWarn :: TidyEnv -> [NE.NonEmpty PredType] -> (TidyEnv, SDoc)
-dupPredWarn env dups
-  = ( env
-    , text "Duplicate constraint" <> plural primaryDups <> text ":"
-      <+> pprWithCommas (ppr_tidy env) primaryDups )
-  where
-    primaryDups = map NE.head dups
-
 tyConArityErr :: TyCon -> [TcType] -> TcRnMessage
 -- For type-constructor arity errors, be careful to report
 -- the number of /visible/ arguments required and supplied,
@@ -1566,7 +1412,7 @@ check_special_inst_head dflags is_boot is_sig ctxt clas cls_args
   -- If not in an hs-boot file, abstract classes cannot have instances
   | isAbstractClass clas
   , not is_boot
-  = failWithTc abstract_class_msg
+  = failWithTc (TcRnAbstractClassInst clas)
 
   -- For Typeable, don't complain about instances for
   -- standalone deriving; they are no-ops, and we warn about
@@ -1603,7 +1449,7 @@ check_special_inst_head dflags is_boot is_sig ctxt clas cls_args
   = checkHasFieldInst clas cls_args
 
   | isCTupleClass clas
-  = failWithTc tuple_class_msg
+  = failWithTc (TcRnTupleConstraintInst clas)
 
   -- Check language restrictions on the args to the class
   | check_h98_arg_shape
@@ -1658,10 +1504,6 @@ check_special_inst_head dflags is_boot is_sig ctxt clas cls_args
     rejected_class_msg :: TcRnMessage
     rejected_class_msg = TcRnUnknownMessage $ mkPlainError noHints $ rejected_class_doc
 
-    tuple_class_msg    :: TcRnMessage
-    tuple_class_msg    = TcRnUnknownMessage $ mkPlainError noHints $
-      text "You can't specify an instance for a tuple constraint"
-
     rejected_class_doc :: SDoc
     rejected_class_doc =
       text "Class" <+> quotes (ppr clas_nm)
@@ -1670,11 +1512,6 @@ check_special_inst_head dflags is_boot is_sig ctxt clas cls_args
     gen_inst_err :: TcRnMessage
     gen_inst_err = TcRnUnknownMessage $ mkPlainError noHints $
       rejected_class_doc $$ nest 2 (text "(in Safe Haskell)")
-
-    abstract_class_msg :: TcRnMessage
-    abstract_class_msg = TcRnUnknownMessage $ mkPlainError noHints $
-      text "Cannot define instance for abstract class"
-                         <+> quotes (ppr clas_nm)
 
     mb_ty_args_msg
       | not (xopt LangExt.TypeSynonymInstances dflags)
@@ -1899,16 +1736,10 @@ synonyms, by matching on TyConApp directly.
 checkValidInstance :: UserTypeCtxt -> LHsSigType GhcRn -> Type -> TcM ()
 checkValidInstance ctxt hs_type ty
   | not is_tc_app
-  = failWithTc (TcRnUnknownMessage $ mkPlainError noHints $
-      hang (text "Instance head is not headed by a class:") 2 ( ppr tau))
+  = failWithTc (TcRnNoClassInstHead tau)
 
   | isNothing mb_cls
-  = failWithTc (TcRnUnknownMessage $ mkPlainError noHints $
-      vcat [ text "Illegal instance for a" <+> ppr (tyConFlavour tc)
-                     , text "A class instance must be for a class" ])
-
-  | not arity_ok
-  = failWithTc (TcRnUnknownMessage $ mkPlainError noHints $ text "Arity mis-match in instance head")
+  = failWithTc (TcRnIllegalClassInst (tyConFlavour tc))
 
   | otherwise
   = do  { setSrcSpanA head_loc $
@@ -1950,7 +1781,6 @@ checkValidInstance ctxt hs_type ty
     TyConApp tc inst_tys = tau   -- See Note [Instances and constraint synonyms]
     mb_cls               = tyConClass_maybe tc
     Just clas            = mb_cls
-    arity_ok             = inst_tys `lengthIs` classArity clas
 
         -- The location of the "head" of the instance
     head_loc = getLoc (getLHsInstDeclHead hs_type)
@@ -2042,9 +1872,8 @@ noMoreMsg tvs what inst_head
    occurs = if isSingleton tvs1 then text "occurs"
                                else text "occur"
 
-undecidableMsg, constraintKindsMsg :: SDoc
-undecidableMsg     = text "Use UndecidableInstances to permit this"
-constraintKindsMsg = text "Use ConstraintKinds to permit this"
+undecidableMsg :: SDoc
+undecidableMsg = text "Use UndecidableInstances to permit this"
 
 {- Note [Type families in instance contexts]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2169,9 +1998,7 @@ checkValidTyFamEqn fam_tc qvs typats rhs
            case drop (tyConArity fam_tc) typats of
              [] -> pure ()
              spec_arg:_ ->
-               addErr $ TcRnUnknownMessage $ mkPlainError noHints $
-                 text "Illegal oversaturated visible kind argument:"
-                    <+> quotes (char '@' <> pprParendType spec_arg)
+               addErr (TcRnOversaturatedVisibleKindArg spec_arg)
 
          -- The argument patterns, and RHS, are all boxed tau types
          -- E.g  Reject type family F (a :: k1) :: k2
@@ -2387,13 +2214,6 @@ nestedMsg what
   = sep [ text "Illegal nested" <+> what
         , parens undecidableMsg ]
 
-badATErr :: Name -> Name -> TcRnMessage
-badATErr clas op
-  = TcRnUnknownMessage $ mkPlainError noHints $
-    hsep [text "Class", quotes (ppr clas),
-          text "does not have an associated type", quotes (ppr op)]
-
-
 -------------------------
 checkConsistentFamInst :: AssocInstInfo
                        -> TyCon     -- ^ Family tycon
@@ -2418,7 +2238,7 @@ checkConsistentFamInst (InClsInst { ai_class = clas
        -- See [Mismatched class methods and associated type families]
        -- in TcInstDecls.
        ; checkTc (Just (classTyCon clas) == tyConAssoc_maybe fam_tc)
-                 (badATErr (className clas) (tyConName fam_tc))
+                 (TcRnBadAssociatedType (className clas) (tyConName fam_tc))
 
        ; check_match arg_triples
        }
@@ -3027,10 +2847,6 @@ isTerminatingClass cls
     || isEqPredClass cls
     || cls `hasKey` typeableClassKey
     || cls `hasKey` coercibleTyConKey
-
--- | Tidy before printing a type
-ppr_tidy :: TidyEnv -> Type -> SDoc
-ppr_tidy env ty = pprType (tidyType env ty)
 
 allDistinctTyVars :: TyVarSet -> [KindOrType] -> Bool
 -- (allDistinctTyVars tvs tys) returns True if tys are

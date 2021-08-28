@@ -1,5 +1,5 @@
 
 tcfail196.hs:5:8: error:
     • Illegal polymorphic type: forall a. a
-      Perhaps you intended to use ImpredicativeTypes
     • In the type signature: bar :: Num (forall a. a) => Int -> Int
+    Suggested fix: Perhaps you intended to use ImpredicativeTypes
