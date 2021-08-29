@@ -12,7 +12,7 @@ Technically in Haskell 2010 this is illegal: ::
 
 The ``import A hiding( g )`` in module ``B`` is technically an error
 (`Haskell Report,
-5.3.1 <http://www.haskell.org/onlinereport/haskell2010/haskellch5.html#x11-1020005.3.1>`__)
+5.3.1 <https://www.haskell.org/onlinereport/haskell2010/haskellch5.html#x11-1020005.3.1>`__)
 because ``A`` does not export ``g``. However GHC allows it, in the
 interests of supporting backward compatibility; for example, a newer
 version of ``A`` might export ``g``, and you want ``B`` to work in

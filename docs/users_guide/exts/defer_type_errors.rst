@@ -20,7 +20,7 @@ ignore the problems in ``a``.
 
 For more motivation and details please refer to the
 :ghc-wiki:`Wiki <defer-errors-to-runtime>` page or the `original
-paper <http://dreixel.net/research/pdf/epdtecp.pdf>`__.
+paper <https://dreixel.net/research/pdf/epdtecp.pdf>`__.
 
 Enabling deferring of type errors
 ---------------------------------

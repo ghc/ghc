@@ -303,7 +303,7 @@ has a number of other effects:
 GHC ensures that inlining cannot go on forever: every mutually-recursive
 group is cut by one or more *loop breakers* that is never inlined (see
 `Secrets of the GHC inliner, JFP 12(4) July
-2002 <http://research.microsoft.com/%7Esimonpj/Papers/inlining/index.htm>`__).
+2002 <https://research.microsoft.com/%7Esimonpj/Papers/inlining/index.htm>`__).
 GHC tries not to select a function with an ``INLINE`` pragma as a loop
 breaker, but when there is no choice even an INLINE function can be
 selected, in which case the ``INLINE`` pragma is ignored. For example, for a

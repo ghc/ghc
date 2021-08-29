@@ -11,6 +11,6 @@ Pattern guards
     :since: 6.8.1
 
 Disable `pattern guards
-<http://www.haskell.org/onlinereport/haskell2010/haskellch3.html#x8-460003.13>`__.
+<https://www.haskell.org/onlinereport/haskell2010/haskellch3.html#x8-460003.13>`__.
 
 

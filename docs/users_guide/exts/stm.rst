@@ -7,7 +7,7 @@ papers <https://wiki.haskell.org/Research_papers/Parallelism_and_concurrency#Loc
 are an excellent introduction to what STM is, and how to use it.
 
 The main library you need to use is the `stm
-library <http://hackage.haskell.org/package/stm>`__. The main features
+library <https://hackage.haskell.org/package/stm>`__. The main features
 supported are these:
 
 -  Atomic blocks.

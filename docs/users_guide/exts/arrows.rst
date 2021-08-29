@@ -18,29 +18,29 @@ more details, see
    a friendly introduction, motivated with programming examples.
 
 -  “\ `A New Notation for
-   Arrows <http://www.soi.city.ac.uk/~ross/papers/notation.html>`__\ ”,
+   Arrows <https://www.soi.city.ac.uk/~ross/papers/notation.html>`__\ ”,
    Ross Paterson, in ICFP, Sep 2001. Introduced the notation described
    here.
 
 -  “\ `Arrows and
-   Computation <http://www.soi.city.ac.uk/~ross/papers/fop.html>`__\ ”,
+   Computation <https://www.soi.city.ac.uk/~ross/papers/fop.html>`__\ ”,
    Ross Paterson, in The Fun of Programming, Palgrave, 2003.
 
 -  “\ `Programming with
-   Arrows <http://www.cse.chalmers.se/~rjmh/afp-arrows.pdf>`__\ ”, John
+   Arrows <https://www.cse.chalmers.se/~rjmh/afp-arrows.pdf>`__\ ”, John
    Hughes, in 5th International Summer School on Advanced Functional
    Programming, Lecture Notes in Computer Science vol. 3622, Springer,
    2004. This paper includes another introduction to the notation, with
    practical examples.
 
 -  “\ `Type and Translation Rules for Arrow Notation in
-   GHC <http://www.haskell.org/ghc/docs/papers/arrow-rules.pdf>`__\ ”,
+   GHC <https://www.haskell.org/ghc/docs/papers/arrow-rules.pdf>`__\ ”,
    Ross Paterson and Simon Peyton Jones, September 16, 2004. A terse
    enumeration of the formal rules used (extracted from comments in the
    source code).
 
 -  The arrows web page at
-   ``http://www.haskell.org/arrows/`` <http://www.haskell.org/arrows/>`__.
+   ``https://www.haskell.org/arrows/`` <https://www.haskell.org/arrows/>`__.
 
 With the :extension:`Arrows` extension, GHC supports the arrow notation described in
 the second of these papers, translating it using combinators from the
@@ -395,7 +395,7 @@ Portability
 
 Although only GHC implements arrow notation directly, there is also a
 preprocessor (available from the `arrows web
-page <http://www.haskell.org/arrows/>`__) that translates arrow notation
+page <https://www.haskell.org/arrows/>`__) that translates arrow notation
 into Haskell 98 for use with other Haskell systems. You would still want
 to check arrow programs with GHC; tracing type errors in the
 preprocessor output is not easy. Modules intended for both GHC and the

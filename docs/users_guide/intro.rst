@@ -5,7 +5,7 @@ Introduction
 
 This is a guide to using the Glasgow Haskell Compiler (GHC): an
 interactive and batch compilation system for the
-`Haskell 2010 <http://www.haskell.org/>`__ language.
+`Haskell 2010 <https://www.haskell.org/>`__ language.
 
 GHC has two main components: an interactive Haskell interpreter (also
 known as GHCi), described in :ref:`ghci`, and a batch compiler,
@@ -45,7 +45,7 @@ documentation.
 Obtaining GHC
 -------------
 
-Go to the `GHC home page <http://www.haskell.org/ghc/>`__ and follow the
+Go to the `GHC home page <https://www.haskell.org/ghc/>`__ and follow the
 "download" link to download GHC for your platform.
 
 Alternatively, if you want to build GHC yourself, head on over to the
@@ -64,7 +64,7 @@ Meta-information: Web sites, mailing lists, etc.
 
 On the World-Wide Web, there are several URLs of likely interest:
 
--  `GHC home page <http://www.haskell.org/ghc/>`__
+-  `GHC home page <https://www.haskell.org/ghc/>`__
 
 -  `GHC Developers Home <https://gitlab.haskell.org/ghc/ghc>`__ (developer
    documentation, wiki, and bug tracker)
@@ -75,12 +75,12 @@ as you feel is appropriate.
 ``glasgow-haskell-users``
     This list is for GHC users to chat among themselves. If you have a
     specific question about GHC, please check the
-    `FAQ <http://www.haskell.org/haskellwiki/GHC/FAQ>`__ first.
+    `FAQ <https://www.haskell.org/haskellwiki/GHC/FAQ>`__ first.
 
     Subscribers can post to the list by sending their message to 
     glasgow-haskell-users@haskell.org. Further information can be found
     on the
-    `Mailman page <http://www.haskell.org/mailman/listinfo/glasgow-haskell-users>`__.
+    `Mailman page <https://www.haskell.org/mailman/listinfo/glasgow-haskell-users>`__.
 
 ``ghc-devs``
     The GHC developers hang out here. If you are working with the GHC API
@@ -88,10 +88,10 @@ as you feel is appropriate.
 
     Subscribers can post to the list by sending their message to 
     ghc-devs@haskell.org. Further information can be found on the
-    `Mailman page <http://www.haskell.org/mailman/listinfo/ghc-devs>`__.
+    `Mailman page <https://www.haskell.org/mailman/listinfo/ghc-devs>`__.
 
 There are several other Haskell and GHC-related mailing lists served by
-``www.haskell.org``. Go to http://www.haskell.org/mailman/listinfo/
+``www.haskell.org``. Go to https://www.haskell.org/mailman/listinfo/
 for the full list.
 
 .. _bug-reporting:
@@ -136,7 +136,7 @@ numbering GHC versions:
 
     We may make snapshot releases of the current stable branch
     `available for
-    download <http://www.haskell.org/ghc/dist/latest/>`__, and the
+    download <https://www.haskell.org/ghc/dist/latest/>`__, and the
     latest sources are available from
     :ghc-wiki:`the git repositories <repositories>`.
 

@@ -39,7 +39,7 @@ mention it explicitly (for example, to give an instance declaration for
 it), you can import it from module ``Data.String``.
 
 Haskell's defaulting mechanism (`Haskell Report, Section
-4.3.4 <http://www.haskell.org/onlinereport/decls.html#sect4.3.4>`__) is
+4.3.4 <https://www.haskell.org/onlinereport/decls.html#sect4.3.4>`__) is
 extended to cover string literals, when :extension:`OverloadedStrings` is
 specified. Specifically:
 

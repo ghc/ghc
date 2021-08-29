@@ -24,6 +24,7 @@ linters = [
 for l in linters:
     # Need do document rules!
     l.add_path_filter(lambda path: path != Path('docs', 'coding-style.html'))
+    l.add_path_filter(lambda path: path != Path('docs', 'users_guide', 'utils.rst'))
     # Don't lint vendored code
     l.add_path_filter(lambda path: not path.name == 'config.guess')
     # Don't lint font files

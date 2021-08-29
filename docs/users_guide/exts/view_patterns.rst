@@ -103,7 +103,7 @@ follows:
    then the whole view pattern matches a ⟨T1⟩.
 
 -  Matching: To the equations in Section 3.17.3 of the `Haskell 98
-   Report <http://www.haskell.org/onlinereport/>`__, add the following: ::
+   Report <https://www.haskell.org/onlinereport/>`__, add the following: ::
 
        case v of { (e -> p) -> e1 ; _ -> e2 }
         =
@@ -120,7 +120,7 @@ follows:
    only applied once. Pattern compilation in GHC follows the matrix
    algorithm described in Chapter 4 of `The Implementation of Functional
    Programming
-   Languages <http://research.microsoft.com/~simonpj/Papers/slpj-book-1987/>`__.
+   Languages <https://research.microsoft.com/~simonpj/Papers/slpj-book-1987/>`__.
    When the top rows of the first column of a matrix are all view
    patterns with the "same" expression, these patterns are transformed
    into a single nested case. This includes, for example, adjacent view

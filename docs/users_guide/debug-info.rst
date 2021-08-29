@@ -334,7 +334,7 @@ Further Reading
 
 For more information about the debug information produced by GHC see
 Peter Wortmann's PhD thesis, `*Profiling Optimized Haskell: Causal
-Analysis and Implementation* <http://etheses.whiterose.ac.uk/8321/>`__.
+Analysis and Implementation* <https://etheses.whiterose.ac.uk/8321/>`__.
 
 
 Direct Mapping

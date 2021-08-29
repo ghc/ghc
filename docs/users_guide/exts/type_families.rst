@@ -46,7 +46,7 @@ The instances of data families can be data types and newtypes.
 Type families are enabled by the language extension :extension:`TypeFamilies`. Additional
 information on the use of type families in GHC is available on `the
 Haskell wiki page on type
-families <http://www.haskell.org/haskellwiki/GHC/Indexed_types>`__.
+families <https://www.haskell.org/haskellwiki/GHC/Indexed_types>`__.
 
 .. [AssocDataTypes2005]
     “`Associated Types with Class
@@ -941,7 +941,7 @@ Import and export
 -----------------
 
 The rules for export lists (Haskell Report `Section
-5.2 <http://www.haskell.org/onlinereport/modules.html#sect5.2>`__) need
+5.2 <https://www.haskell.org/onlinereport/modules.html#sect5.2>`__) need
 adjustment for type families:
 
 -  The form ``T(..)``, where ``T`` is a data family, names the family
@@ -1158,7 +1158,7 @@ extension.  This extension implies ``-XTypeFamilies``.
 
 For full details on injective type families refer to Haskell Symposium
 2015 paper `Injective type families for
-Haskell <http://ics.p.lodz.pl/~stolarek/_media/pl:research:stolarek_peyton-jones_eisenberg_injectivity_extended.pdf>`__.
+Haskell <https://ics.p.lodz.pl/~stolarek/_media/pl:research:stolarek_peyton-jones_eisenberg_injectivity_extended.pdf>`__.
 
 .. _injective-ty-fams-syntax:
 

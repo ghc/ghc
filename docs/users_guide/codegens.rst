@@ -34,7 +34,7 @@ LLVM Code Generator (``-fllvm``)
 .. index::
    single: LLVM code generator
 
-This is an alternative backend that uses the `LLVM <http://llvm.org>`__
+This is an alternative backend that uses the `LLVM <https://llvm.org>`__
 compiler to produce executable code. It generally produces code with
 performance as good as the native code generator but for some cases can
 produce much faster code. This is especially true for numeric, array
@@ -46,7 +46,7 @@ You must install and have LLVM available on your ``PATH`` for the LLVM code
 generator to work. Specifically GHC needs to be able to call the ``opt``
 and ``llc`` tools. Secondly, if you are running Mac OS X with LLVM 3.0
 or greater then you also need the `Clang C
-compiler <http://clang.llvm.org>`__ compiler available on your ``PATH``.
+compiler <https://clang.llvm.org>`__ compiler available on your ``PATH``.
 
 .. note::
 
@@ -60,12 +60,12 @@ To install LLVM and Clang:
 -  *Mac OS X*: Clang is included by default on recent OS X machines when
    Xcode is installed (from 10.6 and later). LLVM is not included.
    In order to use the LLVM based code generator, you should install the
-   `Homebrew <http://mxcl.github.com/homebrew/>`__ package manager for
+   `Homebrew <https://github.com/Homebrew/brew>`__ package manager for
    OS X. Alternatively you can download binaries for LLVM and Clang from
-   `here <http://llvm.org/releases/download.html>`__.
+   `here <https://llvm.org/releases/download.html>`__.
 
 -  *Windows*: You should download binaries for LLVM and clang from
-   `here <http://llvm.org/releases/download.html>`__.
+   `here <https://llvm.org/releases/download.html>`__.
 
 .. _c-code-gen:
 

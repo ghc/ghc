@@ -87,7 +87,7 @@ A *lexically scoped type variable* can be bound by:
 
 In Haskell, a programmer-written type signature is implicitly quantified
 over its free type variables (`Section
-4.1.2 <http://www.haskell.org/onlinereport/decls.html#sect4.1.2>`__ of
+4.1.2 <https://www.haskell.org/onlinereport/decls.html#sect4.1.2>`__ of
 the Haskell Report). Lexically scoped type variables affect this
 implicit quantification rules as follows: any type variable that is in
 scope is *not* universally quantified. For example, if type variable

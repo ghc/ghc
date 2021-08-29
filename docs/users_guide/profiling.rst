@@ -743,7 +743,7 @@ from GHC's ``nofib`` benchmark suite,
 .. image:: images/prof_scc.*
 
 You might also want to take a look at
-`hp2any <http://www.haskell.org/haskellwiki/Hp2any>`__, a more advanced
+`hp2any <https://www.haskell.org/haskellwiki/Hp2any>`__, a more advanced
 suite of tools (not distributed with GHC) for displaying heap profiles.
 
 .. _rts-options-heap-prof:
@@ -1315,7 +1315,7 @@ counts are also stored in shared memory, and continuously updating them
 on multiple cores is extremely slow.
 
 We also recommend using
-`ThreadScope <http://www.haskell.org/haskellwiki/ThreadScope>`__ for
+`ThreadScope <https://www.haskell.org/haskellwiki/ThreadScope>`__ for
 profiling parallel programs; it offers a GUI for visualising parallel
 execution, and is complementary to the time and space profiling features
 provided with GHC.
