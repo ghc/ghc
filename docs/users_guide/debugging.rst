@@ -151,6 +151,12 @@ These flags dump various information from GHC's typechecker and renamer.
     Make the pattern match exhaustiveness checker be *real* chatty about
     what it is up to.
 
+.. ghc-flag:: -ddump-cs-trace
+    :shortdesc: Trace constraint solver
+    :type: dynamic
+
+    Make the constraint solver be *real* chatty about what it is up to.
+
 .. ghc-flag:: -ddump-rn-stats
     :shortdesc: Renamer stats
     :type: dynamic

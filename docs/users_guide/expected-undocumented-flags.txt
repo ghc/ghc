@@ -24,7 +24,6 @@
 -dannot-lint
 -ddump-asm-conflicts
 -ddump-call-arity
--ddump-cs-trace
 -ddump-debug
 -ddump-exitify
 -ddump-simpl-trace
@@ -61,7 +60,6 @@
 -fghci-history
 -fghci-sandbox
 -fhistory-size
--fimplicit-import-qualified
 -fimplicit-params
 -fimplicit-prelude
 -firrefutable-tuples

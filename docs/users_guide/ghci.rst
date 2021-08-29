@@ -873,13 +873,18 @@ done with ordinary ``import`` declarations:
 Qualified names
 ^^^^^^^^^^^^^^^
 
+.. ghc-flag:: -fimplicit-import-qualified
+    :shortdesc: Put in scope qualified identifiers for every loaded module
+    :type: dynamic
+    :reverse: -fno-implicit-import-qualified
+    :category:
+
+    :default: on
+
 To make life slightly easier, the GHCi prompt also behaves as if there
 is an implicit ``import qualified`` declaration for every module in
 every package, and every module currently loaded into GHCi. This
 behaviour can be disabled with the ``-fno-implicit-import-qualified`` flag.
-
-.. index::
-   single: -fno-implicit-import-qualified
 
 ``:module`` and ``:load``
 ^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -904,50 +909,6 @@ if either (a) it is loaded, or (b) it is a module from a package that
 GHCi knows about. Using :ghci-cmd:`:module` or ``import`` to try bring into
 scope a non-loaded module may result in the message
 ``module M is not loaded``.
-
-The ``:main`` and ``:run`` commands
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-When a program is compiled and executed, it can use the ``getArgs``
-function to access the command-line arguments. However, we cannot simply
-pass the arguments to the ``main`` function while we are testing in
-ghci, as the ``main`` function doesn't take its directly.
-
-Instead, we can use the :ghci-cmd:`:main` command. This runs whatever ``main``
-is in scope, with any arguments being treated the same as command-line
-arguments, e.g.:
-
-.. code-block:: none
-
-    ghci> main = System.Environment.getArgs >>= print
-    ghci> :main foo bar
-    ["foo","bar"]
-
-We can also quote arguments which contains characters like spaces, and
-they are treated like Haskell strings, or we can just use Haskell list
-syntax:
-
-.. code-block:: none
-
-    ghci> :main foo "bar baz"
-    ["foo","bar baz"]
-    ghci> :main ["foo", "bar baz"]
-    ["foo","bar baz"]
-
-Finally, other functions can be called, either with the ``-main-is``
-flag or the :ghci-cmd:`:run` command:
-
-.. code-block:: none
-
-    ghci> foo = putStrLn "foo" >> System.Environment.getArgs >>= print
-    ghci> bar = putStrLn "bar" >> System.Environment.getArgs >>= print
-    ghci> :set -main-is foo
-    ghci> :main foo "bar baz"
-    foo
-    ["foo","bar baz"]
-    ghci> :run bar ["foo", "bar baz"]
-    bar
-    ["foo","bar baz"]
 
 The ``it`` variable
 ~~~~~~~~~~~~~~~~~~~
@@ -2650,7 +2611,7 @@ commonly used commands.
     Adding the optional "``!``" turns type errors into warnings while
     loading. This allows to use the portions of the module that are
     correct, even if there are type errors in some definitions.
-    Effectively, the "-fdefer-type-errors" flag is set before loading
+    Effectively, the :ghc-flag:`-fdefer-type-errors` flag is set before loading
     and unset after loading if the flag has not already been set before.
     See :ref:`defer-type-errors` for further motivation and details.
 
@@ -2681,10 +2642,9 @@ commonly used commands.
 .. ghci-cmd:: :main; ⟨arg1⟩ ... ⟨argn⟩
 
     When a program is compiled and executed, it can use the ``getArgs``
-    function to access the command-line arguments. However, we cannot
-    simply pass the arguments to the ``main`` function while we are
-    testing in ghci, as the ``main`` function doesn't take its arguments
-    directly.
+    IO action to access the command-line arguments. However, we cannot
+    simply pass the arguments to ``main`` while we are testing in ghci,
+    as ``main`` doesn't take its arguments directly.
 
     Instead, we can use the :ghci-cmd:`:main` command. This runs whatever
     ``main`` is in scope, with any arguments being treated the same as
@@ -2707,7 +2667,7 @@ commonly used commands.
         ghci> :main ["foo", "bar baz"]
         ["foo","bar baz"]
 
-    Finally, other functions can be called, either with the ``-main-is``
+    Finally, other IO actions can be called, either with the ``-main-is``
     flag or the :ghci-cmd:`:run` command:
 
     .. code-block:: none
@@ -2757,7 +2717,7 @@ commonly used commands.
     Adding the optional "``!``" turns type errors into warnings while
     loading. This allows to use the portions of the module that are
     correct, even if there are type errors in some definitions.
-    Effectively, the "-fdefer-type-errors" flag is set before loading
+    Effectively, the :ghc-flag:`-fdefer-type-errors` flag is set before loading
     and unset after loading if the flag has not already been set before.
     See :ref:`defer-type-errors` for further motivation and details.
 
@@ -2787,7 +2747,7 @@ commonly used commands.
        single: getArgs, behavior in GHCi
 
     Sets the list of arguments which are returned when the program calls
-    ``System.getArgs``.
+    ``System.Environment.getArgs``.
 
 .. ghci-cmd:: :set editor; ⟨cmd⟩
 
@@ -2810,7 +2770,7 @@ commonly used commands.
        single: getProgName, behavior in GHCi
 
     Sets the string to be returned when the program calls
-    ``System.getProgName``.
+    ``System.Environment.getProgName``.
 
 .. ghci-cmd:: :set prompt; ⟨prompt⟩
 

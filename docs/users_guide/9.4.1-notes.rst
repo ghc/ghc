@@ -42,17 +42,17 @@ Version 9.4.1
         raise# :: forall (a :: Type) {r :: RuntimeRep} (b :: TYPE r). a -> b
 
 - ``GHC.Exts.reallyUnsafePtrEquality#`` has been made more general, as it is now
-   both levity-polymorphic and heterogeneous: ::
+  both levity-polymorphic and heterogeneous: ::
 
         reallyUnsafePtrEquality#
           :: forall {l :: Levity} (a :: TYPE (BoxedRep l))
                     {k :: Levity} (b :: TYPE (BoxedRep k))
           . a -> b -> Int#
 
-   This means that ``GHC.Exts.reallyUnsafePtrEquality#`` can be used
-   on primitive arrays such as ``GHC.Exts.Array#`` and ``GHC.Exts.ByteArray#``.
-   It can also be used on values of different types, without needing to call
-   ``GHC.Exts.unsafeCoerce#``.
+  This means that ``GHC.Exts.reallyUnsafePtrEquality#`` can be used
+  on primitive arrays such as ``GHC.Exts.Array#`` and ``GHC.Exts.ByteArray#``.
+  It can also be used on values of different types, without needing to call
+  ``GHC.Exts.unsafeCoerce#``.
 
 - Added ``GHC.Exts.reallyUnsafePtrEquality`` which recovers the
   previous behaviour of ``GHC.Exts.reallyUnsafePtrEquality#``: ::
@@ -74,8 +74,8 @@ Version 9.4.1
   for computing the ``Type`` of an ``HsExpr GhcTc`` in a pure fashion.
   The ``hsLitType`` and ``hsPatType`` functions that previously lived in
   ``GHC.Tc.Utils.Zonk`` have been moved to this module.
-- A `Typeable` constraint has been added to `fromStaticPtr` in the
-  class `GHC.StaticPtr.IsStatic`. GHC automatically wraps each use of
-  the `static` keyword with `fromStaticPtr`. Because `static` requires
-  its argument to be an instance of `Typeable`, `fromStaticPtr` can
+- A ``Typeable`` constraint has been added to ``fromStaticPtr`` in the
+  class ``GHC.StaticPtr.IsStatic``. GHC automatically wraps each use of
+  the ``static`` keyword with ``fromStaticPtr``. Because ``static`` requires
+  its argument to be an instance of ``Typeable``, ``fromStaticPtr`` can
   safely carry this constraint as well.
