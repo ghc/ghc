@@ -172,35 +172,33 @@ primitive operations listed in ``primops.txt.pp`` return unboxed tuples.
 In particular, the ``IO`` and ``ST`` monads use unboxed tuples to avoid
 unnecessary allocation during sequences of operations.
 
-There are some restrictions on the use of unboxed tuples:
+The typical use of unboxed tuples is simply to return multiple
+values, binding those multiple results with a ``case`` expression,
+thus:
 
--  The typical use of unboxed tuples is simply to return multiple
-   values, binding those multiple results with a ``case`` expression,
-   thus:
+::
 
-   ::
+      f x y = (# x+1, y-1 #)
+      g x = case f x x of { (# a, b #) -> a + b }
 
-         f x y = (# x+1, y-1 #)
-         g x = case f x x of { (# a, b #) -> a + b }
+You can have an unboxed tuple in a pattern binding, thus
 
-   You can have an unboxed tuple in a pattern binding, thus
+::
 
-   ::
+      f x = let (# p,q #) = h x in ..body..
 
-         f x = let (# p,q #) = h x in ..body..
+If the types of ``p`` and ``q`` are not unboxed, the resulting
+binding is lazy like any other Haskell pattern binding. The above
+example desugars like this:
 
-   If the types of ``p`` and ``q`` are not unboxed, the resulting
-   binding is lazy like any other Haskell pattern binding. The above
-   example desugars like this:
+::
 
-   ::
+      f x = let t = case h x of { (# p,q #) -> (p,q) }
+                p = fst t
+                q = snd t
+            in ..body..
 
-         f x = let t = case h x of { (# p,q #) -> (p,q) }
-                   p = fst t
-                   q = snd t
-               in ..body..
-
-   Indeed, the bindings can even be recursive.
+Indeed, the bindings can even be recursive.
 
 .. _unboxed-sums:
 

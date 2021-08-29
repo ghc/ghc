@@ -390,8 +390,8 @@ defFullHelpText =
   "   :set local-config { source | ignore }\n" ++
   "                               set whether to source .ghci in current dir\n" ++
   "                               (loading untrusted config is a security issue)\n" ++
-  "   :set args <arg> ...         set the arguments returned by System.getArgs\n" ++
-  "   :set prog <progname>        set the value returned by System.getProgName\n" ++
+  "   :set args <arg> ...         set the arguments returned by System.Environment.getArgs\n" ++
+  "   :set prog <progname>        set the value returned by System.Environment.getProgName\n" ++
   "   :set prompt <prompt>        set the prompt used in GHCi\n" ++
   "   :set prompt-cont <prompt>   set the continuation prompt used in GHCi\n" ++
   "   :set prompt-function <expr> set the function to handle the prompt\n" ++

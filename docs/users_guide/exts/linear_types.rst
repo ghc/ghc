@@ -152,6 +152,7 @@ missing pieces.
 
 - Multiplicity polymorphism is incomplete and experimental. You may
   have success using it, or you may not. Expect it to be really unreliable.
+  (Multiplicity multiplication is not supported yet.)
 - There is currently no support for multiplicity annotations such as
   ``x :: a %p``, ``\(x :: a %p) -> ...``.
 - A ``case`` expression may consume its scrutinee ``One`` time,

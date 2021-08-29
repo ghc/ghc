@@ -8,7 +8,7 @@ Impredicative polymorphism
         Implies :extension:`RankNTypes`.
 
     :implies: :extension:`RankNTypes`
-    :since: 6.10.1
+    :since: 9.2.1 (unreliable in 6.10 - 9.0)
 
     Allow impredicative polymorphic types.
 
@@ -34,13 +34,13 @@ inference algorithm.  It is described in the paper
 
 Switching on :extension:`ImpredicativeTypes`
 
-- Switches on :extension: `RankNTypes`
+- Switches on :extension:`RankNTypes`
 
 - Allows user-written types to have foralls under type constructors, not just under arrows.
   For example ``f :: Maybe (forall a. [a] -> [a])`` is a legal type signature.
 
 - Allows polymorphic types in Visible Type Application
-  (when :extension: `TypeApplications` is enabled).  For example, you
+  (when :extension:`TypeApplications` is enabled).  For example, you
   can write ``reverse @(forall b. b->b) xs``.  Using VTA with a
   polymorphic type argument is useful in cases when Quick Look cannot
   infer the correct instantiation.
@@ -54,3 +54,6 @@ For many years GHC has a special case for the function ``($)``, that allows it
 to typecheck an application like ``runST $ (do { ... })``, even though that
 instantiation may be impredicative.  This special case remains: even without
 :extension:`ImpredicativeTypes` GHC switches on Quick Look for applications of ``($)``.
+
+This flag was available in earlier versions of GHC (6.10.1 - 9.0),
+but the behavior was unpredictable and not officially supported.
