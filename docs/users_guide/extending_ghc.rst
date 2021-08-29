@@ -163,7 +163,7 @@ Compiling it results in:
 
 For more information on using the API, as well as more samples and
 references, please see `this Haskell.org wiki
-page <http://haskell.org/haskellwiki/GHC/As_a_library>`__.
+page <https://haskell.org/haskellwiki/GHC/As_a_library>`__.
 
 .. _compiler-plugins:
 
@@ -172,7 +172,7 @@ Compiler Plugins
 
 GHC has the ability to load compiler plugins at compile time. The
 feature is similar to the one provided by
-`GCC <http://gcc.gnu.org/wiki/plugins>`__, and allows users to write
+`GCC <https://gcc.gnu.org/wiki/plugins>`__, and allows users to write
 plugins that can adjust the behaviour of the constraint solver, inspect
 and modify the compilation pipeline, as well as transform and inspect
 GHC's intermediate language, Core. Plugins are suitable for experimental

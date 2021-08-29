@@ -3273,7 +3273,7 @@ running GHCi session while debugging it
 With this macro defined in your ``.ghci`` file, you can use
 ``:source file`` to read GHCi commands from ``file``. You can find (and
 contribute!-) other suggestions for ``.ghci`` files on this Haskell wiki
-page: `GHC/GHCi <http://haskell.org/haskellwiki/GHC/GHCi>`__
+page: `GHC/GHCi <https://haskell.org/haskellwiki/GHC/GHCi>`__
 
 Additionally, any files specified with :ghc-flag:`-ghci-script` flags will be
 read after the standard files, allowing the use of custom .ghci files.

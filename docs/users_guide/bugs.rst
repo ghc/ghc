@@ -232,12 +232,12 @@ The Haskell Report specifies that a group of bindings (at top level, or
 in a ``let`` or ``where``) should be sorted into strongly-connected
 components, and then type-checked in dependency order
 (`Haskell Report, Section
-4.5.1 <http://www.haskell.org/onlinereport/decls.html#sect4.5.1>`__). As
+4.5.1 <https://www.haskell.org/onlinereport/decls.html#sect4.5.1>`__). As
 each group is type-checked, any binders of the group that have an
 explicit type signature are put in the type environment with the
 specified polymorphic type, and all others are monomorphic until the
 group is generalised (`Haskell Report, Section
-4.5.2 <http://www.haskell.org/onlinereport/decls.html#sect4.5.2>`__).
+4.5.2 <https://www.haskell.org/onlinereport/decls.html#sect4.5.2>`__).
 
 Following a suggestion of Mark Jones, in his paper `Typing Haskell in
 Haskell <https://web.cecs.pdx.edu/~mpj/thih/>`__, GHC implements a
@@ -327,7 +327,7 @@ GHC requires the use of ``hs-boot`` files to cut the recursive loops
 among mutually recursive modules as described in
 :ref:`mutual-recursion`. This more of an infelicity than a bug: the
 Haskell Report says (`Section
-5.7 <http://haskell.org/onlinereport/modules.html#sect5.7>`__)
+5.7 <https://haskell.org/onlinereport/modules.html#sect5.7>`__)
 
     "Depending on the Haskell implementation used, separate compilation of
     mutually recursive modules may require that imported modules contain
@@ -629,7 +629,7 @@ Bugs in GHC
    contrived one, that makes GHC diverge, and fixing the problem would
    impose an extra overhead on every compilation. So the bug remains
    un-fixed. There is more background in `Secrets of the GHC
-   inliner <http://research.microsoft.com/~simonpj/Papers/inlining/>`__.
+   inliner <https://research.microsoft.com/~simonpj/Papers/inlining/>`__.
 
 -  On 32-bit x86 platforms when using the native code generator, the
    :ghc-flag:`-fexcess-precision` option is always on.

@@ -10,7 +10,7 @@ A package is a library of Haskell modules known to the compiler. GHC
 comes with several packages: see the accompanying `library
 documentation <../libraries/index.html>`__. More packages to install can
 be obtained from
-`HackageDB <http://hackage.haskell.org/packages/hackage.html>`__.
+`HackageDB <https://hackage.haskell.org/>`__.
 
 Using a package couldn't be simpler: if you're using ``--make`` or GHCi,
 then most of the installed packages will be automatically available to
@@ -18,11 +18,11 @@ your program without any further options. The exceptions to this rule
 are covered below in :ref:`using-packages`.
 
 Building your own packages is also quite straightforward: we provide the
-`Cabal <http://www.haskell.org/cabal/>`__ infrastructure which automates
+`Cabal <https://www.haskell.org/cabal/>`__ infrastructure which automates
 the process of configuring, building, installing and distributing a
 package. All you need to do is write a simple configuration file, put a
 few files in the right places, and you have a package. See the `Cabal
-documentation <http://www.haskell.org/cabal/users-guide/>`__ for
+documentation <https://www.haskell.org/cabal/users-guide/>`__ for
 details, and also the Cabal libraries
 (:cabal-ref:`Distribution.Simple.`, for example).
 
@@ -713,7 +713,7 @@ about the nature of the failure:
 To fix the problem, you need to recompile the broken packages against
 the new dependencies. The easiest way to do this is to use
 ``cabal-install``, or download the packages from
-`HackageDB <http://hackage.haskell.org/packages/hackage.html>`__ and
+`HackageDB <https://hackage.haskell.org/>`__ and
 build and install them as normal.
 
 Be careful not to recompile any packages that GHC itself depends on, as
@@ -853,7 +853,7 @@ instead of just package name and version, pass the ``--ipid`` flag.
 
 ``ghc-pkg dot``
     Generate a graph of the package dependencies in a form suitable for
-    input for the `graphviz <http://www.graphviz.org/>`__ tools. For
+    input for the `graphviz <https://www.graphviz.org/>`__ tools. For
     example, to generate a PDF of the dependency graph:
 
     ::
@@ -990,7 +990,7 @@ Building a package from Haskell source
    single: packages; building
 
 We don't recommend building packages the hard way. Instead, use the
-`Cabal <http://www.haskell.org/cabal/users-guide/>`__ infrastructure if
+`Cabal <https://www.haskell.org/cabal/users-guide/>`__ infrastructure if
 possible. If your package is particularly complicated or requires a lot
 of configuration, then you might have to fall back to the low-level
 mechanisms, so a few hints for those brave souls follow.
@@ -1438,7 +1438,7 @@ The allowed fields, with their types, are:
        single: haddock-interfaces; package specification
 
     (string list) A list of filenames containing
-    `Haddock <http://www.haskell.org/haddock/>`__ interface files
+    `Haddock <https://www.haskell.org/haddock/>`__ interface files
     (``.haddock`` files) for this package.
 
 ``haddock-html``

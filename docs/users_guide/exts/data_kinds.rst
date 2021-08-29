@@ -13,7 +13,7 @@ Datatype promotion
 This section describes *data type promotion*, an extension to the kind
 system that complements kind polymorphism. It is enabled by
 :extension:`DataKinds`, and described in more detail in the paper `Giving
-Haskell a Promotion <http://dreixel.net/research/pdf/ghp.pdf>`__, which
+Haskell a Promotion <https://dreixel.net/research/pdf/ghp.pdf>`__, which
 appeared at TLDI 2012.
 
 Motivation

@@ -24,7 +24,7 @@ Andy Gill and Simon Marlow have written a parser-generator for Haskell,
 called ``happy``. ``Happy`` is to Haskell what ``Yacc`` is to C.
 
 You can get ``happy`` from `the Happy
-Homepage <http://www.haskell.org/happy/>`__.
+Homepage <https://www.haskell.org/happy/>`__.
 
 ``Happy`` is at its shining best when compiled by GHC.
 

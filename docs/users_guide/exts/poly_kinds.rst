@@ -77,7 +77,7 @@ run to completion, their results indeed have the types assigned. It makes no
 claim about programs that do not finish in a finite amount of time.
 
 To learn more about this decision and the design of GHC under the hood
-please see the `paper <http://www.seas.upenn.edu/~sweirich/papers/fckinds.pdf>`__
+please see the `paper <https://www.seas.upenn.edu/~sweirich/papers/fckinds.pdf>`__
 introducing this kind system to GHC/Haskell.
 
 Principles of kind inference

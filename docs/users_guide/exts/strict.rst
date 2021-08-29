@@ -351,7 +351,7 @@ Dynamic semantics of bang patterns
 ----------------------------------
 
 The semantics of Haskell pattern matching is described in `Section
-3.17.2 <http://www.haskell.org/onlinereport/exps.html#sect3.17.2>`__ of
+3.17.2 <https://www.haskell.org/onlinereport/exps.html#sect3.17.2>`__ of
 the Haskell Report. To this description add one extra item 10, saying:
 
 -  Matching the pattern ``!pat`` against a value ``v`` behaves as
@@ -362,14 +362,14 @@ the Haskell Report. To this description add one extra item 10, saying:
    -  otherwise, ``pat`` is matched against ``v``
 
 Similarly, in Figure 4 of `Section
-3.17.3 <http://www.haskell.org/onlinereport/exps.html#sect3.17.3>`__,
+3.17.3 <https://www.haskell.org/onlinereport/exps.html#sect3.17.3>`__,
 add a new case (t): ::
 
     case v of { !pat -> e; _ -> e' }
        = v `seq` case v of { pat -> e; _ -> e' }
 
 That leaves let expressions, whose translation is given in `Section
-3.12 <http://www.haskell.org/onlinereport/exps.html#sect3.12>`__ of the
+3.12 <https://www.haskell.org/onlinereport/exps.html#sect3.12>`__ of the
 Haskell Report.
 Replace the "Translation" there with the following one.  Given
 ``let { bind1 ... bindn } in body``:

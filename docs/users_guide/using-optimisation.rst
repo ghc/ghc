@@ -448,7 +448,7 @@ by saying ``-fno-wombat``.
 
     Float let-bindings inwards, nearer their binding
     site. See `Let-floating: moving bindings to give faster programs
-    (ICFP'96) <http://research.microsoft.com/en-us/um/people/simonpj/papers/float.ps.gz>`__.
+    (ICFP'96) <https://research.microsoft.com/en-us/um/people/simonpj/papers/float.ps.gz>`__.
 
     This optimisation moves let bindings closer to their use site. The
     benefit here is that this may avoid unnecessary allocation if the
@@ -476,7 +476,7 @@ by saying ``-fno-wombat``.
     let-floating), which floats let-bindings outside enclosing lambdas,
     in the hope they will be thereby be computed less often. See
     `Let-floating: moving bindings to give faster programs
-    (ICFP'96) <http://research.microsoft.com/en-us/um/people/simonpj/papers/float.ps.gz>`__.
+    (ICFP'96) <https://research.microsoft.com/en-us/um/people/simonpj/papers/float.ps.gz>`__.
     Full laziness increases sharing, which can lead to increased memory
     residency.
 

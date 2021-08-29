@@ -1204,7 +1204,7 @@ When the program is linked with the :ghc-flag:`-eventlog` option
 
 -  In binary format to a file for later analysis by a variety of tools.
    One such tool is
-   `ThreadScope <http://www.haskell.org/haskellwiki/ThreadScope>`__,
+   `ThreadScope <https://www.haskell.org/haskellwiki/ThreadScope>`__,
    which interprets the event log to produce a visual parallel execution
    profile of the program.
 
@@ -1266,10 +1266,10 @@ When the program is linked with the :ghc-flag:`-eventlog` option
 
     The format of the log file is described in this users guide in
     :ref:`eventlog-encodings` It can be parsed in Haskell using the
-    `ghc-events <http://hackage.haskell.org/package/ghc-events>`__
+    `ghc-events <https://hackage.haskell.org/package/ghc-events>`__
     library. To dump the contents of a ``.eventlog`` file as text, use
     the tool ``ghc-events show`` that comes with the
-    `ghc-events <http://hackage.haskell.org/package/ghc-events>`__
+    `ghc-events <https://hackage.haskell.org/package/ghc-events>`__
     package.
 
     Each event is associated with a timestamp which is the number of

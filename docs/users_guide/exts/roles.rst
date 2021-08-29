@@ -40,7 +40,7 @@ variables of datatypes, classes, and type synonyms.
 
 Roles as implemented in GHC are a from a simplified version of the work
 described in `Generative type abstraction and type-level
-computation <http://www.seas.upenn.edu/~sweirich/papers/popl163af-weirich.pdf>`__,
+computation <https://www.seas.upenn.edu/~sweirich/papers/popl163af-weirich.pdf>`__,
 published at POPL 2011.
 
 .. _nominal-representational-and-phantom:

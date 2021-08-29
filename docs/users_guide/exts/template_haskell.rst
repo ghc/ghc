@@ -6,10 +6,10 @@ Template Haskell
 Template Haskell allows you to do compile-time meta-programming in
 Haskell. The background to the main technical innovations is discussed
 in "`Template Meta-programming for
-Haskell <http://research.microsoft.com/~simonpj/papers/meta-haskell/>`__"
+Haskell <https://research.microsoft.com/~simonpj/papers/meta-haskell/>`__"
 (Proc Haskell Workshop 2002).
 
-The `Template Haskell <http://www.haskell.org/haskellwiki/Template_Haskell>`__
+The `Template Haskell <https://www.haskell.org/haskellwiki/Template_Haskell>`__
 page on the GHC Wiki has a wealth of information. You may also consult the
 Haddock reference documentation :th-ref:`Language.Haskell.TH.`.
 Many changes to the original
@@ -22,7 +22,7 @@ as a worked example to help get you started.
 
 The documentation here describes the realisation of Template Haskell in
 GHC. It is not detailed enough to understand Template Haskell; see the
-`Wiki page <http://haskell.org/haskellwiki/Template_Haskell>`__.
+`Wiki page <https://haskell.org/haskellwiki/Template_Haskell>`__.
 
 .. _th-syntax:
 
@@ -627,7 +627,7 @@ Quasi-quotation allows patterns and expressions to be written using
 programmer-defined concrete syntax; the motivation behind the extension
 and several examples are documented in "`Why It's Nice to be Quoted:
 Quasiquoting for
-Haskell <http://www.cs.tufts.edu/comp/150FP/archive/geoff-mainland/quasiquoting.pdf>`__"
+Haskell <https://www.cs.tufts.edu/comp/150FP/archive/geoff-mainland/quasiquoting.pdf>`__"
 (Proc Haskell Workshop 2007). The example below shows how to write a
 quasiquoter for a simple expression language.
 

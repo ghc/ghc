@@ -855,7 +855,7 @@ GHC 8.2 supports module signatures (``hsig`` files), which allow you to
 write a signature in place of a module implementation, deferring the
 choice of implementation until a later point in time.  This feature is
 not intended to be used without `Cabal
-<http://www.haskell.org/cabal/>`__; this manual entry will focus
+<https://www.haskell.org/cabal/>`__; this manual entry will focus
 on the syntax and semantics of signatures.
 
 To start with an example, suppose you had a module ``A`` which made use of some

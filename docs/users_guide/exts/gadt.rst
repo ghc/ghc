@@ -44,7 +44,7 @@ the type ``a`` is refined to ``Int``. That's the whole point! A precise
 specification of the type rules is beyond what this user manual aspires
 to, but the design closely follows that described in the paper `Simple
 unification-based type inference for
-GADTs <http://research.microsoft.com/%7Esimonpj/papers/gadt/>`__, (ICFP
+GADTs <https://research.microsoft.com/%7Esimonpj/papers/gadt/>`__, (ICFP
 2006). The general principle is this: *type refinement is only carried
 out based on user-supplied type annotations*. So if no type signature is
 supplied for ``eval``, no type refinement happens, and lots of obscure
@@ -61,9 +61,9 @@ expression. Hence the addition ``i+j`` is legal.
 
 These and many other examples are given in papers by Hongwei Xi, and Tim
 Sheard. There is a longer introduction `on the
-wiki <http://www.haskell.org/haskellwiki/GADT>`__, and Ralf Hinze's `Fun
+wiki <https://www.haskell.org/haskellwiki/GADT>`__, and Ralf Hinze's `Fun
 with phantom
-types <http://www.cs.ox.ac.uk/ralf.hinze/publications/With.pdf>`__ also
+types <https://www.cs.ox.ac.uk/ralf.hinze/publications/With.pdf>`__ also
 has a number of examples. Note that papers may use different notation to
 that implemented in GHC.
 
@@ -135,7 +135,7 @@ also sets :extension:`GADTSyntax` and :extension:`MonoLocalBinds`.
    binding site. The easiest way to ensure that a variable a rigid type
    is to give it a type signature. For more precise details see `Simple
    unification-based type inference for
-   GADTs <http://research.microsoft.com/%7Esimonpj/papers/gadt/>`__. The
+   GADTs <https://research.microsoft.com/%7Esimonpj/papers/gadt/>`__. The
    criteria implemented by GHC are given in the Appendix.
 
 -  When GHC typechecks multiple patterns in a function clause, it typechecks

@@ -24,7 +24,7 @@ With this extension turned on, ``static`` is no longer a valid
 identifier.
 
 Static pointers were first proposed in the paper `Towards Haskell in the
-cloud <http://research.microsoft.com/en-us/um/people/simonpj/papers/parallel/remote.pdf>`__,
+cloud <https://research.microsoft.com/en-us/um/people/simonpj/papers/parallel/remote.pdf>`__,
 Jeff Epstein, Andrew P. Black and Simon Peyton-Jones, Proceedings of the
 4th ACM Symposium on Haskell, pp. 118-129, ACM, 2011.
 
