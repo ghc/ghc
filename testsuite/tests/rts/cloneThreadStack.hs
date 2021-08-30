@@ -7,11 +7,16 @@ import GHC.Conc.Sync (ThreadId(..))
 import GHC.Stack.CloneStack
 import Control.Concurrent
 import GHC.Conc
+import System.Mem
 
 foreign import ccall "expectStacksToBeEqual" expectStacksToBeEqual:: StackSnapshot# -> ThreadId# -> IO ()
 
 foreign import ccall "expectStackToBeNotDirty" expectStackToBeNotDirty:: StackSnapshot# -> IO ()
 
+-- | Clone the stack of another thread and check it's snapshot for being equal
+-- with the live stack.
+-- In the meanwhile enforce a garbage collection to ensure that the stack
+-- snapshot is still valid afterwards (is not gc'ed while in use).
 main :: IO ()
 main = do
     mVarToBeBlockedOn <- newEmptyMVar
@@ -20,6 +25,8 @@ main = do
     waitUntilBlocked threadId
 
     stackSnapshot <- cloneThreadStack threadId
+
+    performMajorGC
 
     let (StackSnapshot stack) = stackSnapshot
     let (ThreadId tid#) = threadId

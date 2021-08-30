@@ -17,9 +17,19 @@ foreign import ccall "expectSixtyFourOnesInRetBigFrame" expectSixtyFourOnesInRet
 cloneStack_returnInt :: IORef (Maybe StackSnapshot) -> Int
 cloneStack_returnInt ioRef = unsafePerformIO $ do
   stackSnapshot <- cloneMyStack
+
+  performMajorGC
+
   writeIORef ioRef (Just stackSnapshot)
+
+  performMajorGC
+
   return 42
 
+-- | Clone a stack with a RET_BIG closure and check it in snapshot.
+-- In the meanwhile enforce several garbage collections in different places to
+-- ensure that the stack snapshot is still valid afterwards (is not gc'ed while
+-- in use).
 main :: IO ()
 main = do
   stackRef <- newIORef Nothing
@@ -28,7 +38,6 @@ main = do
 
   Just (StackSnapshot stackSnapshot) <- readIORef stackRef
 
-  -- Ensure no old data is found.
   performMajorGC
 
   expectSixtyFourOnesInRetBigFrame stackSnapshot

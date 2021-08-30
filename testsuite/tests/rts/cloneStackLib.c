@@ -50,7 +50,7 @@ void expectClosureTypes(StgStack *stack, unsigned int types[], size_t typesSize)
         }
 
         if(info->type != types[i]) {
-            barf("Wrong closure type on stack! Expected %u but got %u in position %i", types[i], info->type, i);
+            barf("Wrong closure type on stack! Expected %u but got %u in position %lu", types[i], info->type, i);
         }
     }
 }
@@ -73,7 +73,7 @@ static int countOnes(StgPtr spBottom, StgPtr payload,
 
         switch (info->type) {
         case CONSTR_0_1: {
-          StgConInfoTable *con_info = get_con_itbl(closure);
+          const StgConInfoTable *con_info = get_con_itbl(closure);
           if (strcmp(GET_CON_DESC(con_info), "ghc-prim:GHC.Types.I#") == 0 &&
               closure->payload[0] == 1) {
             ones++;
