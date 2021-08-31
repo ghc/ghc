@@ -97,6 +97,10 @@ void initTracing (void)
     initEventLogging();
 
     if (RtsFlags.TraceFlags.tracing == TRACE_EVENTLOG
+            && RtsFlags.TraceFlags.nullWriter) {
+        startEventLogging(&NullEventLogWriter);
+    }
+    else if (RtsFlags.TraceFlags.tracing == TRACE_EVENTLOG
             && rtsConfig.eventlog_writer != NULL) {
         startEventLogging(rtsConfig.eventlog_writer);
     }

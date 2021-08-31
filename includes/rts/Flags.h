@@ -181,6 +181,7 @@ typedef struct _TRACE_FLAGS {
     Time eventlogFlushTime;  /* Time between force eventlog flushes (or 0 if disabled) */
     int eventlogFlushTicks;
     char *trace_output;  /* output filename for eventlog */
+    bool nullWriter; /* use null writer instead of file writer */
 } TRACE_FLAGS;
 
 /* See Note [Synchronization of flags and base APIs] */

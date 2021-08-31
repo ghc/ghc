@@ -131,6 +131,12 @@ EventlogOutput2:
 	./EventlogOutput +RTS -l
 	ls EventlogOutput.eventlog >/dev/null
 
+.PHONY: EventlogOutputNull
+EventlogOutputNull:
+	"$(TEST_HC)" -eventlog -rtsopts -v0 EventlogOutput.hs
+	./EventlogOutput +RTS -l --null-eventlog-writer
+	test ! -e EventlogOutput.eventlog
+
 .PHONY: T20199
 T20199:
 	"$(TEST_HC)" -no-hs-main -optcxx-std=c++11 -v0 T20199.cpp -o T20199

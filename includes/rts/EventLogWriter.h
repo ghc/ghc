@@ -43,6 +43,11 @@ typedef struct {
  */
 extern const EventLogWriter FileEventLogWriter;
 
+/*
+ * An EventLogWriter which does nothing.
+ */
+extern const EventLogWriter NullEventLogWriter;
+
 enum EventLogStatus {
   /* The runtime system wasn't compiled with eventlog support. */
   EVENTLOG_NOT_SUPPORTED,
