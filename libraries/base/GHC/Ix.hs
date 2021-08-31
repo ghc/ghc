@@ -26,6 +26,7 @@ import GHC.Num
 import GHC.Base
 import GHC.Real( fromIntegral )
 import GHC.Show
+import GHC.Tuple (Solo (..))
 
 -- | The 'Ix' class is used to map a contiguous subrange of values in
 -- a type onto integers.  It is used primarily for array indexing
@@ -265,6 +266,23 @@ instance Ix () where
 
     {-# INLINE index #-}  -- See Note [Inlining index]
     index b i = unsafeIndex b i
+
+instance Ix a => Ix (Solo a) where -- as derived
+    {-# SPECIALISE instance Ix (Solo Int) #-}
+
+    {-# INLINE range #-}
+    range (Solo l, Solo u) =
+      [ Solo i | i <- range (l,u) ]
+
+    {-# INLINE unsafeIndex #-}
+    unsafeIndex (Solo l, Solo u) (Solo i) =
+      unsafeIndex (l,u) i
+
+    {-# INLINE inRange #-}
+    inRange (Solo l, Solo u) (Solo i) =
+      inRange (l, u) i
+
+    -- Default method for index
 
 ----------------------------------------------------------------------
 -- | @since 2.01

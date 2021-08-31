@@ -36,6 +36,7 @@ import GHC.Char
 import GHC.Num.Integer
 import GHC.Num
 import GHC.Show
+import GHC.Tuple (Solo (..))
 default ()              -- Double isn't available yet
 
 -- | The 'Bounded' class is used to name the upper and lower limits of a
@@ -234,6 +235,22 @@ instance Enum () where
     enumFromTo () ()    = [()]
     enumFromThenTo () () () = let many = ():many in many
 
+instance Enum a => Enum (Solo a) where
+    succ (Solo a) = Solo (succ a)
+    pred (Solo a) = Solo (pred a)
+
+    toEnum x = Solo (toEnum x)
+
+    fromEnum (Solo x) = fromEnum x
+    enumFrom (Solo x) = [Solo a | a <- enumFrom x]
+    enumFromThen (Solo x) (Solo y) =
+      [Solo a | a <- enumFromThen x y]
+    enumFromTo (Solo x) (Solo y) =
+      [Solo a | a <- enumFromTo x y]
+    enumFromThenTo (Solo x) (Solo y) (Solo z) =
+      [Solo a | a <- enumFromThenTo x y z]
+
+deriving instance Bounded a => Bounded (Solo a)
 -- Report requires instances up to 15
 -- | @since 2.01
 deriving instance (Bounded a, Bounded b)

@@ -146,6 +146,7 @@ class  Eq a  where
     {-# MINIMAL (==) | (/=) #-}
 
 deriving instance Eq ()
+deriving instance Eq a => Eq (Solo a)
 deriving instance (Eq  a, Eq  b) => Eq  (a, b)
 deriving instance (Eq  a, Eq  b, Eq  c) => Eq  (a, b, c)
 deriving instance (Eq  a, Eq  b, Eq  c, Eq  d) => Eq  (a, b, c, d)
@@ -356,6 +357,7 @@ class  (Eq a) => Ord a  where
     {-# MINIMAL compare | (<=) #-}
 
 deriving instance Ord ()
+deriving instance Ord a => Ord (Solo a)
 deriving instance (Ord a, Ord b) => Ord (a, b)
 deriving instance (Ord a, Ord b, Ord c) => Ord (a, b, c)
 deriving instance (Ord a, Ord b, Ord c, Ord d) => Ord (a, b, c, d)
