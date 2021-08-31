@@ -170,6 +170,11 @@ test('EventlogOutput2',
        omit_ways(['dyn', 'ghci'] + prof_ways) ],
      makefile_test, ['EventlogOutput2'])
 
+test('EventlogOutputNull',
+     [ extra_files(["EventlogOutput.hs"]),
+       omit_ways(['dyn', 'ghci'] + prof_ways) ],
+     makefile_test, ['EventlogOutputNull'])
+
 # Test that Info Table Provenance (IPE) events are emitted.
 test('EventlogOutput_IPE',
      [ extra_files(["EventlogOutput.hs"]),

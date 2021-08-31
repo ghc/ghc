@@ -900,6 +900,14 @@ There are three more options which relate to heap profiling:
     option is enabled, it's expected that the user will manually start heap
     profiling or request specific samples using functions from ``GHC.Profiling``.
 
+
+.. rts-flag:: --null-eventlog-writer
+
+    :since: 9.2.2
+
+    Don't output eventlog to file, only configure tracing events.
+    Meant to be used with customized event log writer.
+
 .. rts-flag:: -L ⟨num⟩
 
     Sets the maximum length of a cost-centre stack name in a heap

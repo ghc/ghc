@@ -239,6 +239,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.TraceFlags.ticky         = false;
     RtsFlags.TraceFlags.trace_output  = NULL;
     RtsFlags.TraceFlags.eventlogFlushTime = 0;
+    RtsFlags.TraceFlags.nullWriter = false;
 #endif
 
 #if defined(PROFILING)
@@ -958,6 +959,11 @@ error = true;
                               &rts_argv[arg][2])) {
                       OPTION_UNSAFE;
                       RtsFlags.MiscFlags.generate_dump_file = true;
+                  }
+                  else if (strequal("null-eventlog-writer",
+                               &rts_argv[arg][2])) {
+                      OPTION_UNSAFE;
+                      RtsFlags.TraceFlags.nullWriter = true;
                   }
                   else if (strequal("machine-readable",
                                &rts_argv[arg][2])) {

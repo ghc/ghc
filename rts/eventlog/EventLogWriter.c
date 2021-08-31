@@ -147,9 +147,30 @@ stopEventLogFileWriter(void)
 #endif
 }
 
+static void
+initEventLogFileWriterNoop(void) {}
+
+static bool
+writeEventLogFileNoop(void *eventlog STG_UNUSED, size_t eventlog_size STG_UNUSED) {
+    return true; // writes succeed always
+}
+
+static void
+flushEventLogFileNoop(void) {}
+
+static void
+stopEventLogFileWriterNoop(void) {}
+
 const EventLogWriter FileEventLogWriter = {
     .initEventLogWriter = initEventLogFileWriter,
     .writeEventLog = writeEventLogFile,
     .flushEventLog = flushEventLogFile,
     .stopEventLogWriter = stopEventLogFileWriter
+};
+
+const EventLogWriter NullEventLogWriter = {
+    .initEventLogWriter = initEventLogFileWriterNoop,
+    .writeEventLog = writeEventLogFileNoop,
+    .flushEventLog = flushEventLogFileNoop,
+    .stopEventLogWriter = stopEventLogFileWriterNoop
 };
