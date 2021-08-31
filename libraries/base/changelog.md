@@ -29,7 +29,6 @@
     `Generic1`, and `Data` instances for `GHC.Tuple.Solo`.
 
   * Add `Eq1`, `Read1` and `Show1` instances for `Complex`;
-    add `Eq1` and `Ord1` instances for `Fixed;
     add `Eq1/2`, `Ord1/2`, `Show1/2` and `Read1/2` instances for 3 and 4-tuples.
 
   * Remove `Data.Semigroup.Option` and the accompanying `option` function.
