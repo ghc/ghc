@@ -89,9 +89,7 @@ module GHC.Types.Id.Info (
 
 import GHC.Prelude
 
-import GHC.Core hiding( hasCoreUnfolding )
-import GHC.Core( hasCoreUnfolding )
-
+import GHC.Core
 import GHC.Core.Class
 import {-# SOURCE #-} GHC.Builtin.PrimOps (PrimOp)
 import GHC.Types.Name
@@ -689,8 +687,10 @@ zapFragileUnfolding :: Unfolding -> Unfolding
 -- ^ Zaps any core unfolding, but /preserves/ evaluated-ness,
 -- i.e. an unfolding of OtherCon
 zapFragileUnfolding unf
- | hasCoreUnfolding unf = noUnfolding
- | otherwise            = unf
+ -- N.B. isEvaldUnfolding catches *both* OtherCon [] *and* core unfoldings
+ -- representing values.
+ | isEvaldUnfolding unf = evaldUnfolding
+ | otherwise            = noUnfolding
 
 zapUnfolding :: Unfolding -> Unfolding
 -- Squash all unfolding info, preserving only evaluated-ness
