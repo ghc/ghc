@@ -190,9 +190,9 @@ defaults
 -- Note [Levity and representation polymorphic primops]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- In the types of primops in this module,
--- 
+--
 -- * The names `a,b,c,s` stand for type variables of kind Type
--- 
+--
 -- * The names `v` and `w` stand for levity-polymorphic
 --   type variables.
 --   For example:
@@ -207,7 +207,7 @@ defaults
 --     - `v` and `w` end up written as `a` and `b` (respectively) in types,
 --       which means that one shouldn't write a primop type involving both
 --       `a` and `v`, nor `b` and `w`.
--- 
+--
 -- * The names `o` and `p` stand for representation-polymorphic
 --   type variables, similarly to `v` and `w` above. For example:
 --      op :: o -> p -> Int
@@ -3259,29 +3259,29 @@ primop  ReallyUnsafePtrEqualityOp "reallyUnsafePtrEquality#" GenPrimOp
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- The primop `reallyUnsafePtrEquality#` does a direct pointer
 -- equality between two (boxed) values.  Several things to note:
--- 
+--
 -- * It is levity-polymorphic. It works for TYPE (BoxedRep Lifted) and
 --   TYPE (BoxedRep Unlifted). But not TYPE IntRep, for example.
 --   This levity-polymorphism comes from the use of the type variables
 --   "v" and "w". See Note [Levity and representation polymorphic primops]
--- 
+--
 -- * It does not evaluate its arguments. The user of the primop is responsible
 --   for doing so.
--- 
+--
 -- * It is hetero-typed; you can compare pointers of different types.
 --   This is used in various packages such as containers & unordered-containers.
--- 
+--
 -- * It is obviously very dangerous, because
 --      let x = f y in reallyUnsafePtrEquality# x x
 --   will probably return True, whereas
 --      reallyUnsafePtrEquality# (f y) (f y)
 --   will probably return False. ("probably", because it's affected
 --   by CSE and inlining).
--- 
+--
 -- * reallyUnsafePtrEquality# can't fail, but it is marked as such
 --   to prevent it from floating out.
 --   See Note [reallyUnsafePtrEquality# can_fail]
--- 
+--
 -- The library GHC.Exts provides several less Wild-West functions
 -- for use in specific cases, namely:
 --
@@ -3651,7 +3651,12 @@ primtype StackSnapshot#
 
 primop  CloneMyStack "cloneMyStack#" GenPrimOp
    State# RealWorld -> (# State# RealWorld, StackSnapshot# #)
-   { Clones the stack of the current Haskell thread. }
+   { Clones the stack of the current (active) Haskell thread. A cloned stack is
+     represented by {\tt StackSnapshot# } and is not evaluated any further
+     (i.e. it's "cold"). This is useful for stack decoding (backtraces) and
+     analyses because there are no concurrent mutations on a cloned stack.
+     The module {\tt GHC.Stack.CloneStack } contains related funcions.
+     Please see Note [Stack Cloning] for technical details. }
    with
    has_side_effects = True
    out_of_line      = True
