@@ -16,6 +16,8 @@
   * `fromEnum` for `Natural` now throws an error for any number that cannot be
     repesented exactly by an `Int` (#20291).
 
+  * `returnA` is defined as `Control.Category.id` instead of `arr id`.
+
 ## 4.16.0.0 *TBA*
 
   * Add a `Typeable` constraint to `fromStaticPtr` in the class `GHC.StaticPtr.IsStatic`.

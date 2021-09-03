@@ -205,7 +205,7 @@ instance Monad m => Arrow (Kleisli m) where
 
 -- | The identity arrow, which plays the role of 'return' in arrow notation.
 returnA :: Arrow a => a b b
-returnA = arr id
+returnA = id
 
 -- | Precomposition with a pure function.
 (^>>) :: Arrow a => (b -> c) -> a c d -> a b d
