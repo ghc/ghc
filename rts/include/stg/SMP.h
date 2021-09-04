@@ -438,7 +438,7 @@ load_load_barrier(void) {
 #elif defined(arm_HOST_ARCH)
     __asm__ __volatile__ ("dmb" : : : "memory");
 #elif defined(aarch64_HOST_ARCH)
-    __asm__ __volatile__ ("dmb sy" : : : "memory");
+    __asm__ __volatile__ ("dmb ld" : : : "memory");
 #elif defined(riscv64_HOST_ARCH)
     __asm__ __volatile__ ("fence r,r" : : : "memory");
 #else
