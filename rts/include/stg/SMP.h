@@ -449,7 +449,7 @@ load_load_barrier(void) {
 #elif defined(aarch64_HOST_ARCH)
     __asm__ __volatile__ ("dmb sy" : : : "memory");
 #elif defined(riscv64_HOST_ARCH)
-    __asm__ __volatile__ ("fence w,r" : : : "memory");
+    __asm__ __volatile__ ("fence r,r" : : : "memory");
 #else
 #error memory barriers unimplemented on this architecture
 #endif
