@@ -1801,10 +1801,12 @@ binds   ::  { Located (HsLocalBinds GhcPs) }
                                              $ HsIPBinds (EpAnn (glR $1) (AnnList (Just $ glR $2) Nothing Nothing [] []) cs) (IPBinds noExtField (reverse $ unLoc $2)))) }
 
 
-wherebinds :: { Maybe (Located (HsLocalBinds GhcPs)) }
+wherebinds :: { Maybe (Located (HsLocalBinds GhcPs, Maybe EpAnnComments )) }
                                                 -- May have implicit parameters
                                                 -- No type declarations
-        : 'where' binds                 { Just (sLL $1 $> (annBinds (mj AnnWhere $1) (unLoc $2))) }
+        : 'where' binds                 {% do { r <- acs (\cs ->
+                                                (sLL $1 $> (annBinds (mj AnnWhere $1) cs (unLoc $2))))
+                                              ; return $ Just r} }
         | {- empty -}                   { Nothing }
 
 -----------------------------------------------------------------------------
@@ -2513,12 +2515,14 @@ decl    :: { LHsDecl GhcPs }
 
 rhs     :: { Located (GRHSs GhcPs (LHsExpr GhcPs)) }
         : '=' exp wherebinds    {% runPV (unECP $2) >>= \ $2 ->
-                                  do { let loc = (comb3 $1 (reLoc $2) (adaptWhereBinds $3))
+                                  do { let L l (bs, csw) = adaptWhereBinds $3
+                                     ; let loc = (comb3 $1 (reLoc $2) (L l bs))
                                      ; acs (\cs ->
-                                       sL loc (GRHSs NoExtField (unguardedRHS (EpAnn (anc $ rs loc) (GrhsAnn Nothing (mj AnnEqual $1)) cs) loc $2)
-                                                      (unLoc $ (adaptWhereBinds $3)))) } }
-        | gdrhs wherebinds      { sL (comb2 $1 (adaptWhereBinds $>))
-                                    (GRHSs noExtField (reverse (unLoc $1)) (unLoc $ (adaptWhereBinds $2))) }
+                                       sL loc (GRHSs csw (unguardedRHS (EpAnn (anc $ rs loc) (GrhsAnn Nothing (mj AnnEqual $1)) cs) loc $2)
+                                                      bs)) } }
+        | gdrhs wherebinds      {% do { let {L l (bs, csw) = adaptWhereBinds $2}
+                                      ; acs (\cs -> sL (comb2 $1 (L l bs))
+                                                (GRHSs (cs Semi.<> csw) (reverse (unLoc $1)) bs)) }}
 
 gdrhs :: { Located [LGRHS GhcPs (LHsExpr GhcPs)] }
         : gdrhs gdrh            { sLL $1 $> ($2 : unLoc $1) }
@@ -3237,7 +3241,8 @@ alt     :: { forall b. DisambECP b => PV (LMatch GhcPs (LocatedA b)) }
 
 alt_rhs :: { forall b. DisambECP b => PV (Located (GRHSs GhcPs (LocatedA b))) }
         : ralt wherebinds           { $1 >>= \alt ->
-                                      return $ sLL alt (adaptWhereBinds $>) (GRHSs noExtField (unLoc alt) (unLoc $ adaptWhereBinds $2)) }
+                                      do { let {L l (bs, csw) = adaptWhereBinds $2}
+                                         ; acs (\cs -> sLL alt (L l bs) (GRHSs (cs Semi.<> csw) (unLoc alt) bs)) }}
 
 ralt :: { forall b. DisambECP b => PV (Located [LGRHS GhcPs (LocatedA b)]) }
         : '->' exp            { unECP $2 >>= \ $2 ->
@@ -4413,8 +4418,9 @@ addTrailingDarrowC (L (SrcSpanAnn (EpAnn lr (AnnContext _ o c) csc) l) a) lt cs 
 -- We need a location for the where binds, when computing the SrcSpan
 -- for the AST element using them.  Where there is a span, we return
 -- it, else noLoc, which is ignored in the comb2 call.
-adaptWhereBinds :: Maybe (Located (HsLocalBinds GhcPs)) -> Located (HsLocalBinds GhcPs)
-adaptWhereBinds Nothing = noLoc (EmptyLocalBinds noExtField)
-adaptWhereBinds (Just b) = b
+adaptWhereBinds :: Maybe (Located (HsLocalBinds GhcPs, Maybe EpAnnComments))
+                ->        Located (HsLocalBinds GhcPs,       EpAnnComments)
+adaptWhereBinds Nothing = noLoc (EmptyLocalBinds noExtField, emptyComments)
+adaptWhereBinds (Just (L l (b, mc))) = L l (b, maybe emptyComments id mc)
 
 }

@@ -920,7 +920,8 @@
             (NoSrcStrict))
            []
            (GRHSs
-            (NoExtField)
+            (EpaComments
+             [])
             [(L
               { DumpParsedAst.hs:20:6-23 }
               (GRHS

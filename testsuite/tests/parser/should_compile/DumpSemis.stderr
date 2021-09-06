@@ -234,7 +234,8 @@
             (NoSrcStrict))
            []
            (GRHSs
-            (NoExtField)
+            (EpaComments
+             [])
             [(L
               { DumpSemis.hs:(10,5)-(12,3) }
               (GRHS
@@ -477,7 +478,8 @@
             (NoSrcStrict))
            []
            (GRHSs
-            (NoExtField)
+            (EpaComments
+             [])
             [(L
               { DumpSemis.hs:(15,5)-(19,3) }
               (GRHS
@@ -680,7 +682,8 @@
             (NoSrcStrict))
            []
            (GRHSs
-            (NoExtField)
+            (EpaComments
+             [])
             [(L
               { DumpSemis.hs:22:5-30 }
               (GRHS
@@ -847,7 +850,8 @@
             (NoSrcStrict))
            []
            (GRHSs
-            (NoExtField)
+            (EpaComments
+             [])
             [(L
               { DumpSemis.hs:24:3-13 }
               (GRHS
@@ -913,7 +917,8 @@
             (NoSrcStrict))
            []
            (GRHSs
-            (NoExtField)
+            (EpaComments
+             [])
             [(L
               { DumpSemis.hs:25:3-13 }
               (GRHS
@@ -980,7 +985,8 @@
             (NoSrcStrict))
            []
            (GRHSs
-            (NoExtField)
+            (EpaComments
+             [])
             [(L
               { DumpSemis.hs:26:3-13 }
               (GRHS
@@ -1377,7 +1383,8 @@
                (Unqual
                 {OccName: x}))))]
            (GRHSs
-            (NoExtField)
+            (EpaComments
+             [])
             [(L
               { DumpSemis.hs:32:5-7 }
               (GRHS
@@ -1446,7 +1453,8 @@
             (NoSrcStrict))
            []
            (GRHSs
-            (NoExtField)
+            (EpaComments
+             [])
             [(L
               { DumpSemis.hs:34:9-35 }
               (GRHS
@@ -1543,7 +1551,8 @@
                              (NoSrcStrict))
                             []
                             (GRHSs
-                             (NoExtField)
+                             (EpaComments
+                              [])
                              [(L
                                { DumpSemis.hs:34:20-21 }
                                (GRHS
@@ -1634,7 +1643,8 @@
                              (NoSrcStrict))
                             []
                             (GRHSs
-                             (NoExtField)
+                             (EpaComments
+                              [])
                              [(L
                                { DumpSemis.hs:34:25-26 }
                                (GRHS
@@ -1748,7 +1758,8 @@
                (Unqual
                 {OccName: x}))))]
            (GRHSs
-            (NoExtField)
+            (EpaComments
+             [])
             [(L
               { DumpSemis.hs:(36,7)-(44,4) }
               (GRHS
@@ -1851,7 +1862,8 @@
                          (Nothing)
                          (NoExtField)))]
                       (GRHSs
-                       (NoExtField)
+                       (EpaComments
+                        [])
                        [(L
                          { DumpSemis.hs:39:8-13 }
                          (GRHS
@@ -1926,7 +1938,8 @@
                          (Nothing)
                          (NoExtField)))]
                       (GRHSs
-                       (NoExtField)
+                       (EpaComments
+                        [])
                        [(L
                          { DumpSemis.hs:40:8-13 }
                          (GRHS
@@ -2003,7 +2016,8 @@
                          (Nothing)
                          (NoExtField)))]
                       (GRHSs
-                       (NoExtField)
+                       (EpaComments
+                        [])
                        [(L
                          { DumpSemis.hs:41:8-13 }
                          (GRHS
@@ -2082,7 +2096,8 @@
                          (Nothing)
                          (NoExtField)))]
                       (GRHSs
-                       (NoExtField)
+                       (EpaComments
+                        [])
                        [(L
                          { DumpSemis.hs:42:8-13 }
                          (GRHS

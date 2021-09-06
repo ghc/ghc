@@ -277,7 +277,7 @@ tcGRHSs ctxt (GRHSs _ grhss binds) res_ty
                mapM (tcCollectingUsage . wrapLocM (tcGRHS ctxt res_ty)) grhss
         ; let (usages, grhss') = unzip ugrhss
         ; tcEmitBindingUsage $ supUEs usages
-        ; return (GRHSs noExtField grhss' binds') }
+        ; return (GRHSs emptyComments grhss' binds') }
 
 -------------
 tcGRHS :: TcMatchCtxt body -> ExpRhoType -> GRHS GhcRn (LocatedA (body GhcRn))

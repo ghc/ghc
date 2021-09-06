@@ -193,7 +193,7 @@ unguardedGRHSs :: Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p))))
                => SrcSpan -> LocatedA (body (GhcPass p)) -> EpAnn GrhsAnn
                -> GRHSs (GhcPass p) (LocatedA (body (GhcPass p)))
 unguardedGRHSs loc rhs an
-  = GRHSs noExtField (unguardedRHS an loc rhs) emptyLocalBinds
+  = GRHSs emptyComments (unguardedRHS an loc rhs) emptyLocalBinds
 
 unguardedRHS :: Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p))))
                      ~ SrcSpan
@@ -926,7 +926,7 @@ mkMatch ctxt pats expr binds
   = noLocA (Match { m_ext   = noAnn
                   , m_ctxt  = ctxt
                   , m_pats  = map paren pats
-                  , m_grhss = GRHSs noExtField (unguardedRHS noAnn noSrcSpan expr) binds })
+                  , m_grhss = GRHSs emptyComments (unguardedRHS noAnn noSrcSpan expr) binds })
   where
     paren :: LPat (GhcPass p) -> LPat (GhcPass p)
     paren lp@(L l p)
