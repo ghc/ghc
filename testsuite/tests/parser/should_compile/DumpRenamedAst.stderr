@@ -41,7 +41,8 @@
                  (NoSrcStrict))
                 []
                 (GRHSs
-                 (NoExtField)
+                 (EpaComments
+                  [])
                  [(L
                    { DumpRenamedAst.hs:34:6-23 }
                    (GRHS

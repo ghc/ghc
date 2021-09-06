@@ -389,7 +389,7 @@ dsExpr (HsMultiIf res_ty alts)
   = mkErrorExpr
 
   | otherwise
-  = do { let grhss = GRHSs noExtField alts emptyLocalBinds
+  = do { let grhss = GRHSs emptyComments  alts emptyLocalBinds
        ; rhss_nablas  <- pmcGRHSs IfAlt grhss
        ; match_result <- dsGRHSs IfAlt grhss res_ty rhss_nablas
        ; error_expr   <- mkErrorExpr

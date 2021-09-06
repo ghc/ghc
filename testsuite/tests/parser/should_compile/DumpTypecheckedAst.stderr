@@ -1568,7 +1568,8 @@
               (NoSrcStrict))
              []
              (GRHSs
-              (NoExtField)
+              (EpaComments
+               [])
               [(L
                 { DumpTypecheckedAst.hs:19:6-23 }
                 (GRHS
