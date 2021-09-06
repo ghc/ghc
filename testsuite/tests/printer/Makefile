@@ -729,7 +729,6 @@ PprCommentPlacement2:
 	$(CHECK_PPR)   $(LIBDIR) PprCommentPlacement2.hs
 	$(CHECK_EXACT) $(LIBDIR) PprCommentPlacement2.hs
 
-
 .PHONY: Test20243
 Test20243:
 	$(CHECK_PPR)   $(LIBDIR) Test20243.hs
@@ -739,3 +738,8 @@ Test20243:
 Test20258:
 	$(CHECK_PPR)   $(LIBDIR) Test20258.hs
 	$(CHECK_EXACT) $(LIBDIR) Test20258.hs
+
+.PHONY: Test20297
+Test20297:
+	$(CHECK_PPR)   $(LIBDIR) Test20297.hs
+	$(CHECK_EXACT) $(LIBDIR) Test20297.hs

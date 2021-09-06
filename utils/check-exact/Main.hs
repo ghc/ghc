@@ -518,7 +518,7 @@ changeLocalDecls libdir (L l p) = do
         let binds' = (HsValBinds van'
                           (ValBinds sortKey (listToBag $ decl':oldBinds)
                                           (sig':os':oldSigs)))
-        return (L lm (Match an mln pats (GRHSs noExtField rhs binds')))
+        return (L lm (Match an mln pats (GRHSs emptyComments rhs binds')))
       replaceLocalBinds x = return x
   return (L l p')
 
@@ -548,7 +548,7 @@ changeLocalDecls2 libdir (L l p) = do
         let sortKey = captureOrder decls
         let binds = (HsValBinds an (ValBinds sortKey (listToBag $ [decl'])
                                     [sig']))
-        return (L lm (Match ma mln pats (GRHSs noExtField rhs binds)))
+        return (L lm (Match ma mln pats (GRHSs emptyComments rhs binds)))
       replaceLocalBinds x = return x
   return (L l p')
 

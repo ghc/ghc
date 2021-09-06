@@ -1274,7 +1274,12 @@ matchGroupArity (MG { mg_alts = alts })
 hsLMatchPats :: LMatch (GhcPass id) body -> [LPat (GhcPass id)]
 hsLMatchPats (L _ (Match { m_pats = pats })) = pats
 
-type instance XCGRHSs (GhcPass _) _ = NoExtField
+-- We keep the type checker happy by providing EpAnnComments.  They
+-- can only be used if they follow a `where` keyword with no binds,
+-- but in that case the comment is attached to the following parsed
+-- item. So this can never be used in practice.
+type instance XCGRHSs (GhcPass _) _ = EpAnnComments
+
 type instance XXGRHSs (GhcPass _) _ = NoExtCon
 
 data GrhsAnn

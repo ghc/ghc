@@ -190,7 +190,7 @@ cvtDec (TH.ValD pat body ds)
         ; ds' <- cvtLocalDecs (text "a where clause") ds
         ; returnJustLA $ Hs.ValD noExtField $
           PatBind { pat_lhs = pat'
-                  , pat_rhs = GRHSs noExtField body' ds'
+                  , pat_rhs = GRHSs emptyComments body' ds'
                   , pat_ext = noAnn
                   , pat_ticks = ([],[]) } }
 
@@ -911,7 +911,7 @@ cvtClause ctxt (Clause ps body wheres)
         ; let pps = map (parenthesizePat appPrec) ps'
         ; g'  <- cvtGuard body
         ; ds' <- cvtLocalDecs (text "a where clause") wheres
-        ; returnLA $ Hs.Match noAnn ctxt pps (GRHSs noExtField g' ds') }
+        ; returnLA $ Hs.Match noAnn ctxt pps (GRHSs emptyComments g' ds') }
 
 cvtImplicitParamBind :: String -> TH.Exp -> CvtM (LIPBind GhcPs)
 cvtImplicitParamBind n e = do
@@ -1223,7 +1223,7 @@ cvtMatch ctxt (TH.Match p body decs)
                      _                -> p'
         ; g' <- cvtGuard body
         ; decs' <- cvtLocalDecs (text "a where clause") decs
-        ; returnLA $ Hs.Match noAnn ctxt [lp] (GRHSs noExtField g' decs') }
+        ; returnLA $ Hs.Match noAnn ctxt [lp] (GRHSs emptyComments g' decs') }
 
 cvtGuard :: TH.Body -> CvtM [LGRHS GhcPs (LHsExpr GhcPs)]
 cvtGuard (GuardedB pairs) = mapM cvtpair pairs

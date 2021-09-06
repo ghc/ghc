@@ -437,21 +437,23 @@ fromSpecTyVarBndr bndr = case bndr of
                                      PsErrInferredTypeVarNotAllowed
 
 -- | Add the annotation for a 'where' keyword to existing @HsLocalBinds@
-annBinds :: AddEpAnn -> HsLocalBinds GhcPs -> HsLocalBinds GhcPs
-annBinds a (HsValBinds an bs)  = (HsValBinds (add_where a an) bs)
-annBinds a (HsIPBinds an bs)   = (HsIPBinds (add_where a an) bs)
-annBinds _ (EmptyLocalBinds x) = (EmptyLocalBinds x)
+annBinds :: AddEpAnn -> EpAnnComments -> HsLocalBinds GhcPs
+  -> (HsLocalBinds GhcPs, Maybe EpAnnComments)
+annBinds a cs (HsValBinds an bs)  = (HsValBinds (add_where a an cs) bs, Nothing)
+annBinds a cs (HsIPBinds an bs)   = (HsIPBinds (add_where a an cs) bs, Nothing)
+annBinds _ cs  (EmptyLocalBinds x) = (EmptyLocalBinds x, Just cs)
 
-add_where :: AddEpAnn -> EpAnn AnnList -> EpAnn AnnList
-add_where an@(AddEpAnn _ (EpaSpan rs)) (EpAnn a (AnnList anc o c r t) cs)
+add_where :: AddEpAnn -> EpAnn AnnList -> EpAnnComments -> EpAnn AnnList
+add_where an@(AddEpAnn _ (EpaSpan rs)) (EpAnn a (AnnList anc o c r t) cs) cs2
   | valid_anchor (anchor a)
-  = EpAnn (widenAnchor a [an]) (AnnList anc o c (an:r) t) cs
+  = EpAnn (widenAnchor a [an]) (AnnList anc o c (an:r) t) (cs Semi.<> cs2)
   | otherwise
-  = EpAnn (patch_anchor rs a) (AnnList (fmap (patch_anchor rs) anc) o c (an:r) t) cs
-add_where an@(AddEpAnn _ (EpaSpan rs)) EpAnnNotUsed
+  = EpAnn (patch_anchor rs a)
+          (AnnList (fmap (patch_anchor rs) anc) o c (an:r) t) (cs Semi.<> cs2)
+add_where an@(AddEpAnn _ (EpaSpan rs)) EpAnnNotUsed cs
   = EpAnn (Anchor rs UnchangedAnchor)
-           (AnnList (Just $ Anchor rs UnchangedAnchor) Nothing Nothing [an] []) emptyComments
-add_where (AddEpAnn _ (EpaDelta _)) _ = panic "add_where"
+           (AnnList (Just $ Anchor rs UnchangedAnchor) Nothing Nothing [an] []) cs
+add_where (AddEpAnn _ (EpaDelta _)) _ _ = panic "add_where"
  -- EpaDelta should only be used for transformations
 
 valid_anchor :: RealSrcSpan -> Bool

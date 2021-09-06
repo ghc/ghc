@@ -1244,7 +1244,7 @@ rnGRHSs :: AnnoBody body
 rnGRHSs ctxt rnBody (GRHSs _ grhss binds)
   = rnLocalBindsAndThen binds   $ \ binds' _ -> do
     (grhss', fvGRHSs) <- mapFvRn (rnGRHS ctxt rnBody) grhss
-    return (GRHSs noExtField grhss' binds', fvGRHSs)
+    return (GRHSs emptyComments grhss' binds', fvGRHSs)
 
 rnGRHS :: AnnoBody body
        => HsMatchContext GhcRn

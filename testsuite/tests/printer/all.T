@@ -172,3 +172,4 @@ test('PprCommentPlacement2', ignore_stderr, makefile_test, ['PprCommentPlacement
 
 test('Test20243', ignore_stderr, makefile_test, ['Test20243'])
 test('Test20258', ignore_stderr, makefile_test, ['Test20258'])
+test('Test20297', ignore_stderr, makefile_test, ['Test20297'])

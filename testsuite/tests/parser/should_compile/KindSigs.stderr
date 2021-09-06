@@ -887,7 +887,8 @@
              (WildPat
               (NoExtField)))]
            (GRHSs
-            (NoExtField)
+            (EpaComments
+             [])
             [(L
               { KindSigs.hs:23:9-12 }
               (GRHS
@@ -1491,7 +1492,8 @@
             (NoSrcStrict))
            []
            (GRHSs
-            (NoExtField)
+            (EpaComments
+             [])
             [(L
               { KindSigs.hs:35:6-11 }
               (GRHS
