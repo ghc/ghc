@@ -3439,9 +3439,9 @@ outOfLineCmmOp bid mop res args
               MO_Pdep w    -> pdepLabel w
               MO_Pext w    -> pextLabel w
 
-              MO_AtomicRMW _ _ -> fsLit "atomicrmw"
-              MO_AtomicRead _  -> fsLit "atomicread"
-              MO_AtomicWrite _ -> fsLit "atomicwrite"
+              MO_AtomicRMW _ _ -> unsupported
+              MO_AtomicRead _  -> unsupported
+              MO_AtomicWrite _ -> unsupported
               MO_Cmpxchg w     -> cmpxchgLabel w -- for W64 on 32-bit
                                                  -- TODO: implement
                                                  -- cmpxchg8b instr
