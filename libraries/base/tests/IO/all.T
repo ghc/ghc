@@ -86,8 +86,7 @@ test('hGetBuf001',
       expect_fail_if_windows],
      compile_and_run, ['-package unix'])
 
-# As discussed in #16819, this test is racy in a threaded environment.
-test('hDuplicateTo001', [omit_ways(concurrent_ways),
+test('hDuplicateTo001', [fragile_for(16819, concurrent_ways),
                          when(opsys('mingw32'), skip)], compile_and_run, [''])
 
 test('countReaders001', [], compile_and_run, [''])
