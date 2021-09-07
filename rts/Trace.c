@@ -44,12 +44,12 @@ static Mutex trace_utx;
    Starting up / shutting down the tracing facilities
  --------------------------------------------------------------------------- */
 
-void initTracing (void)
+/*
+ * Update the TRACE_* globals. Must be called whenever RtsFlags.TraceFlags is
+ * modified.
+ */
+static void updateTraceFlagCache (void)
 {
-#if defined(THREADED_RTS)
-    initMutex(&trace_utx);
-#endif
-
     // -Ds turns on scheduler tracing too
     TRACE_sched =
         RtsFlags.TraceFlags.scheduler ||
@@ -60,9 +60,6 @@ void initTracing (void)
         RtsFlags.TraceFlags.gc ||
         RtsFlags.DebugFlags.gc ||
         RtsFlags.DebugFlags.scheduler;
-    if (TRACE_gc && RtsFlags.GcFlags.giveStats == NO_GC_STATS) {
-        RtsFlags.GcFlags.giveStats = COLLECT_GC_STATS;
-    }
 
     TRACE_nonmoving_gc =
         RtsFlags.TraceFlags.nonmoving_gc;
@@ -85,6 +82,19 @@ void initTracing (void)
         TRACE_spark_sampled ||
         TRACE_spark_full ||
         TRACE_user;
+}
+
+void initTracing (void)
+{
+#if defined(THREADED_RTS)
+    initMutex(&trace_utx);
+#endif
+
+    updateTraceFlagCache();
+
+    if (TRACE_gc && RtsFlags.GcFlags.giveStats == NO_GC_STATS) {
+        RtsFlags.GcFlags.giveStats = COLLECT_GC_STATS;
+    }
 
     /* Note: we can have any of the TRACE_* flags turned on even when
        eventlog_enabled is off. In the DEBUG way we may be tracing to stderr.
