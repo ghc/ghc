@@ -3,56 +3,48 @@
 Result size of Tidy Core
   = {terms: 35, types: 14, coercions: 0, joins: 0/0}
 
--- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 ten :: Natural
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
 ten = GHC.Num.Natural.NS 10##
 
--- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 M.$trModule4 :: GHC.Prim.Addr#
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
 M.$trModule4 = "main"#
 
--- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 M.$trModule3 :: GHC.Types.TrName
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
 M.$trModule3 = GHC.Types.TrNameS M.$trModule4
 
--- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 M.$trModule2 :: GHC.Prim.Addr#
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
 M.$trModule2 = "M"#
 
--- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 M.$trModule1 :: GHC.Types.TrName
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
 M.$trModule1 = GHC.Types.TrNameS M.$trModule2
 
--- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 M.$trModule :: GHC.Types.Module
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
 M.$trModule = GHC.Types.Module M.$trModule3 M.$trModule1
 
--- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 M.minusOne1 :: Natural
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 100 0}]
 M.minusOne1 = 1
 
--- RHS size: {terms: 6, types: 1, coercions: 0, joins: 0/0}
 minusOne :: Natural
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=False, ConLike=False,
@@ -63,14 +55,12 @@ minusOne
     GHC.Num.Natural.NS ww
     }
 
--- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 twoTimesTwo :: Natural
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 100 0}]
 twoTimesTwo = 4
 
--- RHS size: {terms: 4, types: 1, coercions: 0, joins: 0/0}
 plusOne :: Natural -> Natural
 [GblId,
  Arity=1,
@@ -79,7 +69,6 @@ plusOne :: Natural -> Natural
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 30 0}]
 plusOne = \ (n :: Natural) -> naturalAdd n M.minusOne1
 
--- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 one :: Natural
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,

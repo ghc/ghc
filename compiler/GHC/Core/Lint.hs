@@ -320,7 +320,9 @@ dumpPassResult logger unqual mb_flag hdr extra_info binds rules
     dump_doc  = vcat [ nest 2 extra_info
                      , size_doc
                      , blankLine
-                     , pprCoreBindingsWithSize binds
+                     , if logHasDumpFlag logger Opt_D_dump_core_stats
+                        then pprCoreBindingsWithSize binds
+                        else pprCoreBindings         binds
                      , ppUnless (null rules) pp_rules ]
     pp_rules = vcat [ blankLine
                     , text "------ Local rules for imported ids --------"

@@ -3,10 +3,8 @@
 Result size of Tidy Core
   = {terms: 4, types: 2, coercions: 0, joins: 0/0}
 
--- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 testAB = False
 
--- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 testAA = True
 
 

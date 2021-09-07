@@ -3,7 +3,6 @@
 Result size of Tidy Core
   = {terms: 63, types: 39, coercions: 1, joins: 0/0}
 
--- RHS size: {terms: 2, types: 3, coercions: 1, joins: 0/0}
 T2431.$WRefl [InlPrag=INLINE[final] CONLIKE] :: forall a. a :~: a
 [GblId[DataConWrapper],
  Caf=NoCafRefs,
@@ -15,52 +14,42 @@ T2431.$WRefl [InlPrag=INLINE[final] CONLIKE] :: forall a. a :~: a
 T2431.$WRefl
   = \ (@a) -> T2431.Refl @a @a @~(<a>_N :: a GHC.Prim.~# a)
 
--- RHS size: {terms: 4, types: 7, coercions: 0, joins: 0/0}
 absurd :: forall a. (Int :~: Bool) -> a
 [GblId, Arity=1, Str=<L>b, Cpr=b, Unf=OtherCon []]
 absurd = \ (@a) (x :: Int :~: Bool) -> case x of { }
 
--- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 $trModule1 :: GHC.Prim.Addr#
 [GblId, Unf=OtherCon []]
 $trModule1 = "main"#
 
--- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 $trModule2 :: GHC.Types.TrName
 [GblId, Unf=OtherCon []]
 $trModule2 = GHC.Types.TrNameS $trModule1
 
--- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 $trModule3 :: GHC.Prim.Addr#
 [GblId, Unf=OtherCon []]
 $trModule3 = "T2431"#
 
--- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 $trModule4 :: GHC.Types.TrName
 [GblId, Unf=OtherCon []]
 $trModule4 = GHC.Types.TrNameS $trModule3
 
--- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 T2431.$trModule :: GHC.Types.Module
 [GblId, Unf=OtherCon []]
 T2431.$trModule = GHC.Types.Module $trModule2 $trModule4
 
--- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 $krep :: GHC.Types.KindRep
 [GblId, Unf=OtherCon []]
 $krep = GHC.Types.KindRepVar 0#
 
--- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 $tc:~:1 :: GHC.Prim.Addr#
 [GblId, Unf=OtherCon []]
 $tc:~:1 = ":~:"#
 
--- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 $tc:~:2 :: GHC.Types.TrName
 [GblId, Unf=OtherCon []]
 $tc:~:2 = GHC.Types.TrNameS $tc:~:1
 
--- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
 T2431.$tc:~: :: GHC.Types.TyCon
 [GblId, Unf=OtherCon []]
 T2431.$tc:~:
@@ -72,34 +61,28 @@ T2431.$tc:~:
       0#
       GHC.Types.krep$*->*->*
 
--- RHS size: {terms: 3, types: 2, coercions: 0, joins: 0/0}
 $krep1 :: [GHC.Types.KindRep]
 [GblId, Unf=OtherCon []]
 $krep1
   = GHC.Types.:
       @GHC.Types.KindRep $krep (GHC.Types.[] @GHC.Types.KindRep)
 
--- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
 $krep2 :: [GHC.Types.KindRep]
 [GblId, Unf=OtherCon []]
 $krep2 = GHC.Types.: @GHC.Types.KindRep $krep $krep1
 
--- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 $krep3 :: GHC.Types.KindRep
 [GblId, Unf=OtherCon []]
 $krep3 = GHC.Types.KindRepTyConApp T2431.$tc:~: $krep2
 
--- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 $tc'Refl1 :: GHC.Prim.Addr#
 [GblId, Unf=OtherCon []]
 $tc'Refl1 = "'Refl"#
 
--- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 $tc'Refl2 :: GHC.Types.TrName
 [GblId, Unf=OtherCon []]
 $tc'Refl2 = GHC.Types.TrNameS $tc'Refl1
 
--- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
 T2431.$tc'Refl :: GHC.Types.TyCon
 [GblId, Unf=OtherCon []]
 T2431.$tc'Refl

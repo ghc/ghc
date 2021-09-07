@@ -3,7 +3,6 @@
 Result size of Tidy Core
   = {terms: 3, types: 3, coercions: 0, joins: 0/0}
 
--- RHS size: {terms: 2, types: 1, coercions: 0, joins: 0/0}
 neg_neg = \ x -> x
 
 

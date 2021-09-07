@@ -3,16 +3,12 @@
 Result size of Tidy Core
   = {terms: 9, types: 4, coercions: 0, joins: 0/0}
 
--- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 foobar1 = "foobar"#
 
--- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 foobar = unpackCString# foobar1
 
--- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 foobar2 = foobar
 
--- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 foobar3 = foobar
 
 

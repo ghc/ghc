@@ -12,17 +12,14 @@ Dependent packages: [base-4.16.0.0]
 Result size of Tidy Core
   = {terms: 24, types: 52, coercions: 0, joins: 0/0}
 
--- RHS size: {terms: 7, types: 6, coercions: 0, joins: 0/0}
 T18052a.$b:||: :: forall {a} {b}. a -> b -> (a, b)
 [GblId, Arity=2, Unf=OtherCon []]
 T18052a.$b:||: = \ (@a) (@b) (x :: a) (y :: b) -> (x, y)
 
--- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 (+++) :: forall {a}. [a] -> [a] -> [a]
 [GblId]
 (+++) = ++
 
--- RHS size: {terms: 13, types: 18, coercions: 0, joins: 0/0}
 T18052a.$m:||:
   :: forall {rep :: GHC.Types.RuntimeRep} {r :: TYPE rep} {a} {b}.
      (a, b) -> (a -> b -> r) -> ((# #) -> r) -> r
@@ -36,3 +33,6 @@ T18052a.$m:||:
       (cont :: a -> b -> r)
       _ [Occ=Dead] ->
       case scrut of { (x, y) -> cont x y }
+
+
+

@@ -3,35 +3,30 @@
 Result size of Tidy Core
   = {terms: 68, types: 43, coercions: 0, joins: 0/0}
 
--- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T4908.$trModule4 :: Addr#
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
 T4908.$trModule4 = "main"#
 
--- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 T4908.$trModule3 :: TrName
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
 T4908.$trModule3 = GHC.Types.TrNameS T4908.$trModule4
 
--- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T4908.$trModule2 :: Addr#
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
 T4908.$trModule2 = "T4908"#
 
--- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 T4908.$trModule1 :: TrName
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
 T4908.$trModule1 = GHC.Types.TrNameS T4908.$trModule2
 
--- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 T4908.$trModule :: Module
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
@@ -40,7 +35,6 @@ T4908.$trModule
   = GHC.Types.Module T4908.$trModule3 T4908.$trModule1
 
 Rec {
--- RHS size: {terms: 19, types: 5, coercions: 0, joins: 0/0}
 T4908.f_$s$wf [Occ=LoopBreaker] :: Int -> Int# -> Int# -> Bool
 [GblId, Arity=3, Str=<A><ML><1L>, Unf=OtherCon []]
 T4908.f_$s$wf
@@ -55,7 +49,6 @@ T4908.f_$s$wf
       }
 end Rec }
 
--- RHS size: {terms: 24, types: 13, coercions: 0, joins: 0/0}
 T4908.$wf [InlPrag=[2]] :: Int# -> (Int, Int) -> Bool
 [GblId,
  Arity=2,
@@ -77,7 +70,6 @@ T4908.$wf
         0# -> GHC.Types.True
       }
 
--- RHS size: {terms: 8, types: 6, coercions: 0, joins: 0/0}
 f [InlPrag=[2]] :: Int -> (Int, Int) -> Bool
 [GblId,
  Arity=2,
