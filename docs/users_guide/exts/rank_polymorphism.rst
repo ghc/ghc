@@ -168,7 +168,7 @@ Suppose: ::
   g1 :: forall x y. Int -> y -> x -> x
 
   f2 :: (forall a. (Eq a, Show a) => a -> a) -> Bool
-  g2 :: forall x. (Show x, Eq x) => Int -> a -> b -> b
+  g2 :: forall x. (Show x, Eq x) => x -> x
 
 then ``f1 g1`` and ``f2 g2`` are both well typed, despite the
 different order of type variables and constraints.  What happens is that the
