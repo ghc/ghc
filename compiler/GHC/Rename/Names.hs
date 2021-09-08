@@ -477,13 +477,16 @@ calculateAvails home_unit iface mod_safe' want_boot imported_by =
       -- 'imp_finsts' if it defines an orphan or instance family; thus the
       -- orph_iface/has_iface tests.
 
-      orphans | orph_iface = assertPpr (not (imp_sem_mod `elem` dep_orphs deps)) (ppr imp_sem_mod <+> ppr (dep_orphs deps)) $
-                             imp_sem_mod : dep_orphs deps
-              | otherwise  = dep_orphs deps
+      deporphs  = dep_orphs deps
+      depfinsts = dep_finsts deps
 
-      finsts | has_finsts = assertPpr (not (imp_sem_mod `elem` dep_finsts deps)) (ppr imp_sem_mod <+> ppr (dep_orphs deps)) $
-                            imp_sem_mod : dep_finsts deps
-             | otherwise  = dep_finsts deps
+      orphans | orph_iface = assertPpr (not (imp_sem_mod `elem` deporphs)) (ppr imp_sem_mod <+> ppr deporphs) $
+                             imp_sem_mod : deporphs
+              | otherwise  = deporphs
+
+      finsts | has_finsts = assertPpr (not (imp_sem_mod `elem` depfinsts)) (ppr imp_sem_mod <+> ppr depfinsts) $
+                            imp_sem_mod : depfinsts
+             | otherwise  = depfinsts
 
       -- Trusted packages are a lot like orphans.
       trusted_pkgs | mod_safe' = dep_trusted_pkgs deps

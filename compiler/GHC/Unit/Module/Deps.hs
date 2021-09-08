@@ -1,8 +1,20 @@
 -- | Dependencies and Usage of a module
 module GHC.Unit.Module.Deps
-   ( Dependencies (..)
-   , Usage (..)
+   ( Dependencies
+   , mkDependencies
    , noDependencies
+   , dep_direct_mods
+   , dep_direct_pkgs
+   , dep_sig_mods
+   , dep_trusted_pkgs
+   , dep_orphs
+   , dep_finsts
+   , dep_boot_mods
+   , dep_orphs_update
+   , dep_finsts_update
+   , pprDeps
+   , Usage (..)
+   , ImportAvails (..)
    )
 where
 
@@ -10,12 +22,19 @@ import GHC.Prelude
 
 import GHC.Types.SafeHaskell
 import GHC.Types.Name
+import GHC.Types.Unique.FM
+
 import GHC.Unit.Module.Name
+import GHC.Unit.Module.Imported
 import GHC.Unit.Module
+import GHC.Unit.Home
+import GHC.Unit.State
 
 import GHC.Utils.Fingerprint
 import GHC.Utils.Binary
+import GHC.Utils.Outputable
 
+import Data.List (sortBy, sort, partition)
 import Data.Set (Set)
 import qualified Data.Set as Set
 
@@ -26,6 +45,8 @@ import qualified Data.Set as Set
 --
 -- Invariant: none of the lists contain duplicates.
 --
+-- Invariant: lists are ordered canonically (e.g. using stableModuleCmp)
+--
 -- See Note [Transitive Information in Dependencies]
 data Dependencies = Deps
    { dep_direct_mods :: Set ModuleNameWithIsBoot
@@ -34,9 +55,10 @@ data Dependencies = Deps
    , dep_direct_pkgs :: Set UnitId
       -- ^ All packages directly imported by this module
       -- I.e. packages to which this module's direct imports belong.
-      --
 
+    ------------------------------------
     -- Transitive information below here
+
    , dep_sig_mods :: ![ModuleName]
     -- ^ Transitive closure of hsig files in the home package
 
@@ -74,6 +96,71 @@ data Dependencies = Deps
         -- Equality used only for old/new comparison in GHC.Iface.Recomp.addFingerprints
         -- See 'GHC.Tc.Utils.ImportAvails' for details on dependencies.
 
+
+-- | Extract information from the rename and typecheck phases to produce
+-- a dependencies information for the module being compiled.
+--
+-- The fourth argument is a list of plugin modules.
+mkDependencies :: HomeUnit -> Module -> ImportAvails -> [Module] -> Dependencies
+mkDependencies home_unit mod imports plugin_mods =
+  let (home_plugins, external_plugins) = partition (isHomeUnit home_unit . moduleUnit) plugin_mods
+      plugin_units = Set.fromList (map (toUnitId . moduleUnit) external_plugins)
+      all_direct_mods = foldr (\mn m -> addToUFM m mn (GWIB mn NotBoot))
+                              (imp_direct_dep_mods imports)
+                              (map moduleName home_plugins)
+
+      modDepsElts = Set.fromList . nonDetEltsUFM
+        -- It's OK to use nonDetEltsUFM here because sorting by module names
+        -- restores determinism
+
+      direct_mods = modDepsElts (delFromUFM all_direct_mods (moduleName mod))
+            -- M.hi-boot can be in the imp_dep_mods, but we must remove
+            -- it before recording the modules on which this one depends!
+            -- (We want to retain M.hi-boot in imp_dep_mods so that
+            --  loadHiBootInterface can see if M's direct imports depend
+            --  on M.hi-boot, and hence that we should do the hi-boot consistency
+            --  check.)
+
+      dep_orphs = filter (/= mod) (imp_orphs imports)
+            -- We must also remove self-references from imp_orphs. See
+            -- Note [Module self-dependency]
+
+      direct_pkgs = foldr Set.insert (imp_dep_direct_pkgs imports) plugin_units
+
+      -- Set the packages required to be Safe according to Safe Haskell.
+      -- See Note [Tracking Trust Transitively] in GHC.Rename.Names
+      trust_pkgs  = imp_trust_pkgs imports
+
+      -- If there's a non-boot import, then it shadows the boot import
+      -- coming from the dependencies
+      source_mods = modDepsElts (imp_boot_mods imports)
+
+      sig_mods = filter (/= (moduleName mod)) $ imp_sig_mods imports
+
+  in Deps { dep_direct_mods  = direct_mods
+          , dep_direct_pkgs  = direct_pkgs
+          , dep_sig_mods     = sort sig_mods
+          , dep_trusted_pkgs = trust_pkgs
+          , dep_boot_mods    = source_mods
+          , dep_orphs        = sortBy stableModuleCmp dep_orphs
+          , dep_finsts       = sortBy stableModuleCmp (imp_finsts imports)
+            -- sort to get into canonical order
+            -- NB. remember to use lexicographic ordering
+          }
+
+-- | Update module dependencies containing orphans (used by Backpack)
+dep_orphs_update :: Monad m => Dependencies -> ([Module] -> m [Module]) -> m Dependencies
+dep_orphs_update deps f = do
+  r <- f (dep_orphs deps)
+  pure (deps { dep_orphs = sortBy stableModuleCmp r })
+
+-- | Update module dependencies containing family instances (used by Backpack)
+dep_finsts_update :: Monad m => Dependencies -> ([Module] -> m [Module]) -> m Dependencies
+dep_finsts_update deps f = do
+  r <- f (dep_finsts deps)
+  pure (deps { dep_finsts = sortBy stableModuleCmp r })
+
+
 instance Binary Dependencies where
     put_ bh deps = do put_ bh (dep_direct_mods deps)
                       put_ bh (dep_direct_pkgs deps)
@@ -108,6 +195,32 @@ noDependencies = Deps
   , dep_orphs        = []
   , dep_finsts       = []
   }
+
+-- | Pretty-print unit dependencies
+pprDeps :: UnitState -> Dependencies -> SDoc
+pprDeps unit_state (Deps { dep_direct_mods = dmods
+                         , dep_boot_mods = bmods
+                         , dep_orphs = orphs
+                         , dep_direct_pkgs = pkgs
+                         , dep_trusted_pkgs = tps
+                         , dep_finsts = finsts
+                         })
+  = pprWithUnitState unit_state $
+    vcat [text "direct module dependencies:"  <+> ppr_set ppr_mod dmods,
+          text "boot module dependencies:"    <+> ppr_set ppr bmods,
+          text "direct package dependencies:" <+> ppr_set ppr pkgs,
+          if null tps
+            then empty
+            else text "trusted package dependencies:" <+> ppr_set ppr tps,
+          text "orphans:" <+> fsep (map ppr orphs),
+          text "family instance modules:" <+> fsep (map ppr finsts)
+        ]
+  where
+    ppr_mod (GWIB mod IsBoot)  = ppr mod <+> text "[boot]"
+    ppr_mod (GWIB mod NotBoot) = ppr mod
+
+    ppr_set :: Outputable a => (a -> SDoc) -> Set a -> SDoc
+    ppr_set w = fsep . fmap w . Set.toAscList
 
 -- | Records modules for which changes may force recompilation of this module
 -- See wiki: https://gitlab.haskell.org/ghc/ghc/wikis/commentary/compiler/recompilation-avoidance
@@ -327,3 +440,67 @@ Question: does this happen even across packages?
 No: if I need to load the interface for module X from package P I always look for p:X.hi.
 
 -}
+
+-- | 'ImportAvails' summarises what was imported from where, irrespective of
+-- whether the imported things are actually used or not.  It is used:
+--
+--  * when processing the export list,
+--
+--  * when constructing usage info for the interface file,
+--
+--  * to identify the list of directly imported modules for initialisation
+--    purposes and for optimised overlap checking of family instances,
+--
+--  * when figuring out what things are really unused
+--
+data ImportAvails
+   = ImportAvails {
+        imp_mods :: ImportedMods,
+          --      = ModuleEnv [ImportedModsVal],
+          -- ^ Domain is all directly-imported modules
+          --
+          -- See the documentation on ImportedModsVal in
+          -- "GHC.Unit.Module.Imported" for the meaning of the fields.
+          --
+          -- We need a full ModuleEnv rather than a ModuleNameEnv here,
+          -- because we might be importing modules of the same name from
+          -- different packages. (currently not the case, but might be in the
+          -- future).
+
+        imp_direct_dep_mods :: ModuleNameEnv ModuleNameWithIsBoot,
+          -- ^ Home-package modules directly imported by the module being compiled.
+
+        imp_dep_direct_pkgs :: Set UnitId,
+          -- ^ Packages directly needed by the module being compiled
+
+        imp_trust_own_pkg :: Bool,
+          -- ^ Do we require that our own package is trusted?
+          -- This is to handle efficiently the case where a Safe module imports
+          -- a Trustworthy module that resides in the same package as it.
+          -- See Note [Trust Own Package] in "GHC.Rename.Names"
+
+        -- Transitive information below here
+
+        imp_trust_pkgs :: Set UnitId,
+          -- ^ This records the
+          -- packages the current module needs to trust for Safe Haskell
+          -- compilation to succeed. A package is required to be trusted if
+          -- we are dependent on a trustworthy module in that package.
+          -- See Note [Tracking Trust Transitively] in "GHC.Rename.Names"
+
+        imp_boot_mods :: ModuleNameEnv ModuleNameWithIsBoot,
+          -- ^ Domain is all modules which have hs-boot files, and whether
+          -- we should import the boot version of interface file. Only used
+          -- in one-shot mode to populate eps_is_boot.
+
+        imp_sig_mods :: [ModuleName],
+          -- ^ Signature modules below this one
+
+        imp_orphs :: [Module],
+          -- ^ Orphan modules below us in the import tree (and maybe including
+          -- us for imported modules)
+
+        imp_finsts :: [Module]
+          -- ^ Family instance modules below us in the import tree (and maybe
+          -- including us for imported modules)
+      }

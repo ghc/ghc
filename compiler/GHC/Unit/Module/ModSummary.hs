@@ -1,4 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE TupleSections #-}
 
 -- | A ModSummary is a node in the compilation manager's dependency graph
 -- (ModuleGraph)
@@ -10,6 +11,7 @@ module GHC.Unit.Module.ModSummary
    , ms_installed_mod
    , ms_mod_name
    , ms_imps
+   , ms_plugin_imps
    , ms_mnwib
    , ms_home_srcimps
    , ms_home_imps
@@ -114,11 +116,11 @@ ms_mod_name = moduleName . ms_mod
 
 -- | Textual imports, plus plugin imports but not SOURCE imports.
 ms_imps :: ModSummary -> [(Maybe FastString, Located ModuleName)]
-ms_imps ms =
-  ms_textual_imps ms ++
-  map mk_additional_import (dynFlagDependencies (ms_hspp_opts ms))
-  where
-    mk_additional_import mod_nm = (Nothing, noLoc mod_nm)
+ms_imps ms = ms_textual_imps ms ++ ms_plugin_imps ms
+
+-- | Plugin imports
+ms_plugin_imps :: ModSummary -> [(Maybe FastString, Located ModuleName)]
+ms_plugin_imps ms = map ((Nothing,) . noLoc) (pluginModNames (ms_hspp_opts ms))
 
 home_imps :: [(Maybe FastString, Located ModuleName)] -> [Located ModuleName]
 home_imps imps = [ lmodname |  (mb_pkg, lmodname) <- imps,

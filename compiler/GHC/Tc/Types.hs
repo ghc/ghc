@@ -42,7 +42,7 @@ module GHC.Tc.Types(
         -- Renamer types
         ErrCtxt, RecFieldEnv, pushErrCtxt, pushErrCtxtSameOrigin,
         ImportAvails(..), emptyImportAvails, plusImportAvails,
-        WhereFrom(..), mkModDeps, modDepsElts,
+        WhereFrom(..), mkModDeps,
 
         -- Typechecker types
         TcTypeEnv, TcBinderStack, TcBinder(..),
@@ -146,7 +146,7 @@ import GHC.Data.List.SetOps
 
 import GHC.Unit
 import GHC.Unit.Module.Warnings
-import GHC.Unit.Module.Imported
+import GHC.Unit.Module.Deps
 import GHC.Unit.Module.ModDetails
 
 import GHC.Utils.Error
@@ -1365,69 +1365,6 @@ peCategory NoDataKindsDC          = "data constructor"
 ************************************************************************
 -}
 
--- | 'ImportAvails' summarises what was imported from where, irrespective of
--- whether the imported things are actually used or not.  It is used:
---
---  * when processing the export list,
---
---  * when constructing usage info for the interface file,
---
---  * to identify the list of directly imported modules for initialisation
---    purposes and for optimised overlap checking of family instances,
---
---  * when figuring out what things are really unused
---
-data ImportAvails
-   = ImportAvails {
-        imp_mods :: ImportedMods,
-          --      = ModuleEnv [ImportedModsVal],
-          -- ^ Domain is all directly-imported modules
-          --
-          -- See the documentation on ImportedModsVal in
-          -- "GHC.Unit.Module.Imported" for the meaning of the fields.
-          --
-          -- We need a full ModuleEnv rather than a ModuleNameEnv here,
-          -- because we might be importing modules of the same name from
-          -- different packages. (currently not the case, but might be in the
-          -- future).
-
-        imp_direct_dep_mods :: ModuleNameEnv ModuleNameWithIsBoot,
-          -- ^ Home-package modules directly imported by the module being compiled.
-
-        imp_dep_direct_pkgs :: Set UnitId,
-          -- ^ Packages directly needed by the module being compiled
-
-        imp_trust_own_pkg :: Bool,
-          -- ^ Do we require that our own package is trusted?
-          -- This is to handle efficiently the case where a Safe module imports
-          -- a Trustworthy module that resides in the same package as it.
-          -- See Note [Trust Own Package] in "GHC.Rename.Names"
-
-        -- Transitive information below here
-
-        imp_trust_pkgs :: Set UnitId,
-          -- ^ This records the
-          -- packages the current module needs to trust for Safe Haskell
-          -- compilation to succeed. A package is required to be trusted if
-          -- we are dependent on a trustworthy module in that package.
-          -- See Note [Tracking Trust Transitively] in "GHC.Rename.Names"
-
-        imp_boot_mods :: ModuleNameEnv ModuleNameWithIsBoot,
-          -- ^ Domain is all modules which have hs-boot files, and whether
-          -- we should import the boot version of interface file. Only used
-          -- in one-shot mode to populate eps_is_boot.
-
-        imp_sig_mods :: [ModuleName],
-          -- ^ Signature modules below this one
-
-        imp_orphs :: [Module],
-          -- ^ Orphan modules below us in the import tree (and maybe including
-          -- us for imported modules)
-
-        imp_finsts :: [Module]
-          -- ^ Family instance modules below us in the import tree (and maybe
-          -- including us for imported modules)
-      }
 
 mkModDeps :: Set ModuleNameWithIsBoot
           -> ModuleNameEnv ModuleNameWithIsBoot
@@ -1448,13 +1385,6 @@ plusModDeps = plusUFM_C plus_mod_dep
       -- If either side can "see" a non-hi-boot interface, use that
       -- Reusing existing tuples saves 10% of allocations on test
       -- perf/compiler/MultiLayerModules
-
-modDepsElts
-  :: ModuleNameEnv ModuleNameWithIsBoot
-  -> Set ModuleNameWithIsBoot
-modDepsElts = S.fromList . nonDetEltsUFM
-  -- It's OK to use nonDetEltsUFM here because sorting by module names
-  -- restores determinism
 
 emptyImportAvails :: ImportAvails
 emptyImportAvails = ImportAvails { imp_mods          = emptyModuleEnv,

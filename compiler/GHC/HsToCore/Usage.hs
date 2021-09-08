@@ -4,7 +4,7 @@
 
 module GHC.HsToCore.Usage (
     -- * Dependency/fingerprinting code (used by GHC.Iface.Make)
-    mkUsageInfo, mkUsedNames, mkDependencies
+    mkUsageInfo, mkUsedNames,
     ) where
 
 import GHC.Prelude
@@ -23,7 +23,6 @@ import GHC.Utils.Panic
 import GHC.Types.Name
 import GHC.Types.Name.Set ( NameSet, allUses )
 import GHC.Types.Unique.Set
-import GHC.Types.Unique.FM
 
 import GHC.Unit
 import GHC.Unit.External
@@ -33,10 +32,9 @@ import GHC.Unit.Module.Deps
 
 import GHC.Data.Maybe
 
-import Data.List (sortBy, sort, partition)
+import Data.List (sortBy)
 import Data.Map (Map)
 import qualified Data.Map as Map
-import qualified Data.Set as Set
 
 import GHC.Linker.Types
 import GHC.Linker.Loader ( getLoaderState )
@@ -60,53 +58,6 @@ break the invariant asserted by calculateAvails that a module does not itself in
 its dep_orphs. This was the cause of #14128.
 
 -}
-
--- | Extract information from the rename and typecheck phases to produce
--- a dependencies information for the module being compiled.
---
--- The fourth argument is a list of plugin modules.
-mkDependencies :: HomeUnit -> Module -> ImportAvails -> [Module] -> Dependencies
-mkDependencies home_unit mod imports plugin_mods =
-  let (home_plugins, external_plugins) = partition (isHomeUnit home_unit . moduleUnit) plugin_mods
-      plugin_units = map (toUnitId . moduleUnit) external_plugins
-      all_direct_mods = foldr (\mn m -> addToUFM m mn (GWIB mn NotBoot))
-                              (imp_direct_dep_mods imports)
-                              (map moduleName home_plugins)
-
-      direct_mods = modDepsElts (delFromUFM all_direct_mods (moduleName mod))
-            -- M.hi-boot can be in the imp_dep_mods, but we must remove
-            -- it before recording the modules on which this one depends!
-            -- (We want to retain M.hi-boot in imp_dep_mods so that
-            --  loadHiBootInterface can see if M's direct imports depend
-            --  on M.hi-boot, and hence that we should do the hi-boot consistency
-            --  check.)
-
-      dep_orphs = filter (/= mod) (imp_orphs imports)
-            -- We must also remove self-references from imp_orphs. See
-            -- Note [Module self-dependency]
-
-      direct_pkgs = foldr Set.insert (imp_dep_direct_pkgs imports) plugin_units
-
-      -- Set the packages required to be Safe according to Safe Haskell.
-      -- See Note [Tracking Trust Transitively] in GHC.Rename.Names
-      trust_pkgs  = imp_trust_pkgs imports
-
-      -- If there's a non-boot import, then it shadows the boot import
-      -- coming from the dependencies
-      source_mods = modDepsElts (imp_boot_mods imports)
-
-      sig_mods = filter (/= (moduleName mod)) $ imp_sig_mods imports
-
-  in Deps { dep_direct_mods  = direct_mods
-          , dep_direct_pkgs  = direct_pkgs
-          , dep_sig_mods     = sort sig_mods
-          , dep_trusted_pkgs = trust_pkgs
-          , dep_boot_mods    = source_mods
-          , dep_orphs        = dep_orphs
-          , dep_finsts       = sortBy stableModuleCmp (imp_finsts imports)
-            -- sort to get into canonical order
-            -- NB. remember to use lexicographic ordering
-          }
 
 mkUsedNames :: TcGblEnv -> NameSet
 mkUsedNames TcGblEnv{ tcg_dus = dus } = allUses dus

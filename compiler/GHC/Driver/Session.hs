@@ -55,7 +55,6 @@ module GHC.Driver.Session (
         DynLibLoader(..),
         fFlags, fLangFlags, xFlags,
         wWarningFlags,
-        dynFlagDependencies,
         makeDynFlagsConsistent,
         positionIndependent,
         optimisationFlags,
@@ -1573,10 +1572,6 @@ lang_set dflags lang =
 -- | Set the Haskell language standard to use
 setLanguage :: Language -> DynP ()
 setLanguage l = upd (`lang_set` Just l)
-
--- | Some modules have dependencies on others through the DynFlags rather than textual imports
-dynFlagDependencies :: DynFlags -> [ModuleName]
-dynFlagDependencies = pluginModNames
 
 -- | Is the -fpackage-trust mode on
 packageTrustOn :: DynFlags -> Bool

@@ -115,8 +115,6 @@ import GHC.Data.FastString
 
 import Control.Monad
 import Data.Map ( toList )
-import qualified Data.Set as Set
-import Data.Set (Set)
 import System.FilePath
 import System.Directory
 import GHC.Driver.Env.KnotVars
@@ -1183,32 +1181,6 @@ pprUsageImport usage usg_mod'
     where
         safe | usg_safe usage = text "safe"
              | otherwise      = text " -/ "
-
--- | Pretty-print unit dependencies
-pprDeps :: UnitState -> Dependencies -> SDoc
-pprDeps unit_state (Deps { dep_direct_mods = dmods
-                         , dep_boot_mods = bmods
-                         , dep_orphs = orphs
-                         , dep_direct_pkgs = pkgs
-                         , dep_trusted_pkgs = tps
-                         , dep_finsts = finsts
-                         })
-  = pprWithUnitState unit_state $
-    vcat [text "direct module dependencies:"  <+> ppr_set ppr_mod dmods,
-          text "boot module dependencies:"    <+> ppr_set ppr bmods,
-          text "direct package dependencies:" <+> ppr_set ppr pkgs,
-          if null tps
-            then empty
-            else text "trusted package dependencies:" <+> ppr_set ppr tps,
-          text "orphans:" <+> fsep (map ppr orphs),
-          text "family instance modules:" <+> fsep (map ppr finsts)
-        ]
-  where
-    ppr_mod (GWIB mod IsBoot)  = ppr mod <+> text "[boot]"
-    ppr_mod (GWIB mod NotBoot) = ppr mod
-
-    ppr_set :: Outputable a => (a -> SDoc) -> Set a -> SDoc
-    ppr_set w = fsep . fmap w . Set.toAscList
 
 pprFixities :: [(OccName, Fixity)] -> SDoc
 pprFixities []    = Outputable.empty

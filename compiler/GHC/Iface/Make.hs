@@ -82,7 +82,7 @@ import GHC.Data.FastString
 import GHC.Data.Maybe
 
 import GHC.HsToCore.Docs
-import GHC.HsToCore.Usage ( mkUsageInfo, mkUsedNames, mkDependencies )
+import GHC.HsToCore.Usage ( mkUsageInfo, mkUsedNames )
 
 import GHC.Unit
 import GHC.Unit.Module.Warnings

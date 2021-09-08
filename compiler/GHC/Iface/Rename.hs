@@ -128,19 +128,18 @@ rnModExports hsc_env insts iface
     $ mapM rnAvailInfo (mi_exports iface)
 
 rnDependencies :: Rename Dependencies
-rnDependencies deps = do
-    orphs  <- rnDepModules dep_orphs deps
-    finsts <- rnDepModules dep_finsts deps
-    return deps { dep_orphs = orphs, dep_finsts = finsts }
+rnDependencies deps0 = do
+    deps1  <- dep_orphs_update deps0 (rnDepModules dep_orphs)
+    dep_finsts_update deps1 (rnDepModules dep_finsts)
 
-rnDepModules :: (Dependencies -> [Module]) -> Dependencies -> ShIfM [Module]
-rnDepModules sel deps = do
+rnDepModules :: (Dependencies -> [Module]) -> [Module] -> ShIfM [Module]
+rnDepModules sel mods = do
     hsc_env <- getTopEnv
     hmap <- getHoleSubst
     -- NB: It's not necessary to test if we're doing signature renaming,
     -- because ModIface will never contain module reference for itself
     -- in these dependencies.
-    fmap (nubSort . concat) . T.forM (sel deps) $ \mod -> do
+    fmap (nubSort . concat) . T.forM mods $ \mod -> do
         -- For holes, its necessary to "see through" the instantiation
         -- of the hole to get accurate family instance dependencies.
         -- For example, if B imports <A>, and <A> is instantiated with

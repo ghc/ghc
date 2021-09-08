@@ -86,6 +86,7 @@ import GHC.Types.HpcInfo
 import GHC.Unit
 import GHC.Unit.Module.ModGuts
 import GHC.Unit.Module.ModIface
+import GHC.Unit.Module.Deps
 
 import Data.List (partition)
 import Data.IORef

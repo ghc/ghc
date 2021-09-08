@@ -1,8 +1,8 @@
 ==pure.0
 parsePlugin()
 interfacePlugin: Prelude
-interfacePlugin: GHC.Float
 interfacePlugin: GHC.Base
+interfacePlugin: GHC.Float
 interfacePlugin: System.IO
 typeCheckPlugin (rn)
 interfacePlugin: GHC.Prim

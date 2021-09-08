@@ -973,11 +973,11 @@ addFingerprints hsc_env iface0
    (local_env, decls_w_hashes) <-
        foldM fingerprint_group (emptyOccEnv, []) groups
 
-   -- when calculating fingerprints, we always need to use canonical
-   -- ordering for lists of things.  In particular, the mi_deps has various
-   -- lists of modules and suchlike, so put these all in canonical order:
+   -- when calculating fingerprints, we always need to use canonical ordering
+   -- for lists of things. The mi_deps has various lists of modules and
+   -- suchlike, which are stored in canonical order:
    let sorted_deps :: Dependencies
-       sorted_deps = sortDependencies (mi_deps iface0)
+       sorted_deps = mi_deps iface0
 
    -- The export hash of a module depends on the orphan hashes of the
    -- orphan modules below us in the dependency tree.  This is the way
@@ -1192,16 +1192,6 @@ getOrphanHashes hsc_env mods = do
   --
   mapM get_orph_hash mods
 
-
-sortDependencies :: Dependencies -> Dependencies
-sortDependencies d
- = Deps { dep_direct_mods  = dep_direct_mods d,
-          dep_direct_pkgs  = dep_direct_pkgs d,
-          dep_sig_mods     = sort (dep_sig_mods d),
-          dep_trusted_pkgs = dep_trusted_pkgs d,
-          dep_boot_mods    = dep_boot_mods d,
-          dep_orphs  = sortBy stableModuleCmp (dep_orphs d),
-          dep_finsts = sortBy stableModuleCmp (dep_finsts d) }
 
 {-
 ************************************************************************
