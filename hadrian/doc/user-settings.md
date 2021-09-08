@@ -114,12 +114,12 @@ prefixes, and `*` matches an entire path component, excluding any separators.
 #### Enabling -Werror
 
 It is useful to enable `-Werror` when building GHC as this setting is
-used in the CI to ensure a warning free build. The `werror` function can be
-used to easily modify a flavour to turn this setting on.
+used in the CI to ensure a warning-free build. The `+werror`
+[flavour transformer](flavours.md#flavour-transformers)
+can be used to easily modify a flavour to turn this setting on:
 
 ```
-devel2WerrorFlavour :: Flavour
-devel2WerrorFlavour = werror (developmentFlavour Stage2)
+hadrian/build --flavour=validate+werror
 ```
 
 #### Linking GHC against the debugged RTS
