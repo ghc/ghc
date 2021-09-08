@@ -32,7 +32,7 @@ import GHC.Types.Unique
 import GHC.Types.Unique.DFM
 
 import GHC.Utils.Outputable
-import Data.List
+import Data.List (sortOn)
 import Data.Ord
 
 -- | Information about modules in the package being compiled
