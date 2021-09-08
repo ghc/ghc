@@ -9,7 +9,6 @@ main = do
   let fields = read info :: [(String,String)]
   getGhcFieldOrFail fields "HostOS" "Host OS"
   getGhcFieldOrFail fields "WORDSIZE" "Word size"
-  getGhcFieldOrFail fields "TARGETPLATFORM" "Target platform"
   getGhcFieldOrFail fields "TargetOS_CPP" "Target OS"
   getGhcFieldOrFail fields "TargetARCH_CPP" "Target architecture"
 

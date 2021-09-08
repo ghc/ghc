@@ -27,6 +27,18 @@ RUNTESTS     = $(TOP)/driver/runtests.py
 COMPILER     = ghc
 CONFIG       = $(TOP)/config/$(COMPILER)
 
+# We'll use a quoted '$(TEST_WRAPPER)', if supplied. If
+# not we'll have an empty _TEST_WRAPPER.
+ifneq "$(TEST_WRAPPER)" ""
+  export _TEST_WRAPPER="'$(TEST_WRAPPER)' "
+else
+  export _TEST_WRAPPER=
+endif
+
+# if no STRIP is set, use `strip`
+STRIP ?= strip
+export STRIP
+
 ifeq "$(GhcUnregisterised)" "YES"
     # Otherwise C backend generates many warnings about
     # imcompatible proto casts for GCC's buitins:
@@ -132,7 +144,7 @@ endif
 
 ifeq "$(GhcWithInterpreter)" "NO"
 RUNTEST_OPTS += -e config.have_interp=False
-else ifeq "$(GhcStage)" "1"
+else ifeq "$(GhcStage)x$(WRAPPED_ISERV)y" "1xy"
 RUNTEST_OPTS += -e config.have_interp=False
 else
 RUNTEST_OPTS += -e config.have_interp=True
@@ -251,10 +263,14 @@ else
 RUNTEST_OPTS += -e config.ghc_built_by_llvm=True
 endif
 
+# XXX config.platform needs to be removed once all libraries have been updated
+# to use targetPlatform.
 RUNTEST_OPTS +=  \
 	--rootdir=. \
 	--config-file=$(CONFIG) \
 	-e 'config.platform="$(TARGETPLATFORM)"' \
+	-e 'config.targetPlatform="$(TARGETPLATFORM)"' \
+	-e 'config.hostPlatform="$(HOSTPLATFORM)"' \
 	-e 'config.os="$(TargetOS_CPP)"' \
 	-e 'config.arch="$(TargetARCH_CPP)"' \
 	-e 'config.wordsize="$(WORDSIZE)"' \

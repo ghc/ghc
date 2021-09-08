@@ -73,7 +73,9 @@ class TestConfig:
         self.no_print_summary = False
 
         # What platform are we running on?
-        self.platform = ''
+        self.platform = '' # XXX This needs to die eventually once all access to `platform` has been relinquished from the test-suite
+        self.targetPlatform = ''
+        self.hostPlatform = ''
         self.os = ''
         self.arch = ''
         self.msys = False
@@ -181,6 +183,10 @@ class TestConfig:
 
         # I have no idea what this does
         self.package_conf_cache_file = None # type: Optional[Path]
+
+        # test-wrapper, a program to run the executable through.
+        # the driver/id program is the identity test-wrapper.
+        self.test_wrapper = None
 
 
 global config
@@ -354,6 +360,9 @@ class TestOptions:
 
        # Command to run before the test
        self.pre_cmd = None
+
+       # Command prefix: a function to add a prefix to the command before running it
+       self.cmd_prefix = None
 
        # Command wrapper: a function to apply to the command before running it
        self.cmd_wrapper = None

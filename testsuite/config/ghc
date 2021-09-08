@@ -39,7 +39,7 @@ if config.have_profiling:
     config.compile_ways.append('profasm')
     config.run_ways.append('profasm')
 
-if config.have_interp:
+if config.have_interp and config.hostPlatform == config.targetPlatform:
     config.run_ways.append('ghci')
 
 if ghc_with_threaded_rts:

@@ -1,0 +1,9 @@
+#! /usr/bin/env bash
+#
+# This is the identity test-wrapper.  For native tests we do not need to run
+# executables through a wrapper, as we would need for cross compiled binaries.
+# Cross compiled binaries can be evaluated through WINE, qemu-xxx, nodejs, ...
+#
+# Therefore this backup identity test-wrapper is the default for native builds.
+#
+"$@"

@@ -488,8 +488,12 @@ def when(b: bool, f):
 def unless(b: bool, f):
     return when(not b, f)
 
+
+# Cross compilers can't do ghci (for now).  Once we
+# have ghci fully working via iserv (and a test-wrapper)
+# for the iserv process, this can probably work.
 def doing_ghci() -> bool:
-    return 'ghci' in config.run_ways
+    return 'ghci' in config.run_ways and config.hostPlatform == config.targetPlatform
 
 def ghc_dynamic() -> bool:
     return config.ghc_dynamic
@@ -497,8 +501,22 @@ def ghc_dynamic() -> bool:
 def fast() -> bool:
     return config.speed == 2
 
+# XXX: This needs to be removed once no remnants of platform are left.
 def platform( plat: str ) -> bool:
-    return config.platform == plat
+    "The platform this GHC targets. Deprecated: Use targetPlatform."
+    return targetPlatform( plat )
+
+def targetPlatform( plat: str ) -> bool:
+    "The platform GHC targets. This does not need to be the platform that GHC runs on."
+    return config.targetPlatform == plat
+
+def hostPlatform( plat: str ) -> bool:
+    "The platform GHC runs on. Does not need to be identical with the one for which GHC produces code."
+    return config.hostPlatform == plat
+
+def cross() -> bool:
+    "Is this a cross compiler?"
+    return config.hostPlatform != config.targetPlatform
 
 def opsys( os: str ) -> bool:
     return config.os == os
@@ -651,7 +669,7 @@ def cmd_prefix( prefix ):
     return lambda name, opts, p=prefix: _cmd_prefix(name, opts, prefix)
 
 def _cmd_prefix( name, opts, prefix ):
-    opts.cmd_wrapper = lambda cmd, p=prefix: p + ' ' + cmd;
+    opts.cmd_prefix = lambda cmd, p=prefix: p + ' ' + cmd;
 
 # ----
 
@@ -1593,15 +1611,42 @@ def simple_run(name: TestName, way: WayName, prog: str, extra_run_opts: str) -> 
     else:
         stats_args = ''
 
+    # 1. Build command
     # Put extra_run_opts last: extra_run_opts('+RTS foo') should work.
     cmd = ' '.join([prog, stats_args, my_rts_flags, extra_run_opts])
 
+    # 2. Apply the command prefix. This needs to happen before we apply
+    #    the test-wrapper.
+
+    if opts.cmd_prefix is not None:
+        cmd = opts.cmd_prefix(cmd)
+    else:
+        # (optional) 3. Add TEST_WRAPPER environment variable.
+        #
+        # We won't do this if command prefix is set, as the
+        # set prefix and the test-wrapper might interfere.
+        if config.test_wrapper is None:
+            test_wrapper = ""
+        else:
+            test_wrapper = "{config.test_wrapper} ".format(**locals())
+
+        # if cmd looks like we want to execute something, run it through
+        # the command wrapper.
+        if cmd.startswith("./"):
+            # we don't need to prefix cmd with anything if there is no
+            # test wrapper.
+            if config.test_wrapper is not None:
+                cmd = "{test_wrapper} {cmd}".format(**locals())
+        else:
+            cmd = 'TEST_WRAPPER="{test_wrapper}" && {cmd}'.format(**locals())
+
+    # 4. Apply cmd_wrapper if set.
     if opts.cmd_wrapper is not None:
         cmd = opts.cmd_wrapper(cmd)
 
     cmd = 'cd "{opts.testdir}" && {cmd}'.format(**locals())
 
-    # run the command
+    # 5. Finally, run the command
     exit_code = runCmd(cmd, stdin_arg, stdout_arg, stderr_arg, opts.run_timeout_multiplier)
 
     # check the exit code
@@ -1688,6 +1733,9 @@ def interpreter_run(name: TestName,
 
     cmd = ('{{compiler}} {srcname} {flags} {extra_hc_opts}'
           ).format(**locals())
+
+    if opts.cmd_prefix is not None:
+        cmd = opts.cmd_prefix(cmd);
 
     if opts.cmd_wrapper is not None:
         cmd = opts.cmd_wrapper(cmd);
@@ -1963,8 +2011,8 @@ def compare_outputs(way: WayName,
         elif config.accept and actual_raw:
             if config.accept_platform:
                 if_verbose(1, 'Accepting new output for platform "'
-                              + config.platform + '".')
-                expected_path += '-' + config.platform
+                              + config.targetPlatform + '".')
+                expected_path += '-' + config.targetPlatform
             elif config.accept_os:
                 if_verbose(1, 'Accepting new output for os "'
                               + config.os + '".')
@@ -2403,7 +2451,7 @@ def find_expected_file(name: TestName, suff: str) -> Path:
     basename = getTestOpts().use_specs.get(suff, basename)
 
     files = [str(basename) + ws + plat
-             for plat in ['-' + config.platform, '-' + config.os, '']
+             for plat in ['-' + config.targetPlatform, '-' + config.os, '']
              for ws in ['-ws-' + config.wordsize, '']]
 
     for f in files:
