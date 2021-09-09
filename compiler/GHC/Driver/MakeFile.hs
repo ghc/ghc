@@ -73,15 +73,17 @@ doMkDependHS srcs = do
     -- We therefore do the initial dependency generation with an empty
     -- way and .o/.hi extensions, regardless of any flags that might
     -- be specified.
-    let dflags = dflags0
+    let dflags1 = dflags0
             { targetWays_ = Set.empty
             , hiSuf_      = "hi"
             , objectSuf_  = "o"
             }
-    GHC.setSessionDynFlags dflags
+    GHC.setSessionDynFlags dflags1
 
-    when (null (depSuffixes dflags)) $ liftIO $
-        throwGhcExceptionIO (ProgramError "You must specify at least one -dep-suffix")
+    -- If no suffix is provided, use the default -- the empty one
+    let dflags = if null (depSuffixes dflags1)
+                 then dflags1 { depSuffixes = [""] }
+                 else dflags1
 
     tmpfs <- hsc_tmpfs <$> getSession
     files <- liftIO $ beginMkDependHS logger tmpfs dflags

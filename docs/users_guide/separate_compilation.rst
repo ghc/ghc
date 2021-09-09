@@ -1297,7 +1297,7 @@ following to your ``Makefile``:
 .. code-block:: make
 
     depend :
-            ghc -dep-suffix '' -M $(HC_OPTS) $(SRCS)
+            ghc -M $(HC_OPTS) $(SRCS)
 
 Now, before you start compiling, and any time you change the ``imports``
 in your program, do ``make depend`` before you do ``make cool_pgm``. The command
@@ -1401,8 +1401,7 @@ generation are:
     Multiple ``-dep-suffix`` flags are permitted. For example,
     ``-dep-suffix a_ -dep-suffix b_`` will make dependencies for ``.hs``
     on ``.hi``, ``.a_hs`` on ``.a_hi``, and ``.b_hs`` on ``.b_hi``.
-    Note that you must provide at least one suffix; if you do not want a suffix
-    then pass ``-dep-suffix ''``.
+    If you do not use this flag then the empty suffix is used.
 
 .. ghc-flag:: --exclude-module=⟨file⟩
     :shortdesc: Regard ``⟨file⟩`` as "stable"; i.e., exclude it from having
