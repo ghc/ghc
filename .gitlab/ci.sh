@@ -66,6 +66,10 @@ Environment variables affecting both build systems:
                     Whether to ignore perf failures (one of "increases",
                     "decreases", or "all")
   HERMETIC          Take measures to avoid looking at anything in \$HOME
+  CONFIGURE_ARGS    Arguments passed to configure script.
+  INSTALL_CONFIGURE_ARGS
+                    Arguments passed to the binary distribution configure script
+                    during installation of test toolchain.
 
 Environment variables determining build configuration of Make system:
 
@@ -466,6 +470,21 @@ function test_hadrian() {
     return
   fi
 
+  # Ensure that statically-linked builds are actually static
+  if [[ "${BUILD_FLAVOUR}" = *static* ]]; then
+    bad_execs=""
+    for binary in _build/stage1/bin/*; do
+      if ldd "${binary}" &> /dev/null; then
+        warn "${binary} is not static!"
+        ldd "${binary}"
+        echo
+        bad_execs="$bad_execs $binary"
+      fi
+    done
+    if [ -n "$bad_execs" ]; then
+      error "the following executables contain dynamic-object references: $bad_execs"
+    fi
+  fi
 
   cd _build/bindist/ghc-*/
   case "$(uname)" in
@@ -474,7 +493,8 @@ function test_hadrian() {
       cp -a * "$TOP"/_build/install
       ;;
     *)
-      run ./configure --prefix="$TOP"/_build/install
+      read -r -a args <<< "${INSTALL_CONFIGURE_ARGS:-}"
+      run ./configure --prefix="$TOP"/_build/install "${args[@]}"
       run "$MAKE" install
       ;;
   esac
