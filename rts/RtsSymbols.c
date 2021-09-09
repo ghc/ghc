@@ -59,7 +59,7 @@
       SymI_HasProto(signal_handlers)            \
       SymI_HasProto(stg_sig_install)            \
       SymI_HasProto(rtsTimerSignal)             \
-      SymI_HasProto(atexit)                     \
+      SymI_HasProto_redirect(atexit, atexit, STRENGTH_STRONG) /* See Note [Strong symbols] */ \
       SymI_NeedsDataProto(environ)              \
       SymI_NeedsDataProto(nocldstop)
 #endif
@@ -88,6 +88,15 @@
  * which is loaded later. GHC generalizes this notion, allowing symbol
  * definitions to be declared as *strong*. A strong symbol is one which will
  * silently supercede definitions of the same name by later objects.
+ *
+ * This is currently only used in the case of atexit() to workaround an
+ * unfortunate interaction on musl systems (#20350). Specifically,
+ * we include atexit() in RtsSymbols to ensure that it can be used by foreign
+ * code loaded by the RTS linker (see #4456). However, this causes trouble on
+ * statically-linked musl systems since musl's libc.a defines atexit() as a
+ * non-weak symbol, causing it to conflict with the symbol table entry produced
+ * by the RtsSymbols entry. To avoid this we introduce a horrible special case
+ * in `ghciInsertSymbolTable`, ensure that `atexit` is never overridden.
  */
 /*
  * Note [Symbols for MinGW's printf]
