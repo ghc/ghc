@@ -22,7 +22,7 @@ CABAL_CONSTRAINT := --constraint="Cabal == $(CABAL_DOTTED_VERSION)"
 # generate MIN_VERSION_<pkgname>() CPP macros. The generation of those
 # macros is triggered by `-hide-all-packages`, so we have to explicitly
 # enumerate all packages we need in scope.
-CABAL_BUILD_DEPS := ghc-prim base binary array transformers time containers bytestring deepseq process pretty directory filepath template-haskell
+CABAL_BUILD_DEPS := ghc-prim base binary array transformers time containers bytestring deepseq process pretty directory filepath template-haskell text
 ifeq "$(Windows_Host)" "YES"
 CABAL_BUILD_DEPS += Win32
 else
@@ -76,14 +76,6 @@ $(ghc-cabal_DIST_BINARY): $(CABAL_LEXER_DEP) utils/ghc-cabal/Main.hs $(TOUCH_DEP
 	       -ilibraries/filepath \
 	       -ilibraries/hpc \
 	       -ilibraries/mtl \
-	       -ilibraries/text/src \
-	       libraries/text/cbits/is_ascii.c \
-	       libraries/text/cbits/measure_off.c \
-	       libraries/text/cbits/reverse.c \
-	       libraries/text/cbits/utils.c \
-	       libraries/text/cbits/simdutf.cpp \
-	       libraries/text/cbits/validate_utf8.cpp \
-	       -Ilibraries/text/include \
 	       -ilibraries/parsec/src \
 	       $(utils/ghc-cabal_dist_EXTRA_HC_OPTS) \
 	       $(EXTRA_HC_OPTS)
