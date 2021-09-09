@@ -154,6 +154,17 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
     <td>-O</td>
     <td>-O</td>
   </tr>
+  <tr>
+    <th>static</td>
+    <td>-O<br>-H64m<br>-fPIC -static</td>
+    <td>-O<br>-H64m<br>-fPIC -static</td>
+    <td></td>
+    <td>-O2</td>
+    <td>-O2</td>
+    <td>-O2</td>
+    <td>-O<br>-optl -static</td>
+    <td>-O2<br>-optl -static</td>
+  </tr>
 </table>
 
 ## Flavour transformers
@@ -231,6 +242,16 @@ The supported transformers are listed below:
     </tr>
 </table>
 
+### Static
+
+The `static` flavour does not strictly follow the groupings in the table
+above because it links all the executables statically, not just GHC
+itself, and because it passes `-optc -static` when delegating to a C
+compiler.  It also adds the `-dynamic-system-linker` cabal flag to the
+`ghc` package build and only adds static flags when building in a
+non-dynamic _way_.  Some of the considerations for a static build aren't
+a great fit for the flavour system, so it's a little bit hacky.
+
 ## Ways
 
 Libraries and GHC can be built in different _ways_, e.g. with or without profiling
@@ -264,6 +285,19 @@ information. The following table lists ways that are built in different flavours
         <br>debugDynamic<br>threadedDynamic<br>threadedDebugDynamic
         <br>loggingDynamic<br>threadedLoggingDynamic
     </td>
+</tr>
+<tr>
+    <th>static</td>
+    <td>vanilla</td>
+    <td>vanilla<br>profiling</td>
+    <td>logging<br>debug<br>threaded<br>threadedDebug<br>threadedLogging
+    </td>
+    <td>
+        logging<br>debug<br>threaded<br>threadedDebug<br>
+        threadedLogging<br>threadedProfiling
+    </td>
+    <td>Only in<br>prof<br>flavour</td>
+    <td>Only in<br>prof<br>flavour</td>
 </tr>
 <tr>
     <th>quick<br>quick-validate<br>quick-debug</th>
