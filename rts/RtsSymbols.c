@@ -80,6 +80,16 @@
 #endif
 
 /*
+ * Note [Strong symbols]
+ * ~~~~~~~~~~~~~~~~~~~~~
+ *
+ * The notion of a *weak* symbol is fairly common in linking: a symbol is weak
+ * if it is declared but not defined, allowing it to be defined by an object
+ * which is loaded later. GHC generalizes this notion, allowing symbol
+ * definitions to be declared as *strong*. A strong symbol is one which will
+ * silently supercede definitions of the same name by later objects.
+ */
+/*
  * Note [Symbols for MinGW's printf]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  *
@@ -149,9 +159,9 @@
       /* ^^ Need to figure out why this is needed.  */   \
       /* See Note [_iob_func symbol] */                  \
       RTS_WIN64_ONLY(SymI_HasProto_redirect(             \
-         __imp___acrt_iob_func, __rts_iob_func, true))   \
+         __imp___acrt_iob_func, __rts_iob_func, STRENGTH_WEAK))   \
       RTS_WIN32_ONLY(SymI_HasProto_redirect(             \
-         __imp____acrt_iob_func, __rts_iob_func, true))  \
+         __imp____acrt_iob_func, __rts_iob_func, STRENGTH_WEAK))  \
       SymI_HasProto(__mingw_vsnwprintf)                  \
       /* ^^ Need to figure out why this is needed.  */   \
       SymI_HasProto(__mingw_vfprintf)                    \
@@ -1050,7 +1060,7 @@
 #define SymE_HasProto(vvv)    SymI_HasProto(vvv)
 #endif
 #define SymI_HasProto(vvv) /**/
-#define SymI_HasProto_redirect(vvv,xxx,weak) /**/
+#define SymI_HasProto_redirect(vvv,xxx,strength) /**/
 #define SymI_HasProto_deprecated(vvv) /**/
 RTS_SYMBOLS
 RTS_RET_SYMBOLS
@@ -1071,11 +1081,11 @@ RTS_LIBFFI_SYMBOLS
 #undef SymE_NeedsDataProto
 
 #define SymI_HasProto(vvv) { MAYBE_LEADING_UNDERSCORE_STR(#vvv), \
-                    (void*)(&(vvv)), false },
+                    (void*)(&(vvv)), STRENGTH_NORMAL },
 #define SymI_HasDataProto(vvv) \
                     SymI_HasProto(vvv)
 #define SymE_HasProto(vvv) { MAYBE_LEADING_UNDERSCORE_STR(#vvv), \
-            (void*)DLL_IMPORT_DATA_REF(vvv), false },
+            (void*)DLL_IMPORT_DATA_REF(vvv), STRENGTH_NORMAL },
 #define SymE_HasDataProto(vvv) \
                     SymE_HasProto(vvv)
 
@@ -1086,9 +1096,9 @@ RTS_LIBFFI_SYMBOLS
 
 // SymI_HasProto_redirect allows us to redirect references to one symbol to
 // another symbol.  See newCAF/newRetainedCAF/newGCdCAF for an example.
-#define SymI_HasProto_redirect(vvv,xxx,weak) \
+#define SymI_HasProto_redirect(vvv,xxx,strength) \
     { MAYBE_LEADING_UNDERSCORE_STR(#vvv),    \
-      (void*)(&(xxx)), weak },
+      (void*)(&(xxx)), strength },
 
 // SymI_HasProto_deprecated allows us to redirect references from their deprecated
 // names to the undeprecated ones. e.g. access -> _access.
@@ -1098,7 +1108,7 @@ RTS_LIBFFI_SYMBOLS
 // define them, since on Windows these functions shouldn't be in the top level
 // namespace, but we have them for POSIX compatibility.
 #define SymI_HasProto_deprecated(vvv)   \
-   { #vvv, (void*)0xBAADF00D, true },
+   { #vvv, (void*)0xBAADF00D, STRENGTH_WEAK },
 
 RtsSymbolVal rtsSyms[] = {
       RTS_SYMBOLS
@@ -1115,7 +1125,7 @@ RtsSymbolVal rtsSyms[] = {
       // dyld stub code contains references to this,
       // but it should never be called because we treat
       // lazy pointers as nonlazy.
-      { "dyld_stub_binding_helper", (void*)0xDEADBEEF, false },
+      { "dyld_stub_binding_helper", (void*)0xDEADBEEF, STRENGTH_NORMAL },
 #endif
-      { 0, 0, false } /* sentinel */
+      { 0, 0, STRENGTH_NORMAL } /* sentinel */
 };

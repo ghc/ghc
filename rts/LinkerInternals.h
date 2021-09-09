@@ -345,6 +345,12 @@ extern Mutex dl_mutex;
 /* Type of the initializer */
 typedef void (*init_t) (int argc, char **argv, char **env);
 
+typedef enum _SymStrength {
+    STRENGTH_NORMAL,
+    STRENGTH_WEAK,
+    STRENGTH_STRONG,
+} SymStrength;
+
 /* SymbolInfo tracks a symbol's address, the object code from which
    it originated, and whether or not it's weak.
 
@@ -360,7 +366,7 @@ typedef void (*init_t) (int argc, char **argv, char **env);
 typedef struct _RtsSymbolInfo {
     SymbolAddr* value;
     ObjectCode *owner;
-    HsBool weak;
+    SymStrength strength;
 } RtsSymbolInfo;
 
 void exitLinker( void );
@@ -389,7 +395,7 @@ int ghciInsertSymbolTable(
     StrHashTable *table,
     const SymbolName* key,
     SymbolAddr* data,
-    HsBool weak,
+    SymStrength weak,
     ObjectCode *owner);
 
 /* Lock-free version of lookupSymbol. When 'dependent' is not NULL, adds it as a

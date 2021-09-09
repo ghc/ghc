@@ -266,7 +266,7 @@ int ghciInsertSymbolTable(
    StrHashTable *table,
    const SymbolName* key,
    SymbolAddr* data,
-   HsBool weak,
+   SymStrength strength,
    ObjectCode *owner)
 {
    RtsSymbolInfo *pinfo = lookupStrHashTable(table, key);
@@ -275,18 +275,27 @@ int ghciInsertSymbolTable(
       pinfo = stgMallocBytes(sizeof (*pinfo), "ghciInsertToSymbolTable");
       pinfo->value = data;
       pinfo->owner = owner;
-      pinfo->weak = weak;
+      pinfo->strength = strength;
       insertStrHashTable(table, key, pinfo);
       return 1;
    }
-   else if (weak && data && pinfo->weak && !pinfo->value)
+   else if (pinfo->strength == STRENGTH_STRONG)
+   {
+       /* The existing symbol is strong meaning we must never override it */
+       IF_DEBUG(linker, debugBelch("%s is already defined as a strong symbol; ignoring redefinition...", key));
+       return 1;
+   }
+   else if (strength == STRENGTH_WEAK &&
+            data &&
+            pinfo->strength == STRENGTH_WEAK &&
+            !pinfo->value)
    {
        /* The existing symbol is weak with a zero value; replace it with the new symbol. */
        pinfo->value = data;
        pinfo->owner = owner;
        return 1;
    }
-   else if (weak)
+   else if (strength == STRENGTH_WEAK)
    {
        return 1; /* weak symbol, because the symbol is weak, data = 0 and we
                  already know of another copy throw this one away.
@@ -296,12 +305,12 @@ int ghciInsertSymbolTable(
                  This also preserves the semantics of linking against
                  the first symbol we find. */
    }
-   else if (pinfo->weak && !weak) /* weak symbol is in the table */
+   else if (pinfo->strength == STRENGTH_WEAK && strength != STRENGTH_WEAK) /* weak symbol is in the table */
    {
       /* override the weak definition with the non-weak one */
       pinfo->value = data;
       pinfo->owner = owner;
-      pinfo->weak = HS_BOOL_FALSE;
+      pinfo->strength = strength;
       return 1;
    }
    else if (  pinfo->owner
@@ -322,7 +331,7 @@ int ghciInsertSymbolTable(
        if (owner && (owner->status == OBJECT_NEEDED || owner->status == OBJECT_RESOLVED)) {
            pinfo->value = data;
            pinfo->owner = owner;
-           pinfo->weak  = weak;
+           pinfo->strength = strength;
        }
 
        return 1;
@@ -376,10 +385,11 @@ HsBool ghciLookupSymbolInfo(StrHashTable *table,
         *result = NULL;
         return HS_BOOL_FALSE;
     }
-    if (pinfo->weak)
+    if (pinfo->strength == STRENGTH_WEAK) {
         IF_DEBUG(linker, debugBelch("lookupSymbolInfo: promoting %s\n", key));
-    /* Once it's looked up, it can no longer be overridden */
-    pinfo->weak = HS_BOOL_FALSE;
+        /* Once it's looked up, it can no longer be overridden */
+        pinfo->strength = STRENGTH_NORMAL;
+    }
 
     *result = pinfo;
     return HS_BOOL_TRUE;
@@ -412,7 +422,6 @@ void initLinker (void)
 void
 initLinker_ (int retain_cafs)
 {
-    RtsSymbolVal *sym;
 #if defined(OBJFORMAT_ELF) || defined(OBJFORMAT_MACHO)
     int compileResult;
 #endif
@@ -441,10 +450,10 @@ initLinker_ (int retain_cafs)
     symhash = allocStrHashTable();
 
     /* populate the symbol table with stuff from the RTS */
-    for (sym = rtsSyms; sym->lbl != NULL; sym++) {
+    for (const RtsSymbolVal *sym = rtsSyms; sym->lbl != NULL; sym++) {
         if (! ghciInsertSymbolTable(WSTR("(GHCi built-in symbols)"),
                                     symhash, sym->lbl, sym->addr,
-                                    sym->weak, NULL)) {
+                                    sym->strength, NULL)) {
             barf("ghciInsertSymbolTable failed");
         }
         IF_DEBUG(linker, debugBelch("initLinker: inserting rts symbol %s, %p\n", sym->lbl, sym->addr));
