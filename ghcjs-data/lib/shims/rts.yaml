@@ -4,6 +4,8 @@ js:
   - lib/typedarray/typedarray.js
   - lib/setImmediate/setImmediate.js.pp
   - lib/closure-library/closure/goog/math/long.js
+  - lib/closure-library/closure/goog/crypt/hash.js
+  - lib/closure-library/closure/goog/crypt/md5.js
   - src/structs.js.pp
   - src/mem.js.pp
   - src/compact.js.pp
