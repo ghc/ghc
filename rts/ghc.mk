@@ -199,11 +199,12 @@ rts_$1_LIB_FILE = libHSrts$$($1_libsuf)
 rts_$1_LIB = rts/dist-install/build/$$(rts_$1_LIB_FILE)
 
 rts_$1_C_OBJS      = $$(patsubst rts/%.c,rts/dist-install/build/%.$$($1_osuf),$$(rts_C_SRCS)) $$(patsubst %.c,%.$$($1_osuf),$$(rts_$1_EXTRA_C_SRCS))
+rts_$1_CXX_OBJS    = $$(patsubst rts/%.c,rts/dist-install/build/%.$$($1_osuf),$$(rts_CXX_SRCS))
 rts_$1_C_HOOK_OBJS = $$(patsubst rts/hooks/%.c,rts/dist-install/build/hooks/%.$$($1_osuf),$$(rts_C_HOOK_SRCS))
 rts_$1_S_OBJS      = $$(patsubst rts/%.S,rts/dist-install/build/%.$$($1_osuf),$$(rts_S_SRCS))
 rts_$1_CMM_OBJS    = $$(patsubst rts/%.cmm,rts/dist-install/build/%.$$($1_osuf),$$(rts_CMM_SRCS)) $$(patsubst %.cmm,%.$$($1_osuf),$$(rts_AUTO_APPLY_CMM))
 
-rts_$1_OBJS = $$(rts_$1_C_OBJS) $$(rts_$1_S_OBJS) $$(rts_$1_CMM_OBJS)
+rts_$1_OBJS = $$(rts_$1_C_OBJS) $$(rts_$1_CXX_OBJS) $$(rts_$1_S_OBJS) $$(rts_$1_CMM_OBJS)
 
 ifeq "$(USE_DTRACE)" "YES"
 ifeq "$(NEED_DTRACE_PROBES_OBJ)" "YES"
@@ -574,6 +575,7 @@ rts_dist-install_C_SRCS    = $(rts_C_SRCS) $(rts_thr_EXTRA_C_SRCS)
 rts_dist-install_S_SRCS    = $(rts_S_SRCS)
 rts_dist-install_CMM_SRCS  = $(rts_CMM_SRCS)
 rts_dist-install_C_FILES   = $(rts_dist-install_C_SRCS)
+rts_dist-install_CXX_FILES = $(rts_dist-install_CXX_SRCS)
 rts_dist-install_S_FILES   = $(rts_dist-install_S_SRCS)
 rts_dist-install_CMM_FILES = $(rts_dist-install_CMM_SRCS)
 

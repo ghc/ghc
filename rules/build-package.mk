@@ -112,7 +112,8 @@ $(call dependencies,$1,$2,$3)
 # Now generate all the build rules for each way in this directory:
 $$(foreach way,$$($1_$2_WAYS),$$(eval \
     $$(call c-objs,$1,$2,$$(way)) \
-    $$(call c-suffix-rules,$1,$2,$$(way),YES) \
+		$$(call c-suffix-rules,$1,$2,$$(way),YES) \
+    $$(call cxx-suffix-rules,$1,$2,$$(way),YES) \
     $$(call cmm-objs,$1,$2,$$(way)) \
     $$(call cmm-suffix-rules,$1,$2,$$(way)) \
     $$(call build-package-way,$1,$2,$$(way),$3) \
@@ -138,6 +139,9 @@ endif
 ifeq "$$(BuildSharedLibs)" "YES"
 $(call c-objs,$1,$2,dyn)
 $(call c-suffix-rules,$1,$2,dyn,YES)
+$(call cxx-suffix-rules,$1,$2,dyn,YES)
+$(call cmm-objs,$1,$2,dyn)
+$(call cmm-suffix-rules,$1,$2,dyn,YES)
 endif
 $$(foreach dir,$$($1_$2_HS_SRC_DIRS),\
   $$(eval $$(call hs-suffix-rules-srcdir,$1,$2,$$(dir))))

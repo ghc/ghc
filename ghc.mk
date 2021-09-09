@@ -308,6 +308,7 @@ include rules/hs-suffix-way-rules-srcdir.mk
 include rules/hs-suffix-way-rules.mk
 include rules/hi-rule.mk
 include rules/c-suffix-rules.mk
+include rules/cxx-suffix-rules.mk
 include rules/cmm-suffix-rules.mk
 endif
 

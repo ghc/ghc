@@ -21,6 +21,7 @@ $1_$2_depfile_haskell = $$($1_$2_depfile_base).haskell
 $1_$2_depfile_c_asm = $$($1_$2_depfile_base).c_asm
 
 $1_$2_C_FILES_DEPS = $$(filter-out $$($1_$2_C_FILES_NODEPS),$$($1_$2_C_FILES))
+$1_$2_CXX_FILES_DEPS = $$(filter-out $$($1_$2_CXX_FILES_NODEPS),$$($1_$2_CXX_FILES))
 
 $1_$2_MKDEPENDHS_FLAGS = -dep-makefile $$($1_$2_depfile_haskell).tmp $$(foreach way,$$($1_$2_WAYS),-dep-suffix "$$(patsubst %o,%,$$($$(way)_osuf))")
 $1_$2_MKDEPENDHS_FLAGS += -include-pkg-deps
@@ -67,15 +68,17 @@ endif
 # includes files.
 $$($1_$2_depfile_c_asm) : $$(includes_$3_H_CONFIG) $$(includes_$3_H_PLATFORM)
 
-$$($1_$2_depfile_c_asm) : $$($1_$2_C_FILES_DEPS) $$($1_$2_S_FILES) $$($1_$2_CMM_FILES) | $$$$(dir $$$$@)/.
+$$($1_$2_depfile_c_asm) : $$($1_$2_C_FILES_DEPS) $$($1_$2_CXX_FILES_DEPS) $$($1_$2_S_FILES) $$($1_$2_CMM_FILES) | $$$$(dir $$$$@)/.
 	$$(call removeFiles,$$@.tmp)
-ifneq "$$(strip $$($1_$2_C_FILES_DEPS) $$($1_$2_S_FILES)) $$($1_$2_CMM_FILES))" ""
+ifneq "$$(strip $$($1_$2_C_FILES_DEPS) $$($1_$2_CXX_FILES_DEPS) $$($1_$2_S_FILES)) $$($1_$2_CMM_FILES))" ""
 # We ought to actually do this for each way in $$($1_$2_WAYS), but then
 # it takes a long time to make the C deps for the RTS (30 seconds rather
 # than 3), so instead we just pass the list of ways in and let addCFileDeps
 # copy the deps for each way on the assumption that they are the same
 	$$(foreach f,$$($1_$2_C_FILES_DEPS) $$($1_$2_S_FILES) $$($1_$2_CMM_FILES), \
-	    $$(call addCFileDeps,$1,$2,$$($1_$2_depfile_c_asm),$$f,$$($1_$2_WAYS)))
+	    $$(call addCFileDeps,$1,$2,$$($1_$2_depfile_c_asm),$$f,$$($1_$2_WAYS),"c"))
+	$$(foreach f,$$($1_$2_CXX_FILES_DEPS), \
+	    $$(call addCFileDeps,$1,$2,$$($1_$2_depfile_c_asm),$$f,$$($1_$2_WAYS),"c++"))
 	$$(call removeFiles,$$@.bit)
 endif
 	echo "$1_$2_depfile_c_asm_EXISTS = YES" >> $$@.tmp
@@ -97,6 +100,7 @@ endef
 # $3 = depfile
 # $4 = file
 # $5 = ways
+# $6 = lang (c or c++)
 #
 # The formatting of this definition (e.g. the blank line above) is
 # important, in order to get make to generate the right makefile code.
@@ -145,7 +149,7 @@ endef
 
 define addCFileDeps
 
-	$(CPP) $($1_$2_MKDEPENDC_OPTS) $($1_$2_$(firstword $($1_$2_WAYS))_ALL_CC_OPTS) $($(basename $4)_CC_OPTS) -MM -x c $4 -MF $3.bit
+	$(CPP) $($1_$2_MKDEPENDC_OPTS) $($1_$2_$(firstword $($1_$2_WAYS))_ALL_CC_OPTS) $($(basename $4)_CC_OPTS) -MM -x $6 $4 -MF $3.bit
 	$(foreach w,$5,sed -e 's|\\|/|g' -e 's| /$$| \\|' -e "1s|\.o|\.$($w_osuf)|" -e "1s|^|$(dir $4)|" -e "1s|$1/|$1/$2/build/|" -e "1s|$2/build/$2/build|$2/build|g" -e "s|^$(TOP)/||g$(CASE_INSENSITIVE_SED)" $3.bit >> $3.tmp &&) true
 endef
 

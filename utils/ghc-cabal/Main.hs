@@ -452,6 +452,7 @@ generate directory distdir config_args
                 variablePrefix ++ "_EXTRA_LIBDIRS = " ++ unwords (extraLibDirs bi),
                 variablePrefix ++ "_S_SRCS = " ++ unwords (asmSources bi),
                 variablePrefix ++ "_C_SRCS  = " ++ unwords (cSources bi),
+                variablePrefix ++ "_CXX_SRCS  = " ++ unwords (cxxSources bi),
                 variablePrefix ++ "_CMM_SRCS = " ++ unwords (cmmSources bi),
                 variablePrefix ++ "_DATA_FILES = "    ++ unwords (dataFiles pd),
                 -- XXX This includes things it shouldn't, like:
