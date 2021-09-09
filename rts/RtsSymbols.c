@@ -60,6 +60,7 @@
       SymI_HasProto(stg_sig_install)            \
       SymI_HasProto(rtsTimerSignal)             \
       SymI_HasProto(atexit)                     \
+      SymI_NeedsDataProto(environ)              \
       SymI_NeedsDataProto(nocldstop)
 #endif
 
