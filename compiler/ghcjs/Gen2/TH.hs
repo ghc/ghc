@@ -316,7 +316,7 @@ linkTh :: GhcjsEnv
        -> Maybe ByteString     -- current module or Nothing to get the initial code + rts
        -> IO Gen2.LinkResult
 linkTh env settings js_files dflags pkgs hpt code = do
-  (th_deps_pkgs, th_deps)  <- Gen2.thDeps dflags
+  (th_deps_pkgs, th_deps)  <- Gen2.thDeps dflags pkgs
   let home_mod_infos = eltsUDFM hpt
       pkgs' | isJust code = L.nub $ pkgs ++ th_deps_pkgs
             | otherwise   = th_deps_pkgs

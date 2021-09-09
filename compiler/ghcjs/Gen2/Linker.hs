@@ -212,7 +212,7 @@ link' dflags env settings target _include pkgs objFiles jsFiles isRootFun extraS
         NoBase        -> return emptyBase
         BaseFile file -> Compactor.loadBase file
         BaseState b   -> return b
-      (rdPkgs, rds) <- rtsDeps dflags
+      (rdPkgs, rds) <- rtsDeps dflags pkgs
       -- c   <- newMVar M.empty
       let rtsPkgs     =  map stringToInstalledUnitId
                              ["@rts", "@rts_" ++ buildTag dflags]
@@ -567,29 +567,45 @@ instance FromJSON StaticDeps where
   parseJSON _          = mempty
 
 -- | dependencies for the RTS, these need to be always linked
-rtsDeps :: DynFlags -> IO ([InstalledUnitId], Set Fun)
-rtsDeps dflags = readSystemDeps dflags
+rtsDeps :: DynFlags -> [InstalledUnitId] -> IO ([InstalledUnitId], Set Fun)
+rtsDeps dflags pkgs = readSystemDeps dflags pkgs
                                 "RTS"
                                 "linking"
                                 "rtsdeps.yaml"
 
 -- | dependencies for the Template Haskell, these need to be linked when running
 --   Template Haskell (in addition to the RTS deps)
-thDeps :: DynFlags -> IO ([InstalledUnitId], Set Fun)
-thDeps dflags = readSystemDeps dflags
+thDeps :: DynFlags -> [InstalledUnitId] -> IO ([InstalledUnitId], Set Fun)
+thDeps dflags pkgs = readSystemDeps dflags pkgs
                                "Template Haskell"
                                "running Template Haskell"
                                "thdeps.yaml"
 
 readSystemDeps :: DynFlags
+               -> [InstalledUnitId]
                -> String
                -> String
                -> FilePath
                -> IO ([InstalledUnitId], Set Fun)
-readSystemDeps dflags depsName requiredFor file
+readSystemDeps dflags pkgs depsName requiredFor file = do
+  (deps_pkgs, deps_funs) <- readSystemDeps' dflags depsName requiredFor file
+  pure ( filter (`S.member` linked_pkgs) deps_pkgs
+       , S.filter (\fun -> funPackage fun `S.member` linked_pkgs_pkg) deps_funs
+       )
+
+  where
+    linked_pkgs     = S.fromList pkgs
+    linked_pkgs_pkg = S.fromList (map (Package . T.pack . installedUnitIdString) pkgs)
+
+
+readSystemDeps' :: DynFlags
+               -> String
+               -> String
+               -> FilePath
+               -> IO ([InstalledUnitId], Set Fun)
+readSystemDeps' dflags depsName requiredFor file
   -- hardcode contents to get rid of yaml dep
   -- XXX move runTHServer to some suitable wired-in package
-  -- | True = pure ([], mempty) -- XXX to fix booting
   | file == "thdeps.yaml" = pure ( [stringToInstalledUnitId "base"]
                                  , S.fromList $ d "base" "GHCJS.Prim.TH.Eval" ["runTHServer"])
   | file == "rtsdeps.yaml" = pure ( [stringToInstalledUnitId "base"
