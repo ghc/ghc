@@ -265,7 +265,7 @@ T11272:
 # We expect to see a $wfoo worker that doesn't take any dictionaries.
 .PHONY: T12600
 T12600:
-	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O -ddump-prep -dsuppress-all -dsuppress-uniques -dno-suppress-type-signatures -dppr-cols=200 T12600.hs | grep "wfoo" | head -n 1
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O -ddump-prep -dsuppress-all -dsuppress-uniques -dno-suppress-type-signatures -dppr-cols=200 T12600.hs | grep "wfoo *::"
 
 # We don't expect to case match on any literal numbers other than
 # 0 or 1. See T14140.hs for an explanation.
