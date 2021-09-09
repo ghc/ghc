@@ -1060,6 +1060,17 @@
 #define RTS_LIBGCC_SYMBOLS
 #endif
 
+#if !defined(DYNAMIC) && defined(linux_HOST_OS)
+// we need these for static musl builds. However when
+// linking shared objects (DLLs) this will fail, hence
+// we do not include them when building with -DDYNAMIC
+#define RTS_FINI_ARRAY_SYMBOLS                         \
+      SymI_NeedsProto(__fini_array_start)              \
+      SymI_NeedsProto(__fini_array_end)
+#else
+#define RTS_FINI_ARRAY_SYMBOLS
+#endif
+
 /* entirely bogus claims about types of these symbols */
 #define SymI_NeedsProto(vvv)  extern void vvv(void);
 #define SymI_NeedsDataProto(vvv)  extern StgWord vvv[];
@@ -1087,6 +1098,7 @@ RTS_MINGW_ONLY_SYMBOLS
 RTS_DARWIN_ONLY_SYMBOLS
 RTS_OPENBSD_ONLY_SYMBOLS
 RTS_LIBGCC_SYMBOLS
+RTS_FINI_ARRAY_SYMBOLS
 RTS_LIBFFI_SYMBOLS
 #undef SymI_NeedsProto
 #undef SymI_NeedsDataProto
@@ -1137,6 +1149,7 @@ RtsSymbolVal rtsSyms[] = {
       RTS_DARWIN_ONLY_SYMBOLS
       RTS_OPENBSD_ONLY_SYMBOLS
       RTS_LIBGCC_SYMBOLS
+      RTS_FINI_ARRAY_SYMBOLS
       RTS_LIBFFI_SYMBOLS
       SymI_HasDataProto(nonmoving_write_barrier_enabled)
 #if defined(darwin_HOST_OS) && defined(i386_HOST_ARCH)
