@@ -200,7 +200,7 @@ collectShim base (pkgName, pkgVer) = do
 
 checkShimsInstallation :: FilePath -> IO ()
 checkShimsInstallation base = do
-  e <- doesFileExist (base </> "base.json")
+  e <- doesFileExist (base </> "rts.json")
   unless e (error $ "Shims repository not found in `" ++ base ++ "'.")
 
 foldShim :: Pkg -> Version -> Shim -> [FilePath]
