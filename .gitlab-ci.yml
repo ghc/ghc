@@ -989,9 +989,11 @@ release-x86_64-linux-ubuntu2004:
   allow_failure: true
   variables:
     TEST_ENV: "x86_64-linux-alpine"
+    BUILD_FLAVOUR: "static"
     BIN_DIST_NAME: "ghc-x86_64-alpine-linux"
     # Can't use ld.gold due to #13958.
     CONFIGURE_ARGS: "--disable-ld-override"
+    INSTALL_CONFIGURE_ARGS: "--disable-ld-override"
     HADRIAN_ARGS: "--docs=no-sphinx"
     # encoding004 due to lack of locale support
     # T10458 due to fact that dynamic linker tries to reload libAS
@@ -1002,12 +1004,16 @@ release-x86_64-linux-ubuntu2004:
     when: always
     expire_in: 2 week
 
+validate-x86_64-linux-alpine-hadrian:
+  extends: .build-x86_64-linux-alpine-hadrian
+
 release-x86_64-linux-alpine-integer-simple:
   extends:
     - .build-x86_64-linux-alpine-hadrian
     - .release
   variables:
     BIGNUM_BACKEND: native
+    BUILD_FLAVOUR: "static"
 
 release-x86_64-linux-alpine-integer-gmp:
   extends:
@@ -1015,6 +1021,7 @@ release-x86_64-linux-alpine-integer-gmp:
     - .release
   variables:
     BIGNUM_BACKEND: gmp
+    BUILD_FLAVOUR: "static"
 
 nightly-x86_64-linux-alpine:
   <<: *nightly
