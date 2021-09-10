@@ -446,7 +446,7 @@ bindings are:
 
 -}
 
-fiExpr platform to_drop (_, AnnCase scrut case_bndr _ [AnnAlt con alt_bndrs rhs])
+fiExpr platform to_drop (_, AnnCase scrut case_bndr _ [AnnAlt con _freq alt_bndrs rhs])
   | isUnliftedType (idType case_bndr)
   , exprOkForSideEffects (deAnnotate scrut)
       -- See Note [Floating primops]
@@ -485,12 +485,12 @@ fiExpr platform to_drop (_, AnnCase scrut case_bndr ty alts)
     scrut_fvs    = freeVarsOf scrut
     alts_fvs     = map alt_fvs alts
     all_alts_fvs = unionDVarSets alts_fvs
-    alt_fvs (AnnAlt _con args rhs)
+    alt_fvs (AnnAlt _con _float args rhs)
       = foldl' delDVarSet (freeVarsOf rhs) (case_bndr:args)
            -- Delete case_bndr and args from free vars of rhs
            -- to get free vars of alt
 
-    fi_alt to_drop (AnnAlt con args rhs) = Alt con args (fiExpr platform to_drop rhs)
+    fi_alt to_drop (AnnAlt con freq args rhs) = Alt con freq args (fiExpr platform to_drop rhs)
 
 ------------------
 fiBind :: Platform

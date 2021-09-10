@@ -1579,13 +1579,13 @@ tcIfaceAlt :: CoreExpr -> Mult -> (TyCon, [Type])
 tcIfaceAlt _ _ _ (IfaceAlt IfaceDefault names rhs)
   = assert (null names) $ do
     rhs' <- tcIfaceExpr rhs
-    return (Alt DEFAULT [] rhs')
+    return (Alt DEFAULT NoFreq [] rhs')
 
 tcIfaceAlt _ _ _ (IfaceAlt (IfaceLitAlt lit) names rhs)
   = assert (null names) $ do
     lit' <- tcIfaceLit lit
     rhs' <- tcIfaceExpr rhs
-    return (Alt (LitAlt lit') [] rhs')
+    return (Alt (LitAlt lit') NoFreq [] rhs')
 
 -- A case alternative is made quite a bit more complicated
 -- by the fact that we omit type annotations because we can
@@ -1607,7 +1607,7 @@ tcIfaceDataAlt mult con inst_tys arg_strs rhs
         ; rhs' <- extendIfaceEnvs  ex_tvs       $
                   extendIfaceIdEnv arg_ids      $
                   tcIfaceExpr rhs
-        ; return (Alt (DataAlt con) (ex_tvs ++ arg_ids) rhs') }
+        ; return (Alt (DataAlt con) NoFreq (ex_tvs ++ arg_ids) rhs') }
 
 {-
 ************************************************************************

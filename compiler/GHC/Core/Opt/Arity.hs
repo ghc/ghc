@@ -1058,7 +1058,7 @@ arityType env (Case scrut bndr _ alts)
   = takeWhileOneShot alts_type -- evaluation of the scrutinee in
   where
     env' = delInScope env bndr
-    arity_type_alt (Alt _con bndrs rhs) = arityType (delInScopeList env' bndrs) rhs
+    arity_type_alt (Alt _con _freq bndrs rhs) = arityType (delInScopeList env' bndrs) rhs
     alts_type = foldr1 andArityType (map arity_type_alt alts)
 
 arityType env (Let (NonRec j rhs) body)
@@ -1503,7 +1503,7 @@ etaInfoApp in_scope expr eis
         (subst1, b1) = Core.substBndr subst b
         alts' = map subst_alt alts
         ty'   = etaInfoAppTy (Core.substTy subst ty) eis
-        subst_alt (Alt con bs rhs) = Alt con bs' (go subst2 rhs eis)
+        subst_alt (Alt con freq bs rhs) = Alt con freq bs' (go subst2 rhs eis)
                  where
                   (subst2,bs') = Core.substBndrs subst1 bs
 

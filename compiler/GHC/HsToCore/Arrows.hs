@@ -199,7 +199,7 @@ coreCaseTuple uniqs scrut_var vars body
 coreCasePair :: Id -> Id -> Id -> CoreExpr -> CoreExpr
 coreCasePair scrut_var var1 var2 body
   = Case (Var scrut_var) scrut_var (exprType body)
-         [Alt (DataAlt (tupleDataCon Boxed 2)) [var1, var2] body]
+         [Alt (DataAlt (tupleDataCon Boxed 2)) NoFreq [var1, var2] body]
 
 mkCorePairTy :: Type -> Type -> Type
 mkCorePairTy t1 t2 = mkBoxedTupleTy [t1, t2]

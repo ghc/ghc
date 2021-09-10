@@ -120,7 +120,7 @@ pWithOptions : with pOptions { $2 }
              | {- empty -}   { [] }
 
 pCategory :: { Category }
-pCategory : compare { Compare }
+pCategory : '(' compare upperName ')' { Compare $3 }
           | genprimop { GenPrimOp }
 
 pDesc :: { String }
@@ -148,7 +148,7 @@ pVectors : pVector ',' pVectors { [$1] ++ $3 }
 
 pVector :: { (String, String, Int) }
 pVector : '<' upperName ',' upperName ',' integer '>' { ($2, $4, $6) }
- 
+
 pType :: { Ty }
 pType : paT '->' pType { TyF $1 $3 }
       | paT '=>' pType { TyC $1 $3 }

@@ -145,12 +145,12 @@ wwExpr ww_opts (Case expr binder ty alts) = do
       -- See Note [Zapping Used Once info in WorkWrap]
     return (Case new_expr new_binder ty new_alts)
   where
-    ww_alt (Alt con binders rhs) = do
+    ww_alt (Alt con freq binders rhs) = do
         new_rhs <- wwExpr ww_opts rhs
         let new_binders = [ if isId b then zapIdUsedOnceInfo b else b
                           | b <- binders ]
            -- See Note [Zapping Used Once info in WorkWrap]
-        return (Alt con new_binders new_rhs)
+        return (Alt con freq new_binders new_rhs)
 
 {-
 ************************************************************************

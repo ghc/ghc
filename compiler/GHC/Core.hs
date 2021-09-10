@@ -267,14 +267,15 @@ data Expr b
 -- Only 'Arg' should contain a 'Type' at top level, general 'Expr' should not
 type Arg b = Expr b
 
--- | A case split alternative. Consists of the constructor leading to the alternative,
--- the variables bound from the constructor, and the expression to be executed given that binding.
--- The default alternative is @(DEFAULT, [], rhs)@
+-- | A case split alternative. Consists of the constructor leading to the
+-- alternative, a static estimate for how often this alternative is taken, the
+-- variables bound from the constructor, and the expression to be executed given
+-- that binding. The default alternative is @('DEFAULT', 'NoFreq', [], rhs)@.
 
 -- If you edit this type, you may need to update the GHC formalism
 -- See Note [GHC Formalism] in GHC.Core.Lint
 data Alt b
-    = Alt AltCon [b] (Expr b)
+    = Alt AltCon !Freq [b] (Expr b)
     deriving (Data)
 
 -- | A case alternative constructor (i.e. pattern match)
@@ -1578,7 +1579,7 @@ instance Outputable AltCon where
   ppr DEFAULT      = text "__DEFAULT"
 
 cmpAlt :: Alt a -> Alt a -> Ordering
-cmpAlt (Alt con1 _ _) (Alt con2 _ _) = con1 `cmpAltCon` con2
+cmpAlt (Alt con1 _ _ _) (Alt con2 _ _ _) = con1 `cmpAltCon` con2
 
 ltAlt :: Alt a -> Alt a -> Bool
 ltAlt a1 a2 = (a1 `cmpAlt` a2) == LT
@@ -1679,7 +1680,7 @@ deTagBind (NonRec (TB b _) rhs) = NonRec b (deTagExpr rhs)
 deTagBind (Rec prs)             = Rec [(b, deTagExpr rhs) | (TB b _, rhs) <- prs]
 
 deTagAlt :: TaggedAlt t -> CoreAlt
-deTagAlt (Alt con bndrs rhs) = Alt con [b | TB b _ <- bndrs] (deTagExpr rhs)
+deTagAlt (Alt con freq bndrs rhs) = Alt con freq [b | TB b _ <- bndrs] (deTagExpr rhs)
 
 {-
 ************************************************************************
@@ -1879,7 +1880,7 @@ rhssOfBind (NonRec _ rhs) = [rhs]
 rhssOfBind (Rec pairs)    = [rhs | (_,rhs) <- pairs]
 
 rhssOfAlts :: [Alt b] -> [Expr b]
-rhssOfAlts alts = [e | Alt _ _ e <- alts]
+rhssOfAlts alts = [e | Alt _ _ _ e <- alts]
 
 -- | Collapse all the bindings in the supplied groups into a single
 -- list of lhs\/rhs pairs suitable for binding in a 'Rec' binding group
@@ -2042,7 +2043,7 @@ data AnnExpr' bndr annot
   | AnnCoercion Coercion
 
 -- | A clone of the 'Alt' type but allowing annotation at every tree node
-data AnnAlt bndr annot = AnnAlt AltCon [bndr] (AnnExpr bndr annot)
+data AnnAlt bndr annot = AnnAlt AltCon !Freq [bndr] (AnnExpr bndr annot)
 
 -- | A clone of the 'Bind' type but allowing annotation at every tree node
 data AnnBind bndr annot
@@ -2087,7 +2088,7 @@ deAnnotate' (AnnCase scrut v t alts)
   = Case (deAnnotate scrut) v t (map deAnnAlt alts)
 
 deAnnAlt :: AnnAlt bndr annot -> Alt bndr
-deAnnAlt (AnnAlt con args rhs) = Alt con args (deAnnotate rhs)
+deAnnAlt (AnnAlt con freq args rhs) = Alt con freq args (deAnnotate rhs)
 
 deAnnBind  :: AnnBind b annot -> Bind b
 deAnnBind (AnnNonRec var rhs) = NonRec var (deAnnotate rhs)

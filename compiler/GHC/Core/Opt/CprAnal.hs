@@ -204,8 +204,8 @@ cprAnalAlt
   -> CprType -- ^ CPR type of the scrutinee
   -> Alt Var -- ^ current alternative
   -> (CprType, Alt Var)
-cprAnalAlt env scrut_ty (Alt con bndrs rhs)
-  = (rhs_ty, Alt con bndrs rhs')
+cprAnalAlt env scrut_ty (Alt con freq bndrs rhs)
+  = (rhs_ty, Alt con freq bndrs rhs')
   where
     env_alt
       | DataAlt dc <- con

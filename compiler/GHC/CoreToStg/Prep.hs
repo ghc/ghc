@@ -839,7 +839,7 @@ cpeRhsE env (Case scrut bndr _ alts)
   | isUnsafeEqualityProof scrut
   , isDeadBinder bndr -- We can only discard the case if the case-binder
                       -- is dead.  It usually is, but see #18227
-  , [Alt _ [co_var] rhs] <- alts
+  , [Alt _ _ [co_var] rhs] <- alts
   , let Pair ty1 ty2 = coVarTypes co_var
         the_co = mkUnivCo prov Nominal (cpSubstTy env ty1) (cpSubstTy env ty2)
         prov   = CorePrepProv True  -- True <=> kind homogeneous
@@ -866,10 +866,10 @@ cpeRhsE env (Case scrut bndr ty alts)
 
        ; return (floats, Case scrut' bndr2 ty alts'') }
   where
-    sat_alt env (Alt con bs rhs)
+    sat_alt env (Alt con freq bs rhs)
        = do { (env2, bs') <- cpCloneBndrs env bs
             ; rhs' <- cpeBodyNF env2 rhs
-            ; return (Alt con bs' rhs') }
+            ; return (Alt con freq bs' rhs') }
 
 -- ---------------------------------------------------------------------------
 --              CpeBody: produces a result satisfying CpeBody
@@ -1023,9 +1023,9 @@ cpeApp top_env expr
                   Lam s body -> cpe_app (extendCorePrepEnvExpr env s s0) body rest (n-2)
                   _          -> cpe_app env k (CpeApp s0 : rest) (n-1)
              ; let touchId = mkPrimOpId TouchOp
-                   expr = Case k' y result_ty [Alt DEFAULT [] rhs]
+                   expr = Case k' y result_ty [Alt DEFAULT NoFreq [] rhs]
                    rhs = let scrut = mkApps (Var touchId) [Type arg_rep, Type arg_ty, arg, Var realWorldPrimId]
-                         in Case scrut s2 result_ty [Alt DEFAULT [] (Var y)]
+                         in Case scrut s2 result_ty [Alt DEFAULT NoFreq [] (Var y)]
              ; (floats', expr') <- cpeBody env expr
              ; return (floats `appendFloats` floats', expr')
              }
@@ -1650,7 +1650,7 @@ wrapBinds :: Floats -> CpeBody -> CpeBody
 wrapBinds (Floats _ binds) body
   = foldrOL mk_bind body binds
   where
-    mk_bind (FloatCase rhs bndr con bs _) body = Case rhs bndr (exprType body) [Alt con bs body]
+    mk_bind (FloatCase rhs bndr con bs _) body = Case rhs bndr (exprType body) [Alt con NoFreq bs body]
     mk_bind (FloatLet bind)               body = Let bind body
     mk_bind (FloatTick tickish)           body = mkTick tickish body
 

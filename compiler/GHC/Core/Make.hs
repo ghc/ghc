@@ -225,7 +225,7 @@ mkWildCase scrut (Scaled w scrut_ty) res_ty alts
 -- | Build a strict application (case e2 of x -> e1 x)
 mkStrictApp :: CoreExpr -> CoreExpr -> Scaled Type -> Type -> CoreExpr
 mkStrictApp fun arg (Scaled w arg_ty) res_ty
-  = Case arg arg_id res_ty [Alt DEFAULT [] (App fun (Var arg_id))]
+  = Case arg arg_id res_ty [Alt DEFAULT NoFreq [] (App fun (Var arg_id))]
        -- mkDefaultCase looks attractive here, and would be sound.
        -- But it uses (exprType alt_rhs) to compute the result type,
        -- whereas here we already know that the result type is res_ty
@@ -248,8 +248,8 @@ mkIfThenElse :: CoreExpr -- ^ guard
 mkIfThenElse guard then_expr else_expr
 -- Not going to be refining, so okay to take the type of the "then" clause
   = mkWildCase guard (linear boolTy) (exprType then_expr)
-         [ Alt (DataAlt falseDataCon) [] else_expr,       -- Increasing order of tag!
-           Alt (DataAlt trueDataCon)  [] then_expr ]
+         [ Alt (DataAlt falseDataCon) NoFreq [] else_expr,       -- Increasing order of tag!
+           Alt (DataAlt trueDataCon)  NoFreq [] then_expr ]
 
 castBottomExpr :: CoreExpr -> Type -> CoreExpr
 -- (castBottomExpr e ty), assuming that 'e' diverges,
@@ -560,7 +560,7 @@ mkSmallTupleSelector vars the_var scrut_var scrut
 mkSmallTupleSelector1 vars the_var scrut_var scrut
   = assert (notNull vars) $
     Case scrut scrut_var (idType the_var)
-         [Alt (DataAlt (tupleDataCon Boxed (length vars))) vars (Var the_var)]
+         [Alt (DataAlt (tupleDataCon Boxed (length vars))) NoFreq vars (Var the_var)]
 
 -- | A generalization of 'mkTupleSelector', allowing the body
 -- of the case to be an arbitrary expression.
@@ -614,7 +614,7 @@ mkSmallTupleCase [var] body _scrut_var scrut
 mkSmallTupleCase vars body scrut_var scrut
 -- One branch no refinement?
   = Case scrut scrut_var (exprType body)
-         [Alt (DataAlt (tupleDataCon Boxed (length vars))) vars body]
+         [Alt (DataAlt (tupleDataCon Boxed (length vars))) NoFreq vars body]
 
 {-
 ************************************************************************

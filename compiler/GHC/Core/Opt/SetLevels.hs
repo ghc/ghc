@@ -111,7 +111,7 @@ import GHC.Types.Unique       ( hasKey )
 import GHC.Types.Tickish      ( tickishIsCode )
 import GHC.Types.Unique.Supply
 import GHC.Types.Unique.DFM
-import GHC.Types.Basic  ( Arity, RecFlag(..), isRec )
+import GHC.Types.Basic
 
 import GHC.Builtin.Types
 import GHC.Builtin.Names      ( runRWKey )
@@ -494,7 +494,7 @@ lvlCase :: LevelEnv             -- Level of in-scope names/tyvars
         -> LvlM LevelledExpr    -- Result expression
 lvlCase env scrut_fvs scrut' case_bndr ty alts
   -- See Note [Floating single-alternative cases]
-  | [AnnAlt con@(DataAlt {}) bs body] <- alts
+  | [AnnAlt con@(DataAlt {}) freq bs body] <- alts
   , exprIsHNF (deTagExpr scrut')  -- See Note [Check the output scrutinee for exprIsHNF]
   , not (isTopLvl dest_lvl)       -- Can't have top-level cases
   , not (floatTopLvlOnly env)     -- Can float anywhere
@@ -504,7 +504,7 @@ lvlCase env scrut_fvs scrut' case_bndr ty alts
     do { (env1, (case_bndr' : bs')) <- cloneCaseBndrs env dest_lvl (case_bndr : bs)
        ; let rhs_env = extendCaseBndrEnv env1 case_bndr scrut'
        ; body' <- lvlMFE rhs_env True body
-       ; let alt' = Alt con (map (stayPut dest_lvl) bs') body'
+       ; let alt' = Alt con freq (map (stayPut dest_lvl) bs') body'
        ; return (Case scrut' (TB case_bndr' (FloatMe dest_lvl)) ty' [alt']) }
 
   | otherwise     -- Stays put
@@ -519,9 +519,9 @@ lvlCase env scrut_fvs scrut' case_bndr ty alts
     dest_lvl = maxFvLevel (const True) env scrut_fvs
             -- Don't abstract over type variables, hence const True
 
-    lvl_alt alts_env (AnnAlt con bs rhs)
+    lvl_alt alts_env (AnnAlt con freq bs rhs)
       = do { rhs' <- lvlMFE new_env True rhs
-           ; return (Alt con bs' rhs') }
+           ; return (Alt con freq bs' rhs') }
       where
         (new_env, bs') = substAndLvlBndrs NonRecursive alts_env incd_lvl bs
 
@@ -704,13 +704,13 @@ lvlMFE env strict_ctxt ann_expr
        ; let l1r       = incMinorLvlFrom rhs_env
              float_rhs = mkLams abs_vars_w_lvls $
                          Case expr1 (stayPut l1r ubx_bndr) dc_res_ty
-                             [Alt DEFAULT [] (mkConApp dc [Var ubx_bndr])]
+                             [Alt DEFAULT NoFreq [] (mkConApp dc [Var ubx_bndr])]
 
        ; var <- newLvlVar float_rhs Nothing is_mk_static
        ; let l1u      = incMinorLvlFrom env
              use_expr = Case (mkVarApps (Var var) abs_vars)
                              (stayPut l1u bx_bndr) expr_ty
-                             [Alt (DataAlt dc) [stayPut l1u ubx_bndr] (Var ubx_bndr)]
+                             [Alt (DataAlt dc) NoFreq [stayPut l1u ubx_bndr] (Var ubx_bndr)]
        ; return (Let (NonRec (TB var (FloatMe dest_lvl)) float_rhs)
                      use_expr) }
 

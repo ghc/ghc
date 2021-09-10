@@ -1501,7 +1501,7 @@ seqId = pcMiscPrelId seqName ty info
 
     [x,y] = mkTemplateLocals [alphaTy, openBetaTy]
     rhs = mkLams ([runtimeRep2TyVar, alphaTyVar, openBetaTyVar, x, y]) $
-          Case (Var x) x openBetaTy [Alt DEFAULT [] (Var y)]
+          Case (Var x) x openBetaTy [Alt DEFAULT NoFreq [] (Var y)]
 
 ------------------------------------------------
 lazyId :: Id    -- See Note [lazyId magic]
@@ -1624,7 +1624,7 @@ coerceId = pcMiscPrelId coerceName ty info
     [eqR,x,eq] = mkTemplateLocals [eqRTy, a, eqRPrimTy]
     rhs = mkLams (bndrs ++ [eqR, x]) $
           mkWildCase (Var eqR) (unrestricted eqRTy) b $
-          [Alt (DataAlt coercibleDataCon) [eq] (Cast (Var x) (mkCoVarCo eq))]
+          [Alt (DataAlt coercibleDataCon) NoFreq [eq] (Cast (Var x) (mkCoVarCo eq))]
 
 {-
 Note [seqId magic]

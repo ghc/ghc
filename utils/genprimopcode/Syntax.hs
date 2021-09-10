@@ -65,7 +65,7 @@ data Option
 
 -- categorises primops
 data Category
-   = Compare | GenPrimOp
+   = Compare String | GenPrimOp
      deriving Show
 
 -- types
@@ -74,7 +74,7 @@ data Ty
    | TyC    Ty Ty -- We only allow one constraint, keeps the grammar simpler
    | TyApp  TyCon [Ty]
    | TyVar  TyVar
-   | TyUTup [Ty]   -- unboxed tuples; just a TyCon really, 
+   | TyUTup [Ty]   -- unboxed tuples; just a TyCon really,
                    -- but convenient like this
    deriving (Eq,Show)
 
@@ -115,9 +115,9 @@ data SourceText = SourceText String
 {- Do some simple sanity checks:
     * all the default field names are unique
     * for each PrimOpSpec, all override field names are unique
-    * for each PrimOpSpec, all overridden field names   
+    * for each PrimOpSpec, all overridden field names
           have a corresponding default value
-    * that primop types correspond in certain ways to the 
+    * that primop types correspond in certain ways to the
       Category: eg if Comparison, the type must be of the form
          T -> T -> Bool.
    Dies with "error" if there's a problem, else returns ().
@@ -130,7 +130,7 @@ sanityTop :: Info -> ()
 sanityTop (Info defs entries)
    = let opt_names = map get_attrib_name defs
          primops = filter is_primop entries
-     in  
+     in
      if   length opt_names /= length (nub opt_names)
      then error ("non-unique default attribute names: " ++ show opt_names ++ "\n")
      else myseqAll (map (sanityPrimOp opt_names) primops) ()
@@ -153,7 +153,7 @@ sanityPrimOp def_names p
          else ()
 
 sane_ty :: Category -> Ty -> Bool
-sane_ty Compare (TyF t1 (TyF t2 td)) 
+sane_ty (Compare _cmp) (TyF t1 (TyF t2 td))
    | t1 == t2 && td == TyApp (TyCon "Int#") []  = True
 sane_ty GenPrimOp _
    = True
@@ -170,7 +170,7 @@ get_attrib_name (OptionFixity _) = "fixity"
 
 lookup_attrib :: String -> [Option] -> Maybe Option
 lookup_attrib _ [] = Nothing
-lookup_attrib nm (a:as) 
+lookup_attrib nm (a:as)
     = if get_attrib_name a == nm then Just a else lookup_attrib nm as
 
 is_vector :: Entry -> Bool

@@ -1084,8 +1084,8 @@ litEq is_eq = msum
     do_lit_eq platform lit expr = do
       guard (not (litIsLifted lit))
       return (mkWildCase expr (unrestricted $ literalType lit) intPrimTy
-                    [ Alt DEFAULT      [] val_if_neq
-                    , Alt (LitAlt lit) [] val_if_eq])
+                    [ Alt DEFAULT      NoFreq [] val_if_neq
+                    , Alt (LitAlt lit) NoFreq [] val_if_eq])
       where
         val_if_eq  | is_eq     = trueValInt  platform
                    | otherwise = falseValInt platform
@@ -1101,8 +1101,6 @@ boundsCmp op = do
   platform <- getPlatform
   [a, b] <- getArgs
   liftMaybe $ mkRuleFn platform op a b
-
-data Comparison = Gt | Ge | Lt | Le
 
 mkRuleFn :: Platform -> Comparison -> CoreExpr -> CoreExpr -> Maybe CoreExpr
 mkRuleFn platform Gt (Lit lit) _ | isMinBound platform lit = Just $ falseValInt platform

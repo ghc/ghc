@@ -348,11 +348,11 @@ instance TrieMap AltMap where
 
 instance Eq (DeBruijn CoreAlt) where
   D env1 a1 == D env2 a2 = go a1 a2 where
-    go (Alt DEFAULT _ rhs1) (Alt DEFAULT _ rhs2)
+    go (Alt DEFAULT _ _ rhs1) (Alt DEFAULT _ _ rhs2)
         = D env1 rhs1 == D env2 rhs2
-    go (Alt (LitAlt lit1) _ rhs1) (Alt (LitAlt lit2) _ rhs2)
+    go (Alt (LitAlt lit1) _ _ rhs1) (Alt (LitAlt lit2) _ _ rhs2)
         = lit1 == lit2 && D env1 rhs1 == D env2 rhs2
-    go (Alt (DataAlt dc1) bs1 rhs1) (Alt (DataAlt dc2) bs2 rhs2)
+    go (Alt (DataAlt dc1) _ bs1 rhs1) (Alt (DataAlt dc2) _ bs2 rhs2)
         = dc1 == dc2 &&
           D (extendCMEs env1 bs1) rhs1 == D (extendCMEs env2 bs2) rhs2
     go _ _ = False
@@ -370,17 +370,17 @@ ftA f (AM { am_deflt = adeflt, am_data = adata, am_lit = alit })
        , am_lit = mapTM (filterTM f) alit }
 
 lkA :: CmEnv -> CoreAlt -> AltMap a -> Maybe a
-lkA env (Alt DEFAULT      _  rhs) = am_deflt >.> lkG (D env rhs)
-lkA env (Alt (LitAlt lit) _  rhs) = am_lit >.> lookupTM lit >=> lkG (D env rhs)
-lkA env (Alt (DataAlt dc) bs rhs) = am_data >.> lkDNamed dc
+lkA env (Alt DEFAULT      _ _  rhs) = am_deflt >.> lkG (D env rhs)
+lkA env (Alt (LitAlt lit) _ _  rhs) = am_lit >.> lookupTM lit >=> lkG (D env rhs)
+lkA env (Alt (DataAlt dc) _ bs rhs) = am_data >.> lkDNamed dc
                                         >=> lkG (D (extendCMEs env bs) rhs)
 
 xtA :: CmEnv -> CoreAlt -> XT a -> AltMap a -> AltMap a
-xtA env (Alt DEFAULT _ rhs)      f m =
+xtA env (Alt DEFAULT _ _ rhs)      f m =
     m { am_deflt = am_deflt m |> xtG (D env rhs) f }
-xtA env (Alt (LitAlt l) _ rhs)   f m =
+xtA env (Alt (LitAlt l) _ _ rhs)   f m =
     m { am_lit   = am_lit m   |> alterTM l |>> xtG (D env rhs) f }
-xtA env (Alt (DataAlt d) bs rhs) f m =
+xtA env (Alt (DataAlt d) _ bs rhs) f m =
     m { am_data  = am_data m  |> xtDNamed d
                              |>> xtG (D (extendCMEs env bs) rhs) f }
 

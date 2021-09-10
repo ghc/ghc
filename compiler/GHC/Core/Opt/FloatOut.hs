@@ -467,7 +467,7 @@ floatExpr (Let bind body)
 floatExpr (Case scrut (TB case_bndr case_spec) ty alts)
   = case case_spec of
       FloatMe dest_lvl  -- Case expression moves
-        | [Alt con@(DataAlt {}) bndrs rhs] <- alts
+        | [Alt con@(DataAlt {}) _freq bndrs rhs] <- alts
         -> case atJoinCeiling $ floatExpr scrut of { (fse, fde, scrut') ->
            case                 floatExpr rhs   of { (fsb, fdb, rhs') ->
            let
@@ -484,9 +484,9 @@ floatExpr (Case scrut (TB case_bndr case_spec) ty alts)
            (add_stats fse fsa, fda `plusFloats` fde, Case scrut' case_bndr ty alts')
            }}
   where
-    float_alt bind_lvl (Alt con bs rhs)
+    float_alt bind_lvl (Alt con freq bs rhs)
         = case (floatBody bind_lvl rhs) of { (fs, rhs_floats, rhs') ->
-          (fs, rhs_floats, Alt con [b | TB b _ <- bs] rhs') }
+          (fs, rhs_floats, Alt con freq [b | TB b _ <- bs] rhs') }
 
 floatRhs :: CoreBndr
          -> LevelledExpr

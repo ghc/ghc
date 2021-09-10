@@ -254,7 +254,7 @@ libCase env (Case scrut bndr ty alts)
     mk_alt_env _               = env
 
 libCaseAlt :: LibCaseEnv -> Alt CoreBndr -> Alt CoreBndr
-libCaseAlt env (Alt con args rhs) = Alt con args (libCase (addBinders env args) rhs)
+libCaseAlt env (Alt con freq args rhs) = Alt con freq args (libCase (addBinders env args) rhs)
 
 {-
 Ids

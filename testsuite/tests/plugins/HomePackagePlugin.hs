@@ -31,4 +31,4 @@ replaceInExpr (Case e b ty alts) = Case (replaceInExpr e) b ty (map replaceInAlt
 replaceInExpr (Type ty) = Type ty
 
 replaceInAlt :: CoreAlt -> CoreAlt
-replaceInAlt (Alt ac bs e) = Alt ac bs (replaceInExpr e)
+replaceInAlt (Alt ac fq bs e) = Alt ac fq bs (replaceInExpr e)

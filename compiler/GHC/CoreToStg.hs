@@ -455,7 +455,7 @@ coreToStgExpr (Case scrut bndr _ alts)
        ; return (StgCase scrut2 bndr (mkStgAltType bndr alts) alts2) }
   where
     vars_alt :: CoreAlt -> CtsM (AltCon, [Var], StgExpr)
-    vars_alt (Alt con binders rhs)
+    vars_alt (Alt con _freq binders rhs)
       | DataAlt c <- con, c == unboxedUnitDataCon
       = -- This case is a bit smelly.
         -- See Note [Nullary unboxed tuple] in GHC.Core.Type
@@ -506,7 +506,7 @@ mkStgAltType bndr alts
    -- grabbing the one from a constructor alternative
    -- if one exists.
    look_for_better_tycon
-        | ((Alt (DataAlt con) _ _) : _) <- data_alts =
+        | ((Alt (DataAlt con) _ _ _) : _) <- data_alts =
                 AlgAlt (dataConTyCon con)
         | otherwise =
                 assert (null data_alts)

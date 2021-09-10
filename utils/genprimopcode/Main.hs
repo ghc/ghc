@@ -830,10 +830,10 @@ mkPOI_LHS_text i
 mkPOI_RHS_text :: Entry -> String
 mkPOI_RHS_text i
    = case cat i of
-        Compare
+        Compare cmp
            -> case ty i of
                  TyF t1 (TyF _ _)
-                    -> "mkCompare " ++ sl_name i ++ ppType t1
+                    -> "mkCompare " ++ sl_name i ++ cmp ++ " " ++ ppType t1
                  _ -> error "Type error in comparison op"
         GenPrimOp
            -> let (argTys, resTy) = flatTys (ty i)

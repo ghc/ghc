@@ -583,7 +583,7 @@ toIfaceBind (Rec prs)    = IfaceRec [(toIfaceLetBndr b, toIfaceExpr r) | (b,r) <
 
 ---------------------
 toIfaceAlt :: CoreAlt -> IfaceAlt
-toIfaceAlt (Alt c bs r) = IfaceAlt (toIfaceCon c) (map getOccFS bs) (toIfaceExpr r)
+toIfaceAlt (Alt c _f bs r) = IfaceAlt (toIfaceCon c) (map getOccFS bs) (toIfaceExpr r)
 
 ---------------------
 toIfaceCon :: AltCon -> IfaceConAlt

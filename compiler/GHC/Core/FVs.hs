@@ -267,7 +267,7 @@ expr_fvs (Case scrut bndr ty alts) fv_cand in_scope acc
   = (expr_fvs scrut `unionFV` tyCoFVsOfType ty `unionFV` addBndr bndr
       (mapUnionFV alt_fvs alts)) fv_cand in_scope acc
   where
-    alt_fvs (Alt _ bndrs rhs) = addBndrs bndrs (expr_fvs rhs)
+    alt_fvs (Alt _ _ bndrs rhs) = addBndrs bndrs (expr_fvs rhs)
 
 expr_fvs (Let (NonRec bndr rhs) body) fv_cand in_scope acc
   = (rhs_fvs (bndr, rhs) `unionFV` addBndr bndr (expr_fvs body))
@@ -325,7 +325,7 @@ exprOrphNames e
     go (Case e _ ty as)     = go e `unionNameSet` orphNamesOfType ty
                               `unionNameSet` unionNameSets (map go_alt as)
 
-    go_alt (Alt _ _ r)      = go r
+    go_alt (Alt _ _ _ r)      = go r
 
 -- | Finds the free /external/ names of several expressions: see 'exprOrphNames' for details
 exprsOrphNames :: [CoreExpr] -> NameSet
@@ -756,10 +756,10 @@ freeVars = go
         (alts_fvs_s, alts2) = mapAndUnzip fv_alt alts
         alts_fvs            = unionFVss alts_fvs_s
 
-        fv_alt (Alt con args rhs) = (delBindersFV args (freeVarsOf rhs2),
-                                     (AnnAlt con args rhs2))
-                              where
-                                 rhs2 = go rhs
+        fv_alt (Alt con freq args rhs) = (delBindersFV args (freeVarsOf rhs2),
+                                          (AnnAlt con freq args rhs2))
+                                   where
+                                      rhs2 = go rhs
 
     go (Let bind body)
       = (bind_fvs, AnnLet bind2 body2)

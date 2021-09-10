@@ -17,8 +17,12 @@ types that
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE GeneralisedNewtypeDeriving #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+{-# OPTIONS_GHC -ddump-simpl -ddump-to-file #-}
 
 module GHC.Types.Basic (
         LeftOrRight(..),
@@ -42,6 +46,8 @@ module GHC.Types.Basic (
 
         OverlapFlag(..), OverlapMode(..), setOverlapModeMaybe,
         hasOverlappingFlag, hasOverlappableFlag, hasIncoherentFlag,
+
+        Comparison(..), flipComparison,
 
         Boxity(..), isBoxed,
 
@@ -67,6 +73,8 @@ module GHC.Types.Basic (
         InterestingCxt(..),
         TailCallInfo(..), tailCallInfo, zapOccTailCallInfo,
         isAlwaysTailCalled,
+
+        Freq(NoFreq, Freq), uniformFreqs, absToRelFreqs, normaliseFreqs,
 
         EP(..),
 
@@ -802,6 +810,32 @@ higher than 'funPrec' but lower than 'appPrec':
 {-
 ************************************************************************
 *                                                                      *
+                Comparison
+*                                                                      *
+************************************************************************
+-}
+
+-- | Classifies a comparison operation
+data Comparison
+  = Eq -- ^ Equal
+  | Ne -- ^ Not equal
+  | Lt -- ^ Less than
+  | Le -- ^ Less than or Equal
+  | Gt -- ^ Greater than
+  | Ge -- ^ Greater than or equal
+
+-- | Turns 'Gt' into 'Lt', etc., as if operands were flipped.
+-- Makes use of (anti-)commutativity.
+flipComparison :: Comparison -> Comparison
+flipComparison Lt  = Gt
+flipComparison Le  = Ge
+flipComparison Gt  = Lt
+flipComparison Ge  = Le
+flipComparison cmp = cmp
+
+{-
+************************************************************************
+*                                                                      *
                 Tuples
 *                                                                      *
 ************************************************************************
@@ -1140,6 +1174,41 @@ data DefMethSpec ty
 instance Outputable (DefMethSpec ty) where
   ppr VanillaDM      = text "{- Has default method -}"
   ppr (GenericDM {}) = text "{- Has generic default method -}"
+
+
+{-
+************************************************************************
+*                                                                      *
+            Branch frequency
+*                                                                      *
+************************************************************************
+-}
+
+
+-- | A type representing execution frequency of a particular branch/case alternative
+newtype Freq = Freq { unFreq :: Float }
+  deriving (Eq, Ord, Num, Fractional, Data, Outputable)
+
+-- | A 'Freq' saying there was no frequency annotation.
+pattern NoFreq :: Freq
+pattern NoFreq <- (isNegativeZero . unFreq -> True) where
+  NoFreq = Freq (-0.0)
+
+-- | @n@ uniformly distributed list of 'Freq's that sum up to 1.
+uniformFreqs :: Int -> [Freq]
+uniformFreqs n = replicate n (Freq (1 / fromIntegral n))
+
+-- | Turns @[1,2,3,2]@ into @[0.125, 0.25, 0.375, 0.25]@
+absToRelFreqs :: [Int] -> [Freq]
+absToRelFreqs abs = [ Freq (fromIntegral a / total) | a <- abs ]
+  where
+    total = fromIntegral $ sum abs
+
+-- | Turns @[0.1,0.2,0.3,0.2]@ into @[0.125, 0.25, 0.375, 0.25]@
+normaliseFreqs :: [Freq] -> [Freq]
+normaliseFreqs freqs = [ Freq (f / total) | Freq f <- freqs ]
+  where
+    Freq total = sum freqs
 
 {-
 ************************************************************************

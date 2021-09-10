@@ -899,7 +899,7 @@ match_alts :: RuleMatchEnv
            -> Maybe RuleSubst
 match_alts _ subst [] []
   = return subst
-match_alts renv subst (Alt c1 vs1 r1:alts1) (Alt c2 vs2 r2:alts2)
+match_alts renv subst (Alt c1 _f1 vs1 r1:alts1) (Alt c2 _f2 vs2 r2:alts2)
   | c1 == c2
   = do  { subst1 <- match renv' subst r1 r2
         ; match_alts renv subst1 alts1 alts2 }
@@ -1227,7 +1227,7 @@ ruleCheck env (Cast e _)    = ruleCheck env e
 ruleCheck env (Let bd e)    = ruleCheckBind env bd `unionBags` ruleCheck env e
 ruleCheck env (Lam _ e)     = ruleCheck env e
 ruleCheck env (Case e _ _ as) = ruleCheck env e `unionBags`
-                                unionManyBags [ruleCheck env r | Alt _ _ r <- as]
+                                unionManyBags [ruleCheck env r | Alt _ _ _ r <- as]
 
 ruleCheckApp :: RuleCheckEnv -> Expr CoreBndr -> [Arg CoreBndr] -> Bag SDoc
 ruleCheckApp env (App f a) as = ruleCheck env a `unionBags` ruleCheckApp env f (a:as)

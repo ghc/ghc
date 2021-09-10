@@ -27,7 +27,7 @@ import GHC.Platform
 
 import {-#SOURCE#-} GHC.HsToCore.Expr (dsExpr)
 
-import GHC.Types.Basic ( Origin(..), isGenerated, Boxity(..) )
+import GHC.Types.Basic
 import GHC.Types.SourceText
 import GHC.Driver.Session
 import GHC.Hs
@@ -259,7 +259,7 @@ matchEmpty var res_ty
   = return [MR_Fallible mk_seq]
   where
     mk_seq fail = return $ mkWildCase (Var var) (idScaledType var) res_ty
-                                      [Alt DEFAULT [] fail]
+                                      [Alt DEFAULT NoFreq [] fail]
 
 matchVariables :: NonEmpty MatchId -> Type -> NonEmpty EquationInfo -> DsM (MatchResult CoreExpr)
 -- Real true variables, just like in matchVar, SLPJ p 94

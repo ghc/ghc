@@ -512,7 +512,7 @@ collectCostCentres mod_name binds rules
       Type{} -> cs
       Coercion{} -> cs
 
-    go_alts = foldl' (\cs (Alt _con _bndrs e) -> go cs e)
+    go_alts = foldl' (\cs (Alt _con _freq _bndrs e) -> go cs e)
 
     go_bind :: S.Set CostCentre -> CoreBind -> S.Set CostCentre
     go_bind cs (NonRec b e) =
@@ -896,7 +896,7 @@ dffvExpr (Case e b _ as)      = dffvExpr e >> extendScope b (mapM_ dffvAlt as)
 dffvExpr _other               = return ()
 
 dffvAlt :: CoreAlt -> DFFV ()
-dffvAlt (Alt _ xs r) = extendScopeList xs (dffvExpr r)
+dffvAlt (Alt _ _ xs r) = extendScopeList xs (dffvExpr r)
 
 dffvBind :: (Id, CoreExpr) -> DFFV ()
 dffvBind(x,r)

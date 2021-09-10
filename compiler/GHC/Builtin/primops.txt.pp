@@ -190,9 +190,9 @@ defaults
 -- Note [Levity and representation polymorphic primops]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- In the types of primops in this module,
--- 
+--
 -- * The names `a,b,c,s` stand for type variables of kind Type
--- 
+--
 -- * The names `v` and `w` stand for levity-polymorphic
 --   type variables.
 --   For example:
@@ -207,7 +207,7 @@ defaults
 --     - `v` and `w` end up written as `a` and `b` (respectively) in types,
 --       which means that one shouldn't write a primop type involving both
 --       `a` and `v`, nor `b` and `w`.
--- 
+--
 -- * The names `o` and `p` stand for representation-polymorphic
 --   type variables, similarly to `v` and `w` above. For example:
 --      op :: o -> p -> Int
@@ -297,21 +297,16 @@ section "Char#"
 
 primtype Char#
 
-primop   CharGtOp  "gtChar#"   Compare   Char# -> Char# -> Int#
-primop   CharGeOp  "geChar#"   Compare   Char# -> Char# -> Int#
-
-primop   CharEqOp  "eqChar#"   Compare
-   Char# -> Char# -> Int#
+primop CharLtOp "ltChar#" (Compare Lt)  Char# -> Char# -> Int#
+primop CharLeOp "leChar#" (Compare Le)  Char# -> Char# -> Int#
+primop CharGtOp "gtChar#" (Compare Gt)  Char# -> Char# -> Int#
+primop CharGeOp "geChar#" (Compare Ge)  Char# -> Char# -> Int#
+primop CharEqOp "eqChar#" (Compare Eq)  Char# -> Char# -> Int#
+   with commutable = True
+primop CharNeOp "neChar#" (Compare Ne)  Char# -> Char# -> Int#
    with commutable = True
 
-primop   CharNeOp  "neChar#"   Compare
-   Char# -> Char# -> Int#
-   with commutable = True
-
-primop   CharLtOp  "ltChar#"   Compare   Char# -> Char# -> Int#
-primop   CharLeOp  "leChar#"   Compare   Char# -> Char# -> Int#
-
-primop   OrdOp   "ord#"  GenPrimOp   Char# -> Int#
+primop OrdOp     "ord#"  GenPrimOp   Char# -> Int#
    with code_size = 0
 
 ------------------------------------------------------------------------
@@ -355,12 +350,14 @@ primop Int8SrlOp "uncheckedShiftRLInt8#" GenPrimOp Int8# -> Int# -> Int8#
 primop Int8ToWord8Op "int8ToWord8#" GenPrimOp Int8# -> Word8#
    with code_size = 0
 
-primop Int8EqOp "eqInt8#" Compare Int8# -> Int8# -> Int#
-primop Int8GeOp "geInt8#" Compare Int8# -> Int8# -> Int#
-primop Int8GtOp "gtInt8#" Compare Int8# -> Int8# -> Int#
-primop Int8LeOp "leInt8#" Compare Int8# -> Int8# -> Int#
-primop Int8LtOp "ltInt8#" Compare Int8# -> Int8# -> Int#
-primop Int8NeOp "neInt8#" Compare Int8# -> Int8# -> Int#
+primop Int8LtOp "ltInt8#" (Compare Lt)  Int8# -> Int8# -> Int#
+primop Int8LeOp "leInt8#" (Compare Le)  Int8# -> Int8# -> Int#
+primop Int8GtOp "gtInt8#" (Compare Gt)  Int8# -> Int8# -> Int#
+primop Int8GeOp "geInt8#" (Compare Ge)  Int8# -> Int8# -> Int#
+primop Int8EqOp "eqInt8#" (Compare Eq)  Int8# -> Int8# -> Int#
+   with commutable = True
+primop Int8NeOp "neInt8#" (Compare Ne)  Int8# -> Int8# -> Int#
+   with commutable = True
 
 ------------------------------------------------------------------------
 section "Word8#"
@@ -411,12 +408,14 @@ primop Word8SrlOp "uncheckedShiftRLWord8#" GenPrimOp Word8# -> Int# -> Word8#
 primop Word8ToInt8Op "word8ToInt8#" GenPrimOp Word8# -> Int8#
    with code_size = 0
 
-primop Word8EqOp "eqWord8#" Compare Word8# -> Word8# -> Int#
-primop Word8GeOp "geWord8#" Compare Word8# -> Word8# -> Int#
-primop Word8GtOp "gtWord8#" Compare Word8# -> Word8# -> Int#
-primop Word8LeOp "leWord8#" Compare Word8# -> Word8# -> Int#
-primop Word8LtOp "ltWord8#" Compare Word8# -> Word8# -> Int#
-primop Word8NeOp "neWord8#" Compare Word8# -> Word8# -> Int#
+primop   Word8LtOp  "ltWord8#"   (Compare Lt)  Word8# -> Word8# -> Int#
+primop   Word8LeOp  "leWord8#"   (Compare Le)  Word8# -> Word8# -> Int#
+primop   Word8GtOp  "gtWord8#"   (Compare Gt)  Word8# -> Word8# -> Int#
+primop   Word8GeOp  "geWord8#"   (Compare Ge)  Word8# -> Word8# -> Int#
+primop   Word8EqOp  "eqWord8#"   (Compare Eq)  Word8# -> Word8# -> Int#
+   with commutable = True
+primop   Word8NeOp  "neWord8#"   (Compare Ne)  Word8# -> Word8# -> Int#
+   with commutable = True
 
 ------------------------------------------------------------------------
 section "Int16#"
@@ -459,12 +458,14 @@ primop Int16SrlOp "uncheckedShiftRLInt16#" GenPrimOp Int16# -> Int# -> Int16#
 primop Int16ToWord16Op "int16ToWord16#" GenPrimOp Int16# -> Word16#
    with code_size = 0
 
-primop Int16EqOp "eqInt16#" Compare Int16# -> Int16# -> Int#
-primop Int16GeOp "geInt16#" Compare Int16# -> Int16# -> Int#
-primop Int16GtOp "gtInt16#" Compare Int16# -> Int16# -> Int#
-primop Int16LeOp "leInt16#" Compare Int16# -> Int16# -> Int#
-primop Int16LtOp "ltInt16#" Compare Int16# -> Int16# -> Int#
-primop Int16NeOp "neInt16#" Compare Int16# -> Int16# -> Int#
+primop   Int16LtOp  "ltInt16#"   (Compare Lt)  Int16# -> Int16# -> Int#
+primop   Int16LeOp  "leInt16#"   (Compare Le)  Int16# -> Int16# -> Int#
+primop   Int16GtOp  "gtInt16#"   (Compare Gt)  Int16# -> Int16# -> Int#
+primop   Int16GeOp  "geInt16#"   (Compare Ge)  Int16# -> Int16# -> Int#
+primop   Int16EqOp  "eqInt16#"   (Compare Eq)  Int16# -> Int16# -> Int#
+   with commutable = True
+primop   Int16NeOp  "neInt16#"   (Compare Ne)  Int16# -> Int16# -> Int#
+   with commutable = True
 
 ------------------------------------------------------------------------
 section "Word16#"
@@ -515,12 +516,14 @@ primop Word16SrlOp "uncheckedShiftRLWord16#" GenPrimOp Word16# -> Int# -> Word16
 primop Word16ToInt16Op "word16ToInt16#" GenPrimOp Word16# -> Int16#
    with code_size = 0
 
-primop Word16EqOp "eqWord16#" Compare Word16# -> Word16# -> Int#
-primop Word16GeOp "geWord16#" Compare Word16# -> Word16# -> Int#
-primop Word16GtOp "gtWord16#" Compare Word16# -> Word16# -> Int#
-primop Word16LeOp "leWord16#" Compare Word16# -> Word16# -> Int#
-primop Word16LtOp "ltWord16#" Compare Word16# -> Word16# -> Int#
-primop Word16NeOp "neWord16#" Compare Word16# -> Word16# -> Int#
+primop   Word16LtOp  "ltWord16#"   (Compare Lt)  Word16# -> Word16# -> Int#
+primop   Word16LeOp  "leWord16#"   (Compare Le)  Word16# -> Word16# -> Int#
+primop   Word16GtOp  "gtWord16#"   (Compare Gt)  Word16# -> Word16# -> Int#
+primop   Word16GeOp  "geWord16#"   (Compare Ge)  Word16# -> Word16# -> Int#
+primop   Word16EqOp  "eqWord16#"   (Compare Eq)  Word16# -> Word16# -> Int#
+   with commutable = True
+primop   Word16NeOp  "neWord16#"   (Compare Ne)  Word16# -> Word16# -> Int#
+   with commutable = True
 
 ------------------------------------------------------------------------
 section "Int32#"
@@ -563,12 +566,14 @@ primop Int32SrlOp "uncheckedShiftRLInt32#" GenPrimOp Int32# -> Int# -> Int32#
 primop Int32ToWord32Op "int32ToWord32#" GenPrimOp Int32# -> Word32#
    with code_size = 0
 
-primop Int32EqOp "eqInt32#" Compare Int32# -> Int32# -> Int#
-primop Int32GeOp "geInt32#" Compare Int32# -> Int32# -> Int#
-primop Int32GtOp "gtInt32#" Compare Int32# -> Int32# -> Int#
-primop Int32LeOp "leInt32#" Compare Int32# -> Int32# -> Int#
-primop Int32LtOp "ltInt32#" Compare Int32# -> Int32# -> Int#
-primop Int32NeOp "neInt32#" Compare Int32# -> Int32# -> Int#
+primop   Int32LtOp  "ltInt32#"   (Compare Lt)  Int32# -> Int32# -> Int#
+primop   Int32LeOp  "leInt32#"   (Compare Le)  Int32# -> Int32# -> Int#
+primop   Int32GtOp  "gtInt32#"   (Compare Gt)  Int32# -> Int32# -> Int#
+primop   Int32GeOp  "geInt32#"   (Compare Ge)  Int32# -> Int32# -> Int#
+primop   Int32EqOp  "eqInt32#"   (Compare Eq)  Int32# -> Int32# -> Int#
+   with commutable = True
+primop   Int32NeOp  "neInt32#"   (Compare Ne)  Int32# -> Int32# -> Int#
+   with commutable = True
 
 ------------------------------------------------------------------------
 section "Word32#"
@@ -619,12 +624,14 @@ primop Word32SrlOp "uncheckedShiftRLWord32#" GenPrimOp Word32# -> Int# -> Word32
 primop Word32ToInt32Op "word32ToInt32#" GenPrimOp Word32# -> Int32#
    with code_size = 0
 
-primop Word32EqOp "eqWord32#" Compare Word32# -> Word32# -> Int#
-primop Word32GeOp "geWord32#" Compare Word32# -> Word32# -> Int#
-primop Word32GtOp "gtWord32#" Compare Word32# -> Word32# -> Int#
-primop Word32LeOp "leWord32#" Compare Word32# -> Word32# -> Int#
-primop Word32LtOp "ltWord32#" Compare Word32# -> Word32# -> Int#
-primop Word32NeOp "neWord32#" Compare Word32# -> Word32# -> Int#
+primop   Word32LtOp  "ltWord32#"   (Compare Lt)  Word32# -> Word32# -> Int#
+primop   Word32LeOp  "leWord32#"   (Compare Le)  Word32# -> Word32# -> Int#
+primop   Word32GtOp  "gtWord32#"   (Compare Gt)  Word32# -> Word32# -> Int#
+primop   Word32GeOp  "geWord32#"   (Compare Ge)  Word32# -> Word32# -> Int#
+primop   Word32EqOp  "eqWord32#"   (Compare Eq)  Word32# -> Word32# -> Int#
+   with commutable = True
+primop   Word32NeOp  "neWord32#"   (Compare Ne)  Word32# -> Word32# -> Int#
+   with commutable = True
 
 ------------------------------------------------------------------------
 section "Int64#"
@@ -665,12 +672,14 @@ primop Int64SrlOp "uncheckedIShiftRL64#" GenPrimOp Int64# -> Int# -> Int64#
 primop Int64ToWord64Op "int64ToWord64#" GenPrimOp Int64# -> Word64#
    with code_size = 0
 
-primop Int64EqOp "eqInt64#" Compare Int64# -> Int64# -> Int#
-primop Int64GeOp "geInt64#" Compare Int64# -> Int64# -> Int#
-primop Int64GtOp "gtInt64#" Compare Int64# -> Int64# -> Int#
-primop Int64LeOp "leInt64#" Compare Int64# -> Int64# -> Int#
-primop Int64LtOp "ltInt64#" Compare Int64# -> Int64# -> Int#
-primop Int64NeOp "neInt64#" Compare Int64# -> Int64# -> Int#
+primop   Int64LtOp  "ltInt64#"   (Compare Lt)  Int64# -> Int64# -> Int#
+primop   Int64LeOp  "leInt64#"   (Compare Le)  Int64# -> Int64# -> Int#
+primop   Int64GtOp  "gtInt64#"   (Compare Gt)  Int64# -> Int64# -> Int#
+primop   Int64GeOp  "geInt64#"   (Compare Ge)  Int64# -> Int64# -> Int#
+primop   Int64EqOp  "eqInt64#"   (Compare Eq)  Int64# -> Int64# -> Int#
+   with commutable = True
+primop   Int64NeOp  "neInt64#"   (Compare Ne)  Int64# -> Int64# -> Int#
+   with commutable = True
 
 ------------------------------------------------------------------------
 section "Word64#"
@@ -719,12 +728,14 @@ primop Word64SrlOp "uncheckedShiftRL64#" GenPrimOp Word64# -> Int# -> Word64#
 primop Word64ToInt64Op "word64ToInt64#" GenPrimOp Word64# -> Int64#
    with code_size = 0
 
-primop Word64EqOp "eqWord64#" Compare Word64# -> Word64# -> Int#
-primop Word64GeOp "geWord64#" Compare Word64# -> Word64# -> Int#
-primop Word64GtOp "gtWord64#" Compare Word64# -> Word64# -> Int#
-primop Word64LeOp "leWord64#" Compare Word64# -> Word64# -> Int#
-primop Word64LtOp "ltWord64#" Compare Word64# -> Word64# -> Int#
-primop Word64NeOp "neWord64#" Compare Word64# -> Word64# -> Int#
+primop   Word64LtOp  "ltWord64#"   (Compare Lt)  Word64# -> Word64# -> Int#
+primop   Word64LeOp  "leWord64#"   (Compare Le)  Word64# -> Word64# -> Int#
+primop   Word64GtOp  "gtWord64#"   (Compare Gt)  Word64# -> Word64# -> Int#
+primop   Word64GeOp  "geWord64#"   (Compare Ge)  Word64# -> Word64# -> Int#
+primop   Word64EqOp  "eqWord64#"   (Compare Eq)  Word64# -> Word64# -> Int#
+   with commutable = True
+primop   Word64NeOp  "neWord64#"   (Compare Ne)  Word64# -> Word64# -> Int#
+   with commutable = True
 
 ------------------------------------------------------------------------
 section "Int#"
@@ -835,29 +846,27 @@ primop   IntSubCOp   "subIntC#"    GenPrimOp   Int# -> Int# -> (# Int#, Int# #)
           or too small to fit in an {\tt Int#}).}
    with code_size = 2
 
-primop   IntGtOp  ">#"   Compare   Int# -> Int# -> Int#
+primop   IntGtOp  ">#"   (Compare Gt)  Int# -> Int# -> Int#
    with fixity = infix 4
 
-primop   IntGeOp  ">=#"   Compare   Int# -> Int# -> Int#
+primop   IntGeOp  ">=#"  (Compare Ge)  Int# -> Int# -> Int#
    with fixity = infix 4
 
-primop   IntEqOp  "==#"   Compare
-   Int# -> Int# -> Int#
+primop   IntEqOp  "==#"  (Compare Eq)  Int# -> Int# -> Int#
    with commutable = True
         fixity = infix 4
 
-primop   IntNeOp  "/=#"   Compare
-   Int# -> Int# -> Int#
+primop   IntNeOp  "/=#"  (Compare Ne)  Int# -> Int# -> Int#
    with commutable = True
         fixity = infix 4
 
-primop   IntLtOp  "<#"   Compare   Int# -> Int# -> Int#
+primop   IntLtOp  "<#"   (Compare Lt)  Int# -> Int# -> Int#
    with fixity = infix 4
 
-primop   IntLeOp  "<=#"   Compare   Int# -> Int# -> Int#
+primop   IntLeOp  "<=#"  (Compare Le)  Int# -> Int# -> Int#
    with fixity = infix 4
 
-primop   ChrOp   "chr#"   GenPrimOp   Int# -> Char#
+primop   ChrOp   "chr#"  GenPrimOp   Int# -> Char#
    with code_size = 0
 
 primop   IntToWordOp "int2Word#" GenPrimOp Int# -> Word#
@@ -968,12 +977,14 @@ primop   WordSrlOp   "uncheckedShiftRL#"   GenPrimOp   Word# -> Int# -> Word#
 primop   WordToIntOp   "word2Int#"   GenPrimOp   Word# -> Int#
    with code_size = 0
 
-primop   WordGtOp   "gtWord#"   Compare   Word# -> Word# -> Int#
-primop   WordGeOp   "geWord#"   Compare   Word# -> Word# -> Int#
-primop   WordEqOp   "eqWord#"   Compare   Word# -> Word# -> Int#
-primop   WordNeOp   "neWord#"   Compare   Word# -> Word# -> Int#
-primop   WordLtOp   "ltWord#"   Compare   Word# -> Word# -> Int#
-primop   WordLeOp   "leWord#"   Compare   Word# -> Word# -> Int#
+primop   WordLtOp  "ltWord#"   (Compare Lt)  Word# -> Word# -> Int#
+primop   WordLeOp  "leWord#"   (Compare Le)  Word# -> Word# -> Int#
+primop   WordGtOp  "gtWord#"   (Compare Gt)  Word# -> Word# -> Int#
+primop   WordGeOp  "geWord#"   (Compare Ge)  Word# -> Word# -> Int#
+primop   WordEqOp  "eqWord#"   (Compare Eq)  Word# -> Word# -> Int#
+   with commutable = True
+primop   WordNeOp  "neWord#"   (Compare Ne)  Word# -> Word# -> Int#
+   with commutable = True
 
 primop   PopCnt8Op   "popCnt8#"   GenPrimOp   Word# -> Word#
     {Count the number of set bits in the lower 8 bits of a word.}
@@ -1069,26 +1080,24 @@ section "Double#"
 
 primtype Double#
 
-primop   DoubleGtOp ">##"   Compare   Double# -> Double# -> Int#
+primop   DoubleGtOp ">##"  (Compare Gt)   Double# -> Double# -> Int#
    with fixity = infix 4
 
-primop   DoubleGeOp ">=##"   Compare   Double# -> Double# -> Int#
+primop   DoubleGeOp ">=##" (Compare Ge)   Double# -> Double# -> Int#
    with fixity = infix 4
 
-primop DoubleEqOp "==##"   Compare
-   Double# -> Double# -> Int#
+primop DoubleEqOp "==##"   (Compare Eq)   Double# -> Double# -> Int#
    with commutable = True
         fixity = infix 4
 
-primop DoubleNeOp "/=##"   Compare
-   Double# -> Double# -> Int#
+primop DoubleNeOp "/=##"   (Compare Ne)   Double# -> Double# -> Int#
    with commutable = True
         fixity = infix 4
 
-primop   DoubleLtOp "<##"   Compare   Double# -> Double# -> Int#
+primop   DoubleLtOp "<##"  (Compare Lt)   Double# -> Double# -> Int#
    with fixity = infix 4
 
-primop   DoubleLeOp "<=##"   Compare   Double# -> Double# -> Int#
+primop   DoubleLeOp "<=##" (Compare Le)   Double# -> Double# -> Int#
    with fixity = infix 4
 
 primop   DoubleAddOp   "+##"   GenPrimOp
@@ -1235,19 +1244,17 @@ section "Float#"
 
 primtype Float#
 
-primop   FloatGtOp  "gtFloat#"   Compare   Float# -> Float# -> Int#
-primop   FloatGeOp  "geFloat#"   Compare   Float# -> Float# -> Int#
+primop   FloatGtOp  "gtFloat#"   (Compare Gt)   Float# -> Float# -> Int#
+primop   FloatGeOp  "geFloat#"   (Compare Ge)   Float# -> Float# -> Int#
 
-primop   FloatEqOp  "eqFloat#"   Compare
-   Float# -> Float# -> Int#
+primop   FloatEqOp  "eqFloat#"   (Compare Eq)   Float# -> Float# -> Int#
    with commutable = True
 
-primop   FloatNeOp  "neFloat#"   Compare
-   Float# -> Float# -> Int#
+primop   FloatNeOp  "neFloat#"   (Compare Ne)   Float# -> Float# -> Int#
    with commutable = True
 
-primop   FloatLtOp  "ltFloat#"   Compare   Float# -> Float# -> Int#
-primop   FloatLeOp  "leFloat#"   Compare   Float# -> Float# -> Int#
+primop   FloatLtOp  "ltFloat#"   (Compare Lt)   Float# -> Float# -> Int#
+primop   FloatLeOp  "leFloat#"   (Compare Le)   Float# -> Float# -> Int#
 
 primop   FloatAddOp   "plusFloat#"      GenPrimOp
    Float# -> Float# -> Float#
@@ -2149,12 +2156,14 @@ primop   IntToAddrOp   "int2Addr#"    GenPrimOp  Int# -> Addr#
    with code_size = 0
         deprecated_msg = { This operation is strongly deprecated. }
 
-primop   AddrGtOp  "gtAddr#"   Compare   Addr# -> Addr# -> Int#
-primop   AddrGeOp  "geAddr#"   Compare   Addr# -> Addr# -> Int#
-primop   AddrEqOp  "eqAddr#"   Compare   Addr# -> Addr# -> Int#
-primop   AddrNeOp  "neAddr#"   Compare   Addr# -> Addr# -> Int#
-primop   AddrLtOp  "ltAddr#"   Compare   Addr# -> Addr# -> Int#
-primop   AddrLeOp  "leAddr#"   Compare   Addr# -> Addr# -> Int#
+primop   AddrLtOp  "ltAddr#"   (Compare Lt)  Addr# -> Addr# -> Int#
+primop   AddrLeOp  "leAddr#"   (Compare Le)  Addr# -> Addr# -> Int#
+primop   AddrGtOp  "gtAddr#"   (Compare Gt)  Addr# -> Addr# -> Int#
+primop   AddrGeOp  "geAddr#"   (Compare Ge)  Addr# -> Addr# -> Int#
+primop   AddrEqOp  "eqAddr#"   (Compare Eq)  Addr# -> Addr# -> Int#
+   with commutable = True
+primop   AddrNeOp  "neAddr#"   (Compare Ne)  Addr# -> Addr# -> Int#
+   with commutable = True
 
 primop IndexOffAddrOp_Char "indexCharOffAddr#" GenPrimOp
    Addr# -> Int# -> Char#
@@ -3259,29 +3268,29 @@ primop  ReallyUnsafePtrEqualityOp "reallyUnsafePtrEquality#" GenPrimOp
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- The primop `reallyUnsafePtrEquality#` does a direct pointer
 -- equality between two (boxed) values.  Several things to note:
--- 
+--
 -- * It is levity-polymorphic. It works for TYPE (BoxedRep Lifted) and
 --   TYPE (BoxedRep Unlifted). But not TYPE IntRep, for example.
 --   This levity-polymorphism comes from the use of the type variables
 --   "v" and "w". See Note [Levity and representation polymorphic primops]
--- 
+--
 -- * It does not evaluate its arguments. The user of the primop is responsible
 --   for doing so.
--- 
+--
 -- * It is hetero-typed; you can compare pointers of different types.
 --   This is used in various packages such as containers & unordered-containers.
--- 
+--
 -- * It is obviously very dangerous, because
 --      let x = f y in reallyUnsafePtrEquality# x x
 --   will probably return True, whereas
 --      reallyUnsafePtrEquality# (f y) (f y)
 --   will probably return False. ("probably", because it's affected
 --   by CSE and inlining).
--- 
+--
 -- * reallyUnsafePtrEquality# can't fail, but it is marked as such
 --   to prevent it from floating out.
 --   See Note [reallyUnsafePtrEquality# can_fail]
--- 
+--
 -- The library GHC.Exts provides several less Wild-West functions
 -- for use in specific cases, namely:
 --

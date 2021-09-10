@@ -224,7 +224,7 @@ inlineBoringOk e
                         , exprIsTrivial a  = go (credit-1) f
     go credit (Tick _ e)                   = go credit e -- dubious
     go credit (Cast e _)                   = go credit e
-    go credit (Case scrut _ _ [Alt _ _ rhs]) -- See Note [Inline unsafeCoerce]
+    go credit (Case scrut _ _ [Alt _ _ _ rhs]) -- See Note [Inline unsafeCoerce]
       | isUnsafeEqualityProof scrut        = go credit rhs
     go _      (Var {})                     = boringCxtOk
     go _      _                            = boringCxtNotOk
@@ -570,7 +570,7 @@ sizeExpr opts !bOMB_OUT_SIZE top_args expr
            _                -> funSize opts top_args fun (length val_args) voids
 
     ------------
-    size_up_alt (Alt _con _bndrs rhs) = size_up rhs `addSizeN` 10
+    size_up_alt (Alt _con _freq _bndrs rhs) = size_up rhs `addSizeN` 10
         -- Don't charge for args, so that wrappers look cheap
         -- (See comments about wrappers with Case)
         --

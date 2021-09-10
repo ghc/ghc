@@ -672,15 +672,15 @@ cseCase env scrut bndr ty alts
     arg_tys = tyConAppArgs (idType bndr3)
 
     -- See Note [CSE for case alternatives]
-    cse_alt (Alt (DataAlt con) args rhs)
-        = Alt (DataAlt con) args' (tryForCSE new_env rhs)
+    cse_alt (Alt (DataAlt con) freq args rhs)
+        = Alt (DataAlt con) freq args' (tryForCSE new_env rhs)
         where
           (env', args') = addBinders alt_env args
           new_env       = extendCSEnv env' con_expr con_target
           con_expr      = mkAltExpr (DataAlt con) args' arg_tys
 
-    cse_alt (Alt con args rhs)
-        = Alt con args' (tryForCSE env' rhs)
+    cse_alt (Alt con freq args rhs)
+        = Alt con freq args' (tryForCSE env' rhs)
         where
           (env', args') = addBinders alt_env args
 
@@ -688,11 +688,11 @@ combineAlts :: CSEnv -> [OutAlt] -> [OutAlt]
 -- See Note [Combine case alternatives]
 combineAlts env alts
   | (Just alt1, rest_alts) <- find_bndr_free_alt alts
-  , Alt _ bndrs1 rhs1 <- alt1
+  , Alt _ _ bndrs1 rhs1 <- alt1
   , let filtered_alts = filterOut (identical_alt rhs1) rest_alts
   , not (equalLength rest_alts filtered_alts)
   = assertPpr (null bndrs1) (ppr alts) $
-    Alt DEFAULT [] rhs1 : filtered_alts
+    Alt DEFAULT NoFreq [] rhs1 : filtered_alts
 
   | otherwise
   = alts
@@ -704,12 +704,12 @@ combineAlts env alts
        -- See Note [Combine case alts: awkward corner]
     find_bndr_free_alt []
       = (Nothing, [])
-    find_bndr_free_alt (alt@(Alt _ bndrs _) : alts)
+    find_bndr_free_alt (alt@(Alt _ _ bndrs _) : alts)
       | null bndrs = (Just alt, alts)
       | otherwise  = case find_bndr_free_alt alts of
                        (mb_bf, alts) -> (mb_bf, alt:alts)
 
-    identical_alt rhs1 (Alt _ _ rhs) = eqExpr in_scope rhs1 rhs
+    identical_alt rhs1 (Alt _ _ _ rhs) = eqExpr in_scope rhs1 rhs
        -- Even if this alt has binders, they will have been cloned
        -- If any of these binders are mentioned in 'rhs', then
        -- 'rhs' won't compare equal to 'rhs1' (which is from an

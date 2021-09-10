@@ -2301,12 +2301,12 @@ occAnalLamOrRhs env binders body
 
 occAnalAlt :: OccEnv
            -> CoreAlt -> WithUsageDetails (Alt IdWithOccInfo)
-occAnalAlt !env (Alt con bndrs rhs)
+occAnalAlt !env (Alt con freq bndrs rhs)
   = let
       (WithUsageDetails rhs_usage1 rhs1) = occAnal (env `addInScope` bndrs) rhs
       (alt_usg, tagged_bndrs) = tagLamBinders rhs_usage1 bndrs
     in                          -- See Note [Binders in case alternatives]
-    WithUsageDetails alt_usg (Alt con tagged_bndrs rhs1)
+    WithUsageDetails alt_usg (Alt con freq tagged_bndrs rhs1)
 
 {-
 ************************************************************************

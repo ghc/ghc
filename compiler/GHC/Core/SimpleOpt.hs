@@ -257,7 +257,7 @@ simple_opt_expr env expr
       | isDeadBinder b
       , Just (_, [], con, _tys, es) <- exprIsConApp_maybe in_scope_env e'
         -- We don't need to be concerned about floats when looking for coerce.
-      , Just (Alt altcon bs rhs) <- findAlt (DataAlt con) as
+      , Just (Alt altcon _freq bs rhs) <- findAlt (DataAlt con) as
       = case altcon of
           DEFAULT -> go rhs
           _       -> foldr wrapLet (simple_opt_expr env' rhs) mb_prs
@@ -267,7 +267,7 @@ simple_opt_expr env expr
 
          -- Note [Getting the map/coerce RULE to work]
       | isDeadBinder b
-      , [Alt DEFAULT _ rhs] <- as
+      , [Alt DEFAULT _freq _ rhs] <- as
       , isCoVarType (varType b)
       , (Var fun, _args) <- collectArgs e
       , fun `hasKey` coercibleSCSelIdKey
@@ -285,8 +285,8 @@ simple_opt_expr env expr
     go_co co = optCoercion (soe_co_opt_opts env) (getTCvSubst subst) co
 
     ----------------------
-    go_alt env (Alt con bndrs rhs)
-      = Alt con bndrs' (simple_opt_expr env' rhs)
+    go_alt env (Alt con freq bndrs rhs)
+      = Alt con freq bndrs' (simple_opt_expr env' rhs)
       where
         (env', bndrs') = subst_opt_bndrs env bndrs
 
@@ -1141,7 +1141,7 @@ exprIsConApp_maybe (in_scope, id_unf) expr
              float           = FloatLet (NonRec bndr' rhs')
          in go subst' (float:floats) expr cont
 
-    go subst floats (Case scrut b _ [Alt con vars expr]) cont
+    go subst floats (Case scrut b _ [Alt con _freq vars expr]) cont
        = let
           scrut'           = subst_expr subst scrut
           (subst', b')     = subst_bndr subst b

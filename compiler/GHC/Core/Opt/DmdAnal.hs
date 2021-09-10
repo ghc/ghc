@@ -419,10 +419,10 @@ dmdAnal' env dmd (Lam var body)
     in
     WithDmdType new_dmd_type (Lam var' body')
 
-dmdAnal' env dmd (Case scrut case_bndr ty [Alt alt bndrs rhs])
+dmdAnal' env dmd (Case scrut case_bndr ty [Alt con freq bndrs rhs])
   -- Only one alternative.
   -- If it's a DataAlt, it should be the only constructor of the type.
-  | is_single_data_alt alt
+  | is_single_data_alt con
   = let
         WithDmdType rhs_ty rhs'           = dmdAnal env dmd rhs
         WithDmdType alt_ty1 dmds          = findBndrsDmds env rhs_ty bndrs
@@ -434,7 +434,7 @@ dmdAnal' env dmd (Case scrut case_bndr ty [Alt alt bndrs rhs])
         -- FORCE the result, otherwise thunks will end up retaining the
         -- whole DmdEnv
         !(!bndrs', !scrut_sd)
-          | DataAlt _ <- alt
+          | DataAlt _ <- con
           , id_dmds <- addCaseBndrDmd case_bndr_sd dmds
           -- See Note [Demand on scrutinee of a product case]
           = let !new_info = setBndrsDemandInfo bndrs id_dmds
@@ -463,7 +463,7 @@ dmdAnal' env dmd (Case scrut case_bndr ty [Alt alt bndrs rhs])
 --                                   , text "scrut_ty" <+> ppr scrut_ty
 --                                   , text "alt_ty" <+> ppr alt_ty2
 --                                   , text "res_ty" <+> ppr res_ty ]) $
-    WithDmdType res_ty (Case scrut' case_bndr' ty [Alt alt bndrs' rhs'])
+    WithDmdType res_ty (Case scrut' case_bndr' ty [Alt con freq bndrs' rhs'])
     where
       is_single_data_alt (DataAlt dc) = isJust $ tyConSingleAlgDataCon_maybe $ dataConTyCon dc
       is_single_data_alt _            = True
@@ -545,7 +545,7 @@ forcesRealWorld fam_envs ty
   = False
 
 dmdAnalSumAlt :: AnalEnv -> SubDemand -> Id -> Alt Var -> WithDmdType (Alt Var)
-dmdAnalSumAlt env dmd case_bndr (Alt con bndrs rhs)
+dmdAnalSumAlt env dmd case_bndr (Alt con freq bndrs rhs)
   | WithDmdType rhs_ty rhs' <- dmdAnal env dmd rhs
   , WithDmdType alt_ty dmds <- findBndrsDmds env rhs_ty bndrs
   , let (_ :* case_bndr_sd) = findIdDemand alt_ty case_bndr
@@ -553,7 +553,7 @@ dmdAnalSumAlt env dmd case_bndr (Alt con bndrs rhs)
         id_dmds              = addCaseBndrDmd case_bndr_sd dmds
         -- Do not put a thunk into the Alt
         !new_ids  = setBndrsDemandInfo bndrs id_dmds
-  = WithDmdType alt_ty (Alt con new_ids rhs')
+  = WithDmdType alt_ty (Alt con freq new_ids rhs')
 
 {-
 Note [Analysing with absent demand]

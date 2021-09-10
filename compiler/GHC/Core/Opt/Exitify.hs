@@ -81,7 +81,7 @@ exitifyProgram binds = map goTopLvl binds
       = Case (go in_scope scrut) bndr ty (map go_alt alts)
       where
         in_scope1 = in_scope `extendInScopeSet` bndr
-        go_alt (Alt dc pats rhs) = Alt dc pats (go in_scope' rhs)
+        go_alt (Alt dc freq pats rhs) = Alt dc freq pats (go in_scope' rhs)
            where in_scope' = in_scope1 `extendInScopeSetList` pats
 
     go in_scope (Let (NonRec bndr rhs) body)
@@ -152,9 +152,9 @@ exitifyRec in_scope pairs
 
     -- Case right hand sides are in tail-call position
     go captured (_, AnnCase scrut bndr ty alts) = do
-        alts' <- forM alts $ \(AnnAlt dc pats rhs) -> do
+        alts' <- forM alts $ \(AnnAlt dc freq pats rhs) -> do
             rhs' <- go (captured ++ [bndr] ++ pats) rhs
-            return (Alt dc pats rhs')
+            return (Alt dc freq pats rhs')
         return $ Case (deAnnotate scrut) bndr ty alts'
 
     go captured (_, AnnLet ann_bind body)

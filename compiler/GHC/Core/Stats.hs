@@ -85,7 +85,7 @@ exprStats (Cast e co)     = coStats co `plusCS` exprStats e
 exprStats (Tick _ e)      = exprStats e
 
 altStats :: CoreAlt -> CoreStats
-altStats (Alt _ bs r) = altBndrStats bs `plusCS` exprStats r
+altStats (Alt _ _ bs r) = altBndrStats bs `plusCS` exprStats r
 
 altBndrStats :: [Var] -> CoreStats
 -- Charge one for the alternative, not for each binder
@@ -135,4 +135,4 @@ pairSize :: (Var, CoreExpr) -> Int
 pairSize (b,e) = bndrSize b + exprSize e
 
 altSize :: CoreAlt -> Int
-altSize (Alt _ bs e) = bndrsSize bs + exprSize e
+altSize (Alt _ _ bs e) = bndrsSize bs + exprSize e

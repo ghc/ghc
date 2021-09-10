@@ -1185,14 +1185,14 @@ specCase :: SpecEnv
                   , Id
                   , [CoreAlt]
                   , UsageDetails)
-specCase env scrut' case_bndr [Alt con args rhs]
+specCase env scrut' case_bndr [Alt con freq args rhs]
   | isDictId case_bndr           -- See Note [Floating dictionaries out of cases]
   , interestingDict env scrut'
   , not (isDeadBinder case_bndr && null sc_args')
   = do { (case_bndr_flt : sc_args_flt) <- mapM clone_me (case_bndr' : sc_args')
 
        ; let sc_rhss = [ Case (Var case_bndr_flt) case_bndr' (idType sc_arg')
-                              [Alt con args' (Var sc_arg')]
+                              [Alt con freq args' (Var sc_arg')]
                        | sc_arg' <- sc_args' ]
 
              -- Extend the substitution for RHS to map the *original* binders
@@ -1216,7 +1216,7 @@ specCase env scrut' case_bndr [Alt con args rhs]
              flt_binds     = scrut_bind : sc_binds
              (free_uds, dumped_dbs) = dumpUDs (case_bndr':args') rhs_uds
              all_uds = flt_binds `addDictBinds` free_uds
-             alt'    = Alt con args' (wrapDictBindsE dumped_dbs rhs')
+             alt'    = Alt con freq args' (wrapDictBindsE dumped_dbs rhs')
        ; return (Var case_bndr_flt, case_bndr', [alt'], all_uds) }
   where
     (env_rhs, (case_bndr':args')) = substBndrs env (case_bndr:args)
@@ -1245,10 +1245,10 @@ specCase env scrut case_bndr alts
        ; return (scrut, case_bndr', alts', uds_alts) }
   where
     (env_alt, case_bndr') = substBndr env case_bndr
-    spec_alt (Alt con args rhs) = do
+    spec_alt (Alt con freq args rhs) = do
           (rhs', uds) <- specExpr env_rhs rhs
           let (free_uds, dumped_dbs) = dumpUDs (case_bndr' : args') uds
-          return (Alt con args' (wrapDictBindsE dumped_dbs rhs'), free_uds)
+          return (Alt con freq args' (wrapDictBindsE dumped_dbs rhs'), free_uds)
         where
           (env_rhs, args') = substBndrs env_alt args
 

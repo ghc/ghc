@@ -337,6 +337,7 @@ Library
         GHC.Core.Opt.CprAnal
         GHC.Core.Opt.CSE
         GHC.Core.Opt.DmdAnal
+        GHC.Core.Opt.ExecFreq
         GHC.Core.Opt.Exitify
         GHC.Core.Opt.FloatIn
         GHC.Core.Opt.FloatOut

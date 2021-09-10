@@ -17,7 +17,7 @@ module GHC.Builtin.PrimOps (
         primOpOutOfLine, primOpCodeSize,
         primOpOkForSpeculation, primOpOkForSideEffects,
         primOpIsCheap, primOpFixity, primOpDocs,
-        primOpIsDiv,
+        primOpIsDiv, primOpIsComparison_maybe,
 
         getPrimOpResultInfo,  isComparisonPrimOp, PrimOpResultInfo(..),
 
@@ -38,7 +38,7 @@ import GHC.Builtin.Names ( gHC_PRIMOPWRAPPERS )
 import GHC.Core.TyCon    ( TyCon, isPrimTyCon, PrimRep(..) )
 import GHC.Core.Type
 import GHC.Types.RepType ( tyConPrimRep1 )
-import GHC.Types.Basic   ( Arity, Boxity(..) )
+import GHC.Types.Basic
 import GHC.Types.Fixity  ( Fixity(..), FixityDirection(..) )
 import GHC.Types.SrcLoc  ( wiredInSrcSpan )
 import GHC.Types.ForeignCall ( CLabelString )
@@ -107,14 +107,15 @@ tagToEnumKey = mkPrimOpIdUnique (primOpTag TagToEnumOp)
 
 data PrimOpInfo
   = Compare     OccName         -- string :: T -> T -> Int#
+                !Comparison
                 Type
   | GenPrimOp   OccName         -- string :: \/a1..an . T1 -> .. -> Tk -> T
                 [TyVarBinder]
                 [Type]
                 Type
 
-mkCompare :: FastString -> Type -> PrimOpInfo
-mkCompare str ty = Compare (mkVarOccFS str) ty
+mkCompare :: FastString -> Comparison -> Type -> PrimOpInfo
+mkCompare str cmp ty = Compare (mkVarOccFS str) cmp ty
 
 mkGenPrimOp :: FastString -> [TyVarBinder] -> [Type] -> Type -> PrimOpInfo
 mkGenPrimOp str tvs tys ty = GenPrimOp (mkVarOccFS str) tvs tys ty
@@ -580,6 +581,10 @@ primOpIsDiv op = case op of
   _               -> False
 
 
+primOpIsComparison_maybe :: PrimOp -> Maybe Comparison
+primOpIsComparison_maybe op = case primOpInfo op of
+  Compare _occ cmp _ty -> Just cmp
+  _                    -> Nothing
 
 {-
 ************************************************************************
@@ -616,7 +621,7 @@ primOpCodeSizeForeignCall = 4
 primOpType :: PrimOp -> Type  -- you may want to use primOpSig instead
 primOpType op
   = case primOpInfo op of
-    Compare _occ ty -> compare_fun_ty ty
+    Compare _occ _cmp ty -> compare_fun_ty ty
 
     GenPrimOp _occ tyvars arg_tys res_ty ->
         mkForAllTys tyvars (mkVisFunTysMany arg_tys res_ty)
@@ -624,12 +629,12 @@ primOpType op
 primOpResultType :: PrimOp -> Type
 primOpResultType op
   = case primOpInfo op of
-    Compare _occ _ty -> intPrimTy
+    Compare _occ _cmp _ty -> intPrimTy
     GenPrimOp _occ _tyvars _arg_tys res_ty -> res_ty
 
 primOpOcc :: PrimOp -> OccName
 primOpOcc op = case primOpInfo op of
-               Compare   occ _     -> occ
+               Compare   occ _ _   -> occ
                GenPrimOp occ _ _ _ -> occ
 
 {- Note [Primop wrappers]
@@ -741,7 +746,7 @@ primOpSig op
     arity = length arg_tys
     (tyvars, arg_tys, res_ty)
       = case (primOpInfo op) of
-        Compare   _occ ty                    -> ([],     [ty,ty], intPrimTy)
+        Compare   _cmp _occ ty               -> ([],     [ty,ty], intPrimTy)
         GenPrimOp _occ tyvars arg_tys res_ty -> (tyvars, arg_tys, res_ty   )
 
 data PrimOpResultInfo
@@ -755,7 +760,7 @@ data PrimOpResultInfo
 getPrimOpResultInfo :: PrimOp -> PrimOpResultInfo
 getPrimOpResultInfo op
   = case (primOpInfo op) of
-      Compare _ _                         -> ReturnsPrim (tyConPrimRep1 intPrimTyCon)
+      Compare _ _ _                       -> ReturnsPrim (tyConPrimRep1 intPrimTyCon)
       GenPrimOp _ _ _ ty | isPrimTyCon tc -> ReturnsPrim (tyConPrimRep1 tc)
                          | otherwise      -> ReturnsAlg tc
                          where

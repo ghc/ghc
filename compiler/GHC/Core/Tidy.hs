@@ -82,9 +82,9 @@ tidyExpr env (Lam b e)
 
 ------------  Case alternatives  --------------
 tidyAlt :: TidyEnv -> CoreAlt -> CoreAlt
-tidyAlt env (Alt con vs rhs)
+tidyAlt env (Alt con freq vs rhs)
   = tidyBndrs env vs    =: \ (env', vs) ->
-    (Alt con vs (tidyExpr env' rhs))
+    (Alt con freq vs (tidyExpr env' rhs))
 
 ------------  Tickish  --------------
 tidyTickish :: TidyEnv -> CoreTickish -> CoreTickish

@@ -1,6 +1,7 @@
 {-# LANGUAGE TupleSections, PatternSynonyms #-}
 import GHC.Core
 import GHC.Core.Utils
+import GHC.Types.Basic
 import GHC.Types.Id
 import GHC.Core.Type
 import GHC.Core.Multiplicity ( pattern Many )
@@ -74,7 +75,7 @@ exprs =
                           (mkLams [y] $ Var y)
                   ) $ mkLams [z] $ Var d `mkVarApps` [x]) $
         Case (go `mkLApps` [0, 0]) z intTy
-            [Alt DEFAULT [] (Var f `mkVarApps` [z,z])]
+            [Alt DEFAULT NoFreq [] (Var f `mkVarApps` [z,z])]
   , ("go2 (in function call)",) $
      mkRFun go [x]
         (mkLetNonRec d (mkACase (Var go `mkVarApps` [x])
@@ -217,7 +218,7 @@ allBoundIds (Let (Rec binds) body) =
 allBoundIds (App e1 e2) = allBoundIds e1 `unionVarSet` allBoundIds e2
 allBoundIds (Case scrut _ _ alts) =
     allBoundIds scrut `unionVarSet` unionVarSets
-        [ allBoundIds e | Alt _ _ e <- alts ]
+        [ allBoundIds e | Alt _ _ _ e <- alts ]
 allBoundIds (Lam _ e)  = allBoundIds e
 allBoundIds (Tick _ e) = allBoundIds e
 allBoundIds (Cast e _) = allBoundIds e

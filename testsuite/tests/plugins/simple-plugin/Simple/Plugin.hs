@@ -83,4 +83,4 @@ changeExpr anns mb_replacement e = let go = changeExpr anns mb_replacement in ca
         _ -> return e
 
 changeAlt :: VarEnv [ReplaceWith] -> Maybe String -> CoreAlt -> CoreM CoreAlt
-changeAlt anns mb_replacement (Alt con bs e) = liftM (\e' -> Alt con bs e') (changeExpr anns mb_replacement e)
+changeAlt anns mb_replacement (Alt con fq bs e) = liftM (\e' -> Alt con fq bs e') (changeExpr anns mb_replacement e)

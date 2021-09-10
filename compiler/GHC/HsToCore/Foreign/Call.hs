@@ -156,7 +156,7 @@ unboxArg arg
               \ body -> Case (mkIfThenElse arg (mkIntLit platform 1) (mkIntLit platform 0))
                              prim_arg
                              (exprType body)
-                             [Alt DEFAULT [] body])
+                             [Alt DEFAULT NoFreq [] body])
 
   -- Data types with a single constructor, which has a single, primitive-typed arg
   -- This deals with Int, Float etc; also Ptr, ForeignPtr
@@ -166,7 +166,7 @@ unboxArg arg
     do case_bndr <- newSysLocalDs Many arg_ty
        prim_arg <- newSysLocalDs Many data_con_arg_ty1
        return (Var prim_arg,
-               \ body -> Case arg case_bndr (exprType body) [Alt (DataAlt data_con) [prim_arg] body]
+               \ body -> Case arg case_bndr (exprType body) [Alt (DataAlt data_con) NoFreq [prim_arg] body]
               )
 
   -- Byte-arrays, both mutable and otherwise; hack warning
@@ -181,7 +181,7 @@ unboxArg arg
   = do case_bndr <- newSysLocalDs Many arg_ty
        vars@[_l_var, _r_var, arr_cts_var] <- newSysLocalsDs (map unrestricted data_con_arg_tys)
        return (Var arr_cts_var,
-               \ body -> Case arg case_bndr (exprType body) [Alt (DataAlt data_con) vars body]
+               \ body -> Case arg case_bndr (exprType body) [Alt (DataAlt data_con) NoFreq vars body]
               )
 
   | otherwise
@@ -273,7 +273,7 @@ mk_alt return_result (Nothing, wrap_result)
                                      (wrap_result (panic "boxResult"))
 
              ccall_res_ty = mkTupleTy Unboxed [realWorldStatePrimTy]
-             the_alt      = Alt (DataAlt (tupleDataCon Unboxed 1)) [state_id] the_rhs
+             the_alt      = Alt (DataAlt (tupleDataCon Unboxed 1)) NoFreq [state_id] the_rhs
 
        return (ccall_res_ty, the_alt)
 
@@ -286,7 +286,7 @@ mk_alt return_result (Just prim_res_ty, wrap_result)
        ; let the_rhs = return_result (Var state_id)
                                 (wrap_result (Var result_id))
              ccall_res_ty = mkTupleTy Unboxed [realWorldStatePrimTy, prim_res_ty]
-             the_alt      = Alt (DataAlt (tupleDataCon Unboxed 2)) [state_id, result_id] the_rhs
+             the_alt      = Alt (DataAlt (tupleDataCon Unboxed 2)) NoFreq [state_id, result_id] the_rhs
        ; return (ccall_res_ty, the_alt) }
 
 
@@ -321,8 +321,8 @@ resultWrapper result_ty
        ; let platform = targetPlatform dflags
        ; let marshal_bool e
                = mkWildCase e (unrestricted intPrimTy) boolTy
-                   [ Alt DEFAULT                        [] (Var trueDataConId )
-                   , Alt (LitAlt (mkLitInt platform 0)) [] (Var falseDataConId)]
+                   [ Alt DEFAULT                        NoFreq [] (Var trueDataConId )
+                   , Alt (LitAlt (mkLitInt platform 0)) NoFreq [] (Var falseDataConId)]
        ; return (Just intPrimTy, marshal_bool) }
 
   -- Newtypes
