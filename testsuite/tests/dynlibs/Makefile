@@ -67,9 +67,9 @@ T18072:
 	$(RM) -rf T18072/
 	mkdir T18072
 	'$(TEST_HC)' $(filter-out -rtsopts,$(TEST_HC_OPTS)) -v0 -outputdir T18072 \
-    -dynamic -fPIC -c T18072.hs
+      -dynamic -fPIC -c T18072.hs
 	'$(TEST_HC)' $(filter-out -rtsopts,$(TEST_HC_OPTS)) -v0 -outputdir T18072 \
-    -dynamic -shared -flink-rts T18072/T18072.o -o T18072/T18072.so
+      -dynamic -shared -flink-rts T18072/T18072.o -o T18072/T18072.so
 	ldd T18072/T18072.so | grep libHSrts >/dev/null
 
 .PHONY: T18072debug
@@ -77,9 +77,9 @@ T18072debug:
 	$(RM) -rf T18072debug/
 	mkdir T18072debug
 	'$(TEST_HC)' $(filter-out -rtsopts,$(TEST_HC_OPTS)) -v0 -outputdir T18072debug \
-    -dynamic -fPIC -c T18072.hs
+      -dynamic -fPIC -c T18072.hs
 	'$(TEST_HC)' $(filter-out -rtsopts,$(TEST_HC_OPTS)) -v0 -outputdir T18072debug \
-    -dynamic -shared -flink-rts -debug T18072debug/T18072.o -o T18072debug/T18072.so
+      -dynamic -shared -flink-rts -debug T18072debug/T18072.o -o T18072debug/T18072.so
 	ldd T18072debug/T18072.so | grep libHSrts | grep _debug >/dev/null
 
 .PHONY: T18072static
@@ -87,7 +87,7 @@ T18072static:
 	$(RM) -rf T18072static/
 	mkdir T18072static
 	'$(TEST_HC)' $(filter-out -rtsopts,$(TEST_HC_OPTS)) -v0 -outputdir T18072static \
-    -c T18072.hs
+      -c T18072.hs
 	'$(TEST_HC)' $(filter-out -rtsopts,$(TEST_HC_OPTS)) -v0 -outputdir T18072static \
-    -staticlib -fno-link-rts T18072static/T18072.o -o T18072static/T18072.a
+      -staticlib -fno-link-rts T18072static/T18072.o -o T18072static/T18072.a
 	ar t T18072static/T18072.a | grep RtsSymbols.o > /dev/null && exit 1 || exit 0

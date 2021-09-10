@@ -204,8 +204,20 @@ def req_profiling( name, opts ):
     if not config.have_profiling:
         opts.expect = 'fail'
 
-def req_shared_libs( name, opts ):
-    if not config.have_shared_libs:
+def req_dynamic_lib_support( name, opts ):
+    '''
+    Require that the platform have shared object support (N.B. this doesn't
+    necessary imply that GHC supports the dynamic way).
+    '''
+    if not config.supports_dynamic_libs:
+        opts.expect = 'fail'
+
+def req_dynamic_hs( name, opts ):
+    '''
+    Require that the GHC supports dynamic linking of Haskell objects on the
+    platform
+    '''
+    if not config.supports_dynamic_hs:
         opts.expect = 'fail'
 
 def req_interp( name, opts ):
@@ -559,6 +571,7 @@ def have_ncg( ) -> bool:
     return config.have_ncg
 
 def have_dynamic( ) -> bool:
+    ''' Were libraries built in the dynamic way? '''
     return config.have_dynamic
 
 def have_profiling( ) -> bool:
