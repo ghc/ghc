@@ -69,3 +69,8 @@ test('T15729',
      [extra_files(['T15729.hs', 'T15729.c']),
       unless(doing_ghci, skip)],
      makefile_test, ['T15729'])
+
+test('big-obj', [extra_files(['big-obj-c.c', 'big-obj.hs']),
+                    unless(doing_ghci, skip), unless(opsys('mingw32'), skip)],
+     makefile_test, ['big-obj'])
+
