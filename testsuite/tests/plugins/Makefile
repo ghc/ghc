@@ -152,3 +152,14 @@ plugin-recomp-change-2:
 T20417:
 	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) -v0 plugin-recomp-test.hs -package-db plugin-recomp/pkg.plugins01/local.package.conf -hide-all-packages -package base -plugin-package plugin-recompilation-0.1  -fplugin PurePlugin
 	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) -v0 plugin-recomp-test.hs -package-db plugin-recomp/pkg.plugins01/local.package.conf -hide-all-packages -package base -plugin-package plugin-recompilation-0.1 -fplugin PurePlugin
+
+# Test that we don't link plugin with target code
+.PHONY: T20218
+T20218:
+	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) -v4 T20218.hs -package-db simple-plugin/pkg.T20218/local.package.conf -fplugin Simple.Plugin -plugin-package simple-plugin
+
+# T20218b tests that we correctly link with plugins passed with -package
+.PHONY: T20218b
+T20218b:
+	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) T20218b.hs -package-db simple-plugin/pkg.T20218b/local.package.conf -fplugin Simple.ReplacePlugin -package simple-plugin -v0
+	./T20218b

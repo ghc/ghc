@@ -22,3 +22,4 @@ Library
         Simple.RemovePlugin
         Simple.TrustworthyPlugin
         Simple.DefaultPlugin
+        Simple.ReplacePlugin

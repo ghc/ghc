@@ -247,3 +247,17 @@ test('T20417',
       pre_cmd('$MAKE -s --no-print-directory -C plugin-recomp package.plugins01 TOP={top}')
       ],
      makefile_test, [])
+
+test('T20218',
+     [extra_files(['simple-plugin/']), only_ways([config.ghc_plugin_way]),
+      pre_cmd('$MAKE -s --no-print-directory -C simple-plugin package.T20218 TOP={top}'),
+      grep_errmsg(r'-lHSsimple-plugin'),
+      ignore_stdout
+      ],
+     makefile_test, [])
+
+test('T20218b',
+     [extra_files(['simple-plugin/']), only_ways([config.ghc_plugin_way]),
+      pre_cmd('$MAKE -s --no-print-directory -C simple-plugin package.T20218b TOP={top}')
+      ],
+     makefile_test, [])

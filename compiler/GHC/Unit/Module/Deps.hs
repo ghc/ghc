@@ -8,6 +8,7 @@ module GHC.Unit.Module.Deps
    , dep_sig_mods
    , dep_trusted_pkgs
    , dep_orphs
+   , dep_plugin_pkgs
    , dep_finsts
    , dep_boot_mods
    , dep_orphs_update
@@ -55,6 +56,9 @@ data Dependencies = Deps
    , dep_direct_pkgs :: Set UnitId
       -- ^ All packages directly imported by this module
       -- I.e. packages to which this module's direct imports belong.
+
+   , dep_plugin_pkgs :: Set UnitId
+      -- ^ All units needed for plugins
 
     ------------------------------------
     -- Transitive information below here
@@ -125,7 +129,7 @@ mkDependencies home_unit mod imports plugin_mods =
             -- We must also remove self-references from imp_orphs. See
             -- Note [Module self-dependency]
 
-      direct_pkgs = foldr Set.insert (imp_dep_direct_pkgs imports) plugin_units
+      direct_pkgs = imp_dep_direct_pkgs imports
 
       -- Set the packages required to be Safe according to Safe Haskell.
       -- See Note [Tracking Trust Transitively] in GHC.Rename.Names
@@ -139,6 +143,7 @@ mkDependencies home_unit mod imports plugin_mods =
 
   in Deps { dep_direct_mods  = direct_mods
           , dep_direct_pkgs  = direct_pkgs
+          , dep_plugin_pkgs  = plugin_units
           , dep_sig_mods     = sort sig_mods
           , dep_trusted_pkgs = trust_pkgs
           , dep_boot_mods    = source_mods
@@ -164,6 +169,7 @@ dep_finsts_update deps f = do
 instance Binary Dependencies where
     put_ bh deps = do put_ bh (dep_direct_mods deps)
                       put_ bh (dep_direct_pkgs deps)
+                      put_ bh (dep_plugin_pkgs deps)
                       put_ bh (dep_trusted_pkgs deps)
                       put_ bh (dep_sig_mods deps)
                       put_ bh (dep_boot_mods deps)
@@ -172,6 +178,7 @@ instance Binary Dependencies where
 
     get bh = do dms <- get bh
                 dps <- get bh
+                plugin_pkgs <- get bh
                 tps <- get bh
                 hsigms <- get bh
                 sms <- get bh
@@ -179,6 +186,7 @@ instance Binary Dependencies where
                 fis <- get bh
                 return (Deps { dep_direct_mods = dms
                              , dep_direct_pkgs = dps
+                             , dep_plugin_pkgs = plugin_pkgs
                              , dep_sig_mods = hsigms
                              , dep_boot_mods = sms
                              , dep_trusted_pkgs = tps
@@ -189,6 +197,7 @@ noDependencies :: Dependencies
 noDependencies = Deps
   { dep_direct_mods  = Set.empty
   , dep_direct_pkgs  = Set.empty
+  , dep_plugin_pkgs  = Set.empty
   , dep_sig_mods     = []
   , dep_boot_mods    = Set.empty
   , dep_trusted_pkgs = Set.empty
@@ -200,6 +209,7 @@ noDependencies = Deps
 pprDeps :: UnitState -> Dependencies -> SDoc
 pprDeps unit_state (Deps { dep_direct_mods = dmods
                          , dep_boot_mods = bmods
+                         , dep_plugin_pkgs = plgns
                          , dep_orphs = orphs
                          , dep_direct_pkgs = pkgs
                          , dep_trusted_pkgs = tps
@@ -209,6 +219,7 @@ pprDeps unit_state (Deps { dep_direct_mods = dmods
     vcat [text "direct module dependencies:"  <+> ppr_set ppr_mod dmods,
           text "boot module dependencies:"    <+> ppr_set ppr bmods,
           text "direct package dependencies:" <+> ppr_set ppr pkgs,
+          text "plugin package dependencies:" <+> ppr_set ppr plgns,
           if null tps
             then empty
             else text "trusted package dependencies:" <+> ppr_set ppr tps,
