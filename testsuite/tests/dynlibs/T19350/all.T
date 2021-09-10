@@ -13,4 +13,4 @@
 # into libhello.
 #
 
-test('T19350', [req_shared_libs, expect_broken(19350), extra_files(['clib', 'lib'])], makefile_test, [])
+test('T19350', [req_dynamic_lib_support, expect_broken(19350), extra_files(['clib', 'lib'])], makefile_test, [])

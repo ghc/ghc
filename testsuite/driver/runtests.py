@@ -42,6 +42,7 @@ ghc_env['TERM'] = 'vt100'
 
 global config
 config = getConfig() # get it from testglobals
+config.validate()
 
 def signal_handler(signal, frame):
     stopNow()

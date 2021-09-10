@@ -1,4 +1,4 @@
-setTestOpts(req_shared_libs)
+setTestOpts(req_dynamic_lib_support)
 
 test('load_short_name', [extra_files(['A.c']),
                          unless(doing_ghci, skip)],

@@ -53,10 +53,11 @@ if ghc_with_threaded_rts:
             config.run_ways.append('nonmoving_thr')
 
 if ghc_with_dynamic_rts:
-    config.have_shared_libs = True
-
-if ghc_with_dynamic_rts:
+    config.supports_dynamic_libs = True
     config.run_ways.append('dyn')
+
+if windows:
+    config.supports_dynamic_hs = False
 
 if (config.have_profiling and ghc_with_threaded_rts):
     config.run_ways.append('profthreaded')
