@@ -82,11 +82,14 @@ test('T5435_dyn_gcc', extra_files(['T5435.hs', 'T5435_gcc.c']) , makefile_test, 
 
 ######################################
 test('linker_unload',
-     [extra_files(['LinkerUnload.hs', 'Test.hs']), req_rts_linker],
+     [extra_files(['LinkerUnload.hs', 'Test.hs']),
+      req_rts_linker],
      makefile_test, ['linker_unload'])
 
 test('linker_unload_native',
-     [extra_files(['LinkerUnload.hs', 'Test.hs']), req_rts_linker,
+     [extra_files(['LinkerUnload.hs', 'Test.hs']),
+      req_rts_linker,
+      unless(have_dynamic(), skip),
       when(opsys('darwin') or opsys('mingw32'), skip)],
      makefile_test, ['linker_unload_native'])
 
