@@ -45,10 +45,6 @@ test('T13606', [unless(doing_ghci, skip), unless(opsys('mingw32'), skip),
                 exit_code(0)],
      makefile_test, ['T13606'])
 
-test('big-obj', [extra_files(['big-obj-c.c', 'big-obj.hs']),
-                    unless(doing_ghci, skip), unless(opsys('mingw32'), skip)],
-     makefile_test, ['big-obj'])
-
 test('T3372',
      [unless(doing_ghci, skip),
       req_rts_linker,

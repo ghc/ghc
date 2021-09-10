@@ -150,3 +150,8 @@ T14708:
 T15729:
 	"$(TEST_HC)" -fPIC -c T15729.c -o bss.o
 	echo "main" | "$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) bss.o T15729.hs
+
+.PHONY: big-obj
+big-obj:
+	'$(TEST_CC)' -c -Wa,-mbig-obj big-obj-c.c -o big-obj-c.o
+	echo "main" | '$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE) big-obj-c.o big-obj.hs
