@@ -1293,7 +1293,7 @@ roundingMode# (IS i#) t =
                  then 2#
                  else 1#
 
-roundingMode# (IN bn) t = roundingMode# (IP bn) t -- dummy
+roundingMode# (IN _)  _ = errorWithoutStackTrace "roundingMode#: IN" -- See the Assumption
 roundingMode# (IP bn) t =
    let
       j = word2Int# (int2Word# t `and#` MMASK##) -- index of relevant bit in word
