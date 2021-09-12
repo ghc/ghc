@@ -645,7 +645,9 @@ void osCommitMemory(void *at, W_ size)
 {
     void *r = my_mmap(at, size, MEM_COMMIT);
     if (r == NULL) {
-        barf("Unable to commit %" FMT_Word " bytes of memory", size);
+        errorBelch("Unable to commit %" FMT_Word " bytes of memory", size);
+        errorBelch("Exiting. The system might be out of memory.");
+        stg_exit(EXIT_FAILURE);
     }
 }
 
