@@ -1,0 +1,2 @@
+T17865.hs:3:10:
+    Cannot parse data constructor in a data/newtype declaration: 'MkT
