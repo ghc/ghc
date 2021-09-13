@@ -59,7 +59,9 @@ checkLeakIndicators dflags (LeakIndicators leakmods)  = do
       Just hmi ->
         report ("HomeModInfo for " ++
           showSDoc dflags (ppr (mi_module (hm_iface hmi)))) (Just hmi)
-    deRefWeak leakIface >>= report "ModIface"
+    deRefWeak leakIface >>= \case
+      Nothing -> return ()
+      Just miface -> report ("ModIface:" ++ moduleNameString (moduleName (mi_module miface))) (Just miface)
     deRefWeak leakDetails >>= report "ModDetails"
     forM_ leakLinkable $ \l -> deRefWeak l >>= report "Linkable"
  where

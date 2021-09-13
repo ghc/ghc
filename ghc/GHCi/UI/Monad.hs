@@ -56,6 +56,7 @@ import GHC.Hs (ImportDecl, GhcPs, GhciLStmt, LHsDecl)
 import GHC.Hs.Utils
 import GHC.Utils.Misc
 import GHC.Utils.Logger
+import GHC.Unit.Home.ModInfo
 
 import GHC.Utils.Exception hiding (uninterruptibleMask, mask, catch)
 import Numeric
@@ -159,8 +160,9 @@ data GHCiState = GHCiState
 
         flushStdHandles :: ForeignHValue,
             -- ^ @hFlush stdout; hFlush stderr@ in the interpreter
-        noBuffering :: ForeignHValue
+        noBuffering :: ForeignHValue,
             -- ^ @hSetBuffering NoBuffering@ for stdin/stdout/stderr
+        hmiCache :: [HomeModInfo]
      }
 
 type TickArray = Array Int [(GHC.BreakIndex,RealSrcSpan)]
@@ -288,7 +290,7 @@ class GhcMonad m => GhciMonad m where
 instance GhciMonad GHCi where
   getGHCiState      = GHCi $ \r -> liftIO $ readIORef r
   setGHCiState s    = GHCi $ \r -> liftIO $ writeIORef r s
-  modifyGHCiState f = GHCi $ \r -> liftIO $ modifyIORef r f
+  modifyGHCiState f = GHCi $ \r -> liftIO $ modifyIORef' r f
   reifyGHCi f       = GHCi $ \r -> reifyGhc $ \s -> f (s, r)
 
 instance GhciMonad (InputT GHCi) where
@@ -327,7 +329,7 @@ instance GhcMonad (InputT GHCi) where
 isOptionSet :: GhciMonad m => GHCiOption -> m Bool
 isOptionSet opt
  = do st <- getGHCiState
-      return (opt `elem` options st)
+      return $! (opt `elem` options st)
 
 setOption :: GhciMonad m => GHCiOption -> m ()
 setOption opt
