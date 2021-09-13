@@ -512,7 +512,7 @@ data WarningFlag =
    | Opt_WarnAmbiguousFields                -- Since 9.2
    | Opt_WarnImplicitLift                 -- Since 9.2
    | Opt_WarnMissingKindSignatures        -- Since 9.2
-   deriving (Eq, Show, Enum)
+   deriving (Eq, Ord, Show, Enum)
 
 -- | Used when outputting warnings: if a reason is given, it is
 -- displayed. If a warning isn't controlled by a flag, this is made
@@ -540,3 +540,4 @@ data Language = Haskell98 | Haskell2010 | GHC2021
 
 instance Outputable Language where
     ppr = text . show
+
