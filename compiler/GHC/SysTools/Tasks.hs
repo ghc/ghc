@@ -211,7 +211,7 @@ figureLlvmVersion logger dflags = traceToolCommand logger dflags "llc" $ do
       -- options are specified when '-version' is used.
       args' = args ++ ["-version"]
   catchIO (do
-              (pin, pout, perr, _) <- runInteractiveProcess pgm args'
+              (pin, pout, perr, p) <- runInteractiveProcess pgm args'
                                               Nothing Nothing
               {- > llc -version
                   LLVM (http://llvm.org/):
@@ -225,6 +225,7 @@ figureLlvmVersion logger dflags = traceToolCommand logger dflags "llc" $ do
               hClose pin
               hClose pout
               hClose perr
+              _ <- waitForProcess p
               return mb_ver
             )
             (\err -> do
