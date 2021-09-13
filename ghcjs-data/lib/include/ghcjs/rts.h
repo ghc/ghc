@@ -82,15 +82,15 @@
 #endif
 
 // Data.Maybe.Maybe
-#define HS_NOTHING h$baseZCGHCziBaseziNothing
-#define IS_NOTHING(cl) ((cl).f === h$baseZCGHCziBaseziNothing_con_e)
-#define IS_JUST(cl) ((cl).f === h$baseZCGHCziBaseziJust_con_e)
+#define HS_NOTHING h$baseZCGHCziMaybeziNothing
+#define IS_NOTHING(cl) ((cl).f === h$baseZCGHCziMaybeziNothing_con_e)
+#define IS_JUST(cl) ((cl).f === h$baseZCGHCziMaybeziJust_con_e)
 #define JUST_VAL(jj) ((jj).d1)
 // #define HS_NOTHING h$nothing
 #ifdef GHCJS_PROF
-#define MK_JUST(val) (h$c1(h$baseZCGHCziBaseziJust_con_e, (val), h$CCS_SYSTEM))
+#define MK_JUST(val) (h$c1(h$baseZCGHCziMaybeziJust_con_e, (val), h$CCS_SYSTEM))
 #else
-#define MK_JUST(val) (h$c1(h$baseZCGHCziBaseziJust_con_e, (val)))
+#define MK_JUST(val) (h$c1(h$baseZCGHCziMaybeziJust_con_e, (val)))
 #endif
 
 // Data.List
