@@ -2258,7 +2258,10 @@ executeInstantiationNode k n wait_deps iu = do
         -- avoid output interleaving
         let lcl_hsc_env = setHPT deps hsc_env
         msg <- asks env_messager
-        lift $ MaybeT $ wrapAction lcl_hsc_env $ upsweep_inst lcl_hsc_env msg k n iu
+        lift $ MaybeT $ wrapAction lcl_hsc_env $ do
+          res <- upsweep_inst lcl_hsc_env msg k n iu
+          cleanCurrentModuleTempFilesMaybe (hsc_logger hsc_env) (hsc_tmpfs hsc_env) (hsc_dflags hsc_env)
+          return res
 
 executeCompileNode :: Int
   -> Int
@@ -2288,7 +2291,10 @@ executeCompileNode k n wait_deps mknot_var mod = do
              hsc_env { hsc_type_env_vars = knotVarsFromModuleEnv knot_var }
      -- Compile the module, locking with a semphore to avoid too many modules
      -- being compiled at the same time leading to high memory usage.
-     lift $ MaybeT (withAbstractSem compile_sem $ wrapAction lcl_hsc_env $ upsweep_mod lcl_hsc_env env_messager old_hpt mod k n)
+     lift $ MaybeT (withAbstractSem compile_sem $ wrapAction lcl_hsc_env $ do
+      res <- upsweep_mod lcl_hsc_env env_messager old_hpt mod k n
+      cleanCurrentModuleTempFilesMaybe (hsc_logger hsc_env) (hsc_tmpfs hsc_env) lcl_dynflags
+      return res)
 
 executeTypecheckLoop :: IO HomePackageTable -- Dependencies of the loop
   -> RunMakeM [HomeModInfo] -- The loop itself
