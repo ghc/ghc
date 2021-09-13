@@ -1,12 +1,17 @@
 function h$hsprimitive_memcpy(dst_d, dst_o, doff, src_d, src_o, soff, len) {
-  return h$primitive_memmove(dst_d, dst_o, doff, src_d, src_o, soff, len);
-}
-
-function h$hsprimitive_memmove(dst_d, dst_o, doff, src_d, src_o, soff, len) {
   if(len === 0) return;
   var du8 = dst_d.u8, su8 = src_d.u8;
   for(var i=len-1;i>=0;i--) {
     du8[dst_o+doff+i] = su8[src_o+soff+i];
+  }
+}
+
+function h$hsprimitive_memmove(dst_d, dst_o, doff, src_d, src_o, soff, len) {
+  if(len === 0) return;
+  if (dst_d == src_d) {
+    dst_d.u8.copyWithin(dst_o+doff, src_o+soff, src_o+soff+len);
+  } else {
+    h$hsprimitive_memcpy(dst_d, dst_o, doff, src_d, src_o, soff, len);
   }
 }
 
