@@ -51,7 +51,7 @@
 //
 // Note that, crucially, we don't unload an object code even if it's not
 // reachable from the heap, unless it's explicitly asked for unloading (via
-// `unloadObj`). This is a feature and not a but! Two use cases:
+// `unloadObj`). This is a feature and not a bug! Two use cases:
 //
 // - The user might request a symbol from a loaded object at any point with
 //   lookupSymbol (e.g. GHCi might do this).
@@ -459,7 +459,7 @@ void checkUnload()
         // NB (osa): If this assertion doesn't hold then freeObjectCode below
         // will corrupt symhash as keys of that table live in ObjectCodes. If
         // you see a segfault in a hash table operation in linker (in non-debug
-        // RTS) then it's probably becuse this assertion did not hold.
+        // RTS) then it's probably because this assertion did not hold.
         ASSERT(oc->symbols == NULL);
 
         freeObjectCode(oc);
