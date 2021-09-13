@@ -1309,8 +1309,6 @@ lintCaseExpr scrut var alt_ty alts =
           -- in GHC.Core
      ; let scrut_mult = varMult var
 
-     ; alt_ty <- addLoc (CaseTy scrut) $
-                 lintValueType alt_ty
      ; var_ty <- addLoc (IdTy var) $
                  lintValueType (idType var)
 
@@ -1348,6 +1346,9 @@ lintCaseExpr scrut var alt_ty alts =
 
      ; lintBinder CaseBind var $ \_ ->
        do { -- Check the alternatives
+
+          ; alt_ty <- addLoc (CaseTy scrut) $
+                       lintValueType alt_ty
           ; alt_ues <- mapM (lintCoreAlt var scrut_ty scrut_mult alt_ty) alts
           ; let case_ue = (scaleUE scrut_mult scrut_ue) `addUE` supUEs alt_ues
           ; checkCaseAlts e scrut_ty alts
