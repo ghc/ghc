@@ -87,6 +87,10 @@ import Data.List (intersperse)
 import Control.Exception as Exception
 import Control.Monad (when)
 import System.FilePath as FilePath
+#if !defined(mingw32_HOST_OS)
+import System.Posix.Files
+import GHC.IO.Exception (ioe_type, IOErrorType(NoSuchThing))
+#endif
 import System.IO
 import System.IO.Error
 import GHC.IO.Exception (IOErrorType(InappropriateType))
@@ -503,6 +507,26 @@ decodeFromFile file mode decoder = case mode of
 -- Copied from Cabal's Distribution.Simple.Utils.
 writeFileAtomic :: FilePath -> BS.Lazy.ByteString -> IO ()
 writeFileAtomic targetPath content = do
+  -- Figure out how to update the file mode after we create the temporary file
+  let no_update _path = return ()
+#if !defined(mingw32_HOST_OS)
+  let on_error ioe =
+          -- If the file doesn't yet exist then just use the default owner and
+          -- mode.
+          case ioe_type ioe of
+            NoSuchThing -> return no_update
+            _ -> ioError ioe
+  let handleIO :: (IOException -> IO a) -> IO a -> IO a
+      handleIO = flip catch
+  set_metadata <- handleIO on_error $ do
+      status <- getFileStatus targetPath
+      return $ \path -> do
+        setFileMode path (fileMode status)
+        setOwnerAndGroup path (fileOwner status) (fileGroup status)
+#else
+  let set_metadata = no_update
+#endif
+
   let (targetDir, targetFile) = splitFileName targetPath
   Exception.bracketOnError
     (openBinaryTempFileWithDefaultPermissions targetDir $ targetFile <.> "tmp")
@@ -510,6 +534,7 @@ writeFileAtomic targetPath content = do
     (\(tmpPath, handle) -> do
         BS.Lazy.hPut handle content
         hClose handle
+        set_metadata tmpPath
         renameFile tmpPath targetPath)
 
 instance Binary DbUnitInfo where
