@@ -525,9 +525,11 @@ doCorePass pass guts = do
     CoreAddCallerCcs          -> {-# SCC "AddCallerCcs" #-}
                                  addCallerCostCentres guts
 
-    CoreDoPrintCore           -> liftIO $ printCore logger (mg_binds guts) >> return guts
+    CoreDoPrintCore           -> {-# SCC "PrintCore" #-}
+                                 liftIO $ printCore logger (mg_binds guts) >> return guts
 
-    CoreDoRuleCheck phase pat -> ruleCheckPass phase pat guts
+    CoreDoRuleCheck phase pat -> {-# SCC "RuleCheck" #-}
+                                 ruleCheckPass phase pat guts
     CoreDoNothing             -> return guts
     CoreDoPasses passes       -> runCorePasses passes guts
 
