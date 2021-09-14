@@ -77,7 +77,12 @@ $(ghc-cabal_DIST_BINARY): $(CABAL_LEXER_DEP) utils/ghc-cabal/Main.hs $(TOUCH_DEP
 	       -ilibraries/hpc \
 	       -ilibraries/mtl \
 	       -ilibraries/text/src \
-	       libraries/text/cbits/cbits.c \
+	       libraries/text/cbits/is_ascii.c \
+	       libraries/text/cbits/measure_off.c \
+	       libraries/text/cbits/reverse.c \
+	       libraries/text/cbits/utils.c \
+	       libraries/text/cbits/simdutf.cpp \
+	       libraries/text/cbits/validate_utf8.cpp \
 	       -Ilibraries/text/include \
 	       -ilibraries/parsec/src \
 	       $(utils/ghc-cabal_dist_EXTRA_HC_OPTS) \
