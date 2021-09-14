@@ -44,6 +44,7 @@ flavourTransformers = M.fromList
     , "no_dynamic_ghc" =: disableDynamicGhcPrograms
     , "no_profiled_libs" =: disableProfiledLibs
     , "omit_pragmas" =: omitPragmas
+    , "ipe" =: enableIPE
     ]
   where (=:) = (,)
 
@@ -187,6 +188,14 @@ disableProfiledLibs flavour =
 omitPragmas :: Flavour -> Flavour
 omitPragmas =
   let Right kv = parseKV "stage1.ghc.ghc.hs.opts += -fomit-interface-pragmas"
+      Right transformer = applySetting kv
+  in transformer
+
+-- | Build stage2 dependencies with options to enable IPE debugging
+-- information.
+enableIPE :: Flavour -> Flavour
+enableIPE =
+  let Right kv = parseKV "stage1.*.ghc.hs.opts += -finfo-table-map -fdistinct-constructor-tables"
       Right transformer = applySetting kv
   in transformer
 
