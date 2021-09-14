@@ -161,7 +161,7 @@ toolchain="$TOP/toolchain"
 mkdir -p "$toolchain/bin"
 PATH="$toolchain/bin:$PATH"
 
-export METRICS_FILE="$CI_PROJECT_DIR/performance-metrics.tsv"
+export METRICS_FILE="$TOP/performance-metrics.tsv"
 
 cores="$(mk/detect-cpu-count.sh)"
 
@@ -553,7 +553,7 @@ function shell() {
 setup_locale
 
 # Platform-specific environment initialization
-if [ -n "$HERMETIC" ]; then
+if [ -n "${HERMETIC:-}" ]; then
   export CABAL_DIR="$TOP/cabal"
   export HOME="/nonexistent"
 else
