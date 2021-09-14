@@ -20,7 +20,7 @@ source-repository head
     subdir:   libraries/ghc-prim
 
 custom-setup
-    setup-depends: base >= 4 && < 5, Cabal >= 1.23
+    setup-depends: base >= 4 && < 5, Cabal >= 1.23 && < 3.8
 
 Library
     default-language: Haskell2010

@@ -40,10 +40,7 @@ expectedGhcOnlyExtensions =
     [ "RelaxedLayout"
     , "AlternativeLayoutRule"
     , "AlternativeLayoutRuleTransitional"
-    , "FieldSelectors"
-    , "OverloadedRecordDot"
     , "OverloadedRecordUpdate"
-    , "UnliftedDatatypes"
     ]
 
 expectedCabalOnlyExtensions :: [String]
