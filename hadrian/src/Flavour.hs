@@ -92,6 +92,7 @@ flavourTransformers = M.fromList
     , "profiled_ghc" =: enableProfiledGhc
     , "no_dynamic_ghc" =: disableDynamicGhcPrograms
     , "no_profiled_libs" =: disableProfiledLibs
+    , "ipe" =: enableIPE
     ]
   where (=:) = (,)
 
@@ -227,3 +228,9 @@ disableDynamicGhcPrograms flavour = flavour { dynamicGhcPrograms = pure False }
 disableProfiledLibs :: Flavour -> Flavour
 disableProfiledLibs flavour =
     flavour { libraryWays = filter (not . wayUnit Profiling) <$> libraryWays flavour }
+
+-- | Build stage2 dependencies with options to enable IPE debugging
+-- information.
+enableIPE :: Flavour -> Flavour
+enableIPE = addArgs
+    $ notStage0 ? builder (Ghc CompileHs) ? pure ["-finfo-table-map", "-fdistinct-constructor-tables"]

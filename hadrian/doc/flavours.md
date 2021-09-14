@@ -231,6 +231,15 @@ The supported transformers are listed below:
         <td><code>no_profiled_libs</code></td>
         <td>Disables building of libraries in profiled build ways.</td>
     </tr>
+    <tr>
+        <td><code>omit_pragmas</code></td>
+        <td>Build the stage2 compiler with -fomit-interface-pragmas to reduce
+        recompilation.</td>
+    </tr>
+    <tr>
+        <td><code>ipe</code></td>
+        <td>Build the stage2 libraries with IPE debugging information for use with -hi profiling.</td>
+    </tr>
 </table>
 
 ### Static
