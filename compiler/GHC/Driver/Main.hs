@@ -742,7 +742,7 @@ checkObjects dflags mb_old_linkable summary = do
     checkDynamicObj k = case dt_state of
                           DT_OK -> case (>=) <$> mb_dyn_obj_date <*> mb_if_date of
                                       Just True -> k
-                                      _ -> return (RecompBecause "Missing dynamic object", Nothing)
+                                      _ -> return (RecompBecause MissingDynObjectFile, Nothing)
                           -- Not in dynamic-too mode
                           _ -> k
 
@@ -755,7 +755,7 @@ checkObjects dflags mb_old_linkable summary = do
                 | isObjectLinkable old_linkable, linkableTime old_linkable == obj_date
                 -> return $ (UpToDate, Just old_linkable)
               _ -> (UpToDate,) . Just <$> findObjectLinkable this_mod obj_fn obj_date
-      _ -> return (RecompBecause "Missing object file", Nothing)
+      _ -> return (RecompBecause MissingObjectFile, Nothing)
 
 -- | Check to see if we can reuse the old linkable, by this point we will
 -- have just checked that the old interface matches up with the source hash, so
@@ -766,7 +766,7 @@ checkByteCode mb_old_linkable =
     Just old_linkable
       | not (isObjectLinkable old_linkable)
       -> return $ (UpToDate, Just old_linkable)
-    _ -> return $ (RecompBecause "Missing bytecode", Nothing)
+    _ -> return $ (RecompBecause MissingBytecode, Nothing)
 
 --------------------------------------------------------------
 -- Compilers
@@ -1083,17 +1083,20 @@ batchMsg hsc_env mod_index recomp node = case node of
             UpToDate
                 | logVerbAtLeast logger 2 -> showMsg (text "Skipping  ") empty
                 | otherwise -> return ()
-            RecompBecause reason -> showMsg (text "Instantiating ") (text " [" <> text reason <> text "]")
+            RecompBecause reason -> showMsg (text "Instantiating ")
+                                            (text " [" <> pprWithUnitState state (ppr reason) <> text "]")
     ModuleNode _ ->
         case recomp of
             MustCompile -> showMsg (text "Compiling ") empty
             UpToDate
                 | logVerbAtLeast logger 2 -> showMsg (text "Skipping  ") empty
                 | otherwise -> return ()
-            RecompBecause reason -> showMsg (text "Compiling ") (text " [" <> text reason <> text "]")
+            RecompBecause reason -> showMsg (text "Compiling ")
+                                            (text " [" <> pprWithUnitState state (ppr reason) <> text "]")
     where
         dflags = hsc_dflags hsc_env
         logger = hsc_logger hsc_env
+        state  = hsc_units hsc_env
         showMsg msg reason =
             compilationProgressMsg logger $
             (showModuleIndex mod_index <>
