@@ -3296,7 +3296,7 @@ dupExtVars vars
 -- consistency checks: We check this by running the given task twice,
 -- noting all differences between the results.
 lintAnnots :: SDoc -> (ModGuts -> CoreM ModGuts) -> ModGuts -> CoreM ModGuts
-lintAnnots pname pass guts = do
+lintAnnots pname pass guts = {-# SCC "lintAnnots" #-} do
   -- Run the pass as we normally would
   dflags <- getDynFlags
   logger <- getLogger
