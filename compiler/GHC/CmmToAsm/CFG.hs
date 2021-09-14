@@ -305,7 +305,9 @@ shortcutWeightMap cuts cfg =
       applyMapping m (from, Just to) =
         let updatedMap :: CFG
             updatedMap
-              = fmap (shortcutEdge (from,to)) $
+              -- Careful here to use a strict mapping function, the derived
+              -- Functor instance is lazy and leads to a large thunk build-up. #19471/!6523
+              = mapMap (shortcutEdge (from,to)) $
                 (mapDelete from m :: CFG )
         --Sometimes we can shortcut multiple blocks like so:
         -- A -> B -> C -> D -> E => A -> E
