@@ -560,7 +560,7 @@ validate-x86_64-darwin:
     CPUS: 8
     LANG: "en_US.UTF-8"
     # WARNING: this is overridden in the shell.nix, see shell.nix!
-    CONFIGURE_ARGS: "--with-intree-gmp"
+    CONFIGURE_ARGS: "--with-intree-gmp --with-iconv-libraries=/usr/lib --with-iconv-includes=/usr/include"
     HADRIAN_ARGS: "--docs=no-sphinx"
     TEST_ENV: "x86_64-darwin-hadrian"
     BIN_DIST_NAME: "ghc-amd64-apple-darwin"
@@ -610,7 +610,7 @@ validate-aarch64-darwin:
     CPUS: 8
     LANG: "en_US.UTF-8"
     # WARNING: this is overridden in the shell.nix, see shell.nix!
-    CONFIGURE_ARGS: "--with-intree-gmp"
+    CONFIGURE_ARGS: "--with-intree-gmp --with-iconv-libraries=/usr/lib --with-iconv-includes=/usr/include"
     HADRIAN_ARGS: "--docs=no-sphinx"
     BIN_DIST_NAME: "ghc-arm64-apple-darwin"
     TEST_ENV: "aarch64-darwin-hadrian"
