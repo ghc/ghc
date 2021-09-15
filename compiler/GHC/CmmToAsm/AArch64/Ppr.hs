@@ -5,11 +5,6 @@ module GHC.CmmToAsm.AArch64.Ppr (pprNatCmmDecl, pprInstr) where
 
 import GHC.Prelude hiding (EQ)
 
-import Data.Word
-import qualified Data.Array.Unsafe as U ( castSTUArray )
-import Data.Array.ST
-import Control.Monad.ST
-
 import GHC.CmmToAsm.AArch64.Instr
 import GHC.CmmToAsm.AArch64.Regs
 import GHC.CmmToAsm.AArch64.Cond
@@ -228,29 +223,13 @@ pprDataItem config lit
 
         ppr_item FF32  (CmmFloat r _)
            = let bs = floatToBytes (fromRational r)
-             in  map (\b -> text "\t.byte\t" <> pprImm platform (ImmInt b)) bs
+             in  map (\b -> text "\t.byte\t" <> int (fromIntegral b)) bs
 
         ppr_item FF64 (CmmFloat r _)
            = let bs = doubleToBytes (fromRational r)
-             in  map (\b -> text "\t.byte\t" <> pprImm platform (ImmInt b)) bs
+             in  map (\b -> text "\t.byte\t" <> int (fromIntegral b)) bs
 
         ppr_item _ _ = pprPanic "pprDataItem:ppr_item" (text $ show lit)
-
-floatToBytes :: Float -> [Int]
-floatToBytes f
-   = runST (do
-        arr <- newArray_ ((0::Int),3)
-        writeArray arr 0 f
-        arr <- castFloatToWord8Array arr
-        i0 <- readArray arr 0
-        i1 <- readArray arr 1
-        i2 <- readArray arr 2
-        i3 <- readArray arr 3
-        return (map fromIntegral [i0,i1,i2,i3])
-     )
-
-castFloatToWord8Array :: STUArray s Int Float -> ST s (STUArray s Int Word8)
-castFloatToWord8Array = U.castSTUArray
 
 pprImm :: Platform -> Imm -> SDoc
 pprImm _ (ImmInt i)     = int i
