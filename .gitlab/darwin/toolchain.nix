@@ -37,6 +37,8 @@ pkgs.writeTextFile {
     # into PATH to ensure that we use the correct target platform.
     # This is a temporary workaround for #20162.
     PATH="${pkgs.clang}/bin:$PATH"
+    # Nixpkgs's ghc fails to set LLC and OPT when invoking configure.
+    PATH="${pkgs.llvm_13}/bin:$PATH"
     export FONTCONFIG_FILE=${fonts}
     export XELATEX="${ourtexlive}/bin/xelatex"
     export MAKEINDEX="${ourtexlive}/bin/makeindex"
