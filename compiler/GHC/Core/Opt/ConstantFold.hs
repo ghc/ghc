@@ -412,6 +412,39 @@ primOpRules nm = \case
                                     , identityPlatform onei
                                     , mulFoldingRules IntMulOp intOps
                                     ]
+   IntMul2Op   -> mkPrimOpRule nm 2 [ do
+                                        [Lit (LitNumber _ l1), Lit (LitNumber _ l2)] <- getArgs
+                                        platform <- getPlatform
+                                        let r = l1 * l2
+                                        pure $ mkCoreUbxTup [intPrimTy,intPrimTy,intPrimTy]
+                                          [ Lit (if platformInIntRange platform r then zeroi platform else onei platform)
+                                          , mkIntLitWrap platform (r `shiftR` platformWordSizeInBits platform)
+                                          , mkIntLitWrap platform r
+                                          ]
+
+                                    , zeroElem >>= \z ->
+                                        pure (mkCoreUbxTup [intPrimTy,intPrimTy,intPrimTy]
+                                                           [z,z,z])
+
+                                      -- timesInt2# 1# other
+                                      -- ~~~>
+                                      -- (# 0#, 0# -# (other >># (WORD_SIZE_IN_BITS-1)), other #)
+                                      -- The second element is the sign bit
+                                      -- repeated to fill a word.
+                                    , identityPlatform onei >>= \other -> do
+                                        platform <- getPlatform
+                                        pure $ mkCoreUbxTup [intPrimTy,intPrimTy,intPrimTy]
+                                          [ Lit (zeroi platform)
+                                          , mkCoreApps (Var (mkPrimOpId IntSubOp))
+                                              [ Lit (zeroi platform)
+                                              , mkCoreApps (Var (mkPrimOpId IntSrlOp))
+                                                [ other
+                                                , mkIntLit platform (fromIntegral (platformWordSizeInBits platform - 1))
+                                                ]
+                                              ]
+                                          , other
+                                          ]
+                                    ]
    IntQuotOp   -> mkPrimOpRule nm 2 [ nonZeroLit 1 >> binaryLit (intOp2 quot)
                                     , leftZero
                                     , rightIdentityPlatform onei
