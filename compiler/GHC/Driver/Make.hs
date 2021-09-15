@@ -1679,6 +1679,7 @@ enableCodeGenWhen logger tmpfs condition should_modify staticLife dynLife bcknd 
                   setOutputFile (Just o_file) $
                   setDynOutputFile (Just $ dynamicOutputFile dflags o_file) $
                   setOutputHi (Just hi_file) $
+                  setDynOutputHi (Just $ dynamicOutputHi dflags hi_file) $
                   dflags {backend = bcknd}
               }
         pure (ExtendedModSummary ms' bkp_deps)

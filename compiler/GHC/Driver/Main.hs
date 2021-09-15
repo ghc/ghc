@@ -961,15 +961,15 @@ hscMaybeWriteIface logger dflags is_simple iface old_iface mod_location = do
       -- mod_location only contains the base name, so we rebuild the
       -- correct file extension from the dynflags.
         baseName = ml_hi_file mod_location
-        buildIfName suffix
-          | Just name <- outputHi dflags
+        buildIfName suffix is_dynamic
+          | Just name <- (if is_dynamic then dynOutputHi else outputHi) dflags
           = name
           | otherwise
           = let with_hi = replaceExtension baseName suffix
             in  addBootSuffix_maybe (mi_boot iface) with_hi
 
         write_iface dflags' iface =
-          let !iface_name = buildIfName (hiSuf dflags')
+          let !iface_name = buildIfName (hiSuf dflags') (dynamicNow dflags')
               profile     = targetProfile dflags'
           in
           {-# SCC "writeIface" #-}
