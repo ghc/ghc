@@ -3,6 +3,8 @@
 {-# LANGUAGE Rank2Types                 #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE TypeFamilies               #-}
+{-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE TupleSections              #-}
 --
 -- Copyright (c) 2018 Andreas Klebinger
 --
@@ -13,7 +15,7 @@ module GHC.CmmToAsm.CFG
 
     --Modify the CFG
     , addWeightEdge, addEdge
-    , delEdge, delNode
+    , delEdge
     , addNodesBetween, shortcutWeightMap
     , reverseEdges, filterEdges
     , addImmediateSuccessor
@@ -89,6 +91,7 @@ import Data.Array.Unsafe (unsafeFreeze)
 import Data.Array.Base (unsafeRead, unsafeWrite)
 
 import Control.Monad
+import GHC.Data.UnionFind
 
 type Prob = Double
 
@@ -292,35 +295,56 @@ applies the mapping to the CFG in the way laid out above.
 
 -}
 shortcutWeightMap :: LabelMap (Maybe BlockId) -> CFG -> CFG
-shortcutWeightMap cuts cfg =
-  foldl' applyMapping cfg $ mapToList cuts
+shortcutWeightMap cuts cfg
+  | mapNull cuts = cfg
+  | otherwise = normalised_cfg
     where
--- takes the tuple (B,C) from the notation in [Updating the CFG during shortcutting]
-      applyMapping :: CFG -> (BlockId,Maybe BlockId) -> CFG
-      --Shortcut immediate
-      applyMapping m (from, Nothing) =
-        mapDelete from .
-        fmap (mapDelete from) $ m
-      --Regular shortcut
-      applyMapping m (from, Just to) =
-        let updatedMap :: CFG
-            updatedMap
-              -- Careful here to use a strict mapping function, the derived
-              -- Functor instance is lazy and leads to a large thunk build-up. #19471/!6523
-              = mapMap (shortcutEdge (from,to)) $
-                (mapDelete from m :: CFG )
-        --Sometimes we can shortcut multiple blocks like so:
-        -- A -> B -> C -> D -> E => A -> E
-        -- so we check for such chains.
-        in case mapLookup to cuts of
-            Nothing -> updatedMap
-            Just dest -> applyMapping updatedMap (to, dest)
-      --Redirect edge from B to C
-      shortcutEdge :: (BlockId, BlockId) -> LabelMap EdgeInfo -> LabelMap EdgeInfo
-      shortcutEdge (from, to) m =
-        case mapLookup from m of
-          Just info -> mapInsert to info $ mapDelete from m
-          Nothing   -> m
+      -- First take the cuts map and collapse any shortcuts, for example
+      -- if the cuts map has A -> B and B -> C then we want to rewrite
+      -- A -> C and B -> C directly.
+      normalised_cuts_st :: forall s . ST s (LabelMap (Maybe BlockId))
+      normalised_cuts_st = do
+        (null :: Point s (Maybe BlockId)) <- fresh Nothing
+        let cuts_list = mapToList cuts
+        -- Create a unification variable for each of the nodes in a rewrite
+        cuts_vars <- traverse (\p -> (p,) <$> fresh (Just p)) (concatMap (\(a, b) -> [a] ++ maybe [] (:[]) b) cuts_list)
+        let cuts_map = mapFromList cuts_vars :: LabelMap (Point s (Maybe BlockId))
+        -- Then unify according the the rewrites in the cuts map
+        mapM_ (\(from, to) -> expectJust "shortcutWeightMap" (mapLookup from cuts_map)
+                              `union` expectJust "shortcutWeightMap" (maybe (Just null) (flip mapLookup cuts_map) to) ) cuts_list
+        -- Then recover the unique representative, which is the result of following
+        -- the chain to the end.
+        mapM find cuts_map
+
+      normalised_cuts = runST normalised_cuts_st
+
+      cuts_domain :: LabelSet
+      cuts_domain = setFromList $ mapKeys cuts
+
+      -- The CFG is shortcutted using the normalised cuts map
+      normalised_cfg :: CFG
+      normalised_cfg = mapFoldlWithKey update_edge mapEmpty cfg
+
+      update_edge :: CFG -> Label -> LabelMap EdgeInfo -> CFG
+      update_edge new_map from edge_map
+        -- If the from edge is in the cuts map then delete the edge
+        | setMember from cuts_domain = new_map
+        -- Otherwise we are keeping the edge, but might have shortcutted some of
+        -- the target nodes.
+        | otherwise = mapInsert from (mapFoldlWithKey update_from_edge mapEmpty edge_map) new_map
+
+      update_from_edge :: LabelMap a -> Label -> a -> LabelMap a
+      update_from_edge new_map to_edge edge_info
+        -- Edge is in the normalised cuts
+        | Just new_edge <- mapLookup to_edge normalised_cuts =
+            case new_edge of
+              -- The result was Nothing, so edge is deleted
+              Nothing -> new_map
+              -- The new target for the edge, write it with the old edge_info.
+              Just new_to -> mapInsert new_to edge_info new_map
+        -- Node wasn't in the cuts map, so just add it back
+        | otherwise = mapInsert to_edge edge_info new_map
+
 
 -- | Sometimes we insert a block which should unconditionally be executed
 --   after a given block. This function updates the CFG for these cases.
@@ -368,10 +392,6 @@ delEdge from to m =
         remDest Nothing = Nothing
         remDest (Just wm) = Just $ mapDelete to wm
 
-delNode :: BlockId -> CFG -> CFG
-delNode node cfg =
-  mapMap (mapDelete node)  -- < Edges to the node
-    (mapDelete node cfg) -- < Edges from the node
 
 -- | Destinations from bid ordered by weight (descending)
 getSuccEdgesSorted :: CFG -> BlockId -> [(BlockId,EdgeInfo)]
