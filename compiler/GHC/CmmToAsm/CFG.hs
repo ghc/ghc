@@ -370,7 +370,7 @@ delEdge from to m =
 
 delNode :: BlockId -> CFG -> CFG
 delNode node cfg =
-  fmap (mapDelete node)  -- < Edges to the node
+  mapMap (mapDelete node)  -- < Edges to the node
     (mapDelete node cfg) -- < Edges from the node
 
 -- | Destinations from bid ordered by weight (descending)
