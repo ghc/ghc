@@ -240,6 +240,14 @@ Redirecting the compilation output(s)
 
     will produce ``Prog`` (or ``Prog.exe`` if you are on Windows).
 
+.. ghc-flag:: -dyno ⟨file⟩
+    :shortdesc: set dynamic output filename
+    :type: dynamic
+    :category:
+
+    When using ``-dynamic-too``, option ``-dyno`` ⟨suffix⟩ is the
+    counterpart of ``-o``. It redirects the dynamic output to ⟨file⟩.
+
 .. ghc-flag:: -odir ⟨dir⟩
     :shortdesc: set directory for object files
     :type: dynamic
@@ -354,6 +362,15 @@ Redirecting the compilation output(s)
     so that objects for the profiling versions of the libraries don't
     clobber the normal ones.
 
+.. ghc-flag:: -dynosuf ⟨suffix⟩
+    :shortdesc: set the dynamic output file suffix
+    :type: dynamic
+    :category:
+
+    When using ``-dynamic-too``, option ``-dynosuf`` ⟨suffix⟩ is the
+    counterpart of ``-osuf``. It changes the ``.dyn_o`` file suffix
+    for dynamic object files.
+
 .. ghc-flag:: -hisuf ⟨suffix⟩
     :shortdesc: set the suffix to use for interface files
     :type: dynamic
@@ -377,6 +394,15 @@ Redirecting the compilation output(s)
         ghc ... -osuf prof.o -hisuf prof.hi -prof -fprof-auto
 
     to get the profiled version.
+
+.. ghc-flag:: -dynhisuf ⟨suffix⟩
+    :shortdesc: set the suffix to use for dynamic interface files
+    :type: dynamic
+    :category:
+
+    When using ``-dynamic-too``, option ``-dynhisuf`` ⟨suffix⟩ is the
+    counterpart of ``-hisuf``. It changes the ``.dyn_hi`` file suffix
+    for dynamic interface files.
 
 .. ghc-flag:: -hiesuf ⟨suffix⟩
     :shortdesc: set the suffix to use for extended interface files
