@@ -40,13 +40,14 @@ import GHC.Data.Maybe
 import GHC.Data.List.SetOps (removeDups)
 
 import GHC.Data.OrdList
-import Data.List
+import Data.List (sortOn, sortBy, nub)
 import Data.Foldable (toList)
 
 import qualified Data.Set as Set
 import Data.STRef
 import Control.Monad.ST.Strict
-import Control.Monad (foldM)
+import Control.Monad (foldM, unless)
+import GHC.Data.UnionFind
 
 {-
   Note [CFG based code layout]
@@ -481,10 +482,9 @@ combineNeighbourhood edges chains
 mergeChains :: [CfgEdge] -> [BlockChain]
             -> (BlockChain)
 mergeChains edges chains
-    = -- pprTrace "combine" (ppr edges) $
-      runST $ do
+    = runST $ do
         let addChain m0 chain = do
-                ref <- newSTRef chain
+                ref <- fresh chain
                 return $ chainFoldl (\m' b -> mapInsert b ref m') m0 chain
         chainMap' <- foldM (\m0 c -> addChain m0 c) mapEmpty chains
         merge edges chainMap'
@@ -492,35 +492,25 @@ mergeChains edges chains
         -- We keep a map from ALL blocks to their respective chain (sigh)
         -- This is required since when looking at an edge we need to find
         -- the associated chains quickly.
-        -- We use a map of STRefs, maintaining a invariant of one STRef per chain.
-        -- When merging chains we can update the
-        -- STRef of one chain once (instead of writing to the map for each block).
-        -- We then overwrite the STRefs for the other chain so there is again only
-        -- a single STRef for the combined chain.
-        -- The difference in terms of allocations saved is ~0.2% with -O so actually
-        -- significant compared to using a regular map.
+        -- We use a union-find data structure to do this efficiently.
 
-        merge :: forall s. [CfgEdge] -> LabelMap (STRef s BlockChain) -> ST s BlockChain
+        merge :: forall s. [CfgEdge] -> LabelMap (Point s BlockChain) -> ST s BlockChain
         merge [] chains = do
-            chains' <- ordNub <$> (mapM readSTRef $ mapElems chains) :: ST s [BlockChain]
+            chains' <- mapM find =<< (nub <$> (mapM repr $ mapElems chains)) :: ST s [BlockChain]
             return $ foldl' chainConcat (head chains') (tail chains')
         merge ((CfgEdge from to _):edges) chains
         --   | pprTrace "merge" (ppr (from,to) <> ppr chains) False
         --   = undefined
-          | cFrom == cTo
-          = merge edges chains
-          | otherwise
           = do
-            chains' <- mergeComb cFrom cTo
-            merge edges chains'
+            same <- equivalent cFrom cTo
+            unless same $ do
+              cRight <- find cTo
+              cLeft <- find cFrom
+              new_point <- fresh (chainConcat cLeft cRight)
+              union cTo new_point
+              union cFrom new_point
+            merge edges chains
           where
-            mergeComb :: STRef s BlockChain -> STRef s BlockChain -> ST s (LabelMap (STRef s BlockChain))
-            mergeComb refFrom refTo = do
-                cRight <- readSTRef refTo
-                chain <- pure chainConcat <*> readSTRef refFrom <*> pure cRight
-                writeSTRef refFrom chain
-                return $ chainFoldl (\m b -> mapInsert b refFrom m) chains cRight
-
             cFrom = expectJust "mergeChains:chainMap:from" $ mapLookup from chains
             cTo = expectJust "mergeChains:chainMap:to"   $ mapLookup to   chains
 

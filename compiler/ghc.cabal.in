@@ -306,6 +306,7 @@ Library
         GHC.HsToCore.PmCheck.Types
         GHC.HsToCore.PmCheck
         GHC.HsToCore.Coverage
+        GHC.Data.UnionFind
         GHC.HsToCore
         GHC.HsToCore.Arrows
         GHC.HsToCore.Binds
