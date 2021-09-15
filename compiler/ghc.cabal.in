@@ -407,6 +407,7 @@ Library
         GHC.Data.Strict
         GHC.Data.StringBuffer
         GHC.Data.TrieMap
+        GHC.Data.UnionFind
         GHC.Driver.Backend
         GHC.Driver.Backpack
         GHC.Driver.Backpack.Syntax
