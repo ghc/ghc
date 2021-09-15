@@ -383,6 +383,7 @@ Library
         GHC.Data.Stream
         GHC.Data.StringBuffer
         GHC.Data.TrieMap
+        GHC.Data.UnionFind
         GHC.Driver.Backend
         GHC.Driver.Backpack
         GHC.Driver.Backpack.Syntax
