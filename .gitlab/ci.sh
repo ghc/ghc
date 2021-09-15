@@ -448,7 +448,7 @@ function test_make() {
 }
 
 function build_hadrian() {
-  if [ -z "$BIN_DIST_NAME" ]; then
+  if [ -z "${BIN_DIST_NAME:-}" ]; then
     fail "BIN_DIST_NAME not set"
   fi
 
@@ -524,7 +524,7 @@ function clean() {
 }
 
 function run_hadrian() {
-  if [ -z "$BUILD_FLAVOUR" ]; then
+  if [ -z "${BUILD_FLAVOUR:-}" ]; then
     fail "BUILD_FLAVOUR not set"
   fi
   if [ -z "${BIGNUM_BACKEND:-}" ]; then BIGNUM_BACKEND="gmp"; fi
@@ -535,7 +535,7 @@ function run_hadrian() {
     -j"$cores" \
     --broken-test="${BROKEN_TESTS:-}" \
     --bignum=$BIGNUM_BACKEND \
-    "${args[@]}" \
+    "${args[@]+"${args[@]}"}" \
     "$@"
 }
 
