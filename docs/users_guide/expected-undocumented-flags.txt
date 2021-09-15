@@ -33,9 +33,6 @@
 -dsource-stats
 -dstg-stats
 -dsuppress-stg-exts
--dynhisuf
--dyno
--dynosuf
 -exclude-module
 -fallow-incoherent-instances
 -fallow-overlapping-instances
