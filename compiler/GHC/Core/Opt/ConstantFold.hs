@@ -491,6 +491,33 @@ primOpRules nm = \case
    WordSllOp   -> mkPrimOpRule nm 2 [ shiftRule LitNumWord (const shiftL) ]
    WordSrlOp   -> mkPrimOpRule nm 2 [ shiftRule LitNumWord shiftRightLogicalNative ]
 
+   PopCnt8Op   -> mkPrimOpRule nm 1 [ pop_count @Word8  ]
+   PopCnt16Op  -> mkPrimOpRule nm 1 [ pop_count @Word16 ]
+   PopCnt32Op  -> mkPrimOpRule nm 1 [ pop_count @Word32 ]
+   PopCnt64Op  -> mkPrimOpRule nm 1 [ pop_count @Word64 ]
+   PopCntOp    -> mkPrimOpRule nm 1 [ getWordSize >>= \case
+                                        PW4 -> pop_count @Word32
+                                        PW8 -> pop_count @Word64
+                                    ]
+
+   Ctz8Op      -> mkPrimOpRule nm 1 [ ctz @Word8  ]
+   Ctz16Op     -> mkPrimOpRule nm 1 [ ctz @Word16 ]
+   Ctz32Op     -> mkPrimOpRule nm 1 [ ctz @Word32 ]
+   Ctz64Op     -> mkPrimOpRule nm 1 [ ctz @Word64 ]
+   CtzOp       -> mkPrimOpRule nm 1 [ getWordSize >>= \case
+                                        PW4 -> ctz @Word32
+                                        PW8 -> ctz @Word64
+                                    ]
+
+   Clz8Op      -> mkPrimOpRule nm 1 [ clz @Word8  ]
+   Clz16Op     -> mkPrimOpRule nm 1 [ clz @Word16 ]
+   Clz32Op     -> mkPrimOpRule nm 1 [ clz @Word32 ]
+   Clz64Op     -> mkPrimOpRule nm 1 [ clz @Word64 ]
+   ClzOp       -> mkPrimOpRule nm 1 [ getWordSize >>= \case
+                                        PW4 -> clz @Word32
+                                        PW8 -> clz @Word64
+                                    ]
+
    -- coercions
 
    Int8ToIntOp    -> mkPrimOpRule nm 1 [ liftLitPlatform extendIntLit ]
@@ -1422,6 +1449,9 @@ instance MonadPlus RuleM
 getPlatform :: RuleM Platform
 getPlatform = roPlatform <$> getRuleOpts
 
+getWordSize :: RuleM PlatformWordSize
+getWordSize = platformWordSize <$> getPlatform
+
 getRuleOpts :: RuleM RuleOpts
 getRuleOpts = RuleM $ \rule_opts _ _ _ -> Just rule_opts
 
@@ -1613,6 +1643,21 @@ nonZeroLit n = getLiteral n >>= guard . not . isZeroLit
 
 oneLit :: Int -> RuleM ()
 oneLit n = getLiteral n >>= guard . isOneLit
+
+lift_bits_op :: forall a. (Num a, FiniteBits a) => (a -> Integer) -> RuleM CoreExpr
+lift_bits_op op = do
+  platform <- getPlatform
+  [Lit (LitNumber _ l)] <- getArgs
+  pure $ mkWordLit platform $ op (fromInteger l :: a)
+
+pop_count :: forall a. (Num a, FiniteBits a) => RuleM CoreExpr
+pop_count = lift_bits_op @a (fromIntegral . popCount)
+
+ctz :: forall a. (Num a, FiniteBits a) => RuleM CoreExpr
+ctz = lift_bits_op @a (fromIntegral . countTrailingZeros)
+
+clz :: forall a. (Num a, FiniteBits a) => RuleM CoreExpr
+clz = lift_bits_op @a (fromIntegral . countLeadingZeros)
 
 -- When excess precision is not requested, cut down the precision of the
 -- Rational value to that of Float/Double. We confuse host architecture

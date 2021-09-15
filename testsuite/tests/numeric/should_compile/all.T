@@ -12,3 +12,4 @@ test('T16402', [ grep_errmsg(r'and'), when(wordsize(32), expect_broken(19024)) ]
 test('T19892', normal, compile, ['-O -ddump-rule-firings'])
 test('T20062', [ grep_errmsg(r'integer') ], compile, ['-ddump-simpl -O -dsuppress-all'])
 test('T20245', normal, compile, ['-ddump-simpl -O -dsuppress-all -dno-typeable-binds'])
+test('T20376', normal, compile, ['-ddump-simpl -O -dsuppress-all -dsuppress-uniques -dno-typeable-binds'])
