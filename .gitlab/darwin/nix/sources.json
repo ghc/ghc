@@ -12,15 +12,15 @@
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "nixpkgs": {
-        "branch": "master",
+        "branch": "wip/ghc-8.10.7-darwin",
         "description": "Nix Packages collection",
         "homepage": "",
-        "owner": "nixos",
+        "owner": "bgamari",
         "repo": "nixpkgs",
-        "rev": "3bd130c09f844ddd7942ea177bc4f5af7566d244",
-        "sha256": "1pqdw4nzvrandrp4c8qp4vh9fpn3b03p4g4s0lpzrnxn4j5r28gj",
+        "rev": "37c60356e3f83c708a78a96fdd914b5ffc1f551c",
+        "sha256": "0i5j7nwk4ky0fg4agla3aznadpxz0jyrdwp2q92hyxidra987syn",
         "type": "tarball",
-        "url": "https://github.com/nixos/nixpkgs/archive/3bd130c09f844ddd7942ea177bc4f5af7566d244.tar.gz",
+        "url": "https://github.com/bgamari/nixpkgs/archive/37c60356e3f83c708a78a96fdd914b5ffc1f551c.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     }
 }

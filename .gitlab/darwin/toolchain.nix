@@ -13,7 +13,6 @@ let
   happy = hsPkgs.happy;
   hsPkgs = pkgs.haskellPackages;
 
-
   ourtexlive = with pkgs;
     texlive.combine {
       inherit (texlive)
@@ -32,13 +31,6 @@ pkgs.writeTextFile {
     PATH="${pkgs.autoconf}/bin:$PATH"
     PATH="${pkgs.automake}/bin:$PATH"
     PATH="${pkgs.coreutils}/bin:$PATH"
-    # Nixpkgs' ghc sets `C compiler command` to `clang`, which resolves to
-    # /usr/bin/clang which targets the wrong platform. Bring nixpkgs' clang
-    # into PATH to ensure that we use the correct target platform.
-    # This is a temporary workaround for #20162.
-    PATH="${pkgs.clang}/bin:$PATH"
-    # Nixpkgs's ghc fails to set LLC and OPT when invoking configure.
-    PATH="${pkgs.llvm_13}/bin:$PATH"
     export FONTCONFIG_FILE=${fonts}
     export XELATEX="${ourtexlive}/bin/xelatex"
     export MAKEINDEX="${ourtexlive}/bin/makeindex"
