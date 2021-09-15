@@ -497,7 +497,7 @@ assembleI platform i = case i of
 
     litlabel fs = lit [BCONPtrLbl fs]
     addr (RemotePtr a) = words [fromIntegral a]
-    float = words . mkLitF
+    float = words . mkLitF platform
     double = words . mkLitD platform
     int = words . mkLitI
     int8 = words . mkLitI64 platform
@@ -586,18 +586,28 @@ mkTupleInfoLit platform tuple_info =
 -- words are placed in memory at increasing addresses, the
 -- bit pattern is correct for the host's word size and endianness.
 mkLitI   ::             Int    -> [Word]
-mkLitF   ::             Float  -> [Word]
+mkLitF   :: Platform -> Float  -> [Word]
 mkLitD   :: Platform -> Double -> [Word]
 mkLitI64 :: Platform -> Int64  -> [Word]
 
-mkLitF f
-   = runST (do
+mkLitF platform f = case platformWordSize platform of
+  PW4 -> runST $ do
         arr <- newArray_ ((0::Int),0)
         writeArray arr 0 f
         f_arr <- castSTUArray arr
         w0 <- readArray f_arr 0
         return [w0 :: Word]
-     )
+
+  PW8 -> runST $ do
+        arr <- newArray_ ((0::Int),1)
+        writeArray arr 0 f
+        -- on 64-bit architectures we read two (32-bit) Float cells when we read
+        -- a (64-bit) Word: so we write a dummy value in the second cell to
+        -- avoid an out-of-bound read.
+        writeArray arr 1 0.0
+        f_arr <- castSTUArray arr
+        w0 <- readArray f_arr 0
+        return [w0 :: Word]
 
 mkLitD platform d = case platformWordSize platform of
    PW4 -> runST (do
