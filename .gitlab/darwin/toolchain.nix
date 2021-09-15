@@ -7,7 +7,7 @@ let
 in
 
 let
-  ghcVer = "ghc8107Binary";
+  ghcVer = "ghc8107";
   ghc = pkgs.haskell.compiler."${ghcVer}";
   alex = hsPkgs.alex;
   happy = hsPkgs.happy;
