@@ -16,9 +16,8 @@
 -- described by,
 --
 -- * Simon Peyton-Jones, Stephanie Weirich, Richard Eisenberg,
--- Dimitrios Vytiniotis. "A reflection on types."
+-- Dimitrios Vytiniotis. "<https://www.microsoft.com/en-us/research/wp-content/uploads/2016/08/dynamic.pdf A reflection on types>".
 -- /Proc. Philip Wadler's 60th birthday Festschrift/, Edinburgh (April 2016).
--- ([PDF](https://www.microsoft.com/en-us/research/wp-content/uploads/2016/08/dynamic.pdf))
 --
 -- The interface provides 'I.TypeRep', a type representation which can
 -- be safely decomposed and composed. See "Data.Dynamic" for an example of this.
