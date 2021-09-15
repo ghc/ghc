@@ -864,7 +864,7 @@ loopInfo cfg root = LoopInfo  { liBackEdges = backEdges
       = ( edge, setInsert head $ go (setSingleton tail) (setSingleton tail) )
       where
         -- See Note [Determining the loop body]
-        cfg' = delNode head revCfg
+
 
         go :: LabelSet -> LabelSet -> LabelSet
         go found current
@@ -874,10 +874,9 @@ loopInfo cfg root = LoopInfo  { liBackEdges = backEdges
           where
             -- Really predecessors, since we use the reversed cfg.
             newSuccessors = setFilter (\n -> not $ setMember n found) successors :: LabelSet
-            successors = setFromList $ concatMap
-                                      (getSuccessors cfg')
-                                      -- we filter head as it's no longer part of the cfg.
-                                      (filter (/= head) $ setElems current) :: LabelSet
+            successors = setDelete head $ setUnions $ map
+                                      (\x -> if x == head then setEmpty else setFromList (getSuccessors revCfg x))
+                                      (setElems current) :: LabelSet
 
     backEdges = filter isBackEdge edges
     loopBodies = map findBody backEdges :: [(Edge, LabelSet)]
