@@ -329,6 +329,7 @@ generateSettings = do
         , ("target has .ident directive", expr $ lookupValueOrError configFile "target-has-ident-directive")
         , ("target has subsections via symbols", expr $ lookupValueOrError configFile "target-has-subsections-via-symbols")
         , ("target has RTS linker", expr $ lookupValueOrError configFile "target-has-rts-linker")
+        , ("target has libm", expr $  lookupValueOrError configFile "target-has-libm")
         , ("Unregisterised", expr $ yesNo <$> flag GhcUnregisterised)
         , ("LLVM target", getSetting LlvmTarget)
         , ("LLVM llc command", expr $ settingsFileSetting SettingsFileSetting_LlcCommand)

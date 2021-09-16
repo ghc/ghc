@@ -462,6 +462,7 @@ TargetHasGnuNonexecStack = @TargetHasGnuNonexecStack@
 TargetHasIdentDirective = @TargetHasIdentDirective@
 TargetHasSubsectionsViaSymbols = @TargetHasSubsectionsViaSymbols@
 TargetHasRTSLinker = @TargetHasRTSLinker@
+TargetHasLibm = @TargetHasLibm@
 TablesNextToCode = @TablesNextToCode@
 
 SettingsCCompilerCommand = @SettingsCCompilerCommand@

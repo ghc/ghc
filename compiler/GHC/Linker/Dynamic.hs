@@ -197,7 +197,8 @@ linkDynLib logger tmpfs dflags0 unit_env o_files dep_packages
             -------------------------------------------------------------------
 
             let output_fn = case o_file of { Just s -> s; Nothing -> "a.out"; }
-                unregisterised = platformUnregisterised (targetPlatform dflags)
+                platform  = targetPlatform dflags
+                unregisterised = platformUnregisterised platform
             let bsymbolicFlag = -- we need symbolic linking to resolve
                                 -- non-PIC intra-package-relocations for
                                 -- performance (where symbolic linking works)
@@ -206,7 +207,7 @@ linkDynLib logger tmpfs dflags0 unit_env o_files dep_packages
 
             runLink logger tmpfs dflags (
                     map Option verbFlags
-                 ++ libmLinkOpts
+                 ++ libmLinkOpts platform
                  ++ [ Option "-o"
                     , FileOption "" output_fn
                     ]
@@ -224,13 +225,10 @@ linkDynLib logger tmpfs dflags0 unit_env o_files dep_packages
 
 -- | Some platforms require that we explicitly link against @libm@ if any
 -- math-y things are used (which we assume to include all programs). See #14022.
-libmLinkOpts :: [Option]
-libmLinkOpts =
-#if defined(HAVE_LIBM)
-  [Option "-lm"]
-#else
-  []
-#endif
+libmLinkOpts :: Platform -> [Option]
+libmLinkOpts platform
+  | platformHasLibm platform = [Option "-lm"]
+  | otherwise                = []
 
 {-
 Note [-Bsymbolic assumptions by GHC]

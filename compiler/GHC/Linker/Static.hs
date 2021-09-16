@@ -197,7 +197,7 @@ linkBinary' staticLink logger tmpfs dflags unit_env o_files dep_units = do
                       ++ [ GHC.SysTools.Option "-o"
                          , GHC.SysTools.FileOption "" output_fn
                          ]
-                      ++ libmLinkOpts
+                      ++ libmLinkOpts platform
                       ++ map GHC.SysTools.Option (
                          []
 

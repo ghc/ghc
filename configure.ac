@@ -1092,6 +1092,8 @@ then
 else
   AC_SUBST([CabalHaveLibm],[False])
 fi
+TargetHasLibm=$HaveLibM
+AC_SUBST(TargetHasLibm)
 
 FP_BFD_SUPPORT
 

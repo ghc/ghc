@@ -19,6 +19,9 @@ bootstrap_target=@TargetPlatform@
 TargetHasRTSLinker=@TargetHasRTSLinker@
 AC_SUBST(TargetHasRTSLinker)
 
+TargetHasLibm=@TargetHasLibm@
+AC_SUBST(TargetHasLibm)
+
 FFIIncludeDir=@FFIIncludeDir@
 FFILibDir=@FFILibDir@
 AC_SUBST(FFILibDir)

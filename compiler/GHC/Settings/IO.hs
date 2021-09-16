@@ -235,6 +235,7 @@ getTargetPlatform settingsFile settings = do
   targetHasGnuNonexecStack <- getBooleanSetting "target has GNU nonexec stack"
   targetHasIdentDirective <- getBooleanSetting "target has .ident directive"
   targetHasSubsectionsViaSymbols <- getBooleanSetting "target has subsections via symbols"
+  targetHasLibm <- getBooleanSetting "target has libm"
   crossCompiling <- getBooleanSetting "cross compiling"
   tablesNextToCode <- getBooleanSetting "Tables next to code"
 
@@ -249,5 +250,6 @@ getTargetPlatform settingsFile settings = do
     , platformIsCrossCompiling = crossCompiling
     , platformLeadingUnderscore = targetLeadingUnderscore
     , platformTablesNextToCode  = tablesNextToCode
+    , platformHasLibm = targetHasLibm
     , platform_constants = Nothing -- will be filled later when loading (or building) the RTS unit
     }

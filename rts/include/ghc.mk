@@ -247,6 +247,7 @@ $(includes_SETTINGS) : rts/include/Makefile | $$(dir $$@)/.
 	@echo ',("target has .ident directive", "$(TargetHasIdentDirective)")' >> $@
 	@echo ',("target has subsections via symbols", "$(TargetHasSubsectionsViaSymbols)")' >> $@
 	@echo ',("target has RTS linker", "$(TargetHasRTSLinker)")' >> $@
+	@echo ',("target has libm", "$(TargetHasLibm)")' >> $@
 	@echo ',("Unregisterised", "$(GhcUnregisterised)")' >> $@
 	@echo ',("LLVM target", "$(LLVMTarget_CPP)")' >> $@
 	@echo ',("LLVM llc command", "$(SettingsLlcCommand)")' >> $@
