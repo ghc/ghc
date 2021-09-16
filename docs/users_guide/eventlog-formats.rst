@@ -901,6 +901,8 @@ heap.
 
    Describes the occupancy of the *blk_sz* sub-heap.
 
+.. _ticky-event-format:
+
 Ticky counters
 ~~~~~~~~~~~~~~
 
