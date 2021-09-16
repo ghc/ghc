@@ -557,9 +557,10 @@ if [ -n "${HERMETIC:-}" ]; then
   export CABAL_DIR="$TOP/cabal"
   export HOME="/nonexistent"
 else
+  BIN_DIST_NAME="${BIN_DIST_NAME:-}"
   case "$(uname)" in
-    MSYS_*|MINGW*) exe=".exe"; CABAL_DIR="$APPDATA/cabal" ;;
-    *) CABAL_DIR="$HOME/.cabal"; exe="" ;;
+    MSYS_*|MINGW*) CABAL_DIR="$APPDATA/cabal" ;;
+    *) CABAL_DIR="$HOME/.cabal" ;;
   esac
 fi
 
