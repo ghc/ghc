@@ -860,6 +860,14 @@ parts that you are not interested in.
 
     Suppress the printing of closure free variable lists in STG output
 
+.. ghc-flag:: -dsuppress-core-sizes
+    :shortdesc: Suppress the printing of core size stats per binding (since 9.4)
+    :type: dynamic
+
+    :since: 9.4.1
+
+    Suppress the printing of core size stats per binding
+
 
 .. _checking-consistency:
 

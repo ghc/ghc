@@ -4,11 +4,13 @@ Result size of Tidy Core
   = {terms: 12, types: 18, coercions: 0, joins: 0/0}
 
 Rec {
+-- RHS size: {terms: 3, types: 2, coercions: 0, joins: 0/0}
 f [Occ=LoopBreaker] :: [Int] -> [Int]
 [GblId, Arity=1, Str=<B>b, Cpr=b, Unf=OtherCon []]
 f = \ (x :: [Int]) -> f x
 end Rec }
 
+-- RHS size: {terms: 3, types: 2, coercions: 0, joins: 0/0}
 g [InlPrag=INLINE (sat-args=1)] :: [Int] -> [Int]
 [GblId,
  Arity=1,
@@ -20,6 +22,7 @@ g [InlPrag=INLINE (sat-args=1)] :: [Int] -> [Int]
          Tmpl= \ (x [Occ=Once1] :: [Int]) -> f x}]
 g = \ (x :: [Int]) -> f x
 
+-- RHS size: {terms: 3, types: 2, coercions: 0, joins: 0/0}
 h [InlPrag=INLINE (sat-args=1)] :: [Int] -> [Int]
 [GblId,
  Arity=1,

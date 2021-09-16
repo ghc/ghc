@@ -3,6 +3,7 @@
 Result size of Desugar (after optimization)
   = {terms: 36, types: 13, coercions: 0, joins: 0/0}
 
+-- RHS size: {terms: 5, types: 0, coercions: 0, joins: 0/0}
 T16615.$trModule :: GHC.Types.Module
 [LclIdX,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
@@ -12,6 +13,7 @@ T16615.$trModule
       (GHC.Types.TrNameS "main"#) (GHC.Types.TrNameS "T16615"#)
 
 Rec {
+-- RHS size: {terms: 14, types: 4, coercions: 0, joins: 0/0}
 g :: Int -> Bool
 [LclIdX,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
@@ -22,6 +24,7 @@ g = \ (i :: Int) ->
         True -> GHC.Types.False
       }
 
+-- RHS size: {terms: 14, types: 4, coercions: 0, joins: 0/0}
 f [Occ=LoopBreaker] :: Int -> Bool
 [LclIdX,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,

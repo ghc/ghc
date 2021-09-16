@@ -2350,6 +2350,7 @@ dynamic_flags_deps = [
                   setGeneralFlag Opt_SuppressTicks
                   setGeneralFlag Opt_SuppressStgExts
                   setGeneralFlag Opt_SuppressTypeSignatures
+                  setGeneralFlag Opt_SuppressCoreSizes
                   setGeneralFlag Opt_SuppressTimestamps)
 
         ------ Debugging ----------------------------------------------------
@@ -3268,7 +3269,8 @@ dFlagsDeps = [
   flagSpec "suppress-type-applications" Opt_SuppressTypeApplications,
   flagSpec "suppress-type-signatures"   Opt_SuppressTypeSignatures,
   flagSpec "suppress-uniques"           Opt_SuppressUniques,
-  flagSpec "suppress-var-kinds"         Opt_SuppressVarKinds
+  flagSpec "suppress-var-kinds"         Opt_SuppressVarKinds,
+  flagSpec "suppress-core-sizes"        Opt_SuppressCoreSizes
   ]
 
 -- | These @-f\<blah\>@ flags can all be reversed with @-fno-\<blah\>@

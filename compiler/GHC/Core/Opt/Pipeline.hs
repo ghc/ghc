@@ -763,7 +763,8 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
            let { binds2 = {-# SCC "ZapInd" #-} shortOutIndirections binds1 } ;
 
                 -- Dump the result of this iteration
-           dump_end_iteration logger print_unqual iteration_no counts1 binds2 rules1 ;
+           let { dump_core_sizes = not (gopt Opt_SuppressCoreSizes dflags) } ;
+           dump_end_iteration logger dump_core_sizes print_unqual iteration_no counts1 binds2 rules1 ;
            lintPassResult hsc_env pass binds2 ;
 
                 -- Loop
@@ -781,10 +782,10 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
 simplifyPgmIO _ _ _ _ = panic "simplifyPgmIO"
 
 -------------------
-dump_end_iteration :: Logger -> PrintUnqualified -> Int
+dump_end_iteration :: Logger -> Bool -> PrintUnqualified -> Int
                    -> SimplCount -> CoreProgram -> [CoreRule] -> IO ()
-dump_end_iteration logger print_unqual iteration_no counts binds rules
-  = dumpPassResult logger print_unqual mb_flag hdr pp_counts binds rules
+dump_end_iteration logger dump_core_sizes print_unqual iteration_no counts binds rules
+  = dumpPassResult logger dump_core_sizes print_unqual mb_flag hdr pp_counts binds rules
   where
     mb_flag | logHasDumpFlag logger Opt_D_dump_simpl_iterations = Just Opt_D_dump_simpl_iterations
             | otherwise                                         = Nothing

@@ -285,10 +285,11 @@ endPassIO :: HscEnv -> PrintUnqualified
           -> CoreToDo -> CoreProgram -> [CoreRule] -> IO ()
 -- Used by the IO-is CorePrep too
 endPassIO hsc_env print_unqual pass binds rules
-  = do { dumpPassResult logger print_unqual mb_flag
+  = do { dumpPassResult logger dump_core_sizes print_unqual mb_flag
                         (showSDoc dflags (ppr pass)) (pprPassDetails pass) binds rules
        ; lintPassResult hsc_env pass binds }
   where
+    dump_core_sizes = not (gopt Opt_SuppressCoreSizes dflags)
     logger  = hsc_logger hsc_env
     dflags  = hsc_dflags hsc_env
     mb_flag = case coreDumpFlag pass of
@@ -297,6 +298,7 @@ endPassIO hsc_env print_unqual pass binds rules
                 _ -> Nothing
 
 dumpPassResult :: Logger
+               -> Bool                  -- dump core sizes?
                -> PrintUnqualified
                -> Maybe DumpFlag        -- Just df => show details in a file whose
                                         --            name is specified by df
@@ -304,7 +306,7 @@ dumpPassResult :: Logger
                -> SDoc                  -- Extra info to appear after header
                -> CoreProgram -> [CoreRule]
                -> IO ()
-dumpPassResult logger unqual mb_flag hdr extra_info binds rules
+dumpPassResult logger dump_core_sizes unqual mb_flag hdr extra_info binds rules
   = do { forM_ mb_flag $ \flag -> do
            logDumpFile logger (mkDumpStyle unqual) flag hdr FormatCore dump_doc
 
@@ -320,7 +322,7 @@ dumpPassResult logger unqual mb_flag hdr extra_info binds rules
     dump_doc  = vcat [ nest 2 extra_info
                      , size_doc
                      , blankLine
-                     , if logHasDumpFlag logger Opt_D_dump_core_stats
+                     , if dump_core_sizes
                         then pprCoreBindingsWithSize binds
                         else pprCoreBindings         binds
                      , ppUnless (null rules) pp_rules ]
