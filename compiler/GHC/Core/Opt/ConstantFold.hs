@@ -1325,15 +1325,12 @@ idempotent = do [e1, e2] <- getArgs
 --  and return the innermost (op v e) or (op e v).
 sameArgIdempotentCommut :: PrimOp -> RuleM CoreExpr
 sameArgIdempotentCommut op = do
-  let is_op = \case
-        BinOpApp v op' e | op == op' -> Just (v,e)
-        _                            -> Nothing
   [a,b] <- getArgs
   case (a,b) of
-    (is_op -> Just (e1,e2), e3)
+    (is_binop op -> Just (e1,e2), e3)
       | cheapEqExpr e2 e3 -> return a
       | cheapEqExpr e1 e3 -> return a
-    (e3, is_op -> Just (e1,e2))
+    (e3, is_binop op -> Just (e1,e2))
       | cheapEqExpr e2 e3 -> return b
       | cheapEqExpr e1 e3 -> return b
     _ -> mzero
@@ -2689,6 +2686,11 @@ orFoldingRules num_ops = do
 
 addFoldingRules' :: Platform -> CoreExpr -> CoreExpr -> NumOps -> Maybe CoreExpr
 addFoldingRules' platform arg1 arg2 num_ops = case (arg1, arg2) of
+
+      -- x + (-y) ==> x-y
+      (x, is_neg num_ops -> Just y)
+         -> Just (x `sub` y)
+
       -- R1) +/- simplification
 
       -- l1 + (l2 + x) ==> (l1+l2) + x
@@ -2770,6 +2772,10 @@ addFoldingRules' platform arg1 arg2 num_ops = case (arg1, arg2) of
 
 subFoldingRules' :: Platform -> CoreExpr -> CoreExpr -> NumOps -> Maybe CoreExpr
 subFoldingRules' platform arg1 arg2 num_ops = case (arg1,arg2) of
+      -- x - (-y) ==> x+y
+      (x, is_neg num_ops -> Just y)
+         -> Just (x `add` y)
+
       -- R1) +/- simplification
 
       -- l1 - (l2 + x) ==> (l1-l2) - x
@@ -2887,6 +2893,14 @@ subFoldingRules' platform arg1 arg2 num_ops = case (arg1,arg2) of
 
 mulFoldingRules' :: Platform -> CoreExpr -> CoreExpr -> NumOps -> Maybe CoreExpr
 mulFoldingRules' platform arg1 arg2 num_ops = case (arg1,arg2) of
+   -- (-x) * (-y) ==> x*y
+   (is_neg num_ops -> Just x, is_neg num_ops -> Just y)
+      -> Just (x `mul` y)
+
+   -- l1 * (-x) ==> (-l1) * x
+   (L l1, is_neg num_ops -> Just x)
+      -> Just (mkL (-l1) `mul` x)
+
    -- l1 * (l2 * x) ==> (l1*l2) * x
    (L l1, is_lit_mul num_ops -> Just (l2,x))
       -> Just (mkL (l1*l2) `mul` x)
@@ -2960,17 +2974,25 @@ orFoldingRules' platform arg1 arg2 num_ops = case (arg1, arg2) of
       mkL = Lit . mkNumLiteral platform num_ops
       or x y = BinOpApp x (fromJust (numOr num_ops)) y
 
-is_op :: PrimOp -> CoreExpr -> Maybe (Arg CoreBndr, Arg CoreBndr)
-is_op op e = case e of
+is_binop :: PrimOp -> CoreExpr -> Maybe (Arg CoreBndr, Arg CoreBndr)
+is_binop op e = case e of
  BinOpApp x op' y | op == op' -> Just (x,y)
  _                            -> Nothing
 
+is_op :: PrimOp -> CoreExpr -> Maybe (Arg CoreBndr)
+is_op op e = case e of
+ App (OpVal op') x | op == op' -> Just x
+ _                             -> Nothing
+
 is_add, is_sub, is_mul, is_and, is_or :: NumOps -> CoreExpr -> Maybe (Arg CoreBndr, Arg CoreBndr)
-is_add num_ops = is_op (numAdd num_ops)
-is_sub num_ops = is_op (numSub num_ops)
-is_mul num_ops = is_op (numMul num_ops)
-is_and num_ops = is_op (fromJust (numAnd num_ops))
-is_or  num_ops = is_op (fromJust (numOr num_ops))
+is_add num_ops e = is_binop (numAdd num_ops) e
+is_sub num_ops e = is_binop (numSub num_ops) e
+is_mul num_ops e = is_binop (numMul num_ops) e
+is_and num_ops e = numAnd num_ops >>= \op -> is_binop op e
+is_or  num_ops e = numOr  num_ops >>= \op -> is_binop op e
+
+is_neg :: NumOps -> CoreExpr -> Maybe (Arg CoreBndr)
+is_neg num_ops e = numNeg num_ops >>= \op -> is_op op e
 
 -- match operation with a literal (handles commutativity)
 is_lit_add, is_lit_mul, is_lit_and, is_lit_or :: NumOps -> CoreExpr -> Maybe (Integer, Arg CoreBndr)
@@ -3013,12 +3035,13 @@ pattern L i <- Lit (LitNumber _ i)
 
 -- | Explicit "type-class"-like dictionary for numeric primops
 data NumOps = NumOps
-   { numAdd     :: !PrimOp     -- ^ Add two numbers
-   , numSub     :: !PrimOp     -- ^ Sub two numbers
-   , numMul     :: !PrimOp     -- ^ Multiply two numbers
-   , numLitType :: !LitNumType -- ^ Literal type
+   { numAdd     :: !PrimOp         -- ^ Add two numbers
+   , numSub     :: !PrimOp         -- ^ Sub two numbers
+   , numMul     :: !PrimOp         -- ^ Multiply two numbers
    , numAnd     :: !(Maybe PrimOp) -- ^ And two numbers
    , numOr      :: !(Maybe PrimOp) -- ^ Or two numbers
+   , numNeg     :: !(Maybe PrimOp) -- ^ Negate a number
+   , numLitType :: !LitNumType     -- ^ Literal type
    }
 
 -- | Create a numeric literal
@@ -3033,6 +3056,7 @@ int8Ops = NumOps
    , numLitType = LitNumInt8
    , numAnd     = Nothing
    , numOr      = Nothing
+   , numNeg     = Just Int8NegOp
    }
 
 word8Ops :: NumOps
@@ -3042,6 +3066,7 @@ word8Ops = NumOps
    , numMul     = Word8MulOp
    , numAnd     = Just Word8AndOp
    , numOr      = Just Word8OrOp
+   , numNeg     = Nothing
    , numLitType = LitNumWord8
    }
 
@@ -3053,6 +3078,7 @@ int16Ops = NumOps
    , numLitType = LitNumInt16
    , numAnd     = Nothing
    , numOr      = Nothing
+   , numNeg     = Just Int16NegOp
    }
 
 word16Ops :: NumOps
@@ -3062,6 +3088,7 @@ word16Ops = NumOps
    , numMul     = Word16MulOp
    , numAnd     = Just Word16AndOp
    , numOr      = Just Word16OrOp
+   , numNeg     = Nothing
    , numLitType = LitNumWord16
    }
 
@@ -3073,6 +3100,7 @@ int32Ops = NumOps
    , numLitType = LitNumInt32
    , numAnd     = Nothing
    , numOr      = Nothing
+   , numNeg     = Just Int32NegOp
    }
 
 word32Ops :: NumOps
@@ -3082,6 +3110,7 @@ word32Ops = NumOps
    , numMul     = Word32MulOp
    , numAnd     = Just Word32AndOp
    , numOr      = Just Word32OrOp
+   , numNeg     = Nothing
    , numLitType = LitNumWord32
    }
 
@@ -3093,6 +3122,7 @@ int64Ops = NumOps
    , numLitType = LitNumInt64
    , numAnd     = Nothing
    , numOr      = Nothing
+   , numNeg     = Just Int64NegOp
    }
 
 word64Ops :: NumOps
@@ -3102,6 +3132,7 @@ word64Ops = NumOps
    , numMul     = Word64MulOp
    , numAnd     = Just Word64AndOp
    , numOr      = Just Word64OrOp
+   , numNeg     = Nothing
    , numLitType = LitNumWord64
    }
 
@@ -3112,6 +3143,7 @@ intOps = NumOps
    , numMul     = IntMulOp
    , numAnd     = Just IntAndOp
    , numOr      = Just IntOrOp
+   , numNeg     = Just IntNegOp
    , numLitType = LitNumInt
    }
 
@@ -3122,6 +3154,7 @@ wordOps = NumOps
    , numMul     = WordMulOp
    , numAnd     = Just WordAndOp
    , numOr      = Just WordOrOp
+   , numNeg     = Nothing
    , numLitType = LitNumWord
    }
 

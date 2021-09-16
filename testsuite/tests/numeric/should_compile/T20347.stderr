@@ -1,0 +1,17 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 20, types: 15, coercions: 0, joins: 0/0}
+
+foo0 = \ x -> -# 10# x
+
+foo1 = \ _ -> 10#
+
+foo2 = \ x -> +# 10# x
+
+foo3 = *#
+
+foo4 = \ x -> *# -10# x
+
+
+

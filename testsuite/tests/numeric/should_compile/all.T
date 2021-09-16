@@ -15,3 +15,4 @@ test('T20245', normal, compile, ['-ddump-simpl -O -dsuppress-all -dno-typeable-b
 test('T20376', normal, compile, ['-ddump-simpl -O -dsuppress-all -dsuppress-uniques -dno-typeable-binds'])
 test('T20374', normal, compile, ['-ddump-simpl -O -dsuppress-all -dno-typeable-binds -dsuppress-uniques'])
 test('T19769', normal, compile, ['-ddump-simpl -O -dsuppress-all -dno-typeable-binds -dsuppress-uniques'])
+test('T20347', normal, compile, ['-ddump-simpl -O -dsuppress-all -dno-typeable-binds -dsuppress-uniques'])
