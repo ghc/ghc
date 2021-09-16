@@ -82,6 +82,8 @@ import GHC.Data.Pair
 import GHC.Data.Bag
 
 import Data.List  ( find, partition, intersperse )
+import GHC.Data.Maybe ( expectJust )
+import GHC.Unit.Module
 
 type BagDerivStuff = Bag DerivStuff
 
@@ -2139,9 +2141,12 @@ genAuxBindSpecOriginal dflags loc spec
     gen_bind (DerivDataDataType tycon dataT_RDR dataC_RDRs)
       = mkHsVarBind loc dataT_RDR rhs
       where
+        tc_name = tyConName tycon
+        tc_name_string = occNameString (getOccName tc_name)
+        definition_mod_name = moduleNameString (moduleName (expectJust "gen_bind DerivDataDataType" $ nameModule_maybe tc_name))
         ctx = initDefaultSDocContext dflags
         rhs = nlHsVar mkDataType_RDR
-              `nlHsApp` nlHsLit (mkHsString (showSDocOneLine ctx (ppr tycon)))
+              `nlHsApp` nlHsLit (mkHsString (showSDocOneLine ctx (text definition_mod_name <> dot <> text tc_name_string)))
               `nlHsApp` nlList (map nlHsVar dataC_RDRs)
 
     gen_bind (DerivDataConstr dc dataC_RDR dataT_RDR)

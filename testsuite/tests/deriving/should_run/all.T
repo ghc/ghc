@@ -46,3 +46,4 @@ test('T10598_run', normal, compile_and_run, [''])
 test('T11535', when(opsys('mingw32'), expect_broken_for(12210, ['ghci'])),
      compile_and_run, [''])
 test('T14918', normal, compile_and_run, [''])
+test('T20371', normal, compile_and_run, ['-dppr-debug'])
