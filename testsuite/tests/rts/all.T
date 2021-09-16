@@ -402,6 +402,7 @@ test('T13617', [ unless(opsys('mingw32'), skip)],
 # Test is being skipped on darwin due to it's flakiness.
 test('T12903', [ when(opsys('mingw32'), skip)
                , when(opsys('darwin'), skip)
+               , when(arch('i386'), fragile(20377))
                , omit_ways(['ghci', 'profasm'])]
                , compile_and_run, [''])
 
