@@ -1713,11 +1713,20 @@ Using “ticky-ticky” profiling (for implementors)
 
     Track allocations of dynamic thunks.
 
+GHC's ticky-ticky profiler provides a low-level facility for tracking
+entry and allocation counts of particular individual closures.
 Because ticky-ticky profiling requires a certain familiarity with GHC
 internals, we have moved the documentation to the GHC developers wiki.
 Take a look at its
 :ghc-wiki:`overview of the profiling options <commentary/profiling>`,
 which includes a link to the ticky-ticky profiling page.
+
+Note that ticky-ticky samples can be emitted in two formats: the eventlog,
+using the :rts-flag:`-lT <-l ⟨flags⟩>` event type, and a plain text
+summary format, using the :rts-flag:`-r ⟨file⟩` option. The former has the
+advantage of being able to resolve dynamic behaviors over the program's
+lifetime. See :ref:`ticky-event-format` for details on the event types
+reported.
 
 .. [1]
    :ghc-flag:`-fprof-auto` was known as ``-auto-all`` prior to
