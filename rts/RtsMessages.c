@@ -191,8 +191,8 @@ void
 rtsErrorMsgFn(const char *s, va_list ap)
 {
 #if defined(mingw32_HOST_OS)
-  /* Ensure we're in text mode so newlines get encoded properly.  */
-  int mode = _setmode (_fileno(stderr), _O_TEXT);
+  /* Ensure we're in UTF-8 text mode so newlines get encoded properly.  */
+  int mode = _setmode (_fileno(stderr), _O_U8TEXT);
   if (isGUIApp())
   {
      char buf[BUFSIZE];
