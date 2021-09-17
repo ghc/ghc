@@ -48,6 +48,12 @@
 
   export MACOSX_DEPLOYMENT_TARGET=10.7
 
+  # make sure CLT binaries take precedence over nix supplied binraries.
+  # the logic behind this is as follows: we expect people to be able to use their
+  # apple supplied (and likey more recent) CC, LD, ... instead of relying of
+  # midly outdated open sourced and rebuilt tools of those.
+  export PATH=/Library/Developer/CommandLineTools/usr/bin:$PATH
+
   '';
 
   nativeBuildInputs = (with pkgs; [
