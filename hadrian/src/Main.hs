@@ -50,7 +50,7 @@ main = do
             , shakeFiles    = buildRoot -/- Base.shakeFilesDir
             , shakeProgress = progressSimple
             , shakeRebuild  = rebuild
-            , shakeTimings  = True
+            , shakeTimings  = False
             , shakeColor    = shakeColor
             , shakeExtra    = extra
 
