@@ -103,6 +103,9 @@
     call, ensuring that the call can be interrupted with `SIGINT` on POSIX
     systems.
 
+  * Make `openFile` more tolerant of asynchronous exceptions: more care taken
+    to release the file descriptor and the read/write lock (#18832)
+
   * Add `hGetContents'`, `getContents'`, and `readFile'` in `System.IO`:
     Strict IO variants of `hGetContents`, `getContents`, and `readFile`.
 

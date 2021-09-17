@@ -150,3 +150,4 @@ test('T17414',
 test('T17510', expect_broken(17510), compile_and_run, [''])
 test('bytestringread001', extra_run_opts('test.data'), compile_and_run, [''])
 test('T17912', [only_ways(['threaded1']), when(opsys('mingw32'),expect_broken(1))], compile_and_run, [''])
+test('T18832', only_ways(['threaded1']), compile_and_run, [''])

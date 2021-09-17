@@ -167,46 +167,6 @@ writeBuf' fd buf = do
 -- -----------------------------------------------------------------------------
 -- opening files
 
--- | A wrapper for 'System.Posix.Internals.c_interruptible_open' that takes
--- two actions, @act1@ and @act2@, to perform after opening the file.
---
--- @act1@ is passed a file descriptor for the newly opened file. If
--- an exception occurs in @act1@, then the file will be closed.
--- @act1@ /must not/ close the file itself. If it does so and then
--- receives an exception, then the exception handler will attempt to
--- close it again, which is impermissable.
---
--- @act2@ is performed with asynchronous exceptions masked. It is passed a
--- function to restore the masking state and the result of @act1@.
--- It /must not/ throw an exception (or deliver one via an interruptible
--- operation) without first closing the file or arranging for it to be
--- closed. @act2@ /may/ close the file, but is not required to do so.
--- If @act2@ leaves the file open, then the file will remain open on
--- return from `c_interruptible_open_with`.
---
--- Code calling `c_interruptible_open_with` that wishes to install a finalizer
--- to close the file should do so in @act2@. Doing so in @act1@ could
--- potentially close the file in the finalizer first and then in the
--- exception handler.
-
-c_interruptible_open_with
-  :: System.Posix.Internals.CFilePath  -- ^ The file to open
-  -> CInt -- ^ The flags to pass to open
-  -> CMode -- ^ The permission mode to use for file creation
-  -> (CInt -> IO r) -- ^ @act1@: An action to perform on the file descriptor
-                    -- with the masking state restored and an exception
-                    -- handler that closes the file on exception.
-  -> ((forall x. IO x -> IO x) -> r -> IO s)
-                    -- ^ @act2@: An action to perform with async exceptions
-                    -- masked and no exception handler.
-  -> IO s
-c_interruptible_open_with path oflags mode act1 act2 =
-  mask $ \restore -> do
-    fd <- throwErrnoIfMinus1Retry "openFile" $
-             c_interruptible_open path oflags mode
-    r <- restore (act1 fd) `onException` c_close fd
-    act2 restore r
-
 -- | Open a file and make an 'FD' for it. Truncates the file to zero size when
 -- the `IOMode` is `WriteMode`.
 --
@@ -265,23 +225,32 @@ openFileWith filepath iomode non_blocking act1 act2 =
       oflags | non_blocking = oflags2 .|. nonblock_flags
              | otherwise    = oflags2
     in do
-      -- We want to be sure all the arguments to c_interruptible_open_with
+      -- We want to be sure all the arguments to c_interruptible_open
       -- are fully evaluated *before* it slips under a mask (assuming we're
       -- not already under a user-imposed mask).
       oflags' <- evaluate oflags
       -- NB. always use a safe open(), because we don't know whether open()
       -- will be fast or not.  It can be slow on NFS and FUSE filesystems,
       -- for example.
-      c_interruptible_open_with f oflags' 0o666 ( \ fileno -> do
+
+      mask $ \restore -> do
+        fileno <- throwErrnoIfMinus1Retry "openFile" $
+                c_interruptible_open f oflags' 0o666
+
         (fD,fd_type) <- mkFD fileno iomode Nothing{-no stat-}
                                 False{-not a socket-}
-                                non_blocking
+                                non_blocking `onException` c_close fileno
+
         -- we want to truncate() if this is an open in WriteMode, but only
         -- if the target is a RegularFile.  ftruncate() fails on special files
         -- like /dev/null.
+
         when (iomode == WriteMode && fd_type == RegularFile) $
-          setSize fD 0
-        act1 fD fd_type ) act2
+          setSize fD 0 `onException` close fD
+
+        carry <- restore (act1 fD fd_type) `onException` close fD
+
+        act2 restore carry
 
 -- | Open a file and make an 'FD' for it.  Truncates the file to zero
 -- size when the `IOMode` is `WriteMode`. This function is difficult
