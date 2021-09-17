@@ -1082,7 +1082,7 @@ AC_ARG_WITH([system-libffi],
 
 AS_IF([test "x$with_system_libffi" = "xyes"],
   [UseSystemLibFFI="YES"; CabalUseSystemLibFFI="True"],
-  [UseSystemLibFFI="NO"; CabalUseSystemLibFFI="True"]
+  [UseSystemLibFFI="NO"; CabalUseSystemLibFFI="False"]
 )
 
 AC_SUBST(UseSystemLibFFI)
