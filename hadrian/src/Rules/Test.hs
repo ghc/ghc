@@ -123,6 +123,8 @@ testRules = do
               [ "--interactive", "-v0", "-ignore-dot-ghci"
               , "-fno-ghci-history"
               ]
+        ccPath          <- settingsFileSetting SettingsFileSetting_CCompilerCommand
+        ccFlags         <- settingsFileSetting SettingsFileSetting_CCompilerFlags
 
         pythonPath      <- builderPath Python
         need [ root -/- checkPprProgPath, root -/- checkApiAnnotationsProgPath ]
@@ -140,6 +142,8 @@ testRules = do
             setEnv "TEST_HC" ghcPath
             setEnv "TEST_HC_OPTS" ghcFlags
             setEnv "TEST_HC_OPTS_INTERACTIVE" ghciFlags
+            setEnv "TEST_CC" ccPath
+            setEnv "TEST_CC_OPTS" ccFlags
             setEnv "CHECK_PPR" (top -/- root -/- checkPprProgPath)
             setEnv "CHECK_API_ANNOTATIONS"
                    (top -/- root -/- checkApiAnnotationsProgPath)
