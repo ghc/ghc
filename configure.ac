@@ -1115,7 +1115,6 @@ AC_ARG_WITH([ffi-libraries],
 
 AC_SUBST(FFILibDir)
 
-AC_SUBST([CabalHaveLibffi],[False])
 AS_IF([test "$UseSystemLibFFI" = "YES"], [
  CFLAGS2="$CFLAGS"
  CFLAGS="$LIBFFI_CFLAGS $CFLAGS"
@@ -1137,6 +1136,8 @@ AS_IF([test "$UseSystemLibFFI" = "YES"], [
   [AC_MSG_ERROR([Cannot find system libffi])])
  CFLAGS="$CFLAGS2"
  LDFLAGS="$LDFLAGS2"
+], [
+ AC_SUBST([CabalHaveLibffi],[True])
 ])
 
 dnl ** check whether we need -ldl to get dlopen()
