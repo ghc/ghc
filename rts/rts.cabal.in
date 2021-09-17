@@ -10,8 +10,6 @@ flag librt
   default: @CabalHaveLibrt@
 flag libdl
   default: @CabalHaveLibdl@
-flag ffi
-  default: @CabalHaveLibffi@
 flag use-system-libffi
   default: @CabalUseSystemLibFFI@
 flag libffi-adjustors
@@ -106,7 +104,7 @@ library
        extra-libraries: rt
     if flag(libdl)
        extra-libraries: dl
-    if flag(ffi)
+    if flag(use-system-libffi)
        extra-libraries: ffi
     if os(windows)
        extra-libraries:

@@ -1089,7 +1089,6 @@ AC_ARG_WITH([ffi-libraries],
 
 AC_SUBST(FFILibDir)
 
-AC_SUBST([CabalHaveLibffi],[False])
 AS_IF([test "$UseSystemLibFFI" = "YES"], [
  CFLAGS2="$CFLAGS"
  CFLAGS="$LIBFFI_CFLAGS $CFLAGS"
@@ -1106,8 +1105,7 @@ AS_IF([test "$UseSystemLibFFI" = "YES"], [
  fi
  AC_CHECK_LIB(ffi, ffi_call,
   [AC_CHECK_HEADERS([ffi.h], [break], [])
-   AC_DEFINE([HAVE_LIBFFI], [1], [Define to 1 if you have libffi.])]
-   AC_SUBST([CabalHaveLibffi],[True]),
+   AC_DEFINE([HAVE_SYSTEM_LIBFFI], [1], [Define to 1 if you have libffi.])],
   [AC_MSG_ERROR([Cannot find system libffi])])
  CFLAGS="$CFLAGS2"
  LDFLAGS="$LDFLAGS2"

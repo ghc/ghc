@@ -35,7 +35,7 @@ extra-libraries:
 #if defined(HAVE_LIBDL)
                               , "dl"
 #endif
-#if defined(HAVE_LIBFFI)
+#if defined(HAVE_SYSTEM_LIBFFI)
                               , "ffi"
 #endif
 #if HAVE_LIBNUMA
