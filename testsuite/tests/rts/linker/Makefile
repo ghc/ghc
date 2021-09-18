@@ -8,7 +8,7 @@ unsigned_reloc_macho_x64:
 	./runner unsigned_reloc_macho_x64.o getAnswer
 
 section_alignment:
-	cc -c -o section_alignment.o section_alignment.c
+	'$(TEST_CC)' $(TEST_CC_OPTS) -c -o section_alignment.o section_alignment.c
 	'$(TEST_HC)' $(TEST_HC_OPTS_NO_RTSOPTS) -v0 --make -no-rtsopts-suggestions -no-hs-main -o runner runner.c
 	./runner section_alignment.o isAligned
 
