@@ -14,10 +14,16 @@ let
   ghc = pkgs.stdenv.mkDerivation rec {
     version = "8.10.7";
     name = "ghc";
-    src = fetchTarball {
-      url = "https://downloads.haskell.org/ghc/${version}/ghc-${version}-aarch64-apple-darwin.tar.xz";
-      sha256 = "sha256:0dp5k4w60xbs3k8bpnwyrl520r623i7ra0d0iybgi91lzimbq1l8";
-    };
+    src = fetchurl ({
+      aarch64-darwin = {
+        url = "https://downloads.haskell.org/ghc/${version}/ghc-${version}-aarch64-apple-darwin.tar.xz";
+        sha256 = "sha256:0dp5k4w60xbs3k8bpnwyrl520r623i7ra0d0iybgi91lzimbq1l8";
+      };
+      x86_64-darwin = {
+        url = "https://downloads.haskell.org/ghc/${version}/ghc-${version}-x86_64-apple-darwin.tar.xz";
+        sha256 = "sha256:0000000000000000000000000000000000000000000000000000000000000000";
+      };
+    }.${stdenv.hostPlatform.system});
     configureFlags = [
       "LLC=${llvm}/bin/llc"
       "OPT=${llvm}/bin/opt"
@@ -35,9 +41,26 @@ let
       sed -i -e "s%\"llc\"%\"${llvm}/bin/llc\"%" $settings
       sed -i -e "s%\"opt\"%\"${llvm}/bin/opt\"%" $settings
       sed -i -e "s%\"clang\"%\"/usr/bin/clang\"%" $settings
-      sed -i -e 's%("C compiler flags", "")%("C compiler flags", "--target=aarch64-apple-darwin")%' $settings
-      sed -i -e 's%("C++ compiler flags", "")%("C++ compiler flags", "--target=aarch64-apple-darwin")%' $settings
-      sed -i -e 's%("C compiler link flags", "")%("C compiler link flags", "--target=aarch64-apple-darwin")%' $settings
+      sed -i -e 's%("C compiler flags", "")%("C compiler flags", "--target=${targetTriple}")%' $settings
+      sed -i -e 's%("C++ compiler flags", "")%("C++ compiler flags", "--target=${targetTriple}")%' $settings
+      sed -i -e 's%("C compiler link flags", "")%("C compiler link flags", "--target=${targetTriple}")%' $settings
+    '';
+
+    # Sanity check: verify that we can compile hello world.
+    doInstallCheck = true;
+    installCheckPhase = ''
+      unset ${libEnvVar}
+      # Sanity check, can ghc create executables?
+      cd $TMP
+      mkdir test-ghc; cd test-ghc
+      cat > main.hs << EOF
+        {-# LANGUAGE TemplateHaskell #-}
+        module Main where
+        main = putStrLn \$([|"yes"|])
+      EOF
+      $out/bin/ghc --make main.hs || exit 1
+      echo compilation ok
+      [ $(./main) == "yes" ]
     '';
   };
 
@@ -70,7 +93,6 @@ pkgs.writeTextFile {
     export SPHINXBUILD="${pkgs.python3Packages.sphinx}/bin/sphinx-build"
     export CABAL_INSTALL="${pkgs.cabal-install}/bin/cabal"
     export CABAL="$CABAL_INSTALL"
-    #export CURSES_LIB_DIRS="${pkgs.ncurses}/lib"
   '';
 }
 
