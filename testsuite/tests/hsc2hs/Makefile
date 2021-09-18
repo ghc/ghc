@@ -2,7 +2,7 @@ TOP=../..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
-HSC2HS_OPTS = --cc="$(TEST_CC)" --cflag="$(TEST_CC_OPTS)" --ld=$(TEST_CC) ---lflag="$(TEST_CC_OPTS)"
+HSC2HS_OPTS = --cc="$(TEST_CC)" --cflag="$(TEST_CC_OPTS)" --ld=$(TEST_CC) --lflag="$(TEST_CC_OPTS)"
 
 .PHONY: hsc2hs001
 hsc2hs001:
