@@ -715,7 +715,7 @@ T14923:
 
 	"$(TEST_HC)" $(TEST_HC_OPTS) -c Foo.hs;
 
-	sed -i 's/^{-\#/--&/' Foo.hs # comment out the pragma
+	sed -i -e 's/^{-\#/--&/' Foo.hs # comment out the pragma
 
 	# Check sed actually worked
 	cat Foo.hs
