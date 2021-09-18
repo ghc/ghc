@@ -567,8 +567,8 @@ validate-x86_64-darwin:
     BUILD_FLAVOUR: "validate"
     # Due to #19025
     IGNORE_PERF_FAILURES: "all"
-    # Capi_Ctype_001 Capi_Ctype_002 T12010 T14923 T16737 T20199 bkpreex03 cc017 section_alignment: Due to #
-    BROKEN_TESTS: "Capi_Ctype_001 Capi_Ctype_002 T12010 T14923 T16737 T20199 bkpreex03 cc017"
+    # Capi_Ctype_001 Capi_Ctype_002 T12010 T14923 T16737 T20199 cc017: Due to #TODO
+    BROKEN_TESTS: "Capi_Ctype_001 Capi_Ctype_002 T12010 T14923 T16737 T20199 cc017"
   after_script:
     - .gitlab/ci.sh clean
     - cat ci-timings
@@ -620,6 +620,8 @@ validate-aarch64-darwin:
     HADRIAN_ARGS: "--docs=no-sphinx"
     BIN_DIST_NAME: "ghc-arm64-apple-darwin"
     TEST_ENV: "aarch64-darwin-hadrian"
+    # Capi_Ctype_001 Capi_Ctype_002 T12010 T14923 T16737 T20199 cc017: Due to #TODO
+    BROKEN_TESTS: "Capi_Ctype_001 Capi_Ctype_002 T12010 T14923 T16737 T20199 cc017"
   after_script:
     - .gitlab/ci.sh clean
     - cat ci-timings
