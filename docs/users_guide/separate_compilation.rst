@@ -283,6 +283,14 @@ Redirecting the compilation output(s)
     to redirect the interface into the bit bucket: ``-ohi /dev/null``,
     for example.
 
+.. ghc-flag:: -dynohi ⟨file⟩
+    :shortdesc: set the filename in which to put the dynamic interface
+    :type: dynamic
+    :category:
+
+    When using ``-dynamic-too``, option ``-dynohi`` ⟨file⟩ is the counterpart
+    of ``-ohi``. It redirects the dynamic interface output to ⟨file⟩.
+
 .. ghc-flag:: -hidir ⟨dir⟩
     :shortdesc: set directory for interface files
     :type: dynamic
@@ -333,7 +341,7 @@ Redirecting the compilation output(s)
     :category:
 
     The ``-outputdir`` option is shorthand for the combination of
-    :ghc-flag:`-odir ⟨dir⟩`, :ghc-flag:`-hidir ⟨dir⟩`, :ghc-flag:`-hiedir ⟨dir⟩`, 
+    :ghc-flag:`-odir ⟨dir⟩`, :ghc-flag:`-hidir ⟨dir⟩`, :ghc-flag:`-hiedir ⟨dir⟩`,
     :ghc-flag:`-stubdir ⟨dir⟩` and :ghc-flag:`-dumpdir ⟨dir⟩`.
 
 .. ghc-flag:: -osuf ⟨suffix⟩

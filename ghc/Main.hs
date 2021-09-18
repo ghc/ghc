@@ -310,6 +310,11 @@ checkOptions mode dflags srcs objs = do
         then throwGhcException (UsageError "-ohi can only be used when compiling a single source file")
         else do
 
+   if (isJust (dynOutputHi dflags) &&
+      (isCompManagerMode mode || srcs `lengthExceeds` 1))
+     then throwGhcException (UsageError "-dynohi can only be used when compiling a single source file")
+     else do
+
         -- -o sanity checking
    if (srcs `lengthExceeds` 1 && isJust (outputFile dflags)
          && not (isLinkMode mode))

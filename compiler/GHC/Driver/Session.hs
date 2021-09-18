@@ -39,7 +39,7 @@ module GHC.Driver.Session (
         xopt_FieldSelectors,
         lang_set,
         DynamicTooState(..), dynamicTooState, setDynamicNow, setDynamicTooFailed,
-        dynamicOutputFile,
+        dynamicOutputFile, dynamicOutputHi,
         sccProfilingEnabled,
         DynFlags(..),
         outputFile, hiSuf, objectSuf, ways,
@@ -540,6 +540,7 @@ data DynFlags = DynFlags {
   outputFile_           :: Maybe String,
   dynOutputFile_        :: Maybe String,
   outputHi              :: Maybe String,
+  dynOutputHi           :: Maybe String,
   dynLibLoader          :: DynLibLoader,
 
   dynamicNow            :: !Bool, -- ^ Indicate if we are now generating dynamic output
@@ -1065,9 +1066,10 @@ setDynamicTooFailed dflags =
 
 -- | Compute the path of the dynamic object corresponding to an object file.
 dynamicOutputFile :: DynFlags -> FilePath -> FilePath
-dynamicOutputFile dflags outputFile = dynOut outputFile
-  where
-    dynOut = flip addExtension (dynObjectSuf_ dflags) . dropExtension
+dynamicOutputFile dflags outputFile = outputFile -<.> dynObjectSuf_ dflags
+
+dynamicOutputHi :: DynFlags -> FilePath -> FilePath
+dynamicOutputHi dflags hi = hi -<.> dynHiSuf_ dflags
 
 -----------------------------------------------------------------------------
 
@@ -1185,6 +1187,7 @@ defaultDynFlags mySettings llvmConfig =
         outputFile_             = Nothing,
         dynOutputFile_          = Nothing,
         outputHi                = Nothing,
+        dynOutputHi             = Nothing,
         dynLibLoader            = SystemDependent,
         dumpPrefix              = Nothing,
         dumpPrefixForce         = Nothing,
@@ -1689,7 +1692,7 @@ setObjectDir, setHiDir, setHieDir, setStubDir, setDumpDir, setOutputDir,
          addCmdlineFramework, addHaddockOpts, addGhciScript,
          setInteractivePrint
    :: String -> DynFlags -> DynFlags
-setOutputFile, setDynOutputFile, setOutputHi, setDumpPrefixForce
+setOutputFile, setDynOutputFile, setOutputHi, setDynOutputHi, setDumpPrefixForce
    :: Maybe String -> DynFlags -> DynFlags
 
 setObjectDir  f d = d { objectDir  = Just f}
@@ -1718,6 +1721,7 @@ setHcSuf        f d = d { hcSuf         = f}
 setOutputFile    f d = d { outputFile_    = f}
 setDynOutputFile f d = d { dynOutputFile_ = f}
 setOutputHi      f d = d { outputHi       = f}
+setDynOutputHi   f d = d { dynOutputHi    = f}
 
 parseUnitInsts :: String -> Instantiations
 parseUnitInsts str = case filter ((=="").snd) (readP_to_S parse str) of
@@ -2209,6 +2213,8 @@ dynamic_flags_deps = [
         (sepArg (setDynOutputFile . Just))
   , make_ord_flag defGhcFlag "ohi"
         (hasArg (setOutputHi . Just ))
+  , make_ord_flag defGhcFlag "dynohi"
+        (hasArg (setDynOutputHi . Just ))
   , make_ord_flag defGhcFlag "osuf"              (hasArg setObjectSuf)
   , make_ord_flag defGhcFlag "dynosuf"           (hasArg setDynObjectSuf)
   , make_ord_flag defGhcFlag "hcsuf"             (hasArg setHcSuf)
