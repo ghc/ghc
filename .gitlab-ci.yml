@@ -560,13 +560,15 @@ validate-x86_64-darwin:
     CPUS: 8
     LANG: "en_US.UTF-8"
     # WARNING: this is overridden in the shell.nix, see shell.nix!
-    CONFIGURE_ARGS: "--with-intree-gmp --with-iconv-libraries=/usr/lib --with-iconv-includes=/usr/include"
+    CONFIGURE_ARGS: "--with-intree-gmp --with-system-libffi"
     HADRIAN_ARGS: "--docs=no-sphinx"
     TEST_ENV: "x86_64-darwin-hadrian"
     BIN_DIST_NAME: "ghc-amd64-apple-darwin"
     BUILD_FLAVOUR: "validate"
     # Due to #19025
     IGNORE_PERF_FAILURES: "all"
+    # Capi_Ctype_001 Capi_Ctype_002 T12010 T14923 T16737 T20199 bkpreex03 cc017 section_alignment: Due to #
+    BROKEN_TESTS: "Capi_Ctype_001 Capi_Ctype_002 T12010 T14923 T16737 T20199 bkpreex03 cc017"
   after_script:
     - .gitlab/ci.sh clean
     - cat ci-timings
@@ -574,6 +576,10 @@ validate-x86_64-darwin:
   script: |
     nix build -f .gitlab/darwin/toolchain.nix --argstr system x86_64-darwin -o toolchain.sh
     source toolchain.sh
+    cat toolchain.sh
+
+    sdk_path="$(xcrun --sdk macosx --show-sdk-path)"
+    CONFIGURE_ARGS="$CONFIGURE_ARGS --with-ffi-libraries=$sdk_path/usr/lib --with-ffi-includes=$sdk_path/usr/include/ffi"
 
     # fix up config.sub in libraries for the time.
     # aarch64-darwin is not supported in older config.sub's
@@ -610,7 +616,7 @@ validate-aarch64-darwin:
     CPUS: 8
     LANG: "en_US.UTF-8"
     # WARNING: this is overridden in the shell.nix, see shell.nix!
-    CONFIGURE_ARGS: "--with-intree-gmp --with-iconv-libraries=/usr/lib --with-iconv-includes=/usr/include"
+    CONFIGURE_ARGS: "--with-intree-gmp --with-system-libffi"
     HADRIAN_ARGS: "--docs=no-sphinx"
     BIN_DIST_NAME: "ghc-arm64-apple-darwin"
     TEST_ENV: "aarch64-darwin-hadrian"
@@ -624,6 +630,10 @@ validate-aarch64-darwin:
   script: |
     nix build -f .gitlab/darwin/toolchain.nix --argstr system aarch64-darwin -o toolchain.sh
     source toolchain.sh
+    cat toolchain.sh
+
+    sdk_path="$(xcrun --sdk macosx --show-sdk-path)"
+    CONFIGURE_ARGS="$CONFIGURE_ARGS --with-ffi-libraries=$sdk_path/usr/lib --with-ffi-includes=$sdk_path/usr/include/ffi"
 
     # fix up config.sub in libraries for the time.
     # aarch64-darwin is not supported in older config.sub's
