@@ -6,7 +6,7 @@ test('unsigned_reloc_macho_x64',
          unless(opsys('darwin'), skip),
          unless(arch('x86_64'), skip)
      ],
-     run_command, ['$MAKE -s --no-print-directory unsigned_reloc_macho_x64'])
+     makefile_test, [])
 
 ######################################
 test('section_alignment',
@@ -14,7 +14,7 @@ test('section_alignment',
          extra_files(['runner.c', 'section_alignment.c']),
          unless(opsys('darwin'), expect_broken(13624))
      ],
-     run_command, ['$MAKE -s --no-print-directory section_alignment'])
+     makefile_test, [])
 
 ######################################
 # Test to see if linker scripts link properly to real ELF files
