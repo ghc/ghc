@@ -149,8 +149,10 @@ infix  4 `elem`, `notElem`
 -- >             | Node (Tree a) a (Tree a)
 -- >     deriving Foldable
 --
--- A more detailed description can be found in the overview section of
+-- A more detailed description can be found in the __Overview__ section of
 -- "Data.Foldable#overview".
+--
+-- For the class laws see the __Laws__ section of "Data.Foldable#laws".
 --
 class Foldable t where
     {-# MINIMAL foldMap | foldr #-}
@@ -1517,11 +1519,12 @@ elements in a single pass.
 -- == Left and right folds
 --
 -- #leftright#
--- Merging the contribution of the current element with an accumulator value
--- from a partial result is performed by an /operator/ function, either
--- explicitly provided by the caller as in `foldr`, implicit count as in
--- `length`, or partly implicit as in `foldMap` (where each element is mapped
--- into a 'Monoid', and the monoid's `mappend` operator performs the merge).
+-- The contribution of each element to the final result is combined with an
+-- accumulator via an /operator/ function.  The operator may be explicitly
+-- provided by the caller as with `foldr` or may be implicit as in `length`.
+-- In the case of `foldMap`, the caller provides a function mapping each
+-- element into a suitable 'Monoid', which makes it possible to merge the
+-- per-element contributions via that monoid's `mappend` function.
 --
 -- A key distinction is between left-associative and right-associative
 -- folds:
@@ -1985,10 +1988,10 @@ elements in a single pass.
 -- They do have specialised uses, but are best avoided when in doubt.
 --
 -- @
--- 'foldr'' :: (a -> b -> b) -> b -> t a -> b
--- `foldl` :: (b -> a -> b) -> b -> t a -> b
--- `foldl1` :: (a -> a -> a) -> t a -> a
--- `foldrM` :: (Foldable t, Monad m) => (a -> b -> m b) -> b -> t a -> m b
+-- 'foldr'' :: Foldable t => (a -> b -> b) -> b -> t a -> b
+-- 'foldl'  :: Foldable t => (b -> a -> b) -> b -> t a -> b
+-- 'foldl1' :: Foldable t => (a -> a -> a) -> t a -> a
+-- 'foldrM' :: (Foldable t, Monad m) => (a -> b -> m b) -> b -> t a -> m b
 -- @
 --
 -- The lazy left-folds (used corecursively) and 'foldrM' (used to sequence
@@ -2128,9 +2131,9 @@ elements in a single pass.
 --
 -- > f' x k = \ z -> z `seq` k (f z x)
 --
--- We see that a lazy 'foldr' of the @g e@ endomorphisms, with @f'@ as as the
--- operator, in fact yields a strict left fold, that avoids building a
--- deep chain of intermediate thunks:
+-- We see that a lazy 'foldr' combining the @g e :: b -> b@ terms, with @f'@ as
+-- as the operator evaluated at the base case `z0` yields a strict left fold
+-- that avoids building a deep chain of intermediate thunks:
 --
 -- > foldl' f z0 xs = foldr f' id xs z0
 -- >   where f' x k = \ z -> z `seq` k (f z x)
@@ -2338,6 +2341,7 @@ elements in a single pass.
 --------------
 
 -- $laws
+-- #laws#
 --
 -- @Foldable@ instances are expected to satisfy the following laws:
 --
@@ -2358,7 +2362,7 @@ elements in a single pass.
 -- but are generally more efficient when defined more directly as:
 --
 -- > sum = foldl' (+) 0
--- > sum = foldl' (*) 1
+-- > product = foldl' (*) 1
 --
 -- If the type is also a 'Functor' instance, it should satisfy
 --
