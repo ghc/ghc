@@ -845,7 +845,7 @@ dropWhile p xs@(x:xs')
             | otherwise =  xs
 
 -- | 'take' @n@, applied to a list @xs@, returns the prefix of @xs@
--- of length @n@, or @xs@ itself if @n > 'length' xs@.
+-- of length @n@, or @xs@ itself if @n >= 'length' xs@.
 --
 -- >>> take 5 "Hello World!"
 -- "Hello"
@@ -918,7 +918,7 @@ takeFB c n x xs
 #endif
 
 -- | 'drop' @n xs@ returns the suffix of @xs@
--- after the first @n@ elements, or @[]@ if @n > 'length' xs@.
+-- after the first @n@ elements, or @[]@ if @n >= 'length' xs@.
 --
 -- >>> drop 6 "Hello World!"
 -- "World!"
