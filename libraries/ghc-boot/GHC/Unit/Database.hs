@@ -88,8 +88,9 @@ import Control.Exception as Exception
 import Control.Monad (when)
 import System.FilePath as FilePath
 #if !defined(mingw32_HOST_OS)
+import Data.Bits ((.|.))
 import System.Posix.Files
-import GHC.IO.Exception (ioe_type, IOErrorType(NoSuchThing))
+import System.Posix.Types (FileMode)
 #endif
 import System.IO
 import System.IO.Error
@@ -413,8 +414,14 @@ readPackageDbForGhcPkg file mode =
 -- | Write the whole of the package DB, both parts.
 --
 writePackageDb :: Binary pkgs => FilePath -> [DbUnitInfo] -> pkgs -> IO ()
-writePackageDb file ghcPkgs ghcPkgPart =
+writePackageDb file ghcPkgs ghcPkgPart = do
   writeFileAtomic file (runPut putDbForGhcPkg)
+#if !defined(mingw32_HOST_OS)
+  addFileMode file 0o444
+  --  ^ In case the current umask is too restrictive force all read bits to
+  --  allow access.
+#endif
+  return ()
   where
     putDbForGhcPkg = do
         putHeader
@@ -425,6 +432,13 @@ writePackageDb file ghcPkgs ghcPkgPart =
         ghcPartLen :: Word32
         ghcPartLen = fromIntegral (BS.Lazy.length ghcPart)
         ghcPart    = encode ghcPkgs
+
+#if !defined(mingw32_HOST_OS)
+addFileMode :: FilePath -> FileMode -> IO ()
+addFileMode file m = do
+  o <- fileMode <$> getFileStatus file
+  setFileMode file (m .|. o)
+#endif
 
 getHeader :: Get (Word32, Word32)
 getHeader = do
@@ -508,26 +522,6 @@ decodeFromFile file mode decoder = case mode of
 -- Copied from Cabal's Distribution.Simple.Utils.
 writeFileAtomic :: FilePath -> BS.Lazy.ByteString -> IO ()
 writeFileAtomic targetPath content = do
-  -- Figure out how to update the file mode after we create the temporary file
-  let no_update _path = return ()
-#if !defined(mingw32_HOST_OS)
-  let on_error ioe =
-          -- If the file doesn't yet exist then just use the default owner and
-          -- mode.
-          case ioe_type ioe of
-            NoSuchThing -> return no_update
-            _ -> ioError ioe
-  let handleIO :: (IOException -> IO a) -> IO a -> IO a
-      handleIO = flip catch
-  set_metadata <- handleIO on_error $ do
-      status <- getFileStatus targetPath
-      return $ \path -> do
-        setFileMode path (fileMode status)
-        setOwnerAndGroup path (fileOwner status) (fileGroup status)
-#else
-  let set_metadata = no_update
-#endif
-
   let (targetDir, targetFile) = splitFileName targetPath
   Exception.bracketOnError
     (openBinaryTempFileWithDefaultPermissions targetDir $ targetFile <.> "tmp")
@@ -535,7 +529,6 @@ writeFileAtomic targetPath content = do
     (\(tmpPath, handle) -> do
         BS.Lazy.hPut handle content
         hClose handle
-        set_metadata tmpPath
         renameFile tmpPath targetPath)
 
 instance Binary DbUnitInfo where
