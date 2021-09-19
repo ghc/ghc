@@ -217,6 +217,7 @@ platformCConvNeedsExtension :: Platform -> Bool
 platformCConvNeedsExtension platform = case platformArch platform of
   ArchPPC_64 _ -> True
   ArchS390X    -> True
+  ArchRISCV64  -> True
   _            -> False
 
 
