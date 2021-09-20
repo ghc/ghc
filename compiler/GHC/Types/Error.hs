@@ -41,6 +41,7 @@ module GHC.Types.Error
    , suggestExtensionsWithInfo
    , suggestAnyExtension
    , suggestAnyExtensionWithInfo
+   , useExtensionInOrderTo
    , noHints
 
     -- * Rendering Messages

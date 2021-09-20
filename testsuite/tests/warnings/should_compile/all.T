@@ -46,3 +46,4 @@ test('T19564d', normal, compile, [''])
 # Also, suppress uniques as one of the warnings is unstable in CI, otherwise.
 test('T19296', normal, compile, ['-fdiagnostics-show-caret -Wredundant-constraints -dsuppress-uniques'])
 test('DodgyExports01', normal, compile, ['-Wdodgy-exports'])
+test('DerivingTypeable', normal, compile, ['-Wderiving-typeable'])

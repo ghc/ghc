@@ -8,5 +8,5 @@ T13324_fail2.hs:7:1: error:
 T13324_fail2.hs:11:1: error:
     • Can't make a derived instance of ‘Eq (T a)’:
         Constructor ‘MkT’ is a GADT
-        Possible fix: fill in the wildcard constraint yourself
     • In the stand-alone deriving instance for ‘_ => Eq (T a)’
+    Suggested fix: Fill in the wildcard constraint yourself

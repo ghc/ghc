@@ -5,3 +5,4 @@ T11509_1.hs:53:1: error:
         if DeriveAnyClass is enabled
     • In the stand-alone deriving instance for
         ‘(Typeable a, SC (Serializable a)) => SC (Serializable (MyList a))’
+    Suggested fix: Perhaps you intended to use DeriveAnyClass

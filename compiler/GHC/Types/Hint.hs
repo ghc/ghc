@@ -11,6 +11,7 @@ module GHC.Types.Hint (
   , suggestExtensionsWithInfo
   , suggestAnyExtension
   , suggestAnyExtensionWithInfo
+  , useExtensionInOrderTo
   ) where
 
 import GHC.Prelude
@@ -38,10 +39,16 @@ data AvailableBindings
   -- ^ An unknown binding (i.e. too complicated to turn into a 'Name')
 
 data LanguageExtensionHint
-  = -- | Suggest to enable the input extension. If the input 'SDoc'
-    -- is not empty, it will contain some extra information about the
-    -- why the extension is required, but it's totally irrelevant/redundant
-    -- for IDEs and other tools.
+  = -- | Suggest to enable the input extension. This is the hint that
+    -- GHC emits if this is not a \"known\" fix, i.e. this is GHC giving
+    -- its best guess on what extension might be necessary to make a
+    -- certain program compile. For example, GHC might suggests to
+    -- enable 'BlockArguments' when the user simply formatted incorrectly
+    -- the input program, so GHC here is trying to be as helpful as
+    -- possible.
+    -- If the input 'SDoc' is not empty, it will contain some extra
+    -- information about the why the extension is required, but
+    -- it's totally irrelevant/redundant for IDEs and other tools.
      SuggestSingleExtension !SDoc !LangExt.Extension
     -- | Suggest to enable the input extensions. The list
     -- is to be intended as /disjuctive/ i.e. the user is
@@ -57,6 +64,17 @@ data LanguageExtensionHint
     -- information about the why the extensions are required, but
     -- it's totally irrelevant/redundant for IDEs and other tools.
   | SuggestExtensions !SDoc [LangExt.Extension]
+    -- | Suggest to enable the input extension in order to fix
+    -- a certain problem. This is the suggestion that GHC emits when
+    -- is more-or-less clear \"what's going on\". For example, if
+    -- both 'DeriveAnyClass' and 'GeneralizedNewtypeDeriving' are
+    -- turned on, the right thing to do is to enabled 'DerivingStrategies',
+    -- so in contrast to 'SuggestSingleExtension' GHC will be a bit more
+    -- \"imperative\" (i.e. \"Use X Y Z in order to ... \").
+    -- If the input 'SDoc' is not empty, it will contain some extra
+    -- information about the why the extensions are required, but
+    -- it's totally irrelevant/redundant for IDEs and other tools.
+  | SuggestExtensionInOrderTo !SDoc !LangExt.Extension
 
 -- | Suggests a single extension without extra user info.
 suggestExtension :: LangExt.Extension -> GhcHint
@@ -81,6 +99,9 @@ suggestAnyExtension exts = SuggestExtension (SuggestAnyExtension empty exts)
 -- | Like 'suggestAnyExtension' but allows supplying extra info for the user.
 suggestAnyExtensionWithInfo :: SDoc -> [LangExt.Extension] -> GhcHint
 suggestAnyExtensionWithInfo extraInfo exts = SuggestExtension (SuggestAnyExtension extraInfo exts)
+
+useExtensionInOrderTo :: SDoc -> LangExt.Extension -> GhcHint
+useExtensionInOrderTo extraInfo ext = SuggestExtension (SuggestExtensionInOrderTo extraInfo ext)
 
 -- | A type for hints emitted by GHC.
 -- A /hint/ suggests a possible way to deal with a particular warning or error.
@@ -268,6 +289,25 @@ data GhcHint
                        typecheck/should_compile/T4912
     -}
   | SuggestFixOrphanInstance
+
+    {-| Suggests to use a standalone deriving declaration when GHC
+        can't derive a typeclass instance in a trivial way.
+
+        Triggered by: 'GHC.Tc.Errors.Types.DerivBadErrConstructor'
+        Test cases(s): typecheck/should_fail/tcfail086
+    -}
+  | SuggestAddStandaloneDerivation
+
+    {-| Suggests the user to fill in the wildcard constraint to
+        disambiguate which constraint that is.
+
+        Example:
+          deriving instance _ => Eq (Foo f a)
+
+        Triggered by: 'GHC.Tc.Errors.Types.DerivBadErrConstructor'
+        Test cases(s): partial-sigs/should_fail/T13324_fail2
+    -}
+  | SuggestFillInWildcardConstraint
 
 -- | An 'InstantiationSuggestion' for a '.hsig' file. This is generated
 -- by GHC in case of a 'DriverUnexpectedSignature' and suggests a way

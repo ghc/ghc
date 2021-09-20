@@ -13,6 +13,23 @@ module GHC.Tc.Errors.Types (
   , SuggestUndecidableInstances(..)
   , suggestUndecidableInstances
   , NotClosedReason(..)
+  , SuggestPartialTypeSignatures(..)
+  , suggestPartialTypeSignatures
+  , DeriveInstanceErrReason(..)
+  , UsingGeneralizedNewtypeDeriving(..)
+  , usingGeneralizedNewtypeDeriving
+  , DeriveAnyClassEnabled(..)
+  , deriveAnyClassEnabled
+  , DeriveInstanceBadConstructor(..)
+  , HasWildcard(..)
+  , hasWildcard
+  , DeriveGenericsErrReason(..)
+  , HasAssociatedDataFamInsts(..)
+  , hasAssociatedDataFamInsts
+  , AssociatedTyLastVarInKind(..)
+  , associatedTyLastVarInKind
+  , AssociatedTyNotParamOverLastTyVar(..)
+  , associatedTyNotParamOverLastTyVar
   ) where
 
 import GHC.Prelude
@@ -35,13 +52,15 @@ import GHC.Utils.Outputable
 import GHC.Core.Class (Class)
 import GHC.Core.Coercion.Axiom (CoAxBranch)
 import GHC.Core.ConLike (ConLike)
+import GHC.Core.DataCon (DataCon)
 import GHC.Core.FamInstEnv (FamInst)
 import GHC.Core.InstEnv (ClsInst)
 import GHC.Core.TyCon (TyCon, TyConFlavour)
-import GHC.Core.Type (Kind, Type, Var)
+import GHC.Core.Type (Kind, Type, Var, ThetaType, PredType)
 import GHC.Unit.State (UnitState)
 import GHC.Unit.Module.Name (ModuleName)
 import GHC.Types.Basic
+import qualified GHC.LanguageExtensions as LangExt
 
 import qualified Data.List.NonEmpty as NE
 import           Data.Typeable hiding (TyCon)
@@ -1231,6 +1250,129 @@ data TcRnMessage where
   -}
   TcRnStaticFormNotClosed :: Name -> NotClosedReason -> TcRnMessage
 
+  {-| TcRnUselessTypeable is a warning (controlled by -Wderiving-typeable) that
+      occurs when trying to derive an instance of the 'Typeable' class. Deriving
+      'Typeable' is no longer necessary (hence the \"useless\") as all types
+      automatically derive 'Typeable' in modern GHC versions.
+
+      Example(s): None.
+
+     Test cases: warnings/should_compile/DerivingTypeable
+  -}
+  TcRnUselessTypeable :: TcRnMessage
+
+  {-| TcRnDerivingDefaults is a warning (controlled by -Wderiving-defaults) that
+      occurs when both 'DeriveAnyClass' and 'GeneralizedNewtypeDeriving' are
+      enabled, and therefore GHC defaults to 'DeriveAnyClass', which might not
+      be what the user wants.
+
+      Example(s): None.
+
+     Test cases: typecheck/should_compile/T15839a
+                 deriving/should_compile/T16179
+  -}
+  TcRnDerivingDefaults :: !Class -> TcRnMessage
+
+  {-| TcRnNonUnaryTypeclassConstraint is an error that occurs when GHC
+      encounters a non-unary constraint when trying to derive a typeclass.
+
+      Example(s):
+        class A
+        deriving instance A
+        data B deriving A  -- We cannot derive A, is not unary (i.e. 'class A a').
+
+     Test cases: deriving/should_fail/T7959
+                 deriving/should_fail/drvfail005
+                 deriving/should_fail/drvfail009
+                 deriving/should_fail/drvfail006
+  -}
+  TcRnNonUnaryTypeclassConstraint :: !(LHsSigType GhcRn) -> TcRnMessage
+
+  {-| TcRnPartialTypeSignatures is a warning (controlled by -Wpartial-type-signatures)
+      that occurs when a wildcard '_' is found in place of a type in a signature or a
+      type class derivation
+
+      Example(s):
+        foo :: _ -> Int
+        foo = ...
+
+        deriving instance _ => Eq (Foo a)
+
+     Test cases: dependent/should_compile/T11241
+                 dependent/should_compile/T15076
+                 dependent/should_compile/T14880-2
+                 typecheck/should_compile/T17024
+                 typecheck/should_compile/T10072
+                 partial-sigs/should_fail/TidyClash2
+                 partial-sigs/should_fail/Defaulting1MROff
+                 partial-sigs/should_fail/WildcardsInPatternAndExprSig
+                 partial-sigs/should_fail/T10615
+                 partial-sigs/should_fail/T14584a
+                 partial-sigs/should_fail/TidyClash
+                 partial-sigs/should_fail/T11122
+                 partial-sigs/should_fail/T14584
+                 partial-sigs/should_fail/T10045
+                 partial-sigs/should_fail/PartialTypeSignaturesDisabled
+                 partial-sigs/should_fail/T10999
+                 partial-sigs/should_fail/ExtraConstraintsWildcardInExpressionSignature
+                 partial-sigs/should_fail/ExtraConstraintsWildcardInPatternSplice
+                 partial-sigs/should_fail/WildcardInstantiations
+                 partial-sigs/should_run/T15415
+                 partial-sigs/should_compile/T10463
+                 partial-sigs/should_compile/T15039a
+                 partial-sigs/should_compile/T16728b
+                 partial-sigs/should_compile/T15039c
+                 partial-sigs/should_compile/T10438
+                 partial-sigs/should_compile/SplicesUsed
+                 partial-sigs/should_compile/T18008
+                 partial-sigs/should_compile/ExprSigLocal
+                 partial-sigs/should_compile/T11339a
+                 partial-sigs/should_compile/T11670
+                 partial-sigs/should_compile/WarningWildcardInstantiations
+                 partial-sigs/should_compile/T16728
+                 partial-sigs/should_compile/T12033
+                 partial-sigs/should_compile/T15039b
+                 partial-sigs/should_compile/T10403
+                 partial-sigs/should_compile/T11192
+                 partial-sigs/should_compile/T16728a
+                 partial-sigs/should_compile/TypedSplice
+                 partial-sigs/should_compile/T15039d
+                 partial-sigs/should_compile/T11016
+                 partial-sigs/should_compile/T13324_compile2
+                 linear/should_fail/LinearPartialSig
+                 polykinds/T14265
+                 polykinds/T14172
+  -}
+  TcRnPartialTypeSignatures :: !SuggestPartialTypeSignatures -> !ThetaType -> TcRnMessage
+
+  {-| TcRnCannotDeriveInstance is an error that occurs every time a typeclass instance
+      can't be derived. The 'DeriveInstanceErrReason' will contain the specific reason
+      this error arose.
+
+      Example(s): None.
+
+      Test cases: generics/T10604/T10604_no_PolyKinds
+                  deriving/should_fail/drvfail009
+                  deriving/should_fail/drvfail-functor2
+                  deriving/should_fail/T10598_fail3
+                  deriving/should_fail/deriving-via-fail2
+                  deriving/should_fail/deriving-via-fail
+                  deriving/should_fail/T16181
+  -}
+  TcRnCannotDeriveInstance :: !Class
+                           -- ^ The typeclass we are trying to derive
+                           -- an instance for
+                           -> [Type]
+                           -- ^ The typeclass arguments, if any.
+                           -> !(Maybe (DerivStrategy GhcTc))
+                           -- ^ The derivation strategy, if any.
+                           -> !UsingGeneralizedNewtypeDeriving
+                           -- ^ Is '-XGeneralizedNewtypeDeriving' enabled?
+                           -> !DeriveInstanceErrReason
+                           -- ^ The specific reason why we couldn't derive
+                           -- an instance for the class.
+                           -> TcRnMessage
+
 -- | Which parts of a record field are affected by a particular error or warning.
 data RecordFieldPart
   = RecordFieldConstructor !Name
@@ -1291,3 +1433,183 @@ suggestUndecidableInstances False = NoSuggestUndecidableInstaces
 data NotClosedReason = NotLetBoundReason
                      | NotTypeClosed VarSet
                      | NotClosed Name NotClosedReason
+
+data SuggestPartialTypeSignatures
+  = YesSuggestPartialTypeSignatures
+  | NoSuggestPartialTypeSignatures
+  deriving (Show, Eq)
+
+suggestPartialTypeSignatures :: Bool -> SuggestPartialTypeSignatures
+suggestPartialTypeSignatures True  = YesSuggestPartialTypeSignatures
+suggestPartialTypeSignatures False = NoSuggestPartialTypeSignatures
+
+data UsingGeneralizedNewtypeDeriving
+  = YesGeneralizedNewtypeDeriving
+  | NoGeneralizedNewtypeDeriving
+  deriving Eq
+
+usingGeneralizedNewtypeDeriving :: Bool -> UsingGeneralizedNewtypeDeriving
+usingGeneralizedNewtypeDeriving True  = YesGeneralizedNewtypeDeriving
+usingGeneralizedNewtypeDeriving False = NoGeneralizedNewtypeDeriving
+
+data DeriveAnyClassEnabled
+  = YesDeriveAnyClassEnabled
+  | NoDeriveAnyClassEnabled
+  deriving Eq
+
+deriveAnyClassEnabled :: Bool -> DeriveAnyClassEnabled
+deriveAnyClassEnabled True  = YesDeriveAnyClassEnabled
+deriveAnyClassEnabled False = NoDeriveAnyClassEnabled
+
+-- | Why a particular typeclass instance couldn't be derived.
+data DeriveInstanceErrReason
+  =
+    -- | The typeclass instance is not well-kinded.
+    DerivErrNotWellKinded !TyCon
+                          -- ^ The type constructor that occurs in
+                          -- the typeclass instance declaration.
+                          !Kind
+                          -- ^ The typeclass kind.
+                          !Int
+                          -- ^ The number of typeclass arguments that GHC
+                          -- kept. See Note [tc_args and tycon arity] in
+                          -- GHC.Tc.Deriv.
+  -- | Generic instances can only be derived using the stock strategy
+  -- in Safe Haskell.
+  | DerivErrSafeHaskellGenericInst
+  | DerivErrDerivingViaWrongKind !Kind !Type !Kind
+  | DerivErrNoEtaReduce !Type
+                        -- ^ The instance type
+  -- | We cannot derive instances in boot files
+  | DerivErrBootFileFound
+  | DerivErrDataConsNotAllInScope !TyCon
+  -- | We cannot use GND on non-newtype types
+  | DerivErrGNDUsedOnData
+  -- | We cannot derive instances of nullary classes
+  | DerivErrNullaryClasses
+  -- | Last arg must be newtype or data application
+  | DerivErrLastArgMustBeApp
+  | DerivErrNoFamilyInstance !TyCon [Type]
+  | DerivErrNotStockDeriveable !DeriveAnyClassEnabled
+  | DerivErrHasAssociatedDatatypes !HasAssociatedDataFamInsts
+                                   !AssociatedTyLastVarInKind
+                                   !AssociatedTyNotParamOverLastTyVar
+  | DerivErrNewtypeNonDeriveableClass
+  | DerivErrCannotEtaReduceEnough !Bool -- Is eta-reduction OK?
+  | DerivErrOnlyAnyClassDeriveable !TyCon
+                                   -- ^ Type constructor for which the instance
+                                   -- is requested
+                                   !DeriveAnyClassEnabled
+                                   -- ^ Whether or not -XDeriveAnyClass is enabled
+                                   -- already.
+  -- | Stock deriving won't work, but perhas DeriveAnyClass will.
+  | DerivErrNotDeriveable !DeriveAnyClassEnabled
+  -- | The given 'PredType' is not a class.
+  | DerivErrNotAClass !PredType
+  -- | The given (representation of the) 'TyCon' has no
+  -- data constructors.
+  | DerivErrNoConstructors !TyCon
+  | DerivErrLangExtRequired !LangExt.Extension
+  -- | GHC simply doesn't how to how derive the input 'Class' for the given
+  -- 'Type'.
+  | DerivErrDunnoHowToDeriveForType !Type
+  -- | The given 'TyCon' must be an enumeration.
+  -- See Note [Enumeration types] in GHC.Core.TyCon
+  | DerivErrMustBeEnumType !TyCon
+  -- | The given 'TyCon' must have /precisely/ one constructor.
+  | DerivErrMustHaveExactlyOneConstructor !TyCon
+  -- | The given data type must have some parameters.
+  | DerivErrMustHaveSomeParameters !TyCon
+  -- | The given data type must not have a class context.
+  | DerivErrMustNotHaveClassContext !TyCon !ThetaType
+  -- | We couldn't derive an instance for a particular data constructor
+  -- for a variety of reasons.
+  | DerivErrBadConstructor !(Maybe HasWildcard) [DeriveInstanceBadConstructor]
+  -- | We couldn't derive a 'Generic' instance for the given type for a
+  -- variety of reasons
+  | DerivErrGenerics [DeriveGenericsErrReason]
+  -- | We couldn't derive an instance either because the type was not an
+  -- enum type or because it did have more than one constructor.
+  | DerivErrEnumOrProduct !DeriveInstanceErrReason !DeriveInstanceErrReason
+
+data DeriveInstanceBadConstructor
+  =
+  -- | The given 'DataCon' must be truly polymorphic in the
+  -- last argument of the data type.
+    DerivErrBadConExistential !DataCon
+  -- | The given 'DataCon' must not use the type variable in a function argument"
+  | DerivErrBadConCovariant !DataCon
+  -- | The given 'DataCon' must not contain function types
+  | DerivErrBadConFunTypes !DataCon
+  -- | The given 'DataCon' must use the type variable only
+  -- as the last argument of a data type
+  | DerivErrBadConWrongArg !DataCon
+  -- | The given 'DataCon' is a GADT so we cannot directly
+  -- derive an istance for it.
+  | DerivErrBadConIsGADT !DataCon
+  -- | The given 'DataCon' has existentials type vars in its type.
+  | DerivErrBadConHasExistentials !DataCon
+  -- | The given 'DataCon' has constraints in its type.
+  | DerivErrBadConHasConstraints !DataCon
+  -- | The given 'DataCon' has a higher-rank type.
+  | DerivErrBadConHasHigherRankType !DataCon
+
+data DeriveGenericsErrReason
+  = -- | The type must not have some datatype context.
+    DerivErrGenericsMustNotHaveDatatypeContext !TyCon
+    -- | The data constructor must not have exotic unlifted
+    -- or polymorphic arguments.
+  | DerivErrGenericsMustNotHaveExoticArgs !DataCon
+    -- | The data constructor must be a vanilla constructor.
+  | DerivErrGenericsMustBeVanillaDataCon  !DataCon
+    -- | The type must have some type parameters.
+    -- check (d) from Note [Requirements for deriving Generic and Rep]
+    -- in GHC.Tc.Deriv.Generics.
+  | DerivErrGenericsMustHaveSomeTypeParams !TyCon
+    -- | The data constructor must not have existential arguments.
+  | DerivErrGenericsMustNotHaveExistentials !DataCon
+    -- | The derivation applies a type to an argument involving
+    -- the last parameter but the applied type is not of kind * -> *.
+  | DerivErrGenericsWrongArgKind !DataCon
+
+data HasWildcard
+  = YesHasWildcard
+  | NoHasWildcard
+  deriving Eq
+
+hasWildcard :: Bool -> HasWildcard
+hasWildcard True  = YesHasWildcard
+hasWildcard False = NoHasWildcard
+
+-- | A type representing whether or not the input type has associated data family instances.
+data HasAssociatedDataFamInsts
+  = YesHasAdfs
+  | NoHasAdfs
+  deriving Eq
+
+hasAssociatedDataFamInsts :: Bool -> HasAssociatedDataFamInsts
+hasAssociatedDataFamInsts True = YesHasAdfs
+hasAssociatedDataFamInsts False = NoHasAdfs
+
+-- | If 'YesAssocTyLastVarInKind', the associated type of a typeclass
+-- contains the last type variable of the class in a kind, which is not (yet) allowed
+-- by GHC.
+data AssociatedTyLastVarInKind
+  = YesAssocTyLastVarInKind !TyCon -- ^ The associated type family of the class
+  | NoAssocTyLastVarInKind
+  deriving Eq
+
+associatedTyLastVarInKind :: Maybe TyCon -> AssociatedTyLastVarInKind
+associatedTyLastVarInKind (Just tc) = YesAssocTyLastVarInKind tc
+associatedTyLastVarInKind Nothing   = NoAssocTyLastVarInKind
+
+-- | If 'NoAssociatedTyNotParamOverLastTyVar', the associated type of a
+-- typeclass is not parameterized over the last type variable of the class
+data AssociatedTyNotParamOverLastTyVar
+  = YesAssociatedTyNotParamOverLastTyVar !TyCon -- ^ The associated type family of the class
+  | NoAssociatedTyNotParamOverLastTyVar
+  deriving Eq
+
+associatedTyNotParamOverLastTyVar :: Maybe TyCon -> AssociatedTyNotParamOverLastTyVar
+associatedTyNotParamOverLastTyVar (Just tc) = YesAssociatedTyNotParamOverLastTyVar tc
+associatedTyNotParamOverLastTyVar Nothing   = NoAssociatedTyNotParamOverLastTyVar

@@ -5,8 +5,8 @@ GenCannotDoRep0_0.hs:6:14: warning: [-Wdeprecated-flags (in -Wdefault)]
 GenCannotDoRep0_0.hs:13:45: error:
     • Can't make a derived instance of ‘Generic Dynamic’:
         Constructor ‘Dynamic’ has existential type variables in its type
-        Possible fix: use a standalone deriving declaration instead
     • In the data declaration for ‘Dynamic’
+    Suggested fix: Use a standalone deriving declaration instead
 
 GenCannotDoRep0_0.hs:28:1: error:
     • Can't make a derived instance of ‘Generic (D Int a)’:
