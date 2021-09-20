@@ -1,7 +1,8 @@
 
 T7959.hs:5:1: error:
-    • Can't make a derived instance of ‘A’: Try enabling DeriveAnyClass
+    • Can't make a derived instance of ‘A’:
     • In the stand-alone deriving instance for ‘A’
+    Suggested fix: Perhaps you intended to use DeriveAnyClass
 
 T7959.hs:6:17: error:
     • ‘A’ is not a unary constraint, as expected by a deriving clause

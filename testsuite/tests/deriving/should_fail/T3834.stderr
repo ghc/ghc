@@ -2,5 +2,7 @@
 T3834.hs:9:1: error:
     • Can't make a derived instance of ‘C T’:
         ‘C’ is not a stock derivable class (Eq, Show, etc.)
-        Try GeneralizedNewtypeDeriving for GHC's newtype-deriving extension
     • In the stand-alone deriving instance for ‘C T’
+    Suggested fix:
+      Perhaps you intended to use GeneralizedNewtypeDeriving
+      for GHC's newtype-deriving extension

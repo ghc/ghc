@@ -1,0 +1,3 @@
+DerivingTypeable.hs:8:12: warning: [-Wderiving-typeable]
+     Deriving ‘Typeable’ has no effect: all types now auto-derive Typeable
+     In the data declaration for ‘Foo’

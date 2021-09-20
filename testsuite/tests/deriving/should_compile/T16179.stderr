@@ -2,5 +2,6 @@
 T16179.hs:7:30: warning: [-Wderiving-defaults (in -Wdefault)]
     • Both DeriveAnyClass and GeneralizedNewtypeDeriving are enabled
       Defaulting to the DeriveAnyClass strategy for instantiating C
-      Use DerivingStrategies to pick a different strategy
     • In the newtype declaration for ‘T’
+    Suggested fix:
+      Use DerivingStrategies to pick a different strategy

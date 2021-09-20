@@ -1,0 +1,7 @@
+
+T13324_compile2.hs:7:19: warning: [-Wpartial-type-signatures (in -Wdefault)]
+    • Found type wildcard ‘_’ standing for ‘Show a’
+    • In the instance declaration for ‘Show (Option a)’
+    Suggested fix:
+      Perhaps you intended to use PartialTypeSignatures
+      to use the inferred type

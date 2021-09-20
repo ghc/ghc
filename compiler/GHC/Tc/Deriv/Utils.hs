@@ -17,7 +17,6 @@ module GHC.Tc.Deriv.Utils (
         PredOrigin(..), ThetaOrigin(..), mkPredOrigin,
         mkThetaOrigin, mkThetaOriginFromPreds, substPredOrigin,
         checkOriginativeSideConditions, hasStockDeriving,
-        canDeriveAnyClass,
         std_class_via_coercible, non_coercible_class,
         newDerivClsInst, extendLocalInstEnv
     ) where
@@ -45,13 +44,13 @@ import GHC.Types.SrcLoc
 import GHC.Tc.Deriv.Generate
 import GHC.Tc.Deriv.Functor
 import GHC.Tc.Deriv.Generics
+import GHC.Tc.Errors.Types
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcType
 import GHC.Builtin.Names.TH (liftClassKey)
 import GHC.Core.TyCon
 import GHC.Core.Multiplicity
-import GHC.Core.TyCo.Ppr (pprSourceTyCon)
 import GHC.Core.Type
 import GHC.Utils.Misc
 import GHC.Types.Var.Set
@@ -432,9 +431,9 @@ data OriginativeDerivStatus
   = CanDeriveStock            -- Stock class, can derive
       (SrcSpan -> TyCon -> [Type] -> [Type]
                -> TcM (LHsBinds GhcPs, [LSig GhcPs], BagDerivStuff, [Name]))
-  | StockClassError SDoc      -- Stock class, but can't do it
+  | StockClassError !DeriveInstanceErrReason -- Stock class, but can't do it
   | CanDeriveAnyClass         -- See Note [Deriving any class]
-  | NonDerivableClass SDoc    -- Cannot derive with either stock or anyclass
+  | NonDerivableClass -- Cannot derive with either stock or anyclass
 
 -- A stock class is one either defined in the Haskell report or for which GHC
 -- otherwise knows how to generate code for (possibly requiring the use of a
@@ -561,8 +560,7 @@ function determines the criteria that needs to be met in order for a particular
 stock class to be able to be derived successfully.
 
 A class might be able to be used in a deriving clause if -XDeriveAnyClass
-is willing to support it. The canDeriveAnyClass function checks if this is the
-case.
+is willing to support it.
 -}
 
 hasStockDeriving
@@ -702,14 +700,15 @@ checkOriginativeSideConditions dflags deriv_ctxt cls cls_tys tc rep_tc
                    -- e.g. deriving( Eq s )
 
     -- ...if not, try falling back on DeriveAnyClass.
-  | NotValid err <- canDeriveAnyClass dflags
-  = NonDerivableClass err  -- Neither anyclass nor stock work
-
-  | otherwise
+  | xopt LangExt.DeriveAnyClass dflags
   = CanDeriveAnyClass   -- DeriveAnyClass should work
 
-classArgsErr :: Class -> [Type] -> SDoc
-classArgsErr cls cls_tys = quotes (ppr (mkClassPred cls cls_tys)) <+> text "is not a class"
+  | otherwise
+  = NonDerivableClass -- Neither anyclass nor stock work
+
+
+classArgsErr :: Class -> [Type] -> DeriveInstanceErrReason
+classArgsErr cls cls_tys = DerivErrNotAClass (mkClassPred cls cls_tys)
 
 -- Side conditions (whether the datatype must have at least one constructor,
 -- required language extensions, etc.) for using GHC's stock deriving
@@ -756,15 +755,6 @@ stockSideConditions deriv_ctxt cls
     cond_vanilla = cond_stdOK deriv_ctxt True
       -- Vanilla data constructors but allow no data cons or polytype arguments
 
-canDeriveAnyClass :: DynFlags -> Validity
--- IsValid: we can (try to) derive it via an empty instance declaration
--- NotValid s:  we can't, reason s
-canDeriveAnyClass dflags
-  | not (xopt LangExt.DeriveAnyClass dflags)
-  = NotValid (text "Try enabling DeriveAnyClass")
-  | otherwise
-  = IsValid   -- OK!
-
 type Condition
    = DynFlags
 
@@ -774,17 +764,10 @@ type Condition
   -> TyCon    -- ^ For data families, this is the representation 'TyCon'.
               -- Otherwise, this is the same as the other 'TyCon' argument.
 
-  -> Validity -- ^ 'IsValid' if deriving an instance for this 'TyCon' is
-              -- possible. Otherwise, it's @'NotValid' err@, where @err@
-              -- explains what went wrong.
-
-orCond :: Condition -> Condition -> Condition
-orCond c1 c2 dflags tc rep_tc
-  = case (c1 dflags tc rep_tc, c2 dflags tc rep_tc) of
-     (IsValid,    _)          -> IsValid    -- c1 succeeds
-     (_,          IsValid)    -> IsValid    -- c21 succeeds
-     (NotValid x, NotValid y) -> NotValid (x $$ text "  or" $$ y)
-                                            -- Both fail
+  -> Validity' DeriveInstanceErrReason
+     -- ^ 'IsValid' if deriving an instance for this 'TyCon' is
+     -- possible. Otherwise, it's @'NotValid' err@, where @err@
+     -- explains what went wrong.
 
 andCond :: Condition -> Condition -> Condition
 andCond c1 c2 dflags tc rep_tc
@@ -821,15 +804,14 @@ cond_stdOK
 cond_stdOK deriv_ctxt permissive dflags tc rep_tc
   = valid_ADT `andValid` valid_misc
   where
-    valid_ADT, valid_misc :: Validity
+    valid_ADT, valid_misc :: Validity' DeriveInstanceErrReason
     valid_ADT
       | isAlgTyCon tc || isDataFamilyTyCon tc
       = IsValid
       | otherwise
         -- Complain about functions, primitive types, and other tycons that
         -- stock deriving can't handle.
-      = NotValid $ text "The last argument of the instance must be a"
-               <+> text "data or newtype application"
+      = NotValid DerivErrLastArgMustBeApp
 
     valid_misc
       = case deriv_ctxt of
@@ -841,52 +823,62 @@ cond_stdOK deriv_ctxt permissive dflags tc rep_tc
            | null data_cons -- 1.
            , not permissive
            -> checkFlag LangExt.EmptyDataDeriving dflags tc rep_tc `orValid`
-              NotValid (no_cons_why rep_tc $$ empty_data_suggestion)
+              NotValid (no_cons_why rep_tc)
            | not (null con_whys)
-           -> NotValid (vcat con_whys $$ possible_fix_suggestion wildcard)
+           -> NotValid $ DerivErrBadConstructor (Just $ has_wildcard wildcard) con_whys
            | otherwise
            -> IsValid
 
-    empty_data_suggestion =
-      text "Use EmptyDataDeriving to enable deriving for empty data types"
-    possible_fix_suggestion wildcard
+    has_wildcard wildcard
       = case wildcard of
-          Just _ ->
-            text "Possible fix: fill in the wildcard constraint yourself"
-          Nothing ->
-            text "Possible fix: use a standalone deriving declaration instead"
+          Just _  -> YesHasWildcard
+          Nothing -> NoHasWildcard
     data_cons  = tyConDataCons rep_tc
     con_whys   = getInvalids (map check_con data_cons)
 
-    check_con :: DataCon -> Validity
+    check_con :: DataCon -> Validity' DeriveInstanceBadConstructor
     check_con con
       | not (null eq_spec) -- 2.
-      = bad "is a GADT"
+      = bad DerivErrBadConIsGADT
       | not (null ex_tvs) -- 3.
-      = bad "has existential type variables in its type"
+      = bad DerivErrBadConHasExistentials
       | not (null theta) -- 4.
-      = bad "has constraints in its type"
+      = bad DerivErrBadConHasConstraints
       | not (permissive || all isTauTy (map scaledThing $ dataConOrigArgTys con)) -- 5.
-      = bad "has a higher-rank type"
+      = bad DerivErrBadConHasHigherRankType
       | otherwise
       = IsValid
       where
         (_, ex_tvs, eq_spec, theta, _, _) = dataConFullSig con
-        bad msg = NotValid (badCon con (text msg))
+        bad mkErr = NotValid $ mkErr con
 
-no_cons_why :: TyCon -> SDoc
-no_cons_why rep_tc = quotes (pprSourceTyCon rep_tc) <+>
-                     text "must have at least one data constructor"
+no_cons_why :: TyCon -> DeriveInstanceErrReason
+no_cons_why = DerivErrNoConstructors
 
 cond_RepresentableOk :: Condition
-cond_RepresentableOk _ _ rep_tc = canDoGenerics rep_tc
+cond_RepresentableOk _ _ rep_tc =
+  case canDoGenerics rep_tc of
+    IsValid -> IsValid
+    NotValid generic_errs -> NotValid $ DerivErrGenerics generic_errs
 
 cond_Representable1Ok :: Condition
-cond_Representable1Ok _ _ rep_tc = canDoGenerics1 rep_tc
+cond_Representable1Ok _ _ rep_tc =
+  case canDoGenerics1 rep_tc of
+    IsValid -> IsValid
+    NotValid generic_errs -> NotValid $ DerivErrGenerics generic_errs
 
 cond_enumOrProduct :: Class -> Condition
 cond_enumOrProduct cls = cond_isEnumeration `orCond`
                          (cond_isProduct `andCond` cond_args cls)
+  where
+    orCond :: Condition -> Condition -> Condition
+    orCond c1 c2 dflags tc rep_tc
+      = case (c1 dflags tc rep_tc, c2 dflags tc rep_tc) of
+         (IsValid,    _)          -> IsValid    -- c1 succeeds
+         (_,          IsValid)    -> IsValid    -- c21 succeeds
+         (NotValid x, NotValid y) -> NotValid $ DerivErrEnumOrProduct x y
+                                                -- Both fail
+
 
 cond_args :: Class -> Condition
 -- ^ For some classes (eg 'Eq', 'Ord') we allow unlifted arg types
@@ -896,8 +888,7 @@ cond_args :: Class -> Condition
 cond_args cls _ _ rep_tc
   = case bad_args of
       []     -> IsValid
-      (ty:_) -> NotValid (hang (text "Don't know how to derive" <+> quotes (ppr cls))
-                             2 (text "for type" <+> quotes (ppr ty)))
+      (ty:_) -> NotValid $ DerivErrDunnoHowToDeriveForType ty
   where
     bad_args = [ arg_ty | con <- tyConDataCons rep_tc
                         , Scaled _ arg_ty <- dataConOrigArgTys con
@@ -919,20 +910,14 @@ cond_args cls _ _ rep_tc
 cond_isEnumeration :: Condition
 cond_isEnumeration _ _ rep_tc
   | isEnumerationTyCon rep_tc = IsValid
-  | otherwise                 = NotValid why
-  where
-    why = sep [ quotes (pprSourceTyCon rep_tc) <+>
-                  text "must be an enumeration type"
-              , text "(an enumeration consists of one or more nullary, non-GADT constructors)" ]
-                  -- See Note [Enumeration types] in GHC.Core.TyCon
+  | otherwise                 = NotValid $ DerivErrMustBeEnumType rep_tc
 
 cond_isProduct :: Condition
 cond_isProduct _ _ rep_tc
-  | Just _ <- tyConSingleDataCon_maybe rep_tc = IsValid
-  | otherwise                                 = NotValid why
-  where
-    why = quotes (pprSourceTyCon rep_tc) <+>
-          text "must have precisely one constructor"
+  | Just _ <- tyConSingleDataCon_maybe rep_tc
+  = IsValid
+  | otherwise
+  = NotValid $ DerivErrMustHaveExactlyOneConstructor rep_tc
 
 cond_functorOK :: Bool -> Bool -> Condition
 -- OK for Functor/Foldable/Traversable class
@@ -943,12 +928,10 @@ cond_functorOK :: Bool -> Bool -> Condition
 --            (e) no "stupid context" on data type
 cond_functorOK allowFunctions allowExQuantifiedLastTyVar _ _ rep_tc
   | null tc_tvs
-  = NotValid (text "Data type" <+> quotes (ppr rep_tc)
-              <+> text "must have some type parameters")
+  = NotValid $ DerivErrMustHaveSomeParameters rep_tc
 
   | not (null bad_stupid_theta)
-  = NotValid (text "Data type" <+> quotes (ppr rep_tc)
-              <+> text "must not have a class context:" <+> pprTheta bad_stupid_theta)
+  = NotValid $ DerivErrMustNotHaveClassContext rep_tc bad_stupid_theta
 
   | otherwise
   = allValid (map check_con data_cons)
@@ -962,7 +945,7 @@ cond_functorOK allowFunctions allowExQuantifiedLastTyVar _ _ rep_tc
     data_cons = tyConDataCons rep_tc
     check_con con = allValid (check_universal con : foldDataConArgs (ft_check con) con)
 
-    check_universal :: DataCon -> Validity
+    check_universal :: DataCon -> Validity' DeriveInstanceErrReason
     check_universal con
       | allowExQuantifiedLastTyVar
       = IsValid -- See Note [DeriveFoldable with ExistentialQuantification]
@@ -972,31 +955,26 @@ cond_functorOK allowFunctions allowExQuantifiedLastTyVar _ _ rep_tc
       , not (tv `elemVarSet` exactTyCoVarsOfTypes (dataConTheta con))
       = IsValid   -- See Note [Check that the type variable is truly universal]
       | otherwise
-      = NotValid (badCon con existential)
+      = NotValid $ DerivErrBadConstructor Nothing [DerivErrBadConExistential con]
 
-    ft_check :: DataCon -> FFoldType Validity
+    ft_check :: DataCon -> FFoldType (Validity' DeriveInstanceErrReason)
     ft_check con = FT { ft_triv = IsValid, ft_var = IsValid
-                      , ft_co_var = NotValid (badCon con covariant)
+                      , ft_co_var = NotValid $ DerivErrBadConstructor Nothing [DerivErrBadConCovariant con]
                       , ft_fun = \x y -> if allowFunctions then x `andValid` y
-                                                           else NotValid (badCon con functions)
+                                                           else NotValid $ DerivErrBadConstructor Nothing [DerivErrBadConFunTypes con]
                       , ft_tup = \_ xs  -> allValid xs
                       , ft_ty_app = \_ _ x -> x
-                      , ft_bad_app = NotValid (badCon con wrong_arg)
+                      , ft_bad_app = NotValid $ DerivErrBadConstructor Nothing [DerivErrBadConWrongArg con]
                       , ft_forall = \_ x   -> x }
 
-    existential = text "must be truly polymorphic in the last argument of the data type"
-    covariant   = text "must not use the type variable in a function argument"
-    functions   = text "must not contain function types"
-    wrong_arg   = text "must use the type variable only as the last argument of a data type"
 
 checkFlag :: LangExt.Extension -> Condition
 checkFlag flag dflags _ _
   | xopt flag dflags = IsValid
   | otherwise        = NotValid why
   where
-    why = text "You need " <> text flag_str
-          <+> text "to derive an instance for this class"
-    flag_str = case [ flagSpecName f | f <- xFlags , flagSpecFlag f == flag ] of
+    why = DerivErrLangExtRequired the_flag
+    the_flag = case [ flagSpecFlag f | f <- xFlags , flagSpecFlag f == flag ] of
                  [s]   -> s
                  other -> pprPanic "checkFlag" (ppr other)
 
@@ -1020,9 +998,6 @@ non_coercible_class cls
   = classKey cls `elem` ([ readClassKey, showClassKey, dataClassKey
                          , genClassKey, gen1ClassKey, typeableClassKey
                          , traversableClassKey, liftClassKey ])
-
-badCon :: DataCon -> SDoc -> SDoc
-badCon con msg = text "Constructor" <+> quotes (ppr con) <+> msg
 
 ------------------------------------------------------------------
 

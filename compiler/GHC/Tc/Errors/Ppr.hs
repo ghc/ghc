@@ -9,17 +9,24 @@ module GHC.Tc.Errors.Ppr (
 
 import GHC.Prelude
 
+import Data.Maybe (isJust)
+
+import GHC.Builtin.Names
 import GHC.Core.Class (Class(..))
 import GHC.Core.Coercion (pprCoAxBranchUser)
 import GHC.Core.Coercion.Axiom (coAxiomTyCon, coAxiomSingleBranch)
+import GHC.Core.DataCon (DataCon)
 import GHC.Core.FamInstEnv (famInstAxiom)
 import GHC.Core.InstEnv
-import GHC.Core.TyCo.Ppr (pprKind, pprParendType, pprType, pprWithTYPE, pprWithExplicitKindsWhen)
+import GHC.Core.TyCon (isNewTyCon)
+import GHC.Core.TyCo.Ppr (pprKind, pprParendType, pprType, pprWithTYPE,
+                          pprWithExplicitKindsWhen, pprTheta, pprClassPred, pprTypeApp,
+                          pprSourceTyCon)
 import GHC.Core.Type
 import GHC.Data.Bag
 import GHC.Tc.Errors.Types
 import GHC.Tc.Types.Rank (Rank(..))
-import GHC.Tc.Utils.TcType (TcType, tcSplitForAllTyVars)
+import GHC.Tc.Utils.TcType (TcType, tcSplitForAllTyVars, mkClassPred)
 import GHC.Types.Error
 import GHC.Types.FieldLabel (FieldLabelString, flIsOverloaded, flSelector)
 import GHC.Types.Id (isRecordSelector)
@@ -31,8 +38,8 @@ import GHC.Types.Var.Env (emptyTidyEnv)
 import GHC.Types.Var.Set (pprVarSet, pluralVarSet)
 import GHC.Driver.Flags
 import GHC.Hs
-import GHC.Utils.Outputable
 import GHC.Utils.Misc (capitalise)
+import GHC.Utils.Outputable
 import GHC.Unit.State (pprWithUnitState, UnitState)
 import qualified GHC.LanguageExtensions as LangExt
 import qualified Data.List.NonEmpty as NE
@@ -471,6 +478,29 @@ instance Diagnostic TcRnMessage where
                   NotClosed _ _ -> msg : causes reason
                   _   -> let (xs0, xs1) = splitAt 1 $ causes reason
                           in fmap (msg <+>) xs0 ++ xs1
+    TcRnUselessTypeable
+      -> mkSimpleDecorated $
+           text "Deriving" <+> quotes (ppr typeableClassName) <+>
+           text "has no effect: all types now auto-derive Typeable"
+    TcRnDerivingDefaults cls
+      -> mkSimpleDecorated $ sep
+                     [ text "Both DeriveAnyClass and"
+                       <+> text "GeneralizedNewtypeDeriving are enabled"
+                     , text "Defaulting to the DeriveAnyClass strategy"
+                       <+> text "for instantiating" <+> ppr cls
+                     ]
+    TcRnNonUnaryTypeclassConstraint ct
+      -> mkSimpleDecorated $
+           quotes (ppr ct)
+           <+> text "is not a unary constraint, as expected by a deriving clause"
+    TcRnPartialTypeSignatures _ theta
+      -> mkSimpleDecorated $
+           text "Found type wildcard" <+> quotes (char '_')
+                       <+> text "standing for" <+> quotes (pprTheta theta)
+    TcRnCannotDeriveInstance cls cls_tys mb_strat newtype_deriving reason
+      -> mkSimpleDecorated $
+           derivErrDiagnosticMessage cls cls_tys mb_strat newtype_deriving True reason
+
 
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -644,6 +674,43 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnStaticFormNotClosed{}
       -> ErrorWithoutFlag
+    TcRnUselessTypeable
+      -> WarningWithFlag Opt_WarnDerivingTypeable
+    TcRnDerivingDefaults{}
+      -> WarningWithFlag Opt_WarnDerivingDefaults
+    TcRnNonUnaryTypeclassConstraint{}
+      -> ErrorWithoutFlag
+    TcRnPartialTypeSignatures{}
+      -> WarningWithFlag Opt_WarnPartialTypeSignatures
+    TcRnCannotDeriveInstance _ _ _ _ rea
+      -> case rea of
+           DerivErrNotWellKinded{}                 -> ErrorWithoutFlag
+           DerivErrSafeHaskellGenericInst          -> ErrorWithoutFlag
+           DerivErrDerivingViaWrongKind{}          -> ErrorWithoutFlag
+           DerivErrNoEtaReduce{}                   -> ErrorWithoutFlag
+           DerivErrBootFileFound                   -> ErrorWithoutFlag
+           DerivErrDataConsNotAllInScope{}         -> ErrorWithoutFlag
+           DerivErrGNDUsedOnData                   -> ErrorWithoutFlag
+           DerivErrNullaryClasses                  -> ErrorWithoutFlag
+           DerivErrLastArgMustBeApp                -> ErrorWithoutFlag
+           DerivErrNoFamilyInstance{}              -> ErrorWithoutFlag
+           DerivErrNotStockDeriveable{}            -> ErrorWithoutFlag
+           DerivErrHasAssociatedDatatypes{}        -> ErrorWithoutFlag
+           DerivErrNewtypeNonDeriveableClass       -> ErrorWithoutFlag
+           DerivErrCannotEtaReduceEnough{}         -> ErrorWithoutFlag
+           DerivErrOnlyAnyClassDeriveable{}        -> ErrorWithoutFlag
+           DerivErrNotDeriveable{}                 -> ErrorWithoutFlag
+           DerivErrNotAClass{}                     -> ErrorWithoutFlag
+           DerivErrNoConstructors{}                -> ErrorWithoutFlag
+           DerivErrLangExtRequired{}               -> ErrorWithoutFlag
+           DerivErrDunnoHowToDeriveForType{}       -> ErrorWithoutFlag
+           DerivErrMustBeEnumType{}                -> ErrorWithoutFlag
+           DerivErrMustHaveExactlyOneConstructor{} -> ErrorWithoutFlag
+           DerivErrMustHaveSomeParameters{}        -> ErrorWithoutFlag
+           DerivErrMustNotHaveClassContext{}       -> ErrorWithoutFlag
+           DerivErrBadConstructor{}                -> ErrorWithoutFlag
+           DerivErrGenerics{}                      -> ErrorWithoutFlag
+           DerivErrEnumOrProduct{}                 -> ErrorWithoutFlag
 
   diagnosticHints = \case
     TcRnUnknownMessage m
@@ -833,6 +900,103 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnStaticFormNotClosed{}
       -> noHints
+    TcRnUselessTypeable
+      -> noHints
+    TcRnDerivingDefaults{}
+      -> [useDerivingStrategies]
+    TcRnNonUnaryTypeclassConstraint{}
+      -> noHints
+    TcRnPartialTypeSignatures suggestParSig _
+      -> case suggestParSig of
+           YesSuggestPartialTypeSignatures
+             -> let info = text "to use the inferred type"
+                in [suggestExtensionWithInfo info LangExt.PartialTypeSignatures]
+           NoSuggestPartialTypeSignatures
+             -> noHints
+    TcRnCannotDeriveInstance cls _ _ newtype_deriving rea
+      -> deriveInstanceErrReasonHints cls newtype_deriving rea
+
+
+deriveInstanceErrReasonHints :: Class
+                             -> UsingGeneralizedNewtypeDeriving
+                             -> DeriveInstanceErrReason
+                             -> [GhcHint]
+deriveInstanceErrReasonHints cls newtype_deriving = \case
+  DerivErrNotWellKinded _ _ n_args_to_keep
+    | cls `hasKey` gen1ClassKey && n_args_to_keep >= 0
+    -> [suggestExtension LangExt.PolyKinds]
+    | otherwise
+    -> noHints
+  DerivErrSafeHaskellGenericInst  -> noHints
+  DerivErrDerivingViaWrongKind{}  -> noHints
+  DerivErrNoEtaReduce{}           -> noHints
+  DerivErrBootFileFound           -> noHints
+  DerivErrDataConsNotAllInScope{} -> noHints
+  DerivErrGNDUsedOnData           -> noHints
+  DerivErrNullaryClasses          -> noHints
+  DerivErrLastArgMustBeApp        -> noHints
+  DerivErrNoFamilyInstance{}      -> noHints
+  DerivErrNotStockDeriveable deriveAnyClassEnabled
+    | deriveAnyClassEnabled == NoDeriveAnyClassEnabled
+    -> [suggestExtension LangExt.DeriveAnyClass]
+    | otherwise
+    -> noHints
+  DerivErrHasAssociatedDatatypes{}
+    -> noHints
+  DerivErrNewtypeNonDeriveableClass
+    | newtype_deriving == NoGeneralizedNewtypeDeriving
+    -> [useGND]
+    | otherwise
+    -> noHints
+  DerivErrCannotEtaReduceEnough{}
+    | newtype_deriving == NoGeneralizedNewtypeDeriving
+    -> [useGND]
+    | otherwise
+    -> noHints
+  DerivErrOnlyAnyClassDeriveable _ deriveAnyClassEnabled
+    | deriveAnyClassEnabled == NoDeriveAnyClassEnabled
+    -> [suggestExtension LangExt.DeriveAnyClass]
+    | otherwise
+    -> noHints
+  DerivErrNotDeriveable deriveAnyClassEnabled
+    | deriveAnyClassEnabled == NoDeriveAnyClassEnabled
+    -> [suggestExtension LangExt.DeriveAnyClass]
+    | otherwise
+    -> noHints
+  DerivErrNotAClass{}
+    -> noHints
+  DerivErrNoConstructors{}
+    -> let info = text "to enable deriving for empty data types"
+       in [useExtensionInOrderTo info LangExt.EmptyDataDeriving]
+  DerivErrLangExtRequired{}
+    -- This is a slightly weird corner case of GHC: we are failing
+    -- to derive a typeclass instance because a particular 'Extension'
+    -- is not enabled (and so we report in the main error), but here
+    -- we don't want to /repeat/ to enable the extension in the hint.
+    -> noHints
+  DerivErrDunnoHowToDeriveForType{}
+    -> noHints
+  DerivErrMustBeEnumType rep_tc
+    -- We want to suggest GND only if this /is/ a newtype.
+    | newtype_deriving == NoGeneralizedNewtypeDeriving && isNewTyCon rep_tc
+    -> [useGND]
+    | otherwise
+    -> noHints
+  DerivErrMustHaveExactlyOneConstructor{}
+    -> noHints
+  DerivErrMustHaveSomeParameters{}
+    -> noHints
+  DerivErrMustNotHaveClassContext{}
+    -> noHints
+  DerivErrBadConstructor wcard _
+    -> case wcard of
+         Nothing        -> noHints
+         Just YesHasWildcard -> [SuggestFillInWildcardConstraint]
+         Just NoHasWildcard  -> [SuggestAddStandaloneDerivation]
+  DerivErrGenerics{}
+    -> noHints
+  DerivErrEnumOrProduct{}
+    -> noHints
 
 messageWithInfoDiagnosticMessage :: UnitState
                                  -> ErrInfo
@@ -919,3 +1083,210 @@ formatExportItemError exportedThing reason =
   hsep [ text "The export item"
        , quotes exportedThing
        , text reason ]
+
+useDerivingStrategies :: GhcHint
+useDerivingStrategies =
+  useExtensionInOrderTo (text "to pick a different strategy") LangExt.DerivingStrategies
+
+useGND :: GhcHint
+useGND = let info = text "for GHC's" <+> text "newtype-deriving extension"
+         in suggestExtensionWithInfo info LangExt.GeneralizedNewtypeDeriving
+
+cannotMakeDerivedInstanceHerald :: Class
+                                -> [Type]
+                                -> Maybe (DerivStrategy GhcTc)
+                                -> UsingGeneralizedNewtypeDeriving
+                                -> Bool -- ^ If False, only prints the why.
+                                -> SDoc
+                                -> SDoc
+cannotMakeDerivedInstanceHerald cls cls_args mb_strat newtype_deriving pprHerald why =
+  if pprHerald
+     then sep [(hang (text "Can't make a derived instance of")
+                   2 (quotes (ppr pred) <+> via_mechanism)
+                $$ nest 2 extra) <> colon,
+               nest 2 why]
+      else why
+  where
+    strat_used = isJust mb_strat
+    extra | not strat_used, (newtype_deriving == YesGeneralizedNewtypeDeriving)
+          = text "(even with cunning GeneralizedNewtypeDeriving)"
+          | otherwise = empty
+    pred = mkClassPred cls cls_args
+    via_mechanism | strat_used
+                  , Just strat <- mb_strat
+                  = text "with the" <+> (derivStrategyName strat) <+> text "strategy"
+                  | otherwise
+                  = empty
+
+badCon :: DataCon -> SDoc -> SDoc
+badCon con msg = text "Constructor" <+> quotes (ppr con) <+> msg
+
+derivErrDiagnosticMessage :: Class
+                          -> [Type]
+                          -> Maybe (DerivStrategy GhcTc)
+                          -> UsingGeneralizedNewtypeDeriving
+                          -> Bool -- If True, includes the herald \"can't make a derived..\"
+                          -> DeriveInstanceErrReason
+                          -> SDoc
+derivErrDiagnosticMessage cls cls_tys mb_strat newtype_deriving pprHerald = \case
+  DerivErrNotWellKinded tc cls_kind _
+    -> sep [ hang (text "Cannot derive well-kinded instance of form"
+                         <+> quotes (pprClassPred cls cls_tys
+                                       <+> parens (ppr tc <+> text "...")))
+                  2 empty
+           , nest 2 (text "Class" <+> quotes (ppr cls)
+                         <+> text "expects an argument of kind"
+                         <+> quotes (pprKind cls_kind))
+           ]
+  DerivErrSafeHaskellGenericInst
+    ->     text "Generic instances can only be derived in"
+       <+> text "Safe Haskell using the stock strategy."
+  DerivErrDerivingViaWrongKind cls_kind via_ty via_kind
+    -> hang (text "Cannot derive instance via" <+> quotes (pprType via_ty))
+          2 (text "Class" <+> quotes (ppr cls)
+                  <+> text "expects an argument of kind"
+                  <+> quotes (pprKind cls_kind) <> char ','
+         $+$ text "but" <+> quotes (pprType via_ty)
+                  <+> text "has kind" <+> quotes (pprKind via_kind))
+  DerivErrNoEtaReduce inst_ty
+    -> sep [text "Cannot eta-reduce to an instance of form",
+            nest 2 (text "instance (...) =>"
+                   <+> pprClassPred cls (cls_tys ++ [inst_ty]))]
+  DerivErrBootFileFound
+    -> cannotMakeDerivedInstanceHerald cls cls_tys mb_strat newtype_deriving pprHerald
+         (text "Cannot derive instances in hs-boot files"
+          $+$ text "Write an instance declaration instead")
+  DerivErrDataConsNotAllInScope tc
+    -> cannotMakeDerivedInstanceHerald cls cls_tys mb_strat newtype_deriving pprHerald
+         (hang (text "The data constructors of" <+> quotes (ppr tc) <+> text "are not all in scope")
+            2 (text "so you cannot derive an instance for it"))
+  DerivErrGNDUsedOnData
+    -> cannotMakeDerivedInstanceHerald cls cls_tys mb_strat newtype_deriving pprHerald
+         (text "GeneralizedNewtypeDeriving cannot be used on non-newtypes")
+  DerivErrNullaryClasses
+    -> cannotMakeDerivedInstanceHerald cls cls_tys mb_strat newtype_deriving pprHerald
+         (text "Cannot derive instances for nullary classes")
+  DerivErrLastArgMustBeApp
+    -> cannotMakeDerivedInstanceHerald cls cls_tys mb_strat newtype_deriving pprHerald
+         ( text "The last argument of the instance must be a"
+         <+> text "data or newtype application")
+  DerivErrNoFamilyInstance tc tc_args
+    -> cannotMakeDerivedInstanceHerald cls cls_tys mb_strat newtype_deriving pprHerald
+         (text "No family instance for" <+> quotes (pprTypeApp tc tc_args))
+  DerivErrNotStockDeriveable _
+    -> cannotMakeDerivedInstanceHerald cls cls_tys mb_strat newtype_deriving pprHerald
+         (quotes (ppr cls) <+> text "is not a stock derivable class (Eq, Show, etc.)")
+  DerivErrHasAssociatedDatatypes hasAdfs at_last_cls_tv_in_kinds at_without_last_cls_tv
+    -> cannotMakeDerivedInstanceHerald cls cls_tys mb_strat newtype_deriving pprHerald
+         $ vcat [ ppWhen (hasAdfs == YesHasAdfs) adfs_msg
+               , case at_without_last_cls_tv of
+                    YesAssociatedTyNotParamOverLastTyVar tc -> at_without_last_cls_tv_msg tc
+                    NoAssociatedTyNotParamOverLastTyVar     -> empty
+               , case at_last_cls_tv_in_kinds of
+                   YesAssocTyLastVarInKind tc -> at_last_cls_tv_in_kinds_msg tc
+                   NoAssocTyLastVarInKind     -> empty
+               ]
+       where
+
+         adfs_msg  = text "the class has associated data types"
+
+         at_without_last_cls_tv_msg at_tc = hang
+           (text "the associated type" <+> quotes (ppr at_tc)
+            <+> text "is not parameterized over the last type variable")
+           2 (text "of the class" <+> quotes (ppr cls))
+
+         at_last_cls_tv_in_kinds_msg at_tc = hang
+           (text "the associated type" <+> quotes (ppr at_tc)
+            <+> text "contains the last type variable")
+          2 (text "of the class" <+> quotes (ppr cls)
+            <+> text "in a kind, which is not (yet) allowed")
+  DerivErrNewtypeNonDeriveableClass
+    -> derivErrDiagnosticMessage cls cls_tys mb_strat newtype_deriving pprHerald (DerivErrNotStockDeriveable NoDeriveAnyClassEnabled)
+  DerivErrCannotEtaReduceEnough eta_ok
+    -> let cant_derive_err = ppUnless eta_ok eta_msg
+           eta_msg = text "cannot eta-reduce the representation type enough"
+       in cannotMakeDerivedInstanceHerald cls cls_tys mb_strat newtype_deriving pprHerald
+          cant_derive_err
+  DerivErrOnlyAnyClassDeriveable tc _
+    -> cannotMakeDerivedInstanceHerald cls cls_tys mb_strat newtype_deriving pprHerald
+         (quotes (ppr tc) <+> text "is a type class,"
+                          <+> text "and can only have a derived instance"
+                          $+$ text "if DeriveAnyClass is enabled")
+  DerivErrNotDeriveable _
+    -> cannotMakeDerivedInstanceHerald cls cls_tys mb_strat newtype_deriving pprHerald empty
+  DerivErrNotAClass predType
+    -> cannotMakeDerivedInstanceHerald cls cls_tys mb_strat newtype_deriving pprHerald
+         (quotes (ppr predType) <+> text "is not a class")
+  DerivErrNoConstructors rep_tc
+    -> cannotMakeDerivedInstanceHerald cls cls_tys mb_strat newtype_deriving pprHerald
+         (quotes (pprSourceTyCon rep_tc) <+> text "must have at least one data constructor")
+  DerivErrLangExtRequired ext
+    -> cannotMakeDerivedInstanceHerald cls cls_tys mb_strat newtype_deriving pprHerald
+         (text "You need " <> ppr ext
+            <+> text "to derive an instance for this class")
+  DerivErrDunnoHowToDeriveForType ty
+    -> cannotMakeDerivedInstanceHerald cls cls_tys mb_strat newtype_deriving pprHerald
+        (hang (text "Don't know how to derive" <+> quotes (ppr cls))
+              2 (text "for type" <+> quotes (ppr ty)))
+  DerivErrMustBeEnumType rep_tc
+    -> cannotMakeDerivedInstanceHerald cls cls_tys mb_strat newtype_deriving pprHerald
+         (sep [ quotes (pprSourceTyCon rep_tc) <+>
+                text "must be an enumeration type"
+              , text "(an enumeration consists of one or more nullary, non-GADT constructors)" ])
+
+  DerivErrMustHaveExactlyOneConstructor rep_tc
+    -> cannotMakeDerivedInstanceHerald cls cls_tys mb_strat newtype_deriving pprHerald
+         (quotes (pprSourceTyCon rep_tc) <+> text "must have precisely one constructor")
+  DerivErrMustHaveSomeParameters rep_tc
+    -> cannotMakeDerivedInstanceHerald cls cls_tys mb_strat newtype_deriving pprHerald
+         (text "Data type" <+> quotes (ppr rep_tc) <+> text "must have some type parameters")
+  DerivErrMustNotHaveClassContext rep_tc bad_stupid_theta
+    -> cannotMakeDerivedInstanceHerald cls cls_tys mb_strat newtype_deriving pprHerald
+         (text "Data type" <+> quotes (ppr rep_tc)
+           <+> text "must not have a class context:" <+> pprTheta bad_stupid_theta)
+  DerivErrBadConstructor _ reasons
+    -> let why = vcat $ map renderReason reasons
+       in cannotMakeDerivedInstanceHerald cls cls_tys mb_strat newtype_deriving pprHerald why
+         where
+           renderReason = \case
+                 DerivErrBadConExistential con
+                   -> badCon con $ text "must be truly polymorphic in the last argument of the data type"
+                 DerivErrBadConCovariant con
+                   -> badCon con $ text "must not use the type variable in a function argument"
+                 DerivErrBadConFunTypes con
+                   -> badCon con $ text "must not contain function types"
+                 DerivErrBadConWrongArg con
+                   -> badCon con $ text "must use the type variable only as the last argument of a data type"
+                 DerivErrBadConIsGADT con
+                   -> badCon con $ text "is a GADT"
+                 DerivErrBadConHasExistentials con
+                   -> badCon con $ text "has existential type variables in its type"
+                 DerivErrBadConHasConstraints con
+                   -> badCon con $ text "has constraints in its type"
+                 DerivErrBadConHasHigherRankType con
+                   -> badCon con $ text "has a higher-rank type"
+  DerivErrGenerics reasons
+    -> let why = vcat $ map renderReason reasons
+       in cannotMakeDerivedInstanceHerald cls cls_tys mb_strat newtype_deriving pprHerald why
+         where
+           renderReason = \case
+             DerivErrGenericsMustNotHaveDatatypeContext tc_name
+                -> ppr tc_name <+> text "must not have a datatype context"
+             DerivErrGenericsMustNotHaveExoticArgs dc
+                -> ppr dc <+> text "must not have exotic unlifted or polymorphic arguments"
+             DerivErrGenericsMustBeVanillaDataCon dc
+                -> ppr dc <+> text "must be a vanilla data constructor"
+             DerivErrGenericsMustHaveSomeTypeParams rep_tc
+                ->     text "Data type" <+> quotes (ppr rep_tc)
+                   <+> text "must have some type parameters"
+             DerivErrGenericsMustNotHaveExistentials con
+               -> badCon con $ text "must not have existential arguments"
+             DerivErrGenericsWrongArgKind con
+               -> badCon con $
+                    text "applies a type to an argument involving the last parameter"
+                 $$ text "but the applied type is not of kind * -> *"
+  DerivErrEnumOrProduct this that
+    -> let ppr1 = derivErrDiagnosticMessage cls cls_tys mb_strat newtype_deriving False this
+           ppr2 = derivErrDiagnosticMessage cls cls_tys mb_strat newtype_deriving False that
+       in cannotMakeDerivedInstanceHerald cls cls_tys mb_strat newtype_deriving pprHerald
+          (ppr1 $$ text "  or" $$ ppr2)

@@ -34,6 +34,8 @@ instance Outputable GhcHint where
           SuggestExtensions extraUserInfo exts ->
             let header = text "Enable all of the following extensions:"
             in  header <+> hcat (intersperse (text ", ") (map ppr exts)) $$ extraUserInfo
+          SuggestExtensionInOrderTo extraUserInfo ext ->
+            (text "Use" <+> ppr ext) $$ extraUserInfo
     SuggestMissingDo
       -> text "Possibly caused by a missing 'do'?"
     SuggestLetInDo
@@ -120,6 +122,10 @@ instance Outputable GhcHint where
       -> vcat [ text "Move the instance declaration to the module of the class or of the type, or"
               , text "wrap the type with a newtype and declare the instance on the new type."
               ]
+    SuggestAddStandaloneDerivation
+      -> text "Use a standalone deriving declaration instead"
+    SuggestFillInWildcardConstraint
+      -> text "Fill in the wildcard constraint yourself"
 
 perhapsAsPat :: SDoc
 perhapsAsPat = text "Perhaps you meant an as-pattern, which must not be surrounded by whitespace"

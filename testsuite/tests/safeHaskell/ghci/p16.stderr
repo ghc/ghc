@@ -5,8 +5,10 @@
 <interactive>:16:29: error:
     • Can't make a derived instance of ‘Op T2’:
         ‘Op’ is not a stock derivable class (Eq, Show, etc.)
-        Try GeneralizedNewtypeDeriving for GHC's newtype-deriving extension
     • In the newtype declaration for ‘T2’
+    Suggested fix:
+      Perhaps you intended to use GeneralizedNewtypeDeriving
+      for GHC's newtype-deriving extension
 
 <interactive>:19:9: error:
     • Data constructor not in scope: T2 :: T -> t
