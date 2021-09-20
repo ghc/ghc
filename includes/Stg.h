@@ -25,6 +25,12 @@
 
 #pragma once
 
+// Ensure that we don't get a -Wundef warning for __STDC_VERSION if compiling
+// with a C++ compiler. See #20394.
+#if defined(__cplusplus)
+#define __STDC_VERSION__ 0
+#endif
+
 #if !(__STDC_VERSION__ >= 199901L) && !(__cplusplus >= 201103L)
 # error __STDC_VERSION__ does not advertise C99, C++11 or later
 #endif
