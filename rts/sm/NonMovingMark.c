@@ -1218,10 +1218,12 @@ mark_closure (MarkQueue *queue, const StgClosure *p0, StgClosure **origin)
         switch (type) {
 
         case THUNK_STATIC:
-            if (info->srt != 0) {
-                if (bump_static_flag(THUNK_STATIC_LINK((StgClosure *)p), p)) {
-                    markQueuePushThunkSrt(queue, info); // TODO this function repeats the check above
-                }
+            // N.B. We must bump the static flag even if there is no SRT
+            // since the thunk may have been updated by the time mark-check
+            // sees it, in which case we won't be able to determine whether
+            // original thunk required marking.
+            if (bump_static_flag(THUNK_STATIC_LINK((StgClosure *)p), p)) {
+                markQueuePushThunkSrt(queue, info); // TODO this function repeats the check above
             }
             goto done;
 
@@ -2032,8 +2034,9 @@ static void mark_check_closure(ClosureSet *checked, MarkQueue *queue, StgClosure
 
     // N.B. We use push_closure here since we want to trace all closures, even
     // those outside of the nonmoving heap.
+    //
 #   define PUSH_FIELD(obj, field)                                \
-        push_closure(queue,                              \
+        push_closure(queue,                                      \
                                 (StgClosure *) (obj)->field,     \
                                 (StgClosure **) &(obj)->field)
 
@@ -2065,10 +2068,6 @@ static void mark_check_closure(ClosureSet *checked, MarkQueue *queue, StgClosure
             break;
 
         case IND_STATIC:
-            /* If q->saved_info != NULL, then it's a revertible CAF - it'll be
-             * on the CAF list, so don't do anything with it here (we'll
-             * scavenge it later).
-             */
             mark_check_static_object(p, IND_STATIC_LINK((StgClosure *)p));
             break;
 

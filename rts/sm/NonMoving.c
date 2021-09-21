@@ -1185,6 +1185,10 @@ static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO *
     }
 #endif
 
+    if (RtsFlags.DebugFlags.nonmoving_mark_check) {
+        nonmovingMarkCheck();
+    }
+
     // Everything has been marked; allow the mutators to proceed
 #if defined(THREADED_RTS)
     nonmoving_write_barrier_enabled = false;
@@ -1198,10 +1202,6 @@ static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO *
     oldest_gen->live_estimate = nonmoving_live_words;
     oldest_gen->n_old_blocks = 0;
     resizeGenerations();
-
-    if (RtsFlags.DebugFlags.nonmoving_mark_check) {
-        nonmovingMarkCheck();
-    }
 
     /****************************************************
      * Sweep
