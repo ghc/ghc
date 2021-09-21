@@ -452,6 +452,9 @@ function build_hadrian() {
     fail "BIN_DIST_NAME not set"
   fi
 
+  # N.B. First build Hadrian, unsetting MACOSX_DEPLOYMENT_TARGET which may warn
+  # if the bootstrap libraries were built with a different version expectation.
+  MACOSX_DEPLOYMENT_TARGET="" run_hadrian stage1:exe:ghc-bin
   run_hadrian binary-dist
 
   mv _build/bindist/ghc*.tar.xz "$BIN_DIST_NAME.tar.xz"
