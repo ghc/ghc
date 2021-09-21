@@ -790,8 +790,8 @@ void markQueuePushThunkSrt (MarkQueue *q, const StgInfoTable *info)
 }
 
 void markQueuePushArray (MarkQueue *q,
-                            const StgMutArrPtrs *array,
-                            StgWord start_index)
+                         const StgMutArrPtrs *array,
+                         StgWord start_index)
 {
     push_array(q, array, start_index);
 }
@@ -941,19 +941,25 @@ markQueueLength (MarkQueue *q)
  * any outstanding transactions.
  */
 static void
+mark_trec_chunk (MarkQueue *queue, StgTRecChunk *chunk)
+{
+    markQueuePushClosure_(queue, (StgClosure *) chunk);
+    for (StgWord i=0; i < chunk->next_entry_idx; i++) {
+        TRecEntry *ent = &chunk->entries[i];
+        markQueuePushClosure_(queue, (StgClosure *) ent->tvar);
+        markQueuePushClosure_(queue, ent->expected_value);
+        markQueuePushClosure_(queue, ent->new_value);
+    }
+}
+
+static void
 mark_trec_header (MarkQueue *queue, StgTRecHeader *trec)
 {
     while (trec != NO_TREC) {
         StgTRecChunk *chunk = trec->current_chunk;
         markQueuePushClosure_(queue, (StgClosure *) trec);
-        markQueuePushClosure_(queue, (StgClosure *) chunk);
         while (chunk != END_STM_CHUNK_LIST) {
-            for (StgWord i=0; i < chunk->next_entry_idx; i++) {
-                TRecEntry *ent = &chunk->entries[i];
-                markQueuePushClosure_(queue, (StgClosure *) ent->tvar);
-                markQueuePushClosure_(queue, ent->expected_value);
-                markQueuePushClosure_(queue, ent->new_value);
-            }
+            mark_trec_chunk(queue, chunk);
             chunk = chunk->prev_chunk;
         }
         trec = trec->enclosing_trec;
@@ -1552,7 +1558,6 @@ mark_closure (MarkQueue *queue, const StgClosure *p0, StgClosure **origin)
     case MUT_ARR_PTRS_DIRTY:
     case MUT_ARR_PTRS_FROZEN_CLEAN:
     case MUT_ARR_PTRS_FROZEN_DIRTY:
-        // TODO: Check this against Scav.c
         markQueuePushArray(queue, (StgMutArrPtrs *) p, 0);
         break;
 
@@ -1602,19 +1607,9 @@ mark_closure (MarkQueue *queue, const StgClosure *p0, StgClosure **origin)
         break;
     }
 
-    case TREC_CHUNK: {
-        // TODO: Should we abort here? This should have already been marked
-        // when we dirtied the TSO
-        StgTRecChunk *tc = ((StgTRecChunk *) p);
-        PUSH_FIELD(tc, prev_chunk);
-        TRecEntry *end = &tc->entries[tc->next_entry_idx];
-        for (TRecEntry *e = &tc->entries[0]; e < end; e++) {
-            markQueuePushClosure_(queue, (StgClosure *) e->tvar);
-            markQueuePushClosure_(queue, (StgClosure *) e->expected_value);
-            markQueuePushClosure_(queue, (StgClosure *) e->new_value);
-        }
+    case TREC_CHUNK:
+        // N.B. chunk contents are deeply marked by mark_trec_header
         break;
-    }
 
     case WHITEHOLE:
         while (*(StgInfoTable* volatile*) &p->header.info == &stg_WHITEHOLE_info);
