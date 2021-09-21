@@ -381,8 +381,8 @@ anyUFM p (UFM m) = M.foldr ((||) . p) False m
 allUFM :: (elt -> Bool) -> UniqFM key elt -> Bool
 allUFM p (UFM m) = M.foldr ((&&) . p) True m
 
-seqEltsUFM :: ([elt] -> ()) -> UniqFM key elt -> ()
-seqEltsUFM seqList = seqList . nonDetEltsUFM
+seqEltsUFM :: (elt -> ()) -> UniqFM key elt -> ()
+seqEltsUFM seqElt = foldUFM (\v rest -> seqElt v `seq` rest) ()
   -- It's OK to use nonDetEltsUFM here because the type guarantees that
   -- the only interesting thing this function can do is to force the
   -- elements.
