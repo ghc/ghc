@@ -1438,7 +1438,6 @@ dopt f dflags = (f `EnumSet.member` dumpFlags dflags)
           enableIfVerbose Opt_D_dump_rn_trace               = False
           enableIfVerbose Opt_D_dump_cs_trace               = False
           enableIfVerbose Opt_D_dump_if_trace               = False
-          enableIfVerbose Opt_D_dump_vt_trace               = False
           enableIfVerbose Opt_D_dump_tc                     = False
           enableIfVerbose Opt_D_dump_rn                     = False
           enableIfVerbose Opt_D_dump_rn_stats               = False
@@ -2497,8 +2496,6 @@ dynamic_flags_deps = [
                    setDumpFlag' Opt_D_dump_cs_trace))
   , make_ord_flag defGhcFlag "ddump-ec-trace"
         (setDumpFlag Opt_D_dump_ec_trace)
-  , make_ord_flag defGhcFlag "ddump-vt-trace"
-        (setDumpFlag Opt_D_dump_vt_trace)
   , make_ord_flag defGhcFlag "ddump-splices"
         (setDumpFlag Opt_D_dump_splices)
   , make_ord_flag defGhcFlag "dth-dec-file"

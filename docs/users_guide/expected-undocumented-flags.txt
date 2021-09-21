@@ -28,7 +28,6 @@
 -ddump-exitify
 -ddump-simpl-trace
 -ddump-view-pattern-commoning
--ddump-vt-trace
 -dppr-ticks
 -dsource-stats
 -dstg-stats

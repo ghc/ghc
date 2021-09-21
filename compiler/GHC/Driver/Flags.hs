@@ -115,7 +115,6 @@ data DumpFlag
    | Opt_D_dump_tc_trace
    | Opt_D_dump_ec_trace -- Pattern match exhaustiveness checker
    | Opt_D_dump_if_trace
-   | Opt_D_dump_vt_trace
    | Opt_D_dump_splices
    | Opt_D_th_dec_file
    | Opt_D_dump_BCOs
