@@ -124,11 +124,15 @@ import GHC.Tuple (Solo (..))
 -- @Data.Traversable@ from other modules, but in the home module it should
 -- be possible to specify alternative link text. :-(
 
--- | Functors representing data structures that can be traversed from
--- left to right, performing an action on each element.
+-- | Functors representing data structures that can be transformed to
+-- structures of /same shape/ by performing an 'Applicative' (so also 'Monad')
+-- action on each element from left to right.
 --
--- A more detailed description can be found in the overview section of
--- "Data.Traversable#overview".
+-- A more detailed description of what /same shape/ means, the various methods,
+-- how traversals are constructed, and example advanced use-cases can be found
+-- in the __Overview__ section of "Data.Traversable#overview".
+--
+-- For the class laws see the __Laws__ section of "Data.Traversable#laws".
 --
 class (Functor t, Foldable t) => Traversable t where
     {-# MINIMAL traverse | sequenceA #-}
