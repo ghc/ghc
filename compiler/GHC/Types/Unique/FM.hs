@@ -92,6 +92,24 @@ import qualified Data.Semigroup as Semi
 import Data.Functor.Classes (Eq1 (..))
 import Data.Coerce
 
+smallUFMThresh :: Int
+smallUFMThresh = 10
+
+-- | A linked list of key/value pairs.
+data SmallUniqFM ele = SmallUFMNil | SmallUFMCons !Unique ele !(SmallUniqFM ele)
+
+smallUniqFMToIntMap :: SmallUniqFM ele -> M.IntMap
+smallUniqFMToIntMap = go M.empty
+  where
+      go !accum SmallUFMNil = accum
+      go accum (SmallUFMCons u v rest) = go (M.insert (getKey u) v accum ) rest
+
+foldrSmallUniqFM :: (Unique -> ele -> a -> a) -> a -> SmallUniqFM ele -> a
+foldrSmallUniqFM cons nil = go
+  where
+    go SmallUFMNil = nil
+    go (SmallUFMCons k v rest) = cons k v (go rest)
+
 -- | A finite map from @uniques@ of one type to
 -- elements in another type.
 --
@@ -100,24 +118,34 @@ import Data.Coerce
 -- If two types don't overlap in their uniques it's also safe
 -- to index the same map at multiple key types. But this is
 -- very much discouraged.
-newtype UniqFM key ele = UFM (M.IntMap ele)
+data UniqFM key ele = EmptyUFM
+                    | UnitUFM !Unique ele
+                    | SmallUFM !Int !(SmallUniqFM ele)
+                    | UFM !(M.IntMap ele)
   deriving (Data, Eq, Functor)
   -- Nondeterministic Foldable and Traversable instances are accessible through
   -- use of the 'NonDetUniqFM' wrapper.
   -- See Note [Deterministic UniqFM] in GHC.Types.Unique.DFM to learn about determinism.
 
+-- Invariants:
+--  * empty structures are always represented by EmptyUFM 
+--  * structures with 1 key are represented by UnitUFM
+--  * structures with between 2 and smallUFMThresh keys are represented by SmallUFM
+--  * all other structures are represented by UFM
+
 emptyUFM :: UniqFM key elt
-emptyUFM = UFM M.empty
+emptyUFM = EmptyUFM
 
 isNullUFM :: UniqFM key elt -> Bool
-isNullUFM (UFM m) = M.null m
+isNullUFM EmptyUFM = True
+isNullUFM _ = False
 
 unitUFM :: Uniquable key => key -> elt -> UniqFM key elt
-unitUFM k v = UFM (M.singleton (getKey $ getUnique k) v)
+unitUFM k v = UnitUFM (getKey $ getUnique k) v
 
 -- when you've got the Unique already
 unitDirectlyUFM :: Unique -> elt -> UniqFM key elt
-unitDirectlyUFM u v = UFM (M.singleton (getKey u) v)
+unitDirectlyUFM u v = UnitUFM (getKey u) v
 
 -- zipToUFM ks vs = listToUFM (zip ks vs)
 -- This function exists because it's a common case (#18535), and
@@ -127,7 +155,7 @@ unitDirectlyUFM u v = UFM (M.singleton (getKey u) v)
 -- Note that listToUFM (zip ks vs) performs similarly, but
 -- the explicit recursion avoids relying too much on fusion.
 zipToUFM :: Uniquable key => [key] -> [elt] -> UniqFM key elt
-zipToUFM ks vs = assert (length ks == length vs ) innerZip emptyUFM ks vs
+zipToUFM ks vs = assert (length ks == length vs) innerZip emptyUFM ks vs
   where
     innerZip ufm (k:kList) (v:vList) = innerZip (addToUFM ufm k v) kList vList
     innerZip ufm _ _ = ufm
@@ -149,7 +177,7 @@ listToUFM_C
 listToUFM_C f = foldl' (\m (k, v) -> addToUFM_C f m k v) emptyUFM
 
 addToUFM :: Uniquable key => UniqFM key elt -> key -> elt  -> UniqFM key elt
-addToUFM (UFM m) k v = UFM (M.insert (getKey $ getUnique k) v m)
+addToUFM fm k v = addToUFM_Directly fm (getKey $ getUnique k) v
 
 addListToUFM :: Uniquable key => UniqFM key elt -> [(key,elt)] -> UniqFM key elt
 addListToUFM = foldl' (\m (k, v) -> addToUFM m k v)
@@ -158,15 +186,34 @@ addListToUFM_Directly :: UniqFM key elt -> [(Unique,elt)] -> UniqFM key elt
 addListToUFM_Directly = foldl' (\m (k, v) -> addToUFM_Directly m k v)
 
 addToUFM_Directly :: UniqFM key elt -> Unique -> elt -> UniqFM key elt
-addToUFM_Directly (UFM m) u v = UFM (M.insert (getKey u) v m)
+addToUFM_Directly EmptyUFM k v = unitUFM k v
+addToUFM_Directly (UnitUFM k0 v0) k v = SmallUFM 2 (SmallUFMCons k0 v0 $ SmallUFMCons k v $ SmallUFMNil
+addToUFM_Directly (SmallUFM sz small) k v
+  | sz < smallUFMThresh-1 = SmallUFM (sz+1) (SmallUFMCons k v small)
+  | otherwise             = UFM $ M.insert k v (smallUniqFMToIntMap small)
+addToUFM_Directly (UFM m) k v = UFM (M.insert k v m)
 
 addToUFM_C
   :: Uniquable key
   => (elt -> elt -> elt)  -- old -> new -> result
-  -> UniqFM key elt           -- old
+  -> UniqFM key elt       -- old
   -> key -> elt           -- new
-  -> UniqFM key elt           -- result
+  -> UniqFM key elt       -- result
 -- Arguments of combining function of M.insertWith and addToUFM_C are flipped.
+addToUFM_C f EmptyUFM k v = unitUFM k v
+addToUFM_C f fm@(UnitUFM k0 v0) k v
+  | k0 == getKey (getUnique k) = UnitUFM k0 (f v0 v)
+  | otherwise = addToUFM fm k v
+addToUFM_C f fm@(SmallUFM sz small) k v =
+    let contains :: Bool
+        contains = foldrSmallUniqFM (\k0 _ rest) False small
+     in if | contains -> let rewrite SmallUFMNil = SmallUFMNil
+                             rewrite (SmallUFMCons k0 v0 rest)
+                               | k0 == getKey (getUnique k) = SmallUFMCons k0 (f v0 v) rest
+                               | otherwise = SmallUFMCons k0 v0 (rewrite rest)
+                          in SmallUFM sz (rewrite small)
+           | not contains && sz == smallUFMThresh -> UFM $ M.insert k v $ smallUniqFMToIntMap small
+           | otherwise  -> SmallUFM (sz+1) (SmallUFMCons (getKey $ getUnique k) v small)
 addToUFM_C f (UFM m) k v =
   UFM (M.insertWith (flip f) (getKey $ getUnique k) v m)
 
@@ -174,18 +221,18 @@ addToUFM_Acc
   :: Uniquable key
   => (elt -> elts -> elts)  -- Add to existing
   -> (elt -> elts)          -- New element
-  -> UniqFM key elts            -- old
+  -> UniqFM key elts        -- old
   -> key -> elt             -- new
-  -> UniqFM key elts            -- result
+  -> UniqFM key elts        -- result
 addToUFM_Acc exi new (UFM m) k v =
   UFM (M.insertWith (\_new old -> exi v old) (getKey $ getUnique k) (new v) m)
 
 alterUFM
   :: Uniquable key
   => (Maybe elt -> Maybe elt)  -- How to adjust
-  -> UniqFM key elt                -- old
+  -> UniqFM key elt            -- old
   -> key                       -- new
-  -> UniqFM key elt                -- result
+  -> UniqFM key elt            -- result
 alterUFM f (UFM m) k = UFM (M.alter f (getKey $ getUnique k) m)
 
 -- | Add elements to the map, combining existing values with inserted ones using
@@ -348,38 +395,68 @@ partitionUFM p (UFM m) =
     (left, right) -> (UFM left, UFM right)
 
 sizeUFM :: UniqFM key elt -> Int
+sizeUFM EmptyUFM = 0
+sizeUFM (UnitUFM _ _) = 1
+sizeUFM (SmallUFM sz _) = sz
 sizeUFM (UFM m) = M.size m
 
 elemUFM :: Uniquable key => key -> UniqFM key elt -> Bool
-elemUFM k (UFM m) = M.member (getKey $ getUnique k) m
+elemUFM k fm = elemUFM_Directly (getUnique k) fm
 
 elemUFM_Directly :: Unique -> UniqFM key elt -> Bool
-elemUFM_Directly u (UFM m) = M.member (getKey u) m
+elemUFM_Directly k EmptyUFM = False
+elemUFM_Directly k (UnitUFM k0 _) = k0 == k
+elemUFM_Directly k (SmallUFM _ small) = foldrSmallUniqFM (\k0 _ rest -> k0 == k || rest) False small
+elemUFM_Directly k (UFM m) = M.member (getKey k) m
 
 lookupUFM :: Uniquable key => UniqFM key elt -> key -> Maybe elt
-lookupUFM (UFM m) k = M.lookup (getKey $ getUnique k) m
+lookupUFM fm k = lookupUFM_Directly fm (getKey k)
 
 -- when you've got the Unique already
 lookupUFM_Directly :: UniqFM key elt -> Unique -> Maybe elt
+lookupUFM_Directly EmptyUFM _ = Nothing
+lookupUFM_Directly (UnitUFM k0 v0) k
+  | k0 == k   = Just v0
+  | otherwise = Nothing
+lookupUFM_Directly (SmallUFM _ small) k =
+    foldrSmallUniqFM (\k0 v0 rest -> if k0 == k then Just v0 else rest) Nothing small
 lookupUFM_Directly (UFM m) u = M.lookup (getKey u) m
 
 lookupWithDefaultUFM :: Uniquable key => UniqFM key elt -> elt -> key -> elt
-lookupWithDefaultUFM (UFM m) v k = M.findWithDefault v (getKey $ getUnique k) m
+lookupWithDefaultUFM fm k def = lookupWithDefaultUFM_Directly fm (getUnique k) def
 
 lookupWithDefaultUFM_Directly :: UniqFM key elt -> elt -> Unique -> elt
-lookupWithDefaultUFM_Directly (UFM m) v u = M.findWithDefault v (getKey u) m
+lookupWithDefaultUFM_Directly EmptyUFM _ _ = def
+lookupWithDefaultUFM_Directly (UnitUFM k0 v0) def k
+  | k0 == k   = v0
+  | otherwise = def
+lookupWithDefaultUFM_Directly (SmallUFM _ small) def k =
+    foldrSmallUniqFM (\k0 v0 rest -> if k0 == k then v0 else rest) def small
+lookupWithDefaultUFM_Directly (UFM m) def u = M.findWithDefault def (getKey u) m
 
 eltsUFM :: UniqFM key elt -> [elt]
+eltsUFM EmptyUFM = []
+eltsUFM (UnitUFM _ v) = [v]
+eltsUFM (SmallUFM _ small) = foldrSmallUniqFM (\_ v rest -> v : rest) [] small
 eltsUFM (UFM m) = M.elems m
 
 ufmToSet_Directly :: UniqFM key elt -> S.IntSet
+ufmToSet_Directly EmptyUFM = S.empty
+ufmToSet_Directly (UnitUFM k _) = S.singleton (getKey k)
+ufmToSet_Directly (SmallUFM _ small) = foldrSmallUniqFM (\u _ rest -> S.insert u rest) S.empty small
 ufmToSet_Directly (UFM m) = M.keysSet m
 
+nonDetFoldrUFM :: (elt -> a -> a) -> a -> UniqFM key elt -> a
+nonDetFoldrUFM _ z EmptyUFM = z
+nonDetFoldrUFM f z (UnitUFM _ v) = f v z
+nonDetFoldrUFM f z (SmallUFM _ small) = foldrSmallUniqFM f z small
+nonDetFoldrUFM f z (UFM m) = M.foldr f z m
+
 anyUFM :: (elt -> Bool) -> UniqFM key elt -> Bool
-anyUFM p (UFM m) = M.foldr ((||) . p) False m
+anyUFM p m = nonDetFoldrUFM ((||) . p) False m
 
 allUFM :: (elt -> Bool) -> UniqFM key elt -> Bool
-allUFM p (UFM m) = M.foldr ((&&) . p) True m
+allUFM p m = nonDetFoldrUFM ((&&) . p) True m
 
 seqEltsUFM :: ([elt] -> ()) -> UniqFM key elt -> ()
 seqEltsUFM seqList = seqList . nonDetEltsUFM
