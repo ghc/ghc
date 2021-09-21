@@ -1875,7 +1875,7 @@ seqDmdType (DmdType env ds res) =
   seqDmdEnv env `seq` seqDemandList ds `seq` res `seq` ()
 
 seqDmdEnv :: DmdEnv -> ()
-seqDmdEnv env = seqEltsUFM seqDemandList env
+seqDmdEnv env = seqEltsUFM seqDemand env
 
 seqDmdSig :: DmdSig -> ()
 seqDmdSig (DmdSig ty) = seqDmdType ty
