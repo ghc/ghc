@@ -53,6 +53,7 @@ import GHC.CmmToAsm.CPrim
 import GHC.Types.Basic
 import GHC.Data.FastString
 import GHC.Data.OrdList
+import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Platform
 
@@ -125,7 +126,7 @@ stmtToInstrs stmt = do
   platform <- getPlatform
   config <- getConfig
   case stmt of
-    CmmComment s   -> return (unitOL (COMMENT s))
+    CmmComment s   -> return (unitOL (COMMENT $ ftext s))
     CmmTick {}     -> return nilOL
     CmmUnwind {}   -> return nilOL
 

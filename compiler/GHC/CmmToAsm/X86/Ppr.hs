@@ -572,7 +572,7 @@ asmComment c = whenPprDebug $ text "# " <> c
 pprInstr :: Platform -> Instr -> SDoc
 pprInstr platform i = case i of
    COMMENT s
-      -> asmComment (ftext s)
+      -> asmComment s
 
    LOCATION file line col _name
       -> text "\t.loc " <> ppr file <+> ppr line <+> ppr col

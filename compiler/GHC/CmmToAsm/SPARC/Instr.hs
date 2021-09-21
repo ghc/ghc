@@ -51,7 +51,7 @@ import GHC.Platform.Regs
 import GHC.Cmm.CLabel
 import GHC.Cmm.BlockId
 import GHC.Cmm
-import GHC.Data.FastString
+import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
 
@@ -102,7 +102,7 @@ data Instr
 
         -- meta ops --------------------------------------------------
         -- comment pseudo-op
-        = COMMENT FastString
+        = COMMENT SDoc
 
         -- some static data spat out during code generation.
         -- Will be extracted before pretty-printing.

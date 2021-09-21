@@ -56,7 +56,6 @@ import GHC.Types.Unique ( pprUniqueAlways )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Platform
-import GHC.Data.FastString
 
 -- -----------------------------------------------------------------------------
 -- Printing this stuff out
@@ -388,11 +387,15 @@ castFloatToWord8Array :: STUArray s Int Float -> ST s (STUArray s Int Word8)
 castFloatToWord8Array = U.castSTUArray
 
 
+asmComment :: SDoc -> SDoc
+asmComment c = whenPprDebug $ text "#" <+> c
+
+
 -- | Pretty print an instruction.
 pprInstr :: Platform -> Instr -> SDoc
 pprInstr platform = \case
-   COMMENT _ -> empty -- nuke comments.
-   DELTA d   -> pprInstr platform (COMMENT (mkFastString ("\tdelta = " ++ show d)))
+   COMMENT s -> asmComment s
+   DELTA d   -> asmComment $ text ("\tdelta = " ++ show d)
 
    -- Newblocks and LData should have been slurped out before producing the .s file.
    NEWBLOCK _ -> panic "X86.Ppr.pprInstr: NEWBLOCK"

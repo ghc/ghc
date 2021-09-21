@@ -321,7 +321,7 @@ stmtToInstrs bid stmt = do
        -> genCCall is32Bit target result_regs args bid
 
     _ -> (,Nothing) <$> case stmt of
-      CmmComment s   -> return (unitOL (COMMENT s))
+      CmmComment s   -> return (unitOL (COMMENT $ ftext s))
       CmmTick {}     -> return nilOL
 
       CmmUnwind regs -> do

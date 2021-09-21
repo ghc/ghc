@@ -51,8 +51,8 @@ import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow.Label
 import GHC.Cmm
 import GHC.Cmm.Info
-import GHC.Data.FastString
 import GHC.Cmm.CLabel
+import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Platform
 import GHC.Types.Unique.FM (listToUFM, lookupUFM)
@@ -60,6 +60,7 @@ import GHC.Types.Unique.Supply
 
 import Control.Monad (replicateM)
 import Data.Maybe (fromMaybe)
+
 
 --------------------------------------------------------------------------------
 -- Format of a PPC memory address.
@@ -177,7 +178,7 @@ data RI
 
 data Instr
     -- comment pseudo-op
-    = COMMENT FastString
+    = COMMENT SDoc
 
     -- location pseudo-op (file, line, col, name)
     | LOCATION Int Int Int String

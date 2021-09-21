@@ -38,7 +38,6 @@ import GHC.Cmm.Ppr.Expr () -- For Outputable instances
 
 import GHC.Types.Unique ( pprUniqueAlways, getUnique )
 import GHC.Platform
-import GHC.Data.FastString
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
@@ -335,22 +334,21 @@ pprDataItem platform lit
                 = panic "PPC.Ppr.pprDataItem: no match"
 
 
+asmComment :: SDoc -> SDoc
+asmComment c = whenPprDebug $ text "#" <+> c
+
+
 pprInstr :: Platform -> Instr -> SDoc
 pprInstr platform instr = case instr of
 
-   COMMENT _
-      -> empty -- nuke 'em
-
-   -- COMMENT s
-   --    -> if platformOS platform == OSLinux
-   --          then text "# " <> ftext s
-   --          else text "; " <> ftext s
+   COMMENT s
+      -> asmComment s
 
    LOCATION file line col _name
       -> text "\t.loc" <+> ppr file <+> ppr line <+> ppr col
 
    DELTA d
-      -> pprInstr platform (COMMENT (mkFastString ("\tdelta = " ++ show d)))
+      -> asmComment $ text ("\tdelta = " ++ show d)
 
    NEWBLOCK _
       -> panic "PprMach.pprInstr: NEWBLOCK"

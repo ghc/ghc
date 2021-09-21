@@ -57,4 +57,4 @@ instance Instruction PPC.Instr where
    mkStackAllocInstr   = PPC.mkStackAllocInstr
    mkStackDeallocInstr = PPC.mkStackDeallocInstr
    pprInstr            = PPC.pprInstr
-   mkComment           = const []
+   mkComment           = pure . PPC.COMMENT

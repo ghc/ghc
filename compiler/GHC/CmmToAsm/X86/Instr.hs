@@ -55,7 +55,6 @@ import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow.Label
 import GHC.Platform.Regs
 import GHC.Cmm
-import GHC.Data.FastString
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Platform
@@ -172,7 +171,7 @@ bit precision.
 
 data Instr
         -- comment pseudo-op
-        = COMMENT FastString
+        = COMMENT SDoc
 
         -- location pseudo-op (file, line, col, name)
         | LOCATION Int Int Int String
