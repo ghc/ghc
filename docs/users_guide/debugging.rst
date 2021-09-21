@@ -235,6 +235,12 @@ the desugarer and includes the simplifier, worker-wrapper transformation, the
 rule engine, the specialiser, the strictness/occurrence analyser, and a common
 subexpression elimination pass.
 
+.. ghc-flag:: -ddump-call-arity
+    :shortdesc: Dump output of the call arity analysis pass.
+    :type: dynamic
+
+    Dump output of the call arity analysis pass (:ghc-flag:`-fcall-arity`).
+
 .. ghc-flag:: -ddump-core-stats
     :shortdesc: Print a one-line summary of the size of the Core program at the
         end of the optimisation pipeline
@@ -253,6 +259,12 @@ subexpression elimination pass.
     sensible default. :ghc-flag:`-ddump-ds-preopt` shows the output after
     desugaring but before the very simple optimiser.
 
+.. ghc-flag:: -ddump-exitify
+    :shortdesc: Dump output of the exitification pass.
+    :type: dynamic
+
+    Dump output of the exitification pass (:ghc-flag:`-fexitification`),
+    which tries to pull out code out of recursive functions.
 
 .. ghc-flag:: -ddump-simpl-iterations
     :shortdesc: Dump output from each simplifier iteration
@@ -267,6 +279,13 @@ subexpression elimination pass.
 
     Dump statistics about how many of each kind of transformation took
     place. If you add :ghc-flag:`-dppr-debug` you get more detailed information.
+
+.. ghc-flag:: -ddump-simpl-trace
+    :shortdesc: Dump trace messages in simplifier
+    :type: dynamic
+
+    Dump trace messages from various functions of the simplifier.
+    Produces quite a lot of output.
 
 .. ghc-flag:: -dverbose-core2core
     :shortdesc: Show output from each core-to-core pass
@@ -404,6 +423,12 @@ subexpression elimination pass.
     :type: dynamic
 
     Dump output of Core preparation pass
+
+.. ghc-flag:: -ddump-view-pattern-commoning
+    :shortdesc: Dump commoned view patterns
+    :type: dynamic
+
+    Print the view patterns that are commoned.
 
 STG representation
 ~~~~~~~~~~~~~~~~~~
@@ -598,6 +623,13 @@ assembler.
 
     Alias for :ghc-flag:`-ddump-cmm-opt`
 
+.. ghc-flag:: -ddump-asm-conflicts
+    :shortdesc: Dump register conflicts from the register allocator.
+    :type: dynamic
+
+    Dump (virtual) register conflicts ("interferences") from the
+    graph coloring register allocator (:ghc-flag:`-fregs-graph`).
+
 .. ghc-flag:: -ddump-asm-native
     :shortdesc: Dump initial assembly
     :type: dynamic
@@ -653,6 +685,12 @@ These flags dump various bits of information from other backends.
     :type: dynamic
 
     Dump byte-code objects (BCOs) produced for the GHC's byte-code interpreter.
+
+.. ghc-flag:: -ddump-debug
+    :shortdesc: Dump generated DWARF debug information
+    :type: dynamic
+
+    Dump generated debug information (DWARF) produced with the :ghc-flag:`-g` flag.
 
 .. ghc-flag:: -ddump-rtti
     :shortdesc: Trace runtime type inference
