@@ -184,6 +184,12 @@ INLINE_HEADER bool markQueueIsEmpty(MarkQueue *q)
     return (q->blocks == NULL) || (q->top->head == 0 && q->blocks->link == NULL);
 }
 
+#if defined(NONMOVING_MARK_CHECK)
+void nonmovingMarkCheck(void);
+#else
+INLINE_HEADER void nonmovingMarkCheck(void) {}
+#endif
+
 #if defined(DEBUG)
 
 void printMarkQueueEntry(MarkQueueEnt *ent);

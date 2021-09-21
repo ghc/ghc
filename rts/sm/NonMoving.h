@@ -27,6 +27,10 @@
 // In blocks
 #define NONMOVING_SEGMENT_BLOCKS (NONMOVING_SEGMENT_SIZE / BLOCK_SIZE)
 
+#if defined(DEBUG)
+#define NONMOVING_MARK_CHECK
+#endif
+
 _Static_assert(NONMOVING_SEGMENT_SIZE % BLOCK_SIZE == 0,
                "non-moving segment size must be multiple of block size");
 

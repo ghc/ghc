@@ -15,6 +15,7 @@
 #include "NonMoving.h"
 #include "BlockAlloc.h"  /* for countBlocks */
 #include "HeapAlloc.h"
+#include "Hash.h"
 #include "Task.h"
 #include "Trace.h"
 #include "HeapUtils.h"
@@ -24,6 +25,7 @@
 #include "Stats.h"
 #include "STM.h"
 #include "MarkWeak.h"
+#include "StablePtr.h" // markStablePtrTable
 #include "sm/Storage.h"
 #include "CNF.h"
 
@@ -1469,12 +1471,22 @@ mark_closure (MarkQueue *queue, const StgClosure *p0, StgClosure **origin)
     gen_obj:
     case CONSTR:
     case CONSTR_NOCAF:
-    case WEAK:
     case PRIM:
     {
         for (StgWord i = 0; i < info->layout.payload.ptrs; i++) {
             StgClosure **field = &((StgClosure *) p)->payload[i];
             markQueuePushClosure(queue, *field, field);
+        }
+        break;
+    }
+
+    case WEAK:
+    {
+        StgWeak *w = (StgWeak *) p;
+        if (nonmovingIsAlive(w->key)) {
+            PUSH_FIELD(w, value);
+            PUSH_FIELD(w, cfinalizers);
+            PUSH_FIELD(w, finalizer);
         }
         break;
     }
@@ -1946,6 +1958,458 @@ void nonmovingResurrectThreads (struct MarkQueue_ *queue, StgTSO **resurrected_t
         }
     }
 }
+
+#if defined(NONMOVING_MARK_CHECK)
+
+#define CLOSURE_SET_SEGMENT_OPT 0
+
+typedef struct {
+    HashTable *other_objs; // Map ClosureAddr ()
+#if CLOSURE_SET_SEGMENT_OPT
+    HashTable *segments;  // Map BlockAddr BitMap
+#endif
+} ClosureSet;
+
+static void closureSetInit(ClosureSet *cs) {
+    cs->other_objs = allocHashTable();
+#if CLOSURE_SET_SEGMENT_OPT
+    cs->segments = allocHashTable();
+#endif
+}
+
+static void closureSetFree(ClosureSet *cs) {
+    freeHashTable(cs->other_objs, NULL);
+#if CLOSURE_SET_SEGMENT_OPT
+    freeHashTable(cs->segments);
+#endif
+}
+
+static bool closureSetLookup(ClosureSet *cs, StgClosure *p) {
+#if CLOSURE_SET_SEGMENT_OPT
+    bdescr *bd = Bdescr(c);   
+    if (HEAP_ALLOCED(p) && bd->flags & BF_NONMOVING) {
+        nonmoving_block_idx idx = nonmovingGetBlockIdx(p);
+        char *bitmap = lookupHashTable(cs->segments, (StgWord) p) != NULL;
+        if (bitmap) {
+            return bitmap[idx];
+        } else {
+            return false;
+        }
+    }
+#endif
+
+    return lookupHashTable(cs->other_objs, (StgWord) p) != NULL;
+}
+
+static void closureSetInsert(ClosureSet *cs, StgClosure *p) {
+#if CLOSURE_SET_SEGMENT_OPT
+    abort(); // TOOD
+#endif
+
+    insertHashTable(cs->other_objs, (StgWord) p, (const void *) 1);
+}
+
+static void mark_check_static_object(StgClosure *c, StgClosure **link_field) {
+    StgWord link = RELAXED_LOAD((StgWord*) link_field);
+
+    // See Note [STATIC_LINK fields] for how the link field bits work
+    if ((link & STATIC_BITS) != static_flag) {
+        barf("mark_check_closure: static closure %p not marked", c);
+    }
+}
+
+static void mark_check_closure(ClosureSet *checked, MarkQueue *queue, StgClosure *p) {
+    p = UNTAG_CLOSURE(p);
+
+    if (closureSetLookup(checked, p)) {
+        return; // We have already checked this closure
+    }
+
+    closureSetInsert(checked, p);
+
+    const StgInfoTable *info = get_itbl(p);
+    const bdescr *bd = Bdescr((StgPtr) p);
+
+    // N.B. We use push_closure here since we want to trace all closures, even
+    // those outside of the nonmoving heap.
+#   define PUSH_FIELD(obj, field)                                \
+        push_closure(queue,                              \
+                                (StgClosure *) (obj)->field,     \
+                                (StgClosure **) &(obj)->field)
+
+    if (HEAP_ALLOCED_GC(p)) {
+        if (bd->flags & BF_LARGE && bd->flags & BF_NONMOVING_SWEEPING) {
+            if (!(bd->flags & BF_MARKED)) {
+                barf("mark_check_closure: %p not marked", p);
+            }
+        }
+        else if (bd->flags & BF_NONMOVING \
+                && bd->flags & BF_NONMOVING_SWEEPING \
+                && ! nonmovingClosureMarkedThisCycle((StgPtr) p))
+        {
+            barf("mark_check_closure: %p not marked", p);
+        }
+    } else {
+        switch (info->type) {
+
+        case THUNK_STATIC:
+            if (info->srt != 0) {
+                mark_check_static_object(p, THUNK_STATIC_LINK((StgClosure *)p));
+            }
+            break;
+
+        case FUN_STATIC:
+            if (info->srt != 0 || info->layout.payload.ptrs != 0) {
+                mark_check_static_object(p, STATIC_LINK(info,(StgClosure *)p));
+            }
+            break;
+
+        case IND_STATIC:
+            /* If q->saved_info != NULL, then it's a revertible CAF - it'll be
+             * on the CAF list, so don't do anything with it here (we'll
+             * scavenge it later).
+             */
+            mark_check_static_object(p, IND_STATIC_LINK((StgClosure *)p));
+            break;
+
+        case CONSTR:
+        case CONSTR_1_0:
+        case CONSTR_2_0:
+        case CONSTR_1_1:
+            mark_check_static_object(p, STATIC_LINK(info,(StgClosure *)p));
+            break;
+
+        case CONSTR_0_1:
+        case CONSTR_0_2:
+        case CONSTR_NOCAF:
+            /* no need to put these on the static linked list, they don't need
+             * to be scavenged.
+             */
+            break;
+
+        default:
+            barf("evacuate(static): strange closure type %d", (int)(info->type));
+        }
+    }
+
+    /////////////////////////////////////////////////////
+    // Trace pointers
+    /////////////////////////////////////////////////////
+
+    switch (info->type) {
+
+    case MVAR_CLEAN:
+    case MVAR_DIRTY: {
+        StgMVar *mvar = (StgMVar *) p;
+        PUSH_FIELD(mvar, head);
+        PUSH_FIELD(mvar, tail);
+        PUSH_FIELD(mvar, value);
+        break;
+    }
+
+    case TVAR: {
+        StgTVar *tvar = ((StgTVar *)p);
+        PUSH_FIELD(tvar, current_value);
+        PUSH_FIELD(tvar, first_watch_queue_entry);
+        break;
+    }
+
+    case FUN_2_0:
+        markQueuePushFunSrt(queue, info);
+        PUSH_FIELD(p, payload[1]);
+        PUSH_FIELD(p, payload[0]);
+        break;
+
+    case THUNK_2_0: {
+        StgThunk *thunk = (StgThunk *) p;
+        markQueuePushThunkSrt(queue, info);
+        PUSH_FIELD(thunk, payload[1]);
+        PUSH_FIELD(thunk, payload[0]);
+        break;
+    }
+
+    case THUNK_1_0:
+        markQueuePushThunkSrt(queue, info);
+        PUSH_FIELD((StgThunk *) p, payload[0]);
+        break;
+
+    case FUN_1_0:
+        markQueuePushFunSrt(queue, info);
+        PUSH_FIELD(p, payload[0]);
+        break;
+
+    case CONSTR_1_0:
+    case CONSTR_1_1:
+        PUSH_FIELD(p, payload[0]);
+        break;
+
+    case THUNK_0_1:
+        markQueuePushThunkSrt(queue, info);
+        break;
+
+    case FUN_0_1:
+        markQueuePushFunSrt(queue, info);
+        break;
+
+    case CONSTR_0_1:
+    case CONSTR_0_2:
+        break;
+
+    case THUNK_0_2:
+        markQueuePushThunkSrt(queue, info);
+        break;
+
+    case FUN_0_2:
+        markQueuePushFunSrt(queue, info);
+        break;
+
+    case THUNK_1_1:
+        markQueuePushThunkSrt(queue, info);
+        PUSH_FIELD((StgThunk *) p, payload[0]);
+        break;
+
+    case FUN_1_1:
+        markQueuePushFunSrt(queue, info);
+        PUSH_FIELD(p, payload[0]);
+        break;
+
+    case CONSTR_2_0:
+        PUSH_FIELD(p, payload[1]);
+        PUSH_FIELD(p, payload[0]);
+        break;
+
+    case FUN:
+        markQueuePushFunSrt(queue, info);
+        goto gen_obj;
+
+    case THUNK: {
+        markQueuePushThunkSrt(queue, info);
+        for (StgWord i = 0; i < info->layout.payload.ptrs; i++) {
+            StgClosure **field = &((StgThunk *) p)->payload[i];
+            markQueuePushClosure(queue, *field, field);
+        }
+        break;
+    }
+
+    gen_obj:
+    case CONSTR:
+    case CONSTR_NOCAF:
+    case WEAK:
+    case PRIM:
+    {
+        for (StgWord i = 0; i < info->layout.payload.ptrs; i++) {
+            StgClosure **field = &((StgClosure *) p)->payload[i];
+            markQueuePushClosure(queue, *field, field);
+        }
+        break;
+    }
+
+    case BCO: {
+        StgBCO *bco = (StgBCO *)p;
+        PUSH_FIELD(bco, instrs);
+        PUSH_FIELD(bco, literals);
+        PUSH_FIELD(bco, ptrs);
+        break;
+    }
+
+
+    case THUNK_STATIC:
+        markQueuePushThunkSrt(queue, info);
+        break;
+
+    case FUN_STATIC:
+        if (info->srt != 0 || info->layout.payload.ptrs != 0) {
+            markQueuePushThunkSrt(queue, info);
+            // a FUN_STATIC can also be an SRT, so it may have pointer
+            // fields.  See Note [SRTs] in CmmBuildInfoTables, specifically
+            // the [FUN] optimisation.
+            // TODO (osa) I don't understand this comment
+            for (StgHalfWord i = 0; i < info->layout.payload.ptrs; ++i) {
+                PUSH_FIELD(p, payload[i]);
+            }
+        }
+        break;
+
+    case IND_STATIC:
+        PUSH_FIELD((StgInd *) p, indirectee);
+        break;
+
+    case IND:
+    case BLACKHOLE: {
+        PUSH_FIELD((StgInd *) p, indirectee);
+        break;
+    }
+
+    case MUT_VAR_CLEAN:
+    case MUT_VAR_DIRTY:
+        PUSH_FIELD((StgMutVar *)p, var);
+        break;
+
+    case BLOCKING_QUEUE: {
+        StgBlockingQueue *bq = (StgBlockingQueue *)p;
+        PUSH_FIELD(bq, bh);
+        PUSH_FIELD(bq, owner);
+        PUSH_FIELD(bq, queue);
+        PUSH_FIELD(bq, link);
+        break;
+    }
+
+    case THUNK_SELECTOR:
+        PUSH_FIELD((StgSelector *) p, selectee);
+        break;
+
+    case AP_STACK: {
+        StgAP_STACK *ap = (StgAP_STACK *)p;
+        PUSH_FIELD(ap, fun);
+        trace_stack_(queue, (StgPtr) ap->payload, (StgPtr) ap->payload + ap->size);
+        break;
+    }
+
+    case PAP: {
+        StgPAP *pap = (StgPAP *) p;
+        PUSH_FIELD(pap, fun);
+        trace_PAP_payload(queue, pap->fun, pap->payload, pap->n_args);
+        break;
+    }
+
+    case AP: {
+        StgAP *ap = (StgAP *) p;
+        PUSH_FIELD(ap, fun);
+        trace_PAP_payload(queue, ap->fun, ap->payload, ap->n_args);
+        break;
+    }
+
+    case ARR_WORDS:
+        // nothing to follow
+        break;
+
+    case MUT_ARR_PTRS_CLEAN:
+    case MUT_ARR_PTRS_DIRTY:
+    case MUT_ARR_PTRS_FROZEN_CLEAN:
+    case MUT_ARR_PTRS_FROZEN_DIRTY:
+        markQueuePushArray(queue, (StgMutArrPtrs *) p, 0);
+        break;
+
+    case SMALL_MUT_ARR_PTRS_CLEAN:
+    case SMALL_MUT_ARR_PTRS_DIRTY:
+    case SMALL_MUT_ARR_PTRS_FROZEN_CLEAN:
+    case SMALL_MUT_ARR_PTRS_FROZEN_DIRTY: {
+        StgSmallMutArrPtrs *arr = (StgSmallMutArrPtrs *) p;
+        for (StgWord i = 0; i < arr->ptrs; i++) {
+            StgClosure **field = &arr->payload[i];
+            markQueuePushClosure(queue, *field, field);
+        }
+        break;
+    }
+
+    case TSO:
+        trace_tso(queue, (StgTSO *) p);
+        break;
+
+    case STACK: {
+        // See Note [StgStack dirtiness flags and concurrent marking]
+        StgStack *stack = (StgStack *) p;
+        trace_stack(queue, stack);
+        break;
+    }
+
+    case MUT_PRIM: {
+        for (StgHalfWord p_idx = 0; p_idx < info->layout.payload.ptrs; ++p_idx) {
+            StgClosure **field = &p->payload[p_idx];
+            markQueuePushClosure(queue, *field, field);
+        }
+        break;
+    }
+
+    case TREC_CHUNK:
+        trace_trec_chunk(queue, (StgTRecChunk *) p);
+        break;
+
+    case WHITEHOLE:
+        barf("mark_check_closure: WHITEHOLE");
+
+    case COMPACT_NFDATA:
+        break;
+
+    default:
+        barf("mark_check_closure: unimplemented/strange closure type %d @ %p",
+             info->type, p);
+    }
+
+#   undef PUSH_FIELD
+}
+
+/*
+ * Note [Non-moving mark check]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * To ease debugging, the non-moving collector includes a sanity-checking
+ * facility called mark-checking. When enabled (using -DN) the collector will
+ * perform a second round of heap tracing during the sync pause, asserting that
+ * all reachable objects in the non-moving heap snapshot have been marked. This
+ * will often catch bugs (e.g.  missing write barriers) long before they turn
+ * into a segmentation fault.
+ *
+ * To avoid affecting the heap state the mark check logic uses an out-of-band
+ * ClosureSet to record which closures it has already visited.
+ */
+
+/* Verify that all live objects are marked. May only be called during the sync pause. */
+void nonmovingMarkCheck() {
+    MarkQueue queue;
+    initMarkQueue(&queue);
+
+    ClosureSet checked;
+    closureSetInit(&checked);
+
+    /* Push roots */
+    /* TODO: other roots? */
+    markCAFs((evac_fn)markQueueAddRoot, &queue);
+    markStablePtrTable((evac_fn)markQueueAddRoot, &queue);
+    markScheduler((evac_fn)markQueueAddRoot, &queue);
+    for (unsigned int n = 0; n < n_capabilities; ++n) {
+        markCapability((evac_fn)markQueueAddRoot, &queue,
+                capabilities[n], true/*don't mark sparks*/);
+    }
+    for (uint32_t g = 0; g < RtsFlags.GcFlags.generations; g++) {
+        for (StgTSO *t = generations[g].threads; t != END_TSO_QUEUE; t = t->global_link) {
+            trace_tso(&queue, t);
+        }
+    }
+
+    /* Verify */
+    while (true) {
+        MarkQueueEnt ent = markQueuePop(&queue);
+
+        switch (nonmovingMarkQueueEntryType(&ent)) {
+        case MARK_CLOSURE:
+            mark_check_closure(&checked, &queue, ent.mark_closure.p);
+            break;
+        case MARK_ARRAY: {
+            const StgMutArrPtrs *arr = (const StgMutArrPtrs *)
+                UNTAG_CLOSURE((StgClosure *) ent.mark_array.array);
+            StgWord start = ent.mark_array.start_index;
+            StgWord end = start + MARK_ARRAY_CHUNK_LENGTH;
+            if (end < arr->ptrs) {
+                // There is more to be marked after this chunk.
+                markQueuePushArray(&queue, arr, end);
+            } else {
+                end = arr->ptrs;
+            }
+            for (StgWord i = start; i < end; i++) {
+                mark_check_closure(&checked, &queue, arr->payload[i]);
+            }
+            break;
+        }
+        case NULL_ENTRY:
+            return;
+        }
+    }
+
+    freeMarkQueue(&queue);
+    closureSetFree(&checked);
+}
+
+#endif /* defined(NONMOVING_MARK_CHECK) */
 
 #if defined(DEBUG)
 

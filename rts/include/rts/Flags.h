@@ -101,6 +101,7 @@ typedef struct _DEBUG_FLAGS {
     bool gccafs;         /* 'G' */
     bool gc;             /* 'g' */
     bool nonmoving_gc;   /* 'n' */
+    bool nonmoving_mark_check; /* 'N'  warning: quite expensive! */
     bool block_alloc;    /* 'b' */
     bool sanity;         /* 'S'   warning: might be expensive! */
     bool zero_on_gc;     /* 'Z' */

@@ -2123,6 +2123,9 @@ static void read_debug_flags(const char* arg)
         case 'n':
             RtsFlags.DebugFlags.nonmoving_gc = true;
             break;
+        case 'N':
+            RtsFlags.DebugFlags.nonmoving_mark_check = true;
+            break;
         case 'b':
             RtsFlags.DebugFlags.block_alloc = true;
             break;

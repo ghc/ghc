@@ -236,6 +236,9 @@ Mutex concurrent_coll_finished_lock;
  *    how we use the DIRTY flags associated with MUT_VARs and TVARs to improve
  *    barrier efficiency.
  *
+ *  - Note [Non-moving mark check] (NonMovingMark.c) describes the mark-checking
+ *    facility useful for sanity-checking the collector implementation.
+ *
  * [ueno 2016]:
  *   Katsuhiro Ueno and Atsushi Ohori. 2016. A fully concurrent garbage
  *   collector for functional programs on multicore processors. SIGPLAN Not. 51,
@@ -1195,6 +1198,10 @@ static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO *
     oldest_gen->live_estimate = nonmoving_live_words;
     oldest_gen->n_old_blocks = 0;
     resizeGenerations();
+
+    if (RtsFlags.DebugFlags.nonmoving_mark_check) {
+        nonmovingMarkCheck();
+    }
 
     /****************************************************
      * Sweep
