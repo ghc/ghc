@@ -1,5 +1,5 @@
 Simplifier ticks exhausted
-  When trying UnfoldingDone delta1
+  When trying UnfoldingDone delta
   To increase the limit, use -fsimpl-tick-factor=N (default 100).
    
   If you need to increase the limit substantially, please file a
@@ -12,4 +12,4 @@ Simplifier ticks exhausted
   simplifier non-termination has been judged acceptable.
    
   To see detailed counts use -ddump-simpl-stats
-  Total ticks: 140801
+  Total ticks: 140800
