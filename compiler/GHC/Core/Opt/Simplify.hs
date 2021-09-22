@@ -4004,6 +4004,44 @@ because we don't know its usage in each RHS separately
                     Unfoldings
 *                                                                      *
 ************************************************************************
+
+
+Note [No final simplification of unfoldings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+In #20364 we observe one of the unfortunate consequences of our willingness to
+simplify unstable unfoldings: wrappers, which inline during the final phase,
+are inlined. As noted by #20364, this may break rules which match on the
+wrapper.
+
+To see this, consider the following library function and rule:
+
+    plus (I# x, I#y) = x + y
+    {-# NOINLINE plus #-}
+    {-# RULE "plus_0" forall x. plus (x, 0) = x #-}
+
+Naturally, this will be worker-wrappered.
+
+Now imagine that we have a user of this function with an unstable unfolding:
+
+    module A where
+    foo x y = ... plus x y ...
+
+    module B where
+    import A
+    bar x = foo x 0 -- we expect RULE plus_0 to fire here
+
+If we simplify the unfolding of `foo` all the way to the final phase, the
+wrapper of `plus` will inline, meaning that the RULE can no longer fire on its
+unfolded form.
+
+However, there is an easy way to avoid this: don't perform final-phase
+simplifications on unstable unfoldings. In principle this makes sense: in the
+case of an unfolding the "final" phase of simplifications are not the final
+simplifications that the expression will see; further simplification will
+occur after the unfolding is inlined into an occurrence site.
+
+See #20364, #20406.
 -}
 
 simplLetUnfolding :: SimplEnv-> TopLevelFlag
@@ -4016,6 +4054,12 @@ simplLetUnfolding env top_lvl cont_mb id new_rhs rhs_ty arity unf
   = simplStableUnfolding env top_lvl cont_mb id rhs_ty arity unf
   | isExitJoinId id
   = return noUnfolding -- See Note [Do not inline exit join points] in GHC.Core.Opt.Exitify
+  -- See Note [No final simplification of unfoldings].
+  | FinalPhase <- sm_phase $ seMode env
+  , CoreUnfolding { uf_tmpl = tmpl, uf_src = src} <- unf
+  = do let env' = updMode (\sm -> sm { sm_inline = False }) env
+       tmpl' <- simplExpr env' tmpl
+       return $ unf { uf_tmpl = tmpl', uf_src = src }
   | otherwise
   = -- Otherwise, we end up retaining all the SimpleEnv
     let !opts = seUnfoldingOpts env
