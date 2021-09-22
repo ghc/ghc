@@ -5,6 +5,10 @@ import Hadrian.Expression
 import Hadrian.Utilities
 import Settings.Parser
 import System.Directory (getCurrentDirectory)
+import System.IO
+import System.Exit
+import System.Environment
+import Control.Exception
 
 import qualified Base
 import qualified CommandLine
@@ -96,9 +100,30 @@ main = do
             Rules.topLevelTargets
             Rules.toolArgsTarget
 
-    shakeArgsWith options CommandLine.optDescrs $ \_ targets -> do
+    handleShakeException options $ shakeArgsWith options CommandLine.optDescrs $ \_ targets -> do
         let targets' = filter (not . null) $ removeKVs targets
         Environment.setupEnvironment
         return . Just $ if null targets'
                         then rules
                         else want targets' >> withoutActions rules
+
+handleShakeException :: ShakeOptions -> IO a -> IO a
+handleShakeException opts shake_run = do
+  args <- getArgs
+  catch (withArgs ("--exception" : args) $ shake_run) $ \(_e :: ShakeException) -> do
+    hPrint stderr (shakeExceptionInner _e)
+    hPutStrLn stderr (esc "Build failed.")
+    exitFailure
+  where
+    FailureColour col = lookupExtra red (shakeExtra opts)
+    esc = if shakeColor opts then escape col else id
+
+escForeground :: String -> String
+escForeground code = "\ESC[" ++ code ++ "m"
+
+escNormal :: String
+escNormal = "\ESC[0m"
+
+escape :: String -> String -> String
+escape code x = escForeground code ++ x ++ escNormal
+

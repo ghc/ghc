@@ -24,7 +24,7 @@ module Hadrian.Utilities (
     Colour (..), ANSIColour (..), putColoured, shouldUseColor,
     BuildProgressColour, mkBuildProgressColour, putBuild,
     SuccessColour, mkSuccessColour, putSuccess,
-    FailureColour, mkFailureColour, putFailure,
+    FailureColour(..), red, mkFailureColour, putFailure,
     ProgressInfo (..), putProgressInfo,
     renderAction, renderActionNoOutput, renderProgram, renderLibrary, renderBox, renderUnicorn,
 
