@@ -765,12 +765,14 @@ updateRoleEnv name n role
 *                                                                      *
 ********************************************************************* -}
 
-addTyConsToGblEnv :: [TyCon] -> TcM TcGblEnv
+addTyConsToGblEnv :: [TyCon] -> TcM (TcGblEnv, ThBindEnv)
 -- Given a [TyCon], add to the TcGblEnv
 --   * extend the TypeEnv with the tycons
 --   * extend the TypeEnv with their implicitTyThings
 --   * extend the TypeEnv with any default method Ids
 --   * add bindings for record selectors
+-- Return separately the TH levels of these bindings,
+-- to be added to a LclEnv later.
 addTyConsToGblEnv tyclss
   = tcExtendTyConEnv tyclss                    $
     tcExtendGlobalEnvImplicit implicit_things  $
@@ -778,7 +780,10 @@ addTyConsToGblEnv tyclss
     do { traceTc "tcAddTyCons" $ vcat
             [ text "tycons" <+> ppr tyclss
             , text "implicits" <+> ppr implicit_things ]
-       ; tcRecSelBinds (mkRecSelBinds tyclss) }
+       ; gbl_env <- tcRecSelBinds (mkRecSelBinds tyclss)
+       ; th_bndrs <- tcTyThBinders implicit_things
+       ; return (gbl_env, th_bndrs)
+       }
  where
    implicit_things = concatMap implicitTyConThings tyclss
    def_meth_ids    = mkDefaultMethodIds tyclss

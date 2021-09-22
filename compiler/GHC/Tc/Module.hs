@@ -704,7 +704,7 @@ tcRnHsBootDecls hsc_src decls
 
                 -- Typecheck type/class/instance decls
         ; traceTc "Tc2 (boot)" empty
-        ; (tcg_env, inst_infos, _deriv_binds, _class_scoped_tv_env)
+        ; (tcg_env, inst_infos, _deriv_binds, _class_scoped_tv_env, _th_bndrs)
              <- tcTyClsInstDecls tycl_decls deriv_decls val_binds
         ; setGblEnv tcg_env     $ do {
 
@@ -1463,10 +1463,11 @@ tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
                 -- Source-language instances, including derivings,
                 -- and import the supporting declarations
         traceTc "Tc3" empty ;
-        (tcg_env, inst_infos, class_scoped_tv_env,
+        (tcg_env, inst_infos, class_scoped_tv_env, th_bndrs,
          XValBindsLR (NValBinds deriv_binds deriv_sigs))
             <- tcTyClsInstDecls tycl_decls deriv_decls val_binds ;
 
+        updLclEnv (\tcl_env -> tcl_env { tcl_th_bndrs = th_bndrs `plusNameEnv` tcl_th_bndrs tcl_env }) $
         setGblEnv tcg_env       $ do {
 
                 -- Generate Applicative/Monad proposal (AMP) warnings
@@ -1746,13 +1747,14 @@ tcTyClsInstDecls :: [TyClGroup GhcRn]
                                               -- process; contains all dfuns for
                                               -- this module
                           ClassScopedTVEnv,   -- Class scoped type variables
+                          ThBindEnv,          -- TH binding levels
                           HsValBinds GhcRn)   -- Supporting bindings for derived
                                               -- instances
 
 tcTyClsInstDecls tycl_decls deriv_decls binds
  = tcAddDataFamConPlaceholders (tycl_decls >>= group_instds) $
    tcAddPatSynPlaceholders (getPatSynBinds binds) $
-   do { (tcg_env, inst_info, deriv_info, class_scoped_tv_env)
+   do { (tcg_env, inst_info, deriv_info, class_scoped_tv_env, th_bndrs)
           <- tcTyAndClassDecls tycl_decls ;
       ; setGblEnv tcg_env $ do {
           -- With the @TyClDecl@s and @InstDecl@s checked we're ready to
@@ -1767,7 +1769,7 @@ tcTyClsInstDecls tycl_decls deriv_decls binds
           ; setGblEnv tcg_env' $ do {
                 failIfErrsM
               ; pure ( tcg_env', inst_info' ++ inst_info
-                     , class_scoped_tv_env, val_binds )
+                     , class_scoped_tv_env, th_bndrs, val_binds )
       }}}
 
 {- *********************************************************************

@@ -18,7 +18,7 @@ module GHC.Tc.Utils.Env(
         -- Global environment
         tcExtendGlobalEnv, tcExtendTyConEnv,
         tcExtendGlobalEnvImplicit, setGlobalTypeEnv,
-        tcExtendGlobalValEnv,
+        tcExtendGlobalValEnv, tcTyThBinders,
         tcLookupLocatedGlobal, tcLookupGlobal, tcLookupGlobalOnly,
         tcLookupTyCon, tcLookupClass,
         tcLookupDataCon, tcLookupPatSyn, tcLookupConLike,
@@ -95,7 +95,7 @@ import GHC.Tc.Types.Origin ( CtOrigin(UsageEnvironmentOf) )
 
 import GHC.Core.UsageEnv
 import GHC.Core.InstEnv
-import GHC.Core.DataCon ( DataCon )
+import GHC.Core.DataCon ( DataCon, flSelector )
 import GHC.Core.PatSyn  ( PatSyn )
 import GHC.Core.ConLike
 import GHC.Core.TyCon
@@ -401,6 +401,24 @@ tcExtendTyConEnv tycons thing_inside
        ; setGblEnv env' $
          tcExtendGlobalEnvImplicit (map ATyCon tycons) thing_inside
        }
+
+-- Given a [TyThing] of "non-value" bindings coming from type decls
+-- (constructors, field selectors, class methods) return their
+-- TH binding levels (to be added to a LclEnv).
+-- See GHC ticket #17820 .
+tcTyThBinders :: [TyThing] -> TcM ThBindEnv
+tcTyThBinders implicit_things = do
+  stage <- getStage
+  let th_lvl  = thLevel stage
+      th_bndrs = mkNameEnv
+                  [ ( n , (TopLevel, th_lvl) ) | n <- names ]
+  return th_bndrs
+  where
+    names = concatMap get_names implicit_things
+    get_names (AConLike acl) =
+      conLikeName acl : map flSelector (conLikeFieldLabels acl)
+    get_names (AnId i) = [idName i]
+    get_names _ = []
 
 tcExtendGlobalValEnv :: [Id] -> TcM a -> TcM a
   -- Same deal as tcExtendGlobalEnv, but for Ids

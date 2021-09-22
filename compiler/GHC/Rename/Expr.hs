@@ -232,9 +232,13 @@ rnExpr (HsVar _ (L l v))
 
               | otherwise
               -> finishHsVar (L (na2la l) name) ;
-            Just (FieldGreName fl) ->
-              let sel_name = flSelector fl in
-              return ( HsRecSel noExtField (FieldOcc sel_name (L l v) ), unitFV sel_name) ;
+            Just (FieldGreName fl)
+              -> do { let sel_name = flSelector fl
+                    ; this_mod <- getModule
+                    ; when (nameIsLocalOrFrom this_mod sel_name) $
+                        checkThLocalName sel_name
+                    ; return ( HsRecSel noExtField (FieldOcc sel_name (L l v) ), unitFV sel_name)
+                    }
          }
        }
 

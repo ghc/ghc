@@ -388,7 +388,8 @@ tcInstDecls1    -- Deal with both source-code and imported instance decls
    -> TcM (TcGblEnv,            -- The full inst env
            [InstInfo GhcRn],    -- Source-code instance decls to process;
                                 -- contains all dfuns for this module
-           [DerivInfo])         -- From data family instances
+           [DerivInfo],         -- From data family instances
+           ThBindEnv)           -- TH binding levels
 
 tcInstDecls1 inst_decls
   = do {    -- Do class and family instance declarations
@@ -398,13 +399,14 @@ tcInstDecls1 inst_decls
              fam_insts   = concat fam_insts_s
              local_infos = concat local_infos_s
 
-       ; gbl_env <- addClsInsts local_infos $
-                    addFamInsts fam_insts   $
-                    getGblEnv
+       ; (gbl_env, th_bndrs) <-
+           addClsInsts local_infos $
+           addFamInsts fam_insts
 
        ; return ( gbl_env
                 , local_infos
-                , concat datafam_deriv_infos ) }
+                , concat datafam_deriv_infos
+                , th_bndrs ) }
 
 -- | Use DerivInfo for data family instances (produced by tcInstDecls1),
 --   datatype declarations (TyClDecl), and standalone deriving declarations
@@ -425,17 +427,18 @@ addClsInsts :: [InstInfo GhcRn] -> TcM a -> TcM a
 addClsInsts infos thing_inside
   = tcExtendLocalInstEnv (map iSpec infos) thing_inside
 
-addFamInsts :: [FamInst] -> TcM a -> TcM a
+addFamInsts :: [FamInst] -> TcM (TcGblEnv, ThBindEnv)
 -- Extend (a) the family instance envt
 --        (b) the type envt with stuff from data type decls
-addFamInsts fam_insts thing_inside
+addFamInsts fam_insts
   = tcExtendLocalFamInstEnv fam_insts $
     tcExtendGlobalEnv axioms          $
     do { traceTc "addFamInsts" (pprFamInsts fam_insts)
-       ; gbl_env <- addTyConsToGblEnv data_rep_tycons
+       ; (gbl_env, th_bndrs) <- addTyConsToGblEnv data_rep_tycons
                     -- Does not add its axiom; that comes
                     -- from adding the 'axioms' above
-       ; setGblEnv gbl_env thing_inside }
+       ; return (gbl_env, th_bndrs)
+       }
   where
     axioms = map (ACoAxiom . toBranchedAxiom . famInstAxiom) fam_insts
     data_rep_tycons = famInstsRepTyCons fam_insts

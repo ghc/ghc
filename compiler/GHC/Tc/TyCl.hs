@@ -148,34 +148,37 @@ tcTyAndClassDecls :: [TyClGroup GhcRn]      -- Mutually-recursive groups in
                          , [InstInfo GhcRn] -- Source-code instance decls info
                          , [DerivInfo]      -- Deriving info
                          , ClassScopedTVEnv -- Class scoped type variables
+                         , ThBindEnv        -- TH binding levels
                          )
 -- Fails if there are any errors
 tcTyAndClassDecls tyclds_s
   -- The code recovers internally, but if anything gave rise to
   -- an error we'd better stop now, to avoid a cascade
   -- Type check each group in dependency order folding the global env
-  = checkNoErrs $ fold_env [] [] emptyNameEnv tyclds_s
+  = checkNoErrs $ fold_env [] [] emptyNameEnv emptyNameEnv tyclds_s
   where
     fold_env :: [InstInfo GhcRn]
              -> [DerivInfo]
              -> ClassScopedTVEnv
+             -> ThBindEnv
              -> [TyClGroup GhcRn]
-             -> TcM (TcGblEnv, [InstInfo GhcRn], [DerivInfo], ClassScopedTVEnv)
-    fold_env inst_info deriv_info class_scoped_tv_env []
+             -> TcM (TcGblEnv, [InstInfo GhcRn], [DerivInfo], ClassScopedTVEnv, ThBindEnv)
+    fold_env inst_info deriv_info class_scoped_tv_env th_bndrs []
       = do { gbl_env <- getGblEnv
-           ; return (gbl_env, inst_info, deriv_info, class_scoped_tv_env) }
-    fold_env inst_info deriv_info class_scoped_tv_env (tyclds:tyclds_s)
-      = do { (tcg_env, inst_info', deriv_info', class_scoped_tv_env')
+           ; return (gbl_env, inst_info, deriv_info, class_scoped_tv_env, th_bndrs) }
+    fold_env inst_info deriv_info class_scoped_tv_env th_bndrs (tyclds:tyclds_s)
+      = do { (tcg_env, inst_info', deriv_info', class_scoped_tv_env', th_bndrs')
                <- tcTyClGroup tyclds
            ; setGblEnv tcg_env $
                -- remaining groups are typechecked in the extended global env.
              fold_env (inst_info' ++ inst_info)
                       (deriv_info' ++ deriv_info)
                       (class_scoped_tv_env' `plusNameEnv` class_scoped_tv_env)
+                      (th_bndrs' `plusNameEnv` th_bndrs)
                       tyclds_s }
 
 tcTyClGroup :: TyClGroup GhcRn
-            -> TcM (TcGblEnv, [InstInfo GhcRn], [DerivInfo], ClassScopedTVEnv)
+            -> TcM (TcGblEnv, [InstInfo GhcRn], [DerivInfo], ClassScopedTVEnv, ThBindEnv)
 -- Typecheck one strongly-connected component of type, class, and instance decls
 -- See Note [TyClGroups and dependency analysis] in GHC.Hs.Decls
 tcTyClGroup (TyClGroup { group_tyclds = tyclds
@@ -213,17 +216,18 @@ tcTyClGroup (TyClGroup { group_tyclds = tyclds
            -- Step 3: Add the implicit things;
            -- we want them in the environment because
            -- they may be mentioned in interface files
-       ; gbl_env <- addTyConsToGblEnv tyclss
+       ; (gbl_env, th_bndrs) <- addTyConsToGblEnv tyclss
 
            -- Step 4: check instance declarations
-       ; (gbl_env', inst_info, datafam_deriv_info) <-
+       ; (gbl_env', inst_info, datafam_deriv_info, th_bndrs') <-
          setGblEnv gbl_env $
          tcInstDecls1 instds
 
        ; let deriv_info = datafam_deriv_info ++ data_deriv_info
        ; let gbl_env'' = gbl_env'
                 { tcg_ksigs = tcg_ksigs gbl_env' `unionNameSet` kindless }
-       ; return (gbl_env'', inst_info, deriv_info, class_scoped_tv_env) }
+       ; return (gbl_env'', inst_info, deriv_info, class_scoped_tv_env,
+                 th_bndrs' `plusNameEnv` th_bndrs) }
 
 -- Gives the kind for every TyCon that has a standalone kind signature
 type KindSigEnv = NameEnv Kind

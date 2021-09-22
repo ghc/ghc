@@ -59,6 +59,7 @@ module GHC.Tc.Types(
         topStage, topAnnStage, topSpliceStage,
         ThLevel, impLevel, outerLevel, thLevel,
         ForeignSrcLang(..), THDocs, DocLoc(..),
+        ThBindEnv,
 
         -- Arrows
         ArrowCtxt(..),
