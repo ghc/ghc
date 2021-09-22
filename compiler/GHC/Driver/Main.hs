@@ -733,8 +733,8 @@ hscRecompStatus
 -- or not.
 checkObjects :: DynFlags -> Maybe Linkable -> ModSummary -> IO (RecompileRequired, Maybe Linkable)
 checkObjects dflags mb_old_linkable summary = do
-  dt_state <- dynamicTooState dflags
   let
+    dt_enabled  = gopt Opt_BuildDynamicToo dflags
     this_mod    = ms_mod summary
     mb_obj_date = ms_obj_date summary
     mb_dyn_obj_date = ms_dyn_obj_date summary
@@ -743,12 +743,12 @@ checkObjects dflags mb_old_linkable summary = do
     -- dynamic-too *also* produces the dyn_o_file, so have to check
     -- that's there, and if it's not, regenerate both .o and
     -- .dyn_o
-    checkDynamicObj k = case dt_state of
-                          DT_OK -> case (>=) <$> mb_dyn_obj_date <*> mb_if_date of
+    checkDynamicObj k = if dt_enabled
+                          then case (>=) <$> mb_dyn_obj_date <*> mb_if_date of
                                       Just True -> k
                                       _ -> return (RecompBecause MissingDynObjectFile, Nothing)
                           -- Not in dynamic-too mode
-                          _ -> k
+                          else k
 
   checkDynamicObj $
     case (,) <$> mb_obj_date <*> mb_if_date of
