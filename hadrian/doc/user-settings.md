@@ -232,7 +232,7 @@ can suppress this behaviour completely or partially using `verboseCommand` setti
 verboseCommand :: Predicate
 verboseCommand = do
     verbosity <- expr getVerbosity
-    return $ verbosity >= Loud
+    return $ verbosity >= Verbose
 ```
 For example, to print the full command lines used to compile GHC executables,
 set `verboseCommands` to:

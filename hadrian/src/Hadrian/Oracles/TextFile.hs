@@ -96,13 +96,13 @@ textFileOracle :: Rules ()
 textFileOracle = do
     kv <- newCache $ \file -> do
         need [file]
-        putLoud $ "| KeyValue oracle: reading " ++ quote file ++ "..."
+        putVerbose $ "| KeyValue oracle: reading " ++ quote file ++ "..."
         liftIO $ readConfigFile file
     void $ addOracleCache $ \(KeyValue (file, key)) -> Map.lookup key <$> kv file
 
     kvs <- newCache $ \file -> do
         need [file]
-        putLoud $ "| KeyValues oracle: reading " ++ quote file ++ "..."
+        putVerbose $ "| KeyValues oracle: reading " ++ quote file ++ "..."
         contents <- map words <$> readFileLines file
         return $ Map.fromList [ (key, values) | (key:values) <- contents ]
     void $ addOracleCache $ \(KeyValues (file, key)) -> Map.lookup key <$> kvs file

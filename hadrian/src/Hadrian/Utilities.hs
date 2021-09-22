@@ -419,13 +419,13 @@ mkColour (Dull c) = colourCode c
 mkColour (Vivid c) = colourCode c ++ ";1"
 mkColour (Extended code) = "38;5;" ++ code
 
--- | A more colourful version of Shake's 'putNormal'.
+-- | A more colourful version of Shake's 'putInfo'.
 putColoured :: String -> String -> Action ()
 putColoured code msg = do
     useColour <- shakeColor <$> getShakeOptions
     if useColour
-        then putNormal $ "\ESC[" ++ code ++ "m" ++ msg ++ "\ESC[0m"
-        else putNormal msg
+        then putInfo $ "\ESC[" ++ code ++ "m" ++ msg ++ "\ESC[0m"
+        else putInfo msg
 
 newtype BuildProgressColour = BuildProgressColour String
     deriving Typeable

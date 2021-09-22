@@ -47,7 +47,7 @@ userPackages = []
 verboseCommand :: Predicate
 verboseCommand = do
     verbosity <- expr getVerbosity
-    return $ verbosity >= Loud
+    return $ verbosity >= Verbose
 
 -- | Set colour for build progress messages (e.g. executing a build command).
 buildProgressColour :: BuildProgressColour

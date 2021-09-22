@@ -39,14 +39,14 @@ topLevelTargets :: Rules ()
 topLevelTargets = action $ do
     verbosity <- getVerbosity
     forM_ [ Stage1 ..] $ \stage -> do
-      when (verbosity >= Loud) $ do
+      when (verbosity >= Verbose) $ do
         (libraries, programs) <- partition isLibrary <$> stagePackages stage
         libNames <- mapM (name stage) libraries
         pgmNames <- mapM (name stage) programs
         let stageHeader t ps =
               "| Building " ++ show stage ++ " "
                             ++ t ++ ": " ++ intercalate ", " ps
-        putNormal . unlines $
+        putInfo . unlines $
             [ stageHeader "libraries" libNames
             , stageHeader "programs" pgmNames ]
     let buildStages = [ s | s <- [Stage0 ..], s < finalStage ]

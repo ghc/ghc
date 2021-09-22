@@ -152,9 +152,9 @@ configurePackage context@Context {..} = do
     trackArgsHash (target context (Cabal Flags stage) [] [])
     trackArgsHash (target context (Cabal Setup stage) [] [])
     verbosity   <- getVerbosity
-    when (verbosity >= Loud) $
+    when (verbosity >= Verbose) $
         putProgressInfo $ "| Package " ++ quote (pkgName package) ++ " configuration flags: " ++ unwords argList
-    let v = if verbosity >= Loud then "-v3" else "-v0"
+    let v = if verbosity >= Verbose then "-v3" else "-v0"
     traced "cabal-configure" $
         C.defaultMainWithHooksNoReadArgs hooks gpd
             (argList ++ ["--flags=" ++ unwords flagList, v])
@@ -175,7 +175,7 @@ copyPackage context@Context {..} = do
     ctxPath   <- Context.contextPath context
     pkgDbPath <- packageDbPath stage
     verbosity <- getVerbosity
-    let v = if verbosity >= Loud then "-v3" else "-v0"
+    let v = if verbosity >= Verbose then "-v3" else "-v0"
     traced "cabal-copy" $
         C.defaultMainWithHooksNoReadArgs C.autoconfUserHooks gpd
             [ "copy", "--builddir", ctxPath, "--target-package-db", pkgDbPath, v ]
@@ -187,7 +187,7 @@ registerPackage context@Context {..} = do
     ctxPath <- Context.contextPath context
     gpd <- pkgGenericDescription package
     verbosity <- getVerbosity
-    let v = if verbosity >= Loud then "-v3" else "-v0"
+    let v = if verbosity >= Verbose then "-v3" else "-v0"
     traced "cabal-register" $
         C.defaultMainWithHooksNoReadArgs C.autoconfUserHooks gpd
             [ "register", "--builddir", ctxPath, v ]

@@ -10,7 +10,7 @@ ghcPkgBuilderArgs = mconcat
         pkgDb     <- expr $ packageDbPath stage
         mconcat [ use_db pkgDb
                 , arg "register"
-                , verbosity < Chatty ? arg "-v0"
+                , verbosity < Verbose ? arg "-v0"
                 ]
     , builder (GhcPkg Unregister) ? do
         verbosity <- expr getVerbosity
@@ -19,7 +19,7 @@ ghcPkgBuilderArgs = mconcat
         mconcat [ use_db pkgDb
                 , arg "unregister"
                 , arg "--force"
-                , verbosity < Chatty ? arg "-v0"
+                , verbosity < Verbose ? arg "-v0"
                 ]
     , builder (GhcPkg Update) ? do
         verbosity <- expr getVerbosity
@@ -30,7 +30,7 @@ ghcPkgBuilderArgs = mconcat
         mconcat [ notStage0 ? use_db pkgDb
                 , arg "update"
                 , arg "--force"
-                , verbosity < Chatty ? arg "-v0"
+                , verbosity < Verbose ? arg "-v0"
                 , bootPackageDatabaseArgs
                 , arg config ] ]
     where
