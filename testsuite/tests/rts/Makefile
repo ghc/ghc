@@ -133,5 +133,5 @@ EventlogOutput2:
 
 .PHONY: T20199
 T20199:
-	"$(TEST_HC)" -no-hs-main -v0 T20199.cpp -o T20199
+	"$(TEST_HC)" -no-hs-main -optcxx-std=c++11 -v0 T20199.cpp -o T20199
 	./T20199
