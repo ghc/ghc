@@ -77,6 +77,7 @@ import GHC.Types.Fixity
 import GHC.Types.ForeignCall
 import GHC.Types.SourceFile
 import GHC.Types.SourceText
+import GHC.Types.PkgQual
 
 import GHC.Core.Type    ( unrestrictedFunTyCon, Specificity(..) )
 import GHC.Core.Class   ( FunDep )
@@ -1126,13 +1127,13 @@ maybe_safe :: { (Maybe EpaLocation,Bool) }
         : 'safe'                                { (Just (glAA $1),True) }
         | {- empty -}                           { (Nothing,      False) }
 
-maybe_pkg :: { (Maybe EpaLocation,Maybe StringLiteral) }
+maybe_pkg :: { (Maybe EpaLocation, RawPkgQual) }
         : STRING  {% do { let { pkgFS = getSTRING $1 }
                         ; unless (looksLikePackageName (unpackFS pkgFS)) $
                              addError $ mkPlainErrorMsgEnvelope (getLoc $1) $
                                (PsErrInvalidPackageName pkgFS)
-                        ; return (Just (glAA $1), Just (StringLiteral (getSTRINGs $1) pkgFS Nothing)) } }
-        | {- empty -}                           { (Nothing,Nothing) }
+                        ; return (Just (glAA $1), RawPkgQual (StringLiteral (getSTRINGs $1) pkgFS Nothing)) } }
+        | {- empty -}                           { (Nothing,NoRawPkgQual) }
 
 optqualified :: { Located (Maybe EpaLocation) }
         : 'qualified'                           { sL1 $1 (Just (glAA $1)) }

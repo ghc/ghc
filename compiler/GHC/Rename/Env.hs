@@ -103,6 +103,7 @@ import Control.Arrow    ( first )
 import Data.Function
 import GHC.Types.FieldLabel
 import GHC.Data.Bag
+import GHC.Types.PkgQual
 
 {-
 *********************************************************
@@ -1714,7 +1715,7 @@ lookupQualifiedNameGHCi fos rdr_name
       , is_ghci
       , gopt Opt_ImplicitImportQualified dflags   -- Enables this GHCi behaviour
       , not (safeDirectImpsReq dflags)            -- See Note [Safe Haskell and GHCi]
-      = do { res <- loadSrcInterface_maybe doc mod NotBoot Nothing
+      = do { res <- loadSrcInterface_maybe doc mod NotBoot NoPkgQual
            ; case res of
                 Succeeded iface
                   -> return [ gname

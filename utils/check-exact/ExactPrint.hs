@@ -29,6 +29,7 @@ import GHC.Types.Basic hiding (EP)
 import GHC.Types.Fixity
 import GHC.Types.ForeignCall
 import GHC.Types.SourceText
+import GHC.Types.PkgQual
 import GHC.Types.Var
 import GHC.Utils.Outputable hiding ( (<>) )
 import GHC.Unit.Module.Warnings
@@ -760,7 +761,7 @@ instance ExactPrint (ImportDecl GhcPs) where
         -> printStringAtMkw (importDeclAnnQualified an) "qualified"
       _ -> return ()
     case mpkg of
-     Just (StringLiteral src v _) ->
+     RawPkgQual (StringLiteral src v _) ->
        printStringAtMkw (importDeclAnnPackage an) (sourceTextToString src (show v))
      _ -> return ()
 

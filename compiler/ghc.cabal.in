@@ -709,6 +709,7 @@ Library
         GHC.Types.Name.Set
         GHC.Types.Name.Shape
         GHC.Types.Name.Ppr
+        GHC.Types.PkgQual
         GHC.Types.RepType
         GHC.Types.SafeHaskell
         GHC.Types.SourceError

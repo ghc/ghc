@@ -98,6 +98,7 @@ import GHC.Types.Unique.FM
 import GHC.Types.Unique.DSet
 import GHC.Types.SrcLoc
 import GHC.Types.TyThing
+import GHC.Types.PkgQual
 
 import GHC.Unit.External
 import GHC.Unit.Module
@@ -111,7 +112,6 @@ import GHC.Unit.Finder
 import GHC.Unit.Env ( ue_hpt )
 
 import GHC.Data.Maybe
-import GHC.Data.FastString
 
 import Control.Monad
 import Data.Map ( toList )
@@ -295,7 +295,7 @@ needWiredInHomeIface _           = False
 loadSrcInterface :: SDoc
                  -> ModuleName
                  -> IsBootInterface     -- {-# SOURCE #-} ?
-                 -> Maybe FastString    -- "package", if any
+                 -> PkgQual             -- "package", if any
                  -> RnM ModIface
 
 loadSrcInterface doc mod want_boot maybe_pkg
@@ -308,7 +308,7 @@ loadSrcInterface doc mod want_boot maybe_pkg
 loadSrcInterface_maybe :: SDoc
                        -> ModuleName
                        -> IsBootInterface     -- {-# SOURCE #-} ?
-                       -> Maybe FastString    -- "package", if any
+                       -> PkgQual             -- "package", if any
                        -> RnM (MaybeErr SDoc ModIface)
 
 loadSrcInterface_maybe doc mod want_boot maybe_pkg

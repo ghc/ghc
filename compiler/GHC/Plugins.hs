@@ -15,6 +15,7 @@ module GHC.Plugins
    , module GHC.Types.Var
    , module GHC.Types.Id
    , module GHC.Types.Id.Info
+   , module GHC.Types.PkgQual
    , module GHC.Core.Opt.Monad
    , module GHC.Core
    , module GHC.Types.Literal
@@ -29,6 +30,7 @@ module GHC.Plugins
    , module GHC.Driver.Ppr
    , module GHC.Unit.State
    , module GHC.Unit.Module
+   , module GHC.Unit.Home
    , module GHC.Core.Type
    , module GHC.Core.TyCon
    , module GHC.Core.Coercion
@@ -66,6 +68,7 @@ import GHC.Driver.Plugins
 
 -- Variable naming
 import GHC.Types.TyThing
+import GHC.Types.PkgQual
 import GHC.Types.SourceError
 import GHC.Types.Name.Reader
 import GHC.Types.Name.Occurrence  hiding  ( varName {- conflicts with Var.varName -} )
@@ -92,6 +95,7 @@ import GHC.Types.Meta
 import GHC.Driver.Session
 import GHC.Unit.State
 
+import GHC.Unit.Home
 import GHC.Unit.Module
 import GHC.Unit.Module.ModGuts
 import GHC.Unit.Module.ModSummary

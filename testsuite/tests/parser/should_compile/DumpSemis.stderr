@@ -76,7 +76,7 @@
      (L
       { DumpSemis.hs:5:8-16 }
       {ModuleName: Data.List})
-     (Nothing)
+     (NoRawPkgQual)
      (NotBoot)
      (False)
      (NotQualified)
@@ -115,7 +115,7 @@
      (L
       { DumpSemis.hs:7:8-16 }
       {ModuleName: Data.Kind})
-     (Nothing)
+     (NoRawPkgQual)
      (NotBoot)
      (False)
      (NotQualified)
@@ -2070,3 +2070,5 @@
       [])))]
   (Nothing)
   (Nothing)))
+
+

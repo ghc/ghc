@@ -53,6 +53,7 @@ import GHC.Types.Basic     ( failed )
 import GHC.Types.SrcLoc
 import GHC.Types.SourceError
 import GHC.Types.Unique.Supply
+import GHC.Types.PkgQual
 
 import GHC.Utils.Error
 import GHC.Utils.Misc
@@ -881,7 +882,7 @@ abiHash strs = do
 
   let find_it str = do
          let modname = mkModuleName str
-         r <- findImportedModule fc fopts units home_unit modname Nothing
+         r <- findImportedModule fc fopts units home_unit modname NoPkgQual
          case r of
            Found _ m -> return m
            _error    -> throwGhcException $ CmdLineError $ showSDoc dflags $

@@ -170,7 +170,7 @@
      (L
       { T14189.hs:1:8-13 }
       {ModuleName: Prelude})
-     (Nothing)
+     (NoPkgQual)
      (NotBoot)
      (False)
      (NotQualified)

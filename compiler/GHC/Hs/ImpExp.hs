@@ -20,7 +20,7 @@ import GHC.Prelude
 
 import GHC.Unit.Module        ( ModuleName, IsBootInterface(..) )
 import GHC.Hs.Doc             ( HsDocString )
-import GHC.Types.SourceText   ( SourceText(..), StringLiteral(..), pprWithSourceText )
+import GHC.Types.SourceText   ( SourceText(..) )
 import GHC.Types.FieldLabel   ( FieldLabel )
 
 import GHC.Utils.Outputable
@@ -30,6 +30,7 @@ import Language.Haskell.Syntax.Extension
 import GHC.Hs.Extension
 import GHC.Parser.Annotation
 import GHC.Types.Name
+import GHC.Types.PkgQual
 
 import Data.Data
 import Data.Maybe
@@ -85,7 +86,7 @@ data ImportDecl pass
       ideclSourceSrc :: SourceText,
                                  -- Note [Pragma source text] in GHC.Types.SourceText
       ideclName      :: XRec pass ModuleName, -- ^ Module name.
-      ideclPkgQual   :: Maybe StringLiteral,  -- ^ Package qualifier.
+      ideclPkgQual   :: ImportDeclPkgQual pass,  -- ^ Package qualifier.
       ideclSource    :: IsBootInterface,      -- ^ IsBoot <=> {-\# SOURCE \#-} import
       ideclSafe      :: Bool,          -- ^ True => safe import
       ideclQualified :: ImportDeclQualifiedStyle, -- ^ If/how the import is qualified.
@@ -111,6 +112,11 @@ data ImportDecl pass
      --     to location in ideclHiding
 
      -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
+
+type family ImportDeclPkgQual pass
+type instance ImportDeclPkgQual GhcPs = RawPkgQual
+type instance ImportDeclPkgQual GhcRn = PkgQual
+type instance ImportDeclPkgQual GhcTc = PkgQual
 
 type instance XCImportDecl  GhcPs = EpAnn EpAnnImportDecl
 type instance XCImportDecl  GhcRn = NoExtField
@@ -141,7 +147,7 @@ simpleImportDecl mn = ImportDecl {
       ideclExt       = noAnn,
       ideclSourceSrc = NoSourceText,
       ideclName      = noLoc mn,
-      ideclPkgQual   = Nothing,
+      ideclPkgQual   = NoRawPkgQual,
       ideclSource    = NotBoot,
       ideclSafe      = False,
       ideclImplicit  = False,
@@ -151,7 +157,8 @@ simpleImportDecl mn = ImportDecl {
     }
 
 instance (OutputableBndrId p
-         , Outputable (Anno (IE (GhcPass p))))
+         , Outputable (Anno (IE (GhcPass p)))
+         , Outputable (ImportDeclPkgQual (GhcPass p)))
        => Outputable (ImportDecl (GhcPass p)) where
     ppr (ImportDecl { ideclSourceSrc = mSrcText, ideclName = mod'
                     , ideclPkgQual = pkg
@@ -159,15 +166,11 @@ instance (OutputableBndrId p
                     , ideclQualified = qual, ideclImplicit = implicit
                     , ideclAs = as, ideclHiding = spec })
       = hang (hsep [text "import", ppr_imp from, pp_implicit implicit, pp_safe safe,
-                    pp_qual qual False, pp_pkg pkg, ppr mod', pp_qual qual True, pp_as as])
+                    pp_qual qual False, ppr pkg, ppr mod', pp_qual qual True, pp_as as])
              4 (pp_spec spec)
       where
         pp_implicit False = empty
         pp_implicit True = text "(implicit)"
-
-        pp_pkg Nothing                    = empty
-        pp_pkg (Just (StringLiteral st p _))
-          = pprWithSourceText st (doubleQuotes (ftext p))
 
         pp_qual QualifiedPre False = text "qualified" -- Prepositive qualifier/prepositive position.
         pp_qual QualifiedPost True = text "qualified" -- Postpositive qualifier/postpositive position.

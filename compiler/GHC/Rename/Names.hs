@@ -9,6 +9,7 @@ Extracting imported and top-level names in scope
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE LambdaCase #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
@@ -25,6 +26,7 @@ module GHC.Rename.Names (
         findImportUsage,
         getMinimalImports,
         printMinimalImports,
+        renamePkgQual, renameRawPkgQual,
         ImportDeclUsage
     ) where
 
@@ -73,12 +75,14 @@ import GHC.Types.Id
 import GHC.Types.HpcInfo
 import GHC.Types.Unique.FM
 import GHC.Types.Error
+import GHC.Types.PkgQual
 
 import GHC.Unit
 import GHC.Unit.Module.Warnings
 import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.Imported
 import GHC.Unit.Module.Deps
+import GHC.Unit.Env
 
 import GHC.Data.Maybe
 import GHC.Data.FastString
@@ -304,13 +308,15 @@ rnImportDecl  :: Module -> (LImportDecl GhcPs, SDoc)
              -> RnM (LImportDecl GhcRn, GlobalRdrEnv, ImportAvails, AnyHpcUsage)
 rnImportDecl this_mod
              (L loc decl@(ImportDecl { ideclName = loc_imp_mod_name
-                                     , ideclPkgQual = mb_pkg
+                                     , ideclPkgQual = raw_pkg_qual
                                      , ideclSource = want_boot, ideclSafe = mod_safe
                                      , ideclQualified = qual_style, ideclImplicit = implicit
                                      , ideclAs = as_mod, ideclHiding = imp_details }), import_reason)
   = setSrcSpanA loc $ do
 
-    when (isJust mb_pkg) $ do
+    case raw_pkg_qual of
+      NoRawPkgQual -> pure ()
+      RawPkgQual _ -> do
         pkg_imports <- xoptM LangExt.PackageImports
         when (not pkg_imports) $ addErr packageImportErr
 
@@ -320,6 +326,9 @@ rnImportDecl this_mod
     -- file not found) we get lots of spurious errors from 'filterImports'
     let imp_mod_name = unLoc loc_imp_mod_name
         doc = ppr imp_mod_name <+> import_reason
+
+    unit_env <- hsc_unit_env <$> getTopEnv
+    let pkg_qual = renameRawPkgQual unit_env raw_pkg_qual
 
     -- Check for self-import, which confuses the typechecker (#9032)
     -- ghc --make rejects self-import cycles already, but batch-mode may not
@@ -334,13 +343,13 @@ rnImportDecl this_mod
     -- extend Provenance to support a local definition in a qualified location.
     -- For now, we don't support it, but see #10336
     when (imp_mod_name == moduleName this_mod &&
-          (case mb_pkg of  -- If we have import "<pkg>" M, then we should
-                           -- check that "<pkg>" is "this" (which is magic)
-                           -- or the name of this_mod's package.  Yurgh!
-                           -- c.f. GHC.findModule, and #9997
-             Nothing         -> True
-             Just (StringLiteral _ pkg_fs _) -> pkg_fs == fsLit "this" ||
-                            fsToUnit pkg_fs == moduleUnit this_mod))
+          (case pkg_qual of -- If we have import "<pkg>" M, then we should
+                            -- check that "<pkg>" is "this" (which is magic)
+                            -- or the name of this_mod's package.  Yurgh!
+                            -- c.f. GHC.findModule, and #9997
+             NoPkgQual         -> True
+             ThisPkg _         -> True
+             OtherPkg _        -> False))
          (addErr $ TcRnUnknownMessage $ mkPlainError noHints $
            (text "A module cannot import itself:" <+> ppr imp_mod_name))
 
@@ -358,7 +367,7 @@ rnImportDecl this_mod
                              addDiagnostic msg
 
 
-    iface <- loadSrcInterface doc imp_mod_name want_boot (fmap sl_fs mb_pkg)
+    iface <- loadSrcInterface doc imp_mod_name want_boot pkg_qual
 
     -- Compiler sanity check: if the import didn't say
     -- {-# SOURCE #-} we should not get a hi-boot file
@@ -427,12 +436,44 @@ rnImportDecl this_mod
     -- Complain about -Wcompat-unqualified-imports violations.
     warnUnqualifiedImport decl iface
 
-    let new_imp_decl = L loc (decl { ideclExt = noExtField, ideclSafe = mod_safe'
-                                   , ideclHiding = new_imp_details
-                                   , ideclName = ideclName decl
-                                   , ideclAs = ideclAs decl })
+    let new_imp_decl = ImportDecl
+          { ideclExt       = noExtField
+          , ideclSourceSrc = ideclSourceSrc decl
+          , ideclName      = ideclName decl
+          , ideclPkgQual   = pkg_qual
+          , ideclSource    = ideclSource decl
+          , ideclSafe      = mod_safe'
+          , ideclQualified = ideclQualified decl
+          , ideclImplicit  = ideclImplicit decl
+          , ideclAs        = ideclAs decl
+          , ideclHiding    = new_imp_details
+          }
 
-    return (new_imp_decl, gbl_env, imports, mi_hpc iface)
+    return (L loc new_imp_decl, gbl_env, imports, mi_hpc iface)
+
+
+-- | Rename raw package imports
+renameRawPkgQual :: UnitEnv -> RawPkgQual -> PkgQual
+renameRawPkgQual unit_env = \case
+  NoRawPkgQual -> NoPkgQual
+  RawPkgQual p -> renamePkgQual unit_env (Just (sl_fs p))
+
+-- | Rename raw package imports
+renamePkgQual :: UnitEnv -> Maybe FastString -> PkgQual
+renamePkgQual unit_env mb_pkg = case mb_pkg of
+  Nothing -> NoPkgQual
+  Just pkg_fs
+    | Just uid <- homeUnitId <$> ue_home_unit unit_env
+    , pkg_fs == fsLit "this" || pkg_fs == unitFS uid
+    -> ThisPkg uid
+
+    | Just uid <- lookupPackageName (ue_units unit_env) (PackageName pkg_fs)
+    -> OtherPkg uid
+
+    | otherwise
+    -> OtherPkg (UnitId pkg_fs)
+       -- not really correct as pkg_fs is unlikely to be a valid unit-id but
+       -- we will report the failure later...
 
 -- | Calculate the 'ImportAvails' induced by an import of a particular
 -- interface, but without 'imp_mods'.
@@ -1871,8 +1912,8 @@ getMinimalImports = fmap combine . mapM mk_minimal
       | otherwise
       = do { let ImportDecl { ideclName    = L _ mod_name
                             , ideclSource  = is_boot
-                            , ideclPkgQual = mb_pkg } = decl
-           ; iface <- loadSrcInterface doc mod_name is_boot (fmap sl_fs mb_pkg)
+                            , ideclPkgQual = pkg_qual } = decl
+           ; iface <- loadSrcInterface doc mod_name is_boot pkg_qual
            ; let used_avails = gresToAvailInfo used_gres
                  lies = map (L l) (concatMap (to_ie iface) used_avails)
            ; return (L l (decl { ideclHiding = Just (False, L (l2l l) lies) })) }

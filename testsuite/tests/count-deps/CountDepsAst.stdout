@@ -1,4 +1,4 @@
-Found 276 Language.Haskell.Syntax module dependencies
+Found 277 Language.Haskell.Syntax module dependencies
 GHC.Builtin.Names
 GHC.Builtin.PrimOps
 GHC.Builtin.Types
@@ -198,6 +198,7 @@ GHC.Types.Name.Occurrence
 GHC.Types.Name.Ppr
 GHC.Types.Name.Reader
 GHC.Types.Name.Set
+GHC.Types.PkgQual
 GHC.Types.RepType
 GHC.Types.SafeHaskell
 GHC.Types.SourceError

@@ -30,8 +30,8 @@ import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Types.SourceError
 import GHC.Types.SrcLoc
+import GHC.Types.PkgQual
 import Data.List (partition)
-import GHC.Data.FastString
 import GHC.Utils.TmpFs
 
 import GHC.Iface.Load (cannotFindModule)
@@ -284,7 +284,7 @@ processDeps dflags hsc_env excl_mods root hdl (AcyclicSCC (ModuleNode (ExtendedM
 
 findDependency  :: HscEnv
                 -> SrcSpan
-                -> Maybe FastString     -- package qualifier, if any
+                -> PkgQual              -- package qualifier, if any
                 -> ModuleName           -- Imported module
                 -> IsBootInterface      -- Source import
                 -> Bool                 -- Record dependency on package modules

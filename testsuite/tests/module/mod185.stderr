@@ -50,7 +50,7 @@
      (L
       { mod185.hs:3:8-14 }
       {ModuleName: Prelude})
-     (Nothing)
+     (NoRawPkgQual)
      (NotBoot)
      (False)
      (QualifiedPost)
@@ -127,3 +127,5 @@
       [])))]
   (Nothing)
   (Nothing)))
+
+

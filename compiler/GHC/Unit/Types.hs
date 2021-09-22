@@ -487,12 +487,12 @@ unitIsDefinite = isEmptyUniqDSet . unitFreeModuleHoles
 -- libraries as we can cheaply instantiate them on-the-fly, cf VirtUnit).  Put
 -- another way, an installed unit id is either fully instantiated, or not
 -- instantiated at all.
-newtype UnitId =
-    UnitId {
-      -- | The full hashed unit identifier, including the component id
+newtype UnitId = UnitId
+  { unitIdFS :: FastString
+      -- ^ The full hashed unit identifier, including the component id
       -- and the hash.
-      unitIdFS :: FastString
-    }
+  }
+  deriving (Data)
 
 instance Binary UnitId where
   put_ bh (UnitId fs) = put_ bh fs

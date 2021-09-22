@@ -40,6 +40,7 @@ import GHC.Types.Name.Occurrence
   ( mkClsOcc, mkDataOcc, mkTcOcc )
 import GHC.Types.Unique.FM
   ( UniqFM, emptyUFM )
+import GHC.Types.PkgQual
 import GHC.Unit.Finder
   ( FindResult(..) )
 import GHC.Unit.Module
@@ -70,7 +71,7 @@ data PluginDefs =
 
 definitionsModule :: TcPluginM Module
 definitionsModule = do
-  findResult <- findImportedModule ( mkModuleName "Definitions" ) Nothing
+  findResult <- findImportedModule ( mkModuleName "Definitions" ) NoPkgQual
   case findResult of
     Found _ res     -> pure res
     FoundMultiple _ -> error $ "TcPlugin test: found multiple modules named 'Definitions'."

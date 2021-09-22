@@ -86,8 +86,8 @@ import GHC.Utils.Outputable ( SDoc )
 import GHC.Core.Type        ( Kind, Type, PredType )
 import GHC.Types.Id         ( Id )
 import GHC.Core.InstEnv     ( InstEnvs )
-import GHC.Data.FastString  ( FastString )
 import GHC.Types.Unique     ( Unique )
+import GHC.Types.PkgQual    ( PkgQual )
 
 
 -- | Perform some IO, typically to interact with an external tool.
@@ -99,7 +99,7 @@ tcPluginTrace :: String -> SDoc -> TcPluginM ()
 tcPluginTrace a b = unsafeTcPluginTcM (traceTc a b)
 
 
-findImportedModule :: ModuleName -> Maybe FastString -> TcPluginM Finder.FindResult
+findImportedModule :: ModuleName -> PkgQual -> TcPluginM Finder.FindResult
 findImportedModule mod_name mb_pkg = do
     hsc_env <- getTopEnv
     let fc        = hsc_FC hsc_env

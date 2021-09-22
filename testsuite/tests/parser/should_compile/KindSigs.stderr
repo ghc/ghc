@@ -53,7 +53,7 @@
      (L
       { KindSigs.hs:8:8-16 }
       {ModuleName: Data.Kind})
-     (Nothing)
+     (NoRawPkgQual)
      (NotBoot)
      (False)
      (NotQualified)

@@ -90,6 +90,7 @@ import GHC.Types.Unique.FM
 import GHC.Types.Unique.DFM
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.DSet
+import GHC.Types.PkgQual
 
 import GHC.Utils.Misc
 import GHC.Utils.Panic
@@ -1794,7 +1795,7 @@ lookupModuleInAllUnits :: UnitState
                           -> ModuleName
                           -> [(Module, UnitInfo)]
 lookupModuleInAllUnits pkgs m
-  = case lookupModuleWithSuggestions pkgs m Nothing of
+  = case lookupModuleWithSuggestions pkgs m NoPkgQual of
       LookupFound a b -> [(a,fst b)]
       LookupMultiple rs -> map f rs
         where f (m,_) = (m, expectJust "lookupModule" (lookupUnit pkgs
@@ -1822,7 +1823,7 @@ data ModuleSuggestion = SuggestVisible ModuleName Module ModuleOrigin
 
 lookupModuleWithSuggestions :: UnitState
                             -> ModuleName
-                            -> Maybe FastString
+                            -> PkgQual
                             -> LookupResult
 lookupModuleWithSuggestions pkgs
   = lookupModuleWithSuggestions' pkgs (moduleNameProvidersMap pkgs)
@@ -1830,7 +1831,7 @@ lookupModuleWithSuggestions pkgs
 -- | The package which the module **appears** to come from, this could be
 -- the one which reexports the module from it's original package. This function
 -- is currently only used for -Wunused-packages
-lookupModulePackage :: UnitState -> ModuleName -> Maybe FastString -> Maybe [UnitInfo]
+lookupModulePackage :: UnitState -> ModuleName -> PkgQual -> Maybe [UnitInfo]
 lookupModulePackage pkgs mn mfs =
     case lookupModuleWithSuggestions' pkgs (moduleNameProvidersMap pkgs) mn mfs of
       LookupFound _ (orig_unit, origin) ->
@@ -1849,7 +1850,7 @@ lookupModulePackage pkgs mn mfs =
 
 lookupPluginModuleWithSuggestions :: UnitState
                                   -> ModuleName
-                                  -> Maybe FastString
+                                  -> PkgQual
                                   -> LookupResult
 lookupPluginModuleWithSuggestions pkgs
   = lookupModuleWithSuggestions' pkgs (pluginModuleNameProvidersMap pkgs)
@@ -1857,7 +1858,7 @@ lookupPluginModuleWithSuggestions pkgs
 lookupModuleWithSuggestions' :: UnitState
                             -> ModuleNameProvidersMap
                             -> ModuleName
-                            -> Maybe FastString
+                            -> PkgQual
                             -> LookupResult
 lookupModuleWithSuggestions' pkgs mod_map m mb_pn
   = case Map.lookup m mod_map of
@@ -1892,24 +1893,29 @@ lookupModuleWithSuggestions' pkgs mod_map m mb_pn
     -- Filters out origins which are not associated with the given package
     -- qualifier.  No-op if there is no package qualifier.  Test if this
     -- excluded all origins with 'originEmpty'.
-    filterOrigin :: Maybe FastString
+    filterOrigin :: PkgQual
                  -> UnitInfo
                  -> ModuleOrigin
                  -> ModuleOrigin
-    filterOrigin Nothing _ o = o
-    filterOrigin (Just pn) pkg o =
-      case o of
-          ModHidden -> if go pkg then ModHidden else mempty
-          (ModUnusable _) -> if go pkg then o else mempty
+    filterOrigin NoPkgQual _ o = o
+    filterOrigin (ThisPkg _) _ o = o
+    filterOrigin (OtherPkg u) pkg o =
+      let match_pkg p = u == unitId p
+      in case o of
+          ModHidden
+            | match_pkg pkg -> ModHidden
+            | otherwise     -> mempty
+          ModUnusable _
+            | match_pkg pkg -> o
+            | otherwise     -> mempty
           ModOrigin { fromOrigUnit = e, fromExposedReexport = res,
                       fromHiddenReexport = rhs }
-            -> ModOrigin {
-                  fromOrigUnit = if go pkg then e else Nothing
-                , fromExposedReexport = filter go res
-                , fromHiddenReexport = filter go rhs
-                , fromPackageFlag = False -- always excluded
+            -> ModOrigin
+                { fromOrigUnit        = if match_pkg pkg then e else Nothing
+                , fromExposedReexport = filter match_pkg res
+                , fromHiddenReexport  = filter match_pkg rhs
+                , fromPackageFlag     = False -- always excluded
                 }
-      where go pkg = pn == fsPackageName pkg
 
     suggestions = fuzzyLookup (moduleNameString m) all_mods
 

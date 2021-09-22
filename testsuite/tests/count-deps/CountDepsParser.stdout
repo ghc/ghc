@@ -1,4 +1,4 @@
-Found 282 GHC.Parser module dependencies
+Found 283 GHC.Parser module dependencies
 GHC.Builtin.Names
 GHC.Builtin.PrimOps
 GHC.Builtin.Types
@@ -204,6 +204,7 @@ GHC.Types.Name.Occurrence
 GHC.Types.Name.Ppr
 GHC.Types.Name.Reader
 GHC.Types.Name.Set
+GHC.Types.PkgQual
 GHC.Types.RepType
 GHC.Types.SafeHaskell
 GHC.Types.SourceError

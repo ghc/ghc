@@ -47,7 +47,6 @@ import GHC.Unit.Home
 import GHC.Unit.State
 import GHC.Unit.Finder.Types
 
-import GHC.Data.FastString
 import GHC.Data.Maybe    ( expectJust )
 import qualified GHC.Data.ShortText as ST
 
@@ -56,6 +55,7 @@ import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 
 import GHC.Linker.Types
+import GHC.Types.PkgQual
 
 import GHC.Fingerprint
 import Data.IORef
@@ -136,21 +136,19 @@ findImportedModule
   -> UnitState
   -> HomeUnit
   -> ModuleName
-  -> Maybe FastString
+  -> PkgQual
   -> IO FindResult
 findImportedModule fc fopts units home_unit mod_name mb_pkg =
   case mb_pkg of
-        Nothing                        -> unqual_import
-        Just pkg | pkg == fsLit "this" -> home_import -- "this" is special
-                 | otherwise           -> pkg_import
+    NoPkgQual  -> unqual_import
+    ThisPkg _  -> home_import
+    OtherPkg _ -> pkg_import
   where
     home_import   = findHomeModule fc fopts home_unit mod_name
-
-    pkg_import    = findExposedPackageModule fc fopts units  mod_name mb_pkg
-
+    pkg_import    = findExposedPackageModule fc fopts units mod_name mb_pkg
     unqual_import = home_import
                     `orIfNotFound`
-                    findExposedPackageModule fc fopts units mod_name Nothing
+                    findExposedPackageModule fc fopts units mod_name NoPkgQual
 
 -- | Locate a plugin module requested by the user, for a compiler
 -- plugin.  This consults the same set of exposed packages as
@@ -212,7 +210,7 @@ homeSearchCache fc home_unit mod_name do_this = do
   let mod = mkHomeInstalledModule home_unit mod_name
   modLocationCache fc mod do_this
 
-findExposedPackageModule :: FinderCache -> FinderOpts -> UnitState -> ModuleName -> Maybe FastString -> IO FindResult
+findExposedPackageModule :: FinderCache -> FinderOpts -> UnitState -> ModuleName -> PkgQual -> IO FindResult
 findExposedPackageModule fc fopts units mod_name mb_pkg =
   findLookupResult fc fopts
     $ lookupModuleWithSuggestions units mod_name mb_pkg
@@ -220,7 +218,7 @@ findExposedPackageModule fc fopts units mod_name mb_pkg =
 findExposedPluginPackageModule :: FinderCache -> FinderOpts -> UnitState -> ModuleName -> IO FindResult
 findExposedPluginPackageModule fc fopts units mod_name =
   findLookupResult fc fopts
-    $ lookupPluginModuleWithSuggestions units mod_name Nothing
+    $ lookupPluginModuleWithSuggestions units mod_name NoPkgQual
 
 findLookupResult :: FinderCache -> FinderOpts -> LookupResult -> IO FindResult
 findLookupResult fc fopts r = case r of

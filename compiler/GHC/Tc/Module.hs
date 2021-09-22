@@ -153,9 +153,9 @@ import GHC.Types.Avail
 import GHC.Types.Basic hiding( SuccessFlag(..) )
 import GHC.Types.Annotations
 import GHC.Types.SrcLoc
-import GHC.Types.SourceText
 import GHC.Types.SourceFile
 import GHC.Types.TyThing.Ppr ( pprTyThingInContext )
+import GHC.Types.PkgQual
 import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Unit.External
@@ -270,7 +270,8 @@ tcRnModuleTcRnM hsc_env mod_sum
 
         ; -- TODO This is a little skeevy; maybe handle a bit more directly
           let { simplifyImport (L _ idecl) =
-                  ( fmap sl_fs (ideclPkgQual idecl) , ideclName idecl)
+                  ( renameRawPkgQual (hsc_unit_env hsc_env) (ideclPkgQual idecl)
+                  , ideclName idecl)
               }
         ; raw_sig_imports <- liftIO
                              $ findExtraSigImports hsc_env hsc_src
@@ -279,10 +280,9 @@ tcRnModuleTcRnM hsc_env mod_sum
                              $ implicitRequirements hsc_env
                                 (map simplifyImport (prel_imports
                                                      ++ import_decls))
-        ; let { mkImport (Nothing, L _ mod_name) = noLocA
+        ; let { mkImport mod_name = noLocA
                 $ (simpleImportDecl mod_name)
-                  { ideclHiding = Just (False, noLocA [])}
-              ; mkImport _ = panic "mkImport" }
+                  { ideclHiding = Just (False, noLocA [])}}
         ; let { withReason t imps = map (,text t) imps }
         ; let { all_imports = withReason "is implicitly imported" prel_imports
                   ++ withReason "is directly imported" import_decls
@@ -2052,10 +2052,9 @@ runTcInteractive hsc_env thing_inside
 
        ; !orphs <- fmap (force . concat) . forM (ic_imports icxt) $ \i ->
             case i of                   -- force above: see #15111
-                IIModule n -> getOrphans n Nothing
-                IIDecl i ->
-                  let mb_pkg = sl_fs <$> ideclPkgQual i in
-                  getOrphans (unLoc (ideclName i)) mb_pkg
+                IIModule n -> getOrphans n NoPkgQual
+                IIDecl i   -> getOrphans (unLoc (ideclName i))
+                                         (renameRawPkgQual (hsc_unit_env hsc_env) (ideclPkgQual i))
 
        ; let imports = emptyImportAvails {
                             imp_orphs = orphs

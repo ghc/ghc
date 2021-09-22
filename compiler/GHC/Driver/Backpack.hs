@@ -38,6 +38,8 @@ import GHC.Parser.Header
 import GHC.Parser.Lexer
 import GHC.Parser.Annotation
 
+import GHC.Rename.Names
+
 import GHC hiding (Failed, Succeeded)
 import GHC.Tc.Utils.Monad
 import GHC.Iface.Recomp
@@ -45,7 +47,6 @@ import GHC.Builtin.Names
 
 import GHC.Types.SrcLoc
 import GHC.Types.SourceError
-import GHC.Types.SourceText
 import GHC.Types.SourceFile
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DFM
@@ -781,7 +782,7 @@ summariseRequirement pn mod_name = do
         ms_iface_date = hi_timestamp,
         ms_hie_date = hie_timestamp,
         ms_srcimps = [],
-        ms_textual_imps = extra_sig_imports,
+        ms_textual_imps = ((,) NoPkgQual . noLoc) <$> extra_sig_imports,
         ms_ghc_prim_import = False,
         ms_parsed_mod = Just (HsParsedModule {
                 hpm_module = L loc (HsModule {
@@ -874,7 +875,9 @@ hsModuleToModSummary pn hsc_src modname
         implicit_prelude = xopt LangExt.ImplicitPrelude dflags
         implicit_imports = mkPrelImports modname loc
                                          implicit_prelude imps
-        convImport (L _ i) = (fmap sl_fs (ideclPkgQual i), ideclName i)
+
+        rn_pkg_qual = renameRawPkgQual (hsc_unit_env hsc_env)
+        convImport (L _ i) = (rn_pkg_qual (ideclPkgQual i), ideclName i)
 
     extra_sig_imports <- liftIO $ findExtraSigImports hsc_env hsc_src modname
 
@@ -903,8 +906,8 @@ hsModuleToModSummary pn hsc_src modname
                            -- We have to do something special here:
                            -- due to merging, requirements may end up with
                            -- extra imports
-                           ++ extra_sig_imports
-                           ++ ((,) Nothing . noLoc <$> implicit_sigs),
+                           ++ ((,) NoPkgQual . noLoc <$> extra_sig_imports)
+                           ++ ((,) NoPkgQual . noLoc <$> implicit_sigs),
             -- This is our hack to get the parse tree to the right spot
             ms_parsed_mod = Just (HsParsedModule {
                     hpm_module = hsmod,

@@ -4,9 +4,7 @@
 {-# LANGUAGE TypeFamilies             #-}
 
 module GHC.Tc.Utils.Backpack (
-    findExtraSigImports',
     findExtraSigImports,
-    implicitRequirements',
     implicitRequirements,
     implicitRequirementsShallow,
     checkUnit,
@@ -40,6 +38,7 @@ import GHC.Types.SourceFile
 import GHC.Types.Var
 import GHC.Types.Unique.DSet
 import GHC.Types.Name.Shape
+import GHC.Types.PkgQual
 
 import GHC.Unit
 import GHC.Unit.Finder
@@ -278,50 +277,33 @@ check_inst sig_inst = do
 -- process A first, because the merging process will cause B to indirectly
 -- import A.  This function finds the TRANSITIVE closure of all such imports
 -- we need to make.
-findExtraSigImports' :: HscEnv
-                     -> HscSource
-                     -> ModuleName
-                     -> IO (UniqDSet ModuleName)
-findExtraSigImports' hsc_env HsigFile modname =
-    fmap unionManyUniqDSets (forM reqs $ \(Module iuid mod_name) ->
-        (initIfaceLoad hsc_env
+findExtraSigImports :: HscEnv
+                    -> HscSource
+                    -> ModuleName
+                    -> IO [ModuleName]
+findExtraSigImports hsc_env HsigFile modname = do
+    let
+      dflags     = hsc_dflags hsc_env
+      ctx        = initSDocContext dflags defaultUserStyle
+      unit_state = hsc_units hsc_env
+      reqs       = requirementMerges unit_state modname
+    holes <- forM reqs $ \(Module iuid mod_name) -> do
+        initIfaceLoad hsc_env
             . withException ctx
             $ moduleFreeHolesPrecise (text "findExtraSigImports")
-                (mkModule (VirtUnit iuid) mod_name)))
-  where
-    dflags = hsc_dflags hsc_env
-    ctx = initSDocContext dflags defaultUserStyle
-    unit_state = hsc_units hsc_env
-    reqs = requirementMerges unit_state modname
+                (mkModule (VirtUnit iuid) mod_name)
+    return (uniqDSetToList (unionManyUniqDSets holes))
 
-findExtraSigImports' _ _ _ = return emptyUniqDSet
-
--- | 'findExtraSigImports', but in a convenient form for "GHC.Driver.Make" and
--- "GHC.Tc.Module".
-findExtraSigImports :: HscEnv -> HscSource -> ModuleName
-                    -> IO [(Maybe FastString, Located ModuleName)]
-findExtraSigImports hsc_env hsc_src modname = do
-    extra_requirements <- findExtraSigImports' hsc_env hsc_src modname
-    return [ (Nothing, noLoc mod_name)
-           | mod_name <- uniqDSetToList extra_requirements ]
-
--- A version of 'implicitRequirements'' which is more friendly
--- for "GHC.Tc.Module".
-implicitRequirements :: HscEnv
-                     -> [(Maybe FastString, Located ModuleName)]
-                     -> IO [(Maybe FastString, Located ModuleName)]
-implicitRequirements hsc_env normal_imports
-  = do mns <- implicitRequirements' hsc_env normal_imports
-       return [ (Nothing, noLoc mn) | mn <- mns ]
+findExtraSigImports _ _ _ = return []
 
 -- Given a list of 'import M' statements in a module, figure out
 -- any extra implicit requirement imports they may have.  For
 -- example, if they 'import M' and M resolves to p[A=<B>,C=D], then
 -- they actually also import the local requirement B.
-implicitRequirements' :: HscEnv
-                     -> [(Maybe FastString, Located ModuleName)]
+implicitRequirements :: HscEnv
+                     -> [(PkgQual, Located ModuleName)]
                      -> IO [ModuleName]
-implicitRequirements' hsc_env normal_imports
+implicitRequirements hsc_env normal_imports
   = fmap concat $
     forM normal_imports $ \(mb_pkg, L _ imp) -> do
         found <- findImportedModule fc fopts units home_unit imp mb_pkg
@@ -342,7 +324,7 @@ implicitRequirements' hsc_env normal_imports
 -- than a transitive closure done here) all the free holes are still reachable.
 implicitRequirementsShallow
   :: HscEnv
-  -> [(Maybe FastString, Located ModuleName)]
+  -> [(PkgQual, Located ModuleName)]
   -> IO ([ModuleName], [InstantiatedUnit])
 implicitRequirementsShallow hsc_env normal_imports = go ([], []) normal_imports
  where

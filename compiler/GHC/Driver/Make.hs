@@ -108,6 +108,7 @@ import GHC.Types.Unique.DSet
 import GHC.Types.Unique.Set
 import GHC.Types.Name
 import GHC.Types.Name.Env
+import GHC.Types.PkgQual
 
 import GHC.Unit
 import GHC.Unit.Finder
@@ -149,6 +150,7 @@ import GHC.Driver.Env.KnotVars
 import Control.Concurrent.STM
 import Control.Monad.Trans.Maybe
 import GHC.Runtime.Loader
+import GHC.Rename.Names
 
 
 -- -----------------------------------------------------------------------------
@@ -1916,7 +1918,7 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
           old_summary location
 
     find_it = do
-        found <- findImportedModule fc fopts units home_unit wanted_mod Nothing
+        found <- findImportedModule fc fopts units home_unit wanted_mod NoPkgQual
         case found of
              Found location mod
                 | isJust (ml_hs_file location) ->
@@ -2016,8 +2018,8 @@ makeNewModSummary hsc_env MakeNewModSummary{..} = do
         , ms_srcimps = pi_srcimps
         , ms_ghc_prim_import = pi_ghc_prim_import
         , ms_textual_imps =
-            extra_sig_imports ++
-            ((,) Nothing . noLoc <$> implicit_sigs) ++
+            ((,) NoPkgQual . noLoc <$> extra_sig_imports) ++
+            ((,) NoPkgQual . noLoc <$> implicit_sigs) ++
             pi_theimps
         , ms_hs_hash = nms_src_hash
         , ms_iface_date = hi_timestamp
@@ -2031,8 +2033,8 @@ makeNewModSummary hsc_env MakeNewModSummary{..} = do
 data PreprocessedImports
   = PreprocessedImports
       { pi_local_dflags :: DynFlags
-      , pi_srcimps  :: [(Maybe FastString, Located ModuleName)]
-      , pi_theimps  :: [(Maybe FastString, Located ModuleName)]
+      , pi_srcimps  :: [(PkgQual, Located ModuleName)]
+      , pi_theimps  :: [(PkgQual, Located ModuleName)]
       , pi_ghc_prim_import :: Bool
       , pi_hspp_fn  :: FilePath
       , pi_hspp_buf :: StringBuffer
@@ -2053,12 +2055,16 @@ getPreprocessedImports hsc_env src_fn mb_phase maybe_buf = do
   (pi_local_dflags, pi_hspp_fn)
       <- ExceptT $ preprocess hsc_env src_fn (fst <$> maybe_buf) mb_phase
   pi_hspp_buf <- liftIO $ hGetStringBuffer pi_hspp_fn
-  (pi_srcimps, pi_theimps, pi_ghc_prim_import, L pi_mod_name_loc pi_mod_name)
+  (pi_srcimps', pi_theimps', pi_ghc_prim_import, L pi_mod_name_loc pi_mod_name)
       <- ExceptT $ do
           let imp_prelude = xopt LangExt.ImplicitPrelude pi_local_dflags
               popts = initParserOpts pi_local_dflags
           mimps <- getImports popts imp_prelude pi_hspp_buf pi_hspp_fn src_fn
           return (first (mkMessages . fmap mkDriverPsHeaderMessage . getMessages) mimps)
+  let rn_pkg_qual = renameRawPkgQual (hsc_unit_env hsc_env)
+  let rn_imps = fmap (first rn_pkg_qual)
+  let pi_srcimps = rn_imps pi_srcimps'
+  let pi_theimps = rn_imps pi_theimps'
   return PreprocessedImports {..}
 
 

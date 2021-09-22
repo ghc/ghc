@@ -35,6 +35,7 @@ import GHC.Types.Name.Occurrence
   ( mkTcOcc )
 import GHC.Types.Unique.FM
   ( UniqFM, listToUFM )
+import GHC.Types.PkgQual
 import GHC.Unit.Finder
   ( FindResult(..) )
 import GHC.Unit.Module
@@ -54,7 +55,7 @@ type PluginDefs = [ TyCon ]
 
 definitionsModule :: TcPluginM Module
 definitionsModule = do
-  findResult <- findImportedModule ( mkModuleName "RewritePerfDefs" ) Nothing
+  findResult <- findImportedModule ( mkModuleName "RewritePerfDefs" ) NoPkgQual
   case findResult of
     Found _ res     -> pure res
     FoundMultiple _ -> error $ "RewritePerfPlugin: found multiple modules named 'RewritePerfDefs'."

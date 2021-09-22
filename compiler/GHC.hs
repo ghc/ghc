@@ -63,6 +63,7 @@ module GHC (
         TypecheckedMod, ParsedMod,
         moduleInfo, renamedSource, typecheckedSource,
         parsedSource, coreModule,
+        PkgQual(..),
 
         -- ** Compiling to Core
         CoreModule(..),
@@ -116,6 +117,8 @@ module GHC (
         -- ** Inspecting the current context
         getBindings, getInsts, getPrintUnqual,
         findModule, lookupModule,
+        findQualifiedModule, lookupQualifiedModule,
+        renamePkgQualM, renameRawPkgQualM,
         isModuleTrusted, moduleTrustReqs,
         getNamesInScope,
         getRdrNamesInScope,
@@ -337,6 +340,7 @@ import GHC.Iface.Tidy
 import GHC.Data.StringBuffer
 import GHC.Data.FastString
 import qualified GHC.LanguageExtensions as LangExt
+import GHC.Rename.Names (renamePkgQual, renameRawPkgQual)
 
 import GHC.Tc.Utils.Monad    ( finalSafeMode, fixSafeInstances, initIfaceTcRn )
 import GHC.Tc.Types
@@ -387,6 +391,7 @@ import GHC.Types.Name.Env
 import GHC.Types.Name.Ppr
 import GHC.Types.TypeEnv
 import GHC.Types.BreakInfo
+import GHC.Types.PkgQual
 
 import GHC.Unit
 import GHC.Unit.Env
@@ -1631,29 +1636,35 @@ showRichTokenStream ts = go startLoc ts ""
 -- filesystem and package database to find the corresponding 'Module',
 -- using the algorithm that is used for an @import@ declaration.
 findModule :: GhcMonad m => ModuleName -> Maybe FastString -> m Module
-findModule mod_name maybe_pkg = withSession $ \hsc_env -> do
+findModule mod_name maybe_pkg = do
+  pkg_qual <- renamePkgQualM maybe_pkg
+  findQualifiedModule pkg_qual mod_name
+
+
+findQualifiedModule :: GhcMonad m => PkgQual -> ModuleName -> m Module
+findQualifiedModule pkgqual mod_name = withSession $ \hsc_env -> do
   let fc        = hsc_FC hsc_env
   let home_unit = hsc_home_unit hsc_env
   let units     = hsc_units hsc_env
   let dflags    = hsc_dflags hsc_env
   let fopts     = initFinderOpts dflags
-  case maybe_pkg of
-    Just pkg | not (isHomeUnit home_unit (fsToUnit pkg)) && pkg /= fsLit "this" -> liftIO $ do
-      res <- findImportedModule fc fopts units home_unit mod_name maybe_pkg
-      case res of
-        Found _ m -> return m
-        err       -> throwOneError $ noModError hsc_env noSrcSpan mod_name err
-    _otherwise -> do
+  case pkgqual of
+    ThisPkg _ -> do
       home <- lookupLoadedHomeModule mod_name
       case home of
         Just m  -> return m
         Nothing -> liftIO $ do
-           res <- findImportedModule fc fopts units home_unit mod_name maybe_pkg
+           res <- findImportedModule fc fopts units home_unit mod_name pkgqual
            case res of
              Found loc m | not (isHomeModule home_unit m) -> return m
                          | otherwise -> modNotLoadedError dflags m loc
              err -> throwOneError $ noModError hsc_env noSrcSpan mod_name err
-  where
+
+    _ -> liftIO $ do
+      res <- findImportedModule fc fopts units home_unit mod_name pkgqual
+      case res of
+        Found _ m -> return m
+        err       -> throwOneError $ noModError hsc_env noSrcSpan mod_name err
 
 
 modNotLoadedError :: DynFlags -> Module -> ModLocation -> IO a
@@ -1661,6 +1672,12 @@ modNotLoadedError dflags m loc = throwGhcExceptionIO $ CmdLineError $ showSDoc d
    text "module is not loaded:" <+>
    quotes (ppr (moduleName m)) <+>
    parens (text (expectJust "modNotLoadedError" (ml_hs_file loc)))
+
+renamePkgQualM :: GhcMonad m => Maybe FastString -> m PkgQual
+renamePkgQualM p = withSession $ \hsc_env -> pure (renamePkgQual (hsc_unit_env hsc_env) p)
+
+renameRawPkgQualM :: GhcMonad m => RawPkgQual -> m PkgQual
+renameRawPkgQualM p = withSession $ \hsc_env -> pure (renameRawPkgQual (hsc_unit_env hsc_env) p)
 
 -- | Like 'findModule', but differs slightly when the module refers to
 -- a source file, and the file has not been loaded via 'load'.  In
@@ -1670,8 +1687,12 @@ modNotLoadedError dflags m loc = throwGhcExceptionIO $ CmdLineError $ showSDoc d
 -- returned.  If not, the usual module-not-found error will be thrown.
 --
 lookupModule :: GhcMonad m => ModuleName -> Maybe FastString -> m Module
-lookupModule mod_name (Just pkg) = findModule mod_name (Just pkg)
-lookupModule mod_name Nothing = withSession $ \hsc_env -> do
+lookupModule mod_name maybe_pkg = do
+  pkgqual <- renamePkgQualM maybe_pkg
+  lookupQualifiedModule pkgqual mod_name
+
+lookupQualifiedModule :: GhcMonad m => PkgQual -> ModuleName -> m Module
+lookupQualifiedModule NoPkgQual mod_name = withSession $ \hsc_env -> do
   home <- lookupLoadedHomeModule mod_name
   case home of
     Just m  -> return m
@@ -1680,10 +1701,11 @@ lookupModule mod_name Nothing = withSession $ \hsc_env -> do
       let units  = hsc_units hsc_env
       let dflags = hsc_dflags hsc_env
       let fopts  = initFinderOpts dflags
-      res <- findExposedPackageModule fc fopts units mod_name Nothing
+      res <- findExposedPackageModule fc fopts units mod_name NoPkgQual
       case res of
         Found _ m -> return m
         err       -> throwOneError $ noModError hsc_env noSrcSpan mod_name err
+lookupQualifiedModule pkgqual mod_name = findQualifiedModule pkgqual mod_name
 
 lookupLoadedHomeModule :: GhcMonad m => ModuleName -> m (Maybe Module)
 lookupLoadedHomeModule mod_name = withSession $ \hsc_env ->

@@ -37,9 +37,9 @@ import GHC.Unit.Module
 import GHC.Types.SourceFile ( HscSource(..), hscSourceString )
 import GHC.Types.SrcLoc
 import GHC.Types.Target
+import GHC.Types.PkgQual
 
 import GHC.Data.Maybe
-import GHC.Data.FastString
 import GHC.Data.StringBuffer ( StringBuffer )
 
 import GHC.Utils.Fingerprint
@@ -88,9 +88,9 @@ data ModSummary
           -- See Note [When source is considered modified] and #9243
         ms_hie_date   :: Maybe UTCTime,
           -- ^ Timestamp of hie file, if we have one
-        ms_srcimps      :: [(Maybe FastString, Located ModuleName)],
+        ms_srcimps      :: [(PkgQual, Located ModuleName)], -- FIXME: source imports are never from an external package, why do we allow PkgQual?
           -- ^ Source imports of the module
-        ms_textual_imps :: [(Maybe FastString, Located ModuleName)],
+        ms_textual_imps :: [(PkgQual, Located ModuleName)],
           -- ^ Non-source imports of the module from the module *text*
         ms_ghc_prim_import :: !Bool,
           -- ^ Whether the special module GHC.Prim was imported explicitliy
@@ -116,19 +116,22 @@ ms_mod_name :: ModSummary -> ModuleName
 ms_mod_name = moduleName . ms_mod
 
 -- | Textual imports, plus plugin imports but not SOURCE imports.
-ms_imps :: ModSummary -> [(Maybe FastString, Located ModuleName)]
+ms_imps :: ModSummary -> [(PkgQual, Located ModuleName)]
 ms_imps ms = ms_textual_imps ms ++ ms_plugin_imps ms
 
 -- | Plugin imports
-ms_plugin_imps :: ModSummary -> [(Maybe FastString, Located ModuleName)]
-ms_plugin_imps ms = map ((Nothing,) . noLoc) (pluginModNames (ms_hspp_opts ms))
+ms_plugin_imps :: ModSummary -> [(PkgQual, Located ModuleName)]
+ms_plugin_imps ms = map ((NoPkgQual,) . noLoc) (pluginModNames (ms_hspp_opts ms))
 
-home_imps :: [(Maybe FastString, Located ModuleName)] -> [Located ModuleName]
-home_imps imps = [ lmodname |  (mb_pkg, lmodname) <- imps,
-                                  isLocal mb_pkg ]
-  where isLocal Nothing = True
-        isLocal (Just pkg) | pkg == fsLit "this" = True -- "this" is special
-        isLocal _ = False
+-- | All of the (possibly) home module imports from the given list that is to
+-- say, each of these module names could be a home import if an appropriately
+-- named file existed.  (This is in contrast to package qualified imports, which
+-- are guaranteed not to be home imports.)
+home_imps :: [(PkgQual, Located ModuleName)] -> [Located ModuleName]
+home_imps imps = fmap snd (filter (maybe_home . fst) imps)
+  where maybe_home NoPkgQual    = True
+        maybe_home (ThisPkg _)  = True
+        maybe_home (OtherPkg _) = False
 
 -- | Like 'ms_home_imps', but for SOURCE imports.
 ms_home_srcimps :: ModSummary -> [Located ModuleName]

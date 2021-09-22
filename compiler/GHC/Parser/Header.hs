@@ -37,6 +37,7 @@ import GHC.Types.Error
 import GHC.Types.SrcLoc
 import GHC.Types.SourceError
 import GHC.Types.SourceText
+import GHC.Types.PkgQual
 
 import GHC.Utils.Misc
 import GHC.Utils.Panic
@@ -72,8 +73,8 @@ getImports :: ParserOpts   -- ^ Parser options
                            --   in the function result)
            -> IO (Either
                (Messages PsMessage)
-               ([(Maybe FastString, Located ModuleName)],
-                [(Maybe FastString, Located ModuleName)],
+               ([(RawPkgQual, Located ModuleName)],
+                [(RawPkgQual, Located ModuleName)],
                 Bool, -- Is GHC.Prim imported or not
                 Located ModuleName))
               -- ^ The source imports and normal imports (with optional package
@@ -107,7 +108,7 @@ getImports popts implicit_prelude buf filename source_filename = do
 
                 implicit_imports = mkPrelImports (unLoc mod) main_loc
                                                  implicit_prelude imps
-                convImport (L _ i) = (fmap sl_fs (ideclPkgQual i), ideclName i)
+                convImport (L _ i) = (ideclPkgQual i, ideclName i)
               in
               return (map convImport src_idecls
                      , map convImport (implicit_imports ++ ordinary_imps)
@@ -136,8 +137,8 @@ mkPrelImports this_mod loc implicit_prelude import_decls
         unLoc (ideclName decl) == pRELUDE_NAME
         -- allow explicit "base" package qualifier (#19082, #17045)
         && case ideclPkgQual decl of
-            Nothing -> True
-            Just b  -> sl_fs b == unitIdFS baseUnitId
+            NoRawPkgQual -> True
+            RawPkgQual b -> sl_fs b == unitIdFS baseUnitId
 
 
       loc' = noAnnSrcSpan loc
@@ -146,7 +147,7 @@ mkPrelImports this_mod loc implicit_prelude import_decls
         = L loc' $ ImportDecl { ideclExt       = noAnn,
                                 ideclSourceSrc = NoSourceText,
                                 ideclName      = L loc pRELUDE_NAME,
-                                ideclPkgQual   = Nothing,
+                                ideclPkgQual   = NoRawPkgQual,
                                 ideclSource    = NotBoot,
                                 ideclSafe      = False,  -- Not a safe import
                                 ideclQualified = NotQualified,

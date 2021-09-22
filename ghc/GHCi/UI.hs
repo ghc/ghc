@@ -69,7 +69,6 @@ import GHC.Types.TyThing.Ppr
 import GHC.Core.TyCo.Ppr
 import GHC.Types.SafeHaskell ( getSafeMode )
 import GHC.Types.Name
-import GHC.Types.SourceText
 import GHC.Types.Var ( varType )
 import GHC.Iface.Syntax ( showToHeader )
 import GHC.Builtin.Names
@@ -78,6 +77,7 @@ import GHC.Types.Name.Reader as RdrName ( getGRE_NameQualifier_maybes, getRdrNam
 import GHC.Types.SrcLoc as SrcLoc
 import qualified GHC.Parser.Lexer as Lexer
 import GHC.Parser.Header ( toArgs )
+import GHC.Types.PkgQual
 
 import GHC.Unit
 import GHC.Unit.Finder as Finder
@@ -2049,7 +2049,7 @@ addModule files = do
       let dflags    = hsc_dflags hsc_env
       let fopts     = initFinderOpts dflags
       result <- liftIO $
-        Finder.findImportedModule fc fopts units home_unit m (Just (fsLit "this"))
+        Finder.findImportedModule fc fopts units home_unit m (ThisPkg (homeUnitId home_unit))
       case result of
         Found _ _ -> return True
         _ -> (liftIO $ putStrLn $
@@ -2208,12 +2208,14 @@ keepPackageImports = filterM is_pkg_import
      is_pkg_import :: GHC.GhcMonad m => InteractiveImport -> m Bool
      is_pkg_import (IIModule _) = return False
      is_pkg_import (IIDecl d)
-         = do e <- MC.try $ GHC.findModule mod_name (fmap sl_fs $ ideclPkgQual d)
+         = do pkgqual <- GHC.renameRawPkgQualM (ideclPkgQual d)
+              e <- MC.try $ GHC.findQualifiedModule pkgqual mod_name
               case e :: Either SomeException Module of
                 Left _  -> return False
                 Right m -> return (not (isMainUnitModule m))
         where
           mod_name = unLoc (ideclName d)
+
 
 
 modulesLoadedMsg :: GHC.GhcMonad m => SuccessFlag -> [GHC.ModSummary] -> m ()
@@ -2560,9 +2562,10 @@ guessCurrentModule cmd
        when (null imports) $ throwGhcException $
           CmdLineError (':' : cmd ++ ": no current module")
        case (head imports) of
-          IIModule m -> GHC.findModule m Nothing
-          IIDecl d   -> GHC.findModule (unLoc (ideclName d))
-                                       (fmap sl_fs $ ideclPkgQual d)
+          IIModule m -> GHC.findQualifiedModule NoPkgQual m
+          IIDecl d   -> do
+            pkgqual <- GHC.renameRawPkgQualM (ideclPkgQual d)
+            GHC.findQualifiedModule pkgqual (unLoc (ideclName d))
 
 -- without bang, show items in context of their parents and omit children
 -- with bang, show class methods and data constructors separately, and
@@ -2759,8 +2762,8 @@ checkAdd ii = do
 
     IIDecl d -> do
        let modname = unLoc (ideclName d)
-           pkgqual = ideclPkgQual d
-       m <- GHC.lookupModule modname (fmap sl_fs pkgqual)
+       pkgqual <- GHC.renameRawPkgQualM (ideclPkgQual d)
+       m <- GHC.lookupQualifiedModule pkgqual modname
        when safe $ do
            t <- GHC.isModuleTrusted m
            when (not t) $ throwGhcException $ ProgramError $ ""
@@ -4510,7 +4513,7 @@ lookupModule :: GHC.GhcMonad m => String -> m Module
 lookupModule mName = lookupModuleName (GHC.mkModuleName mName)
 
 lookupModuleName :: GHC.GhcMonad m => ModuleName -> m Module
-lookupModuleName mName = GHC.lookupModule mName Nothing
+lookupModuleName mName = GHC.lookupQualifiedModule NoPkgQual mName
 
 isMainUnitModule :: Module -> Bool
 isMainUnitModule m = GHC.moduleUnit m == mainUnit
