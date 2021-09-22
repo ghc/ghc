@@ -44,7 +44,7 @@ nofibRules = do
         (Exit e, Stdouterr log) <- cmd (Cwd "nofib") [makePath] nofibArgs
         writeFile' fp log
         if e == ExitSuccess
-            then putLoud $ "nofib log available at " ++ fp
+            then putVerbose $ "nofib log available at " ++ fp
             else error $ "nofib failed, full log available at " ++ fp
 
 -- | Build the dependencies required by @nofib@.

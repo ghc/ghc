@@ -253,7 +253,7 @@ instance H.Builder Builder where
                 output = fromSingleton msgOut buildOutputs
                 msgOut = "[runBuilderWith] Exactly one output file expected."
                 -- Suppress stdout depending on the Shake's verbosity setting.
-                echo = EchoStdout (verbosity >= Loud)
+                echo = EchoStdout (verbosity >= Verbose)
                 -- Capture stdout and write it to the output file.
                 captureStdout = do
                     Stdout stdout <- cmd' [path] buildArgs
@@ -308,7 +308,7 @@ instance H.Builder Builder where
                   -- xelatex produces an incredible amount of output, almost
                   -- all of which is useless. Suppress it unless user
                   -- requests a loud build.
-                  if verbosity >= Loud
+                  if verbosity >= Verbose
                     then cmd' [Cwd output] [path] buildArgs
                     else do (Stdouterr out, Exit code) <- cmd' [Cwd output] [path] buildArgs
                             when (code /= ExitSuccess) $ do

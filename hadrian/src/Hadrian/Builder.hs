@@ -122,7 +122,7 @@ doWith f info rs opts target args = do
     trackArgsHash target -- Rerun the rule if the hash of argList has changed.
     info target
     verbose <- interpret target verboseCommand
-    let quietlyUnlessVerbose = if verbose then withVerbosity Loud else quietly
+    let quietlyUnlessVerbose = if verbose then withVerbosity Verbose else quietly
     quietlyUnlessVerbose $ f (builder target) $
         BuildInfo { buildArgs      = argList
                   , buildInputs    = inputs target

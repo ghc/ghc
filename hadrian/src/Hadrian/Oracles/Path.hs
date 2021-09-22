@@ -47,7 +47,7 @@ pathOracle = do
     void $ addOracleCache $ \(WindowsPath path) -> do
         Stdout out <- quietly $ cmd ["cygpath", "-m", path]
         let windowsPath = unifyPath $ dropWhileEnd isSpace out
-        putLoud $ "| Windows path mapping: " ++ path ++ " => " ++ windowsPath
+        putVerbose $ "| Windows path mapping: " ++ path ++ " => " ++ windowsPath
         return windowsPath
 
     void $ addOracleCache $ \(LookupInPath name) -> do
@@ -56,5 +56,5 @@ pathOracle = do
         exe <- case exes of
           []      -> error $ "Cannot find executable " ++ quote name
           (exe:_) -> pure $ unifyPath exe
-        putLoud $ "| Executable found: " ++ name ++ " => " ++ exe
+        putVerbose $ "| Executable found: " ++ name ++ " => " ++ exe
         return exe

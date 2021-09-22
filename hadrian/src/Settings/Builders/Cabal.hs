@@ -63,7 +63,7 @@ cabalBuilderArgs = builder (Cabal Setup) ? do
             , with Alex
             , with Happy
             -- Update Target.trackArgument if changing these:
-            , verbosity < Chatty ?
+            , verbosity < Verbose ?
               pure [ "-v0", "--configure-option=--quiet"
                    , "--configure-option=--disable-option-checking" ] ]
 
