@@ -40,7 +40,7 @@ import GHC.Types.SrcLoc
 
 import GHC.Utils.Outputable
 import GHC.Utils.FV
-import GHC.Utils.Error( Validity(..), allValid )
+import GHC.Utils.Error( Validity'(..), Validity, allValid )
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 

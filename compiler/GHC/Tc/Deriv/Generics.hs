@@ -47,7 +47,7 @@ import GHC.Builtin.Names
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Monad
 import GHC.Driver.Session
-import GHC.Utils.Error( Validity(..), andValid )
+import GHC.Utils.Error( Validity'(..), Validity, andValid )
 import GHC.Types.SrcLoc
 import GHC.Data.Bag
 import GHC.Types.Var.Env

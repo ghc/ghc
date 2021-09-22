@@ -10,7 +10,7 @@
 
 module GHC.Utils.Error (
         -- * Basic types
-        Validity(..), andValid, allValid, isValid, getInvalids, orValid,
+        Validity'(..), Validity, andValid, allValid, isValid, getInvalids, orValid,
         Severity(..),
 
         -- * Messages
@@ -191,27 +191,30 @@ mkPlainErrorMsgEnvelope locn msg =
   mk_msg_envelope SevError locn alwaysQualify msg
 
 -------------------------
-data Validity
-  = IsValid            -- ^ Everything is fine
-  | NotValid SDoc    -- ^ A problem, and some indication of why
+data Validity' a
+  = IsValid      -- ^ Everything is fine
+  | NotValid a   -- ^ A problem, and some indication of why
 
-isValid :: Validity -> Bool
+-- | Monomorphic version of @Validity'@ specialised for 'SDoc's.
+type Validity = Validity' SDoc
+
+isValid :: Validity' a -> Bool
 isValid IsValid       = True
 isValid (NotValid {}) = False
 
-andValid :: Validity -> Validity -> Validity
+andValid :: Validity' a -> Validity' a -> Validity' a
 andValid IsValid v = v
 andValid v _       = v
 
 -- | If they aren't all valid, return the first
-allValid :: [Validity] -> Validity
+allValid :: [Validity' a] -> Validity' a
 allValid []       = IsValid
 allValid (v : vs) = v `andValid` allValid vs
 
-getInvalids :: [Validity] -> [SDoc]
+getInvalids :: [Validity' a] -> [a]
 getInvalids vs = [d | NotValid d <- vs]
 
-orValid :: Validity -> Validity -> Validity
+orValid :: Validity' a -> Validity' a -> Validity' a
 orValid IsValid _ = IsValid
 orValid _       v = v
 
