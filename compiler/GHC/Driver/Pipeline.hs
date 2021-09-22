@@ -239,12 +239,12 @@ compileOne' mHscMessage
 
    plugin_hsc_env <- initializePlugins hsc_env (Just (ms_mnwib summary))
    let pipe_env = mkPipeEnv NoStop input_fn pipelineOutput
-   status <- hscRecompStatus mHscMessage plugin_hsc_env summary
+   status <- hscRecompStatus mHscMessage plugin_hsc_env upd_summary
                 mb_old_iface mb_old_linkable (mod_index, nmods)
-   let pipeline = hscPipeline pipe_env (setDumpPrefix pipe_env plugin_hsc_env, summary, status)
+   let pipeline = hscPipeline pipe_env (setDumpPrefix pipe_env plugin_hsc_env, upd_summary, status)
    (iface, linkable) <- runPipeline (hsc_hooks hsc_env) pipeline
    -- See Note [ModDetails and --make mode]
-   details <- initModDetails plugin_hsc_env summary iface
+   details <- initModDetails plugin_hsc_env upd_summary iface
    return $! HomeModInfo iface details linkable
 
  where lcl_dflags  = ms_hspp_opts summary
@@ -303,6 +303,7 @@ compileOne' mHscMessage
          | otherwise
          = (backend dflags, dflags2)
        dflags  = dflags3 { includePaths = addImplicitQuoteInclude old_paths [current_dir] }
+       upd_summary = summary { ms_hspp_opts = dflags }
        hsc_env = hscSetFlags dflags hsc_env0
 
 -- ---------------------------------------------------------------------------
