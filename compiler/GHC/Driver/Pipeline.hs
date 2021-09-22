@@ -718,13 +718,10 @@ fullPipeline pipe_env hsc_env pp_fn src_flavour = do
   let hsc_env' = hscSetFlags dflags hsc_env
   (hsc_env_with_plugins, mod_sum, hsc_recomp_status)
     <- use (T_HscRecomp pipe_env hsc_env' input_fn src_flavour)
-  res <- hscPipeline pipe_env (hsc_env_with_plugins, mod_sum, hsc_recomp_status)
-  checkDynamicToo pipe_env hsc_env pp_fn src_flavour res
-  -- Once the pipeline has finished, check to see if -dynamic-too failed and
-  -- rerun again if it failed but just the `--dynamic` way.
+  hscPipeline pipe_env (hsc_env_with_plugins, mod_sum, hsc_recomp_status)
 
-checkDynamicToo :: P m => PipeEnv -> HscEnv -> FilePath -> HscSource -> (ModIface, Maybe Linkable) -> m (ModIface, Maybe Linkable)
-checkDynamicToo pipe_env hsc_env pp_fn src_flavour res = do
+checkDynamicToo :: P m => HscEnv -> (HscEnv -> m (ModIface, Maybe Linkable)) -> (ModIface, Maybe Linkable) -> m (ModIface, Maybe Linkable)
+checkDynamicToo hsc_env dyn_too_rerun res = do
   liftIO (dynamicTooState (hsc_dflags hsc_env)) >>= \case
       DT_Dont   -> return res
       DT_Dyn    -> return res
@@ -752,7 +749,7 @@ checkDynamicToo pipe_env hsc_env pp_fn src_flavour res = do
               liftIO (debugTraceMsg logger 4
                         (text "Running the full pipeline again for -dynamic-too"))
               hsc_env' <- liftIO (resetHscEnv hsc_env)
-              fullPipeline pipe_env hsc_env' pp_fn src_flavour
+              dyn_too_rerun hsc_env'
   where
     dflags = hsc_dflags hsc_env
     logger = hsc_logger hsc_env
@@ -778,14 +775,17 @@ resetHscEnv hsc_env = do
   return hsc_env''
 
 -- | Everything after preprocess
-hscPipeline :: P m => PipeEnv -> ((HscEnv, ModSummary, HscRecompStatus)) -> m (ModIface, Maybe Linkable)
+hscPipeline :: P m => PipeEnv ->  ((HscEnv, ModSummary, HscRecompStatus)) -> m (ModIface, Maybe Linkable)
 hscPipeline pipe_env (hsc_env_with_plugins, mod_sum, hsc_recomp_status) = do
   case hsc_recomp_status of
     HscUpToDate iface mb_linkable -> return (iface, mb_linkable)
     HscRecompNeeded mb_old_hash -> do
       (tc_result, warnings) <- use (T_Hsc hsc_env_with_plugins mod_sum)
       hscBackendAction <- use (T_HscPostTc hsc_env_with_plugins mod_sum tc_result warnings mb_old_hash )
-      hscBackendPipeline pipe_env hsc_env_with_plugins mod_sum hscBackendAction
+      res <- hscBackendPipeline pipe_env hsc_env_with_plugins mod_sum hscBackendAction
+      -- Once the pipeline has finished, check to see if -dynamic-too failed and
+      -- rerun again if it failed but just the `--dynamic` way.
+      checkDynamicToo hsc_env_with_plugins (\hsc' -> hscPipeline pipe_env (hsc', mod_sum, hsc_recomp_status)) res
 
 hscBackendPipeline :: P m => PipeEnv -> HscEnv -> ModSummary -> HscBackendAction -> m (ModIface, Maybe Linkable)
 hscBackendPipeline pipe_env hsc_env mod_sum result =
