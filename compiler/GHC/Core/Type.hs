@@ -408,6 +408,8 @@ coreView :: Type -> Maybe Type
 -- Returns 'Nothing' if there is nothing to look through.
 -- This function considers 'Constraint' to be a synonym of @Type@.
 --
+-- This function does not look through type family applications.
+--
 -- By being non-recursive and inlined, this case analysis gets efficiently
 -- joined onto the case analysis that the caller is already doing
 coreView ty@(TyConApp tc tys)
@@ -2507,8 +2509,8 @@ GHC.Core.TyCo.Rep for details.
 -}
 
 eqType :: Type -> Type -> Bool
--- ^ Type equality on source types. Does not look through @newtypes@ or
--- 'PredType's, but it does look through type synonyms.
+-- ^ Type equality on source types. Does not look through @newtypes@,
+-- 'PredType's or type families, but it does look through type synonyms.
 -- This first checks that the kinds of the types are equal and then
 -- checks whether the types are equal, ignoring casts and coercions.
 -- (The kind check is a recursive call, but since all kinds have type
