@@ -4031,7 +4031,7 @@ breakById inp = do
     let (mod_str, top_level, fun_str) = splitIdent inp
         mod_top_lvl = combineModIdent mod_str top_level
     mb_mod <- catch (lookupModuleInscope mod_top_lvl)
-                    (\(_ :: SomeExceptionWithLocation) -> lookupModuleInGraph mod_str)
+                    (\(_ :: SomeException) -> lookupModuleInGraph mod_str)
       -- If the top-level name is not in scope, `lookupModuleInscope` will
       -- throw an exception, then lookup the module name in the module graph.
     mb_err_msg <- validateBP mod_str fun_str mb_mod

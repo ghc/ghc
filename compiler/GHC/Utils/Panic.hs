@@ -141,11 +141,7 @@ safeShowException e = do
     r <- try (return $! forceList (showException e))
     case r of
         Right msg -> return msg
-#if __GLASGOW_HASKELL__ >= 903
-        Left e' -> safeShowException (e' :: SomeExceptionWithLocation)
-#else
         Left e' -> safeShowException (e' :: SomeException)
-#endif
     where
         forceList [] = []
         forceList xs@(x : xt) = x `seq` forceList xt `seq` xs

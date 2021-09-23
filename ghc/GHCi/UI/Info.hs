@@ -276,7 +276,7 @@ collectInfo ms loaded = do
   where
     go df unit_state m name = do { info <- getModInfo name; return (M.insert name info m) }
                    `MC.catch`
-                   (\(e :: SomeExceptionWithLocation) -> do
+                   (\(e :: SomeException) -> do
                          liftIO $ putStrLn
                                 $ showSDocForUser df unit_state alwaysQualify
                                 $ "Error while getting type info from" <+>

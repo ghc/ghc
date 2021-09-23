@@ -701,7 +701,7 @@ hDuplicateTo h1 _ =
   ioe_dupHandlesNotCompatible h1
 
 try :: IO () -> IO ()
-try io = io `catchException` (const (pure ()) :: SomeExceptionWithLocation -> IO ())
+try io = io `catchException` (const (pure ()) :: SomeException -> IO ())
 
 ioe_dupHandlesNotCompatible :: Handle -> IO a
 ioe_dupHandlesNotCompatible h =

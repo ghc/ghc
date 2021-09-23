@@ -536,36 +536,19 @@ findSystemLibrary interp str = interpCmd interp (FindSystemLibrary str)
 iservCall :: Binary a => IServInstance -> Message a -> IO a
 iservCall iserv msg =
   remoteCall (iservPipe iserv) msg
-    -- TODO: Use SomeExceptionWithLocation?
-#if __GLASGOW_HASKELL__ >= 903
-    `catchException` \(e :: SomeExceptionWithLocation) -> handleIServFailure iserv e
-#else
     `catchException` \(e :: SomeException) -> handleIServFailure iserv e
-#endif
 -- | Read a value from the iserv process
 readIServ :: IServInstance -> Get a -> IO a
 readIServ iserv get =
   readPipe (iservPipe iserv) get
-#if __GLASGOW_HASKELL__ >= 903
-    `catchException` \(e :: SomeExceptionWithLocation) -> handleIServFailure iserv e
-#else
     `catchException` \(e :: SomeException) -> handleIServFailure iserv e
-#endif
 -- | Send a value to the iserv process
 writeIServ :: IServInstance -> Put -> IO ()
 writeIServ iserv put =
   writePipe (iservPipe iserv) put
-#if __GLASGOW_HASKELL__ >= 903
-    `catchException` \(e :: SomeExceptionWithLocation) -> handleIServFailure iserv e
-#else
     `catchException` \(e :: SomeException) -> handleIServFailure iserv e
-#endif
 
-#if __GLASGOW_HASKELL__ >= 903
-handleIServFailure :: IServInstance -> SomeExceptionWithLocation -> IO a
-#else
 handleIServFailure :: IServInstance -> SomeException -> IO a
-#endif
 handleIServFailure iserv e = do
   let proc = iservProcess iserv
   ex <- getProcessExitCode proc

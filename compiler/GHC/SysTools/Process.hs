@@ -63,11 +63,7 @@ readCreateProcessWithExitCode' proc = do
 
     -- fork off a thread to start consuming the output
     outMVar <- newEmptyMVar
-#if __GLASGOW_HASKELL__ >= 903
-    let onError :: SomeExceptionWithLocation -> IO ()
-#else
     let onError :: SomeException -> IO ()
-#endif
         onError exc = putMVar outMVar (Left exc)
     _ <- forkIO $ handle onError $ do
       output <- hGetContents' outh
