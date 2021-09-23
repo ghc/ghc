@@ -1,7 +1,6 @@
 module Main (main) where
 
 import Development.Shake
-import Hadrian.Expression
 import Hadrian.Utilities
 import Settings.Parser
 import System.Directory (getCurrentDirectory)
@@ -9,6 +8,7 @@ import System.IO
 import System.Exit
 import System.Environment
 import Control.Exception
+import Data.IORef
 
 import qualified Base
 import qualified CommandLine
@@ -31,7 +31,7 @@ main = do
     argsMap <- CommandLine.cmdLineArgsMap
     let extra = insertExtra UserSettings.buildProgressColour
               $ insertExtra UserSettings.successColour
-              $ insertExtra (VerboseCommand UserSettings.verboseCommand) argsMap
+              $ argsMap
 
         BuildRoot buildRoot = CommandLine.lookupBuildRoot argsMap
 
@@ -100,23 +100,30 @@ main = do
             Rules.topLevelTargets
             Rules.toolArgsTarget
 
-    handleShakeException options $ shakeArgsWith options CommandLine.optDescrs $ \_ targets -> do
+    shake_opts_var <- newIORef options
+    handleShakeException shake_opts_var $ shakeArgsOptionsWith options CommandLine.optDescrs $ \shake_opts _ targets -> do
+        writeIORef  shake_opts_var shake_opts
         let targets' = filter (not . null) $ removeKVs targets
         Environment.setupEnvironment
-        return . Just $ if null targets'
-                        then rules
-                        else want targets' >> withoutActions rules
+        return . Just $ (shake_opts, if null targets'
+                                      then rules
+                                      else want targets' >> withoutActions rules)
 
-handleShakeException :: ShakeOptions -> IO a -> IO a
-handleShakeException opts shake_run = do
+handleShakeException :: IORef ShakeOptions -> IO a -> IO a
+handleShakeException shake_opts_var shake_run = do
   args <- getArgs
   catch (withArgs ("--exception" : args) $ shake_run) $ \(_e :: ShakeException) -> do
-    hPrint stderr (shakeExceptionInner _e)
+    shake_opts <- readIORef shake_opts_var
+    let
+      FailureColour col = lookupExtra red (shakeExtra shake_opts)
+      esc = if shakeColor shake_opts then escape col else id
+    if shakeVerbosity shake_opts >= Verbose
+      then
+        hPrint stderr _e
+      else
+        hPrint stderr (shakeExceptionInner _e)
     hPutStrLn stderr (esc "Build failed.")
     exitFailure
-  where
-    FailureColour col = lookupExtra red (shakeExtra opts)
-    esc = if shakeColor opts then escape col else id
 
 escForeground :: String -> String
 escForeground code = "\ESC[" ++ code ++ "m"
