@@ -412,9 +412,11 @@ data UnitState = UnitState {
   -- See Note [VirtUnit to RealUnit improvement]
   preloadClosure :: PreloadUnitClosure,
 
-  -- | A mapping of 'PackageName' to 'IndefUnitId'.  This is used when
-  -- users refer to packages in Backpack includes.
-  packageNameMap            :: UniqFM PackageName IndefUnitId,
+  -- | A mapping of 'PackageName' to 'UnitId'. If several units have the same
+  -- package name (e.g. different instantiations), then we return one of them...
+  -- This is used when users refer to packages in Backpack includes.
+  -- And also to resolve package qualifiers with the PackageImports extension.
+  packageNameMap            :: UniqFM PackageName UnitId,
 
   -- | A mapping from database unit keys to wired in unit ids.
   wireMap :: Map UnitId UnitId,
@@ -498,7 +500,7 @@ lookupUnit' allowOnTheFlyInst pkg_map closure u = case u of
       -> -- lookup UnitInfo of the indefinite unit to be instantiated and
          -- instantiate it on-the-fly
          fmap (renameUnitInfo pkg_map closure (instUnitInsts i))
-           (Map.lookup (indefUnit (instUnitInstanceOf i)) pkg_map)
+           (Map.lookup (instUnitInstanceOf i) pkg_map)
 
       | otherwise
       -> -- lookup UnitInfo by virtual UnitId. This is used to find indefinite
@@ -531,7 +533,7 @@ unsafeLookupUnitId state uid = case lookupUnitId state uid of
 
 -- | Find the unit we know about with the given package name (e.g. @foo@), if any
 -- (NB: there might be a locally defined unit name which overrides this)
-lookupPackageName :: UnitState -> PackageName -> Maybe IndefUnitId
+lookupPackageName :: UnitState -> PackageName -> Maybe UnitId
 lookupPackageName pkgstate n = lookupUFM (packageNameMap pkgstate) n
 
 -- | Search for units with a given package ID (e.g. \"foo-0.1\")
@@ -936,7 +938,7 @@ findPackages prec_map pkg_map closure arg pkgs unusable
             | iuid == unitId p
             -> Just p
           VirtUnit inst
-            | indefUnit (instUnitInstanceOf inst) == unitId p
+            | instUnitInstanceOf inst == unitId p
             -> Just (renameUnitInfo pkg_map closure (instUnitInsts inst) p)
           _ -> Nothing
 
@@ -1108,7 +1110,7 @@ findWiredInUnits logger prec_map pkgs vis_map = do
           where upd_pkg pkg
                   | Just wiredInUnitId <- Map.lookup (unitId pkg) wiredInMap
                   = pkg { unitId         = wiredInUnitId
-                        , unitInstanceOf = fmap (const wiredInUnitId) (unitInstanceOf pkg)
+                        , unitInstanceOf = wiredInUnitId
                            -- every non instantiated unit is an instance of
                            -- itself (required by Backpack...)
                            --
@@ -2002,14 +2004,7 @@ instance Outputable UnitErr where
 -- to form @mod_name@, or @[]@ if this is not a requirement.
 requirementMerges :: UnitState -> ModuleName -> [InstantiatedModule]
 requirementMerges pkgstate mod_name =
-    fmap fixupModule $ fromMaybe [] (Map.lookup mod_name (requirementContext pkgstate))
-    where
-      -- update IndefUnitId ppr info as they may have changed since the
-      -- time the IndefUnitId was created
-      fixupModule (Module iud name) = Module iud' name
-         where
-            iud' = iud { instUnitInstanceOf = cid' }
-            cid' = instUnitInstanceOf iud
+    fromMaybe [] (Map.lookup mod_name (requirementContext pkgstate))
 
 -- -----------------------------------------------------------------------------
 
@@ -2017,7 +2012,7 @@ requirementMerges pkgstate mod_name =
 --
 -- Cabal packages may contain several components (programs, libraries, etc.).
 -- As far as GHC is concerned, installed package components ("units") are
--- identified by an opaque IndefUnitId string provided by Cabal. As the string
+-- identified by an opaque UnitId string provided by Cabal. As the string
 -- contains a hash, we don't want to display it to users so GHC queries the
 -- database to retrieve some infos about the original source package (name,
 -- version, component name).

@@ -122,14 +122,14 @@ doBackpack [src_filename] = do
                     innerBkpM $ do
                         let (cid, insts) = computeUnitId lunit
                         if null insts
-                            then if cid == Indefinite (UnitId (fsLit "main"))
+                            then if cid == UnitId (fsLit "main")
                                     then compileExe lunit
                                     else compileUnit cid []
                             else typecheckUnit cid insts
 doBackpack _ =
     throwGhcException (CmdLineError "--backpack can only process a single file")
 
-computeUnitId :: LHsUnit HsComponentId -> (IndefUnitId, [(ModuleName, Module)])
+computeUnitId :: LHsUnit HsComponentId -> (UnitId, [(ModuleName, Module)])
 computeUnitId (L _ unit) = (cid, [ (r, mkHoleModule r) | r <- reqs ])
   where
     cid = hsComponentId (unLoc (hsunitName unit))
@@ -155,7 +155,7 @@ data SessionType
 
 -- | Create a temporary Session to do some sort of type checking or
 -- compilation.
-withBkpSession :: IndefUnitId
+withBkpSession :: UnitId
                -> [(ModuleName, Module)]
                -> [(Unit, ModRenaming)]
                -> SessionType   -- what kind of session are we doing
@@ -163,7 +163,7 @@ withBkpSession :: IndefUnitId
                -> BkpM a
 withBkpSession cid insts deps session_type do_this = do
     dflags <- getDynFlags
-    let cid_fs = unitFS (indefUnit cid)
+    let cid_fs = unitFS cid
         is_primary = False
         uid_str = unpackFS (mkInstantiatedUnitHash cid insts)
         cid_str = unpackFS cid_fs
@@ -193,7 +193,7 @@ withBkpSession cid insts deps session_type do_this = do
                                      -- if we don't have any instantiation, don't
                                      -- fill `homeUnitInstanceOfId` as it makes no
                                      -- sense (we're not instantiating anything)
-            , homeUnitInstanceOf_   = if null insts then Nothing else Just (indefUnit cid)
+            , homeUnitInstanceOf_   = if null insts then Nothing else Just cid
             , homeUnitId_ = case session_type of
                 TcSession -> newUnitId cid Nothing
                 -- No hash passed if no instances
@@ -245,21 +245,21 @@ withBkpSession cid insts deps session_type do_this = do
 
 withBkpExeSession :: [(Unit, ModRenaming)] -> BkpM a -> BkpM a
 withBkpExeSession deps do_this =
-    withBkpSession (Indefinite (UnitId (fsLit "main"))) [] deps ExeSession do_this
+    withBkpSession (UnitId (fsLit "main")) [] deps ExeSession do_this
 
-getSource :: IndefUnitId -> BkpM (LHsUnit HsComponentId)
+getSource :: UnitId -> BkpM (LHsUnit HsComponentId)
 getSource cid = do
     bkp_env <- getBkpEnv
     case Map.lookup cid (bkp_table bkp_env) of
         Nothing -> pprPanic "missing needed dependency" (ppr cid)
         Just lunit -> return lunit
 
-typecheckUnit :: IndefUnitId -> [(ModuleName, Module)] -> BkpM ()
+typecheckUnit :: UnitId -> [(ModuleName, Module)] -> BkpM ()
 typecheckUnit cid insts = do
     lunit <- getSource cid
     buildUnit TcSession cid insts lunit
 
-compileUnit :: IndefUnitId -> [(ModuleName, Module)] -> BkpM ()
+compileUnit :: UnitId -> [(ModuleName, Module)] -> BkpM ()
 compileUnit cid insts = do
     -- Let everyone know we're building this unit
     msgUnitId (mkVirtUnit cid insts)
@@ -287,7 +287,7 @@ hsunitDeps include_sigs unit = concatMap get_dep (hsunitBody unit)
             convRn (L _ (Renaming (L _ from) (Just (L _ to)))) = (from, to)
     get_dep _ = []
 
-buildUnit :: SessionType -> IndefUnitId -> [(ModuleName, Module)] -> LHsUnit HsComponentId -> BkpM ()
+buildUnit :: SessionType -> UnitId -> [(ModuleName, Module)] -> LHsUnit HsComponentId -> BkpM ()
 buildUnit session cid insts lunit = do
     -- NB: include signature dependencies ONLY when typechecking.
     -- If we're compiling, it's not necessary to recursively
@@ -342,7 +342,7 @@ buildUnit session cid insts lunit = do
             obj_files = concatMap getOfiles linkables
             state     = hsc_units hsc_env
 
-        let compat_fs = unitIdFS (indefUnit cid)
+        let compat_fs = unitIdFS cid
             compat_pn = PackageName compat_fs
             unit_id   = homeUnitId (hsc_home_unit hsc_env)
 
@@ -475,7 +475,7 @@ data BkpEnv
         -- | The filename of the bkp file we're compiling
         bkp_filename :: FilePath,
         -- | Table of source units which we know how to compile
-        bkp_table :: Map IndefUnitId (LHsUnit HsComponentId),
+        bkp_table :: Map UnitId (LHsUnit HsComponentId),
         -- | When a package we are compiling includes another package
         -- which has not been compiled, we bump the level and compile
         -- that.
@@ -631,7 +631,7 @@ type PackageNameMap a = UniqFM PackageName a
 -- to use this for anything
 unitDefines :: LHsUnit PackageName -> (PackageName, HsComponentId)
 unitDefines (L _ HsUnit{ hsunitName = L _ pn@(PackageName fs) })
-    = (pn, HsComponentId pn (Indefinite (UnitId fs)))
+    = (pn, HsComponentId pn (UnitId fs))
 
 bkpPackageNameMap :: [LHsUnit PackageName] -> PackageNameMap HsComponentId
 bkpPackageNameMap units = listToUFM (map unitDefines units)
@@ -924,7 +924,7 @@ hsModuleToModSummary pn hsc_src modname
 
 -- | Create a new, externally provided hashed unit id from
 -- a hash.
-newUnitId :: IndefUnitId -> Maybe FastString -> UnitId
+newUnitId :: UnitId -> Maybe FastString -> UnitId
 newUnitId uid mhash = case mhash of
-   Nothing   -> indefUnit uid
-   Just hash -> UnitId (unitIdFS (indefUnit uid) `appendFS` mkFastString "+" `appendFS` hash)
+   Nothing   -> uid
+   Just hash -> UnitId (unitIdFS uid `appendFS` mkFastString "+" `appendFS` hash)

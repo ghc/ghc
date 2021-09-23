@@ -153,10 +153,6 @@ synonyms, classes, etc.) to typecheck modules depending on them but not
 enough to compile them. As such, indefinite units found in databases only
 provide module interfaces (the .hi ones this time), not object code.
 
-To distinguish between indefinite and definite unit ids at the type level, we
-respectively use 'IndefUnitId' and 'DefUnitId' datatypes that are basically
-wrappers over 'UnitId'.
-
 Unit instantiation / on-the-fly instantiation
 ---------------------------------------------
 
@@ -224,7 +220,7 @@ on-the-fly:
 
 'InstantiatedUnit' has two interesting fields:
 
-   * instUnitInstanceOf :: IndefUnitId
+   * instUnitInstanceOf :: UnitId
       -- ^ the indefinite unit that is instantiated
 
    * instUnitInsts :: [(ModuleName,(Unit,ModuleName)]
@@ -267,7 +263,7 @@ themselves.  It is a reminiscence of previous terminology (when "instanceOf" was
                                  , ...
                                  }
 
-TODO: We should probably have `instanceOf :: Maybe IndefUnitId` instead.
+TODO: We should probably have `instanceOf :: Maybe UnitId` instead.
 
 
 Note [Pretty-printing UnitId]

@@ -99,7 +99,7 @@ import GHC.IO.Handle.Lock
 import System.Directory
 
 -- | @ghc-boot@'s UnitInfo, serialized to the database.
-type DbUnitInfo      = GenericUnitInfo BS.ByteString BS.ByteString BS.ByteString BS.ByteString BS.ByteString DbModule
+type DbUnitInfo      = GenericUnitInfo BS.ByteString BS.ByteString BS.ByteString BS.ByteString DbModule
 
 -- | Information about an unit (a unit is an installed module library).
 --
@@ -109,14 +109,16 @@ type DbUnitInfo      = GenericUnitInfo BS.ByteString BS.ByteString BS.ByteString
 -- Some types are left as parameters to be instantiated differently in ghc-pkg
 -- and in ghc itself.
 --
-data GenericUnitInfo compid srcpkgid srcpkgname uid modulename mod = GenericUnitInfo
+data GenericUnitInfo srcpkgid srcpkgname uid modulename mod = GenericUnitInfo
    { unitId             :: uid
       -- ^ Unique unit identifier that is used during compilation (e.g. to
       -- generate symbols).
 
-   , unitInstanceOf     :: compid
+   , unitInstanceOf     :: uid
       -- ^ Identifier of an indefinite unit (i.e. with module holes) that this
       -- unit is an instance of.
+      --
+      -- For non instantiated units, unitInstanceOf=unitId
 
    , unitInstantiations :: [(modulename, mod)]
       -- ^ How this unit instantiates some of its module holes. Map hole module
@@ -252,16 +254,15 @@ type FilePathST = ST.ShortText
 -- | Convert between GenericUnitInfo instances
 mapGenericUnitInfo
    :: (uid1 -> uid2)
-   -> (cid1 -> cid2)
    -> (srcpkg1 -> srcpkg2)
    -> (srcpkgname1 -> srcpkgname2)
    -> (modname1 -> modname2)
    -> (mod1 -> mod2)
-   -> (GenericUnitInfo cid1 srcpkg1 srcpkgname1 uid1 modname1 mod1
-       -> GenericUnitInfo cid2 srcpkg2 srcpkgname2 uid2 modname2 mod2)
-mapGenericUnitInfo fuid fcid fsrcpkg fsrcpkgname fmodname fmod g@(GenericUnitInfo {..}) =
+   -> (GenericUnitInfo srcpkg1 srcpkgname1 uid1 modname1 mod1
+       -> GenericUnitInfo srcpkg2 srcpkgname2 uid2 modname2 mod2)
+mapGenericUnitInfo fuid fsrcpkg fsrcpkgname fmodname fmod g@(GenericUnitInfo {..}) =
    g { unitId              = fuid unitId
-     , unitInstanceOf      = fcid unitInstanceOf
+     , unitInstanceOf      = fuid unitInstanceOf
      , unitInstantiations  = fmap (bimap fmodname fmod) unitInstantiations
      , unitPackageId       = fsrcpkg unitPackageId
      , unitPackageName     = fsrcpkgname unitPackageName
@@ -711,7 +712,7 @@ mkMungePathUrl top_dir pkgroot = (munge_path, munge_url)
 -- Also perform a similar substitution for the older GHC-specific
 -- "$topdir" variable. The "topdir" is the location of the ghc
 -- installation (obtained from the -B option).
-mungeUnitInfoPaths :: FilePathST -> FilePathST -> GenericUnitInfo a b c d e f -> GenericUnitInfo a b c d e f
+mungeUnitInfoPaths :: FilePathST -> FilePathST -> GenericUnitInfo a b c d e -> GenericUnitInfo a b c d e
 mungeUnitInfoPaths top_dir pkgroot pkg =
    -- TODO: similar code is duplicated in utils/ghc-pkg/Main.hs
     pkg

@@ -626,7 +626,7 @@ mergeSignatures
             let insts = instUnitInsts iuid
                 isFromSignaturePackage =
                     let inst_uid = instUnitInstanceOf iuid
-                        pkg = unsafeLookupUnitId unit_state (indefUnit inst_uid)
+                        pkg = unsafeLookupUnitId unit_state inst_uid
                     in null (unitExposedModules pkg)
             -- 3(a). Rename the exports according to how the dependency
             -- was instantiated.  The resulting export list will be accurate
@@ -1076,7 +1076,7 @@ instantiateSignature = do
     -- the local one just to get the information?  Hmm...
     massert (isHomeModule home_unit outer_mod )
     massert (isHomeUnitInstantiating home_unit)
-    let uid = Indefinite (homeUnitInstanceOf home_unit)
+    let uid = homeUnitInstanceOf home_unit
     inner_mod `checkImplements`
         Module
             (mkInstantiatedUnit uid (homeUnitInstantiations home_unit))

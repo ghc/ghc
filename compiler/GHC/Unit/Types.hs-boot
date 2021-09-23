@@ -9,11 +9,9 @@ import Data.Kind (Type)
 data UnitId
 data GenModule (unit :: Type)
 data GenUnit (uid :: Type)
-data Indefinite (unit :: Type)
 
 type Module      = GenModule  Unit
 type Unit        = GenUnit    UnitId
-type IndefUnitId = Indefinite UnitId
 
 moduleName :: GenModule a -> ModuleName
 moduleUnit :: GenModule a -> a

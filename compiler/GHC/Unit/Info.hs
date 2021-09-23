@@ -60,7 +60,7 @@ import Data.List (isPrefixOf, stripPrefix)
 --
 -- These two identifiers are different for wired-in packages. See Note [About
 -- Units] in "GHC.Unit"
-type GenUnitInfo unit = GenericUnitInfo (Indefinite unit) PackageId PackageName unit ModuleName (GenModule (GenUnit unit))
+type GenUnitInfo unit = GenericUnitInfo PackageId PackageName unit ModuleName (GenModule (GenUnit unit))
 
 -- | Information about an installed unit (units are identified by their database
 -- UnitKey)
@@ -74,7 +74,6 @@ type UnitInfo    = GenUnitInfo UnitId
 mkUnitKeyInfo :: DbUnitInfo -> UnitKeyInfo
 mkUnitKeyInfo = mapGenericUnitInfo
    mkUnitKey'
-   mkIndefUnitKey'
    mkPackageIdentifier'
    mkPackageName'
    mkModuleName'
@@ -84,9 +83,8 @@ mkUnitKeyInfo = mapGenericUnitInfo
      mkPackageName'       = PackageName    . mkFastStringByteString
      mkUnitKey'           = UnitKey        . mkFastStringByteString
      mkModuleName'        = mkModuleNameFS . mkFastStringByteString
-     mkIndefUnitKey' cid  = Indefinite (mkUnitKey' cid)
      mkVirtUnitKey' i = case i of
-      DbInstUnitId cid insts -> mkVirtUnit (mkIndefUnitKey' cid) (fmap (bimap mkModuleName' mkModule') insts)
+      DbInstUnitId cid insts -> mkVirtUnit (mkUnitKey' cid) (fmap (bimap mkModuleName' mkModule') insts)
       DbUnitId uid           -> RealUnit (Definite (mkUnitKey' uid))
      mkModule' m = case m of
        DbModule uid n -> mkModule (mkVirtUnitKey' uid) (mkModuleName' n)
@@ -96,7 +94,6 @@ mkUnitKeyInfo = mapGenericUnitInfo
 mapUnitInfo :: IsUnitId v => (u -> v) -> GenUnitInfo u -> GenUnitInfo v
 mapUnitInfo f = mapGenericUnitInfo
    f         -- unit identifier
-   (fmap f)  -- indefinite unit identifier
    id        -- package identifier
    id        -- package name
    id        -- module name

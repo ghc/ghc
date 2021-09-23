@@ -1,7 +1,7 @@
 -- | Parsers for unit/module identifiers
 module GHC.Unit.Parser
    ( parseUnit
-   , parseIndefUnitId
+   , parseUnitId
    , parseHoleyModule
    , parseModSubst
    )
@@ -21,7 +21,7 @@ parseUnit :: ReadP Unit
 parseUnit = parseVirtUnitId <++ parseDefUnitId
   where
     parseVirtUnitId = do
-        uid   <- parseIndefUnitId
+        uid   <- parseUnitId
         insts <- parseModSubst
         return (mkVirtUnit uid insts)
     parseDefUnitId = do
@@ -32,11 +32,6 @@ parseUnitId :: ReadP UnitId
 parseUnitId = do
    s <- Parse.munch1 (\c -> isAlphaNum c || c `elem` "-_.+")
    return (UnitId (mkFastString s))
-
-parseIndefUnitId :: ReadP IndefUnitId
-parseIndefUnitId = do
-   uid <- parseUnitId
-   return (Indefinite uid)
 
 parseHoleyModule :: ReadP Module
 parseHoleyModule = parseModuleVar <++ parseModule

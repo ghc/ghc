@@ -1315,7 +1315,6 @@ updateDBCache verbosity db db_stack = do
     GhcPkg.DbOpenReadWrite lock -> GhcPkg.unlockPackageDb lock
 
 type PackageCacheFormat = GhcPkg.GenericUnitInfo
-                            ComponentId
                             PackageIdentifier
                             PackageName
                             UnitId
@@ -1375,7 +1374,7 @@ recomputeValidAbiDeps db pkg =
 -- Ghc.PackageDb to store into the database)
 fromPackageCacheFormat :: PackageCacheFormat -> GhcPkg.DbUnitInfo
 fromPackageCacheFormat = GhcPkg.mapGenericUnitInfo
-     mkUnitId' mkComponentId' mkPackageIdentifier' mkPackageName' mkModuleName' mkModule'
+     mkUnitId' mkPackageIdentifier' mkPackageName' mkModuleName' mkModule'
    where
      displayBS :: Pretty a => a -> BS.ByteString
      displayBS            = toUTF8BS . display
@@ -1396,7 +1395,7 @@ convertPackageInfoToCacheFormat :: InstalledPackageInfo -> PackageCacheFormat
 convertPackageInfoToCacheFormat pkg =
     GhcPkg.GenericUnitInfo {
        GhcPkg.unitId             = installedUnitId pkg,
-       GhcPkg.unitInstanceOf     = installedComponentId pkg,
+       GhcPkg.unitInstanceOf     = mkUnitId (unComponentId (installedComponentId pkg)),
        GhcPkg.unitInstantiations = instantiatedWith pkg,
        GhcPkg.unitPackageId      = sourcePackageId pkg,
        GhcPkg.unitPackageName    = packageName pkg,

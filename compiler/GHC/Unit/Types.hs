@@ -28,7 +28,6 @@ module GHC.Unit.Types
    , UnitKey (..)
    , GenInstantiatedUnit (..)
    , InstantiatedUnit
-   , IndefUnitId
    , DefUnitId
    , Instantiations
    , GenInstantiations
@@ -54,7 +53,6 @@ module GHC.Unit.Types
 
      -- * Utils
    , Definite (..)
-   , Indefinite (..)
 
      -- * Wired-in units
    , primUnitId
@@ -248,7 +246,7 @@ data GenUnit uid
 -- see Note [VirtUnit to RealUnit improvement].
 --
 -- An indefinite unit identifier pretty-prints to something like
--- @p[H=<H>,A=aimpl:A>]@ (@p@ is the 'IndefUnitId', and the
+-- @p[H=<H>,A=aimpl:A>]@ (@p@ is the 'UnitId', and the
 -- brackets enclose the module substitution).
 data GenInstantiatedUnit unit
     = InstantiatedUnit {
@@ -258,8 +256,8 @@ data GenInstantiatedUnit unit
         instUnitFS :: !FastString,
         -- | Cached unique of 'unitFS'.
         instUnitKey :: !Unique,
-        -- | The indefinite unit being instantiated.
-        instUnitInstanceOf :: !(Indefinite unit),
+        -- | The (indefinite) unit being instantiated.
+        instUnitInstanceOf :: !unit,
         -- | The sorted (by 'ModuleName') instantiations of this unit.
         instUnitInsts :: !(GenInstantiations unit),
         -- | A cache of the free module holes of 'instUnitInsts'.
@@ -375,7 +373,7 @@ moduleFreeHoles (Module u        _   ) = unitFreeModuleHoles u
 
 
 -- | Create a new 'GenInstantiatedUnit' given an explicit module substitution.
-mkInstantiatedUnit :: IsUnitId u => Indefinite u -> GenInstantiations u -> GenInstantiatedUnit u
+mkInstantiatedUnit :: IsUnitId u => u -> GenInstantiations u -> GenInstantiatedUnit u
 mkInstantiatedUnit cid insts =
     InstantiatedUnit {
         instUnitInstanceOf = cid,
@@ -390,8 +388,8 @@ mkInstantiatedUnit cid insts =
 
 
 -- | Smart constructor for instantiated GenUnit
-mkVirtUnit :: IsUnitId u => Indefinite u -> [(ModuleName, GenModule (GenUnit u))] -> GenUnit u
-mkVirtUnit uid []    = RealUnit $ Definite (indefUnit uid) -- huh? indefinite unit without any instantiation/hole?
+mkVirtUnit :: IsUnitId u => u -> [(ModuleName, GenModule (GenUnit u))] -> GenUnit u
+mkVirtUnit uid []    = RealUnit $ Definite uid
 mkVirtUnit uid insts = VirtUnit $ mkInstantiatedUnit uid insts
 
 -- | Generate a uniquely identifying hash (internal unit-id) for an instantiated
@@ -402,7 +400,7 @@ mkVirtUnit uid insts = VirtUnit $ mkInstantiatedUnit uid insts
 -- This hash is completely internal to GHC and is not used for symbol names or
 -- file paths. It is different from the hash Cabal would produce for the same
 -- instantiated unit.
-mkInstantiatedUnitHash :: IsUnitId u => Indefinite u -> [(ModuleName, GenModule (GenUnit u))] -> FastString
+mkInstantiatedUnitHash :: IsUnitId u => u -> [(ModuleName, GenModule (GenUnit u))] -> FastString
 mkInstantiatedUnitHash cid sorted_holes =
     mkFastStringByteString
   . fingerprintUnitId (bytesFS (unitFS cid))
@@ -451,7 +449,7 @@ mapGenUnit f = go
                RealUnit d -> RealUnit (fmap f d)
                VirtUnit i ->
                   VirtUnit $ mkInstantiatedUnit
-                     (fmap f (instUnitInstanceOf i))
+                     (f (instUnitInstanceOf i))
                      (fmap (second (fmap go)) (instUnitInsts i))
 
 -- | Map over the unit identifier of unit instantiations.
@@ -462,7 +460,7 @@ mapInstantiations f = map (second (fmap (mapGenUnit f)))
 -- the UnitId of the indefinite unit this unit is an instance of.
 toUnitId :: Unit -> UnitId
 toUnitId (RealUnit (Definite iuid)) = iuid
-toUnitId (VirtUnit indef)           = indefUnit (instUnitInstanceOf indef)
+toUnitId (VirtUnit indef)           = instUnitInstanceOf indef
 toUnitId HoleUnit                   = error "Hole unit"
 
 -- | Return the virtual UnitId of an on-the-fly instantiated unit.
@@ -532,14 +530,6 @@ stringToUnitId = UnitId . mkFastString
 
 -- | A definite unit (i.e. without any free module hole)
 newtype Definite unit = Definite { unDefinite :: unit }
-   deriving (Functor)
-   deriving newtype (Eq, Ord, Outputable, Binary, Uniquable, IsUnitId)
-
--- | An 'IndefUnitId' is an 'UnitId' with the invariant that it only
--- refers to an indefinite library; i.e., one that can be instantiated.
-type IndefUnitId = Indefinite UnitId
-
-newtype Indefinite unit = Indefinite { indefUnit :: unit }
    deriving (Functor)
    deriving newtype (Eq, Ord, Outputable, Binary, Uniquable, IsUnitId)
 

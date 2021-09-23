@@ -553,7 +553,7 @@ checkDependencies hsc_env summary iface
    prev_dep_mods = map gwib_mod $ Set.toAscList $ dep_direct_mods (mi_deps iface)
    prev_dep_pkgs = Set.toAscList (Set.union (dep_direct_pkgs (mi_deps iface))
                                             (dep_plugin_pkgs (mi_deps iface)))
-   bkpk_units    = map (("Signature",) . indefUnit . instUnitInstanceOf . moduleUnit) (requirementMerges units (moduleName (mi_module iface)))
+   bkpk_units    = map (("Signature",) . instUnitInstanceOf . moduleUnit) (requirementMerges units (moduleName (mi_module iface)))
 
    implicit_deps = map ("Implicit",) (implicitPackageDeps dflags)
 

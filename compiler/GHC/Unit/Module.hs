@@ -106,7 +106,7 @@ getModuleInstantiation m =
 
 -- | Return the unit-id this unit is an instance of and the module instantiations (if any).
 getUnitInstantiations :: Unit -> (UnitId, Maybe InstantiatedUnit)
-getUnitInstantiations (VirtUnit iuid)           = (indefUnit (instUnitInstanceOf iuid), Just iuid)
+getUnitInstantiations (VirtUnit iuid)           = (instUnitInstanceOf iuid, Just iuid)
 getUnitInstantiations (RealUnit (Definite uid)) = (uid, Nothing)
 getUnitInstantiations HoleUnit                  = error "Hole unit"
 
