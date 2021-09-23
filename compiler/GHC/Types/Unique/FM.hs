@@ -65,6 +65,7 @@ module GHC.Types.Unique.FM (
         nonDetStrictFoldUFM, foldUFM, nonDetStrictFoldUFM_Directly,
         anyUFM, allUFM, seqEltsUFM,
         mapUFM, mapUFM_Directly,
+        mapMaybeUFM,
         elemUFM, elemUFM_Directly,
         filterUFM, filterUFM_Directly, partitionUFM,
         sizeUFM,
@@ -318,6 +319,9 @@ foldUFM k z (UFM m) = M.foldr k z m
 
 mapUFM :: (elt1 -> elt2) -> UniqFM key elt1 -> UniqFM key elt2
 mapUFM f (UFM m) = UFM (M.map f m)
+
+mapMaybeUFM :: (elt1 -> Maybe elt2) -> UniqFM key elt1 -> UniqFM key elt2
+mapMaybeUFM f (UFM m) = UFM (M.mapMaybe f m)
 
 mapUFM_Directly :: (Unique -> elt1 -> elt2) -> UniqFM key elt1 -> UniqFM key elt2
 mapUFM_Directly f (UFM m) = UFM (M.mapWithKey (f . getUnique) m)
