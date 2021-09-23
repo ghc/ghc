@@ -1,0 +1,5 @@
+
+T17820b.hs:7:17: error:
+    GHC stage restriction:
+      ‘f’ is used in a top-level splice, quasi-quote, or annotation,
+      and must be imported, not defined locally

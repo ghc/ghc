@@ -1,0 +1,5 @@
+
+T17820c.hs:8:18: error:
+    GHC stage restriction:
+      ‘meth’ is used in a top-level splice, quasi-quote, or annotation,
+      and must be imported, not defined locally

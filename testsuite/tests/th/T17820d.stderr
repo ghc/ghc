@@ -1,0 +1,7 @@
+
+T17820d.hs:6:38: error:
+    • Stage error: ‘foo’ is bound at stage 2 but used at stage 1
+    • In the untyped splice: $(const [| 0 |] foo)
+      In the Template Haskell quotation
+        [d| data D = MkD {foo :: Int}
+            blargh = $(const [| 0 |] foo) |]
