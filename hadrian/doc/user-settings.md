@@ -220,41 +220,6 @@ noDynamicFlavour = defaultFlavour
     , libraryWays = remove [dynamic] defaultLibraryWays }
 ```
 
-### Verbose command lines
-
-By default Hadrian does not print full command lines during the build process
-and instead prints short human readable digests for each executed command. You
-can suppress this behaviour completely or partially using `verboseCommand` setting:
-```haskell
--- | Set to 'True' to print full command lines during the build process. Note:
--- this is a 'Predicate', hence you can enable verbose output only for certain
--- targets, e.g.: @verboseCommand = package ghcPrim@.
-verboseCommand :: Predicate
-verboseCommand = do
-    verbosity <- expr getVerbosity
-    return $ verbosity >= Verbose
-```
-For example, to print the full command lines used to compile GHC executables,
-set `verboseCommands` to:
-```haskell
-verboseCommand :: Predicate
-verboseCommand = input "ghc/Main.hs"
-```
-Below are a few other examples:
-```haskell
--- Print command lines for all Ghc Link invocations:
-verboseCommand = builder (Ghc Link)
-
--- Print command lines when compiling files in package compiler using Gcc:
-verboseCommand = builder (Gcc Compile) &&^ package compiler
-
--- Use patterns when matching files:
-verboseCommand = output "**/rts/sm/*" &&^ way threaded
-
--- Print all commands:
-verboseCommand = return True
-```
-
 ### Documentation
 
 `Flavour`'s `ghcDocs :: Action DocTargets` field lets you

@@ -117,8 +117,11 @@ four settings: `none`, `brief` (one line per build command; this is the default
 setting), `normal` (typically a box per build command), and `unicorn` (when
 `normal` just won't do).
 
-* `--verbose`: run Hadrian in verbose mode. In particular this prints diagnostic
-messages by Shake oracles.
+* `-V`/`--verbose`: run Hadrian in verbose mode. This makes commands print their stdout
+  and produces slightly more output on a failure (including hadrian call stacks).
+
+* `-VV`: run hadrian in diagnostics mode: In particular this prints diagnostic
+messages by Shake oracles and full command lines for all commands.
 
 * `--lint`: run [Shake Lint](https://shakebuild.com/manual#lint) during the
 build to check that the build system is well formed. Note that the Lint check
