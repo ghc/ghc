@@ -546,6 +546,7 @@ function run_hadrian() {
     -j"$cores" \
     --broken-test="${BROKEN_TESTS:-}" \
     --bignum=$BIGNUM_BACKEND \
+    -V \
     "${args[@]+"${args[@]}"}" \
     "$@"
 }
