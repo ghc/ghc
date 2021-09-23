@@ -1,8 +1,13 @@
+{-# LANGUAGE RecordWildCards #-}
 
 -- | Put common type definitions here to break recursive module dependencies.
 
 module GHC.CmmToAsm.Reg.Linear.Base (
         BlockAssignment,
+        lookupBlockAssignment,
+        lookupFirstUsed,
+        emptyBlockAssignment,
+        updateBlockAssignment,
 
         Loc(..),
         regsOfLoc,
@@ -29,6 +34,8 @@ import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Supply
 import GHC.Cmm.BlockId
+import GHC.Cmm.Dataflow.Collections
+import GHC.CmmToAsm.Reg.Utils
 
 data ReadingOrWriting = Reading | Writing deriving (Eq,Ord)
 
@@ -37,8 +44,41 @@ data ReadingOrWriting = Reading | Writing deriving (Eq,Ord)
 --      target a particular label. We have to insert fixup code to make
 --      the register assignments from the different sources match up.
 --
-type BlockAssignment freeRegs
-        = BlockMap (freeRegs, RegMap Loc)
+data BlockAssignment freeRegs
+        = BlockAssignment { blockMap :: !(BlockMap (freeRegs, RegMap Loc))
+                          , firstUsed :: !(UniqFM VirtualReg RealReg) }
+
+-- | Find the register mapping for a specific BlockId.
+lookupBlockAssignment :: BlockId -> BlockAssignment freeRegs -> Maybe (freeRegs, RegMap Loc)
+lookupBlockAssignment bid ba = mapLookup bid (blockMap ba)
+
+-- | Lookup which register a virtual register was first assigned to.
+lookupFirstUsed :: VirtualReg -> BlockAssignment freeRegs -> Maybe RealReg
+lookupFirstUsed vr ba = lookupUFM (firstUsed ba) vr
+
+-- | An initial empty 'BlockAssignment'
+emptyBlockAssignment :: BlockAssignment freeRegs
+emptyBlockAssignment = BlockAssignment mapEmpty mempty
+
+-- | Add new register mappings for a specific block.
+updateBlockAssignment :: BlockId
+  -> (freeRegs, RegMap Loc)
+  -> BlockAssignment freeRegs
+  -> BlockAssignment freeRegs
+updateBlockAssignment dest (freeRegs, regMap) (BlockAssignment {..}) =
+  BlockAssignment (mapInsert dest (freeRegs, regMap) blockMap)
+                  (mergeUFM combWithExisting id (mapMaybeUFM fromLoc) (firstUsed) (toVRegMap regMap))
+  where
+    -- The blocks are processed in dependency order, so if there's already an
+    -- entry in the map then keep that assignment rather than writing the new
+    -- assignment.
+    combWithExisting :: RealReg -> Loc -> Maybe RealReg
+    combWithExisting old_reg _ = Just $ old_reg
+
+    fromLoc :: Loc -> Maybe RealReg
+    fromLoc (InReg rr) = Just rr
+    fromLoc (InBoth rr _) = Just rr
+    fromLoc _ = Nothing
 
 
 -- | Where a vreg is currently stored
