@@ -308,7 +308,7 @@ instance H.Builder Builder where
                   -- xelatex produces an incredible amount of output, almost
                   -- all of which is useless. Suppress it unless user
                   -- requests a loud build.
-                  if verbosity >= Verbose
+                  if verbosity >= Diagnostic
                     then cmd' [Cwd output] [path] buildArgs
                     else do (Stdouterr out, Exit code) <- cmd' [Cwd output] [path] buildArgs
                             when (code /= ExitSuccess) $ do

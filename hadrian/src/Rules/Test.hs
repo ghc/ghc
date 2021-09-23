@@ -173,7 +173,7 @@ testRules = do
         -- Execute the test target.
         -- We override the verbosity setting to make sure the user can see
         -- the test output: https://gitlab.haskell.org/ghc/ghc/issues/15951.
-        withVerbosity Verbose $ buildWithCmdOptions env $
+        withVerbosity Diagnostic $ buildWithCmdOptions env $
             target (vanillaContext Stage2 compiler) RunTest [] []
 
 -- | Build the timeout program.
