@@ -427,7 +427,7 @@ getRegister e = do
 getRegister' :: NCGConfig -> Platform -> CmmExpr -> NatM Register
 -- OPTIMIZATION WARNING: CmmExpr rewrites
 -- 1. Rewrite: Reg + (-n) => Reg - n
---    TODO: this expression souldn't even be generated to begin with.
+--    TODO: this expression shouldn't even be generated to begin with.
 getRegister' config plat (CmmMachOp (MO_Add w0) [x, CmmLit (CmmInt i w1)]) | i < 0
   = getRegister' config plat (CmmMachOp (MO_Sub w0) [x, CmmLit (CmmInt (-i) w1)])
 
