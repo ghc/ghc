@@ -97,6 +97,9 @@ module Data.Foldable (
     -- * Notes
     -- $notes
 
+    -- ** Generally linear-time `elem`
+    -- $linear
+
     -- * See also
     -- $also
     ) where
@@ -2378,18 +2381,20 @@ elements in a single pass.
 -- $notes
 --
 -- #notes#
--- The absence of a 'Functor' superclass allows
--- @Foldable@ structures to impose constraints on their element types.  Thus,
--- Sets are @Foldable@, even though @Set@ imposes an 'Ord' constraint on its
--- elements (this precludes defining a @Functor@ instance for @Set@).
+-- Since 'Foldable' does not have 'Functor' as a superclass, it is possible to
+-- define 'Foldable' instances for structures that constrain their element
+-- types (and thus are not parametrically polymorphic, as required by Functor).
+-- Therefore, __@Set@__ can be 'Foldable', even though sets keep their elements
+-- in ascending order, which requires the elements to be comparable.  (This
+-- element-type restriction precludes defining a 'Functor' instance for @Set@.)
 --
--- The @Foldable@ class makes it possible to use idioms familiar from the List
+-- The 'Foldable' class makes it possible to use idioms familiar from the @List@
 -- type with container structures that are better suited to the task at hand.
--- This allows a user to substitute more appropriate @Foldable@ data types
--- for Lists without requiring new idioms (see [[1\]](#uselistsnot) for when
--- not to use lists).
+-- This supports use of more appropriate 'Foldable' data types, such as @Seq@,
+-- @Set@, @NonEmpty@, etc., without requiring new idioms (see
+-- [[1\]](#uselistsnot) for when not to use lists).
 --
--- The more general methods of the @Foldable@ class are now exported by the
+-- The more general methods of the 'Foldable' class are now exported by the
 -- "Prelude" in place of the original List-specific methods (see the
 -- [FTP Proposal](https://wiki.haskell.org/Foldable_Traversable_In_Prelude)).
 -- The List-specific variants are still available in "Data.List".
@@ -2416,6 +2421,42 @@ elements in a single pass.
 -- to something other than a list, the call-site will no longer compile until
 -- appropriate changes are made.
 
+-- $linear
+--
+-- It is perhaps worth noting that since the __`elem`__ function in the
+-- Foldable class carries only an __`Eq`__ constraint on the element type,
+-- search for the presence or absence of an element in the structure generally
+-- takes \(\mathcal{O}(n)\) time, even for ordered structures like __@Set@__
+-- that are potentially capable of performing the search faster.  (The @member@
+-- function of the @Set@ module carries an `Ord` constraint, and can perform
+-- the search in \(\mathcal{O}(log\ n)\) time).
+--
+-- Even when using abstract Foldable structures, it is possible to leverage
+-- faster than linear element search via a dedicated alternative to Foldable's
+-- __`elem`__ method.  This can be achieved by defining an additional type
+-- class (e.g.  @HasMember@ below) to support a more performant implementation
+-- when available.  Instances of such a type class can employ the `elem` linear
+-- search as a last resort, and perform faster searches for specific
+-- structures:
+--
+-- > {-# LANGUAGE FlexibleInstances, MultiParamTypeClasses #-}
+-- >
+-- > import qualified Data.Set as Set
+-- >
+-- > class Eq a => HasMember t a where
+-- >     member :: a -> t a -> Bool
+-- >
+-- > instance Eq a => HasMember [] a where
+-- >     member = elem
+-- > [...]
+-- > instance Ord a => HasMember Set.Set a where
+-- >     member = Set.member
+--
+-- Note that some structure-specific optimisations may of course be possible
+-- directly in the corresponding @Foldable@ instance, e.g. with @Set@ the size
+-- of the set is known in advance, without iterating to count the elements, and
+-- its `length` instance takes advantage of this to return the size directly.
+
 --------------
 
 -- $also
@@ -2429,3 +2470,7 @@ elements in a single pass.
 --    by Jeremy Gibbons and Bruno Oliveira,
 --    in /Mathematically-Structured Functional Programming/, 2006, online at
 --    <http://www.cs.ox.ac.uk/people/jeremy.gibbons/publications/#iterator>.
+--
+--  * [3] \"A tutorial on the universality and expressiveness of fold\",
+--    by Graham Hutton, J\. Functional Programming 9 (4): 355–372, July 1999,
+--    online at <http://www.cs.nott.ac.uk/~pszgmh/fold.pdf>.
