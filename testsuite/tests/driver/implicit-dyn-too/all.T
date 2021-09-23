@@ -1,0 +1,1 @@
+test('implicit-dyn-too', [when(opsys('mingw32'),skip), extra_files(['QuasiExpr.hs', 'QuasiQuote.hs']) ], makefile_test, [])
