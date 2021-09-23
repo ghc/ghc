@@ -52,6 +52,7 @@ module GHC.Types.Unique.FM (
         plusUFM_C,
         plusUFM_CD,
         plusUFM_CD2,
+        mergeUFM,
         plusMaybeUFM_C,
         plusUFMList,
         minusUFM,
@@ -62,6 +63,7 @@ module GHC.Types.Unique.FM (
         nonDetStrictFoldUFM, foldUFM, nonDetStrictFoldUFM_Directly,
         anyUFM, allUFM, seqEltsUFM,
         mapUFM, mapUFM_Directly,
+        mapMaybeUFM,
         elemUFM, elemUFM_Directly,
         filterUFM, filterUFM_Directly, partitionUFM,
         sizeUFM,
@@ -85,6 +87,7 @@ import qualified Data.IntSet as S
 import Data.Data
 import qualified Data.Semigroup as Semi
 import Data.Functor.Classes (Eq1 (..))
+import Data.Coerce
 
 -- | A finite map from @uniques@ of one type to
 -- elements in another type.
@@ -250,6 +253,20 @@ plusUFM_CD2 f (UFM xm) (UFM ym)
       (M.map (\y -> Nothing `f` Just y))
       xm ym
 
+mergeUFM
+  :: (elta -> eltb -> Maybe eltc)
+  -> (UniqFM key elta -> UniqFM key eltc)  -- map X
+  -> (UniqFM key eltb -> UniqFM key eltc) -- map Y
+  -> UniqFM key elta
+  -> UniqFM key eltb
+  -> UniqFM key eltc
+mergeUFM f g h (UFM xm) (UFM ym)
+  = UFM $ M.mergeWithKey
+      (\_ x y -> (x `f` y))
+      (coerce g)
+      (coerce h)
+      xm ym
+
 plusMaybeUFM_C :: (elt -> elt -> Maybe elt)
                -> UniqFM key elt -> UniqFM key elt -> UniqFM key elt
 plusMaybeUFM_C f (UFM xm) (UFM ym)
@@ -283,6 +300,9 @@ foldUFM k z (UFM m) = M.foldr k z m
 
 mapUFM :: (elt1 -> elt2) -> UniqFM key elt1 -> UniqFM key elt2
 mapUFM f (UFM m) = UFM (M.map f m)
+
+mapMaybeUFM :: (elt1 -> Maybe elt2) -> UniqFM key elt1 -> UniqFM key elt2
+mapMaybeUFM f (UFM m) = UFM (M.mapMaybe f m)
 
 mapUFM_Directly :: (Unique -> elt1 -> elt2) -> UniqFM key elt1 -> UniqFM key elt2
 mapUFM_Directly f (UFM m) = UFM (M.mapWithKey (f . getUnique) m)

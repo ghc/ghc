@@ -97,7 +97,7 @@ joinToTargets' block_live new_blocks block_id instr (dest:dests)
                         , not (elemUniqSet_Directly reg live_set)
                         , r          <- regsOfLoc loc ]
 
-        case mapLookup dest block_assig of
+        case lookupBlockAssignment  dest block_assig of
          Nothing
           -> joinToTargets_first
                         block_live new_blocks block_id instr dest dests
@@ -133,7 +133,7 @@ joinToTargets_first block_live new_blocks block_id instr dest dests
         let freeregs' = foldl' (flip $ frReleaseReg platform) freeregs to_free
 
         -- remember the current assignment on entry to this block.
-        setBlockAssigR (mapInsert dest (freeregs', src_assig) block_assig)
+        setBlockAssigR (updateBlockAssignment dest (freeregs', src_assig) block_assig)
 
         joinToTargets' block_live new_blocks block_id instr dests
 

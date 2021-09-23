@@ -139,7 +139,6 @@ import GHC.Platform
 import Data.Maybe
 import Data.List
 import Control.Monad
-import Control.Applicative
 
 -- -----------------------------------------------------------------------------
 -- Top level of the register allocator
@@ -248,8 +247,8 @@ linearRegAlloc'
 
 linearRegAlloc' config initFreeRegs entry_ids block_live sccs
  = do   us      <- getUniqueSupplyM
-        let (_, stack, stats, blocks) =
-                runR config mapEmpty initFreeRegs emptyRegMap emptyStackMap us
+        let !(_, !stack, !stats, !blocks) =
+                runR config emptyBlockAssignment initFreeRegs emptyRegMap emptyStackMap us
                     $ linearRA_SCCs entry_ids block_live [] sccs
         return  (blocks, stats, getStackUse stack)
 
@@ -319,7 +318,7 @@ process entry_ids block_live (b@(BasicBlock id _) : blocks)
  = do
         block_assig <- getBlockAssigR
 
-        if isJust (mapLookup id block_assig)
+        if isJust (lookupBlockAssignment id block_assig)
              || id `elem` entry_ids
          then do
                 b'  <- processBlock block_live b
@@ -355,7 +354,7 @@ initBlock :: FR freeRegs
 initBlock id block_live
  = do   platform    <- getPlatform
         block_assig <- getBlockAssigR
-        case mapLookup id block_assig of
+        case lookupBlockAssignment id block_assig of
                 -- no prior info about this block: we must consider
                 -- any fixed regs to be allocated, but we can ignore
                 -- virtual regs (presumably this is part of a loop,
@@ -813,19 +812,11 @@ allocateRegsAndSpill reading keep spills alloc (r:rs)
 -- variables are likely to end up in the same registers at the
 -- end and start of the loop, avoiding redundant reg-reg moves.
 -- Note: I tried returning a list of past assignments, but that
--- turned out to barely matter but added a few tenths of
--- a percent to compile time.
+-- turned out to barely matter.
 findPrefRealReg :: VirtualReg -> RegM freeRegs (Maybe RealReg)
 findPrefRealReg vreg = do
-  bassig <- getBlockAssigR :: RegM freeRegs (BlockMap (freeRegs,RegMap Loc))
-  return $ foldr (findVirtRegAssig) Nothing bassig
-  where
-    findVirtRegAssig :: (freeRegs,RegMap Loc) -> Maybe RealReg -> Maybe RealReg
-    findVirtRegAssig assig z =
-        z <|>   case lookupUFM (toVRegMap $ snd assig) vreg of
-                        Just (InReg real_reg) -> Just real_reg
-                        Just (InBoth real_reg _) -> Just real_reg
-                        _ -> z
+  bassig <- getBlockAssigR :: RegM freeRegs (BlockAssignment freeRegs)
+  return $ lookupFirstUsed vreg bassig
 
 -- reading is redundant with reason, but we keep it around because it's
 -- convenient and it maintains the recursive structure of the allocator. -- EZY
