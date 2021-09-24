@@ -96,9 +96,6 @@ module GHC (
         ModIface, ModIface_(..),
         SafeHaskellMode(..),
 
-        -- * Querying the environment
-        -- packageDbModules,
-
         -- * Printing
         PrintUnqualified, alwaysQualify,
 
@@ -1515,27 +1512,6 @@ getNameToInstancesIndex visible_mods mods_to_load = do
                (fmap (,Seq.empty) cls_index)
                (fmap (Seq.empty,) fam_index)
            ] }
-
--- -----------------------------------------------------------------------------
-
-{- ToDo: Move the primary logic here to "GHC.Unit.State"
--- | Return all /external/ modules available in the package database.
--- Modules from the current session (i.e., from the 'HomePackageTable') are
--- not included.  This includes module names which are reexported by packages.
-packageDbModules :: GhcMonad m =>
-                    Bool  -- ^ Only consider exposed packages.
-                 -> m [Module]
-packageDbModules only_exposed = do
-   dflags <- getSessionDynFlags
-   let pkgs = eltsUFM (unitInfoMap (unitState dflags))
-   return $
-     [ mkModule pid modname
-     | p <- pkgs
-     , not only_exposed || exposed p
-     , let pid = mkUnit p
-     , modname <- exposedModules p
-               ++ map exportName (reexportedModules p) ]
-               -}
 
 -- -----------------------------------------------------------------------------
 -- Misc exported utils
