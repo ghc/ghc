@@ -78,6 +78,33 @@
 #if defined(dragonfly_HOST_OS)
 #include <sys/tls.h>
 #endif
+
+/*
+ * Note [iconv and FreeBSD]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~
+ *
+ * On FreeBSD libc.so provides an implementation of the iconv_* family of
+ * functions. However, due to their implementation, these symbols cannot be
+ * resolved via dlsym(); rather, they can only be resolved using the
+ * explicitly-versioned dlvsym().
+ *
+ * This is problematic for the RTS linker since we may be asked to load
+ * an object that depends upon iconv. To handle this we include a set of
+ * fallback cases for these functions, allowing us to resolve them to the
+ * symbols provided by the libc against which the RTS is linked.
+ *
+ * See #20354.
+ */
+
+#if defined(freebsd_HOST_OS)
+extern void iconvctl();
+extern void iconv_open_into();
+extern void iconv_open();
+extern void iconv_close();
+extern void iconv_canonicalize();
+extern void iconv();
+#endif
+
 /*
    Note [runtime-linker-support]
    -----------------------------
@@ -655,6 +682,10 @@ internal_dlsym(const char *symbol) {
     }
     RELEASE_LOCK(&dl_mutex);
 
+    IF_DEBUG(linker, debugBelch("internal_dlsym: looking for symbol '%s' in special cases\n", symbol));
+#   define SPECIAL_SYMBOL(sym) \
+      if (strcmp(symbol, #sym) == 0) return (void*)&sym;
+
 #   if defined(HAVE_SYS_STAT_H) && defined(linux_HOST_OS) && defined(__GLIBC__)
     // HACK: GLIBC implements these functions with a great deal of trickery where
     //       they are either inlined at compile time to their corresponding
@@ -664,17 +695,27 @@ internal_dlsym(const char *symbol) {
     //       We borrow the approach that the LLVM JIT uses to resolve these
     //       symbols. See http://llvm.org/PR274 and #7072 for more info.
 
-    IF_DEBUG(linker, debugBelch("internal_dlsym: looking for symbol '%s' in GLIBC special cases\n", symbol));
-
-    if (strcmp(symbol, "stat") == 0) return (void*)&stat;
-    if (strcmp(symbol, "fstat") == 0) return (void*)&fstat;
-    if (strcmp(symbol, "lstat") == 0) return (void*)&lstat;
-    if (strcmp(symbol, "stat64") == 0) return (void*)&stat64;
-    if (strcmp(symbol, "fstat64") == 0) return (void*)&fstat64;
-    if (strcmp(symbol, "lstat64") == 0) return (void*)&lstat64;
-    if (strcmp(symbol, "atexit") == 0) return (void*)&atexit;
-    if (strcmp(symbol, "mknod") == 0) return (void*)&mknod;
+    SPECIAL_SYMBOL(stat);
+    SPECIAL_SYMBOL(fstat);
+    SPECIAL_SYMBOL(lstat);
+    SPECIAL_SYMBOL(stat64);
+    SPECIAL_SYMBOL(fstat64);
+    SPECIAL_SYMBOL(lstat64);
+    SPECIAL_SYMBOL(atexit);
+    SPECIAL_SYMBOL(mknod);
 #   endif
+
+    // See Note [iconv and FreeBSD]
+#   if defined(freebsd_HOST_OS)
+    SPECIAL_SYMBOL(iconvctl);
+    SPECIAL_SYMBOL(iconv_open_into);
+    SPECIAL_SYMBOL(iconv_open);
+    SPECIAL_SYMBOL(iconv_close);
+    SPECIAL_SYMBOL(iconv_canonicalize);
+    SPECIAL_SYMBOL(iconv);
+#   endif
+
+#undef SPECIAL_SYMBOL
 
     // we failed to find the symbol
     return NULL;
