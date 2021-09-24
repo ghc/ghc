@@ -46,7 +46,22 @@ We keep a "work list" of active items here, which should be regularly updated. W
   - rebase 8.10 version on 8.10.7
   - update to 9.2 / 9.3 and make sure everything works with hadrian build system
   - make compiler less "different" and more flexible where possible, for example adopt a standard ld-style linker
-  - fix many more tests, template haskell etc.
+  - fix many more tests, etc.
+
+#### Template Haskell
+
+Template Haskell is currently broken because we still need to do some restructuring to fix it.
+
+GHCJS uses a Template Haskell runner that predates the `iserv` GHC external interpreter. The runner is mostly implemented in Haskell with a bit of JavaScript (`thrunner.js`) to deal with communication.
+
+The runner is invoked with the `runTHServer` function, which should be in a wired-in package for consistent naming. This runner, which used to live in the `ghcjs-th` package is linked on demand with the user's code, and then incrementally with everything each new TH splice needs to be able to run. A quick solution would be to move the contents of `ghcjs-th` into an existing wired-in package like `base` or `template-haskell`, but unfortunately dependencies like `bytestring` are a problem for this. Having `runTHServer` in a different non-wired-in package causes a mess with dependencies, and breaks the way we start the runner.
+
+A potential solution would be:
+
+  - Instead of on-demand linking, pre-build the `runTHServer` runner and save the incremental linker state. It can be in a normal (non-wired-in) package if we make it an executable or we use `-no-hs-main` and a `foreign export` for `runTHServer`.
+  - Use incremental linking to add the code for each splice. The first batch of code would contain all the foreign code for the packages in the dependencies. We may need to cache the first batch for performance like we did with the runner before.
+  - GHVJS also needs to know how to (de)serialize the messages, so we still need some library that links against both the runner and the compiler.
+  - Remove the `nodesettings.json` dependency, storing these settings elsewhere (like the `settings` file)
 
 ### Done
 
