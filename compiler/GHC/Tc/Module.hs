@@ -1583,7 +1583,7 @@ tcPreludeClashWarn warnFlag name = do
     -- Continue only the name is imported from Prelude
     ; when (importedViaPrelude name rnImports) $ do
       -- Handle 2.-4.
-    { rdrElts <- fmap (concat . occEnvElts . tcg_rdr_env) getGblEnv
+    { rdrElts <- fmap (concat . nonDetOccEnvElts . tcg_rdr_env) getGblEnv
 
     ; let clashes :: GlobalRdrElt -> Bool
           clashes x = isLocalDef && nameClashes && isNotInProperModule
@@ -2038,7 +2038,7 @@ runTcInteractive hsc_env thing_inside
             vcat [ text "ic_tythings:" <+> vcat (map ppr (ic_tythings icxt))
                  , text "ic_insts:" <+> vcat (map (pprBndr LetBind . instanceDFunId) ic_insts)
                  , text "ic_rn_gbl_env (LocalDef)" <+>
-                      vcat (map ppr [ local_gres | gres <- occEnvElts (ic_rn_gbl_env icxt)
+                      vcat (map ppr [ local_gres | gres <- nonDetOccEnvElts (ic_rn_gbl_env icxt)
                                                  , let local_gres = filter isLocalGRE gres
                                                  , not (null local_gres) ]) ]
 

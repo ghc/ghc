@@ -81,7 +81,7 @@ module GHC.Types.Name.Occurrence (
         -- * The 'OccEnv' type
         OccEnv, emptyOccEnv, unitOccEnv, extendOccEnv, mapOccEnv,
         lookupOccEnv, mkOccEnv, mkOccEnv_C, extendOccEnvList, elemOccEnv,
-        occEnvElts, foldOccEnv, plusOccEnv, plusOccEnv_C, extendOccEnv_C,
+        nonDetOccEnvElts, foldOccEnv, plusOccEnv, plusOccEnv_C, extendOccEnv_C,
         extendOccEnv_Acc, filterOccEnv, delListFromOccEnv, delFromOccEnv,
         alterOccEnv, pprOccEnv,
 
@@ -401,7 +401,7 @@ mkOccEnv     :: [(OccName,a)] -> OccEnv a
 mkOccEnv_C   :: (a -> a -> a) -> [(OccName,a)] -> OccEnv a
 elemOccEnv   :: OccName -> OccEnv a -> Bool
 foldOccEnv   :: (a -> b -> b) -> b -> OccEnv a -> b
-occEnvElts   :: OccEnv a -> [a]
+nonDetOccEnvElts   :: OccEnv a -> [a]
 extendOccEnv_C :: (a->a->a) -> OccEnv a -> OccName -> a -> OccEnv a
 extendOccEnv_Acc :: (a->b->b) -> (a->b) -> OccEnv b -> OccName -> a -> OccEnv b
 plusOccEnv     :: OccEnv a -> OccEnv a -> OccEnv a
@@ -420,7 +420,7 @@ lookupOccEnv (A x) y = lookupUFM x y
 mkOccEnv     l    = A $ listToUFM l
 elemOccEnv x (A y)       = elemUFM x y
 foldOccEnv a b (A c)     = foldUFM a b c
-occEnvElts (A x)         = nonDetEltsUFM x
+nonDetOccEnvElts (A x)         = nonDetEltsUFM x
 plusOccEnv (A x) (A y)   = A $ plusUFM x y
 plusOccEnv_C f (A x) (A y)       = A $ plusUFM_C f x y
 extendOccEnv_C f (A x) y z   = A $ addToUFM_C f x y z
