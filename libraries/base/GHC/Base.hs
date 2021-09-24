@@ -1494,7 +1494,7 @@ breakpointCond :: Bool -> a -> a
 breakpointCond _ r = r
 
 data Opaque = forall a. O a
--- | @const x@ is a unary function which evaluates to @x@ for all inputs.
+-- | @const x y@ always evaluates to @x@, ignoring its second argument.
 --
 -- >>> const 42 "hello"
 -- 42
