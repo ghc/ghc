@@ -16,7 +16,7 @@ module GHC.Types.Name.Env (
         -- ** Manipulating these environments
         mkNameEnv, mkNameEnvWith,
         emptyNameEnv, isEmptyNameEnv,
-        unitNameEnv, nameEnvElts,
+        unitNameEnv, nonDetNameEnvElts,
         extendNameEnv_C, extendNameEnv_Acc, extendNameEnv,
         extendNameEnvList, extendNameEnvList_C,
         filterNameEnv, anyNameEnv,
@@ -31,6 +31,7 @@ module GHC.Types.Name.Env (
         delFromDNameEnv, filterDNameEnv,
         mapDNameEnv,
         adjustDNameEnv, alterDNameEnv, extendDNameEnv,
+        eltsDNameEnv, extendDNameEnv_C,
         -- ** Dependency analysis
         depAnal
     ) where
@@ -97,7 +98,7 @@ emptyNameEnv       :: NameEnv a
 isEmptyNameEnv     :: NameEnv a -> Bool
 mkNameEnv          :: [(Name,a)] -> NameEnv a
 mkNameEnvWith      :: (a -> Name) -> [a] -> NameEnv a
-nameEnvElts        :: NameEnv a -> [a]
+nonDetNameEnvElts  :: NameEnv a -> [a]
 alterNameEnv       :: (Maybe a-> Maybe a) -> NameEnv a -> Name -> NameEnv a
 extendNameEnv_C    :: (a->a->a) -> NameEnv a -> Name -> a -> NameEnv a
 extendNameEnv_Acc  :: (a->b->b) -> (a->b) -> NameEnv b -> Name -> a -> NameEnv b
@@ -119,7 +120,7 @@ anyNameEnv         :: (elt -> Bool) -> NameEnv elt -> Bool
 mapNameEnv         :: (elt1 -> elt2) -> NameEnv elt1 -> NameEnv elt2
 disjointNameEnv    :: NameEnv a -> NameEnv a -> Bool
 
-nameEnvElts x         = nonDetEltsUFM x
+nonDetNameEnvElts x         = nonDetEltsUFM x
 emptyNameEnv          = emptyUFM
 isEmptyNameEnv        = isNullUFM
 unitNameEnv x y       = unitUFM x y
@@ -176,3 +177,9 @@ alterDNameEnv = alterUDFM
 
 extendDNameEnv :: DNameEnv a -> Name -> a -> DNameEnv a
 extendDNameEnv = addToUDFM
+
+extendDNameEnv_C :: (a -> a -> a) -> DNameEnv a -> Name -> a -> DNameEnv a
+extendDNameEnv_C = addToUDFM_C
+
+eltsDNameEnv :: DNameEnv a -> [a]
+eltsDNameEnv = eltsUDFM
