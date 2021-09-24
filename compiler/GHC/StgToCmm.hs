@@ -143,7 +143,7 @@ codeGen logger tmpfs dflags this_mod (InfoTableProvMap (UniqMap denv) _ _) data_
                 | gopt Opt_OmitInterfacePragmas dflags
                 = emptyNameEnv
                 | otherwise
-                = mkNameEnv (Prelude.map extractInfo (eltsUFM cg_id_infos))
+                = mkNameEnv (Prelude.map extractInfo (nonDetEltsUFM cg_id_infos))
 
         ; return generatedInfo
         }

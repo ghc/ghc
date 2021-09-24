@@ -382,7 +382,7 @@ tcRnImports hsc_env import_decls
                 -- modules batch (@--make@) compiled before this one, but
                 -- which are not below this one.
               ; (home_insts, home_fam_insts) = hptInstancesBelow hsc_env (moduleName this_mod)
-                                                                 (S.fromList (eltsUFM dep_mods))
+                                                                 (S.fromList (nonDetEltsUFM dep_mods))
               } ;
 
                 -- Record boot-file info in the EPS, so that it's

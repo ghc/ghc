@@ -119,7 +119,7 @@ anyNameEnv         :: (elt -> Bool) -> NameEnv elt -> Bool
 mapNameEnv         :: (elt1 -> elt2) -> NameEnv elt1 -> NameEnv elt2
 disjointNameEnv    :: NameEnv a -> NameEnv a -> Bool
 
-nameEnvElts x         = eltsUFM x
+nameEnvElts x         = nonDetEltsUFM x
 emptyNameEnv          = emptyUFM
 isEmptyNameEnv        = isNullUFM
 unitNameEnv x y       = unitUFM x y
