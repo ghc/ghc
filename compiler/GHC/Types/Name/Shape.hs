@@ -212,7 +212,7 @@ setNameFieldSelector hsc_env mb_mod (FieldLabel l b has_sel sel) = do
 mergeAvails :: [AvailInfo] -> [AvailInfo] -> [AvailInfo]
 mergeAvails as1 as2 =
     let mkNE as = mkNameEnv [(availName a, a) | a <- as]
-    in nameEnvElts (plusNameEnv_C plusAvail (mkNE as1) (mkNE as2))
+    in nonDetNameEnvElts (plusNameEnv_C plusAvail (mkNE as1) (mkNE as2))
 
 {-
 ************************************************************************

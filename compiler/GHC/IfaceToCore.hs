@@ -258,7 +258,7 @@ mergeIfaceDecl d1 d2
     | isAbstractIfaceDecl d2 = d1 `withRolesFrom` d2
     | IfaceClass{ ifBody = IfConcreteClass { ifSigs = ops1, ifMinDef = bf1 } } <- d1
     , IfaceClass{ ifBody = IfConcreteClass { ifSigs = ops2, ifMinDef = bf2 } } <- d2
-    = let ops = nameEnvElts $
+    = let ops = nonDetNameEnvElts $
                   plusNameEnv_C mergeIfaceClassOp
                     (mkNameEnv [ (n, op) | op@(IfaceClassOp n _ _) <- ops1 ])
                     (mkNameEnv [ (n, op) | op@(IfaceClassOp n _ _) <- ops2 ])

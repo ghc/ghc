@@ -92,11 +92,11 @@ import Control.Monad
 -}
 
 synonymTyConsOfType :: Type -> [TyCon]
--- Does not look through type synonyms at all
--- Return a list of synonym tycons
+-- Does not look through type synonyms at all.
+-- Returns a list of synonym tycons in nondeterministic order.
 -- Keep this synchronized with 'expandTypeSynonyms'
 synonymTyConsOfType ty
-  = nameEnvElts (go ty)
+  = nonDetNameEnvElts (go ty)
   where
      go :: Type -> NameEnv TyCon  -- The NameEnv does duplicate elim
      go (TyConApp tc tys) = go_tc tc `plusNameEnv` go_s tys
