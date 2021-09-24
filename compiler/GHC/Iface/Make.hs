@@ -276,8 +276,8 @@ mkIface_ hsc_env
                       -- See Note [Identity versus semantic module]
 
         fixities    = sortBy (comparing fst)
-          [(occ,fix) | FixItem occ fix <- nameEnvElts fix_env]
-          -- The order of fixities returned from nameEnvElts is not
+          [(occ,fix) | FixItem occ fix <- nonDetNameEnvElts fix_env]
+          -- The order of fixities returned from nonDetNameEnvElts is not
           -- deterministic, so we sort by OccName to canonicalize it.
           -- See Note [Deterministic UniqFM] in GHC.Types.Unique.DFM for more details.
         warns       = src_warns

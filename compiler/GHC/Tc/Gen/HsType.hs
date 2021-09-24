@@ -1055,7 +1055,7 @@ tc_infer_hs_type _ (XHsType ty)
        -- Raw uniques since we go from NameEnv to TvSubstEnv.
        let subst_prs :: [(Unique, TcTyVar)]
            subst_prs = [ (getUnique nm, tv)
-                       | ATyVar nm tv <- nameEnvElts (tcl_env env) ]
+                       | ATyVar nm tv <- nonDetNameEnvElts (tcl_env env) ]
            subst = mkTvSubst
                      (mkInScopeSet $ mkVarSet $ map snd subst_prs)
                      (listToUFM_Directly $ map (liftSnd mkTyVarTy) subst_prs)

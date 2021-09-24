@@ -760,7 +760,7 @@ greParent_maybe gre = case gre_par gre of
 -- uniqueness assumption.
 gresToAvailInfo :: [GlobalRdrElt] -> [AvailInfo]
 gresToAvailInfo gres
-  = nameEnvElts avail_env
+  = nonDetNameEnvElts avail_env
   where
     avail_env :: NameEnv AvailInfo -- Keyed by the parent
     (avail_env, _) = foldl' add (emptyNameEnv, emptyNameSet) gres

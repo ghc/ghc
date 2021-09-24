@@ -1190,7 +1190,7 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
     lookup_name :: IE GhcPs -> RdrName -> IELookupM (Name, AvailInfo, Maybe Name)
     lookup_name ie rdr
        | isQual rdr              = failLookupWith (QualImportError rdr)
-       | Just succ <- mb_success = case nameEnvElts succ of
+       | Just succ <- mb_success = case nonDetNameEnvElts succ of
                                      -- See Note [Importing DuplicateRecordFields]
                                      [(c,a,x)] -> return (greNameMangledName c, a, x)
                                      xs -> failLookupWith (AmbiguousImport rdr (map sndOf3 xs))

@@ -157,7 +157,7 @@ checkHsigIface tcg_env gr sig_iface
     -- have to look up the right name.
     sig_type_occ_env = mkOccEnv
                      . map (\t -> (nameOccName (getName t), t))
-                     $ nameEnvElts sig_type_env
+                     $ nonDetNameEnvElts sig_type_env
     dfun_names = map getName sig_insts
     check_export name
       -- Skip instances, we'll check them later

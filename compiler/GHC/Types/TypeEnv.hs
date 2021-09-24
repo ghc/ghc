@@ -49,7 +49,7 @@ typeEnvClasses  :: TypeEnv -> [Class]
 lookupTypeEnv   :: TypeEnv -> Name -> Maybe TyThing
 
 emptyTypeEnv        = emptyNameEnv
-typeEnvElts     env = nameEnvElts env
+typeEnvElts     env = nonDetNameEnvElts env
 typeEnvTyCons   env = [tc | ATyCon tc   <- typeEnvElts env]
 typeEnvCoAxioms env = [ax | ACoAxiom ax <- typeEnvElts env]
 typeEnvIds      env = [id | AnId id     <- typeEnvElts env]
