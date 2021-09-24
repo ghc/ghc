@@ -290,35 +290,35 @@ setLevels :: FloatOutSwitches
           -> [LevelledBind]
 
 setLevels float_lams binds us
-  = initLvl us (do_them init_env binds)
+  = initLvl us (do_them binds)
   where
-    init_env = initialEnv float_lams
+    env = initialEnv float_lams binds
 
-    do_them :: LevelEnv -> [CoreBind] -> LvlM [LevelledBind]
-    do_them _ [] = return []
-    do_them env (b:bs)
-      = do { (lvld_bind, env') <- lvlTopBind env b
-           ; lvld_binds <- do_them env' bs
+    do_them :: [CoreBind] -> LvlM [LevelledBind]
+    do_them [] = return []
+    do_them (b:bs)
+      = do { lvld_bind <- lvlTopBind env b
+           ; lvld_binds <- do_them bs
            ; return (lvld_bind : lvld_binds) }
 
-lvlTopBind :: LevelEnv -> Bind Id -> LvlM (LevelledBind, LevelEnv)
+lvlTopBind :: LevelEnv -> Bind Id -> LvlM LevelledBind
 lvlTopBind env (NonRec bndr rhs)
-  = do { rhs' <- lvl_top env NonRecursive bndr rhs
-       ; let (env', [bndr']) = substAndLvlBndrs NonRecursive env tOP_LEVEL [bndr]
-       ; return (NonRec bndr' rhs', env') }
+  = do { (bndr', rhs') <- lvl_top env NonRecursive bndr rhs
+       ; return (NonRec bndr' rhs') }
 
 lvlTopBind env (Rec pairs)
-  = do { let (env', bndrs') = substAndLvlBndrs Recursive env tOP_LEVEL
-                                               (map fst pairs)
-       ; rhss' <- mapM (\(b,r) -> lvl_top env' Recursive b r) pairs
-       ; return (Rec (bndrs' `zip` rhss'), env') }
+  = do { prs' <- mapM (\(b,r) -> lvl_top env Recursive b r) pairs
+       ; return (Rec prs') }
 
-lvl_top :: LevelEnv -> RecFlag -> Id -> CoreExpr -> LvlM LevelledExpr
+lvl_top :: LevelEnv -> RecFlag -> Id -> CoreExpr
+        -> LvlM (LevelledBndr, LevelledExpr)
+-- NB: 'env' has all the top-level binders in scope, so
+--     there is no need call substAndLvlBndrs here
 lvl_top env is_rec bndr rhs
-  = lvlRhs env is_rec
-           (isDeadEndId bndr)
-           Nothing  -- Not a join point
-           (freeVars rhs)
+  = do { rhs' <- lvlRhs env is_rec (isDeadEndId bndr)
+                                   Nothing  -- Not a join point
+                                   (freeVars rhs)
+       ; return (stayPut tOP_LEVEL bndr, rhs') }
 
 {-
 ************************************************************************
@@ -1553,9 +1553,9 @@ data LevelEnv
 
 {- Note [le_subst and le_env]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We clone let- and case-bound variables so that they are still distinct
-when floated out; hence the le_subst/le_env.  (see point 3 of the
-module overview comment).  We also use these envs when making a
+We clone nested let- and case-bound variables so that they are still
+distinct when floated out; hence the le_subst/le_env.  (see point 3 of
+the module overview comment).  We also use these envs when making a
 variable polymorphic because we want to float it out past a big
 lambda.
 
@@ -1582,14 +1582,21 @@ The domain of the both envs is *pre-cloned* Ids, though
 The domain of the le_lvl_env is the *post-cloned* Ids
 -}
 
-initialEnv :: FloatOutSwitches -> LevelEnv
-initialEnv float_lams
-  = LE { le_switches = float_lams
-       , le_ctxt_lvl = tOP_LEVEL
+initialEnv :: FloatOutSwitches -> CoreProgram -> LevelEnv
+initialEnv float_lams binds
+  = LE { le_switches  = float_lams
+       , le_ctxt_lvl  = tOP_LEVEL
        , le_join_ceil = panic "initialEnv"
-       , le_lvl_env = emptyVarEnv
-       , le_subst = emptySubst
-       , le_env = emptyVarEnv }
+       , le_lvl_env   = emptyVarEnv
+       , le_subst     = mkEmptySubst in_scope_toplvl
+       , le_env       = emptyVarEnv }
+  where
+    in_scope_toplvl = emptyInScopeSet `extendInScopeSetList` bindersOfBinds binds
+      -- The Simplifier (see Note [Glomming] in GHC.Core.Opt.Occuranal) and
+      -- the specialiser (see Note [Top level scope] in GHC.Core.Opt.Specialise)
+      -- may both produce top-level bindings where an early binding refers
+      -- to a later one.  So here we put all the top-level binders in scope before
+      -- we start, to satisfy the lookupIdSubst invariants (#20200 and #20294)
 
 addLvl :: Level -> VarEnv Level -> OutVar -> VarEnv Level
 addLvl dest_lvl env v' = extendVarEnv env v' dest_lvl
