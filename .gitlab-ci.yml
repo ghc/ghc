@@ -339,6 +339,14 @@ validate-x86_64-linux-deb9-unreg-hadrian:
     CONFIGURE_ARGS: --enable-unregisterised
     TEST_ENV: "x86_64-linux-deb9-unreg-hadrian"
 
+validate-x86_64-linux-deb9-no_tntc-hadrian:
+  extends: .validate-linux-hadrian
+  stage: full-build
+  when: manual
+  variables:
+    CONFIGURE_ARGS: --disable-tables-next-to-code
+    TEST_ENV: "x86_64-linux-deb9-no_tntc-hadrian"
+
 .build-x86_64-linux-deb10-hadrian-cross-aarch64:
   extends: .validate-linux-hadrian
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV"
