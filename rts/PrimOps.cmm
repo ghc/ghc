@@ -621,7 +621,7 @@ stg_casMutVarzh ( gcptr mv, gcptr old, gcptr new )
         return (1,h);
     } else {
         if (GET_INFO(mv) == stg_MUT_VAR_CLEAN_info) {
-            ccall dirty_MUT_VAR(BaseReg "ptr", mv "ptr", old);
+            ccall dirty_MUT_VAR(BaseReg "ptr", mv "ptr", old "ptr");
         }
         return (0,new);
     }
@@ -634,7 +634,7 @@ stg_casMutVarzh ( gcptr mv, gcptr old, gcptr new )
     } else {
         StgMutVar_var(mv) = new;
         if (GET_INFO(mv) == stg_MUT_VAR_CLEAN_info) {
-            ccall dirty_MUT_VAR(BaseReg "ptr", mv "ptr", old);
+            ccall dirty_MUT_VAR(BaseReg "ptr", mv "ptr", old "ptr");
         }
         return (0,new);
     }
@@ -706,7 +706,7 @@ stg_atomicModifyMutVar2zh ( gcptr mv, gcptr f )
 #endif
 
     if (GET_INFO(mv) == stg_MUT_VAR_CLEAN_info) {
-        ccall dirty_MUT_VAR(BaseReg "ptr", mv "ptr", h);
+        ccall dirty_MUT_VAR(BaseReg "ptr", mv "ptr", h "ptr");
     }
 
     return (x,z);
@@ -758,7 +758,7 @@ stg_atomicModifyMutVarzuzh ( gcptr mv, gcptr f )
 #endif
 
     if (GET_INFO(mv) == stg_MUT_VAR_CLEAN_info) {
-        ccall dirty_MUT_VAR(BaseReg "ptr", mv "ptr");
+        ccall dirty_MUT_VAR(BaseReg "ptr", mv "ptr", x "ptr");
     }
 
     return (x,z);
