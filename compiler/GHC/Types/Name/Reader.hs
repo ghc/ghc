@@ -428,7 +428,7 @@ elemLocalRdrEnv rdr_name (LRE { lre_env = env, lre_in_scope = ns })
       Orig {} -> False
 
 localRdrEnvElts :: LocalRdrEnv -> [Name]
-localRdrEnvElts (LRE { lre_env = env }) = occEnvElts env
+localRdrEnvElts (LRE { lre_env = env }) = nonDetOccEnvElts env
 
 inLocalRdrEnvScope :: Name -> LocalRdrEnv -> Bool
 -- This is the point of the NameSet
@@ -818,7 +818,7 @@ pprGlobalRdrEnv :: Bool -> GlobalRdrEnv -> SDoc
 pprGlobalRdrEnv locals_only env
   = vcat [ text "GlobalRdrEnv" <+> ppWhen locals_only (text "(locals only)")
              <+> lbrace
-         , nest 2 (vcat [ pp (remove_locals gre_list) | gre_list <- occEnvElts env ]
+         , nest 2 (vcat [ pp (remove_locals gre_list) | gre_list <- nonDetOccEnvElts env ]
              <+> rbrace) ]
   where
     remove_locals gres | locals_only = filter isLocalGRE gres
