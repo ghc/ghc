@@ -16,6 +16,7 @@
    position-independent code.
 
    Note [x86-64-relative]
+   ~~~~~~~~~~~~~~~~~~~~~~
    There is a complication on the x86_64 platform, where pointers are
    64 bits, but the tools don't support 64-bit relative relocations.
    However, the default memory model (small) ensures that all symbols
@@ -153,13 +154,26 @@ typedef union {
 } StgClosureInfo;
 
 
-#if defined(x86_64_HOST_ARCH) && defined(TABLES_NEXT_TO_CODE)
-// On x86_64 we can fit a pointer offset in half a word, so put the SRT offset
-// in the info->srt field directly.
+#if defined(x86_64_HOST_ARCH)
+#define SMALL_MEMORY_MODEL
+#endif
+
+// This is where we choose how to represent the SRT location in the info
+// table.  See the section "Referring to an SRT from the info table" in
+// Note [SRTs] in GHC.Cmm.Info.Build.
 //
-// See the section "Referring to an SRT from the info table" in
-// Note [SRTs] in CmmBuildInfoTables.hs
+// Specifically we define one of the following:
+#if WORD_SIZE_IN_BITS == 64 && defined(SMALL_MEMORY_MODEL) && defined(TABLES_NEXT_TO_CODE)
+// On 64-bit platforms using the small memory model we can fit a pointer
+// offset in half a word, so put the SRT offset in the info->srt field
+// directly.
 #define USE_INLINE_SRT_FIELD
+#elif defined(TABLES_NEXT_TO_CODE)
+// Otherwise use the srt_offset field...
+#define USE_SRT_OFFSET
+#else
+// If not using tables-next-to-code then simply use a full pointer...
+#define USE_SRT_POINTER
 #endif
 
 #if defined(USE_INLINE_SRT_FIELD)
@@ -219,14 +233,16 @@ typedef struct StgInfoTable_ {
    -------------------------------------------------------------------------- */
 
 /*
-   Note [Encoding static reference tables]
-   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * Note [Encoding static reference tables]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-   As static reference tables appear frequently in code, we use a special
-   compact encoding for the common case of a module defining only a few CAFs: We
-   produce one table containing a list of CAFs in the module and then include a
-   bitmap in each info table describing which entries of this table the closure
-   references.
+ * As static reference tables appear frequently in code, we use a special
+ * compact encoding for the common case of a module defining only a few CAFs: We
+ * produce one table containing a list of CAFs in the module and then include a
+ * bitmap in each info table describing which entries of this table the closure
+ * references.
+ *
+ * See Note [SRTs] in "GHC.Cmm.Info.Build".
  */
 
 typedef struct StgFunInfoExtraRev_ {
@@ -275,8 +291,8 @@ extern const StgWord stg_arg_bitmaps[];
  */
 
 typedef struct {
-#if defined(TABLES_NEXT_TO_CODE)
-#if !defined(USE_INLINE_SRT_FIELD)
+#if !defined(USE_SRT_POINTER)
+#if defined(USE_SRT_OFFSET)
     OFFSET_FIELD(srt_offset);   /* offset to the SRT closure */
 #endif
     StgInfoTable i;
@@ -296,8 +312,8 @@ typedef struct {
  */
 
 typedef struct StgThunkInfoTable_ {
-#if defined(TABLES_NEXT_TO_CODE)
-#if !defined(USE_INLINE_SRT_FIELD)
+#if !defined(USE_SRT_POINTER)
+#if defined(USE_SRT_OFFSET)
     OFFSET_FIELD(srt_offset);   /* offset to the SRT closure */
 #endif
     StgInfoTable i;
@@ -337,15 +353,13 @@ typedef struct StgConInfoTable_ {
  * GET_SRT(info)
  * info must be a Stg[Ret|Thunk]InfoTable* (an info table that has a SRT)
  */
-#if defined(TABLES_NEXT_TO_CODE)
-#if defined(x86_64_HOST_ARCH)
+#if defined(USE_INLINE_SRT_FIELD)
 #define GET_SRT(info) \
   ((StgClosure*) (((StgWord) ((info)+1)) + (info)->i.srt))
-#else
+#elif defined(USE_SRT_OFFSET)
 #define GET_SRT(info) \
   ((StgClosure*) (((StgWord) ((info)+1)) + (info)->srt_offset))
-#endif
-#else // !TABLES_NEXT_TO_CODE
+#else
 #define GET_SRT(info) ((info)->srt)
 #endif
 
@@ -364,14 +378,12 @@ typedef struct StgConInfoTable_ {
  * GET_FUN_SRT(info)
  * info must be a StgFunInfoTable*
  */
-#if defined(TABLES_NEXT_TO_CODE)
-#if defined(x86_64_HOST_ARCH)
+#if defined(USE_INLINE_SRT_FIELD)
 #define GET_FUN_SRT(info) \
   ((StgClosure*) (((StgWord) ((info)+1)) + (info)->i.srt))
-#else
+#elif defined(USE_SRT_OFFSET)
 #define GET_FUN_SRT(info) \
   ((StgClosure*) (((StgWord) ((info)+1)) + (info)->f.srt_offset))
-#endif
 #else
 #define GET_FUN_SRT(info) ((info)->f.srt)
 #endif
