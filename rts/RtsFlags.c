@@ -164,7 +164,6 @@ void initRtsFlagsDefaults(void)
     RtsFlags.GcFlags.pcFreeHeap         = 3;    /* 3% */
     RtsFlags.GcFlags.oldGenFactor       = 2;
     RtsFlags.GcFlags.useNonmoving       = false;
-    RtsFlags.GcFlags.nonmovingSelectorOpt = false;
     RtsFlags.GcFlags.generations        = 2;
     RtsFlags.GcFlags.squeezeUpdFrames   = true;
     RtsFlags.GcFlags.compact            = false;
@@ -1661,10 +1660,6 @@ error = true;
                     OPTION_SAFE;
                     RtsFlags.GcFlags.useNonmoving = true;
                     unchecked_arg_start++;
-                    if (rts_argv[arg][3] == 's') {
-                        RtsFlags.GcFlags.nonmovingSelectorOpt = true;
-                        unchecked_arg_start++;
-                    }
                     break;
 
                 case 'c': /* Debugging tool: show current cost centre on

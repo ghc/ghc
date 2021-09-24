@@ -53,8 +53,6 @@ typedef struct _GC_FLAGS {
     double  pcFreeHeap;
 
     bool         useNonmoving; // default = false
-    bool         nonmovingSelectorOpt; // Do selector optimization in the
-                                       // non-moving heap, default = false
     uint32_t     generations;
     bool squeezeUpdFrames;
 
