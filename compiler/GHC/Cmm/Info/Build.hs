@@ -55,6 +55,7 @@ import Data.List (unzip4)
 import GHC.Types.Name.Set
 
 {- Note [SRTs]
+   ~~~~~~~~~~~
 
 SRTs are the mechanism by which the garbage collector can determine
 the live CAFs in the program.
@@ -112,9 +113,15 @@ The following things have SRTs:
 - Static thunks (THUNK), ie. CAFs
 - Continuations (RET_SMALL, etc.)
 
-In each case, the info table points to the SRT.
+In each case, the info table points to the SRT.  There are three ways which we
+may encode the location of the SRT in the info table, described below.
 
-- info->srt is zero if there's no SRT, otherwise:
+USE_SRT_OFFSET
+--------------
+In this case we use the info->srt to encode whether or not there is an
+SRT and if so encode the offset to its location in info->f.srt_offset:
+
+- info->srt is 0 if there's no SRT, otherwise,
 - info->srt == 1 and info->f.srt_offset points to the SRT
 
 e.g. for a FUN with an SRT:
@@ -128,11 +135,26 @@ StgStdInfoTable       +------+
   info->type          | ...  |
                       |------|
 
-On x86_64, we optimise the info table representation further.  The
-offset to the SRT can be stored in 32 bits (all code lives within a
-2GB region in x86_64's small memory model), so we can save a word in
-the info table by storing the srt_offset in the srt field, which is
-half a word.
+USE_SRT_POINTER
+---------------
+When tables-next-to-code isn't in use we rather encode an absolute pointer to
+the SRT in info->srt. e.g. for a FUN with an SRT:
+
+StgFunInfoTable       +------+
+  info->f.srt_offset  |  ------------> pointer to SRT object
+StgStdInfoTable       +------+
+  info->layout.ptrs   | ...  |
+  info->layout.nptrs  | ...  |
+  info->srt           |  1   |
+  info->type          | ...  |
+                      |------|
+USE_INLINE_SRT_FIELD
+--------------------
+When using TNTC on x86_64 (and other platforms using the small memory model),
+we optimise the info table representation further.  The offset to the SRT can
+be stored in 32 bits (all code lives within a 2GB region in x86_64's small
+memory model), so we can save a word in the info table by storing the
+srt_offset in the srt field, which is half a word.
 
 On x86_64 with TABLES_NEXT_TO_CODE (except on MachO, due to #15169):
 
@@ -368,6 +390,7 @@ Here we could use C = {A} and therefore [Inline] C = A.
 
 -- ---------------------------------------------------------------------
 {- Note [Invalid optimisation: shortcutting]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 You might think that if we have something like
 

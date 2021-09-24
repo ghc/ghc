@@ -283,8 +283,7 @@ mkSRTLit platform _ (Just lbl) = ([CmmLabel lbl], CmmInt 1 (halfWordWidth platfo
 -- See the section "Referring to an SRT from the info table" in
 -- Note [SRTs] in "GHC.Cmm.Info.Build"
 inlineSRT :: Platform -> Bool
-inlineSRT platform = platformArch platform == ArchX86_64
-  && platformTablesNextToCode platform
+inlineSRT = pc_USE_INLINE_SRT_FIELD . platformConstants
 
 -------------------------------------------------------------------------
 --
