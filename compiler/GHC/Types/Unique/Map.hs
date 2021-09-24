@@ -72,7 +72,7 @@ instance (Outputable k, Outputable a) => Outputable (UniqMap k a) where
     ppr (UniqMap m) =
         brackets $ fsep $ punctuate comma $
         [ ppr k <+> text "->" <+> ppr v
-        | (k, v) <- eltsUFM m ]
+        | (k, v) <- nonDetEltsUFM m ]
 
 liftC :: (a -> a -> a) -> (k, a) -> (k, a) -> (k, a)
 liftC f (_, v) (k', v') = (k', f v v')

@@ -78,7 +78,7 @@ anyTyConEnv         :: (elt -> Bool) -> TyConEnv elt -> Bool
 mapTyConEnv         :: (elt1 -> elt2) -> TyConEnv elt1 -> TyConEnv elt2
 disjointTyConEnv    :: TyConEnv a -> TyConEnv a -> Bool
 
-nameEnvElts x         = eltsUFM x
+nameEnvElts x          = nonDetEltsUFM x
 emptyTyConEnv          = emptyUFM
 isEmptyTyConEnv        = isNullUFM
 unitTyConEnv x y       = unitUFM x y

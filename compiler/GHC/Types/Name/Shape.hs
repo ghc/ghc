@@ -230,7 +230,7 @@ uAvailInfos flexi as1 as2 = -- pprTrace "uAvailInfos" (ppr as1 $$ ppr as2) $
                                  n <- availNames a
                                  return (nameOccName n, a)
     in foldM (\subst (a1, a2) -> uAvailInfo flexi subst a1 a2) emptyNameEnv
-             (eltsUFM (intersectUFM_C (,) (mkOE as1) (mkOE as2)))
+             (nonDetEltsUFM (intersectUFM_C (,) (mkOE as1) (mkOE as2)))
              -- Edward: I have to say, this is pretty clever.
 
 -- | Unify two 'AvailInfo's, given an existing substitution @subst@,
