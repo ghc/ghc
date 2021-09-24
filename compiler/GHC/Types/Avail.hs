@@ -349,9 +349,9 @@ filterAvail keep ie rest =
 -- will give Ix(Ix,index,range) and Ix(index)
 -- We want to combine these; addAvail does that
 nubAvails :: [AvailInfo] -> [AvailInfo]
-nubAvails avails = nameEnvElts (foldl' add emptyNameEnv avails)
+nubAvails avails = eltsDNameEnv (foldl' add emptyDNameEnv avails)
   where
-    add env avail = extendNameEnv_C plusAvail env (availName avail) avail
+    add env avail = extendDNameEnv_C plusAvail env (availName avail) avail
 
 -- -----------------------------------------------------------------------------
 -- Printing
