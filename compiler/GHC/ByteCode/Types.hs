@@ -68,7 +68,7 @@ instance Outputable CompiledByteCode where
 seqCompiledByteCode :: CompiledByteCode -> ()
 seqCompiledByteCode CompiledByteCode{..} =
   rnf bc_bcos `seq`
-  rnf (nameEnvElts bc_itbls) `seq`
+  seqEltsNameEnv rnf bc_itbls `seq`
   rnf bc_ffis `seq`
   rnf bc_strs `seq`
   rnf (fmap seqModBreaks bc_breaks)
