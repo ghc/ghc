@@ -23,6 +23,7 @@ module GHC.Types.Name.Env (
         plusNameEnv, plusNameEnv_C, plusNameEnv_CD, plusNameEnv_CD2, alterNameEnv,
         lookupNameEnv, lookupNameEnv_NF, delFromNameEnv, delListFromNameEnv,
         elemNameEnv, mapNameEnv, disjointNameEnv,
+        seqEltsNameEnv,
 
         DNameEnv,
 
@@ -119,6 +120,7 @@ filterNameEnv      :: (elt -> Bool) -> NameEnv elt -> NameEnv elt
 anyNameEnv         :: (elt -> Bool) -> NameEnv elt -> Bool
 mapNameEnv         :: (elt1 -> elt2) -> NameEnv elt1 -> NameEnv elt2
 disjointNameEnv    :: NameEnv a -> NameEnv a -> Bool
+seqEltsNameEnv     :: (elt -> ()) -> NameEnv elt -> ()
 
 nonDetNameEnvElts x         = nonDetEltsUFM x
 emptyNameEnv          = emptyUFM
@@ -145,6 +147,7 @@ delListFromNameEnv x y  = delListFromUFM x y
 filterNameEnv x y       = filterUFM x y
 anyNameEnv f x          = foldUFM ((||) . f) False x
 disjointNameEnv x y     = disjointUFM x y
+seqEltsNameEnv seqElt x = seqEltsUFM seqElt x
 
 lookupNameEnv_NF env n = expectJust "lookupNameEnv_NF" (lookupNameEnv env n)
 
