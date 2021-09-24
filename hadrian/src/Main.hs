@@ -100,6 +100,10 @@ main = do
             Rules.topLevelTargets
             Rules.toolArgsTarget
 
+    -- This IORef is used to communicate the result of shake parsing
+    -- command line options (which happens in shakeArgsOptionsWith, but
+    -- isn't exposed to the user) to the exception handler, which uses the
+    -- verbosity and colour information to decide how much of the error to display.
     shake_opts_var <- newIORef options
     handleShakeException shake_opts_var $ shakeArgsOptionsWith options CommandLine.optDescrs $ \shake_opts _ targets -> do
         writeIORef  shake_opts_var shake_opts
@@ -112,6 +116,10 @@ main = do
 handleShakeException :: IORef ShakeOptions -> IO a -> IO a
 handleShakeException shake_opts_var shake_run = do
   args <- getArgs
+  -- Using withArgs here is a bit of a hack but the API doesn't allow another way
+  -- See https://github.com/ndmitchell/shake/issues/811
+  -- Passing --exception means shake throws an exception rather than
+  -- catching ShakeException and displaying the error itself to the user.
   catch (withArgs ("--exception" : args) $ shake_run) $ \(_e :: ShakeException) -> do
     shake_opts <- readIORef shake_opts_var
     let
@@ -121,6 +129,10 @@ handleShakeException shake_opts_var shake_run = do
       then
         hPrint stderr _e
       else
+        -- The SomeException here is normally an IOError which lacks
+        -- very much structure, in the future we could try to catch
+        -- a more structured exception and further refine the
+        -- displayed output. https://github.com/ndmitchell/shake/pull/812
         hPrint stderr (shakeExceptionInner _e)
     hPutStrLn stderr (esc "Build failed.")
     exitFailure

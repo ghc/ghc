@@ -426,7 +426,7 @@ applyPatch dir patch = do
     putBuild $ "| Apply patch " ++ file
     quietly $ cmd' [Cwd dir, FileStdin file] [path, "-p0"]
 
--- | Wrapper for 'cmd' that makes sure we include both stdout and stderr in
---   Shake's output when any of our builder commands fail.
+-- | Wrapper for 'cmd' that suppresses the double reporting of StdErr and
+-- Stdout when a command fails.
 cmd' :: (Partial, CmdArguments args) => args :-> Action r
 cmd' = cmd [WithStderr False, WithStdout False]
