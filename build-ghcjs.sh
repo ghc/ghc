@@ -53,7 +53,7 @@ mkdir -p "inplace/toolchain"
     chmod 755 js-unknown-ghcjs-ld
 )
 
-export PATH=$(PWD)/inplace/toolchain:$PATH
+export PATH=$PWD/inplace/toolchain:$PATH
 
 ./boot
 ./configure --target=js-unknown-ghcjs
