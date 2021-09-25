@@ -25,17 +25,17 @@ function pull() {
 function setup_ssh() {
   # Add gitlab as a known host.
   # This can be generated with `ssh-keyscan -H gitlab.haskell.org`
-  mkdir -p ~/.ssh
-  echo "|1|cta91z3DoAGdpX2Epe9WF+sr+Rk=|1qlsbqiTTa8YsDyQBjVnzANFQ3Y= ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDSzzl8mwY6ohtW6MftKaQfta8yTL8cTxtA7lcueo2mkPpwBBQ7FA6z3nFATx25QwdV7fa7DuNRDX57f/a/W7+wMhXZ6yyQr+gwr0h4vdZ8Nt4XNfNdkdGw4fZKRApWxyvfSkxjs/E9+G0o3eQLspxjVohBkmkcsowpFUI5Aazv/K6QIf1gKt+4iPvYcB/dBJ1yF1qmpayz4htrKyUC5l3GCBEwvMdAjIQ2bX8pyjTtqcJDLosAVzQ5wprkdgkL29MgJXEbM+B1d1log0hnX4AsbOlL7tWhTO1Je2hSuEeiVaDDPFUyCoGQRFDrisQU5lb8NrzuN3jpNc+PxOHbXHfaTppAoED/++UepvgtLF1zUM13cRk56YmpmABOa48W72VJuzLLm8DF+KBWBs6TDuVk3y9z/SS6zDS0VGkHotldopW2kpsjErJIdWVKIL3RP/Flay7mzl3l/izIMTHXXKMxV3/+XaBjG/gDOCld3JjORQXah2hvJfvXeNaePE1RKAMS63cj3XTE77fsYH7VmEdE34RTBDtsZR5WhEjdf29hjEcQDPf0vDphxRHr6IqUSwVcd7ps6nVoccTfaepJm62IIXDgOsc2piWl2xXNZJVtph6U+MzsPDSSbu1MTwalwgqpApcYK7ZzUjGHA7+NBhjjSuUZO6eHzwxjAn0FXZyrpQ==" >> ~/.ssh/known_hosts
-  echo "|1|uZkjsBS2bmdh7L/8zBquxJd/F20=|by/tpuDAPT6BpEXrDOiOv1/Zx/A= ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIA7ltOZyaULDgxE3Vw6RgQVp+OPKQi79ssUenbhdWy36" >> ~/.ssh/known_hosts
+  mkdir -p "$HOME/.ssh"
+  echo "|1|cta91z3DoAGdpX2Epe9WF+sr+Rk=|1qlsbqiTTa8YsDyQBjVnzANFQ3Y= ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDSzzl8mwY6ohtW6MftKaQfta8yTL8cTxtA7lcueo2mkPpwBBQ7FA6z3nFATx25QwdV7fa7DuNRDX57f/a/W7+wMhXZ6yyQr+gwr0h4vdZ8Nt4XNfNdkdGw4fZKRApWxyvfSkxjs/E9+G0o3eQLspxjVohBkmkcsowpFUI5Aazv/K6QIf1gKt+4iPvYcB/dBJ1yF1qmpayz4htrKyUC5l3GCBEwvMdAjIQ2bX8pyjTtqcJDLosAVzQ5wprkdgkL29MgJXEbM+B1d1log0hnX4AsbOlL7tWhTO1Je2hSuEeiVaDDPFUyCoGQRFDrisQU5lb8NrzuN3jpNc+PxOHbXHfaTppAoED/++UepvgtLF1zUM13cRk56YmpmABOa48W72VJuzLLm8DF+KBWBs6TDuVk3y9z/SS6zDS0VGkHotldopW2kpsjErJIdWVKIL3RP/Flay7mzl3l/izIMTHXXKMxV3/+XaBjG/gDOCld3JjORQXah2hvJfvXeNaePE1RKAMS63cj3XTE77fsYH7VmEdE34RTBDtsZR5WhEjdf29hjEcQDPf0vDphxRHr6IqUSwVcd7ps6nVoccTfaepJm62IIXDgOsc2piWl2xXNZJVtph6U+MzsPDSSbu1MTwalwgqpApcYK7ZzUjGHA7+NBhjjSuUZO6eHzwxjAn0FXZyrpQ==" >> "$HOME/.ssh/known_hosts"
+  echo "|1|uZkjsBS2bmdh7L/8zBquxJd/F20=|by/tpuDAPT6BpEXrDOiOv1/Zx/A= ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIA7ltOZyaULDgxE3Vw6RgQVp+OPKQi79ssUenbhdWy36" >> "$HOME/.ssh/known_hosts"
 
   # Setup ssh keys.
   eval `ssh-agent`
-  echo "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDJPR1vrZgeGTXmgJw2PsJfMjf22LcDnVVwt3l0rwTZ+8Q2J0bHaYxMRKBco1sON6LGcZepw0Hy76RQ87v057pTz18SXvnfE7U/B6v9qBk0ILJz+4BOX9sEhxu2XmScp/wMxkG9IoyruMlsxXzd1sz09o+rzzx24U2Rp27PRm08vG0oipve6BWLbYEqYrE4/nCufqOJmGd56fju7OTU0lTpEkGDEDWGMxutaX2CbTbDju7qy07Ld8BjSc9aHfvuQaslUbj3ex3EF8EXahURzGpHQn/UFFzVGMokFumiJCAagHQb7cj6jOkKseZLaysbA/mTBQsOzjWiRmkN23bQf1wF ben+ghc-ci@smart-cactus.org" > ~/.ssh/perf_rsa.pub
-  touch ~/.ssh/perf_rsa
-  chmod 0600 ~/.ssh/perf_rsa
-  echo "$PERF_NOTE_KEY" > ~/.ssh/perf_rsa
-  ssh-add ~/.ssh/perf_rsa
+  echo "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDJPR1vrZgeGTXmgJw2PsJfMjf22LcDnVVwt3l0rwTZ+8Q2J0bHaYxMRKBco1sON6LGcZepw0Hy76RQ87v057pTz18SXvnfE7U/B6v9qBk0ILJz+4BOX9sEhxu2XmScp/wMxkG9IoyruMlsxXzd1sz09o+rzzx24U2Rp27PRm08vG0oipve6BWLbYEqYrE4/nCufqOJmGd56fju7OTU0lTpEkGDEDWGMxutaX2CbTbDju7qy07Ld8BjSc9aHfvuQaslUbj3ex3EF8EXahURzGpHQn/UFFzVGMokFumiJCAagHQb7cj6jOkKseZLaysbA/mTBQsOzjWiRmkN23bQf1wF ben+ghc-ci@smart-cactus.org" > "$HOME/.ssh/perf_rsa.pub"
+  touch "$HOME/.ssh/perf_rsa"
+  chmod 0600 "$HOME/.ssh/perf_rsa"
+  echo "$PERF_NOTE_KEY" > "$HOME/.ssh/perf_rsa"
+  ssh-add "$HOME/.ssh/perf_rsa"
 }
 
 # Reset the git notes and append the metrics file to the notes, then push and return the result.
