@@ -1541,10 +1541,17 @@ mkHashFun hsc_env eps name
                       -- Kind of a heinous hack.
                       initIfaceLoad hsc_env . withException ctx
                           $ withoutDynamicNow
-                            -- For some unknown reason, we need to reset the
-                            -- dynamicNow bit, otherwise only dynamic
-                            -- interfaces are looked up and some tests fail
-                            -- (e.g. T16219).
+                            -- If you try and load interfaces when dynamic-too
+                            -- enabled then it attempts to load the dyn_hi and hi
+                            -- interface files. Backpack doesn't really care about
+                            -- dynamic object files as it isn't doing any code
+                            -- generation so -dynamic-too is turned off.
+                            -- Some tests fail without doing this (such as T16219),
+                            -- but they fail because dyn_hi files are not found for
+                            -- one of the dependencies (because they are deliberately turned off)
+                            -- Why is this check turned off here? That is unclear but
+                            -- just one of the many horrible hacks in the backpack
+                            -- implementation.
                           $ loadInterface (text "lookupVers2") mod ImportBySystem
         return $ snd (mi_hash_fn (mi_final_exts iface) occ `orElse`
                   pprPanic "lookupVers1" (ppr mod <+> ppr occ))
