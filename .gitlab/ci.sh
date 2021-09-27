@@ -427,8 +427,9 @@ function push_perf_notes() {
   # N.B. $HOME may be unset (e.g. is HERMETIC is set) yet test-metrics.sh
   # relies on it for SSH configuration. Provide a temporary $HOME instead.
   TMP_HOME="$(pwd)/.home"
+  mkdir -p "$TMP_HOME"
   HOME="$TMP_HOME" "$TOP/.gitlab/test-metrics.sh" push
-  rm -R "$TMP_HOME"
+  rm -Rf "$TMP_HOME"
 }
 
 # Figure out which commit should be used by the testsuite driver as a
