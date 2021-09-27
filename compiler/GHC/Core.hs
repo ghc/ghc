@@ -1131,6 +1131,8 @@ data RuleOpts = RuleOpts
    , roBignumRules             :: !Bool     -- ^ Enable rules for bignums
    }
 
+-- | The 'InScopeSet' in the 'InScopeEnv' is a /superset/ of variables that are
+-- currently in scope. See Note [The InScopeSet invariant].
 type RuleFun = RuleOpts -> InScopeEnv -> Id -> [CoreExpr] -> Maybe CoreExpr
 type InScopeEnv = (InScopeSet, IdUnfoldingFun)
 

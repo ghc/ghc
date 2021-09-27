@@ -98,7 +98,11 @@ import GHC.Utils.Outputable
 ************************************************************************
 -}
 
--- | A set of variables that are in scope at some point
+-- | A set of variables that are in scope at some point.
+--
+-- Note that this is a /superset/ of the variables that are currently in scope.
+-- See Note [The InScopeSet invariant].
+--
 -- "Secrets of the Glasgow Haskell Compiler inliner" Section 3.2 provides
 -- the motivation for this abstraction.
 newtype InScopeSet = InScope VarSet
@@ -109,6 +113,21 @@ newtype InScopeSet = InScope VarSet
         -- version of the variable (e.g. with an informative unfolding), so this
         -- lookup is useful (see, for instance, Note [In-scope set as a
         -- substitution]).
+
+        -- Note [The InScopeSet invariant]
+        -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        -- The InScopeSet must include every in-scope variable, but it may also
+        -- include other variables.
+
+        -- Its principal purpose is to provide a set of variables to be avoided
+        -- when creating a fresh identifier (fresh in the sense that it does not
+        -- "shadow" any in-scope binding). To do this we simply have to find one that
+        -- does not appear in the InScopeSet. This is done by the key function
+        -- GHC.Types.Var.Env.uniqAway.
+
+        -- See "Secrets of the Glasgow Haskell Compiler inliner" Section 3.2
+        -- for more detailed motivation. #20419 has further discussion.
+
 
 instance Outputable InScopeSet where
   ppr (InScope s) =
@@ -182,7 +201,8 @@ since they are only locally unique. In particular, two successive calls to
  -}
 
 -- | @uniqAway in_scope v@ finds a unique that is not used in the
--- in-scope set, and gives that to v. See Note [Local uniques].
+-- in-scope set, and gives that to v. See Note [Local uniques] and
+-- Note [The InScopeSet invariant].
 uniqAway :: InScopeSet -> Var -> Var
 -- It starts with v's current unique, of course, in the hope that it won't
 -- have to change, and thereafter uses the successor to the last derived unique
