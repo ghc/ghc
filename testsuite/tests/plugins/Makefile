@@ -146,3 +146,9 @@ plugin-recomp-change-2:
 	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) -v0 plugin-recomp-test.hs PluginRecompTest.hs -package-db plugin-recomp/pkg.plugins01/local.package.conf -fplugin PurePlugin
 	"$(MAKE)" -s --no-print-directory -C plugin-recomp package.plugins01 TOP=$(TOP) RUN=-DRUN2
 	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) -v0 plugin-recomp-test.hs PluginRecompTest.hs -package-db plugin-recomp/pkg.plugins01/local.package.conf -fplugin PurePlugin
+
+# Shouldn't recompile the module because the plugin is pure and nothing changed.
+.PHONY: T20417
+T20417:
+	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) -v0 plugin-recomp-test.hs -package-db plugin-recomp/pkg.plugins01/local.package.conf -hide-all-packages -package base -plugin-package plugin-recompilation-0.1  -fplugin PurePlugin
+	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) -v0 plugin-recomp-test.hs -package-db plugin-recomp/pkg.plugins01/local.package.conf -hide-all-packages -package base -plugin-package plugin-recompilation-0.1 -fplugin PurePlugin

@@ -506,11 +506,9 @@ checkMergedSignatures hsc_env mod_summary iface = do
 checkDependencies :: HscEnv -> ModSummary -> ModIface -> IfG RecompileRequired
 checkDependencies hsc_env summary iface
  = do
-    res <- liftIO $ traverse (\(mb_pkg, L _ mod) ->
-              let reason = ModuleChanged mod
-              in classify reason <$> findImportedModule fc fopts units home_unit mod (mb_pkg))
-              (ms_imps summary ++ ms_srcimps summary)
-    case sequence (res ++ [Right (fake_ghc_prim_import)| ms_ghc_prim_import summary]) of
+    res_normal <- classify_import (findImportedModule fc fopts units home_unit) (ms_textual_imps summary ++ ms_srcimps summary)
+    res_plugin <- classify_import (\mod _ -> findPluginModule fc fopts units home_unit mod) (ms_plugin_imps summary)
+    case sequence (res_normal ++ res_plugin ++ [Right (fake_ghc_prim_import)| ms_ghc_prim_import summary]) of
       Left recomp -> return recomp
       Right es -> do
         let (hs, ps) = partitionEithers es
@@ -520,6 +518,12 @@ checkDependencies hsc_env summary iface
         res2 <- liftIO $ check_packages allPkgDeps prev_dep_pkgs
         return (res1 `mappend` res2)
  where
+
+   classify_import find_import imports =
+    liftIO $ traverse (\(mb_pkg, L _ mod) ->
+           let reason = ModuleChanged mod
+           in classify reason <$> find_import mod mb_pkg)
+           imports
    dflags        = hsc_dflags hsc_env
    fopts         = initFinderOpts dflags
    logger        = hsc_logger hsc_env

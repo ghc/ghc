@@ -240,3 +240,10 @@ test('plugin-recomp-change-2',
       pre_cmd('$MAKE -s --no-print-directory -C plugin-recomp package.plugins01 TOP={top}')
       ],
      makefile_test, [])
+
+test('T20417',
+     [extra_files(['plugin-recomp/', 'plugin-recomp-test.hs']),
+      only_ways([config.ghc_plugin_way]),
+      pre_cmd('$MAKE -s --no-print-directory -C plugin-recomp package.plugins01 TOP={top}')
+      ],
+     makefile_test, [])
