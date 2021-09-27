@@ -904,10 +904,10 @@ pipelineStart pipe_env hsc_env input_fn =
                       -- File name we expected the output to have
                       final_fn <- liftIO $ phaseOutputFilenameNew (Hsc HsSrcFile) pipe_env hsc_env Nothing
                       when (final_fn /= out_fn) $ do
-                        let msg = "Copying `" ++ input_fn ++"' to `" ++ final_fn ++ "'"
+                        let msg = "Copying `" ++ out_fn ++"' to `" ++ final_fn ++ "'"
                             line_prag = "{-# LINE 1 \"" ++ src_filename pipe_env ++ "\" #-}\n"
                         liftIO (showPass logger msg)
-                        liftIO (copyWithHeader line_prag input_fn final_fn)
+                        liftIO (copyWithHeader line_prag out_fn final_fn)
                       return Nothing
                     _ -> objFromLinkable <$> fullPipeline pipe_env hsc_env input_fn sf
    c :: P m => Phase -> m (Maybe FilePath)
