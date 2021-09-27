@@ -871,8 +871,6 @@ tcExpr (HsOverLabel {})    ty = pprPanic "tcExpr:HsOverLabel"  (ppr ty)
 tcExpr (SectionL {})       ty = pprPanic "tcExpr:SectionL"    (ppr ty)
 tcExpr (SectionR {})       ty = pprPanic "tcExpr:SectionR"    (ppr ty)
 tcExpr (HsTcBracketOut {}) ty = pprPanic "tcExpr:HsTcBracketOut"    (ppr ty)
-tcExpr (HsTick {})         ty = pprPanic "tcExpr:HsTick"    (ppr ty)
-tcExpr (HsBinTick {})      ty = pprPanic "tcExpr:HsBinTick"    (ppr ty)
 
 
 {-

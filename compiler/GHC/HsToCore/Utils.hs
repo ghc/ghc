@@ -1137,13 +1137,13 @@ isTrueLHsExpr (L _ (HsVar _ (L _ v)))
         -- trueDataConId doesn't have the same unique as trueDataCon
 isTrueLHsExpr (L _ (XExpr (ConLikeTc con _ _)))
   | con `hasKey` getUnique trueDataCon = Just return
-isTrueLHsExpr (L _ (HsTick _ tickish e))
+isTrueLHsExpr (L _ (XExpr (HsTick tickish e)))
     | Just ticks <- isTrueLHsExpr e
     = Just (\x -> do wrapped <- ticks x
                      return (Tick tickish wrapped))
    -- This encodes that the result is constant True for Hpc tick purposes;
    -- which is specifically what isTrueLHsExpr is trying to find out.
-isTrueLHsExpr (L _ (HsBinTick _ ixT _ e))
+isTrueLHsExpr (L _ (XExpr (HsBinTick ixT _ e)))
     | Just ticks <- isTrueLHsExpr e
     = Just (\x -> do e <- ticks x
                      this_mod <- getModule

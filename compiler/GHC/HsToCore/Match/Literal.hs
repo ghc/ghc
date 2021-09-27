@@ -429,8 +429,8 @@ getLHsIntegralLit (L _ e) = go e
     go (HsLit _ lit)          = getSimpleIntegralLit lit
 
     -- Remember to look through automatically-added tick-boxes! (#8384)
-    go (HsTick _ _ e)         = getLHsIntegralLit e
-    go (HsBinTick _ _ _ e)    = getLHsIntegralLit e
+    go (XExpr (HsTick _ e))       = getLHsIntegralLit e
+    go (XExpr (HsBinTick _ _ e))  = getLHsIntegralLit e
 
     -- The literal might be wrapped in a case with -XOverloadedLists
     go (XExpr (WrapExpr (HsWrap _ e))) = go e
@@ -456,9 +456,9 @@ getSimpleIntegralLit _ = Nothing
 -- | Extract the Char if the expression is a Char literal.
 getLHsCharLit :: LHsExpr GhcTc -> Maybe Char
 getLHsCharLit (L _ (HsPar _ _ e _))        = getLHsCharLit e
-getLHsCharLit (L _ (HsTick _ _ e))         = getLHsCharLit e
-getLHsCharLit (L _ (HsBinTick _ _ _ e))    = getLHsCharLit e
 getLHsCharLit (L _ (HsLit _ (HsChar _ c))) = Just c
+getLHsCharLit (L _ (XExpr (HsTick _ e)))         = getLHsCharLit e
+getLHsCharLit (L _ (XExpr (HsBinTick _ _ e)))    = getLHsCharLit e
 getLHsCharLit _ = Nothing
 
 -- | Convert a pair (Integer, Type) to (Integer, Name) after eventually

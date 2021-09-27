@@ -40,7 +40,6 @@ import GHC.Types.Basic
 import GHC.Types.Fixity
 import GHC.Types.SourceText
 import GHC.Types.SrcLoc
-import GHC.Types.Tickish
 import GHC.Unit.Module (ModuleName)
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -636,20 +635,6 @@ data HsExpr p
   -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
   | HsStatic (XStatic p) -- Free variables of the body
              (LHsExpr p)        -- Body
-
-  ---------------------------------------
-  -- Haskell program coverage (Hpc) Support
-
-  | HsTick
-     (XTick p)
-     CoreTickish
-     (LHsExpr p)                       -- sub-expression
-
-  | HsBinTick
-     (XBinTick p)
-     Int                                -- module-local tick number for True
-     Int                                -- module-local tick number for False
-     (LHsExpr p)                        -- sub-expression
 
   ---------------------------------------
   -- Expressions annotated with pragmas, written as {-# ... #-}

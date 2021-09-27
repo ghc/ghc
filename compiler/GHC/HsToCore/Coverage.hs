@@ -620,12 +620,6 @@ addTickHsExpr (ArithSeq ty wit arith_seq) =
                    addTickWit (Just fl) = do fl' <- addTickSyntaxExpr hpcSrcSpan fl
                                              return (Just fl')
 
--- We might encounter existing ticks (multiple Coverage passes)
-addTickHsExpr (HsTick x t e) =
-        liftM (HsTick x t) (addTickLHsExprNever e)
-addTickHsExpr (HsBinTick x t0 t1 e) =
-        liftM (HsBinTick x t0 t1) (addTickLHsExprNever e)
-
 addTickHsExpr (HsPragE x p e) =
         liftM (HsPragE x p) (addTickLHsExpr e)
 addTickHsExpr e@(HsBracket     {})   = return e
@@ -649,6 +643,12 @@ addTickHsExpr e@(XExpr (ConLikeTc {})) = return e
   -- We used to do a freeVar on a pat-syn builder, but actually
   -- such builders are never in the inScope env, which
   -- doesn't include top level bindings
+
+-- We might encounter existing ticks (multiple Coverage passes)
+addTickHsExpr (XExpr (HsTick t e)) =
+        liftM (XExpr . HsTick t) (addTickLHsExprNever e)
+addTickHsExpr (XExpr (HsBinTick t0 t1 e)) =
+        liftM (XExpr . HsBinTick t0 t1) (addTickLHsExprNever e)
 
 addTickTupArg :: HsTupArg GhcTc -> TM (HsTupArg GhcTc)
 addTickTupArg (Present x e)  = do { e' <- addTickLHsExpr e
@@ -1193,7 +1193,7 @@ allocTickBox boxLabel countEntries topOnly pos m =
     (fvs, e) <- getFreeVars m
     env <- getEnv
     tickish <- mkTickish boxLabel countEntries topOnly pos fvs (declPath env)
-    return (L (noAnnSrcSpan pos) (HsTick noExtField tickish (L (noAnnSrcSpan pos) e)))
+    return (L (noAnnSrcSpan pos) (XExpr $ HsTick tickish $ L (noAnnSrcSpan pos) e))
   ) (do
     e <- m
     return (L (noAnnSrcSpan pos) e)
@@ -1266,14 +1266,14 @@ mkBinTickBoxHpc :: (Bool -> BoxLabel) -> SrcSpan -> LHsExpr GhcTc
                 -> TM (LHsExpr GhcTc)
 mkBinTickBoxHpc boxLabel pos e = do
   env <- getEnv
-  binTick <- HsBinTick noExtField
+  binTick <- HsBinTick
     <$> addMixEntry (pos,declPath env, [],boxLabel True)
     <*> addMixEntry (pos,declPath env, [],boxLabel False)
     <*> pure e
   tick <- HpcTick (this_mod env)
     <$> addMixEntry (pos,declPath env, [],ExpBox False)
   let pos' = noAnnSrcSpan pos
-  return $ L pos' $ HsTick noExtField tick (L pos' binTick)
+  return $ L pos' $ XExpr $ HsTick tick (L pos' (XExpr binTick))
 
 mkHpcPos :: SrcSpan -> HpcPos
 mkHpcPos pos@(RealSrcSpan s _)

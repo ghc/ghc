@@ -139,12 +139,12 @@ hsExprType e@(HsSpliceE{}) = pprPanic "hsExprType: Unexpected HsSpliceE"
                                       -- than in the typechecked AST.
 hsExprType (HsProc _ _ lcmd_top) = lhsCmdTopType lcmd_top
 hsExprType (HsStatic _ e) = lhsExprType e
-hsExprType (HsTick _ _ e) = lhsExprType e
-hsExprType (HsBinTick _ _ _ e) = lhsExprType e
 hsExprType (HsPragE _ _ e) = lhsExprType e
 hsExprType (XExpr (WrapExpr (HsWrap wrap e))) = hsWrapperType wrap $ hsExprType e
 hsExprType (XExpr (ExpansionExpr (HsExpanded _ tc_e))) = hsExprType tc_e
 hsExprType (XExpr (ConLikeTc con _ _)) = conLikeType con
+hsExprType (XExpr (HsTick _ e)) = lhsExprType e
+hsExprType (XExpr (HsBinTick _ _ e)) = lhsExprType e
 
 arithSeqInfoType :: ArithSeqInfo GhcTc -> Type
 arithSeqInfoType asi = mkListTy $ case asi of

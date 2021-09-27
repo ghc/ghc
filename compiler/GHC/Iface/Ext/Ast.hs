@@ -739,10 +739,10 @@ instance HiePass p => HasType (LocatedA (HsExpr (GhcPass p))) where
         RecordCon con_expr _ _ -> computeType con_expr
         ExprWithTySig _ e _ -> computeLType e
         HsStatic _ e -> computeLType e
-        HsTick _ _ e -> computeLType e
-        HsBinTick _ _ _ e -> computeLType e
         HsPragE _ _ e -> computeLType e
         XExpr (ExpansionExpr (HsExpanded _ e)) -> computeType e
+        XExpr (HsTick _ e) -> computeLType e
+        XExpr (HsBinTick _ _ e) -> computeLType e
         e -> Just (hsExprType e)
 
       computeLType :: LHsExpr GhcTc -> Maybe Type
@@ -1190,12 +1190,6 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
       HsStatic _ expr ->
         [ toHie expr
         ]
-      HsTick _ _ expr ->
-        [ toHie expr
-        ]
-      HsBinTick _ _ _ expr ->
-        [ toHie expr
-        ]
       HsBracket _ b ->
         [ toHie b
         ]
@@ -1222,6 +1216,12 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
                -> [ toHie (L mspan b) ]
              ConLikeTc con _ _
                -> [ toHie $ C Use $ L mspan $ conLikeName con ]
+             HsTick _ expr
+               -> [ toHie expr
+                  ]
+             HsBinTick _ _ expr
+               -> [ toHie expr
+                  ]
         | otherwise -> []
 
 -- NOTE: no longer have the location

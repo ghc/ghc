@@ -540,8 +540,6 @@ exprCtOrigin (HsTcBracketOut {})= panic "exprCtOrigin HsTcBracketOut"
 exprCtOrigin (HsSpliceE {})      = Shouldn'tHappenOrigin "TH splice"
 exprCtOrigin (HsProc {})         = Shouldn'tHappenOrigin "proc"
 exprCtOrigin (HsStatic {})       = Shouldn'tHappenOrigin "static expression"
-exprCtOrigin (HsTick _ _ e)           = lexprCtOrigin e
-exprCtOrigin (HsBinTick _ _ _ e)      = lexprCtOrigin e
 exprCtOrigin (XExpr (HsExpanded a _)) = exprCtOrigin a
 
 -- | Extract a suitable CtOrigin from a MatchGroup

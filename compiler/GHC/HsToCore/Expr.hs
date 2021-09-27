@@ -280,6 +280,23 @@ dsExpr e@(XExpr ext_expr_tc)
       ExpansionExpr (HsExpanded _ b) -> dsExpr b
       WrapExpr {}                    -> dsHsWrapped e
       ConLikeTc {}                   -> dsHsWrapped e
+      -- Hpc Support
+      HsTick tickish e -> do
+        e' <- dsLExpr e
+        return (Tick tickish e')
+
+      -- There is a problem here. The then and else branches
+      -- have no free variables, so they are open to lifting.
+      -- We need someway of stopping this.
+      -- This will make no difference to binary coverage
+      -- (did you go here: YES or NO), but will effect accurate
+      -- tick counting.
+
+      HsBinTick ixT ixF e -> do
+        e2 <- dsLExpr e
+        do { assert (exprType e2 `eqType` boolTy)
+            mkBinaryTickBox ixT ixF e2
+          }
 
 dsExpr (NegApp _ (L loc
                     (HsOverLit _ lit@(OverLit { ol_val = HsIntegral i})))
@@ -757,25 +774,6 @@ dsExpr (HsSpliceE _ s)         = pprPanic "dsExpr:splice" (ppr s)
 
 -- Arrow notation extension
 dsExpr (HsProc _ pat cmd) = dsProcExpr pat cmd
-
--- Hpc Support
-
-dsExpr (HsTick _ tickish e) = do
-  e' <- dsLExpr e
-  return (Tick tickish e')
-
--- There is a problem here. The then and else branches
--- have no free variables, so they are open to lifting.
--- We need someway of stopping this.
--- This will make no difference to binary coverage
--- (did you go here: YES or NO), but will effect accurate
--- tick counting.
-
-dsExpr (HsBinTick _ ixT ixF e) = do
-  e2 <- dsLExpr e
-  do { assert (exprType e2 `eqType` boolTy)
-       mkBinaryTickBox ixT ixF e2
-     }
 
 
 -- HsSyn constructs that just shouldn't be here, because

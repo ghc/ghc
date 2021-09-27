@@ -1639,8 +1639,6 @@ repE e@(HsBracket{}) = notHandled (ThExpressionForm e)
 repE e@(HsRnBracketOut{}) = notHandled (ThExpressionForm e)
 repE e@(HsTcBracketOut{}) = notHandled (ThExpressionForm e)
 repE e@(HsProc{}) = notHandled (ThExpressionForm e)
-repE e@(HsTick{}) = notHandled (ThExpressionForm e)
-repE e@(HsBinTick{}) = notHandled (ThExpressionForm e)
 
 {- Note [Quotation and rebindable syntax]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

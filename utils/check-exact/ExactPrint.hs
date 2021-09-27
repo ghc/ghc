@@ -1846,8 +1846,6 @@ instance ExactPrint (HsExpr GhcPs) where
   getAnnotationEntry (HsSpliceE an _)             = fromAnn an
   getAnnotationEntry (HsProc an _ _)              = fromAnn an
   getAnnotationEntry (HsStatic an _)              = fromAnn an
-  getAnnotationEntry (HsTick {})                  = NoEntryVal
-  getAnnotationEntry (HsBinTick {})               = NoEntryVal
   getAnnotationEntry (HsPragE{})                  = NoEntryVal
 
 
@@ -2083,8 +2081,6 @@ instance ExactPrint (HsExpr GhcPs) where
     markEpAnn an AnnStatic
     markAnnotated e
 
-  -- exact x@(HsTick {})                  = withPpr x
-  -- exact x@(HsBinTick {})               = withPpr x
   exact (HsPragE _ prag e) = do
     markAnnotated prag
     markAnnotated e
