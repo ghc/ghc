@@ -750,8 +750,7 @@ data TyCon
   --     - boxed tuples
   --     - unboxed tuples
   --     - constraint tuples
-  -- All these constructors are lifted and boxed except unboxed tuples
-  -- which should have an 'UnboxedAlgTyCon' parent.
+  --     - unboxed sums
   -- Data/newtype/type /families/ are handled by 'FamilyTyCon'.
   -- See 'AlgTyConRhs' for more information.
   | AlgTyCon {
@@ -805,7 +804,8 @@ data TyCon
         algTcFields :: FieldLabelEnv, -- ^ Maps a label to information
                                       -- about the field
 
-        algTcParent :: AlgTyConFlav -- ^ Gives the class or family declaration
+        algTcFlavour :: AlgTyConFlav   -- ^ The flavour of this algebraic tycon.
+                                       -- Gives the class or family declaration
                                        -- 'TyCon' for derived 'TyCon's representing
                                        -- class or family instances, respectively.
 
@@ -1250,20 +1250,20 @@ visibleDataCons (NewTyCon{ data_con = c })    = [c]
 visibleDataCons (TupleTyCon{ data_con = c })  = [c]
 visibleDataCons (SumTyCon{ data_cons = cs })  = cs
 
--- ^ Both type classes as well as family instances imply implicit
--- type constructors.  These implicit type constructors refer to their parent
--- structure (ie, the class or family from which they derive) using a type of
--- the following form.
+-- | Describes the flavour of an algebraic type constructor. For
+-- classes and data families, this flavour includes a reference to
+-- the parent 'TyCon'.
 data AlgTyConFlav
-  = -- | An ordinary type constructor has no parent.
+  = -- | An ordinary algebraic type constructor. This includes unlifted and
+    -- representation-polymorphic datatypes and newtypes and unboxed tuples,
+    -- but NOT unboxed sums; see UnboxedSumTyCon.
     VanillaAlgTyCon
        TyConRepName   -- For Typeable
 
-    -- | An unboxed type constructor. The TyConRepName is a Maybe since we
-    -- currently don't allow unboxed sums to be Typeable since there are too
-    -- many of them. See #13276.
-  | UnboxedAlgTyCon
-       (Maybe TyConRepName)
+    -- | An unboxed sum type constructor. This is distinct from VanillaAlgTyCon
+    -- because we currently don't allow unboxed sums to be Typeable since
+    -- there are too many of them. See #13276.
+  | UnboxedSumTyCon
 
   -- | Type constructors representing a class dictionary.
   -- See Note [ATyCon for classes] in "GHC.Core.TyCo.Rep"
@@ -1306,11 +1306,11 @@ data AlgTyConFlav
         -- gives a representation tycon:
         --      data R:TList a = ...
         --      axiom co a :: T [a] ~ R:TList a
-        -- with R:TList's algTcParent = DataFamInstTyCon T [a] co
+        -- with R:TList's algTcFlavour = DataFamInstTyCon T [a] co
 
 instance Outputable AlgTyConFlav where
     ppr (VanillaAlgTyCon {})        = text "Vanilla ADT"
-    ppr (UnboxedAlgTyCon {})        = text "Unboxed ADT"
+    ppr (UnboxedSumTyCon {})        = text "Unboxed sum"
     ppr (ClassTyCon cls _)          = text "Class parent" <+> ppr cls
     ppr (DataFamInstTyCon _ tc tys) = text "Family parent (family instance)"
                                       <+> ppr tc <+> sep (map pprType tys)
@@ -1319,7 +1319,7 @@ instance Outputable AlgTyConFlav where
 -- name, if any
 okParent :: Name -> AlgTyConFlav -> Bool
 okParent _       (VanillaAlgTyCon {})            = True
-okParent _       (UnboxedAlgTyCon {})            = True
+okParent _       (UnboxedSumTyCon {})            = True
 okParent tc_name (ClassTyCon cls _)              = tc_name == tyConName (classTyCon cls)
 okParent _       (DataFamInstTyCon _ fam_tc tys) = tys `lengthAtLeast` tyConArity fam_tc
 
@@ -1500,10 +1500,11 @@ tyConRepName_maybe (FunTyCon   { tcRepName = rep_nm })
   = Just rep_nm
 tyConRepName_maybe (PrimTyCon  { primRepName = rep_nm })
   = Just rep_nm
-tyConRepName_maybe (AlgTyCon { algTcParent = parent })
-  | VanillaAlgTyCon rep_nm <- parent = Just rep_nm
-  | ClassTyCon _ rep_nm    <- parent = Just rep_nm
-  | UnboxedAlgTyCon rep_nm <- parent = rep_nm
+tyConRepName_maybe (AlgTyCon { algTcFlavour = parent }) = case parent of
+  VanillaAlgTyCon rep_nm -> Just rep_nm
+  UnboxedSumTyCon        -> Nothing
+  ClassTyCon _ rep_nm    -> Just rep_nm
+  DataFamInstTyCon {}    -> Nothing
 tyConRepName_maybe (FamilyTyCon { famTcFlav = DataFamilyTyCon rep_nm })
   = Just rep_nm
 tyConRepName_maybe (PromotedDataCon { dataCon = dc, tcRepName = rep_nm })
@@ -1862,7 +1863,7 @@ mkAlgTyCon name binders res_kind roles cType stupid rhs parent gadt_syn
               algTcStupidTheta = stupid,
               algTcRhs         = rhs,
               algTcFields      = fieldsOfAlgTcRhs rhs,
-              algTcParent      = assertPpr (okParent name parent) (ppr name $$ ppr parent) parent,
+              algTcFlavour     = assertPpr (okParent name parent) (ppr name $$ ppr parent) parent,
               algTcGadtSyntax  = gadt_syn
           }
     in tc
@@ -1902,7 +1903,7 @@ mkTupleTyCon name binders res_kind arity con sort parent
               algTcRhs         = TupleTyCon { data_con = con,
                                               tup_sort = sort },
               algTcFields      = emptyDFsEnv,
-              algTcParent      = parent
+              algTcFlavour     = parent
           }
     in tc
 
@@ -1931,7 +1932,7 @@ mkSumTyCon name binders res_kind arity tyvars cons parent
               algTcStupidTheta = [],
               algTcRhs         = mkSumTyConRhs cons,
               algTcFields      = emptyDFsEnv,
-              algTcParent      = parent
+              algTcFlavour     = parent
           }
     in tc
 
@@ -2122,7 +2123,7 @@ isAlgTyCon _               = False
 -- | Returns @True@ for vanilla AlgTyCons -- that is, those created
 -- with a @data@ or @newtype@ declaration.
 isVanillaAlgTyCon :: TyCon -> Bool
-isVanillaAlgTyCon (AlgTyCon { algTcParent = VanillaAlgTyCon _ }) = True
+isVanillaAlgTyCon (AlgTyCon { algTcFlavour = VanillaAlgTyCon _ }) = True
 isVanillaAlgTyCon _                                              = False
 
 -- | Returns @True@ for the 'TyCon' of the 'Constraint' kind.
@@ -2480,24 +2481,27 @@ setTcTyConKind tc              _    = pprPanic "setTcTyConKind" (ppr tc)
 -- See Note [Representation-polymorphic TyCons]
 tcHasFixedRuntimeRep :: TyCon -> Bool
 tcHasFixedRuntimeRep FunTyCon{}           = True
-tcHasFixedRuntimeRep (AlgTyCon { algTcParent = parent, algTcRhs = rhs })
-  | UnboxedAlgTyCon _ <- parent
-  = False
-  | NewTyCon { nt_fixed_rep = fixed_rep } <- rhs
-  = fixed_rep -- A newtype might not have a fixed runtime representation
-              -- with UnliftedNewtypes (#17360)
-  | DataTyCon { data_fixed_lev = fixed_lev } <- rhs
-  = fixed_lev -- A datatype might not have a fixed levity with UnliftedDatatypes (#20423).
-              -- NB: the current representation-polymorphism checks require that
-              -- the representation be fully-known, including levity variables.
-              -- This might be relaxed in the future (#15532).
-  | AbstractTyCon {} <- rhs
-  = False -- An abstract TyCon might not have a fixed runtime representation.
+tcHasFixedRuntimeRep (AlgTyCon { algTcRhs = rhs }) = case rhs of
+  AbstractTyCon {} -> False
+          -- An abstract TyCon might not have a fixed runtime representation.
           -- Note that this is an entirely different matter from the concreteness
           -- of the 'TyCon', in the sense of 'isConcreteTyCon'.
-  | otherwise
-  = True
-tcHasFixedRuntimeRep SynonymTyCon{}       = False
+
+  DataTyCon { data_fixed_lev = fixed_lev } -> fixed_lev
+          -- A datatype might not have a fixed levity with UnliftedDatatypes (#20423).
+          -- NB: the current representation-polymorphism checks require that
+          -- the representation be fully-known, including levity variables.
+          -- This might be relaxed in the future (#15532).
+
+  TupleTyCon { tup_sort = tuple_sort } -> isBoxed (tupleSortBoxity tuple_sort)
+
+  SumTyCon {} -> False   -- only unboxed sums here
+
+  NewTyCon { nt_fixed_rep = fixed_rep } -> fixed_rep
+         -- A newtype might not have a fixed runtime representation
+         -- with UnliftedNewtypes (#17360)
+
+tcHasFixedRuntimeRep SynonymTyCon{}       = False   -- conservative choice
 tcHasFixedRuntimeRep FamilyTyCon{}        = False
 tcHasFixedRuntimeRep PrimTyCon{}          = True
 tcHasFixedRuntimeRep TcTyCon{}            = False
@@ -2566,7 +2570,7 @@ expandSynTyCon_maybe tc tys
 -- exported tycon can have a pattern synonym bundled with it, e.g.,
 -- module Foo (TyCon(.., PatSyn)) where
 isTyConWithSrcDataCons :: TyCon -> Bool
-isTyConWithSrcDataCons (AlgTyCon { algTcRhs = rhs, algTcParent = parent }) =
+isTyConWithSrcDataCons (AlgTyCon { algTcRhs = rhs, algTcFlavour = parent }) =
   case rhs of
     DataTyCon {}  -> isSrcParent
     NewTyCon {}   -> isSrcParent
@@ -2741,36 +2745,36 @@ famTyConFlav_maybe _                                = Nothing
 
 -- | Is this 'TyCon' that for a class instance?
 isClassTyCon :: TyCon -> Bool
-isClassTyCon (AlgTyCon {algTcParent = ClassTyCon {}}) = True
+isClassTyCon (AlgTyCon {algTcFlavour = ClassTyCon {}}) = True
 isClassTyCon _                                        = False
 
 -- | If this 'TyCon' is that for a class instance, return the class it is for.
 -- Otherwise returns @Nothing@
 tyConClass_maybe :: TyCon -> Maybe Class
-tyConClass_maybe (AlgTyCon {algTcParent = ClassTyCon clas _}) = Just clas
+tyConClass_maybe (AlgTyCon {algTcFlavour = ClassTyCon clas _}) = Just clas
 tyConClass_maybe _                                            = Nothing
 
 -- | Return the associated types of the 'TyCon', if any
 tyConATs :: TyCon -> [TyCon]
-tyConATs (AlgTyCon {algTcParent = ClassTyCon clas _}) = classATs clas
+tyConATs (AlgTyCon {algTcFlavour = ClassTyCon clas _}) = classATs clas
 tyConATs _                                            = []
 
 ----------------------------------------------------------------------------
 -- | Is this 'TyCon' that for a data family instance?
 isFamInstTyCon :: TyCon -> Bool
-isFamInstTyCon (AlgTyCon {algTcParent = DataFamInstTyCon {} })
+isFamInstTyCon (AlgTyCon {algTcFlavour = DataFamInstTyCon {} })
   = True
 isFamInstTyCon _ = False
 
 tyConFamInstSig_maybe :: TyCon -> Maybe (TyCon, [Type], CoAxiom Unbranched)
-tyConFamInstSig_maybe (AlgTyCon {algTcParent = DataFamInstTyCon ax f ts })
+tyConFamInstSig_maybe (AlgTyCon {algTcFlavour = DataFamInstTyCon ax f ts })
   = Just (f, ts, ax)
 tyConFamInstSig_maybe _ = Nothing
 
 -- | If this 'TyCon' is that of a data family instance, return the family in question
 -- and the instance types. Otherwise, return @Nothing@
 tyConFamInst_maybe :: TyCon -> Maybe (TyCon, [Type])
-tyConFamInst_maybe (AlgTyCon {algTcParent = DataFamInstTyCon _ f ts })
+tyConFamInst_maybe (AlgTyCon {algTcFlavour = DataFamInstTyCon _ f ts })
   = Just (f, ts)
 tyConFamInst_maybe _ = Nothing
 
@@ -2778,7 +2782,7 @@ tyConFamInst_maybe _ = Nothing
 -- represents a coercion identifying the representation type with the type
 -- instance family.  Otherwise, return @Nothing@
 tyConFamilyCoercion_maybe :: TyCon -> Maybe (CoAxiom Unbranched)
-tyConFamilyCoercion_maybe (AlgTyCon {algTcParent = DataFamInstTyCon ax _ _ })
+tyConFamilyCoercion_maybe (AlgTyCon {algTcFlavour = DataFamInstTyCon ax _ _ })
   = Just ax
 tyConFamilyCoercion_maybe _ = Nothing
 
@@ -2875,7 +2879,7 @@ instance Outputable TyConFlavour where
       go PromotedDataConFlavour  = "promoted data constructor"
 
 tyConFlavour :: TyCon -> TyConFlavour
-tyConFlavour (AlgTyCon { algTcParent = parent, algTcRhs = rhs })
+tyConFlavour (AlgTyCon { algTcFlavour = parent, algTcRhs = rhs })
   | ClassTyCon _ _ <- parent = ClassFlavour
   | otherwise = case rhs of
                   TupleTyCon { tup_sort = sort }
