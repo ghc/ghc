@@ -388,6 +388,31 @@ idea is to have roles in kind coercions, but that has yet to be implemented.
 See also "A Role for Dependent Types in Haskell", ICFP 2019, which describes
 how roles in kinds might work out.
 
+One annoying consequence of this inconsistency is that we can get ill-kinded
+updates to metavariables. #20356 is a case in point. Simplifying somewhat,
+we end up with
+  [W] (alpha :: Constraint)  ~  (Int :: Type)
+This is heterogeneous, so we produce
+  [W] co :: (Constraint ~ Type)
+and transform our original wanted to become
+  [W] alpha ~ Int |> sym co
+in accordance with Note [Equalities with incompatible kinds] in GHC.Tc.Solver.Canonical.
+Our transformed wanted is now homogeneous (both sides have kind Constraint)
+and so we unify alpha := Int |> sym co.
+
+However, it's not so easy: when we build the cast (Int |> sym co), we actually
+just get Int back. This is because we forbid reflexive casts (invariant (EQ2) of
+Note [Respecting definitional equality] in GHC.Core.TyCo.Rep), and co looks
+reflexive: it relates Type and Constraint, even though these are considered
+identical in Core. Above, when we tried to say alpha := Int |> sym co, we
+really ended up doing alpha := Int -- even though alpha :: Constraint and
+Int :: Type have different kinds. Nothing has really gone wrong, though:
+we still emitted [W] co :: (Constraint ~ Type), which will be insoluble
+and lead to a decent error message. We simply need not to fall over at the
+moment of unification, because all will be OK in the end. We thus use the
+Core eqType, not the Haskell tcEqType, in the kind check for a meta-tyvar
+unification in GHC.Tc.Utils.TcMType.writeMetaTyVarRef.
+
 -}
 
 -- | Gives the typechecker view of a type. This unwraps synonyms but

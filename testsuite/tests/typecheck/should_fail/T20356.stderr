@@ -1,0 +1,7 @@
+
+T20356.hs:18:10: error:
+    • Couldn't match kind ‘*’ with ‘Constraint’
+      When matching the kind of ‘Eq’
+    • In the first argument of ‘id'’, namely ‘(MkProxy @T)’
+      In the expression: id' (MkProxy @T)
+      In an equation for ‘z’: z = id' (MkProxy @T)

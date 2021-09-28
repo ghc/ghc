@@ -1573,7 +1573,7 @@ interactEq inerts workItem@(CEqCan { cc_lhs = lhs
 interactEq _ wi = pprPanic "interactEq" (ppr wi)
 
 ----------------------
--- We have a meta-tyvar on the left, and metaTyVarUpateOK has said "yes"
+-- We have a meta-tyvar on the left, and metaTyVarUpdateOK has said "yes"
 -- So try to solve by unifying.
 -- Three reasons why not:
 --    Skolem escape

@@ -987,10 +987,10 @@ writeMetaTyVarRef tyvar ref ty
              zonked_ty_lvl  = tcTypeLevel zonked_ty
              level_check_ok  = not (zonked_ty_lvl `strictlyDeeperThan` tv_lvl)
              level_check_msg = ppr zonked_ty_lvl $$ ppr tv_lvl $$ ppr tyvar $$ ppr ty
-             kind_check_ok = tcIsConstraintKind zonked_tv_kind
-                          || tcEqKind zonked_ty_kind zonked_tv_kind
-             -- Hack alert! tcIsConstraintKind: see GHC.Tc.Gen.HsType
-             -- Note [Extra-constraint holes in partial type signatures]
+             kind_check_ok = zonked_ty_kind `eqType` zonked_tv_kind
+             -- Hack alert! eqType, not tcEqType. see:
+             -- Note [coreView vs tcView] in GHC.Core.Type
+             -- Note [Extra-constraint holes in partial type signatures] in GHC.Tc.Gen.HsType
 
              kind_msg = hang (text "Ill-kinded update to meta tyvar")
                            2 (    ppr tyvar <+> text "::" <+> (ppr tv_kind $$ ppr zonked_tv_kind)
