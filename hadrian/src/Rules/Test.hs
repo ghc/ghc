@@ -214,7 +214,7 @@ timeoutProgBuilder = do
             python <- builderPath Python
             copyFile "testsuite/timeout/timeout.py" (root -/- timeoutPath <.> "py")
             let script = unlines
-                    [ "#!/usr/bin/env sh"
+                    [ "#!/bin/sh"
                     , "exec " ++ python ++ " $0.py \"$@\"" ]
             writeFile' (root -/- timeoutPath) script
             makeExecutable (root -/- timeoutPath)
