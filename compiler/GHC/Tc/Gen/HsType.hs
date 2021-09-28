@@ -4079,10 +4079,11 @@ more.  So I use a HACK:
   ordinary tuples we don't have the same limit as for constraint
   tuples (which need selectors and an associated class).
 
-* Because it is ill-kinded, it trips an assert in writeMetaTyVar,
-  so now I disable the assertion if we are writing a type of
-  kind Constraint.  (That seldom/never normally happens so we aren't
-  losing much.)
+* Because it is ill-kinded (unifying something of kind Constraint with
+  something of kind Type), it should trip an assert in writeMetaTyVarRef.
+  However, writeMetaTyVarRef uses eqType, not tcEqType, to avoid falling
+  over in this scenario (and another scenario, as detailed in
+  Note [coreView vs tcView] in GHC.Core.Type).
 
 Result works fine, but it may eventually bite us.
 

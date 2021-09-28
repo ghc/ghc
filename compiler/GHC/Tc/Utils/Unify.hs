@@ -1764,38 +1764,6 @@ better in practice.
 Revisited in Nov '20, along with removing flattening variables. Problem
 is still present, and the solution is still the same.
 
-Note [Refactoring hazard: metaTyVarUpdateOK]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-I (Richard E.) have a sad story about refactoring this code, retained here
-to prevent others (or a future me!) from falling into the same traps.
-
-It all started with #11407, which was caused by the fact that the TyVarTy
-case of defer_me didn't look in the kind. But it seemed reasonable to
-simply remove the defer_me check instead.
-
-It referred to two Notes (since removed) that were out of date, and the
-fast_check code in occurCheckExpand seemed to do just about the same thing as
-defer_me. The one piece that defer_me did that wasn't repeated by
-occurCheckExpand was the type-family check. (See Note [Prevent unification
-with type families].) So I checked the result of occurCheckExpand for any
-type family occurrences and deferred if there were any. This was done
-in commit e9bf7bb5cc9fb3f87dd05111aa23da76b86a8967 .
-
-This approach turned out not to be performant, because the expanded
-type was bigger than the original type, and tyConsOfType (needed to
-see if there are any type family occurrences) looks through type
-synonyms. So it then struck me that we could dispense with the
-defer_me check entirely. This simplified the code nicely, and it cut
-the allocations in T5030 by half. But, as documented in Note [Prevent
-unification with type families], this destroyed performance in
-T3064. Regardless, I missed this regression and the change was
-committed as 3f5d1a13f112f34d992f6b74656d64d95a3f506d .
-
-Bottom lines:
- * defer_me is back, but now fixed w.r.t. #11407.
- * Tread carefully before you start to refactor here. There can be
-   lots of hard-to-predict consequences.
-
 Note [Type synonyms and the occur check]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Generally speaking we try to update a variable with type synonyms not
