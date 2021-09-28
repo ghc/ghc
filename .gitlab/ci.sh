@@ -456,7 +456,7 @@ function build_hadrian() {
   # N.B. First build Hadrian, unsetting MACOSX_DEPLOYMENT_TARGET which may warn
   # if the bootstrap libraries were built with a different version expectation.
   MACOSX_DEPLOYMENT_TARGET="" run_hadrian stage1:exe:ghc-bin
-  run_hadrian binary-dist
+  run_hadrian binary-dist -V
 
   mv _build/bindist/ghc*.tar.xz "$BIN_DIST_NAME.tar.xz"
 }
@@ -544,7 +544,6 @@ function run_hadrian() {
       -j"$cores" \
       --broken-test="${BROKEN_TESTS:-}" \
       --bignum=$BIGNUM_BACKEND \
-      -V \
       "${args[@]+"${args[@]}"}" \
       "$@")
 }
