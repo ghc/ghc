@@ -1388,6 +1388,11 @@ The rules for map work like this.
 (++) (x:xs) ys = x : xs ++ ys
 
 {-# RULES
+"++/literal"      forall x. (++) (unpackCString# x)     = unpackAppendCString# x
+"++/literal_utf8" forall x. (++) (unpackCStringUtf8# x) = unpackAppendCStringUtf8# x
+#-}
+
+{-# RULES
 "++"    [~1] forall xs ys. xs ++ ys = augment (\c n -> foldr c n xs) ys
   #-}
 
