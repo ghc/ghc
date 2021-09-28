@@ -229,6 +229,10 @@ Mutex concurrent_coll_finished_lock;
  *  - Note [StgStack dirtiness flags and concurrent marking] (TSO.h) describes
  *    the protocol for concurrent marking of stacks.
  *
+ *  - Note [Nonmoving write barrier in Perform{Take,Put}] (PrimOps.cmm) describes
+ *    a tricky barrier necessary when resuming threads blocked on MVar
+ *    operations.
+ *
  *  - Note [Static objects under the nonmoving collector] (Storage.c) describes
  *    treatment of static objects.
  *

@@ -1538,6 +1538,23 @@ stg_writeTVarzh (P_ tvar,     /* :: TVar a */
  * exception and never perform its take or put, and we'd end up with a
  * deadlock.
  *
+ * Note [Nonmoving write barrier in Perform{Take,Put}]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * As noted in Note [Non-moving garbage collector] in NonMoving.c, the
+ * non-moving GC requires that all overwritten pointers be pushed to the update
+ * remembered set. In the case of stack mutation this typically happens by
+ * "dirtying" the stack, which eagerly traces the entire stack chunk.
+ *
+ * An exception to this rule is PerformPut, which mutates the stack of a
+ * blocked thread (overwriting an stg_block_putmvar frame). To ensure that the
+ * collector sees the MVar and value reachable from the overwritten frame, we
+ * must push them to the update remembered set. Failing to do so was the cause
+ * of #20399.
+ *
+ * Note that unlike PerformPut, the callers of PerformTake first dirty the
+ * stack prior mutating it (since they introduce a *new*, potentially
+ * inter-generational reference to the stack) and therefore the barrier
+ * described above is unnecessary in this case.
  * -------------------------------------------------------------------------- */
 
 stg_isEmptyMVarzh ( P_ mvar /* :: MVar a */ )
@@ -1566,15 +1583,22 @@ stg_newMVarzh ()
 }
 
 
+// See Note [Nonmoving write barrier in Perform{Put,Take}].
+// Precondition: the stack must be dirtied.
 #define PerformTake(stack, value)               \
     W_ sp;                                      \
     sp = StgStack_sp(stack);                    \
     W_[sp + WDS(1)] = value;                    \
     W_[sp + WDS(0)] = stg_ret_p_info;
 
+// See Note [Nonmoving write barrier in Perform{Put,Take}].
 #define PerformPut(stack,lval)                  \
     W_ sp;                                      \
     sp = StgStack_sp(stack) + WDS(3);           \
+    IF_NONMOVING_WRITE_BARRIER_ENABLED {        \
+      ccall updateRemembSetPushClosure_(BaseReg "ptr", W_[sp - WDS(1)] "ptr"); \
+      ccall updateRemembSetPushClosure_(BaseReg "ptr", W_[sp - WDS(2)] "ptr"); \
+    }                                           \
     StgStack_sp(stack) = sp;                    \
     lval = W_[sp - WDS(1)];
 
@@ -1847,14 +1871,13 @@ loop:
     // actually perform the takeMVar
     W_ stack;
     stack = StgTSO_stackobj(tso);
+    if ((TO_W_(StgStack_dirty(stack)) & STACK_DIRTY) == 0) {
+        ccall dirty_STACK(MyCapability() "ptr", stack "ptr");
+    }
     PerformTake(stack, val);
 
     // indicate that the MVar operation has now completed.
     StgTSO__link(tso) = stg_END_TSO_QUEUE_closure;
-
-    if ((TO_W_(StgStack_dirty(stack)) & STACK_DIRTY) == 0) {
-        ccall dirty_STACK(MyCapability() "ptr", stack "ptr");
-    }
 
     ccall tryWakeupThread(MyCapability() "ptr", tso);
 
@@ -1938,14 +1961,13 @@ loop:
     // actually perform the takeMVar
     W_ stack;
     stack = StgTSO_stackobj(tso);
+    if ((TO_W_(StgStack_dirty(stack)) & STACK_DIRTY) == 0) {
+        ccall dirty_STACK(MyCapability() "ptr", stack "ptr");
+    }
     PerformTake(stack, val);
 
     // indicate that the MVar operation has now completed.
     StgTSO__link(tso) = stg_END_TSO_QUEUE_closure;
-
-    if ((TO_W_(StgStack_dirty(stack)) & STACK_DIRTY) == 0) {
-        ccall dirty_STACK(MyCapability() "ptr", stack "ptr");
-    }
 
     ccall tryWakeupThread(MyCapability() "ptr", tso);
 
@@ -2220,14 +2242,13 @@ loop:
     // actually perform the takeMVar
     W_ stack;
     stack = StgTSO_stackobj(tso);
+    if (TO_W_(StgStack_dirty(stack)) == 0) {
+        ccall dirty_STACK(MyCapability() "ptr", stack "ptr");
+    }
     PerformTake(stack, val);
 
     // indicate that the operation has now completed.
     StgTSO__link(tso) = stg_END_TSO_QUEUE_closure;
-
-    if (TO_W_(StgStack_dirty(stack)) == 0) {
-        ccall dirty_STACK(MyCapability() "ptr", stack "ptr");
-    }
 
     ccall tryWakeupThread(MyCapability() "ptr", tso);
 
