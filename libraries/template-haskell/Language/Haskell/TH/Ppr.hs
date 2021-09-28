@@ -15,6 +15,7 @@ import Data.Char ( toLower, chr)
 import GHC.Show  ( showMultiLineString )
 import GHC.Lexeme( startsVarSym )
 import Data.Ratio ( numerator, denominator )
+import Data.Foldable ( toList )
 import Prelude hiding ((<>))
 
 nestDepth :: Int
@@ -224,7 +225,7 @@ pprExp _ (UnboundVarE v) = pprName' Applied v
 pprExp _ (LabelE s) = text "#" <> text s
 pprExp _ (ImplicitParamVarE n) = text ('?' : n)
 pprExp _ (GetFieldE e f) = pprExp appPrec e <> text ('.': f)
-pprExp _ (ProjectionE xs) = parens $ hcat $ map ((char '.'<>) . text) xs
+pprExp _ (ProjectionE xs) = parens $ hcat $ map ((char '.'<>) . text) $ toList xs
 
 pprFields :: [(Name,Exp)] -> Doc
 pprFields = sep . punctuate comma . map (\(s,e) -> pprName' Applied s <+> equals <+> ppr e)

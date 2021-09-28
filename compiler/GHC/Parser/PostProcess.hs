@@ -150,6 +150,7 @@ import Text.ParserCombinators.ReadP as ReadP
 import Data.Char
 import Data.Data       ( dataTypeOf, fromConstr, dataTypeConstrs )
 import Data.Kind       ( Type )
+import Data.List.NonEmpty (NonEmpty)
 
 #include "HsVersions.h"
 
@@ -2972,8 +2973,7 @@ mkRdrGetField loc arg field anns =
     , gf_field = field
     }
 
-mkRdrProjection :: [Located (HsFieldLabel GhcPs)] -> EpAnn AnnProjection -> HsExpr GhcPs
-mkRdrProjection [] _ = panic "mkRdrProjection: The impossible has happened!"
+mkRdrProjection :: NonEmpty (Located (HsFieldLabel GhcPs)) -> EpAnn AnnProjection -> HsExpr GhcPs
 mkRdrProjection flds anns =
   HsProjection {
       proj_ext = anns

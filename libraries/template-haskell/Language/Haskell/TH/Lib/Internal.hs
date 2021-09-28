@@ -23,6 +23,7 @@ import qualified Language.Haskell.TH.Syntax as TH
 import Control.Applicative(liftA, liftA2)
 import qualified Data.Kind as Kind (Type)
 import Data.Word( Word8 )
+import Data.List.NonEmpty ( NonEmpty(..) )
 import GHC.Exts (TYPE)
 import Prelude
 
@@ -371,7 +372,7 @@ getFieldE e f = do
   e' <- e
   pure (GetFieldE e' f)
 
-projectionE :: Quote m => [String] -> m Exp
+projectionE :: Quote m => NonEmpty String -> m Exp
 projectionE xs = pure (ProjectionE xs)
 
 -- ** 'arithSeqE' Shortcuts

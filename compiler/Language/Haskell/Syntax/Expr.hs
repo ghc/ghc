@@ -57,6 +57,8 @@ import GHC.Core.Type
 import Data.Data hiding (Fixity(..))
 import qualified Data.Data as Data (Fixity(..))
 
+import Data.List.NonEmpty ( NonEmpty )
+
 import GHCi.RemoteTypes ( ForeignRef )
 import qualified Language.Haskell.TH as TH (Q)
 
@@ -507,7 +509,7 @@ data HsExpr p
 
   | HsProjection {
         proj_ext :: XProjection p
-      , proj_flds :: [Located (HsFieldLabel p)]
+      , proj_flds :: NonEmpty (Located (HsFieldLabel p))
       }
 
   -- | Expression with an explicit type signature. @e :: type@

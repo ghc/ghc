@@ -2169,7 +2169,7 @@ data Exp
   | LabelE String                      -- ^ @{ #x }@ ( Overloaded label )
   | ImplicitParamVarE String           -- ^ @{ ?x }@ ( Implicit parameter )
   | GetFieldE Exp String               -- ^ @{ exp.field }@ ( Overloaded Record Dot )
-  | ProjectionE [String]                -- ^ @(.x)@ or @(.x.y)@ (Record projections)
+  | ProjectionE (NonEmpty String)      -- ^ @(.x)@ or @(.x.y)@ (Record projections)
   deriving( Show, Eq, Ord, Data, Generic )
 
 type FieldExp = (Name,Exp)

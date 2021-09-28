@@ -64,6 +64,10 @@ module GHC.Builtin.Types (
         promotedNilDataCon, promotedConsDataCon,
         mkListTy, mkPromotedListTy,
 
+        -- * NonEmpty
+        nonEmptyTyCon, nonEmptyTyConName,
+        nonEmptyDataCon, nonEmptyDataConName,
+
         -- * Maybe
         maybeTyCon, maybeTyConName,
         nothingDataCon, nothingDataConName, promotedNothingDataCon,
@@ -317,6 +321,7 @@ wiredInTyCons = [ -- Units are not treated like other tuples, because they
                 , integerTyCon
                 , liftedRepTyCon
                 , unliftedRepTyCon
+                , nonEmptyTyCon
                 ]
 
 mkWiredInTyConName :: BuiltInSyntax -> Module -> FastString -> Unique -> TyCon -> Name
@@ -395,6 +400,10 @@ listTyConName, nilDataConName, consDataConName :: Name
 listTyConName     = mkWiredInTyConName   BuiltInSyntax gHC_TYPES (fsLit "[]") listTyConKey listTyCon
 nilDataConName    = mkWiredInDataConName BuiltInSyntax gHC_TYPES (fsLit "[]") nilDataConKey nilDataCon
 consDataConName   = mkWiredInDataConName BuiltInSyntax gHC_TYPES (fsLit ":") consDataConKey consDataCon
+
+nonEmptyTyConName, nonEmptyDataConName :: Name
+nonEmptyTyConName   = mkWiredInTyConName   UserSyntax  gHC_BASE (fsLit "NonEmpty") nonEmptyTyConKey nonEmptyTyCon
+nonEmptyDataConName = mkWiredInDataConName UserSyntax  gHC_BASE (fsLit ":|") nonEmptyDataConKey nonEmptyDataCon
 
 maybeTyConName, nothingDataConName, justDataConName :: Name
 maybeTyConName     = mkWiredInTyConName   UserSyntax gHC_MAYBE (fsLit "Maybe")
@@ -1902,6 +1911,17 @@ consDataCon = pcDataConWithFixity True {- Declared infix -}
 -- Interesting: polymorphic recursion would help here.
 -- We can't use (mkListTy alphaTy) in the defn of consDataCon, else mkListTy
 -- gets the over-specific type (Type -> Type)
+
+-- NonEmpty lists (used for 'ProjectionE')
+nonEmptyTyCon :: TyCon
+nonEmptyTyCon = pcTyCon nonEmptyTyConName Nothing [alphaTyVar] [nonEmptyDataCon]
+
+nonEmptyDataCon :: DataCon
+nonEmptyDataCon = pcDataConWithFixity True {- Declared infix -}
+                    nonEmptyDataConName
+                    alpha_tyvar [] alpha_tyvar
+                    (map linear [alphaTy, mkTyConApp listTyCon alpha_ty])
+                    nonEmptyTyCon
 
 -- Wired-in type Maybe
 

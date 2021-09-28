@@ -43,6 +43,8 @@ where
 import Control.Monad    ( unless, liftM, when, (<=<) )
 import GHC.Exts
 import Data.Maybe       ( maybeToList )
+import Data.List.NonEmpty ( NonEmpty((:|)) )
+import qualified Data.List.NonEmpty as NE
 import qualified Prelude -- for happy-generated code
 
 import GHC.Prelude
@@ -2890,7 +2892,7 @@ aexp2   :: { ECP }
 
         -- This case is only possible when 'OverloadedRecordDotBit' is enabled.
         | '(' projection ')'            { ECP $
-                                            acsA (\cs -> sLL $1 $> $ mkRdrProjection (reverse (unLoc $2)) (EpAnn (glR $1) (AnnProjection (glAA $1) (glAA $3)) cs))
+                                            acsA (\cs -> sLL $1 $> $ mkRdrProjection (NE.reverse (unLoc $2)) (EpAnn (glR $1) (AnnProjection (glAA $1) (glAA $3)) cs))
                                             >>= ecpFromExp'
                                         }
 
@@ -2938,12 +2940,12 @@ aexp2   :: { ECP }
                                       acsA (\cs -> sLL $1 $> $ HsCmdArrForm (EpAnn (glR $1) (AnnList (Just $ glR $1) (Just $ mu AnnOpenB $1) (Just $ mu AnnCloseB $4) [] []) cs) $2 Prefix
                                                            Nothing (reverse $3)) }
 
-projection :: { Located [Located (HsFieldLabel GhcPs)] }
+projection :: { Located (NonEmpty (Located (HsFieldLabel GhcPs))) }
 projection
         -- See Note [Whitespace-sensitive operator parsing] in GHC.Parsing.Lexer
         : projection TIGHT_INFIX_PROJ field
-                             {% acs (\cs -> sLL $1 $> ((sLL $2 $> $ HsFieldLabel (EpAnn (glR $1) (AnnFieldLabel (Just $ glAA $2)) cs) $3) : unLoc $1)) }
-        | PREFIX_PROJ field  {% acs (\cs -> sLL $1 $>  [sLL $1 $> $ HsFieldLabel (EpAnn (glR $1) (AnnFieldLabel (Just $ glAA $1)) cs) $2]) }
+                             {% acs (\cs -> sLL $1 $> ((sLL $2 $> $ HsFieldLabel (EpAnn (glR $1) (AnnFieldLabel (Just $ glAA $2)) cs) $3) `NE.cons` unLoc $1)) }
+        | PREFIX_PROJ field  {% acs (\cs -> sLL $1 $> ((sLL $1 $> $ HsFieldLabel (EpAnn (glR $1) (AnnFieldLabel (Just $ glAA $1)) cs) $2) :| [])) }
 
 splice_exp :: { LHsExpr GhcPs }
         : splice_untyped { mapLoc (HsSpliceE noAnn) (reLocA $1) }

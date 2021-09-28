@@ -69,6 +69,7 @@ import GHC.Builtin.Types ( nilDataConName )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Data.List (unzip4, minimumBy)
+import Data.List.NonEmpty ( NonEmpty(..) )
 import Data.Maybe (isJust, isNothing)
 import Control.Arrow (first)
 import Data.Ord
@@ -327,7 +328,7 @@ rnExpr (HsProjection _ fs)
        ; let fs' = fmap rnHsFieldLabel fs
        ; return ( mkExpandedExpr
                     (HsProjection noExtField fs')
-                    (mkProjection getField circ (map (fmap (unLoc . hflLabel)) fs'))
+                    (mkProjection getField circ (fmap (fmap (unLoc . hflLabel)) fs'))
                 , unitFV circ `plusFV` fv_getField) }
 
 ------------------------------------------
@@ -2608,15 +2609,14 @@ mkSet set_field acc (field, g) = wrapGenSpan (mkSetField set_field g field acc)
 -- mkProjection fields calculates a projection.
 -- e.g. .x = mkProjection [x] = getField @"x"
 --      .x.y = mkProjection [.x, .y] = (.y) . (.x) = getField @"y" . getField @"x"
-mkProjection :: Name -> Name -> [Located FieldLabelString] -> HsExpr GhcRn
-mkProjection getFieldName circName (field : fields) = foldl' f (proj field) fields
+mkProjection :: Name -> Name -> NonEmpty (Located FieldLabelString) -> HsExpr GhcRn
+mkProjection getFieldName circName (field :| fields) = foldl' f (proj field) fields
   where
     f :: HsExpr GhcRn -> Located FieldLabelString -> HsExpr GhcRn
     f acc field = genHsApps circName $ map wrapGenSpan [proj field, acc]
 
     proj :: Located FieldLabelString -> HsExpr GhcRn
     proj (L _ f) = genHsVar getFieldName `genAppType` genHsTyLit f
-mkProjection _ _ [] = panic "mkProjection: The impossible happened"
 
 -- mkProjUpdateSetField calculates functions representing dot notation record updates.
 -- e.g. Suppose an update like foo.bar = 1.
