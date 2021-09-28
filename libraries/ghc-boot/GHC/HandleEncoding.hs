@@ -10,8 +10,8 @@ import System.IO
 -- GHC produces output regardless of OS.
 configureHandleEncoding :: IO ()
 configureHandleEncoding = do
-   env <- getEnvironment
-   case lookup "GHC_CHARENC" env of
+   mb_val <- lookupEnv "GHC_CHARENC"
+   case mb_val of
     Just "UTF-8" -> do
      hSetEncoding stdout utf8
      hSetEncoding stderr utf8
