@@ -2452,6 +2452,10 @@ elements in a single pass.
 -- > instance Ord a => HasMember Set.Set a where
 -- >     member = Set.member
 --
+-- The above suggests that 'elem' may be a misfit in the 'Foldable' class.
+-- Alternative design ideas are solicited on GHC's bug tracker via issue
+-- [\#20421](https://gitlab.haskell.org/ghc/ghc/-/issues/20421).
+--
 -- Note that some structure-specific optimisations may of course be possible
 -- directly in the corresponding @Foldable@ instance, e.g. with @Set@ the size
 -- of the set is known in advance, without iterating to count the elements, and
