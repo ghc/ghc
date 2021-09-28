@@ -50,6 +50,8 @@ import GHC.Core.Type
 import Data.Data hiding (Fixity(..))
 import qualified Data.Data as Data (Fixity(..))
 
+import Data.List.NonEmpty ( NonEmpty )
+
 import GHCi.RemoteTypes ( ForeignRef )
 import qualified Language.Haskell.TH as TH (Q)
 
@@ -555,7 +557,7 @@ data HsExpr p
   -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
   | HsProjection {
         proj_ext :: XProjection p
-      , proj_flds :: [XRec p (DotFieldOcc p)]
+      , proj_flds :: NonEmpty (XRec p (DotFieldOcc p))
       }
 
   -- | Expression with an explicit type signature. @e :: type@

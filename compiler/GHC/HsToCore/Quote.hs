@@ -92,6 +92,7 @@ import qualified GHC.LanguageExtensions as LangExt
 import Data.ByteString ( unpack )
 import Control.Monad
 import Data.List (sort, sortBy)
+import Data.List.NonEmpty ( NonEmpty(..) )
 import Data.Function
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Class
@@ -1628,7 +1629,7 @@ repE (HsUnboundVar _ uv)   = do
 repE (HsGetField _ e (L _ (DotFieldOcc _ (L _ f)))) = do
   e1 <- repLE e
   repGetField e1 f
-repE (HsProjection _ xs) = repProjection (map (unLoc . dfoLabel . unLoc) xs)
+repE (HsProjection _ xs) = repProjection (fmap (unLoc . dfoLabel . unLoc) xs)
 repE (XExpr (HsExpanded orig_expr ds_expr))
   = do { rebindable_on <- lift $ xoptM LangExt.RebindableSyntax
        ; if rebindable_on  -- See Note [Quotation and rebindable syntax]
@@ -2936,9 +2937,9 @@ repGetField (MkC exp) fs = do
   MkC s <- coreStringLit $ unpackFS fs
   rep2 getFieldEName [exp,s]
 
-repProjection :: [FastString] -> MetaM (Core (M TH.Exp))
+repProjection :: NonEmpty FastString -> MetaM (Core (M TH.Exp))
 repProjection fs = do
-  MkC xs <- coreList' stringTy <$> mapM (coreStringLit . unpackFS) fs
+  MkC xs <- coreListNonEmpty stringTy <$> mapM (coreStringLit . unpackFS) fs
   rep2 projectionEName [xs]
 
 ------------ Lists -------------------
@@ -2969,6 +2970,9 @@ coreList tc_name es
 coreList' :: Type       -- The element type
           -> [Core a] -> Core [a]
 coreList' elt_ty es = MkC (mkListExpr elt_ty (map unC es ))
+
+coreListNonEmpty :: Type -> NonEmpty (Core a) -> Core (NonEmpty a)
+coreListNonEmpty ty (MkC x :| xs) = MkC $ mkNonEmptyListExpr ty x (map unC xs)
 
 nonEmptyCoreList :: [Core a] -> Core [a]
   -- The list must be non-empty so we can get the element type

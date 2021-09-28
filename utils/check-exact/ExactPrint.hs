@@ -43,6 +43,7 @@ import Data.Data ( Data )
 import Data.Foldable
 import Data.Typeable
 import Data.List ( partition, sort, sortBy)
+import Data.List.NonEmpty ( NonEmpty )
 import Data.Maybe ( isJust )
 
 import Data.Void
@@ -379,6 +380,10 @@ instance (ExactPrint a) => ExactPrint (LocatedAn NoEpAnns a) where
   exact (L _ a) = markAnnotated a
 
 instance (ExactPrint a) => ExactPrint [a] where
+  getAnnotationEntry = const NoEntryVal
+  exact ls = mapM_ markAnnotated ls
+
+instance (ExactPrint a) => ExactPrint (NonEmpty a) where
   getAnnotationEntry = const NoEntryVal
   exact ls = mapM_ markAnnotated ls
 

@@ -1873,6 +1873,9 @@ concretePrimTyConKey                    = mkPreludeTyConUnique 82
 eitherTyConKey :: Unique
 eitherTyConKey                          = mkPreludeTyConUnique 84
 
+nonEmptyTyConKey :: Unique
+nonEmptyTyConKey                        = mkPreludeTyConUnique 85
+
 -- Kind constructors
 liftedTypeKindTyConKey, unliftedTypeKindTyConKey,
   tYPETyConKey, liftedRepTyConKey, unliftedRepTyConKey,
@@ -2053,7 +2056,8 @@ charDataConKey, consDataConKey, doubleDataConKey, falseDataConKey,
     floatDataConKey, intDataConKey, nilDataConKey,
     ratioDataConKey, stableNameDataConKey, trueDataConKey, wordDataConKey,
     word8DataConKey, ioDataConKey, heqDataConKey,
-    coercibleDataConKey, eqDataConKey, nothingDataConKey, justDataConKey :: Unique
+    coercibleDataConKey, eqDataConKey, nothingDataConKey, justDataConKey,
+    nonEmptyDataConKey :: Unique
 
 charDataConKey                          = mkPreludeDataConUnique  1
 consDataConKey                          = mkPreludeDataConUnique  2
@@ -2072,6 +2076,7 @@ trueDataConKey                          = mkPreludeDataConUnique 14
 wordDataConKey                          = mkPreludeDataConUnique 15
 ioDataConKey                            = mkPreludeDataConUnique 16
 heqDataConKey                           = mkPreludeDataConUnique 18
+nonEmptyDataConKey                      = mkPreludeDataConUnique 19
 
 -- Generic data constructors
 crossDataConKey, inlDataConKey, inrDataConKey, genUnitDataConKey :: Unique

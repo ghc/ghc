@@ -71,6 +71,7 @@ import qualified Data.Data as Data (Fixity(..))
 import qualified Data.Kind
 import Data.Maybe (isJust)
 import Data.Void  ( Void )
+import Data.Foldable ( toList )
 
 {- *********************************************************************
 *                                                                      *
@@ -654,7 +655,7 @@ ppr_expr (RecordUpd { rupd_expr = L _ aexp, rupd_flds = flds })
 ppr_expr (HsGetField { gf_expr = L _ fexp, gf_field = field })
   = ppr fexp <> dot <> ppr field
 
-ppr_expr (HsProjection { proj_flds = flds }) = parens (hcat (dot : (punctuate dot (map ppr flds))))
+ppr_expr (HsProjection { proj_flds = flds }) = parens (hcat (dot : (punctuate dot (map ppr $ toList flds))))
 
 ppr_expr (ExprWithTySig _ expr sig)
   = hang (nest 2 (ppr_lexpr expr) <+> dcolon)

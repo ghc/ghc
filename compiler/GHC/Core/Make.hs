@@ -42,6 +42,9 @@ module GHC.Core.Make (
         mkNilExpr, mkConsExpr, mkListExpr,
         mkFoldrExpr, mkBuildExpr,
 
+        -- * Constructing non empty lists
+        mkNonEmptyListExpr,
+
         -- * Constructing Maybe expressions
         mkNothingExpr, mkJustExpr,
 
@@ -678,6 +681,9 @@ mkConsExpr ty hd tl = mkCoreConApps consDataCon [Type ty, hd, tl]
 -- | Make a list containing the given expressions, where the list has the given type
 mkListExpr :: Type -> [CoreExpr] -> CoreExpr
 mkListExpr ty xs = foldr (mkConsExpr ty) (mkNilExpr ty) xs
+
+mkNonEmptyListExpr :: Type -> CoreExpr -> [CoreExpr] -> CoreExpr
+mkNonEmptyListExpr ty x xs = mkCoreConApps nonEmptyDataCon [Type ty, x, mkListExpr ty xs]
 
 -- | Make a fully applied 'foldr' expression
 mkFoldrExpr :: MonadThings m

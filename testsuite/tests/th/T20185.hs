@@ -22,6 +22,8 @@ main = do
   print i
   print j
   print (k x)
+  y <- [| (.foo.bar) |]
+  print y
   putStrLn . pprint =<< [| x.foo.bar |]
   putStrLn . pprint =<< [| (id x).foo.bar |]
   putStrLn . pprint =<< [| (id (id x).foo).bar |]
