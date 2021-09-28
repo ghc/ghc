@@ -2,11 +2,17 @@ TOP=../../..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
+# Find all the env variables starting with CI_ to unset them.
+# Otherwise, we might run into environment length limitations on Windows.
+# (See `xargs --show-limits`.)
+VARS_TO_UNSET := $(shell env | grep ^CI_ | egrep -o '^[^=]+')
+unexport $(VARS_TO_UNSET)
+
 clean:
 	rm -rf setup a.out dist/build/testA
 	rm -rf ,tmp dist ,tmp2
-	find . -name "*.o" |xargs rm -f
-	find . -name "*.hi" |xargs rm -f
+	find . -name "*.o" -exec rm -f {} \;
+	find . -name "*.hi" -exec rm -f {} \;
 	rm -fr install-tmp
 	rm -fr install
 	rm -f .setup-config .installed-pkg-config
