@@ -155,10 +155,11 @@ import GHC.IO
 
 -- | Gives the Modified UTF-8 encoded bytes corresponding to a 'FastString'
 bytesFS, fastStringToByteString :: FastString -> ByteString
-bytesFS = fastStringToByteString
+{-# INLINE[1] bytesFS #-}
+bytesFS f = SBS.fromShort $ fs_sbs f
 
 {-# DEPRECATED fastStringToByteString "Use `bytesFS` instead" #-}
-fastStringToByteString f = SBS.fromShort $ fs_sbs f
+fastStringToByteString = bytesFS
 
 fastStringToShortByteString :: FastString -> ShortByteString
 fastStringToShortByteString = fs_sbs
@@ -529,10 +530,17 @@ mkFastStringShortByteString sbs =
 
 -- | Creates a UTF-8 encoded 'FastString' from a 'String'
 mkFastString :: String -> FastString
+{-# NOINLINE[1] mkFastString #-}
 mkFastString str =
   inlinePerformIO $ do
     sbs <- utf8EncodeShortByteString str
     mkFastStringWith (mkNewFastStringShortByteString sbs) sbs
+
+-- The following rule is used to avoid polluting the non-reclaimable FastString
+-- table with transient strings when we only want their encoding.
+{-# RULES
+"bytesFS/mkFastString" forall x. bytesFS (mkFastString x) = utf8EncodeString x
+#-}
 
 -- | Creates a 'FastString' from a UTF-8 encoded @[Word8]@
 mkFastStringByteList :: [Word8] -> FastString

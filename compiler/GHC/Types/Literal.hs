@@ -75,6 +75,7 @@ import GHC.Utils.Binary
 import GHC.Settings.Constants
 import GHC.Platform
 import GHC.Utils.Panic
+import GHC.Utils.Encoding
 
 import Data.ByteString (ByteString)
 import Data.Int
@@ -576,7 +577,8 @@ mkLitChar = LitChar
 -- e.g. some of the \"error\" functions in GHC.Err such as @GHC.Err.runtimeError@
 mkLitString :: String -> Literal
 -- stored UTF-8 encoded
-mkLitString s = LitString (bytesFS $ mkFastString s)
+mkLitString [] = LitString mempty
+mkLitString s  = LitString (utf8EncodeString s)
 
 mkLitBigNat :: Integer -> Literal
 mkLitBigNat x = assertPpr (x >= 0) (integer x)
