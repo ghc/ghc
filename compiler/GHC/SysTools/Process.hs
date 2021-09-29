@@ -105,6 +105,7 @@ c_locale_env = ("LANGUAGE", "C")
 -- a bug in gcc on Windows Vista where it can't find its auxiliary
 -- binaries (see bug #1110).
 getGccEnv :: [Option] -> IO (Maybe [(String,String)])
+#if defined(mingw32_HOST_OS)
 getGccEnv opts =
   if null b_dirs
      then return Nothing
@@ -117,13 +118,12 @@ getGccEnv opts =
   get_b_opt other = Right other
 
   -- Work around #1110 on Windows only (lest we stumble into #17266).
-#if defined(mingw32_HOST_OS)
   mangle_paths = map mangle_path
   mangle_path (path,paths) | map toUpper path == "PATH"
         = (path, '\"' : head b_dirs ++ "\";" ++ paths)
   mangle_path other = other
 #else
-  mangle_paths = id
+getGccEnv _ = return Nothing
 #endif
 
 
