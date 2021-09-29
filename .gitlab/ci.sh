@@ -447,10 +447,11 @@ function test_make() {
   fi
 
   run "$MAKE" test_bindist TEST_PREP=YES
-  run "$MAKE" V=0 VERBOSE=1 test \
-    THREADS="$cores" \
-    JUNIT_FILE=../../junit.xml \
-    EXTRA_RUNTEST_OPTS="${RUNTEST_ARGS:-}"
+  (unset $(compgen -v | grep CI_*);
+    run "$MAKE" V=0 VERBOSE=1 test \
+      THREADS="$cores" \
+      JUNIT_FILE=../../junit.xml \
+      EXTRA_RUNTEST_OPTS="${RUNTEST_ARGS:-}")
 }
 
 function build_hadrian() {
@@ -541,14 +542,17 @@ function run_hadrian() {
   if [ -z "${BIGNUM_BACKEND:-}" ]; then BIGNUM_BACKEND="gmp"; fi
   read -r -a args <<< "${HADRIAN_ARGS:-}"
   if [ -n "${VERBOSE:-}" ]; then args+=("-V"); fi
-  run hadrian/build-cabal \
-    --flavour="$BUILD_FLAVOUR" \
-    -j"$cores" \
-    --broken-test="${BROKEN_TESTS:-}" \
-    --bignum=$BIGNUM_BACKEND \
-    -V \
-    "${args[@]+"${args[@]}"}" \
-    "$@"
+  # Before running the compiler, unset variables gitlab env vars as these
+  # can destabilise the performance test (see #20341)
+  (unset $(compgen -v | grep CI_*);
+    run hadrian/build-cabal \
+      --flavour="$BUILD_FLAVOUR" \
+      -j"$cores" \
+      --broken-test="${BROKEN_TESTS:-}" \
+      --bignum=$BIGNUM_BACKEND \
+      -V \
+      "${args[@]+"${args[@]}"}" \
+      "$@")
 }
 
 # A convenience function to allow debugging in the CI environment.
