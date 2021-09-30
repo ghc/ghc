@@ -1852,14 +1852,13 @@ loop:
     // actually perform the takeMVar
     W_ stack;
     stack = StgTSO_stackobj(tso);
+    if (IS_STACK_CLEAN(stack)) {
+        ccall dirty_STACK(MyCapability() "ptr", stack "ptr");
+    }
     PerformTake(stack, val);
 
     // indicate that the MVar operation has now completed.
     StgTSO__link(tso) = stg_END_TSO_QUEUE_closure;
-
-    if ((TO_W_(StgStack_dirty(stack)) & STACK_DIRTY) == 0) {
-        ccall dirty_STACK(MyCapability() "ptr", stack "ptr");
-    }
 
     ccall tryWakeupThread(MyCapability() "ptr", tso);
 
@@ -1943,14 +1942,13 @@ loop:
     // actually perform the takeMVar
     W_ stack;
     stack = StgTSO_stackobj(tso);
+    if (IS_STACK_CLEAN(stack)) {
+        ccall dirty_STACK(MyCapability() "ptr", stack "ptr");
+    }
     PerformTake(stack, val);
 
     // indicate that the MVar operation has now completed.
     StgTSO__link(tso) = stg_END_TSO_QUEUE_closure;
-
-    if ((TO_W_(StgStack_dirty(stack)) & STACK_DIRTY) == 0) {
-        ccall dirty_STACK(MyCapability() "ptr", stack "ptr");
-    }
 
     ccall tryWakeupThread(MyCapability() "ptr", tso);
 
