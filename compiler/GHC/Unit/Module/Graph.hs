@@ -204,7 +204,7 @@ showModMsg dflags recomp (ModuleNode (ExtendedModSummary mod_summary _)) =
     op       = normalise
     mod      = moduleName (ms_mod mod_summary)
     mod_str  = showPpr dflags mod ++ hscSourceString (ms_hsc_src mod_summary)
-    dyn_file = op $ msDynObjFilePath mod_summary dflags
+    dyn_file = op $ msDynObjFilePath mod_summary
     obj_file = case backend dflags of
                 Interpreter | recomp -> "interpreted"
                 NoBackend            -> "nothing"

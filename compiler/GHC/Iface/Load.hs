@@ -912,10 +912,10 @@ findAndReadIface logger name_cache fc hooks unit_state home_unit dflags doc_str 
                         case r of
                           Failed _
                             -> return ()
-                          Succeeded (iface,fp)
+                          Succeeded (iface,_fp)
                             -> load_dynamic_too_maybe logger name_cache unit_state
                                                       dflags wanted_mod
-                                                      hi_boot_file iface fp
+                                                      hi_boot_file iface loc
                         return r
               err -> do
                   trace_if logger (text "...not found")
@@ -928,20 +928,20 @@ findAndReadIface logger name_cache fc hooks unit_state home_unit dflags doc_str 
                                       err
 
 -- | Check if we need to try the dynamic interface for -dynamic-too
-load_dynamic_too_maybe :: Logger -> NameCache -> UnitState -> DynFlags -> Module -> IsBootInterface -> ModIface -> FilePath -> IO ()
-load_dynamic_too_maybe logger name_cache unit_state dflags wanted_mod is_boot iface file_path
+load_dynamic_too_maybe :: Logger -> NameCache -> UnitState -> DynFlags -> Module -> IsBootInterface -> ModIface -> ModLocation -> IO ()
+load_dynamic_too_maybe logger name_cache unit_state dflags wanted_mod is_boot iface loc
   -- Indefinite interfaces are ALWAYS non-dynamic.
   | not (moduleIsDefinite (mi_module iface)) = return ()
   | otherwise = dynamicTooState dflags  >>= \case
       DT_Dont   -> return ()
       DT_Failed -> return ()
-      DT_Dyn    -> load_dynamic_too logger name_cache unit_state dflags wanted_mod is_boot iface file_path
-      DT_OK     -> load_dynamic_too logger name_cache unit_state (setDynamicNow dflags) wanted_mod is_boot iface file_path
+      DT_Dyn    -> load_dynamic_too logger name_cache unit_state dflags wanted_mod iface file_path
+      DT_OK     -> load_dynamic_too logger name_cache unit_state (setDynamicNow dflags) wanted_mod iface file_path
+  where
+    file_path = addBootSuffix_maybe is_boot (ml_dyn_hi_file loc)
 
-load_dynamic_too :: Logger -> NameCache -> UnitState -> DynFlags -> Module -> IsBootInterface -> ModIface -> FilePath -> IO ()
-load_dynamic_too logger name_cache unit_state dflags wanted_mod is_boot iface file_path = do
-  let dynFilePath = addBootSuffix_maybe is_boot
-                  $ replaceExtension file_path (hiSuf dflags)
+load_dynamic_too :: Logger -> NameCache -> UnitState -> DynFlags -> Module -> ModIface -> FilePath -> IO ()
+load_dynamic_too logger name_cache unit_state dflags wanted_mod iface dynFilePath = do
   read_file logger name_cache unit_state dflags wanted_mod dynFilePath >>= \case
     Succeeded (dynIface, _)
      | mi_mod_hash (mi_final_exts iface) == mi_mod_hash (mi_final_exts dynIface)

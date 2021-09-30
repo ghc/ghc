@@ -615,7 +615,7 @@ checkNonStdWay dflags interp srcspan
     -- Only if we are compiling with the same ways as GHC is built
     -- with, can we dynamically load those object files. (see #3604)
 
-  | objectSuf dflags == normalObjectSuffix && not (null targetFullWays)
+  | objectSuf_ dflags == normalObjectSuffix && not (null targetFullWays)
   = failNonStd dflags srcspan
 
   | otherwise = return (Just (hostWayTag ++ "o"))
@@ -663,7 +663,7 @@ failNonStd dflags srcspan = dieWith dflags srcspan $
 
 getLinkDeps :: HscEnv -> HomePackageTable
             -> LoaderState
-            -> Maybe FilePath                   -- replace object suffices?
+            -> Maybe FilePath                   -- replace object suffixes?
             -> SrcSpan                          -- for error messages
             -> [Module]                         -- If you need these
             -> IO ([Linkable], [Linkable], [UnitId])     -- ... then link these first

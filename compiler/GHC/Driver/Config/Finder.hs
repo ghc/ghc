@@ -6,7 +6,8 @@ module GHC.Driver.Config.Finder (
 import GHC.Prelude
 
 import GHC.Driver.Session
-import GHC.Unit.Finder
+import GHC.Unit.Finder.Types
+
 
 -- | Create a new 'FinderOpts' from DynFlags.
 initFinderOpts :: DynFlags -> FinderOpts
@@ -19,8 +20,10 @@ initFinderOpts flags = FinderOpts
   , finder_hieDir = hieDir flags
   , finder_hieSuf = hieSuf flags
   , finder_hiDir = hiDir flags
-  , finder_hiSuf = hiSuf flags
+  , finder_hiSuf = hiSuf_ flags
+  , finder_dynHiSuf = dynHiSuf_ flags
   , finder_objectDir = objectDir flags
-  , finder_objectSuf = objectSuf flags
+  , finder_objectSuf = objectSuf_ flags
+  , finder_dynObjectSuf = dynObjectSuf_ flags
   , finder_stubDir = stubDir flags
   }

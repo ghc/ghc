@@ -73,7 +73,7 @@ linkBinary' staticLink logger tmpfs dflags unit_env o_files dep_units = do
         unit_state = ue_units unit_env
         toolSettings' = toolSettings dflags
         verbFlags = getVerbFlags dflags
-        output_fn = exeFileName platform staticLink (outputFile dflags)
+        output_fn = exeFileName platform staticLink (outputFile_ dflags)
 
     -- get the full list of packages to link with, by combining the
     -- explicit packages with the auto packages and all of their
@@ -277,7 +277,7 @@ linkStaticLib logger dflags unit_env o_files dep_units = do
   let platform  = ue_platform unit_env
       extra_ld_inputs = [ f | FileOption _ f <- ldInputs dflags ]
       modules = o_files ++ extra_ld_inputs
-      output_fn = exeFileName platform True (outputFile dflags)
+      output_fn = exeFileName platform True (outputFile_ dflags)
 
   full_output_fn <- if isAbsolute output_fn
                     then return output_fn

@@ -597,7 +597,7 @@ load' cache how_much mHscMessage mod_graph = do
           -- called Main, or (b) the user said -no-hs-main, indicating
           -- that main() is going to come from somewhere else.
           --
-          let ofile = outputFile dflags
+          let ofile = outputFile_ dflags
           let no_hs_main = gopt Opt_NoHsMain dflags
           let
             main_mod = mainModIs hsc_env
@@ -1652,27 +1652,26 @@ enableCodeGenWhen logger tmpfs condition should_modify staticLife dynLife bcknd 
               tn <- newTempName logger tmpfs (tmpDir dflags) staticLife suf
               let dyn_tn = tn -<.> dynsuf
               addFilesToClean tmpfs dynLife [dyn_tn]
-              return tn
+              return (tn, dyn_tn)
           -- We don't want to create .o or .hi files unless we have been asked
           -- to by the user. But we need them, so we patch their locations in
           -- the ModSummary with temporary files.
           --
-        (hi_file, o_file) <-
+        ((hi_file, dyn_hi_file), (o_file, dyn_o_file)) <-
           -- If ``-fwrite-interface` is specified, then the .o and .hi files
           -- are written into `-odir` and `-hidir` respectively.  #16670
           if gopt Opt_WriteInterface dflags
-            then return (ml_hi_file ms_location, ml_obj_file ms_location)
+            then return ((ml_hi_file ms_location, ml_dyn_hi_file ms_location)
+                        , (ml_obj_file ms_location, ml_dyn_obj_file ms_location))
             else (,) <$> (new_temp_file (hiSuf_ dflags) (dynHiSuf_ dflags))
                      <*> (new_temp_file (objectSuf_ dflags) (dynObjectSuf_ dflags))
         let ms' = ms
               { ms_location =
-                  ms_location {ml_hi_file = hi_file, ml_obj_file = o_file}
-              , ms_hspp_opts = updOptLevel 0 $
-                  setOutputFile (Just o_file) $
-                  setDynOutputFile (Just $ dynamicOutputFile dflags o_file) $
-                  setOutputHi (Just hi_file) $
-                  setDynOutputHi (Just $ dynamicOutputHi dflags hi_file) $
-                  dflags {backend = bcknd}
+                  ms_location { ml_hi_file = hi_file
+                              , ml_obj_file = o_file
+                              , ml_dyn_hi_file = dyn_hi_file
+                              , ml_dyn_obj_file = dyn_o_file }
+              , ms_hspp_opts = updOptLevel 0 $ dflags {backend = bcknd}
               }
         pure (ExtendedModSummary ms' bkp_deps)
       | otherwise = return (ExtendedModSummary ms bkp_deps)
@@ -1789,7 +1788,7 @@ summariseFile hsc_env old_summaries src_fn mb_phase maybe_buf
         let fopts = initFinderOpts (hsc_dflags hsc_env)
 
         -- Make a ModLocation for this file
-        location <- liftIO $ mkHomeModLocation fopts pi_mod_name src_fn
+        let location = mkHomeModLocation fopts pi_mod_name src_fn
 
         -- Tell the Finder cache where it is, so that subsequent calls
         -- to findModule will find it, even if it's not on any search path
@@ -1904,7 +1903,7 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
   | otherwise  = find_it
   where
     dflags    = hsc_dflags hsc_env
-    fopts        = initFinderOpts dflags
+    fopts     = initFinderOpts dflags
     home_unit = hsc_home_unit hsc_env
     fc        = hsc_FC hsc_env
     units     = hsc_units hsc_env
@@ -1995,9 +1994,8 @@ data MakeNewModSummary
 makeNewModSummary :: HscEnv -> MakeNewModSummary -> IO ExtendedModSummary
 makeNewModSummary hsc_env MakeNewModSummary{..} = do
   let PreprocessedImports{..} = nms_preimps
-  let dflags = hsc_dflags hsc_env
   obj_timestamp <- modificationTimeIfExists (ml_obj_file nms_location)
-  dyn_obj_timestamp <- modificationTimeIfExists (dynamicOutputFile dflags (ml_obj_file nms_location))
+  dyn_obj_timestamp <- modificationTimeIfExists (ml_dyn_obj_file nms_location)
   hi_timestamp <- modificationTimeIfExists (ml_hi_file nms_location)
   hie_timestamp <- modificationTimeIfExists (ml_hie_file nms_location)
 

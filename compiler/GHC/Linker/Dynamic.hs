@@ -44,7 +44,7 @@ linkDynLib logger tmpfs dflags0 unit_env o_files dep_packages
                = dflags0
 
         verbFlags = getVerbFlags dflags
-        o_file = outputFile dflags
+        o_file = outputFile_ dflags
 
     pkgs_with_rts <- mayThrowUnitErr (preloadUnitsInfo' unit_env dep_packages)
 

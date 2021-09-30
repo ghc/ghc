@@ -433,7 +433,7 @@ link' logger tmpfs dflags unit_env batch_attempt_linking hpt
         let getOfiles LM{ linkableUnlinked } = map nameOfObject (filter isObject linkableUnlinked)
             obj_files = concatMap getOfiles linkables
             platform  = targetPlatform dflags
-            exe_file  = exeFileName platform staticLink (outputFile dflags)
+            exe_file  = exeFileName platform staticLink (outputFile_ dflags)
 
         linking_needed <- linkingNeeded logger dflags unit_env staticLink linkables pkg_deps
 
@@ -470,7 +470,7 @@ linkingNeeded logger dflags unit_env staticLink linkables pkg_deps = do
         -- linking (unless the -fforce-recomp flag was given).
   let platform   = ue_platform unit_env
       unit_state = ue_units unit_env
-      exe_file   = exeFileName platform staticLink (outputFile dflags)
+      exe_file   = exeFileName platform staticLink (outputFile_ dflags)
   e_exe_time <- tryIO $ getModificationUTCTime exe_file
   case e_exe_time of
     Left _  -> return True
@@ -757,9 +757,12 @@ checkDynamicToo hsc_env dyn_too_rerun res = do
 -- | Enable dynamic-too, reset EPS
 resetHscEnv :: HscEnv -> IO HscEnv
 resetHscEnv hsc_env = do
-  let dflags0 = flip gopt_unset Opt_BuildDynamicToo
-                     $ setDynamicNow
-                     $ (hsc_dflags hsc_env)
+  let init_dflags = hsc_dflags hsc_env
+      dflags0 = flip gopt_unset Opt_BuildDynamicToo
+                     $ setDynamicNow                                  -- -dynamic
+                     $ (init_dflags { hiSuf_ = dynHiSuf_ init_dflags  -- -hisuf = -dynhisuf
+                                    , objectSuf_ =  dynObjectSuf_ init_dflags -- -osuf = -dynosuf
+                                    })
   hsc_env' <- newHscEnv dflags0
   (dbs,unit_state,home_unit,mconstants) <- initUnits (hsc_logger hsc_env) dflags0 Nothing
   dflags1 <- updatePlatformConstants dflags0 mconstants
@@ -814,11 +817,7 @@ hscGenBackendPipeline :: P m
 hscGenBackendPipeline pipe_env hsc_env mod_sum result = do
   let mod_name = moduleName (ms_mod mod_sum)
       src_flavour = (ms_hsc_src mod_sum)
-      dflags = hsc_dflags hsc_env
-  -- MP: The ModLocation is recalculated here to get the right paths when
-  -- -dynamic-too is enabled. `ModLocation` should be extended with a field for
-  -- the location of the `dyn_o` file to avoid this recalculation.
-  location <- liftIO (getLocation pipe_env dflags src_flavour mod_name)
+  let location = ms_location mod_sum
   (fos, miface, mlinkable, o_file) <- use (T_HscBackend pipe_env hsc_env mod_name src_flavour location result)
   final_fp <- hscPostBackendPipeline pipe_env hsc_env (ms_hsc_src mod_sum) (backend (hsc_dflags hsc_env)) (Just location) o_file
   final_linkable <-

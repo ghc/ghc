@@ -123,37 +123,6 @@ lookupFileCache (FinderCache _ ref) key = do
 -- -----------------------------------------------------------------------------
 -- The three external entry points
 
--- | Locations and information the finder cares about.
---
--- Should be taken from 'DynFlags' via 'initFinderOpts'.
-data FinderOpts = FinderOpts
-  { finder_importPaths :: [FilePath]
-      -- ^ Where are we allowed to look for Modules and Source files
-  , finder_lookupHomeInterfaces :: Bool
-      -- ^ When looking up a home module:
-      --
-      --    * 'True':  search interface files (e.g. in '-c' mode)
-      --    * 'False': search source files (e.g. in '--make' mode)
-
-  , finder_bypassHiFileCheck :: Bool
-      -- ^ Don't check that an imported interface file actually exists
-      -- if it can only be at one location. The interface will be reported
-      -- as `InstalledFound` even if the file doesn't exist, so this is
-      -- only useful in specific cases (e.g. to generate dependencies
-      -- with `ghc -M`)
-  , finder_ways :: Ways
-  , finder_enableSuggestions :: Bool
-      -- ^ If we encounter unknown modules, should we suggest modules
-      -- that have a similar name.
-  , finder_hieDir :: Maybe FilePath
-  , finder_hieSuf :: String
-  , finder_hiDir :: Maybe FilePath
-  , finder_hiSuf :: String
-  , finder_objectDir :: Maybe FilePath
-  , finder_objectSuf :: String
-  , finder_stubDir :: Maybe FilePath
-  }
-
 
 -- | Locate a module that was imported by the user.  We have the
 -- module's name, and possibly a package name.  Without a package
@@ -424,19 +393,21 @@ findPackageModule_ fc fopts mod pkg_conf = do
        package_hisuf | null tag  = "hi"
                      | otherwise = tag ++ "_hi"
 
-       mk_hi_loc = mkHiOnlyModLocation fopts package_hisuf
+       package_dynhisuf = waysBuildTag (addWay WayDyn (finder_ways fopts)) ++ "_hi"
+
+       mk_hi_loc = mkHiOnlyModLocation fopts package_hisuf package_dynhisuf
 
        import_dirs = map ST.unpack $ unitImportDirs pkg_conf
         -- we never look for a .hi-boot file in an external package;
         -- .hi-boot files only make sense for the home package.
     in
     case import_dirs of
-      [one] | finder_bypassHiFileCheck fopts -> do
+      [one] | finder_bypassHiFileCheck fopts ->
             -- there's only one place that this .hi file can be, so
             -- don't bother looking for it.
             let basename = moduleNameSlashes (moduleName mod)
-            loc <- mk_hi_loc one basename
-            return (InstalledFound loc mod)
+                loc = mk_hi_loc one basename
+            in return $ InstalledFound loc mod
       _otherwise ->
             searchPathExts import_dirs mod [(package_hisuf, mk_hi_loc)]
 
@@ -446,8 +417,8 @@ findPackageModule_ fc fopts mod pkg_conf = do
 searchPathExts :: [FilePath]      -- paths to search
                -> InstalledModule -- module name
                -> [ (
-                     FileExt,                                -- suffix
-                     FilePath -> BaseName -> IO ModLocation  -- action
+                     FileExt,                             -- suffix
+                     FilePath -> BaseName -> ModLocation  -- action
                     )
                   ]
                -> IO InstalledFindResult
@@ -456,7 +427,7 @@ searchPathExts paths mod exts = search to_search
   where
     basename = moduleNameSlashes (moduleName mod)
 
-    to_search :: [(FilePath, IO ModLocation)]
+    to_search :: [(FilePath, ModLocation)]
     to_search = [ (file, fn path basename)
                 | path <- paths,
                   (ext,fn) <- exts,
@@ -467,16 +438,17 @@ searchPathExts paths mod exts = search to_search
 
     search [] = return (InstalledNotFound (map fst to_search) (Just (moduleUnit mod)))
 
-    search ((file, mk_result) : rest) = do
+    search ((file, loc) : rest) = do
       b <- doesFileExist file
       if b
-        then do { loc <- mk_result; return (InstalledFound loc mod) }
+        then return $ InstalledFound loc mod
         else search rest
 
 mkHomeModLocationSearched :: FinderOpts -> ModuleName -> FileExt
-                          -> FilePath -> BaseName -> IO ModLocation
+                          -> FilePath -> BaseName -> ModLocation
 mkHomeModLocationSearched fopts mod suff path basename =
   mkHomeModLocation2 fopts mod (path </> basename) suff
+
 
 -- -----------------------------------------------------------------------------
 -- Constructing a home module location
@@ -511,49 +483,59 @@ mkHomeModLocationSearched fopts mod suff path basename =
 -- ext
 --      The filename extension of the source file (usually "hs" or "lhs").
 
-mkHomeModLocation :: FinderOpts -> ModuleName -> FilePath -> IO ModLocation
-mkHomeModLocation dflags mod src_filename = do
+mkHomeModLocation :: FinderOpts -> ModuleName -> FilePath -> ModLocation
+mkHomeModLocation dflags mod src_filename =
    let (basename,extension) = splitExtension src_filename
-   mkHomeModLocation2 dflags mod basename extension
+   in mkHomeModLocation2 dflags mod basename extension
 
 mkHomeModLocation2 :: FinderOpts
                    -> ModuleName
                    -> FilePath  -- Of source module, without suffix
                    -> String    -- Suffix
-                   -> IO ModLocation
-mkHomeModLocation2 fopts mod src_basename ext = do
+                   -> ModLocation
+mkHomeModLocation2 fopts mod src_basename ext =
    let mod_basename = moduleNameSlashes mod
 
        obj_fn = mkObjPath  fopts src_basename mod_basename
+       dyn_obj_fn = mkDynObjPath  fopts src_basename mod_basename
        hi_fn  = mkHiPath   fopts src_basename mod_basename
+       dyn_hi_fn  = mkDynHiPath   fopts src_basename mod_basename
        hie_fn = mkHiePath  fopts src_basename mod_basename
 
-   return (ModLocation{ ml_hs_file   = Just (src_basename <.> ext),
+   in (ModLocation{ ml_hs_file   = Just (src_basename <.> ext),
                         ml_hi_file   = hi_fn,
+                        ml_dyn_hi_file = dyn_hi_fn,
                         ml_obj_file  = obj_fn,
+                        ml_dyn_obj_file = dyn_obj_fn,
                         ml_hie_file  = hie_fn })
 
 mkHomeModHiOnlyLocation :: FinderOpts
                         -> ModuleName
                         -> FilePath
                         -> BaseName
-                        -> IO ModLocation
-mkHomeModHiOnlyLocation fopts mod path basename = do
-   loc <- mkHomeModLocation2 fopts mod (path </> basename) ""
-   return loc { ml_hs_file = Nothing }
+                        -> ModLocation
+mkHomeModHiOnlyLocation fopts mod path basename =
+   let loc = mkHomeModLocation2 fopts mod (path </> basename) ""
+   in loc { ml_hs_file = Nothing }
 
-mkHiOnlyModLocation :: FinderOpts -> Suffix -> FilePath -> String
-                    -> IO ModLocation
-mkHiOnlyModLocation fopts hisuf path basename
- = do let full_basename = path </> basename
-          obj_fn = mkObjPath fopts full_basename basename
-          hie_fn = mkHiePath fopts full_basename basename
-      return ModLocation{    ml_hs_file   = Nothing,
+-- This function is used to make a ModLocation for a package module. Hence why
+-- we explicitly pass in the interface file suffixes.
+mkHiOnlyModLocation :: FinderOpts -> Suffix -> Suffix -> FilePath -> String
+                    -> ModLocation
+mkHiOnlyModLocation fopts hisuf dynhisuf path basename
+ = let full_basename = path </> basename
+       obj_fn = mkObjPath fopts full_basename basename
+       dyn_obj_fn = mkDynObjPath fopts full_basename basename
+       hie_fn = mkHiePath fopts full_basename basename
+   in ModLocation{    ml_hs_file   = Nothing,
                              ml_hi_file   = full_basename <.> hisuf,
                                 -- Remove the .hi-boot suffix from
                                 -- hi_file, if it had one.  We always
                                 -- want the name of the real .hi file
                                 -- in the ml_hi_file field.
+                             ml_dyn_obj_file = dyn_obj_fn,
+                             -- MP: TODO
+                             ml_dyn_hi_file  = full_basename <.> dynhisuf,
                              ml_obj_file  = obj_fn,
                              ml_hie_file  = hie_fn
                   }
@@ -573,6 +555,21 @@ mkObjPath fopts basename mod_basename = obj_basename <.> osuf
                 obj_basename | Just dir <- odir = dir </> mod_basename
                              | otherwise        = basename
 
+-- | Constructs the filename of a .dyn_o file for a given source file.
+-- Does /not/ check whether the .dyn_o file exists
+mkDynObjPath
+  :: FinderOpts
+  -> FilePath           -- the filename of the source file, minus the extension
+  -> String             -- the module name with dots replaced by slashes
+  -> FilePath
+mkDynObjPath fopts basename mod_basename = obj_basename <.> dynosuf
+  where
+                odir = finder_objectDir fopts
+                dynosuf = finder_dynObjectSuf fopts
+
+                obj_basename | Just dir <- odir = dir </> mod_basename
+                             | otherwise        = basename
+
 
 -- | Constructs the filename of a .hi file for a given source file.
 -- Does /not/ check whether the .hi file exists
@@ -585,6 +582,21 @@ mkHiPath fopts basename mod_basename = hi_basename <.> hisuf
  where
                 hidir = finder_hiDir fopts
                 hisuf = finder_hiSuf fopts
+
+                hi_basename | Just dir <- hidir = dir </> mod_basename
+                            | otherwise         = basename
+
+-- | Constructs the filename of a .dyn_hi file for a given source file.
+-- Does /not/ check whether the .dyn_hi file exists
+mkDynHiPath
+  :: FinderOpts
+  -> FilePath           -- the filename of the source file, minus the extension
+  -> String             -- the module name with dots replaced by slashes
+  -> FilePath
+mkDynHiPath fopts basename mod_basename = hi_basename <.> dynhisuf
+ where
+                hidir = finder_hiDir fopts
+                dynhisuf = finder_dynHiSuf fopts
 
                 hi_basename | Just dir <- hidir = dir </> mod_basename
                             | otherwise         = basename

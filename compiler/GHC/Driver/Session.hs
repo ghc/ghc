@@ -38,10 +38,9 @@ module GHC.Driver.Session (
         xopt_FieldSelectors,
         lang_set,
         DynamicTooState(..), dynamicTooState, setDynamicNow, setDynamicTooFailed,
-        dynamicOutputFile, dynamicOutputHi,
         sccProfilingEnabled,
         DynFlags(..),
-        outputFile, hiSuf, objectSuf, ways,
+        outputFile, objectSuf, ways,
         FlagSpec(..),
         HasDynFlags(..), ContainsDynFlags(..),
         RtsOptsEnabled(..),
@@ -1059,13 +1058,6 @@ setDynamicTooFailed :: MonadIO m => DynFlags -> m ()
 setDynamicTooFailed dflags =
    liftIO $ writeIORef (dynamicTooFailed dflags) True
 
--- | Compute the path of the dynamic object corresponding to an object file.
-dynamicOutputFile :: DynFlags -> FilePath -> FilePath
-dynamicOutputFile dflags outputFile = outputFile -<.> dynObjectSuf_ dflags
-
-dynamicOutputHi :: DynFlags -> FilePath -> FilePath
-dynamicOutputHi dflags hi = hi -<.> dynHiSuf_ dflags
-
 -----------------------------------------------------------------------------
 
 -- | Used by 'GHC.runGhc' to partially initialize a new 'DynFlags' value
@@ -1873,26 +1865,19 @@ parseDynamicFlagsFull activeFlags cmdline dflags0 args = do
       throwGhcExceptionIO (CmdLineError ("combination not supported: " ++
                                intercalate "/" (map wayDesc (Set.toAscList theWays))))
 
-  let dflags3
-        | Just outFile <- outputFile_ dflags2   -- Only iff user specified -o ...
-        , not (isJust (dynOutputFile_ dflags2)) -- but not -dyno
-        = dflags2 { dynOutputFile_ = Just $ dynamicOutputFile dflags2 outFile }
-        | otherwise
-        = dflags2
-
-  let (dflags4, consistency_warnings) = makeDynFlagsConsistent dflags3
+  let (dflags3, consistency_warnings) = makeDynFlagsConsistent dflags2
 
   -- Set timer stats & heap size
-  when (enableTimeStats dflags4) $ liftIO enableTimingStats
-  case (ghcHeapSize dflags4) of
+  when (enableTimeStats dflags3) $ liftIO enableTimingStats
+  case (ghcHeapSize dflags3) of
     Just x -> liftIO (setHeapSize x)
     _      -> return ()
 
-  liftIO $ setUnsafeGlobalDynFlags dflags4
+  liftIO $ setUnsafeGlobalDynFlags dflags3
 
   let warns' = map (Warn WarningWithoutFlag) (consistency_warnings ++ sh_warns)
 
-  return (dflags4, leftover, warns' ++ warns)
+  return (dflags3, leftover, warns' ++ warns)
 
 -- | Check (and potentially disable) any extensions that aren't allowed
 -- in safe mode.
@@ -4873,11 +4858,6 @@ outputFile :: DynFlags -> Maybe String
 outputFile dflags
    | dynamicNow dflags = dynOutputFile_ dflags
    | otherwise         = outputFile_    dflags
-
-hiSuf :: DynFlags -> String
-hiSuf dflags
-   | dynamicNow dflags = dynHiSuf_ dflags
-   | otherwise         = hiSuf_    dflags
 
 objectSuf :: DynFlags -> String
 objectSuf dflags
