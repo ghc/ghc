@@ -330,8 +330,7 @@ assignTemp :: CmmExpr -> FCode LocalReg
 -- the optimization pass doesn't have to do as much work)
 assignTemp (CmmReg (CmmLocal reg)) = return reg
 assignTemp e = do { platform <- getPlatform
-                  ; uniq <- newUnique
-                  ; let reg = LocalReg uniq (cmmExprType platform e)
+                  ; reg <- newTemp (cmmExprType platform e)
                   ; emitAssign (CmmLocal reg) e
                   ; return reg }
 
