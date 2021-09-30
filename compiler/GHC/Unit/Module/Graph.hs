@@ -193,20 +193,19 @@ showModMsg dflags recomp (ModuleNode (ExtendedModSummary mod_summary _)) =
          [ text (mod_str ++ replicate (max 0 (16 - length mod_str)) ' ')
          , char '('
          , text (op $ msHsFilePath mod_summary) <> char ','
-         ] ++
-         if gopt Opt_BuildDynamicToo dflags
-            then [ text obj_file <> char ','
-                 , text dyn_file
-                 , char ')'
-                 ]
-            else [ text obj_file, char ')' ]
+         , message, char ')' ]
+
   where
     op       = normalise
     mod      = moduleName (ms_mod mod_summary)
     mod_str  = showPpr dflags mod ++ hscSourceString (ms_hsc_src mod_summary)
     dyn_file = op $ msDynObjFilePath mod_summary
-    obj_file = case backend dflags of
-                Interpreter | recomp -> "interpreted"
-                NoBackend            -> "nothing"
-                _                    -> (op $ msObjFilePath mod_summary)
+    obj_file = op $ msObjFilePath mod_summary
+    message = case backend dflags of
+                Interpreter | recomp -> text "interpreted"
+                NoBackend            -> text "nothing"
+                _                    ->
+                  if gopt Opt_BuildDynamicToo  dflags
+                    then text obj_file <> comma <+> text dyn_file
+                    else text obj_file
 
