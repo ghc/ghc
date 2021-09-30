@@ -37,6 +37,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Utils.Monad
 import GHC.Utils.Trace
+import GHC.Unit.Types
 
 {-
 We take Core bindings whose binders have:
@@ -66,14 +67,14 @@ info for exported values).
 \end{enumerate}
 -}
 
-wwTopBinds :: DynFlags -> FamInstEnvs -> UniqSupply -> CoreProgram -> CoreProgram
+wwTopBinds :: Module -> DynFlags -> FamInstEnvs -> UniqSupply -> CoreProgram -> CoreProgram
 
-wwTopBinds dflags fam_envs us top_binds
+wwTopBinds this_mod dflags fam_envs us top_binds
   = initUs_ us $ do
     top_binds' <- mapM (wwBind ww_opts) top_binds
     return (concat top_binds')
   where
-    ww_opts = initWwOpts dflags fam_envs
+    ww_opts = initWwOpts this_mod dflags fam_envs
 
 {-
 ************************************************************************

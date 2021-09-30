@@ -514,7 +514,7 @@ doCorePass pass guts = do
                                  updateBindsM (liftIO . cprAnalProgram logger fam_envs)
 
     CoreDoWorkerWrapper       -> {-# SCC "WorkWrap" #-}
-                                 updateBinds (wwTopBinds dflags fam_envs us)
+                                 updateBinds (wwTopBinds (mg_module guts) dflags fam_envs us)
 
     CoreDoSpecialising        -> {-# SCC "Specialise" #-}
                                  specProgram guts

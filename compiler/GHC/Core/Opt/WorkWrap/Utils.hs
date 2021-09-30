@@ -64,6 +64,7 @@ import Control.Monad ( zipWithM )
 import Data.List ( unzip4 )
 
 import GHC.Types.RepType
+import GHC.Unit.Types
 
 {-
 ************************************************************************
@@ -141,17 +142,18 @@ data WwOpts
   , wo_cpr_anal          :: !Bool
   , wo_fun_to_thunk      :: !Bool
   , wo_max_worker_args   :: !Int
-  , wo_output_file       :: Maybe String
+  -- Used for absent argument error message
+  , wo_module            :: !Module
   }
 
-initWwOpts :: DynFlags -> FamInstEnvs -> WwOpts
-initWwOpts dflags fam_envs = MkWwOpts
+initWwOpts :: Module -> DynFlags -> FamInstEnvs -> WwOpts
+initWwOpts this_mod dflags fam_envs = MkWwOpts
   { wo_fam_envs          = fam_envs
   , wo_simple_opts       = initSimpleOpts dflags
   , wo_cpr_anal          = gopt Opt_CprAnal dflags
   , wo_fun_to_thunk      = gopt Opt_FunToThunk dflags
   , wo_max_worker_args   = maxWorkerArgs dflags
-  , wo_output_file       = outputFile dflags
+  , wo_module            = this_mod
   }
 
 type WwResult
@@ -1003,9 +1005,7 @@ mkAbsentFiller opts arg
               -- will have different lengths and hence different costs for
               -- the inliner leading to different inlining.
               -- See also Note [Unique Determinism] in GHC.Types.Unique
-    file_msg = case wo_output_file opts of
-                 Nothing -> empty
-                 Just f  -> text "In output file " <+> quotes (text f)
+    file_msg = text "In module" <+> quotes (ppr $ wo_module opts)
 
 {- Note [Worker/wrapper for Strictness and Absence]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
