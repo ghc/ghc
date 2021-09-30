@@ -81,6 +81,7 @@ import Data.Version
 import GHC.Utils.Panic
 import GHC.Unit.Module.Env
 import GHC.Driver.Env.KnotVars
+import GHC.Driver.Config.Finder
 
 newtype HookedUse a = HookedUse { runHookedUse :: (Hooks, PhaseHook) -> IO a }
   deriving (Functor, Applicative, Monad, MonadIO, MonadThrow, MonadCatch) via (ReaderT (Hooks, PhaseHook) IO)
@@ -494,7 +495,7 @@ runHscBackendPhase :: PipeEnv
 runHscBackendPhase pipe_env hsc_env mod_name src_flavour location result = do
   let dflags = hsc_dflags hsc_env
       logger = hsc_logger hsc_env
-      o_file = ml_obj_file location -- The real object file
+      o_file = if dynamicNow dflags then ml_dyn_obj_file location else ml_obj_file location -- The real object file
       next_phase = hscPostBackendPhase src_flavour (backend dflags)
   case result of
       HscUpdate iface ->
@@ -649,11 +650,11 @@ runHscPhase pipe_env hsc_env0 input_fn src_flavour = do
   -- (If we're linking then the -o applies to the linked thing, not to
   -- the object file for one module.)
   -- Note the nasty duplication with the same computation in compileFile above
-  location <- getLocation pipe_env dflags src_flavour mod_name
+  location <- mkOneShotModLocation pipe_env dflags src_flavour mod_name
   let o_file = ml_obj_file location -- The real object file
       hi_file = ml_hi_file location
       hie_file = ml_hie_file location
-      dyn_o_file = dynamicOutputFile dflags o_file
+      dyn_o_file = ml_dyn_obj_file location
 
   src_hash <- getFileHash (basename <.> suff)
   hi_date <- modificationTimeIfExists hi_file
@@ -702,6 +703,52 @@ runHscPhase pipe_env hsc_env0 input_fn src_flavour = do
 
   return (plugin_hsc_env, mod_summary, status)
 
+-- | Calculate the ModLocation from the provided DynFlags. This function is only used
+-- in one-shot mode and therefore takes into account the effect of -o/-ohi flags
+-- (which do nothing in --make mode)
+mkOneShotModLocation :: PipeEnv -> DynFlags -> HscSource -> ModuleName -> IO ModLocation
+mkOneShotModLocation pipe_env dflags src_flavour mod_name = do
+    let PipeEnv{ src_basename=basename,
+             src_suffix=suff } = pipe_env
+    let location1 = mkHomeModLocation2 fopts mod_name basename suff
+
+    -- Boot-ify it if necessary
+    let location2
+          | HsBootFile <- src_flavour = addBootSuffixLocnOut location1
+          | otherwise                 = location1
+
+
+    -- Take -ohi into account if present
+    -- This can't be done in mkHomeModuleLocation because
+    -- it only applies to the module being compiles
+    let ohi = outputHi dflags
+        location3 | Just fn <- ohi = location2{ ml_hi_file = fn }
+                  | otherwise      = location2
+
+    let dynohi = dynOutputHi dflags
+        location4 | Just fn <- dynohi = location3{ ml_dyn_hi_file = fn }
+                  | otherwise         = location3
+
+    -- Take -o into account if present
+    -- Very like -ohi, but we must *only* do this if we aren't linking
+    -- (If we're linking then the -o applies to the linked thing, not to
+    -- the object file for one module.)
+    -- Note the nasty duplication with the same computation in compileFile
+    -- above
+    let expl_o_file = outputFile_ dflags
+        expl_dyn_o_file  = dynOutputFile_ dflags
+        location5 | Just ofile <- expl_o_file
+                  , let dyn_ofile = fromMaybe (ofile -<.> dynObjectSuf_ dflags) expl_dyn_o_file
+                  , isNoLink (ghcLink dflags)
+                  = location4 { ml_obj_file = ofile
+                              , ml_dyn_obj_file = dyn_ofile }
+                  | Just dyn_ofile <- expl_dyn_o_file
+                  = location4 { ml_dyn_obj_file = dyn_ofile }
+                  | otherwise = location4
+    return location5
+    where
+      fopts = initFinderOpts dflags
+
 runHscTcPhase :: HscEnv -> ModSummary -> IO (FrontendResult, Messages GhcMessage)
 runHscTcPhase = hscTypecheckAndGetWarnings
 
@@ -728,7 +775,11 @@ runHsPpPhase hsc_env orig_fn input_fn output_fn = do
       ] )
     return output_fn
 
-phaseOutputFilenameNew :: Phase -> PipeEnv -> HscEnv -> Maybe ModLocation -> IO FilePath
+phaseOutputFilenameNew :: Phase -- ^ The next phase
+                       -> PipeEnv
+                       -> HscEnv
+                       -> Maybe ModLocation -- ^ A ModLocation, if we are compiling a Haskell source file
+                       -> IO FilePath
 phaseOutputFilenameNew next_phase pipe_env hsc_env maybe_loc = do
   let PipeEnv{stop_phase, src_basename, output_spec} = pipe_env
   let dflags = hsc_dflags hsc_env
@@ -764,16 +815,37 @@ getOutputFilename
   -> Maybe ModLocation
   -> IO FilePath
 getOutputFilename logger tmpfs stop_phase output basename dflags next_phase maybe_location
+  -- 1. If we are generating object files for a .hs file, then return the odir as the ModLocation
+  -- will have been modified to point to the accurate locations
+ | StopLn <- next_phase, Just loc <- maybe_location  =
+      return $ if dynamicNow dflags then ml_dyn_obj_file loc
+                                    else ml_obj_file loc
+ -- 2. If output style is persistant then
  | is_last_phase, Persistent   <- output = persistent_fn
- | is_last_phase, SpecificFile <- output = case outputFile dflags of
-                                           Just f -> return f
-                                           Nothing ->
-                                               panic "SpecificFile: No filename"
+ -- 3. Specific file is only set when outputFile is set by -o
+ -- If we are in dynamic mode but -dyno is not set then write to the same path as
+ -- -o with a .dyn_* extension. This case is not triggered for object files which
+ -- are always handled by the ModLocation.
+ | is_last_phase, SpecificFile <- output =
+    return $
+      if dynamicNow dflags
+        then case dynOutputFile_ dflags of
+                Nothing -> let ofile = getOutputFile_ dflags
+                               new_ext = case takeExtension ofile of
+                                            "" -> "dyn"
+                                            ext -> "dyn_" ++ tail ext
+                           in replaceExtension ofile new_ext
+                Just fn -> fn
+        else getOutputFile_ dflags
  | keep_this_output                      = persistent_fn
  | Temporary lifetime <- output          = newTempName logger tmpfs (tmpDir dflags) lifetime suffix
  | otherwise                             = newTempName logger tmpfs (tmpDir dflags) TFL_CurrentModule
    suffix
     where
+          getOutputFile_ dflags = case outputFile_ dflags of
+                                    Nothing -> pprPanic "SpecificFile: No filename" (ppr $ (dynamicNow dflags, outputFile_ dflags, dynOutputFile_ dflags))
+                                    Just fn -> fn
+
           hcsuf      = hcSuf dflags
           odir       = objectDir dflags
           osuf       = objectSuf dflags
@@ -808,7 +880,6 @@ getOutputFilename logger tmpfs stop_phase output basename dflags next_phase mayb
           persistent = basename <.> suffix
 
           odir_persistent
-             | Just loc <- maybe_location = ml_obj_file loc
              | Just d <- odir = (d </> persistent)
              | otherwise      = persistent
 

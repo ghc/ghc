@@ -962,18 +962,8 @@ hscMaybeWriteIface logger dflags is_simple iface old_iface mod_location = do
                             Interpreter  -> False
                             _            -> True
 
-      -- mod_location only contains the base name, so we rebuild the
-      -- correct file extension from the dynflags.
-        baseName = ml_hi_file mod_location
-        buildIfName suffix is_dynamic
-          | Just name <- (if is_dynamic then dynOutputHi else outputHi) dflags
-          = name
-          | otherwise
-          = let with_hi = replaceExtension baseName suffix
-            in  addBootSuffix_maybe (mi_boot iface) with_hi
-
         write_iface dflags' iface =
-          let !iface_name = buildIfName (hiSuf dflags') (dynamicNow dflags')
+          let !iface_name = if dynamicNow dflags' then ml_dyn_hi_file mod_location else ml_hi_file mod_location
               profile     = targetProfile dflags'
           in
           {-# SCC "writeIface" #-}
@@ -1714,6 +1704,8 @@ hscCompileCmmFile hsc_env filename output_filename = runHsc hsc_env $ do
     no_loc = ModLocation{ ml_hs_file  = Just filename,
                           ml_hi_file  = panic "hscCompileCmmFile: no hi file",
                           ml_obj_file = panic "hscCompileCmmFile: no obj file",
+                          ml_dyn_obj_file = panic "hscCompileCmmFile: no dyn obj file",
+                          ml_dyn_hi_file  = panic "hscCompileCmmFile: no dyn obj file",
                           ml_hie_file = panic "hscCompileCmmFile: no hie file"}
 
 -------------------- Stuff for new code gen ---------------------
@@ -1945,6 +1937,8 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
     let iNTERACTIVELoc = ModLocation{ ml_hs_file   = Nothing,
                                       ml_hi_file   = panic "hsDeclsWithLocation:ml_hi_file",
                                       ml_obj_file  = panic "hsDeclsWithLocation:ml_obj_file",
+                                      ml_dyn_obj_file = panic "hsDeclsWithLocation:ml_dyn_obj_file",
+                                      ml_dyn_hi_file = panic "hsDeclsWithLocation:ml_dyn_hi_file",
                                       ml_hie_file  = panic "hsDeclsWithLocation:ml_hie_file" }
     ds_result <- hscDesugar' iNTERACTIVELoc tc_gblenv
 
@@ -2155,6 +2149,8 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr
          ; let iNTERACTIVELoc = ModLocation{ ml_hs_file   = Nothing,
                                       ml_hi_file   = panic "hscCompileCoreExpr':ml_hi_file",
                                       ml_obj_file  = panic "hscCompileCoreExpr':ml_obj_file",
+                                      ml_dyn_obj_file = panic "hscCompileCoreExpr': ml_obj_file",
+                                      ml_dyn_hi_file  = panic "hscCompileCoreExpr': ml_dyn_hi_file",
                                       ml_hie_file  = panic "hscCompileCoreExpr':ml_hie_file" }
 
          ; let ictxt = hsc_IC hsc_env

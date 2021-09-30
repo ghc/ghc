@@ -50,6 +50,8 @@ import GHC.Utils.Logger
 import GHC.Utils.Outputable
 import GHC.Types.Basic
 import GHC.Unit.Home
+import GHC.Unit.Finder
+import GHC.Driver.Config.Finder
 
 import GHC.Data.Stream as Stream (collect, yield)
 
@@ -158,7 +160,7 @@ compileCmmForRegAllocStats logger dflags cmmFile ncgImplF us = do
           thisMod = mkModule
                         (stringToUnit . show . uniqFromSupply $ usc)
                         (mkModuleName . show . uniqFromSupply $ usd)
-          thisModLoc = ModLocation Nothing (cmmFile ++ ".hi") (cmmFile ++ ".o") (cmmFile ++ ".hie")
+          thisModLoc = mkHiOnlyModLocation (initFinderOpts dflags) "hi" "dyn_hi" "" cmmFile
 
 
 -- | The register allocator should be able to see that each variable only

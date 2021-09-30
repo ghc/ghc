@@ -3,6 +3,7 @@ module GHC.Unit.Finder.Types
    , FinderCacheState
    , FindResult (..)
    , InstalledFindResult (..)
+   , FinderOpts(..)
    )
 where
 
@@ -10,6 +11,7 @@ import GHC.Prelude
 import GHC.Unit
 import qualified Data.Map as M
 import GHC.Fingerprint
+import GHC.Platform.Ways
 
 import Data.IORef
 
@@ -62,3 +64,35 @@ data FindResult
       , fr_suggestions :: [ModuleSuggestion] -- ^ Possible mis-spelled modules
       }
 
+-- | Locations and information the finder cares about.
+--
+-- Should be taken from 'DynFlags' via 'initFinderOpts'.
+data FinderOpts = FinderOpts
+  { finder_importPaths :: [FilePath]
+      -- ^ Where are we allowed to look for Modules and Source files
+  , finder_lookupHomeInterfaces :: Bool
+      -- ^ When looking up a home module:
+      --
+      --    * 'True':  search interface files (e.g. in '-c' mode)
+      --    * 'False': search source files (e.g. in '--make' mode)
+
+  , finder_bypassHiFileCheck :: Bool
+      -- ^ Don't check that an imported interface file actually exists
+      -- if it can only be at one location. The interface will be reported
+      -- as `InstalledFound` even if the file doesn't exist, so this is
+      -- only useful in specific cases (e.g. to generate dependencies
+      -- with `ghc -M`)
+  , finder_ways :: Ways
+  , finder_enableSuggestions :: Bool
+      -- ^ If we encounter unknown modules, should we suggest modules
+      -- that have a similar name.
+  , finder_hieDir :: Maybe FilePath
+  , finder_hieSuf :: String
+  , finder_hiDir :: Maybe FilePath
+  , finder_hiSuf :: String
+  , finder_dynHiSuf :: String
+  , finder_objectDir :: Maybe FilePath
+  , finder_objectSuf :: String
+  , finder_dynObjectSuf :: String
+  , finder_stubDir :: Maybe FilePath
+  }

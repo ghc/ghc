@@ -156,8 +156,8 @@ msHsFilePath  ms = expectJust "msHsFilePath" (ml_hs_file  (ms_location ms))
 msHiFilePath  ms = ml_hi_file  (ms_location ms)
 msObjFilePath ms = ml_obj_file (ms_location ms)
 
-msDynObjFilePath :: ModSummary -> DynFlags -> FilePath
-msDynObjFilePath ms dflags = dynamicOutputFile dflags (msObjFilePath ms)
+msDynObjFilePath :: ModSummary -> FilePath
+msDynObjFilePath ms = ml_dyn_obj_file (ms_location ms)
 
 -- | Did this 'ModSummary' originate from a hs-boot file?
 isBootSummary :: ModSummary -> IsBootInterface
