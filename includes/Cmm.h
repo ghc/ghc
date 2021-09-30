@@ -637,6 +637,9 @@
     if (TO_W_(RtsFlags_ProfFlags_doHeapProfile(RtsFlags)) != 0) { foreign "C" overwritingMutableClosureOfs(c "ptr", off); }
 #endif
 
+#define IS_STACK_CLEAN(stack) \
+    ((TO_W_(StgStack_dirty(stack)) & STACK_DIRTY) == 0)
+
 // Memory barriers.
 // For discussion of how these are used to fence heap object
 // accesses see Note [Heap memory barriers] in SMP.h.
@@ -781,9 +784,6 @@
       __gen = TO_W_(bdescr_gen_no(__bd));                       \
       if (__gen > 0) { recordMutableCap(__p, __gen); }
 
-/* -----------------------------------------------------------------------------
-   Update remembered set write barrier
-   -------------------------------------------------------------------------- */
 
 /* -----------------------------------------------------------------------------
    Arrays

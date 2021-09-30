@@ -1872,7 +1872,7 @@ loop:
     // actually perform the takeMVar
     W_ stack;
     stack = StgTSO_stackobj(tso);
-    if ((TO_W_(StgStack_dirty(stack)) & STACK_DIRTY) == 0) {
+    if (IS_STACK_CLEAN(stack)) {
         ccall dirty_STACK(MyCapability() "ptr", stack "ptr");
     }
     PerformTake(stack, val);
@@ -1962,7 +1962,7 @@ loop:
     // actually perform the takeMVar
     W_ stack;
     stack = StgTSO_stackobj(tso);
-    if ((TO_W_(StgStack_dirty(stack)) & STACK_DIRTY) == 0) {
+    if (IS_STACK_CLEAN(stack)) {
         ccall dirty_STACK(MyCapability() "ptr", stack "ptr");
     }
     PerformTake(stack, val);
@@ -2243,7 +2243,7 @@ loop:
     // actually perform the takeMVar
     W_ stack;
     stack = StgTSO_stackobj(tso);
-    if (TO_W_(StgStack_dirty(stack)) == 0) {
+    if (IS_STACK_CLEAN(stack)) {
         ccall dirty_STACK(MyCapability() "ptr", stack "ptr");
     }
     PerformTake(stack, val);
