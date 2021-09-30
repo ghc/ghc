@@ -573,6 +573,8 @@ data DynFlags = DynFlags {
 
   -- Plugins
   pluginModNames        :: [ModuleName],
+    -- ^ the @-fplugin@ flags given on the command line, in *reverse*
+    -- order that they're specified on the command line.
   pluginModNameOpts     :: [(ModuleName,String)],
   frontendPluginOpts    :: [String],
     -- ^ the @-ffrontend-opt@ flags given on the command line, in *reverse*

@@ -249,7 +249,6 @@ test('T20417',
       ],
      makefile_test, [])
 
-
 test('T20218',
      [extra_files(['simple-plugin/']), only_ways([config.ghc_plugin_way]),
       pre_cmd('$MAKE -s --no-print-directory -C simple-plugin package.T20218 TOP={top}'),
@@ -274,4 +273,18 @@ test('test-defaulting-plugin-fail',
      [extra_files(['defaulting-plugin/']),
       only_ways([config.ghc_plugin_way]),
       pre_cmd('$MAKE -s --no-print-directory -C defaulting-plugin package.test-defaulting-plugin-fail TOP={top}')],
+     makefile_test, [])
+
+test('plugins-order',
+     [extra_files(['plugin-recomp/', 'plugin-recomp-test.hs']),
+      only_ways([config.ghc_plugin_way]),
+      pre_cmd('$MAKE -s --no-print-directory -C plugin-recomp package.plugins01 TOP={top}')
+      ],
+     makefile_test, [])
+
+test('plugins-order-pragma',
+     [extra_files(['plugin-recomp/', 'plugin-recomp-test.hs']),
+      only_ways([config.ghc_plugin_way]),
+      pre_cmd('$MAKE -s --no-print-directory -C plugin-recomp package.plugins01 TOP={top}')
+      ],
      makefile_test, [])

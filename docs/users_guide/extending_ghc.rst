@@ -195,9 +195,11 @@ Using compiler plugins
 
 Plugins can be added on the command line with the :ghc-flag:`-fplugin=⟨module⟩`
 option where ⟨module⟩ is a module in a registered package that exports the
-plugin. Arguments can be passed to the plugins with the
-:ghc-flag:`-fplugin-opt=⟨module⟩:⟨args⟩` option. The list of enabled plugins can
-be reset with the :ghc-flag:`-fclear-plugins` option.
+plugin. Plugins are loaded in order, with command-line and Cabal flags preceding
+those in OPTIONS pragmas which are processed in file order. Arguments can be
+passed to the plugins with the :ghc-flag:`-fplugin-opt=⟨module⟩:⟨args⟩`
+option. The list of enabled plugins can be reset with the
+:ghc-flag:`-fclear-plugins` option.
 
 .. ghc-flag:: -fplugin=⟨module⟩
     :shortdesc: Load a plugin exported by a given module

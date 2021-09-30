@@ -74,7 +74,7 @@ import GHC.Unit.Types (ModuleNameWithIsBoot)
 initializePlugins :: HscEnv -> Maybe ModuleNameWithIsBoot -> IO HscEnv
 initializePlugins hsc_env mnwib
     -- plugins not changed
-  | map lpModuleName (hsc_plugins hsc_env) == pluginModNames dflags
+  | map lpModuleName (hsc_plugins hsc_env) == reverse (pluginModNames dflags)
    -- arguments not changed
   , all same_args (hsc_plugins hsc_env)
   = return hsc_env -- no need to reload plugins
@@ -96,7 +96,7 @@ loadPlugins hsc_env mnwib
        ; return $ zipWith attachOptions to_load plugins }
   where
     dflags  = hsc_dflags hsc_env
-    to_load = pluginModNames dflags
+    to_load = reverse $ pluginModNames dflags
 
     attachOptions mod_nm (plug, mod) =
         LoadedPlugin (PluginWithArgs plug (reverse options)) mod
