@@ -669,9 +669,11 @@ data CallishMachOp
   | MO_AtomicRMW Width AtomicMachOp
   | MO_AtomicRead Width
   | MO_AtomicWrite Width
+  -- | Atomic compare-and-swap. Arguments are @[dest, expected, new]@.
+  -- Sequentially consistent.
+  -- Possible future refactoring: should this be an'MO_AtomicRMW' variant?
   | MO_Cmpxchg Width
-  -- Should be an AtomicRMW variant eventually.
-  -- Sequential consistent.
+  -- | Atomic swap. Arguments are @[dest, new]@
   | MO_Xchg Width
 
   -- These rts provided functions are special: suspendThread releases the
