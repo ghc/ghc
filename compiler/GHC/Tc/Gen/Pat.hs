@@ -1212,9 +1212,11 @@ tcConArgs con_like arg_tys tenv penv con_args thing_inside = case con_args of
         { checkTc (con_arity == no_of_args)     -- Check correct arity
                   (arityErr (text "constructor") con_like con_arity no_of_args)
 
-        ; let con_binders = conLikeUserTyVarBinders con_like
-        ; checkTc (type_args `leLength` con_binders)
-                  (conTyArgArityErr con_like (length con_binders) (length type_args))
+              -- forgetting to filter out inferred binders led to #20443
+        ; let con_spec_binders = filter ((== SpecifiedSpec) . binderArgFlag) $
+                                 conLikeUserTyVarBinders con_like
+        ; checkTc (type_args `leLength` con_spec_binders)
+                  (conTyArgArityErr con_like (length con_spec_binders) (length type_args))
 
         ; let pats_w_tys = zipEqual "tcConArgs" arg_pats arg_tys
         ; (type_args', (arg_pats', res))
@@ -1224,7 +1226,7 @@ tcConArgs con_like arg_tys tenv penv con_args thing_inside = case con_args of
           -- This unification is straight from Figure 7 of
           -- "Type Variables in Patterns", Haskell'18
         ; _ <- zipWithM (unifyType Nothing) type_args' (substTyVars tenv $
-                                                        binderVars con_binders)
+                                                        binderVars con_spec_binders)
           -- OK to drop coercions here. These unifications are all about
           -- guiding inference based on a user-written type annotation
           -- See Note [Typechecking type applications in patterns]
