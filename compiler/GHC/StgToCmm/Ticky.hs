@@ -109,9 +109,10 @@ import GHC.Platform.Profile
 
 import GHC.StgToCmm.ArgRep    ( slowCallPattern , toArgRep , argRepString )
 import GHC.StgToCmm.Closure
-import GHC.StgToCmm.Utils
-import GHC.StgToCmm.Monad
+import {-# SOURCE #-} GHC.StgToCmm.Foreign   ( emitPrimCall )
 import GHC.StgToCmm.Lit       ( newStringCLit )
+import GHC.StgToCmm.Monad
+import GHC.StgToCmm.Utils
 
 import GHC.Stg.Syntax
 import GHC.Cmm.Expr
@@ -339,30 +340,46 @@ registerTickyCtrAtEntryDyn ctr_lbl = do
   already_registered <- tickyAllocdIsOn
   when (not already_registered) $ registerTickyCtr ctr_lbl
 
+-- | Register a ticky counter.
+--
+-- It's important that this does not race with other entries of the same
+-- closure, lest the ticky_entry_ctrs list may become cyclic. However, we also
+-- need to make sure that this is reasonably efficient. Consequently, we first
+-- perform a normal load of the counter's "registered" flag to check whether
+-- registration is necessary. If so, then we do a compare-and-swap to lock the
+-- counter for registration and use an atomic-exchange to add the counter to the list.
+--
+-- @
+-- if ( f_ct.registeredp == 0 ) {
+--    if (cas(f_ct.registeredp, 0, 1) == 0) {
+--        old_head = xchg(ticky_entry_ctrs,  f_ct);
+--        f_ct.link = old_head;
+--    }
+-- }
+-- @
 registerTickyCtr :: CLabel -> FCode ()
--- Register a ticky counter
---   if ( ! f_ct.registeredp ) {
---          f_ct.link = ticky_entry_ctrs;       /* hook this one onto the front of the list */
---          ticky_entry_ctrs = & (f_ct);        /* mark it as "registered" */
---          f_ct.registeredp = 1 }
 registerTickyCtr ctr_lbl = do
   platform <- getPlatform
-  let
-    constants = platformConstants platform
-    -- krc: code generator doesn't handle Not, so we test for Eq 0 instead
-    test = CmmMachOp (MO_Eq (wordWidth platform))
-              [CmmLoad (CmmLit (cmmLabelOffB ctr_lbl
-                                (pc_OFFSET_StgEntCounter_registeredp constants))) (bWord platform),
-               zeroExpr platform]
-    register_stmts
-      = [ mkStore (CmmLit (cmmLabelOffB ctr_lbl (pc_OFFSET_StgEntCounter_link constants)))
-                   (CmmLoad ticky_entry_ctrs (bWord platform))
-        , mkStore ticky_entry_ctrs (mkLblExpr ctr_lbl)
-        , mkStore (CmmLit (cmmLabelOffB ctr_lbl
-                                (pc_OFFSET_StgEntCounter_registeredp constants)))
-                   (mkIntExpr platform 1) ]
-    ticky_entry_ctrs = mkLblExpr (mkRtsCmmDataLabel (fsLit "ticky_entry_ctrs"))
-  emit =<< mkCmmIfThen test (catAGraphs register_stmts)
+  let constants = platformConstants platform
+      word_width = wordWidth platform
+      registeredp = CmmLit (cmmLabelOffB ctr_lbl (pc_OFFSET_StgEntCounter_registeredp constants))
+
+  register_stmts <- getCode $ do
+    old_head <- newTemp (bWord platform)
+    let ticky_entry_ctrs = mkLblExpr (mkRtsCmmDataLabel (fsLit "ticky_entry_ctrs"))
+        link = CmmLit (cmmLabelOffB ctr_lbl (pc_OFFSET_StgEntCounter_link constants))
+    emitPrimCall [old_head] (MO_Xchg word_width) [ticky_entry_ctrs, mkLblExpr ctr_lbl]
+    emitStore link (CmmReg $ CmmLocal old_head)
+
+  cas_test <- getCode $ do
+    old <- newTemp (bWord platform)
+    emitPrimCall [old] (MO_Cmpxchg word_width)
+        [registeredp, zeroExpr platform, mkIntExpr platform 1]
+    let locked = cmmEqWord platform (CmmReg $ CmmLocal old) (zeroExpr platform)
+    emit =<< mkCmmIfThen locked register_stmts
+
+  let test = cmmEqWord platform (CmmLoad registeredp (bWord platform)) (zeroExpr platform)
+  emit =<< mkCmmIfThen test cas_test
 
 tickyReturnOldCon, tickyReturnNewCon :: RepArity -> FCode ()
 tickyReturnOldCon arity
