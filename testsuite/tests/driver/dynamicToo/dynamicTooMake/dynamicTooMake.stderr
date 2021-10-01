@@ -1,0 +1,9 @@
+Warning: -rtsopts and -with-rtsopts have no effect with -shared.
+    Call hs_init_ghc() from your main() function to set these options.
+
+app/Main.hs:4:1: error:
+    Dynamic hash doesn't match for ‘Lib’
+    Normal interface file from /run/user/1000/ghctest-hbhb_f3v/test   spaces/testsuite/tests/driver/dynamicToo/dynamicTooMake/dynamicTooMake.run/inst/lib/x86_64-linux-ghc-9.3.20210922/p-0.1/Lib.hi
+    Dynamic interface file from /run/user/1000/ghctest-hbhb_f3v/test   spaces/testsuite/tests/driver/dynamicToo/dynamicTooMake/dynamicTooMake.run/inst/lib/x86_64-linux-ghc-9.3.20210922/p-0.1/Lib.dyn_hi
+    You probably need to recompile ‘Lib’
+make: *** [Makefile:26: dynamicTooMake] Error 1

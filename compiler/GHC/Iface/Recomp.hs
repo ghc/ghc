@@ -152,6 +152,8 @@ data RecompReason
   | MissingBytecode
   | MissingObjectFile
   | MissingDynObjectFile
+  | MissingDynHiFile
+  | MismatchedDynHiFile
   deriving (Eq)
 
 instance Outputable RecompReason where
@@ -180,6 +182,8 @@ instance Outputable RecompReason where
     MissingBytecode          -> text "Missing bytecode"
     MissingObjectFile        -> text "Missing object file"
     MissingDynObjectFile     -> text "Missing dynamic object file"
+    MissingDynHiFile         -> text "Missing dynamic interface file"
+    MismatchedDynHiFile     -> text "Mismatched dynamic interface file"
 
 recompileRequired :: RecompileRequired -> Bool
 recompileRequired UpToDate = False
@@ -227,12 +231,11 @@ check_old_iface hsc_env mod_summary maybe_iface
                     trace_if logger (text "We already have the old interface for" <+>
                       ppr (ms_mod mod_summary))
                     return maybe_iface
-                Nothing -> loadIface
+                Nothing -> loadIface dflags (msHiFilePath mod_summary)
 
-        loadIface = do
-             let iface_path = msHiFilePath mod_summary
+        loadIface read_dflags iface_path = do
              let ncu        = hsc_NC hsc_env
-             read_result <- readIface dflags ncu (ms_mod mod_summary) iface_path
+             read_result <- readIface read_dflags ncu (ms_mod mod_summary) iface_path
              case read_result of
                  Failed err -> do
                      trace_if logger (text "FYI: cannot read old interface file:" $$ nest 4 err)
@@ -241,6 +244,23 @@ check_old_iface hsc_env mod_summary maybe_iface
                  Succeeded iface -> do
                      trace_if logger (text "Read the interface file" <+> text iface_path)
                      return $ Just iface
+        check_dyn_hi :: ModIface
+                  -> IfG (RecompileRequired, Maybe a)
+                  -> IfG (RecompileRequired, Maybe a)
+        check_dyn_hi normal_iface recomp_check | gopt Opt_BuildDynamicToo dflags = do
+          res <- recomp_check
+          case fst res of
+            UpToDate -> do
+              maybe_dyn_iface <- liftIO $ loadIface (setDynamicNow dflags) (msDynHiFilePath mod_summary)
+              case maybe_dyn_iface of
+                Nothing -> return (RecompBecause MissingDynHiFile, Nothing)
+                Just dyn_iface | mi_iface_hash (mi_final_exts dyn_iface)
+                                    /= mi_iface_hash (mi_final_exts normal_iface)
+                  -> return (RecompBecause MismatchedDynHiFile, Nothing)
+                Just {} -> return res
+            _ -> return res
+        check_dyn_hi _ recomp_check = recomp_check
+
 
         src_changed
             | gopt Opt_ForceRecomp dflags    = True
@@ -273,7 +293,7 @@ check_old_iface hsc_env mod_summary maybe_iface
                     -- should check versions because some packages
                     -- might have changed or gone away.
                     Just iface ->
-                      checkVersions hsc_env mod_summary iface
+                      check_dyn_hi iface $ checkVersions hsc_env mod_summary iface
 
 -- | Check if a module is still the same 'version'.
 --

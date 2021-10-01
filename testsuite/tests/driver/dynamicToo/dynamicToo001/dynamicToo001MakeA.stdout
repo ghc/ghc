@@ -1,0 +1,6 @@
+[1 of 3] Compiling A                ( A.hs, A.o, A.dyn_o )
+[2 of 3] Compiling B                ( B.hs, B.o, B.dyn_o )
+[3 of 3] Compiling Main             ( C.hs, C.o, C.dyn_o )
+Linking C ...
+[2 of 3] Compiling B                ( B.hs, B.o, B.dyn_o ) [Missing dynamic interface file]
+Linking C ...
