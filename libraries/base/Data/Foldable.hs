@@ -2115,36 +2115,45 @@ elements in a single pass.
 --
 -- #strictlazy#
 --
--- The left fold:
+-- Sometimes, it is useful for the result of applying 'foldr' to be a
+-- /function/.  This is done by mapping the structure elements to functions
+-- with the same argument and result types.  The per-element functions are then
+-- composed to give the final result.
 --
--- @foldl' f z [a, b, &#x2026;, x, y]@
+-- For example, we can /flip/ the strict left fold 'foldl'' by writing:
 --
--- can be expanded as:
+-- > foldl' f z xs = flippedFoldl' f xs z
 --
--- @
--- id . g y . g x . &#x2026; . g b . g a $ z
---    where g = flip f
--- @
+-- with the function 'flippedFoldl'' defined as below, with 'seq' used to
+-- ensure the strictness in the accumulator:
 --
--- In which to ensure the correct strictness we must evaluate the accumulator
--- before applying the next function.  We therefore introduce a helper function
--- @f'@ which maps each element @x@ to an application of @g x@ to its eagerly
--- evaluated argument, followed by similar application of the @g e@ functions
--- for the remaining elements @e@:
+-- > flippedFoldl' f [] z = z
+-- > flippedFoldl' f (x : xs) z = z `seq` flippedFoldl' f xs (f z x)
 --
--- > f' x k = \ z -> z `seq` k (f z x)
+-- Rewriting to use lambdas, this is:
 --
--- We see that a lazy 'foldr' combining the @g e :: b -> b@ terms, with @f'@ as
--- the operator evaluated at the base case `z0` yields a strict left fold that
--- avoids building a deep chain of intermediate thunks:
+-- > flippedFoldl' f [] = \ b -> b
+-- > flippedFoldl' f (x : xs) = \ b -> b `seq` r (f b x)
+-- >     where r = flippedFoldl' f xs
 --
--- > foldl' f z0 xs = foldr f' id xs z0
--- >   where f' x k = \ z -> z `seq` k (f z x)
+-- The above has the form of a right fold, enabling a rewrite to:
 --
--- The function applied to @z0@ is built corecursively, and its terms are
--- applied to an eagerly evaluated accumulator before further terms are applied
--- to the result.  As promised, this runs in constant space, and can be
--- optimised to an efficient loop.
+-- > flippedFoldl' f = \ xs -> foldr f' id xs
+-- >     where f' x r = \ b -> b `seq` r (f b x)
+--
+-- We can now unflip this to get 'foldl'':
+--
+-- > foldl' f z = \ xs -> foldr f' id xs z
+-- >           -- \ xs -> flippedFoldl' f xs z
+-- >   where f' x r = \ b -> b `seq` r (f b x)
+--
+-- The function __@foldr f' id xs@__ applied to @z@ is built corecursively, and
+-- its terms are applied to an eagerly evaluated accumulator before further
+-- terms are applied to the result.  As required, this runs in constant space,
+-- and can be optimised to an efficient loop.
+--
+-- (The actual definition of 'foldl'' labels the lambdas in the definition of
+-- __@f'@__ above as /oneShot/, which enables further optimisations).
 
 --------------
 
