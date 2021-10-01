@@ -1205,7 +1205,7 @@ def do_test(name: TestName,
 # with the output.
 def override_options(pre_cmd):
     if config.verbose >= 5 and bool(re.match('\$make', pre_cmd, re.I)):
-        return pre_cmd.replace('-s'      , '') \
+        return pre_cmd.replace(' -s'     , '') \
                       .replace('--silent', '') \
                       .replace('--quiet' , '')
 
