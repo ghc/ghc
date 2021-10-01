@@ -1,0 +1,6 @@
+
+C.hs:5:1: error:
+    Dynamic hash doesn't match for ‘B’
+    Normal interface file from ./B.hi-boot
+    Dynamic interface file from ./B.dyn_hi-boot
+    You probably need to recompile ‘B’

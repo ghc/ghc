@@ -989,7 +989,7 @@ hscMaybeWriteIface logger dflags is_simple iface old_iface mod_location = do
       --
       let no_change = old_iface == Just (mi_iface_hash (mi_final_exts iface))
 
-      dt <- dynamicTooState dflags
+      let dt = dynamicTooState dflags
 
       when (logHasDumpFlag logger Opt_D_dump_if_trace) $ putMsg logger $
         hang (text "Writing interface(s):") 2 $ vcat
@@ -1003,7 +1003,6 @@ hscMaybeWriteIface logger dflags is_simple iface old_iface mod_location = do
             write_iface dflags iface
             case dt of
                DT_Dont   -> return ()
-               DT_Failed -> return ()
                DT_Dyn    -> panic "Unexpected DT_Dyn state when writing simple interface"
                DT_OK     -> write_iface (setDynamicNow dflags) iface
          else case dt of
@@ -1011,7 +1010,6 @@ hscMaybeWriteIface logger dflags is_simple iface old_iface mod_location = do
                DT_OK   | not no_change             -> write_iface dflags iface
                -- FIXME: see no_change' comment above
                DT_Dyn                              -> write_iface dflags iface
-               DT_Failed | not (dynamicNow dflags) -> write_iface dflags iface
                _                                   -> return ()
 
       when (gopt Opt_WriteHie dflags) $ do

@@ -10,6 +10,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# LANGUAGE ViewPatterns #-}
 
 -- | Loading interface files
 module GHC.Iface.Load (
@@ -900,23 +901,24 @@ findAndReadIface logger name_cache fc hooks unit_state home_unit dflags doc_str 
           -- Look for the file
           mb_found <- liftIO (findExactModule fc fopts unit_state home_unit mod)
           case mb_found of
-              InstalledFound loc mod -> do
-                  -- Found file, so read it
-                  let file_path = addBootSuffix_maybe hi_boot_file (ml_hi_file loc)
+              InstalledFound (addBootSuffixLocn_maybe hi_boot_file -> loc) mod -> do
                   -- See Note [Home module load error]
                   if isHomeInstalledModule home_unit mod &&
                      not (isOneShot (ghcMode dflags))
                       then return (Failed (homeModError mod loc))
                       else do
-                        r <- read_file logger name_cache unit_state dflags wanted_mod file_path
+                        r <- read_file logger name_cache unit_state dflags wanted_mod (ml_hi_file loc)
                         case r of
                           Failed _
-                            -> return ()
+                            -> return r
                           Succeeded (iface,_fp)
-                            -> load_dynamic_too_maybe logger name_cache unit_state
-                                                      dflags wanted_mod
-                                                      hi_boot_file iface loc
-                        return r
+                            -> do
+                                r2 <- load_dynamic_too_maybe logger name_cache unit_state
+                                                         (setDynamicNow dflags) wanted_mod
+                                                         iface loc
+                                case r2 of
+                                  Failed sdoc -> return (Failed sdoc)
+                                  Succeeded {} -> return r
               err -> do
                   trace_if logger (text "...not found")
                   return $ Failed $ cannotFindInterface
@@ -928,30 +930,32 @@ findAndReadIface logger name_cache fc hooks unit_state home_unit dflags doc_str 
                                       err
 
 -- | Check if we need to try the dynamic interface for -dynamic-too
-load_dynamic_too_maybe :: Logger -> NameCache -> UnitState -> DynFlags -> Module -> IsBootInterface -> ModIface -> ModLocation -> IO ()
-load_dynamic_too_maybe logger name_cache unit_state dflags wanted_mod is_boot iface loc
+load_dynamic_too_maybe :: Logger -> NameCache -> UnitState -> DynFlags -> Module -> ModIface -> ModLocation -> IO (MaybeErr SDoc ())
+load_dynamic_too_maybe logger name_cache unit_state dflags wanted_mod iface loc
   -- Indefinite interfaces are ALWAYS non-dynamic.
-  | not (moduleIsDefinite (mi_module iface)) = return ()
-  | otherwise = dynamicTooState dflags  >>= \case
-      DT_Dont   -> return ()
-      DT_Failed -> return ()
-      DT_Dyn    -> load_dynamic_too logger name_cache unit_state dflags wanted_mod iface file_path
-      DT_OK     -> load_dynamic_too logger name_cache unit_state (setDynamicNow dflags) wanted_mod iface file_path
-  where
-    file_path = addBootSuffix_maybe is_boot (ml_dyn_hi_file loc)
+  | not (moduleIsDefinite (mi_module iface)) = return (Succeeded ())
+  | gopt Opt_BuildDynamicToo dflags = load_dynamic_too logger name_cache unit_state dflags wanted_mod iface loc
+  | otherwise = return (Succeeded ())
 
-load_dynamic_too :: Logger -> NameCache -> UnitState -> DynFlags -> Module -> ModIface -> FilePath -> IO ()
-load_dynamic_too logger name_cache unit_state dflags wanted_mod iface dynFilePath = do
-  read_file logger name_cache unit_state dflags wanted_mod dynFilePath >>= \case
+load_dynamic_too :: Logger -> NameCache -> UnitState -> DynFlags -> Module -> ModIface -> ModLocation -> IO (MaybeErr SDoc ())
+load_dynamic_too logger name_cache unit_state dflags wanted_mod iface loc = do
+  read_file logger name_cache unit_state dflags wanted_mod (ml_dyn_hi_file loc) >>= \case
     Succeeded (dynIface, _)
      | mi_mod_hash (mi_final_exts iface) == mi_mod_hash (mi_final_exts dynIface)
-     -> return ()
+     -> return (Succeeded ())
      | otherwise ->
-        do trace_if logger (text "Dynamic hash doesn't match")
-           setDynamicTooFailed dflags
+        do return $ (Failed $ dynamicHashMismatchError wanted_mod loc)
     Failed err ->
-        do trace_if logger (text "Failed to load dynamic interface file:" $$ err)
-           setDynamicTooFailed dflags
+        do return $ (Failed $ ((text "Failed to load dynamic interface file for" <+> ppr wanted_mod <> colon) $$ err))
+
+
+dynamicHashMismatchError :: Module -> ModLocation -> SDoc
+dynamicHashMismatchError wanted_mod loc  =
+  vcat [ text "Dynamic hash doesn't match for" <+> quotes (ppr wanted_mod)
+       , text "Normal interface file from"  <+> text (ml_hi_file loc)
+       , text "Dynamic interface file from" <+> text (ml_dyn_hi_file loc)
+       , text "You probably need to recompile" <+> quotes (ppr wanted_mod) ]
+
 
 read_file :: Logger -> NameCache -> UnitState -> DynFlags -> Module -> FilePath -> IO (MaybeErr SDoc (ModIface, FilePath))
 read_file logger name_cache unit_state dflags wanted_mod file_path = do

@@ -16,6 +16,7 @@ module GHC.Unit.Module.ModSummary
    , ms_home_srcimps
    , ms_home_imps
    , msHiFilePath
+   , msDynHiFilePath
    , msHsFilePath
    , msObjFilePath
    , msDynObjFilePath
@@ -151,12 +152,11 @@ ms_home_imps = home_imps . ms_imps
 -- The ModLocation is stable over successive up-sweeps in GHCi, wheres
 -- the ms_hs_hash and imports can, of course, change
 
-msHsFilePath, msHiFilePath, msObjFilePath :: ModSummary -> FilePath
+msHsFilePath, msDynHiFilePath, msHiFilePath, msObjFilePath, msDynObjFilePath :: ModSummary -> FilePath
 msHsFilePath  ms = expectJust "msHsFilePath" (ml_hs_file  (ms_location ms))
 msHiFilePath  ms = ml_hi_file  (ms_location ms)
+msDynHiFilePath ms = ml_dyn_hi_file (ms_location ms)
 msObjFilePath ms = ml_obj_file (ms_location ms)
-
-msDynObjFilePath :: ModSummary -> FilePath
 msDynObjFilePath ms = ml_dyn_obj_file (ms_location ms)
 
 -- | Did this 'ModSummary' originate from a hs-boot file?

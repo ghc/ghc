@@ -1,0 +1,6 @@
+
+C.hs:5:1: error:
+    Dynamic hash doesn't match for ‘B’
+    Normal interface file from ./B.hi
+    Dynamic interface file from ./B.dyn_hi
+    You probably need to recompile ‘B’

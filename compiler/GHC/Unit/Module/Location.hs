@@ -3,6 +3,7 @@ module GHC.Unit.Module.Location
    ( ModLocation(..)
    , addBootSuffix
    , addBootSuffix_maybe
+   , addBootSuffixLocn_maybe
    , addBootSuffixLocn
    , addBootSuffixLocnOut
    , removeBootSuffix
@@ -85,6 +86,11 @@ addBootSuffix_maybe :: IsBootInterface -> FilePath -> FilePath
 addBootSuffix_maybe is_boot path = case is_boot of
   IsBoot -> addBootSuffix path
   NotBoot -> path
+
+addBootSuffixLocn_maybe :: IsBootInterface -> ModLocation -> ModLocation
+addBootSuffixLocn_maybe is_boot locn = case is_boot of
+  IsBoot -> addBootSuffixLocn locn
+  _ -> locn
 
 -- | Add the @-boot@ suffix to all file paths associated with the module
 addBootSuffixLocn :: ModLocation -> ModLocation

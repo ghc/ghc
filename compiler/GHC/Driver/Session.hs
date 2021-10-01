@@ -37,7 +37,7 @@ module GHC.Driver.Session (
         xopt_DuplicateRecordFields,
         xopt_FieldSelectors,
         lang_set,
-        DynamicTooState(..), dynamicTooState, setDynamicNow, setDynamicTooFailed,
+        DynamicTooState(..), dynamicTooState, setDynamicNow,
         sccProfilingEnabled,
         DynFlags(..),
         outputFile, objectSuf, ways,
@@ -530,7 +530,6 @@ data DynFlags = DynFlags {
   hiSuf_                :: String,
   hieSuf                :: String,
 
-  dynamicTooFailed      :: IORef Bool,
   dynObjectSuf_         :: String,
   dynHiSuf_             :: String,
 
@@ -1020,33 +1019,21 @@ positionIndependent dflags = gopt Opt_PIC dflags || gopt Opt_PIE dflags
 -- need Template-Haskell and GHC is dynamically linked (cf
 -- GHC.Driver.Pipeline.compileOne').
 --
--- This somewhat explains why we have "dynamicTooFailed :: IORef Bool" in
--- DynFlags: when -dynamic-too is enabled, we try to build the dynamic objects,
--- but we may fail and we shouldn't abort the whole compilation because the user
--- may not even have asked for -dynamic-too in the first place. So instead we
--- use this global variable to indicate that we can't build dynamic objects and
--- compilation continues to build non-dynamic objects only. At the end of the
--- non-dynamic pipeline, if this value indicates that the dynamic compilation
--- failed, we run the whole pipeline again for the dynamic way (except on
--- Windows...). See GHC.Driver.Pipeline.runPipeline.
+-- We used to try and fall back from a dynamic-too failure but this feature
+-- didn't work as expected (#20446) so it was removed to simplify the
+-- implementation and not obscure latent bugs.
 
 data DynamicTooState
    = DT_Dont    -- ^ Don't try to build dynamic objects too
-   | DT_Failed  -- ^ Won't try to generate dynamic objects for some reason
    | DT_OK      -- ^ Will still try to generate dynamic objects
    | DT_Dyn     -- ^ Currently generating dynamic objects (in the backend)
    deriving (Eq,Show,Ord)
 
-dynamicTooState :: MonadIO m => DynFlags -> m DynamicTooState
+dynamicTooState :: DynFlags -> DynamicTooState
 dynamicTooState dflags
-   | not (gopt Opt_BuildDynamicToo dflags) = return DT_Dont
-   | otherwise = do
-      failed <- liftIO $ readIORef (dynamicTooFailed dflags)
-      if failed
-         then return DT_Failed
-         else if dynamicNow dflags
-               then return DT_Dyn
-               else return DT_OK
+   | not (gopt Opt_BuildDynamicToo dflags) = DT_Dont
+   | dynamicNow dflags = DT_Dyn
+   | otherwise = DT_OK
 
 setDynamicNow :: DynFlags -> DynFlags
 setDynamicNow dflags0 =
@@ -1054,21 +1041,12 @@ setDynamicNow dflags0 =
       { dynamicNow = True
       }
 
-setDynamicTooFailed :: MonadIO m => DynFlags -> m ()
-setDynamicTooFailed dflags =
-   liftIO $ writeIORef (dynamicTooFailed dflags) True
-
 -----------------------------------------------------------------------------
 
 -- | Used by 'GHC.runGhc' to partially initialize a new 'DynFlags' value
 initDynFlags :: DynFlags -> IO DynFlags
 initDynFlags dflags = do
- let -- We can't build with dynamic-too on Windows, as labels before
-     -- the fork point are different depending on whether we are
-     -- building dynamically or not.
-     platformCanGenerateDynamicToo
-         = platformOS (targetPlatform dflags) /= OSMinGW32
- refDynamicTooFailed <- newIORef (not platformCanGenerateDynamicToo)
+ let
  refRtldInfo <- newIORef Nothing
  refRtccInfo <- newIORef Nothing
  refRtasmInfo <- newIORef Nothing
@@ -1089,7 +1067,6 @@ initDynFlags dflags = do
        (useColor dflags, colScheme dflags)
  tmp_dir <- normalise <$> getTemporaryDirectory
  return dflags{
-        dynamicTooFailed = refDynamicTooFailed,
         useUnicode    = useUnicode',
         useColor      = useColor',
         canUseColor   = stderrSupportsAnsiColors,
@@ -1163,7 +1140,6 @@ defaultDynFlags mySettings llvmConfig =
         hiSuf_                  = "hi",
         hieSuf                  = "hie",
 
-        dynamicTooFailed        = panic "defaultDynFlags: No dynamicTooFailed",
         dynObjectSuf_           = "dyn_" ++ phaseInputExt StopLn,
         dynHiSuf_               = "dyn_hi",
         dynamicNow              = False,

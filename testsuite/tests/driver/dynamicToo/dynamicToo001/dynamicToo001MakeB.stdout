@@ -1,0 +1,3 @@
+[2 of 3] Compiling B                ( B.hs, B.o, B.dyn_o ) [Mismatched dynamic interface file]
+[3 of 3] Compiling Main             ( C.hs, C.o, C.dyn_o )
+Linking C ...

@@ -720,63 +720,6 @@ fullPipeline pipe_env hsc_env pp_fn src_flavour = do
     <- use (T_HscRecomp pipe_env hsc_env' input_fn src_flavour)
   hscPipeline pipe_env (hsc_env_with_plugins, mod_sum, hsc_recomp_status)
 
-checkDynamicToo :: P m => HscEnv -> (HscEnv -> m (ModIface, Maybe Linkable)) -> (ModIface, Maybe Linkable) -> m (ModIface, Maybe Linkable)
-checkDynamicToo hsc_env dyn_too_rerun res = do
-  liftIO (dynamicTooState (hsc_dflags hsc_env)) >>= \case
-      DT_Dont   -> return res
-      DT_Dyn    -> return res
-      DT_OK     -> return res
-      -- If we are compiling a Haskell module with -dynamic-too, we
-      -- first try the "fast path": that is we compile the non-dynamic
-      -- version and at the same time we check that interfaces depended
-      -- on exist both for the non-dynamic AND the dynamic way. We also
-      -- check that they have the same hash.
-      --    If they don't, dynamicTooState is set to DT_Failed.
-      --       See GHC.Iface.Load.checkBuildDynamicToo
-      --    If they do, in the end we produce both the non-dynamic and
-      --    dynamic outputs.
-      --
-      -- If this "fast path" failed, we execute the whole pipeline
-      -- again, this time for the dynamic way *only*. To do that we
-      -- just set the dynamicNow bit from the start to ensure that the
-      -- dynamic DynFlags fields are used and we disable -dynamic-too
-      -- (its state is already set to DT_Failed so it wouldn't do much
-      -- anyway).
-      DT_Failed
-          -- NB: Currently disabled on Windows (ref #7134, #8228, and #5987)
-          | OSMinGW32 <- platformOS (targetPlatform dflags) -> return res
-          | otherwise -> do
-              liftIO (debugTraceMsg logger 4
-                        (text "Running the full pipeline again for -dynamic-too"))
-              hsc_env' <- liftIO (resetHscEnv hsc_env)
-              dyn_too_rerun hsc_env'
-  where
-    dflags = hsc_dflags hsc_env
-    logger = hsc_logger hsc_env
-
--- | Enable dynamic-too, reset EPS
-resetHscEnv :: HscEnv -> IO HscEnv
-resetHscEnv hsc_env = do
-  let init_dflags = hsc_dflags hsc_env
-      dflags0 = flip gopt_unset Opt_BuildDynamicToo
-                     $ setDynamicNow                                  -- -dynamic
-                     $ (init_dflags { hiSuf_ = dynHiSuf_ init_dflags  -- -hisuf = -dynhisuf
-                                    , objectSuf_ =  dynObjectSuf_ init_dflags -- -osuf = -dynosuf
-                                    })
-  hsc_env' <- newHscEnv dflags0
-  (dbs,unit_state,home_unit,mconstants) <- initUnits (hsc_logger hsc_env) dflags0 Nothing
-  dflags1 <- updatePlatformConstants dflags0 mconstants
-  unit_env0 <- initUnitEnv (ghcNameVersion dflags1) (targetPlatform dflags1)
-  let unit_env = unit_env0
-        { ue_home_unit = Just home_unit
-        , ue_units     = unit_state
-        , ue_unit_dbs  = Just dbs
-        }
-  let hsc_env'' = hscSetFlags dflags1 $ hsc_env'
-       { hsc_unit_env = unit_env
-       }
-  return hsc_env''
-
 -- | Everything after preprocess
 hscPipeline :: P m => PipeEnv ->  ((HscEnv, ModSummary, HscRecompStatus)) -> m (ModIface, Maybe Linkable)
 hscPipeline pipe_env (hsc_env_with_plugins, mod_sum, hsc_recomp_status) = do
@@ -785,10 +728,7 @@ hscPipeline pipe_env (hsc_env_with_plugins, mod_sum, hsc_recomp_status) = do
     HscRecompNeeded mb_old_hash -> do
       (tc_result, warnings) <- use (T_Hsc hsc_env_with_plugins mod_sum)
       hscBackendAction <- use (T_HscPostTc hsc_env_with_plugins mod_sum tc_result warnings mb_old_hash )
-      res <- hscBackendPipeline pipe_env hsc_env_with_plugins mod_sum hscBackendAction
-      -- Once the pipeline has finished, check to see if -dynamic-too failed and
-      -- rerun again if it failed but just the `--dynamic` way.
-      checkDynamicToo hsc_env_with_plugins (\hsc' -> hscPipeline pipe_env (hsc', mod_sum, hsc_recomp_status)) res
+      hscBackendPipeline pipe_env hsc_env_with_plugins mod_sum hscBackendAction
 
 hscBackendPipeline :: P m => PipeEnv -> HscEnv -> ModSummary -> HscBackendAction -> m (ModIface, Maybe Linkable)
 hscBackendPipeline pipe_env hsc_env mod_sum result =
@@ -801,11 +741,9 @@ hscBackendPipeline pipe_env hsc_env mod_sum result =
     -- Interpreter -> (,) <$> use (T_IO (mkFullIface hsc_env (hscs_partial_iface result) Nothing)) <*> pure Nothing
     _ -> do
       res <- hscGenBackendPipeline pipe_env hsc_env mod_sum result
-      liftIO (dynamicTooState (hsc_dflags hsc_env)) >>= \case
-        DT_OK -> do
+      when (gopt Opt_BuildDynamicToo (hsc_dflags hsc_env)) $ do
           let dflags' = setDynamicNow (hsc_dflags hsc_env) -- set "dynamicNow"
           () <$ hscGenBackendPipeline pipe_env (hscSetFlags dflags' hsc_env) mod_sum result
-        _ -> return ()
       return res
 
 hscGenBackendPipeline :: P m
