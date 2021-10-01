@@ -1,0 +1,3 @@
+
+when making flags consistent: warning:
+    -dynamic-too is ignored when using -dynamic

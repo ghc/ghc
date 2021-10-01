@@ -4609,6 +4609,12 @@ makeDynFlagsConsistent dflags
     = let dflags' = gopt_unset dflags Opt_BuildDynamicToo
           warn    = "-dynamic-too is not supported on Windows"
       in loop dflags' warn
+ -- Disable -dynamic-too if we are are compiling with -dynamic already, otherwise
+ -- you get two dynamic object files (.o and .dyn_o). (#20436)
+ | ways dflags `hasWay` WayDyn && gopt Opt_BuildDynamicToo dflags
+    = let dflags' = gopt_unset dflags Opt_BuildDynamicToo
+          warn = "-dynamic-too is ignored when using -dynamic"
+      in loop dflags' warn
 
    -- Via-C backend only supports unregisterised ABI. Switch to a backend
    -- supporting it if possible.

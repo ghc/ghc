@@ -707,6 +707,8 @@ Options affecting code generation
     and ``-dynhisuf`` are the counterparts of ``-o``, ``-osuf``, and
     ``-hisuf`` respectively, but applying to the dynamic compilation.
 
+    ``-dynamic-too`` is ignored if :ghc-flag:`-dynamic` is also specified.
+
 .. ghc-flag:: -split-objs
     :shortdesc: Split generated object files into smaller files
     :type: dynamic
