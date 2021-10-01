@@ -52,7 +52,7 @@ module Data.Foldable (
     -- * Overview
     -- $overview
 
-    -- ** Chirality
+    -- ** Expectation of efficient left-to-right iteration
     -- $chirality
 
     -- ** Recursive and corecursive reduction
@@ -1516,14 +1516,14 @@ elements in a single pass.
 -- $overview
 --
 -- #overview#
--- Foldable structures are reduced to a summary value by accumulating
--- contributions to the result one element at a time.
+-- The Foldabla class generalises some common "Data.List" functions to
+-- structures that can be reduced to a summary value one element at a time.
 --
 -- == Left and right folds
 --
 -- #leftright#
 -- The contribution of each element to the final result is combined with an
--- accumulator via an /operator/ function.  The operator may be explicitly
+-- accumulator via a suitable /operator/.  The operator may be explicitly
 -- provided by the caller as with `foldr` or may be implicit as in `length`.
 -- In the case of `foldMap`, the caller provides a function mapping each
 -- element into a suitable 'Monoid', which makes it possible to merge the
@@ -1572,7 +1572,7 @@ elements in a single pass.
 -- The third and final argument is a @Foldable@ structure containing elements
 -- @(a, b, c, &#x2026;)@.
 --
--- * __'foldl''__ takes an operator function of the form:
+-- * __'foldl''__ takes an operator argument of the form:
 --
 --     @
 --     f :: b -- accumulated fold of the initial elements
@@ -1594,7 +1594,7 @@ elements in a single pass.
 --     strictness is space efficiency: the final result can be computed without
 --     storing a potentially deep stack of lazy intermediate results.
 --
--- * __`foldr`__ takes an operator function of the form:
+-- * __`foldr`__ takes an operator argument of the form:
 --
 --     @
 --     f :: a -- current element
@@ -1617,7 +1617,7 @@ elements in a single pass.
 --     `foldr` is well suited to define both [corecursive](#corec)
 --     and [short-circuit](#short) reductions.
 --
---     When the operator is always strict in the second argument, 'foldl'' is
+--     When the operator is always strict in its second argument, 'foldl'' is
 --     generally a better choice than `foldr`.  When `foldr` is called with a
 --     strict operator, evaluation cannot begin until the last element is
 --     reached, by which point a deep stack of pending function applications
@@ -1660,7 +1660,7 @@ elements in a single pass.
 -- type-specific interfaces.  If nevertheless a @Foldable@ instance is
 -- provided, the material in the sections that follow applies to these also, by
 -- replacing each method with one with the opposite associativity (when
--- available) and switching the order of arguments in the /operator/ function.
+-- available) and switching the order of arguments in the fold's /operator/.
 --
 -- You may need to pay careful attention to strictness of the fold's /operator/
 -- when its strictness is different between its first and second argument.
@@ -2135,8 +2135,8 @@ elements in a single pass.
 -- > f' x k = \ z -> z `seq` k (f z x)
 --
 -- We see that a lazy 'foldr' combining the @g e :: b -> b@ terms, with @f'@ as
--- as the operator evaluated at the base case `z0` yields a strict left fold
--- that avoids building a deep chain of intermediate thunks:
+-- the operator evaluated at the base case `z0` yields a strict left fold that
+-- avoids building a deep chain of intermediate thunks:
 --
 -- > foldl' f z0 xs = foldr f' id xs z0
 -- >   where f' x k = \ z -> z `seq` k (f z x)
@@ -2383,10 +2383,9 @@ elements in a single pass.
 -- #notes#
 -- Since 'Foldable' does not have 'Functor' as a superclass, it is possible to
 -- define 'Foldable' instances for structures that constrain their element
--- types (and thus are not parametrically polymorphic, as required by Functor).
--- Therefore, __@Set@__ can be 'Foldable', even though sets keep their elements
--- in ascending order, which requires the elements to be comparable.  (This
--- element-type restriction precludes defining a 'Functor' instance for @Set@.)
+-- types.  Therefore, __@Set@__ can be 'Foldable', even though sets keep their
+-- elements in ascending order.  This requires the elements to be comparable,
+-- which precludes defining a 'Functor' instance for @Set@.
 --
 -- The 'Foldable' class makes it possible to use idioms familiar from the @List@
 -- type with container structures that are better suited to the task at hand.
@@ -2431,13 +2430,12 @@ elements in a single pass.
 -- function of the @Set@ module carries an `Ord` constraint, and can perform
 -- the search in \(\mathcal{O}(log\ n)\) time).
 --
--- Even when using abstract Foldable structures, it is possible to leverage
--- faster than linear element search via a dedicated alternative to Foldable's
--- __`elem`__ method.  This can be achieved by defining an additional type
--- class (e.g.  @HasMember@ below) to support a more performant implementation
--- when available.  Instances of such a type class can employ the `elem` linear
--- search as a last resort, and perform faster searches for specific
--- structures:
+-- An alternative to Foldable's __`elem`__ method is required in order to
+-- abstract potentially faster than linear search over general container
+-- structures.  This can be achieved by defining an additional type class (e.g.
+-- @HasMember@ below).  Instances of such a type class (that are also
+-- `Foldable') can employ the `elem` linear search as a last resort, when
+-- faster search is not supported.
 --
 -- > {-# LANGUAGE FlexibleInstances, MultiParamTypeClasses #-}
 -- >

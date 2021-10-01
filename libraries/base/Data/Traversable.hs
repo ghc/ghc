@@ -125,8 +125,8 @@ import GHC.Tuple (Solo (..))
 -- be possible to specify alternative link text. :-(
 
 -- | Functors representing data structures that can be transformed to
--- structures of /same shape/ by performing an 'Applicative' (so also 'Monad')
--- action on each element from left to right.
+-- structures of the /same shape/ by performing an 'Applicative' (or,
+-- therefore, 'Monad') action on each element from left to right.
 --
 -- A more detailed description of what /same shape/ means, the various methods,
 -- how traversals are constructed, and example advanced use-cases can be found
@@ -1134,7 +1134,7 @@ foldMapDefault = coerce (traverse @t @(Const m) @a @())
 -- 'Control.Monad.Trans.State.State' that threads a state __@s@__ through a
 -- chain of computations left to right.  Its @('<*>')@ operator passes the
 -- input state first to its left argument, and then the resulting state is
--- passed to its right argument, which in returns the final state.
+-- passed to its right argument, which returns the final state.
 --
 -- > newtype StateL s a = StateL { runStateL :: s -> (s, a) }
 -- >
