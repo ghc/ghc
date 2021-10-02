@@ -194,9 +194,9 @@ mkClassDecl loc' (L _ (mcxt, tycl_hdr)) fds where_cls layoutInfo annsIn
   = do { let loc = noAnnSrcSpan loc'
        ; (binds, sigs, ats, at_defs, _, docs) <- cvBindsAndSigs where_cls
        ; (cls, tparams, fixity, ann) <- checkTyClHdr True tycl_hdr
-       ; (tyvars,annst) <- checkTyVars (text "class") whereDots cls tparams
+       ; tyvars <- checkTyVars (text "class") whereDots cls tparams
        ; cs <- getCommentsFor (locA loc) -- Get any remaining comments
-       ; let anns' = addAnns (EpAnn (spanAsAnchor $ locA loc) annsIn emptyComments) (ann++annst) cs
+       ; let anns' = addAnns (EpAnn (spanAsAnchor $ locA loc) annsIn emptyComments) ann cs
        ; return (L loc (ClassDecl { tcdCExt = (anns', NoAnnSortKey, layoutInfo)
                                   , tcdCtxt = mcxt
                                   , tcdLName = cls, tcdTyVars = tyvars
@@ -220,9 +220,9 @@ mkTyData loc' new_or_data cType (L _ (mcxt, tycl_hdr))
          ksig data_cons (L _ maybe_deriv) annsIn
   = do { let loc = noAnnSrcSpan loc'
        ; (tc, tparams, fixity, ann) <- checkTyClHdr False tycl_hdr
-       ; (tyvars, anns) <- checkTyVars (ppr new_or_data) equalsDots tc tparams
+       ; tyvars <- checkTyVars (ppr new_or_data) equalsDots tc tparams
        ; cs <- getCommentsFor (locA loc) -- Get any remaining comments
-       ; let anns' = addAnns (EpAnn (spanAsAnchor $ locA loc) annsIn emptyComments) (ann ++ anns) cs
+       ; let anns' = addAnns (EpAnn (spanAsAnchor $ locA loc) annsIn emptyComments) ann cs
        ; defn <- mkDataDefn new_or_data cType mcxt ksig data_cons maybe_deriv
        ; return (L loc (DataDecl { tcdDExt = anns',
                                    tcdLName = tc, tcdTyVars = tyvars,
@@ -254,9 +254,9 @@ mkTySynonym :: SrcSpan
 mkTySynonym loc lhs rhs annsIn
   = do { (tc, tparams, fixity, ann) <- checkTyClHdr False lhs
        ; cs1 <- getCommentsFor loc -- Add any API Annotations to the top SrcSpan [temp]
-       ; (tyvars, anns) <- checkTyVars (text "type") equalsDots tc tparams
+       ; tyvars <- checkTyVars (text "type") equalsDots tc tparams
        ; cs2 <- getCommentsFor loc -- Add any API Annotations to the top SrcSpan [temp]
-       ; let anns' = addAnns (EpAnn (spanAsAnchor loc) annsIn emptyComments) (ann ++ anns) (cs1 Semi.<> cs2)
+       ; let anns' = addAnns (EpAnn (spanAsAnchor loc) annsIn emptyComments) ann (cs1 Semi.<> cs2)
        ; return (L (noAnnSrcSpan loc) (SynDecl
                                 { tcdSExt = anns'
                                 , tcdLName = tc, tcdTyVars = tyvars
@@ -349,9 +349,9 @@ mkFamDecl :: SrcSpan
 mkFamDecl loc info topLevel lhs ksig injAnn annsIn
   = do { (tc, tparams, fixity, ann) <- checkTyClHdr False lhs
        ; cs1 <- getCommentsFor loc -- Add any API Annotations to the top SrcSpan [temp]
-       ; (tyvars, anns) <- checkTyVars (ppr info) equals_or_where tc tparams
+       ; tyvars <- checkTyVars (ppr info) equals_or_where tc tparams
        ; cs2 <- getCommentsFor loc -- Add any API Annotations to the top SrcSpan [temp]
-       ; let anns' = addAnns (EpAnn (spanAsAnchor loc) annsIn emptyComments) (ann++anns) (cs1 Semi.<> cs2)
+       ; let anns' = addAnns (EpAnn (spanAsAnchor loc) annsIn emptyComments) ann (cs1 Semi.<> cs2)
        ; return (L (noAnnSrcSpan loc) (FamDecl noExtField
                                          (FamilyDecl
                                            { fdExt       = anns'
@@ -843,13 +843,12 @@ eitherToP (Left err)    = addFatalError err
 eitherToP (Right thing) = return thing
 
 checkTyVars :: SDoc -> SDoc -> LocatedN RdrName -> [LHsTypeArg GhcPs]
-            -> P ( LHsQTyVars GhcPs  -- the synthesized type variables
-                 , [AddEpAnn] )      -- action which adds annotations
+            -> P (LHsQTyVars GhcPs)  -- the synthesized type variables
 -- ^ Check whether the given list of type parameters are all type variables
 -- (possibly with a kind signature).
 checkTyVars pp_what equals_or_where tc tparms
-  = do { (tvs, anns) <- fmap unzip $ mapM check tparms
-       ; return (mkHsQTvs tvs, concat anns) }
+  = do { tvs <- mapM check tparms
+       ; return (mkHsQTvs tvs) }
   where
     check (HsTypeArg _ ki@(L loc _)) = addFatalError $ mkPlainErrorMsgEnvelope (locA loc) $
                                          (PsErrUnexpectedTypeAppInDecl ki pp_what (unLoc tc))
@@ -858,12 +857,10 @@ checkTyVars pp_what equals_or_where tc tparms
                             (PsErrMalformedDecl pp_what (unLoc tc))
         -- Keep around an action for adjusting the annotations of extra parens
     chkParens :: [AddEpAnn] -> EpAnnComments -> LHsType GhcPs
-              -> P (LHsTyVarBndr () GhcPs, [AddEpAnn])
+              -> P (LHsTyVarBndr () GhcPs)
     chkParens acc cs (L l (HsParTy an ty))
       = chkParens (mkParensEpAnn (locA l) ++ acc) (cs Semi.<> epAnnComments an) ty
-    chkParens acc cs ty = do
-      tv <- chk acc cs ty
-      return (tv, reverse acc)
+    chkParens acc cs ty = chk acc cs ty
 
         -- Check that the name space is correct!
     chk :: [AddEpAnn] -> EpAnnComments -> LHsType GhcPs -> P (LHsTyVarBndr () GhcPs)
