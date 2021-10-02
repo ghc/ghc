@@ -151,10 +151,10 @@
                (HsLinearArrow
                 (HsPct1
                  (L
-                  (EpAnnNotUsed)
+                  (NoTokenLoc)
                   (HsTok))
                  (L
-                  (EpAnnNotUsed)
+                  (NoTokenLoc)
                   (HsNormalTok))))
                (L
                 (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:10:26-30 })
@@ -386,13 +386,8 @@
                []))
              (HsUnrestrictedArrow
               (L
-               (EpAnn
-                (Anchor
-                 { DumpRenamedAst.hs:16:22-23 }
-                 (UnchangedAnchor))
-                (NoEpAnns)
-                (EpaComments
-                 []))
+               (TokenLoc
+                (EpaSpan { DumpRenamedAst.hs:16:22-23 }))
                (HsNormalTok)))
              (L
               (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:16:20 })
@@ -414,13 +409,8 @@
                  []))
                (HsUnrestrictedArrow
                 (L
-                 (EpAnn
-                  (Anchor
-                   { DumpRenamedAst.hs:16:27-28 }
-                   (UnchangedAnchor))
-                  (NoEpAnns)
-                  (EpaComments
-                   []))
+                 (TokenLoc
+                  (EpaSpan { DumpRenamedAst.hs:16:27-28 }))
                  (HsNormalTok)))
                (L
                 (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:16:25 })
@@ -496,13 +486,8 @@
                     []))
                   (HsUnrestrictedArrow
                    (L
-                    (EpAnn
-                     (Anchor
-                      { DumpRenamedAst.hs:19:30-31 }
-                      (UnchangedAnchor))
-                     (NoEpAnns)
-                     (EpaComments
-                      []))
+                    (TokenLoc
+                     (EpaSpan { DumpRenamedAst.hs:19:30-31 }))
                     (HsNormalTok)))
                   (L
                    (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:19:28 })
@@ -539,13 +524,8 @@
                 []))
               (HsUnrestrictedArrow
                (L
-                (EpAnn
-                 (Anchor
-                  { DumpRenamedAst.hs:19:54-55 }
-                  (UnchangedAnchor))
-                 (NoEpAnns)
-                 (EpaComments
-                  []))
+                (TokenLoc
+                 (EpaSpan { DumpRenamedAst.hs:19:54-55 }))
                 (HsNormalTok)))
               (L
                (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:19:42-52 })
@@ -563,13 +543,8 @@
                     []))
                   (HsUnrestrictedArrow
                    (L
-                    (EpAnn
-                     (Anchor
-                      { DumpRenamedAst.hs:19:45-46 }
-                      (UnchangedAnchor))
-                     (NoEpAnns)
-                     (EpaComments
-                      []))
+                    (TokenLoc
+                     (EpaSpan { DumpRenamedAst.hs:19:45-46 }))
                     (HsNormalTok)))
                   (L
                    (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:19:43 })
@@ -612,13 +587,8 @@
                [(HsScaled
                  (HsUnrestrictedArrow
                   (L
-                   (EpAnn
-                    (Anchor
-                     { DumpRenamedAst.hs:20:36-37 }
-                     (UnchangedAnchor))
-                    (NoEpAnns)
-                    (EpaComments
-                     []))
+                   (TokenLoc
+                    (EpaSpan { DumpRenamedAst.hs:20:36-37 }))
                    (HsNormalTok)))
                  (L
                   (SrcSpanAnn (EpAnn
@@ -663,13 +633,8 @@
                          []))
                        (HsUnrestrictedArrow
                         (L
-                         (EpAnn
-                          (Anchor
-                           { DumpRenamedAst.hs:20:27-28 }
-                           (UnchangedAnchor))
-                          (NoEpAnns)
-                          (EpaComments
-                           []))
+                         (TokenLoc
+                          (EpaSpan { DumpRenamedAst.hs:20:27-28 }))
                          (HsNormalTok)))
                        (L
                         (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:20:22-25 })
@@ -828,10 +793,10 @@
                (HsLinearArrow
                 (HsPct1
                  (L
-                  (EpAnnNotUsed)
+                  (NoTokenLoc)
                   (HsTok))
                  (L
-                  (EpAnnNotUsed)
+                  (NoTokenLoc)
                   (HsNormalTok))))
                (L
                 (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:22:25-29 })
@@ -1020,13 +985,8 @@
                  []))
                (HsUnrestrictedArrow
                 (L
-                 (EpAnn
-                  (Anchor
-                   { DumpRenamedAst.hs:24:33-34 }
-                   (UnchangedAnchor))
-                  (NoEpAnns)
-                  (EpaComments
-                   []))
+                 (TokenLoc
+                  (EpaSpan { DumpRenamedAst.hs:24:33-34 }))
                  (HsNormalTok)))
                (L
                 (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:24:31 })

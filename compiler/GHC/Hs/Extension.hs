@@ -236,12 +236,12 @@ pprIfTc :: forall p. IsPass p => (p ~ 'Typechecked => SDoc) -> SDoc
 pprIfTc pp = case ghcPass @p of GhcTc -> pp
                                 _     -> empty
 
-type instance Anno (HsToken tok) = EpAnnCO
+type instance Anno (HsToken tok) = TokenLocation
 
-noHsTok :: GenLocated (EpAnn a) (HsToken tok)
-noHsTok = L noAnn HsTok
+noHsTok :: GenLocated TokenLocation (HsToken tok)
+noHsTok = L NoTokenLoc HsTok
 
-type instance Anno (HsUniToken tok utok) = EpAnnCO
+type instance Anno (HsUniToken tok utok) = TokenLocation
 
-noHsUniTok :: GenLocated (EpAnn a) (HsUniToken tok utok)
-noHsUniTok = L noAnn HsNormalTok
+noHsUniTok :: GenLocated TokenLocation (HsUniToken tok utok)
+noHsUniTok = L NoTokenLoc HsNormalTok

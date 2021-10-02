@@ -63,10 +63,10 @@
                (HsLinearArrow
                 (HsPct1
                  (L
-                  (EpAnnNotUsed)
+                  (NoTokenLoc)
                   (HsTok))
                  (L
-                  (EpAnnNotUsed)
+                  (NoTokenLoc)
                   (HsNormalTok))))
                (L
                 (SrcSpanAnn (EpAnnNotUsed) { T14189.hs:6:18-20 })

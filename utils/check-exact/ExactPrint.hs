@@ -627,11 +627,8 @@ markKwA :: AnnKeywordId -> EpaLocation -> EPP ()
 markKwA kw aa = printStringAtAA aa (keywordToString (G kw))
 
 markToken :: forall tok. KnownSymbol tok => LHsToken tok GhcPs -> EPP ()
-markToken (L EpAnnNotUsed _) = return ()
-markToken (L (EpAnn (Anchor a a_op) _ _) _) = printStringAtAA aa (symbolVal (Proxy @tok))
-  where aa = case a_op of
-               UnchangedAnchor -> EpaSpan a
-               MovedAnchor dp  -> EpaDelta dp
+markToken (L NoTokenLoc _) = return ()
+markToken (L (TokenLoc aa) _) = printStringAtAA aa (symbolVal (Proxy @tok))
 
 markUniToken :: forall tok utok. (KnownSymbol tok, KnownSymbol utok) => LHsUniToken tok utok GhcPs -> EPP ()
 markUniToken (L l HsNormalTok)  = markToken (L l (HsTok @tok))

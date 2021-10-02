@@ -684,13 +684,8 @@
              []))
            (HsUnrestrictedArrow
             (L
-             (EpAnn
-              (Anchor
-               { KindSigs.hs:22:22-23 }
-               (UnchangedAnchor))
-              (NoEpAnns)
-              (EpaComments
-               []))
+             (TokenLoc
+              (EpaSpan { KindSigs.hs:22:22-23 }))
              (HsNormalTok)))
            (L
             (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:22:8-20 })
@@ -757,13 +752,8 @@
                []))
              (HsUnrestrictedArrow
               (L
-               (EpAnn
-                (Anchor
-                 { KindSigs.hs:22:30-31 }
-                 (UnchangedAnchor))
-                (NoEpAnns)
-                (EpaComments
-                 []))
+               (TokenLoc
+                (EpaSpan { KindSigs.hs:22:30-31 }))
                (HsNormalTok)))
              (L
               (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:22:25-28 })

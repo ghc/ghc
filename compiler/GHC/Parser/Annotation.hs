@@ -14,6 +14,7 @@ module GHC.Parser.Annotation (
   -- * In-tree Exact Print Annotations
   AddEpAnn(..),
   EpaLocation(..), epaLocationRealSrcSpan, epaLocationFromSrcAnn,
+  TokenLocation(..),
   DeltaPos(..), deltaPos, getDeltaLine,
 
   EpAnn(..), Anchor(..), AnchorOperation(..),
@@ -403,6 +404,11 @@ data AddEpAnn = AddEpAnn AnnKeywordId EpaLocation deriving (Data,Show,Eq,Ord)
 -- exact printing the changed one.
 data EpaLocation = EpaSpan RealSrcSpan
                  | EpaDelta DeltaPos
+               deriving (Data,Show,Eq,Ord)
+
+-- | Tokens embedded in the AST have an EpaLocation, unless they come from
+-- generated code (e.g. by TH).
+data TokenLocation = NoTokenLoc | TokenLoc !EpaLocation
                deriving (Data,Show,Eq,Ord)
 
 -- | Spacing between output items when exact printing.  It captures

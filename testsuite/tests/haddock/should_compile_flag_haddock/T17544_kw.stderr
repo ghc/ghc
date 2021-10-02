@@ -167,13 +167,8 @@
            [(HsScaled
              (HsUnrestrictedArrow
               (L
-               (EpAnn
-                (Anchor
-                 { T17544_kw.hs:19:21-22 }
-                 (UnchangedAnchor))
-                (NoEpAnns)
-                (EpaComments
-                 []))
+               (TokenLoc
+                (EpaSpan { T17544_kw.hs:19:21-22 }))
                (HsNormalTok)))
              (L
               (SrcSpanAnn (EpAnn

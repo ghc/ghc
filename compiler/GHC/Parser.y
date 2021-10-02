@@ -4354,11 +4354,11 @@ listAsAnchor [] = spanAsAnchor noSrcSpan
 listAsAnchor (L l _:_) = spanAsAnchor (locA l)
 
 hsTok :: Located Token -> LHsToken tok GhcPs
-hsTok (L l _) = L (EpAnn (spanAsAnchor l) NoEpAnns emptyComments) HsTok
+hsTok (L l _) = L (mkTokenLocation l) HsTok
 
 hsUniTok :: Located Token -> LHsUniToken tok utok GhcPs
 hsUniTok t@(L l _) =
-  L (EpAnn (spanAsAnchor l) NoEpAnns emptyComments)
+  L (mkTokenLocation l)
     (if isUnicode t then HsUnicodeTok else HsNormalTok)
 
 -- -------------------------------------

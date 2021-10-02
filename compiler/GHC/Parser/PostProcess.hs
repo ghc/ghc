@@ -74,6 +74,9 @@ module GHC.Parser.PostProcess (
         UnpackednessPragma(..),
         mkMultTy,
 
+        -- Token location
+        mkTokenLocation,
+
         -- Help with processing exports
         ImpExpSubSpec(..),
         ImpExpQcSpec(..),
@@ -2994,12 +2997,27 @@ mkLHsOpTy x op y =
 mkMultTy :: LHsToken "%" GhcPs -> LHsType GhcPs -> LHsUniToken "->" "→" GhcPs -> HsArrow GhcPs
 mkMultTy pct t@(L _ (HsTyLit _ (HsNumTy (SourceText "1") 1))) arr
   -- See #18888 for the use of (SourceText "1") above
-  = HsLinearArrow (HsPct1 (L (getLoc pct Semi.<> locOf1) HsTok) arr)
+  = HsLinearArrow (HsPct1 (L locOfPct1 HsTok) arr)
   where
-    -- The location of "1" in "%1".
-    locOf1 :: EpAnn NoEpAnns
-    locOf1 = EpAnn (spanAsAnchor (locA (getLoc t))) NoEpAnns emptyComments
+    -- The location of "%" combined with the location of "1".
+    locOfPct1 :: TokenLocation
+    locOfPct1 = token_location_widenR (getLoc pct) (locA (getLoc t))
 mkMultTy pct t arr = HsExplicitMult pct t arr
+
+mkTokenLocation :: SrcSpan -> TokenLocation
+mkTokenLocation (UnhelpfulSpan _) = NoTokenLoc
+mkTokenLocation (RealSrcSpan r _)  = TokenLoc (EpaSpan r)
+
+-- Precondition: the TokenLocation has EpaSpan, never EpaDelta.
+token_location_widenR :: TokenLocation -> SrcSpan -> TokenLocation
+token_location_widenR NoTokenLoc _ = NoTokenLoc
+token_location_widenR tl (UnhelpfulSpan _) = tl
+token_location_widenR (TokenLoc (EpaSpan r1)) (RealSrcSpan r2 _) =
+                      (TokenLoc (EpaSpan (combineRealSrcSpans r1 r2)))
+token_location_widenR (TokenLoc (EpaDelta _)) _ =
+  -- Never happens because the parser does not produce EpaDelta.
+  panic "token_location_widenR: EpaDelta"
+
 
 -----------------------------------------------------------------------------
 -- Token symbols

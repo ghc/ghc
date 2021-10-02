@@ -146,10 +146,10 @@
              (HsLinearArrow
               (HsPct1
                (L
-                (EpAnnNotUsed)
+                (NoTokenLoc)
                 (HsTok))
                (L
-                (EpAnnNotUsed)
+                (NoTokenLoc)
                 (HsNormalTok))))
              (L
               (SrcSpanAnn (EpAnnNotUsed) { DumpParsedAst.hs:8:26-30 })
@@ -556,10 +556,10 @@
              (HsLinearArrow
               (HsPct1
                (L
-                (EpAnnNotUsed)
+                (NoTokenLoc)
                 (HsTok))
                (L
-                (EpAnnNotUsed)
+                (NoTokenLoc)
                 (HsNormalTok))))
              (L
               (SrcSpanAnn (EpAnnNotUsed) { DumpParsedAst.hs:15:25-29 })
@@ -846,13 +846,8 @@
                []))
              (HsUnrestrictedArrow
               (L
-               (EpAnn
-                (Anchor
-                 { DumpParsedAst.hs:17:33-34 }
-                 (UnchangedAnchor))
-                (NoEpAnns)
-                (EpaComments
-                 []))
+               (TokenLoc
+                (EpaSpan { DumpParsedAst.hs:17:33-34 }))
                (HsNormalTok)))
              (L
               (SrcSpanAnn (EpAnnNotUsed) { DumpParsedAst.hs:17:31 })
