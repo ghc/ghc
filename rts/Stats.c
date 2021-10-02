@@ -881,15 +881,18 @@ static void report_summary(const RTSSummaryStats* sum)
                     TimeToSecondsDbl(gen_stats->max_pause_ns));
     }
     if (RtsFlags.GcFlags.useNonmoving) {
-        const int n_major_colls = sum->gc_summary_stats[RtsFlags.GcFlags.generations-1].collections;
-        statsPrintf("  Gen  1     %5d syncs"
+        const uint32_t nonmoving_gen = RtsFlags.GcFlags.generations-1;
+        const int n_major_colls = sum->gc_summary_stats[nonmoving_gen].collections;
+        statsPrintf("  Gen %2d     %5d syncs"
                     ",                      %6.3fs     %3.4fs    %3.4fs\n",
+                    nonmoving_gen,
                     n_major_colls,
                     TimeToSecondsDbl(stats.nonmoving_gc_sync_elapsed_ns),
                     TimeToSecondsDbl(stats.nonmoving_gc_sync_elapsed_ns) / n_major_colls,
                     TimeToSecondsDbl(stats.nonmoving_gc_sync_max_elapsed_ns));
-        statsPrintf("  Gen  1      concurrent"
+        statsPrintf("  Gen %2d      concurrent"
                     ",             %6.3fs  %6.3fs     %3.4fs    %3.4fs\n",
+                    nonmoving_gen,
                     TimeToSecondsDbl(stats.nonmoving_gc_cpu_ns),
                     TimeToSecondsDbl(stats.nonmoving_gc_elapsed_ns),
                     TimeToSecondsDbl(stats.nonmoving_gc_elapsed_ns) / n_major_colls,
