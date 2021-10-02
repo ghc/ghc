@@ -115,6 +115,8 @@ module GHC.Tc.Utils.TcType (
 
   ---------------------------------
   -- Foreign import and export
+  IllegalForeignTypeReason(..),
+  TypeCannotBeMarshaledReason(..),
   isFFIArgumentTy,     -- :: DynFlags -> Safety -> Type -> Bool
   isFFIImportResultTy, -- :: DynFlags -> Type -> Bool
   isFFIExportResultTy, -- :: Type -> Bool
@@ -232,7 +234,7 @@ import GHC.Data.List.SetOps ( getNth, findDupsEq )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
-import GHC.Utils.Error( Validity'(..), Validity )
+import GHC.Utils.Error( Validity'(..) )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Data.IORef
@@ -2143,23 +2145,45 @@ tcSplitIOType_maybe ty
         _ ->
             Nothing
 
-isFFIArgumentTy :: DynFlags -> Safety -> Type -> Validity
+-- | Reason why a type in an FFI signature is invalid
+data IllegalForeignTypeReason
+  = TypeCannotBeMarshaled !Type TypeCannotBeMarshaledReason
+  | ForeignDynNotPtr
+      !Type -- ^ Expected type
+      !Type -- ^ Actual type
+  | SafeHaskellMustBeInIO
+  | IOResultExpected
+  | UnexpectedNestedForall
+  | LinearTypesNotAllowed
+  | OneArgExpected
+  | AtLeastOneArgExpected
+
+-- | Reason why a type cannot be marshalled through the FFI.
+data TypeCannotBeMarshaledReason
+  = NotADataType
+  | NewtypeDataConNotInScope !(Maybe TyCon)
+  | UnliftedFFITypesNeeded
+  | NotABoxedMarshalableTyCon
+  | ForeignLabelNotAPtr
+  | NotSimpleUnliftedType
+
+isFFIArgumentTy :: DynFlags -> Safety -> Type -> Validity' IllegalForeignTypeReason
 -- Checks for valid argument type for a 'foreign import'
 isFFIArgumentTy dflags safety ty
    = checkRepTyCon (legalOutgoingTyCon dflags safety) ty
 
-isFFIExternalTy :: Type -> Validity
+isFFIExternalTy :: Type -> Validity' IllegalForeignTypeReason
 -- Types that are allowed as arguments of a 'foreign export'
 isFFIExternalTy ty = checkRepTyCon legalFEArgTyCon ty
 
-isFFIImportResultTy :: DynFlags -> Type -> Validity
+isFFIImportResultTy :: DynFlags -> Type -> Validity' IllegalForeignTypeReason
 isFFIImportResultTy dflags ty
   = checkRepTyCon (legalFIResultTyCon dflags) ty
 
-isFFIExportResultTy :: Type -> Validity
+isFFIExportResultTy :: Type -> Validity' IllegalForeignTypeReason
 isFFIExportResultTy ty = checkRepTyCon legalFEResultTyCon ty
 
-isFFIDynTy :: Type -> Type -> Validity
+isFFIDynTy :: Type -> Type -> Validity' IllegalForeignTypeReason
 -- The type in a foreign import dynamic must be Ptr, FunPtr, or a newtype of
 -- either, and the wrapped function type must be equal to the given type.
 -- We assume that all types have been run through normaliseFfiType, so we don't
@@ -2173,19 +2197,18 @@ isFFIDynTy expected ty
     , eqType ty' expected
     = IsValid
     | otherwise
-    = NotValid (vcat [ text "Expected: Ptr/FunPtr" <+> pprParendType expected <> comma
-                     , text "  Actual:" <+> ppr ty ])
+    = NotValid (ForeignDynNotPtr expected ty)
 
-isFFILabelTy :: Type -> Validity
+isFFILabelTy :: Type -> Validity' IllegalForeignTypeReason
 -- The type of a foreign label must be Ptr, FunPtr, or a newtype of either.
 isFFILabelTy ty = checkRepTyCon ok ty
   where
     ok tc | tc `hasKey` funPtrTyConKey || tc `hasKey` ptrTyConKey
           = IsValid
           | otherwise
-          = NotValid (text "A foreign-imported address (via &foo) must have type (Ptr a) or (FunPtr a)")
+          = NotValid ForeignLabelNotAPtr
 
-isFFIPrimArgumentTy :: DynFlags -> Type -> Validity
+isFFIPrimArgumentTy :: DynFlags -> Type -> Validity' IllegalForeignTypeReason
 -- Checks for valid argument type for a 'foreign import prim'
 -- Currently they must all be simple unlifted types, or the well-known type
 -- Any, which can be used to pass the address to a Haskell object on the heap to
@@ -2194,7 +2217,7 @@ isFFIPrimArgumentTy dflags ty
   | isAnyTy ty = IsValid
   | otherwise  = checkRepTyCon (legalFIPrimArgTyCon dflags) ty
 
-isFFIPrimResultTy :: DynFlags -> Type -> Validity
+isFFIPrimResultTy :: DynFlags -> Type -> Validity' IllegalForeignTypeReason
 -- Checks for valid result type for a 'foreign import prim' Currently
 -- it must be an unlifted type, including unboxed tuples, unboxed
 -- sums, or the well-known type Any.
@@ -2212,22 +2235,20 @@ isFunPtrTy ty
 -- normaliseFfiType gets run before checkRepTyCon, so we don't
 -- need to worry about looking through newtypes or type functions
 -- here; that's already been taken care of.
-checkRepTyCon :: (TyCon -> Validity) -> Type -> Validity
+checkRepTyCon
+  :: (TyCon -> Validity' TypeCannotBeMarshaledReason)
+  -> Type
+  -> Validity' IllegalForeignTypeReason
 checkRepTyCon check_tc ty
-  = case splitTyConApp_maybe ty of
+  = fmap (TypeCannotBeMarshaled ty) $ case splitTyConApp_maybe ty of
       Just (tc, tys)
-        | isNewTyCon tc -> NotValid (hang msg 2 (mk_nt_reason tc tys $$ nt_fix))
-        | otherwise     -> case check_tc tc of
-                             IsValid        -> IsValid
-                             NotValid extra -> NotValid (msg $$ extra)
-      Nothing -> NotValid (quotes (ppr ty) <+> text "is not a data type")
+        | isNewTyCon tc -> NotValid (mk_nt_reason tc tys)
+        | otherwise     -> check_tc tc
+      Nothing -> NotValid NotADataType
   where
-    msg = quotes (ppr ty) <+> text "cannot be marshalled in a foreign call"
     mk_nt_reason tc tys
-      | null tys  = text "because its data constructor is not in scope"
-      | otherwise = text "because the data constructor for"
-                    <+> quotes (ppr tc) <+> text "is not in scope"
-    nt_fix = text "Possible fix: import the data constructor to bring it into scope"
+      | null tys  = NewtypeDataConNotInScope Nothing
+      | otherwise = NewtypeDataConNotInScope (Just tc)
 
 {-
 Note [Foreign import dynamic]
@@ -2250,23 +2271,23 @@ These chaps do the work; they are not exported
 ----------------------------------------------
 -}
 
-legalFEArgTyCon :: TyCon -> Validity
+legalFEArgTyCon :: TyCon -> Validity' TypeCannotBeMarshaledReason
 legalFEArgTyCon tc
   -- It's illegal to make foreign exports that take unboxed
   -- arguments.  The RTS API currently can't invoke such things.  --SDM 7/2000
   = boxedMarshalableTyCon tc
 
-legalFIResultTyCon :: DynFlags -> TyCon -> Validity
+legalFIResultTyCon :: DynFlags -> TyCon -> Validity' TypeCannotBeMarshaledReason
 legalFIResultTyCon dflags tc
   | tc == unitTyCon         = IsValid
   | otherwise               = marshalableTyCon dflags tc
 
-legalFEResultTyCon :: TyCon -> Validity
+legalFEResultTyCon :: TyCon -> Validity' TypeCannotBeMarshaledReason
 legalFEResultTyCon tc
   | tc == unitTyCon         = IsValid
   | otherwise               = boxedMarshalableTyCon tc
 
-legalOutgoingTyCon :: DynFlags -> Safety -> TyCon -> Validity
+legalOutgoingTyCon :: DynFlags -> Safety -> TyCon -> Validity' TypeCannotBeMarshaledReason
 -- Checks validity of types going from Haskell -> external world
 legalOutgoingTyCon dflags _ tc
   = marshalableTyCon dflags tc
@@ -2281,7 +2302,7 @@ legalOutgoingTyCon dflags _ tc
 marshalablePrimTyCon :: TyCon -> Bool
 marshalablePrimTyCon tc = isPrimTyCon tc && not (isLiftedTypeKind (tyConResKind tc))
 
-marshalableTyCon :: DynFlags -> TyCon -> Validity
+marshalableTyCon :: DynFlags -> TyCon -> Validity' TypeCannotBeMarshaledReason
 marshalableTyCon dflags tc
   | marshalablePrimTyCon tc
   , not (null (tyConPrimRep tc)) -- Note [Marshalling void]
@@ -2289,7 +2310,7 @@ marshalableTyCon dflags tc
   | otherwise
   = boxedMarshalableTyCon tc
 
-boxedMarshalableTyCon :: TyCon -> Validity
+boxedMarshalableTyCon :: TyCon -> Validity' TypeCannotBeMarshaledReason
 boxedMarshalableTyCon tc
    | getUnique tc `elem` [ intTyConKey, int8TyConKey, int16TyConKey
                          , int32TyConKey, int64TyConKey
@@ -2303,17 +2324,17 @@ boxedMarshalableTyCon tc
                          ]
   = IsValid
 
-  | otherwise = NotValid empty
+  | otherwise = NotValid NotABoxedMarshalableTyCon
 
-legalFIPrimArgTyCon :: DynFlags -> TyCon -> Validity
+legalFIPrimArgTyCon :: DynFlags -> TyCon -> Validity' TypeCannotBeMarshaledReason
 -- Check args of 'foreign import prim', only allow simple unlifted types.
 legalFIPrimArgTyCon dflags tc
   | marshalablePrimTyCon tc
   = validIfUnliftedFFITypes dflags
   | otherwise
-  = NotValid unlifted_only
+  = NotValid NotSimpleUnliftedType
 
-legalFIPrimResultTyCon :: DynFlags -> TyCon -> Validity
+legalFIPrimResultTyCon :: DynFlags -> TyCon -> Validity' TypeCannotBeMarshaledReason
 -- Check result type of 'foreign import prim'. Allow simple unlifted
 -- types and also unboxed tuple and sum result types.
 legalFIPrimResultTyCon dflags tc
@@ -2325,15 +2346,12 @@ legalFIPrimResultTyCon dflags tc
   = validIfUnliftedFFITypes dflags
 
   | otherwise
-  = NotValid unlifted_only
+  = NotValid $ NotSimpleUnliftedType
 
-unlifted_only :: SDoc
-unlifted_only = text "foreign import prim only accepts simple unlifted types"
-
-validIfUnliftedFFITypes :: DynFlags -> Validity
+validIfUnliftedFFITypes :: DynFlags -> Validity' TypeCannotBeMarshaledReason
 validIfUnliftedFFITypes dflags
   | xopt LangExt.UnliftedFFITypes dflags =  IsValid
-  | otherwise = NotValid (text "To marshal unlifted types, use UnliftedFFITypes")
+  | otherwise = NotValid UnliftedFFITypesNeeded
 
 {-
 Note [Marshalling void]

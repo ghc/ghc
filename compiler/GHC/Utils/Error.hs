@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns    #-}
+{-# LANGUAGE DeriveFunctor   #-}
 {-# LANGUAGE RankNTypes      #-}
 {-# LANGUAGE ViewPatterns    #-}
 
@@ -194,6 +195,7 @@ mkPlainErrorMsgEnvelope locn msg =
 data Validity' a
   = IsValid      -- ^ Everything is fine
   | NotValid a   -- ^ A problem, and some indication of why
+  deriving Functor
 
 -- | Monomorphic version of @Validity'@ specialised for 'SDoc's.
 type Validity = Validity' SDoc

@@ -48,6 +48,7 @@ import {-# SOURCE #-} GHC.Tc.Types (getLclEnvLoc)
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Rank (Rank(..))
 import GHC.Tc.Utils.TcType
+import GHC.Types.Basic (UnboxedTupleOrSum(..), unboxedTupleOrSumExtension)
 import GHC.Types.Error
 import GHC.Types.FieldLabel (flIsOverloaded)
 import GHC.Types.Hint.Ppr () -- Outputable GhcHint
@@ -712,6 +713,88 @@ instance Diagnostic TcRnMessage where
              (pprWithArising tidy_wanteds)
 
 
+    TcRnForeignImportPrimExtNotSet _decl
+      -> mkSimpleDecorated $
+           text "Use GHCForeignImportPrim to allow `foreign import prim'."
+
+    TcRnForeignImportPrimSafeAnn _decl
+      -> mkSimpleDecorated $
+           text "The safe/unsafe annotation should not be used with `foreign import prim'."
+
+    TcRnForeignFunctionImportAsValue _decl
+      -> mkSimpleDecorated $
+           text "`value' imports cannot have function types"
+
+    TcRnFunPtrImportWithoutAmpersand _decl
+      -> mkSimpleDecorated $
+           text "possible missing & in foreign import of FunPtr"
+
+    TcRnIllegalForeignDeclBackend _decl _backend expectedBknds
+      -> mkSimpleDecorated $ text "Illegal foreign declaration:" <+>
+           case expectedBknds of
+             COrAsmOrLlvm ->
+               text "requires unregisterised, llvm (-fllvm) or native code generation (-fasm)"
+             COrAsmOrLlvmOrInterp ->
+               text "requires interpreted, unregisterised, llvm or native code generation"
+
+    TcRnUnsupportedCallConv _decl unsupportedCC
+      -> mkSimpleDecorated $
+           case unsupportedCC of
+             StdCallConvUnsupported ->
+               text "the 'stdcall' calling convention is unsupported on this platform,"
+               $$ text "treating as ccall"
+             PrimCallConvUnsupported ->
+               text "The `prim' calling convention can only be used with `foreign import'"
+             JavaScriptCallConvUnsupported ->
+               text "The `javascript' calling convention is unsupported on this platform"
+
+    TcRnIllegalForeignType mArgOrResult reason
+      -> mkSimpleDecorated $ hang msg 2 extra
+      where
+        arg_or_res = case mArgOrResult of
+          Nothing -> empty
+          Just Arg -> text "argument"
+          Just Result -> text "result"
+        msg = hsep [ text "Unacceptable", arg_or_res
+                   , text "type in foreign declaration:"]
+        extra =
+          case reason of
+            TypeCannotBeMarshaled ty why ->
+              let innerMsg = quotes (ppr ty) <+> text "cannot be marshalled in a foreign call"
+               in case why of
+                NotADataType ->
+                  quotes (ppr ty) <+> text "is not a data type"
+                NewtypeDataConNotInScope Nothing ->
+                  hang innerMsg 2 $ text "because its data constructor is not in scope"
+                NewtypeDataConNotInScope (Just tc) ->
+                  hang innerMsg 2 $
+                    text "because the data constructor for"
+                    <+> quotes (ppr tc) <+> text "is not in scope"
+                UnliftedFFITypesNeeded ->
+                  innerMsg $$ text "To marshal unlifted types, use UnliftedFFITypes"
+                NotABoxedMarshalableTyCon -> innerMsg
+                ForeignLabelNotAPtr ->
+                  innerMsg $$ text "A foreign-imported address (via &foo) must have type (Ptr a) or (FunPtr a)"
+                NotSimpleUnliftedType ->
+                  innerMsg $$ text "foreign import prim only accepts simple unlifted types"
+            ForeignDynNotPtr expected ty ->
+              vcat [ text "Expected: Ptr/FunPtr" <+> pprParendType expected <> comma, text "  Actual:" <+> ppr ty ]
+            SafeHaskellMustBeInIO ->
+              text "Safe Haskell is on, all FFI imports must be in the IO monad"
+            IOResultExpected ->
+              text "IO result type expected"
+            UnexpectedNestedForall ->
+              text "Unexpected nested forall"
+            LinearTypesNotAllowed ->
+              text "Linear types are not supported in FFI declarations, see #18472"
+            OneArgExpected ->
+              text "One argument expected"
+            AtLeastOneArgExpected ->
+              text "At least one argument expected"
+    TcRnInvalidCIdentifier target
+      -> mkSimpleDecorated $
+           sep [quotes (ppr target) <+> text "is not a valid C identifier"]
+
   diagnosticReason = \case
     TcRnUnknownMessage m
       -> diagnosticReason m
@@ -955,6 +1038,24 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnWarnDefaulting {}
       -> WarningWithFlag Opt_WarnTypeDefaults
+    TcRnForeignImportPrimExtNotSet{}
+      -> ErrorWithoutFlag
+    TcRnForeignImportPrimSafeAnn{}
+      -> ErrorWithoutFlag
+    TcRnForeignFunctionImportAsValue{}
+      -> ErrorWithoutFlag
+    TcRnFunPtrImportWithoutAmpersand{}
+      -> WarningWithFlag Opt_WarnDodgyForeignImports
+    TcRnIllegalForeignDeclBackend{}
+      -> ErrorWithoutFlag
+    TcRnUnsupportedCallConv _ unsupportedCC
+      -> case unsupportedCC of
+           StdCallConvUnsupported -> WarningWithFlag Opt_WarnUnsupportedCallingConventions
+           _ -> ErrorWithoutFlag
+    TcRnIllegalForeignType{}
+      -> ErrorWithoutFlag
+    TcRnInvalidCIdentifier{}
+      -> ErrorWithoutFlag
 
   diagnosticHints = \case
     TcRnUnknownMessage m
@@ -1195,6 +1296,25 @@ instance Diagnostic TcRnMessage where
     TcRnIllegalBuiltinSyntax {}
       -> noHints
     TcRnWarnDefaulting {}
+      -> noHints
+    TcRnForeignImportPrimExtNotSet{}
+      -> noHints
+    TcRnForeignImportPrimSafeAnn{}
+      -> noHints
+    TcRnForeignFunctionImportAsValue{}
+      -> noHints
+    TcRnFunPtrImportWithoutAmpersand{}
+      -> noHints
+    TcRnIllegalForeignDeclBackend{}
+      -> noHints
+    TcRnUnsupportedCallConv{}
+      -> noHints
+    TcRnIllegalForeignType _ reason
+      -> case reason of
+           TypeCannotBeMarshaled _ why
+             | NewtypeDataConNotInScope{} <- why -> [SuggestImportingDataCon]
+           _ -> noHints
+    TcRnInvalidCIdentifier{}
       -> noHints
 
 deriveInstanceErrReasonHints :: Class

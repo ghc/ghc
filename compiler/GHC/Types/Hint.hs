@@ -330,6 +330,7 @@ data GhcHint
         Triggered by: 'GHC.Tc.Errors.Types.TcRnIncorrectNameSpace'.
     -}
   | SuggestAppropriateTHTick NameSpace
+
   {-| Suggests enabling -ddump-splices to help debug an issue
       when a 'Name' is not in scope or is used in multiple
       different namespaces (e.g. both as a data constructor
@@ -383,6 +384,12 @@ data GhcHint
   -}
   | ImportSuggestion ImportSuggestion
 
+    {-| Suggest importing a data constructor to bring it into scope
+        Triggered by: 'GHC.Tc.Errors.Types.TcRnTypeCannotBeMarshaled'
+
+        Test cases: ccfail004
+    -}
+  | SuggestImportingDataCon
 
 -- | An 'InstantiationSuggestion' for a '.hsig' file. This is generated
 -- by GHC in case of a 'DriverUnexpectedSignature' and suggests a way

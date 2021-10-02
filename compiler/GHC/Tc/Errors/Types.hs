@@ -57,6 +57,9 @@ module GHC.Tc.Errors.Types (
   , HoleError(..)
   , CoercibleMsg(..)
   , PotentialInstances(..)
+  , UnsupportedCallConvention(..)
+  , ExpectedBackends(..)
+  , ArgOrResult(..)
   ) where
 
 import GHC.Prelude
@@ -68,9 +71,10 @@ import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Evidence (EvBindsVar)
 import GHC.Tc.Types.Origin (CtOrigin (ProvCtxtOrigin), SkolemInfoAnon (SigSkol), UserTypeCtxt (PatSynCtxt), TyVarBndrs, TypedThing, FRROrigin)
 import GHC.Tc.Types.Rank (Rank)
-import GHC.Tc.Utils.TcType (TcType)
+import GHC.Tc.Utils.TcType (IllegalForeignTypeReason, TcType)
 import GHC.Types.Error
 import GHC.Types.FieldLabel (FieldLabelString)
+import GHC.Types.ForeignCall (CLabelString)
 import GHC.Types.Name (Name, OccName, getSrcLoc)
 import GHC.Types.Name.Reader
 import GHC.Types.SrcLoc
@@ -90,6 +94,7 @@ import GHC.Core.PatSyn (PatSyn)
 import GHC.Core.Predicate (EqRel, predTypeEqRel)
 import GHC.Core.TyCon (TyCon, TyConFlavour)
 import GHC.Core.Type (Kind, Type, ThetaType, PredType)
+import GHC.Driver.Backend (Backend)
 import GHC.Unit.State (UnitState)
 import GHC.Unit.Module.Name (ModuleName)
 import GHC.Types.Basic
@@ -1688,6 +1693,116 @@ data TcRnMessage where
                                  -- in a Template Haskell tick
                                  -- (so we should give a Template Haskell hint)
                          -> TcRnMessage
+
+  {- TcRnForeignImportPrimExtNotSet is an error occurring when a foreign import
+     is declared using the @prim@ calling convention without having turned on
+     the -XGHCForeignImportPrim extension.
+
+     Example(s):
+     foreign import prim "foo" foo :: ByteArray# -> (# Int#, Int# #)
+
+    Test cases: None
+  -}
+  TcRnForeignImportPrimExtNotSet :: ForeignImport -> TcRnMessage
+
+  {- TcRnForeignImportPrimSafeAnn is an error declaring that the safe/unsafe
+     annotation should not be used with @prim@ foreign imports.
+
+     Example(s):
+     foreign import prim unsafe "my_primop_cmm" :: ...
+
+    Test cases: None
+  -}
+  TcRnForeignImportPrimSafeAnn :: ForeignImport -> TcRnMessage
+
+  {- TcRnForeignFunctionImportAsValue is an error explaining that foreign @value@
+     imports cannot have function types.
+
+     Example(s):
+     foreign import capi "math.h value sqrt" f :: CInt -> CInt
+
+    Test cases: ffi/should_fail/capi_value_function
+  -}
+  TcRnForeignFunctionImportAsValue :: ForeignImport -> TcRnMessage
+
+  {- TcRnFunPtrImportWithoutAmpersand is a warning controlled by @-Wdodgy-foreign-imports@
+     that informs the user of a possible missing @&@ in the declaration of a
+     foreign import with a 'FunPtr' return type.
+
+     Example(s):
+     foreign import ccall "f" f :: FunPtr (Int -> IO ())
+
+    Test cases: ffi/should_compile/T1357
+  -}
+  TcRnFunPtrImportWithoutAmpersand :: ForeignImport -> TcRnMessage
+
+  {- TcRnIllegalForeignDeclBackend is an error occurring when a foreign import declaration
+     is not compatible with the code generation backend being used.
+
+     Example(s): None
+
+    Test cases: None
+  -}
+  TcRnIllegalForeignDeclBackend
+    :: Either ForeignExport ForeignImport
+    -> Backend
+    -> ExpectedBackends
+    -> TcRnMessage
+
+  {- TcRnUnsupportedCallConv informs the user that the calling convention specified
+     for a foreign export declaration is not compatible with the target platform.
+     It is a warning controlled by @-Wunsupported-calling-conventions@ in the case of
+     @stdcall@ but is otherwise considered an error.
+
+     Example(s): None
+
+    Test cases: None
+  -}
+  TcRnUnsupportedCallConv :: Either ForeignExport ForeignImport -> UnsupportedCallConvention -> TcRnMessage
+
+  {- TcRnIllegalForeignType is an error for when a type appears in a foreign
+     function signature that is not compatible with the FFI.
+
+     Example(s): None
+
+    Test cases: ffi/should_fail/T3066
+                ffi/should_fail/ccfail004
+                ffi/should_fail/T10461
+                ffi/should_fail/T7506
+                ffi/should_fail/T5664
+                safeHaskell/ghci/p6
+                safeHaskell/safeLanguage/SafeLang08
+                ffi/should_fail/T16702
+                linear/should_fail/LinearFFI
+                ffi/should_fail/T7243
+  -}
+  TcRnIllegalForeignType :: !(Maybe ArgOrResult) -> !IllegalForeignTypeReason -> TcRnMessage
+
+  {- TcRnInvalidCIdentifier indicates a C identifier that is not valid.
+
+     Example(s):
+     foreign import prim safe "not valid" cmm_test2 :: Int# -> Int#
+
+    Test cases: th/T10638
+  -}
+  TcRnInvalidCIdentifier :: !CLabelString -> TcRnMessage
+
+-- | Specifies which backend code generators where expected for an FFI declaration
+data ExpectedBackends
+  = COrAsmOrLlvm         -- ^ C, Asm, or LLVM
+  | COrAsmOrLlvmOrInterp -- ^ C, Asm, LLVM, or interpreted
+  deriving Eq
+
+-- | Specifies which calling convention is unsupported on the current platform
+data UnsupportedCallConvention
+  = StdCallConvUnsupported
+  | PrimCallConvUnsupported
+  | JavaScriptCallConvUnsupported
+  deriving Eq
+
+-- | Whether the error pertains to a function argument or a result.
+data ArgOrResult
+  = Arg | Result
 
 -- | Which parts of a record field are affected by a particular error or warning.
 data RecordFieldPart
