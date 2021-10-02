@@ -189,9 +189,7 @@
         [(AddEpAnn AnnType (EpaSpan { DumpParsedAst.hs:10:1-4 }))
         ,(AddEpAnn AnnFamily (EpaSpan { DumpParsedAst.hs:10:6-11 }))
         ,(AddEpAnn AnnDcolon (EpaSpan { DumpParsedAst.hs:10:32-33 }))
-        ,(AddEpAnn AnnWhere (EpaSpan { DumpParsedAst.hs:10:41-45 }))
-        ,(AddEpAnn AnnCloseP (EpaSpan { DumpParsedAst.hs:10:30 }))
-        ,(AddEpAnn AnnOpenP (EpaSpan { DumpParsedAst.hs:10:20 }))]
+        ,(AddEpAnn AnnWhere (EpaSpan { DumpParsedAst.hs:10:41-45 }))]
         (EpaComments
          []))
        (ClosedTypeFamily
@@ -468,9 +466,7 @@
         { DumpParsedAst.hs:15:1-29 }
         (UnchangedAnchor))
        [(AddEpAnn AnnData (EpaSpan { DumpParsedAst.hs:15:1-4 }))
-       ,(AddEpAnn AnnEqual (EpaSpan { DumpParsedAst.hs:15:19 }))
-       ,(AddEpAnn AnnCloseP (EpaSpan { DumpParsedAst.hs:15:17 }))
-       ,(AddEpAnn AnnOpenP (EpaSpan { DumpParsedAst.hs:15:10 }))]
+       ,(AddEpAnn AnnEqual (EpaSpan { DumpParsedAst.hs:15:19 }))]
        (EpaComments
         []))
       (L
@@ -631,11 +627,7 @@
         [(AddEpAnn AnnType (EpaSpan { DumpParsedAst.hs:17:1-4 }))
         ,(AddEpAnn AnnFamily (EpaSpan { DumpParsedAst.hs:17:6-11 }))
         ,(AddEpAnn AnnDcolon (EpaSpan { DumpParsedAst.hs:17:42-43 }))
-        ,(AddEpAnn AnnWhere (EpaSpan { DumpParsedAst.hs:17:50-54 }))
-        ,(AddEpAnn AnnCloseP (EpaSpan { DumpParsedAst.hs:17:23 }))
-        ,(AddEpAnn AnnOpenP (EpaSpan { DumpParsedAst.hs:17:16 }))
-        ,(AddEpAnn AnnCloseP (EpaSpan { DumpParsedAst.hs:17:40 }))
-        ,(AddEpAnn AnnOpenP (EpaSpan { DumpParsedAst.hs:17:25 }))]
+        ,(AddEpAnn AnnWhere (EpaSpan { DumpParsedAst.hs:17:50-54 }))]
         (EpaComments
          []))
        (ClosedTypeFamily
