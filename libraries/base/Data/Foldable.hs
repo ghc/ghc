@@ -2355,13 +2355,50 @@ elements in a single pass.
 -- $laws
 -- #laws#
 --
--- @Foldable@ instances are expected to satisfy the following laws:
+-- The type constructor 'Endo' from "Data.Monoid", associates with each type
+-- __@b@__ the __@newtype@__-encapulated type of functions mapping __@b@__ to
+-- itself.  Functions from a type to itself are called /endomorphisms/, hence
+-- the name /Endo/.  The type __@Endo b@__ is a 'Monoid' under function
+-- composition:
+--
+-- > newtype Endo b = Endo { appEndo :: b -> b }
+-- > instance Semigroup Endo b where
+-- >     Endo f <> Endo g = Endo (f . g)
+-- > instance Monoid Endo b where
+-- >     mempty = Endo id
+--
+-- For every 'Monoid' m, we also have a 'Dual' monoid __@Dual m@__ which
+-- combines elements in the opposite order:
+--
+-- > newtype Dual m = Dual { getDual :: m }
+-- > instance Semigroup m => Semigroup Dual m where
+-- >     Dual a <> Dual b = Dual (b <> a)
+-- > instance Monoid m => Monoid Dual m where
+-- >     mempty = Dual mempty
+--
+-- With the above preliminaries out of the way, 'Foldable' instances are
+-- expected to satisfy the following laws:
+--
+-- The 'foldr' method must be equivalent in value and strictness to replacing
+-- each element __@a@__ of a 'Foldable' structure with __@Endo (f a)@__,
+-- composing these via 'foldMap' and applying the result to the base case
+-- __@z@__:
 --
 -- > foldr f z t = appEndo (foldMap (Endo . f) t ) z
 --
+-- Likewise, the 'foldl' method must be equivalent in value and strictness
+-- to composing the functions __@flip f a@__ in reverse order and applying
+-- the result to the base case:
+--
 -- > foldl f z t = appEndo (getDual (foldMap (Dual . Endo . flip f) t)) z
 --
+-- When the elements of the structure are taken from a 'Monoid', the
+-- defintion of 'fold' must agree with __@foldMap id@__:
+--
 -- > fold = foldMap id
+--
+-- The 'length' method must agree with a 'foldMap' mapping each element to
+-- __@Sum 1@__ (The 'Sum' type abstracts numbers as a monoid under addition).
 --
 -- > length = getSum . foldMap (Sum . const 1)
 --
@@ -2376,7 +2413,8 @@ elements in a single pass.
 -- > sum = foldl' (+) 0
 -- > product = foldl' (*) 1
 --
--- If the type is also a 'Functor' instance, it should satisfy
+-- If the 'Foldable' structure has a 'Functor' instance, then for every
+-- function __@f@__ mapping the elements into a 'Monoid', it should satisfy:
 --
 -- > foldMap f = fold . fmap f
 --
