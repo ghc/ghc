@@ -3,7 +3,6 @@
 set -euo pipefail
 
 NOTES_ORIGIN="https://gitlab.haskell.org/ghc/ghc-performance-notes.git"
-NOTES_ORIGIN_PUSH="git@gitlab.haskell.org:ghc/ghc-performance-notes.git"
 REF="perf"
 
 run() {
@@ -22,36 +21,23 @@ function pull() {
   echo "perf notes ref $ref is $(git rev-parse $ref)"
 }
 
-function setup_ssh() {
-  # Add gitlab as a known host.
-  # This can be generated with `ssh-keyscan -H gitlab.haskell.org`
-  mkdir -p "$HOME/.ssh"
-  echo "|1|cta91z3DoAGdpX2Epe9WF+sr+Rk=|1qlsbqiTTa8YsDyQBjVnzANFQ3Y= ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDSzzl8mwY6ohtW6MftKaQfta8yTL8cTxtA7lcueo2mkPpwBBQ7FA6z3nFATx25QwdV7fa7DuNRDX57f/a/W7+wMhXZ6yyQr+gwr0h4vdZ8Nt4XNfNdkdGw4fZKRApWxyvfSkxjs/E9+G0o3eQLspxjVohBkmkcsowpFUI5Aazv/K6QIf1gKt+4iPvYcB/dBJ1yF1qmpayz4htrKyUC5l3GCBEwvMdAjIQ2bX8pyjTtqcJDLosAVzQ5wprkdgkL29MgJXEbM+B1d1log0hnX4AsbOlL7tWhTO1Je2hSuEeiVaDDPFUyCoGQRFDrisQU5lb8NrzuN3jpNc+PxOHbXHfaTppAoED/++UepvgtLF1zUM13cRk56YmpmABOa48W72VJuzLLm8DF+KBWBs6TDuVk3y9z/SS6zDS0VGkHotldopW2kpsjErJIdWVKIL3RP/Flay7mzl3l/izIMTHXXKMxV3/+XaBjG/gDOCld3JjORQXah2hvJfvXeNaePE1RKAMS63cj3XTE77fsYH7VmEdE34RTBDtsZR5WhEjdf29hjEcQDPf0vDphxRHr6IqUSwVcd7ps6nVoccTfaepJm62IIXDgOsc2piWl2xXNZJVtph6U+MzsPDSSbu1MTwalwgqpApcYK7ZzUjGHA7+NBhjjSuUZO6eHzwxjAn0FXZyrpQ==" >> "$HOME/.ssh/known_hosts"
-  echo "|1|uZkjsBS2bmdh7L/8zBquxJd/F20=|by/tpuDAPT6BpEXrDOiOv1/Zx/A= ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIA7ltOZyaULDgxE3Vw6RgQVp+OPKQi79ssUenbhdWy36" >> "$HOME/.ssh/known_hosts"
-
-  # Setup ssh keys.
-  eval `ssh-agent`
-  echo "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDJPR1vrZgeGTXmgJw2PsJfMjf22LcDnVVwt3l0rwTZ+8Q2J0bHaYxMRKBco1sON6LGcZepw0Hy76RQ87v057pTz18SXvnfE7U/B6v9qBk0ILJz+4BOX9sEhxu2XmScp/wMxkG9IoyruMlsxXzd1sz09o+rzzx24U2Rp27PRm08vG0oipve6BWLbYEqYrE4/nCufqOJmGd56fju7OTU0lTpEkGDEDWGMxutaX2CbTbDju7qy07Ld8BjSc9aHfvuQaslUbj3ex3EF8EXahURzGpHQn/UFFzVGMokFumiJCAagHQb7cj6jOkKseZLaysbA/mTBQsOzjWiRmkN23bQf1wF ben+ghc-ci@smart-cactus.org" > "$HOME/.ssh/perf_rsa.pub"
-  touch "$HOME/.ssh/perf_rsa"
-  chmod 0600 "$HOME/.ssh/perf_rsa"
-  echo "$PERF_NOTE_KEY" > "$HOME/.ssh/perf_rsa"
-  ssh-add "$HOME/.ssh/perf_rsa"
-}
-
 # Reset the git notes and append the metrics file to the notes, then push and return the result.
 # This is favoured over a git notes merge as it avoids potential data loss/duplication from the merge strategy.
 function reset_append_note_push {
   pull || true
   run git notes --ref=$REF append -F $METRICS_FILE HEAD
-  run git push $NOTES_ORIGIN_PUSH refs/notes/$REF
+  run git push $PERF_NOTES_PUSH_REPO refs/notes/$REF
 }
 
 function push() {
-  # Check that private key is available (Set on all GitLab protected branches).
-  if [ -z ${PERF_NOTE_KEY+"$PERF_NOTE_KEY"} ]
-  then
-    echo "Not pushing performance git notes: PERF_NOTE_KEY is not set."
-    exit 0
+  # PERF_NOTES_PUSH_CREDENTIALS is a CI variable set on all GitLab protected branches.
+  if [ -z "${PERF_NOTES_PUSH_REPO:-}" ]; then
+    if [ -n "${PERF_NOTES_PUSH_CREDENTIALS:-}" ]; then
+      PERF_NOTES_PUSH_REPO="https://$PERF_NOTES_PUSH_CREDENTIALS@gitlab.haskell.org/ghc/ghc-performance-notes.git"
+    else
+      echo "Not pushing performance git notes: PERF_NOTES_PUSH_REPO or PERF_NOTES_PUSH_CREDENTIALS not set."
+      exit 0
+    fi
   fi
 
   # TEST_ENV must be set.
@@ -70,8 +56,6 @@ function push() {
     fail "Metrics file not found: $METRICS_FILE"
   fi
 
-  setup_ssh
-
   # Push the metrics file as a git note. This may fail if another task pushes a note first. In that case
   # the latest note is fetched and appended.
   MAX_RETRY=20
@@ -81,10 +65,6 @@ function push() {
     echo ""
     echo "Failed to push git notes. Fetching, appending, and retrying... $MAX_RETRY retries left."
   done
-
-  # Be sure to kill agent before we terminate since otherwise the Windows CI
-  # job won't finish.
-  ssh-agent -k
 }
 
 case $1 in
