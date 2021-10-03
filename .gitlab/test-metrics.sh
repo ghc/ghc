@@ -17,7 +17,7 @@ fail() {
 
 function pull() {
   local ref="refs/notes/$REF"
-  run git fetch -f $NOTES_ORIGIN $ref:$ref
+  run git fetch -f "$NOTES_ORIGIN" "$ref:$ref"
   echo "perf notes ref $ref is $(git rev-parse $ref)"
 }
 
@@ -25,8 +25,8 @@ function pull() {
 # This is favoured over a git notes merge as it avoids potential data loss/duplication from the merge strategy.
 function reset_append_note_push {
   pull || true
-  run git notes --ref=$REF append -F $METRICS_FILE HEAD
-  run git push $PERF_NOTES_PUSH_REPO refs/notes/$REF
+  run git notes --ref="$REF" append -F "$METRICS_FILE" HEAD
+  run git push "$PERF_NOTES_PUSH_REPO" "refs/notes/$REF"
 }
 
 function push() {
@@ -41,17 +41,17 @@ function push() {
   fi
 
   # TEST_ENV must be set.
-  if [ -z ${TEST_ENV+"$TEST_ENV"} ]
+  if [ -z "${TEST_ENV:-}" ]
   then
     fail "Not pushing performance git notes: TEST_ENV must be set."
   fi
 
   # Assert that the METRICS_FILE exists and can be read.
-  if [ -z ${METRICS_FILE+"$METRICS_FILE"} ]
+  if [ -z "${METRICS_FILE:-}" ]
   then
     fail "\$METRICS_FILE not set."
   fi
-  if ! [ -r $METRICS_FILE ]
+  if ! [ -r "$METRICS_FILE" ]
   then
     fail "Metrics file not found: $METRICS_FILE"
   fi
