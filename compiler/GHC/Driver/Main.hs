@@ -74,6 +74,7 @@ module GHC.Driver.Main
     , hscTcRnLookupRdrName
     , hscStmt, hscParseStmtWithLocation, hscStmtWithLocation, hscParsedStmt
     , hscDecls, hscParseDeclsWithLocation, hscDeclsWithLocation, hscParsedDecls
+    , hscParseModuleWithLocation
     , hscTcExpr, TcRnExprMode(..), hscImport, hscKcType
     , hscParseExpr
     , hscParseType
@@ -1937,12 +1938,17 @@ hscDecls :: HscEnv
          -> IO ([TyThing], InteractiveContext)
 hscDecls hsc_env str = hscDeclsWithLocation hsc_env str "<interactive>" 1
 
-hscParseDeclsWithLocation :: HscEnv -> String -> Int -> String -> IO [LHsDecl GhcPs]
-hscParseDeclsWithLocation hsc_env source line_num str = do
-    L _ (HsModule{ hsmodDecls = decls }) <-
+hscParseModuleWithLocation :: HscEnv -> String -> Int -> String -> IO HsModule
+hscParseModuleWithLocation hsc_env source line_num str = do
+    L _ mod <-
       runInteractiveHsc hsc_env $
         hscParseThingWithLocation source line_num parseModule str
-    return decls
+    return mod
+
+hscParseDeclsWithLocation :: HscEnv -> String -> Int -> String -> IO [LHsDecl GhcPs]
+hscParseDeclsWithLocation hsc_env source line_num str = do
+  HsModule { hsmodDecls = decls } <- hscParseModuleWithLocation hsc_env source line_num str
+  return decls
 
 -- | Compile a decls
 hscDeclsWithLocation :: HscEnv

@@ -59,7 +59,7 @@ import GHC ( LoadHowMuch(..), Target(..),  TargetId(..),
              Resume, SingleStep, Ghc,
              GetDocsFailure(..), putLogMsgM, pushLogHookM,
              getModuleGraph, handleSourceError, ms_mod )
-import GHC.Driver.Main (hscParseDeclsWithLocation, hscParseStmtWithLocation)
+import GHC.Driver.Main (hscParseModuleWithLocation, hscParseStmtWithLocation)
 import GHC.Hs.ImpExp
 import GHC.Hs
 import GHC.Driver.Env
@@ -1231,16 +1231,8 @@ runStmt input step = do
            Just stmt ->
              run_stmt stmt
 
-     | GHC.isImport pflags input -> run_import
-
-     -- Every import declaration should be handled by `run_import`. As GHCi
-     -- in general only accepts one command at a time, we simply throw an
-     -- exception when the input contains multiple commands of which at least
-     -- one is an import command (see #10663).
-     | GHC.hasImport pflags input -> throwGhcException
-       (CmdLineError "error: expecting a single import declaration")
-
      -- Otherwise assume a declaration (or a list of declarations)
+     -- and/or import(s) (#20473).
      -- Note: `GHC.isDecl` returns False on input like
      -- `data Infix a b = a :@: b; infixl 4 :@:`
      -- and should therefore not be used here.
@@ -1250,14 +1242,14 @@ runStmt input step = do
          setDumpFilePrefix ic
            -- `-ddump-to-file` must work for normal GHCi compilations /
            --     evaluations. (#17500)
-         decls <- liftIO (hscParseDeclsWithLocation hsc_env source line input)
+         HsModule { hsmodDecls = decls, hsmodImports = imports } <-
+            liftIO (hscParseModuleWithLocation hsc_env source line input)
+         run_imports imports
          run_decls decls
   where
     exec_complete = GHC.ExecComplete (Right []) 0
 
-    run_import = do
-      addImportToContext input
-      return (Just exec_complete)
+    run_imports imports = mapM_ (addImportToContext . unLoc) imports
 
     run_stmt :: GhciMonad m => GhciLStmt GhcPs -> m (Maybe GHC.ExecResult)
     run_stmt stmt = do
@@ -2713,9 +2705,8 @@ setContext starred unstarred = restoreContextOnFailure $ do
                                 -- delete the transient context
   addModulesToContext_ starred unstarred
 
-addImportToContext :: GhciMonad m => String -> m ()
-addImportToContext str = restoreContextOnFailure $ do
-  idecl <- GHC.parseImportDecl str
+addImportToContext :: GhciMonad m => ImportDecl GhcPs -> m ()
+addImportToContext idecl = restoreContextOnFailure $ do
   addII (IIDecl idecl)   -- #5836
   setGHCContextFromGHCiState
 

@@ -1,0 +1,7 @@
+:{
+import Data.List
+
+xs :: [Int]
+xs = sort [2,1]
+:}
+sort xs

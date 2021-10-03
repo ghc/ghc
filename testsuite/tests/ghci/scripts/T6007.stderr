@@ -2,5 +2,5 @@
 <interactive>:1:19:
     Module ‘System.IO’ does not export ‘does_not_exist’
 
-<interactive>:1:20:
+<interactive>:3:20:
     Module ‘Data.Maybe’ does not export ‘does_not_exist’
