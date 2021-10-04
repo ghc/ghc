@@ -42,7 +42,7 @@ T3772.$trModule
 Rec {
 -- RHS size: {terms: 10, types: 2, coercions: 0, joins: 0/0}
 $wxs :: GHC.Prim.Int# -> (# #)
-[GblId, Arity=1, Str=<1L>, Cpr=1, Unf=OtherCon []]
+[GblId, Arity=1, Str=<1L>, Unf=OtherCon []]
 $wxs
   = \ (ww :: GHC.Prim.Int#) ->
       case ww of ds1 {
