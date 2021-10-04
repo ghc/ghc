@@ -539,9 +539,6 @@ validate-x86_64-darwin:
   tags:
     - x86_64-darwin-m1
 
-  # for now make this non mandatory to pass.
-  allow_failure: true
-
   variables:
     BUILD_FLAVOUR: "validate"
     GHC_VERSION: 8.10.4
