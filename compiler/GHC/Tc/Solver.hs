@@ -222,9 +222,11 @@ simplifyAndEmitFlatConstraints wanted
                          -- Emit the bad constraints, wrapped in an implication
                          -- See Note [Wrapping failing kind equalities]
                          ; tclvl  <- TcM.getTcLevel
-                         ; implic <- buildTvImplication UnkSkol [] tclvl wanted
-                                     -- UnkSkol: doesn't matter, because
-                                     -- we bind no skolem variables here
+                         ; implic <- buildTvImplication UnkSkol [] (pushTcLevel tclvl) wanted
+                                    --                  ^^^^^^   |  ^^^^^^^^^^^^^^^^^
+                                    -- it's OK to use UnkSkol    |  we must increase the TcLevel,
+                                    -- because we don't bind     |  as explained in
+                                    -- any skolem variables here |  Note [Wrapping failing kind equalities]
                          ; emitImplication implic
                          ; failM }
            Just (simples, holes)
@@ -403,12 +405,30 @@ Our solution is this:
 
 * Right here in simplifyAndEmitFlatConstraints, use buildTvImplication
   to wrap the failing constraint in a degenerate implication (no
-  skolems, no theta, no bumped TcLevel), with ic_binds = CoEvBindsVar.
-  That way any failing equalities will lead to an error not a warning,
-  irrespective of -fdefer-type-errors.
+  skolems, no theta), with ic_binds = CoEvBindsVar.  This setting of
+  `ic_binds` means that any failing equalities will lead to an
+  error not a warning, irrespective of -fdefer-type-errors: see
+  Note [Failing equalities with no evidence bindings] in GHC.Tc.Errors,
+  and `maybeSwitchOffDefer` in that module.
 
-  This is a slight hack, because the implication doesn't have a bumped
-  TcLevel, but that doesn't matter.
+  We still take care to bump the TcLevel of the implication.  Partly,
+  that ensures that nested implications have increasing level numbers
+  which seems nice.  But more specifically, suppose the outer level
+  has a Given `(C ty)`, which has pending (not-yet-expanded)
+  superclasses. Consider what happens when we process this implication
+  constraint (which we have re-emitted) in that context:
+    - in the inner implication we'll call `getPendingGivenScs`,
+    - we /do not/ want to get the `(C ty)` from the outer level,
+    lest we try to add an evidence term for the superclass,
+    which we can't do because we have specifically set
+    `ic_binds` = `CoEvBindsVar`.
+    - as `getPendingGivenSCcs is careful to only get Givens from
+    the /current/ level, and we bumped the `TcLevel` of the implication,
+    we're OK.
+
+  TL;DR: bump the `TcLevel` when creating the nested implication.
+  If we don't we get a panic in `GHC.Tc.Utils.Monad.addTcEvBind` (#20043).
+
 
 We re-emit the implication rather than reporting the errors right now,
 so that the error mesages are improved by other solving and defaulting.
