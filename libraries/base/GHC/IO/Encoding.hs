@@ -109,8 +109,10 @@ utf32be = UTF32.utf32be
 getLocaleEncoding :: IO TextEncoding
 {-# NOINLINE getLocaleEncoding #-}
 
--- | The Unicode encoding of the current locale, but allowing arbitrary
+-- | The encoding of the current locale, but allowing arbitrary
 -- undecodable bytes to be round-tripped through it.
+--
+-- Do not expect the encoding to be Unicode-compatible: it could appear to be ASCII or anything else.
 --
 -- This 'TextEncoding' is used to decode and encode command line arguments
 -- and environment variables on non-Windows platforms.
