@@ -390,8 +390,20 @@ tuple.
           in case z of A -> j 1 2
                        B -> j 2 3
 
-Note that we still want to give @j@ the CPR property, so that @f@ has it. So
+Note that we still want to give `j` the CPR property, so that `f` has it. So
 CPR *analyse* join points as regular functions, but don't *transform* them.
+
+We could retain the CPR /signature/ on the worker after W/W, but it would
+become outright wrong if the Simplifier pushes a non-trivial continuation
+into it. For example:
+    case (let $j x = (x,x) in ...) of alts
+    ==>
+    let $j x = case (x,x) of alts in case ... of alts
+Before pushing the case in, `$j` has the CPR property, but not afterwards.
+
+So we simply zap the CPR signature for join pints as part of the W/W pass.
+The signature served its purpose during CPR analysis in propagating the
+CPR property of `$j`.
 
 Doing W/W for returned products on a join point would be tricky anyway, as the
 worker could not be a join point because it would not be tail-called. However,
@@ -529,7 +541,7 @@ tryWW ww_opts is_rec fn_id rhs
   = return [ (new_fn_id, rhs ) ]
 
   | is_fun && is_eta_exp
-  = splitFun ww_opts new_fn_id fn_info rhs
+  = splitFun ww_opts new_fn_id rhs
 
   -- See Note [Thunk splitting]
   | isNonRec is_rec, is_thunk
@@ -541,10 +553,16 @@ tryWW ww_opts is_rec fn_id rhs
   where
     fn_info        = idInfo fn_id
     (wrap_dmds, _) = splitDmdSig (dmdSigInfo fn_info)
+    new_fn_id      = zap_join_cpr $ zap_usage fn_id
 
-    new_fn_id = zapIdUsedOnceInfo (zapIdUsageEnvInfo fn_id)
+    zap_usage = zapIdUsedOnceInfo . zapIdUsageEnvInfo
         -- See Note [Zapping DmdEnv after Demand Analyzer] and
         -- See Note [Zapping Used Once info in WorkWrap]
+
+    zap_join_cpr id
+      | isJoinId id = id `setIdCprSig` topCprSig
+      | otherwise   = id
+        -- See Note [Don't w/w join points for CPR]
 
     -- is_eta_exp: see Note [Don't eta expand in w/w]
     is_eta_exp = length wrap_dmds == manifestArity rhs
@@ -690,11 +708,11 @@ by LitRubbish (see Note [Drop absent bindings]) so there is no great harm.
 
 
 ---------------------
-splitFun :: WwOpts -> Id -> IdInfo -> CoreExpr -> UniqSM [(Id, CoreExpr)]
-splitFun ww_opts fn_id fn_info rhs
+splitFun :: WwOpts -> Id -> CoreExpr -> UniqSM [(Id, CoreExpr)]
+splitFun ww_opts fn_id rhs
   = warnPprTrace (not (wrap_dmds `lengthIs` (arityInfo fn_info)))
                  (ppr fn_id <+> (ppr wrap_dmds $$ ppr cpr)) $
-    do { mb_stuff <- mkWwBodies ww_opts fn_id arg_vars (exprType body) wrap_dmds use_cpr_info
+    do { mb_stuff <- mkWwBodies ww_opts fn_id arg_vars (exprType body) wrap_dmds cpr
        ; case mb_stuff of
             Nothing -> -- No useful wrapper; leave the binding alone
                        return [(fn_id, rhs)]
@@ -710,9 +728,10 @@ splitFun ww_opts fn_id fn_info rhs
               | otherwise
               -> do { work_uniq <- getUniqueM
                     ; return (mkWWBindPair ww_opts fn_id fn_info arg_vars body
-                                           work_uniq div cpr stuff) } }
+                                           work_uniq div stuff) } }
   where
     uf_opts = so_uf_opts (wo_simple_opts ww_opts)
+    fn_info = idInfo fn_id
     (arg_vars, body) = collectBinders rhs
             -- collectBinders was not enough for GHC.Event.IntTable.insertWith
             -- last time I checked, where manifest lambdas were wrapped in casts
@@ -727,17 +746,11 @@ splitFun ww_opts fn_id fn_info rhs
                       <+> text "arityInfo:" <+> ppr (arityInfo fn_info)) $
           ct_cpr cpr_ty
 
-    -- use_cpr_info is the CPR we w/w for. Note that we kill it for join points,
-    -- see Note [Don't w/w join points for CPR].
-    use_cpr_info  | isJoinId fn_id = topCpr
-                  | otherwise      = cpr
-
-
 mkWWBindPair :: WwOpts -> Id -> IdInfo
-             -> [Var] -> CoreExpr -> Unique -> Divergence -> Cpr
+             -> [Var] -> CoreExpr -> Unique -> Divergence
              -> ([Demand], JoinArity, Id -> CoreExpr, Expr CoreBndr -> CoreExpr)
              -> [(Id, CoreExpr)]
-mkWWBindPair ww_opts fn_id fn_info fn_args fn_body work_uniq div cpr
+mkWWBindPair ww_opts fn_id fn_info fn_args fn_body work_uniq div
              (work_demands, join_arity, wrap_fn, work_fn)
   = [(work_id, work_rhs), (wrap_id, wrap_rhs)]
      -- Worker first, because wrapper mentions it
@@ -783,7 +796,7 @@ mkWWBindPair ww_opts fn_id fn_info fn_args fn_body work_uniq div cpr
                         -- Even though we may not be at top level,
                         -- it's ok to give it an empty DmdEnv
 
-                `setIdCprSig` mkCprSig work_arity work_cpr_info
+                `setIdCprSig` topCprSig
 
                 `setIdDemandInfo` worker_demand
 
@@ -813,13 +826,6 @@ mkWWBindPair ww_opts fn_id fn_info fn_args fn_body work_uniq div cpr
     fn_inl_prag     = inlinePragInfo fn_info
     fn_inline_spec  = inl_inline fn_inl_prag
     fn_unfolding    = realUnfoldingInfo fn_info
-
-    -- Even if we don't w/w join points for CPR, we might still do so for
-    -- strictness. In which case a join point worker keeps its original CPR
-    -- property; see Note [Don't w/w join points for CPR]. Otherwise, the worker
-    -- doesn't have the CPR property anymore.
-    work_cpr_info | isJoinId fn_id = cpr
-                  | otherwise      = topCpr
 
 mkStrWrapperInlinePrag :: InlinePragma -> InlinePragma
 mkStrWrapperInlinePrag (InlinePragma { inl_act = act, inl_rule = rule_info })
