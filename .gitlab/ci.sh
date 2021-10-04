@@ -504,6 +504,7 @@ function test_hadrian() {
   run_hadrian \
     test \
     --summary-junit=./junit.xml \
+    --test-have-intree-files \
     --test-compiler="$TOP/_build/install/bin/ghc$exe" \
     "runtest.opts+=${RUNTEST_ARGS:-}"
 }

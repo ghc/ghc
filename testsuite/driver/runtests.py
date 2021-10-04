@@ -79,8 +79,8 @@ perf_group.add_argument("--skip-perf-tests", action="store_true", help="skip per
 perf_group.add_argument("--only-perf-tests", action="store_true", help="Only do performance tests")
 parser.add_argument("--ignore-perf-failures", choices=['increases','decreases','all'],
                         help="Do not fail due to out-of-tolerance perf tests")
-parser.add_argument("--only-report-hadrian-deps", action="store_true",
-                        help="Dry run the testsuite and report all extra hadrian depenedencies needed on stderr")
+parser.add_argument("--only-report-hadrian-deps", type=argparse.FileType('w'),
+                        help="Dry run the testsuite and report all extra hadrian depenedencies needed on the given file")
 
 args = parser.parse_args()
 
@@ -571,7 +571,7 @@ else:
     if config.only_report_hadrian_deps:
       print("WARNING - skipping all tests and only reporting required hadrian dependencies:", config.hadrian_deps)
       for d in config.hadrian_deps:
-        print(d,file=sys.stderr)
+        print(d,file=config.only_report_hadrian_deps)
 
 if len(t.unexpected_failures) > 0 or \
    len(t.unexpected_stat_failures) > 0 or \

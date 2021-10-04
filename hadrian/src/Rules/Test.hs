@@ -121,7 +121,9 @@ testRules = do
         need [root -/- ghcConfigPath, root -/- timeoutPath]
 
         args <- userSetting defaultTestArgs
-        ghcPath <- getCompilerPath (testCompiler args)
+
+        let testCompilerArg = testCompiler args
+        ghcPath <- getCompilerPath testCompilerArg
 
         -- TODO This approach doesn't work.
         -- Set environment variables for test's Makefile.
@@ -172,12 +174,13 @@ testRules = do
 
         let test_target tt = target (vanillaContext Stage2 compiler) (Testsuite tt) [] []
 
-        -- We need to ask the testsuite if it needs any extra hadrian dependencies for the
-        -- tests it is going to run,
-        -- for example "docs_haddock"
-        -- We then need to go and build these dependencies
-        extra_targets <- words <$> askWithResources [] (test_target GetExtraDeps)
-        need extra_targets
+        when (isInTreeCompiler testCompilerArg) $ do
+          -- We need to ask the testsuite if it needs any extra hadrian dependencies for the
+          -- tests it is going to run,
+          -- for example "docs_haddock"
+          -- We then need to go and build these dependencies
+          extra_targets <- words <$> askWithResources [] (test_target GetExtraDeps)
+          need extra_targets
 
         -- Execute the test target.
         -- We override the verbosity setting to make sure the user can see
@@ -205,21 +208,21 @@ timeoutProgBuilder = do
 needTestBuilders :: Action ()
 needTestBuilders = do
     testGhc <- testCompiler <$> userSetting defaultTestArgs
-    when (testGhc `elem` ["stage1", "stage2", "stage3"])
+    when (isInTreeCompiler testGhc)
          (needTestsuitePackages testGhc)
 
 -- | Build extra programs and libraries required by testsuite
+-- 'testGhc' has to be one of "stage1", "stage2" or "stage3"
 needTestsuitePackages :: String -> Action ()
 needTestsuitePackages testGhc = do
-    when (testGhc `elem` ["stage1", "stage2", "stage3"]) $ do
-        let stg = stageOf testGhc
-        allpkgs   <- packages <$> flavour
-        stgpkgs   <- allpkgs (succ stg)
-        testpkgs  <- testsuitePackages
-        let pkgs = filter (\p -> not $ "iserv" `isInfixOf` pkgName p)
-                          (stgpkgs ++ testpkgs)
-        need =<< mapM (pkgFile stg) pkgs
-        needIservBins
+  let stg = stageOf testGhc
+  allpkgs   <- packages <$> flavour
+  stgpkgs   <- allpkgs (succ stg)
+  testpkgs  <- testsuitePackages
+  let pkgs = filter (\p -> not $ "iserv" `isInfixOf` pkgName p)
+                    (stgpkgs ++ testpkgs)
+  need =<< mapM (pkgFile stg) pkgs
+  needIservBins
 
 -- stage 1 ghc lives under stage0/bin,
 -- stage 2 ghc lives under stage1/bin, etc

@@ -53,13 +53,7 @@ runTestGhcFlags = do
 -- Command line arguments for invoking the @runtest.py@ script. A lot of this
 -- mirrors @testsuite/mk/test.mk@.
 runTestBuilderArgs :: Args
-runTestBuilderArgs =
-  mconcat [ runTestNormalArgs
-          , builder (Testsuite GetExtraDeps) ? arg "--only-report-hadrian-deps"
-          ]
-
-runTestNormalArgs :: Args
-runTestNormalArgs = builder Testsuite ? do
+runTestBuilderArgs = builder Testsuite ? do
     pkgs     <- expr $ stagePackages Stage1
     libTests <- expr $ filterM doesDirectoryExist $ concat
             [ [ pkgPath pkg -/- "tests", pkgPath pkg -/- "tests-ghc" ]
@@ -213,7 +207,7 @@ getTestArgs = do
         hp2psArg     = ["--config", "hp2ps=" ++ show (bindir -/- "hp2ps" <.> exe)]
         hpcArg       = ["--config", "hpc=" ++ show (bindir -/- "hpc" <.> exe)]
         inTreeArg    = [ "-e", "config.in_tree_compiler=" ++
-          show (testCompiler args `elem` ["stage1", "stage2", "stage3"]) ]
+          show (isInTreeCompiler (testCompiler args) || testHasInTreeFiles args) ]
 
     pure $  configFileArg ++ testOnlyArg ++ speedArg
          ++ catMaybes [ onlyPerfArg, skipPerfArg, summaryArg

@@ -214,7 +214,8 @@ class TestConfig:
         self.hadrian_deps = set() # type: Set[str]
 
         # Are we only reporting hadrian dependencies?
-        self.only_report_hadrian_deps = False # type: bool
+        # The path specifies the file in which to write the dependencies
+        self.only_report_hadrian_deps = None # type: Optional[Path]
 
 
     def validate(self) -> None:

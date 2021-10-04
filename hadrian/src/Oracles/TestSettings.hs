@@ -4,7 +4,7 @@
 
 module Oracles.TestSettings
   ( TestSetting (..), testSetting, testRTSSettings
-  , getCompilerPath, getBinaryDirectory
+  , getCompilerPath, getBinaryDirectory, isInTreeCompiler
   ) where
 
 import Base
@@ -81,6 +81,7 @@ getBinaryDirectory :: String -> Action FilePath
 getBinaryDirectory "stage0" = takeDirectory <$> setting SystemGhc
 getBinaryDirectory "stage1" = liftM2 (-/-) topDirectory (stageBinPath Stage0)
 getBinaryDirectory "stage2" = liftM2 (-/-) topDirectory (stageBinPath Stage1)
+getBinaryDirectory "stage3" = liftM2 (-/-) topDirectory (stageBinPath Stage2)
 getBinaryDirectory compiler = pure $ takeDirectory compiler
 
 -- | Get the path to the given @--test-compiler@.
@@ -88,7 +89,11 @@ getCompilerPath :: String -> Action FilePath
 getCompilerPath "stage0" = setting SystemGhc
 getCompilerPath "stage1" = liftM2 (-/-) topDirectory (fullPath Stage0 ghc)
 getCompilerPath "stage2" = liftM2 (-/-) topDirectory (fullPath Stage1 ghc)
+getCompilerPath "stage3" = liftM2 (-/-) topDirectory (fullPath Stage2 ghc)
 getCompilerPath compiler = pure compiler
+
+isInTreeCompiler :: String -> Bool
+isInTreeCompiler c = c `elem` ["stage1","stage2","stage3"]
 
 -- | Get the full path to the given program.
 fullPath :: Stage -> Package -> Action FilePath

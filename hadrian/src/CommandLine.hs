@@ -71,7 +71,13 @@ data TestArgs = TestArgs
     , testVerbosity  :: Maybe String
     , testWays       :: [String]
     , brokenTests    :: [String]
-    , testAccept     :: Bool}
+    , testAccept     :: Bool
+    , testHasInTreeFiles :: Bool
+      -- ^ This is used to signal that we have access to in-tree files like
+      -- the rts sources and the haddock stats directory even if the test
+      -- compiler is not in-tree
+      -- If this flag is set, then those tests will also be run.
+    }
     deriving (Eq, Show)
 
 -- | Default value for `TestArgs`.
@@ -92,7 +98,9 @@ defaultTestArgs = TestArgs
     , testVerbosity  = Nothing
     , testWays       = []
     , brokenTests    = []
-    , testAccept     = False }
+    , testAccept     = False
+    , testHasInTreeFiles = False
+    }
 
 readConfigure :: Either String (CommandLineArgs -> CommandLineArgs)
 readConfigure = Left "hadrian --configure has been deprecated (see #20167). Please run ./boot; ./configure manually"
@@ -139,6 +147,9 @@ readTestKeepFiles = Right $ \flags -> flags { testArgs = (testArgs flags) { test
 
 readTestAccept :: Either String (CommandLineArgs -> CommandLineArgs)
 readTestAccept = Right $ \flags -> flags { testArgs = (testArgs flags) { testAccept = True } }
+
+readTestHasInTreeFiles :: Either String (CommandLineArgs -> CommandLineArgs)
+readTestHasInTreeFiles = Right $ \flags -> flags { testArgs = (testArgs flags) { testHasInTreeFiles = True } }
 
 readTestCompiler :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
 readTestCompiler compiler = maybe (Left "Cannot parse compiler") (Right . set) compiler
@@ -298,6 +309,7 @@ optDescrs =
     , Option [] ["broken-test"] (OptArg readBrokenTests "TEST_NAME")
       "consider these tests to be broken"
     , Option ['a'] ["test-accept"] (NoArg readTestAccept) "Accept new output of tests"
+    , Option [] ["test-have-intree-files"] (NoArg readTestHasInTreeFiles) "Run the in-tree tests even with an out of tree compiler"
     , Option [] ["prefix"] (OptArg readPrefix "PATH")
         "Destination path for the bindist 'install' rule"
     , Option [] ["complete-setting"] (OptArg readCompleteStg "SETTING")

@@ -253,11 +253,10 @@ instance H.Builder Builder where
             return stdout
         Testsuite GetExtraDeps -> do
           path <- builderPath builder
-          withResources buildResources $ do
-              -- The testsuite driver reports the dependencies on stderr
-              -- buildArgs should include --only-report-hadrian-deps at this point
-              Stderr stderr <- cmd' [path] buildArgs
-              return stderr
+          withResources buildResources $
+              withTempFile $ \temp -> do
+                () <- cmd' [path] (buildArgs ++ ["--only-report-hadrian-deps", temp])
+                readFile' temp
         _ -> error $ "Builder " ++ show builder ++ " can not be asked!"
 
     runBuilderWith :: Builder -> BuildInfo -> Action ()
