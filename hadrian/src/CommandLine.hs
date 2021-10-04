@@ -77,6 +77,8 @@ data TestArgs = TestArgs
       -- the rts sources and the haddock stats directory even if the test
       -- compiler is not in-tree
       -- If this flag is set, then those tests will also be run.
+      -- This is useful when we want to test the bindist, but we still
+      -- have access to the build directory
     }
     deriving (Eq, Show)
 

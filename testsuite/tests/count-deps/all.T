@@ -1,2 +1,2 @@
-test('CountDepsAst', [], makefile_test, ['count-deps-ast'])
-test('CountDepsParser', [], makefile_test, ['count-deps-parser'])
+test('CountDepsAst', [req_hadrian_deps(["test:count-deps"])], makefile_test, ['count-deps-ast'])
+test('CountDepsParser', [req_hadrian_deps(["test:count-deps"])], makefile_test, ['count-deps-parser'])

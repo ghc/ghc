@@ -44,11 +44,11 @@ countDepsSourcePath = "utils/count-deps/Main.hs"
 countDepsExtra :: Maybe String
 countDepsExtra = Just "-iutils/count-deps"
 
-checkPrograms :: [(FilePath, FilePath, Maybe String, Package)]
+checkPrograms :: [(String,FilePath, FilePath, Maybe String, Package)]
 checkPrograms =
-    [ (checkPprProgPath, checkPprSourcePath, checkPprExtra, checkPpr)
-    , (checkExactProgPath, checkExactSourcePath, checkExactExtra, checkExact)
-    , (countDepsProgPath, countDepsSourcePath, countDepsExtra, countDeps)
+    [ ("test:check-ppr",checkPprProgPath, checkPprSourcePath, checkPprExtra, checkPpr)
+    , ("test:check-exact",checkExactProgPath, checkExactSourcePath, checkExactExtra, checkExact)
+    , ("test:count-deps",countDepsProgPath, countDepsSourcePath, countDepsExtra, countDeps)
     ]
 
 ghcConfigPath :: FilePath
@@ -69,23 +69,26 @@ testRules = do
     -- Rules for building check-ppr, check-exact and
     -- check-ppr-annotations with the compiler we are going to test
     -- (in-tree or out-of-tree).
-    forM_ checkPrograms $ \(progPath, sourcePath, mextra, progPkg) ->
+    forM_ checkPrograms $ \(name, progPath, sourcePath, mextra, progPkg) -> do
+        name ~> need [root -/- progPath]
         root -/- progPath %> \path -> do
             need [ sourcePath ]
             testGhc <- testCompiler <$> userSetting defaultTestArgs
-            top <- topDirectory
-            depsPkgs <- packageDependencies <$> readPackageData progPkg
 
             -- when we're about to test an in-tree compiler, just build the package
             -- normally, NOT stage3, as there are no rules for stage4 yet
             if (testGhc `elem` ["stage1", "stage2"])
               then do
                 let stg = stageOf testGhc
+                fs <- pkgFile stg progPkg
+                need [fs]
                 prog_path <- programPath =<< programContext stg progPkg
                 abs_prog_path <- liftIO (IO.canonicalizePath prog_path)
                 createFileLink abs_prog_path path
             -- otherwise, build it by directly invoking ghc
               else do
+                top <- topDirectory
+                depsPkgs <- packageDependencies <$> readPackageData progPkg
                 bindir <- getBinaryDirectory testGhc
                 debugged <- ghcDebugged <$> flavour
                 dynPrograms <- dynamicGhcPrograms =<< flavour
@@ -143,10 +146,6 @@ testRules = do
         ccFlags         <- settingsFileSetting SettingsFileSetting_CCompilerFlags
 
         pythonPath      <- builderPath Python
-        need [ root -/- checkPprProgPath
-             , root -/- checkExactProgPath
-             , root -/- countDepsProgPath
-             ]
 
         -- Set environment variables for test's Makefile.
         -- TODO: Ideally we would define all those env vars in 'env', so that
@@ -174,21 +173,37 @@ testRules = do
 
         let test_target tt = target (vanillaContext Stage2 compiler) (Testsuite tt) [] []
 
-        when (isInTreeCompiler testCompilerArg) $ do
-          -- We need to ask the testsuite if it needs any extra hadrian dependencies for the
-          -- tests it is going to run,
-          -- for example "docs_haddock"
-          -- We then need to go and build these dependencies
-          extra_targets <- words <$> askWithResources [] (test_target GetExtraDeps)
-          need extra_targets
+        -- We need to ask the testsuite if it needs any extra hadrian dependencies for the
+        -- tests it is going to run,
+        -- for example "docs_haddock"
+        -- We then need to go and build these dependencies
+        extra_targets <- words <$> askWithResources [] (test_target GetExtraDeps)
+        need $ filter (isOkToBuild args) extra_targets
 
         -- Execute the test target.
         -- We override the verbosity setting to make sure the user can see
         -- the test output: https://gitlab.haskell.org/ghc/ghc/issues/15951.
         withVerbosity Diagnostic $ buildWithCmdOptions env $ test_target RunTest
 
+-- | Given a test compiler and a hadrian dependency (target), check if we
+-- can build the target with the compiler
+--
+-- We can always build a target with an intree compiler But we can only build
+-- targets with special support (checkPrograms) with arbitrary compilers.
+--
+-- We need to build the dependencies if --test-have-intree-files is set.
+-- We should have built them already by this point, but
+isOkToBuild :: TestArgs -> String -> Bool
+isOkToBuild args target
+   = isInTreeCompiler (testCompiler args)
+  || testHasInTreeFiles args
+  || target `elem` map fst5 checkPrograms
+  where
+    fst5 (a,_,_,_,_) = a
+
 -- | Build the timeout program.
 -- See: https://github.com/ghc/ghc/blob/master/testsuite/timeout/Makefile#L23
+
 timeoutProgBuilder :: Action ()
 timeoutProgBuilder = do
     root    <- buildRoot
@@ -218,9 +233,8 @@ needTestsuitePackages testGhc = do
   let stg = stageOf testGhc
   allpkgs   <- packages <$> flavour
   stgpkgs   <- allpkgs (succ stg)
-  testpkgs  <- testsuitePackages
   let pkgs = filter (\p -> not $ "iserv" `isInfixOf` pkgName p)
-                    (stgpkgs ++ testpkgs)
+                    (stgpkgs ++ [ timeout | windowsHost ])
   need =<< mapM (pkgFile stg) pkgs
   needIservBins
 
