@@ -1,0 +1,6 @@
+
+T20043.hs:20:24: error:
+    • Expected kind ‘GHC.Types.RuntimeRep’, but ‘a’ has kind ‘*’
+    • In the type ‘a’
+      In the expression: undefined @a
+      In an equation for ‘y’: y = undefined @a
