@@ -51,8 +51,7 @@ import GHC.Types.Id
 import GHC.Types.Id.Make   ( seqId )
 import GHC.Types.Id.Info
 import GHC.Types.Name   ( mkSystemVarName, isExternalName, getOccFS )
-import GHC.Types.Demand ( DmdSig(..), Demand, dmdTypeDepth, isStrUsedDmd
-                        , mkClosedDmdSig, topDmd, seqDmd, isDeadEndDiv )
+import GHC.Types.Demand
 import GHC.Types.Cpr    ( mkCprSig, botCpr )
 import GHC.Types.Unique ( hasKey )
 import GHC.Types.Basic
@@ -950,12 +949,7 @@ addLetBndrInfo new_bndr new_arity_type new_unf
     info2 = info1 `setUnfoldingInfo` new_unf
 
     -- Demand info: Note [Setting the demand info]
-    -- We also have to nuke demand info if for some reason
-    -- eta-expansion *reduces* the arity of the binding to less
-    -- than that of the strictness sig. This can happen: see Note [Arity decrease].
     info3 | isEvaldUnfolding new_unf
-            || (case dmdSigInfo info2 of
-                  DmdSig dmd_ty -> new_arity < dmdTypeDepth dmd_ty)
           = zapDemandInfo info2 `orElse` info2
           | otherwise
           = info2
@@ -974,31 +968,8 @@ addLetBndrInfo new_bndr new_arity_type new_unf
     info5 = zapCallArityInfo info4
 
 
-{- Note [Arity decrease]
-~~~~~~~~~~~~~~~~~~~~~~~~
-Generally speaking the arity of a binding should not decrease.  But it *can*
-legitimately happen because of RULES.  Eg
-        f = g @Int
-where g has arity 2, will have arity 2.  But if there's a rewrite rule
-        g @Int --> h
-where h has arity 1, then f's arity will decrease.  Here's a real-life example,
-which is in the output of Specialise:
-
-     Rec {
-        $dm {Arity 2} = \d.\x. op d
-        {-# RULES forall d. $dm Int d = $s$dm #-}
-
-        dInt = MkD .... opInt ...
-        opInt {Arity 1} = $dm dInt
-
-        $s$dm {Arity 0} = \x. op dInt }
-
-Here opInt has arity 1; but when we apply the rule its arity drops to 0.
-That's why Specialise goes to a little trouble to pin the right arity
-on specialised functions too.
-
-Note [Bottoming bindings]
-~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Bottoming bindings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Suppose we have
    let x = error "urk"
    in ...(case x of <alts>)...
