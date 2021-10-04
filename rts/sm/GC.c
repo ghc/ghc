@@ -1859,7 +1859,7 @@ resizeGenerations (void)
             heapOverflow();
         }
 
-        if (oldest_gen->compact) {
+        if (oldest_gen->compact || RtsFlags.GcFlags.useNonmoving) {
             if ( (size + (size - 1) * (gens - 2) * 2) + min_alloc > max ) {
                 size = (max - min_alloc) / ((gens - 1) * 2 - 1);
             }
