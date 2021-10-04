@@ -386,8 +386,20 @@ tuple.
           in case z of A -> j 1 2
                        B -> j 2 3
 
-Note that we still want to give @j@ the CPR property, so that @f@ has it. So
+Note that we still want to give `j` the CPR property, so that `f` has it. So
 CPR *analyse* join points as regular functions, but don't *transform* them.
+
+We could retain the CPR /signature/ on the worker after W/W, but it would
+become outright wrong if the Simplifier pushes a non-trivial continuation
+into it. For example:
+    case (let $j x = (x,x) in ...) of alts
+    ==>
+    let $j x = case (x,x) of alts in case ... of alts
+Before pushing the case in, `$j` has the CPR property, but not afterwards.
+
+So we simply zap the CPR signature for join pints as part of the W/W pass.
+The signature served its purpose during CPR analysis in propagating the
+CPR property of `$j`.
 
 Doing W/W for returned products on a join point would be tricky anyway, as the
 worker could not be a join point because it would not be tail-called. However,
@@ -510,7 +522,7 @@ tryWW dflags fam_envs is_rec fn_id rhs
 
   where
     uf_opts      = unfoldingOpts dflags
-    fn_info      = idInfo fn_id
+    fn_info      = idInfo new_fn_id
     (wrap_dmds, div) = splitStrictSig (strictnessInfo fn_info)
 
     cpr_ty       = getCprSig (cprInfo fn_info)
@@ -520,9 +532,16 @@ tryWW dflags fam_envs is_rec fn_id rhs
                           , ppr fn_id <> colon <+> text "ct_arty:" <+> int (ct_arty cpr_ty) <+> text "arityInfo:" <+> ppr (arityInfo fn_info))
                    ct_cpr cpr_ty
 
-    new_fn_id = zapIdUsedOnceInfo (zapIdUsageEnvInfo fn_id)
+    new_fn_id      = zap_join_cpr $ zap_usage fn_id
+
+    zap_usage = zapIdUsedOnceInfo . zapIdUsageEnvInfo
         -- See Note [Zapping DmdEnv after Demand Analyzer] and
         -- See Note [Zapping Used Once info WorkWrap]
+
+    zap_join_cpr id
+      | isJoinId id = id `setIdCprInfo` topCprSig
+      | otherwise   = id
+        -- See Note [Don't w/w join points for CPR]
 
     is_fun     = notNull wrap_dmds || isJoinId fn_id
     -- See Note [Don't eta expand in w/w]
@@ -624,7 +643,7 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds div cpr rhs
               | otherwise
               -> do { work_uniq <- getUniqueM
                     ; return (mkWWBindPair dflags fn_id fn_info arity rhs
-                                           work_uniq div cpr stuff) } }
+                                           work_uniq div stuff) } }
   where
     rhs_fvs = exprFreeVars rhs
     arity   = arityInfo fn_info
@@ -638,10 +657,10 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds div cpr rhs
 
 
 mkWWBindPair :: DynFlags -> Id -> IdInfo -> Arity
-             -> CoreExpr -> Unique -> Divergence -> Cpr
+             -> CoreExpr -> Unique -> Divergence
              -> ([Demand], JoinArity, Id -> CoreExpr, Expr CoreBndr -> CoreExpr)
              -> [(Id, CoreExpr)]
-mkWWBindPair dflags fn_id fn_info arity rhs work_uniq div cpr
+mkWWBindPair dflags fn_id fn_info arity rhs work_uniq div
              (work_demands, join_arity, wrap_fn, work_fn)
   = [(work_id, work_rhs), (wrap_id, wrap_rhs)]
      -- Worker first, because wrapper mentions it
@@ -683,7 +702,7 @@ mkWWBindPair dflags fn_id fn_info arity rhs work_uniq div cpr
                         -- Even though we may not be at top level,
                         -- it's ok to give it an empty DmdEnv
 
-                `setIdCprInfo` mkCprSig work_arity work_cpr_info
+                `setIdCprInfo` topCprSig
 
                 `setIdDemandInfo` worker_demand
 
@@ -712,13 +731,6 @@ mkWWBindPair dflags fn_id fn_info arity rhs work_uniq div cpr
     fn_inl_prag     = inlinePragInfo fn_info
     fn_inline_spec  = inl_inline fn_inl_prag
     fn_unfolding    = unfoldingInfo fn_info
-
-    -- Even if we don't w/w join points for CPR, we might still do so for
-    -- strictness. In which case a join point worker keeps its original CPR
-    -- property; see Note [Don't w/w join points for CPR]. Otherwise, the worker
-    -- doesn't have the CPR property anymore.
-    work_cpr_info | isJoinId fn_id = cpr
-                  | otherwise      = topCpr
 
 mkStrWrapperInlinePrag :: InlinePragma -> InlinePragma
 mkStrWrapperInlinePrag (InlinePragma { inl_act = act, inl_rule = rule_info })
