@@ -530,11 +530,13 @@ compileFile hsc_env stop_phase (src, _mb_phase) = do
         dflags    = hsc_dflags hsc_env
         mb_o_file = outputFile dflags
         ghc_link  = ghcLink dflags      -- Set by -c or -no-link
-
+        notStopPreprocess | StopPreprocess <- stop_phase = False
+                          | _              <- stop_phase = True
         -- When linking, the -o argument refers to the linker's output.
         -- otherwise, we use it as the name for the pipeline's output.
         output
-         | NoBackend <- backend dflags = NoOutputFile
+         | NoBackend <- backend dflags, notStopPreprocess = NoOutputFile
+                -- avoid -E -fno-code undesirable interactions. see #20439
          | NoStop <- stop_phase, not (isNoLink ghc_link) = Persistent
                 -- -o foo applies to linker
          | isJust mb_o_file = SpecificFile

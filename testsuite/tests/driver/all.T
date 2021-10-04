@@ -294,3 +294,6 @@ test('OneShotTH', normal, makefile_test, [])
 test('T17481', normal, makefile_test, [])
 test('T20084', normal, makefile_test, [])
 test('RunMode', extra_files(['RunMode/Test.hs']), run_command, ['{compiler} --run -iRunMode/ -ignore-dot-ghci RunMode.hs -- hello'])
+test('T20439', normal, run_command,
+     ['echo "module Foo where" >> Foo.hs && \
+      {compiler} -E -fno-code -XCPP -v Foo.hs 2>&1 | grep "Copying" | sed "s/.*to//" '])
