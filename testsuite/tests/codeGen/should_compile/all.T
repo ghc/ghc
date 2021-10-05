@@ -33,6 +33,7 @@ test('T10518', [cmm_src], compile, ['-no-hs-main'])
 test('T10667', normal, compile, ['-g'])
 test('T12115', normal, compile, [''])
 test('T12355', normal, compile, [''])
+test('T13233_orig', [unless(have_profiling(), skip)], makefile_test, [])
 test('T14999',
      [when(unregisterised(), skip),
       unless(opsys('linux') and arch('x86_64') and have_gdb() and
