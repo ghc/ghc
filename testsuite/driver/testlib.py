@@ -2232,9 +2232,11 @@ def normalise_errmsg(s: str) -> str:
     # Error messages sometimes contain ghc-bignum implementation package
     s = re.sub('ghc-bignum-[0-9.]+', 'ghc-bignum-<VERSION>', s)
 
-    # Error messages sometimes contain this blurb which can vary
+    # Error messages sometimes contain these blurbs which can vary
     # spuriously depending upon build configuration (e.g. based on bignum
     # backend)
+    s = re.sub('...plus ([a-z]+|[0-9]+) others',
+                 '...plus N others', s)
     s = re.sub('...plus ([a-z]+|[0-9]+) instances involving out-of-scope types',
                  '...plus N instances involving out-of-scope types', s)
 

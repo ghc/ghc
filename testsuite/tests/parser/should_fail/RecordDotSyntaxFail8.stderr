@@ -1,24 +1,25 @@
-RecordDotSyntaxFail8.hs:37:3:
-     Ambiguous type variable ‘a0’ arising from a use of ‘print’
+
+RecordDotSyntaxFail8.hs:37:3: error:
+    • Ambiguous type variable ‘a0’ arising from a use of ‘print’
       prevents the constraint ‘(Show a0)’ from being solved.
       Probable fix: use a type annotation to specify what ‘a0’ should be.
       These potential instances exist:
         instance Show Ordering -- Defined in ‘GHC.Show’
         instance Show Bar -- Defined at RecordDotSyntaxFail8.hs:22:41
         instance Show Baz -- Defined at RecordDotSyntaxFail8.hs:27:42
-        ...plus 27 others
+        ...plus N others
         ...plus N instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
-     In the first argument of ‘($)’, namely ‘print’
+    • In the first argument of ‘($)’, namely ‘print’
       In a stmt of a 'do' block: print $ ....baz.quux
       In the expression:
         do let a = ...
            print $ ....quux
 
-RecordDotSyntaxFail8.hs:37:11:
-     No instance for (HasField "quux" Quux a0)
+RecordDotSyntaxFail8.hs:37:11: error:
+    • No instance for (HasField "quux" Quux a0)
         arising from selecting the field ‘quux’
-     In the second argument of ‘($)’, namely ‘....baz.quux’
+    • In the second argument of ‘($)’, namely ‘....baz.quux’
       In a stmt of a 'do' block: print $ ....baz.quux
       In the expression:
         do let a = ...

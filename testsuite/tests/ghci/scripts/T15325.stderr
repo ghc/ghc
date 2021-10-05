@@ -12,7 +12,7 @@ T15325.hs:11:9: warning: [-Wdeferred-type-errors (in -Wdefault)]
         instance Num Integer -- Defined in ‘GHC.Num’
         instance Num Double -- Defined in ‘GHC.Float’
         instance Num Float -- Defined in ‘GHC.Float’
-        ...plus two others
+        ...plus N others
         ...plus one instance involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the first argument of ‘f’, namely ‘0’

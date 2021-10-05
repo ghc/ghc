@@ -5,8 +5,8 @@ T5095.hs:9:11: error:
         instance [overlappable] Show a => Eq a -- Defined at T5095.hs:5:31
         instance Eq Ordering -- Defined in ‘GHC.Classes’
         instance Eq a => Eq (Maybe a) -- Defined in ‘GHC.Maybe’
-        ...plus 24 others
-        ...plus six instances involving out-of-scope types
+        ...plus N others
+        ...plus N instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
       (The choice depends on the instantiation of ‘a’
        To pick the first instance above, use IncoherentInstances

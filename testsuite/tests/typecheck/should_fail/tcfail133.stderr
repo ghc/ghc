@@ -11,8 +11,8 @@ tcfail133.hs:68:7: error:
         instance (Number a, Digit b, Show a, Show b) => Show (a :@ b)
           -- Defined at tcfail133.hs:11:54
         instance Show One -- Defined at tcfail133.hs:9:28
-        ...plus 26 others
-        ...plus 12 instances involving out-of-scope types
+        ...plus N others
+        ...plus N instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the first argument of ‘($)’, namely ‘show’
       In the expression: show $ add (One :@ Zero) (One :@ One)

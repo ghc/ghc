@@ -29,8 +29,8 @@ T13242a.hs:13:13: error:
         instance Eq Ordering -- Defined in ‘GHC.Classes’
         instance Eq Integer -- Defined in ‘GHC.Num.Integer’
         instance Eq () -- Defined in ‘GHC.Classes’
-        ...plus 22 others
-        ...plus five instances involving out-of-scope types
+        ...plus N others
+        ...plus N instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In a stmt of a 'do' block: return (x == x)
       In the expression:

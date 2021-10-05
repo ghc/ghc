@@ -40,8 +40,8 @@ T14884.hs:4:7: error:
           -- Defined in ‘Data.Either’
         instance Show Ordering -- Defined in ‘GHC.Show’
         instance Show a => Show (Maybe a) -- Defined in ‘GHC.Show’
-        ...plus 24 others
-        ...plus 67 instances involving out-of-scope types
+        ...plus N others
+        ...plus N instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the first argument of ‘_’, namely ‘print’
       In the expression: _ print "abc"

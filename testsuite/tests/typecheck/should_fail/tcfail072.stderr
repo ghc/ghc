@@ -10,8 +10,8 @@ tcfail072.hs:23:13: error:
         instance Ord Ordering -- Defined in ‘GHC.Classes’
         instance Ord Integer -- Defined in ‘GHC.Num.Integer’
         instance Ord () -- Defined in ‘GHC.Classes’
-        ...plus 22 others
-        ...plus two instances involving out-of-scope types
+        ...plus N others
+        ...plus N instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the expression: g A
       In an equation for ‘g’: g (B _ _) = g A

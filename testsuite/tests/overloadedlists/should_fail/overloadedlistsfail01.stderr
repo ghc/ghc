@@ -7,8 +7,8 @@ overloadedlistsfail01.hs:5:8: error:
         instance Show Ordering -- Defined in ‘GHC.Show’
         instance Show a => Show (Maybe a) -- Defined in ‘GHC.Show’
         instance Show Integer -- Defined in ‘GHC.Show’
-        ...plus 23 others
-        ...plus 14 instances involving out-of-scope types
+        ...plus N others
+        ...plus N instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the expression: print [1]
       In an equation for ‘main’: main = print [1]
@@ -19,7 +19,7 @@ overloadedlistsfail01.hs:5:14: error:
       Probable fix: use a type annotation to specify what ‘a0’ should be.
       These potential instances exist:
         instance GHC.Exts.IsList [a] -- Defined in ‘GHC.Exts’
-        ...plus four instances involving out-of-scope types
+        ...plus N instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the first argument of ‘print’, namely ‘[1]’
       In the expression: print [1]
@@ -34,7 +34,7 @@ overloadedlistsfail01.hs:5:15: error:
         instance Num Integer -- Defined in ‘GHC.Num’
         instance Num Double -- Defined in ‘GHC.Float’
         instance Num Float -- Defined in ‘GHC.Float’
-        ...plus two others
+        ...plus N others
         ...plus one instance involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the expression: 1

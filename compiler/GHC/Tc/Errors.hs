@@ -50,7 +50,7 @@ import GHC.Types.Error
 import GHC.Rename.Unbound ( unknownNameSuggestions, WhatLooking(..) )
 import GHC.Unit.Module
 import GHC.Hs.Binds ( PatSynBind(..) )
-import GHC.Builtin.Names ( typeableClassName )
+import GHC.Builtin.Names ( typeableClassName, pretendNameIsInScope )
 import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Core.Predicate
@@ -58,7 +58,7 @@ import GHC.Core.Type
 import GHC.Core.Coercion
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Ppr  ( pprTyVars, pprWithExplicitKindsWhen, pprSourceTyCon, pprWithTYPE )
-import GHC.Core.Unify     ( tcMatchTys, flattenTys )
+import GHC.Core.Unify     ( tcMatchTys )
 import GHC.Core.InstEnv
 import GHC.Core.TyCon
 import GHC.Core.Class
@@ -2420,8 +2420,7 @@ mkDictErr ctxt cts
       && (null unifiers || all (not . isAmbiguousTyVar) (tyCoVarsOfCtList ct))
 
     lookup_cls_inst inst_envs ct
-                -- Note [Flattening in error message generation]
-      = (ct, lookupInstEnv True inst_envs clas (flattenTys emptyInScopeSet tys))
+      = (ct, lookupInstEnv True inst_envs clas tys)
       where
         (clas, tys) = getClassPredTys (ctPred ct)
 
@@ -2862,8 +2861,8 @@ pprPotentials (PrintPotentialInstances show_potentials) sty herald insts
                              orphNamesOfTypes (is_tys cls_inst)
 
     name_in_scope name
-      | isBuiltInSyntax name
-      = True -- E.g. (->)
+      | pretendNameIsInScope name
+      = True -- E.g. (->); see Note [pretendNameIsInScope] in GHC.Builtin.Names
       | Just mod <- nameModule_maybe name
       = qual_in_scope (qualName sty mod (nameOccName name))
       | otherwise
@@ -2897,7 +2896,7 @@ we want to give it a bit of structure.  Here's the plan
   These are the ones most likely to be useful to the programmer.
 
 * Show at most n_show in-scope instances,
-  and summarise the rest ("plus 3 others")
+  and summarise the rest ("plus N others")
 
 * Summarise the not-in-scope instances ("plus 4 not in scope")
 
@@ -2906,18 +2905,6 @@ we want to give it a bit of structure.  Here's the plan
 -}
 
 {-
-Note [Flattening in error message generation]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider (C (Maybe (F x))), where F is a type function, and we have
-instances
-                C (Maybe Int) and C (Maybe a)
-Since (F x) might turn into Int, this is an overlap situation, and
-indeed the main solver will have refrained
-from solving.  But by the time we get to error message generation, we've
-un-flattened the constraint.  So we must *re*-flatten it before looking
-up in the instance environment, lest we only report one matching
-instance when in fact there are two.
-
 Note [Kind arguments in error messages]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 It can be terribly confusing to get an error message like (#9171)

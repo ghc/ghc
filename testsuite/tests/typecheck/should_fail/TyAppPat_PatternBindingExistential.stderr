@@ -24,8 +24,8 @@ TyAppPat_PatternBindingExistential.hs:13:3: error:
         instance Show Ordering -- Defined in ‘GHC.Show’
         instance Show a => Show (Maybe a) -- Defined in ‘GHC.Show’
         instance Show Integer -- Defined in ‘GHC.Show’
-        ...plus 23 others
-        ...plus 12 instances involving out-of-scope types
+        ...plus N others
+        ...plus N instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In a stmt of a 'do' block: print (x :: a)
       In the expression: do print (x :: a)

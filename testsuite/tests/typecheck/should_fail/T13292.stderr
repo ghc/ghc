@@ -8,9 +8,9 @@ T13292a.hs:4:12: warning: [-Wdeferred-type-errors (in -Wdefault)]
       These potential instances exist:
         instance Monad IO -- Defined in ‘GHC.Base’
         instance Monad Maybe -- Defined in ‘GHC.Base’
-        instance Monoid a => Monad ((,) a) -- Defined in ‘GHC.Base’
-        ...plus four others
-        ...plus two instances involving out-of-scope types
+        instance Monad ((->) r) -- Defined in ‘GHC.Base’
+        ...plus N others
+        ...plus one instance involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the expression: return ()
       In an equation for ‘someFunc’: someFunc = return ()

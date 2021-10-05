@@ -10,8 +10,8 @@ annfail10.hs:9:1: error:
         instance Data.Data.Data Ordering -- Defined in ‘Data.Data’
         instance Data.Data.Data a => Data.Data.Data (Maybe a)
           -- Defined in ‘Data.Data’
-        ...plus 16 others
-        ...plus 50 instances involving out-of-scope types
+        ...plus N others
+        ...plus N instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the annotation: {-# ANN f 1 #-}
 
@@ -23,7 +23,7 @@ annfail10.hs:9:11: error:
         instance Num Integer -- Defined in ‘GHC.Num’
         instance Num Double -- Defined in ‘GHC.Float’
         instance Num Float -- Defined in ‘GHC.Float’
-        ...plus two others
-        ...plus 19 instances involving out-of-scope types
+        ...plus N others
+        ...plus N instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the annotation: {-# ANN f 1 #-}

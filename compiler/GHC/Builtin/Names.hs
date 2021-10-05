@@ -2794,17 +2794,41 @@ interactiveClassKeys = map getUnique interactiveClassNames
 *                                                                      *
 ************************************************************************
 
-GHCi's :info command will usually filter out instances mentioning types whose
-names are not in scope. GHCi makes an exception for some commonly used names,
-such as Data.Kind.Type, which may not actually be in scope but should be
-treated as though they were in scope. The list in the definition of
-pretendNameIsInScope below contains these commonly used names.
+Note [pretendNameIsInScope]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In general, we filter out instances that mention types whose names are
+not in scope. However, in the situations listed below, we make an exception
+for some commonly used names, such as Data.Kind.Type, which may not actually
+be in scope but should be treated as though they were in scope.
+This includes built-in names, as well as a few extra names such as
+'Type', 'TYPE', 'BoxedRep', etc.
 
+Situations in which we apply this special logic:
+
+  - GHCi's :info command, see GHC.Runtime.Eval.getInfo.
+    This fixes #1581.
+
+  - When reporting instance overlap errors. Not doing so could mean
+    that we would omit instances for typeclasses like
+
+      type Cls :: k -> Constraint
+      class Cls a
+
+    because BoxedRep/Lifted were not in scope.
+    See GHC.Tc.Errors.pprPotentials.
+    This fixes one of the issues reported in #20465.
 -}
 
+-- | Should this name be considered in-scope, even though it technically isn't?
+--
+-- This ensures that we don't filter out information because, e.g.,
+-- Data.Kind.Type isn't imported.
+--
+-- See Note [pretendNameIsInScope].
 pretendNameIsInScope :: Name -> Bool
 pretendNameIsInScope n
-  = any (n `hasKey`)
+  = isBuiltInSyntax n
+  || any (n `hasKey`)
     [ liftedTypeKindTyConKey, unliftedTypeKindTyConKey
     , liftedDataConKey, unliftedDataConKey
     , tYPETyConKey

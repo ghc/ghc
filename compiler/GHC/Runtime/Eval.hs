@@ -81,7 +81,6 @@ import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Origin
 
 import GHC.Builtin.Names ( toDynName, pretendNameIsInScope )
-import GHC.Builtin.Types ( isCTupleTyConName )
 
 import GHC.Data.Maybe
 import GHC.Data.FastString
@@ -873,8 +872,7 @@ getInfo allInfo name
           ok n | n == name              = True
                        -- The one we looked for in the first place!
                | pretendNameIsInScope n = True
-               | isBuiltInSyntax n      = True
-               | isCTupleTyConName n    = True
+                   -- See Note [pretendNameIsInScope] in GHC.Builtin.Names
                | isExternalName n       = isJust (lookupGRE_Name rdr_env n)
                | otherwise              = True
 
