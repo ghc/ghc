@@ -7,6 +7,8 @@ setTestOpts(extra_hc_opts('-dno-typeable-binds -ddump-cpr-signatures -v0'))
 
 test('CaseBinderCPR', normal, compile, [''])
 test('RecDataConCPR', [], multimod_compile, ['RecDataConCPR', ''])
+test('T2387', normal, compile, [''])
+test('T16040', normal, compile, [''])
 test('T19232', normal, compile, [''])
 test('T19398', normal, compile, [''])
 test('T19822', normal, compile, [''])
