@@ -23,7 +23,7 @@ module GHC.Core.Ppr (
         pprCoreBinding, pprCoreBindings, pprCoreAlt,
         pprCoreBindingWithSize, pprCoreBindingsWithSize,
         pprCoreBinder, pprCoreBinders,
-        pprRules, pprOptCo
+        pprRule, pprRules, pprOptCo
     ) where
 
 import GHC.Prelude

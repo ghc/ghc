@@ -46,6 +46,7 @@ import GHC.Core.Type
 import GHC.Core.Multiplicity
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
+import GHC.Core.Ppr
 import GHC.Core.Unify( RoughMatchTc(..) )
 
 import GHC.Driver.Env
@@ -73,6 +74,7 @@ import GHC.Types.HpcInfo
 import GHC.Types.CompleteMatch
 
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc  hiding ( eqListBy )
 import GHC.Utils.Logger
@@ -735,9 +737,12 @@ ifaceRoughMatchTcs tcs = map do_rough tcs
 
 --------------------------
 coreRuleToIfaceRule :: CoreRule -> IfaceRule
-coreRuleToIfaceRule (BuiltinRule { ru_fn = fn})
-  = pprTrace "toHsRule: builtin" (ppr fn) $
-    bogusIfaceRule fn
+-- A plugin that installs a BuiltinRule in a CoreDoPluginPass should
+-- ensure that there's another CoreDoPluginPass that removes the rule.
+-- Otherwise a module using the plugin and compiled with -fno-omit-interface-pragmas
+-- would cause panic when the rule is attempted to be written to the interface file.
+coreRuleToIfaceRule rule@(BuiltinRule {})
+  = pprPanic "toHsRule:" (pprRule rule)
 
 coreRuleToIfaceRule (Rule { ru_name = name, ru_fn = fn,
                             ru_act = act, ru_bndrs = bndrs,
@@ -758,10 +763,3 @@ coreRuleToIfaceRule (Rule { ru_name = name, ru_fn = fn,
     do_arg (Type ty)     = IfaceType (toIfaceType (deNoteType ty))
     do_arg (Coercion co) = IfaceCo   (toIfaceCoercion co)
     do_arg arg           = toIfaceExpr arg
-
-bogusIfaceRule :: Name -> IfaceRule
-bogusIfaceRule id_name
-  = IfaceRule { ifRuleName = fsLit "bogus", ifActivation = NeverActive,
-        ifRuleBndrs = [], ifRuleHead = id_name, ifRuleArgs = [],
-        ifRuleRhs = IfaceExt id_name, ifRuleOrph = IsOrphan,
-        ifRuleAuto = True }
