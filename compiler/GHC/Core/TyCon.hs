@@ -910,8 +910,9 @@ data TyCon
                                  -- e.g. @RealWorld@
                                  -- Only relevant if tyConKind = *
 
-        primRepName :: Maybe TyConRepName   -- Only relevant for kind TyCons
-                                            -- i.e, *, #, ?
+        primRepName :: TyConRepName   -- ^ The 'Typeable' representation.
+                                      -- A cached version of
+                                      -- @'mkPrelTyConRepName' ('tyConName' tc)@.
     }
 
   -- | Represents promoted data constructor.
@@ -1388,8 +1389,8 @@ type TyConRepName = Name
 tyConRepName_maybe :: TyCon -> Maybe TyConRepName
 tyConRepName_maybe (FunTyCon   { tcRepName = rep_nm })
   = Just rep_nm
-tyConRepName_maybe (PrimTyCon  { primRepName = mb_rep_nm })
-  = mb_rep_nm
+tyConRepName_maybe (PrimTyCon  { primRepName = rep_nm })
+  = Just rep_nm
 tyConRepName_maybe (AlgTyCon { algTcParent = parent })
   | VanillaAlgTyCon rep_nm <- parent = Just rep_nm
   | ClassTyCon _ rep_nm    <- parent = Just rep_nm
@@ -1864,7 +1865,7 @@ mkPrimTyCon :: Name -> [TyConBinder]
             -> Kind   -- ^ /result/ kind, never representation-polymorphic
             -> [Role] -> TyCon
 mkPrimTyCon name binders res_kind roles
-  = mkPrimTyCon' name binders res_kind roles True (Just $ mkPrelTyConRepName name)
+  = mkPrimTyCon' name binders res_kind roles True (mkPrelTyConRepName name)
 
 -- | Kind constructors
 mkKindTyCon :: Name -> [TyConBinder]
@@ -1873,14 +1874,14 @@ mkKindTyCon :: Name -> [TyConBinder]
 mkKindTyCon name binders res_kind roles rep_nm
   = tc
   where
-    tc = mkPrimTyCon' name binders res_kind roles False (Just rep_nm)
+    tc = mkPrimTyCon' name binders res_kind roles False rep_nm
 
 -- | Create a lifted primitive 'TyCon' such as @RealWorld@
 mkLiftedPrimTyCon :: Name -> [TyConBinder]
                   -> Kind   -- ^ /result/ kind
                   -> [Role] -> TyCon
 mkLiftedPrimTyCon name binders res_kind roles
-  = mkPrimTyCon' name binders res_kind roles False (Just rep_nm)
+  = mkPrimTyCon' name binders res_kind roles False rep_nm
   where rep_nm = mkPrelTyConRepName name
 
 mkPrimTyCon' :: Name -> [TyConBinder]
@@ -1888,7 +1889,7 @@ mkPrimTyCon' :: Name -> [TyConBinder]
                         -- (If you need a representation-polymorphic PrimTyCon,
                         -- change isTcLevPoly.)
              -> [Role]
-             -> Bool -> Maybe TyConRepName -> TyCon
+             -> Bool -> TyConRepName -> TyCon
 mkPrimTyCon' name binders res_kind roles is_unlifted rep_nm
   = let tc =
           PrimTyCon {
