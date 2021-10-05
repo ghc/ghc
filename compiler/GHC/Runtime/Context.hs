@@ -30,6 +30,8 @@ import GHC.Core.FamInstEnv
 import GHC.Core.InstEnv ( ClsInst, identicalClsInstHead )
 import GHC.Core.Type
 
+import GHC.Data.Maybe ( isNothing )
+
 import GHC.Types.Avail
 import GHC.Types.Fixity.Env
 import GHC.Types.Id.Info ( IdDetails(..) )
@@ -67,7 +69,7 @@ This scheme deals well with shadowing.  For example:
 Here we must display info about constructor A, but its type T has been
 shadowed by the second declaration.  But it has a respectable
 qualified name (Ghci1.T), and its source location says where it was
-defined.
+defined, and it can also be used with the qualified name.
 
 So the main invariant continues to hold, that in any session an
 original name M.T only refers to one unique thing.  (In a previous
@@ -233,7 +235,9 @@ data InteractiveContext
 
          ic_tythings   :: [TyThing],
              -- ^ TyThings defined by the user, in reverse order of
-             -- definition (ie most recent at the front)
+             -- definition (ie most recent at the front).
+             -- Also used in GHC.Tc.Module.runTcInteractive to fill the type
+             -- checker environment.
              -- See Note [ic_tythings]
 
          ic_gre_cache :: IcGlobalRdrEnv,
@@ -322,9 +326,22 @@ icInteractiveModule (InteractiveContext { ic_mod_index = index })
   = mkInteractiveModule index
 
 -- | This function returns the list of visible TyThings (useful for
--- e.g. showBindings)
+-- e.g. showBindings).
+--
+-- It picks only those TyThings that are not shadowed by later definitions on the interpreter,
+-- to not clutter :showBindings with shadowed ids, which would show up as Ghci9.foo.
+--
+-- Some TyThings define many names; we include them if _any_ name is still
+-- available unqualified.
 icInScopeTTs :: InteractiveContext -> [TyThing]
-icInScopeTTs = ic_tythings
+icInScopeTTs ictxt = filter in_scope_unqualified (ic_tythings ictxt)
+  where
+    in_scope_unqualified thing = or
+        [ any isNothing qualifiers -- Nothing in qualifiers means available unqualified
+        | name <- concatMap availNames $ tyThingAvailInfo thing
+        , let qualifiers = getGRE_NameQualifier_maybes (icReaderEnv ictxt) name
+        ]
+
 
 -- | Get the PrintUnqualified function based on the flags and this InteractiveContext
 icPrintUnqual :: UnitEnv -> InteractiveContext -> PrintUnqualified
