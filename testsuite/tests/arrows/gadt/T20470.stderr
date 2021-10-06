@@ -1,0 +1,6 @@
+
+T20470.hs:12:5: error:
+    • Proc patterns cannot use existential or GADT data constructors
+    • In the pattern: A x B
+      In a case alternative within arrow notation: A x B -> id -< x
+      In the command: case a of A x B -> id -< x

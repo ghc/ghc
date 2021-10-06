@@ -500,7 +500,13 @@ instance Diagnostic TcRnMessage where
     TcRnCannotDeriveInstance cls cls_tys mb_strat newtype_deriving reason
       -> mkSimpleDecorated $
            derivErrDiagnosticMessage cls cls_tys mb_strat newtype_deriving True reason
-
+    TcRnLazyGADTPattern
+      -> mkSimpleDecorated $
+           hang (text "An existential or GADT data constructor cannot be used")
+              2 (text "inside a lazy (~) pattern")
+    TcRnArrowProcGADTPattern
+      -> mkSimpleDecorated $
+           text "Proc patterns cannot use existential or GADT data constructors"
 
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -711,6 +717,10 @@ instance Diagnostic TcRnMessage where
            DerivErrBadConstructor{}                -> ErrorWithoutFlag
            DerivErrGenerics{}                      -> ErrorWithoutFlag
            DerivErrEnumOrProduct{}                 -> ErrorWithoutFlag
+    TcRnLazyGADTPattern
+      -> ErrorWithoutFlag
+    TcRnArrowProcGADTPattern
+      -> ErrorWithoutFlag
 
   diagnosticHints = \case
     TcRnUnknownMessage m
@@ -915,7 +925,10 @@ instance Diagnostic TcRnMessage where
              -> noHints
     TcRnCannotDeriveInstance cls _ _ newtype_deriving rea
       -> deriveInstanceErrReasonHints cls newtype_deriving rea
-
+    TcRnLazyGADTPattern
+      -> noHints
+    TcRnArrowProcGADTPattern
+      -> noHints
 
 deriveInstanceErrReasonHints :: Class
                              -> UsingGeneralizedNewtypeDeriving

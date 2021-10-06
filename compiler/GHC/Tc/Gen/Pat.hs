@@ -1,5 +1,6 @@
 
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -886,8 +887,10 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty_scaled
           -- Add the stupid theta
         ; setSrcSpanA con_span $ addDataConStupidTheta data_con ctxt_res_tys
 
+        -- Check that this isn't a GADT pattern match
+        -- in situations in which that isn't allowed.
         ; let all_arg_tys = eqSpecPreds eq_spec ++ theta ++ (map scaledThing arg_tys)
-        ; checkExistentials ex_tvs all_arg_tys penv
+        ; checkGADT (RealDataCon data_con) ex_tvs all_arg_tys penv
 
         ; tenv1 <- instTyVarsWith PatOrigin univ_tvs ctxt_res_tys
                   -- NB: Do not use zipTvSubst!  See #14154
@@ -979,8 +982,11 @@ tcPatSynPat penv (L con_span con_name) pat_syn pat_ty arg_pats thing_inside
 
         ; (subst, univ_tvs') <- newMetaTyVars univ_tvs
 
+        -- Check that we aren't matching on a GADT-like pattern synonym
+        -- in situations in which that isn't allowed.
         ; let all_arg_tys = ty : prov_theta ++ (map scaledThing arg_tys)
-        ; checkExistentials ex_tvs all_arg_tys penv
+        ; checkGADT (PatSynCon pat_syn) ex_tvs all_arg_tys penv
+
         ; (tenv, ex_tvs') <- tcInstSuperSkolTyVarsX subst ex_tvs
            -- This freshens: Note [Freshen existentials]
 
@@ -1344,11 +1350,15 @@ these bindings scope over 'term'.
 
 The Right Thing is not to confuse these constraints together. But for
 now the Easy Thing is to ensure that we do not have existential or
-GADT constraints in a 'proc', and to short-cut the constraint
-simplification for such vanilla patterns so that it binds no
-constraints. Hence the 'fast path' in tcConPat; but it's also a good
-plan for ordinary vanilla patterns to bypass the constraint
-simplification step.
+GADT constraints in a 'proc', which we do by disallowing any
+non-vanilla pattern match (i.e. one that introduces existential
+variables or provided constraints), in tcDataConPat and tcPatSynPat.
+
+We also short-cut the constraint simplification for such vanilla patterns,
+so that we bind no constraints. Hence the 'fast path' in tcDataConPat;
+which applies more generally (not just within 'proc'), as it's a good
+plan in general to bypass the constraint simplification step entirely
+when it's not needed.
 
 ************************************************************************
 *                                                                      *
@@ -1442,28 +1452,30 @@ maybeWrapPatCtxt pat tcm thing_inside
    msg = hang (text "In the pattern:") 2 (ppr pat)
 
 -----------------------------------------------
-checkExistentials :: [TyVar]   -- existentials
-                  -> [Type]    -- argument types
-                  -> PatEnv -> TcM ()
-    -- See Note [Existential check]]
+
+-- | Check that a pattern isn't a GADT, or doesn't have existential variables,
+-- in a situation in which that is not permitted (inside a lazy pattern, or
+-- in arrow notation).
+checkGADT :: ConLike
+          -> [TyVar] -- ^ existentials
+          -> [Type]  -- ^ argument types
+          -> PatEnv
+          -> TcM ()
+checkGADT conlike ex_tvs arg_tys = \case
+  PE { pe_ctxt = LetPat {} }
+    -> return ()
+  PE { pe_ctxt = LamPat (ArrowMatchCtxt {}) }
+    | not $ isVanillaConLike conlike
     -- See Note [Arrows and patterns]
-checkExistentials ex_tvs tys _
-  | all (not . (`elemVarSet` tyCoVarsOfTypes tys)) ex_tvs = return ()
-checkExistentials _ _ (PE { pe_ctxt = LetPat {}})         = return ()
-checkExistentials _ _ (PE { pe_ctxt = LamPat ProcExpr })  = failWithTc existentialProcPat
-checkExistentials _ _ (PE { pe_lazy = True })             = failWithTc existentialLazyPat
-checkExistentials _ _ _                                   = return ()
-
-existentialLazyPat :: TcRnMessage
-existentialLazyPat
-  = TcRnUnknownMessage $ mkPlainError noHints $
-    hang (text "An existential or GADT data constructor cannot be used")
-       2 (text "inside a lazy (~) pattern")
-
-existentialProcPat :: TcRnMessage
-existentialProcPat
-  = TcRnUnknownMessage $ mkPlainError noHints $
-    text "Proc patterns cannot use existential or GADT data constructors"
+    -> failWithTc TcRnArrowProcGADTPattern
+  PE { pe_lazy = True }
+    | has_existentials
+    -- See Note [Existential check]
+    -> failWithTc TcRnLazyGADTPattern
+  _ -> return ()
+  where
+    has_existentials :: Bool
+    has_existentials = any (`elemVarSet` tyCoVarsOfTypes arg_tys) ex_tvs
 
 badFieldCon :: ConLike -> FieldLabelString -> TcRnMessage
 badFieldCon con field

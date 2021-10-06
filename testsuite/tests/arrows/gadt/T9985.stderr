@@ -1,0 +1,6 @@
+
+T9985.hs:29:18: error:
+    • Proc patterns cannot use existential or GADT data constructors
+    • In the pattern: VNil
+      In the pattern: a :> VNil
+      In the expression: proc (a :> VNil) -> returnA -< a

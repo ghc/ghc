@@ -9,6 +9,7 @@
 
 module GHC.Core.ConLike (
           ConLike(..)
+        , isVanillaConLike
         , conLikeArity
         , conLikeFieldLabels
         , conLikeInstOrigArgTys
@@ -53,6 +54,12 @@ import qualified Data.Data as Data
 -- | A constructor-like thing
 data ConLike = RealDataCon DataCon
              | PatSynCon PatSyn
+
+-- | Is this a \'vanilla\' constructor-like thing
+-- (no existentials, no provided constraints)?
+isVanillaConLike :: ConLike -> Bool
+isVanillaConLike (RealDataCon con) = isVanillaDataCon con
+isVanillaConLike (PatSynCon   ps ) = isVanillaPatSyn  ps
 
 {-
 ************************************************************************

@@ -13,6 +13,7 @@ module GHC.Core.PatSyn (
 
         -- ** Type deconstruction
         patSynName, patSynArity, patSynIsInfix, patSynResultType,
+        isVanillaPatSyn,
         patSynArgs,
         patSynMatcher, patSynBuilder,
         patSynUnivTyVarBinders, patSynExTyVars, patSynExTyVarBinders,
@@ -418,6 +419,10 @@ patSynIsInfix = psInfix
 -- | Arity of the pattern synonym
 patSynArity :: PatSyn -> Arity
 patSynArity = psArity
+
+-- | Is this a \'vanilla\' pattern synonym (no existentials, no provided constraints)?
+isVanillaPatSyn :: PatSyn -> Bool
+isVanillaPatSyn ps = null (psExTyVars ps) && null (psProvTheta ps)
 
 patSynArgs :: PatSyn -> [Type]
 patSynArgs = psArgs

@@ -553,7 +553,7 @@ rnExpr e@(HsStatic _ expr) = do
 
 rnExpr (HsProc x pat body)
   = newArrowScope $
-    rnPat ProcExpr pat $ \ pat' -> do
+    rnPat (ArrowMatchCtxt ProcExpr) pat $ \ pat' -> do
       { (body',fvBody) <- rnCmdTop body
       ; return (HsProc x pat' body', fvBody) }
 
@@ -798,7 +798,7 @@ rnCmd (HsCmdApp x fun arg)
        ; return (HsCmdApp x fun' arg', fvFun `plusFV` fvArg) }
 
 rnCmd (HsCmdLam _ matches)
-  = do { (matches', fvMatch) <- rnMatchGroup LambdaExpr rnLCmd matches
+  = do { (matches', fvMatch) <- rnMatchGroup (ArrowMatchCtxt KappaExpr) rnLCmd matches
        ; return (HsCmdLam noExtField matches', fvMatch) }
 
 rnCmd (HsCmdPar x lpar e rpar)
@@ -807,12 +807,12 @@ rnCmd (HsCmdPar x lpar e rpar)
 
 rnCmd (HsCmdCase _ expr matches)
   = do { (new_expr, e_fvs) <- rnLExpr expr
-       ; (new_matches, ms_fvs) <- rnMatchGroup CaseAlt rnLCmd matches
+       ; (new_matches, ms_fvs) <- rnMatchGroup (ArrowMatchCtxt ArrowCaseAlt) rnLCmd matches
        ; return (HsCmdCase noExtField new_expr new_matches
                 , e_fvs `plusFV` ms_fvs) }
 
 rnCmd (HsCmdLamCase x matches)
-  = do { (new_matches, ms_fvs) <- rnMatchGroup CaseAlt rnLCmd matches
+  = do { (new_matches, ms_fvs) <- rnMatchGroup (ArrowMatchCtxt ArrowCaseAlt) rnLCmd matches
        ; return (HsCmdLamCase x new_matches, ms_fvs) }
 
 rnCmd (HsCmdIf _ _ p b1 b2)

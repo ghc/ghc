@@ -1220,13 +1220,16 @@ rnMatch' ctxt rnBody (Match { m_ctxt = mf, m_pats = pats, m_grhss = grhss })
 
 emptyCaseErr :: HsMatchContext GhcRn -> TcRnMessage
 emptyCaseErr ctxt = TcRnUnknownMessage $ mkPlainError noHints $
-  hang (text "Empty list of alternatives in" <+> pp_ctxt)
+  hang (text "Empty list of alternatives in" <+> pp_ctxt ctxt)
         2 (text "Use EmptyCase to allow this")
   where
-    pp_ctxt = case ctxt of
-                CaseAlt    -> text "case expression"
-                LambdaExpr -> text "\\case expression"
-                _ -> text "(unexpected)" <+> pprMatchContextNoun ctxt
+    pp_ctxt :: HsMatchContext GhcRn -> SDoc
+    pp_ctxt c = case c of
+      CaseAlt       -> text "case expression"
+      LambdaExpr    -> text "\\case expression"
+      ArrowMatchCtxt ArrowCaseAlt -> text "case expression"
+      ArrowMatchCtxt KappaExpr    -> text "kappa abstraction"
+      _             -> text "(unexpected)" <+> pprMatchContextNoun c
 
 {-
 ************************************************************************

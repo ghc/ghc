@@ -1,0 +1,6 @@
+
+T5777.hs:13:18: error:
+    • Proc patterns cannot use existential or GADT data constructors
+    • In the pattern: BoolVal
+      In the expression: proc BoolVal -> returnA -< ()
+      In an equation for ‘arrif’: arrif = proc BoolVal -> returnA -< ()

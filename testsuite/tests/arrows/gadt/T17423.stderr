@@ -1,0 +1,13 @@
+
+T17423.hs:19:13: error:
+    • Proc patterns cannot use existential or GADT data constructors
+    • In the pattern: DecoBool i c
+      In the expression:
+        proc (DecoBool i c) -> do i1 <- id -< i
+                                  c1 <- id -< c
+                                  returnA -< DecoBool i1 c1
+      In an equation for ‘decoBoolDialog’:
+          decoBoolDialog
+            = proc (DecoBool i c) -> do i1 <- id -< i
+                                        c1 <- id -< c
+                                        ....

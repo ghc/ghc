@@ -1857,7 +1857,7 @@ instance OutputableBndrId p => Outputable (HsMatchContext (GhcPass p)) where
   ppr LambdaExpr            = text "LambdaExpr"
   ppr CaseAlt               = text "CaseAlt"
   ppr IfAlt                 = text "IfAlt"
-  ppr ProcExpr              = text "ProcExpr"
+  ppr (ArrowMatchCtxt c)    = text "ArrowMatchCtxt" <+> ppr c
   ppr PatBindRhs            = text "PatBindRhs"
   ppr PatBindGuards         = text "PatBindGuards"
   ppr RecUpd                = text "RecUpd"
@@ -1865,6 +1865,11 @@ instance OutputableBndrId p => Outputable (HsMatchContext (GhcPass p)) where
   ppr ThPatSplice           = text "ThPatSplice"
   ppr ThPatQuote            = text "ThPatQuote"
   ppr PatSyn                = text "PatSyn"
+
+instance Outputable HsArrowMatchContext where
+  ppr ProcExpr     = text "ProcExpr"
+  ppr ArrowCaseAlt = text "ArrowCaseAlt"
+  ppr KappaExpr    = text "KappaExpr"
 
 -----------------
 
@@ -1882,15 +1887,20 @@ matchContextErrString PatBindRhs                 = text "pattern binding"
 matchContextErrString PatBindGuards              = text "pattern binding guards"
 matchContextErrString RecUpd                     = text "record update"
 matchContextErrString LambdaExpr                 = text "lambda"
-matchContextErrString ProcExpr                   = text "proc"
+matchContextErrString (ArrowMatchCtxt c)         = matchArrowContextErrString c
 matchContextErrString ThPatSplice                = panic "matchContextErrString"  -- Not used at runtime
 matchContextErrString ThPatQuote                 = panic "matchContextErrString"  -- Not used at runtime
 matchContextErrString PatSyn                     = panic "matchContextErrString"  -- Not used at runtime
 matchContextErrString (StmtCtxt (ParStmtCtxt c))   = matchContextErrString (StmtCtxt c)
 matchContextErrString (StmtCtxt (TransStmtCtxt c)) = matchContextErrString (StmtCtxt c)
 matchContextErrString (StmtCtxt (PatGuard _))      = text "pattern guard"
-matchContextErrString (StmtCtxt (ArrowExpr))  = text "'do' block"
+matchContextErrString (StmtCtxt (ArrowExpr))       = text "'do' block"
 matchContextErrString (StmtCtxt (HsDoStmt flavour)) = matchDoContextErrString flavour
+
+matchArrowContextErrString :: HsArrowMatchContext -> SDoc
+matchArrowContextErrString ProcExpr     = text "proc"
+matchArrowContextErrString ArrowCaseAlt = text "case"
+matchArrowContextErrString KappaExpr    = text "kappa"
 
 matchDoContextErrString :: HsDoFlavour -> SDoc
 matchDoContextErrString GhciStmtCtxt = text "interactive GHCi command"

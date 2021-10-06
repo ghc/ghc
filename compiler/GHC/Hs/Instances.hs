@@ -366,6 +366,8 @@ deriving instance Data (HsStmtContext GhcPs)
 deriving instance Data (HsStmtContext GhcRn)
 deriving instance Data (HsStmtContext GhcTc)
 
+deriving instance Data HsArrowMatchContext
+
 deriving instance Data HsDoFlavour
 
 deriving instance Data (HsMatchContext GhcPs)

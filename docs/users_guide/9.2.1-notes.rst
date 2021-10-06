@@ -135,6 +135,21 @@ Language
   will allow the scrutinee to have a multiplicity of ``One``, using its best-effort
   inference algorithm.
 
+* Support for matching on GADT constructors in arrow notation has been removed,
+  as the current implementation of :extension:`Arrows` doesn't handle GADT
+  evidence correctly.
+
+  One possible workaround, for the time being, is to perform GADT matches
+  inside let bindings: ::
+
+      data G a where
+        MkG :: Show a => a -> G a
+
+      foo :: G a -> String
+      foo = proc x -> do
+        let res = case x of { MkG a -> show a }
+        returnA -< res
+
 Compiler
 ~~~~~~~~
 

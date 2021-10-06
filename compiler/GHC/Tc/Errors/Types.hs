@@ -1373,6 +1373,20 @@ data TcRnMessage where
                            -- an instance for the class.
                            -> TcRnMessage
 
+  {-| TcRnLazyGADTPattern is an error that occurs when a user writes a nested
+      GADT pattern match inside a lazy (~) pattern.
+
+      Test case: gadt/lazypat
+  -}
+  TcRnLazyGADTPattern :: TcRnMessage
+
+  {-| TcRnArrowProcGADTPattern is an error that occurs when a user writes a
+      GADT pattern inside arrow proc notation.
+
+      Test case: arrows/should_fail/arrowfail004.
+  -}
+  TcRnArrowProcGADTPattern :: TcRnMessage
+
 -- | Which parts of a record field are affected by a particular error or warning.
 data RecordFieldPart
   = RecordFieldConstructor !Name
