@@ -496,7 +496,7 @@ cmmNativeGen logger modLoc ncgImpl us fileIds dbgMap cmm count
         -- tag instructions with register liveness information
         -- also drops dead code. We don't keep the cfg in sync on
         -- some backends, so don't use it there.
-        let livenessCfg = if backendMaintainsCfg platform
+        let livenessCfg = if ncgEnableDeadCodeElimination config
                                 then Just nativeCfgWeights
                                 else Nothing
         let (withLiveness, usLive) =
@@ -643,7 +643,7 @@ cmmNativeGen logger modLoc ncgImpl us fileIds dbgMap cmm count
         let getBlks (CmmProc _info _lbl _live (ListGraph blocks)) = blocks
             getBlks _ = []
 
-        when ( backendMaintainsCfg platform &&
+        when ( ncgEnableDeadCodeElimination config &&
                 (ncgAsmLinting config || debugIsOn )) $ do
                 let blocks = concatMap getBlks shorted
                 let labels = setFromList $ fmap blockId blocks :: LabelSet

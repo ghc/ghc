@@ -11,6 +11,7 @@ import GHC.Platform
 import GHC.Unit.Types (Module)
 import GHC.CmmToAsm.Config
 import GHC.Utils.Outputable
+import GHC.CmmToAsm.BlockLayout
 
 -- | Initialize the native code generator configuration from the DynFlags
 initNCGConfig :: DynFlags -> Module -> NCGConfig
@@ -67,4 +68,8 @@ initNCGConfig dflags this_mod = NCGConfig
    , ncgCmmStaticPred       = gopt Opt_CmmStaticPred dflags
    , ncgEnableShortcutting  = gopt Opt_AsmShortcutting dflags
    , ncgComputeUnwinding    = debugLevel dflags > 0
+   , ncgEnableDeadCodeElimination = not (gopt Opt_InfoTableMap dflags)
+                                     -- Disable when -finfo-table-map is on (#20428)
+                                     && backendMaintainsCfg (targetPlatform dflags)
+                                     -- Enable if the platform maintains the CFG
    }

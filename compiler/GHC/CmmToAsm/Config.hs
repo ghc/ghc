@@ -45,6 +45,7 @@ data NCGConfig = NCGConfig
    , ncgCmmStaticPred         :: !Bool            -- ^ Enable static control-flow prediction
    , ncgEnableShortcutting    :: !Bool            -- ^ Enable shortcutting (don't jump to blocks only containing a jump)
    , ncgComputeUnwinding      :: !Bool            -- ^ Compute block unwinding tables
+   , ncgEnableDeadCodeElimination :: !Bool        -- ^ Whether to enable the dead-code elimination
    }
 
 -- | Return Word size
