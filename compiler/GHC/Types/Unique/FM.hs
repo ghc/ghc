@@ -384,9 +384,6 @@ allUFM p (UFM m) = M.foldr ((&&) . p) True m
 
 seqEltsUFM :: (elt -> ()) -> UniqFM key elt -> ()
 seqEltsUFM seqElt = foldUFM (\v rest -> seqElt v `seq` rest) ()
-  -- It's OK to use nonDetEltsUFM here because the type guarantees that
-  -- the only interesting thing this function can do is to force the
-  -- elements.
 
 -- See Note [Deterministic UniqFM] to learn about nondeterminism.
 -- If you use this please provide a justification why it doesn't introduce
