@@ -1514,9 +1514,9 @@ isLiteral e = do
         Nothing -> mzero
         Just l  -> pure l
 
--- | Match Integer and Natural literals
+-- | Match BigNat#, Integer and Natural literals
 isBignumLiteral :: CoreExpr -> RuleM Integer
-isBignumLiteral e = isIntegerLiteral e <|> isNaturalLiteral e
+isBignumLiteral e = isNumberLiteral e <|> isIntegerLiteral e <|> isNaturalLiteral e
 
 -- | Match numeric literals
 isNumberLiteral :: CoreExpr -> RuleM Integer
@@ -2056,23 +2056,17 @@ builtinBignumRules =
   , natural_to_word "Natural -> Word# (clamp)" naturalToWordClampName True
 
     -- comparisons (return an unlifted Int#)
-  , integer_cmp "integerEq#" integerEqName (==)
-  , integer_cmp "integerNe#" integerNeName (/=)
-  , integer_cmp "integerLe#" integerLeName (<=)
-  , integer_cmp "integerGt#" integerGtName (>)
-  , integer_cmp "integerLt#" integerLtName (<)
-  , integer_cmp "integerGe#" integerGeName (>=)
-
-  , natural_cmp "naturalLe#" naturalLeName (<=)
-  , natural_cmp "naturalGt#" naturalGtName (>)
-  , natural_cmp "naturalLt#" naturalLtName (<)
-  , natural_cmp "naturalGe#" naturalGeName (>=)
-
-  , bignat_cmp  "bigNatEq#"  bignatEqName (==)
+  , bignum_bin_pred "integerEq#" integerEqName (==)
+  , bignum_bin_pred "integerNe#" integerNeName (/=)
+  , bignum_bin_pred "integerLe#" integerLeName (<=)
+  , bignum_bin_pred "integerGt#" integerGtName (>)
+  , bignum_bin_pred "integerLt#" integerLtName (<)
+  , bignum_bin_pred "integerGe#" integerGeName (>=)
+  , bignum_bin_pred "bigNatEq#"  bignatEqName (==)
 
     -- comparisons (return an Ordering)
   , bignum_compare "integerCompare" integerCompareName
-  , bignum_compare "naturalCompare" naturalCompareName
+  , bignum_compare "bignatCompare" bignatCompareName
 
     -- binary operations
   , integer_binop "integerAdd" integerAddName (+)
@@ -2205,7 +2199,7 @@ builtinBignumRules =
     lit_to_integer str name = mkRule str name 1 $ do
       [a0] <- getArgs
       platform <- getPlatform
-      i <- isNumberLiteral a0 <|> isBignumLiteral a0
+      i <- isBignumLiteral a0
       -- convert any numeric literal into an Integer literal
       pure (mkIntegerExpr platform i)
 
@@ -2231,29 +2225,11 @@ builtinBignumRules =
       platform <- getPlatform
       pure (mkNaturalExpr platform (x - y))
 
-    integer_cmp str name op = mkRule str name 2 $ do
+    bignum_bin_pred str name op = mkRule str name 2 $ do
       platform <- getPlatform
       [a0,a1] <- getArgs
-      x <- isIntegerLiteral a0
-      y <- isIntegerLiteral a1
-      pure $ if x `op` y
-              then trueValInt platform
-              else falseValInt platform
-
-    natural_cmp str name op = mkRule str name 2 $ do
-      platform <- getPlatform
-      [a0,a1] <- getArgs
-      x <- isNaturalLiteral a0
-      y <- isNaturalLiteral a1
-      pure $ if x `op` y
-              then trueValInt platform
-              else falseValInt platform
-
-    bignat_cmp str name op = mkRule str name 2 $ do
-      platform <- getPlatform
-      [a0,a1] <- getArgs
-      x <- isNumberLiteral a0
-      y <- isNumberLiteral a1
+      x <- isBignumLiteral a0
+      y <- isBignumLiteral a1
       pure $ if x `op` y
               then trueValInt platform
               else falseValInt platform

@@ -162,7 +162,6 @@ naturalNe !x !y = isTrue# (naturalNe# x y)
 
 -- | Greater or equal test for Natural
 naturalGe# :: Natural -> Natural -> Bool#
-{-# NOINLINE naturalGe# #-}
 naturalGe# (NS x) (NS y) = x `geWord#` y
 naturalGe# (NS _) (NB _) = 0#
 naturalGe# (NB _) (NS _) = 1#
@@ -174,7 +173,6 @@ naturalGe !x !y = isTrue# (naturalGe# x y)
 
 -- | Lower or equal test for Natural
 naturalLe# :: Natural -> Natural -> Bool#
-{-# NOINLINE naturalLe# #-}
 naturalLe# (NS x) (NS y) = x `leWord#` y
 naturalLe# (NS _) (NB _) = 1#
 naturalLe# (NB _) (NS _) = 0#
@@ -187,7 +185,6 @@ naturalLe !x !y = isTrue# (naturalLe# x y)
 
 -- | Greater test for Natural
 naturalGt# :: Natural -> Natural -> Bool#
-{-# NOINLINE naturalGt# #-}
 naturalGt# (NS x) (NS y) = x `gtWord#` y
 naturalGt# (NS _) (NB _) = 0#
 naturalGt# (NB _) (NS _) = 1#
@@ -199,7 +196,6 @@ naturalGt !x !y = isTrue# (naturalGt# x y)
 
 -- | Lower test for Natural
 naturalLt# :: Natural -> Natural -> Bool#
-{-# NOINLINE naturalLt# #-}
 naturalLt# (NS x) (NS y) = x `ltWord#` y
 naturalLt# (NS _) (NB _) = 1#
 naturalLt# (NB _) (NS _) = 0#
@@ -211,7 +207,6 @@ naturalLt !x !y = isTrue# (naturalLt# x y)
 
 -- | Compare two Natural
 naturalCompare :: Natural -> Natural -> Ordering
-{-# NOINLINE naturalCompare #-}
 naturalCompare (NS x) (NS y) = cmpW# x y
 naturalCompare (NB x) (NB y) = bigNatCompare x y
 naturalCompare (NS _) (NB _) = LT

@@ -344,6 +344,7 @@ bigNatCompareWord a (W# b) = bigNatCompareWord# a b
 
 -- | Compare two BigNat
 bigNatCompare :: BigNat# -> BigNat# -> Ordering
+{-# NOINLINE bigNatCompare #-}
 bigNatCompare a b =
    let
       szA = wordArraySize# a

@@ -989,12 +989,22 @@ instance Enum Natural where
         i = I# (word2Int# w)
     fromEnum _ = errorWithoutStackTrace "fromEnum: out of Int range"
 
+    -- See Note [Stable Unfolding for list producers]
+    {-# INLINE enumFrom #-}
     enumFrom x        = enumDeltaNatural      x 1
+
+    -- See Note [Stable Unfolding for list producers]
+    {-# INLINE enumFromThen #-}
     enumFromThen x y
       | x <= y        = enumDeltaNatural      x (y-x)
       | otherwise     = enumNegDeltaToNatural x (x-y) 0
 
+    -- See Note [Stable Unfolding for list producers]
+    {-# INLINE enumFromTo #-}
     enumFromTo x lim  = enumDeltaToNatural    x 1 lim
+
+    -- See Note [Stable Unfolding for list producers]
+    {-# INLINE enumFromThenTo #-}
     enumFromThenTo x y lim
       | x <= y        = enumDeltaToNatural    x (y-x) lim
       | otherwise     = enumNegDeltaToNatural x (x-y) lim
@@ -1004,12 +1014,16 @@ instance Enum Natural where
 enumDeltaNatural :: Natural -> Natural -> [Natural]
 enumDeltaNatural !x d = x : enumDeltaNatural (x+d) d
 
+-- Inline to specialize
+{-# INLINE enumDeltaToNatural #-}
 enumDeltaToNatural :: Natural -> Natural -> Natural -> [Natural]
 enumDeltaToNatural x0 delta lim = go x0
   where
     go x | x > lim   = []
          | otherwise = x : go (x+delta)
 
+-- Inline to specialize
+{-# INLINE enumNegDeltaToNatural #-}
 enumNegDeltaToNatural :: Natural -> Natural -> Natural -> [Natural]
 enumNegDeltaToNatural x0 ndelta lim = go x0
   where

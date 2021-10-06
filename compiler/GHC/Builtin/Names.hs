@@ -398,11 +398,6 @@ basicKnownKeyNames
 
         naturalToWordName,
         naturalToWordClampName,
-        naturalGeName,
-        naturalLeName,
-        naturalGtName,
-        naturalLtName,
-        naturalCompareName,
         naturalPopCountName,
         naturalShiftRName,
         naturalShiftLName,
@@ -1195,11 +1190,6 @@ integerFromNaturalName
    , integerShiftRName
    , naturalToWordName
    , naturalToWordClampName
-   , naturalGeName
-   , naturalLeName
-   , naturalGtName
-   , naturalLtName
-   , naturalCompareName
    , naturalPopCountName
    , naturalShiftRName
    , naturalShiftLName
@@ -1228,6 +1218,7 @@ integerFromNaturalName
    , naturalSizeInBaseName
    , bignatFromWordListName
    , bignatEqName
+   , bignatCompareName
    :: Name
 
 bnbVarQual, bnnVarQual, bniVarQual :: String -> Unique -> Name
@@ -1238,14 +1229,10 @@ bniVarQual str key = varQual gHC_NUM_INTEGER (fsLit str) key
 -- Types and DataCons
 bignatFromWordListName    = bnbVarQual "bigNatFromWordList#"       bignatFromWordListIdKey
 bignatEqName              = bnbVarQual "bigNatEq#"                 bignatEqIdKey
+bignatCompareName         = bnbVarQual "bigNatCompare"             bignatCompareIdKey
 
 naturalToWordName         = bnnVarQual "naturalToWord#"            naturalToWordIdKey
 naturalToWordClampName    = bnnVarQual "naturalToWordClamp#"       naturalToWordClampIdKey
-naturalGeName             = bnnVarQual "naturalGe#"                naturalGeIdKey
-naturalLeName             = bnnVarQual "naturalLe#"                naturalLeIdKey
-naturalGtName             = bnnVarQual "naturalGt#"                naturalGtIdKey
-naturalLtName             = bnnVarQual "naturalLt#"                naturalLtIdKey
-naturalCompareName        = bnnVarQual "naturalCompare"            naturalCompareIdKey
 naturalPopCountName       = bnnVarQual "naturalPopCount#"          naturalPopCountIdKey
 naturalShiftRName         = bnnVarQual "naturalShiftR#"            naturalShiftRIdKey
 naturalShiftLName         = bnnVarQual "naturalShiftL#"            naturalShiftLIdKey
@@ -2592,14 +2579,8 @@ integerFromNaturalIdKey
    , integerFromWordIdKey
    , integerFromWord64IdKey
    , integerFromInt64IdKey
-   , bignatEqIdKey
    , naturalToWordIdKey
    , naturalToWordClampIdKey
-   , naturalGeIdKey
-   , naturalLeIdKey
-   , naturalGtIdKey
-   , naturalLtIdKey
-   , naturalCompareIdKey
    , naturalPopCountIdKey
    , naturalShiftRIdKey
    , naturalShiftLIdKey
@@ -2627,6 +2608,8 @@ integerFromNaturalIdKey
    , naturalPowModIdKey
    , naturalSizeInBaseIdKey
    , bignatFromWordListIdKey
+   , bignatEqIdKey
+   , bignatCompareIdKey
    :: Unique
 
 integerFromNaturalIdKey    = mkPreludeMiscIdUnique 600
@@ -2675,11 +2658,6 @@ integerFromInt64IdKey      = mkPreludeMiscIdUnique 644
 
 naturalToWordIdKey         = mkPreludeMiscIdUnique 650
 naturalToWordClampIdKey    = mkPreludeMiscIdUnique 651
-naturalGeIdKey             = mkPreludeMiscIdUnique 654
-naturalLeIdKey             = mkPreludeMiscIdUnique 655
-naturalGtIdKey             = mkPreludeMiscIdUnique 656
-naturalLtIdKey             = mkPreludeMiscIdUnique 657
-naturalCompareIdKey        = mkPreludeMiscIdUnique 658
 naturalPopCountIdKey       = mkPreludeMiscIdUnique 659
 naturalShiftRIdKey         = mkPreludeMiscIdUnique 660
 naturalShiftLIdKey         = mkPreludeMiscIdUnique 661
@@ -2709,6 +2687,7 @@ naturalSizeInBaseIdKey     = mkPreludeMiscIdUnique 684
 
 bignatFromWordListIdKey    = mkPreludeMiscIdUnique 690
 bignatEqIdKey              = mkPreludeMiscIdUnique 691
+bignatCompareIdKey         = mkPreludeMiscIdUnique 692
 
 
 ------------------------------------------------------
