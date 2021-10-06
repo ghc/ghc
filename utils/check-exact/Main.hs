@@ -442,7 +442,7 @@ changeLetIn1 _libdir parsed
              (L (SrcSpanAnn _ le) e) = expr
              a = (SrcSpanAnn (EpAnn (Anchor (realSrcSpan le) (MovedAnchor (SameLine 1))) mempty emptyComments) le)
              expr' = L a e
-         in (HsLet (EpAnn anc (AnnsLet l (EpaDelta (DifferentLine 1 0))) cs)
+         in (HsLet (EpAnn anc (AnnsLet l (EpaDelta (DifferentLine 1 0) [])) cs)
                 (HsValBinds x (ValBinds xv bagDecls' sigs)) expr')
 
     replace x = x
