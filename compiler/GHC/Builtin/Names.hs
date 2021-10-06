@@ -398,8 +398,6 @@ basicKnownKeyNames
 
         naturalToWordName,
         naturalToWordClampName,
-        naturalEqName,
-        naturalNeName,
         naturalGeName,
         naturalLeName,
         naturalGtName,
@@ -433,6 +431,7 @@ basicKnownKeyNames
         naturalSizeInBaseName,
 
         bignatFromWordListName,
+        bignatEqName,
 
         -- Float/Double
         integerToFloatName,
@@ -1196,8 +1195,6 @@ integerFromNaturalName
    , integerShiftRName
    , naturalToWordName
    , naturalToWordClampName
-   , naturalEqName
-   , naturalNeName
    , naturalGeName
    , naturalLeName
    , naturalGtName
@@ -1230,6 +1227,7 @@ integerFromNaturalName
    , naturalPowModName
    , naturalSizeInBaseName
    , bignatFromWordListName
+   , bignatEqName
    :: Name
 
 bnbVarQual, bnnVarQual, bniVarQual :: String -> Unique -> Name
@@ -1239,11 +1237,10 @@ bniVarQual str key = varQual gHC_NUM_INTEGER (fsLit str) key
 
 -- Types and DataCons
 bignatFromWordListName    = bnbVarQual "bigNatFromWordList#"       bignatFromWordListIdKey
+bignatEqName              = bnbVarQual "bigNatEq#"                 bignatEqIdKey
 
 naturalToWordName         = bnnVarQual "naturalToWord#"            naturalToWordIdKey
 naturalToWordClampName    = bnnVarQual "naturalToWordClamp#"       naturalToWordClampIdKey
-naturalEqName             = bnnVarQual "naturalEq#"                naturalEqIdKey
-naturalNeName             = bnnVarQual "naturalNe#"                naturalNeIdKey
 naturalGeName             = bnnVarQual "naturalGe#"                naturalGeIdKey
 naturalLeName             = bnnVarQual "naturalLe#"                naturalLeIdKey
 naturalGtName             = bnnVarQual "naturalGt#"                naturalGtIdKey
@@ -2595,10 +2592,9 @@ integerFromNaturalIdKey
    , integerFromWordIdKey
    , integerFromWord64IdKey
    , integerFromInt64IdKey
+   , bignatEqIdKey
    , naturalToWordIdKey
    , naturalToWordClampIdKey
-   , naturalEqIdKey
-   , naturalNeIdKey
    , naturalGeIdKey
    , naturalLeIdKey
    , naturalGtIdKey
@@ -2679,8 +2675,6 @@ integerFromInt64IdKey      = mkPreludeMiscIdUnique 644
 
 naturalToWordIdKey         = mkPreludeMiscIdUnique 650
 naturalToWordClampIdKey    = mkPreludeMiscIdUnique 651
-naturalEqIdKey             = mkPreludeMiscIdUnique 652
-naturalNeIdKey             = mkPreludeMiscIdUnique 653
 naturalGeIdKey             = mkPreludeMiscIdUnique 654
 naturalLeIdKey             = mkPreludeMiscIdUnique 655
 naturalGtIdKey             = mkPreludeMiscIdUnique 656
@@ -2714,6 +2708,8 @@ naturalPowModIdKey         = mkPreludeMiscIdUnique 683
 naturalSizeInBaseIdKey     = mkPreludeMiscIdUnique 684
 
 bignatFromWordListIdKey    = mkPreludeMiscIdUnique 690
+bignatEqIdKey              = mkPreludeMiscIdUnique 691
+
 
 ------------------------------------------------------
 -- ghci optimization for big rationals 700-749 uniques

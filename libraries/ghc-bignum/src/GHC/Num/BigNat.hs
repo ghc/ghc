@@ -312,6 +312,7 @@ bigNatLeWord bn (W# w) = isTrue# (bigNatLeWord# bn w)
 
 -- | Equality test for BigNat
 bigNatEq# :: BigNat# -> BigNat# -> Bool#
+{-# NOINLINE bigNatEq# #-}
 bigNatEq# wa wb
    | isTrue# (wordArraySize# wa /=# wordArraySize# wb) = 0#
    | isTrue# (wordArraySize# wa ==# 0#)                = 1#

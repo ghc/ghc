@@ -142,7 +142,6 @@ naturalEncodeFloat# !m e  = double2Float# (naturalEncodeDouble# m e)
 
 -- | Equality test for Natural
 naturalEq# :: Natural -> Natural -> Bool#
-{-# NOINLINE naturalEq# #-}
 naturalEq# (NS x) (NS y) = x `eqWord#` y
 naturalEq# (NB x) (NB y) = bigNatEq# x y
 naturalEq# _      _      = 0#
@@ -153,7 +152,6 @@ naturalEq !x !y = isTrue# (naturalEq# x y)
 
 -- | Inequality test for Natural
 naturalNe# :: Natural -> Natural -> Bool#
-{-# NOINLINE naturalNe# #-}
 naturalNe# (NS x) (NS y) = x `neWord#` y
 naturalNe# (NB x) (NB y) = bigNatNe# x y
 naturalNe# _      _      = 1#

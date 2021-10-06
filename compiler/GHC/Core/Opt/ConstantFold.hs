@@ -2063,12 +2063,12 @@ builtinBignumRules =
   , integer_cmp "integerLt#" integerLtName (<)
   , integer_cmp "integerGe#" integerGeName (>=)
 
-  , natural_cmp "naturalEq#" naturalEqName (==)
-  , natural_cmp "naturalNe#" naturalNeName (/=)
   , natural_cmp "naturalLe#" naturalLeName (<=)
   , natural_cmp "naturalGt#" naturalGtName (>)
   , natural_cmp "naturalLt#" naturalLtName (<)
   , natural_cmp "naturalGe#" naturalGeName (>=)
+
+  , bignat_cmp  "bigNatEq#"  bignatEqName (==)
 
     -- comparisons (return an Ordering)
   , bignum_compare "integerCompare" integerCompareName
@@ -2245,6 +2245,15 @@ builtinBignumRules =
       [a0,a1] <- getArgs
       x <- isNaturalLiteral a0
       y <- isNaturalLiteral a1
+      pure $ if x `op` y
+              then trueValInt platform
+              else falseValInt platform
+
+    bignat_cmp str name op = mkRule str name 2 $ do
+      platform <- getPlatform
+      [a0,a1] <- getArgs
+      x <- isNumberLiteral a0
+      y <- isNumberLiteral a1
       pure $ if x `op` y
               then trueValInt platform
               else falseValInt platform
