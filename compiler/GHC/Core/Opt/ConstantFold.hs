@@ -2109,14 +2109,6 @@ builtinBignumRules =
   , bignum_popcount "integerPopCount" integerPopCountName mkLitIntWrap
   , bignum_popcount "naturalPopCount" naturalPopCountName mkLitWordWrap
 
-  ------------------------------------------------------------
-  -- The following `small_passthough_*` rules are used to optimise conversions
-  -- between numeric types by avoiding passing through "small" constructors of
-  -- Integer and Natural.
-  --
-  -- See Note [Optimising conversions between numeric types]
-  --
-
     -- Bits.bit
   , bignum_bit "integerBit" integerBitName mkIntegerExpr
   , bignum_bit "naturalBit" naturalBitName mkNaturalExpr
