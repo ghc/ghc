@@ -1,4 +1,4 @@
 
 T15539.hs:6:13: error:
     • Variable not in scope: baz
-    • Perhaps you meant one of these: ‘bar’ (line 15), ‘bam’ (line 17)
+    • Perhaps you meant one of these: ‘bam’ (line 17), ‘bar’ (line 15)

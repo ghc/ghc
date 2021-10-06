@@ -6,5 +6,5 @@
 <interactive>:4:1: error:
     • Variable not in scope: fit
     • Perhaps you meant one of these:
-        ‘fst’ (imported from Prelude), ‘Ghci1.it’ (imported from Ghci1),
-        ‘it’ (line 3)
+        ‘Ghci1.it’ (imported from Ghci1), ‘it’ (line 3),
+        ‘fst’ (imported from Prelude)

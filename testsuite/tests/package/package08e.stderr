@@ -3,8 +3,8 @@ package08e.hs:2:1: error:
     Could not find module ‘GHC.Hs.MyTypes’
     Perhaps you meant
       GHC.Hs.Type (needs flag -package-id ghc-9.3)
-      GHC.Hs.Syn.Type (needs flag -package-id ghc-9.3)
       GHC.Tc.Types (needs flag -package-id ghc-9.3)
+      GHC.Hs.Syn.Type (needs flag -package-id ghc-9.3)
     Use -v (or `:set -v` in ghci) to see a list of the files searched for.
 
 package08e.hs:3:1: error:
