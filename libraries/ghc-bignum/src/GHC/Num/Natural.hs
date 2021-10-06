@@ -510,7 +510,6 @@ naturalSizeInBase# base (NB n) = bigNatSizeInBase# base n
 -- byte first (big-endian) if @1#@ or least significant byte first
 -- (little-endian) if @0#@.
 naturalToAddr# :: Natural -> Addr# -> Bool# -> State# s -> (# State# s, Word# #)
-{-# NOINLINE naturalToAddr# #-}
 naturalToAddr# (NS i) = wordToAddr# i
 naturalToAddr# (NB n) = bigNatToAddr# n
 
@@ -535,7 +534,6 @@ naturalToAddr a addr e = IO \s -> case naturalToAddr# a addr e s of
 --
 -- Null higher limbs are automatically trimed.
 naturalFromAddr# :: Word# -> Addr# -> Bool# -> State# s -> (# State# s, Natural #)
-{-# NOINLINE naturalFromAddr# #-}
 naturalFromAddr# sz addr e s =
    case bigNatFromAddr# sz addr e s of
       (# s', n #) -> (# s', naturalFromBigNat# n #)
@@ -560,7 +558,6 @@ naturalFromAddr sz addr e = IO (naturalFromAddr# sz addr e)
 -- byte first (big-endian) if @1#@ or least significant byte first
 -- (little-endian) if @0#@.
 naturalToMutableByteArray# :: Natural -> MutableByteArray# s -> Word# -> Bool# -> State# s -> (# State# s, Word# #)
-{-# NOINLINE naturalToMutableByteArray# #-}
 naturalToMutableByteArray# (NS w) = wordToMutableByteArray# w
 naturalToMutableByteArray# (NB a) = bigNatToMutableByteArray# a
 
@@ -574,7 +571,6 @@ naturalToMutableByteArray# (NB a) = bigNatToMutableByteArray# a
 --
 -- Null higher limbs are automatically trimed.
 naturalFromByteArray# :: Word# -> ByteArray# -> Word# -> Bool# -> State# s -> (# State# s, Natural #)
-{-# NOINLINE naturalFromByteArray# #-}
 naturalFromByteArray# sz ba off e s = case bigNatFromByteArray# sz ba off e s of
    (# s', a #) -> (# s', naturalFromBigNat# a #)
 

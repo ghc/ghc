@@ -1228,6 +1228,7 @@ bigNatCtzWord a = W# (bigNatCtzWord# a)
 -- written in advance. In case of @/i/ == 0@, the function will write and report
 -- zero bytes written.
 bigNatToAddrLE# :: BigNat# -> Addr# -> State# s -> (# State# s, Word# #)
+{-# NOINLINE bigNatToAddrLE# #-}
 bigNatToAddrLE# a addr s0
    | isTrue# (sz ==# 0#) = (# s0, 0## #)
    | True = case writeMSB s0 of
@@ -1257,6 +1258,7 @@ bigNatToAddrLE# a addr s0
 -- written in advance. In case of @/i/ == 0@, the function will write and report
 -- zero bytes written.
 bigNatToAddrBE# :: BigNat# -> Addr# -> State# s -> (# State# s, Word# #)
+{-# NOINLINE bigNatToAddrBE# #-}
 bigNatToAddrBE# a addr s0
    | isTrue# (sz ==# 0#) = (# s0, 0## #)
    | msw <- indexWordArray# a (sz -# 1#)
@@ -1316,6 +1318,7 @@ bigNatToAddr a addr e = IO \s -> case bigNatToAddr# a addr e s of
 --
 -- Higher limbs equal to 0 are automatically trimmed.
 bigNatFromAddrLE# :: Word# -> Addr# -> State# s -> (# State# s, BigNat# #)
+{-# NOINLINE bigNatFromAddrLE# #-}
 bigNatFromAddrLE# 0## _    s = (# s, bigNatZero# (# #) #)
 bigNatFromAddrLE# sz  addr s =
    let
@@ -1351,6 +1354,7 @@ bigNatFromAddrLE# sz  addr s =
 --
 -- Null higher limbs are automatically trimmed.
 bigNatFromAddrBE# :: Word# -> Addr# -> State# s -> (# State# s, BigNat# #)
+{-# NOINLINE bigNatFromAddrBE# #-}
 bigNatFromAddrBE# 0## _    s = (# s, bigNatZero# (# #) #)
 bigNatFromAddrBE# sz  addr s =
    let
@@ -1405,6 +1409,7 @@ bigNatFromAddr# sz addr _  s = bigNatFromAddrBE# sz addr s
 -- written in advance. In case of @/i/ == 0@, the function will write and report
 -- zero bytes written.
 bigNatToMutableByteArrayLE# :: BigNat# -> MutableByteArray# s -> Word# -> State# s -> (# State# s, Word# #)
+{-# NOINLINE bigNatToMutableByteArrayLE# #-}
 bigNatToMutableByteArrayLE# a mba moff s0
    | isTrue# (sz ==# 0#) = (# s0, 0## #)
    | True = case writeMSB s0 of
@@ -1434,6 +1439,7 @@ bigNatToMutableByteArrayLE# a mba moff s0
 -- written in advance. In case of @/i/ == 0@, the function will write and report
 -- zero bytes written.
 bigNatToMutableByteArrayBE# :: BigNat# -> MutableByteArray# s -> Word# -> State# s -> (# State# s, Word# #)
+{-# NOINLINE bigNatToMutableByteArrayBE# #-}
 bigNatToMutableByteArrayBE# a mba moff s0
    | isTrue# (sz ==# 0#) = (# s0, 0## #)
    | msw <- indexWordArray# a (sz -# 1#)
@@ -1477,6 +1483,7 @@ bigNatToMutableByteArray# a mba off _  s = bigNatToMutableByteArrayBE# a mba off
 --
 -- Null higher limbs are automatically trimmed.
 bigNatFromByteArrayLE# :: Word# -> ByteArray# -> Word# -> State# s -> (# State# s, BigNat# #)
+{-# NOINLINE bigNatFromByteArrayLE# #-}
 bigNatFromByteArrayLE# 0## _  _    s = (# s, bigNatZero# (# #) #)
 bigNatFromByteArrayLE# sz  ba moff s =
    let
@@ -1512,6 +1519,7 @@ bigNatFromByteArrayLE# sz  ba moff s =
 --
 -- Null higher limbs are automatically trimmed.
 bigNatFromByteArrayBE# :: Word# -> ByteArray# -> Word# -> State# s -> (# State# s, BigNat# #)
+{-# NOINLINE bigNatFromByteArrayBE# #-}
 bigNatFromByteArrayBE# 0## _  _    s = (# s, bigNatZero# (# #) #)
 bigNatFromByteArrayBE# sz  ba moff s =
    let
@@ -1564,6 +1572,7 @@ bigNatFromByteArray# sz ba off _  s = bigNatFromByteArrayBE# sz ba off s
 -- If possible 'WordArray#', will be used directly (i.e. shared
 -- /without/ cloning the 'WordArray#' into a newly allocated one)
 bigNatFromWordArray# :: WordArray# -> Word# -> BigNat#
+{-# NOINLINE bigNatFromWordArray# #-}
 bigNatFromWordArray# wa n0
    | isTrue# (n `eqWord#` 0##)
    = bigNatZero# (# #)
