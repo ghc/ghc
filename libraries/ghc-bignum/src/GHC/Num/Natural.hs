@@ -114,7 +114,6 @@ naturalToWord !n = W# (naturalToWord# n)
 
 -- | Convert a Natural into a Word# clamping to (maxBound :: Word#).
 naturalToWordClamp# :: Natural -> Word#
-{-# NOINLINE naturalToWordClamp# #-}
 naturalToWordClamp# (NS x) = x
 naturalToWordClamp# (NB _) = WORD_MAXBOUND##
 
@@ -325,13 +324,11 @@ naturalSqr !a = naturalMul a a
 
 -- | Signum for Natural
 naturalSignum :: Natural -> Natural
-{-# NOINLINE naturalSignum #-}
 naturalSignum (NS 0##) = NS 0##
 naturalSignum _        = NS 1##
 
 -- | Negate for Natural
 naturalNegate :: Natural -> Natural
-{-# NOINLINE naturalNegate #-}
 naturalNegate (NS 0##) = NS 0##
 naturalNegate _        = raiseUnderflow
 
@@ -588,9 +585,6 @@ naturalFromByteArray# sz ba off e s = case bigNatFromByteArray# sz ba off e s of
 {-# RULES
 "Word# -> Natural -> Word#"
   forall x. naturalToWord# (NS x) = x
-
-"Word# -> Natural -> Word# (clamp)"
-  forall x. naturalToWordClamp# (NS x) = x
 
 "BigNat# -> Natural -> BigNat#"
   forall x. naturalToBigNat# (naturalFromBigNat# x) = x

@@ -397,7 +397,6 @@ basicKnownKeyNames
         integerShiftRName,
 
         naturalToWordName,
-        naturalToWordClampName,
         naturalPopCountName,
         naturalShiftRName,
         naturalShiftLName,
@@ -406,8 +405,6 @@ basicKnownKeyNames
         naturalSubThrowName,
         naturalSubUnsafeName,
         naturalMulName,
-        naturalSignumName,
-        naturalNegateName,
         naturalQuotRemName,
         naturalQuotName,
         naturalRemName,
@@ -1189,7 +1186,6 @@ integerFromNaturalName
    , integerShiftLName
    , integerShiftRName
    , naturalToWordName
-   , naturalToWordClampName
    , naturalPopCountName
    , naturalShiftRName
    , naturalShiftLName
@@ -1198,8 +1194,6 @@ integerFromNaturalName
    , naturalSubThrowName
    , naturalSubUnsafeName
    , naturalMulName
-   , naturalSignumName
-   , naturalNegateName
    , naturalQuotRemName
    , naturalQuotName
    , naturalRemName
@@ -1232,7 +1226,6 @@ bignatEqName              = bnbVarQual "bigNatEq#"                 bignatEqIdKey
 bignatCompareName         = bnbVarQual "bigNatCompare"             bignatCompareIdKey
 
 naturalToWordName         = bnnVarQual "naturalToWord#"            naturalToWordIdKey
-naturalToWordClampName    = bnnVarQual "naturalToWordClamp#"       naturalToWordClampIdKey
 naturalPopCountName       = bnnVarQual "naturalPopCount#"          naturalPopCountIdKey
 naturalShiftRName         = bnnVarQual "naturalShiftR#"            naturalShiftRIdKey
 naturalShiftLName         = bnnVarQual "naturalShiftL#"            naturalShiftLIdKey
@@ -1241,8 +1234,6 @@ naturalSubName            = bnnVarQual "naturalSub"                naturalSubIdK
 naturalSubThrowName       = bnnVarQual "naturalSubThrow"           naturalSubThrowIdKey
 naturalSubUnsafeName      = bnnVarQual "naturalSubUnsafe"          naturalSubUnsafeIdKey
 naturalMulName            = bnnVarQual "naturalMul"                naturalMulIdKey
-naturalSignumName         = bnnVarQual "naturalSignum"             naturalSignumIdKey
-naturalNegateName         = bnnVarQual "naturalNegate"             naturalNegateIdKey
 naturalQuotRemName        = bnnVarQual "naturalQuotRem#"           naturalQuotRemIdKey
 naturalQuotName           = bnnVarQual "naturalQuot"               naturalQuotIdKey
 naturalRemName            = bnnVarQual "naturalRem"                naturalRemIdKey
@@ -2580,7 +2571,6 @@ integerFromNaturalIdKey
    , integerFromWord64IdKey
    , integerFromInt64IdKey
    , naturalToWordIdKey
-   , naturalToWordClampIdKey
    , naturalPopCountIdKey
    , naturalShiftRIdKey
    , naturalShiftLIdKey
@@ -2589,8 +2579,6 @@ integerFromNaturalIdKey
    , naturalSubThrowIdKey
    , naturalSubUnsafeIdKey
    , naturalMulIdKey
-   , naturalSignumIdKey
-   , naturalNegateIdKey
    , naturalQuotRemIdKey
    , naturalQuotIdKey
    , naturalRemIdKey
@@ -2657,7 +2645,6 @@ integerFromWord64IdKey     = mkPreludeMiscIdUnique 643
 integerFromInt64IdKey      = mkPreludeMiscIdUnique 644
 
 naturalToWordIdKey         = mkPreludeMiscIdUnique 650
-naturalToWordClampIdKey    = mkPreludeMiscIdUnique 651
 naturalPopCountIdKey       = mkPreludeMiscIdUnique 659
 naturalShiftRIdKey         = mkPreludeMiscIdUnique 660
 naturalShiftLIdKey         = mkPreludeMiscIdUnique 661
@@ -2666,8 +2653,6 @@ naturalSubIdKey            = mkPreludeMiscIdUnique 663
 naturalSubThrowIdKey       = mkPreludeMiscIdUnique 664
 naturalSubUnsafeIdKey      = mkPreludeMiscIdUnique 665
 naturalMulIdKey            = mkPreludeMiscIdUnique 666
-naturalSignumIdKey         = mkPreludeMiscIdUnique 667
-naturalNegateIdKey         = mkPreludeMiscIdUnique 668
 naturalQuotRemIdKey        = mkPreludeMiscIdUnique 669
 naturalQuotIdKey           = mkPreludeMiscIdUnique 670
 naturalRemIdKey            = mkPreludeMiscIdUnique 671

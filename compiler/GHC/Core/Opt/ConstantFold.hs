@@ -2052,8 +2052,7 @@ builtinBignumRules =
   , integer_to_natural "Integer -> Natural (wrap)"  integerToNaturalName      False False
   , integer_to_natural "Integer -> Natural (throw)" integerToNaturalThrowName True False
 
-  , natural_to_word "Natural -> Word# (wrap)"  naturalToWordName      False
-  , natural_to_word "Natural -> Word# (clamp)" naturalToWordClampName True
+  , natural_to_word "Natural -> Word# (wrap)"  naturalToWordName
 
     -- comparisons (return an unlifted Int#)
   , bignum_bin_pred "integerEq#" integerEqName (==)
@@ -2106,14 +2105,6 @@ builtinBignumRules =
   , bignum_unop "integerAbs"        integerAbsName        mkIntegerExpr abs
   , bignum_unop "integerSignum"     integerSignumName     mkIntegerExpr signum
   , bignum_unop "integerComplement" integerComplementName mkIntegerExpr complement
-
-  , bignum_unop "naturalSignum"     naturalSignumName     mkNaturalExpr signum
-
-  , mkRule "naturalNegate" naturalNegateName 1 $ do
-        [a0] <- getArgs
-        x <- isNaturalLiteral a0
-        guard (x == 0) -- negate is only valid for (0 :: Natural)
-        pure a0
 
   , bignum_popcount "integerPopCount" integerPopCountName mkLitIntWrap
   , bignum_popcount "naturalPopCount" naturalPopCountName mkLitWordWrap
@@ -2179,13 +2170,11 @@ builtinBignumRules =
       x <- isBigIntegerLiteral a0
       pure (convert platform x)
 
-    natural_to_word str name clamp = mkRule str name 1 $ do
+    natural_to_word str name = mkRule str name 1 $ do
       [a0] <- getArgs
       n <- isNaturalLiteral a0
       platform <- getPlatform
-      if clamp && not (platformInWordRange platform n)
-          then pure (Lit (mkLitWord platform (platformMaxWord platform)))
-          else pure (Lit (mkLitWordWrap platform n))
+      pure (Lit (mkLitWordWrap platform n))
 
     integer_to_natural str name thrw clamp = mkRule str name 1 $ do
       [a0] <- getArgs
