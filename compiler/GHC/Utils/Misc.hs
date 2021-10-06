@@ -950,10 +950,12 @@ fuzzyMatch key vals = fuzzyLookup key [(v,v) | v <- vals]
 fuzzyLookup :: String -> [(String,a)] -> [a]
 fuzzyLookup user_entered possibilites
   = map fst $ take mAX_RESULTS $ List.sortBy (comparing snd)
-    [ (poss_val, distance) | (poss_str, poss_val) <- possibilites
-                       , let distance = restrictedDamerauLevenshteinDistance
-                                            poss_str user_entered
-                       , distance <= fuzzy_threshold ]
+    [ (poss_val, sort_key)
+    | (poss_str, poss_val) <- possibilites
+    , let distance = restrictedDamerauLevenshteinDistance poss_str user_entered
+    , distance <= fuzzy_threshold
+    , let sort_key = (distance, length poss_str, poss_str)
+    ]
   where
     -- Work out an appropriate match threshold:
     -- We report a candidate if its edit distance is <= the threshold,
@@ -966,6 +968,10 @@ fuzzyLookup user_entered possibilites
     --     5         1
     --     6         2
     --
+    -- Candidates with the same distance are sorted by their length. We also
+    -- use the actual string as the third sorting criteria the sort key to get
+    -- deterministic output, even if the input may have depended on the uniques
+    -- in question
     fuzzy_threshold = truncate $ fromIntegral (length user_entered + 2) / (4 :: Rational)
     mAX_RESULTS = 3
 
