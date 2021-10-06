@@ -110,7 +110,6 @@ test('T2783', [ omit_ways(['ghci']), exit_code(1)
 # both threaded1 (-threaded -debug) and threaded2 (-threaded) ways.
 test('testwsdeque', [extra_files(['../../../rts/WSDeque.h']),
                      unless(in_tree_compiler(), skip),
-                    req_smp, # needs atomic 'cas'
                     c_src, only_ways(['threaded1', 'threaded2'])],
                     compile_and_run, [''])
 
