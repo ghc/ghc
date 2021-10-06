@@ -1,0 +1,6 @@
+
+ArrowPatSyn2.hs:16:15: error:
+    • Proc patterns cannot use existential or GADT data constructors
+    • In the pattern: P x
+      In the expression: proc (P x) -> MkT -< x
+      In an equation for ‘panic’: panic = proc (P x) -> MkT -< x

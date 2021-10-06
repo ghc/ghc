@@ -320,9 +320,9 @@ dsProcExpr pat (L _ (HsCmdTop (CmdTopTc _unitTy cmd_ty ids) cmd)) = do
     let env_ty = mkBigCoreVarTupTy env_ids
     let env_stk_ty = mkCorePairTy env_ty unitTy
     let env_stk_expr = mkCorePairExpr (mkBigCoreVarTup env_ids) mkCoreUnitExpr
-    fail_expr <- mkFailExpr ProcExpr env_stk_ty
+    fail_expr <- mkFailExpr (ArrowMatchCtxt ProcExpr) env_stk_ty
     var <- selectSimpleMatchVarL Many pat
-    match_code <- matchSimply (Var var) ProcExpr pat env_stk_expr fail_expr
+    match_code <- matchSimply (Var var) (ArrowMatchCtxt ProcExpr) pat env_stk_expr fail_expr
     let pat_ty = hsLPatType pat
     let proc_code = do_premap meth_ids pat_ty env_stk_ty cmd_ty
                     (Lam var match_code)
@@ -758,9 +758,9 @@ dsCmdLam ids local_vars stack_ty res_ty pats body env_ids = do
         in_ty = envStackType env_ids stack_ty
         in_ty' = envStackType env_ids' stack_ty'
 
-    fail_expr <- mkFailExpr LambdaExpr in_ty'
+    fail_expr <- mkFailExpr (ArrowMatchCtxt KappaExpr) in_ty'
     -- match the patterns against the parameters
-    match_code <- matchSimplys (map Var param_ids) LambdaExpr pats core_expr
+    match_code <- matchSimplys (map Var param_ids) (ArrowMatchCtxt KappaExpr) pats core_expr
                     fail_expr
     -- match the parameters against the top of the old stack
     (stack_id, param_code) <- matchVarStack param_ids stack_id' match_code

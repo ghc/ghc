@@ -1,0 +1,6 @@
+
+ArrowDict.hs:8:13: error:
+    • Proc patterns cannot use existential or GADT data constructors
+    • In the pattern: D x
+      In the expression: proc (D x) -> do show -< x
+      In an equation for ‘get’: get = proc (D x) -> do show -< x

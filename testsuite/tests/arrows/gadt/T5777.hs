@@ -3,7 +3,8 @@ module T5777 where
 
 import Control.Arrow
 
-data Value a where BoolVal :: Value Bool
+data Value a where
+    BoolVal :: Value Bool
 
 class ArrowInit f where
     arrif :: f b -> ()

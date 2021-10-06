@@ -1638,7 +1638,8 @@ data HsMatchContext p
   | LambdaExpr                  -- ^Patterns of a lambda
   | CaseAlt                     -- ^Patterns and guards on a case alternative
   | IfAlt                       -- ^Guards of a multi-way if alternative
-  | ProcExpr                    -- ^Patterns of a proc
+  | ArrowMatchCtxt              -- ^A pattern match inside arrow notation
+      HsArrowMatchContext
   | PatBindRhs                  -- ^A pattern binding  eg [y] <- e = e
   | PatBindGuards               -- ^Guards of pattern bindings, e.g.,
                                 --    (Just b) | Just _ <- x = e
@@ -1675,6 +1676,12 @@ data HsStmtContext p
   | ParStmtCtxt (HsStmtContext p)    -- ^A branch of a parallel stmt
   | TransStmtCtxt (HsStmtContext p)  -- ^A branch of a transform stmt
 
+-- | Haskell arrow match context.
+data HsArrowMatchContext
+  = ProcExpr     -- ^ A proc expression
+  | ArrowCaseAlt -- ^ A case alternative inside arrow notation
+  | KappaExpr    -- ^ An arrow kappa abstraction
+
 qualifiedDoModuleName_maybe :: HsStmtContext p -> Maybe ModuleName
 qualifiedDoModuleName_maybe ctxt = case ctxt of
   DoExpr m -> m
@@ -1708,7 +1715,7 @@ matchSeparator (FunRhs {})   = text "="
 matchSeparator CaseAlt       = text "->"
 matchSeparator IfAlt         = text "->"
 matchSeparator LambdaExpr    = text "->"
-matchSeparator ProcExpr      = text "->"
+matchSeparator (ArrowMatchCtxt{})= text "->"
 matchSeparator PatBindRhs    = text "="
 matchSeparator PatBindGuards = text "="
 matchSeparator (StmtCtxt _)  = text "<-"
@@ -1724,9 +1731,10 @@ pprMatchContext ctxt
   | want_an ctxt = text "an" <+> pprMatchContextNoun ctxt
   | otherwise    = text "a"  <+> pprMatchContextNoun ctxt
   where
-    want_an (FunRhs {}) = True  -- Use "an" in front
-    want_an ProcExpr    = True
-    want_an _           = False
+    want_an (FunRhs {})                = True  -- Use "an" in front
+    want_an (ArrowMatchCtxt ProcExpr)  = True
+    want_an (ArrowMatchCtxt KappaExpr) = True
+    want_an _                          = False
 
 pprMatchContextNoun :: forall p. (Outputable (IdP p), UnXRec p)
                     => HsMatchContext p -> SDoc
@@ -1741,10 +1749,15 @@ pprMatchContextNoun ThPatQuote      = text "Template Haskell pattern quotation"
 pprMatchContextNoun PatBindRhs      = text "pattern binding"
 pprMatchContextNoun PatBindGuards   = text "pattern binding guards"
 pprMatchContextNoun LambdaExpr      = text "lambda abstraction"
-pprMatchContextNoun ProcExpr        = text "arrow abstraction"
+pprMatchContextNoun (ArrowMatchCtxt c)= pprArrowMatchContextNoun c
 pprMatchContextNoun (StmtCtxt ctxt) = text "pattern binding in"
                                       $$ pprAStmtContext ctxt
 pprMatchContextNoun PatSyn          = text "pattern synonym declaration"
+
+pprArrowMatchContextNoun :: HsArrowMatchContext -> SDoc
+pprArrowMatchContextNoun ProcExpr     = text "arrow proc pattern"
+pprArrowMatchContextNoun ArrowCaseAlt = text "case alternative within arrow notation"
+pprArrowMatchContextNoun KappaExpr    = text "arrow kappa abstraction"
 
 -----------------
 pprAStmtContext, pprStmtContext :: (Outputable (IdP p), UnXRec p)

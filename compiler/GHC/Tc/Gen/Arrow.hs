@@ -98,7 +98,7 @@ tcProc pat cmd@(L _ (HsCmdTop names _)) exp_ty
         ; names' <- mapM (tcSyntaxName ProcOrigin arr_ty) names
         ; let cmd_env = CmdEnv { cmd_arr = arr_ty }
         ; (pat', cmd') <- newArrowScope
-                          $ tcCheckPat ProcExpr pat (unrestricted arg_ty)
+                          $ tcCheckPat (ArrowMatchCtxt ProcExpr) pat (unrestricted arg_ty)
                           $ tcCmdTop cmd_env names' cmd (unitTy, res_ty)
         ; let res_co = mkTcTransCo co
                          (mkTcAppCo co1 (mkTcNomReflCo res_ty))
@@ -260,11 +260,13 @@ tc_cmd env
 
                 -- Check the patterns, and the GRHSs inside
         ; (pats', grhss') <- setSrcSpanA mtch_loc                                 $
-                             tcPats LambdaExpr pats (map (unrestricted . mkCheckExpType) arg_tys) $
+                             tcPats (ArrowMatchCtxt KappaExpr)
+                               pats (map (unrestricted . mkCheckExpType) arg_tys) $
                              tc_grhss grhss cmd_stk' (mkCheckExpType res_ty)
 
         ; let match' = L mtch_loc (Match { m_ext = noAnn
-                                         , m_ctxt = LambdaExpr, m_pats = pats'
+                                         , m_ctxt = ArrowMatchCtxt KappaExpr
+                                         , m_pats = pats'
                                          , m_grhss = grhss' })
               arg_tys = map (unrestricted . hsLPatType) pats'
               cmd' = HsCmdLam x (MG { mg_alts = L l [match']
@@ -273,7 +275,7 @@ tc_cmd env
         ; return (mkHsCmdWrap (mkWpCastN co) cmd') }
   where
     n_pats     = length pats
-    match_ctxt = (LambdaExpr :: HsMatchContext GhcRn)    -- Maybe KappaExpr?
+    match_ctxt = ArrowMatchCtxt KappaExpr
     pg_ctxt    = PatGuard match_ctxt
 
     tc_grhss (GRHSs x grhss binds) stk_ty res_ty
@@ -349,7 +351,7 @@ tcCmdMatches :: CmdEnv
 tcCmdMatches env scrut_ty matches (stk, res_ty)
   = tcMatchesCase match_ctxt (unrestricted scrut_ty) matches (mkCheckExpType res_ty)
   where
-    match_ctxt = MC { mc_what = CaseAlt,
+    match_ctxt = MC { mc_what = ArrowMatchCtxt ArrowCaseAlt,
                       mc_body = mc_body }
     mc_body body res_ty' = do { res_ty' <- expTypeToType res_ty'
                               ; tcCmd env body (stk, res_ty') }

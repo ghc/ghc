@@ -1,0 +1,6 @@
+
+ArrowExistential.hs:16:27: error:
+    • Proc patterns cannot use existential or GADT data constructors
+    • In the pattern: Bar a
+      In a case alternative within arrow notation: Bar a -> foo -< a
+      In the command: case x of Bar a -> foo -< a
