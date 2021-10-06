@@ -910,6 +910,45 @@ GHCi knows about. Using :ghci-cmd:`:module` or ``import`` to try bring into
 scope a non-loaded module may result in the message
 ``module M is not loaded``.
 
+``Shadowing`` and the ``Ghci1`` module name
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Bindings on the prompt can shadow earlier bindings:
+
+.. code-block:: none
+
+    ghci> let foo = True
+    ghci> let foo = False
+    ghci> :show bindings
+    foo :: Bool = False
+
+But the shadowed thing still exists, and may show up again later, for example
+in a type signature:
+
+.. code-block:: none
+
+    ghci> data T = A | B deriving Eq
+    ghci> let a = A
+    ghci> data T = ANewType
+    ghci> :t a
+    a :: Ghci1.T
+
+Now the type of ``a`` is printed using its fully qualified name using the
+module name ``Ghci1`` (and ``Ghci2`` for the next set of bindings, and so on).
+You can use these qualified names as well:
+
+.. code-block:: none
+
+    ghci> a == Ghci1.A
+    True
+    ghci> let a = False -- shadowing a
+    ghci> Ghci2.a == Ghci1.A
+    True
+
+The command ``:show bindings`` only shows bindings that are not shadowed.
+Bindings that define multiple names, such as a type constructor and its data
+constructors, are shown if *any* defined name is still available unqualifiedly.
+
 The ``it`` variable
 ~~~~~~~~~~~~~~~~~~~
 
