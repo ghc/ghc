@@ -263,11 +263,11 @@ normaliseCommentText ('\r':xs) = normaliseCommentText xs
 normaliseCommentText (x:xs) = x:normaliseCommentText xs
 
 -- | Makes a comment which originates from a specific keyword.
-mkKWComment :: AnnKeywordId -> EpaLocation -> Comment
+mkKWComment :: AnnKeywordId -> EpaLocation -> [Comment]
 mkKWComment kw (EpaSpan ss)
-  = Comment (keywordToString $ G kw) (Anchor ss UnchangedAnchor) (Just kw)
-mkKWComment kw (EpaDelta dp)
-  = Comment (keywordToString $ G kw) (Anchor placeholderRealSpan (MovedAnchor dp)) (Just kw)
+  = [Comment (keywordToString $ G kw) (Anchor ss UnchangedAnchor) (Just kw)]
+mkKWComment kw (EpaDelta dp cs)
+  = (map tokComment cs) ++ [Comment (keywordToString $ G kw) (Anchor placeholderRealSpan (MovedAnchor dp)) (Just kw)]
 
 comment2dp :: (Comment,  DeltaPos) -> (KeywordId, DeltaPos)
 comment2dp = first AnnComment

@@ -456,7 +456,7 @@ add_where an@(AddEpAnn _ (EpaSpan rs)) (EpAnn a (AnnList anc o c r t) cs) cs2
 add_where an@(AddEpAnn _ (EpaSpan rs)) EpAnnNotUsed cs
   = EpAnn (Anchor rs UnchangedAnchor)
            (AnnList (Just $ Anchor rs UnchangedAnchor) Nothing Nothing [an] []) cs
-add_where (AddEpAnn _ (EpaDelta _)) _ _ = panic "add_where"
+add_where (AddEpAnn _ (EpaDelta _ _)) _ _ = panic "add_where"
  -- EpaDelta should only be used for transformations
 
 valid_anchor :: RealSrcSpan -> Bool
@@ -3011,7 +3011,7 @@ token_location_widenR NoTokenLoc _ = NoTokenLoc
 token_location_widenR tl (UnhelpfulSpan _) = tl
 token_location_widenR (TokenLoc (EpaSpan r1)) (RealSrcSpan r2 _) =
                       (TokenLoc (EpaSpan (combineRealSrcSpans r1 r2)))
-token_location_widenR (TokenLoc (EpaDelta _)) _ =
+token_location_widenR (TokenLoc (EpaDelta _ _)) _ =
   -- Never happens because the parser does not produce EpaDelta.
   panic "token_location_widenR: EpaDelta"
 
