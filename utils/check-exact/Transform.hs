@@ -294,8 +294,8 @@ captureTypeSigSpacing (L l (SigD x (TypeSig (EpAnn anc (AnnSig dc rs') cs) ns (H
       L (SrcSpanAnn (EpAnn anc' _ _) _) _ -> anchor anc' -- TODO MovedAnchor?
     -- DP (line, col) = ss2delta (ss2pos $ anchor $ getLoc lc) r
     dc' = case dca of
-      EpaSpan r -> AddEpAnn kw (EpaDelta $ ss2delta (ss2posEnd rd) r)
-      EpaDelta _ -> AddEpAnn kw dca
+      EpaSpan r -> AddEpAnn kw (EpaDelta (ss2delta (ss2posEnd rd) r) [])
+      EpaDelta _ _ -> AddEpAnn kw dca
 
     -- ---------------------------------
 
@@ -305,7 +305,7 @@ captureTypeSigSpacing (L l (SigD x (TypeSig (EpAnn anc (AnnSig dc rs') cs) ns (H
         -> let
              op = case dca of
                EpaSpan r -> MovedAnchor (ss2delta (ss2posEnd r) (realSrcSpan ll))
-               EpaDelta _ -> MovedAnchor (SameLine 1)
+               EpaDelta _ _ -> MovedAnchor (SameLine 1)
            in (L (SrcSpanAnn (EpAnn (Anchor (realSrcSpan ll) op) mempty emptyComments) ll) b)
       (L (SrcSpanAnn (EpAnn (Anchor r op) a c) ll) b)
         -> let
@@ -313,7 +313,7 @@ captureTypeSigSpacing (L l (SigD x (TypeSig (EpAnn anc (AnnSig dc rs') cs) ns (H
                 MovedAnchor _ -> op
                 _ -> case dca of
                   EpaSpan dcr -> MovedAnchor (ss2delta (ss2posEnd dcr) r)
-                  EpaDelta _ -> MovedAnchor (SameLine 1)
+                  EpaDelta _ _ -> MovedAnchor (SameLine 1)
            in (L (SrcSpanAnn (EpAnn (Anchor r op') a c) ll) b)
 
 captureTypeSigSpacing s = s
@@ -500,13 +500,13 @@ setEntryDP _ast _dp anns = anns
 -- ---------------------------------------------------------------------
 
 addEpaLocationDelta :: LayoutStartCol -> RealSrcSpan -> EpaLocation -> EpaLocation
-addEpaLocationDelta _off _anc (EpaDelta d) = EpaDelta d
+addEpaLocationDelta _off _anc (EpaDelta d cs) = EpaDelta d cs
 addEpaLocationDelta  off  anc (EpaSpan r)
-  = EpaDelta (adjustDeltaForOffset 0 off (ss2deltaEnd anc r))
+  = EpaDelta (adjustDeltaForOffset 0 off (ss2deltaEnd anc r)) []
 
 -- Set the entry DP for an element coming after an existing keyword annotation
 setEntryDPFromAnchor :: LayoutStartCol -> EpaLocation -> LocatedA t -> LocatedA t
-setEntryDPFromAnchor _off (EpaDelta _) (L la a) = L la a
+setEntryDPFromAnchor _off (EpaDelta _ _) (L la a) = L la a
 setEntryDPFromAnchor  off (EpaSpan anc) ll@(L la _) = setEntryDP' ll dp'
   where
     r = case la of
@@ -955,22 +955,22 @@ noAnnSrcSpanDPn :: (Monoid ann) => SrcSpan -> Int -> SrcSpanAnn' (EpAnn ann)
 noAnnSrcSpanDPn l s = noAnnSrcSpanDP l (SameLine s)
 
 d0 :: EpaLocation
-d0 = EpaDelta $ SameLine 0
+d0 = EpaDelta (SameLine 0) []
 
 d1 :: EpaLocation
-d1 = EpaDelta $ SameLine 1
+d1 = EpaDelta (SameLine 1) []
 
 dn :: Int -> EpaLocation
-dn n = EpaDelta $ SameLine n
+dn n = EpaDelta (SameLine n) []
 
 m0 :: AnchorOperation
-m0 = MovedAnchor $ SameLine 0
+m0 = MovedAnchor (SameLine 0)
 
 m1 :: AnchorOperation
-m1 = MovedAnchor $ SameLine 1
+m1 = MovedAnchor (SameLine 1)
 
 mn :: Int -> AnchorOperation
-mn n = MovedAnchor $ SameLine n
+mn n = MovedAnchor (SameLine n)
 
 addComma :: SrcSpanAnnA -> SrcSpanAnnA
 addComma (SrcSpanAnn EpAnnNotUsed l)
@@ -1122,8 +1122,8 @@ instance HasDecls (LocatedA (HsExpr GhcPs)) where
                 let
                   off = case l of
                           (EpaSpan r) -> LayoutStartCol $ snd $ ss2pos r
-                          (EpaDelta (SameLine _)) -> LayoutStartCol 0
-                          (EpaDelta (DifferentLine _ c)) -> LayoutStartCol c
+                          (EpaDelta (SameLine _) _) -> LayoutStartCol 0
+                          (EpaDelta (DifferentLine _ c) _) -> LayoutStartCol c
                   ex'' = setEntryDPFromAnchor off i ex
                   newDecls'' = case newDecls of
                     [] -> newDecls
@@ -1399,7 +1399,7 @@ oldWhereAnnotation :: (Monad m)
 oldWhereAnnotation EpAnnNotUsed ww _oldSpan = do
   newSpan <- uniqueSrcSpanT
   let w = case ww of
-        WithWhere -> [AddEpAnn AnnWhere (EpaDelta (SameLine 0))]
+        WithWhere -> [AddEpAnn AnnWhere (EpaDelta (SameLine 0) [])]
         WithoutWhere -> []
   let anc2' = Anchor (rs newSpan) (MovedAnchor (SameLine 1))
   (anc, anc2) <- do
@@ -1414,7 +1414,7 @@ oldWhereAnnotation (EpAnn anc an cs) ww _oldSpan = do
   -- TODO: when we set DP (0,0) for the HsValBinds EpEpaLocation, change the AnnList anchor to have the correct DP too
   let (AnnList ancl o c _r t) = an
   let w = case ww of
-        WithWhere -> [AddEpAnn AnnWhere (EpaDelta (SameLine 0))]
+        WithWhere -> [AddEpAnn AnnWhere (EpaDelta (SameLine 0) [])]
         WithoutWhere -> []
   (anc', ancl') <- do
         case ww of
@@ -1431,7 +1431,7 @@ newWhereAnnotation ww = do
   let anc  = Anchor (rs newSpan) (MovedAnchor (DifferentLine 1 2))
   let anc2 = Anchor (rs newSpan) (MovedAnchor (DifferentLine 1 4))
   let w = case ww of
-        WithWhere -> [AddEpAnn AnnWhere (EpaDelta (SameLine 0))]
+        WithWhere -> [AddEpAnn AnnWhere (EpaDelta (SameLine 0) [])]
         WithoutWhere -> []
   let an = EpAnn anc
                   (AnnList (Just anc2) Nothing Nothing w [])

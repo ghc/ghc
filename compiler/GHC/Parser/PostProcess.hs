@@ -443,7 +443,7 @@ add_where an@(AddEpAnn _ (EpaSpan rs)) (EpAnn a (AnnList anc o c r t) cs)
 add_where an@(AddEpAnn _ (EpaSpan rs)) EpAnnNotUsed
   = EpAnn (Anchor rs UnchangedAnchor)
            (AnnList (Just $ Anchor rs UnchangedAnchor) Nothing Nothing [an] []) emptyComments
-add_where (AddEpAnn _ (EpaDelta _)) _ = panic "add_where"
+add_where (AddEpAnn _ (EpaDelta _ _)) _ = panic "add_where"
  -- EpaDelta should only be used for transformations
 
 valid_anchor :: RealSrcSpan -> Bool

@@ -392,17 +392,20 @@ instance Outputable EpaComment where
 -- The usual way an 'AddEpAnn' is created is using the 'mj' ("make
 -- jump") function, and then it can be inserted into the appropriate
 -- annotation.
-data AddEpAnn = AddEpAnn AnnKeywordId EpaLocation deriving (Data,Show,Eq,Ord)
+data AddEpAnn = AddEpAnn AnnKeywordId EpaLocation deriving (Data,Eq,Ord)
 
--- | The anchor for an @'AnnKeywordId'@. The Parser inserts the @'EpaSpan'@
--- variant, giving the exact location of the original item in the
--- parsed source.  This can be replaced by the @'EpaDelta'@ version, to
--- provide a position for the item relative to the end of the previous
--- item in the source.  This is useful when editing an AST prior to
--- exact printing the changed one.
-data EpaLocation = EpaSpan RealSrcSpan
-                 | EpaDelta DeltaPos
-               deriving (Data,Show,Eq,Ord)
+-- | The anchor for an @'AnnKeywordId'@. The Parser inserts the
+-- @'EpaSpan'@ variant, giving the exact location of the original item
+-- in the parsed source.  This can be replaced by the @'EpaDelta'@
+-- version, to provide a position for the item relative to the end of
+-- the previous item in the source.  This is useful when editing an
+-- AST prior to exact printing the changed one. The list of comments
+-- in the @'EpaDelta'@ variant captures any comments between the prior
+-- output and the thing being marked here, since we cannot otherwise
+-- sort the relative order.
+data EpaLocation = EpaSpan !RealSrcSpan
+                 | EpaDelta !DeltaPos ![LEpaComment]
+               deriving (Data,Eq,Ord)
 
 -- | Spacing between output items when exact printing.  It captures
 -- the spacing from the current print position on the page to the
@@ -437,7 +440,7 @@ getDeltaLine (DifferentLine r _) = r
 -- partial function is safe.
 epaLocationRealSrcSpan :: EpaLocation -> RealSrcSpan
 epaLocationRealSrcSpan (EpaSpan r) = r
-epaLocationRealSrcSpan (EpaDelta _) = panic "epaLocationRealSrcSpan"
+epaLocationRealSrcSpan (EpaDelta _ _) = panic "epaLocationRealSrcSpan"
 
 epaLocationFromSrcAnn :: SrcAnn ann -> EpaLocation
 epaLocationFromSrcAnn (SrcSpanAnn EpAnnNotUsed l) = EpaSpan (realSrcSpan l)
@@ -445,7 +448,7 @@ epaLocationFromSrcAnn (SrcSpanAnn (EpAnn anc _ _) _) = EpaSpan (anchor anc)
 
 instance Outputable EpaLocation where
   ppr (EpaSpan r) = text "EpaSpan" <+> ppr r
-  ppr (EpaDelta d) = text "EpaDelta" <+> ppr d
+  ppr (EpaDelta d cs) = text "EpaDelta" <+> ppr d <+> ppr cs
 
 instance Outputable AddEpAnn where
   ppr (AddEpAnn kw ss) = text "AddEpAnn" <+> ppr kw <+> ppr ss
@@ -627,7 +630,7 @@ data TrailingAnn
   | AddRarrowAnn EpaLocation  -- ^ Trailing '->'
   | AddRarrowAnnU EpaLocation -- ^ Trailing '->', unicode variant
   | AddLollyAnnU EpaLocation  -- ^ Trailing '⊸'
-  deriving (Data,Show,Eq, Ord)
+  deriving (Data,Eq, Ord)
 
 instance Outputable TrailingAnn where
   ppr (AddSemiAnn ss)    = text "AddSemiAnn"    <+> ppr ss
@@ -933,7 +936,7 @@ widenSpan s as = foldl combineSrcSpans s (go as)
   where
     go [] = []
     go (AddEpAnn _ (EpaSpan s):rest) = RealSrcSpan s Nothing : go rest
-    go (AddEpAnn _ (EpaDelta _):rest) = go rest
+    go (AddEpAnn _ (EpaDelta _ _):rest) = go rest
 
 -- | The annotations need to all come after the anchor.  Make sure
 -- this is the case.
@@ -942,7 +945,7 @@ widenRealSpan s as = foldl combineRealSrcSpans s (go as)
   where
     go [] = []
     go (AddEpAnn _ (EpaSpan s):rest) = s : go rest
-    go (AddEpAnn _ (EpaDelta _):rest) =     go rest
+    go (AddEpAnn _ (EpaDelta _ _):rest) =     go rest
 
 widenAnchor :: Anchor -> [AddEpAnn] -> Anchor
 widenAnchor (Anchor s op) as = Anchor (widenRealSpan s as) op
