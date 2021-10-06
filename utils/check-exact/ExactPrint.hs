@@ -300,7 +300,7 @@ annotationsToComments ans kws = do
     doOne :: AnnKeywordId -> EPP [Comment]
     doOne kw = do
       let sps =getSpans kw ans
-      return $ map (mkKWComment kw ) sps
+      return $ concatMap (mkKWComment kw ) sps
     -- TODO:AZ make sure these are sorted/merged properly when the invariant for
     -- allocateComments is re-established.
   newComments <- mapM doOne kws
@@ -433,7 +433,8 @@ printStringAtAnn (EpAnn _ a _) f str = printStringAtAA (f a) str
 
 printStringAtAA :: EpaLocation -> String -> EPP ()
 printStringAtAA (EpaSpan r) s = printStringAtKw' r s
-printStringAtAA (EpaDelta d) s = do
+printStringAtAA (EpaDelta d cs) s = do
+  mapM_ (printOneComment . tokComment) cs
   pe <- getPriorEndD
   p1 <- getPosP
   printStringAtLsDelta d s
