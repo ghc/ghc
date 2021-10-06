@@ -241,20 +241,20 @@ Language
 
 * The behavior of :extension:`NegativeLiterals` changed, and now we require
   that a negative literal must not be preceded by a closing token (see
-  `GHC Proposal #229 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0229-whitespace-bang-patterns.rst>`__
+  `GHC Proposal #229 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0229-whitespace-bang-patterns.rst>`_)
   for the definition of a closing token). In other words, we parse ``f -123``
   as ``f (-123)``, but ``x-123`` as ``(-) x 123``. Before this amendment,
   :extension:`NegativeLiterals` caused ``x-123`` to be parsed as ``x(-123)``.
 
 * GHC is now more sensitive to whitespace between infix operators and their arguments,
   requiring it in some cases where it was not previously necessary as the result of the
-  :ref:`whitespace-sensitive operator parsing proposal <https://github.com/ghc-proposals/ghc-proposals/pull/229>`.
+  `whitespace-sensitive operator parsing proposal <https://github.com/ghc-proposals/ghc-proposals/pull/229>`_.
   It also affects the usage of ``!``,``~`` and ``@`` as BangPatterns, irrefutable patterns
   and type applications respectively.
   This  means that expressions that were parsed as visible type applications
   in previous versions when the ``@`` was surrounded by whitespace will now
   be parsed as an operator application.
-  For more details see the `migration guide on the wiki <https://gitlab.haskell.org/ghc/ghc/-/wikis/migration/9.0#whitespace-sensitive-and->`.
+  For more details see the `migration guide on the wiki <https://gitlab.haskell.org/ghc/ghc/-/wikis/migration/9.0#whitespace-sensitive-and->`_.
 
 Compiler
 ~~~~~~~~
