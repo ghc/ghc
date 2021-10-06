@@ -27,10 +27,14 @@ Dumping out compiler intermediate structures
     :shortdesc: Dump to files instead of stdout
     :type: dynamic
 
-    Causes the output from all of the flags listed below to be dumped
-    to a file. The file name depends upon the output produced; for instance,
-    output from :ghc-flag:`-ddump-simpl` will end up in
-    :file:`{module}.dump-simpl`.
+    Causes the output from each of flags starting with "-ddump", to be
+    dumped to a file or files. If you want to have all the output from one
+    single flag saved to one file, use :ghc-flag:`-ddump-file-prefix=⟨str⟩`
+    (see descriptions below). Otherwise, the output will go to several
+    files, including one for non-module specific and several for module
+    specific. The suffix of a dump file depends on the flag turned on, for
+    instance, output from :ghc-flag:`-ddump-simpl` will end up in
+    :file:`prefix.dump-simpl`.
 
 .. ghc-flag:: -ddump-file-prefix=⟨str⟩
     :shortdesc: Set the prefix of the filenames used for debugging output.

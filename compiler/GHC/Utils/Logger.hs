@@ -116,7 +116,7 @@ data LogFlags = LogFlags
   , log_enable_timestamps    :: !Bool               -- ^ Enable timestamps
   , log_dump_to_file         :: !Bool               -- ^ Enable dump to file
   , log_dump_dir             :: !(Maybe FilePath)   -- ^ Dump directory
-  , log_dump_prefix          :: !(Maybe FilePath)   -- ^ Normal dump path ("basename.")
+  , log_dump_prefix          :: !FilePath           -- ^ Normal dump path ("basename.")
   , log_dump_prefix_override :: !(Maybe FilePath)   -- ^ Overriden dump path
   , log_enable_debug         :: !Bool               -- ^ Enable debug output
   , log_verbosity            :: !Int                -- ^ Verbosity level
@@ -133,7 +133,7 @@ defaultLogFlags = LogFlags
   , log_enable_timestamps    = True
   , log_dump_to_file         = False
   , log_dump_dir             = Nothing
-  , log_dump_prefix          = Nothing
+  , log_dump_prefix          = ""
   , log_dump_prefix_override = Nothing
   , log_enable_debug         = False
   , log_verbosity            = 0
@@ -485,8 +485,7 @@ withDumpFileHandle dumps logflags flag action = do
 chooseDumpFile :: LogFlags -> DumpFlag -> Maybe FilePath
 chooseDumpFile logflags flag
     | log_dump_to_file logflags || forced_to_file
-    , Just prefix <- getPrefix
-    = Just $ setDir (prefix ++ dump_suffix)
+    = Just $ setDir (getPrefix ++ dump_suffix)
 
     | otherwise
     = Nothing
@@ -510,13 +509,12 @@ chooseDumpFile logflags flag
          -- dump file location is being forced
          --      by the --ddump-file-prefix flag.
        | Just prefix <- log_dump_prefix_override logflags
-          = Just prefix
-         -- dump file location chosen by GHC.Driver.Pipeline.runPipeline
-       | Just prefix <- log_dump_prefix logflags
-          = Just prefix
-         -- we haven't got a place to put a dump file.
+          = prefix
+         -- dump file locations, module specified to [modulename] set by
+         -- GHC.Driver.Pipeline.runPipeline; non-module specific, e.g. Chasing dependencies,
+         -- to 'non-module' by default.
        | otherwise
-          = Nothing
+          = log_dump_prefix logflags
     setDir f = case log_dump_dir logflags of
                  Just d  -> d </> f
                  Nothing ->       f

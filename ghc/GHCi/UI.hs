@@ -1299,7 +1299,7 @@ runStmt input step = do
     setDumpFilePrefix :: GHC.GhcMonad m => InteractiveContext -> m () -- #17500
     setDumpFilePrefix ic = do
         dflags <- GHC.getInteractiveDynFlags
-        GHC.setInteractiveDynFlags dflags { dumpPrefix = Just (modStr ++ ".") }
+        GHC.setInteractiveDynFlags dflags { dumpPrefix = modStr ++ "." }
       where
         modStr = moduleNameString $ moduleName $ icInteractiveModule $ ic
 

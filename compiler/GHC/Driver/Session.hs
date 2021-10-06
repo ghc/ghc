@@ -549,9 +549,10 @@ data DynFlags = DynFlags {
                                   -- used to query the appropriate fields
                                   -- (outputFile/dynOutputFile, ways, etc.)
 
-  -- | This is set by 'GHC.Driver.Pipeline.setDumpPrefix'
-  --    or 'ghc.GHCi.UI.runStmt' based on where its output is going.
-  dumpPrefix            :: Maybe FilePath,
+  -- | This defaults to 'non-module'. It can be set by
+  -- 'GHC.Driver.Pipeline.setDumpPrefix' or 'ghc.GHCi.UI.runStmt' based on
+  -- where its output is going.
+  dumpPrefix            :: FilePath,
 
   -- | Override the 'dumpPrefix' set by 'GHC.Driver.Pipeline.setDumpPrefix'
   --    or 'ghc.GHCi.UI.runStmt'.
@@ -1159,7 +1160,7 @@ defaultDynFlags mySettings llvmConfig =
         outputHi                = Nothing,
         dynOutputHi             = Nothing,
         dynLibLoader            = SystemDependent,
-        dumpPrefix              = Nothing,
+        dumpPrefix              = "non-module.",
         dumpPrefixForce         = Nothing,
         ldInputs                = [],
         includePaths            = IncludeSpecs [] [] [],
@@ -2192,7 +2193,7 @@ dynamic_flags_deps = [
   , make_ord_flag defGhcFlag "dumpdir"           (hasArg setDumpDir)
   , make_ord_flag defGhcFlag "outputdir"         (hasArg setOutputDir)
   , make_ord_flag defGhcFlag "ddump-file-prefix"
-        (hasArg (setDumpPrefixForce . Just))
+        (hasArg (setDumpPrefixForce . Just . flip (++) "."))
 
   , make_ord_flag defGhcFlag "dynamic-too"
         (NoArg (setGeneralFlag Opt_BuildDynamicToo))

@@ -733,3 +733,9 @@ T20084:
 	# Don't compile
 	"$(TEST_HC)" $(TEST_HC_OPTS) T20084.hs
 
+.PHONY: T20316
+T20316:
+	echo 'main = print "Hello World"' > T20316.hs
+	"$(TEST_HC)" $(TEST_HC_OPTS) -fno-code T20316.hs -ddump-to-file -ddump-timings;
+	echo "*** non-module.dump-timings ***"
+	cat non-module.dump-timings | grep alloc | sed 's/alloc.*//'

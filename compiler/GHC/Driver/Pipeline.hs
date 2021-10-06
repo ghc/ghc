@@ -634,7 +634,7 @@ mkPipeEnv stop_phase  input_fn output =
 
 setDumpPrefix :: PipeEnv -> HscEnv -> HscEnv
 setDumpPrefix pipe_env hsc_env =
-  hscUpdateFlags (\dflags -> dflags { dumpPrefix = Just (src_basename pipe_env ++ ".")}) hsc_env
+  hscUpdateFlags (\dflags -> dflags { dumpPrefix = src_basename pipe_env ++ "."}) hsc_env
 
 {- The Pipelines -}
 
