@@ -25,6 +25,7 @@ module GHC.Core.RoughMap
   , elemsRM
   , sizeRM
   , foldRM
+  , traverse_RM
   , unionRM
   ) where
 
@@ -327,6 +328,9 @@ dropEmpty rm = Just rm
 
 elemsRM :: RoughMap a -> [a]
 elemsRM = foldRM (:) []
+
+traverse_RM :: Monad m => (a -> m ()) -> RoughMap a -> m ()
+traverse_RM f = foldRM (\x rest -> f x >> rest) (return ())
 
 foldRM :: (a -> b -> b) -> b -> RoughMap a -> b
 foldRM f = go

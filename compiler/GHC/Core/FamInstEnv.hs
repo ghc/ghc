@@ -17,6 +17,7 @@ module GHC.Core.FamInstEnv (
 
         FamInstEnvs, FamInstEnv, emptyFamInstEnv, emptyFamInstEnvs,
         unionFamInstEnv, extendFamInstEnv, extendFamInstEnvList,
+        traverse_FamInstEnv,
         famInstEnvElts, famInstEnvSize, familyInstances,
 
         -- * CoAxioms
@@ -381,6 +382,9 @@ emptyFamInstEnvs = (emptyFamInstEnv, emptyFamInstEnv)
 
 emptyFamInstEnv :: FamInstEnv
 emptyFamInstEnv = FamIE 0 emptyRM
+
+traverse_FamInstEnv :: Monad m => (FamInst -> m ()) -> FamInstEnv -> m ()
+traverse_FamInstEnv f (FamIE _ rm) = traverse_RM f rm
 
 famInstEnvElts :: FamInstEnv -> [FamInst]
 famInstEnvElts (FamIE _ rm) = elemsRM rm

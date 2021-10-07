@@ -452,9 +452,8 @@ checkFamInstConsistency directlyImpMods
            --
            -- See also Note [Tying the knot]
            -- for why we are doing this at all.
-           ; let check_now = famInstEnvElts env1
-           ; mapM_ (checkForConflicts (emptyFamInstEnv, env2))           check_now
-           ; mapM_ (checkForInjectivityConflicts (emptyFamInstEnv,env2)) check_now
+           ; traverse_FamInstEnv (checkForConflicts (emptyFamInstEnv, env2))           env1
+           ; traverse_FamInstEnv (checkForInjectivityConflicts (emptyFamInstEnv,env2)) env1
  }
 
 getFamInsts :: ModuleEnv FamInstEnv -> Module -> TcM FamInstEnv
