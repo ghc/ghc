@@ -514,13 +514,11 @@ integerAbs n@(IS i)
 -- | Return @-1@, @0@, and @1@ depending on whether argument is
 -- negative, zero, or positive, respectively
 integerSignum :: Integer -> Integer
-{-# NOINLINE integerSignum #-}
 integerSignum !j = IS (integerSignum# j)
 
 -- | Return @-1#@, @0#@, and @1#@ depending on whether argument is
 -- negative, zero, or positive, respectively
 integerSignum# :: Integer -> Int#
-{-# NOINLINE integerSignum# #-}
 integerSignum# (IN _)  = -1#
 integerSignum# (IS i#) = sgnI# i#
 integerSignum# (IP _ ) =  1#

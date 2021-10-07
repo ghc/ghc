@@ -2097,7 +2097,6 @@ builtinBignumRules =
     -- unary operations
   , bignum_unop "integerNegate"     integerNegateName     mkIntegerExpr negate
   , bignum_unop "integerAbs"        integerAbsName        mkIntegerExpr abs
-  , bignum_unop "integerSignum"     integerSignumName     mkIntegerExpr signum
   , bignum_unop "integerComplement" integerComplementName mkIntegerExpr complement
 
   , bignum_popcount "integerPopCount" integerPopCountName mkLitIntWrap

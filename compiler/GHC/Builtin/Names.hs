@@ -368,7 +368,6 @@ basicKnownKeyNames
         integerSubName,
         integerNegateName,
         integerAbsName,
-        integerSignumName,
         integerPopCountName,
         integerQuotName,
         integerRemName,
@@ -1151,7 +1150,6 @@ integerFromNaturalName
    , integerSubName
    , integerNegateName
    , integerAbsName
-   , integerSignumName
    , integerPopCountName
    , integerQuotName
    , integerRemName
@@ -1255,7 +1253,6 @@ integerMulName            = bniVarQual "integerMul"                integerMulIdK
 integerSubName            = bniVarQual "integerSub"                integerSubIdKey
 integerNegateName         = bniVarQual "integerNegate"             integerNegateIdKey
 integerAbsName            = bniVarQual "integerAbs"                integerAbsIdKey
-integerSignumName         = bniVarQual "integerSignum"             integerSignumIdKey
 integerPopCountName       = bniVarQual "integerPopCount#"          integerPopCountIdKey
 integerQuotName           = bniVarQual "integerQuot"               integerQuotIdKey
 integerRemName            = bniVarQual "integerRem"                integerRemIdKey
@@ -2522,7 +2519,6 @@ integerFromNaturalIdKey
    , integerSubIdKey
    , integerNegateIdKey
    , integerAbsIdKey
-   , integerSignumIdKey
    , integerPopCountIdKey
    , integerQuotIdKey
    , integerRemIdKey
@@ -2589,7 +2585,6 @@ integerMulIdKey            = mkPreludeMiscIdUnique 609
 integerSubIdKey            = mkPreludeMiscIdUnique 610
 integerNegateIdKey         = mkPreludeMiscIdUnique 611
 integerAbsIdKey            = mkPreludeMiscIdUnique 618
-integerSignumIdKey         = mkPreludeMiscIdUnique 619
 integerPopCountIdKey       = mkPreludeMiscIdUnique 621
 integerQuotIdKey           = mkPreludeMiscIdUnique 622
 integerRemIdKey            = mkPreludeMiscIdUnique 623
