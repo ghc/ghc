@@ -1,0 +1,5 @@
+
+<interactive>:1:1: error:
+    • GHC internal error: ‘Ghci1.foo’ is not in scope during type checking, but it passed the renamer
+      tcl_env of environment: []
+    • In the expression: Ghci1.foo
