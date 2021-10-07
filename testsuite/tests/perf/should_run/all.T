@@ -332,6 +332,11 @@ test('T14052',
      ghci_script,
      ['T14052.script'])
 
+test('T14052Type',
+     [collect_compiler_stats('bytes allocated',15)],
+     ghci_script,
+     ['T14052Type.script'])
+
 test('T14936',
      [collect_stats('bytes allocated',10)],
      compile_and_run,
