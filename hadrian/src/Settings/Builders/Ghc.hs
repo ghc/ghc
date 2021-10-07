@@ -196,6 +196,7 @@ commonGhcArgs = do
     way  <- getWay
     path <- getBuildPath
     stage <- getStage
+    useColor <- shakeColor <$> expr getShakeOptions
     ghcVersion <- expr $ ghcVersionH stage
     mconcat [ arg "-hisuf", arg $ hisuf way
             , arg "-osuf" , arg $  osuf way
@@ -211,7 +212,17 @@ commonGhcArgs = do
             , map ("-optc" ++) <$> getStagedSettingList ConfCcArgs
             , map ("-optP" ++) <$> getStagedSettingList ConfCppArgs
             , map ("-optP" ++) <$> getContextData cppOpts
-            , arg "-outputdir", arg path ]
+            , arg "-outputdir", arg path
+              -- we need to enable color explicitly because the output is
+              -- captured to be displayed after the failed command line in case
+              -- of error (#20490). GHC detects that it doesn't output to a
+              -- terminal and it disables colors if we don't do this.
+            , useColor ?
+              -- N.B. Target.trackArgument ignores this argument from the
+              -- input hash to avoid superfluous recompilation, avoiding
+              -- #18672.
+              arg "-fdiagnostics-color=always"
+            ]
 
 -- TODO: Do '-ticky' in all debug ways?
 wayGhcArgs :: Args
