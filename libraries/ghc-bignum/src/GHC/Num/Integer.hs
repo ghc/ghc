@@ -282,7 +282,6 @@ integerGe !x !y = isTrue# (integerGe# x y)
 
 -- | Equal predicate.
 integerEq# :: Integer -> Integer -> Bool#
-{-# NOINLINE integerEq# #-}
 integerEq# (IS x) (IS y) = x ==# y
 integerEq# (IN x) (IN y) = bigNatEq# x y
 integerEq# (IP x) (IP y) = bigNatEq# x y
@@ -290,7 +289,6 @@ integerEq# _       _     = 0#
 
 -- | Not-equal predicate.
 integerNe# :: Integer -> Integer -> Bool#
-{-# NOINLINE integerNe# #-}
 integerNe# (IS x) (IS y) = x /=# y
 integerNe# (IN x) (IN y) = bigNatNe# x y
 integerNe# (IP x) (IP y) = bigNatNe# x y
@@ -298,31 +296,27 @@ integerNe# _       _     = 1#
 
 -- | Greater predicate.
 integerGt# :: Integer -> Integer -> Bool#
-{-# NOINLINE integerGt# #-}
-integerGt# (IS x) (IS y)                   = x ># y
-integerGt# x y | GT <- integerCompare' x y = 1#
-integerGt# _ _                             = 0#
+integerGt# (IS x) (IS y)                  = x ># y
+integerGt# x y | GT <- integerCompare x y = 1#
+integerGt# _ _                            = 0#
 
 -- | Lower-or-equal predicate.
 integerLe# :: Integer -> Integer -> Bool#
-{-# NOINLINE integerLe# #-}
-integerLe# (IS x) (IS y)                   = x <=# y
-integerLe# x y | GT <- integerCompare' x y = 0#
-integerLe# _ _                             = 1#
+integerLe# (IS x) (IS y)                  = x <=# y
+integerLe# x y | GT <- integerCompare x y = 0#
+integerLe# _ _                            = 1#
 
 -- | Lower predicate.
 integerLt# :: Integer -> Integer -> Bool#
-{-# NOINLINE integerLt# #-}
-integerLt# (IS x) (IS y)                   = x <# y
-integerLt# x y | LT <- integerCompare' x y = 1#
-integerLt# _ _                             = 0#
+integerLt# (IS x) (IS y)                  = x <# y
+integerLt# x y | LT <- integerCompare x y = 1#
+integerLt# _ _                            = 0#
 
 -- | Greater-or-equal predicate.
 integerGe# :: Integer -> Integer -> Bool#
-{-# NOINLINE integerGe# #-}
-integerGe# (IS x) (IS y)                   = x >=# y
-integerGe# x y | LT <- integerCompare' x y = 0#
-integerGe# _ _                             = 1#
+integerGe# (IS x) (IS y)                  = x >=# y
+integerGe# x y | LT <- integerCompare x y = 0#
+integerGe# _ _                            = 1#
 
 instance Eq Integer where
    (==) = integerEq
@@ -330,20 +324,16 @@ instance Eq Integer where
 
 -- | Compare two Integer
 integerCompare :: Integer -> Integer -> Ordering
-{-# NOINLINE integerCompare #-}
-integerCompare = integerCompare'
-
-integerCompare' :: Integer -> Integer -> Ordering
-{-# INLINE integerCompare' #-}
-integerCompare' (IS x) (IS y) = compareInt# x y
-integerCompare' (IP x) (IP y) = bigNatCompare x y
-integerCompare' (IN x) (IN y) = bigNatCompare y x
-integerCompare' (IS _) (IP _) = LT
-integerCompare' (IS _) (IN _) = GT
-integerCompare' (IP _) (IS _) = GT
-integerCompare' (IN _) (IS _) = LT
-integerCompare' (IP _) (IN _) = GT
-integerCompare' (IN _) (IP _) = LT
+{-# INLINEABLE integerCompare #-}
+integerCompare (IS x) (IS y) = compareInt# x y
+integerCompare (IP x) (IP y) = bigNatCompare x y
+integerCompare (IN x) (IN y) = bigNatCompare y x
+integerCompare (IS _) (IP _) = LT
+integerCompare (IS _) (IN _) = GT
+integerCompare (IP _) (IS _) = GT
+integerCompare (IN _) (IS _) = LT
+integerCompare (IP _) (IN _) = GT
+integerCompare (IN _) (IP _) = LT
 
 instance Ord Integer where
    compare = integerCompare

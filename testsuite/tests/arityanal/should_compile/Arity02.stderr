@@ -1,38 +1,43 @@
 
 ==================== Tidy Core ====================
-Result size of Tidy Core = {terms: 35, types: 23, coercions: 0, joins: 0/0}
+Result size of Tidy Core = {terms: 51, types: 27, coercions: 0, joins: 0/0}
 
--- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 F2.f1 :: Integer
-[GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 100 0}]
-F2.f1 = 0
+[GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+F2.f1 = GHC.Num.Integer.IS 0#
 
 -- RHS size: {terms: 7, types: 6, coercions: 0, joins: 0/0}
 f2f :: forall {t1} {t2}. (t1 -> Integer -> t2) -> t1 -> t2
 [GblId, Arity=2, Str=<1C1(C1(L))><L>, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=True)}]
 f2f = \ (@t) (@t1) (h :: t -> Integer -> t1) (x :: t) -> h x F2.f1
 
--- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 lvl :: Integer
 [GblId, Unf=OtherCon []]
-lvl = 1
+lvl = GHC.Num.Integer.IS 1#
 
 Rec {
--- RHS size: {terms: 16, types: 3, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 29, types: 7, coercions: 0, joins: 0/0}
 F2.f2_g [Occ=LoopBreaker] :: Integer -> Integer -> Integer
-[GblId, Arity=2, Str=<SL><SL>, Unf=OtherCon []]
+[GblId, Arity=2, Str=<1L><SL>, Unf=OtherCon []]
 F2.f2_g
   = \ (x :: Integer) (y :: Integer) ->
-      case GHC.Num.Integer.integerGt# x F2.f1 of {
-        __DEFAULT -> y;
-        1# -> F2.f2_g (GHC.Num.Integer.integerSub x lvl) (GHC.Num.Integer.integerAdd x y)
+      case x of wild {
+        GHC.Num.Integer.IS x1 ->
+          case GHC.Prim.># x1 0# of {
+            __DEFAULT -> y;
+            1# -> F2.f2_g (GHC.Num.Integer.integerSub wild lvl) (GHC.Num.Integer.integerAdd wild y)
+          };
+        GHC.Num.Integer.IP x1 -> F2.f2_g (GHC.Num.Integer.integerSub wild lvl) (GHC.Num.Integer.integerAdd wild y);
+        GHC.Num.Integer.IN x1 -> y
       }
 end Rec }
 
--- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 F2.f3 :: Integer
-[GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 100 0}]
-F2.f3 = 5
+[GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+F2.f3 = GHC.Num.Integer.IS 5#
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 f2 :: Integer

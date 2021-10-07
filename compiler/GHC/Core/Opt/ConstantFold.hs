@@ -2055,16 +2055,9 @@ builtinBignumRules =
   , natural_to_word "Natural -> Word# (wrap)"  naturalToWordName
 
     -- comparisons (return an unlifted Int#)
-  , bignum_bin_pred "integerEq#" integerEqName (==)
-  , bignum_bin_pred "integerNe#" integerNeName (/=)
-  , bignum_bin_pred "integerLe#" integerLeName (<=)
-  , bignum_bin_pred "integerGt#" integerGtName (>)
-  , bignum_bin_pred "integerLt#" integerLtName (<)
-  , bignum_bin_pred "integerGe#" integerGeName (>=)
   , bignum_bin_pred "bigNatEq#"  bignatEqName (==)
 
     -- comparisons (return an Ordering)
-  , bignum_compare "integerCompare"     integerCompareName
   , bignum_compare "bignatCompare"      bignatCompareName
   , bignum_compare "bignatCompareWord#" bignatCompareWordName
 
