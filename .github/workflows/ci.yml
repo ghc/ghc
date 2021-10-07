@@ -15,7 +15,7 @@ jobs:
         os: [ubuntu-latest]
         cabal: ["3.4"]
         ghc:
-          - "9.2.0.20210422"
+          - "9.2.0.20210821"
 
     steps:
     - uses: actions/checkout@v2
