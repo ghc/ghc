@@ -2064,8 +2064,9 @@ builtinBignumRules =
   , bignum_bin_pred "bigNatEq#"  bignatEqName (==)
 
     -- comparisons (return an Ordering)
-  , bignum_compare "integerCompare" integerCompareName
-  , bignum_compare "bignatCompare" bignatCompareName
+  , bignum_compare "integerCompare"     integerCompareName
+  , bignum_compare "bignatCompare"      bignatCompareName
+  , bignum_compare "bignatCompareWord#" bignatCompareWordName
 
     -- binary operations
   , integer_binop "integerAdd" integerAddName (+)

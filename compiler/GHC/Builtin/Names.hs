@@ -1213,6 +1213,7 @@ integerFromNaturalName
    , bignatFromWordListName
    , bignatEqName
    , bignatCompareName
+   , bignatCompareWordName
    :: Name
 
 bnbVarQual, bnnVarQual, bniVarQual :: String -> Unique -> Name
@@ -1224,6 +1225,7 @@ bniVarQual str key = varQual gHC_NUM_INTEGER (fsLit str) key
 bignatFromWordListName    = bnbVarQual "bigNatFromWordList#"       bignatFromWordListIdKey
 bignatEqName              = bnbVarQual "bigNatEq#"                 bignatEqIdKey
 bignatCompareName         = bnbVarQual "bigNatCompare"             bignatCompareIdKey
+bignatCompareWordName     = bnbVarQual "bigNatCompareWord#"        bignatCompareWordIdKey
 
 naturalToWordName         = bnnVarQual "naturalToWord#"            naturalToWordIdKey
 naturalPopCountName       = bnnVarQual "naturalPopCount#"          naturalPopCountIdKey
@@ -2599,6 +2601,7 @@ integerFromNaturalIdKey
    , bignatFromWordListIdKey
    , bignatEqIdKey
    , bignatCompareIdKey
+   , bignatCompareWordIdKey
    :: Unique
 
 integerFromNaturalIdKey    = mkPreludeMiscIdUnique 600
@@ -2674,6 +2677,7 @@ naturalSizeInBaseIdKey     = mkPreludeMiscIdUnique 684
 bignatFromWordListIdKey    = mkPreludeMiscIdUnique 690
 bignatEqIdKey              = mkPreludeMiscIdUnique 691
 bignatCompareIdKey         = mkPreludeMiscIdUnique 692
+bignatCompareWordIdKey     = mkPreludeMiscIdUnique 693
 
 
 ------------------------------------------------------

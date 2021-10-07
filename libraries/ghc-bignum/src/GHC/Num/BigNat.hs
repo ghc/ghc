@@ -332,6 +332,7 @@ bigNatNe a b = isTrue# (bigNatNe# a b)
 
 -- | Compare a BigNat and a Word#
 bigNatCompareWord# :: BigNat# -> Word# -> Ordering
+{-# NOINLINE bigNatCompareWord# #-}
 bigNatCompareWord# a b
    | bigNatIsZero a                   = cmpW# 0## b
    | isTrue# (wordArraySize# a ># 1#) = GT
