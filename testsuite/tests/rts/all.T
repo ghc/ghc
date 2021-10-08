@@ -484,7 +484,8 @@ test('T15427', normal, compile_and_run, [''])
 
 test('T19481', extra_run_opts('+RTS -T  -RTS'), compile_and_run, [''])
 test('T19381', extra_run_opts('+RTS -T -RTS'), compile_and_run, [''])
-test('T20199', normal, makefile_test, [])
+test('T20199', [ grep_errmsg('Hello') ]
+      , makefile_test, [])
 
 test('ipeMap', [c_src], compile_and_run, [''])
 
