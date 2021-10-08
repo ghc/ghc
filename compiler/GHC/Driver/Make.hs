@@ -468,7 +468,7 @@ createBuildPlan mod_graph maybe_top_mod =
         -- hs-boot files which are **not** part of cycles.
         collapseAcyclic :: [SCC ModuleGraphNode] -> [BuildPlan]
         collapseAcyclic (AcyclicSCC node : nodes) = SingleModule node : collapseAcyclic nodes
-        collapseAcyclic (CyclicSCC nodes : _) = [UnresolvedCycle nodes]
+        collapseAcyclic (CyclicSCC cy_nodes : nodes) = (UnresolvedCycle cy_nodes) : collapseAcyclic nodes
         collapseAcyclic [] = []
 
         topSortWithBoot nodes = topSortModules False (select_boot_modules nodes ++ nodes) Nothing

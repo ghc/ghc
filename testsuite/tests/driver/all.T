@@ -297,3 +297,5 @@ test('RunMode', extra_files(['RunMode/Test.hs']), run_command, ['{compiler} --ru
 test('T20439', normal, run_command,
      ['echo "module Foo where" >> Foo.hs && \
       {compiler} -E -fno-code -XCPP -v Foo.hs 2>&1 | grep "Copying" | sed "s/.*to//" '])
+test('T20459', normal, multimod_compile_fail,
+     ['T20459B', ''])
