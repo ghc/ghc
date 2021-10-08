@@ -2087,7 +2087,7 @@ initIfaceLoad hsc_env do_this
                         if_doc = text "initIfaceLoad",
                         if_rec_types = emptyKnotVars
                     }
-      initTcRnIf 'i' hsc_env gbl_env () do_this
+      initTcRnIf 'i' (hsc_env { hsc_type_env_vars = emptyKnotVars }) gbl_env () do_this
 
 -- | This is used when we are doing to call 'typecheckModule' on an 'ModIface',
 -- if it's part of a loop with some other modules then we need to use their
