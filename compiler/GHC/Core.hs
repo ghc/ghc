@@ -942,7 +942,7 @@ type MOutCoercion = MCoercion
 -- See Note [Orphans]
 data IsOrphan
   = IsOrphan
-  | NotOrphan OccName -- The OccName 'n' witnesses the instance's non-orphanhood
+  | NotOrphan !OccName -- The OccName 'n' witnesses the instance's non-orphanhood
                       -- In that case, the instance is fingerprinted as part
                       -- of the definition of 'n's definition
     deriving Data
