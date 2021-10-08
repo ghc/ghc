@@ -2999,6 +2999,7 @@ primop  MyThreadIdOp "myThreadId#" GenPrimOp
 
 primop LabelThreadOp "labelThread#" GenPrimOp
    ThreadId# -> Addr# -> State# RealWorld -> State# RealWorld
+   {Set the label of the given thread.}
    with
    has_side_effects = True
    out_of_line      = True
@@ -3014,6 +3015,12 @@ primop  NoDuplicateOp "noDuplicate#" GenPrimOp
    with
    out_of_line = True
    has_side_effects = True
+
+primop GetThreadLabelOp "threadLabel#" GenPrimOp
+   ThreadId# -> State# RealWorld -> (# State# RealWorld, Addr# #)
+   {Get the label of the given thread. Returns NULL if not set.}
+   with
+   out_of_line      = True
 
 primop  ThreadStatusOp "threadStatus#" GenPrimOp
    ThreadId# -> State# RealWorld -> (# State# RealWorld, Int#, Int#, Int# #)

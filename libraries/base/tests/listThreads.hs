@@ -1,4 +1,5 @@
 import Control.Concurrent
+import Data.List (sort)
 import GHC.Conc.Sync
 
 dummyThread :: MVar () -> Int -> IO ()
@@ -16,7 +17,7 @@ main = do
 
   mapM_ mkThread [0..100]
   threads <- listThreads
-  -- TODO: Check labels
   print $ length threads
+  print . sort =<< mapM threadLabel threads
   putMVar mvar ()
 

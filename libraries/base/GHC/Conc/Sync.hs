@@ -39,7 +39,9 @@ module GHC.Conc.Sync
         , yield
         , labelThread
         , mkWeakThreadId
+        -- ** Queries
         , listThreads
+        , threadLabel
         , ThreadStatus(..), BlockReason(..)
         , threadStatus
         , threadCapability
@@ -625,6 +627,17 @@ threadCapability :: ThreadId -> IO (Int, Bool)
 threadCapability (ThreadId t) = IO $ \s ->
    case threadStatus# t s of
      (# s', _, cap#, locked# #) -> (# s', (I# cap#, isTrue# (locked# /=# 0#)) #)
+
+-- | Query the label of thread, returning 'Nothing' if the
+-- thread's label has not been set.
+threadLabel :: ThreadId -> IO (Maybe String)
+threadLabel (ThreadId t) = IO $ \s ->
+    case threadLabel# t s of
+      (# s', lbl #) ->
+          let lbl'
+                | Ptr lbl == nullPtr = Nothing
+                | otherwise          = Just $ unpackCStringUtf8# lbl
+          in (# s', lbl' #)
 
 -- | Make a weak pointer to a 'ThreadId'.  It can be important to do
 -- this if you want to hold a reference to a 'ThreadId' while still

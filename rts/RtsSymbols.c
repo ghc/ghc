@@ -682,13 +682,14 @@
       SymI_HasProto(initLinker_)                                        \
       SymI_HasProto(stg_unpackClosurezh)                                \
       SymI_HasProto(stg_closureSizzezh)                                 \
-      SymI_HasProto(stg_whereFromzh)                                 \
+      SymI_HasProto(stg_whereFromzh)                                    \
       SymI_HasProto(stg_getApStackValzh)                                \
       SymI_HasProto(stg_getSparkzh)                                     \
       SymI_HasProto(stg_numSparkszh)                                    \
       SymI_HasProto(stg_isCurrentThreadBoundzh)                         \
       SymI_HasProto(stg_isEmptyMVarzh)                                  \
       SymI_HasProto(stg_killThreadzh)                                   \
+      SymI_NeedsProto(stg_threadLabelzh)                                \
       SymI_HasProto(stg_listThreadszh)                                  \
       SymI_HasProto(loadArchive)                                        \
       SymI_HasProto(loadObj)                                            \

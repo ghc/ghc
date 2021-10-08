@@ -1634,6 +1634,7 @@ emitPrimOp dflags primop = case primop of
   LabelThreadOp -> alwaysExternal
   IsCurrentThreadBoundOp -> alwaysExternal
   NoDuplicateOp -> alwaysExternal
+  GetThreadLabelOp -> alwaysExternal
   ThreadStatusOp -> alwaysExternal
   MkWeakOp -> alwaysExternal
   MkWeakNoFinalizerOp -> alwaysExternal

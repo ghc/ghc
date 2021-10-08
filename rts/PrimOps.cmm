@@ -1122,6 +1122,13 @@ stg_isCurrentThreadBoundzh (/* no args */)
     return (r);
 }
 
+stg_threadLabelzh ( gcptr tso )
+{
+    W_ r;
+    (r) = ccall lookupThreadLabel (StgTSO_id(tso));
+    return (r);
+}
+
 stg_threadStatuszh ( gcptr tso )
 {
     W_ why_blocked;
