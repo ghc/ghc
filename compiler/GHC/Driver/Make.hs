@@ -921,11 +921,11 @@ withAbstractSem :: AbstractSem -> IO b -> IO b
 withAbstractSem sem = MC.bracket_ (acquireSem sem) (releaseSem sem)
 
 -- | Environment used when compiling a module
-data MakeEnv = MakeEnv { hsc_env :: HscEnv -- The basic HscEnv which will be augmented for each module
-                       , old_hpt :: HomePackageTable -- A cache of old interface files
-                       , compile_sem :: AbstractSem
-                       , lqq_var :: TVar LogQueueQueue
-                       , env_messager :: Maybe Messager
+data MakeEnv = MakeEnv { hsc_env :: !HscEnv -- The basic HscEnv which will be augmented for each module
+                       , old_hpt :: !HomePackageTable -- A cache of old interface files
+                       , compile_sem :: !AbstractSem
+                       , lqq_var :: !(TVar LogQueueQueue)
+                       , env_messager :: !(Maybe Messager)
                        }
 
 type RunMakeM a = ReaderT MakeEnv (MaybeT IO) a
