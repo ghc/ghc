@@ -101,10 +101,10 @@ type ClosureEnv = NameEnv (Name, ForeignHValue)
 
 -- | Information we can use to dynamically link modules into the compiler
 data Linkable = LM {
-  linkableTime     :: UTCTime,          -- ^ Time at which this linkable was built
+  linkableTime     :: !UTCTime,          -- ^ Time at which this linkable was built
                                         -- (i.e. when the bytecodes were produced,
                                         --       or the mod date on the files)
-  linkableModule   :: Module,           -- ^ The linkable module itself
+  linkableModule   :: !Module,           -- ^ The linkable module itself
   linkableUnlinked :: [Unlinked]
     -- ^ Those files and chunks of code we have yet to link.
     --
