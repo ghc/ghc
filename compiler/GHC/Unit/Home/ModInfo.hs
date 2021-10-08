@@ -38,9 +38,11 @@ data HomeModInfo = HomeModInfo
         -- ^ The basic loaded interface file: every loaded module has one of
         -- these, even if it is imported from another package
 
-   , hm_details  :: !ModDetails
+   , hm_details  :: ModDetails
         -- ^ Extra information that has been created from the 'ModIface' for
         -- the module, typically during typechecking
+
+        -- This field is LAZY because a ModDetails is constructed by knot tying.
 
    , hm_linkable :: !(Maybe Linkable)
         -- ^ The actual artifact we would like to link to access things in

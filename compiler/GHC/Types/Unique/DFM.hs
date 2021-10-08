@@ -72,6 +72,7 @@ import GHC.Prelude
 import GHC.Types.Unique ( Uniquable(..), Unique, getKey )
 import GHC.Utils.Outputable
 
+import qualified Data.IntMap.Strict as MS
 import qualified Data.IntMap as M
 import Data.Data
 import Data.Functor.Classes (Eq1 (..))
@@ -122,7 +123,7 @@ import Unsafe.Coerce
 -- | A type of values tagged with insertion time
 data TaggedVal val =
   TaggedVal
-    val
+    !val
     {-# UNPACK #-} !Int -- ^ insertion time
   deriving stock (Data, Functor, Foldable, Traversable)
 
@@ -175,12 +176,16 @@ addToUDFM m k v = addToUDFM_Directly m (getUnique k) v
 -- The new binding always goes to the right of existing ones
 addToUDFM_Directly :: UniqDFM key elt -> Unique -> elt -> UniqDFM key elt
 addToUDFM_Directly (UDFM m i) u v
-  = UDFM (M.insertWith tf (getKey u) (TaggedVal v i) m) (i + 1)
+  = UDFM (MS.insertWith tf (getKey u) (TaggedVal v i) m) (i + 1)
   where
     tf (TaggedVal new_v _) (TaggedVal _ old_i) = TaggedVal new_v old_i
       -- Keep the old tag, but insert the new value
       -- This means that udfmToList typically returns elements
       -- in the order of insertion, rather than the reverse
+
+      -- It is quite critical that the strict insertWith is used as otherwise
+      -- the combination function 'tf' is not forced and both old values are retained
+      -- in the map.
 
 addToUDFM_C_Directly
   :: (elt -> elt -> elt)   -- old -> new -> result
@@ -188,7 +193,7 @@ addToUDFM_C_Directly
   -> Unique -> elt
   -> UniqDFM key elt
 addToUDFM_C_Directly f (UDFM m i) u v
-  = UDFM (M.insertWith tf (getKey u) (TaggedVal v i) m) (i + 1)
+  = UDFM (MS.insertWith tf (getKey u) (TaggedVal v i) m) (i + 1)
     where
       tf (TaggedVal new_v _) (TaggedVal old_v old_i)
          = TaggedVal (f old_v new_v) old_i
@@ -400,7 +405,10 @@ alterUDFM f (UDFM m i) k =
 
 -- | Map a function over every value in a UniqDFM
 mapUDFM :: (elt1 -> elt2) -> UniqDFM key elt1 -> UniqDFM key elt2
-mapUDFM f (UDFM m i) = UDFM (M.map (fmap f) m) i
+mapUDFM f (UDFM m i) = UDFM (MS.map (fmap f) m) i
+-- Critical this is strict map, otherwise you get a big space leak when reloading
+-- in GHCi because all old ModDetails are retained (see pruneHomePackageTable).
+-- Modify with care.
 
 mapMaybeUDFM :: forall elt1 elt2 key.
                 (elt1 -> Maybe elt2) -> UniqDFM key elt1 -> UniqDFM key elt2

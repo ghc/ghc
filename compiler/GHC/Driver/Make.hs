@@ -91,7 +91,6 @@ import GHC.Types.Target
 import GHC.Types.SourceFile
 import GHC.Types.SourceError
 import GHC.Types.SrcLoc
-import GHC.Types.Unique.FM
 import GHC.Types.Unique.DSet
 import GHC.Types.Unique.Set
 import GHC.Types.Name
@@ -102,7 +101,6 @@ import GHC.Unit.State
 import GHC.Unit.Finder
 import GHC.Unit.Module.ModSummary
 import GHC.Unit.Module.ModIface
-import GHC.Unit.Module.ModDetails
 import GHC.Unit.Module.Graph
 import GHC.Unit.Home.ModInfo
 
@@ -481,11 +479,7 @@ load' how_much mHscMessage mod_graph = do
         stable_mods@(stable_obj,stable_bco)
             = checkStability hpt1 mg2_with_srcimps all_home_mods
 
-        -- prune bits of the HPT which are definitely redundant now,
-        -- to save space.
-        pruned_hpt = pruneHomePackageTable hpt1
-                            (flattenSCCs mg2_with_srcimps)
-                            stable_mods
+        pruned_hpt = hpt1
 
     _ <- liftIO $ evaluate pruned_hpt
 
@@ -785,44 +779,6 @@ guessOutputFile = modifySession $ \env ->
     case outputFile_ dflags of
         Just _ -> env
         Nothing -> env { hsc_dflags = dflags { outputFile_ = name_exe } }
-
--- -----------------------------------------------------------------------------
---
--- | Prune the HomePackageTable
---
--- Before doing an upsweep, we can throw away:
---
---   - For non-stable modules:
---      - all ModDetails, all linked code
---   - all unlinked code that is out of date with respect to
---     the source file
---
--- This is VERY IMPORTANT otherwise we'll end up requiring 2x the
--- space at the end of the upsweep, because the topmost ModDetails of the
--- old HPT holds on to the entire type environment from the previous
--- compilation.
-pruneHomePackageTable :: HomePackageTable
-                      -> [ModSummary]
-                      -> StableModules
-                      -> HomePackageTable
-pruneHomePackageTable hpt summ (stable_obj, stable_bco)
-  = mapHpt prune hpt
-  where prune hmi
-          | is_stable modl = hmi'
-          | otherwise      = hmi'{ hm_details = emptyModDetails }
-          where
-           modl = moduleName (mi_module (hm_iface hmi))
-           hmi' | Just l <- hm_linkable hmi, linkableTime l < ms_hs_date ms
-                = hmi{ hm_linkable = Nothing }
-                | otherwise
-                = hmi
-                where ms = expectJust "prune" (lookupUFM ms_map modl)
-
-        ms_map = listToUFM [(ms_mod_name ms, ms) | ms <- summ]
-
-        is_stable m =
-          m `elementOfUniqSet` stable_obj ||
-          m `elementOfUniqSet` stable_bco
 
 -- -----------------------------------------------------------------------------
 --
