@@ -1255,8 +1255,6 @@ function GHC.IfaceToCore.typecheckIface does exactly that.
 Following this fix, GHC can compile itself with --make -O2.
 -}
 
--- NB: sometimes mods has duplicates; this is harmless because
--- any duplicates get clobbered in addListToHpt and never get forced.
 typecheckLoop :: HscEnv -> [HomeModInfo] -> IO [(ModuleName, HomeModInfo)]
 typecheckLoop hsc_env hmis = do
   debugTraceMsg logger 2 $
@@ -1265,6 +1263,7 @@ typecheckLoop hsc_env hmis = do
       let new_hpt = addListToHpt old_hpt new_mods
       let new_hsc_env = hscUpdateHPT (const new_hpt) hsc_env
       -- Crucial, crucial: initIfaceLoad clears the if_rec_types field.
+      -- See [KnotVars invariants]
       mds <- initIfaceLoad new_hsc_env $
                 mapM (typecheckIface . hm_iface) hmis
       let new_mods = [ (mn,hmi{ hm_details = details })
@@ -1274,7 +1273,10 @@ typecheckLoop hsc_env hmis = do
 
   where
     logger  = hsc_logger hsc_env
-    old_hpt = hsc_HPT hsc_env
+    to_delete =  (map (moduleName . mi_module . hm_iface) hmis)
+    -- Filter out old modules before tying the knot, otherwise we can end
+    -- up with a thunk which keeps reference to the old HomeModInfo.
+    !old_hpt = foldl' delFromHpt (hsc_HPT hsc_env) to_delete
 
 -- ---------------------------------------------------------------------------
 --
