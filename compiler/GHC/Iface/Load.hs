@@ -631,9 +631,18 @@ home-package modules however, so it's safe for the HPT to be empty.
 
 dontLeakTheHPT :: IfL a -> IfL a
 dontLeakTheHPT thing_inside = do
+  env <- getTopEnv
   let
+    inOneShot =
+      isOneShot (ghcMode (hsc_dflags env))
+    cleanGblEnv gbl_env
+      | inOneShot = gbl_env
+      | otherwise = gbl_env { if_rec_types = emptyKnotVars }
     cleanTopEnv hsc_env =
+
        let
+         !maybe_type_vars | inOneShot = Just (hsc_type_env_vars env)
+                          | otherwise = Nothing
          -- wrinkle: when we're typechecking in --backpack mode, the
          -- instantiation of a signature might reside in the HPT, so
          -- this case breaks the assumption that EPS interfaces only
@@ -655,11 +664,15 @@ dontLeakTheHPT thing_inside = do
        hsc_env {  hsc_targets      = panic "cleanTopEnv: hsc_targets"
                ,  hsc_mod_graph    = panic "cleanTopEnv: hsc_mod_graph"
                ,  hsc_IC           = panic "cleanTopEnv: hsc_IC"
+               ,  hsc_type_env_vars = case maybe_type_vars of
+                                          Just vars -> vars
+                                          Nothing -> panic "cleanTopEnv: hsc_type_env_vars"
                ,  hsc_unit_env     = unit_env
                }
 
-  updTopEnv cleanTopEnv $ do
+  updTopEnv cleanTopEnv $ updGblEnv cleanGblEnv $ do
   !_ <- getTopEnv        -- force the updTopEnv
+  !_ <- getGblEnv
   thing_inside
 
 

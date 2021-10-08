@@ -317,7 +317,7 @@ data IfGblEnv
         -- We need the module name so we can test when it's appropriate
         -- to look in this env.
         -- See Note [Tying the knot] in GHC.IfaceToCore
-        if_rec_types :: !(KnotVars (IfG TypeEnv))
+        if_rec_types :: (KnotVars (IfG TypeEnv))
                 -- Allows a read effect, so it can be in a mutable
                 -- variable; c.f. handling the external package type env
                 -- Nothing => interactive stuff, no loops possible
