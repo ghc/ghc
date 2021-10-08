@@ -738,11 +738,11 @@ pruneHomePackageTable hpt summ
   where prune hmi = hmi'{ hm_details = emptyModDetails }
           where
            modl = moduleName (mi_module (hm_iface hmi))
-           hmi' | mi_src_hash (hm_iface hmi) /= ms_hs_hash ms
+           hmi' | Just ms <- lookupUFM ms_map modl
+                , mi_src_hash (hm_iface hmi) /= ms_hs_hash ms
                 = hmi{ hm_linkable = Nothing }
                 | otherwise
                 = hmi
-                where ms = expectJust "prune" (lookupUFM ms_map modl)
 
         ms_map = listToUFM [(ms_mod_name ms, ms) | ms <- summ]
 
@@ -990,7 +990,7 @@ interpretBuildPlan deps_map plan = do
                   hmi <- executeCompileNode mod_idx n_mods (wait_deps_hpt hpt_var build_deps) knot_var (emsModSummary ms)
                   -- This global MVar is incrementally modified in order to avoid having to
                   -- recreate the HPT before compiling each module which leads to a quadratic amount of work.
-                  liftIO $ modifyMVar_ hpt_var (return . addHomeModInfoToHpt hmi)
+                  liftIO $ modifyMVar_ hpt_var (\hpt -> return $! addHomeModInfoToHpt hmi hpt)
                   return (Just hmi)
 
       res_var <- liftIO newEmptyMVar
@@ -1009,8 +1009,8 @@ interpretBuildPlan deps_map plan = do
       hpt_var <- gets hpt_var
       res_var <- liftIO newEmptyMVar
       let loop_action = do
-            hmis <- executeTypecheckLoop (readMVar hpt_var) (wait_deps wait_modules)
-            liftIO $ modifyMVar_ hpt_var (\hpt -> return $ foldl' (flip addHomeModInfoToHpt) hpt hmis)
+            !hmis <- executeTypecheckLoop (readMVar hpt_var) (wait_deps wait_modules)
+            liftIO $ modifyMVar_ hpt_var (\hpt -> return $! foldl' (flip addHomeModInfoToHpt) hpt hmis)
             return hmis
 
 
