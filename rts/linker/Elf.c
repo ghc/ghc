@@ -1931,6 +1931,28 @@ ocResolve_ELF ( ObjectCode* oc )
     return ocMprotect_Elf(oc);
 }
 
+/*
+ * Note [Initializers and finalizers (ELF)]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * The System V ABI describes a facility for allowing object code to mark
+ * functions to be run at load time. These functions are known as
+ * "initializers" (or "constructors"). Initializers are recorded in a section
+ * marked with the DT_INIT tag (often with the name `.init`).
+ *
+ * There is also a similar mechanism for code to be run at unload time (e.g.
+ * during program termination). These are known as finalizers and are collected
+ * in `.fini` section.
+ *
+ * For more about how the code generator emits initializers and finalizers see
+ * Note [Initializers and finalizers in Cmm] in GHC.Cmm.InitFini.
+ *
+ * See also: the "Initialization and Termination Functions" section of the
+ * System V ABI.
+ */
+
+// Run the constructors/initializers of an ObjectCode.
+// Returns 1 on success.
+// See Note [Initializers and finalizers (ELF)].
 int ocRunInit_ELF( ObjectCode *oc )
 {
    Elf_Word i;
@@ -1959,7 +1981,7 @@ int ocRunInit_ELF( ObjectCode *oc )
       }
 
       if (kind == SECTIONKIND_INIT_ARRAY) {
-          char *init_startC = oc->sections[i].start;
+         char *init_startC = oc->sections[i].start;
          init_start = (init_t*)init_startC;
          init_end = (init_t*)(init_startC + shdr[i].sh_size);
          for (init = init_start; init < init_end; init++) {
@@ -1972,7 +1994,7 @@ int ocRunInit_ELF( ObjectCode *oc )
       // SECTIONKIND_RWDATA; but allowing RODATA seems harmless enough.
       if ((kind == SECTIONKIND_RWDATA || kind == SECTIONKIND_CODE_OR_RODATA)
        && 0 == memcmp(".ctors", sh_strtab + shdr[i].sh_name, 6)) {
-          char *init_startC = oc->sections[i].start;
+         char *init_startC = oc->sections[i].start;
          init_start = (init_t*)init_startC;
          init_end = (init_t*)(init_startC + shdr[i].sh_size);
          // ctors run in reverse
@@ -1983,6 +2005,32 @@ int ocRunInit_ELF( ObjectCode *oc )
    }
 
    freeProgEnvv(envc, envv);
+   return 1;
+}
+
+// Run the finalizers of an ObjectCode.
+// Returns 1 on success.
+// See Note [Initializers and finalizers (ELF)].
+int ocRunFini_ELF( ObjectCode *oc )
+{
+   char*     ehdrC = (char*)(oc->image);
+   Elf_Ehdr* ehdr  = (Elf_Ehdr*) ehdrC;
+   Elf_Shdr* shdr  = (Elf_Shdr*) (ehdrC + ehdr->e_shoff);
+   char* sh_strtab = ehdrC + shdr[elf_shstrndx(ehdr)].sh_offset;
+
+   for (Elf_Word i = 0; i < elf_shnum(ehdr); i++) {
+      int is_bss = false;
+      SectionKind kind = getSectionKind_ELF(&shdr[i], &is_bss);
+      if (kind == SECTIONKIND_CODE_OR_RODATA && 0 == memcmp(".fini", sh_strtab + shdr[i].sh_name, 5)) {
+         char *fini_startC = oc->sections[i].start;
+         fini_t *fini_start = (fini_t*)fini_startC;
+         fini_t *fini_end = (fini_t*)(fini_startC + shdr[i].sh_size);
+         for (fini_t *fini = fini_start; fini < fini_end; fini++) {
+            (*fini)();
+         }
+      }
+   }
+
    return 1;
 }
 

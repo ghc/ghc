@@ -373,8 +373,11 @@ extern Mutex dl_mutex;
 #endif
 #endif /* THREADED_RTS */
 
-/* Type of the initializer */
+/* Type of an initializer */
 typedef void (*init_t) (int argc, char **argv, char **env);
+
+/* Type of a finalizer */
+typedef void (*fini_t) (void);
 
 typedef enum _SymStrength {
     STRENGTH_NORMAL,
