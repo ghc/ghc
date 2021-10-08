@@ -568,6 +568,7 @@ load' how_much mHscMessage mod_graph = do
                     Just n  -> return n
 
     setSession $ hscUpdateHPT (const emptyHomePackageTable) hsc_env
+    hsc_env <- getSession
     (upsweep_ok, hsc_env1) <- withDeferredDiagnostics $
       liftIO $ upsweep n_jobs hsc_env mHscMessage pruned_hpt direct_deps build_plan
     setSession hsc_env1
