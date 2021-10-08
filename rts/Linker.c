@@ -1136,6 +1136,16 @@ void freeObjectCode (ObjectCode *oc)
 {
     IF_DEBUG(linker, ocDebugBelch(oc, "start\n"));
 
+    // Run finalizers
+    if (oc->type == STATIC_OBJECT &&
+            (oc->status == OBJECT_READY || oc->status == OBJECT_UNLOADED)) {
+        // Only run finalizers if the initializers have also been run, which
+        // happens when we resolve the object.
+#if defined(OBJFORMAT_ELF)
+        ocRunFini_ELF(oc);
+#endif
+    }
+
     if (oc->type == DYNAMIC_OBJECT) {
 #if defined(OBJFORMAT_ELF)
         ACQUIRE_LOCK(&dl_mutex);
