@@ -448,16 +448,6 @@ initLinker_ (int retain_cafs)
         IF_DEBUG(linker, debugBelch("initLinker: inserting rts symbol %s, %p\n", sym->lbl, sym->addr));
     }
 
-    /* GCC defines a special symbol __dso_handle which is resolved to NULL if
-       referenced from a statically linked module. We need to mimic this, but
-       we cannot use NULL because we use it to mean nonexistent symbols. So we
-       use an arbitrary (hopefully unique) address here.
-    */
-    if (! ghciInsertSymbolTable(WSTR("(GHCi special symbols)"),
-                                symhash, "__dso_handle", (void *)0x12345687, HS_BOOL_FALSE, NULL)) {
-        barf("ghciInsertSymbolTable failed");
-    }
-
     // Redirect newCAF to newRetainedCAF if retain_cafs is true.
     if (! ghciInsertSymbolTable(WSTR("(GHCi built-in symbols)"), symhash,
                                 MAYBE_LEADING_UNDERSCORE_STR("newCAF"),
@@ -863,6 +853,17 @@ SymbolAddr* lookupDependentSymbol (SymbolName* lbl, ObjectCode *dependent)
     ASSERT(symhash != NULL);
     RtsSymbolInfo *pinfo;
 
+    /* See Note [Resolving __dso_handle] */
+    if (strcmp(lbl, "__dso_handle") == 0) {
+        if (dependent) {
+            return dependent->image;
+        } else {
+            // In the case that we don't know which object the reference lives
+            // in we return a random symbol from the executable image.
+            return &lookupDependentSymbol;
+        }
+    }
+
     if (!ghciLookupSymbolInfo(symhash, lbl, &pinfo)) {
         IF_DEBUG(linker, debugBelch("lookupSymbol: symbol '%s' not found, trying dlsym\n", lbl));
 
@@ -897,6 +898,22 @@ SymbolAddr* lookupDependentSymbol (SymbolName* lbl, ObjectCode *dependent)
     }
 }
 #endif /* OBJFORMAT_PEi386 */
+
+/* Note [Resolving __dso_handle]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * This symbol, which is defined by the C++ ABI, would typically be defined by
+ * the system's dynamic linker to act as a "handle", identifying a particular
+ * loaded dynamic object to the C++ standard library for the purpose of running
+ * destructors on unload. Here we behave the same way that the dynamic linker
+ * would, using some address (here the start address) of the loaded object as
+ * its handle.
+ *
+ * Note that references to __dso_handle may be relocated using
+ * relocations of bounded displacement and therefore __dso_handle must not be
+ * too far from the loaded object's code (hence using its start address).
+ *
+ * See #20493.
+ */
 
 /*
  * Load and relocate the object code for a symbol as necessary.
