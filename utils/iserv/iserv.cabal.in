@@ -28,7 +28,6 @@ cabal-version: >=1.10
 
 Executable iserv
     Default-Language: Haskell2010
-    ghc-options: -no-hs-main
     Main-Is: Main.hs
     C-Sources: cbits/iservmain.c
     Hs-Source-Dirs: src
@@ -46,3 +45,8 @@ Executable iserv
         Cpp-Options: -DWINDOWS
     else
         Build-Depends: unix   >= 2.7 && < 2.9
+
+    if os(ghcjs)
+        js-sources: jsbits/thrunner.js
+    else
+        ghc-options: -no-hs-main

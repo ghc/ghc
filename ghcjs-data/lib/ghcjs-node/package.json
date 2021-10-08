@@ -1,0 +1,24 @@
+{
+  "name": "ghcjs",
+  "version": "0.1.0",
+  "description": "GHCJS scripts",
+  "keywords": [
+    "dom",
+    "html"
+  ],
+  "maintainers": [
+    "Luite Stegeman <stegeman@gmail.com>"
+  ],
+  "license": "MIT",
+  "repository": "ghcjs/ghcjs",
+  "dependencies": {
+    "jsdom": "^9.11.0",
+    "jsdom-global": "^2.1.1",
+    "socket.io": "^1.7.3"
+  },
+  "browser": {
+    "canvas": false
+  },
+  "main": "./lib/jsdom"
+}
+
