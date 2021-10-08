@@ -29,26 +29,13 @@
 
 -- #not-home
 module GHC.Conc.Sync
-        ( ThreadId(..)
+        (
+        -- * Threads
+          ThreadId(..)
         , showThreadId
-
-        -- * Forking and suchlike
-        , forkIO
-        , forkIOWithUnmask
-        , forkOn
-        , forkOnWithUnmask
-        , numCapabilities
-        , getNumCapabilities
-        , setNumCapabilities
-        , getNumProcessors
-        , numSparks
-        , childHandler
         , myThreadId
         , killThread
         , throwTo
-        , par
-        , pseq
-        , runSparks
         , yield
         , labelThread
         , mkWeakThreadId
@@ -57,6 +44,26 @@ module GHC.Conc.Sync
         , threadStatus
         , threadCapability
 
+        -- * Forking and suchlike
+        , forkIO
+        , forkIOWithUnmask
+        , forkOn
+        , forkOnWithUnmask
+
+        -- * Capabilities
+        , numCapabilities
+        , getNumCapabilities
+        , setNumCapabilities
+        , getNumProcessors
+
+        -- * Sparks
+        , numSparks
+        , childHandler
+        , par
+        , pseq
+        , runSparks
+
+        -- * PrimMVar
         , newStablePtrPrimMVar, PrimMVar
 
         -- * Allocation counter and quota
@@ -620,10 +627,10 @@ mkWeakThreadId t@(ThreadId t#) = IO $ \s ->
 
 data PrimMVar
 
--- | Make a StablePtr that can be passed to the C function
--- @hs_try_putmvar()@.  The RTS wants a 'StablePtr' to the underlying
--- 'MVar#', but a 'StablePtr#' can only refer to lifted types, so we
--- have to cheat by coercing.
+-- | Make a 'StablePtr' that can be passed to the C function
+-- @hs_try_putmvar()@.  The RTS wants a 'StablePtr' to the
+-- underlying 'MVar#', but a 'StablePtr#' can only refer to
+-- lifted types, so we have to cheat by coercing.
 newStablePtrPrimMVar :: MVar a -> IO (StablePtr PrimMVar)
 newStablePtrPrimMVar (MVar m) = IO $ \s0 ->
   case makeStablePtr# (unsafeCoerce# m :: PrimMVar) s0 of
