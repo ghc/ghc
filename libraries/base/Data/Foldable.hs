@@ -52,7 +52,7 @@ module Data.Foldable (
     -- * Overview
     -- $overview
 
-    -- ** Chirality
+    -- ** Expectation of efficient left-to-right iteration
     -- $chirality
 
     -- ** Recursive and corecursive reduction
@@ -96,6 +96,9 @@ module Data.Foldable (
 
     -- * Notes
     -- $notes
+
+    -- ** Generally linear-time `elem`
+    -- $linear
 
     -- * See also
     -- $also
@@ -149,8 +152,10 @@ infix  4 `elem`, `notElem`
 -- >             | Node (Tree a) a (Tree a)
 -- >     deriving Foldable
 --
--- A more detailed description can be found in the overview section of
+-- A more detailed description can be found in the __Overview__ section of
 -- "Data.Foldable#overview".
+--
+-- For the class laws see the __Laws__ section of "Data.Foldable#laws".
 --
 class Foldable t where
     {-# MINIMAL foldMap | foldr #-}
@@ -1486,17 +1491,18 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 -- $overview
 --
 -- #overview#
--- Foldable structures are reduced to a summary value by accumulating
--- contributions to the result one element at a time.
+-- The Foldabla class generalises some common "Data.List" functions to
+-- structures that can be reduced to a summary value one element at a time.
 --
 -- == Left and right folds
 --
 -- #leftright#
--- Merging the contribution of the current element with an accumulator value
--- from a partial result is performed by an /operator/ function, either
--- explicitly provided by the caller as in `foldr`, implicit count as in
--- `length`, or partly implicit as in `foldMap` (where each element is mapped
--- into a 'Monoid', and the monoid's `mappend` operator performs the merge).
+-- The contribution of each element to the final result is combined with an
+-- accumulator via a suitable /operator/.  The operator may be explicitly
+-- provided by the caller as with `foldr` or may be implicit as in `length`.
+-- In the case of `foldMap`, the caller provides a function mapping each
+-- element into a suitable 'Monoid', which makes it possible to merge the
+-- per-element contributions via that monoid's `mappend` function.
 --
 -- A key distinction is between left-associative and right-associative
 -- folds:
@@ -1541,7 +1547,7 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 -- The third and final argument is a @Foldable@ structure containing elements
 -- @(a, b, c, &#x2026;)@.
 --
--- * __'foldl''__ takes an operator function of the form:
+-- * __'foldl''__ takes an operator argument of the form:
 --
 --     @
 --     f :: b -- accumulated fold of the initial elements
@@ -1563,7 +1569,7 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 --     strictness is space efficiency: the final result can be computed without
 --     storing a potentially deep stack of lazy intermediate results.
 --
--- * __`foldr`__ takes an operator function of the form:
+-- * __`foldr`__ takes an operator argument of the form:
 --
 --     @
 --     f :: a -- current element
@@ -1586,7 +1592,7 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 --     `foldr` is well suited to define both [corecursive](#corec)
 --     and [short-circuit](#short) reductions.
 --
---     When the operator is always strict in the second argument, 'foldl'' is
+--     When the operator is always strict in its second argument, 'foldl'' is
 --     generally a better choice than `foldr`.  When `foldr` is called with a
 --     strict operator, evaluation cannot begin until the last element is
 --     reached, by which point a deep stack of pending function applications
@@ -1629,7 +1635,7 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 -- type-specific interfaces.  If nevertheless a @Foldable@ instance is
 -- provided, the material in the sections that follow applies to these also, by
 -- replacing each method with one with the opposite associativity (when
--- available) and switching the order of arguments in the /operator/ function.
+-- available) and switching the order of arguments in the fold's /operator/.
 --
 -- You may need to pay careful attention to strictness of the fold's /operator/
 -- when its strictness is different between its first and second argument.
@@ -1960,10 +1966,10 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 -- They do have specialised uses, but are best avoided when in doubt.
 --
 -- @
--- 'foldr'' :: (a -> b -> b) -> b -> t a -> b
--- `foldl` :: (b -> a -> b) -> b -> t a -> b
--- `foldl1` :: (a -> a -> a) -> t a -> a
--- `foldrM` :: (Foldable t, Monad m) => (a -> b -> m b) -> b -> t a -> m b
+-- 'foldr'' :: Foldable t => (a -> b -> b) -> b -> t a -> b
+-- 'foldl'  :: Foldable t => (b -> a -> b) -> b -> t a -> b
+-- 'foldl1' :: Foldable t => (a -> a -> a) -> t a -> a
+-- 'foldrM' :: (Foldable t, Monad m) => (a -> b -> m b) -> b -> t a -> m b
 -- @
 --
 -- The lazy left-folds (used corecursively) and 'foldrM' (used to sequence
@@ -2084,36 +2090,45 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 --
 -- #strictlazy#
 --
--- The left fold:
+-- Sometimes, it is useful for the result of applying 'foldr' to be a
+-- /function/.  This is done by mapping the structure elements to functions
+-- with the same argument and result types.  The per-element functions are then
+-- composed to give the final result.
 --
--- @foldl' f z [a, b, &#x2026;, x, y]@
+-- For example, we can /flip/ the strict left fold 'foldl'' by writing:
 --
--- can be expanded as:
+-- > foldl' f z xs = flippedFoldl' f xs z
 --
--- @
--- id . g y . g x . &#x2026; . g b . g a $ z
---    where g = flip f
--- @
+-- with the function 'flippedFoldl'' defined as below, with 'seq' used to
+-- ensure the strictness in the accumulator:
 --
--- In which to maintain the expected strictness we need to perform function
--- application eagerly, and composition lazily.  To that end we introduce a new
--- function @f'@ which maps each element @x@ to an eager application of @g x@
--- to its argument, followed by an application of a lazily computed composition
--- (@k@) of the @g e@ functions for the remaining elements @e@:
+-- > flippedFoldl' f [] z = z
+-- > flippedFoldl' f (x : xs) z = z `seq` flippedFoldl' f xs (f z x)
 --
--- > f' x k z = k $! (g x) z = k $! f z x
+-- Rewriting to use lambdas, this is:
 --
--- We see that a lazy 'foldr' of the @g e@ endomorphisms, with @f'@ as as the
--- operator, in fact yields a strict left fold, that avoids building a
--- deep chain of intermediate thunks:
+-- > flippedFoldl' f [] = \ b -> b
+-- > flippedFoldl' f (x : xs) = \ b -> b `seq` r (f b x)
+-- >     where r = flippedFoldl' f xs
 --
--- > foldl' f z0 xs = foldr f' id xs z0
--- >   where f' x k z = k $! f z x
+-- The above has the form of a right fold, enabling a rewrite to:
 --
--- The function applied to @z0@ is built corecursively, and its terms are
--- applied eagerly to the accumulator before further terms are applied to
--- the result.  So, as promised, this will run in constant space, and GHC
--- is able to optimise this to an efficient loop.
+-- > flippedFoldl' f = \ xs -> foldr f' id xs
+-- >     where f' x r = \ b -> b `seq` r (f b x)
+--
+-- We can now unflip this to get 'foldl'':
+--
+-- > foldl' f z = \ xs -> foldr f' id xs z
+-- >           -- \ xs -> flippedFoldl' f xs z
+-- >   where f' x r = \ b -> b `seq` r (f b x)
+--
+-- The function __@foldr f' id xs@__ applied to @z@ is built corecursively, and
+-- its terms are applied to an eagerly evaluated accumulator before further
+-- terms are applied to the result.  As required, this runs in constant space,
+-- and can be optimised to an efficient loop.
+--
+-- (The actual definition of 'foldl'' labels the lambdas in the definition of
+-- __@f'@__ above as /oneShot/, which enables further optimisations).
 
 --------------
 
@@ -2313,14 +2328,52 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 --------------
 
 -- $laws
+-- #laws#
 --
--- @Foldable@ instances are expected to satisfy the following laws:
+-- The type constructor 'Endo' from "Data.Monoid", associates with each type
+-- __@b@__ the __@newtype@__-encapulated type of functions mapping __@b@__ to
+-- itself.  Functions from a type to itself are called /endomorphisms/, hence
+-- the name /Endo/.  The type __@Endo b@__ is a 'Monoid' under function
+-- composition:
+--
+-- > newtype Endo b = Endo { appEndo :: b -> b }
+-- > instance Semigroup Endo b where
+-- >     Endo f <> Endo g = Endo (f . g)
+-- > instance Monoid Endo b where
+-- >     mempty = Endo id
+--
+-- For every 'Monoid' m, we also have a 'Dual' monoid __@Dual m@__ which
+-- combines elements in the opposite order:
+--
+-- > newtype Dual m = Dual { getDual :: m }
+-- > instance Semigroup m => Semigroup Dual m where
+-- >     Dual a <> Dual b = Dual (b <> a)
+-- > instance Monoid m => Monoid Dual m where
+-- >     mempty = Dual mempty
+--
+-- With the above preliminaries out of the way, 'Foldable' instances are
+-- expected to satisfy the following laws:
+--
+-- The 'foldr' method must be equivalent in value and strictness to replacing
+-- each element __@a@__ of a 'Foldable' structure with __@Endo (f a)@__,
+-- composing these via 'foldMap' and applying the result to the base case
+-- __@z@__:
 --
 -- > foldr f z t = appEndo (foldMap (Endo . f) t ) z
 --
+-- Likewise, the 'foldl' method must be equivalent in value and strictness
+-- to composing the functions __@flip f a@__ in reverse order and applying
+-- the result to the base case:
+--
 -- > foldl f z t = appEndo (getDual (foldMap (Dual . Endo . flip f) t)) z
 --
+-- When the elements of the structure are taken from a 'Monoid', the
+-- defintion of 'fold' must agree with __@foldMap id@__:
+--
 -- > fold = foldMap id
+--
+-- The 'length' method must agree with a 'foldMap' mapping each element to
+-- __@Sum 1@__ (The 'Sum' type abstracts numbers as a monoid under addition).
 --
 -- > length = getSum . foldMap (Sum . const 1)
 --
@@ -2333,9 +2386,10 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 -- but are generally more efficient when defined more directly as:
 --
 -- > sum = foldl' (+) 0
--- > sum = foldl' (*) 1
+-- > product = foldl' (*) 1
 --
--- If the type is also a 'Functor' instance, it should satisfy
+-- If the 'Foldable' structure has a 'Functor' instance, then for every
+-- function __@f@__ mapping the elements into a 'Monoid', it should satisfy:
 --
 -- > foldMap f = fold . fmap f
 --
@@ -2349,23 +2403,22 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 -- $notes
 --
 -- #notes#
--- The absence of a 'Functor' superclass allows
--- @Foldable@ structures to impose constraints on their element types.  Thus,
--- Sets are @Foldable@, even though @Set@ imposes an 'Ord' constraint on its
--- elements (this precludes defining a @Functor@ instance for @Set@).
+-- Since 'Foldable' does not have 'Functor' as a superclass, it is possible to
+-- define 'Foldable' instances for structures that constrain their element
+-- types.  Therefore, __@Set@__ can be 'Foldable', even though sets keep their
+-- elements in ascending order.  This requires the elements to be comparable,
+-- which precludes defining a 'Functor' instance for @Set@.
 --
--- The @Foldable@ class makes it possible to use idioms familiar from the List
+-- The 'Foldable' class makes it possible to use idioms familiar from the @List@
 -- type with container structures that are better suited to the task at hand.
--- This allows a user to substitute more appropriate @Foldable@ data types
--- for Lists without requiring new idioms (see [[1\]](#uselistsnot) for when
--- not to use lists).
+-- This supports use of more appropriate 'Foldable' data types, such as @Seq@,
+-- @Set@, @NonEmpty@, etc., without requiring new idioms (see
+-- [[1\]](#uselistsnot) for when not to use lists).
 --
--- The more general methods of the @Foldable@ class are now exported by the
+-- The more general methods of the 'Foldable' class are now exported by the
 -- "Prelude" in place of the original List-specific methods (see the
 -- [FTP Proposal](https://wiki.haskell.org/Foldable_Traversable_In_Prelude)).
--- The List-specific variants are for now still available in "GHC.OldList", but
--- that module is intended only as a transitional aid, and may be removed in
--- the future.
+-- The List-specific variants are still available in "Data.List".
 --
 -- Surprises can arise from the @Foldable@ instance of the 2-tuple @(a,)@ which
 -- now behaves as a 1-element @Foldable@ container in its second slot.  In
@@ -2389,6 +2442,45 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 -- to something other than a list, the call-site will no longer compile until
 -- appropriate changes are made.
 
+-- $linear
+--
+-- It is perhaps worth noting that since the __`elem`__ function in the
+-- Foldable class carries only an __`Eq`__ constraint on the element type,
+-- search for the presence or absence of an element in the structure generally
+-- takes \(\mathcal{O}(n)\) time, even for ordered structures like __@Set@__
+-- that are potentially capable of performing the search faster.  (The @member@
+-- function of the @Set@ module carries an `Ord` constraint, and can perform
+-- the search in \(\mathcal{O}(log\ n)\) time).
+--
+-- An alternative to Foldable's __`elem`__ method is required in order to
+-- abstract potentially faster than linear search over general container
+-- structures.  This can be achieved by defining an additional type class (e.g.
+-- @HasMember@ below).  Instances of such a type class (that are also
+-- `Foldable') can employ the `elem` linear search as a last resort, when
+-- faster search is not supported.
+--
+-- > {-# LANGUAGE FlexibleInstances, MultiParamTypeClasses #-}
+-- >
+-- > import qualified Data.Set as Set
+-- >
+-- > class Eq a => HasMember t a where
+-- >     member :: a -> t a -> Bool
+-- >
+-- > instance Eq a => HasMember [] a where
+-- >     member = elem
+-- > [...]
+-- > instance Ord a => HasMember Set.Set a where
+-- >     member = Set.member
+--
+-- The above suggests that 'elem' may be a misfit in the 'Foldable' class.
+-- Alternative design ideas are solicited on GHC's bug tracker via issue
+-- [\#20421](https://gitlab.haskell.org/ghc/ghc/-/issues/20421).
+--
+-- Note that some structure-specific optimisations may of course be possible
+-- directly in the corresponding @Foldable@ instance, e.g. with @Set@ the size
+-- of the set is known in advance, without iterating to count the elements, and
+-- its `length` instance takes advantage of this to return the size directly.
+
 --------------
 
 -- $also
@@ -2402,3 +2494,7 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 --    by Jeremy Gibbons and Bruno Oliveira,
 --    in /Mathematically-Structured Functional Programming/, 2006, online at
 --    <http://www.cs.ox.ac.uk/people/jeremy.gibbons/publications/#iterator>.
+--
+--  * [3] \"A tutorial on the universality and expressiveness of fold\",
+--    by Graham Hutton, J\. Functional Programming 9 (4): 355–372, July 1999,
+--    online at <http://www.cs.nott.ac.uk/~pszgmh/fold.pdf>.
