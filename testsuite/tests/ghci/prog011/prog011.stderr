@@ -1,2 +1,4 @@
 
-prog011.hx:14:22: error: Empty 'do' block
+prog011.hx:14:22: error:
+    Empty 'do' block
+    Suggested fix: Perhaps you intended to use NondecreasingIndentation

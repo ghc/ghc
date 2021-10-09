@@ -1,4 +1,7 @@
 
-NondecreasingIndentationFail.hs:7:28: Empty 'do' block
-
-NondecreasingIndentationFail.hs:9:28: Empty 'do' block
+NondecreasingIndentationFail.hs:7:28:
+    Empty 'do' block
+    Suggested fix: Perhaps you intended to use NondecreasingIndentation
+NondecreasingIndentationFail.hs:9:28:
+    Empty 'do' block
+    Suggested fix: Perhaps you intended to use NondecreasingIndentation
