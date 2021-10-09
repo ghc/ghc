@@ -628,24 +628,38 @@ checkNonStdWay dflags interp srcspan
 normalObjectSuffix :: String
 normalObjectSuffix = phaseInputExt StopLn
 
+data Way' = Normal | Prof | Dyn
+
 failNonStd :: DynFlags -> SrcSpan -> IO (Maybe FilePath)
 failNonStd dflags srcspan = dieWith dflags srcspan $
-  text "Cannot load" <+> compWay <+>
-     text "objects when GHC is built" <+> ghciWay $$
+  text "Cannot load" <+> pprWay' compWay <+>
+     text "objects when GHC is built" <+> pprWay' ghciWay $$
   text "To fix this, either:" $$
   text "  (1) Use -fexternal-interpreter, or" $$
-  text "  (2) Build the program twice: once" <+>
-                       ghciWay <> text ", and then" $$
-  text "      with" <+> compWay <+>
-     text "using -osuf to set a different object file suffix."
+  buildTwiceMsg
     where compWay
-            | ways dflags `hasWay` WayDyn  = text "-dynamic"
-            | ways dflags `hasWay` WayProf = text "-prof"
-            | otherwise = text "normal"
+            | ways dflags `hasWay` WayDyn  = Dyn
+            | ways dflags `hasWay` WayProf = Prof
+            | otherwise = Normal
           ghciWay
-            | hostIsDynamic = text "with -dynamic"
-            | hostIsProfiled = text "with -prof"
-            | otherwise = text "the normal way"
+            | hostIsDynamic = Dyn
+            | hostIsProfiled = Prof
+            | otherwise = Normal
+          buildTwiceMsg = case (ghciWay, compWay) of
+            (Normal, Dyn) -> dynamicTooMsg
+            (Dyn, Normal) -> dynamicTooMsg
+            _ ->
+              text "  (2) Build the program twice: once" <+>
+                pprWay' ghciWay <> text ", and then" $$
+              text "      " <> pprWay' compWay <+>
+                text "using -osuf to set a different object file suffix."
+          dynamicTooMsg = text "  (2) Use -dynamic-too," <+>
+            text "and use -osuf and -dynosuf to set object file suffixes as needed."
+          pprWay' :: Way' -> SDoc
+          pprWay' way = text $ case way of
+            Normal -> "the normal way"
+            Prof -> "with -prof"
+            Dyn -> "with -dynamic"
 
 getLinkDeps :: HscEnv -> HomePackageTable
             -> LoaderState
