@@ -1,25 +1,84 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2230
+# shellcheck disable=SC1090
 
 # This is the primary driver of the GitLab CI infrastructure.
 # Run `ci.sh usage` for usage information.
 set -Eeuo pipefail
 
 # Configuration:
-hackage_index_state="2021-04-08T21:41:19Z"
-
-# Version bounds (min inclusive, max exclusive)
-MIN_HAPPY_VERSION="1.19"
-MAX_HAPPY_VERSION="1.20"
+HACKAGE_INDEX_STATE="2020-12-21T14:48:20Z" # TODO dedup with yaml's def
+MIN_HAPPY_VERSION="1.20"
 MIN_ALEX_VERSION="3.2.6"
-MAX_ALEX_VERSION="3.3"
 
 TOP="$(pwd)"
 if [ ! -d "$TOP/.gitlab" ]; then
   echo "This script expects to be run from the root of a ghc checkout"
 fi
 
-source $TOP/.gitlab/common.sh
+CABAL_CACHE="$TOP/${CABAL_CACHE:-cabal-cache}"
+
+source "$TOP/.gitlab/common.sh"
+
+function usage() {
+  cat <<EOF
+$0 - GHC continuous integration driver
+
+Common Modes:
+
+  usage         Show this usage message.
+  setup         Prepare environment for a build.
+  configure     Run ./configure.
+  clean         Clean the tree
+  shell         Run an interactive shell with a configured build environment.
+
+Make build system:
+
+  build_make    Build GHC via the make build system
+  test_make     Test GHC via the make build system
+
+Hadrian build system
+  build_hadrian Build GHC via the Hadrian build system
+  test_hadrian  Test GHC via the Hadrian build system
+
+Environment variables affecting both build systems:
+
+  CROSS_TARGET      Triple of cross-compilation target.
+  VERBOSE           Set to non-empty for verbose build output
+  RUNTEST_ARGS      Arguments passed to runtest.py
+  MSYSTEM           (Windows-only) Which platform to build form (MINGW64 or MINGW32).
+  IGNORE_PERF_FAILURES
+                    Whether to ignore perf failures (one of "increases",
+                    "decreases", or "all")
+
+Environment variables determining build configuration of Make system:
+
+  BUILD_FLAVOUR     Which flavour to build.
+  BUILD_SPHINX_HTML Whether to build Sphinx HTML documentation.
+  BUILD_SPHINX_PDF  Whether to build Sphinx PDF documentation.
+  INTEGER_LIBRARY   Which integer library to use (integer-simple or integer-gmp).
+  HADDOCK_HYPERLINKED_SOURCES
+                    Whether to build hyperlinked Haddock sources.
+  TEST_TYPE         Which test rule to run.
+
+Environment variables determining build configuration of Hadrian system:
+
+  BUILD_FLAVOUR     Which flavour to build.
+
+Environment variables determining bootstrap toolchain (Linux):
+
+  GHC           Path of GHC executable to use for bootstrapping.
+  CABAL         Path of cabal-install executable to use for bootstrapping.
+  ALEX          Path of alex executable to use for bootstrapping.
+  HAPPY         Path of alex executable to use for bootstrapping.
+
+Environment variables determining bootstrap toolchain (non-Linux):
+
+  GHC_VERSION   Which GHC version to fetch for bootstrapping.
+  CABAL_INSTALL_VERSION
+                Cabal-install version to fetch for bootstrapping.
+EOF
+}
 
 function setup_locale() {
   # Musl doesn't provide locale support at all...
@@ -57,11 +116,11 @@ function setup_locale() {
 function mingw_init() {
   case "$MSYSTEM" in
     MINGW32)
-      triple="i386-unknown-mingw32"
+      target_triple="i386-unknown-mingw32"
       boot_triple="i386-unknown-mingw32" # triple of bootstrap GHC
       ;;
     MINGW64)
-      triple="x86_64-unknown-mingw32"
+      target_triple="x86_64-unknown-mingw32"
       boot_triple="x86_64-unknown-mingw32" # triple of bootstrap GHC
       ;;
     *)
@@ -95,17 +154,6 @@ cores="$(mk/detect-cpu-count.sh)"
 mkdir -p "$TOP/tmp"
 export TMP="$TOP/tmp"
 export TEMP="$TOP/tmp"
-
-function darwin_setup() {
-  # It looks like we already have python2 here and just installing python3
-  # does not work.
-  brew upgrade python
-  brew install ghc cabal-install ncurses gmp
-
-  pip3 install sphinx
-  # PDF documentation disabled as MacTeX apparently doesn't include xelatex.
-  #brew cask install mactex
-}
 
 function show_tool() {
   local tool="$1"
@@ -150,19 +198,15 @@ function set_toolchain_paths() {
 
 # Extract GHC toolchain
 function setup() {
-  if [ -d "$TOP/cabal-cache" ]; then
-      info "Extracting cabal cache..."
+  if [ -d "${CABAL_CACHE}" ]; then
+      info "Extracting cabal cache from ${CABAL_CACHE} to $cabal_dir..."
       mkdir -p "$cabal_dir"
-      cp -Rf cabal-cache/* "$cabal_dir"
+      cp -Rf "${CABAL_CACHE}"/* "$cabal_dir"
   fi
 
-  if [[ -n "$needs_toolchain" ]]; then
+  if [[ "$needs_toolchain" = "1" ]]; then
     setup_toolchain
   fi
-  case "$(uname)" in
-    Darwin) darwin_setup ;;
-    *) ;;
-  esac
 
   # Make sure that git works
   git config user.email "ghc-ci@gitlab-haskell.org"
@@ -203,6 +247,7 @@ function fetch_ghc() {
       rm -Rf "ghc-${GHC_VERSION}" ghc.tar.xz
       end_section "fetch GHC"
   fi
+
 }
 
 function fetch_cabal() {
@@ -255,7 +300,7 @@ function setup_toolchain() {
 
   cabal_install="$CABAL v2-install \
     --with-compiler=$GHC \
-    --index-state=$hackage_index_state \
+    --index-state=$HACKAGE_INDEX_STATE \
     --installdir=$toolchain/bin \
     --overwrite-policy=always"
 
@@ -265,13 +310,13 @@ function setup_toolchain() {
     *) ;;
   esac
 
-  cabal update --index="$hackage_index_state"
+  cabal update --index="$HACKAGE_INDEX_STATE"
 
   info "Building happy..."
-  $cabal_install happy --constraint="happy>=$MIN_HAPPY_VERSION" --constraint="happy<$MAX_HAPPY_VERSION"
+  $cabal_install happy --constraint="happy>=$MIN_HAPPY_VERSION"
 
   info "Building alex..."
-  $cabal_install alex --constraint="alex>=$MIN_ALEX_VERSION" --constraint="alex<$MAX_ALEX_VERSION"
+  $cabal_install alex --constraint="alex>=$MIN_ALEX_VERSION"
 }
 
 function cleanup_submodules() {
@@ -312,16 +357,17 @@ function configure() {
   run python3 boot
   end_section "booting"
 
-  local target_args=""
-  if [[ -n "${triple:-}" ]]; then
-    target_args="--target=$triple"
+  read -r -a args <<< "${CONFIGURE_ARGS:-}"
+  if [[ -n "${target_triple:-}" ]]; then
+    args+=("--target=$target_triple")
   fi
 
   start_section "configuring"
+  # See https://stackoverflow.com/questions/7577052 for a rationale for the
+  # args[@] symbol-soup below.
   run ./configure \
     --enable-tarballs-autodownload \
-    $target_args \
-    ${CONFIGURE_ARGS:-} \
+    "${args[@]+"${args[@]}"}" \
     GHC="$GHC" \
     HAPPY="$HAPPY" \
     ALEX="$ALEX" \
@@ -363,37 +409,94 @@ function push_perf_notes() {
 # Figure out which commit should be used by the testsuite driver as a
 # performance baseline. See Note [The CI Story].
 function determine_metric_baseline() {
-  export PERF_BASELINE_COMMIT="$(git merge-base $CI_MERGE_REQUEST_TARGET_BRANCH_NAME HEAD)"
+  PERF_BASELINE_COMMIT="$(git merge-base "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME" HEAD)"
+  export PERF_BASELINE_COMMIT
   info "Using $PERF_BASELINE_COMMIT for performance metric baseline..."
 }
 
 function test_make() {
+  if [ -n "${CROSS_TARGET:-}" ]; then
+    info "Can't test cross-compiled build."
+    return
+  fi
+
   run "$MAKE" test_bindist TEST_PREP=YES
   run "$MAKE" V=0 VERBOSE=1 test \
     THREADS="$cores" \
-    JUNIT_FILE=../../junit.xml
+    JUNIT_FILE=../../junit.xml \
+    EXTRA_RUNTEST_OPTS="${RUNTEST_ARGS:-}"
 }
 
 function build_hadrian() {
-  if [ -z "$BUILD_FLAVOUR" ]; then
-    fail "BUILD_FLAVOUR not set"
+  if [ -z "$BIN_DIST_NAME" ]; then
+    fail "BIN_DIST_NAME not set"
   fi
 
   run_hadrian binary-dist
 
-  mv _build/bindist/ghc*.tar.xz ghc.tar.xz
+  mv _build/bindist/ghc*.tar.xz "$BIN_DIST_NAME.tar.xz"
 }
 
 function test_hadrian() {
+  if [ -n "${CROSS_TARGET:-}" ]; then
+    info "Can't test cross-compiled build."
+    return
+  fi
+
+
   cd _build/bindist/ghc-*/
-  run ./configure --prefix="$TOP"/_build/install
-  run "$MAKE" install
+  case "$(uname)" in
+    MSYS_*|MINGW*)
+      mkdir -p "$TOP"/_build/install
+      cp -a * "$TOP"/_build/install
+      ;;
+    *)
+      run ./configure --prefix="$TOP"/_build/install
+      run "$MAKE" install
+      ;;
+  esac
   cd ../../../
 
   run_hadrian \
     test \
     --summary-junit=./junit.xml \
-    --test-compiler="$TOP"/_build/install/bin/ghc
+    --test-compiler="$TOP/_build/install/bin/ghc$exe" \
+    "runtest.opts+=${RUNTEST_ARGS:-}"
+}
+
+function cabal_test() {
+  if [ -z "$OUT" ]; then
+    fail "OUT not set"
+  fi
+
+  start_section "Cabal test: $OUT"
+  mkdir -p "$OUT"
+  run "$HC" \
+    -hidir tmp -odir tmp -fforce-recomp \
+    -dumpdir "$OUT/dumps" -ddump-timings \
+    +RTS --machine-readable "-t$OUT/rts.log" -RTS \
+    -ilibraries/Cabal/Cabal/src -XNoPolyKinds Distribution.Simple \
+    "$@" 2>&1 | tee $OUT/log
+  rm -Rf tmp
+  end_section "Cabal test: $OUT"
+}
+
+function run_perf_test() {
+  if [ -z "$HC" ]; then
+    fail "HC not set"
+  fi
+
+  mkdir -p out
+  git -C libraries/Cabal/ rev-parse HEAD > out/cabal_commit
+  $HC --print-project-git-commit-id > out/ghc_commit
+  OUT=out/Cabal-O0 cabal_test -O0
+  OUT=out/Cabal-O1 cabal_test -O1
+  OUT=out/Cabal-O2 cabal_test -O2
+}
+
+function save_cache () {
+  info "Storing cabal cache from $cabal_dir to ${CABAL_CACHE}..."
+  cp -Rf "$cabal_dir" "${CABAL_CACHE}"
 }
 
 function clean() {
@@ -403,23 +506,28 @@ function clean() {
 }
 
 function run_hadrian() {
+  if [ -z "$BUILD_FLAVOUR" ]; then
+    fail "BUILD_FLAVOUR not set"
+  fi
   if [ -z "${BIGNUM_BACKEND:-}" ]; then BIGNUM_BACKEND="gmp"; fi
+  read -r -a args <<< "${HADRIAN_ARGS:-}"
+  if [ -n "${VERBOSE:-}" ]; then args+=("-V"); fi
   run hadrian/build-cabal \
     --flavour="$BUILD_FLAVOUR" \
     -j"$cores" \
     --broken-test="${BROKEN_TESTS:-}" \
     --bignum=$BIGNUM_BACKEND \
-    ${HADRIAN_ARGS:-} \
-    $@
+    "${args[@]}" \
+    "$@"
 }
 
 # A convenience function to allow debugging in the CI environment.
 function shell() {
-  local cmd=$@
+  local cmd="*@"
   if [ -z "$cmd" ]; then
     cmd="bash -i"
   fi
-  run $cmd
+  run "$cmd"
 }
 
 setup_locale
@@ -429,6 +537,10 @@ case "$(uname)" in
   MSYS_*|MINGW*) exe=".exe"; cabal_dir="$APPDATA/cabal" ;;
   *) cabal_dir="$HOME/.cabal"; exe="" ;;
 esac
+
+echo "Cabal_dir is $cabal_dir"
+echo "$(uname -m)"
+echo "${CABAL_CACHE}"
 
 # Platform-specific environment initialization
 MAKE="make"
@@ -445,9 +557,36 @@ case "$(uname)" in
   *) fail "uname $(uname) is not supported" ;;
 esac
 
+if [ -n "${CROSS_TARGET:-}" ]; then
+  info "Cross-compiling for $CROSS_TARGET..."
+  target_triple="$CROSS_TARGET"
+fi
+
+echo "Branch name ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-}"
+# Ignore performance improvements in @marge-bot batches.
+# See #19562.
+if [ "${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-}" == "wip/marge_bot_batch_merge_job" ]; then
+  if [ -z "${IGNORE_PERF_FAILURES:-}" ]; then
+    IGNORE_PERF_FAILURES="decreases"
+    echo "Ignoring perf failures"
+  fi
+fi
+echo "CI_COMMIT_BRANCH: ${CI_COMMIT_BRANCH:-}"
+echo "CI_PROJECT_PATH: ${CI_PROJECT_PATH:-}"
+if [ "${CI_COMMIT_BRANCH:-}" == "master" ] &&  [ "${CI_PROJECT_PATH:-}" == "ghc/ghc" ]; then
+  if [ -z "${IGNORE_PERF_FAILURES:-}" ]; then
+    IGNORE_PERF_FAILURES="decreases"
+    echo "Ignoring perf failures"
+  fi
+fi
+if [ -n "${IGNORE_PERF_FAILURES:-}" ]; then
+  RUNTEST_ARGS="--ignore-perf-failures=$IGNORE_PERF_FAILURES"
+fi
+
 set_toolchain_paths
 
 case $1 in
+  usage) usage ;;
   setup) setup && cleanup_submodules ;;
   configure) configure ;;
   build_make) build_make ;;
@@ -467,8 +606,11 @@ case $1 in
     test_hadrian || res=$?
     push_perf_notes
     exit $res ;;
-  run_hadrian) run_hadrian $@ ;;
+  run_hadrian) shift; run_hadrian "$@" ;;
+  perf_test) run_perf_test ;;
+  cabal_test) cabal_test ;;
   clean) clean ;;
-  shell) shell $@ ;;
+  save-cache) save_cache ;;
+  shell) shell "$@" ;;
   *) fail "unknown mode $1" ;;
 esac
