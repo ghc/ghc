@@ -55,6 +55,7 @@ import GHC.Builtin.Names
 
 import GHC.Types.FieldLabel
 import GHC.Types.Fixity
+import GHC.Types.Hint (suggestExtension)
 import GHC.Types.Id.Make
 import GHC.Types.Name
 import GHC.Types.Name.Set
@@ -2361,6 +2362,8 @@ emptyErr (ParStmtCtxt {})   = TcRnUnknownMessage $ mkPlainError noHints $
   text "Empty statement group in parallel comprehension"
 emptyErr (TransStmtCtxt {}) = TcRnUnknownMessage $ mkPlainError noHints $
   text "Empty statement group preceding 'group' or 'then'"
+emptyErr ctxt@(HsDoStmt _)  = TcRnUnknownMessage $ mkPlainError [suggestExtension LangExt.NondecreasingIndentation] $
+  text "Empty" <+> pprStmtContext ctxt
 emptyErr ctxt               = TcRnUnknownMessage $ mkPlainError noHints $
   text "Empty" <+> pprStmtContext ctxt
 
