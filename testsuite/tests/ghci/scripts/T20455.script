@@ -1,0 +1,17 @@
+let l = "first l"
+let l = "second l"
+ll -- should not recommend Ghci.l
+Ghci1.l
+l
+:info Ghci1.l
+:browse Ghci1
+
+-- Now the same for types
+data T = T
+t = T :: T
+data T = T
+:info t
+:type t
+t2 = Ghci5.T :: Ghci5.T
+
+
