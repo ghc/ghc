@@ -9,7 +9,7 @@ in
 let
   hsPkgs = pkgs.haskellPackages;
   alex = hsPkgs.alex;
-  happy = hsPkgs.happy;
+  happy = hsPkgs.callHackage "happy" "1.19.12" {};
   targetTriple = pkgs.stdenv.targetPlatform.config;
 
   ghc = pkgs.stdenv.mkDerivation rec {

@@ -8,7 +8,8 @@ set -Eeuo pipefail
 
 # Configuration:
 HACKAGE_INDEX_STATE="2020-12-21T14:48:20Z" # TODO dedup with yaml's def
-MIN_HAPPY_VERSION="1.20"
+MIN_HAPPY_VERSION="1.19"
+MAX_HAPPY_VERSION="1.20"
 MIN_ALEX_VERSION="3.2.6"
 
 TOP="$(pwd)"
@@ -333,7 +334,7 @@ function setup_toolchain() {
   esac
 
   info "Building happy..."
-  $cabal_install happy --constraint="happy>=$MIN_HAPPY_VERSION"
+  $cabal_install happy --constraint="happy>=$MIN_HAPPY_VERSION && <$MAX_HAPPY_VERSION"
 
   info "Building alex..."
   $cabal_install alex --constraint="alex>=$MIN_ALEX_VERSION"
