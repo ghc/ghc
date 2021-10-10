@@ -413,16 +413,6 @@ hadrian-ghc-in-ghci:
     paths:
       - cabal-cache
 
-lint-libs:
-  extends: .lint-params
-  variables:
-    BUILD_FLAVOUR: default
-  script:
-    - .gitlab/ci.sh setup
-    - .gitlab/ci.sh configure
-    - .gitlab/ci.sh run_hadrian lint:base
-    - .gitlab/ci.sh run_hadrian lint:compiler
-
 ############################################################
 # Validation via Pipelines (make)
 ############################################################
