@@ -1,5 +1,4 @@
-The Glasgow Haskell Compiler
-============================
+# The Glasgow Haskell Compiler
 
 [![pipeline status](https://gitlab.haskell.org/ghc/ghc/badges/master/pipeline.svg?style=flat)](https://gitlab.haskell.org/ghc/ghc/commits/master)
 
@@ -10,32 +9,32 @@ For more information, visit [GHC's web site][1].
 
 Information for developers of GHC can be found on the [GHC issue tracker][2].
 
-
-Getting the Source
-==================
+## Getting the Source
 
 There are two ways to get a source tree:
 
  1. *Download source tarballs*
 
-    Download the GHC source distribution:
+ Download the GHC source distribution:
 
-        ghc-<version>-src.tar.xz
-
-    which contains GHC itself and the "boot" libraries.
+ ```
+ ghc-<version>-src.tar.xz
+ ```
+    
+ which contains GHC itself and the "boot" libraries.
 
  2. *Check out the source code from git*
+    
+ ```sh
+ $ git clone --recurse-submodules git@gitlab.haskell.org:ghc/ghc.git
+ ```
 
-        $ git clone --recurse-submodules git@gitlab.haskell.org:ghc/ghc.git
+ Note: cloning GHC from Github requires a special setup. See [Getting a GHC repository from Github][7].
 
-    Note: cloning GHC from Github requires a special setup. See [Getting a GHC
-    repository from Github][7].
-
-  *See the GHC team's working conventions regarding [how to contribute a patch to GHC](https://gitlab.haskell.org/ghc/ghc/wikis/working-conventions/fixing-bugs).* First time contributors are encouraged to get started by just sending a Merge Request.
+*See the GHC team's working conventions regarding [how to contribute a patch to GHC](https://gitlab.haskell.org/ghc/ghc/wikis/working-conventions/fixing-bugs).* First time contributors are encouraged to get started by just sending a Merge Request.
 
 
-Building & Installing
-=====================
+## Building & Installing
 
 For full information on building GHC, see the [GHC Building Guide][3].
 Here follows a summary - if you get into trouble, the Building Guide
@@ -54,16 +53,18 @@ the compiler documentation, you need [Sphinx](http://www.sphinx-doc.org/)
 and Xelatex (only for PDF output).
 
 **Quick start**: the following gives you a default build:
+```sh
+$ ./boot
+$ ./configure
+$ make         # can also say 'make -jX' for X number of jobs
+$ make install
+```
 
-    $ ./boot
-    $ ./configure
-    $ make         # can also say 'make -jX' for X number of jobs
-    $ make install
-
-  On Windows, you need an extra repository containing some build tools.
-  These can be downloaded for you by configure. This only needs to be done once by running:
-
-    $ ./configure --enable-tarballs-autodownload
+On Windows, you need an extra repository containing some build tools.
+These can be downloaded for you by configure. This only needs to be done once by running:
+```sh
+$ ./configure --enable-tarballs-autodownload
+```
 
 (NB: **Do you have multiple cores? Be sure to tell that to `make`!** This can
 save you hours of build time depending on your system configuration, and is
@@ -78,8 +79,7 @@ These steps give you the default build, which includes everything
 optimised and built in various ways (eg. profiling libs are built).
 It can take a long time.  To customise the build, see the file `HACKING.md`.
 
-Filing bugs and feature requests
-================================
+## Filing bugs and feature requests
 
 If you've encountered what you believe is a bug in GHC, or you'd like
 to propose a feature request, please let us know! Submit an [issue][10] and we'll be sure to look into it. Remember:
@@ -90,16 +90,14 @@ If you're an active user of GHC, you may also be interested in joining
 the [glasgow-haskell-users][11] mailing list, where developers and
 GHC users discuss various topics and hang out.
 
-Hacking & Developing GHC
-========================
+## Hacking & Developing GHC
 
 Once you've filed a bug, maybe you'd like to fix it yourself? That
 would be great, and we'd surely love your company! If you're looking
 to hack on GHC, check out the guidelines in the `HACKING.md` file in
 this directory - they'll get you up to speed quickly.
 
-Contributors & Acknowledgements
-===============================
+## Contributors & Acknowledgements
 
 GHC in its current form wouldn't exist without the hard work of
 [its many contributors][12]. Over time, it has grown to include the
@@ -107,22 +105,15 @@ efforts and research of many institutions, highly talented people, and
 groups from around the world. We'd like to thank them all, and invite
 you to join!
 
-  [1]:  http://www.haskell.org/ghc/            "www.haskell.org/ghc/"
-  [2]:  https://gitlab.haskell.org/ghc/ghc/issues
-          "gitlab.haskell.org/ghc/ghc/issues"
-  [3]:  https://gitlab.haskell.org/ghc/ghc/wikis/building
-          "https://gitlab.haskell.org/ghc/ghc/wikis/building"
-  [4]:  http://www.haskell.org/happy/          "www.haskell.org/happy/"
-  [5]:  http://www.haskell.org/alex/           "www.haskell.org/alex/"
-  [6]:  http://www.haskell.org/haddock/        "www.haskell.org/haddock/"
-  [7]: https://gitlab.haskell.org/ghc/ghc/wikis/building/getting-the-sources#cloning-from-github
-          "https://gitlab.haskell.org/ghc/ghc/wikis/building/getting-the-sources#cloning-from-github"
-  [8]:  https://gitlab.haskell.org/ghc/ghc/wikis/building/preparation
-          "https://gitlab.haskell.org/ghc/ghc/wikis/building/preparation"
-  [9]:  http://www.haskell.org/cabal/          "http://www.haskell.org/cabal/"
-  [10]: https://gitlab.haskell.org/ghc/ghc/issues
-          "https://gitlab.haskell.org/ghc/ghc/issues"
-  [11]: http://www.haskell.org/pipermail/glasgow-haskell-users/
-          "http://www.haskell.org/pipermail/glasgow-haskell-users/"
-  [12]: https://gitlab.haskell.org/ghc/ghc/wikis/team-ghc
-          "https://gitlab.haskell.org/ghc/ghc/wikis/team-ghc"
+[1]: http://www.haskell.org/ghc/
+[2]: https://gitlab.haskell.org/ghc/ghc/issues
+[3]: https://gitlab.haskell.org/ghc/ghc/wikis/building
+[4]: http://www.haskell.org/happy/
+[5]: http://www.haskell.org/alex/
+[6]: http://www.haskell.org/haddock/
+[7]: https://gitlab.haskell.org/ghc/ghc/wikis/building/getting-the-sources#cloning-from-github
+[8]: https://gitlab.haskell.org/ghc/ghc/wikis/building/preparation
+[9]: http://www.haskell.org/cabal/
+[10]: https://gitlab.haskell.org/ghc/ghc/issues
+[11]: http://www.haskell.org/pipermail/glasgow-haskell-users/
+[12]: https://gitlab.haskell.org/ghc/ghc/wikis/team-ghc
