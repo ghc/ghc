@@ -26,7 +26,7 @@ There are two ways to get a source tree:
  2. *Check out the source code from git*
     
  ```sh
- $ git clone --recurse-submodules git@gitlab.haskell.org:ghc/ghc.git
+ $ git clone --recurse-submodules https://github.com/ghc/ghc.git
  ```
 
  Note: cloning GHC from Github requires a special setup. See [Getting a GHC repository from Github][7].
