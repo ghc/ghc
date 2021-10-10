@@ -160,12 +160,12 @@ configurePackage context@Context {..} = do
     trackArgsHash (target context (Cabal Flags stage) [] [])
     trackArgsHash (target context (Cabal Setup stage) [] [])
     verbosity   <- getVerbosity
-    when (verbosity >= Loud) $
-        putProgressInfo $ "| Package " ++ quote (pkgName package) ++ " configuration flags: " ++ unwords argList
     let v = if verbosity >= Loud then "-v3" else "-v0"
+        argList' = argList ++ ["--flags=" ++ unwords flagList, v]
+    when (verbosity >= Loud) $
+        putProgressInfo $ "| Package " ++ quote (pkgName package) ++ " configuration flags: " ++ unwords argList'
     traced "cabal-configure" $
-        C.defaultMainWithHooksNoReadArgs hooks gpd
-            (argList ++ ["--flags=" ++ unwords flagList, v])
+        C.defaultMainWithHooksNoReadArgs hooks gpd argList'
 
     dir <- Context.buildPath context
     files <- liftIO $ getDirectoryFilesIO "." [ dir -/- "include" -/- "**"
