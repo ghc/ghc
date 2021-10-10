@@ -79,6 +79,8 @@
           ownership of the Task and a Capability.
 */
 
+void printAllTasks(void);
+
 // The InCall structure represents either a single in-call from C to
 // Haskell, or a worker thread.
 typedef struct InCall_ {
