@@ -30,7 +30,7 @@
    (1))
   (Just
    (L
-    { KindSigs.hs:6:8-15 }
+    (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:6:8-15 })
     {ModuleName: KindSigs}))
   (Nothing)
   [(L
@@ -51,7 +51,7 @@
        []))
      (NoSourceText)
      (L
-      { KindSigs.hs:8:8-16 }
+      (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:8:8-16 })
       {ModuleName: Data.Kind})
      (Nothing)
      (NotBoot)

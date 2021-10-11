@@ -218,7 +218,7 @@ tcRnModule hsc_env mod_sum save_rn_syntax
     pair :: (Module, SrcSpan)
     pair@(this_mod,_)
       | Just (L mod_loc mod) <- hsmodName this_module
-      = (mkHomeModule home_unit mod, mod_loc)
+      = (mkHomeModule home_unit mod, locA mod_loc)
 
       | otherwise   -- 'module M where' is omitted
       = (mkHomeModule home_unit mAIN_NAME, srcLocSpan (srcSpanStart loc))
@@ -264,7 +264,7 @@ tcRnModuleTcRnM hsc_env mod_sum
 
         ; -- TODO This is a little skeevy; maybe handle a bit more directly
           let { simplifyImport (L _ idecl) =
-                  ( fmap sl_fs (ideclPkgQual idecl) , ideclName idecl)
+                  ( fmap sl_fs (ideclPkgQual idecl) , reLoc $ ideclName idecl)
               }
         ; raw_sig_imports <- liftIO
                              $ findExtraSigImports hsc_env hsc_src

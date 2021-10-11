@@ -163,7 +163,7 @@
      (NoExtField)
      (NoSourceText)
      (L
-      { T14189.hs:1:8-13 }
+      (SrcSpanAnn (EpAnnNotUsed) { T14189.hs:1:8-13 })
       {ModuleName: Prelude})
      (Nothing)
      (NotBoot)
