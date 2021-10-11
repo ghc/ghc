@@ -633,11 +633,10 @@ threadCapability (ThreadId t) = IO $ \s ->
 threadLabel :: ThreadId -> IO (Maybe String)
 threadLabel (ThreadId t) = IO $ \s ->
     case threadLabel# t s of
-      (# s', lbl #) ->
-          let lbl'
-                | Ptr lbl == nullPtr = Nothing
-                | otherwise          = Just $ unpackCStringUtf8# lbl
+      (# s', 1#, lbl #) ->
+          let lbl' = Just (unpackCStringUtf8# lbl)
           in (# s', lbl' #)
+      (# s', 0#, _ #) -> (# s', Nothing #)
 
 -- | Make a weak pointer to a 'ThreadId'.  It can be important to do
 -- this if you want to hold a reference to a 'ThreadId' while still

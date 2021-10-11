@@ -24,7 +24,6 @@
 #include "Ticky.h"
 #include "StgRun.h"
 #include "Prelude.h"            /* fixupRTStoPreludeRefs */
-#include "ThreadLabels.h"
 #include "sm/BlockAlloc.h"
 #include "Trace.h"
 #include "StableName.h"
@@ -364,9 +363,6 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
     /* initialise file locking, if necessary */
     initFileLocking();
 
-    /* initialise thread label table (tso->char*) */
-    initThreadLabelTable();
-
 #if defined(PROFILING)
     initProfiling();
 #endif
@@ -537,9 +533,6 @@ hs_exit_(bool wait_foreign)
 
     /* free the stable name table */
     exitStableNameTable();
-
-    /* free the thread label table */
-    freeThreadLabelTable();
 
 #if defined(PROFILING)
     reportCCSProfiling();

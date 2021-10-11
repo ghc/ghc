@@ -3017,8 +3017,9 @@ primop  NoDuplicateOp "noDuplicate#" GenPrimOp
    has_side_effects = True
 
 primop GetThreadLabelOp "threadLabel#" GenPrimOp
-   ThreadId# -> State# RealWorld -> (# State# RealWorld, Addr# #)
-   {Get the label of the given thread. Returns NULL if not set.}
+   ThreadId# -> State# RealWorld -> (# State# RealWorld, Int#, ByteArray# #)
+   {Get the label of the given thread. Morally of type
+    {\tt ThreadId# -> IO (Maybe ByteArray#)}.}
    with
    out_of_line      = True
 

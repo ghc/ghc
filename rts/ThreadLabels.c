@@ -18,91 +18,54 @@
 #include <stdlib.h>
 #include <string.h>
 
-#if defined(THREADED_RTS)
-static Mutex threadLabels_mutex;
-#endif /* THREADED_RTS */
-
-static HashTable * threadLabels = NULL;
-
-void
-initThreadLabelTable(void)
+char *
+lookupThreadLabel(StgTSO *tso)
 {
-#if defined(THREADED_RTS)
-  initMutex(&threadLabels_mutex);
-#endif /* THREADED_RTS */
-
-  if (threadLabels == NULL) {
-    threadLabels = allocHashTable();
-  }
-}
-
-void
-freeThreadLabelTable(void)
-{
-    ACQUIRE_LOCK(&threadLabels_mutex);
-
-    if (threadLabels != NULL) {
-        freeHashTable(threadLabels, stgFree);
-        threadLabels = NULL;
+    if (tso->label) {
+        return (char*) tso->label->payload;
+    } else {
+        return NULL;
     }
-
-    RELEASE_LOCK(&threadLabels_mutex);
 }
 
-static void
-updateThreadLabel(StgThreadID key, void *data)
+static StgArrBytes *
+allocateArrBytes(Capability *cap, size_t size_in_bytes)
 {
-  removeThreadLabel(key);
+    uint32_t data_size_in_words, total_size_in_words;
 
-  ACQUIRE_LOCK(&threadLabels_mutex);
+    /* round up to a whole number of words */
+    data_size_in_words  = ROUNDUP_BYTES_TO_WDS(size_in_bytes);
+    total_size_in_words = sizeofW(StgArrBytes) + data_size_in_words;
 
-  insertHashTable(threadLabels,key,data);
-
-  RELEASE_LOCK(&threadLabels_mutex);
-}
-
-void *
-lookupThreadLabel(StgThreadID key)
-{
-  void * result;
-  ACQUIRE_LOCK(&threadLabels_mutex);
-
-  result = lookupHashTable(threadLabels,key);
-
-  RELEASE_LOCK(&threadLabels_mutex);
-
-  return result;
+    StgArrBytes *arr = (StgArrBytes *) allocate(cap, total_size_in_words);
+    SET_ARR_HDR(arr, &stg_ARR_WORDS_info, cap->r.rCCCS, size_in_bytes);
+    arr->bytes = size_in_bytes;
+    return arr;
 }
 
 void
-removeThreadLabel(StgThreadID key)
+labelThread(Capability  *cap   STG_UNUSED,
+            StgTSO      *tso   STG_UNUSED,
+            char        *label STG_UNUSED)
 {
-  ACQUIRE_LOCK(&threadLabels_mutex);
-
-  void * old = NULL;
-  if ((old = lookupHashTable(threadLabels,key))) {
-    removeHashTable(threadLabels,key,old);
-    stgFree(old);
-  }
-
-  RELEASE_LOCK(&threadLabels_mutex);
+    int len = strlen(label);
+    StgArrBytes *arr = allocateArrBytes(cap, len+1);
+    memcpy(&arr->payload, label, len);
+    arr->payload[len] = '\0';
+    setThreadLabel(cap, tso, arr);
 }
 
 void
-labelThread(Capability *cap   STG_UNUSED,
-            StgTSO     *tso   STG_UNUSED,
-            char       *label STG_UNUSED)
+setThreadLabel(Capability  *cap   STG_UNUSED,
+               StgTSO      *tso   STG_UNUSED,
+               StgArrBytes *label STG_UNUSED)
 {
-  int len;
-  void *buf;
-
-  /* Caveat: Once set, you can only set the thread name to "" */
-  len = strlen(label)+1;
-  buf = stgMallocBytes(len * sizeof(char), "ThreadLabels.c:labelThread()");
-  strncpy(buf,label,len);
-
-  /* Update will free the old memory for us */
-  updateThreadLabel(tso->id,buf);
-
-  traceThreadLabel(cap, tso, label);
+    if (tso->label) {
+        IF_NONMOVING_WRITE_BARRIER_ENABLED {
+            updateRemembSetPushClosure(cap, (StgClosure *) tso->label);
+        }
+        recordClosureMutated(cap, (StgClosure*)tso);
+    }
+    tso->label = label;
+    traceThreadLabel(cap, tso, (char *) label->payload);
 }

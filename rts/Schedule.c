@@ -21,7 +21,6 @@
 #include "Stats.h"
 #include "STM.h"
 #include "Prelude.h"
-#include "ThreadLabels.h"
 #include "Updates.h"
 #include "Proftimer.h"
 #include "ProfHeap.h"
@@ -1357,8 +1356,6 @@ scheduleHandleThreadFinished (Capability *cap, Task *task, StgTSO *t)
                   task->incall->rstat = Killed;
               }
           }
-
-          removeThreadLabel(task->incall->tso->id);
 
           // We no longer consider this thread and task to be bound to
           // each other.  The TSO lives on until it is GC'd, but the

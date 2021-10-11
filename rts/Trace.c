@@ -196,7 +196,7 @@ static void traceSchedEvent_stderr (Capability *cap, EventTypeNum tag,
     ACQUIRE_LOCK(&trace_utx);
 
     tracePreface();
-    char *threadLabel = (char *)lookupThreadLabel(tso->id);
+    char *threadLabel = lookupThreadLabel(tso);
     if(!threadLabel)
     {
         threadLabel = "";

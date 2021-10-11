@@ -11,12 +11,12 @@
 
 #include "BeginPrivate.h"
 
-void    initThreadLabelTable (void);
-void    freeThreadLabelTable (void);
-void *  lookupThreadLabel    (StgThreadID key);
-void    removeThreadLabel    (StgThreadID key);
-void    labelThread          (Capability *cap,
-                              StgTSO     *tso,
-                              char       *label);
+char *  lookupThreadLabel    (StgTSO      *tso);
+void    setThreadLabel       (Capability  *cap,
+                              StgTSO      *tso,
+                              StgArrBytes *label);
+void    labelThread          (Capability  *cap,
+                              StgTSO      *tso,
+                              char        *label);
 
 #include "EndPrivate.h"
