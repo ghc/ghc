@@ -392,7 +392,7 @@ instance Outputable EpaComment where
 -- The usual way an 'AddEpAnn' is created is using the 'mj' ("make
 -- jump") function, and then it can be inserted into the appropriate
 -- annotation.
-data AddEpAnn = AddEpAnn AnnKeywordId EpaLocation deriving (Data,Eq,Ord)
+data AddEpAnn = AddEpAnn AnnKeywordId EpaLocation deriving (Data,Eq)
 
 -- | The anchor for an @'AnnKeywordId'@. The Parser inserts the
 -- @'EpaSpan'@ variant, giving the exact location of the original item
@@ -452,6 +452,9 @@ instance Outputable EpaLocation where
 
 instance Outputable AddEpAnn where
   ppr (AddEpAnn kw ss) = text "AddEpAnn" <+> ppr kw <+> ppr ss
+
+instance Ord AddEpAnn where
+  compare (AddEpAnn kw1 loc1) (AddEpAnn kw2 loc2) = compare (loc1, kw1) (loc2,kw2)
 
 -- ---------------------------------------------------------------------
 
@@ -812,7 +815,7 @@ addTrailingAnnToA s t cs EpAnnNotUsed
 addTrailingAnnToA _ t cs n = n { anns = addTrailing (anns n)
                                , comments = comments n <> cs }
   where
-    addTrailing n = n { lann_trailing = t : lann_trailing n }
+    addTrailing n = n { lann_trailing = lann_trailing n ++ [t] }
 
 -- | Helper function used in the parser to add a comma location to an
 -- existing annotation.
