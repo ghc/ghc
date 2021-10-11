@@ -931,7 +931,7 @@ body2   :: { (AnnList
 
 top     :: { ([TrailingAnn]
              ,([LImportDecl GhcPs], [LHsDecl GhcPs])) }
-        : semis top1                            { ($1, $2) }
+        : semis top1                            { (reverse $1, $2) }
 
 top1    :: { ([LImportDecl GhcPs], [LHsDecl GhcPs]) }
         : importdecls_semi topdecls_cs_semi        { (reverse $1, cvTopDecls $2) }
@@ -1080,7 +1080,7 @@ importdecls
 importdecls_semi :: { [LImportDecl GhcPs] }
 importdecls_semi
         : importdecls_semi importdecl semis1
-                                {% do { i <- amsA $2 $3
+                                {% do { i <- amsA $2 (reverse $3)
                                       ; return (i : $1)} }
         | {- empty -}           { [] }
 
@@ -1181,7 +1181,7 @@ topdecls :: { OrdList (LHsDecl GhcPs) }
 
 -- May have trailing semicolons, can be empty
 topdecls_semi :: { OrdList (LHsDecl GhcPs) }
-        : topdecls_semi topdecl semis1 {% do { t <- amsA $2 $3
+        : topdecls_semi topdecl semis1 {% do { t <- amsA $2 (reverse $3)
                                              ; return ($1 `snocOL` t) }}
         | {- empty -}                  { nilOL }
 
@@ -1194,7 +1194,7 @@ topdecls_cs :: { OrdList (LHsDecl GhcPs) }
 
 -- May have trailing semicolons, can be empty
 topdecls_cs_semi :: { OrdList (LHsDecl GhcPs) }
-        : topdecls_cs_semi topdecl_cs semis1 {% do { t <- amsA $2 $3
+        : topdecls_cs_semi topdecl_cs semis1 {% do { t <- amsA $2 (reverse $3)
                                                    ; return ($1 `snocOL` t) }}
         | {- empty -}                  { nilOL }
 
@@ -1674,7 +1674,7 @@ decl_cls  : at_decl_cls                 { $1 }
 
 decls_cls :: { Located ([AddEpAnn],OrdList (LHsDecl GhcPs)) }  -- Reversed
           : decls_cls ';' decl_cls      {% if isNilOL (snd $ unLoc $1)
-                                             then return (sLLlA $1 $> ((mz AnnSemi $2) ++ (fst $ unLoc $1)
+                                             then return (sLLlA $1 $> ((fst $ unLoc $1) ++ (mz AnnSemi $2)
                                                                     , unitOL $3))
                                             else case (snd $ unLoc $1) of
                                               SnocOL hs t -> do
@@ -1682,7 +1682,7 @@ decls_cls :: { Located ([AddEpAnn],OrdList (LHsDecl GhcPs)) }  -- Reversed
                                                  return (sLLlA $1 $> (fst $ unLoc $1
                                                                 , snocOL hs t' `appOL` unitOL $3)) }
           | decls_cls ';'               {% if isNilOL (snd $ unLoc $1)
-                                             then return (sLL $1 $> ((mz AnnSemi $2) ++ (fst $ unLoc $1)
+                                             then return (sLL $1 $> ( (fst $ unLoc $1) ++ (mz AnnSemi $2)
                                                                                    ,snd $ unLoc $1))
                                              else case (snd $ unLoc $1) of
                                                SnocOL hs t -> do
@@ -1720,7 +1720,7 @@ decl_inst  : at_decl_inst               { sL1A $1 (unitOL (sL1 $1 (InstD noExtFi
 
 decls_inst :: { Located ([AddEpAnn],OrdList (LHsDecl GhcPs)) }   -- Reversed
            : decls_inst ';' decl_inst   {% if isNilOL (snd $ unLoc $1)
-                                             then return (sLL $1 $> ((mz AnnSemi $2) ++ (fst $ unLoc $1)
+                                             then return (sLL $1 $> ((fst $ unLoc $1) ++ (mz AnnSemi $2)
                                                                     , unLoc $3))
                                              else case (snd $ unLoc $1) of
                                                SnocOL hs t -> do
@@ -1728,7 +1728,7 @@ decls_inst :: { Located ([AddEpAnn],OrdList (LHsDecl GhcPs)) }   -- Reversed
                                                   return (sLL $1 $> (fst $ unLoc $1
                                                                  , snocOL hs t' `appOL` unLoc $3)) }
            | decls_inst ';'             {% if isNilOL (snd $ unLoc $1)
-                                             then return (sLL $1 $> ((mz AnnSemi $2) ++ (fst $ unLoc $1)
+                                             then return (sLL $1 $> ((fst $ unLoc $1) ++ (mz AnnSemi $2)
                                                                                    ,snd $ unLoc $1))
                                              else case (snd $ unLoc $1) of
                                                SnocOL hs t -> do
@@ -1758,7 +1758,7 @@ where_inst :: { Located ([AddEpAnn]
 --
 decls   :: { Located ([TrailingAnn], OrdList (LHsDecl GhcPs)) }
         : decls ';' decl    {% if isNilOL (snd $ unLoc $1)
-                                 then return (sLLlA $1 $> ((msemi $2) ++ (fst $ unLoc $1)
+                                 then return (sLLlA $1 $> ((fst $ unLoc $1) ++ (msemi $2)
                                                         , unitOL $3))
                                  else case (snd $ unLoc $1) of
                                    SnocOL hs t -> do
@@ -1769,7 +1769,7 @@ decls   :: { Located ([TrailingAnn], OrdList (LHsDecl GhcPs)) }
                                       return (rest `seq` this `seq` these `seq`
                                                  (sLLlA $1 $> (fst $ unLoc $1, these))) }
         | decls ';'          {% if isNilOL (snd $ unLoc $1)
-                                  then return (sLL $1 $> (((msemi $2) ++ (fst $ unLoc $1)
+                                  then return (sLL $1 $> (((fst $ unLoc $1) ++ (msemi $2)
                                                           ,snd $ unLoc $1)))
                                   else case (snd $ unLoc $1) of
                                     SnocOL hs t -> do
@@ -3206,21 +3206,21 @@ alts    :: { forall b. DisambECP b => PV (Located ([AddEpAnn],[LMatch GhcPs (Loc
         : alts1                    { $1 >>= \ $1 -> return $
                                      sL1 $1 (fst $ unLoc $1,snd $ unLoc $1) }
         | ';' alts                 { $2 >>= \ $2 -> return $
-                                     sLL $1 $> (((mz AnnSemi $1) ++ (fst $ unLoc $2))
+                                     sLL $1 $> (((fst $ unLoc $2) ++ (mz AnnSemi $1))
                                                ,snd $ unLoc $2) }
 
 alts1   :: { forall b. DisambECP b => PV (Located ([AddEpAnn],[LMatch GhcPs (LocatedA b)])) }
         : alts1 ';' alt         { $1 >>= \ $1 ->
                                   $3 >>= \ $3 ->
                                      case snd $ unLoc $1 of
-                                       [] -> return (sLL $1 (reLoc $>) ((mz AnnSemi $2) ++(fst $ unLoc $1)
+                                       [] -> return (sLL $1 (reLoc $>) ((fst $ unLoc $1) ++ (mz AnnSemi $2)
                                                                        ,[$3]))
                                        (h:t) -> do
                                          h' <- addTrailingSemiA h (gl $2)
                                          return (sLL $1 (reLoc $>) (fst $ unLoc $1,$3 : h' : t)) }
         | alts1 ';'             {  $1 >>= \ $1 ->
                                      case snd $ unLoc $1 of
-                                       [] -> return (sLL $1 $> ((mz AnnSemi $2) ++(fst $ unLoc $1)
+                                       [] -> return (sLL $1 $> ((fst $ unLoc $1) ++ (mz AnnSemi $2)
                                                                        ,[]))
                                        (h:t) -> do
                                          h' <- addTrailingSemiA h (gl $2)
@@ -3289,9 +3289,9 @@ apats  :: { [LPat GhcPs] }
 
 stmtlist :: { forall b. DisambECP b => PV (LocatedL [LocatedA (Stmt GhcPs (LocatedA b))]) }
         : '{'           stmts '}'       { $2 >>= \ $2 -> amsrl
-                                          (sLL $1 $> (reverse $ snd $ unLoc $2)) (AnnList (Just $ glR $2) (Just $ moc $1) (Just $ mcc $3) (fst $ unLoc $2) []) } -- AZ:performance of reverse?
+                                          (sLL $1 $> (reverse $ snd $ unLoc $2)) (AnnList (Just $ glR $2) (Just $ moc $1) (Just $ mcc $3) (fromOL $ fst $ unLoc $2) []) }
         |     vocurly   stmts close     { $2 >>= \ $2 -> amsrl
-                                          (L (gl $2) (reverse $ snd $ unLoc $2)) (AnnList (Just $ glR $2) Nothing Nothing (fst $ unLoc $2) []) }
+                                          (L (gl $2) (reverse $ snd $ unLoc $2)) (AnnList (Just $ glR $2) Nothing Nothing (fromOL $ fst $ unLoc $2) []) }
 
 --      do { ;; s ; s ; ; s ;; }
 -- The last Stmt should be an expression, but that's hard to enforce
@@ -3299,11 +3299,11 @@ stmtlist :: { forall b. DisambECP b => PV (LocatedL [LocatedA (Stmt GhcPs (Locat
 -- So we use BodyStmts throughout, and switch the last one over
 -- in ParseUtils.checkDo instead
 
-stmts :: { forall b. DisambECP b => PV (Located ([AddEpAnn],[LStmt GhcPs (LocatedA b)])) }
+stmts :: { forall b. DisambECP b => PV (Located (OrdList AddEpAnn,[LStmt GhcPs (LocatedA b)])) }
         : stmts ';' stmt  { $1 >>= \ $1 ->
                             $3 >>= \ ($3 :: LStmt GhcPs (LocatedA b)) ->
                             case (snd $ unLoc $1) of
-                              [] -> return (sLL $1 (reLoc $>) ((mj AnnSemi $2) : (fst $ unLoc $1)
+                              [] -> return (sLL $1 (reLoc $>) ((fst $ unLoc $1) `snocOL` (mj AnnSemi $2)
                                                      ,$3   : (snd $ unLoc $1)))
                               (h:t) -> do
                                { h' <- addTrailingSemiA h (gl $2)
@@ -3311,13 +3311,13 @@ stmts :: { forall b. DisambECP b => PV (Located ([AddEpAnn],[LStmt GhcPs (Locate
 
         | stmts ';'     {  $1 >>= \ $1 ->
                            case (snd $ unLoc $1) of
-                             [] -> return (sLL $1 $> ((mj AnnSemi $2) : (fst $ unLoc $1),snd $ unLoc $1))
+                             [] -> return (sLL $1 $> ((fst $ unLoc $1) `snocOL` (mj AnnSemi $2),snd $ unLoc $1))
                              (h:t) -> do
                                { h' <- addTrailingSemiA h (gl $2)
                                ; return $ sL1 $1 (fst $ unLoc $1,h':t) }}
         | stmt                   { $1 >>= \ $1 ->
-                                   return $ sL1A $1 ([],[$1]) }
-        | {- empty -}            { return $ noLoc ([],[]) }
+                                   return $ sL1A $1 (nilOL,[$1]) }
+        | {- empty -}            { return $ noLoc (nilOL,[]) }
 
 
 -- For typing stmts at the GHCi prompt, where

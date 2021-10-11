@@ -834,7 +834,7 @@ checkTyVars pp_what equals_or_where tc tparms
     chkParens :: [AddEpAnn] -> EpAnnComments -> LHsType GhcPs
               -> P (LHsTyVarBndr () GhcPs)
     chkParens acc cs (L l (HsParTy an ty))
-      = chkParens (mkParensEpAnn (locA l) ++ acc) (cs Semi.<> epAnnComments an) ty
+      = chkParens (sort $ mkParensEpAnn (locA l) ++ acc) (cs Semi.<> epAnnComments an) ty
     chkParens acc cs ty = chk acc cs ty
 
         -- Check that the name space is correct!
@@ -937,7 +937,7 @@ checkTyClHdr is_cls ty
       | isRdrTc tc               = return (ltc, acc, fix, ann)
     go _ (HsOpTy _ t1 ltc@(L _ tc) t2) acc ann _fix
       | isRdrTc tc               = return (ltc, HsValArg t1:HsValArg t2:acc, Infix, ann)
-    go l (HsParTy _ ty)    acc ann fix = goL ty acc (ann ++mkParensEpAnn l) fix
+    go l (HsParTy _ ty)    acc ann fix = goL ty acc (sort $ ann ++mkParensEpAnn l) fix
     go _ (HsAppTy _ t1 t2) acc ann fix = goL t1 (HsValArg t2:acc) ann fix
     go _ (HsAppKindTy l ty ki) acc ann fix = goL ty (HsTypeArg l ki:acc) ann fix
     go l (HsTupleTy _ HsBoxedOrConstraintTuple ts) [] ann fix
@@ -1023,7 +1023,7 @@ checkContext orig_t@(L (SrcSpanAnn _ l) _orig_t) =
               EpAnnNotUsed -> ([],[],emptyComments)
               EpAnn _ (AnnParen _ o c) cs -> ([o],[c],cs)
         return (L (SrcSpanAnn (EpAnn (spanAsAnchor l)
-                               (AnnContext Nothing (op Semi.<> oparens) (cp Semi.<> cparens)) (cs Semi.<> cs')) l) ts)
+                               (AnnContext Nothing (sort $ op Semi.<> oparens) (sort $ cp Semi.<> cparens)) (cs Semi.<> cs')) l) ts)
 
   check (opi,cpi,csi) (L _lp1 (HsParTy ann' ty))
                                   -- to be sure HsParTy doesn't get into the way
@@ -1284,7 +1284,7 @@ isFunLhs e = go e [] []
        | not (isRdrDataCon f)        = return (Just (L loc f, Prefix, es, ann))
    go (L _ (PatBuilderApp f e)) es       ann = go f (e:es) ann
    go (L l (PatBuilderPar e _an)) es@(_:_) ann
-                                      = go e es (ann ++ mkParensEpAnn (locA l))
+                                      = go e es (sort $ ann ++ mkParensEpAnn (locA l))
    go (L loc (PatBuilderOpApp l (L loc' op) r (EpAnn loca anns cs))) es ann
         | not (isRdrDataCon op)         -- We have found the function!
         = return (Just (L loc' op, Infix, (l:r:es), (anns ++ ann)))
