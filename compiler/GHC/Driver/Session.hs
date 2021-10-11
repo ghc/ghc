@@ -272,7 +272,7 @@ import Control.Monad.Trans.Except
 import Data.Ord
 import Data.Char
 import Data.List (intercalate, sortBy)
-import Data.Map (Map, (!?))
+import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import System.FilePath
