@@ -1067,7 +1067,7 @@ extendGlobalRdrEnv env gre
   = extendOccEnv_Acc insertGRE Utils.singleton env
                      (greOccName gre) gre
 
-shadowNames :: GlobalRdrEnv -> [GreName] -> GlobalRdrEnv
+shadowNames :: GlobalRdrEnv -> [OccName] -> GlobalRdrEnv
 shadowNames = foldl' shadowName
 
 {- Note [GlobalRdrEnv shadowing]
@@ -1075,7 +1075,7 @@ shadowNames = foldl' shadowName
 Before adding new names to the GlobalRdrEnv we nuke some existing entries;
 this is "shadowing".  The actual work is done by RdrEnv.shadowName.
 Suppose
-   env' = shadowName env M.f
+   env' = shadowName env f `extendGlobalRdrEnv` M.f
 
 Then:
    * Looking up (Unqual f) in env' should succeed, returning M.f,
@@ -1086,6 +1086,7 @@ Then:
 
    * Looking up (Qual X.f) in env', where X /= M, should be the same as
      looking up (Qual X.f) in env.
+
      That is, shadowName does /not/ delete earlier qualified bindings
 
 There are two reasons for shadowing:
@@ -1107,9 +1108,10 @@ There are two reasons for shadowing:
            ghci> True
            ghci> M.x           -- M.x is still in scope!
            ghci> "Hello"
+
     So when we add `x = True` we must not delete the `M.x` from the
     `GlobalRdrEnv`; rather we just want to make it "qualified only";
-    hence the `mk_fake-imp_spec` in `shadowName`.  See also Note
+    hence the `set_qual` in `shadowName`.  See also Note
     [Interactively-bound Ids in GHCi] in GHC.Runtime.Context
 
   - Data types also have External Names, like Ghci4.T; but we still want
@@ -1143,24 +1145,17 @@ There are two reasons for shadowing:
       At that stage, the class op 'f' will have an Internal name.
 -}
 
-shadowName :: GlobalRdrEnv -> GreName -> GlobalRdrEnv
+shadowName :: GlobalRdrEnv -> OccName -> GlobalRdrEnv
 -- Remove certain old GREs that share the same OccName as this new Name.
 -- See Note [GlobalRdrEnv shadowing] for details
-shadowName env new_name
-  = alterOccEnv (fmap (mapMaybe shadow)) env (occName new_name)
+shadowName = alterOccEnv (fmap (mapMaybe shadow))
   where
-    maybe_new_mod = nameModule_maybe (greNameMangledName new_name)
-
     shadow :: GlobalRdrElt -> Maybe GlobalRdrElt
     shadow
        old_gre@(GRE { gre_lcl = lcl, gre_imp = iss })
        = case greDefinitionModule old_gre of
            Nothing -> Just old_gre   -- Old name is Internal; do not shadow
            Just old_mod
-              | Just new_mod <- maybe_new_mod
-              , new_mod == old_mod   -- Old name same as new name; shadow completely
-              -> Nothing
-
               | null iss'            -- Nothing remains
               -> Nothing
 
@@ -1168,7 +1163,7 @@ shadowName env new_name
               -> Just (old_gre { gre_lcl = False, gre_imp = iss' })
 
               where
-                iss' = lcl_imp ++ mapMaybe shadow_is iss
+                iss' = lcl_imp ++ mapMaybe set_qual iss
                 lcl_imp | lcl       = [mk_fake_imp_spec old_gre old_mod]
                         | otherwise = []
 
@@ -1181,13 +1176,8 @@ shadowName env new_name
                                    , is_qual = True
                                    , is_dloc = greDefinitionSrcSpan old_gre }
 
-    shadow_is :: ImportSpec -> Maybe ImportSpec
-    shadow_is is@(ImpSpec { is_decl = id_spec })
-       | Just new_mod <- maybe_new_mod
-       , is_as id_spec == moduleName new_mod
-       = Nothing   -- Shadow both qualified and unqualified
-       | otherwise -- Shadow unqualified only
-       = Just (is { is_decl = id_spec { is_qual = True } })
+    set_qual :: ImportSpec -> Maybe ImportSpec
+    set_qual is = Just (is { is_decl = (is_decl is) { is_qual = True } })
 
 
 {-

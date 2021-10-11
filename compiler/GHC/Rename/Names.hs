@@ -660,7 +660,7 @@ extendGlobalRdrEnvRn avails new_fixities
 
               -- Deal with shadowing: see Note [GlobalRdrEnv shadowing]
               want_shadowing = isGHCi || inBracket
-              rdr_env1 | want_shadowing = shadowNames rdr_env new_names
+              rdr_env1 | want_shadowing = shadowNames rdr_env new_occs
                        | otherwise      = rdr_env
 
               lcl_env3 = lcl_env2 { tcl_th_bndrs = extendNameEnvList th_bndrs
