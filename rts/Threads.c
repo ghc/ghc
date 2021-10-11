@@ -965,20 +965,20 @@ printThreadStatus(StgTSO *t)
       void *label = lookupThreadLabel(t->id);
       if (label) debugBelch("[\"%s\"] ",(char *)label);
     }
-        switch (t->what_next) {
-        case ThreadKilled:
-            debugBelch("has been killed");
-            break;
-        case ThreadComplete:
-            debugBelch("has completed");
-            break;
-        default:
-            printThreadBlockage(t);
-        }
-        if (t->dirty) {
-            debugBelch(" (TSO_DIRTY)");
-        }
-        debugBelch("\n");
+    switch (t->what_next) {
+    case ThreadKilled:
+        debugBelch("has been killed");
+        break;
+    case ThreadComplete:
+        debugBelch("has completed");
+        break;
+    default:
+        printThreadBlockage(t);
+    }
+    if (t->dirty) {
+        debugBelch(" (TSO_DIRTY)");
+    }
+    debugBelch("\n");
 }
 
 void
