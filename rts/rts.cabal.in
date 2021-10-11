@@ -20,6 +20,8 @@ flag libbfd
   default: @CabalHaveLibbfd@
 flag mingwex
   default: @CabalMingwex@
+flag need-atomic
+  default: @CabalNeedLibatomic@
 flag libdw
   default: @CabalHaveLibdw@
 flag libnuma
@@ -126,6 +128,9 @@ library
     if flag(need-pthread)
        -- for pthread_getthreadid_np, pthread_create, ...
        extra-libraries: pthread
+    if flag(need-atomic)
+       -- for sub-word-sized atomic operations (#19119)
+       extra-libraries: atomic
     if flag(libbfd)
        -- for debugging
        extra-libraries: bfd iberty

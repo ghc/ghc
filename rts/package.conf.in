@@ -63,6 +63,9 @@ extra-libraries:
                              , "elf"
                              , "dw"             /* for backtraces */
 #endif
+#if NEED_ATOMIC_LIB
+                             , "atomic"
+#endif
 
 #if defined(INSTALLING)
 include-dirs:           INCLUDE_DIR FFI_INCLUDE_DIR

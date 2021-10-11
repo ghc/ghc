@@ -1189,6 +1189,32 @@ AC_LINK_IFELSE([AC_LANG_CALL([], [printf\$LDBLStub])],
 
 FP_CHECK_PTHREADS
 
+AC_MSG_CHECKING(whether -latomic is needed for sub-word-sized atomic operations)
+AC_LINK_IFELSE([AC_LANG_PROGRAM([[unsigned char a;]], [[__atomic_fetch_or(&a, 1, __ATOMIC_RELAXED);]])],
+    [
+        AC_MSG_RESULT(no)
+        AC_SUBST([CabalNeedLibatomic],[False])
+        need_latomic=0
+    ],
+    [
+        _save_LIBS=$LIBS
+        LIBS="-latomic"
+        AC_LINK_IFELSE([AC_LANG_PROGRAM([[unsigned char a;]], [[__atomic_fetch_or(&a, 1, __ATOMIC_RELAXED);]])],
+            [
+                AC_MSG_RESULT(yes)
+                AC_SUBST([CabalNeedLibatomic],[True])
+                need_latomic=1
+            ],
+            [
+                AC_SUBST([CabalNeedLibatomic],[False])
+                AC_MSG_ERROR([sub-word-sized atomic operations not available.])
+                need_latomic=0
+            ])
+        LIBS=$_save_LIBS
+    ])
+AC_DEFINE_UNQUOTED([NEED_ATOMIC_LIB], [$need_latomic],
+    [Define to 1 if we need -latomic for sub-word atomic operations.])
+
 dnl ** check for eventfd which is needed by the I/O manager
 AC_CHECK_HEADERS([sys/eventfd.h])
 AC_CHECK_FUNCS([eventfd])
