@@ -91,7 +91,7 @@ data ModSummary
           -- ^ Source imports of the module
         ms_textual_imps :: [(Maybe FastString, Located ModuleName)],
           -- ^ Non-source imports of the module from the module *text*
-        ms_ghc_prim_import :: Bool,
+        ms_ghc_prim_import :: !Bool,
           -- ^ Whether the special module GHC.Prim was imported explicitliy
         ms_parsed_mod   :: Maybe HsParsedModule,
           -- ^ The parsed, nonrenamed source, if we have it.  This is also
