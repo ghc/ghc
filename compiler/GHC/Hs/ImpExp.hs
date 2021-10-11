@@ -119,7 +119,7 @@ type instance XCImportDecl  GhcTc = NoExtField
 
 type instance XXImportDecl  (GhcPass _) = NoExtCon
 
-type instance Anno ModuleName = SrcSpan
+type instance Anno ModuleName = SrcSpanAnnA
 type instance Anno [LocatedA (IE (GhcPass p))] = SrcSpanAnnL
 
 -- ---------------------------------------------------------------------
@@ -141,7 +141,7 @@ simpleImportDecl :: ModuleName -> ImportDecl GhcPs
 simpleImportDecl mn = ImportDecl {
       ideclExt       = noAnn,
       ideclSourceSrc = NoSourceText,
-      ideclName      = noLoc mn,
+      ideclName      = noLocA mn,
       ideclPkgQual   = Nothing,
       ideclSource    = NotBoot,
       ideclSafe      = False,

@@ -525,7 +525,7 @@ warnUnqualifiedImport decl iface =
     $ addWarnAt (Reason Opt_WarnCompatUnqualifiedImports) loc warning
   where
     mod = mi_module iface
-    loc = getLoc $ ideclName decl
+    loc = getLocA $ ideclName decl
 
     is_qual = isImportDeclQualified (ideclQualified decl)
     has_import_list =

@@ -73,7 +73,7 @@ data HsModule
       hsmodLayout :: LayoutInfo,
         -- ^ Layout info for the module.
         -- For incomplete modules (e.g. the output of parseHeader), it is NoLayoutInfo.
-      hsmodName :: Maybe (Located ModuleName),
+      hsmodName :: Maybe (LocatedA ModuleName),
         -- ^ @Nothing@: \"module X where\" is omitted (in which case the next
         --     field is Nothing too)
       hsmodExports :: Maybe (LocatedL [LIE GhcPs]),

@@ -97,7 +97,7 @@ getImports popts implicit_prelude buf filename source_filename = do
                 imps = hsmodImports hsmod
                 main_loc = srcLocSpan (mkSrcLoc (mkFastString source_filename)
                                        1 1)
-                mod = mb_mod `orElse` L main_loc mAIN_NAME
+                mod = mb_mod `orElse` L (noAnnSrcSpan main_loc) mAIN_NAME
                 (src_idecls, ord_idecls) = partition ((== IsBoot) . ideclSource . unLoc) imps
 
                -- GHC.Prim doesn't exist physically, so don't go looking for it.
@@ -107,11 +107,11 @@ getImports popts implicit_prelude buf filename source_filename = do
 
                 implicit_imports = mkPrelImports (unLoc mod) main_loc
                                                  implicit_prelude imps
-                convImport (L _ i) = (fmap sl_fs (ideclPkgQual i), ideclName i)
+                convImport (L _ i) = (fmap sl_fs (ideclPkgQual i), reLoc (ideclName i))
               in
               return (map convImport src_idecls,
                       map convImport (implicit_imports ++ ordinary_imps),
-                      mod)
+                      reLoc mod)
 
 mkPrelImports :: ModuleName
               -> SrcSpan    -- Attribute the "import Prelude" to this location
@@ -144,7 +144,7 @@ mkPrelImports this_mod loc implicit_prelude import_decls
       preludeImportDecl
         = L loc' $ ImportDecl { ideclExt       = noAnn,
                                 ideclSourceSrc = NoSourceText,
-                                ideclName      = L loc pRELUDE_NAME,
+                                ideclName      = L loc' pRELUDE_NAME,
                                 ideclPkgQual   = Nothing,
                                 ideclSource    = NotBoot,
                                 ideclSafe      = False,  -- Not a safe import
