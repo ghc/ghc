@@ -551,6 +551,8 @@ void rts_pinThreadToNumaNode (
 
 #if defined(DEBUG)
 
+void printAllTasks(void);
+
 void
 printAllTasks(void)
 {
