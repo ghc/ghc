@@ -735,14 +735,14 @@ AC_SUBST([ClangCmd])
 dnl ** Which LLVM llc to use?
 dnl --------------------------------------------------------------
 AC_ARG_VAR(LLC,[Use as the path to LLVM's llc [default=autodetect]])
-FIND_LLVM_PROG([LLC], [llc], [$LlvmVersion])
+FIND_LLVM_PROG([LLC], [llc], [$LlvmMinVersion], [$LlvmMaxVersion])
 LlcCmd="$LLC"
 AC_SUBST([LlcCmd])
 
 dnl ** Which LLVM opt to use?
 dnl --------------------------------------------------------------
 AC_ARG_VAR(OPT,[Use as the path to LLVM's opt [default=autodetect]])
-FIND_LLVM_PROG([OPT], [opt], [$LlvmVersion])
+FIND_LLVM_PROG([OPT], [opt], [$LlvmMinVersion], [$LlvmMaxVersion])
 OptCmd="$OPT"
 AC_SUBST([OptCmd])
 
