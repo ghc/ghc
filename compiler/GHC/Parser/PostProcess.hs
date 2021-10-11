@@ -828,25 +828,35 @@ checkTyVars pp_what equals_or_where tc tparms
        ; return (mkHsQTvs tvs) }
   where
     check (HsTypeArg _ ki@(L loc _)) = addFatalError $ PsError (PsErrUnexpectedTypeAppInDecl ki pp_what (unLoc tc)) [] (locA loc)
-    check (HsValArg ty) = chkParens [] emptyComments ty
+    check (HsValArg ty) = chkParens [] [] emptyComments ty
     check (HsArgPar sp) = addFatalError $ PsError (PsErrMalformedDecl pp_what (unLoc tc)) [] sp
         -- Keep around an action for adjusting the annotations of extra parens
-    chkParens :: [AddEpAnn] -> EpAnnComments -> LHsType GhcPs
+    chkParens :: [AddEpAnn] -> [AddEpAnn] -> EpAnnComments -> LHsType GhcPs
               -> P (LHsTyVarBndr () GhcPs)
-    chkParens acc cs (L l (HsParTy an ty))
-      = chkParens (mkParensEpAnn (locA l) ++ acc) (cs Semi.<> epAnnComments an) ty
-    chkParens acc cs ty = chk acc cs ty
+    chkParens ops cps cs (L l (HsParTy an ty))
+      = let
+          (o,c) = mkParensEpAnn (realSrcSpan $ locA l)
+        in
+          chkParens (o:ops) (c:cps) (cs Semi.<> epAnnComments an) ty
+    chkParens ops cps cs ty = chk ops cps cs ty
 
         -- Check that the name space is correct!
-    chk :: [AddEpAnn] -> EpAnnComments -> LHsType GhcPs -> P (LHsTyVarBndr () GhcPs)
-    chk an cs (L l (HsKindSig annk (L annt (HsTyVar ann _ (L lv tv))) k))
+    chk :: [AddEpAnn] -> [AddEpAnn] -> EpAnnComments -> LHsType GhcPs -> P (LHsTyVarBndr () GhcPs)
+    chk ops cps cs (L l (HsKindSig annk (L annt (HsTyVar ann _ (L lv tv))) k))
         | isRdrTyVar tv
-            = return (L (widenLocatedAn (l Semi.<> annt) an)
-                      (KindedTyVar (addAnns (annk Semi.<> ann) an cs) () (L lv tv) k))
-    chk an cs (L l (HsTyVar ann _ (L ltv tv)))
-        | isRdrTyVar tv    = return (L (widenLocatedAn l an)
+            = let
+                an = (reverse ops) ++ cps
+              in
+                return (L (widenLocatedAn (l Semi.<> annt) an)
+                       (KindedTyVar (addAnns (annk Semi.<> ann) an cs) () (L lv tv) k))
+    chk ops cps cs (L l (HsTyVar ann _ (L ltv tv)))
+        | isRdrTyVar tv
+            = let
+                an = (reverse ops) ++ cps
+              in
+                return (L (widenLocatedAn l an)
                                      (UserTyVar (addAnns ann an cs) () (L ltv tv)))
-    chk _ _ t@(L loc _)
+    chk _ _ _ t@(L loc _)
         = addFatalError $ PsError (PsErrUnexpectedTypeInDecl t pp_what (unLoc tc) tparms equals_or_where) [] (locA loc)
 
 
@@ -921,34 +931,36 @@ checkTyClHdr :: Bool               -- True  <=> class header
 --              Int :*: Bool   into    (:*:, [Int, Bool])
 -- returning the pieces
 checkTyClHdr is_cls ty
-  = goL ty [] [] Prefix
+  = goL ty [] [] [] Prefix
   where
-    goL (L l ty) acc ann fix = go (locA l) ty acc ann fix
+    goL (L l ty) acc ops cps fix = go (locA l) ty acc ops cps fix
 
     -- workaround to define '*' despite StarIsType
-    go _ (HsParTy an (L l (HsStarTy _ isUni))) acc ann' fix
+    go _ (HsParTy an (L l (HsStarTy _ isUni))) acc ops' cps' fix
       = do { addWarning Opt_WarnStarBinder (PsWarnStarBinder (locA l))
            ; let name = mkOccName tcClsName (starSym isUni)
            ; let a' = newAnns l an
            ; return (L a' (Unqual name), acc, fix
-                    , ann') }
+                    , (reverse ops') ++ cps') }
 
-    go _ (HsTyVar _ _ ltc@(L _ tc)) acc ann fix
-      | isRdrTc tc               = return (ltc, acc, fix, ann)
-    go _ (HsOpTy _ t1 ltc@(L _ tc) t2) acc ann _fix
-      | isRdrTc tc               = return (ltc, HsValArg t1:HsValArg t2:acc, Infix, ann)
-    go l (HsParTy _ ty)    acc ann fix = goL ty acc (ann ++mkParensEpAnn l) fix
-    go _ (HsAppTy _ t1 t2) acc ann fix = goL t1 (HsValArg t2:acc) ann fix
-    go _ (HsAppKindTy l ty ki) acc ann fix = goL ty (HsTypeArg l ki:acc) ann fix
-    go l (HsTupleTy _ HsBoxedOrConstraintTuple ts) [] ann fix
+    go _ (HsTyVar _ _ ltc@(L _ tc)) acc ops cps fix
+      | isRdrTc tc               = return (ltc, acc, fix, (reverse ops) ++ cps)
+    go _ (HsOpTy _ t1 ltc@(L _ tc) t2) acc ops cps _fix
+      | isRdrTc tc               = return (ltc, HsValArg t1:HsValArg t2:acc, Infix, (reverse ops) ++ cps)
+    go l (HsParTy _ ty)    acc ops cps fix = goL ty acc (o:ops) (c:cps) fix
+      where
+        (o,c) = mkParensEpAnn (realSrcSpan l)
+    go _ (HsAppTy _ t1 t2) acc ops cps fix = goL t1 (HsValArg t2:acc) ops cps fix
+    go _ (HsAppKindTy l ty ki) acc ops cps fix = goL ty (HsTypeArg l ki:acc) ops cps fix
+    go l (HsTupleTy _ HsBoxedOrConstraintTuple ts) [] ops cps fix
       = return (L (noAnnSrcSpan l) (nameRdrName tup_name)
-               , map HsValArg ts, fix, ann)
+               , map HsValArg ts, fix, (reverse ops)++cps)
       where
         arity = length ts
         tup_name | is_cls    = cTupleTyConName arity
                  | otherwise = getName (tupleTyCon Boxed arity)
           -- See Note [Unit tuples] in GHC.Hs.Type  (TODO: is this still relevant?)
-    go l _ _ _ _
+    go l _ _ _ _ _
       = addFatalError $ PsError (PsErrMalformedTyOrClDecl ty) [] l
 
     -- Combine the annotations from the HsParTy and HsStarTy into a
@@ -1023,7 +1035,8 @@ checkContext orig_t@(L (SrcSpanAnn _ l) _orig_t) =
               EpAnnNotUsed -> ([],[],emptyComments)
               EpAnn _ (AnnParen _ o c) cs -> ([o],[c],cs)
         return (L (SrcSpanAnn (EpAnn (spanAsAnchor l)
-                               (AnnContext Nothing (op Semi.<> oparens) (cp Semi.<> cparens)) (cs Semi.<> cs')) l) ts)
+                              -- Append parens so that the original order in the source is maintained
+                               (AnnContext Nothing (oparens ++ op) (cp ++ cparens)) (cs Semi.<> cs')) l) ts)
 
   check (opi,cpi,csi) (L _lp1 (HsParTy ann' ty))
                                   -- to be sure HsParTy doesn't get into the way
@@ -1278,26 +1291,29 @@ isFunLhs :: LocatedA (PatBuilder GhcPs)
                    [LocatedA (PatBuilder GhcPs)],[AddEpAnn]))
 -- A variable binding is parsed as a FunBind.
 -- Just (fun, is_infix, arg_pats) if e is a function LHS
-isFunLhs e = go e [] []
+isFunLhs e = go e [] [] []
  where
-   go (L _ (PatBuilderVar (L loc f))) es ann
-       | not (isRdrDataCon f)        = return (Just (L loc f, Prefix, es, ann))
-   go (L _ (PatBuilderApp f e)) es       ann = go f (e:es) ann
-   go (L l (PatBuilderPar e _an)) es@(_:_) ann
-                                      = go e es (ann ++ mkParensEpAnn (locA l))
-   go (L loc (PatBuilderOpApp l (L loc' op) r (EpAnn loca anns cs))) es ann
+   go (L _ (PatBuilderVar (L loc f))) es ops cps
+       | not (isRdrDataCon f)        = return (Just (L loc f, Prefix, es, (reverse ops) ++ cps))
+   go (L _ (PatBuilderApp f e)) es       ops cps = go f (e:es) ops cps
+   go (L l (PatBuilderPar e _)) es@(_:_) ops cps
+                                      = let
+                                          (o,c) = mkParensEpAnn (realSrcSpan $ locA l)
+                                        in
+                                          go e es (o:ops) (c:cps)
+   go (L loc (PatBuilderOpApp l (L loc' op) r (EpAnn loca anns cs))) es ops cps
         | not (isRdrDataCon op)         -- We have found the function!
-        = return (Just (L loc' op, Infix, (l:r:es), (anns ++ ann)))
+        = return (Just (L loc' op, Infix, (l:r:es), (anns ++ reverse ops ++ cps)))
         | otherwise                     -- Infix data con; keep going
-        = do { mb_l <- go l es ann
+        = do { mb_l <- go l es ops cps
              ; case mb_l of
-                 Just (op', Infix, j : k : es', ann')
-                   -> return (Just (op', Infix, j : op_app : es', ann'))
+                 Just (op', Infix, j : k : es', anns')
+                   -> return (Just (op', Infix, j : op_app : es', anns'))
                    where
                      op_app = L loc (PatBuilderOpApp k
-                               (L loc' op) r (EpAnn loca anns cs))
+                               (L loc' op) r (EpAnn loca (reverse ops++cps) cs))
                  _ -> return Nothing }
-   go _ _ _ = return Nothing
+   go _ _ _ _ = return Nothing
 
 mkBangTy :: EpAnn [AddEpAnn] -> SrcStrictness -> LHsType GhcPs -> HsType GhcPs
 mkBangTy anns strictness =
