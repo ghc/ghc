@@ -72,7 +72,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/exactprin
  -- "../../testsuite/tests/ghc-api/exactprint/RmDecl1.hs" (Just rmDecl1)
  -- "../../testsuite/tests/ghc-api/exactprint/RmDecl2.hs" (Just rmDecl2)
  -- "../../testsuite/tests/ghc-api/exactprint/RmDecl3.hs" (Just rmDecl3)
- "../../testsuite/tests/ghc-api/exactprint/RmDecl4.hs" (Just rmDecl4)
+ -- "../../testsuite/tests/ghc-api/exactprint/RmDecl4.hs" (Just rmDecl4)
  -- "../../testsuite/tests/ghc-api/exactprint/RmDecl5.hs" (Just rmDecl5)
  -- "../../testsuite/tests/ghc-api/exactprint/RmDecl6.hs" (Just rmDecl6)
  -- "../../testsuite/tests/ghc-api/exactprint/RmDecl7.hs" (Just rmDecl7)
@@ -199,6 +199,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/exactprin
  -- "../../testsuite/tests/printer/PprLinearArrow.hs" Nothing
  -- "../../testsuite/tests/printer/PprSemis.hs" Nothing
  -- "../../testsuite/tests/printer/PprEmptyMostly.hs" Nothing
+ "../../testsuite/tests/parser/should_compile/DumpSemis.hs" Nothing
 
 -- cloneT does not need a test, function can be retired
 

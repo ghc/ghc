@@ -3490,12 +3490,11 @@ clean_pragma prag = canon_ws (map toLower (unprefix prag))
 -}
 
 
--- |Given a 'SrcSpan' that surrounds a 'HsPar' or 'HsParTy', generate
+-- |Given a 'RealSrcSpan' that surrounds a 'HsPar' or 'HsParTy', generate
 -- 'AddEpAnn' values for the opening and closing bordering on the start
 -- and end of the span
-mkParensEpAnn :: SrcSpan -> [AddEpAnn]
-mkParensEpAnn (UnhelpfulSpan _)  = []
-mkParensEpAnn (RealSrcSpan ss _) = [AddEpAnn AnnOpenP (EpaSpan lo),AddEpAnn AnnCloseP (EpaSpan lc)]
+mkParensEpAnn :: RealSrcSpan -> (AddEpAnn, AddEpAnn)
+mkParensEpAnn ss = (AddEpAnn AnnOpenP (EpaSpan lo),AddEpAnn AnnCloseP (EpaSpan lc))
   where
     f = srcSpanFile ss
     sl = srcSpanStartLine ss
