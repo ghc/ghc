@@ -155,9 +155,9 @@
             { T20452.hs:6:13-22 }
             (UnchangedAnchor))
            [(AddEpAnn AnnDcolon (EpaSpan { T20452.hs:6:17-18 }))
+           ,(AddEpAnn AnnOpenP (EpaSpan { T20452.hs:6:13 }))
            ,(AddEpAnn AnnOpenP (EpaSpan { T20452.hs:6:14 }))
            ,(AddEpAnn AnnCloseP (EpaSpan { T20452.hs:6:21 }))
-           ,(AddEpAnn AnnOpenP (EpaSpan { T20452.hs:6:13 }))
            ,(AddEpAnn AnnCloseP (EpaSpan { T20452.hs:6:22 }))]
            (EpaComments
             []))
@@ -436,9 +436,9 @@
             { T20452.hs:9:14-27 }
             (UnchangedAnchor))
            [(AddEpAnn AnnDcolon (EpaSpan { T20452.hs:9:20-21 }))
+           ,(AddEpAnn AnnOpenP (EpaSpan { T20452.hs:9:14 }))
            ,(AddEpAnn AnnOpenP (EpaSpan { T20452.hs:9:15 }))
            ,(AddEpAnn AnnCloseP (EpaSpan { T20452.hs:9:26 }))
-           ,(AddEpAnn AnnOpenP (EpaSpan { T20452.hs:9:14 }))
            ,(AddEpAnn AnnCloseP (EpaSpan { T20452.hs:9:27 }))]
            (EpaComments
             []))
@@ -470,9 +470,9 @@
             { T20452.hs:9:29-46 }
             (UnchangedAnchor))
            [(AddEpAnn AnnDcolon (EpaSpan { T20452.hs:9:36-37 }))
+           ,(AddEpAnn AnnOpenP (EpaSpan { T20452.hs:9:29 }))
            ,(AddEpAnn AnnOpenP (EpaSpan { T20452.hs:9:30 }))
            ,(AddEpAnn AnnCloseP (EpaSpan { T20452.hs:9:45 }))
-           ,(AddEpAnn AnnOpenP (EpaSpan { T20452.hs:9:29 }))
            ,(AddEpAnn AnnCloseP (EpaSpan { T20452.hs:9:46 }))]
            (EpaComments
             []))
@@ -504,9 +504,9 @@
             { T20452.hs:9:48-76 }
             (UnchangedAnchor))
            [(AddEpAnn AnnDcolon (EpaSpan { T20452.hs:9:54-55 }))
+           ,(AddEpAnn AnnOpenP (EpaSpan { T20452.hs:9:48 }))
            ,(AddEpAnn AnnOpenP (EpaSpan { T20452.hs:9:49 }))
            ,(AddEpAnn AnnCloseP (EpaSpan { T20452.hs:9:75 }))
-           ,(AddEpAnn AnnOpenP (EpaSpan { T20452.hs:9:48 }))
            ,(AddEpAnn AnnCloseP (EpaSpan { T20452.hs:9:76 }))]
            (EpaComments
             []))

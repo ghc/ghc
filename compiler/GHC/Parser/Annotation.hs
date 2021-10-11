@@ -100,7 +100,7 @@ import qualified GHC.Data.Strict as Strict
 
 {-
 Note [exact print annotations]
-~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Given a parse tree of a Haskell module, how can we reconstruct
 the original Haskell source code, retaining all whitespace and
 source code comments?  We need to track the locations of all
@@ -394,7 +394,7 @@ instance Outputable EpaComment where
 -- The usual way an 'AddEpAnn' is created is using the 'mj' ("make
 -- jump") function, and then it can be inserted into the appropriate
 -- annotation.
-data AddEpAnn = AddEpAnn AnnKeywordId EpaLocation deriving (Data,Eq,Ord)
+data AddEpAnn = AddEpAnn AnnKeywordId EpaLocation deriving (Data,Eq)
 
 -- | The anchor for an @'AnnKeywordId'@. The Parser inserts the
 -- @'EpaSpan'@ variant, giving the exact location of the original item
@@ -459,6 +459,9 @@ instance Outputable EpaLocation where
 
 instance Outputable AddEpAnn where
   ppr (AddEpAnn kw ss) = text "AddEpAnn" <+> ppr kw <+> ppr ss
+
+instance Ord AddEpAnn where
+  compare (AddEpAnn kw1 loc1) (AddEpAnn kw2 loc2) = compare (loc1, kw1) (loc2,kw2)
 
 -- ---------------------------------------------------------------------
 
@@ -802,7 +805,8 @@ addTrailingAnnToL s t cs EpAnnNotUsed
 addTrailingAnnToL _ t cs n = n { anns = addTrailing (anns n)
                                , comments = comments n <> cs }
   where
-    addTrailing n = n { al_trailing = t : al_trailing n }
+    -- See Note [list append in addTrailing*]
+    addTrailing n = n { al_trailing = al_trailing n ++ [t]}
 
 -- | Helper function used in the parser to add a 'TrailingAnn' items
 -- to an existing annotation.
@@ -813,7 +817,8 @@ addTrailingAnnToA s t cs EpAnnNotUsed
 addTrailingAnnToA _ t cs n = n { anns = addTrailing (anns n)
                                , comments = comments n <> cs }
   where
-    addTrailing n = n { lann_trailing = t : lann_trailing n }
+    -- See Note [list append in addTrailing*]
+    addTrailing n = n { lann_trailing = lann_trailing n ++ [t] }
 
 -- | Helper function used in the parser to add a comma location to an
 -- existing annotation.
@@ -822,8 +827,29 @@ addTrailingCommaToN s EpAnnNotUsed l
   = EpAnn (spanAsAnchor s) (NameAnnTrailing [AddCommaAnn l]) emptyComments
 addTrailingCommaToN _ n l = n { anns = addTrailing (anns n) l }
   where
+    -- See Note [list append in addTrailing*]
     addTrailing :: NameAnn -> EpaLocation -> NameAnn
-    addTrailing n l = n { nann_trailing = AddCommaAnn l : nann_trailing n }
+    addTrailing n l = n { nann_trailing = nann_trailing n ++ [AddCommaAnn l]}
+
+{-
+Note [list append in addTrailing*]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The addTrailingAnnToL, addTrailingAnnToA and addTrailingCommaToN
+functions are used to add a separator for an item when it occurs in a
+list.  So they are used to capture a comma, vbar, semicolon and similar.
+
+In general, a given element will have zero or one of these.  In
+extreme (test) cases, there may be multiple semicolons.
+
+In exact printing we sometimes convert the EpaLocation variant for an
+trailing annotation to the EpaDelta variant, which cannot be sorted.
+
+Hence it is critical that these annotations are captured in the order
+they appear in the original source file.
+
+And so we use the less efficient list append to preserve the order,
+knowing that in most cases the original list is empty.
+-}
 
 -- ---------------------------------------------------------------------
 
