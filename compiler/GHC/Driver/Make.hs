@@ -697,11 +697,11 @@ guessOutputFile = modifySession $ \env ->
             ml_hs_file (ms_location ms)
         name = fmap dropExtension mainModuleSrcPath
 
-        name_exe = do
+        !name_exe = do
           -- we must add the .exe extension unconditionally here, otherwise
           -- when name has an extension of its own, the .exe extension will
           -- not be added by GHC.Driver.Pipeline.exeFileName.  See #2248
-          name' <- if platformOS platform == OSMinGW32
+          !name' <- if platformOS platform == OSMinGW32
                     then fmap (<.> "exe") name
                     else name
           mainModuleSrcPath' <- mainModuleSrcPath
