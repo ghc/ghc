@@ -250,10 +250,10 @@ computeAddend(Section * section, Elf_Rel * rel,
             }
             return V;
         }
-        case COMPAT_R_AARCH64_LDST128_ABS_LO12_NC: CHECK(0 == ((S+A) & 0x0f));
-        case COMPAT_R_AARCH64_LDST64_ABS_LO12_NC:  CHECK(0 == ((S+A) & 0x07));
-        case COMPAT_R_AARCH64_LDST32_ABS_LO12_NC:  CHECK(0 == ((S+A) & 0x03));
-        case COMPAT_R_AARCH64_LDST16_ABS_LO12_NC:  CHECK(0 == ((S+A) & 0x01));
+        case COMPAT_R_AARCH64_LDST128_ABS_LO12_NC: CHECK(0 == ((S+A) & 0x0f)); FALLTHROUGH;
+        case COMPAT_R_AARCH64_LDST64_ABS_LO12_NC:  CHECK(0 == ((S+A) & 0x07)); FALLTHROUGH;
+        case COMPAT_R_AARCH64_LDST32_ABS_LO12_NC:  CHECK(0 == ((S+A) & 0x03)); FALLTHROUGH;
+        case COMPAT_R_AARCH64_LDST16_ABS_LO12_NC:  CHECK(0 == ((S+A) & 0x01)); FALLTHROUGH;
         case COMPAT_R_AARCH64_LDST8_ABS_LO12_NC:
             /* type: static, class: aarch64, op: S + A */
             return (S + A) & 0xfff;
