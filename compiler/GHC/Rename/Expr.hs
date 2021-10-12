@@ -207,16 +207,10 @@ finishHsVar (L l name)
       ; return (HsVar noExtField (L (la2na l) name), unitFV name) }
 
 rnUnboundVar :: RdrName -> RnM (HsExpr GhcRn, FreeVars)
-rnUnboundVar v =
-  if isUnqual v
-  then -- Treat this as a "hole"
-       -- Do not fail right now; instead, return HsUnboundVar
-       -- and let the type checker report the error
-       return (HsUnboundVar noExtField (rdrNameOcc v), emptyFVs)
-
-        else -- Fail immediately (qualified name)
-             do { n <- reportUnboundName v
-                ; return (HsVar noExtField (noLocA n), emptyFVs) }
+rnUnboundVar v = do
+  deferOutofScopeVariables <- goptM Opt_DeferOutOfScopeVariables
+  unless (isUnqual v || deferOutofScopeVariables) (reportUnboundName v >> return ())
+  return (HsUnboundVar noExtField (rdrNameOcc v), emptyFVs)
 
 rnExpr (HsVar _ (L l v))
   = do { dflags <- getDynFlags

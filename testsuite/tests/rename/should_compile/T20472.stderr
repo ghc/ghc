@@ -1,0 +1,9 @@
+
+T20472.hs:5:5: warning: [-Wdeferred-out-of-scope-variables (in -Wdefault)]
+    Variable not in scope: nonexistent
+
+T20472.hs:6:5: warning: [-Wdeferred-out-of-scope-variables (in -Wdefault)]
+    Variable not in scope: nonexistent
+
+T20472.hs:8:5: warning: [-Wdeferred-out-of-scope-variables (in -Wdefault)]
+    Variable not in scope: x
