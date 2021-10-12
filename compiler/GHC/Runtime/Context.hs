@@ -368,7 +368,8 @@ icExtendGblRdrEnv env tythings
        = foldl' extendGlobalRdrEnv env1 (concatMap localGREsFromAvail avail)
        where
           new_gres = concatMap availGreNames avail
-          env1  = shadowNames env (map occName new_gres)
+          new_occs = occSetToEnv (mkOccSet (map occName new_gres))
+          env1  = shadowNames env new_occs
           avail = tyThingAvailInfo thing
 
     -- Ugh! The new_tythings may include record selectors, since they

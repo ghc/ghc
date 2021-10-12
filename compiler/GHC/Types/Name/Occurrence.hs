@@ -83,14 +83,14 @@ module GHC.Types.Name.Occurrence (
         lookupOccEnv, mkOccEnv, mkOccEnv_C, extendOccEnvList, elemOccEnv,
         nonDetOccEnvElts, foldOccEnv, plusOccEnv, plusOccEnv_C, extendOccEnv_C,
         extendOccEnv_Acc, filterOccEnv, delListFromOccEnv, delFromOccEnv,
-        alterOccEnv, pprOccEnv,
+        alterOccEnv, minusOccEnv, minusOccEnv_C, pprOccEnv,
 
         -- * The 'OccSet' type
         OccSet, emptyOccSet, unitOccSet, mkOccSet, extendOccSet,
         extendOccSetList,
         unionOccSets, unionManyOccSets, minusOccSet, elemOccSet,
         isEmptyOccSet, intersectOccSet,
-        filterOccSet,
+        filterOccSet, occSetToEnv,
 
         -- * Tidying up
         TidyOccEnv, emptyTidyOccEnv, initTidyOccEnv,
@@ -411,6 +411,10 @@ delFromOccEnv      :: OccEnv a -> OccName -> OccEnv a
 delListFromOccEnv :: OccEnv a -> [OccName] -> OccEnv a
 filterOccEnv       :: (elt -> Bool) -> OccEnv elt -> OccEnv elt
 alterOccEnv        :: (Maybe elt -> Maybe elt) -> OccEnv elt -> OccName -> OccEnv elt
+minusOccEnv :: OccEnv a -> OccEnv b -> OccEnv a
+
+-- | Alters (replaces or removes) those elements of the map that are mentioned in the second map
+minusOccEnv_C :: (a -> b -> Maybe a) -> OccEnv a -> OccEnv b -> OccEnv a
 
 emptyOccEnv      = A emptyUFM
 unitOccEnv x y = A $ unitUFM x y
@@ -431,6 +435,8 @@ delFromOccEnv (A x) y    = A $ delFromUFM x y
 delListFromOccEnv (A x) y  = A $ delListFromUFM x y
 filterOccEnv x (A y)       = A $ filterUFM x y
 alterOccEnv fn (A y) k     = A $ alterUFM fn y k
+minusOccEnv (A x) (A y) = A $ minusUFM x y
+minusOccEnv_C fn (A x) (A y) = A $ minusUFM_C fn x y
 
 instance Outputable a => Outputable (OccEnv a) where
     ppr x = pprOccEnv ppr x
@@ -452,6 +458,8 @@ elemOccSet        :: OccName -> OccSet -> Bool
 isEmptyOccSet     :: OccSet -> Bool
 intersectOccSet   :: OccSet -> OccSet -> OccSet
 filterOccSet      :: (OccName -> Bool) -> OccSet -> OccSet
+-- | Converts an OccSet to an OccEnv (operationally the identity)
+occSetToEnv       :: OccSet -> OccEnv OccName
 
 emptyOccSet       = emptyUniqSet
 unitOccSet        = unitUniqSet
@@ -465,6 +473,7 @@ elemOccSet        = elementOfUniqSet
 isEmptyOccSet     = isEmptyUniqSet
 intersectOccSet   = intersectUniqSets
 filterOccSet      = filterUniqSet
+occSetToEnv       = A . getUniqSet
 
 {-
 ************************************************************************
