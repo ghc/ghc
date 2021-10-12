@@ -931,7 +931,7 @@ body2   :: { (AnnList
 
 top     :: { ([TrailingAnn]
              ,([LImportDecl GhcPs], [LHsDecl GhcPs])) }
-        : semis top1                            { (reverse $1, $2) }
+        : semis top1                            { ($1, $2) }
 
 top1    :: { ([LImportDecl GhcPs], [LHsDecl GhcPs]) }
         : importdecls_semi topdecls_cs_semi        { (reverse $1, cvTopDecls $2) }
@@ -1080,7 +1080,7 @@ importdecls
 importdecls_semi :: { [LImportDecl GhcPs] }
 importdecls_semi
         : importdecls_semi importdecl semis1
-                                {% do { i <- amsA $2 (reverse $3)
+                                {% do { i <- amsA $2 $3
                                       ; return (i : $1)} }
         | {- empty -}           { [] }
 
@@ -1181,7 +1181,7 @@ topdecls :: { OrdList (LHsDecl GhcPs) }
 
 -- May have trailing semicolons, can be empty
 topdecls_semi :: { OrdList (LHsDecl GhcPs) }
-        : topdecls_semi topdecl semis1 {% do { t <- amsA $2 (reverse $3)
+        : topdecls_semi topdecl semis1 {% do { t <- amsA $2 $3
                                              ; return ($1 `snocOL` t) }}
         | {- empty -}                  { nilOL }
 
@@ -1194,7 +1194,7 @@ topdecls_cs :: { OrdList (LHsDecl GhcPs) }
 
 -- May have trailing semicolons, can be empty
 topdecls_cs_semi :: { OrdList (LHsDecl GhcPs) }
-        : topdecls_cs_semi topdecl_cs semis1 {% do { t <- amsA $2 (reverse $3)
+        : topdecls_cs_semi topdecl_cs semis1 {% do { t <- amsA $2 $3
                                                    ; return ($1 `snocOL` t) }}
         | {- empty -}                  { nilOL }
 
@@ -3289,9 +3289,9 @@ apats  :: { [LPat GhcPs] }
 
 stmtlist :: { forall b. DisambECP b => PV (LocatedL [LocatedA (Stmt GhcPs (LocatedA b))]) }
         : '{'           stmts '}'       { $2 >>= \ $2 -> amsrl
-                                          (sLL $1 $> (reverse $ snd $ unLoc $2)) (AnnList (Just $ glR $2) (Just $ moc $1) (Just $ mcc $3) (fromOL $ fst $ unLoc $2) []) }
+                                          (sLL $1 $> (reverse $ snd $ unLoc $2)) (AnnList (Just $ glR $2) (Just $ moc $1) (Just $ mcc $3) (fst $ unLoc $2) []) } -- AZ:performance of reverse?
         |     vocurly   stmts close     { $2 >>= \ $2 -> amsrl
-                                          (L (gl $2) (reverse $ snd $ unLoc $2)) (AnnList (Just $ glR $2) Nothing Nothing (fromOL $ fst $ unLoc $2) []) }
+                                          (L (gl $2) (reverse $ snd $ unLoc $2)) (AnnList (Just $ glR $2) Nothing Nothing (fst $ unLoc $2) []) }
 
 --      do { ;; s ; s ; ; s ;; }
 -- The last Stmt should be an expression, but that's hard to enforce
@@ -3299,11 +3299,11 @@ stmtlist :: { forall b. DisambECP b => PV (LocatedL [LocatedA (Stmt GhcPs (Locat
 -- So we use BodyStmts throughout, and switch the last one over
 -- in ParseUtils.checkDo instead
 
-stmts :: { forall b. DisambECP b => PV (Located (OrdList AddEpAnn,[LStmt GhcPs (LocatedA b)])) }
+stmts :: { forall b. DisambECP b => PV (Located ([AddEpAnn],[LStmt GhcPs (LocatedA b)])) }
         : stmts ';' stmt  { $1 >>= \ $1 ->
                             $3 >>= \ ($3 :: LStmt GhcPs (LocatedA b)) ->
                             case (snd $ unLoc $1) of
-                              [] -> return (sLL $1 (reLoc $>) ((fst $ unLoc $1) `snocOL` (mj AnnSemi $2)
+                              [] -> return (sLL $1 (reLoc $>) ((mj AnnSemi $2) : (fst $ unLoc $1)
                                                      ,$3   : (snd $ unLoc $1)))
                               (h:t) -> do
                                { h' <- addTrailingSemiA h (gl $2)
@@ -3311,13 +3311,13 @@ stmts :: { forall b. DisambECP b => PV (Located (OrdList AddEpAnn,[LStmt GhcPs (
 
         | stmts ';'     {  $1 >>= \ $1 ->
                            case (snd $ unLoc $1) of
-                             [] -> return (sLL $1 $> ((fst $ unLoc $1) `snocOL` (mj AnnSemi $2),snd $ unLoc $1))
+                             [] -> return (sLL $1 $> ((mj AnnSemi $2) : (fst $ unLoc $1),snd $ unLoc $1))
                              (h:t) -> do
                                { h' <- addTrailingSemiA h (gl $2)
                                ; return $ sL1 $1 (fst $ unLoc $1,h':t) }}
         | stmt                   { $1 >>= \ $1 ->
-                                   return $ sL1A $1 (nilOL,[$1]) }
-        | {- empty -}            { return $ noLoc (nilOL,[]) }
+                                   return $ sL1A $1 ([],[$1]) }
+        | {- empty -}            { return $ noLoc ([],[]) }
 
 
 -- For typing stmts at the GHCi prompt, where
