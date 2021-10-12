@@ -18,6 +18,16 @@
 #include <stdlib.h>
 #include <string.h>
 
+/*
+ * Note [Thread Labels]
+ * ~~~~~~~~~~~~~~~~~~~~
+ * The user may assign a textual label to a thread using the labelThread#
+ * primop to help identify the thread. This label is represented by StgTSO's
+ * label field which contains a pointer to a ByteArray# containing a
+ * UTF-8 string. We mandate that this string must be null-terminated
+ * to ensure that it is convenient to use from the RTS.
+ */
+
 char *
 lookupThreadLabel(StgTSO *tso)
 {
