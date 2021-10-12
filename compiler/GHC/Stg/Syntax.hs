@@ -829,6 +829,9 @@ pprStgOp (StgPrimOp  op)   = ppr op
 pprStgOp (StgPrimCallOp op)= ppr op
 pprStgOp (StgFCallOp op _) = ppr op
 
+instance Outputable StgOp where
+  ppr = pprStgOp
+
 instance Outputable AltType where
   ppr PolyAlt         = text "Polymorphic"
   ppr (MultiValAlt n) = text "MultiAlt" <+> ppr n
