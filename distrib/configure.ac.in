@@ -9,6 +9,8 @@ AC_INIT([The Glorious Glasgow Haskell Compilation System], [@ProjectVersion@], [
 dnl See /configure.ac for rationale.
 AC_PREREQ([2.69])
 
+AC_CONFIG_MACRO_DIRS([../m4])
+
 dnl--------------------------------------------------------------------
 dnl * Deal with arguments telling us gmp is somewhere odd
 dnl--------------------------------------------------------------------

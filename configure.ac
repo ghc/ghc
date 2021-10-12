@@ -26,6 +26,8 @@ AC_INIT([The Glorious Glasgow Haskell Compilation System], [9.0.1], [glasgow-has
 # checkout), then we ship a file 'VERSION' containing the full version
 # when the source distribution was created.
 
+AC_CONFIG_MACRO_DIRS([m4])
+
 if test ! -f mk/config.h.in; then
    echo "mk/config.h.in doesn't exist: perhaps you haven't run 'python3 boot'?"
    exit 1
