@@ -16,6 +16,8 @@ import GHC.Types.Name.Occurrence (OccName)
 import GHC.Types.Name.Reader
 import GHC.Unit.Module.Name
 import GHC.Utils.Outputable
+import Data.List.NonEmpty (NonEmpty)
+import GHC.Types.SrcLoc (PsLoc)
 
 -- The type aliases below are useful to make some type signatures a bit more
 -- descriptive, like 'handleWarningsThrowErrors' in 'GHC.Driver.Main'.
@@ -71,6 +73,14 @@ data PsMessage
         See Note [Messages from GHC.Parser.Header].
     -}
    | PsHeaderMessage !PsHeaderMessage
+
+   {-| PsWarnBidirectionalFormatChars is a warning (controlled by the -Wwarn-bidirectional-format-characters flag)
+   that occurs when unicode bi-directional format characters are found within in a file
+
+   The 'PsLoc' contains the exact position in the buffer the character occured, and the
+   string contains a description of the character.
+   -}
+   | PsWarnBidirectionalFormatChars (NonEmpty (PsLoc, Char, String))
 
    {-| PsWarnTab is a warning (controlled by the -Wwarn-tabs flag) that occurs
        when tabulations (tabs) are found within a file.

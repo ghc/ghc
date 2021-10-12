@@ -3209,7 +3209,8 @@ wWarningFlagsDeps = mconcat [
   warnSpec    Opt_WarnOperatorWhitespaceExtConflict,
   warnSpec    Opt_WarnOperatorWhitespace,
   warnSpec    Opt_WarnImplicitLift,
-  warnSpec    Opt_WarnMissingExportedPatternSynonymSignatures
+  warnSpec    Opt_WarnMissingExportedPatternSynonymSignatures,
+  warnSpec    Opt_WarnUnicodeBidirectionalFormatCharacters
  ]
 
 -- | These @-\<blah\>@ flags can all be reversed with @-no-\<blah\>@
