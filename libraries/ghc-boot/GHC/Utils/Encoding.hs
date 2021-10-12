@@ -233,11 +233,14 @@ utf8CompareShortByteString (SBS a1) (SBS a2) = go 0# 0#
                          | isTrue# (b1_1 `ltWord#` b2_1) -> LT
                          | otherwise                     -> go (off1 +# 1#) (off2 +# 1#)
 
-utf8DecodeShortByteString :: ShortByteString -> [Char]
-utf8DecodeShortByteString (SBS ba#)
+utf8DecodeByteArray :: ByteArray# -> [Char]
+utf8DecodeByteArray ba#
   = unsafeDupablePerformIO $
       let len# = sizeofByteArray# ba# in
       utf8DecodeLazy# (return ()) (utf8DecodeCharByteArray# ba#) len#
+
+utf8DecodeShortByteString :: ShortByteString -> [Char]
+utf8DecodeShortByteString (SBS ba#) = utf8DecodeByteArray ba#
 
 countUTF8Chars :: ShortByteString -> IO Int
 countUTF8Chars (SBS ba) = go 0# 0#

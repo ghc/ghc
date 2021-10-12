@@ -634,7 +634,7 @@ threadLabel :: ThreadId -> IO (Maybe String)
 threadLabel (ThreadId t) = IO $ \s ->
     case threadLabel# t s of
       (# s', 1#, lbl #) ->
-          let lbl' = Just (unpackCStringUtf8# lbl)
+          let lbl' = Just (utf8DecodeCharByteArray# lbl 0)
           in (# s', lbl' #)
       (# s', 0#, _ #) -> (# s', Nothing #)
 
@@ -965,3 +965,67 @@ setUncaughtExceptionHandler = writeIORef uncaughtExceptionHandler
 
 getUncaughtExceptionHandler :: IO (SomeException -> IO ())
 getUncaughtExceptionHandler = readIORef uncaughtExceptionHandler
+
+-- We can't write the decoder as efficiently as we'd like without
+-- resorting to unboxed extensions, unfortunately.  I tried to write
+-- an IO version of this function, but GHC can't eliminate boxed
+-- results from an IO-returning function.
+--
+-- We assume we can ignore overflow when parsing a multibyte character here.
+-- To make this safe, we add extra sentinel bytes to unparsed UTF-8 sequences
+-- before decoding them (see "GHC.Data.StringBuffer").
+
+{-# INLINE utf8DecodeChar# #-}
+utf8DecodeChar# :: (Int# -> Word#) -> (# Char#, Int# #)
+utf8DecodeChar# indexWord8# =
+  let !ch0 = word2Int# (indexWord8# 0#) in
+  case () of
+    _ | isTrue# (ch0 <=# 0x7F#) -> (# chr# ch0, 1# #)
+
+      | isTrue# ((ch0 >=# 0xC0#) `andI#` (ch0 <=# 0xDF#)) ->
+        let !ch1 = word2Int# (indexWord8# 1#) in
+        if isTrue# ((ch1 <# 0x80#) `orI#` (ch1 >=# 0xC0#)) then fail 1# else
+        (# chr# (((ch0 -# 0xC0#) `uncheckedIShiftL#` 6#) +#
+                  (ch1 -# 0x80#)),
+           2# #)
+
+      | isTrue# ((ch0 >=# 0xE0#) `andI#` (ch0 <=# 0xEF#)) ->
+        let !ch1 = word2Int# (indexWord8# 1#) in
+        if isTrue# ((ch1 <# 0x80#) `orI#` (ch1 >=# 0xC0#)) then fail 1# else
+        let !ch2 = word2Int# (indexWord8# 2#) in
+        if isTrue# ((ch2 <# 0x80#) `orI#` (ch2 >=# 0xC0#)) then fail 2# else
+        (# chr# (((ch0 -# 0xE0#) `uncheckedIShiftL#` 12#) +#
+                 ((ch1 -# 0x80#) `uncheckedIShiftL#` 6#)  +#
+                  (ch2 -# 0x80#)),
+           3# #)
+
+     | isTrue# ((ch0 >=# 0xF0#) `andI#` (ch0 <=# 0xF8#)) ->
+        let !ch1 = word2Int# (indexWord8# 1#) in
+        if isTrue# ((ch1 <# 0x80#) `orI#` (ch1 >=# 0xC0#)) then fail 1# else
+        let !ch2 = word2Int# (indexWord8# 2#) in
+        if isTrue# ((ch2 <# 0x80#) `orI#` (ch2 >=# 0xC0#)) then fail 2# else
+        let !ch3 = word2Int# (indexWord8# 3#) in
+        if isTrue# ((ch3 <# 0x80#) `orI#` (ch3 >=# 0xC0#)) then fail 3# else
+        (# chr# (((ch0 -# 0xF0#) `uncheckedIShiftL#` 18#) +#
+                 ((ch1 -# 0x80#) `uncheckedIShiftL#` 12#) +#
+                 ((ch2 -# 0x80#) `uncheckedIShiftL#` 6#)  +#
+                  (ch3 -# 0x80#)),
+           4# #)
+
+      | otherwise -> fail 1#
+  where
+        -- all invalid sequences end up here:
+        fail :: Int# -> (# Char#, Int# #)
+        fail nBytes# = (# '\0'#, nBytes# #)
+        -- '\xFFFD' would be the usual replacement character, but
+        -- that's a valid symbol in Haskell, so will result in a
+        -- confusing parse error later on.  Instead we use '\0' which
+        -- will signal a lexer error immediately.
+
+utf8DecodeCharByteArray# :: ByteArray# -> Int# -> (# Char#, Int# #)
+utf8DecodeCharByteArray# ba# off# =
+#if !MIN_VERSION_base(4,16,0)
+    utf8DecodeChar# (\i# -> indexWord8Array# ba# (i# +# off#))
+#else
+    utf8DecodeChar# (\i# -> word8ToWord# (indexWord8Array# ba# (i# +# off#)))
+#endif
