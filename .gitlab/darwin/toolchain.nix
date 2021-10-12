@@ -9,7 +9,8 @@ in
 let
   hsPkgs = pkgs.haskellPackages;
   alex = hsPkgs.alex;
-  happy = hsPkgs.callHackage "happy" "1.19.12" {};
+  # N.B. happy doesn't pass testsuite on AArch64/Darwin
+  happy = pkgs.haskell.lib.dontCheck (hsPkgs.callHackage "happy" "1.19.12" {});
   targetTriple = pkgs.stdenv.targetPlatform.config;
 
   ghc = pkgs.stdenv.mkDerivation rec {
