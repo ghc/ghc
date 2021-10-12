@@ -1325,7 +1325,6 @@ nightly-hackage:
 perf-nofib:
   # This needs to be reverted, and is only
   # an attempt to unbreak master
-  allow_failure: true
   stage: testing
   needs: [validate-x86_64-linux-deb9-dwarf, doc-tarball]
   dependencies:
@@ -1338,27 +1337,28 @@ perf-nofib:
   tags:
     - x86_64-linux
   before_script:
-    - "cabal update --index=$HACKAGE_INDEX_STATE"
+    - cd nofib
+    - "cabal update --index=$HACKAGE_INDEX_STATE --project-file=cabal.project.head-hackage"
   script:
     - root=$(pwd)/ghc
     - |
       mkdir tmp
-      tar -xf ghc-x86_64-deb9-linux-dwarf.tar.xz -C tmp
+      tar -xf ../ghc-x86_64-deb9-linux-dwarf.tar.xz -C tmp
       pushd tmp/ghc-*/
       ./configure --prefix=$root
       make install
       popd
       rm -Rf tmp
-    - export BOOT_HC=$GHC
-    - cabal install -w "$BOOT_HC" --lib regex-compat
     - export PATH=$root/bin:$PATH
-    - make -C nofib boot mode=fast -j$CPUS
-    - "make -C nofib EXTRA_RUNTEST_OPTS='-cachegrind +RTS -V0 -RTS' NoFibRuns=1 mode=fast -j$CPUS 2>&1 | tee nofib.log"
+    - cabal install -w "$root/bin/ghc" --lib regex-compat unboxed-ref parallel random-1.2.1 --allow-newer --package-env local.env --project-file=cabal.project.head-hackage
+    - export GHC_ENVIRONMENT="$(pwd)/local.env"
+    - "make HC=$root/bin/ghc BOOT_HC=$root/bin/ghc boot mode=fast -j$CPUS"
+    - "make HC=$root/bin/ghc BOOT_HC=$root/bin/ghc EXTRA_RUNTEST_OPTS='-cachegrind +RTS -V0 -RTS' NoFibRuns=1 mode=fast -j$CPUS 2>&1 | tee nofib.log"
   artifacts:
     expire_in: 12 week
     when: always
     paths:
-      - nofib.log
+      - nofib/nofib.log
   rules:
     - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
 
