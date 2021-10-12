@@ -113,12 +113,12 @@ Library
         Control.Monad.ST.Strict
         Control.Monad.ST.Unsafe
         Control.Monad.Zip
+        Data.Array.ByteArray
         Data.Bifoldable
         Data.Bifunctor
         Data.Bitraversable
         Data.Bits
         Data.Bool
-        Data.ByteArray
         Data.Char
         Data.Coerce
         Data.Complex

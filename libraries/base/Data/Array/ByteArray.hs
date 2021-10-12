@@ -1,5 +1,5 @@
 -- |
--- Module      : Data.ByteArray
+-- Module      : Data.Array.ByteArray
 -- Copyright   : (c) Roman Leshchinskiy 2009-2012
 -- License     : BSD-style
 --
@@ -11,9 +11,10 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE UnboxedTuples #-}
 
-module Data.ByteArray (
+module Data.Array.ByteArray (
   ByteArray(..)
 ) where
 
@@ -91,12 +92,12 @@ byteArrayFromListN n ys = runST $ do
     marr <- newByteArray n
     let go !ix [] = if ix == n
           then return ()
-          else error $ "Data.ByteArray.byteArrayFromListN: list length less than specified size"
+          else error $ "Data.Array.ByteArray.byteArrayFromListN: list length less than specified size"
         go !ix (x : xs) = if ix < n
           then do
             writeByteArray marr ix x
             go (ix + 1) xs
-          else error $ "Data.ByteArray.byteArrayFromListN: list length greater than specified size"
+          else error $ "Data.Array.ByteArray.byteArrayFromListN: list length greater than specified size"
     go 0 ys
     unsafeFreezeByteArray marr
 
@@ -118,7 +119,7 @@ copyByteArray (MutableByteArray dst#) (I# doff#) (ByteArray src#) (I# soff#) (I#
 instance Data ByteArray where
   toConstr _ = error "toConstr"
   gunfold _ _ = error "gunfold"
-  dataTypeOf _ = mkNoRepType "Data.ByteArray.ByteArray"
+  dataTypeOf _ = mkNoRepType "Data.Array.ByteArray.ByteArray"
 
 instance Show ByteArray where
   showsPrec _ ba =
@@ -227,7 +228,7 @@ instance Semigroup ByteArray where
   stimes i arr
     | itgr < 1 = emptyByteArray
     | itgr <= (fromIntegral (maxBound :: Int)) = replicateByteArray (fromIntegral itgr) arr
-    | otherwise = error "Data.ByteArray#stimes: cannot allocate the requested amount of memory"
+    | otherwise = error "Data.Array.ByteArray#stimes: cannot allocate the requested amount of memory"
     where itgr = toInteger i :: Integer
 
 instance Monoid ByteArray where
