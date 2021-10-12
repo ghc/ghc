@@ -118,6 +118,7 @@ import GHC.IO.Exception
 import GHC.Exception
 import qualified GHC.Foreign
 import GHC.IORef
+import GHC.List         ( takeWhile )
 import GHC.MVar
 import GHC.Ptr
 import GHC.Real         ( fromIntegral )
@@ -635,7 +636,8 @@ threadLabel :: ThreadId -> IO (Maybe String)
 threadLabel (ThreadId t) = IO $ \s ->
     case threadLabel# t s of
       (# s', 1#, lbl #) ->
-          let lbl' = Just (utf8DecodeByteArray lbl)
+          let lbl' = Just (takeWhile (/= '\0') $ utf8DecodeByteArray lbl)
+            -- N.B. strip off the NUL terminator
           in (# s', lbl' #)
       (# s', 0#, _ #) -> (# s', Nothing #)
       _ -> error "threadLabel: impossible"
