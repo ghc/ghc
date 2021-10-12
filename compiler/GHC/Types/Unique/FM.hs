@@ -59,6 +59,7 @@ module GHC.Types.Unique.FM (
         plusUFMList,
         sequenceUFMList,
         minusUFM,
+        minusUFM_C,
         intersectUFM,
         intersectUFM_C,
         disjointUFM,
@@ -314,6 +315,14 @@ sequenceUFMList = foldr (plusUFM_CD2 cons) emptyUFM
 
 minusUFM :: UniqFM key elt1 -> UniqFM key elt2 -> UniqFM key elt1
 minusUFM (UFM x) (UFM y) = UFM (M.difference x y)
+
+-- | @minusUFC_C f map1 map2@ returns @map1@, except that every mapping @key
+-- |-> value1@ in @map1@ that shares a key with a mapping @key |-> value2@ in
+-- @map2@ is altered by @f@: @value1@ is replaced by @f value1 value2@, where
+-- 'Just' means that the new value is used and 'Nothing' means that the mapping
+-- is deleted.
+minusUFM_C :: (elt1 -> elt2 -> Maybe elt1) -> UniqFM key elt1 -> UniqFM key elt2 -> UniqFM key elt1
+minusUFM_C f (UFM x) (UFM y) = UFM (M.differenceWith f x y)
 
 intersectUFM :: UniqFM key elt1 -> UniqFM key elt2 -> UniqFM key elt1
 intersectUFM (UFM x) (UFM y) = UFM (M.intersection x y)

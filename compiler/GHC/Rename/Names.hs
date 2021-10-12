@@ -652,7 +652,7 @@ extendGlobalRdrEnvRn avails new_fixities
               -- See Note [GlobalRdrEnv shadowing]
               inBracket = isBrackStage stage
 
-              lcl_env_TH = lcl_env { tcl_rdr = delLocalRdrEnvList (tcl_rdr lcl_env) new_occs }
+              lcl_env_TH = lcl_env { tcl_rdr = minusLocalRdrEnv (tcl_rdr lcl_env) new_occs }
                            -- See Note [GlobalRdrEnv shadowing]
 
               lcl_env2 | inBracket = lcl_env_TH
@@ -677,7 +677,7 @@ extendGlobalRdrEnvRn avails new_fixities
         ; return (gbl_env', lcl_env3) }
   where
     new_names = concatMap availGreNames avails
-    new_occs  = map occName new_names
+    new_occs  = occSetToEnv (mkOccSet (map occName new_names))
 
     -- If there is a fixity decl for the gre, add it to the fixity env
     extend_fix_env fix_env gre

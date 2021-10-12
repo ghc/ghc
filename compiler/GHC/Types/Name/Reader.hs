@@ -41,7 +41,7 @@ module GHC.Types.Name.Reader (
         LocalRdrEnv, emptyLocalRdrEnv, extendLocalRdrEnv, extendLocalRdrEnvList,
         lookupLocalRdrEnv, lookupLocalRdrOcc,
         elemLocalRdrEnv, inLocalRdrEnvScope,
-        localRdrEnvElts, delLocalRdrEnvList,
+        localRdrEnvElts, minusLocalRdrEnv,
 
         -- * Global mapping of 'RdrName' to 'GlobalRdrElt's
         GlobalRdrEnv, emptyGlobalRdrEnv, mkGlobalRdrEnv, plusGlobalRdrEnv,
@@ -434,9 +434,9 @@ inLocalRdrEnvScope :: Name -> LocalRdrEnv -> Bool
 -- This is the point of the NameSet
 inLocalRdrEnvScope name (LRE { lre_in_scope = ns }) = name `elemNameSet` ns
 
-delLocalRdrEnvList :: LocalRdrEnv -> [OccName] -> LocalRdrEnv
-delLocalRdrEnvList lre@(LRE { lre_env = env }) occs
-  = lre { lre_env = delListFromOccEnv env occs }
+minusLocalRdrEnv :: LocalRdrEnv -> OccEnv a -> LocalRdrEnv
+minusLocalRdrEnv lre@(LRE { lre_env = env }) occs
+  = lre { lre_env = minusOccEnv env occs }
 
 {-
 Note [Local bindings with Exact Names]
@@ -1067,15 +1067,12 @@ extendGlobalRdrEnv env gre
   = extendOccEnv_Acc insertGRE Utils.singleton env
                      (greOccName gre) gre
 
-shadowNames :: GlobalRdrEnv -> [OccName] -> GlobalRdrEnv
-shadowNames = foldl' shadowName
-
 {- Note [GlobalRdrEnv shadowing]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Before adding new names to the GlobalRdrEnv we nuke some existing entries;
-this is "shadowing".  The actual work is done by RdrEnv.shadowName.
+this is "shadowing".  The actual work is done by RdrEnv.shadowNames.
 Suppose
-   env' = shadowName env f `extendGlobalRdrEnv` M.f
+   env' = shadowNames env f `extendGlobalRdrEnv` M.f
 
 Then:
    * Looking up (Unqual f) in env' should succeed, returning M.f,
@@ -1087,7 +1084,7 @@ Then:
    * Looking up (Qual X.f) in env', where X /= M, should be the same as
      looking up (Qual X.f) in env.
 
-     That is, shadowName does /not/ delete earlier qualified bindings
+     That is, shadowNames does /not/ delete earlier qualified bindings
 
 There are two reasons for shadowing:
 
@@ -1111,7 +1108,7 @@ There are two reasons for shadowing:
 
     So when we add `x = True` we must not delete the `M.x` from the
     `GlobalRdrEnv`; rather we just want to make it "qualified only";
-    hence the `set_qual` in `shadowName`.  See also Note
+    hence the `set_qual` in `shadowNames`.  See also Note
     [Interactively-bound Ids in GHCi] in GHC.Runtime.Context
 
   - Data types also have External Names, like Ghci4.T; but we still want
@@ -1145,10 +1142,10 @@ There are two reasons for shadowing:
       At that stage, the class op 'f' will have an Internal name.
 -}
 
-shadowName :: GlobalRdrEnv -> OccName -> GlobalRdrEnv
+shadowNames :: GlobalRdrEnv -> OccEnv a -> GlobalRdrEnv
 -- Remove certain old GREs that share the same OccName as this new Name.
 -- See Note [GlobalRdrEnv shadowing] for details
-shadowName = alterOccEnv (fmap (mapMaybe shadow))
+shadowNames = minusOccEnv_C (\gres _ -> Just (mapMaybe shadow gres))
   where
     shadow :: GlobalRdrElt -> Maybe GlobalRdrElt
     shadow
