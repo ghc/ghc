@@ -28,6 +28,7 @@ import GHC.Hs.Type (pprLHsContext)
 import GHC.Builtin.Names (allNameStrings)
 import GHC.Builtin.Types (filterCTuple)
 import qualified GHC.LanguageExtensions as LangExt
+import Data.List.NonEmpty (NonEmpty((:|)))
 
 
 instance Diagnostic PsMessage where
@@ -44,6 +45,20 @@ instance Diagnostic PsMessage where
        -> mkSimpleDecorated $
             text "Multiple Haddock comments for a single entity are not allowed." $$
             text "The extraneous comment will be ignored."
+    PsWarnBidirectionalFormatChars ((loc,_,desc) :| xs)
+      -> mkSimpleDecorated $
+            text "A unicode bidirectional formatting character" <+> parens (text desc)
+         $$ text "was found at offset" <+> ppr (bufPos (psBufPos loc)) <+> text "in the file"
+         $$ (case xs of
+           [] -> empty
+           xs -> text "along with further bidirectional formatting characters at" <+> pprChars xs
+            where
+              pprChars [] = empty
+              pprChars ((loc,_,desc):xs) = text "offset" <+> ppr (bufPos (psBufPos loc)) <> text ":" <+> text desc
+                                       $$ pprChars xs
+              )
+         $$ text "Bidirectional formatting characters may be rendered misleadingly in certain editors"
+
     PsWarnTab tc
       -> mkSimpleDecorated $
            text "Tab character found here"
@@ -474,6 +489,7 @@ instance Diagnostic PsMessage where
   diagnosticReason  = \case
     PsUnknownMessage m                            -> diagnosticReason m
     PsHeaderMessage  m                            -> psHeaderMessageReason m
+    PsWarnBidirectionalFormatChars{}              -> WarningWithFlag Opt_WarnUnicodeBidirectionalFormatCharacters
     PsWarnTab{}                                   -> WarningWithFlag Opt_WarnTabs
     PsWarnTransitionalLayout{}                    -> WarningWithFlag Opt_WarnAlternativeLayoutRuleTransitional
     PsWarnOperatorWhitespaceExtConflict{}         -> WarningWithFlag Opt_WarnOperatorWhitespaceExtConflict
@@ -586,6 +602,7 @@ instance Diagnostic PsMessage where
   diagnosticHints  = \case
     PsUnknownMessage m                            -> diagnosticHints m
     PsHeaderMessage  m                            -> psHeaderMessageHints m
+    PsWarnBidirectionalFormatChars{}              -> noHints
     PsWarnTab{}                                   -> [SuggestUseSpaces]
     PsWarnTransitionalLayout{}                    -> noHints
     PsWarnOperatorWhitespaceExtConflict sym       -> [SuggestUseWhitespaceAfter sym]
