@@ -30,6 +30,7 @@ import GHC.Core.Coercion.Axiom (Role)
 import GHC.Utils.Outputable (SDoc)
 import GHC.Data.FastString
 import GHC.Unit.Module.Name
+import Data.List.NonEmpty (NonEmpty)
 
 -- | A warning that might arise during parsing.
 data PsWarning
@@ -39,6 +40,14 @@ data PsWarning
       { tabFirst :: !SrcSpan -- ^ First occurrence of a tab
       , tabCount :: !Word    -- ^ Number of other occurrences
       }
+
+   {-| PsWarnBidirectionalFormatChars is a warning (controlled by the -Wwarn-bidirectional-format-characters flag)
+   that occurs when unicode bi-directional format characters are found within in a file
+
+   The 'PsLoc' contains the exact position in the buffer the character occured, and the
+   string contains a description of the character.
+   -}
+   | PsWarnBidirectionalFormatChars (NonEmpty (PsLoc, Char, String))
 
    | PsWarnTransitionalLayout !SrcSpan !TransLayoutReason
       -- ^ Transitional layout warnings

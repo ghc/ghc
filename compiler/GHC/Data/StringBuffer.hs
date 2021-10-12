@@ -46,7 +46,11 @@ module GHC.Data.StringBuffer
 
          -- * Parsing integers
         parseUnsignedInteger,
-       ) where
+
+        -- * Checking for bi-directional format characters
+        containsBidirectionalFormatChar,
+        bidirectionalFormatChars
+        ) where
 
 #include "HsVersions.h"
 
@@ -214,6 +218,58 @@ nextChar (StringBuffer buf len (I# cur#)) =
           (# c#, nBytes# #) ->
              let cur' = I# (cur# +# nBytes#) in
              return (C# c#, StringBuffer buf len cur')
+
+
+bidirectionalFormatChars :: [(Char,String)]
+bidirectionalFormatChars =
+  [ ('\x202a' , "U+202A LEFT-TO-RIGHT EMBEDDING (LRE)")
+  , ('\x202b' , "U+202B RIGHT-TO-LEFT EMBEDDING (RLE)")
+  , ('\x202c' , "U+202C POP DIRECTIONAL FORMATTING (PDF)")
+  , ('\x202d' , "U+202D LEFT-TO-RIGHT OVERRIDE (LRO)")
+  , ('\x202e' , "U+202E RIGHT-TO-LEFT OVERRIDE (RLO)")
+  , ('\x2066' , "U+2066 LEFT-TO-RIGHT ISOLATE (LRI)")
+  , ('\x2067' , "U+2067 RIGHT-TO-LEFT ISOLATE (RLI)")
+  , ('\x2068' , "U+2068 FIRST STRONG ISOLATE (FSI)")
+  , ('\x2069' , "U+2069 POP DIRECTIONAL ISOLATE (PDI)")
+  ]
+
+{-| Returns true if the buffer contains Unicode bi-directional formatting
+characters.
+
+https://www.unicode.org/reports/tr9/#Bidirectional_Character_Types
+
+Bidirectional format characters are one of
+'\x202a' : "U+202A LEFT-TO-RIGHT EMBEDDING (LRE)"
+'\x202b' : "U+202B RIGHT-TO-LEFT EMBEDDING (RLE)"
+'\x202c' : "U+202C POP DIRECTIONAL FORMATTING (PDF)"
+'\x202d' : "U+202D LEFT-TO-RIGHT OVERRIDE (LRO)"
+'\x202e' : "U+202E RIGHT-TO-LEFT OVERRIDE (RLO)"
+'\x2066' : "U+2066 LEFT-TO-RIGHT ISOLATE (LRI)"
+'\x2067' : "U+2067 RIGHT-TO-LEFT ISOLATE (RLI)"
+'\x2068' : "U+2068 FIRST STRONG ISOLATE (FSI)"
+'\x2069' : "U+2069 POP DIRECTIONAL ISOLATE (PDI)"
+
+This list is encoded in 'bidirectionalFormatChars'
+
+-}
+{-# INLINE containsBidirectionalFormatChar #-}
+containsBidirectionalFormatChar :: StringBuffer -> Bool
+containsBidirectionalFormatChar (StringBuffer buf (I# len#) (I# cur#))
+  = inlinePerformIO $ unsafeWithForeignPtr buf $ \(Ptr a#) -> do
+  let go :: Int# -> Bool
+      go i | isTrue# (i >=# len#) = False
+           | otherwise = case utf8DecodeCharAddr# a# i of
+                (# '\x202a'#  , _ #) -> True
+                (# '\x202b'#  , _ #) -> True
+                (# '\x202c'#  , _ #) -> True
+                (# '\x202d'#  , _ #) -> True
+                (# '\x202e'#  , _ #) -> True
+                (# '\x2066'#  , _ #) -> True
+                (# '\x2067'#  , _ #) -> True
+                (# '\x2068'#  , _ #) -> True
+                (# '\x2069'#  , _ #) -> True
+                (# _, bytes #) -> go (i +# bytes)
+  pure $! go cur#
 
 -- | Return the first UTF-8 character of a nonempty 'StringBuffer' (analogous
 -- to 'Data.List.head').  __Warning:__ The behavior is undefined if the

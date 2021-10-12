@@ -3233,7 +3233,9 @@ wWarningFlagsDeps = [
   flagSpec "invalid-haddock"             Opt_WarnInvalidHaddock,
   flagSpec "operator-whitespace-ext-conflict"  Opt_WarnOperatorWhitespaceExtConflict,
   flagSpec "operator-whitespace"         Opt_WarnOperatorWhitespace,
-  flagSpec "implicit-lift"               Opt_WarnImplicitLift
+  flagSpec "implicit-lift"               Opt_WarnImplicitLift,
+  flagSpec "unicode-bidirectional-format-characters"
+                                         Opt_WarnUnicodeBidirectionalFormatCharacters
  ]
 
 -- | These @-\<blah\>@ flags can all be reversed with @-no-\<blah\>@

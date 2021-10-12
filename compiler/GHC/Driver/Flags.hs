@@ -512,6 +512,7 @@ data WarningFlag =
    | Opt_WarnAmbiguousFields                -- Since 9.2
    | Opt_WarnImplicitLift                 -- Since 9.2
    | Opt_WarnMissingKindSignatures        -- Since 9.2
+   | Opt_WarnUnicodeBidirectionalFormatCharacters -- Since 9.0.2
    deriving (Eq, Ord, Show, Enum)
 
 -- | Used when outputting warnings: if a reason is given, it is

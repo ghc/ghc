@@ -24,6 +24,7 @@ import GHC.Hs.Expr (prependQualified,HsExpr(..))
 import GHC.Hs.Type (pprLHsContext)
 import GHC.Builtin.Names (allNameStrings)
 import GHC.Builtin.Types (filterCTuple)
+import Data.List.NonEmpty (NonEmpty((:|)))
 
 mkParserErr :: SrcSpan -> SDoc -> MsgEnvelope DecoratedSDoc
 mkParserErr span doc = MsgEnvelope
@@ -61,6 +62,20 @@ pprWarning = \case
                TransLayout_Where -> "`where' clause at the same depth as implicit layout block"
                TransLayout_Pipe  -> "`|' at the same depth as implicit layout block"
             )
+
+   PsWarnBidirectionalFormatChars ((loc,_,desc) :| xs)
+      -> mkParserWarn Opt_WarnUnicodeBidirectionalFormatCharacters (RealSrcSpan (realSrcLocSpan $ psRealLoc loc) Nothing) $
+            text "A unicode bidirectional formatting character" <+> parens (text desc)
+         $$ text "was found at offset" <+> ppr (bufPos (psBufPos loc)) <+> text "in the file"
+         $$ (case xs of
+           [] -> empty
+           xs -> text "along with further bidirectional formatting characters at" <+> pprChars xs
+            where
+              pprChars [] = empty
+              pprChars ((loc,_,desc):xs) = text "offset" <+> ppr (bufPos (psBufPos loc)) <> text ":" <+> text desc
+                                       $$ pprChars xs
+              )
+         $$ text "Bidirectional formatting characters may be rendered misleadingly in certain editors"
 
    PsWarnUnrecognisedPragma loc
       -> mkParserWarn Opt_WarnUnrecognisedPragmas loc $

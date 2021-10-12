@@ -1,0 +1,8 @@
+
+T20263.hs:2:17: error: [-Wunicode-bidirectional-format-characters, -Werror=unicode-bidirectional-format-characters]
+    A unicode bidirectional formatting character (U+2067 RIGHT-TO-LEFT ISOLATE (RLI))
+    was found at offset 30 in the file
+    along with further bidirectional formatting characters at offset 31: U+2066 LEFT-TO-RIGHT ISOLATE (LRI)
+                                                              offset 40: U+2069 POP DIRECTIONAL ISOLATE (PDI)
+                                                              offset 41: U+2066 LEFT-TO-RIGHT ISOLATE (LRI)
+    Bidirectional formatting characters may be rendered misleadingly in certain editors
