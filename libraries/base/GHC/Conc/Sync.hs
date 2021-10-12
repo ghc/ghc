@@ -4,6 +4,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE UnliftedFFITypes #-}
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE Unsafe #-}
 
 {-# OPTIONS_HADDOCK not-home #-}
@@ -634,9 +635,10 @@ threadLabel :: ThreadId -> IO (Maybe String)
 threadLabel (ThreadId t) = IO $ \s ->
     case threadLabel# t s of
       (# s', 1#, lbl #) ->
-          let lbl' = Just (utf8DecodeCharByteArray# lbl 0)
+          let lbl' = Just (utf8DecodeByteArray lbl)
           in (# s', lbl' #)
       (# s', 0#, _ #) -> (# s', Nothing #)
+      _ -> error "threadLabel: impossible"
 
 -- | Make a weak pointer to a 'ThreadId'.  It can be important to do
 -- this if you want to hold a reference to a 'ThreadId' while still
@@ -1029,3 +1031,22 @@ utf8DecodeCharByteArray# ba# off# =
 #else
     utf8DecodeChar# (\i# -> word8ToWord# (indexWord8Array# ba# (i# +# off#)))
 #endif
+
+utf8DecodeByteArray :: ByteArray# -> [Char]
+utf8DecodeByteArray ba#
+  = unsafeDupablePerformIO $
+      let len# = sizeofByteArray# ba# in
+      utf8DecodeLazy# (return ()) (utf8DecodeCharByteArray# ba#) len#
+
+{-# INLINE utf8DecodeLazy# #-}
+utf8DecodeLazy# :: (IO ()) -> (Int# -> (# Char#, Int# #)) -> Int# -> IO [Char]
+utf8DecodeLazy# retain decodeChar# len#
+  = unpack 0#
+  where
+    unpack i#
+        | isTrue# (i# >=# len#) = retain >> return []
+        | otherwise =
+            case decodeChar# i# of
+              (# c#, nBytes# #) -> do
+                rest <- unsafeDupableInterleaveIO $ unpack (i# +# nBytes#)
+                return (C# c# : rest)
