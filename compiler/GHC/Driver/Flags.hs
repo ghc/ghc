@@ -498,6 +498,7 @@ data WarningFlag =
    | Opt_WarnCompatUnqualifiedImports     -- Since 8.10
    | Opt_WarnDerivingDefaults
    | Opt_WarnInvalidHaddock               -- Since 8.12
+   | Opt_WarnUnicodeBidirectionalFormatCharacters -- Since 9.0.2
    deriving (Eq, Show, Enum)
 
 -- | Used when outputting warnings: if a reason is given, it is

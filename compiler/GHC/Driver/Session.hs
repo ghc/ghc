@@ -3509,7 +3509,8 @@ wWarningFlagsDeps = [
                                          Opt_WarnPrepositiveQualifiedModule,
   flagSpec "unused-packages"             Opt_WarnUnusedPackages,
   flagSpec "compat-unqualified-imports"  Opt_WarnCompatUnqualifiedImports,
-  flagSpec "invalid-haddock"             Opt_WarnInvalidHaddock
+  flagSpec "invalid-haddock"             Opt_WarnInvalidHaddock,
+  flagSpec "unicode-bidirectional-format-characters"    Opt_WarnUnicodeBidirectionalFormatCharacters
  ]
 
 -- | These @-\<blah\>@ flags can all be reversed with @-no-\<blah\>@
@@ -4252,7 +4253,8 @@ standardWarnings -- see Note [Documenting warning flags]
         Opt_WarnSimplifiableClassConstraints,
         Opt_WarnStarBinder,
         Opt_WarnInaccessibleCode,
-        Opt_WarnSpaceAfterBang
+        Opt_WarnSpaceAfterBang,
+        Opt_WarnUnicodeBidirectionalFormatCharacters
       ]
 
 -- | Things you get with -W

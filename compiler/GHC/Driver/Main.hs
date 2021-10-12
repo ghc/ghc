@@ -181,6 +181,7 @@ import GHC.Iface.Ext.Ast    ( mkHieFile )
 import GHC.Iface.Ext.Types  ( getAsts, hie_asts, hie_module )
 import GHC.Iface.Ext.Binary ( readHieFile, writeHieFile , hie_file_result, NameCacheUpdater(..))
 import GHC.Iface.Ext.Debug  ( diffFile, validateScopes )
+import Data.List.NonEmpty (NonEmpty ((:|)))
 
 #include "HsVersions.h"
 
@@ -347,6 +348,25 @@ hscParse' mod_summary
                Nothing -> liftIO $ hGetStringBuffer src_filename
 
     let loc = mkRealSrcLoc (mkFastString src_filename) 1 1
+    when (wopt Opt_WarnUnicodeBidirectionalFormatCharacters dflags) $ do
+      case checkBidirectionFormatChars (PsLoc loc (BufPos 0)) buf of
+        Nothing -> pure ()
+        Just ((loc,chr,desc) :| xs) ->
+          let span = mkSrcSpanPs $ mkPsSpan loc (advancePsLoc loc chr)
+              warn = makeIntoWarning (Reason Opt_WarnUnicodeBidirectionalFormatCharacters) $ mkLongWarnMsg dflags span neverQualify msg empty
+              msg = text "A unicode bidirectional formatting character" <+> parens (text desc)
+                 $$ text "was found at offset" <+> ppr (bufPos (psBufPos loc)) <+> text "in the file"
+                 $$ (case xs of
+                       [] -> empty
+                       xs -> text "along with further bidirectional formatting characters at" <+> pprChars xs
+                        where
+                          pprChars [] = empty
+                          pprChars ((loc,_,desc):xs) = text "offset" <+> ppr (bufPos (psBufPos loc)) <> text ":" <+> text desc
+                                                    $$ pprChars xs)
+                 $$ text "Bidirectional formatting characters may be rendered misleadingly in certain editors"
+
+          in liftIO $ printOrThrowWarnings dflags (unitBag warn)
+
     let parseMod | HsigFile == ms_hsc_src mod_summary
                  = parseSignature
                  | otherwise = parseModule
@@ -408,9 +428,34 @@ hscParse' mod_summary
                   = parsedResultAction p opts mod_summary
             withPlugins dflags applyPluginAction res
 
+checkBidirectionFormatChars :: PsLoc -> StringBuffer -> Maybe (NonEmpty (PsLoc, Char, String))
+checkBidirectionFormatChars start_loc sb
+  | containsBidirectionalFormatChar sb = Just $ go start_loc sb
+  | otherwise = Nothing
+  where
+    go :: PsLoc -> StringBuffer -> NonEmpty (PsLoc, Char, String)
+    go loc sb
+      | atEnd sb = panic "checkBidirectionFormatChars: no char found"
+      | otherwise = case nextChar sb of
+          (chr, sb)
+            | Just desc <- lookup chr bidirectionalFormatChars ->
+                (loc, chr, desc) :| go1 (advancePsLoc loc chr) sb
+            | otherwise -> go (advancePsLoc loc chr) sb
+
+    go1 :: PsLoc -> StringBuffer -> [(PsLoc, Char, String)]
+    go1 loc sb
+      | atEnd sb = []
+      | otherwise = case nextChar sb of
+          (chr, sb)
+            | Just desc <- lookup chr bidirectionalFormatChars ->
+                (loc, chr, desc) : go1 (advancePsLoc loc chr) sb
+            | otherwise -> go1 (advancePsLoc loc chr) sb
+
 
 -- -----------------------------------------------------------------------------
 -- | If the renamed source has been kept, extract it. Dump it if requested.
+
+
 extract_renamed_stuff :: ModSummary -> TcGblEnv -> Hsc RenamedStuff
 extract_renamed_stuff mod_summary tc_result = do
     let rn_info = getRenamedStuff tc_result
