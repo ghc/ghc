@@ -40,9 +40,7 @@ common lib-defaults
 
   build-depends:
     , base         >= 4.5     && < 4.17
-    , bytestring   ^>= 0.9.2.1 || ^>= 0.10.0.0 || ^>= 0.11.1.0
     , containers   ^>= 0.4.2.1 || ^>= 0.5.0.0 || ^>= 0.6.0.1
-    , transformers ^>= 0.3.0.0 || ^>= 0.4.1.0 || ^>= 0.5.0.0
     , text         ^>= 1.2.3.0
     , parsec       ^>= 3.1.13.0
 
