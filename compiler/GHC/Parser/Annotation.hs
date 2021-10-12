@@ -499,11 +499,11 @@ instance Ord AddEpAnn where
 -- new AST fragments out of old ones, and have them still printed out
 -- in a precise way.
 data EpAnn ann
-  = EpAnn { entry   :: Anchor
+  = EpAnn { entry   :: !Anchor
            -- ^ Base location for the start of the syntactic element
            -- holding the annotations.
-           , anns     :: ann -- ^ Annotations added by the Parser
-           , comments :: EpAnnComments
+           , anns     :: !ann -- ^ Annotations added by the Parser
+           , comments :: !EpAnnComments
               -- ^ Comments enclosed in the SrcSpan of the element
               -- this `EpAnn` is attached to
            }
@@ -570,7 +570,10 @@ emptyComments = EpaComments []
 -- | The 'SrcSpanAnn\'' type wraps a normal 'SrcSpan', together with
 -- an extra annotation type. This is mapped to a specific `GenLocated`
 -- usage in the AST through the `XRec` and `Anno` type families.
-data SrcSpanAnn' a = SrcSpanAnn { ann :: a, locA :: SrcSpan }
+
+-- Important that the fields are strict as these live inside L nodes which
+-- are live for a long time.
+data SrcSpanAnn' a = SrcSpanAnn { ann :: !a, locA :: !SrcSpan }
         deriving (Data, Eq)
 -- See Note [XRec and Anno in the AST]
 
