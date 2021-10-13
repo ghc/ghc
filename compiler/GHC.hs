@@ -321,7 +321,6 @@ import GHC.ByteCode.Types
 import qualified GHC.Linker.Loader as Loader
 import GHC.Runtime.Loader
 import GHC.Runtime.Eval
-import GHC.Runtime.Eval.Types
 import GHC.Runtime.Interpreter
 import GHC.Runtime.Context
 import GHCi.RemoteTypes
@@ -387,6 +386,7 @@ import GHC.Types.TyThing
 import GHC.Types.Name.Env
 import GHC.Types.Name.Ppr
 import GHC.Types.TypeEnv
+import GHC.Types.BreakInfo
 
 import GHC.Unit
 import GHC.Unit.Env

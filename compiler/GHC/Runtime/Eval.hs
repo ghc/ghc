@@ -106,6 +106,7 @@ import GHC.Types.SrcLoc
 import GHC.Types.Unique
 import GHC.Types.Unique.Supply
 import GHC.Types.TyThing
+import GHC.Types.BreakInfo
 
 import GHC.Unit
 import GHC.Unit.Module.Graph

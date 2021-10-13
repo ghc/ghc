@@ -66,7 +66,7 @@ import GHCi.Message
 import GHCi.RemoteTypes
 import GHCi.ResolvedBCO
 import GHCi.BreakArray (BreakArray)
-import GHC.Runtime.Eval.Types(BreakInfo(..))
+import GHC.Types.BreakInfo (BreakInfo(..))
 import GHC.ByteCode.Types
 
 import GHC.Linker.Types
