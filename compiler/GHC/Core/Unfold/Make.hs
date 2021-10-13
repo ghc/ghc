@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
 -- | Unfolding creation
 module GHC.Core.Unfold.Make
@@ -16,6 +17,7 @@ module GHC.Core.Unfold.Make
    , mkCompulsoryUnfolding'
    , mkDFunUnfolding
    , specUnfolding
+   , certainlyWillInline
    )
 where
 
@@ -30,6 +32,7 @@ import GHC.Core.DataCon
 import GHC.Core.Utils
 import GHC.Types.Basic
 import GHC.Types.Id
+import GHC.Types.Id.Info
 import GHC.Types.Demand ( StrictSig, isDeadEndSig )
 
 import GHC.Utils.Outputable
@@ -308,4 +311,92 @@ mkCoreUnfolding src top_lvl expr guidance
                     uf_expandable   = exprIsExpandable expr,
                     uf_guidance     = guidance }
 
+----------------
+certainlyWillInline :: UnfoldingOpts -> IdInfo -> CoreExpr -> Maybe Unfolding
+-- ^ Sees if the unfolding is pretty certain to inline.
+-- If so, return a *stable* unfolding for it, that will always inline.
+-- The CoreExpr is the WW'd and simplified RHS. In contrast, the unfolding
+-- template might not have been WW'd yet.
+certainlyWillInline opts fn_info rhs'
+  = case fn_unf of
+      CoreUnfolding { uf_guidance = guidance, uf_src = src }
+        | noinline -> Nothing       -- See Note [Worker/wrapper for NOINLINE functions]
+        | otherwise
+        -> case guidance of
+             UnfNever   -> Nothing
+             UnfWhen {} -> Just (fn_unf { uf_src = src', uf_tmpl = tmpl' })
+                             -- INLINE functions have UnfWhen
+             UnfIfGoodArgs { ug_size = size, ug_args = args }
+                        -> do_cunf size args src' tmpl'
+        where
+          src' = -- Do not change InlineCompulsory!
+                 case src of
+                   InlineCompulsory -> InlineCompulsory
+                   _                -> InlineStable
+          tmpl' = -- Do not overwrite stable unfoldings!
+                  case src of
+                    InlineRhs -> occurAnalyseExpr rhs'
+                    _         -> uf_tmpl fn_unf
 
+      DFunUnfolding {} -> Just fn_unf  -- Don't w/w DFuns; it never makes sense
+                                       -- to do so, and even if it is currently a
+                                       -- loop breaker, it may not be later
+
+      _other_unf       -> Nothing
+
+  where
+    noinline = isNoInlinePragma (inlinePragInfo fn_info)
+    fn_unf   = unfoldingInfo fn_info -- NB: loop-breakers never inline
+
+        -- The UnfIfGoodArgs case seems important.  If we w/w small functions
+        -- binary sizes go up by 10%!  (This is with SplitObjs.)
+        -- I'm not totally sure why.
+        -- INLINABLE functions come via this path
+        --    See Note [certainlyWillInline: INLINABLE]
+    do_cunf size args src' tmpl'
+      | arityInfo fn_info > 0  -- See Note [certainlyWillInline: be careful of thunks]
+      , not (isDeadEndSig (dmdSigInfo fn_info))
+              -- Do not unconditionally inline a bottoming functions even if
+              -- it seems smallish. We've carefully lifted it out to top level,
+              -- so we don't want to re-inline it.
+      , let unf_arity = length args
+      , size - (10 * (unf_arity + 1)) <= unfoldingUseThreshold opts
+      = Just (fn_unf { uf_src      = src'
+                     , uf_tmpl     = tmpl'
+                     , uf_guidance = UnfWhen { ug_arity     = unf_arity
+                                             , ug_unsat_ok  = unSaturatedOk
+                                             , ug_boring_ok = inlineBoringOk tmpl' } })
+             -- Note the "unsaturatedOk". A function like  f = \ab. a
+             -- will certainly inline, even if partially applied (f e), so we'd
+             -- better make sure that the transformed inlining has the same property
+      | otherwise
+      = Nothing
+
+{- Note [certainlyWillInline: be careful of thunks]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Don't claim that thunks will certainly inline, because that risks work
+duplication.  Even if the work duplication is not great (eg is_cheap
+holds), it can make a big difference in an inner loop In #5623 we
+found that the WorkWrap phase thought that
+       y = case x of F# v -> F# (v +# v)
+was certainlyWillInline, so the addition got duplicated.
+
+Note that we check arityInfo instead of the arity of the unfolding to detect
+this case. This is so that we don't accidentally fail to inline small partial
+applications, like `f = g 42` (where `g` recurses into `f`) where g has arity 2
+(say). Here there is no risk of work duplication, and the RHS is tiny, so
+certainlyWillInline should return True. But `unf_arity` is zero! However f's
+arity, gotten from `arityInfo fn_info`, is 1.
+
+Failing to say that `f` will inline forces W/W to generate a potentially huge
+worker for f that will immediately cancel with `g`'s wrapper anyway, causing
+unnecessary churn in the Simplifier while arriving at the same result.
+
+Note [certainlyWillInline: INLINABLE]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+certainlyWillInline /must/ return Nothing for a large INLINABLE thing,
+even though we have a stable inlining, so that strictness w/w takes
+place.  It makes a big difference to efficiency, and the w/w pass knows
+how to transfer the INLINABLE info to the worker; see WorkWrap
+Note [Worker/wrapper for INLINABLE functions]
+-}
