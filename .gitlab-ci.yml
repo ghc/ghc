@@ -1083,6 +1083,7 @@ release-x86_64-linux-fedora27-dwarf:
 ############################################################
 
 .build-windows:
+  allow_failure: true
   before_script:
     - git clean -xdf
 
