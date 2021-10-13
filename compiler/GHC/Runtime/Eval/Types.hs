@@ -8,8 +8,7 @@
 
 module GHC.Runtime.Eval.Types (
         Resume(..), History(..), ExecResult(..),
-        SingleStep(..), isStep, ExecOptions(..),
-        BreakInfo(..)
+        SingleStep(..), isStep, ExecOptions(..)
         ) where
 
 import GHC.Prelude
@@ -19,7 +18,7 @@ import GHCi.Message (EvalExpr, ResumeContext)
 import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.TyThing
-import GHC.Unit.Module
+import GHC.Types.BreakInfo
 import GHC.Types.Name.Reader
 import GHC.Types.SrcLoc
 import GHC.Utils.Exception
@@ -53,11 +52,6 @@ data ExecResult
        { breakNames :: [Name]
        , breakInfo :: Maybe BreakInfo
        }
-
-data BreakInfo = BreakInfo
-  { breakInfo_module :: Module
-  , breakInfo_number :: Int
-  }
 
 data Resume = Resume
        { resumeStmt      :: String       -- the original statement

@@ -1,4 +1,4 @@
-Found 277 Language.Haskell.Syntax module dependencies
+Found 278 Language.Haskell.Syntax module dependencies
 GHC.Builtin.Names
 GHC.Builtin.PrimOps
 GHC.Builtin.Types
@@ -171,6 +171,7 @@ GHC.Tc.Utils.TcType
 GHC.Types.Annotations
 GHC.Types.Avail
 GHC.Types.Basic
+GHC.Types.BreakInfo
 GHC.Types.CompleteMatch
 GHC.Types.CostCentre
 GHC.Types.CostCentre.State
