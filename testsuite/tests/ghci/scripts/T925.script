@@ -1,0 +1,7 @@
+:set -XTemplateHaskell
+let f n = n * 2::Int
+import Language.Haskell.TH
+fName <- runQ [| f |]
+$(return $ AppE fName (LitE (IntegerL 7)))
+let f n = n * 3::Int
+$(return $ AppE fName (LitE (IntegerL 7)))

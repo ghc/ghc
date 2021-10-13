@@ -2170,25 +2170,6 @@ tcRnStmt hsc_env rdr_stmt
     global_ids <- mapM (externaliseAndTidyId this_mod) zonked_ids ;
         -- Note [Interactively-bound Ids in GHCi] in GHC.Driver.Env
 
-{- ---------------------------------------------
-   At one stage I removed any shadowed bindings from the type_env;
-   they are inaccessible but might, I suppose, cause a space leak if we leave them there.
-   However, with Template Haskell they aren't necessarily inaccessible.  Consider this
-   GHCi session
-         Prelude> let f n = n * 2 :: Int
-         Prelude> fName <- runQ [| f |]
-         Prelude> $(return $ AppE fName (LitE (IntegerL 7)))
-         14
-         Prelude> let f n = n * 3 :: Int
-         Prelude> $(return $ AppE fName (LitE (IntegerL 7)))
-   In the last line we use 'fName', which resolves to the *first* 'f'
-   in scope. If we delete it from the type env, GHCi crashes because
-   it doesn't expect that.
-
-   Hence this code is commented out
-
--------------------------------------------------- -}
-
     traceOptTcRn Opt_D_dump_tc
         (vcat [text "Bound Ids" <+> pprWithCommas ppr global_ids,
                text "Typechecked expr" <+> ppr zonked_expr]) ;
