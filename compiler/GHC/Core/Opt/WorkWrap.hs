@@ -13,13 +13,12 @@ import GHC.Driver.Session
 
 import GHC.Core.Opt.Arity  ( manifestArity )
 import GHC.Core
-import GHC.Core.Unfold
 import GHC.Core.Unfold.Make
 import GHC.Core.Utils  ( exprType, exprIsHNF )
 import GHC.Core.Type
 import GHC.Core.Opt.WorkWrap.Utils
 import GHC.Core.FamInstEnv
-import GHC.Core.SimpleOpt( SimpleOpts(..) )
+import GHC.Core.SimpleOpt
 
 import GHC.Types.Var
 import GHC.Types.Id
@@ -719,7 +718,9 @@ splitFun ww_opts fn_id rhs
                        return [(fn_id, rhs)]
 
             Just stuff
-              | Just stable_unf <- certainlyWillInline uf_opts fn_info
+              | let opt_wwd_rhs = simpleOptExpr (wo_simple_opts ww_opts) rhs
+                  -- We need to stabilise the WW'd (and optimised) RHS below
+              , Just stable_unf <- certainlyWillInline uf_opts fn_info opt_wwd_rhs
                 -- We could make a w/w split, but in fact the RHS is small
                 -- See Note [Don't w/w inline small non-loop-breaker things]
               , let id_w_unf = fn_id `setIdUnfolding` stable_unf
