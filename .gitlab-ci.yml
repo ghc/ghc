@@ -1440,7 +1440,7 @@ perf-nofib:
     - root=$(pwd)/ghc
     - |
       mkdir tmp
-      tar -xf ghc-x86_64-deb9-linux-dwarf.tar.xz -C tmp
+      tar -xf ../ghc-x86_64-deb9-linux-dwarf.tar.xz -C tmp
       pushd tmp/ghc-*/
       ./configure --prefix=$root
       make install
