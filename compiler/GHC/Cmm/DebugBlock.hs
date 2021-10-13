@@ -122,7 +122,7 @@ cmmDebugGen modLoc decls = map (blocksForScope Nothing) topScopes
                    | otherwise                   = panic "findP impossible"
 #endif
 
-      scopeMap = foldr (uncurry insertMulti) Map.empty childScopes
+      scopeMap = foldl' (\acc (key, scope) -> insertMulti key scope acc) Map.empty childScopes
 
       -- This allows us to recover ticks that we lost by flattening
       -- the graph. Basically, if the parent is A but the child is
