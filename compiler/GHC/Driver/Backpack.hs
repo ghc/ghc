@@ -91,8 +91,6 @@ import qualified Data.Set as Set
 -- | Entry point to compile a Backpack file.
 doBackpack :: [FilePath] -> Ghc ()
 doBackpack [src_filename] = do
-    logger <- getLogger
-
     -- Apply options from file to dflags
     dflags0 <- getDynFlags
     let dflags1 = dflags0
@@ -100,6 +98,9 @@ doBackpack [src_filename] = do
     src_opts <- liftIO $ getOptionsFromFile parser_opts1 src_filename
     (dflags, unhandled_flags, warns) <- liftIO $ parseDynamicFilePragma dflags1 src_opts
     modifySession (hscSetFlags dflags)
+    logger <- getLogger -- Get the logger after having set the session flags,
+                        -- so that logger options are correctly set.
+                        -- Not doing so caused #20396.
     -- Cribbed from: preprocessFile / GHC.Driver.Pipeline
     liftIO $ checkProcessArgsResult unhandled_flags
     liftIO $ handleFlagWarnings logger (initDiagOpts dflags) warns
