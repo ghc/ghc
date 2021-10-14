@@ -227,21 +227,22 @@ rnImports imports = do
     combine :: [(LImportDecl GhcRn,  GlobalRdrEnv, ImportAvails, AnyHpcUsage)]
             -> ([LImportDecl GhcRn], GlobalRdrEnv, ImportAvails, AnyHpcUsage)
     combine ss =
-      let (decls, rdr_env, imp_avails, hpc_usage, finsts) = foldr
+      let (decls, rdr_env, imp_avails, hpc_usage, finsts) = foldl'
             plus
             ([], emptyGlobalRdrEnv, emptyImportAvails, False, emptyModuleSet)
             ss
       in (decls, rdr_env, imp_avails { imp_finsts = moduleSetElts finsts },
             hpc_usage)
 
-    plus (decl,  gbl_env1, imp_avails1, hpc_usage1)
-         (decls, gbl_env2, imp_avails2, hpc_usage2, finsts_set)
+    plus (!decls, !gbl_env2, !imp_avails2, !hpc_usage2, !finsts_set)
+         (decl,  gbl_env1, imp_avails1, hpc_usage1)
       = ( decl:decls,
           gbl_env1 `plusGlobalRdrEnv` gbl_env2,
           imp_avails1' `plusImportAvails` imp_avails2,
-          hpc_usage1 || hpc_usage2,
+          hpc_usage',
           extendModuleSetList finsts_set new_finsts )
       where
+      !hpc_usage' = hpc_usage1 || hpc_usage2
       imp_avails1' = imp_avails1 { imp_finsts = [] }
       new_finsts = imp_finsts imp_avails1
 
