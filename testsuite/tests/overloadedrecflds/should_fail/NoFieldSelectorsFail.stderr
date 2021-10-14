@@ -4,37 +4,37 @@ NoFieldSelectorsFail.hs:9:14: error:
     It could refer to
        either the field ‘foo’,
               imported from ‘NoFieldSelectorsFailA’ at NoFieldSelectorsFail.hs:4:1-28
-              (and originally defined at NoFieldSelectorsFailA.hs:5:18-20)
+              (and originally defined at NoFieldSelectorsFailA.hs:6:18-20)
            or the field ‘foo’,
               imported from ‘NoFieldSelectorsFailA’ at NoFieldSelectorsFail.hs:4:1-28
-              (and originally defined at NoFieldSelectorsFailA.hs:6:18-20)
+              (and originally defined at NoFieldSelectorsFailA.hs:5:18-20)
 
 NoFieldSelectorsFail.hs:12:15: error:
     Ambiguous occurrence ‘foo’
     It could refer to
        either the field ‘foo’,
               imported from ‘NoFieldSelectorsFailA’ at NoFieldSelectorsFail.hs:4:1-28
-              (and originally defined at NoFieldSelectorsFailA.hs:5:18-20)
+              (and originally defined at NoFieldSelectorsFailA.hs:6:18-20)
            or the field ‘foo’,
               imported from ‘NoFieldSelectorsFailA’ at NoFieldSelectorsFail.hs:4:1-28
-              (and originally defined at NoFieldSelectorsFailA.hs:6:18-20)
+              (and originally defined at NoFieldSelectorsFailA.hs:5:18-20)
 
 NoFieldSelectorsFail.hs:14:15: error:
     Ambiguous occurrence ‘foo’
     It could refer to
        either the field ‘foo’,
               imported from ‘NoFieldSelectorsFailA’ at NoFieldSelectorsFail.hs:4:1-28
-              (and originally defined at NoFieldSelectorsFailA.hs:5:18-20)
+              (and originally defined at NoFieldSelectorsFailA.hs:6:18-20)
            or the field ‘foo’,
               imported from ‘NoFieldSelectorsFailA’ at NoFieldSelectorsFail.hs:4:1-28
-              (and originally defined at NoFieldSelectorsFailA.hs:6:18-20)
+              (and originally defined at NoFieldSelectorsFailA.hs:5:18-20)
 
 NoFieldSelectorsFail.hs:16:15: error:
     Ambiguous occurrence ‘bar’
     It could refer to
-       either the field ‘bar’,
-              imported from ‘NoFieldSelectorsFailA’ at NoFieldSelectorsFail.hs:4:1-28
-              (and originally defined at NoFieldSelectorsFailA.hs:5:30-32)
-           or ‘NoFieldSelectorsFailA.bar’,
+       either ‘NoFieldSelectorsFailA.bar’,
               imported from ‘NoFieldSelectorsFailA’ at NoFieldSelectorsFail.hs:4:1-28
               (and originally defined at NoFieldSelectorsFailA.hs:8:1-3)
+           or the field ‘bar’,
+              imported from ‘NoFieldSelectorsFailA’ at NoFieldSelectorsFail.hs:4:1-28
+              (and originally defined at NoFieldSelectorsFailA.hs:5:30-32)

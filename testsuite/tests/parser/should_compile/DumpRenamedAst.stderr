@@ -1256,36 +1256,6 @@
    []
    [])
   [(L
-    (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:5:8-21 })
-    (ImportDecl
-     (NoExtField)
-     (NoSourceText)
-     (L
-      { DumpRenamedAst.hs:5:8-21 }
-      {ModuleName: Prelude})
-     (Nothing)
-     (NotBoot)
-     (False)
-     (NotQualified)
-     (True)
-     (Nothing)
-     (Nothing)))
-  ,(L
-    (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:6:1-16 })
-    (ImportDecl
-     (NoExtField)
-     (NoSourceText)
-     (L
-      { DumpRenamedAst.hs:6:8-16 }
-      {ModuleName: Data.Kind})
-     (Nothing)
-     (NotBoot)
-     (False)
-     (NotQualified)
-     (False)
-     (Nothing)
-     (Nothing)))
-  ,(L
     (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:8:1-23 })
     (ImportDecl
      (NoExtField)
@@ -1326,7 +1296,37 @@
             (IEName
              (L
               (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:8:19-22 })
-              {Name: GHC.Types.Type})))))])))))]
+              {Name: GHC.Types.Type})))))])))))
+  ,(L
+    (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:6:1-16 })
+    (ImportDecl
+     (NoExtField)
+     (NoSourceText)
+     (L
+      { DumpRenamedAst.hs:6:8-16 }
+      {ModuleName: Data.Kind})
+     (Nothing)
+     (NotBoot)
+     (False)
+     (NotQualified)
+     (False)
+     (Nothing)
+     (Nothing)))
+  ,(L
+    (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:5:8-21 })
+    (ImportDecl
+     (NoExtField)
+     (NoSourceText)
+     (L
+      { DumpRenamedAst.hs:5:8-21 }
+      {ModuleName: Prelude})
+     (Nothing)
+     (NotBoot)
+     (False)
+     (NotQualified)
+     (True)
+     (Nothing)
+     (Nothing)))]
   (Nothing)
   (Nothing)))
 

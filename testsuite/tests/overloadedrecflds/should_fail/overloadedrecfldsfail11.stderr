@@ -1,12 +1,12 @@
 [1 of 2] Compiling OverloadedRecFldsFail11_A ( OverloadedRecFldsFail11_A.hs, OverloadedRecFldsFail11_A.o )
 [2 of 2] Compiling Main             ( overloadedrecfldsfail11.hs, overloadedrecfldsfail11.o )
 
-overloadedrecfldsfail11.hs:5:15:
+overloadedrecfldsfail11.hs:5:15: error:
     Ambiguous occurrence ‘foo’
     It could refer to
        either the field ‘foo’,
               imported from ‘OverloadedRecFldsFail11_A’ at overloadedrecfldsfail11.hs:3:1-32
-              (and originally defined at OverloadedRecFldsFail11_A.hs:6:16-18)
+              (and originally defined at OverloadedRecFldsFail11_A.hs:5:16-18)
            or the field ‘foo’,
               imported from ‘OverloadedRecFldsFail11_A’ at overloadedrecfldsfail11.hs:3:1-32
-              (and originally defined at OverloadedRecFldsFail11_A.hs:5:16-18)
+              (and originally defined at OverloadedRecFldsFail11_A.hs:6:16-18)

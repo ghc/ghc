@@ -1,4 +1,4 @@
-import Data.Char ( isDigit, isLetter )
+import Data.Char ( isLetter, isDigit )
 import Data.List ( sortOn )
 import Data.Maybe ( fromJust, isJust )
 import qualified Data.Char as C ( isLetter, isDigit )
