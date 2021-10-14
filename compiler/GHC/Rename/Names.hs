@@ -201,7 +201,6 @@ rnImports imports = do
     stuff1 <- mapAndReportM (rnImportDecl this_mod) ordinary
     stuff2 <- mapAndReportM (rnImportDecl this_mod) source
     -- Safe Haskell: See Note [Tracking Trust Transitively]
-    liftIO $ print (length stuff1, length stuff2)
     let (decls, rdr_env, imp_avails, hpc_usage) = combine (stuff1 ++ stuff2)
     -- Update imp_boot_mods if imp_direct_mods mentions any of them
     let merged_import_avail = clobberSourceImports imp_avails
