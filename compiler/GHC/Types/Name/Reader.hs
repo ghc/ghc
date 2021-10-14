@@ -1025,11 +1025,11 @@ pickBothGRE mod gre
 
 {-# SCC plusGlobalRdrEnv #-}
 plusGlobalRdrEnv :: GlobalRdrEnv -> GlobalRdrEnv -> GlobalRdrEnv
-plusGlobalRdrEnv env1 env2 = plusOccEnv_C (foldr insertGRE) env1 env2
+plusGlobalRdrEnv env1 env2 = plusOccEnv_C (foldl' $ flip insertGRE) env2 env1
 
 mkGlobalRdrEnv :: [GlobalRdrElt] -> GlobalRdrEnv
 mkGlobalRdrEnv gres
-  = foldr add emptyGlobalRdrEnv gres
+  = foldl' (flip add) emptyGlobalRdrEnv gres
   where
     add gre env = extendOccEnv_Acc insertGRE Utils.singleton env
                                    (greOccName gre)
