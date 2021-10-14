@@ -28,7 +28,6 @@ data HscStatus
           -- ^ Information for the code generator.
         , hscs_mod_location   :: !ModLocation
           -- ^ Module info
-        , hscs_mod_details    :: !ModDetails
         , hscs_partial_iface  :: !PartialModIface
           -- ^ Partial interface
         , hscs_old_iface_hash :: !(Maybe Fingerprint)

@@ -463,7 +463,6 @@ Library
         GHC.Iface.Tidy.StaticPtrTable
         GHC.IfaceToCore
         GHC.Iface.Type
-        GHC.Iface.UpdateIdInfos
         GHC.Linker
         GHC.Linker.Dynamic
         GHC.Linker.ExtraObj

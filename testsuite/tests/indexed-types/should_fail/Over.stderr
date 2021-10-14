@@ -1,10 +1,10 @@
 
-OverB.hs:7:15: error:
+OverD.hs:1:1: error:
     Conflicting family instance declarations:
-      C [Int] [a] -- Defined at OverB.hs:7:15
-      C [a] [Int] -- Defined at OverC.hs:7:15
+      OverA.D [Int] [a] = Int -- Defined in module OverB
+      OverA.D [a] [Int] = Char -- Defined in module OverC
 
-OverB.hs:9:15: error:
+OverD.hs:1:1: error:
     Conflicting family instance declarations:
-      OverA.D [Int] [a] = Int -- Defined at OverB.hs:9:15
-      OverA.D [a] [Int] = Char -- Defined at OverC.hs:9:15
+      C [Int] [a] -- Defined in module OverB
+      C [a] [Int] -- Defined in module OverC

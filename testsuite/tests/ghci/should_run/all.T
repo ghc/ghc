@@ -78,4 +78,5 @@ test('T18064',
 test('T18594', just_ghci, ghci_script, ['T18594.script'])
 test('T18562', just_ghci, ghci_script, ['T18562.script'])
 
+test('T19460', just_ghci, ghci_script, ['T19460.script'])
 test('T19628', [extra_files(['T19628a.hs']), only_ways(['ghci']) ], compile_and_run, [''])

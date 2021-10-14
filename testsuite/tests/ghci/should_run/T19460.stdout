@@ -1,0 +1,5 @@
+type Foo :: * -> Constraint
+class Foo a where
+  bar :: a -> ()
+  	-- Defined at T19460.hs:3:1
+instance [safe] Foo T -- Defined at <interactive>:3:10
