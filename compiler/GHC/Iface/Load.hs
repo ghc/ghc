@@ -629,6 +629,7 @@ We know that none of the interfaces below here can refer to
 home-package modules however, so it's safe for the HPT to be empty.
 -}
 
+-- Note [GHC Heap Invariants]
 dontLeakTheHPT :: IfL a -> IfL a
 dontLeakTheHPT thing_inside = do
   env <- getTopEnv

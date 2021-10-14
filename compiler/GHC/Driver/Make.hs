@@ -732,6 +732,7 @@ guessOutputFile = modifySession $ \env ->
 -- space at the end of the upsweep, because the topmost ModDetails of the
 -- old HPT holds on to the entire type environment from the previous
 -- compilation.
+-- Note [GHC Heap Invariants]
 pruneCache :: [HomeModInfo]
                       -> [ModSummary]
                       -> [HomeModInfo]
@@ -1251,6 +1252,7 @@ typecheckLoop hsc_env hmis = do
       let new_hsc_env = hscUpdateHPT (const new_hpt) hsc_env
       -- Crucial, crucial: initIfaceLoad clears the if_rec_types field.
       -- See [KnotVars invariants]
+      -- Note [GHC Heap Invariants]
       mds <- initIfaceLoad new_hsc_env $
                 mapM (typecheckIface . hm_iface) hmis
       let new_mods = [ (mn,hmi{ hm_details = details })
@@ -2456,3 +2458,31 @@ data MakeAction = forall a . MakeAction (RunMakeM a) (MVar (Maybe a))
 
 waitMakeAction :: MakeAction -> IO ()
 waitMakeAction (MakeAction _ mvar) = () <$ readMVar mvar
+
+{- Note [GHC Heap Invariants]
+
+This note is a general place to explain some of the heap invariants which should
+hold for a program compiled with --make mode. These invariants are all things
+which can be checked easily using ghc-debug.
+
+1. No HomeModInfo are reachable via the EPS.
+   Why? Interfaces are lazily loaded into the EPS and the lazy thunk retains
+        a reference to the entire HscEnv, if we are not careful the HscEnv will
+        contain the HomePackageTable at the time the interface was loaded and
+        it will never be released.
+   Where? dontLeakTheHPT in GHC.Iface.Load
+
+2. No KnotVars are live at the end of upsweep (#20491)
+   Why? KnotVars contains an old stale reference to the TypeEnv for modules
+        which participate in a loop. At the end of a loop all the KnotVars references
+        should be removed by the call to typecheckLoop.
+   Where? typecheckLoop in GHC.Driver.Make.
+
+3. Immediately after a reload, no ModDetails are live.
+   Why? During the upsweep all old ModDetails are replaced with a new ModDetails
+        generated from a ModIface. If we don't clear the ModDetails before the
+        reload takes place then memory usage during the reload is twice as much
+        as it should be as we retain a copy of the ModDetails for too long.
+   Where? pruneCache in GHC.Driver.Make
+
+-}
