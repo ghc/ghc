@@ -291,9 +291,11 @@ This is basically the idea from #13092, comment:14.
 -- We don't need to check the current module, this is done in
 -- tcExtendLocalFamInstEnv.
 -- See Note [The type family instance consistency story].
+{-# SCC checkFamInstConsistency #-}
 checkFamInstConsistency :: [Module] -> TcM ()
 checkFamInstConsistency directlyImpMods
-  = do { (eps, hpt) <- getEpsAndHpt
+  = {-# SCC checkFamInstConsistency #-}
+    do { (eps, hpt) <- getEpsAndHpt
        ; traceTc "checkFamInstConsistency" (ppr directlyImpMods)
        ; let { -- Fetch the iface of a given module.  Must succeed as
                -- all directly imported modules must already have been loaded.
@@ -322,7 +324,7 @@ checkFamInstConsistency directlyImpMods
 
              }
 
-       ; checkMany hpt_fam_insts modConsistent directlyImpMods
+       ; {-# SCC checkMany #-} checkMany hpt_fam_insts modConsistent directlyImpMods
        }
   where
     -- See Note [Checking family instance optimization]
@@ -692,6 +694,7 @@ Check whether a single family instance conflicts with those in two instance
 environments (one for the EPS and one for the HPT).
 -}
 
+{-# SCC checkForConflicts #-}
 -- | Checks to make sure no two family instances overlap.
 checkForConflicts :: FamInstEnvs -> FamInst -> TcM ()
 checkForConflicts inst_envs fam_inst
@@ -703,6 +706,7 @@ checkForConflicts inst_envs fam_inst
          ]
        ; reportConflictInstErr fam_inst conflicts }
 
+{-# SCC checkForInjectivityConflicts #-}
 checkForInjectivityConflicts :: FamInstEnvs -> FamInst -> TcM ()
   -- see Note [Verifying injectivity annotation] in GHC.Core.FamInstEnv, check 1B1.
 checkForInjectivityConflicts instEnvs famInst

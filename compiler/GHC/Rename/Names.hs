@@ -12,6 +12,7 @@ Extracting imported and top-level names in scope
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+{-# OPTIONS_GHC -ddump-to-file -ddump-simpl #-}
 
 module GHC.Rename.Names (
         rnImports, getLocalNonValBinders, newRecordSelector,
@@ -187,6 +188,7 @@ with yes we have gone with no for now.
 -- the return types represent.
 -- Note: Do the non SOURCE ones first, so that we get a helpful warning
 -- for SOURCE ones that are unnecessary
+{-# SCC rnImports #-}
 rnImports :: [(LImportDecl GhcPs, SDoc)]
           -> RnM ([LImportDecl GhcRn], GlobalRdrEnv, ImportAvails, AnyHpcUsage)
 rnImports imports = do
@@ -199,6 +201,7 @@ rnImports imports = do
     stuff1 <- mapAndReportM (rnImportDecl this_mod) ordinary
     stuff2 <- mapAndReportM (rnImportDecl this_mod) source
     -- Safe Haskell: See Note [Tracking Trust Transitively]
+    liftIO $ print (length stuff1, length stuff2)
     let (decls, rdr_env, imp_avails, hpc_usage) = combine (stuff1 ++ stuff2)
     -- Update imp_boot_mods if imp_direct_mods mentions any of them
     let merged_import_avail = clobberSourceImports imp_avails
@@ -209,6 +212,7 @@ rnImports imports = do
     return (decls, rdr_env, final_import_avail, hpc_usage)
 
   where
+    {-# SCC clobberSourceImports #-}
     clobberSourceImports imp_avails =
       imp_avails { imp_boot_mods = imp_boot_mods' }
       where
@@ -219,6 +223,7 @@ rnImports imports = do
         combJ (GWIB _ IsBoot) x = Just x
         combJ r _               = Just r
     -- See Note [Combining ImportAvails]
+    {-# SCC combine #-}
     combine :: [(LImportDecl GhcRn,  GlobalRdrEnv, ImportAvails, AnyHpcUsage)]
             -> ([LImportDecl GhcRn], GlobalRdrEnv, ImportAvails, AnyHpcUsage)
     combine ss =
@@ -299,6 +304,7 @@ Running generateModules from #14693 with DEPTH=16, WIDTH=30 finishes in
 --
 --  4. A boolean 'AnyHpcUsage' which is true if the imported module
 --     used HPC.
+{-# SCC rnImportDecl #-}
 rnImportDecl  :: Module -> (LImportDecl GhcPs, SDoc)
              -> RnM (LImportDecl GhcRn, GlobalRdrEnv, ImportAvails, AnyHpcUsage)
 rnImportDecl this_mod

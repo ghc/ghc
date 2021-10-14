@@ -1410,6 +1410,7 @@ emptyImportAvails = ImportAvails { imp_mods          = emptyModuleEnv,
 -- This function is a key part of Import handling, basically
 -- for each import we create a separate ImportAvails structure
 -- and then union them all together with this function.
+{-# SCC plusImportAvails #-}
 plusImportAvails ::  ImportAvails ->  ImportAvails ->  ImportAvails
 plusImportAvails
   (ImportAvails { imp_mods = mods1,

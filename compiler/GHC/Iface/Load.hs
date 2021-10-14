@@ -400,6 +400,7 @@ loadWiredInHomeIface name
 -- | Loads a system interface and throws an exception if it fails
 loadSysInterface :: SDoc -> Module -> IfM lcl ModIface
 loadSysInterface doc mod_name = loadInterfaceWithException doc mod_name ImportBySystem
+{-# SCC loadSysInterface #-}
 
 ------------------
 -- | Loads a user interface and throws an exception if it fails. The first parameter indicates

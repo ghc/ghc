@@ -1023,6 +1023,7 @@ pickBothGRE mod gre
 
 -- Building GlobalRdrEnvs
 
+{-# SCC plusGlobalRdrEnv #-}
 plusGlobalRdrEnv :: GlobalRdrEnv -> GlobalRdrEnv -> GlobalRdrEnv
 plusGlobalRdrEnv env1 env2 = plusOccEnv_C (foldr insertGRE) env1 env2
 
