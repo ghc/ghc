@@ -83,6 +83,11 @@ main = do
                 -- Ignore in-tree GMP objects
                 , buildRoot -/- "**/gmp/objs/**"
                 ]
+            , shakeOutput = \v -> case v of
+                -- We don't want to print internal shake diagnostic messages as
+                -- they are too verbose to be of any use. See #20484.
+                Diagnostic -> const (pure ())
+                _ -> shakeOutput shakeOptions v
             }
 
         rules :: Rules ()
