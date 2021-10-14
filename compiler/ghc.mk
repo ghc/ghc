@@ -97,9 +97,9 @@ compiler/stage$1/build/GHC/Platform/Constants.hs : $$(deriveConstants_INPLACE) |
 	$$< --gen-haskell-type -o $$@
 endef
 
-$(eval $(call compilerConfig,0))
 $(eval $(call compilerConfig,1))
 $(eval $(call compilerConfig,2))
+$(eval $(call compilerConfig,3))
 
 # ----------------------------------------------------------------------------
 #		Generate supporting stuff for GHC/Builtin/PrimOps.hs
