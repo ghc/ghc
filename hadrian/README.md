@@ -208,6 +208,20 @@ system offers.
 `build selftest` runs tests of the build system. The current test coverage
 is close to zero (see [#197][test-issue]).
 
+#### Running linters
+
+There are two targets which runs the lint commands used by CI:
+
+* `lint:base`, runs hlint on the `base` library.
+* `lint:compiler`, runs hlint on the `ghc` library.
+
+It's useful to know that you can combine multiple targets in build command. For example,
+you can tell hadrian to build the compiler and also run the linters:
+
+```
+./hadrian/build stage2:exe:ghc-bin lint:compiler
+```
+
 #### Clean and full rebuild
 
 * `build clean` removes all build artefacts.
