@@ -3,7 +3,6 @@
     • Exception when trying to run compile-time code:
         Prelude.undefined
 CallStack (from HasCallStack):
-  error, called at libraries/base/GHC/Err.hs:74:14 in base:GHC.Err
   undefined, called at <interactive>:2:10 in interactive:Ghci1
       Code: undefined
     • In the Template Haskell splice $$undefined
