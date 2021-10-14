@@ -71,7 +71,13 @@ errorWithoutStackTrace s = raise# (errorCallException s)
 -- appears.
 undefined :: forall (r :: RuntimeRep). forall (a :: TYPE r).
              HasCallStack => a
-undefined =  error "Prelude.undefined"
+-- This used to be
+--   undefined = error "Prelude.undefined"
+-- but that would add an extra call stack entry that is not actually helpful
+-- nor wanted (see #19886). We’d like to use withFrozenCallStack, but that
+-- is not available in this module yet, and making it so is hard. So let’s just
+-- use raise# directly.
+undefined = raise# (errorCallWithCallStackException "Prelude.undefined" ?callStack)
 
 -- | Used for compiler-generated error message;
 -- encoding saves bytes of string junk.
