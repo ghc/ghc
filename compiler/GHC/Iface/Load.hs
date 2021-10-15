@@ -41,6 +41,9 @@ import {-# SOURCE #-} GHC.IfaceToCore
    , tcIfaceAnnotations, tcIfaceCompleteSigs )
 
 import GHC.Driver.Session
+import GHC.Driver.Hooks
+import GHC.Driver.Plugins
+
 import GHC.Iface.Syntax
 import GHC.Iface.Env
 import GHC.Driver.Types
@@ -75,11 +78,9 @@ import GHC.Utils.Panic
 import GHC.Utils.Misc
 import GHC.Data.FastString
 import GHC.Utils.Fingerprint
-import GHC.Driver.Hooks
 import GHC.Types.FieldLabel
 import GHC.Iface.Rename
 import GHC.Types.Unique.DSet
-import GHC.Driver.Plugins
 
 import Control.Monad
 import Control.Exception
@@ -591,13 +592,15 @@ dontLeakTheHPT thing_inside = do
          -- wrinkle: when we're typechecking in --backpack mode, the
          -- instantiation of a signature might reside in the HPT, so
          -- this case breaks the assumption that EPS interfaces only
-         -- refer to other EPS interfaces. We can detect when we're in
-         -- typechecking-only mode by using hscTarget==HscNothing, and
-         -- in that case we don't empty the HPT.  (admittedly this is
-         -- a bit of a hack, better suggestions welcome). A number of
-         -- tests in testsuite/tests/backpack break without this
+         -- refer to other EPS interfaces.
+         -- As a temporary (MP Oct 2021 #20509) we only keep the HPT if it
+         -- contains any hole modules.
+         -- Quite a few tests in testsuite/tests/backpack break without this
          -- tweak.
-         !hpt | hscTarget hsc_dflags == HscNothing = hsc_HPT
+         keepFor20509 hmi
+          | isHoleModule (mi_semantic_module (hm_iface hmi)) = True
+          | otherwise = False
+         !hpt | anyHpt keepFor20509 hsc_HPT  = hsc_HPT
               | otherwise = emptyHomePackageTable
        in
        HscEnv {  hsc_targets      = panic "cleanTopEnv: hsc_targets"

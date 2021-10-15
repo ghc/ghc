@@ -50,7 +50,7 @@ module GHC.Driver.Types (
 
         -- * State relating to modules in this package
         HomePackageTable, HomeModInfo(..), emptyHomePackageTable,
-        lookupHpt, eltsHpt, filterHpt, allHpt, mapHpt, delFromHpt,
+        lookupHpt, eltsHpt, filterHpt, allHpt, anyHpt, mapHpt, delFromHpt,
         addToHpt, addListToHpt, lookupHptDirectly, listToHpt,
         hptCompleteSigs,
         hptInstances, hptRules, pprHPT,
@@ -657,6 +657,9 @@ filterHpt = filterUDFM
 
 allHpt :: (HomeModInfo -> Bool) -> HomePackageTable -> Bool
 allHpt = allUDFM
+
+anyHpt :: (HomeModInfo -> Bool) -> HomePackageTable -> Bool
+anyHpt = anyUDFM
 
 mapHpt :: (HomeModInfo -> HomeModInfo) -> HomePackageTable -> HomePackageTable
 mapHpt = mapUDFM
