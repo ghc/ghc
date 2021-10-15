@@ -2040,8 +2040,8 @@ runTcInteractive hsc_env thing_inside
     do { traceTc "setInteractiveContext" $
             vcat [ text "ic_tythings:" <+> vcat (map ppr (ic_tythings icxt))
                  , text "ic_insts:" <+> vcat (map (pprBndr LetBind . instanceDFunId) ic_insts)
-                 , text "ic_rn_gbl_env (LocalDef)" <+>
-                      vcat (map ppr [ local_gres | gres <- nonDetOccEnvElts (ic_rn_gbl_env icxt)
+                 , text "icReaderEnv (LocalDef)" <+>
+                      vcat (map ppr [ local_gres | gres <- nonDetOccEnvElts (icReaderEnv icxt)
                                                  , let local_gres = filter isLocalGRE gres
                                                  , not (null local_gres) ]) ]
 
@@ -2063,7 +2063,7 @@ runTcInteractive hsc_env thing_inside
 
        ; (gbl_env, lcl_env) <- getEnvs
        ; let gbl_env' = gbl_env {
-                           tcg_rdr_env      = ic_rn_gbl_env icxt
+                           tcg_rdr_env      = icReaderEnv icxt
                          , tcg_type_env     = type_env
                          , tcg_inst_env     = extendInstEnvList
                                                (extendInstEnvList (tcg_inst_env gbl_env) ic_insts)
@@ -2910,7 +2910,7 @@ loadUnqualIfaces hsc_env ictxt
     home_unit = hsc_home_unit hsc_env
 
     unqual_mods = [ nameModule name
-                  | gre <- globalRdrEnvElts (ic_rn_gbl_env ictxt)
+                  | gre <- globalRdrEnvElts (icReaderEnv ictxt)
                   , let name = greMangledName gre
                   , nameIsFromExternalPackage home_unit name
                   , isTcOcc (nameOccName name)   -- Types and classes only

@@ -7,7 +7,8 @@
 -- -----------------------------------------------------------------------------
 
 module GHC.Runtime.Eval.Types (
-        Resume(..), History(..), ExecResult(..),
+        Resume(..), ResumeBindings, IcGlobalRdrEnv(..),
+        History(..), ExecResult(..),
         SingleStep(..), isStep, ExecOptions(..)
         ) where
 
@@ -53,10 +54,24 @@ data ExecResult
        , breakInfo :: Maybe BreakInfo
        }
 
+type ResumeBindings = ([TyThing], IcGlobalRdrEnv)
+
+-- | Essentially a GlobalRdrEnv, but with additional cached values to allow
+-- efficient re-calculation when the imports change.
+-- Fields are strict to avoid space leaks (see T4029)
+-- All operations are in GHC.Runtime.Context.
+-- See Note [icReaderEnv recalculation]
+data IcGlobalRdrEnv = IcGlobalRdrEnv
+  { igre_env :: !GlobalRdrEnv
+    -- ^ The final environment
+  , igre_prompt_env :: !GlobalRdrEnv
+    -- ^ Just the things defined at the prompt (excluding imports!)
+  }
+
 data Resume = Resume
        { resumeStmt      :: String       -- the original statement
        , resumeContext   :: ForeignRef (ResumeContext [HValueRef])
-       , resumeBindings  :: ([TyThing], GlobalRdrEnv)
+       , resumeBindings  :: ResumeBindings
        , resumeFinalIds  :: [Id]         -- [Id] to bind on completion
        , resumeApStack   :: ForeignHValue -- The object from which we can get
                                         -- value of the free variables.

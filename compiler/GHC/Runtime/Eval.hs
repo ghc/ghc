@@ -233,7 +233,7 @@ execStmt' stmt stmt_text ExecOptions{..} = do
               evalStmt interp eval_opts (execWrap hval)
 
         let ic = hsc_IC hsc_env
-            bindings = (ic_tythings ic, ic_rn_gbl_env ic)
+            bindings = (ic_tythings ic, ic_gre_cache ic)
 
             size = ghciHistSize idflags'
 
@@ -310,7 +310,9 @@ emptyHistory :: Int -> BoundedList History
 emptyHistory size = nilBL size
 
 handleRunStatus :: GhcMonad m
-                => SingleStep -> String -> ([TyThing],GlobalRdrEnv) -> [Id]
+                => SingleStep -> String
+                -> ResumeBindings
+                -> [Id]
                 -> EvalStatus_ [ForeignHValue] [HValueRef]
                 -> BoundedList History
                 -> m ExecResult
@@ -418,9 +420,9 @@ resumeExec canLogSpan step mbCnt
         -- unbind the temporary locals by restoring the TypeEnv from
         -- before the breakpoint, and drop this Resume from the
         -- InteractiveContext.
-        let (resume_tmp_te,resume_rdr_env) = resumeBindings r
+        let (resume_tmp_te,resume_gre_cache) = resumeBindings r
             ic' = ic { ic_tythings = resume_tmp_te,
-                       ic_rn_gbl_env = resume_rdr_env,
+                       ic_gre_cache = resume_gre_cache,
                        ic_resume   = rs }
         setSession hsc_env{ hsc_IC = ic' }
 
@@ -773,7 +775,7 @@ fromListBL bound l = BL (length l) bound l []
 --
 -- (setContext imports) sets the ic_imports field (which in turn
 -- determines what is in scope at the prompt) to 'imports', and
--- constructs the ic_rn_glb_env environment to reflect it.
+-- updates the icReaderEnv environment to reflect it.
 --
 -- We retain in scope all the things defined at the prompt, and kept
 -- in ic_tythings.  (Indeed, they shadow stuff from ic_imports.)
@@ -788,10 +790,10 @@ setContext imports
                liftIO $ throwGhcExceptionIO (formatError dflags mod err)
            Right all_env -> do {
        ; let old_ic         = hsc_IC hsc_env
-             !final_rdr_env = all_env `icExtendGblRdrEnv` ic_tythings old_ic
+             !final_gre_cache = ic_gre_cache old_ic `replaceImportEnv` all_env
        ; setSession
-         hsc_env{ hsc_IC = old_ic { ic_imports    = imports
-                                  , ic_rn_gbl_env = final_rdr_env }}}}
+         hsc_env{ hsc_IC = old_ic { ic_imports   = imports
+                                  , ic_gre_cache = final_gre_cache }}}}
   where
     formatError dflags mod err = ProgramError . showSDoc dflags $
       text "Cannot add module" <+> ppr mod <+>
@@ -856,7 +858,7 @@ getInfo allInfo name
        case mb_stuff of
          Nothing -> return Nothing
          Just (thing, fixity, cls_insts, fam_insts, docs) -> do
-           let rdr_env = ic_rn_gbl_env (hsc_IC hsc_env)
+           let rdr_env = icReaderEnv (hsc_IC hsc_env)
 
            -- Filter the instances based on whether the constituent names of their
            -- instance heads are all in scope.
@@ -865,7 +867,7 @@ getInfo allInfo name
            return (Just (thing, fixity, cls_insts', fam_insts', docs))
   where
     plausible rdr_env names
-          -- Dfun involving only names that are in ic_rn_glb_env
+          -- Dfun involving only names that are in icReaderEnv
         = allInfo
        || nameSetAll ok names
         where   -- A name is ok if it's in the rdr_env,
@@ -880,7 +882,7 @@ getInfo allInfo name
 -- | Returns all names in scope in the current interactive context
 getNamesInScope :: GhcMonad m => m [Name]
 getNamesInScope = withSession $ \hsc_env ->
-  return (map greMangledName (globalRdrEnvElts (ic_rn_gbl_env (hsc_IC hsc_env))))
+  return (map greMangledName (globalRdrEnvElts (icReaderEnv (hsc_IC hsc_env))))
 
 -- | Returns all 'RdrName's in scope in the current interactive
 -- context, excluding any that are internally-generated.
@@ -888,7 +890,7 @@ getRdrNamesInScope :: GhcMonad m => m [RdrName]
 getRdrNamesInScope = withSession $ \hsc_env -> do
   let
       ic = hsc_IC hsc_env
-      gbl_rdrenv = ic_rn_gbl_env ic
+      gbl_rdrenv = icReaderEnv ic
       gbl_names = concatMap greRdrNames $ globalRdrEnvElts gbl_rdrenv
   -- Exclude internally generated names; see e.g. #11328
   return (filter (not . isDerivedOccName . rdrNameOcc) gbl_names)
