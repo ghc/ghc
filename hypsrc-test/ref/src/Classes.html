@@ -342,6 +342,7 @@ forall a. a -&gt; a
       ><span class="annot"
       ><span class="annottext"
 	>[a] -&gt; Int
+forall a. [a] -&gt; Int
 forall (t :: * -&gt; *) a. Foldable t =&gt; t a -&gt; Int
 </span
 	><span class="hs-identifier hs-var"
@@ -716,6 +717,7 @@ forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
 	><span class="annot"
 	><span class="annottext"
 	  >[Int] -&gt; Int
+forall a. Num a =&gt; [a] -&gt; a
 forall (t :: * -&gt; *) a. (Foldable t, Num a) =&gt; t a -&gt; a
 </span
 	  ><span class="hs-identifier hs-var"
@@ -813,6 +815,7 @@ forall a. Foo a =&gt; a -&gt; Int
       ><span class="annot"
       ><span class="annottext"
 	>[Int] -&gt; Int
+forall a. Num a =&gt; [a] -&gt; a
 forall (t :: * -&gt; *) a. (Foldable t, Num a) =&gt; t a -&gt; a
 </span
 	><span class="hs-identifier hs-var"
