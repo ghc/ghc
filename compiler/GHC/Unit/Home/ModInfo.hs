@@ -7,6 +7,7 @@ module GHC.Unit.Home.ModInfo
    , eltsHpt
    , filterHpt
    , allHpt
+   , anyHpt
    , mapHpt
    , delFromHpt
    , addToHpt
@@ -89,6 +90,9 @@ filterHpt = filterUDFM
 
 allHpt :: (HomeModInfo -> Bool) -> HomePackageTable -> Bool
 allHpt = allUDFM
+
+anyHpt :: (HomeModInfo -> Bool) -> HomePackageTable -> Bool
+anyHpt = anyUDFM
 
 mapHpt :: (HomeModInfo -> HomeModInfo) -> HomePackageTable -> HomePackageTable
 mapHpt = mapUDFM
