@@ -21,12 +21,14 @@ import Data.Time
 -- module.  If so, use this instead of the file contents (this
 -- is for use in an IDE where the file hasn't been saved by
 -- the user yet).
+--
+-- These fields are strict because Targets are long lived.
 data Target
   = Target {
-      targetId           :: TargetId, -- ^ module or filename
-      targetAllowObjCode :: Bool,     -- ^ object code allowed?
-      targetUnitId       :: UnitId,   -- ^ id of the unit this target is part of
-      targetContents     :: Maybe (InputFileBuffer, UTCTime)
+      targetId           :: !TargetId, -- ^ module or filename
+      targetAllowObjCode :: !Bool,     -- ^ object code allowed?
+      targetUnitId       :: !UnitId,   -- ^ id of the unit this target is part of
+      targetContents     :: !(Maybe (InputFileBuffer, UTCTime))
       -- ^ Optional in-memory buffer containing the source code GHC should
       -- use for this target instead of reading it from disk.
       --
@@ -40,9 +42,9 @@ data Target
     }
 
 data TargetId
-  = TargetModule ModuleName
+  = TargetModule !ModuleName
         -- ^ A module name: search for the file
-  | TargetFile FilePath (Maybe Phase)
+  | TargetFile !FilePath !(Maybe Phase)
         -- ^ A filename: preprocess & parse it to find the module name.
         -- If specified, the Phase indicates how to compile this file
         -- (which phase to start from).  Nothing indicates the starting phase
