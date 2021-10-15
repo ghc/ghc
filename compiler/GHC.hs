@@ -1469,7 +1469,7 @@ findGlobalAnns deserialize target = withSession $ \hsc_env -> do
 
 -- | get the GlobalRdrEnv for a session
 getGRE :: GhcMonad m => m GlobalRdrEnv
-getGRE = withSession $ \hsc_env-> return $ ic_rn_gbl_env (hsc_IC hsc_env)
+getGRE = withSession $ \hsc_env-> return $ icReaderEnv (hsc_IC hsc_env)
 
 -- | Retrieve all type and family instances in the environment, indexed
 -- by 'Name'. Each name's lists will contain every instance in which that name

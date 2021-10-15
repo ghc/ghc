@@ -6,7 +6,8 @@ module GHC.Runtime.Context
    , extendInteractiveContextWithIds
    , setInteractivePrintName
    , substInteractiveContext
-   , icExtendGblRdrEnv
+   , replaceImportEnv
+   , icReaderEnv
    , icInteractiveModule
    , icInScopeTTs
    , icPrintUnqual
@@ -20,7 +21,7 @@ import GHC.Hs
 import GHC.Driver.Session
 import {-# SOURCE #-} GHC.Driver.Plugins
 
-import GHC.Runtime.Eval.Types ( Resume )
+import GHC.Runtime.Eval.Types ( IcGlobalRdrEnv(..), Resume )
 
 import GHC.Unit
 import GHC.Unit.Env
@@ -182,6 +183,37 @@ e.g.    Prelude> data T = A | B
         Prelude> instance Eq T where ...   -- This one overrides
 
 It's exactly the same for type-family instances.  See #7102
+
+Note [icReaderEnv recalculation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The GlobalRdrEnv describing what’s in scope at the prompts consists
+of all the imported things, followed by all the things defined on the prompt, with
+shadowing. Defining new things on the prompt is easy: we shadow as needed and then extend the environment.  But changing the set of imports, which can happen later as well,
+is tricky: we need to re-apply the shadowing from all the things defined at the prompt!
+
+For example:
+
+    ghci> let empty = True
+    ghci> import Data.IntMap.Strict     -- Exports 'empty'
+    ghci> empty   -- Still gets the 'empty' defined at the prompt
+    True
+
+
+It would be correct ot re-construct the env from scratch based on
+`ic_tythings`, but that'd be quite expensive if there are many entires in
+`ic_tythings` that shadow each other.
+
+Therefore we keep around a that `GlobalRdrEnv` in `igre_prompt_env` that
+contians _just_ the things defined at the prompt, and use that in
+`replaceImportEnv` to rebuild the full env.  Conveniently, `shadowNames` takes
+such an `OccEnv` to denote the set of names to shadow.
+
+INVARIANT: Every `OccName` in `igre_prompt_env` is present unqualified as well
+(else it would not be right to use pass `igre_prompt_env` to `shadowNames`.)
+
+The definition of the IcGlobalRdrEnv type should conceptually be in this module, and
+made abstract, but it’s used in `Resume`, so it lives in GHC.Runtime.Eval.Type.
+-
 -}
 
 -- | Interactive context, recording information about the state of the
@@ -200,7 +232,7 @@ data InteractiveContext
              -- See Note [The interactive package]
 
          ic_imports :: [InteractiveImport],
-             -- ^ The GHCi top-level scope (ic_rn_gbl_env) is extended with
+             -- ^ The GHCi top-level scope (icReaderEnv) is extended with
              -- these imports
              --
              -- This field is only stored here so that the client
@@ -213,11 +245,16 @@ data InteractiveContext
              -- definition (ie most recent at the front)
              -- See Note [ic_tythings]
 
-         ic_rn_gbl_env :: GlobalRdrEnv,
-             -- ^ The cached 'GlobalRdrEnv', built by
-             -- 'GHC.Runtime.Eval.setContext' and updated regularly
-             -- It contains everything in scope at the command line,
-             -- including everything in ic_tythings
+         ic_gre_cache :: IcGlobalRdrEnv,
+             -- ^ Essentially the cached 'GlobalRdrEnv'.
+             --
+             -- The GlobalRdrEnv contains everything in scope at the command
+             -- line, both imported and everything in ic_tythings, with the
+             -- correct shadowing.
+             --
+             -- The IcGlobalRdrEnv contains extra data to allow efficient
+             -- recalculation when the set of imports change.
+             -- See Note [icReaderEnv recalculation]
 
          ic_instances  :: ([ClsInst], [FamInst]),
              -- ^ All instances and family instances created during
@@ -233,7 +270,7 @@ data InteractiveContext
          ic_default :: Maybe [Type],
              -- ^ The current default types, set by a 'default' declaration
 
-          ic_resume :: [Resume],
+         ic_resume :: [Resume],
              -- ^ The stack of breakpoint contexts
 
          ic_monad      :: Name,
@@ -261,6 +298,11 @@ data InteractiveImport
       -- of this module, including the things imported
       -- into it.
 
+emptyIcGlobalRdrEnv :: IcGlobalRdrEnv
+emptyIcGlobalRdrEnv = IcGlobalRdrEnv
+    { igre_env = emptyGlobalRdrEnv
+    , igre_prompt_env = emptyGlobalRdrEnv
+    }
 
 -- | Constructs an empty InteractiveContext.
 emptyInteractiveContext :: DynFlags -> InteractiveContext
@@ -268,7 +310,7 @@ emptyInteractiveContext dflags
   = InteractiveContext {
        ic_dflags     = dflags,
        ic_imports    = [],
-       ic_rn_gbl_env = emptyGlobalRdrEnv,
+       ic_gre_cache  = emptyIcGlobalRdrEnv,
        ic_mod_index  = 1,
        ic_tythings   = [],
        ic_instances  = ([],[]),
@@ -281,6 +323,9 @@ emptyInteractiveContext dflags
        ic_plugins    = []
        }
 
+icReaderEnv :: InteractiveContext -> GlobalRdrEnv
+icReaderEnv = igre_env . ic_gre_cache
+
 icInteractiveModule :: InteractiveContext -> Module
 icInteractiveModule (InteractiveContext { ic_mod_index = index })
   = mkInteractiveModule index
@@ -292,8 +337,7 @@ icInScopeTTs = ic_tythings
 
 -- | Get the PrintUnqualified function based on the flags and this InteractiveContext
 icPrintUnqual :: UnitEnv -> InteractiveContext -> PrintUnqualified
-icPrintUnqual unit_env InteractiveContext{ ic_rn_gbl_env = grenv } =
-    mkPrintUnqualified unit_env grenv
+icPrintUnqual unit_env ictxt = mkPrintUnqualified unit_env (icReaderEnv ictxt)
 
 -- | extendInteractiveContext is called with new TyThings recently defined to update the
 -- InteractiveContext to include them.  Ids are easily removed when shadowed,
@@ -312,7 +356,7 @@ extendInteractiveContext ictxt new_tythings new_cls_insts new_fam_insts defaults
                             -- Always bump this; even instances should create
                             -- a new mod_index (#9426)
           , ic_tythings   = new_tythings ++ old_tythings
-          , ic_rn_gbl_env = ic_rn_gbl_env ictxt `icExtendGblRdrEnv` new_tythings
+          , ic_gre_cache  = ic_gre_cache  ictxt `icExtendIcGblRdrEnv` new_tythings
           , ic_instances  = ( new_cls_insts ++ old_cls_insts
                             , new_fam_insts ++ fam_insts )
                             -- we don't shadow old family instances (#7102),
@@ -333,9 +377,11 @@ extendInteractiveContextWithIds :: InteractiveContext -> [Id] -> InteractiveCont
 -- Just a specialised version
 extendInteractiveContextWithIds ictxt new_ids
   | null new_ids = ictxt
-  | otherwise    = ictxt { ic_mod_index  = ic_mod_index ictxt + 1
-                         , ic_tythings   = new_tythings ++ old_tythings
-                         , ic_rn_gbl_env = ic_rn_gbl_env ictxt `icExtendGblRdrEnv` new_tythings }
+  | otherwise
+  = ictxt { ic_mod_index  = ic_mod_index ictxt + 1
+          , ic_tythings   = new_tythings ++ old_tythings
+          , ic_gre_cache  = ic_gre_cache ictxt `icExtendIcGblRdrEnv` new_tythings
+          }
   where
     new_tythings = map AnId new_ids
     old_tythings = filterOut (shadowed_by new_ids) (ic_tythings ictxt)
@@ -351,7 +397,19 @@ shadowed_by ids = shadowed
 setInteractivePrintName :: InteractiveContext -> Name -> InteractiveContext
 setInteractivePrintName ic n = ic{ic_int_print = n}
 
-    -- ToDo: should not add Ids to the gbl env here
+icExtendIcGblRdrEnv :: IcGlobalRdrEnv -> [TyThing] -> IcGlobalRdrEnv
+icExtendIcGblRdrEnv igre tythings = IcGlobalRdrEnv
+    { igre_env = igre_env igre `icExtendGblRdrEnv` tythings
+    , igre_prompt_env = igre_prompt_env igre `icExtendGblRdrEnv` tythings
+    }
+
+-- This is used by setContext in GHC.Runtime.Eval when the set of imports
+-- changes, and recalculates the GlobalRdrEnv. See Note [icReaderEnv recalculation]
+replaceImportEnv :: IcGlobalRdrEnv -> GlobalRdrEnv -> IcGlobalRdrEnv
+replaceImportEnv igre import_env = igre { igre_env = new_env }
+  where
+    import_env_shadowed = import_env `shadowNames` igre_prompt_env igre
+    new_env = import_env_shadowed `plusGlobalRdrEnv` igre_prompt_env igre
 
 -- | Add TyThings to the GlobalRdrEnv, earlier ones in the list shadowing
 -- later ones, and shadowing existing entries in the GlobalRdrEnv.
@@ -399,4 +457,3 @@ substInteractiveContext ictxt@InteractiveContext{ ic_tythings = tts } subst
 instance Outputable InteractiveImport where
   ppr (IIModule m) = char '*' <> ppr m
   ppr (IIDecl d)   = ppr d
-
