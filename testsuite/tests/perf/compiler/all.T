@@ -306,6 +306,19 @@ test('MultiLayerModulesDefsGhci',
      ghci_script,
      ['MultiLayerModulesDefsGhci.script'])
 
+test('MultiLayerModulesNoCode',
+     [ collect_compiler_residency(15),
+       pre_cmd('./genMultiLayerModulesNoCode'),
+       extra_files(['genMultiLayerModulesNoCode']),
+       compile_timeout_multiplier(5)
+       # this is _a lot_
+       # but this test has been failing every now and then,
+       # especially on i386. Let's just give it some room
+       # to complete successfully reliably everywhere.
+     ],
+     ghci_script,
+     ['MultiLayerModulesNoCode.script'])
+
 test('ManyConstructors',
      [ collect_compiler_stats('bytes allocated',2),
        pre_cmd('./genManyConstructors'),
