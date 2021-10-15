@@ -431,7 +431,7 @@ roles(T) = r_1 .. r_n
 ---------------------------------------------------- RCDApp
 Z |- T t_1 .. t_n : R
 
-Z, a:N |- t : r
+Z, a:P |- t : r
 ---------------------- RCAll
 Z |- forall a:k.t : r
 
@@ -514,7 +514,7 @@ initialRoleEnv1 hsc_src annots_env tc
           | isVisibleArgFlag argf
           = (m_annot `orElse` default_role) : build_default_roles argfs ras
         build_default_roles (_argf : argfs) ras
-          = Nominal : build_default_roles argfs ras
+          = default_role : build_default_roles argfs ras
         build_default_roles [] [] = []
         build_default_roles _ _ = pprPanic "initialRoleEnv1 (2)"
                                            (vcat [ppr tc, ppr role_annots])
@@ -615,7 +615,6 @@ irType = go
                                     ; zipWithM_ (go_app lcls) roles tys }
     go lcls (ForAllTy tvb ty)  = do { let tv = binderVar tvb
                                           lcls' = extendVarSet lcls tv
-                                    ; markNominal lcls (tyVarKind tv)
                                     ; go lcls' ty }
     go lcls (FunTy _ w arg res)  = markNominal lcls w >> go lcls arg >> go lcls res
     go _    (LitTy {})         = return ()
@@ -632,8 +631,7 @@ irTcTyVars tc thing
   = setRoleInferenceTc (tyConName tc) $ go (tyConTyVars tc)
   where
     go []       = thing
-    go (tv:tvs) = do { markNominal emptyVarSet (tyVarKind tv)
-                     ; addRoleInferenceVar tv $ go tvs }
+    go (tv:tvs) = do {  addRoleInferenceVar tv $ go tvs }
 
 irExTyVars :: [TyVar] -> (TyVarSet -> RoleM a) -> RoleM a
 irExTyVars orig_tvs thing = go emptyVarSet orig_tvs

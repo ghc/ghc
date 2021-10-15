@@ -8,7 +8,7 @@
                 <ReaderT r (ST s) a>_R
                 %<'Many>_N ->_R <ReaderT r (ST s) b>_R
                 %<'Many>_N ->_R <r>_R %<'Many>_N ->_R Sym (N:ST[0] <s>_N <b>_R)
-                                ; Sym (N:ReaderT[0] <*>_N <r>_R <ST s>_R <b>_N)
+                                ; Sym (N:ReaderT[0] <*>_P <r>_R <ST s>_R <b>_N)
                 :: Coercible
                      (forall {a} {b}.
                       ReaderT r (ST s) a -> ReaderT r (ST s) b -> r -> STRep s b)
@@ -27,7 +27,7 @@
                 %<'Many>_N ->_R <ReaderT r (ST s) a>_R
                 %<'Many>_N ->_R <ReaderT r (ST s) b>_R
                 %<'Many>_N ->_R <r>_R %<'Many>_N ->_R Sym (N:ST[0] <s>_N <c>_R)
-                                ; Sym (N:ReaderT[0] <*>_N <r>_R <ST s>_R <c>_N)
+                                ; Sym (N:ReaderT[0] <*>_P <r>_R <ST s>_R <c>_N)
                 :: Coercible
                      (forall {a} {b} {c}.
                       (a -> b -> c)
@@ -62,7 +62,7 @@
       = (useAbstractMonad1 @s)
         `cast` (<Int>_R
                 %<'Many>_N ->_R <Int>_R %<'Many>_N ->_R Sym (N:ST[0] <s>_N <Int>_R)
-                                ; Sym (N:ReaderT[0] <*>_N <Int>_R <ST s>_R <Int>_N)
+                                ; Sym (N:ReaderT[0] <*>_P <Int>_R <ST s>_R <Int>_N)
                 :: Coercible
                      (Int -> Int -> STRep s Int) (Int -> ReaderT Int (ST s) Int))
 

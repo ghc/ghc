@@ -5,7 +5,7 @@ TYPE CONSTRUCTORS
   type family F{1} :: * -> *
     roles nominal
   data type P{2} :: forall k -> k -> *
-    roles nominal phantom
+    roles phantom phantom
 COERCION AXIOMS
   axiom T14729.D:R:FInt :: F Int = Bool
 FAMILY INSTANCES

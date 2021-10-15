@@ -7,19 +7,19 @@ TYPE CONSTRUCTORS
     -> (k3 -> *)
     -> k3
     -> forall (k7 :: k1). Proxy k7 -> forall (k8 :: k5). Proxy k8 -> *
-    roles nominal
-          nominal
-          nominal
-          nominal
-          nominal
-          nominal
+    roles phantom
+          phantom
+          phantom
+          phantom
+          phantom
+          phantom
           phantom
           phantom
           representational
           nominal
-          nominal
           phantom
-          nominal
+          phantom
+          phantom
           phantom
   data type T2{14} ::
     forall {k1} {k2} (k3 :: k2) k7.
@@ -30,19 +30,19 @@ TYPE CONSTRUCTORS
     -> k7
     -> forall (k5 :: k1).
        Proxy k5 -> forall k6 (k8 :: k6). Proxy k8 -> *
-    roles nominal
-          nominal
-          nominal
-          nominal
-          nominal
+    roles phantom
+          phantom
+          phantom
+          phantom
+          phantom
           phantom
           phantom
           representational
           nominal
-          nominal
           phantom
-          nominal
-          nominal
+          phantom
+          phantom
+          phantom
           phantom
 DATA CONSTRUCTORS
   MkT2 :: forall {k7} {k1} {k2 :: k1} {k3} {k4 :: k3} {k5} {k6 :: k5}

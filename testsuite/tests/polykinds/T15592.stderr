@@ -1,6 +1,6 @@
 TYPE CONSTRUCTORS
   data type T{5} :: forall {k} k1. (k1 -> k -> *) -> k1 -> k -> *
-    roles nominal nominal representational nominal nominal
+    roles phantom phantom representational nominal nominal
 DATA CONSTRUCTORS
   MkT :: forall {k} k1 (f :: k1 -> k -> *) (a :: k1) (b :: k).
          f a b -> T f a b -> T f a b
