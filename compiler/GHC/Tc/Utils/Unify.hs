@@ -43,18 +43,23 @@ import GHC.Prelude
 import GHC.Hs
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Ppr( debugPprType )
-import GHC.Tc.Utils.TcMType
-import GHC.Tc.Utils.Monad
-import GHC.Tc.Utils.TcType
+import GHC.Tc.Utils.Concrete ( mkWpFun )
 import GHC.Tc.Utils.Env
+import GHC.Tc.Utils.Instantiate
+import GHC.Tc.Utils.Monad
+import GHC.Tc.Utils.TcMType
+import GHC.Tc.Utils.TcType
+
+
 import GHC.Core.Type
 import GHC.Core.Coercion
 import GHC.Core.Multiplicity
+
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Origin
 import GHC.Types.Name( isSystemName )
-import GHC.Tc.Utils.Instantiate
+
 import GHC.Core.TyCon
 import GHC.Builtin.Types
 import GHC.Types.Var as Var
@@ -210,12 +215,8 @@ matchActualFunTysRho herald ct_orig mb_thing n_val_args_wanted fun_ty
                                                  (n_val_args_wanted, so_far)
                                                  fun_ty
            ; (wrap_res, arg_tys, res_ty)   <- go (n-1) (arg_ty1:so_far) res_ty1
-           ; let wrap_fun2 = mkWpFun idHsWrapper wrap_res arg_ty1 res_ty doc
+           ; wrap_fun2 <- mkWpFun idHsWrapper wrap_res arg_ty1 res_ty (WpFunFunTy fun_ty)
            ; return (wrap_fun2 <.> wrap_fun1, arg_ty1:arg_tys, res_ty) }
-      where
-        doc = text "When inferring the argument type of a function with type" <+>
-              quotes (ppr fun_ty)
-
 
 {-
 ************************************************************************
@@ -320,11 +321,8 @@ matchExpectedFunTys herald ctx arity orig_ty thing_inside
       = assert (af == VisArg) $
         do { (wrap_res, result) <- go ((Scaled mult $ mkCheckExpType arg_ty) : acc_arg_tys)
                                       (n-1) res_ty
-           ; let fun_wrap = mkWpFun idHsWrapper wrap_res (Scaled mult arg_ty) res_ty doc
+           ; fun_wrap <- mkWpFun idHsWrapper wrap_res (Scaled mult arg_ty) res_ty (WpFunFunExpTy orig_ty)
            ; return ( fun_wrap, result ) }
-      where
-        doc = text "When inferring the argument type of a function with type" <+>
-              quotes (ppr orig_ty)
 
     go acc_arg_tys n ty@(TyVarTy tv)
       | isMetaTyVar tv
@@ -779,7 +777,7 @@ There is no notion of multiplicity coercion in Core, therefore the wrapper
 returned by tcSubMult (and derived functions such as tcCheckUsage and
 checkManyPattern) is quite unlike any other wrapper: it checks whether the
 coercion produced by the constraint solver is trivial, producing a type error
-is it is not. This is implemented via the WpMultCoercion wrapper, as desugared
+if it is not. This is implemented via the WpMultCoercion wrapper, as desugared
 by GHC.HsToCore.Binds.dsHsWrapper, which does the reflexivity check.
 
 This wrapper needs to be placed in the term; otherwise, checking of the
@@ -788,11 +786,14 @@ anywhere, since it doesn't affect the desugared code.
 
 Why do we check this in the desugarer? It's a convenient place, since it's
 right after all the constraints are solved. We need the constraints to be
-solved to check whether they are trivial or not. Plus there is precedent for
-type errors during desuraging (such as the representation polymorphism
-restriction). An alternative would be to have a kind of constraint which can
-only produce trivial evidence, then this check would happen in the constraint
-solver (#18756).
+solved to check whether they are trivial or not.
+
+An alternative would be to have a kind of constraint which can
+only produce trivial evidence. This would allow such checks to happen
+in the constraint solver (#18756).
+This would be similar to the existing setup for Concrete, see
+  Note [The Concrete mechanism] in GHC.Tc.Utils.Concrete
+    (PHASE 1 in particular).
 -}
 
 tcSubMult :: CtOrigin -> Mult -> Mult -> TcM HsWrapper

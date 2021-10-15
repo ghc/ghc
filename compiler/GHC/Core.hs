@@ -547,30 +547,34 @@ Note [Core case invariants]
 See Note [Case expression invariants]
 
 Note [Representation polymorphism invariants]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The representation polymorphism invariants are described as follows,
-according to the paper "Levity Polymorphism", PLDI '17.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+GHC allows us to abstract over calling conventions using **representation polymorphism**.
+For example, we have:
 
-* The type of a term-binder must not be representation-polymorphic,
-  unless it is a let(rec)-bound join point
-     (see Note [Invariants on join points])
+  ($) :: forall (r :: RuntimeRep) (a :: Type) (b :: TYPE r). a -> b -> b
 
-* The type of the argument of an App must not be representation-polymorphic.
+In this example, the type `b` is representation-polymorphic: it has kind `TYPE r`,
+where the type variable `r :: RuntimeRep` abstracts over the runtime representation
+of values of type `b`.
 
-A type (t::TYPE r) is "representation-polymorphic" if 'r' has any free variables,
-and "levity-polymorphic" if it is of the form (t::TYPE (BoxedRep v))
-and 'v' has free variables (levity polymorphism is a special case of
-representation polymorphism).
-Note that the aforementioned "Levity Polymorphism" paper conflates both these
-types of polymorphism; a more precise distinction was only made possible
-with the introduction of BoxedRep.
+To ensure that programs containing representation-polymorphism remain compilable,
+we enforce two invariants (the representation-polymorphism invariants),
+as per "Levity Polymorphism" [PLDI'17]:
+
+  I1. The type of a bound variable must have a fixed runtime representation
+      (except for join points: See Note [Invariants on join points])
+  I2. The type of a function argument must have a fixed runtime representation.
 
 For example
   \(r::RuntimeRep). \(a::TYPE r). \(x::a). e
 is illegal because x's type has kind (TYPE r), which has 'r' free.
+We thus wouldn't know how to compile this lambda abstraction.
 
-See Note [Representation polymorphism checking] in GHC.HsToCore.Monad to see where these
-invariants are established for user-written code.
+In practice, we currently require something slightly stronger than a fixed runtime
+representation: we check whether bound variables and function arguments have a
+/fixed RuntimeRep/ in the sense of Note [Fixed RuntimeRep] in GHC.Tc.Utils.Concrete.
+See Note [Representation polymorphism checking] in GHC.Tc.Utils.Concrete
+for an overview of how we enforce these invariants in the typechecker.
 
 Note [Core let goal]
 ~~~~~~~~~~~~~~~~~~~~
@@ -712,7 +716,7 @@ However, join points have simpler invariants in other ways
      ok-for-speculation (i.e. drop the let/app invariant)
      e.g.  let j :: Int# = factorial x in ...
 
-  6. A join point can have a representation-polymorphic RHS
+  6. The RHS of join point is not required to have a fixed runtime representation,
      e.g.  let j :: r :: TYPE l = fail void# in ...
      This happened in an intermediate program #13394
 

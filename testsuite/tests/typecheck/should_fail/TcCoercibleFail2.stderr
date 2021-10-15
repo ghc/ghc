@@ -1,4 +1,4 @@
 
 TcCoercibleFail2.hs:5:10: error:
-    • Class ‘Coercible’ does not support user-specified instances
+    • Class ‘Coercible’ does not support user-specified instances.
     • In the instance declaration for ‘Coercible () ()’

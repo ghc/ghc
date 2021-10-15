@@ -477,12 +477,17 @@ getRuleQuantCts wc
         new_skol_tvs = skol_tvs `extendVarSetList` ic_skols imp
 
     rule_quant_ct :: TcTyCoVarSet -> Ct -> Bool
-    rule_quant_ct skol_tvs ct
-      | EqPred _ t1 t2 <- classifyPredType (ctPred ct)
-      , not (ok_eq t1 t2)
-       = False        -- Note [RULE quantification over equalities]
-      | otherwise
-      = tyCoVarsOfCt ct `disjointVarSet` skol_tvs
+    rule_quant_ct skol_tvs ct = case classifyPredType (ctPred ct) of
+      EqPred _ t1 t2
+        | not (ok_eq t1 t2)
+        -> False        -- Note [RULE quantification over equalities]
+      SpecialPred {}
+        -- RULES must never quantify over special predicates, as that
+        -- would leak internal GHC implementation details to the user.
+        --
+        -- Tests (for Concrete# predicates): RepPolyRule{1,2,3}.
+        -> False
+      _ -> tyCoVarsOfCt ct `disjointVarSet` skol_tvs
 
     ok_eq t1 t2
        | t1 `tcEqType` t2 = False

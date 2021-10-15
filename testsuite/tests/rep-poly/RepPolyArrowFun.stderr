@@ -1,0 +1,30 @@
+
+RepPolyArrowFun.hs:29:9: error:
+    • • The return type of the arrow function
+          ‘arr’
+        does not have a fixed runtime representation:
+          arr b c :: TYPE r
+      • The return type of the arrow function
+          ‘(>>>)’
+        does not have a fixed runtime representation:
+          arr a1 c1 :: TYPE r
+      • The return type of the arrow function
+          ‘first’
+        does not have a fixed runtime representation:
+          arr (b1, d) (c2, d) :: TYPE r
+    • When checking that ‘arr’ (needed by a syntactic construct)
+        has the required type: forall b c. (b -> c) -> arr b c
+        arising from a proc expression at RepPolyArrowFun.hs:29:9-32
+      In the expression: proc x -> undefined -< x
+      In an equation for ‘foo’: foo _ = proc x -> undefined -< x
+
+RepPolyArrowFun.hs:29:19: error:
+    • In the first order arrow application of
+        ‘undefined’
+      to
+        ‘x’,
+      the function does not have a fixed runtime representation:
+        arr a a :: TYPE r
+    • In the command: undefined -< x
+      In the expression: proc x -> undefined -< x
+      In an equation for ‘foo’: foo _ = proc x -> undefined -< x

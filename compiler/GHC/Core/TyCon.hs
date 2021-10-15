@@ -40,6 +40,7 @@ module GHC.Core.TyCon(
         mkTupleTyCon,
         mkSumTyCon,
         mkDataTyConRhs,
+        mkLevPolyDataTyConRhs,
         mkSynonymTyCon,
         mkFamilyTyCon,
         mkPromotedDataCon,
@@ -73,7 +74,8 @@ module GHC.Core.TyCon(
         isImplicitTyCon,
         isTyConWithSrcDataCons,
         isTcTyCon, setTcTyConKind,
-        isTcLevPoly,
+        tcHasFixedRuntimeRep,
+        isConcreteTyCon,
 
         -- ** Extracting information out of TyCons
         tyConName,
@@ -1018,6 +1020,86 @@ So, when promoted to become a type constructor, the tyConBinders
 will include CoVars.  That is why we use [TyConTyCoBinder] for the
 tyconBinders field.  TyConTyCoBinder is a synonym for TyConBinder,
 but with the clue that the binder can be a CoVar not just a TyVar.
+
+Note [Representation-polymorphic TyCons]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+To check for representation-polymorphism directly in the typechecker,
+e.g. when using GHC.Tc.Utils.TcMType.checkTypeHasFixedRuntimeRep,
+we need to compute whether a type has a fixed RuntimeRep,
+as per Note [Fixed RuntimeRep] in GHC.Tc.Utils.Concrete.
+
+It's useful to have a quick way to check whether a saturated application
+of a type constructor has a fixed RuntimeRep. That is, we want
+to know, given a TyCon 'T' of arity 'n', does
+
+  T a_1 ... a_n
+
+always have a fixed RuntimeRep? That is, is it always the case
+that this application has a kind of the form
+
+  T a_1 ... a_n :: TYPE rep
+
+in which 'rep' is a concrete 'RuntimeRep'?
+('Concrete' in the sense of Note [The Concrete mechanism] in GHC.Tc.Utils.Concrete:
+it contains no type-family applications or type variables.)
+
+To answer this question, we have 'tcHasFixedRuntimeRep'.
+If 'tcHasFixedRuntimeRep' returns 'True', it means we're sure that
+every saturated application of `T` has a fixed RuntimeRep.
+However, if it returns 'False', we don't know: perhaps some application might not
+have a fixed RuntimeRep.
+
+Examples:
+
+  - For type families, we won't know in general whether an application
+    will have a fixed RuntimeRep:
+
+      type F :: k -> k
+      type family F a where {..}
+
+    `tcHasFixedRuntimeRep F = False'
+
+  - For newtypes, we're usually OK:
+
+      newtype N a b c = MkN Int
+
+    No matter what arguments we apply `N` to, we always get something of
+    kind `Type`, which has a fixed RuntimeRep.
+    Thus `tcHasFixedRuntimeRep N = True`.
+
+    However, with `-XUnliftedNewtypes`, we can have representation-polymorphic
+    newtypes:
+
+      type UN :: TYPE rep -> TYPE rep
+      newtype UN a = MkUN a
+
+    `tcHasFixedRuntimeRep UN = False`
+
+    For example, `UN @Int8Rep Int8#` is represented by an 8-bit value,
+    while `UN @LiftedRep Int` is represented by a heap pointer.
+
+    To distinguish whether we are dealing with a representation-polymorphic newtype,
+    we keep track of which situation we are in using the 'nt_fixed_rep'
+    field of the 'NewTyCon' constructor of 'AlgTyConRhs', and read this field
+    to compute 'tcHasFixedRuntimeRep'.
+
+  - A similar story can be told for datatypes: we're usually OK,
+    except with `-XUnliftedDatatypes` which allows for levity polymorphism,
+    e.g.:
+
+      type UC :: TYPE (BoxedRep l) -> TYPE (BoxedRep l)
+      type UC a = MkUC a
+
+    `tcHasFixedRuntimeRep UC = False`
+
+    Here, we keep track of whether we are dealing with a levity-polymorphic
+    unlifted datatype using the 'data_fixed_lev' field of the 'DataTyCon'
+    constructor of 'AlgTyConRhs'.
+
+    N.B.: technically, the representation of a datatype is fixed,
+    as it is always a pointer. However, we currently require that we
+    know the specific `RuntimeRep`: knowing that it's `BoxedRep l`
+    for a type-variable `l` isn't enough. See #15532.
 -}
 
 -- | Represents right-hand-sides of 'TyCon's for algebraic types
@@ -1040,8 +1122,21 @@ data AlgTyConRhs
                           -- tag (see the tag assignment in mkTyConTagMap)
         data_cons_size :: Int,
                           -- ^ Cached value: length data_cons
-        is_enum :: Bool   -- ^ Cached value: is this an enumeration type?
+        is_enum :: Bool,  -- ^ Cached value: is this an enumeration type?
                           --   See Note [Enumeration types]
+        data_fixed_lev :: Bool
+                        -- ^ 'True' if the data type constructor has
+                        -- a known, fixed levity when fully applied
+                        -- to its arguments, False otherwise.
+                        --
+                        -- This can only be 'False' with UnliftedDatatypes,
+                        -- e.g.
+                        --
+                        -- > data A :: TYPE (BoxedRep l) where { MkA :: Int -> A }
+                        --
+                        -- This boolean is cached to make it cheaper to check
+                        -- for levity and representation-polymorphism in
+                        -- tcHasFixedRuntimeRep.
     }
 
   | TupleTyCon {                   -- A boxed, unboxed, or constraint tuple
@@ -1085,35 +1180,49 @@ data AlgTyConRhs
                              -- See Note [Newtype eta]
                              -- Watch out!  If any newtypes become transparent
                              -- again check #1072.
-        nt_lev_poly :: Bool
-                        -- 'True' if the newtype can be
-                        -- representation-polymorphic when fully applied to its
-                        -- arguments, 'False' otherwise.
-                        -- This can only ever be 'True' with UnliftedNewtypes.
+        nt_fixed_rep :: Bool
+                        -- ^ 'True' if the newtype has a know, fixed representation
+                        -- when fully applied to its arguments, 'False' otherwise.
+                        -- This can only ever be 'False' with UnliftedNewtypes.
                         --
-                        -- Invariant: nt_lev_poly nt = isTypeLevPoly (nt_rhs nt)
+                        -- Example:
                         --
-                        -- This is cached to make it cheaper to check if a
-                        -- variable binding is representation-polymorphic,
-                        -- as used by isTcLevPoly.
+                        -- > newtype N (a :: TYPE r) = MkN a
+                        --
+                        -- Invariant: nt_fixed_rep nt = tcHasFixedRuntimeRep (nt_rhs nt)
+                        --
+                        -- This boolean is cached to make it cheaper to check if a
+                        -- variable binding is representation-polymorphic
+                        -- in tcHasFixedRuntimeRep.
     }
 
 mkSumTyConRhs :: [DataCon] -> AlgTyConRhs
 mkSumTyConRhs data_cons = SumTyCon data_cons (length data_cons)
 
-mkDataTyConRhs :: [DataCon] -> AlgTyConRhs
-mkDataTyConRhs cons
+-- | Create an 'AlgTyConRhs' from the data constructors,
+-- for a potentially levity-polymorphic datatype (with `UnliftedDatatypes`).
+mkLevPolyDataTyConRhs :: Bool -- ^ whether the 'DataCon' has a fixed levity
+                      -> [DataCon]
+                      -> AlgTyConRhs
+mkLevPolyDataTyConRhs fixed_lev cons
   = DataTyCon {
         data_cons = cons,
         data_cons_size = length cons,
-        is_enum = not (null cons) && all is_enum_con cons
+        is_enum = not (null cons) && all is_enum_con cons,
                   -- See Note [Enumeration types] in GHC.Core.TyCon
+        data_fixed_lev = fixed_lev
     }
   where
     is_enum_con con
        | (_univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _res)
            <- dataConFullSig con
        = null ex_tvs && null eq_spec && null theta && null arg_tys
+
+-- | Create an 'AlgTyConRhs' from the data constructors.
+--
+-- Use 'mkLevPolyDataConRhs' if the datatype can be levity-polymorphic.
+mkDataTyConRhs :: [DataCon] -> AlgTyConRhs
+mkDataTyConRhs = mkLevPolyDataTyConRhs False
 
 -- | Some promoted datacons signify extra info relevant to GHC. For example,
 -- the @IntRep@ constructor of @RuntimeRep@ corresponds to the 'IntRep'
@@ -1862,7 +1971,8 @@ noTcTyConScopedTyVars = []
 
 -- | Create an unlifted primitive 'TyCon', such as @Int#@.
 mkPrimTyCon :: Name -> [TyConBinder]
-            -> Kind   -- ^ /result/ kind, never representation-polymorphic
+            -> Kind   -- ^ /result/ kind
+                      -- Must answer 'True' to 'isFixedRuntimeRepKind' (no representation polymorphism).
             -> [Role] -> TyCon
 mkPrimTyCon name binders res_kind roles
   = mkPrimTyCon' name binders res_kind roles True (mkPrelTyConRepName name)
@@ -1885,9 +1995,10 @@ mkLiftedPrimTyCon name binders res_kind roles
   where rep_nm = mkPrelTyConRepName name
 
 mkPrimTyCon' :: Name -> [TyConBinder]
-             -> Kind    -- ^ /result/ kind, never representation-polymorphic
+             -> Kind    -- ^ /result/ kind
+                        -- Must answer 'True' to 'isFixedRuntimeRepKind' (i.e., no representation polymorphism).
                         -- (If you need a representation-polymorphic PrimTyCon,
-                        -- change isTcLevPoly.)
+                        -- change tcHasFixedRuntimeRep.)
              -> [Role]
              -> Bool -> TyConRepName -> TyCon
 mkPrimTyCon' name binders res_kind roles is_unlifted rep_nm
@@ -1981,7 +2092,7 @@ isFunTyCon _             = False
 
 -- | Test if the 'TyCon' is algebraic but abstract (invisible data constructors)
 isAbstractTyCon :: TyCon -> Bool
-isAbstractTyCon (AlgTyCon { algTcRhs = AbstractTyCon }) = True
+isAbstractTyCon (AlgTyCon { algTcRhs = AbstractTyCon {} }) = True
 isAbstractTyCon _ = False
 
 -- | Does this 'TyCon' represent something that cannot be defined in Haskell?
@@ -2360,25 +2471,61 @@ setTcTyConKind tc@(TcTyCon {}) kind = let tc' = tc { tyConKind = kind
                                       in tc'
 setTcTyConKind tc              _    = pprPanic "setTcTyConKind" (ppr tc)
 
--- | Could this TyCon ever be representation-polymorphic when fully applied?
--- True is safe. False means we're sure. Does only a quick check
--- based on the TyCon's category.
--- Precondition: The fully-applied TyCon has kind (TYPE blah)
-isTcLevPoly :: TyCon -> Bool
-isTcLevPoly FunTyCon{}           = False
-isTcLevPoly (AlgTyCon { algTcParent = parent, algTcRhs = rhs })
+-- | Does this 'TyCon' have a fixed RuntimeRep when fully applied,
+-- as per Note [Fixed RuntimeRep] in GHC.Tc.Utils.Concrete?
+--
+-- False is safe. True means we're sure.
+-- Does only a quick check, based on the TyCon's category.
+--
+-- See Note [Representation-polymorphic TyCons]
+tcHasFixedRuntimeRep :: TyCon -> Bool
+tcHasFixedRuntimeRep FunTyCon{}           = True
+tcHasFixedRuntimeRep (AlgTyCon { algTcParent = parent, algTcRhs = rhs })
   | UnboxedAlgTyCon _ <- parent
-  = True
-  | NewTyCon { nt_lev_poly = lev_poly } <- rhs
-  = lev_poly -- Newtypes can be representation-polymorphic
-             -- with UnliftedNewtypes (#17360)
-  | otherwise
   = False
-isTcLevPoly SynonymTyCon{}       = True
-isTcLevPoly FamilyTyCon{}        = True
-isTcLevPoly PrimTyCon{}          = False
-isTcLevPoly TcTyCon{}            = False
-isTcLevPoly tc@PromotedDataCon{} = pprPanic "isTcLevPoly datacon" (ppr tc)
+  | NewTyCon { nt_fixed_rep = fixed_rep } <- rhs
+  = fixed_rep -- A newtype might not have a fixed runtime representation
+              -- with UnliftedNewtypes (#17360)
+  | DataTyCon { data_fixed_lev = fixed_lev } <- rhs
+  = fixed_lev -- A datatype might not have a fixed levity with UnliftedDatatypes (#20423).
+              -- NB: the current representation-polymorphism checks require that
+              -- the representation be fully-known, including levity variables.
+              -- This might be relaxed in the future (#15532).
+  | AbstractTyCon {} <- rhs
+  = False -- An abstract TyCon might not have a fixed runtime representation.
+          -- Note that this is an entirely different matter from the concreteness
+          -- of the 'TyCon', in the sense of 'isConcreteTyCon'.
+  | otherwise
+  = True
+tcHasFixedRuntimeRep SynonymTyCon{}       = False
+tcHasFixedRuntimeRep FamilyTyCon{}        = False
+tcHasFixedRuntimeRep PrimTyCon{}          = True
+tcHasFixedRuntimeRep TcTyCon{}            = False
+tcHasFixedRuntimeRep tc@PromotedDataCon{} = pprPanic "tcHasFixedRuntimeRep datacon" (ppr tc)
+
+-- | Is this 'TyCon' concrete (i.e. not a synonym/type family)?
+--
+-- Used for representation polymorphism checks.
+isConcreteTyCon :: TyCon -> Bool
+isConcreteTyCon = isConcreteTyConFlavour . tyConFlavour
+
+-- | Is this 'TyConFlavour' concrete (i.e. not a synonym/type family)?
+--
+-- Used for representation polymorphism checks.
+isConcreteTyConFlavour :: TyConFlavour -> Bool
+isConcreteTyConFlavour = \case
+  ClassFlavour             -> True
+  TupleFlavour {}          -> True
+  SumFlavour               -> True
+  DataTypeFlavour          -> True
+  NewtypeFlavour           -> True
+  AbstractTypeFlavour      -> True  -- See (3) in Note [Solving Concrete# constraints] in GHC.Tc.Utils.Concrete
+  DataFamilyFlavour {}     -> False -- See
+  OpenTypeFamilyFlavour {} -> False
+  ClosedTypeFamilyFlavour  -> False
+  TypeSynonymFlavour       -> False
+  BuiltInTypeFlavour       -> True
+  PromotedDataConFlavour   -> True
 
 {-
 -----------------------------------------------
@@ -2758,7 +2905,7 @@ tcFlavourMustBeSaturated NewtypeFlavour          = False
 tcFlavourMustBeSaturated DataFamilyFlavour{}     = False
 tcFlavourMustBeSaturated TupleFlavour{}          = False
 tcFlavourMustBeSaturated SumFlavour              = False
-tcFlavourMustBeSaturated AbstractTypeFlavour     = False
+tcFlavourMustBeSaturated AbstractTypeFlavour {}  = False
 tcFlavourMustBeSaturated BuiltInTypeFlavour      = False
 tcFlavourMustBeSaturated PromotedDataConFlavour  = False
 tcFlavourMustBeSaturated TypeSynonymFlavour      = True
@@ -2775,7 +2922,7 @@ tcFlavourIsOpen DataTypeFlavour         = False
 tcFlavourIsOpen NewtypeFlavour          = False
 tcFlavourIsOpen TupleFlavour{}          = False
 tcFlavourIsOpen SumFlavour              = False
-tcFlavourIsOpen AbstractTypeFlavour     = False
+tcFlavourIsOpen AbstractTypeFlavour {}  = False
 tcFlavourIsOpen BuiltInTypeFlavour      = False
 tcFlavourIsOpen PromotedDataConFlavour  = False
 tcFlavourIsOpen TypeSynonymFlavour      = False

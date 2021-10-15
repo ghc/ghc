@@ -2,6 +2,7 @@
 {-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE GADTs               #-}
+{-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies        #-}
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
@@ -21,13 +22,21 @@ module GHC.Tc.Gen.App
 
 import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcPolyExpr )
 
-import GHC.Builtin.Types (multiplicityTy)
+import GHC.Types.Basic ( Arity )
+import GHC.Types.Id ( idArity, idName, hasNoBinding )
+import GHC.Types.Name ( isWiredInName )
+import GHC.Types.Var
+import GHC.Builtin.Types ( multiplicityTy )
+import GHC.Core.ConLike  ( ConLike(..) )
+import GHC.Core.DataCon ( dataConRepArity
+                        , isNewDataCon, isUnboxedSumDataCon, isUnboxedTupleDataCon )
 import GHC.Tc.Gen.Head
 import GHC.Hs
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Utils.Instantiate
+import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep )
 import GHC.Tc.Instance.Family ( tcGetFamInstEnvs, tcLookupDataFamInst_maybe )
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Utils.TcMType
@@ -317,6 +326,22 @@ tcApp rn_expr exp_res_ty
        ; do_ql <- wantQuickLook rn_fun
        ; (delta, inst_args, app_res_rho) <- tcInstFun do_ql True fun fun_sigma rn_args
 
+       -- Check for representation polymorphism in the case that
+       -- the head of the application is a primop or data constructor
+       -- which has argument types that are representation-polymorphic.
+       -- This amounts to checking that the leftover argument types,
+       -- up until the arity, are not representation-polymorphic,
+       -- so that we can perform eta-expansion later without introducing
+       -- representation-polymorphic binders.
+       --
+       -- See Note [Checking for representation-polymorphic built-ins]
+       ; traceTc "tcApp FRR" $
+           vcat
+             [ text "tc_fun =" <+> ppr tc_fun
+             , text "inst_args =" <+> ppr inst_args
+             , text "app_res_rho =" <+> ppr app_res_rho ]
+       ; hasFixedRuntimeRep_remainingValArgs inst_args app_res_rho tc_fun
+
        -- Quick look at result
        ; app_res_rho <- if do_ql
                         then quickLookResultType delta app_res_rho exp_res_ty
@@ -353,13 +378,220 @@ tcApp rn_expr exp_res_ty
        -- Typecheck the value arguments
        ; tc_args <- tcValArgs do_ql inst_args
 
-       -- Reconstruct, with special case for tagToEnum#
-       ; tc_expr <- if isTagToEnum rn_fun
-                    then tcTagToEnum tc_fun fun_ctxt tc_args app_res_rho
-                    else return (rebuildHsApps tc_fun fun_ctxt tc_args)
+       -- Reconstruct, with a special cases for tagToEnum#.
+       ; tc_expr <-
+          if isTagToEnum rn_fun
+          then tcTagToEnum tc_fun fun_ctxt tc_args app_res_rho
+          else do return (rebuildHsApps tc_fun fun_ctxt tc_args)
 
        -- Wrap the result
        ; return (mkHsWrapCo res_co tc_expr) }
+
+{-
+Note [Checking for representation-polymorphic built-ins]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We cannot have representation-polymorphic or levity-polymorphic
+function arguments. See Note [Representation polymorphism invariants]
+in GHC.Core.  That is checked by the calls to `hasFixedRuntimeRep ` in
+`tcEValArg`.
+
+But some /built-in/ functions are representation-polymorphic.  Users
+can't define such Ids; they are all GHC built-ins or data
+constructors.  Specifically they are:
+
+1. A few wired-in Ids like unsafeCoerce#, with compulsory unfoldings.
+2. Primops, such as raise#
+3. Newtype constructors with `UnliftedNewtypes` that have
+   a representation-polymorphic argument.
+4. Representation-polymorphic data constructors: unboxed tuples
+   and unboxed sums.
+
+For (1) consider
+  badId :: forall r (a :: TYPE r). a -> a
+  badId = unsafeCoerce# @r @r @a @a
+
+The wired-in function
+  unsafeCoerce# :: forall (r1 :: RuntimeRep) (r2 :: RuntimeRep)
+                   (a :: TYPE r1) (b :: TYPE r2).
+                   a -> b
+has a convenient but representation-polymorphic type. It has no
+binding; instead it has a compulsory unfolding, after which we
+would have
+  badId = /\r /\(a :: TYPE r). \(x::a). ...body of unsafeCorece#...
+And this is no good because of that rep-poly \(x::a).  So we want
+to reject this.
+
+On the other hand
+  goodId :: forall (a :: Type). a -> a
+  goodId = unsafeCoerce# @LiftedRep @LiftedRep @a @a
+
+is absolutely fine, because after we inline the unfolding, the \(x::a)
+is representation-monomorphic.
+
+Test cases: T14561, RepPolyWrappedVar2.
+
+For primops (2) the situation is similar; they are eta-expanded in
+CorePrep to be saturated, and that eta-expansion must not add a
+representation-polymorphic lambda.
+
+Test cases: T14561b, RepPolyWrappedVar, UnliftedNewtypesCoerceFail.
+
+For (3), consider a representation-polymorphic newtype with
+UnliftedNewtypes:
+
+  type Id :: forall r. TYPE r -> TYPE r
+  newtype Id a where { MkId :: a }
+
+  bad :: forall r (a :: TYPE r). a -> Id a
+  bad = MkId @r @a             -- Want to reject
+
+  good :: forall (a :: Type). a -> Id a
+  good = MkId @LiftedRep @a   -- Want to accept
+
+Test cases: T18481, UnliftedNewtypesLevityBinder
+
+So these three cases need special treatment. We add a special case
+in tcApp to check whether an application of an Id has any remaining
+representation-polymorphic arguments, after instantiation and application
+of previous arguments.  This is achieved by the hasFixedRuntimeRep_remainingValArgs
+function, which computes the types of the remaining value arguments, and checks
+that each of these have a fixed runtime representation using hasFixedRuntimeRep.
+
+Wrinkles
+
+* Because of Note [Typechecking data constructors] in GHC.Tc.Gen.Head,
+  we desugar a representation-polymorphic data constructor application
+  like this:
+     (/\(r :: RuntimeRep) (a :: TYPE r) \(x::a). K r a x) @LiftedRep Int 4
+  That is, a rep-poly lambda applied to arguments that instantiate it in
+  a rep-mono way.  It's a bit like a compulsory unfolding that has been
+  inlined, but not yet beta-reduced.
+
+  Because we want to accept this, we switch off Lint's representation
+  polymorphism checks when Lint checks the output of the desugarer;
+  see the lf_check_fixed_repy flag in GHC.Core.Lint.lintCoreBindings.
+
+* Arity.  We don't want to check for arguments past the
+  arity of the function.  For example
+
+      raise# :: forall {r :: RuntimeRep} (a :: Type) (b :: TYPE r). a -> b
+
+  has arity 1, so an instantiation such as:
+
+      foo :: forall w r (z :: TYPE r). w -> z -> z
+      foo = raise# @w @(z -> z)
+
+  is unproblematic.  This means we must take care not to perform a
+  representation-polymorphism check on `z`.
+
+  To achieve this, we consult the arity of the 'Id' which is the head
+  of the application (or just use 1 for a newtype constructor),
+  and keep track of how many value-level arguments we have seen,
+  to ensure we stop checking once we reach the arity.
+  This is slightly complicated by the need to include both visible
+  and invisible arguments, as the arity counts both:
+  see GHC.Tc.Gen.Head.countVisAndInvisValArgs.
+
+  Test cases: T20330{a,b}
+
+-}
+
+-- | Check for representation-polymorphism in the remaining argument types
+-- of a variable or data constructor, after it has been instantiated and applied to some arguments.
+--
+-- See Note [Checking for representation-polymorphic built-ins]
+hasFixedRuntimeRep_remainingValArgs :: [HsExprArg 'TcpInst] -> TcRhoType -> HsExpr GhcTc -> TcM ()
+hasFixedRuntimeRep_remainingValArgs applied_args app_res_rho = \case
+
+  HsVar _ (L _ fun_id)
+
+    -- (1): unsafeCoerce#
+    -- 'unsafeCoerce#' is peculiar: it is patched in manually as per
+    -- Note [Wiring in unsafeCoerce#] in GHC.HsToCore.
+    -- Unfortunately, even though its arity is set to 1 in GHC.HsToCore.mkUnsafeCoercePrimPair,
+    -- at this stage, if we query idArity, we get 0. This is because
+    -- we end up looking at the non-patched version of unsafeCoerce#
+    -- defined in Unsafe.Coerce, and that one indeed has arity 0.
+    --
+    -- We thus manually specify the correct arity of 1 here.
+    | idName fun_id == unsafeCoercePrimName
+    -> check_thing fun_id 1 (FRRNoBindingResArg fun_id)
+
+    -- (2): primops and other wired-in representation-polymorphic functions,
+    -- such as 'rightSection', 'oneShot', etc; see bindings with Compulsory unfoldings
+    -- in GHC.Types.Id.Make
+    | isWiredInName (idName fun_id) && hasNoBinding fun_id
+    -> check_thing fun_id (idArity fun_id) (FRRNoBindingResArg fun_id)
+       -- NB: idArity consults the IdInfo of the Id. This can be a problem
+       -- in the presence of hs-boot files, as we might not have finished
+       -- typechecking; inspecting the IdInfo at this point can cause
+       -- strange Core Lint errors (see #20447).
+       -- We avoid this entirely by only checking wired-in names,
+       -- as those are the only ones this check is applicable to anyway.
+
+
+  XExpr (ConLikeTc (RealDataCon con) _ _)
+  -- (3): Representation-polymorphic newtype constructors.
+    | isNewDataCon con
+  -- (4): Unboxed tuples and unboxed sums
+    || isUnboxedTupleDataCon con
+    || isUnboxedSumDataCon con
+    -> check_thing con (dataConRepArity con) (FRRDataConArg con)
+
+  _ -> return ()
+
+  where
+    nb_applied_vis_val_args :: Int
+    nb_applied_vis_val_args = count isHsValArg applied_args
+
+    nb_applied_val_args :: Int
+    nb_applied_val_args = countVisAndInvisValArgs applied_args
+
+    arg_tys :: [TyCoBinder]
+    arg_tys = fst $ splitPiTys app_res_rho
+    -- We do not need to zonk app_res_rho first, because the number of arrows
+    -- in the (possibly instantiated) inferred type of the function will
+    -- be at least the arity of the function.
+
+    check_thing :: Outputable thing => thing -> Arity -> (Int -> FRROrigin) -> TcM ()
+    check_thing thing arity mk_frr_orig = do
+      traceTc "tcApp remainingValArgs check_thing" (debug_msg thing arity)
+      go (nb_applied_vis_val_args + 1) (nb_applied_val_args + 1) arg_tys
+      where
+        go :: Int -- ^ visible value argument index
+                  -- (only used to report the argument position in error messages)
+           -> Int -- ^ value argument index
+                  -- used to count up to the arity to ensure we don't check too many argument types
+           -> [TyCoBinder]
+           -> TcM ()
+        go _ i_val _
+          | i_val > arity
+          = return ()
+        go _ _ []
+          -- Should never happen: it would mean that the arity is higher
+          -- than the number of arguments apparent from the type
+          = pprPanic "hasFixedRuntimeRep_remainingValArgs" (debug_msg thing arity)
+        go i_visval !i_val (Anon af (Scaled _ arg_ty) : tys)
+          = case af of
+              InvisArg ->
+                go i_visval (i_val + 1) tys
+              VisArg   -> do
+                _concrete_ev <- hasFixedRuntimeRep (mk_frr_orig i_visval) arg_ty
+                go (i_visval + 1) (i_val + 1) tys
+        go i_visval i_val (_: tys)
+          = go i_visval i_val tys
+
+    -- A message containing all the relevant info, in case this functions
+    -- needs to be debugged again at some point.
+    debug_msg :: Outputable thing => thing -> Arity -> SDoc
+    debug_msg thing arity =
+      vcat
+        [ text "thing =" <+> ppr thing
+        , text "arity =" <+> ppr arity
+        , text "applied_args =" <+> ppr applied_args
+        , text "nb_applied_vis_val_args =" <+> ppr nb_applied_vis_val_args
+        , text "nb_applied_val_args =" <+> ppr nb_applied_val_args
+        , text "arg_tys =" <+> ppr arg_tys ]
 
 --------------------
 wantQuickLook :: HsExpr GhcRn -> TcM Bool
@@ -438,9 +670,10 @@ tcEValArg :: AppCtxt -> EValArg 'TcpInst -> TcSigmaType -> TcM (LHsExpr GhcTc)
 tcEValArg ctxt (ValArg larg@(L arg_loc arg)) exp_arg_sigma
   = addArgCtxt ctxt larg $
     do { arg' <- tcPolyExpr arg (mkCheckExpType exp_arg_sigma)
+       ; _concrete_ev <- hasFixedRuntimeRep (FRRApp arg) exp_arg_sigma
        ; return (L arg_loc arg') }
 
-tcEValArg ctxt (ValArgQL { va_expr = larg@(L arg_loc _)
+tcEValArg ctxt (ValArgQL { va_expr = larg@(L arg_loc arg)
                          , va_fun = (inner_fun, fun_ctxt)
                          , va_args = inner_args
                          , va_ty = app_res_rho }) exp_arg_sigma
@@ -448,6 +681,7 @@ tcEValArg ctxt (ValArgQL { va_expr = larg@(L arg_loc _)
     do { traceTc "tcEValArgQL {" (vcat [ ppr inner_fun <+> ppr inner_args ])
        ; tc_args <- tcValArgs True inner_args
        ; co      <- unifyType Nothing app_res_rho exp_arg_sigma
+       ; _concrete_ev <- hasFixedRuntimeRep (FRRApp arg) exp_arg_sigma
        ; traceTc "tcEValArg }" empty
        ; return (L arg_loc $ mkHsWrapCo co $
                  rebuildHsApps inner_fun fun_ctxt tc_args) }

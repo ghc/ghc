@@ -1,0 +1,46 @@
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE RoleAnnotations #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
+{-# LANGUAGE UnliftedDatatypes #-}
+
+unit number-unknown where
+  signature NumberUnknown where
+    import GHC.Types
+    import GHC.Exts
+    data Rep (l :: Levity) :: RuntimeRep
+    data Number l :: TYPE (Rep l)
+    fromInt :: Int -> Number l
+    internal_toInt :: Number Lifted -> Int
+    -- representation-polymorphism in return position: no problem
+  module SomeNumber where
+    import GHC.Types
+    import NumberUnknown
+    someNumber :: proxy l -> Number l
+    someNumber _ = fromInt 1728
+    toInt :: Number Lifted -> Int
+    toInt = internal_toInt
+
+unit number-int where
+  module NumberUnknown where
+    import GHC.Types
+    type Rep = 'BoxedRep
+
+    type Number :: forall (l :: Levity) -> TYPE (Rep l)
+    data Number l = MkNumber Int
+    type role Number nominal
+
+    fromInt :: Int -> Number l
+    fromInt = MkNumber
+    internal_toInt (MkNumber i) = i
+
+unit main where
+  dependency number-unknown[NumberUnknown=number-int:NumberUnknown]
+  module Main where
+    import SomeNumber
+    import Data.Proxy
+    import GHC.Exts
+    main =
+      case someNumber (Proxy @Lifted) of
+        number -> print (toInt number)

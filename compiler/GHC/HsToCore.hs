@@ -648,7 +648,7 @@ or (Core)
             (x |> (GRefl :: a ~# (a |> TYPE co1)) ; co2)
 
 It looks like we can write this in Haskell directly, but we can't:
-the reprsentation polymorphism checks defeat us. Note that `x` is a
+the representation polymorphism checks defeat us. Note that `x` is a
 representation-polymorphic variable. So we must wire it in with a
 compulsory unfolding, like other representation-polymorphic primops.
 
@@ -755,10 +755,13 @@ mkUnsafeCoercePrimPair _old_id old_expr
 
              info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma
                                 `setUnfoldingInfo` mkCompulsoryUnfolding' rhs
+                                `setArityInfo`     arity
 
              ty = mkSpecForAllTys [ runtimeRep1TyVar, runtimeRep2TyVar
                                   , openAlphaTyVar, openBetaTyVar ] $
                   mkVisFunTyMany openAlphaTy openBetaTy
+
+             arity = 1
 
              id   = mkExportedVanillaId unsafeCoercePrimName ty `setIdInfo` info
        ; return (id, old_expr) }

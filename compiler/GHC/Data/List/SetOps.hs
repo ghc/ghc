@@ -18,7 +18,7 @@ module GHC.Data.List.SetOps (
         Assoc, assoc, assocMaybe, assocUsing, assocDefault, assocDefaultUsing,
 
         -- Duplicate handling
-        hasNoDups, removeDups, findDupsEq,
+        hasNoDups, removeDups, nubOrdBy, findDupsEq,
         equivClasses,
 
         -- Indexing
@@ -160,6 +160,11 @@ equivClasses cmp items   = NE.groupBy eq (L.sortBy cmp items)
   where
     eq a b = case cmp a b of { EQ -> True; _ -> False }
 
+-- | Remove the duplicates from a list using the provided
+-- comparison function.
+--
+-- Returns the list without duplicates, and accumulates
+-- all the duplicates in the second component of its result.
 removeDups :: (a -> a -> Ordering) -- Comparison function
            -> [a]
            -> ([a],          -- List with no duplicates
@@ -175,6 +180,11 @@ removeDups cmp xs
     collect_dups :: [NonEmpty a] -> NonEmpty a -> ([NonEmpty a], a)
     collect_dups dups_so_far (x :| [])     = (dups_so_far,      x)
     collect_dups dups_so_far dups@(x :| _) = (dups:dups_so_far, x)
+
+-- | Remove the duplicates from a list using the provided
+-- comparison function.
+nubOrdBy :: (a -> a -> Ordering) -> [a] -> [a]
+nubOrdBy cmp xs = fst (removeDups cmp xs)
 
 findDupsEq :: (a->a->Bool) -> [a] -> [NonEmpty a]
 findDupsEq _  [] = []

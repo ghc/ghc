@@ -41,6 +41,7 @@ import GHC.Tc.Utils.TcType
 import GHC.Types.Var
 import GHC.Types.Var.Env
 
+import GHC.Core.Class (Class(..))
 import GHC.Core.Reduction
 import GHC.Core.Predicate
 import GHC.Core.TyCo.FVs
@@ -1235,7 +1236,10 @@ addInertItem tc_lvl ics@(IC { inert_irreds = irreds }) item@(CIrredCan {})
     ics { inert_irreds = irreds `snocBag` item }
 
 addInertItem _ ics item@(CDictCan { cc_class = cls, cc_tyargs = tys })
-  = ics { inert_dicts = addDictCt (inert_dicts ics) cls tys item }
+  = ics { inert_dicts = addDictCt (inert_dicts ics) (classTyCon cls) tys item }
+
+addInertItem _ ics@( IC { inert_irreds = irreds }) item@(CSpecialCan {})
+  = ics { inert_irreds = irreds `snocBag` item }
 
 addInertItem _ _ item
   = pprPanic "upd_inert set: can't happen! Inserting " $

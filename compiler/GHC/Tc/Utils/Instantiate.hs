@@ -69,12 +69,13 @@ import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.Env
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Instance.FunDeps
+import GHC.Tc.Utils.Concrete
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Errors.Types
 
 import GHC.Types.Id.Make( mkDictFunId )
-import GHC.Types.Basic ( TypeOrKind(..) )
+import GHC.Types.Basic ( TypeOrKind(..), Arity )
 import GHC.Types.Error
 import GHC.Types.SourceText
 import GHC.Types.SrcLoc as SrcLoc
@@ -95,7 +96,7 @@ import GHC.Unit.External
 
 import Data.List ( mapAccumL )
 import qualified Data.List.NonEmpty as NE
-import Control.Monad( unless )
+import Control.Monad( when, unless, void )
 import Data.Function ( on )
 
 {-
@@ -740,10 +741,10 @@ just use the expression inline.
 -}
 
 tcSyntaxName :: CtOrigin
-             -> TcType                 -- ^ Type to instantiate it at
-             -> (Name, HsExpr GhcRn)   -- ^ (Standard name, user name)
+             -> TcType                  -- ^ Type to instantiate it at
+             -> (Name, HsExpr GhcRn)    -- ^ (Standard name, user name)
              -> TcM (Name, HsExpr GhcTc)
-                                       -- ^ (Standard name, suitable expression)
+                                        -- ^ (Standard name, suitable expression)
 -- USED ONLY FOR CmdTop (sigh) ***
 -- See Note [CmdSyntaxTable] in "GHC.Hs.Expr"
 
@@ -755,31 +756,65 @@ tcSyntaxName orig ty (std_nm, HsVar _ (L _ user_nm))
 tcSyntaxName orig ty (std_nm, user_nm_expr) = do
     std_id <- tcLookupId std_nm
     let
-        -- C.f. newMethodAtLoc
         ([tv], _, tau) = tcSplitSigmaTy (idType std_id)
         sigma1         = substTyWith [tv] [ty] tau
         -- Actually, the "tau-type" might be a sigma-type in the
         -- case of locally-polymorphic methods.
 
-    addErrCtxtM (syntaxNameCtxt user_nm_expr orig sigma1) $ do
+    span <- getSrcSpanM
+    addErrCtxtM (syntaxNameCtxt user_nm_expr orig sigma1 span) $ do
 
         -- Check that the user-supplied thing has the
         -- same type as the standard one.
         -- Tiresome jiggling because tcCheckSigma takes a located expression
-     span <- getSrcSpanM
      expr <- tcCheckPolyExpr (L (noAnnSrcSpan span) user_nm_expr) sigma1
+     hasFixedRuntimeRepRes std_nm user_nm_expr sigma1
      return (std_nm, unLoc expr)
 
-syntaxNameCtxt :: HsExpr GhcRn -> CtOrigin -> Type -> TidyEnv
+syntaxNameCtxt :: HsExpr GhcRn -> CtOrigin -> Type -> SrcSpan -> TidyEnv
                -> TcRn (TidyEnv, SDoc)
-syntaxNameCtxt name orig ty tidy_env
-  = do { inst_loc <- getCtLocM orig (Just TypeLevel)
-       ; let msg = vcat [ text "When checking that" <+> quotes (ppr name)
+syntaxNameCtxt name orig ty loc tidy_env = return (tidy_env, msg)
+  where
+    msg = vcat [ text "When checking that" <+> quotes (ppr name)
                           <+> text "(needed by a syntactic construct)"
-                        , nest 2 (text "has the required type:"
-                                  <+> ppr (tidyType tidy_env ty))
-                        , nest 2 (pprCtLoc inst_loc) ]
-       ; return (tidy_env, msg) }
+               , nest 2 (text "has the required type:"
+                         <+> ppr (tidyType tidy_env ty))
+               , nest 2 (sep [ppr orig, text "at" <+> ppr loc])]
+
+{-
+************************************************************************
+*                                                                      *
+                FixedRuntimeRep
+*                                                                      *
+************************************************************************
+-}
+
+-- | Check that the result type of an expression has a fixed runtime representation.
+--
+-- Used only for arrow operations such as 'arr', 'first', etc.
+hasFixedRuntimeRepRes :: Name -> HsExpr GhcRn -> TcSigmaType -> TcM ()
+hasFixedRuntimeRepRes std_nm user_expr ty = mapM_ do_check mb_arity
+  where
+   do_check :: Arity -> TcM ()
+   do_check arity =
+     let res_ty = nTimes arity (snd . splitPiTy) ty
+     in void $ hasFixedRuntimeRep (FRRArrow $ ArrowFun user_expr) res_ty
+   mb_arity :: Maybe Arity
+   mb_arity -- arity of the arrow operation, counting type-level arguments
+     | std_nm == arrAName     -- result used as an argument in, e.g., do_premap
+     = Just 3
+     | std_nm == composeAName -- result used as an argument in, e.g., dsCmdStmt/BodyStmt
+     = Just 5
+     | std_nm == firstAName   -- result used as an argument in, e.g., dsCmdStmt/BodyStmt
+     = Just 4
+     | std_nm == appAName     -- result used as an argument in, e.g., dsCmd/HsCmdArrApp/HsHigherOrderApp
+     = Just 2
+     | std_nm == choiceAName  -- result used as an argument in, e.g., HsCmdIf
+     = Just 5
+     | std_nm == loopAName    -- result used as an argument in, e.g., HsCmdIf
+     = Just 4
+     | otherwise
+     = Nothing
 
 {-
 ************************************************************************
@@ -827,7 +862,8 @@ newClsInst overlap_mode dfun_name tvs theta clas tys
 
        ; oflag <- getOverlapFlag overlap_mode
        ; let inst = mkLocalInstance dfun oflag tvs' clas tys'
-       ; warnIf (isOrphan (is_orphan inst)) (TcRnOrphanInstance inst)
+       ; when (isOrphan (is_orphan inst)) $
+          addDiagnostic (TcRnOrphanInstance inst)
        ; return inst }
 
 tcExtendLocalInstEnv :: [ClsInst] -> TcM a -> TcM a

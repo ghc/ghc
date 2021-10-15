@@ -146,7 +146,7 @@ module GHC.Tc.Utils.TcType (
   isClassPred, isEqPrimPred, isIPLikePred, isEqPred, isEqPredClass,
   mkClassPred,
   tcSplitDFunTy, tcSplitDFunHead, tcSplitMethodTy,
-  isRuntimeRepVar, isKindLevPoly,
+  isRuntimeRepVar, isFixedRuntimeRepKind,
   isVisibleBinder, isInvisibleBinder,
 
   -- Type substitutions
@@ -1935,6 +1935,7 @@ isImprovementPred ty
       ClassPred cls _    -> classHasFds cls
       IrredPred {}       -> True -- Might have equalities after reduction?
       ForAllPred {}      -> False
+      SpecialPred {}     -> False
 
 {- Note [Expanding superclasses]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

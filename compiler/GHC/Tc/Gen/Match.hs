@@ -49,6 +49,7 @@ import GHC.Tc.Gen.Head( tcCheckId )
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Gen.Bind
+import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep )
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Evidence
@@ -226,6 +227,10 @@ tcMatches ctxt pat_tys rhs_ty (MG { mg_alts = L l matches
   = do { tcEmitBindingUsage bottomUE
        ; pat_tys <- mapM scaledExpTypeToType pat_tys
        ; rhs_ty  <- expTypeToType rhs_ty
+       ; _concrete_evs <- zipWithM
+                       (\ i (Scaled _ pat_ty) ->
+                         hasFixedRuntimeRep (FRRMatch (mc_what ctxt) i) pat_ty)
+                       [1..] pat_tys
        ; return (MG { mg_alts = L l []
                     , mg_ext = MatchGroupTc pat_tys rhs_ty
                     , mg_origin = origin }) }
@@ -236,6 +241,10 @@ tcMatches ctxt pat_tys rhs_ty (MG { mg_alts = L l matches
        ; tcEmitBindingUsage $ supUEs usages
        ; pat_tys  <- mapM readScaledExpType pat_tys
        ; rhs_ty   <- readExpType rhs_ty
+       ; _concrete_evs <- zipWithM
+                       (\ i (Scaled _ pat_ty) ->
+                         hasFixedRuntimeRep (FRRMatch (mc_what ctxt) i) pat_ty)
+                       [1..] pat_tys
        ; return (MG { mg_alts   = L l matches'
                     , mg_ext    = MatchGroupTc pat_tys rhs_ty
                     , mg_origin = origin }) }
@@ -431,6 +440,7 @@ tcGuardStmt ctxt (BindStmt _ pat rhs) res_ty thing_inside
           -- two multiplicity to still be the same.
           (rhs', rhs_ty) <- tcScalingUsage Many $ tcInferRhoNC rhs
                                    -- Stmt has a context already
+        ; _concrete_ev <- hasFixedRuntimeRep FRRBindStmtGuard rhs_ty
         ; (pat', thing)  <- tcCheckPat_O (StmtCtxt ctxt) (lexprCtOrigin rhs)
                                          pat (unrestricted rhs_ty) $
                             thing_inside res_ty
@@ -583,14 +593,16 @@ tcMcStmt _ (LastStmt x body noret return_op) res_ty thing_inside
 
 tcMcStmt ctxt (BindStmt xbsrn pat rhs) res_ty thing_inside
            -- (>>=) :: rhs_ty -> (pat_ty -> new_res_ty) -> res_ty
-  = do  { ((rhs', pat_mult, pat', thing, new_res_ty), bind_op')
+  = do  { ((rhs_ty, rhs', pat_mult, pat', thing, new_res_ty), bind_op')
             <- tcSyntaxOp MCompOrigin (xbsrn_bindOp xbsrn)
                           [SynRho, SynFun SynAny SynRho] res_ty $
                \ [rhs_ty, pat_ty, new_res_ty] [rhs_mult, fun_mult, pat_mult] ->
                do { rhs' <- tcScalingUsage rhs_mult $ tcCheckMonoExprNC rhs rhs_ty
                   ; (pat', thing) <- tcScalingUsage fun_mult $ tcCheckPat (StmtCtxt ctxt) pat (Scaled pat_mult pat_ty) $
                                      thing_inside (mkCheckExpType new_res_ty)
-                  ; return (rhs', pat_mult, pat', thing, new_res_ty) }
+                  ; return (rhs_ty, rhs', pat_mult, pat', thing, new_res_ty) }
+
+        ; _concrete_ev <- hasFixedRuntimeRep (FRRBindStmt MonadComprehension) rhs_ty
 
         -- If (but only if) the pattern can fail, typecheck the 'fail' operator
         ; fail_op' <- fmap join . forM (xbsrn_failOp xbsrn) $ \fail ->
@@ -613,17 +625,23 @@ tcMcStmt _ (BodyStmt _ rhs then_op guard_op) res_ty thing_inside
           --    guard_op :: test_ty -> rhs_ty
           --    then_op  :: rhs_ty -> new_res_ty -> res_ty
           -- Where test_ty is, for example, Bool
-        ; ((thing, rhs', rhs_ty, guard_op'), then_op')
+        ; ((thing, rhs', rhs_ty, new_res_ty, test_ty, guard_op'), then_op')
             <- tcSyntaxOp MCompOrigin then_op [SynRho, SynRho] res_ty $
                \ [rhs_ty, new_res_ty] [rhs_mult, fun_mult] ->
-               do { (rhs', guard_op')
+               do { ((rhs', test_ty), guard_op')
                       <- tcScalingUsage rhs_mult $
                          tcSyntaxOp MCompOrigin guard_op [SynAny]
                                     (mkCheckExpType rhs_ty) $
-                         \ [test_ty] [test_mult] ->
-                         tcScalingUsage test_mult $ tcCheckMonoExpr rhs test_ty
+                         \ [test_ty] [test_mult] -> do
+                           rhs' <- tcScalingUsage test_mult $ tcCheckMonoExpr rhs test_ty
+                           return $ (rhs', test_ty)
                   ; thing <- tcScalingUsage fun_mult $ thing_inside (mkCheckExpType new_res_ty)
-                  ; return (thing, rhs', rhs_ty, guard_op') }
+                  ; return (thing, rhs', rhs_ty, new_res_ty, test_ty, guard_op') }
+
+        ; _evTerm1 <- hasFixedRuntimeRep FRRBodyStmtGuard test_ty
+        ; _evTerm2 <- hasFixedRuntimeRep (FRRBodyStmt MonadComprehension 1) rhs_ty
+        ; _evTerm3 <- hasFixedRuntimeRep (FRRBodyStmt MonadComprehension 2) new_res_ty
+
         ; return (BodyStmt rhs_ty rhs' then_op' guard_op', thing) }
 
 -- Grouping statements
@@ -850,13 +868,15 @@ tcDoStmt ctxt (BindStmt xbsrn pat rhs) res_ty thing_inside
                 -- This level of generality is needed for using do-notation
                 -- in full generality; see #1537
 
-          ((rhs', pat_mult, pat', new_res_ty, thing), bind_op')
+          ((rhs_ty, rhs', pat_mult, pat', new_res_ty, thing), bind_op')
             <- tcSyntaxOp DoOrigin (xbsrn_bindOp xbsrn) [SynRho, SynFun SynAny SynRho] res_ty $
                 \ [rhs_ty, pat_ty, new_res_ty] [rhs_mult,fun_mult,pat_mult] ->
                 do { rhs' <-tcScalingUsage rhs_mult $ tcCheckMonoExprNC rhs rhs_ty
                    ; (pat', thing) <- tcScalingUsage fun_mult $ tcCheckPat (StmtCtxt ctxt) pat (Scaled pat_mult pat_ty) $
                                       thing_inside (mkCheckExpType new_res_ty)
-                   ; return (rhs', pat_mult, pat', new_res_ty, thing) }
+                   ; return (rhs_ty, rhs', pat_mult, pat', new_res_ty, thing) }
+
+        ; _concrete_ev <- hasFixedRuntimeRep (FRRBindStmt DoNotation) rhs_ty
 
         -- If (but only if) the pattern can fail, typecheck the 'fail' operator
         ; fail_op' <- fmap join . forM (xbsrn_failOp xbsrn) $ \fail ->
@@ -884,12 +904,14 @@ tcDoStmt ctxt (ApplicativeStmt _ pairs mb_join) res_ty thing_inside
 tcDoStmt _ (BodyStmt _ rhs then_op _) res_ty thing_inside
   = do  {       -- Deal with rebindable syntax;
                 --   (>>) :: rhs_ty -> new_res_ty -> res_ty
-        ; ((rhs', rhs_ty, thing), then_op')
+        ; ((rhs', rhs_ty, new_res_ty, thing), then_op')
             <- tcSyntaxOp DoOrigin then_op [SynRho, SynRho] res_ty $
                \ [rhs_ty, new_res_ty] [rhs_mult,fun_mult] ->
                do { rhs' <- tcScalingUsage rhs_mult $ tcCheckMonoExprNC rhs rhs_ty
                   ; thing <- tcScalingUsage fun_mult $ thing_inside (mkCheckExpType new_res_ty)
-                  ; return (rhs', rhs_ty, thing) }
+                  ; return (rhs', rhs_ty, new_res_ty, thing) }
+        ; _evTerm1 <- hasFixedRuntimeRep (FRRBodyStmt DoNotation 1) rhs_ty
+        ; _evTerm2 <- hasFixedRuntimeRep (FRRBodyStmt DoNotation 2) new_res_ty
         ; return (BodyStmt rhs_ty rhs' then_op' noSyntaxExpr, thing) }
 
 tcDoStmt ctxt (RecStmt { recS_stmts = L l stmts, recS_later_ids = later_names

@@ -667,6 +667,7 @@ Library
         GHC.Tc.Types.Origin
         GHC.Tc.Types.Rank
         GHC.Tc.Utils.Backpack
+        GHC.Tc.Utils.Concrete
         GHC.Tc.Utils.Env
         GHC.Tc.Utils.Instantiate
         GHC.Tc.Utils.Monad

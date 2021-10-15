@@ -30,7 +30,7 @@ module GHC.HsToCore.Utils (
         wrapBind, wrapBinds,
 
         mkErrorAppDs, mkCoreAppDs, mkCoreAppsDs, mkCastDs,
-        mkFailExpr, dsWhenNoErrs,
+        mkFailExpr,
 
         seqVar,
 
@@ -132,10 +132,10 @@ selectMatchVars ps = mapM (uncurry selectMatchVar) ps
 
 selectMatchVar :: Mult -> Pat GhcTc -> DsM Id
 -- Postcondition: the returned Id has an Internal Name
-selectMatchVar w (BangPat _ pat) = selectMatchVar w (unLoc pat)
-selectMatchVar w (LazyPat _ pat) = selectMatchVar w (unLoc pat)
+selectMatchVar w (BangPat _ pat)    = selectMatchVar w (unLoc pat)
+selectMatchVar w (LazyPat _ pat)    = selectMatchVar w (unLoc pat)
 selectMatchVar w (ParPat _ _ pat _) = selectMatchVar w (unLoc pat)
-selectMatchVar _w (VarPat _ var)  = return (localiseId (unLoc var))
+selectMatchVar _w (VarPat _ var)    = return (localiseId (unLoc var))
                                   -- Note [Localise pattern binders]
                                   --
                                   -- Remark: when the pattern is a variable (or
@@ -144,7 +144,7 @@ selectMatchVar _w (VarPat _ var)  = return (localiseId (unLoc var))
                                   -- itself. It's easier to pull it from the
                                   -- variable, so we ignore the multiplicity.
 selectMatchVar _w (AsPat _ var _) = assert (isManyDataConTy _w ) (return (unLoc var))
-selectMatchVar w other_pat     = newSysLocalDsNoLP w (hsPatType other_pat)
+selectMatchVar w other_pat        = newSysLocalDs w (hsPatType other_pat)
 
 {- Note [Localise pattern binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -739,7 +739,7 @@ mkSelectorBinds ticks pat val_expr
 
   | is_flat_prod_lpat pat'           -- Special case (B)
   = do { let pat_ty = hsLPatType pat'
-       ; val_var <- newSysLocalDsNoLP Many pat_ty
+       ; val_var <- newSysLocalDs Many pat_ty
 
        ; let mk_bind tick bndr_var
                -- (mk_bind sv bv)  generates  bv = case sv of { pat -> bv }
@@ -981,69 +981,6 @@ mk_fail_msg :: DynFlags -> HsDoFlavour -> LocatedA e -> String
 mk_fail_msg dflags ctx pat
   = showPpr dflags $ text "Pattern match failure in" <+> pprHsDoFlavour ctx
                    <+> text "at" <+> ppr (getLocA pat)
-
-{- Note [Desugaring representation-polymorphic applications]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-To desugar a function application
-
-> HsApp _ f e :: HsExpr GhcTc
-
-into Core, we need to know whether the argument e is lifted or unlifted,
-in order to respect the let/app invariant.
-  (See Note [Core let/app invariant] in GHC.Core)
-
-This causes a problem when e is representation-polymorphic, as we aren't able
-to determine whether to build a Core application
-
-> f_desugared e_desugared
-
-or a strict binding:
-
-> case e_desugared of { x -> f_desugared x }
-
-See GHC.Core.Make.mkValApp, which will call isUnliftedType, which panics
-on a representation-polymorphic type.
-
-These representation-polymorphic applications are disallowed in source Haskell,
-but we might want to continue desugaring as much as possible instead of
-aborting as soon as we see such a problematic function application.
-
-When desugaring an expression which might have problems (such as disallowed
-representation polymorphism as above), we check for errors first, and then:
-
-  - if no problems were detected, desugar normally,
-  - if errors were found, we want to avoid desugaring, so we instead return
-    a runtime error Core expression which has the right type.
-
-This is what the function dsWhenNoErrs achieves:
-
-> dsWhenNoErrs result_ty thing_inside mk_expr
-
-We run thing_inside to check for errors. If there are no errors, we apply
-mk_expr to desugar; otherwise, we construct a runtime error at type result_ty.
-
-Note that result_ty is only used when there is an error, and isn't inspected
-otherwise; this means it's OK to pass something that can be a bit expensive
-to compute.
-
-See #12709 for an example of why this machinery is necessary.
-See also #14765 and #18149 for why it is important to return an expression
-that has the proper type in case of an error.
--}
-
--- | Runs the thing_inside. If there are no errors, use the provided
--- function to construct a Core expression, and return it.
--- Otherwise, return a runtime error, of the given type.
--- This is useful for doing a bunch of representation polymorphism checks
--- and then avoiding making a Core App.
--- See Note [Desugaring representation-polymorphic applications]
-dsWhenNoErrs :: Type -> DsM a -> (a -> CoreExpr) -> DsM CoreExpr
-dsWhenNoErrs result_ty thing_inside mk_expr
-  = do { (result, no_errs) <- askNoErrsDs thing_inside
-       ; if no_errs
-         then return $ mk_expr result
-         else mkErrorAppDs rUNTIME_ERROR_ID result_ty
-            (text "dsWhenNoErrs found errors") }
 
 {- *********************************************************************
 *                                                                      *

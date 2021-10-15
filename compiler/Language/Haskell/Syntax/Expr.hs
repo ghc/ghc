@@ -973,10 +973,17 @@ data HsCmd id
                                 -- in Language.Haskell.Syntax.Extension
 
 
--- | Haskell Array Application Type
-data HsArrAppType = HsHigherOrderApp | HsFirstOrderApp
-  deriving Data
+-- | Haskell arrow application type.
+data HsArrAppType
+  -- | First order arrow application '-<'
+  = HsHigherOrderApp
+  -- | Higher order arrow application '-<<'
+  | HsFirstOrderApp
+    deriving Data
 
+pprHsArrType :: HsArrAppType -> SDoc
+pprHsArrType HsHigherOrderApp = text "higher order arrow application"
+pprHsArrType HsFirstOrderApp  = text "first order arrow application"
 
 {- | Top-level command, introducing a new arrow.
 This may occur inside a proc (where the stack is empty) or as an

@@ -13,10 +13,9 @@ module GHC.HsToCore.ListComp ( dsListComp, dsMonadComp ) where
 
 import GHC.Prelude
 
-import {-# SOURCE #-} GHC.HsToCore.Expr ( dsExpr, dsLExpr, dsLExprNoLP, dsLocalBinds, dsSyntaxExpr )
+import {-# SOURCE #-} GHC.HsToCore.Expr ( dsExpr, dsLExpr, dsLocalBinds, dsSyntaxExpr )
 
 import GHC.Hs
-import GHC.Tc.Errors.Types ( LevityCheckProvenance(..) )
 import GHC.Hs.Syn.Type
 import GHC.Core
 import GHC.Core.Make
@@ -139,8 +138,6 @@ dsTransStmt (TransStmt { trS_form = form, trS_stmts = stmts, trS_bndrs = binderM
                 , Var unzip_fn'
                 , inner_list_expr' ]
 
-    dsNoLevPoly (tcFunResultTyN (length usingArgs') (exprType usingExpr')) (LevityCheckInFunUse using)
-
     -- Build a pattern that ensures the consumer binds into the NEW binders,
     -- which hold lists rather than single values
     let pat = mkBigLHsVarPatTupId to_bndrs  -- NB: no '!
@@ -240,7 +237,7 @@ deListComp (stmt@(TransStmt {}) : quals) list = do
     deBindComp pat inner_list_expr quals list
 
 deListComp (BindStmt _ pat list1 : quals) core_list2 = do -- rule A' above
-    core_list1 <- dsLExprNoLP list1
+    core_list1 <- dsLExpr list1
     deBindComp pat core_list1 quals core_list2
 
 deListComp (ParStmt _ stmtss_w_bndrs _ _ : quals) list
@@ -328,7 +325,7 @@ dfListComp _ _ [] = panic "dfListComp"
 
 dfListComp c_id n_id (LastStmt _ body _ _ : quals)
   = assert (null quals) $
-    do { core_body <- dsLExprNoLP body
+    do { core_body <- dsLExpr body
        ; return (mkApps (Var c_id) [core_body, Var n_id]) }
 
         -- Non-last: must be a guard
@@ -549,7 +546,7 @@ dsMcStmt (TransStmt { trS_stmts = stmts, trS_bndrs = bndrs
        ; let tup_n_ty' = mkBigCoreVarTupTy to_bndrs
 
        ; body        <- dsMcStmts stmts_rest
-       ; n_tup_var'  <- newSysLocalDsNoLP Many n_tup_ty'
+       ; n_tup_var'  <- newSysLocalDs Many n_tup_ty'
        ; tup_n_var'  <- newSysLocalDs Many tup_n_ty'
        ; tup_n_expr' <- mkMcUnzipM form fmap_op n_tup_var' from_bndr_tys
        ; us          <- newUniqueSupply

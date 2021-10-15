@@ -1,5 +1,4 @@
 
-
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
 
@@ -431,9 +430,10 @@ interactWithInertsStage wi
   = do { inerts <- getTcSInerts
        ; let ics = inert_cans inerts
        ; case wi of
-             CEqCan    {} -> interactEq    ics wi
-             CIrredCan {} -> interactIrred ics wi
-             CDictCan  {} -> interactDict  ics wi
+             CEqCan       {} -> interactEq      ics wi
+             CIrredCan    {} -> interactIrred   ics wi
+             CDictCan     {} -> interactDict    ics wi
+             CSpecialCan  {} -> continueWith wi -- cannot have Special Givens, so nothing to interact with
              _ -> pprPanic "interactWithInerts" (ppr wi) }
                 -- CNonCanonical have been canonicalised
 
@@ -1905,13 +1905,23 @@ topReactionsStage :: WorkItem -> TcS (StopOrContinue Ct)
 topReactionsStage work_item
   = do { traceTcS "doTopReact" (ppr work_item)
        ; case work_item of
-           CDictCan {}  -> do { inerts <- getTcSInerts
-                              ; doTopReactDict inerts work_item }
-           CEqCan {}    -> doTopReactEq    work_item
-           CIrredCan {} -> doTopReactOther work_item
-           _  -> -- Any other work item does not react with any top-level equations
-                 continueWith work_item  }
 
+           CDictCan {} ->
+             do { inerts <- getTcSInerts
+                ; doTopReactDict inerts work_item }
+
+           CEqCan {} ->
+             doTopReactEq work_item
+
+           CSpecialCan {} ->
+             -- No top-level interactions for special constraints.
+             continueWith work_item
+
+           CIrredCan {} ->
+             doTopReactOther work_item
+
+           -- Any other work item does not react with any top-level equations
+           _  -> continueWith work_item }
 
 --------------------
 doTopReactOther :: Ct -> TcS (StopOrContinue Ct)
@@ -1938,6 +1948,12 @@ doTopReactOther work_item
     ev   = ctEvidence work_item
     loc  = ctEvLoc ev
     pred = ctEvPred ev
+
+{-********************************************************************
+*                                                                    *
+          Top-level reaction for equality constraints (CEqCan)
+*                                                                    *
+********************************************************************-}
 
 doTopReactEqPred :: Ct -> EqRel -> TcType -> TcType -> TcS (StopOrContinue Ct)
 doTopReactEqPred work_item eq_rel t1 t2

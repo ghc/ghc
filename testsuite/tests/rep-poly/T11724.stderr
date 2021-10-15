@@ -1,0 +1,6 @@
+
+T11724.hs:7:44: error:
+    • The data constructor field does not have a fixed runtime representation:
+      • a :: TYPE r
+    • In the definition of data constructor ‘Foo’
+      In the data type declaration for ‘Foo’

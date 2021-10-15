@@ -1,0 +1,34 @@
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE DataKinds #-}
+
+unit number-unknown where
+  signature NumberUnknown where
+    import GHC.Types
+    data Rep a :: RuntimeRep
+    instance Concrete (Rep a)
+    data Number a :: TYPE (Rep a)
+    plus :: Number a -> Number a -> Number a
+    multiply :: Number a -> Number a -> Number a
+  module NumberStuff where
+    import NumberUnknown
+    funcA :: Number a -> Number a -> Number a
+    funcA x y = plus x (multiply x y)
+
+unit number-unboxed-int where
+  module NumberUnknown where
+    import GHC.Types
+    import GHC.Prim
+    type Rep a = IntRep
+    type Number a = Int#
+    plus :: Int# -> Int# -> Int#
+    plus = (+#)
+    multiply :: Int# -> Int# -> Int#
+    multiply = (*#)
+
+unit main1 where
+  dependency number-unknown[NumberUnknown=number-unboxed-int:NumberUnknown]
+  module Main where
+    import NumberStuff
+    import GHC.Types
+    main = print (I# (funcA 2# 3#))

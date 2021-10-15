@@ -1,0 +1,5 @@
+
+RepPolyNewtypePat1.hs:16:1: error:
+    The type of the first pattern in the equation for ‘bar’
+    does not have a fixed runtime representation:
+      X a :: TYPE rep

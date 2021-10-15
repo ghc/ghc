@@ -34,6 +34,7 @@ import GHC.Data.FastString
 import GHC.Hs
 import GHC.Tc.Errors.Types
 import GHC.Tc.Gen.Sig
+import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep )
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.Env
@@ -518,6 +519,11 @@ tcPolyBinds sig_fn prag_fn rec_group rec_tc closed bind_list
          NoGen              -> tcPolyNoGen rec_tc prag_fn sig_fn bind_list
          InferGen mn        -> tcPolyInfer rec_tc prag_fn sig_fn mn bind_list
          CheckGen lbind sig -> tcPolyCheck prag_fn sig lbind
+
+    ; _concrete_evs <-
+        mapM (\ poly_id ->
+          hasFixedRuntimeRep (FRRBinder $ idName poly_id) (idType poly_id))
+          poly_ids
 
     ; traceTc "} End of bindings for" (vcat [ ppr binder_names, ppr rec_group
                                             , vcat [ppr id <+> ppr (idType id) | id <- poly_ids]
@@ -1181,7 +1187,7 @@ tcMonoBinds :: RecFlag  -- Whether the binding is recursive for typechecking pur
             -> [LHsBind GhcRn]
             -> TcM (LHsBinds GhcTc, [MonoBindInfo])
 
--- SPECIAL CASE 1: see Note [Inference for non-recursive function bindings]
+-- SPECIAL CASE 1: see Note [Special case for non-recursive function bindings]
 tcMonoBinds is_rec sig_fn no_gen
            [ L b_loc (FunBind { fun_id = L nm_loc name
                               , fun_matches = matches })]
@@ -1210,7 +1216,7 @@ tcMonoBinds is_rec sig_fn no_gen
                        , mbi_sig       = Nothing
                        , mbi_mono_id   = mono_id }]) }
 
--- SPECIAL CASE 2: see Note [Inference for non-recursive pattern bindings]
+-- SPECIAL CASE 2: see Note [Special case for non-recursive pattern bindings]
 tcMonoBinds is_rec sig_fn no_gen
            [L b_loc (PatBind { pat_lhs = pat, pat_rhs = grhss })]
   | NonRecursive <- is_rec   -- ...binder isn't mentioned in RHS
@@ -1470,6 +1476,7 @@ tcRhs (TcPatBind infos pat' grhss pat_ty)
     do  { traceTc "tcRhs: pat bind" (ppr pat' $$ ppr pat_ty)
         ; grhss' <- addErrCtxt (patMonoBindsCtxt pat' grhss) $
                     tcGRHSsPat grhss (mkCheckExpType pat_ty)
+
         ; return ( PatBind { pat_lhs = pat', pat_rhs = grhss'
                            , pat_ext = pat_ty
                            , pat_ticks = ([],[]) } )}

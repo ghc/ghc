@@ -680,7 +680,7 @@ instance ToHie (LocatedA HsWrapper) where
         (WpLet bs)      -> toHie $ EvBindContext (mkScopeA osp) (getRealSpanA osp) (L osp bs)
         (WpCompose a b) -> concatM $
           [toHie (L osp a), toHie (L osp b)]
-        (WpFun a b _ _) -> concatM $
+        (WpFun a b _)   -> concatM $
           [toHie (L osp a), toHie (L osp b)]
         (WpEvLam a) ->
           toHie $ C (EvidenceVarBind EvWrapperBind (mkScopeA osp) (getRealSpanA osp))

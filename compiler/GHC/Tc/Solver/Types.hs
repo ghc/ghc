@@ -15,7 +15,9 @@ module GHC.Tc.Solver.Types (
     FunEqMap, emptyFunEqs, foldFunEqs, findFunEq, insertFunEq,
     findFunEqsByTyCon,
 
-    TcAppMap, isEmptyTcAppMap, insertTcApp, alterTcApp, filterTcAppMap,
+    TcAppMap, emptyTcAppMap, isEmptyTcAppMap,
+    insertTcApp, alterTcApp, filterTcAppMap,
+    tcAppMapToBag, foldTcAppMap,
 
     EqualCtList, pattern EqualCtList,
     equalCtListToList, filterEqualCtList, unitEqualCtList,
@@ -155,10 +157,10 @@ delDict m cls tys = delTcApp m (classTyCon cls) tys
 addDict :: DictMap a -> Class -> [Type] -> a -> DictMap a
 addDict m cls tys item = insertTcApp m (classTyCon cls) tys item
 
-addDictCt :: DictMap Ct -> Class -> [Type] -> Ct -> DictMap Ct
+addDictCt :: DictMap Ct -> TyCon -> [Type] -> Ct -> DictMap Ct
 -- Like addDict, but combines [W] and [D] to [WD]
 -- See Note [KeepBoth] in GHC.Tc.Solver.Interact
-addDictCt m cls tys new_ct = alterTcApp m (classTyCon cls) tys xt_ct
+addDictCt m tc tys new_ct = alterTcApp m tc tys xt_ct
   where
     new_ct_ev = ctEvidence new_ct
 

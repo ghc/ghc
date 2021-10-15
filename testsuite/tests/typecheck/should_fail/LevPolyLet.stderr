@@ -1,5 +1,0 @@
-LevPolyLet.hs:18:7:
-    A representation-polymorphic type is not allowed here:
-      Type: a
-      Kind: TYPE ('BoxedRep v)
-    In the type of binder ‘x’

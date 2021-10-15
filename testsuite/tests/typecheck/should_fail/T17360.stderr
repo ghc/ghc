@@ -1,6 +1,0 @@
-
-T17360.hs:11:5: error:
-    A representation-polymorphic type is not allowed here:
-      Type: Id a
-      Kind: TYPE r
-    In the type of binder ‘x’

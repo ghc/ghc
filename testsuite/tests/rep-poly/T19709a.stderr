@@ -1,0 +1,10 @@
+
+T19709a.hs:8:8: error:
+    • The type of the first pattern in the equation for ‘levid’
+      does not have a fixed runtime representation:
+        a :: TYPE r
+    • In the expression:
+        let
+          levid :: forall (r :: RuntimeRep) (a :: TYPE r). a -> a
+          levid x = x
+        in return []

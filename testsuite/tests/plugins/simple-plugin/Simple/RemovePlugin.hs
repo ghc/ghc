@@ -54,7 +54,7 @@ typecheckPlugin [name, "typecheck"] _ tc
 typecheckPlugin _ _ tc = return tc
 
 metaPlugin' :: [CommandLineOption] -> LHsExpr GhcTc -> TcM (LHsExpr GhcTc)
-metaPlugin' [name, "meta"] (L l (HsPar _ _ (L _ (XExpr (WrapExpr (HsWrap w (HsApp noExt (L _ (HsVar _ (L _ id))) e))))) _))
+metaPlugin' [name, "meta"] (L l (XExpr (WrapExpr (HsWrap w (HsPar _ _ (L _ (HsApp noExt (L _ (HsVar _ (L _ id))) e)) _ )))))
   | occNameString (getOccName id) == name
   = return (L l (XExpr (WrapExpr (HsWrap w (unLoc e)))))
 -- The test should always match this first case. If the desugaring changes

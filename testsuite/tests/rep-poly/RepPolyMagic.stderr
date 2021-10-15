@@ -1,0 +1,16 @@
+
+RepPolyMagic.hs:12:7: error:
+    • Unsaturated use of a representation-polymorphic primitive function.
+      The second argument of ‘seq’
+      does not have a fixed runtime representation:
+        b :: TYPE r
+    • In the expression: seq
+      In an equation for ‘foo’: foo = seq
+
+RepPolyMagic.hs:15:7: error:
+    • Unsaturated use of a representation-polymorphic primitive function.
+      The second argument of ‘oneShot’
+      does not have a fixed runtime representation:
+        a :: TYPE r
+    • In the expression: oneShot
+      In an equation for ‘bar’: bar = oneShot

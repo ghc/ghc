@@ -2,10 +2,8 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-} -- instance Diagnostic TcRnMessage
 {-# LANGUAGE RecordWildCards #-}
 
-module GHC.Tc.Errors.Ppr (
-    formatLevPolyErr
-  , pprLevityPolyInType
-  ) where
+module GHC.Tc.Errors.Ppr ( pprTypeDoesNotHaveFixedRuntimeRep )
+  where
 
 import GHC.Prelude
 
@@ -19,7 +17,7 @@ import GHC.Core.DataCon (DataCon)
 import GHC.Core.FamInstEnv (famInstAxiom)
 import GHC.Core.InstEnv
 import GHC.Core.TyCon (isNewTyCon)
-import GHC.Core.TyCo.Ppr (pprKind, pprParendType, pprType, pprWithTYPE,
+import GHC.Core.TyCo.Ppr (pprKind, pprParendType, pprType,
                           pprWithExplicitKindsWhen, pprTheta, pprClassPred, pprTypeApp,
                           pprSourceTyCon)
 import GHC.Core.Type
@@ -49,8 +47,8 @@ instance Diagnostic TcRnMessage where
   diagnosticMessage = \case
     TcRnUnknownMessage m
       -> diagnosticMessage m
-    TcLevityPolyInType ty prov (ErrInfo extra supplementary)
-      -> mkDecorated [pprLevityPolyInType ty prov, extra, supplementary]
+    TcRnTypeDoesNotHaveFixedRuntimeRep ty prov (ErrInfo extra supplementary)
+      -> mkDecorated [pprTypeDoesNotHaveFixedRuntimeRep ty prov, extra, supplementary]
     TcRnMessageWithInfo unit_state msg_with_info
       -> case msg_with_info of
            TcRnMessageDetailed err_info msg
@@ -508,10 +506,22 @@ instance Diagnostic TcRnMessage where
       -> mkSimpleDecorated $
            text "Proc patterns cannot use existential or GADT data constructors"
 
+    TcRnSpecialClassInst cls because_safeHaskell
+      -> mkSimpleDecorated $
+            text "Class" <+> quotes (ppr $ className cls)
+                   <+> text "does not support user-specified instances"
+                   <> safeHaskell_msg
+          where
+            safeHaskell_msg
+              | because_safeHaskell
+              = text " when Safe Haskell is enabled."
+              | otherwise
+              = dot
+
   diagnosticReason = \case
     TcRnUnknownMessage m
       -> diagnosticReason m
-    TcLevityPolyInType{}
+    TcRnTypeDoesNotHaveFixedRuntimeRep{}
       -> ErrorWithoutFlag
     TcRnMessageWithInfo _ msg_with_info
       -> case msg_with_info of
@@ -721,11 +731,13 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnArrowProcGADTPattern
       -> ErrorWithoutFlag
+    TcRnSpecialClassInst {}
+      -> ErrorWithoutFlag
 
   diagnosticHints = \case
     TcRnUnknownMessage m
       -> diagnosticHints m
-    TcLevityPolyInType{}
+    TcRnTypeDoesNotHaveFixedRuntimeRep{}
       -> noHints
     TcRnMessageWithInfo _ msg_with_info
       -> case msg_with_info of
@@ -929,6 +941,8 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnArrowProcGADTPattern
       -> noHints
+    TcRnSpecialClassInst {}
+      -> noHints
 
 deriveInstanceErrReasonHints :: Class
                              -> UsingGeneralizedNewtypeDeriving
@@ -1034,46 +1048,19 @@ dodgy_msg_insert tc = IEThingAll noAnn ii
     ii :: LIEWrappedName (IdP (GhcPass p))
     ii = noLocA (IEName $ noLocA tc)
 
-formatLevPolyErr :: Type  -- representation-polymorphic type
-                 -> SDoc
-formatLevPolyErr ty
-  = hang (text "A representation-polymorphic type is not allowed here:")
-       2 (vcat [ text "Type:" <+> pprWithTYPE tidy_ty
-               , text "Kind:" <+> pprWithTYPE tidy_ki ])
+pprTypeDoesNotHaveFixedRuntimeRep :: Type -> FixedRuntimeRepProvenance -> SDoc
+pprTypeDoesNotHaveFixedRuntimeRep ty prov =
+  let what = pprFixedRuntimeRepProvenance prov
+  in text "The" <+> what <+> text "does not have a fixed runtime representation:"
+  $$ format_frr_err ty
+
+format_frr_err :: Type  -- ^ the type which doesn't have a fixed runtime representation
+                -> SDoc
+format_frr_err ty
+  = (bullet <+> ppr tidy_ty <+> dcolon <+> ppr tidy_ki)
   where
     (tidy_env, tidy_ty) = tidyOpenType emptyTidyEnv ty
     tidy_ki             = tidyType tidy_env (tcTypeKind ty)
-
-pprLevityPolyInType :: Type -> LevityCheckProvenance -> SDoc
-pprLevityPolyInType ty prov =
-  let extra = case prov of
-        LevityCheckInBinder v
-          -> text "In the type of binder" <+> quotes (ppr v)
-        LevityCheckInVarType
-          -> text "When trying to create a variable of type:" <+> ppr ty
-        LevityCheckInWildcardPattern
-          -> text "In a wildcard pattern"
-        LevityCheckInUnboxedTuplePattern p
-          -> text "In the type of an element of an unboxed tuple pattern:" $$ ppr p
-        LevityCheckPatSynSig
-          -> empty
-        LevityCheckCmdStmt
-          -> empty -- I (Richard E, Dec '16) have no idea what to say here
-        LevityCheckMkCmdEnv id_var
-          -> text "In the result of the function" <+> quotes (ppr id_var)
-        LevityCheckDoCmd do_block
-          -> text "In the do-command:" <+> ppr do_block
-        LevityCheckDesugaringCmd cmd
-          -> text "When desugaring the command:" <+> ppr cmd
-        LevityCheckInCmd body
-          -> text "In the command:" <+> ppr body
-        LevityCheckInFunUse using
-          -> text "In the result of a" <+> quotes (text "using") <+> text "function:" <+> ppr using
-        LevityCheckInValidDataCon
-          -> empty
-        LevityCheckInValidClass
-          -> empty
-  in formatLevPolyErr ty $$ extra
 
 pprField :: (FieldLabelString, TcType) -> SDoc
 pprField (f,ty) = ppr f <+> dcolon <+> ppr ty

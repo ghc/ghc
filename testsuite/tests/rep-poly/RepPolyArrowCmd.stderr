@@ -1,0 +1,7 @@
+
+RepPolyArrowCmd.hs:26:17: error:
+    • The arrow command ‘returnA -< x’
+      does not have a fixed runtime representation:
+        a :: TYPE r
+    • In the expression: proc x -> returnA -< x
+      In an equation for ‘foo’: foo = proc x -> returnA -< x

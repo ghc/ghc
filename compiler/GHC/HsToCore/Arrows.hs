@@ -27,13 +27,11 @@ import GHC.Hs.Syn.Type
 --     So WATCH OUT; check each use of split*Ty functions.
 -- Sigh.  This is a pain.
 
-import {-# SOURCE #-} GHC.HsToCore.Expr ( dsExpr, dsLExpr, dsLExprNoLP, dsLocalBinds,
+import {-# SOURCE #-} GHC.HsToCore.Expr ( dsExpr, dsLExpr, dsLocalBinds,
                                           dsSyntaxExpr )
 
 import GHC.Tc.Utils.TcType
-import GHC.Core.Type( splitPiTy )
 import GHC.Core.Multiplicity
-import GHC.Tc.Errors.Types ( LevityCheckProvenance(..) )
 import GHC.Tc.Types.Evidence
 import GHC.Core
 import GHC.Core.FVs
@@ -75,25 +73,6 @@ mkCmdEnv tc_meths
              the_choice_id  = assocMaybe prs choiceAName
              the_loop_id    = assocMaybe prs loopAName
 
-           -- used as an argument in, e.g., do_premap
-       ; check_lev_poly 3 the_arr_id
-
-           -- used as an argument in, e.g., dsCmdStmt/BodyStmt
-       ; check_lev_poly 5 the_compose_id
-
-           -- used as an argument in, e.g., dsCmdStmt/BodyStmt
-       ; check_lev_poly 4 the_first_id
-
-           -- the result of the_app_id is used as an argument in, e.g.,
-           -- dsCmd/HsCmdArrApp/HsHigherOrderApp
-       ; check_lev_poly 2 the_app_id
-
-           -- used as an argument in, e.g., HsCmdIf
-       ; check_lev_poly 5 the_choice_id
-
-           -- used as an argument in, e.g., RecStmt
-       ; check_lev_poly 4 the_loop_id
-
        ; return (meth_binds, DsCmdEnv {
                arr_id     = Var (unmaybe the_arr_id arrAName),
                compose_id = Var (unmaybe the_compose_id composeAName),
@@ -111,20 +90,6 @@ mkCmdEnv tc_meths
 
     unmaybe Nothing name = pprPanic "mkCmdEnv" (text "Not found:" <+> ppr name)
     unmaybe (Just id) _  = id
-
-      -- returns the result type of a pi-type (that is, a forall or a function)
-      -- Note that this result type may be ill-scoped.
-    res_type :: Type -> Type
-    res_type ty = res_ty
-      where
-        (_, res_ty) = splitPiTy ty
-
-    check_lev_poly :: Int -- arity
-                   -> Maybe Id -> DsM ()
-    check_lev_poly _     Nothing = return ()
-    check_lev_poly arity (Just id)
-      = dsNoLevPoly (nTimes arity res_type (idType id)) (LevityCheckMkCmdEnv id)
-
 
 -- arr :: forall b c. (b -> c) -> a b c
 do_arr :: DsCmdEnv -> Type -> Type -> CoreExpr -> CoreExpr
@@ -367,7 +332,7 @@ dsCmd ids local_vars stack_ty res_ty
     let
         (a_arg_ty, _res_ty') = tcSplitAppTy arrow_ty
         (_a_ty, arg_ty) = tcSplitAppTy a_arg_ty
-    core_arrow <- dsLExprNoLP arrow
+    core_arrow <- dsLExpr arrow
     core_arg   <- dsLExpr arg
     stack_id   <- newSysLocalDs Many stack_ty
     core_make_arg <- matchEnvStack env_ids stack_id core_arg
@@ -423,7 +388,7 @@ dsCmd ids local_vars stack_ty res_ty (HsCmdApp _ cmd arg) env_ids = do
     (core_cmd, free_vars, env_ids')
              <- dsfixCmd ids local_vars stack_ty' res_ty cmd
     stack_id <- newSysLocalDs Many stack_ty
-    arg_id <- newSysLocalDsNoLP Many arg_ty
+    arg_id <- newSysLocalDs Many arg_ty
     -- push the argument expression onto the stack
     let
         stack' = mkCorePairExpr (Var arg_id) (Var stack_id)
@@ -628,11 +593,7 @@ dsCmd ids local_vars stack_ty res_ty (HsCmdLet _ lbinds@binds body) env_ids = do
 --
 --              ---> premap (\ (env,stk) -> env) c
 
-dsCmd ids local_vars stack_ty res_ty do_block@(HsCmdDo stmts_ty
-                                               (L loc stmts))
-                                                                   env_ids = do
-    putSrcSpanDsA loc $
-      dsNoLevPoly stmts_ty (LevityCheckDoCmd do_block)
+dsCmd ids local_vars stack_ty res_ty (HsCmdDo _ (L _ stmts)) env_ids = do
     (core_stmts, env_ids') <- dsCmdDo ids local_vars res_ty stmts env_ids
     let env_ty = mkBigCoreVarTupTy env_ids
     core_fst <- mkFstExpr env_ty stack_ty
@@ -702,8 +663,7 @@ dsfixCmd
                 DIdSet,         -- subset of local vars that occur free
                 [Id])           -- the same local vars as a list, fed back
 dsfixCmd ids local_vars stk_ty cmd_ty cmd
-  = do { putSrcSpanDs (getLocA cmd) $ dsNoLevPoly cmd_ty (LevityCheckDesugaringCmd cmd)
-       ; trimInput (dsLCmd ids local_vars stk_ty cmd_ty cmd) }
+  = trimInput (dsLCmd ids local_vars stk_ty cmd_ty cmd)
 
 -- Feed back the list of local variables actually used a command,
 -- for use as the input tuple of the generated arrow.
@@ -744,7 +704,7 @@ dsCmdLam ids local_vars stack_ty res_ty pats body env_ids = do
         (pat_tys, stack_ty') = splitTypeAt (length pats) stack_ty
     (core_body, free_vars, env_ids')
        <- dsfixCmd ids local_vars' stack_ty' res_ty body
-    param_ids <- mapM (newSysLocalDsNoLP Many) pat_tys
+    param_ids <- mapM (newSysLocalDs Many) pat_tys
     stack_id' <- newSysLocalDs Many stack_ty'
 
     -- the expression is built from the inside out, so the actions
@@ -790,8 +750,7 @@ dsCmdDo _ _ _ [] _ = panic "dsCmdDo"
 --
 --              ---> premap (\ (xs) -> ((xs), ())) c
 
-dsCmdDo ids local_vars res_ty [L loc (LastStmt _ body _ _)] env_ids = do
-    putSrcSpanDsA loc $ dsNoLevPoly res_ty (LevityCheckInCmd body)
+dsCmdDo ids local_vars res_ty [L _ (LastStmt _ body _ _)] env_ids = do
     (core_body, env_ids') <- dsLCmd ids local_vars unitTy res_ty body env_ids
     let env_ty = mkBigCoreVarTupTy env_ids
     env_var <- newSysLocalDs Many env_ty
@@ -859,7 +818,6 @@ dsCmdStmt ids local_vars out_ids (BodyStmt c_ty cmd _ _) env_ids = do
         out_ty = mkBigCoreVarTupTy out_ids
         before_c_ty = mkCorePairTy in_ty1 out_ty
         after_c_ty = mkCorePairTy c_ty out_ty
-    dsNoLevPoly c_ty LevityCheckCmdStmt
     snd_fn <- mkSndExpr c_ty out_ty
     return (do_premap ids in_ty before_c_ty out_ty core_mux $
                 do_compose ids before_c_ty after_c_ty out_ty

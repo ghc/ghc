@@ -1,6 +1,0 @@
-
-T14765.hs:11:31: error:
-    A representation-polymorphic type is not allowed here:
-      Type: r
-      Kind: TYPE rep
-    In the type of expression: (k proxy#)

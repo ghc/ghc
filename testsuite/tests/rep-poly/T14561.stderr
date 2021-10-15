@@ -1,0 +1,8 @@
+
+T14561.hs:12:9: error:
+    • Unsaturated use of a representation-polymorphic primitive function.
+      The first argument of ‘unsafeCoerce#’
+      does not have a fixed runtime representation:
+        a :: TYPE r
+    • In the expression: unsafeCoerce#
+      In an equation for ‘badId’: badId = unsafeCoerce#

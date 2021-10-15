@@ -692,7 +692,7 @@ significantly simpler since otherwise we would need to define a calling
 convention for curried applications that can accommodate representation
 polymorphism.
 
-To ensure saturation, CorePrep eta expands expand all primop applications as
+To ensure saturation, CorePrep eta expands all primop applications as
 described in Note [Eta expansion of hasNoBinding things in CorePrep] in
 GHC.Core.Prep.
 

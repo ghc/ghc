@@ -1,4 +1,4 @@
 
 T14390.hs:4:10: error:
-    • Class ‘~~’ does not support user-specified instances
+    • Class ‘~~’ does not support user-specified instances.
     • In the instance declaration for ‘(~~) Int Int’

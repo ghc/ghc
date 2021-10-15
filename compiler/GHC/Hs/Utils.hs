@@ -785,13 +785,9 @@ mkClassOpSigs sigs
 mkLHsWrap :: HsWrapper -> LHsExpr GhcTc -> LHsExpr GhcTc
 mkLHsWrap co_fn (L loc e) = L loc (mkHsWrap co_fn e)
 
--- | Avoid @'HsWrap' co1 ('HsWrap' co2 _)@ and @'HsWrap' co1 ('HsPar' _ _)@
--- See Note [Detecting forced eta expansion] in "GHC.HsToCore.Expr"
 mkHsWrap :: HsWrapper -> HsExpr GhcTc -> HsExpr GhcTc
-mkHsWrap co_fn e | isIdHsWrapper co_fn   = e
-mkHsWrap co_fn (XExpr (WrapExpr (HsWrap co_fn' e))) = mkHsWrap (co_fn <.> co_fn') e
-mkHsWrap co_fn (HsPar x lpar (L l e) rpar)      = HsPar x lpar (L l (mkHsWrap co_fn e)) rpar
-mkHsWrap co_fn e                                = XExpr (WrapExpr $ HsWrap co_fn e)
+mkHsWrap co_fn e | isIdHsWrapper co_fn = e
+mkHsWrap co_fn e                       = XExpr (WrapExpr $ HsWrap co_fn e)
 
 mkHsWrapCo :: TcCoercionN   -- A Nominal coercion  a ~N b
            -> HsExpr GhcTc -> HsExpr GhcTc

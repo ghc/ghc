@@ -57,7 +57,8 @@ import GHC.Core.Predicate
 import GHC.Core.Type
 import GHC.Core.Coercion
 import GHC.Core.TyCo.Rep
-import GHC.Core.TyCo.Ppr  ( pprTyVars, pprWithExplicitKindsWhen, pprSourceTyCon, pprWithTYPE )
+import GHC.Core.TyCo.Ppr  ( pprTyVars, pprWithExplicitKindsWhen, pprSourceTyCon
+                          , pprWithTYPE )
 import GHC.Core.Unify     ( tcMatchTys )
 import GHC.Core.InstEnv
 import GHC.Core.TyCon
@@ -75,12 +76,14 @@ import GHC.Utils.FV ( fvVarList, unionFV )
 import GHC.Data.Bag
 import GHC.Data.FastString
 import GHC.Utils.Trace (pprTraceUserWarning)
-import GHC.Data.List.SetOps ( equivClasses )
+import GHC.Data.List.SetOps ( equivClasses, nubOrdBy )
 import GHC.Data.Maybe
 import qualified GHC.Data.Strict as Strict
 
 import Control.Monad    ( unless, when, foldM, forM_ )
 import Data.Foldable    ( toList )
+import Data.Functor     ( (<&>) )
+import Data.Function    ( on )
 import Data.List        ( partition, mapAccumL, sortBy, unfoldr )
 -- import Data.Semigroup   ( Semigroup )
 import qualified Data.Semigroup as Semigroup
@@ -564,7 +567,10 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_impl = implics
          -- says to suppress
        ; let ctxt2 = ctxt { cec_suppress = cec_suppress ctxt || cec_suppress ctxt1 }
        ; (_, leftovers) <- tryReporters ctxt2 report2 cts1
-       ; massertPpr (null leftovers) (ppr leftovers)
+       ; massertPpr (null leftovers)
+           (text "The following unsolved Wanted constraints \
+                 \have not been reported to the user:"
+           $$ ppr leftovers)
 
             -- All the Derived ones have been filtered out of simples
             -- by the constraint solver. This is ok; we don't want
@@ -606,6 +612,7 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_impl = implics
     -- report2: we suppress these if there are insolubles elsewhere in the tree
     report2 = [ ("Implicit params", is_ip,           False, mkGroupReporter mkIPErr)
               , ("Irreds",          is_irred,        False, mkGroupReporter mkIrredErr)
+              , ("FixedRuntimeRep", is_FRR,          False, mkGroupReporter mkFRRErr)
               , ("Dicts",           is_dict,         False, mkGroupReporter mkDictErr) ]
 
     -- also checks to make sure the constraint isn't HoleBlockerReason
@@ -615,7 +622,7 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_impl = implics
     unblocked checker ct pred = checker ct pred
 
     -- rigid_nom_eq, rigid_nom_tv_eq,
-    is_dict, is_equality, is_ip, is_irred :: Ct -> Pred -> Bool
+    is_dict, is_equality, is_ip, is_FRR, is_irred :: Ct -> Pred -> Bool
 
     is_given_eq ct pred
        | EqPred {} <- pred = arisesFromGivens ct
@@ -651,6 +658,12 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_impl = implics
 
     is_ip _ (ClassPred cls _) = isIPClass cls
     is_ip _ _                 = False
+
+    is_FRR ct (SpecialPred ConcretePrimPred _)
+      | FixedRuntimeRepOrigin {} <- ctOrigin ct
+      = True
+    is_FRR _ _
+      = False
 
     is_irred _ (IrredPred {}) = True
     is_irred _ _              = False
@@ -928,9 +941,10 @@ suppressGroup mk_err ctxt cts
 
 -- See Note [No deferring for multiplicity errors]
 nonDeferrableOrigin :: CtOrigin -> Bool
-nonDeferrableOrigin NonLinearPatternOrigin = True
-nonDeferrableOrigin (UsageEnvironmentOf _) = True
-nonDeferrableOrigin _                      = False
+nonDeferrableOrigin NonLinearPatternOrigin     = True
+nonDeferrableOrigin (UsageEnvironmentOf {})    = True
+nonDeferrableOrigin (FixedRuntimeRepOrigin {}) = True
+nonDeferrableOrigin _                          = False
 
 maybeReportError :: ReportErrCtxt -> Ct -> Report -> TcM ()
 maybeReportError ctxt ct report
@@ -1427,6 +1441,53 @@ mkIPErr ctxt cts
        ; return $ msg `mappend` mk_relevant_bindings binds_msg }
   where
     (ct1:_) = cts
+
+----------------
+
+-- | Create a user-facing error message for unsolved @'Concrete#' ki@
+-- Wanted constraints arising from representation-polymorphism checks.
+--
+-- See Note [Reporting representation-polymorphism errors] in GHC.Tc.Types.Origin.
+mkFRRErr :: ReportErrCtxt -> [Ct] -> TcM Report
+mkFRRErr ctxt cts
+  = do { -- Zonking/tidying.
+       ; origs <-
+           -- Zonk/tidy the 'CtOrigin's.
+           zonkTidyOrigins (cec_tidy ctxt) (map ctOrigin cts)
+             <&>
+           -- Then remove duplicates: only retain one 'CtOrigin' per representation-polymorphic type.
+          (nubOrdBy (nonDetCmpType `on` frr_type) . snd)
+
+        -- Obtain all the errors we want to report (constraints with FixedRuntimeRep origin),
+        -- with the corresponding types:
+        --   ty1 :: TYPE rep1, ty2 :: TYPE rep2, ...
+       ; let tys = map frr_type origs
+             kis = map typeKind tys
+
+        -- Assemble the error message: pair up each origin with the corresponding type, e.g.
+        --   • FixedRuntimeRep origin msg 1 ...
+        --       a :: TYPE r1
+        --   • FixedRuntimeRep origin msg 2 ...
+        --       b :: TYPE r2
+
+             combine_origin_ty_ki :: CtOrigin -> Type -> Kind -> SDoc
+             combine_origin_ty_ki orig ty ki =
+               -- Add bullet points if there is more than one error.
+               (if length tys > 1 then (bullet <+>) else id) $
+                 vcat [pprArising orig <> colon
+                      ,nest 2 $ ppr ty <+> dcolon <+> pprWithTYPE ki]
+
+             msg :: SDoc
+             msg = vcat $ zipWith3 combine_origin_ty_ki origs tys kis
+
+       ; return $ important msg }
+  where
+
+    frr_type :: CtOrigin -> Type
+    frr_type (FixedRuntimeRepOrigin ty _) = ty
+    frr_type orig
+      = pprPanic "mkFRRErr: not a FixedRuntimeRep origin"
+          (text "origin =" <+> ppr orig)
 
 {-
 Note [Constraints include ...]
@@ -2396,7 +2457,7 @@ Warn of loopy local equalities that were dropped.
 ************************************************************************
 -}
 
-mkDictErr :: ReportErrCtxt -> [Ct] -> TcM Report
+mkDictErr :: HasDebugCallStack => ReportErrCtxt -> [Ct] -> TcM Report
 mkDictErr ctxt cts
   = assert (not (null cts)) $
     do { inst_envs <- tcGetInstEnvs
@@ -2430,7 +2491,7 @@ mkDictErr ctxt cts
     -- but we really only want to report the latter
     elim_superclasses cts = mkMinimalBySCs ctPred cts
 
-mk_dict_err :: ReportErrCtxt -> (Ct, ClsInstLookupResult)
+mk_dict_err :: HasCallStack => ReportErrCtxt -> (Ct, ClsInstLookupResult)
             -> TcM SDoc
 -- Report an overlap error if this class constraint results
 -- from an overlap (returning Left clas), otherwise return (Right pred)
@@ -3035,7 +3096,7 @@ relevantBindings want_filtering ctxt ct
              -- enclosing *type* equality, because that's more useful for the programmer
        ; let extra_tvs = case tidy_orig of
                              KindEqOrigin t1 t2 _ _ -> tyCoVarsOfTypes [t1,t2]
-                             _                        -> emptyVarSet
+                             _                      -> emptyVarSet
              ct_fvs = tyCoVarsOfCt ct `unionVarSet` extra_tvs
 
              -- Put a zonked, tidied CtOrigin into the Ct

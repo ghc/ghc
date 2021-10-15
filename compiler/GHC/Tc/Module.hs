@@ -1308,7 +1308,7 @@ checkBootTyCon is_boot tc1 tc2
                     Nothing -> Just roles_msg
 -}
 
-    eqAlgRhs _ AbstractTyCon _rhs2
+    eqAlgRhs _ (AbstractTyCon {}) _rhs2
       = checkSuccess -- rhs2 is guaranteed to be injective, since it's an AlgTyCon
     eqAlgRhs _  tc1@DataTyCon{} tc2@DataTyCon{} =
         checkListBy eqCon (data_cons tc1) (data_cons tc2) (text "constructors")

@@ -1,0 +1,18 @@
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE RoleAnnotations #-}
+
+unit number-unknown where
+  signature NumberUnknown where
+    import GHC.Types
+    import GHC.Exts
+    data Rep (l :: Levity) :: RuntimeRep
+    data Number (l :: Levity) :: TYPE (Rep l)
+    plus :: Number l -> Number l -> Number l
+    multiply :: Number l -> Number l -> Number l
+  module NumberStuff where
+    import NumberUnknown
+    funcA :: Number l -> Number l -> Number l
+    funcA x y = plus x (multiply x y)
+    -- should get a representation polymorphism error: 'Rep l' is not fixed.

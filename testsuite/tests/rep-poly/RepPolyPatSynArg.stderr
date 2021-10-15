@@ -1,0 +1,4 @@
+
+RepPolyPatSynArg.hs:17:1: error:
+    The pattern synonym argument does not have a fixed runtime representation:
+    • a :: TYPE rep

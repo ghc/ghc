@@ -1860,7 +1860,8 @@ statePrimTyConKey, stableNamePrimTyConKey, stableNameTyConKey,
     typeConKey, threadIdPrimTyConKey, bcoPrimTyConKey, ptrTyConKey,
     funPtrTyConKey, tVarPrimTyConKey, eqPrimTyConKey,
     eqReprPrimTyConKey, eqPhantPrimTyConKey,
-    compactPrimTyConKey, stackSnapshotPrimTyConKey :: Unique
+    compactPrimTyConKey, stackSnapshotPrimTyConKey,
+    concretePrimTyConKey :: Unique
 statePrimTyConKey                       = mkPreludeTyConUnique 50
 stableNamePrimTyConKey                  = mkPreludeTyConUnique 51
 stableNameTyConKey                      = mkPreludeTyConUnique 52
@@ -1889,6 +1890,7 @@ funPtrTyConKey                          = mkPreludeTyConUnique 78
 tVarPrimTyConKey                        = mkPreludeTyConUnique 79
 compactPrimTyConKey                     = mkPreludeTyConUnique 80
 stackSnapshotPrimTyConKey               = mkPreludeTyConUnique 81
+concretePrimTyConKey                    = mkPreludeTyConUnique 82
 
 eitherTyConKey :: Unique
 eitherTyConKey                          = mkPreludeTyConUnique 84
@@ -2227,7 +2229,6 @@ integerINDataConKey       = mkPreludeDataConUnique 121
 integerIPDataConKey       = mkPreludeDataConUnique 122
 naturalNSDataConKey       = mkPreludeDataConUnique 123
 naturalNBDataConKey       = mkPreludeDataConUnique 124
-
 
 ---------------- Template Haskell -------------------
 --      GHC.Builtin.Names.TH: USES DataUniques 200-250

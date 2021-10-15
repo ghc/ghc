@@ -1,0 +1,8 @@
+
+RepPolyBinder.hs:11:1: error:
+    • The type of the first pattern in the equation for ‘foo’
+      does not have a fixed runtime representation:
+        a :: TYPE rep1
+    • The type of the second pattern in the equation for ‘foo’
+      does not have a fixed runtime representation:
+        b :: TYPE rep2

@@ -66,7 +66,7 @@ module GHC.Tc.Utils.TcMType (
 
   --------------------------------
   -- Zonking and tidying
-  zonkTidyTcType, zonkTidyTcTypes, zonkTidyOrigin,
+  zonkTidyTcType, zonkTidyTcTypes, zonkTidyOrigin, zonkTidyOrigins,
   tidyEvVar, tidyCt, tidyHole, tidySkolemInfo,
     zonkTcTyVar, zonkTcTyVars,
   zonkTcTyVarToTyVar, zonkInvisTVBinder,
@@ -93,7 +93,7 @@ module GHC.Tc.Utils.TcMType (
 
   ------------------------------
   -- Representation polymorphism
-  ensureNotLevPoly, checkForLevPoly, checkForLevPolyX,
+  checkTypeHasFixedRuntimeRep,
   ) where
 
 import GHC.Prelude
@@ -116,6 +116,7 @@ import GHC.Core.TyCon
 import GHC.Core.Coercion
 import GHC.Core.Class
 import GHC.Core.Predicate
+import GHC.Core.InstEnv (ClsInst(is_tys))
 
 import GHC.Types.Var
 import GHC.Types.Id as Id
@@ -203,7 +204,7 @@ newWanteds orig = mapM (newWanted orig Nothing)
 
 cloneWanted :: Ct -> TcM Ct
 cloneWanted ct
-  | ev@(CtWanted { ctev_pred = pty }) <- ctEvidence ct
+  | ev@(CtWanted { ctev_pred = pty, ctev_dest = HoleDest _ }) <- ctEvidence ct
   = do { co_hole <- newCoercionHole pty
        ; return (mkNonCanonical (ev { ctev_dest = HoleDest co_hole })) }
   | otherwise
@@ -307,6 +308,9 @@ predTypeOccName ty = case classifyPredType ty of
     EqPred {}       -> mkVarOccFS (fsLit "co")
     IrredPred {}    -> mkVarOccFS (fsLit "irred")
     ForAllPred {}   -> mkVarOccFS (fsLit "df")
+    SpecialPred special_pred _ ->
+      case special_pred of
+        ConcretePrimPred -> mkVarOccFS (fsLit "concr")
 
 -- | Create a new 'Implication' with as many sensible defaults for its fields
 -- as possible. Note that the 'ic_tclvl', 'ic_binds', and 'ic_info' fields do
@@ -2550,7 +2554,19 @@ zonkTidyOrigin env (FunDepOrigin2 p1 o1 p2 l2)
        ; (env2, p2') <- zonkTidyTcType env1 p2
        ; (env3, o1') <- zonkTidyOrigin env2 o1
        ; return (env3, FunDepOrigin2 p1' o1' p2' l2) }
+zonkTidyOrigin env (CycleBreakerOrigin orig)
+  = do { (env1, orig') <- zonkTidyOrigin env orig
+       ; return (env1, CycleBreakerOrigin orig') }
+zonkTidyOrigin env (InstProvidedOrigin mod cls_inst)
+  = do { (env1, is_tys') <- mapAccumLM zonkTidyTcType env (is_tys cls_inst)
+       ; return (env1, InstProvidedOrigin mod (cls_inst {is_tys = is_tys'})) }
+zonkTidyOrigin env (FixedRuntimeRepOrigin ty frr_orig)
+  = do { (env1, ty') <- zonkTidyTcType env ty
+       ; return (env1, FixedRuntimeRepOrigin ty' frr_orig)}
 zonkTidyOrigin env orig = return (env, orig)
+
+zonkTidyOrigins :: TidyEnv -> [CtOrigin] -> TcM (TidyEnv, [CtOrigin])
+zonkTidyOrigins = mapAccumLM zonkTidyOrigin
 
 ----------------
 tidyCt :: TidyEnv -> Ct -> Ct
@@ -2614,43 +2630,22 @@ tidySigSkol env cx ty tv_prs
 %*                                                                      *
              Representation polymorphism checks
 *                                                                       *
-*************************************************************************
+***********************************************************************-}
 
-See Note [Representation polymorphism checking] in GHC.HsToCore.Monad
-
--}
-
--- | According to the rules around representation polymorphism
--- (see https://gitlab.haskell.org/ghc/ghc/wikis/no-sub-kinds), no binder
--- can have a representation-polymorphic type. This check ensures
--- that we respect this rule. It is a bit regrettable that this error
--- occurs in zonking, after which we should have reported all errors.
--- But it's hard to see where else to do it, because this can be discovered
--- only after all solving is done. And, perhaps most importantly, this
--- isn't really a compositional property of a type system, so it's
--- not a terrible surprise that the check has to go in an awkward spot.
-ensureNotLevPoly :: Type  -- its zonked type
-                 -> LevityCheckProvenance  -- where this happened
-                 -> TcM ()
-ensureNotLevPoly ty provenance
-  = whenNoErrs $   -- sometimes we end up zonking bogus definitions of type
-                   -- forall a. a. See, for example, test ghci/scripts/T9140
-    checkForLevPoly provenance ty
-
-  -- See Note [Representation polymorphism checking] in GHC.HsToCore.Monad
-checkForLevPoly :: LevityCheckProvenance -> Type -> TcM ()
-checkForLevPoly = checkForLevPolyX (\ty -> addDetailedDiagnostic . TcLevityPolyInType ty)
-
-checkForLevPolyX :: Monad m
-                 => (Type -> LevityCheckProvenance -> m ())  -- how to report an error
-                 -> LevityCheckProvenance
-                 -> Type
-                 -> m ()
-checkForLevPolyX add_err provenance ty
-  | isTypeLevPoly ty
-  = add_err ty provenance
-  | otherwise
-  = return ()
+-- | Check that the specified type has a fixed runtime representation.
+--
+-- If it isn't, throw a representation-polymorphism error appropriate
+-- for the context (as specified by the 'FixedRuntimeRepProvenance').
+--
+-- Unlike the other representation polymorphism checks, which emit
+-- 'Concrete#' constraints, this function does not emit any constraints,
+-- as it has enough information to immediately make a decision.
+--
+-- See (1) in Note [Representation polymorphism checking] in GHC.Tc.Utils.Concrete
+checkTypeHasFixedRuntimeRep :: FixedRuntimeRepProvenance -> Type -> TcM ()
+checkTypeHasFixedRuntimeRep prov ty =
+  unless (typeHasFixedRuntimeRep ty)
+    (addDetailedDiagnostic $ TcRnTypeDoesNotHaveFixedRuntimeRep ty prov)
 
 {-
 %************************************************************************

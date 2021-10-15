@@ -33,7 +33,7 @@ import GHC.Driver.Session
 
 import GHC.Hs
 
-import GHC.Tc.Errors.Types ( TcRnMessage(..), LevityCheckProvenance(..) )
+import GHC.Tc.Errors.Types ( TcRnMessage(..), FixedRuntimeRepProvenance(..) )
 import GHC.Tc.TyCl.Build
 import GHC.Tc.Solver( pushLevelAndSolveEqualities, pushLevelAndSolveEqualitiesX
                     , reportUnsolvedEqualities )
@@ -2955,20 +2955,20 @@ tcDataDefn err_ctxt roles_info tc_name
     mk_permissive_kind HsigFile [] = True
     mk_permissive_kind _ _ = False
 
-    -- In hs-boot, a 'data' declaration with no constructors
+    -- In an hs-boot or a signature file,
+    -- a 'data' declaration with no constructors
     -- indicates a nominally distinct abstract data type.
-    mk_tc_rhs HsBootFile _ []
-      = return AbstractTyCon
-
-    mk_tc_rhs HsigFile _ [] -- ditto
+    mk_tc_rhs (isHsBootOrSig -> True) _ []
       = return AbstractTyCon
 
     mk_tc_rhs _ tycon data_cons
       = case new_or_data of
-          DataType -> return (mkDataTyConRhs data_cons)
+          DataType -> return $
+                        mkLevPolyDataTyConRhs
+                          (isFixedRuntimeRepKind (tyConResKind tycon))
+                          data_cons
           NewType  -> assert (not (null data_cons)) $
                       mkNewTyConRhs tc_name tycon (head data_cons)
-
 
 -------------------------
 kcTyFamInstEqn :: TcTyCon -> LTyFamInstEqn GhcRn -> TcM ()
@@ -4372,10 +4372,11 @@ checkValidDataCon dflags existential_ok tc con
           -- If we are dealing with a newtype, we allow representation
           -- polymorphism regardless of whether or not UnliftedNewtypes
           -- is enabled. A later check in checkNewDataCon handles this,
-          -- producing a better error message than checkForLevPoly would.
+          -- producing a better error message than checkTypeHasFixedRuntimeRep would.
         ; unless (isNewTyCon tc) $
             checkNoErrs $
-            mapM_ (checkForLevPoly LevityCheckInValidDataCon) (map scaledThing $ dataConOrigArgTys con)
+              mapM_ (checkTypeHasFixedRuntimeRep FixedRuntimeRepDataConField)
+                (map scaledThing $ dataConOrigArgTys con)
             -- the checkNoErrs is to prevent a panic in isVanillaDataCon
             -- (called a a few lines down), which can fall over if there is a
             -- bang on a representation-polymorphic argument. This is #18534,
@@ -4587,12 +4588,11 @@ checkValidClass cls
                 --      newBoard :: MonadState b m => m ()
                 -- Here, MonadState has a fundep m->b, so newBoard is fine
 
-           -- a method cannot be representation-polymorphic, as we have to
-           -- store the method in a dictionary
-           -- example of what this prevents:
-           --   class BoundedX (a :: TYPE r) where minBound :: a
-           -- See Note [Representation polymorphism checking] in GHC.HsToCore.Monad
-        ; checkForLevPoly LevityCheckInValidClass tau1
+        -- NB: we don't check that the class method is not representation-polymorphic here,
+        -- as GHC.TcGen.TyCl.tcClassSigType already includes a subtype check that guarantees
+        -- typeclass methods always have kind 'Type'.
+        --
+        -- Test case: rep-poly/RepPolyClassMethod.
 
         ; unless constrained_class_methods $
           mapM_ check_constraint (tail (cls_pred:op_theta))

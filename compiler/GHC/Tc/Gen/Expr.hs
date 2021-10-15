@@ -40,6 +40,7 @@ import GHC.Types.Error
 import GHC.Core.Multiplicity
 import GHC.Core.UsageEnv
 import GHC.Tc.Errors.Types
+import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep, mkWpFun )
 import GHC.Tc.Utils.Instantiate
 import GHC.Tc.Gen.App
 import GHC.Tc.Gen.Head
@@ -344,7 +345,16 @@ tcExpr (ExplicitSum _ alt arity expr) res_ty
        ; (coi, arg_tys) <- matchExpectedTyConApp sum_tc res_ty
        ; -- Drop levity vars, we don't care about them here
          let arg_tys' = drop arity arg_tys
-       ; expr' <- tcCheckPolyExpr expr (arg_tys' `getNth` (alt - 1))
+             arg_ty   = arg_tys' `getNth` (alt - 1)
+       ; expr' <- tcCheckPolyExpr expr arg_ty
+       -- Check the whole res_ty, not just the arg_ty, to avoid #20277.
+       -- Example:
+       --   a :: TYPE rep (representation-polymorphic)
+       --   (# 17# | #) :: (# Int# | a #)
+       -- This should cause an error, even though (17# :: Int#)
+       -- is not representation-polymorphic: we don't know how
+       -- wide the concrete representation of the sum type will be.
+       ; _concrete_ev <- hasFixedRuntimeRep FRRUnboxedSum res_ty
        ; return $ mkHsWrapCo coi (ExplicitSum arg_tys' alt arity expr' ) }
 
 
@@ -938,12 +948,17 @@ tcTupArgs :: [HsTupArg GhcRn] -> [TcSigmaType] -> TcM [HsTupArg GhcTc]
 tcTupArgs args tys
   = do massert (equalLength args tys)
        checkTupSize (length args)
-       mapM go (args `zip` tys)
+       zipWith3M go [1,2..] args tys
   where
-    go (Missing {},     arg_ty) = do { mult <- newFlexiTyVarTy multiplicityTy
-                                     ; return (Missing (Scaled mult arg_ty)) }
-    go (Present x expr, arg_ty) = do { expr' <- tcCheckPolyExpr expr arg_ty
-                                     ; return (Present x expr') }
+    go :: Int -> HsTupArg GhcRn -> TcType -> TcM (HsTupArg GhcTc)
+    go i (Missing {})     arg_ty
+      = do { mult <- newFlexiTyVarTy multiplicityTy
+           ; _concrete_ev <- hasFixedRuntimeRep (FRRTupleSection i) arg_ty
+           ; return (Missing (Scaled mult arg_ty)) }
+    go i (Present x expr) arg_ty
+      = do { expr' <- tcCheckPolyExpr expr arg_ty
+           ; _concrete_ev <- hasFixedRuntimeRep (FRRTupleArg i) arg_ty
+           ; return (Present x expr') }
 
 ---------------------------
 -- See TcType.SyntaxOpType also for commentary
@@ -1003,8 +1018,8 @@ tcSynArgE :: CtOrigin
            -- ^ returns a wrapper :: (type of right shape) "->" (type passed in)
 tcSynArgE orig sigma_ty syn_ty thing_inside
   = do { (skol_wrap, (result, ty_wrapper))
-           <- tcSkolemise GenSigCtxt sigma_ty $ \ rho_ty ->
-              go rho_ty syn_ty
+           <- tcSkolemise GenSigCtxt sigma_ty
+                (\ rho_ty -> go rho_ty syn_ty)
        ; return (result, skol_wrap <.> ty_wrapper) }
     where
     go rho_ty SynAny
@@ -1046,13 +1061,11 @@ tcSynArgE orig sigma_ty syn_ty thing_inside
                        do { result <- thing_inside (arg_results ++ res_results) ([arg_mult] ++ arg_res_mults ++ res_res_mults)
                           ; return (result, arg_tc_ty, res_tc_ty, arg_mult) }}
 
-           ; return ( result
-                    , match_wrapper <.>
-                      mkWpFun (arg_wrapper2 <.> arg_wrapper1) res_wrapper
-                              (Scaled op_mult arg_ty) res_ty doc ) }
+           ; fun_wrap <- mkWpFun (arg_wrapper2 <.> arg_wrapper1) res_wrapper
+                              (Scaled op_mult arg_ty) res_ty (WpFunSyntaxOp orig)
+           ; return (result, match_wrapper <.> fun_wrap) }
       where
         herald = text "This rebindable syntax expects a function with"
-        doc = text "When checking a rebindable syntax operator arising from" <+> ppr orig
 
     go rho_ty (SynType the_ty)
       = do { wrap   <- tcSubTypePat orig GenSigCtxt the_ty rho_ty
@@ -1374,6 +1387,9 @@ tcRecordField con_like flds_w_tys (L loc (FieldOcc sel_name lbl)) rhs
   | Just field_ty <- assocMaybe flds_w_tys sel_name
       = addErrCtxt (fieldCtxt field_lbl) $
         do { rhs' <- tcCheckPolyExprNC rhs field_ty
+           ; _concrete_ev <-
+                hasFixedRuntimeRep (FRRRecordUpdate (unLoc lbl) (unLoc rhs))
+                  field_ty
            ; let field_id = mkUserLocal (nameOccName sel_name)
                                         (nameUnique sel_name)
                                         Many field_ty loc

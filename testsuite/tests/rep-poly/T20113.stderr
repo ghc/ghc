@@ -1,0 +1,5 @@
+
+T20113.hs:4:35: error:
+    The type of the first pattern in the equation for ‘$sel:y_fld:MkY’
+    does not have a fixed runtime representation:
+      Y a :: TYPE rep

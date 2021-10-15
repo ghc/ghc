@@ -1,0 +1,146 @@
+
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
+{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE UnboxedTuples #-}
+
+unit prel where
+
+  module UnboxedPrelude where
+    import Data.Kind
+    import GHC.Exts
+    type Num# :: forall (r :: RuntimeRep). TYPE r -> Constraint
+    class Num# a where
+      add# :: a -> a -> a
+      mul# :: a -> a -> a
+    instance Num# Int# where
+      add# = (+#)
+      mul# = (*#)
+
+  module IntRep where
+    import GHC.Exts
+    type Rep :: RuntimeRep
+    type Rep = 'IntRep
+
+  module NilReps where
+    import GHC.Exts
+    type Reps :: [RuntimeRep]
+    type Reps = '[]
+
+
+unit rep where
+
+  dependency prel
+
+  signature Rep where
+    import GHC.Exts
+    data Rep :: RuntimeRep
+
+  module Defs where
+    import GHC.Exts
+    import Rep
+    import UnboxedPrelude
+    foo :: forall (a :: TYPE Rep). Num# a => a -> a -> a
+    foo x y = mul# x ( add# x y )
+    bar :: forall (a :: TYPE Rep) (b :: TYPE Rep). Num# a => (# a, a, b #) -> (# b, a #)
+    bar (# x, y, z #) = (# z, foo x y #)
+
+
+unit reps where
+
+  signature Reps where
+    import GHC.Exts
+    data Reps :: [RuntimeRep]
+
+  module TupleRep where
+    import GHC.Exts
+    import Reps
+    type Rep = 'TupleRep Reps
+
+  module SumRep where
+    import GHC.Exts
+    import Reps
+    type Rep = 'SumRep Reps
+
+
+unit cons where
+
+  signature Head where
+    import GHC.Exts
+    data Rep :: RuntimeRep
+
+  signature Tail where
+    import GHC.Exts
+    data Reps :: [RuntimeRep]
+
+  module ConsRep where
+    import GHC.Exts
+    import qualified Head
+    import qualified Tail
+    type Reps :: [ RuntimeRep ]
+    type Reps = Head.Rep ': Tail.Reps
+
+unit unit0 where
+  dependency prel
+  dependency cons [Head = prel:IntRep, Tail = prel:NilReps] (ConsRep as Reps1.IntRep_)
+  dependency reps [Reps = prel:NilReps] (TupleRep as TupleRep0_ )
+
+  module Reps1.IntRep ( module Reps1.IntRep_ ) where
+    import Reps1.IntRep_
+
+  module TupleRep0 ( module TupleRep0_ ) where
+    import TupleRep0_
+
+unit unit1 where
+
+  dependency unit0
+  dependency cons [Head = unit0:TupleRep0, Tail = unit0:Reps1.IntRep] (ConsRep as Reps2.TupleRep0.IntRep_)
+
+  module Reps2.TupleRep0.IntRep ( module Reps2.TupleRep0.IntRep_ ) where
+    import Reps2.TupleRep0.IntRep_
+
+unit unit2 where
+
+  dependency unit1
+  dependency reps [Reps = unit1:Reps2.TupleRep0.IntRep] (SumRep as Sum2.TupleRep0.IntRep_)
+
+  module Sum2.TupleRep0.IntRep ( module Sum2.TupleRep0.IntRep_ ) where
+    import Sum2.TupleRep0.IntRep_
+
+unit main where
+
+  dependency prel
+  dependency unit2
+  dependency rep  [Rep = unit2:Sum2.TupleRep0.IntRep] (Defs as Defs.Sum2.Tuple0.IntRep)
+
+  module Main where
+    import GHC.Exts
+    import UnboxedPrelude ( Num#(..) )
+    import Defs.Sum2.Tuple0.IntRep ( bar )
+
+    type MaybeInt# = (# (# #) | Int# #)
+
+    showMaybeInt# :: MaybeInt# -> String
+    showMaybeInt# (# _ | #) = "(Nothing# :: MaybeInt#)"
+    showMaybeInt# (# | i #) = "(Just# " <> show (I# i) <> " :: MaybeInt#)"
+
+    instance Num# MaybeInt# where
+
+      add# (# _ | #) _ = (# (# #) | #)
+      add# _ (# _ | #) = (# (# #) | #)
+      add# (# | x #) (# | y #) = (# | add# x y #)
+
+      mul# (# _ | #) _ = (# (# #) | #)
+      mul# _ (# _ | #) = (# (# #) | #)
+      mul# (# | x #) (# | y #) = (# | mul# x y #)
+
+    main :: IO ()
+    main =
+      case bar (# (# | 3# #), (# | 17# #), (# (# #) | #) #) of
+        (# a, b #) -> do
+          putStrLn $ showMaybeInt# a
+          putStrLn $ showMaybeInt# b

@@ -32,15 +32,15 @@ import GHC.Driver.Backend
 import GHC.Hs
 
 
-import GHC.Tc.Errors.Types ( TcRnMessage(..), LevityCheckProvenance(..) )
+import GHC.Tc.Errors.Types ( FixedRuntimeRepProvenance(..), TcRnMessage(..) )
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Types
 import GHC.Tc.Solver( pushLevelAndSolveEqualitiesX, reportUnsolvedEqualities )
 import GHC.Tc.Utils.Monad
+import GHC.Tc.Utils.TcMType ( checkTypeHasFixedRuntimeRep )
 import GHC.Tc.Utils.Zonk
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcType
-import GHC.Tc.Utils.TcMType
 import GHC.Tc.Validity ( checkValidType )
 import GHC.Tc.Utils.Unify( tcSkolemise, unifyType )
 import GHC.Tc.Utils.Instantiate( topInstantiate, tcInstTypeBndrs )
@@ -452,10 +452,15 @@ tcPatSynSig name sig_ty@(L _ (HsSig{sig_bndrs = hs_outer_bndrs, sig_body = hs_ty
        ; checkValidType ctxt $
          build_patsyn_type implicit_bndrs univ_bndrs req ex_bndrs prov body_ty
 
-       -- arguments become the types of binders. We thus cannot allow
-       -- representation polymorphism here
-       ; let (arg_tys, _) = tcSplitFunTys body_ty
-       ; mapM_ (checkForLevPoly LevityCheckPatSynSig . scaledThing) arg_tys
+       -- Neither argument types nor the return type may be representation polymorphic.
+       -- This is because, when creating a matcher:
+       --   - the argument types become the the binder types (see test RepPolyPatySynArg),
+       --   - the return type becomes the scrutinee type (see test RepPolyPatSynRes).
+       ; let (arg_tys, res_ty) = tcSplitFunTys body_ty
+       ; mapM_
+           (\(Scaled _ arg_ty) -> checkTypeHasFixedRuntimeRep FixedRuntimeRepPatSynSigArg arg_ty)
+           arg_tys
+       ; checkTypeHasFixedRuntimeRep FixedRuntimeRepPatSynSigRes res_ty
 
        ; traceTc "tcTySig }" $
          vcat [ text "kvs"          <+> ppr_tvs (binderVars kv_bndrs)

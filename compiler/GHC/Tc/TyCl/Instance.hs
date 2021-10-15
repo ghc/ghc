@@ -750,7 +750,10 @@ tcDataFamInstDecl mb_clsinfo tv_skol_env
               ; rep_tc_name <- newFamInstTyConName lfam_name pats
               ; axiom_name  <- newFamInstAxiomName lfam_name [pats]
               ; tc_rhs <- case new_or_data of
-                     DataType -> return (mkDataTyConRhs data_cons)
+                     DataType -> return $
+                        mkLevPolyDataTyConRhs
+                          (isFixedRuntimeRepKind final_res_kind)
+                          data_cons
                      NewType  -> assert (not (null data_cons)) $
                                  mkNewTyConRhs rep_tc_name rec_rep_tc (head data_cons)
 
@@ -1333,8 +1336,9 @@ addDFunPrags dfun_id sc_meth_ids
  where
    con_app    = mkLams dfun_bndrs $
                 mkApps (Var (dataConWrapId dict_con)) dict_args
-                 -- mkApps is OK because of the checkForLevPoly call in checkValidClass
-                 -- See Note [Representation polymorphism checking] in GHC.HsToCore.Monad
+                -- This application will satisfy the Core invariants
+                -- from Note [Representation polymorphism invariants] in GHC.Core,
+                -- because typeclass method types are never unlifted.
    dict_args  = map Type inst_tys ++
                 [mkVarApps (Var id) dfun_bndrs | id <- sc_meth_ids]
 

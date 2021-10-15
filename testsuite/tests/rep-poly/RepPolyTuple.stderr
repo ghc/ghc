@@ -1,0 +1,11 @@
+
+RepPolyTuple.hs:11:9: error:
+    • The tuple argument in first position does not have a fixed runtime representation:
+        a :: TYPE r
+    • In the expression: (# bar (), bar (), bar () #)
+      In an equation for ‘foo’:
+          foo _
+            = (# bar (), bar (), bar () #)
+            where
+                bar :: forall (r :: RuntimeRep) (a :: TYPE r). () -> a
+                bar _ = undefined

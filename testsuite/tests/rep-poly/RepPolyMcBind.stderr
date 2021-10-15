@@ -1,0 +1,9 @@
+
+RepPolyMcBind.hs:26:16: error:
+    • The first argument to (>>=),
+      arising from the monad comprehension,
+      does not have a fixed runtime representation:
+        ma :: TYPE rep
+    • In a stmt of a monad comprehension: x <- undefined :: ma
+      In the expression: [() | x <- undefined :: ma]
+      In an equation for ‘foo’: foo _ = [() | x <- undefined :: ma]

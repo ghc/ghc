@@ -1,6 +1,8 @@
 {-# LANGUAGE MagicHash, NoImplicitPrelude, TypeFamilies, UnboxedTuples,
              MultiParamTypeClasses, RoleAnnotations, CPP, TypeOperators,
-             PolyKinds, NegativeLiterals, DataKinds #-}
+             PolyKinds, NegativeLiterals, DataKinds, ScopedTypeVariables,
+             TypeApplications, StandaloneKindSignatures,
+             FlexibleInstances, UndecidableInstances #-}
 -- NegativeLiterals: see Note [Fixity of (->)]
 -----------------------------------------------------------------------------
 -- |

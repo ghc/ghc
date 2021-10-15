@@ -83,8 +83,8 @@ module GHC.Types.Id.Info (
         TickBoxOp(..), TickBoxId,
 
         -- ** Levity info
-        LevityInfo, levityInfo, setNeverLevPoly, setLevityInfoWithType,
-        isNeverLevPolyIdInfo
+        LevityInfo, levityInfo, setNeverRepPoly, setLevityInfoWithType,
+        isNeverRepPolyIdInfo
     ) where
 
 import GHC.Prelude
@@ -124,7 +124,7 @@ infixl  1 `setRuleInfo`,
           `setDmdSigInfo`,
           `setCprSigInfo`,
           `setDemandInfo`,
-          `setNeverLevPoly`,
+          `setNeverRepPoly`,
           `setLevityInfoWithType`
 
 {-
@@ -736,12 +736,16 @@ Note [Levity info]
 ~~~~~~~~~~~~~~~~~~
 
 Ids store whether or not they can be representation-polymorphic at any amount
-of saturation. This is helpful in optimizing the representation polymorphism
-check done in the desugarer, where we can usually learn that something is not
-representation-polymorphic without actually figuring out its type.
-See isExprLevPoly in GHC.Core.Utils for where this info is used.
-Storing this is required to prevent perf/compiler/T5631 from blowing up.
+of saturation. This is helpful in optimizing representation polymorphism checks,
+allowing us to learn that something is not representation-polymorphic without
+actually figuring out its type.
+See exprHasFixedRuntimeRep in GHC.Core.Utils for where this info is used.
 
+Historical note: this was very important when representation polymorphism
+was checked in the desugarer (it was needed to prevent T5631 from blowing up).
+It's less important now that the checks happen in the typechecker, but remains useful.
+Refer to Note [The Concrete mechanism] in GHC.Tc.Utils.Concrete for details
+about the new approach being used.
 -}
 
 -- See Note [Levity info]
@@ -756,19 +760,19 @@ instance Outputable LevityInfo where
 -- | Marks an IdInfo describing an Id that is never representation-polymorphic
 -- (even when applied). The Type is only there for checking that it's really
 -- never representation-polymorphic.
-setNeverLevPoly :: HasDebugCallStack => IdInfo -> Type -> IdInfo
-setNeverLevPoly info ty
-  = assertPpr (not (resultIsLevPoly ty)) (ppr ty) $
+setNeverRepPoly :: HasDebugCallStack => IdInfo -> Type -> IdInfo
+setNeverRepPoly info ty
+  = assertPpr (resultHasFixedRuntimeRep ty) (ppr ty) $
     info { bitfield = bitfieldSetLevityInfo NeverLevityPolymorphic (bitfield info) }
 
 setLevityInfoWithType :: IdInfo -> Type -> IdInfo
 setLevityInfoWithType info ty
-  | not (resultIsLevPoly ty)
+  | resultHasFixedRuntimeRep ty
   = info { bitfield = bitfieldSetLevityInfo NeverLevityPolymorphic (bitfield info) }
   | otherwise
   = info
 
-isNeverLevPolyIdInfo :: IdInfo -> Bool
-isNeverLevPolyIdInfo info
+isNeverRepPolyIdInfo :: IdInfo -> Bool
+isNeverRepPolyIdInfo info
   | NeverLevityPolymorphic <- levityInfo info = True
   | otherwise                                 = False

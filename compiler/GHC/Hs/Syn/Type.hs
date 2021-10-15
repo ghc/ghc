@@ -181,7 +181,7 @@ hsWrapperType wrap ty = prTypeType $ go wrap (ty,[])
   where
     go WpHole              = id
     go (w1 `WpCompose` w2) = go w1 . go w2
-    go (WpFun _ w2 (Scaled m exp_arg) _) = liftPRType $ \t ->
+    go (WpFun _ w2 (Scaled m exp_arg)) = liftPRType $ \t ->
       let act_res = funResultTy t
           exp_res = hsWrapperType w2 act_res
       in mkFunctionType m exp_arg exp_res

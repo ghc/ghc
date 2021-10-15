@@ -9,7 +9,7 @@ module GHC.Tc.Types.Evidence (
   HsWrapper(..),
   (<.>), mkWpTyApps, mkWpEvApps, mkWpEvVarApps, mkWpTyLams,
   mkWpLams, mkWpLet, mkWpCastN, mkWpCastR, collectHsWrapBinders,
-  mkWpFun, idHsWrapper, isIdHsWrapper,
+  idHsWrapper, isIdHsWrapper,
   pprHsWrapper, hsWrapDictBinders,
 
   -- * Evidence bindings
@@ -225,7 +225,7 @@ data HsWrapper
        -- Hence  (\a. []) `WpCompose` (\b. []) = (\a b. [])
        -- But    ([] a)   `WpCompose` ([] b)   = ([] b a)
 
-  | WpFun HsWrapper HsWrapper (Scaled TcType) SDoc
+  | WpFun HsWrapper HsWrapper (Scaled TcType)
        -- (WpFun wrap1 wrap2 (w, t1))[e] = \(x:_w t1). wrap2[ e wrap1[x] ]
        -- So note that if  wrap1 :: exp_arg <= act_arg
        --                  wrap2 :: act_res <= exp_res
@@ -233,9 +233,8 @@ data HsWrapper
        -- This isn't the same as for mkFunCo, but it has to be this way
        -- because we can't use 'sym' to flip around these HsWrappers
        -- The TcType is the "from" type of the first wrapper
-       -- The SDoc explains the circumstances under which we have created this
-       -- WpFun, in case we run afoul of representation polymorphism restrictions in
-       -- the desugarer. See Note [Representation polymorphism checking] in GHC.HsToCore.Monad
+       --
+       -- Use 'mkWpFun' to construct such a wrapper.
 
   | WpCast TcCoercionR        -- A cast:  [] `cast` co
                               -- Guaranteed not the identity coercion
@@ -256,45 +255,7 @@ data HsWrapper
   | WpMultCoercion Coercion     -- Require that a Coercion be reflexive; otherwise,
                                 -- error in the desugarer. See GHC.Tc.Utils.Unify
                                 -- Note [Wrapper returned from tcSubMult]
-
--- Cannot derive Data instance because SDoc is not Data (it stores a function).
--- So we do it manually:
-instance Data.Data HsWrapper where
-  gfoldl _ z WpHole             = z WpHole
-  gfoldl k z (WpCompose a1 a2)  = z WpCompose `k` a1 `k` a2
-  gfoldl k z (WpFun a1 a2 a3 _) = z wpFunEmpty `k` a1 `k` a2 `k` a3
-  gfoldl k z (WpCast a1)        = z WpCast `k` a1
-  gfoldl k z (WpEvLam a1)       = z WpEvLam `k` a1
-  gfoldl k z (WpEvApp a1)       = z WpEvApp `k` a1
-  gfoldl k z (WpTyLam a1)       = z WpTyLam `k` a1
-  gfoldl k z (WpTyApp a1)       = z WpTyApp `k` a1
-  gfoldl k z (WpLet a1)         = z WpLet `k` a1
-  gfoldl k z (WpMultCoercion a1) = z WpMultCoercion `k` a1
-
-  gunfold k z c = case Data.constrIndex c of
-                    1 -> z WpHole
-                    2 -> k (k (z WpCompose))
-                    3 -> k (k (k (z wpFunEmpty)))
-                    4 -> k (z WpCast)
-                    5 -> k (z WpEvLam)
-                    6 -> k (z WpEvApp)
-                    7 -> k (z WpTyLam)
-                    8 -> k (z WpTyApp)
-                    9 -> k (z WpLet)
-                    _ -> k (z WpMultCoercion)
-
-  toConstr WpHole          = wpHole_constr
-  toConstr (WpCompose _ _) = wpCompose_constr
-  toConstr (WpFun _ _ _ _) = wpFun_constr
-  toConstr (WpCast _)      = wpCast_constr
-  toConstr (WpEvLam _)     = wpEvLam_constr
-  toConstr (WpEvApp _)     = wpEvApp_constr
-  toConstr (WpTyLam _)     = wpTyLam_constr
-  toConstr (WpTyApp _)     = wpTyApp_constr
-  toConstr (WpLet _)       = wpLet_constr
-  toConstr (WpMultCoercion _) = wpMultCoercion_constr
-
-  dataTypeOf _ = hsWrapper_dataType
+  deriving Data.Data
 
 -- | The Semigroup instance is a bit fishy, since @WpCompose@, as a data
 -- constructor, is "syntactic" and not associative. Concretely, if @a@, @b@,
@@ -315,49 +276,10 @@ instance S.Semigroup HsWrapper where
 instance Monoid HsWrapper where
   mempty = WpHole
 
-hsWrapper_dataType :: Data.DataType
-hsWrapper_dataType
-  = Data.mkDataType "HsWrapper"
-      [ wpHole_constr, wpCompose_constr, wpFun_constr, wpCast_constr
-      , wpEvLam_constr, wpEvApp_constr, wpTyLam_constr, wpTyApp_constr
-      , wpLet_constr, wpMultCoercion_constr ]
-
-wpHole_constr, wpCompose_constr, wpFun_constr, wpCast_constr, wpEvLam_constr,
-  wpEvApp_constr, wpTyLam_constr, wpTyApp_constr, wpLet_constr,
-  wpMultCoercion_constr :: Data.Constr
-wpHole_constr    = mkHsWrapperConstr "WpHole"
-wpCompose_constr = mkHsWrapperConstr "WpCompose"
-wpFun_constr     = mkHsWrapperConstr "WpFun"
-wpCast_constr    = mkHsWrapperConstr "WpCast"
-wpEvLam_constr   = mkHsWrapperConstr "WpEvLam"
-wpEvApp_constr   = mkHsWrapperConstr "WpEvApp"
-wpTyLam_constr   = mkHsWrapperConstr "WpTyLam"
-wpTyApp_constr   = mkHsWrapperConstr "WpTyApp"
-wpLet_constr     = mkHsWrapperConstr "WpLet"
-wpMultCoercion_constr     = mkHsWrapperConstr "WpMultCoercion"
-
-mkHsWrapperConstr :: String -> Data.Constr
-mkHsWrapperConstr name = Data.mkConstr hsWrapper_dataType name [] Data.Prefix
-
-wpFunEmpty :: HsWrapper -> HsWrapper -> Scaled TcType -> HsWrapper
-wpFunEmpty c1 c2 t1 = WpFun c1 c2 t1 empty
-
 (<.>) :: HsWrapper -> HsWrapper -> HsWrapper
 WpHole <.> c = c
 c <.> WpHole = c
 c1 <.> c2    = c1 `WpCompose` c2
-
-mkWpFun :: HsWrapper -> HsWrapper
-        -> (Scaled TcType)    -- the "from" type of the first wrapper
-        -> TcType    -- either type of the second wrapper (used only when the
-                     -- second wrapper is the identity)
-        -> SDoc      -- what caused you to want a WpFun? Something like "When converting ..."
-        -> HsWrapper
-mkWpFun WpHole       WpHole       _  _  _ = WpHole
-mkWpFun WpHole       (WpCast co2) (Scaled w t1) _  _ = WpCast (mkTcFunCo Representational (multToCo w) (mkTcRepReflCo t1) co2)
-mkWpFun (WpCast co1) WpHole       (Scaled w _)  t2 _ = WpCast (mkTcFunCo Representational (multToCo w) (mkTcSymCo co1) (mkTcRepReflCo t2))
-mkWpFun (WpCast co1) (WpCast co2) (Scaled w _)  _  _ = WpCast (mkTcFunCo Representational (multToCo w) (mkTcSymCo co1) co2)
-mkWpFun co1          co2          t1 _  d = WpFun co1 co2 t1 d
 
 mkWpCastR :: TcCoercionR -> HsWrapper
 mkWpCastR co
@@ -420,7 +342,7 @@ hsWrapDictBinders wrap = go wrap
  where
    go (WpEvLam dict_id)   = unitBag dict_id
    go (w1 `WpCompose` w2) = go w1 `unionBags` go w2
-   go (WpFun _ w _ _)     = go w
+   go (WpFun _ w _)       = go w
    go WpHole              = emptyBag
    go (WpCast  {})        = emptyBag
    go (WpEvApp {})        = emptyBag
@@ -1033,8 +955,8 @@ pprHsWrapper wrap pp_thing_inside
     -- False <=> appears as body of let or lambda
     help it WpHole             = it
     help it (WpCompose f1 f2)  = help (help it f2) f1
-    help it (WpFun f1 f2 (Scaled w t1) _) = add_parens $ text "\\(x" <> dcolon <> brackets (ppr w) <> ppr t1 <> text ")." <+>
-                                              help (\_ -> it True <+> help (\_ -> text "x") f1 True) f2 False
+    help it (WpFun f1 f2 (Scaled w t1)) = add_parens $ text "\\(x" <> dcolon <> brackets (ppr w) <> ppr t1 <> text ")." <+>
+                                            help (\_ -> it True <+> help (\_ -> text "x") f1 True) f2 False
     help it (WpCast co)   = add_parens $ sep [it False, nest 2 (text "|>"
                                               <+> pprParendCo co)]
     help it (WpEvApp id)  = no_parens  $ sep [it True, nest 2 (ppr id)]

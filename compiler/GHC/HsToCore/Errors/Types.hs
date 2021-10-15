@@ -12,13 +12,11 @@ import GHC.Core.Type
 import GHC.Driver.Session
 import GHC.Hs
 import GHC.HsToCore.Pmc.Solver.Types
-import GHC.Tc.Errors.Types (LevityCheckProvenance)
 import GHC.Types.Basic (Activation)
 import GHC.Types.Error
 import GHC.Types.ForeignCall
 import GHC.Types.Id
 import GHC.Types.Name (Name)
-import GHC.Utils.Outputable
 import qualified GHC.LanguageExtensions as LangExt
 
 newtype MinBound = MinBound Integer
@@ -144,30 +142,14 @@ data DsMessage
 
   | DsRecBindsNotAllowedForUnliftedTys ![LHsBindLR GhcTc GhcTc]
 
-  -- NOTE(adn) The first argument is an opaque 'expr' with an
-  -- 'Outputable' constraint because this messages is emitted from
-  -- 'GHC.HsToCore.Expr.checkLevPolyArgs' which gets passed a polymorphic
-  -- 'Outputable' type.
-  | forall expr. Outputable expr => DsCannotUseFunWithPolyArgs !expr !Type ![Type]
-
   | DsRuleMightInlineFirst !RuleName !Var !Activation
 
   | DsAnotherRuleMightFireFirst !RuleName
                                 !RuleName -- the \"bad\" rule
                                 !Var
 
-  | DsLevityPolyInExpr !CoreExpr !LevityExprProvenance
-
-  | DsLevityPolyInType !Type !LevityCheckProvenance
-
 -- The positional number of the argument for an expression (first, second, third, etc)
 newtype DsArgNum = DsArgNum Int
-
--- | Where the levity checking for the expression originated
-data LevityExprProvenance
-  = LevityCheckHsExpr !(HsExpr GhcTc)
-  | LevityCheckWpFun !SDoc -- FIXME(adn) Alas 'WpFun' gives us an SDoc here.
-  | LevityCheckInSyntaxExpr !DsArgNum !(HsExpr GhcTc)
 
 -- | Why TemplateHaskell rejected the splice. Used in the 'DsNotYetHandledByTH'
 -- constructor of a 'DsMessage'.

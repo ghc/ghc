@@ -22,6 +22,7 @@ import GHC.Hs.Syn.Type
 import GHC.Tc.Errors.Types
 import GHC.Tc.Gen.Match
 import GHC.Tc.Gen.Head( tcCheckId )
+import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep )
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Gen.Bind
@@ -91,13 +92,14 @@ tcProc :: LPat GhcRn -> LHsCmdTop GhcRn         -- proc pat -> expr
        -> ExpRhoType                            -- Expected type of whole proc expression
        -> TcM (LPat GhcTc, LHsCmdTop GhcTc, TcCoercion)
 
-tcProc pat cmd@(L _ (HsCmdTop names _)) exp_ty
+tcProc pat cmd@(L loc (HsCmdTop names _)) exp_ty
   = do  { exp_ty <- expTypeToType exp_ty  -- no higher-rank stuff with arrows
         ; (co, (exp_ty1, res_ty)) <- matchExpectedAppTy exp_ty
         ; (co1, (arr_ty, arg_ty)) <- matchExpectedAppTy exp_ty1
         -- start with the names as they are used to desugar the proc itself
         -- See #17423
-        ; names' <- mapM (tcSyntaxName ProcOrigin arr_ty) names
+        ; names' <- setSrcSpan loc $
+            mapM (tcSyntaxName ProcOrigin arr_ty) names
         ; let cmd_env = CmdEnv { cmd_arr = arr_ty }
         ; (pat', cmd') <- newArrowScope
                           $ tcCheckPat (ArrowMatchCtxt ProcExpr) pat (unrestricted arg_ty)
@@ -141,9 +143,10 @@ tcCmdTop env names (L loc (HsCmdTop _names cmd)) cmd_ty@(cmd_stk, res_ty)
 ----------------------------------------
 tcCmd  :: CmdEnv -> LHsCmd GhcRn -> CmdType -> TcM (LHsCmd GhcTc)
         -- The main recursive function
-tcCmd env (L loc cmd) res_ty
+tcCmd env (L loc cmd) cmd_ty@(_, res_ty)
   = setSrcSpan (locA loc) $ do
-        { cmd' <- tc_cmd env cmd res_ty
+        { cmd' <- tc_cmd env cmd cmd_ty
+        ; _concrete_ev <- hasFixedRuntimeRep (FRRArrow $ ArrowCmdResTy cmd) res_ty
         ; return (L loc cmd') }
 
 tc_cmd :: CmdEnv -> HsCmd GhcRn  -> CmdType -> TcM (HsCmd GhcTc)
@@ -219,6 +222,10 @@ tc_cmd env cmd@(HsCmdArrApp _ fun arg ho_app lr) (_, res_ty)
 
         ; arg' <- tcCheckMonoExpr arg arg_ty
 
+        ; _concrete_ev <- hasFixedRuntimeRep
+                        (FRRArrow $ ArrowCmdArrApp (unLoc fun) (unLoc arg) ho_app)
+                        fun_ty
+
         ; return (HsCmdArrApp fun_ty fun' arg' ho_app lr) }
   where
        -- Before type-checking f, use the environment of the enclosing
@@ -243,6 +250,9 @@ tc_cmd env cmd@(HsCmdApp x fun arg) (cmd_stk, res_ty)
     do  { arg_ty <- newOpenFlexiTyVarTy
         ; fun'   <- tcCmd env fun (mkPairTy arg_ty cmd_stk, res_ty)
         ; arg'   <- tcCheckMonoExpr arg arg_ty
+        ; _concrete_ev <- hasFixedRuntimeRep
+                        (FRRArrow $ ArrowCmdApp (unLoc fun) (unLoc arg))
+                        arg_ty
         ; return (HsCmdApp x fun' arg') }
 
 -------------------------------------------
@@ -271,6 +281,15 @@ tc_cmd env
                                          , m_pats = pats'
                                          , m_grhss = grhss' })
               arg_tys = map (unrestricted . hsLPatType) pats'
+
+        ; _concrete_evs <-
+              zipWithM
+                (\ (Scaled _ arg_ty) i ->
+                  hasFixedRuntimeRep (FRRArrow $ ArrowCmdLam i) arg_ty)
+                arg_tys
+                [1..]
+
+        ; let
               cmd' = HsCmdLam x (MG { mg_alts = L l [match']
                                     , mg_ext = MatchGroupTc arg_tys res_ty
                                     , mg_origin = origin })
@@ -326,11 +345,12 @@ tc_cmd env cmd@(HsCmdArrForm x expr f fixity cmd_args) (cmd_stk, res_ty)
 
   where
     tc_cmd_arg :: LHsCmdTop GhcRn -> TcM (LHsCmdTop GhcTc, TcType)
-    tc_cmd_arg cmd@(L _ (HsCmdTop names _))
+    tc_cmd_arg cmd@(L loc (HsCmdTop names _))
        = do { arr_ty <- newFlexiTyVarTy arrowTyConKind
             ; stk_ty <- newFlexiTyVarTy liftedTypeKind
             ; res_ty <- newFlexiTyVarTy liftedTypeKind
-            ; names' <- mapM (tcSyntaxName ProcOrigin arr_ty) names
+            ; names' <- setSrcSpan loc $
+                mapM (tcSyntaxName ArrowCmdOrigin arr_ty) names
             ; let env' = env { cmd_arr = arr_ty }
             ; cmd' <- tcCmdTop env' names' cmd (stk_ty, res_ty)
             ; return (cmd',  mkCmdArrTy env' (mkPairTy alphaTy stk_ty) res_ty) }

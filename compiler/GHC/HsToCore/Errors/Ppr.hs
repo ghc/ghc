@@ -5,14 +5,11 @@ module GHC.HsToCore.Errors.Ppr where
 
 import GHC.Builtin.Names (withDictName)
 import GHC.Core.Predicate (isEvVar)
-import GHC.Core.TyCo.Ppr (pprWithTYPE)
 import GHC.Core.Type
-import GHC.Core.Utils (exprType)
 import GHC.Driver.Flags
 import GHC.Hs
 import GHC.HsToCore.Errors.Types
 import GHC.Prelude
-import GHC.Tc.Errors.Ppr (formatLevPolyErr, pprLevityPolyInType)
 import GHC.Types.Basic (pprRuleName)
 import GHC.Types.Error
 import GHC.Types.Id (idType)
@@ -197,21 +194,6 @@ instance Diagnostic DsMessage where
       -> mkSimpleDecorated $
            hang (text "Recursive bindings for unlifted types aren't allowed:")
               2 (vcat (map ppr binds))
-    DsCannotUseFunWithPolyArgs orig_hs_expr ty bad_tys
-      -> mkSimpleDecorated $
-           vcat [ hang (text "Cannot use function with representation-polymorphic arguments:")
-                  2 (hang (ppr orig_hs_expr) 2 (dcolon <+> pprWithTYPE ty))
-             , ppUnlessOption sdocPrintTypecheckerElaboration $ vcat
-                 [ text "(Note that representation-polymorphic primops,"
-                 , text "such as 'coerce' and unboxed tuples, are eta-expanded"
-                 , text "internally because they must occur fully saturated."
-                 , text "Use -fprint-typechecker-elaboration to display the full expression.)"
-                 ]
-             , hang (text "Representation-polymorphic arguments:")
-                  2 $ vcat $ map
-                    (\t -> pprWithTYPE t <+> dcolon <+> pprWithTYPE (typeKind t))
-                    bad_tys
-             ]
     DsRuleMightInlineFirst rule_name lhs_id _
       -> mkSimpleDecorated $
            vcat [ hang (text "Rule" <+> pprRuleName rule_name
@@ -227,17 +209,6 @@ instance Diagnostic DsMessage where
                           <+> text "for"<+> quotes (ppr lhs_id)
                           <+> text "might fire first")
                 ]
-    DsLevityPolyInExpr e prov
-      -> let extra = case prov of
-               LevityCheckHsExpr hsExpr -> ppr hsExpr
-               LevityCheckWpFun doc     -> doc
-               LevityCheckInSyntaxExpr (DsArgNum n) expr
-                 -> text "In the" <+> speakNth n <+> text "argument of" <+> quotes (ppr expr)
-
-         in mkSimpleDecorated $
-               formatLevPolyErr (exprType e) $$ (text "In the type of expression:" <+> extra)
-    DsLevityPolyInType ty prov
-      -> mkSimpleDecorated $ pprLevityPolyInType ty prov
 
   diagnosticReason = \case
     DsUnknownMessage m          -> diagnosticReason m
@@ -268,11 +239,8 @@ instance Diagnostic DsMessage where
     DsWrongDoBind{}                             -> WarningWithFlag Opt_WarnWrongDoBind
     DsUnusedDoBind{}                            -> WarningWithFlag Opt_WarnUnusedDoBind
     DsRecBindsNotAllowedForUnliftedTys{}        -> ErrorWithoutFlag
-    DsCannotUseFunWithPolyArgs{}                -> ErrorWithoutFlag
     DsRuleMightInlineFirst{}                    -> WarningWithFlag Opt_WarnInlineRuleShadowing
     DsAnotherRuleMightFireFirst{}               -> WarningWithFlag Opt_WarnInlineRuleShadowing
-    DsLevityPolyInExpr{}                        -> ErrorWithoutFlag
-    DsLevityPolyInType{}                        -> ErrorWithoutFlag
 
   diagnosticHints  = \case
     DsUnknownMessage m          -> diagnosticHints m
@@ -309,11 +277,8 @@ instance Diagnostic DsMessage where
     DsUnusedDoBind rhs _                        -> [SuggestBindToWildcard rhs]
     DsRecBindsNotAllowedForUnliftedTys{}        -> noHints
     DsInvalidInstantiationDictAtType{}          -> noHints
-    DsCannotUseFunWithPolyArgs{}                -> noHints
     DsRuleMightInlineFirst _ lhs_id rule_act    -> [SuggestAddInlineOrNoInlinePragma lhs_id rule_act]
     DsAnotherRuleMightFireFirst _ bad_rule _    -> [SuggestAddPhaseToCompetingRule bad_rule]
-    DsLevityPolyInExpr{}                        -> noHints
-    DsLevityPolyInType{}                        -> noHints
 
 {-
 Note [Suggest NegativeLiterals]

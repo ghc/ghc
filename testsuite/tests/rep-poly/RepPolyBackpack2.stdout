@@ -1,0 +1,2 @@
+(Nothing# :: MaybeInt#)
+(Just# 60 :: MaybeInt#)

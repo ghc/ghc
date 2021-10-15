@@ -1,0 +1,8 @@
+
+UnliftedNewtypesCoerceFail.hs:15:8: error:
+    • Unsaturated use of a representation-polymorphic primitive function.
+      The first argument of ‘coerce’
+      does not have a fixed runtime representation:
+        x :: TYPE rep
+    • In the expression: coerce
+      In an equation for ‘goof’: goof = coerce

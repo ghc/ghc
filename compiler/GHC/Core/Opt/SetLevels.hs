@@ -82,7 +82,6 @@ import GHC.Core.Opt.Monad ( FloatOutSwitches(..) )
 import GHC.Core.Utils   ( exprType, exprIsHNF
                         , exprOkForSpeculation
                         , exprIsTopLevelBindable
-                        , isExprLevPoly
                         , collectMakeStaticArgs
                         , mkLamTypes
                         )
@@ -91,7 +90,9 @@ import GHC.Core.FVs     -- all of it
 import GHC.Core.Subst
 import GHC.Core.Make    ( sortQuantVars )
 import GHC.Core.Type    ( Type, splitTyConApp_maybe, tyCoVarsOfType
-                        , mightBeUnliftedType, closeOverKindsDSet )
+                        , mightBeUnliftedType, closeOverKindsDSet
+                        , typeHasFixedRuntimeRep
+                        )
 import GHC.Core.Multiplicity     ( pattern Many )
 import GHC.Core.DataCon ( dataConOrigResTy )
 
@@ -668,8 +669,9 @@ lvlMFE env strict_ctxt ann_expr
          -- Only floating to the top level is allowed.
   || hasFreeJoin env fvs   -- If there is a free join, don't float
                            -- See Note [Free join points]
-  || isExprLevPoly expr
-         -- We can't let-bind representation-polymorphic expressions
+  || not (typeHasFixedRuntimeRep (exprType expr))
+         -- We can't let-bind an expression if we don't know
+         -- how it will be represented at runtime.
          -- See Note [Representation polymorphism invariants] in GHC.Core
   || notWorthFloating expr abs_vars
   || not float_me

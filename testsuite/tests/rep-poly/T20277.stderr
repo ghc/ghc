@@ -1,0 +1,6 @@
+
+T20277.hs:14:9: error:
+    • The unboxed sum result type does not have a fixed runtime representation:
+        (# Int# | a #) :: TYPE ('SumRep '[ 'IntRep, rep])
+    • In the expression: (# 17# | #)
+      In an equation for ‘baz’: baz _ = (# 17# | #)

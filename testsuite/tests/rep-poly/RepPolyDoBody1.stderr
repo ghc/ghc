@@ -1,0 +1,18 @@
+
+RepPolyDoBody1.hs:24:3: error:
+    • • The first argument to (>>),
+        arising from the ‘do’ statement,
+        does not have a fixed runtime representation:
+          ma :: TYPE rep
+      • The second argument to (>>),
+        arising from the ‘do’ statement,
+        does not have a fixed runtime representation:
+          mb0 :: TYPE rep
+    • In a stmt of a 'do' block: undefined :: ma
+      In the expression:
+        do undefined :: ma
+         return ()
+      In an equation for ‘foo’:
+          foo _
+            = do undefined :: ma
+               return ()

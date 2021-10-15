@@ -1,0 +1,4 @@
+
+RepPolyPatSynRes.hs:13:1: error:
+    The pattern synonym scrutinee does not have a fixed runtime representation:
+    • a :: TYPE rep

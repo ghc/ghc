@@ -230,7 +230,7 @@ data IfaceAxBranch = IfaceAxBranch { ifaxbTyVars    :: [IfaceTvBndr]
                                      -- See Note [Storing compatibility] in GHC.Core.Coercion.Axiom
 
 data IfaceConDecls
-  = IfAbstractTyCon     -- c.f TyCon.AbstractTyCon
+  = IfAbstractTyCon -- c.f TyCon.AbstractTyCon
   | IfDataTyCon [IfaceConDecl] -- Data type decls
   | IfNewTyCon  IfaceConDecl   -- Newtype decls
 
@@ -375,7 +375,7 @@ data IfaceUnfolding
 
 -- We only serialise the IdDetails of top-level Ids, and even then
 -- we only need a very limited selection.  Notably, none of the
--- implicit ones are needed here, because they are not put it
+-- implicit ones are needed here, because they are not put in
 -- interface files
 
 data IfaceIdDetails
@@ -452,9 +452,9 @@ See [https://gitlab.haskell.org/ghc/ghc/wikis/commentary/compiler/recompilation-
 -}
 
 visibleIfConDecls :: IfaceConDecls -> [IfaceConDecl]
-visibleIfConDecls IfAbstractTyCon  = []
-visibleIfConDecls (IfDataTyCon cs) = cs
-visibleIfConDecls (IfNewTyCon c)   = [c]
+visibleIfConDecls (IfAbstractTyCon {}) = []
+visibleIfConDecls (IfDataTyCon cs)     = cs
+visibleIfConDecls (IfNewTyCon c)       = [c]
 
 ifaceDeclImplicitBndrs :: IfaceDecl -> [OccName]
 --  *Excludes* the 'main' name, but *includes* the implicitly-bound names
@@ -471,9 +471,9 @@ ifaceDeclImplicitBndrs :: IfaceDecl -> [OccName]
 
 ifaceDeclImplicitBndrs (IfaceData {ifName = tc_name, ifCons = cons })
   = case cons of
-      IfAbstractTyCon -> []
-      IfNewTyCon  cd  -> mkNewTyCoOcc (occName tc_name) : ifaceConDeclImplicitBndrs cd
-      IfDataTyCon cds -> concatMap ifaceConDeclImplicitBndrs cds
+      IfAbstractTyCon {} -> []
+      IfNewTyCon  cd     -> mkNewTyCoOcc (occName tc_name) : ifaceConDeclImplicitBndrs cd
+      IfDataTyCon cds    -> concatMap ifaceConDeclImplicitBndrs cds
 
 ifaceDeclImplicitBndrs (IfaceClass { ifBody = IfAbstractClass })
   = []

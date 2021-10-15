@@ -22,6 +22,7 @@ module GHC.Tc.Gen.Head
        , splitHsApps, rebuildHsApps
        , addArgWrap, isHsValArg
        , countLeadingValArgs, isVisibleArg, pprHsExprArgTc
+       , countVisAndInvisValArgs, countHsWrapperInvisArgs
 
        , tcInferAppHead, tcInferAppHead_maybe
        , tcInferId, tcCheckId
@@ -75,6 +76,7 @@ import GHC.Types.SrcLoc
 import GHC.Utils.Misc
 import GHC.Data.Maybe
 import GHC.Utils.Outputable as Outputable
+import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import Control.Monad
 
@@ -322,6 +324,36 @@ isVisibleArg :: HsExprArg id -> Bool
 isVisibleArg (EValArg {})  = True
 isVisibleArg (ETypeArg {}) = True
 isVisibleArg _             = False
+
+-- | Count visible and invisible value arguments in a list
+-- of 'HsExprArg' arguments.
+countVisAndInvisValArgs :: [HsExprArg id] -> Arity
+countVisAndInvisValArgs []                  = 0
+countVisAndInvisValArgs (EValArg {} : args) = 1 + countVisAndInvisValArgs args
+countVisAndInvisValArgs (EWrap wrap : args) =
+  case wrap of { EHsWrap hsWrap            -> countHsWrapperInvisArgs hsWrap + countVisAndInvisValArgs args
+               ; EPar   {}                 -> countVisAndInvisValArgs args
+               ; EExpand {}                -> countVisAndInvisValArgs args }
+countVisAndInvisValArgs (EPrag {}   : args) = countVisAndInvisValArgs args
+countVisAndInvisValArgs (ETypeArg {}: args) = countVisAndInvisValArgs args
+
+-- | Counts the number of invisible term-level arguments applied by an 'HsWrapper'.
+-- Precondition: this wrapper contains no abstractions.
+countHsWrapperInvisArgs :: HsWrapper -> Arity
+countHsWrapperInvisArgs = go
+  where
+    go WpHole = 0
+    go (WpCompose wrap1 wrap2) = go wrap1 + go wrap2
+    go fun@(WpFun {}) = nope fun
+    go (WpCast {}) = 0
+    go evLam@(WpEvLam {}) = nope evLam
+    go (WpEvApp _) = 1
+    go tyLam@(WpTyLam {}) = nope tyLam
+    go (WpTyApp _) = 0
+    go (WpLet _) = 0
+    go (WpMultCoercion {}) = 0
+
+    nope x = pprPanic "countHsWrapperInvisApps" (ppr x)
 
 instance OutputableBndrId (XPass p) => Outputable (HsExprArg p) where
   ppr (EValArg { eva_arg = arg })      = text "EValArg" <+> ppr arg

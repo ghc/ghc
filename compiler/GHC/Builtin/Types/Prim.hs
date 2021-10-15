@@ -102,6 +102,8 @@ module GHC.Builtin.Types.Prim(
         eqPhantPrimTyCon,       -- ty1 ~P# ty2  (at role Phantom)
         equalityTyCon,
 
+        concretePrimTyCon,
+
         -- * SIMD
 #include "primop-vector-tys-exports.hs-incl"
   ) where
@@ -164,6 +166,7 @@ unexposedPrimTyCons
   = [ eqPrimTyCon
     , eqReprPrimTyCon
     , eqPhantPrimTyCon
+    , concretePrimTyCon
     ]
 
 -- | Primitive 'TyCon's that are defined in, and exported from, GHC.Prim.
@@ -227,7 +230,19 @@ mkBuiltInPrimTc fs unique tycon
                   BuiltInSyntax
 
 
-charPrimTyConName, intPrimTyConName, int8PrimTyConName, int16PrimTyConName, int32PrimTyConName, int64PrimTyConName, wordPrimTyConName, word32PrimTyConName, word8PrimTyConName, word16PrimTyConName, word64PrimTyConName, addrPrimTyConName, floatPrimTyConName, doublePrimTyConName, statePrimTyConName, proxyPrimTyConName, realWorldTyConName, arrayPrimTyConName, arrayArrayPrimTyConName, smallArrayPrimTyConName, byteArrayPrimTyConName, mutableArrayPrimTyConName, mutableByteArrayPrimTyConName, mutableArrayArrayPrimTyConName, smallMutableArrayPrimTyConName, mutVarPrimTyConName, mVarPrimTyConName, ioPortPrimTyConName, tVarPrimTyConName, stablePtrPrimTyConName, stableNamePrimTyConName, compactPrimTyConName, bcoPrimTyConName, weakPrimTyConName, threadIdPrimTyConName, eqPrimTyConName, eqReprPrimTyConName, eqPhantPrimTyConName, stackSnapshotPrimTyConName :: Name
+charPrimTyConName, intPrimTyConName, int8PrimTyConName, int16PrimTyConName, int32PrimTyConName, int64PrimTyConName,
+  wordPrimTyConName, word32PrimTyConName, word8PrimTyConName, word16PrimTyConName, word64PrimTyConName,
+  addrPrimTyConName, floatPrimTyConName, doublePrimTyConName,
+  statePrimTyConName, proxyPrimTyConName, realWorldTyConName,
+  arrayPrimTyConName, arrayArrayPrimTyConName, smallArrayPrimTyConName, byteArrayPrimTyConName,
+  mutableArrayPrimTyConName, mutableByteArrayPrimTyConName, mutableArrayArrayPrimTyConName,
+  smallMutableArrayPrimTyConName, mutVarPrimTyConName, mVarPrimTyConName,
+  ioPortPrimTyConName, tVarPrimTyConName, stablePtrPrimTyConName,
+  stableNamePrimTyConName, compactPrimTyConName, bcoPrimTyConName,
+  weakPrimTyConName, threadIdPrimTyConName,
+  eqPrimTyConName, eqReprPrimTyConName, eqPhantPrimTyConName,
+  stackSnapshotPrimTyConName,
+  concretePrimTyConName :: Name
 charPrimTyConName             = mkPrimTc (fsLit "Char#") charPrimTyConKey charPrimTyCon
 intPrimTyConName              = mkPrimTc (fsLit "Int#") intPrimTyConKey  intPrimTyCon
 int8PrimTyConName             = mkPrimTc (fsLit "Int8#") int8PrimTyConKey int8PrimTyCon
@@ -267,6 +282,7 @@ stackSnapshotPrimTyConName    = mkPrimTc (fsLit "StackSnapshot#") stackSnapshotP
 bcoPrimTyConName              = mkPrimTc (fsLit "BCO") bcoPrimTyConKey bcoPrimTyCon
 weakPrimTyConName             = mkPrimTc (fsLit "Weak#") weakPrimTyConKey weakPrimTyCon
 threadIdPrimTyConName         = mkPrimTc (fsLit "ThreadId#") threadIdPrimTyConKey threadIdPrimTyCon
+concretePrimTyConName         = mkPrimTc (fsLit "Concrete#") concretePrimTyConKey concretePrimTyCon
 
 {-
 ************************************************************************
@@ -1025,6 +1041,25 @@ equalityTyCon :: Role -> TyCon
 equalityTyCon Nominal          = eqPrimTyCon
 equalityTyCon Representational = eqReprPrimTyCon
 equalityTyCon Phantom          = eqPhantPrimTyCon
+
+{- *********************************************************************
+*                                                                      *
+                 The Concrete mechanism
+*                                                                      *
+********************************************************************* -}
+
+-- See Note [The Concrete mechanism] in GHC.Tc.Utils.Concrete.
+
+-- type Concrete# :: forall k. k -> TYPE (TupleRep '[])
+
+concretePrimTyCon :: TyCon
+concretePrimTyCon =
+  mkPrimTyCon concretePrimTyConName binders res_kind roles
+    where
+      -- Kind :: forall k. k -> TYPE (TupleRep '[])
+      binders = mkTemplateTyConBinders [liftedTypeKind] (\[k] -> [k])
+      res_kind = unboxedTupleKind []
+      roles   = [Nominal, Nominal]
 
 {- *********************************************************************
 *                                                                      *

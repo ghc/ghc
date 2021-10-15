@@ -239,6 +239,19 @@ data Ct
       --     look like this, with the payload in an
       --     auxiliary type
 
+  -- | A special canonical constraint.
+  --
+  -- When the 'SpecialPred' is 'ConcretePrimPred':
+  --
+  --   - `cc_ev` is Wanted,
+  --   - `cc_xi = ty`, where `ty` cannot be decomposed any further.
+  -- See Note [Canonical Concrete# constraints] in GHC.Tc.Solver.Canonical.
+  | CSpecialCan {
+      cc_ev           :: CtEvidence,
+      cc_special_pred :: SpecialPred,
+      cc_xi           :: Xi
+    }
+
 ------------
 -- | A 'CanEqLHS' is a type that can appear on the left of a canonical
 -- equality: a type variable or exactly-saturated type family application.
@@ -612,6 +625,8 @@ instance Outputable Ct where
          CQuantCan (QCI { qci_pend_sc = pend_sc })
             | pend_sc   -> text "CQuantCan(psc)"
             | otherwise -> text "CQuantCan"
+         CSpecialCan { cc_special_pred = special_pred } ->
+           text "CSpecialCan" <> parens (ppr special_pred)
 
 -----------------------------------
 -- | Is a type a canonical LHS? That is, is it a tyvar or an exactly-saturated

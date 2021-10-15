@@ -1,0 +1,9 @@
+
+RepPolyLeftSection2.hs:14:11: error:
+    • The function argument
+        ‘undefined’
+      does not have a fixed runtime representation:
+        a :: TYPE r
+    • In the expression: undefined
+      In the expression: undefined `f`
+      In an equation for ‘test1’: test1 = (undefined `f`)

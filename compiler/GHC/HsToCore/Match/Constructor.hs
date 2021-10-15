@@ -245,10 +245,11 @@ same_fields flds1 flds2
 
 -----------------
 selectConMatchVars :: [Scaled Type] -> ConArgPats -> DsM [Id]
-selectConMatchVars arg_tys con = case con of
-                                   (RecCon {}) -> newSysLocalsDsNoLP arg_tys
-                                   (PrefixCon _ ps) -> selectMatchVars (zipMults arg_tys ps)
-                                   (InfixCon p1 p2) -> selectMatchVars (zipMults arg_tys [p1, p2])
+selectConMatchVars arg_tys con
+  = case con of
+      RecCon {}      -> newSysLocalsDs arg_tys
+      PrefixCon _ ps -> selectMatchVars (zipMults arg_tys ps)
+      InfixCon p1 p2 -> selectMatchVars (zipMults arg_tys [p1, p2])
   where
     zipMults = zipWithEqual "selectConMatchVar" (\a b -> (scaledMult a, unLoc b))
 

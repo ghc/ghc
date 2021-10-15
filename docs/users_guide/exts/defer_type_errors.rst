@@ -107,7 +107,7 @@ example, an ill-kinded type signature, an instance declaration that is
 non-terminating or ill-formed, a type-family instance that does not
 obey the declared injectivity constraints, etc etc.
 
-In a few cases, equality constraints cannot be deferred.  Specifically:
+In a few cases, some constraints cannot be deferred.  Specifically:
 
 - Kind errors in a type or kind signature, partial type signatures, or pattern signature.
   e.g. ::
@@ -130,3 +130,8 @@ In a few cases, equality constraints cannot be deferred.  Specifically:
 
     f :: a %1 -> a
     f _  = ()
+
+- Illegal representation polymorphism, e.g. ::
+
+    f :: forall rep (a :: TYPE rep). a -> a
+    f a = a

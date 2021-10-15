@@ -15,6 +15,7 @@ import GHC.Prelude
 import GHC.Tc.Types.Constraint
 import GHC.Core.Predicate
 import GHC.Tc.Types.Origin
+import GHC.Tc.Utils.Concrete ( newConcretePrimWanted )
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Utils.TcType
 import GHC.Core.Type
@@ -41,6 +42,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Builtin.Types ( anyTypeOfKind )
+import GHC.Builtin.Types.Prim ( concretePrimTyCon )
 import GHC.Types.Name.Set
 import GHC.Types.Name.Reader
 import GHC.Hs.Type( HsIPName(..) )
@@ -97,6 +99,9 @@ canonicalize (CNonCanonical { cc_ev = ev })
 canonicalize (CQuantCan (QCI { qci_ev = ev, qci_pend_sc = pend_sc }))
   = canForAll ev pend_sc
 
+canonicalize (CSpecialCan { cc_ev = ev, cc_special_pred = special_pred, cc_xi = xi })
+  = canSpecial ev special_pred xi
+
 canonicalize (CIrredCan { cc_ev = ev })
   = canNC ev
     -- Instead of rewriting the evidence before classifying, it's possible we
@@ -131,6 +136,8 @@ canNC ev =
                                   canIrred ev
       ForAllPred tvs th p   -> do traceTcS "canEvNC:forall" (ppr pred)
                                   canForAllNC ev tvs th p
+      SpecialPred tc ty     -> do traceTcS "canEvNC:special" (ppr pred)
+                                  canSpecial ev tc ty
   where
     pred = ctEvPred ev
 
@@ -208,7 +215,7 @@ canClass :: CtEvidence
 -- Precondition: EvVar is class evidence
 
 canClass ev cls tys pend_sc fds
-  =   -- all classes do *nominal* matching
+  = -- all classes do *nominal* matching
     assertPpr (ctEvRole ev == Nominal) (ppr ev $$ ppr cls $$ ppr tys) $
     do { redns@(Reductions _ xis) <- rewriteArgsNom ev cls_tc tys
        ; let redn@(Reduction _ xi) = mkClassPredRedn cls redns
@@ -718,12 +725,19 @@ canIrred ev
          -- that the IrredPred branch stops work
        ; case classifyPredType (ctEvPred new_ev) of
            ClassPred cls tys     -> canClassNC new_ev cls tys
-           EqPred eq_rel ty1 ty2 -> canEqNC new_ev eq_rel ty1 ty2
+           EqPred eq_rel ty1 ty2 -> -- IrredPreds have kind Constraint, so
+                                    -- cannot become EqPreds
+                                    pprPanic "canIrred: EqPred"
+                                      (ppr ev $$ ppr eq_rel $$ ppr ty1 $$ ppr ty2)
            ForAllPred tvs th p   -> -- this is highly suspect; Quick Look
                                     -- should never leave a meta-var filled
                                     -- in with a polytype. This is #18987.
                                     do traceTcS "canEvNC:forall" (ppr pred)
                                        canForAllNC ev tvs th p
+           SpecialPred tc tys    -> -- IrredPreds have kind Constraint, so cannot
+                                    -- become SpecialPreds
+                                    pprPanic "canIrred: SpecialPred"
+                                      (ppr ev $$ ppr tc $$ ppr tys)
            IrredPred {}          -> continueWith $
                                     mkIrredCt IrredShapeReason new_ev } }
 
@@ -896,6 +910,133 @@ we'll find a match in the InstEnv.
 
 
 ************************************************************************
+*                                                                      *
+*                       Special predicates
+*                                                                      *
+********************************************************************* -}
+
+-- | Canonicalise a 'SpecialPred' constraint.
+canSpecial :: CtEvidence -> SpecialPred -> TcType -> TcS (StopOrContinue Ct)
+canSpecial ev special_pred ty
+  = do { -- Special constraints should never appear in Givens.
+       ; massertPpr (not $ isGivenOrigin $ ctEvOrigin ev)
+           (text "canSpecial: Given Special constraint" $$ ppr ev)
+       ; case special_pred of
+         { ConcretePrimPred -> canConcretePrim ev ty } }
+
+{- Note [Canonical Concrete# constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A 'Concrete#' constraint can be decomposed precisely when
+it is an application, possibly nullary, of a concrete 'TyCon'.
+
+A canonical 'Concrete#' constraint is one that cannot be decomposed.
+
+To illustrate, when we come across a constraint of the form `Concrete# (f a_1 ... a_n)`,
+to canonicalise it, we decompose it into the collection of constraints
+`Concrete# a_1`, ..., `Concrete# a_n`, whenever `f` is a concrete type constructor
+(that is, it is not a type variable, nor a type-family, nor an abstract 'TyCon'
+as declared in a Backpack signature file).
+
+Writing NC for a non-canonical constraint and C for a canonical one,
+here are some examples:
+
+  (1)
+    NC: Concrete# IntRep
+      ==> nullary decomposition, by observing that `IntRep = TyConApp intRepTyCon []`
+
+  (2)
+    NC: Concrete# (TYPE (TupleRep '[Rep, rr])) -- where 'Rep' is an abstract type and 'rr' is a type variable
+      ==> decompose once, noting that 'TYPE' is a concrete 'TyCon'
+        NC: Concrete# (TupleRep '[Rep, rr])
+      ==> decompose again in the same way but with 'TupleRep'
+        NC: Concrete# ((:) @RuntimeRep Rep ((:) @RuntimeRep rr []))
+      ==> handle (:) and its type-level argument 'RuntimeRep' (which is concrete)
+        C: Concrete# Rep, NC: Concrete# ((:) @RuntimeRep rr []))
+      ==> the second constraint can be decomposed again; 'RuntimeRep' and '[]' are concrete, so we get
+        C: Concrete# Rep, C: Concrete# rr
+
+-}
+
+-- | Canonicalise a 'Concrete#' constraint.
+--
+-- See Note [Canonical Concrete# constraints] for details.
+canConcretePrim :: CtEvidence -> TcType -> TcS (StopOrContinue Ct)
+canConcretePrim ev ty
+  = do {
+       -- As per Note [The Concrete mechanism] in GHC.Tc.Instance.Class,
+       -- in PHASE 1, we don't allow a 'Concrete#' constraint to be rewritten.
+       -- We still need to zonk, otherwise we can end up stuck with a constraint
+       -- such as `Concrete# rep` for a unification variable `rep`,
+       -- which we can't make progress on.
+       ; ty <- zonkTcType ty
+       ; traceTcS "canConcretePrim" $
+           vcat [text "ev =" <+> ppr ev, text "ty =" <+> ppr ty]
+
+       ; decomposeConcretePrim ev ty }
+
+-- | Try to decompose a 'Concrete#' constraint:
+--
+--  - calls 'canDecomposableConcretePrim' if the constraint can be decomposed;
+--  - calls 'canNonDecomposableConcretePrim' otherwise.
+decomposeConcretePrim :: CtEvidence -> Type -> TcS (StopOrContinue Ct)
+decomposeConcretePrim ev ty
+  -- Handle applications of concrete 'TyCon's.
+  -- See examples (1,2) in Note [Canonical Concrete# constraints].
+  | (f,args) <- tcSplitAppTys ty
+  , Just f_tc <- tyConAppTyCon_maybe f
+  , isConcreteTyCon f_tc
+  = canDecomposableConcretePrim ev f_tc args
+
+  -- Couldn't decompose the constraint: keep it as-is.
+  | otherwise
+  = canNonDecomposableConcretePrim ev ty
+
+-- | Decompose a constraint of the form @'Concrete#' (f t_1 ... t_n)@,
+-- for a concrete `TyCon' `f`.
+--
+-- This function will emit new Wanted @Concrete# t_i@ constraints, one for
+-- each of the arguments of `f`.
+--
+-- See Note [Canonical Concrete# constraints].
+canDecomposableConcretePrim :: CtEvidence
+                            -> TyCon
+                            -> [TcType]
+                            -> TcS (StopOrContinue Ct)
+canDecomposableConcretePrim ev f_tc args
+  = do { traceTcS "canDecomposableConcretePrim" $
+           vcat [text "args =" <+> ppr args, text "ev =" <+> ppr ev]
+       ; arg_cos <- mapM (emit_new_concretePrim_wanted (ctEvLoc ev)) args
+       ; case ev of
+          CtWanted { ctev_dest = dest }
+            -> setWantedEvTerm dest (evCoercion $ mkTyConAppCo Nominal f_tc arg_cos)
+          _ -> pprPanic "canDecomposableConcretePrim: non-Wanted" $
+                  vcat [ text "ev =" <+> ppr ev
+                       , text "args =" <+> ppr args ]
+       ; stopWith ev "Decomposed Concrete#" }
+
+-- | Canonicalise a non-decomposable 'Concrete#' constraint.
+canNonDecomposableConcretePrim :: CtEvidence -> TcType -> TcS (StopOrContinue Ct)
+canNonDecomposableConcretePrim ev ty
+  = do { -- Update the evidence to account for the zonk to `ty`.
+         let ki = typeKind ty
+             new_ev = ev { ctev_pred = mkTyConApp concretePrimTyCon [ki, ty] }
+             new_ct =
+               CSpecialCan { cc_ev = new_ev
+                           , cc_special_pred = ConcretePrimPred
+                           , cc_xi = ty }
+       ; traceTcS "canNonDecomposableConcretePrim" $
+           vcat [ text "ty =" <+> ppr ty, text "new_ev =" <+> ppr new_ev ]
+       ; continueWith new_ct }
+
+-- | Create a new 'Concrete#' Wanted constraint and immediately add it
+-- to the work list.
+emit_new_concretePrim_wanted :: CtLoc -> Type -> TcS Coercion
+emit_new_concretePrim_wanted loc ty
+  = do { (hole, wanted) <- wrapTcS $ newConcretePrimWanted loc ty
+       ; emitWorkNC [wanted]
+       ; return $ mkHoleCo hole }
+
+{- **********************************************************************
 *                                                                      *
 *        Equalities
 *                                                                      *

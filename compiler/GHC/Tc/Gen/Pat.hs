@@ -36,6 +36,7 @@ import GHC.Rename.Utils
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Zonk
 import GHC.Tc.Gen.Sig( TcPragEnv, lookupPragEnv, addInlinePrags )
+import GHC.Tc.Utils.Concrete ( mkWpFun )
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Instantiate
 import GHC.Types.Error
@@ -445,12 +446,12 @@ tc_pat pat_ty penv ps_pat thing_inside = case ps_pat of
 
         ; let Scaled w h_pat_ty = pat_ty
         ; pat_ty <- readExpType h_pat_ty
-        ; let expr_wrap2' = mkWpFun expr_wrap2 idHsWrapper
-                                    (Scaled w pat_ty) inf_res_sigma doc
-               -- expr_wrap2' :: (inf_arg_ty -> inf_res_sigma) "->"
-               --                (pat_ty -> inf_res_sigma)
+        ; expr_wrap2' <- mkWpFun expr_wrap2 idHsWrapper
+                            (Scaled w pat_ty) inf_res_sigma (WpFunViewPat $ unLoc expr)
+        -- expr_wrap2' :: (inf_arg_ty -> inf_res_sigma) "->"
+        --                (pat_ty -> inf_res_sigma)
+        ; let
               expr_wrap = expr_wrap2' <.> expr_wrap1 <.> mult_wrap
-              doc = text "When checking the view pattern function:" <+> (ppr expr)
 
         ; return $ (ViewPat pat_ty (mkLHsWrap expr_wrap expr') pat', res) }
 
@@ -656,6 +657,7 @@ AST is used for the subtraction operation.
                   ; return (lit2', wrap, bndr_id) }
 
         ; pat_ty <- readExpType pat_exp_ty
+
         -- The Report says that n+k patterns must be in Integral
         -- but it's silly to insist on this in the RebindableSyntax case
         ; unlessM (xoptM LangExt.RebindableSyntax) $

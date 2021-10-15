@@ -159,6 +159,7 @@ import GHC.Types.Var.Set
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Logger
+import GHC.Utils.Misc (HasDebugCallStack)
 import GHC.Data.Bag as Bag
 import GHC.Types.Unique.Supply
 import GHC.Tc.Types
@@ -729,7 +730,7 @@ kickOutAfterFillingCoercionHole hole filled_co
 --------------
 addInertSafehask :: InertCans -> Ct -> InertCans
 addInertSafehask ics item@(CDictCan { cc_class = cls, cc_tyargs = tys })
-  = ics { inert_safehask = addDictCt (inert_dicts ics) cls tys item }
+  = ics { inert_safehask = addDictCt (inert_dicts ics) (classTyCon cls) tys item }
 
 addInertSafehask _ item
   = pprPanic "addInertSafehask: can't happen! Inserting " $ ppr item
@@ -766,7 +767,6 @@ setSolvedDicts :: DictMap CtEvidence -> TcS ()
 setSolvedDicts solved_dicts
   = updInertTcS $ \ ics ->
     ics { inert_solved_dicts = solved_dicts }
-
 
 {- *********************************************************************
 *                                                                      *
@@ -878,7 +878,7 @@ get_sc_pending this_lvl ic@(IC { inert_dicts = dicts, inert_insts = insts })
 
     add :: Ct -> DictMap Ct -> DictMap Ct
     add ct@(CDictCan { cc_class = cls, cc_tyargs = tys }) dicts
-        = addDictCt dicts cls tys ct
+        = addDictCt dicts (classTyCon cls) tys ct
     add ct _ = pprPanic "getPendingScDicts" (ppr ct)
 
     get_pending_inst :: [Ct] -> QCInst -> ([Ct], QCInst)
@@ -901,21 +901,21 @@ getUnsolvedInerts :: TcS ( Bag Implication
 --                     (because they come from the inert set)
 --                 the unsolved implics may not be
 getUnsolvedInerts
- = do { IC { inert_eqs     = tv_eqs
-           , inert_funeqs  = fun_eqs
-           , inert_irreds  = irreds
-           , inert_blocked = blocked
-           , inert_dicts   = idicts
+ = do { IC { inert_eqs      = tv_eqs
+           , inert_funeqs   = fun_eqs
+           , inert_irreds   = irreds
+           , inert_blocked  = blocked
+           , inert_dicts    = idicts
            } <- getInertCans
 
-      ; let unsolved_tv_eqs  = foldTyEqs add_if_unsolved tv_eqs emptyCts
-            unsolved_fun_eqs = foldFunEqs add_if_unsolveds fun_eqs emptyCts
-            unsolved_irreds  = Bag.filterBag is_unsolved irreds
-            unsolved_blocked = blocked  -- all blocked equalities are W/D
-            unsolved_dicts   = foldDicts add_if_unsolved idicts emptyCts
-            unsolved_others  = unionManyBags [ unsolved_irreds
-                                             , unsolved_dicts
-                                             , unsolved_blocked ]
+      ; let unsolved_tv_eqs   = foldTyEqs add_if_unsolved tv_eqs emptyCts
+            unsolved_fun_eqs  = foldFunEqs add_if_unsolveds fun_eqs emptyCts
+            unsolved_irreds   = Bag.filterBag is_unsolved irreds
+            unsolved_blocked  = blocked  -- all blocked equalities are W/D
+            unsolved_dicts    = foldDicts add_if_unsolved idicts emptyCts
+            unsolved_others   = unionManyBags [ unsolved_irreds
+                                              , unsolved_dicts
+                                              , unsolved_blocked ]
 
       ; implics <- getWorkListImplics
 
@@ -1077,6 +1077,8 @@ removeInertCt is ct =
     CQuantCan {}     -> panic "removeInertCt: CQuantCan"
     CIrredCan {}     -> panic "removeInertCt: CIrredEvCan"
     CNonCanonical {} -> panic "removeInertCt: CNonCanonical"
+    CSpecialCan _ special_pred _ ->
+      pprPanic "removeInertCt" (ppr "CSpecialCan" <+> parens (ppr special_pred))
 
 -- | Looks up a family application in the inerts.
 lookupFamAppInert :: TyCon -> [Type] -> TcS (Maybe (Reduction, CtFlavourRole))
@@ -2025,7 +2027,7 @@ useVars co_vars
             ; TcM.writeTcRef ref tcvs' } }
 
 -- | Equalities only
-setWantedEq :: TcEvDest -> Coercion -> TcS ()
+setWantedEq :: HasDebugCallStack => TcEvDest -> Coercion -> TcS ()
 setWantedEq (HoleDest hole) co
   = do { useVars (coVarsOfCo co)
        ; fillCoercionHole hole co }

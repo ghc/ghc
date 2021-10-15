@@ -1591,7 +1591,7 @@ mkEtaWW orig_oss ppr_orig_expr in_scope orig_ty
 
        ----------- Function types  (t1 -> t2)
        | Just (mult, arg_ty, res_ty) <- splitFunTy_maybe ty
-       , not (isTypeLevPoly arg_ty)
+       , typeHasFixedRuntimeRep arg_ty
           -- See Note [Representation polymorphism invariants] in GHC.Core
           -- See also test case typecheck/should_run/EtaExpandLevPoly
 
@@ -1621,7 +1621,7 @@ mkEtaWW orig_oss ppr_orig_expr in_scope orig_ty
 
        | otherwise       -- We have an expression of arity > 0,
                          -- but its type isn't a function, or a binder
-                         -- is representation-polymorphic
+                         -- does not have a fixed runtime representation
        = warnPprTrace True ((ppr orig_oss <+> ppr orig_ty) $$ ppr_orig_expr)
          (getTCvInScope subst, EI [] MRefl)
         -- This *can* legitimately happen:

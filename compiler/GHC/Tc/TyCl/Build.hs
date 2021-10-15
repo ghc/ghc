@@ -52,11 +52,11 @@ mkNewTyConRhs tycon_name tycon con
   = do  { co_tycon_name <- newImplicitBinder tycon_name mkNewTyCoOcc
         ; let nt_ax = mkNewTypeCoAxiom co_tycon_name tycon etad_tvs etad_roles etad_rhs
         ; traceIf (text "mkNewTyConRhs" <+> ppr nt_ax)
-        ; return (NewTyCon { data_con    = con,
-                             nt_rhs      = rhs_ty,
-                             nt_etad_rhs = (etad_tvs, etad_rhs),
-                             nt_co       = nt_ax,
-                             nt_lev_poly = isKindLevPoly res_kind } ) }
+        ; return (NewTyCon { data_con     = con,
+                             nt_rhs       = rhs_ty,
+                             nt_etad_rhs  = (etad_tvs, etad_rhs),
+                             nt_co        = nt_ax,
+                             nt_fixed_rep = isFixedRuntimeRepKind res_kind } ) }
                              -- Coreview looks through newtypes with a Nothing
                              -- for nt_co, or uses explicit coercions otherwise
   where
@@ -292,7 +292,8 @@ buildClass tycon_name binders roles fds Nothing
         ; tc_rep_name  <- newTyConRepName tycon_name
         ; let univ_tvs = binderVars binders
               tycon = mkClassTyCon tycon_name binders roles
-                                   AbstractTyCon rec_clas tc_rep_name
+                                   AbstractTyCon
+                                   rec_clas tc_rep_name
               result = mkAbstractClass tycon_name univ_tvs fds tycon
         ; traceIf (text "buildClass" <+> ppr tycon)
         ; return result }

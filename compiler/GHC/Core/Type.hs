@@ -145,7 +145,7 @@ module GHC.Core.Type (
         Kind,
 
         -- ** Finding the kind of a type
-        typeKind, tcTypeKind, isTypeLevPoly, resultIsLevPoly,
+        typeKind, tcTypeKind, typeHasFixedRuntimeRep, resultHasFixedRuntimeRep,
         tcIsLiftedTypeKind, tcIsConstraintKind, tcReturnsConstraintKind,
         tcIsBoxedTypeKind, tcIsRuntimeTypeKind,
 
@@ -233,7 +233,7 @@ module GHC.Core.Type (
         -- * Kinds
         isConstraintKindCon,
         classifiesTypeWithValues,
-        isKindLevPoly
+        isConcrete, isFixedRuntimeRepKind,
     ) where
 
 import GHC.Prelude
@@ -2971,31 +2971,32 @@ typeLiteralKind (NumTyLit {}) = naturalTy
 typeLiteralKind (StrTyLit {}) = typeSymbolKind
 typeLiteralKind (CharTyLit {}) = charTy
 
--- | Returns True if a type is representation-polymorphic. Should be the same
--- as (isKindLevPoly . typeKind) but much faster.
--- Precondition: The type has kind (TYPE blah)
-isTypeLevPoly :: Type -> Bool
-isTypeLevPoly = go
+-- | Returns True if a type has a fixed runtime rep,
+-- as per Note [Fixed RuntimeRep] in GHC.Tc.Utils.Concrete.
+--
+-- This function is equivalent to @('isFixedRuntimeRepKind' . 'typeKind')@,
+-- but much faster.
+--
+-- __Precondition:__ The type has kind @('TYPE' blah)@
+typeHasFixedRuntimeRep :: Type -> Bool
+typeHasFixedRuntimeRep = go
   where
-    go ty@(TyVarTy {})                           = check_kind ty
-    go ty@(AppTy {})                             = check_kind ty
-    go ty@(TyConApp tc _) | not (isTcLevPoly tc) = False
-                          | otherwise            = check_kind ty
-    go (ForAllTy _ ty)                           = go ty
-    go (FunTy {})                                = False
-    go (LitTy {})                                = False
-    go ty@(CastTy {})                            = check_kind ty
-    go ty@(CoercionTy {})                        = pprPanic "isTypeLevPoly co" (ppr ty)
+    go (TyConApp tc _)
+      | tcHasFixedRuntimeRep tc = True
+    go (FunTy {})               = True
+    go (LitTy {})               = True
+    go (ForAllTy _ ty)          = go ty
+    go ty                       = isFixedRuntimeRepKind (typeKind ty)
 
-    check_kind = isKindLevPoly . typeKind
-
--- | Looking past all pi-types, is the end result potentially
--- representation-polymorphic?
--- Example: True for (forall r (a :: TYPE r). String -> a)
--- Example: False for (forall r1 r2 (a :: TYPE r1) (b :: TYPE r2). a -> b -> Type)
-resultIsLevPoly :: Type -> Bool
-resultIsLevPoly = isTypeLevPoly . snd . splitPiTys
-
+-- | Looking past all pi-types, does the end result have a
+-- fixed runtime rep, as per Note [Fixed RuntimeRep] in GHC.Tc.Utils.Concrete?
+--
+-- Examples:
+--
+--   * False for @(forall r (a :: TYPE r). String -> a)@
+--   * True for @(forall r1 r2 (a :: TYPE r1) (b :: TYPE r2). a -> b -> Type)@
+resultHasFixedRuntimeRep :: Type -> Bool
+resultHasFixedRuntimeRep = typeHasFixedRuntimeRep . snd . splitPiTys
 
 {- **********************************************************************
 *                                                                       *
@@ -3334,26 +3335,37 @@ distinct uniques, they are treated as equal at all times except
 during type inference.
 -}
 
--- | Tests whether the given kind (which should look like @TYPE x@)
--- is something other than a constructor tree (that is, constructors at every node).
--- E.g.  True of   TYPE k, TYPE (F Int)
---       False of  TYPE 'LiftedRep
-isKindLevPoly :: Kind -> Bool
-isKindLevPoly k = assertPpr (isLiftedTypeKind k || _is_type) (ppr k) $
-                    -- the isLiftedTypeKind check is necessary b/c of Constraint
-                  go k
+-- | Tests whether the given kind is a constructor tree
+-- (that is, constructors at every node).
+--
+-- E.g.  @False@ for @TYPE k@, @TYPE (F Int)@
+--       @True@ for @TYPE 'LiftedRep@
+--
+-- __Precondition:__ The type has kind @('TYPE' blah)@.
+isFixedRuntimeRepKind :: HasDebugCallStack => Kind -> Bool
+isFixedRuntimeRepKind k
+  = assertPpr (isLiftedTypeKind k || _is_type) (ppr k) $
+    -- the isLiftedTypeKind check is necessary b/c of Constraint
+    isConcrete k
+  where
+    _is_type = classifiesTypeWithValues k
+
+-- | Tests whether the given type is a constructor tree,
+-- consisting only of concrete type constructors and applications.
+isConcrete :: Type -> Bool
+isConcrete = go
   where
     go ty | Just ty' <- coreView ty = go ty'
-    go TyVarTy{}         = True
-    go AppTy{}           = True  -- it can't be a TyConApp
-    go (TyConApp tc tys) = isFamilyTyCon tc || any go tys
-    go ForAllTy{}        = True
-    go (FunTy _ w t1 t2) = go w || go t1 || go t2
-    go LitTy{}           = False
-    go CastTy{}          = True
-    go CoercionTy{}      = True
-
-    _is_type = classifiesTypeWithValues k
+    go TyVarTy{}           = False
+    go AppTy{}             = False  -- it can't be a TyConApp
+    go (TyConApp tc tys)
+      | isConcreteTyCon tc = all go tys
+      | otherwise          = False
+    go ForAllTy{}          = False
+    go (FunTy _ w t1 t2)   = go w && go t1 && go t2
+    go LitTy{}             = True
+    go CastTy{}            = False
+    go CoercionTy{}        = False
 
 -----------------------------------------
 -- | Does this classify a type allowed to have values? Responds True to things

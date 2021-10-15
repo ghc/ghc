@@ -1,12 +1,12 @@
 
 T12837.hs:10:10: error:
-    • Class ‘Typeable’ does not support user-specified instances
+    • Class ‘Typeable’ does not support user-specified instances.
     • In the instance declaration for ‘Typeable K’
 
 T12837.hs:11:10: error:
-    • Class ‘KnownNat’ does not support user-specified instances
+    • Class ‘KnownNat’ does not support user-specified instances.
     • In the instance declaration for ‘KnownNat n’
 
 T12837.hs:12:10: error:
-    • Class ‘KnownSymbol’ does not support user-specified instances
+    • Class ‘KnownSymbol’ does not support user-specified instances.
     • In the instance declaration for ‘KnownSymbol n’

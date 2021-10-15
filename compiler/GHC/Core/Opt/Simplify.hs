@@ -434,9 +434,8 @@ simplNonRecX env bndr new_rhs
         ; completeNonRecX NotTopLevel env' (isStrictId bndr') bndr bndr' new_rhs }
           -- NotTopLevel: simplNonRecX is only used for NotTopLevel things
           --
-          -- isStrictId: use bndr' because in a representation-polymorphic
-          -- setting, the InId bndr might have a representation-polymorphic
-          -- type, which isStrictId doesn't expect
+          -- isStrictId: use bndr' because the InId bndr might not have
+          -- a fixed runtime representation, which isStrictId doesn't expect
           -- c.f. Note [Dark corner with representation polymorphism]
 
 --------------------------
@@ -1543,7 +1542,7 @@ simplCast env body co0 cont0
         addCoerce co cont@(ApplyToVal { sc_arg = arg, sc_env = arg_se
                                       , sc_dup = dup, sc_cont = tail })
           | Just (m_co1, m_co2) <- pushCoValArg co
-          , levity_ok m_co1
+          , fixed_rep m_co1
           = {-#SCC "addCoerce-pushCoValArg" #-}
             do { tail' <- addCoerceM m_co2 tail
                ; case m_co1 of {
@@ -1571,10 +1570,11 @@ simplCast env body co0 cont0
                                             -- See Note [Optimising reflexivity]
           | otherwise        = return (CastIt co cont)
 
-        levity_ok :: MCoercionR -> Bool
-        levity_ok MRefl = True
-        levity_ok (MCo co) = not $ isTypeLevPoly $ coercionRKind co
-          -- Without this check, we get a lev-poly arg
+        fixed_rep :: MCoercionR -> Bool
+        fixed_rep MRefl    = True
+        fixed_rep (MCo co) = typeHasFixedRuntimeRep $ coercionRKind co
+          -- Without this check, we can get an argument which does not
+          -- have a fixed runtime representation.
           -- See Note [Representation polymorphism invariants] in GHC.Core
           -- test: typecheck/should_run/EtaExpandLevPoly
 
@@ -1717,10 +1717,10 @@ simplRecE env pairs body cont
         ; return (floats1 `addFloats` floats2, expr') }
 
 {- Note [Dark corner with representation polymorphism]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In `simplNonRecE`, the call to `isStrictId` will fail if the binder
-has a representation-polymorphic type, of kind (TYPE r).  So we are careful to
-call `isStrictId` on the OutId, not the InId, in case we have
+does not have a fixed runtime representation, e.g. if it is of kind (TYPE r).
+So we are careful to call `isStrictId` on the OutId, not the InId, in case we have
      ((\(r::RuntimeRep) \(x::TYPE r). blah) Lifted arg)
 That will lead to `simplNonRecE env (x::TYPE r) arg`, and we can't tell
 if x is lifted or unlifted from that.
@@ -1736,7 +1736,7 @@ GHCi or TH and operator sections will fall over if we don't take
 care here.
 
 Note [Avoiding exponential behaviour]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 One way in which we can get exponential behaviour is if we simplify a
 big expression, and the re-simplify it -- and then this happens in a
 deeply-nested way.  So we must be jolly careful about re-simplifying

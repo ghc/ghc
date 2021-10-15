@@ -1,4 +1,4 @@
 
 T8132.hs:7:10: error:
-    • Class ‘Typeable’ does not support user-specified instances
+    • Class ‘Typeable’ does not support user-specified instances.
     • In the instance declaration for ‘Typeable K’

@@ -1,18 +1,18 @@
 
-
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 module GHC.Tc.Instance.Class (
      matchGlobalInst,
      ClsInstResult(..),
      InstanceWhat(..), safeOverlap, instanceReturnsDictCon,
-     AssocInstInfo(..), isNotAssociated
+     AssocInstInfo(..), isNotAssociated,
   ) where
 
 import GHC.Prelude
 
 import GHC.Driver.Session
 
+import GHC.Core.TyCo.Rep
 
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Monad
@@ -25,7 +25,7 @@ import GHC.Tc.Instance.Family( tcGetFamInstEnvs, tcInstNewTyCon_maybe, tcLookupD
 import GHC.Rename.Env( addUsedGRE )
 
 import GHC.Builtin.Types
-import GHC.Builtin.Types.Prim( eqPrimTyCon, eqReprPrimTyCon )
+import GHC.Builtin.Types.Prim
 import GHC.Builtin.Names
 
 import GHC.Types.Name.Reader( lookupGRE_FieldLabel, greMangledName )
@@ -37,7 +37,7 @@ import GHC.Types.Id
 import GHC.Core.Predicate
 import GHC.Core.InstEnv
 import GHC.Core.Type
-import GHC.Core.Make ( mkCharExpr, mkStringExprFS, mkNaturalExpr )
+import GHC.Core.Make ( mkCharExpr, mkNaturalExpr, mkStringExprFS )
 import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Core.Class
@@ -608,7 +608,6 @@ matchCoercible args@[k, t1, t2]
   where
     args' = [k, k, t1, t2]
 matchCoercible args = pprPanic "matchLiftedCoercible" (ppr args)
-
 
 {- ********************************************************************
 *                                                                     *

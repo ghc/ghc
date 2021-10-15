@@ -1,0 +1,15 @@
+
+RepPolyPatBind.hs:18:5: error:
+    • The binder ‘x’ does not have a fixed runtime representation:
+        a :: TYPE rep
+    • In the expression:
+        let
+          x, y :: a
+          (# x, y #) = undefined
+        in x
+      In an equation for ‘foo’:
+          foo _
+            = let
+                x, y :: a
+                (# x, y #) = undefined
+              in x

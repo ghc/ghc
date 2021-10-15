@@ -1,2 +1,3 @@
 
-T9084.hs:5:3: MINIMAL pragmas not (yet) handled by Template Haskell
+T9084.hs:5:2: error:
+    MINIMAL pragmas not (yet) handled by Template Haskell

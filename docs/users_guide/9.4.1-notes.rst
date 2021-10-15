@@ -13,6 +13,9 @@ Compiler
   defaults for ambiguous variables that would otherwise cause errors
   just like the built-in defaulting mechanism.
 
+- The way GHC checks for representation polymorphism has been overhauled:
+  all the checks are now done during typechecking. The error messages
+  now contain more detailed information about the specific check that was performed.
 
 ``base`` library
 ~~~~~~~~~~~~~~~~

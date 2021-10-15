@@ -1,4 +1,5 @@
 
+{-# LANGUAGE DerivingStrategies #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
@@ -32,7 +33,7 @@ import GHC.Core.TyCo.FVs
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Ppr
 import GHC.Tc.Utils.TcType hiding ( sizeType, sizeTypes )
-import GHC.Builtin.Types ( heqTyConName, eqTyConName, coercibleTyConName, manyDataConTy )
+import GHC.Builtin.Types
 import GHC.Builtin.Names
 import GHC.Core.Type
 import GHC.Core.Unify ( tcMatchTyX_BM, BindFlag(..) )
@@ -692,8 +693,10 @@ check_type ve (AppTy ty1 ty2)
 check_type ve ty@(TyConApp tc tys)
   | isTypeSynonymTyCon tc || isTypeFamilyTyCon tc
   = check_syn_tc_app ve ty tc tys
-  | isUnboxedTupleTyCon tc = check_ubx_tuple ve ty tys
-  | otherwise              = mapM_ (check_arg_type False ve) tys
+  | isUnboxedTupleTyCon tc
+  = check_ubx_tuple ve ty tys
+  | otherwise
+  = mapM_ (check_arg_type False ve) tys
 
 check_type _ (LitTy {}) = return ()
 
@@ -1384,11 +1387,12 @@ checkValidInstHead ctxt clas cls_args
 Note [Instances of built-in classes in signature files]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-User defined instances for KnownNat, KnownSymbol and Typeable are
-disallowed -- they are generated when needed by GHC itself on-the-fly.
+User defined instances for KnownNat, KnownSymbol, KnownChar,
+and Typeable are disallowed
+  -- they are generated when needed by GHC itself, on-the-fly.
 
 However, if they occur in a Backpack signature file, they have an
-entirely different meaning. Suppose in M.hsig we see
+entirely different meaning. To illustrate, suppose in M.hsig we see
 
   signature M where
     data T :: Nat
@@ -1407,6 +1411,7 @@ in hsig files, where `is_sig` is True.
 check_special_inst_head :: DynFlags -> Bool -> Bool
                         -> UserTypeCtxt -> Class -> [Type] -> TcM ()
 -- Wow!  There are a surprising number of ad-hoc special cases here.
+-- TODO: common up the logic for special typeclasses (see GHC ticket #20441).
 check_special_inst_head dflags is_boot is_sig ctxt clas cls_args
 
   -- If not in an hs-boot file, abstract classes cannot have instances
@@ -1421,15 +1426,15 @@ check_special_inst_head dflags is_boot is_sig ctxt clas cls_args
   , not is_sig
     -- Note [Instances of built-in classes in signature files]
   , hand_written_bindings
-  = failWithTc rejected_class_msg
+  = failWithTc $ TcRnSpecialClassInst clas False
 
-  -- Handwritten instances of KnownNat/KnownSymbol class
-  -- are always forbidden (#12837)
+  -- Handwritten instances of KnownNat/KnownSymbol
+  -- are forbidden outside of signature files (#12837)
   | clas_nm `elem` [ knownNatClassName, knownSymbolClassName ]
   , not is_sig
     -- Note [Instances of built-in classes in signature files]
   , hand_written_bindings
-  = failWithTc rejected_class_msg
+  = failWithTc $ TcRnSpecialClassInst clas False
 
   -- For the most part we don't allow
   -- instances for (~), (~~), or Coercible;
@@ -1437,12 +1442,12 @@ check_special_inst_head dflags is_boot is_sig ctxt clas cls_args
   --   f :: (forall a b. Coercible a b => Coercible (m a) (m b)) => ...m...
   | clas_nm `elem` [ heqTyConName, eqTyConName, coercibleTyConName ]
   , not quantified_constraint
-  = failWithTc rejected_class_msg
+  = failWithTc $ TcRnSpecialClassInst clas False
 
   -- Check for hand-written Generic instances (disallowed in Safe Haskell)
   | clas_nm `elem` genericClassNames
   , hand_written_bindings
-  =  do { failIfTc (safeLanguageOn dflags) gen_inst_err
+  =  do { failIfTc (safeLanguageOn dflags) (TcRnSpecialClassInst clas True)
         ; when (safeInferOn dflags) (recordUnsafeInfer emptyMessages) }
 
   | clas_nm == hasFieldClassName
@@ -1500,18 +1505,6 @@ check_special_inst_head dflags is_boot is_sig ctxt clas cls_args
     head_one_type_msg = parens $
                         text "Only one type can be given in an instance head." $$
                         text "Use MultiParamTypeClasses if you want to allow more, or zero."
-
-    rejected_class_msg :: TcRnMessage
-    rejected_class_msg = TcRnUnknownMessage $ mkPlainError noHints $ rejected_class_doc
-
-    rejected_class_doc :: SDoc
-    rejected_class_doc =
-      text "Class" <+> quotes (ppr clas_nm)
-                   <+> text "does not support user-specified instances"
-
-    gen_inst_err :: TcRnMessage
-    gen_inst_err = TcRnUnknownMessage $ mkPlainError noHints $
-      rejected_class_doc $$ nest 2 (text "(in Safe Haskell)")
 
     mb_ty_args_msg
       | not (xopt LangExt.TypeSynonymInstances dflags)
@@ -1819,8 +1812,9 @@ checkInstTermination theta head_pred
    check :: VarSet -> PredType -> TcM ()
    check foralld_tvs pred
      = case classifyPredType pred of
-         EqPred {}    -> return ()  -- See #4200.
-         IrredPred {} -> check2 foralld_tvs pred (sizeType pred)
+         EqPred {}      -> return ()  -- See #4200.
+         SpecialPred {} -> return ()
+         IrredPred {}   -> check2 foralld_tvs pred (sizeType pred)
          ClassPred cls tys
            | isTerminatingClass cls
            -> return ()
@@ -2834,6 +2828,7 @@ sizePred ty = goClass ty
                     -- The filtering looks bogus
                     -- See Note [Invisible arguments and termination]
     go (EqPred {})           = 0
+    go (SpecialPred {})      = 0
     go (IrredPred ty)        = sizeType ty
     go (ForAllPred _ _ pred) = goClass pred
 

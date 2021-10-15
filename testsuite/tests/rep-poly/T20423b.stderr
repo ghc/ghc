@@ -1,0 +1,4 @@
+
+T20423b.hs:17:1: error:
+    The pattern synonym scrutinee does not have a fixed runtime representation:
+    • LPGADT l :: TYPE ('BoxedRep l)

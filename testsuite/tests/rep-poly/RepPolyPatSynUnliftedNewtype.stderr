@@ -1,0 +1,8 @@
+
+RepPolyPatSynUnliftedNewtype.hs:16:1: error:
+    The pattern synonym scrutinee does not have a fixed runtime representation:
+    • X a :: TYPE rep
+
+RepPolyPatSynUnliftedNewtype.hs:16:1: error:
+    The pattern synonym argument does not have a fixed runtime representation:
+    • a :: TYPE rep

@@ -480,17 +480,17 @@ lintCoreBindings dflags pass local_in_scope binds
                , lf_check_inline_loop_breakers = check_lbs
                , lf_check_static_ptrs = check_static_ptrs
                , lf_check_linearity = check_linearity
-               , lf_check_levity_poly = check_levity }
+               , lf_check_fixed_rep = check_fixed_rep }
 
     -- In the output of the desugarer, before optimisation,
     -- we have eta-expanded data constructors with representation-polymorphic
-    -- bindings; so we switch off the lev-poly checks. The very simple
-    -- optimiser will beta-reduce them away.
+    -- bindings; so we switch off the representation-polymorphism checks.
+    -- The very simple optimiser will beta-reduce them away.
     -- See Note [Checking representation-polymorphic data constructors]
     -- in GHC.HsToCore.Expr.
-    check_levity = case pass of
-                      CoreDesugar -> False
-                      _           -> True
+    check_fixed_rep = case pass of
+                        CoreDesugar -> False
+                        _           -> True
 
     -- See Note [Checking for global Ids]
     check_globals = case pass of
@@ -565,7 +565,7 @@ lintUnfolding is_compulsory dflags locn var_set expr
     (_warns, errs) = initL dflags (defaultLintFlags dflags) vars $
                      if is_compulsory
                        -- See Note [Checking for representation polymorphism]
-                     then noLPChecks linter
+                     then noFixedRuntimeRepChecks linter
                      else linter
     linter = addLoc (ImportedUnfolding locn) $
              lintCoreExpr expr
@@ -749,8 +749,8 @@ lintIdUnfolding bndr bndr_ty uf
   | isStableUnfolding uf
   , Just rhs <- maybeUnfoldingTemplate uf
   = do { ty <- fst <$> (if isCompulsoryUnfolding uf
-                        then noLPChecks $ lintRhs bndr rhs
-            --               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                        then noFixedRuntimeRepChecks $ lintRhs bndr rhs
+            --               ^^^^^^^^^^^^^^^^^^^^^^^
             -- See Note [Checking for representation polymorphism]
                         else lintRhs bndr rhs)
        ; ensureEqTys bndr_ty ty (mkRhsMsg bndr (text "unfolding") ty) }
@@ -1191,11 +1191,11 @@ lintCoreArg (fun_ty, fun_ue) arg
            -- See Note [Representation polymorphism invariants] in GHC.Core
        ; flags <- getLintFlags
 
-       ; when (lf_check_levity_poly flags) $
-         -- Only do these checks if lf_check_levity_poly is on,
+       ; when (lf_check_fixed_rep flags) $
+         -- Only do these checks if lf_check_fixed_rep is on,
          -- because otherwise isUnliftedType panics
-         do { checkL (not (isTypeLevPoly arg_ty))
-                     (text "Representation-polymorphic argument:"
+         do { checkL (typeHasFixedRuntimeRep arg_ty)
+                     (text "Argument does not have a fixed runtime representation"
                       <+> ppr arg <+> dcolon
                       <+> parens (ppr arg_ty <+> dcolon <+> ppr (typeKind arg_ty)))
 
@@ -1550,9 +1550,9 @@ lintIdBndr top_lvl bind_site id thing_inside
            (mkNonTopExternalNameMsg id)
 
           -- See Note [Representation polymorphism invariants] in GHC.Core
-       ; lintL (isJoinId id || not (lf_check_levity_poly flags)
-                || not (isTypeLevPoly id_ty)) $
-         text "Representation-polymorphic binder:" <+> ppr id <+> dcolon <+>
+       ; lintL (isJoinId id || not (lf_check_fixed_rep flags)
+                || typeHasFixedRuntimeRep id_ty) $
+         text "Binder does not have a fixed runtime representation:" <+> ppr id <+> dcolon <+>
             parens (ppr id_ty <+> dcolon <+> ppr (typeKind id_ty))
 
        -- Check that a join-id is a not-top-level let-binding
@@ -2121,17 +2121,17 @@ lintCoercion co@(UnivCo prov r ty1 ty2)
        | allow_ill_kinded_univ_co prov
        = return ()  -- Skip kind checks
        | otherwise
-       = do { checkWarnL (not lev_poly1)
-                         (report "left-hand type is representation-polymorphic")
-            ; checkWarnL (not lev_poly2)
-                         (report "right-hand type is representation-polymorphic")
-            ; when (not (lev_poly1 || lev_poly2)) $
+       = do { checkWarnL fixed_rep_1
+                         (report "left-hand type does not have a fixed runtime representation")
+            ; checkWarnL fixed_rep_2
+                         (report "right-hand type does not have a fixed runtime representation")
+            ; when (fixed_rep_1 && fixed_rep_2) $
               do { checkWarnL (reps1 `equalLength` reps2)
                               (report "between values with different # of reps")
                  ; zipWithM_ validateCoercion reps1 reps2 }}
        where
-         lev_poly1 = isTypeLevPoly t1
-         lev_poly2 = isTypeLevPoly t2
+         fixed_rep_1 = typeHasFixedRuntimeRep t1
+         fixed_rep_2 = typeHasFixedRuntimeRep t2
 
          -- don't look at these unless lev_poly1/2 are False
          -- Otherwise, we get #13458
@@ -2559,7 +2559,7 @@ data LintFlags
        , lf_check_static_ptrs :: StaticPtrCheck -- ^ See Note [Checking StaticPtrs]
        , lf_report_unsat_syns :: Bool -- ^ See Note [Linting type synonym applications]
        , lf_check_linearity :: Bool -- ^ See Note [Linting linearity]
-       , lf_check_levity_poly :: Bool -- See Note [Checking for representation polymorphism]
+       , lf_check_fixed_rep :: Bool -- See Note [Checking for representation polymorphism]
     }
 
 -- See Note [Checking StaticPtrs]
@@ -2578,7 +2578,7 @@ defaultLintFlags dflags = LF { lf_check_global_ids = False
                              , lf_check_static_ptrs = AllowAnywhere
                              , lf_check_linearity = gopt Opt_DoLinearCoreLinting dflags
                              , lf_report_unsat_syns = True
-                             , lf_check_levity_poly = True
+                             , lf_check_fixed_rep = True
                              }
 
 newtype LintM a =
@@ -2737,10 +2737,10 @@ setReportUnsat ru thing_inside
     in unLintM thing_inside env' errs
 
 -- See Note [Checking for representation polymorphism]
-noLPChecks :: LintM a -> LintM a
-noLPChecks thing_inside
+noFixedRuntimeRepChecks :: LintM a -> LintM a
+noFixedRuntimeRepChecks thing_inside
   = LintM $ \env errs ->
-    let env' = env { le_flags = (le_flags env) { lf_check_levity_poly = False } }
+    let env' = env { le_flags = (le_flags env) { lf_check_fixed_rep = False } }
     in unLintM thing_inside env' errs
 
 getLintFlags :: LintM LintFlags

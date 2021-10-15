@@ -49,7 +49,6 @@ import GHC.Builtin.Names
 
 import GHC.Hs
 
-import GHC.Tc.Errors.Types ( LevityCheckProvenance(..) )
 import {-# SOURCE #-} GHC.Tc.Gen.Splice (runTopSplice)
 import GHC.Tc.Utils.Monad
 import GHC.Tc.TyCl.Build ( TcMethInfo, MethInfo )
@@ -387,8 +386,6 @@ zonkIdOccs env ids = map (zonkIdOcc env) ids
 zonkIdBndr :: ZonkEnv -> TcId -> TcM Id
 zonkIdBndr env v
   = do Scaled w' ty' <- zonkScaledTcTypeToTypeX env (idScaledType v)
-       ensureNotLevPoly ty' (LevityCheckInBinder v)
-
        return (modifyIdInfo (`setLevityInfoWithType` ty') (setIdMult (setIdType v ty') w'))
 
 zonkIdBndrs :: ZonkEnv -> [TcId] -> TcM [Id]
@@ -1065,10 +1062,10 @@ zonkCoFn env WpHole   = return (env, WpHole)
 zonkCoFn env (WpCompose c1 c2) = do { (env1, c1') <- zonkCoFn env c1
                                     ; (env2, c2') <- zonkCoFn env1 c2
                                     ; return (env2, WpCompose c1' c2') }
-zonkCoFn env (WpFun c1 c2 t1 d) = do { (env1, c1') <- zonkCoFn env c1
-                                     ; (env2, c2') <- zonkCoFn env1 c2
-                                     ; t1'         <- zonkScaledTcTypeToTypeX env2 t1
-                                     ; return (env2, WpFun c1' c2' t1' d) }
+zonkCoFn env (WpFun c1 c2 t1)  = do { (env1, c1') <- zonkCoFn env c1
+                                    ; (env2, c2') <- zonkCoFn env1 c2
+                                    ; t1'         <- zonkScaledTcTypeToTypeX env2 t1
+                                    ; return (env2, WpFun c1' c2' t1') }
 zonkCoFn env (WpCast co) = do { co' <- zonkCoToCo env co
                               ; return (env, WpCast co') }
 zonkCoFn env (WpEvLam ev)   = do { (env', ev') <- zonkEvBndrX env ev
@@ -1348,7 +1345,6 @@ zonk_pat env (ParPat x lpar p rpar)
 
 zonk_pat env (WildPat ty)
   = do  { ty' <- zonkTcTypeToTypeX env ty
-        ; ensureNotLevPoly ty' LevityCheckInWildcardPattern
         ; return (env, WildPat ty') }
 
 zonk_pat env (VarPat x (L l v))
@@ -1389,8 +1385,7 @@ zonk_pat env (SumPat tys pat alt arity )
         ; (env', pat') <- zonkPat env pat
         ; return (env', SumPat tys' pat' alt arity) }
 
-zonk_pat env p@(ConPat { pat_con = L _ con
-                       , pat_args = args
+zonk_pat env p@(ConPat { pat_args = args
                        , pat_con_ext = p'@(ConPatTc
                          { cpt_tvs = tyvars
                          , cpt_dicts = evs
@@ -1401,16 +1396,6 @@ zonk_pat env p@(ConPat { pat_con = L _ con
                        })
   = assert (all isImmutableTyVar tyvars) $
     do  { new_tys <- mapM (zonkTcTypeToTypeX env) tys
-
-          -- an unboxed tuple pattern (but only an unboxed tuple pattern)
-          -- might have representation-polymorphic arguments.
-          -- Check for this badness.
-        ; case con of
-            RealDataCon dc
-              | isUnboxedTupleTyCon (dataConTyCon dc)
-              -> mapM_ (checkForLevPoly (LevityCheckInUnboxedTuplePattern p)) (dropRuntimeRepArgs new_tys)
-            _ -> return ()
-
         ; (env0, new_tyvars) <- zonkTyBndrsX env tyvars
           -- Must zonk the existential variables, because their
           -- /kind/ need potential zonking.

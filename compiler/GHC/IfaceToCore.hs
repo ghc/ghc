@@ -238,7 +238,7 @@ typecheckIface iface
 
 -- | Returns true if an 'IfaceDecl' is for @data T@ (an abstract data type)
 isAbstractIfaceDecl :: IfaceDecl -> Bool
-isAbstractIfaceDecl IfaceData{ ifCons = IfAbstractTyCon } = True
+isAbstractIfaceDecl IfaceData{ ifCons = IfAbstractTyCon {} } = True
 isAbstractIfaceDecl IfaceClass{ ifBody = IfAbstractClass } = True
 isAbstractIfaceDecl IfaceFamily{ ifFamFlav = IfaceAbstractClosedSynFamilyTyCon } = True
 isAbstractIfaceDecl _ = False
@@ -1035,11 +1035,17 @@ tc_ax_branch prev_branches
 tcIfaceDataCons :: Name -> TyCon -> [TyConBinder] -> IfaceConDecls -> IfL AlgTyConRhs
 tcIfaceDataCons tycon_name tycon tc_tybinders if_cons
   = case if_cons of
-        IfAbstractTyCon  -> return AbstractTyCon
-        IfDataTyCon cons -> do  { data_cons  <- mapM tc_con_decl cons
-                                ; return (mkDataTyConRhs data_cons) }
-        IfNewTyCon  con  -> do  { data_con  <- tc_con_decl con
-                                ; mkNewTyConRhs tycon_name tycon data_con }
+        IfAbstractTyCon
+          -> return AbstractTyCon
+        IfDataTyCon cons
+          -> do  { data_cons  <- mapM tc_con_decl cons
+                 ; return $
+                     mkLevPolyDataTyConRhs
+                       (isFixedRuntimeRepKind $ tyConResKind tycon)
+                       data_cons }
+        IfNewTyCon con
+          -> do  { data_con  <- tc_con_decl con
+                 ; mkNewTyConRhs tycon_name tycon data_con }
   where
     univ_tvs :: [TyVar]
     univ_tvs = binderVars tc_tybinders
@@ -1661,7 +1667,7 @@ tcIdInfo ignore_prags toplvl name ty info = do
     tcPrag info (HsDmdSig str)     = return (info `setDmdSigInfo` str)
     tcPrag info (HsCprSig cpr)     = return (info `setCprSigInfo` cpr)
     tcPrag info (HsInline prag)    = return (info `setInlinePragInfo` prag)
-    tcPrag info HsLevity           = return (info `setNeverLevPoly` ty)
+    tcPrag info HsLevity           = return (info `setNeverRepPoly` ty)
     tcPrag info (HsLFInfo lf_info) = do
       lf_info <- tcLFInfo lf_info
       return (info `setLFInfo` lf_info)
@@ -1909,13 +1915,15 @@ tcIfaceCoAxiom name = do { thing <- tcIfaceImplicit name
 
 
 tcIfaceCoAxiomRule :: IfLclName -> IfL CoAxiomRule
--- Unlike CoAxioms, which arise form user 'type instance' declarations,
--- there are a fixed set of CoAxiomRules,
--- currently enumerated in typeNatCoAxiomRules
+-- Unlike CoAxioms, which arise from user 'type instance' declarations,
+-- there are a fixed set of CoAxiomRules:
+--   - axioms for type-level literals (Nat and Symbol),
+--     enumerated in typeNatCoAxiomRules
 tcIfaceCoAxiomRule n
-  = case lookupUFM typeNatCoAxiomRules n of
-        Just ax -> return ax
-        _  -> pprPanic "tcIfaceCoAxiomRule" (ppr n)
+  | Just ax <- lookupUFM typeNatCoAxiomRules n
+  = return ax
+  | otherwise
+  = pprPanic "tcIfaceCoAxiomRule" (ppr n)
 
 tcIfaceDataCon :: Name -> IfL DataCon
 tcIfaceDataCon name = do { thing <- tcIfaceGlobal name

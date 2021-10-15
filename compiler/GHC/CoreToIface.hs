@@ -491,8 +491,8 @@ toIfaceIdInfo id_info
     inline_hsinfo | isDefaultInlinePragma inline_prag = Nothing
                   | otherwise = Just (HsInline inline_prag)
 
-    ------------  Levity polymorphism  ----------
-    levity_hsinfo | isNeverLevPolyIdInfo id_info = Just HsLevity
+    ------------  Representation polymorphism  ----------
+    levity_hsinfo | isNeverRepPolyIdInfo id_info = Just HsLevity
                   | otherwise                    = Nothing
 
 toIfaceJoinInfo :: Maybe JoinArity -> IfaceJoinInfo

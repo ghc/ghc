@@ -1,0 +1,12 @@
+
+RepPolyRecordUpdate.hs:7:35: error:
+    The type of the first pattern in the equation for ‘fld’
+    does not have a fixed runtime representation:
+      X a :: TYPE rep
+
+RepPolyRecordUpdate.hs:13:9: error:
+    • The record update at field ‘fld’ does not have a fixed runtime representation:
+        a :: TYPE rep
+    • In the ‘fld’ field of a record
+      In the expression: x {fld = meth ()}
+      In an equation for ‘upd’: upd x = x {fld = meth ()}

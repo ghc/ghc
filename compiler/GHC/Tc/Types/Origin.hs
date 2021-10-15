@@ -21,7 +21,15 @@ module GHC.Tc.Types.Origin (
   pprCtOrigin, isGivenOrigin,
 
   -- CtOrigin and CallStack
-  isPushCallStackOrigin, callStackOriginFS
+  isPushCallStackOrigin, callStackOriginFS,
+  -- FixedRuntimeRep origin
+  FRROrigin(..), pprFRROrigin,
+  StmtOrigin(..),
+
+  -- Arrow command origin
+  FRRArrowOrigin(..), pprFRRArrowOrigin,
+  -- HsWrapper WpFun origin
+  WpFunOrigin(..), pprWpFunOrigin,
 
   ) where
 
@@ -226,8 +234,6 @@ data SkolemInfo
              -- The pattern MkT x will allocate an existential type
              -- variable for 'a'.
 
-  | ArrowSkol           -- An arrow form (see GHC.Tc.Gen.Arrow)
-
   | IPSkol [HsIPName]   -- Binding site of an implicit parameter
 
   | RuleSkol RuleName   -- The LHS of a RULE
@@ -272,7 +278,6 @@ pprSkolInfo (InstSC n)        = text "the instance declaration" <> whenPprDebug 
 pprSkolInfo FamInstSkol       = text "a family instance declaration"
 pprSkolInfo BracketSkol       = text "a Template Haskell bracket"
 pprSkolInfo (RuleSkol name)   = text "the RULE" <+> pprRuleName name
-pprSkolInfo ArrowSkol         = text "an arrow form"
 pprSkolInfo (PatSkol cl mc)   = sep [ pprPatSkolInfo cl
                                     , text "in" <+> pprMatchContext mc ]
 pprSkolInfo (InferSkol ids)   = hang (text "the inferred type" <> plural ids <+> text "of")
@@ -437,6 +442,7 @@ data CtOrigin
   | MCompPatOrigin (LPat GhcRn) -- Arising from a failable pattern in a
                                 -- monad comprehension
   | ProcOrigin          -- Arising from a proc expression
+  | ArrowCmdOrigin      -- Arising from an arrow command
   | AnnOrigin           -- An annotation
 
   | FunDepOrigin1       -- A functional dependency from combining
@@ -460,15 +466,25 @@ data CtOrigin
                             -- the user should never see this one,
                             -- unless ImpredicativeTypes is on, where all
                             -- bets are off
-  | InstProvidedOrigin Module ClsInst
-        -- Skolem variable arose when we were testing if an instance
-        -- is solvable or not.
+
+  -- | Testing whether the constraint associated with an instance declaration
+  -- in a signature file is satisfied upon instantiation.
+  --
+  -- Test cases: backpack/should_fail/bkpfail{11,43}.bkp
+  | InstProvidedOrigin
+      Module  -- ^ Module in which the instance was declared
+      ClsInst -- ^ The declared typeclass instance
+
   | NonLinearPatternOrigin
   | UsageEnvironmentOf Name
 
   | CycleBreakerOrigin
       CtOrigin   -- origin of the original constraint
       -- See Detail (7) of Note [Type variable cycles] in GHC.Tc.Solver.Canonical
+  | FixedRuntimeRepOrigin
+      !Type -- ^ The type being checked for representation polymorphism.
+            -- We record it here for access in 'GHC.Tc.Errors.mkFRRErr'.
+      !FRROrigin
 
 -- An origin is visible if the place where the constraint arises is manifest
 -- in user code. Currently, all origins are visible except for invisible
@@ -637,6 +653,12 @@ pprCtOrigin (InstProvidedOrigin mod cls_inst)
 pprCtOrigin (CycleBreakerOrigin orig)
   = pprCtOrigin orig
 
+pprCtOrigin (FixedRuntimeRepOrigin _ frrOrig)
+  -- We ignore the type argument, as we would prefer
+  -- to report all types that don't have a fixed runtime representation at once,
+  -- in 'GHC.Tc.Errors.mkFRRErr'.
+  = pprFRROrigin frrOrig
+
 pprCtOrigin simple_origin
   = ctoHerald <+> pprCtO simple_origin
 
@@ -668,6 +690,7 @@ pprCtO DefaultOrigin         = text "a 'default' declaration"
 pprCtO DoOrigin              = text "a do statement"
 pprCtO MCompOrigin           = text "a statement in a monad comprehension"
 pprCtO ProcOrigin            = text "a proc expression"
+pprCtO ArrowCmdOrigin        = text "an arrow command"
 pprCtO AnnOrigin             = text "an annotation"
 pprCtO (ExprHoleOrigin occ)  = text "a use of" <+> quotes (ppr occ)
 pprCtO (TypeHoleOrigin occ)  = text "a use of wildcard" <+> quotes (ppr occ)
@@ -696,6 +719,7 @@ pprCtO (Shouldn'tHappenOrigin note) = text note
 pprCtO (ProvCtxtOrigin {})          = text "a provided constraint"
 pprCtO (InstProvidedOrigin {})      = text "a provided constraint"
 pprCtO (CycleBreakerOrigin orig)    = pprCtO orig
+pprCtO (FixedRuntimeRepOrigin {})   = text "a representation polymorphism check"
 
 {- *********************************************************************
 *                                                                      *
@@ -717,3 +741,317 @@ callStackOriginFS :: CtOrigin -> FastString
 -- This is the string that appears in the CallStack
 callStackOriginFS (OccurrenceOf fun) = occNameFS (getOccName fun)
 callStackOriginFS orig               = mkFastString (showSDocUnsafe (pprCtO orig))
+
+{-
+************************************************************************
+*                                                                      *
+            Checking for representation polymorphism
+*                                                                      *
+************************************************************************
+
+Note [Reporting representation-polymorphism errors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When we emit a 'Concrete#' Wanted constraint using GHC.Tc.Utils.Concrete.hasFixedRuntimeRep,
+we provide a 'CtOrigin' using the 'FixedRuntimeRepOrigin' constructor of,
+which keeps track of two things:
+  - the type which we want to ensure has a fixed runtime representation,
+  - the 'FRROrigin' explaining the nature of the check, e.g. a pattern,
+    a function application, a record update, ...
+
+If the constraint goes unsolved, we report it as follows:
+  - we detect that the unsolved Wanted is a Concrete# constraint in
+    GHC.Tc.Errors.reportWanteds using is_FRR,
+  - we assemble an error message in GHC.Tc.Errors.mkFRRErr.
+
+For example, if we try to write the program
+
+  foo :: forall r1 r2 (a :: TYPE r1) (b :: TYPE r2). a -> b -> ()
+  foo x y = ()
+
+we will get two unsolved Concrete# wanted constraints, namely
+'Concrete# r1' and 'Concrete# r2', and their 'CtOrigin's will be:
+
+  FixedRuntimeRepOrigin a (FRRVarPattern x)
+  FixedRuntimeRepOrigin b (FRRVarPattern y)
+
+These constraints will be processed in tandem by mkFRRErr,
+producing an error message of the form:
+
+  Representation-polymorphic types are not allowed here.
+    * The variable 'x' bound by the pattern
+      does not have a fixed runtime representation:
+        a :: TYPE r1
+    * The variable 'y' bound by the pattern
+      does not have a fixed runtime representation:
+        b :: TYPE r2
+-}
+
+-- | Where are we checking that a type has a fixed runtime representation?
+-- Equivalently: what is the origin of an emitted 'Concrete#' constraint?
+data FRROrigin
+
+  -- | Function arguments must have a fixed runtime representation.
+  --
+  -- Test case: RepPolyApp.
+  = FRRApp !(HsExpr GhcRn)
+
+  -- | Record fields in record updates must have a fixed runtime representation.
+  --
+  -- Test case: RepPolyRecordUpdate.
+  | FRRRecordUpdate !RdrName !(HsExpr GhcRn)
+
+  -- | Variable binders must have a fixed runtime representation.
+  --
+  -- Test cases: LevPolyLet, RepPolyPatBind.
+  | FRRBinder !Name
+
+  -- | The type of a pattern in a match group must have a fixed runtime representation.
+  --
+  -- This rules out:
+  --   - individual patterns which don't have a fixed runtime representation,
+  --   - a representation-polymorphic empty case statement,
+  --   - representation-polymorphic GADT pattern matches
+  --     in which individual pattern types have a fixed runtime representation.
+  --
+  -- Test cases: RepPolyRecordPattern, RepPolyUnboxedPatterns,
+  --             RepPolyBinder, RepPolyWildcardPattern, RepPolyMatch,
+  --             RepPolyNPlusK, RepPolyPatBind, T20426.
+  | FRRMatch !(HsMatchContext GhcTc) !Int
+
+  -- | An instantiation of a newtype/data constructor in which
+  -- one of the remaining arguments types does not have a fixed runtime representation.
+  --
+  -- Test case: UnliftedNewtypesLevityBinder.
+  | FRRDataConArg !DataCon !Int
+
+  -- | An instantiation of an 'Id' with no binding (e.g. `coerce`, `unsafeCoerce#`)
+  -- in which one of the remaining arguments types does not have a fixed runtime representation.
+  --
+  -- Test cases: RepPolyWrappedVar, T14561, UnliftedNewtypesCoerceFail.
+  | FRRNoBindingResArg !Id !Int
+
+  -- | Arguments to unboxed tuples must have fixed runtime representations.
+  --
+  -- Test case: RepPolyTuple.
+  | FRRTupleArg !Int
+
+  -- | Tuple sections must have a fixed runtime representation.
+  --
+  -- Test case: RepPolyTupleSection.
+  | FRRTupleSection !Int
+
+  -- | Unboxed sums must have a fixed runtime representation.
+  --
+  -- Test cases: RepPolySum.
+  | FRRUnboxedSum
+
+  -- | The body of a @do@ expression or a monad comprehension must
+  -- have a fixed runtime representation.
+  --
+  -- Test cases: RepPolyDoBody{1,2}, RepPolyMcBody.
+  | FRRBodyStmt !StmtOrigin !Int
+
+  -- | Arguments to a guard in a monad comprehesion must have
+  -- a fixed runtime representation.
+  --
+  -- Test case: RepPolyMcGuard.
+  | FRRBodyStmtGuard
+
+  -- | Arguments to `(>>=)` arising from a @do@ expression
+  -- or a monad comprehension must have a fixed runtime representation.
+  --
+  -- Test cases: RepPolyDoBind, RepPolyMcBind.
+  | FRRBindStmt !StmtOrigin
+
+  -- | A value bound by a pattern guard must have a fixed runtime representation.
+  --
+  -- Test cases: none.
+  | FRRBindStmtGuard
+
+  -- | A representation-polymorphism check arising from arrow notation.
+  --
+  -- See 'FRRArrowOrigin' for more details.
+  | FRRArrow !FRRArrowOrigin
+
+  -- | A representation-polymorphic check arising from an 'HsWrapper'.
+  --
+  -- See 'WpFunOrigin' for more details.
+  | FRRWpFun !WpFunOrigin
+
+-- | Print the context for a @FixedRuntimeRep@ representation-polymorphism check.
+--
+-- Note that this function does not include the specific 'RuntimeRep'
+-- which is not fixed. That information is added by 'GHC.Tc.Errors.mkFRRErr'.
+pprFRROrigin :: FRROrigin -> SDoc
+pprFRROrigin (FRRApp arg)
+  = sep [ text "The function argument"
+        , nest 2 $ quotes (ppr arg)
+        , text "does not have a fixed runtime representation"]
+pprFRROrigin (FRRRecordUpdate lbl _arg)
+  = hsep [ text "The record update at field"
+         , quotes (ppr lbl)
+         , text "does not have a fixed runtime representation"]
+pprFRROrigin (FRRBinder binder)
+  = hsep [ text "The binder"
+         , quotes (ppr binder)
+         , text "does not have a fixed runtime representation"]
+pprFRROrigin (FRRMatch matchCtxt i)
+  = vcat [ text "The type of the" <+> speakNth i <+> text "pattern in the" <+> pprMatchContextNoun matchCtxt
+         , text "does not have a fixed runtime representation"]
+pprFRROrigin (FRRDataConArg con i)
+  = sep [ text "The" <+> what
+        , text "does not have a fixed runtime representation"]
+  where
+    what :: SDoc
+    what
+      | isNewDataCon con
+      = text "newtype constructor argument"
+      | otherwise
+      = text "data constructor argument in" <+> speakNth i <+> text "position"
+pprFRROrigin (FRRNoBindingResArg fn i)
+  = vcat [ text "Unsaturated use of a representation-polymorphic primitive function."
+         , text "The" <+> speakNth i <+> text "argument of" <+> quotes (ppr $ getName fn)
+         , text "does not have a fixed runtime representation" ]
+pprFRROrigin (FRRTupleArg i)
+  = hsep [ text "The tuple argument in" <+> speakNth i <+> text "position"
+         , text "does not have a fixed runtime representation"]
+pprFRROrigin (FRRTupleSection i)
+  = hsep [ text "The tuple section does not have a fixed runtime representation"
+         , text "in the" <+> speakNth i <+> text "position" ]
+pprFRROrigin FRRUnboxedSum
+  = hsep [ text "The unboxed sum result type"
+         , text "does not have a fixed runtime representation"]
+pprFRROrigin (FRRBodyStmt stmtOrig i)
+  = vcat [ text "The" <+> speakNth i <+> text "argument to (>>)" <> comma
+         , text "arising from the" <+> ppr stmtOrig <> comma
+         , text "does not have a fixed runtime representation" ]
+pprFRROrigin FRRBodyStmtGuard
+  = vcat [ text "The argument to" <+> quotes (text "guard") <> comma
+         , text "arising from the" <+> ppr MonadComprehension <> comma
+         , text "does not have a fixed runtime representation" ]
+pprFRROrigin (FRRBindStmt stmtOrig)
+  = vcat [ text "The first argument to (>>=)" <> comma
+         , text "arising from the" <+> ppr stmtOrig <> comma
+         , text "does not have a fixed runtime representation" ]
+pprFRROrigin FRRBindStmtGuard
+  = hsep [ text "The return type of the bind statement"
+         , text "does not have a fixed runtime representation" ]
+pprFRROrigin (FRRArrow arrowOrig)
+  = pprFRRArrowOrigin arrowOrig
+pprFRROrigin (FRRWpFun wpFunOrig)
+  = pprWpFunOrigin wpFunOrig
+
+instance Outputable FRROrigin where
+  ppr = pprFRROrigin
+
+-- | Are we in a @do@ expression or a monad comprehension?
+--
+-- This datatype is only used to report this context to the user in error messages.
+data StmtOrigin
+  = MonadComprehension
+  | DoNotation
+
+instance Outputable StmtOrigin where
+  ppr MonadComprehension = text "monad comprehension"
+  ppr DoNotation         = quotes ( text "do" ) <+> text "statement"
+
+{- *********************************************************************
+*                                                                      *
+                       FixedRuntimeRep: arrows
+*                                                                      *
+********************************************************************* -}
+
+-- | While typechecking arrow notation, in which context
+-- did a representation polymorphism check arise?
+--
+-- See 'FRROrigin' for more general origins of representation polymorphism checks.
+data FRRArrowOrigin
+
+  -- | The result of an arrow command does not have a fixed runtime representation.
+  --
+  -- Test case: RepPolyArrowCmd.
+  = ArrowCmdResTy !(HsCmd GhcRn)
+
+  -- | The argument to an arrow in an arrow command application does not have
+  -- a fixed runtime representation.
+  --
+  -- Test cases: none.
+  | ArrowCmdApp !(HsCmd GhcRn) !(HsExpr GhcRn)
+
+  -- | A function in an arrow application does not have
+  -- a fixed runtime representation.
+  --
+  -- Test cases: none.
+  | ArrowCmdArrApp !(HsExpr GhcRn) !(HsExpr GhcRn) !HsArrAppType
+
+  -- | A pattern in an arrow command abstraction does not have
+  -- a fixed runtime representation.
+  --
+  -- Test cases: none.
+  | ArrowCmdLam !Int
+
+  -- | The overall type of an arrow proc expression does not have
+  -- a fixed runtime representation.
+  --
+  -- Test case: RepPolyArrowFun.
+  | ArrowFun !(HsExpr GhcRn)
+
+pprFRRArrowOrigin :: FRRArrowOrigin -> SDoc
+pprFRRArrowOrigin (ArrowCmdResTy cmd)
+  = vcat [ hang (text "The arrow command") 2 (quotes (ppr cmd))
+         , text "does not have a fixed runtime representation" ]
+pprFRRArrowOrigin (ArrowCmdApp fun arg)
+  = vcat [ text "In the arrow command application of"
+         , nest 2 (quotes (ppr fun))
+         , text "to"
+         , nest 2 (quotes (ppr arg)) <> comma
+         , text "the argument does not have a fixed runtime representation" ]
+pprFRRArrowOrigin (ArrowCmdArrApp fun arg ho_app)
+  = vcat [ text "In the" <+> pprHsArrType ho_app <+> text "of"
+         , nest 2 (quotes (ppr fun))
+         , text "to"
+         , nest 2 (quotes (ppr arg)) <> comma
+         , text "the function does not have a fixed runtime representation" ]
+pprFRRArrowOrigin (ArrowCmdLam i)
+  = vcat [ text "The" <+> speakNth i <+> text "pattern of the arrow command abstraction"
+         , text "does not have a fixed runtime representation" ]
+pprFRRArrowOrigin (ArrowFun fun)
+  = vcat [ text "The return type of the arrow function"
+         , nest 2 (quotes (ppr fun))
+         , text "does not have a fixed runtime representation" ]
+
+instance Outputable FRRArrowOrigin where
+  ppr = pprFRRArrowOrigin
+
+{- *********************************************************************
+*                                                                      *
+              FixedRuntimeRep: HsWrapper WpFun origin
+*                                                                      *
+********************************************************************* -}
+
+-- | While typechecking a 'WpFun' 'HsWrapper', in which context
+-- did a representation polymorphism check arise?
+--
+-- See 'FRROrigin' for more general origins of representation polymorphism checks.
+data WpFunOrigin
+  = WpFunSyntaxOp !CtOrigin
+  | WpFunViewPat  !(HsExpr GhcRn)
+  | WpFunFunTy    !Type
+  | WpFunFunExpTy !ExpType
+
+pprWpFunOrigin :: WpFunOrigin -> SDoc
+pprWpFunOrigin (WpFunSyntaxOp orig)
+  = vcat [ text "When checking a rebindable syntax operator arising from"
+         , nest 2 (ppr orig) ]
+pprWpFunOrigin (WpFunViewPat expr)
+  = vcat [ text "When checking the view pattern function:"
+         , nest 2 (ppr expr) ]
+pprWpFunOrigin (WpFunFunTy fun_ty)
+  = vcat [ text "When inferring the argument type of a function with type"
+         , nest 2 (ppr fun_ty) ]
+pprWpFunOrigin (WpFunFunExpTy fun_ty)
+  = vcat [ text "When inferring the argument type of a function with expected type"
+         , nest 2 (ppr fun_ty) ]
+
+instance Outputable WpFunOrigin where
+  ppr = pprWpFunOrigin

@@ -373,13 +373,13 @@ just a cast. That is, it has a compulsory unfolding. As long as its
 argument is not representation-polymorphic (which it can't be, according to
 Note [Representation polymorphism invariants] in GHC.Core), and it's saturated,
 no representation-polymorphic code ends up in the code generator.
-The saturation condition is effectively checked by
-Note [Detecting forced eta expansion] in GHC.HsToCore.Expr.
+The saturation condition is effectively checked in
+GHC.Tc.Gen.App.hasFixedRuntimeRep_remainingValArgs.
 
 However, if we make a *wrapper* for a newtype, we get into trouble.
-The saturation condition is no longer checked (because hasNoBinding
-returns False) and indeed we generate a forbidden representation-polymorphic
-binding.
+In that case, we generate a forbidden representation-polymorphic
+binding, and we must then ensure that it is always instantiated
+at a representation-monomorphic type.
 
 The solution is simple, though: just make the newtype wrappers
 as ephemeral as the newtype workers. In other words, give the wrappers
@@ -586,7 +586,7 @@ mkDataConWorkId wkr_name data_con
                                                            -- even if arity = 0
                    `setLevityInfoWithType` wkr_ty
                      -- NB: unboxed tuples have workers, so we can't use
-                     -- setNeverLevPoly
+                     -- setNeverRepPoly
 
     wkr_inline_prag = defaultInlinePragma { inl_rule = ConLike }
     wkr_arity = dataConRepArity data_con
@@ -1300,7 +1300,7 @@ mkPrimOpId prim_op
     -- PrimOps don't ever construct a product, but we want to preserve bottoms
     cpr
       | isDeadEndDiv (snd (splitDmdSig strict_sig)) = botCpr
-      | otherwise                                      = topCpr
+      | otherwise                                   = topCpr
 
     info = noCafIdInfo
            `setRuleInfo`           mkRuleInfo (maybeToList $ primOpRules name prim_op)
@@ -1429,7 +1429,7 @@ proxyHashId :: Id
 proxyHashId
   = pcMiscPrelId proxyName ty
        (noCafIdInfo `setUnfoldingInfo` evaldUnfolding -- Note [evaldUnfoldings]
-                    `setNeverLevPoly`  ty)
+                    `setNeverRepPoly`  ty)
   where
     -- proxy# :: forall {k} (a:k). Proxy# k a
     --
@@ -1449,7 +1449,7 @@ nullAddrId = pcMiscPrelId nullAddrName addrPrimTy info
   where
     info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma
                        `setUnfoldingInfo`  mkCompulsoryUnfolding defaultSimpleOpts (Lit nullAddrLit)
-                       `setNeverLevPoly`   addrPrimTy
+                       `setNeverRepPoly`   addrPrimTy
 
 ------------------------------------------------
 seqId :: Id     -- See Note [seqId magic]
@@ -1457,6 +1457,7 @@ seqId = pcMiscPrelId seqName ty info
   where
     info = noCafIdInfo `setInlinePragInfo` inline_prag
                        `setUnfoldingInfo`  mkCompulsoryUnfolding defaultSimpleOpts rhs
+                       `setArityInfo`      arity
 
     inline_prag
          = alwaysInlinePragma `setInlinePragmaActivation` ActiveAfter
@@ -1476,17 +1477,19 @@ seqId = pcMiscPrelId seqName ty info
     rhs = mkLams ([runtimeRep2TyVar, alphaTyVar, openBetaTyVar, x, y]) $
           Case (Var x) x openBetaTy [Alt DEFAULT [] (Var y)]
 
+    arity = 2
+
 ------------------------------------------------
 lazyId :: Id    -- See Note [lazyId magic]
 lazyId = pcMiscPrelId lazyIdName ty info
   where
-    info = noCafIdInfo `setNeverLevPoly` ty
+    info = noCafIdInfo `setNeverRepPoly` ty
     ty  = mkSpecForAllTys [alphaTyVar] (mkVisFunTyMany alphaTy alphaTy)
 
 noinlineId :: Id -- See Note [noinlineId magic]
 noinlineId = pcMiscPrelId noinlineIdName ty info
   where
-    info = noCafIdInfo `setNeverLevPoly` ty
+    info = noCafIdInfo `setNeverRepPoly` ty
     ty  = mkSpecForAllTys [alphaTyVar] (mkVisFunTyMany alphaTy alphaTy)
 
 oneShotId :: Id -- See Note [The oneShot function]
@@ -1494,6 +1497,7 @@ oneShotId = pcMiscPrelId oneShotName ty info
   where
     info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma
                        `setUnfoldingInfo`  mkCompulsoryUnfolding defaultSimpleOpts rhs
+                       `setArityInfo`      arity
     ty  = mkInfForAllTys  [ runtimeRep1TyVar, runtimeRep2TyVar ] $
           mkSpecForAllTys [ openAlphaTyVar, openBetaTyVar ]      $
           mkVisFunTyMany fun_ty fun_ty
@@ -1504,6 +1508,7 @@ oneShotId = pcMiscPrelId oneShotName ty info
                  , openAlphaTyVar, openBetaTyVar
                  , body, x'] $
           Var body `App` Var x'
+    arity = 2
 
 ----------------------------------------------------------------------
 {- Note [Wired-in Ids for rebindable syntax]
@@ -1533,6 +1538,7 @@ leftSectionId = pcMiscPrelId leftSectionName ty info
   where
     info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma
                        `setUnfoldingInfo`  mkCompulsoryUnfolding defaultSimpleOpts rhs
+                       `setArityInfo`      arity
     ty  = mkInfForAllTys  [runtimeRep1TyVar,runtimeRep2TyVar, multiplicityTyVar1] $
           mkSpecForAllTys [openAlphaTyVar,  openBetaTyVar]    $
           exprType body
@@ -1544,6 +1550,7 @@ leftSectionId = pcMiscPrelId leftSectionName ty info
     rhs  = mkLams [ runtimeRep1TyVar, runtimeRep2TyVar, multiplicityTyVar1
                   , openAlphaTyVar,   openBetaTyVar   ] body
     body = mkLams [f,xmult] $ App (Var f) (Var xmult)
+    arity = 2
 
 -- See Note [Left and right sections] in GHC.Rename.Expr
 -- See Note [Wired-in Ids for rebindable syntax]
@@ -1556,6 +1563,7 @@ rightSectionId = pcMiscPrelId rightSectionName ty info
   where
     info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma
                        `setUnfoldingInfo`  mkCompulsoryUnfolding defaultSimpleOpts rhs
+                       `setArityInfo`      arity
     ty  = mkInfForAllTys  [runtimeRep1TyVar,runtimeRep2TyVar,runtimeRep3TyVar
                           , multiplicityTyVar1, multiplicityTyVar2 ] $
           mkSpecForAllTys [openAlphaTyVar,  openBetaTyVar,   openGammaTyVar ]  $
@@ -1572,6 +1580,7 @@ rightSectionId = pcMiscPrelId rightSectionName ty info
                   , multiplicityTyVar1, multiplicityTyVar2
                   , openAlphaTyVar,   openBetaTyVar,    openGammaTyVar ] body
     body = mkLams [f,ymult,xmult] $ mkVarApps (Var f) [xmult,ymult]
+    arity = 3
 
 --------------------------------------------------------------------------------
 
@@ -1580,6 +1589,7 @@ coerceId = pcMiscPrelId coerceName ty info
   where
     info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma
                        `setUnfoldingInfo`  mkCompulsoryUnfolding defaultSimpleOpts rhs
+                       `setArityInfo`      2
     eqRTy     = mkTyConApp coercibleTyCon [ tYPE r , a, b ]
     eqRPrimTy = mkTyConApp eqReprPrimTyCon [ tYPE r, tYPE r, a, b ]
     ty        = mkInvisForAllTys [ Bndr rv InferredSpec
@@ -1792,7 +1802,7 @@ realWorldPrimId :: Id   -- :: State# RealWorld
 realWorldPrimId = pcMiscPrelId realWorldName realWorldStatePrimTy
                      (noCafIdInfo `setUnfoldingInfo` evaldUnfolding    -- Note [evaldUnfoldings]
                                   `setOneShotInfo`   stateHackOneShot
-                                  `setNeverLevPoly`  realWorldStatePrimTy)
+                                  `setNeverRepPoly`  realWorldStatePrimTy)
 
 voidPrimId :: Id     -- Global constant :: Void#
                      -- The type Void# is now the same as (# #) (ticket #18441),
@@ -1802,7 +1812,7 @@ voidPrimId :: Id     -- Global constant :: Void#
                      -- a top-level unlifted value.
 voidPrimId  = pcMiscPrelId voidPrimIdName unboxedUnitTy
                 (noCafIdInfo `setUnfoldingInfo` mkCompulsoryUnfolding defaultSimpleOpts rhs
-                             `setNeverLevPoly`  unboxedUnitTy)
+                             `setNeverRepPoly`  unboxedUnitTy)
     where rhs = Var (dataConWorkId unboxedUnitDataCon)
 
 

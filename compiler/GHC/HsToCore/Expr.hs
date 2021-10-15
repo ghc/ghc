@@ -13,7 +13,7 @@ Desugaring expressions.
 -}
 
 module GHC.HsToCore.Expr
-   ( dsExpr, dsLExpr, dsLExprNoLP, dsLocalBinds
+   ( dsExpr, dsLExpr, dsLocalBinds
    , dsValBinds, dsLit, dsSyntaxExpr
    )
 where
@@ -30,7 +30,6 @@ import GHC.HsToCore.Arrows
 import GHC.HsToCore.Monad
 import GHC.HsToCore.Pmc ( addTyCs, pmcGRHSs )
 import GHC.HsToCore.Errors.Types
-import GHC.Hs.Syn.Type ( hsExprType, hsWrapperType )
 import GHC.Types.SourceText
 import GHC.Types.Name
 import GHC.Types.Name.Env
@@ -241,18 +240,6 @@ dsLExpr :: LHsExpr GhcTc -> DsM CoreExpr
 dsLExpr (L loc e) =
   putSrcSpanDsA loc $ dsExpr e
 
--- | Variant of 'dsLExpr' that ensures that the result is not
--- representation- polymorphic. This should be used when the resulting
--- expression will be an argument to some other function.
--- See Note [Representation polymorphism checking] in "GHC.HsToCore.Monad"
--- See Note [Representation polymorphism invariants] in "GHC.Core"
-dsLExprNoLP :: LHsExpr GhcTc -> DsM CoreExpr
-dsLExprNoLP (L loc e)
-  = putSrcSpanDsA loc $
-    do { e' <- dsExpr e
-       ; dsNoLevPolyExpr e' (LevityCheckHsExpr e)
-       ; return e' }
-
 dsExpr :: HsExpr GhcTc -> DsM CoreExpr
 dsExpr (HsVar    _ (L _ id))           = dsHsVar id
 dsExpr (HsRecSel _ (FieldOcc id _))    = dsHsVar id
@@ -279,7 +266,7 @@ dsExpr e@(XExpr ext_expr_tc)
   = case ext_expr_tc of
       ExpansionExpr (HsExpanded _ b) -> dsExpr b
       WrapExpr {}                    -> dsHsWrapped e
-      ConLikeTc {}                   -> dsHsWrapped e
+      ConLikeTc con tvs tys          -> dsConLike con tvs tys
       -- Hpc Support
       HsTick tickish e -> do
         e' <- dsLExpr e
@@ -320,10 +307,8 @@ dsExpr (HsLamCase _ matches)
 
 dsExpr e@(HsApp _ fun arg)
   = do { fun' <- dsLExpr fun
-       -- See Note [Desugaring representation-polymorphic applications]
-       --   in GHC.HsToCore.Utils
-       ; dsWhenNoErrs (hsExprType e) (dsLExprNoLP arg)
-                      (\arg' -> mkCoreAppDs (text "HsApp" <+> ppr e) fun' arg') }
+       ; arg' <- dsLExpr arg
+       ; return $ mkCoreAppDs (text "HsApp" <+> ppr e) fun' arg' }
 
 dsExpr e@(HsAppType {}) = dsHsWrapped e
 
@@ -345,32 +330,25 @@ That 'g' in the 'in' part is an evidence variable, and when
 converting to core it must become a CO.
 -}
 
-dsExpr e@(ExplicitTuple _ tup_args boxity)
+dsExpr (ExplicitTuple _ tup_args boxity)
   = do { let go (lam_vars, args) (Missing (Scaled mult ty))
                     -- For every missing expression, we need
                     -- another lambda in the desugaring.
-               = do { lam_var <- newSysLocalDsNoLP mult ty
+               = do { lam_var <- newSysLocalDs mult ty
                     ; return (lam_var : lam_vars, Var lam_var : args) }
              go (lam_vars, args) (Present _ expr)
                     -- Expressions that are present don't generate
                     -- lambdas, just arguments.
-               = do { core_expr <- dsLExprNoLP expr
+               = do { core_expr <- dsLExpr expr
                     ; return (lam_vars, core_expr : args) }
 
-       -- See Note [Desugaring representation-polymorphic applications]
-       --   in GHC.HsToCore.Utils
-       ; dsWhenNoErrs (hsExprType e) (foldM go ([], []) (reverse tup_args))
+       ; (lam_vars, args) <- foldM go ([], []) (reverse tup_args)
                 -- The reverse is because foldM goes left-to-right
-                      (\(lam_vars, args) ->
-                        mkCoreLams lam_vars $
-                          mkCoreTupBoxity boxity args) }
+       ; return $ mkCoreLams lam_vars (mkCoreTupBoxity boxity args) }
                         -- See Note [Don't flatten tuples from HsSyn] in GHC.Core.Make
 
-dsExpr e@(ExplicitSum types alt arity expr)
-  -- See Note [Desugaring representation-polymorphic applications]
-  --   in GHC.HsToCore.Utils
-  = dsWhenNoErrs (hsExprType e) (dsLExprNoLP expr)
-      (mkCoreUbxSum arity alt types)
+dsExpr (ExplicitSum types alt arity expr)
+  = mkCoreUbxSum arity alt types <$> dsLExpr expr
 
 dsExpr (HsPragE _ prag expr) =
   ds_prag_expr prag expr
@@ -441,7 +419,7 @@ See Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable for an o
 -}
 
 dsExpr (HsStatic _ expr@(L loc _)) = do
-    expr_ds <- dsLExprNoLP expr
+    expr_ds <- dsLExpr expr
     let ty = exprType expr_ds
     makeStaticId <- dsLookupGlobalId makeStaticName
 
@@ -495,8 +473,8 @@ dsExpr (RecordCon { rcon_con  = L _ con_like
 
              mk_arg (arg_ty, fl)
                = case findField (rec_flds rbinds) (flSelector fl) of
-                   (rhs:rhss) -> assert (null rhss )
-                                 dsLExprNoLP rhs
+                   (rhs:rhss) -> assert (null rhss)
+                                 dsLExpr rhs
                    []         -> mkErrorAppDs rEC_CON_ERROR_ID arg_ty (ppr (flLabel fl))
              unlabelled_bottom arg_ty = mkErrorAppDs rEC_CON_ERROR_ID arg_ty Outputable.empty
 
@@ -808,23 +786,7 @@ dsSyntaxExpr (SyntaxExprTc { syn_expr      = expr
        ; core_arg_wraps <- mapM dsHsWrapper arg_wraps
        ; core_res_wrap  <- dsHsWrapper res_wrap
        ; let wrapped_args = zipWithEqual "dsSyntaxExpr" ($) core_arg_wraps arg_exprs
-        -- We need to compute the type of the desugared expression without
-        -- actually performing the desugaring, which could be problematic
-        -- in the presence of representation polymorphism.
-        -- See Note [Desugaring representation-polymorphic applications]
-        --   in GHC.HsToCore.Utils
-             expr_type = hsWrapperType res_wrap
-               (applyTypeToArgs (ppr fun) (exprType fun) wrapped_args)
-       ; dsWhenNoErrs expr_type
-          (zipWithM_ dsNoLevPolyExpr wrapped_args [ mk_msg n | n <- [1..] ])
-          (\_ -> core_res_wrap (mkCoreApps fun wrapped_args)) }
-             -- Use mkCoreApps instead of mkApps:
-             -- unboxed types are possible with RebindableSyntax (#19883)
-             -- This won't be evaluated if there are any
-             -- representation-polymorphic arguments.
-
-  where
-    mk_msg n = LevityCheckInSyntaxExpr (DsArgNum n) expr
+       ; return $ core_res_wrap (mkCoreApps fun wrapped_args) }
 dsSyntaxExpr NoSyntaxExprTc _ = panic "dsSyntaxExpr"
 
 findField :: [LHsRecField GhcTc arg] -> Name -> [arg]
@@ -897,7 +859,7 @@ dsExplicitList :: Type -> [LHsExpr GhcTc]
 -- See Note [Desugaring explicit lists]
 dsExplicitList elt_ty xs
   = do { dflags <- getDynFlags
-       ; xs' <- mapM dsLExprNoLP xs
+       ; xs' <- mapM dsLExpr xs
        ; if xs' `lengthExceeds` maxBuildLength
                 -- Don't generate builds if the list is very long.
          || null xs'
@@ -913,25 +875,25 @@ dsExplicitList elt_ty xs
 
 dsArithSeq :: PostTcExpr -> (ArithSeqInfo GhcTc) -> DsM CoreExpr
 dsArithSeq expr (From from)
-  = App <$> dsExpr expr <*> dsLExprNoLP from
+  = App <$> dsExpr expr <*> dsLExpr from
 dsArithSeq expr (FromTo from to)
   = do fam_envs <- dsGetFamInstEnvs
        dflags <- getDynFlags
        warnAboutEmptyEnumerations fam_envs dflags from Nothing to
        expr' <- dsExpr expr
-       from' <- dsLExprNoLP from
-       to'   <- dsLExprNoLP to
+       from' <- dsLExpr from
+       to'   <- dsLExpr to
        return $ mkApps expr' [from', to']
 dsArithSeq expr (FromThen from thn)
-  = mkApps <$> dsExpr expr <*> mapM dsLExprNoLP [from, thn]
+  = mkApps <$> dsExpr expr <*> mapM dsLExpr [from, thn]
 dsArithSeq expr (FromThenTo from thn to)
   = do fam_envs <- dsGetFamInstEnvs
        dflags <- getDynFlags
        warnAboutEmptyEnumerations fam_envs dflags from (Just thn) to
        expr' <- dsExpr expr
-       from' <- dsLExprNoLP from
-       thn'  <- dsLExprNoLP thn
-       to'   <- dsLExprNoLP to
+       from' <- dsLExpr from
+       thn'  <- dsLExpr thn
+       to'   <- dsLExpr to
        return $ mkApps expr' [from', thn', to']
 
 {-
@@ -1057,8 +1019,7 @@ dsHsVar :: Id -> DsM CoreExpr
 -- NB: withDict is always instantiated by a wrapper, so we need
 --     only check for it in dsHsUnwrapped
 dsHsVar var
-  = do { checkLevPolyFunction var var (idType var)
-       ; return (varToCoreExpr var) }   -- See Note [Desugaring vars]
+  = return (varToCoreExpr var) -- See Note [Desugaring vars]
 
 dsHsConLike :: ConLike -> DsM CoreExpr
 dsHsConLike (RealDataCon dc)
@@ -1131,112 +1092,13 @@ warnDiscardedDoBindings rhs rhs_ty
 {-
 ************************************************************************
 *                                                                      *
-            Representation polymorphism checks
+            dsHsWrapped and ds_withDict
 *                                                                      *
 ************************************************************************
-
-Note [Checking for representation-polymorphic functions]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We cannot have representation-polymorphic function arguments. See
-Note [Representation polymorphism invariants] in GHC.Core. That is
-checked by dsLExprNoLP.
-
-But what about
-  const True (unsafeCoerce# :: forall r1 r2 (a :: TYPE r1) (b :: TYPE r2). a -> b)
-
-Since `unsafeCoerce#` has no binding, it has a compulsory unfolding.
-But that compulsory unfolding is a representation-polymorphic lambda, which
-is no good.  So we want to reject this.  On the other hand
-  const True (unsafeCoerce# @LiftedRep @UnliftedRep)
-is absolutely fine.
-
-We have to collect all the type-instantiation and *then* check.  That
-is what dsHsWrapped does.  Because we might have an HsVar without a
-wrapper, we check in dsHsVar as well. typecheck/should_fail/T17021
-triggers this case.
-
-Note that if `f :: forall r (a :: TYPE r). blah`, then
-   const True f
-is absolutely fine.  Here `f` is a function, represented by a
-pointer, and we can pass it to `const` (or anything else).  (See
-#12708 for an example.)  It's only the Id.hasNoBinding functions
-that are a problem.  See checkLevPolyFunction.
-
-Interestingly, this approach does not look to see whether the Id in
-question will be eta expanded. The logic is this:
-  * Either the Id in question is saturated or not.
-  * If it is, then it surely can't have representation-polymorphic arguments.
-    If its wrapped type contains representation-polymorphic arguments, reject.
-  * If it's not, then it can't be eta expanded with representation-polymorphic
-    argument. If its wrapped type contains representation-polymorphic arguments,
-    reject.
-So, either way, we're good to reject.
-
-Note [Nasty wrinkle in representation-polymorphic function check]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A nasty wrinkle came up in T13244
-   type family Rep x
-   type instance Rep Int = IntRep
-
-   type Unboxed x :: TYPE (Rep x)
-   type instance Unboxed Int = Int#
-
-   box :: Unboxed Int -> Int
-   box = I#
-
-Here the function I# is wrapped in a /cast/, thus
-   box = I# |> (co :: (Int# -> Int) ~ (Unboxed Int -> Int))
-If we look only at final type of the expression,
-  namely: Unboxed Int -> Int,
-the kind of the argument type is TYPE (Rep Int), and that needs
-type-family reduction to determine the runtime representation.
-
-So we split the wrapper into the instantiating part (which is what
-we really want) and everything else; see splitWrapper.  This is
-very disgusting.
-
-But it also improves the error message in an example like T13233_elab:
-  obscure :: (forall (rep1 :: RuntimeRep) (rep2 :: RuntimeRep)
-                     (a :: TYPE rep1) (b :: TYPE rep2).
-                     a -> b -> (# a, b #)) -> ()
-  obscure _ = ()
-
-  quux = obscure (#,#)
-
-Around the (#,#) we'll get some type /abstractions/ wrapping some type
-/instantiations/. In the representation polymorphism error message,
-we really only want to report the instantiations.
-Hence passing (mkHsWrap w_inner e) to checkLevPolyArgs.
-
-
-Note [Checking representation-polymorphic data constructors]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Similarly, generated by a newtype data constructor, we might get this:
-  (/\(r :: RuntimeRep) (a :: TYPE r) \(x::a). K r a x) @LiftedRep Int 4
-
-which we want to accept. See Note [Typechecking data constructors] in
-GHC.Tc.Gen.Head.
-
-Because we want to accept this, we switch off Lint's
-representation polymorphism checks when Lint checks the output of the
-desugarer; see the lf_check_levity_poly flag in
-GHC.Core.Lint.lintCoreBindings.
-
-We can get this situation both for representation-polymorphic
-newtype constructors (T18481), and for representation-polymorphic
-algebraic data types, e.g (T18481a)
-    type T :: TYPE (BoxedRep r) -> TYPE (BoxedRep r)
-    data T a = MkT Int
-
-    f :: T Bool
-    f = MkT @Lifted @Bool 42
 -}
 
 ------------------------------
 dsHsWrapped :: HsExpr GhcTc -> DsM CoreExpr
--- Looks for a function 'f' wrapped in type applications (HsAppType)
--- or wrappers (HsWrap), and checks that any hasNoBinding function
--- is not representation-polymorphic, *after* instantiation with those wrappers
 dsHsWrapped orig_hs_expr
   = go idHsWrapper orig_hs_expr
   where
@@ -1247,63 +1109,24 @@ dsHsWrapped orig_hs_expr
     go wrap (HsAppType ty (L _ hs_e) _)
        = go (wrap <.> WpTyApp ty) hs_e
 
-    go wrap e@(XExpr (ConLikeTc con tvs tys))
-      = do { let (w_outer, w_inner) = splitWrapper wrap
-           ; w_outer' <- dsHsWrapper w_outer
-           ; w_inner' <- dsHsWrapper w_inner
-           ; ds_con <- dsConLike con tvs tys
-           ; let inst_e  = w_inner' ds_con
-                 inst_ty = exprType inst_e
-           ; checkLevPolyArgs (mkHsWrap w_inner e) inst_ty
-           ; return (w_outer' inst_e) }
-
-    go wrap e@(HsVar _ (L _ var))
+    go wrap (HsVar _ (L _ var))
       | var `hasKey` withDictKey
       = do { wrap' <- dsHsWrapper wrap
            ; ds_withDict (exprType (wrap' (varToCoreExpr var))) }
 
       | otherwise
-      = do { let (w_outer, w_inner) = splitWrapper wrap
-           ; w_outer' <- dsHsWrapper w_outer
-           ; w_inner' <- dsHsWrapper w_inner
-           ; let inst_e  = w_inner' (varToCoreExpr var)
-                 inst_ty = exprType inst_e
-           ; checkLevPolyFunction (mkHsWrap w_inner e) var inst_ty
+      = do { wrap' <- dsHsWrapper wrap
+           ; let expr = wrap' (varToCoreExpr var)
+                 ty   = exprType expr
            ; dflags <- getDynFlags
-           ; warnAboutIdentities dflags var inst_ty
-           ; return (w_outer' inst_e) }
+           ; warnAboutIdentities dflags var ty
+           ; return expr }
 
     go wrap hs_e
        = do { wrap' <- dsHsWrapper wrap
             ; addTyCs FromSource (hsWrapDictBinders wrap) $
               do { e <- dsExpr hs_e
                  ; return (wrap' e) } }
-
-splitWrapper :: HsWrapper -> (HsWrapper, HsWrapper)
--- Split a wrapper w into (outer_wrap <.> inner_wrap), where
--- inner_wrap does instantiation (type and evidence application)
--- and outer_wrap is everything else, such as a final cast
--- See Note [Nasty wrinkle in representation-polymorphic function check]
-splitWrapper wrap
-  = go WpHole wrap
-  where
-    go :: HsWrapper -> HsWrapper -> (HsWrapper, HsWrapper)
-    -- If (go w1 w2) = (w3,w4) then
-    --    - w1 <.> w2  = w3 <.> w4
-    --    - w4 does instantiation only ("instantiator" below)
-    -- 'go' mainly dispatches on w2, using w1 as a work-list
-    -- onto which it pushes stuff in w2 to come back to later
-    go WpHole WpHole              = (WpHole,WpHole)
-    go w      WpHole              = splitWrapper w
-    go w1     (w2 `WpCompose` w3) = go (w1 <.> w2) w3
-
-    go w1 w2 | instantiator w2  = liftSnd (<.> w2) (splitWrapper w1)
-             | otherwise        = (w1 <.> w2, WpHole)
-
-    instantiator (WpTyApp {}) = True
-    instantiator (WpEvApp {}) = True
-    instantiator _            = False
-
 
 -- See Note [withDict]
 ds_withDict :: Type -> DsM CoreExpr
@@ -1456,30 +1279,3 @@ Some further observations about `withDict`:
     error, which is trickier to do with the way that GHC.Core.Opt.ConstantFold
     is set up.
 -}
-
--- | Takes a (pretty-printed) expression, a function, and its
--- instantiated type.  If the function is a hasNoBinding op, and the
--- type has representation-polymorphic arguments, issue an error.
--- Note [Checking for representation-polymorphic functions]
-checkLevPolyFunction :: Outputable e => e -> Id -> Type -> DsM ()
-checkLevPolyFunction orig_hs_expr var ty
-  | hasNoBinding var
-  = checkLevPolyArgs orig_hs_expr ty
-  | otherwise
-  = return ()
-
-checkLevPolyArgs :: Outputable e => e -> Type -> DsM ()
--- Check that there are no representation-polymorphic arguments in
--- the supplied type
--- E.g. Given (forall a. t1 -> t2 -> blah), ensure that t1,t2
---      are not representation-polymorhic
---
--- Pass orig_hs_expr, so that the user can see entire thing
--- Note [Checking for representation-polymorphic functions]
-checkLevPolyArgs orig_hs_expr ty
-  | let (binders, _) = splitPiTys ty
-        arg_tys      = mapMaybe binderRelevantType_maybe binders
-        bad_tys      = filter isTypeLevPoly arg_tys
-  , not (null bad_tys)
-  = diagnosticDs $ DsCannotUseFunWithPolyArgs orig_hs_expr ty bad_tys
-  | otherwise = return ()

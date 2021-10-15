@@ -1,5 +1,5 @@
 
-T19709d.hs:6:4: warning: [-Wincomplete-patterns (in -Wextra)]
+T19709d.hs:6:2: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In a case alternative:
         Patterns of type ‘String’ not matched:
@@ -11,6 +11,6 @@ T19709d.hs:6:4: warning: [-Wincomplete-patterns (in -Wextra)]
 
 T19709d.hs:1:1: error:
     Exception when trying to run compile-time code:
-      T19709d.hs:6:4-44: Non-exhaustive patterns in case
+      T19709d.hs:6:2-46: Non-exhaustive patterns in case
 
     Code: (case tail "hello" of "hello" -> return [])

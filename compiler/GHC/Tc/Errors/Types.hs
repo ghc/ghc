@@ -4,7 +4,8 @@ module GHC.Tc.Errors.Types (
     TcRnMessage(..)
   , TcRnMessageDetailed(..)
   , ErrInfo(..)
-  , LevityCheckProvenance(..)
+  , FixedRuntimeRepProvenance(..)
+  , pprFixedRuntimeRepProvenance
   , ShadowedNameProvenance(..)
   , RecordFieldPart(..)
   , InjectivityErrReason(..)
@@ -56,7 +57,7 @@ import GHC.Core.DataCon (DataCon)
 import GHC.Core.FamInstEnv (FamInst)
 import GHC.Core.InstEnv (ClsInst)
 import GHC.Core.TyCon (TyCon, TyConFlavour)
-import GHC.Core.Type (Kind, Type, Var, ThetaType, PredType)
+import GHC.Core.Type (Kind, Type, ThetaType, PredType)
 import GHC.Unit.State (UnitState)
 import GHC.Unit.Module.Name (ModuleName)
 import GHC.Types.Basic
@@ -137,12 +138,21 @@ data TcRnMessage where
                       -> !TcRnMessageDetailed
                       -> TcRnMessage
 
-  {-| A levity polymorphism check happening during TcRn.
+  {-| A type which was expected to have a fixed runtime representation
+      does not have a fixed runtime representation.
+
+      Example:
+
+        data D (a :: TYPE r) = MkD a
+
+      Test cases: T11724, T18534,
+                  RepPolyPatSynArg, RepPolyPatSynUnliftedNewtype,
+                  RepPolyPatSynRes, T20423
   -}
-  TcLevityPolyInType :: !Type
-                     -> !LevityCheckProvenance
-                     -> !ErrInfo -- Extra info accumulated in the TcM monad
-                     -> TcRnMessage
+  TcRnTypeDoesNotHaveFixedRuntimeRep :: !Type
+                                     -> !FixedRuntimeRepProvenance
+                                     -> !ErrInfo -- Extra info accumulated in the TcM monad
+                                     -> TcRnMessage
 
   {-| TcRnImplicitLift is a warning (controlled with -Wimplicit-lift) that occurs when
       a Template Haskell quote implicitly uses 'lift'.
@@ -1249,6 +1259,21 @@ data TcRnMessage where
                 rename/should_fail/RnStaticPointersFail03
   -}
   TcRnStaticFormNotClosed :: Name -> NotClosedReason -> TcRnMessage
+  {-| TcRnSpecialClassInst is an error that occurs when a user
+      attempts to define an instance for a built-in typeclass such as
+      'Coercible', 'Typeable', or 'KnownNat', outside of a signature file.
+
+     Test cases: deriving/should_fail/T9687
+                 deriving/should_fail/T14916
+                 polykinds/T8132
+                 typecheck/should_fail/TcCoercibleFail2
+                 typecheck/should_fail/T12837
+                 typecheck/should_fail/T14390
+
+  -}
+  TcRnSpecialClassInst :: !Class
+                       -> !Bool -- ^ Whether the error is due to Safe Haskell being enabled
+                       -> TcRnMessage
 
   {-| TcRnUselessTypeable is a warning (controlled by -Wderiving-typeable) that
       occurs when trying to derive an instance of the 'Typeable' class. Deriving
@@ -1400,21 +1425,32 @@ data ShadowedNameProvenance
   | ShadowedNameProvenanceGlobal [GlobalRdrElt]
     -- ^ The shadowed name is global, typically imported from elsewhere.
 
--- | Where the levity checking for the input type originated
-data LevityCheckProvenance
-  = LevityCheckInVarType
-  | LevityCheckInBinder !Var
-  | LevityCheckInWildcardPattern
-  | LevityCheckInUnboxedTuplePattern !(Pat GhcTc)
-  | LevityCheckPatSynSig
-  | LevityCheckCmdStmt
-  | LevityCheckMkCmdEnv !Var
-  | LevityCheckDoCmd !(HsCmd GhcTc)
-  | LevityCheckDesugaringCmd !(LHsCmd GhcTc)
-  | LevityCheckInCmd !(LHsCmd GhcTc)
-  | LevityCheckInFunUse !(LHsExpr GhcTc)
-  | LevityCheckInValidDataCon
-  | LevityCheckInValidClass
+-- | In what context did we require a type to have a fixed runtime representation?
+--
+-- Used by 'GHC.Tc.Utils.TcMType.checkTypeHasFixedRuntimeRep' for throwing
+-- representation polymorphism errors when validity checking.
+--
+-- See Note [Representation polymorphism checking] in GHC.Tc.Utils.Concrete
+data FixedRuntimeRepProvenance
+  -- | Data constructor fields must have a fixed runtime representation.
+  --
+  -- Tests: T11734, T18534.
+  = FixedRuntimeRepDataConField
+
+  -- | Pattern synonym signature arguments must have a fixed runtime representation.
+  --
+  -- Test: RepPolyPatSynArg.
+  | FixedRuntimeRepPatSynSigArg
+
+  -- | Pattern synonym signature scrutinee must have a fixed runtime representation.
+  --
+  -- Test: RepPolyPatSynRes.
+  | FixedRuntimeRepPatSynSigRes
+
+pprFixedRuntimeRepProvenance :: FixedRuntimeRepProvenance -> SDoc
+pprFixedRuntimeRepProvenance FixedRuntimeRepDataConField = text "data constructor field"
+pprFixedRuntimeRepProvenance FixedRuntimeRepPatSynSigArg = text "pattern synonym argument"
+pprFixedRuntimeRepProvenance FixedRuntimeRepPatSynSigRes = text "pattern synonym scrutinee"
 
 -- | Why the particular injectivity error arose together with more information,
 -- if any.

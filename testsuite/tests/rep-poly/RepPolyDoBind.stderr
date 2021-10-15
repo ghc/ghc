@@ -1,0 +1,14 @@
+
+RepPolyDoBind.hs:26:3: error:
+    • The first argument to (>>=),
+      arising from the ‘do’ statement,
+      does not have a fixed runtime representation:
+        ma0 :: TYPE rep
+    • In a stmt of a 'do' block: a <- undefined
+      In the expression:
+        do a <- undefined
+           return ()
+      In an equation for ‘foo’:
+          foo _
+            = do a <- undefined
+                 return ()
