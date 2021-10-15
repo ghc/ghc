@@ -627,7 +627,11 @@ dontLeakTheHPT thing_inside = do
          -- a bit of a hack, better suggestions welcome). A number of
          -- tests in testsuite/tests/backpack break without this
          -- tweak.
-         !hpt | backend hsc_dflags == NoBackend = hsc_HPT
+         keepFor20509 hmi
+          | isHoleModule (mi_semantic_module (hm_iface hmi)) = True
+          | otherwise = False
+         !hpt | backend hsc_dflags == NoBackend = if anyHpt keepFor20509 hsc_HPT then hsc_HPT
+                                                                     else emptyHomePackageTable
               | otherwise = emptyHomePackageTable
        in
        HscEnv {  hsc_targets      = panic "cleanTopEnv: hsc_targets"
@@ -1524,4 +1528,3 @@ cantFindErr using_cabal cannot_find _ unit_env profile tried_these mod_name find
                  = parens (text "needs flag -package-id"
                     <+> ppr (mkUnit pkg))
               | otherwise = Outputable.empty
-
