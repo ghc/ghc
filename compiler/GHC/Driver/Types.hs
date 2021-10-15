@@ -570,9 +570,9 @@ hscEPS hsc_env = readIORef (hsc_EPS hsc_env)
 -- the user yet).
 data Target
   = Target {
-      targetId           :: TargetId, -- ^ module or filename
-      targetAllowObjCode :: Bool,     -- ^ object code allowed?
-      targetContents     :: Maybe (InputFileBuffer, UTCTime)
+      targetId           :: !TargetId, -- ^ module or filename
+      targetAllowObjCode :: !Bool,     -- ^ object code allowed?
+      targetContents     :: !(Maybe (InputFileBuffer, UTCTime))
       -- ^ Optional in-memory buffer containing the source code GHC should
       -- use for this target instead of reading it from disk.
       --
