@@ -188,6 +188,8 @@ function set_toolchain_paths() {
     *) ;;
   esac
 
+  if [ -z "${CC:-}" ]; then CC="$(which cc)"; fi
+
   if [[ -n "$needs_toolchain" ]]; then
       # These are populated by setup_toolchain
       GHC="$toolchain/bin/ghc$exe"
@@ -204,6 +206,7 @@ function set_toolchain_paths() {
       if [ -z "$ALEX" ]; then ALEX="$(which alex)"; fi
   fi
 
+  export CC
   export GHC
   export CABAL
   export HAPPY
@@ -237,6 +240,7 @@ function setup() {
   info "====================================================="
   info "Toolchain versions"
   info "====================================================="
+  show_tool CC
   show_tool GHC
   show_tool CABAL
   show_tool HAPPY
