@@ -47,7 +47,6 @@ import GHC.Driver.Config.Finder
 import GHC.Driver.Env
 import GHC.Driver.Errors.Types
 import GHC.Driver.Session
-import GHC.Driver.Backend
 import GHC.Driver.Hooks
 import GHC.Driver.Plugins
 
@@ -646,19 +645,19 @@ dontLeakTheHPT thing_inside = do
          -- wrinkle: when we're typechecking in --backpack mode, the
          -- instantiation of a signature might reside in the HPT, so
          -- this case breaks the assumption that EPS interfaces only
-         -- refer to other EPS interfaces. We can detect when we're in
-         -- typechecking-only mode by using backend==NoBackend, and
-         -- in that case we don't empty the HPT.  (admittedly this is
-         -- a bit of a hack, better suggestions welcome). A number of
-         -- tests in testsuite/tests/backpack break without this
+         -- refer to other EPS interfaces.
+         -- As a temporary (MP Oct 2021 #20509) we only keep the HPT if it
+         -- contains any hole modules.
+         -- Quite a few tests in testsuite/tests/backpack break without this
          -- tweak.
          old_unit_env = hsc_unit_env hsc_env
+         keepFor20509 hmi
+          | isHoleModule (mi_semantic_module (hm_iface hmi)) = True
+          | otherwise = False
          !unit_env
-          | NoBackend <- backend (hsc_dflags hsc_env)
           = old_unit_env
-          | otherwise
-          = old_unit_env
-             { ue_hpt = emptyHomePackageTable
+             { ue_hpt = if anyHpt keepFor20509 (ue_hpt old_unit_env) then ue_hpt old_unit_env
+                                                                     else emptyHomePackageTable
              }
        in
        hsc_env {  hsc_targets      = panic "cleanTopEnv: hsc_targets"
