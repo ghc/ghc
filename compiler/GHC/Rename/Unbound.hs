@@ -384,7 +384,7 @@ importSuggestions looking_for global_env hpt currMod imports rdr_name
   -- wouldn't have an out-of-scope error in the first place)
   helpful_imports = filter helpful interesting_imports
     where helpful (_,imv)
-            = any (isGreOk looking_for) $
+            = any (isGreOk looking_for) $ greEntryToList $
               lookupGlobalRdrEnv (imv_all_exports imv) occ_name
 
   -- Which of these do that because of an explicit hiding list resp. an

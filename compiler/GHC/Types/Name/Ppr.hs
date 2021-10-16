@@ -120,7 +120,7 @@ mkPrintUnqualified unit_env env
         right_name gre = greDefinitionModule gre == Just mod
 
         unqual_gres = lookupGRE_RdrName (mkRdrUnqual occ) env
-        qual_gres   = filter right_name (lookupGlobalRdrEnv env occ)
+        qual_gres   = filter right_name (greEntryToList (lookupGlobalRdrEnv env occ))
 
     -- we can mention a module P:M without the P: qualifier iff
     -- "import M" would resolve unambiguously to P:M.  (if P is the

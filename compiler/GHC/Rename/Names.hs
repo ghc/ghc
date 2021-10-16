@@ -705,7 +705,7 @@ extendGlobalRdrEnvRn avails new_fixities
       = return (extendGlobalRdrEnv env gre)
       where
         -- See Note [Reporting duplicate local declarations]
-        dups = filter isDupGRE (lookupGlobalRdrEnv env (greOccName gre))
+        dups = filter isDupGRE (greEntryToList (lookupGlobalRdrEnv env (greOccName gre)))
         isDupGRE gre' = isLocalGRE gre' && not (isAllowedDup gre')
         isAllowedDup gre' =
             case (isRecFldGRE gre, isRecFldGRE gre') of

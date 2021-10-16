@@ -1585,7 +1585,7 @@ tcPreludeClashWarn warnFlag name = do
     -- Continue only the name is imported from Prelude
     ; when (importedViaPrelude name rnImports) $ do
       -- Handle 2.-4.
-    { rdrElts <- fmap (concat . nonDetOccEnvElts . tcg_rdr_env) getGblEnv
+    { rdrElts <- fmap (globalRdrEnvElts . tcg_rdr_env) getGblEnv
 
     ; let clashes :: GlobalRdrElt -> Bool
           clashes x = isLocalDef && nameClashes && isNotInProperModule
@@ -1794,7 +1794,7 @@ checkMainType tcg_env
     do { rdr_env <- getGlobalRdrEnv
        ; let dflags    = hsc_dflags hsc_env
              main_occ  = getMainOcc dflags
-             main_gres = lookupGlobalRdrEnv rdr_env main_occ
+             main_gres = greEntryToList (lookupGlobalRdrEnv rdr_env main_occ)
        ; case filter isLocalGRE main_gres of {
             []         -> return emptyWC ;
             (_:_:_)    -> return emptyWC ;
@@ -2041,7 +2041,7 @@ runTcInteractive hsc_env thing_inside
             vcat [ text "ic_tythings:" <+> vcat (map ppr (ic_tythings icxt))
                  , text "ic_insts:" <+> vcat (map (pprBndr LetBind . instanceDFunId) ic_insts)
                  , text "icReaderEnv (LocalDef)" <+>
-                      vcat (map ppr [ local_gres | gres <- nonDetOccEnvElts (icReaderEnv icxt)
+                      vcat (map ppr [ local_gres | gres <- map greEntryToList (nonDetOccEnvElts (icReaderEnv icxt))
                                                  , let local_gres = filter isLocalGRE gres
                                                  , not (null local_gres) ]) ]
 
@@ -2516,7 +2516,7 @@ isGHCiMonad :: HscEnv -> String -> IO (Messages TcRnMessage, Maybe Name)
 isGHCiMonad hsc_env ty
   = runTcInteractive hsc_env $ do
         rdrEnv <- getGlobalRdrEnv
-        let occIO = lookupOccEnv rdrEnv (mkOccName tcName ty)
+        let occIO = greEntryToList <$> lookupOccEnv rdrEnv (mkOccName tcName ty)
         case occIO of
             Just [n] -> do
                 let name = greMangledName n

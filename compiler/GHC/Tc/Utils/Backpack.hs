@@ -177,7 +177,7 @@ checkHsigIface tcg_env gr sig_iface
       -- The hsig did NOT define this function; that means it must
       -- be a reexport.  In this case, make sure the 'Name' of the
       -- reexport matches the 'Name exported here.
-      | [gre] <- lookupGlobalRdrEnv gr (nameOccName name) = do
+      | [gre] <- greEntryToList (lookupGlobalRdrEnv gr (nameOccName name)) = do
         let name' = greMangledName gre
         when (name /= name') $ do
             -- See Note [Error reporting bad reexport]
@@ -795,7 +795,7 @@ mergeSignatures
     -- STEP 4.1: Merge fixities (we'll verify shortly) tcg_fix_env
     let fix_env = mkNameEnv [ (greMangledName rdr_elt, FixItem occ f)
                             | (occ, f) <- concatMap mi_fixities ifaces
-                            , rdr_elt <- lookupGlobalRdrEnv rdr_env occ ]
+                            , rdr_elt <- greEntryToList (lookupGlobalRdrEnv rdr_env occ) ]
 
     -- STEP 5: Typecheck the interfaces
     let type_env_var = tcg_type_env_var tcg_env
@@ -995,7 +995,7 @@ checkImplements impl_mod req_mod@(Module uid mod_name) = do
                     impl_iface False{- safe -} NotBoot ImportedBySystem
         fix_env = mkNameEnv [ (greMangledName rdr_elt, FixItem occ f)
                             | (occ, f) <- mi_fixities impl_iface
-                            , rdr_elt <- lookupGlobalRdrEnv impl_gr occ ]
+                            , rdr_elt <- greEntryToList (lookupGlobalRdrEnv impl_gr occ) ]
     updGblEnv (\tcg_env -> tcg_env {
         -- Setting tcg_rdr_env to treat all exported entities from
         -- the implementing module as in scope improves error messages,
@@ -1036,7 +1036,7 @@ checkImplements impl_mod req_mod@(Module uid mod_name) = do
     -- STEP 3: Check that the implementing interface exports everything
     -- we need.  (Notice we IGNORE the Modules in the AvailInfos.)
     forM_ (exportOccs (mi_exports isig_iface)) $ \occ ->
-        case lookupGlobalRdrEnv impl_gr occ of
+        case greEntryToList (lookupGlobalRdrEnv impl_gr occ) of
             [] -> addErr $ TcRnUnknownMessage $ mkPlainError noHints $
                         quotes (ppr occ)
                     <+> text "is exported by the hsig file, but not exported by the implementing module"

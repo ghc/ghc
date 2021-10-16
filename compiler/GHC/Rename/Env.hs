@@ -325,7 +325,7 @@ lookupExactOcc_either name
                               Just occ -> [occ]
                               Nothing  -> []
              gres = [ gre | occ <- main_occ : demoted_occs
-                          , gre <- lookupGlobalRdrEnv env occ
+                          , gre <- greEntryToList (lookupGlobalRdrEnv env occ)
                           , greMangledName gre == name ]
        ; case gres of
            [gre] -> return (Right (greMangledName gre))
@@ -519,7 +519,7 @@ lookupRecFieldOcc mb_con rdr_name
                            -- GRE so we get import usage right (see #17853).
                            gre <- lookupGRE_FieldLabel env fl
                            if isQual rdr_name
-                             then do gre' <- listToMaybe (pickGREs rdr_name [gre])
+                             then do gre' <- listToMaybe (pickGREs rdr_name (singletonGreEntry gre))
                                      return (fl, gre')
                               else return (fl, gre)
        ; case mb_field of
@@ -701,13 +701,13 @@ lookupSubBndrOcc_helper must_have_parent warn_if_deprec parent rdr_name
   -- this includes things which have `NoParent`. Those are sorted in
   -- `checkPatSynParent`.
   traceRn "parent" (ppr parent)
-  traceRn "lookupExportChild original_gres:" (ppr original_gres)
+  traceRn "lookupExportChild original_gres:" (ppr (greEntryToList original_gres))
   traceRn "lookupExportChild picked_gres:" (ppr (picked_gres original_gres) $$ ppr must_have_parent)
   case picked_gres original_gres of
     NoOccurrence ->
-      noMatchingParentErr original_gres
+      noMatchingParentErr (greEntryToList original_gres)
     UniqueOccurrence g ->
-      if must_have_parent then noMatchingParentErr original_gres
+      if must_have_parent then noMatchingParentErr (greEntryToList original_gres)
                           else checkFld g
     DisambiguatedOccurrence g ->
       checkFld g
@@ -758,12 +758,12 @@ lookupSubBndrOcc_helper must_have_parent warn_if_deprec parent rdr_name
             ParentIs cur_parent -> Just cur_parent
             NoParent -> Nothing
 
-        picked_gres :: [GlobalRdrElt] -> DisambigInfo
+        picked_gres :: GreEntry -> DisambigInfo
         -- For Unqual, find GREs that are in scope qualified or unqualified
         -- For Qual,   find GREs that are in scope with that qualification
         picked_gres gres
           | isUnqual rdr_name
-          = mconcat (map right_parent gres)
+          = mconcat (map right_parent (greEntryToList gres))
           | otherwise
           = mconcat (map right_parent (pickGREs rdr_name gres))
 
@@ -1875,7 +1875,7 @@ lookupBindGroupOcc ctxt what rdr_name
     lookup_top keep_me
       = do { env <- getGlobalRdrEnv
            ; dflags <- getDynFlags
-           ; let all_gres = lookupGlobalRdrEnv env (rdrNameOcc rdr_name)
+           ; let all_gres = greEntryToList (lookupGlobalRdrEnv env (rdrNameOcc rdr_name))
                  names_in_scope = -- If rdr_name lacks a binding, only
                                   -- recommend alternatives from related
                                   -- namespaces. See #17593.

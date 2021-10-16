@@ -36,7 +36,8 @@ import {-# SOURCE #-} GHC.Tc.Errors.Hole ( findValidHoleFits )
 
 import GHC.Types.Name
 import GHC.Types.Name.Reader ( lookupGRE_Name, GlobalRdrEnv, mkRdrUnqual
-                             , emptyLocalRdrEnv, lookupGlobalRdrEnv , lookupLocalRdrOcc )
+                             , emptyLocalRdrEnv, lookupGlobalRdrEnv , lookupLocalRdrOcc
+                             , greEntryToList )
 import GHC.Types.Id
 import GHC.Types.Var
 import GHC.Types.Var.Set
@@ -2491,7 +2492,7 @@ mk_dict_err ctxt@(CEC {cec_encl = implics}) (ct, (matches, unifiers, unsafe_over
                           glb_env emptyLocalRdrEnv imp_info (mkRdrUnqual name)) } }
 
     occ_name_in_scope glb_env lcl_env occ_name = not $
-      null (lookupGlobalRdrEnv glb_env occ_name) &&
+      null (greEntryToList (lookupGlobalRdrEnv glb_env occ_name)) &&
       isNothing (lookupLocalRdrOcc lcl_env occ_name)
 
     record_field = case orig of

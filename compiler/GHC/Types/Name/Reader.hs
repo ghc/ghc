@@ -43,7 +43,7 @@ module GHC.Types.Name.Reader (
         elemLocalRdrEnv, inLocalRdrEnvScope,
         localRdrEnvElts, minusLocalRdrEnv,
 
-        -- * Global mapping of 'RdrName' to 'GlobalRdrElt's
+        -- * Global mapping of 'RdrName' to 'GreEntry'
         GlobalRdrEnv, emptyGlobalRdrEnv, mkGlobalRdrEnv, plusGlobalRdrEnv,
         lookupGlobalRdrEnv, extendGlobalRdrEnv, greOccName, shadowNames,
         pprGlobalRdrEnv, globalRdrEnvElts,
@@ -51,7 +51,10 @@ module GHC.Types.Name.Reader (
         lookupGRE_GreName, lookupGRE_FieldLabel,
         lookupGRE_Name_OccName,
         getGRE_NameQualifier_maybes,
-        transformGREs, pickGREs, pickGREsModExp,
+        pickGREs, pickGREsModExp,
+
+        -- * GreEntry
+        GreEntry, singletonGreEntry, greEntryToList, greEntryFromList,
 
         -- * GlobalRdrElts
         gresFromAvails, gresFromAvail, localGREsFromAvail, availFromGRE,
@@ -97,7 +100,7 @@ import GHC.Utils.Panic
 import GHC.Types.Name.Env
 
 import Data.Data
-import Data.List( sortBy )
+import Data.List( sortBy, partition )
 
 {-
 ************************************************************************
@@ -455,7 +458,7 @@ the in-scope-name-set.
 -}
 
 -- | Global Reader Environment
-type GlobalRdrEnv = OccEnv [GlobalRdrElt]
+type GlobalRdrEnv = OccEnv GreEntry
 -- ^ Keyed by 'OccName'; when looking up a qualified name
 -- we look up the 'OccName' part, and then check the 'Provenance'
 -- to see if the appropriate qualification is valid.  This
@@ -480,6 +483,23 @@ type GlobalRdrEnv = OccEnv [GlobalRdrElt]
 --              NB: greOccName gre is usually the same as
 --                  nameOccName (greMangledName gre), but not always in the
 --                  case of record selectors; see Note [GreNames]
+
+-- | Global Reader Elements
+--
+-- Morally a [GlobalRdrElt], but pre-sorted so that access to the unqualified
+-- name (a common operation) is fast.
+data GreEntry = GreEntry
+  { gree_unqual :: [GlobalRdrElt]
+      -- ^ INVARIANT: all unQualOK gree_unqual
+  , gree_qual_only :: [GlobalRdrElt]
+      -- ^ INVARIANT: all (not . unQualOK) gree_unqual
+  }
+
+emptyGreEntry :: GreEntry
+emptyGreEntry = GreEntry [] []
+
+greEntryToList :: GreEntry -> [GlobalRdrElt]
+greEntryToList gree = gree_unqual gree ++ gree_qual_only gree
 
 -- | Global Reader Element
 --
@@ -808,7 +828,7 @@ emptyGlobalRdrEnv :: GlobalRdrEnv
 emptyGlobalRdrEnv = emptyOccEnv
 
 globalRdrEnvElts :: GlobalRdrEnv -> [GlobalRdrElt]
-globalRdrEnvElts env = foldOccEnv (++) [] env
+globalRdrEnvElts env = foldOccEnv (\gree -> (greEntryToList gree ++)) [] env
 
 instance Outputable GlobalRdrElt where
   ppr gre = hang (ppr (greMangledName gre) <+> ppr (gre_par gre))
@@ -818,7 +838,8 @@ pprGlobalRdrEnv :: Bool -> GlobalRdrEnv -> SDoc
 pprGlobalRdrEnv locals_only env
   = vcat [ text "GlobalRdrEnv" <+> ppWhen locals_only (text "(locals only)")
              <+> lbrace
-         , nest 2 (vcat [ pp (remove_locals gre_list) | gre_list <- nonDetOccEnvElts env ]
+         , nest 2 (vcat [ pp (remove_locals (greEntryToList gre_list))
+                        | gre_list <- nonDetOccEnvElts env ]
              <+> rbrace) ]
   where
     remove_locals gres | locals_only = filter isLocalGRE gres
@@ -831,10 +852,10 @@ pprGlobalRdrEnv locals_only env
       where
         occ = nameOccName (greMangledName (head gres))
 
-lookupGlobalRdrEnv :: GlobalRdrEnv -> OccName -> [GlobalRdrElt]
+lookupGlobalRdrEnv :: GlobalRdrEnv -> OccName -> GreEntry
 lookupGlobalRdrEnv env occ_name = case lookupOccEnv env occ_name of
-                                  Nothing   -> []
-                                  Just gres -> gres
+                                  Nothing   -> emptyGreEntry
+                                  Just gree -> gree
 
 lookupGRE_RdrName :: RdrName -> GlobalRdrEnv -> [GlobalRdrElt]
 -- ^ Look for this 'RdrName' in the global environment.  Omits record fields
@@ -848,7 +869,7 @@ lookupGRE_RdrName' :: RdrName -> GlobalRdrEnv -> [GlobalRdrElt]
 lookupGRE_RdrName' rdr_name env
   = case lookupOccEnv env (rdrNameOcc rdr_name) of
     Nothing   -> []
-    Just gres -> pickGREs rdr_name gres
+    Just gree -> pickGREs rdr_name gree
 
 lookupGRE_Name :: GlobalRdrEnv -> Name -> Maybe GlobalRdrElt
 -- ^ Look for precisely this 'Name' in the environment.  This tests
@@ -876,7 +897,7 @@ lookupGRE_Name_OccName :: GlobalRdrEnv -> Name -> OccName -> Maybe GlobalRdrElt
 -- that might differ from that of the 'Name'.  See 'lookupGRE_FieldLabel' and
 -- Note [GreNames].
 lookupGRE_Name_OccName env name occ
-  = case [ gre | gre <- lookupGlobalRdrEnv env occ
+  = case [ gre | gre <- greEntryToList (lookupGlobalRdrEnv env occ)
                , greMangledName gre == name ] of
       []    -> Nothing
       [gre] -> Just gre
@@ -934,8 +955,8 @@ unQualOK (GRE {gre_lcl = lcl, gre_imp = iss })
 
 {- Note [GRE filtering]
 ~~~~~~~~~~~~~~~~~~~~~~~
-(pickGREs rdr gres) takes a list of GREs which have the same OccName
-as 'rdr', say "x".  It does two things:
+(pickGREs rdr gree) takes a GreEntry (i.e. a list of GREs) which have the same
+OccName as 'rdr', say "x".  It does two things:
 
 (a) filters the GREs to a subset that are in scope
     * Qualified,   as 'M.x'  if want_qual    is Qual M _
@@ -965,7 +986,7 @@ Now the "ambiguous occurrence" message can correctly report how the
 ambiguity arises.
 -}
 
-pickGREs :: RdrName -> [GlobalRdrElt] -> [GlobalRdrElt]
+pickGREs :: RdrName -> GreEntry -> [GlobalRdrElt]
 -- ^ Takes a list of GREs which have the right OccName 'x'
 -- Pick those GREs that are in scope
 --    * Qualified,   as 'M.x'  if want_qual    is Qual M _
@@ -974,8 +995,8 @@ pickGREs :: RdrName -> [GlobalRdrElt] -> [GlobalRdrElt]
 -- Return each such GRE, with its ImportSpecs filtered, to reflect
 -- how it is in scope qualified or unqualified respectively.
 -- See Note [GRE filtering]
-pickGREs (Unqual {})  gres = mapMaybe pickUnqualGRE     gres
-pickGREs (Qual mod _) gres = mapMaybe (pickQualGRE mod) gres
+pickGREs (Unqual {})  gres = mapMaybe pickUnqualGRE     (gree_unqual gres)
+pickGREs (Qual mod _) gres = mapMaybe (pickQualGRE mod) (greEntryToList gres)
 pickGREs _            _    = []  -- I don't think this actually happens
 
 pickUnqualGRE :: GlobalRdrElt -> Maybe GlobalRdrElt
@@ -1024,23 +1045,55 @@ pickBothGRE mod gre
 -- Building GlobalRdrEnvs
 
 plusGlobalRdrEnv :: GlobalRdrEnv -> GlobalRdrEnv -> GlobalRdrEnv
-plusGlobalRdrEnv env1 env2 = plusOccEnv_C (foldr insertGRE) env1 env2
+plusGlobalRdrEnv env1 env2 = plusOccEnv_C mergeGreEntry env1 env2
 
 mkGlobalRdrEnv :: [GlobalRdrElt] -> GlobalRdrEnv
 mkGlobalRdrEnv gres
   = foldr add emptyGlobalRdrEnv gres
   where
-    add gre env = extendOccEnv_Acc insertGRE Utils.singleton env
+    add gre env = extendOccEnv_Acc insertGRE singletonGreEntry env
                                    (greOccName gre)
                                    gre
 
-insertGRE :: GlobalRdrElt -> [GlobalRdrElt] -> [GlobalRdrElt]
-insertGRE new_g [] = [new_g]
-insertGRE new_g (old_g : old_gs)
-        | gre_name new_g == gre_name old_g
-        = new_g `plusGRE` old_g : old_gs
+singletonGreEntry :: GlobalRdrElt -> GreEntry
+singletonGreEntry g
+  | unQualOK g = GreEntry { gree_unqual = [g], gree_qual_only = [] }
+  | otherwise  = GreEntry { gree_unqual = [], gree_qual_only = [g] }
+
+mergeGreEntry :: GreEntry -> GreEntry -> GreEntry
+mergeGreEntry gree1 gree2 = foldl' (flip insertGRE) gree1 (greEntryToList gree2)
+
+greEntryFromList :: [GlobalRdrElt] -> GreEntry
+greEntryFromList gres = foldl' (flip insertGRE) emptyGreEntry gres
+
+-- | To insert a GlobalRdrElt in a GreEntry, we need to
+--
+-- * find an existing GreEntry for that name, if present
+-- * merge them
+-- * and put them in the right section (gree_unqual or gree_qual_only)
+insertGRE :: GlobalRdrElt -> GreEntry -> GreEntry
+insertGRE new_g gree0 = gree2
+  where
+
+    (merged_g, gree1)
+        | Just (old_g, gree_unqual') <- find_and_remove (gree_unqual gree0)
+        = (new_g `plusGRE` old_g, gree0 { gree_unqual = gree_unqual' })
+        | Just (old_g, gree_qual_only') <- find_and_remove (gree_qual_only gree0)
+        = (new_g `plusGRE` old_g, gree0 { gree_qual_only = gree_qual_only' })
         | otherwise
-        = old_g : insertGRE new_g old_gs
+        = (new_g, gree0)
+
+    -- here we establish the invariant on GreEntry
+    gree2 | unQualOK merged_g = gree1 { gree_unqual = merged_g : gree_unqual gree1 }
+          | otherwise         = gree1 { gree_qual_only = merged_g : gree_qual_only gree1 }
+
+
+    find_and_remove :: [GlobalRdrElt] -> Maybe (GlobalRdrElt, [GlobalRdrElt])
+    find_and_remove gres =
+        case partition (\old_g -> gre_name old_g == gre_name new_g) gres of
+            ([], _) -> Nothing
+            ([old_g], gres') -> Just (old_g, gres')
+            _ -> pprPanic "insertGRE" (ppr gres) -- INVARIANT 1
 
 plusGRE :: GlobalRdrElt -> GlobalRdrElt -> GlobalRdrElt
 -- Used when the gre_name fields match
@@ -1050,21 +1103,9 @@ plusGRE g1 g2
         , gre_imp  = gre_imp g1 ++ gre_imp g2
         , gre_par  = gre_par  g1 `plusParent` gre_par  g2 }
 
-transformGREs :: (GlobalRdrElt -> GlobalRdrElt)
-              -> [OccName]
-              -> GlobalRdrEnv -> GlobalRdrEnv
--- ^ Apply a transformation function to the GREs for these OccNames
-transformGREs trans_gre occs rdr_env
-  = foldr trans rdr_env occs
-  where
-    trans occ env
-      = case lookupOccEnv env occ of
-           Just gres -> extendOccEnv env occ (map trans_gre gres)
-           Nothing   -> env
-
 extendGlobalRdrEnv :: GlobalRdrEnv -> GlobalRdrElt -> GlobalRdrEnv
 extendGlobalRdrEnv env gre
-  = extendOccEnv_Acc insertGRE Utils.singleton env
+  = extendOccEnv_Acc insertGRE singletonGreEntry env
                      (greOccName gre) gre
 
 {- Note [GlobalRdrEnv shadowing]
@@ -1145,22 +1186,23 @@ There are two reasons for shadowing:
 shadowNames :: GlobalRdrEnv -> OccEnv a -> GlobalRdrEnv
 -- Remove certain old GREs that share the same OccName as this new Name.
 -- See Note [GlobalRdrEnv shadowing] for details
-shadowNames = minusOccEnv_C (\gres _ -> Just (mapMaybe shadow gres))
+shadowNames = minusOccEnv_C (\gres _ -> Just (shadowGreEntry gres))
   where
-    shadow :: GlobalRdrElt -> Maybe GlobalRdrElt
-    shadow
-       old_gre@(GRE { gre_lcl = lcl, gre_imp = iss })
+    -- The resulting GreEntry has _no_ unqualified names
+    shadowGreEntry :: GreEntry -> GreEntry
+    shadowGreEntry gree@GreEntry{ gree_unqual = unqual, gree_qual_only = qual_only}
+        | null unqual = gree
+        | otherwise = GreEntry { gree_unqual = []
+                               , gree_qual_only = map shadowGRE unqual ++ qual_only }
+
+    -- The resulting GreEntry has unQualOK == True
+    shadowGRE :: GlobalRdrElt -> GlobalRdrElt
+    shadowGRE old_gre@(GRE { gre_lcl = lcl, gre_imp = iss })
        = case greDefinitionModule old_gre of
-           Nothing -> Just old_gre   -- Old name is Internal; do not shadow
-           Just old_mod
-              | null iss'            -- Nothing remains
-              -> Nothing
-
-              | otherwise
-              -> Just (old_gre { gre_lcl = False, gre_imp = iss' })
-
+           Nothing -> old_gre   -- Old name is Internal; do not shadow
+           Just old_mod -> old_gre { gre_lcl = False, gre_imp = iss' }
               where
-                iss' = lcl_imp ++ mapMaybe set_qual iss
+                iss' = lcl_imp ++ map set_qual iss
                 lcl_imp | lcl       = [mk_fake_imp_spec old_gre old_mod]
                         | otherwise = []
 
@@ -1173,8 +1215,8 @@ shadowNames = minusOccEnv_C (\gres _ -> Just (mapMaybe shadow gres))
                                    , is_qual = True
                                    , is_dloc = greDefinitionSrcSpan old_gre }
 
-    set_qual :: ImportSpec -> Maybe ImportSpec
-    set_qual is = Just (is { is_decl = (is_decl is) { is_qual = True } })
+    set_qual :: ImportSpec -> ImportSpec
+    set_qual is = is { is_decl = (is_decl is) { is_qual = True } }
 
 
 {-
