@@ -155,7 +155,7 @@ configurePackage context@Context {..} = do
     let v = if verbosity >= Diagnostic then "-v3" else "-v0"
         argList' = argList ++ ["--flags=" ++ unwords flagList, v]
     when (verbosity >= Verbose) $
-        putProgressInfo $ "| Package " ++ quote (pkgName package) ++ " configuration flags: " ++ unwords argList'
+        putProgressInfo $ "| Package " ++ quote (pkgName package) ++ " configuration flags: " ++ show argList'
     traced "cabal-configure" $
         C.defaultMainWithHooksNoReadArgs hooks gpd argList'
 
