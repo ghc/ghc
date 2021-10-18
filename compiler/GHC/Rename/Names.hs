@@ -95,6 +95,7 @@ import qualified Data.Set as S
 import System.FilePath  ((</>))
 
 import System.IO
+import GHC.Data.Bag
 
 {-
 ************************************************************************
@@ -1769,7 +1770,7 @@ mkImportMap gres
        RealSrcLoc decl_loc _ -> Map.insertWith add decl_loc [gre] imp_map
        UnhelpfulLoc _ -> imp_map
        where
-          best_imp_spec = bestImport imp_specs
+          best_imp_spec = bestImport (bagToList imp_specs)
           add _ gres = gre : gres
 
 warnUnusedImport :: WarningFlag -> NameEnv (FieldLabelString, Parent)
