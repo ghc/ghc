@@ -17,7 +17,7 @@ module GHC.Data.Bag (
         filterBag, partitionBag, partitionBagWith,
         concatBag, catBagMaybes, foldBag,
         isEmptyBag, isSingletonBag, consBag, snocBag, anyBag, allBag,
-        listToBag, nonEmptyToBag, bagToList, mapAccumBagL,
+        listToBag, nonEmptyToBag, bagToList, headMaybe, mapAccumBagL,
         concatMapBag, concatMapBagPair, mapMaybeBag,
         mapBagM, mapBagM_,
         flatMapBagM, flatMapBagPairM,
@@ -33,7 +33,7 @@ import GHC.Utils.Misc
 import GHC.Utils.Monad
 import Control.Monad
 import Data.Data
-import Data.Maybe( mapMaybe )
+import Data.Maybe( mapMaybe, listToMaybe )
 import Data.List ( partition, mapAccumL )
 import Data.List.NonEmpty ( NonEmpty(..) )
 import qualified Data.Foldable as Foldable
@@ -307,6 +307,12 @@ nonEmptyToBag (x :| xs) = ListBag (x : xs)
 
 bagToList :: Bag a -> [a]
 bagToList b = foldr (:) [] b
+
+headMaybe :: Bag a -> Maybe a
+headMaybe EmptyBag = Nothing
+headMaybe (UnitBag v) = Just v
+headMaybe (TwoBags b1 _) = headMaybe b1
+headMaybe (ListBag l) = listToMaybe l
 
 instance (Outputable a) => Outputable (Bag a) where
     ppr bag = braces (pprWithCommas ppr (bagToList bag))

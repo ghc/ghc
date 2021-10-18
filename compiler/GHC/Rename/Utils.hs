@@ -65,6 +65,7 @@ import Data.List (find, sortBy)
 import GHC.Settings.Constants ( mAX_TUPLE_SIZE, mAX_CTUPLE_SIZE )
 import qualified Data.List.NonEmpty as NE
 import qualified GHC.LanguageExtensions as LangExt
+import GHC.Data.Bag
 
 {-
 *********************************************************
@@ -566,7 +567,7 @@ addNameClashErrRn rdr_name gres
         pp_qual name
                 | lcl
                 = ppr (nameModule name)
-                | imp : _ <- iss  -- This 'imp' is the one that
+                | Just imp  <- headMaybe iss  -- This 'imp' is the one that
                                   -- pprNameProvenance chooses
                 , ImpDeclSpec { is_as = mod } <- is_decl imp
                 = ppr mod

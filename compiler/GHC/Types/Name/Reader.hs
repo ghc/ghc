@@ -98,6 +98,7 @@ import GHC.Types.Name.Env
 
 import Data.Data
 import Data.List( sortBy )
+import GHC.Data.Bag
 
 {-
 ************************************************************************
@@ -485,11 +486,11 @@ type GlobalRdrEnv = OccEnv [GlobalRdrElt]
 --
 -- An element of the 'GlobalRdrEnv'
 data GlobalRdrElt
-  = GRE { gre_name :: GreName      -- ^ See Note [GreNames]
-        , gre_par  :: Parent       -- ^ See Note [Parents]
-        , gre_lcl :: Bool          -- ^ True <=> the thing was defined locally
-        , gre_imp :: [ImportSpec]  -- ^ In scope through these imports
-    } deriving (Data, Eq)
+  = GRE { gre_name :: !GreName      -- ^ See Note [GreNames]
+        , gre_par  :: !Parent       -- ^ See Note [Parents]
+        , gre_lcl ::  !Bool          -- ^ True <=> the thing was defined locally
+        , gre_imp ::  !(Bag ImportSpec)  -- ^ In scope through these imports
+    } deriving (Data)
          -- INVARIANT: either gre_lcl = True or gre_imp is non-empty
          -- See Note [GlobalRdrElt provenance]
 
@@ -671,17 +672,17 @@ gresFromAvail prov_fn avail
       = case prov_fn n of  -- Nothing => bound locally
                            -- Just is => imported from 'is'
           Nothing -> GRE { gre_name = NormalGreName n, gre_par = mkParent n avail
-                         , gre_lcl = True, gre_imp = [] }
+                         , gre_lcl = True, gre_imp = emptyBag }
           Just is -> GRE { gre_name = NormalGreName n, gre_par = mkParent n avail
-                         , gre_lcl = False, gre_imp = [is] }
+                         , gre_lcl = False, gre_imp = unitBag is }
 
     mk_fld_gre fl
       = case prov_fn (flSelector fl) of  -- Nothing => bound locally
                            -- Just is => imported from 'is'
           Nothing -> GRE { gre_name = FieldGreName fl, gre_par = availParent avail
-                         , gre_lcl = True, gre_imp = [] }
+                         , gre_lcl = True, gre_imp = emptyBag }
           Just is -> GRE { gre_name = FieldGreName fl, gre_par = availParent avail
-                         , gre_lcl = False, gre_imp = [is] }
+                         , gre_lcl = False, gre_imp = unitBag is }
 
 instance HasOccName GlobalRdrElt where
   occName = greOccName
@@ -714,18 +715,18 @@ greQualModName :: GlobalRdrElt -> ModuleName
 -- Prerecondition: the greMangledName is always External
 greQualModName gre@(GRE { gre_lcl = lcl, gre_imp = iss })
  | lcl, Just mod <- greDefinitionModule gre = moduleName mod
- | (is:_) <- iss                            = is_as (is_decl is)
+ | Just is <- headMaybe iss                 = is_as (is_decl is)
  | otherwise                                = pprPanic "greQualModName" (ppr gre)
 
 greRdrNames :: GlobalRdrElt -> [RdrName]
 greRdrNames gre@GRE{ gre_lcl = lcl, gre_imp = iss }
-  = (if lcl then [unqual] else []) ++ concatMap do_spec (map is_decl iss)
+  = bagToList $ (if lcl then unitBag unqual else emptyBag) `unionBags` concatMapBag do_spec (mapBag is_decl iss)
   where
     occ    = greOccName gre
     unqual = Unqual occ
     do_spec decl_spec
-        | is_qual decl_spec = [qual]
-        | otherwise         = [unqual,qual]
+        | is_qual decl_spec = unitBag qual
+        | otherwise         = listToBag [unqual,qual]
         where qual = Qual (is_as decl_spec) occ
 
 -- the SrcSpan that pprNameProvenance prints out depends on whether
@@ -736,7 +737,7 @@ greRdrNames gre@GRE{ gre_lcl = lcl, gre_imp = iss }
 greSrcSpan :: GlobalRdrElt -> SrcSpan
 greSrcSpan gre@(GRE { gre_lcl = lcl, gre_imp = iss } )
   | lcl           = greDefinitionSrcSpan gre
-  | (is:_) <- iss = is_dloc (is_decl is)
+  | Just is <- headMaybe iss = is_dloc (is_decl is)
   | otherwise     = pprPanic "greSrcSpan" (ppr gre)
 
 mkParent :: Name -> AvailInfo -> Parent
@@ -896,7 +897,7 @@ getGRE_NameQualifier_maybes env name
   where
     qualifier_maybe (GRE { gre_lcl = lcl, gre_imp = iss })
       | lcl       = Nothing
-      | otherwise = Just $ map (is_as . is_decl) iss
+      | otherwise = Just $ map (is_as . is_decl) (bagToList iss)
 
 isLocalGRE :: GlobalRdrElt -> Bool
 isLocalGRE (GRE {gre_lcl = lcl }) = lcl
@@ -983,14 +984,14 @@ pickUnqualGRE gre@(GRE { gre_lcl = lcl, gre_imp = iss })
   | not lcl, null iss' = Nothing
   | otherwise          = Just (gre { gre_imp = iss' })
   where
-    iss' = filter unQualSpecOK iss
+    iss' = filterBag unQualSpecOK iss
 
 pickQualGRE :: ModuleName -> GlobalRdrElt -> Maybe GlobalRdrElt
 pickQualGRE mod gre@(GRE { gre_lcl = lcl, gre_imp = iss })
   | not lcl', null iss' = Nothing
   | otherwise           = Just (gre { gre_lcl = lcl', gre_imp = iss' })
   where
-    iss' = filter (qualSpecOK mod) iss
+    iss' = filterBag (qualSpecOK mod) iss
     lcl' = lcl && name_is_from mod
 
     name_is_from :: ModuleName -> Bool
@@ -1047,7 +1048,7 @@ plusGRE :: GlobalRdrElt -> GlobalRdrElt -> GlobalRdrElt
 plusGRE g1 g2
   = GRE { gre_name = gre_name g1
         , gre_lcl  = gre_lcl g1 || gre_lcl g2
-        , gre_imp  = gre_imp g1 ++ gre_imp g2
+        , gre_imp  = gre_imp g1 `unionBags` gre_imp g2
         , gre_par  = gre_par  g1 `plusParent` gre_par  g2 }
 
 transformGREs :: (GlobalRdrElt -> GlobalRdrElt)
@@ -1160,9 +1161,9 @@ shadowNames = minusOccEnv_C (\gres _ -> Just (mapMaybe shadow gres))
               -> Just (old_gre { gre_lcl = False, gre_imp = iss' })
 
               where
-                iss' = lcl_imp ++ mapMaybe set_qual iss
-                lcl_imp | lcl       = [mk_fake_imp_spec old_gre old_mod]
-                        | otherwise = []
+                iss' = lcl_imp `unionBags` mapMaybeBag set_qual iss
+                lcl_imp | lcl       = listToBag [mk_fake_imp_spec old_gre old_mod]
+                        | otherwise = emptyBag
 
     mk_fake_imp_spec old_gre old_mod    -- Urgh!
       = ImpSpec id_spec ImpAll
@@ -1338,7 +1339,7 @@ pprNameProvenance gre@(GRE { gre_lcl = lcl, gre_imp = iss })
                (head pp_provs)
   where
     name = greMangledName gre
-    pp_provs = pp_lcl ++ map pp_is iss
+    pp_provs = pp_lcl ++ map pp_is (bagToList iss)
     pp_lcl = if lcl then [text "defined at" <+> ppr (nameSrcLoc name)]
                     else []
     pp_is is = sep [ppr is, ppr_defn_site is name]

@@ -10,6 +10,7 @@ import GHC.Tc.Types.Constraint
 import GHC.Tc.Utils.Monad
 
 import Text.Read
+import GHC.Data.Bag
 
 
 
@@ -28,7 +29,7 @@ initPlugin _ = newTcRef $ HPS 0 Nothing
 
 fromModule :: HoleFitCandidate -> [String]
 fromModule (GreHFCand gre) =
-  map (moduleNameString . importSpecModule) $ gre_imp gre
+  map (moduleNameString . importSpecModule) $ (bagToList (gre_imp gre))
 fromModule _ = []
 
 toHoleFitCommand :: TypedHole -> String -> Maybe String

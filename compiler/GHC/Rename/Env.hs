@@ -102,6 +102,7 @@ import qualified Data.List.NonEmpty as NE
 import Control.Arrow    ( first )
 import Data.Function
 import GHC.Types.FieldLabel
+import GHC.Data.Bag
 
 {-
 *********************************************************
@@ -1568,7 +1569,7 @@ addUsedGREs gres
 
 warnIfDeprecated :: GlobalRdrElt -> RnM ()
 warnIfDeprecated gre@(GRE { gre_imp = iss })
-  | (imp_spec : _) <- iss
+  | Just imp_spec <- headMaybe iss
   = do { dflags <- getDynFlags
        ; this_mod <- getModule
        ; when (wopt Opt_WarnWarningsDeprecations dflags &&
@@ -1689,7 +1690,7 @@ lookupOneQualifiedNameGHCi fos rdr_name = do
     -- -fimplicit-import-qualified is used with a module that exports the same
     -- field name multiple times (see
     -- Note [DuplicateRecordFields and -fimplicit-import-qualified]).
-    toGRE gname = GRE { gre_name = gname, gre_par = NoParent, gre_lcl = False, gre_imp = [is] }
+    toGRE gname = GRE { gre_name = gname, gre_par = NoParent, gre_lcl = False, gre_imp = unitBag is }
     is = ImpSpec { is_decl = ImpDeclSpec { is_mod = mod, is_as = mod, is_qual = True, is_dloc = noSrcSpan }
                  , is_item = ImpAll }
     -- If -fimplicit-import-qualified succeeded, the name must be qualified.

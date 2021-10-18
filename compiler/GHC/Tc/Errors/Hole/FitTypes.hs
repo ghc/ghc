@@ -42,7 +42,12 @@ instance Outputable TypedHole where
 data HoleFitCandidate = IdHFCand Id             -- An id, like locals.
                       | NameHFCand Name         -- A name, like built-in syntax.
                       | GreHFCand GlobalRdrElt  -- A global, like imported ids.
-                      deriving (Eq)
+
+instance Eq HoleFitCandidate where
+  IdHFCand i1 == IdHFCand i2 = i1 == i2
+  NameHFCand n1 == NameHFCand n2 = n1 == n2
+  GreHFCand gre1 == GreHFCand gre2 = gre_name gre1 == gre_name gre2
+  _ == _ = False
 
 instance Outputable HoleFitCandidate where
   ppr = pprHoleFitCand
