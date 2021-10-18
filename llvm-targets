@@ -40,7 +40,7 @@
 ,("s390x-ibm-linux", ("E-m:e-i1:8:16-i8:8:16-i64:64-f128:64-a:8:16-n32:64", "z10", ""))
 ,("i386-apple-darwin", ("e-m:o-p:32:32-p270:32:32-p271:32:32-p272:64:64-f64:32:64-f80:128-n8:16:32-S128", "penryn", ""))
 ,("x86_64-apple-darwin", ("e-m:o-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", "penryn", ""))
-,("arm64-apple-darwin", ("e-m:o-i64:64-i128:128-n32:64-S128", "vortex", "+v8.3a +fp-armv8 +neon +crc +crypto +fullfp16 +ras +lse +rdm +rcpc +zcm +zcz +sha2 +aes"))
+,("arm64-apple-darwin", ("e-m:o-i64:64-i128:128-n32:64-S128", "apple-a12", "+v8.3a +fp-armv8 +neon +crc +crypto +fullfp16 +ras +lse +rdm +rcpc +zcm +zcz +sha2 +aes"))
 ,("armv7-apple-ios", ("e-m:o-p:32:32-Fi8-f64:32:64-v64:32:64-v128:32:128-a:0:32-n32-S32", "generic", ""))
 ,("aarch64-apple-ios", ("e-m:o-i64:64-i128:128-n32:64-S128", "apple-a7", "+fp-armv8 +neon +crypto +zcm +zcz +sha2 +aes"))
 ,("i386-apple-ios", ("e-m:o-p:32:32-p270:32:32-p271:32:32-p272:64:64-f64:32:64-f80:128-n8:16:32-S128", "yonah", ""))
