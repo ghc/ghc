@@ -925,7 +925,6 @@ withAbstractSem sem = MC.bracket_ (acquireSem sem) (releaseSem sem)
 
 -- | Environment used when compiling a module
 data MakeEnv = MakeEnv { hsc_env :: !HscEnv -- The basic HscEnv which will be augmented for each module
-                       , old_hpt :: !(M.Map ModuleNameWithIsBoot HomeModInfo) -- A cache of old interface files
                        , compile_sem :: !AbstractSem
                        , lqq_var :: !(TVar LogQueueQueue)
                        , env_messager :: !(Maybe Messager)
@@ -937,12 +936,13 @@ type RunMakeM a = ReaderT MakeEnv (MaybeT IO) a
 -- get its direct dependencies from. This might not be the corresponding build action
 -- if the module participates in a loop. This step also labels each node with a number for the output.
 -- See Note [Upsweep] for a high-level description.
-interpretBuildPlan :: (NodeKey -> [NodeKey])
+interpretBuildPlan :: (M.Map ModuleNameWithIsBoot HomeModInfo)
+                   -> (NodeKey -> [NodeKey])
                    -> [BuildPlan]
                    -> IO ( Maybe [ModuleGraphNode] -- Is there an unresolved cycle
                          , [MakeAction] -- Actions we need to run in order to build everything
                          , IO [Maybe (Maybe HomeModInfo)]) -- An action to query to get all the built modules at the end.
-interpretBuildPlan deps_map plan = do
+interpretBuildPlan old_hpt deps_map plan = do
   hpt_var <- newMVar emptyHomePackageTable
   ((mcycle, plans), build_map) <- runStateT (buildLoop plan) (BuildLoopState M.empty 1 hpt_var)
   return (mcycle, plans, collect_results (buildDep build_map))
@@ -990,7 +990,8 @@ interpretBuildPlan deps_map plan = do
             case mod of
               InstantiationNode iu -> const Nothing <$> executeInstantiationNode mod_idx n_mods (wait_deps_hpt hpt_var build_deps) iu
               ModuleNode ms -> do
-                  hmi <- executeCompileNode mod_idx n_mods (wait_deps_hpt hpt_var build_deps) knot_var (emsModSummary ms)
+                  let !old_hmi = M.lookup (msKey $ emsModSummary ms) old_hpt
+                  hmi <- executeCompileNode mod_idx n_mods old_hmi (wait_deps_hpt hpt_var build_deps) knot_var (emsModSummary ms)
                   -- This global MVar is incrementally modified in order to avoid having to
                   -- recreate the HPT before compiling each module which leads to a quadratic amount of work.
                   liftIO $ modifyMVar_ hpt_var (\hpt -> return $! addHomeModInfoToHpt hmi hpt)
@@ -1038,8 +1039,8 @@ upsweep
     -> [BuildPlan]
     -> IO (SuccessFlag, HscEnv, [HomeModInfo])
 upsweep n_jobs hsc_env mHscMessage old_hpt direct_deps build_plan = do
-    (cycle, pipelines, collect_result) <- interpretBuildPlan direct_deps build_plan
-    runPipelines n_jobs hsc_env old_hpt mHscMessage pipelines
+    (cycle, pipelines, collect_result) <- interpretBuildPlan old_hpt direct_deps build_plan
+    runPipelines n_jobs hsc_env mHscMessage pipelines
     res <- collect_result
 
     let completed = [m | Just (Just m) <- res]
@@ -1076,14 +1077,12 @@ upsweep_inst hsc_env mHscMessage mod_index nmods iuid = do
 -- successful.  If no compilation happened, return the old Linkable.
 upsweep_mod :: HscEnv
             -> Maybe Messager
-            -> M.Map ModuleNameWithIsBoot HomeModInfo
+            -> Maybe HomeModInfo
             -> ModSummary
             -> Int  -- index of module
             -> Int  -- total number of modules
             -> IO HomeModInfo
-upsweep_mod hsc_env mHscMessage old_hpt summary mod_index nmods =  do
-  let old_hmi = M.lookup (ms_mnwib summary) old_hpt
-
+upsweep_mod hsc_env mHscMessage old_hmi summary mod_index nmods =  do
   hmi <- compileOne' mHscMessage hsc_env summary
           mod_index nmods (hm_iface <$> old_hmi) (old_hmi >>= hm_linkable)
 
@@ -2260,11 +2259,12 @@ executeInstantiationNode k n wait_deps iu = do
 
 executeCompileNode :: Int
   -> Int
+  -> Maybe HomeModInfo
   -> RunMakeM HomePackageTable
   -> Maybe (ModuleEnv (IORef TypeEnv))
   -> ModSummary
   -> RunMakeM HomeModInfo
-executeCompileNode k n wait_deps mknot_var mod = do
+executeCompileNode k n !old_hmi wait_deps mknot_var mod = do
    MakeEnv{..} <- ask
    let mk_mod = case ms_hsc_src mod of
                      HsigFile ->
@@ -2287,7 +2287,7 @@ executeCompileNode k n wait_deps mknot_var mod = do
      -- Compile the module, locking with a semphore to avoid too many modules
      -- being compiled at the same time leading to high memory usage.
      lift $ MaybeT (withAbstractSem compile_sem $ wrapAction lcl_hsc_env $ do
-      res <- upsweep_mod lcl_hsc_env env_messager old_hpt mod k n
+      res <- upsweep_mod lcl_hsc_env env_messager old_hmi mod k n
       cleanCurrentModuleTempFilesMaybe (hsc_logger hsc_env) (hsc_tmpfs hsc_env) lcl_dynflags
       return res)
 
@@ -2355,11 +2355,10 @@ label_self thread_name = do
 -- | Build and run a pipeline
 runPipelines :: Int              -- ^ How many capabilities to use
              -> HscEnv           -- ^ The basic HscEnv which is augmented with specific info for each module
-             -> M.Map ModuleNameWithIsBoot HomeModInfo -- ^ The old HPT which is used as a cache (TODO: The cache should be from the ActionMap)
              -> Maybe Messager   -- ^ Optional custom messager to use to report progress
              -> [MakeAction]  -- ^ The build plan for all the module nodes
              -> IO ()
-runPipelines n_jobs orig_hsc_env old_hpt mHscMessager all_pipelines = do
+runPipelines n_jobs orig_hsc_env mHscMessager all_pipelines = do
 
   liftIO $ label_self "main --make thread"
 
@@ -2401,7 +2400,6 @@ runPipelines n_jobs orig_hsc_env old_hpt mHscMessager all_pipelines = do
         return $ AbstractSem (waitQSem compile_sem) (signalQSem compile_sem)
     -- Reset the number of capabilities once the upsweep ends.
   let env = MakeEnv { hsc_env = thread_safe_hsc_env
-                    , old_hpt = old_hpt
                     , lqq_var = log_queue_queue_var
                     , compile_sem = abstract_sem
                     , env_messager = mHscMessager
