@@ -982,7 +982,7 @@ hscMaybeWriteIface logger dflags is_simple iface old_iface mod_location = do
               (const ())
               (writeIface logger profile iface_name iface)
 
-    when (write_interface || force_write_interface) $ do
+    if (write_interface || force_write_interface) then do
 
       -- FIXME: with -dynamic-too, "no_change" is only meaningful for the
       -- non-dynamic interface, not for the dynamic one. We should have another
@@ -1039,6 +1039,9 @@ hscMaybeWriteIface logger dflags is_simple iface old_iface mod_location = do
           let hie_file = ml_hie_file mod_location
           whenM (doesFileExist hie_file) $
             GHC.SysTools.touch logger dflags "Touching hie file" hie_file
+    else
+        -- See Note [Strictness in ModIface]
+        forceModIface iface
 
 --------------------------------------------------------------
 -- NoRecomp handlers

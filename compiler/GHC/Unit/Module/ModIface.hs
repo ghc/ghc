@@ -24,6 +24,7 @@ module GHC.Unit.Module.ModIface
    , emptyFullModIface
    , mkIfaceHashCache
    , emptyIfaceHashCache
+   , forceModIface
    )
 where
 
@@ -55,6 +56,7 @@ import GHC.Utils.Fingerprint
 import GHC.Utils.Binary
 
 import Control.DeepSeq
+import Control.Exception
 
 {- Note [Interface file stages]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -145,6 +147,9 @@ type family IfaceBackendExts (phase :: ModIfacePhase) where
 -- except that we explicitly make the 'mi_decls' and a few other fields empty;
 -- as when reading we consolidate the declarations etc. into a number of indexed
 -- maps and environments in the 'ExternalPackageState'.
+--
+-- See Note [Strictness in ModIface] to learn about why some fields are
+-- strict and others are not.
 data ModIface_ (phase :: ModIfacePhase)
   = ModIface {
         mi_module     :: !Module,             -- ^ Name of the module we are for
@@ -228,7 +233,7 @@ data ModIface_ (phase :: ModIfacePhase)
                 -- itself) but imports some trustworthy modules from its own
                 -- package (which does require its own package be trusted).
                 -- See Note [Trust Own Package] in GHC.Rename.Names
-        mi_complete_matches :: [IfaceCompleteMatch],
+        mi_complete_matches :: ![IfaceCompleteMatch],
 
         mi_doc_hdr :: Maybe HsDocString,
                 -- ^ Module header.
@@ -243,7 +248,7 @@ data ModIface_ (phase :: ModIfacePhase)
                 -- ^ Either `()` or `ModIfaceBackend` for
                 -- a fully instantiated interface.
 
-        mi_ext_fields :: ExtensibleFields,
+        mi_ext_fields :: !ExtensibleFields,
                 -- ^ Additional optional fields, where the Map key represents
                 -- the field name, resulting in a (size, serialized data) pair.
                 -- Because the data is intended to be serialized through the
@@ -255,6 +260,29 @@ data ModIface_ (phase :: ModIfacePhase)
         mi_src_hash :: !Fingerprint
                 -- ^ Hash of the .hs source, used for recompilation checking.
      }
+
+{-
+Note [Strictness in ModIface]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The ModIface is the Haskell representation of an interface (.hi) file.
+
+* During compilation we write out ModIface values to disk for files
+  that we have just compiled
+* For packages that we depend on we load the ModIface from disk.
+
+Some fields in the ModIface are deliberately lazy because when we read
+an interface file we don't always need all the parts. For example, an
+interface file contains information about documentation which is often
+not needed during compilation. This is achieved using the lazyPut/lazyGet pair.
+If the field was strict then we would pointlessly load this information into memory.
+
+On the other hand, if we create a ModIface but **don't** write it to
+disk then to avoid space leaks we need to make sure to deepseq all these lazy fields
+because the ModIface might live for a long time (for instance in a GHCi session).
+That's why in GHC.Driver.Main.hscMaybeWriteIface there is the call to
+forceModIface.
+-}
 
 -- | Old-style accessor for whether or not the ModIface came from an hs-boot
 -- file.
@@ -307,7 +335,7 @@ renameFreeHoles fhs insts =
         -- It wasn't actually a hole
         | otherwise                           = emptyUniqDSet
 
-
+-- See Note [Strictness in ModIface] about where we use lazyPut vs put
 instance Binary ModIface where
    put_ bh (ModIface {
                  mi_module    = mod,
@@ -531,6 +559,16 @@ instance (NFData (IfaceBackendExts (phase :: ModIfacePhase)), NFData (IfaceDeclE
     f9 `seq` rnf f10 `seq` rnf f11 `seq` f12 `seq` rnf f13 `seq` rnf f14 `seq` rnf f15 `seq`
     rnf f16 `seq` f17 `seq` rnf f18 `seq` rnf f19 `seq` f20 `seq` f21 `seq` f22 `seq` rnf f23
     `seq` rnf f24 `seq` f25 `seq` ()
+
+instance NFData (ModIfaceBackend) where
+  rnf (ModIfaceBackend f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13)
+    = rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4 `seq`
+      rnf f5 `seq` rnf f6 `seq` rnf f7 `seq` rnf f8 `seq`
+      rnf f9 `seq` rnf f10 `seq` rnf f11 `seq` rnf f12 `seq` rnf f13
+
+
+forceModIface :: ModIface -> IO ()
+forceModIface iface = () <$ (evaluate $ force iface)
 
 -- | Records whether a module has orphans. An \"orphan\" is one of:
 --
