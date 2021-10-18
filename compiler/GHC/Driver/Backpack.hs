@@ -87,6 +87,7 @@ import Data.IORef
 import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
+import qualified GHC.Data.Strict as Strict
 
 -- | Entry point to compile a Backpack file.
 doBackpack :: [FilePath] -> Ghc ()
@@ -763,7 +764,8 @@ summariseRequirement pn mod_name = do
     src_hash <- liftIO $ getFileHash (bkp_filename env)
     hi_timestamp <- liftIO $ modificationTimeIfExists (ml_hi_file location)
     hie_timestamp <- liftIO $ modificationTimeIfExists (ml_hie_file location)
-    let loc = srcLocSpan (mkSrcLoc (mkFastString (bkp_filename env)) 1 1)
+    let real_loc = mkRealSrcLoc (mkFastString (bkp_filename env)) 1 1
+        loc = RealSrcSpan (realSrcLocSpan real_loc) Strict.Nothing
 
     let fc = hsc_FC hsc_env
     mod <- liftIO $ addHomeModuleToFinder fc home_unit mod_name location
@@ -795,7 +797,7 @@ summariseRequirement pn mod_name = do
                     }),
                 hpm_src_files = []
             }),
-        ms_hspp_file = "", -- none, it came inline
+        ms_hspp_file = BackpackFile real_loc,
         ms_hspp_opts = dflags,
         ms_hspp_buf = Nothing
         }
@@ -833,8 +835,12 @@ hsModuleToModSummary :: PackageName
                      -> BkpM ExtendedModSummary
 hsModuleToModSummary pn hsc_src modname
                      hsmod = do
+    env <- getBkpEnv
     let imps = hsmodImports (unLoc hsmod)
         loc  = getLoc hsmod
+        real_loc = case loc of
+          RealSrcSpan sp _ -> realSrcSpanStart sp
+          UnhelpfulSpan _ -> mkRealSrcLoc (mkFastString $ bkp_filename env) 1 1
     hsc_env <- getSession
     -- Sort of the same deal as in GHC.Driver.Pipeline's getLocation
     -- Use the PACKAGE NAME to find the location
@@ -891,9 +897,7 @@ hsModuleToModSummary pn hsc_src modname
             ms_mod = this_mod,
             ms_hsc_src = hsc_src,
             ms_location = location,
-            ms_hspp_file = (case hiDir dflags of
-                            Nothing -> ""
-                            Just d -> d) </> ".." </> moduleNameSlashes modname <.> "hi",
+            ms_hspp_file = BackpackFile real_loc,
             ms_hspp_opts = dflags,
             ms_hspp_buf = Nothing,
             ms_srcimps = map convImport src_idecls,

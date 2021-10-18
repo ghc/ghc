@@ -10,7 +10,7 @@
     Instantiating sig[A=mod:A]
     [1 of 2] Compiling A[sig]           ( sig/A.hsig, bkpfail11.out/sig/sig-HyoWTHt34SDIRGEX0vZ8iN/A.o )
 
-bkpfail11.out/sig/sig-HyoWTHt34SDIRGEX0vZ8iN/../A.hi:1:1: error:
+bkpfail11.bkp:3:5: error:
     • No instance for (GHC.Show.Show X)
         arising when attempting to show that
         instance [safe] GHC.Show.Show T -- Defined at bkpfail11.bkp:5:18

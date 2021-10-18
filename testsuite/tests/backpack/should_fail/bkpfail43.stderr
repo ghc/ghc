@@ -10,7 +10,7 @@
     Instantiating p[A=q:A]
     [1 of 2] Compiling A[sig]           ( p/A.hsig, bkpfail43.out/p/p-HVmFlcYSefiK5n1aDP1v7x/A.o )
 
-bkpfail43.out/p/p-HVmFlcYSefiK5n1aDP1v7x/../A.hi:1:1: error:
+bkpfail43.bkp:2:5: error:
     • No instance for (GHC.Show.Show (a -> b))
         arising when attempting to show that
         instance [safe] GHC.Show.Show (a -> b)

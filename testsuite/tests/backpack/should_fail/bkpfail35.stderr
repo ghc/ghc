@@ -13,6 +13,6 @@
     Instantiating q[A=aimpl:A]
     [1 of 1] Compiling A[sig]           ( q/A.hsig, bkpfail35.out/q/q-E72T6bb4XRkIeTPWK2mCKa/A.o )
 
-bkpfail35.out/q/q-E72T6bb4XRkIeTPWK2mCKa/../A.hi:1:1: error:
+bkpfail35.bkp:8:5: error:
     • ‘y’ is exported by the hsig file, but not exported by the implementing module ‘aimpl:A’
     • while checking that aimpl:A implements signature A in q[A=aimpl:A]

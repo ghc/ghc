@@ -671,7 +671,7 @@ runHscPhase pipe_env hsc_env0 input_fn src_flavour = do
   let
     mod_summary = ModSummary {  ms_mod       = mod,
                                 ms_hsc_src   = src_flavour,
-                                ms_hspp_file = input_fn,
+                                ms_hspp_file = PreprocessedFile input_fn,
                                 ms_hspp_opts = dflags,
                                 ms_hspp_buf  = hspp_buf,
                                 ms_location  = location,

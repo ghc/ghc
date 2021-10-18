@@ -5,6 +5,7 @@
 -- (ModuleGraph)
 module GHC.Unit.Module.ModSummary
    ( ExtendedModSummary (..)
+   , PreprocessedFile(..)
    , extendModSummaryNoDeps
    , ModSummary (..)
    , ms_unitid
@@ -96,7 +97,7 @@ data ModSummary
         ms_parsed_mod   :: Maybe HsParsedModule,
           -- ^ The parsed, nonrenamed source, if we have it.  This is also
           -- used to support "inline module syntax" in Backpack files.
-        ms_hspp_file    :: FilePath,
+        ms_hspp_file    :: PreprocessedFile,
           -- ^ Filename of preprocessed source file
         ms_hspp_opts    :: DynFlags,
           -- ^ Cached flags from @OPTIONS@, @INCLUDE@ and @LANGUAGE@
@@ -104,6 +105,10 @@ data ModSummary
         ms_hspp_buf     :: Maybe StringBuffer
           -- ^ The actual preprocessed source, if we have it
      }
+
+data PreprocessedFile
+  = PreprocessedFile FilePath  -- ^ This is a regular haskell file that has been preprocessed
+  | BackpackFile RealSrcLoc    -- ^ There is no preprocessed source since we are instantiating a backpack signature at this location
 
 ms_unitid :: ModSummary -> UnitId
 ms_unitid = toUnitId . moduleUnit . ms_mod

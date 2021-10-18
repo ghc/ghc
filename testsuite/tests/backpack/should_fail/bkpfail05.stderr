@@ -18,6 +18,6 @@
       Instantiating h[H=h-impl:H]
       [1 of 1] Compiling H[sig]           ( h/H.hsig, bkpfail05.out/h/h-5FYQgnNkfSvBT5yogOxPpf/H.o )
 
-bkpfail05.out/h/h-5FYQgnNkfSvBT5yogOxPpf/../H.hi:1:1: error:
+bkpfail05.bkp:2:5: error:
     • ‘T1’ is exported by the hsig file, but not exported by the implementing module ‘h-impl:H’
     • while checking that h-impl:H implements signature H in h[H=h-impl:H]

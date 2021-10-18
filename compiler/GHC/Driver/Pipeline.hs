@@ -227,7 +227,7 @@ compileOne' mHscMessage
             hsc_env0 summary mod_index nmods mb_old_iface mb_old_linkable
  = do
 
-   debugTraceMsg logger 2 (text "compile: input file" <+> text input_fnpp)
+   debugTraceMsg logger 2 (text "compile: input file" <+> input_fnpp)
 
    let flags = hsc_dflags hsc_env0
      in do unless (gopt Opt_KeepHiFiles flags) $
@@ -250,7 +250,9 @@ compileOne' mHscMessage
  where lcl_dflags  = ms_hspp_opts summary
        location    = ms_location summary
        input_fn    = expectJust "compile:hs" (ml_hs_file location)
-       input_fnpp  = ms_hspp_file summary
+       input_fnpp  = case ms_hspp_file summary of
+         PreprocessedFile f -> text f
+         BackpackFile loc -> text "backpack instantiation:" <+> ppr (ms_mod summary) <+> ppr loc
        mod_graph   = hsc_mod_graph hsc_env0
        needsLinker = needsTemplateHaskellOrQQ mod_graph
        isDynWay    = hasWay (ways lcl_dflags) WayDyn

@@ -1,0 +1,14 @@
+unit sig where
+  signature Sig where
+    data A
+    instance Show A
+
+unit impl where
+  module Impl where
+    type A = Int -> Int
+
+unit main where
+  dependency sig[Sig=impl:Impl]
+  module Main where
+    import Impl
+    main = print "no"
