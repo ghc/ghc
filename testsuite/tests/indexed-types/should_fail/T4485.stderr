@@ -11,6 +11,7 @@ T4485.hs:51:15: error:
                                  (IdentityT IO) (XMLGenT Identity ())
           -- Defined at T4485.hs:46:30
       (The choice depends on the instantiation of ‘m0’
+       and the result of evaluating ‘XML’
        To pick the first instance above, use IncoherentInstances
        when compiling the other instance declarations)
     • In the first argument of ‘($)’, namely ‘asChild’
