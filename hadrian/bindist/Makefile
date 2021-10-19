@@ -30,9 +30,9 @@ define installscript
 # to it. This implementation is a bit hacky and depends on consistency
 # of program names. For hadrian build this will work as programs have a
 # consistent naming procedure.
-	if [ -L wrappers/$1 ]; then echo "$1 is a symlink"; fi
-	@if [ -L wrappers/$1 ]; then \
-		cp -RP wrappers/$1 '$2'; \
+	if [ -L 'wrappers/$1' ]; then echo "$1 is a symlink"; fi
+	@if [ -L 'wrappers/$1' ]; then \
+		cp -RP 'wrappers/$1' '$2'; \
 	else								 \
 		rm -f '$2' && 		 \
 		$(CREATE_SCRIPT) '$2' && \
@@ -45,7 +45,7 @@ define installscript
 		echo "docdir=\"$7\"" >> '$2'  && \
 		echo "includedir=\"$8\"" >> '$2'  && \
 		echo "" >> '$2'  && \
-		cat wrappers/$1 >> '$2'  && \
+		cat 'wrappers/$1' >> '$2'  && \
 		$(EXECUTABLE_FILE) '$2' ; \
 	fi
 	@echo "$1 installed to $2"
