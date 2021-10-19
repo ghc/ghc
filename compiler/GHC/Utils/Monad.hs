@@ -383,7 +383,7 @@ insertion of "oneShot".
    data M a = MkM' (State -> (State,a))
             deriving (Functor) <-- Functor implementation will use MkM'!
 
-Conclusion: don't use 'derviving' in these cases.
+Conclusion: don't use 'deriving' in these cases.
 
 Multi-shot actions (cf #18238)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
