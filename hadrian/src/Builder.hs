@@ -268,6 +268,8 @@ instance H.Builder Builder where
                 msgIn  = "[runBuilderWith] Exactly one input file expected."
                 output = fromSingleton msgOut buildOutputs
                 msgOut = "[runBuilderWith] Exactly one output file expected."
+                -- Suppress stdout depending on the Shake's verbosity setting.
+                echo = EchoStdout (verbosity >= Verbose)
                 -- Capture stdout and write it to the output file.
                 captureStdout = do
                     Stdout stdout <- cmd' [path] buildArgs
@@ -278,18 +280,18 @@ instance H.Builder Builder where
                     if useTempFile then runAr                path buildArgs
                                    else runArWithoutTempFile path buildArgs
 
-                Ar Unpack _ -> cmd' [Cwd output] [path] buildArgs
+                Ar Unpack _ -> cmd' echo [Cwd output] [path] buildArgs
 
                 Autoreconf dir -> do
                   bash <- bashPath
-                  cmd' [Cwd dir] [bash, path] buildArgs
+                  cmd' echo [Cwd dir] [bash, path] buildArgs
 
                 Configure  dir -> do
                     -- Inject /bin/bash into `libtool`, instead of /bin/sh,
                     -- otherwise Windows breaks. TODO: Figure out why.
                     bash <- bashPath
                     let env = AddEnv "CONFIG_SHELL" bash
-                    cmd' env [Cwd dir] ["sh", path] buildOptions buildArgs
+                    cmd' echo env [Cwd dir] ["sh", path] buildOptions buildArgs
 
                 GenApply -> captureStdout
 
@@ -308,17 +310,15 @@ instance H.Builder Builder where
                     cmd' (Stdin pkgDesc) [path] (buildArgs ++ ["-"])
 
                 GhcPkg Unregister _ -> do
-                    -- unregistering is allowed to fail (e.g. when a package
-                    -- isn't already present)
-                    Exit _ <- cmd' [path] (buildArgs ++ [input])
+                    Exit _ <- cmd' echo [path] (buildArgs ++ [input])
                     return ()
 
                 HsCpp    -> captureStdout
 
-                Make dir -> cmd' path ["-C", dir] buildArgs
+                Make dir -> cmd' echo path ["-C", dir] buildArgs
 
                 Makeinfo -> do
-                  cmd' [path] "--no-split" [ "-o", output] [input]
+                  cmd' echo [path] "--no-split" [ "-o", output] [input]
 
                 Xelatex   ->
                   -- xelatex produces an incredible amount of output, almost
@@ -334,16 +334,16 @@ instance H.Builder Builder where
 
                 Makeindex -> unit $ cmd' [Cwd output] [path] (buildArgs ++ [input])
 
-                Tar _ -> cmd' buildOptions [path] buildArgs
+                Tar _ -> cmd' buildOptions echo [path] buildArgs
 
                 -- RunTest produces a very large amount of (colorised) output;
                 -- Don't attempt to capture it.
                 Testsuite RunTest -> do
-                  Exit code <- cmd [path] buildArgs
+                  Exit code <- cmd echo [path] buildArgs
                   when (code /= ExitSuccess) $ do
                     fail "tests failed"
 
-                _  -> cmd' [path] buildArgs
+                _  -> cmd' echo [path] buildArgs
 
 -- TODO: Some builders are required only on certain platforms. For example,
 -- 'Objdump' is only required on OpenBSD and AIX. Add support for platform
@@ -442,107 +442,7 @@ applyPatch dir patch = do
     putBuild $ "| Apply patch " ++ file
     quietly $ cmd' [Cwd dir, FileStdin file] [path, "-p0"]
 
--- Note [cmd wrapper]
--- ~~~~~~~~~~~~~~~~~~
--- `cmd'` is a wrapper for Shake's `cmd` that allows us to customize what is
--- output in the terminal in case of failure.
---
--- However `cmd` is quite a complex function because:
---
---  1) it relies on a CmdArguments type class to be variadic -- it can be called
---  with any number of arguments, as long as they are valid arguments -- and to
---  return either "Action r" or "IO r".
---
---  2) its behavior depends on the returned "r" type! In particular, if it has
---  to return a value of type Exit or ExitCode, then it doesn't raise an
---  exception if the exit code isn't 0! It also doesn't echo the command
---  stdout/stderr if it is requested in a Stdout/Stderr/Stdouterr result. Result
---  types are handled via CmdResult type class.
---
--- To wrap `cmd` while keeping its behavior, we need to replicate some of these
--- type classes.
---
---  1) CmdWrap corresponds to CmdArguments except that we do our own stuff in
---  the base case (i.e. in the instance for `Action r`).
---
---  2) Sadly CmdResult internals aren't exposed by Shake, so when we get a
---  `CmdResult r => r` we can't tell anything about `r`. In particular, we can't
---  tell if an Exit or ExitCode value is returned in `r`. So we use our own
---  HasExit type class to provide the `hasExit` predicate that tells us if we
---  should throw an exception as `cmd` would do in case of failure or not.
-
-
--- | Wrapper for Shake's 'cmd'
---
--- See Note [cmd wrapper]
-cmd' :: (Partial, CmdWrap args) => args :-> Action r
-cmd' = cmdArgs mempty
-
-
--- See Note [cmd wrapper]
-class HasExit a where
-  -- | Indicate if `a` is Exit or ExitCode
-  -- See Note [cmd wrapper]
-  hasExit :: a -> Bool
-
-instance HasExit ExitCode      where hasExit = const True
-instance HasExit Exit          where hasExit = const True
-instance HasExit ()            where hasExit = const False
-instance HasExit (Stdouterr a) where hasExit = const False
-instance HasExit (Stdout    a) where hasExit = const False
-
-instance (HasExit a, HasExit b) => HasExit (a,b) where
-  hasExit (a,b) = hasExit a || hasExit b
-instance (HasExit a, HasExit b, HasExit c) => HasExit (a,b,c) where
-  hasExit (a,b,c) = hasExit a || hasExit b || hasExit c
-
-class CmdWrap t where
-  cmdArgs :: Partial => CmdArgument -> t
-
-instance (IsCmdArgument a, CmdWrap r) => CmdWrap (a -> r) where
-  cmdArgs xs x = cmdArgs $ xs `mappend` toCmdArgument x
-
-instance CmdWrap CmdArgument where
-  cmdArgs = id
-
-instance (HasExit r, CmdResult r) => CmdWrap (Action r) where
-  cmdArgs (CmdArgument x) = do
-    verbosity <- getVerbosity
-
-    let real_args = mconcat
-          [ -- don't print stderr and stdout in command failure exception
-            toCmdArgument (WithStderr False)
-          , toCmdArgument (WithStdout False)
-            -- caller specified arguments come last to allow them to overload
-            -- the previous ones.
-          , CmdArgument x
-          ]
-    (Stdout out, Stderr err, cmdline :: CmdLine, Exit code, r :: r) <- cmd real_args
-
-    if hasExit r
-      -- if the caller queries the exit code of the command, we don't do
-      -- anything here. In particular we don't throw an exception.
-      -- (this is used e.g. to allow ghc-pkg to fail to unregister)
-      -- See Note [cmd wrapper]
-      then pure r
-      else do
-        -- In every case, we only print both command outputs (stdout/stderr)
-        -- onto Hadrian's stderr because Hadrian's stdout may be piped into
-        -- another process and we don't want random command output to break
-        -- this.
-        --
-        -- For example, the result of "hadrian tool:ghc/Main.hs --flavour=ghc-in-ghci"
-        -- is directly passed as arguments for ghc in "hadrian/ghci-cabal" script.
-        let dump x = liftIO (BSL.hPutStr stderr x)
-        case code of
-          ExitSuccess   -> do
-            -- Suppress stdout/stderr depending on Shake's verbosity setting
-            when (verbosity >  Silent)  (dump err)
-            when (verbosity >= Verbose) (dump out)
-            pure r
-          ExitFailure i -> do
-            putError ("Command line: " ++ fromCmdLine cmdline)
-            putError ("===> Command failed with error code: " ++ show i)
-            dump err
-            dump out
-            error "Command failed"
+-- | Wrapper for 'cmd' that suppresses the double reporting of StdErr and
+-- Stdout when a command fails.
+cmd' :: (Partial, CmdArguments args) => args :-> Action r
+cmd' = cmd [WithStderr False, WithStdout False]

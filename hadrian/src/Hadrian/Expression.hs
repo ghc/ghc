@@ -21,6 +21,7 @@ import Control.Monad.Extra
 import Control.Monad.Trans
 import Control.Monad.Trans.Reader
 import Development.Shake
+import Development.Shake.Classes
 
 import qualified Hadrian.Target as Target
 import Hadrian.Target (Target, target)
