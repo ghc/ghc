@@ -805,6 +805,12 @@ def grep_errmsg(needle):
         return "".join(filter(lambda l: re.search(needle, l), str.splitlines(True)))
     return normalise_errmsg_fun(norm)
 
+def multiline_grep_errmsg(needle):
+    def norm(s):
+        match = re.search(needle, s)
+        return "" if match is None else match.group(0)
+    return normalise_errmsg_fun(norm)
+
 def normalise_whitespace_fun(f):
     return lambda name, opts: _normalise_whitespace_fun(name, opts, f)
 

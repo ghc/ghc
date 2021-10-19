@@ -128,3 +128,7 @@ test('T17880', normal, compile, [''])
 test('T18055', normal, compile, [''])
 test('T18321', normal, compile, [''])
 test('T18914', normal, compile, [''])
+# We need to find derived instances in the Tc trace dump.
+# They are printed in tcDeriv beginning with "rnd" line
+# and are indented with spaces.
+test('T20496', multiline_grep_errmsg(r"rnd\n( .*\n)*"), compile, ['-ddump-tc-trace'])

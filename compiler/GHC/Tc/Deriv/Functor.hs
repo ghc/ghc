@@ -807,12 +807,15 @@ gen_Foldable_binds loc tycon tycon_args
   where
     data_cons = getPossibleDataCons tycon tycon_args
 
+    foldr_name = L (noAnnSrcSpan loc) foldable_foldr_RDR
+
     foldr_bind = mkRdrFunBind (L (noAnnSrcSpan loc) foldable_foldr_RDR) eqns
     eqns = map foldr_eqn data_cons
     foldr_eqn con
       = evalState (match_foldr z_Expr [f_Pat,z_Pat] con =<< parts) bs_RDRs
       where
         parts = sequence $ foldDataConArgs ft_foldr con
+    foldr_match_ctxt = mkPrefixFunRhs foldr_name
 
     foldMap_name = L (noAnnSrcSpan loc) foldMap_RDR
 
@@ -826,6 +829,7 @@ gen_Foldable_binds loc tycon tycon_args
       = evalState (match_foldMap [f_Pat] con =<< parts) bs_RDRs
       where
         parts = sequence $ foldDataConArgs ft_foldMap con
+    foldMap_match_ctxt = mkPrefixFunRhs foldMap_name
 
     -- Given a list of NullM results, produce Nothing if any of
     -- them is NotNull, and otherwise produce a list of Maybes
@@ -881,7 +885,7 @@ gen_Foldable_binds loc tycon tycon_args
                 -> DataCon
                 -> [Maybe (LHsExpr GhcPs)]
                 -> m (LMatch GhcPs (LHsExpr GhcPs))
-    match_foldr z = mkSimpleConMatch2 LambdaExpr $ \_ xs -> return (mkFoldr xs)
+    match_foldr z = mkSimpleConMatch2 foldr_match_ctxt $ \_ xs -> return (mkFoldr xs)
       where
         -- g1 v1 (g2 v2 (.. z))
         mkFoldr :: [LHsExpr GhcPs] -> LHsExpr GhcPs
@@ -911,7 +915,7 @@ gen_Foldable_binds loc tycon tycon_args
                   -> DataCon
                   -> [Maybe (LHsExpr GhcPs)]
                   -> m (LMatch GhcPs (LHsExpr GhcPs))
-    match_foldMap = mkSimpleConMatch2 CaseAlt $ \_ xs -> return (mkFoldMap xs)
+    match_foldMap = mkSimpleConMatch2 foldMap_match_ctxt $ \_ xs -> return (mkFoldMap xs)
       where
         -- mappend v1 (mappend v2 ..)
         mkFoldMap :: [LHsExpr GhcPs] -> LHsExpr GhcPs
@@ -1042,6 +1046,7 @@ gen_Traversable_binds loc tycon tycon_args
       = evalState (match_for_con [f_Pat] con =<< parts) bs_RDRs
       where
         parts = sequence $ foldDataConArgs ft_trav con
+    traverse_match_ctxt = mkPrefixFunRhs traverse_name
 
     -- Yields 'Just' an expression if we're folding over a type that mentions
     -- the last type parameter of the datatype. Otherwise, yields 'Nothing'.
@@ -1072,7 +1077,7 @@ gen_Traversable_binds loc tycon tycon_args
                   -> DataCon
                   -> [Maybe (LHsExpr GhcPs)]
                   -> m (LMatch GhcPs (LHsExpr GhcPs))
-    match_for_con = mkSimpleConMatch2 CaseAlt $
+    match_for_con = mkSimpleConMatch2 traverse_match_ctxt $
                                              \con xs -> return (mkApCon con xs)
       where
         -- liftA2 (\b1 b2 ... -> Con b1 b2 ...) x1 x2 <*> ..
