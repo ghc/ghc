@@ -49,7 +49,7 @@ FP_FIND_ROOT
 
 # ToDo: if Stage1Only=YES, should be YES
 CrossCompiling=NO
-CrossCompilePrefix=""
+CrossCompilePrefix="@CrossCompilePrefix@"
 TargetPlatformFull="${target}"
 TablesNextToCode="@TablesNextToCode@"
 
