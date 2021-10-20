@@ -1422,42 +1422,40 @@ unfoldr f b0 = build (\c n ->
 -- -----------------------------------------------------------------------------
 -- Functions on strings
 
--- | Separates the argument into pieces, with @\n@ characters as
--- separators. A single trailing @\n@ is ignored. None of the final results
--- contain @\n@.
+-- | Splits the argument into a list of /lines/ stripped of their terminating
+-- @\n@ characters.  The @\n@ terminator is optional in a final non-empty
+-- line of the argument string.
 --
--- After splitting the input on @\n@ characters, the last part of the string is considered a
--- line, even if it doesn't end with @\n@. For example:
+-- For example:
 --
--- >>> lines ""
+-- >>> lines ""           -- empty input contains no lines
 -- []
 --
--- >>> lines "\n"
+-- >>> lines "\n"         -- single empty line
 -- [""]
 --
--- >>> lines "one"
+-- >>> lines "one"        -- single unterminated line
 -- ["one"]
 --
--- >>> lines "one\n"
+-- >>> lines "one\n"      -- single non-empty line
 -- ["one"]
 --
--- >>> lines "one\n\n"
+-- >>> lines "one\n\n"    -- second line is empty
 -- ["one",""]
 --
--- >>> lines "one\ntwo"
+-- >>> lines "one\ntwo"   -- second line is unterminated
 -- ["one","two"]
 --
--- >>> lines "one\ntwo\n"
+-- >>> lines "one\ntwo\n" -- two non-empty lines
 -- ["one","two"]
 --
--- Thus @'lines' s@ contains at least as many elements as @\n@ characters in @s@.
+-- When the argument string is empty, or ends in a @\n@ character, it can be
+-- recovered by passing the result of 'lines' to the 'unlines' function.
+-- Otherwise, 'unlines' appends the missing terminating @\n@.  This makes
+-- @unlines . lines@ /idempotent/:
 --
--- = Note
+-- > (unlines . lines) . (unlines . lines) = (unlines . lines)
 --
--- @'unlines' '.' 'lines' '/=' 'id'@. Consider the example below:
---
--- >>> unlines . lines $ "foo\nbar"
--- "foo\nbar\n"
 lines                   :: String -> [String]
 lines ""                =  []
 -- Somehow GHC doesn't detect the selector thunks in the below code,
@@ -1479,7 +1477,7 @@ lines s                 =  cons (case break (== '\n') s of
 --
 -- = Note
 --
--- @'unlines' '.' 'lines' '/=' 'id'@. Consider the example below:
+-- @'unlines' '.' 'lines' '/=' 'id'@ when the input is not @\n@-terminated:
 --
 -- >>> unlines . lines $ "foo\nbar"
 -- "foo\nbar\n"
