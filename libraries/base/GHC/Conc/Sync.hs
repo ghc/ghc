@@ -92,6 +92,8 @@ module GHC.Conc.Sync
         , sharedCAF
         ) where
 
+#include "MachDeps.h"
+
 import Foreign
 import Foreign.C
 
@@ -192,7 +194,11 @@ instance Ord ThreadId where
 -- @since 4.8.0.0
 setAllocationCounter :: Int64 -> IO ()
 setAllocationCounter (I64# i) = IO $ \s ->
+#if WORD_SIZE_IN_BITS < 64
   case setThreadAllocationCounter# i s of s' -> (# s', () #)
+#else
+  case setThreadAllocationCounter# (intToInt64# i) s of s' -> (# s', () #)
+#endif
 
 -- | Return the current value of the allocation counter for the
 -- current thread.

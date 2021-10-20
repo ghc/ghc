@@ -36,7 +36,11 @@ instance Pext Word32 where
   pext (W32# src#) (W32# mask#) = W32# (wordToWord32# (pext32# (word32ToWord# src#) (word32ToWord# mask#)))
 
 instance Pext Word64 where
+#if WORD_SIZE_IN_BITS < 64
   pext (W64# src#) (W64# mask#) = W64# (pext64# src# mask#)
+#else
+  pext (W64# src#) (W64# mask#) = W64# (word64ToWord# (pext64# (wordToWord64# src#) (wordToWord64# mask#)))
+#endif
 
 class SlowPext a where
   slowPext :: a -> a -> a

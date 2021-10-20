@@ -36,7 +36,11 @@ instance Pdep Word32 where
   pdep (W32# src#) (W32# mask#) = W32# (wordToWord32# (pdep32# (word32ToWord# src#) (word32ToWord# mask#)))
 
 instance Pdep Word64 where
+#if WORD_SIZE_IN_BITS < 64
   pdep (W64# src#) (W64# mask#) = W64# (pdep64# src# mask#)
+#else
+  pdep (W64# src#) (W64# mask#) = W64# (word64ToWord# (pdep64# (wordToWord64# src#) (wordToWord64# mask#)))
+#endif
 
 class SlowPdep a where
   slowPdep :: a -> a -> a

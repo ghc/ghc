@@ -37,7 +37,11 @@ bswap32 :: Word32 -> Word32
 bswap32 (W32# w#) = W32# (wordToWord32# (byteSwap32# (word32ToWord# w#)))
 
 bswap64 :: Word64 -> Word64
+#if WORD_SIZE_IN_BITS < 64
 bswap64 (W64# w#) = W64# (byteSwap64# w#)
+#else
+bswap64 (W64# w#) = W64# (word64ToWord# (byteSwap64# (wordToWord64# w#)))
+#endif
 
 slowBswap64 :: Word64 -> Word64
 slowBswap64 w =

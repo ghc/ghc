@@ -749,7 +749,6 @@ AC_MSG_NOTICE([Creating links for headers shared by the RTS and compiler])
 ln -f rts/include/rts/Bytecodes.h compiler/
 ln -f rts/include/rts/storage/ClosureTypes.h compiler/
 ln -f rts/include/rts/storage/FunTypes.h compiler/
-ln -f rts/include/MachDeps.h compiler/
 ln -f rts/include/stg/MachRegs.h compiler/
 AC_MSG_NOTICE([done.])
 

@@ -263,6 +263,16 @@ bigNatToWord64# b
          in uncheckedShiftL64# wh 32# `or64#` wl
       else wl
 
+#else
+
+-- | Convert a Word64# into a BigNat on 64-bit architectures
+bigNatFromWord64# :: Word64# -> BigNat#
+bigNatFromWord64# w64 = bigNatFromWord# (word64ToWord# w64)
+
+-- | Convert a BigNat into a Word64# on 64-bit architectures
+bigNatToWord64# :: BigNat# -> Word64#
+bigNatToWord64# b = wordToWord64# (bigNatToWord# b)
+
 #endif
 
 -- | Encode (# BigNat mantissa, Int# exponent #) into a Double#

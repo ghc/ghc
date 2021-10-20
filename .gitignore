@@ -106,7 +106,6 @@ _darcs/
 /compiler/Bytecodes.h
 /compiler/ClosureTypes.h
 /compiler/FunTypes.h
-/compiler/MachDeps.h
 /compiler/MachRegs.h
 /compiler/ghc-llvm-version.h
 /compiler/ghc.cabal
