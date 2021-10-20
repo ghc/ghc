@@ -28,7 +28,6 @@ data Natural
 
 instance Eq Natural where
    (==) = naturalEq
-   (/=) = naturalNe
 
 instance Ord Natural where
    compare = naturalCompare

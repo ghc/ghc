@@ -35,7 +35,7 @@ module GHC.Classes(
     IP(..),
 
     -- * Equality and ordering
-    Eq(..),
+    Eq(..), (/=),
     Ord(..),
     -- ** Monomorphic equality operators
     -- $matching_overloaded_methods_in_rules
@@ -102,13 +102,10 @@ instances defined in terms of helper functions with inlinings delayed to phase
 @
 instance Eq Word8 where
     (==) = eqWord8
-    (/=) = neWord8
 
 eqWord8, neWord8 :: Word8 -> Word8 -> Bool
 eqWord8 (W8# x) (W8# y) = ...
-neWord8 (W8# x) (W8# y) = ...
 \{\-\# INLINE [1] eqWord8 \#\-\}
-\{\-\# INLINE [1] neWord8 \#\-\}
 @
 
 This allows us to save our @break@ rule above by rewriting it to instead match
@@ -122,7 +119,7 @@ Currently this is only done for @('==')@, @('/=')@, @('<')@, @('<=')@, @('>')@,
 and @('>=')@ for the types in "GHC.Word" and "GHC.Int".
 -}
 
--- | The 'Eq' class defines equality ('==') and inequality ('/=').
+-- | The 'Eq' class defines equality ('==').
 -- All the basic datatypes exported by the "Prelude" are instances of 'Eq',
 -- and 'Eq' may be derived for any datatype whose constituents are also
 -- instances of 'Eq'.
@@ -135,18 +132,13 @@ and @('>=')@ for the types in "GHC.Word" and "GHC.Int".
 -- [__Transitivity__]: if @x == y && y == z@ = 'True', then @x == z@ = 'True'
 -- [__Extensionality__]: if @x == y@ = 'True' and @f@ is a function
 -- whose return type is an instance of 'Eq', then @f x == f y@ = 'True'
--- [__Negation__]: @x /= y@ = @not (x == y)@
 --
--- Minimal complete definition: either '==' or '/='.
---
-class  Eq a  where
-    (==), (/=)           :: a -> a -> Bool
+class Eq a where
+    (==) :: a -> a -> Bool
 
-    {-# INLINE (/=) #-}
-    {-# INLINE (==) #-}
-    x /= y               = not (x == y)
-    x == y               = not (x /= y)
-    {-# MINIMAL (==) | (/=) #-}
+(/=) :: Eq a => a -> a -> Bool
+x /= y = not (x == y)
+{-# INLINE (/=) #-}
 
 deriving instance Eq ()
 deriving instance Eq a => Eq (Solo a)
@@ -205,7 +197,6 @@ deriving instance Eq Ordering
 
 instance Eq Word where
     (==) = eqWord
-    (/=) = neWord
 
 -- See GHC.Classes#matching_overloaded_methods_in_rules
 {-# INLINE [1] eqWord #-}
@@ -217,7 +208,6 @@ eqWord, neWord :: Word -> Word -> Bool
 -- See GHC.Classes#matching_overloaded_methods_in_rules
 instance Eq Char where
     (==) = eqChar
-    (/=) = neChar
 
 -- See GHC.Classes#matching_overloaded_methods_in_rules
 {-# INLINE [1] eqChar #-}
@@ -268,7 +258,6 @@ eqDouble :: Double -> Double -> Bool
 
 instance Eq Int where
     (==) = eqInt
-    (/=) = neInt
 
 -- See GHC.Classes#matching_overloaded_methods_in_rules
 {-# INLINE [1] eqInt #-}

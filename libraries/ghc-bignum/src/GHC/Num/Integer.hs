@@ -326,7 +326,6 @@ integerGe# _ _                             = 1#
 
 instance Eq Integer where
    (==) = integerEq
-   (/=) = integerNe
 
 -- | Compare two Integer
 integerCompare :: Integer -> Integer -> Ordering

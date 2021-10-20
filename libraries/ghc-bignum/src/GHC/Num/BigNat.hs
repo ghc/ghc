@@ -1609,7 +1609,6 @@ bigNatFromWordArray wa n = BN# (bigNatFromWordArray# wa n)
 
 instance Eq BigNat where
    BN# a == BN# b = bigNatEq a b
-   BN# a /= BN# b = bigNatNe a b
 
 instance Ord BigNat where
    (BN# a) `compare` (BN# b) = bigNatCompare a b

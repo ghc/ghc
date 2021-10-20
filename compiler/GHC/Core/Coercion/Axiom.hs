@@ -459,7 +459,6 @@ See also:
 
 instance Eq (CoAxiom br) where
     a == b = getUnique a == getUnique b
-    a /= b = getUnique a /= getUnique b
 
 instance Uniquable (CoAxiom br) where
     getUnique = co_ax_unique

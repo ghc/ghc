@@ -70,7 +70,6 @@ data {-# CTYPE "HsInt8" #-} Int8 = I8# Int8#
 -- | @since 2.01
 instance Eq Int8 where
     (==) = eqInt8
-    (/=) = neInt8
 
 eqInt8, neInt8 :: Int8 -> Int8 -> Bool
 eqInt8 (I8# x) (I8# y) = isTrue# (x `eqInt8#` y)
@@ -277,7 +276,6 @@ data {-# CTYPE "HsInt16" #-} Int16 = I16# Int16#
 -- | @since 2.01
 instance Eq Int16 where
     (==) = eqInt16
-    (/=) = neInt16
 
 eqInt16, neInt16 :: Int16 -> Int16 -> Bool
 eqInt16 (I16# x) (I16# y) = isTrue# (x `eqInt16#` y)
@@ -481,7 +479,6 @@ data {-# CTYPE "HsInt32" #-} Int32 = I32# Int32#
 -- | @since 2.01
 instance Eq Int32 where
     (==) = eqInt32
-    (/=) = neInt32
 
 eqInt32, neInt32 :: Int32 -> Int32 -> Bool
 eqInt32 (I32# x) (I32# y) = isTrue# (x `eqInt32#` y)
@@ -692,7 +689,6 @@ data {-# CTYPE "HsInt64" #-} Int64 = I64# Int64#
 -- | @since 2.01
 instance Eq Int64 where
     (==) = eqInt64
-    (/=) = neInt64
 
 eqInt64, neInt64 :: Int64 -> Int64 -> Bool
 eqInt64 (I64# x) (I64# y) = isTrue# (x `eqInt64#` y)
@@ -889,7 +885,6 @@ data {-# CTYPE "HsInt64" #-} Int64 = I64# Int#
 -- | @since 2.01
 instance Eq Int64 where
     (==) = eqInt64
-    (/=) = neInt64
 
 eqInt64, neInt64 :: Int64 -> Int64 -> Bool
 eqInt64 (I64# x) (I64# y) = isTrue# (x ==# y)

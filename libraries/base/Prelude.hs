@@ -38,7 +38,7 @@ module Prelude (
     fst, snd, curry, uncurry,
 
     -- ** Basic type classes
-    Eq((==), (/=)),
+    Eq((==)), (/=),
     Ord(compare, (<), (<=), (>=), (>), max, min),
     Enum(succ, pred, toEnum, fromEnum, enumFrom, enumFromThen,
          enumFromTo, enumFromThenTo),

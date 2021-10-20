@@ -263,7 +263,6 @@ The alternatives are:
 
 instance Eq Unique where
     a == b = eqUnique a b
-    a /= b = not (eqUnique a b)
 
 instance Uniquable Unique where
     getUnique u = u

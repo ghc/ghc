@@ -2822,7 +2822,6 @@ mkTyConTagMap tycon =
 
 instance Eq TyCon where
     a == b = getUnique a == getUnique b
-    a /= b = getUnique a /= getUnique b
 
 instance Uniquable TyCon where
     getUnique tc = tyConUnique tc

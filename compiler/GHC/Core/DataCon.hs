@@ -869,7 +869,6 @@ for the details of this transformation.
 
 instance Eq DataCon where
     a == b = getUnique a == getUnique b
-    a /= b = getUnique a /= getUnique b
 
 instance Uniquable DataCon where
     getUnique = dcUnique

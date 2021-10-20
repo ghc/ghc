@@ -344,7 +344,6 @@ We cannot in general represent this by a value of type Type:
 
 instance Eq PatSyn where
     (==) = (==) `on` getUnique
-    (/=) = (/=) `on` getUnique
 
 instance Uniquable PatSyn where
     getUnique = psUnique

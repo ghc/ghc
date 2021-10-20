@@ -79,7 +79,6 @@ data {-# CTYPE "HsWord8" #-} Word8
 -- | @since 2.01
 instance Eq Word8 where
     (==) = eqWord8
-    (/=) = neWord8
 
 eqWord8, neWord8 :: Word8 -> Word8 -> Bool
 eqWord8 (W8# x) (W8# y) = isTrue# (x `eqWord8#` y)
@@ -265,7 +264,6 @@ data {-# CTYPE "HsWord16" #-} Word16 = W16# Word16#
 -- | @since 2.01
 instance Eq Word16 where
     (==) = eqWord16
-    (/=) = neWord16
 
 eqWord16, neWord16 :: Word16 -> Word16 -> Bool
 eqWord16 (W16# x) (W16# y) = isTrue# (x `eqWord16#` y)
@@ -493,7 +491,6 @@ data {-# CTYPE "HsWord32" #-} Word32 = W32# Word32#
 -- | @since 2.01
 instance Eq Word32 where
     (==) = eqWord32
-    (/=) = neWord32
 
 eqWord32, neWord32 :: Word32 -> Word32 -> Bool
 eqWord32 (W32# x) (W32# y) = isTrue# (x `eqWord32#` y)
@@ -673,7 +670,6 @@ data {-# CTYPE "HsWord64" #-} Word64 = W64# Word64#
 -- | @since 2.01
 instance Eq Word64 where
     (==) = eqWord64
-    (/=) = neWord64
 
 eqWord64, neWord64 :: Word64 -> Word64 -> Bool
 eqWord64 (W64# x) (W64# y) = isTrue# (x `eqWord64#` y)
@@ -816,7 +812,6 @@ data {-# CTYPE "HsWord64" #-} Word64 = W64# Word#
 -- | @since 2.01
 instance Eq Word64 where
     (==) = eqWord64
-    (/=) = neWord64
 
 eqWord64, neWord64 :: Word64 -> Word64 -> Bool
 eqWord64 (W64# x) (W64# y) = isTrue# (x `eqWord#` y)
