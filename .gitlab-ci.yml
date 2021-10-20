@@ -389,7 +389,7 @@ hadrian-ghc-in-ghci:
 ############################################################
 
 .lint-params:
-  stage: quick-build
+  stage: full-build
   needs: [lint-submods]
   tags:
     - lint
