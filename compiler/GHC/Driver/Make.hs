@@ -928,7 +928,11 @@ withAbstractSem sem = MC.bracket_ (acquireSem sem) (releaseSem sem)
 -- | Environment used when compiling a module
 data MakeEnv = MakeEnv { hsc_env :: !HscEnv -- The basic HscEnv which will be augmented for each module
                        , compile_sem :: !AbstractSem
-                       , lqq_var :: !(TVar LogQueueQueue)
+                       -- Modify the environment for module k, with the supplied logger modification function.
+                       -- For -j1, this wrapper doesn't do anything
+                       -- For -jn, the wrapper initialised a log queue and then modifies the logger to pipe its output
+                       --          into the log queue.
+                       , withLogger :: forall a . Int -> ((Logger -> Logger) -> RunMakeM a) -> RunMakeM a
                        , env_messager :: !(Maybe Messager)
                        }
 
@@ -2226,9 +2230,8 @@ wrapAction hsc_env k = do
                         _ -> errorMsg lcl_logger (text (show exc))
         return Nothing
 
-withParLog :: Int -> (HscEnv -> RunMakeM a) -> RunMakeM a
-withParLog k cont  = do
-  MakeEnv{lqq_var, hsc_env} <- ask
+withParLog :: TVar LogQueueQueue -> Int -> ((Logger -> Logger) -> RunMakeM b) -> RunMakeM b
+withParLog lqq_var k cont = do
   let init_log = liftIO $ do
         -- Make a new log queue
         lq <- newLogQueue k
@@ -2236,9 +2239,13 @@ withParLog k cont  = do
         atomically $ initLogQueue lqq_var lq
         return lq
       finish_log lq = liftIO (finishLogQueue lq)
-  MC.bracket init_log finish_log $ \lq -> do
-    -- Modify the logger to use the log queue
-    let lcl_logger = pushLogHook (const (parLogAction lq)) (hsc_logger hsc_env)
+  MC.bracket init_log finish_log $ \lq -> cont (pushLogHook (const (parLogAction lq)))
+
+withLoggerHsc :: Int -> (HscEnv -> RunMakeM a) -> RunMakeM a
+withLoggerHsc k cont  = do
+  MakeEnv{withLogger, hsc_env} <- ask
+  withLogger k $ \modifyLogger -> do
+    let lcl_logger = modifyLogger (hsc_logger hsc_env)
         hsc_env' = hsc_env { hsc_logger = lcl_logger }
     -- Run continuation with modified logger
     cont hsc_env'
@@ -2251,7 +2258,7 @@ executeInstantiationNode :: Int
   -> InstantiatedUnit
   -> RunMakeM ()
 executeInstantiationNode k n wait_deps iu = do
-    withParLog k $ \hsc_env -> do
+    withLoggerHsc k $ \hsc_env -> do
         -- Wait for the dependencies of this node
         deps <- wait_deps
         -- Output of the logger is mediated by a central worker to
@@ -2282,7 +2289,7 @@ executeCompileNode k n !old_hmi wait_deps mknot_var mod = do
                      _ -> return emptyModuleEnv
    knot_var <- liftIO $ maybe mk_mod return mknot_var
    deps <- wait_deps
-   withParLog k $ \hsc_env -> do
+   withLoggerHsc k $ \hsc_env -> do
      let -- Use the cached DynFlags which includes OPTIONS_GHC pragmas
          lcl_dynflags = ms_hspp_opts mod
      let lcl_hsc_env =
@@ -2358,15 +2365,34 @@ label_self thread_name = do
     self_tid <- CC.myThreadId
     CC.labelThread self_tid thread_name
 
+
+runPipelines :: Int -> HscEnv -> Maybe Messager -> [MakeAction] -> IO ()
+runPipelines n_job orig_hsc_env mHscMessager all_pipelines = do
+  liftIO $ label_self "main --make thread"
+
+  plugins_hsc_env <- initializePlugins orig_hsc_env Nothing
+  case n_job of
+    1 -> runSeqPipelines plugins_hsc_env mHscMessager all_pipelines
+    _n -> runParPipelines n_job plugins_hsc_env mHscMessager all_pipelines
+
+runSeqPipelines :: HscEnv -> Maybe Messager -> [MakeAction] -> IO ()
+runSeqPipelines plugin_hsc_env mHscMessager all_pipelines =
+  let env = MakeEnv { hsc_env = plugin_hsc_env
+                    , withLogger = \_ k -> k id
+                    , compile_sem = AbstractSem (return ()) (return ())
+                    , env_messager = mHscMessager
+                    }
+  in runAllPipelines 1 env all_pipelines
+
+
 -- | Build and run a pipeline
-runPipelines :: Int              -- ^ How many capabilities to use
+runParPipelines :: Int              -- ^ How many capabilities to use
              -> HscEnv           -- ^ The basic HscEnv which is augmented with specific info for each module
              -> Maybe Messager   -- ^ Optional custom messager to use to report progress
              -> [MakeAction]  -- ^ The build plan for all the module nodes
              -> IO ()
-runPipelines n_jobs orig_hsc_env mHscMessager all_pipelines = do
+runParPipelines n_jobs plugin_hsc_env mHscMessager all_pipelines = do
 
-  liftIO $ label_self "main --make thread"
 
   -- A variable which we write to when an error has happened and we have to tell the
   -- logging thread to gracefully shut down.
@@ -2375,13 +2401,12 @@ runPipelines n_jobs orig_hsc_env mHscMessager all_pipelines = do
   -- will add it's LogQueue into this queue.
   log_queue_queue_var <- newTVarIO newLogQueueQueue
   -- Thread which coordinates the printing of logs
-  wait_log_thread <- logThread (hsc_logger orig_hsc_env) stopped_var log_queue_queue_var
+  wait_log_thread <- logThread (hsc_logger plugin_hsc_env) stopped_var log_queue_queue_var
 
-  plugins_hsc_env <- initializePlugins orig_hsc_env Nothing
 
   -- Make the logger thread-safe, in case there is some output which isn't sent via the LogQueue.
-  thread_safe_logger <- liftIO $ makeThreadSafe (hsc_logger orig_hsc_env)
-  let thread_safe_hsc_env = plugins_hsc_env { hsc_logger = thread_safe_logger }
+  thread_safe_logger <- liftIO $ makeThreadSafe (hsc_logger plugin_hsc_env)
+  let thread_safe_hsc_env = plugin_hsc_env { hsc_logger = thread_safe_logger }
 
   let updNumCapabilities = liftIO $ do
           n_capabilities <- getNumCapabilities
@@ -2398,15 +2423,11 @@ runPipelines n_jobs orig_hsc_env mHscMessager all_pipelines = do
           atomically $ writeTVar stopped_var True
           wait_log_thread
 
-  abstract_sem <-
-    case n_jobs of
-      1 -> return $ AbstractSem (return ()) (return ())
-      _ -> do
-        compile_sem <- newQSem n_jobs
-        return $ AbstractSem (waitQSem compile_sem) (signalQSem compile_sem)
+  compile_sem <- newQSem n_jobs
+  let abstract_sem = AbstractSem (waitQSem compile_sem) (signalQSem compile_sem)
     -- Reset the number of capabilities once the upsweep ends.
   let env = MakeEnv { hsc_env = thread_safe_hsc_env
-                    , lqq_var = log_queue_queue_var
+                    , withLogger = withParLog log_queue_queue_var
                     , compile_sem = abstract_sem
                     , env_messager = mHscMessager
                     }
