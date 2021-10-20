@@ -888,20 +888,6 @@ instance Enum Word64 where
                         = I# (word2Int# x#)
         | otherwise     = fromEnumError "Word64" x
 
-#if WORD_SIZE_IN_BITS < 64
-    -- See Note [Stable Unfolding for list producers] in GHC.Enum
-    {-# INLINE enumFrom #-}
-    enumFrom            = integralEnumFrom
-    -- See Note [Stable Unfolding for list producers] in GHC.Enum
-    {-# INLINE enumFromThen #-}
-    enumFromThen        = integralEnumFromThen
-    -- See Note [Stable Unfolding for list producers] in GHC.Enum
-    {-# INLINE enumFromTo #-}
-    enumFromTo          = integralEnumFromTo
-    -- See Note [Stable Unfolding for list producers] in GHC.Enum
-    {-# INLINE enumFromThenTo #-}
-    enumFromThenTo      = integralEnumFromThenTo
-#else
     -- See Note [Stable Unfolding for list producers] in GHC.Enum
     {-# INLINABLE enumFrom #-}
     enumFrom w
@@ -931,7 +917,6 @@ word64ToWord (W64# w#) = (W# w#)
 
 wordToWord64 :: Word -> Word64
 wordToWord64 (W# w#) = (W64# w#)
-#endif
 
 
 -- | @since 2.01
@@ -992,7 +977,7 @@ instance Bits Word64 where
     bitSizeMaybe i            = Just (finiteBitSize i)
     bitSize i                 = finiteBitSize i
     isSigned _                = False
-    popCount (W64# x#)        = I# (word2Int# (popCnt64# x#))
+    popCount (W64# x#)        = I# (word2Int# (popCnt# x#))
     bit                       = bitDefault
     testBit                   = testBitDefault
 
@@ -1009,8 +994,13 @@ instance FiniteBits Word64 where
     {-# INLINE countLeadingZeros #-}
     {-# INLINE countTrailingZeros #-}
     finiteBitSize _ = 64
+#if WORD_SIZE_IN_BITS < 64
     countLeadingZeros  (W64# x#) = I# (word2Int# (clz64# x#))
     countTrailingZeros (W64# x#) = I# (word2Int# (ctz64# x#))
+#else
+    countLeadingZeros  (W64# x#) = I# (word2Int# (clz# x#))
+    countTrailingZeros (W64# x#) = I# (word2Int# (ctz# x#))
+#endif
 
 -- | @since 2.01
 instance Show Word64 where

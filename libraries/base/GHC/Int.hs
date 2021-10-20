@@ -1048,7 +1048,11 @@ instance Bits Int64 where
     bitSizeMaybe i             = Just (finiteBitSize i)
     bitSize i                  = finiteBitSize i
     isSigned _                 = True
-    popCount (I64# x#)         = I# (word2Int# (popCnt64# (int2Word# x#)))
+#if WORD_SIZE_IN_BITS < 64
+    popCount (I64# x#)         = I# (word2Int# (popCnt64# (int64ToWord64# x#)))
+#else
+    popCount (I64# x#)         = I# (word2Int# (popCnt# (int2Word# x#)))
+#endif
     bit                        = bitDefault
     testBit                    = testBitDefault
 
@@ -1098,8 +1102,8 @@ instance FiniteBits Int64 where
     countLeadingZeros  (I64# x#) = I# (word2Int# (clz64# (int64ToWord64# x#)))
     countTrailingZeros (I64# x#) = I# (word2Int# (ctz64# (int64ToWord64# x#)))
 #else
-    countLeadingZeros  (I64# x#) = I# (word2Int# (clz64# (int2Word# x#)))
-    countTrailingZeros (I64# x#) = I# (word2Int# (ctz64# (int2Word# x#)))
+    countLeadingZeros  (I64# x#) = I# (word2Int# (clz# (int2Word# x#)))
+    countTrailingZeros (I64# x#) = I# (word2Int# (ctz# (int2Word# x#)))
 #endif
 
 -- | @since 2.01

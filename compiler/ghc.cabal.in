@@ -33,8 +33,6 @@ extra-source-files:
     ClosureTypes.h
     FunTypes.h
     MachRegs.h
-    -- Target sensative, should not be used.
-    MachDeps.h
 
 Flag internal-interpreter
     Description: Build with internal interpreter support.
@@ -75,9 +73,6 @@ Library
               Bytecodes.h
               ClosureTypes.h
               FunTypes.h
-              -- MachRegs.h -- hits #error, skip
-              -- target sensative, should not be used
-              MachDeps.h
               ghc-llvm-version.h
 
     Build-Depends: base       >= 4.11 && < 4.17,

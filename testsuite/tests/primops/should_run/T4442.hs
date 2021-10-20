@@ -222,11 +222,19 @@ main = do
     (\arr i s -> case readWord8ArrayAsInt32# arr i s of (# s', a #) -> (# s', I32# a #))
     (\arr i (I32# a) s -> writeWord8ArrayAsInt32# arr i a s)
     12345678 4
+#if WORD_SIZE_IN_BITS < 64
   testInt64Array "Int64#"
     (\arr i -> I64# (indexWord8ArrayAsInt64# arr i))
     (\arr i s -> case readWord8ArrayAsInt64# arr i s of (# s', a #) -> (# s', I64# a #))
     (\arr i (I64# a) s -> writeWord8ArrayAsInt64# arr i a s)
     1234567890123 8
+#else
+  testInt64Array "Int64#"
+    (\arr i -> I64# (int64ToInt# (indexWord8ArrayAsInt64# arr i)))
+    (\arr i s -> case readWord8ArrayAsInt64# arr i s of (# s', a #) -> (# s', I64# (int64ToInt# a) #))
+    (\arr i (I64# a) s -> writeWord8ArrayAsInt64# arr i (intToInt64# a) s)
+    1234567890123 8
+#endif
   testIntArray "Int#"
     (\arr i -> I# (indexWord8ArrayAsInt# arr i))
     (\arr i s -> case readWord8ArrayAsInt# arr i s of (# s', a #) -> (# s', I# a #))
@@ -248,11 +256,19 @@ main = do
     (\arr i s -> case readWord8ArrayAsWord32# arr i s of (# s', a #) -> (# s', W32# a #))
     (\arr i (W32# a) s -> writeWord8ArrayAsWord32# arr i a s)
     12345678 4
+#if WORD_SIZE_IN_BITS < 64
   testWord64Array "Word64#"
     (\arr i -> W64# (indexWord8ArrayAsWord64# arr i))
     (\arr i s -> case readWord8ArrayAsWord64# arr i s of (# s', a #) -> (# s', W64# a #))
     (\arr i (W64# a) s -> writeWord8ArrayAsWord64# arr i a s)
     1234567890123 8
+#else
+  testWord64Array "Word64#"
+    (\arr i -> W64# (word64ToWord# (indexWord8ArrayAsWord64# arr i)))
+    (\arr i s -> case readWord8ArrayAsWord64# arr i s of (# s', a #) -> (# s', W64# (word64ToWord# a) #))
+    (\arr i (W64# a) s -> writeWord8ArrayAsWord64# arr i (wordToWord64# a) s)
+    1234567890123 8
+#endif
   testWordArray "Word#"
     (\arr i -> W# (indexWord8ArrayAsWord# arr i))
     (\arr i s -> case readWord8ArrayAsWord# arr i s of (# s', a #) -> (# s', W# a #))
