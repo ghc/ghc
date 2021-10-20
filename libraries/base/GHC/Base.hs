@@ -1432,7 +1432,8 @@ eqString []       []       = True
 eqString (c1:cs1) (c2:cs2) = c1 == c2 && cs1 `eqString` cs2
 eqString _        _        = False
 
-{-# RULES "eqString" (==) = eqString #-}
+-- How can this work with -Werror=inline-rule-shadowing
+-- {-# RULES "eqString" (==) = eqString #-}
 -- eqString also has a BuiltInRule in GHC.Core.Opt.ConstantFold:
 --      eqString (unpackCString# (Lit s1)) (unpackCString# (Lit s2)) = s1==s2
 
