@@ -552,11 +552,7 @@ instance Eq Name where
 
 -- For a deterministic lexicographic ordering, use `stableNameCmp`.
 instance Ord Name where
-    a <= b = case (a `compare` b) of { LT -> True;  EQ -> True;  GT -> False }
-    a <  b = case (a `compare` b) of { LT -> True;  EQ -> False; GT -> False }
-    a >= b = case (a `compare` b) of { LT -> False; EQ -> True;  GT -> True  }
-    a >  b = case (a `compare` b) of { LT -> False; EQ -> False; GT -> True  }
-    compare a b = cmpName a b
+    compare = cmpName
 
 instance Uniquable Name where
     getUnique = nameUnique
