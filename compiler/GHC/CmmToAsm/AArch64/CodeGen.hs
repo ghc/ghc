@@ -445,6 +445,11 @@ getRegister' config plat expr
 
         -- TODO handle CmmInt 0 specially, use wzr or xzr.
 
+        CmmInt i W8 | i >= 0 -> do
+          return (Any (intFormat W8) (\dst -> unitOL $ annExpr expr (MOV (OpReg W8 dst) (OpImm (ImmInteger (narrowU W8 i))))))
+        CmmInt i W16 | i >= 0 -> do
+          return (Any (intFormat W16) (\dst -> unitOL $ annExpr expr (MOV (OpReg W16 dst) (OpImm (ImmInteger (narrowU W16 i))))))
+
         CmmInt i W8  -> do
           return (Any (intFormat W8) (\dst -> unitOL $ annExpr expr (MOV (OpReg W8 dst) (OpImm (ImmInteger (narrowS W8 i))))))
         CmmInt i W16 -> do
