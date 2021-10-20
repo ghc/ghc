@@ -816,7 +816,7 @@ interestingArg env e = go env 0 e
   where
     -- n is # value args to which the expression is applied
     go env n (Var v)
-       = case substId env v of
+       = case substId Nothing env v of
            DoneId v'            -> go_var n v'
            DoneEx e _           -> go (zapSubstEnv env)             n e
            ContEx tvs cvs ids e -> go (setSubstEnv env tvs cvs ids) n e

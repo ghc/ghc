@@ -9,7 +9,7 @@ module GHC.Core.Opt.Simplify.Monad (
         -- The monad
         SimplM,
         initSmpl, traceSmpl,
-        getSimplRules, getFamEnvs, getOptCoercionOpts,
+        getSimplRules, getFamEnvs, getOptCoercionOpts, getSimplModule,
 
         -- Unique supply
         MonadUnique(..), newId, newJoinId,
@@ -37,6 +37,7 @@ import GHC.Driver.Config
 import GHC.Core.Opt.Monad
 import GHC.Utils.Outputable
 import GHC.Data.FastString
+import GHC.Unit.Module     ( Module )
 import GHC.Utils.Monad
 import GHC.Utils.Logger as Logger
 import GHC.Utils.Misc      ( count )
@@ -81,28 +82,32 @@ data SimplTopEnv
         , st_max_ticks :: IntWithInf  -- ^ Max #ticks in this simplifier run
         , st_rules     :: RuleEnv
         , st_fams      :: (FamInstEnv, FamInstEnv)
+        , st_module    :: Maybe Module -- See Note [Simplifying recursive modules]
+                                       -- in GHC.Core.Opt.Simplify.Env
 
         , st_co_opt_opts :: !OptCoercionOpts
             -- ^ Coercion optimiser options
         }
 
-initSmpl :: Logger -> DynFlags -> RuleEnv -> (FamInstEnv, FamInstEnv)
+initSmpl :: Logger -> DynFlags
+         -> Maybe Module -> RuleEnv -> (FamInstEnv, FamInstEnv)
          -> Int                 -- Size of the bindings, used to limit
                                 -- the number of ticks we allow
          -> SimplM a
          -> IO (a, SimplCount)
 
-initSmpl logger dflags rules fam_envs size m
+initSmpl logger dflags mb_mod rules fam_envs size m
   = do -- No init count; set to 0
        let simplCount = zeroSimplCount dflags
        (result, count) <- unSM m env simplCount
        return (result, count)
   where
-    env = STE { st_flags = dflags
-              , st_logger = logger
-              , st_rules = rules
-              , st_max_ticks = computeMaxTicks dflags size
-              , st_fams = fam_envs
+    env = STE { st_flags       = dflags
+              , st_logger      = logger
+              , st_rules       = rules
+              , st_max_ticks   = computeMaxTicks dflags size
+              , st_fams        = fam_envs
+              , st_module      = mb_mod
               , st_co_opt_opts = initOptCoercionOpts dflags
               }
 
@@ -201,6 +206,9 @@ instance MonadIO SimplM where
     liftIO m = SM $ \_ sc -> do
       x <- m
       return (x, sc)
+
+getSimplModule :: SimplM (Maybe Module)
+getSimplModule = SM (\st_env sc -> return (st_module st_env, sc))
 
 getSimplRules :: SimplM RuleEnv
 getSimplRules = SM (\st_env sc -> return (st_rules st_env, sc))

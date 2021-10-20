@@ -218,7 +218,8 @@ simplTopBinds env0 binds0
                 -- It's rather as if the top-level binders were imported.
                 -- See note [Glomming] in "GHC.Core.Opt.OccurAnal".
         -- See Note [Bangs in the Simplifier]
-        ; !env1 <- {-#SCC "simplTopBinds-simplRecBndrs" #-} simplRecBndrs env0 (bindersOfBinds binds0)
+        ; !env1 <- {-#SCC "simplTopBinds-simplRecBndrs" #-}
+                   simplTopRecBndrs env0 (bindersOfBinds binds0)
         ; (floats, env2) <- {-#SCC "simplTopBinds-simpl_binds" #-} simpl_binds env1 binds0
         ; freeTick SimplifierDone
         ; return (floats, env2) }
@@ -1352,8 +1353,9 @@ simplTick env tickish expr cont
   no_floating_past_tick =
     do { let (inc,outc) = splitCont cont
        ; (floats, expr1) <- simplExprF env expr inc
+       ; mb_mod          <- getSimplModule
        ; let expr2    = wrapFloats floats expr1
-             tickish' = simplTickish env tickish
+             tickish' = simplTickish mb_mod tickish
        ; rebuild env (mkTick tickish' expr2) outc
        }
 
@@ -1377,9 +1379,9 @@ simplTick env tickish expr cont
 --       }
 
 
-  simplTickish env tickish
+  simplTickish mb_mod tickish
     | Breakpoint ext n ids <- tickish
-          = Breakpoint ext n (map (getDoneId . substId env) ids)
+          = Breakpoint ext n (map (getDoneId . substId mb_mod env) ids)
     | otherwise = tickish
 
   -- Push type application and coercion inside a tick
@@ -1960,45 +1962,48 @@ outside.  Surprisingly tricky!
 ************************************************************************
 -}
 
-simplVar :: SimplEnv -> InVar -> SimplM OutExpr
+simplLocalVar :: SimplEnv -> InVar -> SimplM OutExpr
 -- Look up an InVar in the environment
-simplVar env var
+-- Used only in a case alternative
+simplLocalVar env var
   -- Why $! ? See Note [Bangs in the Simplifier]
   | isTyVar var = return $! Type $! (substTyVar env var)
   | isCoVar var = return $! Coercion $! (substCoVar env var)
   | otherwise
-  = case substId env var of
-        ContEx tvs cvs ids e -> let env' = setSubstEnv env tvs cvs ids
-                                in simplExpr env' e
-        DoneId var1          -> return (Var var1)
-        DoneEx e _           -> return e
+  = case substId Nothing env var of
+      ContEx tvs cvs ids e -> let env' = setSubstEnv env tvs cvs ids
+                              in simplExpr env' e
+      DoneId var1          -> return (Var var1)
+      DoneEx e _           -> return e
 
 simplIdF :: SimplEnv -> InId -> SimplCont -> SimplM (SimplFloats, OutExpr)
 simplIdF env var cont
-  = case substId env var of
-      ContEx tvs cvs ids e ->
-          let env' = setSubstEnv env tvs cvs ids
-          in simplExprF env' e cont
-          -- Don't trim; haven't already simplified e,
-          -- so the cont is not embodied in e
+  = do { mb_mod <- getSimplModule
+       ; case substId mb_mod env var of
+           ContEx tvs cvs ids e ->
+               let env' = setSubstEnv env tvs cvs ids
+               in simplExprF env' e cont
+               -- Don't trim; haven't already simplified e,
+               -- so the cont is not embodied in e
 
-      DoneId var1 ->
-          let cont' = trimJoinCont var (isJoinId_maybe var1) cont
-          in completeCall env var1 cont'
+           DoneId var1 ->
+               let cont' = trimJoinCont var (isJoinId_maybe var1) cont
+               in completeCall env var1 cont'
 
-      DoneEx e mb_join ->
-          let env' = zapSubstEnv env
-              cont' = trimJoinCont var mb_join cont
-          in simplExprF env' e cont'
-              -- Note [zapSubstEnv]
-              -- The template is already simplified, so don't re-substitute.
-              -- This is VITAL.  Consider
-              --      let x = e in
-              --      let y = \z -> ...x... in
-              --      \ x -> ...y...
-              -- We'll clone the inner \x, adding x->x' in the id_subst
-              -- Then when we inline y, we must *not* replace x by x' in
-              -- the inlined copy!!
+           DoneEx e mb_join ->
+               let env' = zapSubstEnv env
+                   cont' = trimJoinCont var mb_join cont
+               in simplExprF env' e cont'
+                   -- Note [zapSubstEnv]
+                   -- The template is already simplified, so don't re-substitute.
+                   -- This is VITAL.  Consider
+                   --      let x = e in
+                   --      let y = \z -> ...x... in
+                   --      \ x -> ...y...
+                   -- We'll clone the inner \x, adding x->x' in the id_subst
+                   -- Then when we inline y, we must *not* replace x by x' in
+                   -- the inlined copy!!
+    }
 
 ---------------------------------------------------------
 --      Dealing with a call site
@@ -3316,7 +3321,7 @@ knownCon env scrut dc_floats dc dc_ty_args dc_args bndr bs rhs cont
       | exprIsTrivial scrut = return (emptyFloats env
                                      , extendIdSubst env bndr (DoneEx scrut Nothing))
                               -- See Note [Do not duplicate constructor applications]
-      | otherwise           = do { dc_args <- mapM (simplVar env) bs
+      | otherwise           = do { dc_args <- mapM (simplLocalVar env) bs
                                          -- dc_ty_args are already OutTypes,
                                          -- but bs are InBndrs
                                  ; let con_app = Var (dataConWorkId dc)

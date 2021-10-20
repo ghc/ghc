@@ -20,10 +20,10 @@ module GHC.Core.Opt.Simplify.Env (
         getSimplRules,
 
         -- * Substitution results
-        SimplSR(..), mkContEx, substId, lookupRecBndr, refineFromInScope,
+        SimplSR(..), mkContEx, substId, lookupRecBndr,
 
         -- * Simplifying 'Id' binders
-        simplNonRecBndr, simplNonRecJoinBndr, simplRecBndrs, simplRecJoinBndrs,
+        simplNonRecBndr, simplNonRecJoinBndr, simplTopRecBndrs, simplRecBndrs, simplRecJoinBndrs,
         simplBinder, simplBinders,
         substTy, substTyVar, getTCvSubst,
         substCo, substCoVar,
@@ -64,6 +64,8 @@ import qualified GHC.Core.Type as Type
 import GHC.Core.Type hiding     ( substTy, substTyVar, substTyVarBndr, extendTvSubst, extendCvSubst )
 import qualified GHC.Core.Coercion as Coercion
 import GHC.Core.Coercion hiding ( substCo, substCoVar, substCoVarBndr )
+import GHC.Unit.Module          ( Module )
+import GHC.Types.Name           ( nameModule_maybe )
 import GHC.Types.Basic
 import GHC.Utils.Monad
 import GHC.Utils.Outputable
@@ -687,27 +689,77 @@ So we want to look up the inner X.g_34 in the substitution, where we'll
 find that it has been substituted by b.  (Or conceivably cloned.)
 -}
 
-substId :: SimplEnv -> InId -> SimplSR
+substId :: Maybe Module -> SimplEnv -> InId -> SimplSR
 -- Returns DoneEx only on a non-Var expression
-substId (SimplEnv { seInScope = in_scope, seIdSubst = ids }) v
+substId mb_mod (SimplEnv { seInScope = in_scope, seIdSubst = ids }) v
   = case lookupVarEnv ids v of  -- Note [Global Ids in the substitution]
-        Nothing               -> DoneId (refineFromInScope in_scope v)
-        Just (DoneId v)       -> DoneId (refineFromInScope in_scope v)
+        Nothing               -> DoneId (refineFromInScope mb_mod in_scope v)
+        Just (DoneId v1)      -> DoneId (refineFromInScope mb_mod in_scope v1)
         Just res              -> res    -- DoneEx non-var, or ContEx
 
-        -- Get the most up-to-date thing from the in-scope set
-        -- Even though it isn't in the substitution, it may be in
-        -- the in-scope set with better IdInfo.
-        --
-        -- See also Note [In-scope set as a substitution] in GHC.Core.Opt.Simplify.
-
-refineFromInScope :: InScopeSet -> Var -> Var
-refineFromInScope in_scope v
-  | isLocalId v = case lookupInScope in_scope v of
-                  Just v' -> v'
-                  Nothing -> pprPanic "refineFromInScope" (ppr in_scope $$ ppr v)
-                             -- c.f #19074 for a subtle place where this went wrong
+refineFromInScope :: Maybe Module -> InScopeSet -> Id -> Id
+-- Get the most up-to-date thing from the in-scope set
+-- Even though it isn't in the substitution (the Nothing case in
+-- substId), it may be in the in-scope set with better IdInfo.
+--
+-- See also Note [In-scope set as a substitution] in GHC.Core.Opt.Simplify.
+refineFromInScope mb_mod in_scope v
+  | lookup_in_scope
+   = case lookupInScope in_scope v of
+       Just v' -> v'
+       Nothing -> pprPanic "refineFromInScope" (ppr in_scope $$ ppr v)
+                  -- c.f #19074 for a subtle place where this went wrong
   | otherwise = v
+  where
+    v_mod = nameModule_maybe (varName v)
+    lookup_in_scope
+       | isLocalId v = True
+       ---- Below here v is a Globald -----
+
+       -- Implicit Ids don't have bindings until they are added by
+       --  Prep or Tidy, so the won't be in the in-scope set
+       | isImplicitId v = False
+
+       -- If we are compiling module M and come across a GlobalId M.foo
+       -- then we want to look it up in the in-scope set
+       -- See Note [Simplifying recursive modules]
+       | Just name_mod <- v_mod
+       , Just this_mod <- mb_mod
+       = name_mod == this_mod
+
+       -- All other (imported) GlobalIds won't be in the in-scope set
+       | otherwise = False
+
+{- Note [Simplifying recursive modules]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we have
+   M.hs-boot    module M where { foo :: Int -> Int }
+   A.hs         module A where { import {-# SOURCE #-} M
+                               ; bar = foo 3 }
+   M.hs         module M where { import A; foo = id; ...bar... }
+
+In --make mode we'll make an unfolding for `bar` that refers to a GlobalId `M.foo`,
+but one with no useful info beyond the type of `foo`.
+
+Then when compiling M, we inline `bar` and lo! we have an occurrence of a
+GlobalId `M.foo` when the binding site `foo = id` is for a LocalId.
+Lint rightly complains (seee #20200).
+
+Solution:
+
+* In the (unchanging) SimplTopEnv we keep st_module,
+  which tracks the module being compiled.
+
+* The field can be Nothing, which is useful for GHCi, and in other
+  siuations where we don't need to worry about the boot-file problem.
+
+* When looking up a GlobalId, in refineFromInScope, if the Module part
+  of the Name is the same as the module being compiled (kept in
+  st_module), then it look up in the InScopeSet, just like a LocalId.
+
+* Wrinkle: data constructor workers aren't injected until the end, so
+  we won't find them in the in-scope set.
+-}
 
 lookupRecBndr :: SimplEnv -> InId -> OutId
 -- Look up an Id which has been put into the envt by simplRecBndrs,
@@ -716,7 +768,7 @@ lookupRecBndr (SimplEnv { seInScope = in_scope, seIdSubst = ids }) v
   = case lookupVarEnv ids v of
         Just (DoneId v) -> v
         Just _ -> pprPanic "lookupRecBndr" (ppr v)
-        Nothing -> refineFromInScope in_scope v
+        Nothing -> refineFromInScope Nothing in_scope v
 
 {-
 ************************************************************************
@@ -784,8 +836,15 @@ simplNonRecBndr !env id
         ; seqId id1 `seq` return (env1, id1) }
 
 ---------------
+simplTopRecBndrs :: SimplEnv -> [InBndr] -> SimplM SimplEnv
+-- Top-level recursive let binders
+-- No need to clone, and the current substitution is empty
+simplTopRecBndrs env@(SimplEnv { seInScope = in_scope }) ids
+  = assert (all (not . isJoinId) ids) $
+    return (env { seInScope = extendInScopeSetList in_scope ids })
+
 simplRecBndrs :: SimplEnv -> [InBndr] -> SimplM SimplEnv
--- Recursive let binders
+-- Recursive let binders; used for nested (non-top-level) letrecs
 simplRecBndrs env@(SimplEnv {}) ids
   -- See Note [Bangs in the Simplifier]
   = assert (all (not . isJoinId) ids) $

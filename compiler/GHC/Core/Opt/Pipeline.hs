@@ -593,7 +593,7 @@ simplifyExpr hsc_env expr
 
         ; let sz = exprSize expr
 
-        ; (expr', counts) <- initSmpl logger dflags rule_env fi_env sz $
+        ; (expr', counts) <- initSmpl logger dflags Nothing rule_env fi_env sz $
                              simplExprGently simpl_env expr
 
         ; Logger.putDumpFileMaybe logger Opt_D_dump_simpl_stats
@@ -733,7 +733,8 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
 
                 -- Simplify the program
            ((binds1, rules1), counts1) <-
-             initSmpl logger dflags (mkRuleEnv rule_base2 vis_orphs) fam_envs sz $
+             initSmpl logger dflags (Just this_mod)
+                      (mkRuleEnv rule_base2 vis_orphs) fam_envs sz $
                do { (floats, env1) <- {-# SCC "SimplTopBinds" #-}
                                       simplTopBinds simpl_env tagged_binds
 

@@ -296,12 +296,14 @@ A GlobalId is
   * imported, or data constructor, or primop, or record selector
   * has a Unique that is globally unique across the whole
     GHC invocation (a single invocation may compile multiple modules)
+  * usually has an External Name -- the exception is FCallIds
   * never treated as a candidate by the free-variable finder;
         it's a constant!
 
 A LocalId is
   * bound within an expression (lambda, case, local let(rec))
   * or defined at top level in the module being compiled
+  * may have an Internal or External Name
   * always treated as a candidate by the free-variable finder
 
 After CoreTidy, top-level LocalIds are turned into GlobalIds
