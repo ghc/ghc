@@ -21,4 +21,4 @@ test('T18401', [ grep_errmsg(r'^T18401\.\S+ ::') ], compile, ['-ddump-simpl -dsu
 # It won't match if the Cpr=1 is missing, which is what we're trying to assess.
 test('T18824', [ grep_errmsg(r'JoinId[^\n]*Cpr') ], compile, ['-ddump-exitify -dppr-cols=1000 -dsuppress-uniques'])
 
-
+test('T20539', [], compile, ['']) # simply should not crash

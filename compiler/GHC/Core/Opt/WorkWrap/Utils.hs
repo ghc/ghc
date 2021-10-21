@@ -1333,6 +1333,8 @@ isRecDataCon fam_envs fuel dc
 
     go_arg_ty :: IntWithInf -> RecTcChecker -> Type -> IsRecDataConResult
     go_arg_ty fuel rec_tc ty
+      --- | pprTrace "arg_ty" (ppr ty) False = undefined
+
       | Just (_, _arg_ty, _res_ty) <- splitFunTy_maybe ty
       -- = go_arg_ty fuel rec_tc _arg_ty <||> go_arg_ty fuel rec_tc _res_ty
           -- Plausible, but unnecessary for CPR.
@@ -1382,7 +1384,7 @@ isRecDataCon fam_envs fuel dc
             -- we expanded this TyCon once already, no need to test it multiple times
 
           Just rec_tc'
-            | Just (_tvs, rhs, _co) <- unwrapNewTyConEtad_maybe tc
+            | Just (_tvs, rhs, _co) <- unwrapNewTyCon_maybe tc
                 -- See Note [Detecting recursive data constructors], points (2) and (3)
             -> go_arg_ty fuel rec_tc' rhs
 
