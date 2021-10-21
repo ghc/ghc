@@ -1,11 +1,17 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 4, types: 2, coercions: 0, joins: 0/0}
+  = {terms: 16, types: 5, coercions: 0, joins: 0/0}
 
-testAB = False
+testAA2 = "A"#
 
-testAA = True
+testAA1 = unpackCString# testAA2
+
+testAB1 = "B"#
+
+testAB = $fEqModule_$s$c== testAA1 (unpackCString# testAB1)
+
+testAA = $fEqModule_$s$c== testAA1 testAA1
 
 
 

@@ -14,7 +14,6 @@ instance Num T where
 
 instance Eq T where
   (==) (T a) (T b) = isTrue# (a `eqWord8#` b)
-  (/=) (T a) (T b) = isTrue# (a `neWord8#` b)
 
 main :: IO ()
 main = do

@@ -6,4 +6,3 @@ data Foo = Bar | Baz
 
 instance Eq Foo where
   Bar == Baz = True
-  Bar /= Baz = False

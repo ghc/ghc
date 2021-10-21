@@ -153,12 +153,6 @@ Data.Data.Data [T14682.Foo]
 
 
 ==================== Filling in method body ====================
-GHC.Classes.Eq [T14682.Foo]
-  GHC.Classes./= = GHC.Classes.$dm/= @(T14682.Foo)
-
-
-
-==================== Filling in method body ====================
 GHC.Classes.Ord [T14682.Foo]
   GHC.Classes.max = GHC.Classes.$dmmax @(T14682.Foo)
 

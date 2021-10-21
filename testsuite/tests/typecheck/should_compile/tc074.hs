@@ -8,11 +8,7 @@ instance (Eq a) => Eq (T a) where
  C == C = True
  a == b = False
 
- a /= b = not (a == b)
-
 instance (Eq b) => Eq (B b) where
  X == X = True
  (Y a) == (Y b) = a == b
  a == b = False
-
- a /= b = not (a == b)

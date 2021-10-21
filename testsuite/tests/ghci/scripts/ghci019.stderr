@@ -1,5 +1,5 @@
 
 ghci019.hs:10:10: warning: [-Wmissing-methods (in -Wdefault)]
     • No explicit implementation for
-        either ‘Prelude.==’ or ‘Prelude./=’
+        ‘Prelude.==’
     • In the instance declaration for ‘Prelude.Eq Foo’

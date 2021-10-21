@@ -1,3 +1,7 @@
 
 T2497.hs:22:1: warning: [-Wunused-top-binds (in -Wextra, -Wunused-binds)]
     Defined but not used: ‘beq’
+
+T2497.hs:25:5: warning: [-Winline-rule-shadowing (in -Wdefault)]
+    Rule "rule 1" may never fire because ‘==’ might inline first
+    Suggested fix: Add an INLINE[n] or NOINLINE[n] pragma for ‘==’

@@ -1,12 +1,12 @@
 
 deriving-1935.hs:18:11: warning: [-Wmissing-methods (in -Wdefault)]
     • No explicit implementation for
-        either ‘==’ or ‘/=’
+        ‘==’
     • In the instance declaration for ‘Eq (T a)’
 
 deriving-1935.hs:21:11: warning: [-Wmissing-methods (in -Wdefault)]
     • No explicit implementation for
-        either ‘==’ or ‘/=’
+        ‘==’
     • In the instance declaration for ‘Eq (S a)’
 
 deriving-1935.hs:22:11: warning: [-Wmissing-methods (in -Wdefault)]

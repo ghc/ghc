@@ -42,4 +42,3 @@ data GUIOBJECT
 
 instance Eq GUIOBJECT where
   (==) = undefined
-  (/=) = undefined

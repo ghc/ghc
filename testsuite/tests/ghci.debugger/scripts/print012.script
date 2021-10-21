@@ -7,5 +7,5 @@ let o = O (id foo)
 seq _t1 ()
 :t _t1
 :p o
-seq _t4 ()
+seq _t3 ()
 :p o
