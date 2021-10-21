@@ -8,7 +8,7 @@ main = do
     mask_ $ return ()
     throwIO (ErrorCall "test") `catch`
        \e -> do
-         let _ = e::SomeException
+         let _ = e::SomeExceptionWithLocation
          print =<< getMaskingState
          putMVar m1 ()
          takeMVar m2

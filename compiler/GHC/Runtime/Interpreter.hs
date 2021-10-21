@@ -537,21 +537,21 @@ findSystemLibrary interp str = interpCmd interp (FindSystemLibrary str)
 iservCall :: Binary a => IServInstance -> Message a -> IO a
 iservCall iserv msg =
   remoteCall (iservPipe iserv) msg
-    `catchException` \(e :: SomeException) -> handleIServFailure iserv e
+    `catchException` \(e :: SomeExceptionWithLocation) -> handleIServFailure iserv e
 
 -- | Read a value from the iserv process
 readIServ :: IServInstance -> Get a -> IO a
 readIServ iserv get =
   readPipe (iservPipe iserv) get
-    `catchException` \(e :: SomeException) -> handleIServFailure iserv e
+    `catchException` \(e :: SomeExceptionWithLocation) -> handleIServFailure iserv e
 
 -- | Send a value to the iserv process
 writeIServ :: IServInstance -> Put -> IO ()
 writeIServ iserv put =
   writePipe (iservPipe iserv) put
-    `catchException` \(e :: SomeException) -> handleIServFailure iserv e
+    `catchException` \(e :: SomeExceptionWithLocation) -> handleIServFailure iserv e
 
-handleIServFailure :: IServInstance -> SomeException -> IO a
+handleIServFailure :: IServInstance -> SomeExceptionWithLocation -> IO a
 handleIServFailure iserv e = do
   let proc = iservProcess iserv
   ex <- getProcessExitCode proc

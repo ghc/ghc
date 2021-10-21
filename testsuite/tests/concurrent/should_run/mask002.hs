@@ -9,12 +9,12 @@ main = do
   m <- newEmptyMVar
   t1 <- mask_ $ forkIO $ do
           takeMVar m `catch` \e -> do stat 1 MaskedInterruptible
-                                      print (e::SomeException)
+                                      print (e::SomeExceptionWithLocation)
                                       throwIO e
   killThread t1
   t2 <- uninterruptibleMask_ $ forkIO $ do
           takeMVar m `catch` \e -> do stat 2 MaskedUninterruptible
-                                      print (e::SomeException)
+                                      print (e::SomeExceptionWithLocation)
                                       throwIO e
   killThread t2
   t3 <- mask_ $ forkIOWithUnmask $ \unmask ->
@@ -25,9 +25,8 @@ main = do
   takeMVar m
 
 stat :: Int -> MaskingState -> IO ()
-stat n m = do 
+stat n m = do
  s <- getMaskingState
- if (s /= m) 
+ if (s /= m)
     then error (printf "%2d: %s\n" n (show s))
     else return ()
-

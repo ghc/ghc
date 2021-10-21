@@ -20,4 +20,4 @@ thread restore r t = run
     run = (restore $ forever $ do killThread t
                                   i <- atomicModifyIORef r (\i -> (i + 1, i))
                                   evaluate i)
-             `catch` \(e::SomeException) -> run
+             `catch` \(e::SomeExceptionWithLocation) -> run

@@ -7,6 +7,6 @@ import GHC.Conc
 main = do
   ms1 ← getMaskingState
   atomically $ (throwSTM Overflow) `catchSTM`
-               (\(e ∷ SomeException) → return ())
+               (\(e ∷ SomeExceptionWithLocation) → return ())
   ms2 ← getMaskingState
   putStrLn $ show (ms1, ms2)

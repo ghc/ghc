@@ -26,7 +26,7 @@ testEnumInt8 = do
      -- pred
   printTest (pred (1::Int8))
   printTest (pred (maxBound::Int8))
-  mayBomb   (printTest (pred (minBound::Int8))) 
+  mayBomb   (printTest (pred (minBound::Int8)))
 
      -- toEnum
   printTest ((map (toEnum::Int->Int8) [1, fromIntegral (minBound::Int8), fromIntegral (maxBound::Int8)]))
@@ -38,7 +38,7 @@ testEnumInt8 = do
      -- [x..] aka enumFrom
   printTest ((take 7 [(1::Int8)..]))
   printTest ((take 7 [((maxBound::Int8)-5)..])) -- just in case it doesn't catch the upper bound..
-  
+
      -- [x,y..] aka enumFromThen
   printTest ((take 7 [(1::Int8),2..]))
   printTest ((take 7 [(1::Int8),7..]))
@@ -84,7 +84,7 @@ testEnumInt16 = do
      -- pred
   printTest (pred (1::Int16))
   printTest (pred (maxBound::Int16))
-  mayBomb   (printTest (pred (minBound::Int16))) 
+  mayBomb   (printTest (pred (minBound::Int16)))
 
      -- toEnum
   printTest ((map (toEnum::Int->Int16) [1, fromIntegral (minBound::Int16), fromIntegral (maxBound::Int16)]))
@@ -97,7 +97,7 @@ testEnumInt16 = do
      -- [x..] aka enumFrom
   printTest ((take 7 [(1::Int16)..]))
   printTest ((take 7 [((maxBound::Int16)-5)..])) -- just in case it doesn't catch the upper bound..
-  
+
      -- [x,y..] aka enumFromThen
   printTest ((take 7 [(1::Int16),2..]))
   printTest ((take 7 [(1::Int16),7..]))
@@ -143,7 +143,7 @@ testEnumInt32 = do
      -- pred
   printTest (pred (1::Int32))
   printTest (pred (maxBound::Int32))
-  mayBomb   (printTest (pred (minBound::Int32))) 
+  mayBomb   (printTest (pred (minBound::Int32)))
 
      -- toEnum
   printTest ((map (toEnum::Int->Int32) [1, fromIntegral (minBound::Int32), fromIntegral (maxBound::Int32)]))
@@ -155,7 +155,7 @@ testEnumInt32 = do
      -- [x..] aka enumFrom
   printTest ((take 7 [(1::Int32)..]))
   printTest ((take 7 [((maxBound::Int32)-5)..])) -- just in case it doesn't catch the upper bound..
-  
+
      -- [x,y..] aka enumFromThen
   printTest ((take 7 [(1::Int32),2..]))
   printTest ((take 7 [(1::Int32),7..]))
@@ -201,7 +201,7 @@ testEnumInt64 = do
      -- pred
   printTest (pred (1::Int64))
   printTest (pred (maxBound::Int64))
-  mayBomb   (printTest (pred (minBound::Int64))) 
+  mayBomb   (printTest (pred (minBound::Int64)))
 
      -- toEnum
   mayBomb   (printTest ((map (toEnum::Int->Int64) [1, fromIntegral (minBound::Int64), fromIntegral (maxBound::Int64)])))
@@ -259,4 +259,4 @@ testEnumInt64 = do
 
 
 mayBomb x = catch x (\(ErrorCall e) -> putStrLn ("error " ++ show e))
-  `catch` (\e -> putStrLn ("Fail: " ++ show (e :: SomeException)))
+  `catch` (\e -> putStrLn ("Fail: " ++ show (e :: SomeExceptionWithLocation)))

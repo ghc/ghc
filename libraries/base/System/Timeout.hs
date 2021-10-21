@@ -92,7 +92,7 @@ instance Exception Timeout where
 ---
 -- Note that 'timeout' cancels the computation by throwing it the 'Timeout'
 -- exception. Consequently blanket exception handlers (e.g. catching
--- 'SomeException') within the computation will break the timeout behavior.
+-- 'SomeExceptionWithLocation') within the computation will break the timeout behavior.
 timeout :: Int -> IO a -> IO (Maybe a)
 timeout n f
     | n <  0    = fmap Just f

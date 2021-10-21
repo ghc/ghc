@@ -5,11 +5,11 @@ T5439.hs:83:33: error:
                                     -> Attempt (HElemOf l0)
     • Probable cause: ‘($)’ is applied to too few arguments
       In the second argument of ‘($)’, namely
-        ‘inj $ Failure (e :: SomeException)’
+        ‘inj $ Failure (e :: SomeExceptionWithLocation)’
       In a stmt of a 'do' block:
-        c <- complete ev $ inj $ Failure (e :: SomeException)
+        c <- complete ev $ inj $ Failure (e :: SomeExceptionWithLocation)
       In the expression:
-        do c <- complete ev $ inj $ Failure (e :: SomeException)
+        do c <- complete ev $ inj $ Failure (e :: SomeExceptionWithLocation)
            return $ c || not first
     • Relevant bindings include
         register :: Bool -> Peano n -> WaitOps (HDrop n rs) -> IO Bool
@@ -25,8 +25,8 @@ T5439.hs:83:39: error:
     • Couldn't match expected type: Peano n0
                   with actual type: Attempt α0
     • In the second argument of ‘($)’, namely
-        ‘Failure (e :: SomeException)’
+        ‘Failure (e :: SomeExceptionWithLocation)’
       In the second argument of ‘($)’, namely
-        ‘inj $ Failure (e :: SomeException)’
+        ‘inj $ Failure (e :: SomeExceptionWithLocation)’
       In a stmt of a 'do' block:
-        c <- complete ev $ inj $ Failure (e :: SomeException)
+        c <- complete ev $ inj $ Failure (e :: SomeExceptionWithLocation)

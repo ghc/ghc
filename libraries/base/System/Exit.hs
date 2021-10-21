@@ -47,7 +47,7 @@ import GHC.IO.Exception
 --
 -- As an 'ExitCode' is not an 'IOError', 'exitWith' bypasses
 -- the error handling in the 'IO' monad and cannot be intercepted by
--- 'catch' from the "Prelude".  However it is a 'Control.Exception.SomeException', and can
+-- 'catch' from the "Prelude".  However it is a 'Control.Exception.SomeExceptionWithLocation', and can
 -- be caught using the functions of "Control.Exception".  This means
 -- that cleanup computations added with 'Control.Exception.bracket'
 -- (from "Control.Exception") are also executed properly on 'exitWith'.

@@ -18,7 +18,7 @@ import Data.Typeable
 import Control.Exception
 
 data Attempt α = Success α
-               | ∀ e . Exception e ⇒ Failure e 
+               | ∀ e . Exception e ⇒ Failure e
 
 data Inject f α = ∀ β . Inject (f β) (α → β)
 
@@ -59,7 +59,7 @@ instance (Typeable n, Exception e) ⇒ Exception (NthException n e)
 
 instance WaitOp (WaitOps rs) where
   type WaitOpResult (WaitOps rs) = HElemOf rs
-  registerWaitOp ops ev = 
+  registerWaitOp ops ev =
     let register ∷ ∀ n . HDropClass n rs
                  ⇒ Bool → Peano n → WaitOps (HDrop n rs) → IO Bool
         register first n (WaitOp op) = do
@@ -68,7 +68,7 @@ instance WaitOp (WaitOps rs) where
           t ← try $ registerWaitOp op (Inject ev $ inj n)
           r ← case t of
             Right r → return r
-            Left e  → complete ev $ inj n $ Failure (e ∷ SomeException)
+            Left e  → complete ev $ inj n $ Failure (e ∷ SomeExceptionWithLocation)
           return $ r || not first
         register first n (op :? ops') = do
           let inj n (Success r) = Success (HNth n r)
@@ -80,7 +80,7 @@ instance WaitOp (WaitOps rs) where
                 HTailDropComm → register False (PSucc n) ops'
             Right False → return $ not first
             Left e → do
-              c ← complete ev $ inj $ Failure (e ∷ SomeException)
+              c ← complete ev $ inj $ Failure (e ∷ SomeExceptionWithLocation)
               return $ c || not first
     in case waitOpsNonEmpty ops of
       HNonEmptyInst → register True PZero ops
@@ -108,7 +108,7 @@ instance IsPeano PZero where
   peano = PZero
 
 instance IsPeano p ⇒ IsPeano (PSucc p) where
-  peano = PSucc peano 
+  peano = PSucc peano
 
 class (n ~ PSucc (PPred n)) ⇒ PHasPred n where
   type PPred n
@@ -252,4 +252,3 @@ type HNth n l = HHead (HDrop n l)
 data HElemOf l where
   HNth ∷ (HDropClass n l, HNonEmpty (HDrop n l))
        ⇒ Peano n → HNth n l → HElemOf l
-

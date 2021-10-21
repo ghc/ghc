@@ -18,28 +18,28 @@ _result :: a
 Stopped at <unknown>
 _exception :: e
 already at the beginning of the history
-_exception = SomeException
+_exception = SomeExceptionWithLocation
                (ErrorCallWithLocation
                   "foo"
                   "CallStack (from HasCallStack):
   error, called at Test7.hs:2:18 in main:Main")
 _result :: a = _
-_exception :: SomeException = SomeException
-                                (ErrorCallWithLocation
-                                   "foo"
-                                   "CallStack (from HasCallStack):
+_exception :: SomeExceptionWithLocation = SomeExceptionWithLocation
+                                            (ErrorCallWithLocation
+                                               "foo"
+                                               "CallStack (from HasCallStack):
   error, called at Test7.hs:2:18 in main:Main")
 *** Exception: foo
 CallStack (from HasCallStack):
   error, called at Test7.hs:2:18 in main:Main
 Stopped in <exception thrown>, <unknown>
-_exception :: e = SomeException
+_exception :: e = SomeExceptionWithLocation
                     (ErrorCallWithLocation
                        "foo"
                        "CallStack (from HasCallStack):
   error, called at Test7.hs:2:18 in main:Main")
 Stopped in <exception thrown>, <unknown>
-_exception :: e = SomeException
+_exception :: e = SomeExceptionWithLocation
                     (ErrorCallWithLocation
                        "foo"
                        "CallStack (from HasCallStack):

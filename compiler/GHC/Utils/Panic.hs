@@ -110,7 +110,7 @@ data GhcException
   | PprProgramError String SDoc
 
 instance Exception GhcException where
-  fromException (SomeException e)
+  fromException (SomeExceptionWithLocation e)
     | Just ge <- cast e = Just ge
     | Just pge <- cast e = Just $
         case pge of
@@ -138,7 +138,7 @@ safeShowException e = do
     r <- try (return $! forceList (showException e))
     case r of
         Right msg -> return msg
-        Left e' -> safeShowException (e' :: SomeException)
+        Left e' -> safeShowException (e' :: SomeExceptionWithLocation)
     where
         forceList [] = []
         forceList xs@(x : xt) = x `seq` forceList xt `seq` xs
@@ -196,7 +196,7 @@ pgmErrorDoc x doc = throwGhcException (PprProgramError x doc)
 -- | Like try, but pass through UserInterrupt and Panic exceptions.
 --   Used when we want soft failures when reading interface files, for example.
 --   TODO: I'm not entirely sure if this is catching what we really want to catch
-tryMost :: IO a -> IO (Either SomeException a)
+tryMost :: IO a -> IO (Either SomeExceptionWithLocation a)
 tryMost action = do r <- try action
                     case r of
                         Left se ->

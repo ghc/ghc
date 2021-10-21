@@ -4,7 +4,7 @@ import GHC.Foreign
 import Control.Exception
 import Data.Word
 
-decode :: TextEncoding -> BS.ByteString -> IO (Either SomeException String)
+decode :: TextEncoding -> BS.ByteString -> IO (Either SomeExceptionWithLocation String)
 decode enc bs = try $ BS.useAsCStringLen bs $ peekCStringLen enc
 
 main :: IO ()

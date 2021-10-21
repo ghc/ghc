@@ -20,7 +20,7 @@
 
 module GHC.Exception.Type
        ( Exception(..)    -- Class
-       , SomeException(..), ArithException(..)
+       , SomeExceptionWithLocation(..), SomeException, ArithException(..)
        , divZeroException, overflowException, ratioZeroDenomException
        , underflowException
        ) where
@@ -32,15 +32,17 @@ import GHC.Base
 import GHC.Show
 
 {- |
-The @SomeException@ type is the root of the exception type hierarchy.
+The @SomeExceptionWithLocation@ type is the root of the exception type hierarchy.
 When an exception of type @e@ is thrown, behind the scenes it is
-encapsulated in a @SomeException@.
+encapsulated in a @SomeExceptionWithLocation@.
 -}
-data SomeException = forall e . Exception e => SomeException e
+data SomeExceptionWithLocation = forall e . Exception e => SomeExceptionWithLocation e
+
+type SomeException = SomeExceptionWithLocation
 
 -- | @since 3.0
-instance Show SomeException where
-    showsPrec p (SomeException e) = showsPrec p e
+instance Show SomeExceptionWithLocation where
+    showsPrec p (SomeExceptionWithLocation e) = showsPrec p e
 
 {- |
 Any type that you wish to throw or catch as an exception must be an
@@ -74,10 +76,10 @@ of exceptions:
 >
 > instance Exception SomeCompilerException
 >
-> compilerExceptionToException :: Exception e => e -> SomeException
+> compilerExceptionToException :: Exception e => e -> SomeExceptionWithLocation
 > compilerExceptionToException = toException . SomeCompilerException
 >
-> compilerExceptionFromException :: Exception e => SomeException -> Maybe e
+> compilerExceptionFromException :: Exception e => SomeExceptionWithLocation -> Maybe e
 > compilerExceptionFromException x = do
 >     SomeCompilerException a <- fromException x
 >     cast a
@@ -94,10 +96,10 @@ of exceptions:
 >     toException = compilerExceptionToException
 >     fromException = compilerExceptionFromException
 >
-> frontendExceptionToException :: Exception e => e -> SomeException
+> frontendExceptionToException :: Exception e => e -> SomeExceptionWithLocation
 > frontendExceptionToException = toException . SomeFrontendException
 >
-> frontendExceptionFromException :: Exception e => SomeException -> Maybe e
+> frontendExceptionFromException :: Exception e => SomeExceptionWithLocation -> Maybe e
 > frontendExceptionFromException x = do
 >     SomeFrontendException a <- fromException x
 >     cast a
@@ -129,11 +131,11 @@ Caught MismatchedParentheses
 
 -}
 class (Typeable e, Show e) => Exception e where
-    toException   :: e -> SomeException
-    fromException :: SomeException -> Maybe e
+    toException   :: e -> SomeExceptionWithLocation
+    fromException :: SomeExceptionWithLocation -> Maybe e
 
-    toException = SomeException
-    fromException (SomeException e) = cast e
+    toException = SomeExceptionWithLocation
+    fromException (SomeExceptionWithLocation e) = cast e
 
     -- | Render this exception value in a human-friendly manner.
     --
@@ -144,10 +146,10 @@ class (Typeable e, Show e) => Exception e where
     displayException = show
 
 -- | @since 3.0
-instance Exception SomeException where
+instance Exception SomeExceptionWithLocation where
     toException se = se
     fromException = Just
-    displayException (SomeException e) = displayException e
+    displayException (SomeExceptionWithLocation e) = displayException e
 
 -- |Arithmetic exceptions.
 data ArithException
@@ -161,7 +163,7 @@ data ArithException
            , Ord -- ^ @since 3.0
            )
 
-divZeroException, overflowException, ratioZeroDenomException, underflowException  :: SomeException
+divZeroException, overflowException, ratioZeroDenomException, underflowException  :: SomeExceptionWithLocation
 divZeroException        = toException DivideByZero
 overflowException       = toException Overflow
 ratioZeroDenomException = toException RatioZeroDenominator

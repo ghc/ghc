@@ -1406,7 +1406,7 @@ is not strict in its argument: Just try this in GHCi
 
   :set -XScopedTypeVariables
   import Control.Exception
-  catch undefined (\(_ :: SomeException) -> putStrLn "you'll see this")
+  catch undefined (\(_ :: SomeExceptionWithLocation) -> putStrLn "you'll see this")
 
 Any analysis that assumes otherwise will be broken in some way or another
 (beyond `-fno-pendantic-bottoms`).

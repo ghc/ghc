@@ -7,4 +7,4 @@ import GHC.Conc
 main = join $ atomically $ do
   catchSTM
     (throwSTM ThreadKilled `orElse` return (putStrLn "wtf"))
-    (\(e::SomeException) -> return (putStrLn "ok"))
+    (\(e::SomeExceptionWithLocation) -> return (putStrLn "ok"))

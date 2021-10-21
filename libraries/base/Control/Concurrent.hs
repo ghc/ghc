@@ -195,7 +195,7 @@ attribute will block all other threads.
 -- terminates, for example.
 --
 -- @since 4.6.0.0
-forkFinally :: IO a -> (Either SomeException a -> IO ()) -> IO ThreadId
+forkFinally :: IO a -> (Either SomeExceptionWithLocation a -> IO ()) -> IO ThreadId
 forkFinally action and_then =
   mask $ \restore ->
     forkIO $ try (restore action) >>= and_then
@@ -382,12 +382,12 @@ runInUnboundThread action = do
       mv <- newEmptyMVar
       mask $ \restore -> do
         tid <- forkIO $ Exception.try (restore action) >>= putMVar mv
-        let wait = takeMVar mv `catchException` \(e :: SomeException) ->
+        let wait = takeMVar mv `catchException` \(e :: SomeExceptionWithLocation) ->
                      Exception.throwTo tid e >> wait
         wait >>= unsafeResult
     else action
 
-unsafeResult :: Either SomeException a -> IO a
+unsafeResult :: Either SomeExceptionWithLocation a -> IO a
 unsafeResult = either Exception.throwIO return
 
 -- ---------------------------------------------------------------------------

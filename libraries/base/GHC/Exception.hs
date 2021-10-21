@@ -74,10 +74,10 @@ instance Show ErrorCall where
   showsPrec _ (ErrorCallWithLocation err loc) =
       showString err . showChar '\n' . showString loc
 
-errorCallException :: String -> SomeException
+errorCallException :: String -> SomeExceptionWithLocation
 errorCallException s = toException (ErrorCall s)
 
-errorCallWithCallStackException :: String -> CallStack -> SomeException
+errorCallWithCallStackException :: String -> CallStack -> SomeExceptionWithLocation
 errorCallWithCallStackException s stk = unsafeDupablePerformIO $ do
   ccsStack <- currentCallStack
   let

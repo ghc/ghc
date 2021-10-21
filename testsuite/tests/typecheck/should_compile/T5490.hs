@@ -94,7 +94,7 @@ instance WaitOp (WaitOps rs) where
           t ← try $ registerWaitOp op (Inject ev $ inj n)
           r ← case t of
             Right r → return r
-            Left e  → complete ev $ inj n $ Failure (e ∷ SomeException)
+            Left e  → complete ev $ inj n $ Failure (e ∷ SomeExceptionWithLocation)
           return $ r || not first
         register first n (op :? ops') = do
           t ← try $ registerWaitOp op (Inject ev $ inj n)
@@ -104,7 +104,7 @@ instance WaitOp (WaitOps rs) where
                 HTailDropComm → register False (PSucc n) ops'
             Right False → return $ not first
             Left e → do
-              c ← complete ev $ inj n $ Failure (e ∷ SomeException)
+              c ← complete ev $ inj n $ Failure (e ∷ SomeExceptionWithLocation)
               return $ c || not first
     case waitOpsNonEmpty ops of
       HNonEmptyInst → register True PZero ops
