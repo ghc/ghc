@@ -1,0 +1,9 @@
+
+T20521.hs:19:9: error:
+    • Couldn't match type ‘XFam
+                             Constraint (*) (XFam (*) Constraint Float)’
+                     with ‘Float’
+      Expected: Float
+        Actual: C2T (T2C Float)
+    • In the expression: x
+      In an equation for ‘bad’: bad x = x

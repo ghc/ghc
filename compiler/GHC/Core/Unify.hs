@@ -47,6 +47,7 @@ import GHC.Utils.Outputable
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set
+import {-# SOURCE #-} GHC.Tc.Utils.TcType ( tcEqType )
 import GHC.Exts( oneShot )
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
@@ -1236,8 +1237,17 @@ uVar env tv1 ty kco
                       -- this is because the range of the subst is the target
                       -- type, not the template type. So, just check for
                       -- normal type equality.
-                      unless ((ty' `mkCastTy` kco) `eqType` ty) $
-                      surelyApart
+                      unless ((ty' `mkCastTy` kco) `tcEqType` ty) $
+                        surelyApart
+                      -- NB: it's important to use `tcEqType` instead of `eqType` here,
+                      -- otherwise we might not reject a substitution
+                      -- which unifies `Type` with `Constraint`, e.g.
+                      -- a call to tc_unify_tys with arguments
+                      --
+                      --   tys1 = [k,k]
+                      --   tys2 = [Type, Constraint]
+                      --
+                      -- See test cases: T11715b, T20521.
           Nothing  -> uUnrefined env tv1' ty ty kco } -- No, continue
 
 uUnrefined :: UMEnv
@@ -1549,6 +1559,8 @@ ty_co_match menv subst ty co lkco rkco
   | tyCoVarsOfType ty `isNotInDomainOf` subst
   , Just (ty', _) <- isReflCo_maybe co
   , ty `eqType` ty'
+    -- Why `eqType` and not `tcEqType`? Because this function is only used
+    -- during coercion optimisation, after type-checking has finished.
   = Just subst
 
   where
