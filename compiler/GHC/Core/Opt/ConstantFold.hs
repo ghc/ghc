@@ -690,6 +690,9 @@ primOpRules nm = \case
    Int32EqOp  -> mkRelOpRule nm (==) [ litEq True ]
    Int32NeOp  -> mkRelOpRule nm (/=) [ litEq False ]
 
+   Int64EqOp  -> mkRelOpRule nm (==) [ litEq True ]
+   Int64NeOp  -> mkRelOpRule nm (/=) [ litEq False ]
+
    IntEqOp    -> mkRelOpRule nm (==) [ litEq True ]
    IntNeOp    -> mkRelOpRule nm (/=) [ litEq False ]
 
@@ -701,6 +704,9 @@ primOpRules nm = \case
 
    Word32EqOp -> mkRelOpRule nm (==) [ litEq True ]
    Word32NeOp -> mkRelOpRule nm (/=) [ litEq False ]
+
+   Word64EqOp -> mkRelOpRule nm (==) [ litEq True ]
+   Word64NeOp -> mkRelOpRule nm (/=) [ litEq False ]
 
    WordEqOp   -> mkRelOpRule nm (==) [ litEq True ]
    WordNeOp   -> mkRelOpRule nm (/=) [ litEq False ]
@@ -731,6 +737,11 @@ primOpRules nm = \case
    Int32LeOp  -> mkRelOpRule nm (<=) [ boundsCmp Le ]
    Int32LtOp  -> mkRelOpRule nm (<)  [ boundsCmp Lt ]
 
+   Int64GtOp  -> mkRelOpRule nm (>)  [ boundsCmp Gt ]
+   Int64GeOp  -> mkRelOpRule nm (>=) [ boundsCmp Ge ]
+   Int64LeOp  -> mkRelOpRule nm (<=) [ boundsCmp Le ]
+   Int64LtOp  -> mkRelOpRule nm (<)  [ boundsCmp Lt ]
+
    IntGtOp    -> mkRelOpRule nm (>)  [ boundsCmp Gt ]
    IntGeOp    -> mkRelOpRule nm (>=) [ boundsCmp Ge ]
    IntLeOp    -> mkRelOpRule nm (<=) [ boundsCmp Le ]
@@ -750,6 +761,11 @@ primOpRules nm = \case
    Word32GeOp -> mkRelOpRule nm (>=) [ boundsCmp Ge ]
    Word32LeOp -> mkRelOpRule nm (<=) [ boundsCmp Le ]
    Word32LtOp -> mkRelOpRule nm (<)  [ boundsCmp Lt ]
+
+   Word64GtOp -> mkRelOpRule nm (>)  [ boundsCmp Gt ]
+   Word64GeOp -> mkRelOpRule nm (>=) [ boundsCmp Ge ]
+   Word64LeOp -> mkRelOpRule nm (<=) [ boundsCmp Le ]
+   Word64LtOp -> mkRelOpRule nm (<)  [ boundsCmp Lt ]
 
    WordGtOp   -> mkRelOpRule nm (>)  [ boundsCmp Gt ]
    WordGeOp   -> mkRelOpRule nm (>=) [ boundsCmp Ge ]
