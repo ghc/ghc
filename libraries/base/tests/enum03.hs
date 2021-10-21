@@ -28,7 +28,7 @@ testEnumWord8 = do
      -- pred
   printTest (pred (1::Word8))
   printTest (pred (maxBound::Word8))
-  mayBomb   (printTest (pred (minBound::Word8))) 
+  mayBomb   (printTest (pred (minBound::Word8)))
 
      -- toEnum
   printTest ((map (toEnum::Int->Word8) [1, fromIntegral (minBound::Word8)::Int, fromIntegral (maxBound::Word8)::Int]))
@@ -86,7 +86,7 @@ testEnumWord16 = do
      -- pred
   printTest (pred (1::Word16))
   printTest (pred (maxBound::Word16))
-  mayBomb   (printTest (pred (minBound::Word16))) 
+  mayBomb   (printTest (pred (minBound::Word16)))
 
      -- toEnum
   printTest ((map (toEnum::Int->Word16) [1, fromIntegral (minBound::Word16)::Int, fromIntegral (maxBound::Word16)::Int]))
@@ -99,7 +99,7 @@ testEnumWord16 = do
      -- [x..] aka enumFrom
   printTest ((take 7 [(1::Word16)..]))
   printTest ((take 7 [((maxBound::Word16)-5)..])) -- just in case it doesn't catch the upper bound..
-  
+
      -- [x,y..] aka enumFromThen
   printTest ((take 7 [(1::Word16),2..]))
   printTest ((take 7 [(1::Word16),7..]))
@@ -145,7 +145,7 @@ testEnumWord32 = do
      -- pred
   printTest (pred (1::Word32))
   printTest (pred (maxBound::Word32))
-  mayBomb   (printTest (pred (minBound::Word32))) 
+  mayBomb   (printTest (pred (minBound::Word32)))
 
      -- toEnum
   printTest ((map (toEnum::Int->Word32) [1, fromIntegral (minBound::Word32)::Int, fromIntegral (maxBound::Int32)::Int]))
@@ -158,7 +158,7 @@ testEnumWord32 = do
      -- [x..] aka enumFrom
   printTest ((take 7 [(1::Word32)..]))
   printTest ((take 7 [((maxBound::Word32)-5)..])) -- just in case it doesn't catch the upper bound..
-  
+
      -- [x,y..] aka enumFromThen
   printTest ((take 7 [(1::Word32),2..]))
   printTest ((take 7 [(1::Word32),7..]))
@@ -204,7 +204,7 @@ testEnumWord64 = do
      -- pred
   printTest (pred (1::Word64))
   printTest (pred (maxBound::Word64))
-  mayBomb   (printTest (pred (minBound::Word64))) 
+  mayBomb   (printTest (pred (minBound::Word64)))
 
      -- toEnum
   mayBomb   (printTest ((map (toEnum::Int->Word64) [1, fromIntegral (minBound::Word64)::Int, maxBound::Int])))
@@ -262,4 +262,4 @@ testEnumWord64 = do
 
 
 mayBomb x = catch x (\(ErrorCall e) -> putStrLn ("error " ++ show e))
-  `catch` (\e -> putStrLn ("Fail: " ++ show (e :: SomeException)))
+  `catch` (\e -> putStrLn ("Fail: " ++ show (e :: SomeExceptionWithLocation)))

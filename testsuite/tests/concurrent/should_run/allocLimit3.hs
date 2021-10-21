@@ -12,4 +12,4 @@ main = do
   -- result, and then immediately raise the exception
   r <- mask_ $ try $ print (length [1..100000])
 
-  print (r :: Either SomeException ())
+  print (r :: Either SomeExceptionWithLocation ())

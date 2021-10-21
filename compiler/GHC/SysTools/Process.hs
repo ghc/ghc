@@ -63,7 +63,7 @@ readCreateProcessWithExitCode' proc = do
 
     -- fork off a thread to start consuming the output
     outMVar <- newEmptyMVar
-    let onError :: SomeException -> IO ()
+    let onError :: SomeExceptionWithLocation -> IO ()
         onError exc = putMVar outMVar (Left exc)
     _ <- forkIO $ handle onError $ do
       output <- hGetContents' outh
@@ -281,7 +281,7 @@ builderMainLoop logger filter_fn pgm real_args mb_cwd mb_env = do
             inner hProcess
         case r of
           -- onException
-          Left (SomeException e) -> do
+          Left (SomeExceptionWithLocation e) -> do
             terminateProcess hProcess
             cleanup_handles
             throw e

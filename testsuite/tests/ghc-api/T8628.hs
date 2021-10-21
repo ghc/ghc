@@ -26,7 +26,7 @@ main
                      , IIDecl (simpleImportDecl (mkModuleNameFS (fsLit "System.IO")))]
           runDecls "data X = Y ()"
           execStmt "print True" execOptions
-          MC.try $ execStmt "print (Y ())" execOptions :: GhcMonad m => m (Either SomeException ExecResult)
+          MC.try $ execStmt "print (Y ())" execOptions :: GhcMonad m => m (Either SomeExceptionWithLocation ExecResult)
           runDecls "data X = Y () deriving Show"
           _ <- dynCompileExpr "'x'"
           execStmt "print (Y ())" execOptions

@@ -16,7 +16,7 @@ ok x = do
 
 bad :: a -> IO ()
 bad x = do
-  r <- try @SomeException $ evaluate x
+  r <- try @SomeExceptionWithLocation $ evaluate x
   case r of
     Left _  -> putStrLn "Exception thrown as expected."
     Right _ -> putStrLn "Exception not thrown when expected."

@@ -11,6 +11,6 @@ main = do
   takeMVar m
 
 thread restore m = run
-  where 
+  where
     run = (restore $ forever $ modifyMVar_ m $ \v -> if v `mod` 2 == 1 then return (v*2) else return (v-1))
-             `catch` \(e::SomeException) -> run
+             `catch` \(e::SomeExceptionWithLocation) -> run

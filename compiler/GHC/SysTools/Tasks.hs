@@ -206,7 +206,7 @@ runClang logger dflags args = traceToolCommand logger "clang" $ do
   mb_env <- getGccEnv args2
   catchException
     (runSomethingFiltered logger id "Clang (Assembler)" clang args2 Nothing mb_env)
-    (\(err :: SomeException) -> do
+    (\(err :: SomeExceptionWithLocation) -> do
         errorMsg logger $
             text ("Error running clang! you need clang installed to use the" ++
                   " LLVM backend") $+$

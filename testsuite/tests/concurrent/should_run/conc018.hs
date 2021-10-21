@@ -21,6 +21,6 @@ main = do
                 m <- newMVar ()
                 putMVar m ()
              )
-             (\e -> putMVar m (e::SomeException))
+             (\e -> putMVar m (e::SomeExceptionWithLocation))
   takeMVar m >>= print
   -- should print "thread blocked indefinitely"

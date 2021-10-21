@@ -46,7 +46,7 @@ instance Exception IOPortException where
     displayException IOPortException = "IOPortException"
 
 
-doubleReadException :: SomeException
+doubleReadException :: SomeExceptionWithLocation
 doubleReadException = toException IOPortException
 
 data IOPort a = IOPort (IOPort# RealWorld a)
@@ -119,4 +119,3 @@ writeIOPort (IOPort ioport#) x = IO $ \ s# ->
     case writeIOPort# ioport# x s# of
         (# s, 0# #) -> (# s, False #)
         (# s, _  #) -> (# s, True #)
-

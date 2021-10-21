@@ -252,10 +252,10 @@ delta ra x = case (eqT ra rt) of
              Nothing    -> x
 loop = delta rt (MkT delta)
 
-throw# :: SomeException -> a
+throw# :: SomeExceptionWithLocation -> a
 
-data SomeException where
-  SomeException :: Exception e => e -> SomeException
+data SomeExceptionWithLocation where
+  SomeExceptionWithLocation :: Exception e => e -> SomeExceptionWithLocation
 
 class (Typeable e, Show e) => Exception e where {   }
 

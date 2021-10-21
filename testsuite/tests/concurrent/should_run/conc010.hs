@@ -22,7 +22,7 @@ main = do
   ready  <- newEmptyMVar
   ready2 <- newEmptyMVar
   id <- forkIO (Control.Exception.catch (putMVar ready () >> takeMVar block)
-                (\e -> putStr (show (e::SomeException)) >> putMVar ready2 ()))
+                (\e -> putStr (show (e::SomeExceptionWithLocation)) >> putMVar ready2 ()))
   takeMVar ready
   throwTo id (ErrorCall "hello")
   takeMVar ready2

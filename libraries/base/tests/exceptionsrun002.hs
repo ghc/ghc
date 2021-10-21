@@ -6,7 +6,7 @@ import Data.IORef
 
 safeCatch :: IO () -> IO ()
 safeCatch f = Exception.catch f
-                  ((\_ -> return ()) :: Exception.SomeException -> IO ())
+                  ((\_ -> return ()) :: Exception.SomeExceptionWithLocation -> IO ())
 
 type Thrower = IO Bool
 
@@ -82,7 +82,7 @@ preludeCatchCatcher = MkNamed "Prelude.catch"
 
 ceCatchCatcher :: Named Catcher
 ceCatchCatcher = MkNamed "Exception.catch"
- (\f cc -> Exception.catch (f >> (return ())) (const cc :: Exception.SomeException -> IO ()))
+ (\f cc -> Exception.catch (f >> (return ())) (const cc :: Exception.SomeExceptionWithLocation -> IO ()))
 
 finallyCatcher :: Named Catcher
 finallyCatcher = MkNamed "Exception.finally"
@@ -92,4 +92,3 @@ main = checkNamedCatches
         [bindCatcher,preludeCatchCatcher,ceCatchCatcher,finallyCatcher]
         [returnThrower,returnUndefinedThrower,returnThrowThrower,returnErrorThrower,failThrower,
         errorThrower,throwThrower,ioErrorErrorCallThrower,ioErrorIOExceptionThrower,undefinedThrower]
-

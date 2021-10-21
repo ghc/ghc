@@ -4,7 +4,7 @@ import Control.Concurrent
 import Control.Exception
 --import GlaExts
 
-data Result = Died SomeException | Finished
+data Result = Died SomeExceptionWithLocation | Finished
 
 -- Test stack overflow catching.  Should print "Died: stack overflow".
 

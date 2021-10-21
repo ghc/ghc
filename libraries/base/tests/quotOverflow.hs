@@ -29,5 +29,4 @@ f = sequence [ g (minBound `div` (-1)),
     where g x = do x' <- evaluate x
                    return (Left x')
                 `E.catch`
-                   \e -> return (Right (show (e :: SomeException)))
-
+                   \e -> return (Right (show (e :: SomeExceptionWithLocation)))

@@ -8,7 +8,7 @@ import System.IO.Unsafe
 -- 'onException'.
 
 main = do
-  let x = unsafePerformIO $ 
+  let x = unsafePerformIO $
              (do threadDelay 1000000; return 42)
              `onException` return ()
 
@@ -16,4 +16,4 @@ main = do
   threadDelay 1000
   killThread t
 
-  print x `E.catch` \e -> putStrLn ("main caught: " ++ show (e::SomeException))
+  print x `E.catch` \e -> putStrLn ("main caught: " ++ show (e::SomeExceptionWithLocation))

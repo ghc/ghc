@@ -1,21 +1,21 @@
 module T11167 where
 
-data SomeException
+data SomeExceptionWithLocation
 
 newtype ContT r m a = ContT {runContT :: (a -> m r) -> m r}
 
 runContT' :: ContT r m a -> (a -> m r) -> m r
 runContT' = runContT
 
-catch_ :: IO a -> (SomeException -> IO a) -> IO a
+catch_ :: IO a -> (SomeExceptionWithLocation -> IO a) -> IO a
 catch_ = undefined
 
 foo :: IO ()
 foo = (undefined :: ContT () IO a)
         `runContT` (undefined :: a -> IO ())
-        `catch_` (undefined :: SomeException -> IO ())
+        `catch_` (undefined :: SomeExceptionWithLocation -> IO ())
 
 foo' :: IO ()
 foo' = (undefined :: ContT () IO a)
          `runContT'` (undefined :: a -> IO ())
-         `catch_` (undefined :: SomeException -> IO ())
+         `catch_` (undefined :: SomeExceptionWithLocation -> IO ())

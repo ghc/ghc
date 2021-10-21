@@ -34,7 +34,6 @@ import GHC.Core.Type
 import GHC.Utils.Outputable
 import GHC.Utils.Error
 import GHC.Utils.Monad
-import GHC.Utils.Exception
 import GHC.Utils.Logger
 
 import GHC.Types.Id
@@ -265,6 +264,6 @@ pprTypeAndContents id = do
       docs_term <- case e_term of
                       Right term -> showTerm term
                       Left  exn  -> return (text "*** Exception:" <+>
-                                            text (show (exn :: SomeException)))
+                                            text (show (exn :: GHC.Prelude.SomeExceptionWithLocation)))
       return $ pprdId <+> equals <+> docs_term
     else return pprdId
