@@ -81,6 +81,7 @@ import Data.Version
 import GHC.Utils.Panic
 import GHC.Unit.Module.Env
 import GHC.Driver.Env.KnotVars
+import GHC.Data.FastString
 
 newtype HookedUse a = HookedUse { runHookedUse :: (Hooks, PhaseHook) -> IO a }
   deriving (Functor, Applicative, Monad, MonadIO, MonadThrow, MonadCatch) via (ReaderT (Hooks, PhaseHook) IO)
@@ -671,7 +672,7 @@ runHscPhase pipe_env hsc_env0 input_fn src_flavour = do
   let
     mod_summary = ModSummary {  ms_mod       = mod,
                                 ms_hsc_src   = src_flavour,
-                                ms_hspp_file = PreprocessedFile input_fn,
+                                ms_hspp_file_loc = mkRealSrcLoc (mkFastString input_fn) 1 1,
                                 ms_hspp_opts = dflags,
                                 ms_hspp_buf  = hspp_buf,
                                 ms_location  = location,

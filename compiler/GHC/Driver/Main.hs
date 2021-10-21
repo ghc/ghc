@@ -399,9 +399,7 @@ hscParse' mod_summary
     {-# SCC "Parser" #-} withTiming logger
                 (text "Parser"<+>brackets (ppr $ ms_mod mod_summary))
                 (const ()) $ do
-    let src_filename  = case ms_hspp_file mod_summary of
-          PreprocessedFile f -> f
-          BackpackFile _ -> pprPanic "hscParse" (text "Can't parse backpack interface file:" <+> ppr mod_summary)
+    let src_filename  = unpackFS $ srcLocFile $ ms_hspp_file_loc mod_summary
         maybe_src_buf = ms_hspp_buf  mod_summary
 
     --------------------------  Parser  ----------------
@@ -544,9 +542,7 @@ hsc_typecheck keep_rn mod_summary mb_rdr_module = do
         mod_name = moduleName outer_mod
         outer_mod' = mkHomeModule home_unit mod_name
         inner_mod = homeModuleNameInstantiation home_unit mod_name
-        real_loc  = realSrcLocSpan $ case ms_hspp_file mod_summary of
-          PreprocessedFile src_filename -> mkRealSrcLoc (mkFastString src_filename) 1 1
-          BackpackFile loc -> loc
+        real_loc  = realSrcLocSpan $ ms_hspp_file_loc mod_summary
         keep_rn' = gopt Opt_WriteHie dflags || keep_rn
     massert (isHomeModule home_unit outer_mod)
     tc_result <- if hsc_src == HsigFile && not (isHoleModule inner_mod)

@@ -797,7 +797,7 @@ summariseRequirement pn mod_name = do
                     }),
                 hpm_src_files = []
             }),
-        ms_hspp_file = BackpackFile real_loc,
+        ms_hspp_file_loc = real_loc,
         ms_hspp_opts = dflags,
         ms_hspp_buf = Nothing
         }
@@ -897,7 +897,7 @@ hsModuleToModSummary pn hsc_src modname
             ms_mod = this_mod,
             ms_hsc_src = hsc_src,
             ms_location = location,
-            ms_hspp_file = BackpackFile real_loc,
+            ms_hspp_file_loc = real_loc,
             ms_hspp_opts = dflags,
             ms_hspp_buf = Nothing,
             ms_srcimps = map convImport src_idecls,

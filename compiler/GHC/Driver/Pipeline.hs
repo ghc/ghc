@@ -250,9 +250,7 @@ compileOne' mHscMessage
  where lcl_dflags  = ms_hspp_opts summary
        location    = ms_location summary
        input_fn    = expectJust "compile:hs" (ml_hs_file location)
-       input_fnpp  = case ms_hspp_file summary of
-         PreprocessedFile f -> text f
-         BackpackFile loc -> text "backpack instantiation:" <+> ppr (ms_mod summary) <+> ppr loc
+       input_fnpp  = ppr $ ms_hspp_file_loc summary
        mod_graph   = hsc_mod_graph hsc_env0
        needsLinker = needsTemplateHaskellOrQQ mod_graph
        isDynWay    = hasWay (ways lcl_dflags) WayDyn
