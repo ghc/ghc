@@ -16,3 +16,6 @@
 /config.log
 /config.status
 /configure
+
+/ghcautoconf.h.autoconf.in
+/ghcautoconf.h.autoconf

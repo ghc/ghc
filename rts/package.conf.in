@@ -2,6 +2,7 @@
 
 #include "ghcconfig.h"
 #include "rts/Config.h"
+#include "ghcautoconf.h"
 #include "MachDeps.h"
 
 name:           rts

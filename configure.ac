@@ -40,6 +40,7 @@ fi
 dnl this makes sure `./configure --target=<cross-compile-target>`
 dnl works as expected, since we're slightly modifying how Autoconf
 dnl interprets build/host/target and how this interacts with $CC tests
+dnl TODO use CC_FOR_TARGET and CC_FOR_BUILD instead, and get rid of this hack.
 test -n "$target_alias" && ac_tool_prefix=$target_alias-
 
 dnl ----------------------------------------------------------

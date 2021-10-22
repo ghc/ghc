@@ -3,7 +3,10 @@ name: rts
 version: 1.0.2
 license: BSD-3-Clause
 maintainer: glasgow-haskell-users@haskell.org
-build-type: Simple
+build-type: Configure
+description:
+    The run-time system for code produced by GHC.
+
 flag libm
   default: @CabalHaveLibm@
 flag librt
@@ -53,6 +56,12 @@ flag thread-sanitizer
     mechanism supported by GCC and Clang. See Note [ThreadSanitizer]
     in @rts/include/rts/TSANUtils.h@.
   default: False
+
+extra-tmp-files:
+  autom4te.cache
+  rts.buildinfo
+  config.log
+  config.status
 
 library
     -- rts is a wired in package and
@@ -574,6 +583,8 @@ library
     extra-source-files:
                -- This file needs to be in the package but shouldn't be compiled on its own.
                xxhash.c
+               configure
+               configure.ac
 
     if os(windows)
        c-sources: win32/AsyncMIO.c

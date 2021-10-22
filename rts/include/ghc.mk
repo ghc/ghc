@@ -72,31 +72,6 @@ endif
 
 ifneq "$(BINDIST)" "YES"
 
-define includesHeaderConfig
-# $1 = stage
-$$(includes_$1_H_CONFIG) : mk/config.h mk/config.mk rts/include/ghc.mk | $$$$(dir $$$$@)/.
-	$$(call removeFiles,$$@)
-	@echo "Creating $$@..."
-	@echo "#if !defined(__GHCAUTOCONF_H__)"  > $$@
-	@echo "#define __GHCAUTOCONF_H__" >> $$@
-#
-#	Copy the contents of mk/config.h, turning '#define PACKAGE_FOO
-#	"blah"' into '/* #undef PACKAGE_FOO */' to avoid clashes.
-#
-	@sed mk/config.h \
-		-e 's,^\([	 ]*\)#[	 ]*define[	 ][	 ]*\(PACKAGE_[A-Z]*\)[	 ][ 	]*".*".*$$$$,\1/* #undef \2 */,' \
-		-e '/__GLASGOW_HASKELL/d' \
-		-e '/REMOVE ME/d' \
-		>> $$@
-#
-	@echo "#endif /* __GHCAUTOCONF_H__ */"          >> $$@
-	@echo "Done."
-
-endef
-
-$(eval $(call includesHeaderConfig,0))
-$(eval $(call includesHeaderConfig,1))
-
 BuildPlatform_0_CPP = $(BuildPlatform_CPP)
 BuildPlatform_1_CPP = $(HostPlatform_CPP)
 BuildPlatform_2_CPP = $(TargetPlatform_CPP)

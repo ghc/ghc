@@ -1,0 +1,19 @@
+/* -----------------------------------------------------------------------------
+ *
+ * (c) The GHC Team, 1998-2009
+ *
+ * Rts settings from rts-specific configure.
+ *
+ * NOTE: Over time, this might replace Config.h as everything is migrated
+ * here, but for now we need both.
+ *
+ * To understand the structure of the RTS headers, see the wiki:
+ *   https://gitlab.haskell.org/ghc/ghc/wikis/commentary/source-tree/includes
+ *
+ * ---------------------------------------------------------------------------*/
+
+#pragma once
+
+/* -----------------------------------------------------------------------------
+   Begin automatic from autoconf
+   -------------------------------------------------------------------------- */

@@ -47,17 +47,20 @@ runHLint includeDirs defines dir = do
 base :: Action ()
 base = do
   buildDir <- buildRoot
-  let stage1RtsInc = buildDir </> "stage1/rts/build/include"
+  let stage1RtsInc = buildDir </> "stage1/rts/stage1/build/include"
   let machDeps     = "rts/include/MachDeps.h"
   let ghcautoconf  = stage1RtsInc </> "ghcautoconf.h"
   let ghcplatform  = stage1RtsInc </> "ghcplatform.h"
-  -- ./configure is called here manually because we need to generate
-  -- HsBaseConfig.h, which is created from HsBaseConfig.h.in. ./configure
-  -- is usually run by Cabal which generates this file but if we do that
-  -- then hadrian thinks it needs to build the stage0 compiler before
+  -- The libraries' `./configure`s are called here manually because we need to
+  -- generate `HsBaseConfig.h` and `ghcautoconf.h`, which are created from
+  -- `HsBaseConfig.h.in` and `ghcautoconf.h.autoconf`, respectfully. These
+  -- `./configure`s is usually run by Cabal which generates this file but if we
+  -- do that then hadrian thinks it needs to build the stage0 compiler before
   -- attempting to configure. Therefore we just run it directly everytime,
   -- which is slower but still faster than building the whole of stage0.
-  cmd_ (Cwd "libraries/base") "./configure"
+  cmd_ (Cwd "libraries/base/stage1/build") "../../configure"
+  cmd_ (Cwd "rts/stage1/build") "../../configure"
+  cmd_ (Cwd "rts") "./configure"
   need [ghcautoconf, ghcplatform, machDeps]
   let includeDirs =
         [ "rts/include"
