@@ -48,11 +48,9 @@ configurePackageRules = do
         when (pkg == rts) $ do
           -- Rts.h is a header listed in the cabal file, and configuring
           -- therefore wants to ensure that the header "works" post-configure.
-          -- But it (transitively) includes these, so we must ensure they exist
+          -- But it (transitively) includes this, so we must ensure it exists
           -- for that check to work.
-          need [ buildP -/- "include/ghcautoconf.h"
-               , buildP -/- "include/ghcplatform.h"
-               ]
+          need [buildP -/- "include/ghcplatform.h"]
         Cabal.configurePackage ctx
 
     root -/- "**/autogen/cabal_macros.h" %> \out -> do

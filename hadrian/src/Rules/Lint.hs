@@ -11,13 +11,15 @@ lintRules :: Rules ()
 lintRules = do
   "lint:base" ~> lint base
   "lint:compiler" ~> lint compiler
+
+  -- Ensure that autoconf scripts, which are usually run by Cabal, are run to
+  -- avoid depending upon Cabal from the stage0 compiler..
   "libraries" -/- "base" -/- "include" -/- "HsBaseConfig.h" %> \_ ->
       -- ./configure is called here manually because we need to generate
       -- HsBaseConfig.h, which is created from HsBaseConfig.h.in. ./configure
-      -- is usually run by Cabal which generates this file but if we do that
-      -- then hadrian thinks it needs to build the stage0 compiler before
-      -- attempting to configure. Therefore we just run it directly here.
       cmd_ (Cwd "libraries/base") "./configure"
+  "rts" -/- "include" -/- "ghcautoconf.h" %> \_ ->
+      cmd_ (Cwd "rts") "./configure"
 
 lint :: Action () -> Action ()
 lint lintAction = do

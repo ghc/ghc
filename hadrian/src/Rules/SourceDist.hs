@@ -142,7 +142,9 @@ prepareTree dest = do
       moveFile (dest -/- "boot") (dest -/- "boot.source")
 
     bootFiles =
-      [ pkgPath process -/- "include" -/- "HsProcessConfig.h.in"
+      [ pkgPath rts -/- "configure"
+      , pkgPath rts -/- "ghcautoconf.h.autoconf.in"
+      , pkgPath process -/- "include" -/- "HsProcessConfig.h.in"
       , pkgPath process -/- "configure"
       , pkgPath ghcBignum -/- "configure"
       , pkgPath base -/- "configure"

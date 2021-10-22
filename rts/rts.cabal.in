@@ -1,9 +1,24 @@
 cabal-version: 3.0
 name: rts
 version: 1.0.2
+synopsis: The GHC runtime system
+description:
+    The GHC runtime system.
+
+    Code produced by GHC links this library to provide missing functionality
+    that cannot be written in Haskell itself.
 license: BSD-3-Clause
 maintainer: glasgow-haskell-users@haskell.org
-build-type: Simple
+build-type: Configure
+
+extra-source-files:
+    configure
+    configure.ac
+
+extra-tmp-files:
+    autom4te.cache
+    config.log
+    config.status
 
 source-repository head
     type:     git
@@ -206,6 +221,7 @@ library
 
       include-dirs: include
       includes: Rts.h
+      autogen-includes: ghcautoconf.h
       install-includes: Cmm.h HsFFI.h MachDeps.h Rts.h RtsAPI.h Stg.h
                         ghcautoconf.h ghcconfig.h ghcplatform.h ghcversion.h
                         -- ^ from include

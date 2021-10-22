@@ -48,9 +48,6 @@ AC_DEFUN([FP_FIND_LIBDW],
   AC_SUBST(UseLibdw)
   if test $UseLibdw = "YES" ; then
     USE_LIBDW=1
-    AC_SUBST([CabalHaveLibdw],[True])
-  else
-    AC_SUBST([CabalHaveLibdw],[False])
   fi
   AC_DEFINE_UNQUOTED([USE_LIBDW], [$USE_LIBDW], [Set to 1 to use libdw])
 ])

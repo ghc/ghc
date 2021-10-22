@@ -147,7 +147,8 @@ generatePackageCode context@(Context stage pkg _ _) = do
         root -/- "**" -/- dir -/- "cmm/AutoApply.cmm" %> \file ->
             build $ target context GenApply [] [file]
         let go gen file = generate file (semiEmptyTarget stage) gen
-        root -/- "**" -/- dir -/- "include/ghcautoconf.h" %> go generateGhcAutoconfH
+        root -/- "**" -/- dir -/- "include/ghcautoconf.h" %> \_ ->
+            need . pure =<< pkgSetupConfigFile context
         root -/- "**" -/- dir -/- "include/ghcplatform.h" %> go generateGhcPlatformH
         root -/- "**" -/- dir -/- "include/DerivedConstants.h" %> genPlatformConstantsHeader context
         root -/- "**" -/- dir -/- "include/rts/EventLogConstants.h" %> genEventTypes "--event-types-defines"
@@ -485,26 +486,6 @@ generateConfigHs = do
     stageString Stage3 = "4"
     stageString (Stage0 GlobalLibs) = error "stageString: StageBoot"
 
-
--- | Generate @ghcautoconf.h@ header.
-generateGhcAutoconfH :: Expr String
-generateGhcAutoconfH = do
-    trackGenerateHs
-    configHContents  <- expr $ mapMaybe undefinePackage <$> readFileLines configH
-    return . unlines $
-        [ "#if !defined(__GHCAUTOCONF_H__)"
-        , "#define __GHCAUTOCONF_H__" ]
-        ++ configHContents ++
-        [ "#endif /* __GHCAUTOCONF_H__ */" ]
-  where
-    undefinePackage s
-        | "#define PACKAGE_" `isPrefixOf` s
-            = Just $ "/* #undef " ++ takeWhile (/=' ') (drop 8 s) ++ " */"
-        | "#define __GLASGOW_HASKELL" `isPrefixOf` s
-            = Nothing
-        | "/* REMOVE ME */" == s
-            = Nothing
-        | otherwise = Just s
 
 -- | Generate @Version.hs@ files.
 generateVersionHs :: Expr String
