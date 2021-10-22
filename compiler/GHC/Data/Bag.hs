@@ -334,6 +334,10 @@ instance Foldable.Foldable Bag where
   foldl' k z (TwoBags b1 b2) = let r1 = foldl' k z b1 in seq r1 $ foldl' k r1 b2
   foldl' k z (ListBag xs)    = foldl' k z xs
 
+  length = lengthBag
+  null = isEmptyBag
+  x `elem` bag = anyBag (==x) bag
+
 instance Traversable Bag where
   traverse _ EmptyBag        = pure EmptyBag
   traverse f (UnitBag x)     = UnitBag <$> f x
