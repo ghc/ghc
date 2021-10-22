@@ -337,6 +337,10 @@ instance Foldable.Foldable Bag where
       go z (ListBag xs)    = foldl' k z xs
   {-# INLINEABLE foldl' #-}
 
+  length = lengthBag
+  null = isEmptyBag
+  x `elem` bag = anyBag (==x) bag
+
 instance Traversable Bag where
   traverse _ EmptyBag        = pure EmptyBag
   traverse f (UnitBag x)     = UnitBag <$> f x
