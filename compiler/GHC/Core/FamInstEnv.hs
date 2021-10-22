@@ -51,6 +51,7 @@ import GHC.Core.Coercion
 import GHC.Core.Coercion.Axiom
 import GHC.Core.Reduction
 import GHC.Core.RoughMap
+import GHC.Data.Bag
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Name
@@ -786,7 +787,7 @@ lookupFamInstEnvByTyCon (pkg_ie, home_ie) fam_tc
 lookupFamInstEnv
     :: FamInstEnvs
     -> TyCon -> [Type]          -- What we are looking for
-    -> [FamInstMatch]           -- Successful matches
+    -> Bag FamInstMatch         -- Successful matches
 -- Precondition: the tycon is saturated (or over-saturated)
 
 lookupFamInstEnv
@@ -798,7 +799,7 @@ lookupFamInstEnv
 lookupFamInstEnvConflicts
     :: FamInstEnvs
     -> FamInst          -- ^ Putative new instance
-    -> [FamInstMatch]   -- ^ Conflicting matches (don't look at the fim_tys field)
+    -> Bag FamInstMatch -- ^ Conflicting matches (don't look at the fim_tys field)
 -- E.g. when we are about to add
 --    f : type instance F [a] = a->a
 -- we do (lookupFamInstConflicts f [b])
@@ -985,25 +986,18 @@ type MatchFun =  FamInst                -- The FamInst template
               -> [Type]                 -- Target to match against
               -> Maybe TCvSubst
 
-mapMaybe' :: Foldable f => (a -> Maybe b) -> f a -> [b]
-mapMaybe' f = foldr g []
-  where
-    g x rest
-      | Just y <- f x = y : rest
-      | otherwise     = rest
-
 lookup_fam_inst_env'          -- The worker, local to this module
     :: MatchFun
     -> FamInstEnv
     -> TyCon -> [Type]        -- What we are looking for
-    -> [FamInstMatch]
+    -> Bag FamInstMatch
 lookup_fam_inst_env' match_fun (FamIE _ ie) fam match_tys
   | isOpenFamilyTyCon fam
-  , let xs = (lookupRM' rough_tmpl ie)   -- The common case
+  , let xs = lookupRM' rough_tmpl ie   -- The common case
     -- Avoid doing any of the allocation below if there are no instances to look at.
   , not $ null xs
-  = mapMaybe' f xs
-  | otherwise = []
+  = mapMaybeBag f xs
+  | otherwise = emptyBag
   where
     rough_tmpl :: [RoughMatchTc]
     rough_tmpl = KnownTc (tyConName fam) : map typeToRoughMatchTc match_tys
@@ -1042,21 +1036,23 @@ lookup_fam_inst_env' match_fun (FamIE _ ie) fam match_tys
             rough_tcs = roughMatchTcs match_tys1
         in (rough_tcs, match_tys1, match_tys2)
 
-    (pre_match_tys1, pre_match_tys2) = splitAt (tyConArity fam) match_tys
     pre_rough_split_tys
       = (roughMatchTcs pre_match_tys1, pre_match_tys1, pre_match_tys2)
+      where
+        (pre_match_tys1, pre_match_tys2) = splitAt (tyConArity fam) match_tys
 
 lookup_fam_inst_env           -- The worker, local to this module
     :: MatchFun
     -> FamInstEnvs
     -> TyCon -> [Type]        -- What we are looking for
-    -> [FamInstMatch]         -- Successful matches
+    -> Bag FamInstMatch       -- Successful matches
 
 -- Precondition: the tycon is saturated (or over-saturated)
 
 lookup_fam_inst_env match_fun (pkg_ie, home_ie) fam tys
   =  lookup_fam_inst_env' match_fun home_ie fam tys
-  ++ lookup_fam_inst_env' match_fun pkg_ie  fam tys
+     `unionBags`
+     lookup_fam_inst_env' match_fun pkg_ie  fam tys
 
 {-
 Note [Over-saturated matches]
@@ -1143,7 +1139,7 @@ reduceTyFamApp_maybe envs role tc tys
        -- otherwise only type-synonym families
   , FamInstMatch { fim_instance = FamInst { fi_axiom = ax }
                  , fim_tys      = inst_tys
-                 , fim_cos      = inst_cos } : _ <- lookupFamInstEnv envs tc tys
+                 , fim_cos      = inst_cos } : _ <- bagToList $ lookupFamInstEnv envs tc tys
       -- NB: Allow multiple matches because of compatible overlap
 
   = let co = mkUnbranchedAxInstCo role ax inst_tys inst_cos

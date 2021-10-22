@@ -52,7 +52,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Utils.FV
 
-import GHC.Data.Bag( Bag, unionBags, unitBag )
+import GHC.Data.Bag( Bag, unionBags, unitBag, bagToList )
 import GHC.Data.Maybe
 
 import Control.Monad
@@ -503,7 +503,7 @@ tcLookupDataFamInst_maybe :: FamInstEnvs -> TyCon -> [TcType]
 -- and returns a coercion between the two: co :: F [a] ~R FList a.
 tcLookupDataFamInst_maybe fam_inst_envs tc tc_args
   | isDataFamilyTyCon tc
-  , match : _ <- lookupFamInstEnv fam_inst_envs tc tc_args
+  , match : _ <- bagToList $ lookupFamInstEnv fam_inst_envs tc tc_args
   , FamInstMatch { fim_instance = rep_fam@(FamInst { fi_axiom = ax
                                                    , fi_cvs   = cvs })
                  , fim_tys      = rep_args
@@ -700,11 +700,11 @@ checkForConflicts :: FamInstEnvs -> FamInst -> TcM ()
 checkForConflicts inst_envs fam_inst
   = do { let conflicts = lookupFamInstEnvConflicts inst_envs fam_inst
        ; traceTc "checkForConflicts" $
-         vcat [ ppr (map fim_instance conflicts)
+         vcat [ ppr (fmap fim_instance conflicts)
               , ppr fam_inst
               -- , ppr inst_envs
          ]
-       ; reportConflictInstErr fam_inst conflicts }
+       ; reportConflictInstErr fam_inst (bagToList conflicts) }
 
 {-# SCC checkForInjectivityConflicts #-}
 checkForInjectivityConflicts :: FamInstEnvs -> FamInst -> TcM ()

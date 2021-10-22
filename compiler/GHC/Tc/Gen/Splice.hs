@@ -128,6 +128,7 @@ import GHC.Utils.Exception (throwIO, ErrorCall(..))
 
 import GHC.Utils.TmpFs ( newTempName, TempFileLifetime(..) )
 
+import GHC.Data.Bag ( bagToList )
 import GHC.Data.FastString
 import GHC.Data.Maybe( MaybeErr(..) )
 import qualified GHC.Data.EnumSet as EnumSet
@@ -1718,7 +1719,7 @@ reifyInstances' th_nm th_tys
                -> do { inst_envs <- tcGetFamInstEnvs
                      ; let matches = lookupFamInstEnv inst_envs tc tys
                      ; traceTc "reifyInstances'2" (ppr matches)
-                     ; return $ Right (tc, map fim_instance matches) }
+                     ; return $ Right (tc, map fim_instance $ bagToList matches) }
             _  -> bale_out $ TcRnUnknownMessage $ mkPlainError noHints $
                   (hang (text "reifyInstances:" <+> quotes (ppr ty))
                       2 (text "is not a class constraint or type family application")) }
