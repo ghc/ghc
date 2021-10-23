@@ -3,7 +3,7 @@
  * (c) The GHC Team, 1998-2004
  *
  * Various C datatypes used in the run-time system.  This is the
- * lowest-level include file, after ghcconfig.h and RtsConfig.h.
+ * lowest-level include file, after ghcconfig.h and rts/Config.h.
  *
  * Do not #include this file directly: #include "Rts.h" instead.
  *
