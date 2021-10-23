@@ -606,7 +606,7 @@ warnUnqualifiedImport decl iface =
       addDiagnosticAt loc msg
   where
     mod = mi_module iface
-    loc = getLoc $ ideclName decl
+    loc = getLocA $ ideclName decl
 
     is_qual = isImportDeclQualified (ideclQualified decl)
     has_import_list =

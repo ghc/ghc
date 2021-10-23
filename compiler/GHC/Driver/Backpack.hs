@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeFamilies #-}
 
 
 -- | This is the driver for the 'ghc --backpack' mode, which
@@ -788,7 +789,7 @@ summariseRequirement pn mod_name = do
                 hpm_module = L loc (HsModule {
                         hsmodAnn = noAnn,
                         hsmodLayout = NoLayoutInfo,
-                        hsmodName = Just (L loc mod_name),
+                        hsmodName = Just (L (noAnnSrcSpan loc) mod_name),
                         hsmodExports = Nothing,
                         hsmodImports = [],
                         hsmodDecls = [],
@@ -877,7 +878,7 @@ hsModuleToModSummary pn hsc_src modname
                                          implicit_prelude imps
 
         rn_pkg_qual = renameRawPkgQual (hsc_unit_env hsc_env)
-        convImport (L _ i) = (rn_pkg_qual (ideclPkgQual i), ideclName i)
+        convImport (L _ i) = (rn_pkg_qual (ideclPkgQual i), reLoc $ ideclName i)
 
     extra_sig_imports <- liftIO $ findExtraSigImports hsc_env hsc_src modname
 

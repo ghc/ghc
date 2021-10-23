@@ -790,12 +790,12 @@ msubsts :: { OrdList (LHsModuleSubst PackageName) }
         | msubst             { unitOL $1 }
 
 msubst :: { LHsModuleSubst PackageName }
-        : modid '=' moduleid { sLL $1 $> $ ($1, $3) }
-        | modid VARSYM modid VARSYM { sLL $1 $> $ ($1, sLL $2 $> $ HsModuleVar $3) }
+        : modid '=' moduleid { sLL (reLoc $1) $> $ (reLoc $1, $3) }
+        | modid VARSYM modid VARSYM { sLL (reLoc $1) $> $ (reLoc $1, sLL $2 $> $ HsModuleVar (reLoc $3)) }
 
 moduleid :: { LHsModuleId PackageName }
-          : VARSYM modid VARSYM { sLL $1 $> $ HsModuleVar $2 }
-          | unitid ':' modid    { sLL $1 $> $ HsModuleId $1 $3 }
+          : VARSYM modid VARSYM { sLL $1 $> $ HsModuleVar (reLoc $2) }
+          | unitid ':' modid    { sLL $1 (reLoc $>) $ HsModuleId $1 (reLoc $3) }
 
 pkgname :: { Located PackageName }
         : STRING     { sL1 $1 $ PackageName (getSTRING $1) }
@@ -832,8 +832,8 @@ rns :: { OrdList LRenaming }
         | rn         { unitOL $1 }
 
 rn :: { LRenaming }
-        : modid 'as' modid { sLL $1 $> $ Renaming $1 (Just $3) }
-        | modid            { sL1 $1    $ Renaming $1 Nothing }
+        : modid 'as' modid { sLL (reLoc $1) (reLoc $>) $ Renaming (reLoc $1) (Just (reLoc $3)) }
+        | modid            { sL1 (reLoc $1)            $ Renaming (reLoc $1) Nothing }
 
 unitbody :: { OrdList (LHsUnitDecl PackageName) }
         : '{'     unitdecls '}'   { $2 }
@@ -851,19 +851,19 @@ unitdecl :: { LHsUnitDecl PackageName }
                  (case snd $2 of
                    NotBoot -> HsSrcFile
                    IsBoot  -> HsBootFile)
-                 $3
+                 (reLoc $3)
                  (Just $ sL1 $1 (HsModule noAnn (thdOf3 $7) (Just $3) $5 (fst $ sndOf3 $7) (snd $ sndOf3 $7) $4 Nothing)) }
         | 'signature' modid maybemodwarning maybeexports 'where' body
              { sL1 $1 $ DeclD
                  HsigFile
-                 $2
+                 (reLoc $2)
                  (Just $ sL1 $1 (HsModule noAnn (thdOf3 $6) (Just $2) $4 (fst $ sndOf3 $6) (snd $ sndOf3 $6) $3 Nothing)) }
         | 'module' maybe_src modid
              { sL1 $1 $ DeclD (case snd $2 of
                    NotBoot -> HsSrcFile
-                   IsBoot  -> HsBootFile) $3 Nothing }
+                   IsBoot  -> HsBootFile) (reLoc $3) Nothing }
         | 'signature' modid
-             { sL1 $1 $ DeclD HsigFile $2 Nothing }
+             { sL1 $1 $ DeclD HsigFile (reLoc $2) Nothing }
         | 'dependency' unitid mayberns
              { sL1 $1 $ IncludeD (IncludeDecl { idUnitId = $2
                                               , idModRenaming = $3
@@ -1014,7 +1014,7 @@ exportlist1 :: { OrdList (LIE GhcPs) }
 export  :: { OrdList (LIE GhcPs) }
         : qcname_ext export_subspec  {% mkModuleImpExp (fst $ unLoc $2) $1 (snd $ unLoc $2)
                                           >>= \ie -> fmap (unitOL . reLocA) (return (sLL (reLoc $1) $> ie)) }
-        |  'module' modid            {% fmap (unitOL . reLocA) (acs (\cs -> sLL $1 $> (IEModuleContents (EpAnn (glR $1) [mj AnnModule $1] cs) $2))) }
+        |  'module' modid            {% fmap (unitOL . reLocA) (acs (\cs -> sLL $1 (reLoc $>) (IEModuleContents (EpAnn (glR $1) [mj AnnModule $1] cs) $2))) }
         |  'pattern' qcon            { unitOL (reLocA (sLL $1 (reLocN $>)
                                               (IEVar noExtField (sLLa $1 (reLocN $>) (IEPattern (glAA $1) $2))))) }
 
@@ -1105,7 +1105,7 @@ importdecl :: { LImportDecl GhcPs }
                              , importDeclAnnPackage   = fst $5
                              , importDeclAnnAs        = fst $8
                              }
-                  ; fmap reLocA $ acs (\cs -> L (comb5 $1 $6 $7 (snd $8) $9) $
+                  ; fmap reLocA $ acs (\cs -> L (comb5 $1 (reLoc $6) $7 (snd $8) $9) $
                       ImportDecl { ideclExt = EpAnn (glR $1) anns cs
                                   , ideclSourceSrc = snd $ fst $2
                                   , ideclName = $6, ideclPkgQual = snd $5
@@ -1139,9 +1139,9 @@ optqualified :: { Located (Maybe EpaLocation) }
         : 'qualified'                           { sL1 $1 (Just (glAA $1)) }
         | {- empty -}                           { noLoc Nothing }
 
-maybeas :: { (Maybe EpaLocation,Located (Maybe (Located ModuleName))) }
+maybeas :: { (Maybe EpaLocation,Located (Maybe (LocatedA ModuleName))) }
         : 'as' modid                           { (Just (glAA $1)
-                                                 ,sLL $1 $> (Just $2)) }
+                                                 ,sLL $1 (reLoc $>) (Just $2)) }
         | {- empty -}                          { (Nothing,noLoc Nothing) }
 
 maybeimpspec :: { Located (Maybe (Bool, LocatedL [LIE GhcPs])) }
@@ -3847,9 +3847,9 @@ close :: { () }
 -----------------------------------------------------------------------------
 -- Miscellaneous (mostly renamings)
 
-modid   :: { Located ModuleName }
-        : CONID                 { sL1 $1 $ mkModuleNameFS (getCONID $1) }
-        | QCONID                { sL1 $1 $ let (mod,c) = getQCONID $1 in
+modid   :: { LocatedA ModuleName }
+        : CONID                 { sL1a $1 $ mkModuleNameFS (getCONID $1) }
+        | QCONID                { sL1a $1 $ let (mod,c) = getQCONID $1 in
                                   mkModuleNameFS
                                    (mkFastString
                                      (unpackFS mod ++ '.':unpackFS c))

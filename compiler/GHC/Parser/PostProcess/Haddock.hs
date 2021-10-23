@@ -249,10 +249,10 @@ instance HasHaddock (Located HsModule) where
     -- Only do this when the module header exists.
     headerDocs <-
       for @Maybe (hsmodName mod) $ \(L l_name _) ->
-      extendHdkA l_name $ liftHdkA $ do
+      extendHdkA (locA l_name) $ liftHdkA $ do
         -- todo: register keyword location of 'module', see Note [Register keyword location]
         docs <-
-          inLocRange (locRangeTo (getBufPos (srcSpanStart l_name))) $
+          inLocRange (locRangeTo (getBufPos (srcSpanStart (locA l_name)))) $
           takeHdkComments mkDocNext
         selectDocString docs
 

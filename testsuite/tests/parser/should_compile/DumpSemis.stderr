@@ -41,7 +41,7 @@
    (1))
   (Just
    (L
-    { DumpSemis.hs:1:8-16 }
+    (SrcSpanAnn (EpAnnNotUsed) { DumpSemis.hs:1:8-16 })
     {ModuleName: DumpSemis}))
   (Nothing)
   [(L
@@ -74,7 +74,7 @@
        []))
      (NoSourceText)
      (L
-      { DumpSemis.hs:5:8-16 }
+      (SrcSpanAnn (EpAnnNotUsed) { DumpSemis.hs:5:8-16 })
       {ModuleName: Data.List})
      (NoRawPkgQual)
      (NotBoot)
@@ -113,7 +113,7 @@
        []))
      (NoSourceText)
      (L
-      { DumpSemis.hs:7:8-16 }
+      (SrcSpanAnn (EpAnnNotUsed) { DumpSemis.hs:7:8-16 })
       {ModuleName: Data.Kind})
      (NoRawPkgQual)
      (NotBoot)

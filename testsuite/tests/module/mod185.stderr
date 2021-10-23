@@ -48,7 +48,7 @@
        []))
      (NoSourceText)
      (L
-      { mod185.hs:3:8-14 }
+      (SrcSpanAnn (EpAnnNotUsed) { mod185.hs:3:8-14 })
       {ModuleName: Prelude})
      (NoRawPkgQual)
      (NotBoot)

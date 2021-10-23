@@ -30,7 +30,7 @@
    (1))
   (Just
    (L
-    { T18791.hs:2:8-13 }
+    (SrcSpanAnn (EpAnnNotUsed) { T18791.hs:2:8-13 })
     {ModuleName: T18791}))
   (Nothing)
   []

@@ -588,8 +588,8 @@ instance (ToHie a) => ToHie (Bag a) where
 instance (ToHie a) => ToHie (Maybe a) where
   toHie = maybe (pure []) toHie
 
-instance ToHie (IEContext (Located ModuleName)) where
-  toHie (IEC c (L (RealSrcSpan span _) mname)) = do
+instance ToHie (IEContext (LocatedA ModuleName)) where
+  toHie (IEC c (L (SrcSpanAnn _ (RealSrcSpan span _)) mname)) = do
       org <- ask
       pure $ [Node (mkSourcedNodeInfo org $ NodeInfo S.empty [] idents) span []]
     where details = mempty{identInfo = S.singleton (IEThing c)}
