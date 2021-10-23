@@ -223,3 +223,17 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
     checkVendor "[$]$1Vendor"
     checkOS "[$]$1OS" "Haskell$1Os"
 ])
+
+# GHC_RTS_LINKER(platform)
+# ----------------------------------------
+# Does platform have runtime linker support?
+AC_DEFUN([GHC_RTS_LINKER], [
+    case "$1" in
+        powerpc64-*|powerpc64le-*|powerpc-ibm-aix*|s390x-ibm-linux|riscv64-*)
+            TargetHasRTSLinker=NO
+            ;;
+        *)
+            TargetHasRTSLinker=YES
+            ;;
+    esac
+])

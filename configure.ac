@@ -308,16 +308,7 @@ dnl --------------------------------------------------------------
 GHC_TABLES_NEXT_TO_CODE
 AC_SUBST(TablesNextToCode)
 
-dnl ** Does target have runtime linker support?
-dnl --------------------------------------------------------------
-case "$target" in
-    powerpc64-*|powerpc64le-*|powerpc-ibm-aix*|s390x-ibm-linux|riscv64-*)
-        TargetHasRTSLinker=NO
-        ;;
-    *)
-        TargetHasRTSLinker=YES
-        ;;
-esac
+GHC_RTS_LINKER($target)
 AC_SUBST(TargetHasRTSLinker)
 
 # Requires FPTOOLS_SET_PLATFORMS_VARS to be run first.
