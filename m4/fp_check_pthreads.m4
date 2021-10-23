@@ -1,7 +1,10 @@
-dnl FP_CHECK_PTHREADS
-dnl ----------------------------------
-dnl Check various aspects of the platform's pthreads support
-AC_DEFUN([FP_CHECK_PTHREADS],
+# FP_CHECK_PTHREAD_LIB
+# ----------------------------------
+# Check whether -lpthread is needed for pthread.
+#
+# Sets variables:
+#   - UseLibpthread: [YES|NO]
+AC_DEFUN([FP_CHECK_PTHREAD_LIB],
 [
   dnl Some platforms (e.g. Android's Bionic) have pthreads support available
   dnl without linking against libpthread. Check whether -lpthread is necessary
@@ -12,25 +15,28 @@ AC_DEFUN([FP_CHECK_PTHREADS],
   AC_CHECK_FUNC(pthread_create,
       [
           AC_MSG_RESULT(no)
-          AC_SUBST([UseLibpthread],[NO])
-          need_lpthread=0
+          UseLibpthread=NO
       ],
       [
           AC_CHECK_LIB(pthread, pthread_create,
               [
                   AC_MSG_RESULT(yes)
-                  AC_SUBST([UseLibpthread],[YES])
-                  need_lpthread=1
+                  UseLibpthread=YES
               ],
               [
-                  AC_SUBST([UseLibpthread],[NO])
                   AC_MSG_RESULT([no pthreads support found.])
-                  need_lpthread=0
+                  UseLibpthread=NO
               ])
       ])
-  AC_DEFINE_UNQUOTED([NEED_PTHREAD_LIB], [$need_lpthread],
-      [Define 1 if we need to link code using pthreads with -lpthread])
+])
 
+# FP_CHECK_PTHREAD_FUNCS
+# ----------------------------------
+# Check various aspects of the platform's pthreads support
+#
+# `AC_DEFINE`s various C `HAVE_*` macros.
+AC_DEFUN([FP_CHECK_PTHREAD_FUNCS],
+[
   dnl Setting thread names
   dnl ~~~~~~~~~~~~~~~~~~~~
   dnl The portability situation here is complicated:
