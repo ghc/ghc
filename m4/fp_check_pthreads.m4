@@ -12,18 +12,15 @@ AC_DEFUN([FP_CHECK_PTHREADS],
   AC_CHECK_FUNC(pthread_create,
       [
           AC_MSG_RESULT(no)
-          AC_SUBST([CabalNeedLibpthread],[False])
           need_lpthread=0
       ],
       [
           AC_CHECK_LIB(pthread, pthread_create,
               [
                   AC_MSG_RESULT(yes)
-                  AC_SUBST([CabalNeedLibpthread],[True])
                   need_lpthread=1
               ],
               [
-                  AC_SUBST([CabalNeedLibpthread],[False])
                   AC_MSG_RESULT([no pthreads support found.])
                   need_lpthread=0
               ])

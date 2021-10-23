@@ -1130,6 +1130,10 @@ AC_LINK_IFELSE([AC_LANG_CALL([], [printf\$LDBLStub])],
     ])
 
 FP_CHECK_PTHREADS
+AS_IF([test x"$need_lpthread" = 1],
+    [CabalNeedLibpthread=True],
+    [CabalNeedLibpthread=False])
+AC_SUBST([CabalNeedLibpthread])
 
 GHC_ADJUSTORS_METHOD([Target])
 AC_SUBST([UseLibffiForAdjustors])
