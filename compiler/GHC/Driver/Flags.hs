@@ -536,7 +536,7 @@ data WarningFlag =
    | Opt_WarnMissingKindSignatures        -- Since 9.2
    | Opt_WarnMissingExportedPatternSynonymSignatures -- since 9.2
    | Opt_WarnRedundantStrictnessFlags     -- Since 9.4
-   deriving (Eq, Show, Enum)
+   deriving (Eq, Ord, Show, Enum)
 
 -- | Return the names of a WarningFlag
 --
@@ -787,4 +787,3 @@ unusedBindsFlags = [ Opt_WarnUnusedTopBinds
                    , Opt_WarnUnusedLocalBinds
                    , Opt_WarnUnusedPatternBinds
                    ]
-
