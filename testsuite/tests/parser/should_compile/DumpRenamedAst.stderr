@@ -1261,7 +1261,7 @@
      (NoExtField)
      (NoSourceText)
      (L
-      { DumpRenamedAst.hs:5:8-21 }
+      (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:5:8-21 })
       {ModuleName: Prelude})
      (NoPkgQual)
      (NotBoot)
@@ -1276,7 +1276,7 @@
      (NoExtField)
      (NoSourceText)
      (L
-      { DumpRenamedAst.hs:6:8-16 }
+      (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:6:8-16 })
       {ModuleName: Data.Kind})
      (NoPkgQual)
      (NotBoot)
@@ -1291,7 +1291,7 @@
      (NoExtField)
      (NoSourceText)
      (L
-      { DumpRenamedAst.hs:8:8-16 }
+      (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:8:8-16 })
       {ModuleName: Data.Kind})
      (NoPkgQual)
      (NotBoot)

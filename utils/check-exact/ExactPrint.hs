@@ -742,7 +742,7 @@ instance ExactPrint (LocatedP WarningTxt) where
 instance ExactPrint (ImportDecl GhcPs) where
   getAnnotationEntry idecl = fromAnn (ideclExt idecl)
   exact x@(ImportDecl EpAnnNotUsed _ _ _ _ _ _ _ _ _) = withPpr x
-  exact (ImportDecl ann@(EpAnn _ an _) msrc (L lm modname) mpkg _src safeflag qualFlag _impl mAs hiding) = do
+  exact (ImportDecl ann@(EpAnn _ an _) msrc modname mpkg _src safeflag qualFlag _impl mAs hiding) = do
 
     markAnnKw ann importDeclAnnImport AnnImport
 
@@ -765,7 +765,7 @@ instance ExactPrint (ImportDecl GhcPs) where
        printStringAtMkw (importDeclAnnPackage an) (sourceTextToString src (show v))
      _ -> return ()
 
-    printStringAtKw' (realSrcSpan lm) (moduleNameString modname)
+    markAnnotated modname
 
     case qualFlag of
       QualifiedPost  -- 'qualified' appears in postpositive position.
@@ -774,9 +774,9 @@ instance ExactPrint (ImportDecl GhcPs) where
 
     case mAs of
       Nothing -> return ()
-      Just (L l mn) -> do
+      Just mn -> do
         printStringAtMkw (importDeclAnnAs an) "as"
-        printStringAtKw' (realSrcSpan l) (moduleNameString mn)
+        markAnnotated mn
 
     case hiding of
       Nothing -> return ()
@@ -3488,9 +3488,9 @@ instance ExactPrint (IE GhcPs) where
         markAnnotated as
     markEpAnn an AnnCloseP
 
-  exact (IEModuleContents an (L lm mn)) = do
+  exact (IEModuleContents an mn) = do
     markEpAnn an AnnModule
-    printStringAtSs lm (moduleNameString mn)
+    markAnnotated mn
 
   -- exact (IEGroup _ _ _)          = NoEntryVal
   -- exact (IEDoc _ _)              = NoEntryVal

@@ -30,7 +30,7 @@
    (1))
   (Just
    (L
-    { DumpParsedAst.hs:5:8-20 }
+    (SrcSpanAnn (EpAnnNotUsed) { DumpParsedAst.hs:5:8-20 })
     {ModuleName: DumpParsedAst}))
   (Nothing)
   [(L
@@ -51,7 +51,7 @@
        []))
      (NoSourceText)
      (L
-      { DumpParsedAst.hs:6:8-16 }
+      (SrcSpanAnn (EpAnnNotUsed) { DumpParsedAst.hs:6:8-16 })
       {ModuleName: Data.Kind})
      (NoRawPkgQual)
      (NotBoot)

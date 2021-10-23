@@ -37,7 +37,7 @@
    (1))
   (Just
    (L
-    { Test20297.hs:2:8-16 }
+    (SrcSpanAnn (EpAnnNotUsed) { Test20297.hs:2:8-16 })
     {ModuleName: Test20297}))
   (Nothing)
   []
@@ -383,7 +383,7 @@
    (1))
   (Just
    (L
-    { Test20297.ppr.hs:2:8-16 }
+    (SrcSpanAnn (EpAnnNotUsed) { Test20297.ppr.hs:2:8-16 })
     {ModuleName: Test20297}))
   (Nothing)
   []
