@@ -43,3 +43,12 @@ AC_DEFUN([GHC_LLVM_TARGET], [
   esac
   $5="$llvm_target_cpu-$llvm_target_vendor-$llvm_target_os"
 ])
+
+# GHC_LLVM_TARGET_SET_VAR
+# -----------------------
+# Sets the cannonical target variable. This stub exists so other macros can
+# require it.
+AC_DEFUN([GHC_LLVM_TARGET_SET_VAR], [
+  AC_REQUIRE([FPTOOLS_SET_PLATFORMS_VARS])
+  GHC_LLVM_TARGET([$target],[$target_cpu],[$target_vendor],[$target_os],[LlvmTarget])
+])

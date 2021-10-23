@@ -1,7 +1,7 @@
-# FPTOOLS_SET_HASKELL_PLATFORM_VARS
+# FPTOOLS_SET_HASKELL_PLATFORM_VARS_SHELL_FUNCTIONS
 # ----------------------------------
-# Set the Haskell platform variables
-AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
+# Drop in shell functions used by FPTOOLS_SET_HASKELL_PLATFORM_VARS
+AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS_SHELL_FUNCTIONS],
 [
     checkArch() {
         case [$]1 in
@@ -118,29 +118,32 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
             ;;
         esac
     }
+])
 
-    dnl Note [autoconf assembler checks and -flto]
-    dnl ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    dnl
-    dnl Autoconf's AC_COMPILE_IFELSE macro is fragile in the case of checks
-    dnl which require that the assembler is run. Specifically, GCC does not run
-    dnl the assembler if invoked with `-c -flto`; it merely dumps its internal
-    dnl AST to the object file, to be compiled and assembled during the final
-    dnl link.
-    dnl
-    dnl This can cause configure checks like that for the
-    dnl .subsections_via_symbols directive to pass unexpected (see #16440),
-    dnl leading the build system to incorrectly conclude that the directive is
-    dnl supported.
-    dnl
-    dnl For this reason, it is important that configure checks that rely on the
-    dnl assembler failing use AC_LINK_IFELSE rather than AC_COMPILE_IFELSE,
-    dnl ensuring that the assembler sees the check.
-    dnl
+# Note [autoconf assembler checks and -flto]
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#
+# Autoconf's AC_COMPILE_IFELSE macro is fragile in the case of checks
+# which require that the assembler is run. Specifically, GCC does not run
+# the assembler if invoked with `-c -flto`; it merely dumps its internal
+# AST to the object file, to be compiled and assembled during the final
+# link.
+#
+# This can cause configure checks like that for the
+# .subsections_via_symbols directive to pass unexpected (see #16440),
+# leading the build system to incorrectly conclude that the directive is
+# supported.
+#
+# For this reason, it is important that configure checks that rely on the
+# assembler failing use AC_LINK_IFELSE rather than AC_COMPILE_IFELSE,
+# ensuring that the assembler sees the check.
 
-    dnl ** check for Apple-style dead-stripping support
-    dnl    (.subsections-via-symbols assembler directive)
-
+# GHC_SUBSECTIONS_VIA_SYMBOLS
+# ----------------------------------
+# check for Apple-style dead-stripping support
+# (.subsections-via-symbols assembler directive)
+AC_DEFUN([GHC_SUBSECTIONS_VIA_SYMBOLS],
+[
     AC_MSG_CHECKING(for .subsections_via_symbols)
     dnl See Note [autoconf assembler checks and -flto]
     AC_LINK_IFELSE(
@@ -157,9 +160,13 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
         ],
         [TargetHasSubsectionsViaSymbols=NO
          AC_MSG_RESULT(no)])
+])
 
-    dnl ** check for .ident assembler directive
-
+# GHC_IDENT_DIRECTIVE
+# ----------------------------------
+# check for .ident assembler directive
+AC_DEFUN([GHC_IDENT_DIRECTIVE],
+[
     AC_MSG_CHECKING(whether your assembler supports .ident directive)
     dnl See Note [autoconf assembler checks and -flto]
     AC_LINK_IFELSE(
@@ -168,13 +175,18 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
          TargetHasIdentDirective=YES],
         [AC_MSG_RESULT(no)
          TargetHasIdentDirective=NO])
+])
 
-    dnl *** check for GNU non-executable stack note support (ELF only)
-    dnl     (.section .note.GNU-stack,"",@progbits)
-
-    dnl This test doesn't work with "gcc -g" in gcc 4.4 (GHC trac #3889:
-    dnl     Error: can't resolve `.note.GNU-stack' {.note.GNU-stack section} - `.Ltext0' {.text section}
-    dnl so we empty CFLAGS while running this test
+# GHC_GNU_NONEXEC_STACK
+# ----------------------------------
+# *** check for GNU non-executable stack note support (ELF only)
+#     (.section .note.GNU-stack,"",@progbits)
+#
+# This test doesn't work with "gcc -g" in gcc 4.4 (GHC trac #3889:
+#     Error: can't resolve `.note.GNU-stack' {.note.GNU-stack section} - `.Ltext0' {.text section}
+# so we empty CFLAGS while running this test
+AC_DEFUN([GHC_GNU_NONEXEC_STACK],
+[
     CFLAGS2="$CFLAGS"
     CFLAGS=
     case $TargetArch in
@@ -201,24 +213,15 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
         [AC_MSG_RESULT(no)
          TargetHasGnuNonexecStack=NO])
     CFLAGS="$CFLAGS2"
+])
 
-    checkArch "$BuildArch" "HaskellBuildArch"
-    checkVendor "$BuildVendor"
-    checkOS "$BuildOS" ""
-
-    checkArch "$HostArch" "HaskellHostArch"
-    checkVendor "$HostVendor"
-    checkOS "$HostOS" "HaskellHostOs"
-
-    checkArch "$TargetArch" "HaskellTargetArch"
-    checkVendor "$TargetVendor"
-    checkOS "$TargetOS" "HaskellTargetOs"
-
-    AC_SUBST(HaskellHostArch)
-    AC_SUBST(HaskellHostOs)
-    AC_SUBST(HaskellTargetArch)
-    AC_SUBST(HaskellTargetOs)
-    AC_SUBST(TargetHasSubsectionsViaSymbols)
-    AC_SUBST(TargetHasIdentDirective)
-    AC_SUBST(TargetHasGnuNonexecStack)
+# FPTOOLS_SET_HASKELL_PLATFORM_VARS
+# ----------------------------------
+# Set the Haskell platform variables
+AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
+[
+    AC_REQUIRE([FPTOOLS_SET_HASKELL_PLATFORM_VARS_SHELL_FUNCTIONS])
+    checkArch "[$]$1Arch" "Haskell$1Arch"
+    checkVendor "[$]$1Vendor"
+    checkOS "[$]$1OS" "Haskell$1Os"
 ])

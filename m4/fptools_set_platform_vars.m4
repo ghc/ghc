@@ -1,7 +1,10 @@
-# FPTOOLS_SET_PLATFORM_VARS
+# FPTOOLS_SET_PLATFORMS_VARS
 # ----------------------------------
-# Set the platform variables
-AC_DEFUN([FPTOOLS_SET_PLATFORM_VARS],
+# Set all the platform variables. First massage the default autoconf
+# choices for build, host, and target, then parse it into
+# <platform>Arch, <platform>Vendor, and <platform>OS, and finally define
+# the other variables in terms of those.
+AC_DEFUN([FPTOOLS_SET_PLATFORMS_VARS],
 [
     # If no argument was given for a configuration variable, then discard
     # the guessed canonical system and use the configuration of the
@@ -15,131 +18,104 @@ AC_DEFUN([FPTOOLS_SET_PLATFORM_VARS],
 
     if test "$build_alias" = ""
     then
-        if test "$bootstrap_target" != ""
-        then
-            build=$bootstrap_target
-            echo "Build platform inferred as: $build"
-        else
-            echo "Can't work out build platform"
-            exit 1
-        fi
-
-        BuildArch=`echo "$build" | sed 's/-.*//'`
-        BuildVendor=`echo "$build" | sed -e 's/.*-\(.*\)-.*/\1/'`
-        BuildOS=`echo "$build" | sed 's/.*-//'`
+        FPTOOLS_OVERRIDE_PLATFORM_FROM_BOOTSTRAP([build], [Build])
     else
-        GHC_CONVERT_CPU([$build_cpu], [BuildArch])
-        GHC_CONVERT_VENDOR([$build_vendor], [BuildVendor])
-        GHC_CONVERT_OS([$build_os], [$BuildArch], [BuildOS])
+        GHC_CONVERT_PLATFORM_PARTS([build], [Build])
     fi
 
     if test "$host_alias" = ""
     then
-        if test "$bootstrap_target" != ""
-        then
-            host=$bootstrap_target
-            echo "Host platform inferred as: $host"
-        else
-            echo "Can't work out host platform"
-            exit 1
-        fi
-
-        HostArch=`echo "$host" | sed 's/-.*//'`
-        HostVendor=`echo "$host" | sed -e 's/.*-\(.*\)-.*/\1/'`
-        HostOS=`echo "$host" | sed 's/.*-//'`
+        FPTOOLS_OVERRIDE_PLATFORM_FROM_BOOTSTRAP([host], [Host])
     else
-        GHC_CONVERT_CPU([$host_cpu], [HostArch])
-        GHC_CONVERT_VENDOR([$host_vendor], [HostVendor])
-        GHC_CONVERT_OS([$host_os], [$HostArch], [HostOS])
+        GHC_CONVERT_PLATFORM_PARTS([host], [Host])
     fi
 
     if test "$target_alias" = ""
     then
         if test "$host_alias" != ""
         then
-            GHC_CONVERT_CPU([$host_cpu], [TargetArch])
-            GHC_CONVERT_VENDOR([$host_vendor], [TargetVendor])
-            GHC_CONVERT_OS([$host_os], [$TargetArch],[TargetOS])
+            GHC_CONVERT_PLATFORM_PARTS([host], [Target])
         else
-            if test "$bootstrap_target" != ""
-            then
-                target=$bootstrap_target
-                echo "Target platform inferred as: $target"
-            else
-                echo "Can't work out target platform"
-                exit 1
-            fi
-
-            TargetArch=`echo "$target" | sed 's/-.*//'`
-            TargetVendor=`echo "$target" | sed -e 's/.*-\(.*\)-.*/\1/'`
-            TargetOS=`echo "$target" | sed 's/.*-//'`
+            FPTOOLS_OVERRIDE_PLATFORM_FROM_BOOTSTRAP([target], [Target])
         fi
     else
-        GHC_CONVERT_CPU([$target_cpu], [TargetArch])
-        GHC_CONVERT_VENDOR([$target_vendor], [TargetVendor])
-        GHC_CONVERT_OS([$target_os], [$TargetArch], [TargetOS])
+        GHC_CONVERT_PLATFORM_PARTS([target], [Target])
     fi
 
-    GHC_LLVM_TARGET([$target],[$target_cpu],[$target_vendor],[$target_os],[LlvmTarget])
+    FPTOOLS_SET_PLATFORM_VARS([build], [Build])
+    FPTOOLS_SET_PLATFORM_VARS([host], [Host])
+    FPTOOLS_SET_PLATFORM_VARS([target], [Target])
 
-    GHC_SELECT_FILE_EXTENSIONS([$host], [exeext_host], [soext_host])
-    GHC_SELECT_FILE_EXTENSIONS([$target], [exeext_target], [soext_target])
     windows=NO
     case $host in
     *-unknown-mingw32)
         windows=YES
         ;;
     esac
-
-    BuildPlatform="$BuildArch-$BuildVendor-$BuildOS"
-    BuildPlatform_CPP=`echo "$BuildPlatform" | sed -e 's/\./_/g' -e 's/-/_/g'`
-    BuildArch_CPP=`    echo "$BuildArch"     | sed -e 's/\./_/g' -e 's/-/_/g'`
-    BuildVendor_CPP=`  echo "$BuildVendor"   | sed -e 's/\./_/g' -e 's/-/_/g'`
-    BuildOS_CPP=`      echo "$BuildOS"       | sed -e 's/\./_/g' -e 's/-/_/g'`
-
-    HostPlatform="$HostArch-$HostVendor-$HostOS"
-    HostPlatform_CPP=`echo "$HostPlatform" | sed -e 's/\./_/g' -e 's/-/_/g'`
-    HostArch_CPP=`    echo "$HostArch"     | sed -e 's/\./_/g' -e 's/-/_/g'`
-    HostVendor_CPP=`  echo "$HostVendor"   | sed -e 's/\./_/g' -e 's/-/_/g'`
-    HostOS_CPP=`      echo "$HostOS"       | sed -e 's/\./_/g' -e 's/-/_/g'`
-
-    TargetPlatform="$TargetArch-$TargetVendor-$TargetOS"
-    TargetPlatform_CPP=`echo "$TargetPlatform" | sed -e 's/\./_/g' -e 's/-/_/g'`
-    TargetArch_CPP=`    echo "$TargetArch"     | sed -e 's/\./_/g' -e 's/-/_/g'`
-    TargetVendor_CPP=`  echo "$TargetVendor"   | sed -e 's/\./_/g' -e 's/-/_/g'`
-    TargetOS_CPP=`      echo "$TargetOS"       | sed -e 's/\./_/g' -e 's/-/_/g'`
-
-    # we intend to pass trough --targets to llvm as is.
-    LLVMTarget_CPP=`    echo "$LlvmTarget"`
-
-    echo "GHC build  : $BuildPlatform"
-    echo "GHC host   : $HostPlatform"
-    echo "GHC target : $TargetPlatform"
-    echo "LLVM target: $LlvmTarget"
-
-    AC_SUBST(BuildPlatform)
-    AC_SUBST(HostPlatform)
-    AC_SUBST(TargetPlatform)
-    AC_SUBST(HostPlatform_CPP)
-    AC_SUBST(BuildPlatform_CPP)
-    AC_SUBST(TargetPlatform_CPP)
-
-    AC_SUBST(HostArch_CPP)
-    AC_SUBST(BuildArch_CPP)
-    AC_SUBST(TargetArch_CPP)
-
-    AC_SUBST(HostOS_CPP)
-    AC_SUBST(BuildOS_CPP)
-    AC_SUBST(TargetOS_CPP)
-    AC_SUBST(LLVMTarget_CPP)
-
-    AC_SUBST(HostVendor_CPP)
-    AC_SUBST(BuildVendor_CPP)
-    AC_SUBST(TargetVendor_CPP)
-
-    AC_SUBST(exeext_host)
-    AC_SUBST(exeext_target)
-    AC_SUBST(soext_host)
-    AC_SUBST(soext_target)
 ])
 
+dnl Attempt at arch agnostic distillation of the above, but it
+dnl doesn't quite work yet. Perhaps after the configure script is
+dnl more split up (#17191) this wil become more feasible.
+
+dnl if test "[$]$1_alias" = ""
+dnl then
+dnl     if test "[$]$3_alias" != ""
+dnl     then
+dnl         GHC_CONVERT_PLATFORM_PARTS($3, $2)
+dnl     else
+dnl         FPTOOLS_SET_PLATFORMS_VARS($1, $2)
+dnl     fi
+dnl else
+dnl     GHC_CONVERT_PLATFORM_PARTS($1, $2)
+dnl fi
+
+# FPTOOLS_OVERRIDE_PLATFORM_FROM_BOOTSTRAP(platform,Platform)
+# ----------------------------------
+# Per the comment in FPTOOLS_OVERRIDE_PLATFORM_FROM_BOOTSTRAP's body, we
+# need to sometimes replace inferred platforms with the bootstrap
+# compiler's target platform.
+AC_DEFUN([FPTOOLS_OVERRIDE_PLATFORM_FROM_BOOTSTRAP],
+[
+    if test "$bootstrap_target" != ""
+    then
+        $1=$bootstrap_target
+        echo "$1 platform inferred as: [$]$1"
+    else
+        echo "Can't work out $1 platform"
+        exit 1
+    fi
+
+    $2[Arch]=`echo "[$]$1" | sed 's/-.*//'`
+    $2[Vendor]=`echo "[$]$1" | sed -e 's/.*-\(.*\)-.*/\1/'`
+    $2[OS]=`echo "[$]$1" | sed 's/.*-//'`
+])
+
+# FPTOOLS_SET_PLATFORM_VARS(platform,Platform)
+# ----------------------------------
+# Set the platform variables for a single plaform (one of build, host,
+# or target). Assumes <platform>Arch, <platform>Vendor, and <platform>OS
+# are defined, and does everything else in terms of them.
+AC_DEFUN([FPTOOLS_SET_PLATFORM_VARS],
+[
+
+    $2Platform="[$]$2Arch-[$]$2Vendor-[$]$2OS"
+    $2Platform_CPP=`echo "[$]$2Platform" | sed -e 's/\./_/g' -e 's/-/_/g'`
+    $2Arch_CPP=`    echo "[$]$2Arch"     | sed -e 's/\./_/g' -e 's/-/_/g'`
+    $2Vendor_CPP=`  echo "[$]$2Vendor"   | sed -e 's/\./_/g' -e 's/-/_/g'`
+    $2OS_CPP=`      echo "[$]$2OS"       | sed -e 's/\./_/g' -e 's/-/_/g'`
+
+    echo "GHC $1  : [$]$2Platform"
+
+    AC_SUBST($2Platform)
+    AC_SUBST($2Platform_CPP)
+
+    AC_SUBST($2Arch_CPP)
+    AC_SUBST($2OS_CPP)
+    AC_SUBST($2Vendor_CPP)
+
+    GHC_SELECT_FILE_EXTENSIONS([$]$1, [exeext_]$1, [soext_]$1)
+
+    AC_SUBST(exeext_$1)
+    AC_SUBST(soext_$1)
+])

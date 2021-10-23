@@ -265,7 +265,7 @@ AC_CANONICAL_BUILD
 AC_CANONICAL_HOST
 AC_CANONICAL_TARGET
 
-FPTOOLS_SET_PLATFORM_VARS
+FPTOOLS_SET_PLATFORMS_VARS
 
 FP_PROG_SH
 
@@ -374,7 +374,7 @@ case "$target" in
 esac
 AC_SUBST(TargetHasRTSLinker)
 
-# Requires FPTOOLS_SET_PLATFORM_VARS to be run first.
+# Requires FPTOOLS_SET_PLATFORMS_VARS to be run first.
 FP_FIND_ROOT
 
 
@@ -806,6 +806,11 @@ FPTOOLS_SET_C_LD_FLAGS([target],[CONF_CC_OPTS_STAGE1],[CONF_GCC_LINKER_OPTS_STAG
 FPTOOLS_SET_C_LD_FLAGS([target],[CONF_CC_OPTS_STAGE2],[CONF_GCC_LINKER_OPTS_STAGE2],[CONF_LD_LINKER_OPTS_STAGE2],[CONF_CPP_OPTS_STAGE2])
 # Stage 3 won't be supported by cross-compilation
 
+GHC_LLVM_TARGET_SET_VAR
+# we intend to pass trough --targets to llvm as is.
+LLVMTarget_CPP=`    echo "$LlvmTarget"`
+AC_SUBST(LLVMTarget_CPP)
+
 dnl ** See whether cc supports --target=<triple> and set
 dnl CONF_CC_OPTS_STAGE[12] accordingly.
 FP_CC_SUPPORTS_TARGET
@@ -835,7 +840,24 @@ AC_SUBST(CONF_HC_OPTS_STAGE2)
 dnl ** Set up the variables for the platform in the settings file.
 dnl May need to use gcc to find platform details.
 dnl --------------------------------------------------------------
-FPTOOLS_SET_HASKELL_PLATFORM_VARS
+FPTOOLS_SET_HASKELL_PLATFORM_VARS([Build])
+
+FPTOOLS_SET_HASKELL_PLATFORM_VARS([Host])
+AC_SUBST(HaskellHostArch)
+AC_SUBST(HaskellHostOs)
+
+FPTOOLS_SET_HASKELL_PLATFORM_VARS([Target])
+AC_SUBST(HaskellTargetArch)
+AC_SUBST(HaskellTargetOs)
+
+GHC_SUBSECTIONS_VIA_SYMBOLS
+AC_SUBST(TargetHasSubsectionsViaSymbols)
+
+GHC_IDENT_DIRECTIVE
+AC_SUBST(TargetHasIdentDirective)
+
+GHC_GNU_NONEXEC_STACK
+AC_SUBST(TargetHasGnuNonexecStack)
 
 dnl ** figure out how to do context diffs
 FP_PROG_CONTEXT_DIFF

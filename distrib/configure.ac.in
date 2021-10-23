@@ -37,15 +37,15 @@ AC_SUBST(LibdwIncludeDir)
 UseLibffiForAdjustors=@UseLibffiForAdjustors@
 AC_SUBST(UseLibffiForAdjustors)
 
-# We have to run these unconditionally as FPTOOLS_SET_PLATFORM_VARS wants the
+# We have to run these unconditionally as FPTOOLS_SET_PLATFORMS_VARS wants the
 # values it computes.
 AC_CANONICAL_BUILD
 AC_CANONICAL_HOST
 AC_CANONICAL_TARGET
 
-FPTOOLS_SET_PLATFORM_VARS
+FPTOOLS_SET_PLATFORMS_VARS
 
-# Requires FPTOOLS_SET_PLATFORM_VARS to be run first.
+# Requires FPTOOLS_SET_PLATFORMS_VARS to be run first.
 FP_FIND_ROOT
 
 # ToDo: if Stage1Only=YES, should be YES
@@ -168,7 +168,24 @@ AC_SUBST(CONF_CPP_OPTS_STAGE2)
 dnl ** Set up the variables for the platform in the settings file.
 dnl May need to use gcc to find platform details.
 dnl --------------------------------------------------------------
-FPTOOLS_SET_HASKELL_PLATFORM_VARS
+FPTOOLS_SET_HASKELL_PLATFORM_VARS([Build])
+
+FPTOOLS_SET_HASKELL_PLATFORM_VARS([Host])
+AC_SUBST(HaskellHostArch)
+AC_SUBST(HaskellHostOs)
+
+FPTOOLS_SET_HASKELL_PLATFORM_VARS([Target])
+AC_SUBST(HaskellTargetArch)
+AC_SUBST(HaskellTargetOs)
+
+GHC_SUBSECTIONS_VIA_SYMBOLS
+AC_SUBST(TargetHasSubsectionsViaSymbols)
+
+GHC_IDENT_DIRECTIVE
+AC_SUBST(TargetHasIdentDirective)
+
+GHC_GNU_NONEXEC_STACK
+AC_SUBST(TargetHasGnuNonexecStack)
 
 dnl ** See whether cc supports --target=<triple> and set
 dnl CONF_CC_OPTS_STAGE[12] accordingly.

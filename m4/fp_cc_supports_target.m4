@@ -9,7 +9,7 @@
 AC_DEFUN([FP_CC_SUPPORTS_TARGET],
 [
    AC_REQUIRE([AC_PROG_CC])
-   AC_REQUIRE([FPTOOLS_SET_PLATFORM_VARS])
+   AC_REQUIRE([GHC_LLVM_TARGET_SET_VAR])
    AC_MSG_CHECKING([whether $1 CC supports --target])
    echo 'int main() { return 0; }' > conftest.c
    if $CC --target=$LlvmTarget -Werror conftest.c > /dev/null ; then
