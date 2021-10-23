@@ -96,6 +96,7 @@ prepareTree dest = do
         , Test "libraries/random"
         , Test "libraries/vector"
         , Test "rts/rts.cabal"
+        , Test "rts/rts.buildinfo"
         , Test "mk/build.mk" ]
     srcDirs =
         [ "bindisttest"

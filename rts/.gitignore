@@ -17,5 +17,6 @@
 /config.status
 /configure
 
+/rts.buildinfo
 /ghcautoconf.h.autoconf.in
 /ghcautoconf.h.autoconf

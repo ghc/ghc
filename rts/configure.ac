@@ -363,6 +363,7 @@ AC_DEFINE_UNQUOTED([HAVE_LIBNUMA], [$HaveLibNuma], [Define to 1 if you have libn
 dnl ** Write config files
 dnl --------------------------------------------------------------
 
+AC_CONFIG_FILES([rts.buildinfo])
 AC_OUTPUT
 
 [

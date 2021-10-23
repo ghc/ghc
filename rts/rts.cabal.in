@@ -585,6 +585,7 @@ library
                xxhash.c
                configure
                configure.ac
+               rts.buildinfo
 
     if os(windows)
        c-sources: win32/AsyncMIO.c
