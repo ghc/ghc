@@ -1038,7 +1038,8 @@ AC_LINK_IFELSE([AC_LANG_CALL([], [printf\$LDBLStub])],
             [Define to 1 if we have printf$LDBLStub (Apple Mac OS >= 10.4, PPC).])
     ])
 
-FP_CHECK_PTHREADS
+FP_CHECK_PTHREAD_LIB
+AC_SUBST([UseLibpthread])
 
 GHC_ADJUSTORS_METHOD([Target])
 AC_SUBST([UseLibffiForAdjustors])
