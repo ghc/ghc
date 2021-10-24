@@ -639,7 +639,7 @@ ifeq "$(HaveLibMingwEx)" "YES"
 rts_PACKAGE_CPP_OPTS += -DHAVE_LIBMINGWEX
 endif
 
-$(eval $(call manual-package-config,rts,1))
+$(eval $(call manual-package-config,rts,dist,1))
 
 rts/dist/package.conf.inplace : $(includes_1_H_CONFIG) $(includes_1_H_PLATFORM) $(includes_1_H_VERSION)
 

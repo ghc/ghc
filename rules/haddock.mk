@@ -40,6 +40,9 @@ endif
 .PHONY: html_$1
 html_$1 : $$($$($1_PACKAGE)-$$($1_$2_VERSION)_HADDOCK_FILE)
 
+# See Note [inconsistent distdirs] in rules/build-package-way.mk for why
+# we hard-code dist-install; GHC will use stage2/stage3 here so we
+# cannot use the distdir parameter.
 $$($1_PACKAGE)-$$($1_$2_VERSION)_HADDOCK_DEPS = $$(foreach n,$$($1_$2_DEPS),$$($$n_HADDOCK_FILE) $$($$n_dist-install_$$(HADDOCK_WAY)_LIB))
 
 # We don't pass -dcore-lint to haddock because it caused a performance regression in #13789

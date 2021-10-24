@@ -196,6 +196,10 @@ ifneq "$$(BINDIST)" "YES"
 
 # The quadrupled $'s here are because the _<way>_LIB variables aren't
 # necessarily set when this part of the makefile is read
+#
+# See Note [inconsistent distdirs] in rules/build-package-way.mk for why
+# we are computing the dist-dir from the GHC stage and not just using
+# the distdir parameter.
 $1/$2/build/tmp/$$($1_$2_PROG) $1/$2/build/tmp/$$($1_$2_PROG).dll : \
     $$(foreach dep,$$($1_$2_TRANSITIVE_DEP_COMPONENT_IDS),\
         $$$$($$(dep)_dist-$(if $(filter 0,$3),boot,install)_PROGRAM_DEP_LIB))
@@ -319,6 +323,10 @@ $(call dependencies,$1,$2,$3)
 # so we need to add a dependency for that. As we don't know which
 # module contains Main, we just make all modules in the program
 # depend on it.
+#
+# See Note [inconsistent distdirs] in rules/build-package-way.mk for why
+# we hard-code dist-install; GHC will use stage2/stage3 here so we
+# cannot use the distdir parameter.
 ifneq "$3" "0"
 $$(foreach o,$$($1_$2_$$($1_$2_PROGRAM_WAY)_HS_OBJS),$$(eval $$(call add-dependency,$$o,libraries/base/dist-install/build/GHC/TopHandler.$$($$($1_$2_PROGRAM_WAY)_osuf))))
 endif

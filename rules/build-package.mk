@@ -154,6 +154,10 @@ $(call haddock,$1,$2)
 endif
 
 # Don't put bootstrapping packages in the bindist
+#
+# See Note [inconsistent distdirs] in rules/build-package-way.mk for why
+# we hard-code dist-install; GHC will use stage2/stage3 here so we
+# cannot use the distdir parameter.
 ifneq "$3" "0"
 BINDIST_EXTRAS += $1/*.cabal $$(wildcard $1/*.buildinfo) $$(wildcard $1/dist-install/build/*.buildinfo) $1/$2/setup-config $1/LICENSE
 BINDIST_EXTRAS += $$($1_$2_INSTALL_INCLUDES_SRCS)
