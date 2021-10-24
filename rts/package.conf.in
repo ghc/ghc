@@ -20,7 +20,7 @@ import-dirs:
 #if defined(INSTALLING)
 library-dirs:           LIB_DIR"/rts" FFI_LIB_DIR LIBDW_LIB_DIR
 #else /* !INSTALLING */
-library-dirs:           TOP"/rts/dist/build" FFI_LIB_DIR LIBDW_LIB_DIR
+library-dirs:           TOP"/rts/dist-install/build" FFI_LIB_DIR LIBDW_LIB_DIR
 #endif
 
 hs-libraries:   "HSrts" FFI_LIB
@@ -70,7 +70,7 @@ extra-libraries:
 #if defined(INSTALLING)
 include-dirs:           INCLUDE_DIR FFI_INCLUDE_DIR
 #else /* !INSTALLING */
-include-dirs:           TOP"/rts/dist/build"
+include-dirs:           TOP"/rts/dist-install/build"
                         TOP"/rts/include"
                         TOP"/rts/include/dist-derivedconstants/header"
                         FFI_INCLUDE_DIR

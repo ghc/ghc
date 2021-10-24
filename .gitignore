@@ -80,7 +80,7 @@ _darcs/
 /libraries/*/dist-install/
 /libraries/*/dist-newstyle/
 /libraries/dist-haddock/
-/rts/dist/
+/rts/dist-install/
 /rts/include/dist/
 /rts/include/dist-*/
 /utils/*/dist*/

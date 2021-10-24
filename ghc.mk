@@ -572,7 +572,7 @@ utils/check-exact/dist-install/package-data.mk: compiler/stage2/package-data.mk
 utils/count-deps/dist-install/package-data.mk: compiler/stage2/package-data.mk
 
 # add the final package.conf dependency: ghc-prim depends on RTS
-libraries/ghc-prim/dist-install/package-data.mk : rts/dist/package.conf.inplace
+libraries/ghc-prim/dist-install/package-data.mk : rts/dist-install/package.conf.inplace
 endif
 
 # --------------------------------
@@ -982,7 +982,7 @@ INSTALL_DISTDIR_compiler = stage2
 
 # Now we can do the installation
 install_packages: install_libexecs
-install_packages: rts/dist/package.conf.install
+install_packages: rts/dist-install/package.conf.install
 	$(INSTALL_DIR) "$(DESTDIR)$(topdir)"
 	$(call removeTrees,"$(INSTALLED_PACKAGE_CONF)")
 	$(INSTALL_DIR) "$(INSTALLED_PACKAGE_CONF)"
@@ -998,7 +998,7 @@ install_packages: rts/dist/package.conf.install
 	                                  '$(ghclibdir)'              \
 	                                  '$(docdir)/html/libraries'  \
 	                                  '$(GhcLibWays)'))
-	"$(INSTALLED_GHC_PKG_REAL)" --force --global-package-db "$(INSTALLED_PACKAGE_CONF)" update rts/dist/package.conf.install
+	"$(INSTALLED_GHC_PKG_REAL)" --force --global-package-db "$(INSTALLED_PACKAGE_CONF)" update rts/dist-install/package.conf.install
 	$(foreach p, $(INSTALL_PACKAGES),                             \
 	    $(call make-command,                                      \
 	           "$(ghc-cabal_INPLACE)" register                    \

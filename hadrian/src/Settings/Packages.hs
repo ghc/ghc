@@ -397,7 +397,7 @@ rtsPackageArgs = package rts ? do
 -- On Darwin we get errors of the form
 --
 --  ld: absolute addressing (perhaps -mdynamic-no-pic) used in _stg_ap_0_fast
---      from rts/dist/build/Apply.dyn_o not allowed in slidable image
+--      from rts/dist-install/build/Apply.dyn_o not allowed in slidable image
 --
 -- and lots of these warnings:
 --
@@ -408,7 +408,7 @@ rtsPackageArgs = package rts ? do
 --
 -- Text relocation remains                         referenced
 --     against symbol                  offset      in file
--- .rodata (section)                   0x11        rts/dist/build/Apply.dyn_o
+-- .rodata (section)                   0x11        rts/dist-install/build/Apply.dyn_o
 --   ...
 -- ld: fatal: relocations remain against allocatable but non-writable sections
 -- collect2: ld returned 1 exit status

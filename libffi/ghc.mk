@@ -32,8 +32,8 @@ libffi_EnableShared    = no
 endif
 
 libffi_STATIC_LIB  = libffi/build/inst/lib/libffi.a
-libffi_HEADERS     = rts/dist/build/ffi.h \
-                     rts/dist/build/ffitarget.h
+libffi_HEADERS     = rts/dist-install/build/ffi.h \
+                     rts/dist-install/build/ffitarget.h
 
 ifeq "$(HostOS_CPP)" "mingw32"
 LIBFFI_NAME = ffi-6

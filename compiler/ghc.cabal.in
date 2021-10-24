@@ -113,7 +113,7 @@ Library
 
     if flag(internal-interpreter)
         CPP-Options: -DHAVE_INTERNAL_INTERPRETER
-        Include-Dirs: ../rts/dist/build @FFIIncludeDir@
+        Include-Dirs: ../rts/dist-install/build @FFIIncludeDir@
 
     -- if no dynamic system linker is available, don't try DLLs.
     if flag(dynamic-system-linker)
