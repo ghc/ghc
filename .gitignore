@@ -80,9 +80,8 @@ _darcs/
 /libraries/*/dist-install/
 /libraries/*/dist-newstyle/
 /libraries/dist-haddock/
-/rts/dist-install/
-/rts/include/dist/
-/rts/include/dist-*/
+/rts/dist/
+/rts/dist-*/
 /utils/*/dist*/
 /compiler/stage1/
 /compiler/stage2/
@@ -188,7 +187,6 @@ _darcs/
 /mk/project.mk
 /mk/project.mk.old
 /mk/validate.mk
-/rts/include/dist/
 /rts/rts.cabal
 /rts/package.conf.inplace
 /rts/package.conf.inplace.raw

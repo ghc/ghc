@@ -145,7 +145,7 @@ library
        cpp-options: -DNOSMP
 
     include-dirs: build include
-                  include/dist-derivedconstants/header @FFIIncludeDir@
+                  @FFIIncludeDir@
                   @LibdwIncludeDir@
     includes: Stg.h
     install-includes: Cmm.h HsFFI.h MachDeps.h Rts.h RtsAPI.h Stg.h

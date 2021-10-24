@@ -72,10 +72,9 @@ include-dirs:           INCLUDE_DIR FFI_INCLUDE_DIR
 #else /* !INSTALLING */
 include-dirs:           TOP"/rts/dist-install/build"
                         TOP"/rts/include"
-                        TOP"/rts/include/dist-derivedconstants/header"
                         FFI_INCLUDE_DIR
                         LIBDW_INCLUDE_DIR
-                        TOP"/rts/include/dist-install/build"
+                        TOP"/rts/dist-install/build/include"
 #endif
 
 includes:               Stg.h

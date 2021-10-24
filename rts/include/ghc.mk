@@ -13,20 +13,20 @@
 #
 # Header files built from the configure script's findings
 #
-includes_0_H_CONFIG   = rts/include/dist/build/ghcautoconf.h
-includes_1_H_CONFIG   = rts/include/dist-install/build/ghcautoconf.h
+includes_0_H_CONFIG   = rts/dist/build/include/ghcautoconf.h
+includes_1_H_CONFIG   = rts/dist-install/build/include/ghcautoconf.h
 includes_2_H_CONFIG   = $(includes_1_H_CONFIG)
 
-includes_0_H_PLATFORM = rts/include/dist/build/ghcplatform.h
-includes_1_H_PLATFORM = rts/include/dist-install/build/ghcplatform.h
+includes_0_H_PLATFORM = rts/dist/build/include/ghcplatform.h
+includes_1_H_PLATFORM = rts/dist-install/build/include/ghcplatform.h
 includes_2_H_PLATFORM = $(includes_1_H_PLATFORM)
 
-includes_0_H_VERSION  = rts/include/dist/build/ghcversion.h
-includes_1_H_VERSION  = rts/include/dist-install/build/ghcversion.h
+includes_0_H_VERSION  = rts/dist/build/include/ghcversion.h
+includes_1_H_VERSION  = rts/dist-install/build/include/ghcversion.h
 includes_2_H_VERSION  = $(includes_1_H_VERSION)
 
-BUILD_0_INCLUDE_DIR = rts/include/dist/build
-BUILD_1_INCLUDE_DIR = rts/include/dist-install/build
+BUILD_0_INCLUDE_DIR = rts/dist/build/include
+BUILD_1_INCLUDE_DIR = rts/dist-install/build/include
 BUILD_2_INCLUDE_DIR = $(BUILD_1_INCLUDE_DIR)
 
 #
@@ -205,7 +205,7 @@ $(eval $(call includesHeaderPlatform,1))
 # rebuilds.
 # See Note [tooldir: How GHC finds mingw on Windows]
 
-includes_SETTINGS = rts/include/dist/build/settings
+includes_SETTINGS = rts/dist-install/build/include/settings
 
 # N.B. this is duplicated in hadrian/bindist/Makefile.
 $(includes_SETTINGS) : rts/include/Makefile | $$(dir $$@)/.
@@ -268,7 +268,7 @@ $(includes_SETTINGS) : rts/include/Makefile | $$(dir $$@)/.
 # ---------------------------------------------------------------------------
 # Make DerivedConstants.h for the compiler
 
-includes_DERIVEDCONSTANTS = rts/include/dist-derivedconstants/header/DerivedConstants.h
+includes_DERIVEDCONSTANTS = rts/dist-install/build/include/DerivedConstants.h
 
 DERIVE_CONSTANTS_FLAGS_FOR_HEADER += --gcc-program "$(CC)"
 DERIVE_CONSTANTS_FLAGS_FOR_HEADER += $(addprefix --gcc-flag$(space),$(includes_CC_OPTS) -fcommon)

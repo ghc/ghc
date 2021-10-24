@@ -1349,7 +1349,6 @@ clean : clean_files clean_libraries
 clean_files :
 	$(call removeFiles,$(CLEAN_FILES))
 # this is here since CLEAN_FILES can't handle folders
-	$(call removeTrees,rts/include/dist-derivedconstants)
 	$(call removeTrees,inplace/bin)
 	$(call removeTrees,inplace/lib)
 	$(call removeTrees,libraries/bootstrapping.conf)
@@ -1433,9 +1432,6 @@ distclean : clean
 	$(call removeFiles,bindist-list)
 	$(call removeFiles,bindist-list.uniq)
 	$(call removeTrees,bindisttest/a)
-
-# Not sure why this is being cleaned here.
-	$(call removeTrees,rts/include/dist-derivedconstants)
 
 # Also clean Windows-only inplace directories.
 # Don't delete 'inplace' itself, it contains source files.
