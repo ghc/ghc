@@ -287,9 +287,42 @@ pprLit _ (CharPrimL c)   = text (show c) <> char '#'
 pprLit _ (StringL s)     = pprString s
 pprLit _ (StringPrimL s) = pprString (bytesToString s) <> char '#'
 pprLit _ (BytesPrimL {}) = pprString "<binary data>"
-pprLit i (RationalL rat) = parensIf (i > noPrec) $
-                           integer (numerator rat) <+> char '/'
-                              <+> integer (denominator rat)
+pprLit i (RationalL rat)
+  | withoutFactor 2 (withoutFactor 5 $ denominator rat) /= 1
+  -- if the denominator has prime factors other than 2 and 5, show as fraction
+  = parensIf (i > noPrec) $
+    integer (numerator rat) <+> char '/' <+> integer (denominator rat)
+  | rat /= 0 && (zeroes < -1 || zeroes > 7),
+    let (n, d) = properFraction (rat' / magnitude)
+        (rat', zeroes')
+          | abs rat < 1 = (10 * rat, zeroes - 1)
+          | otherwise = (rat, zeroes)
+  -- if < 0.01 or >= 100_000_000, use scientific notation
+  = parensIf (i > noPrec && rat < 0)
+             (integer n
+              <> (if d == 0 then empty else char '.' <> decimals (abs d))
+              <> char 'e' <> integer zeroes')
+  | let (n, d) = properFraction rat
+  = parensIf (i > noPrec && rat < 0)
+             (integer n <> char '.'
+              <> if d == 0 then char '0' else decimals (abs d))
+  where zeroes :: Integer
+        zeroes = truncate (logBase 10 (abs (fromRational rat) :: Double)
+                           * (1 - epsilon))
+        epsilon = 0.0000001
+        magnitude :: Rational
+        magnitude = 10 ^^ zeroes
+        withoutFactor :: Integer -> Integer -> Integer
+        withoutFactor _ 0 = 0
+        withoutFactor p n
+          | (n', 0) <- divMod n p = withoutFactor p n'
+          | otherwise = n
+        -- | Expects the argument 0 <= x < 1
+        decimals :: Rational -> Doc
+        decimals x
+          | x == 0 = empty
+          | otherwise = integer n <> decimals d
+          where (n, d) = properFraction (x * 10)
 
 bytesToString :: [Word8] -> String
 bytesToString = map (chr . fromIntegral)
@@ -927,13 +960,13 @@ ppr_cxt_preds ts = parens (commaSep ts)
 instance Ppr Range where
     ppr = brackets . pprRange
         where pprRange :: Range -> Doc
-              pprRange (FromR e) = ppr e <> text ".."
+              pprRange (FromR e) = ppr e <+> text ".."
               pprRange (FromThenR e1 e2) = ppr e1 <> text ","
-                                        <> ppr e2 <> text ".."
-              pprRange (FromToR e1 e2) = ppr e1 <> text ".." <> ppr e2
+                                           <+> ppr e2 <+> text ".."
+              pprRange (FromToR e1 e2) = ppr e1 <+> text ".." <+> ppr e2
               pprRange (FromThenToR e1 e2 e3) = ppr e1 <> text ","
-                                             <> ppr e2 <> text ".."
-                                             <> ppr e3
+                                             <+> ppr e2 <+> text ".."
+                                             <+> ppr e3
 
 ------------------------------
 where_clause :: [Dec] -> Doc
