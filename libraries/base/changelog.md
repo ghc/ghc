@@ -3,6 +3,7 @@
 ## 4.17.0.0 *TBA*
 
   * Add explicitly bidirectional `pattern TypeRep` to `Type.Reflection`.
+
   * Add `Generically` and `Generically1` to `GHC.Generics` for deriving generic
     instances with `DerivingVia`. `Generically` instances include `Semigroup` and
     `Monoid`. `Generically1` instances: `Functor`, `Applicative`, `Alternative`,
@@ -18,7 +19,9 @@
 
   * `returnA` is defined as `Control.Category.id` instead of `arr id`.
 
-## 4.16.0.0 *TBA*
+## 4.16.0.0 *Nov 2021*
+
+  * The unary tuple type, `Solo`, is now exported by `Data.Tuple`.
 
   * Add a `Typeable` constraint to `fromStaticPtr` in the class `GHC.StaticPtr.IsStatic`.
 
