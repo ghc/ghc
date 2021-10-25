@@ -1,6 +1,10 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
+\
+## 4.16.0.0 *Nov 2021*
 
-## 4.16.0.0 *TBA*
+  * The unary tuple type, `Solo`, is now exported by `Data.Tuple`.
+
+  * Add a `Typeable` constraint to `fromStaticPtr` in the class `GHC.StaticPtr.IsStatic`.
 
   * Make it possible to promote `Natural`s and remove the separate `Nat` kind.
     For backwards compatibility, `Nat` is now a type synonym for `Natural`.
@@ -78,7 +82,7 @@
   * Add `MonadFix` and `MonadZip` instances for `Complex`
 
   * Add `Ix` instances for tuples of size 6 through 15
-   
+
   * Correct `Bounded` instance and remove `Enum` and `Integral` instances for
     `Data.Ord.Down`.
 
