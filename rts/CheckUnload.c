@@ -182,8 +182,8 @@ static OCSectionIndices *createOCSectionIndices(void)
 
 static void freeOCSectionIndices(OCSectionIndices *s_indices)
 {
-    free(s_indices->indices);
-    free(s_indices);
+    stgFree(s_indices->indices);
+    stgFree(s_indices);
 }
 
 void initUnloadCheck()
@@ -231,7 +231,7 @@ static void reserveOCSectionIndices(OCSectionIndices *s_indices, int len)
     s_indices->capacity = new_capacity;
     s_indices->indices = new_indices;
 
-    free(old_indices);
+    stgFree(old_indices);
 }
 
 // Insert object section indices of a single ObjectCode. Invalidates 'sorted'

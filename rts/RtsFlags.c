@@ -2252,7 +2252,7 @@ static bool read_heap_profiling_flag(const char *arg)
                     RtsFlags.ProfFlags.bioSelector = selector;
                     break;
                 default:
-                    free(selector);
+                    stgFree(selector);
                 }
             }
             break;

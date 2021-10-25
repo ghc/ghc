@@ -95,7 +95,7 @@ LibdwSession *libdwInit() {
     session->dwfl = dwfl_begin (&proc_callbacks);
     if (session->dwfl == NULL) {
         sysErrorBelch("dwfl_begin failed: %s", dwfl_errmsg(dwfl_errno()));
-        free(session);
+        stgFree(session);
         return NULL;
     }
 
@@ -122,7 +122,7 @@ LibdwSession *libdwInit() {
 
  fail:
     dwfl_end(session->dwfl);
-    free(session);
+    stgFree(session);
     return NULL;
 }
 
@@ -194,7 +194,7 @@ int libdwForEachFrameOutwards(Backtrace *bt,
             if (res != 0) break;
         }
     }
-    free(chunks);
+    stgFree(chunks);
     return res;
 }
 

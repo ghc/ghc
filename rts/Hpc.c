@@ -137,7 +137,7 @@ readTix(void) {
     tmpModule -> hashNo = (unsigned int)expectWord64();
     ws();
     tmpModule -> tickCount = (int)expectWord64();
-    tmpModule -> tixArr = (StgWord64 *)calloc(tmpModule->tickCount,sizeof(StgWord64));
+    tmpModule -> tixArr = (StgWord64 *)stgCallocBytes(tmpModule->tickCount,sizeof(StgWord64), "readTix");
     ws();
     expect('[');
     ws();

@@ -851,7 +851,7 @@ bool removeLibrarySearchPath_PEi386(HsPtr dll_path_index)
         {
             warnMissingKBLibraryPaths();
             result = SetEnvironmentVariableW(L"PATH", (LPCWSTR)dll_path_index);
-            free(dll_path_index);
+            stgFree(dll_path_index);
         }
 
         if (!result) {

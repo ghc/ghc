@@ -84,7 +84,7 @@ freeStubs(Section * section) {
     while(last->next != NULL) {
         Stub * t = last;
         last = last->next;
-        free(t);
+        stgFree(t);
     }
     section->info->stubs = NULL;
     section->info->nstubs = 0;

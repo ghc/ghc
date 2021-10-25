@@ -752,7 +752,7 @@ PauseToken *rts_pause (void)
     // Now we own all capabilities so we own rts_pausing_task and may set it.
     rts_pausing_task = task;
 
-    PauseToken *token = malloc(sizeof(PauseToken));
+    PauseToken *token = stgMallocBytes(sizeof(PauseToken), "rts_pause");
     token->capability = task->cap;
     return token;
 }
@@ -774,7 +774,7 @@ void rts_resume (PauseToken *pauseToken)
     // capabilities.
     releaseAllCapabilities(n_capabilities, NULL, task);
     exitMyTask();
-    free(pauseToken);
+    stgFree(pauseToken);
 }
 
 // See RtsAPI.h

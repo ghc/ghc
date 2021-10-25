@@ -69,7 +69,7 @@ int poolFree(Pool *pool) {
     closeCondition(&pool->cond);
     closeMutex(&pool->mutex);
 #endif
-    free(pool);
+    stgFree(pool);
     return 0;
 }
 
@@ -79,7 +79,7 @@ static void free_available(Pool *pool, uint32_t size) {
         PoolEntry *ent = pool->available;
         pool->free_fn(ent->thing);
         pool->available = ent->next;
-        free(ent);
+        stgFree(ent);
         pool->current_size--;
     }
 }
@@ -167,7 +167,7 @@ void poolRelease(Pool *pool, void *thing) {
             if (pool->current_size > pool->desired_size
                 || ent->flags & FLAG_SHOULD_FREE) {
                 pool->free_fn(ent->thing);
-                free(ent);
+                stgFree(ent);
             } else {
                 ent->next = pool->available;
                 pool->available = ent;

@@ -68,7 +68,7 @@ FreeWorkQueue ( WorkQueue* pq )
   /* Free any remaining work items. */
   for (i = 0; i < WORKQUEUE_SIZE; i++) {
     if (pq->items[i] != NULL) {
-      free(pq->items[i]);
+      stgFree(pq->items[i]);
     }
   }
 
@@ -82,7 +82,7 @@ FreeWorkQueue ( WorkQueue* pq )
     CloseHandle(pq->roomAvailable);
   }
   OS_CLOSE_LOCK(&pq->queueLock);
-  free(pq);
+  stgFree(pq);
   return;
 }
 
