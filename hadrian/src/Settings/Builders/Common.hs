@@ -15,7 +15,6 @@ import Base
 import Expression
 import Oracles.Flag
 import Oracles.Setting
-import Packages
 import Settings
 import UserSettings
 
@@ -25,14 +24,11 @@ cIncludeArgs = do
     path    <- getBuildPath
     incDirs <- getContextData includeDirs
     depDirs <- getContextData depIncludeDirs
-    stage <- getStage
     iconvIncludeDir <- getSetting IconvIncludeDir
     gmpIncludeDir   <- getSetting GmpIncludeDir
     ffiIncludeDir   <- getSetting FfiIncludeDir
     libdwIncludeDir   <- getSetting FfiIncludeDir
-    libPath <- expr $ stageLibPath stage
-    mconcat [ notStage0 ||^ package compiler ? arg "-Irts/include"
-            , arg $ "-I" ++ libPath
+    mconcat [ notStage0 ? arg "-Irts/include"
             , arg $ "-I" ++ path
             , pure . map ("-I"++) . filter (/= "") $ [iconvIncludeDir, gmpIncludeDir]
             , flag UseSystemFfi ? if not (null ffiIncludeDir) then arg ("-I" ++ ffiIncludeDir) else mempty

@@ -167,6 +167,16 @@ packageArgs = do
         , package hsc2hs ?
           builder (Cabal Flags) ? arg "in-ghc-tree"
 
+        -------------------------------- genapply --------------------------------
+        , package genapply ? do
+            -- genapply bakes in the next stage's headers to bake in the target
+            -- config at build time.
+            -- See Note [Genapply target as host for RTS macros].
+            nextStageRtsBuildDir <- expr $ rtsBuildPath $ succ stage
+            let nextStageRtsBuildIncludeDir = nextStageRtsBuildDir </> "include"
+            --expr $ need $ (nextStageRtsBuildIncludeDir -/-) <$> ["ghcplatform.h", "ghcautoconf.h"]
+            builder Ghc ? arg ("-I" ++ nextStageRtsBuildIncludeDir)
+
         ------------------------------ ghc-bignum ------------------------------
         , ghcBignumArgs
 
@@ -365,6 +375,7 @@ rtsPackageArgs = package rts ? do
           , if not (null libdwIncludeDir) then arg ("--extra-include-dirs="++libdwIncludeDir) else mempty
           , if not (null libnumaLibraryDir) then arg ("--extra-lib-dirs="++libnumaLibraryDir) else mempty
           , if not (null libnumaIncludeDir) then arg ("--extra-include-dirs="++libnumaIncludeDir) else mempty
+          -- , arg "--ghc-option=-ghcversion-file=rts/ghcversion.h"
           ]
         , builder (Cc (FindCDependencies CDep)) ? cArgs
         , builder (Cc (FindCDependencies  CxxDep)) ? cArgs

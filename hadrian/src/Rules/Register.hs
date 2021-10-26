@@ -125,9 +125,9 @@ buildConf _ context@Context {..} _conf = do
     when (package == rts) $
         -- If Cabal knew about "generated-headers", we could read them from the
         -- 'configuredCabal' information, and just "need" them here.
-        need [ path -/- "DerivedConstants.h"
-             , path -/- "ghcautoconf.h"
-             , path -/- "ghcplatform.h"
+        need [ path -/- "include/DerivedConstants.h"
+             , path -/- "include/ghcautoconf.h"
+             , path -/- "include/ghcplatform.h"
              ]
 
     -- we need to generate this file for GMP

@@ -33,14 +33,12 @@ base = do
   stage1Lib <- stageLibPath Stage1
   let cabalFile = pkgCabalFile P.base
   let topIncludes = topDir </> "includes"
-  includeDeps' <- includesDependencies Stage1
   buildPath' <- buildPath context
   let buildIncludesPath = topDir </> buildPath' </> "include"
-  let includeDeps = fmap (topDir </>) includeDeps'
   mtlConfFile <- pkgConfFile $ vanillaContext Stage1 P.mtl
   deepseqConfFile <- pkgConfFile $ vanillaContext Stage1 P.deepseq
   bytestringConfFile <- pkgConfFile $ vanillaContext Stage1 P.bytestring
-  let neededIncludes = includeDeps ++ [mtlConfFile, deepseqConfFile, bytestringConfFile]
+  let neededIncludes = [mtlConfFile, deepseqConfFile, bytestringConfFile]
   need neededIncludes
 
   command_ [] "cabal-docspec" [ "-w", stage1GHC

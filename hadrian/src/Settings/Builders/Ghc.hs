@@ -167,16 +167,8 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
 findHsDependencies :: Args
 findHsDependencies = builder (Ghc FindHsDependencies) ? do
     ways <- getLibraryWays
-    stage <- getStage
-    ghcVersion :: [Int] <- fmap read . splitOn "." <$> expr (ghcVersionStage stage)
     mconcat [ arg "-M"
-
-            -- "-include-cpp-deps" is a new ish feature so is version gated.
-            -- Without this feature some dependencies will be missing in stage0.
-            -- TODO Remove version gate when minimum supported Stage0 compiler
-            -- is >= 8.9.0.
-            , ghcVersion > [8,9,0] ? arg "-include-cpp-deps"
-
+            , arg "-include-cpp-deps"
             , commonGhcArgs
             , defaultGhcWarningsArgs
             , arg "-include-pkg-deps"
@@ -258,8 +250,6 @@ includeGhcArgs = do
     abSrcDirs <- exprIO $ mapM makeAbsolute [ (pkgPath pkg -/- dir) | dir <- srcDirs ]
     autogen <- expr (autogenPath context)
     cautogen <-  exprIO (makeAbsolute autogen)
-    stage <- getStage
-    libPath <- expr (stageLibPath stage)
     let cabalMacros = autogen -/- "cabal_macros.h"
     expr $ need [cabalMacros]
     mconcat [ arg "-i"
@@ -267,6 +257,4 @@ includeGhcArgs = do
             , arg $ "-i" ++ cautogen
             , pure [ "-i" ++ d | d <- abSrcDirs ]
             , cIncludeArgs
-            , arg $      "-I" ++ libPath
-            , arg $ "-optc-I" ++ libPath
             , pure ["-optP-include", "-optP" ++ cabalMacros] ]

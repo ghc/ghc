@@ -248,7 +248,10 @@ compileNonHsObject rs lang path = do
 -- in the @-MM -MG@ mode and building generated dependencies if they are missing
 -- until reaching a fixed point.
 needDependencies :: SourceLang -> Context -> FilePath -> FilePath -> Action ()
-needDependencies lang context@Context {..} src depFile = discover
+needDependencies lang context@Context {..} src depFile = do
+    gens <- interpretInContext context generatedDependencies
+    need gens
+    discover
   where
     discover = do
         build $ target context (Cc (FindCDependencies depType) stage) [src] [depFile]

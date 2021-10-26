@@ -26,7 +26,7 @@ module Base (
     -- * Paths
     hadrianPath, configPath, configFile, sourcePath, shakeFilesDir,
     stageBinPath, stageLibPath, templateHscPath,
-    ghcBinDeps, ghcLibDeps, includesDependencies, haddockDeps,
+    ghcBinDeps, ghcLibDeps, haddockDeps,
     relativePackageDbPath, packageDbPath, packageDbStamp, mingwStamp,
     ) where
 
@@ -115,12 +115,6 @@ ghcBinDeps stage = mapM (\f -> stageLibPath stage <&> (-/- f))
     [ "ghc-usage.txt"
     , "ghci-usage.txt"
     ]
-
-includesDependencies :: Stage -> Action [FilePath]
-includesDependencies stage = do
-    p <- stageLibPath stage
-    pure $ (p -/-) <$>
-      [ "ghcautoconf.h", "ghcplatform.h" ]
 
 -- | Files the `haddock` binary depends on
 haddockDeps :: Stage -> Action [FilePath]
