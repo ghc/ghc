@@ -1875,12 +1875,16 @@ genCondBranch' is32Bit _bid true false (CmmMachOp mop [e1,e2])
   ChildCode64 code2 r2 <- iselExpr64 e2
   let cond = machOpToCond mop :: Cond
 
-  let cmpCode = intComparison cond true false r1 r2
+  -- we mustn't clobber r1/r2 so we use temporaries
+  tmp1 <- getNewRegNat II32
+  tmp2 <- getNewRegNat II32
+
+  let cmpCode = intComparison cond true false r1 r2 tmp1 tmp2
   return $ code1 `appOL` code2 `appOL` cmpCode
 
   where
-    intComparison :: Cond -> BlockId -> BlockId -> Reg -> Reg -> InstrBlock
-    intComparison cond true false r1_lo r2_lo =
+    intComparison :: Cond -> BlockId -> BlockId -> Reg -> Reg -> Reg -> Reg -> InstrBlock
+    intComparison cond true false r1_lo r2_lo tmp1 tmp2 =
       case cond of
         -- Impossible results of machOpToCond
         ALWAYS  -> panic "impossible"
@@ -1897,29 +1901,32 @@ genCondBranch' is32Bit _bid true false (CmmMachOp mop [e1,e2])
         GE  -> cmpGE
         GEU -> cmpGE
         -- [x >  y] <==> ![y >= x]
-        GTT -> intComparison GE  false true r2_lo r1_lo
-        GU  -> intComparison GEU false true r2_lo r1_lo
+        GTT -> intComparison GE  false true r2_lo r1_lo tmp1 tmp2
+        GU  -> intComparison GEU false true r2_lo r1_lo tmp1 tmp2
         -- [x <= y] <==> [y >= x]
-        LE  -> intComparison GE  true false r2_lo r1_lo
-        LEU -> intComparison GEU true false r2_lo r1_lo
+        LE  -> intComparison GE  true false r2_lo r1_lo tmp1 tmp2
+        LEU -> intComparison GEU true false r2_lo r1_lo tmp1 tmp2
         -- [x <  y] <==> ![x >= x]
-        LTT -> intComparison GE  false true r1_lo r2_lo
-        LU  -> intComparison GEU false true r1_lo r2_lo
+        LTT -> intComparison GE  false true r1_lo r2_lo tmp1 tmp2
+        LU  -> intComparison GEU false true r1_lo r2_lo tmp1 tmp2
       where
         r1_hi = getHiVRegFromLo r1_lo
         r2_hi = getHiVRegFromLo r2_lo
         cmpExact :: OrdList Instr
         cmpExact =
           toOL
-            [ XOR II32 (OpReg r2_hi) (OpReg r1_hi)
-            , XOR II32 (OpReg r2_lo) (OpReg r1_lo)
-            , OR  II32 (OpReg r1_hi)  (OpReg r1_lo)
+            [ MOV II32 (OpReg r1_hi) (OpReg tmp1)
+            , MOV II32 (OpReg r1_lo) (OpReg tmp2)
+            , XOR II32 (OpReg r2_hi) (OpReg tmp1)
+            , XOR II32 (OpReg r2_lo) (OpReg tmp2)
+            , OR  II32 (OpReg tmp1)  (OpReg tmp2)
             , JXX cond true
             , JXX ALWAYS false
             ]
         cmpGE = toOL
-            [ CMP II32 (OpReg r2_lo) (OpReg r1_lo)
-            , SBB II32 (OpReg r2_hi) (OpReg r1_hi)
+            [ MOV II32 (OpReg r1_hi) (OpReg tmp1)
+            , CMP II32 (OpReg r2_lo) (OpReg r1_lo)
+            , SBB II32 (OpReg r2_hi) (OpReg tmp1)
             , JXX cond true
             , JXX ALWAYS false ]
 
