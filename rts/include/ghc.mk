@@ -13,15 +13,12 @@
 #
 # Header files built from the configure script's findings
 #
-includes_0_H_CONFIG   = rts/dist/build/include/ghcautoconf.h
 includes_1_H_CONFIG   = rts/dist-install/build/include/ghcautoconf.h
 includes_2_H_CONFIG   = $(includes_1_H_CONFIG)
 
-includes_0_H_PLATFORM = rts/dist/build/include/ghcplatform.h
 includes_1_H_PLATFORM = rts/dist-install/build/include/ghcplatform.h
 includes_2_H_PLATFORM = $(includes_1_H_PLATFORM)
 
-includes_0_H_VERSION  = rts/dist/build/include/ghcversion.h
 includes_1_H_VERSION  = rts/dist-install/build/include/ghcversion.h
 includes_2_H_VERSION  = $(includes_1_H_VERSION)
 
@@ -51,16 +48,13 @@ includes_H_FILES_GENERATED = \
 # without the generated files separtely and not just as part of this due to
 # lingering issues like the derived constants generation snooping the RTS
 # headers.
-define includesFilesWithGenerated
-# $1 = distdir
-includes_$1_H_FILES = \
-	$$(includes_H_FILES) \
-	$$(includes_$1_H_FILES_GENERATED)
-includes_$1_H_FILES_GENERATED = \
-	$$(patsubst %,rts/$1/build/include/%,$$(includes_H_FILES_GENERATED))
-endef
-$(eval $(call includesFilesWithGenerated,dist))
-$(eval $(call includesFilesWithGenerated,dist-install))
+includes_dist_H_FILES = \
+	$(includes_H_FILES)
+includes_dist-install_H_FILES = \
+	$(includes_H_FILES) \
+	$(includes_dist-install_H_FILES_GENERATED)
+includes_dist-install_H_FILES_GENERATED = \
+	$(patsubst %,rts/dist-install/build/include/%,$(includes_H_FILES_GENERATED))
 
 #
 # Options
@@ -307,11 +301,9 @@ includes_dist-install_H_FILES_GENERATED += $(includes_DERIVEDCONSTANTS)
 # ---------------------------------------------------------------------------
 # Install all header files
 
-$(eval $(call clean-target,includes,,\
-  $(foreach distdir,dist dist-install,$(includes_$(distdir)_H_FILES_GENERATED))))
+$(eval $(call clean-target,includes,,$(includes_dist-install_H_FILES_GENERATED)))
 
-$(eval $(call all-target,includes,\
-  $(foreach distdir,dist dist-install,$(includes_$(distdir)_H_FILES_GENERATED))))
+$(eval $(call all-target,includes,$(includes_dist-install_H_FILES_GENERATED)))
 
 install: install_includes
 

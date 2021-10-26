@@ -334,7 +334,7 @@ endif
 
 ifneq "$(BINDIST)" "YES"
 
-$(compiler_stage1_depfile_haskell) : $(includes_0_H_CONFIG) $(includes_0_H_PLATFORM)
+$(compiler_stage1_depfile_haskell) : # Headers come from bootstrap RTS
 $(compiler_stage2_depfile_haskell) : $(includes_1_H_CONFIG) $(includes_1_H_PLATFORM)
 $(compiler_stage3_depfile_haskell) : $(includes_2_H_CONFIG) $(includes_2_H_PLATFORM)
 

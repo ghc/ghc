@@ -1326,9 +1326,8 @@ CLEAN_FILES += mk/config.mk.old
 CLEAN_FILES += mk/project.mk.old
 CLEAN_FILES += compiler/ghc.cabal.old
 
-$(foreach d,dist dist-install, \
-    $(foreach h,$(includes_$d_H_FILES_GENERATED), \
-        $(eval CLEAN_FILES += $h)))
+$(foreach h,$(includes_dist-install_H_FILES_GENERATED), \
+    $(eval CLEAN_FILES += $h))
 CLEAN_FILES += $(includes_SETTINGS)
 CLEAN_FILES += utils/ghc-pkg/Version.hs
 CLEAN_FILES += compiler/GHC/Builtin/primops.txt
