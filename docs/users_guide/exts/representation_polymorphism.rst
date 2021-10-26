@@ -114,14 +114,14 @@ Printing representation-polymorphic types
 -----------------------------------------
 
 .. ghc-flag:: -fprint-explicit-runtime-reps
-    :shortdesc: Print ``RuntimeRep`` variables in types which are
+    :shortdesc: Print ``RuntimeRep`` and ``Levity`` variables in types which are
         runtime-representation polymorphic.
     :type: dynamic
     :reverse: -fno-print-explicit-runtime-reps
     :category: verbosity
 
-    Print ``RuntimeRep`` parameters as they appear; otherwise, they are
-    defaulted to ``LiftedRep``.
+    Print ``RuntimeRep`` and ``Levity`` parameters as they appear;
+    otherwise, they are defaulted to ``LiftedRep`` and ``Lifted``, respectively.
 
 Most GHC users will not need to worry about representation polymorphism
 or unboxed types. For these users, seeing the representation polymorphism

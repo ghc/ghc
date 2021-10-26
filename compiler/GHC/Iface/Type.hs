@@ -73,8 +73,8 @@ import {-# SOURCE #-} GHC.Builtin.Types
                                  ( coercibleTyCon, heqTyCon
                                  , tupleTyConName
                                  , manyDataConTyCon, oneDataConTyCon
-                                 , liftedRepTyCon )
-import {-# SOURCE #-} GHC.Core.Type ( isRuntimeRepTy, isMultiplicityTy )
+                                 , liftedRepTyCon, liftedDataConTyCon )
+import {-# SOURCE #-} GHC.Core.Type ( isRuntimeRepTy, isMultiplicityTy, isLevityTy )
 
 import GHC.Core.TyCon hiding ( pprPromotionQuote )
 import GHC.Core.Coercion.Axiom
@@ -1002,7 +1002,7 @@ kind RuntimeRep to LiftedRep.
 Likewise, we default all Multiplicity variables to Many.
 
 This is done in a pass right before pretty-printing
-(defaultNonStandardVars, controlled by
+(defaultIfaceTyVarsOfKind, controlled by
 -fprint-explicit-runtime-reps and -XLinearTypes)
 
 This applies to /quantified/ variables like 'w' above.  What about
@@ -1028,7 +1028,8 @@ as they appear during kind-checking of "newtype T :: TYPE r where..."
 (test T18357a). Therefore, we additionally test for isTyConableTyVar.
 -}
 
--- | Default 'RuntimeRep' variables to 'LiftedRep', and 'Multiplicity'
+-- | Default 'RuntimeRep' variables to 'LiftedRep',
+--   'Levity' variables to 'Lifted', and 'Multiplicity'
 --   variables to 'Many'. For example:
 --
 -- @
@@ -1042,14 +1043,15 @@ as they appear during kind-checking of "newtype T :: TYPE r where..."
 -- @ ($) :: forall a (b :: *). (a -> b) -> a -> b @
 -- @ Just :: forall a . a -> Maybe a @
 --
--- We do this to prevent RuntimeRep and Multiplicity variables from
+-- We do this to prevent RuntimeRep, Levity and Multiplicity variables from
 -- incurring a significant syntactic overhead in otherwise simple
 -- type signatures (e.g. ($)). See Note [Defaulting RuntimeRep variables]
 -- and #11549 for further discussion.
-defaultNonStandardVars :: Bool -> Bool -> IfaceType -> IfaceType
-defaultNonStandardVars do_runtimereps do_multiplicities ty = go emptyFsEnv ty
+defaultIfaceTyVarsOfKind :: DefaultVarsOfKind
+                         -> IfaceType -> IfaceType
+defaultIfaceTyVarsOfKind def_ns_vars ty = go emptyFsEnv ty
   where
-    go :: FastStringEnv IfaceType -- Set of enclosing forall-ed RuntimeRep/Multiplicity variables
+    go :: FastStringEnv IfaceType -- Set of enclosing forall-ed RuntimeRep/Levity/Multiplicity variables
        -> IfaceType
        -> IfaceType
     go subs (IfaceForAllTy (Bndr (IfaceTvBndr (var, var_kind)) argf) ty)
@@ -1057,7 +1059,7 @@ defaultNonStandardVars do_runtimereps do_multiplicities ty = go emptyFsEnv ty
                                 -- or we get the mess in #13963
      , Just substituted_ty <- check_substitution var_kind
       = let subs' = extendFsEnv subs var substituted_ty
-            -- Record that we should replace it with LiftedRep,
+            -- Record that we should replace it with LiftedRep/Lifted/Many,
             -- and recurse, discarding the forall
         in go subs' ty
 
@@ -1070,11 +1072,18 @@ defaultNonStandardVars do_runtimereps do_multiplicities ty = go emptyFsEnv ty
 
     go _ ty@(IfaceFreeTyVar tv)
       -- See Note [Defaulting RuntimeRep variables], about free vars
-      | do_runtimereps && GHC.Core.Type.isRuntimeRepTy (tyVarKind tv)
+      | def_runtimeRep def_ns_vars
+      , GHC.Core.Type.isRuntimeRepTy (tyVarKind tv)
       , isMetaTyVar tv
       , isTyConableTyVar tv
       = liftedRep_ty
-      | do_multiplicities && GHC.Core.Type.isMultiplicityTy (tyVarKind tv)
+      | def_levity def_ns_vars
+      , GHC.Core.Type.isLevityTy (tyVarKind tv)
+      , isMetaTyVar tv
+      , isTyConableTyVar tv
+      = lifted_ty
+      | def_multiplicity def_ns_vars
+      , GHC.Core.Type.isMultiplicityTy (tyVarKind tv)
       , isMetaTyVar tv
       , isTyConableTyVar tv
       = many_ty
@@ -1112,8 +1121,15 @@ defaultNonStandardVars do_runtimereps do_multiplicities ty = go emptyFsEnv ty
 
     check_substitution :: IfaceType -> Maybe IfaceType
     check_substitution (IfaceTyConApp tc _)
-        | do_runtimereps, tc `ifaceTyConHasKey` runtimeRepTyConKey = Just liftedRep_ty
-        | do_multiplicities, tc `ifaceTyConHasKey` multiplicityTyConKey = Just many_ty
+        | def_runtimeRep def_ns_vars
+        , tc `ifaceTyConHasKey` runtimeRepTyConKey
+        = Just liftedRep_ty
+        | def_levity def_ns_vars
+        , tc `ifaceTyConHasKey` levityTyConKey
+        = Just lifted_ty
+        | def_multiplicity def_ns_vars
+        , tc `ifaceTyConHasKey` multiplicityTyConKey
+        = Just many_ty
     check_substitution _ = Nothing
 
 -- | The type ('BoxedRep 'Lifted), also known as LiftedRep.
@@ -1125,6 +1141,14 @@ liftedRep_ty =
     liftedRep = IfaceTyCon tc_name (mkIfaceTyConInfo NotPromoted IfaceNormalTyCon)
       where tc_name = getName liftedRepTyCon
 
+-- | The type 'Lifted :: Levity'.
+lifted_ty :: IfaceType
+lifted_ty =
+    IfaceTyConApp (IfaceTyCon dc_name (mkIfaceTyConInfo IsPromoted IfaceNormalTyCon))
+                  IA_Nil
+  where dc_name = getName liftedDataConTyCon
+
+-- | The type 'Many :: Multiplicity'.
 many_ty :: IfaceType
 many_ty =
     IfaceTyConApp (IfaceTyCon dc_name (mkIfaceTyConInfo IsPromoted IfaceNormalTyCon))
@@ -1136,10 +1160,13 @@ hideNonStandardTypes f ty
   = sdocOption sdocPrintExplicitRuntimeReps $ \printExplicitRuntimeReps ->
     sdocOption sdocLinearTypes $ \linearTypes ->
     getPprStyle      $ \sty    ->
-    let do_runtimerep = not printExplicitRuntimeReps
-        do_multiplicity = not linearTypes
+    let def_opts =
+          DefaultVarsOfKind
+            { def_runtimeRep   = not printExplicitRuntimeReps
+            , def_levity       = not printExplicitRuntimeReps
+            , def_multiplicity = not linearTypes }
     in if userStyle sty
-       then f (defaultNonStandardVars do_runtimerep do_multiplicity ty)
+       then f (defaultIfaceTyVarsOfKind def_opts ty)
        else f ty
 
 instance Outputable IfaceAppArgs where

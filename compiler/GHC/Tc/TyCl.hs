@@ -907,7 +907,7 @@ generaliseTcTyCon (tc, scoped_prs, tc_res_kind)
 
        -- Step 2b: quantify, mainly meaning skolemise the free variables
        -- Returned 'inferred' are scope-sorted and skolemised
-       ; inferred <- quantifyTyVars dvs2
+       ; inferred <- quantifyTyVars allVarsOfKindDefault dvs2
 
        ; traceTc "generaliseTcTyCon: pre zonk"
            (vcat [ text "tycon =" <+> ppr tc
@@ -2701,7 +2701,7 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info
                               , fdInjectivityAnn = inj })
   | DataFamily <- fam_info
   = bindTyClTyVars tc_name $ \ _ binders res_kind -> do
-  { traceTc "data family:" (ppr tc_name)
+  { traceTc "tcFamDecl1 data family:" (ppr tc_name)
   ; checkFamFlag tc_name
 
   -- Check that the result kind is OK
@@ -2727,7 +2727,7 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info
 
   | OpenTypeFamily <- fam_info
   = bindTyClTyVars tc_name $ \ _ binders res_kind -> do
-  { traceTc "open type family:" (ppr tc_name)
+  { traceTc "tcFamDecl1 open type family:" (ppr tc_name)
   ; checkFamFlag tc_name
   ; inj' <- tcInjectivity binders inj
   ; checkResultSigFlag tc_name sig  -- check after injectivity for better errors
@@ -2739,7 +2739,7 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info
   | ClosedTypeFamily mb_eqns <- fam_info
   = -- Closed type families are a little tricky, because they contain the definition
     -- of both the type family and the equations for a CoAxiom.
-    do { traceTc "Closed type family:" (ppr tc_name)
+    do { traceTc "tcFamDecl1 Closed type family:" (ppr tc_name)
          -- the variables in the header scope only over the injectivity
          -- declaration but this is not involved here
        ; (inj', binders, res_kind)
@@ -3140,7 +3140,7 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
 
        -- See Note [Generalising in tcTyFamInstEqnGuts]
        ; dvs  <- candidateQTyVarsOfTypes (lhs_ty : mkTyVarTys outer_tvs)
-       ; qtvs <- quantifyTyVars dvs
+       ; qtvs <- quantifyTyVars noVarsOfKindDefault dvs
        ; reportUnsolvedEqualities FamInstSkol qtvs tclvl wanted
        ; checkFamTelescope tclvl outer_hs_bndrs outer_tvs
 

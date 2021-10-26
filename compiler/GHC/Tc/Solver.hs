@@ -58,13 +58,14 @@ import GHC.Core.Predicate
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcType
 import GHC.Core.Type
-import GHC.Builtin.Types ( liftedRepTy, manyDataConTy )
+import GHC.Builtin.Types ( liftedRepTy, manyDataConTy, liftedDataConTy )
 import GHC.Core.Unify    ( tcMatchTyKi )
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Types.Var
 import GHC.Types.Var.Set
-import GHC.Types.Basic    ( IntWithInf, intGtLimit )
+import GHC.Types.Basic    ( IntWithInf, intGtLimit
+                          , DefaultKindVars(..), allVarsOfKindDefault )
 import GHC.Types.Error
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -1051,7 +1052,7 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
                                    , pred <- sig_inst_theta sig ]
 
        ; dep_vars <- candidateQTyVarsOfTypes (psig_tv_tys ++ psig_theta ++ map snd name_taus)
-       ; qtkvs <- quantifyTyVars dep_vars
+       ; qtkvs <- quantifyTyVars allVarsOfKindDefault dep_vars
        ; traceTc "simplifyInfer: empty WC" (ppr name_taus $$ ppr qtkvs)
        ; return (qtkvs, [], emptyTcEvBinds, False) }
 
@@ -1503,7 +1504,10 @@ defaultTyVarsAndSimplify rhs_tclvl mono_tvs candidates
       | tv `elemVarSet` mono_tvs
       = return False
       | otherwise
-      = defaultTyVar (not poly_kinds && is_kind_var) tv
+      = defaultTyVar
+          (if not poly_kinds && is_kind_var then DefaultKinds else Don'tDefaultKinds)
+          allVarsOfKindDefault
+          tv
 
     simplify_cand candidates
       = do { clone_wanteds <- newWanteds DefaultOrigin candidates
@@ -1563,7 +1567,7 @@ decideQuantifiedTyVars name_taus psigs candidates
            , text "grown_tcvs =" <+> ppr grown_tcvs
            , text "dvs =" <+> ppr dvs_plus])
 
-       ; quantifyTyVars dvs_plus }
+       ; quantifyTyVars allVarsOfKindDefault dvs_plus }
 
 ------------------
 growThetaTyVars :: ThetaType -> TyCoVarSet -> TyCoVarSet
@@ -2397,6 +2401,11 @@ defaultTyVarTcS the_tv
     -- and Note [Inferring kinds for type declarations] in GHC.Tc.TyCl
   = do { traceTcS "defaultTyVarTcS RuntimeRep" (ppr the_tv)
        ; unifyTyVar the_tv liftedRepTy
+       ; return True }
+  | isLevityVar the_tv
+  , not (isTyVarTyVar the_tv)
+  = do { traceTcS "defaultTyVarTcS Levity" (ppr the_tv)
+       ; unifyTyVar the_tv liftedDataConTy
        ; return True }
   | isMultiplicityVar the_tv
   , not (isTyVarTyVar the_tv)  -- TyVarTvs should only be unified with a tyvar

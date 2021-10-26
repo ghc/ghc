@@ -915,7 +915,7 @@ tcDataFamInstHeader mb_clsinfo fam_tc outer_bndrs fixity
 
        -- See GHC.Tc.TyCl Note [Generalising in tcFamTyPatsGuts]
        ; dvs  <- candidateQTyVarsOfTypes (lhs_ty : mkTyVarTys scoped_tvs)
-       ; qtvs <- quantifyTyVars dvs
+       ; qtvs <- quantifyTyVars noVarsOfKindDefault dvs
        ; reportUnsolvedEqualities FamInstSkol qtvs tclvl wanted
 
        -- Zonk the patterns etc into the Type world

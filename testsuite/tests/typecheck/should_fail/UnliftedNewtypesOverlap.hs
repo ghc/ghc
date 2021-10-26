@@ -3,11 +3,12 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE MagicHash #-}
+{-# LANGUAGE TypeApplications #-}
 
 module UnliftedNewtypesOverlap where
 
-import GHC.Exts (TYPE)
+import GHC.Exts
 
 data family DF :: TYPE r
-data instance DF = MkDF4 | MkDF5
-newtype instance DF = MkDF6 Int
+data instance DF @LiftedRep = MkDF4 | MkDF5
+newtype instance DF @LiftedRep = MkDF6 Int

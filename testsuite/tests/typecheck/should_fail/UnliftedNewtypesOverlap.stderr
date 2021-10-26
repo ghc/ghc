@@ -1,4 +1,5 @@
-UnliftedNewtypesOverlap.hs:12:15:
+
+UnliftedNewtypesOverlap.hs:13:15: error:
     Conflicting family instance declarations:
-      DF -- Defined at UnliftedNewtypesOverlap.hs:12:15
-      DF -- Defined at UnliftedNewtypesOverlap.hs:13:18
+      DF -- Defined at UnliftedNewtypesOverlap.hs:13:15
+      DF -- Defined at UnliftedNewtypesOverlap.hs:14:18

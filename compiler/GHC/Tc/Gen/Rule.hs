@@ -30,7 +30,7 @@ import GHC.Core.TyCon( isTypeFamilyTyCon )
 import GHC.Types.Id
 import GHC.Types.Var( EvVar )
 import GHC.Types.Var.Set
-import GHC.Types.Basic ( RuleName )
+import GHC.Types.Basic ( RuleName, allVarsOfKindDefault )
 import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -151,7 +151,7 @@ tcRule (HsRule { rd_ext  = ext
 
        -- See Note [Re-quantify type variables in rules]
        ; forall_tkvs <- candidateQTyVarsOfTypes (rule_ty : map idType tpl_ids)
-       ; qtkvs <- quantifyTyVars forall_tkvs
+       ; qtkvs <- quantifyTyVars allVarsOfKindDefault forall_tkvs
        ; traceTc "tcRule" (vcat [ pprFullRuleName rname
                                 , ppr forall_tkvs
                                 , ppr qtkvs

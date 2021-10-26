@@ -2396,7 +2396,7 @@ kcCheckDeclHeader_cusk name flav
              candidates = candidates' { dv_kvs = dv_kvs candidates' `extendDVarSetList` non_tc_candidates }
              inf_candidates = candidates `delCandidates` spec_req_tkvs
 
-       ; inferred <- quantifyTyVars inf_candidates
+       ; inferred <- quantifyTyVars allVarsOfKindDefault inf_candidates
                      -- NB: 'inferred' comes back sorted in dependency order
 
        ; scoped_kvs <- mapM zonkTyCoVarKind scoped_kvs
@@ -3505,7 +3505,7 @@ kindGeneralizeSome wanted kind_or_type
          -- thus, every free variable is really a kv, never a tv.
        ; dvs <- candidateQTyVarsOfKind kind_or_type
        ; dvs <- filterConstrainedCandidates wanted dvs
-       ; quantifyTyVars dvs }
+       ; quantifyTyVars allVarsOfKindDefault dvs }
 
 filterConstrainedCandidates
   :: WantedConstraints    -- Don't quantify over variables free in these
@@ -3533,7 +3533,7 @@ kindGeneralizeAll :: TcType -> TcM [KindVar]
 kindGeneralizeAll kind_or_type
   = do { traceTc "kindGeneralizeAll" (ppr kind_or_type)
        ; dvs <- candidateQTyVarsOfKind kind_or_type
-       ; quantifyTyVars dvs }
+       ; quantifyTyVars allVarsOfKindDefault dvs }
 
 -- | Specialized version of 'kindGeneralizeSome', but where no variables
 -- can be generalized, but perhaps some may need to be promoted.

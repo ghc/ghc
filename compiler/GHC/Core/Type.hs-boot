@@ -19,6 +19,7 @@ piResultTy :: HasDebugCallStack => Type -> Type -> Type
 coreView :: Type -> Maybe Type
 tcView :: Type -> Maybe Type
 isRuntimeRepTy :: Type -> Bool
+isLevityTy :: Type -> Bool
 isMultiplicityTy :: Type -> Bool
 isLiftedTypeKind :: Type -> Bool
 tYPE :: Type -> Type

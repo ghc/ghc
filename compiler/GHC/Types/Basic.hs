@@ -101,6 +101,9 @@ module GHC.Types.Basic (
 
         TypeOrKind(..), isTypeLevel, isKindLevel,
 
+        DefaultKindVars(..), DefaultVarsOfKind(..),
+        allVarsOfKindDefault, noVarsOfKindDefault,
+
         ForeignSrcLang (..)
    ) where
 
@@ -1745,3 +1748,60 @@ isTypeLevel KindLevel = False
 isKindLevel :: TypeOrKind -> Bool
 isKindLevel TypeLevel = False
 isKindLevel KindLevel = True
+
+{- *********************************************************************
+*                                                                      *
+                        Defaulting options
+*                                                                      *
+********************************************************************* -}
+
+-- | Whether to default kind variables. Usually: no, unless `-XNoPolyKinds`
+-- is enabled.
+data DefaultKindVars
+  = Don'tDefaultKinds
+  | DefaultKinds
+
+instance Outputable DefaultKindVars where
+  ppr Don'tDefaultKinds = text "Don'tDefaultKinds"
+  ppr DefaultKinds = text "DefaultKinds"
+
+-- | Whether to default type variables of the given kinds:
+--
+--   - default 'RuntimeRep' variables to LiftedRep?
+--   - default 'Levity' variables to Lifted?
+--   - default 'Multiplicity' variables to Many?
+data DefaultVarsOfKind =
+  DefaultVarsOfKind
+    { def_runtimeRep, def_levity, def_multiplicity :: !Bool }
+
+instance Outputable DefaultVarsOfKind where
+  ppr
+    (DefaultVarsOfKind
+      { def_runtimeRep   = rep
+      , def_levity       = lev
+      , def_multiplicity = mult })
+    = text "DefaultVarsOfKind:" <+> defaults
+      where
+        defaults :: SDoc
+        defaults =
+          case filter snd $ [ ("RuntimeRep", rep), ("Levity", lev), ("Multiplicity", mult)] of
+            []   -> text "<no defaulting>"
+            defs -> hsep (map (text . fst) defs)
+
+-- | Do defaulting for variables of kind `RuntimeRep`, `Levity` and `Multiplicity`.
+allVarsOfKindDefault :: DefaultVarsOfKind
+allVarsOfKindDefault =
+  DefaultVarsOfKind
+    { def_runtimeRep   = True
+    , def_levity       = True
+    , def_multiplicity = True
+    }
+
+-- | Don't do defaulting for variables of kind `RuntimeRep`, `Levity` and `Multiplicity`.
+noVarsOfKindDefault :: DefaultVarsOfKind
+noVarsOfKindDefault =
+  DefaultVarsOfKind
+    { def_runtimeRep   = False
+    , def_levity       = False
+    , def_multiplicity = False
+    }
