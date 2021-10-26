@@ -24,7 +24,6 @@ cIncludeArgs = do
     path    <- getBuildPath
     incDirs <- getContextData includeDirs
     depDirs <- getContextData depIncludeDirs
-    stage <- getStage
     -- TODO: Why is any of this necessary? We should have already told Cabal about these paths.
     iconvIncludeDir  <- getSetting IconvIncludeDir
     gmpIncludeDir    <- getSetting GmpIncludeDir
@@ -32,9 +31,7 @@ cIncludeArgs = do
     libdwIncludeDir  <- getSetting LibdwIncludeDir
     numaIncludeDir   <- getSetting LibnumaIncludeDir
     cursesIncludeDir <- getSetting CursesIncludeDir
-    libPath <- expr $ stageLibPath stage
     mconcat [ notStage0 ? arg "-Irts/include"
-            , arg $ "-I" ++ libPath
             , arg $ "-I" ++ path
             , pure . map ("-I"++) . filter (/= "") $ [iconvIncludeDir, gmpIncludeDir, numaIncludeDir, cursesIncludeDir]
             , flag UseSystemFfi ? if not (null ffiIncludeDir) then arg ("-I" ++ ffiIncludeDir) else mempty

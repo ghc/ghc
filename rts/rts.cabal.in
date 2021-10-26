@@ -144,7 +144,7 @@ library
     if !flag(smp)
        cpp-options: -DNOSMP
 
-    include-dirs: build include
+    include-dirs: include
                   @FFIIncludeDir@
                   @LibdwIncludeDir@
     includes: Stg.h

@@ -47,10 +47,10 @@ runHLint includeDirs defines dir = do
 base :: Action ()
 base = do
   buildDir <- buildRoot
-  let stage1Lib    = buildDir </> "stage1/lib"
+  let stage1RtsInc = buildDir </> "stage1/rts/build/include"
   let machDeps     = "rts/include/MachDeps.h"
-  let ghcautoconf  = stage1Lib </> "ghcautoconf.h"
-  let ghcplatform  = stage1Lib </> "ghcplatform.h"
+  let ghcautoconf  = stage1RtsInc </> "ghcautoconf.h"
+  let ghcplatform  = stage1RtsInc </> "ghcplatform.h"
   -- ./configure is called here manually because we need to generate
   -- HsBaseConfig.h, which is created from HsBaseConfig.h.in. ./configure
   -- is usually run by Cabal which generates this file but if we do that
@@ -62,22 +62,22 @@ base = do
   let includeDirs =
         [ "rts/include"
         , "libraries/base/include"
-        , stage1Lib
+        , stage1RtsInc
         ]
   runHLint includeDirs [] "libraries/base"
 
 compiler :: Action ()
 compiler = do
   buildDir <- buildRoot
-  let stage1Lib      = buildDir </> "stage1/lib"
+  let stage1RtsInc   = buildDir </> "stage1/rts/build/include"
   let stage1Compiler = buildDir </> "stage1/compiler/build"
   let machDeps       = "rts/include/MachDeps.h"
   let compilerDir    = "compiler"
-  let ghcautoconf    = stage1Lib </> "ghcautoconf.h"
-  let ghcplatform    = stage1Lib </> "ghcplatform.h"
+  let ghcautoconf    = stage1RtsInc </> "ghcautoconf.h"
+  let ghcplatform    = stage1RtsInc </> "ghcplatform.h"
   need $ mconcat [[ghcautoconf, ghcplatform], hsIncls stage1Compiler, [machDeps]]
   let includeDirs =
-        [ stage1Lib
+        [ stage1RtsInc
         , compilerDir
         , ghcplatform
         , stage1Compiler

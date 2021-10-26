@@ -205,12 +205,11 @@ instance H.Builder Builder where
           -- Read the boot GHC version here to make sure we rebuild when it
           -- changes (#18001).
           _bootGhcVersion <- setting GhcVersion
-          includesDependencies Stage0
+          pure []
         Ghc _ stage -> do
             root <- buildRoot
             touchyPath <- programPath (vanillaContext Stage0 touchy)
             unlitPath  <- builderPath Unlit
-            ghcgens <- includesDependencies stage
 
             -- GHC from the previous stage is used to build artifacts in the
             -- current stage. Need the previous stage's GHC deps.
@@ -218,7 +217,6 @@ instance H.Builder Builder where
 
             return $ [ unlitPath ]
                   ++ ghcdeps
-                  ++ ghcgens
                   ++ [ touchyPath          | windowsHost ]
                   ++ [ root -/- mingwStamp | windowsHost ]
                      -- proxy for the entire mingw toolchain that

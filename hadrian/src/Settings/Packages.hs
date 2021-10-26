@@ -170,6 +170,10 @@ packageArgs = do
         , package hsc2hs ?
           builder (Cabal Flags) ? arg "in-ghc-tree"
 
+        -------------------------------- genapply --------------------------------
+        -- TODO: The logic here needs to come first, so it's hacked into
+        -- Settings.Builder.Ghc instead.
+
         ------------------------------ ghc-bignum ------------------------------
         , ghcBignumArgs
 

@@ -4,8 +4,6 @@ module Rules.Generate (
     ghcPrimDependencies
     ) where
 
-import Data.Foldable (for_)
-
 import Base
 import qualified Context
 import Expression
@@ -16,7 +14,6 @@ import Oracles.Setting
 import Packages
 import Rules.Libffi
 import Settings
-import Settings.Builders.DeriveConstants (deriveConstantsPairs)
 import Target
 import Utilities
 
@@ -39,20 +36,29 @@ ghcPrimDependencies = do
     path  <- expr $ buildPath (vanillaContext stage ghcPrim)
     return [path -/- "GHC/Prim.hs", path -/- "GHC/PrimopWrappers.hs"]
 
-derivedConstantsFiles :: [FilePath]
-derivedConstantsFiles =
-    [ "DerivedConstants.h"
-    ]
+rtsDependencies :: Expr [FilePath]
+rtsDependencies = do
+    stage   <- getStage
+    rtsPath <- expr (rtsBuildPath stage)
+    let headers =
+            [ "ghcautoconf.h", "ghcplatform.h"
+            , "DerivedConstants.h"
+            ]
+            ++ libffiHeaderFiles
+    pure $ ((rtsPath -/- "include") -/-) <$> headers
+
+genapplyDependencies :: Expr [FilePath]
+genapplyDependencies = do
+    stage   <- getStage
+    rtsPath <- expr (rtsBuildPath $ succ stage)
+    ((stage /= Stage3) ?) $ pure $ ((rtsPath -/- "include") -/-) <$>
+        [ "ghcautoconf.h", "ghcplatform.h" ]
 
 compilerDependencies :: Expr [FilePath]
 compilerDependencies = do
     stage   <- getStage
     ghcPath <- expr $ buildPath (vanillaContext stage compiler)
-    rtsPath <- expr (rtsBuildPath stage)
-    libDir <- expr $ stageLibPath stage
-    mconcat [ return $ (libDir -/-) <$> derivedConstantsFiles
-            , notStage0 ? return ((rtsPath -/-) <$> libffiHeaderFiles)
-            , return $ fmap (ghcPath -/-)
+    pure $ (ghcPath -/-) <$>
                   [ "primop-can-fail.hs-incl"
                   , "primop-code-size.hs-incl"
                   , "primop-commutable.hs-incl"
@@ -70,20 +76,15 @@ compilerDependencies = do
                   , "primop-vector-uniques.hs-incl"
                   , "primop-docs.hs-incl"
                   , "GHC/Platform/Constants.hs"
-                  ] ]
+                  ]
 
 generatedDependencies :: Expr [FilePath]
 generatedDependencies = do
-    stage    <- getStage
-    rtsPath  <- expr (rtsBuildPath stage)
-    includes <- expr $ includesDependencies stage
-    libDir <- expr $ stageLibPath stage
     mconcat [ package compiler ? compilerDependencies
             , package ghcPrim  ? ghcPrimDependencies
-            , package rts      ? return (fmap (rtsPath -/-) libffiHeaderFiles
-                ++ includes
-                ++ ((libDir -/-) <$> derivedConstantsFiles))
-            , stage0 ? return includes ]
+            , package rts      ? rtsDependencies
+            , package genapply ? genapplyDependencies
+            ]
 
 generate :: FilePath -> Context -> Expr String -> Action ()
 generate file context expr = do
@@ -122,21 +123,16 @@ generatePackageCode context@(Context stage pkg _) = do
 
     when (pkg == compiler) $ do
         root -/- primopsTxt stage %> \file -> do
-            includes <- includesDependencies stage
-            need $ [primopsSource] ++ includes
+            need $ [primopsSource]
             build $ target context HsCpp [primopsSource] [file]
 
     when (pkg == rts) $ do
         root -/- "**" -/- dir -/- "cmm/AutoApply.cmm" %> \file ->
             build $ target context GenApply [] [file]
-        -- TODO: This should be fixed properly, e.g. generated here on demand.
-        (root -/- "**" -/- dir -/- "DerivedConstants.h") <~ stageLibPath stage
-        (root -/- "**" -/- dir -/- "ghcautoconf.h") <~ stageLibPath stage
-        (root -/- "**" -/- dir -/- "ghcplatform.h") <~ stageLibPath stage
- where
-    pattern <~ mdir = pattern %> \file -> do
-        dir <- mdir
-        copyFile (dir -/- takeFileName file) file
+        let go gen file = generate file (semiEmptyTarget stage) gen
+        root -/- "**" -/- dir -/- "include/ghcautoconf.h" %> go generateGhcAutoconfH
+        root -/- "**" -/- dir -/- "include/ghcplatform.h" %> go generateGhcPlatformH
+        root -/- "**" -/- dir -/- "include/DerivedConstants.h" %> genPlatformConstantsHeader context
 
 genPrimopCode :: Context -> FilePath -> Action ()
 genPrimopCode context@(Context stage _pkg _) file = do
@@ -147,7 +143,19 @@ genPrimopCode context@(Context stage _pkg _) file = do
 genPlatformConstantsType :: Context -> FilePath -> Action ()
 genPlatformConstantsType context file = do
     withTempDir $ \tmpdir ->
-      build $ target context DeriveConstants [] [file,"--gen-haskell-type",tmpdir]
+      build $ target context DeriveConstants [] [file,tmpdir]
+
+genPlatformConstantsHeader :: Context -> FilePath -> Action ()
+genPlatformConstantsHeader context file = do
+    -- N.B. deriveConstants needs to compile programs which #include
+    -- PosixSource.h, which #include's ghcplatform.h. Fixes #18290.
+    let prefix = takeDirectory file
+    need
+        [ prefix -/- "ghcplatform.h"
+        , prefix -/- "ghcautoconf.h"
+        ]
+    withTempDir $ \tmpdir -> build $
+        target context DeriveConstants [] [file, tmpdir]
 
 copyRules :: Rules ()
 copyRules = do
@@ -180,20 +188,8 @@ generateRules = do
     forM_ [Stage0 ..] $ \stage -> do
         let prefix = root -/- stageString stage -/- "lib"
             go gen file = generate file (semiEmptyTarget stage) gen
-        (prefix -/- "ghcplatform.h") %> go generateGhcPlatformH
         (prefix -/- "settings") %> go generateSettings
-        (prefix -/- "ghcautoconf.h") %> go generateGhcAutoconfH
-        -- TODO: simplify, get rid of fake rts context
-        for_ (fst <$> deriveConstantsPairs) $ \constantsFile ->
-            prefix -/- constantsFile %> \file -> do
-                -- N.B. deriveConstants needs to compile programs which #include
-                -- PosixSource.h, which #include's ghcplatform.h. Fixes #18290.
-                need
-                    [ prefix -/- "ghcplatform.h"
-                    , prefix -/- "ghcautoconf.h"
-                    ]
-                withTempDir $ \dir -> build $
-                    target (rtsContext stage) DeriveConstants [] [file, dir]
+
   where
     file <~+ gen = file %> \out -> generate out emptyTarget gen >> makeExecutable out
 

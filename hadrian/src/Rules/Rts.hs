@@ -26,7 +26,8 @@ rtsRules = priority 3 $ do
         let buildPath = root -/- buildDir (rtsContext stage)
 
         -- Header files
-        (fmap (buildPath -/-) libffiHeaderFiles) &%> const (copyLibffiHeaders stage)
+        forM_ libffiHeaderFiles $ \header ->
+            buildPath -/- "include" -/- header %> copyLibffiHeader stage
 
         -- Static libraries.
         buildPath -/- "libCffi*.a"     %> copyLibffiStatic stage
@@ -41,18 +42,18 @@ withLibffi stage action = needLibffi stage
                         >> (join $ action <$> libffiBuildPath stage
                                           <*> rtsBuildPath    stage)
 
--- | Copy all header files wither from the system libffi or from the libffi
+-- | Copy a header files wither from the system libffi or from the libffi
 -- build dir to the rts build dir.
-copyLibffiHeaders :: Stage -> Action ()
-copyLibffiHeaders stage = do
-    rtsPath      <- rtsBuildPath stage
+copyLibffiHeader :: Stage -> FilePath -> Action ()
+copyLibffiHeader stage header = do
     useSystemFfi <- flag UseSystemFfi
-    (fromStr, headers) <- if useSystemFfi
-        then ("system",) <$> libffiSystemHeaders
+    (fromStr, headerDir) <- if useSystemFfi
+        then ("system",) <$> libffiSystemHeaderDir
         else needLibffi stage
-          >> ("custom",) <$> libffiHeaders stage
-    forM_ headers $ \ header -> copyFile header
-                                         (rtsPath -/- takeFileName header)
+          >> ("custom",) <$> libffiHeaderDir stage
+    copyFile
+        (headerDir -/- takeFileName header)
+        header
     putSuccess $ "| Successfully copied " ++ fromStr ++ " FFI library header "
                 ++ "files to RTS build directory."
 
@@ -117,7 +118,7 @@ needRtsLibffiTargets stage = do
     useSystemFfi <- flag UseSystemFfi
 
     -- Header files (in the rts build dir).
-    let headers = fmap (rtsPath -/-) libffiHeaderFiles
+    let headers = fmap ((rtsPath -/- "include") -/-) libffiHeaderFiles
 
     if useSystemFfi
     then return headers
@@ -126,9 +127,6 @@ needRtsLibffiTargets stage = do
         -- This returns the dynamic library files (in the Libffi build dir).
         needLibffi stage
         dynLibffSource <- askLibffilDynLibs stage
-
-        -- Header files (in the rts build dir).
-        let headers = fmap (rtsPath -/-) libffiHeaderFiles
 
         -- Dynamic library files (in the rts build dir).
         let dynLibffis = fmap (\ lib -> rtsPath -/- takeFileName lib)

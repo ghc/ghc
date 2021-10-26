@@ -3,7 +3,7 @@
 module Rules.Libffi (
     LibffiDynLibs(..),
     needLibffi, askLibffilDynLibs, libffiRules, libffiLibrary, libffiHeaderFiles,
-    libffiHeaders, libffiSystemHeaders, libffiName
+    libffiHeaderDir, libffiSystemHeaderDir, libffiName
     ) where
 
 import Hadrian.Utilities
@@ -106,15 +106,13 @@ libffiLibrary = "inst/lib/libffi.a"
 libffiHeaderFiles :: [FilePath]
 libffiHeaderFiles = ["ffi.h", "ffitarget.h"]
 
-libffiHeaders :: Stage -> Action [FilePath]
-libffiHeaders stage = do
+libffiHeaderDir :: Stage -> Action FilePath
+libffiHeaderDir stage = do
     path <- libffiBuildPath stage
-    return $ fmap ((path -/- "inst/include") -/-) libffiHeaderFiles
+    return $ path -/- "inst/include"
 
-libffiSystemHeaders :: Action [FilePath]
-libffiSystemHeaders = do
-    ffiIncludeDir <- setting FfiIncludeDir
-    return $ fmap (ffiIncludeDir -/-) libffiHeaderFiles
+libffiSystemHeaderDir :: Action FilePath
+libffiSystemHeaderDir = setting FfiIncludeDir
 
 fixLibffiMakefile :: FilePath -> String -> String
 fixLibffiMakefile top =

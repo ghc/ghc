@@ -1,13 +1,15 @@
 module Settings.Builders.DeriveConstants (
-    deriveConstantsBuilderArgs, deriveConstantsPairs
+    deriveConstantsBuilderArgs
     ) where
 
 import Builder
+import Packages
 import Settings.Builders.Common
 
 deriveConstantsPairs :: [(String, String)]
 deriveConstantsPairs =
-  [ ("DerivedConstants.h", "--gen-header")
+  [ ("Constants.hs", "--gen-haskell-type")
+  , ("DerivedConstants.h", "--gen-header")
   ]
 
 deriveConstantsBuilderArgs :: Args
@@ -36,13 +38,13 @@ deriveConstantsBuilderArgs = builder DeriveConstants ? do
 includeCcArgs :: Args
 includeCcArgs = do
     stage <- getStage
-    libPath <- expr $ stageLibPath stage
+    rtsPath <- expr $ rtsBuildPath stage
     mconcat [ cArgs
             , cWarnings
             , getSettingList $ ConfCcArgs Stage1
             , flag GhcUnregisterised ? arg "-DUSE_MINIINTERPRETER"
             , arg "-Irts"
             , arg "-Irts/include"
-            , arg $ "-I" ++ libPath
+            , arg $ "-I" ++ rtsPath </> "include"
             , notM targetSupportsSMP ? arg "-DNOSMP"
             , arg "-fcommon" ]

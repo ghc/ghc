@@ -102,25 +102,20 @@ configureArgs :: Args
 configureArgs = do
     top  <- expr topDirectory
     pkg  <- getPackage
-    stage <- getStage
-    libPath <- expr $ stageLibPath stage
     let conf key expr = do
             values <- unwords <$> expr
             not (null values) ?
                 arg ("--configure-option=" ++ key ++ "=" ++ values)
         cFlags   = mconcat [ remove ["-Werror"] cArgs
                            , getStagedSettingList ConfCcArgs
-                           , arg $ "-I" ++ libPath
                            -- See https://github.com/snowleopard/hadrian/issues/523
                            , arg $ "-iquote"
                            , arg $ top -/- pkgPath pkg ]
         ldFlags  = ldArgs  <> (getStagedSettingList ConfGccLinkerArgs)
-        cppFlags = cppArgs <> (getStagedSettingList ConfCppArgs)
     cldFlags <- unwords <$> (cFlags <> ldFlags)
     mconcat
         [ conf "CFLAGS"   cFlags
         , conf "LDFLAGS"  ldFlags
-        , conf "CPPFLAGS" cppFlags
         , not (null cldFlags) ? arg ("--gcc-options=" ++ cldFlags)
         , conf "--with-iconv-includes"    $ arg =<< getSetting IconvIncludeDir
         , conf "--with-iconv-libraries"   $ arg =<< getSetting IconvLibDir
@@ -140,12 +135,6 @@ bootPackageConstraints = stage0 ? do
         version <- pkgVersion pkg
         return $ ((pkgName pkg ++ " == ") ++) version
     pure $ concat [ ["--constraint", c] | c <- constraints ]
-
-cppArgs :: Args
-cppArgs = do
-    stage <- getStage
-    libPath <- expr $ stageLibPath stage
-    arg $ "-I" ++ libPath
 
 withBuilderKey :: Builder -> String
 withBuilderKey b = case b of
