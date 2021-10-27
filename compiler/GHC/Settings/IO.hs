@@ -140,10 +140,7 @@ initSettings top_dir = do
   let iserv_prog = libexec "ghc-iserv"
 
   ghcWithInterpreter <- getBooleanSetting "Use interpreter"
-  ghcWithSMP <- getBooleanSetting "Support SMP"
-  ghcRTSWays <- getSetting "RTS ways"
   useLibFFI <- getBooleanSetting "Use LibFFI"
-  ghcRtsWithLibdw <- getBooleanSetting "RTS expects libdw"
 
   return $ Settings
     { sGhcNameVersion = GhcNameVersion
@@ -207,10 +204,7 @@ initSettings top_dir = do
     , sPlatformMisc = PlatformMisc
       { platformMisc_targetPlatformString = targetPlatformString
       , platformMisc_ghcWithInterpreter = ghcWithInterpreter
-      , platformMisc_ghcWithSMP = ghcWithSMP
-      , platformMisc_ghcRTSWays = ghcRTSWays
       , platformMisc_libFFI = useLibFFI
-      , platformMisc_ghcRtsWithLibdw = ghcRtsWithLibdw
       , platformMisc_llvmTarget = llvmTarget
       }
 

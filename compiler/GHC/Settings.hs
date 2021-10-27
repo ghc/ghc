@@ -58,10 +58,7 @@ module GHC.Settings
   , sExtraGccViaCFlags
   , sTargetPlatformString
   , sGhcWithInterpreter
-  , sGhcWithSMP
-  , sGhcRTSWays
   , sLibFFI
-  , sGhcRtsWithLibdw
   ) where
 
 import GHC.Prelude
@@ -268,11 +265,5 @@ sTargetPlatformString :: Settings -> String
 sTargetPlatformString = platformMisc_targetPlatformString . sPlatformMisc
 sGhcWithInterpreter :: Settings -> Bool
 sGhcWithInterpreter = platformMisc_ghcWithInterpreter . sPlatformMisc
-sGhcWithSMP :: Settings -> Bool
-sGhcWithSMP = platformMisc_ghcWithSMP . sPlatformMisc
-sGhcRTSWays :: Settings -> String
-sGhcRTSWays = platformMisc_ghcRTSWays . sPlatformMisc
 sLibFFI :: Settings -> Bool
 sLibFFI = platformMisc_libFFI . sPlatformMisc
-sGhcRtsWithLibdw :: Settings -> Bool
-sGhcRtsWithLibdw = platformMisc_ghcRtsWithLibdw . sPlatformMisc
