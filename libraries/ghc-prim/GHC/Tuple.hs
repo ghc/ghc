@@ -77,7 +77,15 @@ data () = ()
 -- unary tuples, they can also be useful for fine-grained control of
 -- strict-spined data structure traversals, and for unifying the
 -- implementations of lazy and strict mapping functions.
-data Solo a = Solo { getSolo :: a }
+data Solo a = Solo a
+
+getSolo :: Solo a -> a
+-- getSolo is a standalone function, rather than a record field of Solo,
+-- because Solo is a wired-in TyCon, and a wired-in TyCon that  has
+-- record fields is a bit more inconvenient than if it doesn't.
+-- (No other wired-in TyCon has record fields.)  So it seems easier
+-- to have getSolo as its own separate function (#20562)
+getSolo (Solo a) = a
 
 data (a,b) = (a,b)
 data (a,b,c) = (a,b,c)

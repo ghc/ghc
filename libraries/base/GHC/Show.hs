@@ -169,9 +169,7 @@ appPrec1 = I# 11#       -- appPrec + 1
 deriving instance Show ()
 
 -- | @since 4.15
-instance Show a => Show (Solo a) where
-  showsPrec d (Solo x) = showParen (d > 10) $
-      showString "Solo " . showsPrec 11 x
+deriving instance Show a => Show (Solo a)
 
 -- | @since 2.01
 instance Show a => Show [a]  where

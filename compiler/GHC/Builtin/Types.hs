@@ -74,6 +74,7 @@ module GHC.Builtin.Types (
         tupleTyCon, tupleDataCon, tupleTyConName, tupleDataConName,
         promotedTupleDataCon,
         unitTyCon, unitDataCon, unitDataConId, unitTy, unitTyConKey,
+        soloTyCon,
         pairTyCon, mkPromotedPairTy, isPromotedPairType,
         unboxedUnitTy,
         unboxedUnitTyCon, unboxedUnitDataCon,
@@ -288,6 +289,14 @@ wiredInTyCons = [ -- Units are not treated like other tuples, because they
                   -- need to look out for them.
                   unitTyCon
                 , unboxedUnitTyCon
+
+                -- Solo (i.e., the bosed 1-tuple) is also not treated
+                -- like other tuples (i.e. we /do/ include it here),
+                -- since it does not use special syntax like other tuples
+                -- See Note [One-tuples] (Wrinkle: Make boxed one-tuple names
+                -- have known keys) in GHC.Builtin.Types.
+                , soloTyCon
+
                 , anyTyCon
                 , boolTyCon
                 , charTyCon
@@ -1207,6 +1216,9 @@ unitDataCon   = head (tyConDataCons unitTyCon)
 
 unitDataConId :: Id
 unitDataConId = dataConWorkId unitDataCon
+
+soloTyCon :: TyCon
+soloTyCon = tupleTyCon Boxed 1
 
 pairTyCon :: TyCon
 pairTyCon = tupleTyCon Boxed 2
