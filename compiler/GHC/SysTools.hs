@@ -372,7 +372,7 @@ linkDynLib dflags0 o_files dep_packages
                  ++ [ Option "-undefined",
                       Option "dynamic_lookup",
                       Option "-single_module" ]
-                 ++ (if platformArch platform == ArchX86_64
+                 ++ (if platformArch platform `elem` [ ArchX86_64, ArchAArch64 ]
                      then [ ]
                      else [ Option "-Wl,-read_only_relocs,suppress" ])
                  ++ [ Option "-install_name", Option instName ]
