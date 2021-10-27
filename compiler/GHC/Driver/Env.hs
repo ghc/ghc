@@ -6,6 +6,7 @@ module GHC.Driver.Env
    , hscUpdateFlags
    , hscSetFlags
    , hsc_home_unit
+   , hsc_home_unit_maybe
    , hsc_units
    , hsc_HPT
    , hscUpdateHPT
@@ -106,6 +107,9 @@ runInteractiveHsc hsc_env = runHsc (mkInteractiveHscEnv hsc_env)
 
 hsc_home_unit :: HscEnv -> HomeUnit
 hsc_home_unit = unsafeGetHomeUnit . hsc_unit_env
+
+hsc_home_unit_maybe :: HscEnv -> Maybe HomeUnit
+hsc_home_unit_maybe = ue_home_unit . hsc_unit_env
 
 hsc_units :: HscEnv -> UnitState
 hsc_units = ue_units . hsc_unit_env

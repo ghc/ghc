@@ -375,8 +375,12 @@ reachablesG graph froms = map (gr_vertex_to_node graph) result
                  reachable (gr_int_graph graph) vs
         vs = [ v | Just v <- map (gr_node_to_vertex graph) froms ]
 
+-- | Efficiently construct a map which maps each key to it's set of transitive
+-- dependencies.
 allReachable :: Ord key => Graph node -> (node -> key) -> M.Map key (S.Set key)
-allReachable (Graph g from _) conv =  M.fromList [(conv (from v), IS.foldr (\k vs -> conv (from k) `S.insert` vs) S.empty vs) | (v, vs) <- IM.toList int_graph]
+allReachable (Graph g from _) conv =
+  M.fromList [(conv (from v), IS.foldr (\k vs -> conv (from k) `S.insert` vs) S.empty vs)
+             | (v, vs) <- IM.toList int_graph]
   where
     int_graph = reachableGraph g
 

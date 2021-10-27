@@ -92,7 +92,7 @@ NoKnotVars is intended to make this invariant easier to check.
 The most common situation where a KnotVars is retained accidently is if a HscEnv
 which contains reference to a KnotVars is used during interface file loading. The
 thunks created during this process will retain a reference to the KnotVars. In theory,
-all these references should be removed by 'typecheckLoop' as that retypechecks all
+all these references should be removed by 'maybeRehydrateAfter' as that rehydrates all
 interface files in the loop without using KnotVars.
 
 At the time of writing (MP: Oct 21) the invariant doesn't actually hold but also

@@ -25,6 +25,7 @@ module GHC.Unit.Module.Graph
    , isTemplateHaskellOrQQNonBoot
    , showModMsg
    , moduleGraphNodeModule
+   , moduleGraphNodeModSum
 
    , moduleGraphNodes
    , SummaryNode
@@ -36,7 +37,6 @@ module GHC.Unit.Module.Graph
    , msKey
 
    )
-
 where
 
 import GHC.Prelude
@@ -62,6 +62,7 @@ import qualified Data.Map as Map
 import GHC.Types.Unique.DSet
 import GHC.Types.SrcLoc
 import qualified Data.Set as Set
+import GHC.Unit.Module
 
 -- | A '@ModuleGraphNode@' is a node in the '@ModuleGraph@'.
 -- Edges between nodes mark dependencies arising from module imports
@@ -73,9 +74,12 @@ data ModuleGraphNode
   -- | There is a module summary node for each module, signature, and boot module being built.
   | ModuleNode ExtendedModSummary
 
-moduleGraphNodeModule :: ModuleGraphNode -> Maybe ExtendedModSummary
-moduleGraphNodeModule (InstantiationNode {}) = Nothing
-moduleGraphNodeModule (ModuleNode ems)    = Just ems
+moduleGraphNodeModSum :: ModuleGraphNode -> Maybe ExtendedModSummary
+moduleGraphNodeModSum (InstantiationNode {}) = Nothing
+moduleGraphNodeModSum (ModuleNode ems)    = Just ems
+
+moduleGraphNodeModule :: ModuleGraphNode -> Maybe ModuleName
+moduleGraphNodeModule = fmap (ms_mod_name . emsModSummary) . moduleGraphNodeModSum
 
 instance Outputable ModuleGraphNode where
   ppr = \case

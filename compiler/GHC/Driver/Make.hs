@@ -53,7 +53,7 @@ import GHC.Prelude
 import GHC.Platform
 
 import GHC.Tc.Utils.Backpack
-import GHC.Tc.Utils.Monad  ( initIfaceLoad )
+import GHC.Tc.Utils.Monad  ( initIfaceCheck )
 
 import GHC.Runtime.Interpreter
 import qualified GHC.Linker.Loader as Linker
@@ -107,7 +107,6 @@ import GHC.Types.Unique.FM
 import GHC.Types.Unique.DSet
 import GHC.Types.Unique.Set
 import GHC.Types.Name
-import GHC.Types.Name.Env
 import GHC.Types.PkgQual
 
 import GHC.Unit
@@ -415,8 +414,18 @@ warnUnusedPackages hsc_env mod_graph =
           . unitId
 
 
+-- | A ModuleGraphNode which also has a hs-boot file, and the list of nodes on any
+-- path from module to its boot file.
+data ModuleGraphNodeWithBootFile
+  = ModuleGraphNodeWithBootFile ModuleGraphNode [ModuleGraphNode]
+
+instance Outputable ModuleGraphNodeWithBootFile where
+  ppr (ModuleGraphNodeWithBootFile mgn deps) = text "ModeGraphNodeWithBootFile: " <+> ppr mgn $$ ppr deps
+
+getNode :: ModuleGraphNodeWithBootFile -> ModuleGraphNode
+getNode (ModuleGraphNodeWithBootFile mgn _) = mgn
 data BuildPlan = SingleModule ModuleGraphNode  -- A simple, single module all alone but *might* have an hs-boot file which isn't part of a cycle
-               | ResolvedCycle [ModuleGraphNode]   -- A resolved cycle, linearised by hs-boot files
+               | ResolvedCycle [Either ModuleGraphNode ModuleGraphNodeWithBootFile]   -- A resolved cycle, linearised by hs-boot files
                | UnresolvedCycle [ModuleGraphNode] -- An actual cycle, which wasn't resolved by hs-boot files
 
 instance Outputable BuildPlan where
@@ -455,20 +464,40 @@ createBuildPlan mod_graph maybe_top_mod =
               mresolved_cycle = collapseSCC (topSortWithBoot nodes)
           in acyclic ++ [maybe (UnresolvedCycle nodes) ResolvedCycle mresolved_cycle] ++ toBuildPlan sccs []
 
-        -- An environment mapping a module to its hs-boot file, if one exists
+        (mg, lookup_node) = moduleGraphNodes False (mgModSummaries' mod_graph)
+        trans_deps_map = allReachable mg (mkNodeKey . node_payload)
+        boot_path mn =
+          map (summaryNodeSummary . expectJust "toNode" . lookup_node) $ Set.toList $
+          Set.delete (NodeKey_Module (GWIB mn IsBoot))  $
+          expectJust "boot_path" (M.lookup (NodeKey_Module (GWIB mn NotBoot)) trans_deps_map)
+            `Set.difference` (expectJust "boot_path" (M.lookup (NodeKey_Module (GWIB mn IsBoot)) trans_deps_map))
+
+
+        -- An environment mapping a module to its hs-boot file and all nodes on the path between the two, if one exists
         boot_modules = mkModuleEnv
-          [ (ms_mod ms, m) | m@(ModuleNode (ExtendedModSummary ms _)) <- (mgModSummaries' mod_graph), isBootSummary ms == IsBoot]
+          [ (ms_mod ms, (m, boot_path (ms_mod_name ms))) | m@(ModuleNode (ExtendedModSummary ms _)) <- (mgModSummaries' mod_graph), isBootSummary ms == IsBoot]
 
         select_boot_modules :: [ModuleGraphNode] -> [ModuleGraphNode]
-        select_boot_modules = mapMaybe (\m -> case m of ModuleNode (ExtendedModSummary ms _) -> lookupModuleEnv boot_modules (ms_mod ms); _ -> Nothing )
+        select_boot_modules = mapMaybe (fmap fst . get_boot_module)
+
+        get_boot_module :: (ModuleGraphNode -> Maybe (ModuleGraphNode, [ModuleGraphNode]))
+        get_boot_module m = case m of ModuleNode (ExtendedModSummary ms _) | HsSrcFile <- ms_hsc_src ms -> lookupModuleEnv boot_modules (ms_mod ms); _ -> Nothing
 
         -- Any cycles should be resolved now
-        collapseSCC :: [SCC ModuleGraphNode] -> Maybe [ModuleGraphNode]
+        collapseSCC :: [SCC ModuleGraphNode] -> Maybe [(Either ModuleGraphNode ModuleGraphNodeWithBootFile)]
         -- Must be at least two nodes, as we were in a cycle
-        collapseSCC [AcyclicSCC node1, AcyclicSCC node2] = Just [node1, node2]
-        collapseSCC (AcyclicSCC node : nodes) = (node :) <$> collapseSCC nodes
+        collapseSCC [AcyclicSCC node1, AcyclicSCC node2] = Just [toNodeWithBoot node1, toNodeWithBoot node2]
+        collapseSCC (AcyclicSCC node : nodes) = (toNodeWithBoot node :) <$> collapseSCC nodes
         -- Cyclic
         collapseSCC _ = Nothing
+
+        toNodeWithBoot :: (ModuleGraphNode -> Either ModuleGraphNode ModuleGraphNodeWithBootFile)
+        toNodeWithBoot mn =
+          case get_boot_module mn of
+            -- The node doesn't have a boot file
+            Nothing -> Left mn
+            -- The node does have a boot file
+            Just path -> Right (ModuleGraphNodeWithBootFile mn (snd path))
 
         -- The toposort and accumulation of acyclic modules is solely to pick-up
         -- hs-boot files which are **not** part of cycles.
@@ -815,30 +844,28 @@ how to build all the modules.
 
 ```
 data BuildPlan = SingleModule ModuleGraphNode  -- A simple, single module all alone but *might* have an hs-boot file which isn't part of a cycle
-               | ResolvedCycle [ModuleGraphNode]   -- A resolved cycle, linearised by hs-boot files
+               | ResolvedCycle [Either ModuleGraphNode ModuleGraphNodeWithBoot]   -- A resolved cycle, linearised by hs-boot files
                | UnresolvedCycle [ModuleGraphNode] -- An actual cycle, which wasn't resolved by hs-boot files
 ```
 
 The plan is computed in two steps:
 
-Step 1: Topologically sort the module graph without hs-boot files. This returns a [SCC ModuleGraphNode] which contains
-        cycles.
-Step 2: For each cycle, topologically sort the modules in the cycle *with* the relevant hs-boot files. This should
-        result in an acyclic build plan if the hs-boot files are sufficient to resolve the cycle.
-
+Step 1:  Topologically sort the module graph without hs-boot files. This returns a [SCC ModuleGraphNode] which contains
+         cycles.
+Step 2:  For each cycle, topologically sort the modules in the cycle *with* the relevant hs-boot files. This should
+         result in an acyclic build plan if the hs-boot files are sufficient to resolve the cycle.
+Step 2a: For each module in the cycle, if the module has a boot file then compute the
+         modules on the path between it and the hs-boot file. This information is
+         stored in ModuleGraphNodeWithBoot.
 
 The `[BuildPlan]` is then interpreted by the `interpretBuildPlan` function.
 
 * SingleModule nodes are compiled normally by either the upsweep_inst or upsweep_mod functions.
-* ResolvedCycles need to compiled "together" so that the information which ends up in
-  the interface files at the end is accurate (and doesn't contain temporary information from
-  the hs-boot files.)
-  - During the initial compilation, a `KnotVars` is created which stores an IORef TypeEnv for
-    each module of the loop. These IORefs are gradually updated as the loop completes and provide
-    the required laziness to typecheck the module loop.
-  - At the end of typechecking, all the interface files are typechecked again in
-    the retypecheck loop. This time, the knot-tying is done by the normal laziness
-    based tying, so the environment is run without the KnotVars.
+* ResolvedCycles need to compiled "together" so that modules outside the cycle are presented
+  with a consistent knot-tied version of modules at the end.
+    - When the ModuleGraphNodeWithBoot nodes are compiled then suitable rehydration
+      is performed both before and after the module in question is compiled.
+      See Note [Hydrating Modules] for more information.
 * UnresolvedCycles are indicative of a proper cycle, unresolved by hs-boot files
   and are reported as an error to the user.
 
@@ -872,8 +899,8 @@ the whole graph.
 As well as this `interpretBuildPlan` also outputs an `IO [Maybe (Maybe HomeModInfo)]` which
 can be queried at the end to get the result of all modules at the end, with their proper
 visibility. For example, if any module in a loop fails then all modules in that loop will
-report as failed because the visible node at the end will be the result of retypechecking
-those modules together.
+report as failed because the visible node at the end will be the result of checking
+these modules together.
 
 -}
 
@@ -983,8 +1010,10 @@ interpretBuildPlan old_hpt deps_map plan = do
         -- Can't continue past this point as the cycle is unresolved.
         UnresolvedCycle ns -> return (Just ns, [])
 
-    buildSingleModule :: Maybe (ModuleEnv (IORef TypeEnv)) -> ModuleGraphNode -> BuildM (MakeAction, ResultVar (Maybe HomeModInfo))
-    buildSingleModule knot_var mod = do
+    buildSingleModule :: Maybe [ModuleGraphNode]  -- Modules we need to rehydrate before compiling this module
+                      -> ModuleGraphNode          -- The node we are compiling
+                      -> BuildM (MakeAction, ResultVar (Maybe HomeModInfo))
+    buildSingleModule rehydrate_nodes mod = do
       mod_idx <- nodeId
       home_mod_map <- getBuildMap
       hpt_var <- gets hpt_var
@@ -993,16 +1022,22 @@ interpretBuildPlan old_hpt deps_map plan = do
           doc_build_deps = catMaybes $ map (flip M.lookup home_mod_map) direct_deps
           build_deps = map snd doc_build_deps
       -- 2. Set the default way to build this node, not in a loop here
-      let build_action =
+      let build_action = do
+            hsc_env <- asks hsc_env
             case mod of
               InstantiationNode iu -> const Nothing <$> executeInstantiationNode mod_idx n_mods (wait_deps_hpt hpt_var build_deps) iu
               ModuleNode ms -> do
                   let !old_hmi = M.lookup (msKey $ emsModSummary ms) old_hpt
-                  hmi <- executeCompileNode mod_idx n_mods old_hmi (wait_deps_hpt hpt_var build_deps) knot_var (emsModSummary ms)
+                      rehydrate_mods = mapMaybe moduleGraphNodeModule <$> rehydrate_nodes
+                  hmi <- executeCompileNode mod_idx n_mods old_hmi (wait_deps_hpt hpt_var build_deps) rehydrate_mods (emsModSummary ms)
                   -- This global MVar is incrementally modified in order to avoid having to
                   -- recreate the HPT before compiling each module which leads to a quadratic amount of work.
-                  liftIO $ modifyMVar_ hpt_var (\hpt -> return $! addHomeModInfoToHpt hmi hpt)
-                  return (Just hmi)
+                  hmi' <- liftIO $ modifyMVar hpt_var (\hpt -> do
+                    let new_hpt = addHomeModInfoToHpt hmi hpt
+                        new_hsc = setHPT new_hpt hsc_env
+                    maybeRehydrateAfter hmi new_hsc rehydrate_mods
+                      )
+                  return (Just hmi')
 
       res_var <- liftIO newEmptyMVar
       let result_var = mkResultVar res_var
@@ -1010,31 +1045,24 @@ interpretBuildPlan old_hpt deps_map plan = do
       return $ (MakeAction build_action res_var, result_var)
 
 
-    buildModuleLoop :: [ModuleGraphNode] ->  BuildM [MakeAction]
+    buildOneLoopyModule ::  ModuleGraphNodeWithBootFile -> BuildM (MakeAction, (ResultVar (Maybe HomeModInfo)))
+    buildOneLoopyModule (ModuleGraphNodeWithBootFile mn deps) =
+      buildSingleModule (Just deps) mn
+
+    buildModuleLoop :: [(Either ModuleGraphNode ModuleGraphNodeWithBootFile)] ->  BuildM [MakeAction]
     buildModuleLoop ms = do
-      let ms_mods = mapMaybe (\case InstantiationNode {} -> Nothing; ModuleNode ems -> Just (ms_mod (emsModSummary ems))) ms
-      knot_var <- liftIO $ mkModuleEnv <$> mapM (\m -> (m,) <$> newIORef emptyNameEnv) ms_mods
-
-      -- 1. Build all the dependencies in this loop
-      (build_modules, wait_modules) <- mapAndUnzipM (buildSingleModule (Just knot_var)) ms
-      hpt_var <- gets hpt_var
+      (build_modules, wait_modules) <- mapAndUnzipM (either (buildSingleModule Nothing) buildOneLoopyModule) ms
       res_var <- liftIO newEmptyMVar
-      let loop_action = do
-            !hmis <- executeTypecheckLoop (readMVar hpt_var) (wait_deps wait_modules)
-            liftIO $ modifyMVar_ hpt_var (\hpt -> return $! foldl' (flip addHomeModInfoToHpt) hpt hmis)
-            return hmis
-
-
+      let loop_action = wait_deps wait_modules
       let fanout i = Just . (!! i) <$> mkResultVar res_var
       -- From outside the module loop, anyone must wait for the loop to finish and then
-      -- use the result of the retypechecked iface.
+      -- use the result of the rehydrated iface. This makes sure that things not in the
+      -- module loop will see the updated interfaces for all the identifiers in the loop.
       let update_module_pipeline (m, i) = setModulePipeline (NodeKey_Module m) (text "T") (fanout i)
 
-      let ms_i = zip (mapMaybe (fmap (msKey . emsModSummary) . moduleGraphNodeModule) ms) [0..]
+      let ms_i = zip (mapMaybe (fmap (msKey . emsModSummary) . moduleGraphNodeModSum . either id getNode) ms) [0..]
       mapM update_module_pipeline ms_i
       return $ build_modules ++ [MakeAction loop_action res_var]
-
-
 
 
 upsweep
@@ -1226,52 +1254,6 @@ Potential TODOS:
 -- If this assumption is violated, we risk recompiling unnecessarily by
 -- incorrectly regarding non-.hi files as outdated.
 --
-
--- ---------------------------------------------------------------------------
--- Typecheck module loops
-{-
-See bug #930.  This code fixes a long-standing bug in --make.  The
-problem is that when compiling the modules *inside* a loop, a data
-type that is only defined at the top of the loop looks opaque; but
-after the loop is done, the structure of the data type becomes
-apparent.
-
-The difficulty is then that two different bits of code have
-different notions of what the data type looks like.
-
-The idea is that after we compile a module which also has an .hs-boot
-file, we re-generate the ModDetails for each of the modules that
-depends on the .hs-boot file, so that everyone points to the proper
-TyCons, Ids etc. defined by the real module, not the boot module.
-Fortunately re-generating a ModDetails from a ModIface is easy: the
-function GHC.IfaceToCore.typecheckIface does exactly that.
-
-Following this fix, GHC can compile itself with --make -O2.
--}
-
-typecheckLoop :: HscEnv -> [HomeModInfo] -> IO [(ModuleName, HomeModInfo)]
-typecheckLoop hsc_env hmis = do
-  debugTraceMsg logger 2 $
-     text "Re-typechecking loop: "
-  fixIO $ \new_mods -> do
-      let new_hpt = addListToHpt old_hpt new_mods
-      let new_hsc_env = hscUpdateHPT (const new_hpt) hsc_env
-      -- Crucial, crucial: initIfaceLoad clears the if_rec_types field.
-      -- See [KnotVars invariants]
-      -- Note [GHC Heap Invariants]
-      mds <- initIfaceLoad new_hsc_env $
-                mapM (typecheckIface . hm_iface) hmis
-      let new_mods = [ (mn,hmi{ hm_details = details })
-                     | (hmi,details) <- zip hmis mds
-                     , let mn = moduleName (mi_module (hm_iface hmi)) ]
-      return new_mods
-
-  where
-    logger  = hsc_logger hsc_env
-    to_delete =  (map (moduleName . mi_module . hm_iface) hmis)
-    -- Filter out old modules before tying the knot, otherwise we can end
-    -- up with a thunk which keeps reference to the old HomeModInfo.
-    !old_hpt = foldl' delFromHpt (hsc_HPT hsc_env) to_delete
 
 -- ---------------------------------------------------------------------------
 --
@@ -2177,34 +2159,26 @@ executeInstantiationNode k n wait_deps iu = do
           cleanCurrentModuleTempFilesMaybe (hsc_logger hsc_env) (hsc_tmpfs hsc_env) (hsc_dflags hsc_env)
           return res
 
+
 executeCompileNode :: Int
   -> Int
   -> Maybe HomeModInfo
   -> RunMakeM HomePackageTable
-  -> Maybe (ModuleEnv (IORef TypeEnv))
+  -> Maybe [ModuleName] -- List of modules we need to rehydrate before compiling
   -> ModSummary
   -> RunMakeM HomeModInfo
-executeCompileNode k n !old_hmi wait_deps mknot_var mod = do
+executeCompileNode k n !old_hmi wait_deps mrehydrate_mods mod = do
    MakeEnv{..} <- ask
-   let mk_mod = case ms_hsc_src mod of
-                     HsigFile -> do
-                       -- MP: It is probably a bit of a misimplementation in backpack that
-                       -- compiling a signature requires an knot_var for that unit.
-                       -- If you remove this then a lot of backpack tests fail.
-                       let unit_env = hsc_unit_env hsc_env
-                       let mod_name = homeModuleInstantiation (ue_home_unit unit_env) (ms_mod mod)
-                       mkModuleEnv . (:[]) . (mod_name,) <$> newIORef emptyTypeEnv
-                     _ -> return emptyModuleEnv
-   knot_var <- liftIO $ maybe mk_mod return mknot_var
    deps <- wait_deps
+   -- Rehydrate any dependencies if this module had a boot file or is a signature file.
    withLoggerHsc k $ \hsc_env -> do
+     hydrated_hsc_env <- liftIO $ maybeRehydrateBefore (setHPT deps hsc_env) mod fixed_mrehydrate_mods
      let -- Use the cached DynFlags which includes OPTIONS_GHC pragmas
          lcl_dynflags = ms_hspp_opts mod
      let lcl_hsc_env =
              -- Localise the hsc_env to use the cached flags
-             setHPT deps $
              hscSetFlags lcl_dynflags $
-             hsc_env { hsc_type_env_vars = knotVarsFromModuleEnv knot_var }
+             hydrated_hsc_env
      -- Compile the module, locking with a semphore to avoid too many modules
      -- being compiled at the same time leading to high memory usage.
      lift $ MaybeT (withAbstractSem compile_sem $ wrapAction lcl_hsc_env $ do
@@ -2212,18 +2186,193 @@ executeCompileNode k n !old_hmi wait_deps mknot_var mod = do
       cleanCurrentModuleTempFilesMaybe (hsc_logger hsc_env) (hsc_tmpfs hsc_env) lcl_dynflags
       return res)
 
-executeTypecheckLoop :: IO HomePackageTable -- Dependencies of the loop
-  -> RunMakeM [HomeModInfo] -- The loop itself
-  -> RunMakeM [HomeModInfo]
-executeTypecheckLoop wait_other_deps wait_local_deps = do
-      hsc_env <- asks hsc_env
-      hmis <- wait_local_deps
-      other_deps <- liftIO wait_other_deps
-      let lcl_hsc_env = setHPT other_deps hsc_env
-      -- Notice that we do **not** have to pass the knot variables into this function.
-      -- That's the whole point of typecheckLoop, to replace the IORef calls with normal
-      -- knot-tying.
-      lift $ MaybeT $ Just . map snd <$> typecheckLoop lcl_hsc_env hmis
+  where
+    fixed_mrehydrate_mods =
+      case ms_hsc_src mod of
+        -- MP: It is probably a bit of a misimplementation in backpack that
+        -- compiling a signature requires an knot_var for that unit.
+        -- If you remove this then a lot of backpack tests fail.
+        HsigFile -> Just []
+        _ -> mrehydrate_mods
+
+{- Rehydration, see Note [Rehydrating Modules] -}
+
+rehydrate :: HscEnv        -- ^ The HPT in this HscEnv needs rehydrating.
+          -> [HomeModInfo] -- ^ These are the modules we want to rehydrate.
+          -> IO HscEnv
+rehydrate hsc_env hmis = do
+  debugTraceMsg logger 2 $
+     text "Re-hydrating loop: "
+  new_mods <- fixIO $ \new_mods -> do
+      let new_hpt = addListToHpt old_hpt new_mods
+      let new_hsc_env = hscUpdateHPT (const new_hpt) hsc_env
+      mds <- initIfaceCheck (text "rehydrate") new_hsc_env $
+                mapM (typecheckIface . hm_iface) hmis
+      let new_mods = [ (mn,hmi{ hm_details = details })
+                     | (hmi,details) <- zip hmis mds
+                     , let mn = moduleName (mi_module (hm_iface hmi)) ]
+      return new_mods
+  return $ setHPT (foldl' (\old (mn, hmi) -> addToHpt old mn hmi) old_hpt new_mods) hsc_env
+
+  where
+    logger  = hsc_logger hsc_env
+    to_delete =  (map (moduleName . mi_module . hm_iface) hmis)
+    -- Filter out old modules before tying the knot, otherwise we can end
+    -- up with a thunk which keeps reference to the old HomeModInfo.
+    !old_hpt = foldl' delFromHpt (hsc_HPT hsc_env) to_delete
+
+-- If needed, then rehydrate the necessary modules with a suitable KnotVars for the
+-- module currently being compiled.
+maybeRehydrateBefore :: HscEnv -> ModSummary -> Maybe [ModuleName] -> IO HscEnv
+maybeRehydrateBefore hsc_env _ Nothing = return hsc_env
+maybeRehydrateBefore hsc_env mod (Just mns) = do
+  knot_var <- initialise_knot_var hsc_env
+  let hmis = map (expectJust "mr" . lookupHpt (hsc_HPT hsc_env)) mns
+  rehydrate (hsc_env { hsc_type_env_vars = knotVarsFromModuleEnv knot_var }) hmis
+
+  where
+   initialise_knot_var hsc_env = liftIO $
+    let mod_name = homeModuleInstantiation (hsc_home_unit_maybe hsc_env) (ms_mod mod)
+    in mkModuleEnv . (:[]) . (mod_name,) <$> newIORef emptyTypeEnv
+
+maybeRehydrateAfter :: HomeModInfo
+  -> HscEnv
+  -> Maybe [ModuleName]
+  -> IO (HomePackageTable, HomeModInfo)
+maybeRehydrateAfter hmi new_hsc Nothing = return (hsc_HPT new_hsc, hmi)
+maybeRehydrateAfter hmi new_hsc (Just mns) = do
+  let new_hpt = hsc_HPT new_hsc
+      hmis = map (expectJust "mrAfter" . lookupHpt new_hpt) mns
+      new_mod_name = moduleName (mi_module (hm_iface hmi))
+  final_hpt <- hsc_HPT <$> rehydrate (new_hsc { hsc_type_env_vars = emptyKnotVars }) (hmi : hmis)
+  return (final_hpt, expectJust "rehydrate" $ lookupHpt final_hpt new_mod_name)
+
+{-
+Note [Hydrating Modules]
+~~~~~~~~~~~~~~~~~~~~~~~~
+There are at least 4 different representations of an interface file as described
+by this diagram.
+
+------------------------------
+|       On-disk M.hi         |
+------------------------------
+    |             ^
+    | Read file   | Write file
+    V             |
+-------------------------------
+|      ByteString             |
+-------------------------------
+    |             ^
+    | Binary.get  | Binary.put
+    V             |
+--------------------------------
+|    ModIface (an acyclic AST) |
+--------------------------------
+    |           ^
+    | hydrate   | mkIfaceTc
+    V           |
+---------------------------------
+|  ModDetails (lots of cycles)  |
+---------------------------------
+
+The last step, converting a ModIface into a ModDetails is known as "hydration".
+
+Hydration happens in three different places
+
+* When an interface file is initially loaded from disk, it has to be hydrated.
+* When a module is finished compiling, we hydrate the ModIface in order to generate
+  the version of ModDetails which exists in memory (see Note [ModDetails and --make mode])
+* When dealing with boot files and module loops (see Note [Rehydrating Modules])
+
+Note [Rehydrating Modules]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If a module has a boot file then it is critical to rehydrate the modules on
+the path between the two (see #20561).
+
+Suppose we have ("R" for "recursive"):
+```
+R.hs-boot:   module R where
+               data T
+               g :: T -> T
+
+A.hs:        module A( f, T, g ) where
+                import {-# SOURCE #-} R
+                data S = MkS T
+                f :: T -> S = ...g...
+
+R.hs:        module R where
+                import A
+                data T = T1 | T2 S
+                g = ...f...
+```
+
+## Why we need to rehydrate A's ModIface before compiling R.hs
+
+After compiling A.hs we'll have a TypeEnv in which the Id for `f` has a type
+type uses the AbstractTyCon T; and a TyCon for `S` that also mentions that same
+AbstractTyCon. (Abstract because it came from R.hs-boot; we know nothing about
+it.)
+
+When compiling R.hs, we build a TyCon for `T`.  But that TyCon mentions `S`, and
+it currently has an AbstractTyCon for `T` inside it.  But we want to build a
+fully cyclic structure, in which `S` refers to `T` and `T` refers to `S`.
+
+Solution: **rehydration**.  *Before compiling `R.hs`*, rehydrate all the
+ModIfaces below it that depend on R.hs-boot.  To rehydrate a ModIface, call
+`rehydrateIface` to convert it to a ModDetails.  It's just a de-serialisation
+step, no type inference, just lookups.
+
+Now `S` will be bound to a thunk that, when forced, will "see" the final binding
+for `T`; see [Tying the knot](https://gitlab.haskell.org/ghc/ghc/-/wikis/commentary/compiler/tying-the-knot).
+But note that this must be done *before* compiling R.hs.
+
+## Why we need to rehydrate A's ModIface after compiling R.hs
+
+When compiling R.hs, the knot-tying stuff above will ensure that `f`'s unfolding
+mentions the `LocalId` for `g`.  But when we finish R, we carefully ensure that
+all those `LocalIds` are turned into completed `GlobalIds`, replete with
+unfoldings etc.   Alas, that will not apply to the occurrences of `g` in `f`'s
+unfolding. And if we leave matters like that, they will stay that way, and *all*
+subsequent modules that import A will see a crippled unfolding for `f`.
+
+Solution: rehydrate both R and A's ModIface together, right after completing R.hs.
+
+## Which modules to rehydrate
+
+We only need rehydrate modules that are
+* Below R.hs
+* Above R.hs-boot
+
+There might be many unrelated modules (in the home package) that don't need to be
+rehydrated.
+
+## Modules "above" the loop
+
+This dark corner is the subject of #14092.
+
+Suppose we add to our example
+```
+X.hs     module X where
+           import A
+           data XT = MkX T
+           fx = ...g...
+```
+If in `--make` we compile R.hs-boot, then A.hs, then X.hs, we'll get a `ModDetails` for `X` that has an AbstractTyCon for `T` in the the argument type of `MkX`.  So:
+
+* Either we should delay compiling X until after R has beeen compiled. (This is what we do)
+* Or we should rehydrate X after compiling R -- because it transitively depends on R.hs-boot.
+
+Ticket #20200 has exposed some issues to do with the knot-tying logic in GHC.Make, in `--make` mode.
+#20200 has lots of issues, many of them now fixed;
+this particular issue starts [here](https://gitlab.haskell.org/ghc/ghc/-/issues/20200#note_385758).
+
+The wiki page [Tying the knot](https://gitlab.haskell.org/ghc/ghc/-/wikis/commentary/compiler/tying-the-knot) is helpful.
+Also closely related are
+    * #14092
+    * #14103
+
+-}
+
 
 -- | Wait for some dependencies to finish and then read from the given MVar.
 wait_deps_hpt :: MVar b -> [ResultVar (Maybe HomeModInfo)] -> ReaderT MakeEnv (MaybeT IO) b
