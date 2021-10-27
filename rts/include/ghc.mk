@@ -159,8 +159,6 @@ $$(includes_$1_H_PLATFORM) : rts/include/ghc.mk rts/include/Makefile | $$$$(dir 
 	@echo "#if !defined(__GHCPLATFORM_H__)"                      > $$@
 	@echo "#define __GHCPLATFORM_H__"                           >> $$@
 	@echo                                                       >> $$@
-	@echo "#define GHC_STAGE ($1 + 1)"                          >> $$@
-	@echo                                                       >> $$@
 	@echo "#define BuildPlatform_TYPE  $(BuildPlatform_$1_CPP)" >> $$@
 	@echo "#define HostPlatform_TYPE   $(HostPlatform_$1_CPP)"  >> $$@
 	@echo                                                       >> $$@

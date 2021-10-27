@@ -5,7 +5,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE GADTs #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
-#include "ghcplatform.h"
+#include <ghcplatform.h>
 
 {- Functions for providing the default interpretation of the 'TPhase' actions
 -}

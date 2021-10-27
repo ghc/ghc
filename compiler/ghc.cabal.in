@@ -78,6 +78,7 @@ Library
               -- MachRegs.h -- hits #error, skip
               -- target sensative, should not be used
               MachDeps.h
+              ghc-llvm-version.h
 
     Build-Depends: base       >= 4.11 && < 4.17,
                    deepseq    >= 1.4 && < 1.5,
