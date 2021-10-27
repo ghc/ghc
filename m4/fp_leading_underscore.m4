@@ -46,11 +46,4 @@ char **argv;
 }]])],[fptools_cv_leading_underscore=yes],[fptools_cv_leading_underscore=no],[fptools_cv_leading_underscore=no])
 ;;
 esac]);
-AC_SUBST([LeadingUnderscore], [`echo $fptools_cv_leading_underscore | sed 'y/yesno/YESNO/'`])
-if test x"$fptools_cv_leading_underscore" = xyes; then
-   AC_SUBST([CabalLeadingUnderscore],[True])
-   AC_DEFINE([LEADING_UNDERSCORE], [1], [Define to 1 if C symbols have a leading underscore added by the compiler.])
-else
-   AC_SUBST([CabalLeadingUnderscore],[False])
-fi
 ])# FP_LEADING_UNDERSCORE

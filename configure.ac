@@ -799,6 +799,9 @@ FP_GCC_EXTRA_FLAGS
 dnl ** look to see if we have a C compiler using an llvm back end.
 dnl
 FP_CC_LLVM_BACKEND
+AS_IF([test x"$CcLlvmBackend" = x"YES"],
+  [AC_DEFINE([CC_LLVM_BACKEND], [1], [Define (to 1) if C compiler has an LLVM back end])])
+AC_SUBST(CcLlvmBackend)
 
 FPTOOLS_SET_C_LD_FLAGS([target],[CFLAGS],[LDFLAGS],[IGNORE_LINKER_LD_FLAGS],[CPPFLAGS])
 FPTOOLS_SET_C_LD_FLAGS([build],[CONF_CC_OPTS_STAGE0],[CONF_GCC_LINKER_OPTS_STAGE0],[CONF_LD_LINKER_OPTS_STAGE0],[CONF_CPP_OPTS_STAGE0])
@@ -1183,6 +1186,13 @@ FPTOOLS_FLOAT_WORD_ORDER_BIGENDIAN
 
 dnl ** check for leading underscores in symbol names
 FP_LEADING_UNDERSCORE
+AC_SUBST([LeadingUnderscore], [`echo $fptools_cv_leading_underscore | sed 'y/yesno/YESNO/'`])
+if test x"$fptools_cv_leading_underscore" = xyes; then
+   AC_SUBST([CabalLeadingUnderscore],[True])
+   AC_DEFINE([LEADING_UNDERSCORE], [1], [Define to 1 if C symbols have a leading underscore added by the compiler.])
+else
+   AC_SUBST([CabalLeadingUnderscore],[False])
+fi
 
 FP_VISIBILITY_HIDDEN
 
