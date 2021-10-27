@@ -21,7 +21,6 @@ import Settings.Flavours.Performance
 import Settings.Flavours.Quick
 import Settings.Flavours.Quickest
 import Settings.Flavours.QuickCross
-import Settings.Flavours.Static
 import Settings.Flavours.Validate
 
 
@@ -57,7 +56,7 @@ hadrianFlavours =
     , quickestFlavour
     , quickCrossFlavour
     , ghcInGhciFlavour, validateFlavour, slowValidateFlavour
-    , staticFlavour ]
+    ]
 
 -- | This action looks up a flavour with the name given on the
 --   command line with @--flavour@, defaulting to 'userDefaultFlavour'
