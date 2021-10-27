@@ -214,10 +214,7 @@ ghcBignumArgs = package ghcBignum ? do
 
                        -- Ensure that the ghc-bignum package registration includes
                        -- knowledge of the system gmp's library and include directories.
-                     , notM (flag GmpInTree) ? mconcat
-                       [ if not (null librariesGmp) then arg ("--extra-lib-dirs=" ++ librariesGmp) else mempty
-                       , if not (null includesGmp) then arg ("--extra-include-dirs=" ++ includesGmp) else mempty
-                       ]
+                     , notM (flag GmpInTree) ? cabalExtraDirs includesGmp librariesGmp
                      ]
                   ]
                _ -> mempty
@@ -361,11 +358,9 @@ rtsPackageArgs = package rts ? do
           , Debug `wayUnit` way             `cabalFlag` "find-ptr"
           ]
         , builder (Cabal Setup) ? mconcat
-          [ if not (null libdwLibraryDir) then arg ("--extra-lib-dirs="++libdwLibraryDir) else mempty
-          , if not (null libdwIncludeDir) then arg ("--extra-include-dirs="++libdwIncludeDir) else mempty
-          , if not (null libnumaLibraryDir) then arg ("--extra-lib-dirs="++libnumaLibraryDir) else mempty
-          , if not (null libnumaIncludeDir) then arg ("--extra-include-dirs="++libnumaIncludeDir) else mempty
-          ]
+              [ cabalExtraDirs libdwIncludeDir libdwLibraryDir
+              , cabalExtraDirs libnumaIncludeDir libnumaLibraryDir
+              ]
         , builder (Cc (FindCDependencies CDep)) ? cArgs
         , builder (Cc (FindCDependencies  CxxDep)) ? cArgs
         , builder (Ghc CompileCWithGhc) ? map ("-optc" ++) <$> cArgs
@@ -433,3 +428,18 @@ rtsWarnings = mconcat
     , arg "-Wredundant-decls"
     , arg "-Wundef"
     , arg "-fno-strict-aliasing" ]
+
+-- | Expands to Cabal `--extra-lib-dirs` and `--extra-include-dirs` flags if
+-- the respective paths are not null.
+cabalExtraDirs :: FilePath   -- ^ include path
+          -> FilePath   -- ^ libraries path
+          -> Args
+cabalExtraDirs include lib = mconcat
+    [ extraDirFlag "--extra-lib-dirs" lib
+    , extraDirFlag "--extra-include-dirs" include
+    ]
+  where
+    extraDirFlag :: String -> FilePath -> Args
+    extraDirFlag flag dir
+      | null dir  = mempty
+      | otherwise = arg (flag++"="++dir)
