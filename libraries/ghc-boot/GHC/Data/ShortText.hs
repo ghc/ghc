@@ -14,7 +14,7 @@
 --
 -- This can be removed when we exit the boot compiler window. Thus once we drop GHC-9.2 as boot compiler,
 -- we can drop this code as well.
-#if GHC_STAGE < 1
+#if !MIN_VERSION_GLASGOW_HASKELL(9,3,0,0)
 {-# OPTIONS_GHC -fignore-interface-pragmas #-}
 #endif
 -- |

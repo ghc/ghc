@@ -254,8 +254,6 @@ generateGhcPlatformH = do
         [ "#if !defined(__GHCPLATFORM_H__)"
         , "#define __GHCPLATFORM_H__"
         , ""
-        , "#define GHC_STAGE " ++ show (fromEnum stage + 1)
-        , ""
         , "#define BuildPlatform_TYPE  " ++ cppify buildPlatform
         , "#define HostPlatform_TYPE   " ++ cppify hostPlatform
         , ""

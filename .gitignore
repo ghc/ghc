@@ -108,6 +108,7 @@ _darcs/
 /compiler/FunTypes.h
 /compiler/MachDeps.h
 /compiler/MachRegs.h
+/compiler/ghc-llvm-version.h
 /compiler/ghc.cabal
 /compiler/ghc.cabal.old
 /distrib/configure.ac

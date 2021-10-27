@@ -48,7 +48,6 @@ module GHC.Driver.Pipeline (
 ) where
 
 
-#include "ghcplatform.h"
 import GHC.Prelude
 
 import GHC.Platform

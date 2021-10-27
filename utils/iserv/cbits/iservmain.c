@@ -1,4 +1,5 @@
-#if GHC_STAGE > 1
+#include <ghcversion.h>
+#if MIN_VERSION_GLASGOW_HASKELL(9,3,0,0)
 #  include <rts/PosixSource.h>
 #else // PosixSource.h not yet exposed, hacky inline for now.
 #  include <ghcplatform.h>

@@ -111,9 +111,6 @@ module GHC.Data.FastString
         lengthPS
        ) where
 
--- For GHC_STAGE
-#include "ghcplatform.h"
-
 import GHC.Prelude as Prelude
 
 import GHC.Utils.Encoding
@@ -143,7 +140,7 @@ import Data.Semigroup as Semi
 
 import Foreign
 
-#if GHC_STAGE >= 2
+#if MIN_VERSION_GLASGOW_HASKELL(9,3,0,0)
 import GHC.Conc.Sync    (sharedCAF)
 #endif
 
@@ -384,13 +381,14 @@ stringTable = unsafePerformIO $ do
 
   -- use the support wired into the RTS to share this CAF among all images of
   -- libHSghc
-#if GHC_STAGE < 2
+#if !MIN_VERSION_GLASGOW_HASKELL(9,3,0,0)
   return tab
 #else
   sharedCAF tab getOrSetLibHSghcFastStringTable
 
--- from the RTS; thus we cannot use this mechanism when GHC_STAGE<2; the previous
--- RTS might not have this symbol
+-- from the 9.3 RTS; the previouss RTS before might not have this symbol.  The
+-- right way to do this however would be to define some HAVE_FAST_STRING_TABLE
+-- or similar rather than use (odd parity) development versions.
 foreign import ccall unsafe "getOrSetLibHSghcFastStringTable"
   getOrSetLibHSghcFastStringTable :: Ptr a -> IO (Ptr a)
 #endif

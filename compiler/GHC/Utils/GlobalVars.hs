@@ -22,9 +22,6 @@ module GHC.Utils.GlobalVars
    )
 where
 
--- For GHC_STAGE
-#include "ghcplatform.h"
-
 import GHC.Prelude
 
 import GHC.Conc.Sync ( sharedCAF )
@@ -60,7 +57,7 @@ foreign import ccall unsafe saccessor                          \
 
 
 
-#if GHC_STAGE < 2
+#if !MIN_VERSION_GLASGOW_HASKELL(9,3,0,0)
 
 GLOBAL_VAR(v_unsafeHasPprDebug,      False, Bool)
 GLOBAL_VAR(v_unsafeHasNoDebugOutput, False, Bool)
