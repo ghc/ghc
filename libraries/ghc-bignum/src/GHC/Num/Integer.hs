@@ -1466,6 +1466,9 @@ to only rely on rewrite rules for bignum functions.
 "Natural -> Integer -> Natural (clamp)"
   forall x. integerToNaturalClamp (integerFromNatural x) = x
 
+"Natural -> Integer -> Word#"
+  forall x. integerToWord# (integerFromNatural x) = naturalToWord# x
+
 "Int# -> Integer -> Word#"
   forall x. integerToWord# (IS x) = int2Word# x
 
