@@ -2,6 +2,8 @@
 \
 ## 4.16.0.0 *Nov 2021*
 
+  * Shipped with GHC 9.2.1
+
   * The unary tuple type, `Solo`, is now exported by `Data.Tuple`.
 
   * Add a `Typeable` constraint to `fromStaticPtr` in the class `GHC.StaticPtr.IsStatic`.

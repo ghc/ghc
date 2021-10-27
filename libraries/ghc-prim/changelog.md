@@ -1,4 +1,6 @@
-## 0.8.0 (edit as necessary)
+## 0.8.0
+
+- Shipped with GHC 9.2.1
 
 - Change array access primops to use type with size maxing the element size:
 
@@ -16,7 +18,7 @@
    - `extend{Int,Word}<N>#` -> `extend<N>To{Int,Word}#`
    - `narrow{Int,Word}<N>#` -> `intTo{Int,Word}<N>#`
 
-## 0.7.0 (edit as necessary)
+## 0.7.0
 
 - Shipped with GHC 9.0.1
 
