@@ -36,6 +36,7 @@ data Setting = BuildArch
              | BuildOs
              | BuildPlatform
              | BuildVendor
+             | CursesIncludeDir
              | CursesLibDir
              | DynamicExtension
              | FfiIncludeDir
@@ -133,6 +134,7 @@ setting key = lookupValueOrError configFile $ case key of
     BuildOs            -> "build-os"
     BuildPlatform      -> "build-platform"
     BuildVendor        -> "build-vendor"
+    CursesIncludeDir   -> "curses-include-dir"
     CursesLibDir       -> "curses-lib-dir"
     DynamicExtension   -> "dynamic-extension"
     FfiIncludeDir      -> "ffi-include-dir"
