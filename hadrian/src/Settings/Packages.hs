@@ -22,6 +22,9 @@ packageArgs = do
         -- are building. This is used to build cross-compilers
         bootCross = (==) <$> ghcVersionStage Stage0 <*> ghcVersionStage Stage1
 
+    cursesIncludeDir <- getSetting CursesIncludeDir
+    cursesLibraryDir <- getSetting CursesLibDir
+
     mconcat
         --------------------------------- base ---------------------------------
         [ package base ? mconcat
@@ -162,6 +165,10 @@ packageArgs = do
         -- TODO: Perhaps the user should rather be responsible for this?
         , package haskeline ?
           builder (Cabal Flags) ? notM cross `cabalFlag` "terminfo"
+
+        -------------------------------- terminfo ------------------------------
+        , package terminfo ?
+          builder (Cabal Setup) ? cabalExtraDirs cursesIncludeDir cursesLibraryDir
 
         -------------------------------- hsc2hs --------------------------------
         , package hsc2hs ?

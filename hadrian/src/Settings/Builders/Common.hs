@@ -26,15 +26,18 @@ cIncludeArgs = do
     incDirs <- getContextData includeDirs
     depDirs <- getContextData depIncludeDirs
     stage <- getStage
-    iconvIncludeDir <- getSetting IconvIncludeDir
-    gmpIncludeDir   <- getSetting GmpIncludeDir
-    ffiIncludeDir   <- getSetting FfiIncludeDir
-    libdwIncludeDir   <- getSetting FfiIncludeDir
+    -- TODO: Why is any of this necessary? We should have already told Cabal about these paths.
+    iconvIncludeDir  <- getSetting IconvIncludeDir
+    gmpIncludeDir    <- getSetting GmpIncludeDir
+    ffiIncludeDir    <- getSetting FfiIncludeDir
+    libdwIncludeDir  <- getSetting LibdwIncludeDir
+    numaIncludeDir   <- getSetting LibnumaIncludeDir
+    cursesIncludeDir <- getSetting CursesIncludeDir
     libPath <- expr $ stageLibPath stage
     mconcat [ notStage0 ||^ package compiler ? arg "-Irts/include"
             , arg $ "-I" ++ libPath
             , arg $ "-I" ++ path
-            , pure . map ("-I"++) . filter (/= "") $ [iconvIncludeDir, gmpIncludeDir]
+            , pure . map ("-I"++) . filter (/= "") $ [iconvIncludeDir, gmpIncludeDir, numaIncludeDir, cursesIncludeDir]
             , flag UseSystemFfi ? if not (null ffiIncludeDir) then arg ("-I" ++ ffiIncludeDir) else mempty
             , flag WithLibdw ? if not (null libdwIncludeDir) then arg ("-I" ++ libdwIncludeDir) else mempty
             -- Add @incDirs@ in the build directory, since some files generated
