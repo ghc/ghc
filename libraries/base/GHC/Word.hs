@@ -131,7 +131,11 @@ instance Enum Word8 where
                         = W8# (int2Word# i#)
         | otherwise     = toEnumError "Word8" i (minBound::Word8, maxBound::Word8)
     fromEnum (W8# x#)   = I# (word2Int# x#)
+    -- See Note [Stable Unfolding for list producers] in GHC.Enum
+    {-# INLINE enumFrom #-}
     enumFrom            = boundedEnumFrom
+    -- See Note [Stable Unfolding for list producers] in GHC.Enum
+    {-# INLINE enumFromThen #-}
     enumFromThen        = boundedEnumFromThen
 
 -- | @since 2.01
@@ -322,7 +326,11 @@ instance Enum Word16 where
                         = W16# (int2Word# i#)
         | otherwise     = toEnumError "Word16" i (minBound::Word16, maxBound::Word16)
     fromEnum (W16# x#)  = I# (word2Int# x#)
+    -- See Note [Stable Unfolding for list producers] in GHC.Enum
+    {-# INLINE enumFrom #-}
     enumFrom            = boundedEnumFrom
+    -- See Note [Stable Unfolding for list producers] in GHC.Enum
+    {-# INLINE enumFromThen #-}
     enumFromThen        = boundedEnumFromThen
 
 -- | @since 2.01
@@ -561,7 +569,11 @@ instance Enum Word32 where
     enumFromThenTo      = integralEnumFromThenTo
 #else
     fromEnum (W32# x#)  = I# (word2Int# x#)
+    -- See Note [Stable Unfolding for list producers] in GHC.Enum
+    {-# INLINE enumFrom #-}
     enumFrom            = boundedEnumFrom
+    -- See Note [Stable Unfolding for list producers] in GHC.Enum
+    {-# INLINE enumFromThen #-}
     enumFromThen        = boundedEnumFromThen
 #endif
 
@@ -745,9 +757,17 @@ instance Enum Word64 where
         | x <= fromIntegral (maxBound::Int)
                         = I# (word2Int# (word64ToWord# x#))
         | otherwise     = fromEnumError "Word64" x
+    -- See Note [Stable Unfolding for list producers] in GHC.Enum
+    {-# INLINE enumFrom #-}
     enumFrom            = integralEnumFrom
+    -- See Note [Stable Unfolding for list producers] in GHC.Enum
+    {-# INLINE enumFromThen #-}
     enumFromThen        = integralEnumFromThen
+    -- See Note [Stable Unfolding for list producers] in GHC.Enum
+    {-# INLINE enumFromTo #-}
     enumFromTo          = integralEnumFromTo
+    -- See Note [Stable Unfolding for list producers] in GHC.Enum
+    {-# INLINE enumFromThenTo #-}
     enumFromThenTo      = integralEnumFromThenTo
 
 -- | @since 2.01
@@ -894,10 +914,18 @@ instance Enum Word64 where
         | otherwise     = fromEnumError "Word64" x
 
 #if WORD_SIZE_IN_BITS < 64
-    enumFrom       = integralEnumFrom
-    enumFromThen   = integralEnumFromThen
-    enumFromTo     = integralEnumFromTo
-    enumFromThenTo = integralEnumFromThenTo
+    -- See Note [Stable Unfolding for list producers] in GHC.Enum
+    {-# INLINE enumFrom #-}
+    enumFrom            = integralEnumFrom
+    -- See Note [Stable Unfolding for list producers] in GHC.Enum
+    {-# INLINE enumFromThen #-}
+    enumFromThen        = integralEnumFromThen
+    -- See Note [Stable Unfolding for list producers] in GHC.Enum
+    {-# INLINE enumFromTo #-}
+    enumFromTo          = integralEnumFromTo
+    -- See Note [Stable Unfolding for list producers] in GHC.Enum
+    {-# INLINE enumFromThenTo #-}
+    enumFromThenTo      = integralEnumFromThenTo
 #else
     -- See Note [Stable Unfolding for list producers] in GHC.Enum
     {-# INLINABLE enumFrom #-}
