@@ -70,6 +70,7 @@ import GHC.Utils.Misc
 import System.IO.Unsafe
 import qualified Data.ByteString as BS
 import Data.IORef
+import GHC.Utils.Trace
 
 codeGen :: Logger
         -> TmpFs
