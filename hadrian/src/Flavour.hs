@@ -45,6 +45,7 @@ flavourTransformers = M.fromList
     , "no_profiled_libs" =: disableProfiledLibs
     , "omit_pragmas" =: omitPragmas
     , "ipe" =: enableIPE
+    , "fully_static" =: fullyStatic
     ]
   where (=:) = (,)
 
@@ -179,9 +180,12 @@ disableDynamicGhcPrograms flavour = flavour { dynamicGhcPrograms = pure False }
 -- | Don't build libraries in profiled 'Way's.
 disableProfiledLibs :: Flavour -> Flavour
 disableProfiledLibs flavour =
-    flavour { libraryWays = filter (not . wayUnit Profiling) <$> libraryWays flavour
-            , rtsWays     = filter (not . wayUnit Profiling) <$> rtsWays flavour
+    flavour { libraryWays = prune $ libraryWays flavour
+            , rtsWays     = prune $ rtsWays flavour
             }
+  where
+    prune :: Ways -> Ways
+    prune = fmap $ filter (not . wayUnit Profiling)
 
 -- | Build stage2 compiler with -fomit-interface-pragmas to reduce
 -- recompilation.
@@ -198,6 +202,50 @@ enableIPE =
   let Right kv = parseKV "stage1.*.ghc.hs.opts += -finfo-table-map -fdistinct-constructor-tables"
       Right transformer = applySetting kv
   in transformer
+
+-- | Produce fully statically-linked executables and build libraries suitable
+-- for static linking.
+fullyStatic :: Flavour -> Flavour
+fullyStatic flavour =
+    addArgs staticExec
+    $ flavour { dynamicGhcPrograms = return False
+              , libraryWays = prune $ libraryWays flavour
+              , rtsWays     = prune $ rtsWays flavour }
+  where
+    -- Remove any Way that contains a WayUnit of Dynamic
+    prune :: Ways -> Ways
+    prune = fmap $ filter staticCompatible
+
+    staticCompatible :: Way -> Bool
+    staticCompatible = not . wayUnit Dynamic
+
+    staticExec :: Args
+    {- Some packages, especially iserv, seem to force a set of build ways,
+     - including some that are dynamic (in Rules.BinaryDist).  Trying to
+     - build statically and dynamically at the same time breaks the build,
+     - so we respect that overriding of the Ways.  Any code that overrides
+     - the Ways will need to include a Way that's not explicitly dynamic
+     - (like "vanilla").
+     -}
+    staticExec = staticCompatible <$> getWay ? mconcat
+        {-
+         - Disable dynamic linking by the built ghc executable because the
+         - statically-linked musl doesn't support dynamic linking, but will
+         - try and fail.
+         -}
+        [ package compiler ? builder (Cabal Flags) ? arg "-dynamic-system-linker"
+        {-
+         - The final executables don't work unless the libraries linked into
+         - it are compiled with "-fPIC."  The PI stands for "position
+         - independent" and generates libraries that work when inlined into
+         - an executable (where their position is not at the beginning of
+         - the file).
+         -}
+        , builder (Ghc CompileHs) ? pure [ "-fPIC", "-static" ]
+        , builder (Ghc CompileCWithGhc) ? pure [ "-fPIC", "-optc", "-static"]
+        , builder (Ghc LinkHs) ? pure [ "-optl", "-static" ]
+        ]
+
 
 -- * CLI and <root>/hadrian.settings options
 

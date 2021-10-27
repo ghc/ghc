@@ -989,7 +989,7 @@ release-x86_64-linux-ubuntu2004:
   allow_failure: true
   variables:
     TEST_ENV: "x86_64-linux-alpine"
-    BUILD_FLAVOUR: "static"
+    BUILD_FLAVOUR: "validate+fully_static"
     BIN_DIST_NAME: "ghc-x86_64-alpine-linux"
     # Can't use ld.gold due to #13958.
     CONFIGURE_ARGS: "--disable-ld-override"
@@ -1015,7 +1015,7 @@ release-x86_64-linux-alpine-integer-simple:
     - .release
   variables:
     BIGNUM_BACKEND: native
-    BUILD_FLAVOUR: "static"
+    BUILD_FLAVOUR: "validate+fully_static"
 
 release-x86_64-linux-alpine-integer-gmp:
   extends:
@@ -1023,7 +1023,7 @@ release-x86_64-linux-alpine-integer-gmp:
     - .release
   variables:
     BIGNUM_BACKEND: gmp
-    BUILD_FLAVOUR: "static"
+    BUILD_FLAVOUR: "validate+fully_static"
 
 nightly-x86_64-linux-alpine:
   <<: *nightly

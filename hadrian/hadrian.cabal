@@ -112,7 +112,6 @@ executable hadrian
                        , Settings.Flavours.Quick
                        , Settings.Flavours.QuickCross
                        , Settings.Flavours.Quickest
-                       , Settings.Flavours.Static
                        , Settings.Flavours.Validate
                        , Settings.Packages
                        , Settings.Parser
