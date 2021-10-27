@@ -124,7 +124,11 @@ instance Enum Int8 where
                         = I8# (intToInt8# i#)
         | otherwise     = toEnumError "Int8" i (minBound::Int8, maxBound::Int8)
     fromEnum (I8# x#)   = I# (int8ToInt# x#)
+    -- See Note [Stable Unfolding for list producers] in GHC.Enum
+    {-# INLINE enumFrom #-}
     enumFrom            = boundedEnumFrom
+    -- See Note [Stable Unfolding for list producers] in GHC.Enum
+    {-# INLINE enumFromThen #-}
     enumFromThen        = boundedEnumFromThen
 
 -- | @since 2.01
@@ -335,7 +339,11 @@ instance Enum Int16 where
                         = I16# (intToInt16# i#)
         | otherwise     = toEnumError "Int16" i (minBound::Int16, maxBound::Int16)
     fromEnum (I16# x#)  = I# (int16ToInt# x#)
+    -- See Note [Stable Unfolding for list producers] in GHC.Enum
+    {-# INLINE enumFrom #-}
     enumFrom            = boundedEnumFrom
+    -- See Note [Stable Unfolding for list producers] in GHC.Enum
+    {-# INLINE enumFromThen #-}
     enumFromThen        = boundedEnumFromThen
 
 -- | @since 2.01
@@ -543,7 +551,11 @@ instance Enum Int32 where
         | otherwise     = toEnumError "Int32" i (minBound::Int32, maxBound::Int32)
 #endif
     fromEnum (I32# x#)  = I# (int32ToInt# x#)
+    -- See Note [Stable Unfolding for list producers] in GHC.Enum
+    {-# INLINE enumFrom #-}
     enumFrom            = boundedEnumFrom
+    -- See Note [Stable Unfolding for list producers] in GHC.Enum
+    {-# INLINE enumFromThen #-}
     enumFromThen        = boundedEnumFromThen
 
 -- | @since 2.01
@@ -754,9 +766,17 @@ instance Enum Int64 where
         | x >= fromIntegral (minBound::Int) && x <= fromIntegral (maxBound::Int)
                         = I# (int64ToInt# x#)
         | otherwise     = fromEnumError "Int64" x
+    -- See Note [Stable Unfolding for list producers] in GHC.Enum
+    {-# INLINE enumFrom #-}
     enumFrom            = integralEnumFrom
+    -- See Note [Stable Unfolding for list producers] in GHC.Enum
+    {-# INLINE enumFromThen #-}
     enumFromThen        = integralEnumFromThen
+    -- See Note [Stable Unfolding for list producers] in GHC.Enum
+    {-# INLINE enumFromTo #-}
     enumFromTo          = integralEnumFromTo
+    -- See Note [Stable Unfolding for list producers] in GHC.Enum
+    {-# INLINE enumFromThenTo #-}
     enumFromThenTo      = integralEnumFromThenTo
 
 -- | @since 2.01
@@ -948,7 +968,11 @@ instance Enum Int64 where
         | otherwise     = predError "Int64"
     toEnum (I# i#)      = I64# i#
     fromEnum (I64# x#)  = I# x#
+    -- See Note [Stable Unfolding for list producers] in GHC.Enum
+    {-# INLINE enumFrom #-}
     enumFrom            = boundedEnumFrom
+    -- See Note [Stable Unfolding for list producers] in GHC.Enum
+    {-# INLINE enumFromThen #-}
     enumFromThen        = boundedEnumFromThen
 
 -- | @since 2.01

@@ -771,9 +771,13 @@ lcm x y         =  abs ((x `quot` (gcd x y)) * y)
 "gcd/Word->Word->Word"          gcd = gcdWord
  #-}
 
+-- See Note [Stable Unfolding for list producers] in GHC.Enum
+{-# INLINABLE integralEnumFrom #-}
 integralEnumFrom :: (Integral a, Bounded a) => a -> [a]
 integralEnumFrom n = map fromInteger [toInteger n .. toInteger (maxBound `asTypeOf` n)]
 
+-- See Note [Stable Unfolding for list producers] in GHC.Enum
+{-# INLINABLE integralEnumFromThen #-}
 integralEnumFromThen :: (Integral a, Bounded a) => a -> a -> [a]
 integralEnumFromThen n1 n2
   | i_n2 >= i_n1  = map fromInteger [i_n1, i_n2 .. toInteger (maxBound `asTypeOf` n1)]
@@ -782,9 +786,13 @@ integralEnumFromThen n1 n2
     i_n1 = toInteger n1
     i_n2 = toInteger n2
 
+-- See Note [Stable Unfolding for list producers] in GHC.Enum
+{-# INLINABLE integralEnumFromTo #-}
 integralEnumFromTo :: Integral a => a -> a -> [a]
 integralEnumFromTo n m = map fromInteger [toInteger n .. toInteger m]
 
+-- See Note [Stable Unfolding for list producers] in GHC.Enum
+{-# INLINABLE integralEnumFromThenTo #-}
 integralEnumFromThenTo :: Integral a => a -> a -> a -> [a]
 integralEnumFromThenTo n1 n2 m
   = map fromInteger [toInteger n1, toInteger n2 .. toInteger m]
