@@ -796,8 +796,8 @@ llvmManglePipeline :: P m  => PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath
 llvmManglePipeline pipe_env hsc_env location llc_fn = do
   mangled_fn <-
     if gopt Opt_NoLlvmMangler (hsc_dflags hsc_env)
-      then use (T_LlvmMangle pipe_env hsc_env llc_fn)
-      else return llc_fn
+      then return llc_fn
+      else use (T_LlvmMangle pipe_env hsc_env llc_fn)
   asPipeline False pipe_env hsc_env location mangled_fn
 
 cmmCppPipeline :: P m => PipeEnv -> HscEnv -> FilePath -> m FilePath
