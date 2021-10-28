@@ -54,7 +54,7 @@
   * `fromInteger :: Integer -> Float/Double` now consistently round to the
     nearest value, with ties to even.
 
-## 4.15.0.0 *TBA*
+## 4.15.0.0 *Feb 2021*
 
   * `openFile` now calls the `open` system call with an `interruptible` FFI
     call, ensuring that the call can be interrupted with `SIGINT` on POSIX
