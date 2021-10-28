@@ -1469,7 +1469,7 @@ mkOpFormRn a1@(L loc
   | associate_right
   = do new_c <- mkOpFormRn a12 op2 fix2 a2
        return (HsCmdArrForm noExtField op1 f (Just fix1)
-               [a11, L loc (HsCmdTop [] (L (noAnnSrcSpan loc) new_c))])
+               [a11, L loc (HsCmdTop [] (L (l2l loc) new_c))])
         -- TODO: locs are wrong
   where
     (nofix_error, associate_right) = compareFixity fix1 fix2

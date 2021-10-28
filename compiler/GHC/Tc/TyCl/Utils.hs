@@ -886,6 +886,7 @@ mkOneRecordSelector all_cons idDetails fl has_sel
     loc      = getSrcSpan sel_name
     loc'     = noAnnSrcSpan loc
     locn     = noAnnSrcSpan loc
+    locc     = noAnnSrcSpan loc
     lbl      = flLabel fl
     sel_name = flSelector fl
 
@@ -930,8 +931,8 @@ mkOneRecordSelector all_cons idDetails fl has_sel
     rec_field  = noLocA (HsFieldBind
                         { hfbAnn = noAnn
                         , hfbLHS
-                           = L loc (FieldOcc sel_name
-                                     (L locn $ mkVarUnqual lbl))
+                           = L locc (FieldOcc sel_name
+                                      (L locn $ mkVarUnqual lbl))
                         , hfbRHS
                            = L loc' (VarPat noExtField (L locn field_var))
                         , hfbPun = False })

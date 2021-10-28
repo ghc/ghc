@@ -721,7 +721,7 @@ See #18151.
 ************************************************************************
 -}
 
-rnDotFieldOcc :: Located (DotFieldOcc GhcPs) -> Located (DotFieldOcc GhcRn)
+rnDotFieldOcc :: LocatedAn NoEpAnns (DotFieldOcc GhcPs) -> LocatedAn NoEpAnns (DotFieldOcc GhcRn)
 rnDotFieldOcc (L l (DotFieldOcc x label)) = L l (DotFieldOcc x label)
 
 rnFieldLabelStrings :: FieldLabelStrings GhcPs -> FieldLabelStrings GhcRn
@@ -743,7 +743,7 @@ rnCmdArgs (arg:args)
        ; return (arg':args', fvArg `plusFV` fvArgs) }
 
 rnCmdTop :: LHsCmdTop GhcPs -> RnM (LHsCmdTop GhcRn, FreeVars)
-rnCmdTop = wrapLocFstM rnCmdTop'
+rnCmdTop = wrapLocFstMA rnCmdTop'
  where
   rnCmdTop' :: HsCmdTop GhcPs -> RnM (HsCmdTop GhcRn, FreeVars)
   rnCmdTop' (HsCmdTop _ cmd)
@@ -888,7 +888,7 @@ methodNamesGRHSs (GRHSs _ grhss _) = plusFVs (map methodNamesGRHS grhss)
 
 -------------------------------------------------
 
-methodNamesGRHS :: Located (GRHS GhcRn (LHsCmd GhcRn)) -> CmdNeeds
+methodNamesGRHS :: LocatedAn NoEpAnns (GRHS GhcRn (LHsCmd GhcRn)) -> CmdNeeds
 methodNamesGRHS (L _ (GRHS _ _ rhs)) = methodNamesLCmd rhs
 
 ---------------------------------------------------
@@ -2621,33 +2621,33 @@ mkExpandedExpr a b = XExpr (HsExpanded a b)
 
 -- mkGetField arg field calcuates a get_field @field arg expression.
 -- e.g. z.x = mkGetField z x = get_field @x z
-mkGetField :: Name -> LHsExpr GhcRn -> Located FieldLabelString -> HsExpr GhcRn
+mkGetField :: Name -> LHsExpr GhcRn -> LocatedAn NoEpAnns FieldLabelString -> HsExpr GhcRn
 mkGetField get_field arg field = unLoc (head $ mkGet get_field [arg] field)
 
 -- mkSetField a field b calculates a set_field @field expression.
 -- e.g mkSetSetField a field b = set_field @"field" a b (read as "set field 'field' on a to b").
-mkSetField :: Name -> LHsExpr GhcRn -> Located FieldLabelString -> LHsExpr GhcRn -> HsExpr GhcRn
+mkSetField :: Name -> LHsExpr GhcRn -> LocatedAn NoEpAnns FieldLabelString -> LHsExpr GhcRn -> HsExpr GhcRn
 mkSetField set_field a (L _ field) b =
   genHsApp (genHsApp (genHsVar set_field `genAppType` genHsTyLit field)  a) b
 
-mkGet :: Name -> [LHsExpr GhcRn] -> Located FieldLabelString -> [LHsExpr GhcRn]
+mkGet :: Name -> [LHsExpr GhcRn] -> LocatedAn NoEpAnns FieldLabelString -> [LHsExpr GhcRn]
 mkGet get_field l@(r : _) (L _ field) =
   wrapGenSpan (genHsApp (genHsVar get_field `genAppType` genHsTyLit field) r) : l
 mkGet _ [] _ = panic "mkGet : The impossible has happened!"
 
-mkSet :: Name -> LHsExpr GhcRn -> (Located FieldLabelString, LHsExpr GhcRn) -> LHsExpr GhcRn
+mkSet :: Name -> LHsExpr GhcRn -> (LocatedAn NoEpAnns FieldLabelString, LHsExpr GhcRn) -> LHsExpr GhcRn
 mkSet set_field acc (field, g) = wrapGenSpan (mkSetField set_field g field acc)
 
 -- mkProjection fields calculates a projection.
 -- e.g. .x = mkProjection [x] = getField @"x"
 --      .x.y = mkProjection [.x, .y] = (.y) . (.x) = getField @"y" . getField @"x"
-mkProjection :: Name -> Name -> [Located FieldLabelString] -> HsExpr GhcRn
+mkProjection :: Name -> Name -> [LocatedAn NoEpAnns FieldLabelString] -> HsExpr GhcRn
 mkProjection getFieldName circName (field : fields) = foldl' f (proj field) fields
   where
-    f :: HsExpr GhcRn -> Located FieldLabelString -> HsExpr GhcRn
+    f :: HsExpr GhcRn -> LocatedAn NoEpAnns FieldLabelString -> HsExpr GhcRn
     f acc field = genHsApps circName $ map wrapGenSpan [proj field, acc]
 
-    proj :: Located FieldLabelString -> HsExpr GhcRn
+    proj :: LocatedAn NoEpAnns FieldLabelString -> HsExpr GhcRn
     proj (L _ f) = genHsVar getFieldName `genAppType` genHsTyLit f
 mkProjection _ _ [] = panic "mkProjection: The impossible happened"
 

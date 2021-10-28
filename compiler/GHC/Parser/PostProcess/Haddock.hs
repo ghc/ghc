@@ -592,7 +592,7 @@ instance HasHaddock (HsDataDefn GhcPs) where
 
 -- Process the deriving clauses of a data/newtype declaration.
 -- Not used for standalone deriving.
-instance HasHaddock (Located [Located (HsDerivingClause GhcPs)]) where
+instance HasHaddock (Located [LocatedAn NoEpAnns (HsDerivingClause GhcPs)]) where
   addHaddock lderivs =
     extendHdkA (getLoc lderivs) $
     traverse @Located addHaddock lderivs
@@ -604,10 +604,10 @@ instance HasHaddock (Located [Located (HsDerivingClause GhcPs)]) where
 --    deriving (Ord {- ^ Comment on Ord N -}) via Down N
 --
 -- Not used for standalone deriving.
-instance HasHaddock (Located (HsDerivingClause GhcPs)) where
+instance HasHaddock (LocatedAn NoEpAnns (HsDerivingClause GhcPs)) where
   addHaddock lderiv =
-    extendHdkA (getLoc lderiv) $
-    for @Located lderiv $ \deriv ->
+    extendHdkA (getLocA lderiv) $
+    for @(LocatedAn NoEpAnns) lderiv $ \deriv ->
     case deriv of
       HsDerivingClause { deriv_clause_ext, deriv_clause_strategy, deriv_clause_tys } -> do
         let
@@ -620,8 +620,8 @@ instance HasHaddock (Located (HsDerivingClause GhcPs)) where
           (register_strategy_before, register_strategy_after) =
             case deriv_clause_strategy of
               Nothing -> (pure (), pure ())
-              Just (L l (ViaStrategy _)) -> (pure (), registerLocHdkA l)
-              Just (L l _) -> (registerLocHdkA l, pure ())
+              Just (L l (ViaStrategy _)) -> (pure (), registerLocHdkA (locA l))
+              Just (L l _) -> (registerLocHdkA (locA l), pure ())
         register_strategy_before
         deriv_clause_tys' <- addHaddock deriv_clause_tys
         register_strategy_after

@@ -133,7 +133,9 @@
                 (ConDeclField
                  (EpAnnNotUsed)
                  [(L
-                   { T14189.hs:6:33 }
+                   (SrcSpanAnn
+                    (EpAnnNotUsed)
+                    { T14189.hs:6:33 })
                    (FieldOcc
                     {Name: T14189.f}
                     (L

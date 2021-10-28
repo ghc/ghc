@@ -672,7 +672,7 @@ zonkLTcSpecPrags env ps
 ************************************************************************
 -}
 
-zonkMatchGroup :: Anno (GRHS GhcTc (LocatedA (body GhcTc))) ~ SrcSpan
+zonkMatchGroup :: Anno (GRHS GhcTc (LocatedA (body GhcTc))) ~ SrcAnn NoEpAnns
             => ZonkEnv
             -> (ZonkEnv -> LocatedA (body GhcTc) -> TcM (LocatedA (body GhcTc)))
             -> MatchGroup GhcTc (LocatedA (body GhcTc))
@@ -687,7 +687,7 @@ zonkMatchGroup env zBody (MG { mg_alts = L l ms
                      , mg_ext = MatchGroupTc arg_tys' res_ty'
                      , mg_origin = origin }) }
 
-zonkMatch :: Anno (GRHS GhcTc (LocatedA (body GhcTc))) ~ SrcSpan
+zonkMatch :: Anno (GRHS GhcTc (LocatedA (body GhcTc))) ~ SrcAnn NoEpAnns
           => ZonkEnv
           -> (ZonkEnv -> LocatedA (body GhcTc) -> TcM (LocatedA (body GhcTc)))
           -> LMatch GhcTc (LocatedA (body GhcTc))
@@ -699,7 +699,7 @@ zonkMatch env zBody (L loc match@(Match { m_pats = pats
         ; return (L loc (match { m_pats = new_pats, m_grhss = new_grhss })) }
 
 -------------------------------------------------------------------------
-zonkGRHSs :: Anno (GRHS GhcTc (LocatedA (body GhcTc))) ~ SrcSpan
+zonkGRHSs :: Anno (GRHS GhcTc (LocatedA (body GhcTc))) ~ SrcAnn NoEpAnns
           => ZonkEnv
           -> (ZonkEnv -> LocatedA (body GhcTc) -> TcM (LocatedA (body GhcTc)))
           -> GRHSs GhcTc (LocatedA (body GhcTc))
@@ -712,7 +712,7 @@ zonkGRHSs env zBody (GRHSs x grhss binds) = do
           = do (env2, new_guarded) <- zonkStmts new_env zonkLExpr guarded
                new_rhs <- zBody env2 rhs
                return (GRHS xx new_guarded new_rhs)
-    new_grhss <- mapM (wrapLocM zonk_grhs) grhss
+    new_grhss <- mapM (wrapLocMA zonk_grhs) grhss
     return (GRHSs x new_grhss new_binds)
 
 {-
@@ -842,7 +842,7 @@ zonkExpr env (HsIf x e1 e2 e3)
        return (HsIf x new_e1 new_e2 new_e3)
 
 zonkExpr env (HsMultiIf ty alts)
-  = do { alts' <- mapM (wrapLocM zonk_alt) alts
+  = do { alts' <- mapM (wrapLocMA zonk_alt) alts
        ; ty'   <- zonkTcTypeToTypeX env ty
        ; return $ HsMultiIf ty' alts' }
   where zonk_alt (GRHS x guard expr)
@@ -1040,7 +1040,7 @@ zonkCmd env (HsCmdDo ty (L l stmts))
 
 
 zonkCmdTop :: ZonkEnv -> LHsCmdTop GhcTc -> TcM (LHsCmdTop GhcTc)
-zonkCmdTop env cmd = wrapLocM (zonk_cmd_top env) cmd
+zonkCmdTop env cmd = wrapLocMA (zonk_cmd_top env) cmd
 
 zonk_cmd_top :: ZonkEnv -> HsCmdTop GhcTc -> TcM (HsCmdTop GhcTc)
 zonk_cmd_top env (HsCmdTop (CmdTopTc stack_tys ty ids) cmd)
@@ -1302,7 +1302,7 @@ zonkRecFields env (HsRecFields flds dd)
         ; return (HsRecFields flds' dd) }
   where
     zonk_rbind (L l fld)
-      = do { new_id   <- wrapLocM (zonkFieldOcc env) (hfbLHS fld)
+      = do { new_id   <- wrapLocMA (zonkFieldOcc env) (hfbLHS fld)
            ; new_expr <- zonkLExpr env (hfbRHS fld)
            ; return (L l (fld { hfbLHS = new_id
                               , hfbRHS = new_expr })) }
@@ -1312,14 +1312,14 @@ zonkRecUpdFields :: ZonkEnv -> [LHsRecUpdField GhcTc]
 zonkRecUpdFields env = mapM zonk_rbind
   where
     zonk_rbind (L l fld)
-      = do { new_id   <- wrapLocM (zonkFieldOcc env) (hsRecUpdFieldOcc fld)
+      = do { new_id   <- wrapLocMA (zonkFieldOcc env) (hsRecUpdFieldOcc fld)
            ; new_expr <- zonkLExpr env (hfbRHS fld)
            ; return (L l (fld { hfbLHS = fmap ambiguousFieldOcc new_id
                               , hfbRHS = new_expr })) }
 
 -------------------------------------------------------------------------
-mapIPNameTc :: (a -> TcM b) -> Either (Located HsIPName) a
-            -> TcM (Either (Located HsIPName) b)
+mapIPNameTc :: (a -> TcM b) -> Either (LocatedAn NoEpAnns  HsIPName) a
+            -> TcM (Either (LocatedAn NoEpAnns HsIPName) b)
 mapIPNameTc _ (Left x)  = return (Left x)
 mapIPNameTc f (Right x) = do r <- f x
                              return (Right r)

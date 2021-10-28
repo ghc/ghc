@@ -205,8 +205,8 @@ type AnnoBody body
     , Anno (Match GhcTc (LocatedA (body GhcTc))) ~ SrcSpanAnnA
     , Anno [LocatedA (Match GhcRn (LocatedA (body GhcRn)))] ~ SrcSpanAnnL
     , Anno [LocatedA (Match GhcTc (LocatedA (body GhcTc)))] ~ SrcSpanAnnL
-    , Anno (GRHS GhcRn (LocatedA (body GhcRn))) ~ SrcSpan
-    , Anno (GRHS GhcTc (LocatedA (body GhcTc))) ~ SrcSpan
+    , Anno (GRHS GhcRn (LocatedA (body GhcRn))) ~ SrcAnn NoEpAnns
+    , Anno (GRHS GhcTc (LocatedA (body GhcTc))) ~ SrcAnn NoEpAnns
     , Anno (StmtLR GhcRn GhcRn (LocatedA (body GhcRn))) ~ SrcSpanAnnA
     , Anno (StmtLR GhcTc GhcTc (LocatedA (body GhcTc))) ~ SrcSpanAnnA
     )
@@ -289,7 +289,7 @@ tcGRHSs :: AnnoBody body
 tcGRHSs ctxt (GRHSs _ grhss binds) res_ty
   = do  { (binds', ugrhss)
             <- tcLocalBinds binds $
-               mapM (tcCollectingUsage . wrapLocM (tcGRHS ctxt res_ty)) grhss
+               mapM (tcCollectingUsage . wrapLocMA (tcGRHS ctxt res_ty)) grhss
         ; let (usages, grhss') = unzip ugrhss
         ; tcEmitBindingUsage $ supUEs usages
         ; return (GRHSs emptyComments grhss' binds') }

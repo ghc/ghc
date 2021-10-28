@@ -1694,7 +1694,7 @@ data RuleBndr pass
 collectRuleBndrSigTys :: [RuleBndr pass] -> [HsPatSigType pass]
 collectRuleBndrSigTys bndrs = [ty | RuleBndrSig _ _ ty <- bndrs]
 
-pprFullRuleName :: Located (SourceText, RuleName) -> SDoc
+pprFullRuleName :: GenLocated a (SourceText, RuleName) -> SDoc
 pprFullRuleName (L _ (st, n)) = pprWithSourceText st (doubleQuotes $ ftext n)
 
 {-

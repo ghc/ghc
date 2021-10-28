@@ -1017,7 +1017,7 @@ type instance XHsRule       GhcTc = HsRuleRn
 
 type instance XXRuleDecl    (GhcPass _) = NoExtCon
 
-type instance Anno (SourceText, RuleName) = SrcSpan
+type instance Anno (SourceText, RuleName) = SrcAnn NoEpAnns
 
 data HsRuleAnn
   = HsRuleAnn
@@ -1130,7 +1130,7 @@ type instance XCRoleAnnotDecl GhcTc = NoExtField
 
 type instance XXRoleAnnotDecl (GhcPass _) = NoExtCon
 
-type instance Anno (Maybe Role) = SrcSpan
+type instance Anno (Maybe Role) = SrcAnn NoEpAnns
 
 instance OutputableBndr (IdP (GhcPass p))
        => Outputable (RoleAnnotDecl (GhcPass p)) where
@@ -1156,15 +1156,15 @@ type instance Anno (HsDecl (GhcPass _)) = SrcSpanAnnA
 type instance Anno (SpliceDecl (GhcPass p)) = SrcSpanAnnA
 type instance Anno (TyClDecl (GhcPass p)) = SrcSpanAnnA
 type instance Anno (FunDep (GhcPass p)) = SrcSpanAnnA
-type instance Anno (FamilyResultSig (GhcPass p)) = SrcSpan
+type instance Anno (FamilyResultSig (GhcPass p)) = SrcAnn NoEpAnns
 type instance Anno (FamilyDecl (GhcPass p)) = SrcSpanAnnA
-type instance Anno (InjectivityAnn (GhcPass p)) = SrcSpan
+type instance Anno (InjectivityAnn (GhcPass p)) = SrcAnn NoEpAnns
 type instance Anno CType = SrcSpanAnnP
-type instance Anno (HsDerivingClause (GhcPass p)) = SrcSpan
+type instance Anno (HsDerivingClause (GhcPass p)) = SrcAnn NoEpAnns
 type instance Anno (DerivClauseTys (GhcPass _)) = SrcSpanAnnC
 type instance Anno (StandaloneKindSig (GhcPass p)) = SrcSpanAnnA
 type instance Anno (ConDecl (GhcPass p)) = SrcSpanAnnA
-type instance Anno Bool = SrcSpan
+type instance Anno Bool = SrcAnn NoEpAnns
 type instance Anno [LocatedA (ConDeclField (GhcPass _))] = SrcSpanAnnL
 type instance Anno (FamEqn p (LocatedA (HsType p))) = SrcSpanAnnA
 type instance Anno (TyFamInstDecl (GhcPass p)) = SrcSpanAnnA
@@ -1175,15 +1175,15 @@ type instance Anno (InstDecl (GhcPass p)) = SrcSpanAnnA
 type instance Anno DocDecl = SrcSpanAnnA
 type instance Anno (DerivDecl (GhcPass p)) = SrcSpanAnnA
 type instance Anno OverlapMode = SrcSpanAnnP
-type instance Anno (DerivStrategy (GhcPass p)) = SrcSpan
+type instance Anno (DerivStrategy (GhcPass p)) = SrcAnn NoEpAnns
 type instance Anno (DefaultDecl (GhcPass p)) = SrcSpanAnnA
 type instance Anno (ForeignDecl (GhcPass p)) = SrcSpanAnnA
 type instance Anno (RuleDecls (GhcPass p)) = SrcSpanAnnA
 type instance Anno (RuleDecl (GhcPass p)) = SrcSpanAnnA
-type instance Anno (SourceText, RuleName) = SrcSpan
-type instance Anno (RuleBndr (GhcPass p)) = SrcSpan
+type instance Anno (SourceText, RuleName) = SrcAnn NoEpAnns
+type instance Anno (RuleBndr (GhcPass p)) = SrcAnn NoEpAnns
 type instance Anno (WarnDecls (GhcPass p)) = SrcSpanAnnA
 type instance Anno (WarnDecl (GhcPass p)) = SrcSpanAnnA
 type instance Anno (AnnDecl (GhcPass p)) = SrcSpanAnnA
 type instance Anno (RoleAnnotDecl (GhcPass p)) = SrcSpanAnnA
-type instance Anno (Maybe Role) = SrcSpan
+type instance Anno (Maybe Role) = SrcAnn NoEpAnns

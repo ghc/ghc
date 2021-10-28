@@ -182,7 +182,9 @@
              {OccName: a}))))])
        (Prefix)
        (L
-        { <no location info> }
+        (SrcSpanAnn
+         (EpAnnNotUsed)
+         { <no location info> })
         (NoSig
          (NoExtField)))
        (Nothing)))))
@@ -880,7 +882,9 @@
             (EpaComments
              [])
             [(L
-              { KindSigs.hs:23:9-12 }
+              (SrcSpanAnn
+               (EpAnnNotUsed)
+               { KindSigs.hs:23:9-12 })
               (GRHS
                (EpAnn
                 (Anchor
@@ -1485,7 +1489,9 @@
             (EpaComments
              [])
             [(L
-              { KindSigs.hs:35:6-11 }
+              (SrcSpanAnn
+               (EpAnnNotUsed)
+               { KindSigs.hs:35:6-11 })
               (GRHS
                (EpAnn
                 (Anchor

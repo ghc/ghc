@@ -641,7 +641,7 @@ tcDerivStrategy mb_lds
   = case mb_lds of
       Nothing -> boring_case Nothing
       Just (L loc ds) ->
-        setSrcSpan loc $ do
+        setSrcSpanA loc $ do
           (ds', tvs) <- tc_deriv_strategy ds
           pure (Just (L loc ds'), tvs)
   where

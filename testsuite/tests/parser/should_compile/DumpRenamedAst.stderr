@@ -44,7 +44,9 @@
                  (EpaComments
                   [])
                  [(L
-                   { DumpRenamedAst.hs:34:6-23 }
+                   (SrcSpanAnn
+                    (EpAnnNotUsed)
+                    { DumpRenamedAst.hs:34:6-23 })
                    (GRHS
                     (EpAnnNotUsed)
                     []
@@ -331,7 +333,9 @@
                   {Name: k})))))))])
          (Prefix)
          (L
-          { DumpRenamedAst.hs:12:32-39 }
+          (SrcSpanAnn
+           (EpAnnNotUsed)
+           { DumpRenamedAst.hs:12:32-39 })
           (KindSig
            (NoExtField)
            (L
@@ -371,7 +375,9 @@
           [])
          (Prefix)
          (L
-          { DumpRenamedAst.hs:16:17-33 }
+          (SrcSpanAnn
+           (EpAnnNotUsed)
+           { DumpRenamedAst.hs:16:17-33 })
           (KindSig
            (NoExtField)
            (L
@@ -1006,7 +1012,9 @@
                   {Name: GHC.Types.Type})))))))])
          (Prefix)
          (L
-          { DumpRenamedAst.hs:24:42-48 }
+          (SrcSpanAnn
+           (EpAnnNotUsed)
+           { DumpRenamedAst.hs:24:42-48 })
           (KindSig
            (NoExtField)
            (L
@@ -1101,7 +1109,9 @@
                 {Name: b})))])
            (Prefix)
            (L
-            { <no location info> }
+            (SrcSpanAnn
+             (EpAnnNotUsed)
+             { <no location info> })
             (NoSig
              (NoExtField)))
            (Nothing)))]

@@ -91,7 +91,9 @@
             (EpaComments
              [])
             [(L
-              { Test20297.hs:(5,5)-(7,7) }
+              (SrcSpanAnn
+               (EpAnnNotUsed)
+               { Test20297.hs:(5,5)-(7,7) })
               (GRHS
                (EpAnn
                 (Anchor
@@ -184,7 +186,9 @@
             (EpaComments
              [])
             [(L
-              { Test20297.hs:(9,5)-(11,26) }
+              (SrcSpanAnn
+               (EpAnnNotUsed)
+               { Test20297.hs:(9,5)-(11,26) })
               (GRHS
                (EpAnn
                 (Anchor
@@ -271,7 +275,9 @@
                         (EpaComments
                          [])
                         [(L
-                          { Test20297.hs:11:17-26 }
+                          (SrcSpanAnn
+                           (EpAnnNotUsed)
+                           { Test20297.hs:11:17-26 })
                           (GRHS
                            (EpAnn
                             (Anchor
@@ -430,7 +436,9 @@
             (EpaComments
              [])
             [(L
-              { Test20297.ppr.hs:(4,3)-(5,7) }
+              (SrcSpanAnn
+               (EpAnnNotUsed)
+               { Test20297.ppr.hs:(4,3)-(5,7) })
               (GRHS
                (EpAnn
                 (Anchor
@@ -516,7 +524,9 @@
             (EpaComments
              [])
             [(L
-              { Test20297.ppr.hs:(7,3)-(9,24) }
+              (SrcSpanAnn
+               (EpAnnNotUsed)
+               { Test20297.ppr.hs:(7,3)-(9,24) })
               (GRHS
                (EpAnn
                 (Anchor
@@ -596,7 +606,9 @@
                         (EpaComments
                          [])
                         [(L
-                          { Test20297.ppr.hs:9:15-24 }
+                          (SrcSpanAnn
+                           (EpAnnNotUsed)
+                           { Test20297.ppr.hs:9:15-24 })
                           (GRHS
                            (EpAnn
                             (Anchor

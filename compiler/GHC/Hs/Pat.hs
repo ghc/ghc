@@ -243,10 +243,10 @@ hsRecFieldId :: HsRecField GhcTc arg -> Id
 hsRecFieldId = hsRecFieldSel
 
 hsRecUpdFieldRdr :: HsRecUpdField (GhcPass p) -> Located RdrName
-hsRecUpdFieldRdr = fmap rdrNameAmbiguousFieldOcc . hfbLHS
+hsRecUpdFieldRdr = fmap rdrNameAmbiguousFieldOcc . reLoc . hfbLHS
 
 hsRecUpdFieldId :: HsFieldBind (LAmbiguousFieldOcc GhcTc) arg -> Located Id
-hsRecUpdFieldId = fmap foExt . hsRecUpdFieldOcc
+hsRecUpdFieldId = fmap foExt . reLoc . hsRecUpdFieldOcc
 
 hsRecUpdFieldOcc :: HsFieldBind (LAmbiguousFieldOcc GhcTc) arg -> LFieldOcc GhcTc
 hsRecUpdFieldOcc = fmap unambiguousFieldOcc . hfbLHS
@@ -726,6 +726,6 @@ collectEvVarsPat pat =
 -}
 
 type instance Anno (Pat (GhcPass p)) = SrcSpanAnnA
-type instance Anno (HsOverLit (GhcPass p)) = SrcSpan
+type instance Anno (HsOverLit (GhcPass p)) = SrcAnn NoEpAnns
 type instance Anno ConLike = SrcSpanAnnN
 type instance Anno (HsFieldBind lhs rhs) = SrcSpanAnnA

@@ -1258,7 +1258,7 @@ tcConArgs con_like arg_tys tenv penv con_args thing_inside = case con_args of
                (L l (HsFieldBind ann (L loc (FieldOcc sel (L lr rdr))) pat pun))
                thing_inside
         = do { sel'   <- tcLookupId sel
-             ; pat_ty <- setSrcSpan loc $ find_field_ty sel
+             ; pat_ty <- setSrcSpanA loc $ find_field_ty sel
                                             (occNameFS $ rdrNameOcc rdr)
              ; (pat', res) <- tcConArg penv (pat, pat_ty) thing_inside
              ; return (L l (HsFieldBind ann (L loc (FieldOcc sel' (L lr rdr))) pat'

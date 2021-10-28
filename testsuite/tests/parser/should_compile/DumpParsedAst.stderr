@@ -430,7 +430,9 @@
                  {OccName: k}))))))))])
        (Prefix)
        (L
-        { DumpParsedAst.hs:10:32-39 }
+        (SrcSpanAnn
+         (EpAnnNotUsed)
+         { DumpParsedAst.hs:10:32-39 })
         (KindSig
          (NoExtField)
          (L
@@ -873,7 +875,9 @@
                  {OccName: Type}))))))))])
        (Prefix)
        (L
-        { DumpParsedAst.hs:17:42-48 }
+        (SrcSpanAnn
+         (EpAnnNotUsed)
+         { DumpParsedAst.hs:17:42-48 })
         (KindSig
          (NoExtField)
          (L
@@ -935,7 +939,9 @@
             (EpaComments
              [])
             [(L
-              { DumpParsedAst.hs:20:6-23 }
+              (SrcSpanAnn
+               (EpAnnNotUsed)
+               { DumpParsedAst.hs:20:6-23 })
               (GRHS
                (EpAnn
                 (Anchor

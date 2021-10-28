@@ -116,7 +116,7 @@ pmcGRHSs
   -> DsM (NonEmpty Nablas)        -- ^ Covered 'Nablas' for each RHS, for long
                                   --   distance info
 pmcGRHSs hs_ctxt guards@(GRHSs _ grhss _) = do
-  let combined_loc = foldl1 combineSrcSpans (map getLoc grhss)
+  let combined_loc = foldl1 combineSrcSpans (map getLocA grhss)
       ctxt = DsMatchContext hs_ctxt combined_loc
   !missing <- getLdiNablas
   matches  <- noCheckDs $ desugarGRHSs combined_loc empty guards

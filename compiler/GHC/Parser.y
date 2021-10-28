@@ -1356,18 +1356,18 @@ overlap_pragma :: { Maybe (LocatedP OverlapMode) }
   | {- empty -}                 { Nothing }
 
 deriv_strategy_no_via :: { LDerivStrategy GhcPs }
-  : 'stock'                     {% acs (\cs -> sL1 $1 (StockStrategy (EpAnn (glR $1) [mj AnnStock $1] cs))) }
-  | 'anyclass'                  {% acs (\cs -> sL1 $1 (AnyclassStrategy (EpAnn (glR $1) [mj AnnAnyclass $1] cs))) }
-  | 'newtype'                   {% acs (\cs -> sL1 $1 (NewtypeStrategy (EpAnn (glR $1) [mj AnnNewtype $1] cs))) }
+  : 'stock'                     {% acsA (\cs -> sL1 $1 (StockStrategy (EpAnn (glR $1) [mj AnnStock $1] cs))) }
+  | 'anyclass'                  {% acsA (\cs -> sL1 $1 (AnyclassStrategy (EpAnn (glR $1) [mj AnnAnyclass $1] cs))) }
+  | 'newtype'                   {% acsA (\cs -> sL1 $1 (NewtypeStrategy (EpAnn (glR $1) [mj AnnNewtype $1] cs))) }
 
 deriv_strategy_via :: { LDerivStrategy GhcPs }
-  : 'via' sigktype          {% acs (\cs -> sLLlA $1 $> (ViaStrategy (XViaStrategyPs (EpAnn (glR $1) [mj AnnVia $1] cs)
+  : 'via' sigktype          {% acsA (\cs -> sLLlA $1 $> (ViaStrategy (XViaStrategyPs (EpAnn (glR $1) [mj AnnVia $1] cs)
                                                                            $2))) }
 
 deriv_standalone_strategy :: { Maybe (LDerivStrategy GhcPs) }
-  : 'stock'                     {% fmap Just $ acs (\cs -> sL1 $1 (StockStrategy (EpAnn (glR $1) [mj AnnStock $1] cs))) }
-  | 'anyclass'                  {% fmap Just $ acs (\cs -> sL1 $1 (AnyclassStrategy (EpAnn (glR $1) [mj AnnAnyclass $1] cs))) }
-  | 'newtype'                   {% fmap Just $ acs (\cs -> sL1 $1 (NewtypeStrategy (EpAnn (glR $1) [mj AnnNewtype $1] cs))) }
+  : 'stock'                     {% fmap Just $ acsA (\cs -> sL1 $1 (StockStrategy (EpAnn (glR $1) [mj AnnStock $1] cs))) }
+  | 'anyclass'                  {% fmap Just $ acsA (\cs -> sL1 $1 (AnyclassStrategy (EpAnn (glR $1) [mj AnnAnyclass $1] cs))) }
+  | 'newtype'                   {% fmap Just $ acsA (\cs -> sL1 $1 (NewtypeStrategy (EpAnn (glR $1) [mj AnnNewtype $1] cs))) }
   | deriv_strategy_via          { Just $1 }
   | {- empty -}                 { Nothing }
 
@@ -1375,12 +1375,12 @@ deriv_standalone_strategy :: { Maybe (LDerivStrategy GhcPs) }
 
 opt_injective_info :: { Located ([AddEpAnn], Maybe (LInjectivityAnn GhcPs)) }
         : {- empty -}               { noLoc ([], Nothing) }
-        | '|' injectivity_cond      { sLL $1 $> ([mj AnnVbar $1]
+        | '|' injectivity_cond      { sLL $1 (reLoc $>) ([mj AnnVbar $1]
                                                 , Just ($2)) }
 
 injectivity_cond :: { LInjectivityAnn GhcPs }
         : tyvarid '->' inj_varids
-           {% acs (\cs -> sLL (reLocN $1) $> (InjectivityAnn (EpAnn (glNR $1) [mu AnnRarrow $2] cs) $1 (reverse (unLoc $3)))) }
+           {% acsA (\cs -> sLL (reLocN $1) $> (InjectivityAnn (EpAnn (glNR $1) [mu AnnRarrow $2] cs) $1 (reverse (unLoc $3)))) }
 
 inj_varids :: { Located [LocatedN RdrName] }
         : inj_varids tyvarid  { sLL $1 (reLocN $>) ($2 : unLoc $1) }
@@ -1516,24 +1516,24 @@ opt_kind_sig :: { Located ([AddEpAnn], Maybe (LHsKind GhcPs)) }
         | '::' kind     { sLL $1 (reLoc $>) ([mu AnnDcolon $1], Just $2) }
 
 opt_datafam_kind_sig :: { Located ([AddEpAnn], LFamilyResultSig GhcPs) }
-        :               { noLoc     ([]               , noLoc (NoSig noExtField)         )}
-        | '::' kind     { sLL $1 (reLoc $>) ([mu AnnDcolon $1], sLL $1 (reLoc $>) (KindSig noExtField $2))}
+        :               { noLoc     ([]               , noLocA (NoSig noExtField)         )}
+        | '::' kind     { sLL $1 (reLoc $>) ([mu AnnDcolon $1], sLLa $1 (reLoc $>) (KindSig noExtField $2))}
 
 opt_tyfam_kind_sig :: { Located ([AddEpAnn], LFamilyResultSig GhcPs) }
-        :              { noLoc     ([]               , noLoc     (NoSig    noExtField)   )}
-        | '::' kind    { sLL $1 (reLoc $>) ([mu AnnDcolon $1], sLL $1 (reLoc $>) (KindSig  noExtField $2))}
+        :              { noLoc     ([]               , noLocA     (NoSig    noExtField)   )}
+        | '::' kind    { sLL $1 (reLoc $>) ([mu AnnDcolon $1], sLLa $1 (reLoc $>) (KindSig  noExtField $2))}
         | '='  tv_bndr {% do { tvb <- fromSpecTyVarBndr $2
-                             ; return $ sLL $1 (reLoc $>) ([mj AnnEqual $1], sLL $1 (reLoc $>) (TyVarSig noExtField tvb))} }
+                             ; return $ sLL $1 (reLoc $>) ([mj AnnEqual $1], sLLa $1 (reLoc $>) (TyVarSig noExtField tvb))} }
 
 opt_at_kind_inj_sig :: { Located ([AddEpAnn], ( LFamilyResultSig GhcPs
                                             , Maybe (LInjectivityAnn GhcPs)))}
-        :            { noLoc ([], (noLoc (NoSig noExtField), Nothing)) }
+        :            { noLoc ([], (noLocA (NoSig noExtField), Nothing)) }
         | '::' kind  { sLL $1 (reLoc $>) ( [mu AnnDcolon $1]
-                                 , (sL1A $> (KindSig noExtField $2), Nothing)) }
+                                 , (sL1a (reLoc $>) (KindSig noExtField $2), Nothing)) }
         | '='  tv_bndr_no_braces '|' injectivity_cond
                 {% do { tvb <- fromSpecTyVarBndr $2
-                      ; return $ sLL $1 $> ([mj AnnEqual $1, mj AnnVbar $3]
-                                           , (sLL $1 (reLoc $2) (TyVarSig noExtField tvb), Just $4))} }
+                      ; return $ sLL $1 (reLoc $>) ([mj AnnEqual $1, mj AnnVbar $3]
+                                           , (sLLa $1 (reLoc $2) (TyVarSig noExtField tvb), Just $4))} }
 
 -- tycl_hdr parses the header of a class or data type decl,
 -- which takes the form
@@ -1839,7 +1839,7 @@ rule    :: { LRuleDecl GhcPs }
            runPV (unECP $6) >>= \ $6 ->
            acsA (\cs -> (sLLlA $1 $> $ HsRule
                                    { rd_ext = EpAnn (glR $1) ((fstOf3 $3) (mj AnnEqual $5 : (fst $2))) cs
-                                   , rd_name = L (gl $1) (getSTRINGs $1, getSTRING $1)
+                                   , rd_name = L (noAnnSrcSpan $ gl $1) (getSTRINGs $1, getSTRING $1)
                                    , rd_act = (snd $2) `orElse` AlwaysActive
                                    , rd_tyvs = sndOf3 $3, rd_tmvs = thdOf3 $3
                                    , rd_lhs = $4, rd_rhs = $6 })) }
@@ -1898,8 +1898,8 @@ rule_vars :: { [LRuleTyTmVar] }
         | {- empty -}                           { [] }
 
 rule_var :: { LRuleTyTmVar }
-        : varid                         { sL1N $1 (RuleTyTmVar noAnn $1 Nothing) }
-        | '(' varid '::' ctype ')'      {% acs (\cs -> sLL $1 $> (RuleTyTmVar (EpAnn (glR $1) [mop $1,mu AnnDcolon $3,mcp $5] cs) $2 (Just $4))) }
+        : varid                         { sL1l $1 (RuleTyTmVar noAnn $1 Nothing) }
+        | '(' varid '::' ctype ')'      {% acsA (\cs -> sLL $1 $> (RuleTyTmVar (EpAnn (glR $1) [mop $1,mu AnnDcolon $3,mcp $5] cs) $2 (Just $4))) }
 
 {- Note [Parsing explicit foralls in Rules]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2118,7 +2118,7 @@ ctype   :: { LHsType GhcPs }
                                                      , hst_xqual = NoExtField
                                                      , hst_body = $3 })) }
 
-        | ipvar '::' type             {% acsA (\cs -> sLL $1 (reLoc $>) (HsIParamTy (EpAnn (glR $1) [mu AnnDcolon $2] cs) $1 $3)) }
+        | ipvar '::' type             {% acsA (\cs -> sLL $1 (reLoc $>) (HsIParamTy (EpAnn (glR $1) [mu AnnDcolon $2] cs) (reLocA $1) $3)) }
         | type                        { $1 }
 
 ----------------------
@@ -2439,7 +2439,7 @@ fielddecl :: { LConDeclField GhcPs }
         : sig_vars '::' ctype
             {% acsA (\cs -> L (comb2 $1 (reLoc $3))
                       (ConDeclField (EpAnn (glR $1) [mu AnnDcolon $2] cs)
-                                    (reverse (map (\ln@(L l n) -> L (locA l) $ FieldOcc noExtField ln) (unLoc $1))) $3 Nothing))}
+                                    (reverse (map (\ln@(L l n) -> L (l2l l) $ FieldOcc noExtField ln) (unLoc $1))) $3 Nothing))}
 
 -- Reversed!
 maybe_derivings :: { Located (HsDeriving GhcPs) }
@@ -2448,23 +2448,23 @@ maybe_derivings :: { Located (HsDeriving GhcPs) }
 
 -- A list of one or more deriving clauses at the end of a datatype
 derivings :: { Located (HsDeriving GhcPs) }
-        : derivings deriving      { sLL $1 $> ($2 : unLoc $1) } -- AZ: order?
-        | deriving                { sLL $1 $> [$1] }
+        : derivings deriving      { sLL $1 (reLoc $>) ($2 : unLoc $1) } -- AZ: order?
+        | deriving                { sL1 (reLoc $>) [$1] }
 
 -- The outer Located is just to allow the caller to
 -- know the rightmost extremity of the 'deriving' clause
 deriving :: { LHsDerivingClause GhcPs }
         : 'deriving' deriv_clause_types
               {% let { full_loc = comb2A $1 $> }
-                 in acs (\cs -> L full_loc $ HsDerivingClause (EpAnn (glR $1) [mj AnnDeriving $1] cs) Nothing $2) }
+                 in acsA (\cs -> L full_loc $ HsDerivingClause (EpAnn (glR $1) [mj AnnDeriving $1] cs) Nothing $2) }
 
         | 'deriving' deriv_strategy_no_via deriv_clause_types
               {% let { full_loc = comb2A $1 $> }
-                 in acs (\cs -> L full_loc $ HsDerivingClause (EpAnn (glR $1) [mj AnnDeriving $1] cs) (Just $2) $3) }
+                 in acsA (\cs -> L full_loc $ HsDerivingClause (EpAnn (glR $1) [mj AnnDeriving $1] cs) (Just $2) $3) }
 
         | 'deriving' deriv_clause_types deriv_strategy_via
-              {% let { full_loc = comb2 $1 $> }
-                 in acs (\cs -> L full_loc $ HsDerivingClause (EpAnn (glR $1) [mj AnnDeriving $1] cs) (Just $3) $2) }
+              {% let { full_loc = comb2 $1 (reLoc $>) }
+                 in acsA (\cs -> L full_loc $ HsDerivingClause (EpAnn (glR $1) [mj AnnDeriving $1] cs) (Just $3) $2) }
 
 deriv_clause_types :: { LDerivClauseTys GhcPs }
         : qtycon              { let { tc = sL1 (reLocL $1) $ mkHsImplicitSigType $
@@ -2533,12 +2533,12 @@ rhs     :: { Located (GRHSs GhcPs (LHsExpr GhcPs)) }
                                                 (GRHSs (cs Semi.<> csw) (reverse (unLoc $1)) bs)) }}
 
 gdrhs :: { Located [LGRHS GhcPs (LHsExpr GhcPs)] }
-        : gdrhs gdrh            { sLL $1 $> ($2 : unLoc $1) }
-        | gdrh                  { sL1 $1 [$1] }
+        : gdrhs gdrh            { sLL $1 (reLoc $>) ($2 : unLoc $1) }
+        | gdrh                  { sL1 (reLoc $1) [$1] }
 
 gdrh :: { LGRHS GhcPs (LHsExpr GhcPs) }
         : '|' guardquals '=' exp  {% runPV (unECP $4) >>= \ $4 ->
-                                     acs (\cs -> sL (comb2A $1 $>) $ GRHS (EpAnn (glR $1) (GrhsAnn (Just $ glAA $1) (mj AnnEqual $3)) cs) (unLoc $2) $4) }
+                                     acsA (\cs -> sL (comb2A $1 $>) $ GRHS (EpAnn (glR $1) (GrhsAnn (Just $ glAA $1) (mj AnnEqual $3)) cs) (unLoc $2) $4) }
 
 sigdecl :: { LHsDecl GhcPs }
         :
@@ -2581,7 +2581,7 @@ sigdecl :: { LHsDecl GhcPs }
         | '{-# SCC' qvar STRING '#-}'
           {% do { scc <- getSCC $3
                 ; let str_lit = StringLiteral (getSTRINGs $3) scc Nothing
-                ; acsA (\cs -> sLL $1 $> (SigD noExtField (SCCFunSig (EpAnn (glR $1) [mo $1, mc $4] cs) (getSCC_PRAGs $1) $2 (Just ( sL1 $3 str_lit))))) }}
+                ; acsA (\cs -> sLL $1 $> (SigD noExtField (SCCFunSig (EpAnn (glR $1) [mo $1, mc $4] cs) (getSCC_PRAGs $1) $2 (Just ( sL1a $3 str_lit))))) }}
 
         | '{-# SPECIALISE' activation qvar '::' sigtypes1 '#-}'
              {% acsA (\cs ->
@@ -2846,7 +2846,7 @@ aexp    :: { ECP }
                        {% (checkPattern <=< runPV) (unECP $2) >>= \ p ->
                            runPV (unECP $4) >>= \ $4@cmd ->
                            fmap ecpFromExp $
-                           acsA (\cs -> sLLlA $1 $> $ HsProc (EpAnn (glR $1) [mj AnnProc $1,mu AnnRarrow $3] cs) p (sLLlA $1 $> $ HsCmdTop noExtField cmd)) }
+                           acsA (\cs -> sLLlA $1 $> $ HsProc (EpAnn (glR $1) [mj AnnProc $1,mu AnnRarrow $3] cs) p (sLLa $1 (reLoc $>) $ HsCmdTop noExtField cmd)) }
 
         | aexp1                 { $1 }
 
@@ -2863,7 +2863,7 @@ aexp1   :: { ECP }
         | aexp1 TIGHT_INFIX_PROJ field
             {% runPV (unECP $1) >>= \ $1 ->
                fmap ecpFromExp $ acsa (\cs ->
-                 let fl = sLL $2 $> (DotFieldOcc ((EpAnn (glR $2) (AnnFieldLabel (Just $ glAA $2)) emptyComments)) $3) in
+                 let fl = sLLa $2 $> (DotFieldOcc ((EpAnn (glR $2) (AnnFieldLabel (Just $ glAA $2)) emptyComments)) (reLocA $3)) in
                  mkRdrGetField (noAnnSrcSpan $ comb2 (reLoc $1) $>) $1 fl (EpAnn (glAR $1) NoEpAnns cs))  }
 
 
@@ -2880,8 +2880,8 @@ aexp2   :: { ECP }
 -- into HsOverLit when -foverloaded-strings is on.
 --      | STRING    { sL (getLoc $1) (HsOverLit $! mkHsIsString (getSTRINGs $1)
 --                                       (getSTRING $1) noExtField) }
-        | INTEGER   { ECP $ pvA $ mkHsOverLitPV (sL1 $1 $ mkHsIntegral   (getINTEGER  $1)) }
-        | RATIONAL  { ECP $ pvA $ mkHsOverLitPV (sL1 $1 $ mkHsFractional (getRATIONAL $1)) }
+        | INTEGER   { ECP $ mkHsOverLitPV (sL1a $1 $ mkHsIntegral   (getINTEGER  $1)) }
+        | RATIONAL  { ECP $ mkHsOverLitPV (sL1a $1 $ mkHsFractional (getRATIONAL $1)) }
 
         -- N.B.: sections get parsed by these next two productions.
         -- This allows you to write, e.g., '(+ 3, 4 -)', which isn't
@@ -2945,12 +2945,12 @@ aexp2   :: { ECP }
                                       acsA (\cs -> sLL $1 $> $ HsCmdArrForm (EpAnn (glR $1) (AnnList (Just $ glR $1) (Just $ mu AnnOpenB $1) (Just $ mu AnnCloseB $4) [] []) cs) $2 Prefix
                                                            Nothing (reverse $3)) }
 
-projection :: { Located [Located (DotFieldOcc GhcPs)] }
+projection :: { Located [LocatedAn NoEpAnns (DotFieldOcc GhcPs)] }
 projection
         -- See Note [Whitespace-sensitive operator parsing] in GHC.Parsing.Lexer
         : projection TIGHT_INFIX_PROJ field
-                             {% acs (\cs -> sLL $1 $> ((sLL $2 $> $ DotFieldOcc (EpAnn (glR $1) (AnnFieldLabel (Just $ glAA $2)) cs) $3) : unLoc $1)) }
-        | PREFIX_PROJ field  {% acs (\cs -> sLL $1 $>  [sLL $1 $> $ DotFieldOcc (EpAnn (glR $1) (AnnFieldLabel (Just $ glAA $1)) cs) $2]) }
+                             {% acs (\cs -> sLL $1 $> ((sLLa $2 $> $ DotFieldOcc (EpAnn (glR $1) (AnnFieldLabel (Just $ glAA $2)) cs) (reLocA $3)) : unLoc $1)) }
+        | PREFIX_PROJ field  {% acs (\cs -> sLL $1 $>  [sLLa $1 $> $ DotFieldOcc (EpAnn (glR $1) (AnnFieldLabel (Just $ glAA $1)) cs) (reLocA $2)]) }
 
 splice_exp :: { LHsExpr GhcPs }
         : splice_untyped { mapLoc (HsSpliceE noAnn) (reLocA $1) }
@@ -2974,7 +2974,7 @@ cmdargs :: { [LHsCmdTop GhcPs] }
 acmd    :: { LHsCmdTop GhcPs }
         : aexp                  {% runPV (unECP $1) >>= \ (cmd :: LHsCmd GhcPs) ->
                                    runPV (checkCmdBlockArguments cmd) >>= \ _ ->
-                                   return (sL1A cmd $ HsCmdTop noExtField cmd) }
+                                   return (sL1a (reLoc cmd) $ HsCmdTop noExtField cmd) }
 
 cvtopbody :: { ([AddEpAnn],[LHsDecl GhcPs]) }
         :  '{'            cvtopdecls0 '}'      { ([mj AnnOpenC $1
@@ -3260,8 +3260,8 @@ ralt :: { forall b. DisambECP b => PV (Located [LGRHS GhcPs (LocatedA b)]) }
 gdpats :: { forall b. DisambECP b => PV (Located [LGRHS GhcPs (LocatedA b)]) }
         : gdpats gdpat { $1 >>= \gdpats ->
                          $2 >>= \gdpat ->
-                         return $ sLL gdpats gdpat (gdpat : unLoc gdpats) }
-        | gdpat        { $1 >>= \gdpat -> return $ sL1 gdpat [gdpat] }
+                         return $ sLL gdpats (reLoc gdpat) (gdpat : unLoc gdpats) }
+        | gdpat        { $1 >>= \gdpat -> return $ sL1A gdpat [gdpat] }
 
 -- layout for MultiWayIf doesn't begin with an open brace, because it's hard to
 -- generate the open brace in addition to the vertical bar in the lexer, and
@@ -3275,7 +3275,7 @@ ifgdpats :: { Located ([AddEpAnn],[LGRHS GhcPs (LHsExpr GhcPs)]) }
 gdpat   :: { forall b. DisambECP b => PV (LGRHS GhcPs (LocatedA b)) }
         : '|' guardquals '->' exp
                                    { unECP $4 >>= \ $4 ->
-                                     acs (\cs -> sL (comb2A $1 $>) $ GRHS (EpAnn (glR $1) (GrhsAnn (Just $ glAA $1) (mu AnnRarrow $3)) cs) (unLoc $2) $4) }
+                                     acsA (\cs -> sL (comb2A $1 $>) $ GRHS (EpAnn (glR $1) (GrhsAnn (Just $ glAA $1) (mu AnnRarrow $3)) cs) (unLoc $2) $4) }
 
 -- 'pat' recognises a pattern, including one with a bang at the top
 --      e.g.  "!x" or "!(x,y)" or "C a b" etc
@@ -3377,13 +3377,13 @@ fbinds1 :: { forall b. DisambECP b => PV ([Fbind b], Maybe SrcSpan) }
 
 fbind   :: { forall b. DisambECP b => PV (Fbind b) }
         : qvar '=' texp  { unECP $3 >>= \ $3 ->
-                           fmap Left $ acsA (\cs -> sLL (reLocN $1) (reLoc $>) $ HsFieldBind (EpAnn (glNR $1) [mj AnnEqual $2] cs) (sL1N $1 $ mkFieldOcc $1) $3 False) }
+                           fmap Left $ acsA (\cs -> sLL (reLocN $1) (reLoc $>) $ HsFieldBind (EpAnn (glNR $1) [mj AnnEqual $2] cs) (sL1l $1 $ mkFieldOcc $1) $3 False) }
                         -- RHS is a 'texp', allowing view patterns (#6038)
                         -- and, incidentally, sections.  Eg
                         -- f (R { x = show -> s }) = ...
 
         | qvar          { placeHolderPunRhs >>= \rhs ->
-                          fmap Left $ acsa (\cs -> sL1a (reLocN $1) $ HsFieldBind (EpAnn (glNR $1) [] cs) (sL1N $1 $ mkFieldOcc $1) rhs True) }
+                          fmap Left $ acsa (\cs -> sL1a (reLocN $1) $ HsFieldBind (EpAnn (glNR $1) [] cs) (sL1l $1 $ mkFieldOcc $1) rhs True) }
                         -- In the punning case, use a place-holder
                         -- The renamer fills in the final value
 
@@ -3391,10 +3391,10 @@ fbind   :: { forall b. DisambECP b => PV (Fbind b) }
         -- AZ: need to pull out the let block into a helper
         | field TIGHT_INFIX_PROJ fieldToUpdate '=' texp
                         { do
-                            let top = sL1 $1 $ DotFieldOcc noAnn $1
+                            let top = sL1a $1 $ DotFieldOcc noAnn (reLocA $1)
                                 ((L lf (DotFieldOcc _ f)):t) = reverse (unLoc $3)
-                                lf' = comb2 $2 (L lf ())
-                                fields = top : L lf' (DotFieldOcc (EpAnn (spanAsAnchor lf') (AnnFieldLabel (Just $ glAA $2)) emptyComments) f) : t
+                                lf' = comb2 $2 (reLoc $ L lf ())
+                                fields = top : L (noAnnSrcSpan lf') (DotFieldOcc (EpAnn (spanAsAnchor lf') (AnnFieldLabel (Just $ glAA $2)) emptyComments) f) : t
                                 final = last fields
                                 l = comb2 $1 $3
                                 isPun = False
@@ -3407,24 +3407,24 @@ fbind   :: { forall b. DisambECP b => PV (Fbind b) }
         -- AZ: need to pull out the let block into a helper
         | field TIGHT_INFIX_PROJ fieldToUpdate
                         { do
-                            let top =  sL1 $1 $ DotFieldOcc noAnn $1
+                            let top =  sL1a $1 $ DotFieldOcc noAnn (reLocA $1)
                                 ((L lf (DotFieldOcc _ f)):t) = reverse (unLoc $3)
-                                lf' = comb2 $2 (L lf ())
-                                fields = top : L lf' (DotFieldOcc (EpAnn (spanAsAnchor lf') (AnnFieldLabel (Just $ glAA $2)) emptyComments) f) : t
+                                lf' = comb2 $2 (reLoc $ L lf ())
+                                fields = top : L (noAnnSrcSpan lf') (DotFieldOcc (EpAnn (spanAsAnchor lf') (AnnFieldLabel (Just $ glAA $2)) emptyComments) f) : t
                                 final = last fields
                                 l = comb2 $1 $3
                                 isPun = True
-                            var <- mkHsVarPV (L (noAnnSrcSpan $ getLoc final) (mkRdrUnqual . mkVarOcc . unpackFS . unLoc . dfoLabel . unLoc $ final))
+                            var <- mkHsVarPV (L (noAnnSrcSpan $ getLocA final) (mkRdrUnqual . mkVarOcc . unpackFS . unLoc . dfoLabel . unLoc $ final))
                             fmap Right $ mkHsProjUpdatePV l (L l fields) var isPun []
                         }
 
-fieldToUpdate :: { Located [Located (DotFieldOcc GhcPs)] }
+fieldToUpdate :: { Located [LocatedAn NoEpAnns (DotFieldOcc GhcPs)] }
 fieldToUpdate
         -- See Note [Whitespace-sensitive operator parsing] in Lexer.x
         : fieldToUpdate TIGHT_INFIX_PROJ field   {% getCommentsFor (getLoc $3) >>= \cs ->
-                                                     return (sLL $1 $> ((sLL $2 $> (DotFieldOcc (EpAnn (glR $2) (AnnFieldLabel $ Just $ glAA $2) cs) $3)) : unLoc $1)) }
+                                                     return (sLL $1 $> ((sLLa $2 $> (DotFieldOcc (EpAnn (glR $2) (AnnFieldLabel $ Just $ glAA $2) cs) (reLocA $3))) : unLoc $1)) }
         | field       {% getCommentsFor (getLoc $1) >>= \cs ->
-                        return (sL1 $1 [sL1 $1 (DotFieldOcc (EpAnn (glR $1) (AnnFieldLabel Nothing) cs) $1)]) }
+                        return (sL1 $1 [sL1a $1 (DotFieldOcc (EpAnn (glR $1) (AnnFieldLabel Nothing) cs) (reLocA $1))]) }
 
 -----------------------------------------------------------------------------
 -- Implicit Parameter Bindings
@@ -3445,7 +3445,7 @@ dbinds  :: { Located [LIPBind GhcPs] } -- reversed
 
 dbind   :: { LIPBind GhcPs }
 dbind   : ipvar '=' exp                {% runPV (unECP $3) >>= \ $3 ->
-                                          acsA (\cs -> sLLlA $1 $> (IPBind (EpAnn (glR $1) [mj AnnEqual $2] cs) (Left $1) $3)) }
+                                          acsA (\cs -> sLLlA $1 $> (IPBind (EpAnn (glR $1) [mj AnnEqual $2] cs) (Left (reLocA $1)) $3)) }
 
 ipvar   :: { Located HsIPName }
         : IPDUPVARID            { sL1 $1 (HsIPName (getIPDUPVARID $1)) }
@@ -4020,6 +4020,10 @@ sL1N x = sL (getLocA x)   -- #define sL1   sL (getLoc $1)
 {-# INLINE sL1a #-}
 sL1a :: Located a -> b -> LocatedAn t b
 sL1a x = sL (noAnnSrcSpan $ getLoc x)   -- #define sL1   sL (getLoc $1)
+
+{-# INLINE sL1l #-}
+sL1l :: LocatedAn t a -> b -> LocatedAn u b
+sL1l x = sL (l2l $ getLoc x)   -- #define sL1   sL (getLoc $1)
 
 {-# INLINE sL1n #-}
 sL1n :: Located a -> b -> LocatedN b

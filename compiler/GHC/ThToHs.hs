@@ -127,18 +127,11 @@ getL = CvtM (\_ loc -> Right (loc,loc))
 setL :: SrcSpan -> CvtM ()
 setL loc = CvtM (\_ _ -> Right (loc, ()))
 
-returnL :: a -> CvtM (Located a)
-returnL x = CvtM (\_ loc -> Right (loc, L loc x))
-
--- returnLA :: a -> CvtM (LocatedA a)
 returnLA :: e -> CvtM (GenLocated (SrcSpanAnn' (EpAnn ann)) e)
 returnLA x = CvtM (\_ loc -> Right (loc, L (noAnnSrcSpan loc) x))
 
 returnJustLA :: a -> CvtM (Maybe (LocatedA a))
 returnJustLA = fmap Just . returnLA
-
--- wrapParL :: (Located a -> a) -> a -> CvtM a
--- wrapParL add_par x = CvtM (\_ loc -> Right (loc, add_par (L loc x)))
 
 wrapParLA :: (LocatedA a -> a) -> a -> CvtM a
 wrapParLA add_par x = CvtM (\_ loc -> Right (loc, add_par (L (noAnnSrcSpan loc) x)))
@@ -401,7 +394,7 @@ cvtDec (ClosedTypeFamilyD head eqns)
 
 cvtDec (TH.RoleAnnotD tc roles)
   = do { tc' <- tconNameN tc
-       ; let roles' = map (noLoc . cvtRole) roles
+       ; let roles' = map (noLocA . cvtRole) roles
        ; returnJustLA
                    $ Hs.RoleAnnotD noExtField (RoleAnnotDecl noAnn tc' roles') }
 
@@ -701,7 +694,7 @@ cvt_id_arg (i, str, ty)
         ; return $ noLocA (ConDeclField
                           { cd_fld_ext = noAnn
                           , cd_fld_names
-                              = [L (locA li) $ FieldOcc noExtField (L li i')]
+                              = [L (l2l li) $ FieldOcc noExtField (L li i')]
                           , cd_fld_type =  ty'
                           , cd_fld_doc = Nothing}) }
 
@@ -824,7 +817,7 @@ cvtPragmaD (RuleP nm ty_bndrs tm_bndrs lhs rhs phases)
                       , rds_src = SourceText "{-# RULES"
                       , rds_rules = [noLocA $
                           HsRule { rd_ext  = noAnn
-                                 , rd_name = (noLoc (quotedSourceText nm,nm'))
+                                 , rd_name = (noLocA (quotedSourceText nm,nm'))
                                  , rd_act  = act
                                  , rd_tyvs = ty_bndrs'
                                  , rd_tmvs = tm_bndrs'
@@ -878,11 +871,11 @@ cvtPhases (BeforePhase i) _    = ActiveBefore NoSourceText i
 cvtRuleBndr :: TH.RuleBndr -> CvtM (Hs.LRuleBndr GhcPs)
 cvtRuleBndr (RuleVar n)
   = do { n' <- vNameN n
-       ; return $ noLoc $ Hs.RuleBndr noAnn n' }
+       ; return $ noLocA $ Hs.RuleBndr noAnn n' }
 cvtRuleBndr (TypedRuleVar n ty)
   = do { n'  <- vNameN n
        ; ty' <- cvtType ty
-       ; return $ noLoc $ Hs.RuleBndrSig noAnn n' $ mkHsPatSigType noAnn ty' }
+       ; return $ noLocA $ Hs.RuleBndrSig noAnn n' $ mkHsPatSigType noAnn ty' }
 
 ---------------------------------------------------
 --              Declarations
@@ -917,7 +910,7 @@ cvtImplicitParamBind :: String -> TH.Exp -> CvtM (LIPBind GhcPs)
 cvtImplicitParamBind n e = do
     n' <- wrapL (ipName n)
     e' <- cvtl e
-    returnLA (IPBind noAnn (Left n') e')
+    returnLA (IPBind noAnn (Left (reLocA n')) e')
 
 -------------------------------------------------------------------
 --              Expressions
@@ -1056,8 +1049,8 @@ cvtl e = wrapLA (cvt e)
     cvt (LabelE s)       = return $ HsOverLabel noComments (fsLit s)
     cvt (ImplicitParamVarE n) = do { n' <- ipName n; return $ HsIPVar noComments n' }
     cvt (GetFieldE exp f) = do { e' <- cvtl exp
-                               ; return $ HsGetField noComments e' (L noSrcSpan (DotFieldOcc noAnn (L noSrcSpan (fsLit f)))) }
-    cvt (ProjectionE xs) = return $ HsProjection noAnn $ map (L noSrcSpan . DotFieldOcc noAnn . L noSrcSpan . fsLit) xs
+                               ; return $ HsGetField noComments e' (L noSrcSpanA (DotFieldOcc noAnn (L noSrcSpanA (fsLit f)))) }
+    cvt (ProjectionE xs) = return $ HsProjection noAnn $ map (L noSrcSpanA . DotFieldOcc noAnn . L noSrcSpanA . fsLit) xs
 
 {- | #16895 Ensure an infix expression's operator is a variable/constructor.
 Consider this example:
@@ -1093,11 +1086,11 @@ which we don't want.
 -}
 
 cvtFld :: (RdrName -> t) -> (TH.Name, TH.Exp)
-       -> CvtM (LHsFieldBind GhcPs (Located t) (LHsExpr GhcPs))
+       -> CvtM (LHsFieldBind GhcPs (LocatedAn NoEpAnns t) (LHsExpr GhcPs))
 cvtFld f (v,e)
   = do  { v' <- vNameL v; e' <- cvtl e
         ; return (noLocA $ HsFieldBind { hfbAnn = noAnn
-                                       , hfbLHS = reLoc $ fmap f v'
+                                       , hfbLHS = la2la $ fmap f v'
                                        , hfbRHS = e'
                                        , hfbPun = False}) }
 
@@ -1228,14 +1221,14 @@ cvtMatch ctxt (TH.Match p body decs)
 cvtGuard :: TH.Body -> CvtM [LGRHS GhcPs (LHsExpr GhcPs)]
 cvtGuard (GuardedB pairs) = mapM cvtpair pairs
 cvtGuard (NormalB e)      = do { e' <- cvtl e
-                               ; g' <- returnL $ GRHS noAnn [] e'; return [g'] }
+                               ; g' <- returnLA $ GRHS noAnn [] e'; return [g'] }
 
 cvtpair :: (TH.Guard, TH.Exp) -> CvtM (LGRHS GhcPs (LHsExpr GhcPs))
 cvtpair (NormalG ge,rhs) = do { ge' <- cvtl ge; rhs' <- cvtl rhs
                               ; g' <- returnLA $ mkBodyStmt ge'
-                              ; returnL $ GRHS noAnn [g'] rhs' }
+                              ; returnLA $ GRHS noAnn [g'] rhs' }
 cvtpair (PatG gs,rhs)    = do { gs' <- cvtStmts gs; rhs' <- cvtl rhs
-                              ; returnL $ GRHS noAnn gs' rhs' }
+                              ; returnLA $ GRHS noAnn gs' rhs' }
 
 cvtOverLit :: Lit -> CvtM (HsOverLit GhcPs)
 cvtOverLit (IntegerL i)
@@ -1308,7 +1301,7 @@ cvtPat pat = wrapLA (cvtp pat)
 cvtp :: TH.Pat -> CvtM (Hs.Pat GhcPs)
 cvtp (TH.LitP l)
   | overloadedLit l    = do { l' <- cvtOverLit l
-                            ; return (mkNPat (noLoc l') Nothing noAnn) }
+                            ; return (mkNPat (noLocA l') Nothing noAnn) }
                                   -- Not right for negative patterns;
                                   -- need to think about that!
   | otherwise          = do { l' <- cvtLit l; return $ Hs.LitPat noExtField l' }
@@ -1374,7 +1367,7 @@ cvtPatFld (s,p)
         ; p' <- cvtPat p
         ; return (noLocA $ HsFieldBind { hfbAnn = noAnn
                                        , hfbLHS
-                                          = L (locA ls) $ mkFieldOcc (L ls s')
+                                          = L (l2l ls) $ mkFieldOcc (L (l2l ls) s')
                                        , hfbRHS = p'
                                        , hfbPun = False}) }
 
@@ -1456,15 +1449,15 @@ cvtDerivClause :: TH.DerivClause
 cvtDerivClause (TH.DerivClause ds tys)
   = do { tys' <- cvtDerivClauseTys tys
        ; ds'  <- traverse cvtDerivStrategy ds
-       ; returnL $ HsDerivingClause noAnn ds' tys' }
+       ; returnLA $ HsDerivingClause noAnn ds' tys' }
 
 cvtDerivStrategy :: TH.DerivStrategy -> CvtM (Hs.LDerivStrategy GhcPs)
-cvtDerivStrategy TH.StockStrategy    = returnL (Hs.StockStrategy noAnn)
-cvtDerivStrategy TH.AnyclassStrategy = returnL (Hs.AnyclassStrategy noAnn)
-cvtDerivStrategy TH.NewtypeStrategy  = returnL (Hs.NewtypeStrategy noAnn)
+cvtDerivStrategy TH.StockStrategy    = returnLA (Hs.StockStrategy noAnn)
+cvtDerivStrategy TH.AnyclassStrategy = returnLA (Hs.AnyclassStrategy noAnn)
+cvtDerivStrategy TH.NewtypeStrategy  = returnLA (Hs.NewtypeStrategy noAnn)
 cvtDerivStrategy (TH.ViaStrategy ty) = do
   ty' <- cvtSigType ty
-  returnL $ Hs.ViaStrategy (XViaStrategyPs noAnn ty')
+  returnLA $ Hs.ViaStrategy (XViaStrategyPs noAnn ty')
 
 cvtType :: TH.Type -> CvtM (LHsType GhcPs)
 cvtType = cvtTypeKind "type"
@@ -1677,7 +1670,7 @@ cvtTypeKind ty_str ty
            ImplicitParamT n t
              -> do { n' <- wrapL $ ipName n
                    ; t' <- cvtType t
-                   ; returnLA (HsIParamTy noAnn n' t')
+                   ; returnLA (HsIParamTy noAnn (reLocA n') t')
                    }
 
            _ -> failWith (text "Malformed " <> text ty_str <+> text (show ty))
@@ -1796,18 +1789,18 @@ cvtSigKind = cvtSigTypeKind "kind"
 -- signature is possible).
 cvtMaybeKindToFamilyResultSig :: Maybe TH.Kind
                               -> CvtM (LFamilyResultSig GhcPs)
-cvtMaybeKindToFamilyResultSig Nothing   = returnL (Hs.NoSig noExtField)
+cvtMaybeKindToFamilyResultSig Nothing   = returnLA (Hs.NoSig noExtField)
 cvtMaybeKindToFamilyResultSig (Just ki) = do { ki' <- cvtKind ki
-                                             ; returnL (Hs.KindSig noExtField ki') }
+                                             ; returnLA (Hs.KindSig noExtField ki') }
 
 -- | Convert type family result signature. Used with both open and closed type
 -- families.
 cvtFamilyResultSig :: TH.FamilyResultSig -> CvtM (Hs.LFamilyResultSig GhcPs)
-cvtFamilyResultSig TH.NoSig           = returnL (Hs.NoSig noExtField)
+cvtFamilyResultSig TH.NoSig           = returnLA (Hs.NoSig noExtField)
 cvtFamilyResultSig (TH.KindSig ki)    = do { ki' <- cvtKind ki
-                                           ; returnL (Hs.KindSig noExtField  ki') }
+                                           ; returnLA (Hs.KindSig noExtField  ki') }
 cvtFamilyResultSig (TH.TyVarSig bndr) = do { tv <- cvt_tv bndr
-                                           ; returnL (Hs.TyVarSig noExtField tv) }
+                                           ; returnLA (Hs.TyVarSig noExtField tv) }
 
 -- | Convert injectivity annotation of a type family.
 cvtInjectivityAnnotation :: TH.InjectivityAnn
@@ -1815,7 +1808,7 @@ cvtInjectivityAnnotation :: TH.InjectivityAnn
 cvtInjectivityAnnotation (TH.InjectivityAnn annLHS annRHS)
   = do { annLHS' <- tNameN annLHS
        ; annRHS' <- mapM tNameN annRHS
-       ; returnL (Hs.InjectivityAnn noAnn annLHS' annRHS') }
+       ; returnLA (Hs.InjectivityAnn noAnn annLHS' annRHS') }
 
 cvtPatSynSigTy :: TH.Type -> CvtM (LHsSigType GhcPs)
 -- pattern synonym types are of peculiar shapes, which is why we treat

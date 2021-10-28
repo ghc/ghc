@@ -1181,8 +1181,8 @@ type AnnoBody body
     , Anno [LocatedA (Match GhcPs (LocatedA (body GhcPs)))] ~ SrcSpanAnnL
     , Anno (Match GhcRn (LocatedA (body GhcRn))) ~ SrcSpanAnnA
     , Anno (Match GhcPs (LocatedA (body GhcPs))) ~ SrcSpanAnnA
-    , Anno (GRHS GhcRn (LocatedA (body GhcRn))) ~ SrcSpan
-    , Anno (GRHS GhcPs (LocatedA (body GhcPs))) ~ SrcSpan
+    , Anno (GRHS GhcRn (LocatedA (body GhcRn))) ~ SrcAnn NoEpAnns
+    , Anno (GRHS GhcPs (LocatedA (body GhcPs))) ~ SrcAnn NoEpAnns
     , Outputable (body GhcPs)
     )
 
@@ -1254,7 +1254,7 @@ rnGRHS :: AnnoBody body
        -> (LocatedA (body GhcPs) -> RnM (LocatedA (body GhcRn), FreeVars))
        -> LGRHS GhcPs (LocatedA (body GhcPs))
        -> RnM (LGRHS GhcRn (LocatedA (body GhcRn)), FreeVars)
-rnGRHS ctxt rnBody = wrapLocFstM (rnGRHS' ctxt rnBody)
+rnGRHS ctxt rnBody = wrapLocFstMA (rnGRHS' ctxt rnBody)
 
 rnGRHS' :: HsMatchContext GhcRn
         -> (LocatedA (body GhcPs) -> RnM (LocatedA (body GhcRn), FreeVars))

@@ -175,7 +175,7 @@ tcRule (HsRule { rd_ext  = ext
                          , rd_name = rname
                          , rd_act = act
                          , rd_tyvs = ty_bndrs -- preserved for ppr-ing
-                         , rd_tmvs = map (noLoc . RuleBndr noAnn . noLocA)
+                         , rd_tmvs = map (noLocA . RuleBndr noAnn . noLocA)
                                          (qtkvs ++ tpl_ids)
                          , rd_lhs  = mkHsDictLet lhs_binds lhs'
                          , rd_rhs  = mkHsDictLet rhs_binds rhs' } }

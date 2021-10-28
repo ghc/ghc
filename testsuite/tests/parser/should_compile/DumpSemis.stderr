@@ -237,7 +237,9 @@
             (EpaComments
              [])
             [(L
-              { DumpSemis.hs:(10,5)-(12,3) }
+              (SrcSpanAnn
+               (EpAnnNotUsed)
+               { DumpSemis.hs:(10,5)-(12,3) })
               (GRHS
                (EpAnn
                 (Anchor
@@ -481,7 +483,9 @@
             (EpaComments
              [])
             [(L
-              { DumpSemis.hs:(15,5)-(19,3) }
+              (SrcSpanAnn
+               (EpAnnNotUsed)
+               { DumpSemis.hs:(15,5)-(19,3) })
               (GRHS
                (EpAnn
                 (Anchor
@@ -685,7 +689,9 @@
             (EpaComments
              [])
             [(L
-              { DumpSemis.hs:22:5-30 }
+              (SrcSpanAnn
+               (EpAnnNotUsed)
+               { DumpSemis.hs:22:5-30 })
               (GRHS
                (EpAnn
                 (Anchor
@@ -853,7 +859,9 @@
             (EpaComments
              [])
             [(L
-              { DumpSemis.hs:24:3-13 }
+              (SrcSpanAnn
+               (EpAnnNotUsed)
+               { DumpSemis.hs:24:3-13 })
               (GRHS
                (EpAnn
                 (Anchor
@@ -920,7 +928,9 @@
             (EpaComments
              [])
             [(L
-              { DumpSemis.hs:25:3-13 }
+              (SrcSpanAnn
+               (EpAnnNotUsed)
+               { DumpSemis.hs:25:3-13 })
               (GRHS
                (EpAnn
                 (Anchor
@@ -988,7 +998,9 @@
             (EpaComments
              [])
             [(L
-              { DumpSemis.hs:26:3-13 }
+              (SrcSpanAnn
+               (EpAnnNotUsed)
+               { DumpSemis.hs:26:3-13 })
               (GRHS
                (EpAnn
                 (Anchor
@@ -1389,7 +1401,9 @@
             (EpaComments
              [])
             [(L
-              { DumpSemis.hs:32:5-7 }
+              (SrcSpanAnn
+               (EpAnnNotUsed)
+               { DumpSemis.hs:32:5-7 })
               (GRHS
                (EpAnn
                 (Anchor
@@ -1459,7 +1473,9 @@
             (EpaComments
              [])
             [(L
-              { DumpSemis.hs:34:9-35 }
+              (SrcSpanAnn
+               (EpAnnNotUsed)
+               { DumpSemis.hs:34:9-35 })
               (GRHS
                (EpAnn
                 (Anchor
@@ -1559,7 +1575,9 @@
                              (EpaComments
                               [])
                              [(L
-                               { DumpSemis.hs:34:20-21 }
+                               (SrcSpanAnn
+                                (EpAnnNotUsed)
+                                { DumpSemis.hs:34:20-21 })
                                (GRHS
                                 (EpAnn
                                  (Anchor
@@ -1640,7 +1658,9 @@
                              (EpaComments
                               [])
                              [(L
-                               { DumpSemis.hs:34:25-26 }
+                               (SrcSpanAnn
+                                (EpAnnNotUsed)
+                                { DumpSemis.hs:34:25-26 })
                                (GRHS
                                 (EpAnn
                                  (Anchor
@@ -1748,7 +1768,9 @@
             (EpaComments
              [])
             [(L
-              { DumpSemis.hs:(36,7)-(44,4) }
+              (SrcSpanAnn
+               (EpAnnNotUsed)
+               { DumpSemis.hs:(36,7)-(44,4) })
               (GRHS
                (EpAnn
                 (Anchor
@@ -1827,7 +1849,9 @@
                         (NPat
                          (EpAnnNotUsed)
                          (L
-                          { DumpSemis.hs:39:6 }
+                          (SrcSpanAnn
+                           (EpAnnNotUsed)
+                           { DumpSemis.hs:39:6 })
                           (OverLit
                            (NoExtField)
                            (HsIntegral
@@ -1841,7 +1865,9 @@
                        (EpaComments
                         [])
                        [(L
-                         { DumpSemis.hs:39:8-13 }
+                         (SrcSpanAnn
+                          (EpAnnNotUsed)
+                          { DumpSemis.hs:39:8-13 })
                          (GRHS
                           (EpAnn
                            (Anchor
@@ -1892,7 +1918,9 @@
                         (NPat
                          (EpAnnNotUsed)
                          (L
-                          { DumpSemis.hs:40:6 }
+                          (SrcSpanAnn
+                           (EpAnnNotUsed)
+                           { DumpSemis.hs:40:6 })
                           (OverLit
                            (NoExtField)
                            (HsIntegral
@@ -1906,7 +1934,9 @@
                        (EpaComments
                         [])
                        [(L
-                         { DumpSemis.hs:40:8-13 }
+                         (SrcSpanAnn
+                          (EpAnnNotUsed)
+                          { DumpSemis.hs:40:8-13 })
                          (GRHS
                           (EpAnn
                            (Anchor
@@ -1959,7 +1989,9 @@
                         (NPat
                          (EpAnnNotUsed)
                          (L
-                          { DumpSemis.hs:41:6 }
+                          (SrcSpanAnn
+                           (EpAnnNotUsed)
+                           { DumpSemis.hs:41:6 })
                           (OverLit
                            (NoExtField)
                            (HsIntegral
@@ -1973,7 +2005,9 @@
                        (EpaComments
                         [])
                        [(L
-                         { DumpSemis.hs:41:8-13 }
+                         (SrcSpanAnn
+                          (EpAnnNotUsed)
+                          { DumpSemis.hs:41:8-13 })
                          (GRHS
                           (EpAnn
                            (Anchor
@@ -2028,7 +2062,9 @@
                         (NPat
                          (EpAnnNotUsed)
                          (L
-                          { DumpSemis.hs:42:6 }
+                          (SrcSpanAnn
+                           (EpAnnNotUsed)
+                           { DumpSemis.hs:42:6 })
                           (OverLit
                            (NoExtField)
                            (HsIntegral
@@ -2042,7 +2078,9 @@
                        (EpaComments
                         [])
                        [(L
-                         { DumpSemis.hs:42:8-13 }
+                         (SrcSpanAnn
+                          (EpAnnNotUsed)
+                          { DumpSemis.hs:42:8-13 })
                          (GRHS
                           (EpAnn
                            (Anchor

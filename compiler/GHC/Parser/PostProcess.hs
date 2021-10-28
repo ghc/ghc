@@ -342,7 +342,7 @@ mkFamDecl :: SrcSpan
           -> FamilyInfo GhcPs
           -> TopLevelFlag
           -> LHsType GhcPs                   -- LHS
-          -> Located (FamilyResultSig GhcPs) -- Optional result signature
+          -> LFamilyResultSig GhcPs          -- Optional result signature
           -> Maybe (LInjectivityAnn GhcPs)   -- Injectivity annotation
           -> [AddEpAnn]
           -> P (LTyClDecl GhcPs)
@@ -407,10 +407,10 @@ mkRoleAnnotDecl loc tycon roles anns
     all_roles = map fromConstr $ dataTypeConstrs role_data_type
     possible_roles = [(fsFromRole role, role) | role <- all_roles]
 
-    parse_role (L loc_role Nothing) = return $ L loc_role Nothing
+    parse_role (L loc_role Nothing) = return $ L (noAnnSrcSpan loc_role) Nothing
     parse_role (L loc_role (Just role))
       = case lookup role possible_roles of
-          Just found_role -> return $ L loc_role $ Just found_role
+          Just found_role -> return $ L (noAnnSrcSpan loc_role) $ Just found_role
           Nothing         ->
             let nearby = fuzzyLookup (unpackFS role)
                   (mapFst unpackFS possible_roles)
@@ -898,7 +898,7 @@ checkDatatypeContext (Just c)
          unless allowed $ addError $ mkPlainErrorMsgEnvelope (getLocA c) $
                                        (PsErrIllegalDataTypeContext c)
 
-type LRuleTyTmVar = Located RuleTyTmVar
+type LRuleTyTmVar = LocatedAn NoEpAnns RuleTyTmVar
 data RuleTyTmVar = RuleTyTmVar (EpAnn [AddEpAnn]) (LocatedN RdrName) (Maybe (LHsType GhcPs))
 -- ^ Essentially a wrapper for a @RuleBndr GhcPs@
 
@@ -913,9 +913,9 @@ mkRuleBndrs = fmap (fmap cvt_one)
 mkRuleTyVarBndrs :: [LRuleTyTmVar] -> [LHsTyVarBndr () GhcPs]
 mkRuleTyVarBndrs = fmap cvt_one
   where cvt_one (L l (RuleTyTmVar ann v Nothing))
-          = L (noAnnSrcSpan l) (UserTyVar ann () (fmap tm_to_ty v))
+          = L (l2l l) (UserTyVar ann () (fmap tm_to_ty v))
         cvt_one (L l (RuleTyTmVar ann v (Just sig)))
-          = L (noAnnSrcSpan l) (KindedTyVar ann () (fmap tm_to_ty v) sig)
+          = L (l2l l) (KindedTyVar ann () (fmap tm_to_ty v) sig)
     -- takes something in namespace 'varName' to something in namespace 'tvName'
         tm_to_ty (Unqual occ) = Unqual (setOccNameSpace tvName occ)
         tm_to_ty _ = panic "mkRuleTyVarBndrs"
@@ -1156,7 +1156,7 @@ checkAPat loc e0 = do
    -- Overloaded numeric patterns (e.g. f 0 x = x)
    -- Negation is recorded separately, so that the literal is zero or +ve
    -- NB. Negative *primitive* literals are already handled by the lexer
-   PatBuilderOverLit pos_lit -> return (mkNPat (L (locA loc) pos_lit) Nothing noAnn)
+   PatBuilderOverLit pos_lit -> return (mkNPat (L (l2l loc) pos_lit) Nothing noAnn)
 
    -- n+k patterns
    PatBuilderOpApp
@@ -1165,7 +1165,7 @@ checkAPat loc e0 = do
            (L lloc (PatBuilderOverLit lit@(OverLit {ol_val = HsIntegral {}})))
            (EpAnn anc _ cs)
                      | nPlusKPatterns && (plus == plus_RDR)
-                     -> return (mkNPlusKPat (L nloc n) (L (locA lloc) lit)
+                     -> return (mkNPlusKPat (L nloc n) (L (l2l lloc) lit)
                                 (EpAnn anc (epaLocationFromSrcAnn l) cs))
 
    -- Improve error messages for the @-operator when the user meant an @-pattern
@@ -1438,7 +1438,7 @@ instance DisambInfixOp RdrName where
   mkHsInfixHolePV l _ = addFatalError $ mkPlainErrorMsgEnvelope l $ PsErrInvalidInfixHole
 
 type AnnoBody b
-  = ( Anno (GRHS GhcPs (LocatedA (Body b GhcPs))) ~ SrcSpan
+  = ( Anno (GRHS GhcPs (LocatedA (Body b GhcPs))) ~ SrcAnn NoEpAnns
     , Anno [LocatedA (Match GhcPs (LocatedA (Body b GhcPs)))] ~ SrcSpanAnnL
     , Anno (Match GhcPs (LocatedA (Body b GhcPs))) ~ SrcSpanAnnA
     , Anno (StmtLR GhcPs GhcPs (LocatedA (Body (Body b GhcPs) GhcPs))) ~ SrcSpanAnnA
@@ -1456,7 +1456,7 @@ class (b ~ (Body b) GhcPs, AnnoBody b) => DisambECP b where
   ecpFromCmd' :: LHsCmd GhcPs -> PV (LocatedA b)
   -- | Return an expression without ambiguity, or fail in a non-expression context.
   ecpFromExp' :: LHsExpr GhcPs -> PV (LocatedA b)
-  mkHsProjUpdatePV :: SrcSpan -> Located [Located (DotFieldOcc GhcPs)]
+  mkHsProjUpdatePV :: SrcSpan -> Located [LocatedAn NoEpAnns (DotFieldOcc GhcPs)]
     -> LocatedA b -> Bool -> [AddEpAnn] -> PV (LHsRecProj GhcPs (LocatedA b))
   -- | Disambiguate "\... -> ..." (lambda)
   mkHsLamPV
@@ -1516,7 +1516,7 @@ class (b ~ (Body b) GhcPs, AnnoBody b) => DisambECP b where
   -- | Disambiguate a monomorphic literal
   mkHsLitPV :: Located (HsLit GhcPs) -> PV (Located b)
   -- | Disambiguate an overloaded literal
-  mkHsOverLitPV :: Located (HsOverLit GhcPs) -> PV (Located b)
+  mkHsOverLitPV :: LocatedAn a (HsOverLit GhcPs) -> PV (LocatedAn a b)
   -- | Disambiguate a wildcard
   mkHsWildCardPV :: SrcSpan -> PV (Located b)
   -- | Disambiguate "a :: t" (type annotation)
@@ -1615,7 +1615,7 @@ instance DisambECP (HsCmd GhcPs) where
   type InfixOp (HsCmd GhcPs) = HsExpr GhcPs
   superInfixOp m = m
   mkHsOpAppPV l c1 op c2 = do
-    let cmdArg c = L (getLocA c) $ HsCmdTop noExtField c
+    let cmdArg c = L (l2l $ getLoc c) $ HsCmdTop noExtField c
     cs <- getCommentsFor l
     return $ L (noAnnSrcSpan l) $ HsCmdArrForm (EpAnn (spanAsAnchor l) (AnnList Nothing Nothing Nothing [] []) cs) (reLocL op) Infix Nothing [cmdArg c1, cmdArg c2]
   mkHsCasePV l c (L lm m) anns = do
@@ -1647,7 +1647,7 @@ instance DisambECP (HsCmd GhcPs) where
     return $ L (noAnnSrcSpan l) (HsCmdPar (EpAnn (spanAsAnchor l) NoEpAnns cs) lpar c rpar)
   mkHsVarPV (L l v) = cmdFail (locA l) (ppr v)
   mkHsLitPV (L l a) = cmdFail l (ppr a)
-  mkHsOverLitPV (L l a) = cmdFail l (ppr a)
+  mkHsOverLitPV (L l a) = cmdFail (locA l) (ppr a)
   mkHsWildCardPV l = cmdFail l (text "_")
   mkHsTySigPV l a sig _ = cmdFail (locA l) (ppr a <+> text "::" <+> ppr sig)
   mkHsExplicitListPV l xs _ = cmdFail l $
@@ -1737,8 +1737,8 @@ instance DisambECP (HsExpr GhcPs) where
     cs <- getCommentsFor l
     return $ L l (HsLit (comment (realSrcSpan l) cs) a)
   mkHsOverLitPV (L l a) = do
-    cs <- getCommentsFor l
-    return $ L l (HsOverLit (comment (realSrcSpan l) cs) a)
+    cs <- getCommentsFor (locA l)
+    return $ L l (HsOverLit (comment (realSrcSpan (locA l)) cs) a)
   mkHsWildCardPV l = return $ L l (hsHoleExpr noAnn)
   mkHsTySigPV l a sig anns = do
     cs <- getCommentsFor (locA l)
@@ -1778,7 +1778,7 @@ instance DisambECP (HsExpr GhcPs) where
 hsHoleExpr :: EpAnn EpAnnUnboundVar -> HsExpr GhcPs
 hsHoleExpr anns = HsUnboundVar anns (mkVarOcc "_")
 
-type instance Anno (GRHS GhcPs (LocatedA (PatBuilder GhcPs))) = SrcSpan
+type instance Anno (GRHS GhcPs (LocatedA (PatBuilder GhcPs))) = SrcAnn NoEpAnns
 type instance Anno [LocatedA (Match GhcPs (LocatedA (PatBuilder GhcPs)))] = SrcSpanAnnL
 type instance Anno (Match GhcPs (LocatedA (PatBuilder GhcPs))) = SrcSpanAnnA
 type instance Anno (StmtLR GhcPs GhcPs (LocatedA (PatBuilder GhcPs))) = SrcSpanAnnA
@@ -1833,7 +1833,7 @@ instance DisambECP (PatBuilder GhcPs) where
        checkRecordSyntax (L (noAnnSrcSpan l) r)
   mkHsNegAppPV l (L lp p) anns = do
     lit <- case p of
-      PatBuilderOverLit pos_lit -> return (L (locA lp) pos_lit)
+      PatBuilderOverLit pos_lit -> return (L (l2l lp) pos_lit)
       _ -> patFail l $ PsErrInPat p PEIP_NegApp
     cs <- getCommentsFor l
     let an = EpAnn (spanAsAnchor l) anns cs
@@ -2463,6 +2463,7 @@ mkRdrRecordUpd overloaded_on exp@(L loc _) fbinds anns = do
   -- overloaded_on) is in effect because it affects the Left/Right nature
   -- of the RecordUpd value we calculate.
   let (fs, ps) = partitionEithers fbinds
+      fs' :: [LHsRecUpdField GhcPs]
       fs' = map (fmap mk_rec_upd_field) fs
   case overloaded_on of
     False | not $ null ps ->
@@ -2481,7 +2482,7 @@ mkRdrRecordUpd overloaded_on exp@(L loc _) fbinds anns = do
             ]
       if not $ null qualifiedFields
         then
-          addFatalError $ mkPlainErrorMsgEnvelope (getLoc (head qualifiedFields)) $
+          addFatalError $ mkPlainErrorMsgEnvelope (getLocA (head qualifiedFields)) $
             PsErrOverloadedRecordUpdateNoQualifiedFields
         else -- This is a RecordDotSyntax update.
           return RecordUpd {
@@ -2498,9 +2499,9 @@ mkRdrRecordUpd overloaded_on exp@(L loc _) fbinds anns = do
     recFieldToProjUpdate (L l (HsFieldBind anns (L _ (FieldOcc _ (L loc rdr))) arg pun)) =
         -- The idea here is to convert the label to a singleton [FastString].
         let f = occNameFS . rdrNameOcc $ rdr
-            fl = DotFieldOcc noAnn (L lf f) -- AZ: what about the ann?
+            fl = DotFieldOcc noAnn (L (l2l loc) f) -- AZ: what about the ann?
             lf = locA loc
-        in mkRdrProjUpdate l (L lf [L lf fl]) (punnedVar f) pun anns
+        in mkRdrProjUpdate l (L lf [L (l2l loc) fl]) (punnedVar f) pun anns
         where
           -- If punning, compute HsVar "f" otherwise just arg. This
           -- has the effect that sentinel HsVar "pun-rhs" is replaced
@@ -3047,7 +3048,7 @@ starSym False = "*"
 -----------------------------------------
 -- Bits and pieces for RecordDotSyntax.
 
-mkRdrGetField :: SrcSpanAnnA -> LHsExpr GhcPs -> Located (DotFieldOcc GhcPs)
+mkRdrGetField :: SrcSpanAnnA -> LHsExpr GhcPs -> LocatedAn NoEpAnns (DotFieldOcc GhcPs)
   -> EpAnnCO -> LHsExpr GhcPs
 mkRdrGetField loc arg field anns =
   L loc HsGetField {
@@ -3056,7 +3057,7 @@ mkRdrGetField loc arg field anns =
     , gf_field = field
     }
 
-mkRdrProjection :: [Located (DotFieldOcc GhcPs)] -> EpAnn AnnProjection -> HsExpr GhcPs
+mkRdrProjection :: [LocatedAn NoEpAnns (DotFieldOcc GhcPs)] -> EpAnn AnnProjection -> HsExpr GhcPs
 mkRdrProjection [] _ = panic "mkRdrProjection: The impossible has happened!"
 mkRdrProjection flds anns =
   HsProjection {
@@ -3064,14 +3065,14 @@ mkRdrProjection flds anns =
     , proj_flds = flds
     }
 
-mkRdrProjUpdate :: SrcSpanAnnA -> Located [Located (DotFieldOcc GhcPs)]
+mkRdrProjUpdate :: SrcSpanAnnA -> Located [LocatedAn NoEpAnns (DotFieldOcc GhcPs)]
                 -> LHsExpr GhcPs -> Bool -> EpAnn [AddEpAnn]
                 -> LHsRecProj GhcPs (LHsExpr GhcPs)
 mkRdrProjUpdate _ (L _ []) _ _ _ = panic "mkRdrProjUpdate: The impossible has happened!"
 mkRdrProjUpdate loc (L l flds) arg isPun anns =
   L loc HsFieldBind {
       hfbAnn = anns
-    , hfbLHS = L l (FieldLabelStrings flds)
+    , hfbLHS = L (noAnnSrcSpan l) (FieldLabelStrings flds)
     , hfbRHS = arg
     , hfbPun = isPun
   }

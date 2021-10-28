@@ -1996,7 +1996,7 @@ rnLHsDerivingClause doc
                               , deriv_clause_tys = dct }))
   = do { (dcs', dct', fvs)
            <- rnLDerivStrategy doc dcs $ rn_deriv_clause_tys dct
-       ; warnNoDerivStrat dcs' loc
+       ; warnNoDerivStrat dcs' (locA loc)
        ; pure ( L loc (HsDerivingClause { deriv_clause_ext = noExtField
                                         , deriv_clause_strategy = dcs'
                                         , deriv_clause_tys = dct' })
@@ -2034,7 +2034,7 @@ rnLDerivStrategy doc mds thing_inside
   = case mds of
       Nothing -> boring_case Nothing
       Just (L loc ds) ->
-        setSrcSpan loc $ do
+        setSrcSpanA loc $ do
           (ds', thing, fvs) <- rn_deriv_strat ds
           pure (Just (L loc ds'), thing, fvs)
   where
@@ -2117,7 +2117,7 @@ rnFamDecl mb_cls (FamilyDecl { fdLName = tycon, fdTyVars = tyvars
        ; ((tyvars', res_sig', injectivity'), fv1) <-
             bindHsQTyVars doc mb_cls kvs tyvars $ \ tyvars' _ ->
             do { let rn_sig = rnFamResultSig doc
-               ; (res_sig', fv_kind) <- wrapLocFstM rn_sig res_sig
+               ; (res_sig', fv_kind) <- wrapLocFstMA rn_sig res_sig
                ; injectivity' <- traverse (rnInjectivityAnn tyvars' res_sig')
                                           injectivity
                ; return ( (tyvars', res_sig', injectivity') , fv_kind ) }
@@ -2225,7 +2225,9 @@ rnInjectivityAnn tvBndrs (L _ (TyVarSig _ resTv))
              -- e.g.   type family F a = (r::*) | r -> a
              do { injFrom' <- rnLTyVar injFrom
                 ; injTo'   <- mapM rnLTyVar injTo
-                ; return $ L srcSpan (InjectivityAnn x injFrom' injTo') }
+                -- Note: srcSpan is unchanged, but typechecker gets
+                -- confused, l2l call makes it happy
+                ; return $ L (l2l srcSpan) (InjectivityAnn x injFrom' injTo') }
 
    ; let tvNames  = Set.fromList $ hsAllLTyVarNames tvBndrs
          resName  = hsLTyVarName resTv
@@ -2246,7 +2248,7 @@ rnInjectivityAnn tvBndrs (L _ (TyVarSig _ resTv))
 
    ; when (noRnErrors && not (Set.null rhsValid)) $
       do { let errorVars = Set.toList rhsValid
-         ; addErrAt srcSpan $ TcRnUnknownMessage $ mkPlainError noHints $
+         ; addErrAt (locA srcSpan) $ TcRnUnknownMessage $ mkPlainError noHints $
                         ( hsep
                         [ text "Unknown type variable" <> plural errorVars
                         , text "on the RHS of injectivity condition:"
@@ -2263,7 +2265,7 @@ rnInjectivityAnn tvBndrs (L _ (TyVarSig _ resTv))
 -- So we rename injectivity annotation like we normally would except that
 -- this time we expect "result" to be reported not in scope by rnLTyVar.
 rnInjectivityAnn _ _ (L srcSpan (InjectivityAnn x injFrom injTo)) =
-   setSrcSpan srcSpan $ do
+   setSrcSpanA srcSpan $ do
    (injDecl', _) <- askNoErrs $ do
      injFrom' <- rnLTyVar injFrom
      injTo'   <- mapM rnLTyVar injTo
@@ -2444,7 +2446,7 @@ extendPatSynEnv dup_fields_ok has_sel val_decls local_fix_env thing = do {
                                        , psb_args = RecCon as }))) <- bind
       = do
           bnd_name <- newTopSrcBinder (L (l2l bind_loc) n)
-          let field_occs = map ((\ f -> L (getLocA (foLabel f)) f) . recordPatSynField) as
+          let field_occs = map ((\ f -> L (noAnnSrcSpan $ getLocA (foLabel f)) f) . recordPatSynField) as
           flds <- mapM (newRecordSelector dup_fields_ok has_sel [bnd_name]) field_occs
           return ((bnd_name, flds): names)
       | L bind_loc (PatSynBind _ (PSB { psb_id = L _ n})) <- bind

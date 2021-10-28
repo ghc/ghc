@@ -1571,7 +1571,9 @@
               (EpaComments
                [])
               [(L
-                { DumpTypecheckedAst.hs:19:6-23 }
+                (SrcSpanAnn
+                 (EpAnnNotUsed)
+                 { DumpTypecheckedAst.hs:19:6-23 })
                 (GRHS
                  (EpAnnNotUsed)
                  []

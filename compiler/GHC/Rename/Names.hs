@@ -1028,7 +1028,7 @@ getLocalNonValBinders fixity_env
 newRecordSelector :: DuplicateRecordFields -> FieldSelectors -> [Name] -> LFieldOcc GhcPs -> RnM FieldLabel
 newRecordSelector _ _ [] _ = error "newRecordSelector: datatype has no constructors!"
 newRecordSelector dup_fields_ok has_sel (dc:_) (L loc (FieldOcc _ (L _ fld)))
-  = do { selName <- newTopSrcBinder $ L (noAnnSrcSpan loc) $ field
+  = do { selName <- newTopSrcBinder $ L (l2l loc) $ field
        ; return $ FieldLabel { flLabel = fieldLabelString
                              , flHasDuplicateRecordFields = dup_fields_ok
                              , flHasFieldSelector = has_sel

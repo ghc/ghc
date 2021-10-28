@@ -406,7 +406,7 @@ tcExpr (HsIf x pred b1 b2) res_ty
        ; return (HsIf x pred' b1' b2') }
 
 tcExpr (HsMultiIf _ alts) res_ty
-  = do { alts' <- mapM (wrapLocM $ tcGRHS match_ctxt res_ty) alts
+  = do { alts' <- mapM (wrapLocMA $ tcGRHS match_ctxt res_ty) alts
        ; res_ty <- readExpType res_ty
        ; return (HsMultiIf res_ty alts') }
   where match_ctxt = MC { mc_what = IfAlt, mc_body = tcBody }
@@ -1269,7 +1269,7 @@ disambiguateRecordBinds record_expr record_rho rbnds res_ty
                       -- (giving duplicate deprecation warnings).
           Just gre -> do { unless (null (tail xs)) $ do
                              let L loc _ = hfbLHS (unLoc upd)
-                             setSrcSpan loc $ addUsedGRE True gre
+                             setSrcSpanA loc $ addUsedGRE True gre
                          ; lookupSelector (upd, greMangledName gre) }
                       -- The field doesn't belong to this parent, so report
                       -- an error but keep going through all the fields
@@ -1285,12 +1285,10 @@ disambiguateRecordBinds record_expr record_rho rbnds res_ty
       = do { i <- tcLookupId n
            ; let L loc af = hfbLHS upd
                  lbl      = rdrNameAmbiguousFieldOcc af
-           -- ; return $ L l upd { hfbLHS
-           --                = L loc (Unambiguous i (L (noAnnSrcSpan loc) lbl)) }
            ; return $ L l HsFieldBind
                { hfbAnn = hfbAnn upd
                , hfbLHS
-                       = L loc (Unambiguous i (L (noAnnSrcSpan loc) lbl))
+                       = L (l2l loc) (Unambiguous i (L (l2l loc) lbl))
                , hfbRHS = hfbRHS upd
                , hfbPun = hfbPun upd
                }
@@ -1368,7 +1366,7 @@ tcRecordUpd con_like arg_tys rbinds = fmap catMaybes $ mapM do_bind rbinds
                                  , hfbRHS = rhs }))
       = do { let lbl = rdrNameAmbiguousFieldOcc af
                  sel_id = selectorAmbiguousFieldOcc af
-                 f = L loc (FieldOcc (idName sel_id) (L (noAnnSrcSpan loc) lbl))
+                 f = L loc (FieldOcc (idName sel_id) (L (l2l loc) lbl))
            ; mb <- tcRecordField con_like flds_w_tys f rhs
            ; case mb of
                Nothing         -> return Nothing
@@ -1377,7 +1375,7 @@ tcRecordUpd con_like arg_tys rbinds = fmap catMaybes $ mapM do_bind rbinds
                          (L l (fld { hfbLHS
                                       = L loc (Unambiguous
                                                (foExt (unLoc f'))
-                                               (L (noAnnSrcSpan loc) lbl))
+                                               (L (l2l loc) lbl))
                                    , hfbRHS = rhs' }))) }
 
 tcRecordField :: ConLike -> Assoc Name Type
@@ -1392,7 +1390,7 @@ tcRecordField con_like flds_w_tys (L loc (FieldOcc sel_name lbl)) rhs
                   field_ty
            ; let field_id = mkUserLocal (nameOccName sel_name)
                                         (nameUnique sel_name)
-                                        Many field_ty loc
+                                        Many field_ty (locA loc)
                 -- Yuk: the field_id has the *unique* of the selector Id
                 --          (so we can find it easily)
                 --      but is a LocalId with the appropriate type of the RHS

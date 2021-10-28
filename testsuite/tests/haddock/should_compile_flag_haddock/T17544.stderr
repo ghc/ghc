@@ -692,7 +692,9 @@
                {OccName: a}))))])
          (Prefix)
          (L
-          { <no location info> }
+          (SrcSpanAnn
+           (EpAnnNotUsed)
+           { <no location info> })
           (NoSig
            (NoExtField)))
          (Nothing)))]
@@ -952,7 +954,9 @@
                {OccName: a}))))])
          (Prefix)
          (L
-          { <no location info> }
+          (SrcSpanAnn
+           (EpAnnNotUsed)
+           { <no location info> })
           (NoSig
            (NoExtField)))
          (Nothing)))]
@@ -1212,7 +1216,9 @@
                {OccName: a}))))])
          (Prefix)
          (L
-          { <no location info> }
+          (SrcSpanAnn
+           (EpAnnNotUsed)
+           { <no location info> })
           (NoSig
            (NoExtField)))
          (Nothing)))]
@@ -1472,7 +1478,9 @@
                {OccName: a}))))])
          (Prefix)
          (L
-          { <no location info> }
+          (SrcSpanAnn
+           (EpAnnNotUsed)
+           { <no location info> })
           (NoSig
            (NoExtField)))
          (Nothing)))]
@@ -1732,7 +1740,9 @@
                {OccName: a}))))])
          (Prefix)
          (L
-          { <no location info> }
+          (SrcSpanAnn
+           (EpAnnNotUsed)
+           { <no location info> })
           (NoSig
            (NoExtField)))
          (Nothing)))]
@@ -1992,7 +2002,9 @@
                {OccName: a}))))])
          (Prefix)
          (L
-          { <no location info> }
+          (SrcSpanAnn
+           (EpAnnNotUsed)
+           { <no location info> })
           (NoSig
            (NoExtField)))
          (Nothing)))]

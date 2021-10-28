@@ -1942,13 +1942,13 @@ type instance Anno (HsCmd (GhcPass p)) = SrcSpanAnnA
 
 type instance Anno [LocatedA (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsCmd (GhcPass pr))))]
   = SrcSpanAnnL
-type instance Anno (HsCmdTop (GhcPass p)) = SrcSpan
+type instance Anno (HsCmdTop (GhcPass p)) = SrcAnn NoEpAnns
 type instance Anno [LocatedA (Match (GhcPass p) (LocatedA (HsExpr (GhcPass p))))] = SrcSpanAnnL
 type instance Anno [LocatedA (Match (GhcPass p) (LocatedA (HsCmd  (GhcPass p))))] = SrcSpanAnnL
 type instance Anno (Match (GhcPass p) (LocatedA (HsExpr (GhcPass p)))) = SrcSpanAnnA
 type instance Anno (Match (GhcPass p) (LocatedA (HsCmd  (GhcPass p)))) = SrcSpanAnnA
-type instance Anno (GRHS (GhcPass p) (LocatedA (HsExpr (GhcPass p)))) = SrcSpan
-type instance Anno (GRHS (GhcPass p) (LocatedA (HsCmd  (GhcPass p)))) = SrcSpan
+type instance Anno (GRHS (GhcPass p) (LocatedA (HsExpr (GhcPass p)))) = SrcAnn NoEpAnns
+type instance Anno (GRHS (GhcPass p) (LocatedA (HsCmd  (GhcPass p)))) = SrcAnn NoEpAnns
 type instance Anno (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsExpr (GhcPass pr)))) = SrcSpanAnnA
 type instance Anno (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsCmd  (GhcPass pr)))) = SrcSpanAnnA
 
@@ -1957,9 +1957,9 @@ type instance Anno (HsSplice (GhcPass p)) = SrcSpanAnnA
 type instance Anno [LocatedA (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsExpr (GhcPass pr))))] = SrcSpanAnnL
 type instance Anno [LocatedA (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsCmd  (GhcPass pr))))] = SrcSpanAnnL
 
-type instance Anno (FieldLabelStrings (GhcPass p)) = SrcSpan
-type instance Anno (FieldLabelString) = SrcSpan
-type instance Anno (DotFieldOcc (GhcPass p)) = SrcSpan
+type instance Anno (FieldLabelStrings (GhcPass p)) = SrcAnn NoEpAnns
+type instance Anno (FieldLabelString) = SrcAnn NoEpAnns
+type instance Anno (DotFieldOcc (GhcPass p)) = SrcAnn NoEpAnns
 
 instance (Anno a ~ SrcSpanAnn' (EpAnn an))
    => WrapXRec (GhcPass p) a where

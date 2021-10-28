@@ -172,7 +172,7 @@ mkHsPar e = L (getLoc e) (gHsPar e)
 mkSimpleMatch :: (Anno (Match (GhcPass p) (LocatedA (body (GhcPass p))))
                         ~ SrcSpanAnnA,
                   Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p))))
-                        ~ SrcSpan)
+                        ~ SrcAnn NoEpAnns)
               => HsMatchContext (GhcPass p)
               -> [LPat (GhcPass p)] -> LocatedA (body (GhcPass p))
               -> LMatch (GhcPass p) (LocatedA (body (GhcPass p)))
@@ -186,17 +186,17 @@ mkSimpleMatch ctxt pats rhs
                 (pat:_) -> combineSrcSpansA (getLoc pat) (getLoc rhs)
 
 unguardedGRHSs :: Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p))))
-                     ~ SrcSpan
+                     ~ SrcAnn NoEpAnns
                => SrcSpan -> LocatedA (body (GhcPass p)) -> EpAnn GrhsAnn
                -> GRHSs (GhcPass p) (LocatedA (body (GhcPass p)))
 unguardedGRHSs loc rhs an
   = GRHSs emptyComments (unguardedRHS an loc rhs) emptyLocalBinds
 
 unguardedRHS :: Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p))))
-                     ~ SrcSpan
+                     ~ SrcAnn NoEpAnns
              => EpAnn GrhsAnn -> SrcSpan -> LocatedA (body (GhcPass p))
              -> [LGRHS (GhcPass p) (LocatedA (body (GhcPass p)))]
-unguardedRHS an loc rhs = [L loc (GRHS an [] rhs)]
+unguardedRHS an loc rhs = [L (noAnnSrcSpan loc) (GRHS an [] rhs)]
 
 type AnnoBody p body
   = ( XMG (GhcPass p) (LocatedA (body (GhcPass p))) ~ NoExtField
@@ -264,7 +264,7 @@ mkHsLams tyvars dicts expr = mkLHsWrap (mkWpTyLams tyvars
 -- |A simple case alternative with a single pattern, no binds, no guards;
 -- pre-typechecking
 mkHsCaseAlt :: (Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p))))
-                     ~ SrcSpan,
+                     ~ SrcAnn NoEpAnns,
                  Anno (Match (GhcPass p) (LocatedA (body (GhcPass p))))
                         ~ SrcSpanAnnA)
             => LPat (GhcPass p) -> (LocatedA (body (GhcPass p)))
@@ -306,9 +306,9 @@ mkHsCompAnns   :: HsDoFlavour -> [ExprLStmt GhcPs] -> LHsExpr GhcPs
                -> EpAnn AnnList
                -> HsExpr GhcPs
 
-mkNPat      :: Located (HsOverLit GhcPs) -> Maybe (SyntaxExpr GhcPs) -> EpAnn [AddEpAnn]
+mkNPat      :: LocatedAn NoEpAnns (HsOverLit GhcPs) -> Maybe (SyntaxExpr GhcPs) -> EpAnn [AddEpAnn]
             -> Pat GhcPs
-mkNPlusKPat :: LocatedN RdrName -> Located (HsOverLit GhcPs) -> EpAnn EpaLocation
+mkNPlusKPat :: LocatedN RdrName -> LocatedAn NoEpAnns (HsOverLit GhcPs) -> EpAnn EpaLocation
             -> Pat GhcPs
 
 -- NB: The following functions all use noSyntaxExpr: the generated expressions

@@ -98,7 +98,7 @@ tcProc pat cmd@(L loc (HsCmdTop names _)) exp_ty
         ; (co1, (arr_ty, arg_ty)) <- matchExpectedAppTy exp_ty1
         -- start with the names as they are used to desugar the proc itself
         -- See #17423
-        ; names' <- setSrcSpan loc $
+        ; names' <- setSrcSpanA loc $
             mapM (tcSyntaxName ProcOrigin arr_ty) names
         ; let cmd_env = CmdEnv { cmd_arr = arr_ty }
         ; (pat', cmd') <- newArrowScope
@@ -136,7 +136,7 @@ tcCmdTop :: CmdEnv
          -> TcM (LHsCmdTop GhcTc)
 
 tcCmdTop env names (L loc (HsCmdTop _names cmd)) cmd_ty@(cmd_stk, res_ty)
-  = setSrcSpan loc $
+  = setSrcSpanA loc $
     do  { cmd' <- tcCmd env cmd cmd_ty
         ; return (L loc $ HsCmdTop (CmdTopTc cmd_stk res_ty names) cmd') }
 
@@ -301,7 +301,7 @@ tc_cmd env
 
     tc_grhss (GRHSs x grhss binds) stk_ty res_ty
         = do { (binds', grhss') <- tcLocalBinds binds $
-                                   mapM (wrapLocM (tc_grhs stk_ty res_ty)) grhss
+                                   mapM (wrapLocMA (tc_grhs stk_ty res_ty)) grhss
              ; return (GRHSs x grhss' binds') }
 
     tc_grhs stk_ty res_ty (GRHS x guards body)
@@ -349,7 +349,7 @@ tc_cmd env cmd@(HsCmdArrForm x expr f fixity cmd_args) (cmd_stk, res_ty)
        = do { arr_ty <- newFlexiTyVarTy arrowTyConKind
             ; stk_ty <- newFlexiTyVarTy liftedTypeKind
             ; res_ty <- newFlexiTyVarTy liftedTypeKind
-            ; names' <- setSrcSpan loc $
+            ; names' <- setSrcSpanA loc $
                 mapM (tcSyntaxName ArrowCmdOrigin arr_ty) names
             ; let env' = env { cmd_arr = arr_ty }
             ; cmd' <- tcCmdTop env' names' cmd (stk_ty, res_ty)

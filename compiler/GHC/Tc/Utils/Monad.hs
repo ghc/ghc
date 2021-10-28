@@ -963,7 +963,7 @@ wrapLocFstM fn (L loc a) =
     (b,c) <- fn a
     return (L loc b, c)
 
-wrapLocFstMA :: (a -> TcM (b,c)) -> LocatedA a -> TcM (LocatedA b, c)
+wrapLocFstMA :: (a -> TcM (b,c)) -> LocatedAn t a -> TcM (LocatedAn t b, c)
 wrapLocFstMA fn (L loc a) =
   setSrcSpanA loc $ do
     (b,c) <- fn a

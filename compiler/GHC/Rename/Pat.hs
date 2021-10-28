@@ -516,7 +516,7 @@ rnPatAndThen mk (LitPat x lit)
   = do { ovlStr <- liftCps (xoptM LangExt.OverloadedStrings)
        ; if ovlStr
          then rnPatAndThen mk
-                           (mkNPat (noLoc (mkHsIsString src s))
+                           (mkNPat (noLocA (mkHsIsString src s))
                                       Nothing noAnn)
          else normal_lit }
   | otherwise = normal_lit
@@ -778,12 +778,12 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                                   (L loc (FieldOcc _ (L ll lbl)))
                               , hfbRHS = arg
                               , hfbPun      = pun }))
-      = do { sel <- setSrcSpan loc $ lookupRecFieldOcc parent lbl
+      = do { sel <- setSrcSpanA loc $ lookupRecFieldOcc parent lbl
            ; arg' <- if pun
-                     then do { checkErr pun_ok (TcRnIllegalFieldPunning (L loc lbl))
+                     then do { checkErr pun_ok (TcRnIllegalFieldPunning (L (locA loc) lbl))
                                -- Discard any module qualifier (#11662)
                              ; let arg_rdr = mkRdrUnqual (rdrNameOcc lbl)
-                             ; return (L (noAnnSrcSpan loc) (mk_arg loc arg_rdr)) }
+                             ; return (L (l2l loc) (mk_arg (locA loc) arg_rdr)) }
                      else return arg
            ; return (L l (HsFieldBind
                              { hfbAnn = noAnn
@@ -833,7 +833,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
            ; return [ L (noAnnSrcSpan loc) (HsFieldBind
                         { hfbAnn = noAnn
                         , hfbLHS
-                           = L loc (FieldOcc sel (L (noAnnSrcSpan loc) arg_rdr))
+                           = L (noAnnSrcSpan loc) (FieldOcc sel (L (noAnnSrcSpan loc) arg_rdr))
                         , hfbRHS = L locn (mk_arg loc arg_rdr)
                         , hfbPun      = False })
                     | fl <- dot_dot_fields
@@ -881,23 +881,23 @@ rnHsRecUpdFields flds
                                                   , hfbRHS = arg
                                                   , hfbPun      = pun }))
       = do { let lbl = rdrNameAmbiguousFieldOcc f
-           ; mb_sel <- setSrcSpan loc $
+           ; mb_sel <- setSrcSpanA loc $
                       -- Defer renaming of overloaded fields to the typechecker
                       -- See Note [Disambiguating record fields] in GHC.Tc.Gen.Head
                       lookupRecFieldOcc_update dup_fields_ok lbl
            ; arg' <- if pun
-                     then do { checkErr pun_ok (TcRnIllegalFieldPunning (L loc lbl))
+                     then do { checkErr pun_ok (TcRnIllegalFieldPunning (L (locA loc) lbl))
                                -- Discard any module qualifier (#11662)
                              ; let arg_rdr = mkRdrUnqual (rdrNameOcc lbl)
-                             ; return (L (noAnnSrcSpan loc) (HsVar noExtField
-                                              (L (noAnnSrcSpan loc) arg_rdr))) }
+                             ; return (L (l2l loc) (HsVar noExtField
+                                              (L (l2l loc) arg_rdr))) }
                      else return arg
            ; (arg'', fvs) <- rnLExpr arg'
 
            ; let (lbl', fvs') = case mb_sel of
                    UnambiguousGre gname -> let sel_name = greNameMangledName gname
-                                           in (Unambiguous sel_name (L (noAnnSrcSpan loc) lbl), fvs `addOneFV` sel_name)
-                   AmbiguousFields       -> (Ambiguous   noExtField (L (noAnnSrcSpan loc) lbl), fvs)
+                                           in (Unambiguous sel_name (L (l2l loc) lbl), fvs `addOneFV` sel_name)
+                   AmbiguousFields       -> (Ambiguous   noExtField (L (l2l loc) lbl), fvs)
 
            ; return (L l (HsFieldBind { hfbAnn = noAnn
                                       , hfbLHS = L loc lbl'

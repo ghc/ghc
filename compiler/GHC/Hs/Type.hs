@@ -1245,8 +1245,8 @@ type instance Anno (HsTyVarBndr _flag GhcRn) = SrcSpanAnnA
 type instance Anno (HsTyVarBndr _flag GhcTc) = SrcSpanAnnA
 
 type instance Anno (HsOuterTyVarBndrs _ (GhcPass _)) = SrcSpanAnnA
-type instance Anno HsIPName = SrcSpan
+type instance Anno HsIPName = SrcAnn NoEpAnns
 type instance Anno (ConDeclField (GhcPass p)) = SrcSpanAnnA
 
-type instance Anno (FieldOcc (GhcPass p)) = SrcSpan
-type instance Anno (AmbiguousFieldOcc (GhcPass p)) = SrcSpan
+type instance Anno (FieldOcc (GhcPass p)) = SrcAnn NoEpAnns
+type instance Anno (AmbiguousFieldOcc (GhcPass p)) = SrcAnn NoEpAnns

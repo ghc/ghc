@@ -1203,6 +1203,9 @@ instance (Outputable a) => Outputable (EpAnn a) where
   ppr (EpAnn l a c)  = text "EpAnn" <+> ppr l <+> ppr a <+> ppr c
   ppr EpAnnNotUsed = text "EpAnnNotUsed"
 
+instance Outputable NoEpAnns where
+  ppr NoEpAnns = text "NoEpAnns"
+
 instance Outputable Anchor where
   ppr (Anchor a o)        = text "Anchor" <+> ppr a <+> ppr o
 

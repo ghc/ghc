@@ -2822,7 +2822,7 @@ tcInjectivity _ Nothing
   -- But this does not seem to be useful in any way so we don't do it.  (Another
   -- reason is that the implementation would not be straightforward.)
 tcInjectivity tcbs (Just (L loc (InjectivityAnn _ _ lInjNames)))
-  = setSrcSpan loc $
+  = setSrcSpanA loc $
     do { let tvs = binderVars tcbs
        ; dflags <- getDynFlags
        ; checkTc (xopt LangExt.TypeFamilyDependencies dflags)
@@ -4964,7 +4964,7 @@ checkValidRoleAnnots role_annots tc
     check_no_roles
       = whenIsJust role_annot_decl_maybe illegalRoleAnnotDecl
 
-checkRoleAnnot :: TyVar -> Located (Maybe Role) -> Role -> TcM ()
+checkRoleAnnot :: TyVar -> LocatedAn NoEpAnns (Maybe Role) -> Role -> TcM ()
 checkRoleAnnot _  (L _ Nothing)   _  = return ()
 checkRoleAnnot tv (L _ (Just r1)) r2
   = when (r1 /= r2) $
