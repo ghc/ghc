@@ -45,9 +45,18 @@ Language
 
 .. _Unlifted Datatypes Proposal: https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0265-unlifted-datatypes.rst
 
-* Kind inference for data/newtype instance declarations is slightly
-  more restrictive than before.  See the user manual :ref:`kind-inference-data-family-instances`.
-  This is a breaking change, albeit a fairly obscure one that corrects a specification bug.
+* Kind inference for data/newtype instance declarations is slightly more restrictive than before.
+  In particular, GHC now requires that the kind of a data family instance be fully determined
+  by the header of the instance, without looking at the definition of the constructor.
+
+  This means that data families that dispatched on an invisible parameter might now require this parameter
+  to be made explicit, as in the following example: ::
+
+      data family DF :: forall (r :: RuntimeRep). TYPE r
+      newtype instance DF @IntRep   = MkDF2 Int#
+      newtype instance DF @FloatRep = MkDF1 Float#
+
+  See the user manual :ref:`kind-inference-data-family-instances`.
 
 * GHC is stricter about checking for out-of-scope type variables on the
   right-hand sides of associated type family instances that are not bound on
