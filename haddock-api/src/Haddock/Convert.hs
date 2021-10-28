@@ -341,14 +341,14 @@ synifyInjectivityAnn Nothing _ _            = Nothing
 synifyInjectivityAnn _       _ NotInjective = Nothing
 synifyInjectivityAnn (Just lhs) tvs (Injective inj) =
     let rhs = map (noLocA . tyVarName) (filterByList inj tvs)
-    in Just $ noLoc $ InjectivityAnn noAnn (noLocA lhs) rhs
+    in Just $ noLocA $ InjectivityAnn noAnn (noLocA lhs) rhs
 
 synifyFamilyResultSig :: Maybe Name -> Kind -> LFamilyResultSig GhcRn
 synifyFamilyResultSig  Nothing    kind
-   | isLiftedTypeKind kind = noLoc $ NoSig noExtField
-   | otherwise = noLoc $ KindSig  noExtField (synifyKindSig kind)
+   | isLiftedTypeKind kind = noLocA $ NoSig noExtField
+   | otherwise = noLocA $ KindSig  noExtField (synifyKindSig kind)
 synifyFamilyResultSig (Just name) kind =
-   noLoc $ TyVarSig noExtField (noLocA $ KindedTyVar noAnn () (noLocA name) (synifyKindSig kind))
+   noLocA $ TyVarSig noExtField (noLocA $ KindedTyVar noAnn () (noLocA name) (synifyKindSig kind))
 
 -- User beware: it is your responsibility to pass True (use_gadt_syntax)
 -- for any constructor that would be misrepresented by omitting its
@@ -387,7 +387,7 @@ synifyDataCon use_gadt_syntax dc =
 
   field_tys = zipWith con_decl_field (dataConFieldLabels dc) linear_tys
   con_decl_field fl synTy = noLocA $
-    ConDeclField noAnn [noLoc $ FieldOcc (flSelector fl) (noLocA $ mkVarUnqual $ flLabel fl)] synTy
+    ConDeclField noAnn [noLocA $ FieldOcc (flSelector fl) (noLocA $ mkVarUnqual $ flLabel fl)] synTy
                  Nothing
 
   mk_h98_arg_tys :: Either ErrMsg (HsConDeclH98Details GhcRn)
@@ -611,7 +611,7 @@ synifyType _ vs (TyConApp tc tys)
       | tc `hasKey` ipClassKey
       , [name, ty] <- tys
       , Just x <- isStrLitTy name
-      = noLocA $ HsIParamTy noAnn (noLoc $ HsIPName x) (synifyType WithinType vs ty)
+      = noLocA $ HsIParamTy noAnn (noLocA $ HsIPName x) (synifyType WithinType vs ty)
       -- and equalities
       | tc `hasKey` eqTyConKey
       , [ty1, ty2] <- tys
