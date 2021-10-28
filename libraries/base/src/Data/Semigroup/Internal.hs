@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE PolyKinds #-}
@@ -134,8 +135,46 @@ newtype Endo a = Endo { appEndo :: a -> a }
 
 -- | @since 4.9.0.0
 instance Semigroup (Endo a) where
-        (<>) = coerce ((.) :: (a -> a) -> (a -> a) -> (a -> a))
-        stimes = stimesMonoid
+    (<>) = coerce ((.) :: (a -> a) -> (a -> a) -> (a -> a))
+
+    -- See Note [stimes Endo]
+    stimes !n0 (Endo e) = Endo (\a0 ->
+      -- We check separately for 0 and 1 per
+      -- https://github.com/haskell/core-libraries-committee/issues/4#issuecomment-955605592
+      -- We are explicitly strict in the number so strictness is calculated
+      -- correctly even without specialization.
+      case n0 of
+        _ | n0 < 0 -> stimesEndoError
+        0 -> a0
+        1 -> e a0
+        _ -> go n0 a0)
+      where
+        go !0 a = a
+        go n a = e (go (n - 1) a)
+
+{-# NOINLINE stimesEndoError #-}
+-- There's no reason to put this gunk in the unfolding.
+stimesEndoError :: a
+stimesEndoError = errorWithoutStackTrace "stimes (for Endo): negative multiplier"
+
+-- Note [stimes Endo]
+-- ~~~~~~~~~~~~~~~~~~
+--
+-- We used to use
+--
+--   stimes = stimesMonoid
+--
+-- But this is pretty bad! The function it produces is represented in memory as
+-- a balanced tree of compositions. To actually *apply* that function, it's
+-- necessary to walk the tree. It's much better to just construct a function
+-- that counts out applications.
+--
+-- Why do we break open the `Endo` construction rather than just using `mempty`
+-- and `<>`? We want GHC to infer that `stimes` has an arity of 3. Currently,
+-- it does so by default, but there has been some talk in the past of turning
+-- on -fpedantic-bottoms, which would drop the arity to 2. Indeed, if we were
+-- really careless, we could theoretically get GHC to build a *list* of
+-- compositions, which would be awful.
 
 -- | @since 2.01
 instance Monoid (Endo a) where

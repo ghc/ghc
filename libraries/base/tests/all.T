@@ -317,3 +317,4 @@ test('T23697',
   [ when(opsys('mingw32'), skip) # header not found
   , when(opsys('darwin'), skip)  # permission denied
   ], makefile_test, ['T23697'])
+test('stimesEndo', normal, compile_and_run, [''])
