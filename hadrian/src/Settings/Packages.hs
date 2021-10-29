@@ -277,8 +277,8 @@ rtsPackageArgs = package rts ? do
 
     let cArgs = mconcat
           [ rtsWarnings
-          , flag UseSystemFfi ? arg ("-I" ++ ffiIncludeDir)
-          , flag WithLibdw ? arg ("-I" ++ libdwIncludeDir)
+          , flag UseSystemFfi ? not (null ffiIncludeDir) ? arg ("-I" ++ ffiIncludeDir)
+          , flag WithLibdw ? not (null libdwIncludeDir) ? arg ("-I" ++ libdwIncludeDir)
           , arg "-fomit-frame-pointer"
           -- RTS *must* be compiled with optimisations. The INLINE_HEADER macro
           -- requires that functions are inlined to work as expected. Inlining
