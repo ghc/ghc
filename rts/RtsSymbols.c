@@ -33,6 +33,11 @@
 #include <elf.h> /* _DYNAMIC */
 #endif
 
+/* We must provide a prototype for environ since depending upon the libc
+ * version it may or may not be provided by unistd.h. See #20577.
+ */
+extern char **environ;
+
 /* -----------------------------------------------------------------------------
  * Symbols to be inserted into the RTS symbol table.
  */
@@ -60,7 +65,6 @@
       SymI_HasProto(stg_sig_install)            \
       SymI_HasProto(rtsTimerSignal)             \
       SymI_HasProto_redirect(atexit, atexit, STRENGTH_STRONG) /* See Note [Strong symbols] */ \
-      SymI_NeedsDataProto(environ)              \
       SymI_NeedsDataProto(nocldstop)
 #endif
 
