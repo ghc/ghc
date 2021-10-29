@@ -950,8 +950,7 @@ wrapLocM fn (L loc a) = setSrcSpan loc $ do { b <- fn a
                                             ; return (L loc b) }
 
 wrapLocAM :: (a -> TcM b) -> LocatedAn an a -> TcM (Located b)
-wrapLocAM fn (L loc a) = setSrcSpanA loc $ do { b <- fn a
-                                              ; return (L (locA loc) b) }
+wrapLocAM fn a = wrapLocM fn (reLoc a)
 
 wrapLocMA :: (a -> TcM b) -> GenLocated (SrcSpanAnn' ann) a -> TcRn (GenLocated (SrcSpanAnn' ann) b)
 wrapLocMA fn (L loc a) = setSrcSpanA loc $ do { b <- fn a
@@ -963,7 +962,12 @@ wrapLocFstM fn (L loc a) =
     (b,c) <- fn a
     return (L loc b, c)
 
-wrapLocFstMA :: (a -> TcM (b,c)) -> LocatedAn t a -> TcM (LocatedAn t b, c)
+-- Possible instantiations:
+--    wrapLocFstMA :: (a -> TcM (b,c)) -> LocatedA    a -> TcM (LocatedA    b, c)
+--    wrapLocFstMA :: (a -> TcM (b,c)) -> LocatedN    a -> TcM (LocatedN    b, c)
+--    wrapLocFstMA :: (a -> TcM (b,c)) -> LocatedAn t a -> TcM (LocatedAn t b, c)
+-- and so on.
+wrapLocFstMA :: (a -> TcM (b,c)) -> GenLocated (SrcSpanAnn' ann) a -> TcM (GenLocated (SrcSpanAnn' ann) b, c)
 wrapLocFstMA fn (L loc a) =
   setSrcSpanA loc $ do
     (b,c) <- fn a
@@ -975,7 +979,12 @@ wrapLocSndM fn (L loc a) =
     (b,c) <- fn a
     return (b, L loc c)
 
-wrapLocSndMA :: (a -> TcM (b, c)) -> LocatedA a -> TcM (b, LocatedA c)
+-- Possible instantiations:
+--    wrapLocSndMA :: (a -> TcM (b, c)) -> LocatedA    a -> TcM (b, LocatedA    c)
+--    wrapLocSndMA :: (a -> TcM (b, c)) -> LocatedN    a -> TcM (b, LocatedN    c)
+--    wrapLocSndMA :: (a -> TcM (b, c)) -> LocatedAn t a -> TcM (b, LocatedAn t c)
+-- and so on.
+wrapLocSndMA :: (a -> TcM (b, c)) -> GenLocated (SrcSpanAnn' ann) a -> TcM (b, GenLocated (SrcSpanAnn' ann) c)
 wrapLocSndMA fn (L loc a) =
   setSrcSpanA loc $ do
     (b,c) <- fn a
