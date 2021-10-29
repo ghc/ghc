@@ -906,7 +906,7 @@ uncaughtExceptionHandler :: IORef (SomeExceptionWithLocation -> IO ())
 uncaughtExceptionHandler = unsafePerformIO (newIORef defaultHandler)
    where
       defaultHandler :: SomeExceptionWithLocation -> IO ()
-      defaultHandler se@(SomeExceptionWithLocation ex) = do
+      defaultHandler se@(SomeExceptionWithLocation ex _) = do
          (hFlush stdout) `catchAny` (\ _ -> return ())
          let msg = case cast ex of
                Just Deadlock -> "no threads to run:  infinite loop or deadlock?"

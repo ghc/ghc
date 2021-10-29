@@ -194,7 +194,7 @@ catch (IO io) handler = IO $ catch# io handler'
 -- details.
 catchAny :: IO a -> (forall e . Exception e => e -> IO a) -> IO a
 catchAny !(IO io) handler = IO $ catch# io handler'
-    where handler' (SomeExceptionWithLocation e) = unIO (handler e)
+    where handler' (SomeExceptionWithLocation e _) = unIO (handler e)
 
 -- Using catchException here means that if `m` throws an
 -- 'IOError' /as an imprecise exception/, we will not catch

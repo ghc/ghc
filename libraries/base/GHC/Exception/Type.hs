@@ -36,13 +36,14 @@ The @SomeExceptionWithLocation@ type is the root of the exception type hierarchy
 When an exception of type @e@ is thrown, behind the scenes it is
 encapsulated in a @SomeExceptionWithLocation@.
 -}
-data SomeExceptionWithLocation = forall e . Exception e => SomeExceptionWithLocation e
+data SomeExceptionWithLocation = forall e . Exception e => SomeExceptionWithLocation e [String]
 
 type SomeException = SomeExceptionWithLocation
 
 -- | @since 3.0
 instance Show SomeExceptionWithLocation where
-    showsPrec p (SomeExceptionWithLocation e) = showsPrec p e
+    -- TODO: Print backtraces
+    showsPrec p (SomeExceptionWithLocation e _) = showsPrec p e
 
 {- |
 Any type that you wish to throw or catch as an exception must be an
@@ -134,8 +135,8 @@ class (Typeable e, Show e) => Exception e where
     toException   :: e -> SomeExceptionWithLocation
     fromException :: SomeExceptionWithLocation -> Maybe e
 
-    toException = SomeExceptionWithLocation
-    fromException (SomeExceptionWithLocation e) = cast e
+    toException e = SomeExceptionWithLocation e []
+    fromException (SomeExceptionWithLocation e _) = cast e
 
     -- | Render this exception value in a human-friendly manner.
     --
@@ -149,7 +150,7 @@ class (Typeable e, Show e) => Exception e where
 instance Exception SomeExceptionWithLocation where
     toException se = se
     fromException = Just
-    displayException (SomeExceptionWithLocation e) = displayException e
+    displayException (SomeExceptionWithLocation e _) = displayException e
 
 -- |Arithmetic exceptions.
 data ArithException

@@ -96,7 +96,7 @@ liftMaybeT act = MaybeT $ Just `liftM` act
 tryMaybeT :: IO a -> MaybeT IO a
 tryMaybeT action = MaybeT $ catchException (Just `fmap` action) handler
   where
-    handler (SomeExceptionWithLocation _) = return Nothing
+    handler (SomeExceptionWithLocation _ _) = return Nothing
 
 {-
 ************************************************************************

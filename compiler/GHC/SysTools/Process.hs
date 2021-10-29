@@ -281,7 +281,7 @@ builderMainLoop logger filter_fn pgm real_args mb_cwd mb_env = do
             inner hProcess
         case r of
           -- onException
-          Left (SomeExceptionWithLocation e) -> do
+          Left (SomeExceptionWithLocation e _) -> do
             terminateProcess hProcess
             cleanup_handles
             throw e
