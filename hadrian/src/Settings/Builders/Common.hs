@@ -38,8 +38,8 @@ cIncludeArgs = do
             , arg $ "-I" ++ libPath
             , arg $ "-I" ++ path
             , pure . map ("-I"++) . filter (/= "") $ [iconvIncludeDir, gmpIncludeDir, numaIncludeDir, cursesIncludeDir]
-            , flag UseSystemFfi ? if not (null ffiIncludeDir) then arg ("-I" ++ ffiIncludeDir) else mempty
-            , flag WithLibdw ? if not (null libdwIncludeDir) then arg ("-I" ++ libdwIncludeDir) else mempty
+            , flag UseSystemFfi ? not (null ffiIncludeDir) ? arg ("-I" ++ ffiIncludeDir)
+            , flag WithLibdw ? not (null libdwIncludeDir) ? arg ("-I" ++ libdwIncludeDir)
             -- Add @incDirs@ in the build directory, since some files generated
             -- with @autoconf@ may end up in the build directory.
             , pure [ "-I" ++ path        -/- dir | dir <- incDirs ]
