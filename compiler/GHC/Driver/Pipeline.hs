@@ -774,7 +774,7 @@ asPipeline use_cpp pipe_env hsc_env location input_fn =
 
 viaCPipeline :: P m => Phase -> PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> m (Maybe FilePath)
 viaCPipeline c_phase pipe_env hsc_env location input_fn = do
-  out_fn <- use (T_Cc c_phase pipe_env hsc_env input_fn)
+  out_fn <- use (T_Cc c_phase pipe_env hsc_env location input_fn)
   case stop_phase pipe_env of
     StopC -> return Nothing
     _ -> asPipeline False pipe_env hsc_env location out_fn

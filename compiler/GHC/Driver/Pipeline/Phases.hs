@@ -42,7 +42,7 @@ data TPhase res where
   T_HscBackend :: PipeEnv -> HscEnv -> ModuleName -> HscSource -> ModLocation -> HscBackendAction -> TPhase ([FilePath], ModIface, Maybe Linkable, FilePath)
   T_CmmCpp :: PipeEnv -> HscEnv -> FilePath -> TPhase FilePath
   T_Cmm :: PipeEnv -> HscEnv -> FilePath -> TPhase ([FilePath], FilePath)
-  T_Cc :: Phase -> PipeEnv -> HscEnv -> FilePath -> TPhase FilePath
+  T_Cc :: Phase -> PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> TPhase FilePath
   T_As :: Bool -> PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> TPhase FilePath
   T_LlvmOpt :: PipeEnv -> HscEnv -> FilePath -> TPhase FilePath
   T_LlvmLlc :: PipeEnv -> HscEnv -> FilePath -> TPhase FilePath

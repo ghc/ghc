@@ -134,7 +134,7 @@ runPhase (T_Cmm pipe_env hsc_env input_fn) = do
   let foreign_os = maybeToList stub_o
   return (foreign_os, output_fn)
 
-runPhase (T_Cc phase pipe_env hsc_env input_fn) = runCcPhase phase pipe_env hsc_env input_fn
+runPhase (T_Cc phase pipe_env hsc_env location input_fn) = runCcPhase phase pipe_env hsc_env location input_fn
 runPhase (T_As cpp pipe_env hsc_env location input_fn) = do
   runAsPhase cpp pipe_env hsc_env location input_fn
 runPhase (T_LlvmOpt pipe_env hsc_env input_fn) =
@@ -363,8 +363,8 @@ applyAssemblerProg DarwinClangAssemblerProg logger dflags platform =
 
 
 
-runCcPhase :: Phase -> PipeEnv -> HscEnv -> FilePath -> IO FilePath
-runCcPhase cc_phase pipe_env hsc_env input_fn = do
+runCcPhase :: Phase -> PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> IO FilePath
+runCcPhase cc_phase pipe_env hsc_env location input_fn = do
   let dflags    = hsc_dflags hsc_env
   let logger    = hsc_logger hsc_env
   let unit_env  = hsc_unit_env hsc_env
@@ -429,7 +429,7 @@ runCcPhase cc_phase pipe_env hsc_env input_fn = do
 
   -- Decide next phase
   let next_phase = As False
-  output_fn <- phaseOutputFilenameNew next_phase pipe_env hsc_env Nothing
+  output_fn <- phaseOutputFilenameNew next_phase pipe_env hsc_env location
 
   let
     more_hcc_opts =
