@@ -512,10 +512,29 @@ instance Enum a => Enum (WrappedMonoid a) where
 --
 -- > mtimesDefault n a = a <> a <> ... <> a  -- using <> (n-1) times
 --
--- Implemented using 'stimes' and 'mempty'.
+-- In many cases, `stimes 0 a` for a `Monoid` will produce `mempty`.
+-- However, there are situations when it cannot do so. In particular,
+-- the following situation is fairly common:
 --
--- This is a suitable definition for an 'mtimes' member of 'Monoid'.
+-- @
+-- data T a = ...
+--
+-- class Constraint1 a
+-- class Constraint1 a => Constraint2 a
+--
+-- @
+-- instance Constraint1 a => 'Semigroup' (T a)
+-- instance Constraint2 a => 'Monoid' (T a)
+-- @
+--
+-- Since @Constraint1@ is insufficient to implement 'mempty',
+-- 'stimes' for @T a@ cannot do so.
+--
+-- When working with such a type, or when working polymorphically with
+-- 'Semigroup' instances, @mtimesDefault@ should be used when the
+-- multiplier might be zero. It is implemented using 'stimes' when
+-- the multiplier is nonzero and 'mempty' when it is zero.
 mtimesDefault :: (Integral b, Monoid a) => b -> a -> a
 mtimesDefault n x
   | n == 0    = mempty
-  | otherwise = unwrapMonoid (stimes n (WrapMonoid x))
+  | otherwise = stimes n x
