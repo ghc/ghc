@@ -59,7 +59,8 @@ $(ghc-cabal_DIST_BINARY): $(CABAL_LEXER_DEP) utils/ghc-cabal/Main.hs $(TOUCH_DEP
 	"$(GHC)" $(SRC_HC_OPTS) \
 	       $(addprefix -optc, $(SRC_CC_OPTS) $(CONF_CC_OPTS_STAGE0)) \
 	       $(addprefix -optl, $(SRC_LD_OPTS) $(CONF_GCC_LINKER_OPTS_STAGE0)) \
-				 -O0 \
+		   -O0 \
+		   -XHaskell2010 \
 	       -hide-all-packages \
 	       -package-env - \
 	       $(addprefix -package , $(CABAL_BUILD_DEPS)) \
