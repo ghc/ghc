@@ -593,6 +593,8 @@ endif
 
 $(eval $(call dependencies,rts,dist-install,1))
 
+$(rts_dist-install_depfile_c_asm) : $(includes_dist-install_H_FILES)
+
 $(rts_dist-install_depfile_c_asm) : $(includes_1_H_CONFIG)
 $(rts_dist-install_depfile_c_asm) : $(includes_1_H_PLATFORM)
 $(rts_dist-install_depfile_c_asm) : $(includes_1_H_VERSION)
@@ -641,7 +643,8 @@ endif
 
 $(eval $(call manual-package-config,rts,dist-install,1))
 
-rts/dist-install/package.conf.inplace : $(includes_1_H_CONFIG) $(includes_1_H_PLATFORM) $(includes_1_H_VERSION)
+rts/dist-install/package.conf.inplace : $(includes_dist-install_H_FILES)
+rts/dist-install/package.conf.install : $(includes_dist-install_H_FILES)
 
 # -----------------------------------------------------------------------------
 # installing

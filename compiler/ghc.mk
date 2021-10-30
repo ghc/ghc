@@ -338,8 +338,6 @@ $(compiler_stage1_depfile_haskell) : $(includes_0_H_CONFIG) $(includes_0_H_PLATF
 $(compiler_stage2_depfile_haskell) : $(includes_1_H_CONFIG) $(includes_1_H_PLATFORM)
 $(compiler_stage3_depfile_haskell) : $(includes_2_H_CONFIG) $(includes_2_H_PLATFORM)
 
-COMPILER_INCLUDES_DEPS += $(includes_DERIVEDCONSTANTS)
-
 $(compiler_stage1_depfile_haskell) : $(COMPILER_INCLUDES_DEPS) $(PRIMOP_BITS_STAGE1)
 $(compiler_stage2_depfile_haskell) : $(COMPILER_INCLUDES_DEPS) $(PRIMOP_BITS_STAGE2)
 $(compiler_stage3_depfile_haskell) : $(COMPILER_INCLUDES_DEPS) $(PRIMOP_BITS_STAGE3)

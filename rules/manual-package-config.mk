@@ -34,7 +34,7 @@ $1/$2/package.conf.inplace : $1/package.conf.in $$$$(ghc-pkg_INPLACE) | $$$$(dir
 # This is actually a real file, but we need to recreate it on every
 # "make install", so we declare it as phony
 .PHONY: $1/$2/package.conf.install
-$1/$2/package.conf.install: | $$$$(dir $$$$@)/.
+$1/$2/package.conf.install : $1/package.conf.in | $$$$(dir $$$$@)/.
 	$$(HS_CPP) -P \
 		-DINSTALLING \
 		-DLIB_DIR='"$$(if $$(filter YES,$$(RelocatableBuild)),$$$$topdir,$$(ghclibdir))"' \

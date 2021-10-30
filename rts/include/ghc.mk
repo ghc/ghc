@@ -42,6 +42,24 @@ includes_H_FILES := $(wildcard $(patsubst %,rts/include/%/*.h,$(includes_H_SUBDI
 # This isn't necessary, but it makes the paths look a little prettier
 includes_H_FILES := $(subst /./,/,$(includes_H_FILES))
 
+includes_H_FILES_GENERATED = \
+    ghcautoconf.h \
+    ghcplatform.h \
+    ghcversion.h
+
+# Unlike above, include generated files. We still need the previous list
+# without the generated files separtely and not just as part of this due to
+# lingering issues like the derived constants generation snooping the RTS
+# headers.
+define includesFilesWithGenerated
+# $1 = distdir
+includes_$1_H_FILES = \
+	$$(includes_H_FILES) \
+	$$(patsubst %,rts/$1/build/include/%,$$(includes_H_FILES_GENERATED))
+endef
+$(eval $(call includesFilesWithGenerated,dist))
+$(eval $(call includesFilesWithGenerated,dist-install))
+
 #
 # Options
 #
@@ -284,6 +302,8 @@ $(includes_DERIVEDCONSTANTS):           $$(includes_H_FILES) $$(rts_H_FILES)
 $(includes_DERIVEDCONSTANTS): $(deriveConstants_INPLACE) $(includes_1_H_CONFIG) $(includes_1_H_PLATFORM) | $$(dir $$@)/.
 	$< --gen-header -o $@ --tmpdir $(dir $@) $(DERIVE_CONSTANTS_FLAGS_FOR_HEADER)
 endif
+
+includes_dist-install_H_FILES += $(includes_DERIVEDCONSTANTS)
 
 # ---------------------------------------------------------------------------
 # Install all header files
