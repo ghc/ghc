@@ -53,6 +53,7 @@ import GHC.Data.Bag
 import GHC.Utils.Error  ( pprLocMsgEnvelope )
 import GHC.Types.Basic
 import GHC.Types.Error
+import GHC.Types.Unique.Set ( nonDetEltsUniqSet )
 import GHC.Core.ConLike ( ConLike(..))
 import GHC.Utils.Misc
 import GHC.Data.FastString
@@ -2358,6 +2359,17 @@ mkDictErr ctxt cts
     -- but we really only want to report the latter
     elim_superclasses cts = mkMinimalBySCs ctPred cts
 
+-- [Note: mk_dict_err]
+-- ~~~~~~~~~~~~~~~~~~~
+-- Different dictionary error messages are reported depending on the number of
+-- matches and unifiers:
+--
+--   - No matches, regardless of unifiers: report "No instance for ...".
+--   - Two or more matches, regardless of unifiers: report "Overlapping instances for ...",
+--     and show the matching and unifying instances.
+--   - One match, one or more unifiers: report "Overlapping instances for", show the
+--     matching and unifying instances, and say "The choice depends on the instantion of ...,
+--     and the result of evaluating ...".
 mk_dict_err :: ReportErrCtxt -> (Ct, ClsInstLookupResult)
             -> TcM (ReportErrCtxt, SDoc)
 -- Report an overlap error if this class constraint results
@@ -2523,12 +2535,24 @@ mk_dict_err ctxt@(CEC {cec_encl = implics}) (ct, (matches, unifiers, unsafe_over
                       , nest 2 (vcat (pp_givens useful_givens))]
 
              ,  ppWhen (isSingleton matches) $
-                parens (vcat [ text "The choice depends on the instantiation of" <+>
-                                  quotes (pprWithCommas ppr (tyCoVarsOfTypesList tys))
+                parens (vcat [ ppUnless (null tyCoVars) $
+                                 text "The choice depends on the instantiation of" <+>
+                                   quotes (pprWithCommas ppr tyCoVars)
+                             , ppUnless (null famTyCons) $
+                                 if (null tyCoVars)
+                                   then
+                                     text "The choice depends on the result of evaluating" <+>
+                                       quotes (pprWithCommas ppr famTyCons)
+                                   else
+                                     text "and the result of evaluating" <+>
+                                       quotes (pprWithCommas ppr famTyCons)
                              , ppWhen (null (matching_givens)) $
                                vcat [ text "To pick the first instance above, use IncoherentInstances"
                                     , text "when compiling the other instance declarations"]
                         ])]
+      where
+        tyCoVars = tyCoVarsOfTypesList tys
+        famTyCons = filter isFamilyTyCon $ concatMap (nonDetEltsUniqSet . tyConsOfType) tys
 
     matching_givens = mapMaybe matchable useful_givens
 
