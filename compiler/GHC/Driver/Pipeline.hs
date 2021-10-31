@@ -777,7 +777,7 @@ viaCPipeline c_phase pipe_env hsc_env location input_fn = do
   out_fn <- use (T_Cc c_phase pipe_env hsc_env location input_fn)
   case stop_phase pipe_env of
     StopC -> return Nothing
-    _ -> asPipeline False pipe_env hsc_env location out_fn
+    _ -> return $ Just out_fn
 
 llvmPipeline :: P m => PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> m (Maybe FilePath)
 llvmPipeline pipe_env hsc_env location fp = do

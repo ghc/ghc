@@ -427,9 +427,11 @@ runCcPhase cc_phase pipe_env hsc_env location input_fn = do
              | llvmOptLevel dflags >= 1 = [ "-O" ]
              | otherwise            = []
 
-  -- Decide next phase
-  let next_phase = As False
-  output_fn <- phaseOutputFilenameNew next_phase pipe_env hsc_env location
+  output_fn <- phaseOutputFilenameNew StopLn pipe_env hsc_env location
+
+  -- we create directories for the object file, because it
+  -- might be a hierarchical module.
+  createDirectoryIfMissing True (takeDirectory output_fn)
 
   let
     more_hcc_opts =
@@ -450,13 +452,21 @@ runCcPhase cc_phase pipe_env hsc_env location input_fn = do
 
   ghcVersionH <- getGhcVersionPathName dflags unit_env
 
-  GHC.SysTools.runCc (phaseForeignLanguage cc_phase) logger tmpfs dflags (
-                  [ GHC.SysTools.FileOption "" input_fn
+  withAtomicRename output_fn $ \temp_outputFilename ->
+    GHC.SysTools.runCc (phaseForeignLanguage cc_phase) logger tmpfs dflags (
+                  [ GHC.SysTools.Option "-c"
+                  , GHC.SysTools.FileOption "" input_fn
                   , GHC.SysTools.Option "-o"
-                  , GHC.SysTools.FileOption "" output_fn
+                  , GHC.SysTools.FileOption "" temp_outputFilename
                   ]
                  ++ map GHC.SysTools.Option (
                     pic_c_flags
+
+                 -- See Note [Produce big objects on Windows]
+                 ++ [ "-Wa,-mbig-obj"
+                    | platformOS (targetPlatform dflags) == OSMinGW32
+                    , not $ target32Bit (targetPlatform dflags)
+                    ]
 
           -- Stub files generated for foreign exports references the runIO_closure
           -- and runNonIO_closure symbols, which are defined in the base package.
@@ -477,7 +487,6 @@ runCcPhase cc_phase pipe_env hsc_env location input_fn = do
                        then gcc_extra_viac_flags ++ more_hcc_opts
                        else [])
                  ++ verbFlags
-                 ++ [ "-S" ]
                  ++ cc_opt
                  ++ [ "-include", ghcVersionH ]
                  ++ framework_paths
