@@ -1,0 +1,4 @@
+T20590.hs:(6,2)-(8,7): Splicing declarations
+    [d| data T where MkT :: forall a. a -> T |]
+  ======>
+    data T where MkT :: forall a. a -> T
