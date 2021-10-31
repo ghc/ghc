@@ -1,0 +1,25 @@
+
+T20466.hs:28:7:
+     Overlapping instances for Cls (Either a (F (Either (G a) (G b))))
+        arising from a use of ‘foo’
+      Matching instances:
+        instance [overlappable] Cls a -- Defined at T20466.hs:20:31
+        instance Cls (Either Int Bool) -- Defined at T20466.hs:22:10
+      (The choice depends on the instantiation of ‘a, b’
+       and the result of evaluating ‘G, F’
+       To pick the first instance above, use IncoherentInstances
+       when compiling the other instance declarations)
+       In the expression: foo
+        In an equation for ‘bar’: bar = foo
+
+T20466.hs:34:8:
+     Overlapping instances for Cls (Either Int (F Bool))
+        arising from a use of ‘foo'’
+      Matching instances:
+        instance [overlappable] Cls a -- Defined at T20466.hs:20:31
+        instance Cls (Either Int Bool) -- Defined at T20466.hs:22:10
+      (The choice depends on the result of evaluating ‘F’
+       To pick the first instance above, use IncoherentInstances
+       when compiling the other instance declarations)
+     In the expression: foo'
+      In an equation for ‘bar'’: bar' = foo'
