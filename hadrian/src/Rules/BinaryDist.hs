@@ -412,8 +412,7 @@ runGhcWrapper = pure $ "exec \"$executablename\" -f \"$exedir/ghc\" ${1+\"$@\"}\
 -- | --interactive flag.
 ghciScriptWrapper :: Action String
 ghciScriptWrapper = pure $ unlines
-    [ "DIR=`dirname \"$0\"`"
-    , "executable=\"$DIR/ghc\""
+    [ "executable=\"$bindir/ghc\""
     , "exec $executable --interactive \"$@\"" ]
 
 -- | When not on Windows, we want to ship the 3 flavours of the iserv program
