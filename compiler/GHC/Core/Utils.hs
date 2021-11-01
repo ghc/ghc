@@ -2460,7 +2460,12 @@ tryEtaReduce bndrs body
     ok_fun _fun                = False
 
     ---------------
-    ok_fun_id fun = fun_arity fun >= incoming_arity
+    ok_fun_id fun = -- There are arguments to reduce
+                    fun_arity fun >= incoming_arity &&
+                    -- We always want args for join points so
+                    -- we should never eta-reduce to a trivial expression.
+                    -- See Note [Invariants on join points] in GHC.Core, and #20599
+                    not (isJoinId fun)
 
     ---------------
     fun_arity fun             -- See Note [Arity care]

@@ -1527,7 +1527,13 @@ tryEtaReducePrep bndrs expr@(App _ _)
     ok _    _         = False
 
     -- We can't eta reduce something which must be saturated.
-    ok_to_eta_reduce (Var f) = not (hasNoBinding f) && not (isLinearType (idType f))
+    ok_to_eta_reduce (Var f) =  not (hasNoBinding f) &&
+                                not (isLinearType (idType f)) && -- Unsure why this is unsafe.
+                                (not (isJoinId f) || idJoinArity f <= n_remaining)
+                                -- Don't undersaturate join points.
+                                -- See Note [Invariants on join points] in GHC.Core, and #20599
+
+
     ok_to_eta_reduce _       = False -- Safe. ToDo: generalise
 
 
