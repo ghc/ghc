@@ -982,7 +982,7 @@ Checking for consistency
     as each function will start at a cache line.
     However forcing larger alignments in general reduces performance.
 
-.. ghc-flag:: -fcatch-bottoms
+.. ghc-flag:: -fcatch-nonexhaustive-cases
     :shortdesc: Add a default ``error`` alternative to case expressions without
         a default alternative.
     :type: dynamic
