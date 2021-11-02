@@ -332,8 +332,14 @@ The supported transformers are listed below:
     <tr>
         <td><code>no_self_recomp</code></td>
         <td>Disable including self-recompilation information in interface files via <code>-fno-write-if-self-recomp</code>. If you are building a distribution you can enable this flag to produce more deterministic interface files.</td>
+    </tr>
+    <tr>
         <td><code>hash_unit_ids</code></td>
         <td>Include a package hash in the unit id of built packages</td>
+    </tr>
+    <tr>
+        <td><code>ghc_coverage</code></td>
+        <td>Build the stage2 compiler with HPC coverage support.</td>
     </tr>
 </table>
 
