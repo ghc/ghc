@@ -5,3 +5,4 @@ def f( name, opts ):
 setTestOpts(f)
 
 test('CPRRepeat', normal, compile_and_run, [''])
+test('T20598', normal, multimod_compile_and_run, ['T20598c', ''])
