@@ -120,7 +120,7 @@ import GHC.Prim.Ext
 import GHC.Prim.PtrEq
 import GHC.Err
 import GHC.Maybe
-import {-# SOURCE #-} GHC.IO (mkUserError, mplusIO)
+import {-# SOURCE #-} GHC.IO (mplusIO, throwIOUserError)
 
 import GHC.Tuple (Solo (..))     -- Note [Depend on GHC.Tuple]
 import GHC.Num.Integer ()        -- Note [Depend on GHC.Num.Integer]
@@ -1601,7 +1601,7 @@ thenIO (IO m) k = IO (\ s -> case m s of (# new_s, _ #) -> unIO k new_s)
 -- behavior, which can expose useful simplifications. See
 -- #16588.
 failIO :: String -> IO a
-failIO s = IO (raiseIO# (mkUserError s))
+failIO = throwIOUserError
 
 unIO :: IO a -> (State# RealWorld -> (# State# RealWorld, a #))
 unIO (IO a) = a

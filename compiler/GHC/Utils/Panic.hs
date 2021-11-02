@@ -110,7 +110,8 @@ data GhcException
   | PprProgramError String SDoc
 
 instance Exception GhcException where
-  fromException (SomeExceptionWithLocation e _)
+  -- TODO: Print stack traces here
+  fromException (SomeExceptionWithLocation (SomeException e) _)
     | Just ge <- cast e = Just ge
     | Just pge <- cast e = Just $
         case pge of

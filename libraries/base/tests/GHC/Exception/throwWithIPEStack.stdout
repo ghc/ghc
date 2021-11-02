@@ -1,0 +1,2 @@
+Info Table Provenance Entries (IPE) backtrace:
+ Main.throwExceptionInScrutinee: throwWithIPEStack.hs:20:53-60

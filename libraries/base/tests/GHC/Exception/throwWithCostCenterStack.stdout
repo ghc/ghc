@@ -1,0 +1,3 @@
+Cost Centre backtrace:
+ Main.main (throwWithCostCenterStack.hs:(11,1)-(16,44))
+ Main.CAF (<entire-module>)

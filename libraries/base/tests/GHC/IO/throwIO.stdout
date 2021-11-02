@@ -1,0 +1,39 @@
+"=== Test backtraces ==="
+"Backtrace mechanisms []:"
+
+"Backtrace mechanisms [HasCallStackBacktraceMech]:"
+HasCallStack backtrace:
+ CallStack (from HasCallStack):
+   collectHasCallStackBacktrace, called at libraries/base/GHC/Exception/Backtrace.hs:109:52 in base:GHC.Exception.Backtrace
+   collectBacktraces', called at libraries/base/GHC/Exception/Backtrace.hs:102:27 in base:GHC.Exception.Backtrace
+   collectBacktraces, called at libraries/base/GHC/IO.hs:239:7 in base:GHC.IO
+   throwIO, called at throwIO.hs:6:21 in main:Main
+"Backtrace mechanisms [CostCenterBacktraceMech]:"
+Cost Centre backtrace:
+ ThrowTestLib.produceDeepStack.getDeepStackCase (ThrowTestLib.hs:(61,5)-(62,53))
+ ThrowTestLib.produceDeepStack (ThrowTestLib.hs:(51,1)-(62,53))
+ ThrowTestLib.printBacktrace (ThrowTestLib.hs:(37,1)-(44,9))
+ ThrowTestLib.runThrowTest (ThrowTestLib.hs:(18,1)-(34,20))
+ Main.main (throwIO.hs:6:1-27)
+"Backtrace mechanisms [IPEBacktraceMech]:"
+Info Table Provenance Entries (IPE) backtrace:
+ ThrowTestLib.runThrowTest: ThrowTestLib.hs:26:18-30
+ ThrowTestLib.printBacktrace: ThrowTestLib.hs:(41,5)-(43,42)
+ ThrowTestLib.printBacktrace: ThrowTestLib.hs:42:48
+"Backtrace mechanisms [IPEBacktraceMech,CostCenterBacktraceMech,HasCallStackBacktraceMech]:"
+Info Table Provenance Entries (IPE) backtrace:
+ ThrowTestLib.runThrowTest: ThrowTestLib.hs:28:5-17
+ ThrowTestLib.printBacktrace: ThrowTestLib.hs:(41,5)-(43,42)
+ ThrowTestLib.printBacktrace: ThrowTestLib.hs:42:48
+Cost Centre backtrace:
+ ThrowTestLib.produceDeepStack.getDeepStackCase (ThrowTestLib.hs:(61,5)-(62,53))
+ ThrowTestLib.produceDeepStack (ThrowTestLib.hs:(51,1)-(62,53))
+ ThrowTestLib.printBacktrace (ThrowTestLib.hs:(37,1)-(44,9))
+ ThrowTestLib.runThrowTest (ThrowTestLib.hs:(18,1)-(34,20))
+ Main.main (throwIO.hs:6:1-27)
+HasCallStack backtrace:
+ CallStack (from HasCallStack):
+   collectHasCallStackBacktrace, called at libraries/base/GHC/Exception/Backtrace.hs:109:52 in base:GHC.Exception.Backtrace
+   collectBacktraces', called at libraries/base/GHC/Exception/Backtrace.hs:102:27 in base:GHC.Exception.Backtrace
+   collectBacktraces, called at libraries/base/GHC/IO.hs:239:7 in base:GHC.IO
+   throwIO, called at throwIO.hs:6:21 in main:Main

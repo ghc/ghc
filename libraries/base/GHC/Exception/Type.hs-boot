@@ -7,6 +7,7 @@ module GHC.Exception.Type
   , overflowException
   , ratioZeroDenomException
   , underflowException
+  , Exception
   ) where
 
 import GHC.Num.Integer ()   -- See Note [Depend on GHC.Num.Integer] in GHC.Base
@@ -14,3 +15,7 @@ import GHC.Num.Integer ()   -- See Note [Depend on GHC.Num.Integer] in GHC.Base
 data SomeExceptionWithLocation
 divZeroException, overflowException,
   ratioZeroDenomException, underflowException :: SomeExceptionWithLocation
+
+class Exception e
+
+instance Exception SomeExceptionWithLocation

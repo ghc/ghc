@@ -1,0 +1,4 @@
+HasCallStack backtrace:
+ CallStack (from HasCallStack):
+   collectHasCallStackBacktrace, called at libraries/base/GHC/IO.hs:253:34 in base:GHC.IO
+   throwIOWithCallStack, called at throwIOWithCallStack.hs:14:6 in main:Main

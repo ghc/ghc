@@ -30,6 +30,7 @@ import GHC.Exts (Int (I#), RealWorld, StackSnapshot#, ThreadId#, Array#, sizeofA
 import GHC.IO (IO (..))
 import GHC.Stack.CCS (InfoProv (..), InfoProvEnt, ipeProv, peekInfoProv)
 import GHC.Stable
+import GHC.Stack.CloneStack.Types
 
 -- | A frozen snapshot of the state of an execution stack.
 --
@@ -200,16 +201,6 @@ cloneThreadStack (ThreadId tid#) = do
   IO $ \s -> case sendCloneStackMessage# tid# ptr s of (# s', (# #) #) -> (# s', () #)
   freeStablePtr boxedPtr
   takeMVar resultVar
-
--- | Represetation for the source location where a return frame was pushed on the stack.
--- This happens every time when a @case ... of@ scrutinee is evaluated.
-data StackEntry = StackEntry
-  { functionName :: String,
-    moduleName :: String,
-    srcLoc :: String,
-    closureType :: Word
-  }
-  deriving (Show, Eq)
 
 -- | Decode a 'StackSnapshot' to a stacktrace (a list of 'StackEntry').
 -- The stack trace is created from return frames with according 'InfoProvEnt'

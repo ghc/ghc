@@ -29,7 +29,8 @@ import GHC.Enum
 import GHC.Show
 import {-# SOURCE #-} GHC.Exception( divZeroException, overflowException
                                    , underflowException
-                                   , ratioZeroDenomException )
+                                   , ratioZeroDenomException
+                                   , throw )
 
 import GHC.Num.BigNat (gcdInt,gcdWord)
 
@@ -60,19 +61,19 @@ so INLINE[2] seems sufficient.  c.f. #20709
 
 {-# NOINLINE divZeroError #-}
 divZeroError :: a
-divZeroError = raise# divZeroException
+divZeroError = throw divZeroException
 
 {-# NOINLINE ratioZeroDenominatorError #-}
 ratioZeroDenominatorError :: a
-ratioZeroDenominatorError = raise# ratioZeroDenomException
+ratioZeroDenominatorError = throw ratioZeroDenomException
 
 {-# NOINLINE overflowError #-}
 overflowError :: a
-overflowError = raise# overflowException
+overflowError = throw overflowException
 
 {-# NOINLINE underflowError #-}
 underflowError :: a
-underflowError = raise# underflowException
+underflowError = throw underflowException
 
 
 --------------------------------------------------------------

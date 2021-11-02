@@ -1,0 +1,2 @@
+Cost Centre backtrace:
+ Main.main (throwIOWithCostCenterStack.hs:(12,1)-(17,44))

@@ -1,0 +1,7 @@
+"=== Test Show instances ==="
+"SomeExceptionWithLocation:"
+CustomException
+"SomeException:"
+CustomException
+"CustomException:"
+CustomException
