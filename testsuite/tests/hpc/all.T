@@ -24,3 +24,5 @@ test('T2991', [cmd_wrapper(T2991), extra_clean(['T2991LiterateModule.hi',
 
 test('T17073', when(opsys('mingw32'), expect_broken(17607)),
      makefile_test, ['T17073 HPC={hpc}'])
+
+test('T20568', normal, makefile_test, [])

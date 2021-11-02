@@ -15,3 +15,6 @@ T17073:
 	"$(HPC)" version
 	LANG=ASCII "$(HPC)" markup T17073
 
+T20568:
+	"$(TEST_HC)" $(TEST_HC_ARGS) T20568.hs -fhpc -v0
+	./T20568
