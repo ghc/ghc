@@ -42,12 +42,8 @@ module GHC.Int (
 import Data.Bits
 import Data.Maybe
 
-#if WORD_SIZE_IN_BITS < 64
 import GHC.Prim
 import GHC.Base
-#else
-import GHC.Base hiding (uncheckedIShiftL64#, uncheckedIShiftRA64#)
-#endif
 
 import GHC.Enum
 import GHC.Num
@@ -695,8 +691,6 @@ instance Ix Int32 where
 -- type Int64
 ------------------------------------------------------------------------
 
-#if WORD_SIZE_IN_BITS < 64
-
 data {-# CTYPE "HsInt64" #-} Int64 = I64# Int64#
 -- ^ 64-bit signed integer type
 
@@ -802,14 +796,24 @@ instance Integral Int64 where
         | y == 0                     = divZeroError
           -- Note [Order of tests]
         | y == (-1) && x == minBound = (overflowError, 0)
-        | otherwise                  = (I64# (x# `quotInt64#` y#),
-                                        I64# (x# `remInt64#` y#))
+#if WORD_SIZE_IN_BITS < 64
+        -- we don't have quotRemInt64# primop yet
+        | otherwise                  = (I64# (x# `quotInt64#` y#), I64# (x# `remInt64#` y#))
+#else
+        | otherwise                  = case quotRemInt# (int64ToInt# x#) (int64ToInt# y#) of
+                                        (# q, r #) -> (I64# (intToInt64# q), I64# (intToInt64# r))
+#endif
     divMod  x@(I64# x#) y@(I64# y#)
         | y == 0                     = divZeroError
           -- Note [Order of tests]
         | y == (-1) && x == minBound = (overflowError, 0)
-        | otherwise                  = (I64# (x# `divInt64#` y#),
-                                        I64# (x# `modInt64#` y#))
+#if WORD_SIZE_IN_BITS < 64
+        -- we don't have divModInt64# primop yet
+        | otherwise                  = (I64# (x# `divInt64#` y#), I64# (x# `modInt64#` y#))
+#else
+        | otherwise                  = case divModInt# (int64ToInt# x#) (int64ToInt# y#) of
+                                        (# q, r #) -> (I64# (intToInt64# q), I64# (intToInt64# r))
+#endif
     toInteger (I64# x)               = integerFromInt64# x
 
 
@@ -896,166 +900,8 @@ a `iShiftRA64#` b | isTrue# (b >=# 64#) = if isTrue# (a `ltInt64#` (intToInt64# 
 
 -- No RULES for RealFrac methods if Int is smaller than Int64, we can't
 -- go through Int and whether going through Integer is faster is uncertain.
-#else
 
--- Int64 is represented in the same way as Int.
--- Operations may assume and must ensure that it holds only values
--- from its logical range.
-
-data {-# CTYPE "HsInt64" #-} Int64 = I64# Int#
--- ^ 64-bit signed integer type
-
--- See GHC.Classes#matching_overloaded_methods_in_rules
--- | @since 2.01
-instance Eq Int64 where
-    (==) = eqInt64
-    (/=) = neInt64
-
-eqInt64, neInt64 :: Int64 -> Int64 -> Bool
-eqInt64 (I64# x) (I64# y) = isTrue# (x ==# y)
-neInt64 (I64# x) (I64# y) = isTrue# (x /=# y)
-{-# INLINE [1] eqInt64 #-}
-{-# INLINE [1] neInt64 #-}
-
--- | @since 2.01
-instance Ord Int64 where
-    (<)  = ltInt64
-    (<=) = leInt64
-    (>=) = geInt64
-    (>)  = gtInt64
-
-{-# INLINE [1] gtInt64 #-}
-{-# INLINE [1] geInt64 #-}
-{-# INLINE [1] ltInt64 #-}
-{-# INLINE [1] leInt64 #-}
-gtInt64, geInt64, ltInt64, leInt64 :: Int64 -> Int64 -> Bool
-(I64# x) `gtInt64` (I64# y) = isTrue# (x >#  y)
-(I64# x) `geInt64` (I64# y) = isTrue# (x >=# y)
-(I64# x) `ltInt64` (I64# y) = isTrue# (x <#  y)
-(I64# x) `leInt64` (I64# y) = isTrue# (x <=# y)
-
--- | @since 2.01
-instance Show Int64 where
-    showsPrec p x = showsPrec p (fromIntegral x :: Int)
-
--- | @since 2.01
-instance Num Int64 where
-    (I64# x#) + (I64# y#)  = I64# (x# +# y#)
-    (I64# x#) - (I64# y#)  = I64# (x# -# y#)
-    (I64# x#) * (I64# y#)  = I64# (x# *# y#)
-    negate (I64# x#)       = I64# (negateInt# x#)
-    abs x | x >= 0         = x
-          | otherwise      = negate x
-    signum x | x > 0       = 1
-    signum 0               = 0
-    signum _               = -1
-    fromInteger i          = I64# (integerToInt# i)
-
--- | @since 2.01
-instance Enum Int64 where
-    succ x
-        | x /= maxBound = x + 1
-        | otherwise     = succError "Int64"
-    pred x
-        | x /= minBound = x - 1
-        | otherwise     = predError "Int64"
-    toEnum (I# i#)      = I64# i#
-    fromEnum (I64# x#)  = I# x#
-    -- See Note [Stable Unfolding for list producers] in GHC.Enum
-    {-# INLINE enumFrom #-}
-    enumFrom            = boundedEnumFrom
-    -- See Note [Stable Unfolding for list producers] in GHC.Enum
-    {-# INLINE enumFromThen #-}
-    enumFromThen        = boundedEnumFromThen
-
--- | @since 2.01
-instance Integral Int64 where
-    quot    x@(I64# x#) y@(I64# y#)
-        | y == 0                     = divZeroError
-        | y == (-1) && x == minBound = overflowError -- Note [Order of tests]
-        | otherwise                  = I64# (x# `quotInt#` y#)
-    rem       (I64# x#) y@(I64# y#)
-        | y == 0                     = divZeroError
-          -- The quotRem CPU instruction might fail for 'minBound
-          -- `quotRem` -1' if it is an instruction for exactly this
-          -- width of signed integer. But, 'minBound `rem` -1' is
-          -- well-defined (0). We therefore special-case it.
-        | y == (-1)                  = 0
-        | otherwise                  = I64# (x# `remInt#` y#)
-    div     x@(I64# x#) y@(I64# y#)
-        | y == 0                     = divZeroError
-        | y == (-1) && x == minBound = overflowError -- Note [Order of tests]
-        | otherwise                  = I64# (x# `divInt#` y#)
-    mod       (I64# x#) y@(I64# y#)
-        | y == 0                     = divZeroError
-          -- The divMod CPU instruction might fail for 'minBound
-          -- `divMod` -1' if it is an instruction for exactly this
-          -- width of signed integer. But, 'minBound `mod` -1' is
-          -- well-defined (0). We therefore special-case it.
-        | y == (-1)                  = 0
-        | otherwise                  = I64# (x# `modInt#` y#)
-    quotRem x@(I64# x#) y@(I64# y#)
-        | y == 0                     = divZeroError
-          -- Note [Order of tests]
-        | y == (-1) && x == minBound = (overflowError, 0)
-        | otherwise                  = case x# `quotRemInt#` y# of
-                                       (# q, r #) ->
-                                           (I64# q, I64# r)
-    divMod  x@(I64# x#) y@(I64# y#)
-        | y == 0                     = divZeroError
-          -- Note [Order of tests]
-        | y == (-1) && x == minBound = (overflowError, 0)
-        | otherwise                  = case x# `divModInt#` y# of
-                                       (# d, m #) ->
-                                           (I64# d, I64# m)
-    toInteger (I64# x#)              = IS x#
-
--- | @since 2.01
-instance Read Int64 where
-    readsPrec p s = [(fromIntegral (x::Int), r) | (x, r) <- readsPrec p s]
-
--- | @since 2.01
-instance Bits Int64 where
-    {-# INLINE shift #-}
-    {-# INLINE bit #-}
-    {-# INLINE testBit #-}
-    {-# INLINE popCount #-}
-
-    (I64# x#) .&.   (I64# y#)  = I64# (x# `andI#` y#)
-    (I64# x#) .|.   (I64# y#)  = I64# (x# `orI#`  y#)
-    (I64# x#) `xor` (I64# y#)  = I64# (x# `xorI#` y#)
-    complement (I64# x#)       = I64# (notI# x#)
-    (I64# x#) `shift` (I# i#)
-        | isTrue# (i# >=# 0#)  = I64# (x# `iShiftL#` i#)
-        | otherwise            = I64# (x# `iShiftRA#` negateInt# i#)
-    (I64# x#) `shiftL`       (I# i#)
-        | isTrue# (i# >=# 0#)  = I64# (x# `iShiftL#` i#)
-        | otherwise            = overflowError
-    (I64# x#) `unsafeShiftL` (I# i#) = I64# (x# `uncheckedIShiftL#` i#)
-    (I64# x#) `shiftR`       (I# i#)
-        | isTrue# (i# >=# 0#)  = I64# (x# `iShiftRA#` i#)
-        | otherwise            = overflowError
-    (I64# x#) `unsafeShiftR` (I# i#) = I64# (x# `uncheckedIShiftRA#` i#)
-    (I64# x#) `rotate` (I# i#)
-        | isTrue# (i'# ==# 0#)
-        = I64# x#
-        | otherwise
-        = I64# (word2Int# ((x'# `uncheckedShiftL#` i'#) `or#`
-                           (x'# `uncheckedShiftRL#` (64# -# i'#))))
-        where
-        !x'# = int2Word# x#
-        !i'# = word2Int# (int2Word# i# `and#` 63##)
-    bitSizeMaybe i             = Just (finiteBitSize i)
-    bitSize i                  = finiteBitSize i
-    isSigned _                 = True
-#if WORD_SIZE_IN_BITS < 64
-    popCount (I64# x#)         = I# (word2Int# (popCnt64# (int64ToWord64# x#)))
-#else
-    popCount (I64# x#)         = I# (word2Int# (popCnt# (int2Word# x#)))
-#endif
-    bit                        = bitDefault
-    testBit                    = testBitDefault
-
+#if WORD_SIZE_IN_BITS == 64
 {-# RULES
 "properFraction/Float->(Int64,Float)"
     properFraction = \x ->
@@ -1085,12 +931,6 @@ instance Bits Int64 where
 "round/Double->Int64"
     round    = (fromIntegral :: Int -> Int64) . (round  :: Double -> Int)
   #-}
-
-uncheckedIShiftL64# :: Int# -> Int# -> Int#
-uncheckedIShiftL64#  = uncheckedIShiftL#
-
-uncheckedIShiftRA64# :: Int# -> Int# -> Int#
-uncheckedIShiftRA64# = uncheckedIShiftRA#
 #endif
 
 -- | @since 4.6.0.0
@@ -1098,13 +938,8 @@ instance FiniteBits Int64 where
     {-# INLINE countLeadingZeros #-}
     {-# INLINE countTrailingZeros #-}
     finiteBitSize _ = 64
-#if WORD_SIZE_IN_BITS < 64
     countLeadingZeros  (I64# x#) = I# (word2Int# (clz64# (int64ToWord64# x#)))
     countTrailingZeros (I64# x#) = I# (word2Int# (ctz64# (int64ToWord64# x#)))
-#else
-    countLeadingZeros  (I64# x#) = I# (word2Int# (clz# (int2Word# x#)))
-    countTrailingZeros (I64# x#) = I# (word2Int# (ctz# (int2Word# x#)))
-#endif
 
 -- | @since 2.01
 instance Real Int64 where

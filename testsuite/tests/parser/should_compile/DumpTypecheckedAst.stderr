@@ -153,8 +153,7 @@
            (NoEpAnns)
            (EpaComments
             []))
-          {HsInt{64}Prim (1) (SourceText
-                              "1")}))))
+          {HsInt{64}Prim (1) (NoSourceText)}))))
       (L
        (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
        (HsVar
@@ -313,8 +312,7 @@
            (NoEpAnns)
            (EpaComments
             []))
-          {HsInt{64}Prim (3) (SourceText
-                              "3")}))))
+          {HsInt{64}Prim (3) (NoSourceText)}))))
       (L
        (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
        (HsVar
@@ -473,8 +471,7 @@
            (NoEpAnns)
            (EpaComments
             []))
-          {HsInt{64}Prim (0) (SourceText
-                              "0")}))))
+          {HsInt{64}Prim (0) (NoSourceText)}))))
       (L
        (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
        (HsVar
@@ -633,8 +630,7 @@
            (NoEpAnns)
            (EpaComments
             []))
-          {HsInt{64}Prim (0) (SourceText
-                              "0")}))))
+          {HsInt{64}Prim (0) (NoSourceText)}))))
       (L
        (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
        (HsVar
@@ -793,8 +789,7 @@
            (NoEpAnns)
            (EpaComments
             []))
-          {HsInt{64}Prim (0) (SourceText
-                              "0")}))))
+          {HsInt{64}Prim (0) (NoSourceText)}))))
       (L
        (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
        (HsVar

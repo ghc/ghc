@@ -30,12 +30,7 @@ popcnt32 :: Word -> Word
 popcnt32 (W# w#) = W# (popCnt32# w#)
 
 popcnt64 :: Word64 -> Word
-popcnt64 (W64# w#) =
-#if SIZEOF_HSWORD == 4
-    W# (popCnt64# w#)
-#else
-    W# (popCnt# w#)
-#endif
+popcnt64 (W64# w#) = W# (popCnt64# w#)
 
 -- Cribbed from https://gitlab.haskell.org/ghc/ghc/issues/3563
 slowPopcnt :: Word -> Word

@@ -131,10 +131,10 @@ type T4c = Float -> Double -> Word64 -> Integer
         -> Float -> Double -> Word64 -> Integer
         -> Float -> Double -> Word64 -> Integer
         -> Float -> Double -> Word64 -> Integer
-        -> (# Float#, Double#, WW#, Integer
-            , Float#, Double#, WW#, Integer
-            , Float#, Double#, WW#, Integer
-            , Float#, Double#, WW#, Integer
+        -> (# Float#, Double#, Word64#, Integer
+            , Float#, Double#, Word64#, Integer
+            , Float#, Double#, Word64#, Integer
+            , Float#, Double#, Word64#, Integer
             #)
 tuple4c :: T4c
 tuple4c (F# f1) (D# d1) (W64# w1) i1
@@ -179,10 +179,10 @@ type T5 = Int -> Word64 -> Int -> Word64
        -> Int -> Word64 -> Int -> Word64
        -> Int -> Word64 -> Int -> Word64
        -> Int -> Word64 -> Int -> Word64
-       -> (# Int, WW#, Int, WW#
-           , Int, WW#, Int, WW#
-           , Int, WW#, Int, WW#
-           , Int, WW#, Int, WW#
+       -> (# Int, Word64#, Int, Word64#
+           , Int, Word64#, Int, Word64#
+           , Int, Word64#, Int, Word64#
+           , Int, Word64#, Int, Word64#
            #)
 
 tuple5 :: T5

@@ -109,34 +109,6 @@ testIntArray name0 index read write val0 len = do
   doOne name val = test name index read write
     val (intToBytes (fromIntegral val) len) len
 
-#if WORD_SIZE_IN_BITS == 64
-testInt64Array = testIntArray
-#else
-testInt64Array ::
-     String
-  -> (ByteArray# -> Int# -> Int64#)
-  -> (MutableByteArray# RealWorld -> Int# -> State# RealWorld
-        -> (# State# RealWorld, Int64# #))
-  -> (MutableByteArray# RealWorld -> Int# -> Int64# -> State# RealWorld
-        -> State# RealWorld)
-  -> Int64
-  -> Int
-  -> IO ()
-testInt64Array name0 index read write val0 len = do
-  doOne (name0 ++ " positive") val0
-  doOne (name0 ++ " negative") (negate val0)
- where
-  doOne :: String -> Int64 -> IO ()
-  doOne name val = test
-    name
-    (\arr i -> I64# (index arr i))
-    (\arr i s -> case read arr i s of (# s', a #) -> (# s', I64# a #))
-    (\arr i (I64# a) s -> write arr i a s)
-    val
-    (intToBytes (fromIntegral val) len)
-    len
-#endif
-
 testWordArray :: (Eq a, Show a, Integral a)
   => String
   -> (ByteArray# -> Int# -> a)
@@ -150,29 +122,6 @@ testWordArray :: (Eq a, Show a, Integral a)
 testWordArray name index read write val len =
   test name index read write
     val (intToBytes (fromIntegral val) len) len
-
-#if WORD_SIZE_IN_BITS == 64
-testWord64Array = testWordArray
-#else
-testWord64Array ::
-     String
-  -> (ByteArray# -> Int# -> Word64#)
-  -> (MutableByteArray# RealWorld -> Int# -> State# RealWorld
-        -> (# State# RealWorld, Word64# #))
-  -> (MutableByteArray# RealWorld -> Int# -> Word64# -> State# RealWorld
-        -> State# RealWorld)
-  -> Word64
-  -> Int
-  -> IO ()
-testWord64Array name index read write val len = test
-  name
-  (\arr i -> W64# (index arr i))
-  (\arr i s -> case read arr i s of (# s', a #) -> (# s', W64# a #))
-  (\arr i (W64# a) s -> write arr i a s)
-  val
-  (intToBytes (fromIntegral val) len)
-  len
-#endif
 
 wordSizeInBytes :: Int
 wordSizeInBytes = WORD_SIZE_IN_BITS `div` 8
@@ -222,19 +171,11 @@ main = do
     (\arr i s -> case readWord8ArrayAsInt32# arr i s of (# s', a #) -> (# s', I32# a #))
     (\arr i (I32# a) s -> writeWord8ArrayAsInt32# arr i a s)
     12345678 4
-#if WORD_SIZE_IN_BITS < 64
-  testInt64Array "Int64#"
+  testIntArray "Int64#"
     (\arr i -> I64# (indexWord8ArrayAsInt64# arr i))
     (\arr i s -> case readWord8ArrayAsInt64# arr i s of (# s', a #) -> (# s', I64# a #))
     (\arr i (I64# a) s -> writeWord8ArrayAsInt64# arr i a s)
     1234567890123 8
-#else
-  testInt64Array "Int64#"
-    (\arr i -> I64# (int64ToInt# (indexWord8ArrayAsInt64# arr i)))
-    (\arr i s -> case readWord8ArrayAsInt64# arr i s of (# s', a #) -> (# s', I64# (int64ToInt# a) #))
-    (\arr i (I64# a) s -> writeWord8ArrayAsInt64# arr i (intToInt64# a) s)
-    1234567890123 8
-#endif
   testIntArray "Int#"
     (\arr i -> I# (indexWord8ArrayAsInt# arr i))
     (\arr i s -> case readWord8ArrayAsInt# arr i s of (# s', a #) -> (# s', I# a #))
@@ -256,19 +197,11 @@ main = do
     (\arr i s -> case readWord8ArrayAsWord32# arr i s of (# s', a #) -> (# s', W32# a #))
     (\arr i (W32# a) s -> writeWord8ArrayAsWord32# arr i a s)
     12345678 4
-#if WORD_SIZE_IN_BITS < 64
-  testWord64Array "Word64#"
+  testWordArray "Word64#"
     (\arr i -> W64# (indexWord8ArrayAsWord64# arr i))
     (\arr i s -> case readWord8ArrayAsWord64# arr i s of (# s', a #) -> (# s', W64# a #))
     (\arr i (W64# a) s -> writeWord8ArrayAsWord64# arr i a s)
     1234567890123 8
-#else
-  testWord64Array "Word64#"
-    (\arr i -> W64# (word64ToWord# (indexWord8ArrayAsWord64# arr i)))
-    (\arr i s -> case readWord8ArrayAsWord64# arr i s of (# s', a #) -> (# s', W64# (word64ToWord# a) #))
-    (\arr i (W64# a) s -> writeWord8ArrayAsWord64# arr i (wordToWord64# a) s)
-    1234567890123 8
-#endif
   testWordArray "Word#"
     (\arr i -> W# (indexWord8ArrayAsWord# arr i))
     (\arr i s -> case readWord8ArrayAsWord# arr i s of (# s', a #) -> (# s', W# a #))

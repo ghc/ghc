@@ -28,41 +28,20 @@
 -- are described over there.
 module GHC.Prim.Ext
   (
-  -- 64-bit bit aliases
-    INT64
-  , WORD64
+  -- * Misc
+    getThreadAllocationCounter#
   -- * Delay\/wait operations
 #if defined(mingw32_HOST_OS)
   , asyncRead#
   , asyncWrite#
   , asyncDoProc#
 #endif
-  -- * Misc
-  , getThreadAllocationCounter#
   ) where
 
 import GHC.Prim
 import GHC.Types () -- Make implicit dependency known to build system
 
 default () -- Double and Integer aren't available yet
-
-------------------------------------------------------------------------
--- 64-bit bit aliases
-------------------------------------------------------------------------
-
-type INT64 =
-#if WORD_SIZE_IN_BITS < 64
-  Int64#
-#else
-  Int#
-#endif
-
-type WORD64 =
-#if WORD_SIZE_IN_BITS < 64
-  Word64#
-#else
-  Word#
-#endif
 
 ------------------------------------------------------------------------
 -- Delay/wait operations
@@ -104,7 +83,7 @@ foreign import prim "stg_asyncDoProczh" asyncDoProc#
 -- | Retrieves the allocation counter for the current thread.
 foreign import prim "stg_getThreadAllocationCounterzh" getThreadAllocationCounter#
   :: State# RealWorld
-  -> (# State# RealWorld, INT64 #)
+  -> (# State# RealWorld, Int64# #)
 
 ------------------------------------------------------------------------
 -- Rules for primops that don't need to be built-in
@@ -249,3 +228,17 @@ foreign import prim "stg_getThreadAllocationCounterzh" getThreadAllocationCounte
   forall x . intToInt64# (word2Int# (word64ToWord# x)) = word64ToInt64# x
 #-}
 #endif
+
+
+-- Push downcast into bitwise operations
+{-# RULES
+"word64ToWord#/and64#"
+  forall x y . word64ToWord# (and64# x y) = and# (word64ToWord# x) (word64ToWord# y)
+
+"word64ToWord#/or64#"
+  forall x y . word64ToWord# (or64# x y) = or# (word64ToWord# x) (word64ToWord# y)
+
+"word64ToWord#/xor64#"
+  forall x y . word64ToWord# (xor64# x y) = xor# (word64ToWord# x) (word64ToWord# y)
+
+#-}

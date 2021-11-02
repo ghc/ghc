@@ -1001,7 +1001,7 @@ integerIsPowerOf2# (IP w) = bigNatIsPowerOf2# w
 -- | Convert an Int64# into an Integer
 integerFromInt64# :: Int64# -> Integer
 {-# NOINLINE integerFromInt64# #-}
-integerFromInt64# !i
+integerFromInt64# i
   | isTrue# ((i `leInt64#` intToInt64#  INT_MAXBOUND#)
       &&# (i `geInt64#` intToInt64# INT_MINBOUND#))
   = IS (int64ToInt# i)
@@ -1476,7 +1476,6 @@ to only rely on rewrite rules for bignum functions.
 
 #-}
 
-#if WORD_SIZE_IN_BITS == 32
 {-# RULES
 
 "Int64# -> Integer -> Int64#"
@@ -1516,4 +1515,3 @@ to only rely on rewrite rules for bignum functions.
   forall x. integerToInt# (integerFromWord64# x) = word2Int# (word64ToWord# x)
 
 #-}
-#endif
