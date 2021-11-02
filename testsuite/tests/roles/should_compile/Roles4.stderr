@@ -14,20 +14,20 @@ Dependent packages: [base-4.16.0.0]
 ==================== Typechecker ====================
 Roles4.$tcC3
   = GHC.Types.TyCon
-      7508642517340826358## 16938219270597865136## Roles4.$trModule
-      (GHC.Types.TrNameS "C3"#) 0 $krep
+      7508642517340826358##64 16938219270597865136##64 Roles4.$trModule
+      (GHC.Types.TrNameS "C3"#) 0# $krep
 Roles4.$tc'C:C3
   = GHC.Types.TyCon
-      3133378316178104365## 15809386433947157376## Roles4.$trModule
-      (GHC.Types.TrNameS "'C:C3"#) 1 $krep
+      3133378316178104365##64 15809386433947157376##64 Roles4.$trModule
+      (GHC.Types.TrNameS "'C:C3"#) 1# $krep
 Roles4.$tcC1
   = GHC.Types.TyCon
-      13392243382482428602## 1780037961948725012## Roles4.$trModule
-      (GHC.Types.TrNameS "C1"#) 0 $krep
+      13392243382482428602##64 1780037961948725012##64 Roles4.$trModule
+      (GHC.Types.TrNameS "C1"#) 0# $krep
 Roles4.$tc'C:C1
   = GHC.Types.TyCon
-      3870707671502302648## 10631907186261837450## Roles4.$trModule
-      (GHC.Types.TrNameS "'C:C1"#) 1 $krep
+      3870707671502302648##64 10631907186261837450##64 Roles4.$trModule
+      (GHC.Types.TrNameS "'C:C1"#) 1# $krep
 $krep [InlPrag=[~]] = GHC.Types.KindRepVar 0
 $krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
 $krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep

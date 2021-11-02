@@ -7,8 +7,8 @@ Dependent packages: [base-4.16.0.0, template-haskell-2.18.0.0]
 ==================== Typechecker ====================
 TH_Roles2.$tcT
   = GHC.Types.TyCon
-      11651627537942629178## 11503899791410937231## TH_Roles2.$trModule
-      (GHC.Types.TrNameS "T"#) 1 $krep
+      11651627537942629178##64 11503899791410937231##64
+      TH_Roles2.$trModule (GHC.Types.TrNameS "T"#) 1# $krep
 $krep [InlPrag=[~]] = GHC.Types.KindRepVar 0
 $krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep GHC.Types.krep$*
 TH_Roles2.$trModule

@@ -48,7 +48,6 @@ import GHC.Data.FastString ( FastString, mkFastString, fsLit )
 import Control.Monad.Trans.State.Strict
 import Control.Monad.Trans.Class (lift)
 import Data.Maybe ( isJust )
-import Data.Word( Word64 )
 
 {- Note [Grand plan for Typeable]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -641,11 +640,11 @@ mkTyConRepTyConRHS :: TypeableStuff -> TypeRepTodo
                    -> LHsExpr GhcTc
 mkTyConRepTyConRHS (Stuff {..}) todo tycon kind_rep
   =           nlHsDataCon trTyConDataCon
-    `nlHsApp` nlHsLit (word64 platform high)
-    `nlHsApp` nlHsLit (word64 platform low)
+    `nlHsApp` nlHsLit (HsWord64Prim NoSourceText (toInteger high))
+    `nlHsApp` nlHsLit (HsWord64Prim NoSourceText (toInteger low))
     `nlHsApp` mod_rep_expr todo
     `nlHsApp` trNameLit (mkFastString tycon_str)
-    `nlHsApp` nlHsLit (int n_kind_vars)
+    `nlHsApp` nlHsLit (HsIntPrim NoSourceText (toInteger n_kind_vars))
     `nlHsApp` kind_rep
   where
     n_kind_vars = length $ filter isNamedTyConBinder (tyConBinders tycon)
@@ -659,14 +658,6 @@ mkTyConRepTyConRHS (Stuff {..}) todo tycon kind_rep
                                                    , mod_fingerprint todo
                                                    , fingerprintString tycon_str
                                                    ]
-
-    int :: Int -> HsLit GhcTc
-    int n = HsIntPrim (SourceText $ show n) (toInteger n)
-
-word64 :: Platform -> Word64 -> HsLit GhcTc
-word64 platform n = case platformWordSize platform of
-   PW4 -> HsWord64Prim NoSourceText (toInteger n)
-   PW8 -> HsWordPrim   NoSourceText (toInteger n)
 
 {-
 Note [Representing TyCon kinds: KindRep]

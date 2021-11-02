@@ -11,12 +11,12 @@ Dependent packages: [base-4.16.0.0]
 ==================== Typechecker ====================
 Roles12.$tcC2
   = GHC.Types.TyCon
-      7996680154108933333## 9454227235464419996## Roles12.$trModule
-      (GHC.Types.TrNameS "C2"#) 0 $krep
+      7996680154108933333##64 9454227235464419996##64 Roles12.$trModule
+      (GHC.Types.TrNameS "C2"#) 0# $krep
 Roles12.$tc'C:C2
   = GHC.Types.TyCon
-      7087988437584478859## 11477953550142401435## Roles12.$trModule
-      (GHC.Types.TrNameS "'C:C2"#) 1 $krep
+      7087988437584478859##64 11477953550142401435##64 Roles12.$trModule
+      (GHC.Types.TrNameS "'C:C2"#) 1# $krep
 $krep [InlPrag=[~]] = GHC.Types.KindRepVar 0
 $krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
 $krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep

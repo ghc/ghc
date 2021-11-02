@@ -25,60 +25,60 @@ Dependent packages: [base-4.16.0.0]
 ==================== Typechecker ====================
 Roles1.$tcT7
   = GHC.Types.TyCon
-      178606230775360129## 14564382578551945561## Roles1.$trModule
-      (GHC.Types.TrNameS "T7"#) 1 $krep
+      178606230775360129##64 14564382578551945561##64 Roles1.$trModule
+      (GHC.Types.TrNameS "T7"#) 1# $krep
 Roles1.$tc'K7
   = GHC.Types.TyCon
-      15901479081375327280## 4842873210599704617## Roles1.$trModule
-      (GHC.Types.TrNameS "'K7"#) 3 $krep
+      15901479081375327280##64 4842873210599704617##64 Roles1.$trModule
+      (GHC.Types.TrNameS "'K7"#) 3# $krep
 Roles1.$tcT6
   = GHC.Types.TyCon
-      7244893995195634045## 6882827069359931041## Roles1.$trModule
-      (GHC.Types.TrNameS "T6"#) 1 $krep
+      7244893995195634045##64 6882827069359931041##64 Roles1.$trModule
+      (GHC.Types.TrNameS "T6"#) 1# $krep
 Roles1.$tc'K6
   = GHC.Types.TyCon
-      13928703131159360198## 9274401506945696896## Roles1.$trModule
-      (GHC.Types.TrNameS "'K6"#) 2 $krep
+      13928703131159360198##64 9274401506945696896##64 Roles1.$trModule
+      (GHC.Types.TrNameS "'K6"#) 2# $krep
 Roles1.$tcT5
   = GHC.Types.TyCon
-      12033401645911719002## 6369139038321702301## Roles1.$trModule
-      (GHC.Types.TrNameS "T5"#) 0 GHC.Types.krep$*Arr*
+      12033401645911719002##64 6369139038321702301##64 Roles1.$trModule
+      (GHC.Types.TrNameS "T5"#) 0# GHC.Types.krep$*Arr*
 Roles1.$tc'K5
   = GHC.Types.TyCon
-      5548842497263642061## 18349261927117571882## Roles1.$trModule
-      (GHC.Types.TrNameS "'K5"#) 1 $krep
+      5548842497263642061##64 18349261927117571882##64 Roles1.$trModule
+      (GHC.Types.TrNameS "'K5"#) 1# $krep
 Roles1.$tcT4
   = GHC.Types.TyCon
-      15834077582937152787## 17059037094835388922## Roles1.$trModule
-      (GHC.Types.TrNameS "T4"#) 0 $krep
+      15834077582937152787##64 17059037094835388922##64 Roles1.$trModule
+      (GHC.Types.TrNameS "T4"#) 0# $krep
 Roles1.$tc'K4
   = GHC.Types.TyCon
-      10188453925450404995## 4762093850599364042## Roles1.$trModule
-      (GHC.Types.TrNameS "'K4"#) 2 $krep
+      10188453925450404995##64 4762093850599364042##64 Roles1.$trModule
+      (GHC.Types.TrNameS "'K4"#) 2# $krep
 Roles1.$tcT3
   = GHC.Types.TyCon
-      13341737262627465733## 14527452670364737316## Roles1.$trModule
-      (GHC.Types.TrNameS "T3"#) 1 $krep
+      13341737262627465733##64 14527452670364737316##64 Roles1.$trModule
+      (GHC.Types.TrNameS "T3"#) 1# $krep
 Roles1.$tc'K3
   = GHC.Types.TyCon
-      14534968069054730342## 6860808298964464185## Roles1.$trModule
-      (GHC.Types.TrNameS "'K3"#) 2 $krep
+      14534968069054730342##64 6860808298964464185##64 Roles1.$trModule
+      (GHC.Types.TrNameS "'K3"#) 2# $krep
 Roles1.$tcT2
   = GHC.Types.TyCon
-      12900773996789723956## 9313087549503346504## Roles1.$trModule
-      (GHC.Types.TrNameS "T2"#) 0 GHC.Types.krep$*Arr*
+      12900773996789723956##64 9313087549503346504##64 Roles1.$trModule
+      (GHC.Types.TrNameS "T2"#) 0# GHC.Types.krep$*Arr*
 Roles1.$tc'K2
   = GHC.Types.TyCon
-      11054915488163123841## 10799789256744079155## Roles1.$trModule
-      (GHC.Types.TrNameS "'K2"#) 1 $krep
+      11054915488163123841##64 10799789256744079155##64 Roles1.$trModule
+      (GHC.Types.TrNameS "'K2"#) 1# $krep
 Roles1.$tcT1
   = GHC.Types.TyCon
-      13228660854624297872## 14494320157476678712## Roles1.$trModule
-      (GHC.Types.TrNameS "T1"#) 0 GHC.Types.krep$*Arr*
+      13228660854624297872##64 14494320157476678712##64 Roles1.$trModule
+      (GHC.Types.TrNameS "T1"#) 0# GHC.Types.krep$*Arr*
 Roles1.$tc'K1
   = GHC.Types.TyCon
-      1265606750138351672## 7033043930969109074## Roles1.$trModule
-      (GHC.Types.TrNameS "'K1"#) 1 $krep
+      1265606750138351672##64 7033043930969109074##64 Roles1.$trModule
+      (GHC.Types.TrNameS "'K1"#) 1# $krep
 $krep [InlPrag=[~]] = GHC.Types.KindRepVar 1
 $krep [InlPrag=[~]] = GHC.Types.KindRepVar 0
 $krep [InlPrag=[~]] = GHC.Types.KindRepVar 0

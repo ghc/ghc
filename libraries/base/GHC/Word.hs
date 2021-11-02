@@ -48,12 +48,8 @@ module GHC.Word (
 
 import Data.Maybe
 
-#if WORD_SIZE_IN_BITS < 64
 import GHC.Prim
 import GHC.Base
-#else
-import GHC.Base hiding (uncheckedShiftL64#, uncheckedShiftRL64#)
-#endif
 
 import GHC.Bits
 import GHC.Enum
@@ -676,8 +672,6 @@ byteSwap32 (W32# w#) = W32# (wordToWord32# (byteSwap32# (word32ToWord# w#)))
 -- type Word64
 ------------------------------------------------------------------------
 
-#if WORD_SIZE_IN_BITS < 64
-
 data {-# CTYPE "HsWord64" #-} Word64 = W64# Word64#
 -- ^ 64-bit unsigned integer type
 
@@ -766,7 +760,13 @@ instance Integral Word64 where
         | y /= 0                    = W64# (x# `remWord64#` y#)
         | otherwise                 = divZeroError
     quotRem (W64# x#) y@(W64# y#)
+#if WORD_SIZE_IN_BITS < 64
         | y /= 0                    = (W64# (x# `quotWord64#` y#), W64# (x# `remWord64#` y#))
+#else
+        -- we don't have a `quotRemWord64#` primitive yet.
+        | y /= 0                    = case quotRemWord# (word64ToWord# x#) (word64ToWord# y#) of
+                                        (# q, r #) -> (W64# (wordToWord64# q),  W64# (wordToWord64# r))
+#endif
         | otherwise                 = divZeroError
 
     div    x y = quot x y
@@ -823,184 +823,14 @@ a `shiftL64#` b  | isTrue# (b >=# 64#) = wordToWord64# 0##
 a `shiftRL64#` b | isTrue# (b >=# 64#) = wordToWord64# 0##
                  | otherwise           = a `uncheckedShiftRL64#` b
 
-#else
-
--- Word64 is represented in the same way as Word.
--- Operations may assume and must ensure that it holds only values
--- from its logical range.
-
-data {-# CTYPE "HsWord64" #-} Word64 = W64# Word#
--- ^ 64-bit unsigned integer type
-
--- See GHC.Classes#matching_overloaded_methods_in_rules
--- | @since 2.01
-instance Eq Word64 where
-    (==) = eqWord64
-    (/=) = neWord64
-
-eqWord64, neWord64 :: Word64 -> Word64 -> Bool
-eqWord64 (W64# x) (W64# y) = isTrue# (x `eqWord#` y)
-neWord64 (W64# x) (W64# y) = isTrue# (x `neWord#` y)
-{-# INLINE [1] eqWord64 #-}
-{-# INLINE [1] neWord64 #-}
-
--- | @since 2.01
-instance Ord Word64 where
-    (<)  = ltWord64
-    (<=) = leWord64
-    (>=) = geWord64
-    (>)  = gtWord64
-
-{-# INLINE [1] gtWord64 #-}
-{-# INLINE [1] geWord64 #-}
-{-# INLINE [1] ltWord64 #-}
-{-# INLINE [1] leWord64 #-}
-gtWord64, geWord64, ltWord64, leWord64 :: Word64 -> Word64 -> Bool
-(W64# x) `gtWord64` (W64# y) = isTrue# (x `gtWord#` y)
-(W64# x) `geWord64` (W64# y) = isTrue# (x `geWord#` y)
-(W64# x) `ltWord64` (W64# y) = isTrue# (x `ltWord#` y)
-(W64# x) `leWord64` (W64# y) = isTrue# (x `leWord#` y)
-
--- | @since 2.01
-instance Num Word64 where
-    (W64# x#) + (W64# y#)  = W64# (x# `plusWord#` y#)
-    (W64# x#) - (W64# y#)  = W64# (x# `minusWord#` y#)
-    (W64# x#) * (W64# y#)  = W64# (x# `timesWord#` y#)
-    negate (W64# x#)       = W64# (int2Word# (negateInt# (word2Int# x#)))
-    abs x                  = x
-    signum 0               = 0
-    signum _               = 1
-    fromInteger i          = W64# (integerToWord# i)
-
--- | @since 2.01
-instance Enum Word64 where
-    succ x
-        | x /= maxBound = x + 1
-        | otherwise     = succError "Word64"
-    pred x
-        | x /= minBound = x - 1
-        | otherwise     = predError "Word64"
-    toEnum i@(I# i#)
-        | i >= 0        = W64# (int2Word# i#)
-        | otherwise     = toEnumError "Word64" i (minBound::Word64, maxBound::Word64)
-    fromEnum x@(W64# x#)
-        | x <= fromIntegral (maxBound::Int)
-                        = I# (word2Int# x#)
-        | otherwise     = fromEnumError "Word64" x
-
-    -- See Note [Stable Unfolding for list producers] in GHC.Enum
-    {-# INLINABLE enumFrom #-}
-    enumFrom w
-        = map wordToWord64
-        $ enumFrom (word64ToWord w)
-
-    -- See Note [Stable Unfolding for list producers] in GHC.Enum
-    {-# INLINABLE enumFromThen #-}
-    enumFromThen w s
-        = map wordToWord64
-        $ enumFromThen (word64ToWord w) (word64ToWord s)
-
-    -- See Note [Stable Unfolding for list producers] in GHC.Enum
-    {-# INLINABLE enumFromTo #-}
-    enumFromTo w1 w2
-        = map wordToWord64
-        $ enumFromTo (word64ToWord w1) (word64ToWord w2)
-
-    -- See Note [Stable Unfolding for list producers] in GHC.Enum
-    {-# INLINABLE enumFromThenTo #-}
-    enumFromThenTo w1 s w2
-        = map wordToWord64
-        $ enumFromThenTo (word64ToWord w1) (word64ToWord s) (word64ToWord w2)
-
-word64ToWord :: Word64 -> Word
-word64ToWord (W64# w#) = (W# w#)
-
-wordToWord64 :: Word -> Word64
-wordToWord64 (W# w#) = (W64# w#)
-
-
--- | @since 2.01
-instance Integral Word64 where
-    -- see Note [INLINE division wrappers] in GHC.Base
-    {-# INLINE quot    #-}
-    {-# INLINE rem     #-}
-    {-# INLINE quotRem #-}
-    {-# INLINE div     #-}
-    {-# INLINE mod     #-}
-    {-# INLINE divMod  #-}
-
-    quot    (W64# x#) y@(W64# y#)
-        | y /= 0                    = W64# (x# `quotWord#` y#)
-        | otherwise                 = divZeroError
-    rem     (W64# x#) y@(W64# y#)
-        | y /= 0                    = W64# (x# `remWord#` y#)
-        | otherwise                 = divZeroError
-    quotRem (W64# x#) y@(W64# y#)
-        | y /= 0                    = case x# `quotRemWord#` y# of
-                                        (# q, r #) -> (W64# q, W64# r)
-        | otherwise                 = divZeroError
-
-    div    x y = quot x y
-    mod    x y = rem x y
-    divMod x y = quotRem x y
-
-    toInteger (W64# x#)             = integerFromWord# x#
-
--- | @since 2.01
-instance Bits Word64 where
-    {-# INLINE shift #-}
-    {-# INLINE bit #-}
-    {-# INLINE testBit #-}
-    {-# INLINE popCount #-}
-
-    (W64# x#) .&.   (W64# y#)  = W64# (x# `and#` y#)
-    (W64# x#) .|.   (W64# y#)  = W64# (x# `or#`  y#)
-    (W64# x#) `xor` (W64# y#)  = W64# (x# `xor#` y#)
-    complement (W64# x#)       = W64# (not# x#)
-    (W64# x#) `shift` (I# i#)
-        | isTrue# (i# >=# 0#)  = W64# (x# `shiftL#` i#)
-        | otherwise            = W64# (x# `shiftRL#` negateInt# i#)
-    (W64# x#) `shiftL`       (I# i#)
-        | isTrue# (i# >=# 0#)  = W64# (x# `shiftL#` i#)
-        | otherwise            = overflowError
-    (W64# x#) `unsafeShiftL` (I# i#) = W64# (x# `uncheckedShiftL#` i#)
-    (W64# x#) `shiftR`       (I# i#)
-        | isTrue# (i# >=# 0#)  = W64# (x# `shiftRL#` i#)
-        | otherwise            = overflowError
-    (W64# x#) `unsafeShiftR` (I# i#) = W64# (x# `uncheckedShiftRL#` i#)
-    (W64# x#) `rotate` (I# i#)
-        | isTrue# (i'# ==# 0#) = W64# x#
-        | otherwise            = W64# ((x# `uncheckedShiftL#` i'#) `or#`
-                                       (x# `uncheckedShiftRL#` (64# -# i'#)))
-        where
-        !i'# = word2Int# (int2Word# i# `and#` 63##)
-    bitSizeMaybe i            = Just (finiteBitSize i)
-    bitSize i                 = finiteBitSize i
-    isSigned _                = False
-    popCount (W64# x#)        = I# (word2Int# (popCnt# x#))
-    bit                       = bitDefault
-    testBit                   = testBitDefault
-
-uncheckedShiftL64# :: Word# -> Int# -> Word#
-uncheckedShiftL64#  = uncheckedShiftL#
-
-uncheckedShiftRL64# :: Word# -> Int# -> Word#
-uncheckedShiftRL64# = uncheckedShiftRL#
-
-#endif
 
 -- | @since 4.6.0.0
 instance FiniteBits Word64 where
     {-# INLINE countLeadingZeros #-}
     {-# INLINE countTrailingZeros #-}
     finiteBitSize _ = 64
-#if WORD_SIZE_IN_BITS < 64
     countLeadingZeros  (W64# x#) = I# (word2Int# (clz64# x#))
     countTrailingZeros (W64# x#) = I# (word2Int# (ctz64# x#))
-#else
-    countLeadingZeros  (W64# x#) = I# (word2Int# (clz# x#))
-    countTrailingZeros (W64# x#) = I# (word2Int# (ctz# x#))
-#endif
 
 -- | @since 2.01
 instance Show Word64 where
@@ -1024,13 +854,8 @@ instance Ix Word64 where
 -- | Reverse order of bytes in 'Word64'.
 --
 -- @since 4.7.0.0
-#if WORD_SIZE_IN_BITS < 64
 byteSwap64 :: Word64 -> Word64
 byteSwap64 (W64# w#) = W64# (byteSwap64# w#)
-#else
-byteSwap64 :: Word64 -> Word64
-byteSwap64 (W64# w#) = W64# (byteSwap# w#)
-#endif
 
 -- | Reverse the order of the bits in a 'Word8'.
 --
@@ -1053,13 +878,8 @@ bitReverse32 (W32# w#) = W32# (wordToWord32# (bitReverse32# (word32ToWord# w#)))
 -- | Reverse the order of the bits in a 'Word64'.
 --
 -- @since 4.12.0.0
-#if WORD_SIZE_IN_BITS < 64
 bitReverse64 :: Word64 -> Word64
 bitReverse64 (W64# w#) = W64# (bitReverse64# w#)
-#else
-bitReverse64 :: Word64 -> Word64
-bitReverse64 (W64# w#) = W64# (bitReverse# w#)
-#endif
 
 -------------------------------------------------------------------------------
 

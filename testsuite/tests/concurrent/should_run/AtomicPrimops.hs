@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE UnboxedTuples #-}
 
@@ -14,8 +13,6 @@ import GHC.Exts
 import GHC.Int
 import GHC.IO
 import GHC.Word
-
-#include "MachDeps.h"
 
 -- | Iterations per worker.
 iters :: Word
@@ -553,11 +550,7 @@ readInt32Array (MBA mba#) (I# ix#) = IO $ \ s# ->
 readInt64Array :: MByteArray -> Int -> IO Int64
 readInt64Array (MBA mba#) (I# ix#) = IO $ \ s# ->
     case readInt64Array# mba# ix# s# of
-#if WORD_SIZE_IN_BITS < 64
         (# s2#, n# #) -> (# s2#, I64# n# #)
-#else
-        (# s2#, n# #) -> (# s2#, I64# (int64ToInt# n#) #)
-#endif
 
 atomicWriteIntArray :: MByteArray -> Int -> Int -> IO ()
 atomicWriteIntArray (MBA mba#) (I# ix#) (I# n#) = IO $ \ s# ->
@@ -591,13 +584,8 @@ casInt32Array (MBA mba#) (I# ix#) (I32# old#) (I32# new#) = IO $ \ s# ->
 
 casInt64Array :: MByteArray -> Int -> Int64 -> Int64 -> IO Int64
 casInt64Array (MBA mba#) (I# ix#) (I64# old#) (I64# new#) = IO $ \ s# ->
-#if WORD_SIZE_IN_BITS < 64
     case casInt64Array# mba# ix# old# new# s# of
         (# s2#, old2# #) -> (# s2#, I64# old2# #)
-#else
-    case casInt64Array# mba# ix# (intToInt64# old#) (intToInt64# new#) s# of
-        (# s2#, old2# #) -> (# s2#, I64# (int64ToInt# old2#) #)
-#endif
 
 ------------------------------------------------------------------------
 -- Wrappers around Addr#
@@ -663,10 +651,5 @@ atomicCasWord32Ptr (Ptr addr#) (W32# old#) (W32# new#) = IO $ \ s# ->
         (# s2#, old2# #) -> (# s2#, W32# old2# #)
 atomicCasWord64Ptr :: Ptr Word64 -> Word64 -> Word64 -> IO Word64
 atomicCasWord64Ptr (Ptr addr#) (W64# old#) (W64# new#) = IO $ \ s# ->
-#if WORD_SIZE_IN_BITS < 64
     case atomicCasWord64Addr# addr# old# new# s# of
         (# s2#, old2# #) -> (# s2#, W64# old2# #)
-#else
-    case atomicCasWord64Addr# addr# (wordToWord64# old#) (wordToWord64# new#) s# of
-        (# s2#, old2# #) -> (# s2#, W64# (word64ToWord# old2#) #)
-#endif

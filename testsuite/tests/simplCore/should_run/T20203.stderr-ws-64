@@ -1,7 +1,7 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 280, types: 141, coercions: 0, joins: 0/0}
+  = {terms: 290, types: 141, coercions: 0, joins: 0/0}
 
 bitOrTwoVarInt
   = \ x y ->
@@ -122,17 +122,34 @@ bitAndInt32
 bitOrTwoVarInt64
   = \ x y ->
       case x of { I64# x# ->
-      case y of { I64# x#1 -> I64# (orI# 255# (orI# x# x#1)) }
+      case y of { I64# x#1 ->
+      I64#
+        (word64ToInt64#
+           (or64# 255##64 (or64# (int64ToWord64# x#) (int64ToWord64# x#1))))
+      }
       }
 
 bitAndTwoVarInt64
   = \ x y ->
       case x of { I64# x# ->
-      case y of { I64# x#1 -> I64# (andI# 170# (andI# x# x#1)) }
+      case y of { I64# x#1 ->
+      I64#
+        (word64ToInt64#
+           (and64# 170##64 (and64# (int64ToWord64# x#) (int64ToWord64# x#1))))
+      }
       }
 
-bitOrInt64 = \ x -> case x of { I64# x# -> I64# (orI# 255# x#) }
+bitOrInt64
+  = \ x ->
+      case x of { I64# x# ->
+      I64# (word64ToInt64# (or64# 255##64 (int64ToWord64# x#)))
+      }
 
-bitAndInt64 = \ x -> case x of { I64# x# -> I64# (andI# 170# x#) }
+bitAndInt64
+  = \ x ->
+      case x of { I64# x# ->
+      I64# (word64ToInt64# (and64# 170##64 (int64ToWord64# x#)))
+      }
+
 
 

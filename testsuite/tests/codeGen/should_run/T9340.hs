@@ -1,13 +1,10 @@
 {-# LANGUAGE MagicHash #-}
-{-# LANGUAGE CPP #-}
 
 import Control.Monad
 import Data.Bits
 import GHC.Exts
 import GHC.Word
 import Numeric (showHex)
-
-#include "MachDeps.h"
 
 -- Reference Implementation
 
@@ -61,13 +58,8 @@ ctzIUT32 (W# x#) = W# (ctz32# x#)
 clzIUT32 (W# x#) = W# (clz32# x#)
 
 ctzIUT64, clzIUT64 :: Word64 -> Word
-#if WORD_SIZE_IN_BITS < 64
 ctzIUT64 (W64# x#) = W# (ctz64# x#)
 clzIUT64 (W64# x#) = W# (clz64# x#)
-#else
-ctzIUT64 (W64# x#) = W# (ctz64# (wordToWord64# x#))
-clzIUT64 (W64# x#) = W# (clz64# (wordToWord64# x#))
-#endif
 
 main :: IO ()
 main = do

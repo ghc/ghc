@@ -1,37 +1,44 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 36, types: 19, coercions: 0, joins: 0/0}
+  = {terms: 55, types: 22, coercions: 0, joins: 0/0}
 
--- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 $trModule4 = "main"#
 
--- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 $trModule3 = TrNameS $trModule4
 
--- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 $trModule2 = "T16402"#
 
--- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 $trModule1 = TrNameS $trModule2
 
--- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 $trModule = Module $trModule3 $trModule1
 
--- RHS size: {terms: 8, types: 3, coercions: 0, joins: 0/0}
 smallWord_bar
-  = \ x -> case x of { W64# x# -> W64# (and# x# 0xffff##) }
+  = \ x ->
+      case x of { W64# x# ->
+      W64#
+        (int64ToWord64#
+           (intToInt64# (word2Int# (and# (word64ToWord# x#) 0xffff##))))
+      }
 
--- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 smallWord_foo = smallWord_bar
 
--- RHS size: {terms: 8, types: 3, coercions: 0, joins: 0/0}
 smallInt_bar
   = \ x ->
-      case x of { I64# x# -> I64# (int16ToInt# (intToInt16# x#)) }
+      case x of { I64# x1 ->
+      I64# (intToInt64# (int16ToInt# (intToInt16# (int64ToInt# x1))))
+      }
 
--- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-smallInt_foo = smallInt_bar
+smallInt_foo
+  = \ x ->
+      case x of { I64# x# ->
+      I64#
+        (intToInt64#
+           (int16ToInt#
+              (intToInt16#
+                 (int64ToInt#
+                    (word64ToInt64# (and64# (int64ToWord64# x#) 0x0012ffff##64))))))
+      }
 
 
 
