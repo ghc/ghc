@@ -21,12 +21,12 @@ import System.CPUTime.Utils
 getCPUTime :: IO Integer
 getCPUTime = fmap snd $ withTimespec $ \ts ->
     throwErrnoIfMinus1_ "clock_gettime"
-    $ clock_gettime (#const CLOCK_PROCESS_CPUTIME_ID) ts
+    $ clock_gettime cLOCK_PROCESS_CPUTIME_ID ts
 
 getCpuTimePrecision :: IO Integer
 getCpuTimePrecision = fmap snd $ withTimespec $ \ts ->
     throwErrnoIfMinus1_ "clock_getres"
-    $ clock_getres (#const CLOCK_PROCESS_CPUTIME_ID) ts
+    $ clock_getres cLOCK_PROCESS_CPUTIME_ID ts
 
 data Timespec
 
@@ -40,8 +40,9 @@ withTimespec action =
         u_nsec <- (#peek struct timespec,tv_nsec) p_ts :: IO CLong
         return (r, cTimeToInteger u_sec * 1e12 + fromIntegral u_nsec * 1e3)
 
-foreign import capi unsafe "time.h clock_getres"  clock_getres  :: CInt -> Ptr Timespec -> IO CInt
-foreign import capi unsafe "time.h clock_gettime" clock_gettime :: CInt -> Ptr Timespec -> IO CInt
+foreign import capi unsafe "time.h clock_getres"  clock_getres  :: CUIntPtr -> Ptr Timespec -> IO CInt
+foreign import capi unsafe "time.h clock_gettime" clock_gettime :: CUIntPtr -> Ptr Timespec -> IO CInt
+foreign import capi unsafe "time.h value CLOCK_PROCESS_CPUTIME_ID" cLOCK_PROCESS_CPUTIME_ID :: CUIntPtr
 
 #else
 
