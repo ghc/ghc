@@ -3395,7 +3395,7 @@ fFlagsDeps = [
   flagSpec "version-macros"                   Opt_VersionMacros,
   flagSpec "worker-wrapper"                   Opt_WorkerWrapper,
   flagSpec "solve-constant-dicts"             Opt_SolveConstantDicts,
-  flagSpec "catch-bottoms"                    Opt_CatchBottoms,
+  flagSpec "catch-nonexhaustive-cases"        Opt_CatchNonexhaustiveCases,
   flagSpec "alignment-sanitisation"           Opt_AlignmentSanitisation,
   flagSpec "check-prim-bounds"                Opt_DoBoundsChecking,
   flagSpec "num-constant-folding"             Opt_NumConstantFolding,

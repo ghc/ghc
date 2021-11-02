@@ -58,9 +58,10 @@ T15155l:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O0 -ddump-llvm T15155l.hs 2>/dev/null | \
 		grep -F "@T15155_b_closure = alias i8, i8* @T15155_a_closure"
 
-# Without -fcatch-bottoms `f` is non-CAFFY. With -fcatch-bottoms it becomes
-# CAFFY. Before CafInfo rework (c846618a) this used to cause incorrect CafInfo
-# attached to `f` in the interface file.
+# Without -fcatch-nonexhaustive-cases `f` is non-CAFFY. With
+# -fcatch-nonexhaustive-cases it becomes CAFFY. Before CafInfo rework
+# (c846618a) this used to cause incorrect CafInfo attached to `f` in the
+# interface file.
 T17648:
 	# -dno-typeable-binds is to make the iface simpler
 	#  -O is necessary as otherwise we don't write interface pragmas (e.g.
@@ -69,8 +70,8 @@ T17648:
 	'$(TEST_HC)' --show-iface T17648.hi | tr -d '\n\r' | \
 		grep -F 'f :: T GHC.Types.Int -> ()  [HasNoCafRefs, LambdaFormInfo' >/dev/null
 
-	# Second compilation with -fcatch-bottoms, f should be CAFFY
+	# Second compilation with -fcatch-nonexhaustive-cases, f should be CAFFY
 	'$(TEST_HC)' $(TEST_HC_OPTS) -dno-typeable-binds -O \
-		-fcatch-bottoms T17648.hs -v0 -fforce-recomp
+		-fcatch-nonexhaustive-cases T17648.hs -v0 -fforce-recomp
 	'$(TEST_HC)' --show-iface T17648.hi | tr -d '\n\r' | \
 		grep -F 'f :: T GHC.Types.Int -> ()  [LambdaFormInfo' >/dev/null

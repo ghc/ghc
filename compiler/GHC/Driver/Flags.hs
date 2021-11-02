@@ -227,7 +227,7 @@ data GeneralFlag
    | Opt_WorkerWrapper
    | Opt_SolveConstantDicts
    | Opt_AlignmentSanitisation
-   | Opt_CatchBottoms
+   | Opt_CatchNonexhaustiveCases
    | Opt_NumConstantFolding
    | Opt_CoreConstantFolding
    | Opt_FastPAPCalls                  -- #6084
@@ -443,7 +443,7 @@ optimisationFlags = EnumSet.fromList
    , Opt_CprAnal
    , Opt_WorkerWrapper
    , Opt_SolveConstantDicts
-   , Opt_CatchBottoms
+   , Opt_CatchNonexhaustiveCases
    , Opt_IgnoreAsserts
    ]
 
