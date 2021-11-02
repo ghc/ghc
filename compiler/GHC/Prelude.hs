@@ -46,7 +46,7 @@ NoImplicitPrelude. There are two motivations for this:
 import Prelude as X hiding ((<>))
 import Data.Foldable as X (foldl')
 #if __GLASGOW_HASKELL__ < 903
-import Control.Exception ( Exception, SomeException(..) )
+import Control.Exception ( SomeException(..) )
 #else
 import Control.Exception ( SomeExceptionWithLocation(..) )
 #endif
@@ -104,8 +104,8 @@ shiftR = Bits.unsafeShiftR
 type SomeExceptionWithLocation = SomeException
 
 {-# COMPLETE SomeExceptionWithLocation #-}
-pattern SomeExceptionWithLocation :: forall. forall a. Exception a => a -> () -> SomeException
-pattern SomeExceptionWithLocation e unit <- (\x -> ((), x) -> (unit, SomeException e))
+pattern SomeExceptionWithLocation :: forall. SomeException -> () -> SomeException
+pattern SomeExceptionWithLocation e unit <- (\x -> ((), x) -> (unit, e))
   where
-    SomeExceptionWithLocation e _ = SomeException e
+    SomeExceptionWithLocation (SomeException e) _ = SomeException e
 #endif

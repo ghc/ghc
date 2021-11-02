@@ -20,6 +20,7 @@ module Control.Exception.Base (
 
         -- * The Exception type
         SomeExceptionWithLocation(..),
+        SomeException(..),
         Exception(..),
         IOException,
         ArithException(..),

@@ -1,0 +1,6 @@
+test('throwIO', [only_ways(prof_ways), extra_files(['../Exception/ThrowTestLib.hs'])], compile_and_run, ['-finfo-table-map -prof'])
+test('throwIO_rethrowException', normal, compile_and_run, [''])
+test('throwIOWithCallStack', [when(opsys('mingw32'), skip)], compile_and_run, [''])
+test('throwIOWithCallStack_Windows', [unless(opsys('mingw32'), skip)], compile_and_run, [''])
+test('throwIOWithCostCenterStack', [only_ways(prof_ways)], compile_and_run, ['-prof'])
+test('throwIOWithIPEStack', normal, compile_and_run, ['-finfo-table-map'])

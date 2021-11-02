@@ -1,5 +1,8 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE ExistentialQuantification#-}
+{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE TypeInType #-}
 
 {-
 This SOURCE-imported hs-boot module cuts a big dependency loop:
@@ -28,11 +31,14 @@ module GHC.Exception
   ( module GHC.Exception.Type
   , errorCallException
   , errorCallWithCallStackException
+  , throw
   ) where
 
 import {-# SOURCE #-} GHC.Exception.Type
-import GHC.Types ( Char )
-import GHC.Stack.Types ( CallStack )
+import GHC.Types ( Char, RuntimeRep, TYPE )
+import GHC.Stack.Types ( CallStack, HasCallStack )
 
 errorCallException :: [Char] -> SomeExceptionWithLocation
 errorCallWithCallStackException :: [Char] -> CallStack -> SomeExceptionWithLocation
+
+throw :: HasCallStack => forall (r :: RuntimeRep). forall (a :: TYPE r). forall e. Exception e => e -> a

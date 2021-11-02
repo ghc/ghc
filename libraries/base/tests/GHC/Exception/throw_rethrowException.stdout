@@ -1,0 +1,1 @@
+("throw",SrcLoc {srcLocPackage = "main", srcLocModule = "Main", srcLocFile = "throw_rethrowException.hs", srcLocStartLine = 22, srcLocStartCol = 10, srcLocEndLine = 22, srcLocEndCol = 15})

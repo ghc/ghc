@@ -39,10 +39,16 @@ module GHC.IO (
         MaskingState(..), getMaskingState,
         unsafeUnmask, interruptible,
         onException, bracket, finally, evaluate,
-        mkUserError
+        throwIOUserError,
+        throwIOWithCallStack,
+        throwIOWithBacktraceMechanism,
+        throwIOWithIPEStack,
+        throwIOWithCostCenterStack,
+        throwIOWithExecutionStack
     ) where
 
 import GHC.Base
+import GHC.List
 import GHC.ST
 import GHC.Exception
 import GHC.Show
@@ -50,6 +56,13 @@ import GHC.IO.Unsafe
 import Unsafe.Coerce ( unsafeCoerce )
 
 import {-# SOURCE #-} GHC.IO.Exception ( userError, IOError )
+import GHC.Exception.Backtrace ( Backtrace
+                                , collectBacktraces
+                                , collectHasCallStackBacktrace
+                                , collectIPEBacktrace
+                                , collectCostCenterBacktrace
+                                , collectExecutionStackBacktrace )
+import {-# SOURCE #-} GHC.Stack ( HasCallStack )
 
 -- ---------------------------------------------------------------------------
 -- The IO Monad
@@ -184,7 +197,7 @@ catch   :: Exception e
 catch (IO io) handler = IO $ catch# io handler'
     where handler' e = case fromException e of
                        Just e' -> unIO (handler e')
-                       Nothing -> raiseIO# e
+                       Nothing -> unIO $ throwIO e
 
 
 -- | Catch any 'Exception' type in the 'IO' monad.
@@ -194,7 +207,7 @@ catch (IO io) handler = IO $ catch# io handler'
 -- details.
 catchAny :: IO a -> (forall e . Exception e => e -> IO a) -> IO a
 catchAny !(IO io) handler = IO $ catch# io handler'
-    where handler' (SomeExceptionWithLocation e _) = unIO (handler e)
+    where handler' (SomeExceptionWithLocation (SomeException e) _) = unIO (handler e)
 
 -- Using catchException here means that if `m` throws an
 -- 'IOError' /as an imprecise exception/, we will not catch
@@ -203,6 +216,8 @@ mplusIO :: IO a -> IO a -> IO a
 mplusIO m n = m `catchException` \ (_ :: IOError) -> n
 
 -- | A variant of 'throw' that can only be used within the 'IO' monad.
+-- 'Backtrace' backtraces are collected according to the configured
+-- 'BacktraceMechanism's.
 --
 -- Although 'throwIO' has a type that is an instance of the type of 'throw', the
 -- two functions are subtly different:
@@ -217,9 +232,57 @@ mplusIO m n = m `catchException` \ (_ :: IOError) -> n
 -- raise an exception within the 'IO' monad because it guarantees
 -- ordering with respect to other 'IO' operations, whereas 'throw'
 -- does not.
-throwIO :: Exception e => e -> IO a
-throwIO e = IO (raiseIO# (toException e))
+throwIO :: (HasCallStack, Exception e) => e -> IO a
+throwIO e = do
+    let e'@(SomeExceptionWithLocation _ !bts) = toException e
+    !bts' <- if null bts then
+      collectBacktraces
+    else
+      pure bts
 
+    let !e'' = foldr addBacktrace e' bts'
+    IO(raiseIO# e'')
+
+-- | Throw an exception with a 'Backtrace' gathered by the 'HasCallStackBacktraceMech' mechanism.
+-- If the exception already has backtraces, the new one is added.
+throwIOWithCallStack :: (HasCallStack, Exception e) => e -> IO a
+throwIOWithCallStack e =
+-- throwIOWithCallStack cannot call throwWithBacktraceMechanism because that would introduce
+-- unnecessary HasCallStack constraints (that would decrease performance).
+   let
+      !maybeBt = unsafePerformIO collectHasCallStackBacktrace
+      !e' = case maybeBt of
+              Just bt -> addBacktrace bt $ toException e
+              Nothing -> toException e
+    in
+      IO(raiseIO# e')
+
+throwIOWithBacktraceMechanism :: Exception e => IO (Maybe Backtrace) -> e -> IO a
+throwIOWithBacktraceMechanism mech e = let
+      !maybeBt = unsafePerformIO mech
+      !e' = case maybeBt of
+              Just bt -> addBacktrace bt $ toException e
+              Nothing -> toException e
+    in
+      IO(raiseIO# e')
+
+-- | Throw an exception with a 'Backtrace' gathered by the 'IPEBacktraceMech' mechanism.
+-- If the exception already has backtraces, the new one is added.
+throwIOWithIPEStack :: Exception e => e -> IO a
+throwIOWithIPEStack = throwIOWithBacktraceMechanism collectIPEBacktrace
+
+-- | Throw an exception with a 'Backtrace' gathered by the 'CostCenterBacktraceMech' mechanism.
+-- If the exception already has backtraces, the new one is added.
+throwIOWithCostCenterStack :: Exception e => e -> IO a
+throwIOWithCostCenterStack = throwIOWithBacktraceMechanism collectCostCenterBacktrace
+
+-- | Throw an exception with a 'Backtrace' gathered by the 'ExecutionStackBacktraceMech' mechanism.
+-- If the exception already has backtraces, the new one is added.
+throwIOWithExecutionStack :: Exception e => e -> IO a
+throwIOWithExecutionStack = throwIOWithBacktraceMechanism collectExecutionStackBacktrace
+
+throwIOUserError :: String -> IO a
+throwIOUserError s = throwIO $ userError s
 -- -----------------------------------------------------------------------------
 -- Controlling asynchronous exception delivery
 
@@ -456,7 +519,3 @@ Since this strictness is a small optimization and may lead to surprising
 results, all of the @catch@ and @handle@ variants offered by "Control.Exception"
 use 'catch' rather than 'catchException'.
 -}
-
--- For SOURCE import by GHC.Base to define failIO.
-mkUserError       :: [Char]  -> SomeExceptionWithLocation
-mkUserError str   = toException (userError str)

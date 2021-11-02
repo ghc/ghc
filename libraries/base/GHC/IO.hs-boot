@@ -1,10 +1,14 @@
 {-# LANGUAGE Unsafe #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
-module GHC.IO where
+module GHC.IO(
+    IO(..),
+    mplusIO,
+    throwIOUserError
+) where
 
 import GHC.Types
-import {-# SOURCE #-} GHC.Exception.Type (SomeExceptionWithLocation)
+import {-# SOURCE #-} GHC.Base (String)
 
 mplusIO :: IO a -> IO a -> IO a
-mkUserError :: [Char] -> SomeExceptionWithLocation
+throwIOUserError :: String -> IO a

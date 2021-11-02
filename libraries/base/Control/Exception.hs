@@ -35,6 +35,7 @@ module Control.Exception (
 
         -- * The Exception type
         SomeExceptionWithLocation(..),
+        SomeException(..),
         Exception(..),          -- class
         IOException,            -- instance Eq, Ord, Show, Typeable, Exception
         ArithException(..),     -- instance Eq, Ord, Show, Typeable, Exception
