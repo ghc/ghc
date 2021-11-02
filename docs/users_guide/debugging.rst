@@ -920,6 +920,18 @@ Checking for consistency
    single: consistency checks
    single: lint
 
+.. ghc-flag:: -dlint
+    :shortdesc: Enable several common internal sanity checkers
+    :type: dynamic
+
+    :implies: -dcore-lint, -dstg-lint, -dcmm-lint, -dasm-lint, -fllvm-fill-undef-with-garbage, -debug
+    :since: 9.4.1
+
+    Turn on various heavy-weight intra-pass sanity-checking measures within GHC
+    and its runtime system.  Notably, this does not include
+    :ghc-flag:`-falignment-sanitisation` as it incurs a rather hefty runtime
+    cost.
+
 .. ghc-flag:: -dcore-lint
     :shortdesc: Turn on internal sanity checking
     :type: dynamic

@@ -2535,6 +2535,8 @@ dynamic_flags_deps = [
         (setDumpFlag Opt_D_dump_hi_diffs)
   , make_ord_flag defGhcFlag "ddump-rtti"
         (setDumpFlag Opt_D_dump_rtti)
+  , make_ord_flag defGhcFlag "dlint"
+        (NoArg enableDLint)
   , make_ord_flag defGhcFlag "dcore-lint"
         (NoArg (setGeneralFlag Opt_DoCoreLinting))
   , make_ord_flag defGhcFlag "dlinear-core-lint"
@@ -3921,6 +3923,22 @@ enableUnusedBinds = mapM_ setWarningFlag unusedBindsFlags
 
 disableUnusedBinds :: DynP ()
 disableUnusedBinds = mapM_ unSetWarningFlag unusedBindsFlags
+
+-- | Things you get with `-dlint`.
+enableDLint :: DynP ()
+enableDLint = do
+    mapM_ setGeneralFlag dLintFlags
+    addWayDynP WayDebug
+  where
+    dLintFlags :: [GeneralFlag]
+    dLintFlags =
+        [ Opt_DoCoreLinting
+        , Opt_DoStgLinting
+        , Opt_DoCmmLinting
+        , Opt_DoAsmLinting
+        , Opt_CatchNonexhaustiveCases
+        , Opt_LlvmFillUndefWithGarbage
+        ]
 
 enableGlasgowExts :: DynP ()
 enableGlasgowExts = do setGeneralFlag Opt_PrintExplicitForalls
