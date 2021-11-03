@@ -3,4 +3,3 @@ ghc: panic! (the 'impossible' happened)
 	don't know
 
 Please report this as a GHC bug:  https://www.haskell.org/ghc/reportabug
-
