@@ -1008,6 +1008,8 @@ release-x86_64-linux-ubuntu2004:
 
 validate-x86_64-linux-alpine-hadrian:
   extends: .build-x86_64-linux-alpine-hadrian
+  rules:
+    - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
 
 release-x86_64-linux-alpine-integer-simple:
   extends:
