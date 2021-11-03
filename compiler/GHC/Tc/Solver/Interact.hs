@@ -50,7 +50,6 @@ import GHC.Types.SrcLoc
 import GHC.Types.Var.Env
 
 import Control.Monad
-import GHC.Data.Maybe( isJust )
 import GHC.Data.Pair (Pair(..))
 import GHC.Types.Unique( hasKey )
 import GHC.Driver.Session
@@ -526,9 +525,7 @@ solveOneFromTheOther ev_i ev_w
   -- See Note [Replacement vs keeping]
 
   | lvl_i == lvl_w
-  = do { ev_binds_var <- getTcEvBindsVar
-       ; binds <- getTcEvBindsMap ev_binds_var
-       ; return (same_level_strategy binds) }
+  = return same_level_strategy
 
   | otherwise   -- Both are Given, levels differ
   = return different_level_strategy
@@ -538,8 +535,6 @@ solveOneFromTheOther ev_i ev_w
      loc_w = ctEvLoc ev_w
      lvl_i = ctLocLevel loc_i
      lvl_w = ctLocLevel loc_w
-     ev_id_i = ctEvEvId ev_i
-     ev_id_w = ctEvEvId ev_w
 
      different_level_strategy  -- Both Given
        | isIPLikePred pred = if lvl_w > lvl_i then KeepWork  else KeepInert
@@ -547,33 +542,40 @@ solveOneFromTheOther ev_i ev_w
        -- See Note [Replacement vs keeping] (the different-level bullet)
        -- For the isIPLikePred case see Note [Shadowing of Implicit Parameters]
 
-     same_level_strategy binds -- Both Given
-       | GivenOrigin (InstSC s_i) <- ctLocOrigin loc_i
-       = case ctLocOrigin loc_w of
-            GivenOrigin (InstSC s_w) | s_w < s_i -> KeepWork
-                                     | otherwise -> KeepInert
-            _                                    -> KeepWork
+     same_level_strategy -- Both Given
+       = case (un_given (ctLocOrigin loc_i), un_given (ctLocOrigin loc_w)) of
+              -- case 2(b) from Note [Replacement vs keeping]
+           (InstSC _depth_i size_i, InstSC _depth_w size_w) | size_w < size_i -> KeepWork
+                                                            | otherwise       -> KeepInert
 
-       | GivenOrigin (InstSC {}) <- ctLocOrigin loc_w
-       = KeepInert
+              -- case 2(c) from Note [Replacement vs keeping]
+           (InstSC depth_i _, OtherSC depth_w _)  -> choose_shallower depth_i depth_w
+           (OtherSC depth_i _, InstSC depth_w _)  -> choose_shallower depth_i depth_w
+           (OtherSC depth_i _, OtherSC depth_w _) -> choose_shallower depth_i depth_w
 
-       | has_binding binds ev_id_w
-       , not (has_binding binds ev_id_i)
-       , not (ev_id_i `elemVarSet` findNeededEvVars binds (unitVarSet ev_id_w))
-       = KeepWork
+              -- case 2(a) from Note [Replacement vs keeping]
+           (InstSC {}, _)                         -> KeepWork
+           (OtherSC {}, _)                        -> KeepWork
 
-       | otherwise
-       = KeepInert
+             -- case 2(d) from Note [Replacement vs keeping]
+           _                                      -> KeepInert
 
-     has_binding binds ev_id = isJust (lookupEvBind binds ev_id)
+     un_given (GivenOrigin skol_info) = skol_info
+     un_given orig = pprPanic "Given without GivenOrigin in solveOneFromTheOther" $
+                     vcat [ppr ev_i, ppr ev_w, ppr orig]
+
+     choose_shallower depth_i depth_w | depth_w < depth_i = KeepWork
+                                      | otherwise         = KeepInert
+       -- favor KeepInert in the equals case, according to 2(d) from the Note
 
 {-
 Note [Replacement vs keeping]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When we have two Given constraints both of type (C tys), say, which should
-we keep?  More subtle than you might think!
+we keep?  More subtle than you might think! This is all implemented in
+solveOneFromTheOther.
 
-  * Constraints come from different levels (different_level_strategy)
+  1) Constraints come from different levels (different_level_strategy)
 
       - For implicit parameters we want to keep the innermost (deepest)
         one, so that it overrides the outer one.
@@ -588,36 +590,33 @@ we keep?  More subtle than you might think!
         8% performance improvement in nofib cryptarithm2, compared to
         just rolling the dice.  I didn't investigate why.
 
-  * Constraints coming from the same level (i.e. same implication)
+  2) Constraints coming from the same level (i.e. same implication)
 
-       (a) Always get rid of InstSC ones if possible, since they are less
-           useful for solving.  If both are InstSC, choose the one with
-           the smallest TypeSize
-           See Note [Solving superclass constraints] in GHC.Tc.TyCl.Instance
+       (a) Prefer constraints that are not superclass selections. Example:
 
-       (b) Keep the one that has a non-trivial evidence binding.
-              Example:  f :: (Eq a, Ord a) => blah
-              then we may find [G] d3 :: Eq a
-                               [G] d2 :: Eq a
-                with bindings  d3 = sc_sel (d1::Ord a)
-            We want to discard d2 in favour of the superclass selection from
-            the Ord dictionary.
-            Why? See Note [Tracking redundant constraints] in GHC.Tc.Solver again.
+             f :: (Eq a, Ord a) => a -> Bool
+             f x = x == x
 
-       (c) But don't do (b) if the evidence binding depends transitively on the
-           one without a binding.  Example (with RecursiveSuperClasses)
-              class C a => D a
-              class D a => C a
-           Inert:     d1 :: C a, d2 :: D a
-           Binds:     d3 = sc_sel d2, d2 = sc_sel d1
-           Work item: d3 :: C a
-           Then it'd be ridiculous to replace d1 with d3 in the inert set!
-           Hence the findNeedEvVars test.  See #14774.
+           Eager superclass expansion gives us two [G] Eq a constraints. We
+           want to keep the one from the user-written Eq a, not the superclass
+           selection. This means we report the Ord a as redundant with
+           -Wredundant-constraints, not the Eq a.
 
-  * Finally, when there is still a choice, use KeepInert rather than
-    KeepWork, for two reasons:
-      - to avoid unnecessary munging of the inert set.
-      - to cut off superclass loops; see Note [Superclass loops] in GHC.Tc.Solver.Canonical
+           Getting this wrong was #20602. See also
+           Note [Tracking redundant constraints] in GHC.Tc.Solver.
+
+       (b) If both are InstSC, choose the one with the smallest TypeSize,
+           according to Note [Solving superclass constraints] in GHC.Tc.TyCl.Instance.
+
+       (c) If both are superclass selections (but not both InstSC), choose the one
+           with the shallower superclass-selection depth, in the hope of identifying
+           more correct redundant constraints. This is really a generalization of
+           point (a).
+
+       (d) Finally, when there is still a choice, use KeepInert rather than
+           KeepWork, for two reasons:
+             - to avoid unnecessary munging of the inert set.
+             - to cut off superclass loops; see Note [Superclass loops] in GHC.Tc.Solver.Canonical
 
 Doing the depth-check for implicit parameters, rather than making the work item
 always override, is important.  Consider
