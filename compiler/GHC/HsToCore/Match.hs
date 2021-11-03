@@ -796,7 +796,13 @@ matchWrapper ctxt scrs (MG { mg_alts = L _ matches
     mk_eqn_info :: LMatch GhcTc (LHsExpr GhcTc) -> (Nablas, NonEmpty Nablas) -> DsM EquationInfo
     mk_eqn_info (L _ (Match { m_pats = pats, m_grhss = grhss })) (pat_nablas, rhss_nablas)
       = do { dflags <- getDynFlags
+<<<<<<< HEAD
            ; let upats = map (unLoc . decideBangHood dflags) (expectVisPats pats)
+||||||| parent of 27c59c73c7 (parser and renamer checkpoint)
+           ; let upats = map (unLoc . decideBangHood dflags) pats
+=======
+           ; let upats = map (unLoc . decideBangHood dflags) (discardLInvisPats pats)
+>>>>>>> 27c59c73c7 (parser and renamer checkpoint)
            -- pat_nablas is the covered set *after* matching the pattern, but
            -- before any of the GRHSs. We extend the environment with pat_nablas
            -- (via updPmNablas) so that the where-clause of 'grhss' can profit
