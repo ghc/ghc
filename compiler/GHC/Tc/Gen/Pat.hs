@@ -19,7 +19,7 @@ module GHC.Tc.Gen.Pat
    , newLetBndr
    , LetBndrSpec(..)
    , tcCheckPat, tcCheckPat_O, tcInferPat
-   , tcPats
+   , tcLMatchPats
    , addDataConStupidTheta
    , badFieldCon
    , polyPatSig
@@ -99,25 +99,25 @@ tcLetPat sig_fn no_gen pat pat_ty thing_inside
        ; tc_lpat pat_ty penv pat thing_inside }
 
 -----------------
-tcPats :: HsMatchContext GhcTc
-       -> [LPat GhcRn]            -- Patterns,
-       -> [Scaled ExpSigmaType]         --   and their types
-       -> TcM a                  --   and the checker for the body
-       -> TcM ([LPat GhcTc], a)
+tcLMatchPats :: HsMatchContext GhcTc
+             -> [LMatchPat GhcRn]            -- Patterns,
+             -> [Scaled ExpSigmaType]         --   and their types
+             -> TcM a                  --   and the checker for the body
+             -> TcM ([LMatchPat GhcTc], a)
 
--- This is the externally-callable wrapper function
--- Typecheck the patterns, extend the environment to bind the variables,
--- do the thing inside, use any existentially-bound dictionaries to
--- discharge parts of the returning LIE, and deal with pattern type
--- signatures
+    -- This is the externally-callable wrapper function
+    -- Typecheck the patterns, extend the environment to bind the variables,
+    -- do the thing inside, use any existentially-bound dictionaries to
+    -- discharge parts of the returning LIE, and deal with pattern type
+    -- signatures
 
---   1. Initialise the PatState
---   2. Check the patterns
---   3. Check the body
---   4. Check that no existentials escape
+    --   1. Initialise the PatState
+    --   2. Check the patterns
+    --   3. Check the body
+    --   4. Check that no existentials escape
 
-tcPats ctxt pats pat_tys thing_inside
-  = tc_lpats pat_tys penv pats thing_inside
+tcLMatchPats ctxt pats pat_tys thing_inside
+  = tc_lmatchpats pat_tys penv pats thing_inside
   where
     penv = PE { pe_lazy = False, pe_ctxt = LamPat ctxt, pe_orig = PatOrigin }
 
@@ -339,6 +339,21 @@ tc_lpat pat_ty penv (L span pat) thing_inside
     do  { (pat', res) <- maybeWrapPatCtxt pat (tc_pat pat_ty penv pat)
                                           thing_inside
         ; return (L span pat', res) }
+
+tc_lmatchpat :: Scaled ExpSigmaType
+             -> Checker (LMatchPat GhcRn) (LMatchPat GhcTc)
+tc_lmatchpat pat_ty penv (L l (VisPat x pat)) thing_inside
+  = do  { (pat', res) <- tc_lpat pat_ty penv pat thing_inside
+        ; return (L l (VisPat x pat'), res) }
+tc_lmatchpat _ _ _ _ = panic "we don't have that yet"
+
+tc_lmatchpats :: [Scaled ExpSigmaType]
+              -> Checker [LMatchPat GhcRn] [LMatchPat GhcTc]
+tc_lmatchpats tys penv pats
+  = assertPpr (equalLength pats tys) (ppr pats $$ ppr tys) $
+    tcMultiple (\ penv' (p,t) -> tc_lmatchpat t penv' p)
+               penv
+               (zipEqual "tc_lmatchpat" pats tys)
 
 tc_lpats :: [Scaled ExpSigmaType]
          -> Checker [LPat GhcRn] [LPat GhcTc]

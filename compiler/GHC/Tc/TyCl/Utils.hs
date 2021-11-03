@@ -925,7 +925,7 @@ mkOneRecordSelector all_cons idDetails fl has_sel
                                            [] unit_rhs]
              | otherwise =  map mk_match cons_w_field ++ deflt
     mk_match con = mkSimpleMatch (mkPrefixFunRhs sel_lname)
-                                 [L loc' (mk_sel_pat con)]
+                                 [mkVisMatchPat (L loc' (mk_sel_pat con))]
                                  (L loc' (HsVar noExtField (L locn field_var)))
     mk_sel_pat con = ConPat NoExtField (L locn (getName con)) (RecCon rec_fields)
     rec_fields = HsRecFields { rec_flds = [rec_field], rec_dotdot = Nothing }
@@ -945,7 +945,7 @@ mkOneRecordSelector all_cons idDetails fl has_sel
     -- mentions this particular record selector
     deflt | all dealt_with all_cons = []
           | otherwise = [mkSimpleMatch CaseAlt
-                            [L loc' (WildPat noExtField)]
+                            [mkVisMatchPat (L loc' (WildPat noExtField))]
                             (mkHsApp (L loc' (HsVar noExtField
                                          (L locn (getName rEC_SEL_ERROR_ID))))
                                      (L loc' (HsLit noComments msg_lit)))]

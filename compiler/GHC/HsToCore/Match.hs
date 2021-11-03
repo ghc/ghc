@@ -755,7 +755,7 @@ matchWrapper ctxt mb_scr (MG { mg_alts = L _ matches
                             selectMatchVars (zipWithEqual "matchWrapper"
                                               (\a b -> (scaledMult a, unLoc b))
                                                 arg_tys
-                                                (hsLMatchPats m))
+                                                (discardLInvisPats (hsLMatchPats m)))
 
         -- Pattern match check warnings for /this match-group/.
         -- @rhss_nablas@ is a flat list of covered Nablas for each RHS.
@@ -776,7 +776,7 @@ matchWrapper ctxt mb_scr (MG { mg_alts = L _ matches
     mk_eqn_info :: LMatch GhcTc (LHsExpr GhcTc) -> (Nablas, NonEmpty Nablas) -> DsM EquationInfo
     mk_eqn_info (L _ (Match { m_pats = pats, m_grhss = grhss })) (pat_nablas, rhss_nablas)
       = do { dflags <- getDynFlags
-           ; let upats = map (unLoc . decideBangHood dflags) pats
+           ; let upats = map (unLoc . decideBangHood dflags) (discardLInvisPats pats)
            -- pat_nablas is the covered set *after* matching the pattern, but
            -- before any of the GRHSs. We extend the environment with pat_nablas
            -- (via updPmNablas) so that the where-clause of 'grhss' can profit

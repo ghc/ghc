@@ -490,6 +490,16 @@ patScopes rsp useScope patScope xs =
   map (\(RS sc a) -> PS rsp useScope sc a) $
     listScopes patScope xs
 
+matchPatScopes
+  :: Maybe Span
+  -> Scope
+  -> Scope
+  -> [LMatchPat (GhcPass p)]
+  -> [PScoped (LMatchPat (GhcPass p))]
+matchPatScopes rsp useScope patScope xs =
+  map (\(RS sc a) -> PS rsp useScope sc a) $
+    listScopes patScope xs
+
 -- | 'listScopes' specialised to 'HsPatSigType'
 tScopes
   :: Scope
@@ -907,6 +917,12 @@ instance HiePass p => ToHie (HsPatSynDir (GhcPass p)) where
     ExplicitBidirectional mg -> toHie mg
     _ -> pure []
 
+instance HiePass p => ToHie (PScoped (GenLocated SrcSpanAnnA (MatchPat (GhcPass p)))) where
+  toHie (PS mb sc1 sc2 (L _ (VisPat _ pat))) =
+    toHie (PS mb sc1 sc2 pat)
+  toHie _ = panic "we don't have that yet"
+
+
 instance ( HiePass p
          , Data (body (GhcPass p))
          , AnnoBody p body
@@ -916,7 +932,7 @@ instance ( HiePass p
     Match{m_ctxt=mctx, m_pats = pats, m_grhss =  grhss } ->
       [ toHie mctx
       , let rhsScope = mkScope $ grhss_span grhss
-          in toHie $ patScopes Nothing rhsScope NoScope pats
+          in toHie $ matchPatScopes Nothing rhsScope NoScope pats
       , toHie grhss
       ]
 

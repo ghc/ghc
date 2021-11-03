@@ -602,6 +602,10 @@ type family XSigPat      x
 type family XCoPat       x
 type family XXPat        x
 type family XHsFieldBind x
+type family XVisPat      x
+type family XInvisTyVarPat  x
+type family XInvisWildTyPat x
+type family XXMatchPat   x
 
 -- =====================================================================
 -- Type families for the HsTypes type families

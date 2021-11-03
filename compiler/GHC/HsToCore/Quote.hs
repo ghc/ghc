@@ -1670,9 +1670,9 @@ the choice in HsExpanded, but it seems simpler to consult the flag (again).
 repMatchTup ::  LMatch GhcRn (LHsExpr GhcRn) -> MetaM (Core (M TH.Match))
 repMatchTup (L _ (Match { m_pats = [p]
                         , m_grhss = GRHSs _ guards wheres })) =
-  do { ss1 <- mkGenSyms (collectPatBinders CollNoDictBinders p)
+  do { ss1 <- mkGenSyms (collectLMatchPatBinders CollNoDictBinders p)
      ; addBinds ss1 $ do {
-     ; p1 <- repLP p
+     ; p1 <- repLMP p
      ; (ss2,ds) <- repBinds wheres
      ; addBinds ss2 $ do {
      ; gs    <- repGuards guards
@@ -1683,9 +1683,9 @@ repMatchTup _ = panic "repMatchTup: case alt with more than one arg"
 repClauseTup ::  LMatch GhcRn (LHsExpr GhcRn) -> MetaM (Core (M TH.Clause))
 repClauseTup (L _ (Match { m_pats = ps
                          , m_grhss = GRHSs _ guards  wheres })) =
-  do { ss1 <- mkGenSyms (collectPatsBinders CollNoDictBinders ps)
+  do { ss1 <- mkGenSyms (collectLMatchPatsBinders CollNoDictBinders ps)
      ; addBinds ss1 $ do {
-       ps1 <- repLPs ps
+       ps1 <- repLMPs ps
      ; (ss2,ds) <- repBinds wheres
      ; addBinds ss2 $ do {
        gs <- repGuards guards
@@ -2023,10 +2023,10 @@ repLambda :: LMatch GhcRn (LHsExpr GhcRn) -> MetaM (Core (M TH.Exp))
 repLambda (L _ (Match { m_pats = ps
                       , m_grhss = GRHSs _ [L _ (GRHS _ [] e)]
                                               (EmptyLocalBinds _) } ))
- = do { let bndrs = collectPatsBinders CollNoDictBinders ps ;
+ = do { let bndrs = collectLMatchPatsBinders CollNoDictBinders ps ;
       ; ss  <- mkGenSyms bndrs
       ; lam <- addBinds ss (
-                do { xs <- repLPs ps; body <- repLE e; repLam xs body })
+                do { xs <- repLMPs ps; body <- repLE e; repLam xs body })
       ; wrapGenSyms ss lam }
 
 repLambda (L _ m) = notHandled (ThGuardedLambdas m)
@@ -2045,6 +2045,14 @@ repLPs ps = repListM patTyConName repLP ps
 
 repLP :: LPat GhcRn -> MetaM (Core (M TH.Pat))
 repLP p = repP (unLoc p)
+
+repLMP :: LMatchPat GhcRn -> MetaM (Core (M TH.Pat))
+repLMP (L _ (VisPat _ p)) = repLP p
+repLMP _                  = panic "we don't have other patterns at the moment"
+
+repLMPs :: [LMatchPat GhcRn] -> MetaM (Core ([M TH.Pat]))
+repLMPs ps = repListM patTyConName repLMP ps
+
 
 repP :: Pat GhcRn -> MetaM (Core (M TH.Pat))
 repP (WildPat _)        = repPwild

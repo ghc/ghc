@@ -1409,12 +1409,16 @@
             (NoSrcStrict))
            [(L
              (SrcSpanAnn (EpAnnNotUsed) { DumpSemis.hs:32:3 })
-             (VarPat
+             (VisPat
               (NoExtField)
               (L
                (SrcSpanAnn (EpAnnNotUsed) { DumpSemis.hs:32:3 })
-               (Unqual
-                {OccName: x}))))]
+               (VarPat
+                (NoExtField)
+                (L
+                 (SrcSpanAnn (EpAnnNotUsed) { DumpSemis.hs:32:3 })
+                 (Unqual
+                  {OccName: x}))))))]
            (GRHSs
             (EpaComments
              [])
@@ -1776,12 +1780,16 @@
             (NoSrcStrict))
            [(L
              (SrcSpanAnn (EpAnnNotUsed) { DumpSemis.hs:36:5 })
-             (VarPat
+             (VisPat
               (NoExtField)
               (L
                (SrcSpanAnn (EpAnnNotUsed) { DumpSemis.hs:36:5 })
-               (Unqual
-                {OccName: x}))))]
+               (VarPat
+                (NoExtField)
+                (L
+                 (SrcSpanAnn (EpAnnNotUsed) { DumpSemis.hs:36:5 })
+                 (Unqual
+                  {OccName: x}))))))]
            (GRHSs
             (EpaComments
              [])
@@ -1863,22 +1871,26 @@
                         []))
                       (CaseAlt)
                       [(L
-                        (SrcSpanAnn (EpAnnNotUsed) { DumpSemis.hs:39:6 })
-                        (NPat
-                         (EpAnnNotUsed)
+                        (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+                        (VisPat
+                         (NoExtField)
                          (L
-                          (SrcSpanAnn
+                          (SrcSpanAnn (EpAnnNotUsed) { DumpSemis.hs:39:6 })
+                          (NPat
                            (EpAnnNotUsed)
-                           { DumpSemis.hs:39:6 })
-                          (OverLit
-                           (NoExtField)
-                           (HsIntegral
-                            (IL
-                             (SourceText 0)
-                             (False)
-                             (0)))))
-                         (Nothing)
-                         (NoExtField)))]
+                           (L
+                            (SrcSpanAnn
+                             (EpAnnNotUsed)
+                             { DumpSemis.hs:39:6 })
+                            (OverLit
+                             (NoExtField)
+                             (HsIntegral
+                              (IL
+                               (SourceText 0)
+                               (False)
+                               (0)))))
+                           (Nothing)
+                           (NoExtField)))))]
                       (GRHSs
                        (EpaComments
                         [])
@@ -1932,22 +1944,26 @@
                         []))
                       (CaseAlt)
                       [(L
-                        (SrcSpanAnn (EpAnnNotUsed) { DumpSemis.hs:40:6 })
-                        (NPat
-                         (EpAnnNotUsed)
+                        (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+                        (VisPat
+                         (NoExtField)
                          (L
-                          (SrcSpanAnn
+                          (SrcSpanAnn (EpAnnNotUsed) { DumpSemis.hs:40:6 })
+                          (NPat
                            (EpAnnNotUsed)
-                           { DumpSemis.hs:40:6 })
-                          (OverLit
-                           (NoExtField)
-                           (HsIntegral
-                            (IL
-                             (SourceText 1)
-                             (False)
-                             (1)))))
-                         (Nothing)
-                         (NoExtField)))]
+                           (L
+                            (SrcSpanAnn
+                             (EpAnnNotUsed)
+                             { DumpSemis.hs:40:6 })
+                            (OverLit
+                             (NoExtField)
+                             (HsIntegral
+                              (IL
+                               (SourceText 1)
+                               (False)
+                               (1)))))
+                           (Nothing)
+                           (NoExtField)))))]
                       (GRHSs
                        (EpaComments
                         [])
@@ -2003,22 +2019,26 @@
                         []))
                       (CaseAlt)
                       [(L
-                        (SrcSpanAnn (EpAnnNotUsed) { DumpSemis.hs:41:6 })
-                        (NPat
-                         (EpAnnNotUsed)
+                        (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+                        (VisPat
+                         (NoExtField)
                          (L
-                          (SrcSpanAnn
+                          (SrcSpanAnn (EpAnnNotUsed) { DumpSemis.hs:41:6 })
+                          (NPat
                            (EpAnnNotUsed)
-                           { DumpSemis.hs:41:6 })
-                          (OverLit
-                           (NoExtField)
-                           (HsIntegral
-                            (IL
-                             (SourceText 2)
-                             (False)
-                             (2)))))
-                         (Nothing)
-                         (NoExtField)))]
+                           (L
+                            (SrcSpanAnn
+                             (EpAnnNotUsed)
+                             { DumpSemis.hs:41:6 })
+                            (OverLit
+                             (NoExtField)
+                             (HsIntegral
+                              (IL
+                               (SourceText 2)
+                               (False)
+                               (2)))))
+                           (Nothing)
+                           (NoExtField)))))]
                       (GRHSs
                        (EpaComments
                         [])
@@ -2076,22 +2096,26 @@
                         []))
                       (CaseAlt)
                       [(L
-                        (SrcSpanAnn (EpAnnNotUsed) { DumpSemis.hs:42:6 })
-                        (NPat
-                         (EpAnnNotUsed)
+                        (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+                        (VisPat
+                         (NoExtField)
                          (L
-                          (SrcSpanAnn
+                          (SrcSpanAnn (EpAnnNotUsed) { DumpSemis.hs:42:6 })
+                          (NPat
                            (EpAnnNotUsed)
-                           { DumpSemis.hs:42:6 })
-                          (OverLit
-                           (NoExtField)
-                           (HsIntegral
-                            (IL
-                             (SourceText 3)
-                             (False)
-                             (3)))))
-                         (Nothing)
-                         (NoExtField)))]
+                           (L
+                            (SrcSpanAnn
+                             (EpAnnNotUsed)
+                             { DumpSemis.hs:42:6 })
+                            (OverLit
+                             (NoExtField)
+                             (HsIntegral
+                              (IL
+                               (SourceText 3)
+                               (False)
+                               (3)))))
+                           (Nothing)
+                           (NoExtField)))))]
                       (GRHSs
                        (EpaComments
                         [])

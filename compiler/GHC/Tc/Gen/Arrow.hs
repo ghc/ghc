@@ -272,7 +272,7 @@ tc_cmd env
 
                 -- Check the patterns, and the GRHSs inside
         ; (pats', grhss') <- setSrcSpanA mtch_loc                                 $
-                             tcPats (ArrowMatchCtxt KappaExpr)
+                             tcLMatchPats (ArrowMatchCtxt KappaExpr)
                                pats (map (unrestricted . mkCheckExpType) arg_tys) $
                              tc_grhss grhss cmd_stk' (mkCheckExpType res_ty)
 
@@ -280,7 +280,7 @@ tc_cmd env
                                          , m_ctxt = ArrowMatchCtxt KappaExpr
                                          , m_pats = pats'
                                          , m_grhss = grhss' })
-              arg_tys = map (unrestricted . hsLPatType) pats'
+              arg_tys = map (unrestricted . hsLMatchPatType) pats'
 
         ; _concrete_evs <-
               zipWithM

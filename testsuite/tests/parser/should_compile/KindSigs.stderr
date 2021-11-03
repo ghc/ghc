@@ -872,12 +872,20 @@
             (NoSrcStrict))
            [(L
              (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:23:5 })
-             (WildPat
-              (NoExtField)))
+             (VisPat
+              (NoExtField)
+              (L
+               (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:23:5 })
+               (WildPat
+                (NoExtField)))))
            ,(L
              (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:23:7 })
-             (WildPat
-              (NoExtField)))]
+             (VisPat
+              (NoExtField)
+              (L
+               (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:23:7 })
+               (WildPat
+                (NoExtField)))))]
            (GRHSs
             (EpaComments
              [])

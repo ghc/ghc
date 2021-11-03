@@ -70,7 +70,7 @@ module GHC.Hs.Utils(
   -- * Patterns
   mkNPat, mkNPlusKPat, nlVarPat, nlLitPat, nlConVarPat, nlConVarPatName, nlConPat,
   nlConPatName, nlInfixConPat, nlNullaryConPat, nlWildConPat, nlWildPat,
-  nlWildPatName, nlTuplePat, mkParPat, nlParPat,
+  nlWildPatName, nlTuplePat, nlParPat,
   mkBigLHsVarTup, mkBigLHsTup, mkBigLHsVarPatTup, mkBigLHsPatTup,
 
   -- * Types
@@ -98,8 +98,8 @@ module GHC.Hs.Utils(
   collectHsIdBinders,
   collectHsBindsBinders, collectHsBindBinders, collectMethodBinders,
 
-  collectPatBinders, collectPatsBinders,
-  collectLStmtsBinders, collectStmtsBinders,
+  collectPatBinders, collectPatsBinders, collectLMatchPatsBinders,
+  collectLMatchPatBinders, collectLStmtsBinders, collectStmtsBinders,
   collectLStmtBinders, collectStmtBinders,
   CollectPass(..), CollectFlag(..),
 
@@ -174,7 +174,7 @@ mkSimpleMatch :: (Anno (Match (GhcPass p) (LocatedA (body (GhcPass p))))
                   Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p))))
                         ~ SrcAnn NoEpAnns)
               => HsMatchContext (GhcPass p)
-              -> [LPat (GhcPass p)] -> LocatedA (body (GhcPass p))
+              -> [LMatchPat (GhcPass p)] -> LocatedA (body (GhcPass p))
               -> LMatch (GhcPass p) (LocatedA (body (GhcPass p)))
 mkSimpleMatch ctxt pats rhs
   = L loc $
@@ -183,7 +183,7 @@ mkSimpleMatch ctxt pats rhs
   where
     loc = case pats of
                 []      -> getLoc rhs
-                (pat:_) -> combineSrcSpansA (getLoc pat) (getLoc rhs)
+                (pat:_) -> combineSrcSpansA (noAnnSrcSpan (getLocA pat)) (getLoc rhs)
 
 unguardedGRHSs :: Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p))))
                      ~ SrcAnn NoEpAnns
@@ -248,14 +248,14 @@ mkHsAppTypes :: LHsExpr GhcRn -> [LHsWcType GhcRn] -> LHsExpr GhcRn
 mkHsAppTypes = foldl' mkHsAppType
 
 mkHsLam :: (IsPass p, XMG (GhcPass p) (LHsExpr (GhcPass p)) ~ NoExtField)
-        => [LPat (GhcPass p)]
+        => [LMatchPat (GhcPass p)]
         -> LHsExpr (GhcPass p)
         -> LHsExpr (GhcPass p)
 mkHsLam pats body = mkHsPar (L (getLoc body) (HsLam noExtField matches))
   where
     matches = mkMatchGroup Generated
                            (noLocA [mkSimpleMatch LambdaExpr pats' body])
-    pats' = map (parenthesizePat appPrec) pats
+    pats' = map (parenthesizeLMatchPat appPrec) pats
 
 mkHsLams :: [TyVar] -> [EvVar] -> LHsExpr GhcTc -> LHsExpr GhcTc
 mkHsLams tyvars dicts expr = mkLHsWrap (mkWpTyLams tyvars
@@ -270,7 +270,7 @@ mkHsCaseAlt :: (Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p))))
             => LPat (GhcPass p) -> (LocatedA (body (GhcPass p)))
             -> LMatch (GhcPass p) (LocatedA (body (GhcPass p)))
 mkHsCaseAlt pat expr
-  = mkSimpleMatch CaseAlt [pat] expr
+  = mkSimpleMatch CaseAlt [mkVisMatchPat pat] expr
 
 nlHsTyApp :: Id -> [Type] -> LHsExpr GhcTc
 nlHsTyApp fun_id tys
@@ -285,8 +285,8 @@ nlHsTyApps fun_id tys xs = foldl' nlHsApp (nlHsTyApp fun_id tys) xs
 mkLHsPar :: IsPass id => LHsExpr (GhcPass id) -> LHsExpr (GhcPass id)
 mkLHsPar = parenthesizeHsExpr appPrec
 
-mkParPat :: IsPass p => LPat (GhcPass p) -> LPat (GhcPass p)
-mkParPat = parenthesizePat appPrec
+mkParMatchPat :: IsPass p => LMatchPat (GhcPass p) -> LMatchPat (GhcPass p)
+mkParMatchPat = parenthesizeLMatchPat appPrec
 
 nlParPat :: LPat (GhcPass name) -> LPat (GhcPass name)
 nlParPat p = noLocA (gParPat p)
@@ -893,7 +893,7 @@ spanHsLocaLBinds (HsIPBinds _ (IPBinds _ bs))
 ------------
 -- | Convenience function using 'mkFunBind'.
 -- This is for generated bindings only, do not use for user-written code.
-mkSimpleGeneratedFunBind :: SrcSpan -> RdrName -> [LPat GhcPs]
+mkSimpleGeneratedFunBind :: SrcSpan -> RdrName -> [LMatchPat GhcPs]
                 -> LHsExpr GhcPs -> LHsBind GhcPs
 mkSimpleGeneratedFunBind loc fun pats expr
   = L (noAnnSrcSpan loc) $ mkFunBind Generated (L (noAnnSrcSpan loc) fun)
@@ -909,14 +909,14 @@ mkPrefixFunRhs n = FunRhs { mc_fun = n
 ------------
 mkMatch :: forall p. IsPass p
         => HsMatchContext (GhcPass p)
-        -> [LPat (GhcPass p)]
+        -> [LMatchPat (GhcPass p)]
         -> LHsExpr (GhcPass p)
         -> HsLocalBinds (GhcPass p)
         -> LMatch (GhcPass p) (LHsExpr (GhcPass p))
 mkMatch ctxt pats expr binds
   = noLocA (Match { m_ext   = noAnn
                   , m_ctxt  = ctxt
-                  , m_pats  = map mkParPat pats
+                  , m_pats  = map mkParMatchPat pats
                   , m_grhss = GRHSs emptyComments (unguardedRHS noAnn noSrcSpan expr) binds })
 
 {-
@@ -1160,6 +1160,24 @@ collectPatsBinders
     -> [IdP p]
 collectPatsBinders flag pats = foldr (collect_lpat flag) [] pats
 
+collectLMatchPatBinders
+    :: CollectPass p
+    => CollectFlag p
+    -> LMatchPat p
+    -> [IdP p]
+-- ^ Return all the variables bound by the `[LMatchPat p]`,
+--   including both type variables and term variables
+collectLMatchPatBinders flag pat = collect_lmatchpat flag pat []
+
+
+collectLMatchPatsBinders
+    :: CollectPass p
+    => CollectFlag p
+    -> [LMatchPat p]
+    -> [IdP p]
+-- ^ Return all the variables bound by the `[LMatchPat p]`,
+--   including both type variables and term variables
+collectLMatchPatsBinders flag pats = foldr (collect_lmatchpat flag) [] pats
 
 -------------
 
@@ -1182,6 +1200,17 @@ collect_lpat :: forall p. (CollectPass p)
              -> [IdP p]
              -> [IdP p]
 collect_lpat flag pat bndrs = collect_pat flag (unXRec @p pat) bndrs
+
+collect_lmatchpat :: forall p. (CollectPass p)
+                  => CollectFlag p
+                  -> LMatchPat p
+                  -> [IdP p]
+                  -> [IdP p]
+collect_lmatchpat flag match_pat bndrs   = case (unXRec @p match_pat) of
+  VisPat _ pat        -> collect_lpat flag pat bndrs
+  InvisTyVarPat _ idp -> (unXRec @p idp) : bndrs
+  InvisWildTyPat _    -> bndrs
+  XMatchPat _         -> bndrs
 
 collect_pat :: forall p. CollectPass p
             => CollectFlag p

@@ -1,4 +1,6 @@
+ghc: panic! (the 'impossible' happened)
+  GHC version 9.3.20211208:
+	we don't have that yet
 
-T18251d.hs:6:1: error:
-    Parse error in pattern: f @a
-    Type applications in patterns are only allowed on data constructors.
+Please report this as a GHC bug:  https://www.haskell.org/ghc/reportabug
+

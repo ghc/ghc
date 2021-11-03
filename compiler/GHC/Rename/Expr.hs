@@ -2586,7 +2586,7 @@ getMonadFailOp ctxt
               nlHsApp (noLocA failExpr)
                       (nlHsApp (noLocA $ fromStringExpr) arg_syn_expr)
         let failAfterFromStringExpr :: HsExpr GhcRn =
-              unLoc $ mkHsLam [noLocA $ VarPat noExtField $ noLocA arg_name] body
+              unLoc $ mkHsLam [(L noSrcSpanA (VisPat NoExtField (noLocA $ VarPat noExtField $ noLocA arg_name)))] body
         let failAfterFromStringSynExpr :: SyntaxExpr GhcRn =
               mkSyntaxExpr failAfterFromStringExpr
         return (failAfterFromStringSynExpr, failFvs `plusFV` fromStringFvs)

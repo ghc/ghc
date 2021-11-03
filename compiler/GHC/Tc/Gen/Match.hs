@@ -262,7 +262,7 @@ tcMatch ctxt pat_tys rhs_ty match
     tc_match ctxt pat_tys rhs_ty
              match@(Match { m_pats = pats, m_grhss = grhss })
       = add_match_ctxt match $
-        do { (pats', grhss') <- tcPats (mc_what ctxt) pats pat_tys $
+        do { (pats', grhss') <- tcLMatchPats (mc_what ctxt) pats pat_tys $
                                 tcGRHSs ctxt grhss rhs_ty
            ; return (Match { m_ext = noAnn
                            , m_ctxt = mc_what ctxt, m_pats = pats'

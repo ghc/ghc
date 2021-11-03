@@ -159,7 +159,7 @@ gen_Functor_binds loc (DerivInstTys{dit_rep_tc = tycon})
     fmap_name = L (noAnnSrcSpan loc) fmap_RDR
     fmap_bind = mkRdrFunBind fmap_name fmap_eqns
     fmap_eqns = [mkSimpleMatch fmap_match_ctxt
-                               [nlWildPat]
+                               [mkVisMatchPat nlWildPat]
                                coerce_Expr]
     fmap_match_ctxt = mkPrefixFunRhs fmap_name
 
@@ -580,7 +580,7 @@ mkSimpleLam lam =
       n:names -> do
         put names
         body <- lam (nlHsVar n)
-        return (mkHsLam [nlVarPat n] body)
+        return (mkHsLam [mkVisMatchPat (nlVarPat n)] body)
       _ -> panic "mkSimpleLam"
 
 mkSimpleLam2 :: (LHsExpr GhcPs -> LHsExpr GhcPs
@@ -591,7 +591,7 @@ mkSimpleLam2 lam =
       n1:n2:names -> do
         put names
         body <- lam (nlHsVar n1) (nlHsVar n2)
-        return (mkHsLam [nlVarPat n1,nlVarPat n2] body)
+        return (mkHsLam (map mkVisMatchPat [nlVarPat n1, nlVarPat n2]) body)
       _ -> panic "mkSimpleLam2"
 
 -- "Con a1 a2 a3 -> fold [x1 a1, x2 a2, x3 a3]"
@@ -616,7 +616,7 @@ mkSimpleConMatch ctxt fold extra_pats con insides = do
           else nlParPat bare_pat
     rhs <- fold con_name
                 (zipWith (\i v -> i $ nlHsVar v) insides vars_needed)
-    return $ mkMatch ctxt (extra_pats ++ [pat]) rhs emptyLocalBinds
+    return $ mkMatch ctxt (map mkVisMatchPat (extra_pats ++ [pat])) rhs emptyLocalBinds
 
 -- "Con a1 a2 a3 -> fmap (\b2 -> Con a1 b2 a3) (traverse f a2)"
 --
@@ -663,10 +663,10 @@ mkSimpleConMatch2 ctxt fold extra_pats con insides = do
           | otherwise =
               let bs   = filterByList  argTysTyVarInfo bs_RDRs
                   vars = filterByLists argTysTyVarInfo bs_Vars as_Vars
-              in mkHsLam (map nlVarPat bs) (nlHsApps con_name vars)
+              in mkHsLam (map (mkVisMatchPat . nlVarPat) bs) (nlHsApps con_name vars)
 
     rhs <- fold con_expr exps
-    return $ mkMatch ctxt (extra_pats ++ [pat]) rhs emptyLocalBinds
+    return $ mkMatch ctxt (map mkVisMatchPat (extra_pats ++ [pat])) rhs emptyLocalBinds
 
 -- "case x of (a1,a2,a3) -> fold [x1 a1, x2 a2, x3 a3]"
 mkSimpleTupleCase :: Monad m => ([LPat GhcPs] -> DataCon -> [a]
@@ -794,7 +794,7 @@ gen_Foldable_binds loc (DerivInstTys{dit_rep_tc = tycon})
     foldMap_name = L (noAnnSrcSpan loc) foldMap_RDR
     foldMap_bind = mkRdrFunBind foldMap_name foldMap_eqns
     foldMap_eqns = [mkSimpleMatch foldMap_match_ctxt
-                                  [nlWildPat, nlWildPat]
+                                  [mkVisMatchPat nlWildPat, mkVisMatchPat nlWildPat]
                                   mempty_Expr]
     foldMap_match_ctxt = mkPrefixFunRhs foldMap_name
 
@@ -852,7 +852,7 @@ gen_Foldable_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
           parts <- sequence $ foldDataConArgs ft_null con dit
           case convert parts of
             Nothing -> return $
-              mkMatch null_match_ctxt [nlParPat (nlWildConPat con)]
+              mkMatch null_match_ctxt [mkVisMatchPat (nlParPat (nlWildConPat con))]
                 false_Expr emptyLocalBinds
             Just cp -> match_null [] con cp
 
@@ -1029,7 +1029,7 @@ gen_Traversable_binds loc (DerivInstTys{dit_rep_tc = tycon})
     traverse_bind = mkRdrFunBind traverse_name traverse_eqns
     traverse_eqns =
         [mkSimpleMatch traverse_match_ctxt
-                       [nlWildPat, z_Pat]
+                       [mkVisMatchPat nlWildPat, mkVisMatchPat z_Pat]
                        (nlHsApps pure_RDR [nlHsApp coerce_Expr z_Expr])]
     traverse_match_ctxt = mkPrefixFunRhs traverse_name
 

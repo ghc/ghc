@@ -58,6 +58,8 @@ module GHC.Parser.PostProcess (
         checkPrecP,           -- Int -> P Int
         checkContext,         -- HsType -> P HsContext
         checkPattern,         -- HsExp -> P HsPat
+        checkLMatchPattern,
+        mkInvisPatBuilder,
         checkPattern_details,
         incompleteDoBlock,
         ParseContext(..),
@@ -657,17 +659,18 @@ mkPatSynMatchGroup (L loc patsyn_name) (L ld decls) =
                wrongNameBindingErr (locA loc) decl
            ; match <- case details of
                PrefixCon _ pats -> return $ Match { m_ext = noAnn
-                                                  , m_ctxt = ctxt, m_pats = pats
+                                                  , m_ctxt = ctxt
+                                                  , m_pats = (\pat -> L loc (VisPat noExtField pat)) <$> pats
                                                   , m_grhss = rhs }
                    where
                      ctxt = FunRhs { mc_fun = ln
                                    , mc_fixity = Prefix
                                    , mc_strictness = NoSrcStrict }
 
-               InfixCon p1 p2 -> return $ Match { m_ext = noAnn
-                                                , m_ctxt = ctxt
-                                                , m_pats = [p1, p2]
-                                                , m_grhss = rhs }
+               InfixCon p1@(L l1 _) p2@(L l2 _) -> return $ Match { m_ext = noAnn
+                                                                  , m_ctxt = ctxt
+                                                                  , m_pats = [(L l1 (VisPat noExtField p1)), (L l2 (VisPat noExtField p2))]
+                                                                  , m_grhss = rhs }
                    where
                      ctxt = FunRhs { mc_fun = ln
                                    , mc_fixity = Infix
@@ -1123,6 +1126,20 @@ checkPattern_details extraDetails pp = runPV_details extraDetails (pp >>= checkL
 checkLPat :: LocatedA (PatBuilder GhcPs) -> PV (LPat GhcPs)
 checkLPat e@(L l _) = checkPat l e [] []
 
+checkLMatchPattern :: LocatedA (PatBuilder GhcPs) -> P (LMatchPat GhcPs)
+checkLMatchPattern = runPV . checkLMatchPat
+
+checkLMatchPat :: LocatedA (PatBuilder GhcPs) -> PV (LMatchPat GhcPs)
+checkLMatchPat (L l (PatBuilderAppType _ (HsPS {hsps_body = L _ (HsTyVar _ NotPromoted c)}))) =
+  return $ (L l (InvisTyVarPat EpAnnNotUsed c))
+checkLMatchPat (L l (PatBuilderInvisTyVar p@(InvisTyVarPat _ _))) = return $ (L l p)
+checkLMatchPat (L l (PatBuilderInvisTyVar p@(InvisWildTyPat _))) = return $ (L l p)
+checkLMatchPat e@(L l _) = (\pat -> L l (VisPat noExtField pat)) <$> checkPat l e [] []
+
+mkInvisPatBuilder :: MatchPat GhcPs -> PatBuilder GhcPs
+mkInvisPatBuilder (VisPat _ p) = PatBuilderPat (unLoc p)
+mkInvisPatBuilder p            = PatBuilderInvisTyVar p
+
 checkPat :: SrcSpanAnnA -> LocatedA (PatBuilder GhcPs) -> [HsPatSigType GhcPs] -> [LPat GhcPs]
          -> PV (LPat GhcPs)
 checkPat loc (L l e@(PatBuilderVar (L ln c))) tyargs args
@@ -1131,8 +1148,6 @@ checkPat loc (L l e@(PatBuilderVar (L ln c))) tyargs args
       , pat_con = L ln c
       , pat_args = PrefixCon tyargs args
       }
-  | not (null tyargs) =
-      patFail (locA l) . PsErrInPat e $ PEIP_TypeArgs tyargs
   | (not (null args) && patIsRec c) = do
       ctx <- askParseContext
       patFail (locA l) . PsErrInPat e $ PEIP_RecPattern args YesPatIsRecursive ctx
@@ -1248,7 +1263,7 @@ checkFunBind :: SrcStrictness
              -> Located (GRHSs GhcPs (LHsExpr GhcPs))
              -> P (HsBind GhcPs)
 checkFunBind strictness locF ann fun is_infix pats (L _ grhss)
-  = do  ps <- runPV_details extraDetails (mapM checkLPat pats)
+  = do  ps <- runPV_details extraDetails (mapM checkLMatchPat pats)
         let match_span = noAnnSrcSpan $ locF
         cs <- getCommentsFor locF
         return (makeFunBind fun (L (noAnnSrcSpan $ locA match_span)
@@ -1348,6 +1363,10 @@ isFunLhs e = go e [] [] []
                      op_app = L loc (PatBuilderOpApp k
                                (L loc' op) r (EpAnn loca (reverse ops++cps) cs))
                  _ -> return Nothing }
+   go (L _ (PatBuilderAppType pat (HsPS _ (L loc (HsTyVar en_ann _ rdr_name))))) es ann cps =
+     go pat (L loc (PatBuilderInvisTyVar (InvisTyVarPat en_ann rdr_name)) : es) ann cps
+   go (L _ (PatBuilderAppType pat (HsPS _ (L loc (HsWildCardTy x))))) es ann cps =
+     go pat (L loc (PatBuilderInvisTyVar (InvisWildTyPat x)) : es) ann cps
    go _ _ _ _ = return Nothing
 
 mkBangTy :: EpAnn [AddEpAnn] -> SrcStrictness -> LHsType GhcPs -> HsType GhcPs

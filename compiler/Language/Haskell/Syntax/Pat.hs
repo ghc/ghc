@@ -19,8 +19,8 @@
 
 -- See Note [Language.Haskell.Syntax.* Hierarchy] for why not GHC.Hs.*
 module Language.Haskell.Syntax.Pat (
-        Pat(..), LPat,
-        ConLikeP,
+        Pat(..), LPat, MatchPat(..), LMatchPat,
+        isVis, discardLInvisPats, ConLikeP,
 
         HsConPatDetails, hsConPatArgs,
         HsRecFields(..), HsFieldBind(..), LHsFieldBind,
@@ -214,6 +214,28 @@ data Pat p
 
 type family ConLikeP x
 
+data MatchPat pass
+  = VisPat (XVisPat pass) (LPat pass)
+  | InvisTyVarPat (XInvisTyVarPat pass) (LIdP pass)
+  -- this accepts only f @a, f @(a :: k) is in progress
+  | InvisWildTyPat (XInvisWildTyPat pass)
+  | XMatchPat !(XXMatchPat pass)
+
+type LMatchPat pass = XRec pass (MatchPat pass)
+
+isVis :: forall pass. UnXRec pass => LMatchPat pass -> Bool
+isVis pat =
+  case unXRec @pass pat of
+    VisPat _ _ -> True
+    _          -> False
+
+discardLInvisPats :: forall pass. UnXRec pass => [LMatchPat pass] -> [LPat pass]
+-- this is a temporary function that we remove for the final version
+discardLInvisPats [] = []
+discardLInvisPats (x : xs) =
+  case unXRec @pass x of
+    VisPat _ pat -> pat : discardLInvisPats xs
+    _            -> discardLInvisPats xs
 
 -- ---------------------------------------------------------------------
 

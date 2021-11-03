@@ -53,6 +53,7 @@ pprSumOrTuple boxity = \case
 -- | See Note [Ambiguous syntactic categories] and Note [PatBuilder]
 data PatBuilder p
   = PatBuilderPat (Pat p)
+  | PatBuilderInvisTyVar (MatchPat p)
   | PatBuilderPar (LHsToken "(" p) (LocatedA (PatBuilder p)) (LHsToken ")" p)
   | PatBuilderApp (LocatedA (PatBuilder p)) (LocatedA (PatBuilder p))
   | PatBuilderAppType (LocatedA (PatBuilder p)) (HsPatSigType GhcPs)
@@ -63,6 +64,9 @@ data PatBuilder p
 
 instance Outputable (PatBuilder GhcPs) where
   ppr (PatBuilderPat p) = ppr p
+  ppr (PatBuilderInvisTyVar (VisPat _ p)) = ppr p
+  ppr (PatBuilderInvisTyVar (InvisTyVarPat _ p)) = text "@" <> ppr p
+  ppr (PatBuilderInvisTyVar (InvisWildTyPat _)) = text "@_"
   ppr (PatBuilderPar _ (L _ p) _) = parens (ppr p)
   ppr (PatBuilderApp (L _ p1) (L _ p2)) = ppr p1 <+> ppr p2
   ppr (PatBuilderAppType (L _ p) t) = ppr p <+> text "@" <> ppr t

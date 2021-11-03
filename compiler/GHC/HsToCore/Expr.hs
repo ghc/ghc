@@ -722,7 +722,7 @@ dsExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = Left fields
                                          , cpt_wrap = req_wrap
                                          }
                                        }
-           ; return (mkSimpleMatch RecUpd [pat] wrapped_rhs) }
+           ; return (mkSimpleMatch RecUpd [mkVisMatchPat pat] wrapped_rhs) }
 
 {- Note [Scrutinee in Record updates]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -990,7 +990,7 @@ dsDo ctx stmts
         mfix_arg     = noLocA $ HsLam noExtField
                            (MG { mg_alts = noLocA [mkSimpleMatch
                                                     LambdaExpr
-                                                    [mfix_pat] body]
+                                                    [mkVisMatchPat mfix_pat] body]
                                , mg_ext = MatchGroupTc [unrestricted tup_ty] body_ty
                                , mg_origin = Generated })
         mfix_pat     = noLocA $ LazyPat noExtField $ mkBigLHsPatTupId rec_tup_pats
