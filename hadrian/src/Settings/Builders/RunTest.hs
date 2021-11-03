@@ -102,7 +102,8 @@ runTestBuilderArgs = builder Testsuite ? do
         asBool s b = s ++ show b
 
     -- TODO: set CABAL_MINIMAL_BUILD/CABAL_PLUGIN_BUILD
-    mconcat [ arg $ "testsuite/driver/runtests.py"
+    mconcat [ arg "-u" -- Don't buffer output
+            , arg $ "testsuite/driver/runtests.py"
             , pure [ "--rootdir=" ++ testdir | testdir <- rootdirs ]
             , arg "--top", arg (top -/- "testsuite")
             , arg "-e", arg $ "windows=" ++ show windowsHost
