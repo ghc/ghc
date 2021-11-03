@@ -730,6 +730,7 @@ instance Enum Word64 where
         | x <= fromIntegral (maxBound::Int)
                         = I# (word2Int# (word64ToWord# x#))
         | otherwise     = fromEnumError "Word64" x
+#if WORD_SIZE_IN_BITS < 64
     -- See Note [Stable Unfolding for list producers] in GHC.Enum
     {-# INLINE enumFrom #-}
     enumFrom            = integralEnumFrom
@@ -742,6 +743,24 @@ instance Enum Word64 where
     -- See Note [Stable Unfolding for list producers] in GHC.Enum
     {-# INLINE enumFromThenTo #-}
     enumFromThenTo      = integralEnumFromThenTo
+#else
+    -- use Word's Enum as it has better support for fusion. We can't use
+    -- `boundedEnumFrom` and `boundedEnumFromThen` -- which use Int's Enum
+    -- instance -- because Word64 isn't compatible with Int/Int64's domain.
+    --
+    -- See Note [Stable Unfolding for list producers] in GHC.Enum
+    {-# INLINE enumFrom #-}
+    enumFrom x          = map fromIntegral (enumFrom (fromIntegral x :: Word))
+    -- See Note [Stable Unfolding for list producers] in GHC.Enum
+    {-# INLINE enumFromThen #-}
+    enumFromThen x y    = map fromIntegral (enumFromThen (fromIntegral x :: Word) (fromIntegral y))
+    -- See Note [Stable Unfolding for list producers] in GHC.Enum
+    {-# INLINE enumFromTo #-}
+    enumFromTo x y      = map fromIntegral (enumFromTo (fromIntegral x :: Word) (fromIntegral y))
+    -- See Note [Stable Unfolding for list producers] in GHC.Enum
+    {-# INLINE enumFromThenTo #-}
+    enumFromThenTo x y z = map fromIntegral (enumFromThenTo (fromIntegral x :: Word) (fromIntegral y) (fromIntegral z))
+#endif
 
 -- | @since 2.01
 instance Integral Word64 where
