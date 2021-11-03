@@ -171,6 +171,7 @@ test('proposal-229f',
 
 test('T15730a', normal, compile_and_run, [''])
 test('T18130', normal, compile, [''])
+test('T18251d', normal, compile, [''])
 test('T18834a', normal, compile, [''])
 test('T18834b', normal, compile, [''])
 test('T12862', normal, compile, [''])
