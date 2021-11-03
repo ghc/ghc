@@ -2056,19 +2056,28 @@ setImplicationStatus implic@(Implic { ic_status     = status
 
       ; bad_telescope <- checkBadTelescope implic
 
-      ; let dead_givens | warnRedundantGivens info
-                        = filterOut (`elemVarSet` need_inner) givens
-                        | otherwise = []   -- None to report
+      ; let (used_givens, unused_givens)
+              | warnRedundantGivens info
+              = partition (`elemVarSet` need_inner) givens
+              | otherwise = (givens, [])   -- None to report
+
+            minimal_used_givens = mkMinimalBySCs evVarPred used_givens
+            is_minimal = (`elemVarSet` mkVarSet minimal_used_givens)
+
+            warn_givens
+              | not (null unused_givens) = unused_givens
+              | warnRedundantGivens info = filterOut is_minimal used_givens
+              | otherwise                = []
 
             discard_entire_implication  -- Can we discard the entire implication?
-              =  null dead_givens           -- No warning from this implication
+              =  null warn_givens           -- No warning from this implication
               && not bad_telescope
               && isEmptyWC pruned_wc        -- No live children
               && isEmptyVarSet need_outer   -- No needed vars to pass up to parent
 
             final_status
               | bad_telescope = IC_BadTelescope
-              | otherwise     = IC_Solved { ics_dead = dead_givens }
+              | otherwise     = IC_Solved { ics_dead = warn_givens }
             final_implic = implic { ic_status = final_status
                                   , ic_wanted = pruned_wc }
 
@@ -2299,7 +2308,10 @@ Note [Tracking redundant constraints]
 With Opt_WarnRedundantConstraints, GHC can report which
 constraints of a type signature (or instance declaration) are
 redundant, and can be omitted.  Here is an overview of how it
-works:
+works.
+
+This is all tested in typecheck/should_compile/T20602 (among
+others).
 
 ----- What is a redundant constraint?
 
@@ -2307,28 +2319,25 @@ works:
   constraints of an implication.
 
 * A constraint can be redundant in two different ways:
-  a) It is implied by other givens.  E.g.
-       f :: (Eq a, Ord a)     => blah   -- Eq a unnecessary
-       g :: (Eq a, a~b, Eq b) => blah   -- Either Eq a or Eq b unnecessary
-  b) It is not needed by the Wanted constraints covered by the
+  a) It is not needed by the Wanted constraints covered by the
      implication E.g.
        f :: Eq a => a -> Bool
        f x = True  -- Equality not used
+  b) It is implied by other givens.  E.g.
+       f :: (Eq a, Ord a)     => blah   -- Eq a unnecessary
+       g :: (Eq a, a~b, Eq b) => blah   -- Either Eq a or Eq b unnecessary
 
-*  To find (a), when we have two Given constraints,
-   we must be careful to drop the one that is a naked variable (if poss).
-   So if we have
-       f :: (Eq a, Ord a) => blah
-   then we may find [G] sc_sel (d1::Ord a) :: Eq a
-                    [G] d2 :: Eq a
-   We want to discard d2 in favour of the superclass selection from
-   the Ord dictionary.  This is done by GHC.Tc.Solver.Interact.solveOneFromTheOther
-   See Note [Replacement vs keeping].
+*  To find (a) we need to know which evidence bindings are 'wanted';
+   hence the eb_is_given field on an EvBind.
 
-* To find (b) we need to know which evidence bindings are 'wanted';
-  hence the eb_is_given field on an EvBind.
+*  To find (b), we use mkMinimalBySCs on the Givens to see if any
+   are unnecessary.
 
 ----- How tracking works
+
+* When two Givens are the same, we drop the evidence for the one
+  that requires more superclass selectors. This is done
+  according to Note [Replacement vs keeping] in GHC.Tc.Solver.Interact.
 
 * The ic_need fields of an Implic records in-scope (given) evidence
   variables bound by the context, that were needed to solve this
@@ -2343,8 +2352,14 @@ works:
 * We compute which evidence variables are needed by an implication
   in setImplicationStatus.  A variable is needed if
     a) it is free in the RHS of a Wanted EvBind,
-    b) it is free in the RHS of an EvBind whose LHS is needed,
+    b) it is free in the RHS of an EvBind whose LHS is needed, or
     c) it is in the ics_need of a nested implication.
+
+* After computing which variables are needed, we then look at the
+  remaining variables for internal redundancies. This is case (b)
+  from above. This is also done in setImplicationStatus.
+  Note that we only look for case (b) if case (a) shows up empty,
+  as exemplified below.
 
 * We need to be careful not to discard an implication
   prematurely, even one that is fully solved, because we might
@@ -2353,6 +2368,32 @@ works:
   its free vars have been incorporated into its parent; or if it
   simply has no free vars. This careful discarding is also
   handled in setImplicationStatus.
+
+* Examples:
+
+    f, g, h :: (Eq a, Ord a) => a -> Bool
+    f x = x == x
+    g x = x > x
+    h x = x == x && x > x
+
+    All three will discover that they have two [G] Eq a constraints:
+    one as given and one extracted from the Ord a constraint. They will
+    both discard the latter, as noted above and in
+    Note [Replacement vs keeping] in GHC.Tc.Solver.Interact.
+
+    The body of f uses the [G] Eq a, but not the [G] Ord a. It will
+    report a redundant Ord a using the logic for case (a).
+
+    The body of g uses the [G] Ord a, but not the [G] Eq a. It will
+    report a redundant Eq a using the logic for case (a).
+
+    The body of h uses both [G] Ord a and [G] Eq a. Case (a) will
+    thus come up with nothing redundant. But then, the case (b)
+    check will discover that Eq a is redundant and report this.
+
+    If we did case (b) even when case (a) reports something, then
+    we would report both constraints as redundant for f, which is
+    terrible.
 
 ----- Reporting redundant constraints
 
@@ -2384,13 +2425,18 @@ works:
 
 ----- Shortcomings
 
-Consider (see #9939)
-    f2 :: (Eq a, Ord a) => a -> a -> Bool
-    -- Ord a redundant, but Eq a is reported
-    f2 x y = (x == y)
+Consider
 
-We report (Eq a) as redundant, whereas actually (Ord a) is.  But it's
-really not easy to detect that!
+  j :: (Eq a, a ~ b) => a -> Bool
+  j x = x == x
+
+  k :: (Eq a, b ~ a) => a -> Bool
+  k x = x == x
+
+Currently (Nov 2021), j issues no warning, while k says that b ~ a
+is redundant. This is because j uses the a ~ b constraint to rewrite
+everything to be in terms of b, while k does none of that. This is
+ridiculous, but I (Richard E) don't see a good fix.
 
 -}
 

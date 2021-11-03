@@ -191,11 +191,21 @@ data SkolemInfo
                         -- the type is the instance we are trying to derive
 
   | InstSkol            -- Bound at an instance decl
-  | InstSC TypeSize     -- A "given" constraint obtained by superclass selection.
-                        -- If (C ty1 .. tyn) is the largest class from
+
+  -- | A "given" constraint obtained by superclass selection.
+  | InstSC Int          -- ^ The number of superclass selections necessary to
+                        -- get this constraint; see Note [Replacement vs keeping] in
+                        -- GHC.Tc.Solver.Interact
+           TypeSize     -- ^ If @(C ty1 .. tyn)@ is the largest class from
                         --    which we made a superclass selection in the chain,
-                        --    then TypeSize = sizeTypes [ty1, .., tyn]
+                        --    then @TypeSize = sizeTypes [ty1, .., tyn]@
                         -- See Note [Solving superclass constraints] in GHC.Tc.TyCl.Instance
+
+  -- | A "given" constraint obtained by superclass selection, but not from an instance context.
+  -- Needed for Note [Replacement vs keeping] in GHC.Tc.Solver.Interact.
+  | OtherSC Int    -- ^ The number of superclass selections necessary to
+                   -- get this constraint
+            SkolemInfo   -- ^ Where the sub-class constraint arose from
 
   | FamInstSkol         -- Bound at a family instance decl
   | PatSkol             -- An existential type variable bound by a pattern for
@@ -248,7 +258,8 @@ pprSkolInfo (IPSkol ips)      = text "the implicit-parameter binding" <> plural 
                                  <+> pprWithCommas ppr ips
 pprSkolInfo (DerivSkol pred)  = text "the deriving clause for" <+> quotes (ppr pred)
 pprSkolInfo InstSkol          = text "the instance declaration"
-pprSkolInfo (InstSC n)        = text "the instance declaration" <> whenPprDebug (parens (ppr n))
+pprSkolInfo (InstSC _ n)      = text "the instance declaration" <> whenPprDebug (parens (ppr n))
+pprSkolInfo (OtherSC _ si)    = pprSkolInfo si  -- superclass constraints don't bind skolems
 pprSkolInfo FamInstSkol       = text "a family instance declaration"
 pprSkolInfo BracketSkol       = text "a Template Haskell bracket"
 pprSkolInfo (RuleSkol name)   = text "the RULE" <+> pprRuleName name

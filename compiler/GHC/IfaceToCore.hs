@@ -1743,7 +1743,7 @@ tcPragExpr is_compulsory toplvl name expr
     core_expr' <- tcIfaceExpr expr
 
     -- Check for type consistency in the unfolding
-    -- See Note [Linting Unfoldings from Interfaces]
+    -- See Note [Linting Unfoldings from Interfaces] in GHC.Core.Lint
     when (isTopLevel toplvl) $
       whenGOptM Opt_DoCoreLinting $ do
         in_scope <- get_in_scope

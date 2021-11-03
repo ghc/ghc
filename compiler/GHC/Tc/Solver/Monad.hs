@@ -2607,7 +2607,7 @@ mightEqualLater inert_set given_pred given_loc wanted_pred wanted_loc
 prohibitedSuperClassSolve :: CtLoc -> CtLoc -> Bool
 -- See Note [Solving superclass constraints] in GHC.Tc.TyCl.Instance
 prohibitedSuperClassSolve from_loc solve_loc
-  | GivenOrigin (InstSC given_size) <- ctLocOrigin from_loc
+  | GivenOrigin (InstSC _ given_size) <- ctLocOrigin from_loc
   , ScOrigin wanted_size <- ctLocOrigin solve_loc
   = given_size >= wanted_size
   | otherwise
