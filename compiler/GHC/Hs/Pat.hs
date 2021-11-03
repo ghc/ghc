@@ -77,6 +77,7 @@ import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Utils.Outputable
+import GHC.Utils.Panic (panic)
 import GHC.Core.Type
 import GHC.Types.SrcLoc
 import GHC.Data.Bag -- collect ev vars from pats
@@ -318,6 +319,9 @@ instance OutputableBndrId p => Outputable (MatchPat (GhcPass p)) where
 
 pprLPat :: (OutputableBndrId p) => LPat (GhcPass p) -> SDoc
 pprLPat (L _ e) = pprPat e
+
+pprLMatchPat :: (OutputableBndrId p) => LMatchPat (GhcPass p) -> SDoc
+pprLMatchPat (L _ e) = ppr e
 
 -- | Print with type info if -dppr-debug is on
 pprPatBndr :: OutputableBndr name => name -> SDoc
