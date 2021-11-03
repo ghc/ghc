@@ -7,7 +7,8 @@ module GHC.Hs.Syn.Type (
     -- * Extracting types from HsExpr
     lhsExprType, hsExprType, hsWrapperType,
     -- * Extracting types from HsSyn
-    hsLitType, hsPatType, hsLPatType
+    hsLitType, hsPatType, hsLPatType,
+    hsLMatchPatType, hsMatchPatType
 
   ) where
 
@@ -37,6 +38,14 @@ import GHC.Utils.Panic
 ************************************************************************
 
 -}
+
+hsLMatchPatType :: LMatchPat GhcTc -> Type
+hsLMatchPatType (L _ pat) = hsMatchPatType pat
+
+hsMatchPatType :: MatchPat GhcTc -> Type
+hsMatchPatType (VisPat _ pat) = hsLPatType pat
+hsMatchPatType (InvisTyVarPat _ var) = idType (unLoc var)
+hsMatchPatType (InvisWildTyPat ty) = ty
 
 hsLPatType :: LPat GhcTc -> Type
 hsLPatType (L _ p) = hsPatType p
