@@ -175,11 +175,13 @@ type instance XHsFieldBind _ = EpAnn [AddEpAnn]
 
 type instance XVisPat (GhcPass _) = NoExtField
 
-type instance XInvisTyVarPat (GhcPass _) = NoExtField
+type instance XInvisTyVarPat GhcPs = NoExtField
+type instance XInvisTyVarPat GhcRn = NoExtField
+type instance XInvisTyVarPat GhcTc = DataConCantHappen
 
 type instance XInvisWildTyPat GhcPs = NoExtField
 type instance XInvisWildTyPat GhcRn = NoExtField
-type instance XInvisWildTyPat GhcTc = Type
+type instance XInvisWildTyPat GhcTc = DataConCantHappen
 
 type instance XXMatchPat (GhcPass _) = DataConCantHappen
 
