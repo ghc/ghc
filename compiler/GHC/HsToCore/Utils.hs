@@ -40,6 +40,7 @@ module GHC.HsToCore.Utils (
         mkSelectorBinds,
 
         selectSimpleMatchVarL, selectMatchVars, selectMatchVar,
+        selectMatchPatVars, selectMatchPatVar,
         mkOptTickBox, mkBinaryTickBox, decideBangHood,
         isTrueLHsExpr
     ) where
@@ -145,6 +146,14 @@ selectMatchVar _w (VarPat _ var)    = return (localiseId (unLoc var))
                                   -- variable, so we ignore the multiplicity.
 selectMatchVar _w (AsPat _ var _ _) = assert (isManyDataConTy _w ) (return (unLoc var))
 selectMatchVar w other_pat        = newSysLocalDs w (hsPatType other_pat)
+
+selectMatchPatVar :: Mult -> MatchPat GhcTc -> DsM Id
+selectMatchPatVar w (VisPat _ (L _ pat))  = selectMatchVar w pat
+selectMatchPatVar _ (InvisTyVarPat _ var) = return (unLoc var)
+selectMatchPatVar _ (InvisWildTyPat ty)   = newPredVarDs ty
+
+selectMatchPatVars :: [(Mult, MatchPat GhcTc)] -> DsM [Id]
+selectMatchPatVars ps = mapM (uncurry selectMatchPatVar) ps
 
 {- Note [Localise pattern binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

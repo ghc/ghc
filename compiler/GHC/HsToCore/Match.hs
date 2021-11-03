@@ -772,7 +772,7 @@ matchWrapper ctxt scrs (MG { mg_alts = L _ matches
         ; new_vars    <- case matches of
                            []    -> newSysLocalsDs' arg_tys
                            (m:_) ->
-                            selectMatchVars (zipWithEqual "matchWrapper"
+                            selectMatchPatVars (zipWithEqual "matchWrapper"
                                               (\a b -> (scaledMult a, unLoc b))
                                                 (map tyCoBinderScaledType arg_tys)
                                                 (expectVisPats (hsLMatchPats m)))
