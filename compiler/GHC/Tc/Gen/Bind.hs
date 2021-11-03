@@ -645,10 +645,10 @@ tcPolyCheck prag_fn
        ; mod <- getModule
        ; tick <- funBindTicks (locA nm_loc) poly_id mod prag_sigs
 
-       ; let bind' = FunBind { fun_id      = L nm_loc poly_id2
-                             , fun_matches = matches'
-                             , fun_ext     = wrap_gen <.> wrap_res
-                             , fun_tick    = tick }
+       ; let bind' = FunBind { fun_id       = L nm_loc poly_id2
+                             , fun_matches  = matches'
+                             , fun_ext      = wrap_gen <.> wrap_res
+                             , fun_tick     = tick }
 
              export = ABE { abe_ext   = noExtField
                           , abe_wrap  = idHsWrapper
@@ -1507,7 +1507,7 @@ getMonoBindInfo :: [LocatedA TcMonoBind] -> [MonoBindInfo]
 getMonoBindInfo tc_binds
   = foldr (get_info . unLoc) [] tc_binds
   where
-    get_info (TcFunBind info _ _)    rest = info : rest
+    get_info (TcFunBind info _ _)  rest = info : rest
     get_info (TcPatBind infos _ _ _) rest = infos ++ rest
 
 

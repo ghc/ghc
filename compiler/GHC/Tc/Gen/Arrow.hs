@@ -269,18 +269,18 @@ tc_cmd env
        (cmd_stk, res_ty)
   = addErrCtxt (pprMatchInCtxt match)        $
     do  { (co, arg_tys, cmd_stk') <- matchExpectedCmdArgs n_pats cmd_stk
+        ; arg_tys' <- sequenceA (map (readExpType . mkCheckExpType) arg_tys)
 
                 -- Check the patterns, and the GRHSs inside
-        ; (pats', grhss') <- setSrcSpanA mtch_loc                                 $
-                             tcPats (ArrowMatchCtxt KappaExpr)
-                               pats (map (unrestricted . mkCheckExpType) arg_tys) $
+        ; (pats', grhss') <- setSrcSpanA mtch_loc $
+                             tcLMatchPats (ArrowMatchCtxt KappaExpr) pats (unrestricted <$> arg_tys') $
                              tc_grhss grhss cmd_stk' (mkCheckExpType res_ty)
 
         ; let match' = L mtch_loc (Match { m_ext = noAnn
                                          , m_ctxt = ArrowMatchCtxt KappaExpr
                                          , m_pats = pats'
                                          , m_grhss = grhss' })
-              arg_tys = map (unrestricted . hsLPatType) pats'
+              arg_tys = map (unrestricted . hsLMatchPatType) pats'
 
         ; _concrete_evs <-
               zipWithM

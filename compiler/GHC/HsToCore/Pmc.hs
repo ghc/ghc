@@ -34,7 +34,7 @@
 --     'ldiMatch'. See Section 4.1 of the paper.
 module GHC.HsToCore.Pmc (
         -- Checking and printing
-        pmcPatBind, pmcMatches, pmcGRHSs,
+        pmcPatBind, pmcMatchPatBind, pmcMatches, pmcGRHSs,
         isMatchContextPmChecked,
 
         -- See Note [Long-distance information]
@@ -107,6 +107,17 @@ pmcPatBind ctxt@(DsMatchContext PatBindRhs loc) var p = do
   tracePm "}: " (ppr (cr_uncov result))
   formatReportWarnings cirbsPatBind ctxt [var] result
 pmcPatBind _ _ _ = pure ()
+
+pmcMatchPatBind :: DsMatchContext -> Id -> MatchPat GhcTc -> DsM ()
+-- See Note [pmcPatBind only checks PatBindRhs]
+pmcMatchPatBind ctxt@(DsMatchContext PatBindRhs loc) var p = do
+  !missing <- getLdiNablas
+  pat_bind <- noCheckDs $ desugarMatchPatBind loc var p
+  tracePm "pmcPatBind {" (vcat [ppr ctxt, ppr var, ppr p, ppr pat_bind, ppr missing])
+  result <- unCA (checkPatBind pat_bind) missing
+  tracePm "}: " (ppr (cr_uncov result))
+  formatReportWarnings cirbsPatBind ctxt [var] result
+pmcMatchPatBind _ _ _ = pure ()
 
 -- | Exhaustive for guard matches, is used for guards in pattern bindings and
 -- in @MultiIf@ expressions. Returns the 'Nablas' covered by the RHSs.

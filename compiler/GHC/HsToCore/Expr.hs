@@ -207,11 +207,11 @@ dsUnliftedBind (PatBind {pat_lhs = pat, pat_rhs = grhss
         -- ==> case rhs of C x# y# -> body
     do { match_nablas <- pmcGRHSs PatBindGuards grhss
        ; rhs          <- dsGuarded grhss ty match_nablas
-       ; let upat = unLoc pat
+       ; let upat = VisPat noExtField pat
              eqn = EqnInfo { eqn_pats = [upat],
                              eqn_orig = FromSource,
                              eqn_rhs = cantFailMatchResult body }
-       ; var    <- selectMatchVar Many upat
+       ; var    <- selectMatchPatVar Many upat
                     -- `var` will end up in a let binder, so the multiplicity
                     -- doesn't matter.
        ; result <- matchEquations PatBindRhs [var] [eqn] (exprType body)
@@ -722,7 +722,7 @@ dsExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = Left fields
                                          , cpt_wrap = req_wrap
                                          }
                                        }
-           ; return (mkSimpleMatch RecUpd [pat] wrapped_rhs) }
+           ; return (mkSimpleMatch RecUpd [mkVisPat pat] wrapped_rhs) }
 
 {- Note [Scrutinee in Record updates]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -927,7 +927,7 @@ dsDo ctx stmts
       = do  { body     <- goL stmts
             ; rhs'     <- dsLExpr rhs
             ; var   <- selectSimpleMatchVarL (xbstc_boundResultMult xbs) pat
-            ; match <- matchSinglePatVar var Nothing (StmtCtxt (HsDoStmt ctx)) pat
+            ; match <- matchSinglePatVar var Nothing (StmtCtxt (HsDoStmt ctx)) (mkVisPat pat)
                          (xbstc_boundResultType xbs) (cantFailMatchResult body)
             ; match_code <- dsHandleMonadicFailure ctx pat match (xbstc_failOp xbs)
             ; dsSyntaxExpr (xbstc_bindOp xbs) [rhs', Lam var match_code] }
@@ -948,7 +948,7 @@ dsDo ctx stmts
 
            ; let match_args (pat, fail_op) (vs,body)
                    = do { var   <- selectSimpleMatchVarL Many pat
-                        ; match <- matchSinglePatVar var Nothing (StmtCtxt (HsDoStmt ctx)) pat
+                        ; match <- matchSinglePatVar var Nothing (StmtCtxt (HsDoStmt ctx)) (mkVisPat pat)
                                    body_ty (cantFailMatchResult body)
                         ; match_code <- dsHandleMonadicFailure ctx pat match fail_op
                         ; return (var:vs, match_code)
@@ -990,7 +990,7 @@ dsDo ctx stmts
         mfix_arg     = noLocA $ HsLam noExtField
                            (MG { mg_alts = noLocA [mkSimpleMatch
                                                     LambdaExpr
-                                                    [mfix_pat] body]
+                                                    [mkVisPat mfix_pat] body]
                                , mg_ext = MatchGroupTc [unrestricted tup_ty] body_ty
                                , mg_origin = Generated })
         mfix_pat     = noLocA $ LazyPat noExtField $ mkBigLHsPatTupId rec_tup_pats

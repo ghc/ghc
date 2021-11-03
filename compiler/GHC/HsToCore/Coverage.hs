@@ -667,7 +667,7 @@ addTickMatch :: Bool -> Bool -> Match GhcTc (LHsExpr GhcTc)
              -> TM (Match GhcTc (LHsExpr GhcTc))
 addTickMatch isOneOfMany isLambda match@(Match { m_pats = pats
                                                , m_grhss = gRHSs }) =
-  bindLocals (collectPatsBinders CollNoDictBinders pats) $ do
+  bindLocals (collectLMatchPatsBinders CollNoDictBinders pats) $ do
     gRHSs' <- addTickGRHSs isOneOfMany isLambda gRHSs
     return $ match { m_grhss = gRHSs' }
 
@@ -922,7 +922,7 @@ addTickCmdMatchGroup mg@(MG { mg_alts = (L l matches) }) = do
 
 addTickCmdMatch :: Match GhcTc (LHsCmd GhcTc) -> TM (Match GhcTc (LHsCmd GhcTc))
 addTickCmdMatch match@(Match { m_pats = pats, m_grhss = gRHSs }) =
-  bindLocals (collectPatsBinders CollNoDictBinders pats) $ do
+  bindLocals (collectLMatchPatsBinders CollNoDictBinders pats) $ do
     gRHSs' <- addTickCmdGRHSs gRHSs
     return $ match { m_grhss = gRHSs' }
 

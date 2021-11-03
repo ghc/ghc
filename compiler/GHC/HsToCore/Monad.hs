@@ -126,7 +126,7 @@ instance Outputable DsMatchContext where
   ppr (DsMatchContext hs_match ss) = ppr ss <+> pprMatchContext hs_match
 
 data EquationInfo
-  = EqnInfo { eqn_pats :: [Pat GhcTc]
+  = EqnInfo { eqn_pats :: [MatchPat GhcTc]
               -- ^ The patterns for an equation
               --
               -- NB: We have /already/ applied 'decideBangHood' to

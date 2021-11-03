@@ -45,7 +45,6 @@ import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Ppr( debugPprType )
 import GHC.Tc.Utils.Concrete ( mkWpFun )
 import GHC.Tc.Utils.Env
-import GHC.Tc.Utils.Instantiate
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.TcType
@@ -59,9 +58,11 @@ import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Origin
 import GHC.Types.Name( isSystemName )
-
+import GHC.Types.Id
+import GHC.Tc.Utils.Instantiate
 import GHC.Core.TyCon
 import GHC.Builtin.Types
+import GHC.Types.SrcLoc
 import GHC.Types.Var as Var
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
@@ -75,9 +76,9 @@ import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 
 import GHC.Exts      ( inline )
-import Control.Monad
 import Control.Arrow ( second )
 import qualified Data.Semigroup as S ( (<>) )
+import GHC.Data.FastString
 
 {- *********************************************************************
 *                                                                      *
@@ -287,49 +288,52 @@ passed in.
 matchExpectedFunTys :: forall a.
                        SDoc   -- See Note [Herald for matchExpectedFunTys]
                     -> UserTypeCtxt
-                    -> Arity
-                    -> ExpRhoType      -- Skolemised
-                    -> ([Scaled ExpSigmaType] -> ExpRhoType -> TcM a)
+                    -> [LMatchPat GhcRn]
+                    -> ExpSigmaType
+                    -> ([Var] -> ExpSigmaType -> TcM a)
                     -> TcM (HsWrapper, a)
 -- If    matchExpectedFunTys n ty = (_, wrap)
 -- then  wrap : (t1 -> ... -> tn -> ty_r) ~> ty,
 --   where [t1, ..., tn], ty_r are passed to the thing_inside
-matchExpectedFunTys herald ctx arity orig_ty thing_inside
+matchExpectedFunTys herald ctx lmatchpats orig_ty thing_inside
   = case orig_ty of
-      Check ty -> go [] arity ty
-      _        -> defer [] arity orig_ty
+      Check ty -> go [] lmatchpats ty
+      _        -> defer [] lmatchpats orig_ty
   where
-    -- Skolemise any foralls /before/ the zero-arg case
-    -- so that we guarantee to return a rho-type
-    go acc_arg_tys n ty
+    go vars pats ty
       | (tvs, theta, _) <- tcSplitSigmaTy ty
       , not (null tvs && null theta)
       = do { (wrap_gen, (wrap_res, result)) <- tcSkolemise ctx ty $ \ty' ->
-                                               go acc_arg_tys n ty'
+                                               go vars pats ty'
+           ; return (wrap_gen <.> wrap_res, result) }
+
+    go vars (L _ (InvisTyVarPat _ (L _ _)): pats) (ForAllTy (Bndr var _) ty')
+      = do { (wrap_res, result) <- go (var : vars) pats ty'
+           ; let wrap_gen = WpTyLam var
            ; return (wrap_gen <.> wrap_res, result) }
 
     -- No more args; do this /before/ tcView, so
     -- that we do not unnecessarily unwrap synonyms
-    go acc_arg_tys 0 rho_ty
-      = do { result <- thing_inside (reverse acc_arg_tys) (mkCheckExpType rho_ty)
+    go vars [] ty
+      = do { result <- thing_inside (reverse vars) (mkCheckExpType ty)
            ; return (idHsWrapper, result) }
 
-    go acc_arg_tys n ty
-      | Just ty' <- tcView ty = go acc_arg_tys n ty'
+    go vars pats ty
+      | Just ty' <- tcView ty = go vars pats ty'
 
-    go acc_arg_tys n (FunTy { ft_mult = mult, ft_af = af, ft_arg = arg_ty, ft_res = res_ty })
-      = assert (af == VisArg) $
-        do { (wrap_res, result) <- go ((Scaled mult $ mkCheckExpType arg_ty) : acc_arg_tys)
-                                      (n-1) res_ty
+    go vars (L _ (VisPat _ _):pats) (FunTy { ft_mult = mult, ft_af = VisArg, ft_arg = arg_ty, ft_res = res_ty })
+      = do { name <- newMetaTyVarName (fsLit "arg")
+           ; let var = mkLocalId name mult arg_ty
+           ; (wrap_res, result) <- go (var : vars) pats res_ty
            ; fun_wrap <- mkWpFun idHsWrapper wrap_res (Scaled mult arg_ty) res_ty (WpFunFunExpTy orig_ty)
            ; return ( fun_wrap, result ) }
 
-    go acc_arg_tys n ty@(TyVarTy tv)
+    go vars pats ty@(TyVarTy tv)
       | isMetaTyVar tv
       = do { cts <- readMetaTyVar tv
            ; case cts of
-               Indirect ty' -> go acc_arg_tys n ty'
-               Flexi        -> defer acc_arg_tys n (mkCheckExpType ty) }
+               Indirect ty' -> go vars pats ty'
+               Flexi        -> defer vars pats (mkCheckExpType ty) }
 
        -- In all other cases we bale out into ordinary unification
        -- However unlike the meta-tyvar case, we are sure that the
@@ -346,30 +350,78 @@ matchExpectedFunTys herald ctx arity orig_ty thing_inside
        --
        -- But in that case we add specialized type into error context
        -- anyway, because it may be useful. See also #9605.
-    go acc_arg_tys n ty = addErrCtxtM (mk_ctxt acc_arg_tys ty) $
-                          defer acc_arg_tys n (mkCheckExpType ty)
+    go acc_arg_tys vars ty = addErrCtxtM (mk_ctxt acc_arg_tys ty) $
+                          defer acc_arg_tys vars (mkCheckExpType ty)
 
     ------------
-    defer :: [Scaled ExpSigmaType] -> Arity -> ExpRhoType -> TcM (HsWrapper, a)
-    defer acc_arg_tys n fun_ty
-      = do { more_arg_tys <- replicateM n (mkScaled <$> newFlexiTyVarTy multiplicityTy <*> newInferExpType)
-           ; res_ty       <- newInferExpType
-           ; result       <- thing_inside (reverse acc_arg_tys ++ more_arg_tys) res_ty
-           ; more_arg_tys <- mapM (\(Scaled m t) -> Scaled m <$> readExpType t) more_arg_tys
-           ; res_ty       <- readExpType res_ty
-           ; let unif_fun_ty = mkVisFunTys more_arg_tys res_ty
+
+    defer :: [Var] -> [LMatchPat GhcRn] -> ExpSigmaType -> TcM (HsWrapper, a)
+    defer vars pats fun_ty
+      = do { arg_binds     <- sequenceA (lmatch_pats_to_bndrs <$> pats)
+           ; res_ty        <- newInferExpType
+           ; more_vars     <- sequenceA (lampat_to_var <$> pats)
+           ; result        <- thing_inside (reverse vars ++ more_vars) res_ty
+           ; res_ty        <- expTypeToType res_ty
+           ; let unif_fun_ty = mkPiTys arg_binds res_ty
            ; wrap <- tcSubType AppOrigin ctx unif_fun_ty fun_ty
                          -- Not a good origin at all :-(
            ; return (wrap, result) }
 
+    lampat_to_var (L _ (VisPat _ _))   =
+      do { name <- newMetaTyVarName (fsLit "arg")
+         ; ty <- newInferExpType >>= expTypeToType
+         ; return $ mkLocalId name Many ty
+         }
+    lampat_to_var _ = newOpenFlexiTyVar
+
     ------------
-    mk_ctxt :: [Scaled ExpSigmaType] -> TcType -> TidyEnv -> TcM (TidyEnv, SDoc)
-    mk_ctxt arg_tys res_ty env
-      = mkFunTysMsg env herald arg_tys' res_ty arity
-      where
-        arg_tys' = map (\(Scaled u v) -> Scaled u (checkingExpType "matchExpectedFunTys" v)) $
-                   reverse arg_tys
+    mk_ctxt :: [Var] -> TcType -> TidyEnv -> TcM (TidyEnv, SDoc)
+    mk_ctxt vars res_ty env
+      = mkPiTysMsg env herald vars res_ty lmatchpats
             -- this is safe b/c we're called from "go"
+
+    lmatch_pats_to_bndrs :: LMatchPat GhcRn -> TcM TyCoBinder
+    lmatch_pats_to_bndrs (L _ (VisPat _ _))
+      = do { fresh <- newInferExpType
+           ; ty'  <- mkScaled <$> newFlexiTyVarTy multiplicityTy <*> (expTypeToType fresh)
+           ; return $ Anon VisArg ty' }
+    lmatch_pats_to_bndrs (L _ (InvisTyVarPat _ _))
+      = do { var <- newOpenFlexiTyVar
+           ; return $ Named (Bndr var Specified) }
+    lmatch_pats_to_bndrs (L _ (InvisWildTyPat _))
+      = do { var <- newOpenFlexiTyVar
+           ; return $ Named (Bndr var Inferred) }
+
+mkPiTysMsg :: TidyEnv -> SDoc -> [Var] -> TcType -> [LMatchPat GhcRn]
+           -> TcM (TidyEnv, SDoc)
+mkPiTysMsg env herald vars res_ty lmatchpats
+  = do { let arg_binds = to_arg_bind <$> (zip vars lmatchpats)
+       ; let fun = mkPiTys arg_binds res_ty
+       ; (env', fun_ty) <- zonkTidyTcType env fun
+       ; let (all_arg_tys, _) = splitFunTys fun_ty
+             n_fun_args = length all_arg_tys
+             all_lpats  = length (toLPats lmatchpats)
+
+             (all_forall_args, _) = splitForAllTyVars fun_ty
+             n_forall_args = length all_forall_args
+             all_invis_pats = length (toInvisPats lmatchpats)
+
+             full_herald = herald <+> speakNOf all_lpats (text "value argument")
+
+             msg | all_invis_pats <= n_forall_args && all_lpats <= n_fun_args  -- Enough args, in the end
+                 = text "In the result of a function call"
+                 | otherwise
+                 = hang (full_herald <> comma)
+                      2 (sep [ text "but its type" <+> quotes (pprType fun_ty)
+                             , if n_fun_args == 0 then text "has none"
+                               else text "has only" <+> speakN n_fun_args])
+
+       ; return (env', msg) }
+  where
+    to_arg_bind :: (Var, LMatchPat GhcRn) -> TyCoBinder
+    to_arg_bind (var, (L _ (VisPat _ _))) = Anon VisArg (Scaled (varMult var) (varType var))
+    to_arg_bind (var, (L _ (InvisTyVarPat _ _))) = Named (Bndr var Specified)
+    to_arg_bind (var, (L _ (InvisWildTyPat _)))  = Named (Bndr var Inferred)
 
 mkFunTysMsg :: TidyEnv -> SDoc -> [Scaled TcType] -> TcType -> Arity
             -> TcM (TidyEnv, SDoc)

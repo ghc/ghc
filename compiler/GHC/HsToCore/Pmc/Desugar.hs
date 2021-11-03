@@ -11,7 +11,7 @@
 -- In terms of the paper, this module is concerned with Sections 3.1, Figure 4,
 -- in particular.
 module GHC.HsToCore.Pmc.Desugar (
-      desugarPatBind, desugarGRHSs, desugarMatches, desugarEmptyCase
+      desugarPatBind, desugarMatchPatBind, desugarGRHSs, desugarMatches, desugarEmptyCase
     ) where
 
 import GHC.Prelude
@@ -254,6 +254,15 @@ desugarPatV pat = do
 desugarLPat :: Id -> LPat GhcTc -> DsM [PmGrd]
 desugarLPat x = desugarPat x . unLoc
 
+desugarMatchPat :: Id -> MatchPat GhcTc -> DsM [PmGrd]
+desugarMatchPat x (VisPat _ pat) = desugarLPat x pat
+desugarMatchPat x (InvisTyVarPat _ (L _ lidp)) =
+  return $ mkPmLetVar x lidp
+desugarMatchPat _ (InvisWildTyPat _) = pure []
+
+desugarLMatchPat :: Id -> LMatchPat GhcTc -> DsM [PmGrd]
+desugarLMatchPat id lmatchpat = desugarMatchPat id (unLoc lmatchpat)
+
 -- | 'desugarLPat', but also select and return a new match var.
 desugarLPatV :: LPat GhcTc -> DsM (Id, [PmGrd])
 desugarLPatV = desugarPatV . unLoc
@@ -320,6 +329,11 @@ desugarPatBind :: SrcSpan -> Id -> Pat GhcTc -> DsM (PmPatBind Pre)
 desugarPatBind loc var pat =
   PmPatBind . flip PmGRHS (SrcInfo (L loc (ppr pat))) . GrdVec <$> desugarPat var pat
 
+desugarMatchPatBind :: SrcSpan -> Id -> MatchPat GhcTc -> DsM (PmPatBind Pre)
+  -- See 'GrdPatBind' for how this simply repurposes GrdGRHS.
+desugarMatchPatBind loc var pat =
+  PmPatBind . flip PmGRHS (SrcInfo (L loc (ppr pat))) . GrdVec <$> desugarMatchPat var pat
+
 desugarEmptyCase :: Id -> DsM PmEmptyCase
 desugarEmptyCase var = pure PmEmptyCase { pe_var = var }
 
@@ -332,7 +346,7 @@ desugarMatches vars matches =
 -- Desugar a single match
 desugarMatch :: [Id] -> LMatch GhcTc (LHsExpr GhcTc) -> DsM (PmMatch Pre)
 desugarMatch vars (L match_loc (Match { m_pats = pats, m_grhss = grhss })) = do
-  pats'  <- concat <$> zipWithM desugarLPat vars pats
+  pats'  <- concat <$> zipWithM desugarLMatchPat vars pats
   grhss' <- desugarGRHSs (locA match_loc) (sep (map ppr pats)) grhss
   -- tracePm "desugarMatch" (vcat [ppr pats, ppr pats', ppr grhss'])
   return PmMatch { pm_pats = GrdVec pats', pm_grhss = grhss' }
