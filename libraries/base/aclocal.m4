@@ -154,7 +154,7 @@ AC_DEFUN([FPTOOLS_CHECK_HTYPE_ELSE],[
 
             if test "$HTYPE_IS_POINTER" = yes
             then
-                AC_CV_NAME="Ptr ()"
+                AC_CV_NAME="CUIntPtr"
             else
                 FP_COMPUTE_INT([HTYPE_IS_FLOAT],[sizeof($1) == sizeof(float)],
                                [FPTOOLS_HTYPE_INCLUDES],
