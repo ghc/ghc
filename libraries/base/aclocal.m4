@@ -141,13 +141,13 @@ AC_DEFUN([FPTOOLS_CHECK_HTYPE_ELSE],[
         if test "$HTYPE_IS_INTEGRAL" -eq 0
         then
             dnl If the C type isn't an integer, we check if it's a pointer type
-            dnl by trying to dereference one of its values. If that fails to
+            dnl by trying to call memset() on it. If that fails to
             dnl compile, it's not a pointer, so we check to see if it's a
             dnl floating-point type.
             AC_COMPILE_IFELSE(
                 [AC_LANG_PROGRAM(
                     [FPTOOLS_HTYPE_INCLUDES],
-                    [$1 val; *val;]
+                    [$1 val; memset(val, 0, 0);]
                 )],
                 [HTYPE_IS_POINTER=yes],
                 [HTYPE_IS_POINTER=no])
