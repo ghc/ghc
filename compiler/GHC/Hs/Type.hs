@@ -79,7 +79,7 @@ module GHC.Hs.Type (
         mkHsOpTy, mkHsAppTy, mkHsAppTys, mkHsAppKindTy,
         ignoreParens, hsSigWcType, hsPatSigType,
         hsTyKindSig,
-        setHsTyVarBndrFlag, hsTyVarBndrFlag,
+        setHsTyVarBndrFlag, hsTyVarBndrFlag, hsTyVarBndrId,
 
         -- Printing
         pprHsType, pprHsForAll,
@@ -115,6 +115,7 @@ import GHC.Types.Basic
 import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
 import GHC.Utils.Misc (count)
+import GHC.Utils.Panic (panic)
 
 import Data.Maybe
 import Data.Data (Data)
@@ -283,6 +284,12 @@ type instance XXTyVarBndr   (GhcPass _) = DataConCantHappen
 hsTyVarBndrFlag :: HsTyVarBndr flag (GhcPass pass) -> flag
 hsTyVarBndrFlag (UserTyVar _ fl _)     = fl
 hsTyVarBndrFlag (KindedTyVar _ fl _ _) = fl
+
+-- | Return the attached lidp
+hsTyVarBndrId :: HsTyVarBndr flag pass -> LIdP pass
+hsTyVarBndrId (UserTyVar _ _ lipd)     = lipd
+hsTyVarBndrId (KindedTyVar _ _ lipd _) = lipd
+hsTyVarBndrId _                        = panic "hsTyVarBndrId: no LIdP"
 
 -- | Set the attached flag
 setHsTyVarBndrFlag :: flag -> HsTyVarBndr flag' (GhcPass pass)
