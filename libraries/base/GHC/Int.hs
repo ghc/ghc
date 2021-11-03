@@ -753,6 +753,7 @@ instance Enum Int64 where
         | x >= fromIntegral (minBound::Int) && x <= fromIntegral (maxBound::Int)
                         = I# (int64ToInt# x#)
         | otherwise     = fromEnumError "Int64" x
+#if WORD_SIZE_IN_BITS < 64
     -- See Note [Stable Unfolding for list producers] in GHC.Enum
     {-# INLINE enumFrom #-}
     enumFrom            = integralEnumFrom
@@ -765,6 +766,14 @@ instance Enum Int64 where
     -- See Note [Stable Unfolding for list producers] in GHC.Enum
     {-# INLINE enumFromThenTo #-}
     enumFromThenTo      = integralEnumFromThenTo
+#else
+    -- See Note [Stable Unfolding for list producers] in GHC.Enum
+    {-# INLINE enumFrom #-}
+    enumFrom            = boundedEnumFrom
+    -- See Note [Stable Unfolding for list producers] in GHC.Enum
+    {-# INLINE enumFromThen #-}
+    enumFromThen        = boundedEnumFromThen
+#endif
 
 -- | @since 2.01
 instance Integral Int64 where
