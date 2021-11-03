@@ -1,0 +1,9 @@
+
+T17594b.hs:5:3: error:
+    Unexpected case expression in function application:
+        case a of {}
+    Suggested fixes:
+      • Use parentheses.
+      • Perhaps you intended to use BlockArguments
+
+T17594b.hs:6:8: error: parse error on input ‘->’

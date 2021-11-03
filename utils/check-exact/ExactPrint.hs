@@ -3625,6 +3625,19 @@ instance ExactPrint (Pat GhcPs) where
 
 -- ---------------------------------------------------------------------
 
+instance ExactPrint (MatchPat GhcPs) where
+  exact (VisPat _ pat) = exact pat
+  exact (InvisTyVarPat _ lidp) = do
+    let pun_RDR = "pun-left-hand-side"
+    when (showPprUnsafe lidp /= pun_RDR) $ markAnnotated lidp
+  exact (InvisWildTyPat _) = do
+    anchor <- getAnchorU
+    debugM $ "WildPat:anchor=" ++ show anchor
+    printStringAtRs anchor "@_"
+
+  getAnnotationEntry (VisPat _ pat) = getAnnotationEntry pat
+  getAnnotationEntry _              = NoEntryVal
+
 instance ExactPrint (HsPatSigType GhcPs) where
   getAnnotationEntry = const NoEntryVal
   exact (HsPS _ ty) = markAnnotated ty

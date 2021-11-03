@@ -316,6 +316,11 @@ deriving instance Data (HsCmdTop GhcPs)
 deriving instance Data (HsCmdTop GhcRn)
 deriving instance Data (HsCmdTop GhcTc)
 
+-- deriving instance (DataIdLR p p) => Data (MatchPat p)
+deriving instance Data (MatchPat GhcPs)
+deriving instance Data (MatchPat GhcRn)
+deriving instance Data (MatchPat GhcTc)
+
 -- deriving instance (DataIdLR p p,Data body) => Data (MatchGroup p body)
 deriving instance Data (MatchGroup GhcPs (LocatedA (HsExpr GhcPs)))
 deriving instance Data (MatchGroup GhcRn (LocatedA (HsExpr GhcRn)))

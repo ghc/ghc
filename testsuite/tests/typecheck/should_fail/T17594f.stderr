@@ -1,0 +1,30 @@
+
+T17594f.hs:4:7: error:
+    • @-binders in functions are not allowed yet
+    • The lambda expression ‘\ @a x -> x’ has two value arguments,
+        but its type ‘a -> a’ has only one
+      In the expression: \ @a x -> x
+      In an equation for ‘id1’: id1 = \ @a x -> x
+
+T17594f.hs:7:7: error:
+    • @-binders in functions are not allowed yet
+    • The lambda expression ‘\ @_ x -> x’ has two value arguments,
+        but its type ‘a -> a’ has only one
+      In the expression: \ @_ x -> x
+      In an equation for ‘id2’: id2 = \ @_ x -> x
+
+T17594f.hs:10:7: error:
+    • @-binders in functions are not allowed yet
+    • The lambda expression ‘\ @a (x :: a) -> x’
+      has two value arguments,
+        but its type ‘a -> a’ has only one
+      In the expression: \ @a (x :: a) -> x
+      In an equation for ‘id3’: id3 = \ @a (x :: a) -> x
+
+T17594f.hs:13:10: error:
+    • @-binders in functions are not allowed yet
+    • The lambda expression ‘\ @a x @b y -> x’
+      has four value arguments,
+        but its type ‘a -> b -> a’ has only two
+      In the expression: \ @a x @b y -> x
+      In an equation for ‘const'’: const' = \ @a x @b y -> x

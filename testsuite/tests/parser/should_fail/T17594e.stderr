@@ -1,0 +1,5 @@
+
+T17594e.hs:4:1: error:
+    Equations for ‘thing’ have different numbers of arguments
+      T17594e.hs:4:1-21
+      T17594e.hs:5:1-26

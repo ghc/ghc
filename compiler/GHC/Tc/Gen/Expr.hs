@@ -1331,7 +1331,7 @@ desugarRecordUpd record_expr rbnds res_ty
              -- we let-bind x' = e1, y' = e2 and generate the equation:
              --
              --   T1 _ _ z -> T1 x' y' z
-             make_pat conLike = mkSimpleMatch CaseAlt [pat] rhs
+             make_pat conLike = mkSimpleMatch CaseAlt [mkVisPat pat] rhs
                where
                  (lhs_con_pats, rhs_con_args)
                     = zipWithAndUnzip mk_con_arg [1..] con_fields

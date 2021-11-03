@@ -976,8 +976,8 @@ data Match p body
   = Match {
         m_ext :: XCMatch p body,
         m_ctxt :: HsMatchContext p,
-          -- See Note [m_ctxt in Match]
-        m_pats :: [LPat p], -- The patterns
+          -- See note [m_ctxt in Match]
+        m_pats :: [LMatchPat p], -- The patterns
         m_grhss :: (GRHSs p body)
   }
   | XMatch !(XXMatch p body)

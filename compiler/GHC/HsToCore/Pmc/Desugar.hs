@@ -254,6 +254,12 @@ desugarPatV pat = do
 desugarLPat :: Id -> LPat GhcTc -> DsM [PmGrd]
 desugarLPat x = desugarPat x . unLoc
 
+-- | Desugar a match pattern
+desugarLMatchPat :: Id -> LMatchPat GhcTc -> DsM [PmGrd]
+desugarLMatchPat x (L _ (VisPat _ pat))      = desugarLPat x pat
+desugarLMatchPat _ (L _ (InvisTyVarPat x _)) = dataConCantHappen x
+desugarLMatchPat _ (L _ (InvisWildTyPat x))  = dataConCantHappen x
+
 -- | 'desugarLPat', but also select and return a new match var.
 desugarLPatV :: LPat GhcTc -> DsM (Id, [PmGrd])
 desugarLPatV = desugarPatV . unLoc
@@ -332,7 +338,7 @@ desugarMatches vars matches =
 -- Desugar a single match
 desugarMatch :: [Id] -> LMatch GhcTc (LHsExpr GhcTc) -> DsM (PmMatch Pre)
 desugarMatch vars (L match_loc (Match { m_pats = pats, m_grhss = grhss })) = do
-  pats'  <- concat <$> zipWithM desugarLPat vars pats
+  pats'  <- concat <$> zipWithM desugarLMatchPat vars pats
   grhss' <- desugarGRHSs (locA match_loc) (sep (map ppr pats)) grhss
   -- tracePm "desugarMatch" (vcat [ppr pats, ppr pats', ppr grhss'])
   return PmMatch { pm_pats = GrdVec pats', pm_grhss = grhss' }

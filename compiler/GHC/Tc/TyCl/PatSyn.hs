@@ -820,7 +820,7 @@ tcPatSynMatcher (L loc ps_name) lpat prag_fn
 
              fail' = nlHsApps fail [nlHsVar voidPrimId]
 
-             args = map nlVarPat [scrutinee, cont, fail]
+             args = map (mkVisPat . nlVarPat) [scrutinee, cont, fail]
              lwpat = noLocA $ WildPat pat_ty
              cases = if isIrrefutableHsPat dflags lpat
                      then [mkHsCaseAlt lpat  cont']
@@ -986,7 +986,7 @@ tcPatSynBuilderBind prag_fn (PSB { psb_id = ps_lname@(L loc ps_name)
             builder_args  = [L (na2la loc) (VarPat noExtField (L loc n))
                             | L loc n <- args]
             builder_match = mkMatch (mkPrefixFunRhs ps_lname)
-                                    builder_args body
+                                    (map mkVisPat builder_args) body
                                     (EmptyLocalBinds noExtField)
 
     args = case details of
@@ -998,7 +998,7 @@ tcPatSynBuilderBind prag_fn (PSB { psb_id = ps_lname@(L loc ps_name)
                   -> MatchGroup GhcRn (LHsExpr GhcRn)
     add_dummy_arg mg@(MG { mg_alts =
                            (L l [L loc match@(Match { m_pats = pats })]) })
-      = mg { mg_alts = L l [L loc (match { m_pats = nlWildPatName : pats })] }
+      = mg { mg_alts = L l [L loc (match { m_pats = mkVisPat nlWildPatName : pats })] }
     add_dummy_arg other_mg = pprPanic "add_dummy_arg" $
                              pprMatches other_mg
 

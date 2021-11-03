@@ -959,7 +959,7 @@ cvtClause ctxt (Clause ps body wheres)
         ; let pps = map (parenthesizePat appPrec) ps'
         ; g'  <- cvtGuard body
         ; ds' <- cvtLocalDecs (text "a where clause") wheres
-        ; returnLA $ Hs.Match noAnn ctxt pps (GRHSs emptyComments g' ds') }
+        ; returnLA $ Hs.Match noAnn ctxt (map mkVisPat pps) (GRHSs emptyComments g' ds') }
 
 cvtImplicitParamBind :: String -> TH.Exp -> CvtM (LIPBind GhcPs)
 cvtImplicitParamBind n e = do
@@ -1006,7 +1006,7 @@ cvtl e = wrapLA (cvt e)
                                -- oddities that can result from zero-argument
                                -- lambda expressions. See #13856.
     cvt (LamE ps e)    = do { ps' <- cvtPats ps; e' <- cvtl e
-                            ; let pats = map (parenthesizePat appPrec) ps'
+                            ; let pats = map (mkVisPat . (parenthesizePat appPrec)) ps'
                             ; th_origin <- getOrigin
                             ; wrapParLA (HsLam noExtField . mkMatchGroup th_origin)
                                         [mkSimpleMatch LambdaExpr pats e']}
@@ -1280,7 +1280,7 @@ cvtMatch ctxt (TH.Match p body decs)
                      _                -> p'
         ; g' <- cvtGuard body
         ; decs' <- cvtLocalDecs (text "a where clause") decs
-        ; returnLA $ Hs.Match noAnn ctxt [lp] (GRHSs emptyComments g' decs') }
+        ; returnLA $ Hs.Match noAnn ctxt [mkVisPat lp] (GRHSs emptyComments g' decs') }
 
 cvtGuard :: TH.Body -> CvtM [LGRHS GhcPs (LHsExpr GhcPs)]
 cvtGuard (GuardedB pairs) = mapM cvtpair pairs

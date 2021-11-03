@@ -19,8 +19,7 @@
 
 -- See Note [Language.Haskell.Syntax.* Hierarchy] for why not GHC.Hs.*
 module Language.Haskell.Syntax.Pat (
-        Pat(..), LPat,
-        ConLikeP,
+        Pat(..), LPat, MatchPat(..), LMatchPat, ConLikeP,
 
         HsConPatDetails, hsConPatArgs,
         HsConPatTyArg(..),
@@ -224,6 +223,17 @@ data Pat p
 
 type family ConLikeP x
 
+-- | A pattern to be used in a sequence of patterns, like what appears
+-- to the right of @f@ in @f a b True = ...@. A 'MatchPat' allows for the
+-- possibility of binding a /type variable/ with \@.
+data MatchPat pass
+  = VisPat (XVisPat pass) (LPat pass)
+  -- () means that we don't accept f @{x} syntax
+  | InvisTyVarPat (XInvisTyVarPat pass) (LHsTyVarBndr () pass)
+  | InvisWildTyPat (XInvisWildTyPat pass)
+  | XMatchPat !(XXMatchPat pass)
+
+type LMatchPat pass = XRec pass (MatchPat pass)
 
 -- ---------------------------------------------------------------------
 

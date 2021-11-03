@@ -1,0 +1,11 @@
+
+T17594c.hs:4:9: error:
+    Unexpected do block in function application:
+        do
+    Suggested fixes:
+      • Use parentheses.
+      • Perhaps you intended to use BlockArguments
+
+T17594c.hs:5:6: error:
+    parse error on input ‘<-’
+    Suggested fix: Possibly caused by a missing 'do'?

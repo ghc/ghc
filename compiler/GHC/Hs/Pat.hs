@@ -21,7 +21,7 @@
 -}
 
 module GHC.Hs.Pat (
-        Pat(..), LPat,
+        Pat(..), LPat, MatchPat(..), LMatchPat,
         EpAnnSumPat(..),
         ConPatTc (..),
         ConLikeP,
@@ -37,17 +37,17 @@ module GHC.Hs.Pat (
         hsRecFields, hsRecFieldSel, hsRecFieldId, hsRecFieldsArgs,
         hsRecUpdFieldId, hsRecUpdFieldOcc, hsRecUpdFieldRdr,
 
-        mkPrefixConPat, mkCharLitPat, mkNilPat,
+        mkPrefixConPat, mkCharLitPat, mkNilPat, mkVisPat, expectVisPats,
 
         isSimplePat,
         looksLazyPatBind,
         isBangedLPat,
-        gParPat, patNeedsParens, parenthesizePat,
+        gParPat, patNeedsParens, parenthesizePat, parenthesizeLMatchPat,
         isIrrefutableHsPat,
 
         collectEvVarsPat, collectEvVarsPats,
 
-        pprParendLPat, pprConArgs,
+        pprParendLPat, pprParendLMatchPat, pprConArgs,
         pprLPat
     ) where
 
@@ -172,6 +172,30 @@ type instance ConLikeP GhcTc = ConLike
 
 type instance XHsFieldBind _ = EpAnn [AddEpAnn]
 
+type instance XVisPat (GhcPass _) = NoExtField
+
+type instance XInvisTyVarPat GhcPs = NoExtField
+type instance XInvisTyVarPat GhcRn = NoExtField
+type instance XInvisTyVarPat GhcTc = DataConCantHappen
+
+type instance XInvisWildTyPat GhcPs = NoExtField
+type instance XInvisWildTyPat GhcRn = NoExtField
+type instance XInvisWildTyPat GhcTc = DataConCantHappen
+
+type instance XXMatchPat (GhcPass _) = DataConCantHappen
+
+-- | A helper function that constructs a match pattern from an LPat
+mkVisPat :: LPat (GhcPass pass) -> LMatchPat (GhcPass pass)
+mkVisPat lpat = L (getLoc lpat) (VisPat noExtField lpat)
+
+expectVisPats :: [LMatchPat GhcTc] -> [LPat GhcTc]
+expectVisPats xs = map toLPat xs
+  where
+    toLPat :: LMatchPat GhcTc -> LPat GhcTc
+    toLPat (L _ (VisPat _ pat))      = pat
+    toLPat (L _ (InvisTyVarPat x _)) = dataConCantHappen x
+    toLPat (L _ (InvisWildTyPat x))  = dataConCantHappen x
+
 -- ---------------------------------------------------------------------
 
 -- API Annotations types
@@ -287,6 +311,11 @@ instance OutputableBndrId p => Outputable (Pat (GhcPass p)) where
 instance (Outputable a, Outputable b) => Outputable (HsPatExpansion a b) where
   ppr (HsPatExpanded a b) = ifPprDebug (vcat [ppr a, ppr b]) (ppr a)
 
+instance OutputableBndrId p => Outputable (MatchPat (GhcPass p)) where
+    ppr (VisPat _ lpat)     = ppr (unLoc lpat)
+    ppr (InvisTyVarPat _ tvb) = char '@' <> ppr tvb
+    ppr (InvisWildTyPat _)    = text "@_"
+
 pprLPat :: (OutputableBndrId p) => LPat (GhcPass p) -> SDoc
 pprLPat (L _ e) = pprPat e
 
@@ -301,6 +330,12 @@ pprPatBndr var
 pprParendLPat :: (OutputableBndrId p)
               => PprPrec -> LPat (GhcPass p) -> SDoc
 pprParendLPat p = pprParendPat p . unLoc
+
+pprParendLMatchPat :: (OutputableBndrId p)
+                => PprPrec -> LMatchPat (GhcPass p) -> SDoc
+pprParendLMatchPat p (L _ (VisPat _ pat))            = pprParendLPat p pat
+pprParendLMatchPat _ (L _ (InvisTyVarPat _ tv_name)) = char '@' <> (ppr (unLoc tv_name))
+pprParendLMatchPat _ (L _ (InvisWildTyPat _))        = text "@_"
 
 pprParendPat :: forall p. OutputableBndrId p
              => PprPrec
@@ -469,7 +504,6 @@ patterns are treated specially, of course.
 
 The 1.3 report defines what ``irrefutable'' and ``failure-free'' patterns are.
 -}
-
 isBangedLPat :: LPat (GhcPass p) -> Bool
 isBangedLPat = isBangedPat . unLoc
 
@@ -705,6 +739,14 @@ parenthesizePat p lpat@(L loc pat)
   | patNeedsParens p pat = L loc (gParPat lpat)
   | otherwise            = lpat
 
+parenthesizeLMatchPat :: IsPass p
+                   => PprPrec
+                   -> LMatchPat (GhcPass p)
+                   -> LMatchPat (GhcPass p)
+parenthesizeLMatchPat p (L l (VisPat x lpat)) =
+  L l (VisPat x (parenthesizePat p lpat))
+parenthesizeLMatchPat _ invis         = invis
+
 {-
 % Collect all EvVars from all constructor patterns
 -}
@@ -751,6 +793,7 @@ collectEvVarsPat pat =
 -}
 
 type instance Anno (Pat (GhcPass p)) = SrcSpanAnnA
+type instance Anno (MatchPat (GhcPass p)) = SrcSpanAnnA
 type instance Anno (HsOverLit (GhcPass p)) = SrcAnn NoEpAnns
 type instance Anno ConLike = SrcSpanAnnN
 type instance Anno (HsFieldBind lhs rhs) = SrcSpanAnnA

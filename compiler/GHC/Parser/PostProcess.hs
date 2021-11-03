@@ -691,17 +691,18 @@ mkPatSynMatchGroup (L loc patsyn_name) (L ld decls) =
                wrongNameBindingErr (locA loc) decl
            ; match <- case details of
                PrefixCon _ pats -> return $ Match { m_ext = noAnn
-                                                  , m_ctxt = ctxt, m_pats = pats
+                                                  , m_ctxt = ctxt
+                                                  , m_pats = (\pat -> L loc (VisPat noExtField pat)) <$> pats
                                                   , m_grhss = rhs }
                    where
                      ctxt = FunRhs { mc_fun = ln
                                    , mc_fixity = Prefix
                                    , mc_strictness = NoSrcStrict }
 
-               InfixCon p1 p2 -> return $ Match { m_ext = noAnn
-                                                , m_ctxt = ctxt
-                                                , m_pats = [p1, p2]
-                                                , m_grhss = rhs }
+               InfixCon p1@(L _ _) p2@(L _ _) -> return $ Match { m_ext = noAnn
+                                                                , m_ctxt = ctxt
+                                                                , m_pats = [mkVisPat p1, mkVisPat p2]
+                                                                , m_grhss = rhs }
                    where
                      ctxt = FunRhs { mc_fun = ln
                                    , mc_fixity = Infix
@@ -1157,6 +1158,11 @@ checkPattern_details extraDetails pp = runPV_details extraDetails (pp >>= checkL
 checkLPat :: LocatedA (PatBuilder GhcPs) -> PV (LPat GhcPs)
 checkLPat e@(L l _) = checkPat l e [] []
 
+checkLMatchPat :: LocatedA (MatchPatBuilder GhcPs) -> PV (LMatchPat GhcPs)
+checkLMatchPat (L l (MatchPatBuilderVisPat p))
+  = L l <$> (VisPat noExtField <$> checkPat l (L l p) [] [])
+checkLMatchPat (L l (MatchPatBuilderMatchPat p)) = return (L l p)
+
 checkPat :: SrcSpanAnnA -> LocatedA (PatBuilder GhcPs) -> [HsConPatTyArg GhcPs] -> [LPat GhcPs]
          -> PV (LPat GhcPs)
 checkPat loc (L l e@(PatBuilderVar (L ln c))) tyargs args
@@ -1165,8 +1171,6 @@ checkPat loc (L l e@(PatBuilderVar (L ln c))) tyargs args
       , pat_con = L ln c
       , pat_args = PrefixCon tyargs args
       }
-  | not (null tyargs) =
-      patFail (locA l) . PsErrInPat e $ PEIP_TypeArgs tyargs
   | (not (null args) && patIsRec c) = do
       ctx <- askParseContext
       patFail (locA l) . PsErrInPat e $ PEIP_RecPattern args YesPatIsRecursive ctx
@@ -1278,12 +1282,12 @@ checkFunBind :: SrcStrictness
              -> [AddEpAnn]
              -> LocatedN RdrName
              -> LexicalFixity
-             -> [LocatedA (PatBuilder GhcPs)]
+             -> [LocatedA (MatchPatBuilder GhcPs)]
              -> Located (GRHSs GhcPs (LHsExpr GhcPs))
              -> P (HsBind GhcPs)
 checkFunBind strictness locF ann fun is_infix pats (L _ grhss)
-  = do  ps <- runPV_details extraDetails (mapM checkLPat pats)
-        let match_span = noAnnSrcSpan $ locF
+  = do  ps <- runPV_details extraDetails (mapM checkLMatchPat pats)
+        let match_span = noAnnSrcSpan locF
         cs <- getCommentsFor locF
         return (makeFunBind fun (L (noAnnSrcSpan $ locA match_span)
                  [L match_span (Match { m_ext = EpAnn (spanAsAnchor locF) ann cs
@@ -1356,32 +1360,57 @@ checkDoAndIfThenElse err guardExpr semiThen thenExpr semiElse elseExpr
 
 isFunLhs :: LocatedA (PatBuilder GhcPs)
       -> P (Maybe (LocatedN RdrName, LexicalFixity,
-                   [LocatedA (PatBuilder GhcPs)],[AddEpAnn]))
+                   [LocatedA (MatchPatBuilder GhcPs)],[AddEpAnn]))
 -- A variable binding is parsed as a FunBind.
 -- Just (fun, is_infix, arg_pats) if e is a function LHS
 isFunLhs e = go e [] [] []
  where
+   mk :: LocatedA (PatBuilder GhcPs) -> LocatedA (MatchPatBuilder GhcPs)
+   mk = fmap MatchPatBuilderVisPat
+
+   go :: LocatedA (PatBuilder GhcPs)          -- the lhs to examine
+      -> [LocatedA (MatchPatBuilder GhcPs)]   -- acc for argument patterns, in correct order
+      -> [AddEpAnn]                           -- acc for open-paren annotations, in reverse order
+      -> [AddEpAnn]                           -- acc for close-paren annotations, in correct order
+      -> P (Maybe (LocatedN RdrName, LexicalFixity, [LocatedA (MatchPatBuilder GhcPs)], [AddEpAnn]))
    go (L _ (PatBuilderVar (L loc f))) es ops cps
        | not (isRdrDataCon f)        = return (Just (L loc f, Prefix, es, (reverse ops) ++ cps))
-   go (L _ (PatBuilderApp f e)) es       ops cps = go f (e:es) ops cps
-   go (L l (PatBuilderPar _ e _)) es@(_:_) ops cps
-                                      = let
-                                          (o,c) = mkParensEpAnn (realSrcSpan $ locA l)
-                                        in
-                                          go e es (o:ops) (c:cps)
+   go (L _ (PatBuilderApp f e))   es       ops cps = go f (mk e:es) ops cps
+   go (L l (PatBuilderPar _ e _)) es@(_:_) ops cps = go e es (o:ops) (c:cps)
+      -- NB: es@(_:_) means that there must be an arg after the parens for the
+      -- LHS to be a function LHS. This corresponds to the Haskell Report's definition
+      -- of funlhs.
+     where
+       (o,c) = mkParensEpAnn (realSrcSpan $ locA l)
    go (L loc (PatBuilderOpApp l (L loc' op) r (EpAnn loca anns cs))) es ops cps
-        | not (isRdrDataCon op)         -- We have found the function!
-        = return (Just (L loc' op, Infix, (l:r:es), (anns ++ reverse ops ++ cps)))
-        | otherwise                     -- Infix data con; keep going
-        = do { mb_l <- go l es ops cps
-             ; case mb_l of
-                 Just (op', Infix, j : k : es', anns')
-                   -> return (Just (op', Infix, j : op_app : es', anns'))
-                   where
-                     op_app = L loc (PatBuilderOpApp k
-                               (L loc' op) r (EpAnn loca (reverse ops++cps) cs))
-                 _ -> return Nothing }
+      | not (isRdrDataCon op)         -- We have found the function!
+      = return (Just (L loc' op, Infix, (mk l:mk r:es), (anns ++ reverse ops ++ cps)))
+      | otherwise                     -- Infix data con; keep going
+      = do { mb_l <- go l es ops cps
+           ; return (join $ fmap reassociate mb_l) }
+        where
+          reassociate (op', Infix, j : L k_loc (MatchPatBuilderVisPat k) : es', anns')
+            = Just (op', Infix, j : op_app : es', anns')
+            where
+              op_app = mk $ L loc (PatBuilderOpApp (L k_loc k) (L loc' op) r
+                                    (EpAnn loca (reverse ops ++ cps) cs))
+          reassociate _other = Nothing
+   go (L _ (PatBuilderAppType pat _ (HsPS _ (L loc hs_ty)))) es ops cps
+             | Just arg <- go_type_arg hs_ty
+             = go pat (L loc (MatchPatBuilderMatchPat arg) : es) ops cps
    go _ _ _ _ = return Nothing
+
+   go_type_arg :: HsType GhcPs -> Maybe (MatchPat GhcPs)
+   go_type_arg (HsTyVar en_ann _ lname@(L name_loc _))
+     = Just (InvisTyVarPat noExtField (L (l2l name_loc) (UserTyVar en_ann () lname)))
+     -- TODO: Richard is deeply suspicious of en_ann getting repeated above
+     -- TODO: Richard is also suspicious of the use of l2l there.
+   go_type_arg (HsWildCardTy x)
+     = Just (InvisWildTyPat x)
+      -- TODO: deal with (a :: ki) and (_ :: ki) constructs
+   go_type_arg _other = Nothing
+
+
 
 mkBangTy :: EpAnn [AddEpAnn] -> SrcStrictness -> LHsType GhcPs -> HsType GhcPs
 mkBangTy anns strictness =
@@ -1470,7 +1499,7 @@ instance DisambInfixOp (HsExpr GhcPs) where
 instance DisambInfixOp RdrName where
   mkHsConOpPV (L l v) = return $ L l v
   mkHsVarOpPV (L l v) = return $ L l v
-  mkHsInfixHolePV l _ = addFatalError $ mkPlainErrorMsgEnvelope l $ PsErrInvalidInfixHole
+  mkHsInfixHolePV l _ = addFatalError $ mkPlainErrorMsgEnvelope l PsErrInvalidInfixHole
 
 type AnnoBody b
   = ( Anno (GRHS GhcPs (LocatedA (Body b GhcPs))) ~ SrcAnn NoEpAnns
@@ -1640,7 +1669,7 @@ instance DisambECP (HsCmd GhcPs) where
   type Body (HsCmd GhcPs) = HsCmd
   ecpFromCmd' = return
   ecpFromExp' (L l e) = cmdFail (locA l) (ppr e)
-  mkHsProjUpdatePV l _ _ _ _ = addFatalError $ mkPlainErrorMsgEnvelope l $
+  mkHsProjUpdatePV l _ _ _ _ = addFatalError $ mkPlainErrorMsgEnvelope l
                                                  PsErrOverloadedRecordDotInvalid
   mkHsLamPV l mg = do
     cs <- getCommentsFor l

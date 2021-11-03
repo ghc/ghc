@@ -2803,7 +2803,7 @@ aexp    :: { ECP }
                                    unECP $2 >>= \ $2 ->
                                    mkHsNegAppPV (comb2A $1 $>) $2 [mj AnnMinus $1] }
 
-        | '\\' apats '->' exp
+        | '\\' matchpats '->' exp
                    {  ECP $
                       unECP $4 >>= \ $4 ->
                       mkHsLamPV (comb2 $1 (reLoc $>)) (\cs -> mkMatchGroup FromSource
@@ -3263,7 +3263,7 @@ alt(PATS) :: { forall b. DisambECP b => PV (LMatch GhcPs (LocatedA b)) }
                          acsA (\cs -> sLLAsl $1 $>
                                          (Match { m_ext = EpAnn (listAsAnchor $1) [] cs
                                                 , m_ctxt = CaseAlt -- for \case and \cases, this will be changed during post-processing
-                                                , m_pats = $1
+                                                , m_pats = map mkVisPat $1
                                                 , m_grhss = unLoc $2 }))}
 
 alt_rhs :: { forall b. DisambECP b => PV (Located (GRHSs GhcPs (LocatedA b))) }
@@ -3313,6 +3313,15 @@ bindpat :: { LPat GhcPs }
 bindpat :  exp            {% -- See Note [Parser-Validator Details] in GHC.Parser.PostProcess
                              checkPattern_details incompleteDoBlock
                                               (unECP $1) }
+
+matchpat   :: { LMatchPat GhcPs }
+matchpat    : aexp                  {%  (fmap mkVisPat . checkPattern <=< runPV) (unECP $1) }
+            | PREFIX_AT tyvar       { L (getLocAnn (reLocN $2)) (InvisTyVarPat noExtField (L noSrcSpanA (UserTyVar EpAnnNotUsed () $2))) }
+            | PREFIX_AT '_'         { L (getLocAnn $2) (InvisWildTyPat noExtField) }
+
+matchpats :: { [LMatchPat GhcPs] }
+           : matchpat matchpats            { $1 : $2 }
+           | {- empty -}                   { [] }
 
 apat   :: { LPat GhcPs }
 apat    : aexp                  {% (checkPattern <=< runPV) (unECP $1) }

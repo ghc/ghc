@@ -1,0 +1,24 @@
+
+T17594a.hs:4:1: error:
+    • @-binders in functions are not allowed yet
+    • In an equation for ‘id1’: id1 @a x = x
+      The equation for ‘id1’ has two value arguments,
+        but its type ‘a -> a’ has only one
+
+T17594a.hs:7:1: error:
+    • @-binders in functions are not allowed yet
+    • In an equation for ‘id2’: id2 @_ x = x
+      The equation for ‘id2’ has two value arguments,
+        but its type ‘a -> a’ has only one
+
+T17594a.hs:10:1: error:
+    • @-binders in functions are not allowed yet
+    • In an equation for ‘id3’: id3 @a (x :: a) = x
+      The equation for ‘id3’ has two value arguments,
+        but its type ‘a -> a’ has only one
+
+T17594a.hs:13:1: error:
+    • @-binders in functions are not allowed yet
+    • In an equation for ‘const'’: const' @a x @b y = x
+      The equation for ‘const'’ has four value arguments,
+        but its type ‘a -> b -> a’ has only two

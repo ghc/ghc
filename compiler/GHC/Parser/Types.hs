@@ -7,6 +7,7 @@ module GHC.Parser.Types
    ( SumOrTuple(..)
    , pprSumOrTuple
    , PatBuilder(..)
+   , MatchPatBuilder(..)
    , DataConBuilder(..)
    )
 where
@@ -61,6 +62,10 @@ data PatBuilder p
   | PatBuilderVar (LocatedN RdrName)
   | PatBuilderOverLit (HsOverLit GhcPs)
 
+data MatchPatBuilder p
+  = MatchPatBuilderVisPat (PatBuilder p)
+  | MatchPatBuilderMatchPat (MatchPat p)
+
 instance Outputable (PatBuilder GhcPs) where
   ppr (PatBuilderPat p) = ppr p
   ppr (PatBuilderPar _ (L _ p) _) = parens (ppr p)
@@ -69,6 +74,10 @@ instance Outputable (PatBuilder GhcPs) where
   ppr (PatBuilderOpApp (L _ p1) op (L _ p2) _) = ppr p1 <+> ppr op <+> ppr p2
   ppr (PatBuilderVar v) = ppr v
   ppr (PatBuilderOverLit l) = ppr l
+
+instance Outputable (MatchPatBuilder GhcPs) where
+  ppr (MatchPatBuilderVisPat p) = ppr p
+  ppr (MatchPatBuilderMatchPat p) = ppr p
 
 -- | An accumulator to build a prefix data constructor,
 --   e.g. when parsing @MkT A B C@, the accumulator will evolve as follows:

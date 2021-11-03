@@ -758,7 +758,7 @@ dsDo ctx stmts
         mfix_arg     = noLocA $ HsLam noExtField
                            (MG { mg_alts = noLocA [mkSimpleMatch
                                                     LambdaExpr
-                                                    [mfix_pat] body]
+                                                    [mkVisPat mfix_pat] body]
                                , mg_ext = MatchGroupTc [unrestricted tup_ty] body_ty Generated
                                })
         mfix_pat     = noLocA $ LazyPat noExtField $ mkBigLHsPatTupId rec_tup_pats

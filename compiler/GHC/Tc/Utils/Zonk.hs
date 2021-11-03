@@ -690,7 +690,7 @@ zonkMatch :: Anno (GRHS GhcTc (LocatedA (body GhcTc))) ~ SrcAnn NoEpAnns
           -> TcM (LMatch GhcTc (LocatedA (body GhcTc)))
 zonkMatch env zBody (L loc match@(Match { m_pats = pats
                                         , m_grhss = grhss }))
-  = do  { (env1, new_pats) <- zonkPats env pats
+  = do  { (env1, new_pats) <- zonkMatchPats env pats
         ; new_grhss <- zonkGRHSs env1 zBody grhss
         ; return (L loc (match { m_pats = new_pats, m_grhss = new_grhss })) }
 
@@ -1441,6 +1441,17 @@ zonkPats env []         = return (env, [])
 zonkPats env (pat:pats) = do { (env1, pat') <- zonkPat env pat
                              ; (env', pats') <- zonkPats env1 pats
                              ; return (env', pat':pats') }
+
+zonkMatchPats :: ZonkEnv -> [LMatchPat GhcTc] -> TcM (ZonkEnv, [LMatchPat GhcTc])
+zonkMatchPats env [] = return (env, [])
+zonkMatchPats env (pat:pats) =
+  case pat of
+    L l (VisPat x lpat) -> do { (env1, pat') <- zonkPat env lpat
+                              ; (env', pats') <- zonkMatchPats env1 pats
+                              ; return (env', L l (VisPat x pat') : pats')
+                              }
+    L _ (InvisTyVarPat x _) -> dataConCantHappen x
+    L _ (InvisWildTyPat x)  -> dataConCantHappen x
 
 {-
 ************************************************************************
