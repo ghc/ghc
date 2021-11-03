@@ -2408,6 +2408,7 @@ zonkSkolemInfo (InferSkol ntys) = do { ntys' <- mapM do_one ntys
                                      ; return (InferSkol ntys') }
   where
     do_one (n, ty) = do { ty' <- zonkTcType ty; return (n, ty') }
+zonkSkolemInfo (OtherSC depth si) = OtherSC depth <$> zonkSkolemInfo si
 zonkSkolemInfo skol_info = return skol_info
 
 {-

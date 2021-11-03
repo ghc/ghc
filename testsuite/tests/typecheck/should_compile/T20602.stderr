@@ -1,0 +1,40 @@
+
+T20602.hs:7:6: warning: [-Wredundant-constraints]
+    • Redundant constraint: Ord a
+    • In the type signature for:
+           f :: forall a. (Eq a, Ord a) => a -> Bool
+
+T20602.hs:10:6: warning: [-Wredundant-constraints]
+    • Redundant constraint: Eq a
+    • In the type signature for:
+           g :: forall a. (Eq a, Ord a) => a -> Bool
+
+T20602.hs:13:6: warning: [-Wredundant-constraints]
+    • Redundant constraint: Eq a
+    • In the type signature for:
+           h :: forall a. (Eq a, Ord a) => a -> Bool
+
+T20602.hs:16:6: warning: [-Wredundant-constraints]
+    • Redundant constraint: Eq b
+    • In the type signature for:
+           j :: forall a b. (Eq a, a ~ b, Eq b) => a -> Bool
+
+T20602.hs:19:6: warning: [-Wredundant-constraints]
+    • Redundant constraints: (Eq a, a ~ b, Eq b)
+    • In the type signature for:
+           k :: forall a b. (Eq a, a ~ b, Eq b) => a -> Bool
+
+T20602.hs:22:6: warning: [-Wredundant-constraints]
+    • Redundant constraints: (Eq a, Ord a)
+    • In the type signature for:
+           l :: forall a. (Eq a, Ord a) => a -> Bool
+
+T20602.hs:25:6: warning: [-Wredundant-constraints]
+    • Redundant constraint: a ~ b
+    • In the type signature for:
+           m :: forall a b. (a ~ b) => a -> a
+
+T20602.hs:28:6: warning: [-Wredundant-constraints]
+    • Redundant constraint: b ~ a
+    • In the type signature for:
+           n :: forall a b. (Eq a, b ~ a) => a -> Bool

@@ -1604,7 +1604,8 @@ Answer:
     a SkolemInfo of (InstSC size), where 'size' is the size of
     the constraint whose superclass we are taking.  A similarly
     when taking the superclass of an InstSC.  This is implemented
-    in GHC.Tc.Solver.Canonical.newSCWorkFromFlavored
+    in GHC.Tc.Solver.Canonical.mk_strict_superclasses (in the
+    mk_given_loc helper function).
 
 Note [Silent superclass arguments] (historical interest only)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
