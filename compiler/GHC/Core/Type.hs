@@ -488,7 +488,7 @@ expand_syn arity tvs rhs tys
                -- because the function part might well return a
                -- partially-applied type constructor; indeed, usually will!
 -- We never want to inline this cold-path.
-{-# INLINE expand_syn #-}
+{-# NOINLINE expand_syn #-}
 
 coreFullView :: Type -> Type
 -- ^ Iterates 'coreView' until there is no more to synonym to expand.
