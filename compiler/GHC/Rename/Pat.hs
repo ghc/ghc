@@ -23,6 +23,7 @@ free variables.
 -}
 module GHC.Rename.Pat (-- main entry points
               rnPat, rnPats, rnBindPat, rnPatAndThen,
+              rnLMatchPats, rnLMatchPat,
 
               NameMaker, applyNameMaker,     -- a utility for making names:
               localRecNameMaker, topRecNameMaker,  --   sometimes we want to make local names,
@@ -429,6 +430,50 @@ rnPats ctxt pats thing_inside
         ; thing_inside pats' } }
   where
     doc_pat = text "In" <+> pprMatchContext ctxt
+
+rnLMatchPatAndThen :: NameMaker -> LMatchPat GhcPs -> CpsRn (LMatchPat GhcRn)
+rnLMatchPatAndThen nm pat = wrapSrcSpanCps (rnMatchPatAndThen nm) pat
+
+rnLMatchPatsAndThen :: NameMaker -> [LMatchPat GhcPs] -> CpsRn ([LMatchPat GhcRn])
+rnLMatchPatsAndThen nm = mapM (rnLMatchPatAndThen nm)
+
+rnMatchPatAndThen :: NameMaker -> MatchPat GhcPs -> CpsRn (MatchPat GhcRn)
+rnMatchPatAndThen nm (VisPat _ lpat)
+  = do { renamed_pat <- rnLPatAndThen nm lpat
+       ; return (VisPat NoExtField renamed_pat)
+       }
+rnMatchPatAndThen nm (InvisTyVarPat _ (L l rdr))
+  = do { loc <- liftCps getSrcSpanM
+       ; name <- newPatName nm (L (noAnnSrcSpan loc) rdr)
+       ; return (InvisTyVarPat NoExtField (L l name))
+       }
+rnMatchPatAndThen _ (InvisWildTyPat _) = return (InvisWildTyPat NoExtField)
+
+rnLMatchPats :: HsMatchContext GhcRn -- for error messages
+             -> [LMatchPat GhcPs]
+             -> ([LMatchPat GhcRn] -> RnM (a, FreeVars))
+             -> RnM (a, FreeVars)
+rnLMatchPats ctxt pats thing_inside
+  = do { envs_before <- getRdrEnvs
+       ; unCpsRn (rnLMatchPatsAndThen (matchNameMaker ctxt) pats) $ \ pats' -> do
+       {
+       ; let bndrs = collectLMatchPatsBinders CollNoDictBinders pats'
+       ; addErrCtxt doc_pat $
+         if isPatSynCtxt ctxt
+            then checkDupNames bndrs
+            else checkDupAndShadowedNames envs_before bndrs
+       ; thing_inside pats'
+       } }
+  where
+    doc_pat = text "In" <+> pprMatchContext ctxt
+
+rnLMatchPat :: HsMatchContext GhcRn -- for error messages
+            -> LMatchPat GhcPs
+            -> (LMatchPat GhcRn -> RnM (a, FreeVars))
+            -> RnM (a, FreeVars)
+rnLMatchPat ctxt pat thing_inside =
+  rnLMatchPats ctxt [pat] (\pats' -> let [pat'] = pats' in thing_inside pat')
+
 
 rnPat :: HsMatchContext GhcRn -- for error messages
       -> LPat GhcPs

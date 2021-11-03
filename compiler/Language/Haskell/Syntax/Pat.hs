@@ -19,8 +19,7 @@
 
 -- See Note [Language.Haskell.Syntax.* Hierarchy] for why not GHC.Hs.*
 module Language.Haskell.Syntax.Pat (
-        Pat(..), LPat,
-        ConLikeP,
+        Pat(..), LPat, MatchPat(..), LMatchPat, toLPats, toPats, toInvisPats, ConLikeP,
 
         HsConPatDetails, hsConPatArgs,
         HsRecFields(..), HsFieldBind(..), LHsFieldBind,
@@ -214,6 +213,35 @@ data Pat p
 
 type family ConLikeP x
 
+data MatchPat pass
+  = VisPat (XVisPat pass) (LPat pass)
+  | InvisTyVarPat (XInvisTyVarPat pass) (LIdP pass)
+  | InvisWildTyPat (XInvisWildTyPat pass)
+  | XMatchPat !(XXMatchPat pass)
+
+type LMatchPat pass = XRec pass (MatchPat pass)
+
+toLPats :: forall pass. UnXRec pass => [LMatchPat pass] -> [LPat pass]
+toLPats [] = []
+toLPats (x : xs) =
+  case unXRec @pass x of
+    VisPat _ pat -> pat : toLPats xs
+    _            -> toLPats xs
+
+toPats :: forall pass. UnXRec pass => [MatchPat pass] -> [Pat pass]
+toPats [] = []
+toPats (x : xs) =
+  case x of
+    VisPat _ pat -> unXRec @pass pat : toPats xs
+    _            -> toPats xs
+
+toInvisPats :: forall pass. UnXRec pass => [LMatchPat pass] -> [LMatchPat pass]
+toInvisPats [] = []
+toInvisPats (x : xs) =
+  case unXRec @pass x of
+    InvisTyVarPat _ _ -> x : toInvisPats xs
+    InvisWildTyPat _  -> x : toInvisPats xs
+    _               -> toInvisPats xs
 
 -- ---------------------------------------------------------------------
 

@@ -13,5 +13,7 @@ import GHC.Hs.Extension ( OutputableBndrId, GhcPass )
 import Language.Haskell.Syntax.Pat
 
 instance (OutputableBndrId p) => Outputable (Pat (GhcPass p))
+instance (OutputableBndrId p) => Outputable (MatchPat (GhcPass p))
 
 pprLPat :: (OutputableBndrId p) => LPat (GhcPass p) -> SDoc
+pprLMatchPat :: (OutputableBndrId p) => LMatchPat (GhcPass p) -> SDoc
