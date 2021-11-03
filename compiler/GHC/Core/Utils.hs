@@ -1285,21 +1285,21 @@ exprIsCheapX ok_app e
     ok e = go 0 e
 
     -- n is the number of value arguments
-    go n (Var v)                      = ok_app v n
-    go _ (Lit {})                     = True
-    go _ (Type {})                    = True
-    go _ (Coercion {})                = True
-    go n (Cast e _)                   = go n e
-    go n (Case scrut _ _ alts)        = ok scrut &&
-                                        and [ go n rhs | Alt _ _ rhs <- alts ]
-    go n (Tick t e) | tickishCounts t = False
-                    | otherwise       = go n e
-    go n (Lam x e)  | isRuntimeVar x  = n==0 || go (n-1) e
-                    | otherwise       = go n e
-    go n (App f e)  | isRuntimeArg e  = go (n+1) f && ok e
-                    | otherwise       = go n f
-    go n (Let (NonRec _ r) e)         = go n e && ok r
-    go n (Let (Rec prs) e)            = go n e && all (ok . snd) prs
+    go n (Var v)                        = ok_app v n
+    go _ (Lit {})                       = True
+    go _ (Type {})                      = True
+    go _ (Coercion {})                  = True
+    go n (Cast e _)                     = go n e
+    go n (Case scrut _ _ [Alt _ _ rhs]) = ok scrut && go n rhs
+    go _ (Case {})                      = False
+    go n (Tick t e) | tickishCounts t   = False
+                    | otherwise         = go n e
+    go n (Lam x e)  | isRuntimeVar x    = n==0 || go (n-1) e
+                    | otherwise         = go n e
+    go n (App f e)  | isRuntimeArg e    = go (n+1) f && ok e
+                    | otherwise         = go n f
+    go n (Let (NonRec _ r) e)           = go n e && ok r
+    go n (Let (Rec prs) e)              = go n e && all (ok . snd) prs
 
       -- Case: see Note [Case expressions are work-free]
       -- App, Let: see Note [Arguments and let-bindings exprIsCheapX]
