@@ -3326,9 +3326,9 @@ matchpats :: { [LMatchPat GhcPs] }
 apat   :: { LPat GhcPs }
 apat    : aexp                  {% (checkPattern <=< runPV) (unECP $1) }
 
-apats  :: { [LPat GhcPs] }
-        : apat apats            { $1 : $2 }
-        | {- empty -}           { [] }
+apats :: { [LMatchPat GhcPs] }
+       : matchpat matchpats            { $1 : $2 }
+           | {- empty -}                   { [] }
 
 -----------------------------------------------------------------------------
 -- Statement sequences
