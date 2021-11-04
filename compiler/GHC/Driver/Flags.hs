@@ -536,6 +536,7 @@ data WarningFlag =
    | Opt_WarnMissingKindSignatures        -- Since 9.2
    | Opt_WarnMissingExportedPatternSynonymSignatures -- since 9.2
    | Opt_WarnRedundantStrictnessFlags     -- Since 9.4
+   | Opt_WarnForallIdentifier             -- Since 9.4
    | Opt_WarnUnicodeBidirectionalFormatCharacters -- Since 9.0.2
    deriving (Eq, Ord, Show, Enum)
 
@@ -636,6 +637,7 @@ warnFlagNames wflag = case wflag of
   Opt_WarnOperatorWhitespace                      -> "operator-whitespace" :| []
   Opt_WarnImplicitLift                            -> "implicit-lift" :| []
   Opt_WarnMissingExportedPatternSynonymSignatures -> "missing-exported-pattern-synonym-signatures" :| []
+  Opt_WarnForallIdentifier                        -> "forall-identifier" :| []
   Opt_WarnUnicodeBidirectionalFormatCharacters    -> "unicode-bidirectional-format-characters" :| []
 
 -- -----------------------------------------------------------------------------
@@ -728,6 +730,7 @@ standardWarnings -- see Note [Documenting warning flags]
         Opt_WarnNonCanonicalMonadInstances,
         Opt_WarnNonCanonicalMonoidInstances,
         Opt_WarnOperatorWhitespaceExtConflict,
+        Opt_WarnForallIdentifier,
         Opt_WarnUnicodeBidirectionalFormatCharacters
       ]
 

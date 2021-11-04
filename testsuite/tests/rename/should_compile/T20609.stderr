@@ -1,0 +1,49 @@
+
+T20609.hs:6:1: warning: [-Wforall-identifier (in -Wdefault)]
+    The use of ‘forall’ as an identifier
+    will become an error in a future GHC release.
+    Suggested fix:
+      Consider using another name, such as
+      ‘forAll’, ‘for_all’, or ‘forall_’.
+
+T20609.hs:8:1: warning: [-Wforall-identifier (in -Wdefault)]
+    The use of ‘∀’ as an identifier
+    will become an error in a future GHC release.
+    Suggested fix:
+      Consider using another name, such as
+      ‘forAll’, ‘for_all’, or ‘forall_’.
+
+T20609.hs:10:8: warning: [-Wforall-identifier (in -Wdefault)]
+    The use of ‘forall’ as an identifier
+    will become an error in a future GHC release.
+    Suggested fix:
+      Consider using another name, such as
+      ‘forAll’, ‘for_all’, or ‘forall_’.
+
+T20609.hs:12:11: warning: [-Wforall-identifier (in -Wdefault)]
+    The use of ‘forall’ as an identifier
+    will become an error in a future GHC release.
+    Suggested fix:
+      Consider using another name, such as
+      ‘forAll’, ‘for_all’, or ‘forall_’.
+
+T20609.hs:14:16: warning: [-Wforall-identifier (in -Wdefault)]
+    The use of ‘forall’ as an identifier
+    will become an error in a future GHC release.
+    Suggested fix:
+      Consider using another name, such as
+      ‘forAll’, ‘for_all’, or ‘forall_’.
+
+T20609.hs:16:25: warning: [-Wforall-identifier (in -Wdefault)]
+    The use of ‘forall’ as an identifier
+    will become an error in a future GHC release.
+    Suggested fix:
+      Consider using another name, such as
+      ‘forAll’, ‘for_all’, or ‘forall_’.
+
+T20609.hs:18:40: warning: [-Wforall-identifier (in -Wdefault)]
+    The use of ‘forall’ as an identifier
+    will become an error in a future GHC release.
+    Suggested fix:
+      Consider using another name, such as
+      ‘forAll’, ‘for_all’, or ‘forall_’.

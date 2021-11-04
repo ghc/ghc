@@ -72,8 +72,8 @@ import Level2.Level2
 (➾➔) = undefined :: () -- ... U+2794
 
 -- mathematicalOperators
-(∀) = undefined :: () -- U+2200
-(∀⋙) = undefined :: () -- ... U+22D9
+(∁) = undefined :: () -- U+2201 (skip U+2200 because it's the keyword ∀)
+(∁⋙) = undefined :: () -- ... U+22D9
 
 -- miscellaneousMathematicalSymbolsAR
 (⟑) = undefined :: () -- U+27D1

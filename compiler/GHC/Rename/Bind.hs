@@ -43,7 +43,9 @@ import GHC.Rename.Names
 import GHC.Rename.Env
 import GHC.Rename.Fixity
 import GHC.Rename.Utils ( HsDocContext(..), mapFvRn
-                        , checkDupRdrNames, checkDupRdrNamesN, warnUnusedLocalBinds
+                        , checkDupRdrNames, checkDupRdrNamesN
+                        , warnUnusedLocalBinds
+                        , warnForallIdentifier
                         , checkUnusedRecordWildcard
                         , checkDupAndShadowedNames, bindLocalNamesFV
                         , addNoNestedForallsContextsErr, checkInferredVars )
@@ -981,6 +983,7 @@ renameSig ctxt sig@(ClassOpSig _ is_deflt vs ty)
   = do  { defaultSigs_on <- xoptM LangExt.DefaultSignatures
         ; when (is_deflt && not defaultSigs_on) $
           addErr (defaultSigErr sig)
+        ; mapM_ warnForallIdentifier vs
         ; new_v <- mapM (lookupSigOccRnN ctxt sig) vs
         ; (new_ty, fvs) <- rnHsSigType ty_ctxt TypeLevel ty
         ; return (ClassOpSig noAnn is_deflt new_v new_ty, fvs) }

@@ -93,10 +93,10 @@ pprPatSynType :: PatSynType -> Doc
 pprPatSynType ty@(ForallT uniTys reqs ty'@(ForallT exTys provs ty''))
   | null exTys,  null provs = ppr (ForallT uniTys reqs ty'')
   | null uniTys, null reqs  = noreqs <+> ppr ty'
-  | null reqs               = forall uniTys <+> noreqs <+> ppr ty'
+  | null reqs               = pprForallBndrs uniTys <+> noreqs <+> ppr ty'
   | otherwise               = ppr ty
-  where noreqs     = text "() =>"
-        forall tvs = text "forall" <+> (hsep (map ppr tvs)) <+> text "."
+  where noreqs = text "() =>"
+        pprForallBndrs tvs = text "forall" <+> hsep (map ppr tvs) <+> text "."
 pprPatSynType ty            = ppr ty
 
 ------------------------------

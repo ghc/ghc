@@ -56,6 +56,7 @@ To reverse ``-Werror``, which makes all warnings into errors, use ``-Wwarn``.
         * :ghc-flag:`-Woperator-whitespace-ext-conflict`
         * :ghc-flag:`-Wambiguous-fields`
         * :ghc-flag:`-Wunicode-bidirectional-format-characters`
+        * :ghc-flag:`-Wforall-identifier`
 
 The following flags are simple ways to select standard "packages" of warnings:
 
@@ -2169,6 +2170,33 @@ of ``-W(no-)*``.
 
     This warning has no effect when :extension:`DuplicateRecordFields` is
     disabled.
+
+.. ghc-flag:: -Wforall-identifier
+    :shortdesc: warn when ``forall`` is used as an identifier (at definition sites)
+    :type: dynamic
+    :reverse: -Wno-forall-identifier
+
+    :since: 9.4
+
+    In a future GHC release, ``forall`` will become a keyword regardless of
+    enabled extensions. This will make definitions such as the following
+    illegal::
+
+      -- from constraints-0.13
+      forall :: forall p. (forall a. Dict (p a)) -> Dict (Forall p)
+      forall d = ...
+
+    Library authors are advised to use a different identifier, such as
+    ``forAll``, ``forall_``, or ``for_all``::
+
+      forall_ :: forall p. (forall a. Dict (p a)) -> Dict (Forall p)
+      forall_ d = ...
+
+    The warning is only triggered at definition sites where it can be
+    addressed by using a different name.
+
+    Users of a library that exports ``forall`` as an identifier cannot address
+    the issue themselves, so the warning is not reported at use sites.
 
 .. ghc-flag:: -Wunicode-bidirectional-format-characters
     :shortdesc: warn about the usage of unicode bidirectional layout override characters

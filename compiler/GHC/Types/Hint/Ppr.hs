@@ -126,6 +126,11 @@ instance Outputable GhcHint where
       -> text "Use a standalone deriving declaration instead"
     SuggestFillInWildcardConstraint
       -> text "Fill in the wildcard constraint yourself"
+    SuggestRenameForall
+      -> vcat [ text "Consider using another name, such as"
+              , quotes (text "forAll") <> comma <+>
+                quotes (text "for_all") <> comma <+> text "or" <+>
+                quotes (text "forall_") <> dot ]
 
 perhapsAsPat :: SDoc
 perhapsAsPat = text "Perhaps you meant an as-pattern, which must not be surrounded by whitespace"

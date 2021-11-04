@@ -1,0 +1,7 @@
+
+T20609a.hs:6:23: warning: [-Wforall-identifier (in -Wdefault)]
+    The use of ‘forall’ as an identifier
+    will become an error in a future GHC release.
+    Suggested fix:
+      Consider using another name, such as
+      ‘forAll’, ‘for_all’, or ‘forall_’.

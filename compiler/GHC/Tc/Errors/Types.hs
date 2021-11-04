@@ -1412,6 +1412,17 @@ data TcRnMessage where
   -}
   TcRnArrowProcGADTPattern :: TcRnMessage
 
+  {- TcRnForallIdentifier is a warning (controlled with -Wforall-identifier) that occurs
+     when a definition uses 'forall' as an identifier.
+
+     Example:
+       forall x = ()
+       g forall = ()
+
+     Test cases: T20609 T20609a T20609b T20609c T20609d
+  -}
+  TcRnForallIdentifier :: RdrName -> TcRnMessage
+
 -- | Which parts of a record field are affected by a particular error or warning.
 data RecordFieldPart
   = RecordFieldConstructor !Name

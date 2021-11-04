@@ -53,7 +53,7 @@ import GHC.Tc.Utils.Zonk   ( hsOverLitName )
 import GHC.Rename.Env
 import GHC.Rename.Fixity
 import GHC.Rename.Utils    ( HsDocContext(..), newLocalBndrRn, bindLocalNames
-                           , warnUnusedMatches, newLocalBndrRn
+                           , warnUnusedMatches, warnForallIdentifier
                            , checkUnusedRecordWildcard
                            , checkDupNames, checkDupAndShadowedNames
                            , wrapGenSpan, genHsApps, genLHsVar, genHsIntegralLit )
@@ -232,14 +232,16 @@ newPatLName name_maker rdr_name@(L loc _)
 newPatName :: NameMaker -> LocatedN RdrName -> CpsRn Name
 newPatName (LamMk report_unused) rdr_name
   = CpsRn (\ thing_inside ->
-        do { name <- newLocalBndrRn rdr_name
+        do { warnForallIdentifier rdr_name
+           ; name <- newLocalBndrRn rdr_name
            ; (res, fvs) <- bindLocalNames [name] (thing_inside name)
            ; when report_unused $ warnUnusedMatches [name] fvs
            ; return (res, name `delFV` fvs) })
 
 newPatName (LetMk is_top fix_env) rdr_name
   = CpsRn (\ thing_inside ->
-        do { name <- case is_top of
+        do { warnForallIdentifier rdr_name
+           ; name <- case is_top of
                        NotTopLevel -> newLocalBndrRn rdr_name
                        TopLevel    -> newTopSrcBinder rdr_name
            ; bindLocalNames [name] $

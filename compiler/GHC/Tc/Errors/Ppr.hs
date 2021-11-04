@@ -517,6 +517,11 @@ instance Diagnostic TcRnMessage where
               = text " when Safe Haskell is enabled."
               | otherwise
               = dot
+    TcRnForallIdentifier rdr_name
+      -> mkSimpleDecorated $
+            fsep [ text "The use of" <+> quotes (ppr rdr_name)
+                                     <+> text "as an identifier",
+                   text "will become an error in a future GHC release." ]
 
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -733,6 +738,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnSpecialClassInst {}
       -> ErrorWithoutFlag
+    TcRnForallIdentifier {}
+      -> WarningWithFlag Opt_WarnForallIdentifier
 
   diagnosticHints = \case
     TcRnUnknownMessage m
@@ -943,6 +950,8 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnSpecialClassInst {}
       -> noHints
+    TcRnForallIdentifier {}
+      -> [SuggestRenameForall]
 
 deriveInstanceErrReasonHints :: Class
                              -> UsingGeneralizedNewtypeDeriving

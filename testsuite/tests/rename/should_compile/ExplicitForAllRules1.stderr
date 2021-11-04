@@ -1,4 +1,11 @@
 
+ExplicitForAllRules1.hs:46:31: warning: [-Wforall-identifier (in -Wdefault)]
+    The use of ‘forall’ as an identifier
+    will become an error in a future GHC release.
+    Suggested fix:
+      Consider using another name, such as
+      ‘forAll’, ‘for_all’, or ‘forall_’.
+
 ExplicitForAllRules1.hs:49:31: warning: [-Wunused-foralls (in -Wextra)]
     Unused quantified type variable ‘b’
     In the rewrite rule "example7"

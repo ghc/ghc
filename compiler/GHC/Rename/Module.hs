@@ -31,6 +31,7 @@ import GHC.Rename.Env
 import GHC.Rename.Utils ( HsDocContext(..), mapFvRn, bindLocalNames
                         , checkDupRdrNamesN, bindLocalNamesFV
                         , checkShadowedRdrNames, warnUnusedTypePatterns
+                        , warnForallIdentifier
                         , newLocalBndrsRn
                         , withHsDocContext, noNestedForallsContextsErr
                         , addNoNestedForallsContextsErr, checkInferredVars )
@@ -351,6 +352,7 @@ rnDefaultDecl (DefaultDecl _ tys)
 rnHsForeignDecl :: ForeignDecl GhcPs -> RnM (ForeignDecl GhcRn, FreeVars)
 rnHsForeignDecl (ForeignImport { fd_name = name, fd_sig_ty = ty, fd_fi = spec })
   = do { topEnv :: HscEnv <- getTopEnv
+       ; warnForallIdentifier name
        ; name' <- lookupLocatedTopBndrRnN name
        ; (ty', fvs) <- rnHsSigType (ForeignDeclCtx name) TypeLevel ty
 
@@ -1220,6 +1222,7 @@ rnHsRuleDecl (HsRule { rd_name = rule_name
                      , rd_lhs  = lhs
                      , rd_rhs  = rhs })
   = do { let rdr_names_w_loc = map (get_var . unLoc) tmvs
+       ; mapM_ warnForallIdentifier rdr_names_w_loc
        ; checkDupRdrNamesN rdr_names_w_loc
        ; checkShadowedRdrNames rdr_names_w_loc
        ; names <- newLocalBndrsRn rdr_names_w_loc
@@ -2299,7 +2302,7 @@ rnConDecls = mapFvRn (wrapLocFstMA rnConDecl)
 rnConDecl :: ConDecl GhcPs -> RnM (ConDecl GhcRn, FreeVars)
 rnConDecl decl@(ConDeclH98 { con_name = name, con_ex_tvs = ex_tvs
                            , con_mb_cxt = mcxt, con_args = args
-                           , con_doc = mb_doc, con_forall = forall })
+                           , con_doc = mb_doc, con_forall = forall_ })
   = do  { _        <- addLocMA checkConName name
         ; new_name <- lookupLocatedTopConstructorRnN name
 
@@ -2326,7 +2329,7 @@ rnConDecl decl@(ConDeclH98 { con_name = name, con_ex_tvs = ex_tvs
                        , con_name = new_name, con_ex_tvs = new_ex_tvs
                        , con_mb_cxt = new_context, con_args = new_args
                        , con_doc = mb_doc
-                       , con_forall = forall }, -- Remove when #18311 is fixed
+                       , con_forall = forall_ }, -- Remove when #18311 is fixed
                   all_fvs) }}
 
 rnConDecl (ConDeclGADT { con_names   = names

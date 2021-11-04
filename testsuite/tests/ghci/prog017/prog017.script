@@ -61,7 +61,7 @@
 :complete repl "➾"
 
 -- mathematicalOperators
-:complete repl "∀"
+:complete repl "∁"
 
 -- miscellaneousMathematicalSymbolsAR
 :complete repl "⟑"

@@ -3218,6 +3218,7 @@ wWarningFlagsDeps = mconcat [
   warnSpec    Opt_WarnOperatorWhitespace,
   warnSpec    Opt_WarnImplicitLift,
   warnSpec    Opt_WarnMissingExportedPatternSynonymSignatures,
+  warnSpec    Opt_WarnForallIdentifier,
   warnSpec    Opt_WarnUnicodeBidirectionalFormatCharacters
  ]
 
