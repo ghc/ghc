@@ -506,7 +506,7 @@ renameCon :: ConDecl GhcRn -> RnM (ConDecl DocNameI)
 renameCon decl@(ConDeclH98 { con_name = lname, con_ex_tvs = ltyvars
                            , con_mb_cxt = lcontext, con_args = details
                            , con_doc = mbldoc
-                           , con_forall = forall }) = do
+                           , con_forall = forall_ }) = do
       lname'    <- renameL lname
       ltyvars'  <- mapM renameLTyVarBndr ltyvars
       lcontext' <- traverse renameLContext lcontext
@@ -514,7 +514,7 @@ renameCon decl@(ConDeclH98 { con_name = lname, con_ex_tvs = ltyvars
       mbldoc'   <- mapM renameLDocHsSyn mbldoc
       return (decl { con_ext = noExtField, con_name = lname', con_ex_tvs = ltyvars'
                    , con_mb_cxt = lcontext'
-                   , con_forall = forall -- Remove when #18311 is fixed
+                   , con_forall = forall_ -- Remove when #18311 is fixed
                    , con_args = details', con_doc = mbldoc' })
 
 renameCon ConDeclGADT { con_names = lnames, con_bndrs = bndrs
