@@ -485,11 +485,11 @@ primOpRules nm = \case
 
    -- coercions
 
-   Int8ToIntOp    -> mkPrimOpRule nm 1 [ liftLitPlatform extendIntLit ]
-   Int16ToIntOp   -> mkPrimOpRule nm 1 [ liftLitPlatform extendIntLit ]
-   Int32ToIntOp   -> mkPrimOpRule nm 1 [ liftLitPlatform extendIntLit ]
+   Int8ToIntOp    -> mkPrimOpRule nm 1 [ liftLitPlatform convertToIntLit ]
+   Int16ToIntOp   -> mkPrimOpRule nm 1 [ liftLitPlatform convertToIntLit ]
+   Int32ToIntOp   -> mkPrimOpRule nm 1 [ liftLitPlatform convertToIntLit ]
 #if WORD_SIZE_IN_BITS < 64
-   Int64ToIntOp   -> mkPrimOpRule nm 1 [ liftLitPlatform extendIntLit ]
+   Int64ToIntOp   -> mkPrimOpRule nm 1 [ liftLitPlatform convertToIntLit ]
 #endif
    IntToInt8Op    -> mkPrimOpRule nm 1 [ liftLit narrowInt8Lit
                                        , semiInversePrimOp Int8ToIntOp
@@ -504,17 +504,17 @@ primOpRules nm = \case
    IntToInt64Op   -> mkPrimOpRule nm 1 [ liftLit narrowInt64Lit ]
 #endif
 
-   Word8ToWordOp  -> mkPrimOpRule nm 1 [ liftLitPlatform extendWordLit
+   Word8ToWordOp  -> mkPrimOpRule nm 1 [ liftLitPlatform convertToWordLit
                                        , extendNarrowPassthrough WordToWord8Op 0xFF
                                        ]
-   Word16ToWordOp -> mkPrimOpRule nm 1 [ liftLitPlatform extendWordLit
+   Word16ToWordOp -> mkPrimOpRule nm 1 [ liftLitPlatform convertToWordLit
                                        , extendNarrowPassthrough WordToWord16Op 0xFFFF
                                        ]
-   Word32ToWordOp -> mkPrimOpRule nm 1 [ liftLitPlatform extendWordLit
+   Word32ToWordOp -> mkPrimOpRule nm 1 [ liftLitPlatform convertToWordLit
                                        , extendNarrowPassthrough WordToWord32Op 0xFFFFFFFF
                                        ]
 #if WORD_SIZE_IN_BITS < 64
-   Word64ToWordOp -> mkPrimOpRule nm 1 [ liftLitPlatform extendWordLit ]
+   Word64ToWordOp -> mkPrimOpRule nm 1 [ liftLitPlatform convertToWordLit ]
 #endif
 
    WordToWord8Op  -> mkPrimOpRule nm 1 [ liftLit narrowWord8Lit
