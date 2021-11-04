@@ -491,7 +491,7 @@ solveOneFromTheOther ev_i ev_w
 
   -- After this, neither ev_i or ev_w are Derived
   | CtWanted { ctev_loc = loc_w } <- ev_w
-  , prohibitedSuperClassSolve (ctEvLoc ev_i) loc_w
+  , prohibitedSuperClassSolve loc_i loc_w
   = -- inert must be Given
     do { traceTcS "prohibitedClassSolve1" (ppr ev_i $$ ppr ev_w)
        ; return KeepWork }
@@ -539,30 +539,27 @@ solveOneFromTheOther ev_i ev_w
      different_level_strategy  -- Both Given
        | isIPLikePred pred = if lvl_w > lvl_i then KeepWork  else KeepInert
        | otherwise         = if lvl_w > lvl_i then KeepInert else KeepWork
-       -- See Note [Replacement vs keeping] (the different-level bullet)
+       -- See Note [Replacement vs keeping] part (1)
        -- For the isIPLikePred case see Note [Shadowing of Implicit Parameters]
 
      same_level_strategy -- Both Given
-       = case (un_given (ctLocOrigin loc_i), un_given (ctLocOrigin loc_w)) of
-              -- case 2(b) from Note [Replacement vs keeping]
-           (InstSC _depth_i size_i, InstSC _depth_w size_w) | size_w < size_i -> KeepWork
-                                                            | otherwise       -> KeepInert
+       = case (ctLocOrigin loc_i, ctLocOrigin loc_w) of
+              -- case 2(a) from Note [Replacement vs keeping]
+           (InstSCOrigin _depth_i size_i, InstSCOrigin _depth_w size_w)
+             | size_w < size_i -> KeepWork
+             | otherwise       -> KeepInert
 
               -- case 2(c) from Note [Replacement vs keeping]
-           (InstSC depth_i _, OtherSC depth_w _)  -> choose_shallower depth_i depth_w
-           (OtherSC depth_i _, InstSC depth_w _)  -> choose_shallower depth_i depth_w
-           (OtherSC depth_i _, OtherSC depth_w _) -> choose_shallower depth_i depth_w
+           (InstSCOrigin depth_i _, OtherSCOrigin depth_w _)  -> choose_shallower depth_i depth_w
+           (OtherSCOrigin depth_i _, InstSCOrigin depth_w _)  -> choose_shallower depth_i depth_w
+           (OtherSCOrigin depth_i _, OtherSCOrigin depth_w _) -> choose_shallower depth_i depth_w
 
-              -- case 2(a) from Note [Replacement vs keeping]
-           (InstSC {}, _)                         -> KeepWork
-           (OtherSC {}, _)                        -> KeepWork
+              -- case 2(b) from Note [Replacement vs keeping]
+           (InstSCOrigin {}, _)                         -> KeepWork
+           (OtherSCOrigin {}, _)                        -> KeepWork
 
              -- case 2(d) from Note [Replacement vs keeping]
            _                                      -> KeepInert
-
-     un_given (GivenOrigin skol_info) = skol_info
-     un_given orig = pprPanic "Given without GivenOrigin in solveOneFromTheOther" $
-                     vcat [ppr ev_i, ppr ev_w, ppr orig]
 
      choose_shallower depth_i depth_w | depth_w < depth_i = KeepWork
                                       | otherwise         = KeepInert
@@ -592,7 +589,10 @@ solveOneFromTheOther.
 
   2) Constraints coming from the same level (i.e. same implication)
 
-       (a) Prefer constraints that are not superclass selections. Example:
+       (a) If both are InstSCOrigin, choose the one with the smallest TypeSize,
+           according to Note [Solving superclass constraints] in GHC.Tc.TyCl.Instance.
+
+       (b) Prefer constraints that are not superclass selections. Example:
 
              f :: (Eq a, Ord a) => a -> Bool
              f x = x == x
@@ -605,20 +605,18 @@ solveOneFromTheOther.
            Getting this wrong was #20602. See also
            Note [Tracking redundant constraints] in GHC.Tc.Solver.
 
-       (b) If both are InstSC, choose the one with the smallest TypeSize,
-           according to Note [Solving superclass constraints] in GHC.Tc.TyCl.Instance.
-
-       (c) If both are superclass selections (but not both InstSC), choose the one
+       (c) If both are superclass selections (but not both InstSCOrigin), choose the one
            with the shallower superclass-selection depth, in the hope of identifying
            more correct redundant constraints. This is really a generalization of
-           point (a).
+           point (b), because the superclass depth of a non-superclass
+           constraint is 0.
 
        (d) Finally, when there is still a choice, use KeepInert rather than
            KeepWork, for two reasons:
              - to avoid unnecessary munging of the inert set.
              - to cut off superclass loops; see Note [Superclass loops] in GHC.Tc.Solver.Canonical
 
-Doing the depth-check for implicit parameters, rather than making the work item
+Doing the level-check for implicit parameters, rather than making the work item
 always override, is important.  Consider
 
     data T a where { T1 :: (?x::Int) => T Int; T2 :: T a }
@@ -634,7 +632,7 @@ Now consider these steps
   - process a~Int, kicking out (?x::a)
   - process (?x::Int), the inner given, adding to inert set
   - process (?x::a), the outer given, overriding the inner given
-Wrong!  The depth-check ensures that the inner implicit parameter wins.
+Wrong!  The level-check ensures that the inner implicit parameter wins.
 (Actually I think that the order in which the work-list is processed means
 that this chain of events won't happen, but that's very fragile.)
 
@@ -2455,35 +2453,57 @@ matchLocalInst :: TcPredType -> CtLoc -> TcS ClsInstResult
 matchLocalInst pred loc
   = do { inerts@(IS { inert_cans = ics }) <- getTcSInerts
        ; case match_local_inst inerts (inert_insts ics) of
-           ([], False) -> do { traceTcS "No local instance for" (ppr pred)
-                             ; return NoInstance }
-           ([(dfun_ev, inst_tys)], unifs)
-             | not unifs
+           ([], Nothing) -> do { traceTcS "No local instance for" (ppr pred)
+                               ; return NoInstance }
+
+             -- See Note [Use only the best local instance] about
+             -- superclass depths
+           (matches, unifs)
+             | [(dfun_ev, inst_tys)] <- best_matches
+             , maybe True (> min_sc_depth) unifs
              -> do { let dfun_id = ctEvEvId dfun_ev
                    ; (tys, theta) <- instDFunType dfun_id inst_tys
                    ; let result = OneInst { cir_new_theta = theta
                                           , cir_mk_ev     = evDFunApp dfun_id tys
                                           , cir_what      = LocalInstance }
-                   ; traceTcS "Local inst found:" (ppr result)
+                   ; traceTcS "Best local inst found:" (ppr result)
+                   ; traceTcS "All local insts:" (ppr matches)
                    ; return result }
-           _ -> do { traceTcS "Multiple local instances for" (ppr pred)
-                   ; return NotSure }}
+
+             | otherwise
+             -> do { traceTcS "Multiple local instances for" (ppr pred)
+                   ; return NotSure }
+
+             where
+               extract_depth = sc_depth . ctEvLoc . fst
+               min_sc_depth = minimum (map extract_depth matches)
+               best_matches = filter ((== min_sc_depth) . extract_depth) matches }
   where
     pred_tv_set = tyCoVarsOfType pred
 
+    sc_depth :: CtLoc -> Int
+    sc_depth ctloc = case ctLocOrigin ctloc of
+      InstSCOrigin depth _  -> depth
+      OtherSCOrigin depth _ -> depth
+      _                     -> 0
+
+    -- See Note [Use only the best local instance] about superclass depths
     match_local_inst :: InertSet
                      -> [QCInst]
                      -> ( [(CtEvidence, [DFunInstType])]
-                        , Bool )      -- True <=> Some unify but do not match
+                        , Maybe Int )   -- Nothing ==> no unifying local insts
+                                        -- Just n ==> unifying local insts, with
+                                        --            minimum superclass depth
+                                        --            of n
     match_local_inst _inerts []
-      = ([], False)
+      = ([], Nothing)
     match_local_inst inerts (qci@(QCI { qci_tvs = qtvs, qci_pred = qpred
-                               , qci_ev = ev })
+                               , qci_ev = qev })
                              : qcis)
       | let in_scope = mkInScopeSet (qtv_set `unionVarSet` pred_tv_set)
       , Just tv_subst <- ruleMatchTyKiX qtv_set (mkRnEnv2 in_scope)
                                         emptyTvSubstEnv qpred pred
-      , let match = (ev, map (lookupVarEnv tv_subst) qtvs)
+      , let match = (qev, map (lookupVarEnv tv_subst) qtvs)
       = (match:matches, unif)
 
       | otherwise
@@ -2491,8 +2511,52 @@ matchLocalInst pred loc
                   (ppr qci $$ ppr pred)
             -- ASSERT: unification relies on the
             -- quantified variables being fresh
-        (matches, unif || this_unif)
+        (matches, unif `combine` this_unif)
       where
+        qloc = ctEvLoc qev
         qtv_set = mkVarSet qtvs
-        this_unif = mightEqualLater inerts qpred (ctEvLoc ev) pred loc
+        this_unif
+          | mightEqualLater inerts qpred qloc pred loc = Just (sc_depth qloc)
+          | otherwise = Nothing
         (matches, unif) = match_local_inst inerts qcis
+
+        combine Nothing  Nothing    = Nothing
+        combine (Just n) Nothing    = Just n
+        combine Nothing  (Just n)   = Just n
+        combine (Just n1) (Just n2) = Just (n1 `min` n2)
+
+{- Note [Use only the best local instance]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider (#20582) the ambiguity check for
+  (forall a. Ord (m a), forall a. Semigroup a => Eq (m a)) => m Int
+
+Because of eager expansion of given superclasses, we get
+  [G] forall a. Ord (m a)
+  [G] forall a. Eq (m a)
+  [G] forall a. Semigroup a => Eq (m a)
+
+  [W] forall a. Ord (m a)
+  [W] forall a. Semigroup a => Eq (m a)
+
+The first wanted is solved straightforwardly. But the second wanted
+matches *two* local instances. Our general rule around multiple local
+instances is that we refuse to commit to any of them. However, that
+means that our type fails the ambiguity check. That's bad: the type
+is perfectly fine. (This actually came up in the wild, in the streamly
+library.)
+
+The solution is to prefer local instances with fewer superclass selections.
+So, matchLocalInst is careful to whittle down the matches only to the
+ones with the shallowest superclass depth, and also to worry about unifying
+local instances that are at that depth (or less).
+
+By preferring these shallower local instances, we can use the last given
+listed above and pass the ambiguity check.
+
+The instance-depth mechanism uses the same superclass depth
+information as described in Note [Replacement vs keeping], 2a.
+
+Test case: typecheck/should_compile/T20582.
+
+-}
+

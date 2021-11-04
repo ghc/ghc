@@ -2428,7 +2428,6 @@ zonkSkolemInfo (InferSkol ntys) = do { ntys' <- mapM do_one ntys
                                      ; return (InferSkol ntys') }
   where
     do_one (n, ty) = do { ty' <- zonkTcType ty; return (n, ty') }
-zonkSkolemInfo (OtherSC depth si) = OtherSC depth <$> zonkSkolemInfo si
 zonkSkolemInfo skol_info = return skol_info
 
 {-
@@ -2567,6 +2566,10 @@ zonkTidyOrigin env (GivenOrigin skol_info)
   = do { skol_info1 <- zonkSkolemInfo skol_info
        ; let skol_info2 = tidySkolemInfo env skol_info1
        ; return (env, GivenOrigin skol_info2) }
+zonkTidyOrigin env (OtherSCOrigin sc_depth skol_info)
+  = do { skol_info1 <- zonkSkolemInfo skol_info
+       ; let skol_info2 = tidySkolemInfo env skol_info1
+       ; return (env, OtherSCOrigin sc_depth skol_info2) }
 zonkTidyOrigin env orig@(TypeEqOrigin { uo_actual   = act
                                       , uo_expected = exp })
   = do { (env1, act') <- zonkTidyTcType env  act
