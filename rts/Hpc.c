@@ -324,38 +324,33 @@ hs_hpc_module(char *modName,
 
 static void
 writeTix(FILE *f) {
-  HpcModuleInfo *tmpModule;
-  unsigned int i, inner_comma, outer_comma;
-
-  outer_comma = 0;
-
-  if (f == 0) {
+  if (f == NULL) {
     return;
   }
 
   fprintf(f,"Tix [");
-  tmpModule = modules;
-  for(;tmpModule != 0;tmpModule = tmpModule->next) {
+  bool outer_comma = false;
+  for (HpcModuleInfo *tmpModule = modules; tmpModule != NULL; tmpModule = tmpModule->next) {
     if (outer_comma) {
       fprintf(f,",");
     } else {
-      outer_comma = 1;
+      outer_comma = true;
     }
-    fprintf(f," TixModule \"%s\" %u %u [",
+    fprintf(f, " TixModule \"%s\" %u %u [",
            tmpModule->modName,
             (uint32_t)tmpModule->hashNo,
             (uint32_t)tmpModule->tickCount);
-    debugTrace(DEBUG_hpc,"%s: %u (hash=%u)\n",
+    debugTrace(DEBUG_hpc, "%s: %u (hash=%u)\n",
                tmpModule->modName,
                (uint32_t)tmpModule->tickCount,
                (uint32_t)tmpModule->hashNo);
 
-    inner_comma = 0;
-    for(i = 0;i < tmpModule->tickCount;i++) {
+    bool inner_comma = false;
+    for (unsigned int i = 0; i < tmpModule->tickCount; i++) {
       if (inner_comma) {
         fprintf(f,",");
       } else {
-        inner_comma = 1;
+        inner_comma = true;
       }
 
       if (tmpModule->tixArr) {
