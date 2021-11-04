@@ -39,6 +39,7 @@ import GHC.Unit         ( rtsUnit )
 import GHC.Core.Type    ( Type, tyConAppTyCon )
 import GHC.Core.TyCon
 import GHC.Cmm.CLabel
+import GHC.Cmm.Info     ( closureInfoPtr )
 import GHC.Cmm.Utils
 import GHC.Builtin.PrimOps
 import GHC.Runtime.Heap.Layout
@@ -303,10 +304,16 @@ emitPrimOp dflags primop = case primop of
     -- MutVar's value.
     emitPrimCall res MO_WriteBarrier []
     emitStore (cmmOffsetW platform mutv (fixedHdrSizeW profile)) var
-    emitCCall
-            [{-no results-}]
-            (CmmLit (CmmLabel mkDirty_MUT_VAR_Label))
-            [(baseExpr, AddrHint), (mutv, AddrHint), (CmmReg old_val, AddrHint)]
+
+    ptrOpts <- getPtrOpts
+    platform <- getPlatform
+    mkdirtyMutVarCCall <- getCode $! emitCCall
+      [{-no results-}]
+      (CmmLit (CmmLabel mkDirty_MUT_VAR_Label))
+      [(baseExpr, AddrHint), (mutv, AddrHint), (CmmReg old_val, AddrHint)]
+    emit =<< mkCmmIfThen
+      (cmmEqWord platform (mkLblExpr mkMUT_VAR_CLEAN_infoLabel) (closureInfoPtr ptrOpts mutv))
+      mkdirtyMutVarCCall
 
 --  #define sizzeofByteArrayzh(r,a) \
 --     r = ((StgArrBytes *)(a))->bytes

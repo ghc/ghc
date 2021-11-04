@@ -1401,20 +1401,22 @@ allocatePinned (Capability *cap, W_ n /*words*/, W_ alignment /*bytes*/, W_ alig
    MUT_VAR_CLEAN object is not on the mutable list; a MUT_VAR_DIRTY
    is.  When written to, a MUT_VAR_CLEAN turns into a MUT_VAR_DIRTY
    and is put on the mutable list.
+   Note that it is responsibility of the caller to do the
+   stg_MUT_VAR_CLEAN comparison.
 */
 void
 dirty_MUT_VAR(StgRegTable *reg, StgMutVar *mvar, StgClosure *old)
 {
+    ASSERT(RELAXED_LOAD(&mvar->header.info) == &stg_MUT_VAR_CLEAN_info);
+
     Capability *cap = regTableToCapability(reg);
     // No barrier required here as no other heap object fields are read. See
     // note [Heap memory barriers] in SMP.h.
-    if (RELAXED_LOAD(&mvar->header.info) == &stg_MUT_VAR_CLEAN_info) {
-        SET_INFO((StgClosure*) mvar, &stg_MUT_VAR_DIRTY_info);
-        recordClosureMutated(cap, (StgClosure *) mvar);
-        IF_NONMOVING_WRITE_BARRIER_ENABLED {
-            // See Note [Dirty flags in the non-moving collector] in NonMoving.c
-            updateRemembSetPushClosure_(reg, old);
-        }
+    SET_INFO((StgClosure*) mvar, &stg_MUT_VAR_DIRTY_info);
+    recordClosureMutated(cap, (StgClosure *) mvar);
+    IF_NONMOVING_WRITE_BARRIER_ENABLED {
+        // See Note [Dirty flags in the non-moving collector] in NonMoving.c
+        updateRemembSetPushClosure_(reg, old);
     }
 }
 
