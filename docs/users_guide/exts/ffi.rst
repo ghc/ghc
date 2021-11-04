@@ -390,7 +390,7 @@ The CAPI calling convention
 .. extension:: CApiFFI
     :shortdesc: Enable the CAPI calling convention.
 
-    :since: 7.10.1
+    :since: 7.6.1
 
 The ``CApiFFI`` extension allows a calling convention of ``capi`` to be
 used in foreign declarations, e.g. ::
