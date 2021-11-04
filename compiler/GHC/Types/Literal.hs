@@ -58,7 +58,7 @@ module GHC.Types.Literal
         -- ** Coercions
         , narrowInt8Lit, narrowInt16Lit, narrowInt32Lit, narrowInt64Lit
         , narrowWord8Lit, narrowWord16Lit, narrowWord32Lit, narrowWord64Lit
-        , extendIntLit, extendWordLit
+        , convertToIntLit, convertToWordLit
         , charToIntLit, intToCharLit
         , floatToIntLit, intToFloatLit, doubleToIntLit, intToDoubleLit
         , nullAddrLit, floatToDoubleLit, doubleToFloatLit
@@ -682,13 +682,14 @@ narrowWord16Lit = narrowLit' @Word16 LitNumWord16
 narrowWord32Lit = narrowLit' @Word32 LitNumWord32
 narrowWord64Lit = narrowLit' @Word64 LitNumWord64
 
--- | Extend a fixed-width literal (e.g. 'Int16#') to a word-sized literal (e.g.
--- 'Int#').
-extendWordLit, extendIntLit :: Platform -> Literal -> Literal
-extendWordLit platform (LitNumber _nt i)  = mkLitWord platform i
-extendWordLit _platform l                 = pprPanic "extendWordLit" (ppr l)
-extendIntLit  platform (LitNumber _nt i)  = mkLitInt platform i
-extendIntLit  _platform l                 = pprPanic "extendIntLit" (ppr l)
+-- | Extend or narrow a fixed-width literal (e.g. 'Int16#') to a target
+-- word-sized literal ('Int#' or 'Word#'). Narrowing can only happen on 32-bit
+-- architectures when we convert a 64-bit literal into a 32-bit one.
+convertToWordLit, convertToIntLit :: Platform -> Literal -> Literal
+convertToWordLit platform (LitNumber _nt i)  = mkLitWordWrap platform i
+convertToWordLit _platform l                 = pprPanic "convertToWordLit" (ppr l)
+convertToIntLit  platform (LitNumber _nt i)  = mkLitIntWrap platform i
+convertToIntLit  _platform l                 = pprPanic "convertToIntLit" (ppr l)
 
 charToIntLit (LitChar c)       = mkLitIntUnchecked (toInteger (ord c))
 charToIntLit l                 = pprPanic "charToIntLit" (ppr l)
