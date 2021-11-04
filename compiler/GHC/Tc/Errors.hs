@@ -1028,11 +1028,11 @@ tryReporter ctxt (str, keep_me,  suppress_after, reporter) cts
 
 pprArising :: CtOrigin -> SDoc
 -- Used for the main, top-level error message
--- We've done special processing for TypeEq, KindEq, Given
-pprArising (TypeEqOrigin {}) = empty
-pprArising (KindEqOrigin {}) = empty
-pprArising (GivenOrigin {})  = empty
-pprArising orig              = pprCtOrigin orig
+-- We've done special processing for TypeEq, KindEq, givens
+pprArising (TypeEqOrigin {})         = empty
+pprArising (KindEqOrigin {})         = empty
+pprArising orig | isGivenOrigin orig = empty
+                | otherwise          = pprCtOrigin orig
 
 -- Add the "arising from..." part to a message about bunch of dicts
 addArising :: CtOrigin -> SDoc -> SDoc

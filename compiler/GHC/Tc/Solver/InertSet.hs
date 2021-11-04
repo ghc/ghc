@@ -1649,7 +1649,7 @@ mightEqualLater (IS { inert_cycle_breakers = cbvs })
 prohibitedSuperClassSolve :: CtLoc -> CtLoc -> Bool
 -- See Note [Solving superclass constraints] in GHC.Tc.TyCl.Instance
 prohibitedSuperClassSolve from_loc solve_loc
-  | GivenOrigin (InstSC _ given_size) <- ctLocOrigin from_loc
+  | InstSCOrigin _ given_size <- ctLocOrigin from_loc
   , ScOrigin wanted_size <- ctLocOrigin solve_loc
   = given_size >= wanted_size
   | otherwise
