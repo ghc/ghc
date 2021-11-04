@@ -93,6 +93,8 @@ parser.add_argument("--ignore-perf-failures", choices=['increases','decreases','
                         help="Do not fail due to out-of-tolerance perf tests")
 parser.add_argument("--only-report-hadrian-deps", type=argparse.FileType('w'),
                         help="Dry run the testsuite and report all extra hadrian dependencies needed on the given file")
+parser.add_argument("--hpc", type=Path,
+                    help="Enable collection of tix files from test compilations in the given directory")
 
 args = parser.parse_args()
 
@@ -181,6 +183,10 @@ elif args.ignore_perf_failures == 'decreases':
 
 if args.test_env:
     config.test_env = args.test_env
+
+config.tix_dir = args.hpc
+if config.tix_dir is not None:
+    config.tix_dir.mkdir(exist_ok=True)
 
 config.cygwin = False
 config.msys = False

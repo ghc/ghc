@@ -247,6 +247,10 @@ class TestConfig:
         # Are we using GCC to preprocess C--?
         self.cmm_cpp_is_gcc = False
 
+        # Where to place tix files from compilation runs?
+        self.tix_dir = None # type: Optional[Path]
+
+
     def validate(self) -> None:
         """ Check the TestConfig for self-consistency """
         def assert_implies(a: bool, b: bool):

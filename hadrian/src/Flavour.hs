@@ -39,6 +39,7 @@ import Settings.Parser
 import Text.Parsec.Prim as P
 import Text.Parsec.Combinator as P
 import Text.Parsec.Char as P
+import System.Directory (canonicalizePath)
 import Control.Monad.Except
 import UserSettings
 
@@ -440,6 +441,9 @@ enableGhcCoverage = addArgs $ notStage0 ? mconcat
     [ package compiler ? enableCoverage
     , package ghc ? enableCoverage
     , package ghci ? enableCoverage
+    , builder (Testsuite RunTest) ? do
+        path <- expr $ buildRoot >>= liftIO . canonicalizePath
+        pure ["--hpc", path -/- "testsuite/hpc-tix"]
     ]
   where
     -- In principle this should work but in practice it does not: -fhpc does
