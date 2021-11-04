@@ -569,23 +569,23 @@ mk_strict_superclasses rec_clss (CtGiven { ctev_evar = evar, ctev_loc = loc })
                -- get down to a base predicate, we'll include its size.
                -- #10335
 
-       | GivenOrigin skol_info <- ctLocOrigin loc
          -- See Note [Solving superclass constraints] in GHC.Tc.TyCl.Instance
-         -- for explantation of InstSC and Note [Replacement vs keeping] in
-         -- GHC.Tc.Solver.Interact for why we need OtherSC and depths
-       = let new_skol_info = case skol_info of
+         -- for explantation of InstSCOrigin and Note [Replacement vs keeping] in
+         -- GHC.Tc.Solver.Interact for why we need OtherSCOrigin and depths
+       | otherwise
+       = loc { ctl_origin = new_orig }
+       where
+         new_orig = case ctLocOrigin loc of
             -- these cases are when we have something that's already a superclass constraint
-               InstSC  sc_depth n  -> InstSC  (sc_depth + 1) (n `max` size)
-               OtherSC sc_depth si -> OtherSC (sc_depth + 1) si
+           InstSCOrigin  sc_depth n  -> InstSCOrigin  (sc_depth + 1) (n `max` size)
+           OtherSCOrigin sc_depth si -> OtherSCOrigin (sc_depth + 1) si
 
             -- these cases do not already have a superclass constraint: depth starts at 1
-               InstSkol -> InstSC 1 size
-               _        -> OtherSC 1 skol_info
-         in
-         loc { ctl_origin = GivenOrigin new_skol_info }
+           GivenOrigin InstSkol      -> InstSCOrigin  1 size
+           GivenOrigin other_skol    -> OtherSCOrigin 1 other_skol
 
-       | otherwise  -- Probably doesn't happen, since this function
-       = loc        -- is only used for Givens, but does no harm
+           other_orig                -> pprPanic "Given constraint without given origin" $
+                                        ppr evar $$ ppr other_orig
 
 mk_strict_superclasses rec_clss ev tvs theta cls tys
   | all noFreeVarsOfType tys

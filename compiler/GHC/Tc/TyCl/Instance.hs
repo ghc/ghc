@@ -1577,9 +1577,9 @@ Answer:
     GivenOrigin InstSkol.
 
   * When we make a superclass selection from InstSkol we use
-    a SkolemInfo of (InstSC size), where 'size' is the size of
-    the constraint whose superclass we are taking.  A similarly
-    when taking the superclass of an InstSC.  This is implemented
+    a CtOrigin of (InstSCOrigin size), where 'size' is the size of
+    the constraint whose superclass we are taking.  And similarly
+    when taking the superclass of an InstSCOrigin.  This is implemented
     in GHC.Tc.Solver.Canonical.mk_strict_superclasses (in the
     mk_given_loc helper function).
 
