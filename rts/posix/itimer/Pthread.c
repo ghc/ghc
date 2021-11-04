@@ -99,29 +99,13 @@ static Condition start_cond;
 static Mutex mutex;
 static OSThreadId thread;
 
+// file descriptor for the timer (Linux only)
+static int timerfd = -1;
+
 static void *itimer_thread_func(void *_handle_tick)
 {
     TickProc handle_tick = _handle_tick;
     uint64_t nticks;
-    int timerfd = -1;
-
-#if defined(USE_TIMERFD_FOR_ITIMER) && USE_TIMERFD_FOR_ITIMER
-    struct itimerspec it;
-    it.it_value.tv_sec  = TimeToSeconds(itimer_interval);
-    it.it_value.tv_nsec = TimeToNS(itimer_interval) % 1000000000;
-    it.it_interval = it.it_value;
-
-    timerfd = timerfd_create(CLOCK_MONOTONIC, TFD_CLOEXEC);
-    if (timerfd == -1) {
-        barf("timerfd_create: %s", strerror(errno));
-    }
-    if (!TFD_CLOEXEC) {
-        fcntl(timerfd, F_SETFD, FD_CLOEXEC);
-    }
-    if (timerfd_settime(timerfd, 0, &it, NULL)) {
-        barf("timerfd_settime: %s", strerror(errno));
-    }
-#endif
 
     // Relaxed is sufficient: If we don't see that exited was set in one iteration we will
     // see it next time.
@@ -179,6 +163,35 @@ initTicker (Time interval, TickProc handle_tick)
 
     initCondition(&start_cond);
     initMutex(&mutex);
+
+    /* Open the file descriptor for the timer synchronously.
+     *
+     * We used to do it in itimer_thread_func (i.e. in the timer thread) but it
+     * meant that some user code could run before it and get confused by the
+     * allocation of the timerfd.
+     *
+     * See hClose002 which unsafely closes a file descriptor twice expecting an
+     * exception the second time: it sometimes failed when the second call to
+     * "close" closed our own timerfd which inadvertently reused the same file
+     * descriptor closed by the first call! (see #20618)
+     */
+#if USE_TIMERFD_FOR_ITIMER
+    struct itimerspec it;
+    it.it_value.tv_sec  = TimeToSeconds(itimer_interval);
+    it.it_value.tv_nsec = TimeToNS(itimer_interval) % 1000000000;
+    it.it_interval = it.it_value;
+
+    timerfd = timerfd_create(CLOCK_MONOTONIC, TFD_CLOEXEC);
+    if (timerfd == -1) {
+        barf("timerfd_create: %s", strerror(errno));
+    }
+    if (!TFD_CLOEXEC) {
+        fcntl(timerfd, F_SETFD, FD_CLOEXEC);
+    }
+    if (timerfd_settime(timerfd, 0, &it, NULL)) {
+        barf("timerfd_settime: %s", strerror(errno));
+    }
+#endif
 
     /*
      * We can't use the RTS's createOSThread here as we need to remain attached
