@@ -1393,6 +1393,7 @@ generateCCall d0 s p (CCallSpec target cconv safety) result_ty args_r_to_l
 
          conv = case cconv of
            CCallConv -> FFICCall
+           CApiConv  -> FFICCall
            StdCallConv -> FFIStdCall
            _ -> panic "GHC.StgToByteCode: unexpected calling convention"
 
@@ -1935,7 +1936,7 @@ isSupportedCConv (CCallSpec _ cconv _) = case cconv of
    StdCallConv          -> True     -- convention to ensure that a warning
    PrimCallConv         -> False    -- is triggered when a new one is added
    JavaScriptCallConv   -> False
-   CApiConv             -> False
+   CApiConv             -> True
 
 -- See bug #10462
 unsupportedCConvException :: a
