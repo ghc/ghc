@@ -25,6 +25,10 @@ import {-# SOURCE #-} GHC.Num.Integer
 
 default ()
 
+-- | ghc-bignum backend name
+backendName :: [Char]
+backendName = "ffi"
+
 -- | Compare two non-zero BigNat of the same length
 --
 -- Return:

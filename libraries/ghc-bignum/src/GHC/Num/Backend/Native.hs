@@ -30,6 +30,11 @@ import GHC.Types
 
 default ()
 
+-- | ghc-bignum backend name
+backendName :: [Char]
+backendName = "native"
+
+
 count_words_bits :: Word# -> (# Word#, Word# #)
 count_words_bits n = (# nw, nb #)
    where

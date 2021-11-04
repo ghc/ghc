@@ -1,5 +1,9 @@
 # Changelog for `ghc-bignum` package
 
+## 1.3
+
+- Expose backendName
+
 ## 1.2
 
 - Moved naturalToDouble# and naturalToFloat# to `base` package

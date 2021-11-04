@@ -32,6 +32,10 @@ import {-# SOURCE #-} GHC.Num.Natural
 
 default ()
 
+-- | ghc-bignum backend name
+backendName :: [Char]
+backendName = "gmp"
+
 ----------------------------------------------------------------------------
 -- type definitions
 

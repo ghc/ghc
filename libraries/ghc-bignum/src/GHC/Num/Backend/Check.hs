@@ -12,6 +12,7 @@
 -- | Check Native implementation against another backend
 module GHC.Num.Backend.Check where
 
+import GHC.CString
 import GHC.Prim
 import GHC.Types
 import GHC.Num.WordArray
@@ -26,6 +27,12 @@ import qualified GHC.Num.Backend.Selected as Other
 #endif
 
 default ()
+
+-- | ghc-bignum backend name
+backendName :: [Char]
+backendName = unpackAppendCString# "check-"# Other.backendName
+  -- we don't have (++) at our disposal, so we directly use
+  -- `unpackAppendCString#`
 
 bignat_compare
    :: WordArray#
