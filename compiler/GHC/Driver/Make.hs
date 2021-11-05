@@ -43,7 +43,7 @@ module GHC.Driver.Make (
         implicitRequirementsShallow,
 
         noModError, cyclicModuleErr,
-        moduleGraphNodes, SummaryNode,
+        SummaryNode,
         IsBootInterface(..), mkNodeKey,
 
         ModNodeMap(..), emptyModNodeMap, modNodeMapElems, modNodeMapLookup, modNodeMapInsert
@@ -1322,80 +1322,17 @@ topSortModules drop_hs_boot_nodes summaries mb_root_mod
                      = throwGhcException (ProgramError "module does not exist")
             in graphFromEdgedVerticesUniq (seq root (reachableG graph root))
 
-type SummaryNode = Node Int ModuleGraphNode
-
-summaryNodeKey :: SummaryNode -> Int
-summaryNodeKey = node_key
-
-summaryNodeSummary :: SummaryNode -> ModuleGraphNode
-summaryNodeSummary = node_payload
-
--- | Collect the immediate dependencies of a ModuleGraphNode,
--- optionally avoiding hs-boot dependencies.
--- If the drop_hs_boot_nodes flag is False, and if this is a .hs and there is
--- an equivalent .hs-boot, add a link from the former to the latter.  This
--- has the effect of detecting bogus cases where the .hs-boot depends on the
--- .hs, by introducing a cycle.  Additionally, it ensures that we will always
--- process the .hs-boot before the .hs, and so the HomePackageTable will always
--- have the most up to date information.
-unfilteredEdges :: Bool -> ModuleGraphNode -> [NodeKey]
-unfilteredEdges drop_hs_boot_nodes = \case
-    InstantiationNode iuid ->
-      NodeKey_Module . flip GWIB NotBoot <$> uniqDSetToList (instUnitHoles iuid)
-    ModuleNode (ExtendedModSummary ms bds) ->
-      [ NodeKey_Unit inst_unit | inst_unit <- bds ] ++
-      (NodeKey_Module . flip GWIB hs_boot_key . unLoc <$> ms_home_srcimps ms) ++
-      [ NodeKey_Module $ GWIB (ms_mod_name ms) IsBoot
-      | not $ drop_hs_boot_nodes || ms_hsc_src ms == HsBootFile
-      ] ++
-      (NodeKey_Module . flip GWIB NotBoot     . unLoc <$> ms_home_imps ms)
-  where
-    -- Drop hs-boot nodes by using HsSrcFile as the key
-    hs_boot_key | drop_hs_boot_nodes = NotBoot -- is regular mod or signature
-                | otherwise          = IsBoot
-
-moduleGraphNodes :: Bool -> [ModuleGraphNode]
-  -> (Graph SummaryNode, NodeKey -> Maybe SummaryNode)
-moduleGraphNodes drop_hs_boot_nodes summaries =
-  (graphFromEdgedVerticesUniq nodes, lookup_node)
-  where
-    numbered_summaries = zip summaries [1..]
-
-    lookup_node :: NodeKey -> Maybe SummaryNode
-    lookup_node key = Map.lookup key (unNodeMap node_map)
-
-    lookup_key :: NodeKey -> Maybe Int
-    lookup_key = fmap summaryNodeKey . lookup_node
-
-    node_map :: NodeMap SummaryNode
-    node_map = NodeMap $
-      Map.fromList [ (mkNodeKey s, node)
-                   | node <- nodes
-                   , let s = summaryNodeSummary node
-                   ]
-
-    -- We use integers as the keys for the SCC algorithm
-    nodes :: [SummaryNode]
-    nodes = [ DigraphNode s key $ out_edge_keys $ unfilteredEdges drop_hs_boot_nodes s
-            | (s, key) <- numbered_summaries
-             -- Drop the hi-boot ones if told to do so
-            , case s of
-                InstantiationNode _ -> True
-                ModuleNode ems -> not $ isBootSummary (emsModSummary ems) == IsBoot && drop_hs_boot_nodes
-            ]
-
-    out_edge_keys :: [NodeKey] -> [Int]
-    out_edge_keys = mapMaybe lookup_key
-        -- If we want keep_hi_boot_nodes, then we do lookup_key with
-        -- IsBoot; else False
-
 -- The nodes of the graph are keyed by (mod, is boot?) pairs for the current
 -- modules, and indefinite unit IDs for dependencies which are instantiated with
 -- our holes.
 --
 -- NB: hsig files show up as *normal* nodes (not boot!), since they don't
 -- participate in cycles (for now)
-type ModNodeKey = ModuleNameWithIsBoot
+
+mkNodeMap :: [ExtendedModSummary] -> ModNodeMap ExtendedModSummary
+mkNodeMap summaries = ModNodeMap $ Map.fromList
+  [ (ms_mnwib $ emsModSummary s, s) | s <- summaries]
+
 newtype ModNodeMap a = ModNodeMap { unModNodeMap :: Map.Map ModNodeKey a }
   deriving (Functor, Traversable, Foldable)
 
@@ -1410,37 +1347,6 @@ modNodeMapElems (ModNodeMap m) = Map.elems m
 
 modNodeMapLookup :: ModNodeKey -> ModNodeMap a -> Maybe a
 modNodeMapLookup k (ModNodeMap m) = Map.lookup k m
-
-data NodeKey = NodeKey_Unit {-# UNPACK #-} !InstantiatedUnit | NodeKey_Module {-# UNPACK #-} !ModNodeKey
-  deriving (Eq, Ord)
-
-instance Outputable NodeKey where
-  ppr nk = pprNodeKey nk
-
-newtype NodeMap a = NodeMap { unNodeMap :: Map.Map NodeKey a }
-  deriving (Functor, Traversable, Foldable)
-
-mkNodeKey :: ModuleGraphNode -> NodeKey
-mkNodeKey = \case
-  InstantiationNode x -> NodeKey_Unit x
-  ModuleNode x -> NodeKey_Module $ mkHomeBuildModule0 (emsModSummary x)
-
-mkHomeBuildModule0 :: ModSummary -> ModuleNameWithIsBoot
-mkHomeBuildModule0 ms = GWIB
-  { gwib_mod = moduleName $ ms_mod ms
-  , gwib_isBoot = isBootSummary ms
-  }
-
-msKey :: ModSummary -> ModuleNameWithIsBoot
-msKey = mkHomeBuildModule0
-
-pprNodeKey :: NodeKey -> SDoc
-pprNodeKey (NodeKey_Unit iu) = ppr iu
-pprNodeKey (NodeKey_Module mk) = ppr mk
-
-mkNodeMap :: [ExtendedModSummary] -> ModNodeMap ExtendedModSummary
-mkNodeMap summaries = ModNodeMap $ Map.fromList
-  [ (mkHomeBuildModule0 $ emsModSummary s, s) | s <- summaries]
 
 -- | Efficiently construct a map from a NodeKey to its list of transitive dependencies
 mkDepsMap :: [ModuleGraphNode] -> (NodeKey -> [NodeKey])
