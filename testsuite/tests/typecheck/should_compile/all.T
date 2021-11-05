@@ -397,12 +397,6 @@ test('abstract_refinement_hole_fits', normal, compile, ['-fdefer-type-errors -fn
 test('free_monad_hole_fits', normal, compile, ['-fdefer-type-errors -fno-max-valid-hole-fits -fno-max-refinement-hole-fits -frefinement-level-hole-fits=2 -funclutter-valid-hole-fits'])
 test('constraint_hole_fits', normal, compile, ['-fdefer-type-errors -fno-max-valid-hole-fits -fno-max-refinement-hole-fits -frefinement-level-hole-fits=2 -funclutter-valid-hole-fits'])
 test('type_in_type_hole_fits', normal, compile, ['-fdefer-type-errors -fno-max-valid-hole-fits'])
-test('hard_hole_fits', # Testing multiple hole-fits with lots in scope for #16875
-     compile_timeout_multiplier(0.010), # 1 is 300s, 0.010 is 3s. Without  hole-fits it takes 1s
-     compile, ['-fdefer-type-errors -fno-max-valid-hole-fits -package ghc'])
-test('T16875',  # Testing one hole-fit with a lot in scope for #16875
-     compile_timeout_multiplier(0.0015), #0.45s
-     compile, ['-fdefer-type-errors -fno-max-valid-hole-fits -package ghc'])
 test('T15370', normal, compile, ['-fdefer-type-errors -fno-max-valid-hole-fits -funclutter-valid-hole-fits'])
 test('T7408', normal, compile, [''])
 test('UnboxStrictPrimitiveFields', normal, compile, [''])

@@ -512,3 +512,11 @@ test ('T19695',
       [ collect_compiler_stats('bytes allocated',2)],
       compile,
       ['-v0 -O2'])
+
+test('hard_hole_fits', # Testing multiple hole-fits with lots in scope for #16875
+     collect_compiler_stats('bytes allocated', 2), # 1 is 300s, 0.010 is 3s. Without  hole-fits it takes 1s
+     compile, ['-fdefer-type-errors -fno-max-valid-hole-fits -package ghc'])
+
+test('T16875',  # Testing one hole-fit with a lot in scope for #16875
+     collect_compiler_stats('bytes allocated', 2),
+     compile, ['-fdefer-type-errors -fno-max-valid-hole-fits -package ghc'])
