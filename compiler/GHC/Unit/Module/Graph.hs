@@ -1,5 +1,7 @@
 {-# LANGUAGE LambdaCase      #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveTraversable #-}
 
 module GHC.Unit.Module.Graph
    ( ModuleGraph
@@ -18,10 +20,23 @@ module GHC.Unit.Module.Graph
    , mgElemModule
    , mgLookupModule
    , mgBootModules
+   , mgTransDeps
    , needsTemplateHaskellOrQQ
    , isTemplateHaskellOrQQNonBoot
    , showModMsg
-   , moduleGraphNodeModule)
+   , moduleGraphNodeModule
+
+   , moduleGraphNodes
+   , SummaryNode
+   , summaryNodeSummary
+
+   , NodeKey(..)
+   , ModNodeKey
+   , mkNodeKey
+   , msKey
+
+   )
+
 where
 
 import GHC.Prelude
@@ -29,13 +44,13 @@ import GHC.Prelude
 import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Data.Maybe
-import GHC.Data.Graph.Directed ( SCC(..) )
+import GHC.Data.Graph.Directed
 
 import GHC.Driver.Backend
 import GHC.Driver.Ppr
 import GHC.Driver.Session
 
-import GHC.Types.SourceFile ( hscSourceString )
+import GHC.Types.SourceFile ( hscSourceString, HscSource (HsBootFile) )
 
 import GHC.Unit.Module.ModSummary
 import GHC.Unit.Module.Env
@@ -43,6 +58,10 @@ import GHC.Unit.Types
 import GHC.Utils.Outputable
 
 import System.FilePath
+import qualified Data.Map as Map
+import GHC.Types.Unique.DSet
+import GHC.Types.SrcLoc
+import qualified Data.Set as Set
 
 -- | A '@ModuleGraphNode@' is a node in the '@ModuleGraph@'.
 -- Edges between nodes mark dependencies arising from module imports
@@ -76,6 +95,9 @@ instance Outputable ModuleGraphNode where
 -- 'GHC.topSortModuleGraph' and 'GHC.Data.Graph.Directed.flattenSCC' to achieve this.
 data ModuleGraph = ModuleGraph
   { mg_mss :: [ModuleGraphNode]
+  , mg_trans_deps :: Map.Map NodeKey (Set.Set NodeKey)
+    -- A cached transitive dependency calculation so that a lot of work is not
+    -- repeated whenever the transitive dependencies need to be calculated (for example, hptInstances)
   , mg_non_boot :: ModuleEnv ModSummary
     -- a map of all non-boot ModSummaries keyed by Modules
   , mg_boot :: ModuleSet
@@ -107,6 +129,9 @@ mapMG f mg@ModuleGraph{..} = mg
 mgBootModules :: ModuleGraph -> ModuleSet
 mgBootModules ModuleGraph{..} = mg_boot
 
+mgTransDeps :: ModuleGraph -> Map.Map NodeKey (Set.Set NodeKey)
+mgTransDeps = mg_trans_deps
+
 mgModSummaries :: ModuleGraph -> [ModSummary]
 mgModSummaries mg = [ m | ModuleNode (ExtendedModSummary m _) <- mgModSummaries' mg ]
 
@@ -124,7 +149,7 @@ mgLookupModule :: ModuleGraph -> Module -> Maybe ModSummary
 mgLookupModule ModuleGraph{..} m = lookupModuleEnv mg_non_boot m
 
 emptyMG :: ModuleGraph
-emptyMG = ModuleGraph [] emptyModuleEnv emptyModuleSet False
+emptyMG = ModuleGraph [] Map.empty emptyModuleEnv emptyModuleSet False
 
 isTemplateHaskellOrQQNonBoot :: ModSummary -> Bool
 isTemplateHaskellOrQQNonBoot ms =
@@ -137,6 +162,7 @@ isTemplateHaskellOrQQNonBoot ms =
 extendMG :: ModuleGraph -> ExtendedModSummary -> ModuleGraph
 extendMG ModuleGraph{..} ems@(ExtendedModSummary ms _) = ModuleGraph
   { mg_mss = ModuleNode ems : mg_mss
+  , mg_trans_deps = td
   , mg_non_boot = case isBootSummary ms of
       IsBoot -> mg_non_boot
       NotBoot -> extendModuleEnv mg_non_boot (ms_mod ms) ms
@@ -145,6 +171,9 @@ extendMG ModuleGraph{..} ems@(ExtendedModSummary ms _) = ModuleGraph
       IsBoot -> extendModuleSet mg_boot (ms_mod ms)
   , mg_needs_th_or_qq = mg_needs_th_or_qq || isTemplateHaskellOrQQNonBoot ms
   }
+  where
+    (gg, _lookup_node) = moduleGraphNodes False (ModuleNode ems : mg_mss)
+    td = allReachable gg (mkNodeKey . node_payload)
 
 extendMGInst :: ModuleGraph -> InstantiatedUnit -> ModuleGraph
 extendMGInst mg depUnitId = mg
@@ -208,4 +237,97 @@ showModMsg dflags recomp (ModuleNode (ExtendedModSummary mod_summary _)) =
                   if gopt Opt_BuildDynamicToo  dflags
                     then text obj_file <> comma <+> text dyn_file
                     else text obj_file
+
+
+
+
+type SummaryNode = Node Int ModuleGraphNode
+
+summaryNodeKey :: SummaryNode -> Int
+summaryNodeKey = node_key
+
+summaryNodeSummary :: SummaryNode -> ModuleGraphNode
+summaryNodeSummary = node_payload
+
+-- | Collect the immediate dependencies of a ModuleGraphNode,
+-- optionally avoiding hs-boot dependencies.
+-- If the drop_hs_boot_nodes flag is False, and if this is a .hs and there is
+-- an equivalent .hs-boot, add a link from the former to the latter.  This
+-- has the effect of detecting bogus cases where the .hs-boot depends on the
+-- .hs, by introducing a cycle.  Additionally, it ensures that we will always
+-- process the .hs-boot before the .hs, and so the HomePackageTable will always
+-- have the most up to date information.
+unfilteredEdges :: Bool -> ModuleGraphNode -> [NodeKey]
+unfilteredEdges drop_hs_boot_nodes = \case
+    InstantiationNode iuid ->
+      NodeKey_Module . flip GWIB NotBoot <$> uniqDSetToList (instUnitHoles iuid)
+    ModuleNode (ExtendedModSummary ms bds) ->
+      [ NodeKey_Unit inst_unit | inst_unit <- bds ] ++
+      (NodeKey_Module . flip GWIB hs_boot_key . unLoc <$> ms_home_srcimps ms) ++
+      [ NodeKey_Module $ GWIB (ms_mod_name ms) IsBoot
+      | not $ drop_hs_boot_nodes || ms_hsc_src ms == HsBootFile
+      ] ++
+      (NodeKey_Module . flip GWIB NotBoot     . unLoc <$> ms_home_imps ms)
+  where
+    -- Drop hs-boot nodes by using HsSrcFile as the key
+    hs_boot_key | drop_hs_boot_nodes = NotBoot -- is regular mod or signature
+                | otherwise          = IsBoot
+
+moduleGraphNodes :: Bool -> [ModuleGraphNode]
+  -> (Graph SummaryNode, NodeKey -> Maybe SummaryNode)
+moduleGraphNodes drop_hs_boot_nodes summaries =
+  (graphFromEdgedVerticesUniq nodes, lookup_node)
+  where
+    numbered_summaries = zip summaries [1..]
+
+    lookup_node :: NodeKey -> Maybe SummaryNode
+    lookup_node key = Map.lookup key (unNodeMap node_map)
+
+    lookup_key :: NodeKey -> Maybe Int
+    lookup_key = fmap summaryNodeKey . lookup_node
+
+    node_map :: NodeMap SummaryNode
+    node_map = NodeMap $
+      Map.fromList [ (mkNodeKey s, node)
+                   | node <- nodes
+                   , let s = summaryNodeSummary node
+                   ]
+
+    -- We use integers as the keys for the SCC algorithm
+    nodes :: [SummaryNode]
+    nodes = [ DigraphNode s key $ out_edge_keys $ unfilteredEdges drop_hs_boot_nodes s
+            | (s, key) <- numbered_summaries
+             -- Drop the hi-boot ones if told to do so
+            , case s of
+                InstantiationNode _ -> True
+                ModuleNode ems -> not $ isBootSummary (emsModSummary ems) == IsBoot && drop_hs_boot_nodes
+            ]
+
+    out_edge_keys :: [NodeKey] -> [Int]
+    out_edge_keys = mapMaybe lookup_key
+        -- If we want keep_hi_boot_nodes, then we do lookup_key with
+        -- IsBoot; else False
+
+type ModNodeKey = ModuleNameWithIsBoot
+
+data NodeKey = NodeKey_Unit {-# UNPACK #-} !InstantiatedUnit | NodeKey_Module {-# UNPACK #-} !ModNodeKey
+  deriving (Eq, Ord)
+
+instance Outputable NodeKey where
+  ppr nk = pprNodeKey nk
+
+newtype NodeMap a = NodeMap { unNodeMap :: Map.Map NodeKey a }
+  deriving (Functor, Traversable, Foldable)
+
+mkNodeKey :: ModuleGraphNode -> NodeKey
+mkNodeKey = \case
+  InstantiationNode x -> NodeKey_Unit x
+  ModuleNode x -> NodeKey_Module $ ms_mnwib (emsModSummary x)
+
+msKey :: ModSummary -> ModuleNameWithIsBoot
+msKey = ms_mnwib
+
+pprNodeKey :: NodeKey -> SDoc
+pprNodeKey (NodeKey_Unit iu) = ppr iu
+pprNodeKey (NodeKey_Module mk) = ppr mk
 
