@@ -66,7 +66,6 @@ import Control.Monad.Trans.State.Strict
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Writer
 import Data.Functor.Identity
-import Data.Coerce
 import qualified Data.Monoid
 
 import GHC.Parser.Lexer
@@ -1049,7 +1048,7 @@ instance Applicative HdkA where
                                 -- without any smart reordering strategy. So users of this
                                 -- operation must take care to traverse the AST
                                 -- in concrete syntax order.
-                                -- See Note [Smart reordering in HdkA (or lack of thereof)]
+                                -- See Note [Smart reordering in HdkA (or lack thereof)]
                                 --
                                 -- Each computation is delimited ("sandboxed")
                                 -- in a way that it doesn't see any Haddock
@@ -1066,8 +1065,8 @@ instance Applicative HdkA where
     -- any delimiting effect on the surrounding computations.
     liftHdkA (pure a)
 
-{- Note [Smart reordering in HdkA (or lack of thereof)]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Smart reordering in HdkA (or lack thereof)]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When traversing the AST, the user must take care to traverse it in concrete
 syntax order.
 
@@ -1182,8 +1181,8 @@ extendHdkA l' (HdkA l m) = HdkA (getBufSpan l' <> l) m
 -- Haddock twice.
 --
 -- See Note [Adding Haddock comments to the syntax tree].
-newtype HdkM a = HdkM (ReaderT LocRange (State HdkSt) a)
-  deriving (Functor, Applicative, Monad)
+newtype HdkM a = HdkM { unHdkM :: LocRange -> HdkSt -> (a, HdkSt) }
+  deriving (Functor, Applicative, Monad) via (ReaderT LocRange (State HdkSt))
 
 -- | The state of HdkM.
 data HdkSt =
@@ -1199,14 +1198,6 @@ data HdkSt =
 data HdkWarn
   = HdkWarnInvalidComment (PsLocated HdkComment)
   | HdkWarnExtraComment LHsDocString
-
--- 'HdkM' without newtype wrapping/unwrapping.
-type InlineHdkM a = LocRange -> HdkSt -> (a, HdkSt)
-
-mkHdkM :: InlineHdkM a -> HdkM a
-unHdkM :: HdkM a -> InlineHdkM a
-mkHdkM = coerce
-unHdkM = coerce
 
 -- Restrict the range in which a HdkM computation will look up comments:
 --
@@ -1232,13 +1223,13 @@ unHdkM = coerce
 -- In 'HdkA', every (<*>) may restrict the location range of its
 -- subcomputations.
 inLocRange :: LocRange -> HdkM a -> HdkM a
-inLocRange r (HdkM m) = HdkM (local (mappend r) m)
+inLocRange r (HdkM m) = HdkM (\r' -> m (r <> r'))
 
 -- Take the Haddock comments that satisfy the matching function,
 -- leaving the rest pending.
 takeHdkComments :: forall a. (PsLocated HdkComment -> Maybe a) -> HdkM [a]
 takeHdkComments f =
-  mkHdkM $
+  HdkM $
     \(LocRange hdk_from hdk_to hdk_col) ->
     \hdk_st ->
       let
@@ -1277,9 +1268,9 @@ getPrevNextDoc l = do
   selectDocString (nextDocs ++ prevDocs)
 
 appendHdkWarning :: HdkWarn -> HdkM ()
-appendHdkWarning e = HdkM (ReaderT (\_ -> modify append_warn))
-  where
-    append_warn hdk_st = hdk_st { hdk_st_warnings = e : hdk_st_warnings hdk_st }
+appendHdkWarning e = HdkM $ \_ hdk_st ->
+  let hdk_st' = hdk_st { hdk_st_warnings = e : hdk_st_warnings hdk_st }
+  in ((), hdk_st')
 
 selectDocString :: [LHsDocString] -> HdkM (Maybe LHsDocString)
 selectDocString = select . filterOut (isEmptyDocString . unLoc)
@@ -1562,13 +1553,9 @@ constructs that are separated by a keyword. For example:
     data Foo -- | Comment for MkFoo
       where MkFoo :: Foo
 
-The issue stems from the lack of location information for keywords. We could
-utilize API Annotations for this purpose, but not without modification. For
-example, API Annotations operate on RealSrcSpan, whereas we need BufSpan.
+We could use EPA (exactprint annotations) to fix this, but not without
+modification. For example, EpaLocation contains RealSrcSpan but not BufSpan.
+Also, the fix would be more straghtforward after #19623.
 
-Also, there's work towards making API Annotations available in-tree (not in
-a separate Map), see #17638. This change should make the fix very easy (it
-is not as easy with the current design).
-
-See also testsuite/tests/haddock/should_compile_flag_haddock/T17544_kw.hs
+For examples, see tests/haddock/should_compile_flag_haddock/T17544_kw.hs
 -}
