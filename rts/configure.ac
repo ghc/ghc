@@ -33,6 +33,23 @@ GHC_CONVERT_PLATFORM_PARTS([host], [Host])
 FPTOOLS_SET_PLATFORM_VARS([host],[Host])
 FPTOOLS_SET_HASKELL_PLATFORM_VARS([Host])
 
+FP_CHECK_FUNC([WinExec],
+  [@%:@include <windows.h>], [WinExec("",0)])
+
+FP_CHECK_FUNC([GetModuleFileName],
+  [@%:@include <windows.h>], [GetModuleFileName((HMODULE)0,(LPTSTR)0,0)])
+
+dnl ** check for more functions
+dnl ** The following have been verified to be used in ghc/, but might be used somewhere else, too.
+AC_CHECK_FUNCS([getclock getrusage gettimeofday setitimer siginterrupt sysconf times ctime_r sched_setaffinity sched_getaffinity setlocale])
+
+dnl ** On OS X 10.4 (at least), time.h doesn't declare ctime_r if
+dnl ** _POSIX_C_SOURCE is defined
+AC_CHECK_DECLS([ctime_r], , ,
+[#define _POSIX_SOURCE 1
+#define _POSIX_C_SOURCE 199506L
+#include <time.h>])
+
 dnl ** check for mingwex library
 AC_CHECK_LIB(
   [mingwex],
