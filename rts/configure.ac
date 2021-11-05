@@ -33,6 +33,17 @@ GHC_CONVERT_PLATFORM_PARTS([host], [Host])
 FPTOOLS_SET_PLATFORM_VARS([host],[Host])
 FPTOOLS_SET_HASKELL_PLATFORM_VARS([Host])
 
+dnl ** check for mingwex library
+AC_CHECK_LIB(
+  [mingwex],
+  [closedir],
+  [AC_SUBST([HaveLibMingwEx],[YES])],
+  [AC_SUBST([HaveLibMingwEx],[NO])])
+
+if test $HaveLibMingwEx = YES ; then
+  AC_DEFINE([HAVE_MINGWEX], [1], [Define to 1 if you have the mingwex library.])
+fi
+
 dnl ** check for math library
 dnl    Keep that check as early as possible.
 dnl    as we need to know whether we need libm
