@@ -1021,20 +1021,6 @@ fi
 AC_CHECK_FUNCS(clock_gettime timer_settime)
 FP_CHECK_TIMER_CREATE
 
-dnl ** check for Apple's "interesting" long double compatibility scheme
-AC_MSG_CHECKING(for printf\$LDBLStub)
-AC_LINK_IFELSE([AC_LANG_CALL([], [printf\$LDBLStub])],
-    [
-        AC_MSG_RESULT(yes)
-        AC_DEFINE([HAVE_PRINTF_LDBLSTUB],[1],
-            [Define to 1 if we have printf$LDBLStub (Apple Mac OS >= 10.4, PPC).])
-    ],
-    [
-        AC_MSG_RESULT(no)
-        AC_DEFINE([HAVE_PRINTF_LDBLSTUB],[0],
-            [Define to 1 if we have printf$LDBLStub (Apple Mac OS >= 10.4, PPC).])
-    ])
-
 FP_CHECK_PTHREAD_LIB
 AC_SUBST([UseLibpthread])
 
