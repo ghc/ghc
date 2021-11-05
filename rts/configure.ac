@@ -33,6 +33,20 @@ GHC_CONVERT_PLATFORM_PARTS([host], [Host])
 FPTOOLS_SET_PLATFORM_VARS([host],[Host])
 FPTOOLS_SET_HASKELL_PLATFORM_VARS([Host])
 
+dnl ** check for Apple's "interesting" long double compatibility scheme
+AC_MSG_CHECKING(for printf\$LDBLStub)
+AC_LINK_IFELSE([AC_LANG_CALL([], [printf\$LDBLStub])],
+    [
+        AC_MSG_RESULT(yes)
+        AC_DEFINE([HAVE_PRINTF_LDBLSTUB],[1],
+            [Define to 1 if we have printf$LDBLStub (Apple Mac OS >= 10.4, PPC).])
+    ],
+    [
+        AC_MSG_RESULT(no)
+        AC_DEFINE([HAVE_PRINTF_LDBLSTUB],[0],
+            [Define to 1 if we have printf$LDBLStub (Apple Mac OS >= 10.4, PPC).])
+    ])
+
 FP_CHECK_PTHREADS
 
 dnl ** check for eventfd which is needed by the I/O manager
