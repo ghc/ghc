@@ -48,13 +48,4 @@ AC_DEFUN([FP_FIND_LIBNUMA],
     CFLAGS="$CFLAGS2"
     LDFLAGS="$LDFLAGS2"
   fi
-
-  AC_DEFINE_UNQUOTED([HAVE_LIBNUMA], [$HaveLibNuma], [Define to 1 if you have libnuma])
-  if test $HaveLibNuma = "1" ; then
-    AC_SUBST([UseLibNuma],[YES])
-    AC_SUBST([CabalHaveLibNuma],[True])
-  else
-    AC_SUBST([UseLibNuma],[NO])
-    AC_SUBST([CabalHaveLibNuma],[False])
-  fi
 ])

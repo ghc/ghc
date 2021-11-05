@@ -33,6 +33,22 @@ GHC_CONVERT_PLATFORM_PARTS([host], [Host])
 FPTOOLS_SET_PLATFORM_VARS([host],[Host])
 FPTOOLS_SET_HASKELL_PLATFORM_VARS([Host])
 
+dnl ** Other RTS features
+dnl --------------------------------------------------------------
+FP_FIND_LIBDW
+if test $UseLibdw = "YES" ; then
+  USE_LIBDW=1
+else
+  USE_LIBDW=0
+fi
+AC_DEFINE_UNQUOTED([USE_LIBDW], [$USE_LIBDW], [Set to 1 to use libdw])
+
+FP_FIND_LIBNUMA
+AC_DEFINE_UNQUOTED([HAVE_LIBNUMA], [$HaveLibNuma], [Define to 1 if you have libnuma])
+
+dnl ** Write config files
+dnl --------------------------------------------------------------
+
 AC_OUTPUT
 
 [

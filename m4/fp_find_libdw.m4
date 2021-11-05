@@ -26,7 +26,6 @@ AC_DEFUN([FP_FIND_LIBDW],
   AC_SUBST(LibdwIncludeDir)
 
   UseLibdw=NO
-  USE_LIBDW=0
   AC_ARG_ENABLE(dwarf-unwind,
       [AS_HELP_STRING([--enable-dwarf-unwind],
           [Enable DWARF unwinding support in the runtime system via elfutils' libdw [default=no]])])
@@ -44,14 +43,5 @@ AC_DEFUN([FP_FIND_LIBDW],
     CFLAGS="$CFLAGS2"
     LDFLAGS="$LDFLAGS2"
   fi
-
-  AC_SUBST(UseLibdw)
-  if test $UseLibdw = "YES" ; then
-    USE_LIBDW=1
-    AC_SUBST([CabalHaveLibdw],[True])
-  else
-    AC_SUBST([CabalHaveLibdw],[False])
-  fi
-  AC_DEFINE_UNQUOTED([USE_LIBDW], [$USE_LIBDW], [Set to 1 to use libdw])
 ])
 

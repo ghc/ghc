@@ -1234,7 +1234,21 @@ AC_SUBST([CabalLibffiAdjustors])
 dnl ** Other RTS features
 dnl --------------------------------------------------------------
 FP_FIND_LIBDW
+AC_SUBST([UseLibdw])
+if test $UseLibdw = "YES" ; then
+  AC_SUBST([CabalHaveLibdw],[True])
+else
+  AC_SUBST([CabalHaveLibdw],[False])
+fi
+
 FP_FIND_LIBNUMA
+if test $HaveLibNuma = "1" ; then
+  AC_SUBST([UseLibNuma],[YES])
+  AC_SUBST([CabalHaveLibNuma],[True])
+else
+  AC_SUBST([UseLibNuma],[NO])
+  AC_SUBST([CabalHaveLibNuma],[False])
+fi
 
 dnl ** Documentation
 dnl --------------------------------------------------------------
