@@ -337,6 +337,9 @@ case ${HostOS} in
 AC_DEFINE_UNQUOTED([RTS_LINKER_USE_MMAP], [$RtsLinkerUseMmap],
                    [Use mmap in the runtime linker])
 
+GHC_ADJUSTORS_METHOD([Host])
+AC_SUBST([UseLibffiForAdjustors])
+
 dnl ** Other RTS features
 dnl --------------------------------------------------------------
 AC_DEFINE_UNQUOTED([USE_LIBDW], [$CABAL_FLAG_libdw], [Set to 1 to use libdw])
