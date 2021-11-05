@@ -33,6 +33,13 @@ GHC_CONVERT_PLATFORM_PARTS([host], [Host])
 FPTOOLS_SET_PLATFORM_VARS([host],[Host])
 FPTOOLS_SET_HASKELL_PLATFORM_VARS([Host])
 
+FP_VISIBILITY_HIDDEN
+
+dnl ** check for librt
+AC_CHECK_LIB([rt], [clock_gettime])
+AC_CHECK_FUNCS(clock_gettime timer_settime)
+FP_CHECK_TIMER_CREATE
+
 dnl ** check for Apple's "interesting" long double compatibility scheme
 AC_MSG_CHECKING(for printf\$LDBLStub)
 AC_LINK_IFELSE([AC_LANG_CALL([], [printf\$LDBLStub])],

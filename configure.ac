@@ -1107,13 +1107,8 @@ else
    AC_SUBST([CabalLeadingUnderscore],[False])
 fi
 
-FP_VISIBILITY_HIDDEN
-
 dnl ** check for librt
-AC_CHECK_LIB([rt], [clock_gettime])
 AC_CHECK_LIB([rt], [clock_gettime], [AC_SUBST([CabalHaveLibrt], [True])], [AC_SUBST([CabalHaveLibrt], [False])])
-AC_CHECK_FUNCS(clock_gettime timer_settime)
-FP_CHECK_TIMER_CREATE
 
 FP_CHECK_PTHREADS
 AS_IF([test x"$need_lpthread" = 1],
