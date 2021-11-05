@@ -948,7 +948,8 @@ fi
 TargetHasLibm=$HaveLibM
 AC_SUBST(TargetHasLibm)
 
-FP_BFD_SUPPORT
+FP_BFD_FLAG
+AC_SUBST([UseLibbfd])
 
 dnl ################################################################
 dnl Check for libraries
