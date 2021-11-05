@@ -33,6 +33,59 @@ GHC_CONVERT_PLATFORM_PARTS([host], [Host])
 FPTOOLS_SET_PLATFORM_VARS([host],[Host])
 FPTOOLS_SET_HASKELL_PLATFORM_VARS([Host])
 
+dnl --------------------------------------------------
+dnl * Platform header file and syscall feature tests
+dnl ### checking the state of the local header files and syscalls ###
+
+dnl ** Enable large file support.  NB. do this before testing the type of
+dnl    off_t, because it will affect the result of that test.
+AC_SYS_LARGEFILE
+
+dnl ** check for specific header (.h) files that we are interested in
+AC_CHECK_HEADERS([ctype.h dirent.h dlfcn.h errno.h fcntl.h grp.h limits.h locale.h nlist.h pthread.h pwd.h signal.h sys/param.h sys/mman.h sys/resource.h sys/select.h sys/time.h sys/timeb.h sys/timerfd.h sys/timers.h sys/times.h sys/utsname.h sys/wait.h termios.h time.h utime.h windows.h winsock.h sched.h])
+
+dnl sys/cpuset.h needs sys/param.h to be included first on FreeBSD 9.1; #7708
+AC_CHECK_HEADERS([sys/cpuset.h], [], [],
+[[#if HAVE_SYS_PARAM_H
+# include <sys/param.h>
+#endif
+]])
+
+dnl ** check if it is safe to include both <time.h> and <sys/time.h>
+AC_HEADER_TIME
+
+dnl ** do we have long longs?
+AC_CHECK_TYPES([long long])
+
+dnl ** what are the sizes of various types
+FP_CHECK_SIZEOF_AND_ALIGNMENT(char)
+FP_CHECK_SIZEOF_AND_ALIGNMENT(double)
+FP_CHECK_SIZEOF_AND_ALIGNMENT(float)
+FP_CHECK_SIZEOF_AND_ALIGNMENT(int)
+FP_CHECK_SIZEOF_AND_ALIGNMENT(long)
+if test "$ac_cv_type_long_long" = yes; then
+FP_CHECK_SIZEOF_AND_ALIGNMENT(long long)
+fi
+FP_CHECK_SIZEOF_AND_ALIGNMENT(short)
+FP_CHECK_SIZEOF_AND_ALIGNMENT(unsigned char)
+FP_CHECK_SIZEOF_AND_ALIGNMENT(unsigned int)
+FP_CHECK_SIZEOF_AND_ALIGNMENT(unsigned long)
+if test "$ac_cv_type_long_long" = yes; then
+FP_CHECK_SIZEOF_AND_ALIGNMENT(unsigned long long)
+fi
+FP_CHECK_SIZEOF_AND_ALIGNMENT(unsigned short)
+FP_CHECK_SIZEOF_AND_ALIGNMENT(void *)
+
+FP_CHECK_SIZEOF_AND_ALIGNMENT(int8_t)
+FP_CHECK_SIZEOF_AND_ALIGNMENT(uint8_t)
+FP_CHECK_SIZEOF_AND_ALIGNMENT(int16_t)
+FP_CHECK_SIZEOF_AND_ALIGNMENT(uint16_t)
+FP_CHECK_SIZEOF_AND_ALIGNMENT(int32_t)
+FP_CHECK_SIZEOF_AND_ALIGNMENT(uint32_t)
+FP_CHECK_SIZEOF_AND_ALIGNMENT(int64_t)
+FP_CHECK_SIZEOF_AND_ALIGNMENT(uint64_t)
+
+
 FP_CHECK_FUNC([WinExec],
   [@%:@include <windows.h>], [WinExec("",0)])
 
