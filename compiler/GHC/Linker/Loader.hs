@@ -1228,6 +1228,7 @@ unload_wkr interp keep_linkables pls@LoaderState{..}  = do
 partOfGHCi :: [PackageName]
 partOfGHCi
  | isWindowsHost || isDarwinHost = []
+ | True = []
  | otherwise = map (PackageName . mkFastString)
                    ["base", "template-haskell", "editline"]
 
@@ -1292,7 +1293,7 @@ loadPackage interp hsc_env pkg
         let logger    = hsc_logger hsc_env
             platform  = targetPlatform dflags
             is_dyn    = interpreterDynamic interp
-            dirs | is_dyn    = map ST.unpack $ Packages.unitLibraryDynDirs pkg
+            dirs | True || is_dyn    = map ST.unpack $ Packages.unitLibraryDynDirs pkg
                  | otherwise = map ST.unpack $ Packages.unitLibraryDirs pkg
 
         let hs_libs   = map ST.unpack $ Packages.unitLibraries pkg
@@ -1511,7 +1512,7 @@ locateLib interp hsc_env is_hs lib_dirs gcc_dirs lib
     tryGcc         `orElse`
     assumeDll
 
-  | loading_dynamic_hs_libs -- search for .so libraries first.
+  | True || loading_dynamic_hs_libs -- search for .so libraries first.
   = findHSDll     `orElse`
     findDynObject `orElse`
     assumeDll
