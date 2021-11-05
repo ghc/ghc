@@ -1,6 +1,11 @@
-dnl ** Have libffi?
-dnl --------------------------------------------------------------
-dnl Sets UseSystemLibFFI.
+# FP_FIND_LIBFFI
+# --------------------------------------------------------------
+# Should we used libffi? (yes or no)
+#
+# Sets variables:
+#   - UseSystemLibFFI: [YES|NO]
+#   - FFILibDir: optional path
+#   - FFIIncludeDir: optional path
 AC_DEFUN([FP_FIND_LIBFFI],
 [
   # system libffi
@@ -28,8 +33,6 @@ AC_DEFUN([FP_FIND_LIBFFI],
    fi
   ])
 
-  AC_SUBST(FFIIncludeDir)
-
   AC_ARG_WITH([ffi-libraries],
   [AS_HELP_STRING([--with-ffi-libraries=ARG],
     [Find libffi in ARG [default=system default]])
@@ -41,8 +44,6 @@ AC_DEFUN([FP_FIND_LIBFFI],
       FFILibDir="$withval" LIBFFI_LDFLAGS="-L$withval"
    fi
   ])
-
-  AC_SUBST(FFILibDir)
 
   AS_IF([test "$UseSystemLibFFI" = "YES"], [
    CFLAGS2="$CFLAGS"
@@ -63,7 +64,7 @@ AC_DEFUN([FP_FIND_LIBFFI],
    AC_CHECK_LIB(ffi, ffi_call,
     [AC_CHECK_HEADERS(
       [ffi.h],
-      [AC_DEFINE([HAVE_SYSTEM_LIBFFI], [1], [Define to 1 if you have libffi.])],
+      [],
       [AC_MSG_ERROR([Cannot find ffi.h for system libffi])]
      )],
     [AC_MSG_ERROR([Cannot find system libffi])]
