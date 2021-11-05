@@ -1052,7 +1052,6 @@ dnl    (see https://gitlab.haskell.org/ghc/ghc/issues/3730)
 AC_CHECK_LIB(m, atan, HaveLibM=YES, HaveLibM=NO)
 if test $HaveLibM = YES
 then
-  AC_DEFINE([HAVE_LIBM], [1], [Define to 1 if you need to link with libm])
   AC_SUBST([CabalHaveLibm],[True])
 else
   AC_SUBST([CabalHaveLibm],[False])
