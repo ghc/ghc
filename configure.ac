@@ -970,6 +970,8 @@ dnl ################################################################
 
 FP_FIND_LIBFFI
 AC_SUBST(UseSystemLibFFI)
+AC_SUBST(FFILibDir)
+AC_SUBST(FFIIncludeDir)
 
 dnl ** check whether we need -ldl to get dlopen()
 AC_CHECK_LIB([dl], [dlopen], UseLibdl=YES, UseLibdl=NO)
