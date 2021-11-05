@@ -1196,7 +1196,7 @@ instance Outputable LibrarySpec where
 -- just to get the DLL handle into the list.
 partOfGHCi :: [PackageName]
 partOfGHCi
- | isWindowsHost || isDarwinHost = []
+ | True || isWindowsHost || isDarwinHost = []
  | otherwise = map (PackageName . mkFastString)
                    ["base", "template-haskell", "editline"]
 
@@ -1262,7 +1262,7 @@ linkPackage hsc_env pkg
         let dflags    = hsc_dflags hsc_env
             platform  = targetPlatform dflags
             is_dyn = interpreterDynamic dflags
-            dirs | is_dyn    = Packages.libraryDynDirs pkg
+            dirs | True || is_dyn    = Packages.libraryDynDirs pkg
                  | otherwise = Packages.libraryDirs pkg
 
         let hs_libs   =  Packages.hsLibraries pkg
@@ -1470,7 +1470,7 @@ locateLib hsc_env is_hs lib_dirs gcc_dirs lib
     tryGcc         `orElse`
     assumeDll
 
-  | loading_dynamic_hs_libs -- search for .so libraries first.
+  | True || loading_dynamic_hs_libs -- search for .so libraries first.
   = findHSDll     `orElse`
     findDynObject `orElse`
     assumeDll
