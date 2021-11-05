@@ -1010,16 +1010,8 @@ FP_VISIBILITY_HIDDEN
 FP_MUSTTAIL
 
 dnl ** check for librt
-AC_CHECK_LIB([rt], [clock_gettime])
-AC_CHECK_LIB([rt], [clock_gettime], HaveLibrt=YES, HaveLibrt=NO)
-if test $HaveLibrt = YES
-then
-  AC_SUBST([UseLibrt],[YES])
-else
-  AC_SUBST([UseLibrt],[NO])
-fi
-AC_CHECK_FUNCS(clock_gettime timer_settime)
-FP_CHECK_TIMER_CREATE
+AC_CHECK_LIB([rt], [clock_gettime], UseLibrt=YES, UseLibrt=NO)
+AC_SUBST([UseLibrt])
 
 FP_CHECK_PTHREAD_LIB
 AC_SUBST([UseLibpthread])
