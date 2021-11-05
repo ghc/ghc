@@ -55,6 +55,8 @@ define includesFilesWithGenerated
 # $1 = distdir
 includes_$1_H_FILES = \
 	$$(includes_H_FILES) \
+	$$(includes_$1_H_FILES_GENERATED)
+includes_$1_H_FILES_GENERATED = \
 	$$(patsubst %,rts/$1/build/include/%,$$(includes_H_FILES_GENERATED))
 endef
 $(eval $(call includesFilesWithGenerated,dist))
@@ -303,31 +305,27 @@ $(includes_DERIVEDCONSTANTS): $(deriveConstants_INPLACE) $(includes_1_H_CONFIG) 
 	$< --gen-header -o $@ --tmpdir $(dir $@) $(DERIVE_CONSTANTS_FLAGS_FOR_HEADER)
 endif
 
-includes_dist-install_H_FILES += $(includes_DERIVEDCONSTANTS)
+includes_dist-install_H_FILES_GENERATED += $(includes_DERIVEDCONSTANTS)
 
 # ---------------------------------------------------------------------------
 # Install all header files
 
 $(eval $(call clean-target,includes,,\
-  $(includes_0_H_CONFIG) $(includes_0_H_PLATFORM) $(includes_0_H_VERSION) \
-  $(includes_1_H_CONFIG) $(includes_1_H_PLATFORM) $(includes_1_H_VERSION)))
+  $(foreach distdir,dist dist-install,$(includes_$(distdir)_H_FILES_GENERATED))))
 
 $(eval $(call all-target,includes,\
-  $(includes_0_H_CONFIG) $(includes_0_H_PLATFORM) $(includes_0_H_VERSION) \
-  $(includes_1_H_CONFIG) $(includes_1_H_PLATFORM) $(includes_1_H_VERSION) \
-  $(includes_DERIVEDCONSTANTS)))
+  $(foreach distdir,dist dist-install,$(includes_$(distdir)_H_FILES_GENERATED))))
 
 install: install_includes
 
 .PHONY: install_includes
-install_includes : $(includes_1_H_CONFIG) $(includes_1_H_PLATFORM) $(includes_1_H_VERSION)
+install_includes : $(includes_dist-install_H_FILES_GENERATED)
 	$(INSTALL_DIR) "$(DESTDIR)$(ghcheaderdir)"
 	$(foreach d,$(includes_H_SUBDIRS), \
 	    $(INSTALL_DIR) "$(DESTDIR)$(ghcheaderdir)/$d" && \
 	    $(INSTALL_HEADER) $(INSTALL_OPTS) rts/include/$d/*.h "$(DESTDIR)$(ghcheaderdir)/$d/" && \
 	) true
 	$(INSTALL_HEADER) $(INSTALL_OPTS) \
-		$(includes_1_H_CONFIG) $(includes_1_H_PLATFORM) $(includes_1_H_VERSION) \
-		$(includes_DERIVEDCONSTANTS) \
+		$(includes_dist-install_H_FILES_GENERATED) \
 		"$(DESTDIR)$(ghcheaderdir)/"
 
