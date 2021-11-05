@@ -1075,10 +1075,7 @@ AS_IF([test "x$with_system_libffi" = "xyes"],
 AC_SUBST(CabalUseSystemLibFFI)
 
 dnl ** check whether we need -ldl to get dlopen()
-AC_CHECK_LIB([dl], [dlopen])
 AC_CHECK_LIB([dl], [dlopen], [AC_SUBST([CabalHaveLibdl], [True])], [AC_SUBST([CabalHaveLibdl], [False])])
-dnl ** check whether we have dlinfo
-AC_CHECK_FUNCS([dlinfo])
 
 dnl ** check for leading underscores in symbol names
 FP_LEADING_UNDERSCORE
