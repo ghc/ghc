@@ -1325,8 +1325,10 @@ nightly-hackage:
 ############################################################
 
 perf-nofib:
-  # This needs to be reverted, and is only
-  # an attempt to unbreak master
+  # Dependencies used by perf-nofib can't be built when some compiler changes
+  # aren't (yet) supported by head.hackage.
+  # Hence we allow this job to fail.
+  allow_failure: true
   stage: testing
   needs: [validate-x86_64-linux-deb9-dwarf, doc-tarball]
   dependencies:
