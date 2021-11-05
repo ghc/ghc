@@ -33,6 +33,8 @@ GHC_CONVERT_PLATFORM_PARTS([host], [Host])
 FPTOOLS_SET_PLATFORM_VARS([host], [Host])
 FPTOOLS_SET_HASKELL_PLATFORM_VARS([Host])
 
+AS_IF([test "$CABAL_FLAG_libbfd" = 1], [FP_WHEN_ENABLED_BFD])
+
 dnl ################################################################
 dnl Check for libraries
 dnl ################################################################
