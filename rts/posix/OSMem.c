@@ -30,10 +30,8 @@
 #if defined(HAVE_FCNTL_H)
 #include <fcntl.h>
 #endif
-#if defined(HAVE_NUMA_H)
+#if HAVE_LIBNUMA
 #include <numa.h>
-#endif
-#if defined(HAVE_NUMAIF_H)
 #include <numaif.h>
 #endif
 #if defined(HAVE_SYS_RESOURCE_H) && defined(HAVE_SYS_TIME_H)

@@ -33,6 +33,15 @@ GHC_CONVERT_PLATFORM_PARTS([host], [Host])
 FPTOOLS_SET_PLATFORM_VARS([host], [Host])
 FPTOOLS_SET_HASKELL_PLATFORM_VARS([Host])
 
+dnl ** Other RTS features
+dnl --------------------------------------------------------------
+AC_DEFINE_UNQUOTED([USE_LIBDW], [$CABAL_FLAG_libdw], [Set to 1 to use libdw])
+
+AC_DEFINE_UNQUOTED([HAVE_LIBNUMA], [$CABAL_FLAG_libnuma], [Define to 1 if you have libnuma])
+
+dnl ** Write config files
+dnl --------------------------------------------------------------
+
 AC_OUTPUT
 
 dnl ######################################################################
