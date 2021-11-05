@@ -998,12 +998,6 @@ FPTOOLS_FLOAT_WORD_ORDER_BIGENDIAN
 dnl ** check for leading underscores in symbol names
 FP_LEADING_UNDERSCORE
 AC_SUBST([LeadingUnderscore], [`echo $fptools_cv_leading_underscore | sed 'y/yesno/YESNO/'`])
-if test x"$fptools_cv_leading_underscore" = xyes; then
-   AC_SUBST([CabalLeadingUnderscore],[True])
-   AC_DEFINE([LEADING_UNDERSCORE], [1], [Define to 1 if C symbols have a leading underscore added by the compiler.])
-else
-   AC_SUBST([CabalLeadingUnderscore],[False])
-fi
 
 dnl ** check for librt
 AC_CHECK_LIB([rt], [clock_gettime], UseLibrt=YES, UseLibrt=NO)
