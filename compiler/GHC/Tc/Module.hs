@@ -27,6 +27,8 @@ module GHC.Tc.Module (
         tcRnDeclsi,
         isGHCiMonad,
         runTcInteractive,    -- Used by GHC API clients (#8878)
+        withTcPlugins,       -- Used by GHC API clients (#20499)
+        withHoleFitPlugins,  -- Used by GHC API clients (#20499)
         tcRnLookupName,
         tcRnGetInfo,
         tcRnModule, tcRnModuleTcRnM,
