@@ -1080,23 +1080,6 @@ AC_CHECK_LIB([dl], [dlopen], [AC_SUBST([CabalHaveLibdl], [True])], [AC_SUBST([Ca
 dnl ** check whether we have dlinfo
 AC_CHECK_FUNCS([dlinfo])
 
-dnl --------------------------------------------------
-dnl * Miscellaneous feature tests
-dnl --------------------------------------------------
-
-dnl ** can we get alloca?
-AC_FUNC_ALLOCA
-
-dnl ** working vfork?
-AC_FUNC_FORK
-
-dnl ** determine whether or not const works
-AC_C_CONST
-
-dnl ** are we big endian?
-AC_C_BIGENDIAN
-FPTOOLS_FLOAT_WORD_ORDER_BIGENDIAN
-
 dnl ** check for leading underscores in symbol names
 FP_LEADING_UNDERSCORE
 AC_SUBST([LeadingUnderscore], [`echo $fptools_cv_leading_underscore | sed 'y/yesno/YESNO/'`])

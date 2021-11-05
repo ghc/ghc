@@ -33,6 +33,23 @@ GHC_CONVERT_PLATFORM_PARTS([host], [Host])
 FPTOOLS_SET_PLATFORM_VARS([host],[Host])
 FPTOOLS_SET_HASKELL_PLATFORM_VARS([Host])
 
+dnl --------------------------------------------------
+dnl * Miscellaneous feature tests
+dnl --------------------------------------------------
+
+dnl ** can we get alloca?
+AC_FUNC_ALLOCA
+
+dnl ** working vfork?
+AC_FUNC_FORK
+
+dnl ** determine whether or not const works
+AC_C_CONST
+
+dnl ** are we big endian?
+AC_C_BIGENDIAN
+FPTOOLS_FLOAT_WORD_ORDER_BIGENDIAN
+
 dnl ** check for leading underscores in symbol names
 FP_LEADING_UNDERSCORE
 if test x"$fptools_cv_leading_underscore" = xyes; then
