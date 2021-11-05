@@ -958,11 +958,8 @@ FP_FIND_LIBFFI
 AC_SUBST(UseSystemLibFFI)
 
 dnl ** check whether we need -ldl to get dlopen()
-AC_CHECK_LIB([dl], [dlopen])
-AC_CHECK_LIB([dl], [dlopen], HaveLibdl=YES, HaveLibdl=NO)
-AC_SUBST([UseLibdl],[$HaveLibdl])
-dnl ** check whether we have dlinfo
-AC_CHECK_FUNCS([dlinfo])
+AC_CHECK_LIB([dl], [dlopen], UseLibdl=YES, UseLibdl=NO)
+AC_SUBST([UseLibdl])
 
 dnl ** check for leading underscores in symbol names
 FP_LEADING_UNDERSCORE
