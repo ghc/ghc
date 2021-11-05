@@ -290,6 +290,7 @@ data GeneralFlag
    | Opt_Hpc
    | Opt_FamAppCache
    | Opt_ExternalInterpreter
+   | Opt_PreferDynamicLoader
    | Opt_OptimalApplicativeDo
    | Opt_VersionMacros
    | Opt_WholeArchiveHsLibs

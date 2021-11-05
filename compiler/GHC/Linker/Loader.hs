@@ -42,6 +42,7 @@ import GHC.Platform
 import GHC.Platform.Ways
 
 import GHC.Driver.Phases
+import GHC.Driver.Flags
 import GHC.Driver.Env
 import GHC.Driver.Session
 import GHC.Driver.Ppr
@@ -333,6 +334,7 @@ loadCmdLineLibs' interp hsc_env pls =
       let dflags@(DynFlags { ldInputs = cmdline_ld_inputs
                            , libraryPaths = lib_paths_base})
             = hsc_dflags hsc_env
+      let prefer_dynamic_loader = gopt Opt_PreferDynamicLoader dflags
       let logger = hsc_logger hsc_env
 
       -- (c) Link libraries from the command-line
@@ -358,8 +360,10 @@ loadCmdLineLibs' interp hsc_env pls =
       maybePutStrLn logger "Search directories (gcc):"
       maybePutStr logger (unlines $ map ("  "++) gcc_paths)
 
-      libspecs
-        <- mapM (locateLib interp hsc_env False lib_paths_env gcc_paths) minus_ls
+      libspecs <-
+          mapM
+              (locateLib interp hsc_env False prefer_dynamic_loader lib_paths_env gcc_paths)
+              minus_ls
 
       -- (d) Link .o files from the command-line
       classified_ld_inputs <- mapM (classifyLdInput logger platform)
@@ -1227,9 +1231,9 @@ unload_wkr interp keep_linkables pls@LoaderState{..}  = do
 -- of DLL handles that rts/Linker.c maintains, and that in turn is
 -- used by lookupSymbol.  So we must call addDLL for each library
 -- just to get the DLL handle into the list.
-partOfGHCi :: [PackageName]
-partOfGHCi
- | isWindowsHost || isDarwinHost = []
+partOfGHCi :: Bool -> [PackageName]
+partOfGHCi prefer_dynamic_loader
+ | isWindowsHost || isDarwinHost || prefer_dynamic_loader = []
  | otherwise = map (PackageName . mkFastString)
                    ["base", "template-haskell", "editline"]
 
@@ -1294,8 +1298,12 @@ loadPackage interp hsc_env pkg
         let logger    = hsc_logger hsc_env
             platform  = targetPlatform dflags
             is_dyn    = interpreterDynamic interp
-            dirs | is_dyn    = map ST.unpack $ Packages.unitLibraryDynDirs pkg
-                 | otherwise = map ST.unpack $ Packages.unitLibraryDirs pkg
+            prefer_dynamic_loader = gopt Opt_PreferDynamicLoader dflags
+            dirs
+                | prefer_dynamic_loader || is_dyn
+                = map ST.unpack $ Packages.unitLibraryDynDirs pkg
+                | otherwise
+                = map ST.unpack $ Packages.unitLibraryDirs pkg
 
         let hs_libs   = map ST.unpack $ Packages.unitLibraries pkg
             -- The FFI GHCi import lib isn't needed as
@@ -1322,10 +1330,16 @@ loadPackage interp hsc_env pkg
         gcc_paths <- getGCCPaths logger dflags (platformOS platform)
         dirs_env <- addEnvPaths "LIBRARY_PATH" dirs
 
-        hs_classifieds
-           <- mapM (locateLib interp hsc_env True  dirs_env gcc_paths) hs_libs'
-        extra_classifieds
-           <- mapM (locateLib interp hsc_env False dirs_env gcc_paths) extra_libs
+        hs_classifieds <-
+            mapM
+                (locateLib interp hsc_env True prefer_dynamic_loader dirs_env gcc_paths)
+                hs_libs'
+
+        extra_classifieds <-
+            mapM
+                (locateLib interp hsc_env False prefer_dynamic_loader dirs_env gcc_paths)
+                extra_libs
+
         let classifieds = hs_classifieds ++ extra_classifieds
 
         -- Complication: all the .so's must be loaded before any of the .o's.
@@ -1346,7 +1360,7 @@ loadPackage interp hsc_env pkg
 
         -- See comments with partOfGHCi
 #if defined(CAN_LOAD_DLL)
-        when (unitPackageName pkg `notElem` partOfGHCi) $ do
+        when (unitPackageName pkg `notElem` partOfGHCi prefer_dynamic_loader) $ do
             loadFrameworks interp platform pkg
             -- See Note [Crash early load_dyn and locateLib]
             -- Crash early if can't load any of `known_dlls`
@@ -1460,7 +1474,7 @@ loadFrameworks interp platform pkg
                     Just err -> cmdLineErrorIO ("can't load framework: "
                                                 ++ fw ++ " (" ++ err ++ ")" )
 
--- Try to find an object file for a given library in the given paths.
+-- | Try to find an object file for a given library in the given paths.
 -- If it isn't present, we assume that addDLL in the RTS can find it,
 -- which generally means that it should be a dynamic library in the
 -- standard system search path.
@@ -1469,12 +1483,15 @@ loadFrameworks interp platform pkg
 locateLib
   :: Interp
   -> HscEnv
+  -> Bool -- ^ are we looking for a haskell library
   -> Bool
+      -- ^ if we are looking for a haskell library, do we want to look for
+      -- a dynamic library
   -> [FilePath]
   -> [FilePath]
   -> String
   -> IO LibrarySpec
-locateLib interp hsc_env is_hs lib_dirs gcc_dirs lib
+locateLib interp hsc_env is_hs prefer_dynamic_loader lib_dirs gcc_dirs lib
   | not is_hs
     -- For non-Haskell libraries (e.g. gmp, iconv):
     --   first look in library-dirs for a dynamic library (on User paths only)
@@ -1513,7 +1530,7 @@ locateLib interp hsc_env is_hs lib_dirs gcc_dirs lib
     tryGcc         `orElse`
     assumeDll
 
-  | loading_dynamic_hs_libs -- search for .so libraries first.
+  | prefer_dynamic_loader || loading_dynamic_hs_libs -- search for .so libraries first.
   = findHSDll     `orElse`
     findDynObject `orElse`
     assumeDll

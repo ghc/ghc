@@ -3379,7 +3379,8 @@ fFlagsDeps = [
   flagSpec "show-loaded-modules"              Opt_ShowLoadedModules,
   flagSpec "whole-archive-hs-libs"            Opt_WholeArchiveHsLibs,
   flagSpec "keep-cafs"                        Opt_KeepCAFs,
-  flagSpec "link-rts"                         Opt_LinkRts
+  flagSpec "link-rts"                         Opt_LinkRts,
+  flagSpec "prefer-dynamic-loader"            Opt_PreferDynamicLoader
   ]
   ++ fHoleFlags
 
