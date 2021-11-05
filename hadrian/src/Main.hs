@@ -23,9 +23,12 @@ import qualified Rules.Selftest
 import qualified Rules.SourceDist
 import qualified Rules.Test
 import qualified UserSettings
+import System.IO
 
 main :: IO ()
 main = do
+    hSetBuffering stdout NoBuffering
+    hSetBuffering stderr NoBuffering
     -- Provide access to command line arguments and some user settings through
     -- Shake's type-indexed map 'shakeExtra'.
     argsMap <- CommandLine.cmdLineArgsMap
