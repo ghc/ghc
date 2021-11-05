@@ -33,6 +33,12 @@ GHC_CONVERT_PLATFORM_PARTS([host], [Host])
 FPTOOLS_SET_PLATFORM_VARS([host],[Host])
 FPTOOLS_SET_HASKELL_PLATFORM_VARS([Host])
 
+dnl ** check for leading underscores in symbol names
+FP_LEADING_UNDERSCORE
+if test x"$fptools_cv_leading_underscore" = xyes; then
+   AC_DEFINE([LEADING_UNDERSCORE], [1], [Define to 1 if C symbols have a leading underscore added by the compiler.])
+fi
+
 FP_VISIBILITY_HIDDEN
 
 dnl ** check for librt
