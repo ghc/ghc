@@ -33,6 +33,15 @@ GHC_CONVERT_PLATFORM_PARTS([host], [Host])
 FPTOOLS_SET_PLATFORM_VARS([host], [Host])
 FPTOOLS_SET_HASKELL_PLATFORM_VARS([Host])
 
+dnl ** check for math library
+dnl    Keep that check as early as possible.
+dnl    as we need to know whether we need libm
+dnl    for math functions or not
+dnl    (see https://gitlab.haskell.org/ghc/ghc/issues/3730)
+AS_IF(
+  [test "$CABAL_FLAG_libm" = 1],
+  [AC_DEFINE([HAVE_LIBM], [1], [Define to 1 if you need to link with libm])])
+
 AS_IF([test "$CABAL_FLAG_libbfd" = 1], [FP_WHEN_ENABLED_BFD])
 
 dnl ################################################################

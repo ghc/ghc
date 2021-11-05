@@ -937,15 +937,9 @@ dnl    Keep that check as early as possible.
 dnl    as we need to know whether we need libm
 dnl    for math functions or not
 dnl    (see https://gitlab.haskell.org/ghc/ghc/issues/3730)
-AC_CHECK_LIB(m, atan, HaveLibM=YES, HaveLibM=NO)
-if test $HaveLibM = YES
-then
-  AC_DEFINE([HAVE_LIBM], [1], [Define to 1 if you need to link with libm])
-  AC_SUBST([UseLibm],[YES])
-else
-  AC_SUBST([UseLibm],[NO])
-fi
-TargetHasLibm=$HaveLibM
+AC_CHECK_LIB(m, atan, UseLibm=YES, UseLibm=NO)
+AC_SUBST([UseLibm])
+TargetHasLibm=$UseLibM
 AC_SUBST(TargetHasLibm)
 
 FP_BFD_FLAG
