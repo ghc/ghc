@@ -33,6 +33,9 @@ GHC_CONVERT_PLATFORM_PARTS([host], [Host])
 FPTOOLS_SET_PLATFORM_VARS([host],[Host])
 FPTOOLS_SET_HASKELL_PLATFORM_VARS([Host])
 
+GHC_ADJUSTORS_METHOD([Host])
+AC_SUBST([UseLibffiForAdjustors])
+
 dnl ** Other RTS features
 dnl --------------------------------------------------------------
 FP_FIND_LIBDW
