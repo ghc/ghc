@@ -1131,7 +1131,14 @@ FP_FIND_LIBZSTD
 dnl ** Other RTS features
 dnl --------------------------------------------------------------
 FP_FIND_LIBDW
+AC_SUBST(UseLibdw)
+AC_SUBST(LibdwLibDir)
+AC_SUBST(LibdwIncludeDir)
+
 FP_FIND_LIBNUMA
+AC_SUBST(UseLibNuma)
+AC_SUBST(LibNumaLibDir)
+AC_SUBST(LibNumaIncludeDir)
 
 dnl ** Documentation
 dnl --------------------------------------------------------------
@@ -1282,17 +1289,15 @@ echo "\
    cabal-install : $CABAL
 "
 
-USING_LIBNUMA=$(if [ "$HaveLibNuma" = "1" ]; then echo "YES"; else echo "NO"; fi;)
 USING_LIBZSTD=$(if [ "$HaveLibZstd" = "1" ]; then echo "YES"; else echo "NO"; fi;)
 STATIC_LIBZSTD=$(if [ "$StaticLibZstd" = "1" ]; then echo "YES"; else echo "NO"; fi;)
-USING_LIBDW=$(if [ "$USE_LIBDW" = "1" ]; then echo "YES"; else echo "NO"; fi;)
 
 echo "\
    Using optional dependencies:
-      libnuma : $USING_LIBNUMA
+      libnuma : $UseLibNuma
       libzstd : $USING_LIBZSTD
          statically linked? : $STATIC_LIBZSTD
-      libdw   : $USING_LIBDW
+      libdw   : $UseLibdw
 
    Using LLVM tools
       llc   : $LlcCmd
