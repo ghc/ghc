@@ -1046,11 +1046,7 @@ $(eval $(call bindist-list,.,\
     $(BINDIST_HI) \
     $(BINDIST_EXTRAS) \
     rts/include/Makefile \
-    $(includes_H_FILES) \
-    $(includes_1_H_CONFIG) \
-    $(includes_1_H_PLATFORM) \
-    $(includes_1_H_VERSION) \
-    $(includes_DERIVEDCONSTANTS) \
+    $(includes_dist-install_H_FILES) \
     $(libffi_HEADERS) \
     $(INSTALL_LIBEXECS) \
     $(INSTALL_LIBEXEC_SCRIPTS) \
@@ -1090,7 +1086,7 @@ BIN_DIST_MK = $(BIN_DIST_PREP_DIR)/bindist.mk
 #
 # See Note [No stage2 packages when CrossCompiling or Stage1Only].
 
-unix-binary-dist-prep: $(includes_1_H_CONFIG) $(includes_1_H_PLATFORM) $(includes_1_H_VERSION)
+unix-binary-dist-prep: $(includes_dist-install_H_FILES_GENERATED)
 	$(call removeTrees,bindistprep/)
 	"$(MKDIRHIER)" $(BIN_DIST_PREP_DIR)
 	set -e; for i in packages LICENSE compiler ghc rts libraries utils docs libffi includes driver mk rules Makefile m4 aclocal.m4 config.sub config.guess install-sh llvm-targets llvm-passes ghc.mk inplace distrib/configure.ac distrib/README distrib/INSTALL; do ln -s ../../$$i $(BIN_DIST_PREP_DIR)/; done
@@ -1330,12 +1326,8 @@ CLEAN_FILES += mk/config.mk.old
 CLEAN_FILES += mk/project.mk.old
 CLEAN_FILES += compiler/ghc.cabal.old
 
-# These are no longer generated, but we still clean them for a while
-# as they may still be in old GHC trees:
-CLEAN_FILES += rts/include/GHCConstants.h
-CLEAN_FILES += rts/include/DerivedConstants.h
-$(foreach n,0 1 2, \
-    $(foreach h,$(includes_$n_H_CONFIG) $(includes_$n_H_PLATFORM) $(includes_$n_H_VERSION), \
+$(foreach d,dist dist-install, \
+    $(foreach h,$(includes_$d_H_FILES_GENERATED), \
         $(eval CLEAN_FILES += $h)))
 CLEAN_FILES += $(includes_SETTINGS)
 CLEAN_FILES += utils/ghc-pkg/Version.hs

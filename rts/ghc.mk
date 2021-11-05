@@ -595,10 +595,6 @@ $(eval $(call dependencies,rts,dist-install,1))
 
 $(rts_dist-install_depfile_c_asm) : $(includes_dist-install_H_FILES)
 
-$(rts_dist-install_depfile_c_asm) : $(includes_1_H_CONFIG)
-$(rts_dist-install_depfile_c_asm) : $(includes_1_H_PLATFORM)
-$(rts_dist-install_depfile_c_asm) : $(includes_1_H_VERSION)
-
 $(rts_dist-install_depfile_c_asm) : $(DTRACEPROBES_H)
 ifneq "$(UseSystemLibFFI)" "YES"
 $(rts_dist-install_depfile_c_asm) : $(libffi_HEADERS)
@@ -625,7 +621,7 @@ DTRACE_FLAGS = -x cpppath=$(CC)
 endif
 
 DTRACEPROBES_SRC = rts/RtsProbes.d
-$(DTRACEPROBES_H): $(DTRACEPROBES_SRC) $(includes_1_H_PLATFORM) | $$(dir $$@)/.
+$(DTRACEPROBES_H): $(DTRACEPROBES_SRC) $(includes_1_H_CONFIG) $(includes_1_H_PLATFORM) | $$(dir $$@)/.
 	"$(DTRACE)" $(filter -I%,$(rts_CC_OPTS)) -C $(DTRACE_FLAGS) -h -o $@ -s $<
 endif
 
