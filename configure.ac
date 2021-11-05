@@ -991,10 +991,6 @@ else
    AC_SUBST([CabalLeadingUnderscore],[False])
 fi
 
-FP_VISIBILITY_HIDDEN
-
-FP_MUSTTAIL
-
 dnl ** check for librt
 AC_CHECK_LIB([rt], [clock_gettime], UseLibrt=YES, UseLibrt=NO)
 AC_SUBST([UseLibrt])
