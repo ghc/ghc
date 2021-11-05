@@ -33,6 +33,9 @@ GHC_CONVERT_PLATFORM_PARTS([host], [Host])
 FPTOOLS_SET_PLATFORM_VARS([host], [Host])
 FPTOOLS_SET_HASKELL_PLATFORM_VARS([Host])
 
+dnl ** check for mingwex library
+AC_CHECK_LIB([mingwex],[closedir])
+
 dnl ** check for math library
 dnl    Keep that check as early as possible.
 dnl    as we need to know whether we need libm
