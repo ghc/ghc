@@ -33,6 +33,8 @@ GHC_CONVERT_PLATFORM_PARTS([host], [Host])
 FPTOOLS_SET_PLATFORM_VARS([host],[Host])
 FPTOOLS_SET_HASKELL_PLATFORM_VARS([Host])
 
+FP_BFD_SUPPORT
+
 dnl ################################################################
 dnl Check for libraries
 dnl ################################################################

@@ -1061,6 +1061,9 @@ TargetHasLibm=$HaveLibM
 AC_SUBST(TargetHasLibm)
 
 FP_BFD_SUPPORT
+AS_IF([test x"$haveLibbfd" = x"YES"],
+  [AC_SUBST([CabalHaveLibbfd], [False])],
+  [AC_SUBST([CabalHaveLibbfd], [False])])
 
 dnl ################################################################
 dnl Check for libraries
