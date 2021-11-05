@@ -33,6 +33,11 @@ GHC_CONVERT_PLATFORM_PARTS([host], [Host])
 FPTOOLS_SET_PLATFORM_VARS([host], [Host])
 FPTOOLS_SET_HASKELL_PLATFORM_VARS([Host])
 
+dnl ** check whether we need -ldl to get dlopen()
+AC_CHECK_LIB([dl], [dlopen])
+dnl ** check whether we have dlinfo
+AC_CHECK_FUNCS([dlinfo])
+
 dnl --------------------------------------------------
 dnl * Miscellaneous feature tests
 dnl --------------------------------------------------
