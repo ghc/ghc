@@ -33,6 +33,10 @@ GHC_CONVERT_PLATFORM_PARTS([host], [Host])
 FPTOOLS_SET_PLATFORM_VARS([host], [Host])
 FPTOOLS_SET_HASKELL_PLATFORM_VARS([Host])
 
+dnl ** check for eventfd which is needed by the I/O manager
+AC_CHECK_HEADERS([sys/eventfd.h])
+AC_CHECK_FUNCS([eventfd])
+
 AC_CHECK_FUNCS([getpid getuid raise])
 
 dnl ** Check for __thread support in the compiler

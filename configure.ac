@@ -1023,10 +1023,6 @@ AC_LINK_IFELSE([AC_LANG_CALL([], [printf\$LDBLStub])],
 
 FP_CHECK_PTHREADS
 
-dnl ** check for eventfd which is needed by the I/O manager
-AC_CHECK_HEADERS([sys/eventfd.h])
-AC_CHECK_FUNCS([eventfd])
-
 GHC_ADJUSTORS_METHOD([Target])
 AC_SUBST([UseLibffiForAdjustors])
 
