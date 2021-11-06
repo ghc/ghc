@@ -962,11 +962,6 @@ AC_SUBST([CabalNeedLibpthread])
 
 GHC_ADJUSTORS_METHOD([Target])
 AC_SUBST([UseLibffiForAdjustors])
-AS_IF([test x"${UseLibffiForAdjustors}" = x"YES"],
-  [CabalLibffiAdjustors=True],
-  [CabalLibffiAdjustors=False]
-)
-AC_SUBST([CabalLibffiAdjustors])
 
 dnl ** Other RTS features
 dnl --------------------------------------------------------------

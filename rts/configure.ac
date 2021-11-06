@@ -365,6 +365,10 @@ AC_DEFINE_UNQUOTED([RTS_LINKER_USE_MMAP], [$RtsLinkerUseMmap],
 
 GHC_ADJUSTORS_METHOD([Host])
 AC_SUBST([UseLibffiForAdjustors])
+AS_IF([test x"${UseLibffiForAdjustors}" = x"YES"],
+  [cabalFlags+='+libffi-adjustors'],
+  [cabalFlags+='-libffi-adjustors']
+)
 
 dnl ** Other RTS features
 dnl --------------------------------------------------------------

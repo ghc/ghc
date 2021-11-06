@@ -16,7 +16,6 @@ flag libdl
 flag use-system-libffi
   default: @CabalUseSystemLibFFI@
 flag libffi-adjustors
-  default: @CabalLibffiAdjustors@
 flag need-pthread
   default: @CabalNeedLibpthread@
 flag libbfd
