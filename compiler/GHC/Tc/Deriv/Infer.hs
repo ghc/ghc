@@ -178,7 +178,8 @@ inferConstraintsStock (DerivInstTys { dit_cls_tys     = cls_tys
                           -> [([PredOrigin], Maybe TCvSubst)])
              -> ([ThetaOrigin], [TyVar], [TcType])
            con_arg_constraints get_arg_constraints
-             = let (predss, mbSubsts) = unzip
+             = let -- Constraints from the fields of each data constructor.
+                   (predss, mbSubsts) = unzip
                      [ preds_and_mbSubst
                      | data_con <- tyConDataCons rep_tc
                      , (arg_n, arg_t_or_k, arg_ty)
@@ -191,6 +192,23 @@ inferConstraintsStock (DerivInstTys { dit_cls_tys     = cls_tys
                      , preds_and_mbSubst
                          <- get_arg_constraints orig arg_t_or_k (irrelevantMult arg_ty)
                      ]
+                   -- Stupid constraints from DatatypeContexts. Note that we
+                   -- must gather these constraints from the data constructors,
+                   -- not from the parent type constructor, as the latter can
+                   -- lead to redundant constraints in some cases. For example,
+                   -- the derived Eq instance for:
+                   --
+                   --   data Show a => T a = MkT deriving Eq
+                   --
+                   -- Should not have Show in the instance context (#20501).
+                   stupid_theta =
+                     [ substTyWith (dataConUnivTyVars data_con)
+                                   all_rep_tc_args
+                                   stupid_pred
+                     | data_con <- tyConDataCons rep_tc
+                     , stupid_pred <- dataConStupidTheta data_con
+                     ]
+
                    preds = concat predss
                    -- If the constraints require a subtype to be of kind
                    -- (* -> *) (which is the case for functor-like
@@ -202,10 +220,13 @@ inferConstraintsStock (DerivInstTys { dit_cls_tys     = cls_tys
                    unmapped_tvs = filter (\v -> v `notElemTCvSubst` subst
                                              && not (v `isInScope` subst)) tvs
                    (subst', _)  = substTyVarBndrs subst unmapped_tvs
+                   stupid_theta_origin = mkThetaOrigin deriv_origin TypeLevel [] [] [] $
+                                         substTheta subst' stupid_theta
                    preds'       = map (substPredOrigin subst') preds
                    inst_tys'    = substTys subst' inst_tys
                    tvs'         = tyCoVarsOfTypesWellScoped inst_tys'
-               in ([mkThetaOriginFromPreds preds'], tvs', inst_tys')
+               in ( [stupid_theta_origin, mkThetaOriginFromPreds preds']
+                  , tvs', inst_tys' )
 
            is_generic  = main_cls `hasKey` genClassKey
            is_generic1 = main_cls `hasKey` gen1ClassKey
@@ -261,15 +282,6 @@ inferConstraintsStock (DerivInstTys { dit_cls_tys     = cls_tys
            -- instance. rep_tc_args lists each of these counterpart types in
            -- the same order as the type variables.
            all_rep_tc_args = tyConInstArgTys rep_tc rep_tc_args
-
-               -- Stupid constraints
-           stupid_constraints
-             = [ mkThetaOrigin deriv_origin TypeLevel [] [] [] $
-                 substTheta tc_subst (tyConStupidTheta rep_tc) ]
-           tc_subst = -- See the comment with all_rep_tc_args for an
-                      -- explanation of this assertion
-                      assert (equalLength rep_tc_tvs all_rep_tc_args) $
-                      zipTvSubst rep_tc_tvs all_rep_tc_args
 
            -- Extra Data constraints
            -- The Data class (only) requires that for
@@ -327,8 +339,7 @@ inferConstraintsStock (DerivInstTys { dit_cls_tys     = cls_tys
                           [ ppr main_cls <+> ppr inst_tys'
                           , ppr arg_constraints
                           ]
-                   ; return ( stupid_constraints ++ extra_constraints
-                                                 ++ arg_constraints
+                   ; return ( extra_constraints ++ arg_constraints
                             , tvs', inst_tys') }
 
 -- | Like 'inferConstraints', but used only in the case of @DeriveAnyClass@,
