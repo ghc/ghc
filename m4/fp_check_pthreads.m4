@@ -27,6 +27,10 @@ AC_DEFUN([FP_CHECK_PTHREADS],
       ])
   AC_DEFINE_UNQUOTED([NEED_PTHREAD_LIB], [$need_lpthread],
       [Define 1 if we need to link code using pthreads with -lpthread])
+  AS_IF([test x"$need_lpthread" = 1],
+      [PTHREAD_LIB=pthread],
+      [PTHREAD_LIB=''])
+  AC_SUBST([PTHREAD_LIB])
 
   dnl Setting thread names
   dnl ~~~~~~~~~~~~~~~~~~~~

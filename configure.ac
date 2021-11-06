@@ -954,12 +954,6 @@ dnl ** check for leading underscores in symbol names
 FP_LEADING_UNDERSCORE
 AC_SUBST([LeadingUnderscore], [`echo $fptools_cv_leading_underscore | sed 'y/yesno/YESNO/'`])
 
-FP_CHECK_PTHREADS
-AS_IF([test x"$need_lpthread" = 1],
-    [CabalNeedLibpthread=True],
-    [CabalNeedLibpthread=False])
-AC_SUBST([CabalNeedLibpthread])
-
 GHC_ADJUSTORS_METHOD([Target])
 AC_SUBST([UseLibffiForAdjustors])
 

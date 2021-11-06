@@ -16,8 +16,6 @@ flag libdl
 flag use-system-libffi
   default: @CabalUseSystemLibFFI@
 flag libffi-adjustors
-flag need-pthread
-  default: @CabalNeedLibpthread@
 flag libbfd
   default: @CabalHaveLibbfd@
 flag mingwex
@@ -133,9 +131,6 @@ library
        -- and also centralizes the versioning.
        cpp-options: -D_WIN32_WINNT=0x06010000
        cc-options: -D_WIN32_WINNT=0x06010000
-    if flag(need-pthread)
-       -- for pthread_getthreadid_np, pthread_create, ...
-       extra-libraries: pthread
     if flag(need-atomic)
        -- for sub-word-sized atomic operations (#19119)
        extra-libraries: atomic
