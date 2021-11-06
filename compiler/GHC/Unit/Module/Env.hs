@@ -1,3 +1,4 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 -- | Module environment
 module GHC.Unit.Module.Env
    ( -- * Module mappings
@@ -50,6 +51,7 @@ import qualified GHC.Data.FiniteMap as Map
 
 -- | A map keyed off of 'Module's
 newtype ModuleEnv elt = ModuleEnv (Map NDModule elt)
+  deriving (Monoid, Semigroup)
 
 {-
 Note [ModuleEnv performance and determinism]
@@ -206,6 +208,7 @@ type DModuleNameEnv elt = UniqDFM ModuleName elt
 
 -- | A map keyed off of 'InstalledModule'
 newtype InstalledModuleEnv elt = InstalledModuleEnv (Map InstalledModule elt)
+  deriving (Monoid, Semigroup)
 
 emptyInstalledModuleEnv :: InstalledModuleEnv a
 emptyInstalledModuleEnv = InstalledModuleEnv Map.empty
