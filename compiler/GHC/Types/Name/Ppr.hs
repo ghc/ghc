@@ -13,8 +13,6 @@ import GHC.Prelude
 import GHC.Unit
 import GHC.Unit.Env
 
-import GHC.Core.TyCon
-
 import GHC.Types.Name
 import GHC.Types.Name.Reader
 
@@ -83,18 +81,9 @@ mkPrintUnqualified unit_env env
                        -- the right one, then we can use the unqualified name
 
         | [] <- unqual_gres
-        , any is_name forceUnqualNames
+        , pretendNameIsInScopeForPpr
         , not (isDerivedOccName occ)
-        = NameUnqual   -- Don't qualify names that come from modules
-                       -- that come with GHC, often appear in error messages,
-                       -- but aren't typically in scope. Doing this does not
-                       -- cause ambiguity, and it reduces the amount of
-                       -- qualification in error messages thus improving
-                       -- readability.
-                       --
-                       -- A motivating example is 'Constraint'. It's often not
-                       -- in scope, but printing GHC.Prim.Constraint seems
-                       -- overkill.
+        = NameUnqual   -- See Note [pretendNameIsInScopeForPpr]
 
         | [gre] <- qual_gres
         = NameQual (greQualModName gre)
@@ -112,10 +101,15 @@ mkPrintUnqualified unit_env env
         is_name name = assertPpr (isExternalName name) (ppr name) $
                        nameModule name == mod && nameOccName name == occ
 
-        forceUnqualNames :: [Name]
-        forceUnqualNames =
-          map tyConName [ constraintKindTyCon, heqTyCon, coercibleTyCon ]
-          ++ [ eqTyConName ]
+        -- See Note [pretendNameIsInScopeForPpr]
+        pretendNameIsInScopeForPpr :: Bool
+        pretendNameIsInScopeForPpr =
+          any is_name
+            [ liftedTypeKindTyConName
+            , constraintKindTyConName
+            , heqTyConName
+            , coercibleTyConName
+            , eqTyConName ]
 
         right_name gre = greDefinitionModule gre == Just mod
 
@@ -125,6 +119,43 @@ mkPrintUnqualified unit_env env
     -- we can mention a module P:M without the P: qualifier iff
     -- "import M" would resolve unambiguously to P:M.  (if P is the
     -- current package we can just assume it is unqualified).
+
+{- Note [pretendNameIsInScopeForPpr]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Normally, a name is printed unqualified if it's in scope and unambiguous:
+  ghci> :t not
+  not :: Bool -> Bool
+
+Out of scope names are qualified:
+  ghci> import Prelude hiding (Bool)
+  ghci> :t not
+  not :: GHC.Types.Bool -> GHC.Types.Bool
+
+And so are ambiguous names:
+  ghci> data Bool
+  ghci> :t not
+  not :: Prelude.Bool -> Prelude.Bool
+
+However, these rules alone would lead to excessive qualification:
+  ghci> :k Functor
+  Functor :: (GHC.Types.Type -> GHC.Types.Type) -> GHC.Types.Constraint
+
+Even if the user has not imported Data.Kind, we would rather print:
+  Functor :: (Type -> Type) -> Constraint
+
+So we maintain a list of names for which we only require that they are
+unambiguous. It reduces the amount of qualification in GHCi output and error
+messages thus improving readability.
+
+One potential problem here is that external tooling that relies on parsing GHCi
+output (e.g. Emacs mode for Haskell) requires names to be properly qualified to
+make sense of the output (see #11208). So extend this list with care.
+
+Side note (int-index):
+  This function is distinct from GHC.Bulitin.Names.pretendNameIsInScope (used
+  when filtering out instances), and perhaps we could unify them by taking a
+  union, but I have not looked into what that would entail.
+-}
 
 -- | Creates a function for formatting modules based on two heuristics:
 -- (1) if the module is the current module, don't qualify, and (2) if there

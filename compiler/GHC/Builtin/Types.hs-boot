@@ -16,6 +16,8 @@ coercibleTyCon, heqTyCon :: TyCon
 
 unitTy :: Type
 
+liftedTypeKindTyConName :: Name
+
 liftedTypeKind :: Kind
 unliftedTypeKind :: Kind
 

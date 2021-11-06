@@ -80,6 +80,7 @@ import GHC.Core.TyCon hiding ( pprPromotionQuote )
 import GHC.Core.Coercion.Axiom
 import GHC.Types.Var
 import GHC.Builtin.Names
+import {-# SOURCE #-} GHC.Builtin.Types ( liftedTypeKindTyConName )
 import GHC.Types.Name
 import GHC.Types.Basic
 import GHC.Utils.Binary
@@ -1503,7 +1504,7 @@ pprTyTcApp ctxt_prec tc tys =
 
 ppr_kind_type :: PprPrec -> SDoc
 ppr_kind_type ctxt_prec = sdocOption sdocStarIsType $ \case
-   False -> text "Type"
+   False -> pprPrefixOcc liftedTypeKindTyConName
    True  -> maybeParen ctxt_prec starPrec $
               unicodeSyntax (char '★') (char '*')
 
