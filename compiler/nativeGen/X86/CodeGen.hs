@@ -1015,7 +1015,16 @@ getRegister' _ is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
                -> NatM Register
 
     {- Case1: shift length as immediate -}
-    shift_code width instr x (CmmLit lit) = do
+    shift_code width instr x (CmmLit lit)
+      -- Handle the case of a shift larger than the width of the shifted value.
+      -- This is necessary since x86 applies a mask of 0x1f to the shift
+      -- amount, meaning that, e.g., `shr 47, $eax` will actually shift by
+      -- `47 & 0x1f == 15`. See #20626.
+      | CmmInt n _ <- lit
+      , n >= fromIntegral (widthInBits width)
+      = getRegister $ CmmLit $ CmmInt 0 width
+
+      | otherwise = do
           x_code <- getAnyReg x
           let
                format = intFormat width
