@@ -33,6 +33,8 @@ GHC_CONVERT_PLATFORM_PARTS([host], [Host])
 FPTOOLS_SET_PLATFORM_VARS([host], [Host])
 FPTOOLS_SET_HASKELL_PLATFORM_VARS([Host])
 
+AC_CHECK_FUNCS([getpid getuid raise])
+
 dnl ** Check for __thread support in the compiler
 AC_MSG_CHECKING(for __thread support)
 AC_COMPILE_IFELSE(
