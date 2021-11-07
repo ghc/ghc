@@ -291,9 +291,11 @@ emptyVarInfo x
   { vi_id = x
   , vi_pos = []
   , vi_neg = emptyPmAltConSet
-  -- Case (3) in Note [Strict fields and fields of unlifted type]
+  -- Why not set IsNotBot for unlifted type here?
+  -- Because we'd have to trigger an inhabitation test, which we can't.
+  -- See case (4) in Note [Strict fields and variables of unlifted type]
   -- in GHC.HsToCore.Pmc.Solver
-  , vi_bot = if isUnliftedType (idType x) then IsNotBot else MaybeBot
+  , vi_bot = MaybeBot
   , vi_rcm = emptyRCM
   }
 
