@@ -162,8 +162,6 @@ AC_DEFUN([GHC_SUBSECTIONS_VIA_SYMBOLS],
             TargetHasSubsectionsViaSymbols=NO
          else
             TargetHasSubsectionsViaSymbols=YES
-            AC_DEFINE([HAVE_SUBSECTIONS_VIA_SYMBOLS],[1],
-                   [Define to 1 if Apple-style dead-stripping is supported.])
          fi
         ],
         [TargetHasSubsectionsViaSymbols=NO
