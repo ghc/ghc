@@ -525,8 +525,11 @@ emptyVarInfo x
   { vi_id = x
   , vi_pos = []
   , vi_neg = emptyPmAltConSet
-  -- Case (3) in Note [Strict fields and fields of unlifted type]
-  , vi_bot = if isUnliftedType (idType x) then IsNotBot else MaybeBot
+  -- Why not set IsNotBot for unlifted type here?
+  -- Because we'd have to trigger an inhabitation test, which we can't.
+  -- See case (4) in Note [Strict fields and variables of unlifted type]
+  -- in GHC.HsToCore.Pmc.Solver
+  , vi_bot = MaybeBot
   , vi_rcm = emptyRCM
   }
 
@@ -627,7 +630,7 @@ data PhiCt
   -- ^ @PhiConCt x K tvs dicts ys@ encodes @K \@tvs dicts ys <- x@, matching @x@
   -- against the 'PmAltCon' application @K \@tvs dicts ys@, binding @tvs@,
   -- @dicts@ and possibly unlifted fields @ys@ in the process.
-  -- See Note [Strict fields and fields of unlifted type].
+  -- See Note [Strict fields and variables of unlifted type].
   | PhiNotConCt  !Id !PmAltCon
   -- ^ @PhiNotConCt x K@ encodes "x ≁ K", asserting that @x@ can't be headed
   -- by @K@.
@@ -749,9 +752,13 @@ addBotCt nabla@MkNabla{ nabla_tm_st = ts@TmSt{ ts_facts=env } } x = do
   case bot of
     IsNotBot -> mzero      -- There was x ≁ ⊥. Contradiction!
     IsBot    -> pure nabla -- There already is x ~ ⊥. Nothing left to do
-    MaybeBot -> do         -- We add x ~ ⊥
-      let vi' = vi{ vi_bot = IsBot }
-      pure nabla{ nabla_tm_st = ts{ts_facts = addToUSDFM env y vi' } }
+    MaybeBot ->            -- We add x ~ ⊥
+      -- Case (3) in Note [Strict fields and variables of unlifted type]
+      if isUnliftedType (idType x)
+        then mzero -- unlifted vars can never be ⊥
+        else do
+          let vi' = vi{ vi_bot = IsBot }
+          pure nabla{ nabla_tm_st = ts{ts_facts = addToUSDFM env y vi' } }
 
 -- | Adds the constraint @x ~/ ⊥@ to 'Nabla'. Quite similar to 'addNotConCt',
 -- but only cares for the ⊥ "constructor".
@@ -1168,12 +1175,12 @@ storing required arguments along with the PmAltConLike in 'vi_neg'.
 Note [Strict fields and variables of unlifted type]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Binders of unlifted type (and strict fields) are unlifted by construction;
-they are conceived with an implicit @≁⊥@ constraint to begin with. Hence,
-desugaring in "GHC.HsToCore.Pmc" is entirely unconcerned by strict fields,
-since the forcing happens *before* pattern matching.
-And the φ constructor constraints emitted by 'GHC.HsToCore.Pmc.checkGrd'
-have complex binding semantics (binding type constraints and unlifted fields),
-so unliftedness semantics are entirely confined to the oracle.
+they are conceived with an implicit (but delayed checked) @≁⊥@ constraint to
+begin with. Hence, desugaring in "GHC.HsToCore.Pmc" is entirely unconcerned
+by strict fields, since the forcing happens *before* pattern matching. And
+the φ constructor constraints emitted by 'GHC.HsToCore.Pmc.checkGrd' have
+complex binding semantics (binding type constraints and unlifted fields), so
+unliftedness semantics are entirely confined to the oracle.
 
 These are the moving parts:
 
@@ -1204,11 +1211,18 @@ These are the moving parts:
       constructor constraint.
 
   3.  The preceding points handle unlifted constructor fields, but there also
-      are regular binders of unlifted type.
-      Since the oracle as implemented has no notion of scoping and bindings,
-      we can't know *when* an unlifted variable comes into scope. But that's
-      not actually a problem, because we can just add the @x ≁ ⊥@ to the
-      'emptyVarInfo' when we first encounter it.
+      are regular binders of unlifted type. We simply fail in 'addBotCt' for
+      any binder of unlifted type.
+      It would be enough to check for unliftedness once, when the binder comes
+      into scope, but we haven't really a way to track that.
+
+  4.  Why not start an 'emptyVarInfo' of unlifted type with @vi_bot = IsNotBot@?
+      Because then we'd need to trigger an inhabitation test, because the var
+      might actually be void to begin with. But we can't trigger the test from
+      'emptyVarInfo'.
+      Historically, that is what we did and not doing the test led to #20631,
+      where 'addNotBotCt' trivially succeeded, because the 'VarInfo' already
+      said 'IsNotBot', implying that a prior inhabitation test succeeded.
 -}
 
 -------------------------
