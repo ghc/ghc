@@ -134,8 +134,8 @@ cmmMachOpFoldM platform mop [CmmLit (CmmInt x xrep), CmmLit (CmmInt y _)]
         MO_Mul r -> Just $! CmmLit (CmmInt (x * y) r)
         MO_U_Quot r | y /= 0 -> Just $! CmmLit (CmmInt (x_u `quot` y_u) r)
         MO_U_Rem  r | y /= 0 -> Just $! CmmLit (CmmInt (x_u `rem`  y_u) r)
-        MO_S_Quot r | y /= 0 -> Just $! CmmLit (CmmInt (x `quot` y) r)
-        MO_S_Rem  r | y /= 0 -> Just $! CmmLit (CmmInt (x `rem` y) r)
+        MO_S_Quot r | y /= 0 -> Just $! CmmLit (CmmInt (x_s `quot` y_s) r)
+        MO_S_Rem  r | y /= 0 -> Just $! CmmLit (CmmInt (x_s `rem`  y_s) r)
 
         MO_And   r -> Just $! CmmLit (CmmInt (x .&. y) r)
         MO_Or    r -> Just $! CmmLit (CmmInt (x .|. y) r)
