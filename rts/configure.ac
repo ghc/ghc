@@ -155,6 +155,12 @@ FP_CHECK_SIZEOF_AND_ALIGNMENT(int64_t)
 FP_CHECK_SIZEOF_AND_ALIGNMENT(uint64_t)
 
 
+if test "x$ac_cv_sizeof_void_p" = x8; then
+  AC_SUBST([Cabal64bit],[True])
+else
+  AC_SUBST([Cabal64bit],[False])
+fi
+
 FP_CHECK_FUNC([WinExec],
   [@%:@include <windows.h>], [WinExec("",0)])
 
@@ -176,8 +182,8 @@ dnl ** check for mingwex library
 AC_CHECK_LIB(
   [mingwex],
   [closedir],
-  [AC_SUBST([HaveLibMingwEx],[YES])],
-  [AC_SUBST([HaveLibMingwEx],[NO])])
+  [AC_SUBST([HaveLibMingwEx],[YES])] [AC_SUBST([CabalMingwex],[True])],
+  [AC_SUBST([HaveLibMingwEx],[NO])] [AC_SUBST([CabalMingwex],[False])])
 
 if test $HaveLibMingwEx = YES ; then
   AC_DEFINE([HAVE_MINGWEX], [1], [Define to 1 if you have the mingwex library.])
@@ -192,6 +198,9 @@ AC_CHECK_LIB(m, atan, HaveLibM=YES, HaveLibM=NO)
 if test $HaveLibM = YES
 then
   AC_DEFINE([HAVE_LIBM], [1], [Define to 1 if you need to link with libm])
+  AC_SUBST([CabalHaveLibm],[True])
+else
+  AC_SUBST([CabalHaveLibm],[False])
 fi
 
 FP_BFD_SUPPORT
@@ -201,9 +210,15 @@ dnl Check for libraries
 dnl ################################################################
 
 FP_FIND_LIBFFI
+AS_IF([test "x$with_system_libffi" = "xyes"],
+  [CabalUseSystemLibFFI="True"],
+  [CabalUseSystemLibFFI="False"]
+)
+AC_SUBST(CabalUseSystemLibFFI)
 
 dnl ** check whether we need -ldl to get dlopen()
 AC_CHECK_LIB([dl], [dlopen])
+AC_CHECK_LIB([dl], [dlopen], [AC_SUBST([CabalHaveLibdl], [True])], [AC_SUBST([CabalHaveLibdl], [False])])
 dnl ** check whether we have dlinfo
 AC_CHECK_FUNCS([dlinfo])
 
@@ -227,13 +242,17 @@ FPTOOLS_FLOAT_WORD_ORDER_BIGENDIAN
 dnl ** check for leading underscores in symbol names
 FP_LEADING_UNDERSCORE
 if test x"$fptools_cv_leading_underscore" = xyes; then
+   AC_SUBST([CabalLeadingUnderscore],[True])
    AC_DEFINE([LEADING_UNDERSCORE], [1], [Define to 1 if C symbols have a leading underscore added by the compiler.])
+else
+   AC_SUBST([CabalLeadingUnderscore],[False])
 fi
 
 FP_VISIBILITY_HIDDEN
 
 dnl ** check for librt
 AC_CHECK_LIB([rt], [clock_gettime])
+AC_CHECK_LIB([rt], [clock_gettime], [AC_SUBST([CabalHaveLibrt], [True])], [AC_SUBST([CabalHaveLibrt], [False])])
 AC_CHECK_FUNCS(clock_gettime timer_settime)
 FP_CHECK_TIMER_CREATE
 
@@ -352,13 +371,20 @@ dnl --------------------------------------------------------------
 FP_FIND_LIBDW
 if test $UseLibdw = "YES" ; then
   USE_LIBDW=1
+  AC_SUBST([CabalHaveLibdw],[True])
 else
   USE_LIBDW=0
+  AC_SUBST([CabalHaveLibdw],[False])
 fi
 AC_DEFINE_UNQUOTED([USE_LIBDW], [$USE_LIBDW], [Set to 1 to use libdw])
 
 FP_FIND_LIBNUMA
 AC_DEFINE_UNQUOTED([HAVE_LIBNUMA], [$HaveLibNuma], [Define to 1 if you have libnuma])
+if test $HaveLibNuma = "1" ; then
+  AC_SUBST([CabalHaveLibNuma],[True])
+else
+  AC_SUBST([CabalHaveLibNuma],[False])
+fi
 
 dnl ** Write config files
 dnl --------------------------------------------------------------

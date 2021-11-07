@@ -917,11 +917,6 @@ dnl --------------------------------------------------
 dnl for use in settings file
 AC_CHECK_SIZEOF([void *])
 TargetWordSize=$ac_cv_sizeof_void_p
-if test "x$TargetWordSize" = x8; then
-  AC_SUBST([Cabal64bit],[True])
-else
-  AC_SUBST([Cabal64bit],[False])
-fi
 AC_SUBST(TargetWordSize)
 
 AC_C_BIGENDIAN([TargetWordBigEndian=YES],[TargetWordBigEndian=NO])
@@ -931,8 +926,8 @@ dnl ** check for mingwex library
 AC_CHECK_LIB(
   [mingwex],
   [closedir],
-  [AC_SUBST([HaveLibMingwEx],[YES])] [AC_SUBST([CabalMingwex],[True])],
-  [AC_SUBST([HaveLibMingwEx],[NO])] [AC_SUBST([CabalMingwex],[False])])
+  [AC_SUBST([HaveLibMingwEx],[YES])],
+  [AC_SUBST([HaveLibMingwEx],[NO])])
 
 dnl ** check for math library
 dnl    Keep that check as early as possible.
@@ -940,12 +935,6 @@ dnl    as we need to know whether we need libm
 dnl    for math functions or not
 dnl    (see https://gitlab.haskell.org/ghc/ghc/issues/3730)
 AC_CHECK_LIB(m, atan, HaveLibM=YES, HaveLibM=NO)
-if test $HaveLibM = YES
-then
-  AC_SUBST([CabalHaveLibm],[True])
-else
-  AC_SUBST([CabalHaveLibm],[False])
-fi
 TargetHasLibm=$HaveLibM
 AC_SUBST(TargetHasLibm)
 
@@ -960,26 +949,10 @@ dnl ################################################################
 
 FP_FIND_LIBFFI
 AC_SUBST(UseSystemLibFFI)
-AS_IF([test "x$with_system_libffi" = "xyes"],
-  [CabalUseSystemLibFFI="True"],
-  [CabalUseSystemLibFFI="False"]
-)
-AC_SUBST(CabalUseSystemLibFFI)
-
-dnl ** check whether we need -ldl to get dlopen()
-AC_CHECK_LIB([dl], [dlopen], [AC_SUBST([CabalHaveLibdl], [True])], [AC_SUBST([CabalHaveLibdl], [False])])
 
 dnl ** check for leading underscores in symbol names
 FP_LEADING_UNDERSCORE
 AC_SUBST([LeadingUnderscore], [`echo $fptools_cv_leading_underscore | sed 'y/yesno/YESNO/'`])
-if test x"$fptools_cv_leading_underscore" = xyes; then
-   AC_SUBST([CabalLeadingUnderscore],[True])
-else
-   AC_SUBST([CabalLeadingUnderscore],[False])
-fi
-
-dnl ** check for librt
-AC_CHECK_LIB([rt], [clock_gettime], [AC_SUBST([CabalHaveLibrt], [True])], [AC_SUBST([CabalHaveLibrt], [False])])
 
 FP_CHECK_PTHREADS
 AS_IF([test x"$need_lpthread" = 1],
@@ -999,19 +972,12 @@ dnl ** Other RTS features
 dnl --------------------------------------------------------------
 FP_FIND_LIBDW
 AC_SUBST([UseLibdw])
-if test $UseLibdw = "YES" ; then
-  AC_SUBST([CabalHaveLibdw],[True])
-else
-  AC_SUBST([CabalHaveLibdw],[False])
-fi
 
 FP_FIND_LIBNUMA
 if test $HaveLibNuma = "1" ; then
   AC_SUBST([UseLibNuma],[YES])
-  AC_SUBST([CabalHaveLibNuma],[True])
 else
   AC_SUBST([UseLibNuma],[NO])
-  AC_SUBST([CabalHaveLibNuma],[False])
 fi
 
 dnl ** Documentation
