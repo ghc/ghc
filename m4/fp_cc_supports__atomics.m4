@@ -35,7 +35,4 @@ AC_DEFUN([FP_CC_SUPPORTS__ATOMICS],
         AC_MSG_RESULT(no)
         AC_MSG_ERROR([C compiler needs to support __atomic primitives.])
     ])
-    AC_DEFINE([HAVE_C11_ATOMICS], [1], [Does C compiler support __atomic primitives?])
-    AC_DEFINE_UNQUOTED([NEED_ATOMIC_LIB], [$need_latomic],
-        [Define to 1 if we need -latomic for sub-word atomic operations.])
 ])
