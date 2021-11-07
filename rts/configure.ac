@@ -24,14 +24,75 @@ AC_PREREQ([2.69])
 
 AC_CONFIG_HEADERS([ghcautoconf.h.autoconf])
 
+AC_ARG_ENABLE(asserts-all-ways,
+[AS_HELP_STRING([--enable-asserts-all-ways],
+                [Usually ASSERTs are only compiled in the DEBUG way,
+                 this will enable them in all ways.])],
+  [FP_CAPITALIZE_YES_NO(["$enableval"], [EnableAssertsAllWays])],
+  [EnableAssertsAllWays=NO]
+)
+if test "$enable_asserts_all_ways" = "yes" ; then
+   AC_DEFINE([USE_ASSERTS_ALL_WAYS], [1], [Compile-in ASSERTs in all ways.])
+fi
+
+AC_ARG_ENABLE(native-io-manager,
+[AS_HELP_STRING([--enable-native-io-manager],
+                [Enable the native I/O manager by default.])],
+  [FP_CAPITALIZE_YES_NO(["$enableval"], [EnableNativeIOManager])],
+  [EnableNativeIOManager=NO]
+)
+if test "$EnableNativeIOManager" = "YES"; then
+  AC_DEFINE_UNQUOTED([DEFAULT_NATIVE_IO_MANAGER], [1], [Enable Native I/O manager as default.])
+fi
+
 # We have to run these unconditionally, but we may discard their
 # results in the following code
 AC_CANONICAL_BUILD
 AC_CANONICAL_HOST
 
+dnl ** Do an unregisterised build?
+dnl --------------------------------------------------------------
+
+GHC_UNREGISTERISED
+
+dnl ** Do a build with tables next to code?
+dnl --------------------------------------------------------------
+
+GHC_TABLES_NEXT_TO_CODE
+if test x"$TablesNextToCode" = xYES; then
+   AC_DEFINE([TABLES_NEXT_TO_CODE], [1], [Define to 1 if info tables are laid out next to code])
+fi
+
+dnl detect compiler (prefer gcc over clang) and set $CC (unless CC already set),
+dnl later CC is copied to CC_STAGE{1,2,3}
+AC_PROG_CC([cc gcc clang])
+
+dnl make extensions visible to allow feature-tests to detect them lateron
+AC_USE_SYSTEM_EXTENSIONS
+
+dnl ** Used to determine how to compile ghc-prim's atomics.c, used by
+dnl    unregisterised, Sparc, and PPC backends. Also determines whether
+dnl    linking to libatomic is required for atomic operations, e.g. on
+dnl    RISCV64 GCC.
+FP_CC_SUPPORTS__ATOMICS
+AC_DEFINE([HAVE_C11_ATOMICS], [1], [Does C compiler support __atomic primitives?])
+AC_DEFINE_UNQUOTED([NEED_ATOMIC_LIB], [$need_latomic],
+    [Define to 1 if we need -latomic for sub-word atomic operations.])
+
+dnl ** look to see if we have a C compiler using an llvm back end.
+dnl
+FP_CC_LLVM_BACKEND
+AS_IF([test x"$CcLlvmBackend" = x"YES"],
+  [AC_DEFINE([CC_LLVM_BACKEND], [1], [Define (to 1) if C compiler has an LLVM back end])])
+
 GHC_CONVERT_PLATFORM_PARTS([host], [Host])
 FPTOOLS_SET_PLATFORM_VARS([host], [Host])
 FPTOOLS_SET_HASKELL_PLATFORM_VARS([Host])
+
+GHC_SUBSECTIONS_VIA_SYMBOLS
+AS_IF([test x"${TargetHasSubsectionsViaSymbols}" = x"YES"],
+  [AC_DEFINE([HAVE_SUBSECTIONS_VIA_SYMBOLS],[1],
+    [Define to 1 if Apple-style dead-stripping is supported.])])
 
 dnl --------------------------------------------------
 dnl * Platform header file and syscall feature tests
