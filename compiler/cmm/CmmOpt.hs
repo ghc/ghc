@@ -345,10 +345,10 @@ cmmMachOpFoldM dflags mop [x, (CmmLit (CmmInt n _))]
   = case mop of
         MO_Mul rep
            | Just p <- exactLog2 n ->
-                 Just (cmmMachOpFold dflags (MO_Shl rep) [x, CmmLit (CmmInt p rep)])
+                 Just (cmmMachOpFold dflags (MO_Shl rep) [x, CmmLit (CmmInt p wordW)])
         MO_U_Quot rep
            | Just p <- exactLog2 n ->
-                 Just (cmmMachOpFold dflags (MO_U_Shr rep) [x, CmmLit (CmmInt p rep)])
+                 Just (cmmMachOpFold dflags (MO_U_Shr rep) [x, CmmLit (CmmInt p wordW)])
         MO_U_Rem rep
            | Just _ <- exactLog2 n ->
                  Just (cmmMachOpFold dflags (MO_And rep) [x, CmmLit (CmmInt (n - 1) rep)])
@@ -356,7 +356,7 @@ cmmMachOpFoldM dflags mop [x, (CmmLit (CmmInt n _))]
            | Just p <- exactLog2 n,
              CmmReg _ <- x ->   -- We duplicate x in signedQuotRemHelper, hence require
                                 -- it is a reg.  FIXME: remove this restriction.
-                Just (cmmMachOpFold dflags (MO_S_Shr rep)
+                Just (cmmMachOpFold dflags (MO_S_Shr wordW)
                   [signedQuotRemHelper rep p, CmmLit (CmmInt p rep)])
         MO_S_Rem rep
            | Just p <- exactLog2 n,
@@ -370,6 +370,8 @@ cmmMachOpFoldM dflags mop [x, (CmmLit (CmmInt n _))]
                       [signedQuotRemHelper rep p, CmmLit (CmmInt (- n) rep)]])
         _ -> Nothing
   where
+    wordW = wordWidth dflags
+
     -- In contrast with unsigned integers, for signed ones
     -- shift right is not the same as quot, because it rounds
     -- to minus infinity, whereas quot rounds toward zero.
