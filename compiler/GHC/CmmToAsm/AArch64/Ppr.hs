@@ -544,9 +544,9 @@ pprInstr platform instr = case instr of
 #endif
 
   LDR _f o1@(OpReg W8 (RegReal (RealRegSingle i))) o2 | i < 32 ->
-    text "\tldrsb" <+> pprOp platform o1 <> comma <+> pprOp platform o2
+    text "\tldrb" <+> pprOp platform o1 <> comma <+> pprOp platform o2
   LDR _f o1@(OpReg W16 (RegReal (RealRegSingle i))) o2 | i < 32 ->
-    text "\tldrsh" <+> pprOp platform o1 <> comma <+> pprOp platform o2
+    text "\tldrh" <+> pprOp platform o1 <> comma <+> pprOp platform o2
   LDR _f o1 o2 -> text "\tldr" <+> pprOp platform o1 <> comma <+> pprOp platform o2
 
   STP _f o1 o2 o3 -> text "\tstp" <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3
