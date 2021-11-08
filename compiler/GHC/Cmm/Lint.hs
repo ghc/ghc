@@ -98,6 +98,7 @@ lintCmmExpr (CmmLoad expr rep _alignment) = do
 lintCmmExpr expr@(CmmMachOp op args) = do
   platform <- getPlatform
   tys <- mapM lintCmmExpr args
+  lintShiftOp op (zip args tys)
   if map (typeWidth . cmmExprType platform) args == machOpArgReps platform op
         then cmmCheckMachOp op args tys
         else cmmLintMachOpErr expr (map (cmmExprType platform) args) (machOpArgReps platform op)
@@ -109,6 +110,22 @@ lintCmmExpr (CmmRegOff reg offset)
 lintCmmExpr expr =
   do platform <- getPlatform
      return (cmmExprType platform expr)
+
+-- | Check for obviously out-of-bounds shift operations
+lintShiftOp :: MachOp -> [(CmmExpr, CmmType)] -> CmmLint ()
+lintShiftOp op [(_, arg_ty), (CmmLit (CmmInt n _), _)]
+  | isShiftOp op
+  , n >= fromIntegral (widthInBits (typeWidth arg_ty))
+  = cmmLintErr (text "Shift operation" <+> pprMachOp op
+                <+> text "has out-of-range offset" <+> ppr n
+                <> text ". This will result in undefined behavior")
+lintShiftOp _ _ = return ()
+
+isShiftOp :: MachOp -> Bool
+isShiftOp (MO_Shl _)   = True
+isShiftOp (MO_U_Shr _) = True
+isShiftOp (MO_S_Shr _) = True
+isShiftOp _            = False
 
 -- Check for some common byte/word mismatches (eg. Sp + 1)
 cmmCheckMachOp   :: MachOp -> [CmmExpr] -> [CmmType] -> CmmLint CmmType
