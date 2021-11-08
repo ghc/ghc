@@ -77,6 +77,9 @@ import GHC.Utils.Trace
 import Data.IORef
 import qualified Data.Set as Set
 import Data.Set (Set)
+import GHC.Unit.Module.Graph
+import Data.List (sort)
+import qualified Data.Map as Map
 
 runHsc :: HscEnv -> Hsc a -> IO a
 runHsc hsc_env (Hsc hsc) = do
@@ -234,30 +237,14 @@ hptAllThings extract hsc_env = concatMap extract (eltsHpt (hsc_HPT hsc_env))
 -- boot module and the non-boot module can be reached, it only returns the
 -- non-boot one.
 hptModulesBelow :: HscEnv -> Set ModuleNameWithIsBoot -> Set ModuleNameWithIsBoot
-hptModulesBelow hsc_env mn = filtered_mods $ dep_mods mn Set.empty
+hptModulesBelow hsc_env mn = filtered_mods $ [ mnwib |  NodeKey_Module mnwib <- modules_below]
   where
-    !hpt = hsc_HPT hsc_env
+    td_map = mgTransDeps (hsc_mod_graph hsc_env)
 
-    -- get all the dependent modules without filtering boot/non-boot
-    dep_mods !deps !seen -- invariant: intersection of deps and seen is null
-      | Set.null deps = seen
-      | otherwise     = dep_mods deps' seen'
-          where
-            get_deps d@(GWIB mod _is_boot) (home_deps,all_deps) = case lookupHpt hpt mod of
-              Nothing  -> (home_deps,all_deps) -- not a home-module
-              Just hmi -> let
-                            !home_deps' = Set.insert d home_deps
-                            !all_deps'  = Set.union all_deps (dep_direct_mods (mi_deps (hm_iface hmi)))
-                          in (home_deps', all_deps')
+    modules_below = Set.toList (Set.unions (mapMaybe (\mn -> Map.lookup (NodeKey_Module mn) td_map) (Set.toList mn))
+                               `Set.union` (Set.map NodeKey_Module mn))
 
-            -- all the non-transitive deps from our deps
-            (seen',new_deps) = Set.foldr' get_deps (seen,Set.empty) deps
-
-            -- maintain the invariant that deps haven't already been seen
-            deps'    = Set.difference new_deps seen'
-
-    -- remove boot modules when there is also a non-boot one
-    filtered_mods mods = Set.fromDistinctAscList $ filter_mods $ Set.toAscList mods
+    filtered_mods = Set.fromDistinctAscList . filter_mods . sort
 
     -- IsBoot and NotBoot modules are necessarily consecutive in the sorted list
     -- (cf Ord instance of GenWithIsBoot). Hence we only have to perform a
