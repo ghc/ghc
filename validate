@@ -242,7 +242,7 @@ if [ $build_only -eq 1 ] ||
         fi
 
         python3 ./boot --validate
-        $configure_cmd --enable-tarballs-autodownload "$CONFIG_ARGS"
+        $configure_cmd --enable-tarballs-autodownload $CONFIG_ARGS
 
     fi
 
