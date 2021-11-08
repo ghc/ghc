@@ -1048,9 +1048,10 @@ as they appear during kind-checking of "newtype T :: TYPE r where..."
 -- incurring a significant syntactic overhead in otherwise simple
 -- type signatures (e.g. ($)). See Note [Defaulting RuntimeRep variables]
 -- and #11549 for further discussion.
-defaultIfaceTyVarsOfKind :: DefaultVarsOfKind
+defaultIfaceTyVarsOfKind :: Bool -- ^ default 'RuntimeRep'/'Levity' variables?
+                         -> Bool -- ^ default 'Multiplicity' variables?
                          -> IfaceType -> IfaceType
-defaultIfaceTyVarsOfKind def_ns_vars ty = go emptyFsEnv ty
+defaultIfaceTyVarsOfKind def_rep def_mult ty = go emptyFsEnv ty
   where
     go :: FastStringEnv IfaceType -- Set of enclosing forall-ed RuntimeRep/Levity/Multiplicity variables
        -> IfaceType
@@ -1073,17 +1074,17 @@ defaultIfaceTyVarsOfKind def_ns_vars ty = go emptyFsEnv ty
 
     go _ ty@(IfaceFreeTyVar tv)
       -- See Note [Defaulting RuntimeRep variables], about free vars
-      | def_runtimeRep def_ns_vars
+      | def_rep
       , GHC.Core.Type.isRuntimeRepTy (tyVarKind tv)
       , isMetaTyVar tv
       , isTyConableTyVar tv
       = liftedRep_ty
-      | def_levity def_ns_vars
+      | def_rep
       , GHC.Core.Type.isLevityTy (tyVarKind tv)
       , isMetaTyVar tv
       , isTyConableTyVar tv
       = lifted_ty
-      | def_multiplicity def_ns_vars
+      | def_mult
       , GHC.Core.Type.isMultiplicityTy (tyVarKind tv)
       , isMetaTyVar tv
       , isTyConableTyVar tv
@@ -1122,13 +1123,13 @@ defaultIfaceTyVarsOfKind def_ns_vars ty = go emptyFsEnv ty
 
     check_substitution :: IfaceType -> Maybe IfaceType
     check_substitution (IfaceTyConApp tc _)
-        | def_runtimeRep def_ns_vars
+        | def_rep
         , tc `ifaceTyConHasKey` runtimeRepTyConKey
         = Just liftedRep_ty
-        | def_levity def_ns_vars
+        | def_rep
         , tc `ifaceTyConHasKey` levityTyConKey
         = Just lifted_ty
-        | def_multiplicity def_ns_vars
+        | def_mult
         , tc `ifaceTyConHasKey` multiplicityTyConKey
         = Just many_ty
     check_substitution _ = Nothing
@@ -1161,13 +1162,10 @@ hideNonStandardTypes f ty
   = sdocOption sdocPrintExplicitRuntimeReps $ \printExplicitRuntimeReps ->
     sdocOption sdocLinearTypes $ \linearTypes ->
     getPprStyle      $ \sty    ->
-    let def_opts =
-          DefaultVarsOfKind
-            { def_runtimeRep   = not printExplicitRuntimeReps
-            , def_levity       = not printExplicitRuntimeReps
-            , def_multiplicity = not linearTypes }
+    let def_rep  = not printExplicitRuntimeReps
+        def_mult = not linearTypes
     in if userStyle sty
-       then f (defaultIfaceTyVarsOfKind def_opts ty)
+       then f (defaultIfaceTyVarsOfKind def_rep def_mult ty)
        else f ty
 
 instance Outputable IfaceAppArgs where

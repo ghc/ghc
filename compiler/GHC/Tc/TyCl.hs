@@ -907,7 +907,7 @@ generaliseTcTyCon (tc, scoped_prs, tc_res_kind)
 
        -- Step 2b: quantify, mainly meaning skolemise the free variables
        -- Returned 'inferred' are scope-sorted and skolemised
-       ; inferred <- quantifyTyVars allVarsOfKindDefault dvs2
+       ; inferred <- quantifyTyVars DefaultNonStandardTyVars dvs2
 
        ; traceTc "generaliseTcTyCon: pre zonk"
            (vcat [ text "tycon =" <+> ppr tc
@@ -3140,7 +3140,7 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
 
        -- See Note [Generalising in tcTyFamInstEqnGuts]
        ; dvs  <- candidateQTyVarsOfTypes (lhs_ty : mkTyVarTys outer_tvs)
-       ; qtvs <- quantifyTyVars noVarsOfKindDefault dvs
+       ; qtvs <- quantifyTyVars TryNotToDefaultNonStandardTyVars dvs
        ; reportUnsolvedEqualities FamInstSkol qtvs tclvl wanted
        ; checkFamTelescope tclvl outer_hs_bndrs outer_tvs
 

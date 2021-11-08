@@ -101,8 +101,8 @@ module GHC.Types.Basic (
 
         TypeOrKind(..), isTypeLevel, isKindLevel,
 
-        DefaultKindVars(..), DefaultVarsOfKind(..),
-        allVarsOfKindDefault, noVarsOfKindDefault,
+        NonStandardDefaultingStrategy(..),
+        DefaultingStrategy(..), defaultNonStandardTyVars,
 
         ForeignSrcLang (..)
    ) where
@@ -1755,53 +1755,125 @@ isKindLevel KindLevel = True
 *                                                                      *
 ********************************************************************* -}
 
--- | Whether to default kind variables. Usually: no, unless `-XNoPolyKinds`
--- is enabled.
-data DefaultKindVars
-  = Don'tDefaultKinds
-  | DefaultKinds
+{- Note [Type variable defaulting options]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Here is an overview of the current type variable defaulting mechanisms,
+in the order in which they happen.
 
-instance Outputable DefaultKindVars where
-  ppr Don'tDefaultKinds = text "Don'tDefaultKinds"
-  ppr DefaultKinds = text "DefaultKinds"
+GHC.Tc.Utils.TcMType.defaultTyVar
 
--- | Whether to default type variables of the given kinds:
---
---   - default 'RuntimeRep' variables to LiftedRep?
---   - default 'Levity' variables to Lifted?
---   - default 'Multiplicity' variables to Many?
-data DefaultVarsOfKind =
-  DefaultVarsOfKind
-    { def_runtimeRep, def_levity, def_multiplicity :: !Bool }
+  This is a built-in defaulting mechanism for the following type variables:
 
-instance Outputable DefaultVarsOfKind where
-  ppr
-    (DefaultVarsOfKind
-      { def_runtimeRep   = rep
-      , def_levity       = lev
-      , def_multiplicity = mult })
-    = text "DefaultVarsOfKind:" <+> defaults
-      where
-        defaults :: SDoc
-        defaults =
-          case filter snd $ [ ("RuntimeRep", rep), ("Levity", lev), ("Multiplicity", mult)] of
-            []   -> text "<no defaulting>"
-            defs -> hsep (map (text . fst) defs)
+    (1) kind variables with -XNoPolyKinds,
+    (2) type variables of kind 'RuntimeRep' default to 'LiftedRep',
+        of kind 'Levity' to 'Lifted', and of kind 'Multiplicity' to 'Many'.
 
--- | Do defaulting for variables of kind `RuntimeRep`, `Levity` and `Multiplicity`.
-allVarsOfKindDefault :: DefaultVarsOfKind
-allVarsOfKindDefault =
-  DefaultVarsOfKind
-    { def_runtimeRep   = True
-    , def_levity       = True
-    , def_multiplicity = True
-    }
+  It is used in many situations:
 
--- | Don't do defaulting for variables of kind `RuntimeRep`, `Levity` and `Multiplicity`.
-noVarsOfKindDefault :: DefaultVarsOfKind
-noVarsOfKindDefault =
-  DefaultVarsOfKind
-    { def_runtimeRep   = False
-    , def_levity       = False
-    , def_multiplicity = False
-    }
+    - inferring a type (e.g. a declaration with no type signature or a
+      partial type signature), in 'GHC.Tc.Solver.simplifyInfer',
+    - simplifying top-level constraints in 'GHC.Tc.Solver.simplifyTop',
+    - kind checking a CUSK in 'GHC.Tc.Gen.kcCheckDeclHeader_cusk',
+    - 'GHC.Tc.TyCl.generaliseTcTyCon',
+    - type checking type family and data family instances,
+      in 'GHC.Tc.TyCl.tcTyFamInstEqnGuts' and 'GHC.Tc.TyCl.Instance.tcDataFamInstHeader'
+      respectively,
+    - type-checking rules in 'GHC.Tc.Gen.tcRule',
+    - kind generalisation in 'GHC.Tc.Gen.HsType.kindGeneralizeSome'
+      and 'GHC.Tc.Gen.HsType.kindGeneralizeAll'.
+
+  Different situations call for a different defaulting strategy,
+  so 'defaultTyVar' takes a strategy parameter which determines which
+  type variables to default.
+  Currently, this strategy is set as follows:
+
+    - Kind variables:
+      - with -XNoPolyKinds, these must be defaulted. This includes kind variables
+        of kind 'RuntimeRep', 'Levity' and 'Multiplicity'.
+        Test case: T20584.
+      - with -XPolyKinds, behave as if they were type variables (see below).
+    - Type variables of kind 'RuntimeRep', 'Levity' or 'Multiplicity'
+      - in type and data families instances, these are not defaulted.
+        Test case: T17536.
+      - otherwise: default variables of these three kinds. This ensures
+        that in a program such as
+
+          foo :: forall a. a -> a
+          foo x = x
+
+        we continue to infer `a :: Type`.
+
+  Note that the strategy is set in two steps: callers of 'defaultTyVars' only
+  specify whether to default type variables of "non-standard" kinds
+  (that is, of kinds 'RuntimeRep'/'Levity'/'Multiplicity'). Then 'defaultTyVars'
+  determines which variables are type variables and which are kind variables,
+  and if the user has asked for -XNoPolyKinds we default the kind variables.
+
+GHC.Tc.Solver.defaultTyVarTcS
+
+  This is a built-in defaulting mechanism that happens after
+  the constraint solver has run, in 'GHC.Tc.Solver.simplifyTopWanteds'.
+
+  It only defaults type (and kind) variables of kind 'RuntimeRep',
+  'Levity', 'Multiplicity'.
+
+  It is not configurable, neither by options nor by the user.
+
+GHC.Tc.Solver.applyDefaultingRules
+
+  This is typeclass defaulting, and includes defaulting plugins.
+  It happens right after 'defaultTyVarTcS' in 'GHC.Tc.Solver.simplifyTopWanteds'.
+  It is user configurable, using default declarations (/plugins).
+
+GHC.Iface.Type.defaultIfaceTyVarsOfKind
+
+  This is a built-in defaulting mechanism that only applies when pretty-printing.
+  It defaults 'RuntimeRep'/'Levity' variables unless -fprint-explicit-kinds is enabled,
+  and 'Multiplicity' variables unless -XLinearTypes is enabled.
+
+-}
+
+-- | Specify whether to default type variables of kind 'RuntimeRep'/'Levity'/'Multiplicity'.
+data NonStandardDefaultingStrategy
+  -- | Default type variables of the given kinds:
+  --
+  --   - default 'RuntimeRep' variables to 'LiftedRep'
+  --   - default 'Levity' variables to 'Lifted'
+  --   - default 'Multiplicity' variables to 'Many'
+  = DefaultNonStandardTyVars
+  -- | Try not to default type variables of the kinds 'RuntimeRep'/'Levity'/'Multiplicity'.
+  --
+  -- Note that these might get defaulted anyway, if they are kind variables
+  -- and `-XNoPolyKinds` is enabled.
+  | TryNotToDefaultNonStandardTyVars
+
+-- | Specify whether to default kind variables, and type variables
+-- of kind 'RuntimeRep'/'Levity'/'Multiplicity'.
+data DefaultingStrategy
+  -- | Default kind variables:
+  --
+  --   - default kind variables of kind 'Type' to 'Type',
+  --   - default 'RuntimeRep'/'Levity'/'Multiplicity' kind variables
+  --     to 'LiftedRep'/'Lifted'/'Many', respectively.
+  --
+  -- When this strategy is used, it means that we have determined that
+  -- the variables we are considering defaulting are all kind variables.
+  --
+  -- Usually, we pass this option when -XNoPolyKinds is enabled.
+  = DefaultKindVars
+  -- | Default (or don't default) non-standard variables, of kinds
+  -- 'RuntimeRep', 'Levity' and 'Multiplicity'.
+  | NonStandardDefaulting NonStandardDefaultingStrategy
+
+defaultNonStandardTyVars :: DefaultingStrategy -> Bool
+defaultNonStandardTyVars DefaultKindVars                                          = True
+defaultNonStandardTyVars (NonStandardDefaulting DefaultNonStandardTyVars)         = True
+defaultNonStandardTyVars (NonStandardDefaulting TryNotToDefaultNonStandardTyVars) = False
+
+instance Outputable NonStandardDefaultingStrategy where
+  ppr DefaultNonStandardTyVars         = text "DefaultOnlyNonStandardTyVars"
+  ppr TryNotToDefaultNonStandardTyVars = text "TryNotToDefaultNonStandardTyVars"
+
+instance Outputable DefaultingStrategy where
+  ppr DefaultKindVars            = text "DefaultKindVars"
+  ppr (NonStandardDefaulting ns) = text "NonStandardDefaulting" <+> ppr ns

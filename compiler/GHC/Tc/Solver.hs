@@ -65,7 +65,7 @@ import GHC.Utils.Panic
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Basic    ( IntWithInf, intGtLimit
-                          , DefaultKindVars(..), allVarsOfKindDefault )
+                          , DefaultingStrategy(..), NonStandardDefaultingStrategy(..) )
 import GHC.Types.Error
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -1052,7 +1052,7 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
                                    , pred <- sig_inst_theta sig ]
 
        ; dep_vars <- candidateQTyVarsOfTypes (psig_tv_tys ++ psig_theta ++ map snd name_taus)
-       ; qtkvs <- quantifyTyVars allVarsOfKindDefault dep_vars
+       ; qtkvs <- quantifyTyVars DefaultNonStandardTyVars dep_vars
        ; traceTc "simplifyInfer: empty WC" (ppr name_taus $$ ppr qtkvs)
        ; return (qtkvs, [], emptyTcEvBinds, False) }
 
@@ -1505,8 +1505,10 @@ defaultTyVarsAndSimplify rhs_tclvl mono_tvs candidates
       = return False
       | otherwise
       = defaultTyVar
-          (if not poly_kinds && is_kind_var then DefaultKinds else Don'tDefaultKinds)
-          allVarsOfKindDefault
+          (if not poly_kinds && is_kind_var
+           then DefaultKindVars
+           else NonStandardDefaulting DefaultNonStandardTyVars)
+          -- NB: only pass 'DefaultKindVars' when we know we're dealing with a kind variable.
           tv
 
     simplify_cand candidates
@@ -1567,7 +1569,7 @@ decideQuantifiedTyVars name_taus psigs candidates
            , text "grown_tcvs =" <+> ppr grown_tcvs
            , text "dvs =" <+> ppr dvs_plus])
 
-       ; quantifyTyVars allVarsOfKindDefault dvs_plus }
+       ; quantifyTyVars DefaultNonStandardTyVars dvs_plus }
 
 ------------------
 growThetaTyVars :: ThetaType -> TyCoVarSet -> TyCoVarSet

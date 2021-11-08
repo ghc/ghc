@@ -129,7 +129,8 @@ import GHC.Types.Var.Env
 import GHC.Types.Name.Env
 import GHC.Types.Unique.Set
 import GHC.Types.Basic ( TypeOrKind(..)
-                       , DefaultKindVars(..), DefaultVarsOfKind(..), allVarsOfKindDefault )
+                       , NonStandardDefaultingStrategy(..)
+                       , DefaultingStrategy(..), defaultNonStandardTyVars )
 
 import GHC.Data.FastString
 import GHC.Data.Bag
@@ -1691,7 +1692,7 @@ For more information about deterministic sets see
 Note [Deterministic UniqFM] in GHC.Types.Unique.DFM.
 -}
 
-quantifyTyVars :: DefaultVarsOfKind
+quantifyTyVars :: NonStandardDefaultingStrategy
                -> CandidatesQTvs   -- See Note [Dependent type variables]
                                    -- Already zonked
                -> TcM [TcTyVar]
@@ -1702,7 +1703,7 @@ quantifyTyVars :: DefaultVarsOfKind
 -- invariants on CandidateQTvs, we do not have to filter out variables
 -- free in the environment here. Just quantify unconditionally, subject
 -- to the restrictions in Note [quantifyTyVars].
-quantifyTyVars def_varsOfKind dvs
+quantifyTyVars ns_strat dvs
        -- short-circuit common case
   | isEmptyCandidates dvs
   = do { traceTc "quantifyTyVars has nothing to quantify" empty
@@ -1710,10 +1711,10 @@ quantifyTyVars def_varsOfKind dvs
 
   | otherwise
   = do { traceTc "quantifyTyVars {"
-           ( vcat [ text "def_varsOfKind =" <+> ppr def_varsOfKind
+           ( vcat [ text "ns_strat =" <+> ppr ns_strat
                   , text "dvs =" <+> ppr dvs ])
 
-       ; undefaulted <- defaultTyVars def_varsOfKind dvs
+       ; undefaulted <- defaultTyVars ns_strat dvs
        ; final_qtvs  <- mapMaybeM zonk_quant undefaulted
 
        ; traceTc "quantifyTyVars }"
@@ -1791,12 +1792,13 @@ skolemiseQuantifiedTyVar tv
 
       _other -> pprPanic "skolemiseQuantifiedTyVar" (ppr tv) -- RuntimeUnk
 
-defaultTyVar :: DefaultKindVars
-             -> DefaultVarsOfKind
-             -> TcTyVar   -- If it's a MetaTyVar then it is unbound
-             -> TcM Bool  -- True <=> defaulted away altogether
-
-defaultTyVar def_kindVars def_varsOfKind tv
+-- | Default a type variable using the given defaulting strategy.
+--
+-- See Note [Type variable defaulting options] in GHC.Types.Basic.
+defaultTyVar :: DefaultingStrategy
+             -> TcTyVar    -- If it's a MetaTyVar then it is unbound
+             -> TcM Bool   -- True <=> defaulted away altogether
+defaultTyVar def_strat tv
   | not (isMetaTyVar tv)
   = return False
 
@@ -1807,32 +1809,33 @@ defaultTyVar def_kindVars def_varsOfKind tv
     -- See Note [Inferring kinds for type declarations] in GHC.Tc.TyCl
   = return False
 
-
   | isRuntimeRepVar tv
-  , def_runtimeRep def_varsOfKind
+  , default_ns_vars
   -- Do not quantify over a RuntimeRep var
   -- unless it is a TyVarTv, handled earlier
   = do { traceTc "Defaulting a RuntimeRep var to LiftedRep" (ppr tv)
        ; writeMetaTyVar tv liftedRepTy
        ; return True }
   | isLevityVar tv
-  , def_levity def_varsOfKind
+  , default_ns_vars
   = do { traceTc "Defaulting a Levity var to Lifted" (ppr tv)
        ; writeMetaTyVar tv liftedDataConTy
        ; return True }
   | isMultiplicityVar tv
-  , def_multiplicity def_varsOfKind
-  = do { traceTc "Defaulting a Multiplicty var to Many" (ppr tv)
+  , default_ns_vars
+  = do { traceTc "Defaulting a Multiplicity var to Many" (ppr tv)
        ; writeMetaTyVar tv manyDataConTy
        ; return True }
 
-  | DefaultKinds <- def_kindVars -- -XNoPolyKinds and this is a kind var
-  = default_kind_var tv          -- so default it to * if possible
+  | DefaultKindVars <- def_strat -- -XNoPolyKinds and this is a kind var: we must default it
+  = default_kind_var tv
 
   | otherwise
   = return False
 
   where
+    default_ns_vars :: Bool
+    default_ns_vars = defaultNonStandardTyVars def_strat
     default_kind_var :: TyVar -> TcM Bool
        -- defaultKindVar is used exclusively with -XNoPolyKinds
        -- See Note [Defaulting with -XNoPolyKinds]
@@ -1859,20 +1862,37 @@ defaultTyVar def_kindVars def_varsOfKind tv
       where
         (_, kv') = tidyOpenTyCoVar emptyTidyEnv kv
 
--- | Default some unconstrained type variables:
---     RuntimeRep tyvars default to LiftedRep
---     Multiplicity tyvars default to Many
---     Type tyvars from dv_kvs default to Type, when -XNoPolyKinds
---     (under -XNoPolyKinds, non-defaulting vars in dv_kvs is an error)
-defaultTyVars :: DefaultVarsOfKind
-              -> CandidatesQTvs  -- ^ all candidates for quantification
-              -> TcM [TcTyVar]   -- ^ those variables not defaulted
-defaultTyVars def_varsOfKind dvs
+-- | Default some unconstrained type variables, as specified
+-- by the defaulting options:
+--
+--  - 'RuntimeRep' tyvars default to 'LiftedRep'
+--  - 'Levity' tyvars default to 'Lifted'
+--  - 'Multiplicity' tyvars default to 'Many'
+--  - 'Type' tyvars from dv_kvs default to 'Type', when -XNoPolyKinds
+--    (under -XNoPolyKinds, non-defaulting vars in dv_kvs is an error)
+defaultTyVars :: NonStandardDefaultingStrategy
+              -> CandidatesQTvs    -- ^ all candidates for quantification
+              -> TcM [TcTyVar]     -- ^ those variables not defaulted
+defaultTyVars ns_strat dvs
   = do { poly_kinds <- xoptM LangExt.PolyKinds
        ; let
-           def_kinds = if poly_kinds then Don'tDefaultKinds else DefaultKinds
-       ; defaulted_kvs <- mapM (defaultTyVar def_kinds         def_varsOfKind ) dep_kvs
-       ; defaulted_tvs <- mapM (defaultTyVar Don'tDefaultKinds def_varsOfKind ) nondep_tvs
+           def_tvs, def_kvs :: DefaultingStrategy
+           def_tvs = NonStandardDefaulting ns_strat
+           def_kvs
+             | poly_kinds = def_tvs
+             | otherwise  = DefaultKindVars
+             -- As -XNoPolyKinds precludes polymorphic kind variables, we default them.
+             -- For example:
+             --
+             --   type F :: Type -> Type
+             --   type family F a where
+             --      F (a -> b) = b
+             --
+             -- Here we get `a :: TYPE r`, so to accept this program when -XNoPolyKinds is enabled
+             -- we must default the kind variable `r :: RuntimeRep`.
+             -- Test case: T20584.
+       ; defaulted_kvs <- mapM (defaultTyVar def_kvs) dep_kvs
+       ; defaulted_tvs <- mapM (defaultTyVar def_tvs) nondep_tvs
        ; let undefaulted_kvs = [ kv | (kv, False) <- dep_kvs    `zip` defaulted_kvs ]
              undefaulted_tvs = [ tv | (tv, False) <- nondep_tvs `zip` defaulted_tvs ]
        ; return (undefaulted_kvs ++ undefaulted_tvs) }
@@ -2029,7 +2049,7 @@ doNotQuantifyTyVars dvs where_found
 
   | otherwise
   = do { traceTc "doNotQuantifyTyVars" (ppr dvs)
-       ; undefaulted <- defaultTyVars allVarsOfKindDefault dvs
+       ; undefaulted <- defaultTyVars DefaultNonStandardTyVars dvs
           -- could have regular TyVars here, in an associated type RHS, or
           -- bound by a type declaration head. So filter looking only for
           -- metavars. e.g. b and c in `class (forall a. a b ~ a c) => C b c`
