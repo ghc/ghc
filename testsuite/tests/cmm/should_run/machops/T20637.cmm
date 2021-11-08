@@ -1,0 +1,3 @@
+test(bits64 buffer) {
+  return (%zx64(%lobits16(%zx32(%lobits8((%lobits16(%shl((1 :: bits32), (45 :: bits64))) ^ (1 :: bits16)))))));
+}

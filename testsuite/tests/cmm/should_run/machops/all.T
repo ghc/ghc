@@ -6,3 +6,4 @@ def cmm_test(name):
 
 cmm_test('T20626a')
 cmm_test('T20626b')
+cmm_test('T20637')
