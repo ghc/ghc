@@ -102,6 +102,8 @@ data MachOp
   | MO_Or    Width
   | MO_Xor   Width
   | MO_Not   Width
+
+  -- Shifts. The shift amount must be in [0,widthInBits).
   | MO_Shl   Width
   | MO_U_Shr Width      -- unsigned shift right
   | MO_S_Shr Width      -- signed shift right
