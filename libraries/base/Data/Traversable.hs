@@ -1314,7 +1314,9 @@ foldMapDefault = coerce (traverse @t @(Const m) @a @())
 --
 -- #ziplist#
 -- As a warm-up for looking at the 'ZipList' 'Applicative' functor, we'll first
--- look at a simpler fixed-width analogue.
+-- look at a simpler analogue.  First define a fixed width 2-element @Vec2@
+-- type, whose 'Applicative' instance combines a pair of functions with a pair of
+-- values by applying each function to the corresponding value slot:
 --
 -- > data Vec2 a = Vec2 a a
 -- > instance Functor Vec2 where
@@ -1327,7 +1329,9 @@ foldMapDefault = coerce (traverse @t @(Const m) @a @())
 -- >     foldMap f (Vec2 a b) = f a <> f b
 -- > instance Traversable Vec2 where
 -- >     traverse f (Vec2 a b) = Vec2 <$> f a <*> f b
--- >
+--
+-- Along with a similar definition for fixed width 3-element vectors:
+--
 -- > data Vec3 a = Vec3 a a a
 -- > instance Functor Vec3 where
 -- >     fmap f (Vec3 x y z) = Vec3 (f x) (f y) (f z)
@@ -1338,7 +1342,11 @@ foldMapDefault = coerce (traverse @t @(Const m) @a @())
 -- >     foldr f z (Vec3 a b c) = f a (f b (f c z))
 -- >     foldMap f (Vec3 a b c) = f a <> f b <> f c
 -- > instance Traversable Vec3 where
--- >     traverse f (Vec3 a b) = Vec3 <$> f a <*> f b <*> f c
+-- >     traverse f (Vec3 a b c) = Vec3 <$> f a <*> f b <*> f c
+--
+-- With the above definitions, @'sequenceA'@ (same as @'traverse' 'id'@) acts
+-- as a /matrix transpose/ operation on @Vec2 (Vec3 Int)@ producing a
+-- corresponding @Vec3 (Vec2 Int)@:
 --
 -- Let __@t = Vec2 (Vec3 1 2 3) (Vec3 4 5 6)@__ be our 'Traversable' structure,
 -- and __@g = id :: Vec3 Int -> Vec3 Int@__ be the function used to traverse
@@ -1347,9 +1355,10 @@ foldMapDefault = coerce (traverse @t @(Const m) @a @())
 -- > traverse g t = Vec2 <$> (Vec3 1 2 3) <*> (Vec3 4 5 6)
 -- >              = Vec3 (Vec2 1 4) (Vec2 2 5) (Vec2 3 6)
 --
--- And since __@traverse id@__ is just 'sequenceA', we see that the effect of
--- 'sequenceA' on the structure __@t@__ is to perform a matrix /transpose/.
--- Below we look at an analogue of the above for 'Control.Applicative.ZipList'.
+-- This construction can be generalised from fixed width vectors to variable
+-- length lists via 'Control.Applicative.ZipList'.  This gives a transpose
+-- operation that works well for lists of equal length.  If some of the lists
+-- are longer than others, they're truncated to the longest common length.
 --
 -- We've already looked at the standard 'Applicative' instance of @List@ for
 -- which applying __@m@__ functions __@f1, f2, ..., fm@__ to __@n@__ input
