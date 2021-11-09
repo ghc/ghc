@@ -91,6 +91,7 @@ workflow:
     - lint
   rules:
     - *drafts-can-fail-lint
+    - when: always
 
 .nightly: &nightly
   variables:
