@@ -78,6 +78,15 @@ workflow:
     - if: '$CI_COMMIT_BRANCH =~ /ghc-[0-9]+\.[0-9]+/'
     - if: '$CI_PIPELINE_SOURCE == "web"'
 
+# Allow linters to fail on draft MRs.
+.drafts-can-fail-lint: &drafts-can-fail-lint
+  if: "$CI_MERGE_REQUEST_TITLE =~ /^\\s*(Draft|wip|WIP):/"
+  allow_failure: true
+
+.lint:
+  rules:
+    - <<: drafts-can-fail-lint
+
 .nightly: &nightly
   variables:
     XZ_OPT: "-9"
@@ -161,6 +170,7 @@ not-interruptible:
 ghc-linters:
   stage: tool-lint
   image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
+  extends: .lint
   script:
     - git fetch "$CI_MERGE_REQUEST_PROJECT_URL" $CI_MERGE_REQUEST_TARGET_BRANCH_NAME
     - base="$(git merge-base FETCH_HEAD $CI_COMMIT_SHA)"
@@ -176,11 +186,13 @@ ghc-linters:
     - lint
   rules:
     - if: $CI_MERGE_REQUEST_ID
+    - *drafts-can-fail-lint
 
 # Run mypy Python typechecker on linter scripts.
 lint-linters:
   stage: tool-lint
   image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
+  extends: .lint
   script:
     - mypy .gitlab/linters/*.py
   dependencies: []
@@ -191,6 +203,7 @@ lint-linters:
 lint-testsuite:
   stage: tool-lint
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
+  extends: .lint
   script:
     - make -Ctestsuite list_broken TEST_HC=$GHC
   dependencies: []
@@ -201,6 +214,7 @@ lint-testsuite:
 typecheck-testsuite:
   stage: tool-lint
   image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
+  extends: .lint
   script:
     - mypy testsuite/driver/runtests.py
   dependencies: []
@@ -213,6 +227,7 @@ typecheck-testsuite:
 .lint-submods:
   stage: tool-lint
   image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
+  extends: .lint
   script:
     - git fetch "$CI_MERGE_REQUEST_PROJECT_URL" $CI_MERGE_REQUEST_TARGET_BRANCH_NAME
     - base="$(git merge-base FETCH_HEAD $CI_COMMIT_SHA)"
@@ -241,10 +256,12 @@ lint-submods-branch:
   rules:
     - if: '$CI_COMMIT_BRANCH == "master"'
     - if: '$CI_COMMIT_BRANCH =~ /ghc-[0.9]+\.[0-9]+/'
+    - *drafts-can-fail-lint
 
 .lint-changelogs:
   stage: tool-lint
   image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
+  extends: .lint
   dependencies: []
   tags:
     - lint
@@ -257,11 +274,13 @@ lint-changelogs:
   allow_failure: true
   rules:
     - if: '$CI_COMMIT_BRANCH =~ /ghc-[0.9]+\.[0-9]+/'
+    - *drafts-can-fail-lint
 
 lint-release-changelogs:
   extends: .lint-changelogs
   rules:
     - if: '$CI_COMMIT_BRANCH =~ /ghc-[0.9]+\.[0-9]+/'
+    - *drafts-can-fail-lint
 
 ############################################################
 # Validation via Pipelines (hadrian)
@@ -389,11 +408,12 @@ hadrian-ghc-in-ghci:
 ############################################################
 
 .lint-params:
-  stage: full-build
+  stage: tool-lint
   needs: [lint-submods]
   tags:
     - lint
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
+  extends: .lint
   before_script:
     - export PATH="/opt/toolchain/bin:$PATH"
     # workaround for docker permissions
