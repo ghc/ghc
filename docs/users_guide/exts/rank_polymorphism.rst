@@ -31,8 +31,6 @@ quantification in types. For example, all the following types are legal: ::
 
         f3 :: ((forall a. a->a) -> Int) -> Bool -> Bool
 
-        f4 :: Int -> (forall a. a -> a)
-
 Here, ``f1`` and ``g1`` are rank-1 types, and can be written in standard
 Haskell (e.g. ``f1 :: a->b->a``). The ``forall`` makes explicit the
 universal quantification that is implicitly added by Haskell.
@@ -50,21 +48,15 @@ types. That is, you can nest ``forall``\ s arbitrarily deep in function
 arrows. For example, a forall-type (also called a "type scheme"),
 including a type-class context, is legal:
 
--  On the left or right (see ``f4``, for example) of a function arrow
+-  On the left or right of a function arrow.
 
 -  As the argument of a constructor, or type of a field, in a data type
    declaration. For example, any of the ``f1, f2, f3, g1, g2`` above would
    be valid field type signatures.
 
--  As the type of an implicit parameter
+-  As the type of an implicit parameter.
 
--  In a pattern type signature (see :ref:`scoped-type-variables`)
-
-The :extension:`RankNTypes` option is also required for any type with a
-``forall`` or context to the right of an arrow (e.g.
-``f :: Int -> forall a. a->a``, or ``g :: Int -> Ord a => a -> a``).
-Such types are technically rank 1, but are clearly not Haskell-98, and
-an extra extension did not seem worth the bother.
+-  In a pattern type signature (see :ref:`scoped-type-variables`).
 
 In particular, in ``data`` and ``newtype`` declarations the constructor
 arguments may be polymorphic types of any rank; see examples in
@@ -72,6 +64,24 @@ arguments may be polymorphic types of any rank; see examples in
 monomorphic. This is important because by default GHC will not
 instantiate type variables to a polymorphic type
 (:ref:`impredicative-polymorphism`).
+
+Note that the :extension:`RankNTypes` option is also required for any type
+with a ``forall`` or context to the right of an arrow. For example: ::
+
+        h1  :: Int -> (forall a. a -> a)
+        h1' :: forall a. Int -> (a -> a)
+
+        k1  :: Int -> Ord a => a -> a
+        k1' :: Ord a => Int -> a -> a
+
+The function ``h1`` has a rank-1 type; it has the same behaviour as ``h1'``,
+except with a different order of arguments. This matters if one were to specify
+the type explicitly using a visible type application (using :extension:`TypeApplications`):
+we would write ``h1 3 @Bool True`` but ``h1' @Bool 3 True``.
+Similarly, ``k1`` has a rank-1 type; it differs from ``k1'`` only in the order of
+arguments. As the types of ``h1`` and ``k1`` are not allowed in Haskell-98, we also
+require users to enable :extension:`RankNTypes` to write them (which seems more
+sensible than inventing a separate extension just for this case).
 
 The obsolete language option :extension:`Rank2Types` is a synonym for
 :extension:`RankNTypes`. They used to specify finer distinctions that GHC no
