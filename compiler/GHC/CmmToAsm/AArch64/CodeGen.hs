@@ -1,4 +1,5 @@
-{-# language GADTs #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE BinaryLiterals #-}
@@ -10,6 +11,8 @@ module GHC.CmmToAsm.AArch64.CodeGen (
 )
 
 where
+
+#include "HsVersions.h"
 
 -- NCG stuff:
 import GHC.Prelude hiding (EQ)
@@ -550,7 +553,7 @@ getRegister' config plat expr
         CmmBlock _ -> pprPanic "getRegister' (CmmLit:CmmLabelOff): " (pdoc plat expr)
         CmmHighStackMark -> pprPanic "getRegister' (CmmLit:CmmLabelOff): " (pdoc plat expr)
     CmmLoad mem rep _ -> do
-      Amode addr addr_code <- getAmode plat mem
+      Amode addr addr_code <- getAmode plat (typeWidth rep) mem
       let format = cmmTypeFormat rep
       return (Any format (\dst -> addr_code `snocOL` LDR format (OpReg (formatToWidth format) dst) (OpAddr addr)))
     CmmStackSlot _ _
@@ -820,25 +823,28 @@ getRegister' config plat expr
 --  The 'Amode' type: Memory addressing modes passed up the tree.
 data Amode = Amode AddrMode InstrBlock
 
-getAmode :: Platform -> CmmExpr -> NatM Amode
+getAmode :: Platform
+         -> Width     -- ^ width of loaded value
+         -> CmmExpr
+         -> NatM Amode
 -- TODO: Specialize stuff we can destructure here.
 
 -- OPTIMIZATION WARNING: Addressing modes.
 -- Addressing options:
 -- LDUR/STUR: imm9: -256 - 255
-getAmode platform (CmmRegOff reg off) | -256 <= off, off <= 255
+getAmode platform w (CmmRegOff reg off) | -256 <= off, off <= 255
   = return $ Amode (AddrRegImm reg' off') nilOL
     where reg' = getRegisterReg platform reg
           off' = ImmInt off
 -- LDR/STR: imm12: if reg is 32bit: 0 -- 16380 in multiples of 4
-getAmode platform (CmmRegOff reg off)
-  | typeWidth (cmmRegType platform reg) == W32, 0 <= off, off <= 16380, off `mod` 4 == 0
+getAmode platform W32 (CmmRegOff reg off)
+  | 0 <= off, off <= 16380, off `mod` 4 == 0
   = return $ Amode (AddrRegImm reg' off') nilOL
     where reg' = getRegisterReg platform reg
           off' = ImmInt off
 -- LDR/STR: imm12: if reg is 64bit: 0 -- 32760 in multiples of 8
-getAmode platform (CmmRegOff reg off)
-  | typeWidth (cmmRegType platform reg) == W64, 0 <= off, off <= 32760, off `mod` 8 == 0
+getAmode platform W64 (CmmRegOff reg off)
+  | 0 <= off, off <= 32760, off `mod` 8 == 0
   = return $ Amode (AddrRegImm reg' off') nilOL
     where reg' = getRegisterReg platform reg
           off' = ImmInt off
@@ -847,18 +853,18 @@ getAmode platform (CmmRegOff reg off)
 -- CmmStore (CmmMachOp (MO_Add w) [CmmLoad expr, CmmLit (CmmInt n w')]) (expr2)
 -- E.g. a CmmStoreOff really. This can be translated to `str $expr2, [$expr, #n ]
 -- for `n` in range.
-getAmode _platform (CmmMachOp (MO_Add _w) [expr, CmmLit (CmmInt off _w')])
+getAmode _platform _ (CmmMachOp (MO_Add _w) [expr, CmmLit (CmmInt off _w')])
   | -256 <= off, off <= 255
   = do (reg, _format, code) <- getSomeReg expr
        return $ Amode (AddrRegImm reg (ImmInteger off)) code
 
-getAmode _platform (CmmMachOp (MO_Sub _w) [expr, CmmLit (CmmInt off _w')])
+getAmode _platform _ (CmmMachOp (MO_Sub _w) [expr, CmmLit (CmmInt off _w')])
   | -256 <= -off, -off <= 255
   = do (reg, _format, code) <- getSomeReg expr
        return $ Amode (AddrRegImm reg (ImmInteger (-off))) code
 
 -- Generic case
-getAmode _platform expr
+getAmode _platform _ expr
   = do (reg, _format, code) <- getSomeReg expr
        return $ Amode (AddrReg reg) code
 
@@ -884,11 +890,12 @@ assignMem_IntCode rep addrE srcE
   = do
     (src_reg, _format, code) <- getSomeReg srcE
     platform <- getPlatform
-    Amode addr addr_code <- getAmode platform addrE
+    let w = formatToWidth rep
+    Amode addr addr_code <- getAmode platform w addrE
     return $ COMMENT (text "CmmStore" <+> parens (text (show addrE)) <+> parens (text (show srcE)))
             `consOL` (code
             `appOL` addr_code
-            `snocOL` STR rep (OpReg (formatToWidth rep) src_reg) (OpAddr addr))
+            `snocOL` STR rep (OpReg w src_reg) (OpAddr addr))
 
 assignReg_IntCode _ reg src
   = do
