@@ -21,12 +21,14 @@ import Utilities
 libraryRules :: Rules ()
 libraryRules = do
     root <- buildRootRules
-    root -/- "**/libHS*-*.dylib"       %> buildDynamicLibUnix root "dylib"
-    root -/- "**/libHS*-*.so"          %> buildDynamicLibUnix root "so"
-    root -/- "**/*.a"                  %> buildStaticLib      root
+    root -/- "**/libHS*-*.dylib"       %> buildDynamicLib root "dylib"
+    root -/- "**/libHS*-*.so"          %> buildDynamicLib root "so"
+    root -/- "**/libHS*-*.dll"         %> buildDynamicLib root "dll"
+    root -/- "**/*.a"                  %> buildStaticLib  root
     priority 2 $ do
-        root -/- "stage*/lib/**/libHS*-*.dylib" %> registerDynamicLibUnix root "dylib"
-        root -/- "stage*/lib/**/libHS*-*.so"    %> registerDynamicLibUnix root "so"
+        root -/- "stage*/lib/**/libHS*-*.dylib" %> registerDynamicLib root "dylib"
+        root -/- "stage*/lib/**/libHS*-*.so"    %> registerDynamicLib root "so"
+        root -/- "stage*/lib/**/libHS*-*.dll"   %> registerDynamicLib root "dll"
         root -/- "stage*/lib/**/*.a"            %> registerStaticLib  root
         root -/- "**/HS*-*.o"   %> buildGhciLibO root
         root -/- "**/HS*-*.p_o" %> buildGhciLibO root
@@ -64,11 +66,10 @@ buildStaticLib root archivePath = do
         archivePath synopsis
 
 -- | Register (with ghc-pkg) a dynamic library ('LibDyn') under the given build
--- root, with the given suffix (@.so@ or @.dylib@, @.dll@ in the future), where
--- the complete path of the registered dynamic library is given as the third
--- argument.
-registerDynamicLibUnix :: FilePath -> String -> FilePath -> Action ()
-registerDynamicLibUnix root suffix dynlibpath = do
+-- root, with the given suffix (@.so@ or @.dylib@, @.dll@), where the complete
+-- path of the registered dynamic library is given as the third argument.
+registerDynamicLib :: FilePath -> String -> FilePath -> Action ()
+registerDynamicLib root suffix dynlibpath = do
     -- Simply need the ghc-pkg database .conf file.
     (GhcPkgPath _ stage _ (LibDyn name version _ _))
         <- parsePath (parseGhcPkgLibDyn root suffix)
@@ -79,10 +80,10 @@ registerDynamicLibUnix root suffix dynlibpath = do
          ]
 
 -- | Build a dynamic library ('LibDyn') under the given build root, with the
--- given suffix (@.so@ or @.dylib@, @.dll@ in the future), where the complete
--- path of the archive to build is given as the third argument.
-buildDynamicLibUnix :: FilePath -> String -> FilePath -> Action ()
-buildDynamicLibUnix root suffix dynlibpath = do
+-- given suffix (@.so@ or @.dylib@, @.dll@), where the complete path of the
+-- archive to build is given as the third argument.
+buildDynamicLib :: FilePath -> String -> FilePath -> Action ()
+buildDynamicLib root suffix dynlibpath = do
     dynlib <- parsePath (parseBuildLibDyn root suffix) "<dyn lib parser>" dynlibpath
     let context = libDynContext dynlib
     deps <- contextDependencies context
