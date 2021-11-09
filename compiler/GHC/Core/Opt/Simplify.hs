@@ -1496,8 +1496,11 @@ simplArg env dup_flag arg_env arg
   | isSimplified dup_flag
   = return (dup_flag, arg_env, arg)
   | otherwise
-  = do { arg' <- simplExpr (arg_env `setInScopeFromE` env) arg
-       ; return (Simplified, zapSubstEnv arg_env, arg') }
+  = do { let arg_env' = arg_env `setInScopeFromE` env
+       ; arg' <- simplExpr arg_env'  arg
+       ; return (Simplified, zapSubstEnv arg_env', arg') }
+         -- Return a StaticEnv that includes the in-scope set from 'env',
+         -- because arg' may well mention those variables (#20639)
 
 {-
 ************************************************************************

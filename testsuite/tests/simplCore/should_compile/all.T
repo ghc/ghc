@@ -354,4 +354,4 @@ test('T20112',  normal, multimod_compile, ['T20112', '-O -v0 -g1'])
 
 # T19586 should not generate missed specialisation warnings
 test('T19586', normal, compile, [''])
-
+test('T20639', normal, compile, ['-O2'])
