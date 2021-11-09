@@ -72,6 +72,16 @@ cmmMachOpFoldM _ op [CmmLit (CmmInt x rep)]
 
       _ -> panic $ "cmmMachOpFoldM: unknown unary op: " ++ show op
 
+-- Eliminate shifts that are wider than the shiftee
+cmmMachOpFoldM _ op [_shiftee, CmmLit (CmmInt shift _)]
+  | Just width <- isShift op
+  , shift >= fromIntegral (widthInBits width)
+  = Just $! CmmLit (CmmInt 0 width)
+  where
+    isShift (MO_Shl   w) = Just w
+    isShift (MO_U_Shr w) = Just w
+    isShift (MO_S_Shr w) = Just w
+    isShift _            = Nothing
 
 -- Eliminate conversion NOPs
 cmmMachOpFoldM _ (MO_SS_Conv rep1 rep2) [x] | rep1 == rep2 = Just x
@@ -141,9 +151,9 @@ cmmMachOpFoldM platform mop [CmmLit (CmmInt x xrep), CmmLit (CmmInt y _)]
         MO_Or    r -> Just $! CmmLit (CmmInt (x .|. y) r)
         MO_Xor   r -> Just $! CmmLit (CmmInt (x `xor` y) r)
 
-        MO_Shl   r -> Just $! CmmLit (CmmInt (x `shiftL` fromIntegral y) r)
+        MO_Shl   r -> Just $! CmmLit (CmmInt (x   `shiftL` fromIntegral y) r)
         MO_U_Shr r -> Just $! CmmLit (CmmInt (x_u `shiftR` fromIntegral y) r)
-        MO_S_Shr r -> Just $! CmmLit (CmmInt (x `shiftR` fromIntegral y) r)
+        MO_S_Shr r -> Just $! CmmLit (CmmInt (x   `shiftR` fromIntegral y) r)
 
         _          -> Nothing
 
