@@ -153,7 +153,7 @@ cmmMachOpFoldM platform mop [CmmLit (CmmInt x xrep), CmmLit (CmmInt y _)]
 
         MO_Shl   r -> Just $! CmmLit (CmmInt (x   `shiftL` fromIntegral y) r)
         MO_U_Shr r -> Just $! CmmLit (CmmInt (x_u `shiftR` fromIntegral y) r)
-        MO_S_Shr r -> Just $! CmmLit (CmmInt (x   `shiftR` fromIntegral y) r)
+        MO_S_Shr r -> Just $! CmmLit (CmmInt (x_s `shiftR` fromIntegral y) r)
 
         _          -> Nothing
 
