@@ -69,7 +69,7 @@ import GHC.Types.Name.Occurrence (isTcOcc)
 import GHC.Types.Name.Reader (globalRdrEnvElts, greMangledName, unQualOK)
 import GHC.Unit.Module.Env (ModuleSet, emptyModuleSet, mkModuleSet, unionModuleSet)
 import GHC.Unit.Module.Graph
-import GHC.Unit.Module.ModSummary (emsModSummary, isBootSummary)
+import GHC.Unit.Module.ModSummary (isBootSummary)
 import GHC.Unit.Types (IsBootInterface (..))
 import GHC.Utils.Error (withTiming)
 
@@ -212,8 +212,8 @@ createIfaces verbosity modules flags instIfaceMap = do
         -- i.e. if module A imports B, then B is preferred over A,
         -- but if module A {-# SOURCE #-} imports B, then we can't say the same.
         --
-        go (AcyclicSCC (ModuleNode ems))
-          | NotBoot <- isBootSummary (emsModSummary ems) = [ems]
+        go (AcyclicSCC (ModuleNode _ ms))
+          | NotBoot <- isBootSummary ms = [ms]
           | otherwise = []
         go (AcyclicSCC _) = []
         go (CyclicSCC _) = error "haddock: module graph cyclic even with boot files"
@@ -222,9 +222,9 @@ createIfaces verbosity modules flags instIfaceMap = do
         ifaces =
           [ Map.findWithDefault
               (error "haddock:iface")
-              (ms_mod (emsModSummary ems))
+              (ms_mod ms)
               ifaceMap
-          | ems <- concatMap go $ topSortModuleGraph False modGraph Nothing
+          | ms <- concatMap go $ topSortModuleGraph False modGraph Nothing
           ]
 
       return (ifaces, moduleSet)
