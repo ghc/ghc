@@ -739,10 +739,9 @@ class Functor f => Applicative f where
 
 -- | Lift a function to actions.
 -- Equivalent to Functor's `fmap` but implemented using only `Applicative`'s methods:
--- `liftA f a = pure f <*> a`
+-- @'liftA' f a = 'pure' f '<*>' a@
 --
 -- As such this function may be used to implement a `Functor` instance from an `Applicative` one.
-
 --
 -- ==== __Examples__
 -- Using the Applicative instance for Lists:
