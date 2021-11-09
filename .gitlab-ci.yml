@@ -87,7 +87,8 @@ workflow:
 
 .lint:
   stage: tool-lint
-  tags: lint
+  tags:
+    - lint
   rules:
     - *drafts-can-fail-lint
 
