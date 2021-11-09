@@ -1311,7 +1311,8 @@ tcConArg penv (arg_pat, Scaled arg_mult arg_ty)
 
 addDataConStupidTheta :: DataCon -> [TcType] -> TcM ()
 -- Instantiate the "stupid theta" of the data con, and throw
--- the constraints into the constraint set
+-- the constraints into the constraint set.
+-- See Note [The stupid context] in GHC.Core.DataCon.
 addDataConStupidTheta data_con inst_tys
   | null stupid_theta = return ()
   | otherwise         = instStupidTheta origin inst_theta

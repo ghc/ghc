@@ -119,6 +119,7 @@ following constraints are satisfied.
       alpha-renaming).
 
   (b) D cannot have a "stupid context".
+      See Note [The stupid context] in GHC.Core.DataCon.
 
   (c) The right-hand side of D cannot include existential types, universally
       quantified types, or "exotic" unlifted types. An exotic unlifted type

@@ -930,6 +930,9 @@ cond_functorOK allowFunctions allowExQuantifiedLastTyVar _ _ rep_tc
   | null tc_tvs
   = NotValid $ DerivErrMustHaveSomeParameters rep_tc
 
+    -- We can't handle stupid contexts that mention the last type argument,
+    -- so error out if we encounter one.
+    -- See Note [The stupid context] in GHC.Core.DataCon.
   | not (null bad_stupid_theta)
   = NotValid $ DerivErrMustNotHaveClassContext rep_tc bad_stupid_theta
 

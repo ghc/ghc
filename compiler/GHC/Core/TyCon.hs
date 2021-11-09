@@ -797,6 +797,8 @@ data TyCon
                                         -- the left of an algebraic type
                                         -- declaration, e.g. @Eq a@ in the
                                         -- declaration @data Eq a => T a ...@.
+                                        -- See @Note [The stupid context]@ in
+                                        -- "GHC.Core.DataCon".
 
         algTcRhs    :: AlgTyConRhs, -- ^ Contains information about the
                                     -- data constructors of the algebraic type
@@ -2718,7 +2720,7 @@ newTyConDataCon_maybe _ = Nothing
 
 -- | Find the \"stupid theta\" of the 'TyCon'. A \"stupid theta\" is the context
 -- to the left of an algebraic type declaration, e.g. @Eq a@ in the declaration
--- @data Eq a => T a ...@
+-- @data Eq a => T a ...@. See @Note [The stupid context]@ in "GHC.Core.DataCon".
 tyConStupidTheta :: TyCon -> [PredType]
 tyConStupidTheta (AlgTyCon {algTcStupidTheta = stupid}) = stupid
 tyConStupidTheta (FunTyCon {}) = []

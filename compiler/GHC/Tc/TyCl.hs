@@ -3312,7 +3312,8 @@ dataDeclChecks tc_name new_or_data mctxt cons
        ; let gadt_syntax = consUseGadtSyntax cons
        ; checkTc (gadtSyntax_ok || not gadt_syntax) (badGadtDecl tc_name)
 
-           -- Check that the stupid theta is empty for a GADT-style declaration
+           -- Check that the stupid theta is empty for a GADT-style declaration.
+           -- See Note [The stupid context] in GHC.Core.DataCon.
        ; checkTc (null stupid_theta || not gadt_syntax) (badStupidTheta tc_name)
 
          -- Check that a newtype has exactly one constructor

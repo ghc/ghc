@@ -251,11 +251,20 @@ Data types can have a context:
 
         data (Eq a, Ord b) => T a b = T1 a b | T2 a
 
-and that makes the constructors have a context too
-(notice that T2's context is "thinned"):
+And that makes the constructors have a context too. A constructor's context
+isn't necessarily the same as the data type's context, however. Per the
+Haskell98 Report, the part of the datatype context that is used in a data
+constructor is the largest subset of the datatype context that constrains
+only the type variables free in the data constructor's field types. For
+example, here are the types of T1 and T2:
 
         T1 :: (Eq a, Ord b) => a -> b -> T a b
         T2 :: (Eq a) => a -> T a b
+
+Notice that T2's context is "thinned". Since its field is of type `a`, only
+the part of the datatype context that mentions `a`—that is, `Eq a`—is
+included in T2's context. On the other hand, T1's fields mention both `a`
+and `b`, so T1's context includes all of the datatype context.
 
 Furthermore, this context pops up when pattern matching
 (though GHC hasn't implemented this, but it is in H98, and
@@ -267,36 +276,49 @@ gets inferred type
 
 I say the context is "stupid" because the dictionaries passed
 are immediately discarded -- they do nothing and have no benefit.
+(See Note [Instantiating stupid theta] in GHC.Tc.Gen.Head.)
 It's a flaw in the language.
 
-        Up to now [March 2002] I have put this stupid context into the
-        type of the "wrapper" constructors functions, T1 and T2, but
-        that turned out to be jolly inconvenient for generics, and
-        record update, and other functions that build values of type T
-        (because they don't have suitable dictionaries available).
+GHC has made some efforts to correct this flaw. In GHC, datatype contexts
+are not available by default. Instead, one must explicitly opt in to them by
+using the DatatypeContexts extension. To discourage their use, GHC has
+deprecated DatatypeContexts.
 
-        So now I've taken the stupid context out.  I simply deal with
-        it separately in the type checker on occurrences of a
-        constructor, either in an expression or in a pattern.
+Some other notes about stupid contexts:
 
-        [May 2003: actually I think this decision could easily be
-        reversed now, and probably should be.  Generics could be
-        disabled for types with a stupid context; record updates now
-        (H98) needs the context too; etc.  It's an unforced change, so
-        I'm leaving it for now --- but it does seem odd that the
-        wrapper doesn't include the stupid context.]
+* Stupid contexts can interact badly with `deriving`. For instance, it's
+  unclear how to make this derived Functor instance typecheck:
 
-[July 04] With the advent of generalised data types, it's less obvious
-what the "stupid context" is.  Consider
-        C :: forall a. Ord a => a -> a -> T (Foo a)
-Does the C constructor in Core contain the Ord dictionary?  Yes, it must:
+    data Eq a => T a = MkT a
+      deriving Functor
 
-        f :: T b -> Ordering
-        f = /\b. \x:T b.
-            case x of
-                C a (d:Ord a) (p:a) (q:a) -> compare d p q
+  This is because the derived instance would need to look something like
+  `instance Functor T where ...`, but there is nowhere to mention the
+  requisite `Eq a` constraint. For this reason, GHC will throw an error if a
+  user attempts to derive an instance for Functor (or a Functor-like class)
+  where the last type variable is used in a datatype context. For Generic(1),
+  the requirements are even harsher, as stupid contexts are not allowed at all
+  in derived Generic(1) instances. (We could consider relaxing this requirement
+  somewhat, although no one has asked for this yet.)
 
-Note that (Foo a) might not be an instance of Ord.
+  Stupid contexts are permitted when deriving instances of non-Functor-like
+  classes, or when deriving instances of Functor-like classes where the last
+  type variable isn't mentioned in the stupid context. For example, the
+  following is permitted:
+
+    data Show a => T a = MkT deriving Eq
+
+  Note that because of the "thinning" behavior mentioned above, the generated
+  Eq instance should not mention `Show a`, as the type of MkT doesn't require
+  it. That is, the following should be generated (#20501):
+
+    instance Eq (T a) where
+      (MkT == MkT) = True
+
+* It's not obvious how stupid contexts should interact with GADTs. For this
+  reason, GHC disallows combining datatype contexts with GADT syntax. As a
+  result, dcStupidTheta is always empty for data types defined using GADT
+  syntax.
 
 ************************************************************************
 *                                                                      *
@@ -414,7 +436,8 @@ data DataCon
                                         -- or, rather, a "thinned" version thereof
                 -- "Thinned", because the Report says
                 -- to eliminate any constraints that don't mention
-                -- tyvars free in the arg types for this constructor
+                -- tyvars free in the arg types for this constructor.
+                -- See Note [The stupid context].
                 --
                 -- INVARIANT: the free tyvars of dcStupidTheta are a subset of dcUnivTyVars
                 -- Reason: dcStupidTeta is gotten by thinning the stupid theta from the tycon
@@ -1346,6 +1369,8 @@ dataConOrigResTy dc = dcOrigResTy dc
 -- | The \"stupid theta\" of the 'DataCon', such as @data Eq a@ in:
 --
 -- > data Eq a => T a = ...
+--
+-- See @Note [The stupid context]@.
 dataConStupidTheta :: DataCon -> ThetaType
 dataConStupidTheta dc = dcStupidTheta dc
 
