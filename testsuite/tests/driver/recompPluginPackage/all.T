@@ -15,6 +15,7 @@ else:
 
 test('recompPluginPackage', [extra_files(['p', 'q', 'Setup.hs']),
                    when(opsys('mingw32'), fragile(16405)),
-                   when(fast(), skip)],
+                   when(fast(), skip),
+                   unless(have_dynamic(), skip)],
      run_command,
      ['$MAKE -s --no-print-directory recompPluginPackage VANILLA=' + vanilla + ' PROF=' + prof + ' DYN=' + dyn])
