@@ -499,7 +499,7 @@ function test_hadrian() {
       fi
     done
     if [ -n "$bad_execs" ]; then
-      error "the following executables contain dynamic-object references: $bad_execs"
+      fail "the following executables contain dynamic-object references: $bad_execs"
     fi
   fi
 
