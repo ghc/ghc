@@ -905,7 +905,9 @@ being able to reconstruct the exact original program.
 
 Note [Instantiating stupid theta]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider a data type with a "stupid theta":
+Consider a data type with a "stupid theta" (see
+Note [The stupid context] in GHC.Core.DataCon):
+
   data Ord a => T a = MkT (Maybe a)
 
 We want to generate an Ord constraint for every use of MkT; but

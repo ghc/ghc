@@ -192,6 +192,8 @@ buildDataCon fam_envs src_name declared_infix prom_info src_bangs impl_bangs
 -- the type variables mentioned in the arg_tys
 -- ToDo: Or functionally dependent on?
 --       This whole stupid theta thing is, well, stupid.
+--
+-- See Note [The stupid context] in GHC.Core.DataCon.
 mkDataConStupidTheta :: TyCon -> [Type] -> [TyVar] -> [PredType]
 mkDataConStupidTheta tycon arg_tys univ_tvs
   | null stupid_theta = []      -- The common case

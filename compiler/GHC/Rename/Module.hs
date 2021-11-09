@@ -1924,7 +1924,9 @@ rnDataDefn :: HsDocContext -> HsDataDefn GhcPs
 rnDataDefn doc (HsDataDefn { dd_ND = new_or_data, dd_cType = cType
                            , dd_ctxt = context, dd_cons = condecls
                            , dd_kindSig = m_sig, dd_derivs = derivs })
-  = do  { checkTc (h98_style || null (fromMaybeContext context))
+  = do  { -- DatatypeContexts (i.e., stupid contexts) can't be combined with
+          -- GADT syntax. See Note [The stupid context] in GHC.Core.DataCon.
+          checkTc (h98_style || null (fromMaybeContext context))
                   (badGadtStupidTheta doc)
 
         ; (m_sig', sig_fvs) <- case m_sig of

@@ -790,7 +790,8 @@ tcExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = Left rbnds }) res_
         -- Typecheck the bindings
         ; rbinds'      <- tcRecordUpd con1 con1_arg_tys' rbinds
 
-        -- STEP 6: Deal with the stupid theta
+        -- STEP 6: Deal with the stupid theta.
+        -- See Note [The stupid context] in GHC.Core.DataCon.
         ; let theta' = substThetaUnchecked scrut_subst (conLikeStupidTheta con1)
         ; instStupidTheta RecordUpdOrigin theta'
 

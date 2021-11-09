@@ -146,6 +146,7 @@ conLikeName (PatSynCon pat_syn)    = patSynName pat_syn
 --
 -- > data Eq a => T a = ...
 -- It is empty for `PatSynCon` as they do not allow such contexts.
+-- See @Note [The stupid context]@ in "GHC.Core.DataCon".
 conLikeStupidTheta :: ConLike -> ThetaType
 conLikeStupidTheta (RealDataCon data_con) = dataConStupidTheta data_con
 conLikeStupidTheta (PatSynCon {})         = []

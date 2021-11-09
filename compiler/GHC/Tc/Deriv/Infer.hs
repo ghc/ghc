@@ -194,13 +194,9 @@ inferConstraintsStock (DerivInstTys { dit_cls_tys     = cls_tys
                      ]
                    -- Stupid constraints from DatatypeContexts. Note that we
                    -- must gather these constraints from the data constructors,
-                   -- not from the parent type constructor, as the latter can
-                   -- lead to redundant constraints in some cases. For example,
-                   -- the derived Eq instance for:
-                   --
-                   --   data Show a => T a = MkT deriving Eq
-                   --
-                   -- Should not have Show in the instance context (#20501).
+                   -- not from the parent type constructor, as the latter could
+                   -- lead to redundant constraints due to thinning.
+                   -- See Note [The stupid context] in GHC.Core.DataCon.
                    stupid_theta =
                      [ substTyWith (dataConUnivTyVars data_con)
                                    all_rep_tc_args
