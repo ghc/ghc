@@ -569,9 +569,6 @@ validate-x86_64-darwin:
     - cat ci-timings
 
   script: |
-    sdk_path="$(xcrun --sdk macosx --show-sdk-path)"
-    CONFIGURE_ARGS="$CONFIGURE_ARGS --with-ffi-libraries=$sdk_path/usr/lib --with-ffi-includes=$sdk_path/usr/include/ffi"
-
     # fix up config.sub in libraries for the time.
     # aarch64-darwin is not supported in older config.sub's
     find libraries -name config.sub -exec cp config.sub {} \;
@@ -618,13 +615,7 @@ validate-aarch64-darwin:
     - .gitlab/ci.sh clean
     - cat ci-timings
 
-  # I wish we could just use the nix #! logic, but we can't --run and -i bash
-  # behave very differently. -i bash does not pass any nix related env vars
-  # the whole $stdenv/setup part seems to be missing.
   script: |
-    sdk_path="$(xcrun --sdk macosx --show-sdk-path)"
-    CONFIGURE_ARGS="$CONFIGURE_ARGS --with-ffi-libraries=$sdk_path/usr/lib --with-ffi-includes=$sdk_path/usr/include/ffi"
-
     # fix up config.sub in libraries for the time.
     # aarch64-darwin is not supported in older config.sub's
     find libraries -name config.sub -exec cp config.sub {} \;
