@@ -79,13 +79,15 @@ workflow:
     - if: '$CI_PIPELINE_SOURCE == "web"'
 
 # Allow linters to fail on draft MRs.
+# This must be explicitly transcluded in lint jobs which
+# override `rules:`
 .drafts-can-fail-lint: &drafts-can-fail-lint
   if: "$CI_MERGE_REQUEST_TITLE =~ /^\\s*(Draft|wip|WIP):/"
   allow_failure: true
 
 .lint:
   rules:
-    - <<: drafts-can-fail-lint
+    - *drafts-can-fail-lint
 
 .nightly: &nightly
   variables:
