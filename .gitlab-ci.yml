@@ -193,14 +193,11 @@ ghc-linters:
 
 # Run mypy Python typechecker on linter scripts.
 lint-linters:
-  stage: tool-lint
   image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
   extends: .lint
   script:
     - mypy .gitlab/linters/*.py
   dependencies: []
-  tags:
-    - lint
 
 # Check that .T files all parse by listing broken tests.
 lint-testsuite:
