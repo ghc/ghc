@@ -1,0 +1,29 @@
+
+T20588.hs-boot:8:1: error:
+    Class ‘C’ has conflicting definitions in the module
+    and its hs-boot file
+    Main module: type C :: * -> Constraint
+                 class C a where
+                   meth :: a -> a
+                   {-# MINIMAL meth #-}
+    Boot file:   type C :: * -> Constraint
+                 class C a where
+                   meth :: a -> a
+                   {-# MINIMAL meth #-}
+    The methods do not match:
+      The default methods associated with ‘meth’ are different
+
+T20588.hs-boot:11:1: error:
+    Class ‘D’ has conflicting definitions in the module
+    and its hs-boot file
+    Main module: type D :: * -> Constraint
+                 class D a where
+                   type T :: * -> *
+                   type family T a
+                     Default: Int
+    Boot file:   type D :: * -> Constraint
+                 class D a where
+                   type T :: * -> *
+                   type family T a
+    The associated types do not match:
+      The associated type defaults differ

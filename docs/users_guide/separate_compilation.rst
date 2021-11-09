@@ -864,10 +864,12 @@ A hs-boot file is written in a subset of Haskell:
    You cannot use ``deriving`` on a data type declaration; write an
    ``instance`` declaration instead.
 
--  Class declarations is exactly as in Haskell, except that you may not
-   put default method declarations. You can also omit all the
-   superclasses and class methods entirely; but you must either omit
-   them all or put them all in.
+-  Class declarations can either be given in full, exactly as in Haskell,
+   or they can be given abstractly by omitting everything other than the
+   instance head: no superclasses, no class methods, no associated types.
+   If the class declaration is given in full, the default delarations
+   must also match; this applies to both default methods and default
+   declarations for associated types.
 
 -  You can include instance declarations just as in Haskell; but omit
    the "where" part.
