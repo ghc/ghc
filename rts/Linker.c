@@ -1127,6 +1127,9 @@ void
 mmapForLinkerMarkExecutable(void *start, size_t len)
 {
   DWORD old;
+  if (len == 0) {
+    return;
+  }
   if (VirtualProtect(start, len, PAGE_EXECUTE_READ, &old) == 0) {
     sysErrorBelch("mmapForLinkerMarkExecutable: failed to protect %zd bytes at %p",
                   len, start);
@@ -1298,6 +1301,9 @@ void munmapForLinker (void *addr, size_t bytes, const char *caller)
  */
 void mmapForLinkerMarkExecutable(void *start, size_t len)
 {
+    if (len == 0) {
+      return;
+    }
     IF_DEBUG(linker,
              debugBelch("mmapForLinkerMarkExecutable: protecting %" FMT_Word
                         " bytes starting at %p\n", (W_)len, start));
