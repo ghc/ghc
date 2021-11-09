@@ -86,6 +86,8 @@ workflow:
   allow_failure: true
 
 .lint:
+  stage: tool-lint
+  tags: lint
   rules:
     - *drafts-can-fail-lint
 
@@ -184,8 +186,6 @@ ghc-linters:
     - .gitlab/linters/check-version-number.sh
     - python3 utils/checkUniques/check-uniques.py .
   dependencies: []
-  tags:
-    - lint
   rules:
     - if: $CI_MERGE_REQUEST_ID
     - *drafts-can-fail-lint
@@ -203,31 +203,24 @@ lint-linters:
 
 # Check that .T files all parse by listing broken tests.
 lint-testsuite:
-  stage: tool-lint
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   extends: .lint
   script:
     - make -Ctestsuite list_broken TEST_HC=$GHC
   dependencies: []
-  tags:
-    - lint
 
 # Run mypy Python typechecker on testsuite driver
 typecheck-testsuite:
-  stage: tool-lint
   image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
   extends: .lint
   script:
     - mypy testsuite/driver/runtests.py
   dependencies: []
-  tags:
-    - lint
 
 # We allow the submodule checker to fail when run on merge requests (to
 # accommodate, e.g., haddock changes not yet upstream) but not on `master` or
 # Marge jobs.
 .lint-submods:
-  stage: tool-lint
   image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
   extends: .lint
   script:
@@ -237,8 +230,6 @@ typecheck-testsuite:
     - git submodule foreach git remote update
     - submodchecker . $(git rev-list $base..$CI_COMMIT_SHA)
   dependencies: []
-  tags:
-    - lint
 
 lint-submods:
   extends: .lint-submods
@@ -261,12 +252,9 @@ lint-submods-branch:
     - *drafts-can-fail-lint
 
 .lint-changelogs:
-  stage: tool-lint
   image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
   extends: .lint
   dependencies: []
-  tags:
-    - lint
   script:
     - bash .gitlab/linters/check-changelogs.sh
 
@@ -276,7 +264,6 @@ lint-changelogs:
   allow_failure: true
   rules:
     - if: '$CI_COMMIT_BRANCH =~ /ghc-[0.9]+\.[0-9]+/'
-    - *drafts-can-fail-lint
 
 lint-release-changelogs:
   extends: .lint-changelogs
@@ -410,10 +397,7 @@ hadrian-ghc-in-ghci:
 ############################################################
 
 .lint-params:
-  stage: tool-lint
   needs: [lint-submods]
-  tags:
-    - lint
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   extends: .lint
   before_script:
