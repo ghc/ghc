@@ -67,6 +67,8 @@ Environment variables affecting both build systems:
                     Whether to ignore perf failures (one of "increases",
                     "decreases", or "all")
   HERMETIC          Take measures to avoid looking at anything in \$HOME
+  NIX_SYSTEM        On Darwin, the target platform of the desired toolchain
+                    (either "x86-64-darwin" or "aarch-darwin")
 
 Environment variables determining build configuration of Make system:
 
@@ -179,24 +181,33 @@ function show_tool() {
 }
 
 function set_toolchain_paths() {
-  needs_toolchain="1"
   case "$(uname -m)-$(uname)" in
     # Linux toolchains are included in the Docker image
-    *-Linux) needs_toolchain="" ;;
+    *-Linux) toolchain_source="env" ;;
     # Darwin toolchains are provided via .gitlab/darwin/toolchain.nix
-    *-Darwin) needs_toolchain="" ;;
-    *) ;;
+    *-Darwin) toolchain_source="nix" ;;
+    *) toolchain_source="extracted" ;;
   esac
 
-  if [ -z "${CC:-}" ]; then CC="$(which cc)"; fi
-
-  if [[ -n "$needs_toolchain" ]]; then
+  case "$toolchain_source" in
+    extracted)
       # These are populated by setup_toolchain
       GHC="$toolchain/bin/ghc$exe"
       CABAL="$toolchain/bin/cabal$exe"
       HAPPY="$toolchain/bin/happy$exe"
       ALEX="$toolchain/bin/alex$exe"
-  else
+      ;;
+    nix)
+      if [[ ! -f toolchain.sh ]]; then
+        case "$NIX_SYSTEM" in
+          x86_64-darwin|aarch64-darwin) ;;
+          *) fail "unknown NIX_SYSTEM" ;;
+        esac
+        nix build -f .gitlab/darwin/toolchain.nix --argstr system "$NIX_SYSTEM" -o toolchain.sh
+        cat toolchain.sh
+      fi
+      source toolchain.sh ;;
+    env)
       # These are generally set by the Docker image but
       # we provide these handy fallbacks in case the
       # script isn't run from within a GHC CI docker image.
@@ -204,7 +215,9 @@ function set_toolchain_paths() {
       if [ -z "$CABAL" ]; then CABAL="$(which cabal)"; fi
       if [ -z "$HAPPY" ]; then HAPPY="$(which happy)"; fi
       if [ -z "$ALEX" ]; then ALEX="$(which alex)"; fi
-  fi
+      ;;
+    *) fail "bad toolchain_source"
+  esac
 
   export CC
   export GHC
@@ -227,9 +240,10 @@ function setup() {
       cp -Rf "$CABAL_CACHE"/* "$CABAL_DIR"
   fi
 
-  if [[ "$needs_toolchain" = "1" ]]; then
-    time_it "setup" setup_toolchain
-  fi
+  case $toolchain_source in
+    extracted) time_it "setup" setup_toolchain ;;
+    *) ;;
+  esac
 
   cabal_update
 
