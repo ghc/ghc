@@ -98,5 +98,8 @@ pkgs.writeTextFile {
     export SPHINXBUILD="${pkgs.python3Packages.sphinx}/bin/sphinx-build"
     export CABAL_INSTALL="${pkgs.cabal-install}/bin/cabal"
     export CABAL="$CABAL_INSTALL"
+
+    sdk_path="$(xcrun --sdk macosx --show-sdk-path)"
+    export CONFIGURE_ARGS="$CONFIGURE_ARGS --with-ffi-libraries=$sdk_path/usr/lib --with-ffi-includes=$sdk_path/usr/include/ffi"
   '';
 }
