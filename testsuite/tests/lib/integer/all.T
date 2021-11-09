@@ -18,7 +18,7 @@ test('T18813', [], compile_and_run, [''])
 test('T19170', [], compile_and_run, [''])
 
 # skipped on Windows (doesn't support `-dynamic-too`)
-test('T19264', [when(opsys('mingw32'),skip),extra_files(['T19264b.hs'])], compile, ['-dynamic-too --make -v0'])
+test('T19264', [when(opsys('mingw32'),skip),unless(have_dynamic(),skip),extra_files(['T19264b.hs'])], compile, ['-dynamic-too --make -v0'])
 
 # skip ghci as it doesn't support unboxed tuples
 test('integerImportExport', [omit_ways(['ghci'])], compile_and_run, [''])
