@@ -544,6 +544,7 @@ validate-x86_64-darwin:
     - x86_64-darwin-m1
 
   variables:
+    NIX_SYSTEM: x86_64-darwin
     BUILD_FLAVOUR: "validate"
     GHC_VERSION: 8.10.4
     CABAL_INSTALL_VERSION: 3.2.0.0
@@ -573,10 +574,6 @@ validate-x86_64-darwin:
     - cat ci-timings
 
   script: |
-    nix build -f .gitlab/darwin/toolchain.nix --argstr system x86_64-darwin -o toolchain.sh
-    source toolchain.sh
-    cat toolchain.sh
-
     sdk_path="$(xcrun --sdk macosx --show-sdk-path)"
     CONFIGURE_ARGS="$CONFIGURE_ARGS --with-ffi-libraries=$sdk_path/usr/lib --with-ffi-includes=$sdk_path/usr/include/ffi"
 
@@ -603,6 +600,7 @@ validate-aarch64-darwin:
     - aarch64-darwin-m1
 
   variables:
+    NIX_SYSTEM: aarch64-darwin
     BUILD_FLAVOUR: "validate"
     TEST_TYPE: test
     MAKE_ARGS: "-Werror"
@@ -629,10 +627,6 @@ validate-aarch64-darwin:
   # behave very differently. -i bash does not pass any nix related env vars
   # the whole $stdenv/setup part seems to be missing.
   script: |
-    nix build -f .gitlab/darwin/toolchain.nix --argstr system aarch64-darwin -o toolchain.sh
-    source toolchain.sh
-    cat toolchain.sh
-
     sdk_path="$(xcrun --sdk macosx --show-sdk-path)"
     CONFIGURE_ARGS="$CONFIGURE_ARGS --with-ffi-libraries=$sdk_path/usr/lib --with-ffi-includes=$sdk_path/usr/include/ffi"
 
