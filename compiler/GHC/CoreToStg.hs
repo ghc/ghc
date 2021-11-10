@@ -630,6 +630,7 @@ coreToStgTick _ty (HpcTick m i)           = HpcTick m i
 coreToStgTick _ty (SourceNote span nm)    = SourceNote span nm
 coreToStgTick _ty (ProfNote cc cnt scope) = ProfNote cc cnt scope
 coreToStgTick !ty (Breakpoint _ bid fvs)  = Breakpoint ty bid fvs
+coreToStgTick _ty (TickyCounter mod nm)   = TickyCounter mod nm
 
 -- ---------------------------------------------------------------------------
 -- The magic for lets:

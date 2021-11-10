@@ -155,6 +155,16 @@ data GenTickish pass =
                                 --   (uses same names as CCs)
     }
 
+  -- | A Ticky counter. This is used to introduce Ticky-Ticky profiler
+  -- counters which are incremented when the enclosed scope is entered.
+  -- These behave like source notes in that they try to be as unobtrusive to
+  -- simplification as possible. Note that 'tickyCounterName' must be unique
+  -- per module.
+  | TickyCounter
+    { tickyCounterModule :: Module
+    , tickyCounterName   :: String
+    }
+
 deriving instance Eq (GenTickish 'TickishPassCore)
 deriving instance Ord (GenTickish 'TickishPassCore)
 deriving instance Data (GenTickish 'TickishPassCore)
@@ -253,6 +263,7 @@ tickishScoped Breakpoint{} = CostCentreScope
    -- stacks, but also this helps prevent the simplifier from moving
    -- breakpoints around and changing their result type (see #1531).
 tickishScoped SourceNote{} = SoftScope
+tickishScoped TickyCounter{} = SoftScope
 
 -- | Returns whether the tick scoping rule is at least as permissive
 -- as the given scoping rule.
@@ -360,6 +371,7 @@ tickishPlace n@ProfNote{}
 tickishPlace HpcTick{}     = PlaceRuntime
 tickishPlace Breakpoint{}  = PlaceRuntime
 tickishPlace SourceNote{}  = PlaceNonLam
+tickishPlace TickyCounter{} = PlaceNonLam
 
 -- | Returns whether one tick "contains" the other one, therefore
 -- making the second tick redundant.

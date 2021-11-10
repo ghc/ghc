@@ -1122,5 +1122,6 @@ cgTick tick
            ProfNote   cc t p -> emitSetCCC cc t p
            HpcTick    m n    -> emit (mkTickBox platform m n)
            SourceNote s n    -> emitTick $ SourceNote s n
+           TickyCounter m n  -> emitTickyUserCounter m n
            _other            -> return () -- ignore
        }

@@ -674,3 +674,5 @@ instance Outputable (XTickishId pass) => Outputable (GenTickish pass) where
          _            -> hcat [text "scc<",     ppr cc, char '>']
   ppr (SourceNote span _) =
       hcat [ text "src<", pprUserRealSpan True span, char '>']
+  ppr (TickyCounter mod name) =
+      hcat [ text "ticker<", ppr mod <+> text name, char '>']

@@ -90,6 +90,7 @@ module GHC.Cmm.CLabel (
         mkPicBaseLabel,
         mkDeadStripPreventer,
         mkHpcTicksLabel,
+        mkUserTickyCtrLabel,
 
         -- * Predicates
         hasCAF,
@@ -277,6 +278,8 @@ data CLabel
   -- | Per-module table of tick locations
   | HpcTicksLabel Module
 
+  | UserTickyCtrLabel Module !Unique
+
   -- | Static reference table
   | SRTLabel
         {-# UNPACK #-} !Unique
@@ -365,6 +368,8 @@ instance Ord CLabel where
     compare a1 a2
   compare (HpcTicksLabel a1) (HpcTicksLabel a2) =
     compare a1 a2
+  compare (UserTickyCtrLabel a1 b1) (UserTickyCtrLabel a2 b2) =
+    compare a1 a2 `thenCmp` nonDetCmpUnique b1 b2
   compare (SRTLabel u1) (SRTLabel u2) =
     nonDetCmpUnique u1 u2
   compare (LargeBitmapLabel u1) (LargeBitmapLabel u2) =
@@ -397,6 +402,8 @@ instance Ord CLabel where
   compare _ DeadStripPreventer{} = GT
   compare HpcTicksLabel{} _ = LT
   compare _ HpcTicksLabel{} = GT
+  compare UserTickyCtrLabel{} _ = LT
+  compare _ UserTickyCtrLabel{} = GT
   compare SRTLabel{} _ = LT
   compare _ SRTLabel{} = GT
   compare (IPE_Label {}) _ = LT
@@ -802,6 +809,10 @@ mkRtsSlowFastTickyCtrLabel pat = RtsLabel (RtsSlowFastTickyCtr pat)
 mkHpcTicksLabel :: Module -> CLabel
 mkHpcTicksLabel                = HpcTicksLabel
 
+-- Constructing labels for user-provided ticky tickers
+mkUserTickyCtrLabel :: Module -> Unique -> CLabel
+mkUserTickyCtrLabel = UserTickyCtrLabel
+
 
 -- Constructing labels used for dynamic linking
 mkDynamicLinkerLabel :: DynamicLinkerLabelInfo -> CLabel -> CLabel
@@ -946,6 +957,7 @@ needsCDecl (CC_Label _)                 = True
 needsCDecl (CCS_Label _)                = True
 needsCDecl (IPE_Label {})               = True
 needsCDecl (HpcTicksLabel _)            = True
+needsCDecl (UserTickyCtrLabel _ _)      = True
 needsCDecl (DynamicLinkerLabel {})      = panic "needsCDecl DynamicLinkerLabel"
 needsCDecl PicBaseLabel                 = panic "needsCDecl PicBaseLabel"
 needsCDecl (DeadStripPreventer {})      = panic "needsCDecl DeadStripPreventer"
@@ -1070,6 +1082,7 @@ externallyVisibleCLabel (CCS_Label _)           = True
 externallyVisibleCLabel (IPE_Label {})          = True
 externallyVisibleCLabel (DynamicLinkerLabel _ _)  = False
 externallyVisibleCLabel (HpcTicksLabel _)       = True
+externallyVisibleCLabel (UserTickyCtrLabel _ _) = True
 externallyVisibleCLabel (LargeBitmapLabel _)    = False
 externallyVisibleCLabel (SRTLabel _)            = False
 externallyVisibleCLabel (PicBaseLabel {}) = panic "externallyVisibleCLabel PicBaseLabel"
@@ -1132,6 +1145,7 @@ labelType (DynamicLinkerLabel _ _)              = DataLabel -- Is this right?
 labelType PicBaseLabel                          = DataLabel
 labelType (DeadStripPreventer _)                = DataLabel
 labelType (HpcTicksLabel _)                     = DataLabel
+labelType (UserTickyCtrLabel _ _)               = DataLabel
 labelType (LargeBitmapLabel _)                  = DataLabel
 
 idInfoLabelType :: IdLabelInfo -> CLabelType
@@ -1448,6 +1462,9 @@ pprCLabel !platform !sty lbl = -- see Note [Bangs in CLabel]
 
    HpcTicksLabel mod
       -> maybe_underscore $ text "_hpc_tickboxes_"  <> ppr mod <> text "_hpc"
+
+   UserTickyCtrLabel mod u
+      -> maybe_underscore $ text "_ticky_user_"  <> ppr mod <> text "_" <> pprUniqueAlways u <> text "_ctr"
 
    CC_Label cc   -> maybe_underscore $ ppr cc
    CCS_Label ccs -> maybe_underscore $ ppr ccs

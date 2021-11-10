@@ -219,3 +219,8 @@ test('CallConv', [when(unregisterised(), skip),
                   when(arch('x86_64'), extra_hc_opts('CallConv_x86_64.s')),
                   when(arch('aarch64'), extra_hc_opts('CallConv_aarch64.s'))],
      compile_and_run, [''])
+
+test('UserTickyCounter',
+     [extra_files(['user-ticky-counter-plugin/']),
+     pre_cmd('$MAKE -s --no-print-directory -C user-ticky-counter-plugin/ package TOP={top}')],
+     makefile_test, [])

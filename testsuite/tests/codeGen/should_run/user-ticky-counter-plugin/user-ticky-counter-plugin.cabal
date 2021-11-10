@@ -1,0 +1,13 @@
+Name:           user-ticky-counter-plugin
+Version:        0.1
+Cabal-Version:  >= 1.2
+Build-Type:     Simple
+License:        BSD3
+Author:         Ben Gamari
+
+Library
+    Build-Depends:
+        base,
+        ghc >= 6.11
+    Exposed-Modules:
+        UserTickyCounterPlugin

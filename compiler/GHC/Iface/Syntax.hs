@@ -563,6 +563,7 @@ data IfaceExpr
 
 data IfaceTickish
   = IfaceHpcTick Module Int                -- from HpcTick x
+  | IfaceTickyCounter Module String        -- from TickyCounter
   | IfaceSCC     CostCentre Bool Bool      -- from ProfNote
   | IfaceSource  RealSrcSpan String        -- from SourceNote
   -- no breakpoints: we never export these into interface files
@@ -1439,6 +1440,8 @@ ppr_bind (IfLetBndr b ty info ji, rhs)
 pprIfaceTickish :: IfaceTickish -> SDoc
 pprIfaceTickish (IfaceHpcTick m ix)
   = braces (text "tick" <+> ppr m <+> ppr ix)
+pprIfaceTickish (IfaceTickyCounter m n)
+  = braces (text "ticker" <+> ppr m <+> ppr n)
 pprIfaceTickish (IfaceSCC cc tick scope)
   = braces (pprCostCentreCore cc <+> ppr tick <+> ppr scope)
 pprIfaceTickish (IfaceSource src _names)
@@ -2409,13 +2412,17 @@ instance Binary IfaceTickish where
         putByte bh 0
         put_ bh m
         put_ bh ix
-    put_ bh (IfaceSCC cc tick push) = do
+    put_ bh (IfaceTickyCounter m n) = do
         putByte bh 1
+        put_ bh m
+        put_ bh n
+    put_ bh (IfaceSCC cc tick push) = do
+        putByte bh 2
         put_ bh cc
         put_ bh tick
         put_ bh push
     put_ bh (IfaceSource src name) = do
-        putByte bh 2
+        putByte bh 3
         put_ bh (srcSpanFile src)
         put_ bh (srcSpanStartLine src)
         put_ bh (srcSpanStartCol src)
@@ -2429,11 +2436,14 @@ instance Binary IfaceTickish where
             0 -> do m <- get bh
                     ix <- get bh
                     return (IfaceHpcTick m ix)
-            1 -> do cc <- get bh
+            1 -> do m <- get bh
+                    n <- get bh
+                    return (IfaceTickyCounter m n)
+            2 -> do cc <- get bh
                     tick <- get bh
                     push <- get bh
                     return (IfaceSCC cc tick push)
-            2 -> do file <- get bh
+            3 -> do file <- get bh
                     sl <- get bh
                     sc <- get bh
                     el <- get bh
@@ -2656,6 +2666,7 @@ instance NFData IfaceJoinInfo where
 instance NFData IfaceTickish where
   rnf = \case
     IfaceHpcTick m i -> rnf m `seq` rnf i
+    IfaceTickyCounter m n -> rnf m `seq` rnf n
     IfaceSCC cc b1 b2 -> cc `seq` rnf b1 `seq` rnf b2
     IfaceSource src str -> src `seq` rnf str
 

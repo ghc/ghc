@@ -77,6 +77,7 @@ seqTickish ProfNote{ profNoteCC = cc } = cc `seq` ()
 seqTickish HpcTick{} = ()
 seqTickish Breakpoint{ breakpointFVs = ids } = seqBndrs ids
 seqTickish SourceNote{} = ()
+seqTickish TickyCounter{} = ()
 
 seqBndr :: CoreBndr -> ()
 seqBndr b | isTyVar b = seqType (tyVarKind b)

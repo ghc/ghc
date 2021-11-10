@@ -73,6 +73,8 @@ module GHC.StgToCmm.Ticky (
   withNewTickyCounterStdThunk,
   withNewTickyCounterCon,
 
+  emitTickyUserCounter,
+
   tickyDynAlloc,
   tickyAllocHeap,
 
@@ -121,6 +123,7 @@ import GHC.Cmm.Utils
 import GHC.Cmm.CLabel
 import GHC.Runtime.Heap.Layout
 
+import GHC.Unit.Module
 import GHC.Types.Name
 import GHC.Types.Id
 import GHC.Types.Basic
@@ -203,6 +206,19 @@ withNewTickyCounterCon name datacon code = do
       then code
       else withNewTickyCounter (TickyCon datacon) name [] code
 
+-- | Emit a ticker resulting from a 'TickyCounter' 'Tick'.
+emitTickyUserCounter :: Module -> String -> FCode ()
+emitTickyUserCounter mod name = ifTicky $ do
+    -- TODO: Make tickers weak symbols. Once we do so, take care to only emit
+    -- the counter when `this_mod == mod`
+    u <- newUnique
+    let ctr_lbl = mkUserTickyCtrLabel mod u
+    name' <- newStringCLit name
+    placeholder <- newStringCLit ""
+    emitRawTickyCounter ctr_lbl name' placeholder 0
+    registerTickyCtr ctr_lbl
+    bumpTickyLbl ctr_lbl
+
 -- args does not include the void arguments
 withNewTickyCounter :: TickyClosureType -> Name -> [NonVoid Id] -> FCode a -> FCode a
 withNewTickyCounter cloType name args m = do
@@ -215,7 +231,6 @@ emitTickyCounter cloType name args
     (>> return ctr_lbl) $
     ifTicky $ do
         { dflags <- getDynFlags
-        ; platform <- getPlatform
         ; parent <- getTickyCtrLabel
         ; mod_name <- getModuleName
 
@@ -247,15 +262,21 @@ emitTickyCounter cloType name args
                       { sdocPprDebug = True }
         ; fun_descr_lit <- newStringCLit $ renderWithContext ctx ppr_for_ticky_name
         ; arg_descr_lit <- newStringCLit $ map (showTypeCategory . idType . fromNonVoid) args
+        ; emitRawTickyCounter ctr_lbl fun_descr_lit arg_descr_lit (length args)
+        }
+
+emitRawTickyCounter :: CLabel -> CmmLit -> CmmLit -> Int -> FCode ()
+emitRawTickyCounter ctr_lbl fun_descr_lit arg_descr_lit arity = do
+        { platform <- getPlatform
         ; emitDataLits ctr_lbl
         -- Must match layout of rts/include/rts/Ticky.h's StgEntCounter
         --
         -- krc: note that all the fields are I32 now; some were I16
         -- before, but the code generator wasn't handling that
         -- properly and it led to chaos, panic and disorder.
-            [ mkIntCLit platform 0,               -- registered?
-              mkIntCLit platform (length args),   -- Arity
-              mkIntCLit platform 0,               -- Heap allocated for this thing
+            [ mkIntCLit platform 0,       -- registered?
+              mkIntCLit platform arity,   -- Arity
+              mkIntCLit platform 0,       -- Heap allocated for this thing
               fun_descr_lit,
               arg_descr_lit,
               zeroCLit platform,          -- Entries into this thing
