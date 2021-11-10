@@ -7,6 +7,4 @@
 /* The minimum supported LLVM version number */
 #undef sUPPORTED_LLVM_VERSION_MIN
 
-/* Define to `unsigned int' if <sys/types.h> does not define. */
-#undef size_t
 #endif /* __GHC_LLVM_VERSION_H__ */
