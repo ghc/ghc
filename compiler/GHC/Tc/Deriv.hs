@@ -5,6 +5,7 @@
 -}
 
 
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE TypeFamilies #-}
 
@@ -1241,11 +1242,13 @@ mk_deriv_inst_tys_maybe fam_envs cls_tys inst_ty =
       -- Find the instance of a data family
       -- Note [Looking up family instances for deriving]
       let (rep_tc, rep_tc_args, _co) = tcLookupDataFamInst fam_envs tc tc_args
-      in DerivInstTys { dit_cls_tys     = cls_tys
-                      , dit_tc          = tc
-                      , dit_tc_args     = tc_args
-                      , dit_rep_tc      = rep_tc
-                      , dit_rep_tc_args = rep_tc_args }
+          dc_inst_arg_env = buildDataConInstArgEnv rep_tc rep_tc_args
+      in DerivInstTys { dit_cls_tys         = cls_tys
+                      , dit_tc              = tc
+                      , dit_tc_args         = tc_args
+                      , dit_rep_tc          = rep_tc
+                      , dit_rep_tc_args     = rep_tc_args
+                      , dit_dc_inst_arg_env = dc_inst_arg_env }
 
 {-
 Note [Looking up family instances for deriving]
@@ -1327,7 +1330,7 @@ mk_eqn_from_mechanism mechanism
        dfun_name <- lift $ newDFunName cls inst_tys loc
        case deriv_ctxt of
         InferContext wildcard ->
-          do { (inferred_constraints, tvs', inst_tys')
+          do { (inferred_constraints, tvs', inst_tys', mechanism')
                  <- inferConstraints mechanism
              ; return $ InferTheta $ DS
                    { ds_loc = loc
@@ -1336,7 +1339,7 @@ mk_eqn_from_mechanism mechanism
                    , ds_theta = inferred_constraints
                    , ds_overlap = overlap_mode
                    , ds_standalone_wildcard = wildcard
-                   , ds_mechanism = mechanism } }
+                   , ds_mechanism = mechanism' } }
 
         SupplyContext theta ->
             return $ GivenTheta $ DS
@@ -1351,12 +1354,10 @@ mk_eqn_from_mechanism mechanism
 mk_eqn_stock :: DerivInstTys -- Information about the arguments to the class
              -> DerivM EarlyDerivSpec
 mk_eqn_stock dit
-  = do DerivEnv { denv_cls  = cls
-                , denv_ctxt = deriv_ctxt } <- ask
-       dflags <- getDynFlags
+  = do dflags <- getDynFlags
        let isDeriveAnyClassEnabled =
              deriveAnyClassEnabled (xopt LangExt.DeriveAnyClass dflags)
-       case checkOriginativeSideConditions dflags deriv_ctxt cls dit of
+       checkOriginativeSideConditions dit >>= \case
          CanDeriveStock gen_fn -> mk_eqn_from_mechanism $
                                   DerivSpecStock { dsm_stock_dit    = dit
                                                  , dsm_stock_gen_fn = gen_fn }
@@ -1430,8 +1431,6 @@ mk_eqn_no_strategy = do
     mk_eqn_originative :: DerivInstTys -> DerivM EarlyDerivSpec
     mk_eqn_originative dit@(DerivInstTys { dit_tc     = tc
                                          , dit_rep_tc = rep_tc }) = do
-      DerivEnv { denv_cls  = cls
-               , denv_ctxt = deriv_ctxt } <- ask
       dflags <- getDynFlags
       let isDeriveAnyClassEnabled =
             deriveAnyClassEnabled (xopt LangExt.DeriveAnyClass dflags)
@@ -1443,7 +1442,7 @@ mk_eqn_no_strategy = do
             | otherwise
             = DerivErrNotStockDeriveable isDeriveAnyClassEnabled
 
-      case checkOriginativeSideConditions dflags deriv_ctxt cls dit of
+      checkOriginativeSideConditions dit >>= \case
         NonDerivableClass     -> derivingThingFailWith NoGeneralizedNewtypeDeriving dac_error
         StockClassError why   -> derivingThingFailWith NoGeneralizedNewtypeDeriving why
         CanDeriveStock gen_fn -> mk_eqn_from_mechanism $
@@ -1474,8 +1473,7 @@ mkNewTypeEqn newtype_strat dit@(DerivInstTys { dit_cls_tys     = cls_tys
                                              , dit_rep_tc      = rep_tycon
                                              , dit_rep_tc_args = rep_tc_args })
 -- Want: instance (...) => cls (cls_tys ++ [tycon tc_args]) where ...
-  = do DerivEnv { denv_cls   = cls
-                , denv_ctxt  = deriv_ctxt } <- ask
+  = do DerivEnv{denv_cls = cls} <- ask
        dflags <- getDynFlags
 
        let newtype_deriving  = xopt LangExt.GeneralizedNewtypeDeriving dflags
@@ -1567,7 +1565,7 @@ mkNewTypeEqn newtype_strat dit@(DerivInstTys { dit_cls_tys     = cls_tys
              && ((newtype_deriving && not deriveAnyClass)
                   || std_class_via_coercible cls)
          then mk_eqn_newtype dit rep_inst_ty
-         else case checkOriginativeSideConditions dflags deriv_ctxt cls dit of
+         else checkOriginativeSideConditions dit >>= \case
                StockClassError why
                  -- There's a particular corner case where
                  --

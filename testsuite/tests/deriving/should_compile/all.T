@@ -132,4 +132,6 @@ test('T18914', normal, compile, [''])
 # They are printed in tcDeriv beginning with "rnd" line
 # and are indented with spaces.
 test('T20496', multiline_grep_errmsg(r"rnd\n( .*\n)*"), compile, ['-ddump-tc-trace'])
+test('T20375', normal, compile, [''])
+test('T20387', normal, compile, [''])
 test('T20501', normal, compile, [''])
