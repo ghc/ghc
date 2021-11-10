@@ -78,12 +78,12 @@ For the generic representation we need to generate:
 \end{itemize}
 -}
 
-gen_Generic_binds :: GenericKind -> TyCon -> [Type]
-                 -> TcM (LHsBinds GhcPs, [LSig GhcPs], FamInst)
-gen_Generic_binds gk tc inst_tys = do
+gen_Generic_binds :: GenericKind -> [Type] -> DerivInstTys
+                  -> TcM (LHsBinds GhcPs, [LSig GhcPs], FamInst)
+gen_Generic_binds gk inst_tys dit = do
   dflags <- getDynFlags
-  repTyInsts <- tc_mkRepFamInsts gk tc inst_tys
-  let (binds, sigs) = mkBindsRep dflags gk tc
+  repTyInsts <- tc_mkRepFamInsts gk inst_tys dit
+  let (binds, sigs) = mkBindsRep dflags gk dit
   return (binds, sigs, repTyInsts)
 
 {-
@@ -148,7 +148,7 @@ following constraints are satisfied.
 
 -}
 
-canDoGenerics :: TyCon -> Validity' [DeriveGenericsErrReason]
+canDoGenerics :: DerivInstTys -> Validity' [DeriveGenericsErrReason]
 -- canDoGenerics determines if Generic/Rep can be derived.
 --
 -- Check (a) from Note [Requirements for deriving Generic and Rep] is taken
@@ -156,7 +156,7 @@ canDoGenerics :: TyCon -> Validity' [DeriveGenericsErrReason]
 --
 -- It returns IsValid if deriving is possible. It returns (NotValid reason)
 -- if not.
-canDoGenerics tc
+canDoGenerics (DerivInstTys{dit_rep_tc = tc})
   = mergeErrors (
           -- Check (b) from Note [Requirements for deriving Generic and Rep].
               (if (not (null (tyConStupidTheta tc)))
@@ -244,9 +244,9 @@ explicitly, even though foldDataConArgs is also doing this internally.
 --
 -- It returns IsValid if deriving is possible. It returns (NotValid reason)
 -- if not.
-canDoGenerics1 :: TyCon -> Validity' [DeriveGenericsErrReason]
-canDoGenerics1 rep_tc =
-  canDoGenerics rep_tc `andValid` additionalChecks
+canDoGenerics1 :: DerivInstTys -> Validity' [DeriveGenericsErrReason]
+canDoGenerics1 dit@(DerivInstTys{dit_rep_tc = rep_tc}) =
+  canDoGenerics dit `andValid` additionalChecks
   where
     additionalChecks
         -- check (d) from Note [Requirements for deriving Generic and Rep]
@@ -330,8 +330,8 @@ gk2gkDC Gen1_{} d = Gen1_DC $ last $ dataConUnivTyVars d
 
 
 -- Bindings for the Generic instance
-mkBindsRep :: DynFlags -> GenericKind -> TyCon -> (LHsBinds GhcPs, [LSig GhcPs])
-mkBindsRep dflags gk tycon = (binds, sigs)
+mkBindsRep :: DynFlags -> GenericKind -> DerivInstTys -> (LHsBinds GhcPs, [LSig GhcPs])
+mkBindsRep dflags gk (DerivInstTys{dit_rep_tc = tycon}) = (binds, sigs)
       where
         binds = unitBag (mkRdrFunBind (L loc' from01_RDR) [from_eqn])
               `unionBags`
@@ -392,11 +392,12 @@ mkBindsRep dflags gk tycon = (binds, sigs)
 --------------------------------------------------------------------------------
 
 tc_mkRepFamInsts :: GenericKind   -- Gen0 or Gen1
-                 -> TyCon         -- The type to generate representation for
                  -> [Type]        -- The type(s) to which Generic(1) is applied
                                   -- in the generated instance
+                 -> DerivInstTys  -- Information about the last type argument,
+                                  -- including the data type's TyCon
                  -> TcM FamInst   -- Generated representation0 coercion
-tc_mkRepFamInsts gk tycon inst_tys =
+tc_mkRepFamInsts gk inst_tys dit@(DerivInstTys{dit_rep_tc = tycon}) =
        -- Consider the example input tycon `D`, where data D a b = D_ a
        -- Also consider `R:DInt`, where { data family D x y :: * -> *
        --                               ; data instance D Int a b = D_ a }
@@ -437,7 +438,7 @@ tc_mkRepFamInsts gk tycon inst_tys =
              where all_tyvars = tyConTyVars tycon
 
        -- `repTy` = D1 ... (C1 ... (S1 ... (Rec0 a))) :: * -> *
-     ; repTy <- tc_mkRepTy gk_ tycon arg_ki
+     ; repTy <- tc_mkRepTy gk_ dit arg_ki
 
        -- `rep_name` is a name we generate for the synonym
      ; mod <- getModule
@@ -542,14 +543,14 @@ argTyFold argVar (ArgTyAlg {ata_rec0 = mkRec0,
 
 tc_mkRepTy ::  -- Gen0_ or Gen1_, for Rep or Rep1
                GenericKind_
-              -- The type to generate representation for
-            -> TyCon
-              -- The kind of the representation type's argument
-              -- See Note [Handling kinds in a Rep instance]
+               -- Information about the last type argument to Generic(1)
+            -> DerivInstTys
+               -- The kind of the representation type's argument
+               -- See Note [Handling kinds in a Rep instance]
             -> Kind
                -- Generated representation0 type
             -> TcM Type
-tc_mkRepTy gk_ tycon k =
+tc_mkRepTy gk_ (DerivInstTys{dit_rep_tc = tycon}) k =
   do
     d1      <- tcLookupTyCon d1TyConName
     c1      <- tcLookupTyCon c1TyConName

@@ -36,7 +36,8 @@ module GHC.Tc.Deriv.Generate (
         ordOpTbl, boxConTbl, litConTbl,
         mkRdrFunBind, mkRdrFunBindEC, mkRdrFunBindSE, error_Expr,
 
-        getPossibleDataCons, tyConInstArgTys
+        getPossibleDataCons, tyConInstArgTys,
+        DerivInstTys(..)
     ) where
 
 import GHC.Prelude
@@ -212,8 +213,9 @@ for the instance decl, which it probably wasn't, so the decls
 produced don't get through the typechecker.
 -}
 
-gen_Eq_binds :: SrcSpan -> TyCon -> [Type] -> TcM (LHsBinds GhcPs, BagDerivStuff)
-gen_Eq_binds loc tycon tycon_args = do
+gen_Eq_binds :: SrcSpan -> DerivInstTys -> TcM (LHsBinds GhcPs, BagDerivStuff)
+gen_Eq_binds loc (DerivInstTys{ dit_rep_tc = tycon
+                              , dit_rep_tc_args = tycon_args }) = do
     return (method_binds, emptyBag)
   where
     all_cons = getPossibleDataCons tycon tycon_args
@@ -388,8 +390,9 @@ gtResult OrdGE      = true_Expr
 gtResult OrdGT      = true_Expr
 
 ------------
-gen_Ord_binds :: SrcSpan -> TyCon -> [Type] -> TcM (LHsBinds GhcPs, BagDerivStuff)
-gen_Ord_binds loc tycon tycon_args = do
+gen_Ord_binds :: SrcSpan -> DerivInstTys -> TcM (LHsBinds GhcPs, BagDerivStuff)
+gen_Ord_binds loc (DerivInstTys{ dit_rep_tc = tycon
+                               , dit_rep_tc_args = tycon_args }) = do
     return $ if null tycon_data_cons -- No data-cons => invoke bale-out case
       then ( unitBag $ mkFunBindEC 2 loc compare_RDR (const eqTag_Expr) []
            , emptyBag)
@@ -636,8 +639,8 @@ instance ... Enum (Foo ...) where
 For @enumFromTo@ and @enumFromThenTo@, we use the default methods.
 -}
 
-gen_Enum_binds :: SrcSpan -> TyCon -> [Type] -> TcM (LHsBinds GhcPs, BagDerivStuff)
-gen_Enum_binds loc tycon _ = do
+gen_Enum_binds :: SrcSpan -> DerivInstTys -> TcM (LHsBinds GhcPs, BagDerivStuff)
+gen_Enum_binds loc (DerivInstTys{dit_rep_tc = tycon}) = do
     -- See Note [Auxiliary binders]
     tag2con_RDR <- new_tag2con_rdr_name loc tycon
     maxtag_RDR  <- new_maxtag_rdr_name  loc tycon
@@ -726,8 +729,8 @@ gen_Enum_binds loc tycon _ = do
 ************************************************************************
 -}
 
-gen_Bounded_binds :: SrcSpan -> TyCon -> [Type] -> (LHsBinds GhcPs, BagDerivStuff)
-gen_Bounded_binds loc tycon _
+gen_Bounded_binds :: SrcSpan -> DerivInstTys -> (LHsBinds GhcPs, BagDerivStuff)
+gen_Bounded_binds loc (DerivInstTys{dit_rep_tc = tycon})
   | isEnumerationTyCon tycon
   = (listToBag [ min_bound_enum, max_bound_enum ], emptyBag)
   | otherwise
@@ -813,9 +816,9 @@ we follow the scheme given in Figure~19 of the Haskell~1.2 report
 (p.~147).
 -}
 
-gen_Ix_binds :: SrcSpan -> TyCon -> [Type] -> TcM (LHsBinds GhcPs, BagDerivStuff)
+gen_Ix_binds :: SrcSpan -> DerivInstTys -> TcM (LHsBinds GhcPs, BagDerivStuff)
 
-gen_Ix_binds loc tycon _ = do
+gen_Ix_binds loc (DerivInstTys{dit_rep_tc = tycon}) = do
     -- See Note [Auxiliary binders]
     tag2con_RDR <- new_tag2con_rdr_name loc tycon
 
@@ -1015,10 +1018,10 @@ These instances are also useful for Read (Either Int Emp), where
 we want to be able to parse (Left 3) just fine.
 -}
 
-gen_Read_binds :: (Name -> Fixity) -> SrcSpan -> TyCon -> [Type]
+gen_Read_binds :: (Name -> Fixity) -> SrcSpan -> DerivInstTys
                -> (LHsBinds GhcPs, BagDerivStuff)
 
-gen_Read_binds get_fixity loc tycon _
+gen_Read_binds get_fixity loc (DerivInstTys{dit_rep_tc = tycon})
   = (listToBag [read_prec, default_readlist, default_readlistprec], emptyBag)
   where
     -----------------------------------------------------------------------
@@ -1199,10 +1202,11 @@ Example
                     -- the most tightly-binding operator
 -}
 
-gen_Show_binds :: (Name -> Fixity) -> SrcSpan -> TyCon -> [Type]
+gen_Show_binds :: (Name -> Fixity) -> SrcSpan -> DerivInstTys
                -> (LHsBinds GhcPs, BagDerivStuff)
 
-gen_Show_binds get_fixity loc tycon tycon_args
+gen_Show_binds get_fixity loc (DerivInstTys{ dit_rep_tc = tycon
+                                           , dit_rep_tc_args = tycon_args })
   = (unitBag shows_prec, emptyBag)
   where
     data_cons = getPossibleDataCons tycon tycon_args
@@ -1370,12 +1374,10 @@ we generate
 -}
 
 gen_Data_binds :: SrcSpan
-               -> TyCon                 -- For data families, this is the
-                                        --  *representation* TyCon
-               -> [Type]
+               -> DerivInstTys
                -> TcM (LHsBinds GhcPs,  -- The method bindings
                        BagDerivStuff)   -- Auxiliary bindings
-gen_Data_binds loc rep_tc _
+gen_Data_binds loc (DerivInstTys{dit_rep_tc = rep_tc})
   = do { -- See Note [Auxiliary binders]
          dataT_RDR  <- new_dataT_rdr_name loc rep_tc
        ; dataC_RDRs <- traverse (new_dataC_rdr_name loc) data_cons
@@ -1636,8 +1638,10 @@ Example:
 -}
 
 
-gen_Lift_binds :: SrcSpan -> TyCon -> [Type] -> (LHsBinds GhcPs, BagDerivStuff)
-gen_Lift_binds loc tycon tycon_args = (listToBag [lift_bind, liftTyped_bind], emptyBag)
+gen_Lift_binds :: SrcSpan -> DerivInstTys -> (LHsBinds GhcPs, BagDerivStuff)
+gen_Lift_binds loc (DerivInstTys{ dit_rep_tc = tycon
+                                , dit_rep_tc_args = tycon_args }) =
+  (listToBag [lift_bind, liftTyped_bind], emptyBag)
   where
     lift_bind      = mkFunBindEC 1 loc lift_RDR (nlHsApp pure_Expr)
                                  (map (pats_etc mk_exp) data_cons)
@@ -2668,6 +2672,35 @@ tyConInstArgTys :: TyCon -> [Type] -> [Type]
 tyConInstArgTys tycon tycon_args = chkAppend tycon_args $ map mkTyVarTy tycon_args_suffix
   where
     tycon_args_suffix = drop (length tycon_args) $ tyConTyVars tycon
+
+-- | Information about the arguments to the class in a stock- or
+-- newtype-derived instance.
+-- See @Note [DerivEnv and DerivSpecMechanism]@.
+data DerivInstTys = DerivInstTys
+  { dit_cls_tys     :: [Type]
+    -- ^ Other arguments to the class except the last
+  , dit_tc          :: TyCon
+    -- ^ Type constructor for which the instance is requested
+    --   (last arguments to the type class)
+  , dit_tc_args     :: [Type]
+    -- ^ Arguments to the type constructor
+  , dit_rep_tc      :: TyCon
+    -- ^ The representation tycon for 'dit_tc'
+    --   (for data family instances). Otherwise the same as 'dit_tc'.
+  , dit_rep_tc_args :: [Type]
+    -- ^ The representation types for 'dit_tc_args'
+    --   (for data family instances). Otherwise the same as 'dit_tc_args'.
+  }
+
+instance Outputable DerivInstTys where
+  ppr (DerivInstTys { dit_cls_tys = cls_tys, dit_tc = tc, dit_tc_args = tc_args
+                    , dit_rep_tc = rep_tc, dit_rep_tc_args = rep_tc_args })
+    = hang (text "DerivInstTys")
+         2 (vcat [ text "dit_cls_tys"     <+> ppr cls_tys
+                 , text "dit_tc"          <+> ppr tc
+                 , text "dit_tc_args"     <+> ppr tc_args
+                 , text "dit_rep_tc"      <+> ppr rep_tc
+                 , text "dit_rep_tc_args" <+> ppr rep_tc_args ])
 
 {-
 Note [Auxiliary binders]
