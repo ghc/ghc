@@ -21,6 +21,7 @@ import GHC.Platform.Regs
 import GHC.CmmToAsm.AArch64.Instr
 import GHC.CmmToAsm.AArch64.Regs
 import GHC.CmmToAsm.AArch64.Cond
+import GHC.CmmToAsm.AArch64.SignExt
 
 import GHC.CmmToAsm.CPrim
 import GHC.Cmm.DebugBlock
@@ -151,6 +152,7 @@ basicBlockCodeGen block = do
   (mid_instrs,mid_bid) <- stmtsToInstrs id stmts
   (!tail_instrs,_) <- stmtToInstrs mid_bid tail
   let instrs = header_comment_instr `appOL` loc_instrs `appOL` mid_instrs `appOL` tail_instrs
+  instrs <- elideRedundantExtensions <$> getPlatform <*> pure instrs
   -- TODO: Then x86 backend run @verifyBasicBlock@ here and inserts
   --      unwinding info. See Ticket 19913
   -- code generation may introduce new basic block boundaries, which

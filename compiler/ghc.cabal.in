@@ -227,6 +227,7 @@ Library
         GHC.CmmToAsm.AArch64.Cond
         GHC.CmmToAsm.AArch64.Instr
         GHC.CmmToAsm.AArch64.Ppr
+        GHC.CmmToAsm.AArch64.SignExt
         GHC.CmmToAsm.AArch64.RegInfo
         GHC.CmmToAsm.AArch64.Regs
         GHC.CmmToAsm.BlockLayout
