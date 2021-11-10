@@ -11,7 +11,7 @@
 #include "Rts.h"
 #include "ThrIOManager.h"
 #include "MIOManager.h"
-#include "rts\OSThreads.h"
+#include "rts/OSThreads.h"
 #include "Prelude.h"
 #include <windows.h>
 

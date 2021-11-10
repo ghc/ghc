@@ -60,12 +60,11 @@ getFlag = expr . flag
 
 platformSupportsSharedLibs :: Action Bool
 platformSupportsSharedLibs = do
-    badPlatform   <- anyTargetPlatform [ "powerpc-unknown-linux"
-                                       , "x86_64-unknown-mingw32"
-                                       , "i386-unknown-mingw32" ]
+    windows       <- isWinTarget
+    ppc_linux     <- anyTargetPlatform [ "powerpc-unknown-linux" ]
     solaris       <- anyTargetPlatform [ "i386-unknown-solaris2" ]
     solarisBroken <- flag SolarisBrokenShld
-    return $ not (badPlatform || solaris && solarisBroken)
+    return $ not (windows || ppc_linux || solaris && solarisBroken)
 
 -- | Does the target support the threaded runtime system?
 targetSupportsSMP :: Action Bool

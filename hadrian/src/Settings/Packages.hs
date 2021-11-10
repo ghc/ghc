@@ -6,6 +6,7 @@ import Oracles.Setting
 import Oracles.Flag
 import Packages
 import Settings
+import Rules.Libffi
 
 -- | Package-specific command-line arguments.
 packageArgs :: Args
@@ -13,6 +14,7 @@ packageArgs = do
     stage        <- getStage
     path         <- getBuildPath
     compilerPath <- expr $ buildPath (vanillaContext stage compiler)
+
     let -- Do not bind the result to a Boolean: this forces the configure rule
         -- immediately and may lead to cyclic dependencies.
         -- See: https://gitlab.haskell.org/ghc/ghc/issues/16809.
@@ -240,7 +242,7 @@ rtsPackageArgs = package rts ? do
     path           <- getBuildPath
     top            <- expr topDirectory
     useSystemFfi   <- expr $ flag UseSystemFfi
-    libffiName     <- expr libffiLibraryName
+    ffiLibName     <- libffiName
     ffiIncludeDir  <- getSetting FfiIncludeDir
     ffiLibraryDir  <- getSetting FfiLibDir
     libdwIncludeDir   <- getSetting LibdwIncludeDir
@@ -370,7 +372,7 @@ rtsPackageArgs = package rts ? do
           [ "-DTOP="             ++ show top
           , "-DFFI_INCLUDE_DIR=" ++ show ffiIncludeDir
           , "-DFFI_LIB_DIR="     ++ show ffiLibraryDir
-          , "-DFFI_LIB="         ++ show libffiName
+          , "-DFFI_LIB="         ++ show ffiLibName
           , "-DLIBDW_LIB_DIR="   ++ show libdwLibraryDir ]
 
         , builder HsCpp ? flag WithLibdw ? arg "-DUSE_LIBDW"

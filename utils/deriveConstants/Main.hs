@@ -714,6 +714,13 @@ getWanted verbose os tmpdir gccProgram gccFlags nmProgram mobjdumpProgram
                      "",
                      "#define PROFILING",
                      "#define THREADED_RTS",
+                     -- We need to define this if we want StgAsyncIOResult
+                     -- struct to be present after CPP
+                     --
+                     -- FIXME: rts/PosixSource.h should include ghcplatform.h
+                     -- which should set this. There is a mismatch host/target
+                     -- again...
+                     if os == "mingw32" then "#define mingw32_HOST_OS 1" else "",
                      "",
                      "#include \"rts/PosixSource.h\"",
                      "#include \"Rts.h\"",

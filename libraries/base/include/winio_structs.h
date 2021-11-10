@@ -4,7 +4,7 @@
  * Structures supporting the IOCP based I/O Manager or Windows.
  */
 
-#include <Windows.h>
+#include <windows.h>
 #include <stdint.h>
 
 #if defined(_WIN64)

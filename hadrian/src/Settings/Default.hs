@@ -22,6 +22,7 @@ import CommandLine
 import Expression
 import Flavour.Type
 import Oracles.Flag
+import Oracles.Setting
 import Packages
 import Settings.Builders.Alex
 import Settings.Builders.DeriveConstants
@@ -92,42 +93,51 @@ stage1Packages :: Action [Package]
 stage1Packages = do
     libraries0 <- filter isLibrary <$> stage0Packages
     cross      <- flag CrossCompiling
-    return $ libraries0 -- Build all Stage0 libraries in Stage1
-          ++ [ array
-             , base
-             , bytestring
-             , containers
-             , deepseq
-             , directory
-             , exceptions
-             , filepath
-             , ghc
-             , ghcBignum
-             , ghcCompact
-             , ghcPkg
-             , ghcPrim
-             , haskeline
-             , hp2ps
-             , hsc2hs
-             , integerGmp
-             , pretty
-             , process
-             , rts
-             , stm
-             , time
-             , unlit
-             , xhtml
-             ]
-          ++ [ haddock  | not cross                  ]
-          ++ [ hpcBin   | not cross                  ]
-          ++ [ iserv    | not cross ]
-          ++ [ libiserv | not cross ]
-          ++ [ runGhc   | not cross                  ]
-          ++ [ touchy   | windowsHost                ]
-             -- See Note [Hadrian's ghci-wrapper package]
-          ++ [ ghciWrapper | windowsHost             ]
-          ++ [ unix     | not windowsHost            ]
-          ++ [ win32    | windowsHost                ]
+    winTarget  <- isWinTarget
+
+    let when c xs = if c then xs else mempty
+
+    return $ mconcat
+      [ libraries0 -- Build all Stage0 libraries in Stage1
+      , [ array
+        , base
+        , bytestring
+        , containers
+        , deepseq
+        , directory
+        , exceptions
+        , filepath
+        , ghc
+        , ghcBignum
+        , ghcCompact
+        , ghcPkg
+        , ghcPrim
+        , haskeline
+        , hp2ps
+        , hsc2hs
+        , integerGmp
+        , pretty
+        , process
+        , rts
+        , stm
+        , time
+        , unlit
+        , xhtml
+        ]
+      , when (not cross)
+        [ haddock
+        , hpcBin
+        , iserv
+        , libiserv
+        , runGhc
+        ]
+      , if winTarget then [ win32 ] else [ unix ]
+      , when (winTarget && not cross)
+        [ touchy
+         -- See Note [Hadrian's ghci-wrapper package]
+        , ghciWrapper
+        ]
+      ]
 
 -- | Packages built in 'Stage2' by default. You can change this in "UserSettings".
 stage2Packages :: Action [Package]

@@ -11,7 +11,7 @@ module Oracles.Setting (
 
     -- ** Target platform things
     anyTargetPlatform, anyTargetOs, anyTargetArch, anyHostOs,
-    isElfTarget,
+    isElfTarget, isOsxTarget, isWinTarget,
     ArmVersion(..),
     targetArmVersion,
     ghcWithInterpreter
@@ -239,6 +239,12 @@ anyTargetPlatform = matchSetting TargetPlatformFull
 -- | Check whether the target OS setting matches one of the given strings.
 anyTargetOs :: [String] -> Action Bool
 anyTargetOs = matchSetting TargetOs
+
+isWinTarget :: Action Bool
+isWinTarget = anyTargetOs ["mingw32"]
+
+isOsxTarget :: Action Bool
+isOsxTarget = anyTargetOs ["darwin"]
 
 -- | Check whether the target architecture setting matches one of the given
 -- strings.

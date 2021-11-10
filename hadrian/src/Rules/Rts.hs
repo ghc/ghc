@@ -1,6 +1,6 @@
 module Rules.Rts (rtsRules, needRtsLibffiTargets, needRtsSymLinks) where
 
-import Packages (rts, rtsBuildPath, libffiBuildPath, libffiLibraryName, rtsContext)
+import Packages (rts, rtsBuildPath, libffiBuildPath, rtsContext)
 import Rules.Libffi
 import Hadrian.Utilities
 import Settings.Builders.Common
@@ -103,7 +103,7 @@ copyLibffiDynamicWin stage target = do
 
 rtsLibffiLibrary :: Stage -> Way -> Action FilePath
 rtsLibffiLibrary stage way = do
-    name    <- libffiLibraryName
+    name    <- interpretInContext (rtsContext stage) libffiName
     suf     <- libsuf stage way
     rtsPath <- rtsBuildPath stage
     return $ rtsPath -/- "lib" ++ name ++ suf

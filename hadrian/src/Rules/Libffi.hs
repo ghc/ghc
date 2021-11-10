@@ -81,16 +81,24 @@ libffiContext stage = do
         then dynamic
         else vanilla
 
--- | The name of the (locally built) library
+-- | The name of the library
 libffiName :: Expr String
 libffiName = do
-    way <- getWay
-    return $ libffiName' (Dynamic `wayUnit` way)
+    useSystemFfi <- expr (flag UseSystemFfi)
+    if useSystemFfi
+      then pure "ffi"
+      else libffiLocalName Nothing
 
 -- | The name of the (locally built) library
-libffiName' :: Bool -> String
-libffiName' dynamic = (if dynamic     then ""      else "C")
-                   ++ (if windowsHost then "ffi-6" else "ffi")
+libffiLocalName :: Maybe Bool -> Expr String
+libffiLocalName force_dynamic = do
+  way <- getWay
+  winTarget <- expr isWinTarget
+  let dynamic = fromMaybe (Dynamic `wayUnit` way) force_dynamic
+  pure $ mconcat
+      [ if dynamic   then ""      else "C"
+      , if winTarget then "ffi-6" else "ffi"
+      ]
 
 libffiLibrary :: FilePath
 libffiLibrary = "inst/lib/libffi.a"
@@ -164,21 +172,24 @@ libffiRules = do
 
         -- Note this build needs the Makefile, triggering the rules bellow.
         build $ target context (Make libffiPath) [] []
+        libffiName' <- interpretInContext context (libffiLocalName (Just True))
 
         -- Produces all install files.
         produces =<< (\\ topLevelTargets)
                  <$> liftIO (getDirectoryFilesIO "." [libffiPath -/- "inst//*"])
 
         -- Find dynamic libraries.
+        osxTarget <- isOsxTarget
+        winTarget <- isWinTarget
+
         dynLibFiles <- do
             let libfilesDir = libffiPath -/-
-                    (if windowsHost then "inst" -/- "bin" else "inst" -/- "lib")
-                libffiName'' = libffiName' True
+                    (if winTarget then "inst" -/- "bin" else "inst" -/- "lib")
                 dynlibext
-                    | windowsHost = "dll"
-                    | osxHost     = "dylib"
-                    | otherwise   = "so"
-                filepat = "lib" ++ libffiName'' ++ "." ++ dynlibext ++ "*"
+                    | winTarget = "dll"
+                    | osxTarget = "dylib"
+                    | otherwise = "so"
+                filepat = "lib" ++ libffiName' ++ "." ++ dynlibext ++ "*"
             liftIO $ getDirectoryFilesIO "." [libfilesDir -/- filepat]
 
         writeFileLines dynLibMan dynLibFiles

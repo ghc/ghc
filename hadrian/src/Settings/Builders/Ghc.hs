@@ -104,6 +104,9 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
     libffiName' <- libffiName
     debugged <- ghcDebugged <$> expr flavour
 
+    osxTarget <- expr isOsxTarget
+    winTarget <- expr isWinTarget
+
     let
         dynamic = Dynamic `wayUnit` way
         distPath = libPath' -/- distDir
@@ -115,7 +118,7 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
             -- libraries will all end up in the lib dir, so just use $ORIGIN
             | otherwise     = metaOrigin
             where
-                metaOrigin | osxHost   = "@loader_path"
+                metaOrigin | osxTarget = "@loader_path"
                            | otherwise = "$ORIGIN"
 
         -- TODO: an alternative would be to generalize by linking with extra
@@ -144,8 +147,8 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
                 , hostSupportsRPaths ? mconcat
                       [ arg ("-optl-Wl,-rpath," ++ rpath)
                       , isProgram pkg ? arg ("-optl-Wl,-rpath," ++ bindistRpath)
-                      -- The darwin linker doesn't support/require the -zorigin option
-                      , not osxHost ? arg "-optl-Wl,-zorigin"
+                      -- The darwin and Windows linkers don't support/require the -zorigin option
+                      , not (osxTarget || winTarget) ? arg "-optl-Wl,-zorigin"
                       -- We set RPATH directly (relative to $ORIGIN). There's
                       -- no reason for GHC to inject further RPATH entries.
                       -- See #19485.
@@ -158,7 +161,7 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
             , pure [ "-l" ++ lib    | lib    <- libs    ]
             , pure [ "-L" ++ libDir | libDir <- libDirs ]
             , rtsFfiArg
-            , osxHost ? pure (concat [ ["-framework", fmwk] | fmwk <- fmwks ])
+            , osxTarget ? pure (concat [ ["-framework", fmwk] | fmwk <- fmwks ])
             , debugged ? packageOneOf [ghc, iservProxy, iserv, remoteIserv] ?
               arg "-debug"
 

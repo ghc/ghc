@@ -56,6 +56,7 @@ import Data.Word
 import Foreign.C
 import Foreign.Marshal.Array
 import Foreign.Ptr
+import GHC.Windows
 #include <windows.h>
 #include <stdint.h>
 #else
@@ -278,7 +279,7 @@ executablePath = Just (Just <$> getExecutablePath)
 getFinalPath :: FilePath -> IO FilePath
 getFinalPath path = withCWString path $ \s ->
   bracket (createFile s) c_closeHandle $ \h -> do
-    let invalid = h == wordPtrToPtr (#const (intptr_t)INVALID_HANDLE_VALUE)
+    let invalid = h == iNVALID_HANDLE_VALUE
     if invalid then pure path else go h bufSize
 
   where go h sz = allocaArray (fromIntegral sz) $ \outPath -> do

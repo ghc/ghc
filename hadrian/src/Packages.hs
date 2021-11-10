@@ -13,7 +13,7 @@ module Packages (
 
     -- * Package information
     programName, nonHsMainPackage, autogenPath, programPath, timeoutPath,
-    rtsContext, rtsBuildPath, libffiBuildPath, libffiLibraryName,
+    rtsContext, rtsBuildPath, libffiBuildPath,
     ensureConfigured
     ) where
 
@@ -218,16 +218,6 @@ libffiBuildPath stage = buildPath $ Context
     stage
     libffi
     (error "libffiBuildPath: way not set.")
-
--- | Name of the 'libffi' library.
-libffiLibraryName :: Action FilePath
-libffiLibraryName = do
-    useSystemFfi <- flag UseSystemFfi
-    return $ case (useSystemFfi, windowsHost) of
-        (True , False) -> "ffi"
-        (False, False) -> "Cffi"
-        (_    , True ) -> "Cffi-6"
-
 
 {-
 Note [Hadrian's ghci-wrapper package]

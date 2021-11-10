@@ -12,7 +12,7 @@ AC_USE_SYSTEM_EXTENSIONS
 
 AC_MSG_CHECKING(for WINDOWS platform)
 case $host_alias in
-    *mingw32*|*mingw64*|*cygwin*|*msys*)
+    *mingw32*|*mingw64*|*cygwin*|*msys*|*windows*)
         WINDOWS=YES;;
     *)
         WINDOWS=NO;;

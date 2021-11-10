@@ -15,7 +15,6 @@ import Base
 import Expression
 import Oracles.Flag
 import Oracles.Setting
-import Packages
 import Settings
 import UserSettings
 
@@ -31,7 +30,7 @@ cIncludeArgs = do
     ffiIncludeDir   <- getSetting FfiIncludeDir
     libdwIncludeDir   <- getSetting FfiIncludeDir
     libPath <- expr $ stageLibPath stage
-    mconcat [ notStage0 ||^ package compiler ? arg "-Irts/include"
+    mconcat [ notStage0 ? arg "-Irts/include"
             , arg $ "-I" ++ libPath
             , arg $ "-I" ++ path
             , pure . map ("-I"++) . filter (/= "") $ [iconvIncludeDir, gmpIncludeDir]

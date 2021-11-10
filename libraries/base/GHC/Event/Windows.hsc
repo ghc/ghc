@@ -481,7 +481,7 @@ associateHandle' hwnd
 
 -- | A handle value representing an invalid handle.
 invalidHandle :: HANDLE
-invalidHandle = intPtrToPtr (#{const INVALID_HANDLE_VALUE})
+invalidHandle = iNVALID_HANDLE_VALUE
 
 -- | Associate a 'HANDLE' with the I/O manager's completion port.  This must be
 -- done before using the handle with 'withOverlapped'.
