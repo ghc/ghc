@@ -1,214 +1,115 @@
-
-# Tests for pattern match checker (coverage and exhaustiveness)
+# Tests for pattern match checker (overlap and exhaustiveness)
 
 # Just do the normal way...
-def f( name, opts ):
-  opts.only_ways = ['normal']
-
-setTestOpts(f)
+setTestOpts(only_ways(['normal']))
+overlapping_incomplete = '-Woverlapping-patterns -Wincomplete-patterns '
 
 # Bug reports / feature requests
-test('T2006', [], compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T2204', [], compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T3078', [], compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T322', [], compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T366', [], compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T3927a', [], compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T3927b', [], compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T3927', [], compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T4139', [], compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T6124', [], compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T7669a', [], compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T8970', [], compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T9951b', [], compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T9951', [], compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T10183', [], compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T11303', normal, compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns +RTS -M1G -RTS'])
-test('T11276', collect_compiler_stats('bytes allocated',10), compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns +RTS -M1G -RTS'])
-test('T11303b', collect_compiler_stats('bytes allocated',10), compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns +RTS -M1G -RTS'])
-test('T11374', collect_compiler_stats('bytes allocated',10), compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns +RTS -M1G -RTS'])
-test('T11822', collect_compiler_stats('bytes allocated',10), compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T11195', collect_compiler_stats('bytes allocated',10), compile,
-     ['-package ghc -fwarn-incomplete-patterns -fwarn-overlapping-patterns +RTS -M2G -RTS'])
-test('T11503', [], compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T11984', normal, compile,
-    ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T14086', normal, compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T14098', normal, compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T14141', [], compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T14813', normal, compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T14899', normal, compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T15305', normal, compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T15385', normal, compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T15450', normal, compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T15584', normal, compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T15713', normal, compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T15753a', normal, compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T15753b', normal, compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T15753c', normal, compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T15753d', normal, compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T15884', normal, compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T16289', normal, compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T17096', collect_compiler_stats('bytes allocated',10), compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns +RTS -M2G -RTS'])
-test('T17112', normal, compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T17207', normal, compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T17207b', normal, compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T17208', expect_broken(17208), compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T17215', expect_broken(17215), compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T17216', expect_broken(17216), compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T17218', normal, compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T17219', expect_broken(17219), compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T17234', normal, compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T17248', normal, compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T17340', normal, compile,
-     ['-Wredundant-bang-patterns'])
-test('T17357', expect_broken(17357), compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T17376', normal, compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T17378', normal, compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T17465', normal, compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T17646', normal, compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T17703', normal, compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T17725', normal, compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T17729', normal, compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T17783', normal, compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T17836', collect_compiler_stats('bytes allocated',10), compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T17836b', collect_compiler_stats('bytes allocated',10), compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T17977', collect_compiler_stats('bytes allocated',10), compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T17977b', collect_compiler_stats('bytes allocated',10), compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T18049', normal, compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T18249', normal, compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns -Wredundant-bang-patterns'])
-test('T18273', normal, compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T18341', normal, compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T18371', normal, compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T18371b', normal, compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T18478', collect_compiler_stats('bytes allocated',10), compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T18533', normal, compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T18626', normal, compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T18572', normal, compile,
-     ['-fwarn-incomplete-patterns -fwarn-incomplete-uni-patterns -fwarn-overlapping-patterns'])
-test('T18609', normal, compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T18610', normal, compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T18670', normal, compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T18708', normal, compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T18932', normal, compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T19622', normal, compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T20631', normal, compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T20642', normal, compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+test('T2006', [], compile, [overlapping_incomplete])
+test('T2204', [], compile, [overlapping_incomplete])
+test('T3078', [], compile, [overlapping_incomplete])
+test('T322', [], compile, [overlapping_incomplete])
+test('T366', [], compile, [overlapping_incomplete])
+test('T3927a', [], compile, [overlapping_incomplete])
+test('T3927b', [], compile, [overlapping_incomplete])
+test('T3927', [], compile, [overlapping_incomplete])
+test('T4139', [], compile, [overlapping_incomplete])
+test('T6124', [], compile, [overlapping_incomplete])
+test('T7669a', [], compile, [overlapping_incomplete])
+test('T8970', [], compile, [overlapping_incomplete])
+test('T9951b', [], compile, [overlapping_incomplete])
+test('T9951', [], compile, [overlapping_incomplete])
+test('T10183', [], compile, [overlapping_incomplete])
+test('T11303', normal, compile, ['+RTS -M1G -RTS'])
+test('T11276', collect_compiler_stats('bytes allocated',10), compile, [overlapping_incomplete+'+RTS -M1G -RTS'])
+test('T11303b', collect_compiler_stats('bytes allocated',10), compile, [overlapping_incomplete+'+RTS -M1G -RTS'])
+test('T11374', collect_compiler_stats('bytes allocated',10), compile, [overlapping_incomplete+'+RTS -M1G -RTS'])
+test('T11822', collect_compiler_stats('bytes allocated',10), compile, [overlapping_incomplete])
+test('T11195', collect_compiler_stats('bytes allocated',10), compile, [overlapping_incomplete+'-package ghc +RTS -M2G -RTS'])
+test('T11503', [], compile, [overlapping_incomplete])
+test('T11984', normal, compile, [overlapping_incomplete])
+test('T14086', normal, compile, [overlapping_incomplete])
+test('T14098', normal, compile, [overlapping_incomplete])
+test('T14141', [], compile, [overlapping_incomplete])
+test('T14813', normal, compile, [overlapping_incomplete])
+test('T14899', normal, compile, [overlapping_incomplete])
+test('T15305', normal, compile, [overlapping_incomplete])
+test('T15385', normal, compile, [overlapping_incomplete])
+test('T15450', normal, compile, [overlapping_incomplete])
+test('T15584', normal, compile, [overlapping_incomplete])
+test('T15713', normal, compile, [overlapping_incomplete])
+test('T15753a', normal, compile, [overlapping_incomplete])
+test('T15753b', normal, compile, [overlapping_incomplete])
+test('T15753c', normal, compile, [overlapping_incomplete])
+test('T15753d', normal, compile, [overlapping_incomplete])
+test('T15884', normal, compile, [overlapping_incomplete])
+test('T16289', normal, compile, [overlapping_incomplete])
+test('T17096', collect_compiler_stats('bytes allocated',10), compile, [overlapping_incomplete+'+RTS -M2G -RTS'])
+test('T17112', normal, compile, [overlapping_incomplete])
+test('T17207', normal, compile, [overlapping_incomplete])
+test('T17207b', normal, compile, [overlapping_incomplete])
+test('T17208', expect_broken(17208), compile, [overlapping_incomplete])
+test('T17215', expect_broken(17215), compile, [overlapping_incomplete])
+test('T17216', expect_broken(17216), compile, [overlapping_incomplete])
+test('T17218', normal, compile, [overlapping_incomplete])
+test('T17219', expect_broken(17219), compile, [overlapping_incomplete])
+test('T17234', normal, compile, [overlapping_incomplete])
+test('T17248', normal, compile, [overlapping_incomplete])
+test('T17340', normal, compile, ['-Wredundant-bang-patterns'])
+test('T17357', expect_broken(17357), compile, [overlapping_incomplete])
+test('T17376', normal, compile, [overlapping_incomplete])
+test('T17378', normal, compile, [overlapping_incomplete])
+test('T17465', normal, compile, [overlapping_incomplete])
+test('T17646', normal, compile, [overlapping_incomplete])
+test('T17703', normal, compile, [overlapping_incomplete])
+test('T17725', normal, compile, [overlapping_incomplete])
+test('T17729', normal, compile, [overlapping_incomplete])
+test('T17783', normal, compile, [overlapping_incomplete])
+test('T17836', collect_compiler_stats('bytes allocated',10), compile, [overlapping_incomplete])
+test('T17836b', collect_compiler_stats('bytes allocated',10), compile, [overlapping_incomplete])
+test('T17977', collect_compiler_stats('bytes allocated',10), compile, [overlapping_incomplete])
+test('T17977b', collect_compiler_stats('bytes allocated',10), compile, [overlapping_incomplete])
+test('T18049', normal, compile, [overlapping_incomplete])
+test('T18249', normal, compile, ['-Wredundant-bang-patterns'])
+test('T18273', normal, compile, [overlapping_incomplete])
+test('T18341', normal, compile, [overlapping_incomplete])
+test('T18371', normal, compile, [overlapping_incomplete])
+test('T18371b', normal, compile, [overlapping_incomplete])
+test('T18478', collect_compiler_stats('bytes allocated',10), compile, [overlapping_incomplete])
+test('T18533', normal, compile, [overlapping_incomplete])
+test('T18626', normal, compile, [overlapping_incomplete])
+test('T18572', normal, compile, [overlapping_incomplete+'-Wincomplete-uni-patterns'])
+test('T18609', normal, compile, [overlapping_incomplete])
+test('T18610', normal, compile, [overlapping_incomplete])
+test('T18670', normal, compile, [overlapping_incomplete])
+test('T18708', normal, compile, [overlapping_incomplete])
+test('T18932', normal, compile, [overlapping_incomplete])
+# Overloaded patterns and rational pattern matching being broken.
+test('T19384', expect_broken(19384), compile, [overlapping_incomplete])
+test('T19622', normal, compile, [overlapping_incomplete])
+test('T20631', normal, compile, [overlapping_incomplete])
+test('T20642', normal, compile, [overlapping_incomplete])
 
 # Other tests
-test('pmc001', [], compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('pmc002', [], compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('pmc003', [], compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('pmc004', [], compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('pmc005', [], compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('pmc006', [], compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('pmc007', [], compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('pmc008', [], compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('pmc009', [], compile,
-     ['-package ghc -fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T11245', [], compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T11336b', [], compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T12949', [],  compile, ['-fwarn-overlapping-patterns'])
-test('T12957', [], compile, ['-fwarn-overlapping-patterns'])
-test('T12957a', [], compile, ['-fwarn-overlapping-patterns'])
-test('PmExprVars', [],  compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('CyclicSubst', [],  compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('CaseOfKnownCon', [], compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('TooManyDeltas', [], compile,
-     ['-fmax-pmcheck-models=0 -fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('LongDistanceInfo', [], compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+test('pmc001', [], compile, [overlapping_incomplete])
+test('pmc002', [], compile, [overlapping_incomplete])
+test('pmc003', [], compile, [overlapping_incomplete])
+test('pmc004', [], compile, [overlapping_incomplete])
+test('pmc005', [], compile, [overlapping_incomplete])
+test('pmc006', [], compile, [overlapping_incomplete])
+test('pmc007', [], compile, [overlapping_incomplete])
+test('pmc008', [], compile, [overlapping_incomplete])
+test('pmc009', [], compile, [overlapping_incomplete+'-package ghc'])
+test('T11245', [], compile, [overlapping_incomplete])
+test('T11336b', [], compile, [overlapping_incomplete])
+test('T12949', [],  compile, [overlapping_incomplete])
+test('T12957', [], compile, [overlapping_incomplete])
+test('T12957a', [], compile, [overlapping_incomplete])
+test('PmExprVars', [],  compile, [overlapping_incomplete])
+test('CyclicSubst', [],  compile, [overlapping_incomplete])
+test('CaseOfKnownCon', [], compile, [overlapping_incomplete])
+test('TooManyDeltas', [], compile, [overlapping_incomplete+'-fmax-pmcheck-models=0'])
+test('LongDistanceInfo', [], compile, [overlapping_incomplete])
 
 # Series (inspired) by Luke Maranget
 
@@ -242,30 +143,15 @@ test('PmSeriesG',
      ['G', '-v0'])
 
 # EmptyCase
-test('T10746', [], compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('EmptyCase001', [], compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('EmptyCase002', [], compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('EmptyCase003', [], compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('EmptyCase004', [], compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('EmptyCase005', [], compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('EmptyCase006', [],  compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('EmptyCase007', [],  compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('EmptyCase008', [],  compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('EmptyCase009', [],  compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('EmptyCase010', [],  compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+test('T10746', [], compile, [overlapping_incomplete])
+test('EmptyCase001', [], compile, [overlapping_incomplete])
+test('EmptyCase002', [], compile, [overlapping_incomplete])
+test('EmptyCase003', [], compile, [overlapping_incomplete])
+test('EmptyCase004', [], compile, [overlapping_incomplete])
+test('EmptyCase005', [], compile, [overlapping_incomplete])
+test('EmptyCase006', [],  compile, [overlapping_incomplete])
+test('EmptyCase007', [],  compile, [overlapping_incomplete])
+test('EmptyCase008', [],  compile, [overlapping_incomplete])
+test('EmptyCase009', [],  compile, [overlapping_incomplete])
+test('EmptyCase010', [],  compile, [overlapping_incomplete])
 
-# Overloaded patterns and rational pattern matching being broken.
-test('T19384',
-     expect_broken(19384),
-     compile, [''])
