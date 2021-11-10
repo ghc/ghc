@@ -14,6 +14,7 @@ module GHC.Core.DataCon (
         HsSrcBang(..), HsImplBang(..),
         StrictnessMark(..),
         ConTag,
+        DataConEnv,
 
         -- ** Equality specs
         EqSpec, mkEqSpec, eqSpecTyVar, eqSpecType,
@@ -84,8 +85,10 @@ import GHC.Data.FastString
 import GHC.Unit.Types
 import GHC.Unit.Module.Name
 import GHC.Utils.Binary
+import GHC.Types.Unique.FM ( UniqFM )
 import GHC.Types.Unique.Set
 import GHC.Builtin.Uniques( mkAlphaTyVarUnique )
+
 
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
@@ -688,6 +691,8 @@ data DataConRep
                                      -- See Note [Bangs on data constructor arguments]
 
     }
+
+type DataConEnv a = UniqFM DataCon a     -- Keyed by DataCon
 
 -------------------------
 

@@ -1181,8 +1181,6 @@ data ArgOcc = NoOcc     -- Doesn't occur at all; or a type argument
             | ScrutOcc  -- See Note [ScrutOcc]
                  (DataConEnv [ArgOcc])   -- How the sub-components are used
 
-type DataConEnv a = UniqFM DataCon a     -- Keyed by DataCon
-
 {- Note  [ScrutOcc]
 ~~~~~~~~~~~~~~~~~~~
 An occurrence of ScrutOcc indicates that the thing, or a `cast` version of the thing,
