@@ -4,6 +4,7 @@
 
 -}
 
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE TypeFamilies #-}
 
 -- | Error-checking and other utilities for @deriving@ clauses or declarations.
@@ -50,7 +51,6 @@ import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcType
 import GHC.Builtin.Names.TH (liftClassKey)
 import GHC.Core.TyCon
-import GHC.Core.Multiplicity
 import GHC.Core.Type
 import GHC.Utils.Misc
 import GHC.Types.Var.Set
@@ -303,12 +303,15 @@ Each deriving strategy imposes restrictions on arg_1 through arg_n as follows:
 
   This extra structure is witnessed by the DerivInstTys data type, which stores
   arg_1 through arg_(n-1) (dit_cls_tys), the algebraic type constructor
-  (dit_tc), and its arguments (dit_tc_args). If dit_tc is an ordinary data type
-  constructor, then dit_rep_tc/dit_rep_tc_args are the same as
-  dit_tc/dit_tc_args. If dit_tc is a data family type constructor, then
-  dit_rep_tc is the representation type constructor for the data family
-  instance, and dit_rep_tc_args are the arguments to the representation type
-  constructor in the corresponding instance.
+  (dit_tc), and its arguments (dit_tc_args). A DerivInstTys value can be seen
+  as a more structured representation of the denv_inst_tys field of DerivEnv.
+
+  If dit_tc is an ordinary data type constructor, then
+  dit_rep_tc/dit_rep_tc_args are the same as dit_tc/dit_tc_args. If dit_tc is a
+  data family type constructor, then dit_rep_tc is the representation type
+  constructor for the data family instance, and dit_rep_tc_args are the
+  arguments to the representation type constructor in the corresponding
+  instance.
 
 * newtype (DerivSpecNewtype):
 
@@ -648,32 +651,34 @@ getDataConFixityFun tc
 -- the data constructors - but we need to be careful to fall back to the
 -- family tycon (with indexes) in error messages.
 
-checkOriginativeSideConditions
-  :: DynFlags -> DerivContext -> Class -> DerivInstTys
-  -> OriginativeDerivStatus
-checkOriginativeSideConditions dflags deriv_ctxt cls
-                               dit@(DerivInstTys{dit_cls_tys = cls_tys})
-    -- First, check if stock deriving is possible...
-  | Just cond <- stockSideConditions deriv_ctxt cls
-  = case cond dflags dit of
-        NotValid err -> StockClassError err  -- Class-specific error
-        IsValid  | null (filterOutInvisibleTypes (classTyCon cls) cls_tys)
-                   -- All stock derivable classes are unary in the sense that
-                   -- there should be not types in cls_tys (i.e., no type args
-                   -- other than last). Note that cls_types can contain
-                   -- invisible types as well (e.g., for Generic1, which is
-                   -- poly-kinded), so make sure those are not counted.
-                 , Just gen_fn <- hasStockDeriving cls
-                   -> CanDeriveStock gen_fn
-                 | otherwise -> StockClassError (classArgsErr cls cls_tys)
-                   -- e.g. deriving( Eq s )
+checkOriginativeSideConditions :: DerivInstTys -> DerivM OriginativeDerivStatus
+checkOriginativeSideConditions dit@(DerivInstTys{dit_cls_tys = cls_tys}) =
+  do DerivEnv { denv_cls  = cls
+              , denv_ctxt = deriv_ctxt } <- ask
+     dflags <- getDynFlags
 
-    -- ...if not, try falling back on DeriveAnyClass.
-  | xopt LangExt.DeriveAnyClass dflags
-  = CanDeriveAnyClass   -- DeriveAnyClass should work
+     if    -- First, check if stock deriving is possible...
+        |  Just cond <- stockSideConditions deriv_ctxt cls
+        -> case cond dflags dit of
+             NotValid err -> pure $ StockClassError err  -- Class-specific error
+             IsValid  |  null (filterOutInvisibleTypes (classTyCon cls) cls_tys)
+                         -- All stock derivable classes are unary in the sense that
+                         -- there should be not types in cls_tys (i.e., no type args
+                         -- other than last). Note that cls_types can contain
+                         -- invisible types as well (e.g., for Generic1, which is
+                         -- poly-kinded), so make sure those are not counted.
+                      ,  Just gen_fn <- hasStockDeriving cls
+                      -> pure $ CanDeriveStock gen_fn
+                      |  otherwise
+                      -> pure $ StockClassError $ classArgsErr cls cls_tys
+                        -- e.g. deriving( Eq s )
 
-  | otherwise
-  = NonDerivableClass -- Neither anyclass nor stock work
+           -- ...if not, try falling back on DeriveAnyClass.
+        |  xopt LangExt.DeriveAnyClass dflags
+        -> pure CanDeriveAnyClass   -- DeriveAnyClass should work
+
+        |  otherwise
+        -> pure NonDerivableClass -- Neither anyclass nor stock work
 
 
 classArgsErr :: Class -> [Type] -> DeriveInstanceErrReason
@@ -810,7 +815,7 @@ cond_stdOK deriv_ctxt permissive dflags
       = bad DerivErrBadConHasExistentials
       | not (null theta) -- 4.
       = bad DerivErrBadConHasConstraints
-      | not (permissive || all isTauTy (map scaledThing $ dataConOrigArgTys con)) -- 5.
+      | not (permissive || all isTauTy (derivDataConInstArgTys con dit)) -- 5.
       = bad DerivErrBadConHasHigherRankType
       | otherwise
       = IsValid
@@ -851,13 +856,13 @@ cond_args :: Class -> Condition
 -- by generating specialised code.  For others (eg 'Data') we don't.
 -- For even others (eg 'Lift'), unlifted types aren't even a special
 -- consideration!
-cond_args cls _ (DerivInstTys{dit_rep_tc = rep_tc})
+cond_args cls _ dit@(DerivInstTys{dit_rep_tc = rep_tc})
   = case bad_args of
       []     -> IsValid
       (ty:_) -> NotValid $ DerivErrDunnoHowToDeriveForType ty
   where
     bad_args = [ arg_ty | con <- tyConDataCons rep_tc
-                        , Scaled _ arg_ty <- dataConOrigArgTys con
+                        , arg_ty <- derivDataConInstArgTys con dit
                         , isLiftedType_maybe arg_ty /= Just True
                         , not (ok_ty arg_ty) ]
 
@@ -893,7 +898,7 @@ cond_functorOK :: Bool -> Bool -> Condition
 --            (d) optionally: don't use function types
 --            (e) no "stupid context" on data type
 cond_functorOK allowFunctions allowExQuantifiedLastTyVar _
-               (DerivInstTys{dit_rep_tc = rep_tc})
+               dit@(DerivInstTys{dit_rep_tc = rep_tc})
   | null tc_tvs
   = NotValid $ DerivErrMustHaveSomeParameters rep_tc
 
@@ -913,7 +918,7 @@ cond_functorOK allowFunctions allowExQuantifiedLastTyVar _
       -- See Note [Check that the type variable is truly universal]
 
     data_cons = tyConDataCons rep_tc
-    check_con con = allValid (check_universal con : foldDataConArgs (ft_check con) con)
+    check_con con = allValid (check_universal con : foldDataConArgs (ft_check con) con dit)
 
     check_universal :: DataCon -> Validity' DeriveInstanceErrReason
     check_universal con

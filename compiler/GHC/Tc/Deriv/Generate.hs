@@ -36,8 +36,9 @@ module GHC.Tc.Deriv.Generate (
         ordOpTbl, boxConTbl, litConTbl,
         mkRdrFunBind, mkRdrFunBindEC, mkRdrFunBindSE, error_Expr,
 
-        getPossibleDataCons, tyConInstArgTys,
-        DerivInstTys(..)
+        getPossibleDataCons,
+        DerivInstTys(..), buildDataConInstArgEnv,
+        derivDataConInstArgTys, substDerivInstTys
     ) where
 
 import GHC.Prelude
@@ -68,11 +69,12 @@ import GHC.Core.Coercion.Axiom ( coAxiomSingleBranch )
 import GHC.Builtin.Types.Prim
 import GHC.Builtin.Types
 import GHC.Core.Type
-import GHC.Core.Multiplicity
 import GHC.Core.Class
+import GHC.Types.Unique.FM ( lookupUFM )
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Utils.Misc
+import GHC.Types.Unique.FM ( listToUFM )
 import GHC.Types.Var
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -214,8 +216,8 @@ produced don't get through the typechecker.
 -}
 
 gen_Eq_binds :: SrcSpan -> DerivInstTys -> TcM (LHsBinds GhcPs, BagDerivStuff)
-gen_Eq_binds loc (DerivInstTys{ dit_rep_tc = tycon
-                              , dit_rep_tc_args = tycon_args }) = do
+gen_Eq_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
+                                  , dit_rep_tc_args = tycon_args }) = do
     return (method_binds, emptyBag)
   where
     all_cons = getPossibleDataCons tycon tycon_args
@@ -260,9 +262,9 @@ gen_Eq_binds loc (DerivInstTys{ dit_rep_tc = tycon
             con_arity   = length tys_needed
             as_needed   = take con_arity as_RDRs
             bs_needed   = take con_arity bs_RDRs
-            tys_needed  = dataConOrigArgTys data_con
+            tys_needed  = derivDataConInstArgTys data_con dit
         in
-        ([con1_pat, con2_pat], nested_eq_expr (map scaledThing tys_needed) as_needed bs_needed)
+        ([con1_pat, con2_pat], nested_eq_expr tys_needed as_needed bs_needed)
       where
         nested_eq_expr []  [] [] = true_Expr
         nested_eq_expr tys as bs
@@ -391,8 +393,8 @@ gtResult OrdGT      = true_Expr
 
 ------------
 gen_Ord_binds :: SrcSpan -> DerivInstTys -> TcM (LHsBinds GhcPs, BagDerivStuff)
-gen_Ord_binds loc (DerivInstTys{ dit_rep_tc = tycon
-                               , dit_rep_tc_args = tycon_args }) = do
+gen_Ord_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
+                                   , dit_rep_tc_args = tycon_args }) = do
     return $ if null tycon_data_cons -- No data-cons => invoke bale-out case
       then ( unitBag $ mkFunBindEC 2 loc compare_RDR (const eqTag_Expr) []
            , emptyBag)
@@ -510,7 +512,7 @@ gen_Ord_binds loc (DerivInstTys{ dit_rep_tc = tycon
     -- Returns a case alternative  Ki b1 b2 ... bv -> compare (a1,a2,...) with (b1,b2,...)
     mkInnerEqAlt op data_con
       = mkHsCaseAlt (nlConVarPat data_con_RDR bs_needed) $
-        mkCompareFields op (map scaledThing $ dataConOrigArgTys data_con)
+        mkCompareFields op (derivDataConInstArgTys data_con dit)
       where
         data_con_RDR = getRdrName data_con
         bs_needed    = take (dataConSourceArity data_con) bs_RDRs
@@ -1021,7 +1023,7 @@ we want to be able to parse (Left 3) just fine.
 gen_Read_binds :: (Name -> Fixity) -> SrcSpan -> DerivInstTys
                -> (LHsBinds GhcPs, BagDerivStuff)
 
-gen_Read_binds get_fixity loc (DerivInstTys{dit_rep_tc = tycon})
+gen_Read_binds get_fixity loc dit@(DerivInstTys{dit_rep_tc = tycon})
   = (listToBag [read_prec, default_readlist, default_readlistprec], emptyBag)
   where
     -----------------------------------------------------------------------
@@ -1110,7 +1112,7 @@ gen_Read_binds get_fixity loc (DerivInstTys{dit_rep_tc = tycon})
         is_infix     = dataConIsInfix data_con
         is_record    = labels `lengthExceeds` 0
         as_needed    = take con_arity as_RDRs
-        read_args    = zipWithEqual "gen_Read_binds" read_arg as_needed (map scaledThing $ dataConOrigArgTys data_con)
+        read_args    = zipWithEqual "gen_Read_binds" read_arg as_needed (derivDataConInstArgTys data_con dit)
         (read_a1:read_a2:_) = read_args
 
         prefix_prec = appPrecedence
@@ -1205,8 +1207,8 @@ Example
 gen_Show_binds :: (Name -> Fixity) -> SrcSpan -> DerivInstTys
                -> (LHsBinds GhcPs, BagDerivStuff)
 
-gen_Show_binds get_fixity loc (DerivInstTys{ dit_rep_tc = tycon
-                                           , dit_rep_tc_args = tycon_args })
+gen_Show_binds get_fixity loc dit@(DerivInstTys{ dit_rep_tc = tycon
+                                               , dit_rep_tc_args = tycon_args })
   = (unitBag shows_prec, emptyBag)
   where
     data_cons = getPossibleDataCons tycon tycon_args
@@ -1226,7 +1228,7 @@ gen_Show_binds get_fixity loc (DerivInstTys{ dit_rep_tc = tycon
              data_con_RDR  = getRdrName data_con
              con_arity     = dataConSourceArity data_con
              bs_needed     = take con_arity bs_RDRs
-             arg_tys       = dataConOrigArgTys data_con         -- Correspond 1-1 with bs_needed
+             arg_tys       = derivDataConInstArgTys data_con dit -- Correspond 1-1 with bs_needed
              con_pat       = nlConVarPat data_con_RDR bs_needed
              nullary_con   = con_arity == 0
              labels        = map flLabel $ dataConFieldLabels data_con
@@ -1254,7 +1256,7 @@ gen_Show_binds get_fixity loc (DerivInstTys{ dit_rep_tc = tycon
                  where
                    nm       = wrapOpParens (unpackFS l)
 
-             show_args               = zipWithEqual "gen_Show_binds" show_arg bs_needed (map scaledThing arg_tys)
+             show_args               = zipWithEqual "gen_Show_binds" show_arg bs_needed arg_tys
              (show_arg1:show_arg2:_) = show_args
              show_prefix_args        = intersperse (nlHsVar showSpace_RDR) show_args
 
@@ -2646,36 +2648,31 @@ newAuxBinderRdrName loc parent occ_fun = do
 getPossibleDataCons :: TyCon -> [Type] -> [DataCon]
 getPossibleDataCons tycon tycon_args = filter isPossible $ tyConDataCons tycon
   where
-    isPossible = not . dataConCannotMatch (tyConInstArgTys tycon tycon_args)
-
--- | Given a type constructor @tycon@ of arity /n/ and a list of argument types
--- @tycon_args@ of length /m/,
---
--- @
--- tyConInstArgTys tycon tycon_args
--- @
---
--- returns
---
--- @
--- [tycon_arg_{1}, tycon_arg_{2}, ..., tycon_arg_{m}, extra_arg_{m+1}, ..., extra_arg_{n}]
--- @
---
--- where @extra_args@ are distinct type variables.
---
--- Examples:
---
--- * Given @tycon: Foo a b@ and @tycon_args: [Int, Bool]@, return @[Int, Bool]@.
---
--- * Given @tycon: Foo a b@ and @tycon_args: [Int]@, return @[Int, b]@.
-tyConInstArgTys :: TyCon -> [Type] -> [Type]
-tyConInstArgTys tycon tycon_args = chkAppend tycon_args $ map mkTyVarTy tycon_args_suffix
-  where
-    tycon_args_suffix = drop (length tycon_args) $ tyConTyVars tycon
+    isPossible dc = not $ dataConCannotMatch (dataConInstUnivs dc tycon_args) dc
 
 -- | Information about the arguments to the class in a stock- or
--- newtype-derived instance.
--- See @Note [DerivEnv and DerivSpecMechanism]@.
+-- newtype-derived instance. For a @deriving@-generated instance declaration
+-- such as this one:
+--
+-- @
+-- instance Ctx => Cls cls_ty_1 ... cls_ty_m (TC tc_arg_1 ... tc_arg_n) where ...
+-- @
+--
+-- * 'dit_cls_tys' corresponds to @cls_ty_1 ... cls_ty_m@.
+--
+-- * 'dit_tc' corresponds to @TC@.
+--
+-- * 'dit_tc_args' corresponds to @tc_arg_1 ... tc_arg_n@.
+--
+-- See @Note [DerivEnv and DerivSpecMechanism]@ in "GHC.Tc.Deriv.Utils" for a
+-- more in-depth explanation, including the relationship between
+-- 'dit_tc'/'dit_rep_tc' and 'dit_tc_args'/'dit_rep_tc_args'.
+--
+-- A 'DerivInstTys' value can be seen as a more structured representation of
+-- the 'denv_inst_tys' in a 'DerivEnv', as the 'denv_inst_tys' is equal to
+-- @dit_cls_tys ++ ['mkTyConApp' dit_tc dit_tc_args]@. Other parts of the
+-- instance declaration can be found in the 'DerivEnv'. For example, the @Cls@
+-- in the example above corresponds to the 'denv_cls' field of 'DerivEnv'.
 data DerivInstTys = DerivInstTys
   { dit_cls_tys     :: [Type]
     -- ^ Other arguments to the class except the last
@@ -2690,17 +2687,68 @@ data DerivInstTys = DerivInstTys
   , dit_rep_tc_args :: [Type]
     -- ^ The representation types for 'dit_tc_args'
     --   (for data family instances). Otherwise the same as 'dit_tc_args'.
+  , dit_dc_inst_arg_env :: DataConEnv [Type]
+    -- ^ The cached results of instantiating each data constructor's field
+    --   types using @'dataConInstUnivs' data_con 'dit_rep_tc_args'@.
+    --   See @Note [Instantiating field types in stock deriving]@.
+    --
+    --   This field is only used for stock-derived instances and goes unused
+    --   for newtype-derived instances. It is put here mainly for the sake of
+    --   convenience.
   }
 
 instance Outputable DerivInstTys where
   ppr (DerivInstTys { dit_cls_tys = cls_tys, dit_tc = tc, dit_tc_args = tc_args
-                    , dit_rep_tc = rep_tc, dit_rep_tc_args = rep_tc_args })
+                    , dit_rep_tc = rep_tc, dit_rep_tc_args = rep_tc_args
+                    , dit_dc_inst_arg_env = dc_inst_arg_env })
     = hang (text "DerivInstTys")
-         2 (vcat [ text "dit_cls_tys"     <+> ppr cls_tys
-                 , text "dit_tc"          <+> ppr tc
-                 , text "dit_tc_args"     <+> ppr tc_args
-                 , text "dit_rep_tc"      <+> ppr rep_tc
-                 , text "dit_rep_tc_args" <+> ppr rep_tc_args ])
+         2 (vcat [ text "dit_cls_tys"         <+> ppr cls_tys
+                 , text "dit_tc"              <+> ppr tc
+                 , text "dit_tc_args"         <+> ppr tc_args
+                 , text "dit_rep_tc"          <+> ppr rep_tc
+                 , text "dit_rep_tc_args"     <+> ppr rep_tc_args
+                 , text "dit_dc_inst_arg_env" <+> ppr dc_inst_arg_env ])
+
+-- | Look up a data constructor's instantiated field types in a 'DerivInstTys'.
+-- See @Note [Instantiating field types in stock deriving]@.
+derivDataConInstArgTys :: DataCon -> DerivInstTys -> [Type]
+derivDataConInstArgTys dc dit =
+  case lookupUFM (dit_dc_inst_arg_env dit) dc of
+    Just inst_arg_tys -> inst_arg_tys
+    Nothing           -> pprPanic "derivDataConInstArgTys" (ppr dc)
+
+-- | @'buildDataConInstArgEnv' tycon arg_tys@ constructs a cache that maps
+-- each of @tycon@'s data constructors to their field types, with are to be
+-- instantiated with @arg_tys@.
+-- See @Note [Instantiating field types in stock deriving]@.
+buildDataConInstArgEnv :: TyCon -> [Type] -> DataConEnv [Type]
+buildDataConInstArgEnv rep_tc rep_tc_args =
+  listToUFM [ (dc, inst_arg_tys)
+            | dc <- tyConDataCons rep_tc
+            , let (_, _, inst_arg_tys) =
+                    dataConInstSig dc $ dataConInstUnivs dc rep_tc_args
+            ]
+
+-- | Apply a substitution to all of the 'Type's contained in a 'DerivInstTys'.
+-- See @Note [Instantiating field types in stock deriving]@ for why we need to
+-- substitute into a 'DerivInstTys' in the first place.
+substDerivInstTys :: TCvSubst -> DerivInstTys -> DerivInstTys
+substDerivInstTys subst
+  dit@(DerivInstTys { dit_cls_tys = cls_tys, dit_tc_args = tc_args
+                    , dit_rep_tc = rep_tc, dit_rep_tc_args = rep_tc_args })
+
+  | isEmptyTCvSubst subst
+  = dit
+  | otherwise
+  = dit{ dit_cls_tys         = cls_tys'
+       , dit_tc_args         = tc_args'
+       , dit_rep_tc_args     = rep_tc_args'
+       , dit_dc_inst_arg_env = buildDataConInstArgEnv rep_tc rep_tc_args'
+       }
+  where
+    cls_tys'     = substTys subst cls_tys
+    tc_args'     = substTys subst tc_args
+    rep_tc_args' = substTys subst rep_tc_args
 
 {-
 Note [Auxiliary binders]
@@ -2971,4 +3019,82 @@ Classes that do not currently filter constructors may do so in the future, if
 there is a valid use-case and we have requirements for how they should work.
 
 See #16341 and the T16341.hs test case.
+
+Note [Instantiating field types in stock deriving]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Figuring out what the types of data constructor fields are in `deriving` can
+be surprisingly tricky. Here are some examples (adapted from #20375) to set
+the scene:
+
+  data Ta = MkTa Int#
+  data Tb (x :: TYPE IntRep) = MkTb x
+
+  deriving instance Eq Ta        -- 1.
+  deriving instance Eq (Tb a)    -- 2.
+  deriving instance Eq (Tb Int#) -- 3.
+
+Example (1) is accepted, as `deriving Eq` has a special case for fields of type
+Int#. Example (2) is rejected, however, as the special case for Int# does not
+extend to all types of kind (TYPE IntRep).
+
+Example (3) ought to typecheck. If you instantiate the field of type `x` in
+MkTb to be Int#, then `deriving Eq` is capable of handling that. We must be
+careful, however. If we naïvely use, say, `dataConOrigArgTys` to retrieve the
+field types, then we would get `b`, which `deriving Eq` would reject. In
+order to handle `deriving Eq` (and, more generally, any stock deriving
+strategy) correctly, we /must/ instantiate the field types as needed.
+Not doing so led to #20375 and #20387.
+
+In fact, we end up needing to instantiate the field types in quite a few
+places:
+
+* When performing validity checks for stock deriving strategies (e.g., in
+  GHC.Tc.Deriv.Utils.cond_stdOK)
+
+* When inferring the instance context in
+  GHC.Tc.Deriv.Infer.inferConstraintStock
+
+* When generating code for stock-derived instances in
+  GHC.Tc.Deriv.{Functor,Generate,Generics}
+
+Repeatedly performing these instantiations in multiple places would be
+wasteful, so we build a cache of data constructor field instantiations in
+the `dit_dc_inst_arg_env` field of DerivInstTys. Specifically:
+
+1. When beginning to generate code for a stock-derived instance
+   `T arg_1 ... arg_n`, the `dit_dc_inst_arg_env` field is created by taking
+   each data constructor `dc`, instantiating its field types with
+   `dataConInstUnivs dc [arg_1, ..., arg_n]`, and mapping `dc` to the
+   instantiated field types in the cache. The `buildDataConInstArgEnv` function
+   is responsible for orchestrating this.
+
+2. When a part of the code in GHC.Tc.Deriv.* needs to look up the field
+   types, we deliberately avoid using `dataConOrigArgTys`. Instead, we use
+   `derivDataConInstArgTys`, which looks up a DataCon's instantiated field
+   types in the cache.
+
+StandaloneDeriving is one way for the field types to become instantiated.
+Another way is by deriving Functor and related classes, as chronicled in
+Note [Inferring the instance context] in GHC.Tc.Deriv.Infer. Here is one such
+example:
+
+  newtype Compose (f :: k -> Type) (g :: j -> k) (a :: j) = Compose (f (g a))
+    deriving Generic1
+
+This ultimately generates the following instance:
+
+  instance forall (f :: Type -> Type) (g :: j -> Type).
+    Functor f => Generic1 (Compose f g) where ...
+
+Note that because of the inferred `Functor f` constraint, `k` was instantiated
+to be `Type`. GHC's deriving machinery doesn't realize this until it performs
+constraint inference (in GHC.Tc.Deriv.Infer.inferConstraintsStock), however,
+which is *after* the initial DerivInstTys has been created. As a result, the
+`dit_dc_inst_arg_env` field might need to be updated after constraint inference,
+as the inferred constraints might instantiate the field types further.
+
+This is accomplished by way of `substDerivInstTys`, which substitutes all of
+the fields in a `DerivInstTys`, including the `dit_dc_inst_arg_env`.
+It is important to do this in inferConstraintsStock, as the
+deriving/should_compile/T20387 test case will not compile otherwise.
 -}

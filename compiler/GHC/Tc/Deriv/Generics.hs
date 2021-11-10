@@ -31,7 +31,6 @@ import GHC.Tc.Errors.Types
 import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Core.FamInstEnv ( FamInst, FamFlavor(..), mkSingleCoAxiom )
-import GHC.Core.Multiplicity
 import GHC.Tc.Instance.Family
 import GHC.Unit.Module ( moduleName, moduleNameFS
                         , moduleUnit, unitFS, getModule )
@@ -156,7 +155,7 @@ canDoGenerics :: DerivInstTys -> Validity' [DeriveGenericsErrReason]
 --
 -- It returns IsValid if deriving is possible. It returns (NotValid reason)
 -- if not.
-canDoGenerics (DerivInstTys{dit_rep_tc = tc})
+canDoGenerics dit@(DerivInstTys{dit_rep_tc = tc})
   = mergeErrors (
           -- Check (b) from Note [Requirements for deriving Generic and Rep].
               (if (not (null (tyConStupidTheta tc)))
@@ -178,7 +177,7 @@ canDoGenerics (DerivInstTys{dit_rep_tc = tc})
         -- it relies on instantiating *polymorphic* sum and product types
         -- at the argument types of the constructors
     bad_con :: DataCon -> Validity' DeriveGenericsErrReason
-    bad_con dc = if any bad_arg_type (map scaledThing $ dataConOrigArgTys dc)
+    bad_con dc = if any bad_arg_type (derivDataConInstArgTys dc dit)
                   then NotValid $ DerivErrGenericsMustNotHaveExoticArgs dc
                   else if not (isVanillaDataCon dc)
                           then NotValid $ DerivErrGenericsMustBeVanillaDataCon dc
@@ -258,7 +257,7 @@ canDoGenerics1 dit@(DerivInstTys{dit_rep_tc = rep_tc}) =
     data_cons = tyConDataCons rep_tc
     check_con con = case check_vanilla con of
       j@(NotValid {}) -> [j]
-      IsValid -> _ccdg1_errors `map` foldDataConArgs (ft_check con) con
+      IsValid -> _ccdg1_errors `map` foldDataConArgs (ft_check con) con dit
 
     check_vanilla :: DataCon -> Validity' DeriveGenericsErrReason
     check_vanilla con | isVanillaDataCon con = IsValid
@@ -331,7 +330,7 @@ gk2gkDC Gen1_{} d = Gen1_DC $ last $ dataConUnivTyVars d
 
 -- Bindings for the Generic instance
 mkBindsRep :: DynFlags -> GenericKind -> DerivInstTys -> (LHsBinds GhcPs, [LSig GhcPs])
-mkBindsRep dflags gk (DerivInstTys{dit_rep_tc = tycon}) = (binds, sigs)
+mkBindsRep dflags gk dit@(DerivInstTys{dit_rep_tc = tycon}) = (binds, sigs)
       where
         binds = unitBag (mkRdrFunBind (L loc' from01_RDR) [from_eqn])
               `unionBags`
@@ -378,7 +377,7 @@ mkBindsRep dflags gk (DerivInstTys{dit_rep_tc = tycon}) = (binds, sigs)
 
         -- Recurse over the sum first
         from_alts, to_alts :: [Alt]
-        (from_alts, to_alts) = mkSum gk_ (1 :: US) datacons
+        (from_alts, to_alts) = mkSum gk_ (1 :: US) dit datacons
           where gk_ = case gk of
                   Gen0 -> Gen0_
                   Gen1 -> assert (tyvars `lengthAtLeast` 1) $
@@ -406,8 +405,6 @@ tc_mkRepFamInsts gk inst_tys dit@(DerivInstTys{dit_rep_tc = tycon}) =
          Gen0 -> tcLookupTyCon repTyConName
          Gen1 -> tcLookupTyCon rep1TyConName
 
-     ; fam_envs <- tcGetFamInstEnvs
-
      ; let -- If the derived instance is
            --   instance Generic (Foo x)
            -- then:
@@ -422,19 +419,10 @@ tc_mkRepFamInsts gk inst_tys dit@(DerivInstTys{dit_rep_tc = tycon}) =
              (Gen1, [arg_k, inst_t]) -> (arg_k,          inst_t)
              _ -> pprPanic "tc_mkRepFamInsts" (ppr inst_tys)
 
-     ; let mbFamInst         = tyConFamInst_maybe tycon
-           -- If we're examining a data family instance, we grab the parent
-           -- TyCon (ptc) and use it to determine the type arguments
-           -- (inst_args) for the data family *instance*'s type variables.
-           ptc               = maybe tycon fst mbFamInst
-           (_, inst_args, _) = tcLookupDataFamInst fam_envs ptc $ snd
-                                 $ tcSplitTyConApp inst_ty
-
-     ; let -- `tyvars` = [a,b]
-           (tyvars, gk_) = case gk of
-             Gen0 -> (all_tyvars, Gen0_)
+           gk_ = case gk of
+             Gen0 -> Gen0_
              Gen1 -> assert (not $ null all_tyvars)
-                     (init all_tyvars, Gen1_ $ last all_tyvars)
+                     Gen1_ $ last all_tyvars
              where all_tyvars = tyConTyVars tycon
 
        -- `repTy` = D1 ... (C1 ... (S1 ... (Rec0 a))) :: * -> *
@@ -447,19 +435,14 @@ tc_mkRepFamInsts gk inst_tys dit@(DerivInstTys{dit_rep_tc = tycon}) =
            rep_occ = case gk of Gen0 -> mkGenR tc_occ; Gen1 -> mkGen1R tc_occ
      ; rep_name <- newGlobalBinder mod rep_occ loc
 
-       -- We make sure to substitute the tyvars with their user-supplied
-       -- type arguments before generating the Rep/Rep1 instance, since some
-       -- of the tyvars might have been instantiated when deriving.
-       -- See Note [Generating a correctly typed Rep instance].
-     ; let (env_tyvars, env_inst_args)
-             = case gk_ of
-                 Gen0_ -> (tyvars, inst_args)
-                 Gen1_ last_tv
-                          -- See the "wrinkle" in
-                          -- Note [Generating a correctly typed Rep instance]
-                       -> ( last_tv : tyvars
-                          , anyTypeOfKind (tyVarKind last_tv) : inst_args )
-           env        = zipTyEnv env_tyvars env_inst_args
+       -- If deriving Generic1, make sure to substitute the last type variable
+       -- with Any in the generated Rep1 instance. This avoids issues like what
+       -- is documented in the "wrinkle" section of
+       -- Note [Generating a correctly typed Rep instance].
+     ; let env = case gk_ of
+                   Gen0_ -> emptyTvSubstEnv
+                   Gen1_ last_tv
+                     -> zipTyEnv [last_tv] [anyTypeOfKind (tyVarKind last_tv)]
            in_scope   = mkInScopeSet (tyCoVarsOfTypes inst_tys)
            subst      = mkTvSubst in_scope env
            repTy'     = substTyUnchecked  subst repTy
@@ -550,7 +533,7 @@ tc_mkRepTy ::  -- Gen0_ or Gen1_, for Rep or Rep1
             -> Kind
                -- Generated representation0 type
             -> TcM Type
-tc_mkRepTy gk_ (DerivInstTys{dit_rep_tc = tycon}) k =
+tc_mkRepTy gk_ dit@(DerivInstTys{dit_rep_tc = tycon}) k =
   do
     d1      <- tcLookupTyCon d1TyConName
     c1      <- tcLookupTyCon c1TyConName
@@ -600,8 +583,7 @@ tc_mkRepTy gk_ (DerivInstTys{dit_rep_tc = tycon}) k =
         mkD    a   = mkTyConApp d1 [ k, metaDataTy, sumP (tyConDataCons a) ]
         mkC      a = mkTyConApp c1 [ k
                                    , metaConsTy a
-                                   , prod (map scaledThing . dataConInstOrigArgTys a
-                                            . mkTyVarTys . tyConTyVars $ tycon)
+                                   , prod (derivDataConInstArgTys a dit)
                                           (dataConSrcBangs    a)
                                           (dataConImplBangs   a)
                                           (dataConFieldLabels a)]
@@ -732,41 +714,43 @@ mkBoxTy uAddr uChar uDouble uFloat uInt uWord rec0 k ty
 --------------------------------------------------------------------------------
 
 mkSum :: GenericKind_ -- Generic or Generic1?
-      -> US          -- Base for generating unique names
-      -> [DataCon]   -- The data constructors
-      -> ([Alt],     -- Alternatives for the T->Trep "from" function
-          [Alt])     -- Alternatives for the Trep->T "to" function
+      -> US           -- Base for generating unique names
+      -> DerivInstTys -- Information about the last type argument to Generic(1)
+      -> [DataCon]    -- The data constructors
+      -> ([Alt],      -- Alternatives for the T->Trep "from" function
+          [Alt])      -- Alternatives for the Trep->T "to" function
 
 -- Datatype without any constructors
-mkSum _ _ [] = ([from_alt], [to_alt])
+mkSum _ _ _ [] = ([from_alt], [to_alt])
   where
     from_alt = (x_Pat, nlHsCase x_Expr [])
     to_alt   = (x_Pat, nlHsCase x_Expr [])
                -- These M1s are meta-information for the datatype
 
 -- Datatype with at least one constructor
-mkSum gk_ us datacons =
+mkSum gk_ us dit datacons =
   -- switch the payload of gk_ to be datacon-centric instead of tycon-centric
- unzip [ mk1Sum (gk2gkDC gk_ d) us i (length datacons) d
+ unzip [ mk1Sum (gk2gkDC gk_ d) us i (length datacons) dit d
            | (d,i) <- zip datacons [1..] ]
 
 -- Build the sum for a particular constructor
 mk1Sum :: GenericKind_DC -- Generic or Generic1?
-       -> US        -- Base for generating unique names
-       -> Int       -- The index of this constructor
-       -> Int       -- Total number of constructors
-       -> DataCon   -- The data constructor
-       -> (Alt,     -- Alternative for the T->Trep "from" function
-           Alt)     -- Alternative for the Trep->T "to" function
-mk1Sum gk_ us i n datacon = (from_alt, to_alt)
+       -> US             -- Base for generating unique names
+       -> Int            -- The index of this constructor
+       -> Int            -- Total number of constructors
+       -> DerivInstTys   -- Information about the last type argument to Generic(1)
+       -> DataCon        -- The data constructor
+       -> (Alt,          -- Alternative for the T->Trep "from" function
+           Alt)          -- Alternative for the Trep->T "to" function
+mk1Sum gk_ us i n dit datacon = (from_alt, to_alt)
   where
     gk = forgetArgVar gk_
 
     -- Existentials already excluded
-    argTys = dataConOrigArgTys datacon
+    argTys = derivDataConInstArgTys datacon dit
     n_args = dataConSourceArity datacon
 
-    datacon_varTys = zip (map mkGenericLocal [us .. us+n_args-1]) (map scaledThing argTys)
+    datacon_varTys = zip (map mkGenericLocal [us .. us+n_args-1]) argTys
     datacon_vars = map fst datacon_varTys
 
     datacon_rdr  = getRdrName datacon
@@ -924,59 +908,55 @@ details on why URec is implemented the way it is.
 Note [Generating a correctly typed Rep instance]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 tc_mkRepTy derives the RHS of the Rep(1) type family instance when deriving
-Generic(1). That is, it derives the ellipsis in the following:
+Generic(1). For example, given the following data declaration:
 
-    instance Generic Foo where
-      type Rep Foo = ...
+    data Foo a = MkFoo a
+      deriving stock Generic
 
-However, tc_mkRepTy only has knowledge of the *TyCon* of the type for which
-a Generic(1) instance is being derived, not the fully instantiated type. As a
-result, tc_mkRepTy builds the most generalized Rep(1) instance possible using
-the type variables it learns from the TyCon (i.e., it uses tyConTyVars). This
-can cause problems when the instance has instantiated type variables
-(see #11732). As an example:
+tc_mkRepTy would generate the `Rec0 a` portion of this instance:
 
-    data T a = MkT a
-    deriving instance Generic (T Int)
-    ==>
-    instance Generic (T Int) where
-      type Rep (T Int) = (... (Rec0 a)) -- wrong!
+    instance Generic (Foo a) where
+      type Rep (Foo a) = Rec0 a
+      ...
 
--XStandaloneDeriving is one way for the type variables to become instantiated.
-Another way is when Generic1 is being derived for a datatype with a visible
-kind binder, e.g.,
+(The full `Rep` instance is more complicated than this, but we have simplified
+it for presentation purposes.)
 
-   data P k (a :: k) = MkP k deriving Generic1
-   ==>
-   instance Generic1 (P *) where
-     type Rep1 (P *) = (... (Rec0 k)) -- wrong!
+`tc_mkRepTy` figures out the field types to use in the RHS by inspecting a
+DerivInstTys, which contains the instantiated field types for each data
+constructor. (See Note [Instantiating field types in stock deriving] for a
+description of how this works.) As a result, `tc_mkRepTy` "just works" even
+when dealing with StandaloneDeriving, such as in this example:
 
-See Note [Unify kinds in deriving] in GHC.Tc.Deriv.
+    deriving stock instance Generic (Foo Int)
+      ===>
+    instance Generic (Foo Int) where
+      type Rep (Foo Int) = Rec0 Int -- The `a` has been instantiated here
 
-In any such scenario, we must prevent a discrepancy between the LHS and RHS of
-a Rep(1) instance. To do so, we create a type variable substitution that maps
-the tyConTyVars of the TyCon to their counterparts in the fully instantiated
-type. (For example, using T above as example, you'd map a :-> Int.) We then
-apply the substitution to the RHS before generating the instance.
+A wrinkle in all of this: what happens when deriving a Generic1 instance where
+the last type variable appears in a type synonym that discards it? That is,
+what should happen in this example (taken from #15012)?
 
-A wrinkle in all of this: when forming the type variable substitution for
-Generic1 instances, we map the last type variable of the tycon to Any. Why?
-It's because of wily data types like this one (#15012):
+    type FakeOut a = Int
+    data T a = MkT (FakeOut a)
+      deriving Generic1
 
-   data T a = MkT (FakeOut a)
-   type FakeOut a = Int
-
-If we ignore a, then we'll produce the following Rep1 instance:
+MkT is a particularly wily data constructor. Although the last type variable
+`a` technically appears in `FakeOut a`, it's just a smokescreen, as `FakeOut a`
+simply expands to `Int`. As a result, `MkT` doesn't really *use* the last type
+variable. Therefore, T's `Rep` instance would use Rec0 to represent MkT's
+field. But we must be careful not to produce code like this:
 
    instance Generic1 T where
-     type Rep1 T = ... (Rec0 (FakeOut a))
+     type Rep1 T = Rec0 (FakeOut a)
      ...
 
-Oh no! Now we have `a` on the RHS, but it's completely unbound. Instead, we
-ensure that `a` is mapped to Any:
+Oh no! Now we have `a` on the RHS, but it's completely unbound. This can cause
+issues like what was observed in #15012. To avoid this, we ensure that `a` is
+instantiated to Any:
 
    instance Generic1 T where
-     type Rep1 T = ... (Rec0 (FakeOut Any))
+     type Rep1 T = Rec0 (FakeOut Any)
      ...
 
 And now all is good.

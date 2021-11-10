@@ -41,6 +41,7 @@ module GHC.Core.DataCon (
         dataConOtherTheta,
         dataConInstArgTys, dataConOrigArgTys, dataConOrigResTy,
         dataConInstOrigArgTys, dataConRepArgTys,
+        dataConInstUnivs,
         dataConFieldLabels, dataConFieldType, dataConFieldType_maybe,
         dataConSrcBangs,
         dataConSourceArity, dataConRepArity,
@@ -71,6 +72,7 @@ import GHC.Core.Type as Type
 import GHC.Core.Coercion
 import GHC.Core.Unify
 import GHC.Core.TyCon
+import GHC.Core.TyCo.Subst
 import GHC.Core.Multiplicity
 import {-# SOURCE #-} GHC.Types.TyThing
 import GHC.Types.FieldLabel
@@ -80,6 +82,7 @@ import GHC.Types.Name
 import GHC.Builtin.Names
 import GHC.Core.Predicate
 import GHC.Types.Var
+import GHC.Types.Var.Env
 import GHC.Types.Basic
 import GHC.Data.FastString
 import GHC.Unit.Types
@@ -1488,6 +1491,59 @@ dataConInstOrigArgTys dc@(MkData {dcOrigArgTys = arg_tys,
   where
     tyvars = univ_tvs ++ ex_tvs
     subst  = zipTCvSubst tyvars inst_tys
+
+-- | Given a data constructor @dc@ with /n/ universally quantified type
+-- variables @a_{1}@, @a_{2}@, ..., @a_{n}@, and given a list of argument
+-- types @dc_args@ of length /m/ where /m/ <= /n/, then:
+--
+-- @
+-- dataConInstUnivs dc dc_args
+-- @
+--
+-- Will return:
+--
+-- @
+-- [dc_arg_{1}, dc_arg_{2}, ..., dc_arg_{m}, a_{m+1}, ..., a_{n}]
+-- @
+--
+-- That is, return the list of universal type variables with
+-- @a_{1}@, @a_{2}@, ..., @a_{m}@ instantiated with
+-- @dc_arg_{1}@, @dc_arg_{2}@, ..., @dc_arg_{m}@. It is possible for @m@ to
+-- be less than @n@, in which case the remaining @n - m@ elements will simply
+-- be universal type variables (with their kinds possibly instantiated).
+--
+-- Examples:
+--
+-- * Given the data constructor @D :: forall a b. Foo a b@ and
+--   @dc_args@ @[Int, Bool]@, then @dataConInstUnivs D dc_args@ will return
+--   @[Int, Bool]@.
+--
+-- * Given the data constructor @D :: forall a b. Foo a b@ and
+--   @dc_args@ @[Int]@, then @@dataConInstUnivs D dc_args@ will return
+--   @[Int, b]@.
+--
+-- * Given the data constructor @E :: forall k (a :: k). Bar k a@ and
+--   @dc_args@ @[Type]@, then @@dataConInstUnivs D dc_args@ will return
+--   @[Type, (a :: Type)]@.
+--
+-- This is primarily used in @GHC.Tc.Deriv.*@ in service of instantiating data
+-- constructors' field types.
+-- See @Note [Instantiating field types in stock deriving]@ for a notable
+-- example of this.
+dataConInstUnivs :: DataCon -> [Type] -> [Type]
+dataConInstUnivs dc dc_args = chkAppend dc_args $ map mkTyVarTy dc_args_suffix
+  where
+    (dc_univs_prefix, dc_univs_suffix)
+                        = -- Assert that m <= n
+                          assertPpr (dc_args `leLength` dataConUnivTyVars dc)
+                                    (text "dataConInstUnivs"
+                                      <+> ppr dc_args
+                                      <+> ppr (dataConUnivTyVars dc)) $
+                          splitAt (length dc_args) $ dataConUnivTyVars dc
+    (_, dc_args_suffix) = substTyVarBndrs prefix_subst dc_univs_suffix
+    prefix_subst        = mkTvSubst prefix_in_scope prefix_env
+    prefix_in_scope     = mkInScopeSet $ tyCoVarsOfTypes dc_args
+    prefix_env          = zipTyEnv dc_univs_prefix dc_args
 
 -- | Returns the argument types of the wrapper, excluding all dictionary arguments
 -- and without substituting for any type variables

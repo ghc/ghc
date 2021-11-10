@@ -163,8 +163,8 @@ gen_Functor_binds loc (DerivInstTys{dit_rep_tc = tycon})
                                coerce_Expr]
     fmap_match_ctxt = mkPrefixFunRhs fmap_name
 
-gen_Functor_binds loc (DerivInstTys{ dit_rep_tc = tycon
-                                   , dit_rep_tc_args = tycon_args })
+gen_Functor_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
+                                       , dit_rep_tc_args = tycon_args })
   = (listToBag [fmap_bind, replace_bind], emptyBag)
   where
     data_cons = getPossibleDataCons tycon tycon_args
@@ -177,7 +177,7 @@ gen_Functor_binds loc (DerivInstTys{ dit_rep_tc = tycon
     fmap_eqn con = flip evalState bs_RDRs $
                      match_for_con fmap_match_ctxt [f_Pat] con parts
       where
-        parts = foldDataConArgs ft_fmap con
+        parts = foldDataConArgs ft_fmap con dit
 
     fmap_eqns = map fmap_eqn data_cons
 
@@ -216,7 +216,7 @@ gen_Functor_binds loc (DerivInstTys{ dit_rep_tc = tycon
     replace_eqn con = flip evalState bs_RDRs $
         match_for_con replace_match_ctxt [z_Pat] con parts
       where
-        parts = foldDataConArgs ft_replace con
+        parts = foldDataConArgs ft_replace con dit
 
     replace_eqns = map replace_eqn data_cons
 
@@ -553,10 +553,10 @@ deepSubtypesContaining tv
             , ft_forall = \v xs -> filterOut ((v `elemVarSet`) . tyCoVarsOfType) xs })
 
 
-foldDataConArgs :: FFoldType a -> DataCon -> [a]
+foldDataConArgs :: FFoldType a -> DataCon -> DerivInstTys -> [a]
 -- Fold over the arguments of the datacon
-foldDataConArgs ft con
-  = map foldArg (map scaledThing $ dataConOrigArgTys con)
+foldDataConArgs ft con dit
+  = map foldArg (derivDataConInstArgTys con dit)
   where
     foldArg
       = case getTyVar_maybe (last (tyConAppArgs (dataConOrigResTy con))) of
@@ -798,8 +798,8 @@ gen_Foldable_binds loc (DerivInstTys{dit_rep_tc = tycon})
                                   mempty_Expr]
     foldMap_match_ctxt = mkPrefixFunRhs foldMap_name
 
-gen_Foldable_binds loc (DerivInstTys{ dit_rep_tc = tycon
-                                    , dit_rep_tc_args = tycon_args })
+gen_Foldable_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
+                                        , dit_rep_tc_args = tycon_args })
   | null data_cons  -- There's no real point producing anything but
                     -- foldMap for a type with no constructors.
   = (unitBag foldMap_bind, emptyBag)
@@ -816,7 +816,7 @@ gen_Foldable_binds loc (DerivInstTys{ dit_rep_tc = tycon
     foldr_eqn con
       = evalState (match_foldr z_Expr [f_Pat,z_Pat] con =<< parts) bs_RDRs
       where
-        parts = sequence $ foldDataConArgs ft_foldr con
+        parts = sequence $ foldDataConArgs ft_foldr con dit
     foldr_match_ctxt = mkPrefixFunRhs foldr_name
 
     foldMap_name = L (noAnnSrcSpan loc) foldMap_RDR
@@ -830,7 +830,7 @@ gen_Foldable_binds loc (DerivInstTys{ dit_rep_tc = tycon
     foldMap_eqn con
       = evalState (match_foldMap [f_Pat] con =<< parts) bs_RDRs
       where
-        parts = sequence $ foldDataConArgs ft_foldMap con
+        parts = sequence $ foldDataConArgs ft_foldMap con dit
     foldMap_match_ctxt = mkPrefixFunRhs foldMap_name
 
     -- Given a list of NullM results, produce Nothing if any of
@@ -849,7 +849,7 @@ gen_Foldable_binds loc (DerivInstTys{ dit_rep_tc = tycon
     null_eqns = map null_eqn data_cons
     null_eqn con
       = flip evalState bs_RDRs $ do
-          parts <- sequence $ foldDataConArgs ft_null con
+          parts <- sequence $ foldDataConArgs ft_null con dit
           case convert parts of
             Nothing -> return $
               mkMatch null_match_ctxt [nlParPat (nlWildConPat con)]
@@ -1033,8 +1033,8 @@ gen_Traversable_binds loc (DerivInstTys{dit_rep_tc = tycon})
                        (nlHsApps pure_RDR [nlHsApp coerce_Expr z_Expr])]
     traverse_match_ctxt = mkPrefixFunRhs traverse_name
 
-gen_Traversable_binds loc (DerivInstTys{ dit_rep_tc = tycon
-                                       , dit_rep_tc_args = tycon_args })
+gen_Traversable_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
+                                           , dit_rep_tc_args = tycon_args })
   = (unitBag traverse_bind, emptyBag)
   where
     data_cons = getPossibleDataCons tycon tycon_args
@@ -1048,7 +1048,7 @@ gen_Traversable_binds loc (DerivInstTys{ dit_rep_tc = tycon
     traverse_eqn con
       = evalState (match_for_con [f_Pat] con =<< parts) bs_RDRs
       where
-        parts = sequence $ foldDataConArgs ft_trav con
+        parts = sequence $ foldDataConArgs ft_trav con dit
     traverse_match_ctxt = mkPrefixFunRhs traverse_name
 
     -- Yields 'Just' an expression if we're folding over a type that mentions
