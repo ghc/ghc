@@ -365,16 +365,15 @@ runWindres logger dflags args = traceToolCommand logger "windres" $ do
       args' = -- If windres.exe and gcc.exe are in a directory containing
               -- spaces then windres fails to run gcc. We therefore need
               -- to tell it what command to use...
-              Option ("--preprocessor=" ++
-                      unwords (map quote (cc :
-                                          map showOpt opts ++
-                                          ["-E", "-xc", "-DRC_INVOKED"])))
+              [ Option ("--preprocessor=" ++ quote cc) ]
+              ++ map (Option . ("--preprocessor-arg=" ++) . quote)
+                     (map showOpt opts ++ ["-E", "-xc", "-DRC_INVOKED"])
               -- ...but if we do that then if windres calls popen then
               -- it can't understand the quoting, so we have to use
               -- --use-temp-file so that it interprets it correctly.
               -- See #1828.
-            : Option "--use-temp-file"
-            : args
+              ++ [ Option "--use-temp-file" ]
+              ++ args
   mb_env <- getGccEnv cc_args
   runSomethingFiltered logger id "Windres" windres args' Nothing mb_env
 
