@@ -128,7 +128,7 @@ buildConf _ context@Context {..} _conf = do
         need [ path -/- "DerivedConstants.h"
              , path -/- "ghcautoconf.h"
              , path -/- "ghcplatform.h"
-             , path -/- "ghcversion.h" ]
+             ]
 
     -- we need to generate this file for GMP
     when (package == ghcBignum) $ do

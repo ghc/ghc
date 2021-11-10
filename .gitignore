@@ -80,8 +80,6 @@ _darcs/
 /libraries/*/dist-install/
 /libraries/*/dist-newstyle/
 /libraries/dist-haddock/
-/rts/dist/
-/rts/dist-*/
 /utils/*/dist*/
 /compiler/stage1/
 /compiler/stage2/
@@ -187,11 +185,6 @@ _darcs/
 /mk/project.mk
 /mk/project.mk.old
 /mk/validate.mk
-/rts/rts.cabal
-/rts/package.conf.inplace
-/rts/package.conf.inplace.raw
-/rts/package.conf.install
-/rts/package.conf.install.raw
 /stage3.package.conf
 /testsuite_summary*.txt
 /testsuite*.xml
@@ -205,7 +198,6 @@ _darcs/
 /utils/ghc-pkg/ghc-pkg.cabal
 utils/lndir/fs.*
 utils/unlit/fs.*
-rts/fs.*
 libraries/base/include/fs.h
 libraries/base/cbits/fs.c
 missing-win32-tarballs

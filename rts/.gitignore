@@ -1,0 +1,18 @@
+# Specific generated files
+/dist/
+/dist-*/
+
+/rts.cabal
+
+/include/ghcversion.h
+
+/package.conf.inplace
+/package.conf.inplace.raw
+/package.conf.install
+/package.conf.install.raw
+/fs.*
+
+/autom4te.cache/
+/config.log
+/config.status
+/configure

@@ -19,9 +19,6 @@ includes_2_H_CONFIG   = $(includes_1_H_CONFIG)
 includes_1_H_PLATFORM = rts/dist-install/build/include/ghcplatform.h
 includes_2_H_PLATFORM = $(includes_1_H_PLATFORM)
 
-includes_1_H_VERSION  = rts/dist-install/build/include/ghcversion.h
-includes_2_H_VERSION  = $(includes_1_H_VERSION)
-
 BUILD_0_INCLUDE_DIR = rts/dist/build/include
 BUILD_1_INCLUDE_DIR = rts/dist-install/build/include
 BUILD_2_INCLUDE_DIR = $(BUILD_1_INCLUDE_DIR)
@@ -41,8 +38,7 @@ includes_H_FILES := $(subst /./,/,$(includes_H_FILES))
 
 includes_H_FILES_GENERATED = \
     ghcautoconf.h \
-    ghcplatform.h \
-    ghcversion.h
+    ghcplatform.h
 
 # Unlike above, include generated files. We still need the previous list
 # without the generated files separtely and not just as part of this due to
@@ -76,40 +72,6 @@ ifneq "$(GhcWithSMP)" "YES"
 includes_CC_OPTS += -DNOSMP
 endif
 
-define includesHeaderVersion
-# $1 = stage
-$$(includes_$1_H_VERSION) : mk/project.mk | $$$$(dir $$$$@)/.
-	$$(call removeFiles,$$@)
-	@echo "Creating $$@..."
-	@echo "#if !defined(__GHCVERSION_H__)"                                   > $$@
-	@echo "#define __GHCVERSION_H__"                                        >> $$@
-	@echo                                                                   >> $$@
-	@echo "#define __GLASGOW_HASKELL__ $$(ProjectVersionInt)"               >> $$@
-	@echo "#define __GLASGOW_HASKELL_FULL_VERSION__ \"$$(ProjectVersion)\"" >> $$@
-	@echo                                                                   >> $$@
-	@if [ -n "$$(ProjectPatchLevel1)" ]; then \
-	  echo "#define __GLASGOW_HASKELL_PATCHLEVEL1__ $$(ProjectPatchLevel1)" >> $$@; \
-	fi
-	@if [ -n "$$(ProjectPatchLevel2)" ]; then \
-	  echo "#define __GLASGOW_HASKELL_PATCHLEVEL2__ $$(ProjectPatchLevel2)" >> $$@; \
-	fi
-	@echo                                                                   >> $$@
-	@echo '#define MIN_VERSION_GLASGOW_HASKELL(ma,mi,pl1,pl2) (\'           >> $$@
-	@echo '   ((ma)*100+(mi)) <  __GLASGOW_HASKELL__ || \'                  >> $$@
-	@echo '   ((ma)*100+(mi)) == __GLASGOW_HASKELL__    \'                  >> $$@
-	@echo '          && (pl1) <  __GLASGOW_HASKELL_PATCHLEVEL1__ || \'      >> $$@
-	@echo '   ((ma)*100+(mi)) == __GLASGOW_HASKELL__    \'                  >> $$@
-	@echo '          && (pl1) == __GLASGOW_HASKELL_PATCHLEVEL1__ \'         >> $$@
-	@echo '          && (pl2) <= __GLASGOW_HASKELL_PATCHLEVEL2__ )'         >> $$@
-	@echo                                                                   >> $$@
-	@echo "#endif /* __GHCVERSION_H__ */"                                   >> $$@
-	@echo "Done."
-
-endef
-
-$(eval $(call includesHeaderVersion,0))
-$(eval $(call includesHeaderVersion,1))
-
 ifneq "$(BINDIST)" "YES"
 
 define includesHeaderConfig
@@ -123,7 +85,11 @@ $$(includes_$1_H_CONFIG) : mk/config.h mk/config.mk rts/include/ghc.mk | $$$$(di
 #	Copy the contents of mk/config.h, turning '#define PACKAGE_FOO
 #	"blah"' into '/* #undef PACKAGE_FOO */' to avoid clashes.
 #
-	@sed 's,^\([	 ]*\)#[	 ]*define[	 ][	 ]*\(PACKAGE_[A-Z]*\)[	 ][ 	]*".*".*$$$$,\1/* #undef \2 */,' mk/config.h >> $$@
+	@sed mk/config.h \
+		-e 's,^\([	 ]*\)#[	 ]*define[	 ][	 ]*\(PACKAGE_[A-Z]*\)[	 ][ 	]*".*".*$$$$,\1/* #undef \2 */,' \
+		-e '/__GLASGOW_HASKELL/d' \
+		-e '/REMOVE ME/d' \
+		>> $$@
 #
 	@echo "#endif /* __GHCAUTOCONF_H__ */"          >> $$@
 	@echo "Done."

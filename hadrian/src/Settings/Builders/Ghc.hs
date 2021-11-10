@@ -195,9 +195,7 @@ commonGhcArgs :: Args
 commonGhcArgs = do
     way  <- getWay
     path <- getBuildPath
-    stage <- getStage
     useColor <- shakeColor <$> expr getShakeOptions
-    ghcVersion <- expr $ ghcVersionH stage
     mconcat [ arg "-hisuf", arg $ hisuf way
             , arg "-osuf" , arg $  osuf way
             , arg "-hcsuf", arg $ hcsuf way
@@ -208,7 +206,7 @@ commonGhcArgs = do
             -- in the package database. We therefore explicitly supply the path
             -- to the @ghc-version@ file, to prevent GHC from trying to open the
             -- RTS package in the package database and failing.
-            , package rts ? notStage0 ? arg ("-ghcversion-file=" ++ ghcVersion)
+            , package rts ? notStage0 ? arg "-ghcversion-file=rts/include/ghcversion.h"
             , map ("-optc" ++) <$> getStagedSettingList ConfCcArgs
             , map ("-optP" ++) <$> getStagedSettingList ConfCppArgs
             , map ("-optP" ++) <$> getContextData cppOpts

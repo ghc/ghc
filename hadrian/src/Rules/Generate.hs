@@ -133,7 +133,6 @@ generatePackageCode context@(Context stage pkg _) = do
         (root -/- "**" -/- dir -/- "DerivedConstants.h") <~ stageLibPath stage
         (root -/- "**" -/- dir -/- "ghcautoconf.h") <~ stageLibPath stage
         (root -/- "**" -/- dir -/- "ghcplatform.h") <~ stageLibPath stage
-        (root -/- "**" -/- dir -/- "ghcversion.h") <~ stageLibPath stage
  where
     pattern <~ mdir = pattern %> \file -> do
         dir <- mdir
@@ -184,7 +183,6 @@ generateRules = do
         (prefix -/- "ghcplatform.h") %> go generateGhcPlatformH
         (prefix -/- "settings") %> go generateSettings
         (prefix -/- "ghcautoconf.h") %> go generateGhcAutoconfH
-        (prefix -/- "ghcversion.h") %> go generateGhcVersionH
         -- TODO: simplify, get rid of fake rts context
         for_ (fst <$> deriveConstantsPairs) $ \constantsFile ->
             prefix -/- constantsFile %> \file -> do
@@ -193,7 +191,6 @@ generateRules = do
                 need
                     [ prefix -/- "ghcplatform.h"
                     , prefix -/- "ghcautoconf.h"
-                    , prefix -/- "ghcversion.h"
                     ]
                 withTempDir $ \dir -> build $
                     target (rtsContext stage) DeriveConstants [] [file, dir]
@@ -395,7 +392,7 @@ generateConfigHs = do
 generateGhcAutoconfH :: Expr String
 generateGhcAutoconfH = do
     trackGenerateHs
-    configHContents  <- expr $ map undefinePackage <$> readFileLines configH
+    configHContents  <- expr $ mapMaybe undefinePackage <$> readFileLines configH
     return . unlines $
         [ "#if !defined(__GHCAUTOCONF_H__)"
         , "#define __GHCAUTOCONF_H__" ]
@@ -404,43 +401,12 @@ generateGhcAutoconfH = do
   where
     undefinePackage s
         | "#define PACKAGE_" `isPrefixOf` s
-            = "/* #undef " ++ takeWhile (/=' ') (drop 8 s) ++ " */"
-        | otherwise = s
-
--- | Generate @ghcversion.h@ header.
-generateGhcVersionH :: Expr String
-generateGhcVersionH = do
-    trackGenerateHs
-    fullVersion <- getSetting ProjectVersion
-    version     <- getSetting ProjectVersionInt
-    patchLevel1 <- getSetting ProjectPatchLevel1
-    patchLevel2 <- getSetting ProjectPatchLevel2
-    return . unlines $
-        [ "#if !defined(__GHCVERSION_H__)"
-        , "#define __GHCVERSION_H__"
-        , ""
-        , "#if !defined(__GLASGOW_HASKELL__)"
-        , "#define __GLASGOW_HASKELL__ " ++ version
-        , "#endif"
-        , "#if !defined(__GLASGOW_HASKELL_FULL_VERSION__)"
-        , "#define __GLASGOW_HASKELL_FULL_VERSION__ \"" ++ fullVersion ++ "\""
-        , "#endif"
-        , ""]
-        ++
-        [ "#define __GLASGOW_HASKELL_PATCHLEVEL1__ " ++ patchLevel1 | patchLevel1 /= "" ]
-        ++
-        [ "#define __GLASGOW_HASKELL_PATCHLEVEL2__ " ++ patchLevel2 | patchLevel2 /= "" ]
-        ++
-        [ ""
-        , "#define MIN_VERSION_GLASGOW_HASKELL(ma,mi,pl1,pl2) (\\"
-        , "   ((ma)*100+(mi)) <  __GLASGOW_HASKELL__ || \\"
-        , "   ((ma)*100+(mi)) == __GLASGOW_HASKELL__    \\"
-        , "          && (pl1) <  __GLASGOW_HASKELL_PATCHLEVEL1__ || \\"
-        , "   ((ma)*100+(mi)) == __GLASGOW_HASKELL__    \\"
-        , "          && (pl1) == __GLASGOW_HASKELL_PATCHLEVEL1__ \\"
-        , "          && (pl2) <= __GLASGOW_HASKELL_PATCHLEVEL2__ )"
-        , ""
-        , "#endif /* __GHCVERSION_H__ */" ]
+            = Just $ "/* #undef " ++ takeWhile (/=' ') (drop 8 s) ++ " */"
+        | "#define __GLASGOW_HASKELL" `isPrefixOf` s
+            = Nothing
+        | "/* REMOVE ME */" == s
+            = Nothing
+        | otherwise = Just s
 
 -- | Generate @Version.hs@ files.
 generateVersionHs :: Expr String

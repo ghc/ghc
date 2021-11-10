@@ -53,6 +53,23 @@ FP_PROG_SORT
 dnl ----------------------------------------------------------
 FP_SETUP_PROJECT_VERSION
 
+dnl Don't use AC_DEFINE because it will make C-style comments invalid for
+dnl Haskell.
+
+> rts/include/ghcversion.h
+
+cat rts/ghcversion.h.top                                                >> rts/include/ghcversion.h
+
+echo "#define __GLASGOW_HASKELL__ ${ProjectVersionInt}"                 >> rts/include/ghcversion.h
+echo "#define __GLASGOW_HASKELL_FULL_VERSION__ \"${ProjectVersion}\""   >> rts/include/ghcversion.h
+echo                                                                    >> rts/include/ghcversion.h
+AS_IF([test x"${ProjectPatchLevel1}" != x],
+  [echo "#define __GLASGOW_HASKELL_PATCHLEVEL1__ ${ProjectPatchLevel1}" >> rts/include/ghcversion.h])
+AS_IF([test x"${ProjectPatchLevel2}" != x],
+  [echo "#define __GLASGOW_HASKELL_PATCHLEVEL2__ ${ProjectPatchLevel2}" >> rts/include/ghcversion.h])
+
+cat rts/ghcversion.h.bottom                                             >> rts/include/ghcversion.h
+
 # Hmmm, we fix the RPM release number to 1 here... Is this convenient?
 AC_SUBST([release], [1])
 
@@ -76,6 +93,8 @@ AC_PREREQ([2.69])
 AC_CONFIG_HEADER(mk/config.h)
 # This one is manually maintained.
 AC_CONFIG_HEADER(compiler/ghc-llvm-version.h)
+dnl manually outputted above, for reasons described there.
+dnl AC_CONFIG_HEADER(rts/include/ghcversion.h)
 
 # No, semi-sadly, we don't do `--srcdir'...
 if test x"$srcdir" != 'x.' ; then
