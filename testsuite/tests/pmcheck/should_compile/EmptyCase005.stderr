@@ -2,34 +2,34 @@
 EmptyCase005.hs:24:8: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In a case alternative:
-        Patterns of type  ‘Void3’ not matched: Void3 _
+        Patterns of type ‘Void3’ not matched: Void3 _
 
 EmptyCase005.hs:67:8: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In a case alternative:
-        Patterns of type  ‘T ()’ not matched:
+        Patterns of type ‘T ()’ not matched:
             T1
             T2
 
 EmptyCase005.hs:73:8: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In a case alternative:
-        Patterns of type  ‘T Bool’ not matched:
+        Patterns of type ‘T Bool’ not matched:
             MkTBool False
             MkTBool True
 
 EmptyCase005.hs:79:8: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In a case alternative:
-        Patterns of type  ‘T Int’ not matched: MkTInt _
+        Patterns of type ‘T Int’ not matched: MkTInt _
 
 EmptyCase005.hs:91:8: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In a case alternative:
-        Patterns of type  ‘G Int’ not matched:
+        Patterns of type ‘G Int’ not matched:
             MkV False
             MkV True
 
 EmptyCase005.hs:101:8: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
-    In a case alternative: Patterns of type  ‘H Int’ not matched: _
+    In a case alternative: Patterns of type ‘H Int’ not matched: _

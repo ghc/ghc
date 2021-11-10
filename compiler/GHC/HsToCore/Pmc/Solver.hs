@@ -29,7 +29,7 @@ module GHC.HsToCore.Pmc.Solver (
         addPhiCtsNablas,
 
         isInhabited,
-        generateInhabitingPatterns
+        generateInhabitingPatterns, GenerateInhabitingPatternsMode(..)
 
     ) where
 
@@ -1790,36 +1790,51 @@ compatible.
 -- This is important for warnings. Roughly corresponds to G in Figure 6 of the
 -- LYG paper, with a few tweaks for better warning messages.
 
+-- | See Note [Case split inhabiting patterns]
+data GenerateInhabitingPatternsMode
+  = CaseSplitTopLevel
+  | MinimalCover
+  deriving (Eq, Show)
+
+instance Outputable GenerateInhabitingPatternsMode where
+  ppr = text . show
+
 -- | @generateInhabitingPatterns vs n nabla@ returns a list of at most @n@ (but
 -- perhaps empty) refinements of @nabla@ that represent inhabited patterns.
 -- Negative information is only retained if literals are involved or for
 -- recursive GADTs.
-generateInhabitingPatterns :: [Id] -> Int -> Nabla -> DsM [Nabla]
+generateInhabitingPatterns :: GenerateInhabitingPatternsMode -> [Id] -> Int -> Nabla -> DsM [Nabla]
 -- See Note [Why inhabitationTest doesn't call generateInhabitingPatterns]
-generateInhabitingPatterns _      0 _     = pure []
-generateInhabitingPatterns []     _ nabla = pure [nabla]
-generateInhabitingPatterns (x:xs) n nabla = do
-  tracePm "generateInhabitingPatterns" (ppr n <+> ppr (x:xs) $$ ppr nabla)
+generateInhabitingPatterns _    _      0 _     = pure []
+generateInhabitingPatterns _    []     _ nabla = pure [nabla]
+generateInhabitingPatterns mode (x:xs) n nabla = do
+  tracePm "generateInhabitingPatterns" (ppr mode <+> ppr n <+> ppr (x:xs) $$ ppr nabla)
   let VI _ pos neg _ _ = lookupVarInfo (nabla_tm_st nabla) x
   case pos of
     _:_ -> do
-      -- All solutions must be valid at once. Try to find candidates for their
-      -- fields. Example:
-      --   f x@(Just _) True = case x of SomePatSyn _ -> ()
-      -- after this clause, we want to report that
-      --   * @f Nothing _@ is uncovered
-      --   * @f x False@ is uncovered
-      -- where @x@ will have two possibly compatible solutions, @Just y@ for
-      -- some @y@ and @SomePatSyn z@ for some @z@. We must find evidence for @y@
-      -- and @z@ that is valid at the same time. These constitute arg_vas below.
+      -- Example for multiple solutions (must involve a PatSyn):
+      --   f x@(Just _) True | SomePatSyn _ <- x = ...
+      -- within the RHS, we know that
+      --   * @x ~ Just y@ for some @y@
+      --   * @x ~ SomePatSyn z@ for some @z@
+      -- and both conditions have to hold /at the same time/. Hence we must
+      -- find evidence for @y@ and @z@ that is valid at the same time. These
+      -- constitute arg_vas below.
       let arg_vas = concatMap paca_ids pos
-      generateInhabitingPatterns (arg_vas ++ xs) n nabla
+      generateInhabitingPatterns mode (arg_vas ++ xs) n nabla
     []
       -- When there are literals involved, just print negative info
       -- instead of listing missed constructors
       | notNull [ l | PmAltLit l <- pmAltConSetElems neg ]
-      -> generateInhabitingPatterns xs n nabla
-    [] -> try_instantiate x xs n nabla
+      -> generateInhabitingPatterns mode xs n nabla
+      -- When some constructors are impossible or when we don't care for a
+      -- minimal cover (Note [Case split inhabiting patterns]), do a case split.
+      | not (isEmptyPmAltConSet neg) || mode == CaseSplitTopLevel
+      -> try_instantiate x xs n nabla
+      -- Else don't do a case split on this var, just print a wildcard.
+      -- But try splitting for the remaining vars, of course
+      | otherwise
+      -> generateInhabitingPatterns mode xs n nabla
   where
     -- | Tries to instantiate a variable by possibly following the chain of
     -- newtypes and then instantiating to all ConLikes of the wrapped type's
@@ -1843,14 +1858,14 @@ generateInhabitingPatterns (x:xs) n nabla = do
           case NE.nonEmpty (uniqDSetToList . cmConLikes <$> clss) of
             Nothing ->
               -- No COMPLETE sets ==> inhabited
-              generateInhabitingPatterns xs n newty_nabla
+              generateInhabitingPatterns mode xs n newty_nabla
             Just clss -> do
               -- Try each COMPLETE set, pick the one with the smallest number of
               -- inhabitants
               nablass' <- forM clss (instantiate_cons y rep_ty xs n newty_nabla)
               let nablas' = minimumBy (comparing length) nablass'
               if null nablas' && vi_bot vi /= IsNotBot
-                then generateInhabitingPatterns xs n newty_nabla -- bot is still possible. Display a wildcard!
+                then generateInhabitingPatterns mode xs n newty_nabla -- bot is still possible. Display a wildcard!
                 else pure nablas'
 
     -- | Instantiates a chain of newtypes, beginning at @x@.
@@ -1871,7 +1886,7 @@ generateInhabitingPatterns (x:xs) n nabla = do
     instantiate_cons _ ty xs n nabla _
       -- We don't want to expose users to GHC-specific constructors for Int etc.
       | fmap (isTyConTriviallyInhabited . fst) (splitTyConApp_maybe ty) == Just True
-      = generateInhabitingPatterns xs n nabla
+      = generateInhabitingPatterns mode xs n nabla
     instantiate_cons x ty xs n nabla (cl:cls) = do
       -- The following line is where we call out to the inhabitationTest!
       mb_nabla <- runMaybeT $ instCon 4 nabla x cl
@@ -1886,7 +1901,7 @@ generateInhabitingPatterns (x:xs) n nabla = do
         -- NB: We don't prepend arg_vars as we don't have any evidence on
         -- them and we only want to split once on a data type. They are
         -- inhabited, otherwise the inhabitation test would have refuted.
-        Just nabla' -> generateInhabitingPatterns xs n nabla'
+        Just nabla' -> generateInhabitingPatterns mode xs n nabla'
       other_cons_nablas <- instantiate_cons x ty xs (n - length con_nablas) nabla cls
       pure (con_nablas ++ other_cons_nablas)
 
@@ -1912,7 +1927,7 @@ pickApplicableCompleteSets ty_st ty rcm = do
   return applicable_cms
 
 {- Note [Why inhabitationTest doesn't call generateInhabitingPatterns]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Why can't we define `inhabitationTest` (IT) in terms of
 `generateInhabitingPatterns` (GIP) as
 
@@ -1932,4 +1947,36 @@ efficient IT on huge enumerations.
 But we still need GIP to produce the Nablas as proxies for
 uncovered patterns that we display warnings for. It's fine to pay this price
 once at the end, but IT is called far more often than that.
+
+Note [Case split inhabiting patterns]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When we have an -XEmptyCase,
+```hs
+f :: Maybe a -> ()
+f x = case x of {}
+```
+we want to show the different missing patterns {'Just _', 'Nothing'} to the user
+instead of an uninformative wildcard pattern '_'.
+
+But when we have a match as part of a function definition, such as
+```hs
+g :: (Bool, [a]) -> ()
+g (_, []) = ()
+```
+we established in #20642 that we *do not* want to report P1={'(False, (_:_))',
+'(True, (_:_))'} when we could just give the singleton set P2={'(_, (_:_))'}!
+The latter set M is a "minimal cover" of the space of missing patterns S, in
+that
+
+1. The union of M is *exactly* S
+2. The size of M is minimal under all such candidates.
+
+In terms of 'g', P2 satisfies both (1) and (2). While P1 satisfies (1), it does
+not satisfy (2). The set {'_'} satisfies (2), but it does not satisfy (1) as
+it also covers the pattern '(_,[])' which is not part of the space of missing
+patterns of 'g', so it would be a bad (too conservative) suggestion.
+
+Note that for -XEmptyCase, we don't want to emit a minimal cover. We arrange
+that by passing 'CaseSplitTopLevel' to 'generateInhabitingPatterns'. We detect
+the -XEmptyCase case in 'reportWarnings' by looking for 'ReportEmptyCase'.
 -}

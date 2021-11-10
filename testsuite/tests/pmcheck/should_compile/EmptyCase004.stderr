@@ -1,37 +1,37 @@
 
 EmptyCase004.hs:15:6: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
-    In a case alternative: Patterns of type  ‘A Bool’ not matched: A2
+    In a case alternative: Patterns of type ‘A Bool’ not matched: A2
 
 EmptyCase004.hs:19:6: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In a case alternative:
-        Patterns of type  ‘A a’ not matched:
+        Patterns of type ‘A a’ not matched:
             A1
             A2
 
 EmptyCase004.hs:31:8: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
-    In a case alternative: Patterns of type  ‘B a a’ not matched: B1 _
+    In a case alternative: Patterns of type ‘B a a’ not matched: B1 _
 
 EmptyCase004.hs:35:6: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In a case alternative:
-        Patterns of type  ‘B a b’ not matched:
+        Patterns of type ‘B a b’ not matched:
             B1 _
             B2
 
 EmptyCase004.hs:47:6: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In a case alternative:
-        Patterns of type  ‘A a’ not matched:
+        Patterns of type ‘A a’ not matched:
             A1
             A2
 
 EmptyCase004.hs:50:9: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
-    In a case alternative: Patterns of type  ‘B a b’ not matched: B2
+    In a case alternative: Patterns of type ‘B a b’ not matched: B2
 
 EmptyCase004.hs:51:9: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
-    In a case alternative: Patterns of type  ‘B a b’ not matched: B1 _
+    In a case alternative: Patterns of type ‘B a b’ not matched: B1 _

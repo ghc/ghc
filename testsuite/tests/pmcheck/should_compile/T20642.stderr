@@ -1,0 +1,17 @@
+
+T20642.hs:10:3: warning: [-Wincomplete-uni-patterns (in -Wall)]
+    Pattern match(es) are non-exhaustive
+    In a pattern binding:
+        Patterns of type ‘([a], [a])’ not matched: (_, [])
+
+T20642.hs:14:7: warning: [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In a case alternative:
+        Patterns of type ‘Maybe a’ not matched:
+            Nothing
+            Just _
+
+T20642.hs:18:1: warning: [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In an equation for ‘g’:
+        Patterns of type ‘(Bool, [a])’ not matched: (_, (_:_))

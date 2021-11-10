@@ -5,15 +5,12 @@ T18932.hs:10:1: warning: [-Woverlapping-patterns (in -Wdefault)]
 
 T18932.hs:12:1: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
-    In an equation for ‘f'’:
-        Patterns of type  ‘T a’ not matched: MkT2 _
+    In an equation for ‘f'’: Patterns of type ‘T a’ not matched: MkT2 _
 
 T18932.hs:14:1: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In an equation for ‘g’:
-        Patterns of type  ‘T a’, ‘T a’, ‘T a’ not matched:
-            (MkT2 _) (MkT1 _) (MkT1 _)
-            (MkT2 _) (MkT1 _) (MkT2 _)
-            (MkT2 _) (MkT2 _) (MkT1 _)
-            (MkT2 _) (MkT2 _) (MkT2 _)
-            ...
+        Patterns of type ‘T a’, ‘T a’, ‘T a’ not matched:
+            (MkT2 _) _ _
+            (MkT1 _) (MkT2 _) _
+            (MkT1 _) (MkT1 _) (MkT2 _)

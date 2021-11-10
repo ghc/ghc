@@ -2,5 +2,4 @@
 pmc009.hs:6:1: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In an equation for ‘addPatSynSelector’:
-        Patterns of type  ‘GenLocated l (HsBindLR idL idR)’ not matched:
-            L _ _
+        Patterns of type ‘GenLocated l (HsBindLR idL idR)’ not matched: _

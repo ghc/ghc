@@ -5,8 +5,8 @@ T18960b.hs:11:7: warning: [-Wincomplete-patterns (in -Wextra)]
         Patterns of type ‘((), String)’ not matched:
             (_, _)
             P ((), [])
-            P ((), [p]) where p is not one of {'h'}
-            P ((), (p:_:_)) where p is not one of {'h'}
+            P ((), (p:_)) where p is not one of {'h'}
+            P ((), ['h'])
             ...
 
 T18960b.hs:18:7: warning: [-Wincomplete-patterns (in -Wextra)]
@@ -15,6 +15,6 @@ T18960b.hs:18:7: warning: [-Wincomplete-patterns (in -Wextra)]
         Patterns of type ‘((), String)’ not matched:
             (_, _)
             P ((), [])
-            P ((), [p]) where p is not one of {'h'}
-            P ((), (p:_:_)) where p is not one of {'h'}
+            P ((), (p:_)) where p is not one of {'h'}
+            P ((), ['h'])
             ...

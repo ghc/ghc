@@ -2,9 +2,9 @@
 T9951b.hs:7:1: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In an equation for ‘f’:
-        Patterns of type  ‘String’ not matched:
+        Patterns of type ‘String’ not matched:
             []
-            [p] where p is not one of {'a'}
-            (p:_:_) where p is not one of {'a'}
+            (p:_) where p is not one of {'a'}
             ['a']
+            ('a':p:_) where p is not one of {'b'}
             ...

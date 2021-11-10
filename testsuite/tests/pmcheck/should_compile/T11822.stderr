@@ -2,16 +2,15 @@
 T11822.hs:33:1: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In an equation for ‘mkTreeNode’:
-        Patterns of type  ‘prefix’, ‘Seq SiblingDependencies’,
-                          ‘Set prefix’, ‘Depth’ not matched:
-            _ (Data.Sequence.Internal.Seq Data.Sequence.Internal.EmptyT)
-            (Data.Set.Internal.Bin _ _ _ _) (Depth _)
-            _ (Data.Sequence.Internal.Seq Data.Sequence.Internal.EmptyT)
-            Data.Set.Internal.Tip (Depth _)
-            _ (Data.Sequence.Internal.Seq (Data.Sequence.Internal.Single _))
-            (Data.Set.Internal.Bin _ _ _ _) (Depth _)
-            _ (Data.Sequence.Internal.Seq (Data.Sequence.Internal.Single _))
-            Data.Set.Internal.Tip (Depth _)
+        Patterns of type ‘prefix’, ‘Seq SiblingDependencies’, ‘Set prefix’,
+                         ‘Depth’ not matched:
+            _ (Data.Sequence.Internal.Seq Data.Sequence.Internal.EmptyT) _ _
+            _ (Data.Sequence.Internal.Seq (Data.Sequence.Internal.Single _)) _
+            _
+            _
+            (Data.Sequence.Internal.Seq (Data.Sequence.Internal.Deep _ _ _ _))
+            _ _
+            _ (Data.Sequence.Internal.Seq Data.Sequence.Internal.EmptyT) _ _
             ...
 
 T11822.hs:33:1: warning:
@@ -21,4 +20,3 @@ T11822.hs:33:1: warning:
       • Patterns reported as unmatched might actually be matched
     Suggested fix:
       Increase the limit or resolve the warnings to suppress this message.
-

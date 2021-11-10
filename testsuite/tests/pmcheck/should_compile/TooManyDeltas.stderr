@@ -1,12 +1,7 @@
 
 TooManyDeltas.hs:14:1: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
-    In an equation for ‘f’:
-        Patterns of type  ‘T’, ‘T’ not matched:
-            A A
-            A B
-            B A
-            B B
+    In an equation for ‘f’: Patterns of type ‘T’, ‘T’ not matched: _ _
 
 TooManyDeltas.hs:14:1: warning:
     Pattern match checker ran into -fmax-pmcheck-models=0 limit, so
