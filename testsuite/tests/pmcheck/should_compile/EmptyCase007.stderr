@@ -2,30 +2,30 @@
 EmptyCase007.hs:21:7: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In a case alternative:
-        Patterns of type  ‘Foo2 a’ not matched: Foo2 _
+        Patterns of type ‘Foo2 a’ not matched: Foo2 _
 
 EmptyCase007.hs:25:7: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In a case alternative:
-        Patterns of type  ‘Foo2 (a, a)’ not matched: Foo2 _
+        Patterns of type ‘Foo2 (a, a)’ not matched: Foo2 _
 
 EmptyCase007.hs:33:7: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In a case alternative:
-        Patterns of type  ‘Foo2 Int’ not matched: Foo2 (_, _)
+        Patterns of type ‘Foo2 Int’ not matched: Foo2 (_, _)
 
 EmptyCase007.hs:37:7: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In a case alternative:
-        Patterns of type  ‘Foo2 Char’ not matched: Foo2 _
+        Patterns of type ‘Foo2 Char’ not matched: Foo2 _
 
 EmptyCase007.hs:44:17: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
-    In a case alternative: Patterns of type  ‘FA Char’ not matched: _
+    In a case alternative: Patterns of type ‘FA Char’ not matched: _
 
 EmptyCase007.hs:48:7: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In a case alternative:
-        Patterns of type  ‘Foo2 [Int]’ not matched:
+        Patterns of type ‘Foo2 [Int]’ not matched:
             Foo2 []
             Foo2 (_:_)

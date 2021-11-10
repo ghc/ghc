@@ -4,9 +4,9 @@ T19709d.hs:6:2: warning: [-Wincomplete-patterns (in -Wextra)]
     In a case alternative:
         Patterns of type ‘String’ not matched:
             []
-            [p] where p is not one of {'h'}
-            (p:_:_) where p is not one of {'h'}
+            (p:_) where p is not one of {'h'}
             ['h']
+            ('h':p:_) where p is not one of {'e'}
             ...
 
 T19709d.hs:1:1: error:

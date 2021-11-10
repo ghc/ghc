@@ -1,14 +1,14 @@
 
 EmptyCase009.hs:21:9: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
-    In a case alternative: Patterns of type  ‘Bar f’ not matched: Bar _
+    In a case alternative: Patterns of type ‘Bar f’ not matched: Bar _
 
 EmptyCase009.hs:33:7: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In a case alternative:
-        Patterns of type  ‘Bar (DB ())’ not matched: Bar MkDB2_u
+        Patterns of type ‘Bar (DB ())’ not matched: Bar MkDB2_u
 
 EmptyCase009.hs:42:7: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In a case alternative:
-        Patterns of type  ‘Bar GB’ not matched: Bar MkGB3
+        Patterns of type ‘Bar GB’ not matched: Bar MkGB3

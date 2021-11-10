@@ -1,7 +1,8 @@
 
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GADTs             #-}
-{-# LANGUAGE LambdaCase        #-}
+{-# LANGUAGE FlexibleInstances  #-}
+{-# LANGUAGE GADTs              #-}
+{-# LANGUAGE LambdaCase         #-}
+{-# LANGUAGE StandaloneDeriving #-}
 
 -- | This module coverage checks pattern matches. It finds
 --
@@ -105,7 +106,7 @@ pmcPatBind ctxt@(DsMatchContext PatBindRhs loc) var p = do
   tracePm "pmcPatBind {" (vcat [ppr ctxt, ppr var, ppr p, ppr pat_bind, ppr missing])
   result <- unCA (checkPatBind pat_bind) missing
   tracePm "}: " (ppr (cr_uncov result))
-  formatReportWarnings cirbsPatBind ctxt [var] result
+  formatReportWarnings ReportPatBind ctxt [var] result
 pmcPatBind _ _ _ = pure ()
 
 -- | Exhaustive for guard matches, is used for guards in pattern bindings and
@@ -126,7 +127,7 @@ pmcGRHSs hs_ctxt guards@(GRHSs _ grhss _) = do
                                 (pprGRHSs hs_ctxt guards $$ ppr missing))
   result <- unCA (checkGRHSs matches) missing
   tracePm "}: " (ppr (cr_uncov result))
-  formatReportWarnings cirbsGRHSs ctxt [] result
+  formatReportWarnings ReportGRHSs ctxt [] result
   return (ldiGRHSs (cr_ret result))
 
 -- | Check a list of syntactic 'Match'es (part of case, functions, etc.), each
@@ -166,7 +167,7 @@ pmcMatches ctxt vars matches = {-# SCC "pmcMatches" #-} do
       empty_case <- noCheckDs $ desugarEmptyCase var
       result <- unCA (checkEmptyCase empty_case) missing
       tracePm "}: " (ppr (cr_uncov result))
-      formatReportWarnings cirbsEmptyCase ctxt vars result
+      formatReportWarnings ReportEmptyCase ctxt vars result
       return []
     Just matches -> do
       matches <- {-# SCC "desugarMatches" #-}
@@ -174,7 +175,7 @@ pmcMatches ctxt vars matches = {-# SCC "pmcMatches" #-} do
       result  <- {-# SCC "checkMatchGroup" #-}
                  unCA (checkMatchGroup matches) missing
       tracePm "}: " (ppr (cr_uncov result))
-      {-# SCC "formatReportWarnings" #-} formatReportWarnings cirbsMatchGroup ctxt vars result
+      {-# SCC "formatReportWarnings" #-} formatReportWarnings ReportMatchGroup ctxt vars result
       return (NE.toList (ldiMatchGroup (cr_ret result)))
 
 {- Note [pmcPatBind only checks PatBindRhs]
@@ -317,25 +318,45 @@ We detect an inaccessible RHS simply by pretending it's redundant, until we see
 -- * Formatting and reporting warnings
 --
 
--- | Given a function that collects 'CIRB's, this function will emit warnings
+-- | A datatype to accomodate the different call sites of
+-- 'formatReportWarnings'. Used for extracting 'CIRB's from a concrete 'ann'
+-- through 'collectInMode'. Since this is only possible for a couple of
+-- well-known 'ann's, this is a GADT.
+data FormatReportWarningsMode ann where
+  ReportPatBind :: FormatReportWarningsMode (PmPatBind Post)
+  ReportGRHSs   :: FormatReportWarningsMode (PmGRHSs Post)
+  ReportMatchGroup:: FormatReportWarningsMode (PmMatchGroup Post)
+  ReportEmptyCase:: FormatReportWarningsMode PmEmptyCase
+
+deriving instance Eq (FormatReportWarningsMode ann)
+
+-- | A function collecting 'CIRB's for each of the different
+-- 'FormatReportWarningsMode's.
+collectInMode :: FormatReportWarningsMode ann -> ann -> DsM CIRB
+collectInMode ReportPatBind    = cirbsPatBind
+collectInMode ReportGRHSs      = cirbsGRHSs
+collectInMode ReportMatchGroup = cirbsMatchGroup
+collectInMode ReportEmptyCase  = cirbsEmptyCase
+
+-- | Given a 'FormatReportWarningsMode', this function will emit warnings
 -- for a 'CheckResult'.
-formatReportWarnings :: (ann -> DsM CIRB) -> DsMatchContext -> [Id] -> CheckResult ann -> DsM ()
-formatReportWarnings collect ctx vars cr@CheckResult { cr_ret = ann } = do
-  cov_info <- collect ann
+formatReportWarnings :: FormatReportWarningsMode ann -> DsMatchContext -> [Id] -> CheckResult ann -> DsM ()
+formatReportWarnings report_mode ctx vars cr@CheckResult { cr_ret = ann } = do
+  cov_info <- collectInMode report_mode ann
   dflags <- getDynFlags
-  reportWarnings dflags ctx vars cr{cr_ret=cov_info}
+  reportWarnings dflags report_mode ctx vars cr{cr_ret=cov_info}
 
 -- | Issue all the warnings
 -- (redundancy, inaccessibility, exhaustiveness, redundant bangs).
-reportWarnings :: DynFlags -> DsMatchContext -> [Id] -> CheckResult CIRB -> DsM ()
-reportWarnings dflags (DsMatchContext kind loc) vars
+reportWarnings :: DynFlags -> FormatReportWarningsMode ann -> DsMatchContext -> [Id] -> CheckResult CIRB -> DsM ()
+reportWarnings dflags report_mode (DsMatchContext kind loc) vars
   CheckResult { cr_ret    = CIRB { cirb_inacc = inaccessible_rhss
                                  , cirb_red   = redundant_rhss
                                  , cirb_bangs = redundant_bangs }
               , cr_uncov  = uncovered
               , cr_approx = precision }
   = when (flag_i || flag_u || flag_b) $ do
-      unc_examples <- getNFirstUncovered vars (maxPatterns + 1) uncovered
+      unc_examples <- getNFirstUncovered gen_mode vars (maxPatterns + 1) uncovered
       let exists_r = flag_i && notNull redundant_rhss
           exists_i = flag_i && notNull inaccessible_rhss
           exists_u = flag_u && notNull unc_examples
@@ -360,16 +381,19 @@ reportWarnings dflags (DsMatchContext kind loc) vars
     flag_u = exhaustive dflags kind
     flag_b = redundantBang dflags
     check_type = ExhaustivityCheckType (exhaustiveWarningFlag kind)
+    gen_mode = case report_mode of -- See Note [Case split inhabiting patterns]
+      ReportEmptyCase -> CaseSplitTopLevel
+      _               -> MinimalCover
 
     maxPatterns = maxUncoveredPatterns dflags
 
-getNFirstUncovered :: [Id] -> Int -> Nablas -> DsM [Nabla]
-getNFirstUncovered vars n (MkNablas nablas) = go n (bagToList nablas)
+getNFirstUncovered :: GenerateInhabitingPatternsMode -> [Id] -> Int -> Nablas -> DsM [Nabla]
+getNFirstUncovered mode vars n (MkNablas nablas) = go n (bagToList nablas)
   where
     go 0 _              = pure []
     go _ []             = pure []
     go n (nabla:nablas) = do
-      front <- generateInhabitingPatterns vars n nabla
+      front <- generateInhabitingPatterns mode vars n nabla
       back <- go (n - length front) nablas
       pure (front ++ back)
 

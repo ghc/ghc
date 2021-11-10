@@ -2,4 +2,4 @@
 T15305.hs:48:23: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In a case alternative:
-        Patterns of type  ‘Abyss’ not matched: MkAbyss _
+        Patterns of type ‘Abyss’ not matched: MkAbyss _

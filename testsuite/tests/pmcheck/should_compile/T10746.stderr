@@ -2,6 +2,6 @@
 T10746.hs:9:10: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In a case alternative:
-        Patterns of type  ‘Bool’ not matched:
+        Patterns of type ‘Bool’ not matched:
             False
             True

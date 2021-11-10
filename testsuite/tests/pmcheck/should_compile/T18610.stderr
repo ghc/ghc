@@ -6,7 +6,7 @@ T18610.hs:15:3: warning: [-Woverlapping-patterns (in -Wdefault)]
 T18610.hs:24:7: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In a case alternative:
-        Patterns of type ‘(Bool, Bool)’ not matched: (_, _)
+        Patterns of type ‘(Bool, Bool)’ not matched: _
 
 T18610.hs:53:3: warning: [-Winaccessible-code (in -Wdefault)]
     • Couldn't match type ‘Bool’ with ‘Int’
