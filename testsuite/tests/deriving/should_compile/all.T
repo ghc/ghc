@@ -122,6 +122,7 @@ test('T15831', normal, compile, [''])
 test('T16179', normal, compile, [''])
 test('T16341', normal, compile, [''])
 test('T16518', normal, compile, [''])
+test('T17240', normal, compile, ['-ddump-deriv -dsuppress-uniques'])
 test('T17324', normal, compile, [''])
 test('T17339', normal, compile,
      ['-ddump-simpl -dsuppress-idinfo -dno-typeable-binds'])
