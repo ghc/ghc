@@ -1350,16 +1350,13 @@ mk_eqn_from_mechanism mechanism
 
 mk_eqn_stock :: DerivInstTys -- Information about the arguments to the class
              -> DerivM EarlyDerivSpec
-mk_eqn_stock dit@(DerivInstTys { dit_cls_tys = cls_tys
-                               , dit_tc      = tc
-                               , dit_rep_tc  = rep_tc })
+mk_eqn_stock dit
   = do DerivEnv { denv_cls  = cls
                 , denv_ctxt = deriv_ctxt } <- ask
        dflags <- getDynFlags
        let isDeriveAnyClassEnabled =
              deriveAnyClassEnabled (xopt LangExt.DeriveAnyClass dflags)
-       case checkOriginativeSideConditions dflags deriv_ctxt cls cls_tys
-                                           tc rep_tc of
+       case checkOriginativeSideConditions dflags deriv_ctxt cls dit of
          CanDeriveStock gen_fn -> mk_eqn_from_mechanism $
                                   DerivSpecStock { dsm_stock_dit    = dit
                                                  , dsm_stock_gen_fn = gen_fn }
@@ -1431,9 +1428,8 @@ mk_eqn_no_strategy = do
     -- Use heuristics (checkOriginativeSideConditions) to determine whether
     -- stock or anyclass deriving should be used.
     mk_eqn_originative :: DerivInstTys -> DerivM EarlyDerivSpec
-    mk_eqn_originative dit@(DerivInstTys { dit_cls_tys = cls_tys
-                                         , dit_tc      = tc
-                                         , dit_rep_tc  = rep_tc }) = do
+    mk_eqn_originative dit@(DerivInstTys { dit_tc     = tc
+                                         , dit_rep_tc = rep_tc }) = do
       DerivEnv { denv_cls  = cls
                , denv_ctxt = deriv_ctxt } <- ask
       dflags <- getDynFlags
@@ -1447,8 +1443,7 @@ mk_eqn_no_strategy = do
             | otherwise
             = DerivErrNotStockDeriveable isDeriveAnyClassEnabled
 
-      case checkOriginativeSideConditions dflags deriv_ctxt cls
-             cls_tys tc rep_tc of
+      case checkOriginativeSideConditions dflags deriv_ctxt cls dit of
         NonDerivableClass     -> derivingThingFailWith NoGeneralizedNewtypeDeriving dac_error
         StockClassError why   -> derivingThingFailWith NoGeneralizedNewtypeDeriving why
         CanDeriveStock gen_fn -> mk_eqn_from_mechanism $
@@ -1476,7 +1471,6 @@ mkNewTypeEqn :: Bool -- Was this instance derived using an explicit @newtype@
                      -- deriving strategy?
              -> DerivInstTys -> DerivM EarlyDerivSpec
 mkNewTypeEqn newtype_strat dit@(DerivInstTys { dit_cls_tys     = cls_tys
-                                             , dit_tc          = tycon
                                              , dit_rep_tc      = rep_tycon
                                              , dit_rep_tc_args = rep_tc_args })
 -- Want: instance (...) => cls (cls_tys ++ [tycon tc_args]) where ...
@@ -1573,8 +1567,7 @@ mkNewTypeEqn newtype_strat dit@(DerivInstTys { dit_cls_tys     = cls_tys
              && ((newtype_deriving && not deriveAnyClass)
                   || std_class_via_coercible cls)
          then mk_eqn_newtype dit rep_inst_ty
-         else case checkOriginativeSideConditions dflags deriv_ctxt cls cls_tys
-                                                 tycon rep_tycon of
+         else case checkOriginativeSideConditions dflags deriv_ctxt cls dit of
                StockClassError why
                  -- There's a particular corner case where
                  --
@@ -2017,12 +2010,9 @@ genDerivStuff mechanism loc clas inst_tys tyvars
         -> gen_newtype_or_via rhs_ty
 
       -- Try a stock deriver
-      DerivSpecStock { dsm_stock_dit    = DerivInstTys
-                        { dit_rep_tc = rep_tc
-                        , dit_rep_tc_args = rep_tc_args
-                        }
+      DerivSpecStock { dsm_stock_dit    = dit
                      , dsm_stock_gen_fn = gen_fn }
-        -> gen_fn loc rep_tc rep_tc_args inst_tys
+        -> gen_fn loc inst_tys dit
 
       -- Try DeriveAnyClass
       DerivSpecAnyClass -> do

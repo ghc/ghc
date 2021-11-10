@@ -9,7 +9,7 @@
 -- | Error-checking and other utilities for @deriving@ clauses or declarations.
 module GHC.Tc.Deriv.Utils (
         DerivM, DerivEnv(..),
-        DerivSpec(..), pprDerivSpec, DerivInstTys(..),
+        DerivSpec(..), pprDerivSpec,
         DerivSpecMechanism(..), derivSpecMechanismToStrategy, isDerivSpecStock,
         isDerivSpecNewtype, isDerivSpecAnyClass, isDerivSpecVia,
         DerivContext(..), OriginativeDerivStatus(..),
@@ -179,35 +179,6 @@ pprDerivSpec (DS { ds_loc = l, ds_name = n, ds_tvs = tvs, ds_cls = c,
 instance Outputable theta => Outputable (DerivSpec theta) where
   ppr = pprDerivSpec
 
--- | Information about the arguments to the class in a stock- or
--- newtype-derived instance.
--- See @Note [DerivEnv and DerivSpecMechanism]@.
-data DerivInstTys = DerivInstTys
-  { dit_cls_tys     :: [Type]
-    -- ^ Other arguments to the class except the last
-  , dit_tc          :: TyCon
-    -- ^ Type constructor for which the instance is requested
-    --   (last arguments to the type class)
-  , dit_tc_args     :: [Type]
-    -- ^ Arguments to the type constructor
-  , dit_rep_tc      :: TyCon
-    -- ^ The representation tycon for 'dit_tc'
-    --   (for data family instances). Otherwise the same as 'dit_tc'.
-  , dit_rep_tc_args :: [Type]
-    -- ^ The representation types for 'dit_tc_args'
-    --   (for data family instances). Otherwise the same as 'dit_tc_args'.
-  }
-
-instance Outputable DerivInstTys where
-  ppr (DerivInstTys { dit_cls_tys = cls_tys, dit_tc = tc, dit_tc_args = tc_args
-                    , dit_rep_tc = rep_tc, dit_rep_tc_args = rep_tc_args })
-    = hang (text "DITTyConHead")
-         2 (vcat [ text "dit_cls_tys"     <+> ppr cls_tys
-                 , text "dit_tc"          <+> ppr tc
-                 , text "dit_tc_args"     <+> ppr tc_args
-                 , text "dit_rep_tc"      <+> ppr rep_tc
-                 , text "dit_rep_tc_args" <+> ppr rep_tc_args ])
-
 -- | What action to take in order to derive a class instance.
 -- See @Note [DerivEnv and DerivSpecMechanism]@, as well as
 -- @Note [Deriving strategies]@ in "GHC.Tc.Deriv".
@@ -219,9 +190,8 @@ data DerivSpecMechanism
       -- instance, including what type constructor the last argument is
       -- headed by. See @Note [DerivEnv and DerivSpecMechanism]@.
     , dsm_stock_gen_fn ::
-        SrcSpan -> TyCon  -- dit_rep_tc
-                -> [Type] -- dit_rep_tc_args
-                -> [Type] -- inst_tys
+        SrcSpan -> [Type]       -- inst_tys
+                -> DerivInstTys -- dsm_stock_dit
                 -> TcM (LHsBinds GhcPs, [LSig GhcPs], BagDerivStuff, [Name])
       -- ^ This function returns four things:
       --
@@ -429,7 +399,7 @@ instance Outputable DerivContext where
 -- See @Note [Deriving strategies]@ in "GHC.Tc.Deriv".
 data OriginativeDerivStatus
   = CanDeriveStock            -- Stock class, can derive
-      (SrcSpan -> TyCon -> [Type] -> [Type]
+      (SrcSpan -> [Type] -> DerivInstTys
                -> TcM (LHsBinds GhcPs, [LSig GhcPs], BagDerivStuff, [Name]))
   | StockClassError !DeriveInstanceErrReason -- Stock class, but can't do it
   | CanDeriveAnyClass         -- See Note [Deriving any class]
@@ -565,18 +535,16 @@ is willing to support it.
 
 hasStockDeriving
   :: Class -> Maybe (SrcSpan
-                     -> TyCon
                      -> [Type]
-                     -> [Type]
+                     -> DerivInstTys
                      -> TcM (LHsBinds GhcPs, [LSig GhcPs], BagDerivStuff, [Name]))
 hasStockDeriving clas
   = assocMaybe gen_list (getUnique clas)
   where
     gen_list
       :: [(Unique, SrcSpan
-                   -> TyCon
                    -> [Type]
-                   -> [Type]
+                   -> DerivInstTys
                    -> TcM (LHsBinds GhcPs, [LSig GhcPs], BagDerivStuff, [Name]))]
     gen_list = [ (eqClassKey,          simpleM gen_Eq_binds)
                , (ordClassKey,         simpleM gen_Ord_binds)
@@ -593,27 +561,28 @@ hasStockDeriving clas
                , (genClassKey,         generic (gen_Generic_binds Gen0))
                , (gen1ClassKey,        generic (gen_Generic_binds Gen1)) ]
 
-    simple gen_fn loc tc tc_args _
-      = let (binds, deriv_stuff) = gen_fn loc tc tc_args
+    simple gen_fn loc _ dit
+      = let (binds, deriv_stuff) = gen_fn loc dit
         in return (binds, [], deriv_stuff, [])
 
     -- Like `simple`, but monadic. The only monadic thing that these functions
     -- do is allocate new Uniques, which are used for generating the names of
     -- auxiliary bindings.
     -- See Note [Auxiliary binders] in GHC.Tc.Deriv.Generate.
-    simpleM gen_fn loc tc tc_args _
-      = do { (binds, deriv_stuff) <- gen_fn loc tc tc_args
+    simpleM gen_fn loc _ dit
+      = do { (binds, deriv_stuff) <- gen_fn loc dit
            ; return (binds, [], deriv_stuff, []) }
 
-    read_or_show gen_fn loc tc tc_args _
-      = do { fix_env <- getDataConFixityFun tc
-           ; let (binds, deriv_stuff) = gen_fn fix_env loc tc tc_args
+    read_or_show gen_fn loc _ dit
+      = do { let tc = dit_rep_tc dit
+           ; fix_env <- getDataConFixityFun tc
+           ; let (binds, deriv_stuff) = gen_fn fix_env loc dit
                  field_names          = all_field_names tc
            ; return (binds, [], deriv_stuff, field_names) }
 
-    generic gen_fn _ tc _ inst_tys
-      = do { (binds, sigs, faminst) <- gen_fn tc inst_tys
-           ; let field_names = all_field_names tc
+    generic gen_fn _ inst_tys dit
+      = do { (binds, sigs, faminst) <- gen_fn inst_tys dit
+           ; let field_names = all_field_names (dit_rep_tc dit)
            ; return (binds, sigs, unitBag (DerivFamInst faminst), field_names) }
 
     -- See Note [Deriving and unused record selectors]
@@ -680,13 +649,13 @@ getDataConFixityFun tc
 -- family tycon (with indexes) in error messages.
 
 checkOriginativeSideConditions
-  :: DynFlags -> DerivContext -> Class -> [TcType]
-  -> TyCon -> TyCon
+  :: DynFlags -> DerivContext -> Class -> DerivInstTys
   -> OriginativeDerivStatus
-checkOriginativeSideConditions dflags deriv_ctxt cls cls_tys tc rep_tc
+checkOriginativeSideConditions dflags deriv_ctxt cls
+                               dit@(DerivInstTys{dit_cls_tys = cls_tys})
     -- First, check if stock deriving is possible...
   | Just cond <- stockSideConditions deriv_ctxt cls
-  = case (cond dflags tc rep_tc) of
+  = case cond dflags dit of
         NotValid err -> StockClassError err  -- Class-specific error
         IsValid  | null (filterOutInvisibleTypes (classTyCon cls) cls_tys)
                    -- All stock derivable classes are unary in the sense that
@@ -758,20 +727,16 @@ stockSideConditions deriv_ctxt cls
 type Condition
    = DynFlags
 
-  -> TyCon    -- ^ The data type's 'TyCon'. For data families, this is the
-              -- family 'TyCon'.
-
-  -> TyCon    -- ^ For data families, this is the representation 'TyCon'.
-              -- Otherwise, this is the same as the other 'TyCon' argument.
+  -> DerivInstTys -- ^ Information about the type arguments to the class.
 
   -> Validity' DeriveInstanceErrReason
-     -- ^ 'IsValid' if deriving an instance for this 'TyCon' is
+     -- ^ 'IsValid' if deriving an instance for this type is
      -- possible. Otherwise, it's @'NotValid' err@, where @err@
      -- explains what went wrong.
 
 andCond :: Condition -> Condition -> Condition
-andCond c1 c2 dflags tc rep_tc
-  = c1 dflags tc rep_tc `andValid` c2 dflags tc rep_tc
+andCond c1 c2 dflags dit
+  = c1 dflags dit `andValid` c2 dflags dit
 
 -- | Some common validity checks shared among stock derivable classes. One
 -- check that absolutely must hold is that if an instance @C (T a)@ is being
@@ -801,7 +766,8 @@ cond_stdOK
                   -- the -XEmptyDataDeriving extension.
 
   -> Condition
-cond_stdOK deriv_ctxt permissive dflags tc rep_tc
+cond_stdOK deriv_ctxt permissive dflags
+           dit@(DerivInstTys{dit_tc = tc, dit_rep_tc = rep_tc})
   = valid_ADT `andValid` valid_misc
   where
     valid_ADT, valid_misc :: Validity' DeriveInstanceErrReason
@@ -822,7 +788,7 @@ cond_stdOK deriv_ctxt permissive dflags tc rep_tc
          InferContext wildcard
            | null data_cons -- 1.
            , not permissive
-           -> checkFlag LangExt.EmptyDataDeriving dflags tc rep_tc `orValid`
+           -> checkFlag LangExt.EmptyDataDeriving dflags dit `orValid`
               NotValid (no_cons_why rep_tc)
            | not (null con_whys)
            -> NotValid $ DerivErrBadConstructor (Just $ has_wildcard wildcard) con_whys
@@ -856,14 +822,14 @@ no_cons_why :: TyCon -> DeriveInstanceErrReason
 no_cons_why = DerivErrNoConstructors
 
 cond_RepresentableOk :: Condition
-cond_RepresentableOk _ _ rep_tc =
-  case canDoGenerics rep_tc of
+cond_RepresentableOk _ dit =
+  case canDoGenerics dit of
     IsValid -> IsValid
     NotValid generic_errs -> NotValid $ DerivErrGenerics generic_errs
 
 cond_Representable1Ok :: Condition
-cond_Representable1Ok _ _ rep_tc =
-  case canDoGenerics1 rep_tc of
+cond_Representable1Ok _ dit =
+  case canDoGenerics1 dit of
     IsValid -> IsValid
     NotValid generic_errs -> NotValid $ DerivErrGenerics generic_errs
 
@@ -872,8 +838,8 @@ cond_enumOrProduct cls = cond_isEnumeration `orCond`
                          (cond_isProduct `andCond` cond_args cls)
   where
     orCond :: Condition -> Condition -> Condition
-    orCond c1 c2 dflags tc rep_tc
-      = case (c1 dflags tc rep_tc, c2 dflags tc rep_tc) of
+    orCond c1 c2 dflags dit
+      = case (c1 dflags dit, c2 dflags dit) of
          (IsValid,    _)          -> IsValid    -- c1 succeeds
          (_,          IsValid)    -> IsValid    -- c21 succeeds
          (NotValid x, NotValid y) -> NotValid $ DerivErrEnumOrProduct x y
@@ -885,7 +851,7 @@ cond_args :: Class -> Condition
 -- by generating specialised code.  For others (eg 'Data') we don't.
 -- For even others (eg 'Lift'), unlifted types aren't even a special
 -- consideration!
-cond_args cls _ _ rep_tc
+cond_args cls _ (DerivInstTys{dit_rep_tc = rep_tc})
   = case bad_args of
       []     -> IsValid
       (ty:_) -> NotValid $ DerivErrDunnoHowToDeriveForType ty
@@ -908,12 +874,12 @@ cond_args cls _ _ rep_tc
 
 
 cond_isEnumeration :: Condition
-cond_isEnumeration _ _ rep_tc
+cond_isEnumeration _ (DerivInstTys{dit_rep_tc = rep_tc})
   | isEnumerationTyCon rep_tc = IsValid
   | otherwise                 = NotValid $ DerivErrMustBeEnumType rep_tc
 
 cond_isProduct :: Condition
-cond_isProduct _ _ rep_tc
+cond_isProduct _ (DerivInstTys{dit_rep_tc = rep_tc})
   | Just _ <- tyConSingleDataCon_maybe rep_tc
   = IsValid
   | otherwise
@@ -926,7 +892,8 @@ cond_functorOK :: Bool -> Bool -> Condition
 --            (c) don't use argument in the wrong place, e.g. data T a = T (X a a)
 --            (d) optionally: don't use function types
 --            (e) no "stupid context" on data type
-cond_functorOK allowFunctions allowExQuantifiedLastTyVar _ _ rep_tc
+cond_functorOK allowFunctions allowExQuantifiedLastTyVar _
+               (DerivInstTys{dit_rep_tc = rep_tc})
   | null tc_tvs
   = NotValid $ DerivErrMustHaveSomeParameters rep_tc
 
@@ -972,7 +939,7 @@ cond_functorOK allowFunctions allowExQuantifiedLastTyVar _ _ rep_tc
 
 
 checkFlag :: LangExt.Extension -> Condition
-checkFlag flag dflags _ _
+checkFlag flag dflags _
   | xopt flag dflags = IsValid
   | otherwise        = NotValid why
   where
