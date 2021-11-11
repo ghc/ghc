@@ -1045,6 +1045,9 @@ cvReconstructType hsc_env max_depth old_ty hval = runTR_maybe hsc_env $ do
          world <- newVar liftedTypeKind
          addConstraint my_ty (mkTyConApp mutVarPrimTyCon [world,tv'])
          return [(tv', contents)]
+      APClosure {payload=pLoad} -> do                -- #19559 (incr)
+        mapM_ (go my_ty) pLoad
+        return []
       ConstrClosure{ptrArgs=pArgs} -> do
         Right dcname <- liftIO $ constrClosToName hsc_env clos
         traceTR (text "Constr1" <+> ppr dcname)

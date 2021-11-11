@@ -10,9 +10,9 @@ f :: Int -> Int -> Int = _
 x :: Int = 1
 xs :: [Int] = _
 Stopped in Test.foldl.go, break026.hs:7:23-35
-_result :: t = _
-c :: t = _
-f :: t -> Int -> t = _
+_result :: Int = _
+c :: Int = _
+f :: Int -> Int -> Int = _
 x :: Int = 2
 xs :: [Int] = _
 c = 1
@@ -28,9 +28,9 @@ f :: Int -> Int -> Int = _
 x :: Int = 1
 xs :: [Int] = _
 Stopped in Test.foldl.go, break026.hs:7:23-35
-_result :: t = _
-c :: t = _
-f :: t -> Int -> t = _
+_result :: Int = _
+c :: Int = _
+f :: Int -> Int -> Int = _
 x :: Int = 2
 xs :: [Int] = _
 Stopped in Test.foldl.go, break026.hs:7:27-31
