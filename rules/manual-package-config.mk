@@ -37,8 +37,8 @@ $1/$2/package.conf.inplace : $1/package.conf.in $$$$(ghc-pkg_INPLACE) | $$$$(dir
 $1/$2/package.conf.install : $1/package.conf.in | $$$$(dir $$$$@)/.
 	$$(HS_CPP) -P \
 		-DINSTALLING \
-		-DLIB_DIR='"$$(if $$(filter YES,$$(RelocatableBuild)),$$$$topdir,$$(ghclibdir))"' \
-		-DINCLUDE_DIR='"$$(if $$(filter YES,$$(RelocatableBuild)),$$$$topdir,$$(ghclibdir))/include"' \
+		-DLIB_DIR='"$$(if $$(filter YES,$$(RelocatableBuild)),$$$$topdir,$$(ghclibdir))/$1"' \
+		-DINCLUDE_DIR='"$$(if $$(filter YES,$$(RelocatableBuild)),$$$$topdir,$$(ghclibdir))/$1/include"' \
 		$$($1_PACKAGE_CPP_OPTS) \
 		$$(addprefix -I,$$(GHC_INCLUDE_DIRS)) \
 		-I$$(BUILD_$3_INCLUDE_DIR) \

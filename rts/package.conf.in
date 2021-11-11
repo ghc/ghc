@@ -18,7 +18,7 @@ hidden-modules:
 import-dirs:
 
 #if defined(INSTALLING)
-library-dirs:           LIB_DIR"/rts" FFI_LIB_DIR LIBDW_LIB_DIR
+library-dirs:           LIB_DIR FFI_LIB_DIR LIBDW_LIB_DIR
 #else /* !INSTALLING */
 library-dirs:           TOP"/rts/dist-install/build" FFI_LIB_DIR LIBDW_LIB_DIR
 #endif

@@ -103,7 +103,7 @@ endif
 
 ghclibexecdir = $(ghclibdir)
 topdir        = $(ghclibdir)
-ghcheaderdir  = $(ghclibdir)/include
+ghcheaderdir  = $(ghclibdir)/rts/include
 
 #-----------------------------------------------------------------------------
 # install configuration
