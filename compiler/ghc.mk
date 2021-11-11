@@ -134,7 +134,6 @@ compiler/stage$1/build/primops.txt: \
 		$(includes_$(dec$1)_H_PLATFORM)
 	$$(HS_CPP) -P $$(compiler_CPP_OPTS) \
 		-Icompiler/stage$1 \
-		-I$(BUILD_$(dec$1)_INCLUDE_DIR) \
 		-x c $$< | grep -v '^#pragma GCC' > $$@
 
 compiler/stage$1/build/primop-data-decl.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
@@ -312,15 +311,15 @@ compiler_stage3_CONFIGURE_OPTS += --disable-library-for-ghci
 
 # after build-package, because that sets compiler_stage1_HC_OPTS:
 
-compiler_CPP_OPTS += $(addprefix -I,$(GHC_INCLUDE_DIRS))
-$(foreach n,1 2 3,$(eval compiler_stage$n_CPP_OPTS += -I$(BUILD_$(dec$n)_INCLUDE_DIR)))
+$(foreach n,1 2 3,\
+    $(eval compiler_stage$n_CPP_OPTS += $$(addprefix -I,$$(BUILD_$(dec$n)_INCLUDE_DIRS))))
 compiler_CPP_OPTS += ${GhcCppOpts}
 
 # We add these paths to the Haskell compiler's #include search path list since
 # we must avoid #including files by paths relative to the source file as Hadrian
 # moves the build artifacts out of the source tree. See #8040.
-compiler_HC_OPTS += $(addprefix -I,$(GHC_INCLUDE_DIRS))
-$(foreach n,1 2 3,$(eval compiler_stage$n_HC_OPTS += -I$(BUILD_$(dec$n)_INCLUDE_DIR)))
+$(foreach n,1 2 3,\
+    $(eval compiler_stage$n_HP_OPTS += $$(addprefix -I,$$(BUILD_$(dec$n)_INCLUDE_DIRS))))
 
 ifeq "$(V)" "0"
 compiler_stage1_HC_OPTS += $(filter-out -Rghc-timing,$(GhcHcOpts)) $(GhcStage1HcOpts)

@@ -23,8 +23,7 @@ $1/$2/package.conf.inplace : $1/package.conf.in $$$$(ghc-pkg_INPLACE) | $$$$(dir
 	$$(HS_CPP) -P \
 		-DTOP='"$$(TOP)"' \
 		$$($1_PACKAGE_CPP_OPTS) \
-		$$(addprefix -I,$$(GHC_INCLUDE_DIRS)) \
-		-I$$(BUILD_$3_INCLUDE_DIR) \
+		$$(addprefix -I,$$(BUILD_$3_INCLUDE_DIRS)) \
 		-x c $$< -o $$@.raw
 	grep -v '^#pragma GCC' $$@.raw | \
 	    sed -e 's/""//g' -e 's/:[ 	]*,/: /g' > $$@
@@ -40,8 +39,7 @@ $1/$2/package.conf.install : $1/package.conf.in | $$$$(dir $$$$@)/.
 		-DLIB_DIR='"$$(if $$(filter YES,$$(RelocatableBuild)),$$$$topdir,$$(ghclibdir))/$1"' \
 		-DINCLUDE_DIR='"$$(if $$(filter YES,$$(RelocatableBuild)),$$$$topdir,$$(ghclibdir))/$1/include"' \
 		$$($1_PACKAGE_CPP_OPTS) \
-		$$(addprefix -I,$$(GHC_INCLUDE_DIRS)) \
-		-I$$(BUILD_$3_INCLUDE_DIR) \
+		$$(addprefix -I,$$(BUILD_$3_INCLUDE_DIRS)) \
 		-x c $1/package.conf.in -o $$@.raw
 	grep -v '^#pragma GCC' $$@.raw | \
 	    sed -e 's/""//g' -e 's/:[ 	]*,/: /g' >$$@
