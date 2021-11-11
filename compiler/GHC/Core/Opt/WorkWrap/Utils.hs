@@ -609,7 +609,7 @@ wantToUnbox :: FamInstEnvs -> Bool -> Type -> Demand -> UnboxingDecision Demand
 wantToUnbox fam_envs has_inlineable_prag ty dmd =
   case splitArgType_maybe fam_envs ty of
     Just dcpc@DataConPatContext{ dcpc_dc = dc }
-      | isStrUsedDmd dmd
+      | isStrUsedDmd dmd || isUnliftedType ty
       , let arity = dataConRepArity dc
       -- See Note [Unpacking arguments with product and polymorphic demands]
       , Just cs <- split_prod_dmd_arity dmd arity
