@@ -8,7 +8,7 @@ environment for the Haskell functional programming language.
 
 For more information, visit [GHC's web site][1].
 
-Information for developers of GHC can be found on the [GHC issue tracker][2].
+Information for developers of GHC can be found on the [GHC issue tracker][2], and you can also view [proposals for new GHC features][13].
 
 
 Getting the Source
@@ -126,3 +126,5 @@ you to join!
           "http://www.haskell.org/pipermail/glasgow-haskell-users/"
   [12]: https://gitlab.haskell.org/ghc/ghc/wikis/team-ghc
           "https://gitlab.haskell.org/ghc/ghc/wikis/team-ghc"
+  [13]: https://github.com/ghc-proposals/ghc-proposals
+          "https://github.com/ghc-proposals/ghc-proposals"
