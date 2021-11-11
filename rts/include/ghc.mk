@@ -19,9 +19,8 @@ includes_2_H_CONFIG   = $(includes_1_H_CONFIG)
 includes_1_H_PLATFORM = rts/dist-install/build/include/ghcplatform.h
 includes_2_H_PLATFORM = $(includes_1_H_PLATFORM)
 
-BUILD_0_INCLUDE_DIR = rts/dist/build/include
-BUILD_1_INCLUDE_DIR = rts/dist-install/build/include
-BUILD_2_INCLUDE_DIR = $(BUILD_1_INCLUDE_DIR)
+BUILD_1_INCLUDE_DIRS = rts/include rts/dist-install/build/include
+BUILD_2_INCLUDE_DIRS = $(BUILD_1_INCLUDE_DIRS)
 
 #
 # All header files are in rts/include/{one of these subdirectories}
@@ -64,8 +63,7 @@ ifeq "$(GhcUnregisterised)" "YES"
 includes_CC_OPTS += -DUSE_MINIINTERPRETER
 endif
 
-includes_CC_OPTS += $(addprefix -I,$(GHC_INCLUDE_DIRS))
-includes_CC_OPTS += -I$(BUILD_1_INCLUDE_DIR)
+includes_CC_OPTS += $(addprefix -I,$(BUILD_1_INCLUDE_DIRS))
 includes_CC_OPTS += -Irts
 
 ifneq "$(GhcWithSMP)" "YES"

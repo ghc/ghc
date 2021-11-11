@@ -38,16 +38,14 @@ $1/$2/build/%.$$($3_hcsuf) : $1/$4/%.lhs $$(LAX_DEPS_FOLLOW) $$$$($1_$2_HC_DEP) 
 $1/$2/build/%.$$($3_osuf) : $1/$4/%.hc $$(includes_$5_H_CONFIG) $$(includes_$5_H_PLATFORM) | $$$$(dir $$$$@)/.
 	$$(call cmd,$1_$2_CC) \
 		$$($1_$2_$3_ALL_CC_OPTS) \
-		$$(addprefix -I,$$(GHC_INCLUDE_DIRS)) \
-		-I$$(BUILD_$5_INCLUDE_DIR) \
+		$$(addprefix -I,$$(BUILD_$5_INCLUDE_DIRS)) \
 		-x c -c $$< -o $$@ \
 		$$(if $$(findstring YES,$$($1_$2_DYNAMIC_TOO)),-dyno $$(addsuffix .$$(dyn_osuf),$$(basename $$@)))
 
 $1/$2/build/%.$$($3_osuf) : $1/$2/build/%.hc $$(includes_$5_H_CONFIG) $$(includes_$5_H_PLATFORM)
 	$$(call cmd,$1_$2_CC) \
 		$$($1_$2_$3_ALL_CC_OPTS) \
-		$$(addprefix -I,$$(GHC_INCLUDE_DIRS)) \
-		-I$$(BUILD_$5_INCLUDE_DIR) \
+		$$(addprefix -I,$$(BUILD_$5_INCLUDE_DIRS)) \
 		-x c -c $$< -o $$@ \
 		$$(if $$(findstring YES,$$($1_$2_DYNAMIC_TOO)),-dyno $$(addsuffix .$$(dyn_osuf),$$(basename $$@)))
 

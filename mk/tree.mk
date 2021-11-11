@@ -10,7 +10,6 @@
 # indicates a directory relative to the top of the source tree.
 
 GHC_UTILS_DIR           = utils
-GHC_INCLUDE_DIRS        = rts/include rts/dist-install/build/include
 GHC_RTS_DIR             = rts
 GHC_DRIVER_DIR          = driver
 
