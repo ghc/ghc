@@ -639,7 +639,8 @@ $(do
 newDeclarationGroup :: Q [Dec]
 newDeclarationGroup = pure []
 
-{- | @reifyInstances nm tys@ returns a list of visible instances of @nm tys@. That is,
+{- | @reifyInstances nm tys@ returns a list of all visible instances (see below for "visible")
+of @nm tys@. That is,
 if @nm@ is the name of a type class, then all instances of this class at the types @tys@
 are returned. Alternatively, if @nm@ is the name of a data family or type family,
 all instances of this family at the types @tys@ are returned.
@@ -657,8 +658,20 @@ instance heads which unify with @nm tys@, they need not actually be satisfiable.
 There is one edge case: @reifyInstances ''Typeable tys@ currently always
 produces an empty list (no matter what @tys@ are given).
 
-An instance is visible if it is imported or defined in a prior top-level
-declaration group. See the documentation for 'newDeclarationGroup' for more details.
+In principle, the *visible* instances are
+* all instances defined in a prior top-level declaration group
+  (see docs on @newDeclarationGroup@), or
+* all instances defined in any module transitively imported by the
+  module being compiled
+
+However, actually searching all modules transitively below the one being
+compiled is unreasonably expensive, so @reifyInstances@ will report only the
+instance for modules that GHC has had some cause to visit during this
+compilation.  This is a shortcoming: @reifyInstances@ might fail to report
+instances for a type that is otherwise unusued, or instances defined in a
+different component.  You can work around this shortcoming by explicitly importing the modules
+whose instances you want to be visible. GHC issue <https://gitlab.haskell.org/ghc/ghc/-/issues/20529#note_388980 #20529>
+has some discussion around this.
 
 -}
 reifyInstances :: Name -> [Type] -> Q [InstanceDec]
