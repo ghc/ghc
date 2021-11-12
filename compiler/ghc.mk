@@ -16,18 +16,7 @@
 # The 'echo' commands simply spit the values of various make variables
 # into Config.hs, whence they can be compiled and used by GHC itself
 
-# This is just to avoid generating a warning when generating deps
-# involving RtsFlags.h
-compiler_stage1_MKDEPENDC_OPTS = -DMAKING_GHC_BUILD_SYSTEM_DEPENDENCIES
-compiler_stage2_MKDEPENDC_OPTS = -DMAKING_GHC_BUILD_SYSTEM_DEPENDENCIES
-compiler_stage3_MKDEPENDC_OPTS = -DMAKING_GHC_BUILD_SYSTEM_DEPENDENCIES
-
 compiler_stage1_C_FILES_NODEPS = compiler/cbits/cutils.c
-
-# This package doesn't pass the Cabal checks because include-dirs
-# points outside the source directory. This isn't a real problem, so
-# we just skip the check.
-compiler_NO_CHECK = YES
 
 # We need to decrement the 1-indexed compiler stage to be the 0-indexed stage
 # we use everwhere else.
@@ -39,11 +28,6 @@ dec3 = 2
 # don't buy that argument.
 
 ifneq "$(BINDIST)" "YES"
-
-$(foreach n,1 2 3, \
-    $(eval compiler/stage$n/package-data.mk : $(includes_$(dec$n)_H_PLATFORM)) \
-    $(eval compiler/stage$n/package-data.mk : $(includes_$(dec$n)_H_CONFIG)) \
-  )
 
 $(foreach n,1 2 3, \
     $(eval compiler/stage$n/package-data.mk : compiler/stage$n/build/GHC/Settings/Config.hs) \
@@ -183,32 +167,13 @@ $(eval $(call preprocessCompilerFiles,3))
 # -----------------------------------------------------------------------------
 # Configuration
 
-compiler_stage1_CONFIGURE_OPTS += --flags=stage1
-compiler_stage2_CONFIGURE_OPTS += --flags=stage2
-compiler_stage3_CONFIGURE_OPTS += --flags=stage3
-
 ifeq "$(GhcWithInterpreter)" "YES"
 compiler_stage2_CONFIGURE_OPTS += --flags=internal-interpreter
-
-# Should the debugger commands be enabled?
-ifeq "$(GhciWithDebugger)" "YES"
-compiler_stage2_CONFIGURE_OPTS += --ghc-option=-DDEBUGGER
-endif
 
 endif
 
 ifeq "$(TargetOS_CPP)" "openbsd"
 compiler_CONFIGURE_OPTS += --ld-options=-E
-endif
-
-ifeq "$(GhcUnregisterised)" "NO"
-else
-compiler_CONFIGURE_OPTS += --ghc-option=-DNO_REGS
-endif
-
-ifneq "$(GhcWithSMP)" "YES"
-compiler_CONFIGURE_OPTS += --ghc-option=-DNOSMP
-compiler_CONFIGURE_OPTS += --ghc-option=-optc-DNOSMP
 endif
 
 ifeq "$(WITH_TERMINFO)" "NO"
@@ -311,16 +276,6 @@ compiler_stage3_CONFIGURE_OPTS += --disable-library-for-ghci
 
 # after build-package, because that sets compiler_stage1_HC_OPTS:
 
-$(foreach n,1 2 3,\
-    $(eval compiler_stage$n_CPP_OPTS += $$(addprefix -I,$$(BUILD_$(dec$n)_INCLUDE_DIRS))))
-compiler_CPP_OPTS += ${GhcCppOpts}
-
-# We add these paths to the Haskell compiler's #include search path list since
-# we must avoid #including files by paths relative to the source file as Hadrian
-# moves the build artifacts out of the source tree. See #8040.
-$(foreach n,1 2 3,\
-    $(eval compiler_stage$n_HP_OPTS += $$(addprefix -I,$$(BUILD_$(dec$n)_INCLUDE_DIRS))))
-
 ifeq "$(V)" "0"
 compiler_stage1_HC_OPTS += $(filter-out -Rghc-timing,$(GhcHcOpts)) $(GhcStage1HcOpts)
 compiler_stage2_HC_OPTS += $(filter-out -Rghc-timing,$(GhcHcOpts)) $(GhcStage2HcOpts)
@@ -333,10 +288,6 @@ endif
 
 ifneq "$(BINDIST)" "YES"
 
-$(compiler_stage1_depfile_haskell) : # Headers come from bootstrap RTS
-$(compiler_stage2_depfile_haskell) : $(includes_1_H_CONFIG) $(includes_1_H_PLATFORM)
-$(compiler_stage3_depfile_haskell) : $(includes_2_H_CONFIG) $(includes_2_H_PLATFORM)
-
 $(compiler_stage1_depfile_haskell) : $(COMPILER_INCLUDES_DEPS) $(PRIMOP_BITS_STAGE1)
 $(compiler_stage2_depfile_haskell) : $(COMPILER_INCLUDES_DEPS) $(PRIMOP_BITS_STAGE2)
 $(compiler_stage3_depfile_haskell) : $(COMPILER_INCLUDES_DEPS) $(PRIMOP_BITS_STAGE3)
@@ -347,14 +298,5 @@ $(foreach way,$(compiler_stage2_WAYS),\
       compiler/stage2/build/PrimOp.$($(way)_osuf)) : $(PRIMOP_BITS_STAGE2)
 $(foreach way,$(compiler_stage3_WAYS),\
       compiler/stage3/build/PrimOp.$($(way)_osuf)) : $(PRIMOP_BITS_STAGE3)
-
-
-# GHC itself doesn't know about the above dependencies, so we have to
-# switch off the recompilation checker for that module:
-compiler/prelude/PrimOp_HC_OPTS  += -fforce-recomp
-
-ifeq "$(DYNAMIC_GHC_PROGRAMS)" "YES"
-compiler/utils/Util_HC_OPTS += -DDYNAMIC_GHC_PROGRAMS
-endif
 
 endif
