@@ -129,9 +129,10 @@ type Min :: k -> k -> k
 type Min m n = OrdCond (Compare m n) m m n
 
 
--- | A case statement on `Ordering`.
--- `Ordering c l e g` is `l` when `c ~ LT`, `e` when `c ~ EQ`, and `g` when
--- `c ~ GT`.
+-- | A case statement on 'Ordering'.
+--
+-- @OrdCond c l e g@ is @l@ when @c ~ LT@, @e@ when @c ~ EQ@, and @g@ when
+-- @c ~ GT@.
 --
 -- @since 4.16.0.0
 type OrdCond :: Ordering -> k -> k -> k -> k
