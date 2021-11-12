@@ -48,7 +48,7 @@ import Data.Ord
 --
 -- @since 4.16.0.0
 type Compare :: k -> k -> Ordering
-type family Compare a b
+type family Compare (a :: k) (b :: k) :: Ordering
 
 type instance Compare (a :: Natural) b = CmpNat    a b
 type instance Compare (a :: Symbol)  b = CmpSymbol a b
