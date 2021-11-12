@@ -1,0 +1,42 @@
+
+==================== Output Cmm ====================
+[stg_sink_things() { //  [R1]
+         { info_tbls: [(cb,
+                        label: block_info
+                        rep: StackRep [False, True, True, True, True, True, True, True,
+                                       True]
+                        srt: Nothing)]
+           stack_info: arg_space: 8
+         }
+     {offset
+       _lbl_: // global
+           //tick src<cmm_sink_sp.cmm:(4,1)-(24,1)>
+           //tick src<cmm_sink_sp.cmm:12:8-22>
+           //tick src<cmm_sink_sp.cmm:13:8-22>
+           //tick src<cmm_sink_sp.cmm:14:8-22>
+           //tick src<cmm_sink_sp.cmm:15:8-22>
+           //tick src<cmm_sink_sp.cmm:16:8-22>
+           //tick src<cmm_sink_sp.cmm:17:8-22>
+           //tick src<cmm_sink_sp.cmm:18:8-22>
+           //tick src<cmm_sink_sp.cmm:19:8-22>
+           I64[Sp - 80] = cb;   // CmmStore
+           P64[Sp - 72] = R1;   // CmmStore
+           I64[Sp - 64] = I64[R1 + 1];   // CmmStore
+           I64[Sp - 56] = I64[R1 + 2];   // CmmStore
+           I64[Sp - 48] = I64[R1 + 3];   // CmmStore
+           I64[Sp - 40] = I64[R1 + 4];   // CmmStore
+           I64[Sp - 32] = I64[R1 + 5];   // CmmStore
+           I64[Sp - 24] = I64[R1 + 6];   // CmmStore
+           I64[Sp - 16] = I64[R1 + 7];   // CmmStore
+           I64[Sp - 8] = I64[R1 + 8];   // CmmStore
+           Sp = Sp - 80;   // CmmAssign
+           call (R1)(R1) returns to cb, args: 8, res: 8, upd: 8;   // CmmCall
+       _lbl_: // global
+           //tick src<cmm_sink_sp.cmm:22:9-53>
+           R1 = P64[Sp + 8] + (I64[Sp + 16] + (I64[Sp + 24] + (I64[Sp + 32] + (I64[Sp + 40] + (I64[Sp + 48] + (I64[Sp + 56] + (I64[Sp + 64] + I64[Sp + 72])))))));   // CmmAssign
+           Sp = Sp + 80;   // CmmAssign
+           call (P64[Sp])(R1) args: 8, res: 0, upd: 8;   // CmmCall
+     }
+ }]
+
+

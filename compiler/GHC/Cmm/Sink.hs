@@ -318,20 +318,64 @@ walk platform nodes assigs = go nodes emptyBlock assigs
  where
    go []               block as = (block, as)
    go ((live,node):ns) block as
+    -- discard nodes representing dead assignment
     | shouldDiscard node live             = go ns block as
-       -- discard dead assignment
+    -- sometimes only after simplification we can tell we can discard the node.
+    -- See Note [Discard simplified nodes]
+    | noOpAssignment node2                = go ns block as
+    -- Pick up interesting assignments
     | Just a <- shouldSink platform node2 = go ns block (a : as1)
+    -- Try inlining, drop assignments and move on
     | otherwise                           = go ns block' as'
     where
+      -- Simplify node
       node1 = constantFoldNode platform node
 
+      -- Inline assignments
       (node2, as1) = tryToInline platform live node1 as
 
+      -- Drop any earlier assignments conflicting with node2
       (dropped, as') = dropAssignmentsSimple platform
                           (\a -> conflicts platform a node2) as1
 
+      -- Walk over the rest of the block. Includes dropped assignments
       block' = foldl' blockSnoc block dropped `blockSnoc` node2
 
+{- Note [Discard simplified nodes]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider a sequence like this:
+
+      _c1::P64 = R1;
+      _c3::I64 = I64[_c1::P64 + 1];
+      R1 = _c1::P64;
+      P64[Sp - 72] = _c1::P64;
+      I64[Sp - 64] = _c3::I64;
+
+If we discard assignments *before* simplifying nodes when we get to `R1 = _c1`.
+This is then simplified into `R1 = `R1` and as a consequence prevents sinking of
+loads from R1. What happens is that we:
+    * Check if we can discard the node `R1 = _c1 (no)
+    * Simplify the node to R1 = R1
+    * We check all remaining assignments for conflicts.
+    * The assignment `_c3 = [R1 + 1]`; (R1 already inlined on pickup)
+      conflicts with R1 = R1, because it reads `R1` and the node writes
+      to R1
+    * This is clearly no-sensical because `R1 = R1` doesn't affect R1's value.
+
+The solutions is to check if we can discard nodes before and *after* simplifying
+them. We could only do it after as well, but I assume doing it early might save
+some work.
+
+That is if we process a assignment node we now:
+    * Check if it can be discarded (because it's dead or a no-op)
+    * Simplify the rhs of the assignment.
+    * New: Check again if it might be a no-op now.
+    * ...
+
+This can help with problems like the one reported in #20334. For a full example see the test
+cmm_sink_sp.
+
+-}
 
 --
 -- Heuristic to decide whether to pick up and sink an assignment
@@ -358,8 +402,17 @@ shouldSink _ _other = Nothing
 shouldDiscard :: CmmNode e x -> LRegSet -> Bool
 shouldDiscard node live
    = case node of
+       -- r = r
        CmmAssign r (CmmReg r') | r == r' -> True
+       -- r = e, r is dead after assignment
        CmmAssign (CmmLocal r) _ -> not (r `elemLRegSet` live)
+       _otherwise -> False
+
+noOpAssignment :: CmmNode e x -> Bool
+noOpAssignment node
+   = case node of
+       -- r = r
+       CmmAssign r (CmmReg r') | r == r' -> True
        _otherwise -> False
 
 
@@ -379,7 +432,9 @@ dropAssignments platform should_drop state assigs
 
    go _ []             dropped kept = (dropped, kept)
    go state (assig : rest) dropped kept
-      | conflict  = go state' rest (toNode assig : dropped) kept
+      | conflict  =
+          let !node = toNode assig
+          in  go state' rest (node : dropped) kept
       | otherwise = go state' rest dropped (assig:kept)
       where
         (dropit, state') = should_drop assig state
@@ -394,7 +449,6 @@ dropAssignments platform should_drop state assigs
 tryToInline
    :: forall x. Platform
    -> LRegSet               -- set of registers live after this
-  --  -> LocalRegSet               -- set of registers live after this
                                 -- node.  We cannot inline anything
                                 -- that is live after the node, unless
                                 -- it is small enough to duplicate.
