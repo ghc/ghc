@@ -39,21 +39,6 @@ Flag internal-interpreter
     Default: False
     Manual: True
 
-Flag stage1
-    Description: Is this stage 1?
-    Default: False
-    Manual: True
-
-Flag stage2
-    Description: Is this stage 2?
-    Default: False
-    Manual: True
-
-Flag stage3
-    Description: Is this stage 3?
-    Default: False
-    Manual: True
-
 Flag terminfo
     Description: Build GHC with terminfo support on non-Windows platforms.
     Default: True
@@ -109,7 +94,6 @@ Library
 
     if flag(internal-interpreter)
         CPP-Options: -DHAVE_INTERNAL_INTERPRETER
-        Include-Dirs: ../rts/dist-install/build @FFIIncludeDir@
 
     -- if no dynamic system linker is available, don't try DLLs.
     if flag(dynamic-system-linker)
@@ -147,15 +131,6 @@ Library
     -- We need to set the unit id to ghc (without a version number)
     -- as it's magic.
     GHC-Options: -this-unit-id ghc
-
-    if flag(stage1)
-        Include-Dirs: stage1
-    else
-        if flag(stage2)
-            Include-Dirs: stage2
-        else
-            if flag(stage3)
-                Include-Dirs: stage2
 
     c-sources:
         cbits/cutils.c
