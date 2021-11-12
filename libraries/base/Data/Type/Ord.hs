@@ -80,7 +80,7 @@ type x >= y = (x >=? y) ~ 'True
 -- | Comparison (<) of comparable types, as a constraint.
 --
 -- @since 4.16.0.0
-type x < y = (x >? y) ~ 'True
+type x < y = (x <? y) ~ 'True
 
 -- | Comparison (>) of comparable types, as a constraint.
 --
