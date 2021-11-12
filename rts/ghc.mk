@@ -99,7 +99,7 @@ $(rts_AUTO_APPLY_CMM): $$(genapply_INPLACE)
 rts_H_FILES := $(wildcard rts/*.h rts/*/*.h)
 
 ifeq "$(USE_DTRACE)" "YES"
-DTRACEPROBES_H = rts/dist-install/build/RtsProbes.h
+DTRACEPROBES_H = rts/dist-install/build/include/RtsProbes.h
 rts_H_FILES += $(DTRACEPROBES_H)
 endif
 

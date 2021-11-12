@@ -70,11 +70,10 @@ extra-libraries:
 #if defined(INSTALLING)
 include-dirs:           INCLUDE_DIR FFI_INCLUDE_DIR
 #else /* !INSTALLING */
-include-dirs:           TOP"/rts/dist-install/build"
-                        TOP"/rts/include"
+include-dirs:           TOP"/rts/include"
+                        TOP"/rts/dist-install/build/include"
                         FFI_INCLUDE_DIR
                         LIBDW_INCLUDE_DIR
-                        TOP"/rts/dist-install/build/include"
 #endif
 
 includes:               Stg.h
