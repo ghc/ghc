@@ -37,10 +37,10 @@ int main(int argc, char** argv) {
     preArgv[0] = "--interactive";
 
     /* If ghc.exe can't be found, we assume that we're building ghc from
-     * source, in which case we fall back on ghc-stage2.
+     * source, in which case we fall back on ghc-stage1.
      */
     if (!fileExists(exePath)) {
-        exePath = mkString("%s/ghc-stage2.exe", binDir);
+        exePath = mkString("%s/ghc-stage1.exe", binDir);
     }
 
     run(exePath, 1, preArgv, argc - 1, argv + 1, ReleaseResource);

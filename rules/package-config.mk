@@ -15,7 +15,7 @@ define package-config # args: $1 = dir, $2 = distdir, $3 = GHC stage
 $(call trace, package-config($1,$2,$3))
 $(call profStart, package-config($1,$2,$3))
 
-$1_$2_HC = $$(GHC_STAGE$3)
+$1_$2_HC = $$(HC_STAGE$3)
 $1_$2_CC = $$(CC_STAGE$3)
 $1_$2_AS = $$(AS_STAGE$3)
 $1_$2_AR = $$(AR_STAGE$3)
@@ -25,7 +25,7 @@ $1_$2_ArSupportsAtFile = $$(ArSupportsAtFile_STAGE$3)
 
 # configuration stuff that depends on which GHC we're building with
 ifeq "$3" "0"
-$1_$2_HC_CONFIG = $$(GHC_STAGE0)
+$1_$2_HC_CONFIG = $$(HC_STAGE0)
 $1_$2_HC_CONFIG_DEP =
 $1_$2_GHC_PKG = $$(GHC_PKG)
 $1_$2_GHC_PKG_DEP = 
@@ -41,14 +41,14 @@ $1_$2_MORE_HC_OPTS += -no-user-package-db
 $1_$2_MORE_HC_OPTS += -rtsopts
 else
 $1_$2_HC_PKGCONF = 
-$1_$2_HC_CONFIG = $$(TOP)/$$(GHC_STAGE1)
-$1_$2_HC_CONFIG_DEP = $$(GHC_STAGE1)
+$1_$2_HC_CONFIG = $$(TOP)/$$(HC_STAGE1)
+$1_$2_HC_CONFIG_DEP = $$(HC_STAGE1)
 $1_$2_GHC_PKG = $$(TOP)/$$(ghc-pkg_INPLACE)
 $1_$2_GHC_PKG_DEP = $$$$(ghc-pkg_INPLACE)
 $1_$2_GHC_PKG_OPTS =
 # If stage is not 0 then we always use stage1 for making .depend, as later
 # stages aren't available early enough
-$1_$2_HC_MK_DEPEND = $$(GHC_STAGE1)
+$1_$2_HC_MK_DEPEND = $$(HC_STAGE1)
 $1_$2_HC_MK_DEPEND_DEP = $$($1_$2_HC_MK_DEPEND)
 $1_$2_HC_DEP = $$($1_$2_HC)
 $1_$2_MORE_HC_OPTS += -no-user-package-db

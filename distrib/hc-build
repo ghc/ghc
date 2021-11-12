@@ -105,7 +105,7 @@ $MAKE -C libraries boot all
 # The reconfigure step updates a few files, which can lead to
 # unnecessary recompilations.  Touch a bunch of things here to avoid
 # having to recompile stuff that we've already built.
-(cd compiler; touch main/Config.hs $PRIMOP_BITS stage1/*/*.o stage1/ghc-* ghc-*)
+(cd compiler; touch main/Config.hs $PRIMOP_BITS stage0/*/*.o stage0/ghc-* ghc-*)
 
 echo hc-build done
 echo The tree should be safe to do 'make install stage=1' in.

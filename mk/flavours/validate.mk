@@ -1,7 +1,7 @@
 SRC_HC_OPTS        = -O0 -H64m
 SRC_HC_OPTS_STAGE1 = -fllvm-fill-undef-with-garbage   # See #11487
-GhcStage1HcOpts    = -O2 -DDEBUG
-GhcStage2HcOpts    = -O -dcore-lint -dno-debug-output
+GhcStage0HcOpts    = -O2 -DDEBUG
+GhcStage1HcOpts    = -O -dcore-lint -dno-debug-output
 GhcLibHcOpts       = -O -dcore-lint -dno-debug-output
 BUILD_PROF_LIBS    = NO
 SplitSections      = NO
@@ -10,11 +10,11 @@ BUILD_SPHINX_HTML ?= YES
 BUILD_SPHINX_PDF  ?= NO
 
 ifeq "$(ValidateHpc)" "YES"
-GhcStage2HcOpts   += -fhpc -hpcdir $(TOP)/testsuite/hpc_output/
+GhcStage1HcOpts   += -fhpc -hpcdir $(TOP)/testsuite/hpc_output/
 endif
 
 ifeq "$(ValidateSpeed)" "SLOW"
-GhcStage2HcOpts   += -DDEBUG
+GhcStage1HcOpts   += -DDEBUG
 endif
 
 ifeq "$(ValidateSpeed)" "SLOW"
@@ -42,7 +42,7 @@ libraries/Cabal_dist-install_HC_OPTS += -O0
 # Note [validate build settings]
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #
-# Using GhcStage2HcOpts=-O (rather than -O0) here bringes my validate down from
+# Using GhcStage1HcOpts=-O (rather than -O0) here bringes my validate down from
 # 22mins to 16 mins. Compiling stage2 takes longer, but we gain a faster
 # haddock, faster running of the tests, and faster building of the utils to be
 # installed

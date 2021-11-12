@@ -130,7 +130,7 @@ setPath pkg path = pkg { pkgPath = path }
 
 -- | Given a 'Context', compute the name of the program that is built in it
 -- assuming that the corresponding package's type is 'Program'. For example, GHC
--- built in 'Stage0' is called @ghc-stage1@. If the given package is a
+-- built in 'Stage0' is called @ghc-stage0@. If the given package is a
 -- 'Library', the function simply returns its name.
 programName :: Context -> Action String
 programName Context {..} = do

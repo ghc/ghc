@@ -16,7 +16,7 @@ import Data.Map.Strict qualified as Map
 import Data.Set qualified as Set
 
 -- Example invocation:
---  inplace/bin/count-deps `inplace/bin/ghc-stage2 --print-libdir` "GHC.Parser"
+--  inplace/bin/count-deps `inplace/bin/ghc-stage1 --print-libdir` "GHC.Parser"
 main :: IO ()
 main = do
   args <- getArgs

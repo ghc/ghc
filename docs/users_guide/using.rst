@@ -475,7 +475,7 @@ The available mode flags are:
 
     Print ``True`` if GHC was built with ``-DDebug`` flag.
     This enables assertions and extra debug code.
-    The flag can be set in ``GhcStage1HcOpts`` and/or ``GhcStage2HcOpts``
+    The flag can be set in ``GhcStage0HcOpts`` and/or ``GhcStage1HcOpts``
     and is automatically set for ``devel1`` and ``devel2`` build flavors.
 
 .. ghc-flag:: --print-global-package-db

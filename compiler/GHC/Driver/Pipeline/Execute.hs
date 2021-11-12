@@ -188,7 +188,7 @@ runLlvmLlcPhase pipe_env hsc_env input_fn = do
     -- Observed at least with target 'arm-unknown-linux-gnueabihf'.
     --
     --
-    -- With LLVM4, llc -O3 crashes when ghc-stage1 tries to compile
+    -- With LLVM4, llc -O3 crashes when ghc-stage0 tries to compile
     --   rts/HeapStackCheck.cmm
     --
     -- llc -O3 '-mtriple=arm-unknown-linux-gnueabihf' -enable-tbaa /var/folders/fv/xqjrpfj516n5xq_m_ljpsjx00000gn/T/ghc33674_0/ghc_6.bc -o /var/folders/fv/xqjrpfj516n5xq_m_ljpsjx00000gn/T/ghc33674_0/ghc_7.lm_s

@@ -410,7 +410,7 @@ generate directory distdir config_args
           -- The mkLibraryRelDir function is a bit of a hack.
           -- Ideally it should be handled in the makefiles instead.
           mkLibraryRelDir "rts"        = "rts/dist-install/build"
-          mkLibraryRelDir "ghc"        = "compiler/stage2/build"
+          mkLibraryRelDir "ghc"        = "compiler/stage1/build"
           mkLibraryRelDir "Cabal"      = "libraries/Cabal/Cabal/dist-install/build"
           mkLibraryRelDir "containers" = "libraries/containers/containers/dist-install/build"
           mkLibraryRelDir l            = "libraries/" ++ l ++ "/dist-install/build"

@@ -29,7 +29,7 @@ sub :: a => (b => r) -> (C2D a b) -> r
 sub r (Sub Dict) = r
 
 {-
-$ inplace/bin/ghc-stage2 -fforce-recomp -c C.hs -O0
+$ inplace/bin/ghc-stage1 -fforce-recomp -c C.hs -O0
 
 WARNING: file compiler/stgSyn/CoreToStg.hs, line 250
   $fCategoryConstraint:- True False

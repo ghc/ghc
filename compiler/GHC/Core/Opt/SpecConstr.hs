@@ -474,7 +474,8 @@ deprecated):
      and then add *that* type as a parameter to the loop body
 
 The reason #2 is deprecated is because it requires GHCi, which isn't
-available for things like a cross compiler using stage1.
+available for things like a stage0 compiler without the external
+interpreter.
 
 Here's a (simplified) example from the `vector` package. You may bring
 the special 'force specialization' type into scope by saying:

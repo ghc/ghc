@@ -325,7 +325,7 @@ $(call dependencies,$1,$2,$3)
 # depend on it.
 #
 # See Note [inconsistent distdirs] in rules/build-package-way.mk for why
-# we hard-code dist-install; GHC will use stage2/stage3 here so we
+# we hard-code dist-install; GHC will use stage1/stage2 here so we
 # cannot use the distdir parameter.
 ifneq "$3" "0"
 $$(foreach o,$$($1_$2_$$($1_$2_PROGRAM_WAY)_HS_OBJS),$$(eval $$(call add-dependency,$$o,libraries/base/dist-install/build/GHC/TopHandler.$$($$($1_$2_PROGRAM_WAY)_osuf))))

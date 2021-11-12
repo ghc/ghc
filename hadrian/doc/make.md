@@ -60,8 +60,8 @@ time you fire up a build. This is not possible with the Make build system.
 
   ``` sh
   # Make
+  make inplace/bin/ghc-stage0
   make inplace/bin/ghc-stage1
-  make inplace/bin/ghc-stage2
 
   # Hadrian
   build stage1:exe:ghc-bin    # using the simple target name

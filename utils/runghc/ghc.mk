@@ -21,7 +21,7 @@ utils/runghc_dist-install_EXTRA_HC_OPTS = -cpp -DVERSION="\"$(ProjectVersion)\""
 
 # Be explicit about which version of ghc to call (#9054).
 define utils/runghc_dist-install_INPLACE_SHELL_WRAPPER_EXTRA
-echo 'ghcprog="$(ghc_stage2_INPLACE_SHELL_WRAPPER_NAME)"' >> "$(WRAPPER)"
+echo 'ghcprog="$(ghc_stage1_INPLACE_SHELL_WRAPPER_NAME)"' >> "$(WRAPPER)"
 endef
 define utils/runghc_dist-install_INSTALL_SHELL_WRAPPER_EXTRA
 echo 'ghcprog="$(ghc_stage$(INSTALL_GHC_STAGE)_INSTALL_SHELL_WRAPPER_NAME)"' >> "$(WRAPPER)"

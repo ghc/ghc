@@ -2,7 +2,7 @@
 {-# LANGUAGE TupleSections #-}
 module TupSection where
 {-
-inplace/bin/ghc-stage1 -O2 -dcore-lint
+inplace/bin/ghc-stage0 -O2 -dcore-lint
 -}
 
 myAp :: (a -> b) -> a -> b

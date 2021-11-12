@@ -51,7 +51,7 @@ boot all :: calibrate.out $(TIMEOUT_PROGRAM)
 
 calibrate.out:
 	$(RM) -f TimeMe.o TimeMe.hi TimeMe TimeMe.exe
-	$(PYTHON) calibrate '$(STAGE1_GHC)' > $@
+	$(PYTHON) calibrate '$(STAGE0_GHC)' > $@
 # We use stage 1 to do the calibration, as stage 2 may not exist.
 # This isn't necessarily the compiler we'll be running the testsuite
 # with, but it's really the performance of the machine that we're

@@ -14,7 +14,7 @@ $([d| data Foo a = Foo a deriving (y `C` z) |])
 
 Note: to debug
 
-~/inplace/bin/ghc-stage2 --interactive
+~/inplace/bin/ghc-stage1 --interactive
 load the following
 ----------------------------------------
 {-# LANGUAGE MultiParamTypeClasses #-}

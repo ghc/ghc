@@ -16,8 +16,8 @@
 #pragma once
 
 /* Don't allow stage1 (cross-)compiler embed assumptions about target
- * platform. When ghc-stage1 is being built by ghc-stage0 is should not
- * refer to target defines. A few past examples:
+ * platform. When ghc-stage0 is being built by the preexisting bootstrap
+ * hc, it should not refer to target defines. A few past examples:
  *  - https://gitlab.haskell.org/ghc/ghc/issues/13491
  *  - https://phabricator.haskell.org/D3122
  *  - https://phabricator.haskell.org/D3405

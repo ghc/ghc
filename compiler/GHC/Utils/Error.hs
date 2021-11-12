@@ -533,7 +533,7 @@ To actually produce the eventlog, you need an eventlog-capable GHC build:
   $ hadrian/build -j "stage1.ghc-bin.ghc.link.opts += -eventlog"
 
   With Make:
-  $ make -j GhcStage2HcOpts+=-eventlog
+  $ make -j GhcStage1HcOpts+=-eventlog
 
 You can then produce an eventlog when compiling say hello.hs by simply
 doing:
@@ -542,7 +542,7 @@ doing:
   $ _build/stage1/bin/ghc -ddump-timings hello.hs -o hello +RTS -l
 
   If GHC was built with Make:
-  $ inplace/bin/ghc-stage2 -ddump-timing hello.hs -o hello +RTS -l
+  $ inplace/bin/ghc-stage1 -ddump-timing hello.hs -o hello +RTS -l
 
 You could alternatively use -v<N> (with N >= 2) instead of -ddump-timings,
 to ask GHC to report timings (on stderr and the eventlog).

@@ -15,15 +15,15 @@ utils/iserv-proxy_PACKAGE = iserv-proxy
 utils/iserv-proxy_EXECUTABLE = iserv-proxy
 
 ifeq "$(GhcDebugged)" "YES"
-utils/iserv-proxy_stage2_MORE_HC_OPTS += -debug
-utils/iserv-proxy_stage2_p_MORE_HC_OPTS += -debug
-utils/iserv-proxy_stage2_dyn_MORE_HC_OPTS += -debug
+utils/iserv-proxy_stage1_MORE_HC_OPTS += -debug
+utils/iserv-proxy_stage1_p_MORE_HC_OPTS += -debug
+utils/iserv-proxy_stage1_dyn_MORE_HC_OPTS += -debug
 endif
 
 ifeq "$(GhcThreaded)" "YES"
-utils/iserv-proxy_stage2_MORE_HC_OPTS += -threaded
-utils/iserv-proxy_stage2_p_MORE_HC_OPTS += -threaded
-utils/iserv-proxy_stage2_dyn_MORE_HC_OPTS += -threaded
+utils/iserv-proxy_stage1_MORE_HC_OPTS += -threaded
+utils/iserv-proxy_stage1_p_MORE_HC_OPTS += -threaded
+utils/iserv-proxy_stage1_dyn_MORE_HC_OPTS += -threaded
 endif
 
 # Add -Wl,--export-dynamic enables GHCi to load dynamic objects that
@@ -34,9 +34,9 @@ ifeq "$(TargetElf)" "YES"
 ifneq "$(TargetOS_CPP)" "solaris2"
 # The Solaris linker does not support --export-dynamic option. It also
 # does not need it since it exports all dynamic symbols by default
-utils/iserv-proxy_stage2_MORE_HC_OPTS += -optl-Wl,--export-dynamic
-utils/iserv-proxy_stage2_p_MORE_HC_OPTS += -optl-Wl,--export-dynamic
-utils/iserv-proxy_stage2_dyn_MORE_HC_OPTS += -optl-Wl,--export-dynamic
+utils/iserv-proxy_stage1_MORE_HC_OPTS += -optl-Wl,--export-dynamic
+utils/iserv-proxy_stage1_p_MORE_HC_OPTS += -optl-Wl,--export-dynamic
+utils/iserv-proxy_stage1_dyn_MORE_HC_OPTS += -optl-Wl,--export-dynamic
 endif
 endif
 
@@ -44,30 +44,30 @@ endif
 # program for each way.  Note that it's important to do this even for
 # the vanilla version, otherwise we get a dynamic executable when
 # DYNAMIC_GHC_PROGRAMS=YES.
-utils/iserv-proxy_stage2_PROGRAM_WAY = v
-utils/iserv-proxy_stage2_p_PROGRAM_WAY = p
-utils/iserv-proxy_stage2_dyn_PROGRAM_WAY = dyn
+utils/iserv-proxy_stage1_PROGRAM_WAY = v
+utils/iserv-proxy_stage1_p_PROGRAM_WAY = p
+utils/iserv-proxy_stage1_dyn_PROGRAM_WAY = dyn
 
-utils/iserv-proxy_stage2_PROGNAME = ghc-iserv
-utils/iserv-proxy_stage2_p_PROGNAME = ghc-iserv-prof
-utils/iserv-proxy_stage2_dyn_PROGNAME = ghc-iserv-dyn
+utils/iserv-proxy_stage1_PROGNAME = ghc-iserv
+utils/iserv-proxy_stage1_p_PROGNAME = ghc-iserv-prof
+utils/iserv-proxy_stage1_dyn_PROGNAME = ghc-iserv-dyn
 
-utils/iserv-proxy_stage2_MORE_HC_OPTS += -no-hs-main
-utils/iserv-proxy_stage2_p_MORE_HC_OPTS += -no-hs-main
-utils/iserv-proxy_stage2_dyn_MORE_HC_OPTS += -no-hs-main
+utils/iserv-proxy_stage1_MORE_HC_OPTS += -no-hs-main
+utils/iserv-proxy_stage1_p_MORE_HC_OPTS += -no-hs-main
+utils/iserv-proxy_stage1_dyn_MORE_HC_OPTS += -no-hs-main
 
-utils/iserv-proxy_stage2_INSTALL = YES
-utils/iserv-proxy_stage2_p_INSTALL = YES
-utils/iserv-proxy_stage2_dyn_INSTALL = YES
+utils/iserv-proxy_stage1_INSTALL = YES
+utils/iserv-proxy_stage1_p_INSTALL = YES
+utils/iserv-proxy_stage1_dyn_INSTALL = YES
 
 # Install in $(libexec), not in $(bindir)
-utils/iserv-proxy_stage2_TOPDIR = YES
-utils/iserv-proxy_stage2_p_TOPDIR = YES
-utils/iserv-proxy_stage2_dyn_TOPDIR = YES
+utils/iserv-proxy_stage1_TOPDIR = YES
+utils/iserv-proxy_stage1_p_TOPDIR = YES
+utils/iserv-proxy_stage1_dyn_TOPDIR = YES
 
-utils/iserv-proxy_stage2_INSTALL_INPLACE = YES
-utils/iserv-proxy_stage2_p_INSTALL_INPLACE = YES
-utils/iserv-proxy_stage2_dyn_INSTALL_INPLACE = YES
+utils/iserv-proxy_stage1_INSTALL_INPLACE = YES
+utils/iserv-proxy_stage1_p_INSTALL_INPLACE = YES
+utils/iserv-proxy_stage1_dyn_INSTALL_INPLACE = YES
 
 ifeq "$(CLEANING)" "YES"
 
@@ -97,17 +97,17 @@ endif
 endif
 
 ifeq "$(NEED_iserv)" "YES"
-$(eval $(call build-prog,utils/iserv-proxy,stage2,1))
+$(eval $(call build-prog,utils/iserv-proxy,stage1,1))
 endif
 
 ifeq "$(NEED_iserv_p)" "YES"
-$(eval $(call build-prog,utils/iserv-proxy,stage2_p,1))
+$(eval $(call build-prog,utils/iserv-proxy,stage1_p,1))
 endif
 
 ifeq "$(NEED_iserv_dyn)" "YES"
-$(eval $(call build-prog,utils/iserv-proxy,stage2_dyn,1))
+$(eval $(call build-prog,utils/iserv-proxy,stage1_dyn,1))
 endif
 
-all_ghc_stage2 : $(iserv-proxy-stage2_INPLACE)
-all_ghc_stage2 : $(iserv-proxy-stage2_p_INPLACE)
-all_ghc_stage2 : $(iserv-proxy-stage2_dyn_INPLACE)
+all_ghc_stage1 : $(iserv-proxy-stage1_INPLACE)
+all_ghc_stage1 : $(iserv-proxy-stage1_p_INPLACE)
+all_ghc_stage1 : $(iserv-proxy-stage1_dyn_INPLACE)

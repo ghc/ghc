@@ -148,7 +148,7 @@ $1_$2_$3_MOST_HC_OPTS = \
 # place the cabal_macros.h for executables in build/exename/autogen
 # rather than the traditional build/autogen.  This is Right(TM)
 # thing to do, but we have to accommodate it.  Usually, it suffices
-# to look in the PROGNAME, but for ghc the PROGNAME is ghc-stage1
+# to look in the PROGNAME, but for ghc the PROGNAME is ghc-stage0
 # while Cabal puts it in 'ghc', so we $1_EXECUTABLE is for that
 # case.
 

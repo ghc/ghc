@@ -18,7 +18,7 @@ After all the dependencies are in place:
 - `cd hadrian`
 - Build the compiler by e.g. `./build.sh --flavour=quickest --integer-simple -V -j`
 
-After that, you should have built `inplace/bin/ghc-stage1` cross compiler. We will go to the next section to validate this.
+After that, you should have built `inplace/bin/ghc-stage0` cross compiler. We will go to the next section to validate this.
 
 **NOTE**: Use of `-c` to configure the target is currently not supported. Please manually run `./configure` like above.
 
@@ -30,7 +30,7 @@ Write a simple hello world haskell program:
 module Main where
 main = putStrLn "Hello, world!"
 ```
-Compile it with cross-compiling GHC: `<ghc-folder>/inplace/bin/ghc-stage1 -static Main`. Note that we created a static version of it which packs together all depending libraries.
+Compile it with cross-compiling GHC: `<ghc-folder>/inplace/bin/ghc-stage0 -static Main`. Note that we created a static version of it which packs together all depending libraries.
 
 - Install QEMU: `sudo apt-get install qemu-system-arm`
 - Download `vmlinuz` (kernel) and `initrd.gz` (initial ramdisk), e.g. from [this mirror](https://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports/dists/xenial/main/installer-armhf/current/images/generic-lpae/cdrom/).

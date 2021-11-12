@@ -47,7 +47,7 @@ On Windows:
   - ghc never has a shell wrapper.
   - we can find the location of the ghc binary, which is
         $topdir/<foo>/<something>.exe
-    where <something> may be "ghc", "ghc-stage2", or similar
+    where <something> may be "ghc", "ghc-stage1", or similar
   - we strip off the "<foo>/<something>.exe" to leave $topdir.
 
 from topdir we can find package.conf, ghc-asm, etc.

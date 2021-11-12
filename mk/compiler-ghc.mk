@@ -14,23 +14,23 @@ TOP = ..
 SPEC_TARGETS = 1 2 3 re1 re2 re3
 include $(TOP)/mk/sub-makefile.mk
 
-FAST_MAKE_OPTS += compiler_stage1_NO_BUILD_DEPS=YES \
+FAST_MAKE_OPTS += compiler_stage0_NO_BUILD_DEPS=YES \
+                  compiler_stage1_NO_BUILD_DEPS=YES \
                   compiler_stage2_NO_BUILD_DEPS=YES \
-                  compiler_stage3_NO_BUILD_DEPS=YES \
+                  ghc_stage0_NO_BUILD_DEPS=YES \
                   ghc_stage1_NO_BUILD_DEPS=YES \
-                  ghc_stage2_NO_BUILD_DEPS=YES \
-                  ghc_stage3_NO_BUILD_DEPS=YES
+                  ghc_stage2_NO_BUILD_DEPS=YES
 
 .PHONY: 1 2 3
 
 1:
-	+$(TOPMAKE) stage=1 all_ghc_stage1 $(FAST_MAKE_OPTS) ONLY_DEPS_FOR="compiler_stage1 ghc_stage1"
+	+$(TOPMAKE) stage=0 all_ghc_stage0 $(FAST_MAKE_OPTS) ONLY_DEPS_FOR="compiler_stage0 ghc_stage0"
 
 2:
-	+$(TOPMAKE) stage=2 all_ghc_stage2 $(FAST_MAKE_OPTS) ONLY_DEPS_FOR="compiler_stage2 ghc_stage2" NO_STAGE2_DEPS=YES
+	+$(TOPMAKE) stage=1 all_ghc_stage1 $(FAST_MAKE_OPTS) ONLY_DEPS_FOR="compiler_stage1 ghc_stage1" NO_STAGE2_DEPS=YES
 
 3:
-	+$(TOPMAKE) stage=3 all_ghc_stage3 $(FAST_MAKE_OPTS) ONLY_DEPS_FOR="compiler_stage3 ghc_stage3" NO_STAGE3_DEPS=YES
+	+$(TOPMAKE) stage=2 all_ghc_stage2 $(FAST_MAKE_OPTS) ONLY_DEPS_FOR="compiler_stage2 ghc_stage2" NO_STAGE3_DEPS=YES
 
 
 # 'make re2' rebuilds stage2, removing the old executable first.  Useful for
@@ -38,13 +38,13 @@ FAST_MAKE_OPTS += compiler_stage1_NO_BUILD_DEPS=YES \
 
 .PHONY: re1 re2 re3
 re1:
-	$(RM) $(TOP)/ghc/stage1/build/tmp/ghc-stage1
+	$(RM) $(TOP)/ghc/stage0/build/tmp/ghc-stage0
 	$(MAKE) 1
 re2:
-	$(RM) $(TOP)/ghc/stage2/build/tmp/ghc-stage2
+	$(RM) $(TOP)/ghc/stage1/build/tmp/ghc-stage1
 	$(MAKE) 2
 re3:
-	$(RM) $(TOP)/ghc/stage3/build/tmp/ghc-stage3
+	$(RM) $(TOP)/ghc/stage2/build/tmp/ghc-stage2
 	$(MAKE) 3
 
 .PHONY: extra-help

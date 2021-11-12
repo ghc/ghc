@@ -89,9 +89,9 @@
    cross compile for example from i386-solaris2 to x86_64-solaris2,
    then the build fails with error like this:
 
-ghc-stage2: timer_create: Not owner
+ghc-stage1: timer_create: Not owner
 
-   which happens on first ghc-stage2 invocation. So to support
+   which happens on first ghc-stage1 invocation. So to support
    cross-compilation to Solaris we manually undefine USE_TIMER_CREATE
    here */
 #undef USE_TIMER_CREATE

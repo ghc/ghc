@@ -63,7 +63,7 @@ ifeq "$(TEST_HC)" ""
 #    * run the testsuite with BINDIST=YES
 #
 # BINDIST=YES tells the testsuite driver to use
-# 'bindisttest/install   dir/bin/ghc' instead of 'inplace/bin/ghc-stage2' as
+# 'bindisttest/install   dir/bin/ghc' instead of 'inplace/bin/ghc-stage1' as
 # TEST_HC.
 #
 # Before, if a GHC developer forgot to quote TEST_HC in their Makefile when
@@ -74,42 +74,42 @@ ifeq "$(TEST_HC)" ""
 #   * make sure 'bindisttest/install' does exist, and show a nice message when
 #     it is executed.
 #   * let the default value of TEST_HC also contain spaces
-#     (i.e. 'inplace/test   spaces/ghc-stage2'), such that the test always
+#     (i.e. 'inplace/test   spaces/ghc-stage1'), such that the test always
 #     fails, also without BINDIST=YES, and again show a nice message when it
 #     indeed does so, through 'inplace/test'.
 
 # The `wildcard` function requires spaces to be escaped. Other gnu make
 # functions can't seem to handle spaces at all (e.g. `abspath`).
-STAGE1_TEST_SPACES := $(TOP)/../inplace/test\ \ \ spaces/ghc-stage1
-STAGE1_NORMAL := $(TOP)/../inplace/bin/ghc-stage1
+STAGE0_TEST_SPACES := $(TOP)/../inplace/test\ \ \ spaces/ghc-stage0
+STAGE0_NORMAL := $(TOP)/../inplace/bin/ghc-stage0
 
-ifneq "$(wildcard $(STAGE1_TEST_SPACES) $(STAGE1_NORMAL))" ""
+ifneq "$(wildcard $(STAGE0_TEST_SPACES) $(STAGE0_NORMAL))" ""
 IMPLICIT_COMPILER = NO
 IN_TREE_COMPILER = YES
 
-ifneq "$(wildcard $(STAGE1_TEST_SPACES))" ""
+ifneq "$(wildcard $(STAGE0_TEST_SPACES))" ""
 # See Note [Spaces in TEST_HC].
+STAGE0_GHC := $(abspath $(TOP)/../)/inplace/test   spaces/ghc-stage0
 STAGE1_GHC := $(abspath $(TOP)/../)/inplace/test   spaces/ghc-stage1
 STAGE2_GHC := $(abspath $(TOP)/../)/inplace/test   spaces/ghc-stage2
-STAGE3_GHC := $(abspath $(TOP)/../)/inplace/test   spaces/ghc-stage3
 else
 # Maybe we're on Windows (no symlink support), or in a bindist or sdist, which
 # don't have the 'test   spaces' symlink.
+STAGE0_GHC := $(abspath $(TOP)/../)/inplace/bin/ghc-stage0
 STAGE1_GHC := $(abspath $(TOP)/../)/inplace/bin/ghc-stage1
 STAGE2_GHC := $(abspath $(TOP)/../)/inplace/bin/ghc-stage2
-STAGE3_GHC := $(abspath $(TOP)/../)/inplace/bin/ghc-stage3
 endif
 
 ifeq "$(BINDIST)" "YES"
 # See Note [Spaces in TEST_HC].
 TEST_HC := $(abspath $(TOP)/../)/bindisttest/install   dir/bin/ghc
+else ifeq "$(stage)" "0"
+TEST_HC := $(STAGE0_GHC)
 else ifeq "$(stage)" "1"
 TEST_HC := $(STAGE1_GHC)
-else ifeq "$(stage)" "3"
-TEST_HC := $(STAGE3_GHC)
 else
-# use stage2 by default
-TEST_HC := $(STAGE2_GHC)
+# use stage1 by default
+TEST_HC := $(STAGE1_GHC)
 endif
 
 else

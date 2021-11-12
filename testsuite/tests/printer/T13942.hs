@@ -10,7 +10,7 @@ $([d| f :: Either Int (Int -> Int)
 
 Note: to debug
 
-~/inplace/bin/ghc-stage2 --interactive
+~/inplace/bin/ghc-stage1 --interactive
 load the following
 --------------------------------------
 import Language.Haskell.TH

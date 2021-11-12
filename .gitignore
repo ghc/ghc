@@ -54,7 +54,7 @@ stage2
 _build
 _validatebuild
 */generated/
-*/ghc-stage1
+*/ghc-stage0
 .shake.*
 .hadrian_ghci
 
@@ -81,13 +81,13 @@ _darcs/
 /libraries/*/dist-newstyle/
 /libraries/dist-haddock/
 /utils/*/dist*/
+/compiler/stage0/
 /compiler/stage1/
 /compiler/stage2/
-/compiler/stage3/
+/ghc/stage0/
 /ghc/stage1/
 /ghc/stage2/
-/ghc/stage3/
-/utils/iserv/stage2*/
+/utils/iserv/stage1*/
 
 # -----------------------------------------------------------------------------
 # specific generated files
@@ -185,7 +185,7 @@ _darcs/
 /mk/project.mk
 /mk/project.mk.old
 /mk/validate.mk
-/stage3.package.conf
+/stage2.package.conf
 /testsuite_summary*.txt
 /testsuite*.xml
 /testlog*

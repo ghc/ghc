@@ -14,7 +14,7 @@
 # Building the RTS
 
 # We build the RTS with stage 1
-rts_dist-install_HC = $(GHC_STAGE1)
+rts_dist-install_HC = $(HC_STAGE1)
 
 rts_INSTALL_INFO = rts
 rts_VERSION = 1.0.2

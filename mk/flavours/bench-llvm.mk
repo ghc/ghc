@@ -1,6 +1,6 @@
 SRC_HC_OPTS        = -O -H64m -fllvm
-GhcStage1HcOpts    = -O
-GhcStage2HcOpts    = -O0
+GhcStage0HcOpts    = -O
+GhcStage1HcOpts    = -O0
 GhcLibHcOpts       = -O2
 BUILD_PROF_LIBS    = NO
 SplitSections      = NO

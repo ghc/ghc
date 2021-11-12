@@ -14,13 +14,9 @@ ghc_USES_CABAL = YES
 ghc_PACKAGE = ghc-bin
 ghc_EXECUTABLE = ghc
 
-ghc_stage1_CONFIGURE_OPTS += --flags=stage1
-ghc_stage2_CONFIGURE_OPTS += --flags=stage2
-ghc_stage3_CONFIGURE_OPTS += --flags=stage3
-
 ifeq "$(GhcWithInterpreter)" "YES"
+ghc_stage1_CONFIGURE_OPTS += --flags=internal-interpreter
 ghc_stage2_CONFIGURE_OPTS += --flags=internal-interpreter
-ghc_stage3_CONFIGURE_OPTS += --flags=internal-interpreter
 endif
 
 # This package doesn't pass the Cabal checks because data-dir
@@ -28,20 +24,20 @@ endif
 # we just skip the check.
 ghc_NO_CHECK = YES
 
+ghc_stage0_MORE_HC_OPTS = $(GhcStage0HcOpts)
 ghc_stage1_MORE_HC_OPTS = $(GhcStage1HcOpts)
 ghc_stage2_MORE_HC_OPTS = $(GhcStage2HcOpts)
-ghc_stage3_MORE_HC_OPTS = $(GhcStage3HcOpts)
 
 # We need __GLASGOW_HASKELL__ in hschooks.c, so we have to build C
 # sources with GHC:
+ghc_stage0_UseGhcForCC = YES
 ghc_stage1_UseGhcForCC = YES
 ghc_stage2_UseGhcForCC = YES
-ghc_stage3_UseGhcForCC = YES
 
 ifeq "$(GhcDebugged)" "YES"
+ghc_stage0_MORE_HC_OPTS += -debug
 ghc_stage1_MORE_HC_OPTS += -debug
 ghc_stage2_MORE_HC_OPTS += -debug
-ghc_stage3_MORE_HC_OPTS += -debug
 endif
 
 ifneq "$(GhcDynamic)" ""
@@ -50,83 +46,83 @@ endif
 
 ifeq "$(GhcThreaded)" "YES"
 # Use threaded RTS with GHCi, so threads don't get blocked at the prompt.
+ghc_stage1_MORE_HC_OPTS += -threaded
 ghc_stage2_MORE_HC_OPTS += -threaded
-ghc_stage3_MORE_HC_OPTS += -threaded
 else
 # Opt out from threaded GHC. See ghc-bin.cabal.in
+ghc_stage1_CONFIGURE_OPTS += -f-threaded
 ghc_stage2_CONFIGURE_OPTS += -f-threaded
-ghc_stage3_CONFIGURE_OPTS += -f-threaded
 endif
 
 # If stage 0 supplies a threaded RTS, we can use it for stage 1.
 # See Note [Linking ghc-bin against threaded stage0 RTS] in
 # hadrian/src/Settings/Packages.hs for details.
 ifeq "$(GhcThreadedRts)" "YES"
-ghc_stage1_MORE_HC_OPTS += -threaded
+ghc_stage0_MORE_HC_OPTS += -threaded
 else
-ghc_stage1_CONFIGURE_OPTS += -f-threaded
+ghc_stage0_CONFIGURE_OPTS += -f-threaded
 endif
 
 ifeq "$(GhcProfiled)" "YES"
-ghc_stage2_PROGRAM_WAY = p
+ghc_stage1_PROGRAM_WAY = p
 endif
 
+ghc_stage0_PROGNAME = ghc-stage0
 ghc_stage1_PROGNAME = ghc-stage1
 ghc_stage2_PROGNAME = ghc-stage2
-ghc_stage3_PROGNAME = ghc-stage3
 
+ghc_stage0_SHELL_WRAPPER = YES
 ghc_stage1_SHELL_WRAPPER = YES
 ghc_stage2_SHELL_WRAPPER = YES
-ghc_stage3_SHELL_WRAPPER = YES
+ghc_stage0_SHELL_WRAPPER_NAME = ghc/ghc.wrapper
 ghc_stage1_SHELL_WRAPPER_NAME = ghc/ghc.wrapper
 ghc_stage2_SHELL_WRAPPER_NAME = ghc/ghc.wrapper
-ghc_stage3_SHELL_WRAPPER_NAME = ghc/ghc.wrapper
+ghc_stage0_INSTALL_INPLACE = YES
 ghc_stage1_INSTALL_INPLACE = YES
 ghc_stage2_INSTALL_INPLACE = YES
-ghc_stage3_INSTALL_INPLACE = YES
 
 ghc_stage$(INSTALL_GHC_STAGE)_INSTALL = YES
 ghc_stage$(INSTALL_GHC_STAGE)_INSTALL_SHELL_WRAPPER_NAME = ghc-$(ProjectVersion)
 
-# We override the program name to be ghc, rather than ghc-stage2.
+# We override the program name to be ghc, rather than ghc-stage1.
 # This means the right program name is used in error messages etc.
 define ghc_stage$(INSTALL_GHC_STAGE)_INSTALL_SHELL_WRAPPER_EXTRA
 echo 'executablename="$$exedir/ghc"' >> "$(WRAPPER)"
 endef
 
+# if stage is set to something other than "0" or "", disable stage 0
+# See Note [Stage0Only vs stage=0] in mk/config.mk.in.
+ifneq "$(filter-out 0,$(stage))" ""
+ghc_stage0_NOT_NEEDED = YES
+endif
 # if stage is set to something other than "1" or "", disable stage 1
-# See Note [Stage1Only vs stage=1] in mk/config.mk.in.
 ifneq "$(filter-out 1,$(stage))" ""
 ghc_stage1_NOT_NEEDED = YES
 endif
-# if stage is set to something other than "2" or "", disable stage 2
-ifneq "$(filter-out 2,$(stage))" ""
-ghc_stage2_NOT_NEEDED = YES
-endif
 # When cross-compiling, the stage 1 compiler is our release compiler, so omit stage 2
-# See Note [Stage1Only vs stage=1] in mk/config.mk.in.
-ifeq "$(Stage1Only)" "YES"
+# See Note [Stage0Only vs stage=0] in mk/config.mk.in.
+ifeq "$(Stage0Only)" "YES"
+ghc_stage1_NOT_NEEDED = YES
+endif
+# stage 2 has to be requested explicitly with stage=2
+ifneq "$(stage)" "2"
 ghc_stage2_NOT_NEEDED = YES
 endif
-# stage 3 has to be requested explicitly with stage=3
-ifneq "$(stage)" "3"
-ghc_stage3_NOT_NEEDED = YES
-endif
-$(eval $(call build-prog,ghc,stage1,0))
-$(eval $(call build-prog,ghc,stage2,1))
-$(eval $(call build-prog,ghc,stage3,2))
+$(eval $(call build-prog,ghc,stage0,0))
+$(eval $(call build-prog,ghc,stage1,1))
+$(eval $(call build-prog,ghc,stage2,2))
 
 ifneq "$(BINDIST)" "YES"
 
-ghc/stage1/build/tmp/$(ghc_stage1_PROG) : $(BOOT_LIBS)
+ghc/stage0/build/tmp/$(ghc_stage0_PROG) : $(BOOT_LIBS)
 ifeq "$(GhcProfiled)" "YES"
-ghc/stage2/build/tmp/$(ghc_stage2_PROG) : $(compiler_stage2_p_LIB)
-ghc/stage2/build/tmp/$(ghc_stage2_PROG) : $(foreach lib,$(PACKAGES_STAGE1),$(libraries/$(lib)_dist-install_p_LIB))
+ghc/stage1/build/tmp/$(ghc_stage1_PROG) : $(compiler_stage1_p_LIB)
+ghc/stage1/build/tmp/$(ghc_stage1_PROG) : $(foreach lib,$(PACKAGES_STAGE1),$(libraries/$(lib)_dist-install_p_LIB))
 endif
 
-all_ghc_stage1 : $(GHC_STAGE1)
-all_ghc_stage2 : $(GHC_STAGE2)
-all_ghc_stage3 : $(GHC_STAGE3)
+all_ghc_stage0 : $(ghc-stage0_INPLACE)
+all_ghc_stage1 : $(ghc-stage1_INPLACE)
+all_ghc_stage2 : $(ghc-stage2_INPLACE)
 
 $(INPLACE_LIB)/settings : $(includes_SETTINGS)
 	"$(CP)" $< $@
@@ -145,21 +141,21 @@ GHC_DEPENDENCIES += $(INPLACE_LIB)/settings
 GHC_DEPENDENCIES += $(INPLACE_LIB)/llvm-targets
 GHC_DEPENDENCIES += $(INPLACE_LIB)/llvm-passes
 
-$(GHC_STAGE1) : | $(GHC_DEPENDENCIES)
-$(GHC_STAGE2) : | $(GHC_DEPENDENCIES)
-$(GHC_STAGE3) : | $(GHC_DEPENDENCIES)
+$(HC_STAGE1) : | $(GHC_DEPENDENCIES)
+$(HC_STAGE2) : | $(GHC_DEPENDENCIES)
+$(HC_STAGE3) : | $(GHC_DEPENDENCIES)
 
 ifeq "$(Windows_Host)" "YES"
-$(GHC_STAGE1) : | $$(touchy_INPLACE)
-$(GHC_STAGE2) : | $$(touchy_INPLACE)
-$(GHC_STAGE3) : | $$(touchy_INPLACE)
+$(HC_STAGE1) : | $$(touchy_INPLACE)
+$(HC_STAGE2) : | $$(touchy_INPLACE)
+$(HC_STAGE3) : | $$(touchy_INPLACE)
 endif
 
 # Modules like vector:Data.Vector.Fusion.Stream.Monadic use annotations,
 # which means they depend on GHC.Desugar. To ensure that This module is
 # available by the time it is needed, we make the stage 2 compiler
 # depend on it.
-$(GHC_STAGE2) : $(foreach w,$(GhcLibWays),libraries/base/dist-install/build/GHC/Desugar.$($w_osuf))
+$(HC_STAGE2) : $(foreach w,$(GhcLibWays),libraries/base/dist-install/build/GHC/Desugar.$($w_osuf))
 
 endif
 

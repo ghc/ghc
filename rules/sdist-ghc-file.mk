@@ -13,9 +13,9 @@
 #
 # Invoke like this:
 #
-# $(eval $(call sdist-ghc-file,compiler,stage2,parser,Parser,y))
+# $(eval $(call sdist-ghc-file,compiler,stage1,parser,Parser,y))
 #
-# This adds the file 'compiler/stage2/build/Parser.hs' to the sdist, in the
+# This adds the file 'compiler/stage1/build/Parser.hs' to the sdist, in the
 # same directory as 'compiler/GHC/Parser.y' (which is renamed).
 
 define sdist-ghc-file

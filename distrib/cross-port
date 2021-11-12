@@ -55,7 +55,7 @@ if [ ! -f b2-stamp ]; then
   cd ..
 
   cd b2
-   ./configure --with-ghc=$base/b1/ghc/compiler/stage1/ghc-inplace
+   ./configure --with-ghc=$base/b1/ghc/compiler/stage0/ghc-inplace
 
    touch mk/build.mk
    # The bootstrapped compiler should probably generate unregisterised

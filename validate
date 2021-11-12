@@ -404,7 +404,7 @@ if [ $testsuite_only -eq 1 ] ||
     if [ "$use_hadrian" = "NO" ] ; then
         # Use LOCAL=0, see Note [Running tests in /tmp].
         $make -C "$basedir"/testsuite/tests $BINDIST "$PYTHON_ARG" \
-        $MAKE_TEST_TARGET stage=2 LOCAL=0 $TEST_VERBOSITY THREADS=$threads \
+        $MAKE_TEST_TARGET stage=1 LOCAL=0 $TEST_VERBOSITY THREADS=$threads \
         SUMMARY_FILE="$basedir"/testsuite_summary.txt \
         JUNIT_FILE="$basedir"/testsuite.xml \
         2>&1 | tee testlog
@@ -413,7 +413,7 @@ if [ $testsuite_only -eq 1 ] ||
         # See Note [Why is there no stage1 setup function?].
         # Don't use BINDIST=YES, as stage1 is not available in a bindist.
         $make -C testsuite/tests/stage1 "$PYTHON_ARG" \
-        $MAKE_TEST_TARGET stage=1 LOCAL=0 $TEST_VERBOSITY THREADS=$threads \
+        $MAKE_TEST_TARGET stage=0 LOCAL=0 $TEST_VERBOSITY THREADS=$threads \
         SUMMARY_FILE="$basedir"/testsuite_summary_stage1.txt \
         JUNIT_FILE="$basedir"/testsuite_stage1.xml \
         2>&1 | tee testlog-stage1

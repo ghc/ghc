@@ -1,6 +1,6 @@
 SRC_HC_OPTS        = -O -H64m
+GhcStage0HcOpts    = -O2
 GhcStage1HcOpts    = -O2
-GhcStage2HcOpts    = -O2
 GhcLibHcOpts       = -O2
 BUILD_PROF_LIBS    = YES
 HADDOCK_DOCS       = NO
@@ -10,5 +10,5 @@ BUILD_MAN          = NO
 WITH_TERMINFO      = NO
 
 BIGNUM_BACKEND       = native
-Stage1Only           = YES
+Stage0Only           = YES
 DYNAMIC_GHC_PROGRAMS = NO

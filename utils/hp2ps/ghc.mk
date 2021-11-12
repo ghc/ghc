@@ -32,7 +32,7 @@ utils/hp2ps_dist-install_INSTALL_INPLACE = NO
 utils/hp2ps_dist-install_SHELL_WRAPPER              = YES
 utils/hp2ps_dist-install_INSTALL_SHELL_WRAPPER_NAME = $(utils/hp2ps_dist_INSTALL_SHELL_WRAPPER_NAME)
 
-ifeq "$(Stage1Only)" "YES"
+ifeq "$(Stage0Only)" "YES"
 utils/hp2ps_dist_INSTALL         = YES
 utils/hp2ps_dist-install_INSTALL = NO
 else

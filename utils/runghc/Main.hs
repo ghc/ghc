@@ -63,7 +63,7 @@ main = do
 -- if $1_$2_SHELL_WRAPPER = NO (which is always the case on Windows). In such
 -- a scenario, we must guess where ghc lives. Given a path where ghc might
 -- live, we check for the existence of ghc. If we can't find it, we assume that
--- we're building ghc from source, in which case we fall back on ghc-stage2.
+-- we're building ghc from source, in which case we fall back on ghc-stage1.
 -- (See #1185.)
 --
 -- In-tree Hadrian builds of GHC also happen to give us a wrapper-script-less
@@ -77,7 +77,7 @@ findGhc path = do
     ghcExists <- doesFileExist ghc
     return $ if ghcExists
              then ghc
-             else ghcDir </> "ghc-stage2" <.> exeExtension
+             else ghcDir </> "ghc-stage1" <.> exeExtension
 
 data RunGhcFlags = RunGhcFlags (Maybe FilePath) -- GHC location
                  | Help -- Print help text

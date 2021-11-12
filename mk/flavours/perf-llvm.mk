@@ -1,6 +1,6 @@
 SRC_HC_OPTS        = -O -H64m -fllvm
-GhcStage1HcOpts    = -O
-GhcStage2HcOpts    = -O2
+GhcStage0HcOpts    = -O
+GhcStage1HcOpts    = -O2
 GhcLibHcOpts       = -O2
 BUILD_PROF_LIBS    = YES
 #HADDOCK_DOCS

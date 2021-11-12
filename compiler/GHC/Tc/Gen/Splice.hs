@@ -336,7 +336,7 @@ quotationCtxtDoc br_body
          2 (ppr br_body)
 
 
-  -- The whole of the rest of the file is the else-branch (ie stage2 only)
+  -- The whole of the rest of the file is the else-branch (i.e. stage1+ only)
 
 {-
 Note [How top-level splices are handled]

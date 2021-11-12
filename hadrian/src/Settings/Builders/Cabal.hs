@@ -68,7 +68,7 @@ cabalBuilderArgs = builder (Cabal Setup) ? do
                    , "--configure-option=--disable-option-checking" ] ]
 
 -- TODO: Isn't vanilla always built? If yes, some conditions are redundant.
--- TODO: Need compiler_stage1_CONFIGURE_OPTS += --disable-library-for-ghci?
+-- TODO: Need compiler_stage0_CONFIGURE_OPTS += --disable-library-for-ghci?
 -- TODO: should `elem` be `wayUnit`?
 -- This approach still doesn't work. Previously libraries were build only in the
 -- Default flavours and not using context.

@@ -41,7 +41,7 @@ endif
 html_$1 : $$($$($1_PACKAGE)-$$($1_$2_VERSION)_HADDOCK_FILE)
 
 # See Note [inconsistent distdirs] in rules/build-package-way.mk for why
-# we hard-code dist-install; GHC will use stage2/stage3 here so we
+# we hard-code dist-install; GHC will use stage1/stage2 here so we
 # cannot use the distdir parameter.
 $$($1_PACKAGE)-$$($1_$2_VERSION)_HADDOCK_DEPS = $$(foreach n,$$($1_$2_DEPS),$$($$n_HADDOCK_FILE) $$($$n_dist-install_$$(HADDOCK_WAY)_LIB))
 

@@ -3,8 +3,8 @@
 # --enable-dwarf-unwind.
 
 SRC_HC_OPTS        = -O -H64m
-GhcStage1HcOpts    = -O2
-GhcStage2HcOpts    = -O2 -g3
+GhcStage0HcOpts    = -O2
+GhcStage1HcOpts    = -O2 -g3
 GhcRtsHcOpts       = -O2 -g3
 GhcLibHcOpts       = -O2 -g3
 BUILD_PROF_LIBS    = YES

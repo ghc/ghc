@@ -13,7 +13,7 @@
 {-# OPTIONS_GHC -O1 -fspec-constr #-}
 
 {-
-ghc-stage2: panic! (the 'impossible' happened)
+ghc-stage1: panic! (the 'impossible' happened)
   (GHC version 7.11.20150723 for x86_64-unknown-linux):
         Template variable unbound in rewrite rule
 -}

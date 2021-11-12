@@ -48,7 +48,7 @@ FPTOOLS_SET_PLATFORMS_VARS
 # Requires FPTOOLS_SET_PLATFORMS_VARS to be run first.
 FP_FIND_ROOT
 
-# ToDo: if Stage1Only=YES, should be YES
+# ToDo: if Stage0Only=YES, should be YES
 CrossCompiling=NO
 CrossCompilePrefix="@CrossCompilePrefix@"
 TargetPlatformFull="${target}"

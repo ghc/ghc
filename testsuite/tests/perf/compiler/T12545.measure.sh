@@ -9,7 +9,7 @@ EOF
 
 # https://stackoverflow.com/a/4774063/388010
 TOP="$( cd -- "$(dirname "$0")/../../../../" >/dev/null 2>&1 ; pwd -P )"
-GHC=${GHC:-$TOP/_validate/stage1/bin/ghc}
+GHC=${GHC:-$TOP/_validate/stage0/bin/ghc}
 
 echo "Using GHC=$GHC. Feel free to override via env var"
 

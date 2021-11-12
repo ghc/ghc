@@ -16,32 +16,23 @@
 # The 'echo' commands simply spit the values of various make variables
 # into Config.hs, whence they can be compiled and used by GHC itself
 
-compiler_stage1_C_FILES_NODEPS = compiler/cbits/cutils.c
-
-# We need to decrement the 1-indexed compiler stage to be the 0-indexed stage
-# we use everwhere else.
-dec1 = 0
-dec2 = 1
-dec3 = 2
-# TODO(@Ericson2314) Get rid of compiler-specific stage indices. I think the
-# argument was stage n ghc is used to build stage n everything else, but I
-# don't buy that argument.
+compiler_stage0_C_FILES_NODEPS = compiler/cbits/cutils.c
 
 ifneq "$(BINDIST)" "YES"
 
-$(foreach n,1 2 3, \
+$(foreach n,0 1 2, \
     $(eval compiler/stage$n/package-data.mk : compiler/stage$n/build/GHC/Settings/Config.hs) \
     $(eval compiler/stage$n/build/GHC/Platform/Constants.o: compiler/stage$n/build/GHC/Platform/Constants.hs) \
   )
 endif
 
-BUILDPLATFORM_1 = $(BUILDPLATFORM)
-BUILDPLATFORM_2 = $(HOSTPLATFORM)
-BUILDPLATFORM_3 = $(TARGETPLATFORM)
+BUILDPLATFORM_0 = $(BUILDPLATFORM)
+BUILDPLATFORM_1 = $(HOSTPLATFORM)
+BUILDPLATFORM_2 = $(TARGETPLATFORM)
 
-HOSTPLATFORM_1 = $(HOSTPLATFORM)
+HOSTPLATFORM_0 = $(HOSTPLATFORM)
+HOSTPLATFORM_1 = $(TARGETPLATFORM)
 HOSTPLATFORM_2 = $(TARGETPLATFORM)
-HOSTPLATFORM_3 = $(TARGETPLATFORM)
 
 define compilerConfig
 # $1 = compile stage (1-indexed)
@@ -81,9 +72,9 @@ compiler/stage$1/build/GHC/Platform/Constants.hs : $$(deriveConstants_INPLACE) |
 	$$< --gen-haskell-type -o $$@
 endef
 
+$(eval $(call compilerConfig,0))
 $(eval $(call compilerConfig,1))
 $(eval $(call compilerConfig,2))
-$(eval $(call compilerConfig,3))
 
 # ----------------------------------------------------------------------------
 #		Generate supporting stuff for GHC/Builtin/PrimOps.hs
@@ -106,16 +97,16 @@ PRIMOP_BITS_NAMES = primop-data-decl.hs-incl        \
                     primop-vector-tycons.hs-incl    \
                     primop-docs.hs-incl
 
+PRIMOP_BITS_STAGE0 = $(addprefix compiler/stage0/build/,$(PRIMOP_BITS_NAMES))
 PRIMOP_BITS_STAGE1 = $(addprefix compiler/stage1/build/,$(PRIMOP_BITS_NAMES))
 PRIMOP_BITS_STAGE2 = $(addprefix compiler/stage2/build/,$(PRIMOP_BITS_NAMES))
-PRIMOP_BITS_STAGE3 = $(addprefix compiler/stage3/build/,$(PRIMOP_BITS_NAMES))
 
 define preprocessCompilerFiles
 # $1 = compiler stage (build system stage + 1)
 compiler/stage$1/build/primops.txt: \
 		compiler/GHC/Builtin/primops.txt.pp \
-		$(includes_$(dec$1)_H_CONFIG) \
-		$(includes_$(dec$1)_H_PLATFORM)
+		$$(includes_$1_H_CONFIG) \
+		$$(includes_$1_H_PLATFORM)
 	$$(HS_CPP) -P $$(compiler_CPP_OPTS) \
 		-Icompiler/stage$1 \
 		-x c $$< | grep -v '^#pragma GCC' > $$@
@@ -160,16 +151,15 @@ compiler/stage$1/build/primop-usage.hs-incl: compiler/stage$1/build/primops.txt 
 
 endef
 
+$(eval $(call preprocessCompilerFiles,0))
 $(eval $(call preprocessCompilerFiles,1))
 $(eval $(call preprocessCompilerFiles,2))
-$(eval $(call preprocessCompilerFiles,3))
 
 # -----------------------------------------------------------------------------
 # Configuration
 
 ifeq "$(GhcWithInterpreter)" "YES"
-compiler_stage2_CONFIGURE_OPTS += --flags=internal-interpreter
-
+compiler_stage1_CONFIGURE_OPTS += --flags=internal-interpreter
 endif
 
 ifeq "$(TargetOS_CPP)" "openbsd"
@@ -177,7 +167,7 @@ compiler_CONFIGURE_OPTS += --ld-options=-E
 endif
 
 ifeq "$(WITH_TERMINFO)" "NO"
-compiler_stage2_CONFIGURE_OPTS += --flags=-terminfo
+compiler_stage1_CONFIGURE_OPTS += --flags=-terminfo
 endif
 
 # Careful optimisation of the parser: we don't want to throw everything
@@ -189,9 +179,9 @@ endif
 # register allocator running out of stack slots when compiling this
 # module with -fPIC -dynamic.
 # See #8182 for all the details
+compiler/stage0/build/Parser_HC_OPTS += -O0 -fno-ignore-interface-pragmas -fcmm-sink
 compiler/stage1/build/Parser_HC_OPTS += -O0 -fno-ignore-interface-pragmas -fcmm-sink
 compiler/stage2/build/Parser_HC_OPTS += -O0 -fno-ignore-interface-pragmas -fcmm-sink
-compiler/stage3/build/Parser_HC_OPTS += -O0 -fno-ignore-interface-pragmas -fcmm-sink
 
 ifeq "$(GhcProfiled)" "YES"
 # If we're profiling GHC then we want SCCs.  However, adding -auto-all
@@ -212,15 +202,15 @@ compiler/GHC_HC_OPTS                 += -fprof-auto
 # doesn't copy the vanilla .hi files, but ghc-pkg complains about
 # their absence when we register the package. So for now, we just
 # leave the vanilla libraries enabled.
-# compiler_stage2_CONFIGURE_OPTS += --disable-library-vanilla
-compiler_stage2_CONFIGURE_OPTS += --ghc-pkg-option=--force
+# compiler_stage1_CONFIGURE_OPTS += --disable-library-vanilla
+compiler_stage1_CONFIGURE_OPTS += --ghc-pkg-option=--force
 endif
 
-compiler_stage3_CONFIGURE_OPTS := $(compiler_stage2_CONFIGURE_OPTS)
+compiler_stage2_CONFIGURE_OPTS := $(compiler_stage1_CONFIGURE_OPTS)
 
+compiler/stage0/package-data.mk : compiler/ghc.mk
 compiler/stage1/package-data.mk : compiler/ghc.mk
 compiler/stage2/package-data.mk : compiler/ghc.mk
-compiler/stage3/package-data.mk : compiler/ghc.mk
 
 # -----------------------------------------------------------------------------
 # And build the package
@@ -229,26 +219,26 @@ compiler_PACKAGE = ghc
 
 # Don't do splitting for the GHC package, it takes too long and
 # there's not much benefit.
+compiler_stage0_SplitSections = NO
 compiler_stage1_SplitSections = NO
 compiler_stage2_SplitSections = NO
-compiler_stage3_SplitSections = NO
 
+# if stage is set to something other than "0" or "", disable stage 0
+# See Note [Stage0Only vs stage=0] in mk/config.mk.in.
+ifneq "$(filter-out 0,$(stage))" ""
+compiler_stage0_NOT_NEEDED = YES
+endif
 # if stage is set to something other than "1" or "", disable stage 1
-# See Note [Stage1Only vs stage=1] in mk/config.mk.in.
 ifneq "$(filter-out 1,$(stage))" ""
 compiler_stage1_NOT_NEEDED = YES
 endif
-# if stage is set to something other than "2" or "", disable stage 2
-ifneq "$(filter-out 2,$(stage))" ""
+# stage 2 has to be requested explicitly with stage=2
+ifneq "$(stage)" "2"
 compiler_stage2_NOT_NEEDED = YES
 endif
-# stage 3 has to be requested explicitly with stage=3
-ifneq "$(stage)" "3"
-compiler_stage3_NOT_NEEDED = YES
-endif
-$(eval $(call build-package,compiler,stage1,0))
-$(eval $(call build-package,compiler,stage2,1))
-$(eval $(call build-package,compiler,stage3,2))
+$(eval $(call build-package,compiler,stage0,0))
+$(eval $(call build-package,compiler,stage1,1))
+$(eval $(call build-package,compiler,stage2,2))
 
 # We only want to turn keepCAFs on if we will be loading dynamic
 # Haskell libraries with GHCi. We therefore filter the object file
@@ -260,9 +250,9 @@ ifeq "$$(findstring dyn, $2)" ""
 compiler_stage$1_$2_C_OBJS := $$(filter-out %/keepCAFsForGHCi.$$($2_osuf),$$(compiler_stage$1_$2_C_OBJS))
 endif
 endef
+$(foreach w,$(compiler_stage0_WAYS),$(eval $(call keepCAFsForGHCiDynOnly,0,$w)))
 $(foreach w,$(compiler_stage1_WAYS),$(eval $(call keepCAFsForGHCiDynOnly,1,$w)))
 $(foreach w,$(compiler_stage2_WAYS),$(eval $(call keepCAFsForGHCiDynOnly,2,$w)))
-$(foreach w,$(compiler_stage3_WAYS),$(eval $(call keepCAFsForGHCiDynOnly,3,$w)))
 
 # after build-package, because that adds --enable-library-for-ghci
 # to compiler_stage*_CONFIGURE_OPTS:
@@ -270,33 +260,33 @@ $(foreach w,$(compiler_stage3_WAYS),$(eval $(call keepCAFsForGHCiDynOnly,3,$w)))
 # the .a file instead, and as object splitting isn't on for the ghc
 # package this isn't much slower.However, not building the package saves
 # a significant chunk of disk space.
+compiler_stage0_CONFIGURE_OPTS += --disable-library-for-ghci
 compiler_stage1_CONFIGURE_OPTS += --disable-library-for-ghci
 compiler_stage2_CONFIGURE_OPTS += --disable-library-for-ghci
-compiler_stage3_CONFIGURE_OPTS += --disable-library-for-ghci
 
-# after build-package, because that sets compiler_stage1_HC_OPTS:
+# after build-package, because that sets compiler_stage0_HC_OPTS:
 
 ifeq "$(V)" "0"
+compiler_stage0_HC_OPTS += $(filter-out -Rghc-timing,$(GhcHcOpts)) $(GhcStage0HcOpts)
 compiler_stage1_HC_OPTS += $(filter-out -Rghc-timing,$(GhcHcOpts)) $(GhcStage1HcOpts)
 compiler_stage2_HC_OPTS += $(filter-out -Rghc-timing,$(GhcHcOpts)) $(GhcStage2HcOpts)
-compiler_stage3_HC_OPTS += $(filter-out -Rghc-timing,$(GhcHcOpts)) $(GhcStage3HcOpts)
 else
+compiler_stage0_HC_OPTS += $(GhcHcOpts) $(GhcStage0HcOpts)
 compiler_stage1_HC_OPTS += $(GhcHcOpts) $(GhcStage1HcOpts)
 compiler_stage2_HC_OPTS += $(GhcHcOpts) $(GhcStage2HcOpts)
-compiler_stage3_HC_OPTS += $(GhcHcOpts) $(GhcStage3HcOpts)
 endif
 
 ifneq "$(BINDIST)" "YES"
 
+$(compiler_stage0_depfile_haskell) : $(COMPILER_INCLUDES_DEPS) $(PRIMOP_BITS_STAGE0)
 $(compiler_stage1_depfile_haskell) : $(COMPILER_INCLUDES_DEPS) $(PRIMOP_BITS_STAGE1)
 $(compiler_stage2_depfile_haskell) : $(COMPILER_INCLUDES_DEPS) $(PRIMOP_BITS_STAGE2)
-$(compiler_stage3_depfile_haskell) : $(COMPILER_INCLUDES_DEPS) $(PRIMOP_BITS_STAGE3)
 
+$(foreach way,$(compiler_stage0_WAYS),\
+      compiler/stage0/build/PrimOp.$($(way)_osuf)) : $(PRIMOP_BITS_STAGE0)
 $(foreach way,$(compiler_stage1_WAYS),\
       compiler/stage1/build/PrimOp.$($(way)_osuf)) : $(PRIMOP_BITS_STAGE1)
 $(foreach way,$(compiler_stage2_WAYS),\
       compiler/stage2/build/PrimOp.$($(way)_osuf)) : $(PRIMOP_BITS_STAGE2)
-$(foreach way,$(compiler_stage3_WAYS),\
-      compiler/stage3/build/PrimOp.$($(way)_osuf)) : $(PRIMOP_BITS_STAGE3)
 
 endif

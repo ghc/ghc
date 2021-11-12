@@ -2,7 +2,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 module Dollar2 where
 {-
-inplace/bin/ghc-stage1 -O2 -dcore-lint
+inplace/bin/ghc-stage0 -O2 -dcore-lint
 -}
 
 

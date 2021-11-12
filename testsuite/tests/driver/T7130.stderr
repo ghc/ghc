@@ -1,4 +1,4 @@
-ghc-stage2: unrecognised flag: -fflul-laziness
+ghc-stage1: unrecognised flag: -fflul-laziness
 did you mean one of:
   -ffull-laziness
   -fno-full-laziness

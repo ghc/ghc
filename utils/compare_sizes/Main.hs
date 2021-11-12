@@ -2,8 +2,8 @@
 
 --   $ ./compareSizes --hi ~/ghc/darcs/ghc ~/ghc/6.12-branch/ghc
 --        Size | Change | Filename
---      25644 | -0.99% | compiler/stage1/build/Demand.hi
---      21103 | -0.98% | compiler/stage2/build/Demand.hi
+--      25644 | -0.99% | compiler/stage0/build/Demand.hi
+--      21103 | -0.98% | compiler/stage1/build/Demand.hi
 --     180044 | -0.98% | libraries/base/dist-install/build/GHC/Classes.hi
 --       6415 | -0.58% | .../Data/Array/Parallel/Prelude/Base/Tuple.hi
 --       6507 | -0.57% | .../Data/Array/Parallel/Prelude/Base/Tuple.hi

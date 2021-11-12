@@ -201,10 +201,10 @@ endif
 endif
 
 ifeq "$(HADDOCK_DOCS)" "YES"
-ifneq "$(CrossCompiling) $(Stage1Only)" "NO NO"
-$(error Can not build haddock docs when CrossCompiling or Stage1Only. \
+ifneq "$(CrossCompiling) $(Stage0Only)" "NO NO"
+$(error Can not build haddock docs when CrossCompiling or Stage0Only. \
   Set HADDOCK_DOCS=NO in your mk/build.mk file. \
-  See Note [No stage2 packages when CrossCompiling or Stage1Only])
+  See Note [No stage2 packages when CrossCompiling or Stage0Only])
 endif
 endif
 
@@ -487,9 +487,9 @@ PACKAGES_STAGE1 += haskeline
 PACKAGES_STAGE1 += ghci
 PACKAGES_STAGE1 += libiserv
 
-# See Note [No stage2 packages when CrossCompiling or Stage1Only].
-# See Note [Stage1Only vs stage=1] in mk/config.mk.in.
-ifeq "$(CrossCompiling) $(Stage1Only)" "NO NO"
+# See Note [No stage2 packages when CrossCompiling or Stage0Only].
+# See Note [Stage0Only vs stage=0] in mk/config.mk.in.
+ifeq "$(CrossCompiling) $(Stage0Only)" "NO NO"
 define addExtraPackage
 ifeq "$2" "-"
 # Do nothing; this package is already handled above
@@ -506,8 +506,8 @@ endif
 
 # We install all packages that we build.
 INSTALL_PACKAGES := $(addprefix libraries/,$(PACKAGES_STAGE1))
-# See Note [Stage1Only vs stage=1] in mk/config.mk.in.
-ifneq "$(Stage1Only)" "YES"
+# See Note [Stage0Only vs stage=0] in mk/config.mk.in.
+ifneq "$(Stage0Only)" "YES"
 INSTALL_PACKAGES += compiler
 endif
 INSTALL_PACKAGES += $(addprefix libraries/,$(PACKAGES_STAGE2))
@@ -545,31 +545,31 @@ utils/ghc-pkg/dist-install/package-data.mk: $(fixed_pkg_prev)
 utils/hsc2hs/dist-install/package-data.mk: $(fixed_pkg_prev)
 utils/compare_sizes/dist-install/package-data.mk: $(fixed_pkg_prev)
 utils/runghc/dist-install/package-data.mk: $(fixed_pkg_prev)
-utils/iserv/stage2/package-data.mk: $(fixed_pkg_prev)
-utils/iserv/stage2_p/package-data.mk: $(fixed_pkg_prev)
-utils/iserv/stage2_dyn/package-data.mk: $(fixed_pkg_prev)
+utils/iserv/stage1/package-data.mk: $(fixed_pkg_prev)
+utils/iserv/stage1_p/package-data.mk: $(fixed_pkg_prev)
+utils/iserv/stage1_dyn/package-data.mk: $(fixed_pkg_prev)
 ifeq "$(Windows_Host)" "YES"
 utils/gen-dll/dist-install/package-data.mk: $(fixed_pkg_prev)
 endif
 
 # the GHC package doesn't live in libraries/, so we add its dependency manually:
-compiler/stage2/package-data.mk: $(fixed_pkg_prev)
+compiler/stage1/package-data.mk: $(fixed_pkg_prev)
 
 # and continue with PACKAGES_STAGE2, which depend on GHC:
-fixed_pkg_prev:=compiler/stage2/package-data.mk
+fixed_pkg_prev:=compiler/stage1/package-data.mk
 $(foreach pkg,$(PACKAGES_STAGE2),$(eval $(call fixed_pkg_dep,$(pkg),dist-install)))
 
+ghc/stage0/package-data.mk: compiler/stage0/package-data.mk
 ghc/stage1/package-data.mk: compiler/stage1/package-data.mk
-ghc/stage2/package-data.mk: compiler/stage2/package-data.mk
 
 # Utils that we build with the stage2 compiler.
 # They depend on the ghc library and some other libraries, but depending on
 # the ghc library's package-data.mk is sufficient, as that in turn depends on
 # all the other libraries' package-data.mk files.
-utils/haddock/dist/package-data.mk: compiler/stage2/package-data.mk
-utils/check-ppr/dist-install/package-data.mk: compiler/stage2/package-data.mk
-utils/check-exact/dist-install/package-data.mk: compiler/stage2/package-data.mk
-utils/count-deps/dist-install/package-data.mk: compiler/stage2/package-data.mk
+utils/haddock/dist/package-data.mk: compiler/stage1/package-data.mk
+utils/check-ppr/dist-install/package-data.mk: compiler/stage1/package-data.mk
+utils/check-exact/dist-install/package-data.mk: compiler/stage1/package-data.mk
+utils/count-deps/dist-install/package-data.mk: compiler/stage1/package-data.mk
 
 # add the final package.conf dependency: ghc-prim depends on RTS
 libraries/ghc-prim/dist-install/package-data.mk : rts/dist-install/package.conf.inplace
@@ -581,7 +581,7 @@ endif
 # Run Haddock for the packages that will be installed. We need to handle
 # compiler specially due to the different dist directory name.
 $(foreach p,$(INSTALL_PACKAGES),$(eval $p_dist-install_DO_HADDOCK = YES))
-compiler_stage2_DO_HADDOCK = YES
+compiler_stage1_DO_HADDOCK = YES
 
 BOOT_PKG_CONSTRAINTS := \
     $(foreach d,$(PACKAGES_STAGE0),\
@@ -613,7 +613,7 @@ define libraries/ghc-prim_PACKAGE_MAGIC
 libraries/ghc-prim_dist-install_MODULES := $$(filter-out GHC.Prim,$$(libraries/ghc-prim_dist-install_MODULES))
 endef
 
-PRIMOPS_TXT_STAGE1 = compiler/stage1/build/primops.txt
+PRIMOPS_TXT_STAGE1 = compiler/stage0/build/primops.txt
 
 libraries/ghc-prim/dist-install/build/GHC/PrimopWrappers.hs : $$(genprimopcode_INPLACE) $(PRIMOPS_TXT_STAGE1) | $$(dir $$@)/.
 	"$(genprimopcode_INPLACE)" --make-haskell-wrappers < $(PRIMOPS_TXT_STAGE1) >$@
@@ -706,9 +706,9 @@ ifeq "$(GhcWithInterpreter)" "NO"
 # runghc is just GHCi in disguise
 BUILD_DIRS := $(filter-out utils/runghc,$(BUILD_DIRS))
 endif
-ifneq "$(CrossCompiling) $(Stage1Only)" "NO NO"
-# See Note [No stage2 packages when CrossCompiling or Stage1Only].
-# See Note [Stage1Only vs stage=1] in mk/config.mk.in.
+ifneq "$(CrossCompiling) $(Stage0Only)" "NO NO"
+# See Note [No stage2 packages when CrossCompiling or Stage0Only].
+# See Note [Stage0Only vs stage=0] in mk/config.mk.in.
 BUILD_DIRS := $(filter-out utils/check-ppr,$(BUILD_DIRS))
 BUILD_DIRS := $(filter-out utils/check-exact,$(BUILD_DIRS))
 BUILD_DIRS := $(filter-out utils/count-deps,$(BUILD_DIRS))
@@ -768,21 +768,21 @@ $(foreach pkg,$(PACKAGES_STAGE0),$(eval $(call fixed_pkg_dep,$(pkg),dist-boot)))
 # dependency between their package-data.mk files. See also Note
 # [Dependencies between package-data.mk files].
 utils/ghc-pkg/dist/package-data.mk: $(fixed_pkg_prev)
-compiler/stage1/package-data.mk:    $(fixed_pkg_prev)
+compiler/stage0/package-data.mk:    $(fixed_pkg_prev)
 endif
 
 ifneq "$(BINDIST)" "YES"
 # Make sure we have all the GHCi libs by the time we've built
-# ghc-stage2.
+# ghc-stage1.
 #
 GHCI_LIBS = \
     $(foreach way,$(GhcLibWays),\
         $(foreach lib,$(PACKAGES_STAGE1),\
             $(libraries/$(lib)_dist-install_$(way)_GHCI_LIB)) \
-        $(compiler_stage2_$(way)_GHCI_LIB))
+        $(compiler_stage1_$(way)_GHCI_LIB))
 
 ifeq "$(UseArchivesForGhci)" "NO"
-ghc/stage2/build/tmp/$(ghc_stage2_PROG) : $(GHCI_LIBS)
+ghc/stage1/build/tmp/$(ghc_stage1_PROG) : $(GHCI_LIBS)
 endif
 
 ifeq "$(UseArchivesForGhci)" "YES"
@@ -897,15 +897,15 @@ endif
 install_libs: $(INSTALL_LIBS)
 	$(call installLibsTo, $(INSTALL_LIBS), "$(DESTDIR)$(ghclibdir)")
 
-# We rename ghc-stage2, so that the right program name is used in error
+# We rename ghc-stage1, so that the right program name is used in error
 # messages etc. But not on windows.
 RENAME_LIBEXEC_GHC_STAGE_TO_GHC = YES
-ifeq "$(Stage1Only) $(Windows_Host)" "YES YES"
-# resulting ghc-stage1 is built to run on windows
+ifeq "$(Stage0Only) $(Windows_Host)" "YES YES"
+# resulting ghc-stage0 is built to run on windows
 RENAME_LIBEXEC_GHC_STAGE_TO_GHC = NO
 endif
-ifeq "$(Stage1Only) $(Windows_Target)" "NO YES"
-# resulting ghc-stage1 is built to run on windows
+ifeq "$(Stage0Only) $(Windows_Target)" "NO YES"
+# resulting ghc-stage0 is built to run on windows
 RENAME_LIBEXEC_GHC_STAGE_TO_GHC = NO
 endif
 
@@ -959,9 +959,9 @@ endif
 INSTALLED_PACKAGE_CONF=$(DESTDIR)$(topdir)/package.conf.d
 
 ifeq "$(BINDIST) $(CrossCompiling)" "NO YES"
-# when installing ghc-stage2 we can't run target's
-# 'ghc-pkg' and 'ghc-stage2' but those are needed for registration.
-INSTALLED_GHC_REAL=$(TOP)/inplace/bin/ghc-stage1
+# when installing ghc-stage1 we can't run target's
+# 'ghc-pkg' and 'ghc-stage1' but those are needed for registration.
+INSTALLED_GHC_REAL=$(TOP)/inplace/bin/ghc-stage0
 INSTALLED_GHC_PKG_REAL=$(TOP)/$(ghc-pkg_DIST_BINARY)
 else # CrossCompiling
 # Install packages in the right order, so that ghc-pkg doesn't complain.
@@ -1057,7 +1057,7 @@ $(eval $(call bindist-list,.,\
     $(INSTALL_LIBRARY_DOCS) \
     $(addsuffix /*,$(INSTALL_HTML_DOC_DIRS)) \
     docs/index.html \
-    $(wildcard compiler/stage2/doc) \
+    $(wildcard compiler/stage1/doc) \
     $(wildcard libraries/*/dist-install/doc/) \
     $(wildcard libraries/*/*/dist-install/doc/) \
     $(filter-out llvm-targets llvm-passes $(includes_SETTINGS),$(INSTALL_LIBS)) \
@@ -1084,7 +1084,7 @@ BIN_DIST_MK = $(BIN_DIST_PREP_DIR)/bindist.mk
 # distribution so we know during `make install` not to go looking for files that
 # would have been built for these packages. Failing to do this causes #13325.
 #
-# See Note [No stage2 packages when CrossCompiling or Stage1Only].
+# See Note [No stage2 packages when CrossCompiling or Stage0Only].
 
 unix-binary-dist-prep: $(includes_dist-install_H_FILES_GENERATED)
 	$(call removeTrees,bindistprep/)
@@ -1235,10 +1235,10 @@ sdist-ghc-prep-tree :
 
 # Add files generated by alex and happy.
 # These rules depend on sdist-ghc-prep-tree.
-$(eval $(call sdist-ghc-file,compiler,stage2,.,GHC/Cmm/Lexer,x))
-$(eval $(call sdist-ghc-file,compiler,stage2,.,GHC/Cmm/Parser,y))
-$(eval $(call sdist-ghc-file,compiler,stage2,.,GHC/Parser/Lexer,x))
-$(eval $(call sdist-ghc-file,compiler,stage2,.,GHC/Parser,y))
+$(eval $(call sdist-ghc-file,compiler,stage1,.,GHC/Cmm/Lexer,x))
+$(eval $(call sdist-ghc-file,compiler,stage1,.,GHC/Cmm/Parser,y))
+$(eval $(call sdist-ghc-file,compiler,stage1,.,GHC/Parser/Lexer,x))
+$(eval $(call sdist-ghc-file,compiler,stage1,.,GHC/Parser,y))
 $(eval $(call sdist-ghc-file,utils/hpc,dist-install,,HpcParser,y))
 $(eval $(call sdist-ghc-file,utils/genprimopcode,dist,,Lexer,x))
 $(eval $(call sdist-ghc-file,utils/genprimopcode,dist,,Parser,y))
@@ -1495,29 +1495,30 @@ endif
 	cd libraries/xhtml && ./Setup clean   --builddir=dist-bindist
 	cd libraries/xhtml && rm -f Setup Setup.exe Setup.hi Setup.o
 
-# Note [No stage2 packages when CrossCompiling or Stage1Only]
+# Note [No stage2 packages when CrossCompiling or Stage0Only]
 #
-# (first read Note [CrossCompiling vs Stage1Only] and
-#  Note [Stage1Only vs stage=1] in mk/config.mk.in)
+# (first read Note [CrossCompiling vs Stage0Only] and
+#  Note [Stage0Only vs stage=0] in mk/config.mk.in)
 #
-# When either CrossCompiling=YES or Stage1Only=YES, we have to exclude the
+# When either CrossCompiling=YES or Stage0Only=YES, we have to exclude the
 # following packages from the build:
-#   * packages that we build with ghc-stage2 [1]
+#   * packages that we build with ghc-stage1 [1]
 #   * packages that depend on the ghc library [2]
 #
 # Here's why:
-#  - first of all, ghc-stage1 can't use stage0's ghc library (it's too old)
-#  - neither do we register the ghc library (compiler/stage1) that we build
+#  - first of all, ghc-stage0 can't use the ghc library that comes with the GHC
+#    used to build stage0 (it's too old).
+#  - neither do we register the ghc library (compiler/stage0) that we build
 #    with stage0. TODO Why not? We do build it...
-#  - as a result, we need to a) use ghc-stage2 to build packages that depend on
-#    the ghc library and b) exclude those packages when ghc-stage2 is not
+#  - as a result, we need to a) use ghc-stage1 to build packages that depend on
+#    the ghc library and b) exclude those packages when ghc-stage1 is not
 #    available.
-#  - when Stage1Only=YES, it's clear that ghc-stage2 is not available (we just
+#  - when Stage0Only=YES, it's clear that ghc-stage1 is not available (we just
 #    said we didn't want it), so we have to exclude the stage2 packages from
-#    the build. This includes the case where Stage1Only=YES is combined with
+#    the build. This includes the case where Stage0Only=YES is combined with
 #    CrossCompiling=YES (Building GHC as a cross-compiler [3]).
-#  - when CrossCompiling=YES, but Stage1Only=NO (Cross-compiling GHC itself
-#    [3]), we can not use ghc-stage2 either. The reason is that stage2 doesn't
+#  - when CrossCompiling=YES, but Stage0Only=NO (Cross-compiling GHC itself
+#    [3]), we can not use ghc-stage1 either. The reason is that stage2 doesn't
 #    run on the host platform at all; it is built to run on $(TARGETPLATFORM)"
 #    [4]. Therefore in this case we also have to exclude the stage2 packages
 #    from the build.

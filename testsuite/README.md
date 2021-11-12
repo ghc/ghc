@@ -14,7 +14,7 @@ Commands to run testsuite:
  * Test a specific 'way': `make WAY=optllvm`
  * Keeping the run directory after test run: `make CLEANUP=0`. You will find a
    directory `{test_name}.run` in the test's source directory.
- * Test a specific stage of GHC: `make stage=1`
+ * Test a specific stage of GHC: `make stage=0`
  * Skip performance tests: `make SKIP_PERF_TESTS=YES`
  * Set verbosity: `make VERBOSE=n`
    where n=0: No per-test output, n=1: Only failures,

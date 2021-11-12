@@ -22,8 +22,8 @@ install graphviz on your system.
 
   - `make`:
 
-    1. ``inplace/bin/count-deps `inplace/bin/ghc-stage2 --print-libdir` "GHC.Parser"``
-    2. ``inplace/bin/count-deps `inplace/bin/ghc-stage2 --print-libdir` "GHC.Parser" --dot``
+    1. ``inplace/bin/count-deps `inplace/bin/ghc-stage1 --print-libdir` "GHC.Parser"``
+    2. ``inplace/bin/count-deps `inplace/bin/ghc-stage1 --print-libdir` "GHC.Parser" --dot``
 
   - `hadrian`:
 

@@ -151,9 +151,9 @@ def stage1(name, opts):
 # example, as they also use the `ghc --info` settings:
 #     quasiquotation/qq007/Makefile:ifeq "$(GhcDynamic)" "YES"
 #
-# If you want a test to run using the stage1 compiler, add it to the
+# If you want a test to run using the stage0 compiler, add it to the
 # testsuite/tests/stage1 directory. Validate runs the tests in that
-# directory with `make stage=1`.
+# directory with `make stage=0`.
 
 # Cache the results of looking to see if we have a library or not.
 # This makes quite a difference, especially on Windows.
@@ -2451,7 +2451,7 @@ def runCmd(cmd: str,
 
     try:
         # cmd is a complex command in Bourne-shell syntax
-        # e.g (cd . && 'C:/users/simonpj/HEAD/inplace/bin/ghc-stage2' ...etc)
+        # e.g (cd . && 'C:/users/simonpj/HEAD/inplace/bin/ghc-stage1' ...etc)
         # Hence it must ultimately be run by a Bourne shell. It's timeout's job
         # to invoke the Bourne shell
 

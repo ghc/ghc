@@ -1,2 +1,2 @@
-ghc-stage2: on the commandline: Syntax: -j[n] where n > 0
+ghc-stage1: on the commandline: Syntax: -j[n] where n > 0
 Usage: For basic information, try the `--help' option.

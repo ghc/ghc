@@ -127,9 +127,10 @@ platform (= code build platform).
 
 The internal interpreter can be used when both platforms are the same and when
 the built code is compatible with the compiler itself (same way, etc.). This
-interpreter is not always available: for instance stage1 compiler doesn't have
-it because there might be an ABI mismatch between the code objects (built by
-stage1 compiler) and the stage1 compiler itself (built by stage0 compiler).
+interpreter is not always available: for instance the compiler built in stage 0
+doesn't have it because there might be an ABI mismatch between the code objects
+(built in stage 1 by the stage 0 compiler) and the stage 0 compiler itself
+(built in stage  0 by the probuilt bootstrap compiler compiler).
 
 In most cases, an external interpreter can be used instead: it runs in a
 separate process and it communicates with the compiler via a two-way message

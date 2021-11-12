@@ -69,9 +69,9 @@ GhcHcOpts=-Rghc-timing
 #
 # -haddock is needed so the GHCi :doc command can find docs
 #   in the .hi-files for the ghc library
-GhcStage1HcOpts=
+GhcStage0HcOpts=
+GhcStage1HcOpts=-O2 -haddock
 GhcStage2HcOpts=-O2 -haddock
-GhcStage3HcOpts=-O2 -haddock
 
 
 # Note [Stage number in build variables].
@@ -79,7 +79,7 @@ GhcStage3HcOpts=-O2 -haddock
 # There are (unfortunately) two different naming schemes for build variables
 # specific to a certain stage.
 #
-# * GhcStage1HcOpts/GhcStage2HcOpts/GhcStage3HcOpts:
+# * GhcStage0HcOpts/GhcStage1HcOpts/GhcStage2HcOpts:
 #
 #   The stage number refers to the compiler stage being built (ghc library
 #   and executable).
@@ -418,10 +418,13 @@ ifneq "$(wildcard $(GHC).exe)" ""
 GHC := $(GHC).exe
 endif
 
-GHC_STAGE0  = $(GHC)
-GHC_STAGE1  = $(ghc-stage1_INPLACE)
-GHC_STAGE2  = $(ghc-stage2_INPLACE)
-GHC_STAGE3  = $(ghc-stage3_INPLACE)
+# HC_STAGE<N> is the haskell compiler *for* stage <N>. Stage <N+1> is built
+# with the GHC built in stage <N>.
+
+HC_STAGE0  = $(GHC)
+HC_STAGE1  = $(ghc-stage0_INPLACE)
+HC_STAGE2  = $(ghc-stage1_INPLACE)
+HC_STAGE3  = $(ghc-stage2_INPLACE)
 
 BOOTSTRAPPING_CONF = libraries/bootstrapping.conf
 
@@ -531,72 +534,72 @@ MERGE_OBJS_STAGE2_FLAGS = @MergeObjsArgs@
 MERGE_OBJS_STAGE3_FLAGS = @MergeObjsArgs@
 
 # Cross-compiling options
-# See Note [CrossCompiling vs Stage1Only]
+# See Note [CrossCompiling vs Stage0Only]
 CrossCompiling        = @CrossCompiling@
 
 # Change this to YES if you're building a cross-compiler and don't
 # want to build stage 2.
-# See Note [CrossCompiling vs Stage1Only]
-# See Note [Stage1Only vs stage=1]
-Stage1Only = NO
+# See Note [CrossCompiling vs Stage0Only]
+# See Note [Stage0Only vs stage=0]
+Stage0Only = NO
 
 # Installed tools prefix:
-#    we add prefix to crosscompiler GHC only (ghc-stage1),
-#    not cross-built GHC (not ghc-stage2).
-CrossCompilePrefix    = $(if $(filter YES,$(Stage1Only)),@CrossCompilePrefix@,)
+#    we add prefix to crosscompiler GHC only (ghc-stage0),
+#    not cross-built GHC (not ghc-stage1).
+CrossCompilePrefix    = $(if $(filter YES,$(Stage0Only)),@CrossCompilePrefix@,)
 
 # Install stage 2 by default, or stage 1 in the cross compiler
 # case. Can be changed to 3
-INSTALL_GHC_STAGE= $(if $(filter YES,$(Stage1Only)),1,2)
+INSTALL_GHC_STAGE= $(if $(filter YES,$(Stage0Only)),1,2)
 
-# Note [CrossCompiling vs Stage1Only]
+# Note [CrossCompiling vs Stage0Only]
 #
 # There are 4 possible settings:
 #
-# 1 CrossCompiling=NO Stage1Only=NO
+# 1 CrossCompiling=NO Stage0Only=NO
 #   The default.
 #
-# 2 CrossCompiling=NO Stage1Only=YES
-#   Don't build ghc-stage2. See Note [Stage1Only vs stage=1].
+# 2 CrossCompiling=NO Stage0Only=YES
+#   Don't build ghc-stage1. See Note [Stage0Only vs stage=0].
 #
-# 3 CrossCompiling=YES Stage1Only=YES
-#   Building a cross-compiler (ghc-stage1). See [1] and
-#   Note [Stage1Only vs stage=1].
+# 3 CrossCompiling=YES Stage0Only=YES
+#   Building a cross-compiler (ghc-stage0). See [1] and
+#   Note [Stage0Only vs stage=0].
 #
-# 4 CrossCompiling=YES Stage1Only=NO
+# 4 CrossCompiling=YES Stage0Only=NO
 #   Cross-compiling GHC itself. See [1].
 #
 # [1] https://gitlab.haskell.org/ghc/ghc/wikis/building/cross-compiling
 
-# Note [Stage1Only vs stage=1]
+# Note [Stage0Only vs stage=0]
 #
-# Stage1Only=YES means:
-#   - don't build ghc-stage2 (the executable)
-#   - don't build utils that rely on ghc-stage2
-#     See Note [No stage2 packages when CrossCompiling or Stage1Only] in
+# Stage0Only=YES means:
+#   - don't build ghc-stage1 (the executable)
+#   - don't build utils that rely on ghc-stage1
+#     See Note [No stage2 packages when CrossCompiling or Stage0Only] in
 #     ./ghc.mk.
-#   - install ghc-stage1 instead of ghc-stage2
+#   - install ghc-stage0 instead of ghc-stage1
 #   - install the ghc-pkg that was built with the stage0 compiler
-#   - (*do* still build compiler/stage2 (i.e. the ghc library))
+#   - (*do* still build compiler/stage1 (i.e. the ghc library))
 #   - (*do* still build all other libraries)
 #
-# stage=1 means:
-#   - don't build compiler/stage2 (i.e. the ghc library)
-#   - don't build ghc-stage2 (the executable)
+# stage=0 means:
+#   - don't build compiler/stage1 (i.e. the ghc library)
+#   - don't build ghc-stage1 (the executable)
 #   Note: these are the only two things it does. If you want to exclude more
-#   stuff, combine it with Stage1Only=YES, or run make in the ghc or compiler
+#   stuff, combine it with Stage0Only=YES, or run make in the ghc or compiler
 #   directory.
 #
 # running make in the ghc or compiler directory means:
 #   - don't build any packages in the libraries/ directory, except the ones
 #     listed in PACKAGES_STAGE0 (i.e. the boot libraries)
 #
-# You may wonder why Stage1Only=YES still builds compiler/stage2. Quoting
+# You may wonder why Stage0Only=YES still builds compiler/stage1. Quoting
 # simonmar in #7639:
 #
-#     "strictly speaking building compiler/stage2 is correct, because it is
-#     the ghc package that can be used with [ghc-stage1]. If you don't
-#     want to build it, then setting stage=1 in your mk/build.mk should
+#     "strictly speaking building compiler/stage1 is correct, because it is
+#     the ghc package that can be used with [ghc-stage0]. If you don't
+#     want to build it, then setting stage=0 in your mk/build.mk should
 #     disable it."
 
 # C compiler and linker flags from configure (e.g. -m<blah> to select
@@ -877,9 +880,9 @@ CURSES_LIB_DIRS = @CURSES_LIB_DIRS@
 # See Note [Disable -O2 in unregisterised mode]
 # Be careful: 'GhcUnregisterised' should be defined earlier in this file.
 ifeq "$(GhcUnregisterised)" "YES"
+GhcStage0HcOpts=
 GhcStage1HcOpts=
 GhcStage2HcOpts=
-GhcStage3HcOpts=
 
 GhcLibHcOpts=
 endif
