@@ -123,7 +123,8 @@ ifneq "$(BINDIST)" "YES"
 # `includes_dist-install_H_FILES`, so the configure script is properly run when
 # needed.
 rts_dist-install_CONFIGURE_GENERATED_FILES = \
-	rts/dist-install/build/include/ghcautoconf.h
+	rts/dist-install/build/include/ghcautoconf.h \
+	rts/dist-install/build/include/ghcplatform.h
 
 $(rts_dist-install_CONFIGURE_GENERATED_FILES): rts/configure
 	cd rts/dist-install/build ; ../../configure \

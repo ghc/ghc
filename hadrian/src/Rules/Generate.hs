@@ -129,10 +129,10 @@ generatePackageCode context@(Context stage pkg _) = do
     when (pkg == rts) $ do
         root -/- "**" -/- dir -/- "cmm/AutoApply.cmm" %> \file ->
             build $ target context GenApply [] [file]
-        let go gen file = generate file (semiEmptyTarget stage) gen
         root -/- "**" -/- dir -/- "include/ghcautoconf.h" %> \_ ->
             need . pure =<< pkgSetupConfigFile context
-        root -/- "**" -/- dir -/- "include/ghcplatform.h" %> go generateGhcPlatformH
+        root -/- "**" -/- dir -/- "include/ghcplatform.h" %> \_ ->
+            need . pure =<< pkgSetupConfigFile context
         root -/- "**" -/- dir -/- "include/DerivedConstants.h" %> genPlatformConstantsHeader context
 
 genPrimopCode :: Context -> FilePath -> Action ()
@@ -222,59 +222,6 @@ ghcWrapper stage  = do
                                           ]
                                      else [])
                                ++ [ "$@" ]
-
--- | Given a 'String' replace characters '.' and '-' by underscores ('_') so that
--- the resulting 'String' is a valid C preprocessor identifier.
-cppify :: String -> String
-cppify = replaceEq '-' '_' . replaceEq '.' '_'
-
--- | Generate @ghcplatform.h@ header.
-generateGhcPlatformH :: Expr String
-generateGhcPlatformH = do
-    trackGenerateHs
-    stage    <- getStage
-    let chooseSetting x y = getSetting $ if stage == Stage0 then x else y
-    buildPlatform  <- chooseSetting BuildPlatform HostPlatform
-    buildArch      <- chooseSetting BuildArch     HostArch
-    buildOs        <- chooseSetting BuildOs       HostOs
-    buildVendor    <- chooseSetting BuildVendor   HostVendor
-    hostPlatform   <- chooseSetting HostPlatform  TargetPlatform
-    hostArch       <- chooseSetting HostArch      TargetArch
-    hostOs         <- chooseSetting HostOs        TargetOs
-    hostVendor     <- chooseSetting HostVendor    TargetVendor
-    ghcUnreg       <- getFlag    GhcUnregisterised
-    return . unlines $
-        [ "#if !defined(__GHCPLATFORM_H__)"
-        , "#define __GHCPLATFORM_H__"
-        , ""
-        , "#define BuildPlatform_TYPE  " ++ cppify buildPlatform
-        , "#define HostPlatform_TYPE   " ++ cppify hostPlatform
-        , ""
-        , "#define " ++ cppify buildPlatform   ++ "_BUILD 1"
-        , "#define " ++ cppify hostPlatform ++ "_HOST 1"
-        , ""
-        , "#define " ++ buildArch   ++ "_BUILD_ARCH 1"
-        , "#define " ++ hostArch ++ "_HOST_ARCH 1"
-        , "#define BUILD_ARCH " ++ show buildArch
-        , "#define HOST_ARCH "  ++ show hostArch
-        , ""
-        , "#define " ++ buildOs   ++ "_BUILD_OS 1"
-        , "#define " ++ hostOs ++ "_HOST_OS 1"
-        , "#define BUILD_OS " ++ show buildOs
-        , "#define HOST_OS "  ++ show hostOs
-        , ""
-        , "#define " ++ buildVendor   ++ "_BUILD_VENDOR 1"
-        , "#define " ++ hostVendor ++ "_HOST_VENDOR 1"
-        , "#define BUILD_VENDOR " ++ show buildVendor
-        , "#define HOST_VENDOR "  ++ show hostVendor
-        , ""
-        ]
-        ++
-        [ "#define UnregisterisedCompiler 1" | ghcUnreg ]
-        ++
-        [ ""
-        , "#endif /* __GHCPLATFORM_H__ */"
-        ]
 
 -- See Note [tooldir: How GHC finds mingw on Windows]
 generateSettings :: Expr String

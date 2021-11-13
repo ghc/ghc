@@ -1,0 +1,23 @@
+#if !defined(__GHCPLATFORM_H__)
+#define __GHCPLATFORM_H__
+
+#define BuildPlatform_TYPE  @BuildPlatform_CPP@
+#define HostPlatform_TYPE   @HostPlatform_CPP@
+
+#define @BuildPlatform_CPP@_BUILD  1
+#define @HostPlatform_CPP@_HOST  1
+
+#define @BuildArch_CPP@_BUILD_ARCH  1
+#define @HostArch_CPP@_HOST_ARCH  1
+#define BUILD_ARCH  "@BuildArch_CPP@"
+#define HOST_ARCH  "@HostArch_CPP@"
+
+#define @BuildOS_CPP@_BUILD_OS  1
+#define @HostOS_CPP@_HOST_OS  1
+#define BUILD_OS  "@BuildOS_CPP@"
+#define HOST_OS  "@HostOS_CPP@"
+
+#define @BuildVendor_CPP@_BUILD_VENDOR  1
+#define @HostVendor_CPP@_HOST_VENDOR  1
+#define BUILD_VENDOR  "@BuildVendor_CPP@"
+#define HOST_VENDOR  "@HostVendor_CPP@"

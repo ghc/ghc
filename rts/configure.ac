@@ -22,6 +22,8 @@ dnl     #define SIZEOF_CHAR 0
 dnl   recently.
 AC_PREREQ([2.69])
 
+AC_CONFIG_FILES([ghcplatform.h.top])
+
 AC_CONFIG_HEADER([ghcautoconf.h.autoconf])
 
 AC_ARG_ENABLE(asserts-all-ways,
@@ -87,6 +89,10 @@ FP_CC_LLVM_BACKEND
 AS_IF([test x"$CcLlvmBackend" = x"YES"],
   [AC_DEFINE([CC_LLVM_BACKEND], [1], [Define (to 1) if C compiler has an LLVM back end])])
 
+GHC_CONVERT_PLATFORM_PARTS([build], [Build])
+FPTOOLS_SET_PLATFORM_VARS([build],[Build])
+FPTOOLS_SET_HASKELL_PLATFORM_VARS([Build])
+
 GHC_CONVERT_PLATFORM_PARTS([host], [Host])
 FPTOOLS_SET_PLATFORM_VARS([host],[Host])
 FPTOOLS_SET_HASKELL_PLATFORM_VARS([Host])
@@ -94,7 +100,7 @@ FPTOOLS_SET_HASKELL_PLATFORM_VARS([Host])
 GHC_SUBSECTIONS_VIA_SYMBOLS
 AS_IF([test x"${TargetHasSubsectionsViaSymbols}" = x"YES"],
   [AC_DEFINE([HAVE_SUBSECTIONS_VIA_SYMBOLS],[1],
--   [Define to 1 if Apple-style dead-stripping is supported.])])
+  [Define to 1 if Apple-style dead-stripping is supported.])])
 
 dnl --------------------------------------------------
 dnl * Platform header file and syscall feature tests
@@ -360,7 +366,18 @@ dnl --------------------------------------------------------------
 AC_OUTPUT
 
 [
-mkdir -p include/rts
+touch include/ghcplatform.h
+> include/ghcplatform.h
+
+cat ghcplatform.h.top                          >> include/ghcplatform.h
+]
+AS_IF([test x"${GhcUnregisterised}" = x"YES"],
+  [echo "#define UnregisterisedCompiler 1"     >> include/ghcplatform.h])
+[
+cat $srcdir/ghcplatform.h.bottom               >> include/ghcplatform.h
+]
+
+[
 touch include/ghcautoconf.h
 > include/ghcautoconf.h
 
