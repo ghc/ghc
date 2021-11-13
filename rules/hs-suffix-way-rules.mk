@@ -11,7 +11,7 @@
 # -----------------------------------------------------------------------------
 
 
-define hs-suffix-way-rules  # args: $1 = dir,  $2 = distdir, $3 = way, $4 = stage
+define hs-suffix-way-rules  # args: $1 = dir,  $2 = distdir, $3 = way
 
 ifeq "$3 $$($1_$2_DYNAMIC_TOO)" "dyn YES"
 # We only want this rule to be used for Haskell sources, not for
@@ -106,7 +106,7 @@ else
 # [1] https://www.gnu.org/software/make/manual/make.html#Implicit-Rule-Search
 
 $$(foreach dir,$$($1_$2_HS_SRC_DIRS),\
-  $$(eval $$(call hs-suffix-way-rules-srcdir,$1,$2,$3,$$(dir),$4)))
+  $$(eval $$(call hs-suffix-way-rules-srcdir,$1,$2,$3,$$(dir))))
 
 
 ifneq "$$(BINDIST)" "YES"

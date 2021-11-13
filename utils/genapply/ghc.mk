@@ -27,4 +27,4 @@ $(eval $(call build-prog,utils/genapply,dist,0))
 
 # Purposely do the wrong stage for HOST := TARGET hack.
 # See Note [Genapply target as host for RTS macros].
-utils/genapply_dist_CC_OPTS += $(addprefix -I,$(BUILD_1_INCLUDE_DIRS))
+utils/genapply_dist_CC_OPTS += $(addprefix -Irts/include,$(includes_dist-install_DIST_INCLUDE_DIRS))

@@ -126,10 +126,8 @@ $1_$2_$3_MOST_HC_OPTS = \
  -I$1/$2/build \
  -i$1/$2/build/$$(or $$($1_EXECUTABLE),$$($1_$2_PROGNAME),.)/autogen \
  -I$1/$2/build/$$(or $$($1_EXECUTABLE),$$($1_$2_PROGNAME),.)/autogen \
- $$(foreach dir,$$(filter-out /%,$$($1_$2_INCLUDE_DIRS)),-I$1/$$(dir)) \
- $$(foreach dir,$$(filter /%,$$($1_$2_INCLUDE_DIRS)),-I$$(dir)) \
- $$(foreach inc,$$($1_$2_INCLUDE),-\#include "$$(inc)") \
- $$(foreach opt,$$($1_$2_CPP_OPTS),-optP$$(opt)) \
+ $$(foreach dir,$$(filter -I%,$$($1_$2_DIST_CPP_OPTS)),$$(dir)) \
+ $$(foreach opt,$$(filter-out -I%,$$($1_$2_DIST_CPP_OPTS)),-optP$$(opt)) \
  $$(if $$($1_PACKAGE),-optP-include \
     -optP$1/$2/build/$$(or $$($1_EXECUTABLE),$$($1_$2_PROGNAME),.)/autogen/cabal_macros.h) \
  $$($1_$2_$4_DEP_OPTS) \
