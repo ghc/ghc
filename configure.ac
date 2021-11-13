@@ -558,7 +558,6 @@ fi
 AC_SUBST(CrossCompiling)
 AC_SUBST(CrossCompilePrefix)
 AC_SUBST(TargetPlatformFull)
-AC_SUBST(EnableDistroToolchain)
 
 dnl ** Which gcc to use?
 dnl --------------------------------------------------------------

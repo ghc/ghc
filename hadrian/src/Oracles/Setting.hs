@@ -125,6 +125,7 @@ data SettingsFileSetting
     | SettingsFileSetting_ClangCommand
     | SettingsFileSetting_LlcCommand
     | SettingsFileSetting_OptCommand
+    | SettingsFileSetting_DistroMinGW
 
 -- | Look up the value of a 'Setting' in @cfg/system.config@, tracking the
 -- result.
@@ -215,6 +216,7 @@ settingsFileSetting key = lookupValueOrError configFile $ case key of
     SettingsFileSetting_ClangCommand -> "settings-clang-command"
     SettingsFileSetting_LlcCommand -> "settings-llc-command"
     SettingsFileSetting_OptCommand -> "settings-opt-command"
+    SettingsFileSetting_DistroMinGW -> "settings-use-distro-mingw"
 
 -- | An expression that looks up the value of a 'Setting' in @cfg/system.config@,
 -- tracking the result.

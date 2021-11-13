@@ -139,12 +139,16 @@ play nice with the system compiler instead.
 
 -- | Expand occurrences of the @$tooldir@ interpolation in a string
 -- on Windows, leave the string untouched otherwise.
-expandToolDir :: Maybe FilePath -> String -> String
-#if defined(mingw32_HOST_OS) && !defined(USE_INPLACE_MINGW_TOOLCHAIN)
-expandToolDir (Just tool_dir) s = expandPathVar "tooldir" tool_dir s
-expandToolDir Nothing         _ = panic "Could not determine $tooldir"
+expandToolDir
+  :: Bool -- ^ whether we are use the ambiant mingw toolchain
+  -> Maybe FilePath -- ^ tooldir
+  -> String -> String
+#if defined(mingw32_HOST_OS)
+expandToolDir False (Just tool_dir) s = expandPathVar "tooldir" tool_dir s
+expandToolDir False Nothing         _ = panic "Could not determine $tooldir"
+expandToolDir True  _               s = s
 #else
-expandToolDir _ s = s
+expandToolDir _ _ s = s
 #endif
 
 -- | Returns a Unix-format path pointing to TopDir.
@@ -180,10 +184,11 @@ tryFindTopDir Nothing
 -- tooldir can't be located, or returns @Just tooldirpath@.
 -- If the distro toolchain is being used we treat Windows the same as Linux
 findToolDir
-  :: FilePath -- ^ topdir
+  :: Bool -- ^ whether we are use the ambiant mingw toolchain
+  -> FilePath -- ^ topdir
   -> IO (Maybe FilePath)
-#if defined(mingw32_HOST_OS) && !defined(USE_INPLACE_MINGW_TOOLCHAIN)
-findToolDir top_dir = go 0 (top_dir </> "..") []
+#if defined(mingw32_HOST_OS)
+findToolDir False top_dir = go 0 (top_dir </> "..") []
   where maxDepth = 3
         go :: Int -> FilePath -> [FilePath] -> IO (Maybe FilePath)
         go k path tried
@@ -196,6 +201,7 @@ findToolDir top_dir = go 0 (top_dir </> "..") []
               if oneLevel
                 then return (Just path)
                 else go (k+1) (path </> "..") tried
+findToolDir True _ = return Nothing
 #else
-findToolDir _ = return Nothing
+findToolDir _ _ = return Nothing
 #endif

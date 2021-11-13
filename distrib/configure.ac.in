@@ -82,6 +82,13 @@ FIND_PYTHON
 
 XCODE_VERSION()
 
+AC_ARG_ENABLE(distro-toolchain,
+[AS_HELP_STRING([--enable-distro-toolchain],
+                [Do not use bundled Windows toolchain binaries.])],
+  [FP_CAPITALIZE_YES_NO(["$enableval"], [EnableDistroToolchain])],
+  [EnableDistroToolchain=@SettingsUseDistroMINGW@]
+)
+
 dnl ** Which gcc to use?
 dnl --------------------------------------------------------------
 AC_PROG_CC([gcc clang])

@@ -141,6 +141,7 @@ lib/settings :
 	@echo ',("LLVM llc command", "$(SettingsLlcCommand)")' >> $@
 	@echo ',("LLVM opt command", "$(SettingsOptCommand)")' >> $@
 	@echo ',("LLVM clang command", "$(SettingsClangCommand)")' >> $@
+	@echo ',("Use inplace MinGW toolchain", "$(SettingsUseDistroMINGW)")' >> $@
 	@echo
 	@echo ',("Use interpreter", "$(GhcWithInterpreter)")' >> $@
 	@echo ',("Support SMP", "$(GhcWithSMP)")' >> $@
@@ -148,7 +149,7 @@ lib/settings :
 	@echo ',("Tables next to code", "$(TablesNextToCode)")' >> $@
 	@echo ',("Leading underscore", "$(LeadingUnderscore)")' >> $@
 	@echo ',("Use LibFFI", "$(UseLibffiForAdjustors)")' >> $@
-	@echo ",(\"RTS expects libdw\", \"$(GhcRtsWithLibdw)\")" >> $@
+	@echo ',("RTS expects libdw", "$(GhcRtsWithLibdw)")' >> $@
 	@echo "]" >> $@
 
 # We need to install binaries relative to libraries.

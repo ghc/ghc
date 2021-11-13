@@ -22,6 +22,7 @@ module GHC.Settings
   , sLdSupportsFilelist
   , sLdIsGnuLd
   , sGccSupportsNoPie
+  , sUseInplaceMinGW
   , sPgm_L
   , sPgm_P
   , sPgm_F
@@ -89,6 +90,7 @@ data ToolSettings = ToolSettings
   , toolSettings_ldSupportsFilelist      :: Bool
   , toolSettings_ldIsGnuLd               :: Bool
   , toolSettings_ccSupportsNoPie         :: Bool
+  , toolSettings_useInplaceMinGW         :: Bool
 
   -- commands for particular phases
   , toolSettings_pgm_L       :: String
@@ -190,6 +192,8 @@ sLdIsGnuLd :: Settings -> Bool
 sLdIsGnuLd = toolSettings_ldIsGnuLd . sToolSettings
 sGccSupportsNoPie :: Settings -> Bool
 sGccSupportsNoPie = toolSettings_ccSupportsNoPie . sToolSettings
+sUseInplaceMinGW :: Settings -> Bool
+sUseInplaceMinGW = toolSettings_useInplaceMinGW . sToolSettings
 
 sPgm_L :: Settings -> String
 sPgm_L = toolSettings_pgm_L . sToolSettings
