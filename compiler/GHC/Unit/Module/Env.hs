@@ -28,6 +28,7 @@ module GHC.Unit.Module.Env
    , extendInstalledModuleEnv
    , filterInstalledModuleEnv
    , delInstalledModuleEnv
+   , plusInstalledModuleEnv
    )
 where
 
@@ -207,7 +208,6 @@ type DModuleNameEnv elt = UniqDFM ModuleName elt
 
 -- | A map keyed off of 'InstalledModule'
 newtype InstalledModuleEnv elt = InstalledModuleEnv (Map InstalledModule elt)
-  deriving (Monoid, Semigroup)
 
 emptyInstalledModuleEnv :: InstalledModuleEnv a
 emptyInstalledModuleEnv = InstalledModuleEnv Map.empty
@@ -225,3 +225,6 @@ filterInstalledModuleEnv f (InstalledModuleEnv e) =
 delInstalledModuleEnv :: InstalledModuleEnv a -> InstalledModule -> InstalledModuleEnv a
 delInstalledModuleEnv (InstalledModuleEnv e) m = InstalledModuleEnv (Map.delete m e)
 
+-- | Left-biased
+plusInstalledModuleEnv :: InstalledModuleEnv a -> InstalledModuleEnv a -> InstalledModuleEnv a
+plusInstalledModuleEnv (InstalledModuleEnv a) (InstalledModuleEnv b) = InstalledModuleEnv (a `mappend` b)
