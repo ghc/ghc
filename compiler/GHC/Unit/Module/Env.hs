@@ -51,7 +51,6 @@ import qualified GHC.Data.FiniteMap as Map
 
 -- | A map keyed off of 'Module's
 newtype ModuleEnv elt = ModuleEnv (Map NDModule elt)
-  deriving (Monoid, Semigroup)
 
 {-
 Note [ModuleEnv performance and determinism]
