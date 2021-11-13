@@ -11,7 +11,6 @@
 # -----------------------------------------------------------------------------
 
 # stage0
-utils/hp2ps_dist_CC_OPTS += $(addprefix -I,$(BUILD_0_INCLUDE_DIRS))
 utils/hp2ps_dist_C_SRCS          = AreaBelow.c Curves.c Error.c Main.c \
                                    Reorder.c TopTwenty.c AuxFile.c Deviation.c \
                                    HpFile.c Marks.c Scale.c TraceElement.c \
@@ -24,7 +23,6 @@ utils/hp2ps_dist_SHELL_WRAPPER              = YES
 utils/hp2ps_dist_INSTALL_SHELL_WRAPPER_NAME = hp2ps
 
 # stage 1
-utils/hp2ps_dist-install_CC_OPTS += $(addprefix -I,$(BUILD_1_INCLUDE_DIRS))
 utils/hp2ps_dist-install_C_SRCS = $(utils/hp2ps_dist_C_SRCS)
 utils/hp2ps_dist-install_EXTRA_LIBRARIES = $(utils/hp2ps_dist_EXTRA_LIBRARIES)
 utils/hp2ps_dist-install_PROGNAME        = $(utils/hp2ps_dist_PROGNAME)

@@ -214,7 +214,7 @@ rts_$1_DTRACE_OBJS = rts/dist-install/build/RtsProbes.$$($1_osuf)
 
 $$(rts_$1_DTRACE_OBJS) : $$(rts_$1_OBJS)
 	$(DTRACE) -G -C \
-		$$(addprefix -I,$$(BUILD_1_INCLUDE_DIRS)) \
+		$$(addprefix -Irts/,$$(rts_dist-install_DIST_INCLUDE_DIRS)) \
 		-DDTRACE -s rts/RtsProbes.d \
 		-o $$@ \
 		$$(rts_$1_OBJS)
@@ -377,22 +377,23 @@ WARNING_OPTS += -Wno-aggregate-return
 # support for registerised builds on this arch. -- BL 2010/02/03
 # WARNING_OPTS += -Wcast-align
 
-STANDARD_OPTS += \
-	$(addprefix -I,$(BUILD_1_INCLUDE_DIRS)) \
-	-Irts \
-	-Irts/dist-install/build
+rts_INCLUDE_DIRS = \
+	$(addprefix include/,$(includes_INCLUDE_DIRS)) \
+	.
+
+rts_dist-install_INCLUDE_DIRS = \
+	$(addprefix include/,$(includes_dist-install_INCLUDE_DIRS))
 
 # COMPILING_RTS is only used when building Win32 DLL support.
-STANDARD_OPTS += -DCOMPILING_RTS -DFS_NAMESPACE=rts
+rts_CPP_OPTS += -DCOMPILING_RTS -DFS_NAMESPACE=rts
 
 # HC_OPTS is included in both .c and .cmm compilations, whereas CC_OPTS is
 # only included in .c compilations.  HC_OPTS included the WAY_* opts, which
 # must be included in both types of compilations.
 
 rts_CC_OPTS += $(WARNING_OPTS)
-rts_CC_OPTS += $(STANDARD_OPTS)
 
-rts_HC_OPTS += $(STANDARD_OPTS) -this-unit-id rts
+rts_HC_OPTS += -this-unit-id rts
 
 ifneq "$(GhcWithSMP)" "YES"
 rts_CC_OPTS += -DNOSMP
@@ -620,7 +621,7 @@ endif
 
 DTRACEPROBES_SRC = rts/RtsProbes.d
 $(DTRACEPROBES_H): $(DTRACEPROBES_SRC) $(includes_1_H_CONFIG) $(includes_1_H_PLATFORM) | $$(dir $$@)/.
-	"$(DTRACE)" $(filter -I%,$(rts_CC_OPTS)) -C $(DTRACE_FLAGS) -h -o $@ -s $<
+	"$(DTRACE)" $(filter -I%,$(rts_dist-install_DIST_CC_OPTS)) -C $(DTRACE_FLAGS) -h -o $@ -s $<
 endif
 
 # -----------------------------------------------------------------------------
@@ -635,7 +636,11 @@ ifeq "$(HaveLibMingwEx)" "YES"
 rts_PACKAGE_CPP_OPTS += -DHAVE_LIBMINGWEX
 endif
 
-$(eval $(call manual-package-config,rts,dist-install,1))
+rts_dist-install_PACKAGE_CPP_OPTS = \
+	$(rts_PACKAGE_CPP_OPTS) \
+	$(addprefix -Irts/,$(rts_dist-install_DIST_INCLUDE_DIRS))
+
+$(eval $(call manual-package-config,rts,dist-install))
 
 rts/dist-install/package.conf.inplace : $(includes_dist-install_H_FILES)
 rts/dist-install/package.conf.install : $(includes_dist-install_H_FILES)

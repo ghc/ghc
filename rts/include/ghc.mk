@@ -19,8 +19,15 @@ includes_2_H_CONFIG   = $(includes_1_H_CONFIG)
 includes_1_H_PLATFORM = rts/dist-install/build/include/ghcplatform.h
 includes_2_H_PLATFORM = $(includes_1_H_PLATFORM)
 
-BUILD_1_INCLUDE_DIRS = rts/include rts/dist-install/build/include
-BUILD_2_INCLUDE_DIRS = $(BUILD_1_INCLUDE_DIRS)
+includes_INCLUDE_DIRS = .
+# "includes" isn't really a separate component, but just part of the RTS that
+# is in a separate ghc.mk for historical reasons. The ../dist-install puts the
+# build products with the rest of the RTS's.
+includes_dist-install_INCLUDE_DIRS = ../dist-install/build/include
+
+includes_dist-install_DIST_INCLUDE_DIRS = \
+	$(includes_INCLUDE_DIRS) \
+	$(includes_dist-install_INCLUDE_DIRS)
 
 #
 # All header files are in rts/include/{one of these subdirectories}
@@ -63,8 +70,7 @@ ifeq "$(GhcUnregisterised)" "YES"
 includes_CC_OPTS += -DUSE_MINIINTERPRETER
 endif
 
-includes_CC_OPTS += $(addprefix -I,$(BUILD_1_INCLUDE_DIRS))
-includes_CC_OPTS += -Irts
+includes_CC_OPTS += $(addprefix -Irts/,$(rts_dist-install_DIST_INCLUDE_DIRS))
 
 ifneq "$(GhcWithSMP)" "YES"
 includes_CC_OPTS += -DNOSMP

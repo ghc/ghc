@@ -18,11 +18,6 @@
 
 compiler_stage1_C_FILES_NODEPS = compiler/cbits/cutils.c
 
-# We need to decrement the 1-indexed compiler stage to be the 0-indexed stage
-# we use everwhere else.
-dec1 = 0
-dec2 = 1
-dec3 = 2
 # TODO(@Ericson2314) Get rid of compiler-specific stage indices. I think the
 # argument was stage n ghc is used to build stage n everything else, but I
 # don't buy that argument.
@@ -113,11 +108,8 @@ PRIMOP_BITS_STAGE3 = $(addprefix compiler/stage3/build/,$(PRIMOP_BITS_NAMES))
 define preprocessCompilerFiles
 # $1 = compiler stage (build system stage + 1)
 compiler/stage$1/build/primops.txt: \
-		compiler/GHC/Builtin/primops.txt.pp \
-		$(includes_$(dec$1)_H_CONFIG) \
-		$(includes_$(dec$1)_H_PLATFORM)
-	$$(HS_CPP) -P $$(compiler_CPP_OPTS) \
-		-Icompiler/stage$1 \
+		compiler/GHC/Builtin/primops.txt.pp
+	$$(HS_CPP) -P \
 		-x c $$< | grep -v '^#pragma GCC' > $$@
 
 compiler/stage$1/build/primop-data-decl.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
