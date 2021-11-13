@@ -55,12 +55,6 @@ packageArgs = do
           , builder (Cabal Setup) ? mconcat
             [ arg "--disable-library-for-ghci"
             , anyTargetOs ["openbsd"] ? arg "--ld-options=-E"
-            , flag GhcUnregisterised ? arg "--ghc-option=-DNO_REGS"
-            , notM targetSupportsSMP ? arg "--ghc-option=-DNOSMP"
-            , notM targetSupportsSMP ? arg "--ghc-option=-optc-DNOSMP"
-            , ghcWithInterpreter ?
-              ghciWithDebugger <$> flavour ?
-              notStage0 ? arg "--ghc-option=-DDEBUGGER"
             , ghcProfiled <$> flavour ?
               notStage0 ? arg "--ghc-pkg-option=--force" ]
 

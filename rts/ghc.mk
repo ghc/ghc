@@ -214,8 +214,7 @@ rts_$1_DTRACE_OBJS = rts/dist-install/build/RtsProbes.$$($1_osuf)
 
 $$(rts_$1_DTRACE_OBJS) : $$(rts_$1_OBJS)
 	$(DTRACE) -G -C \
-		$$(addprefix -I,$$(GHC_INCLUDE_DIRS)) \
-		-I$$(BUILD_1_INCLUDE_DIR) \
+		$$(addprefix -I,$$(BUILD_1_INCLUDE_DIRS)) \
 		-DDTRACE -s rts/RtsProbes.d \
 		-o $$@ \
 		$$(rts_$1_OBJS)
@@ -379,8 +378,7 @@ WARNING_OPTS += -Wno-aggregate-return
 # WARNING_OPTS += -Wcast-align
 
 STANDARD_OPTS += \
-	$(addprefix -I,$(GHC_INCLUDE_DIRS)) \
-	-I$(BUILD_1_INCLUDE_DIR) \
+	$(addprefix -I,$(BUILD_1_INCLUDE_DIRS)) \
 	-Irts \
 	-Irts/dist-install/build
 
