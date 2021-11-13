@@ -51,12 +51,6 @@ configurePackageRules = do
           isGmp <- (== "gmp") <$> interpretInContext ctx getBignumBackend
           when isGmp $
             need [buildP -/- "include/ghc-gmp.h"]
-        when (pkg == rts) $ do
-          -- Rts.h is a header listed in the cabal file, and configuring
-          -- therefore wants to ensure that the header "works" post-configure.
-          -- But it (transitively) includes this, so we must ensure it exists
-          -- for that check to work.
-          need [buildP -/- "include/ghcplatform.h"]
         Cabal.configurePackage ctx
 
     root -/- "**/autogen/cabal_macros.h" %> \out -> do

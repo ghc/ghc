@@ -414,6 +414,7 @@ rtsPackageArgs = package rts ? do
           , flag UseLibzstd                 `cabalFlag` "libzstd"
           , flag StaticLibzstd              `cabalFlag` "static-libzstd"
           , queryTargetTarget tgtSymbolsHaveLeadingUnderscore `cabalFlag` "leading-underscore"
+          , ghcUnreg                        `cabalFlag` "unregisterised"
           , ghcEnableTNC                    `cabalFlag` "tables-next-to-code"
           , Debug `wayUnit` way             `cabalFlag` "find-ptr"
           ]
