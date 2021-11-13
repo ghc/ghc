@@ -1,0 +1,29 @@
+
+==================== Output Cmm ====================
+[stg_sink_hp() { //  [R1]
+         { info_tbls: []
+           stack_info: arg_space: 8
+         }
+     {offset
+       c7: // global
+           //tick src<cmm_sink_hp.cmm:(4,1)-(22,1)>
+           //tick src<cmm_sink_hp.cmm:11:8-19>
+           //tick src<cmm_sink_hp.cmm:12:8-20>
+           //tick src<cmm_sink_hp.cmm:13:8-22>
+           //tick src<cmm_sink_hp.cmm:14:8-23>
+           //tick src<cmm_sink_hp.cmm:15:8-23>
+           //tick src<cmm_sink_hp.cmm:17:11-22>
+           _c2::P64 = P64[R1];
+           I64[Hp + 8] = I64[_c2::P64];
+           //tick src<cmm_sink_hp.cmm:18:11-23>
+           I64[Hp + 16] = I64[_c2::P64 + 8];
+           //tick src<cmm_sink_hp.cmm:19:11-23>
+           I64[Hp + 24] = I64[_c2::P64 + 16];
+           //tick src<cmm_sink_hp.cmm:20:11-23>
+           I64[Hp + 32] = I64[_c2::P64 + 24];
+           R1 = _c2::P64;
+           call (P64[Sp])(R1) args: 8, res: 0, upd: 8;
+     }
+ }]
+
+

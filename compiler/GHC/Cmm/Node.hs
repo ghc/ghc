@@ -46,6 +46,7 @@ import Data.List (tails,sortBy)
 import GHC.Types.Unique (nonDetCmpUnique)
 import GHC.Utils.Misc
 
+import GHC.Platform (Platform)
 
 ------------------------
 -- CmmNode
@@ -347,6 +348,25 @@ instance UserOfRegs GlobalReg (CmmNode e x) where
     where fold :: forall a b.  UserOfRegs GlobalReg a
                => (b -> GlobalReg -> b) -> b -> a -> b
           fold f z n = foldRegsUsed platform f z n
+
+instance UserOfRegs CmmReg (CmmNode e x) where
+  {-# INLINE foldRegsUsed #-}
+  foldRegsUsed = foldRegsUsed_cmmReg_node
+
+{-# INLINEABLE foldRegsUsed_cmmReg_node #-}
+foldRegsUsed_cmmReg_node :: Platform -> (b->CmmReg->b) -> b -> CmmNode e x -> b
+foldRegsUsed_cmmReg_node platform f !z n = case n of
+  CmmAssign _ expr -> fold f z expr
+  CmmStore addr rval _align -> fold f (fold f z addr) rval
+  CmmUnsafeForeignCall t _ args -> fold f (fold f z t) args
+  CmmCondBranch expr _ _ _ -> fold f z expr
+  CmmSwitch expr _ -> fold f z expr
+  CmmCall {cml_target=tgt, cml_args_regs=args} -> fold f (fold f z args) tgt
+  CmmForeignCall {tgt=tgt, args=args} -> fold f (fold f z tgt) args
+  _ -> z
+  where fold :: forall a b.  UserOfRegs CmmReg a
+              => (b -> CmmReg -> b) -> b -> a -> b
+        fold f z n = foldRegsUsed platform f z n
 
 instance (Ord r, UserOfRegs r CmmReg) => UserOfRegs r ForeignTarget where
   -- The (Ord r) in the context is necessary here

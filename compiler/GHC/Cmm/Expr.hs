@@ -78,6 +78,10 @@ instance Eq CmmExpr where       -- Equality ignores the types
   CmmStackSlot a1 i1 == CmmStackSlot a2 i2 = a1==a2 && i1==i2
   _e1                == _e2                = False
 
+-- Useful for debugging.
+instance Outputable CmmExpr where
+  ppr = text . show
+
 data AlignmentSpec = NaturallyAligned | Unaligned
   deriving (Eq, Ord, Show)
 
@@ -383,6 +387,34 @@ instance Ord r => UserOfRegs r r where
 
 instance Ord r => DefinerOfRegs r r where
     foldRegsDefd _ f z r = f z r
+
+-- | This is a instance of convenience.
+-- For performance sensitive code paths rather
+-- fold over local and global regs separately.
+instance UserOfRegs CmmReg GlobalReg where
+    {-# INLINEABLE foldRegsUsed #-}
+    foldRegsUsed _ f z reg = f z (CmmGlobal reg)
+
+-- | This is a instance of convenience.
+-- For performance sensitive code paths rather
+-- fold over local and global regs separately.
+instance DefinerOfRegs CmmReg GlobalReg where
+    foldRegsDefd _ f z reg  = f z (CmmGlobal reg)
+
+-- | This is a instance of convenience.
+-- For performance sensitive code paths rather
+-- fold over local and global regs separately.
+instance UserOfRegs CmmReg LocalReg where
+    {-# INLINEABLE foldRegsUsed #-}
+    foldRegsUsed _ f z reg  = f z (CmmLocal reg)
+
+-- | This is a instance of convenience.
+-- For performance sensitive code paths rather
+-- fold over local and global regs separately.
+instance DefinerOfRegs CmmReg LocalReg where
+    {-# INLINEABLE foldRegsDefd #-}
+    foldRegsDefd _ f z reg  = f z (CmmLocal reg)
+
 
 instance (Ord r, UserOfRegs r CmmReg) => UserOfRegs r CmmExpr where
   -- The (Ord r) in the context is necessary here

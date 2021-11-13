@@ -194,6 +194,7 @@ Library
         GHC.Cmm.Lexer
         GHC.Cmm.Lint
         GHC.Cmm.Liveness
+        GHC.Cmm.Alias
         GHC.Cmm.MachOp
         GHC.Cmm.Node
         GHC.Cmm.Opt

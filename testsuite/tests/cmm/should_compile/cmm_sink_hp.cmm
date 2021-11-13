@@ -1,0 +1,22 @@
+#include "Cmm.h"
+
+stg_sink_hp ( P_ r1 )
+{
+    // Should produce a series of loads that are sunk into
+    // stores to Hp like this:
+    //    W_[Hp + 16] = W_[x1 + 1];   // CmmStore
+    //    W_[Hp + 24] = W_[x1 + 2];   // CmmStore
+
+    P_ x1,y1, y2, y3,y4;
+    x1 = P_[r1];
+    y1 = W_[x1];
+    y2 = W_[x1+8];
+    y3 = W_[x1+16];
+    y4 = W_[x1+24];
+
+    W_[Hp+8] = y1;
+    W_[Hp+16] = y2;
+    W_[Hp+24] = y3;
+    W_[Hp+32] = y4;
+    return (x1);
+}

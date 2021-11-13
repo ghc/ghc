@@ -1,0 +1,16 @@
+
+==================== Output Cmm ====================
+[violate_hp_invariant() { //  []
+         { info_tbls: []
+           stack_info: arg_space: 8
+         }
+     {offset
+       c3: _c2::I64 = I64[Hp + 16];
+           I64[Hp + 8] = 1;
+           I64[Hp + 16] = _c2::I64;
+           R1 = _c2::I64;
+           call (P64[Sp])(R1) args: 8, res: 0, upd: 8;
+     }
+ }]
+
+

@@ -114,8 +114,9 @@ cpsTop logger platform cfg proc =
       dump Opt_D_dump_cmm_sp "Layout Stack" g
 
       ----------- Sink and inline assignments  --------------------------------
+      let sink_aliasing = if cmmOptSinkAlias cfg then SinkWithAliasAnalysis else SinkWithoutAliasAnalysis
       g <- {-# SCC "sink" #-} -- See Note [Sinking after stack layout]
-           condPass (cmmOptSink cfg) (cmmSink platform) g
+           condPass (cmmOptSink cfg) (cmmSink platform sink_aliasing) g
                     Opt_D_dump_cmm_sink "Sink assignments"
 
       ------------- CAF analysis ----------------------------------------------

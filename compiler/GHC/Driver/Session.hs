@@ -3393,6 +3393,7 @@ fFlagsDeps = [
   flagSpec "case-folding"                     Opt_CaseFolding,
   flagSpec "cmm-elim-common-blocks"           Opt_CmmElimCommonBlocks,
   flagSpec "cmm-sink"                         Opt_CmmSink,
+  flagSpec "cmm-sink-alias"                   Opt_CmmSinkAlias,
   flagSpec "cmm-static-pred"                  Opt_CmmStaticPred,
   flagSpec "cse"                              Opt_CSE,
   flagSpec "stg-cse"                          Opt_StgCSE,
@@ -3989,6 +3990,7 @@ optLevelFlags -- see Note [Documenting optimisation flags]
     , ([1,2],   Opt_CmmElimCommonBlocks)
     , ([2],     Opt_AsmShortcutting)
     , ([1,2],   Opt_CmmSink)
+    , ([2],     Opt_CmmSinkAlias)
     , ([1,2],   Opt_CmmStaticPred)
     , ([1,2],   Opt_CSE)
     , ([1,2],   Opt_StgCSE)

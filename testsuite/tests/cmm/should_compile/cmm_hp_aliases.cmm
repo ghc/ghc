@@ -1,0 +1,12 @@
+#include "Cmm.h"
+
+violate_hp_invariant ()
+{
+  W_ x1, x2;
+  x1 = Hp + 8;
+  x2 = W_[x1+8];
+  W_[Hp+8] = 1;
+  W_[Hp+16] = x2; // We shouldn't inline the alignment to x2 here because it conflichts with the write above.
+                   // If we end up with something like W_[Hp+16] = W_[Hp+8] it's broken.
+  return (x2);
+}

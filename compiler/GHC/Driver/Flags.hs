@@ -216,7 +216,8 @@ data GeneralFlag
    | Opt_LlvmTBAA                       -- Use LLVM TBAA infrastructure for improving AA (hidden flag)
    | Opt_LlvmFillUndefWithGarbage       -- Testing for undef bugs (hidden flag)
    | Opt_IrrefutableTuples
-   | Opt_CmmSink
+   | Opt_CmmSink                        -- ^ Run cmm sinking pass.
+   | Opt_CmmSinkAlias                   -- ^ When doing cmm sinking, perform aliasing analysis to improve sinking.
    | Opt_CmmStaticPred
    | Opt_CmmElimCommonBlocks
    | Opt_CmmControlFlow
@@ -446,6 +447,7 @@ optimisationFlags = EnumSet.fromList
    , Opt_LlvmFillUndefWithGarbage
    , Opt_IrrefutableTuples
    , Opt_CmmSink
+   , Opt_CmmSinkAlias
    , Opt_CmmElimCommonBlocks
    , Opt_AsmShortcutting
    , Opt_OmitYields

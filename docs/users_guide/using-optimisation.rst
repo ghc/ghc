@@ -225,6 +225,17 @@ by saying ``-fno-wombat``.
     to their usage sites. It also inlines simple expressions like
     literals or registers.
 
+.. ghc-flag:: -fcmm-sink-alias
+    :shortdesc: Enable more complex aliasing analysis to improve the sinking pass. Implied by :ghc-flag:`-O2`.
+    :type: dynamic
+    :reverse: -fno-cmm-sink
+    :category:
+
+    :default: off but enabled with :ghc-flag:`-O2`.
+
+    This allows us to remove more intermediate variables in the Cmm pass.
+    For some programs this can avoid excessive spilling.
+
 .. ghc-flag:: -fcmm-static-pred
     :shortdesc: Enable static control flow prediction. Implied by :ghc-flag:`-O`.
     :type: dynamic
