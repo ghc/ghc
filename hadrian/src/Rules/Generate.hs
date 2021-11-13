@@ -246,7 +246,6 @@ generateGhcPlatformH = do
     hostOs         <- chooseSetting HostOs        TargetOs
     hostVendor     <- chooseSetting HostVendor    TargetVendor
     ghcUnreg       <- getFlag    GhcUnregisterised
-    inplaceTools   <- getFlag    SystemDistroMINGW
     return . unlines $
         [ "#if !defined(__GHCPLATFORM_H__)"
         , "#define __GHCPLATFORM_H__"
@@ -273,8 +272,6 @@ generateGhcPlatformH = do
         , "#define HOST_VENDOR "  ++ show hostVendor
         , ""
         ]
-        ++
-        [ "#define USE_INPLACE_MINGW_TOOLCHAIN 1" | inplaceTools ]
         ++
         [ "#define UnregisterisedCompiler 1" | ghcUnreg ]
         ++
@@ -330,6 +327,7 @@ generateSettings = do
         , ("LLVM llc command", expr $ settingsFileSetting SettingsFileSetting_LlcCommand)
         , ("LLVM opt command", expr $ settingsFileSetting SettingsFileSetting_OptCommand)
         , ("LLVM clang command", expr $ settingsFileSetting SettingsFileSetting_ClangCommand)
+        , ("Use inplace MinGW toolchain", expr $ settingsFileSetting SettingsFileSetting_DistroMinGW)
 
         , ("Use interpreter", expr $ yesNo <$> ghcWithInterpreter)
         , ("Support SMP", expr $ yesNo <$> targetSupportsSMP)

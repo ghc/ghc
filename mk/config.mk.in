@@ -487,6 +487,7 @@ SettingsTouchCommand = @SettingsTouchCommand@
 SettingsClangCommand = @SettingsClangCommand@
 SettingsLlcCommand = @SettingsLlcCommand@
 SettingsOptCommand = @SettingsOptCommand@
+SettingsUseDistroMINGW=@SettingsUseDistroMINGW@
 
 #-----------------------------------------------------------------------------
 # C compiler

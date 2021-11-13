@@ -35,12 +35,6 @@ initSettings
   => String -- ^ TopDir path
   -> ExceptT SettingsError m Settings
 initSettings top_dir = do
-  -- see Note [topdir: How GHC finds its files]
-  -- NB: top_dir is assumed to be in standard Unix
-  -- format, '/' separated
-  mtool_dir <- liftIO $ findToolDir top_dir
-        -- see Note [tooldir: How GHC finds mingw on Windows]
-
   let installed :: FilePath -> FilePath
       installed file = top_dir </> file
       libexec :: FilePath -> FilePath
@@ -58,24 +52,31 @@ initSettings top_dir = do
     Nothing -> throwE $ SettingsError_BadData $
       "Can't parse " ++ show settingsFile
   let mySettings = Map.fromList settingsList
+      getBooleanSetting :: String -> ExceptT SettingsError m Bool
+      getBooleanSetting key = either pgmError pure $
+        getRawBooleanSetting settingsFile mySettings key
+
+  -- On Windows, by mingw is often distributed with GHC,
+  -- so we look in TopDir/../mingw/bin,
+  -- as well as TopDir/../../mingw/bin for hadrian.
+  -- But we might be disabled, in which we we don't do that.
+  useInplaceMinGW <- getBooleanSetting "Use inplace MinGW toolchain"
+
+  -- see Note [topdir: How GHC finds its files]
+  -- NB: top_dir is assumed to be in standard Unix
+  -- format, '/' separated
+  mtool_dir <- liftIO $ findToolDir useInplaceMinGW top_dir
+        -- see Note [tooldir: How GHC finds mingw on Windows]
+
   -- See Note [Settings file] for a little more about this file. We're
   -- just partially applying those functions and throwing 'Left's; they're
   -- written in a very portable style to keep ghc-boot light.
   let getSetting key = either pgmError pure $
         getRawFilePathSetting top_dir settingsFile mySettings key
       getToolSetting :: String -> ExceptT SettingsError m String
-      getToolSetting key = expandToolDir mtool_dir <$> getSetting key
-      getBooleanSetting :: String -> ExceptT SettingsError m Bool
-      getBooleanSetting key = either pgmError pure $
-        getRawBooleanSetting settingsFile mySettings key
+      getToolSetting key = expandToolDir useInplaceMinGW mtool_dir <$> getSetting key
   targetPlatformString <- getSetting "target platform string"
   myExtraGccViaCFlags <- getSetting "GCC extra via C opts"
-  -- On Windows, mingw is distributed with GHC,
-  -- so we look in TopDir/../mingw/bin,
-  -- as well as TopDir/../../mingw/bin for hadrian.
-  -- It would perhaps be nice to be able to override this
-  -- with the settings file, but it would be a little fiddly
-  -- to make that possible, so for now you can't.
   cc_prog <- getToolSetting "C compiler command"
   cc_args_str <- getSetting "C compiler flags"
   cxx_args_str <- getSetting "C++ compiler flags"
@@ -162,6 +163,7 @@ initSettings top_dir = do
       , toolSettings_ldSupportsFilelist      = ldSupportsFilelist
       , toolSettings_ldIsGnuLd               = ldIsGnuLd
       , toolSettings_ccSupportsNoPie         = gccSupportsNoPie
+      , toolSettings_useInplaceMinGW         = useInplaceMinGW
 
       , toolSettings_pgm_L   = unlit_path
       , toolSettings_pgm_P   = (cpp_prog, cpp_args)

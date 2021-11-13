@@ -127,7 +127,6 @@ BuildVendor_CPP         = @BuildVendor_CPP@
 # Valid options: YES/NO
 #
 LeadingUnderscore=@LeadingUnderscore@
-SettingsUseDistroMINGW=@SettingsUseDistroMINGW@
 
 # Pin a suffix on executables? If so, what (Windows only).
 exeext0=@exeext_host@

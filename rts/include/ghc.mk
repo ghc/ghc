@@ -160,9 +160,6 @@ $$(includes_$1_H_PLATFORM) : rts/include/ghc.mk rts/include/Makefile | $$$$(dir 
 	@echo "#define BUILD_VENDOR  \"$(BuildVendor_$1_CPP)\""     >> $$@
 	@echo "#define HOST_VENDOR  \"$(HostVendor_$1_CPP)\""       >> $$@
 	@echo                                                       >> $$@
-ifeq "$$(SettingsUseDistroMINGW)" "YES"
-	@echo "#define USE_INPLACE_MINGW_TOOLCHAIN 1"               >> $$@
-endif
 ifeq "$$(GhcUnregisterised)" "YES"
 	@echo "#define UnregisterisedCompiler 1"                    >> $$@
 endif
@@ -231,6 +228,7 @@ $(includes_SETTINGS) : rts/include/Makefile | $$(dir $$@)/.
 	@echo ',("LLVM llc command", "$(SettingsLlcCommand)")' >> $@
 	@echo ',("LLVM opt command", "$(SettingsOptCommand)")' >> $@
 	@echo ',("LLVM clang command", "$(SettingsClangCommand)")' >> $@
+	@echo ',("Use inplace MinGW toolchain", $(SettingsUseDistroMINGW)")' >> $@
 	@echo
 	@echo ',("Use interpreter", "$(GhcWithInterpreter)")' >> $@
 	@echo ',("Support SMP", "$(GhcWithSMP)")' >> $@
