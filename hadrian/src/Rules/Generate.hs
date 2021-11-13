@@ -155,10 +155,10 @@ generatePackageCode context@(Context stage pkg _ _) = do
     when (pkg == rts) $ do
         root -/- "**" -/- dir -/- "cmm/AutoApply.cmm" %> \file ->
             build $ target context GenApply [] [file]
-        let go gen file = generate file (semiEmptyTarget stage) gen
         root -/- "**" -/- dir -/- "include/ghcautoconf.h" %> \_ ->
             need . pure =<< pkgSetupConfigFile context
-        root -/- "**" -/- dir -/- "include/ghcplatform.h" %> go generateGhcPlatformH
+        root -/- "**" -/- dir -/- "include/ghcplatform.h" %> \_ ->
+            need . pure =<< pkgSetupConfigFile context
         root -/- "**" -/- dir -/- "include/DerivedConstants.h" %> genPlatformConstantsHeader context
         root -/- "**" -/- dir -/- "include/rts/EventLogConstants.h" %> genEventTypes "--event-types-defines"
         root -/- "**" -/- dir -/- "include/rts/EventTypes.h" %> genEventTypes "--event-types-array"
@@ -305,6 +305,7 @@ rtsCabalFlags = mconcat
     , flag "CabalUseSystemLibFFI" UseSystemFfi
     , targetFlag "CabalLibffiAdjustors" tgtUseLibffiForAdjustors
     , targetFlag "CabalLeadingUnderscore" tgtSymbolsHaveLeadingUnderscore
+    , targetFlag "CabalUnregisterised" tgtUnregisterised
     , targetFlag "CabalTablesNextToCode" tgtTablesNextToCode
     ]
   where
@@ -370,62 +371,6 @@ ghcWrapper stage  = do
                                      else [])
                                ++ [ "$@" ]
 
--- | Given a 'String' replace characters '.' and '-' by underscores ('_') so that
--- the resulting 'String' is a valid C preprocessor identifier.
-cppify :: String -> String
-cppify = replaceEq '-' '_' . replaceEq '.' '_'
-
--- | Generate @ghcplatform.h@ header.
--- ROMES:TODO: For the runtime-retargetable GHC, these will eventually have to
--- be determined at runtime, and no longer hardcoded to a file (passed as -D
--- flags to the preprocessor, probably)
-generateGhcPlatformH :: Expr String
-generateGhcPlatformH = do
-    trackGenerateHs
-    stage    <- getStage
-    let chooseSetting x y = case stage of { Stage0 {} -> x; _ -> y }
-    -- Not right for stage 3
-    buildPlatform  <- chooseSetting (queryBuild targetPlatformTriple) (queryHost targetPlatformTriple)
-    buildArch      <- chooseSetting (queryBuild queryArch)   (queryHost queryArch)
-    buildOs        <- chooseSetting (queryBuild queryOS)     (queryHost queryOS)
-    buildVendor    <- chooseSetting (queryBuild queryVendor) (queryHost queryVendor)
-    hostPlatform   <- queryTarget stage targetPlatformTriple
-    hostArch       <- queryTarget stage queryArch
-    hostOs         <- queryTarget stage queryOS
-    hostVendor     <- queryTarget stage queryVendor
-    ghcUnreg       <- queryTarget stage tgtUnregisterised
-    return . unlines $
-        [ "#if !defined(__GHCPLATFORM_H__)"
-        , "#define __GHCPLATFORM_H__"
-        , ""
-        , "#define BuildPlatform_TYPE  " ++ cppify buildPlatform
-        , "#define HostPlatform_TYPE   " ++ cppify hostPlatform
-        , ""
-        , "#define " ++ cppify buildPlatform   ++ "_BUILD 1"
-        , "#define " ++ cppify hostPlatform ++ "_HOST 1"
-        , ""
-        , "#define " ++ buildArch   ++ "_BUILD_ARCH 1"
-        , "#define " ++ hostArch ++ "_HOST_ARCH 1"
-        , "#define BUILD_ARCH " ++ show buildArch
-        , "#define HOST_ARCH "  ++ show hostArch
-        , ""
-        , "#define " ++ buildOs   ++ "_BUILD_OS 1"
-        , "#define " ++ hostOs ++ "_HOST_OS 1"
-        , "#define BUILD_OS " ++ show buildOs
-        , "#define HOST_OS "  ++ show hostOs
-        , ""
-        , "#define " ++ buildVendor   ++ "_BUILD_VENDOR 1"
-        , "#define " ++ hostVendor ++ "_HOST_VENDOR 1"
-        , "#define BUILD_VENDOR " ++ show buildVendor
-        , "#define HOST_VENDOR "  ++ show hostVendor
-        , ""
-        ]
-        ++
-        [ "#define UnregisterisedCompiler 1" | ghcUnreg ]
-        ++
-        [ ""
-        , "#endif /* __GHCPLATFORM_H__ */"
-        ]
 
 generateSettings :: Expr String
 generateSettings = do
