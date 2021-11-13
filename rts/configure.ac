@@ -22,6 +22,8 @@ dnl     #define SIZEOF_CHAR 0
 dnl   recently.
 AC_PREREQ([2.69])
 
+AC_CONFIG_FILES([ghcplatform.h.top])
+
 AC_CONFIG_HEADERS([ghcautoconf.h.autoconf])
 
 AC_ARG_ENABLE(asserts-all-ways,
@@ -78,6 +80,10 @@ dnl
 FP_CC_LLVM_BACKEND
 AS_IF([test x"$CcLlvmBackend" = x"YES"],
   [AC_DEFINE([CC_LLVM_BACKEND], [1], [Define (to 1) if C compiler has an LLVM back end])])
+
+GHC_CONVERT_PLATFORM_PARTS([build], [Build])
+FPTOOLS_SET_PLATFORM_VARS([build],[Build])
+FPTOOLS_SET_HASKELL_PLATFORM_VARS([Build])
 
 GHC_CONVERT_PLATFORM_PARTS([host], [Host])
 FPTOOLS_SET_PLATFORM_VARS([host], [Host])
@@ -352,11 +358,33 @@ dnl --------------------------------------------------------------
 AC_OUTPUT
 
 dnl ######################################################################
-dnl Generate ghcautoconf.h
+dnl Generate ghcplatform.h
 dnl ######################################################################
 
 [
 mkdir -p include
+
+touch include/ghcplatform.h
+> include/ghcplatform.h
+
+cat ghcplatform.h.top                          >> include/ghcplatform.h
+]
+
+dnl ** Do an unregisterised build?
+dnl --------------------------------------------------------------
+AS_IF(
+  [test "$CABAL_FLAG_unregisterised" = 1],
+  [echo "#define UnregisterisedCompiler 1"     >> include/ghcplatform.h])
+
+[
+cat $srcdir/ghcplatform.h.bottom               >> include/ghcplatform.h
+]
+
+dnl ######################################################################
+dnl Generate ghcautoconf.h
+dnl ######################################################################
+
+[
 touch include/ghcautoconf.h
 > include/ghcautoconf.h
 

@@ -54,6 +54,8 @@ flag static-libzstd
   default: False
 flag leading-underscore
   default: False
+flag unregisterised
+  default: False
 flag tables-next-to-code
   default: False
 flag smp
@@ -242,7 +244,7 @@ library
 
       include-dirs: include
       includes: Rts.h
-      autogen-includes: ghcautoconf.h
+      autogen-includes: ghcautoconf.h ghcplatform.h
       install-includes: Cmm.h HsFFI.h MachDeps.h Rts.h RtsAPI.h Stg.h
                         ghcautoconf.h ghcconfig.h ghcplatform.h ghcversion.h
                         -- ^ from include
