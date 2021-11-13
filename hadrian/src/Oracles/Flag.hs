@@ -25,7 +25,6 @@ data Flag = ArSupportsAtFile
           | HaveLibMingwEx
           | UseSystemFfi
           | BootstrapThreadedRts
-          | SystemDistroMINGW
           | UseLibffiForAdjustors
 
 -- Note, if a flag is set to empty string we treat it as set to NO. This seems
@@ -47,7 +46,6 @@ flag f = do
             HaveLibMingwEx       -> "have-lib-mingw-ex"
             UseSystemFfi         -> "use-system-ffi"
             BootstrapThreadedRts -> "bootstrap-threaded-rts"
-            SystemDistroMINGW    -> "system-use-distro-mingw"
             UseLibffiForAdjustors -> "use-libffi-for-adjustors"
     value <- lookupValueOrError configFile key
     when (value `notElem` ["YES", "NO", ""]) . error $ "Configuration flag "
