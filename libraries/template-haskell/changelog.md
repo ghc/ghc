@@ -3,9 +3,11 @@
 ## 2.19.0.0
 
   * Add `DefaultD` constructor to support Haskell `default` declarations.
-  * Add support for Overloaded Record Dot. 
+  * Add support for Overloaded Record Dot.
     Introduces `getFieldE :: Quote m => m Exp -> String -> m Exp` and
     `projectionE :: Quote m => [String] -> m Exp`.
+  * Add 'typeConstructorName' helper function which the TemplateHaskell 'Name' from
+    a Typeable type representation.
 
 ## 2.18.0.0
   * The types of `ConP` and `conP` have been changed to allow for an additional list

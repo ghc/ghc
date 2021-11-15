@@ -29,6 +29,7 @@ module Language.Haskell.TH.Syntax
     ) where
 
 import Data.Data hiding (Fixity(..))
+import Data.Typeable
 import Data.IORef
 import System.IO.Unsafe ( unsafePerformIO )
 import GHC.IO.Unsafe    ( unsafeDupableInterleaveIO )
@@ -60,6 +61,7 @@ import Prelude
 import Foreign.ForeignPtr
 import Foreign.C.String
 import Foreign.C.Types
+import Data.List (foldl')
 
 #if __GLASGOW_HASKELL__ >= 901
 import GHC.Types ( Levity(..) )
@@ -1406,6 +1408,24 @@ dataToPatQ = dataToQa id litP conP
                 _ -> error $ "Can't construct a pattern from name "
                           ++ showName n
 
+-- | Retrieve a @TemplateHaskell@ 'Name' for the constructor of a 'Typeable' type. Used to drive derivation:
+--
+-- @
+
+-- $(
+-- let
+--   prxy = Proxy :: Proxy Int
+-- in
+--   mobileGen (moatOptionsP prxy) (typeConstructorName prxy)
+--  )
+-- @
+typeConstructorName :: Typeable a => Proxy a -> Name
+typeConstructorName prxy =
+  let tyRep =
+        typeRep prxy
+      tyCon =
+        typeRepTyCon tyRep
+   in mkNameG TcClsName (tyConPackage tyCon) (tyConModule tyCon) (tyConName tyCon)
 -----------------------------------------------------
 --              Names and uniques
 -----------------------------------------------------
