@@ -32,9 +32,9 @@ initNCGConfig dflags this_mod = NCGConfig
    , ncgCfgBlockLayout        = gopt Opt_CfgBlocklayout dflags
    , ncgCfgWeightlessLayout   = gopt Opt_WeightlessBlocklayout dflags
 
-     -- With -O1 and greater, the cmmSink pass does constant-folding, so
+     -- When constant-folding is enabled, the cmmSink pass does constant-folding, so
      -- we don't need to do it again in the native code generator.
-   , ncgDoConstantFolding     = optLevel dflags < 1
+   , ncgDoConstantFolding     = not (gopt Opt_CoreConstantFolding dflags || gopt Opt_CmmSink dflags)
 
    , ncgDumpRegAllocStages    = dopt Opt_D_dump_asm_regalloc_stages dflags
    , ncgDumpAsmStats          = dopt Opt_D_dump_asm_stats dflags

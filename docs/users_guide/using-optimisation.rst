@@ -121,6 +121,17 @@ on by default are enabled by ``-O``, and as such you shouldn't
 need to set any of them explicitly. A flag ``-fwombat`` can be negated
 by saying ``-fno-wombat``.
 
+.. ghc-flag:: -fcore-constant-folding
+    :shortdesc: Enable constant folding in Core. Implied by :ghc-flag:`-O`.
+    :type: dynamic
+    :reverse: -fno-core-constant-folding
+    :category:
+
+    :default: on
+
+    Enables Core-level constant folding, i.e. propagation of values
+    that can be computed at compile time.
+
 .. ghc-flag:: -fcase-merge
     :shortdesc: Enable case-merging. Implied by :ghc-flag:`-O`.
     :type: dynamic

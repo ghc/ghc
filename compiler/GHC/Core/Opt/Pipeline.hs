@@ -130,6 +130,7 @@ getCoreToDo logger dflags
     phases        = simplPhases        dflags
     max_iter      = maxSimplIterations dflags
     rule_check    = ruleCheck          dflags
+    const_fold    = gopt Opt_CoreConstantFolding          dflags
     call_arity    = gopt Opt_CallArity                    dflags
     exitification = gopt Opt_Exitification                dflags
     strictness    = gopt Opt_Strictness                   dflags
@@ -150,7 +151,7 @@ getCoreToDo logger dflags
     profiling     = ways dflags `hasWay` WayProf
 
     do_presimplify = do_specialise -- TODO: any other optimizations benefit from pre-simplification?
-    do_simpl3      = rules_on      -- TODO: any other optimizations benefit from three-phase simplification?
+    do_simpl3      = const_fold || rules_on -- TODO: any other optimizations benefit from three-phase simplification?
 
     maybe_rule_check phase = runMaybe rule_check (CoreDoRuleCheck phase)
 
