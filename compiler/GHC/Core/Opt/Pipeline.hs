@@ -127,7 +127,6 @@ getCoreToDo :: Logger -> DynFlags -> [CoreToDo]
 getCoreToDo logger dflags
   = flatten_todos core_todo
   where
-    opt_level     = optLevel           dflags
     phases        = simplPhases        dflags
     max_iter      = maxSimplIterations dflags
     rule_check    = ruleCheck          dflags
@@ -149,6 +148,9 @@ getCoreToDo logger dflags
     ww_on         = gopt Opt_WorkerWrapper                dflags
     static_ptrs   = xopt LangExt.StaticPointers           dflags
     profiling     = ways dflags `hasWay` WayProf
+
+    do_presimplify = do_specialise -- TODO: any other optimizations benefit from pre-simplification?
+    do_simpl3      = rules_on      -- TODO: any other optimizations benefit from three-phase simplification?
 
     maybe_rule_check phase = runMaybe rule_check (CoreDoRuleCheck phase)
 
@@ -220,14 +222,7 @@ getCoreToDo logger dflags
         runWhen (profiling && not (null $ callerCcFilters dflags)) CoreAddCallerCcs
 
     core_todo =
-     if opt_level == 0 then
-       [ static_ptrs_float_outwards
-       , simplify "Non-opt simplification"
-       , add_caller_ccs
-       ]
-
-     else {- opt_level >= 1 -} [
-
+     [
     -- We want to do the static argument transform before full laziness as it
     -- may expose extra opportunities to float things outwards. However, to fix
     -- up the output of the transformation we need at do at least one simplify
@@ -235,7 +230,7 @@ getCoreToDo logger dflags
         runWhen static_args (CoreDoPasses [ simpl_gently, CoreDoStaticArgs ]),
 
         -- initial simplify: mk specialiser happy: minimum effort please
-        simpl_gently,
+        runWhen do_presimplify simpl_gently,
 
         -- Specialisation is best done before full laziness
         -- so that overloaded functions have all their dictionary lambdas manifest
@@ -271,9 +266,10 @@ getCoreToDo logger dflags
            static_ptrs_float_outwards,
 
         -- Run the simplier phases 2,1,0 to allow rewrite rules to fire
-        CoreDoPasses [ simpl_phase (Phase phase) "main" max_iter
-                     | phase <- [phases, phases-1 .. 1] ],
-        simpl_phase (Phase 0) "main" (max max_iter 3),
+        runWhen do_simpl3
+            (CoreDoPasses $ [ simpl_phase (Phase phase) "main" max_iter
+                            | phase <- [phases, phases-1 .. 1] ] ++
+                            [ simpl_phase (Phase 0) "main" (max max_iter 3) ]),
                 -- Phase 0: allow all Ids to be inlined now
                 -- This gets foldr inlined before strictness analysis
 
