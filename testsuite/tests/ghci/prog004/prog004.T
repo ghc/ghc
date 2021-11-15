@@ -3,4 +3,5 @@ def f(name, opts):
         opts.skip = 1
 setTestOpts(f)
 
-test('ghciprog004', [], makefile_test, ['ghciprog004'])
+test('ghciprog004', [ skip # ghcjs
+     ], makefile_test, ['ghciprog004'])

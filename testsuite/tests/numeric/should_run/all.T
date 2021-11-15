@@ -16,7 +16,7 @@ if config.arch == 'i386':
     opts = '-msse2'
 else:
     opts = ''
-test('arith008', normal, compile_and_run, [opts])
+test('arith008', [when(opsys("OSJavaScript"), skip), normal], compile_and_run, [opts])
 
 test('arith009', normal, compile_and_run, [''])
 test('arith010', normal, compile_and_run, [''])

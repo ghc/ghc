@@ -9,6 +9,7 @@ test('num008', normal, compile_and_run, [''])
 
 
 test('num009', [ when(fast(), skip)
+               , when(opsys("OSJavaScript"), skip)
                # , when(wordsize(32), expect_broken(15062))
                , when(platform('powerpc64le-unknown-linux'), expect_broken(13634))],
              compile_and_run, [opts])

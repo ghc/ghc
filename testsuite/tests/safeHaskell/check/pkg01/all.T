@@ -29,6 +29,7 @@ make_args = 'VANILLA=' + vanilla + ' PROF=' + prof + ' DYN=' + dyn
 test('safePkg01',
      [extra_files(['M_SafePkg.hs', 'M_SafePkg2.hs', 'M_SafePkg3.hs', 'M_SafePkg4.hs', 'M_SafePkg5.hs', 'M_SafePkg6.hs', 'M_SafePkg7.hs', 'M_SafePkg8.hs', 'Setup.hs', 'p.cabal']),
       normalise_errmsg_fun(ignoreLdOutput, normalise_errmsg),
+      when(opsys("OSJavaScript"), skip),
       normalise_version("array", "integer-gmp", "integer-simple", "bytestring",
                         "base", "deepseq", "ghc-prim"),
       normalise_fun(normalise_errmsg)],
@@ -52,57 +53,66 @@ test('ImpSafe03',
 test('ImpSafe04', normalise_version('base'), compile_fail, ['-fpackage-trust -distrust base'])
 
 test('ImpSafeOnly01',
-     [extra_files(['M_SafePkg.hs', 'M_SafePkg2.hs', 'M_SafePkg3.hs', 'M_SafePkg4.hs', 'M_SafePkg5.hs', 'M_SafePkg6.hs', 'M_SafePkg7.hs', 'M_SafePkg8.hs', 'Setup.hs', 'p.cabal']),
+     [when(opsys("OSJavaScript"), skip),
+      extra_files(['M_SafePkg.hs', 'M_SafePkg2.hs', 'M_SafePkg3.hs', 'M_SafePkg4.hs', 'M_SafePkg5.hs', 'M_SafePkg6.hs', 'M_SafePkg7.hs', 'M_SafePkg8.hs', 'Setup.hs', 'p.cabal']),
       pre_cmd('$MAKE -s --no-print-directory mkPackageDatabase.ImpSafeOnly01 ' + make_args)],
      compile,
      ['-fpackage-trust -package-db pdb.ImpSafeOnly01/local.db -trust base'])
 
 test('ImpSafeOnly02',
-     [extra_files(['M_SafePkg.hs', 'M_SafePkg2.hs', 'M_SafePkg3.hs', 'M_SafePkg4.hs', 'M_SafePkg5.hs', 'M_SafePkg6.hs', 'M_SafePkg7.hs', 'M_SafePkg8.hs', 'Setup.hs', 'p.cabal']),
+     [when(opsys("OSJavaScript"), skip),
+      extra_files(['M_SafePkg.hs', 'M_SafePkg2.hs', 'M_SafePkg3.hs', 'M_SafePkg4.hs', 'M_SafePkg5.hs', 'M_SafePkg6.hs', 'M_SafePkg7.hs', 'M_SafePkg8.hs', 'Setup.hs', 'p.cabal']),
       pre_cmd('$MAKE -s --no-print-directory mkPackageDatabase.ImpSafeOnly02 ' + make_args)],
      compile,
      ['-fpackage-trust -package-db pdb.ImpSafeOnly02/local.db -trust base -trust safePkg01'])
 
 # Fail since we enable package trust (and still need safePkg01 trusted)
 test('ImpSafeOnly03',
-     [extra_files(['M_SafePkg.hs', 'M_SafePkg2.hs', 'M_SafePkg3.hs', 'M_SafePkg4.hs', 'M_SafePkg5.hs', 'M_SafePkg6.hs', 'M_SafePkg7.hs', 'M_SafePkg8.hs', 'Setup.hs', 'p.cabal']),
+     [when(opsys("OSJavaScript"), skip),
+      extra_files(['M_SafePkg.hs', 'M_SafePkg2.hs', 'M_SafePkg3.hs', 'M_SafePkg4.hs', 'M_SafePkg5.hs', 'M_SafePkg6.hs', 'M_SafePkg7.hs', 'M_SafePkg8.hs', 'Setup.hs', 'p.cabal']),
       pre_cmd('$MAKE -s --no-print-directory mkPackageDatabase.ImpSafeOnly03 ' + make_args)],
      compile_fail,
      ['-fpackage-trust -package-db pdb.ImpSafeOnly03/local.db -trust base'])
 
 # Succeed since we don't enable package trust
 test('ImpSafeOnly04',
-     [extra_files(['M_SafePkg.hs', 'M_SafePkg2.hs', 'M_SafePkg3.hs', 'M_SafePkg4.hs', 'M_SafePkg5.hs', 'M_SafePkg6.hs', 'M_SafePkg7.hs', 'M_SafePkg8.hs', 'Setup.hs', 'p.cabal']),
+     [when(opsys("OSJavaScript"), skip),
+      extra_files(['M_SafePkg.hs', 'M_SafePkg2.hs', 'M_SafePkg3.hs', 'M_SafePkg4.hs', 'M_SafePkg5.hs', 'M_SafePkg6.hs', 'M_SafePkg7.hs', 'M_SafePkg8.hs', 'Setup.hs', 'p.cabal']),
       pre_cmd('$MAKE -s --no-print-directory mkPackageDatabase.ImpSafeOnly04 ' + make_args)],
      compile, ['-package-db pdb.ImpSafeOnly04/local.db -trust base'])
 
 # fail due to missing trust of safePkg01, next test succeeds.
 test('ImpSafeOnly05',
-     [extra_files(['M_SafePkg.hs', 'M_SafePkg2.hs', 'M_SafePkg3.hs', 'M_SafePkg4.hs', 'M_SafePkg5.hs', 'M_SafePkg6.hs', 'M_SafePkg7.hs', 'M_SafePkg8.hs', 'Setup.hs', 'p.cabal']),
+     [when(opsys("OSJavaScript"), skip),
+      extra_files(['M_SafePkg.hs', 'M_SafePkg2.hs', 'M_SafePkg3.hs', 'M_SafePkg4.hs', 'M_SafePkg5.hs', 'M_SafePkg6.hs', 'M_SafePkg7.hs', 'M_SafePkg8.hs', 'Setup.hs', 'p.cabal']),
       pre_cmd('$MAKE -s --no-print-directory mkPackageDatabase.ImpSafeOnly05 ' + make_args)],
      compile_fail,
      ['-fpackage-trust -package-db pdb.ImpSafeOnly05/local.db -trust base'])
 test('ImpSafeOnly06',
-     [extra_files(['M_SafePkg.hs', 'M_SafePkg2.hs', 'M_SafePkg3.hs', 'M_SafePkg4.hs', 'M_SafePkg5.hs', 'M_SafePkg6.hs', 'M_SafePkg7.hs', 'M_SafePkg8.hs', 'Setup.hs', 'p.cabal']),
+     [when(opsys("OSJavaScript"), skip),
+      extra_files(['M_SafePkg.hs', 'M_SafePkg2.hs', 'M_SafePkg3.hs', 'M_SafePkg4.hs', 'M_SafePkg5.hs', 'M_SafePkg6.hs', 'M_SafePkg7.hs', 'M_SafePkg8.hs', 'Setup.hs', 'p.cabal']),
       pre_cmd('$MAKE -s --no-print-directory mkPackageDatabase.ImpSafeOnly06 ' + make_args)],
      compile,
      ['-fpackage-trust -package-db pdb.ImpSafeOnly06/local.db -trust base -trust safePkg01'])
 
 # fail due to missing trust
 test('ImpSafeOnly07',
-     [extra_files(['M_SafePkg.hs', 'M_SafePkg2.hs', 'M_SafePkg3.hs', 'M_SafePkg4.hs', 'M_SafePkg5.hs', 'M_SafePkg6.hs', 'M_SafePkg7.hs', 'M_SafePkg8.hs', 'Setup.hs', 'p.cabal']),
+     [when(opsys("OSJavaScript"), skip),
+      extra_files(['M_SafePkg.hs', 'M_SafePkg2.hs', 'M_SafePkg3.hs', 'M_SafePkg4.hs', 'M_SafePkg5.hs', 'M_SafePkg6.hs', 'M_SafePkg7.hs', 'M_SafePkg8.hs', 'Setup.hs', 'p.cabal']),
       pre_cmd('$MAKE -s --no-print-directory mkPackageDatabase.ImpSafeOnly07 ' + make_args),
       normalise_version("bytestring", "base")],
      compile_fail,
      ['-fpackage-trust -package-db pdb.ImpSafeOnly07/local.db -trust safePkg01 -distrust bytestring'])
 test('ImpSafeOnly08',
-     [extra_files(['M_SafePkg.hs', 'M_SafePkg2.hs', 'M_SafePkg3.hs', 'M_SafePkg4.hs', 'M_SafePkg5.hs', 'M_SafePkg6.hs', 'M_SafePkg7.hs', 'M_SafePkg8.hs', 'Setup.hs', 'p.cabal']),
+     [when(opsys("OSJavaScript"), skip),
+      extra_files(['M_SafePkg.hs', 'M_SafePkg2.hs', 'M_SafePkg3.hs', 'M_SafePkg4.hs', 'M_SafePkg5.hs', 'M_SafePkg6.hs', 'M_SafePkg7.hs', 'M_SafePkg8.hs', 'Setup.hs', 'p.cabal']),
       pre_cmd('$MAKE -s --no-print-directory mkPackageDatabase.ImpSafeOnly08 ' + make_args),
       normalise_version("bytestring", "base")],
      compile_fail,
      ['-fpackage-trust -package-db pdb.ImpSafeOnly08/local.db -trust safePkg01'])
 test('ImpSafeOnly09',
-     [extra_files(['M_SafePkg.hs', 'M_SafePkg2.hs', 'M_SafePkg3.hs', 'M_SafePkg4.hs', 'M_SafePkg5.hs', 'M_SafePkg6.hs', 'M_SafePkg7.hs', 'M_SafePkg8.hs', 'Setup.hs', 'p.cabal']),
+     [when(opsys("OSJavaScript"), skip),
+      extra_files(['M_SafePkg.hs', 'M_SafePkg2.hs', 'M_SafePkg3.hs', 'M_SafePkg4.hs', 'M_SafePkg5.hs', 'M_SafePkg6.hs', 'M_SafePkg7.hs', 'M_SafePkg8.hs', 'Setup.hs', 'p.cabal']),
       pre_cmd('$MAKE -s --no-print-directory mkPackageDatabase.ImpSafeOnly09 ' + make_args),
       normalise_version("bytestring")],
      compile_fail,
@@ -110,7 +120,8 @@ test('ImpSafeOnly09',
 
 # finally succeed
 test('ImpSafeOnly10',
-     [extra_files(['M_SafePkg.hs', 'M_SafePkg2.hs', 'M_SafePkg3.hs', 'M_SafePkg4.hs', 'M_SafePkg5.hs', 'M_SafePkg6.hs', 'M_SafePkg7.hs', 'M_SafePkg8.hs', 'Setup.hs', 'p.cabal']),
+     [when(opsys("OSJavaScript"), skip),
+      extra_files(['M_SafePkg.hs', 'M_SafePkg2.hs', 'M_SafePkg3.hs', 'M_SafePkg4.hs', 'M_SafePkg5.hs', 'M_SafePkg6.hs', 'M_SafePkg7.hs', 'M_SafePkg8.hs', 'Setup.hs', 'p.cabal']),
       pre_cmd('$MAKE -s --no-print-directory mkPackageDatabase.ImpSafeOnly10 ' + make_args)],
      compile,
      ['-fpackage-trust -package-db pdb.ImpSafeOnly10/local.db -trust safePkg01 -trust base -trust bytestring'])

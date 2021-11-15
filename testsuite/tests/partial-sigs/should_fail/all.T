@@ -5,6 +5,7 @@ test('ExtraConstraintsWildcardInExpressionSignature', normal, compile, [''])
 test('ExtraConstraintsWildcardInPatternSignature', normal, compile_fail, [''])
 test('ExtraConstraintsWildcardInPatternSplice', [req_interp, normal], compile_fail, [''])
 test('ExtraConstraintsWildcardInTypeSpliceUsed', [extra_files(['ExtraConstraintsWildcardInTypeSplice.hs']),
+                                                  when(opsys("OSJavaScript"), skip),
                                                   req_interp],
      multimod_compile_fail,
      ['ExtraConstraintsWildcardInTypeSpliceUsed', config.ghc_th_way_flags])

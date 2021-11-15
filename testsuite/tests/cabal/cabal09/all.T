@@ -4,6 +4,7 @@ else:
    cleanup = 'CLEANUP=0'
 
 test('cabal09',
-     extra_files(['Main.hs', 'Setup.hs', 'reexport.cabal']),
+     [when(opsys('OSJavaScript'), skip),
+      extra_files(['Main.hs', 'Setup.hs', 'reexport.cabal'])],
      run_command,
      ['$MAKE -s --no-print-directory cabal09 ' + cleanup])

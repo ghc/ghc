@@ -73,4 +73,4 @@ cat mk/build.mk.sample >> mk/build.mk
 
 # Make it so!
 
-make -j8 2>&1 | tee build-ghcjs.log
+make  2>&1 | tee build-ghcjs.log

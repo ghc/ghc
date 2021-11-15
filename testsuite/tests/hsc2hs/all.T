@@ -10,9 +10,9 @@ test('hsc2hs004', [], makefile_test, [])
 
 test('T3837', [], makefile_test, [])
 
-test('T4340', [], makefile_test, [])
+test('T4340', [when(opsys("OSJavaScript"), skip)], makefile_test, [])
 
-test('T10272', [], makefile_test, [])
+test('T10272', [when(opsys("OSJavaScript"), skip)], makefile_test, [])
 
 test('T11004', [], makefile_test, [])
 

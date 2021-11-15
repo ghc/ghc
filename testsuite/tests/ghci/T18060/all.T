@@ -1,1 +1,1 @@
-test('T18060', normal, ghci_script, ['T18060.script'])
+test('T18060', [skip, normal], ghci_script, ['T18060.script'])

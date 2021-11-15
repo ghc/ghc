@@ -1,2 +1,2 @@
-test('conflicting_flags', normal, makefile_test, [])
+test('conflicting_flags', [when(opsys("OSJavaScript"), skip), normal], makefile_test, [])
 

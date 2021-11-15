@@ -1,2 +1,4 @@
-test('prog011', normal, ghci_script, ['prog011.script'])
+test('prog011', [normal,
+	 skip # ghcjs
+	 ], ghci_script, ['prog011.script'])
 

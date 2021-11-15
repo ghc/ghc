@@ -20,7 +20,7 @@ test('rebindable7', normal, compile_and_run, [''])
 test('rebindable8', normal, compile, [''])
 test('rebindable9', normal, compile, [''])
 test('rebindable10', normal, compile_and_run, [''])
-test('RebindableFailA', exit_code(1), compile_and_run, [''])
+test('RebindableFailA', [when(opsys("OSJavaScript"), skip), exit_code(1)], compile_and_run, [''])
 test('RebindableFailB', normal, compile_and_run, [''])
 
 test('T303', normal, compile, [''])

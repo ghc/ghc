@@ -16,8 +16,8 @@ test('cgrun011', normal, compile_and_run, [''])
 test('cgrun012', normal, compile_and_run, [''])
 test('cgrun013', normal, compile_and_run, [''])
 test('cgrun014', normal, compile_and_run, [''])
-test('cgrun015', normal, compile_and_run, [''])
-test('cgrun016', exit_code(1), compile_and_run, [''])
+test('cgrun015', [when(opsys('OSJavaScript'), skip), normal], compile_and_run, [''])
+test('cgrun016', [when(opsys('OSJavaScript'), skip), exit_code(1)], compile_and_run, [''])
 test('cgrun017', normal, compile_and_run, [''])
 test('cgrun018', normal, compile_and_run, [''])
 test('cgrun019', normal, compile_and_run, [''])
@@ -45,14 +45,14 @@ test('cgrun038', normal, compile_and_run, [''])
 test('cgrun039', normal, compile_and_run, [''])
 test('cgrun040', normal, compile_and_run, [''])
 test('cgrun043', normal, compile_and_run, [''])
-test('cgrun044', normal, compile_and_run, [''])
-test('cgrun045', exit_code(1), compile_and_run, [''])
+test('cgrun044', [when(opsys('OSJavaScript'), skip), normal], compile_and_run, [''])
+test('cgrun045', [when(opsys('OSJavaScript'), skip), exit_code(1)], compile_and_run, [''])
 test('cgrun046', normal, compile_and_run, [''])
 test('cgrun047', normal, compile_and_run, [''])
 test('cgrun048', normal, compile_and_run, [''])
 test('cgrun049', normal, compile_and_run, ['-funbox-strict-fields'])
 test('cgrun050', normal, compile_and_run, [''])
-test('cgrun051', [exit_code(1)], compile_and_run, [''])
+test('cgrun051', [when(opsys('OSJavaScript'), skip), exit_code(1)], compile_and_run, [''])
 test('cgrun052', only_ways(['optasm']), compile_and_run, ['-funbox-strict-fields'])
 test('cgrun053', normal, compile_and_run, [''])
 test('cgrun054', normal, compile_and_run, [''])
@@ -61,20 +61,20 @@ test('cgrun056', normal, compile_and_run, [''])
 test('cgrun057', [ only_ways(prof_ways),
                    extra_run_opts('+RTS -xc') ], compile_and_run, [''])
 test('cgrun058', normal, compile_and_run, [''])
-test('cgrun059', exit_code(1), compile_and_run, [''])
+test('cgrun059', [when(opsys('OSJavaScript'), skip), exit_code(1)], compile_and_run, [''])
 test('cgrun060',
      extra_run_opts('+RTS -K64k -RTS'),
      compile_and_run, [''])
 test('cgrun061', normal, compile_and_run, [''])
 test('cgrun062', normal, compile_and_run, [''])
 test('cgrun063', normal, compile_and_run, [''])
-test('cgrun064', normal, compile_and_run, [''])
+test('cgrun064', [when(opsys('OSJavaScript'), skip), normal], compile_and_run, [''])
 test('cgrun065', normal, compile_and_run, [''])
 test('cgrun066', normal, compile_and_run, [''])
 test('cgrun067', [extra_files(['Cgrun067A.hs'])], compile_and_run, [''])
-test('cgrun068', reqlib('random'), compile_and_run, [''])
+test('cgrun068', [when(opsys('OSJavaScript'), skip), reqlib('random')], compile_and_run, [''])
 test('cgrun069',
-     [ omit_ways(['ghci'])],
+     [ when(opsys('OSJavaScript'), skip), omit_ways(['ghci'])],
      multi_compile_and_run,
      ['cgrun069', [('cgrun069_cmm.cmm', '')], ''])
 test('cgrun070', normal, compile_and_run, [''])
@@ -86,24 +86,24 @@ test('cgrun072', normal, compile_and_run, [''])
 test('cgrun075', normal, compile_and_run, [''])
 test('cgrun076', normal, compile_and_run, [''])
 test('cgrun077', [when(have_cpu_feature('bmi2'), extra_hc_opts('-mbmi2'))], compile_and_run, [''])
-test('cgrun078', omit_ways(['ghci']), compile_and_run, [''])
+test('cgrun078', [when(opsys('OSJavaScript'), skip), omit_ways(['ghci'])], compile_and_run, [''])
 
 test('T1852', normal, compile_and_run, [''])
-test('T1861', extra_run_opts('0'), compile_and_run, [''])
+test('T1861', [when(opsys("OSJavaScript"), skip), extra_run_opts('0')], compile_and_run, [''])
 test('T2080', normal, compile_and_run, [''])
 test('T2838', normal, compile_and_run, [''])
 test('T3207', normal, compile_and_run, [''])
 test('T3561', normal, compile_and_run, [''])
 test('T3677', extra_run_opts('+RTS -K8k -RTS'), compile_and_run, [''])
 test('T4441', normal, compile_and_run, [''])
-test('T5149', omit_ways(['ghci']), multi_compile_and_run,
+test('T5149', [when(opsys("OSJavaScript"), skip), omit_ways(['ghci'])], multi_compile_and_run,
                  ['T5149', [('T5149_cmm.cmm', '')], ''])
 test('T5129',
      # The bug is in simplifier when run with -O1 and above, so only run it
      # optimised, using any backend.
      only_ways(['optasm']),
      compile_and_run, [''])
-test('T5626', exit_code(1), compile_and_run, [''])
+test('T5626', [when(opsys("OSJavaScript"), skip), exit_code(1)], compile_and_run, [''])
 test('T5747', when(arch('i386'), extra_hc_opts('-msse2')), compile_and_run, ['-O2'])
 test('T5785', normal, compile_and_run, [''])
 test('setByteArray', normal, compile_and_run, [''])
@@ -114,7 +114,7 @@ test('T5900', normal, compile_and_run, [''])
 test('T7163', normal, compile_and_run, [''])
 
 # T7319 now gives the same results in every 'way', so treat it as normal
-test('T7319', exit_code(1), compile_and_run, [''])
+test('T7319', [when(opsys("OSJavaScript"), skip), exit_code(1)], compile_and_run, [''])
 
 # Gives different results when optimised, so restrict to just one way
 #test('T7319', [ extra_ways(['prof']), only_ways(['prof']), exit_code(1),
@@ -129,17 +129,17 @@ test('T7361', normal, compile_and_run, [''])
 test('T7600', normal, compile_and_run, [''])
 test('T8103', only_ways(['normal']), compile_and_run, [''])
 test('T7953', reqlib('random'), compile_and_run, [''])
-test('T8256', normal, compile_and_run, ['-dcore-lint -O1'])
+test('T8256', [when(opsys("OSJavaScript"), skip), normal], compile_and_run, ['-dcore-lint -O1'])
 test('T6084',normal, compile_and_run, ['-O2'])
-test('CgStaticPointers', [when(doing_ghci(), extra_hc_opts('-fobject-code'))],
+test('CgStaticPointers', [when(opsys('OSJavaScript'), skip), when(doing_ghci(), extra_hc_opts('-fobject-code'))],
      compile_and_run, [''])
-test('CgStaticPointersNoFullLazyness', [when(doing_ghci(), extra_hc_opts('-fobject-code'))],
+test('CgStaticPointersNoFullLazyness', [when(opsys('OSJavaScript'), skip), when(doing_ghci(), extra_hc_opts('-fobject-code'))],
      compile_and_run, ['-O -fno-full-laziness'])
 test('StaticArraySize', [when(doing_ghci(), extra_hc_opts('-fobject-code'))],
      compile_and_run, ['-O2'])
 test('StaticByteArraySize', normal, compile_and_run, ['-O2'])
 test('CopySmallArray', normal, compile_and_run, [''])
-test('CopySmallArrayStressTest', reqlib('random'), compile_and_run, [''])
+test('CopySmallArrayStressTest', [when(opsys("OSJavaScript"), skip), reqlib('random')], compile_and_run, [''])
 test('SizeOfSmallArray', normal, compile_and_run, [''])
 test('NewSmallArray', normal, compile_and_run, [''])
 test('T9001', normal, compile_and_run, [''])
@@ -155,16 +155,16 @@ test('T10246', normal, compile_and_run, [''])
 test('T9533', normal, compile_and_run, [''])
 test('T9533b', normal, compile_and_run, [''])
 test('T9533c', normal, compile_and_run, [''])
-test('T10414', [only_ways(['threaded2']), extra_ways(['threaded2']), req_smp],
+test('T10414', [when(opsys("OSJavaScript"), skip), only_ways(['threaded2']), extra_ways(['threaded2']), req_smp],
      compile_and_run, ['-feager-blackholing'])
 test('T10521', normal, compile_and_run, [''])
 test('T10521b', normal, compile_and_run, [''])
 test('T10870', when(wordsize(32), skip), compile_and_run, [''])
-test('PopCnt', omit_ways(['ghci']), multi_compile_and_run,
+test('PopCnt', [when(opsys("OSJavaScript"), skip), omit_ways(['ghci'])], multi_compile_and_run,
                  ['PopCnt', [('PopCnt_cmm.cmm', '')], ''])
-test('T12059', normal, compile_and_run, [''])
+test('T12059', [when(opsys("OSJavaScript"), skip), normal], compile_and_run, [''])
 test('T12433', normal, compile_and_run, [''])
-test('T12622', normal, multimod_compile_and_run, ['T12622', '-O'])
+test('T12622', [when(opsys("OSJavaScript"), skip), normal], multimod_compile_and_run, ['T12622', '-O'])
 test('T12757', normal, compile_and_run, [''])
 test('T12855', normal, compile_and_run, [''])
 test('T9577', [ unless(arch('x86_64') or arch('i386'),skip),
@@ -174,12 +174,12 @@ test('T9577', [ unless(arch('x86_64') or arch('i386'),skip),
                 only_ways(['normal']) ], compile_and_run, [''])
 
 test('T13425', normal, compile_and_run, ['-O'])
-test('castFloatWord', normal, compile_and_run, ['-dcmm-lint'])
+test('castFloatWord', [when(opsys('OSJavaScript'), skip), normal], compile_and_run, ['-dcmm-lint'])
 test('T13825-unit',
-     extra_run_opts('"' + config.libdir + '"'),
+     [when(opsys("OSJavaScript"), skip), extra_run_opts('"' + config.libdir + '"')],
      compile_and_run,
      ['-package ghc'])
-test('T14619', normal, compile_and_run, [''])
+test('T14619', [when(opsys("OSJavaScript"), skip), normal], compile_and_run, [''])
 test('T14754', normal, compile_and_run, [''])
 test('T14346', only_ways(['threaded1','threaded2']), compile_and_run, ['-O -threaded'])
 test('T14251', [expect_broken_for(14251, ['optllvm'])],
@@ -200,10 +200,10 @@ test('T15892',
        # happen, so -G1 -A32k:
        extra_run_opts('+RTS -G1 -A32k -RTS') ],
      compile_and_run, ['-O'])
-test('T16617', normal, compile_and_run, [''])
+test('T16617', [when(opsys("OSJavaScript"), skip), normal], compile_and_run, [''])
 test('T16449_2', exit_code(0), compile_and_run, [''])
 test('T16846', [only_ways(['optasm']), exit_code(1)], compile_and_run, [''])
 
-test('T17920', cmm_src, compile_and_run, [''])
-test('T18527', normal, compile_and_run, ['T18527FFI.c'])
+test('T17920', [when(opsys("OSJavaScript"), skip), cmm_src], compile_and_run, [''])
+test('T18527', [when(opsys("OSJavaScript"), skip), normal], compile_and_run, ['T18527FFI.c'])
 test('T19149', only_ways('sanity'), compile_and_run, ['T19149_c.c'])

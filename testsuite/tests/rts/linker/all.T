@@ -20,6 +20,7 @@ test('section_alignment',
 # Test to see if linker scripts link properly to real ELF files
 test('T2615',
      [extra_files(['libfoo_T2615.c', 'libfoo_script_T2615.so']),
+       when(opsys("OSJavaScript"), skip),
        when(opsys('mingw32'), skip),
        # OS X doesn't seem to support linker scripts
        when(opsys('darwin'), skip),
@@ -56,33 +57,37 @@ def checkDynAsm(actual_file, normaliser):
 # separately now.
 # These should have extra_clean() arguments, but I need
 # to somehow extract out the name of DLLs to do that
-test('T5435_v_asm_a', [extra_files(['T5435.hs', 'T5435_asm.c']), req_rts_linker],
+test('T5435_v_asm_a', [when(opsys("OSJavaScript"), skip), extra_files(['T5435.hs', 'T5435_asm.c']), req_rts_linker],
      makefile_test, ['T5435_v_asm_a'])
 # this one just needs to run on linux, as darwin/mingw32 are covered
 # by the _a test already.
-test('T5435_v_asm_b', [extra_files(['T5435.hs', 'T5435_asm.c']), req_rts_linker,
+test('T5435_v_asm_b', [when(opsys("OSJavaScript"), skip), extra_files(['T5435.hs', 'T5435_asm.c']), req_rts_linker,
                        when(opsys('darwin') or opsys('mingw32'), skip)],
      makefile_test, ['T5435_v_asm_b'])
-test('T5435_v_gcc', [extra_files(['T5435.hs', 'T5435_gcc.c']), req_rts_linker],
+test('T5435_v_gcc', [when(opsys("OSJavaScript"), skip), extra_files(['T5435.hs', 'T5435_gcc.c']), req_rts_linker],
      makefile_test, ['T5435_v_gcc'])
-test('T5435_dyn_asm', [extra_files(['T5435.hs', 'T5435_asm.c']),
+test('T5435_dyn_asm', [when(opsys("OSJavaScript"), skip), extra_files(['T5435.hs', 'T5435_asm.c']),
                        check_stdout(checkDynAsm)],
      makefile_test, ['T5435_dyn_asm'])
-test('T5435_dyn_gcc', extra_files(['T5435.hs', 'T5435_gcc.c']) , makefile_test, ['T5435_dyn_gcc'])
+test('T5435_dyn_gcc', [when(opsys("OSJavaScript"), skip), extra_files(['T5435.hs', 'T5435_gcc.c'])] , makefile_test, ['T5435_dyn_gcc'])
 
 ######################################
 test('linker_unload',
-     [extra_files(['LinkerUnload.hs', 'Test.hs']), req_rts_linker],
+     [when(opsys("OSJavaScript"), skip),
+      extra_files(['LinkerUnload.hs', 'Test.hs']), req_rts_linker],
      makefile_test, ['linker_unload'])
 
 ######################################
 test('linker_error1', [extra_files(['linker_error.c']),
+                       when(opsys("OSJavaScript"), skip),
                        ignore_stderr], makefile_test, ['linker_error1'])
 
 test('linker_error2', [extra_files(['linker_error.c']),
+                       when(opsys("OSJavaScript"), skip),
                        ignore_stderr], makefile_test, ['linker_error2'])
 
 test('linker_error3', [extra_files(['linker_error.c']),
+                       when(opsys("OSJavaScript"), skip),
                        ignore_stderr], makefile_test, ['linker_error3'])
 
 ######################################

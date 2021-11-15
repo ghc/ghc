@@ -32,6 +32,7 @@ test('plugins03',
 
 test('plugins04',
      [extra_files(['HomePackagePlugin.hs']),
+      when(opsys("OSJavaScript"), skip),
       only_ways([config.ghc_plugin_way])],
      multimod_compile_fail,
      ['plugins04', '-package ghc -fplugin HomePackagePlugin'])

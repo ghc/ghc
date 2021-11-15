@@ -23,6 +23,6 @@ test('T11224', normal, compile_and_run, ['-Wincomplete-patterns -Woverlapping-pa
 #       (1) Use -fexternal-interpreter, or
 #       (2) Build the program twice: once with -dynamic, and then
 #           with -prof using -osuf to set a different object file suffix.
-test('T13688', omit_ways(['profasm', 'profthreaded']), multimod_compile_and_run, ['T13688', '-v0'])
+test('T13688', [when(opsys("OSJavaScript"), skip), omit_ways(['profasm', 'profthreaded'])], multimod_compile_and_run, ['T13688', '-v0'])
 # Requires UnboxedSums, which GHCi does not support.
 test('T14228', omit_ways(['ghci']), compile_and_run, [''])

@@ -5,6 +5,7 @@ else:
 
 test('bkpcabal06',
      [extra_files(['bkpcabal06.cabal', 'Setup.hs', 'sig', 'impl']),
+      when(opsys("OSJavaScript"), skip),
       when(opsys('mingw32'), skip)],
      run_command,
      ['$MAKE -s --no-print-directory bkpcabal06 ' + cleanup])

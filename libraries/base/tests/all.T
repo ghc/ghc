@@ -12,14 +12,14 @@ def normalise_quotes (str):
 #--------------------------------------
 # Test functions
 #--------------------------------------
-test('readFloat', exit_code(1), compile_and_run, [''])
+test('readFloat', [when(opsys("OSJavaScript"), skip), exit_code(1)], compile_and_run, [''])
 test('enumDouble', normal, compile_and_run, [''])
 test('enumRatio', normal, compile_and_run, [''])
 test('enumNumeric', normal, compile_and_run, [''])
 test('tempfiles', normal, compile_and_run, [''])
 test('fixed', normal, compile_and_run, [''])
 test('quotOverflow', normal, compile_and_run, [''])
-test('assert', exit_code(1), compile_and_run, ['-fno-ignore-asserts'])
+test('assert', [when(opsys('OSJavaScript'), skip), exit_code(1)], compile_and_run, ['-fno-ignore-asserts'])
 test('CPUTime001', fragile(16224), compile_and_run, [''])
 test('readLitChar',   normal, compile_and_run, [''])
 test('unicode001',
@@ -27,7 +27,7 @@ test('unicode001',
      compile_and_run,
      [''])
 test('unicode002',
-     when(platform('i386-unknown-openbsd'), expect_fail),
+     [when(opsys("OSJavaScript"), skip), when(platform('i386-unknown-openbsd'), expect_fail)],
      compile_and_run,
      [''])
 test('data-fixed-show-read', normal, compile_and_run, [''])
@@ -74,6 +74,7 @@ test('length001',
      # excessive amounts of stack space. So we specifically set a low
      # stack limit and mark it as failing under a few conditions.
      [extra_run_opts('+RTS -K8m -RTS'),
+     when(opsys("OSJavaScript"), skip),
      expect_fail_for(['normal', 'threaded1', 'llvm', 'nonmoving', 'nonmoving_thr', 'nonmoving_thr_ghc'])],
      compile_and_run, [''])
 
@@ -90,7 +91,7 @@ test('addr001',		normal, compile_and_run, [''])
 test('dynamic001',      normal, compile_and_run, [''])
 test('dynamic002',      normal, compile_and_run, [''])
 test('dynamic003',      extra_run_opts('+RTS -K32m -RTS'), compile_and_run, [''])
-test('dynamic004',      omit_ways(['normal', 'threaded1', 'ghci']), compile_and_run, [''])
+test('dynamic004',      [when(opsys("OSJavaScript"), skip), omit_ways(['normal', 'threaded1', 'ghci'])], compile_and_run, [''])
 test('dynamic005',      normal, compile_and_run, [''])
 
 enum_setups = [when(fast(), skip)]
@@ -152,7 +153,7 @@ test('T2528', normal, compile_and_run, [''])
 # May 2014: seems to work on msys2
 # May 2018: The behavior of printf seems very implementation dependent.
 #     so let's normalise the output.
-test('T4006', normalise_fun(normalise_quotes), compile_and_run, [''])
+test('T4006', [when(opsys("OSJavaScript"), skip), normalise_fun(normalise_quotes)], compile_and_run, [''])
 
 test('T5943', normal, compile_and_run, [''])
 test('T5962', normal, compile_and_run, [''])
@@ -163,7 +164,7 @@ test('qsemn001', normal, compile_and_run, [''])
 
 test('T7457', normal, compile_and_run, [''])
 
-test('T7773', when(opsys('mingw32'), skip), compile_and_run, [''])
+test('T7773', [when(opsys("OSJavaScript"), skip), when(opsys('mingw32'), skip)], compile_and_run, [''])
 # Andreas says that T7773 will not (and should not) work on Windows
 
 # Tests for kind-polymorphic Category
@@ -174,24 +175,28 @@ test('CatEntail', normal, compile, [''])
 test('T7653', omit_ways(prof_ways+['ghci']), compile_and_run, [''])
 test('T7787', normal, compile_and_run, [''])
 
-test('topHandler01', when(opsys('mingw32'), skip), compile_and_run, [''])
+test('topHandler01', [when(opsys("OSJavaScript"), skip), when(opsys('mingw32'), skip)], compile_and_run, [''])
 test('topHandler02',
      [when(opsys('mingw32'), skip),
+      when(opsys("OSJavaScript"), skip),
       omit_ways(['ghci']),
       signal_exit_code(2)
      ], compile_and_run, [''])
 test('topHandler03',
      [when(opsys('mingw32'), skip), ignore_stderr,
+      when(opsys("OSJavaScript"), skip),
       signal_exit_code(15)
      ], compile_and_run, [''])
 test('topHandler04',
      [when(opsys('mingw32'), skip),
+      when(opsys("OSJavaScript"), skip),
       exit_code(1)
      ], compile_and_run, [''])
 
 
 test('T8766',
         [ collect_stats('bytes allocated',5)
+        , when(opsys("OSJavaScript"), skip)
         , only_ways(['normal'])],
       compile_and_run,
       ['-O'])
@@ -215,13 +220,14 @@ test('T9681', normal, compile_fail, [''])
 test('T8089',
      [exit_code(99), run_timeout_multiplier(0.01)],
      compile_and_run, [''])
-test('hWaitForInput-accurate-socket', reqlib('unix'), compile_and_run, [''])
+test('hWaitForInput-accurate-socket', [when(opsys("OSJavaScript"), skip), reqlib('unix')], compile_and_run, [''])
 test('T8684', expect_broken(8684), compile_and_run, [''])
-test('hWaitForInput-accurate-stdin', [expect_broken_for(16535, threaded_ways), omit_ways(['ghci'])], compile_and_run, [''])
-test('hWaitForInput-accurate-pipe', reqlib('unix'), compile_and_run, [''])
+test('hWaitForInput-accurate-stdin', [when(opsys("OSJavaScript"), skip), expect_broken_for(16535, threaded_ways), omit_ways(['ghci'])], compile_and_run, [''])
+test('hWaitForInput-accurate-pipe', [when(opsys("OSJavaScript"), skip), reqlib('unix')], compile_and_run, [''])
 test('T9826',normal, compile_and_run,[''])
 test('T9848',
         [ collect_stats('bytes allocated')
+        , when(opsys("OSJavaScript"), skip)
         , only_ways(['normal'])],
       compile_and_run,
       ['-O'])
@@ -229,28 +235,30 @@ test('T10149', normal, compile_and_run, [''])
 test('T11334a', normal, compile_and_run, [''])
 test('T11555', normal, compile_and_run, [''])
 test('T12494', normal, compile_and_run, [''])
-test('T12852', when(opsys('mingw32'), skip), compile_and_run, [''])
+test('T12852', [when(opsys("OSJavaScript"), skip), when(opsys('mingw32'), skip)], compile_and_run, [''])
 test('lazySTexamples', normal, compile_and_run, [''])
-test('T11760', req_smp, compile_and_run, ['-threaded -with-rtsopts=-N2'])
+test('T11760', [when(opsys("OSJavaScript"), skip), req_smp], compile_and_run, ['-threaded -with-rtsopts=-N2'])
 test('T12874', normal, compile_and_run, [''])
 test('T13191',
         [ collect_stats('bytes allocated', 5)
+        , when(opsys("OSJavaScript"), skip)
         , only_ways(['normal'])],
       compile_and_run,
       ['-O'])
-test('T13525', when(opsys('mingw32'), skip), compile_and_run, [''])
+test('T13525', [when(opsys("OSJavaScript"), skip), when(opsys('mingw32'), skip)], compile_and_run, [''])
 test('T13097', normal, compile_and_run, [''])
 test('functorOperators', normal, compile_and_run, [''])
 test('T3474',
      [collect_stats('max_bytes_used',5),
+      when(opsys("OSJavaScript"), skip),
       only_ways(['normal'])],
      compile_and_run, ['-O'])
 test('T14425', normal, compile_and_run, [''])
 test('T10412', normal, compile_and_run, [''])
 test('T13896', normal, compile_and_run, [''])
 test('T13167', fragile_for(16536, concurrent_ways), compile_and_run, [''])
-test('T15349', [exit_code(1), expect_broken_for(15349, ['ghci'])], compile_and_run, [''])
-test('T16111', exit_code(1), compile_and_run, [''])
+test('T15349', [when(opsys("OSJavaScript"), skip), exit_code(1), expect_broken_for(15349, ['ghci'])], compile_and_run, [''])
+test('T16111', [when(opsys("OSJavaScript"), skip), exit_code(1)], compile_and_run, [''])
 test('T16943a', normal, compile_and_run, [''])
 test('T16943b', normal, compile_and_run, [''])
 test('T20107', extra_run_opts('+RTS -M50M'), compile_and_run, ['-package bytestring'])

@@ -37,7 +37,7 @@ test('T5712', normal, compile_and_run, [''])
 test('T7401', normal, compile_and_run, [''])
 test('T7931', normal, compile_and_run, [''])
 # T8280 is superseded by T10104
-test('T9576', exit_code(1), compile_and_run, [''])
+test('T9576', [when(opsys("OSJavaScript"), skip), exit_code(1)], compile_and_run, [''])
 test('T9830', [], multimod_compile_and_run, ['T9830', '-v0'])
 test('T10104', normal, compile_and_run, [''])
 test('T10447', normal, compile_and_run, [''])

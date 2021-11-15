@@ -4,6 +4,7 @@
 
 test('T5835',
      [collect_runtime_residency(10),
+      when(opsys("OSJavaScript"), skip),
       only_ways(['normal'])
       ],
      compile_and_run,
@@ -11,6 +12,7 @@ test('T5835',
 
 test('T12791',
      [collect_runtime_residency(10),
+      when(opsys("OSJavaScript"), skip),
       only_ways(['normal'])
        ],
      compile_and_run,
@@ -20,6 +22,7 @@ test('T12791',
 
 test('T10359',
      [collect_stats('bytes allocated',5),
+      when(opsys("OSJavaScript"), skip),
       only_ways(['normal'])
       ],
      compile_and_run,
@@ -27,6 +30,7 @@ test('T10359',
 
 test('T14955',
      [collect_stats('bytes allocated',5),
+      when(opsys("OSJavaScript"), skip),
       only_ways(['normal'])
       ],
      multimod_compile_and_run,
@@ -37,6 +41,7 @@ test('T14955',
 test('T3586',
      [collect_runtime_residency(2),
       collect_stats('bytes allocated', 5),
+      when(opsys("OSJavaScript"), skip),
       only_ways(['normal']),
       ],
      compile_and_run,
@@ -44,12 +49,13 @@ test('T3586',
 
 test('T4830',
      [collect_stats('bytes allocated',4),
+      when(opsys("OSJavaScript"), skip),
       only_ways(['normal'])
       ],
      compile_and_run,
      ['-O2'])
 
-test('T3245', [when(doing_ghci(), extra_hc_opts('-fobject-code'))],
+test('T3245', [when(opsys("OSJavaScript"), skip), when(doing_ghci(), extra_hc_opts('-fobject-code'))],
      compile_and_run, ['-O'])
 
 # Test that bytestring reading/writing isn't over-allocating.  We had
@@ -57,6 +63,7 @@ test('T3245', [when(doing_ghci(), extra_hc_opts('-fobject-code'))],
 #
 test('lazy-bs-alloc',
      [extra_files(['../../numeric/should_run/arith011.stdout']),
+      when(opsys("OSJavaScript"), skip),
       collect_stats('bytes allocated',5),
       collect_runtime_residency(1),
       only_ways(['normal']),
@@ -69,6 +76,7 @@ test('lazy-bs-alloc',
 
 test('T876',
      [collect_stats('bytes allocated',5),
+      when(opsys("OSJavaScript"), skip),
       only_ways(['normal']),
       extra_run_opts('10000')
       ],
@@ -82,14 +90,15 @@ else:
    sse2_opts = ''
 
 test('T4321',
-     omit_ways(['ghci']),
+     [when(opsys("OSJavaScript"), skip), omit_ways(['ghci'])],
      compile_and_run, ['-O ' + sse2_opts])
 
-test('T3736', [], makefile_test, ['T3736'])
+test('T3736', [when(opsys("OSJavaScript"), skip)], makefile_test, ['T3736'])
 test('T3738',
      [extra_clean(['T3738a.hi', 'T3738a.o']),
       collect_stats('peak_megabytes_allocated', 0),
       collect_stats('bytes allocated',8),
+      when(opsys("OSJavaScript"), skip),
       only_ways(['normal'])
       ],
      compile_and_run,
@@ -97,14 +106,16 @@ test('T3738',
 
 test('MethSharing',
      [collect_stats('peak_megabytes_allocated',  0),
+      when(opsys("OSJavaScript"), skip),
       collect_stats('bytes allocated',5),
       only_ways(['normal'])
       ],
      compile_and_run,
      ['-O'])
-test('T2902', [], makefile_test, ['T2902'])
+test('T2902', [when(opsys("OSJavaScript"), skip)], makefile_test, ['T2902'])
 test('T149',
      [ # expect_broken(149),
+       when(opsys("OSJavaScript"), skip),
        # working (2 Jul 2013, x86-64/Linux)
       extra_clean(['T149_A',    'T149_B',
                    'T149_A.hi', 'T149_B.hi',
@@ -113,6 +124,7 @@ test('T149',
 
 test('T5113',
      [collect_stats('bytes allocated',5),
+      when(opsys("OSJavaScript"), skip),
       only_ways(['normal'])
       ],
      compile_and_run,
@@ -121,6 +133,7 @@ test('T5113',
 
 test('T4978',
      [collect_stats('bytes allocated',5),
+      when(opsys("OSJavaScript"), skip),
       only_ways(['normal'])
       ],
      compile_and_run,
@@ -128,6 +141,7 @@ test('T4978',
 
 test('T5205',
      [collect_stats('bytes allocated',5),
+      when(opsys("OSJavaScript"), skip),
       only_ways(['normal', 'optasm'])
       ],
      compile_and_run,
@@ -135,6 +149,7 @@ test('T5205',
 
 test('T5549',
      [collect_stats('bytes allocated',5),
+      when(opsys("OSJavaScript"), skip),
       only_ways(['normal'])
       ],
      compile_and_run,
@@ -142,18 +157,21 @@ test('T5549',
 
 test('T4474a',
      [collect_stats('bytes allocated',5),
+      when(opsys("OSJavaScript"), skip),
       only_ways(['normal'])
       ],
      compile_and_run,
      ['-O'])
 test('T4474b',
      [collect_stats('bytes allocated',5),
+      when(opsys("OSJavaScript"), skip),
       only_ways(['normal'])
       ],
      compile_and_run,
      ['-O'])
 test('T4474c',
      [collect_stats('bytes allocated',5),
+      when(opsys("OSJavaScript"), skip),
       only_ways(['normal'])
       ],
      compile_and_run,
@@ -161,6 +179,7 @@ test('T4474c',
 
 test('T5237',
      [collect_stats('bytes allocated',5),
+     when(opsys("OSJavaScript"), skip),
      only_ways(['normal'])
      ],
     compile_and_run,
@@ -168,6 +187,7 @@ test('T5237',
 
 test('T5536',
      [collect_stats('bytes allocated',1),
+     when(opsys("OSJavaScript"), skip),
      extra_clean(['T5536.data']),
      ignore_stdout,
      only_ways(['normal'])
@@ -178,21 +198,24 @@ test('T5536',
 test('T7257',
      [collect_stats('bytes allocated',10),
       collect_stats('peak_megabytes_allocated',5),
+      when(opsys("OSJavaScript"), skip),
       only_ways(['normal'])
      ],
     compile_and_run, ['-O'])
 
 test('Conversions',
      [collect_stats('bytes allocated',3),
+      when(opsys("OSJavaScript"), skip),
       only_ways(['normal'])
      ],
     compile_and_run, ['-O -msse2'])
 
-test('T7507', omit_ways(['ghci']), compile_and_run, ['-O'])
+test('T7507', [when(opsys("OSJavaScript"), skip), omit_ways(['ghci'])], compile_and_run, ['-O'])
 # For 7507, stack overflow is the bad case
 
 test('T7436',
      [collect_stats('max_bytes_used',4),
+      when(opsys("OSJavaScript"), skip),
       only_ways(['normal'])
       ],
      compile_and_run,
@@ -201,6 +224,7 @@ test('T7436',
 test('T7797',
       [collect_stats('bytes allocated',5),
       extra_clean(['T7797a.hi', 'T7797a.o']),
+      when(opsys("OSJavaScript"), skip),
       only_ways(['normal'])
       ],
      compile_and_run,
@@ -208,6 +232,7 @@ test('T7797',
 
 test('T7954',
       [collect_stats('bytes allocated',10),
+      when(opsys("OSJavaScript"), skip),
       only_ways(['normal'])
       ],
      compile_and_run,
@@ -215,54 +240,63 @@ test('T7954',
 
 test('T7850',
      [collect_stats('peak_megabytes_allocated',10),
+      when(opsys("OSJavaScript"), skip),
       only_ways(['normal'])],
      compile_and_run,
      ['-O'])
 
 test('T5949',
      [collect_stats('bytes allocated',10),
+      when(opsys("OSJavaScript"), skip),
       only_ways(['normal'])],
      compile_and_run,
      ['-O'])
 
 test('T4267',
      [collect_stats('bytes allocated',10),
+      when(opsys("OSJavaScript"), skip),
       only_ways(['normal'])],
       compile_and_run,
       ['-O'])
 
 test('T7619',
      [collect_stats('bytes allocated',10),
+      when(opsys("OSJavaScript"), skip),
       only_ways(['normal'])],
      compile_and_run,
      ['-O'])
 
 test('InlineArrayAlloc',
      [collect_stats('bytes allocated',5),
+      when(opsys("OSJavaScript"), skip),
       only_ways(['normal'])],
      compile_and_run,
      ['-O2'])
 
 test('InlineByteArrayAlloc',
      [collect_stats('bytes allocated',5),
+      when(opsys("OSJavaScript"), skip),
       only_ways(['normal'])],
      compile_and_run,
      ['-O2'])
 
 test('InlineCloneArrayAlloc',
      [collect_stats('bytes allocated',5),
+      when(opsys("OSJavaScript"), skip),
       only_ways(['normal'])],
      compile_and_run,
      ['-O2'])
 
 test('T9203',
      [collect_stats('bytes allocated',5),
+      when(opsys("OSJavaScript"), skip),
       only_ways(['normal'])],
      compile_and_run,
      ['-O2'])
 
 test('T9339',
      [collect_stats('bytes allocated',5),
+      when(opsys("OSJavaScript"), skip),
       only_ways(['normal'])],
      compile_and_run,
      ['-O2 -fspec-constr-keen'])
@@ -271,30 +305,35 @@ test('T9339',
 
 test('T8472',
      [collect_stats('bytes allocated',80),
+      when(opsys("OSJavaScript"), skip),
       only_ways(['normal'])],
      compile_and_run,
      ['-O2'])
 
 test('T12996',
      [collect_stats('bytes allocated',5),
+      when(opsys("OSJavaScript"), skip),
       only_ways(['normal'])],
      compile_and_run,
      ['-O2'])
 
 test('T13001',
      [collect_stats('bytes allocated',20),
+      when(opsys("OSJavaScript"), skip),
       only_ways(['normal'])],
      compile_and_run,
      ['-O2'])
 
 test('T8763',
      [collect_stats('bytes allocated', 20),
+      when(opsys("OSJavaScript"), skip),
       only_ways(['normal'])],
      compile_and_run,
      ['-O2'])
 
 test('T12990',
     [collect_stats('bytes allocated',5),
+     when(opsys("OSJavaScript"), skip),
      only_ways(['normal'])],
     compile_and_run,
     ['-O2'])
@@ -302,60 +341,70 @@ test('T12990',
 test('T13218',
     [collect_stats('bytes allocated',5),
      collect_stats('max_bytes_used',10),
+     when(opsys("OSJavaScript"), skip),
      only_ways(['normal'])],
     compile_and_run,
     ['-O'])
 
 test('DeriveNull',
     [collect_stats('bytes allocated',5),
+     when(opsys("OSJavaScript"), skip),
      only_ways(['normal'])],
     compile_and_run,
     ['-O'])
 
-test('DeriveNullTermination', normal, compile_and_run, [''])
+test('DeriveNullTermination', [when(opsys("OSJavaScript"), skip), normal], compile_and_run, [''])
 
 test('T13623',
     [collect_stats('bytes allocated',10),
+     when(opsys("OSJavaScript"), skip),
      only_ways(['normal'])],
     compile_and_run,
     ['-O2'])
 
 test('T14052',
-     [collect_compiler_stats('bytes allocated',15)],
+     [collect_compiler_stats('bytes allocated',15),
+      when(opsys("OSJavaScript"), skip)],
      ghci_script,
      ['T14052.script'])
 
 test('T14936',
-     [collect_stats('bytes allocated',10)],
+     [collect_stats('bytes allocated',10),
+      when(opsys("OSJavaScript"), skip)],
      compile_and_run,
      ['-O2'])
 
 test('T15226',
     [collect_stats('bytes allocated',5),
+     when(opsys("OSJavaScript"), skip),
      only_ways(['normal'])],
     compile_and_run,
     ['-O'])
 
 test('T15226a',
     [collect_stats('bytes allocated',5),
+     when(opsys("OSJavaScript"), skip),
      only_ways(['normal'])],
     compile_and_run,
     ['-O'])
 
 test('T15263',
     [collect_stats('bytes allocated', 4),
+     when(opsys("OSJavaScript"), skip),
      only_ways(['normal'])],
     compile_and_run,
     ['-O'])
 
 test('T15426',
     [collect_stats('bytes allocated', 20),
+    when(opsys("OSJavaScript"), skip),
     only_ways(['normal'])],
     compile_and_run,
     ['-O2'])
 
 test('T15578',
     [collect_stats('bytes allocated', 5),
+     when(opsys("OSJavaScript"), skip),
      only_ways(['normal'])],
     compile_and_run,
     ['-O2'])
@@ -363,6 +412,7 @@ test('T15578',
 # Test performance of creating Uniques.
 test('UniqLoop',
      [collect_stats('bytes allocated',5),
+      when(opsys("OSJavaScript"), skip),
       only_ways(['normal'])
       ],
      compile_and_run,

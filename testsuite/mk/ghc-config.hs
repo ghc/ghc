@@ -8,8 +8,8 @@ main = do
   info <- readProcess ghc ["+RTS", "--info"] ""
   let fields = read info :: [(String,String)]
   getGhcFieldOrFail fields "HostOS" "Host OS"
-  getGhcFieldOrFail fields "WORDSIZE" "Word size"
-  getGhcFieldOrFail fields "TargetOS_CPP" "Target OS"
+  -- getGhcFieldOrFail fields "WORDSIZE" "Word size"
+  -- getGhcFieldOrFail fields "TargetOS_CPP" "Target OS"
   getGhcFieldOrFail fields "TargetARCH_CPP" "Target architecture"
 
   info <- readProcess ghc ["--info"] ""
@@ -22,6 +22,8 @@ main = do
   getGhcFieldOrFail fields "GhcUnregisterised" "Unregisterised"
   getGhcFieldOrFail fields "GhcWithSMP" "Support SMP"
   getGhcFieldOrFail fields "GhcRTSWays" "RTS ways"
+  getGhcFieldOrFail fields "TargetOS_CPP" "target os"
+  getGhcFieldOrFail' fields fixBytesToBits "WORDSIZE" "target word size"
   getGhcFieldOrDefault fields "GhcDynamicByDefault" "Dynamic by default" "NO"
   getGhcFieldOrDefault fields "GhcDynamic" "GHC Dynamic" "NO"
   getGhcFieldOrDefault fields "GhcProfiled" "GHC Profiled" "NO"
@@ -49,9 +51,17 @@ main = do
   putStrLn $ "MinGhcVersion801" ++ '=':minGhcVersion801
 
 
+fixBytesToBits :: String -> String
+fixBytesToBits = show . (* 8) . read
+
+
 getGhcFieldOrFail :: [(String,String)] -> String -> String -> IO ()
 getGhcFieldOrFail fields mkvar key
    = getGhcField fields mkvar key id (fail ("No field: " ++ key))
+
+getGhcFieldOrFail' :: [(String,String)] -> (String -> String) -> String -> String -> IO ()
+getGhcFieldOrFail' fields fix mkvar key
+   = getGhcField fields mkvar key fix (fail ("No field: " ++ key))
 
 getGhcFieldOrDefault :: [(String,String)] -> String -> String -> String -> IO ()
 getGhcFieldOrDefault fields mkvar key deflt
