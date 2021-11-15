@@ -622,6 +622,7 @@ are the most common patterns, rewritten as regular expressions for clarity:
  'dependency'   { L _ ITdependency }
 
  '{-# INLINE'             { L _ (ITinline_prag _ _ _) } -- INLINE or INLINABLE
+ '{-# OPAQUE'             { L _ (ITopaque_prag _) }
  '{-# SPECIALISE'         { L _ (ITspec_prag _) }
  '{-# SPECIALISE_INLINE'  { L _ (ITspec_inline_prag _ _) }
  '{-# SOURCE'             { L _ (ITsource_prag _) }
@@ -2575,7 +2576,9 @@ sigdecl :: { LHsDecl GhcPs }
                 {% acsA (\cs -> (sLL $1 $> $ SigD noExtField (InlineSig (EpAnn (glR $1) ((mo $1:fst $2) ++ [mc $4]) cs) $3
                             (mkInlinePragma (getINLINE_PRAGs $1) (getINLINE $1)
                                             (snd $2))))) }
-
+        | '{-# OPAQUE' qvar '#-}'
+                {% acsA (\cs -> (sLL $1 $> $ SigD noExtField (InlineSig (EpAnn (glR $1) [mo $1, mc $3] cs) $2
+                            (mkOpaquePragma (getOPAQUE_PRAGs $1))))) }
         | '{-# SCC' qvar '#-}'
           {% acsA (\cs -> sLL $1 $> (SigD noExtField (SCCFunSig (EpAnn (glR $1) [mo $1, mc $3] cs) (getSCC_PRAGs $1) $2 Nothing))) }
 
@@ -3914,6 +3917,7 @@ getPRIMWORDs    (L _ (ITprimword   src _)) = src
 
 -- See Note [Pragma source text] in "GHC.Types.Basic" for the following
 getINLINE_PRAGs       (L _ (ITinline_prag       _ inl _)) = inlineSpecSource inl
+getOPAQUE_PRAGs       (L _ (ITopaque_prag       src))     = src
 getSPEC_PRAGs         (L _ (ITspec_prag         src))     = src
 getSPEC_INLINE_PRAGs  (L _ (ITspec_inline_prag  src _))   = src
 getSOURCE_PRAGs       (L _ (ITsource_prag       src)) = src

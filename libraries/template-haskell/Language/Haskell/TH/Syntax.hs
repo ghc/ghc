@@ -2499,6 +2499,7 @@ data Safety = Unsafe | Safe | Interruptible
         deriving( Show, Eq, Ord, Data, Generic )
 
 data Pragma = InlineP         Name Inline RuleMatch Phases
+            | OpaqueP         Name
             | SpecialiseP     Name Type (Maybe Inline) Phases
             | SpecialiseInstP Type
             | RuleP           String (Maybe [TyVarBndr ()]) [RuleBndr] Exp Exp Phases

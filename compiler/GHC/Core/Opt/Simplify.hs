@@ -624,6 +624,8 @@ tryCastWorkerWrapper env top_lvl old_bndr occ_info bndr (Cast rhs co)
   , isConcrete (typeKind rhs_ty)   -- Don't peel off a cast if doing so would
                                    -- lose the underlying runtime representation.
                                    -- See Note [Preserve RuntimeRep info in cast w/w]
+  , not (isOpaquePragma (idInlinePragma old_bndr)) -- Not for OPAQUE bindings
+                                                   -- See Note [OPAQUE pragma]
   = do  { (rhs_floats, work_rhs) <- prepareRhs env top_lvl occ_fs rhs
         ; uniq <- getUniqueM
         ; let work_name = mkSystemVarName uniq occ_fs

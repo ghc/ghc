@@ -534,9 +534,6 @@ tryWW   :: WwOpts
                                         -- if two, then a worker and a
                                         -- wrapper.
 tryWW ww_opts is_rec fn_id rhs
-  -- Do this even if there is a NOINLINE pragma
-  -- See Note [Worker/wrapper for NOINLINE functions]
-
   -- See Note [Drop absent bindings]
   | isAbsDmd (demandInfo fn_info)
   , not (isJoinId fn_id)
@@ -551,6 +548,35 @@ tryWW ww_opts is_rec fn_id rhs
   | isRecordSelector fn_id
   = return [ (new_fn_id, rhs ) ]
 
+  -- Don't w/w OPAQUE things
+  -- See Note [OPAQUE pragma]
+  --
+  -- Whilst this check might seem superfluous, since we strip boxity
+  -- information in GHC.Core.Opt.DmdAnal.finaliseArgBoxities and
+  -- CPR information in GHC.Core.Opt.CprAnal.cprAnalBind, it actually
+  -- isn't. That is because we would still perform w/w when:
+  --
+  -- * An argument is used strictly, and -fworker-wrapper-cbv is
+  --   enabled, or,
+  -- * When demand analysis marks an argument as absent.
+  --
+  -- In a debug build we do assert that boxity and CPR information
+  -- are actually stripped, since we want to prevent callers of OPAQUE
+  -- things to do reboxing. See:
+  -- * Note [The OPAQUE pragma and avoiding the reboxing of arguments]
+  -- * Note [The OPAQUE pragma and avoiding the reboxing of results]
+  | isOpaquePragma (inlinePragInfo fn_info)
+  = assertPpr (onlyBoxedArguments (dmdSigInfo fn_info) &&
+               isTopCprSig (cprSigInfo fn_info))
+              (text "OPAQUE fun with boxity" $$
+               ppr new_fn_id $$
+               ppr (dmdSigInfo fn_info) $$
+               ppr (cprSigInfo fn_info) $$
+               ppr rhs) $
+    return [ (new_fn_id, rhs) ]
+
+  -- Do this even if there is a NOINLINE pragma
+  -- See Note [Worker/wrapper for NOINLINE functions]
   | is_fun
   = splitFun ww_opts new_fn_id rhs
 

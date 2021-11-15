@@ -428,6 +428,31 @@ cprFix orig_env orig_pairs
           where
             (id', rhs', env') = cprAnalBind env id rhs
 
+{-
+Note [The OPAQUE pragma and avoiding the reboxing of results]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider:
+
+  {-# OPAQUE f #-}
+  f x = (x,y)
+
+  g True  = f 2 x
+  g False = (0,0)
+
+Where if we didn't strip the CPR info from 'f' we would end up with the
+following W/W pair for 'g':
+
+  $wg True  = case f 2 of (x, y) -> (# x, y #)
+  $wg False = (# 0, 0 #)
+
+  g b = case wg$ b of (# x, y #) -> (x, y)
+
+Where the worker unboxes the result of 'f', only for wrapper to box it again.
+That's because the non-stripped CPR signature of 'f' is saying to W/W-transform
+'f'. However, OPAQUE-annotated binders aren't W/W transformed (see
+Note [OPAQUE pragma]), so we should strip 'f's CPR signature.
+-}
+
 -- | Process the RHS of the binding for a sensible arity, add the CPR signature
 -- to the Id, and augment the environment with the signature as well.
 cprAnalBind
@@ -452,8 +477,12 @@ cprAnalBind env id rhs
       | otherwise   = rhs_ty
     -- See Note [Arity trimming for CPR signatures]
     sig  = mkCprSigForArity (idArity id) rhs_ty'
-    id'  = setIdCprSig id sig
-    env' = extendSigEnv env id sig
+    -- See Note [OPAQUE pragma]
+    -- See Note [The OPAQUE pragma and avoiding the reboxing of results]
+    sig' | isOpaquePragma (idInlinePragma id) = topCprSig
+         | otherwise                          = sig
+    id'  = setIdCprSig id sig'
+    env' = extendSigEnv env id sig'
 
     -- See Note [CPR for thunks]
     stays_thunk = is_thunk && not_strict

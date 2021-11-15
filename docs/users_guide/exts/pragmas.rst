@@ -454,6 +454,30 @@ arguments etc). Another way to understand the semantics is this:
 The same phase-numbering control is available for :pragma:`RULE <RULES>`\s
 (:ref:`rewrite-rules`).
 
+.. _opaque-pragma:
+
+``OPAQUE`` pragma
+-----------------
+
+.. pragma:: OPAQUE ⟨name⟩
+
+    :where: top-level
+
+    Instructs the compiler to ensure that every call of ``name`` remains a
+    call of ``name``, and not some name-mangled variant.
+
+The :pragma:`OPAQUE` pragma is an even stronger variant of the :pragma:`NOINLINE`
+pragma. Like the :pragma:`NOINLINE`, named functions annotated with a
+:pragma:`OPAQUE` pragma are not inlined, nor will they be be specialized.
+Unlike the :pragma:`NOINLINE`, named functions annotated with a
+:pragma:`OPAQUE` pragma are left untouched by the Worker/Wrapper transformation.
+Unlike :pragma:`NOINLINE`, :pragma:`OPAQUE` has no phase control.
+
+In effect, every call of a named function annotated with an :pragma:`OPAQUE`
+pragma remains a call of that named function, not some name-mangled variant.
+You shouldn't ever need to use the :pragma:`OPAQUE` pragma, unless you have a
+reason to care about name-mangling.
+
 .. _line-pragma:
 
 ``LINE`` pragma

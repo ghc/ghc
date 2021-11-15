@@ -379,3 +379,13 @@ test('T19790',  normal, compile, ['-O -ddump-rule-firings'])
 # -O0 is needed to trigger it because that switches rules off,
 # which (before the fix) lost crucial dependencies
 test('T20820',  normal, compile, ['-O0'])
+
+test('OpaqueNoAbsentArgWW', normal, compile, ['-O -ddump-simpl -dsuppress-uniques'])
+test('OpaqueNoCastWW', normal, compile, ['-O -ddump-simpl -dsuppress-uniques'])
+test('OpaqueNoRebox', normal, compile, ['-O -ddump-simpl -dsuppress-uniques'])
+test('OpaqueNoRebox2', normal, compile, ['-O -ddump-simpl -dsuppress-uniques'])
+test('OpaqueNoRebox3', normal, compile, ['-O -ddump-simpl -dsuppress-uniques'])
+test('OpaqueNoSpecConstr', normal, compile, ['-O -ddump-simpl -dsuppress-uniques'])
+test('OpaqueNoSpecialise', normal, compile, ['-O -ddump-simpl -dsuppress-uniques'])
+test('OpaqueNoStrictArgWW', normal, compile, ['-O -fworker-wrapper-cbv -ddump-simpl -dsuppress-uniques'])
+test('OpaqueNoWW', normal, compile, ['-O -ddump-simpl -dsuppress-uniques'])

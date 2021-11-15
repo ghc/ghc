@@ -1,0 +1,2 @@
+OpaqueParseWarn1.hs:6:1: warning:
+    Ignoring useless SPECIALISE pragma for NOINLINE function: ‘f’

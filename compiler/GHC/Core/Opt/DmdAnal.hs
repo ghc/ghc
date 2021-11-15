@@ -1516,6 +1516,24 @@ next layer, using that depleted budget.
 To achieve this, we use the classic almost-circular programming technique in
 which we we write one pass that takes a lazy list of the Budgets for every
 layer.
+
+Note [The OPAQUE pragma and avoiding the reboxing of arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In https://gitlab.haskell.org/ghc/ghc/-/issues/13143 it was identified that when
+a function 'f' with a NOINLINE pragma is W/W transformed, then the worker for
+'f' should get the NOINLINE annotation, while the wrapper /should/ be inlined.
+
+That's because if the wrapper for 'f' had stayed NOINLINE, then any worker of a
+W/W-transformed /caller of/ 'f' would immediately rebox any unboxed arguments
+that is applied to the wrapper of 'f'. When the wrapper is inlined, that kind of
+reboxing does not happen.
+
+But now we have functions with OPAQUE pragmas, which by definition (See Note
+[OPAQUE pragma]) do not get W/W-transformed. So in order to avoid reboxing
+workers of any W/W-transformed /callers of/ 'f' we need to strip all boxity
+information from 'f' in the demand analysis. This will inform the
+W/W-transformation code that boxed arguments of 'f' must definitely be passed
+along in boxed form and as such dissuade the creation of reboxing workers.
 -}
 
 data Budgets = MkB Arity Budgets   -- An infinite list of arity budgets
@@ -1560,10 +1578,14 @@ finaliseArgBoxities env fn arity rhs div
     mk_triple :: Id -> (Type,StrictnessMark,Demand)
     mk_triple bndr | is_cls_arg ty = (ty, NotMarkedStrict, trimBoxity dmd)
                    | is_bot_fn     = (ty, NotMarkedStrict, unboxDeeplyDmd dmd)
+                   -- See Note [OPAQUE pragma]
+                   -- See Note [The OPAQUE pragma and avoiding the reboxing of arguments]
+                   | is_opaque     = (ty, NotMarkedStrict, trimBoxity dmd)
                    | otherwise     = (ty, NotMarkedStrict, dmd)
                    where
-                     ty  = idType bndr
-                     dmd = idDemandInfo bndr
+                     ty        = idType bndr
+                     dmd       = idDemandInfo bndr
+                     is_opaque = isOpaquePragma (idInlinePragma fn)
 
     -- is_cls_arg: see Note [Do not unbox class dictionaries]
     is_cls_arg arg_ty = is_inlinable_fn && isClassPred arg_ty

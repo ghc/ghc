@@ -1,0 +1,172 @@
+
+==================== Simplified expression ====================
+GHC.Desugar.toAnnotationWrapper
+  @GHC.Exts.SpecConstrAnnotation
+  GHC.Exts.$fDataSpecConstrAnnotation
+  GHC.Exts.ForceSpecConstr
+
+
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 83, types: 40, coercions: 0, joins: 0/0}
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl :: GHC.Prim.Addr#
+[GblId, Unf=OtherCon []]
+lvl = "OpaqueNoSpecConstr.hs:(10,1)-(11,39)|function loop"#
+
+-- RHS size: {terms: 2, types: 2, coercions: 0, joins: 0/0}
+lvl1 :: ()
+[GblId, Str=b, Cpr=b]
+lvl1 = Control.Exception.Base.patError @GHC.Types.LiftedRep @() lvl
+
+Rec {
+-- RHS size: {terms: 20, types: 13, coercions: 0, joins: 0/0}
+loop [InlPrag=OPAQUE, Occ=LoopBreaker]
+  :: SPEC -> [Int] -> [Int] -> [Int]
+[GblId, Arity=3, Str=<1L><L><1L>, Unf=OtherCon []]
+loop
+  = \ (ds :: SPEC) (z :: [Int]) (ds1 :: [Int]) ->
+      case ds of {
+        SPEC ->
+          case ds1 of {
+            [] -> z;
+            : x xs -> loop OpaqueNoSpecConstr.SPEC (GHC.Types.: @Int x z) xs
+          };
+        SPEC2 -> case lvl1 of wild1 { }
+      }
+end Rec }
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+OpaqueNoSpecConstr.$trModule4 :: GHC.Prim.Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+OpaqueNoSpecConstr.$trModule4 = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+OpaqueNoSpecConstr.$trModule3 :: GHC.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+OpaqueNoSpecConstr.$trModule3
+  = GHC.Types.TrNameS OpaqueNoSpecConstr.$trModule4
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+OpaqueNoSpecConstr.$trModule2 :: GHC.Prim.Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 60 0}]
+OpaqueNoSpecConstr.$trModule2 = "OpaqueNoSpecConstr"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+OpaqueNoSpecConstr.$trModule1 :: GHC.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+OpaqueNoSpecConstr.$trModule1
+  = GHC.Types.TrNameS OpaqueNoSpecConstr.$trModule2
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+OpaqueNoSpecConstr.$trModule :: GHC.Types.Module
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+OpaqueNoSpecConstr.$trModule
+  = GHC.Types.Module
+      OpaqueNoSpecConstr.$trModule3 OpaqueNoSpecConstr.$trModule1
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+OpaqueNoSpecConstr.$tcSPEC2 :: GHC.Prim.Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+OpaqueNoSpecConstr.$tcSPEC2 = "SPEC"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+OpaqueNoSpecConstr.$tcSPEC1 :: GHC.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+OpaqueNoSpecConstr.$tcSPEC1
+  = GHC.Types.TrNameS OpaqueNoSpecConstr.$tcSPEC2
+
+-- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
+OpaqueNoSpecConstr.$tcSPEC :: GHC.Types.TyCon
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+OpaqueNoSpecConstr.$tcSPEC
+  = GHC.Types.TyCon
+      1794519131116102988##
+      1536993820726345194##
+      OpaqueNoSpecConstr.$trModule
+      OpaqueNoSpecConstr.$tcSPEC1
+      0#
+      GHC.Types.krep$*
+
+-- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
+OpaqueNoSpecConstr.$tc'SPEC1 [InlPrag=[~]] :: GHC.Types.KindRep
+[GblId, Unf=OtherCon []]
+OpaqueNoSpecConstr.$tc'SPEC1
+  = GHC.Types.KindRepTyConApp
+      OpaqueNoSpecConstr.$tcSPEC (GHC.Types.[] @GHC.Types.KindRep)
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+OpaqueNoSpecConstr.$tc'SPEC4 :: GHC.Prim.Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
+OpaqueNoSpecConstr.$tc'SPEC4 = "'SPEC"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+OpaqueNoSpecConstr.$tc'SPEC3 :: GHC.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+OpaqueNoSpecConstr.$tc'SPEC3
+  = GHC.Types.TrNameS OpaqueNoSpecConstr.$tc'SPEC4
+
+-- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
+OpaqueNoSpecConstr.$tc'SPEC :: GHC.Types.TyCon
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+OpaqueNoSpecConstr.$tc'SPEC
+  = GHC.Types.TyCon
+      9648911419523887824##
+      4100179153648933145##
+      OpaqueNoSpecConstr.$trModule
+      OpaqueNoSpecConstr.$tc'SPEC3
+      0#
+      OpaqueNoSpecConstr.$tc'SPEC1
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+OpaqueNoSpecConstr.$tc'SPEC6 :: GHC.Prim.Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
+OpaqueNoSpecConstr.$tc'SPEC6 = "'SPEC2"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+OpaqueNoSpecConstr.$tc'SPEC5 :: GHC.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+OpaqueNoSpecConstr.$tc'SPEC5
+  = GHC.Types.TrNameS OpaqueNoSpecConstr.$tc'SPEC6
+
+-- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
+OpaqueNoSpecConstr.$tc'SPEC2 :: GHC.Types.TyCon
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+OpaqueNoSpecConstr.$tc'SPEC2
+  = GHC.Types.TyCon
+      4214136204857816792##
+      17253701793498718125##
+      OpaqueNoSpecConstr.$trModule
+      OpaqueNoSpecConstr.$tc'SPEC5
+      0#
+      OpaqueNoSpecConstr.$tc'SPEC1

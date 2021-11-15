@@ -30,6 +30,7 @@ module GHC.Parser.PostProcess (
         mkTyFamInst,
         mkFamDecl,
         mkInlinePragma,
+        mkOpaquePragma,
         mkPatSynMatchGroup,
         mkRecConstrOrUpdate,
         mkTyClD, mkInstD,
@@ -2559,7 +2560,21 @@ mkInlinePragma src (inl, match_info) mb_act
             Nothing  -> -- No phase specified
                         case inl of
                           NoInline _  -> NeverActive
+                          Opaque _    -> NeverActive
                           _other      -> AlwaysActive
+
+mkOpaquePragma :: SourceText -> InlinePragma
+mkOpaquePragma src
+  = InlinePragma { inl_src    = src
+                 , inl_inline = Opaque src
+                 , inl_sat    = Nothing
+                 -- By marking the OPAQUE pragma NeverActive we stop
+                 -- (constructor) specialisation on OPAQUE things.
+                 --
+                 -- See Note [OPAQUE pragma]
+                 , inl_act    = NeverActive
+                 , inl_rule   = FunLike
+                 }
 
 -----------------------------------------------------------------------------
 -- utilities for foreign declarations

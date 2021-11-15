@@ -1650,7 +1650,14 @@ specialise env bind_calls (RI { ri_fn = fn, ri_lam_bndrs = arg_bndrs
   = -- pprTrace "specialise bot" (ppr fn) $
     return (nullUsage, spec_info)
 
-  | not (isNeverActive (idInlineActivation fn))  -- See Note [Transfer activation]
+  | not (isNeverActive (idInlineActivation fn))
+      -- See Note [Transfer activation]
+      --
+      --
+      -- Don't specialise OPAQUE things, see Note [OPAQUE pragma].
+      -- Since OPAQUE things are always never-active (see
+      -- GHC.Parser.PostProcess.mkOpaquePragma) this guard never fires for
+      -- OPAQUE things.
   , not (null arg_bndrs)                         -- Only specialise functions
   , Just all_calls <- lookupVarEnv bind_calls fn -- Some calls to it
   = -- pprTrace "specialise entry {" (ppr fn <+> ppr all_calls) $

@@ -1431,6 +1431,11 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
   && not (isNeverActive (idInlineActivation fn))
         -- Don't specialise NOINLINE things
         -- See Note [Auto-specialisation and RULES]
+        --
+        -- Don't specialise OPAQUE things, see Note [OPAQUE pragma].
+        -- Since OPAQUE things are always never-active (see
+        -- GHC.Parser.PostProcess.mkOpaquePragma) this guard never fires for
+        -- OPAQUE things.
 
 --   && not (certainlyWillInline (idUnfolding fn))      -- And it's not small
 --      See Note [Inline specialisations] for why we do not

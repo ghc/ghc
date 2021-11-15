@@ -1,0 +1,2 @@
+OpaqueParseFail2.hs:4:12: error:
+    parse error on input ‘SPECIALISE’

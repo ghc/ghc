@@ -594,10 +594,11 @@ quoteDecName        = qqFun (fsLit "quoteDec")  quoteDecKey
 quoteTypeName       = qqFun (fsLit "quoteType") quoteTypeKey
 
 -- data Inline = ...
-noInlineDataConName, inlineDataConName, inlinableDataConName :: Name
+noInlineDataConName, inlineDataConName, inlinableDataConName, opaqueDataConName :: Name
 noInlineDataConName  = thCon (fsLit "NoInline")  noInlineDataConKey
 inlineDataConName    = thCon (fsLit "Inline")    inlineDataConKey
 inlinableDataConName = thCon (fsLit "Inlinable") inlinableDataConKey
+opaqueDataConName    = thCon (fsLit "Opaque")    opaqueDataConKey
 
 -- data RuleMatch = ...
 conLikeDataConName, funLikeDataConName :: Name
@@ -700,21 +701,22 @@ modNameTyConKey         = mkPreludeTyConUnique 239
 -- If you want to change this, make sure you check in GHC.Builtin.Names
 
 -- data Inline = ...
-noInlineDataConKey, inlineDataConKey, inlinableDataConKey :: Unique
+noInlineDataConKey, inlineDataConKey, inlinableDataConKey, opaqueDataConKey :: Unique
 noInlineDataConKey  = mkPreludeDataConUnique 200
 inlineDataConKey    = mkPreludeDataConUnique 201
 inlinableDataConKey = mkPreludeDataConUnique 202
+opaqueDataConKey    = mkPreludeDataConUnique 203
 
 -- data RuleMatch = ...
 conLikeDataConKey, funLikeDataConKey :: Unique
-conLikeDataConKey = mkPreludeDataConUnique 203
-funLikeDataConKey = mkPreludeDataConUnique 204
+conLikeDataConKey = mkPreludeDataConUnique 204
+funLikeDataConKey = mkPreludeDataConUnique 205
 
 -- data Phases = ...
 allPhasesDataConKey, fromPhaseDataConKey, beforePhaseDataConKey :: Unique
-allPhasesDataConKey   = mkPreludeDataConUnique 205
-fromPhaseDataConKey   = mkPreludeDataConUnique 206
-beforePhaseDataConKey = mkPreludeDataConUnique 207
+allPhasesDataConKey   = mkPreludeDataConUnique 206
+fromPhaseDataConKey   = mkPreludeDataConUnique 207
+beforePhaseDataConKey = mkPreludeDataConUnique 208
 
 -- data Overlap = ..
 overlappableDataConKey,

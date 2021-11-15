@@ -780,6 +780,17 @@ cvtPragmaD (InlineP nm inline rm phases)
                      toSrcTxt a = SourceText $ src a
        ; returnJustLA $ Hs.SigD noExtField $ InlineSig noAnn nm' ip }
 
+cvtPragmaD (OpaqueP nm)
+  = do { nm' <- vNameN nm
+       ; let ip = InlinePragma { inl_src    = srcTxt
+                               , inl_inline = Opaque srcTxt
+                               , inl_rule   = Hs.FunLike
+                               , inl_act    = NeverActive
+                               , inl_sat    = Nothing }
+                  where
+                    srcTxt = SourceText "{-# OPAQUE"
+       ; returnJustLA $ Hs.SigD noExtField $ InlineSig noAnn nm' ip }
+
 cvtPragmaD (SpecialiseP nm ty inline phases)
   = do { nm' <- vNameN nm
        ; ty' <- cvtSigType ty

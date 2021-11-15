@@ -67,6 +67,9 @@ Compiler
 - The way GHC checks for representation polymorphism has been overhauled:
   all the checks are now done during typechecking. The error messages
   now contain more detailed information about the specific check that was performed.
+- A new pragma, :pragma:`OPAQUE`, that ensures that every call of a named function
+  annotated with an :pragma:`OPAQUE` pragma remains a call of that named function,
+  not some name-mangled variant.
 
 - The parsing of implicit parameters is slightly more permissive, as GHC now allows ::
 

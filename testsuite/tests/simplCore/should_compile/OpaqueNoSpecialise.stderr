@@ -1,0 +1,74 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 41, types: 29, coercions: 0, joins: 0/2}
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+lvl :: Integer
+[GblId, Unf=OtherCon []]
+lvl = GHC.Num.Integer.IS 1#
+
+-- RHS size: {terms: 18, types: 12, coercions: 0, joins: 0/2}
+f [InlPrag=OPAQUE] :: forall {t}. Num t => t -> [t]
+[GblId,
+ Arity=2,
+ Str=<LP(A,LCL(C1(L)),A,A,A,A,MCM(L))><L>,
+ Unf=OtherCon []]
+f = \ (@t) ($dNum :: Num t) (eta :: t) ->
+      let {
+        lvl1 :: t
+        [LclId]
+        lvl1 = fromInteger @t $dNum lvl } in
+      letrec {
+        f1 [Occ=LoopBreaker, Dmd=SCS(L)] :: t -> [t]
+        [LclId, Arity=1, Str=<L>, Unf=OtherCon []]
+        f1 = \ (x :: t) -> GHC.Types.: @t x (f1 (- @t $dNum x lvl1)); } in
+      f1 eta
+
+-- RHS size: {terms: 4, types: 2, coercions: 0, joins: 0/0}
+g :: Int -> [Int]
+[GblId,
+ Arity=1,
+ Str=<L>,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 30 0}]
+g = \ (ds :: Int) -> f @Int GHC.Num.$fNumInt ds
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+OpaqueNoSpecialise.$trModule4 :: GHC.Prim.Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+OpaqueNoSpecialise.$trModule4 = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+OpaqueNoSpecialise.$trModule3 :: GHC.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+OpaqueNoSpecialise.$trModule3
+  = GHC.Types.TrNameS OpaqueNoSpecialise.$trModule4
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+OpaqueNoSpecialise.$trModule2 :: GHC.Prim.Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 60 0}]
+OpaqueNoSpecialise.$trModule2 = "OpaqueNoSpecialise"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+OpaqueNoSpecialise.$trModule1 :: GHC.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+OpaqueNoSpecialise.$trModule1
+  = GHC.Types.TrNameS OpaqueNoSpecialise.$trModule2
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+OpaqueNoSpecialise.$trModule :: GHC.Types.Module
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+OpaqueNoSpecialise.$trModule
+  = GHC.Types.Module
+      OpaqueNoSpecialise.$trModule3 OpaqueNoSpecialise.$trModule1

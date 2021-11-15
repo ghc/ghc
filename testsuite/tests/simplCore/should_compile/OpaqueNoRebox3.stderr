@@ -1,0 +1,161 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 120, types: 47, coercions: 4, joins: 1/1}
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+OpaqueNoRebox3.$trModule4 :: GHC.Prim.Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+OpaqueNoRebox3.$trModule4 = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+OpaqueNoRebox3.$trModule3 :: GHC.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+OpaqueNoRebox3.$trModule3
+  = GHC.Types.TrNameS OpaqueNoRebox3.$trModule4
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+OpaqueNoRebox3.$trModule2 :: GHC.Prim.Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 50 0}]
+OpaqueNoRebox3.$trModule2 = "OpaqueNoRebox3"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+OpaqueNoRebox3.$trModule1 :: GHC.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+OpaqueNoRebox3.$trModule1
+  = GHC.Types.TrNameS OpaqueNoRebox3.$trModule2
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+OpaqueNoRebox3.$trModule :: GHC.Types.Module
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+OpaqueNoRebox3.$trModule
+  = GHC.Types.Module
+      OpaqueNoRebox3.$trModule3 OpaqueNoRebox3.$trModule1
+
+-- RHS size: {terms: 8, types: 3, coercions: 0, joins: 0/0}
+f [InlPrag=OPAQUE] :: Int -> Int
+[GblId, Arity=1, Str=<1L>, Unf=OtherCon []]
+f = / (x :: Int) ->
+      case x of { GHC.Types.I# ipv -> GHC.Types.I# (GHC.Prim.+# ipv 1#) }
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl :: GHC.Prim.Addr#
+[GblId, Unf=OtherCon []]
+lvl = "error"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+lvl1 :: [Char]
+[GblId]
+lvl1 = GHC.CString.unpackCString# lvl
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+lvl2 :: [Char]
+[GblId]
+lvl2 = GHC.CString.unpackCString# OpaqueNoRebox3.$trModule4
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+lvl3 :: [Char]
+[GblId]
+lvl3 = GHC.CString.unpackCString# OpaqueNoRebox3.$trModule2
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl4 :: GHC.Prim.Addr#
+[GblId, Unf=OtherCon []]
+lvl4 = "OpaqueNoRebox3.hs"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+lvl5 :: [Char]
+[GblId]
+lvl5 = GHC.CString.unpackCString# lvl4
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+lvl6 :: Int
+[GblId, Unf=OtherCon []]
+lvl6 = GHC.Types.I# 33#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+lvl7 :: Int
+[GblId, Unf=OtherCon []]
+lvl7 = GHC.Types.I# 23#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+lvl8 :: Int
+[GblId, Unf=OtherCon []]
+lvl8 = GHC.Types.I# 28#
+
+-- RHS size: {terms: 8, types: 0, coercions: 0, joins: 0/0}
+lvl9 :: GHC.Stack.Types.SrcLoc
+[GblId, Unf=OtherCon []]
+lvl9 = GHC.Stack.Types.SrcLoc lvl2 lvl3 lvl5 lvl6 lvl7 lvl6 lvl8
+
+-- RHS size: {terms: 4, types: 0, coercions: 0, joins: 0/0}
+lvl10 :: GHC.Stack.Types.CallStack
+[GblId, Unf=OtherCon []]
+lvl10
+  = GHC.Stack.Types.PushCallStack
+      lvl1 lvl9 GHC.Stack.Types.EmptyCallStack
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+lvl11 :: GHC.Prim.Addr#
+[GblId, Unf=OtherCon []]
+lvl11 = "patError"#
+
+-- RHS size: {terms: 4, types: 2, coercions: 4, joins: 0/0}
+lvl12 :: Int
+[GblId, Str=b, Cpr=b]
+lvl12
+  = error
+      @GHC.Types.LiftedRep
+      @Int
+      (lvl10
+       `cast` (Sym (GHC.Classes.N:IP[0]
+                        <"callStack">_N <GHC.Stack.Types.CallStack>_N)
+               :: GHC.Stack.Types.CallStack
+                  ~R# (?callStack::GHC.Stack.Types.CallStack)))
+      (GHC.CString.unpackCString# lvl11)
+
+Rec {
+-- RHS size: {terms: 50, types: 13, coercions: 0, joins: 1/1}
+g [Occ=LoopBreaker] :: Bool -> Bool -> Bool -> Int -> Int
+[GblId, Arity=4, Str=<SL><SL><L><1L>, Unf=OtherCon []]
+g = / (w :: Bool) (w1 :: Bool) (w2 :: Bool) (p :: Int) ->
+      join {
+        fail_ [Dmd=M!P(L)] :: Int
+        [LclId[JoinId(0)(Nothing)]]
+        fail_
+          = case w1 of {
+              False ->
+                case w2 of {
+                  False -> g w GHC.Types.True GHC.Types.False p;
+                  True -> f (f p)
+                };
+              True -> lvl12
+            } } in
+      case w of {
+        False ->
+          case w1 of {
+            False -> jump fail_;
+            True ->
+              case w2 of {
+                False ->
+                  case p of { GHC.Types.I# x -> GHC.Types.I# (GHC.Prim.+# x 1#) };
+                True -> jump fail_
+              }
+          };
+        True ->
+          case w1 of {
+            False -> jump fail_;
+            True -> f p
+          }
+      }
+end Rec }

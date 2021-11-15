@@ -31,7 +31,7 @@ module GHC.Types.Demand (
     -- ** Predicates on @Card@inalities and @Demand@s
     isAbs, isUsedOnce, isStrict,
     isAbsDmd, isUsedOnceDmd, isStrUsedDmd, isStrictDmd,
-    isTopDmd, isWeakDmd,
+    isTopDmd, isWeakDmd, onlyBoxedArguments,
     -- ** Special demands
     evalDmd,
     -- *** Demands used in PrimOp signatures
@@ -66,7 +66,7 @@ module GHC.Types.Demand (
     -- * Demand signatures
     DmdSig(..), mkDmdSigForArity, mkClosedDmdSig,
     splitDmdSig, dmdSigDmdEnv, hasDemandEnvSig,
-    nopSig, botSig, isTopSig, isDeadEndSig, appIsDeadEnd,
+    nopSig, botSig, isTopSig, isDeadEndSig, appIsDeadEnd, trimBoxityDmdSig,
     -- ** Handling arity adjustments
     prependArgsDmdSig, etaConvertDmdSig,
 
@@ -103,6 +103,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 
+import Data.Coerce (coerce)
 import Data.Function
 
 import GHC.Utils.Trace
@@ -1955,6 +1956,20 @@ isTopSig (DmdSig ty) = isTopDmdType ty
 isDeadEndSig :: DmdSig -> Bool
 isDeadEndSig (DmdSig (DmdType _ _ res)) = isDeadEndDiv res
 
+-- | True when the signature indicates all arguments are boxed
+onlyBoxedArguments :: DmdSig -> Bool
+onlyBoxedArguments (DmdSig (DmdType _ dmds _)) = all demandIsBoxed dmds
+ where
+   demandIsBoxed BotDmd    = True
+   demandIsBoxed AbsDmd    = True
+   demandIsBoxed (_ :* sd) = subDemandIsboxed sd
+
+   subDemandIsboxed (Poly Unboxed _) = False
+   subDemandIsboxed (Poly _ _)       = True
+   subDemandIsboxed (Call _ sd)      = subDemandIsboxed sd
+   subDemandIsboxed (Prod Unboxed _) = False
+   subDemandIsboxed (Prod _ ds)      = all demandIsBoxed ds
+
 -- | Returns true if an application to n args would diverge or throw an
 -- exception.
 --
@@ -1965,6 +1980,13 @@ isDeadEndSig (DmdSig (DmdType _ _ res)) = isDeadEndDiv res
 appIsDeadEnd :: DmdSig -> Int -> Bool
 appIsDeadEnd (DmdSig (DmdType _ ds res)) n
   = isDeadEndDiv res && not (lengthExceeds ds n)
+
+trimBoxityDmdType :: DmdType -> DmdType
+trimBoxityDmdType (DmdType fvs ds res) =
+  DmdType (mapVarEnv trimBoxity fvs) (map trimBoxity ds) res
+
+trimBoxityDmdSig :: DmdSig -> DmdSig
+trimBoxityDmdSig = coerce trimBoxityDmdType
 
 prependArgsDmdSig :: Int -> DmdSig -> DmdSig
 -- ^ Add extra ('topDmd') arguments to a strictness signature.

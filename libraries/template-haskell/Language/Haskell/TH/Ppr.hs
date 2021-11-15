@@ -593,6 +593,8 @@ instance Ppr Pragma where
      <+> ppr phases
      <+> pprName' Applied n
      <+> text "#-}"
+    ppr (OpaqueP n)
+       = text "{-# OPAQUE" <+> pprName' Applied n <+> text "#-}"
     ppr (SpecialiseP n ty inline phases)
        =   text "{-# SPECIALISE"
        <+> maybe empty ppr inline
