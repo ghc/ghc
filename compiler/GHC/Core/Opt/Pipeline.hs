@@ -221,10 +221,8 @@ getCoreToDo logger dflags
 
     core_todo =
      if opt_level == 0 then
-       [ static_ptrs_float_outwards,
-         CoreDoSimplify max_iter
-             (base_mode { sm_phase = FinalPhase
-                        , sm_names = ["Non-opt simplification"] })
+       [ static_ptrs_float_outwards
+       , simplify "Non-opt simplification"
        , add_caller_ccs
        ]
 
