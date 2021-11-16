@@ -1029,25 +1029,25 @@ byteSwap64 (W64# w#) = W64# (byteSwap# w#)
 
 -- | Reverse the order of the bits in a 'Word8'.
 --
--- @since 4.12.0.0
+-- @since 4.14.0.0
 bitReverse8 :: Word8 -> Word8
 bitReverse8 (W8# w#) = W8# (wordToWord8# (bitReverse8# (word8ToWord# w#)))
 
 -- | Reverse the order of the bits in a 'Word16'.
 --
--- @since 4.12.0.0
+-- @since 4.14.0.0
 bitReverse16 :: Word16 -> Word16
 bitReverse16 (W16# w#) = W16# (wordToWord16# (bitReverse16# (word16ToWord# w#)))
 
 -- | Reverse the order of the bits in a 'Word32'.
 --
--- @since 4.12.0.0
+-- @since 4.14.0.0
 bitReverse32 :: Word32 -> Word32
 bitReverse32 (W32# w#) = W32# (wordToWord32# (bitReverse32# (word32ToWord# w#)))
 
 -- | Reverse the order of the bits in a 'Word64'.
 --
--- @since 4.12.0.0
+-- @since 4.14.0.0
 #if WORD_SIZE_IN_BITS < 64
 bitReverse64 :: Word64 -> Word64
 bitReverse64 (W64# w#) = W64# (bitReverse64# w#)
