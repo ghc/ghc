@@ -36,7 +36,7 @@ module GHC.Core.Type (
         splitFunTy, splitFunTy_maybe,
         splitFunTys, funResultTy, funArgTy,
 
-        mkTyConApp, mkTyConTy, tYPE,
+        mkTyConApp, mkTyConTy, mkTYPEapp,
         tyConAppTyCon_maybe, tyConAppTyConPicky_maybe,
         tyConAppArgs_maybe, tyConAppTyCon, tyConAppArgs,
         splitTyConApp_maybe, splitTyConApp, tyConAppArgN,
@@ -259,8 +259,8 @@ import GHC.Builtin.Types.Prim
 import {-# SOURCE #-} GHC.Builtin.Types
                                  ( charTy, naturalTy, listTyCon
                                  , typeSymbolKind, liftedTypeKind, unliftedTypeKind
-                                 , liftedRepTyCon, unliftedRepTyCon
-                                 , constraintKind
+                                 , liftedRepTy, unliftedRepTy, zeroBitRepTy
+                                 , constraintKind, zeroBitTypeKind
                                  , unrestrictedFunTyCon
                                  , manyDataConTy, oneDataConTy )
 import GHC.Types.Name( Name )
@@ -290,6 +290,7 @@ import GHC.Types.Unique ( nonDetCmpUnique )
 import GHC.Data.Maybe   ( orElse, expectJust )
 import Data.Maybe       ( isJust )
 import Control.Monad    ( guard )
+-- import GHC.Utils.Trace
 
 -- $type_classification
 -- #type_classification#
@@ -457,38 +458,58 @@ coreView _ = Nothing
 -- instantiated at arguments @tys@, or returns 'Nothing' if @tc@ is not a
 -- synonym.
 expandSynTyConApp_maybe :: TyCon -> [Type] -> Maybe Type
-expandSynTyConApp_maybe tc tys
+{-# INLINE expandSynTyConApp_maybe #-}
+-- This INLINE will inline the call to expandSynTyConApp_maybe in coreView,
+-- which will eliminate the allocat ion Just/Nothing in the result
+-- Don't be tempted to make `expand_syn` (which is NOINLIN) return the
+-- Just/Nothing, else you'll increase allocation
+expandSynTyConApp_maybe tc arg_tys
   | Just (tvs, rhs) <- synTyConDefn_maybe tc
-  , tys `lengthAtLeast` arity
-  = Just (expand_syn arity tvs rhs tys)
+  , arg_tys `lengthAtLeast` (tyConArity tc)
+  = Just (expand_syn tvs rhs arg_tys)
   | otherwise
   = Nothing
-  where
-    arity = tyConArity tc
--- Without this INLINE the call to expandSynTyConApp_maybe in coreView
--- will result in an avoidable allocation.
-{-# INLINE expandSynTyConApp_maybe #-}
 
 -- | A helper for 'expandSynTyConApp_maybe' to avoid inlining this cold path
 -- into call-sites.
-expand_syn :: Int      -- ^ the arity of the synonym
-           -> [TyVar]  -- ^ the variables bound by the synonym
+--
+-- Precondition: the call is saturated or over-saturated;
+--               i.e. length tvs <= length arg_tys
+expand_syn :: [TyVar]  -- ^ the variables bound by the synonym
            -> Type     -- ^ the RHS of the synonym
            -> [Type]   -- ^ the type arguments the synonym is instantiated at.
            -> Type
-expand_syn arity tvs rhs tys
-  | tys `lengthExceeds` arity = mkAppTys rhs' (drop arity tys)
-  | otherwise                 = rhs'
+{-# NOINLINE expand_syn #-} -- We never want to inline this cold-path.
+
+expand_syn tvs rhs arg_tys
+  -- No substitution necessary if either tvs or tys is empty
+  -- This is both more efficient, and steers clear of an infinite
+  -- loop; see Note [Care using synonyms to compress types]
+  | null arg_tys  = assert (null tvs) rhs
+  | null tvs      = mkAppTys rhs arg_tys
+  | otherwise     = go empty_subst tvs arg_tys
   where
-    rhs' = substTy (mkTvSubstPrs (tvs `zip` tys)) rhs
-               -- The free vars of 'rhs' should all be bound by 'tenv', so it's
-               -- ok to use 'substTy' here (which is what expandSynTyConApp_maybe does).
-               -- See also Note [The substitution invariant] in GHC.Core.TyCo.Subst.
-               -- Its important to use mkAppTys, rather than (foldl AppTy),
-               -- because the function part might well return a
-               -- partially-applied type constructor; indeed, usually will!
--- We never want to inline this cold-path.
-{-# INLINE expand_syn #-}
+    empty_subst = mkEmptyTCvSubst in_scope
+    in_scope = mkInScopeSet $ shallowTyCoVarsOfTypes $ arg_tys
+      -- The free vars of 'rhs' should all be bound by 'tenv',
+      -- so we only need the free vars of tys
+      -- See also Note [The substitution invariant] in GHC.Core.TyCo.Subst.
+
+    go subst [] tys
+      | null tys  = rhs'  -- Exactly Saturated
+      | otherwise = mkAppTys rhs' tys
+          -- Its important to use mkAppTys, rather than (foldl AppTy),
+          -- because the function part might well return a
+          -- partially-applied type constructor; indeed, usually will!
+      where
+        rhs' = substTy subst rhs
+
+    go subst (tv:tvs) (ty:tys) = go (extendTvSubst subst tv ty) tvs tys
+
+    go _ (_:_) [] = pprPanic "expand_syn" (ppr tvs $$ ppr rhs $$ ppr arg_tys)
+                   -- Under-saturated, precondition failed
+
+
 
 coreFullView :: Type -> Type
 -- ^ Iterates 'coreView' until there is no more to synonym to expand.
@@ -1635,55 +1656,137 @@ tyConBindersTyCoBinders = map to_tyb
     to_tyb (Bndr tv (NamedTCB vis)) = Named (Bndr tv vis)
     to_tyb (Bndr tv (AnonTCB af))   = Anon af (tymult (varType tv))
 
--- | Create the plain type constructor type which has been applied to no type arguments at all.
+-- | (mkTyConTy tc) returns (TyConApp tc [])
+-- but arranges to share that TyConApp among all calls
+-- See Note [Sharing nullary TyConApps] in GHC.Core.TyCon
 mkTyConTy :: TyCon -> Type
 mkTyConTy tycon = tyConNullaryTy tycon
-  -- see Note [Sharing nullary TyConApps] in GHC.Core.TyCon
 
 -- | A key function: builds a 'TyConApp' or 'FunTy' as appropriate to
 -- its arguments.  Applies its arguments to the constructor from left to right.
 mkTyConApp :: TyCon -> [Type] -> Type
-mkTyConApp tycon tys
-  | null tys
-  = mkTyConTy tycon
+mkTyConApp tycon []
+  = -- See Note [Sharing nullary TyConApps] in GHC.Core.TyCon
+    mkTyConTy tycon
 
-  | isFunTyCon tycon
-  , [w, _rep1,_rep2,ty1,ty2] <- tys
-  -- The FunTyCon (->) is always a visible one
-  = FunTy { ft_af = VisArg, ft_mult = w, ft_arg = ty1, ft_res = ty2 }
+mkTyConApp tycon tys@(ty1:rest)
+  | key == funTyConKey
+  = case tys of
+      [w, _rep1,_rep2,arg,res] -> FunTy { ft_af = VisArg, ft_mult = w
+                                        , ft_arg = arg, ft_res = res }
+      _ -> bale_out
 
-  -- See Note [Prefer Type over TYPE 'LiftedRep].
-  | tycon `hasKey` tYPETyConKey
-  , [rep] <- tys
-  = tYPE rep
+  -- See Note [Using synonyms to compress types]
+  | key == tYPETyConKey
+  = assert (null rest) $
+--    mkTYPEapp_maybe ty1 `orElse` bale_out
+    case mkTYPEapp_maybe ty1 of
+      Just ty -> ty -- pprTrace "mkTYPEapp:yes" (ppr ty) ty
+      Nothing -> bale_out -- pprTrace "mkTYPEapp:no" (ppr bale_out) bale_out
+
+  -- See Note [Using synonyms to compress types]
+  | key == boxedRepDataConTyConKey
+  = assert (null rest) $
+--     mkBoxedRepApp_maybe ty1 `orElse` bale_out
+    case mkBoxedRepApp_maybe ty1 of
+      Just ty -> ty -- pprTrace "mkBoxedRepApp:yes" (ppr ty) ty
+      Nothing -> bale_out -- pprTrace "mkBoxedRepApp:no" (ppr bale_out) bale_out
+
+  | key == tupleRepDataConTyConKey
+  = case mkTupleRepApp_maybe ty1 of
+      Just ty -> ty -- pprTrace "mkTupleRepApp:yes" (ppr ty) ty
+      Nothing -> bale_out -- pprTrace "mkTupleRepApp:no" (ppr bale_out) bale_out
+
   -- The catch-all case
   | otherwise
-  = TyConApp tycon tys
+  = bale_out
+  where
+    key = tyConUnique tycon
+    bale_out = TyConApp tycon tys
 
-{-
-Note [Prefer Type over TYPE 'LiftedRep]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The Core of nearly any program will have numerous occurrences of
-@TYPE 'LiftedRep@ (and, equivalently, 'Type') floating about. Concretely, while
-investigating #17292 we found that these constituting a majority of TyConApp
-constructors on the heap:
+mkTYPEapp :: Type -> Type
+mkTYPEapp rr
+  = case mkTYPEapp_maybe rr of
+       Just ty -> ty
+       Nothing -> TyConApp tYPETyCon [rr]
 
-```
-(From a sample of 100000 TyConApp closures)
-0x45f3523    - 28732 - `Type`
-0x420b840702 - 9629  - generic type constructors
-0x42055b7e46 - 9596
-0x420559b582 - 9511
-0x420bb15a1e - 9509
-0x420b86c6ba - 9501
-0x42055bac1e - 9496
-0x45e68fd    - 538 - `TYPE ...`
-```
+mkTYPEapp_maybe :: Type -> Maybe Type
+-- ^ Given a @RuntimeRep@, applies @TYPE@ to it.
+-- On the fly it rewrites
+--      TYPE LiftedRep      -->   liftedTypeKind    (a synonym)
+--      TYPE UnliftedRep    -->   unliftedTypeKind  (ditto)
+--      TYPE ZeroBitRep     -->   zeroBitTypeKind   (ditto)
+-- NB: no need to check for TYPE (BoxedRep Lifted), TYPE (BoxedRep Unlifted)
+--     because those inner types should already have been rewritten
+--     to LiftedRep and UnliftedRep respectively, by mkTyConApp
+--
+-- see Note [TYPE and RuntimeRep] in GHC.Builtin.Types.Prim.
+-- See Note [Using synonyms to compress types] in GHC.Core.Type
+{-# NOINLINE mkTYPEapp_maybe #-}
+mkTYPEapp_maybe (TyConApp tc args)
+  | key == liftedRepTyConKey    = assert (null args) $ Just liftedTypeKind   -- TYPE LiftedRep
+  | key == unliftedRepTyConKey  = assert (null args) $ Just unliftedTypeKind -- TYPE UnliftedRep
+  | key == zeroBitRepTyConKey   = assert (null args) $ Just zeroBitTypeKind  -- TYPE ZeroBitRep
+  where
+    key = tyConUnique tc
+mkTYPEapp_maybe _ = Nothing
+
+mkBoxedRepApp_maybe :: Type -> Maybe Type
+-- ^ Given a `Levity`, apply `BoxedRep` to it
+-- On the fly, rewrite
+--      BoxedRep Lifted     -->   liftedRepTy    (a synonym)
+--      BoxedRep Unlifted   -->   unliftedRepTy  (ditto)
+-- See Note [TYPE and RuntimeRep] in GHC.Builtin.Types.Prim.
+-- See Note [Using synonyms to compress types] in GHC.Core.Type
+{-# NOINLINE mkBoxedRepApp_maybe #-}
+mkBoxedRepApp_maybe (TyConApp tc args)
+  | key == liftedDataConKey   = assert (null args) $ Just liftedRepTy    -- BoxedRep Lifted
+  | key == unliftedDataConKey = assert (null args) $ Just unliftedRepTy  -- BoxedRep Unlifted
+  where
+    key = tyConUnique tc
+mkBoxedRepApp_maybe _ = Nothing
+
+mkTupleRepApp_maybe :: Type -> Maybe Type
+-- ^ Given a `[RuntimeRep]`, apply `TupleRep` to it
+-- On the fly, rewrite
+--      TupleRep [] -> zeroBitRepTy   (a synonym)
+-- See Note [TYPE and RuntimeRep] in GHC.Builtin.Types.Prim.
+-- See Note [Using synonyms to compress types] in GHC.Core.Type
+{-# NOINLINE mkTupleRepApp_maybe #-}
+mkTupleRepApp_maybe (TyConApp tc args)
+  | key == nilDataConKey = assert (isSingleton args) $ Just zeroBitRepTy  -- ZeroBitRep
+  where
+    key = tyConUnique tc
+mkTupleRepApp_maybe _ = Nothing
+
+{- Note [Using synonyms to compress types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Was: Prefer Type over TYPE (BoxedRep Lifted)]
+
+The Core of nearly any program will have numerous occurrences of the Types
+
+   TyConApp BoxedRep [TyConApp Lifted []]    -- Synonym LiftedRep
+   TyConApp BoxedRep [TyConApp Unlifted []]  -- Synonym UnliftedREp
+   TyConApp TYPE [TyConApp LiftedRep []]     -- Synonym Type
+   TyConApp TYPE [TyConApp UnliftedRep []]   -- Synonym UnliftedType
+
+While investigating #17292 we found that these constituted a majority
+of all TyConApp constructors on the heap:
+
+    (From a sample of 100000 TyConApp closures)
+    0x45f3523    - 28732 - `Type`
+    0x420b840702 - 9629  - generic type constructors
+    0x42055b7e46 - 9596
+    0x420559b582 - 9511
+    0x420bb15a1e - 9509
+    0x420b86c6ba - 9501
+    0x42055bac1e - 9496
+    0x45e68fd    - 538   - `TYPE ...`
 
 Consequently, we try hard to ensure that operations on such types are
 efficient. Specifically, we strive to
 
- a. Avoid heap allocation of such types
+ a. Avoid heap allocation of such types; use a single static TyConApp
  b. Use a small (shallow in the tree-depth sense) representation
     for such types
 
@@ -1693,41 +1796,51 @@ Comparison in particular takes special advantage of nullary type synonym
 applications (e.g. things like @TyConApp typeTyCon []@), Note [Comparing
 nullary type synonyms] in "GHC.Core.Type".
 
-To accomplish these we use a number of tricks:
+To accomplish these we use a number of tricks, implemented by mkTyConApp.
 
- 1. Instead of representing the lifted kind as
-    @TyConApp tYPETyCon [liftedRepDataCon]@ we rather prefer to
-    use the 'GHC.Types.Type' type synonym (represented as a nullary TyConApp).
-    This serves goal (b) since there are no applied type arguments to traverse,
-    e.g., during comparison.
+ 1. Instead of (TyConApp BoxedRep [TyConApp Lifted []]),
+    we prefer a statically-allocated (TyConApp LiftedRep [])
+    where `LiftedRep` is a type synonym:
+       type LiftedRep = BoxedRep Lifted
+    Similarly for UnliftedRep
 
- 2. We have a top-level binding to represent `TyConApp GHC.Types.Type []`
-    (namely 'GHC.Builtin.Types.Prim.liftedTypeKind'), ensuring that we
-    don't need to allocate such types (goal (a)).
+ 2. Instead of (TyConApp TYPE [TyConApp LiftedRep []])
+    we prefer the statically-allocated (TyConApp Type [])
+    where `Type` is a type synonym
+       type Type = TYPE LiftedRep
+    Similarly for UnliftedType
 
- 3. We use the sharing mechanism described in Note [Sharing nullary TyConApps]
+These serve goal (b) since there are no applied type arguments to traverse,
+e.g., during comparison.
+
+ 3. We have a single, statically allocated top-level binding to
+    represent `TyConApp GHC.Types.Type []` (namely
+    'GHC.Builtin.Types.Prim.liftedTypeKind'), ensuring that we don't
+    need to allocate such types (goal (a)).  See functions
+    mkTYPEapp and mkBoxedRepApp
+
+ 4. We use the sharing mechanism described in Note [Sharing nullary TyConApps]
     in GHC.Core.TyCon to ensure that we never need to allocate such
     nullary applications (goal (a)).
 
-See #17958.
+See #17958, #20541
+
+Note [Care using synonyms to compress types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Using a synonym to compress a types has a tricky wrinkle. Consider
+coreView applied to (TyConApp LiftedRep [])
+
+* coreView expands the LiftedRep synonym:
+     type LiftedRep = BoxedRep Lifted
+
+* Danger: we might apply the empty substitution to the RHS of the
+  synonym.  And substTy calls mkTyConApp BoxedRep [Lifted]. And
+  mkTyConApp compresses that back to LiftedRep.  Loop!
+
+* Solution: in expandSynTyConApp_maybe, don't call substTy for nullary
+  type synonyms.  That's more efficient anyway.
 -}
 
-
--- | Given a @RuntimeRep@, applies @TYPE@ to it.
--- See Note [TYPE and RuntimeRep] in GHC.Builtin.Types.Prim.
-tYPE :: Type -> Type
-tYPE rr@(TyConApp tc [arg])
-  -- See Note [Prefer Type of TYPE 'LiftedRep]
-  | tc `hasKey` boxedRepDataConKey
-  , TyConApp tc' [] <- arg
-  = if | tc' `hasKey` liftedDataConKey   -> liftedTypeKind   -- TYPE (BoxedRep 'Lifted)
-       | tc' `hasKey` unliftedDataConKey -> unliftedTypeKind -- TYPE (BoxedRep 'Unlifted)
-       | otherwise                       -> TyConApp tYPETyCon [rr]
-  | tc == liftedRepTyCon                               -- TYPE LiftedRep
-  = liftedTypeKind
-  | tc == unliftedRepTyCon                             -- TYPE UnliftedRep
-  = unliftedTypeKind
-tYPE rr = TyConApp tYPETyCon [rr]
 
 
 {-
@@ -2528,8 +2641,8 @@ We perform this optimisation in a number of places:
 
 This optimisation is especially helpful for the ubiquitous GHC.Types.Type,
 since GHC prefers to use the type synonym over @TYPE 'LiftedRep@ applications
-whenever possible. See Note [Prefer Type over TYPE 'LiftedRep] in
-GHC.Core.TyCo.Rep for details.
+whenever possible. See Note [Using synonyms to compress types] in
+GHC.Core.Type for details.
 
 -}
 

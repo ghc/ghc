@@ -5,8 +5,7 @@ T15883d.hs:14:1: error:
       Probable fix: use a type annotation to specify what ‘a0’ should be.
       These potential instances exist:
         instance Show Ordering -- Defined in ‘GHC.Show’
-        instance Show (Foo ('BoxedRep 'Lifted))
-          -- Defined at T15883d.hs:14:1
+        instance Show (Foo LiftedRep) -- Defined at T15883d.hs:14:1
         instance Show a => Show (Maybe a) -- Defined in ‘GHC.Show’
         ...plus 28 others
         ...plus 9 instances involving out-of-scope types
@@ -17,5 +16,5 @@ T15883d.hs:14:1: error:
       In the expression:
         showParen (a >= 11) ((.) (showString "MkFoo ") (showsPrec 11 b1))
       When typechecking the code for ‘showsPrec’
-        in a derived instance for ‘Show (Foo ('BoxedRep 'Lifted))’:
+        in a derived instance for ‘Show (Foo LiftedRep)’:
         To see the code I am typechecking, use -ddump-deriv

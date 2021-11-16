@@ -15,9 +15,9 @@ T15883e.hs:16:1: error:
       In an equation for ‘Data.Data.gfoldl’:
           Data.Data.gfoldl k z (MkFoo a1) = (z (\ a1 -> MkFoo a1) `k` a1)
       When typechecking the code for ‘Data.Data.gfoldl’
-        in a derived instance for ‘Data (Foo ('BoxedRep 'Lifted))’:
+        in a derived instance for ‘Data (Foo LiftedRep)’:
         To see the code I am typechecking, use -ddump-deriv
-      In the instance declaration for ‘Data (Foo ('BoxedRep 'Lifted))’
+      In the instance declaration for ‘Data (Foo LiftedRep)’
 
 T15883e.hs:16:1: error:
     • Couldn't match expected type ‘a’ with actual type ‘d0’
@@ -30,7 +30,7 @@ T15883e.hs:16:1: error:
       In the expression: MkFoo a1
       In the first argument of ‘z’, namely ‘(\ a1 -> MkFoo a1)’
       When typechecking the code for ‘Data.Data.gfoldl’
-        in a derived instance for ‘Data (Foo ('BoxedRep 'Lifted))’:
+        in a derived instance for ‘Data (Foo LiftedRep)’:
         To see the code I am typechecking, use -ddump-deriv
     • Relevant bindings include a1 :: d0 (bound at T15883e.hs:16:1)
 
@@ -50,9 +50,9 @@ T15883e.hs:16:1: error:
       In an equation for ‘Data.Data.gunfold’:
           Data.Data.gunfold k z _ = k (z (\ a1 -> MkFoo a1))
       When typechecking the code for ‘Data.Data.gunfold’
-        in a derived instance for ‘Data (Foo ('BoxedRep 'Lifted))’:
+        in a derived instance for ‘Data (Foo LiftedRep)’:
         To see the code I am typechecking, use -ddump-deriv
-      In the instance declaration for ‘Data (Foo ('BoxedRep 'Lifted))’
+      In the instance declaration for ‘Data (Foo LiftedRep)’
 
 T15883e.hs:16:1: error:
     • Couldn't match expected type ‘a’ with actual type ‘b0’
@@ -65,6 +65,6 @@ T15883e.hs:16:1: error:
       In the expression: MkFoo a1
       In the first argument of ‘z’, namely ‘(\ a1 -> MkFoo a1)’
       When typechecking the code for ‘Data.Data.gunfold’
-        in a derived instance for ‘Data (Foo ('BoxedRep 'Lifted))’:
+        in a derived instance for ‘Data (Foo LiftedRep)’:
         To see the code I am typechecking, use -ddump-deriv
     • Relevant bindings include a1 :: b0 (bound at T15883e.hs:16:1)

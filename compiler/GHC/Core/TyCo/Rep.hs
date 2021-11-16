@@ -42,7 +42,7 @@ module GHC.Core.TyCo.Rep (
         MCoercion(..), MCoercionR, MCoercionN,
 
         -- * Functions over types
-        mkTyConTy_, mkTyVarTy, mkTyVarTys,
+        mkNakedTyConTy, mkTyVarTy, mkTyVarTys,
         mkTyCoVarTy, mkTyCoVarTys,
         mkFunTy, mkVisFunTy, mkInvisFunTy, mkVisFunTys,
         mkForAllTy, mkForAllTys, mkInvisForAllTys,
@@ -1062,11 +1062,13 @@ mkPiTy (Named (Bndr tv vis)) ty = mkForAllTy tv vis ty
 mkPiTys :: [TyCoBinder] -> Type -> Type
 mkPiTys tbs ty = foldr mkPiTy ty tbs
 
--- | Create a nullary 'TyConApp'. In general you should rather use
--- 'GHC.Core.Type.mkTyConTy'. This merely exists to break the import cycle
--- between 'GHC.Core.TyCon' and this module.
-mkTyConTy_ :: TyCon -> Type
-mkTyConTy_ tycon = TyConApp tycon []
+-- | 'mkNakedTyConTy' creates a nullary 'TyConApp'. In general you
+-- should rather use 'GHC.Core.Type.mkTyConTy', which picks the shared
+-- nullary TyConApp from inside the TyCon (via tyConNullaryTy.  But
+-- we have to build the TyConApp tc [] in that TyCon field; that's
+-- what 'mkNakedTyConTy' is for.
+mkNakedTyConTy :: TyCon -> Type
+mkNakedTyConTy tycon = TyConApp tycon []
 
 {-
 %************************************************************************

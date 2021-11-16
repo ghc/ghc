@@ -746,8 +746,8 @@ subst_ty subst ty
     go (TyConApp tc tys) = (mkTyConApp $! tc) $! strictMap go tys
                                -- NB: mkTyConApp, not TyConApp.
                                -- mkTyConApp has optimizations.
-                               -- See Note [Prefer Type over TYPE 'LiftedRep]
-                               -- in GHC.Core.TyCo.Rep
+                               -- See Note [Using synonyms to compress types]
+                               -- in GHC.Core.Type
     go ty@(FunTy { ft_mult = mult, ft_arg = arg, ft_res = res })
       = let !mult' = go mult
             !arg' = go arg

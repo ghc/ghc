@@ -355,7 +355,7 @@ checkPostUnariseId id =
       is_sum, is_tuple, is_void :: Maybe String
       is_sum = guard (isUnboxedSumType id_ty) >> return "unboxed sum"
       is_tuple = guard (isUnboxedTupleType id_ty) >> return "unboxed tuple"
-      is_void = guard (isVoidTy id_ty) >> return "void"
+      is_void = guard (isZeroBitTy id_ty) >> return "void"
     in
       is_sum <|> is_tuple <|> is_void
 

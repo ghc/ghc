@@ -43,7 +43,7 @@ import GHC.Types.Id
 import GHC.Builtin.PrimOps
 import GHC.Core.TyCon
 import GHC.Core.Type        ( isUnliftedType )
-import GHC.Types.RepType    ( isVoidTy, countConRepArgs )
+import GHC.Types.RepType    ( isZeroBitTy, countConRepArgs )
 import GHC.Types.CostCentre ( CostCentreStack, currentCCS )
 import GHC.Types.Tickish
 import GHC.Data.Maybe
@@ -896,12 +896,12 @@ cgIdApp fun_id args = do
         fun         = idInfoToAmode fun_info
         lf_info     = cg_lf         fun_info
         n_args      = length args
-        v_args      = length $ filter (isVoidTy . stgArgType) args
+        v_args      = length $ filter (isZeroBitTy . stgArgType) args
     case getCallMethod call_opts fun_name fun_id lf_info n_args v_args (cg_loc fun_info) self_loop_info of
             -- A value in WHNF, so we can just return it.
         ReturnIt
-          | isVoidTy (idType fun_id) -> emitReturn []
-          | otherwise                -> emitReturn [fun]
+          | isZeroBitTy (idType fun_id) -> emitReturn []
+          | otherwise                   -> emitReturn [fun]
           -- ToDo: does ReturnIt guarantee tagged?
 
         EnterIt -> assert (null args) $  -- Discarding arguments

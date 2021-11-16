@@ -1,9 +1,9 @@
 
 T17131.hs:12:34: error:
     • Couldn't match kind: TypeReps xs
-                     with: '[ 'BoxedRep 'Lifted]
+                     with: '[LiftedRep]
       Expected kind ‘TYPE ('TupleRep (TypeReps xs))’,
-        but ‘(# a #)’ has kind ‘TYPE ('TupleRep '[ 'BoxedRep 'Lifted])’
+        but ‘(# a #)’ has kind ‘TYPE ('TupleRep '[LiftedRep])’
       The type variable ‘xs’ is ambiguous
     • In the type ‘(# a #)’
       In the type family declaration for ‘Tuple#’

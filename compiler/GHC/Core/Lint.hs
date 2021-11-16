@@ -1272,13 +1272,12 @@ lintTyApp fun_ty arg_ty
 lintValApp :: CoreExpr -> LintedType -> LintedType -> UsageEnv -> UsageEnv -> LintM (LintedType, UsageEnv)
 lintValApp arg fun_ty arg_ty fun_ue arg_ue
   | Just (w, arg_ty', res_ty') <- splitFunTy_maybe fun_ty
-  = do { ensureEqTys arg_ty' arg_ty err1
+  = do { ensureEqTys arg_ty' arg_ty (mkAppMsg arg_ty' arg_ty arg)
        ; let app_ue =  addUE fun_ue (scaleUE w arg_ue)
        ; return (res_ty', app_ue) }
   | otherwise
   = failWithL err2
   where
-    err1 = mkAppMsg       fun_ty arg_ty arg
     err2 = mkNonFunAppMsg fun_ty arg_ty arg
 
 lintTyKind :: OutTyVar -> LintedType -> LintM ()
@@ -3099,10 +3098,10 @@ mkNewTyDataConAltMsg scrut_ty alt
 --      Other error messages
 
 mkAppMsg :: Type -> Type -> CoreExpr -> SDoc
-mkAppMsg fun_ty arg_ty arg
+mkAppMsg expected_arg_ty actual_arg_ty arg
   = vcat [text "Argument value doesn't match argument type:",
-              hang (text "Fun type:") 4 (ppr fun_ty),
-              hang (text "Arg type:") 4 (ppr arg_ty),
+              hang (text "Expected arg type:") 4 (ppr expected_arg_ty),
+              hang (text "Actual arg type:") 4 (ppr actual_arg_ty),
               hang (text "Arg:") 4 (ppr arg)]
 
 mkNonFunAppMsg :: Type -> Type -> CoreExpr -> SDoc

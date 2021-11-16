@@ -41,6 +41,7 @@ module GHC.Types (
           -- The historical type * should ideally be written as
           -- `type *`, without the parentheses. But that's a true
           -- pain to parse, and for little gain.
+        ZeroBitRep, ZeroBitType,
         VecCount(..), VecElem(..),
         Void#,
 
@@ -95,6 +96,11 @@ type LiftedRep = 'BoxedRep 'Lifted
 -- | The runtime representation of unlifted types.
 type UnliftedRep = 'BoxedRep 'Unlifted
 
+-- | The runtime representation of a zero-width tuple,
+--   represented by no bits at all
+type ZeroBitRep = 'TupleRep '[]
+
+-------------------------
 -- | The kind of types with lifted values. For example @Int :: Type@.
 type Type = TYPE LiftedRep
 
@@ -102,6 +108,10 @@ type Type = TYPE LiftedRep
 -- unlifted data type, using @-XUnliftedDataTypes@.
 type UnliftedType = TYPE UnliftedRep
 
+-- | The kind of the empty unboxed tuple type (# #)
+type ZeroBitType = TYPE ZeroBitRep
+
+-------------------------
 data Multiplicity = Many | One
 
 type family MultMul (a :: Multiplicity) (b :: Multiplicity) :: Multiplicity where

@@ -4,6 +4,5 @@ interfacePlugin: GHC.Base
 interfacePlugin: GHC.Float
 interfacePlugin: GHC.Prim.Ext
 typeCheckPlugin (rn)
-interfacePlugin: GHC.Prim
 typeCheckPlugin (tc)
 interfacePlugin: GHC.Num.BigNat

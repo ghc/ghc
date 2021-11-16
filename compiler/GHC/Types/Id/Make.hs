@@ -1593,19 +1593,19 @@ coerceId = pcMiscPrelId coerceName ty info
     info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma
                        `setUnfoldingInfo`  mkCompulsoryUnfolding defaultSimpleOpts rhs
                        `setArityInfo`      2
-    eqRTy     = mkTyConApp coercibleTyCon [ tYPE r , a, b ]
-    eqRPrimTy = mkTyConApp eqReprPrimTyCon [ tYPE r, tYPE r, a, b ]
+    eqRTy     = mkTyConApp coercibleTyCon  [ tYPE_r,         a, b ]
+    eqRPrimTy = mkTyConApp eqReprPrimTyCon [ tYPE_r, tYPE_r, a, b ]
     ty        = mkInvisForAllTys [ Bndr rv InferredSpec
                                  , Bndr av SpecifiedSpec
-                                 , Bndr bv SpecifiedSpec
-                                 ] $
+                                 , Bndr bv SpecifiedSpec ] $
                 mkInvisFunTyMany eqRTy $
                 mkVisFunTyMany a b
 
     bndrs@[rv,av,bv] = mkTemplateKiTyVar runtimeRepTy
-                        (\r -> [tYPE r, tYPE r])
+                        (\r -> [mkTYPEapp r, mkTYPEapp r])
 
     [r, a, b] = mkTyVarTys bndrs
+    tYPE_r    = mkTYPEapp r
 
     [eqR,x,eq] = mkTemplateLocals [eqRTy, a, eqRPrimTy]
     rhs = mkLams (bndrs ++ [eqR, x]) $

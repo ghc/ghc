@@ -932,7 +932,7 @@ completeBind env top_lvl mb_cont old_bndr new_bndr new_rhs
                 -- substitution will happen, since we are going to discard the binding
 
         else -- Keep the binding; do cast worker/wrapper
-             -- pprTrace "Binding" (ppr final_bndr <+> ppr new_unfolding) $
+             -- pprTrace "Binding" (ppr new_bndr <+> ppr new_unfolding) $
              tryCastWorkerWrapper env top_lvl old_bndr occ_info new_bndr_w_info eta_rhs }
 
 addLetBndrInfo :: OutId -> ArityType -> Unfolding -> OutId
@@ -1082,7 +1082,7 @@ simplExprC :: SimplEnv
            -> SimplM OutExpr
         -- Simplify an expression, given a continuation
 simplExprC env expr cont
-  = -- pprTrace "simplExprC" (ppr expr $$ ppr cont {- $$ ppr (seIdSubst env) -} $$ ppr (seLetFloats env) ) $
+  = -- pprTrace "simplExprC" (ppr expr $$ ppr cont) $
     do  { (floats, expr') <- simplExprF env expr cont
         ; -- pprTrace "simplExprC ret" (ppr expr $$ ppr expr') $
           -- pprTrace "simplExprC ret3" (ppr (seInScope env')) $
@@ -3015,7 +3015,7 @@ simplAlts env0 scrut case_bndr alts cont'
           -- by the caller (rebuildCase) in the missingAlt function
 
         ; alts' <- mapM (simplAlt alt_env' (Just scrut') imposs_deflt_cons case_bndr' cont') in_alts
-        ; -- pprTrace "simplAlts" (ppr case_bndr $$ ppr alts_ty $$ ppr alts_ty' $$ ppr alts $$ ppr cont') $
+--      ; pprTrace "simplAlts" (ppr case_bndr $$ ppr alts $$ ppr cont') $ return ()
 
         ; let alts_ty' = contResultType cont'
         -- See Note [Avoiding space leaks in OutType]
