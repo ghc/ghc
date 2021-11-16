@@ -133,7 +133,7 @@ test('T5366',
      normal,
      makefile_test, ['T5366'])
 test('T7796', [], makefile_test, ['T7796'])
-test('T5550', [when(opsys("OSJavaScript"), skip), omit_ways(prof_ways)], compile, [''])
+test('T5550', [javascript_failures, omit_ways(prof_ways)], compile, [''])
 test('T7865', normal, makefile_test, ['T7865'])
 test('T7785', only_ways(['optasm']), compile, ['-ddump-rules'])
 test('T7702',
@@ -144,7 +144,7 @@ test('T7702',
       # a large effect on allocation which is hard to separate from the
       # allocation done by the plugin... but a regression allocates > 90mb
       collect_compiler_stats('peak_megabytes_allocated',70),
-      when(opsys("OSJavaScript"), skip),
+      javascript_failures,
       when(opsys('mingw'), expect_broken_for(16799, ['normal']))
      ],
      compile,
@@ -159,7 +159,7 @@ test('T7702',
 #       (1) Use -fexternal-interpreter, or
 #       (2) Build the program twice: once with -dynamic, and then
 #           with -prof using -osuf to set a different object file suffix.
-test('T7944', [when(opsys("OSJavaScript"), skip), omit_ways(['profasm'])], compile, ['-O2'])
+test('T7944', [javascript_failures, omit_ways(['profasm'])], compile, ['-O2'])
 
 test('T8196', normal, compile, [''])
 test('T8221b', normal, compile, [''])
@@ -196,7 +196,7 @@ test('T10083',
      makefile_test, ['T10083'])
 test('T10689', normal, compile, [''])
 test('T11155',
-     [when(opsys("OSJavaScript"), skip), normal],
+     [javascript_failures, normal],
      makefile_test, ['T11155'])
 test('T11232', normal, compile, ['-O2'])
 test('T11562', normal, compile, ['-O2'])

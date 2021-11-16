@@ -16,7 +16,7 @@ test('SafeInfered05', [], multimod_compile, ['SafeInfered05', ''])
 
 # Tests that should fail to compile as they should be infered unsafe
 test('UnsafeInfered01', [], multimod_compile_fail, ['UnsafeInfered01', ''])
-test('UnsafeInfered02', [when(opsys("OSJavaScript"), skip)], multimod_compile_fail, ['UnsafeInfered02', ''])
+test('UnsafeInfered02', [javascript_failures], multimod_compile_fail, ['UnsafeInfered02', ''])
 test('UnsafeInfered03', [], multimod_compile_fail, ['UnsafeInfered03', ''])
 test('UnsafeInfered05', [], multimod_compile_fail, ['UnsafeInfered05', ''])
 test('UnsafeInfered06', [], multimod_compile_fail, ['UnsafeInfered06', ''])

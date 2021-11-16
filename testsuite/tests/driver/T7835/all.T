@@ -1,2 +1,2 @@
 
-test('T7835', [when(opsys("OSJavaScript"), skip), extra_files(['Test.hs', 'TestPrim.hs', 'test-prims.cmm'])], makefile_test, [])
+test('T7835', [javascript_failures, extra_files(['Test.hs', 'TestPrim.hs', 'test-prims.cmm'])], makefile_test, [])

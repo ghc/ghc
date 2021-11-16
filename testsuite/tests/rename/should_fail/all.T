@@ -43,7 +43,7 @@ test('rnfail040', [extra_files(['Rnfail040_A.hs']), normalise_version('base')], 
 test('rnfail041', normal, compile_fail, [''])
 test('rnfail042', normal, compile_fail, [''])
 
-test('rnfail043', [when(opsys("OSJavaScript"), skip), unless(doing_ghci, skip)], compile_fail, ['-v0'])
+test('rnfail043', [javascript_failures, unless(doing_ghci, skip)], compile_fail, ['-v0'])
 test('rnfail044', normal, compile_fail, [''])
 test('rnfail045', normal, compile_fail, [''])
 test('rnfail046', normal, compile_fail, [''])

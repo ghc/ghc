@@ -23,10 +23,10 @@ test('T7574', [cmm_src, omit_ways(llvm_ways)], compile, ['-no-hs-main'])
 test('T8205', normal, compile, ['-O0'])
 test('T9155', normal, compile, ['-O2'])
 test('T9303', normal, compile, ['-O2'])
-test('T9329', [when(opsys("OSJavaScript"), skip), when(unregisterised(), expect_broken(15467)), cmm_src], compile, ['-no-hs-main'])
+test('T9329', [javascript_failures, when(unregisterised(), expect_broken(15467)), cmm_src], compile, ['-no-hs-main'])
 
 test('debug',
-     [when(opsys("OSJavaScript"), skip),
+     [javascript_failures,
       when((arch('powerpc64') or arch('powerpc64le')), expect_broken(11261))],
      makefile_test, [])
 test('T9964', normal, compile, ['-O'])
@@ -68,25 +68,25 @@ test('T17334', [ unless(have_ncg() and (arch('x86_64') or arch('i386')), skip)
                , only_ways(['normal'])
                ], compile, ['-O'])
 
-test('T14373', [when(opsys("OSJavaScript"), skip)],
+test('T14373', [javascript_failures],
      multimod_compile_filter, ['T14373', '-fasm -O2 -c -ddump-cmm-from-stg',
      'grep -e "const T14373\.._closure+.;"'])
 
 switch_skeleton_only = 'grep -e "switch \[" -e "case " -e "default: " | sed -e "s|\] .*|\]|g" -e "s|goto .*|goto |g"'
 
-test('T14373a', [when(opsys("OSJavaScript"), skip)],
+test('T14373a', [javascript_failures],
      multimod_compile_filter, ['T14373a', '-fasm -O2 -c -ddump-cmm-from-stg',
      switch_skeleton_only])
-test('T14373b', [when(opsys("OSJavaScript"), skip)],
+test('T14373b', [javascript_failures],
      multimod_compile_filter, ['T14373b', '-fasm -O2 -c -ddump-cmm-from-stg',
      switch_skeleton_only])
-test('T14373c', [when(opsys("OSJavaScript"), skip)],
+test('T14373c', [javascript_failures],
      multimod_compile_filter, ['T14373c', '-fasm -O2 -c -ddump-cmm-from-stg',
      switch_skeleton_only])
 
 switch_skeleton_and_entries_only = ('grep -e "switch \[" -e "case " -e "default: " -e "Default_entry(" -e "R1 = .*_closure+2;"'
                                     '| sed -e "s|\] .*|\]|g" -e "s|goto .*|goto |g" -e "s|R1 = .*_closure+2;.*|R1 = XYZ_closure+2;|g" -e "s|//.*|//|g"')
 
-test('T14373d', [when(opsys("OSJavaScript"), skip)],
+test('T14373d', [javascript_failures],
      multimod_compile_filter, ['T14373d', '-fasm -O2 -c -ddump-cmm-from-stg',
      switch_skeleton_and_entries_only])

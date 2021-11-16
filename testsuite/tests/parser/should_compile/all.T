@@ -95,7 +95,7 @@ test('EmptyDecls', normal, compile, [''])
 test('ParserLambdaCase', [], compile, [''])
 
 test('ColumnPragma', normal, compile, [''])
-test('T5243', [when(opsys("OSJavaScript"), skip)], multimod_compile, ['T5243', ''])
+test('T5243', [javascript_failures], multimod_compile, ['T5243', ''])
 test('T7118', normal, compile, [''])
 test('T7776', normal, compile, [''])
 test('RdrNoStaticPointers01', [], compile, [''])

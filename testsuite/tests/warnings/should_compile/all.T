@@ -6,11 +6,11 @@ test('T9178', [], multimod_compile, ['T9178', '-Wall'])
 test('T9230', normal, compile, [''])
 
 test('T10908', normal, compile, [''])
-test('T10930', [when(opsys("OSJavaScript"), skip), normal], compile, [''])
+test('T10930', [javascript_failures, normal], compile, [''])
 test('T10930b', normal, compile, [''])
 test('T11077', normal, compile, ['-fwarn-missing-exported-signatures'])
-test('T13256', [when(opsys("OSJavaScript"), skip), normal], compile, [''])
-test('T15460', [when(opsys("OSJavaScript"), skip), normal], compile, [''])
+test('T13256', [javascript_failures, normal], compile, [''])
+test('T15460', [javascript_failures, normal], compile, [''])
 test('PluralS', normal, compile, [''])
 
 # T12574 Test that suggest current flag over deprecated
@@ -26,7 +26,7 @@ test('T16551', [extra_files(['T16551/'])], multimod_compile, ['T16551/A.hs T1655
 
 test('StarBinder', normal, compile, [''])
 
-test('Overflow', [when(opsys("OSJavaScript"), skip), expect_broken_for(16543, ['hpc'])], compile, [''])
+test('Overflow', [javascript_failures, expect_broken_for(16543, ['hpc'])], compile, [''])
 
-test('UnusedPackages', [when(opsys("OSJavaScript"), skip), normal], multimod_compile,
+test('UnusedPackages', [javascript_failures, normal], multimod_compile,
     ['UnusedPackages.hs', '-package=bytestring -package=base -package=process -package=ghc -Wunused-packages'])

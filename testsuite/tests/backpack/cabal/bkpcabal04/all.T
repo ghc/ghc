@@ -5,7 +5,7 @@ else:
 
 # Test recompilation checking on signatures
 test('bkpcabal04',
-     [when(opsys("OSJavaScript"), skip),
+     [javascript_failures,
       extra_files(['p', 'q', 'bkpcabal04.cabal.in1', 'bkpcabal04.cabal.in2', 'Setup.hs'])],
      run_command,
      ['$MAKE -s --no-print-directory bkpcabal04 ' + cleanup])

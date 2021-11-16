@@ -8,15 +8,15 @@ test('driver014', [extra_files(['A014.hs'])], makefile_test, ['test014'])
 
 test('driver015', [extra_files(['A015.hs'])], makefile_test, ['test015'])
 
-test('driver016', [when(opsys("OSJavaScript"), skip), extra_files(['F016.hs'])], makefile_test, ['test016'])
+test('driver016', [javascript_failures, extra_files(['F016.hs'])], makefile_test, ['test016'])
 
-test('driver017', [when(opsys("OSJavaScript"), skip), extra_files(['F017.hs'])], makefile_test, ['test017'])
+test('driver017', [javascript_failures, extra_files(['F017.hs'])], makefile_test, ['test017'])
 
 test('driver018', [extra_files(['F018.hs'])], makefile_test, ['test018'])
 
 test('driver018a', [extra_files(['F018a.hs'])], makefile_test, ['test018a'])
 
-test('driver019', [when(opsys("OSJavaScript"), skip), extra_files(['F019.hs'])], makefile_test, ['test019'])
+test('driver019', [javascript_failures, extra_files(['F019.hs'])], makefile_test, ['test019'])
 
 test('driver021', [extra_files(['B021/'])], makefile_test, ['test021'])
 
@@ -32,9 +32,9 @@ test('driver025', [extra_files(['B025/'])], makefile_test, ['test025'])
 
 test('driver026', [extra_files(['d026/'])], makefile_test, ['test026'])
 
-test('driver027', [when(opsys("OSJavaScript"), skip), extra_files(['B027/'])], makefile_test, ['test027'])
+test('driver027', [javascript_failures, extra_files(['B027/'])], makefile_test, ['test027'])
 
-test('driver028', [when(opsys("OSJavaScript"), skip), extra_files(['B028/'])], makefile_test, ['test028'])
+test('driver028', [javascript_failures, extra_files(['B028/'])], makefile_test, ['test028'])
 
 test('driver031', [extra_files(['A031.hs'])], makefile_test, ['test031'])
 
@@ -42,9 +42,9 @@ test('driver032', [extra_files(['A032.hs'])], makefile_test, ['test032'])
 
 test('driver033', [extra_files(['A033.hs'])], makefile_test, ['test033'])
 
-test('driver034', [when(opsys("OSJavaScript"), skip), extra_files(['F034.hs'])], makefile_test, ['test034'])
+test('driver034', [javascript_failures, extra_files(['F034.hs'])], makefile_test, ['test034'])
 
-test('driver035', [when(opsys("OSJavaScript"), skip), extra_files(['F035.hs'])], makefile_test, ['test035'])
+test('driver035', [javascript_failures, extra_files(['F035.hs'])], makefile_test, ['test035'])
 
 test('driver041', [extra_files(['B041/'])], makefile_test, ['test041'])
 
@@ -54,9 +54,9 @@ test('driver042stub', [extra_files(['B042stub/'])], makefile_test, ['test042stub
 
 test('driver043', [extra_files(['B043/'])], makefile_test, ['test043'])
 
-test('driver044', [when(opsys("OSJavaScript"), skip), extra_files(['B044/'])], makefile_test, ['test044'])
+test('driver044', [javascript_failures, extra_files(['B044/'])], makefile_test, ['test044'])
 
-test('driver045', [when(opsys("OSJavaScript"), skip), extra_files(['B045/'])], makefile_test, ['test045'])
+test('driver045', [javascript_failures, extra_files(['B045/'])], makefile_test, ['test045'])
 
 test('driver051', [extra_files(['d051_1/', 'd051_2/'])], makefile_test, ['test051'])
 
@@ -91,7 +91,7 @@ test('driver071', [extra_files(['A071.hs'])], makefile_test, ['test071'])
 
 test('driver081a', [], makefile_test, ['test081a'])
 
-test('driver081b', [when(opsys("OSJavaScript"), skip)], makefile_test, ['test081b'])
+test('driver081b', [javascript_failures], makefile_test, ['test081b'])
 
 test('driver100', [extra_files(['overlap/'])], makefile_test, ['test100'])
 
@@ -104,7 +104,7 @@ test('pragma002', normal, compile, [''])
 
 test('T2499', normal, compile_fail, [''])
 
-test('mode001', [when(opsys("OSJavaScript"), skip), normal], makefile_test, [])
+test('mode001', [javascript_failures, normal], makefile_test, [])
 
 if config.os == 'mingw32':
      only_windows = normal
@@ -131,17 +131,17 @@ test('dynHelloWorld',
      [''])
 
 test('T5313',
-     [ when(opsys("OSJavaScript"), skip), req_rts_linker, extra_run_opts('"' + config.libdir + '"')],
+     [ javascript_failures, req_rts_linker, extra_run_opts('"' + config.libdir + '"')],
      compile_and_run,
      ['-package ghc'])
 
 test('T2464', normal, compile, [''])
 test('T3674', [], makefile_test, [])
 
-test('rtsopts001', [when(opsys("OSJavaScript"), skip), extra_files(['rtsOpts.hs'])], makefile_test, [])
-test('rtsopts002', [when(opsys("OSJavaScript"), skip), normal], makefile_test, [])
+test('rtsopts001', [javascript_failures, extra_files(['rtsOpts.hs'])], makefile_test, [])
+test('rtsopts002', [javascript_failures, normal], makefile_test, [])
 
-test('withRtsOpts', [when(opsys("OSJavaScript"), skip)], makefile_test, [])
+test('withRtsOpts', [javascript_failures], makefile_test, [])
 
 test('T3389', when(arch('i386'), expect_broken_for(17256, ['hpc'] + prof_ways)), compile_and_run, [''])
 test('T3364', normalise_fun(normalise_errmsg), makefile_test, [])
@@ -204,9 +204,9 @@ test('write_interface_make', [extra_files(['A011.hs'])], makefile_test, [])
 
 test('T9776', normal, compile_fail, ['-drule-check'])
 
-test('T9938', [when(opsys("OSJavaScript"), skip)], makefile_test, [])
+test('T9938', [javascript_failures], makefile_test, [])
 
-test('T9938B', [when(opsys("OSJavaScript"), skip)], makefile_test, [])
+test('T9938B', [javascript_failures], makefile_test, [])
 
 test('T9963', exit_code(1), run_command,
      ['{compiler} --interactive -ignore-dot-ghci --print-libdir'])
@@ -216,7 +216,7 @@ test('T10219', normal, run_command,
      # Note: need to specify `-x hspp` before the filename.
      ['{compiler} --make -x hspp T10219.hspp -fno-code -v0'])
 
-test('T10220', [when(opsys("OSJavaScript"), skip), normal], run_command,
+test('T10220', [javascript_failures, normal], run_command,
      # Preprocessed T10220.hspp imports T10220B. Should work in --make mode.
      ['{compiler} --make T10220.hspp -fno-code -v0'])
 
@@ -270,7 +270,7 @@ test('inline-check', omit_ways(['hpc', 'profasm'])
                    , compile
 		   , ['-dinline-check foo -O -ddebug-output'])
 
-test('T14452', [when(opsys("OSJavaScript"), skip)], makefile_test, [])
+test('T14452', [javascript_failures], makefile_test, [])
 test('T15396', normal, compile_and_run, ['-package ghc'])
 test('T16737',
      [extra_files(['T16737include/']),

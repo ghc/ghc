@@ -2634,3 +2634,7 @@ def modify_lines(s: str, f: Callable[[str], str]) -> str:
         # Prevent '\ No newline at end of file' warnings when diffing.
         s += '\n'
     return s
+
+def javascript_failures( name, opts ):
+    # when(opsys('OSJavaScript'), skip(name, opts))
+    when(opsys('OSJavaScript'), expect_fail(name, opts))

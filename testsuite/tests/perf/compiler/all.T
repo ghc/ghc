@@ -267,7 +267,7 @@ test('MultiLayerModules',
 
 test('ManyConstructors',
      [ collect_compiler_stats('bytes allocated',2),
-       when(opsys("OSJavaScript"), skip),
+       javascript_failures,
        pre_cmd('./genManyConstructors'),
        extra_files(['genManyConstructors']),
      ],

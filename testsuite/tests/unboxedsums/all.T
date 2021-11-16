@@ -1,5 +1,5 @@
 test('unboxedsums_unit_tests',
-     [ when(opsys("OSJavaScript"), skip), only_ways(['normal']), extra_run_opts('"' + config.libdir + '"') ],
+     [ javascript_failures, only_ways(['normal']), extra_run_opts('"' + config.libdir + '"') ],
      compile_and_run,
      ['-package ghc'])
 

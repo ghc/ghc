@@ -1,3 +1,3 @@
 test('T3007',
-     [when(opsys("OSJavaScript"), skip), extra_files(['A/', 'B/'])],
+     [javascript_failures, extra_files(['A/', 'B/'])],
      makefile_test, [])

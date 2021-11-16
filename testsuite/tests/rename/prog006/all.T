@@ -1,1 +1,1 @@
-test('rn.prog006', [when(opsys("OSJavaScript"), skip), extra_files(['A.hs', 'B/', 'Main.hs', 'pwd.hs'])], makefile_test, [])
+test('rn.prog006', [javascript_failures, extra_files(['A.hs', 'B/', 'Main.hs', 'pwd.hs'])], makefile_test, [])

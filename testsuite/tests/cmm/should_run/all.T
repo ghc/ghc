@@ -6,7 +6,7 @@ test('HooplPostorder',
 test('cmp64',
      [    extra_run_opts('"' + config.libdir + '"')
      ,    omit_ways(['ghci'])
-     ,    when(opsys('OSJavaScript'), skip)
+     ,    javascript_failures
      ,    extra_clean('cmp64_cmm.o')
      ],
      multi_compile_and_run,

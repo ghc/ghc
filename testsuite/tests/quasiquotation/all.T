@@ -1,6 +1,6 @@
-test('T3953', [when(opsys("OSJavaScript"), skip), req_interp], compile_fail, [''])
+test('T3953', [javascript_failures, req_interp], compile_fail, [''])
 test('T4150', [expect_broken(4150)], makefile_test, ['T4150'])
-test('T5204', [when(opsys("OSJavaScript"), skip), req_interp], compile_fail, [''])
+test('T5204', [javascript_failures, req_interp], compile_fail, [''])
 test('T7918',
      [req_interp, extra_run_opts('"' + config.libdir + '"'),
       only_ways([config.ghc_th_way]), unless(have_dynamic(), skip)],

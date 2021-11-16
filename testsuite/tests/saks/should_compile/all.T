@@ -44,6 +44,6 @@ test('T16756a', normal, compile, [''])
 #       (1) Use -fexternal-interpreter, or
 #       (2) Build the program twice: once with -dynamic, and then
 #           with -prof using -osuf to set a different object file suffix.
-test('saks027', [when(opsys("OSJavaScript"), skip), omit_ways(['profasm'])], compile, ['-v0 -ddump-splices -dsuppress-uniques'])
-test('saks028', [when(opsys("OSJavaScript"), skip), omit_ways(['profasm'])], compile, [''])
-test('T17164', [when(opsys("OSJavaScript"), skip), omit_ways(['profasm'])], compile, ['-v0 -ddump-splices -dsuppress-uniques'])
+test('saks027', [javascript_failures, omit_ways(['profasm'])], compile, ['-v0 -ddump-splices -dsuppress-uniques'])
+test('saks028', [javascript_failures, omit_ways(['profasm'])], compile, [''])
+test('T17164', [javascript_failures, omit_ways(['profasm'])], compile, ['-v0 -ddump-splices -dsuppress-uniques'])

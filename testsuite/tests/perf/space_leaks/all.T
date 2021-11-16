@@ -4,7 +4,7 @@ test('space_leak_001',
      # collect_stats('all',5) to test all 3 with
      # 5% possible deviation.
      [collect_stats(['peak_megabytes_allocated','bytes allocated'],5),
-      when(opsys("OSJavaScript"), skip),
+      javascript_failures,
       collect_runtime_residency(15),
       omit_ways(['profasm','profthreaded','threaded1','threaded2','nonmoving_thr']),
       reqlib('integer-gmp')
@@ -15,7 +15,7 @@ test('space_leak_001',
 test('T4334',
      # Test for a space leak in Data.List.lines (fixed with #4334)
      [extra_run_opts('1000000 2 t'),
-      when(opsys("OSJavaScript"), skip),
+      javascript_failures,
       collect_stats('peak_megabytes_allocated',2),
       # prof ways don't work well with +RTS -V0, nonmoving way residency is
       # highly variable.
@@ -25,7 +25,7 @@ test('T4334',
 
 test('T2762',
      [collect_stats('peak_megabytes_allocated',2),
-      when(opsys("OSJavaScript"), skip),
+      javascript_failures,
       only_ways(['normal']),
       extra_run_opts('+RTS -G1 -RTS' ),
       extra_clean(['T2762A.hi', 'T2762A.o'])],

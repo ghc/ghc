@@ -4,6 +4,6 @@ else:
    cleanup = 'CLEANUP=0'
 
 test('T12733',
-     [when(opsys("OSJavaScript"), skip), extra_files(['p/', 'q/', 'Setup.hs'])],
+     [javascript_failures, extra_files(['p/', 'q/', 'Setup.hs'])],
      run_command,
      ['$MAKE -s --no-print-directory T12733 ' + cleanup])

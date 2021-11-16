@@ -15,6 +15,6 @@ test('HexFloatLiterals', normal, compile_and_run, [''])
 test('NumericUnderscores0', normal, compile_and_run, [''])
 test('NumericUnderscores1', normal, compile_and_run, [''])
 test('CountParserDeps',
-     [ when(opsys("OSJavaScript"), skip), only_ways(['normal']), extra_run_opts('"' + config.libdir + '"') ],
+     [ javascript_failures, only_ways(['normal']), extra_run_opts('"' + config.libdir + '"') ],
      compile_and_run,
      ['-package ghc'])

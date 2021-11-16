@@ -1,6 +1,6 @@
 test('barton-mangler-bug',
      [extra_files(['Basic.hs', 'Expected.hs', 'Main.hs', 'Physical.hs', 'Plot.lhs', 'PlotExample.lhs', 'TypesettingTricks.hs']),
-      when(opsys('OSJavaScript'), skip),
+      javascript_failures,
       when(fast(), skip),
       extra_clean(['Basic.hi',             'Basic.o',
                    'Expected.hi',          'Expected.o',

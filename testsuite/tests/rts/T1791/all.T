@@ -1,4 +1,4 @@
 test('T1791',
-     [ when(opsys("OSJavaScript"), skip), exit_code(0), extra_clean(['T1791.hi', 'T1791']) ],
+     [ javascript_failures, exit_code(0), extra_clean(['T1791.hi', 'T1791']) ],
      run_command,
      ['''"$MAKE" -s --no-print-directory T1791 >/dev/null && ./T1791 +RTS -M8M'''])

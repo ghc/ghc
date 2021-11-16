@@ -17,7 +17,7 @@ test('conc069a', only_threaded_ways, compile_and_run, [''])
 # those for now.
 test('conc070', only_threaded_ways, compile_and_run, [''])
 
-test('conc071', [when(opsys('OSJavaScript'), skip), omit_ways(concurrent_ways)], compile_and_run, [''])
+test('conc071', [javascript_failures, omit_ways(concurrent_ways)], compile_and_run, [''])
 test('conc072', only_ways(concurrent_ways), compile_and_run, [''])
 test('conc073', normal, compile_and_run, [''])
 
@@ -40,16 +40,16 @@ test('T3429', [ extra_run_opts('+RTS -C0.001 -RTS'),
      compile_and_run, [''])
 
 # without -O, goes into an infinite loop
-test('T4030', [when(opsys("OSJavaScript"), skip), normal], compile_and_run, ['-O'])
+test('T4030', [javascript_failures, normal], compile_and_run, ['-O'])
 
 # each of these runs for about a second
-test('throwto001', [when(opsys("OSJavaScript"), skip), reqlib('random'), extra_run_opts('1000 2000')],
+test('throwto001', [javascript_failures, reqlib('random'), extra_run_opts('1000 2000')],
                    compile_and_run, [''])
 test('throwto002', [reqlib('random')], compile_and_run, [''])
 test('throwto003', normal, compile_and_run, [''])
 
 test('mask001', normal, compile_and_run, [''])
-test('mask002', [when(opsys("OSJavaScript"), skip), normal], compile_and_run, [''])
+test('mask002', [javascript_failures, normal], compile_and_run, [''])
 
 test('async001', normal, compile_and_run, [''])
 
@@ -77,7 +77,7 @@ test('T5421', normal, compile_and_run, [''])
 test('T5611', fragile(12751), compile_and_run, [''])
 test('T5611a', fragile(12751), compile_and_run, [''])
 test('T5238', normal, compile_and_run, [''])
-test('T5866', [when(opsys("OSJavaScript"), skip), exit_code(1)], compile_and_run, [''])
+test('T5866', [javascript_failures, exit_code(1)], compile_and_run, [''])
 
 test('readMVar1', normal, compile_and_run, [''])
 test('readMVar2', normal, compile_and_run, [''])
@@ -93,17 +93,17 @@ test('threadstatus-9333', [fragile_for(16555, ['ghci', 'profthreaded']), omit_wa
 
 test('T9379', normal, compile_and_run, [''])
 
-test('allocLimit1', [when(opsys("OSJavaScript"), skip), exit_code(1)], compile_and_run, [''])
-test('allocLimit2', [when(opsys("OSJavaScript"), skip), normal], compile_and_run, [''])
+test('allocLimit1', [javascript_failures, exit_code(1)], compile_and_run, [''])
+test('allocLimit2', [javascript_failures, normal], compile_and_run, [''])
 
 # The non-threaded RTS on Windows doesn't handle throwing exceptions at I/O
 # operations very well, and ends up duplicating the I/O, giving wrong results.
-test('allocLimit3', [ when(opsys("OSJavaScript"), skip),
+test('allocLimit3', [ javascript_failures,
                       when(opsys('mingw32'), only_ways(threaded_ways)),
                       exit_code(1) ], compile_and_run, [''])
 
 test('allocLimit4', [ extra_run_opts('+RTS -xq300k -RTS'),
-                      when(opsys("OSJavaScript"), skip),
+                      javascript_failures,
                       # ghci consumes part of set limit at startup
                       omit_ways(['ghci']) ],
                     compile_and_run, [''])
@@ -123,26 +123,26 @@ test('conc002', normal, compile_and_run, [''])
 test('conc004', normal, compile_and_run, [''])
 test('conc007', extra_run_opts('+RTS -H128M -RTS'), compile_and_run, [''])
 test('conc008', normal, compile_and_run, [''])
-test('conc009', [when(opsys('OSJavaScript'), skip), exit_code(1)], compile_and_run, [''])
+test('conc009', [javascript_failures, exit_code(1)], compile_and_run, [''])
 test('conc010', normal, compile_and_run, [''])
 
 # conc012(ghci) needs a smaller stack, or it takes forever
 test('conc012',
-     [when(opsys('OSJavaScript'), skip), extra_run_opts('+RTS -K8m -RTS')],
+     [javascript_failures, extra_run_opts('+RTS -K8m -RTS')],
      compile_and_run, [''])
 
 test('conc013', normal, compile_and_run, [''])
 test('conc014', normal, compile_and_run, [''])
-test('conc015', [when(opsys('OSJavaScript'), skip), normal], compile_and_run, [''])
+test('conc015', [javascript_failures, normal], compile_and_run, [''])
 test('conc015a', normal, compile_and_run, [''])
-test('conc016', [when(opsys('OSJavaScript'), skip), omit_ways(concurrent_ways)], # see comment in conc016.hs
+test('conc016', [javascript_failures, omit_ways(concurrent_ways)], # see comment in conc016.hs
                 compile_and_run, [''])
 test('conc017', normal, compile_and_run, [''])
 test('conc017a', normal, compile_and_run, [''])
 test('conc018', normal, compile_and_run, [''])
 test('conc019', extra_run_opts('+RTS -K16m -RTS'), compile_and_run, [''])
-test('conc020', [when(opsys('OSJavaScript'), skip), normal], compile_and_run, [''])
-test('conc021', [when(opsys('OSJavaScript'), skip), omit_ways(['ghci']), exit_code(1) ], compile_and_run, [''])
+test('conc020', [javascript_failures, normal], compile_and_run, [''])
+test('conc021', [javascript_failures, omit_ways(['ghci']), exit_code(1) ], compile_and_run, [''])
 test('conc022', normal, compile_and_run, [''])
 
 # On Windows, the non-threaded RTS creates a real OS thread for each
@@ -156,7 +156,7 @@ else:
    conc023_ways = normal
 
 test('conc023', [when(fast(), skip),
-                 when(opsys('OSJavaScript'), skip),
+                 javascript_failures,
                  reqlib('random'), multi_cpu_race,
                  conc023_ways], compile_and_run, [''])
 
@@ -167,7 +167,7 @@ test('conc028', normal, compile_and_run, [''])
 test('conc029', normal, compile_and_run, [''])
 test('conc030', extra_run_opts('+RTS -K4M -RTS'), compile_and_run, [''])
 
-test('conc031', [when(opsys('OSJavaScript'), skip), exit_code(1)], compile_and_run, [''])
+test('conc031', [javascript_failures, exit_code(1)], compile_and_run, [''])
 
 test('conc032', normal, compile_and_run, [''])
 test('conc033', normal, compile_and_run, [''])
@@ -176,7 +176,7 @@ test('conc033', normal, compile_and_run, [''])
 test('conc034', [
                  normal,
                  omit_ways(['ghci']),
-                 when(opsys('OSJavaScript'), skip),
+                 javascript_failures,
                  extra_run_opts('+RTS -C0 -RTS')],
 		compile_and_run, [''])
 
@@ -213,10 +213,10 @@ test('conc038', only_ways(['threaded1', 'threaded2', 'nonmoving_thr']), compile_
 # Omit for GHCi, uses foreign export
 # Omit for the threaded ways, because in this case the main thread is allowed to
 # complete, which causes the child thread to be interrupted.
-test('conc039', [when(opsys('OSJavaScript'), skip), omit_ways(['ghci'] + threaded_ways)], compile_and_run, [''])
+test('conc039', [javascript_failures, omit_ways(['ghci'] + threaded_ways)], compile_and_run, [''])
 
 # Omit for GHCi, uses foreign export
-test('conc040', [when(opsys('OSJavaScript'), skip), exit_code(1), omit_ways(['ghci'])], compile_and_run, [''])
+test('conc040', [javascript_failures, exit_code(1), omit_ways(['ghci'])], compile_and_run, [''])
 
 # STM-related tests.
 test('conc041', normal, compile_and_run, [''])
@@ -225,7 +225,7 @@ test('conc043', normal, compile_and_run, [''])
 test('conc044', normal, compile_and_run, [''])
 test('conc045', normal, compile_and_run, [''])
 
-test('conc058', [when(opsys('OSJavaScript'), skip), normal], compile_and_run, [''])
+test('conc058', [javascript_failures, normal], compile_and_run, [''])
 
 test('conc059',
      [only_ways(['threaded1', 'threaded2', 'nonmoving_thr']),
@@ -235,7 +235,7 @@ test('conc059',
 # This test sometimes just exits successfully
 # when run the threaded2 way. The problem hasn't been diagnosed yet
 test('conc064',
-     [when(opsys('OSJavaScript'), skip), exit_code(1)],
+     [javascript_failures, exit_code(1)],
      compile_and_run, [''])
 
 test('conc065', ignore_stdout, compile_and_run, [''])
@@ -244,7 +244,7 @@ test('conc067', ignore_stdout, compile_and_run, [''])
 
 # omit threaded2, the behaviour of this test is non-deterministic with more
 # than one CPU.
-test('conc068', [ when(opsys('OSJavaScript'), skip), omit_ways(concurrent_ways), exit_code(1) ], compile_and_run, [''])
+test('conc068', [ javascript_failures, omit_ways(concurrent_ways), exit_code(1) ], compile_and_run, [''])
 
 test('setnumcapabilities001',
      [ only_ways(['threaded1','threaded2', 'nonmoving_thr']),
@@ -268,7 +268,7 @@ test('hs_try_putmvar001',
 # This one should work for both threaded and non-threaded RTS
 test('hs_try_putmvar002',
      [pre_cmd('$MAKE -s --no-print-directory hs_try_putmvar002_setup'),
-      when(opsys("OSJavaScript"), skip),
+      javascript_failures,
       omit_ways(['ghci']),
       extra_run_opts('1 8 10000')],
      compile_and_run, ['hs_try_putmvar002_c.c'])
@@ -287,6 +287,6 @@ test('hs_try_putmvar003',
      ['hs_try_putmvar003_c.c'])
 
 # Check forkIO exception determinism under optimization
-test('T13330', [when(opsys("OSJavaScript"), skip), normal], compile_and_run, ['-O'])
+test('T13330', [javascript_failures, normal], compile_and_run, ['-O'])
 test('T13916', [reqlib('vector'), reqlib('stm'), reqlib('async')],
      compile_and_run, ['-O2'])

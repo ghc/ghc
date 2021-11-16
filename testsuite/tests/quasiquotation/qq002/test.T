@@ -1,1 +1,1 @@
-test('qq002', [when(opsys("OSJavaScript"), skip), req_interp], compile_fail, [''])
+test('qq002', [javascript_failures, req_interp], compile_fail, [''])

@@ -5,7 +5,7 @@ else:
 
 test('T14304',
      [extra_files(['p', 'indef', 'th', 'Setup.hs']),
-      when(opsys("OSJavaScript"), skip),
+      javascript_failures,
       unless(have_dynamic(), skip)],
      run_command,
      ['$MAKE -s --no-print-directory T14304 ' + cleanup])

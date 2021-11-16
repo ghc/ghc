@@ -1,1 +1,1 @@
-test('showsrcspan', [when(opsys("OSJavaScript"), skip), normal], makefile_test, ['showsrcspan'])
+test('showsrcspan', [javascript_failures, normal], makefile_test, ['showsrcspan'])

@@ -4,12 +4,12 @@
 #	extra run flags
 #	expected process return value, if not zero
 
-test('fed001', [when(opsys("OSJavaScript"), skip), normal], compile_and_run, [''])
+test('fed001', [javascript_failures, normal], compile_and_run, [''])
 
 # Omit GHCi for these two, as they use foreign export
-test('ffi001', [when(opsys("OSJavaScript"), skip), omit_ways(['ghci'])], compile_and_run, [''])
+test('ffi001', [javascript_failures, omit_ways(['ghci'])], compile_and_run, [''])
 test('ffi002', [ omit_ways(['ghci']),
-                 when(opsys("OSJavaScript"), skip),
+                 javascript_failures,
                  extra_clean(['ffi002_c.o']),
                  pre_cmd('$MAKE -s --no-print-directory ffi002_setup') ],
                  # The ffi002_setup hack is to ensure that we generate
@@ -30,13 +30,13 @@ test('ffi004', skip, compile_and_run, [''])
 # use of 80-bit internal precision when using the native code generator.
 #
 test('ffi005', [ omit_ways(prof_ways + ['ghci']),
-                 when(opsys("OSJavaScript"), skip),
+                 javascript_failures,
                  when(arch('i386'), skip),
                  when(platform('i386-apple-darwin'), expect_broken(4105)),
                  exit_code(3) ],
                compile_and_run, ['ffi005_c.c'])
 
-test('ffi006', [when(opsys("OSJavaScript"), skip), normal], compile_and_run, [''])
+test('ffi006', [javascript_failures, normal], compile_and_run, [''])
 
 # Skip ffi00{7,8} for GHCi.  These tests both try to exit or raise an
 # error from a foreign export, which shuts down the runtime.  When
@@ -45,8 +45,8 @@ test('ffi006', [when(opsys("OSJavaScript"), skip), normal], compile_and_run, [''
 # Sometimes we end up with the wrong exit code, or get an extra
 # 'interrupted' message from the GHCi thread shutting down.
 
-test('ffi007', [when(opsys("OSJavaScript"), skip), omit_ways(['ghci'])], compile_and_run, [''])
-test('ffi008', [when(opsys("OSJavaScript"), skip), exit_code(1), omit_ways(['ghci'])], compile_and_run, [''])
+test('ffi007', [javascript_failures, omit_ways(['ghci'])], compile_and_run, [''])
+test('ffi008', [javascript_failures, exit_code(1), omit_ways(['ghci'])], compile_and_run, [''])
 
 # On i386, we need -msse2 to get reliable floating point results
 if config.platform.startswith('i386-'):
@@ -54,10 +54,10 @@ if config.platform.startswith('i386-'):
 else:
     opts = ''
 
-test('ffi009', [when(opsys("OSJavaScript"), skip), when(fast(), skip), reqlib('random')], compile_and_run, [opts])
+test('ffi009', [javascript_failures, when(fast(), skip), reqlib('random')], compile_and_run, [opts])
 
 test('ffi010', normal, compile_and_run, [''])
-test('ffi011', [when(opsys("OSJavaScript"), skip), normal], compile_and_run, [''])
+test('ffi011', [javascript_failures, normal], compile_and_run, [''])
 
 # The stdcall calling convention works on Windows, and sometimes on
 # Linux, and fails everywhhere else.  For now, we test only on Windows,
@@ -70,21 +70,21 @@ else:
     skip_if_not_windows = skip
 
 test('ffi012', skip_if_not_windows, compile_and_run, [''])
-test('ffi013', [when(opsys("OSJavaScript"), skip), normal], compile_and_run, [''])
+test('ffi013', [javascript_failures, normal], compile_and_run, [''])
 
 # threaded2 sometimes gives ffi014: Main_dDu: interrupted
 test('ffi014', [only_ways(['threaded1', 'threaded2'])], compile_and_run,
      ['ffi014_cbits.c'])
 
 # GHCi can't handle the separate C file (ToDo: fix this somehow)
-test('ffi015', [when(opsys("OSJavaScript"), skip), omit_ways(['ghci'])], compile_and_run, ['ffi015_cbits.c'])
+test('ffi015', [javascript_failures, omit_ways(['ghci'])], compile_and_run, ['ffi015_cbits.c'])
 
 # GHCi can't handle foreign import "&"
-test('ffi016', [when(opsys("OSJavaScript"), skip), omit_ways(['ghci'])], compile_and_run, [''])
+test('ffi016', [javascript_failures, omit_ways(['ghci'])], compile_and_run, [''])
 
 test('ffi017', normal, compile_and_run, [''])
 
-test('ffi018', [when(opsys("OSJavaScript"), skip), omit_ways(['ghci'])], compile_and_run, ['ffi018_c.c'])
+test('ffi018', [javascript_failures, omit_ways(['ghci'])], compile_and_run, ['ffi018_c.c'])
 
 test('ffi018_ghci',
      [extra_files(['ffi018.h']),
@@ -93,33 +93,33 @@ test('ffi018_ghci',
       pre_cmd('$MAKE -s --no-print-directory ffi018_ghci_setup')],
      compile_and_run, ['ffi018_ghci_c.o'])
 
-test('ffi019', [when(opsys("OSJavaScript"), skip), normal], compile_and_run, [''])
+test('ffi019', [javascript_failures, normal], compile_and_run, [''])
 
 # This one originally failed only GHCi, but doesn't hurt to test all ways.
-test('T1679', [when(opsys("OSJavaScript"), skip), normal], compile_and_run, [''])
+test('T1679', [javascript_failures, normal], compile_and_run, [''])
 
-test('T1288', [when(opsys("OSJavaScript"), skip), omit_ways(['ghci'])], compile_and_run, ['T1288_c.c'])
+test('T1288', [javascript_failures, omit_ways(['ghci'])], compile_and_run, ['T1288_c.c'])
 test('T1288_ghci',
      [only_ways(['ghci']),
       when(unregisterised(), fragile(16085)),
       pre_cmd('$MAKE -s --no-print-directory T1288_ghci_setup')],
      compile_and_run, ['T1288_ghci_c.o'])
 
-test('T2276', [when(opsys("OSJavaScript"), skip), omit_ways(['ghci'])], compile_and_run, ['T2276_c.c'])
+test('T2276', [javascript_failures, omit_ways(['ghci'])], compile_and_run, ['T2276_c.c'])
 test('T2276_ghci', [ only_ways(['ghci']),
                      when(opsys('darwin'), skip), # stdcall not supported on OS X
                      pre_cmd('$MAKE -s --no-print-directory T2276_ghci_setup'),
                      extra_clean(['T2276_ghci_c.o']) ],
                    compile_and_run, ['-fobject-code T2276_ghci_c.o'])
 
-test('T2469', [when(opsys("OSJavaScript"), skip), normal], compile_and_run, ['-optc-std=gnu99'])
+test('T2469', [javascript_failures, normal], compile_and_run, ['-optc-std=gnu99'])
 
-test('T2594', [when(opsys("OSJavaScript"), skip), omit_ways(['ghci'])], compile_and_run, ['T2594_c.c'])
+test('T2594', [javascript_failures, omit_ways(['ghci'])], compile_and_run, ['T2594_c.c'])
 
-test('fptr01', [when(opsys("OSJavaScript"), skip), omit_ways(['ghci'])], compile_and_run, ['fptr01_c.c'])
+test('fptr01', [javascript_failures, omit_ways(['ghci'])], compile_and_run, ['fptr01_c.c'])
 test('fptr02', normal, compile_and_run, [''])
 
-test('fptrfail01', [when(opsys("OSJavaScript"), skip), omit_ways(['ghci']), exit_code(1)], compile_and_run,
+test('fptrfail01', [javascript_failures, omit_ways(['ghci']), exit_code(1)], compile_and_run,
      ['fptrfail01_c.c'])
 
 test('T2917a', normal, compile_and_run, [''])
@@ -127,11 +127,11 @@ test('T2917a', normal, compile_and_run, [''])
 # omit prof ways, because this test causes the RTS to exit (correctly)
 # without generating profiling information.
 test('ffi020', [ omit_ways(prof_ways),
-                 when(opsys("OSJavaScript"), skip),
+                 javascript_failures,
                  exit_code(1) ], compile_and_run, [''])
 
 
-test('ffi021', [when(opsys("OSJavaScript"), skip), normal], compile_and_run, [''])
+test('ffi021', [javascript_failures, normal], compile_and_run, [''])
 
 test('ffi022', normal, compile_and_run, [''])
 
@@ -140,13 +140,13 @@ if config.os == 'mingw32':
 	flagsForT4038 = ['-optl-Wl,--stack,10485760']
 else:
 	flagsForT4038 = ['']
-test('T4038', [when(opsys("OSJavaScript"), skip), normal], compile_and_run, flagsForT4038)
+test('T4038', [javascript_failures, normal], compile_and_run, flagsForT4038)
 
-test('T4221', [when(opsys("OSJavaScript"), skip), omit_ways(['ghci'])], compile_and_run, ['T4221_c.c'])
+test('T4221', [javascript_failures, omit_ways(['ghci'])], compile_and_run, ['T4221_c.c'])
 
 test('T5402', [ omit_ways(['ghci']),
                 exit_code(42),
-                when(opsys("OSJavaScript"), skip),
+                javascript_failures,
                 extra_clean(['T5402_main.o']),
                   # The T5402_setup hack is to ensure that we generate
                   # T5402_stub.h before compiling T5402_main.c, which
@@ -156,7 +156,7 @@ test('T5402', [ omit_ways(['ghci']),
 
 test('T5594', [ omit_ways(['ghci']),
                 extra_clean(['T5594_c.o']),
-                when(opsys("OSJavaScript"), skip),
+                javascript_failures,
                 pre_cmd('$MAKE -s --no-print-directory T5594_setup') ],
                 # The T5594_setup hack is to ensure that we generate
                 # T5594_stub.h before compiling T5594_c.c, which
@@ -164,35 +164,35 @@ test('T5594', [ omit_ways(['ghci']),
                 compile_and_run, ['T5594_c.c -no-hs-main'])
 
 test('Capi_Ctype_001',
-     [when(opsys('OSJavaScript'), skip),
+     [javascript_failures,
       extra_files(['Capi_Ctype_A_001.hsc', 'capi_ctype_001.h', 'capi_ctype_001_c.c'])],
      makefile_test, ['Capi_Ctype_001'])
 
 test('Capi_Ctype_002',
-     [when(opsys('OSJavaScript'), skip),
+     [javascript_failures,
       extra_files(['Capi_Ctype_A_002.hsc', 'capi_ctype_002_A.h', 'capi_ctype_002_B.h'])],
      makefile_test, ['Capi_Ctype_002'])
 
-test('ffi_parsing_001', [when(opsys("OSJavaScript"), skip), omit_ways(['ghci'])], compile_and_run,
+test('ffi_parsing_001', [javascript_failures, omit_ways(['ghci'])], compile_and_run,
      ['ffi_parsing_001_c.c'])
 
-test('capi_value', [when(opsys('OSJavaScript'), skip), omit_ways(['ghci'])], compile_and_run, ['capi_value_c.c'])
+test('capi_value', [javascript_failures, omit_ways(['ghci'])], compile_and_run, ['capi_value_c.c'])
 
 test('T7170',
      [when(opsys('mingw32'), fragile(16801)),
-      when(opsys("OSJavaScript"), skip),
+      javascript_failures,
       exit_code(1)],
      compile_and_run, [''])
 
-test('T4012', [when(opsys("OSJavaScript"), skip), expect_broken_for(7388, ['ghci'])], multimod_compile_and_run,
+test('T4012', [javascript_failures, expect_broken_for(7388, ['ghci'])], multimod_compile_and_run,
      ['T4012', ''])
 
-test('T8083', [when(opsys("OSJavaScript"), skip), omit_ways(['ghci'])], compile_and_run, ['T8083_c.c'])
+test('T8083', [javascript_failures, omit_ways(['ghci'])], compile_and_run, ['T8083_c.c'])
 
 test('T9274', [omit_ways(['ghci'])], compile_and_run, [''])
 
 test('ffi023', [ omit_ways(['ghci']),
-                when(opsys("OSJavaScript"), skip),
+                javascript_failures,
                 extra_clean(['ffi023_c.o']),
                 extra_run_opts('1000 4'),
                 pre_cmd('$MAKE -s --no-print-directory ffi023_setup') ],
@@ -201,29 +201,29 @@ test('ffi023', [ omit_ways(['ghci']),
                 # needs it.
               compile_and_run, ['ffi023_c.c'])
 
-test('T12134', [when(opsys("OSJavaScript"), skip), omit_ways(['ghci'])], compile_and_run, ['T12134_c.c'])
+test('T12134', [javascript_failures, omit_ways(['ghci'])], compile_and_run, ['T12134_c.c'])
 
-test('T12614', [when(opsys("OSJavaScript"), skip), omit_ways(['ghci'])], compile_and_run, ['T12614_c.c'])
+test('T12614', [javascript_failures, omit_ways(['ghci'])], compile_and_run, ['T12614_c.c'])
 
-test('T16650a', [when(opsys("OSJavaScript"), skip), omit_ways(['ghci'])], compile_and_run, ['T16650a_c.c'])
+test('T16650a', [javascript_failures, omit_ways(['ghci'])], compile_and_run, ['T16650a_c.c'])
 
-test('T16650b', [when(opsys("OSJavaScript"), skip), omit_ways(['ghci'])], compile_and_run, ['T16650b_c.c'])
+test('T16650b', [javascript_failures, omit_ways(['ghci'])], compile_and_run, ['T16650b_c.c'])
 
-test('T16650c', [when(opsys("OSJavaScript"), skip), omit_ways(['ghci'])], compile_and_run, ['T16650c_c.c'])
+test('T16650c', [javascript_failures, omit_ways(['ghci'])], compile_and_run, ['T16650c_c.c'])
 
-test('T16650d', [when(opsys("OSJavaScript"), skip), omit_ways(['ghci'])], compile_and_run, ['T16650d_c.c'])
+test('T16650d', [javascript_failures, omit_ways(['ghci'])], compile_and_run, ['T16650d_c.c'])
 
-test('PrimFFIInt8', [when(opsys("OSJavaScript"), skip), omit_ways(['ghci'])], compile_and_run, ['PrimFFIInt8_c.c'])
+test('PrimFFIInt8', [javascript_failures, omit_ways(['ghci'])], compile_and_run, ['PrimFFIInt8_c.c'])
 
-test('PrimFFIWord8', [when(opsys("OSJavaScript"), skip), omit_ways(['ghci'])], compile_and_run, ['PrimFFIWord8_c.c'])
+test('PrimFFIWord8', [javascript_failures, omit_ways(['ghci'])], compile_and_run, ['PrimFFIWord8_c.c'])
 
-test('PrimFFIInt16', [when(opsys("OSJavaScript"), skip), omit_ways(['ghci'])], compile_and_run, ['PrimFFIInt16_c.c'])
+test('PrimFFIInt16', [javascript_failures, omit_ways(['ghci'])], compile_and_run, ['PrimFFIInt16_c.c'])
 
-test('PrimFFIWord16', [when(opsys("OSJavaScript"), skip), omit_ways(['ghci'])], compile_and_run, ['PrimFFIWord16_c.c'])
+test('PrimFFIWord16', [javascript_failures, omit_ways(['ghci'])], compile_and_run, ['PrimFFIWord16_c.c'])
 
-test('T493', [when(opsys("OSJavaScript"), skip), omit_ways(['ghci'])], compile_and_run, ['T493_c.c'])
+test('T493', [javascript_failures, omit_ways(['ghci'])], compile_and_run, ['T493_c.c'])
 
-test('UnliftedNewtypesByteArrayOffset', [when(opsys("OSJavaScript"), skip), omit_ways(['ghci'])], compile_and_run, ['UnliftedNewtypesByteArrayOffset_c.c'])
+test('UnliftedNewtypesByteArrayOffset', [javascript_failures, omit_ways(['ghci'])], compile_and_run, ['UnliftedNewtypesByteArrayOffset_c.c'])
 
-test('T17471', [when(opsys("OSJavaScript"), skip), omit_ways(['ghci'])], compile_and_run,
+test('T17471', [javascript_failures, omit_ways(['ghci'])], compile_and_run,
      ['T17471_c.c -optc-D -optcFOO'])

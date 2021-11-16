@@ -2,7 +2,7 @@
 
 test('heapprof002',
      [extra_files(['heapprof001.hs']),
-      when(opsys("OSJavaScript"), skip),
+      javascript_failures,
       pre_cmd('cp heapprof001.hs heapprof002.hs'), extra_ways(['normal_h']),
       extra_run_opts('7')],
      compile_and_run, [''])

@@ -2,6 +2,6 @@
 
 test('recomp011',
      [extra_files(['Main.hs']),
-      when(opsys("OSJavaScript"), skip),
+      javascript_failures,
       when(arch('powerpc64') or arch('powerpc64le'), expect_broken(11260))],
      makefile_test, [])

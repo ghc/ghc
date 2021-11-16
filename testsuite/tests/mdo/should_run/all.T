@@ -1,6 +1,6 @@
 setTestOpts(only_ways(['normal']));
 
-test('mdorun001', [when(opsys("OSJavaScript"), skip), normal], compile_and_run, [''])
+test('mdorun001', [javascript_failures, normal], compile_and_run, [''])
 test('mdorun002', normal, compile_and_run, [''])
 test('mdorun003', normal, compile_and_run, [''])
 test('mdorun004', normal, compile_and_run, [''])

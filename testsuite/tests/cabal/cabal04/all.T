@@ -20,6 +20,6 @@ else:
 
 test('cabal04',
      [extra_files(['Library.hs', 'Setup.lhs', 'TH.hs', 'thtest.cabal']),
-      when(opsys('OSJavaScript'), skip)],
+      javascript_failures],
      run_command,
      ['$MAKE -s --no-print-directory cabal04 VANILLA=' + vanilla + ' PROF=' + prof + ' DYN=' + dyn + ' ' + cleanup])
