@@ -549,7 +549,7 @@ validate-x86_64-darwin:
     GHC_VERSION: 8.10.4
     CABAL_INSTALL_VERSION: 3.2.0.0
     BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-apple-darwin.tar.xz"
-    MACOSX_DEPLOYMENT_TARGET: "10.7"
+    MACOSX_DEPLOYMENT_TARGET: "10.10"
     # Only Sierra and onwards supports clock_gettime. See #12858
     ac_cv_func_clock_gettime: "no"
     # Only newer OS Xs support utimensat. See #17895
@@ -604,9 +604,7 @@ validate-aarch64-darwin:
     GHC_VERSION: 8.10.3
     CABAL_INSTALL_VERSION: 3.2.0.0
     BIN_DIST_PREP_TAR_COMP: "ghc-arm64-apple-darwin.tar.xz"
-    # we run on M1's for now, getconf can't be built with nix yet,
-    # and we use a pure shell, so we can't/shouldn't use /usr/bin/getconf
-    # inside th shell.
+    MACOSX_DEPLOYMENT_TARGET: "11.0"
     CPUS: 8
     LANG: "en_US.UTF-8"
     # WARNING: this is overridden in the shell.nix, see shell.nix!
