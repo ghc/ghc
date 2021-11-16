@@ -41,6 +41,7 @@
 -fdiagnostics-color=never
 -fembed-manifest
 -fextended-default-rules
+-ffast-pap-calls
 -fffi
 -ffi
 -ffloat-all-lams

@@ -212,7 +212,7 @@ slowCall fun stg_args
 
         -- Note [avoid intermediate PAPs]
         let n_args = length stg_args
-        if n_args > arity && optLevel dflags >= 2
+        if n_args > arity && gopt Opt_FastPAPCalls dflags
            then do
              ptr_opts <- getPtrOpts
              funv <- (CmmReg . CmmLocal) `fmap` assignTemp fun

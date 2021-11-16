@@ -3375,6 +3375,7 @@ fFlagsDeps = [
   flagSpec "catch-bottoms"                    Opt_CatchBottoms,
   flagSpec "alignment-sanitisation"           Opt_AlignmentSanitisation,
   flagSpec "num-constant-folding"             Opt_NumConstantFolding,
+  flagSpec "fast-pap-calls"                   Opt_FastPAPCalls,
   flagSpec "show-warning-groups"              Opt_ShowWarnGroups,
   flagSpec "hide-source-paths"                Opt_HideSourcePaths,
   flagSpec "show-loaded-modules"              Opt_ShowLoadedModules,
@@ -3878,6 +3879,7 @@ optLevelFlags -- see Note [Documenting optimisation flags]
 
     , ([2],     Opt_LiberateCase)
     , ([2],     Opt_SpecConstr)
+    , ([2],     Opt_FastPAPCalls)
 --  , ([2],     Opt_RegsGraph)
 --   RegsGraph suffers performance regression. See #7679
 --  , ([2],     Opt_StaticArgumentTransformation)
