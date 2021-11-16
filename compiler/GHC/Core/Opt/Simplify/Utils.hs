@@ -81,6 +81,11 @@ import GHC.Utils.Trace
 
 import Control.Monad    ( when )
 import Data.List        ( sortBy )
+import GHC.Core.Map.Expr
+import GHC.Core.Make ( mkCoreApps, mkCoreLams )
+import GHC.Data.TrieMap (elemsTM)
+import GHC.Core.Stats (exprSize)
+import GHC.Utils.Constants (debugIsOn)
 
 {-
 ************************************************************************
@@ -2137,6 +2142,7 @@ prepareAlts scrut case_bndr' alts
              -- i.e. the constructors that can't match the default case
        ; when yes2 $ tick (FillInCaseDefault case_bndr')
        ; when yes3 $ tick (AltMerge case_bndr')
+      --  ; doAlts case_bndr' alts
        ; return (idcs3, alts3) }
 
   | otherwise  -- Not a data type, so nothing interesting happens
@@ -2145,7 +2151,6 @@ prepareAlts scrut case_bndr' alts
     imposs_cons = case scrut of
                     Var v -> otherCons (idUnfolding v)
                     _     -> []
-
 
 {-
 ************************************************************************
@@ -2259,7 +2264,7 @@ There are some wrinkles
 -}
 
 mkCase, mkCase1, mkCase2, mkCase3
-   :: DynFlags
+   :: DynFlags -> SimplEnv -- TODO flags are already in env
    -> OutExpr -> OutId
    -> OutType -> [OutAlt]               -- Alternatives in standard (increasing) order
    -> SimplM OutExpr
@@ -2268,7 +2273,7 @@ mkCase, mkCase1, mkCase2, mkCase3
 --      1. Merge Nested Cases
 --------------------------------------------------
 
-mkCase dflags scrut outer_bndr alts_ty (Alt DEFAULT _ deflt_rhs : outer_alts)
+mkCase dflags env scrut outer_bndr alts_ty (Alt DEFAULT _ deflt_rhs : outer_alts)
   | gopt Opt_CaseMerge dflags
   , (ticks, Case (Var inner_scrut_var) inner_bndr _ inner_alts)
        <- stripTicksTop tickishFloatable deflt_rhs
@@ -2296,7 +2301,7 @@ mkCase dflags scrut outer_bndr alts_ty (Alt DEFAULT _ deflt_rhs : outer_alts)
                 -- precedence over e2 as the value for A!
 
         ; fmap (mkTicks ticks) $
-          mkCase1 dflags scrut outer_bndr alts_ty merged_alts
+          mkCase1 dflags env scrut outer_bndr alts_ty merged_alts
         }
         -- Warning: don't call mkCase recursively!
         -- Firstly, there's no point, because inner alts have already had
@@ -2304,13 +2309,13 @@ mkCase dflags scrut outer_bndr alts_ty (Alt DEFAULT _ deflt_rhs : outer_alts)
         -- Secondly, if you do, you get an infinite loop, because the bindCaseBndr
         -- in munge_rhs may put a case into the DEFAULT branch!
 
-mkCase dflags scrut bndr alts_ty alts = mkCase1 dflags scrut bndr alts_ty alts
+mkCase dflags env scrut bndr alts_ty alts = mkCase1 dflags env scrut bndr alts_ty alts
 
 --------------------------------------------------
 --      2. Eliminate Identity Case
 --------------------------------------------------
 
-mkCase1 _dflags scrut case_bndr _ alts@(Alt _ _ rhs1 : _)      -- Identity case
+mkCase1 _dflags env scrut case_bndr _ alts@(Alt _ _ rhs1 : _)      -- Identity case
   | all identity_alt alts
   = do { tick (CaseIdentity case_bndr)
        ; return (mkTicks ticks $ re_cast scrut rhs1) }
@@ -2349,13 +2354,13 @@ mkCase1 _dflags scrut case_bndr _ alts@(Alt _ _ rhs1 : _)      -- Identity case
     re_cast scrut (Cast rhs co) = Cast (re_cast scrut rhs) co
     re_cast scrut _             = scrut
 
-mkCase1 dflags scrut bndr alts_ty alts = mkCase2 dflags scrut bndr alts_ty alts
+mkCase1 dflags env scrut bndr alts_ty alts = mkCase2 dflags env scrut bndr alts_ty alts
 
 --------------------------------------------------
 --      2. Scrutinee Constant Folding
 --------------------------------------------------
 
-mkCase2 dflags scrut bndr alts_ty alts
+mkCase2 dflags env scrut bndr alts_ty alts
   | -- See Note [Scrutinee Constant Folding]
     case alts of  -- Not if there is just a DEFAULT alternative
       [Alt DEFAULT _ _] -> False
@@ -2369,12 +2374,12 @@ mkCase2 dflags scrut bndr alts_ty alts
                   -- See Note [Unreachable caseRules alternatives]
                   -- in GHC.Core.Opt.ConstantFold
 
-       ; mkCase3 dflags scrut' bndr' alts_ty $
+       ; mkCase3 dflags env scrut' bndr' alts_ty $
          add_default (re_sort alts')
        }
 
   | otherwise
-  = mkCase3 dflags scrut bndr alts_ty alts
+  = mkCase3 dflags env scrut bndr alts_ty alts
   where
     -- We need to keep the correct association between the scrutinee and its
     -- binder if the latter isn't dead. Hence we wrap rhs of alternatives with
@@ -2455,8 +2460,108 @@ in GHC.Core.Opt.ConstantFold)
 --------------------------------------------------
 --      Catch-all
 --------------------------------------------------
-mkCase3 _dflags scrut bndr alts_ty alts
-  = return (Case scrut bndr alts_ty alts)
+mkCase3 _dflags env scrut bndr alts_ty alts
+  = do
+    (floats,alts') <- doAlts env bndr alts
+    return $ wrapFloats floats (Case scrut bndr alts_ty alts')
+
+-- * Build a (trie)map from the alts rhss to a list of altCons which share the rhs.
+-- * Combine alternatives sharing the same rhs
+-- * Produce a outlining for the rhs to be jumped to by the case alt and
+--   change the alts to jump to it.
+doAlts :: SimplEnv -> CoreBndr -> [CoreAlt] -> SimplM (SimplFloats,[CoreAlt])
+doAlts env case_bndr alts_in = do
+  platform <- targetPlatform <$> getDynFlags
+
+  let -- Build a map by adding all alts to the map
+      c_map = foldl' (\m alt -> extendMap m alt) emptyCoreMap alts_in
+      same_alts = elemsTM c_map
+
+      -- Combine alts which share the same rhs
+      -- Passed alts all have the same rhs under alpha equivalence.
+      combine_alts :: (SimplFloats,[CoreAlt]) -> [CoreAlt] -> SimplM (SimplFloats,[CoreAlt])
+      combine_alts (floats,combined_alts) (combined_in)
+        -- One of the alts is the default case. So we can just drop all others.
+        | dflt@Alt { alt_con = DEFAULT} <- head $ sortWith (alt_con) combined_in
+        = -- pprTrace "single" (ppr coreAlts) $
+          return (floats, dflt:combined_alts)
+
+        -- Nothing to combine.
+        | [alt] <- combined_in
+        = return (floats,alt:combined_alts)
+
+        | alts@(alt1:_) <- combined_in
+        , exprIsDupable platform (alt_rhs alt1)
+
+        = -- pprTrace "dupable-combineable" (ppr (alt_rhs alt1)) $
+          return (floats,combined_alts++alts)
+
+        -- There are alts to combine, create a join point representing the rhs.
+        | (alt1@Alt{alt_bndrs = alt1_bndrs, alt_rhs = alt1_rhs}:_) <- combined_in
+        = do
+            let -- Binders the join point might close over.
+                shared_bnds = case_bndr:alt1_bndrs
+                -- FVs of the rhs
+                fvs = exprFreeVars (alt1_rhs)
+                -- Which of the binders do we *actually* close over.
+                used_shared = map (`elemVarSet` fvs) shared_bnds :: [Bool]
+
+                rhs_args     = filterByList used_shared shared_bnds
+                alt_args alt = filterByList used_shared (map Var (case_bndr : alt_bndrs alt))
+                shared_rhs_expr = -- pprTraceIt "shared_rhs" $
+                                  mkCoreLams rhs_args (alt1_rhs)
+                arity = length rhs_args
+
+            new_id <- newId (fsLit "alt_jn") Many (exprType shared_rhs_expr)
+
+            let alt_join_id = asJoinId new_id arity
+                alt_join_bnd = NonRec alt_join_id shared_rhs_expr
+
+                update_alt :: CoreAlt -> CoreAlt
+                update_alt alt = alt {
+                  alt_rhs =
+                      assert (length (alt_args alt) == length rhs_args) $
+                          mkCoreApps
+                              (Var alt_join_id)
+                              (alt_args alt)}
+
+            let new_alts = map update_alt combined_in
+
+            let saved = ((length new_alts - 1) * exprSize alt1_rhs)
+
+            when (saved > 20) $
+              pprTraceM "combined_alts" ( text "alt_count:" <> ppr (length new_alts) $$
+                                          text "alt_size:" <> ppr (exprSize alt1_rhs) $$
+                                          text "alt_elim:" <> ppr ((length new_alts - 1) * exprSize alt1_rhs) $$
+                                          text "used_vars:" <> ppr (used_shared) $$
+                                          text "alt_args1" <> ppr (alt_args alt1) $$
+                                          text "old_rhs:" <> ppr alt1_rhs $$
+
+
+                                          -- text "con-map:" <> ppr c_map $$
+                                          hang (text "result:") 4 (text "bnd:" <> ppr alt_join_bnd $$
+                                                                  text "new_alts:" <> ppr new_alts))
+
+            return (extendFloats floats alt_join_bnd , combined_alts ++ new_alts)
+
+        | [] <- combined_in
+        = panic "combine_alts: no alts"
+
+  (bnds,alts) <- foldlM combine_alts (emptyFloats env,mempty) same_alts
+  -- pprTraceM "final_alts" (ppr alts)
+
+  return (bnds,sortWith (alt_con) alts)
+  where
+      -- Why mkCoreLams?
+      -- This is a hack to avoid  `C1 x1 x2 -> foo x1 x2` and `C2 x1 x2 -> foo x2 x1`
+      -- being considered equal under alpha equivalence.
+      -- If we instead compare \x1\x2 foo x1 x2 <-> \x1 \x2 foo x2 x1 they are caught as different.
+
+      -- Adds one alternative to the map
+      extendMap :: CoreMap [CoreAlt] -> CoreAlt -> CoreMap [CoreAlt]
+      extendMap m alt = alterTM (mkCoreLams (alt_bndrs alt) (alt_rhs alt)) update m
+        where update Nothing = Just [alt]
+              update (Just cs) = Just (alt:cs)
 
 -- See Note [Exitification] and Note [Do not inline exit join points] in
 -- GHC.Core.Opt.Exitify

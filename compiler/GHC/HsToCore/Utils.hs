@@ -53,7 +53,7 @@ import {-# SOURCE #-} GHC.HsToCore.Expr  ( dsLExpr, dsSyntaxExpr )
 import GHC.Hs
 import GHC.Hs.Syn.Type
 import GHC.Tc.Utils.TcType( tcSplitTyConApp )
-import GHC.Core
+import GHC.Core hiding (alt_con,alt_bndrs,alt_rhs)
 import GHC.HsToCore.Monad
 
 import GHC.Core.Utils

@@ -92,6 +92,7 @@ extendVarSetList:: VarSet -> [Var] -> VarSet
 elemVarSet      :: Var -> VarSet -> Bool
 delVarSet       :: VarSet -> Var -> VarSet
 delVarSetList   :: VarSet -> [Var] -> VarSet
+-- | Variables *not* in both sets.
 minusVarSet     :: VarSet -> VarSet -> VarSet
 isEmptyVarSet   :: VarSet -> Bool
 mkVarSet        :: [Var] -> VarSet

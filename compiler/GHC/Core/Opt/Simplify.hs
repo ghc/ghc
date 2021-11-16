@@ -22,7 +22,7 @@ import GHC.Core.Type hiding ( substTy, substTyVar, extendTvSubst, extendCvSubst 
 import GHC.Core.Opt.Simplify.Env
 import GHC.Core.Opt.Simplify.Utils
 import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr )
-import GHC.Core.Make       ( FloatBind, mkImpossibleExpr, castBottomExpr )
+import GHC.Core.Make       ( FloatBind, mkImpossibleExpr, castBottomExpr, mkCoreLams, mkCoreApps )
 import qualified GHC.Core.Make
 import GHC.Core.Coercion hiding ( substCo, substCoVar )
 import GHC.Core.Reduction
@@ -73,7 +73,6 @@ import GHC.Utils.Monad  ( mapAccumLM, liftIO )
 import GHC.Utils.Logger
 
 import Control.Monad
-
 
 {-
 The guts of the simplifier is in this module, but the driver loop for
@@ -3017,11 +3016,13 @@ simplAlts env0 scrut case_bndr alts cont'
         ; alts' <- mapM (simplAlt alt_env' (Just scrut') imposs_deflt_cons case_bndr' cont') in_alts
         ; -- pprTrace "simplAlts" (ppr case_bndr $$ ppr alts_ty $$ ppr alts_ty' $$ ppr alts $$ ppr cont') $
 
-        ; let alts_ty' = contResultType cont'
-        -- See Note [Avoiding space leaks in OutType]
-        ; seqType alts_ty' `seq`
-          mkCase (seDynFlags env0) scrut' case_bndr' alts_ty' alts' }
+        -- ; (alt_floats,alts'') <- doAlts alt_env' case_bndr' alts'
 
+        ; let alts_ty' = contResultType cont'
+
+        ; final_case <- mkCase (seDynFlags env0) alt_env' scrut' case_bndr' alts_ty' alts'
+        -- See Note [Avoiding space leaks in OutType]
+        ; return $ seqType alts_ty' `seq` final_case }
 
 ------------------------------------
 improveSeq :: (FamInstEnv, FamInstEnv) -> SimplEnv

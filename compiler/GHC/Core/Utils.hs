@@ -113,6 +113,7 @@ import Data.Function       ( on )
 import Data.List           ( sort, sortBy, partition, zipWith4, mapAccumL )
 import Data.Ord            ( comparing )
 import qualified Data.Set as Set
+import GHC.Types.Unique.Supply (MonadUnique)
 
 {-
 ************************************************************************

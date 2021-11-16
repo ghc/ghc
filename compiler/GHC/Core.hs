@@ -38,7 +38,7 @@ module GHC.Core (
         mkConApp, mkConApp2, mkTyBind, mkCoBind,
         varToCoreExpr, varsToCoreExprs,
 
-        isId, cmpAltCon, cmpAlt, ltAlt,
+        isId, cmpAltCon, cmpAlt, ltAlt, unzipAlt,
 
         -- ** Simple 'Expr' access functions and predicates
         bindersOf, bindersOfBinds, rhssOfBind, rhssOfAlts,
@@ -274,8 +274,13 @@ type Arg b = Expr b
 -- If you edit this type, you may need to update the GHC formalism
 -- See Note [GHC Formalism] in GHC.Core.Lint
 data Alt b
-    = Alt AltCon [b] (Expr b)
+    = Alt { alt_con :: AltCon
+          , alt_bndrs :: [b]
+          , alt_rhs :: (Expr b)}
     deriving (Data)
+
+unzipAlt :: Alt b -> (AltCon, [b], Expr b)
+unzipAlt (Alt c bnds rhs) = (c,bnds,rhs)
 
 -- | A case alternative constructor (i.e. pattern match)
 

@@ -175,7 +175,10 @@ mkCoreAppTyped _ (fun, fun_ty) (Type ty)
 mkCoreAppTyped _ (fun, fun_ty) (Coercion co)
   = (App fun (Coercion co), funResultTy fun_ty)
 mkCoreAppTyped d (fun, fun_ty) arg
-  = assertPpr (isFunTy fun_ty) (ppr fun $$ ppr arg $$ d)
+  = assertPpr (isFunTy fun_ty)
+              (text "fun:" <> ppr fun $$
+               text "fun_ty" <> ppr fun_ty $$
+               text "arg:" <> ppr arg $$ d)
     (mkValApp fun arg (Scaled mult arg_ty) res_ty, res_ty)
   where
     (mult, arg_ty, res_ty) = splitFunTy fun_ty

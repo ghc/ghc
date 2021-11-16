@@ -16,7 +16,7 @@ module GHC.Data.TrieMap(
    -- * Maps over 'Literal's
    LiteralMap,
    -- * 'TrieMap' class
-   TrieMap(..), insertTM, deleteTM, foldMapTM, isEmptyTM,
+   TrieMap(..), insertTM, deleteTM, foldMapTM, isEmptyTM, elemsTM,
 
    -- * Things helpful for adding additional Instances.
    (>.>), (|>), (|>>), XT,
@@ -91,6 +91,9 @@ foldMapTM f m = foldTM (\ x r -> f x S.<> r) m mempty
 -- This looks inefficient.
 isEmptyTM :: TrieMap m => m a -> Bool
 isEmptyTM m = foldTM (\ _ _ -> False) m True
+
+elemsTM :: TrieMap m => m a -> [a]
+elemsTM m = (foldTM (:) m [])
 
 ----------------------
 -- Recall that
