@@ -41,6 +41,7 @@ module GHC.Driver.Session (
         sccProfilingEnabled,
         needSourceNotes,
         DynFlags(..),
+        ParMakeCount(..),
         outputFile, objectSuf, ways,
         FlagSpec(..),
         HasDynFlags(..), ContainsDynFlags(..),
@@ -270,6 +271,7 @@ import Data.Functor.Identity
 
 import Data.Ord
 import Data.Char
+import Data.Functor
 import Data.List (intercalate, sortBy)
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as Map
@@ -287,6 +289,7 @@ import qualified GHC.Data.EnumSet as EnumSet
 
 import GHC.Foreign (withCString, peekCString)
 import qualified GHC.LanguageExtensions as LangExt
+import System.Posix (Fd, getFdStatus)
 
 -- Note [Updating flag description in the User's Guide]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -457,9 +460,14 @@ data DynFlags = DynFlags {
   ruleCheck             :: Maybe String,
   strictnessBefore      :: [Int],       -- ^ Additional demand analysis
 
-  parMakeCount          :: Maybe Int,   -- ^ The number of modules to compile in parallel
-                                        --   in --make mode, where Nothing ==> compile as
-                                        --   many in parallel as there are CPUs.
+  parMakeCount          :: Maybe ParMakeCount,
+    -- ^ The number of modules to compile in parallel
+    --   in --make mode, ignored with a warning if jobServerAuth is specified.
+    --   If unspecified, compile with a single job.
+
+  jobServerAuth         :: Maybe (Fd, Fd),
+    -- ^ A pair (read, write) of files which act as an interface to a jobserver
+    -- using the GNU Make jobserver protocol.
 
   enableTimeStats       :: Bool,        -- ^ Enable RTS timing statistics?
   ghcHeapSize           :: Maybe Int,   -- ^ The heap size to set.
@@ -766,6 +774,12 @@ data ProfAuto
   | ProfAutoExports    -- ^ exported functions annotated only
   | ProfAutoCalls      -- ^ annotate call-sites
   deriving (Eq,Enum)
+
+-- | The type for the -jN argument, specifying that -j on its own represents
+-- using the number of machine processors.
+data ParMakeCount
+  = ParMakeThisMany Int
+  | ParMakeNumProcessors
 
 -----------------------------------------------------------------------------
 -- Accessessors from 'DynFlags'
@@ -1087,6 +1101,7 @@ initDynFlags dflags = do
        (adjustCols maybeGhcColoursEnv . adjustCols maybeGhcColorsEnv)
        (useColor dflags, colScheme dflags)
  tmp_dir <- normalise <$> getTemporaryDirectory
+ jsAuth <- getJobserverFromEnv
  return dflags{
         useUnicode    = useUnicode',
         useColor      = useColor',
@@ -1095,7 +1110,8 @@ initDynFlags dflags = do
         rtldInfo      = refRtldInfo,
         rtccInfo      = refRtccInfo,
         rtasmInfo     = refRtasmInfo,
-        tmpDir        = TempDir tmp_dir
+        tmpDir        = TempDir tmp_dir,
+        jobServerAuth = jsAuth
         }
 
 -- | The normal 'DynFlags'. Note that they are not suitable for use in this form
@@ -1134,7 +1150,8 @@ defaultDynFlags mySettings =
         historySize             = 20,
         strictnessBefore        = [],
 
-        parMakeCount            = Just 1,
+        parMakeCount            = Nothing,
+        jobServerAuth           = Nothing,
 
         enableTimeStats         = False,
         ghcHeapSize             = Nothing,
@@ -1919,19 +1936,40 @@ parseDynamicFlagsFull activeFlags cmdline dflags0 args = do
       throwGhcExceptionIO (CmdLineError ("combination not supported: " ++
                                intercalate "/" (map wayDesc (Set.toAscList theWays))))
 
-  let (dflags3, consistency_warnings) = makeDynFlagsConsistent dflags2
+  (dflags3, io_warnings) <- liftIO $ dynFlagsIOCheck dflags2
+
+  let (dflags4, consistency_warnings) = makeDynFlagsConsistent dflags3
 
   -- Set timer stats & heap size
-  when (enableTimeStats dflags3) $ liftIO enableTimingStats
-  case (ghcHeapSize dflags3) of
+  when (enableTimeStats dflags4) $ liftIO enableTimingStats
+  case (ghcHeapSize dflags4) of
     Just x -> liftIO (setHeapSize x)
     _      -> return ()
 
-  liftIO $ setUnsafeGlobalDynFlags dflags3
+  liftIO $ setUnsafeGlobalDynFlags dflags4
 
-  let warns' = map (Warn WarningWithoutFlag) (consistency_warnings ++ sh_warns)
+  let warns' = map (Warn WarningWithoutFlag) (consistency_warnings ++ sh_warns ++ io_warnings)
 
-  return (dflags3, leftover, warns' ++ warns)
+  return (dflags4, leftover, warns' ++ warns)
+
+-- | Perform checks and fixes on DynFlags which require IO
+dynFlagsIOCheck :: DynFlags -> IO (DynFlags, [Located String])
+dynFlagsIOCheck dflags = do
+  case jobServerAuth dflags of
+    Nothing     -> pure (dflags, [])
+    Just (r, w) -> do
+      let isAccessible fd =
+            (True <$ getFdStatus fd) `catchIOError` const (pure False)
+      ok <- isAccessible r <&&> isAccessible w
+      if ok
+        then pure (dflags, [])
+        else pure
+          ( dflags { jobServerAuth = Nothing }
+          , [ mkGeneralLocated
+                "when checking dynflags"
+                "jobserver r and w files are not both open and acessible, ignoring jobserver"
+            ]
+          )
 
 -- | Check (and potentially disable) any extensions that aren't allowed
 -- in safe mode.
@@ -2045,6 +2083,8 @@ add_dep_message (IntSuffix f) message =
                                   IntSuffix $ \i -> f i >> deprecate message
 add_dep_message (WordSuffix f) message =
                                   WordSuffix $ \i -> f i >> deprecate message
+add_dep_message (DoubleWordSuffix f) message =
+                          DoubleWordSuffix $ \i j -> f i j >> deprecate message
 add_dep_message (FloatSuffix f) message =
                                 FloatSuffix $ \fl -> f fl >> deprecate message
 add_dep_message (PassFlag f) message =
@@ -2070,14 +2110,16 @@ dynamic_flags_deps = [
   , make_ord_flag defGhcFlag "j"     (OptIntSuffix
         (\n -> case n of
                  Just n
-                     | n > 0     -> upd (\d -> d { parMakeCount = Just n })
+                     | n > 0     -> upd (\d -> d { parMakeCount = Just (ParMakeThisMany n) })
                      | otherwise -> addErr "Syntax: -j[n] where n > 0"
-                 Nothing -> upd (\d -> d { parMakeCount = Nothing })))
+                 Nothing -> upd (\d -> d { parMakeCount = Just ParMakeNumProcessors })))
                  -- When the number of parallel builds
                  -- is omitted, it is the same
                  -- as specifying that the number of
                  -- parallel builds is equal to the
                  -- result of getNumProcessors
+  , make_ord_flag defGhcFlag "-jobserver-auth"
+        (doubleWordSuffix (\n m d -> d { jobServerAuth = Just (fromIntegral n, fromIntegral m) }))
   , make_ord_flag defFlag "instantiated-with"   (sepArg setUnitInstantiations)
   , make_ord_flag defFlag "this-component-id"   (sepArg setUnitInstanceOf)
 
@@ -4149,6 +4191,9 @@ sepArg fn = SepArg (upd . fn)
 intSuffix :: (Int -> DynFlags -> DynFlags) -> OptKind (CmdLineP DynFlags)
 intSuffix fn = IntSuffix (\n -> upd (fn n))
 
+doubleWordSuffix :: (Word -> Word -> DynFlags -> DynFlags) -> OptKind (CmdLineP DynFlags)
+doubleWordSuffix fn = DoubleWordSuffix (\n m -> upd (fn n m))
+
 intSuffixM :: (Int -> DynFlags -> DynP DynFlags) -> OptKind (CmdLineP DynFlags)
 intSuffixM fn = IntSuffix (\n -> updM (fn n))
 
@@ -4832,6 +4877,11 @@ makeDynFlagsConsistent dflags
  , Nothing <- outputFile dflags
  = pgmError "--output must be specified when using --merge-objs"
 
+ | Just _ <- jobServerAuth dflags
+ , Just _ <- parMakeCount dflags
+   = loop dflags{parMakeCount = Nothing}
+         "`-j` argument is ignored when GHC has a jobserver specified in its environment or arguments"
+
  | otherwise = (dflags, [])
     where loc = mkGeneralSrcSpan (fsLit "when making flags consistent")
           loop updated_dflags warning
@@ -5059,3 +5109,23 @@ updatePlatformConstants dflags mconstants = do
   let platform1 = (targetPlatform dflags) { platform_constants = mconstants }
   let dflags1   = dflags { targetPlatform = platform1 }
   return dflags1
+
+-- | Parse the GHC_MAKEFLAGS env variable for `--jobserver-auth=r,w`
+getJobserverFromEnv :: IO (Maybe (Fd, Fd))
+getJobserverFromEnv = do
+  makeFlagsMaybe <- lookupEnv "GHC_MAKEFLAGS"
+  pure $ do
+    makeFlags <- makeFlagsMaybe
+    snd $ runCmdLine
+      (processArgs
+        [ defFlag
+            "-jobserver-auth"
+            (DoubleWordSuffix
+              (\r w -> liftEwM
+                (putCmdLineState (Just (fromIntegral r, fromIntegral w)))
+              )
+            )
+        ]
+        (mkGeneralLocated "GHC_MAKEFLAGS env variable" <$> words makeFlags)
+      )
+      Nothing

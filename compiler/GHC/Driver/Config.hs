@@ -37,8 +37,10 @@ initBCOOpts dflags = do
   -- Serializing ResolvedBCO is expensive, so if we're in parallel mode
   -- (-j<n>) parallelise the serialization.
   n_jobs <- case parMakeCount dflags of
-              Nothing -> liftIO getNumProcessors
-              Just n  -> return n
+              Nothing -> pure 1
+              Just (ParMakeThisMany n) -> pure n
+              Just ParMakeNumProcessors -> liftIO getNumProcessors
+              -- TODO Ellie, this should use the jobserver
   return $ BCOOpts n_jobs
 
 -- | Extract GHCi options from DynFlags and step

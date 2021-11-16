@@ -97,6 +97,7 @@ data OptKind m                             -- Suppose the flag is -f
     | OptIntSuffix (Maybe Int -> EwM m ()) -- -f or -f=n; pass n to fn
     | IntSuffix (Int -> EwM m ())          -- -f or -f=n; pass n to fn
     | WordSuffix (Word -> EwM m ())        -- -f or -f=n; pass n to fn
+    | DoubleWordSuffix (Word -> Word -> EwM m ()) -- -f=n,m pass n to fn
     | FloatSuffix (Float -> EwM m ())      -- -f or -f=n; pass n to fn
     | PassFlag  (String -> EwM m ())       -- -f; pass "-f" fn
     | AnySuffix (String -> EwM m ())       -- -f or -farg; pass entire "-farg" to fn
@@ -254,6 +255,10 @@ processOneArg opt_kind rest arg args
         WordSuffix f | Just n <- parseWord rest_no_eq -> Right (f n, args)
                      | otherwise -> Left ("malformed natural argument in " ++ dash_arg)
 
+        DoubleWordSuffix f | Just (n, m) <- parseWords rest_no_eq
+                           -> Right (f n m, args)
+                           | otherwise -> Left ("malformed natural arguments in " ++ dash_arg)
+
         FloatSuffix f | Just n <- parseFloat rest_no_eq -> Right (f n, args)
                       | otherwise -> Left ("malformed float argument in " ++ dash_arg)
 
@@ -273,18 +278,19 @@ findArg spec arg =
         (one:_) -> Just one
 
 arg_ok :: OptKind t -> [Char] -> String -> Bool
-arg_ok (NoArg           _)  rest _   = null rest
-arg_ok (HasArg          _)  _    _   = True
-arg_ok (SepArg          _)  rest _   = null rest
-arg_ok (Prefix          _)  _    _   = True -- Missing argument checked for in processOneArg t
-                                            -- to improve error message (#12625)
-arg_ok (OptIntSuffix    _)  _    _   = True
-arg_ok (IntSuffix       _)  _    _   = True
-arg_ok (WordSuffix      _)  _    _   = True
-arg_ok (FloatSuffix     _)  _    _   = True
-arg_ok (OptPrefix       _)  _    _   = True
-arg_ok (PassFlag        _)  rest _   = null rest
-arg_ok (AnySuffix       _)  _    _   = True
+arg_ok (NoArg            _)  rest _   = null rest
+arg_ok (HasArg           _)  _    _   = True
+arg_ok (SepArg           _)  rest _   = null rest
+arg_ok (Prefix           _)  _    _   = True -- Missing argument checked for in processOneArg t
+                                             -- to improve error message (#12625)
+arg_ok (OptIntSuffix     _)  _    _   = True
+arg_ok (IntSuffix        _)  _    _   = True
+arg_ok (WordSuffix       _)  _    _   = True
+arg_ok (DoubleWordSuffix _)  _    _   = True
+arg_ok (FloatSuffix      _)  _    _   = True
+arg_ok (OptPrefix        _)  _    _   = True
+arg_ok (PassFlag         _)  rest _   = null rest
+arg_ok (AnySuffix        _)  _    _   = True
 
 -- | Parse an Int
 --
@@ -296,10 +302,18 @@ parseInt s = case reads s of
                  ((n,""):_) -> Just n
                  _          -> Nothing
 
+
 parseWord :: String -> Maybe Word
 parseWord s = case reads s of
                  ((n,""):_) -> Just n
                  _          -> Nothing
+
+-- | Parse a pair of comma separated naturals
+parseWords :: String -> Maybe (Word, Word)
+parseWords s = case reads s of
+                 ((n,',':s'):_)
+                   | ((m,""):_) <- reads s' -> Just (n, m)
+                 _                          -> Nothing
 
 parseFloat :: String -> Maybe Float
 parseFloat s = case reads s of

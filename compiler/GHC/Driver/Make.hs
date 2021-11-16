@@ -75,6 +75,7 @@ import GHC.Driver.Env
 import GHC.Driver.Errors
 import GHC.Driver.Errors.Types
 import GHC.Driver.Main
+import GHC.Driver.JobServer
 
 import GHC.Parser.Header
 
@@ -149,6 +150,7 @@ import Control.Monad.Trans.Maybe
 import GHC.Runtime.Loader
 import GHC.Rename.Names
 import GHC.Utils.Constants
+import System.Posix (Fd)
 
 -- -----------------------------------------------------------------------------
 -- Loading the program
@@ -642,6 +644,14 @@ createBuildPlan mod_graph maybe_top_mod =
               (vcat [text "Build plan missing nodes:", (text "PLAN:" <+> ppr (sum (map countMods build_plan))), (text "GRAPH:" <+> ppr (length (mgModSummaries' mod_graph )))])
               build_plan
 
+-- | This describes what we use to limit the number of jobs, either we limit it
+-- ourselves to a specific number or we have an external jobserver limit it for
+-- us.
+data WorkerLimit
+  = NumProcessors Int
+  | JobServer (Fd, Fd)
+  deriving (Eq)
+
 -- | Generalized version of 'load' which also supports a custom
 -- 'Messager' (for reporting progress) and 'ModuleGraph' (generally
 -- produced by calling 'depanal'.
@@ -722,14 +732,17 @@ load' mhmi_cache how_much mHscMessage mod_graph = do
     liftIO $ debugTraceMsg logger 2 (hang (text "Ready for upsweep")
                                     2 (ppr build_plan))
 
-    n_jobs <- case parMakeCount (hsc_dflags hsc_env) of
-                    Nothing -> liftIO getNumProcessors
-                    Just n  -> return n
+    worker_limit <- case jobServerAuth dflags of
+                Just js -> pure (JobServer js)
+                Nothing -> NumProcessors <$> case parMakeCount dflags of
+                  Nothing -> pure 1
+                  Just ParMakeNumProcessors -> liftIO getNumProcessors
+                  Just (ParMakeThisMany n) -> pure n
 
     setSession $ hscUpdateHUG (unitEnv_map pruneHomeUnitEnv) hsc_env
     hsc_env <- getSession
-    (upsweep_ok, hsc_env1) <- withDeferredDiagnostics $
-      liftIO $ upsweep n_jobs hsc_env mhmi_cache mHscMessage (toCache pruned_cache) build_plan
+    (upsweep_ok, hsc_env1, new_cache) <- withDeferredDiagnostics $
+      liftIO $ upsweep worker_limit hsc_env mhmi_cache mHscMessage (toCache pruned_cache) build_plan
     setSession hsc_env1
     case upsweep_ok of
       Failed -> loadFinish upsweep_ok
@@ -985,7 +998,7 @@ type BuildM a = StateT BuildLoopState IO a
 
 
 -- | Abstraction over the operations of a semaphore which allows usage with the
---  -j1 case
+--  -j1 case or a jobserver
 data AbstractSem = AbstractSem { acquireSem :: IO ()
                                , releaseSem :: IO () }
 
@@ -1143,7 +1156,7 @@ withCurrentUnit uid = do
 
 
 upsweep
-    :: Int -- ^ The number of workers we wish to run in parallel
+    :: WorkerLimit -- ^ The number of workers we wish to run in parallel
     -> HscEnv -- ^ The base HscEnv, which is augmented for each module
     -> Maybe HomeModInfoCache -- ^ A cache to incrementally write final interface files to
     -> Maybe Messager
@@ -2610,16 +2623,16 @@ runSeqPipelines plugin_hsc_env mHscMessager all_pipelines =
                     , compile_sem = AbstractSem (return ()) (return ())
                     , env_messager = mHscMessager
                     }
-  in runAllPipelines 1 env all_pipelines
+  in runAllPipelines (NumProcessors 1) env all_pipelines
 
 
 -- | Build and run a pipeline
-runParPipelines :: Int              -- ^ How many capabilities to use
-             -> HscEnv           -- ^ The basic HscEnv which is augmented with specific info for each module
+runParPipelines :: WorkerLimit -- ^ How to limit work parallelism
+             -> HscEnv         -- ^ The basic HscEnv which is augmented with specific info for each module
              -> Maybe Messager   -- ^ Optional custom messager to use to report progress
              -> [MakeAction]  -- ^ The build plan for all the module nodes
              -> IO ()
-runParPipelines n_jobs plugin_hsc_env mHscMessager all_pipelines = do
+runParPipelines worker_limit plugin_hsc_env mHscMessager all_pipelines = do
 
 
   -- A variable which we write to when an error has happened and we have to tell the
@@ -2636,13 +2649,16 @@ runParPipelines n_jobs plugin_hsc_env mHscMessager all_pipelines = do
   thread_safe_logger <- liftIO $ makeThreadSafe (hsc_logger plugin_hsc_env)
   let thread_safe_hsc_env = plugin_hsc_env { hsc_logger = thread_safe_logger }
 
+  -- TODO Ellie, update capabilities with jobserver
   let updNumCapabilities = liftIO $ do
           n_capabilities <- getNumCapabilities
           n_cpus <- getNumProcessors
           -- Setting number of capabilities more than
           -- CPU count usually leads to high userspace
           -- lock contention. #9221
-          let n_caps = min n_jobs n_cpus
+          let n_caps = case worker_limit of
+                         NumProcessors n_jobs -> min n_jobs n_cpus
+                         JobServer _ -> n_cpus
           unless (n_capabilities /= 1) $ setNumCapabilities n_caps
           return n_capabilities
 
@@ -2651,8 +2667,13 @@ runParPipelines n_jobs plugin_hsc_env mHscMessager all_pipelines = do
           atomically $ writeTVar stopped_var True
           wait_log_thread
 
-  compile_sem <- newQSem n_jobs
-  let abstract_sem = AbstractSem (waitQSem compile_sem) (signalQSem compile_sem)
+  abstract_sem <- case worker_limit of
+                    NumProcessors n_jobs -> do
+                      compile_sem <- newQSem n_jobs
+                      pure $ AbstractSem (waitQSem compile_sem) (signalQSem compile_sem)
+                    JobServer (r, w) -> do
+                      (wait, signal) <- makeJobserverAcquireRelease r w
+                      pure $ AbstractSem wait signal
     -- Reset the number of capabilities once the upsweep ends.
   let env = MakeEnv { hsc_env = thread_safe_hsc_env
                     , withLogger = withParLog log_queue_queue_var
@@ -2661,7 +2682,7 @@ runParPipelines n_jobs plugin_hsc_env mHscMessager all_pipelines = do
                     }
 
   MC.bracket updNumCapabilities resetNumCapabilities $ \_ ->
-    runAllPipelines n_jobs env all_pipelines
+    runAllPipelines worker_limit env all_pipelines
 
 withLocalTmpFS :: RunMakeM a -> RunMakeM a
 withLocalTmpFS act = do
@@ -2678,10 +2699,11 @@ withLocalTmpFS act = do
   MC.bracket initialiser finaliser $ \lcl_hsc_env -> local (\env -> env { hsc_env = lcl_hsc_env}) act
 
 -- | Run the given actions and then wait for them all to finish.
-runAllPipelines :: Int -> MakeEnv -> [MakeAction] -> IO ()
-runAllPipelines n_jobs env acts = do
-  let spawn_actions :: IO [ThreadId]
-      spawn_actions = if n_jobs == 1
+runAllPipelines :: WorkerLimit -> MakeEnv -> [MakeAction] -> IO ()
+runAllPipelines worker_limit env acts = do
+  let single_worker = worker_limit == NumProcessors 1
+      spawn_actions :: IO [ThreadId]
+      spawn_actions = if single_worker
         then (:[]) <$> (forkIOWithUnmask $ \unmask -> void $ runLoop (\io -> io unmask) env acts)
         else runLoop forkIOWithUnmask env acts
 
