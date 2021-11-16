@@ -212,6 +212,7 @@ data GeneralFlag
    | Opt_CmmSink
    | Opt_CmmStaticPred
    | Opt_CmmElimCommonBlocks
+   | Opt_CmmControlFlow
    | Opt_AsmShortcutting
    | Opt_OmitYields
    | Opt_FunToThunk               -- allow GHC.Core.Opt.WorkWrap.Utils.mkWorkerArgs to remove all value lambdas

@@ -3376,6 +3376,7 @@ fFlagsDeps = [
   flagSpec "alignment-sanitisation"           Opt_AlignmentSanitisation,
   flagSpec "num-constant-folding"             Opt_NumConstantFolding,
   flagSpec "fast-pap-calls"                   Opt_FastPAPCalls,
+  flagSpec "cmm-control-flow"                 Opt_CmmControlFlow,
   flagSpec "show-warning-groups"              Opt_ShowWarnGroups,
   flagSpec "hide-source-paths"                Opt_HideSourcePaths,
   flagSpec "show-loaded-modules"              Opt_ShowLoadedModules,
@@ -3854,6 +3855,7 @@ optLevelFlags -- see Note [Documenting optimisation flags]
     , ([1,2],   Opt_CSE)
     , ([1,2],   Opt_StgCSE)
     , ([2],     Opt_StgLiftLams)
+    , ([1,2],   Opt_CmmControlFlow)
 
     , ([1,2],   Opt_EnableRewriteRules)
           -- Off for -O0.   Otherwise we desugar list literals

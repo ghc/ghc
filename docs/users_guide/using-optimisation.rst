@@ -227,6 +227,17 @@ by saying ``-fno-wombat``.
     loops and hot code paths. This information is then used by the
     register allocation and code layout passes.
 
+.. ghc-flag:: -fcmm-control-flow
+    :shortdesc: Enable control flow optimisation in the Cmm backend. Implied by :ghc-flag:`-O`.
+    :type: dynamic
+    :reverse: -fno-cmm-control-flow
+    :category:
+
+    :default: on
+
+    Enables some control flow optimisations in the Cmm code
+    generator, merging basic blocks and avoiding jumps right after jumps. 
+
 .. ghc-flag:: -fasm-shortcutting
     :shortdesc: Enable shortcutting on assembly. Implied by :ghc-flag:`-O2`.
     :type: dynamic
@@ -1554,4 +1565,3 @@ by saying ``-fno-wombat``.
     This flag sets the size (in bytes) threshold above which the second approach
     is used. You can disable the second approach entirely by setting the
     threshold to 0.
-

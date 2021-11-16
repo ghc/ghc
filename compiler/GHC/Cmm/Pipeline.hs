@@ -142,7 +142,7 @@ cpsTop logger platform dflags proc =
 
       ----------- Control-flow optimisations -----------------------------
       g <- {-# SCC "cmmCfgOpts(2)" #-}
-           return $ if optLevel dflags >= 1
+           return $ if gopt Opt_CmmControlFlow dflags
                     then map (cmmCfgOptsProc splitting_proc_points) g
                     else g
       g <- return (map removeUnreachableBlocksProc g)
