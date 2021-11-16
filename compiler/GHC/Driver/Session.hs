@@ -447,6 +447,7 @@ data DynFlags = DynFlags {
   llvmConfig            :: LlvmConfig,
     -- ^ N.B. It's important that this field is lazy since we load the LLVM
     -- configuration lazily. See Note [LLVM Configuration] in "GHC.SysTools".
+  llvmOptLevel          :: Int,         -- ^ LLVM optimisation level
   verbosity             :: Int,         -- ^ Verbosity level: see Note [Verbosity levels]
   optLevel              :: Int,         -- ^ Optimisation level
   debugLevel            :: Int,         -- ^ How much debug information to produce
@@ -1191,6 +1192,7 @@ defaultDynFlags mySettings llvmConfig =
 
         -- See Note [LLVM configuration].
         llvmConfig              = llvmConfig,
+        llvmOptLevel            = 0,
 
         -- ghc -M values
         depMakefile       = "Makefile",
@@ -1779,7 +1781,7 @@ setInteractivePrint f d = d { interactivePrint = Just f}
 updOptLevel :: Int -> DynFlags -> DynFlags
 -- ^ Sets the 'DynFlags' to be appropriate to the optimisation level
 updOptLevel n dfs
-  = dfs2{ optLevel = final_n }
+  = dfs2{ optLevel = final_n, llvmOptLevel = final_n }
   where
    final_n = max 0 (min 2 n)    -- Clamp to 0 <= n <= 2
    dfs1 = foldr (flip gopt_unset) dfs  remove_gopts

@@ -216,7 +216,7 @@ runLlvmLlcPhase pipe_env hsc_env input_fn = do
     --
     let dflags = hsc_dflags hsc_env
         logger = hsc_logger hsc_env
-        llvmOpts = case optLevel dflags of
+        llvmOpts = case llvmOptLevel dflags of
           0 -> "-O1" -- required to get the non-naive reg allocator. Passing -regalloc=greedy is not sufficient.
           1 -> "-O1"
           _ -> "-O2"
@@ -250,7 +250,7 @@ runLlvmOptPhase pipe_env hsc_env input_fn = do
         logger = hsc_logger hsc_env
     let -- we always (unless -optlo specified) run Opt since we rely on it to
         -- fix up some pretty big deficiencies in the code we generate
-        optIdx = max 0 $ min 2 $ optLevel dflags  -- ensure we're in [0,2]
+        optIdx = max 0 $ min 2 $ llvmOptLevel dflags  -- ensure we're in [0,2]
         llvmOpts = case lookup optIdx $ llvmPasses $ llvmConfig dflags of
                     Just passes -> passes
                     Nothing -> panic ("runPhase LlvmOpt: llvm-passes file "
@@ -410,8 +410,8 @@ runCcPhase cc_phase pipe_env hsc_env input_fn = do
           | otherwise
           = []
 
-  let cc_opt | optLevel dflags >= 2 = [ "-O2" ]
-             | optLevel dflags >= 1 = [ "-O" ]
+  let cc_opt | llvmOptLevel dflags >= 2 = [ "-O2" ]
+             | llvmOptLevel dflags >= 1 = [ "-O" ]
              | otherwise            = []
 
   -- Decide next phase
