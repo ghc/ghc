@@ -1877,7 +1877,8 @@ eitherTyConKey                          = mkPreludeTyConUnique 84
 liftedTypeKindTyConKey, unliftedTypeKindTyConKey,
   tYPETyConKey, liftedRepTyConKey, unliftedRepTyConKey,
   constraintKindTyConKey, levityTyConKey, runtimeRepTyConKey,
-  vecCountTyConKey, vecElemTyConKey :: Unique
+  vecCountTyConKey, vecElemTyConKey,
+  zeroBitRepTyConKey, zeroBitTypeTyConKey :: Unique
 liftedTypeKindTyConKey                  = mkPreludeTyConUnique 87
 unliftedTypeKindTyConKey                = mkPreludeTyConUnique 88
 tYPETyConKey                            = mkPreludeTyConUnique 89
@@ -1888,10 +1889,21 @@ vecCountTyConKey                        = mkPreludeTyConUnique 96
 vecElemTyConKey                         = mkPreludeTyConUnique 97
 liftedRepTyConKey                       = mkPreludeTyConUnique 98
 unliftedRepTyConKey                     = mkPreludeTyConUnique 99
+zeroBitRepTyConKey                         = mkPreludeTyConUnique 100
+zeroBitTypeTyConKey                        = mkPreludeTyConUnique 101
 
 pluginTyConKey, frontendPluginTyConKey :: Unique
 pluginTyConKey                          = mkPreludeTyConUnique 102
 frontendPluginTyConKey                  = mkPreludeTyConUnique 103
+
+trTyConTyConKey, trModuleTyConKey, trNameTyConKey,
+  kindRepTyConKey, typeLitSortTyConKey :: Unique
+trTyConTyConKey                         = mkPreludeTyConUnique 104
+trModuleTyConKey                        = mkPreludeTyConUnique 105
+trNameTyConKey                          = mkPreludeTyConUnique 106
+kindRepTyConKey                         = mkPreludeTyConUnique 107
+typeLitSortTyConKey                     = mkPreludeTyConUnique 108
+
 
 -- Generics (Unique keys)
 v1TyConKey, u1TyConKey, par1TyConKey, rec1TyConKey,
@@ -2092,21 +2104,14 @@ fingerprintDataConKey                   = mkPreludeDataConUnique 35
 srcLocDataConKey :: Unique
 srcLocDataConKey                        = mkPreludeDataConUnique 37
 
-trTyConTyConKey, trTyConDataConKey,
-  trModuleTyConKey, trModuleDataConKey,
-  trNameTyConKey, trNameSDataConKey, trNameDDataConKey,
-  trGhcPrimModuleKey, kindRepTyConKey,
-  typeLitSortTyConKey :: Unique
-trTyConTyConKey                         = mkPreludeDataConUnique 40
+trTyConDataConKey, trModuleDataConKey,
+  trNameSDataConKey, trNameDDataConKey,
+  trGhcPrimModuleKey :: Unique
 trTyConDataConKey                       = mkPreludeDataConUnique 41
-trModuleTyConKey                        = mkPreludeDataConUnique 42
 trModuleDataConKey                      = mkPreludeDataConUnique 43
-trNameTyConKey                          = mkPreludeDataConUnique 44
 trNameSDataConKey                       = mkPreludeDataConUnique 45
 trNameDDataConKey                       = mkPreludeDataConUnique 46
 trGhcPrimModuleKey                      = mkPreludeDataConUnique 47
-kindRepTyConKey                         = mkPreludeDataConUnique 48
-typeLitSortTyConKey                     = mkPreludeDataConUnique 49
 
 typeErrorTextDataConKey,
   typeErrorAppendDataConKey,
@@ -2143,12 +2148,18 @@ metaDataDataConKey                      = mkPreludeDataConUnique 68
 metaConsDataConKey                      = mkPreludeDataConUnique 69
 metaSelDataConKey                       = mkPreludeDataConUnique 70
 
-vecRepDataConKey, tupleRepDataConKey, sumRepDataConKey,
-  boxedRepDataConKey :: Unique
+vecRepDataConKey, sumRepDataConKey,
+  tupleRepDataConKey, boxedRepDataConKey :: Unique
 vecRepDataConKey                        = mkPreludeDataConUnique 71
 tupleRepDataConKey                      = mkPreludeDataConUnique 72
 sumRepDataConKey                        = mkPreludeDataConUnique 73
 boxedRepDataConKey                      = mkPreludeDataConUnique 74
+
+boxedRepDataConTyConKey, tupleRepDataConTyConKey :: Unique
+-- A promoted data constructors (i.e. a TyCon) has
+-- the same key as the data constructor itself
+boxedRepDataConTyConKey = boxedRepDataConKey
+tupleRepDataConTyConKey = tupleRepDataConKey
 
 -- See Note [Wiring in RuntimeRep] in GHC.Builtin.Types
 -- Includes all nullary-data-constructor reps. Does not
@@ -2207,6 +2218,7 @@ integerINDataConKey       = mkPreludeDataConUnique 121
 integerIPDataConKey       = mkPreludeDataConUnique 122
 naturalNSDataConKey       = mkPreludeDataConUnique 123
 naturalNBDataConKey       = mkPreludeDataConUnique 124
+
 
 ---------------- Template Haskell -------------------
 --      GHC.Builtin.Names.TH: USES DataUniques 200-250

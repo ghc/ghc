@@ -271,7 +271,7 @@ mkWwBodies opts fun_id arg_vars res_ty demands res_cpr
     only_one_void_argument
       | [d] <- demands
       , [v] <- filter isId arg_vars
-      , isAbsDmd d && isVoidTy (idType v)
+      , isAbsDmd d && isZeroBitTy (idType v)
       = True
       | otherwise
       = False

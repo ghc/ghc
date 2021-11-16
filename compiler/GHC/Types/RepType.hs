@@ -8,7 +8,7 @@ module GHC.Types.RepType
     unwrapType,
 
     -- * Predicates on types
-    isVoidTy,
+    isZeroBitTy,
 
     -- * Type representation for the code generator
     typePrimRep, typePrimRep1, typeMonoPrimRep_maybe,
@@ -128,8 +128,8 @@ countConRepArgs dc = go (dataConRepArity dc) (dataConRepType dc)
       = pprPanic "countConRepArgs: arity greater than type can handle" (ppr (n, ty, typePrimRep ty))
 
 -- | True if the type has zero width.
-isVoidTy :: Type -> Bool
-isVoidTy = null . typePrimRep
+isZeroBitTy :: Type -> Bool
+isZeroBitTy = null . typePrimRep
 
 
 {- **********************************************************************
@@ -252,7 +252,7 @@ instance Outputable SlotTy where
 
 typeSlotTy :: UnaryType -> Maybe SlotTy
 typeSlotTy ty
-  | isVoidTy ty
+  | isZeroBitTy ty
   = Nothing
   | otherwise
   = Just (primRepSlot (typePrimRep1 ty))
@@ -565,4 +565,4 @@ runtimeRepPrimRep doc rr_ty
 -- to fresh Ids. Really, only the type's representation matters.
 -- See also Note [RuntimeRep and PrimRep]
 primRepToType :: PrimRep -> Type
-primRepToType = anyTypeOfKind . tYPE . primRepToRuntimeRep
+primRepToType = anyTypeOfKind . mkTYPEapp . primRepToRuntimeRep

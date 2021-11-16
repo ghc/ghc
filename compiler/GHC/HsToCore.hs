@@ -740,7 +740,7 @@ mkUnsafeCoercePrimPair _old_id old_expr
              (scrut1, scrut1_ty, rr_cv_ty) = unsafe_equality runtimeRepTy
                                                              runtimeRep1Ty
                                                              runtimeRep2Ty
-             (scrut2, scrut2_ty, ab_cv_ty) = unsafe_equality (tYPE runtimeRep2Ty)
+             (scrut2, scrut2_ty, ab_cv_ty) = unsafe_equality (mkTYPEapp runtimeRep2Ty)
                                                              (openAlphaTy `mkCastTy` alpha_co)
                                                              openBetaTy
 

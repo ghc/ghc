@@ -151,23 +151,23 @@ instance (Outputable a) => Outputable (NonVoid a) where
   ppr (NonVoid a) = ppr a
 
 nonVoidIds :: [Id] -> [NonVoid Id]
-nonVoidIds ids = [NonVoid id | id <- ids, not (isVoidTy (idType id))]
+nonVoidIds ids = [NonVoid id | id <- ids, not (isZeroBitTy (idType id))]
 
 -- | Used in places where some invariant ensures that all these Ids are
 -- non-void; e.g. constructor field binders in case expressions.
 -- See Note [Post-unarisation invariants] in "GHC.Stg.Unarise".
 assertNonVoidIds :: [Id] -> [NonVoid Id]
-assertNonVoidIds ids = assert (not (any (isVoidTy . idType) ids)) $
+assertNonVoidIds ids = assert (not (any (isZeroBitTy . idType) ids)) $
                        coerce ids
 
 nonVoidStgArgs :: [StgArg] -> [NonVoid StgArg]
-nonVoidStgArgs args = [NonVoid arg | arg <- args, not (isVoidTy (stgArgType arg))]
+nonVoidStgArgs args = [NonVoid arg | arg <- args, not (isZeroBitTy (stgArgType arg))]
 
 -- | Used in places where some invariant ensures that all these arguments are
 -- non-void; e.g. constructor arguments.
 -- See Note [Post-unarisation invariants] in "GHC.Stg.Unarise".
 assertNonVoidStgArgs :: [StgArg] -> [NonVoid StgArg]
-assertNonVoidStgArgs args = assert (not (any (isVoidTy . stgArgType) args)) $
+assertNonVoidStgArgs args = assert (not (any (isZeroBitTy . stgArgType) args)) $
                             coerce args
 
 

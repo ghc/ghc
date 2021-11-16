@@ -557,7 +557,7 @@ mapTupleIdBinders
   -> UnariseEnv
   -> UnariseEnv
 mapTupleIdBinders ids args0 rho0
-  = assert (not (any (isVoidTy . stgArgType) args0)) $
+  = assert (not (any (isZeroBitTy . stgArgType) args0)) $
     let
       ids_unarised :: [(Id, [PrimRep])]
       ids_unarised = map (\id -> (id, typePrimRep (idType id))) ids
@@ -591,7 +591,7 @@ mapSumIdBinders
   -> UnariseEnv
 
 mapSumIdBinders [id] args rho0
-  = assert (not (any (isVoidTy . stgArgType) args)) $
+  = assert (not (any (isZeroBitTy . stgArgType) args)) $
     let
       arg_slots = map primRepSlot $ concatMap (typePrimRep . stgArgType) args
       id_slots  = map primRepSlot $ typePrimRep (idType id)
@@ -777,15 +777,15 @@ unariseConArg rho (StgVarArg x) =
     Just (UnaryVal arg) -> [arg]
     Just (MultiVal as) -> as      -- 'as' can be empty
     Nothing
-      | isVoidTy (idType x) -> [] -- e.g. C realWorld#
-                                  -- Here realWorld# is not in the envt, but
-                                  -- is a void, and so should be eliminated
+      | isZeroBitTy (idType x) -> [] -- e.g. C realWorld#
+                                     -- Here realWorld# is not in the envt, but
+                                     -- is a void, and so should be eliminated
       | otherwise -> [StgVarArg x]
 unariseConArg _ arg@(StgLitArg lit)
   | Just as <- unariseRubbish_maybe lit
   = as
   | otherwise
-  = assert (not (isVoidTy (literalType lit))) -- We have no non-rubbish void literals
+  = assert (not (isZeroBitTy (literalType lit))) -- We have no non-rubbish void literals
     [arg]
 
 unariseConArgs :: UnariseEnv -> [InStgArg] -> [OutStgArg]

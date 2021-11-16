@@ -9,7 +9,7 @@ instance Enum () -- Defined in ‘GHC.Enum’
 instance Show () -- Defined in ‘GHC.Show’
 instance Read () -- Defined in ‘GHC.Read’
 instance Bounded () -- Defined in ‘GHC.Enum’
-type (##) :: TYPE ('GHC.Types.TupleRep '[])
+type (##) :: GHC.Types.ZeroBitType
 data (##) = (##)
   	-- Defined in ‘GHC.Prim’
 () :: ()

@@ -138,7 +138,7 @@ import GHC.Prelude
 import GHC.Platform
 
 import {-# SOURCE #-} GHC.Core.TyCo.Rep
-   ( Kind, Type, PredType, mkForAllTy, mkFunTyMany, mkTyConTy_ )
+   ( Kind, Type, PredType, mkForAllTy, mkFunTyMany, mkNakedTyConTy )
 import {-# SOURCE #-} GHC.Core.TyCo.Ppr
    ( pprType )
 import {-# SOURCE #-} GHC.Builtin.Types
@@ -1819,7 +1819,7 @@ So we compromise, and move their Kind calculation to the call site.
 -}
 
 -- | Given the name of the function type constructor and it's kind, create the
--- corresponding 'TyCon'. It is recommended to use 'GHC.Core.TyCo.Rep.funTyCon' if you want
+-- corresponding 'TyCon'. It is recommended to use 'GHC.Builtin.Types.funTyCon' if you want
 -- this functionality
 mkFunTyCon :: Name -> [TyConBinder] -> Name -> TyCon
 mkFunTyCon name binders rep_nm
@@ -1831,7 +1831,7 @@ mkFunTyCon name binders rep_nm
               tyConResKind = liftedTypeKind,
               tyConKind    = mkTyConKind binders liftedTypeKind,
               tyConArity   = length binders,
-              tyConNullaryTy = mkTyConTy_ tc,
+              tyConNullaryTy = mkNakedTyConTy tc,
               tcRepName    = rep_nm
           }
     in tc
@@ -1858,7 +1858,7 @@ mkAlgTyCon name binders res_kind roles cType stupid rhs parent gadt_syn
               tyConResKind     = res_kind,
               tyConKind        = mkTyConKind binders res_kind,
               tyConArity       = length binders,
-              tyConNullaryTy   = mkTyConTy_ tc,
+              tyConNullaryTy   = mkNakedTyConTy tc,
               tyConTyVars      = binderVars binders,
               tcRoles          = roles,
               tyConCType       = cType,
@@ -1897,7 +1897,7 @@ mkTupleTyCon name binders res_kind arity con sort parent
               tyConResKind     = res_kind,
               tyConKind        = mkTyConKind binders res_kind,
               tyConArity       = arity,
-              tyConNullaryTy   = mkTyConTy_ tc,
+              tyConNullaryTy   = mkNakedTyConTy tc,
               tcRoles          = replicate arity Representational,
               tyConCType       = Nothing,
               algTcGadtSyntax  = False,
@@ -1927,7 +1927,7 @@ mkSumTyCon name binders res_kind arity tyvars cons parent
               tyConResKind     = res_kind,
               tyConKind        = mkTyConKind binders res_kind,
               tyConArity       = arity,
-              tyConNullaryTy   = mkTyConTy_ tc,
+              tyConNullaryTy   = mkNakedTyConTy tc,
               tcRoles          = replicate arity Representational,
               tyConCType       = Nothing,
               algTcGadtSyntax  = False,
@@ -1962,7 +1962,7 @@ mkTcTyCon name binders res_kind scoped_tvs poly flav
                   , tyConResKind = res_kind
                   , tyConKind    = mkTyConKind binders res_kind
                   , tyConArity   = length binders
-                  , tyConNullaryTy = mkTyConTy_ tc
+                  , tyConNullaryTy = mkNakedTyConTy tc
                   , tcTyConScopedTyVars = scoped_tvs
                   , tcTyConIsPoly       = poly
                   , tcTyConFlavour      = flav }
@@ -2013,7 +2013,7 @@ mkPrimTyCon' name binders res_kind roles is_unlifted rep_nm
               tyConResKind = res_kind,
               tyConKind    = mkTyConKind binders res_kind,
               tyConArity   = length roles,
-              tyConNullaryTy = mkTyConTy_ tc,
+              tyConNullaryTy = mkNakedTyConTy tc,
               tcRoles      = roles,
               isUnlifted   = is_unlifted,
               primRepName  = rep_nm
@@ -2032,7 +2032,7 @@ mkSynonymTyCon name binders res_kind roles rhs is_tau is_fam_free is_forgetful
               tyConResKind   = res_kind,
               tyConKind      = mkTyConKind binders res_kind,
               tyConArity     = length binders,
-              tyConNullaryTy = mkTyConTy_ tc,
+              tyConNullaryTy = mkNakedTyConTy tc,
               tyConTyVars    = binderVars binders,
               tcRoles        = roles,
               synTcRhs       = rhs,
@@ -2055,7 +2055,7 @@ mkFamilyTyCon name binders res_kind resVar flav parent inj
             , tyConResKind = res_kind
             , tyConKind    = mkTyConKind binders res_kind
             , tyConArity   = length binders
-            , tyConNullaryTy = mkTyConTy_ tc
+            , tyConNullaryTy = mkNakedTyConTy tc
             , tyConTyVars  = binderVars binders
             , famTcResVar  = resVar
             , famTcFlav    = flav
@@ -2078,7 +2078,7 @@ mkPromotedDataCon con name rep_name binders res_kind roles rep_info
             tyConUnique   = nameUnique name,
             tyConName     = name,
             tyConArity    = length roles,
-            tyConNullaryTy = mkTyConTy_ tc,
+            tyConNullaryTy = mkNakedTyConTy tc,
             tcRoles       = roles,
             tyConBinders  = binders,
             tyConResKind  = res_kind,
@@ -2468,7 +2468,7 @@ setTcTyConKind :: TyCon -> Kind -> TyCon
 -- kind, so we don't need to update any other fields.
 -- See Note [The Purely Kinded Invariant] in GHC.Tc.Gen.HsType
 setTcTyConKind tc@(TcTyCon {}) kind = let tc' = tc { tyConKind = kind
-                                                   , tyConNullaryTy = mkTyConTy_ tc'
+                                                   , tyConNullaryTy = mkNakedTyConTy tc'
                                                        -- see Note [Sharing nullary TyCons]
                                                    }
                                       in tc'

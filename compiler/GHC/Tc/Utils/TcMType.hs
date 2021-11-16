@@ -506,7 +506,7 @@ inferResultToType (IR { ir_uniq = u, ir_lvl = tc_lvl
                             -- See Note [inferResultToType]
                           ; return ty }
             Nothing -> do { rr  <- newMetaTyVarTyAtLevel tc_lvl runtimeRepTy
-                          ; tau <- newMetaTyVarTyAtLevel tc_lvl (tYPE rr)
+                          ; tau <- newMetaTyVarTyAtLevel tc_lvl (mkTYPEapp rr)
                             -- See Note [TcLevel of ExpType]
                           ; writeMutVar ref (Just tau)
                           ; return tau }
@@ -683,7 +683,7 @@ promoteTcType dest_lvl ty
     promote_it  -- Emit a constraint  (alpha :: TYPE rr) ~ ty
                 -- where alpha and rr are fresh and from level dest_lvl
       = do { rr      <- newMetaTyVarTyAtLevel dest_lvl runtimeRepTy
-           ; prom_ty <- newMetaTyVarTyAtLevel dest_lvl (tYPE rr)
+           ; prom_ty <- newMetaTyVarTyAtLevel dest_lvl (mkTYPEapp rr)
            ; let eq_orig = TypeEqOrigin { uo_actual   = ty
                                         , uo_expected = prom_ty
                                         , uo_thing    = Nothing
@@ -1068,7 +1068,7 @@ newFlexiTyVarTys n kind = replicateM n (newFlexiTyVarTy kind)
 newOpenTypeKind :: TcM TcKind
 newOpenTypeKind
   = do { rr <- newFlexiTyVarTy runtimeRepTy
-       ; return (tYPE rr) }
+       ; return (mkTYPEapp rr) }
 
 -- | Create a tyvar that can be a lifted or unlifted type.
 -- Returns alpha :: TYPE kappa, where both alpha and kappa are fresh
@@ -1086,7 +1086,7 @@ newOpenBoxedTypeKind :: TcM TcKind
 newOpenBoxedTypeKind
   = do { lev <- newFlexiTyVarTy (mkTyConTy levityTyCon)
        ; let rr = mkTyConApp boxedRepDataConTyCon [lev]
-       ; return (tYPE rr) }
+       ; return (mkTYPEapp rr) }
 
 newMetaTyVars :: [TyVar] -> TcM (TCvSubst, [TcTyVar])
 -- Instantiate with META type variables

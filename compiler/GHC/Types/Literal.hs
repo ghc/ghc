@@ -853,7 +853,7 @@ literalType (LitNumber lt _)  = case lt of
 literalType (LitRubbish rep)
   = mkForAllTy a Inferred (mkTyVarTy a)
   where
-    a = mkTemplateKindVar (tYPE rep)
+    a = mkTemplateKindVar (mkTYPEapp rep)
 
 {-
         Comparison

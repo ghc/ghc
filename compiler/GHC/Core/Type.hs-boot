@@ -22,7 +22,7 @@ isRuntimeRepTy :: Type -> Bool
 isLevityTy :: Type -> Bool
 isMultiplicityTy :: Type -> Bool
 isLiftedTypeKind :: Type -> Bool
-tYPE :: Type -> Type
+mkTYPEapp :: Type -> Type
 
 splitTyConApp_maybe :: HasDebugCallStack => Type -> Maybe (TyCon, [Type])
 tyConAppTyCon_maybe :: Type -> Maybe TyCon

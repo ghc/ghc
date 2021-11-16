@@ -6,12 +6,12 @@ interfacePlugin: GHC.Float
 interfacePlugin: GHC.Prim.Ext
 interfacePlugin: System.IO
 typeCheckPlugin (rn)
-interfacePlugin: GHC.Prim
 interfacePlugin: GHC.Types
 interfacePlugin: GHC.Show
 interfacePlugin: GHC.TopHandler
 typeCheckPlugin (tc)
 interfacePlugin: GHC.CString
+interfacePlugin: GHC.Prim
 interfacePlugin: GHC.Num.BigNat
 ==pure.1
 ==fp0.0

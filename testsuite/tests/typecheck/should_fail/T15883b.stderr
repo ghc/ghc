@@ -6,13 +6,13 @@ T15883b.hs:14:1: error:
       These potential instances exist:
         instance Eq SpecConstrAnnotation -- Defined in ‘GHC.Exts’
         instance Eq Ordering -- Defined in ‘GHC.Classes’
-        instance Eq (Foo ('BoxedRep 'Lifted)) -- Defined at T15883b.hs:14:1
+        instance Eq (Foo LiftedRep) -- Defined at T15883b.hs:14:1
         ...plus 24 others
         ...plus four instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the expression: a1 == b1
       In an equation for ‘==’: (==) (MkFoo a1) (MkFoo b1) = ((a1 == b1))
       When typechecking the code for ‘==’
-        in a derived instance for ‘Eq (Foo ('BoxedRep 'Lifted))’:
+        in a derived instance for ‘Eq (Foo LiftedRep)’:
         To see the code I am typechecking, use -ddump-deriv
-      In the instance declaration for ‘Eq (Foo ('BoxedRep 'Lifted))’
+      In the instance declaration for ‘Eq (Foo LiftedRep)’

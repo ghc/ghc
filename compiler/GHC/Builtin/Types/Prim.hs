@@ -46,7 +46,7 @@ module GHC.Builtin.Types.Prim(
         tYPETyCon, tYPETyConName,
 
         -- Kinds
-        tYPE, primRepToRuntimeRep, primRepsToRuntimeRep,
+        mkTYPEapp, primRepToRuntimeRep, primRepsToRuntimeRep,
 
         functionWithMultiplicity,
         funTyCon, funTyConName,
@@ -113,7 +113,7 @@ import GHC.Prelude
 import {-# SOURCE #-} GHC.Builtin.Types
   ( runtimeRepTy, levityTy, unboxedTupleKind, liftedTypeKind
   , boxedRepDataConTyCon, vecRepDataConTyCon, tupleRepDataConTyCon
-  , liftedRepTy, unliftedRepTy
+  , liftedRepTy, unliftedRepTy, zeroBitRepTy
   , intRepDataConTy
   , int8RepDataConTy, int16RepDataConTy, int32RepDataConTy, int64RepDataConTy
   , wordRepDataConTy
@@ -142,7 +142,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Core.TyCo.Rep -- Doesn't need special access, but this is easier to avoid
                          -- import loops which show up if you import Type instead
-import {-# SOURCE #-} GHC.Core.Type ( mkTyConTy, mkTyConApp, tYPE )
+import {-# SOURCE #-} GHC.Core.Type ( mkTyConTy, mkTyConApp, mkTYPEapp )
 
 import Data.Char
 
@@ -400,7 +400,7 @@ alphaTy, betaTy, gammaTy, deltaTy :: Type
 (alphaTy:betaTy:gammaTy:deltaTy:_) = alphaTys
 
 alphaTyVarsUnliftedRep :: [TyVar]
-alphaTyVarsUnliftedRep = mkTemplateTyVars $ repeat (tYPE unliftedRepTy)
+alphaTyVarsUnliftedRep = mkTemplateTyVars $ repeat (mkTYPEapp unliftedRepTy)
 
 alphaTyVarUnliftedRep :: TyVar
 (alphaTyVarUnliftedRep:_) = alphaTyVarsUnliftedRep
@@ -427,7 +427,7 @@ openAlphaTyVar, openBetaTyVar, openGammaTyVar :: TyVar
 -- beta  :: TYPE r2
 -- gamma :: TYPE r3
 [openAlphaTyVar,openBetaTyVar,openGammaTyVar]
-  = mkTemplateTyVars [tYPE runtimeRep1Ty, tYPE runtimeRep2Ty, tYPE runtimeRep3Ty]
+  = mkTemplateTyVars [mkTYPEapp runtimeRep1Ty, mkTYPEapp runtimeRep2Ty, mkTYPEapp runtimeRep3Ty]
 
 openAlphaTyVarSpec, openBetaTyVarSpec, openGammaTyVarSpec :: TyVarBinder
 openAlphaTyVarSpec = mkTyVarBinder Specified openAlphaTyVar
@@ -456,8 +456,8 @@ levity2Ty = mkTyVarTy levity2TyVar
 levPolyAlphaTyVar, levPolyBetaTyVar :: TyVar
 [levPolyAlphaTyVar, levPolyBetaTyVar] =
   mkTemplateTyVars
-    [tYPE (mkTyConApp boxedRepDataConTyCon [levity1Ty])
-    ,tYPE (mkTyConApp boxedRepDataConTyCon [levity2Ty])]
+    [mkTYPEapp (mkTyConApp boxedRepDataConTyCon [levity1Ty])
+    ,mkTYPEapp (mkTyConApp boxedRepDataConTyCon [levity2Ty])]
 -- alpha :: TYPE ('BoxedRep l)
 -- beta  :: TYPE ('BoxedRep k)
 
@@ -513,8 +513,8 @@ funTyCon = mkFunTyCon funTyConName tc_bndrs tc_rep_nm
     tc_bndrs = [ mkNamedTyConBinder Required multiplicityTyVar1
                , mkNamedTyConBinder Inferred runtimeRep1TyVar
                , mkNamedTyConBinder Inferred runtimeRep2TyVar ]
-               ++ mkTemplateAnonTyConBinders [ tYPE runtimeRep1Ty
-                                             , tYPE runtimeRep2Ty
+               ++ mkTemplateAnonTyConBinders [ mkTYPEapp runtimeRep1Ty
+                                             , mkTYPEapp runtimeRep2Ty
                                              ]
     tc_rep_nm = mkPrelTyConRepName funTyConName
 
@@ -651,13 +651,13 @@ pcPrimTyCon name roles rep
   = mkPrimTyCon name binders result_kind roles
   where
     binders     = mkTemplateAnonTyConBinders (map (const liftedTypeKind) roles)
-    result_kind = tYPE (primRepToRuntimeRep rep)
+    result_kind = mkTYPEapp (primRepToRuntimeRep rep)
 
 -- | Convert a 'PrimRep' to a 'Type' of kind RuntimeRep
 -- Defined here to avoid (more) module loops
 primRepToRuntimeRep :: PrimRep -> Type
 primRepToRuntimeRep rep = case rep of
-  VoidRep       -> mkTupleRep []
+  VoidRep       -> zeroBitRepTy
   LiftedRep     -> liftedRepTy
   UnliftedRep   -> unliftedRepTy
   IntRep        -> intRepDataConTy
