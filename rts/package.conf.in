@@ -76,7 +76,7 @@ include-dirs:           TOP"/rts/include"
                         LIBDW_INCLUDE_DIR
 #endif
 
-includes:               Stg.h
+includes:               Rts.h
 cc-options:
 
 ld-options:

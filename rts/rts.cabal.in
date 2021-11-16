@@ -152,7 +152,7 @@ library
     include-dirs: include
                   @FFIIncludeDir@
                   @LibdwIncludeDir@
-    includes: Stg.h
+    includes: Rts.h
     install-includes: Cmm.h HsFFI.h MachDeps.h Rts.h RtsAPI.h Stg.h
                       ghcautoconf.h ghcconfig.h ghcplatform.h ghcversion.h
                       -- ^ from include
