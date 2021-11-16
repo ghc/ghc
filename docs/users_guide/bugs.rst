@@ -188,9 +188,9 @@ eta-expands ``f`` to
     f []     v = error "urk"
     f (x:xs) v = v
 
-This improves efficiency slightly but significantly for most programs,
-and is bad for only a few. To suppress this bogus "optimisation" use
-``-fpedantic-bottoms``.
+For most programs this improves efficiency enough to be enabled
+& bad only in few rare cases.
+To suppress this optimisation use :ghc-flag:`-fpedantic-bottoms`.
 
 .. _infelicities-failable-pats:
 
