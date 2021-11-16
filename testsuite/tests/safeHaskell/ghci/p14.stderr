@@ -1,4 +1,7 @@
 
+when making flags consistent: warning:
+    Optimization flags conflict with --interactive; optimization flags ignored.
+
 <interactive>:10:25: error:
     • No instance for (Num a) arising from a use of ‘f’
       Possible fix: add (Num a) to the context of the RULE "id/Int"

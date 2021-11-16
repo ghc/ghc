@@ -449,7 +449,6 @@ data DynFlags = DynFlags {
     -- configuration lazily. See Note [LLVM Configuration] in "GHC.SysTools".
   llvmOptLevel          :: Int,         -- ^ LLVM optimisation level
   verbosity             :: Int,         -- ^ Verbosity level: see Note [Verbosity levels]
-  optLevel              :: Int,         -- ^ Optimisation level
   debugLevel            :: Int,         -- ^ How much debug information to produce
   simplPhases           :: Int,         -- ^ Number of simplifier phases
   maxSimplIterations    :: Int,         -- ^ Max simplifier iterations
@@ -1093,7 +1092,6 @@ defaultDynFlags mySettings llvmConfig =
         ghcLink                 = LinkBinary,
         backend                 = platformDefaultBackend (sTargetPlatform mySettings),
         verbosity               = 0,
-        optLevel                = 0,
         debugLevel              = 0,
         simplPhases             = 2,
         maxSimplIterations      = 4,
@@ -1779,17 +1777,34 @@ setInteractivePrint f d = d { interactivePrint = Just f}
 -----------------------------------------------------------------------------
 -- Setting the optimisation level
 
-updOptLevel :: Int -> DynFlags -> DynFlags
--- ^ Sets the 'DynFlags' to be appropriate to the optimisation level
-updOptLevel n dfs
-  = dfs2{ optLevel = final_n, llvmOptLevel = final_n }
+updOptLevelChanged :: Int -> DynFlags -> (DynFlags, Bool)
+-- ^ Sets the 'DynFlags' to be appropriate to the optimisation level and signals if any changes took place
+updOptLevelChanged n dfs
+  = (dfs3, changed1 || changed2 || changed3)
   where
    final_n = max 0 (min 2 n)    -- Clamp to 0 <= n <= 2
-   dfs1 = foldr (flip gopt_unset) dfs  remove_gopts
-   dfs2 = foldr (flip gopt_set)   dfs1 extra_gopts
+   (dfs1, changed1) = foldr unset (dfs , False) remove_gopts
+   (dfs2, changed2) = foldr set   (dfs1, False) extra_gopts
+   (dfs3, changed3) = setLlvmOptLevel dfs2
 
    extra_gopts  = [ f | (ns,f) <- optLevelFlags, final_n `elem` ns ]
    remove_gopts = [ f | (ns,f) <- optLevelFlags, final_n `notElem` ns ]
+
+   set f (dfs, changed)
+     | gopt f dfs = (dfs, changed)
+     | otherwise = (gopt_set dfs f, True)
+
+   unset f (dfs, changed)
+     | not (gopt f dfs) = (dfs, changed)
+     | otherwise = (gopt_unset dfs f, True)
+
+   setLlvmOptLevel dfs
+     | llvmOptLevel dfs /= final_n = (dfs{ llvmOptLevel = final_n }, True)
+     | otherwise = (dfs, False)
+
+updOptLevel :: Int -> DynFlags -> DynFlags
+-- ^ Sets the 'DynFlags' to be appropriate to the optimisation level
+updOptLevel n = fst . updOptLevelChanged n
 
 {- **********************************************************************
 %*                                                                      *
@@ -4263,13 +4278,6 @@ setObjBackend l = updM set
 setOptLevel :: Int -> DynFlags -> DynP DynFlags
 setOptLevel n dflags = return (updOptLevel n dflags)
 
-checkOptLevel :: Int -> DynFlags -> Either String DynFlags
-checkOptLevel n dflags
-   | backend dflags == Interpreter && n > 0
-     = Left "-O conflicts with --interactive; -O ignored."
-   | otherwise
-     = Right dflags
-
 setCallerCcFilters :: String -> DynP ()
 setCallerCcFilters arg =
   case parseCallerCcFilter arg of
@@ -4643,8 +4651,11 @@ makeDynFlagsConsistent dflags
    not (gopt Opt_PIC dflags)
     = loop (gopt_set dflags Opt_PIC)
            "Enabling -fPIC as it is always on for this platform"
- | Left err <- checkOptLevel (optLevel dflags) dflags
-    = loop (updOptLevel 0 dflags) err
+
+ | backend dflags == Interpreter
+ , let (dflags', changed) = updOptLevelChanged 0 dflags
+ , changed
+    = loop dflags' "Optimization flags conflict with --interactive; optimization flags ignored."
 
  | LinkInMemory <- ghcLink dflags
  , not (gopt Opt_ExternalInterpreter dflags)

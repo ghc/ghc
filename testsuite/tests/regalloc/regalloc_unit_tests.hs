@@ -212,7 +212,7 @@ testGraphNoSpills logger dflags' path us = do
             let acc n = maybe n (++ n) in
               foldr (\(as, bs) (xs, ys) -> (acc xs as, acc ys bs)) ([], [])
 
-          dflags = dflags' { optLevel = 2 }
+          dflags = updOptLevel 2 dflags'
 
           -- discard irrelevant stats
           extractSRMs x = case x of
