@@ -1,0 +1,26 @@
+
+
+.. _release-9-2-2:
+
+Version 9.2.2
+==============
+
+- A fix for GHC's handling of the XDG Base Directory Specification
+  (:ghc-ticket:`6077`, :ghc-ticket:`20684`, :ghc-ticket:`20669`,
+  :ghc-ticket:`20660`):
+
+  - For the package database previously in `~/.ghc/<arch-ver>`, we
+    will continue to use the old path if it exists. For example, if the
+    `~/.ghc/x86_64-linux-9.4.1` directory exists, GHC will use that for its
+    user package database. If this directory does not exist, we will use
+    `$XDG_DATA_HOME/ghc/x86_64-linux-9.4.1`. This is in order to give tooling like
+    cabal time to migrate
+
+  - For GHCi configuration files previously located in `~/.ghc/` like
+    `ghci.conf` and `ghci_history`, we will first check if they exist in
+    `~/.ghc` and use those if they do. However, we will create new files like
+    `ghci_history` only in `$XDG_DATA_HOME/ghc`. So if you don't have a previous
+    GHC installation which created `~/.ghc/ghci_history`, the history file will be
+    written to `$XDG_DATA_HOME/ghc`. If you already have an older GHC installation which
+    wrote `~/.ghc/ghci_history`, then GHC will continue to write the history to that file.
+
