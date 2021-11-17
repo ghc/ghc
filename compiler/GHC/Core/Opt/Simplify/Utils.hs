@@ -86,6 +86,9 @@ import GHC.Core.Make ( mkCoreApps, mkCoreLams )
 import GHC.Data.TrieMap (elemsTM)
 import GHC.Core.Stats (exprSize)
 import GHC.Utils.Constants (debugIsOn)
+import GHC.Types.Id.Make (voidArgId, voidPrimId)
+import GHC.Types.RepType (isVoidTy)
+import GHC.Builtin.Types (unboxedUnitTy)
 
 {-
 ************************************************************************
@@ -2142,7 +2145,6 @@ prepareAlts scrut case_bndr' alts
              -- i.e. the constructors that can't match the default case
        ; when yes2 $ tick (FillInCaseDefault case_bndr')
        ; when yes3 $ tick (AltMerge case_bndr')
-      --  ; doAlts case_bndr' alts
        ; return (idcs3, alts3) }
 
   | otherwise  -- Not a data type, so nothing interesting happens
@@ -2499,15 +2501,32 @@ doAlts env case_bndr alts_in = do
         -- There are alts to combine, create a join point representing the rhs.
         | (alt1@Alt{alt_bndrs = alt1_bndrs, alt_rhs = alt1_rhs}:_) <- combined_in
         = do
-            let -- Binders the join point might close over.
-                shared_bnds = case_bndr:alt1_bndrs
-                -- FVs of the rhs
-                fvs = exprFreeVars (alt1_rhs)
-                -- Which of the binders do we *actually* close over.
-                used_shared = map (`elemVarSet` fvs) shared_bnds :: [Bool]
+            let --shared_bnds = case_bndr:alt1_bndrs
+                -- -- FVs of the rhs
+                -- fvs = exprFreeVars (alt1_rhs)
+                -- -- Which of the binders do we *actually* close over.
+                -- used_shared = map (`elemVarSet` fvs) shared_bnds :: [Bool]
 
-                rhs_args     = filterByList used_shared shared_bnds
-                alt_args alt = filterByList used_shared (map Var (case_bndr : alt_bndrs alt))
+                -- rhs_args     = filterByList used_shared shared_bnds
+                -- alt_args alt = filterByList used_shared (map Var (case_bndr : alt_bndrs alt))
+                -- shared_rhs_expr = -- pprTraceIt "shared_rhs" $
+                --                   mkCoreLams rhs_args (alt1_rhs)
+                -- arity = length rhs_args
+
+
+                -- Binders the join point might close over.
+                shared_bnds = case_bndr:alt1_bndrs
+
+                -- FVs of the rhs which are the case binder or bound by a constructor.
+            let case_bound_fvs = filter (`elem` shared_bnds) $ exprFreeVarsList (alt1_rhs)
+
+                rhs_args = case_bound_fvs
+                alt_args alt =
+                    let shared_bnds_a = case_bndr:(alt_bndrs alt)
+                        -- This seems a bit expensive.
+                        alt_bound_fvs = filter (`elem` shared_bnds_a) $ exprFreeVarsList (alt_rhs alt)
+                        alt_call_args = alt_bound_fvs
+                    in map Var alt_call_args
                 shared_rhs_expr = -- pprTraceIt "shared_rhs" $
                                   mkCoreLams rhs_args (alt1_rhs)
                 arity = length rhs_args
@@ -2533,7 +2552,7 @@ doAlts env case_bndr alts_in = do
               pprTraceM "combined_alts" ( text "alt_count:" <> ppr (length new_alts) $$
                                           text "alt_size:" <> ppr (exprSize alt1_rhs) $$
                                           text "alt_elim:" <> ppr ((length new_alts - 1) * exprSize alt1_rhs) $$
-                                          text "used_vars:" <> ppr (used_shared) $$
+                                          text "used_vars:" <> ppr (case_bound_fvs) $$
                                           text "alt_args1" <> ppr (alt_args alt1) $$
                                           text "old_rhs:" <> ppr alt1_rhs $$
 
@@ -2559,7 +2578,7 @@ doAlts env case_bndr alts_in = do
 
       -- Adds one alternative to the map
       extendMap :: CoreMap [CoreAlt] -> CoreAlt -> CoreMap [CoreAlt]
-      extendMap m alt = alterTM (mkCoreLams (alt_bndrs alt) (alt_rhs alt)) update m
+      extendMap m alt = alterTM ((alt_rhs alt)) update m
         where update Nothing = Just [alt]
               update (Just cs) = Just (alt:cs)
 

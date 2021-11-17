@@ -45,6 +45,8 @@ import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 
 import GHC.Driver.Session
+import GHC.Utils.Trace
+import GHC.Stack.Types (HasCallStack)
 
 
 -------------------------------------
@@ -74,7 +76,7 @@ lneIdInfo platform id regs
 
 rhsIdInfo :: Id -> LambdaFormInfo -> FCode (CgIdInfo, LocalReg)
 rhsIdInfo id lf_info
-  = do platform <- getPlatform
+  = do platform <- targetPlatform <$> getDynFlags
        reg <- newTemp (gcWord platform)
        return (mkCgIdInfo id lf_info (CmmReg (CmmLocal reg)), reg)
 
@@ -105,9 +107,11 @@ maybeLetNoEscape _other                                      = Nothing
 -- modifying(modifyBindC) and looking up (getCgIdInfo) bindings.
 ---------------------------------------------------------
 
-addBindC :: CgIdInfo -> FCode ()
+addBindC :: HasCallStack => CgIdInfo -> FCode ()
 addBindC stuff_to_bind = do
         binds <- getBinds
+        p <- targetPlatform <$> getDynFlags
+        pprTraceM "addBind" (pdoc p stuff_to_bind <+> traceCallStackDoc)
         setBinds $ extendVarEnv binds (cg_id stuff_to_bind) stuff_to_bind
 
 addBindsC :: [CgIdInfo] -> FCode ()
@@ -120,30 +124,34 @@ addBindsC new_bindings = do
 
 getCgIdInfo :: Id -> FCode CgIdInfo
 getCgIdInfo id
-  = do  { platform <- targetPlatform <$> getDynFlags
-        ; local_binds <- getBinds -- Try local bindings first
-        ; case lookupVarEnv local_binds id of {
-            Just info -> return info ;
-            Nothing   -> do {
+  = do
+      r <- do  { platform <- targetPlatform <$> getDynFlags
+                  ; local_binds <- getBinds -- Try local bindings first
+                  ; case lookupVarEnv local_binds id of {
+                      Just info -> return info ;
+                      Nothing   -> do {
 
-                -- Should be imported; make up a CgIdInfo for it
-          let name = idName id
-        ; if isExternalName name then
-              let ext_lbl
-                      | isBoxedType (idType id)
-                      = mkClosureLabel name $ idCafInfo id
-                      | isUnliftedType (idType id)
-                          -- An unlifted external Id must refer to a top-level
-                          -- string literal. See Note [Bytes label] in "GHC.Cmm.CLabel".
-                      = assert (idType id `eqType` addrPrimTy) $
-                        mkBytesLabel name
-                      | otherwise
-                      = pprPanic "GHC.StgToCmm.Env: label not found" (ppr id <+> dcolon <+> ppr (idType id))
-              in return $
-                  litIdInfo platform id (mkLFImported id) (CmmLabel ext_lbl)
-          else
-              cgLookupPanic id -- Bug
-        }}}
+                          -- Should be imported; make up a CgIdInfo for it
+                    let name = idName id
+                  ; if isExternalName name then
+                        let ext_lbl
+                                | isBoxedType (idType id)
+                                = mkClosureLabel name $ idCafInfo id
+                                | isUnliftedType (idType id)
+                                    -- An unlifted external Id must refer to a top-level
+                                    -- string literal. See Note [Bytes label] in "GHC.Cmm.CLabel".
+                                = assert (idType id `eqType` addrPrimTy) $
+                                  mkBytesLabel name
+                                | otherwise
+                                = pprPanic "GHC.StgToCmm.Env: label not found" (ppr id <+> dcolon <+> ppr (idType id))
+                        in return $
+                            litIdInfo platform id (mkLFImported id) (CmmLabel ext_lbl)
+                    else
+                        cgLookupPanic id -- Bug
+                  }}}
+      p <- targetPlatform <$> getDynFlags
+      pprTraceM "getCgInfo" (ppr id <+> pdoc p r)
+      return r
 
 cgLookupPanic :: Id -> FCode a
 cgLookupPanic id
@@ -160,7 +168,7 @@ cgLookupPanic id
 --        Interface functions for binding and re-binding names
 ------------------------------------------------------------------------
 
-bindToReg :: NonVoid Id -> LambdaFormInfo -> FCode LocalReg
+bindToReg :: HasCallStack => NonVoid Id -> LambdaFormInfo -> FCode LocalReg
 -- Bind an Id to a fresh LocalReg
 bindToReg nvid@(NonVoid id) lf_info
   = do platform <- getPlatform
@@ -168,20 +176,20 @@ bindToReg nvid@(NonVoid id) lf_info
        addBindC (mkCgIdInfo id lf_info (CmmReg (CmmLocal reg)))
        return reg
 
-rebindToReg :: NonVoid Id -> FCode LocalReg
+rebindToReg :: HasCallStack => NonVoid Id -> FCode LocalReg
 -- Like bindToReg, but the Id is already in scope, so
 -- get its LF info from the envt
 rebindToReg nvid@(NonVoid id)
   = do  { info <- getCgIdInfo id
         ; bindToReg nvid (cg_lf info) }
 
-bindArgToReg :: NonVoid Id -> FCode LocalReg
+bindArgToReg :: HasCallStack => NonVoid Id -> FCode LocalReg
 bindArgToReg nvid@(NonVoid id) = bindToReg nvid (mkLFArgument id)
 
-bindArgsToRegs :: [NonVoid Id] -> FCode [LocalReg]
+bindArgsToRegs :: HasCallStack => [NonVoid Id] -> FCode [LocalReg]
 bindArgsToRegs args = mapM bindArgToReg args
 
-idToReg :: Platform -> NonVoid Id -> LocalReg
+idToReg :: HasCallStack => Platform -> NonVoid Id -> LocalReg
 -- Make a register from an Id, typically a function argument,
 -- free variable, or case binder
 --

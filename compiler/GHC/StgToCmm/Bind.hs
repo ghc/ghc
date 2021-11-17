@@ -62,6 +62,7 @@ import GHC.Data.FastString
 import GHC.Data.List.SetOps
 
 import Control.Monad
+import GHC.Utils.Panic.Plain (assert, assertM)
 
 ------------------------------------------------------------------------
 --              Top-level bindings
@@ -479,6 +480,7 @@ closureCodeBody top_lvl bndr cl_info cc [] body fv_details
      lf_info  = closureLFInfo cl_info
      info_tbl = mkCmmInfo cl_info bndr cc
 
+-- A function.
 closureCodeBody top_lvl bndr cl_info cc args@(arg0:_) body fv_details
   = let nv_args = nonVoidIds args
         arity = length args
@@ -539,8 +541,11 @@ closureCodeBody top_lvl bndr cl_info cc args@(arg0:_) body fv_details
 
 -- A function closure pointer may be tagged, so we
 -- must take it into account when accessing the free variables.
-bind_fv :: (NonVoid Id, ByteOff) -> FCode (LocalReg, ByteOff)
-bind_fv (id, off) = do { reg <- rebindToReg id; return (reg, off) }
+bind_fv :: HasCallStack => (NonVoid Id, ByteOff) -> FCode (LocalReg, ByteOff)
+bind_fv (id, off) = do { massertPpr (not (isJoinId (fromNonVoid id)))
+                            (text "Re-Binding join id to register:" <> ppr id $$
+                             text "Is a join point being used inside a thunk?")
+                       ; reg <- rebindToReg id; return (reg, off) }
 
 load_fvs :: LocalReg -> LambdaFormInfo -> [(LocalReg, ByteOff)] -> FCode ()
 load_fvs node lf_info = mapM_ (\ (reg, off) ->

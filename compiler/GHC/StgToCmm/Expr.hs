@@ -56,6 +56,8 @@ import GHC.Utils.Panic.Plain
 import Control.Monad ( unless, void )
 import Control.Arrow ( first )
 import Data.List     ( partition )
+import GHC.Utils.Trace (pprTraceM)
+import GHC.Platform.Profile (Profile(profilePlatform))
 
 ------------------------------------------------------------------------
 --              cgExpr: the main function
@@ -153,12 +155,15 @@ cgLneBinds :: BlockId -> CgStgBinding -> FCode ()
 cgLneBinds join_id (StgNonRec bndr rhs)
   = do  { local_cc <- saveCurrentCostCentre
                 -- See Note [Saving the current cost centre]
+        ; pprTraceM "cgLneBinds" (ppr bndr)
         ; (info, fcode) <- cgLetNoEscapeRhs join_id local_cc bndr rhs
         ; fcode
         ; addBindC info }
 
 cgLneBinds join_id (StgRec pairs)
   = do  { local_cc <- saveCurrentCostCentre
+        ; pprTraceM "cgLneBinds" (ppr $ map fst pairs)
+
         ; r <- sequence $ unzipWith (cgLetNoEscapeRhs join_id local_cc) pairs
         ; let (infos, fcodes) = unzip r
         ; addBindsC infos
@@ -897,6 +902,7 @@ cgIdApp fun_id args = do
         lf_info     = cg_lf         fun_info
         n_args      = length args
         v_args      = length $ filter (isVoidTy . stgArgType) args
+    pprTraceM "fun_info" (ppr fun_id <+> pdoc (profilePlatform profile) fun_info)
     case getCallMethod call_opts fun_name fun_id lf_info n_args v_args (cg_loc fun_info) self_loop_info of
             -- A value in WHNF, so we can just return it.
         ReturnIt

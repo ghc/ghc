@@ -377,8 +377,8 @@ We use the state-token type which generates no code.
 -}
 
 mkWorkerArgs :: Id      -- The wrapper Id
-             -> Bool
-             -> [Var]
+             -> Bool    -- Allows fun-to-thunk
+             -> [Var]   -- Args
              -> Type    -- Type of body
              -> ([Var], -- Lambda bound args
                  [Var]) -- Args at call site

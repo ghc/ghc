@@ -498,9 +498,12 @@ data CallOpts = CallOpts
    , co_ticky         :: !Bool      -- ^ Ticky profiling enabled (cf @-ticky@)
    }
 
+call_platform :: CallOpts -> Platform
+call_platform = profilePlatform . co_profile
+
 getCallMethod :: CallOpts
               -> Name           -- Function being applied
-              -> Id             -- Function Id used to chech if it can refer to
+              -> Id             -- Function Id used to check if it can refer to
                                 -- CAF's and whether the function is tail-calling
                                 -- itself
               -> LambdaFormInfo -- Its info
@@ -587,7 +590,7 @@ getCallMethod _ _name _ LFLetNoEscape _n_args _v_args (LneLoc blk_id lne_regs)
               _self_loop_info
   = JumpToIt blk_id lne_regs
 
-getCallMethod _ _ _ _ _ _ _ _ = panic "Unknown call method"
+getCallMethod opts _ id lf_info _ _ cg_loc _ = pprPanic "Unknown call method" (ppr id <+> ppr lf_info <+> pdoc (call_platform opts) cg_loc)
 
 -----------------------------------------------------------------------------
 --              Data types for closure information

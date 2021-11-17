@@ -3016,8 +3016,6 @@ simplAlts env0 scrut case_bndr alts cont'
         ; alts' <- mapM (simplAlt alt_env' (Just scrut') imposs_deflt_cons case_bndr' cont') in_alts
         ; -- pprTrace "simplAlts" (ppr case_bndr $$ ppr alts_ty $$ ppr alts_ty' $$ ppr alts $$ ppr cont') $
 
-        -- ; (alt_floats,alts'') <- doAlts alt_env' case_bndr' alts'
-
         ; let alts_ty' = contResultType cont'
 
         ; final_case <- mkCase (seDynFlags env0) alt_env' scrut' case_bndr' alts_ty' alts'
