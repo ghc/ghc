@@ -306,6 +306,7 @@ tidyCoAxBndrsForUser init_env tcvs
 coToMCo :: Coercion -> MCoercion
 -- Convert a coercion to a MCoercion,
 -- It's not clear whether or not isReflexiveCo would be better here
+--    See #19815 for a bit of data and dicussion on this point
 coToMCo co | isReflCo co = MRefl
            | otherwise   = MCo co
 
