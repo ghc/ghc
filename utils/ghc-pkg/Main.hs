@@ -58,7 +58,7 @@ import Distribution.Simple.Utils (toUTF8BS, writeUTF8File, readUTF8File)
 import qualified Data.Version as Version
 import System.FilePath as FilePath
 import qualified System.FilePath.Posix as FilePath.Posix
-import System.Directory ( getXdgDirectory, createDirectoryIfMissing,
+import System.Directory ( getXdgDirectory, createDirectoryIfMissing, getAppUserDataDirectory,
                           getModificationTime, XdgDirectory ( XdgData ) )
 import Text.Printf
 
@@ -636,38 +636,56 @@ getPkgDatabases verbosity mode use_user use_cache expand_vars my_flags = do
 
   -- get the location of the user package database, and create it if necessary
   -- getXdgDirectory can fail (e.g. if $HOME isn't set)
-  e_appdir <- tryIO $ getXdgDirectory XdgData "ghc"
 
   mb_user_conf <-
     case [ f | FlagUserConfig f <- my_flags ] of
       _ | no_user_db -> return Nothing
-      [] -> case e_appdir of
-        Left _    -> return Nothing
-        Right appdir -> do
-          -- See Note [Settings File] about this file, and why we need GHC to share it with us.
-          let settingsFile = top_dir </> "settings"
-          exists_settings_file <- doesFileExist settingsFile
-          targetArchOS <- case exists_settings_file of
-            False -> do
-              warn $ "WARNING: settings file doesn't exist " ++ show settingsFile
-              warn "cannot know target platform so guessing target == host (native compiler)."
-              pure hostPlatformArchOS
-            True -> do
-              settingsStr <- readFile settingsFile
-              mySettings <- case maybeReadFuzzy settingsStr of
-                Just s -> pure $ Map.fromList s
-                -- It's excusable to not have a settings file (for now at
-                -- least) but completely inexcusable to have a malformed one.
-                Nothing -> die $ "Can't parse settings file " ++ show settingsFile
-              case getTargetArchOS settingsFile mySettings of
-                Right archOS -> pure archOS
-                Left e -> die e
-          let subdir = uniqueSubdir targetArchOS
-              dir = appdir </> subdir
-          r <- lookForPackageDBIn dir
-          case r of
-            Nothing -> return (Just (dir </> "package.conf.d", False))
-            Just f  -> return (Just (f, True))
+      [] -> do
+        -- See Note [Settings File] about this file, and why we need GHC to share it with us.
+        let settingsFile = top_dir </> "settings"
+        exists_settings_file <- doesFileExist settingsFile
+        targetArchOS <- case exists_settings_file of
+          False -> do
+            warn $ "WARNING: settings file doesn't exist " ++ show settingsFile
+            warn "cannot know target platform so guessing target == host (native compiler)."
+            pure hostPlatformArchOS
+          True -> do
+            settingsStr <- readFile settingsFile
+            mySettings <- case maybeReadFuzzy settingsStr of
+              Just s -> pure $ Map.fromList s
+              -- It's excusable to not have a settings file (for now at
+              -- least) but completely inexcusable to have a malformed one.
+              Nothing -> die $ "Can't parse settings file " ++ show settingsFile
+            case getTargetArchOS settingsFile mySettings of
+              Right archOS -> pure archOS
+              Left e -> die e
+        let subdir = uniqueSubdir targetArchOS
+
+            getFirstSuccess :: [IO a] -> IO (Maybe a)
+            getFirstSuccess [] = pure Nothing
+            getFirstSuccess (a:as) = tryIO a >>= \case
+              Left _ -> getFirstSuccess as
+              Right d -> pure (Just d)
+        -- The appdir used to be in ~/.ghc but to respect the XDG specification
+        -- we want to move it under $XDG_DATA_HOME/
+        -- However, old tooling (like cabal) might still write package environments
+        -- to the old directory, so we prefer that if a subdirectory of ~/.ghc
+        -- with the correct target and GHC version exists.
+        --
+        -- i.e. if ~/.ghc/$UNIQUE_SUBDIR exists we prefer that
+        -- otherwise we use $XDG_DATA_HOME/$UNIQUE_SUBDIR
+        --
+        -- UNIQUE_SUBDIR is typically a combination of the target platform and GHC version
+        m_appdir <- getFirstSuccess $ map (fmap (</> subdir))
+          [ getAppUserDataDirectory "ghc"  -- this is ~/.ghc/
+          , getXdgDirectory XdgData "ghc"  -- this is $XDG_DATA_HOME/
+          ]
+        case m_appdir of
+          Nothing -> return Nothing
+          Just dir -> do
+            lookForPackageDBIn dir >>= \case
+              Nothing -> return (Just (dir </> "package.conf.d", False))
+              Just f  -> return (Just (f, True))
       fs -> return (Just (last fs, True))
 
   -- If the user database exists, and for "use_user" commands (which includes

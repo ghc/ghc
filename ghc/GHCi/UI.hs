@@ -619,28 +619,30 @@ ghciLogAction lastErrLocations old_log_action
             _ -> return ()
         _ -> return ()
 
-withGhcAppData :: (FilePath -> IO a) -> IO a -> IO a
-withGhcAppData right left = do
-    either_dir <- tryIO (getXdgDirectory XdgData "ghc")
-    case either_dir of
-        Right dir ->
-            do createDirectoryIfMissing False dir `catchIO` \_ -> return ()
-               right dir
-        _ -> left
+-- | Takes a file name and prefixes it with the appropriate
+-- GHC appdir.
+-- Uses ~/.ghc (getAppUserDataDirectory) if it exists
+-- If it doesn't, then it uses $XDG_DATA_HOME/ghc
+-- Earlier we always used to use ~/.ghc, but we want
+-- to gradually move to $XDG_DATA_HOME to respect the XDG specification
+--
+-- As a migration strategy, we will only create new directories in
+-- the appropriate XDG location. However, we will use the old directory
+-- if it already exists.
+getAppDataFile :: FilePath -> IO (Maybe FilePath)
+getAppDataFile file = do
+    let new_path = tryIO (getXdgDirectory XdgConfig "ghc") >>= \case
+          Left _ -> pure Nothing
+          Right dir -> flip catchIO (const $ return Nothing) $ do
+            createDirectoryIfMissing False dir
+            pure $ Just $ dir </> file
 
-withGhcConfig :: (FilePath -> IO a) -> IO a -> IO a
-withGhcConfig right left = do
-    old_path <- getAppUserDataDirectory "ghc"
-    use_old_path <- doesPathExist old_path
-    let path = (if use_old_path
-                 then getAppUserDataDirectory "ghc"
-                 else getXdgDirectory XdgConfig "ghc")
-    either_dir <- tryIO (path)
-    case either_dir of
-        Right dir ->
-            do createDirectoryIfMissing False dir `catchIO` \_ -> return ()
-               right dir
-        _ -> left
+    e_old_path <- tryIO (getAppUserDataDirectory "ghc")
+    case e_old_path of
+      Right old_path -> doesDirectoryExist old_path >>= \case
+        True -> pure $ Just $ old_path </> file
+        False -> new_path
+      Left _ -> new_path
 
 runGHCi :: [(FilePath, Maybe UnitId, Maybe Phase)] -> Maybe [String] -> GHCi ()
 runGHCi paths maybe_exprs = do
@@ -648,9 +650,7 @@ runGHCi paths maybe_exprs = do
   let
    ignore_dot_ghci = gopt Opt_IgnoreDotGhci dflags
 
-   app_user_dir = liftIO $ withGhcConfig
-                    (\dir -> return (Just (dir </> "ghci.conf")))
-                    (return Nothing)
+   app_user_dir = liftIO $ getAppDataFile "ghci.conf"
 
    home_dir = do
     either_dir <- liftIO $ tryIO (getEnv "HOME")
@@ -781,8 +781,7 @@ runGHCiInput f = do
 
     histFile <- case (ghciHistory, localGhciHistory) of
       (True, True) -> return (Just (currentDirectory </> ".ghci_history"))
-      (True, _) -> liftIO $ withGhcAppData
-        (\dir -> return (Just (dir </> "ghci_history"))) (return Nothing)
+      (True, _) -> liftIO $ getAppDataFile "ghci_history"
       _ -> return Nothing
 
     runInputT
