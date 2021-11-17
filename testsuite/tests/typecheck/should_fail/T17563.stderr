@@ -1,7 +1,6 @@
 
-T17563.hs:6:9: error:
-    • Illegal equational constraint a b ~ a c
-    • In the quantified constraint ‘forall (a :: * -> *). a b ~ a c’
-      In the type signature: blah :: (forall a. a b ~ a c) => b -> c
-    Suggested fix:
-      Enable any of the following extensions: GADTs, TypeFamilies
+T17563.hs:8:9: error:
+    • Non type-variable argument in the constraint: Num (T a x)
+    • In the quantified constraint ‘forall x. Num (T a x)’
+      In the type signature: blah :: (forall x. Num (T a x)) => T a b
+    Suggested fix: Perhaps you intended to use FlexibleContexts

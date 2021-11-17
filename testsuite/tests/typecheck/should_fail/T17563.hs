@@ -3,5 +3,7 @@
 
 module T17563 where
 
-blah :: (forall a. a b ~ a c) => b -> c
-blah = undefined
+data T a b
+
+blah :: (forall x. Num (T a x)) => T a b
+blah = 0
