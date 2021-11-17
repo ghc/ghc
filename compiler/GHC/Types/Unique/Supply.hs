@@ -24,11 +24,12 @@ module GHC.Types.Unique.Supply (
         UniqSM, MonadUnique(..),
 
         -- ** Operations on the monad
-        initUs, initUs_,
+        initUs, initUs_, runUniqSMIO,
 
         -- * Set supply strategy
         initUniqSupply
-  ) where
+        )
+  where
 
 import GHC.Prelude
 
@@ -220,6 +221,11 @@ mkSplitUniqSupply c
         case unIO (unsafeDupableInterleaveIO (IO mk_supply)) s3 of { (# s4, y #) ->
         (# s4, MkSplitUniqSupply (mask .|. u) x y #)
         }}}}
+
+runUniqSMIO :: UniqSM a -> IO a
+runUniqSMIO m = do
+  us <- mkSplitUniqSupply 'u'
+  return (initUs_ us m)
 
 #if !MIN_VERSION_GLASGOW_HASKELL(9,1,0,0)
 foreign import ccall unsafe "genSym" genSym :: IO Int

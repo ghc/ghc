@@ -84,7 +84,7 @@ cpsTop logger platform dflags proc =
 
       ----------- Implement switches ------------------------------------------
       g <- {-# SCC "createSwitchPlans" #-}
-           runUniqSM $ cmmImplementSwitchPlans (backend dflags) platform g
+           runUniqSMIO $ cmmImplementSwitchPlans (backend dflags) platform g
       dump Opt_D_dump_cmm_switch "Post switch plan" g
 
       ----------- Proc points -------------------------------------------------
@@ -94,7 +94,7 @@ cpsTop logger platform dflags proc =
       proc_points <-
          if splitting_proc_points
             then do
-              pp <- {-# SCC "minimalProcPointSet" #-} runUniqSM $
+              pp <- {-# SCC "minimalProcPointSet" #-} runUniqSMIO $
                  minimalProcPointSet platform call_pps g
               dumpWith logger Opt_D_dump_cmm_proc "Proc points"
                     FormatCMM (pdoc platform l $$ ppr pp $$ pdoc platform g)
@@ -106,7 +106,7 @@ cpsTop logger platform dflags proc =
       (g, stackmaps) <-
            {-# SCC "layoutStack" #-}
            if do_layout
-              then runUniqSM $ cmmLayoutStack dflags proc_points entry_off g
+              then runUniqSMIO $ cmmLayoutStack dflags proc_points entry_off g
               else return (g, mapEmpty)
       dump Opt_D_dump_cmm_sp "Layout Stack" g
 
@@ -126,7 +126,7 @@ cpsTop logger platform dflags proc =
                           procPointAnalysis proc_points g
              dumpWith logger Opt_D_dump_cmm_procmap "procpoint map"
                 FormatCMM (ppr pp_map)
-             g <- {-# SCC "splitAtProcPoints" #-} runUniqSM $
+             g <- {-# SCC "splitAtProcPoints" #-} runUniqSMIO $
                   splitAtProcPoints platform l call_pps proc_points pp_map
                                     (CmmProc h l v g)
              dumps Opt_D_dump_cmm_split "Post splitting" g
@@ -340,12 +340,6 @@ removing them is good because it might save time in the native code
 generator later.
 
 -}
-
-runUniqSM :: UniqSM a -> IO a
-runUniqSM m = do
-  us <- mkSplitUniqSupply 'u'
-  return (initUs_ us m)
-
 
 dumpGraph :: Logger -> Platform -> DynFlags -> DumpFlag -> String -> CmmGraph -> IO ()
 dumpGraph logger platform dflags flag name g = do
