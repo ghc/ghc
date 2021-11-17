@@ -719,8 +719,8 @@ hsunitModuleGraph unit = do
 
     --  1. Create a HsSrcFile/HsigFile summary for every
     --  explicitly mentioned module/signature.
-    let get_decl (L _ (DeclD hsc_src lmodname mb_hsmod)) =
-          Just `fmap` summariseDecl pn hsc_src lmodname mb_hsmod
+    let get_decl (L _ (DeclD hsc_src lmodname hsmod)) =
+          Just `fmap` summariseDecl pn hsc_src lmodname hsmod
         get_decl _ = return Nothing
     nodes <- catMaybes `fmap` mapM get_decl decls
 
@@ -806,23 +806,9 @@ summariseRequirement pn mod_name = do
 summariseDecl :: PackageName
               -> HscSource
               -> Located ModuleName
-              -> Maybe (Located HsModule)
+              -> Located HsModule
               -> BkpM ExtendedModSummary
-summariseDecl pn hsc_src (L _ modname) (Just hsmod) = hsModuleToModSummary pn hsc_src modname hsmod
-summariseDecl _pn hsc_src lmodname@(L loc modname) Nothing
-    = do hsc_env <- getSession
-         -- TODO: this looks for modules in the wrong place
-         r <- liftIO $ summariseModule hsc_env
-                         emptyModNodeMap -- GHC API recomp not supported
-                         (hscSourceToIsBoot hsc_src)
-                         lmodname
-                         Nothing -- GHC API buffer support not supported
-                         [] -- No exclusions
-         case r of
-            Nothing -> throwOneError $ fmap GhcDriverMessage
-                                     $ mkPlainErrorMsgEnvelope loc (DriverBackpackModuleNotFound modname)
-            Just (Left err) -> throwErrors (fmap GhcDriverMessage err)
-            Just (Right summary) -> return summary
+summariseDecl pn hsc_src (L _ modname) hsmod = hsModuleToModSummary pn hsc_src modname hsmod
 
 -- | Up until now, GHC has assumed a single compilation target per source file.
 -- Backpack files with inline modules break this model, since a single file
