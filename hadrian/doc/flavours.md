@@ -3,7 +3,12 @@
 Hadrian supports a few predefined _build flavours_, i.e. collections of build
 settings that fully define a GHC build (see `src/Flavour.hs`). Users can add their
 own build flavours if need be, as described
-[here](https://gitlab.haskell.org/ghc/ghc/blob/master/hadrian/doc/user-settings.md#build-flavour).
+[here](https://gitlab.haskell.org/ghc/ghc/blob/master/hadrian/doc/user-settings.md#build-flavour) or modify existing flavours using the flavour transformers notion seem below.
+
+The flavour to be used for a build root can be specified on the command-line
+via the `--flavour` flag. Moreover, this flavour name is saved in the build
+root; future invocations of Hadrian without a `--flavour` flag will default to
+the last-used flavour.
 
 ## Arguments
 
