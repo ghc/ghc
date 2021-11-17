@@ -663,14 +663,14 @@ relocateSection(ObjectCode* oc, int curSection)
         int relocLenBytes;
         int nextInstrAdj = 0;
 
-        IF_DEBUG(linker, debugBelch("relocateSection: relocation %d\n", i));
-        IF_DEBUG(linker, debugBelch("               : type      = %d\n", reloc->r_type));
-        IF_DEBUG(linker, debugBelch("               : address   = %d\n", reloc->r_address));
-        IF_DEBUG(linker, debugBelch("               : symbolnum = %u\n", reloc->r_symbolnum));
-        IF_DEBUG(linker, debugBelch("               : pcrel     = %d\n", reloc->r_pcrel));
-        IF_DEBUG(linker, debugBelch("               : length    = %d\n", reloc->r_length));
-        IF_DEBUG(linker, debugBelch("               : extern    = %d\n", reloc->r_extern));
-        IF_DEBUG(linker, debugBelch("               : type      = %d\n", reloc->r_type));
+        IF_DEBUG(linker_verbose, debugBelch("relocateSection: relocation %d\n", i));
+        IF_DEBUG(linker_verbose, debugBelch("               : type      = %d\n", reloc->r_type));
+        IF_DEBUG(linker_verbose, debugBelch("               : address   = %d\n", reloc->r_address));
+        IF_DEBUG(linker_verbose, debugBelch("               : symbolnum = %u\n", reloc->r_symbolnum));
+        IF_DEBUG(linker_verbose, debugBelch("               : pcrel     = %d\n", reloc->r_pcrel));
+        IF_DEBUG(linker_verbose, debugBelch("               : length    = %d\n", reloc->r_length));
+        IF_DEBUG(linker_verbose, debugBelch("               : extern    = %d\n", reloc->r_extern));
+        IF_DEBUG(linker_verbose, debugBelch("               : type      = %d\n", reloc->r_type));
 
         switch(reloc->r_length)
         {
@@ -714,7 +714,7 @@ relocateSection(ObjectCode* oc, int curSection)
 
 
 
-        IF_DEBUG(linker,
+        IF_DEBUG(linker_verbose,
                  debugBelch("relocateSection: length = %d, thing = %" PRId64 ", baseValue = %p\n",
                             reloc->r_length, thing, (char *)baseValue));
 
@@ -725,7 +725,7 @@ relocateSection(ObjectCode* oc, int curSection)
             SymbolName* nm = symbol->name;
             SymbolAddr* addr = NULL;
 
-            IF_DEBUG(linker, debugBelch("relocateSection: making jump island for %s, extern = %d, X86_64_RELOC_GOT\n",
+            IF_DEBUG(linker_verbose, debugBelch("relocateSection: making jump island for %s, extern = %d, X86_64_RELOC_GOT\n",
                                         nm, reloc->r_extern));
 
             if (reloc->r_extern == 0) {
@@ -739,9 +739,10 @@ relocateSection(ObjectCode* oc, int curSection)
                     // to resolve it.
 
                     addr = lookupDependentSymbol(nm, oc);
-                    IF_DEBUG(linker, debugBelch("relocateSection: looked up %s, "
-                                                "external X86_64_RELOC_GOT or X86_64_RELOC_GOT_LOAD\n"
-                                                "               : addr = %p\n", nm, addr));
+                    IF_DEBUG(linker_verbose,
+                             debugBelch("relocateSection: looked up %s, "
+                                        "external X86_64_RELOC_GOT or X86_64_RELOC_GOT_LOAD\n"
+                                        "               : addr = %p\n", nm, addr));
 
                     if (addr == NULL) {
                             errorBelch("\nlookupSymbol failed in relocateSection (RELOC_GOT)\n"
@@ -749,7 +750,7 @@ relocateSection(ObjectCode* oc, int curSection)
                             return 0;
                     }
             } else {
-                    IF_DEBUG(linker, debugBelch("relocateSection: %s is not an exported symbol\n", nm));
+                    IF_DEBUG(linker_verbose, debugBelch("relocateSection: %s is not an exported symbol\n", nm));
 
                     // The symbol is not exported, or defined in another
                     // module, so it must be in the current object module,
@@ -764,9 +765,11 @@ relocateSection(ObjectCode* oc, int curSection)
 
                         addr = symbol->addr;
 
-                        IF_DEBUG(linker, debugBelch("relocateSection: calculated relocation of "
-                                                    "non-external X86_64_RELOC_GOT or X86_64_RELOC_GOT_LOAD\n"));
-                        IF_DEBUG(linker, debugBelch("               : addr = %p\n", addr));
+                        IF_DEBUG(linker_verbose,
+                                 debugBelch("relocateSection: calculated relocation of "
+                                            "non-external X86_64_RELOC_GOT or X86_64_RELOC_GOT_LOAD\n"));
+                        IF_DEBUG(linker_verbose,
+                                 debugBelch("               : addr = %p\n", addr));
                     } else {
                         errorBelch("\nrelocateSection: %s is not exported,"
                                    " and should be defined in a section, but isn't!\n", nm);
@@ -786,17 +789,18 @@ relocateSection(ObjectCode* oc, int curSection)
             SymbolName* nm = symbol->name;
             SymbolAddr* addr = NULL;
 
-            IF_DEBUG(linker, debugBelch("relocateSection: looking up external symbol %s\n", nm));
-            IF_DEBUG(linker, debugBelch("               : type  = %d\n", symbol->nlist->n_type));
-            IF_DEBUG(linker, debugBelch("               : sect  = %d\n", symbol->nlist->n_sect));
-            IF_DEBUG(linker, debugBelch("               : desc  = %d\n", symbol->nlist->n_desc));
-            IF_DEBUG(linker, debugBelch("               : value = %p\n", (void *)symbol->nlist->n_value));
+            IF_DEBUG(linker_verbose, debugBelch("relocateSection: looking up external symbol %s\n", nm));
+            IF_DEBUG(linker_verbose, debugBelch("               : type  = %d\n", symbol->nlist->n_type));
+            IF_DEBUG(linker_verbose, debugBelch("               : sect  = %d\n", symbol->nlist->n_sect));
+            IF_DEBUG(linker_verbose, debugBelch("               : desc  = %d\n", symbol->nlist->n_desc));
+            IF_DEBUG(linker_verbose, debugBelch("               : value = %p\n", (void *)symbol->nlist->n_value));
 
             if ((symbol->nlist->n_type & N_TYPE) == N_SECT) {
                 CHECK(symbol->addr != NULL);
                 value = (uint64_t) symbol->addr;
-                IF_DEBUG(linker, debugBelch("relocateSection, defined external symbol %s, relocated address %p\n",
-                                            nm, (void *)value));
+                IF_DEBUG(linker_verbose,
+                         debugBelch("relocateSection, defined external symbol %s, relocated address %p\n",
+                                    nm, (void *)value));
             }
             else {
                 addr = lookupDependentSymbol(nm, oc);
@@ -808,7 +812,9 @@ relocateSection(ObjectCode* oc, int curSection)
                 }
 
                 value = (uint64_t) addr;
-                IF_DEBUG(linker, debugBelch("relocateSection: external symbol %s, address %p\n", nm, (void *)value));
+                IF_DEBUG(linker_verbose,
+                         debugBelch("relocateSection: external symbol %s, address %p\n",
+                                    nm, (void *)value));
             }
         }
         else
@@ -832,7 +838,7 @@ relocateSection(ObjectCode* oc, int curSection)
             Section * targetSec = &oc->sections[targetSecNum];
             MachOSection * targetMacho = targetSec->info->macho_section;
 
-            IF_DEBUG(linker,
+            IF_DEBUG(linker_verbose,
                      debugBelch("relocateSection: internal relocation relative to section %d (%s, %s)\n",
                                 targetSecNum, targetMacho->segname, targetMacho->sectname));
 
@@ -843,13 +849,15 @@ relocateSection(ObjectCode* oc, int curSection)
                        thing, (uint64_t) targetMacho->addr);
 
                 uint64_t thingRelativeOffset = thing - targetMacho->addr;
-                IF_DEBUG(linker, debugBelch("                 "
-                                            "unsigned displacement %" PRIx64 " with section relative offset %" PRIx64 "\n",
+                IF_DEBUG(linker_verbose,
+                         debugBelch("                 "
+                                    "unsigned displacement %" PRIx64 " with section relative offset %" PRIx64 "\n",
                                             thing, thingRelativeOffset));
 
                 thing = (uint64_t) targetSec->start + thingRelativeOffset;
-                IF_DEBUG(linker, debugBelch("                 "
-                                            "relocated address is %p\n", (void *) thing));
+                IF_DEBUG(linker_verbose,
+                         debugBelch("                 "
+                                    "relocated address is %p\n", (void *) thing));
 
                 /* Compared to external relocation we don't need to adjust value
                  * any further since thing already has absolute address.
@@ -869,7 +877,7 @@ relocateSection(ObjectCode* oc, int curSection)
                        (void *) imThingLoc, (void *) targetMacho->addr);
 
                 int64_t thingRelativeOffset = imThingLoc - targetMacho->addr;
-                IF_DEBUG(linker,
+                IF_DEBUG(linker_verbose,
                      debugBelch("                 "
                                 "original displacement %" PRId64 " to %p with section relative offset %" PRIu64 "\n",
                                 thing, (void *) imThingLoc, thingRelativeOffset));
@@ -877,7 +885,7 @@ relocateSection(ObjectCode* oc, int curSection)
                 thing = (int64_t) ((uint64_t) targetSec->start + thingRelativeOffset)
                                 - ((uint64_t) sect->start + baseValueOffset);
                 value = baseValue; // so that it further cancels out with baseValue
-                IF_DEBUG(linker,
+                IF_DEBUG(linker_verbose,
                          debugBelch("                 "
                                     "relocated displacement %" PRId64 " to %p\n",
                                     (int64_t) thing, (void *) (baseValue + thing)));
@@ -889,7 +897,7 @@ relocateSection(ObjectCode* oc, int curSection)
             }
         }
 
-        IF_DEBUG(linker, debugBelch("relocateSection: value = %p\n", (void *) value));
+        IF_DEBUG(linker_verbose, debugBelch("relocateSection: value = %p\n", (void *) value));
 
         if (type == X86_64_RELOC_BRANCH)
         {
@@ -924,7 +932,7 @@ relocateSection(ObjectCode* oc, int curSection)
                 barf("unknown relocation");
         }
 
-        IF_DEBUG(linker, debugBelch("relocateSection: thing = %p\n", (void *) thing));
+        IF_DEBUG(linker_verbose, debugBelch("relocateSection: thing = %p\n", (void *) thing));
 
         /* Thing points to memory within one of the relocated sections. We can
          * probe the first byte to sanity check internal relocations.
@@ -1326,7 +1334,7 @@ ocGetNames_MachO(ObjectCode* oc)
             SymbolName* nm = oc->info->macho_symbols[i].name;
             if (oc->info->nlist[i].n_type & N_STAB)
             {
-                IF_DEBUG(linker, debugBelch("ocGetNames_MachO: Skip STAB: %s\n", nm));
+                IF_DEBUG(linker_verbose, debugBelch("ocGetNames_MachO: Skip STAB: %s\n", nm));
             }
             else if ((oc->info->nlist[i].n_type & N_TYPE) == N_SECT)
             {
@@ -1335,11 +1343,11 @@ ocGetNames_MachO(ObjectCode* oc)
                     if (   (oc->info->nlist[i].n_desc & N_WEAK_DEF)
                         && lookupDependentSymbol(nm, oc)) {
                         // weak definition, and we already have a definition
-                        IF_DEBUG(linker, debugBelch("    weak: %s\n", nm));
+                        IF_DEBUG(linker_verbose, debugBelch("    weak: %s\n", nm));
                     }
                     else
                     {
-                            IF_DEBUG(linker, debugBelch("ocGetNames_MachO: inserting %s\n", nm));
+                            IF_DEBUG(linker_verbose, debugBelch("ocGetNames_MachO: inserting %s\n", nm));
                             SymbolAddr* addr = oc->info->macho_symbols[i].addr;
 
                             ghciInsertSymbolTable( oc->fileName
@@ -1356,12 +1364,12 @@ ocGetNames_MachO(ObjectCode* oc)
                 }
                 else
                 {
-                    IF_DEBUG(linker, debugBelch("ocGetNames_MachO: \t...not external, skipping %s\n", nm));
+                    IF_DEBUG(linker_verbose, debugBelch("ocGetNames_MachO: \t...not external, skipping %s\n", nm));
                 }
             }
             else
             {
-                IF_DEBUG(linker, debugBelch("ocGetNames_MachO: \t...not defined in this section, skipping %s\n", nm));
+                IF_DEBUG(linker_verbose, debugBelch("ocGetNames_MachO: \t...not defined in this section, skipping %s\n", nm));
             }
         }
     }
@@ -1384,7 +1392,7 @@ ocGetNames_MachO(ObjectCode* oc)
                 /* also set the final address to the macho_symbol */
                 oc->info->macho_symbols[i].addr = (void*)commonCounter;
 
-                IF_DEBUG(linker, debugBelch("ocGetNames_MachO: inserting common symbol: %s\n", nm));
+                IF_DEBUG(linker_verbose, debugBelch("ocGetNames_MachO: inserting common symbol: %s\n", nm));
                 ghciInsertSymbolTable(oc->fileName, symhash, nm,
                                        (void*)commonCounter, HS_BOOL_FALSE, oc);
                 oc->symbols[curSymbol].name = nm;

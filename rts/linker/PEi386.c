@@ -1689,7 +1689,7 @@ ocGetNames_PEi386 ( ObjectCode* oc )
             Allocate zeroed space for it from the BSS section */
           addr = bss;
           bss = (SymbolAddr*)((StgWord)bss + (StgWord)symValue);
-          IF_DEBUG(linker, debugBelch("bss symbol @ %p %u\n", addr, symValue));
+          IF_DEBUG(linker_verbose, debugBelch("bss symbol @ %p %u\n", addr, symValue));
       }
       else if (secNumber > 0
                && section
@@ -1708,7 +1708,7 @@ ocGetNames_PEi386 ( ObjectCode* oc )
           sym   = &oc->info->symbols[oc->n_symbols-1];
           sname = get_sym_name (getSymShortName (info, sym), oc);
 
-          IF_DEBUG(linker,
+          IF_DEBUG(linker_verbose,
                    debugBelch("loading symbol `%s' from dll: '%ls' => `%s'\n",
                               sname, oc->fileName, dllName));
 
@@ -1761,7 +1761,7 @@ ocGetNames_PEi386 ( ObjectCode* oc )
          && (!section || (section && section->kind != SECTIONKIND_IMPORT))) {
          /* debugBelch("addSymbol %p `%s' Weak:%lld \n", addr, sname, isWeak); */
          sname = strdup (sname);
-         IF_DEBUG(linker, debugBelch("addSymbol %p `%s'\n", addr, sname));
+         IF_DEBUG(linker_verbose, debugBelch("addSymbol %p `%s'\n", addr, sname));
          ASSERT(i < (uint32_t)oc->n_symbols);
          oc->symbols[i].name = sname;
          oc->symbols[i].addr = addr;
@@ -1869,7 +1869,7 @@ ocResolve_PEi386 ( ObjectCode* oc )
          uint64_t symIndex = reloc->SymbolTableIndex;
          sym = &oc->info->symbols[symIndex];
 
-         IF_DEBUG(linker,
+         IF_DEBUG(linker_verbose,
                   debugBelch(
                             "reloc sec %2d num %3d:  type 0x%-4x   "
                             "vaddr 0x%-8lx   name `",
