@@ -11,6 +11,7 @@
 #include "Rts.h"
 
 #include "GC.h"
+#include "CheckUnload.h"
 #include "Storage.h"
 #include "Compact.h"
 #include "Task.h"
@@ -145,20 +146,26 @@ revertCAFs( void )
 void
 markCAFs (evac_fn evac, void *user)
 {
-    StgIndStatic *c;
-
-    for (c = dyn_caf_list;
+    /* N.B. We must both ensure that the indirectee is
+     * evacuated and that we let the linker know that the CAF
+     * itself is still reachable, lest it be collected (see
+     * #20649).
+     */
+    for (StgIndStatic *c = dyn_caf_list;
          ((StgWord) c | STATIC_FLAG_LIST) != (StgWord)END_OF_CAF_LIST;
          c = (StgIndStatic *)c->static_link)
     {
         c = (StgIndStatic *)UNTAG_STATIC_LIST_PTR(c);
         evac(user, &c->indirectee);
+        markObjectCode(c);
     }
-    for (c = revertible_caf_list;
+
+    for (StgIndStatic *c = revertible_caf_list;
          ((StgWord) c | STATIC_FLAG_LIST) != (StgWord)END_OF_CAF_LIST;
          c = (StgIndStatic *)c->static_link)
     {
         c = (StgIndStatic *)UNTAG_STATIC_LIST_PTR(c);
         evac(user, &c->indirectee);
+        markObjectCode(c);
     }
 }
