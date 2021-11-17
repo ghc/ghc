@@ -2466,7 +2466,15 @@ tcClassDecl1 roles_info class_name hs_ctxt meths fundeps sigs ats at_defs
 
        ; mindef <- tcClassMinimalDef class_name sigs sig_stuff
        ; is_boot <- tcIsHsBootOrSig
-       ; let body | is_boot, null ctxt, null at_stuff, null sig_stuff
+       ; let body | is_boot, isNothing hs_ctxt, null at_stuff, null sig_stuff
+                  -- We use @isNothing hs_ctxt@ rather than @null ctxt@,
+                  -- so that a declaration in an hs-boot file such as:
+                  --
+                  -- class () => C a b | a -> b
+                  --
+                  -- is not considered abstract; it's sometimes useful
+                  -- to be able to declare such empty classes in hs-boot files.
+                  -- See #20661.
                   = Nothing
                   | otherwise
                   = Just (ctxt, at_stuff, sig_stuff, mindef)

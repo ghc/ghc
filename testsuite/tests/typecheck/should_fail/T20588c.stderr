@@ -1,0 +1,14 @@
+
+T20588c.hs-boot:7:1: error:
+    Class ‘C’ has conflicting definitions in the module
+    and its hs-boot file
+    Main module: type C :: * -> Constraint
+                 class C a where
+                   meth :: a
+                   default meth :: Monoid a => a
+    Boot file:   type C :: * -> Constraint
+                 class C a where
+                   meth :: a
+                   {-# MINIMAL meth #-}
+    The methods do not match:
+      The default methods associated with ‘meth’ are different

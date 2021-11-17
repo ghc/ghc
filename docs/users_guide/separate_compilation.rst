@@ -867,9 +867,31 @@ A hs-boot file is written in a subset of Haskell:
 -  Class declarations can either be given in full, exactly as in Haskell,
    or they can be given abstractly by omitting everything other than the
    instance head: no superclasses, no class methods, no associated types.
-   If the class declaration is given in full, the default delarations
-   must also match; this applies to both default methods and default
-   declarations for associated types.
+   However, if the class has any ::extension::`FunctionalDependencies`,
+   those given in the hs-boot file must be the same.
+  
+   If the class declaration is given in full, the entire class declaration
+   must be identical, up to a renaming of the type variables bound by the
+   class head. This means:
+
+     - The class head must be the same.
+     - The class context must be the same, up to simplification of constraints.
+     - If there are any ::extension::`FunctionalDependencies`, these must
+       be the same.
+     - The order, names, and types of the class methods must be the same.
+     - The arity and kinds of any associated types must be the same.
+     - Default methods as well as default signatures (see ::extension::`DefaultSignatures`)
+       must be provided for the same methods, and must be the same.
+     - Default declarations for associated types must be provided for the
+       same types, and must be the same.
+
+   To declare a class with no methods in an hs-boot file, it must have a superclass.
+   If the class has no superclass constraints, add an empty one, e.g. ::
+
+       class () => C a
+
+   This is a full class declaration, not an abstract declaration in which
+   the methods were omitted.
 
 -  You can include instance declarations just as in Haskell; but omit
    the "where" part.
