@@ -116,7 +116,7 @@ main = do
         Environment.setupEnvironment
         return . Just $ (shake_opts, if null targets'
                                       then rules
-                                      else want targets' >> withoutActions rules)
+                                      else want targets' >> rules)
 
 handleShakeException :: IORef ShakeOptions -> IO a -> IO a
 handleShakeException shake_opts_var shake_run = do

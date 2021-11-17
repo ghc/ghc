@@ -128,6 +128,7 @@ packageRules = do
 
 buildRules :: Rules ()
 buildRules = do
+    Settings.flavourFileRules
     Rules.BinaryDist.bindistRules
     Rules.Generate.copyRules
     Rules.Generate.generateRules

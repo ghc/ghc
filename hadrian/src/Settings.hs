@@ -3,7 +3,8 @@
 module Settings (
     getArgs, getLibraryWays, getRtsWays, flavour, knownPackages,
     findPackageByName, unsafeFindPackageByName, unsafeFindPackageByPath,
-    isLibrary, stagePackages, getBignumBackend, getBignumCheck, completeSetting
+    isLibrary, stagePackages, getBignumBackend, getBignumCheck, completeSetting,
+    flavourFileRules
     ) where
 
 import CommandLine
@@ -58,6 +59,49 @@ hadrianFlavours =
     , ghcInGhciFlavour, validateFlavour, slowValidateFlavour
     ]
 
+{-
+Note [Persisting the flavour]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For a long time Hadrian relied on UserSettings.hs for all configuration.
+However, this approach to configuration is both inconvenient and interacts
+poorly with multiple build roots. For this reason we introduced flavour
+transformers, making it easier to modify the flavour from the command-line.
+However, passing the flavour on the command-line introduces another problem:
+the user must consistently pass the same --flavour flag to all Hadrian
+invocations on a particular build root. Forgetting even once can result in a
+full rebuild of the tree.
+
+To eliminate the inconvenience of needing to always pass --flavour arguments we
+persist the flavour name used to build a particular build root in the build
+root itself (specifically, in `<build root>/flavour`). We refer to this file
+when looking up the active flavour, defaulting to it if the user does not
+specify a flavour name explicitly.
+-}
+
+flavourFileRules :: Rules ()
+flavourFileRules = do
+    root <- buildRootRules
+    root -/- "flavour" %> \out -> do
+        flavourName <- getFlavourName
+        writeFile' out flavourName
+
+    -- Ensure that the persistent flavour file is always updated.
+    want [root -/- "flavour"]
+
+-- | Lookup the requested flavour name, referring to the persistent flavour
+-- file saved from the previous Hadrian execution if not specified.
+getFlavourName :: Action String
+getFlavourName = do
+    root <- buildRoot
+    let flavourFile = root -/- "flavour"
+    mbFlavourName <- cmdFlavour
+    case mbFlavourName of
+      Nothing -> do exists <- doesFileExist flavourFile
+                    if exists
+                      then liftIO $ readFile flavourFile
+                      else return userDefaultFlavour
+      Just nm -> return nm
+
 -- | This action looks up a flavour with the name given on the
 --   command line with @--flavour@, defaulting to 'userDefaultFlavour'
 --   when no explicit @--flavour@ is passed. It then applies any
@@ -66,7 +110,7 @@ hadrianFlavours =
 --   syntax. See Note [Hadrian settings] at the bottom of this file.
 flavour :: Action Flavour
 flavour = do
-    flavourName <- fromMaybe userDefaultFlavour <$> cmdFlavour
+    flavourName <- getFlavourName
     kvs <- userSetting ([] :: [KeyVal])
     let flavours = hadrianFlavours ++ userFlavours
         (settingErrs, tweak) = applySettings kvs
