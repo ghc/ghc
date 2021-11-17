@@ -727,7 +727,7 @@ addDLL( pathchar *dll_name )
                                  MAXLINE-1);
       strncpy(line, (errmsg+(match[1].rm_so)),match_length);
       line[match_length] = '\0'; // make sure string is null-terminated
-      IF_DEBUG(linker, debugBelch ("file name = '%s'\n", line));
+      IF_DEBUG(linker, debugBelch("file name = '%s'\n", line));
       if ((fp = __rts_fopen(line, "r")) == NULL) {
          return errmsg; // return original error if open fails
       }
@@ -859,7 +859,7 @@ SymbolAddr* lookupDependentSymbol (SymbolName* lbl, ObjectCode *dependent)
 SymbolAddr* lookupDependentSymbol (SymbolName* lbl, ObjectCode *dependent)
 {
     ASSERT_LOCK_HELD(&linker_mutex);
-    IF_DEBUG(linker, debugBelch("lookupSymbol: looking up '%s'\n", lbl));
+    IF_DEBUG(linker_verbose, debugBelch("lookupSymbol: looking up '%s'\n", lbl));
 
     ASSERT(symhash != NULL);
     RtsSymbolInfo *pinfo;
@@ -876,7 +876,7 @@ SymbolAddr* lookupDependentSymbol (SymbolName* lbl, ObjectCode *dependent)
     }
 
     if (!ghciLookupSymbolInfo(symhash, lbl, &pinfo)) {
-        IF_DEBUG(linker, debugBelch("lookupSymbol: symbol '%s' not found, trying dlsym\n", lbl));
+        IF_DEBUG(linker_verbose, debugBelch("lookupSymbol: symbol '%s' not found, trying dlsym\n", lbl));
 
 #       if defined(OBJFORMAT_ELF)
         SymbolAddr *ret = internal_dlsym(lbl);
@@ -947,9 +947,10 @@ SymbolAddr* lookupDependentSymbol (SymbolName* lbl, ObjectCode *dependent)
  * Symbol name only used for diagnostics output.
  */
 SymbolAddr* loadSymbol(SymbolName *lbl, RtsSymbolInfo *pinfo) {
-    IF_DEBUG(linker, debugBelch("lookupSymbol: value of %s is %p, owned by %" PATH_FMT "\n", lbl,
-                                pinfo->value,
-                                pinfo->owner ? OC_INFORMATIVE_FILENAME(pinfo->owner) : WSTR("No owner, probably built-in.")));
+    IF_DEBUG(linker_verbose,
+             debugBelch("lookupSymbol: value of %s is %p, owned by %" PATH_FMT "\n", lbl,
+                        pinfo->value,
+                        pinfo->owner ? OC_INFORMATIVE_FILENAME(pinfo->owner) : WSTR("No owner, probably built-in.")));
     ObjectCode* oc = pinfo->owner;
 
     /* Symbol can be found during linking, but hasn't been relocated. Do so now.
@@ -1111,7 +1112,7 @@ mmapForLinker (size_t bytes, uint32_t prot, uint32_t flags, int fd, int offset)
      : TRY_MAP_32BIT;
    static uint32_t fixed = 0;
 
-   IF_DEBUG(linker, debugBelch("mmapForLinker: start\n"));
+   IF_DEBUG(linker_verbose, debugBelch("mmapForLinker: start\n"));
    size = roundUpToPage(bytes);
 
 #if defined(MAP_LOW_MEM)
@@ -1122,9 +1123,9 @@ mmap_again:
        map_addr = mmap_32bit_base;
    }
 
-   IF_DEBUG(linker,
+   IF_DEBUG(linker_verbose,
             debugBelch("mmapForLinker: \tprotection %#0x\n", prot));
-   IF_DEBUG(linker,
+   IF_DEBUG(linker_verbose,
             debugBelch("mmapForLinker: \tflags      %#0x\n",
                        MAP_PRIVATE | tryMap32Bit | fixed | flags));
 
@@ -1206,10 +1207,10 @@ mmap_again:
 //   }
 #endif
 
-   IF_DEBUG(linker,
+   IF_DEBUG(linker_verbose,
             debugBelch("mmapForLinker: mapped %" FMT_Word
                        " bytes starting at %p\n", (W_)size, result));
-   IF_DEBUG(linker,
+   IF_DEBUG(linker_verbose,
             debugBelch("mmapForLinker: done\n"));
 
    return result;
@@ -1263,7 +1264,7 @@ void mmapForLinkerMarkExecutable(void *start, size_t len)
     if (len == 0) {
       return;
     }
-    IF_DEBUG(linker,
+    IF_DEBUG(linker_verbose,
              debugBelch("mmapForLinkerMarkExecutable: protecting %" FMT_Word
                         " bytes starting at %p\n", (W_)len, start));
     if (mprotect(start, len, PROT_READ|PROT_EXEC) == -1) {
@@ -1341,6 +1342,8 @@ freePreloadObjectFile (ObjectCode *oc)
  */
 void freeObjectCode (ObjectCode *oc)
 {
+    IF_DEBUG(linker, debugBelch("freeObjectCode: %s", oc->fileName));
+
     if (oc->type == DYNAMIC_OBJECT) {
 #if defined(OBJFORMAT_ELF)
         ACQUIRE_LOCK(&dl_mutex);
@@ -1439,7 +1442,8 @@ mkOc( ObjectType type, pathchar *path, char *image, int imageSize,
       bool mapped, pathchar *archiveMemberName, int misalignment ) {
    ObjectCode* oc;
 
-   IF_DEBUG(linker, debugBelch("mkOc: start\n"));
+
+   IF_DEBUG(linker, debugBelch("mkOc: %s\n", path));
    oc = stgMallocBytes(sizeof(ObjectCode), "mkOc(oc)");
 
    oc->info = NULL;
@@ -1507,7 +1511,6 @@ mkOc( ObjectType type, pathchar *path, char *image, int imageSize,
    oc->nc_ranges = NULL;
    oc->dlopen_handle = NULL;
 
-   IF_DEBUG(linker, debugBelch("mkOc: done\n"));
    return oc;
 }
 
@@ -1694,7 +1697,7 @@ HsInt loadOc (ObjectCode* oc)
 {
    int r;
 
-   IF_DEBUG(linker, debugBelch("loadOc: start\n"));
+   IF_DEBUG(linker, debugBelch("loadOc: start (%s)\n", oc->fileName));
 
    /* verify the in-memory image */
 #  if defined(OBJFORMAT_ELF)
@@ -1778,7 +1781,7 @@ HsInt loadOc (ObjectCode* oc)
            oc->status = OBJECT_LOADED;
        }
    }
-   IF_DEBUG(linker, debugBelch("loadOc: done.\n"));
+   IF_DEBUG(linker, debugBelch("loadOc: done (%s).\n", oc->fileName));
 
    return 1;
 }

@@ -199,6 +199,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.DebugFlags.prof            = false;
     RtsFlags.DebugFlags.apply           = false;
     RtsFlags.DebugFlags.linker          = false;
+    RtsFlags.DebugFlags.linker_verbose  = false;
     RtsFlags.DebugFlags.squeeze         = false;
     RtsFlags.DebugFlags.hpc             = false;
     RtsFlags.DebugFlags.sparks          = false;
@@ -2141,6 +2142,9 @@ static void read_debug_flags(const char* arg)
             break;
         case 'l':
             RtsFlags.DebugFlags.linker = true;
+            break;
+        case 'L':
+            RtsFlags.DebugFlags.linker_verbose = true;
             break;
         case 'a':
             RtsFlags.DebugFlags.apply = true;

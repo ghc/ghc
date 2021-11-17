@@ -104,7 +104,8 @@ typedef struct _DEBUG_FLAGS {
     bool zero_on_gc;     /* 'Z' */
     bool stable;         /* 't' */
     bool prof;           /* 'p' */
-    bool linker;         /* 'l'   the object linker */
+    bool linker;         /* 'l'   the object linker, output which scales with O(# objects) or errors */
+    bool linker_verbose; /* 'L'   the object linker, output which scales with O(# symbols) */
     bool apply;          /* 'a' */
     bool stm;            /* 'm' */
     bool squeeze;        /* 'z'  stack squeezing & lazy blackholing */
