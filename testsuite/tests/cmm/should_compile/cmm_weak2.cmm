@@ -1,0 +1,13 @@
+#include "Cmm.h"
+
+attribute_weak weak_thing (W_ counter)
+{
+  return (counter+1);
+}
+
+//So we can use ghc for linking without complaints
+main (W_ counter)
+{
+  return (counter+1);
+}
+

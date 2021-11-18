@@ -267,10 +267,18 @@ pprTypeDecl platform lbl
       then text ".type " <> pdoc platform lbl <> text ", " <> pprLabelType' platform lbl
       else empty
 
+-- Are there assemblers that we support that don't support .weak?
+pprWeakDecl :: Platform -> CLabel -> SDoc
+pprWeakDecl platform lbl =
+   if isWeakLabel lbl
+         then text ".weak" <+> pdoc platform lbl
+         else empty
+
 pprLabel :: Platform -> CLabel -> SDoc
 pprLabel platform lbl =
    pprGloblDecl platform lbl
    $$ pprTypeDecl platform lbl
+   $$ pprWeakDecl platform lbl
    $$ (pdoc platform lbl <> colon)
 
 pprAlign :: Platform -> Alignment -> SDoc

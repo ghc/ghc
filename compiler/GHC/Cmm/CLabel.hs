@@ -86,6 +86,8 @@ module GHC.Cmm.CLabel (
         mkIPELabel,
         InfoProvEnt(..),
 
+        mkWeakLabel,
+        isWeakLabel,
         mkDynamicLinkerLabel,
         mkPicBaseLabel,
         mkDeadStripPreventer,
@@ -152,6 +154,8 @@ import GHC.Utils.Misc
 import GHC.Core.Ppr ( {- instances -} )
 import GHC.CmmToAsm.Config
 import GHC.Types.SrcLoc
+import GHC.Utils.Constants (debugIsOn)
+import GHC.Weak (Weak(Weak))
 
 -- -----------------------------------------------------------------------------
 -- The CLabel type
@@ -261,6 +265,7 @@ data CLabel
   -- | These labels are generated and used inside the NCG only.
   --    They are special variants of a label used for dynamic linking
   --    see module "GHC.CmmToAsm.PIC" for details.
+  --    They are access-only.
   | DynamicLinkerLabel DynamicLinkerLabelInfo CLabel
 
   -- | This label is generated and used inside the NCG only.
@@ -285,6 +290,8 @@ data CLabel
   | LargeBitmapLabel
         {-# UNPACK #-} !Unique
 
+  -- | Define label weakly
+  | WeakLabel  CLabel
   deriving Eq
 
 instance Show CLabel where
@@ -365,6 +372,8 @@ instance Ord CLabel where
     compare a1 a2
   compare (HpcTicksLabel a1) (HpcTicksLabel a2) =
     compare a1 a2
+  compare (WeakLabel a1) (WeakLabel a2) =
+    compare a1 a2
   compare (SRTLabel u1) (SRTLabel u2) =
     nonDetCmpUnique u1 u2
   compare (LargeBitmapLabel u1) (LargeBitmapLabel u2) =
@@ -401,6 +410,9 @@ instance Ord CLabel where
   compare _ SRTLabel{} = GT
   compare (IPE_Label {}) _ = LT
   compare  _ (IPE_Label{}) = GT
+  compare (WeakLabel {}) _ = LT
+  compare  _ (WeakLabel{}) = GT
+
 
 -- | Record where a foreign label is stored.
 data ForeignLabelSource
@@ -545,7 +557,7 @@ data DynamicLinkerLabelInfo
   | GotSymbolPtr                -- ELF: foo@got
   | GotSymbolOffset             -- ELF: foo@gotoff
 
-  deriving (Eq, Ord)
+  deriving (Eq, Ord,Show)
 
 
 -- -----------------------------------------------------------------------------
@@ -587,6 +599,14 @@ mkBytesLabel name                 = IdLabel name NoCafRefs Bytes
 mkBlockInfoTableLabel :: Name -> CafInfo -> CLabel
 mkBlockInfoTableLabel name c = IdLabel name c BlockInfoTable
                                -- See Note [Proc-point local block entry-point].
+
+mkWeakLabel :: CLabel -> CLabel
+-- We should never need to make weak labels of things not visible externally.
+mkWeakLabel l = assert (externallyVisibleCLabel l) $ WeakLabel l
+
+isWeakLabel :: CLabel -> Bool
+isWeakLabel (WeakLabel _l) = True
+isWeakLabel _              = False
 
 -- Constructing Cmm Labels
 mkDirty_MUT_VAR_Label,
@@ -817,7 +837,7 @@ mkPicBaseLabel                  = PicBaseLabel
 
 -- Constructing miscellaneous other labels
 mkDeadStripPreventer :: CLabel -> CLabel
-mkDeadStripPreventer lbl        = DeadStripPreventer lbl
+mkDeadStripPreventer lbl = DeadStripPreventer lbl
 
 mkStringLitLabel :: Unique -> CLabel
 mkStringLitLabel                = StringLitLabel
@@ -946,6 +966,7 @@ needsCDecl (CC_Label _)                 = True
 needsCDecl (CCS_Label _)                = True
 needsCDecl (IPE_Label {})               = True
 needsCDecl (HpcTicksLabel _)            = True
+needsCDecl (WeakLabel l)                = needsCDecl l
 needsCDecl (DynamicLinkerLabel {})      = panic "needsCDecl DynamicLinkerLabel"
 needsCDecl PicBaseLabel                 = panic "needsCDecl PicBaseLabel"
 needsCDecl (DeadStripPreventer {})      = panic "needsCDecl DeadStripPreventer"
@@ -1074,6 +1095,7 @@ externallyVisibleCLabel (LargeBitmapLabel _)    = False
 externallyVisibleCLabel (SRTLabel _)            = False
 externallyVisibleCLabel (PicBaseLabel {}) = panic "externallyVisibleCLabel PicBaseLabel"
 externallyVisibleCLabel (DeadStripPreventer {}) = panic "externallyVisibleCLabel DeadStripPreventer"
+externallyVisibleCLabel (WeakLabel lbl)         = True -- We assert all weak labels are also global
 
 externallyVisibleIdLabel :: IdLabelInfo -> Bool
 externallyVisibleIdLabel LocalInfoTable  = False
@@ -1128,11 +1150,12 @@ labelType (StringLitLabel _)                    = DataLabel
 labelType (CC_Label _)                          = DataLabel
 labelType (CCS_Label _)                         = DataLabel
 labelType (IPE_Label {})                        = DataLabel
-labelType (DynamicLinkerLabel _ _)              = DataLabel -- Is this right?
+labelType (DynamicLinkerLabel _ _)              = DataLabel -- Is this right? I think it should be the same as the wrapped label.
 labelType PicBaseLabel                          = DataLabel
 labelType (DeadStripPreventer _)                = DataLabel
 labelType (HpcTicksLabel _)                     = DataLabel
 labelType (LargeBitmapLabel _)                  = DataLabel
+labelType (WeakLabel l)                         = labelType l
 
 idInfoLabelType :: IdLabelInfo -> CLabelType
 idInfoLabelType info =
@@ -1374,6 +1397,9 @@ pprCLabel !platform !sty lbl = -- see Note [Bangs in CLabel]
          on some platforms (Darwin)
       -}
       maybe_underscore $ text "dsp_" <> pprCLabel platform sty lbl <> text "_dsp"
+
+   WeakLabel lbl
+      -> pprCLabel platform sty lbl -- We only check for weak labels at definition sites.
 
    StringLitLabel u
       -> maybe_underscore $ pprUniqueAlways u <> text "_str"

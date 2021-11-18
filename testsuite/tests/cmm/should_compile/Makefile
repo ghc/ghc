@@ -13,3 +13,9 @@ T16930:
 	grep -rl "after setInfoTableStackMap" `ls T16930.*`
 	grep -rl "Layout Stack" `ls T16930.*`
 	grep -rl "Post switch plan" `ls T16930.*`
+
+## weak1 and weak2 define the same symbol. Without weak symbols we would get linker errors.
+cmm_weak:
+	'$(TEST_HC)' cmm_weak1.cmm -c
+	'$(TEST_HC)' cmm_weak2.cmm -c
+	'$(TEST_HC)' cmm_weak1.o cmm_weak2.o -o cmm_weak -no-hs-main

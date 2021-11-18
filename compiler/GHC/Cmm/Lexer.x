@@ -98,6 +98,7 @@ $white_no_nl+           ;
   "True"                { kw CmmT_True  }
   "False"               { kw CmmT_False }
   "likely"              { kw CmmT_likely}
+  "attribute_weak"      { kw CmmT_attribute_weak }
 
   P@decimal             { global_regN (\n -> VanillaReg n VGcPtr) }
   R@decimal             { global_regN (\n -> VanillaReg n VNonGcPtr) }
@@ -183,6 +184,7 @@ data CmmToken
   | CmmT_False
   | CmmT_True
   | CmmT_likely
+  | CmmT_attribute_weak
   deriving (Show)
 
 -- -----------------------------------------------------------------------------
@@ -272,7 +274,9 @@ reservedWordsFM = listToUFM $
         ( "gcptr",              CmmT_gcptr ),
         ( "likely",             CmmT_likely),
         ( "True",               CmmT_True  ),
-        ( "False",              CmmT_False )
+        ( "False",              CmmT_False ),
+-- Attribute
+        ( "attribute_weak",     CmmT_attribute_weak )
         ]
 
 tok_decimal span buf len

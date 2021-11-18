@@ -1,0 +1,6 @@
+#include "Cmm.h"
+
+attribute_weak weak_thing (W_ counter)
+{
+  return (counter);
+}

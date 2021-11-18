@@ -23,6 +23,7 @@ module GHC.Cmm (
      ListGraph(..), pprBBlock,
 
      -- * Info Tables
+     updateInfoTabelLabel,
      CmmTopInfo(..), CmmStackInfo(..), CmmInfoTable(..), topInfoTable,
      ClosureTypeInfo(..),
      ProfilingInfo(..), ConstrDescription,
@@ -173,6 +174,10 @@ data ProfilingInfo
   = NoProfilingInfo
   | ProfilingInfo ByteString ByteString -- closure_type, closure_desc
   deriving Eq
+
+updateInfoTabelLabel :: (CLabel -> CLabel) -> CmmInfoTable -> CmmInfoTable
+updateInfoTabelLabel f tbl = tbl { cit_lbl = f (cit_lbl tbl) }
+
 -----------------------------------------------------------------------------
 --              Static Data
 -----------------------------------------------------------------------------
@@ -216,7 +221,10 @@ do so would end up in segfaults at execution when using linkers that do not
 enforce writability of those sections, such as the gold linker.
 -}
 
-data Section = Section SectionType CLabel
+data Section = Section
+  { section_type :: SectionType
+  , section_label :: CLabel -- ^ E.g. "foo" for .text.foo
+  }
 
 data CmmStatic
   = CmmStaticLit CmmLit

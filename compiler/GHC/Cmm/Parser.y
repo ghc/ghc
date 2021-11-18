@@ -315,6 +315,7 @@ import qualified Data.ByteString.Char8 as BS8
         'True'  { L _ (CmmT_True ) }
         'False' { L _ (CmmT_False) }
         'likely'{ L _ (CmmT_likely)}
+        'attribute_weak' { L _ (CmmT_attribute_weak)}
 
         'CLOSURE'       { L _ (CmmT_CLOSURE) }
         'INFO_TABLE'    { L _ (CmmT_INFO_TABLE) }
@@ -409,11 +410,14 @@ cmmdata :: { CmmParse () }
                      code (emitDecl (CmmData (Section (section $2) lbl) (CmmStaticsRaw lbl (concat ss)))) }
 
 data_label :: { CmmParse CLabel }
-    : NAME ':'
+    : maybe_weak NAME ':'
                 {% do
                    home_unit_id <- getHomeUnitId
                    liftP $ pure $ do
-                     pure (mkCmmDataLabel home_unit_id (NeedExternDecl False) $1) }
+                     if $1
+                        then pure $ mkWeakLabel (mkCmmDataLabel home_unit_id (NeedExternDecl False) $2)
+                        else pure (mkCmmDataLabel home_unit_id (NeedExternDecl False) $2)
+                         }
 
 statics :: { [CmmParse [CmmStatic]] }
         : {- empty -}                   { [] }
@@ -445,7 +449,7 @@ lits    :: { [CmmParse CmmExpr] }
         | ',' expr lits         { $2 : $3 }
 
 cmmproc :: { CmmParse () }
-        : info maybe_conv maybe_formals maybe_body
+        : info_weak maybe_conv maybe_formals maybe_body
                 { do ((entry_ret_label, info, stk_formals, formals), agraph) <-
                        getCodeScoped $ loopDecls $ do {
                          (entry_ret_label, info, stk_formals) <- $1;
@@ -467,6 +471,20 @@ maybe_conv :: { Convention }
 maybe_body :: { CmmParse () }
            : ';'                { return () }
            | '{' body '}'       { withSourceNote $1 $3 $2 }
+
+maybe_weak :: { Bool }
+           : {- empty -}        { False }
+           | 'attribute_weak'   { True }
+
+info_weak       :: { CmmParse (CLabel, Maybe CmmInfoTable, [LocalReg]) }
+                : maybe_weak info
+                        {% return $ do
+                                info@(lbl,tbl,regs) <- $2 :: CmmParse (CLabel, Maybe CmmInfoTable, [LocalReg])
+                                return $ if $1
+                                        then (mkWeakLabel lbl,fmap (updateInfoTabelLabel mkWeakLabel) tbl,regs)
+                                        else info
+
+                        }
 
 info    :: { CmmParse (CLabel, Maybe CmmInfoTable, [LocalReg]) }
         : NAME
