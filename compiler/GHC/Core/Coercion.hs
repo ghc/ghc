@@ -123,7 +123,9 @@ module GHC.Core.Coercion (
         multToCo,
 
         hasCoercionHoleTy, hasCoercionHoleCo,
-        HoleSet, coercionHolesOfType, coercionHolesOfCo
+        HoleSet, coercionHolesOfType, coercionHolesOfCo,
+
+        setCoHoleType
        ) where
 
 import {-# SOURCE #-} GHC.CoreToIface (toIfaceTyCon, tidyToIfaceTcArgs)
@@ -2752,3 +2754,7 @@ coercionHolesOfCo   :: Coercion -> UniqSet CoercionHole
                         , tcf_hole  = const unitUniqSet
                         , tcf_tycobinder = \ _ _ _ -> ()
                         }
+
+-- | Set the type of a 'CoercionHole'
+setCoHoleType :: CoercionHole -> Type -> CoercionHole
+setCoHoleType h t = setCoHoleCoVar h (setVarType (coHoleCoVar h) t)

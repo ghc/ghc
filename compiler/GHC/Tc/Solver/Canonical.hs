@@ -1026,7 +1026,7 @@ canNonDecomposableConcretePrim :: CtEvidence -> TcType -> TcS (StopOrContinue Ct
 canNonDecomposableConcretePrim ev ty
   = do { -- Update the evidence to account for the zonk to `ty`.
          let ki = typeKind ty
-             new_ev = ev { ctev_pred = mkTyConApp concretePrimTyCon [ki, ty] }
+             new_ev = setCtEvPredType ev (mkTyConApp concretePrimTyCon [ki, ty])
              new_ct =
                CSpecialCan { cc_ev = new_ev
                            , cc_special_pred = ConcretePrimPred
@@ -3136,11 +3136,11 @@ rewriteEvidence old_ev@(CtDerived {}) (Reduction _co new_pred)
     -- was produced by rewriting, may contain suspended calls to
     -- (ctEvExpr c), which fails for Derived constraints.
     -- (Getting this wrong caused #7384.)
-    continueWith (old_ev { ctev_pred = new_pred })
+    continueWith (setCtEvPredType old_ev new_pred)
 
 rewriteEvidence old_ev (Reduction co new_pred)
   | isTcReflCo co -- See Note [Rewriting with Refl]
-  = continueWith (old_ev { ctev_pred = new_pred })
+  = continueWith (setCtEvPredType old_ev new_pred)
 
 rewriteEvidence ev@(CtGiven { ctev_evar = old_evar, ctev_loc = loc }) (Reduction co new_pred)
   = do { new_ev <- newGivenEvVar loc (new_pred, new_tm)
@@ -3188,12 +3188,12 @@ rewriteEqEvidence :: CtEvidence         -- Old evidence :: olhs ~ orhs (not swap
 -- It's all a form of rewriteEvidence, specialised for equalities
 rewriteEqEvidence old_ev swapped (Reduction lhs_co nlhs) (Reduction rhs_co nrhs)
   | CtDerived {} <- old_ev  -- Don't force the evidence for a Derived
-  = return (old_ev { ctev_pred = new_pred })
+  = return (setCtEvPredType old_ev new_pred)
 
   | NotSwapped <- swapped
   , isTcReflCo lhs_co      -- See Note [Rewriting with Refl]
   , isTcReflCo rhs_co
-  = return (old_ev { ctev_pred = new_pred })
+  = return (setCtEvPredType old_ev new_pred)
 
   | CtGiven { ctev_evar = old_evar } <- old_ev
   = do { let new_tm = evCoercion ( mkTcSymCo lhs_co

@@ -2407,19 +2407,10 @@ zonkCt ct
        ; return (mkNonCanonical fl') }
 
 zonkCtEvidence :: CtEvidence -> TcM CtEvidence
-zonkCtEvidence ctev@(CtGiven { ctev_pred = pred })
-  = do { pred' <- zonkTcType pred
-       ; return (ctev { ctev_pred = pred'}) }
-zonkCtEvidence ctev@(CtWanted { ctev_pred = pred, ctev_dest = dest })
-  = do { pred' <- zonkTcType pred
-       ; let dest' = case dest of
-                       EvVarDest ev -> EvVarDest $ setVarType ev pred'
-                         -- necessary in simplifyInfer
-                       HoleDest h   -> HoleDest h
-       ; return (ctev { ctev_pred = pred', ctev_dest = dest' }) }
-zonkCtEvidence ctev@(CtDerived { ctev_pred = pred })
-  = do { pred' <- zonkTcType pred
-       ; return (ctev { ctev_pred = pred' }) }
+zonkCtEvidence ctev
+  = do { pred' <- zonkTcType (ctev_pred ctev)
+       ; return (setCtEvPredType ctev pred')
+       }
 
 zonkSkolemInfo :: SkolemInfo -> TcM SkolemInfo
 zonkSkolemInfo (SigSkol cx ty tv_prs)  = do { ty' <- zonkTcType ty

@@ -62,7 +62,7 @@ module GHC.Tc.Types.Constraint (
         CtEvidence(..), TcEvDest(..),
         mkKindLoc, toKindLoc, mkGivenLoc,
         isWanted, isGiven, isDerived,
-        ctEvRole,
+        ctEvRole, setCtEvPredType,
 
         wrapType,
 
@@ -503,10 +503,6 @@ of (cc_ev ct), and is fully rewritten wrt the substitution.   Eg for CDictCan,
    ctev_pred (cc_ev ct) = (cc_class ct) (cc_tyargs ct)
 This holds by construction; look at the unique place where CDictCan is
 built (in GHC.Tc.Solver.Canonical).
-
-In contrast, the type of the evidence *term* (ctev_dest / ctev_evar) in
-the evidence may *not* be fully zonked; we are careful not to look at it
-during constraint solving. See Note [Evidence field of CtEvidence].
 
 Note [Ct kind invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1648,11 +1644,40 @@ wrapType ty skols givens = mkSpecForAllTys skols $ mkPhiTy givens ty
 *                                                                      *
 ************************************************************************
 
-Note [Evidence field of CtEvidence]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-During constraint solving we never look at the type of ctev_evar/ctev_dest;
-instead we look at the ctev_pred field.  The evtm/evar field
-may be un-zonked.
+Note [CtEvidence invariants]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The `ctev_pred` field of a `CtEvidence` is a just a cache for the type
+of the evidence.  More precisely:
+
+More precisely:
+* For Givens, `ctev_pred` = `varType ctev_evar`
+* For Wanteds, `ctev_pred` = `evDestType ctev_dest`
+
+where
+
+  evDestType :: TcEvDest -> TcType
+  evDestType (EvVarDest evVar)       = varType evVar
+  evDestType (HoleDest coercionHole) = varType (coHoleCoVar coercionHole)
+
+The invariant is maintained by `setCtEvPredType`, the only function that
+updates the `ctev_pred` field of a `CtEvidence`.
+
+Why is the invariant important? Because when the evidence is a coercion, it may
+be used in (CastTy ty co); and then we may call `typeKind` on that type (e.g.
+in the kind-check of `eqType`); and expect to see a fully zonked kind.
+(This came up in test T13333, in the MR that fixed #20641, namely !6942.)
+
+Historical Note [Evidence field of CtEvidence]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In the past we tried leaving the `ctev_evar`/`ctev_dest` field of a
+constraint untouched (and hence un-zonked) on the grounds that it is
+never looked at.  But in fact it is: the evidence can become part of a
+type (via `CastTy ty kco`) and we may later ask the kind of that type
+and expect a zonked result.  (For example, in the kind-check
+of `eqType`.)
+
+The safest thing is simply to keep `ctev_evar`/`ctev_dest` in sync
+with `ctev_pref`, as stated in `Note [CtEvidence invariants]`.
 
 Note [Bind new Givens immediately]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1695,13 +1720,13 @@ data TcEvDest
 data CtEvidence
   = CtGiven    -- Truly given, not depending on subgoals
       { ctev_pred :: TcPredType      -- See Note [Ct/evidence invariant]
-      , ctev_evar :: EvVar           -- See Note [Evidence field of CtEvidence]
+      , ctev_evar :: EvVar           -- See Note [CtEvidence invariants]
       , ctev_loc  :: CtLoc }
 
 
   | CtWanted   -- Wanted goal
       { ctev_pred :: TcPredType     -- See Note [Ct/evidence invariant]
-      , ctev_dest :: TcEvDest
+      , ctev_dest :: TcEvDest       -- See Note [CtEvidence invariants]
       , ctev_nosh :: ShadowInfo     -- See Note [Constraint flavours]
       , ctev_loc  :: CtLoc }
 
@@ -1754,6 +1779,33 @@ ctEvEvId (CtWanted { ctev_dest = EvVarDest ev }) = ev
 ctEvEvId (CtWanted { ctev_dest = HoleDest h })   = coHoleCoVar h
 ctEvEvId (CtGiven  { ctev_evar = ev })           = ev
 ctEvEvId ctev@(CtDerived {}) = pprPanic "ctEvId:" (ppr ctev)
+
+-- | Set the type of CtEvidence.
+--
+-- This function ensures that the invariants on 'CtEvidence' hold, by updating
+-- the evidence and the ctev_pred in sync with each other.
+-- See Note [CtEvidence invariants]
+setCtEvPredType :: CtEvidence -> Type -> CtEvidence
+setCtEvPredType old_ctev new_pred = case old_ctev of
+    CtGiven { ctev_evar = ev, ctev_loc = loc } ->
+      CtGiven { ctev_pred = new_pred
+              , ctev_evar = setVarType ev new_pred
+              , ctev_loc  = loc
+              }
+    CtWanted { ctev_dest = dest, ctev_nosh = nosh, ctev_loc = loc } ->
+      CtWanted { ctev_pred = new_pred
+               , ctev_dest = new_dest
+               , ctev_nosh = nosh
+               , ctev_loc  = loc
+               }
+        where
+          new_dest = case dest of
+            EvVarDest ev -> EvVarDest (setVarType ev new_pred)
+            HoleDest h   -> HoleDest  (setCoHoleType h new_pred)
+    CtDerived { ctev_loc = loc } ->
+      CtDerived { ctev_pred = new_pred
+                , ctev_loc  = loc
+                }
 
 instance Outputable TcEvDest where
   ppr (HoleDest h)   = text "hole" <> ppr h
