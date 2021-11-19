@@ -40,6 +40,17 @@ infixl 7  %
 default ()              -- Double isn't available yet,
                         -- and we shouldn't be using defaults anyway
 
+{- Note [Allow time for type-specialisation rules to fire]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+  lcm = ...
+  {-# RULES "lcm/Integer->Integer->Integer" lcm = integerLcm  #-}
+
+We want to delay inlining `lcm` until the rule (which is a form of manual
+type specialisation) has had a chance to fire.  It can fire in InitialPhase,
+so INLINE[2] seems sufficient.  c.f. #20709
+-}
+
 ------------------------------------------------------------------------
 -- Divide by zero and arithmetic overflow
 ------------------------------------------------------------------------
@@ -617,6 +628,8 @@ fromIntegral = fromInteger . toInteger
 -- > NaN
 realToFrac :: (Real a, Fractional b) => a -> b
 {-# NOINLINE [1] realToFrac #-}
+-- See Note [Allow time for type-specialisation rules to fire]
+-- These rule actually appear in other modules, e.g. GHC.Float
 realToFrac = fromRational . toRational
 
 --------------------------------------------------------------
@@ -665,47 +678,48 @@ x0 ^ y0 | y0 < 0    = errorWithoutStackTrace "Negative exponent"
 x ^^ n          =  if n >= 0 then x^n else recip (x^(negate n))
 
 {- Note [Half of y - 1]
-   ~~~~~~~~~~~~~~~~~~~~~
-   Since y is guaranteed to be odd and positive here,
-   half of y - 1 can be computed as y `quot` 2, optimising subtraction away.
+~~~~~~~~~~~~~~~~~~~~~~~~
+Since y is guaranteed to be odd and positive here,
+half of y - 1 can be computed as y `quot` 2, optimising subtraction away.
+
+Note [Inlining (^)
+~~~~~~~~~~~~~~~~~~
+The INLINABLE pragma allows (^) to be specialised at its call sites.
+If it is called repeatedly at the same type, that can make a huge
+difference, because of those constants which can be repeatedly
+calculated.
+
+Currently the fromInteger calls are not floated because we get
+          \d1 d2 x y -> blah
+after the gentle round of simplification.
+
+Note [Powers with small exponent]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For small exponents, (^) is inefficient compared to manually
+expanding the multiplication tree (see #5237).
+
+Here, rules for the most common exponent types are given.
+The range of exponents for which rules are given is quite
+arbitrary and kept small to not unduly increase the number of rules.
+0 and 1 are excluded based on the assumption that nobody would
+write x^0 or x^1 in code and the cases where an exponent could
+be statically resolved to 0 or 1 are rare.
+
+It might be desirable to have corresponding rules also for
+exponents of other types (e. g., Word), but it's doubtful they
+would fire, since the exponents of other types tend to get
+floated out before the rule has a chance to fire.
+
+Also desirable would be rules for (^^), but I haven't managed
+to get those to fire.
+
+Note: Trying to save multiplications by sharing the square for
+exponents 4 and 5 does not save time, indeed, for Double, it is
+up to twice slower, so the rules contain flat sequences of
+multiplications.
 -}
 
-{- Note [Inlining (^)
-   ~~~~~~~~~~~~~~~~~~~~~
-   The INLINABLE pragma allows (^) to be specialised at its call sites.
-   If it is called repeatedly at the same type, that can make a huge
-   difference, because of those constants which can be repeatedly
-   calculated.
-
-   Currently the fromInteger calls are not floated because we get
-             \d1 d2 x y -> blah
-   after the gentle round of simplification. -}
-
-{- Rules for powers with known small exponent
-    see #5237
-    For small exponents, (^) is inefficient compared to manually
-    expanding the multiplication tree.
-    Here, rules for the most common exponent types are given.
-    The range of exponents for which rules are given is quite
-    arbitrary and kept small to not unduly increase the number of rules.
-    0 and 1 are excluded based on the assumption that nobody would
-    write x^0 or x^1 in code and the cases where an exponent could
-    be statically resolved to 0 or 1 are rare.
-
-    It might be desirable to have corresponding rules also for
-    exponents of other types (e. g., Word), but it's doubtful they
-    would fire, since the exponents of other types tend to get
-    floated out before the rule has a chance to fire.
-
-    Also desirable would be rules for (^^), but I haven't managed
-    to get those to fire.
-
-    Note: Trying to save multiplications by sharing the square for
-    exponents 4 and 5 does not save time, indeed, for Double, it is
-    up to twice slower, so the rules contain flat sequences of
-    multiplications.
--}
-
+-- See Note [Powers with small exponent]
 {-# RULES
 "^2/Int"        forall x. x ^ (2 :: Int) = let u = x in u*u
 "^3/Int"        forall x. x ^ (3 :: Int) = let u = x in u*u*u
@@ -787,7 +801,9 @@ x ^^ n          =  if n >= 0 then x^n else recip (x^(negate n))
 -- the result may be negative if one of the arguments is @'minBound'@ (and
 -- necessarily is if the other is @0@ or @'minBound'@) for such types.
 gcd             :: (Integral a) => a -> a -> a
-{-# NOINLINE [1] gcd #-}
+{-# SPECIALISE gcd :: Int -> Int -> Int #-}
+{-# SPECIALISE gcd :: Word -> Word -> Word #-}
+{-# NOINLINE [2] gcd #-} -- See Note [Allow time for type-specialisation rules to fire]
 gcd x y         =  gcd' (abs x) (abs y)
                    where gcd' a 0  =  a
                          gcd' a b  =  gcd' b (a `rem` b)
@@ -796,7 +812,7 @@ gcd x y         =  gcd' (abs x) (abs y)
 lcm             :: (Integral a) => a -> a -> a
 {-# SPECIALISE lcm :: Int -> Int -> Int #-}
 {-# SPECIALISE lcm :: Word -> Word -> Word #-}
-{-# NOINLINE [1] lcm #-}
+{-# NOINLINE [2] lcm #-} -- See Note [Allow time for type-specialisation rules to fire]
 lcm _ 0         =  0
 lcm 0 _         =  0
 lcm x y         =  abs ((x `quot` (gcd x y)) * y)

@@ -1384,9 +1384,10 @@ The rules for map work like this.
 -- first list.
 
 (++) :: [a] -> [a] -> [a]
-{-# NOINLINE [1] (++) #-}    -- We want the RULE to fire first.
-                             -- It's recursive, so won't inline anyway,
-                             -- but saying so is more explicit
+{-# NOINLINE [2] (++) #-}
+  -- Give time for the RULEs for (++) to fire in InitialPhase
+  -- It's recursive, so won't inline anyway,
+  -- but saying so is more explicit
 (++) []     ys = ys
 (++) (x:xs) ys = x : xs ++ ys
 

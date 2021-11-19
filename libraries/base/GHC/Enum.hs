@@ -422,7 +422,7 @@ eftCharFB c n x0 y = go x0
                     go x | isTrue# (x ># y) = n
                          | otherwise        = C# (chr# x) `c` go (x +# 1#)
 
-{-# NOINLINE [1] eftChar #-}
+{-# NOINLINE [1] eftChar #-} -- Inline after rule "eftChar" is inactive
 eftChar :: Int# -> Int# -> String
 eftChar x y | isTrue# (x ># y ) = []
             | otherwise         = C# (chr# x) : eftChar (x +# 1#) y
@@ -437,7 +437,7 @@ efdCharFB c n x1 x2
   where
     !delta = x2 -# x1
 
-{-# NOINLINE [1] efdChar #-}
+{-# NOINLINE [1] efdChar #-} -- Inline after rule "efdChar" is inactive
 efdChar :: Int# -> Int# -> String
 efdChar x1 x2
   | isTrue# (delta >=# 0#) = go_up_char_list x1 delta 0x10FFFF#
@@ -453,7 +453,7 @@ efdtCharFB c n x1 x2 lim
   where
     !delta = x2 -# x1
 
-{-# NOINLINE [1] efdtChar #-}
+{-# NOINLINE [1] efdtChar #-} -- Inline after rule "efdtChar" is inactive
 efdtChar :: Int# -> Int# -> Int# -> String
 efdtChar x1 x2 lim
   | isTrue# (delta >=# 0#) = go_up_char_list x1 delta lim
@@ -910,7 +910,7 @@ enumDeltaIntegerFB :: (Integer -> b -> b) -> Integer -> Integer -> b
 enumDeltaIntegerFB c x0 d = go x0
   where go x = x `seq` (x `c` go (x+d))
 
-{-# NOINLINE [1] enumDeltaInteger #-}
+{-# NOINLINE [1] enumDeltaInteger #-} -- Inline after rule "enumDeltaInteger" is inactive
 enumDeltaInteger :: Integer -> Integer -> [Integer]
 enumDeltaInteger x d = x `seq` (x : enumDeltaInteger (x+d) d)
 -- strict accumulator, so
@@ -936,13 +936,13 @@ enumDeltaToInteger1FB c n x0 lim = go (x0 :: Integer)
                         go x | x > lim   = n
                              | otherwise = x `c` go (x+1)
 
-{-# NOINLINE [1] enumDeltaToInteger #-}
+{-# NOINLINE [1] enumDeltaToInteger #-} -- Inline after rule "efdtInteger" is inactive
 enumDeltaToInteger :: Integer -> Integer -> Integer -> [Integer]
 enumDeltaToInteger x delta lim
   | delta >= 0 = up_list x delta lim
   | otherwise  = dn_list x delta lim
 
-{-# NOINLINE [1] enumDeltaToInteger1 #-}
+{-# NOINLINE [1] enumDeltaToInteger1 #-} -- Inline after rule "efdtInteger1" is inactive
 enumDeltaToInteger1 :: Integer -> Integer -> [Integer]
 -- Special case for Delta = 1
 enumDeltaToInteger1 x0 lim = go (x0 :: Integer)
