@@ -569,7 +569,7 @@ doLink hsc_env o_files =
 --
 -- The object file created by compiling the _stub.c file is put into a
 -- temporary file, which will be later combined with the main .o file
--- (see the MergeForeigns phase).
+-- (see the MergeForeign phase).
 --
 -- Moreover, we also let the user emit arbitrary C/C++/ObjC/ObjC++ files
 -- from TH, that are then compiled and linked to the module. This is
@@ -763,7 +763,7 @@ hscGenBackendPipeline pipe_env hsc_env mod_sum result = do
       Nothing -> return mlinkable
       Just o_fp -> do
         unlinked_time <- liftIO (liftIO getCurrentTime)
-        final_o <- use (T_MergeForeign pipe_env hsc_env (Just location) o_fp fos)
+        final_o <- use (T_MergeForeign pipe_env hsc_env o_fp fos)
         let !linkable = LM unlinked_time
                                     (ms_mod mod_sum)
                                     [DotO final_o]
@@ -810,7 +810,7 @@ cmmPipeline pipe_env hsc_env input_fn = do
   mo_fn <- hscPostBackendPipeline pipe_env hsc_env HsSrcFile (backend (hsc_dflags hsc_env)) Nothing output_fn
   case mo_fn of
     Nothing -> panic "CMM pipeline - produced no .o file"
-    Just mo_fn -> use (T_MergeForeign pipe_env hsc_env Nothing mo_fn fos)
+    Just mo_fn -> use (T_MergeForeign pipe_env hsc_env mo_fn fos)
 
 hscPostBackendPipeline :: P m => PipeEnv -> HscEnv -> HscSource -> Backend -> Maybe ModLocation -> FilePath -> m (Maybe FilePath)
 hscPostBackendPipeline _ _ HsBootFile _ _ _   = return Nothing

@@ -46,7 +46,7 @@ data TPhase res where
   T_LlvmOpt :: PipeEnv -> HscEnv -> FilePath -> TPhase FilePath
   T_LlvmLlc :: PipeEnv -> HscEnv -> FilePath -> TPhase FilePath
   T_LlvmMangle :: PipeEnv -> HscEnv -> FilePath -> TPhase FilePath
-  T_MergeForeign :: PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> [FilePath] -> TPhase FilePath
+  T_MergeForeign :: PipeEnv -> HscEnv -> FilePath -> [FilePath] -> TPhase FilePath
 
 -- | A wrapper around the interpretation function for phases.
 data PhaseHook = PhaseHook (forall a . TPhase a -> IO a)

@@ -143,8 +143,8 @@ runPhase (T_LlvmLlc pipe_env hsc_env input_fn) =
   runLlvmLlcPhase pipe_env hsc_env input_fn
 runPhase (T_LlvmMangle pipe_env hsc_env input_fn) =
   runLlvmManglePhase pipe_env hsc_env input_fn
-runPhase (T_MergeForeign pipe_env hsc_env location input_fn fos) =
-  runMergeForeign pipe_env hsc_env location input_fn fos
+runPhase (T_MergeForeign pipe_env hsc_env input_fn fos) =
+  runMergeForeign pipe_env hsc_env input_fn fos
 
 runLlvmManglePhase :: PipeEnv -> HscEnv -> FilePath -> IO [Char]
 runLlvmManglePhase pipe_env hsc_env input_fn = do
@@ -154,8 +154,8 @@ runLlvmManglePhase pipe_env hsc_env input_fn = do
       llvmFixupAsm (targetPlatform dflags) input_fn output_fn
       return output_fn
 
-runMergeForeign :: PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> [FilePath] -> IO FilePath
-runMergeForeign _pipe_env hsc_env _location input_fn foreign_os = do
+runMergeForeign :: PipeEnv -> HscEnv -> FilePath -> [FilePath] -> IO FilePath
+runMergeForeign _pipe_env hsc_env input_fn foreign_os = do
      if null foreign_os
        then return input_fn
        else do
