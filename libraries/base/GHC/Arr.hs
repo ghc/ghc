@@ -497,7 +497,8 @@ eqArray arr1@(Array l1 u1 n1 _) arr2@(Array l2 u2 n2 _) =
     l1 == l2 && u1 == u2 &&
     and [unsafeAt arr1 i == unsafeAt arr2 i | i <- [0 .. n1 - 1]]
 
-{-# INLINE [1] cmpArray #-}
+{-# INLINE [2] cmpArray #-}
+-- See Note [Allow time for type-specialisation rules to fire] in GHC.Real
 cmpArray :: (Ix i, Ord e) => Array i e -> Array i e -> Ordering
 cmpArray arr1 arr2 = compare (assocs arr1) (assocs arr2)
 

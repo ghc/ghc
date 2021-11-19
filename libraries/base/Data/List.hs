@@ -762,7 +762,10 @@ minimumBy cmp = fromMaybe (errorWithoutStackTrace "minimumBy: empty structure")
 -- >>> genericLength [1..200] :: Int8
 -- -56
 genericLength           :: (Num i) => [a] -> i
-{-# NOINLINE [1] genericLength #-}
+{-# NOINLINE [2] genericLength #-}
+    -- Give time for the RULEs for (++) to fire in InitialPhase
+    -- It's recursive, so won't inline anyway,
+    -- but saying so is more explicit
 genericLength []        =  0
 genericLength (_:l)     =  1 + genericLength l
 

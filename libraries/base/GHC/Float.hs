@@ -1125,7 +1125,8 @@ Now, here's Lennart's code (which works):
 "fromRat/Double"    fromRat = (fromRational :: Rational -> Double)
   #-}
 
-{-# NOINLINE [1] fromRat #-}
+{-# NOINLINE [2] fromRat #-}
+-- See Note [Allow time for type-specialisation rules to fire] in GHC.Real
 fromRat :: (RealFloat a) => Rational -> a
 
 -- Deal with special cases first, delegating the real work to fromRat'
