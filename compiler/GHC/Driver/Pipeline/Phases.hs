@@ -28,7 +28,7 @@ import GHC.Driver.Phases
 -- phase if the inputs have been modified.
 data TPhase res where
   T_Unlit :: PipeEnv -> HscEnv -> FilePath -> TPhase FilePath
-  T_FileArgs :: HscEnv -> FilePath -> TPhase (DynFlags, [Warn])
+  T_FileArgs :: HscEnv -> FilePath -> TPhase (DynFlags, Messages PsMessage, [Warn])
   T_Cpp   :: PipeEnv -> HscEnv -> FilePath -> TPhase FilePath
   T_HsPp  :: PipeEnv -> HscEnv -> FilePath -> FilePath -> TPhase FilePath
   T_HscRecomp :: PipeEnv -> HscEnv -> FilePath -> HscSource -> TPhase (HscEnv, ModSummary, HscRecompStatus)

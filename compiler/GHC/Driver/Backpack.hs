@@ -97,7 +97,7 @@ doBackpack [src_filename] = do
     dflags0 <- getDynFlags
     let dflags1 = dflags0
     let parser_opts1 = initParserOpts dflags1
-    src_opts <- liftIO $ getOptionsFromFile parser_opts1 src_filename
+    (p_warns, src_opts) <- liftIO $ getOptionsFromFile parser_opts1 src_filename
     (dflags, unhandled_flags, warns) <- liftIO $ parseDynamicFilePragma dflags1 src_opts
     modifySession (hscSetFlags dflags)
     logger <- getLogger -- Get the logger after having set the session flags,
@@ -105,6 +105,7 @@ doBackpack [src_filename] = do
                         -- Not doing so caused #20396.
     -- Cribbed from: preprocessFile / GHC.Driver.Pipeline
     liftIO $ checkProcessArgsResult unhandled_flags
+    liftIO $ printOrThrowDiagnostics logger (initDiagOpts dflags) (GhcPsMessage <$> p_warns)
     liftIO $ handleFlagWarnings logger (initDiagOpts dflags) warns
     -- TODO: Preprocessing not implemented
 

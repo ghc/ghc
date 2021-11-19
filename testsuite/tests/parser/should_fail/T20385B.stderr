@@ -1,0 +1,12 @@
+
+T20385B.hs:6:1: warning: [-Wmisplaced-pragmas (in -Wdefault)]
+    Misplaced LANGUAGE pragma
+    Suggested fix:
+      Perhaps you meant to place it in the module header?
+      The module header is the section at the top of the file, before the ‘module’ keyword
+
+T20385B.hs:11:9: error:
+    Variable not in scope: mdo :: a -> a
+    Suggested fixes:
+      • Perhaps use ‘mod’ (imported from Prelude)
+      • Perhaps you intended to use RecursiveDo

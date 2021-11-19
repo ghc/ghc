@@ -181,6 +181,9 @@ instance Outputable GhcHint where
       -> pprImportSuggestion import_suggestion
     SuggestImportingDataCon
       -> text "Import the data constructor to bring it into scope"
+    SuggestPlacePragmaInHeader
+      -> text "Perhaps you meant to place it in the module header?"
+      $$ text "The module header is the section at the top of the file, before the" <+> quotes (text "module") <+> text "keyword"
 
 perhapsAsPat :: SDoc
 perhapsAsPat = text "Perhaps you meant an as-pattern, which must not be surrounded by whitespace"

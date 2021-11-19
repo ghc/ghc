@@ -456,6 +456,20 @@ of ``-W(no-)*``.
     recognises pragmas known to be used by other tools, e.g.
     ``OPTIONS_HUGS`` and ``DERIVE``.
 
+.. ghc-flag:: -Wmisplaced-pragmas
+    :shortdesc: warn about uses of file header pragmas in the module body
+    :type: dynamic
+    :reverse: -Wno-misplaced-pragmas
+    :category:
+
+    :since: 9.4
+
+    :default: on
+
+    Warn when a pragma that should only appear in the header of a module,
+    such as a `LANGUAGE` or `OPTIONS_GHC` pragma, appears in the body of
+    the module instead.
+
 .. ghc-flag:: -Wmissed-specialisations
     :shortdesc: warn when specialisation of an imported, overloaded function
         fails.

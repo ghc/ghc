@@ -3256,6 +3256,7 @@ wWarningFlagsDeps = mconcat [
   warnSpec    Opt_WarnTypedHoles,
   warnSpec    Opt_WarnPartialTypeSignatures,
   warnSpec    Opt_WarnUnrecognisedPragmas,
+  warnSpec    Opt_WarnMisplacedPragmas,
   warnSpec'   Opt_WarnUnsafe setWarnUnsafe,
   warnSpec    Opt_WarnUnsupportedCallingConventions,
   warnSpec    Opt_WarnUnsupportedLlvmVersion,
