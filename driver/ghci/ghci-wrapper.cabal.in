@@ -24,6 +24,5 @@ Executable ghci
       buildable: False
     Include-Dirs: ../utils
     C-Sources:
-       ghci.c
        -- the following get copied from ../utils by hadrian
        getLocation.c isMinTTY.c cwrapper.c

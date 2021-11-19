@@ -15,7 +15,7 @@ Executable hp2ps
     Main-Is: Main.c
     extra-libraries: m
     C-Sources:
-       AreaBelow.c Curves.c Error.c Main.c
+       AreaBelow.c Curves.c Error.c
        Reorder.c TopTwenty.c AuxFile.c Deviation.c
        HpFile.c Marks.c Scale.c TraceElement.c
        Axes.c Dimensions.c Key.c PsFile.c Shade.c

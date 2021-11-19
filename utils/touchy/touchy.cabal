@@ -13,4 +13,3 @@ build-type: Simple
 Executable touchy
     Default-Language: Haskell2010
     Main-Is: touchy.c
-    C-Sources: touchy.c
