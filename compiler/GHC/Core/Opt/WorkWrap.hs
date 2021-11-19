@@ -463,28 +463,40 @@ When should the wrapper inlining be active?
    In module Bar we want to give specialisations a chance to fire
    before inlining f's wrapper.
 
-   Historical note: At one stage I tried making the wrapper inlining
+   (Historical note: At one stage I tried making the wrapper inlining
    always-active, and that had a very bad effect on nofib/imaginary/x2n1;
-   a wrapper was inlined before the specialisation fired.
+   a wrapper was inlined before the specialisation fired.)
+
+4a. If we have
+      {-# SPECIALISE foo :: (Int,Int) -> Bool -> Int #-}
+      {-# NOINLINE [n] foo #-}
+    then specialisation will generate a SPEC rule active from Phase n.
+    See Note [Auto-specialisation and RULES] in GHC.Core.Opt.Specialise
+    This SPEC specialisation rule will compete with inlining, but we don't
+    mind that, because if inlining succeeds, it should be better.
+
+    Now, if we w/w foo, we must ensure that the wrapper (which is very
+    keen to inline) has a phase /after/ 'n', else it'll always "win" over
+    the SPEC rule -- disaster (#20709).
+
+Conclusion: the activation for the wrapper should be the /later/ of
+  (a) the current activation of the function, or FinalPhase if it is NOINLINE
+  (b) one phase /after/ the activation of any rules
+This is implemented by mkStrWrapperInlinePrag.
 
 Reminder: Note [Don't w/w INLINE things], so we don't need to worry
           about INLINE things here.
 
-Conclusion:
-  - If the user said NOINLINE[n] or INLINABLE[n], respect that by putting
-    INLINE[n] on the wrapper (and NOINLINE[n]/INLINABLE[n] on the worker).
 
-  - If the user said NOINLINE, inline the wrapper only in
-    FinalPhase, which is after all the numbered, user-visible phases (and put
-    the original pragma on the worker). That means that all rules will have had
-    a chance to fire.
-    NB: Similar to InitialPhase, users can't write INLINE[Final] f;
-    it's syntactically illegal. See Note [Compiler phases].
+What if `foo` has no specialiations, is worker/wrappered (with the
+wrapper inlining very early), and exported; and then in an importing
+module we have {-# SPECIALISE foo : ... #-}?
 
-  - Otherwise (no pragma or INLINABLE) inline the wrapper in the first phase
-    *after* InitialPhase. We run InitialPhase before the specialiser so that
-    will not inline the wrapper before specialisation; but it will do so
-    immediately afterwards.
+Well then, we'll specialise foo's wrapper, which will expose a
+specialisation for foo's worker, which we will do too.  That seems
+fine.  (To work reliably, `foo` would need an INLINABLE pragma,
+in which case we don't unpack dictionaries for the worker; see
+see Note [Do not unbox class dictionaries].)
 
 Note [Wrapper NoUserInlinePrag]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -814,7 +826,7 @@ mkWWBindPair ww_opts fn_id fn_info fn_args fn_body work_uniq div
                   | otherwise   = topDmd
 
     wrap_rhs  = wrap_fn work_id
-    wrap_prag = mkStrWrapperInlinePrag fn_inl_prag
+    wrap_prag = mkStrWrapperInlinePrag fn_inl_prag fn_rules
     wrap_unf  = mkWrapperUnfolding simpl_opts wrap_rhs arity
 
     wrap_id   = fn_id `setIdUnfolding`  wrap_unf
@@ -826,25 +838,28 @@ mkWWBindPair ww_opts fn_id fn_info fn_args fn_body work_uniq div
     fn_inl_prag     = inlinePragInfo fn_info
     fn_inline_spec  = inl_inline fn_inl_prag
     fn_unfolding    = realUnfoldingInfo fn_info
+    fn_rules        = ruleInfoRules (ruleInfo fn_info)
 
-mkStrWrapperInlinePrag :: InlinePragma -> InlinePragma
-mkStrWrapperInlinePrag (InlinePragma { inl_act = act, inl_rule = rule_info })
+mkStrWrapperInlinePrag :: InlinePragma -> [CoreRule] -> InlinePragma
+-- See Note [Wrapper activation]
+mkStrWrapperInlinePrag (InlinePragma { inl_act = act, inl_rule = rule_info }) rules
   = InlinePragma { inl_src    = SourceText "{-# INLINE"
                  , inl_inline = NoUserInlinePrag -- See Note [Wrapper NoUserInline]
                  , inl_sat    = Nothing
-                 , inl_act    = wrap_act
+                 , inl_act    = activeAfter wrapper_phase
                  , inl_rule   = rule_info }  -- RuleMatchInfo is (and must be) unaffected
   where
-    wrap_act  = case act of  -- See Note [Wrapper activation]
-                   NeverActive     -> activateDuringFinal
-                   FinalActive     -> act
-                   ActiveAfter {}  -> act
-                   ActiveBefore {} -> activateAfterInitial
-                   AlwaysActive    -> activateAfterInitial
-      -- For the last two cases, see (4) in Note [Wrapper activation]
-      -- NB: the (ActiveBefore n) isn't quite right. We really want
-      -- it to be active *after* Initial but *before* n.  We don't have
-      -- a way to say that, alas.
+    -- See Note [Wrapper activation]
+    wrapper_phase = foldr (laterPhase . get_rule_phase) earliest_inline_phase rules
+    earliest_inline_phase = beginPhase act `laterPhase` nextPhase InitialPhase
+          -- laterPhase (nextPhase InitialPhase) is a temporary hack
+          -- to inline no earlier than phase 2.  I got regressions in
+          -- 'mate', due to changes in full laziness due to Note [Case
+          -- MFEs], when I did earlier inlining.
+
+    get_rule_phase :: CoreRule -> CompilerPhase
+    -- The phase /after/ the rule is first active
+    get_rule_phase rule = nextPhase (beginPhase (ruleActivation rule))
 
 {-
 Note [Demand on the worker]
