@@ -54,7 +54,6 @@ import System.Directory
 import System.FilePath
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
-import qualified Control.Exception as Exception
 import GHC.Unit.Info
 import GHC.Unit.State
 import GHC.Unit.Home
@@ -1168,7 +1167,7 @@ joinObjectFiles logger tmpfs dflags o_files output_fn = do
 
 getHCFilePackages :: FilePath -> IO [UnitId]
 getHCFilePackages filename =
-  Exception.bracket (openFile filename ReadMode) hClose $ \h -> do
+  withFile filename ReadMode $ \h -> do
     l <- hGetLine h
     case l of
       '/':'*':' ':'G':'H':'C':'_':'P':'A':'C':'K':'A':'G':'E':'S':rest ->
