@@ -575,7 +575,9 @@ setup_locale
 # Platform-specific environment initialization
 if [ -n "${HERMETIC:-}" ]; then
   export CABAL_DIR="$TOP/cabal"
-  export HOME="/nonexistent"
+  # We previously set HOME=/nonexistent but apparently nix wants $HOME to exist
+  # so sadly we must settle for someplace writable.
+  export HOME="$TOP/tmp-home"
 else
   BIN_DIST_NAME="${BIN_DIST_NAME:-}"
   case "$(uname)" in
