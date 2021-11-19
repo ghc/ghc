@@ -3,11 +3,10 @@ T15883d.hs:14:1: error:
     • Ambiguous type variable ‘a0’ arising from a use of ‘showsPrec’
       prevents the constraint ‘(Show a0)’ from being solved.
       Probable fix: use a type annotation to specify what ‘a0’ should be.
-      These potential instances exist:
+      Potentially matching instances:
         instance Show Ordering -- Defined in ‘GHC.Show’
         instance Show (Foo LiftedRep) -- Defined at T15883d.hs:14:1
-        instance Show a => Show (Maybe a) -- Defined in ‘GHC.Show’
-        ...plus 28 others
+        ...plus 29 others
         ...plus 9 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the second argument of ‘(.)’, namely ‘(showsPrec 11 b1)’

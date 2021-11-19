@@ -6,12 +6,11 @@ tcfail072.hs:23:13: error:
                    g :: forall p q. (Ord p, Ord q) => AB p q -> Bool
         at tcfail072.hs:22:1-38
       The type variable ‘p0’ is ambiguous
-      These potential instances exist:
+      Potentially matching instances:
         instance Ord Ordering -- Defined in ‘GHC.Classes’
         instance Ord Integer -- Defined in ‘GHC.Num.Integer’
-        instance Ord () -- Defined in ‘GHC.Classes’
-        ...plus N others
-        ...plus N instances involving out-of-scope types
+        ...plus 23 others
+        ...plus two instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the expression: g A
       In an equation for ‘g’: g (B _ _) = g A

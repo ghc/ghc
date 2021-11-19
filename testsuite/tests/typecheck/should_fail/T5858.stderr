@@ -5,7 +5,7 @@ T5858.hs:11:7: error:
                                   ([a0], [a1]))’ from being solved.
       Probable fix: use a type annotation to specify what ‘a0’,
                                                           ‘a1’ should be.
-      This potential instance exists:
+      Potentially matching instance:
         instance (t1 ~ String) => InferOverloaded (t1, t1)
           -- Defined at T5858.hs:8:10
     • In the expression: infer ([], [])

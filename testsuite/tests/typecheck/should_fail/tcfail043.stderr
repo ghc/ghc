@@ -7,7 +7,7 @@ tcfail043.hs:38:17: error:
         a :: a0 (bound at tcfail043.hs:38:6)
         search :: a0 -> [a0] -> Bool (bound at tcfail043.hs:37:1)
       Probable fix: use a type annotation to specify what ‘a0’ should be.
-      This potential instance exists:
+      Potentially matching instance:
         instance Ord_ Int -- Defined at tcfail043.hs:34:10
     • In the expression: gt (hd bs) a
       In the expression:
@@ -30,7 +30,7 @@ tcfail043.hs:40:25: error:
         a :: a0 (bound at tcfail043.hs:38:6)
         search :: a0 -> [a0] -> Bool (bound at tcfail043.hs:37:1)
       Probable fix: use a type annotation to specify what ‘a0’ should be.
-      These potential instances exist:
+      Potentially matching instances:
         instance Eq_ Int -- Defined at tcfail043.hs:20:10
         instance Eq_ a => Eq_ [a] -- Defined at tcfail043.hs:23:10
     • In the expression: eq a (hd bs)

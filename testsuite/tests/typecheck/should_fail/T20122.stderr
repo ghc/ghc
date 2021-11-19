@@ -5,8 +5,7 @@ T20122.hs:11:7: error:
       Relevant bindings include
         foo :: a0 -> Bool (bound at T20122.hs:11:1)
       Probable fix: use a type annotation to specify what ‘a0’ should be.
-      This potential instance exists:
-        instance Testable A
-          -- Defined at T20122.hs:8:10
+      Potentially matching instance:
+        instance Testable A -- Defined at T20122.hs:8:10
     • In the expression: test
       In an equation for ‘foo’: foo = test

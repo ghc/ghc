@@ -8,11 +8,10 @@ T15883c.hs:14:1: error:
     • Ambiguous type variable ‘a0’ arising from a use of ‘compare’
       prevents the constraint ‘(Ord a0)’ from being solved.
       Probable fix: use a type annotation to specify what ‘a0’ should be.
-      These potential instances exist:
+      Potentially matching instances:
         instance Ord Ordering -- Defined in ‘GHC.Classes’
         instance Ord (Foo LiftedRep) -- Defined at T15883c.hs:14:1
-        instance Ord Integer -- Defined in ‘GHC.Num.Integer’
-        ...plus 23 others
+        ...plus 24 others
         ...plus two instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the expression: a1 `compare` b1
@@ -26,11 +25,10 @@ T15883c.hs:14:1: error:
     • Ambiguous type variable ‘a1’ arising from a use of ‘<’
       prevents the constraint ‘(Ord a1)’ from being solved.
       Probable fix: use a type annotation to specify what ‘a1’ should be.
-      These potential instances exist:
+      Potentially matching instances:
         instance Ord Ordering -- Defined in ‘GHC.Classes’
         instance Ord (Foo LiftedRep) -- Defined at T15883c.hs:14:1
-        instance Ord Integer -- Defined in ‘GHC.Num.Integer’
-        ...plus 23 others
+        ...plus 24 others
         ...plus two instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the expression: a1 < b1

@@ -2757,7 +2757,7 @@ Situations in which we apply this special logic:
       class Cls a
 
     because BoxedRep/Lifted were not in scope.
-    See GHC.Tc.Errors.pprPotentials.
+    See GHC.Tc.Errors.potentialInstancesErrMsg.
     This fixes one of the issues reported in #20465.
 -}
 

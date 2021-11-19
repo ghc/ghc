@@ -4,9 +4,8 @@ tcfail128.hs:18:16: error:
       prevents the constraint ‘(Data.Array.Base.MArray
                                   b0 FlatVector IO)’ from being solved.
       Probable fix: use a type annotation to specify what ‘b0’ should be.
-      This potential instance exists:
-        one instance involving out-of-scope types
-        (use -fprint-potential-instances to see them all)
+      one instance involving out-of-scope types
+      (use -fprint-potential-instances to see them all)
     • In a stmt of a 'do' block: v <- thaw tmp
       In the expression:
         do let sL = ...

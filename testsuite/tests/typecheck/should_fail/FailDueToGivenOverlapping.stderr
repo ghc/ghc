@@ -6,7 +6,7 @@ FailDueToGivenOverlapping.hs:27:9: error:
           bound by the type signature for:
                      bar :: E [Int] => () -> ()
           at FailDueToGivenOverlapping.hs:26:1-26
-      Matching instances:
+      Matching instance:
         instance E [a] -- Defined at FailDueToGivenOverlapping.hs:21:10
       (The choice depends on the instantiation of ‘a0’)
     • In the expression: eop [undefined]

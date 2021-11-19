@@ -20,12 +20,11 @@ TyAppPat_PatternBindingExistential.hs:13:3: error:
     • Ambiguous type variable ‘a0’ arising from a use of ‘print’
       prevents the constraint ‘(Show a0)’ from being solved.
       Probable fix: use a type annotation to specify what ‘a0’ should be.
-      These potential instances exist:
+      Potentially matching instances:
         instance Show Ordering -- Defined in ‘GHC.Show’
         instance Show a => Show (Maybe a) -- Defined in ‘GHC.Show’
-        instance Show Integer -- Defined in ‘GHC.Show’
-        ...plus N others
-        ...plus N instances involving out-of-scope types
+        ...plus 25 others
+        ...plus 12 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In a stmt of a 'do' block: print (x :: a)
       In the expression: do print (x :: a)

@@ -6,7 +6,7 @@ T16414.hs:15:6: error:
           bound by the type signature for:
                      f1 :: forall x. (All x, AllZip2 I) => x -> ()
           at T16414.hs:14:1-35
-      Matching instances:
+      Matching instance:
         instance AllZip2 f -- Defined at T16414.hs:12:10
       (The choice depends on the instantiation of ‘f0’)
     • In the expression: f2

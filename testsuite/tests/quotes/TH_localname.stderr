@@ -7,7 +7,7 @@ TH_localname.hs:3:11: error:
         x :: t0 -> m0 Language.Haskell.TH.Syntax.Exp
           (bound at TH_localname.hs:3:1)
       Probable fix: use a type annotation to specify what ‘m0’ should be.
-      These potential instances exist:
+      Potentially matching instance:
         instance Language.Haskell.TH.Syntax.Quote IO
           -- Defined in ‘Language.Haskell.TH.Syntax’
         ...plus one instance involving out-of-scope types

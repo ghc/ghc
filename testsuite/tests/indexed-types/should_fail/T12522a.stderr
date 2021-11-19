@@ -6,12 +6,11 @@ T12522a.hs:23:26: error:
         n :: a0 (bound at T12522a.hs:23:15)
         test :: Uncurried '[a0, [Char]] [Char] (bound at T12522a.hs:23:1)
       Probable fix: use a type annotation to specify what ‘a0’ should be.
-      These potential instances exist:
+      Potentially matching instances:
         instance Show Ordering -- Defined in ‘GHC.Show’
         instance Show a => Show (Maybe a) -- Defined in ‘GHC.Show’
-        instance Show Integer -- Defined in ‘GHC.Show’
-        ...plus N others
-        ...plus N instances involving out-of-scope types
+        ...plus 25 others
+        ...plus 12 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the first argument of ‘(++)’, namely ‘show n’
       In the second argument of ‘($)’, namely ‘show n ++ s’

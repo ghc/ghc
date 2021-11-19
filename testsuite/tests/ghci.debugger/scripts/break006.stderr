@@ -4,12 +4,11 @@
       Cannot resolve unknown runtime type ‘a’
       Use :print or :force to determine these types
       Relevant bindings include it :: a (bound at <interactive>:4:1)
-      These potential instances exist:
+      Potentially matching instances:
         instance Show Ordering -- Defined in ‘GHC.Show’
         instance Show a => Show (Maybe a) -- Defined in ‘GHC.Show’
-        instance Show Integer -- Defined in ‘GHC.Show’
-        ...plus N others
-        ...plus N instances involving out-of-scope types
+        ...plus 25 others
+        ...plus 12 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In a stmt of an interactive GHCi command: print it
 
@@ -18,11 +17,10 @@
       Cannot resolve unknown runtime type ‘a’
       Use :print or :force to determine these types
       Relevant bindings include it :: a (bound at <interactive>:6:1)
-      These potential instances exist:
+      Potentially matching instances:
         instance Show Ordering -- Defined in ‘GHC.Show’
         instance Show a => Show (Maybe a) -- Defined in ‘GHC.Show’
-        instance Show Integer -- Defined in ‘GHC.Show’
-        ...plus N others
-        ...plus N instances involving out-of-scope types
+        ...plus 25 others
+        ...plus 12 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In a stmt of an interactive GHCi command: print it

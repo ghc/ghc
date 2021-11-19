@@ -6,12 +6,11 @@ T10971b.hs:4:11: error:
         x :: t2 a (bound at T10971b.hs:4:6)
         f :: t2 a -> Int (bound at T10971b.hs:4:1)
       Probable fix: use a type annotation to specify what ‘t2’ should be.
-      These potential instances exist:
+      Potentially matching instances:
         instance Foldable (Either a) -- Defined in ‘Data.Foldable’
         instance Foldable Maybe -- Defined in ‘Data.Foldable’
-        instance Foldable ((,) a) -- Defined in ‘Data.Foldable’
-        ...plus N others
-        ...plus N instances involving out-of-scope types
+        ...plus three others
+        ...plus 29 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the expression: length x
       In the expression: \ x -> length x
@@ -24,12 +23,11 @@ T10971b.hs:5:13: error:
         x :: t1 a (bound at T10971b.hs:5:8)
         g :: (a -> b) -> t1 a -> t1 b (bound at T10971b.hs:5:1)
       Probable fix: use a type annotation to specify what ‘t1’ should be.
-      These potential instances exist:
+      Potentially matching instances:
         instance Traversable (Either a) -- Defined in ‘Data.Traversable’
         instance Traversable Maybe -- Defined in ‘Data.Traversable’
-        instance Traversable ((,) a) -- Defined in ‘Data.Traversable’
-        ...plus N others
-        ...plus N instances involving out-of-scope types
+        ...plus three others
+        ...plus 29 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the expression: fmapDefault f x
       In the expression: \ f x -> fmapDefault f x
@@ -42,12 +40,11 @@ T10971b.hs:6:14: error:
         x :: t0 a (bound at T10971b.hs:6:8)
         h :: (a -> b) -> t0 a -> (t0 b, Int) (bound at T10971b.hs:6:1)
       Probable fix: use a type annotation to specify what ‘t0’ should be.
-      These potential instances exist:
+      Potentially matching instances:
         instance Traversable (Either a) -- Defined in ‘Data.Traversable’
         instance Traversable Maybe -- Defined in ‘Data.Traversable’
-        instance Traversable ((,) a) -- Defined in ‘Data.Traversable’
-        ...plus N others
-        ...plus N instances involving out-of-scope types
+        ...plus three others
+        ...plus 29 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the expression: fmapDefault f x
       In the expression: (fmapDefault f x, length x)
@@ -60,12 +57,11 @@ T10971b.hs:6:31: error:
         x :: t0 a (bound at T10971b.hs:6:8)
         h :: (a -> b) -> t0 a -> (t0 b, Int) (bound at T10971b.hs:6:1)
       Probable fix: use a type annotation to specify what ‘t0’ should be.
-      These potential instances exist:
+      Potentially matching instances:
         instance Foldable (Either a) -- Defined in ‘Data.Foldable’
         instance Foldable Maybe -- Defined in ‘Data.Foldable’
-        instance Foldable ((,) a) -- Defined in ‘Data.Foldable’
-        ...plus N others
-        ...plus N instances involving out-of-scope types
+        ...plus three others
+        ...plus 29 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the expression: length x
       In the expression: (fmapDefault f x, length x)

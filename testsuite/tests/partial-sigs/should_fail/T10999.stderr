@@ -21,12 +21,11 @@ T10999.hs:8:28: error:
       prevents the constraint ‘(Ord b0)’ from being solved.
       Relevant bindings include g :: [b0] (bound at T10999.hs:8:1)
       Probable fix: use a type annotation to specify what ‘b0’ should be.
-      These potential instances exist:
+      Potentially matching instances:
         instance Ord a => Ord (Set.Set a) -- Defined in ‘Data.Set.Internal’
         instance Ord Ordering -- Defined in ‘GHC.Classes’
-        instance Ord Integer -- Defined in ‘GHC.Num.Integer’
-        ...plus N others
-        ...plus N instances involving out-of-scope types
+        ...plus 24 others
+        ...plus two instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the second argument of ‘($)’, namely ‘f ()’
       In the second argument of ‘($)’, namely ‘Set.toList $ f ()’

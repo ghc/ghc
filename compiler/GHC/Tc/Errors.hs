@@ -1,5 +1,6 @@
 
 {-# LANGUAGE LambdaCase          #-}
+{-# LANGUAGE NamedFieldPuns      #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
@@ -85,7 +86,9 @@ import Control.Monad    ( unless, when, foldM, forM_ )
 import Data.Foldable    ( toList )
 import Data.Functor     ( (<&>) )
 import Data.Function    ( on )
-import Data.List        ( partition, mapAccumL, sortBy, unfoldr )
+import Data.List        ( groupBy, partition, mapAccumL
+                        , sortBy, tails, unfoldr )
+import Data.Ord         ( comparing )
 -- import Data.Semigroup   ( Semigroup )
 import qualified Data.Semigroup as Semigroup
 
@@ -2615,16 +2618,13 @@ mk_dict_err ctxt@(CEC {cec_encl = implics}) (ct, (matches, unifiers, unsafe_over
 
         potential_msg
           = ppWhen (not (null unifiers) && want_potential orig) $
-            sdocOption sdocPrintPotentialInstances $ \print_insts ->
-            getPprStyle $ \sty ->
-            pprPotentials (PrintPotentialInstances print_insts) sty potential_hdr unifiers
+              potential_hdr $$
+              potentialInstancesErrMsg (PotentialInstances { matches = [], unifiers })
 
         potential_hdr
-          = vcat [ ppWhen lead_with_ambig $
-                     text "Probable fix: use a type annotation to specify what"
-                     <+> pprQuotedList ambig_tvs <+> text "should be."
-                 , thisOrThese unifiers <+> text "potential instance" <> plural unifiers
-                   <+> text "exist" <> singular unifiers <> text ":"]
+          = ppWhen lead_with_ambig $
+            text "Probable fix: use a type annotation to specify what"
+            <+> pprQuotedList ambig_tvs <+> text "should be."
 
         mb_patsyn_prov :: Maybe SDoc
         mb_patsyn_prov
@@ -2676,10 +2676,8 @@ mk_dict_err ctxt@(CEC {cec_encl = implics}) (ct, (matches, unifiers, unsafe_over
                   sep [text "Matching givens (or their superclasses):"
                       , nest 2 (vcat matching_givens)]
 
-             ,  sdocOption sdocPrintPotentialInstances $ \print_insts ->
-                getPprStyle $ \sty ->
-                pprPotentials (PrintPotentialInstances print_insts) sty (text "Matching instances:") $
-                ispecs ++ unifiers
+             ,  potentialInstancesErrMsg
+                  (PotentialInstances { matches = map fst matches, unifiers })
 
              ,  ppWhen (null matching_givens && isSingleton matches && null unifiers) $
                 -- Intuitively, some given matched the wanted in their
@@ -2907,36 +2905,88 @@ show_fixes (f:fs) = sep [ text "Possible fix:"
                         , nest 2 (vcat (f : map (text "or" <+>) fs))]
 
 
--- Avoid boolean blindness
-newtype PrintPotentialInstances = PrintPotentialInstances Bool
+-- | This datatype collates instances that match or unifier,
+-- in order to report an error message for an unsolved typeclass constraint.
+data PotentialInstances
+  = PotentialInstances
+  { matches  :: [ClsInst]
+  , unifiers :: [ClsInst]
+  }
 
-pprPotentials :: PrintPotentialInstances -> PprStyle -> SDoc -> [ClsInst] -> SDoc
+-- | Directly display the given matching and unifying instances,
+-- with a header for each: `Matching instances`/`Potentially matching instances`.
+pprPotentialInstances :: (ClsInst -> SDoc) -> PotentialInstances -> SDoc
+pprPotentialInstances ppr_inst (PotentialInstances { matches, unifiers }) =
+  vcat
+    [ ppWhen (not $ null matches) $
+       text "Matching instance" <> plural matches <> colon $$
+         nest 2 (vcat (map ppr_inst matches))
+    , ppWhen (not $ null unifiers) $
+        (text "Potentially matching instance" <> plural unifiers <> colon) $$
+         nest 2 (vcat (map ppr_inst unifiers))
+    ]
+
+-- | Display a summary of available instances, omitting those involving
+-- out-of-scope types, in order to explain why we couldn't solve a particular
+-- constraint, e.g. due to instance overlap or out-of-scope types.
+--
+-- To directly display a collection of matching/unifying instances,
+-- use 'pprPotentialInstances'.
+potentialInstancesErrMsg :: PotentialInstances -> SDoc
 -- See Note [Displaying potential instances]
-pprPotentials (PrintPotentialInstances show_potentials) sty herald insts
-  | null insts
+potentialInstancesErrMsg potentials =
+  sdocOption sdocPrintPotentialInstances $ \print_insts ->
+  getPprStyle $ \sty ->
+    potentials_msg_with_options potentials print_insts sty
+
+-- | Display a summary of available instances, omitting out-of-scope ones.
+--
+-- Use 'potentialInstancesErrMsg' to automatically set the pretty-printing
+-- options.
+potentials_msg_with_options :: PotentialInstances
+                            -> Bool -- ^ Whether to print /all/ potential instances
+                            -> PprStyle
+                            -> SDoc
+potentials_msg_with_options
+  (PotentialInstances { matches, unifiers })
+  show_all_potentials sty
+  | null matches && null unifiers
   = empty
 
-  | null show_these
-  = hang herald
-       2 (vcat [ not_in_scope_msg empty
-               , flag_hint ])
+  | null show_these_matches && null show_these_unifiers
+  = vcat [ not_in_scope_msg empty
+         , flag_hint ]
 
   | otherwise
-  = hang herald
-       2 (vcat [ pprInstances show_these
-               , ppWhen (n_in_scope_hidden > 0) $
-                 text "...plus"
-                   <+> speakNOf n_in_scope_hidden (text "other")
-               , not_in_scope_msg (text "...plus")
-               , flag_hint ])
+  = vcat [ pprPotentialInstances
+            pprInstance -- print instance + location info
+            (PotentialInstances
+              { matches  = show_these_matches
+              , unifiers = show_these_unifiers })
+         , overlapping_but_not_more_specific_msg sorted_matches
+         , nest 2 $ vcat
+           [ ppWhen (n_in_scope_hidden > 0) $
+             text "...plus"
+               <+> speakNOf n_in_scope_hidden (text "other")
+           , ppWhen (not_in_scopes > 0) $
+              not_in_scope_msg (text "...plus")
+           , flag_hint ] ]
   where
-    n_show = 3 :: Int
+    n_show_matches, n_show_unifiers :: Int
+    n_show_matches  = 3
+    n_show_unifiers = 2
 
-    (in_scope, not_in_scope) = partition inst_in_scope insts
-    sorted = sortBy fuzzyClsInstCmp in_scope
-    show_these | show_potentials = sorted
-               | otherwise       = take n_show sorted
-    n_in_scope_hidden = length sorted - length show_these
+    (in_scope_matches, not_in_scope_matches) = partition inst_in_scope matches
+    (in_scope_unifiers, not_in_scope_unifiers) = partition inst_in_scope unifiers
+    sorted_matches = sortBy fuzzyClsInstCmp in_scope_matches
+    sorted_unifiers = sortBy fuzzyClsInstCmp in_scope_unifiers
+    (show_these_matches, show_these_unifiers)
+       | show_all_potentials = (sorted_matches, sorted_unifiers)
+       | otherwise           = (take n_show_matches  sorted_matches
+                               ,take n_show_unifiers sorted_unifiers)
+    n_in_scope_hidden
+      = length sorted_matches + length sorted_unifiers
+      - length show_these_matches - length show_these_unifiers
 
        -- "in scope" means that all the type constructors
        -- are lexically in scope; these instances are likely
@@ -2958,16 +3008,72 @@ pprPotentials (PrintPotentialInstances show_potentials) sty herald insts
     qual_in_scope (NameQual {}) = True
     qual_in_scope _             = False
 
-    not_in_scope_msg herald
-      | null not_in_scope
-      = empty
-      | otherwise
-      = hang (herald <+> speakNOf (length not_in_scope) (text "instance")
-                     <+> text "involving out-of-scope types")
-           2 (ppWhen show_potentials (pprInstances not_in_scope))
+    not_in_scopes :: Int
+    not_in_scopes = length not_in_scope_matches + length not_in_scope_unifiers
 
-    flag_hint = ppUnless (show_potentials || equalLength show_these insts) $
+    not_in_scope_msg herald =
+      hang (herald <+> speakNOf not_in_scopes (text "instance")
+                     <+> text "involving out-of-scope types")
+           2 (ppWhen show_all_potentials $
+               pprPotentialInstances
+               pprInstanceHdr -- only print the header, not the instance location info
+                 (PotentialInstances
+                   { matches = not_in_scope_matches
+                   , unifiers = not_in_scope_unifiers
+                   }))
+
+    flag_hint = ppUnless (show_all_potentials
+                         || (equalLength show_these_matches matches
+                             && equalLength show_these_unifiers unifiers)) $
                 text "(use -fprint-potential-instances to see them all)"
+
+-- | Compute a message informing the user of any instances that are overlapped
+-- but were not discarded because the instance overlapping them wasn't
+-- strictly more specific.
+overlapping_but_not_more_specific_msg :: [ClsInst] -> SDoc
+overlapping_but_not_more_specific_msg insts
+  -- Only print one example of "overlapping but not strictly more specific",
+  -- to avoid information overload.
+  | overlap : _ <- overlapping_but_not_more_specific
+  = overlap_header $$ ppr_overlapping overlap
+  | otherwise
+  = empty
+    where
+      overlap_header :: SDoc
+      overlap_header
+        | [_] <- overlapping_but_not_more_specific
+        = text "An overlapping instance can only be chosen when it is strictly more specific."
+        | otherwise
+        = text "Overlapping instances can only be chosen when they are strictly more specific."
+      overlapping_but_not_more_specific :: [(ClsInst, ClsInst)]
+      overlapping_but_not_more_specific
+        = nubOrdBy (comparing (is_dfun . fst))
+          [ (overlapper, overlappee)
+          | these <- groupBy ((==) `on` is_cls_nm) insts
+          -- Take all pairs of distinct instances...
+          , one:others <- tails these -- if `these = [inst_1, inst_2, ...]`
+          , other <- others           -- then we get pairs `(one, other) = (inst_i, inst_j)` with `i < j`
+          -- ... such that one instance in the pair overlaps the other...
+          , let mb_overlapping
+                  | hasOverlappingFlag (overlapMode $ is_flag one)
+                  || hasOverlappableFlag (overlapMode $ is_flag other)
+                  = [(one, other)]
+                  | hasOverlappingFlag (overlapMode $ is_flag other)
+                  || hasOverlappableFlag (overlapMode $ is_flag one)
+                  = [(other, one)]
+                  | otherwise
+                  = []
+          , (overlapper, overlappee) <- mb_overlapping
+          -- ... but the overlapper is not more specific than the overlappee.
+          , not (overlapper `more_specific_than` overlappee)
+          ]
+      more_specific_than :: ClsInst -> ClsInst -> Bool
+      is1 `more_specific_than` is2
+        = isJust (tcMatchTys (is_tys is1) (is_tys is2))
+      ppr_overlapping :: (ClsInst, ClsInst) -> SDoc
+      ppr_overlapping (overlapper, overlappee)
+        = text "The first instance that follows overlaps the second, but is not more specific than it:"
+        $$ nest 2 (vcat $ map pprInstanceHdr [overlapper, overlappee])
 
 {- Note [Displaying potential instances]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

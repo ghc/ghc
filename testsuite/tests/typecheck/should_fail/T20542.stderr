@@ -1,0 +1,15 @@
+
+T20542.hs:17:7: error:
+    • Overlapping instances for Foo String String
+        arising from a use of ‘foo’
+      Matching instances:
+        instance [overlappable] Show a => Foo a String
+          -- Defined at T20542.hs:10:31
+        instance [overlapping] Read b => Foo String b
+          -- Defined at T20542.hs:13:30
+      An overlapping instance can only be chosen when it is strictly more specific.
+      The first instance that follows overlaps the second, but is not more specific than it:
+        instance [overlapping] Read b => Foo String b
+        instance [overlappable] Show a => Foo a String
+    • In the expression: foo
+      In an equation for ‘bar’: bar = foo

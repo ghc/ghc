@@ -5,13 +5,13 @@ T7857.hs:8:11: error:
         bound by the inferred type of g :: PrintfArg t => t -> b
         at T7857.hs:8:1-21
       The type variable ‘a0’ is ambiguous
-      These potential instances exist:
+      Potentially matching instances:
         instance [safe] (a ~ ()) => PrintfType (IO a)
           -- Defined in ‘Text.Printf’
         instance [safe] (PrintfArg a, PrintfType r) => PrintfType (a -> r)
           -- Defined in ‘Text.Printf’
-        instance [safe] IsChar c => PrintfType [c]
-          -- Defined in ‘Text.Printf’
+        ...plus one other
+        (use -fprint-potential-instances to see them all)
     • In the second argument of ‘($)’, namely ‘printf "" i’
       In the expression: f $ printf "" i
       In an equation for ‘g’: g i = f $ printf "" i

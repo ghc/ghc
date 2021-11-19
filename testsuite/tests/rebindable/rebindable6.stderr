@@ -10,7 +10,7 @@ rebindable6.hs:110:17: error:
         test_do :: IO a -> IO (Maybe b) -> IO b
           (bound at rebindable6.hs:108:9)
       Probable fix: use a type annotation to specify what ‘t0’ should be.
-      This potential instance exists:
+      Potentially matching instance:
         instance HasSeq (IO a -> IO b -> IO b)
           -- Defined at rebindable6.hs:56:18
     • In a stmt of a 'do' block: f
@@ -35,7 +35,7 @@ rebindable6.hs:111:17: error:
           (bound at rebindable6.hs:108:9)
       Probable fix: use a type annotation to specify what ‘p0’,
                                                           ‘t0’ should be.
-      This potential instance exists:
+      Potentially matching instance:
         instance HasBind (IO a -> (a -> IO b) -> IO b)
           -- Defined at rebindable6.hs:51:18
     • In a stmt of a 'do' block: Just (b :: b) <- g
@@ -59,7 +59,7 @@ rebindable6.hs:112:17: error:
         test_do :: IO a -> IO (Maybe b) -> IO b
           (bound at rebindable6.hs:108:9)
       Probable fix: use a type annotation to specify what ‘p0’ should be.
-      This potential instance exists:
+      Potentially matching instance:
         instance HasReturn (a -> IO a) -- Defined at rebindable6.hs:46:18
     • In a stmt of a 'do' block: return b
       In the expression:
