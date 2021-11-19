@@ -370,15 +370,16 @@ The available mode flags are:
     Run GHC using the given frontend plugin. See :ref:`frontend_plugins` for
     details.
 
-.. ghc-flag:: --mk-dll
-    :shortdesc: DLL-creation mode (Windows only)
+.. ghc-flag:: -shared
+    :shortdesc: Create a shared object.
     :type: mode
     :category: modes
 
     .. index::
        single: DLL-creation mode
+       single: Shared-object creation mode
 
-    DLL-creation mode (Windows only). See :ref:`win32-dlls-create`.
+    Create a shared object (or, on Windows, DLL). See :ref:`win32-dlls-create`.
 
 .. ghc-flag:: --help
               -?
