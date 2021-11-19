@@ -66,19 +66,20 @@ import System.FilePath
    C compiler (opt.)      | .hc or .c     | -S            | .s
    assembler              | .s  or .S     | -c            | .o
    linker                 | other         | -             | a.out
+   linker (merge objects) | other         | -             | .o
 -}
 
 -- Phases we can actually stop after
-data StopPhase = StopPreprocess -- -E
-               | StopC  -- -C
-               | StopAs -- -S
-               | NoStop -- -c
+data StopPhase = StopPreprocess -- ^ @-E@
+               | StopC          -- ^ @-C@
+               | StopAs         -- ^ @-S@
+               | NoStop         -- ^ @-c@
 
 stopPhaseToPhase :: StopPhase -> Phase
 stopPhaseToPhase StopPreprocess = anyHsc
-stopPhaseToPhase StopC   = HCc
-stopPhaseToPhase StopAs  = As False
-stopPhaseToPhase NoStop  = StopLn
+stopPhaseToPhase StopC          = HCc
+stopPhaseToPhase StopAs         = As False
+stopPhaseToPhase NoStop         = StopLn
 
 -- | Untyped Phase description
 data Phase

@@ -165,10 +165,7 @@ runMergeForeign _pipe_env hsc_env input_fn foreign_os = do
                               (tmpDir (hsc_dflags hsc_env))
                               TFL_CurrentModule "o"
          copyFile input_fn new_o
-         let dflags = hsc_dflags hsc_env
-             logger = hsc_logger hsc_env
-         let tmpfs = hsc_tmpfs hsc_env
-         joinObjectFiles logger tmpfs dflags (new_o : foreign_os) input_fn
+         joinObjectFiles hsc_env (new_o : foreign_os) input_fn
          return input_fn
 
 runLlvmLlcPhase :: PipeEnv -> HscEnv -> FilePath -> IO FilePath
@@ -1098,7 +1095,7 @@ enabled in the toolchain:
 
 We must enable bigobj output in a few places:
 
- * When merging object files (GHC.Driver.Pipeline.joinObjectFiles)
+ * When merging object files (GHC.Driver.Pipeline.Execute.joinObjectFiles)
 
  * When assembling (GHC.Driver.Pipeline.runPhase (RealPhase As ...))
 
@@ -1123,19 +1120,12 @@ via gcc.
 
 -}
 
-joinObjectFiles :: Logger -> TmpFs -> DynFlags -> [FilePath] -> FilePath -> IO ()
-joinObjectFiles logger tmpfs dflags o_files output_fn = do
+joinObjectFiles :: HscEnv -> [FilePath] -> FilePath -> IO ()
+joinObjectFiles hsc_env o_files output_fn = do
   let toolSettings' = toolSettings dflags
       ldIsGnuLd = toolSettings_ldIsGnuLd toolSettings'
-      osInfo = platformOS (targetPlatform dflags)
-      ld_r args = GHC.SysTools.runMergeObjects logger tmpfs dflags (
-                        -- See Note [Produce big objects on Windows]
-                        concat
-                          [ [GHC.SysTools.Option "--oformat", GHC.SysTools.Option "pe-bigobj-x86-64"]
-                          | OSMinGW32 == osInfo
-                          , not $ target32Bit (targetPlatform dflags)
-                          ]
-                     ++ map GHC.SysTools.Option ld_build_id
+      ld_r args = GHC.SysTools.runMergeObjects (hsc_logger hsc_env) (hsc_tmpfs hsc_env) (hsc_dflags hsc_env) (
+                        map GHC.SysTools.Option ld_build_id
                      ++ [ GHC.SysTools.Option "-o",
                           GHC.SysTools.FileOption "" output_fn ]
                      ++ args)
@@ -1144,7 +1134,7 @@ joinObjectFiles logger tmpfs dflags o_files output_fn = do
       -- which we don't need and sometimes causes ld to emit a
       -- warning:
       ld_build_id | toolSettings_ldSupportsBuildId toolSettings' = ["--build-id=none"]
-                  | otherwise                     = []
+                  | otherwise                                    = []
 
   if ldIsGnuLd
      then do
@@ -1161,6 +1151,11 @@ joinObjectFiles logger tmpfs dflags o_files output_fn = do
                 GHC.SysTools.FileOption "" filelist]
      else
           ld_r (map (GHC.SysTools.FileOption "") o_files)
+  where
+    dflags = hsc_dflags hsc_env
+    tmpfs = hsc_tmpfs hsc_env
+    logger = hsc_logger hsc_env
+
 
 -----------------------------------------------------------------------------
 -- Look for the /* GHC_PACKAGES ... */ comment at the top of a .hc file

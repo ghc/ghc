@@ -3488,6 +3488,21 @@ will be executed on the target. As such packages like ``git-embed``,
 ``file-embed`` and others might not behave as expected if the target
 and host do not share the same filesystem.
 
+.. _building-ghci-libraries:
+
+Building GHCi libraries
+-----------------------
+
+When invoked in the static way, GHCi will use the GHC RTS's static runtime
+linker to load object files for imported modules when available. However, when
+these modules are built with :ghc-flag:`-split-sections` this linking can be
+quite expensive. To reduce this cost, package managers and build systems may
+opt to produce a pre-linked *GHCi object* using the :ghc-flag:`-merge-objs`
+mode. This merges the per-module objects into a single object, collapsing
+function sections into a single text section which can be efficiently loaded by
+the runtime linker.
+
+
 .. _ghci-faq:
 
 FAQ and Things To Watch Out For

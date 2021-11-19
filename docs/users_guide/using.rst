@@ -345,6 +345,14 @@ The available mode flags are:
     compile source files one at a time, or link objects together into an
     executable. See :ref:`options-order`.
 
+.. ghc-flag:: -merge-objs
+    :shortdesc: Merge a set of objects into a GHCi library.
+    :type: mode
+    :category: phases
+
+    Merge a set of static object files into a library optimised for loading in
+    GHCi. See :ref:`building-ghci-libraries`.
+
 .. ghc-flag:: -M
     :shortdesc: generate dependency information suitable for use in a
         ``Makefile``; see :ref:`makefile-dependencies` for details.

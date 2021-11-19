@@ -378,9 +378,10 @@ link ghcLink logger tmpfs hooks dflags unit_env batch_attempt_linking hpt =
   case linkHook hooks of
       Nothing -> case ghcLink of
           NoLink        -> return Succeeded
-          LinkBinary    -> link' logger tmpfs dflags unit_env batch_attempt_linking hpt
-          LinkStaticLib -> link' logger tmpfs dflags unit_env batch_attempt_linking hpt
-          LinkDynLib    -> link' logger tmpfs dflags unit_env batch_attempt_linking hpt
+          LinkBinary    -> normal_link
+          LinkStaticLib -> normal_link
+          LinkDynLib    -> normal_link
+          LinkMergedObj -> normal_link
           LinkInMemory
               | platformMisc_ghcWithInterpreter $ platformMisc dflags
               -> -- Not Linking...(demand linker will do the job)
@@ -388,6 +389,8 @@ link ghcLink logger tmpfs hooks dflags unit_env batch_attempt_linking hpt =
               | otherwise
               -> panicBadLink LinkInMemory
       Just h  -> h ghcLink dflags batch_attempt_linking hpt
+  where
+    normal_link = link' logger tmpfs dflags unit_env batch_attempt_linking hpt
 
 
 panicBadLink :: GhcLink -> a
@@ -559,6 +562,11 @@ doLink hsc_env o_files =
         LinkBinary    -> linkBinary         logger tmpfs dflags unit_env o_files []
         LinkStaticLib -> linkStaticLib      logger       dflags unit_env o_files []
         LinkDynLib    -> linkDynLibCheck    logger tmpfs dflags unit_env o_files []
+        LinkMergedObj
+          | Just out <- outputFile dflags
+          , let objs = [ f | FileOption _ f <- ldInputs dflags ]
+                      -> joinObjectFiles hsc_env (o_files ++ objs) out
+          | otherwise -> panic "Output path must be specified for LinkMergedObj"
         other         -> panicBadLink other
 
 -----------------------------------------------------------------------------
