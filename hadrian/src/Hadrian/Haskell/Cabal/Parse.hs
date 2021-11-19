@@ -194,6 +194,8 @@ registerPackage context@Context {..} = do
     traced "cabal-register" $
         C.defaultMainWithHooksNoReadArgs C.autoconfUserHooks gpd
             [ "register", "--builddir", ctxPath, v ]
+-- | What type of file is Main
+data MainSourceType = HsMain | CppMain | CMain
 
 -- | Parse the 'ContextData' of a given 'Context'.
 resolveContextData :: Context -> Action ContextData
@@ -270,10 +272,18 @@ resolveContextData context@Context {..} = do
 
         (buildInfo, modules, mainIs) = biModules pd'
 
+        classifyMain :: FilePath -> MainSourceType
+        classifyMain fp
+          | takeExtension fp `elem` [".hs", ".lhs"] = HsMain
+          | takeExtension fp `elem` [".cpp", ".cxx", ".c++"]= CppMain
+          | otherwise = CMain
+
+        main_src = fmap (first C.display) mainIs
+
       in return $ ContextData
           { dependencies    = deps
           , componentId     = C.localCompatPackageKey lbi'
-          , mainIs          = fmap (first C.display) mainIs
+          , mainIs          = main_src
           , modules         = map C.display modules
           , otherModules    = map C.display $ C.otherModules buildInfo
           , srcDirs         =
@@ -289,8 +299,8 @@ resolveContextData context@Context {..} = do
           , extraLibs       = C.extraLibs       buildInfo
           , extraLibDirs    = C.extraLibDirs    buildInfo
           , asmSrcs         = C.asmSources      buildInfo
-          , cSrcs           = C.cSources        buildInfo
-          , cxxSrcs         = C.cxxSources      buildInfo
+          , cSrcs           = C.cSources        buildInfo ++ [ ms | Just (_,ms) <- pure main_src, CMain   <- pure (classifyMain ms)]
+          , cxxSrcs         = C.cxxSources      buildInfo ++ [ ms | Just (_,ms) <- pure main_src, CppMain <- pure (classifyMain ms)]
           , cmmSrcs         = C.cmmSources      buildInfo
           , hcOpts          = C.programDefaultArgs ghcProg
               ++ C.hcOptions C.GHC buildInfo
