@@ -571,15 +571,15 @@ runUnlitPhase hsc_env input_fn output_fn = do
 
     return output_fn
 
-getFileArgs :: HscEnv -> FilePath -> IO ((DynFlags, [Warn]))
+getFileArgs :: HscEnv -> FilePath -> IO ((DynFlags, Messages PsMessage, [Warn]))
 getFileArgs hsc_env input_fn = do
   let dflags0 = hsc_dflags hsc_env
       parser_opts = initParserOpts dflags0
-  src_opts <- getOptionsFromFile parser_opts input_fn
+  (warns0, src_opts) <- getOptionsFromFile parser_opts input_fn
   (dflags1, unhandled_flags, warns)
     <- parseDynamicFilePragma dflags0 src_opts
   checkProcessArgsResult unhandled_flags
-  return (dflags1, warns)
+  return (dflags1, warns0, warns)
 
 runCppPhase :: HscEnv -> FilePath -> FilePath -> IO FilePath
 runCppPhase hsc_env input_fn output_fn = do

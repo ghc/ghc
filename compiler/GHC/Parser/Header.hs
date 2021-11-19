@@ -22,6 +22,8 @@ where
 
 import GHC.Prelude
 
+import GHC.Data.Bag
+
 import GHC.Driver.Errors.Types -- Unfortunate, needed due to the fact we throw exceptions!
 
 import GHC.Parser.Errors.Types
@@ -163,15 +165,17 @@ mkPrelImports this_mod loc implicit_prelude import_decls
 -- Throws a 'SourceError' if flag parsing fails (including unsupported flags.)
 getOptionsFromFile :: ParserOpts
                    -> FilePath            -- ^ Input file
-                   -> IO [Located String] -- ^ Parsed options, if any.
+                   -> IO (Messages PsMessage, [Located String]) -- ^ Parsed options, if any.
 getOptionsFromFile opts filename
     = Exception.bracket
               (openBinaryFile filename ReadMode)
               (hClose)
               (\handle -> do
-                  opts <- fmap (getOptions' opts)
+                  (warns, opts) <- fmap (getOptions' opts)
                                (lazyGetToks opts' filename handle)
-                  seqList opts $ return opts)
+                  seqList opts
+                    $ seqList (bagToList $ getMessages warns)
+                    $ return (warns, opts))
     where -- We don't need to get haddock doc tokens when we're just
           -- getting the options from pragmas, and lazily lexing them
           -- correctly is a little tricky: If there is "\n" or "\n-"
@@ -243,7 +247,7 @@ getToks popts filename buf = lexAll pstate
 getOptions :: ParserOpts
            -> StringBuffer -- ^ Input Buffer
            -> FilePath     -- ^ Source filename.  Used for location info.
-           -> [Located String] -- ^ Parsed options.
+           -> (Messages PsMessage,[Located String]) -- ^ warnings and parsed options.
 getOptions opts buf filename
     = getOptions' opts (getToks opts filename buf)
 
@@ -253,7 +257,7 @@ getOptions opts buf filename
 -- CPP, so we can't use the same trick as 'getImports'.
 getOptions' :: ParserOpts
             -> [Located Token]      -- Input buffer
-            -> [Located String]     -- Options.
+            -> (Messages PsMessage,[Located String])     -- Options.
 getOptions' opts toks
     = parseToks toks
     where
@@ -263,7 +267,7 @@ getOptions' opts toks
               = case toArgs starting_loc str of
                   Left _err -> optionsParseError str $   -- #15053
                                  combineSrcSpans (getLoc open) (getLoc close)
-                  Right args -> args ++ parseToks xs
+                  Right args -> fmap (args ++) (parseToks xs)
             where
               src_span      = getLoc open
               real_src_span = expectJust "getOptions'" (srcSpanToRealSrcSpan src_span)
@@ -271,22 +275,24 @@ getOptions' opts toks
           parseToks (open:close:xs)
               | ITinclude_prag str <- unLoc open
               , ITclose_prag       <- unLoc close
-              = map (L (getLoc open)) ["-#include",removeSpaces str] ++
-                parseToks xs
+              = fmap (map (L (getLoc open)) ["-#include",removeSpaces str] ++)
+                     (parseToks xs)
           parseToks (open:close:xs)
               | ITdocOptions str _ <- unLoc open
               , ITclose_prag       <- unLoc close
-              = map (L (getLoc open)) ["-haddock-opts", removeSpaces str]
-                ++ parseToks xs
+              = fmap (map (L (getLoc open)) ["-haddock-opts", removeSpaces str] ++)
+                     (parseToks xs)
           parseToks (open:xs)
               | ITlanguage_prag <- unLoc open
               = parseLanguage xs
           parseToks (comment:xs) -- Skip over comments
               | isComment (unLoc comment)
               = parseToks xs
-          parseToks _ = []
+          -- At the end of the header, warn about all the misplaced pragmas
+          parseToks xs = (unionManyMessages $ mapMaybe mkMessage xs ,[])
+
           parseLanguage ((L loc (ITconid fs)):rest)
-              = checkExtension opts (L loc fs) :
+              = fmap (checkExtension opts (L loc fs) :) $
                 case rest of
                   (L _loc ITcomma):more -> parseLanguage more
                   (L _loc ITclose_prag):more -> parseToks more
@@ -296,6 +302,20 @@ getOptions' opts toks
               = languagePragParseError (getLoc tok)
           parseLanguage []
               = panic "getOptions'.parseLanguage(2) went past eof token"
+
+          -- Warn for all the misplaced pragmas
+          mkMessage :: Located Token -> Maybe (Messages PsMessage)
+          mkMessage (L loc token)
+            | IToptions_prag _ <- token
+            = Just (singleMessage $ mkPlainMsgEnvelope diag_opts loc (PsWarnMisplacedPragma OptionsPrag))
+            | ITinclude_prag _ <- token
+            = Just (singleMessage $ mkPlainMsgEnvelope diag_opts loc (PsWarnMisplacedPragma IncludePrag))
+            | ITdocOptions _ _ <- token
+            = Just (singleMessage $ mkPlainMsgEnvelope diag_opts loc (PsWarnMisplacedPragma DocOptionsPrag))
+            | ITlanguage_prag <- token
+            = Just (singleMessage $ mkPlainMsgEnvelope diag_opts loc (PsWarnMisplacedPragma LanguagePrag))
+            | otherwise = Nothing
+            where diag_opts = pDiagOpts opts
 
           isComment :: Token -> Bool
           isComment c =

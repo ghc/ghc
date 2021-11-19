@@ -107,6 +107,8 @@ instance Diagnostic PsMessage where
           $$ text "deprecated in the future."
     PsWarnUnrecognisedPragma
       -> mkSimpleDecorated $ text "Unrecognised pragma"
+    PsWarnMisplacedPragma prag
+      -> mkSimpleDecorated $ text "Misplaced" <+> pprFileHeaderPragmaType prag <+> text "pragma"
     PsWarnImportPreQualified
       -> mkSimpleDecorated $
             text "Found" <+> quotes (text "qualified")
@@ -506,6 +508,7 @@ instance Diagnostic PsMessage where
     PsWarnStarBinder                              -> WarningWithFlag Opt_WarnStarBinder
     PsWarnStarIsType                              -> WarningWithFlag Opt_WarnStarIsType
     PsWarnUnrecognisedPragma                      -> WarningWithFlag Opt_WarnUnrecognisedPragmas
+    PsWarnMisplacedPragma{}                       -> WarningWithFlag Opt_WarnMisplacedPragmas
     PsWarnImportPreQualified                      -> WarningWithFlag Opt_WarnPrepositiveQualifiedModule
     PsErrLexer{}                                  -> ErrorWithoutFlag
     PsErrCmmLexer                                 -> ErrorWithoutFlag
@@ -621,6 +624,7 @@ instance Diagnostic PsMessage where
     PsWarnStarBinder                              -> [SuggestQualifyStarOperator]
     PsWarnStarIsType                              -> [SuggestUseTypeFromDataKind Nothing]
     PsWarnUnrecognisedPragma                      -> noHints
+    PsWarnMisplacedPragma{}                       -> [SuggestPlacePragmaInHeader]
     PsWarnImportPreQualified                      -> [ SuggestQualifiedAfterModuleName
                                                      , suggestExtension LangExt.ImportQualifiedPost]
     PsErrLexer{}                                  -> noHints
@@ -835,3 +839,9 @@ parse_error_in_pat = text "Parse error in pattern:"
 forallSym :: Bool -> SDoc
 forallSym True  = text "∀"
 forallSym False = text "forall"
+
+pprFileHeaderPragmaType :: FileHeaderPragmaType -> SDoc
+pprFileHeaderPragmaType OptionsPrag    = text "OPTIONS"
+pprFileHeaderPragmaType IncludePrag    = text "INCLUDE"
+pprFileHeaderPragmaType LanguagePrag   = text "LANGUAGE"
+pprFileHeaderPragmaType DocOptionsPrag = text "OPTIONS_HADDOCK"

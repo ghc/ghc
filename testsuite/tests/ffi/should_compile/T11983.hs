@@ -1,7 +1,7 @@
 {-# LANGUAGE ForeignFunctionInterface #-}
 module T11983 where
 
-{-# INCLUDE T11983.h #-}
+
 
 import Foreign.Ptr
 

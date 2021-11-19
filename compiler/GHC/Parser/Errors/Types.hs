@@ -119,6 +119,7 @@ data PsMessage
 
    -- | Unrecognised pragma
    | PsWarnUnrecognisedPragma
+   | PsWarnMisplacedPragma !FileHeaderPragmaType
 
    -- | Invalid Haddock comment position
    | PsWarnHaddockInvalidPos
@@ -550,3 +551,10 @@ data CmmParserError
 data TransLayoutReason
    = TransLayout_Where -- ^ "`where' clause at the same depth as implicit layout block"
    | TransLayout_Pipe  -- ^ "`|' at the same depth as implicit layout block")
+
+
+data FileHeaderPragmaType
+  = OptionsPrag
+  | IncludePrag
+  | LanguagePrag
+  | DocOptionsPrag

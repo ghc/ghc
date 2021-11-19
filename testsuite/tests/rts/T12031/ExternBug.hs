@@ -3,7 +3,5 @@
 {-# LANGUAGE ForeignFunctionInterface #-}
 module ExternBug (bar) where
 
-{-# INCLUDE foo.h #-}
-
 foreign import ccall "bar"
   bar :: IO ()

@@ -1,7 +1,7 @@
 {-# LANGUAGE DatatypeContexts #-}
+{-# OPTIONS -O #-}
 module ShouldSucceed where
 
-{-# OPTIONS -O #-}
 
 newtype Num a => Point2 a     = Point2 (a,a)
 

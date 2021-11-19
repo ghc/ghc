@@ -185,3 +185,5 @@ test('T20846',    normal, compile, ['-dsuppress-uniques -ddump-parsed-ast'])
 
 test('T20551', normal, compile, [''])
 test('OpaqueParseWarn1', normal, compile, [''])
+test('T20385', normal, compile, [''])
+test('T20385S', normal, compile, [''])
