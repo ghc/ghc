@@ -637,9 +637,12 @@ lvlMFE env strict_ctxt (_, AnnCast e (_, co))
   = do  { e' <- lvlMFE env strict_ctxt e
         ; return (Cast e' (substCo (le_subst env) co)) }
 
+{-   Not doing this any more: #19001
 lvlMFE env strict_ctxt e@(_, AnnCase {})
   | strict_ctxt       -- Don't share cases in a strict context
   = lvlExpr env e     -- See Note [Case MFEs]
+-}
+
 
 lvlMFE env strict_ctxt ann_expr
   |  floatTopLvlOnly env && not (isTopLvl dest_lvl)

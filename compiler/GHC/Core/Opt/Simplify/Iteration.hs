@@ -1747,7 +1747,7 @@ simplNonRecE env bndr (rhs, rhs_se) body cont
 
              -- Deal with strict bindings
              -- See Note [Dark corner with representation polymorphism]
-            | isStrictId bndr1 && seCaseCase env
+            | isStrictId bndr1   -- && seCaseCase env
             || needs_case_binding ->
             simplExprF (rhs_se `setInScopeFromE` env) rhs
                        (StrictBind { sc_bndr = bndr, sc_body = body
@@ -1904,12 +1904,14 @@ wrapJoinCont env cont thing_inside
   | contIsStop cont        -- Common case; no need for fancy footwork
   = thing_inside env cont
 
+{-
   | not (seCaseCase env)
     -- See Note [Join points with -fno-case-of-case]
   = do { (floats1, expr1) <- thing_inside env (mkBoringStop (contHoleType cont))
        ; let (floats2, expr2) = wrapJoinFloatsX floats1 expr1
        ; (floats3, expr3) <- rebuild (env `setInScopeFromF` floats2) expr2 cont
        ; return (floats2 `addFloats` floats3, expr3) }
+-}
 
   | otherwise
     -- Normal case; see Note [Join points and case-of-case]
@@ -2212,7 +2214,7 @@ rebuildCall env fun_info
 
   -- Strict arguments
   | isStrictArgInfo fun_info
-  , seCaseCase env
+--   , seCaseCase env
   = -- pprTrace "Strict Arg" (ppr arg $$ ppr (seIdSubst env) $$ ppr (seInScope env)) $
     simplExprF (arg_se `setInScopeFromE` env) arg
                (StrictArg { sc_fun = fun_info, sc_fun_ty = fun_ty
@@ -2955,10 +2957,12 @@ doCaseToLet scrut case_bndr
 --------------------------------------------------
 
 reallyRebuildCase env scrut case_bndr alts cont
+{-
   | not (seCaseCase env)
   = do { case_expr <- simplAlts env scrut case_bndr alts
                                 (mkBoringStop (contHoleType cont))
        ; rebuild env case_expr cont }
+-}
 
   | otherwise
   = do { (floats, env', cont') <- mkDupableCaseCont env alts cont
