@@ -1,9 +1,0 @@
-
-T15073.hs:8:12: error:
-    • Illegal unboxed tuple type as function argument: (# Foo a #)
-    • In the type signature: p :: Foo a -> (# Foo a #)
-      When typechecking the code for ‘p’
-        in a derived instance for ‘P (Foo a)’:
-        To see the code I am typechecking, use -ddump-deriv
-      In the instance declaration for ‘P (Foo a)’
-    Suggested fix: Perhaps you intended to use UnboxedTuples

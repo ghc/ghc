@@ -1850,6 +1850,9 @@ genInst spec@(DS { ds_tvs = tvs, ds_mechanism = mechanism
           -- that bring type variables into scope.
           -- See Note [Newtype-deriving instances] in GHC.Tc.Deriv.Generate
         , LangExt.InstanceSigs
+          -- Skip unboxed tuples checking for derived instances when imported
+          -- in a different module, see #20524
+        , LangExt.UnboxedTuples
         ]
       | otherwise
       = []

@@ -113,6 +113,8 @@ test('T14682', normal, compile, ['-ddump-deriv -dsuppress-uniques'])
 test('T14883', normal, compile, [''])
 test('T14932', normal, compile, [''])
 test('T14933', normal, compile, [''])
+test('T15073', [extra_files(['T15073a.hs'])], multimod_compile,
+               ['T15073', '-v0'])
 test('T15290c', normal, compile, [''])
 test('T15290d', normal, compile, [''])
 test('T15398', normal, compile, [''])
