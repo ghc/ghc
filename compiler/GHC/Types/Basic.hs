@@ -73,11 +73,11 @@ module GHC.Types.Basic (
         DefMethSpec(..),
         SwapFlag(..), flipSwap, unSwap, isSwapped,
 
-        CompilerPhase(..), PhaseNum,
+        CompilerPhase(..), PhaseNum, beginPhase, nextPhase, laterPhase,
 
         Activation(..), isActive, competesWith,
         isNeverActive, isAlwaysActive, activeInFinalPhase,
-        activateAfterInitial, activateDuringFinal,
+        activateAfterInitial, activateDuringFinal, activeAfter,
 
         RuleMatchInfo(..), isConLike, isFunLike,
         InlineSpec(..), noUserInlineSpec,
@@ -1232,12 +1232,43 @@ data Activation
   deriving( Eq, Data )
     -- Eq used in comparing rules in GHC.Hs.Decls
 
-activateAfterInitial :: Activation
--- Active in the first phase after the initial phase
+beginPhase :: Activation -> CompilerPhase
+-- First phase in which the Activation is active
+-- or FinalPhase if it is never active
+beginPhase AlwaysActive      = InitialPhase
+beginPhase (ActiveBefore {}) = InitialPhase
+beginPhase (ActiveAfter _ n) = Phase n
+beginPhase FinalActive       = FinalPhase
+beginPhase NeverActive       = FinalPhase
+
+activeAfter :: CompilerPhase -> Activation
+-- (activeAfter p) makes an Activation that is active in phase p and after
+-- Invariant: beginPhase (activeAfter p) = p
+activeAfter InitialPhase = AlwaysActive
+activeAfter (Phase n)    = ActiveAfter NoSourceText n
+activeAfter FinalPhase   = FinalActive
+
+nextPhase :: CompilerPhase -> CompilerPhase
+-- Tells you the next phase after this one
 -- Currently we have just phases [2,1,0,FinalPhase,FinalPhase,...]
 -- Where FinalPhase means GHC's internal simplification steps
 -- after all rules have run
-activateAfterInitial = ActiveAfter NoSourceText 2
+nextPhase InitialPhase = Phase 2
+nextPhase (Phase 0)    = FinalPhase
+nextPhase (Phase n)    = Phase (n-1)
+nextPhase FinalPhase   = FinalPhase
+
+laterPhase :: CompilerPhase -> CompilerPhase -> CompilerPhase
+-- Returns the later of two phases
+laterPhase (Phase n1)   (Phase n2)   = Phase (n1 `min` n2)
+laterPhase InitialPhase p2           = p2
+laterPhase FinalPhase   _            = FinalPhase
+laterPhase p1           InitialPhase = p1
+laterPhase _            FinalPhase   = FinalPhase
+
+activateAfterInitial :: Activation
+-- Active in the first phase after the initial phase
+activateAfterInitial = activeAfter (nextPhase InitialPhase)
 
 activateDuringFinal :: Activation
 -- Active in the final simplification phase (which is repeated)
