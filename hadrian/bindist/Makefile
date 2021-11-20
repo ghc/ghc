@@ -201,7 +201,7 @@ update_package_db: install_bin install_lib
 	@echo "$(PKG_CONFS)"
 	@echo "Updating the package DB"
 	$(foreach p, $(PKG_CONFS),\
-		$(call patchpackageconf,$(shell echo $(notdir $p) | sed 's/-\([0-9]*[0-9]\.\)*conf//g'),$(shell echo "$p" | sed 's:xxx:   :g'),$(docdir),$(shell realpath --relative-to="$(ActualLibsDir)" "$(docdir)")))
+		$(call patchpackageconf,$(shell echo $(notdir $p) | sed 's/-\([0-9]*[0-9]\.\)*conf//g'),$(shell echo "$p" | sed 's:xxx:   :g'),$(docdir),$(shell mk/relpath.sh "$(ActualLibsDir)" "$(docdir)")))
 	'$(WrapperBinsDir)/$(CrossCompilePrefix)ghc-pkg' recache
 
 install_mingw:
