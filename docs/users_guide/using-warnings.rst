@@ -57,6 +57,7 @@ To reverse ``-Werror``, which makes all warnings into errors, use ``-Wwarn``.
         * :ghc-flag:`-Wambiguous-fields`
         * :ghc-flag:`-Wunicode-bidirectional-format-characters`
         * :ghc-flag:`-Wforall-identifier`
+        * :ghc-flag:`-Wgadt-mono-local-binds`
 
 The following flags are simple ways to select standard "packages" of warnings:
 
@@ -2203,6 +2204,8 @@ of ``-W(no-)*``.
     :type: dynamic
     :category:
 
+    :since: 9.0.2
+
     Explicit unicode bidirectional formatting characters can cause source code
     to be rendered misleadingly in many viewers. We warn if any such character
     is present in the source.
@@ -2212,8 +2215,31 @@ of ``-W(no-)*``.
     category of the `Unicode Bidirectional Character Type Listing
     <https://www.unicode.org/reports/tr9/#Bidirectional_Character_Types>`_
 
-    :since: 9.0.2
+.. ghc-flag:: -Wgadt-mono-local-binds
+    :shortdesc: warn when pattern matching on a GADT without MonoLocalBinds
+    :type: dynamic
+    :reverse: -Wno-gadt-mono-local-binds
 
+    :since: 9.4.1
+
+    This warning is triggered on pattern matching involving GADTs,
+    if :extension:`MonoLocalBinds` is disabled.
+    Type inference can be fragile in this case.
+
+    See the `OutsideIn(X) <https://www.microsoft.com/en-us/research/publication/outsideinx-modular-type-inference-with-local-assumptions/>`__
+    paper (section 4.2) and :ref:`mono-local-binds` for more details.
+
+    To resolve this warning, you can enable :extension:`MonoLocalBinds`
+    or an extension implying it (:extension:`GADTs` or
+    :extension:`TypeFamilies`).
+
+    The warning is also triggered when matching on GADT-like
+    pattern synonyms (i.e. pattern synonyms containing equalities in provided
+    constraints).
+
+    In previous versions of GHC (9.2 and below), it was an error
+    to pattern match on a GADT if neither :extension:`GADTs`
+    nor :extension:`TypeFamilies` were enabled.
 
 If you're feeling really paranoid, the :ghc-flag:`-dcore-lint` option is a good choice.
 It turns on heavyweight intra-pass sanity-checking within GHC. (It checks GHC's

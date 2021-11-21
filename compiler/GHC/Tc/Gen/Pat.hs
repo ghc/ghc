@@ -868,6 +868,19 @@ tcConPat penv con_lname@(L _ con_name) pat_ty arg_pats thing_inside
                                              pat_ty arg_pats thing_inside
         }
 
+-- Warn when pattern matching on a GADT or a pattern synonym
+-- when MonoLocalBinds is off.
+warnMonoLocalBinds :: TcM ()
+warnMonoLocalBinds
+  = do { mono_local_binds <- xoptM LangExt.MonoLocalBinds
+       ; unless mono_local_binds $
+           addDiagnostic TcRnGADTMonoLocalBinds
+           -- We used to require the GADTs or TypeFamilies extension
+           -- to pattern match on a GADT (#2905, #7156)
+           --
+           -- In #20485 this was made into a warning.
+       }
+
 tcDataConPat :: PatEnv -> LocatedN Name -> DataCon
              -> Scaled ExpSigmaType        -- Type of the pattern
              -> HsConPatDetails GhcRn -> TcM a
@@ -940,21 +953,12 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty_scaled
         { let theta'     = substTheta tenv (eqSpecPreds eq_spec ++ theta)
                            -- order is *important* as we generate the list of
                            -- dictionary binders from theta'
-              no_equalities = null eq_spec && not (any isEqPred theta)
               skol_info = PatSkol (RealDataCon data_con) mc
               mc = case pe_ctxt penv of
                      LamPat mc -> mc
                      LetPat {} -> PatBindRhs
 
-        ; gadts_on    <- xoptM LangExt.GADTs
-        ; families_on <- xoptM LangExt.TypeFamilies
-        ; checkTc (no_equalities || gadts_on || families_on)
-                  (TcRnUnknownMessage $ mkPlainError noHints $
-                   text "A pattern match on a GADT requires the" <+>
-                   text "GADTs or TypeFamilies language extension")
-                  -- #2905 decided that a *pattern-match* of a GADT
-                  -- should require the GADT language flag.
-                  -- Re TypeFamilies see also #7156
+        ; when (not (null eq_spec) || any isEqPred theta) warnMonoLocalBinds
 
         ; given <- newEvVars theta'
         ; (ev_binds, (arg_pats', res))
@@ -998,6 +1002,8 @@ tcPatSynPat penv (L con_span con_name) pat_syn pat_ty arg_pats thing_inside
               arg_tys_scaled = map (scaleScaled pat_mult) arg_tys'
               prov_theta' = substTheta tenv prov_theta
               req_theta'  = substTheta tenv req_theta
+
+        ; when (any isEqPred prov_theta) warnMonoLocalBinds
 
         ; mult_wrap <- checkManyPattern pat_ty
             -- See Note [Wrapper returned from tcSubMult] in GHC.Tc.Utils.Unify.

@@ -1423,6 +1423,15 @@ data TcRnMessage where
   -}
   TcRnForallIdentifier :: RdrName -> TcRnMessage
 
+  {-| TcRnGADTMonoLocalBinds is a warning controlled by -Wgadt-mono-local-binds
+      that occurs when pattern matching on a GADT when -XMonoLocalBinds is off.
+
+      Example(s): None
+
+      Test cases: T20485, T20485a
+  -}
+  TcRnGADTMonoLocalBinds :: TcRnMessage
+
 -- | Which parts of a record field are affected by a particular error or warning.
 data RecordFieldPart
   = RecordFieldConstructor !Name
