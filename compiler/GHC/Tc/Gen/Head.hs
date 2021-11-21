@@ -483,7 +483,7 @@ tcInferRecSelId (FieldOcc sel_name lbl)
          = do { thing <- tcLookup sel_name
               ; case thing of
                     ATcId { tct_id = id }
-                      -> do { check_naughty occ id
+                      -> do { check_naughty occ id  -- See Note [Local record selectors]
                             ; check_local_id id
                             ; return id }
 
@@ -1034,11 +1034,11 @@ errors in a polymorphic situation.
 If this check fails (which isn't impossible) we get another chance; see
 Note [Converting strings] in Convert.hs
 
-Local record selectors
-~~~~~~~~~~~~~~~~~~~~~~
+Note [Local record selectors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Record selectors for TyCons in this module are ordinary local bindings,
 which show up as ATcIds rather than AGlobals.  So we need to check for
-naughtiness in both branches.  c.f. TcTyClsBindings.mkAuxBinds.
+naughtiness in both branches.  c.f. GHC.Tc.TyCl.Utils.mkRecSelBinds.
 -}
 
 

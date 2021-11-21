@@ -433,7 +433,7 @@ checkTySynRhs ctxt ty
                         ; expand <- initialExpandMode
                         ; check_pred_ty emptyTidyEnv dflags ctxt expand ty })
          else addErrTcM ( emptyTidyEnv
-                        , TcRnIllegalConstraintSynonymOfKind (tidyKind emptyTidyEnv actual_kind)
+                        , TcRnIllegalConstraintSynonymOfKind (tidyType emptyTidyEnv actual_kind)
                         ) }
 
   | otherwise
@@ -923,7 +923,7 @@ forAllEscapeErr env tvbs theta tau tau_kind
   -- NB: Don't tidy the sigma type since the tvbs were already tidied
   -- previously, and re-tidying them will make the names of type
   -- variables different from tau_kind.
-  = (env, TcRnForAllEscapeError (mkSigmaTy tvbs theta tau) (tidyKind env tau_kind))
+  = (env, TcRnForAllEscapeError (mkSigmaTy tvbs theta tau) (tidyType env tau_kind))
 
 {-
 Note [Type variables escaping through kinds]

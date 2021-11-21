@@ -2708,7 +2708,7 @@ https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0179-printi
   reverse :: forall a. [a] -> [a]
 
   -- foo :: forall a f b. (Show a, Num b, Foldable f) => a -> f b -> String
-  > :type +v foo @Int
+  > :type foo @Int
   forall f b. (Show Int, Num b, Foldable f) => Int -> f b -> String
 
   Note that Show Int is still reported, because the solver never got a chance

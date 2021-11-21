@@ -347,7 +347,6 @@ defFullHelpText =
   "   :script <file>              run the script <file>\n" ++
   "   :type <expr>                show the type of <expr>\n" ++
   "   :type +d <expr>             show the type of <expr>, defaulting type variables\n" ++
-  "   :type +v <expr>             show the type of <expr>, with its specified tyvars\n" ++
   "   :unadd <module> ...         remove module(s) from the current target set\n" ++
   "   :undef <cmd>                undefine user-defined command :<cmd>\n" ++
   "   ::<cmd>                     run the builtin command\n" ++

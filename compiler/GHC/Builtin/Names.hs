@@ -767,12 +767,11 @@ toList_RDR = nameRdrName toListName
 compose_RDR :: RdrName
 compose_RDR             = varQual_RDR gHC_BASE (fsLit ".")
 
-not_RDR, getTag_RDR, dataToTag_RDR, succ_RDR, pred_RDR, minBound_RDR, maxBound_RDR,
+not_RDR, dataToTag_RDR, succ_RDR, pred_RDR, minBound_RDR, maxBound_RDR,
     and_RDR, range_RDR, inRange_RDR, index_RDR,
     unsafeIndex_RDR, unsafeRangeSize_RDR :: RdrName
 and_RDR                 = varQual_RDR gHC_CLASSES (fsLit "&&")
 not_RDR                 = varQual_RDR gHC_CLASSES (fsLit "not")
-getTag_RDR              = varQual_RDR gHC_BASE (fsLit "getTag")
 dataToTag_RDR           = varQual_RDR gHC_PRIM (fsLit "dataToTag#")
 succ_RDR                = varQual_RDR gHC_ENUM (fsLit "succ")
 pred_RDR                = varQual_RDR gHC_ENUM (fsLit "pred")

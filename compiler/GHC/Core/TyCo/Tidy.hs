@@ -8,12 +8,10 @@ module GHC.Core.TyCo.Tidy
         -- * Tidying type related things up for printing
         tidyType,      tidyTypes,
         tidyOpenType,  tidyOpenTypes,
-        tidyOpenKind,
         tidyVarBndr, tidyVarBndrs, tidyFreeTyCoVars, avoidNameClashes,
         tidyOpenTyCoVar, tidyOpenTyCoVars,
         tidyTyCoVarOcc,
         tidyTopType,
-        tidyKind,
         tidyCo, tidyCos,
         tidyTyCoVarBinder, tidyTyCoVarBinders
   ) where
@@ -215,13 +213,6 @@ tidyTopType :: Type -> Type
 tidyTopType ty = tidyType emptyTidyEnv ty
 
 ---------------
-tidyOpenKind :: TidyEnv -> Kind -> (TidyEnv, Kind)
-tidyOpenKind = tidyOpenType
-
-tidyKind :: TidyEnv -> Kind -> Kind
-tidyKind = tidyType
-
-----------------
 
 -- | Tidy a Coercion
 --

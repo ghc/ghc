@@ -484,12 +484,10 @@ pprHoleFit (HFDC sWrp sWrpVars sTy sProv sMs) (HoleFit {..}) =
  hang display 2 provenance
  where tyApp = sep $ zipWithEqual "pprHoleFit" pprArg vars hfWrap
          where pprArg b arg = case binderArgFlag b of
-                                -- See Note [Explicit Case Statement for Specificity]
-                                (Invisible spec) -> case spec of
-                                  SpecifiedSpec -> text "@" <> pprParendType arg
+                                Specified -> text "@" <> pprParendType arg
                                   -- Do not print type application for inferred
                                   -- variables (#16456)
-                                  InferredSpec  -> empty
+                                Inferred  -> empty
                                 Required  -> pprPanic "pprHoleFit: bad Required"
                                                          (ppr b <+> ppr arg)
        tyAppVars = sep $ punctuate comma $
