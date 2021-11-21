@@ -51,18 +51,18 @@ All of the following are permissible: ::
     inc :: Int -> Int
     inc x = x + 1
 
-    ref1 = static 1
+    ref1 = static 'a'
     ref2 = static inc
     ref3 = static (inc 1)
     ref4 = static ((\x -> x + 1) (1 :: Int))
-    ref5 y = static (let x = 1 in x)
-    ref6 y = let x = 1 in static x
+    ref5 = static (let x = 'a' in x)
+    ref6 = let x = 'a' in static x
 
 While the following definitions are rejected: ::
 
     ref7 y = let x = y in static x    -- x is not closed
     ref8 y = static (let x = 1 in y)  -- y is not let-bound
-    ref8 (y :: a) = let x = undefined :: a
+    ref9 (y :: a) = let x = undefined :: a
                      in static x      -- x has a non-closed type
 
 .. note::
@@ -99,7 +99,7 @@ expression is overloaded to allow lifting a ``StaticPtr`` into another
 type implicitly, via the ``IsStatic`` class: ::
 
     class IsStatic p where
-        fromStaticPtr :: StaticPtr a -> p a
+        fromStaticPtr :: Typeable a => StaticPtr a -> p a
 
 The only predefined instance is the obvious one that does nothing: ::
 
@@ -111,7 +111,7 @@ See :base-ref:`GHC.StaticPtr.IsStatic`.
 Furthermore, type ``t`` is constrained to have a ``Typeable`` instance.
 The following are therefore illegal: ::
 
-    static show                    -- No Typeable instance for (Show a => a -> String)
+    static id                      -- No Typeable instance for (a -> a)
     static Control.Monad.ST.runST  -- No Typeable instance for ((forall s. ST s a) -> a)
 
 That being said, with the appropriate use of wrapper datatypes, the

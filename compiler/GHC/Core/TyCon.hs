@@ -680,10 +680,8 @@ instance OutputableBndr tv => Outputable (VarBndr tv TyConBndrVis) where
       ppr_bi (AnonTCB VisArg)     = text "anon-vis"
       ppr_bi (AnonTCB InvisArg)   = text "anon-invis"
       ppr_bi (NamedTCB Required)  = text "req"
-      -- See Note [Explicit Case Statement for Specificity]
-      ppr_bi (NamedTCB (Invisible spec)) = case spec of
-        SpecifiedSpec -> text "spec"
-        InferredSpec  -> text "inf"
+      ppr_bi (NamedTCB Specified) = text "spec"
+      ppr_bi (NamedTCB Inferred)  = text "inf"
 
 instance Binary TyConBndrVis where
   put_ bh (AnonTCB af)   = do { putByte bh 0; put_ bh af }

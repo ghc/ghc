@@ -2948,11 +2948,6 @@ commonly used commands.
 	*X> :type length
 	length :: Foldable t => t a -> Int
 
-.. ghci-cmd:: :type +v; ⟨expression⟩
-
-    Infers and prints the type of ⟨expression⟩, binding inferred type variables
-    with :ref:`*specified* visibility <inferred-vs-specified>`.
-
 .. ghci-cmd:: :type +d; ⟨expression⟩
 
     Infers and prints the type of ⟨expression⟩, instantiating *all* the forall

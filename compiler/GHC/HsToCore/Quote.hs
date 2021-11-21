@@ -2675,7 +2675,7 @@ repH98DataCon con details
              arg_tys <- repPrefixConArgs ps
              rep2 normalCName [unC con', unC arg_tys]
            InfixCon st1 st2 -> do
-             verifyLinearConstructors [st1, st2]
+             verifyLinearFields [st1, st2]
              arg1 <- repBangTy (hsScaledThing st1)
              arg2 <- repBangTy (hsScaledThing st2)
              rep2 infixCName [unC arg1, unC con', unC arg2]
@@ -2705,8 +2705,8 @@ repGadtDataCons cons details res_ty
 -- denotes a linear field.
 -- This check is not performed in repRecConArgs, since the GADT record
 -- syntax currently does not have a way to mark fields as nonlinear.
-verifyLinearConstructors :: [HsScaled GhcRn (LHsType GhcRn)] -> MetaM ()
-verifyLinearConstructors ps = do
+verifyLinearFields :: [HsScaled GhcRn (LHsType GhcRn)] -> MetaM ()
+verifyLinearFields ps = do
   linear <- lift $ xoptM LangExt.LinearTypes
   let allGood = all (\st -> case hsMult st of
                               HsUnrestrictedArrow _ -> not linear
@@ -2718,7 +2718,7 @@ verifyLinearConstructors ps = do
 repPrefixConArgs :: [HsScaled GhcRn (LHsType GhcRn)]
                  -> MetaM (Core [M TH.BangType])
 repPrefixConArgs ps = do
-  verifyLinearConstructors ps
+  verifyLinearFields ps
   repListM bangTypeTyConName repBangTy (map hsScaledThing ps)
 
 -- Desugar the arguments in a data constructor declared with record syntax.

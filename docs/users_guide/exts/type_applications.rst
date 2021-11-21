@@ -84,12 +84,12 @@ We can observe this behavior in a GHCi session: ::
 
   > :set -XTypeApplications -fprint-explicit-foralls
   > let myLength1 :: Foldable f => f a -> Int; myLength1 = length
-  > :type +v myLength1
+  > :type myLength1
   myLength1 :: forall (f :: * -> *) a. Foldable f => f a -> Int
   > let myLength2 = length
-  > :type +v myLength2
-  myLength2 :: forall {a} {t :: * -> *}. Foldable t => t a -> Int
-  > :type +v myLength2 @[]
+  > :type myLength2
+  myLength2 :: forall {t :: * -> *} {a}. Foldable t => t a -> Int
+  > :type myLength2 @[]
 
   <interactive>:1:1: error:
       • Cannot apply expression of type ‘t0 a0 -> Int’
@@ -97,29 +97,10 @@ We can observe this behavior in a GHCi session: ::
       • In the expression: myLength2 @[]
 
 Notice that since ``myLength1`` was defined with an explicit type signature,
-:ghci-cmd:`:type +v` reports that all of its type variables are available
+:ghci-cmd:`:type` reports that all of its type variables are available
 for type application. On the other hand, ``myLength2`` was not given a type
 signature. As a result, all of its type variables are surrounded with braces,
 and trying to use visible type application with ``myLength2`` fails.
-
-Also note the use of :ghci-cmd:`:type +v` in the GHCi session above instead
-of :ghci-cmd:`:type`. This is because :ghci-cmd:`:type` gives you the type
-that would be inferred for a variable assigned to the expression provided
-(that is, the type of ``x`` in ``let x = <expr>``). As we saw above with
-``myLength2``, this type will have no variables available to visible type
-application. On the other hand, :ghci-cmd:`:type +v` gives you the actual
-type of the expression provided. To illustrate this: ::
-
-  > :type myLength1
-  myLength1 :: forall {a} {f :: * -> *}. Foldable f => f a -> Int
-  > :type myLength2
-  myLength2 :: forall {a} {t :: * -> *}. Foldable t => t a -> Int
-
-Using :ghci-cmd:`:type` might lead one to conclude that none of the type
-variables in ``myLength1``'s type signature are available for type
-application. This isn't true, however! Be sure to use :ghci-cmd:`:type +v`
-if you want the most accurate information with respect to visible type
-application properties.
 
 .. index::
    single: ScopedSort

@@ -263,7 +263,7 @@ Class and instance declarations
 
 :extension:`ScopedTypeVariables` allow the type variables bound by the top of a
 ``class`` or ``instance`` declaration to scope over the methods defined in the
-``where`` part. Unlike :ref`decl-type-sigs`, type variables from class and
+``where`` part. Unlike :ref:`decl-type-sigs`, type variables from class and
 instance declarations can be lexically scoped without an explicit ``forall``
 (although you are allowed an explicit ``forall`` in an ``instance``
 declaration; see :ref:`explicit-foralls`). For example: ::
