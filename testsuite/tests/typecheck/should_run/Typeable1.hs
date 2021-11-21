@@ -1,4 +1,4 @@
-{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE PolyKinds, GADTs #-}
 
 import Type.Reflection
 import Data.Kind

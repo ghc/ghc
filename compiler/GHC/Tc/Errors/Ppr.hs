@@ -522,6 +522,10 @@ instance Diagnostic TcRnMessage where
             fsep [ text "The use of" <+> quotes (ppr rdr_name)
                                      <+> text "as an identifier",
                    text "will become an error in a future GHC release." ]
+    TcRnGADTMonoLocalBinds
+      -> mkSimpleDecorated $
+            fsep [ text "Pattern matching on GADTs without MonoLocalBinds"
+                 , text "is fragile." ]
 
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -740,6 +744,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnForallIdentifier {}
       -> WarningWithFlag Opt_WarnForallIdentifier
+    TcRnGADTMonoLocalBinds {}
+      -> WarningWithFlag Opt_WarnGADTMonoLocalBinds
 
   diagnosticHints = \case
     TcRnUnknownMessage m
@@ -952,6 +958,8 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnForallIdentifier {}
       -> [SuggestRenameForall]
+    TcRnGADTMonoLocalBinds {}
+      -> [suggestAnyExtension [LangExt.GADTs, LangExt.TypeFamilies]]
 
 deriveInstanceErrReasonHints :: Class
                              -> UsingGeneralizedNewtypeDeriving

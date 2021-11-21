@@ -538,6 +538,7 @@ data WarningFlag =
    | Opt_WarnRedundantStrictnessFlags     -- Since 9.4
    | Opt_WarnForallIdentifier             -- Since 9.4
    | Opt_WarnUnicodeBidirectionalFormatCharacters -- Since 9.0.2
+   | Opt_WarnGADTMonoLocalBinds           -- Since 9.4
    deriving (Eq, Ord, Show, Enum)
 
 -- | Return the names of a WarningFlag
@@ -639,6 +640,7 @@ warnFlagNames wflag = case wflag of
   Opt_WarnMissingExportedPatternSynonymSignatures -> "missing-exported-pattern-synonym-signatures" :| []
   Opt_WarnForallIdentifier                        -> "forall-identifier" :| []
   Opt_WarnUnicodeBidirectionalFormatCharacters    -> "unicode-bidirectional-format-characters" :| []
+  Opt_WarnGADTMonoLocalBinds                      -> "gadt-mono-local-binds" :| []
 
 -- -----------------------------------------------------------------------------
 -- Standard sets of warning options
@@ -731,7 +733,8 @@ standardWarnings -- see Note [Documenting warning flags]
         Opt_WarnNonCanonicalMonoidInstances,
         Opt_WarnOperatorWhitespaceExtConflict,
         Opt_WarnForallIdentifier,
-        Opt_WarnUnicodeBidirectionalFormatCharacters
+        Opt_WarnUnicodeBidirectionalFormatCharacters,
+        Opt_WarnGADTMonoLocalBinds
       ]
 
 -- | Things you get with -W
