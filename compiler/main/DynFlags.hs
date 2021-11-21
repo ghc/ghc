@@ -647,6 +647,7 @@ data GeneralFlag
    | Opt_Hpc
    | Opt_FlatCache
    | Opt_ExternalInterpreter
+   | Opt_PreferDynamicLoader
    | Opt_OptimalApplicativeDo
    | Opt_VersionMacros
    | Opt_WholeArchiveHsLibs
@@ -4321,7 +4322,8 @@ fFlagsDeps = [
   flagSpec "hide-source-paths"                Opt_HideSourcePaths,
   flagSpec "show-loaded-modules"              Opt_ShowLoadedModules,
   flagSpec "whole-archive-hs-libs"            Opt_WholeArchiveHsLibs,
-  flagSpec "keep-cafs"                        Opt_KeepCAFs
+  flagSpec "keep-cafs"                        Opt_KeepCAFs,
+  flagSpec "prefer-dynamic-loader"            Opt_PreferDynamicLoader
   ]
   ++ fHoleFlags
 

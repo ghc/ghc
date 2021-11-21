@@ -294,6 +294,7 @@ linkCmdLineLibs' hsc_env pls =
       let dflags@(DynFlags { ldInputs = cmdline_ld_inputs
                            , libraryPaths = lib_paths_base})
             = hsc_dflags hsc_env
+      let prefer_dynamic_loader = gopt Opt_PreferDynamicLoader dflags
 
       -- (c) Link libraries from the command-line
       let minus_ls_1 = [ lib | Option ('-':'l':lib) <- cmdline_ld_inputs ]
@@ -319,7 +320,7 @@ linkCmdLineLibs' hsc_env pls =
       maybePutStr dflags (unlines $ map ("  "++) gcc_paths)
 
       libspecs
-        <- mapM (locateLib hsc_env False lib_paths_env gcc_paths) minus_ls
+        <- mapM (locateLib hsc_env False prefer_dynamic_loader lib_paths_env gcc_paths) minus_ls
 
       -- (d) Link .o files from the command-line
       classified_ld_inputs <- mapM (classifyLdInput dflags)
@@ -1194,9 +1195,9 @@ instance Outputable LibrarySpec where
 -- of DLL handles that rts/Linker.c maintains, and that in turn is
 -- used by lookupSymbol.  So we must call addDLL for each library
 -- just to get the DLL handle into the list.
-partOfGHCi :: [PackageName]
-partOfGHCi
- | isWindowsHost || isDarwinHost = []
+partOfGHCi :: Bool -> [PackageName]
+partOfGHCi prefer_dynamic_loader
+ | isWindowsHost || isDarwinHost || prefer_dynamic_loader = []
  | otherwise = map (PackageName . mkFastString)
                    ["base", "template-haskell", "editline"]
 
@@ -1262,8 +1263,12 @@ linkPackage hsc_env pkg
         let dflags    = hsc_dflags hsc_env
             platform  = targetPlatform dflags
             is_dyn = interpreterDynamic dflags
-            dirs | is_dyn    = Packages.libraryDynDirs pkg
-                 | otherwise = Packages.libraryDirs pkg
+            prefer_dynamic_loader = gopt Opt_PreferDynamicLoader dflags
+            dirs
+                | prefer_dynamic_loader || is_dyn
+                = Packages.libraryDynDirs pkg
+                | otherwise
+                = Packages.libraryDirs pkg
 
         let hs_libs   =  Packages.hsLibraries pkg
             -- The FFI GHCi import lib isn't needed as
@@ -1290,9 +1295,9 @@ linkPackage hsc_env pkg
         dirs_env <- addEnvPaths "LIBRARY_PATH" dirs
 
         hs_classifieds
-           <- mapM (locateLib hsc_env True  dirs_env gcc_paths) hs_libs'
+           <- mapM (locateLib hsc_env True prefer_dynamic_loader dirs_env gcc_paths) hs_libs'
         extra_classifieds
-           <- mapM (locateLib hsc_env False dirs_env gcc_paths) extra_libs
+           <- mapM (locateLib hsc_env False prefer_dynamic_loader dirs_env gcc_paths) extra_libs
         let classifieds = hs_classifieds ++ extra_classifieds
 
         -- Complication: all the .so's must be loaded before any of the .o's.
@@ -1313,7 +1318,7 @@ linkPackage hsc_env pkg
 
         -- See comments with partOfGHCi
 #if defined(CAN_LOAD_DLL)
-        when (packageName pkg `notElem` partOfGHCi) $ do
+        when (packageName pkg `notElem` partOfGHCi prefer_dynamic_loader) $ do
             loadFrameworks hsc_env platform pkg
             -- See Note [Crash early load_dyn and locateLib]
             -- Crash early if can't load any of `known_dlls`
@@ -1429,9 +1434,9 @@ loadFrameworks hsc_env platform pkg
 -- standard system search path.
 -- For GHCi we tend to prefer dynamic libraries over static ones as
 -- they are easier to load and manage, have less overhead.
-locateLib :: HscEnv -> Bool -> [FilePath] -> [FilePath] -> String
+locateLib :: HscEnv -> Bool -> Bool -> [FilePath] -> [FilePath] -> String
           -> IO LibrarySpec
-locateLib hsc_env is_hs lib_dirs gcc_dirs lib
+locateLib hsc_env is_hs prefer_dynamic_loader lib_dirs gcc_dirs lib
   | not is_hs
     -- For non-Haskell libraries (e.g. gmp, iconv):
     --   first look in library-dirs for a dynamic library (on User paths only)
@@ -1470,7 +1475,7 @@ locateLib hsc_env is_hs lib_dirs gcc_dirs lib
     tryGcc         `orElse`
     assumeDll
 
-  | loading_dynamic_hs_libs -- search for .so libraries first.
+  | prefer_dynamic_loader || loading_dynamic_hs_libs -- search for .so libraries first.
   = findHSDll     `orElse`
     findDynObject `orElse`
     assumeDll
