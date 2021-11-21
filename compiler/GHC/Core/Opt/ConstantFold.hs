@@ -37,8 +37,6 @@ import GHC.Platform
 import {-# SOURCE #-} GHC.Types.Id.Make ( mkPrimOpId, voidPrimId )
 import GHC.Types.Id
 import GHC.Types.Literal
-import GHC.Types.Var.Set
-import GHC.Types.Var.Env
 import GHC.Types.Name.Occurrence ( occNameFS )
 import GHC.Types.Tickish
 import GHC.Types.Name ( Name, nameOccName )
@@ -48,15 +46,15 @@ import GHC.Core
 import GHC.Core.Make
 import GHC.Core.SimpleOpt (  exprIsConApp_maybe, exprIsLiteral_maybe )
 import GHC.Core.DataCon ( DataCon,dataConTagZ, dataConTyCon, dataConWrapId, dataConWorkId )
-import GHC.Core.Utils  ( eqExpr, cheapEqExpr, exprIsHNF, exprType
+import GHC.Core.Utils  ( cheapEqExpr, exprIsHNF, exprType
                        , stripTicksTop, stripTicksTopT, mkTicks )
 import GHC.Core.Multiplicity
-import GHC.Core.FVs
 import GHC.Core.Type
 import GHC.Core.TyCon
    ( tyConDataCons_maybe, isAlgTyCon, isEnumerationTyCon
    , isNewTyCon, tyConDataCons
    , tyConFamilySize )
+import GHC.Core.Map.Expr ( eqCoreExpr )
 
 import GHC.Builtin.PrimOps ( PrimOp(..), tagToEnumKey )
 import GHC.Builtin.Types
@@ -2390,8 +2388,7 @@ match_cstring_foldr_lit foldVariant _ env _
   , unpk `hasKey` foldVariant
   , Just (LitString s1) <- exprIsLiteral_maybe env lit1
   , Just (LitString s2) <- exprIsLiteral_maybe env lit2
-  , let freeVars = (mkInScopeSet (exprFreeVars c1 `unionVarSet` exprFreeVars c2))
-    in eqExpr freeVars c1 c2
+  , eqCoreExpr c1 c2
   , (c1Ticks, c1') <- stripStrTopTicks env c1
   , c2Ticks <- stripStrTopTicksT c2
   = assert (ty1 `eqType` ty2) $

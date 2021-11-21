@@ -35,7 +35,7 @@ module GHC.Core.Utils (
 
         -- * Equality
         cheapEqExpr, cheapEqExpr', eqExpr,
-        diffExpr, diffBinds,
+        diffBinds,
 
         -- * Lambdas and eta reduction
         tryEtaReduce, zapLamBndrs,
@@ -78,6 +78,7 @@ import GHC.Core.Coercion
 import GHC.Core.Reduction
 import GHC.Core.TyCon
 import GHC.Core.Multiplicity
+import GHC.Core.Map.Expr ( eqCoreExpr )
 
 import GHC.Builtin.Names ( makeStaticName, unsafeEqualityProofIdKey )
 import GHC.Builtin.PrimOps
@@ -2123,95 +2124,17 @@ cheapEqExpr' ignoreTick e1 e2
 
 eqExpr :: InScopeSet -> CoreExpr -> CoreExpr -> Bool
 -- Compares for equality, modulo alpha
-eqExpr in_scope e1 e2
-  = go (mkRnEnv2 in_scope) e1 e2
-  where
-    go env (Var v1) (Var v2)
-      | rnOccL env v1 == rnOccR env v2
-      = True
+-- TODO: remove eqExpr once GHC 9.4 is released
+eqExpr _ = eqCoreExpr
+{-# DEPRECATED eqExpr "Use 'GHC.Core.Map.Expr.eqCoreExpr', 'eqExpr' will be removed in GHC 9.6" #-}
 
-    go _   (Lit lit1)    (Lit lit2)      = lit1 == lit2
-    go env (Type t1)    (Type t2)        = eqTypeX env t1 t2
-    go env (Coercion co1) (Coercion co2) = eqCoercionX env co1 co2
-    go env (Cast e1 co1) (Cast e2 co2) = eqCoercionX env co1 co2 && go env e1 e2
-    go env (App f1 a1)   (App f2 a2)   = go env f1 f2 && go env a1 a2
-    go env (Tick n1 e1)  (Tick n2 e2)  = eqTickish env n1 n2 && go env e1 e2
-
-    go env (Lam b1 e1)  (Lam b2 e2)
-      =  eqTypeX env (varType b1) (varType b2)   -- False for Id/TyVar combination
-      && go (rnBndr2 env b1 b2) e1 e2
-
-    go env (Let (NonRec v1 r1) e1) (Let (NonRec v2 r2) e2)
-      =  go env r1 r2  -- No need to check binder types, since RHSs match
-      && go (rnBndr2 env v1 v2) e1 e2
-
-    go env (Let (Rec ps1) e1) (Let (Rec ps2) e2)
-      = equalLength ps1 ps2
-      && all2 (go env') rs1 rs2 && go env' e1 e2
-      where
-        (bs1,rs1) = unzip ps1
-        (bs2,rs2) = unzip ps2
-        env' = rnBndrs2 env bs1 bs2
-
-    go env (Case e1 b1 t1 a1) (Case e2 b2 t2 a2)
-      | null a1   -- See Note [Empty case alternatives] in GHC.Data.TrieMap
-      = null a2 && go env e1 e2 && eqTypeX env t1 t2
-      | otherwise
-      =  go env e1 e2 && all2 (go_alt (rnBndr2 env b1 b2)) a1 a2
-
-    go _ _ _ = False
-
-    -----------
-    go_alt env (Alt c1 bs1 e1) (Alt c2 bs2 e2)
-      = c1 == c2 && go (rnBndrs2 env bs1 bs2) e1 e2
-
+-- Used by diffBinds, which is itself only used in GHC.Core.Lint.lintAnnots
 eqTickish :: RnEnv2 -> CoreTickish -> CoreTickish -> Bool
 eqTickish env (Breakpoint lext lid lids) (Breakpoint rext rid rids)
       = lid == rid &&
         map (rnOccL env) lids == map (rnOccR env) rids &&
         lext == rext
 eqTickish _ l r = l == r
-
--- | Finds differences between core expressions, modulo alpha and
--- renaming. Setting @top@ means that the @IdInfo@ of bindings will be
--- checked for differences as well.
-diffExpr :: Bool -> RnEnv2 -> CoreExpr -> CoreExpr -> [SDoc]
-diffExpr _   env (Var v1)   (Var v2)   | rnOccL env v1 == rnOccR env v2 = []
-diffExpr _   _   (Lit lit1) (Lit lit2) | lit1 == lit2                   = []
-diffExpr _   env (Type t1)  (Type t2)  | eqTypeX env t1 t2              = []
-diffExpr _   env (Coercion co1) (Coercion co2)
-                                       | eqCoercionX env co1 co2        = []
-diffExpr top env (Cast e1 co1)  (Cast e2 co2)
-  | eqCoercionX env co1 co2                = diffExpr top env e1 e2
-diffExpr top env (Tick n1 e1)   e2
-  | not (tickishIsCode n1)                 = diffExpr top env e1 e2
-diffExpr top env e1             (Tick n2 e2)
-  | not (tickishIsCode n2)                 = diffExpr top env e1 e2
-diffExpr top env (Tick n1 e1)   (Tick n2 e2)
-  | eqTickish env n1 n2                    = diffExpr top env e1 e2
- -- The error message of failed pattern matches will contain
- -- generated names, which are allowed to differ.
-diffExpr _   _   (App (App (Var absent) _) _)
-                 (App (App (Var absent2) _) _)
-  | isDeadEndId absent && isDeadEndId absent2 = []
-diffExpr top env (App f1 a1)    (App f2 a2)
-  = diffExpr top env f1 f2 ++ diffExpr top env a1 a2
-diffExpr top env (Lam b1 e1)  (Lam b2 e2)
-  | eqTypeX env (varType b1) (varType b2)   -- False for Id/TyVar combination
-  = diffExpr top (rnBndr2 env b1 b2) e1 e2
-diffExpr top env (Let bs1 e1) (Let bs2 e2)
-  = let (ds, env') = diffBinds top env (flattenBinds [bs1]) (flattenBinds [bs2])
-    in ds ++ diffExpr top env' e1 e2
-diffExpr top env (Case e1 b1 t1 a1) (Case e2 b2 t2 a2)
-  | equalLength a1 a2 && not (null a1) || eqTypeX env t1 t2
-    -- See Note [Empty case alternatives] in GHC.Data.TrieMap
-  = diffExpr top env e1 e2 ++ concat (zipWith diffAlt a1 a2)
-  where env' = rnBndr2 env b1 b2
-        diffAlt (Alt c1 bs1 e1) (Alt c2 bs2 e2)
-          | c1 /= c2  = [text "alt-cons " <> ppr c1 <> text " /= " <> ppr c2]
-          | otherwise = diffExpr top (rnBndrs2 env' bs1 bs2) e1 e2
-diffExpr _  _ e1 e2
-  = [fsep [ppr e1, text "/=", ppr e2]]
 
 -- | Finds differences between core bindings, see @diffExpr@.
 --
@@ -2223,6 +2146,8 @@ diffExpr _  _ e1 e2
 -- leaves us just with mutually recursive and/or mismatching bindings,
 -- which we then speculatively match by ordering them. It's by no means
 -- perfect, but gets the job done well enough.
+--
+-- Only used in GHC.Core.Lint.lintAnnots
 diffBinds :: Bool -> RnEnv2 -> [(Var, CoreExpr)] -> [(Var, CoreExpr)]
           -> ([SDoc], RnEnv2)
 diffBinds top env binds1 = go (length binds1) env binds1
@@ -2269,6 +2194,47 @@ diffBinds top env binds1 = go (length binds1) env binds1
          = locBind "in binding" bndr1 bndr2 ds
          | otherwise
          = diffIdInfo env bndr1 bndr2
+
+-- | Finds differences between core expressions, modulo alpha and
+-- renaming. Setting @top@ means that the @IdInfo@ of bindings will be
+-- checked for differences as well.
+diffExpr :: Bool -> RnEnv2 -> CoreExpr -> CoreExpr -> [SDoc]
+diffExpr _   env (Var v1)   (Var v2)   | rnOccL env v1 == rnOccR env v2 = []
+diffExpr _   _   (Lit lit1) (Lit lit2) | lit1 == lit2                   = []
+diffExpr _   env (Type t1)  (Type t2)  | eqTypeX env t1 t2              = []
+diffExpr _   env (Coercion co1) (Coercion co2)
+                                       | eqCoercionX env co1 co2        = []
+diffExpr top env (Cast e1 co1)  (Cast e2 co2)
+  | eqCoercionX env co1 co2                = diffExpr top env e1 e2
+diffExpr top env (Tick n1 e1)   e2
+  | not (tickishIsCode n1)                 = diffExpr top env e1 e2
+diffExpr top env e1             (Tick n2 e2)
+  | not (tickishIsCode n2)                 = diffExpr top env e1 e2
+diffExpr top env (Tick n1 e1)   (Tick n2 e2)
+  | eqTickish env n1 n2                    = diffExpr top env e1 e2
+ -- The error message of failed pattern matches will contain
+ -- generated names, which are allowed to differ.
+diffExpr _   _   (App (App (Var absent) _) _)
+                 (App (App (Var absent2) _) _)
+  | isDeadEndId absent && isDeadEndId absent2 = []
+diffExpr top env (App f1 a1)    (App f2 a2)
+  = diffExpr top env f1 f2 ++ diffExpr top env a1 a2
+diffExpr top env (Lam b1 e1)  (Lam b2 e2)
+  | eqTypeX env (varType b1) (varType b2)   -- False for Id/TyVar combination
+  = diffExpr top (rnBndr2 env b1 b2) e1 e2
+diffExpr top env (Let bs1 e1) (Let bs2 e2)
+  = let (ds, env') = diffBinds top env (flattenBinds [bs1]) (flattenBinds [bs2])
+    in ds ++ diffExpr top env' e1 e2
+diffExpr top env (Case e1 b1 t1 a1) (Case e2 b2 t2 a2)
+  | equalLength a1 a2 && not (null a1) || eqTypeX env t1 t2
+    -- See Note [Empty case alternatives] in GHC.Data.TrieMap
+  = diffExpr top env e1 e2 ++ concat (zipWith diffAlt a1 a2)
+  where env' = rnBndr2 env b1 b2
+        diffAlt (Alt c1 bs1 e1) (Alt c2 bs2 e2)
+          | c1 /= c2  = [text "alt-cons " <> ppr c1 <> text " /= " <> ppr c2]
+          | otherwise = diffExpr top (rnBndrs2 env' bs1 bs2) e1 e2
+diffExpr _  _ e1 e2
+  = [fsep [ppr e1, text "/=", ppr e2]]
 
 -- | Find differences in @IdInfo@. We will especially check whether
 -- the unfoldings match, if present (see @diffUnfold@).

@@ -21,7 +21,7 @@ module GHC.Core.Map.Type (
    -- * Utilities for use by friends only
    TypeMapG, CoercionMapG,
 
-   DeBruijn(..), deBruijnize,
+   DeBruijn(..), deBruijnize, eqDeBruijnType, eqDeBruijnVar,
 
    BndrMap, xtBndr, lkBndr,
    VarMap, xtVar, lkVar, lkDFreeVar, xtDFreeVar,
@@ -182,38 +182,122 @@ instance TrieMap TypeMapX where
    filterTM = filterT
 
 instance Eq (DeBruijn Type) where
-  env_t@(D env t) == env_t'@(D env' t')
-    | Just new_t  <- tcView t  = D env new_t == env_t'
-    | Just new_t' <- tcView t' = env_t       == D env' new_t'
-    | otherwise
-    = case (t, t') of
-        (CastTy t1 _, _)  -> D env t1 == D env t'
-        (_, CastTy t1' _) -> D env t  == D env t1'
+  (==) = eqDeBruijnType
 
-        (TyVarTy v, TyVarTy v')
-            -> case (lookupCME env v, lookupCME env' v') of
-                (Just bv, Just bv') -> bv == bv'
-                (Nothing, Nothing)  -> v == v'
-                _ -> False
-                -- See Note [Equality on AppTys] in GHC.Core.Type
-        (AppTy t1 t2, s) | Just (t1', t2') <- repSplitAppTy_maybe s
-            -> D env t1 == D env' t1' && D env t2 == D env' t2'
-        (s, AppTy t1' t2') | Just (t1, t2) <- repSplitAppTy_maybe s
-            -> D env t1 == D env' t1' && D env t2 == D env' t2'
-        (FunTy v1 w1 t1 t2, FunTy v1' w1' t1' t2')
-            -> v1 == v1' &&
-               D env w1 == D env w1' &&
-               D env t1 == D env' t1' &&
-               D env t2 == D env' t2'
-        (TyConApp tc tys, TyConApp tc' tys')
-            -> tc == tc' && D env tys == D env' tys'
-        (LitTy l, LitTy l')
-            -> l == l'
-        (ForAllTy (Bndr tv _) ty, ForAllTy (Bndr tv' _) ty')
-            -> D env (varType tv)      == D env' (varType tv') &&
-               D (extendCME env tv) ty == D (extendCME env' tv') ty'
-        (CoercionTy {}, CoercionTy {})
-            -> True
+{- Note [Using tcView inside eqDeBruijnType]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+`eqDeBruijnType` uses `tcView` and thus treats Type and Constraint as
+distinct -- see Note [coreView vs tcView] in GHC.Core.Type. We do that because
+`eqDeBruijnType` is used in TrieMaps, which are used for instance for instance
+selection in the type checker. [Or at least will be soon.]
+
+However, the odds that we have two expressions that are identical save for the
+'Type'/'Constraint' distinction are low. (Not impossible to do. But doubtful
+anyone has ever done so in the history of Haskell.)
+
+And it's actually all OK: 'eqExpr' is conservative: if `eqExpr e1 e2` returns
+'True', thne it must be that `e1` behaves identically to `e2` in all contexts.
+But if `eqExpr e1 e2` returns 'False', then we learn nothing. The use of
+'tcView' where we expect 'coreView' means 'eqExpr' returns 'False' bit more
+often that it should. This might, say, stop a `RULE` from firing or CSE from
+optimizing an expression. Stopping `RULE` firing is good actually: `RULES` are
+written in Haskell, where `Type /= Constraint`. Stopping CSE is unfortunate,
+but tolerable.
+-}
+
+-- | An equality relation between two 'Type's (known below as @t1 :: k2@
+-- and @t2 :: k2@)
+data TypeEquality = TNEQ -- ^ @t1 /= t2@
+                  | TEQ  -- ^ @t1 ~ t2@ and there are not casts in either,
+                         -- therefore we can conclude @k1 ~ k2@
+                  | TEQX -- ^ @t1 ~ t2@ yet one of the types contains a cast so
+                         -- they may differ in kind
+
+eqDeBruijnType :: DeBruijn Type -> DeBruijn Type -> Bool
+eqDeBruijnType env_t1@(D env1 t1) env_t2@(D env2 t2) =
+    -- See Note [Non-trivial definitional equality] in GHC.Core.TyCo.Rep
+    -- See Note [Computing equality on types]
+    case go env_t1 env_t2 of
+      TEQX  -> toBool (go (D env1 k1) (D env2 k2))
+      ty_eq -> toBool ty_eq
+  where
+    k1 = typeKind t1
+    k2 = typeKind t2
+
+    toBool :: TypeEquality -> Bool
+    toBool TNEQ = False
+    toBool _    = True
+
+    liftEquality :: Bool -> TypeEquality
+    liftEquality False = TNEQ
+    liftEquality _     = TEQ
+
+    hasCast :: TypeEquality -> TypeEquality
+    hasCast TEQ = TEQX
+    hasCast eq  = eq
+
+    andEq :: TypeEquality -> TypeEquality -> TypeEquality
+    andEq TNEQ _ = TNEQ
+    andEq TEQX e = hasCast e
+    andEq TEQ  e = e
+
+    -- See Note [Comparing nullary type synonyms] in GHC.Core.Type
+    go (D _ (TyConApp tc1 [])) (D _ (TyConApp tc2 []))
+      | tc1 == tc2
+      = TEQ
+    go env_t@(D env t) env_t'@(D env' t')
+      -- See Note [Using tcView inside eqDeBruijnType]
+      | Just new_t  <- tcView t  = go (D env new_t) env_t'
+      | Just new_t' <- tcView t' = go env_t (D env' new_t')
+      | otherwise
+      = case (t, t') of
+          -- See Note [Non-trivial definitional equality] in GHC.Core.TyCo.Rep
+          (CastTy t1 _, _)  -> hasCast (go (D env t1) (D env t'))
+          (_, CastTy t1' _) -> hasCast (go (D env t) (D env t1'))
+
+          (TyVarTy v, TyVarTy v')
+              -> liftEquality $ eqDeBruijnVar (D env v) (D env' v')
+          -- See Note [Equality on AppTys] in GHC.Core.Type
+          (AppTy t1 t2, s) | Just (t1', t2') <- repSplitAppTy_maybe s
+              -> go (D env t1) (D env' t1') `andEq` go (D env t2) (D env' t2')
+          (s, AppTy t1' t2') | Just (t1, t2) <- repSplitAppTy_maybe s
+              -> go (D env t1) (D env' t1') `andEq` go (D env t2) (D env' t2')
+          (FunTy v1 w1 t1 t2, FunTy v1' w1' t1' t2')
+
+              -> liftEquality (v1 == v1') `andEq`
+                 -- NB: eqDeBruijnType does the kind check requested by
+                 -- Note [Equality on FunTys] in GHC.Core.TyCo.Rep
+                 liftEquality (eqDeBruijnType (D env t1) (D env' t1')) `andEq`
+                 liftEquality (eqDeBruijnType (D env t2) (D env' t2')) `andEq`
+                 -- Comparing multiplicities last because the test is usually true
+                 go (D env w1) (D env w1')
+          (TyConApp tc tys, TyConApp tc' tys')
+              -> liftEquality (tc == tc') `andEq` gos env env' tys tys'
+          (LitTy l, LitTy l')
+              -> liftEquality (l == l')
+          (ForAllTy (Bndr tv vis) ty, ForAllTy (Bndr tv' vis') ty')
+              -> -- See Note [ForAllTy and typechecker equality] in
+                 -- GHC.Tc.Solver.Canonical for why we use `sameVis` here
+                 liftEquality (vis `sameVis` vis') `andEq`
+                 go (D env (varType tv)) (D env' (varType tv')) `andEq`
+                 go (D (extendCME env tv) ty) (D (extendCME env' tv') ty')
+          (CoercionTy {}, CoercionTy {})
+              -> TEQ
+          _ -> TNEQ
+
+    gos _  _  []         []         = TEQ
+    gos e1 e2 (ty1:tys1) (ty2:tys2) = go (D e1 ty1) (D e2 ty2) `andEq`
+                                      gos e1 e2 tys1 tys2
+    gos _  _  _          _          = TNEQ
+
+instance Eq (DeBruijn Var) where
+  (==) = eqDeBruijnVar
+
+eqDeBruijnVar :: DeBruijn Var -> DeBruijn Var -> Bool
+eqDeBruijnVar (D env1 v1) (D env2 v2) =
+    case (lookupCME env1 v1, lookupCME env2 v2) of
+        (Just b1, Just b2) -> b1 == b2
+        (Nothing, Nothing) -> v1 == v2
         _ -> False
 
 instance {-# OVERLAPPING #-}

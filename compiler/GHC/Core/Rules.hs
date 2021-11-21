@@ -39,7 +39,7 @@ import GHC.Core.Subst
 import GHC.Core.SimpleOpt ( exprIsLambda_maybe )
 import GHC.Core.FVs       ( exprFreeVars, exprsFreeVars, bindFreeVars
                           , rulesFreeVarsDSet, exprsOrphNames, exprFreeVarsList )
-import GHC.Core.Utils     ( exprType, eqExpr, mkTick, mkTicks
+import GHC.Core.Utils     ( exprType, mkTick, mkTicks
                           , stripTicksTopT, stripTicksTopE
                           , isJoinBind )
 import GHC.Core.Ppr       ( pprRules )
@@ -49,6 +49,7 @@ import GHC.Core.Type as Type
    , mkEmptyTCvSubst, substTy )
 import GHC.Core.Coercion as Coercion
 import GHC.Core.Tidy     ( tidyRules )
+import GHC.Core.Map.Expr ( eqCoreExpr )
 
 import GHC.Tc.Utils.TcType  ( tcSplitTyConApp_maybe )
 import GHC.Builtin.Types    ( anyTypeOfKind )
@@ -968,7 +969,7 @@ match_tmpl_var renv@(RV { rv_lcl = rn_env, rv_fltR = flt_env })
                 -- e.g. match forall a. (\x-> a x) against (\y. y y)
 
   | Just e1' <- lookupVarEnv id_subst v1'
-  = if eqExpr (rnInScopeSet rn_env) e1' e2'
+  = if eqCoreExpr e1' e2'
     then Just subst
     else Nothing
 

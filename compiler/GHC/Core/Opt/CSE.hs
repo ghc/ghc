@@ -20,7 +20,7 @@ import GHC.Types.Id     ( Id, idType, idHasRules, zapStableUnfolding
                         , idInlineActivation, setInlineActivation
                         , zapIdOccInfo, zapIdUsageInfo, idInlinePragma
                         , isJoinId, isJoinId_maybe )
-import GHC.Core.Utils   ( mkAltExpr, eqExpr
+import GHC.Core.Utils   ( mkAltExpr
                         , exprIsTickedString
                         , stripTicksE, stripTicksT, mkTicks )
 import GHC.Core.FVs     ( exprFreeVars )
@@ -652,7 +652,7 @@ cseExpr env (Case e bndr ty alts) = cseCase env e bndr ty alts
 cseCase :: CSEnv -> InExpr -> InId -> InType -> [InAlt] -> OutExpr
 cseCase env scrut bndr ty alts
   = Case scrut1 bndr3 ty' $
-    combineAlts alt_env (map cse_alt alts)
+    combineAlts (map cse_alt alts)
   where
     ty' = substTy (csEnvSubst env) ty
     (cse_done, scrut1) = try_for_cse env scrut
@@ -684,9 +684,9 @@ cseCase env scrut bndr ty alts
         where
           (env', args') = addBinders alt_env args
 
-combineAlts :: CSEnv -> [OutAlt] -> [OutAlt]
+combineAlts :: [OutAlt] -> [OutAlt]
 -- See Note [Combine case alternatives]
-combineAlts env alts
+combineAlts alts
   | (Just alt1, rest_alts) <- find_bndr_free_alt alts
   , Alt _ bndrs1 rhs1 <- alt1
   , let filtered_alts = filterOut (identical_alt rhs1) rest_alts
@@ -697,7 +697,6 @@ combineAlts env alts
   | otherwise
   = alts
   where
-    in_scope = substInScope (csEnvSubst env)
 
     find_bndr_free_alt :: [CoreAlt] -> (Maybe CoreAlt, [CoreAlt])
        -- The (Just alt) is a binder-free alt
@@ -709,7 +708,7 @@ combineAlts env alts
       | otherwise  = case find_bndr_free_alt alts of
                        (mb_bf, alts) -> (mb_bf, alt:alts)
 
-    identical_alt rhs1 (Alt _ _ rhs) = eqExpr in_scope rhs1 rhs
+    identical_alt rhs1 (Alt _ _ rhs) = eqCoreExpr rhs1 rhs
        -- Even if this alt has binders, they will have been cloned
        -- If any of these binders are mentioned in 'rhs', then
        -- 'rhs' won't compare equal to 'rhs1' (which is from an

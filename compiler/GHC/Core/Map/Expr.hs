@@ -16,6 +16,8 @@
 module GHC.Core.Map.Expr (
    -- * Maps over Core expressions
    CoreMap, emptyCoreMap, extendCoreMap, lookupCoreMap, foldCoreMap,
+   -- * Alpha equality
+   eqDeBruijnExpr, eqCoreExpr,
    -- * 'TrieMap' class reexports
    TrieMap(..), insertTM, deleteTM,
    lkDFreeVar, xtDFreeVar,
@@ -140,33 +142,42 @@ data CoreMapX a
      }
 
 instance Eq (DeBruijn CoreExpr) where
-  D env1 e1 == D env2 e2 = go e1 e2 where
-    go (Var v1) (Var v2)
-      = case (lookupCME env1 v1, lookupCME env2 v2) of
-                            (Just b1, Just b2) -> b1 == b2
-                            (Nothing, Nothing) -> v1 == v2
-                            _ -> False
+    (==) = eqDeBruijnExpr
+
+eqDeBruijnExpr :: DeBruijn CoreExpr -> DeBruijn CoreExpr -> Bool
+eqDeBruijnExpr (D env1 e1) (D env2 e2) = go e1 e2 where
+    go (Var v1) (Var v2) = eqDeBruijnVar (D env1 v1) (D env2 v2)
     go (Lit lit1)    (Lit lit2)      = lit1 == lit2
-    go (Type t1)    (Type t2)        = D env1 t1 == D env2 t2
-    go (Coercion co1) (Coercion co2) = D env1 co1 == D env2 co2
+    -- See Note [Using tcView inside eqDeBruijnType] in GHC.Core.Map.Type
+    go (Type t1)    (Type t2)        = eqDeBruijnType (D env1 t1) (D env2 t2)
+    -- See Note [Alpha-equality for Coercion arguments]
+    go (Coercion {}) (Coercion {}) = True
     go (Cast e1 co1) (Cast e2 co2) = D env1 co1 == D env2 co2 && go e1 e2
     go (App f1 a1)   (App f2 a2)   = go f1 f2 && go a1 a2
-    -- This seems a bit dodgy, see 'eqTickish'
-    go (Tick n1 e1)  (Tick n2 e2)  = n1 == n2 && go e1 e2
+    go (Tick n1 e1) (Tick n2 e2)
+      =  eqDeBruijnTickish (D env1 n1) (D env2 n2)
+      && go e1 e2
 
     go (Lam b1 e1)  (Lam b2 e2)
-      =  D env1 (varType b1) == D env2 (varType b2)
+          -- See Note [Using tcView inside eqDeBruijnType] in GHC.Core.Map.Type
+      =  eqDeBruijnType (D env1 (varType b1)) (D env2 (varType b2))
       && D env1 (varMultMaybe b1) == D env2 (varMultMaybe b2)
-      && D (extendCME env1 b1) e1 == D (extendCME env2 b2) e2
+      && eqDeBruijnExpr (D (extendCME env1 b1) e1) (D (extendCME env2 b2) e2)
 
     go (Let (NonRec v1 r1) e1) (Let (NonRec v2 r2) e2)
-      =  go r1 r2
-      && D (extendCME env1 v1) e1 == D (extendCME env2 v2) e2
+      =  go r1 r2 -- See Note [Alpha-equality for let-bindings]
+      && eqDeBruijnExpr (D (extendCME env1 v1) e1) (D (extendCME env2 v2) e2)
 
     go (Let (Rec ps1) e1) (Let (Rec ps2) e2)
       = equalLength ps1 ps2
+      -- See Note [Alpha-equality for let-bindings]
+      && all2 (\b1 b2 -> -- See Note [Using tcView inside eqDeBruijnType] in
+                         -- GHC.Core.Map.Type
+                         eqDeBruijnType (D env1 (varType b1))
+                                        (D env2 (varType b2)))
+              bs1 bs2
       && D env1' rs1 == D env2' rs2
-      && D env1' e1  == D env2' e2
+      && eqDeBruijnExpr (D env1' e1) (D env2' e2)
       where
         (bs1,rs1) = unzip ps1
         (bs2,rs2) = unzip ps2
@@ -177,9 +188,59 @@ instance Eq (DeBruijn CoreExpr) where
       | null a1   -- See Note [Empty case alternatives]
       = null a2 && go e1 e2 && D env1 t1 == D env2 t2
       | otherwise
-      =  go e1 e2 && D (extendCME env1 b1) a1 == D (extendCME env2 b2) a2
+      = go e1 e2 && D (extendCME env1 b1) a1 == D (extendCME env2 b2) a2
 
     go _ _ = False
+
+eqDeBruijnTickish :: DeBruijn CoreTickish -> DeBruijn CoreTickish -> Bool
+eqDeBruijnTickish (D env1 t1) (D env2 t2) = go t1 t2 where
+    go (Breakpoint lext lid lids) (Breakpoint rext rid rids)
+        =  lid == rid
+        && D env1 lids == D env2 rids
+        && lext == rext
+    go l r = l == r
+
+-- Compares for equality, modulo alpha
+eqCoreExpr :: CoreExpr -> CoreExpr -> Bool
+eqCoreExpr e1 e2 = eqDeBruijnExpr (deBruijnize e1) (deBruijnize e2)
+
+{- Note [Alpha-equality for Coercion arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The 'Coercion' constructor only appears in argument positions, and so, if the
+functions are equal, then the arguments must have equal types. Because the
+comparison for coercions (correctly) checks only their types, checking for
+alpha-equality of the coercions is redundant.
+-}
+
+{- Note [Alpha-equality for let-bindings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+For /recursive/ let-bindings we need to check that the types of the binders
+are alpha-equivalent. Otherwise
+
+  letrec (x : Bool) = x in x
+
+and
+
+  letrec (y : Char) = y in y
+
+would be considered alpha-equivalent, which they are obviously not.
+
+For /non-recursive/ let-bindings, we do not have to check that the types of
+the binders are alpha-equivalent. When the RHSs (the expressions) of the
+non-recursive let-binders are well-formed and well-typed (which we assume they
+are at this point in the compiler), and the RHSs are alpha-equivalent, then the
+bindings must have the same type.
+
+In addition, it is also worth pointing out that
+
+  letrec { x = e1; y = e2 } in b
+
+is NOT considered equal to
+
+  letrec { y = e2; x = e1 } in b
+-}
 
 emptyE :: CoreMapX a
 emptyE = CM { cm_var = emptyTM, cm_lit = emptyTM
