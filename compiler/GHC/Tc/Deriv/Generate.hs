@@ -1628,11 +1628,14 @@ Example:
     ==>
 
     instance (Lift a) => Lift (Foo a) where
-        lift (Foo a) = [| Foo a |]
-        lift ((:^:) u v) = [| (:^:) u v |]
+        lift (Foo a) = [| Foo $(lift a) |]
+        lift ((:^:) u v) = [| (:^:) $(lift u) $(lift v) |]
 
-        liftTyped (Foo a) = [|| Foo a ||]
-        liftTyped ((:^:) u v) = [|| (:^:) u v ||]
+        liftTyped (Foo a) = [|| Foo $$(liftTyped a) ||]
+        liftTyped ((:^:) u v) = [|| (:^:) $$(liftTyped u) $$(liftTyped v) ||]
+
+Note that we use explicit splices here in order to not trigger the implicit
+lifting warning in derived code. (See #20688)
 -}
 
 
@@ -1640,15 +1643,18 @@ gen_Lift_binds :: SrcSpan -> TyCon -> [Type] -> (LHsBinds GhcPs, BagDerivStuff)
 gen_Lift_binds loc tycon tycon_args = (listToBag [lift_bind, liftTyped_bind], emptyBag)
   where
     lift_bind      = mkFunBindEC 1 loc lift_RDR (nlHsApp pure_Expr)
-                                 (map (pats_etc mk_exp) data_cons)
+                                 (map (pats_etc mk_exp mk_usplice liftName) data_cons)
     liftTyped_bind = mkFunBindEC 1 loc liftTyped_RDR (nlHsApp unsafeCodeCoerce_Expr . nlHsApp pure_Expr)
-                                 (map (pats_etc mk_texp) data_cons)
+                                 (map (pats_etc mk_texp mk_tsplice liftTypedName) data_cons)
 
     mk_exp = ExpBr noExtField
     mk_texp = TExpBr noExtField
+
+    mk_usplice = HsUntypedSplice EpAnnNotUsed DollarSplice
+    mk_tsplice = HsTypedSplice EpAnnNotUsed DollarSplice
     data_cons = getPossibleDataCons tycon tycon_args
 
-    pats_etc mk_bracket data_con
+    pats_etc mk_bracket mk_splice lift_name data_con
       = ([con_pat], lift_Expr)
        where
             con_pat      = nlConVarPat data_con_RDR as_needed
@@ -1657,7 +1663,13 @@ gen_Lift_binds loc tycon tycon_args = (listToBag [lift_bind, liftTyped_bind], em
             as_needed    = take con_arity as_RDRs
             lift_Expr    = noLocA (HsBracket noAnn (mk_bracket br_body))
             br_body      = nlHsApps (Exact (dataConName data_con))
-                                    (map nlHsVar as_needed)
+                                    (map lift_var as_needed)
+
+            lift_var :: RdrName -> LHsExpr (GhcPass 'Parsed)
+            lift_var x   = noLocA (HsSpliceE EpAnnNotUsed (mk_splice x (nlHsPar (mk_lift_expr x))))
+
+            mk_lift_expr :: RdrName -> LHsExpr (GhcPass 'Parsed)
+            mk_lift_expr x = nlHsApps (Exact lift_name) [nlHsVar x]
 
 {-
 ************************************************************************
