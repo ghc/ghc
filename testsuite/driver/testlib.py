@@ -800,20 +800,20 @@ def check_errmsg(needle):
             return "%s not contained in -ddump-simpl\n" % needle
     return normalise_errmsg_fun(norm)
 
-# grep_errmsg(regex,[match_only])
-# If match_only = True we only check the part of the error
+# grep_errmsg(regex,[groups])
+# If groups are given, return only the matched groups
 # that matches the regex.
-def grep_errmsg(needle:str, match_only = False):
+def grep_errmsg(needle:str, groups = None):
 
     def get_match(str:str):
         m = re.search(needle,str)
         if m:
-            return m.group(0)
+            return "".join([m.group(g) for g in groups if m.group(g) is not None])
         else:
             return None
 
     def norm(str) -> str:
-        if not match_only:
+        if groups == None:
             return "".join( filter(lambda l: re.search(needle,l),
                                    str.splitlines(True)))
         else:
