@@ -46,6 +46,8 @@ import GHC.Builtin.Types.Prim ( concretePrimTyCon )
 import GHC.Types.Name.Set
 import GHC.Types.Name.Reader
 import GHC.Hs.Type( HsIPName(..) )
+import GHC.Types.Unique  ( hasKey )
+import GHC.Builtin.Names ( coercibleTyConKey )
 
 import GHC.Data.Pair
 import GHC.Utils.Misc
@@ -537,19 +539,19 @@ mk_strict_superclasses :: NameSet -> CtEvidence
 -- nor are repeated
 mk_strict_superclasses rec_clss (CtGiven { ctev_evar = evar, ctev_loc = loc })
                        tvs theta cls tys
-  = concatMapM (do_one_given (mk_given_loc loc)) $
+  = concatMapM do_one_given $
     classSCSelIds cls
   where
     dict_ids  = mkTemplateLocals theta
     size      = sizeTypes tys
 
-    do_one_given given_loc sel_id
+    do_one_given sel_id
       | isUnliftedType sc_pred
       , not (null tvs && null theta)
       = -- See Note [Equality superclasses in quantified constraints]
         return []
       | otherwise
-      = do { given_ev <- newGivenEvVar given_loc $
+      = do { given_ev <- newGivenEvVar sc_loc $
                          mk_given_desc sel_id sc_pred
            ; mk_superclasses rec_clss given_ev tvs theta sc_pred }
       where
@@ -579,12 +581,19 @@ mk_strict_superclasses rec_clss (CtGiven { ctev_evar = evar, ctev_loc = loc })
             `App` (evId evar `mkVarApps` (tvs ++ dict_ids))
             `mkVarApps` sc_tvs
 
-    mk_given_loc loc
+    sc_loc
        | isCTupleClass cls
        = loc   -- For tuple predicates, just take them apart, without
                -- adding their (large) size into the chain.  When we
                -- get down to a base predicate, we'll include its size.
                -- #10335
+
+       |  isEqPredClass cls
+       || cls `hasKey` coercibleTyConKey
+       = loc   -- The only superclasses of ~, ~~, and Coercible are primitive
+               -- equalities, and they don't use the InstSCOrigin mechanism
+               -- detailed in Note [Solving superclass constraints] in
+               -- GHC.Tc.TyCl.Instance. Skip for a tiny performance win.
 
          -- See Note [Solving superclass constraints] in GHC.Tc.TyCl.Instance
          -- for explantation of InstSCOrigin and Note [Replacement vs keeping] in
