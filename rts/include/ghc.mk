@@ -89,10 +89,11 @@ $$(includes_$1_H_CONFIG) : mk/config.h mk/config.mk rts/include/ghc.mk | $$$$(di
 #	Copy the contents of mk/config.h, turning '#define PACKAGE_FOO
 #	"blah"' into '/* #undef PACKAGE_FOO */' to avoid clashes.
 #
-	@sed mk/config.h \
-		-e 's,^\([	 ]*\)#[	 ]*define[	 ][	 ]*\(PACKAGE_[A-Z]*\)[	 ][ 	]*".*".*$$$$,\1/* #undef \2 */,' \
+	@sed \
+		-e 's,^\([	 ]*\)#[	 ]*define[	 ][	 ]*\(PACKAGE_[A-Z]*\)[	 ][	]*".*".*$$$$,\1/* #undef \2 */,' \
 		-e '/__GLASGOW_HASKELL/d' \
 		-e '/REMOVE ME/d' \
+		mk/config.h \
 		>> $$@
 #
 	@echo "#endif /* __GHCAUTOCONF_H__ */"          >> $$@
