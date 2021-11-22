@@ -27,7 +27,6 @@ import GHC.Types.Fixity (defaultFixity)
 import GHC.Types.Fixity.Env
 import GHC.Types.TypeEnv
 import GHC.Types.Name.Reader
-import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
@@ -35,6 +34,7 @@ import GHC.Types.Avail
 import GHC.Types.SrcLoc
 import GHC.Types.SourceFile
 import GHC.Types.Var
+import GHC.Types.Id( idType )
 import GHC.Types.Unique.DSet
 import GHC.Types.Name.Shape
 import GHC.Types.PkgQual
@@ -62,8 +62,6 @@ import GHC.Hs
 
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
-import GHC.Core.Type
-import GHC.Core.Multiplicity
 
 import GHC.IfaceToCore
 import GHC.Iface.Load
@@ -221,32 +219,23 @@ checkHsigIface tcg_env gr sig_iface
 -- (we might conclude the module exports an instance when it doesn't, see
 -- #9422), but we will never refuse to compile something.
 check_inst :: ClsInst -> TcM ()
-check_inst sig_inst = do
+check_inst sig_inst@(ClsInst { is_dfun = dfun_id }) = do
     -- TODO: This could be very well generalized to support instance
     -- declarations in boot files.
     tcg_env <- getGblEnv
     -- NB: Have to tug on the interface, not necessarily
     -- tugged... but it didn't work?
     mapM_ tcLookupImported_maybe (nameSetElemsStable (orphNamesOfClsInst sig_inst))
+
     -- Based off of 'simplifyDeriv'
-    let ty = idType (instanceDFunId sig_inst)
-        -- Based off of tcSplitDFunTy
-        (tvs, theta, pred) =
-           case tcSplitForAllInvisTyVars ty of { (tvs, rho)    ->
-           case splitFunTys rho             of { (theta, pred) ->
-           (tvs, theta, pred) }}
-        origin = InstProvidedOrigin (tcg_semantic_mod tcg_env) sig_inst
-    skol_info <- mkSkolemInfo InstSkol
-    (skol_subst, tvs_skols) <- tcInstSkolTyVars skol_info tvs -- Skolemize
+    let origin = InstProvidedOrigin (tcg_semantic_mod tcg_env) sig_inst
+    (skol_info, tvs_skols, inst_theta, cls, inst_tys) <- tcSkolDFunType (idType dfun_id)
     (tclvl,cts) <- pushTcLevelM $ do
-       wanted <- newWanted origin
-                           (Just TypeLevel)
-                           (substTy skol_subst pred)
-       givens <- forM theta $ \given -> do
+       wanted <- newWanted origin (Just TypeLevel) (mkClassPred cls inst_tys)
+       givens <- forM inst_theta $ \given -> do
            loc <- getCtLocM origin (Just TypeLevel)
-           let given_pred = substTy skol_subst (scaledThing given)
-           new_ev <- newEvVar given_pred
-           return CtGiven { ctev_pred = given_pred
+           new_ev <- newEvVar given
+           return CtGiven { ctev_pred = given
                           -- Doesn't matter, make something up
                           , ctev_evar = new_ev
                           , ctev_loc = loc
@@ -254,7 +243,7 @@ check_inst sig_inst = do
        return $ wanted : givens
     unsolved <- simplifyWantedsTcM cts
 
-    (implic, _) <- buildImplicationFor tclvl (getSkolemInfo skol_info) tvs_skols [] unsolved
+    (implic, _) <- buildImplicationFor tclvl skol_info tvs_skols [] unsolved
     reportAllUnsolved (mkImplicWC implic)
 
 -- | For a module @modname@ of type 'HscSource', determine the list

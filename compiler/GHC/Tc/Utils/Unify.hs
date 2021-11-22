@@ -1477,8 +1477,8 @@ tcSkolemiseScoped ctxt expected_ty thing_inside
   = do { deep_subsumption <- xoptM LangExt.DeepSubsumption
        ; let skolemise | deep_subsumption = deeplySkolemise
                        | otherwise        = topSkolemise
-       ; -- This (unpleasant) rec block allows us to pass skol_info to deeplySkolemise;
-         -- but skol_info can't be built until we have tv_prs
+       ; -- rec {..}: see Note [Keeping SkolemInfo inside a SkolemTv]
+         --           in GHC.Tc.Utils.TcType
          rec { (wrap, tv_prs, given, rho_ty) <- skolemise skol_info expected_ty
              ; skol_info <- mkSkolemInfo (SigSkol ctxt expected_ty tv_prs) }
 
@@ -1495,7 +1495,9 @@ tcTopSkolemise ctxt expected_ty thing_inside
   = do { res <- thing_inside expected_ty
        ; return (idHsWrapper, res) }
   | otherwise
-  = do { rec { (wrap, tv_prs, given, rho_ty) <- topSkolemise skol_info expected_ty
+  = do { -- rec {..}: see Note [Keeping SkolemInfo inside a SkolemTv]
+         --           in GHC.Tc.Utils.TcType
+         rec { (wrap, tv_prs, given, rho_ty) <- topSkolemise skol_info expected_ty
              ; skol_info <- mkSkolemInfo (SigSkol ctxt expected_ty tv_prs) }
 
        ; let skol_tvs = map snd tv_prs

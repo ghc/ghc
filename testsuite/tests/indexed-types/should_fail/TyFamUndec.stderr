@@ -1,18 +1,19 @@
 
 TyFamUndec.hs:6:15: error:
     • Variable ‘b’ occurs more often
-        in the type family application ‘T (b, b)’
-        than in the instance head ‘T (a, [b])’
+        in the type-family application ‘T (b, b)’
+        than in the LHS of the family instance ‘T (a, [b])’
       (Use UndecidableInstances to permit this)
     • In the type instance declaration for ‘T’
 
 TyFamUndec.hs:7:15: error:
-    • The type family application ‘T (a, Maybe b)’
-        is no smaller than the instance head ‘T (a, Maybe b)’
+    • The type-family application ‘T (a, Maybe b)’
+        is no smaller than the LHS of the family instance ‘T (a, Maybe b)’
       (Use UndecidableInstances to permit this)
     • In the type instance declaration for ‘T’
 
 TyFamUndec.hs:8:15: error:
-    • Illegal nested type family application ‘T (a, T b)’
+    • Illegal nested use of type family ‘T’
+        in the arguments of the type-family application ‘T (a, T b)’
       (Use UndecidableInstances to permit this)
     • In the type instance declaration for ‘T’

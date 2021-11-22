@@ -2579,10 +2579,10 @@ zonkTidyOrigin env (GivenOrigin skol_info)
   = do { skol_info1 <- zonkSkolemInfoAnon skol_info
        ; let skol_info2 = tidySkolemInfoAnon env skol_info1
        ; return (env, GivenOrigin skol_info2) }
-zonkTidyOrigin env (OtherSCOrigin sc_depth skol_info)
+zonkTidyOrigin env (GivenSCOrigin skol_info sc_depth blocked)
   = do { skol_info1 <- zonkSkolemInfoAnon skol_info
        ; let skol_info2 = tidySkolemInfoAnon env skol_info1
-       ; return (env, OtherSCOrigin sc_depth skol_info2) }
+       ; return (env, GivenSCOrigin skol_info2 sc_depth blocked) }
 zonkTidyOrigin env orig@(TypeEqOrigin { uo_actual   = act
                                       , uo_expected = exp })
   = do { (env1, act') <- zonkTidyTcType env  act

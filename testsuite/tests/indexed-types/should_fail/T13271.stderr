@@ -13,10 +13,3 @@ T13271.hs:13:3: error: [GHC-05175]
         X 2 = T2 -- Defined at T13271.hs:13:3
     • In the equations for closed type family ‘X’
       In the type family declaration for ‘X’
-
-T13271.hs:13:3: error:
-    • The type family application ‘(TypeError ...)’
-        is no smaller than the instance head ‘X 2’
-      (Use UndecidableInstances to permit this)
-    • In the equations for closed type family ‘X’
-      In the type family declaration for ‘X’

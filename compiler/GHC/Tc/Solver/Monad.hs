@@ -672,8 +672,16 @@ lookupInInerts :: CtLoc -> TcPredType -> TcS (Maybe CtEvidence)
 lookupInInerts loc pty
   | ClassPred cls tys <- classifyPredType pty
   = do { inerts <- getTcSInerts
-       ; return (lookupSolvedDict inerts loc cls tys `mplus`
-                 fmap ctEvidence (lookupInertDict (inert_cans inerts) loc cls tys)) }
+       ; return $ -- Maybe monad
+                  do { found_ev <-
+                         lookupSolvedDict inerts loc cls tys `mplus`
+                         fmap ctEvidence (lookupInertDict (inert_cans inerts) loc cls tys)
+                     ; guard (not (prohibitedSuperClassSolve (ctEvLoc found_ev) loc))
+                      -- We're about to "solve" the wanted we're looking up, so we
+                      -- must make sure doing so wouldn't run afoul of
+                      -- Note [Solving superclass constraints] in GHC.Tc.TyCl.Instance.
+                      -- Forgetting this led to #20666.
+                     ; return found_ev }}
   | otherwise -- NB: No caching for equalities, IPs, holes, or errors
   = return Nothing
 
@@ -783,7 +791,11 @@ data TcSEnv
     }
 
 ---------------
-newtype TcS a = TcS { unTcS :: TcSEnv -> TcM a } deriving (Functor)
+newtype TcS a = TcS { unTcS :: TcSEnv -> TcM a }
+  deriving (Functor)
+
+instance MonadFix TcS where
+  mfix k = TcS $ \env -> mfix (\x -> unTcS (k x) env)
 
 -- | Smart constructor for 'TcS', as describe in Note [The one-shot state
 -- monad trick] in "GHC.Utils.Monad".

@@ -13,7 +13,7 @@ module GHC.Tc.Types.Origin (
 
   -- * SkolemInfo
   SkolemInfo(..), SkolemInfoAnon(..), mkSkolemInfo, getSkolemInfo, pprSigSkolInfo, pprSkolInfo,
-  unkSkol, unkSkolAnon,
+  unkSkol, unkSkolAnon, mkClsInstSkol,
 
   -- * CtOrigin
   CtOrigin(..), exprCtOrigin, lexprCtOrigin, matchesCtOrigin, grhssCtOrigin,
@@ -29,6 +29,7 @@ module GHC.Tc.Types.Origin (
   FixedRuntimeRepOrigin(..), FixedRuntimeRepContext(..),
   pprFixedRuntimeRepContext,
   StmtOrigin(..), RepPolyFun(..), ArgPos(..),
+  ClsInstOrQC(..), NakedScFlag(..),
 
   -- * Arrow command origin
   FRRArrowContext(..), pprFRRArrowContext,
@@ -45,6 +46,7 @@ import GHC.Hs
 import GHC.Core.DataCon
 import GHC.Core.ConLike
 import GHC.Core.TyCon
+import GHC.Core.Class
 import GHC.Core.InstEnv
 import GHC.Core.PatSyn
 import GHC.Core.Multiplicity ( scaledThing )
@@ -210,8 +212,9 @@ isSigMaybe _                = Nothing
 -- same place in a single report.
 data SkolemInfo
   = SkolemInfo
-      Unique -- ^ used to common up skolem variables bound at the same location (only used in pprSkols)
-      SkolemInfoAnon -- ^ the information about the origin of the skolem type variable
+      Unique         -- ^ The Unique is used to common up skolem variables bound
+                     --   at the same location (only used in pprSkols)
+      SkolemInfoAnon -- ^ The information about the origin of the skolem type variable
 
 instance Uniquable SkolemInfo where
   getUnique (SkolemInfo u _) = u
@@ -248,7 +251,9 @@ data SkolemInfoAnon
   | DerivSkol Type      -- Bound by a 'deriving' clause;
                         -- the type is the instance we are trying to derive
 
-  | InstSkol            -- Bound at an instance decl
+  | InstSkol            -- Bound at an instance decl, or quantified constraint
+       ClsInstOrQC      -- Whether class instance or quantified constraint
+       PatersonSize     -- Head has the given PatersonSize
 
   | FamInstSkol         -- Bound at a family instance decl
   | PatSkol             -- An existential type variable bound by a pattern for
@@ -280,9 +285,6 @@ data SkolemInfoAnon
 
   | ReifySkol           -- Bound during Template Haskell reification
 
-  | QuantCtxtSkol       -- Quantified context, e.g.
-                        --   f :: forall c. (forall a. c a => c [a]) => blah
-
   | RuntimeUnkSkol      -- Runtime skolem from the GHCi debugger      #14628
 
   | ArrowReboundIfSkol  -- Bound by the expected type of the rebound arrow ifThenElse command.
@@ -312,6 +314,8 @@ mkSkolemInfo sk_anon = do
 getSkolemInfo :: SkolemInfo -> SkolemInfoAnon
 getSkolemInfo (SkolemInfo _ skol_anon) = skol_anon
 
+mkClsInstSkol :: Class -> [Type] -> SkolemInfoAnon
+mkClsInstSkol cls tys = InstSkol IsClsInst (pSizeClassPred cls tys)
 
 instance Outputable SkolemInfo where
   ppr (SkolemInfo _ sk_info ) = ppr sk_info
@@ -327,7 +331,10 @@ pprSkolInfo (ForAllSkol tvs)  = text "an explicit forall" <+> ppr tvs
 pprSkolInfo (IPSkol ips)      = text "the implicit-parameter binding" <> plural ips <+> text "for"
                                  <+> pprWithCommas ppr ips
 pprSkolInfo (DerivSkol pred)  = text "the deriving clause for" <+> quotes (ppr pred)
-pprSkolInfo InstSkol          = text "the instance declaration"
+pprSkolInfo (InstSkol IsClsInst sz) = vcat [ text "the instance declaration"
+                                           , whenPprDebug (braces (ppr sz)) ]
+pprSkolInfo (InstSkol (IsQC {}) sz) = vcat [ text "a quantified context"
+                                           , whenPprDebug (braces (ppr sz)) ]
 pprSkolInfo FamInstSkol       = text "a family instance declaration"
 pprSkolInfo BracketSkol       = text "a Template Haskell bracket"
 pprSkolInfo (RuleSkol name)   = text "the RULE" <+> pprRuleName name
@@ -341,7 +348,6 @@ pprSkolInfo (TyConSkol flav name) = text "the" <+> ppr flav <+> text "declaratio
 pprSkolInfo (DataConSkol name)    = text "the type signature for" <+> quotes (ppr name)
 pprSkolInfo ReifySkol             = text "the type being reified"
 
-pprSkolInfo (QuantCtxtSkol {}) = text "a quantified context"
 pprSkolInfo RuntimeUnkSkol     = text "Unknown type from GHCi runtime"
 pprSkolInfo ArrowReboundIfSkol = text "the expected type of a rebound if-then-else command"
 
@@ -450,39 +456,25 @@ data CtOrigin
     -- 'SkolemInfo' inside gives more information.
     GivenOrigin SkolemInfoAnon
 
-  -- The following are other origins for given constraints that cannot produce
-  -- new skolems -- hence no SkolemInfo.
-
-  -- | 'InstSCOrigin' is used for a Given constraint obtained by superclass selection
+  -- | 'GivenSCOrigin' is used for a Given constraint obtained by superclass selection
   -- from the context of an instance declaration.  E.g.
   --       instance @(Foo a, Bar a) => C [a]@ where ...
   -- When typechecking the instance decl itself, including producing evidence
   -- for the superclasses of @C@, the superclasses of @(Foo a)@ and @(Bar a)@ will
-  -- have 'InstSCOrigin' origin.
-  | InstSCOrigin ScDepth      -- ^ The number of superclass selections necessary to
-                              -- get this constraint; see Note [Replacement vs keeping]
-                              -- in GHC.Tc.Solver.Interact
-                 TypeSize     -- ^ If @(C ty1 .. tyn)@ is the largest class from
-                              --    which we made a superclass selection in the chain,
-                              --    then @TypeSize = sizeTypes [ty1, .., tyn]@
-                              -- See Note [Solving superclass constraints] in GHC.Tc.TyCl.Instance
+  -- have 'GivenSCOrigin' origin.
+  | GivenSCOrigin
+        SkolemInfoAnon  -- ^ Just like GivenOrigin
 
-  -- | 'OtherSCOrigin' is used for a Given constraint obtained by superclass
-  -- selection from a constraint /other than/ the context of an instance
-  -- declaration. (For the latter we use 'InstSCOrigin'.)  E.g.
-  --      f :: Foo a => blah
-  --      f = e
-  -- When typechecking body of 'f', the superclasses of the Given (Foo a)
-  -- will have 'OtherSCOrigin'.
-  --
-  -- Needed for Note [Replacement vs keeping] in GHC.Tc.Solver.Interact.
-  | OtherSCOrigin ScDepth -- ^ The number of superclass selections necessary to
-                          -- get this constraint
-                  SkolemInfoAnon
-                    -- ^ Where the sub-class constraint arose from
-                    -- (used only for printing)
+        ScDepth         -- ^ The number of superclass selections necessary to
+                        -- get this constraint; see Note [Replacement vs keeping]
+                        -- in GHC.Tc.Solver.Interact
 
-  -- All the others are for *wanted* constraints
+        Bool   -- ^ True => "blocked": cannot use this to solve naked superclass Wanteds
+               --                      i.e. ones with (ScOrigin _ NakedSc)
+               --   False => can use this to solve all Wanted constraints
+               -- See Note [Solving superclass constraints] in GHC.Tc.TyCl.Instance
+
+  ----------- Below here, all are Origins for Wanted constraints ------------
 
   | OccurrenceOf Name              -- Occurrence of an overloaded identifier
   | OccurrenceOfRecSel RdrName     -- Occurrence of a record selector
@@ -531,11 +523,10 @@ data CtOrigin
   | ViewPatOrigin
 
   -- | 'ScOrigin' is used only for the Wanted constraints for the
-  -- superclasses of an instance declaration.
-  -- If the instance head is @C ty1 .. tyn@
-  --    then @TypeSize = sizeTypes [ty1, .., tyn]@
-  -- See Note [Solving superclass constraints] in GHC.Tc.TyCl.Instance
-  | ScOrigin TypeSize
+  --   superclasses of an instance declaration.
+  | ScOrigin
+      ClsInstOrQC   -- Whether class instance or quantified constraint
+      NakedScFlag
 
   | DerivClauseOrigin   -- Typechecking a deriving clause (as opposed to
                         -- standalone deriving).
@@ -604,6 +595,7 @@ data CtOrigin
 
   | CycleBreakerOrigin
       CtOrigin   -- origin of the original constraint
+
       -- See Detail (7) of Note [Type equality cycles] in GHC.Tc.Solver.Canonical
   | FRROrigin
       FixedRuntimeRepOrigin
@@ -619,10 +611,24 @@ data CtOrigin
       Type   -- the instantiated type of the method
   | AmbiguityCheckOrigin UserTypeCtxt
 
+
 -- | The number of superclass selections needed to get this Given.
 -- If @d :: C ty@   has @ScDepth=2@, then the evidence @d@ will look
 -- like @sc_sel (sc_sel dg)@, where @dg@ is a Given.
 type ScDepth = Int
+
+data ClsInstOrQC = IsClsInst
+                 | IsQC CtOrigin
+
+data NakedScFlag = NakedSc | NotNakedSc
+      --   The NakedScFlag affects only GHC.Tc.Solver.InertSet.prohibitedSuperClassSolve
+      --   * For the original superclass constraints we use (ScOrigin _ NakedSc)
+      --   * But after using an instance declaration we use (ScOrigin _ NotNakedSc)
+      --   See Note [Solving superclass constraints] in GHC.Tc.TyCl.Instance
+
+instance Outputable NakedScFlag where
+  ppr NakedSc    = text "NakedSc"
+  ppr NotNakedSc = text "NotNakedSc"
 
 -- An origin is visible if the place where the constraint arises is manifest
 -- in user code. Currently, all origins are visible except for invisible
@@ -640,11 +646,10 @@ toInvisibleOrigin orig@(TypeEqOrigin {}) = orig { uo_visible = False }
 toInvisibleOrigin orig                   = orig
 
 isGivenOrigin :: CtOrigin -> Bool
-isGivenOrigin (GivenOrigin {})              = True
-isGivenOrigin (InstSCOrigin {})             = True
-isGivenOrigin (OtherSCOrigin {})            = True
-isGivenOrigin (CycleBreakerOrigin o)        = isGivenOrigin o
-isGivenOrigin _                             = False
+isGivenOrigin (GivenOrigin {})       = True
+isGivenOrigin (GivenSCOrigin {})     = True
+isGivenOrigin (CycleBreakerOrigin o) = isGivenOrigin o
+isGivenOrigin _                      = False
 
 -- See Note [Suppressing confusing errors] in GHC.Tc.Errors
 isWantedWantedFunDepOrigin :: CtOrigin -> Bool
@@ -731,9 +736,12 @@ lGRHSCtOrigin _ = Shouldn'tHappenOrigin "multi-way GRHS"
 
 pprCtOrigin :: CtOrigin -> SDoc
 -- "arising from ..."
-pprCtOrigin (GivenOrigin sk)     = ctoHerald <+> ppr sk
-pprCtOrigin (InstSCOrigin {})    = ctoHerald <+> pprSkolInfo InstSkol   -- keep output in sync
-pprCtOrigin (OtherSCOrigin _ si) = ctoHerald <+> pprSkolInfo si
+pprCtOrigin (GivenOrigin sk)
+  = ctoHerald <+> ppr sk
+
+pprCtOrigin (GivenSCOrigin sk d blk)
+  = vcat [ ctoHerald <+> pprSkolInfo sk
+         , whenPprDebug (braces (text "given-sc:" <+> ppr d <> comma <> ppr blk)) ]
 
 pprCtOrigin (SpecPragOrigin ctxt)
   = case ctxt of
@@ -817,9 +825,6 @@ pprCtOrigin (InstProvidedOrigin mod cls_inst)
 pprCtOrigin (CycleBreakerOrigin orig)
   = pprCtOrigin orig
 
-pprCtOrigin (FRROrigin {})
-  = ctoHerald <+> text "a representation-polymorphism check"
-
 pprCtOrigin (WantedSuperclassOrigin subclass_pred subclass_orig)
   = sep [ ctoHerald <+> text "a superclass required to satisfy" <+> quotes (ppr subclass_pred) <> comma
         , pprCtOrigin subclass_orig ]
@@ -835,6 +840,15 @@ pprCtOrigin (InstanceSigOrigin method_name sig_type orig_method_type)
 pprCtOrigin (AmbiguityCheckOrigin ctxt)
   = ctoHerald <+> text "a type ambiguity check for" $$
     pprUserTypeCtxt ctxt
+
+pprCtOrigin (ScOrigin IsClsInst nkd)
+  = vcat [ ctoHerald <+> text "the superclasses of an instance declaration"
+         , whenPprDebug (braces (text "sc-origin:" <> ppr nkd)) ]
+
+pprCtOrigin (ScOrigin (IsQC orig) nkd)
+  = vcat [ ctoHerald <+> text "the head of a quantified constraint"
+         , whenPprDebug (braces (text "sc-origin:" <> ppr nkd))
+         , pprCtOrigin orig ]
 
 pprCtOrigin simple_origin
   = ctoHerald <+> pprCtO simple_origin
@@ -859,8 +873,8 @@ pprCtO (HasFieldOrigin f)    = hsep [text "selecting the field", quotes (ppr f)]
 pprCtO AssocFamPatOrigin     = text "the LHS of a family instance"
 pprCtO TupleOrigin           = text "a tuple"
 pprCtO NegateOrigin          = text "a use of syntactic negation"
-pprCtO (ScOrigin n)          = text "the superclasses of an instance declaration"
-                               <> whenPprDebug (parens (ppr n))
+pprCtO (ScOrigin IsClsInst _) = text "the superclasses of an instance declaration"
+pprCtO (ScOrigin (IsQC {}) _) = text "the head of a quantified constraint"
 pprCtO DerivClauseOrigin     = text "the 'deriving' clause of a data type declaration"
 pprCtO StandAloneDerivOrigin = text "a 'deriving' declaration"
 pprCtO DefaultOrigin         = text "a 'default' declaration"
@@ -884,8 +898,7 @@ pprCtO BracketOrigin         = text "a quotation bracket"
 -- get here via callStackOriginFS, when doing ambiguity checks
 -- A bit silly, but no great harm
 pprCtO (GivenOrigin {})             = text "a given constraint"
-pprCtO (InstSCOrigin {})            = text "the superclass of an instance constraint"
-pprCtO (OtherSCOrigin {})           = text "the superclass of a given constraint"
+pprCtO (GivenSCOrigin {})           = text "the superclass of a given constraint"
 pprCtO (SpecPragOrigin {})          = text "a SPECIALISE pragma"
 pprCtO (FunDepOrigin1 {})           = text "a functional dependency"
 pprCtO (FunDepOrigin2 {})           = text "a functional dependency"

@@ -1,21 +1,24 @@
 
 T15552a.hs:26:9: error:
-    • Illegal nested type family application ‘GetEntryOfVal
-                                                (FirstEntryOfVal v kvs)’
+    • Illegal nested use of type family ‘FirstEntryOfVal’
+        in the arguments of the type-family application ‘GetEntryOfVal
+                                                           (FirstEntryOfVal v kvs)’
       (Use UndecidableInstances to permit this)
     • In the equations for closed type family ‘FirstEntryOfVal’
       In the type family declaration for ‘FirstEntryOfVal’
 
 T15552a.hs:26:9: error:
-    • Illegal nested type family application ‘EntryOfValKey
-                                                (FirstEntryOfVal v kvs)’
+    • Illegal nested use of type family ‘FirstEntryOfVal’
+        in the arguments of the type-family application ‘EntryOfValKey
+                                                           (FirstEntryOfVal v kvs)’
       (Use UndecidableInstances to permit this)
     • In the equations for closed type family ‘FirstEntryOfVal’
       In the type family declaration for ‘FirstEntryOfVal’
 
 T15552a.hs:26:9: error:
-    • Illegal nested type family application ‘EntryOfValKey
-                                                (FirstEntryOfVal v kvs)’
+    • Illegal nested use of type family ‘FirstEntryOfVal’
+        in the arguments of the type-family application ‘EntryOfValKey
+                                                           (FirstEntryOfVal v kvs)’
       (Use UndecidableInstances to permit this)
     • In the equations for closed type family ‘FirstEntryOfVal’
       In the type family declaration for ‘FirstEntryOfVal’

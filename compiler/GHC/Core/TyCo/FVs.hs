@@ -31,7 +31,7 @@ module GHC.Core.TyCo.FVs
         noFreeVarsOfType, noFreeVarsOfTypes, noFreeVarsOfCo,
 
         -- * Free type constructors
-        tyConsOfType,
+        tyConsOfType, tyConsOfTypes,
 
         -- * Free vars with visible/invisible separate
         visVarsOfTypes, visVarsOfType,
@@ -1069,7 +1069,7 @@ tyConsOfType ty
      go ty | Just ty' <- coreView ty = go ty'
      go (TyVarTy {})                = emptyUniqSet
      go (LitTy {})                  = emptyUniqSet
-     go (TyConApp tc tys)           = go_tc tc `unionUniqSets` go_s tys
+     go (TyConApp tc tys)           = go_tc tc `unionUniqSets` tyConsOfTypes tys
      go (AppTy a b)                 = go a `unionUniqSets` go b
      go (FunTy af w a b)            = go w `unionUniqSets`
                                       go a `unionUniqSets` go b
@@ -1108,12 +1108,13 @@ tyConsOfType ty
         -- this last case can happen from the tyConsOfType used from
         -- checkTauTvUpdate
 
-     go_s tys     = foldr (unionUniqSets . go)     emptyUniqSet tys
      go_cos cos   = foldr (unionUniqSets . go_co)  emptyUniqSet cos
 
      go_tc tc = unitUniqSet tc
      go_ax ax = go_tc $ coAxiomTyCon ax
 
+tyConsOfTypes :: [Type] -> UniqSet TyCon
+tyConsOfTypes tys = foldr (unionUniqSets . tyConsOfType) emptyUniqSet tys
 
 {- **********************************************************************
 *                                                                       *

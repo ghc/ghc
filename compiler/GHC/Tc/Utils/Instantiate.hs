@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts, RecursiveDo #-}
 {-# LANGUAGE DisambiguateRecordFields #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
@@ -446,12 +446,24 @@ tcInstTypeBndrs poly_ty
            ; return (subst', Bndr tv' spec) }
 
 --------------------------
-tcSkolDFunType :: SkolemInfo -> DFunId -> TcM ([TcTyVar], TcThetaType, TcType)
+tcSkolDFunType :: Type -> TcM (SkolemInfoAnon, [TcTyVar], TcThetaType, Class, [TcType])
 -- Instantiate a type signature with skolem constants.
 -- This freshens the names, but no need to do so
-tcSkolDFunType skol_info dfun
-  = do { (tv_prs, theta, tau) <- tcInstType (tcInstSuperSkolTyVars skol_info) dfun
-       ; return (map snd tv_prs, theta, tau) }
+tcSkolDFunType dfun_ty
+  = do { let (tvs, theta, cls, tys) = tcSplitDFunTy dfun_ty
+
+         -- rec {..}: see Note [Keeping SkolemInfo inside a SkolemTv]
+         --           in GHC.Tc.Utils.TcType
+       ; rec { skol_info <- mkSkolemInfo skol_info_anon
+             ; (subst, inst_tvs) <- tcInstSuperSkolTyVars skol_info tvs
+                     -- We instantiate the dfun_tyd with superSkolems.
+                     -- See Note [Subtle interaction of recursion and overlap]
+                     -- and Note [Binding when looking up instances]
+             ; let inst_tys = substTys subst tys
+                   skol_info_anon = mkClsInstSkol cls inst_tys }
+
+       ; let inst_theta = substTheta subst theta
+       ; return (skol_info_anon, inst_tvs, inst_theta, cls, inst_tys) }
 
 tcSuperSkolTyVars :: TcLevel -> SkolemInfo -> [TyVar] -> (Subst, [TcTyVar])
 -- Make skolem constants, but do *not* give them new names, as above
@@ -483,7 +495,9 @@ tcInstSkolTyVarsX skol_info = tcInstSkolTyVarsPushLevel skol_info False
 tcInstSuperSkolTyVars :: SkolemInfo -> [TyVar] -> TcM (Subst, [TcTyVar])
 -- See Note [Skolemising type variables]
 -- This version freshens the names and creates "super skolems";
--- see comments around superSkolemTv.
+--    see comments around superSkolemTv.
+-- Must be lazy in skol_info:
+--   see Note [Keeping SkolemInfo inside a SkolemTv] in GHC.Tc.Utils.TcType
 tcInstSuperSkolTyVars skol_info = tcInstSuperSkolTyVarsX skol_info emptySubst
 
 tcInstSuperSkolTyVarsX :: SkolemInfo -> Subst -> [TyVar] -> TcM (Subst, [TcTyVar])

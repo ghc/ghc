@@ -51,7 +51,6 @@ import GHC.Utils.Misc
 
 import GHC.Types.Basic
 import GHC.Types.Var
-import GHC.Types.Var.Set
 
 import GHC.Data.Bag
 
@@ -701,7 +700,7 @@ simplifyInstanceContexts infer_specs
                                     current_solns infer_specs
            ; new_solns <- checkNoErrs $
                           extendLocalInstEnv inst_specs $
-                          mapM gen_soln infer_specs
+                          mapM simplifyDeriv infer_specs
 
            ; if (current_solns `eqSolution` new_solns) then
                 return [ setDerivSpecTheta soln spec
@@ -713,24 +712,6 @@ simplifyInstanceContexts infer_specs
        -- Canonicalise for comparison
        -- See Note [Deterministic simplifyInstanceContexts]
     canSolution = map (sortBy nonDetCmpType)
-    ------------------------------------------------------------------
-    gen_soln :: DerivSpec ThetaSpec -> TcM ThetaType
-    gen_soln (DS { ds_loc = loc, ds_tvs = tyvars
-                 , ds_cls = clas, ds_tys = inst_tys, ds_theta = deriv_rhs
-                 , ds_skol_info = skol_info, ds_user_ctxt = user_ctxt })
-      = setSrcSpan loc  $
-        addErrCtxt (derivInstCtxt the_pred) $
-        do { theta <- simplifyDeriv skol_info user_ctxt tyvars deriv_rhs
-                -- checkValidInstance tyvars theta clas inst_tys
-                -- Not necessary; see Note [Exotic derived instance contexts]
-
-           ; traceTc "GHC.Tc.Deriv" (ppr deriv_rhs $$ ppr theta)
-                -- Claim: the result instance declaration is guaranteed valid
-                -- Hence no need to call:
-                --   checkValidInstance tyvars theta clas inst_tys
-           ; return theta }
-      where
-        the_pred = mkClassPred clas inst_tys
 
 derivInstCtxt :: PredType -> SDoc
 derivInstCtxt pred
@@ -744,29 +725,27 @@ derivInstCtxt pred
 ***********************************************************************************
 -}
 
+
 -- | Given @instance (wanted) => C inst_ty@, simplify 'wanted' as much
 -- as possible. Fail if not possible.
-simplifyDeriv :: SkolemInfo -- ^ The 'SkolemInfo' used to skolemise the
-                            -- 'TcTyVar' arguments
-              -> UserTypeCtxt -- ^ Used to inform error messages as to whether
-                              -- we are in a @deriving@ clause or a standalone
-                              -- @deriving@ declaration
-              -> [TcTyVar]  -- ^ The tyvars bound by @inst_ty@.
-              -> ThetaSpec -- ^ The constraints to solve and simplify
+simplifyDeriv :: DerivSpec ThetaSpec
               -> TcM ThetaType -- ^ Needed constraints (after simplification),
                                -- i.e. @['PredType']@.
-simplifyDeriv skol_info user_ctxt tvs theta
-  = do { let skol_set = mkVarSet tvs
-
+simplifyDeriv (DS { ds_loc = loc, ds_tvs = tvs
+                  , ds_cls = clas, ds_tys = inst_tys, ds_theta = deriv_rhs
+                  , ds_skol_info = skol_info, ds_user_ctxt = user_ctxt })
+  = setSrcSpan loc  $
+    addErrCtxt (derivInstCtxt (mkClassPred clas inst_tys)) $
+    do {
        -- See [STEP DAC BUILD]
        -- Generate the implication constraints, one for each method, to solve
        -- with the skolemized variables.  Start "one level down" because
        -- we are going to wrap the result in an implication with tvs,
        -- in step [DAC RESIDUAL]
-       ; (tc_lvl, wanteds) <- captureThetaSpecConstraints user_ctxt theta
+       ; (tc_lvl, wanteds) <- captureThetaSpecConstraints user_ctxt deriv_rhs
 
        ; traceTc "simplifyDeriv inputs" $
-         vcat [ pprTyVars tvs $$ ppr theta $$ ppr wanteds, ppr skol_info ]
+         vcat [ pprTyVars tvs $$ ppr deriv_rhs $$ ppr wanteds, ppr skol_info ]
 
        -- See [STEP DAC SOLVE]
        -- Simplify the constraints, starting at the same level at which
@@ -783,6 +762,7 @@ simplifyDeriv skol_info user_ctxt tvs theta
        -- From the simplified constraints extract a subset 'good' that will
        -- become the context 'min_theta' for the derived instance.
        ; let residual_simple = approximateWC True solved_wanteds
+             head_size       = pSizeClassPred clas inst_tys
              good = mapMaybeBag get_good residual_simple
 
              -- Returns @Just p@ (where @p@ is the type of the Ct) if a Ct is
@@ -791,10 +771,8 @@ simplifyDeriv skol_info user_ctxt tvs theta
              -- See Note [Exotic derived instance contexts] for what
              -- constitutes an exotic constraint.
              get_good :: Ct -> Maybe PredType
-             get_good ct | validDerivPred skol_set p
-                         = Just p
-                         | otherwise
-                         = Nothing
+             get_good ct | validDerivPred head_size p = Just p
+                         | otherwise                  = Nothing
                where p = ctPred ct
 
        ; traceTc "simplifyDeriv outputs" $
@@ -823,6 +801,13 @@ simplifyDeriv skol_info user_ctxt tvs theta
        -- See also Note [Exotic derived instance contexts], which are caught
        -- in this line of code.
        ; simplifyTopImplic leftover_implic
+
+       ; traceTc "GHC.Tc.Deriv" (ppr deriv_rhs $$ ppr min_theta)
+
+         -- Claim: the result instance declaration is guaranteed valid
+         -- Hence no need to call:
+         --     checkValidInstance tyvars theta clas inst_tys
+         -- See Note [Exotic derived instance contexts]
 
        ; return min_theta }
 

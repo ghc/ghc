@@ -6,8 +6,7 @@ module GHC.Tc.Solver.Interact (
   ) where
 
 import GHC.Prelude
-import GHC.Types.Basic ( SwapFlag(..),
-                         infinity, IntWithInf, intGtLimit )
+import GHC.Types.Basic ( SwapFlag(..), IntWithInf, intGtLimit )
 import GHC.Tc.Solver.Canonical
 import GHC.Types.Var.Set
 
@@ -520,17 +519,18 @@ solveOneFromTheOther ct_i ct_w
 
      pred  = ctEvPred ev_i
 
-     loc_i = ctEvLoc ev_i
-     loc_w = ctEvLoc ev_w
-     lvl_i = ctLocLevel loc_i
-     lvl_w = ctLocLevel loc_w
+     loc_i  = ctEvLoc ev_i
+     loc_w  = ctEvLoc ev_w
+     orig_i = ctLocOrigin loc_i
+     orig_w = ctLocOrigin loc_w
+     lvl_i  = ctLocLevel loc_i
+     lvl_w  = ctLocLevel loc_w
 
      is_psc_w = isPendingScDict ct_w
      is_psc_i = isPendingScDict ct_i
 
-     is_wsc_orig_i = is_wanted_superclass_loc loc_i
-     is_wsc_orig_w = is_wanted_superclass_loc loc_w
-     is_wanted_superclass_loc = isWantedSuperclassOrigin . ctLocOrigin
+     is_wsc_orig_i = isWantedSuperclassOrigin orig_i
+     is_wsc_orig_w = isWantedSuperclassOrigin orig_w
 
      different_level_strategy  -- Both Given
        | isIPLikePred pred = if lvl_w > lvl_i then KeepWork  else KeepInert
@@ -539,27 +539,20 @@ solveOneFromTheOther ct_i ct_w
        -- For the isIPLikePred case see Note [Shadowing of Implicit Parameters]
 
      same_level_strategy -- Both Given
-       = case (ctLocOrigin loc_i, ctLocOrigin loc_w) of
-              -- case 2(a) from Note [Replacement vs keeping]
-           (InstSCOrigin _depth_i size_i, InstSCOrigin _depth_w size_w)
-             | size_w < size_i -> KeepWork
-             | otherwise       -> KeepInert
+       = case (orig_i, orig_w) of
 
-              -- case 2(c) from Note [Replacement vs keeping]
-           (InstSCOrigin depth_i _, OtherSCOrigin depth_w _)  -> choose_shallower depth_i depth_w
-           (OtherSCOrigin depth_i _, InstSCOrigin depth_w _)  -> choose_shallower depth_i depth_w
-           (OtherSCOrigin depth_i _, OtherSCOrigin depth_w _) -> choose_shallower depth_i depth_w
+           (GivenSCOrigin _ depth_i blocked_i, GivenSCOrigin _ depth_w blocked_w)
+             | blocked_i, not blocked_w -> KeepWork  -- Case 2(a) from
+             | not blocked_i, blocked_w -> KeepInert -- Note [Replacement vs keeping]
 
-              -- case 2(b) from Note [Replacement vs keeping]
-           (InstSCOrigin {}, _)                         -> KeepWork
-           (OtherSCOrigin {}, _)                        -> KeepWork
+             -- Both blocked or both not blocked
 
-             -- case 2(d) from Note [Replacement vs keeping]
-           _                                      -> KeepInert
+             | depth_w < depth_i -> KeepWork   -- Case 2(c) from
+             | otherwise         -> KeepInert  -- Note [Replacement vs keeping]
 
-     choose_shallower depth_i depth_w | depth_w < depth_i = KeepWork
-                                      | otherwise         = KeepInert
-       -- favor KeepInert in the equals case, according to 2(d) from the Note
+           (GivenSCOrigin {}, _) -> KeepWork  -- Case 2(b) from Note [Replacement vs keeping]
+
+           _ -> KeepInert  -- Case 2(d) from Note [Replacement vs keeping]
 
 {-
 Note [Replacement vs keeping]
@@ -585,7 +578,7 @@ solveOneFromTheOther.
 
   2) Constraints coming from the same level (i.e. same implication)
 
-       (a) If both are InstSCOrigin, choose the one with the smallest TypeSize,
+       (a) If both are GivenSCOrigin, choose the one that is unblocked if possible
            according to Note [Solving superclass constraints] in GHC.Tc.TyCl.Instance.
 
        (b) Prefer constraints that are not superclass selections. Example:
@@ -601,11 +594,12 @@ solveOneFromTheOther.
            Getting this wrong was #20602. See also
            Note [Tracking redundant constraints] in GHC.Tc.Solver.
 
-       (c) If both are superclass selections (but not both InstSCOrigin), choose the one
-           with the shallower superclass-selection depth, in the hope of identifying
-           more correct redundant constraints. This is really a generalization of
-           point (b), because the superclass depth of a non-superclass
-           constraint is 0.
+       (c) If both are GivenSCOrigin, chooose the one with the shallower
+           superclass-selection depth, in the hope of identifying more correct
+           redundant constraints. This is really a generalization of point (b),
+           because the superclass depth of a non-superclass constraint is 0.
+
+           (If the levels differ, we definitely won't have both with GivenSCOrigin.)
 
        (d) Finally, when there is still a choice, use KeepInert rather than
            KeepWork, for two reasons:
@@ -669,7 +663,10 @@ interactIrred inerts ct_w@(CIrredCan { cc_ev = ev_w, cc_reason = reason })
         -- See Note [Multiple matching irreds]
   , let ev_i = ctEvidence ct_i
   = do { what_next <- solveOneFromTheOther ct_i ct_w
-       ; traceTcS "iteractIrred" (ppr ct_w $$ ppr what_next $$ ppr ct_i)
+       ; traceTcS "iteractIrred" $
+         vcat [ text "wanted:" <+> (ppr ct_w $$ ppr (ctOrigin ct_w))
+              , text "inert: " <+> (ppr ct_i $$ ppr (ctOrigin ct_i))
+              , ppr what_next ]
        ; case what_next of
             KeepInert -> do { setEvBindIfWanted ev_w (swap_me swap ev_i)
                             ; return (Stop ev_w (text "Irred equal" <+> parens (ppr what_next))) }
@@ -2326,9 +2323,11 @@ checkInstanceOK loc what pred
      origin     = ctLocOrigin loc
 
      zap_origin loc  -- After applying an instance we can set ScOrigin to
-                     -- infinity, so that prohibitedSuperClassSolve never fires
-       | ScOrigin {} <- origin
-       = setCtLocOrigin loc (ScOrigin infinity)
+                     -- NotNakedSc, so that prohibitedSuperClassSolve never fires
+                     -- See Note [Solving superclass constraints] in
+                     -- GHC.Tc.TyCl.Instance, (sc1).
+       | ScOrigin what _ <- origin
+       = setCtLocOrigin loc (ScOrigin what NotNakedSc)
        | otherwise
        = loc
 
