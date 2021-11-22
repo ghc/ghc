@@ -98,7 +98,6 @@ import GHC.Utils.Binary
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 
 import Data.Function
 
@@ -880,20 +879,7 @@ isUsedOnceDmd (n :* _) = isUsedOnce n
 -- signatures for analysis performance reasons.
 -- See Note [Lazy and unleashable free variables] in "GHC.Core.Opt.DmdAnal".
 isWeakDmd :: Demand -> Bool
-isWeakDmd dmd@(n :* _) = not (isStrict n) && is_plus_idem_dmd dmd
-  where
-    -- @is_plus_idem_* thing@ checks whether @thing `plus` thing = thing@,
-    -- e.g. if @thing@ is idempotent wrt. to @plus@.
-    -- is_plus_idem_card n = plusCard n n == n
-    is_plus_idem_card = isCardNonOnce
-    -- is_plus_idem_dmd dmd = plusDmd dmd dmd == dmd
-    is_plus_idem_dmd AbsDmd    = True
-    is_plus_idem_dmd BotDmd    = True
-    is_plus_idem_dmd (n :* sd) = is_plus_idem_card n && is_plus_idem_sub_dmd sd
-    -- is_plus_idem_sub_dmd sd = plusSubDmd sd sd == sd
-    is_plus_idem_sub_dmd (Poly _ n)  = assert (isCardNonOnce n) True
-    is_plus_idem_sub_dmd (Prod _ ds) = all is_plus_idem_dmd ds
-    is_plus_idem_sub_dmd (Call n _)  = is_plus_idem_card n -- See Note [Call demands are relative]
+isWeakDmd _ = False
 
 evalDmd :: Demand
 evalDmd = C_1N :* topSubDmd
@@ -1503,11 +1489,13 @@ data DmdType
 
 instance Eq DmdType where
   (==) (DmdType fv1 ds1 div1)
-       (DmdType fv2 ds2 div2) = nonDetUFMToList fv1 == nonDetUFMToList fv2
-         -- It's OK to use nonDetUFMToList here because we're testing for
-         -- equality and even though the lists will be in some arbitrary
-         -- Unique order, it is the same order for both
-                              && ds1 == ds2 && div1 == div2
+       (DmdType fv2 ds2 div2) =  div1 == div2 && ds1 == ds2 -- cheap checks first
+                              && as_list div1 fv1 == as_list div2 fv2
+       where
+         as_list div = filter (\(_, dmd) -> dmd /= defaultFvDmd div) . nonDetUFMToList
+           -- It's OK to use nonDetUFMToList here because we're testing for
+           -- equality and even though the lists will be in some arbitrary
+           -- Unique order, it is the same order for both
 
 -- | Compute the least upper bound of two 'DmdType's elicited /by the same
 -- incoming demand/!

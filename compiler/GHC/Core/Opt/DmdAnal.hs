@@ -101,12 +101,20 @@ dmdAnalProgram opts fam_envs rules binds
     add_exported_use env dmd_ty id
       | isExportedId id || elemVarSet id rule_fvs
       -- See Note [Absence analysis for stable unfoldings and RULES]
-      = dmd_ty `plusDmdType` fst (dmdAnalStar env topDmd (Var id))
+      = keepAlive env id dmd_ty
       | otherwise
       = dmd_ty
 
     rule_fvs :: IdSet
     rule_fvs = rulesRhsFreeIds rules
+
+keepAlive :: AnalEnv -> Id -> DmdType -> DmdType
+-- See Note [Absence analysis for stable unfoldings and RULES]
+keepAlive env id ty = plusDmdType ty (fst $ dmdAnalStar env topDmd $ Var id)
+
+keepAliveSet :: AnalEnv -> IdSet -> DmdType -> DmdType
+-- See Note [Absence analysis for stable unfoldings and RULES]
+keepAliveSet env ids ty = nonDetStrictFoldVarSet (keepAlive env) ty ids
 
 -- | We attach useful (e.g. not 'topDmd') 'idDemandInfo' to top-level bindings
 -- that satisfy this function.
@@ -284,8 +292,7 @@ dmdAnalBindLetUp top_lvl env id rhs anal_body = WithDmdType final_ty (R (NonRec 
     (rhs_ty, rhs')     = dmdAnalStar env (dmdTransformThunkDmd rhs id_dmd') rhs
 
     -- See Note [Absence analysis for stable unfoldings and RULES]
-    rule_fvs           = bndrRuleAndUnfoldingIds id
-    final_ty           = body_ty' `plusDmdType` rhs_ty `keepAliveDmdType` rule_fvs
+    final_ty           = keepAliveSet env (bndrRuleAndUnfoldingIds id) (body_ty' `plusDmdType` rhs_ty)
 
 -- | Let bindings can be processed in two ways:
 -- Down (RHS before body) or Up (body before RHS).
@@ -867,7 +874,7 @@ dmdAnalRhsSig
 -- See Note [NOINLINE and strictness]
 dmdAnalRhsSig top_lvl rec_flag env let_dmd id rhs
   = -- pprTrace "dmdAnalRhsSig" (ppr id $$ ppr let_dmd $$ ppr sig $$ ppr lazy_fv) $
-    (env', lazy_fv, id', rhs')
+    (env', emptyVarEnv, id', rhs')
   where
     rhs_arity = idArity id
     -- See Note [Demand signatures are computed for a threshold demand based on idArity]
@@ -888,7 +895,7 @@ dmdAnalRhsSig top_lvl rec_flag env let_dmd id rhs
     WithDmdType rhs_dmd_ty rhs' = dmdAnal (adjustInlFun id env) rhs_dmd rhs
     DmdType rhs_fv rhs_dmds rhs_div = rhs_dmd_ty
 
-    sig = mkDmdSigForArity rhs_arity (DmdType sig_fv rhs_dmds rhs_div)
+    sig = mkDmdSigForArity rhs_arity sig_ty
 
     id' = id `setIdDmdSig` sig
     !env' = extendAnalEnv top_lvl env id' sig
@@ -905,15 +912,13 @@ dmdAnalRhsSig top_lvl rec_flag env let_dmd id rhs
     --        we'd have to do an additional iteration. reuseEnv makes sure that
     --        we never get used-once info for FVs of recursive functions.
     --        See #14816 where we try to get rid of reuseEnv.
-    rhs_fv1 = case rec_flag of
+    rhs_fv' = case rec_flag of
                 Recursive    -> reuseEnv rhs_fv
                 NonRecursive -> rhs_fv
 
+    dmd_ty' = DmdType rhs_fv' rhs_dmds rhs_div
     -- See Note [Absence analysis for stable unfoldings and RULES]
-    rhs_fv2 = rhs_fv1 `keepAliveDmdEnv` bndrRuleAndUnfoldingIds id
-
-    -- See Note [Lazy and unleashable free variables]
-    !(!lazy_fv, !sig_fv) = partitionVarEnv isWeakDmd rhs_fv2
+    sig_ty = keepAliveSet env (bndrRuleAndUnfoldingIds id) dmd_ty'
 
 unboxableResultWidth :: AnalEnv -> Id -> Maybe Arity
 unboxableResultWidth env id
