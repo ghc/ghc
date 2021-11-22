@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# OPTIONS_HADDOCK not-home #-}
 
 -- | Custom GHC "Prelude"
 --
