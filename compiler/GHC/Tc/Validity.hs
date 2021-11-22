@@ -17,7 +17,6 @@ module GHC.Tc.Validity (
   checkValidTyFamEqn, checkValidAssocTyFamDeflt, checkConsistentFamInst,
   arityErr,
   checkTyConTelescope,
-  allDistinctTyVars
   ) where
 
 import GHC.Prelude
@@ -29,12 +28,19 @@ import GHC.Data.Maybe
 import GHC.Tc.Utils.Unify    ( tcSubTypeAmbiguity )
 import GHC.Tc.Solver         ( simplifyAmbiguityCheck )
 import GHC.Tc.Instance.Class ( matchGlobalInst, ClsInstResult(..), InstanceWhat(..), AssocInstInfo(..) )
-import GHC.Core.TyCo.FVs
-import GHC.Core.TyCo.Rep
-import GHC.Core.TyCo.Ppr
-import GHC.Tc.Utils.TcType hiding ( sizeType, sizeTypes )
+import GHC.Tc.Utils.TcType
+import GHC.Tc.Types.Origin
+import GHC.Tc.Types.Rank
+import GHC.Tc.Errors.Types
+import GHC.Tc.Utils.Monad
+import GHC.Tc.Utils.Env  ( tcInitTidyEnv, tcInitOpenTidyEnv )
+import GHC.Tc.Instance.FunDeps
+import GHC.Tc.Instance.Family
+
 import GHC.Builtin.Types
 import GHC.Builtin.Names
+import GHC.Builtin.Uniques  ( mkAlphaTyVarUnique )
+
 import GHC.Core.Type
 import GHC.Core.Unify ( tcMatchTyX_BM, BindFlag(..) )
 import GHC.Core.Coercion
@@ -42,43 +48,41 @@ import GHC.Core.Coercion.Axiom
 import GHC.Core.Class
 import GHC.Core.TyCon
 import GHC.Core.Predicate
-import GHC.Tc.Types.Origin
-import GHC.Tc.Types.Rank
-import GHC.Tc.Errors.Types
-import GHC.Types.Error
+import GHC.Core.TyCo.FVs
+import GHC.Core.TyCo.Rep
+import GHC.Core.TyCo.Ppr
+import GHC.Core.FamInstEnv ( isDominatedBy, injectiveBranches
+                           , InjectivityCheckResult(..) )
 
--- others:
 import GHC.Iface.Type    ( pprIfaceType, pprIfaceTypeApp )
 import GHC.CoreToIface   ( toIfaceTyCon, toIfaceTcArgs, toIfaceType )
 import GHC.Hs
-import GHC.Tc.Utils.Monad
-import GHC.Tc.Utils.Env  ( tcInitTidyEnv, tcInitOpenTidyEnv )
-import GHC.Tc.Instance.FunDeps
-import GHC.Core.FamInstEnv
-   ( isDominatedBy, injectiveBranches, InjectivityCheckResult(..) )
-import GHC.Tc.Instance.Family
+import GHC.Driver.Session
+import qualified GHC.LanguageExtensions as LangExt
+
+import GHC.Types.Error
 import GHC.Types.Basic   ( UnboxedTupleOrSum(..), unboxedTupleOrSumExtension )
 import GHC.Types.Name
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Var     ( VarBndr(..), isInvisibleFunArg, mkTyVar )
+import GHC.Types.SrcLoc
+import GHC.Types.Unique.Set( isEmptyUniqSet )
+
 import GHC.Utils.FV
 import GHC.Utils.Error
-import GHC.Driver.Session
 import GHC.Utils.Misc
-import GHC.Data.List.SetOps
-import GHC.Types.SrcLoc
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
-import GHC.Builtin.Uniques  ( mkAlphaTyVarUnique )
-import qualified GHC.LanguageExtensions as LangExt
+
+import GHC.Data.List.SetOps
 
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
 import Control.Monad
 import Data.Foldable
 import Data.Function
-import Data.List        ( (\\), nub )
+import Data.List        ( (\\) )
 import qualified Data.List.NonEmpty as NE
 
 {-
@@ -1690,68 +1694,67 @@ The usual functional dependency checks also apply.
 
 Note [Valid 'deriving' predicate]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-validDerivPred checks for OK 'deriving' context.  See Note [Exotic
-derived instance contexts] in GHC.Tc.Deriv.  However the predicate is
-here because it uses sizeTypes, fvTypes.
+validDerivPred checks for OK 'deriving' context.
+See Note [Exotic derived instance contexts] in GHC.Tc.Deriv.Infer.  However the predicate is
+here because it is quite similar to checkInstTermination.
 
-It checks for three things
+It checks for two things:
 
-(VD1) No repeated variables (hasNoDups fvs)
-
-(VD2) No type constructors.  This is done by comparing
-        sizeTypes tys == length (fvTypes tys)
-      sizeTypes counts variables and constructors; fvTypes returns variables.
-      So if they are the same, there must be no constructors.  But there
-      might be applications thus (f (g x)).
-
-      Note that tys only includes the visible arguments of the class type
-      constructor. Including the non-visible arguments can cause the following,
-      perfectly valid instance to be rejected:
-         class Category (cat :: k -> k -> *) where ...
-         newtype T (c :: * -> * -> *) a b = MkT (c a b)
-         instance Category c => Category (T c) where ...
-      since the first argument to Category is a non-visible *, which sizeTypes
-      would count as a constructor! See #11833.
-
-(VD3) Also check for a bizarre corner case, when the derived instance decl
-      would look like
+(VD1) The Paterson conditions; see Note [Paterson conditions]
+      Not on do we want to check for termination (of course), but it also
+      deals with a nasty corner case:
          instance C a b => D (T a) where ...
       Note that 'b' isn't a parameter of T.  This gives rise to all sorts of
       problems; in particular, it's hard to compare solutions for equality
       when finding the fixpoint, and that means the inferContext loop does
       not converge.  See #5287, #21302
 
+(VD2) No type constructors; no foralls, no equalities:
+      see Note [Exotic derived instance contexts] in GHC.Tc.Deriv.Infer
+
+      We check the no-type-constructor bit using tyConsOfType.
+      Wrinkle: we look only at the /visible/ arguments of the class type
+      constructor. Including the non-visible arguments can cause the following,
+      perfectly valid instance to be rejected:
+         class Category (cat :: k -> k -> *) where ...
+         newtype T (c :: * -> * -> *) a b = MkT (c a b)
+         instance Category c => Category (T c) where ...
+      since the first argument to Category is a non-visible *, which has a
+      type constructor! See #11833.
+
+
 Note [Equality class instances]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We can't have users writing instances for the equality classes. But we
 still need to be able to write instances for them ourselves. So we allow
 instances only in the defining module.
-
 -}
 
-validDerivPred :: TyVarSet -> PredType -> Bool
+validDerivPred :: PatersonSize -> PredType -> Bool
 -- See Note [Valid 'deriving' predicate]
-validDerivPred tv_set pred
-  | not (tyCoVarsOfType pred `subVarSet` tv_set)
-  = False  -- Check (VD3)
-
-  | otherwise
+validDerivPred head_size pred
   = case classifyPredType pred of
+            EqPred {}     -> False  -- Reject equality constraints
+            ForAllPred {} -> False  -- Rejects quantified predicates
 
-       ClassPred cls tys
-          | isTerminatingClass cls -> True
-            -- Typeable constraints are bigger than they appear due
-            -- to kind polymorphism, but that's OK
+            ClassPred cls tys -> check_size (pSizeClassPred cls tys)
+                              && isEmptyUniqSet (tyConsOfTypes visible_tys)
+                where
+                  visible_tys = filterOutInvisibleTypes (classTyCon cls) tys  -- (VD2)
 
-          | otherwise -> hasNoDups visible_fvs                        -- Check (VD1)
-                      && lengthIs visible_fvs (sizeTypes visible_tys) -- Check (VD2)
-          where
-            visible_tys = filterOutInvisibleTypes (classTyCon cls) tys
-            visible_fvs = fvTypes visible_tys
+            IrredPred {} -> check_size (pSizeType pred)
+                -- Very important that we do the "too many variable occurrences"
+                -- check here, via check_size.  Example (test T21302):
+                --     instance c Eq a => Eq (BoxAssoc a)
+                --     data BAD = BAD (BoxAssoc Int) deriving( Eq )
+                -- We don't want to accept an inferred predicate (c0 Eq Int)
+                --   from that `deriving(Eq)` clause, because the c0 is fresh,
+                --   so we'll think it's a "new" one, and loop in
+                --   GHC.Tc.Deriv.Infer.simplifyInstanceContexts
 
-       IrredPred {}   -> True   -- Accept (f a)
-       EqPred {}      -> False  -- Reject equality constraints
-       ForAllPred {}  -> False  -- Rejects quantified predicates
+  where
+    check_size pred_size = isNothing (pred_size `ltPatersonSize` head_size)
+        -- Check (VD1)
 
 {-
 ************************************************************************
@@ -1761,34 +1764,72 @@ validDerivPred tv_set pred
 ************************************************************************
 -}
 
-{- Note [Instances and constraint synonyms]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Currently, we don't allow instances for constraint synonyms at all.
-Consider these (#13267):
-  type C1 a = Show (a -> Bool)
-  instance C1 Int where    -- I1
-    show _ = "ur"
+{- Note [Paterson conditions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The Paterson Conditions ensure termination of instance resolution.
+Given an instance declaration
+   instance (..., C t1.. tn, ...) => D s1 .. sm
 
-This elicits "show is not a (visible) method of class C1", which isn't
-a great message. But it comes from the renamer, so it's hard to improve.
+we check that each constraint in the context of the instance is
+"Paterson-smaller" than the instance head.  The underlying idea of
+Paterson-smaller is that
 
-This needs a bit more care:
-  type C2 a = (Show a, Show Int)
-  instance C2 Int           -- I2
+    For any ground substitution S, for each constraint P in the
+    context, S(P) has fewer type constructors, counting repetitions,
+    than the head S(H)
 
-If we use (splitTyConApp_maybe tau) in checkValidInstance to decompose
-the instance head, we'll expand the synonym on fly, and it'll look like
-  instance (%,%) (Show Int, Show Int)
-and we /really/ don't want that.  So we carefully do /not/ expand
-synonyms, by matching on TyConApp directly.
+We implement this check by checking the following syntactic conditions:
 
-For similar reasons, we do not use tcSplitSigmaTy when decomposing the instance
-context, as the looks through type synonyms. If we looked through type
-synonyms, then it could be possible to write an instance for a type synonym
-involving a quantified constraint (see #22570). Instead, we define
-splitInstTyForValidity, a specialized version of tcSplitSigmaTy (local to
-GHC.Tc.Validity) that does not expand type synonyms.
+(PC1) No type variable has more (shallow) occurrences in P than in H.
+
+      (If not, a substitution that replaces that variable with a big type
+      would make P have many more type constructors than H. Side note: we
+      could in principle skip this test for a variable of kind Bool,
+      since there are no big ground types we can substitute for it.)
+
+(PC2) The constraint P has fewer constructors and variables (taken
+      together and counting repetitions) than the head H.  This size
+      metric is computed by sizeType.
+
+      (A substitution that replaces each variable with Int demonstrates
+      the need.)
+
+(PC3) The constraint P mentions no type functions.
+
+      (A type function application can in principle expand to a type of
+      arbitrary size, and so are rejected out of hand.  See #15172.)
+
+(See Section 5 of "Understanding functional dependencies via Constraint
+Handling Rules", JFP Jan 2007; and the user manual section "Instance
+termination rules".)
+
+We measure "size" with the data type PatersonSize, in GHC.Tc.Utils.TcType.
+  data PatersonSize
+    = PS_TyFam TyCon
+    | PS_Vanilla { ps_tvs :: [TyVar]  -- Free tyvars, including repetitions;
+                 , ps_size :: Int}    -- Number of type constructors and variables
+
+* ps_tvs deals with (PC1)
+* ps_size deals with (PC2)
+* PS_TyFam deals with (PC3)
+
+Note [Tuples in checkInstTermination]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider these two ways of giving the same instance decl (#8359):
+
+   instance (Eq a, Num a) => C (T a)
+
+   type X a = (Eq a, Num a)
+   instance X a => C (T a)
+
+In the former, `checkInstTermination` will check the size of two predicates:
+(Eq a) and (Num a). In the latter, it will see only one: (X a). But we want
+to treat the latter like the former.
+
+So the `check` function in `checkInstTermination`, we simply recurse
+if we find a constraint tuple.
 -}
+
 
 checkValidInstance :: UserTypeCtxt -> LHsSigType GhcRn -> Type -> TcM ()
 checkValidInstance ctxt hs_type ty = case tau of
@@ -1856,33 +1897,18 @@ splitInstTyForValidity = split_context [] . drop_foralls
       | isInvisibleFunArg af = split_context (pred:preds) tau
     split_context preds ty = (reverse preds, ty)
 
-{-
-Note [Paterson conditions]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-Termination test: the so-called "Paterson conditions" (see Section 5 of
-"Understanding functional dependencies via Constraint Handling Rules,
-JFP Jan 2007).
-
-We check that each assertion in the context satisfies:
- (1) no variable has more occurrences in the assertion than in the head, and
- (2) the assertion has fewer constructors and variables (taken together
-     and counting repetitions) than the head.
-This is only needed with -fglasgow-exts, as Haskell 98 restrictions
-(which have already been checked) guarantee termination.
-
-The underlying idea is that
-
-    for any ground substitution, each assertion in the
-    context has fewer type constructors than the head.
--}
-
 checkInstTermination :: ThetaType -> TcPredType -> TcM ()
 -- See Note [Paterson conditions]
 checkInstTermination theta head_pred
   = check_preds emptyVarSet theta
   where
-   head_fvs  = fvType head_pred
-   head_size = sizeType head_pred
+   head_size = pSizeType head_pred
+   -- This is inconsistent and probably wrong.  pSizeType does not filter out
+   -- invisible type args (making the instance head look big), whereas the use of
+   -- pSizeClassPredX below /does/ filter them out (making the tested constraints
+   -- look smaller). I'm sure there is non termination lurking here, but see #15177
+   -- for why I didn't change it. See Note [Invisible arguments and termination]
+   -- in GHC.Tc.Utils.TcType
 
    check_preds :: VarSet -> [PredType] -> TcM ()
    check_preds foralld_tvs preds = mapM_ (check foralld_tvs) preds
@@ -1891,86 +1917,84 @@ checkInstTermination theta head_pred
    check foralld_tvs pred
      = case classifyPredType pred of
          EqPred {}      -> return ()  -- See #4200.
-         IrredPred {}   -> check2 foralld_tvs pred (sizeType pred)
-         ClassPred cls tys
-           | isTerminatingClass cls
-           -> return ()
+         IrredPred {}   -> check2 (pSizeTypeX foralld_tvs pred)
 
-           | isCTupleClass cls  -- Look inside tuple predicates; #8359
+         ClassPred cls tys
+           | isCTupleClass cls  -- See Note [Tuples in checkInstTermination]
            -> check_preds foralld_tvs tys
 
            | otherwise          -- Other ClassPreds
-           -> check2 foralld_tvs pred bogus_size
-           where
-              bogus_size = 1 + sizeTypes (filterOutInvisibleTypes (classTyCon cls) tys)
-                               -- See Note [Invisible arguments and termination]
+           -> check2 (pSizeClassPredX foralld_tvs cls tys)
 
          ForAllPred tvs _ head_pred'
            -> check (foralld_tvs `extendVarSetList` tvs) head_pred'
               -- Termination of the quantified predicate itself is checked
               -- when the predicates are individually checked for validity
 
-   check2 foralld_tvs pred pred_size
-     | not (null bad_tvs)     = failWithTc $ mkTcRnUnknownMessage $ mkPlainError noHints $
-       (noMoreMsg bad_tvs what (ppr head_pred))
-     | not (isTyFamFree pred) = failWithTc $ mkTcRnUnknownMessage $ mkPlainError noHints $
-       (nestedMsg what)
-     | pred_size >= head_size = failWithTc $ mkTcRnUnknownMessage $ mkPlainError noHints $
-       (smallerMsg what (ppr head_pred))
-     | otherwise              = return ()
-     -- isTyFamFree: see Note [Type families in instance contexts]
-     where
-        what    = text "constraint" <+> quotes (ppr pred)
-        bad_tvs = filterOut (`elemVarSet` foralld_tvs) (fvType pred)
-                  \\ head_fvs
+      where
+        check2 pred_size
+          = case pred_size `ltPatersonSize` head_size of
+              Just ps_failure -> failWithTc $ mkInstSizeError ps_failure head_pred pred
+              Nothing         -> return ()
 
-smallerMsg :: SDoc -> SDoc -> SDoc
-smallerMsg what inst_head
-  = vcat [ hang (text "The" <+> what)
-              2 (sep [ text "is no smaller than"
-                     , text "the instance head" <+> quotes inst_head ])
-         , parens undecidableMsg ]
 
-noMoreMsg :: [TcTyVar] -> SDoc -> SDoc -> SDoc
-noMoreMsg tvs what inst_head
-  = vcat [ hang (text "Variable" <> plural tvs1 <+> quotes (pprWithCommas ppr tvs1)
-                <+> occurs <+> text "more often")
-              2 (sep [ text "in the" <+> what
-                     , text "than in the instance head" <+> quotes inst_head ])
+mkInstSizeError :: PatersonSizeFailure -> TcPredType -> TcPredType -> TcRnMessage
+mkInstSizeError ps_failure head_pred pred
+  = mkTcRnUnknownMessage $ mkPlainError noHints $
+    vcat [ main_msg
          , parens undecidableMsg ]
   where
-   tvs1   = nub tvs
-   occurs = if isSingleton tvs1 then text "occurs"
-                               else text "occur"
+    pp_head = text "instance head" <+> quotes (ppr head_pred)
+    pp_pred = text "constraint" <+> quotes (ppr pred)
+
+    main_msg = case ps_failure of
+      PSF_TyFam tc -> -- See (PC3) of Note [Paterson conditions]
+                      hang (text "Illegal use of type family" <+> quotes (ppr tc))
+                         2 (text "in the" <+> pp_pred)
+      PSF_TyVar tvs -> hang (occMsg tvs)
+                          2 (sep [ text "in the" <+> pp_pred
+                                 , text "than in the" <+> pp_head ])
+      PSF_Size -> hang (text "The" <+> pp_pred)
+                     2 (sep [ text "is no smaller than", text "the" <+> pp_head ])
+
+occMsg :: [TyVar] -> SDoc
+occMsg tvs = text "Variable" <> plural tvs <+> quotes (pprWithCommas ppr tvs)
+                             <+> pp_occurs <+> text "more often"
+           where
+             pp_occurs | isSingleton tvs = text "occurs"
+                       | otherwise       = text "occur"
 
 undecidableMsg :: SDoc
 undecidableMsg = text "Use UndecidableInstances to permit this"
 
-{- Note [Type families in instance contexts]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Are these OK?
-  type family F a
-  instance F a    => C (Maybe [a]) where ...
-  instance C (F a) => C [[[a]]]     where ...
 
-No: the type family in the instance head might blow up to an
-arbitrarily large type, depending on how 'a' is instantiated.
-So we require UndecidableInstances if we have a type family
-in the instance head.  #15172.
+{- Note [Instances and constraint synonyms]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Currently, we don't allow instances for constraint synonyms at all.
+Consider these (#13267):
+  type C1 a = Show (a -> Bool)
+  instance C1 Int where    -- I1
+    show _ = "ur"
 
-Note [Invisible arguments and termination]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When checking the ​Paterson conditions for termination an instance
-declaration, we check for the number of "constructors and variables"
-in the instance head and constraints. Question: Do we look at
+This elicits "show is not a (visible) method of class C1", which isn't
+a great message. But it comes from the renamer, so it's hard to improve.
 
- * All the arguments, visible or invisible?
- * Just the visible arguments?
+This needs a bit more care:
+  type C2 a = (Show a, Show Int)
+  instance C2 Int           -- I2
 
-I think both will ensure termination, provided we are consistent.
-Currently we are /not/ consistent, which is really a bug.  It's
-described in #15177, which contains a number of examples.
-The suspicious bits are the calls to filterOutInvisibleTypes.
+If we use (splitTyConApp_maybe tau) in checkValidInstance to decompose
+the instance head, we'll expand the synonym on fly, and it'll look like
+  instance (%,%) (Show Int, Show Int)
+and we /really/ don't want that.  So we carefully do /not/ expand
+synonyms, by matching on TyConApp directly.
+
+For similar reasons, we do not use tcSplitSigmaTy when decomposing the instance
+context, as the looks through type synonyms. If we looked through type
+synonyms, then it could be possible to write an instance for a type synonym
+involving a quantified constraint (see #22570). Instead, we define
+splitInstTyForValidity, a specialized version of tcSplitSigmaTy (local to
+GHC.Tc.Validity) that does not expand type synonyms.
 -}
 
 
@@ -2149,33 +2173,46 @@ checkValidAssocTyFamDeflt fam_tc pats =
     suggestion = text "The arguments to" <+> quotes (ppr fam_tc)
              <+> text "must all be distinct type variables"
 
--- Make sure that each type family application is
---   (1) strictly smaller than the lhs,
---   (2) mentions no type variable more often than the lhs, and
---   (3) does not contain any further type family instances.
---
 checkFamInstRhs :: TyCon -> [Type]         -- LHS
                 -> [(TyCon, [Type])]       -- type family calls in RHS
                 -> [TcRnMessage]
+-- Ensure that the type family instance terminates. Specifically:
+-- ensure that each type family application in the RHS is
+--    (TF1) a call to a stuck family like (TypeError ...) or Any
+--          See Note [Stuck type families] in GHC.Tc.Utils.TcType
+-- or (TF2) obeys the Paterson conditions, namely:
+--          - strictly smaller than the lhs,
+--          - mentions no type variable more often than the lhs, and
+--          - does not contain any further type family applications
 checkFamInstRhs lhs_tc lhs_tys famInsts
-  = map (mkTcRnUnknownMessage . mkPlainError noHints) $ mapMaybe check famInsts
+  = mapMaybe check famInsts
   where
-   lhs_size  = sizeTyConAppArgs lhs_tc lhs_tys
-   inst_head = pprType (TyConApp lhs_tc lhs_tys)
-   lhs_fvs   = fvTypes lhs_tys
+   lhs_size = pSizeTypes lhs_tys
    check (tc, tys)
-      | not (all isTyFamFree tys) = Just (nestedMsg what)
-      | not (null bad_tvs)        = Just (noMoreMsg bad_tvs what inst_head)
-      | lhs_size <= fam_app_size  = Just (smallerMsg what inst_head)
-      | otherwise                 = Nothing
-      where
-        what = text "type family application"
-               <+> quotes (pprType (TyConApp tc tys))
-        fam_app_size = sizeTyConAppArgs tc tys
-        bad_tvs      = fvTypes tys \\ lhs_fvs
-                       -- The (\\) is list difference; e.g.
-                       --   [a,b,a,a] \\ [a,a] = [b,a]
-                       -- So we are counting repetitions
+      | not (isStuckTypeFamily tc)                                   -- (TF1)
+      , Just ps_failure <- pSizeTypes tys `ltPatersonSize` lhs_size  -- (TF2)
+      = Just $ mkFamSizeError ps_failure (TyConApp lhs_tc lhs_tys) (TyConApp tc tys)
+      | otherwise
+      = Nothing
+
+mkFamSizeError :: PatersonSizeFailure -> Type -> Type -> TcRnMessage
+mkFamSizeError ps_failure lhs fam_call
+  = mkTcRnUnknownMessage $ mkPlainError noHints $
+    vcat [ main_msg
+         , parens undecidableMsg ]
+  where
+    pp_lhs  = text "LHS of the family instance" <+> quotes (ppr lhs)
+    pp_call = text "type-family application" <+> quotes (ppr fam_call)
+
+    main_msg = case ps_failure of
+      PSF_TyFam tc -> -- See (PC3) of Note [Paterson conditions]
+                      hang (text "Illegal nested use of type family" <+> quotes (ppr tc))
+                         2 (text "in the arguments of the" <+> pp_call)
+      PSF_TyVar tvs -> hang (occMsg tvs)
+                          2 (sep [ text "in the" <+> pp_call
+                                 , text "than in the" <+> pp_lhs ])
+      PSF_Size -> hang (text "The" <+> pp_call)
+                     2 (sep [ text "is no smaller than", text "the" <+> pp_lhs ])
 
 -----------------
 checkFamPatBinders :: TyCon
@@ -2279,11 +2316,6 @@ inaccessibleCoAxBranch :: TyCon -> CoAxBranch -> SDoc
 inaccessibleCoAxBranch fam_tc cur_branch
   = text "Type family instance equation is overlapped:" $$
     nest 2 (pprCoAxBranchUser fam_tc cur_branch)
-
-nestedMsg :: SDoc -> SDoc
-nestedMsg what
-  = sep [ text "Illegal nested" <+> what
-        , parens undecidableMsg ]
 
 -------------------------
 checkConsistentFamInst :: AssocInstInfo
@@ -2843,70 +2875,3 @@ checkTyConTelescope tc
            2 (vcat [ sep [ pp_inf, text "always come first"]
                    , sep [text "then Specified variables", pp_spec]])
 
-{-
-************************************************************************
-*                                                                      *
-\subsection{Auxiliary functions}
-*                                                                      *
-************************************************************************
--}
-
--- Free variables of a type, retaining repetitions, and expanding synonyms
--- This ignores coercions, as coercions aren't user-written
-fvType :: Type -> [TyCoVar]
-fvType ty | Just exp_ty <- coreView ty = fvType exp_ty
-fvType (TyVarTy tv)          = [tv]
-fvType (TyConApp _ tys)      = fvTypes tys
-fvType (LitTy {})            = []
-fvType (AppTy fun arg)       = fvType fun ++ fvType arg
-fvType (FunTy _ w arg res)   = fvType w ++ fvType arg ++ fvType res
-fvType (ForAllTy (Bndr tv _) ty)
-  = fvType (tyVarKind tv) ++
-    filter (/= tv) (fvType ty)
-fvType (CastTy ty _)         = fvType ty
-fvType (CoercionTy {})       = []
-
-fvTypes :: [Type] -> [TyVar]
-fvTypes tys                = concatMap fvType tys
-
-sizeType :: Type -> Int
--- Size of a type: the number of variables and constructors
-sizeType ty | Just exp_ty <- coreView ty = sizeType exp_ty
-sizeType (TyVarTy {})      = 1
-sizeType (TyConApp tc tys) = 1 + sizeTyConAppArgs tc tys
-sizeType (LitTy {})        = 1
-sizeType (AppTy fun arg)   = sizeType fun + sizeType arg
-sizeType (FunTy _ w arg res) = sizeType w + sizeType arg + sizeType res + 1
-sizeType (ForAllTy _ ty)   = sizeType ty
-sizeType (CastTy ty _)     = sizeType ty
-sizeType (CoercionTy _)    = 0
-
-sizeTypes :: [Type] -> Int
-sizeTypes = foldr ((+) . sizeType) 0
-
-sizeTyConAppArgs :: TyCon -> [Type] -> Int
-sizeTyConAppArgs _tc tys = sizeTypes tys -- (filterOutInvisibleTypes tc tys)
-                           -- See Note [Invisible arguments and termination]
-
--- | When this says "True", ignore this class constraint during
--- a termination check
-isTerminatingClass :: Class -> Bool
-isTerminatingClass cls
-  = isIPClass cls    -- Implicit parameter constraints always terminate because
-                     -- there are no instances for them --- they are only solved
-                     -- by "local instances" in expressions
-    || isEqPredClass cls
-    || cls `hasKey` typeableClassKey
-    || cls `hasKey` coercibleTyConKey
-
-allDistinctTyVars :: TyVarSet -> [KindOrType] -> Bool
--- (allDistinctTyVars tvs tys) returns True if tys are
--- a) all tyvars
--- b) all distinct
--- c) disjoint from tvs
-allDistinctTyVars _    [] = True
-allDistinctTyVars tkvs (ty : tys)
-  = case getTyVar_maybe ty of
-      Nothing -> False
-      Just tv | tv `elemVarSet` tkvs -> False
-              | otherwise -> allDistinctTyVars (tkvs `extendVarSet` tv) tys

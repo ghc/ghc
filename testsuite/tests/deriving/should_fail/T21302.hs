@@ -10,3 +10,9 @@ type family Assoc a
 data BoxAssoc a = BoxAssoc (Assoc a)
 
 deriving instance c Eq a => Eq (BoxAssoc a)
+
+{-
+[W] Eq (BoxAssoc Int)
+==>
+[W] c0 Eq Int
+-}

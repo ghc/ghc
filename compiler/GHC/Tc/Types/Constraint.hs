@@ -1690,7 +1690,7 @@ checkSkolInfoAnon sk1 sk2 = go sk1 sk2
     go (DerivSkol pred1)    (DerivSkol pred2)    = pred1 `tcEqType` pred2
     go (TyConSkol f1 n1)    (TyConSkol f2 n2)    = f1==f2 && n1==n2
     go (DataConSkol n1)     (DataConSkol n2)     = n1==n2
-    go InstSkol             InstSkol             = True
+    go (InstSkol {})        (InstSkol {})        = True
     go FamInstSkol          FamInstSkol          = True
     go BracketSkol          BracketSkol          = True
     go (RuleSkol n1)        (RuleSkol n2)        = n1==n2
@@ -1700,7 +1700,6 @@ checkSkolInfoAnon sk1 sk2 = go sk1 sk2
                                                    and (zipWith eq_pr ids1 ids2)
     go (UnifyForAllSkol t1) (UnifyForAllSkol t2) = t1 `tcEqType` t2
     go ReifySkol            ReifySkol            = True
-    go QuantCtxtSkol        QuantCtxtSkol        = True
     go RuntimeUnkSkol       RuntimeUnkSkol       = True
     go ArrowReboundIfSkol   ArrowReboundIfSkol   = True
     go (UnkSkol _)          (UnkSkol _)          = True
@@ -1716,7 +1715,7 @@ checkSkolInfoAnon sk1 sk2 = go sk1 sk2
     -- in tcConDecl for MkT we'll have a SkolemInfo in the implication of
     -- DataConSkol, but 'a' will have SkolemInfo of FamInstSkol
 
-    go FamInstSkol          InstSkol             = True
+    go FamInstSkol          (InstSkol {})         = True
     -- In instance C (T a) where { type F (T a) b = ... }
     -- we have 'a' with SkolemInfo InstSkol, but we make an implication wi
     -- SkolemInfo of FamInstSkol.  Very like the ConDecl/TyConSkol case

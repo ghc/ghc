@@ -490,7 +490,7 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = hs_ty, cid_binds = binds
     do  { dfun_ty <- tcHsClsInstType (InstDeclCtxt False) hs_ty
         ; let (tyvars, theta, clas, inst_tys) = tcSplitDFunTy dfun_ty
              -- NB: tcHsClsInstType does checkValidInstance
-        ; skol_info <- mkSkolemInfo InstSkol
+        ; skol_info <- mkSkolemInfo (mkClsInstSkol clas inst_tys)
         ; (subst, skol_tvs) <- tcInstSkolTyVars skol_info tyvars
         ; let tv_skol_prs = [ (tyVarName tv, skol_tv)
                             | (tv, skol_tv) <- tyvars `zip` skol_tvs ]
@@ -1228,19 +1228,14 @@ the default method Ids replete with their INLINE pragmas.  Urk.
 tcInstDecl2 :: InstInfo GhcRn -> TcM (LHsBinds GhcTc)
             -- Returns a binding for the dfun
 tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
-  = recoverM (return emptyLHsBinds)             $
-    setSrcSpan loc                              $
-    addErrCtxt (instDeclCtxt2 (idType dfun_id)) $
+  = recoverM (return emptyLHsBinds)    $
+    setSrcSpan loc                     $
+    addErrCtxt (instDeclCtxt2 dfun_ty) $
     do {  -- Instantiate the instance decl with skolem constants
-       ; skol_info <- mkSkolemInfo InstSkol
-       ; (inst_tyvars, dfun_theta, inst_head) <- tcSkolDFunType skol_info dfun_id
+         (skol_info, inst_tyvars, dfun_theta, clas, inst_tys) <- tcSkolDFunType dfun_ty
        ; dfun_ev_vars <- newEvVars dfun_theta
-                     -- We instantiate the dfun_id with superSkolems.
-                     -- See Note [Subtle interaction of recursion and overlap]
-                     -- and Note [Binding when looking up instances]
 
-       ; let (clas, inst_tys) = tcSplitDFunHead inst_head
-             (class_tyvars, sc_theta, _, op_items) = classBigSig clas
+       ; let (class_tyvars, sc_theta, _, op_items) = classBigSig clas
              sc_theta' = substTheta (zipTvSubst class_tyvars inst_tys) sc_theta
 
        ; traceTc "tcInstDecl2" (vcat [ppr inst_tyvars, ppr inst_tys, ppr dfun_theta, ppr sc_theta'])
@@ -1256,13 +1251,12 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
        ; (tclvl, (sc_meth_ids, sc_meth_binds, sc_meth_implics))
              <- pushTcLevelM $
                 do { (sc_ids, sc_binds, sc_implics)
-                        <- tcSuperClasses dfun_id clas inst_tyvars dfun_ev_vars
-                                          inst_tys dfun_ev_binds
-                                          sc_theta'
+                        <- tcSuperClasses skol_info dfun_id clas inst_tyvars
+                                          dfun_ev_vars dfun_ev_binds sc_theta'
 
                       -- Typecheck the methods
                    ; (meth_ids, meth_binds, meth_implics)
-                        <- tcMethods dfun_id clas inst_tyvars dfun_ev_vars
+                        <- tcMethods skol_info dfun_id clas inst_tyvars dfun_ev_vars
                                      inst_tys dfun_ev_binds spec_inst_info
                                      op_items ibinds
 
@@ -1277,7 +1271,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
              , ic_given  = dfun_ev_vars
              , ic_wanted = mkImplicWC sc_meth_implics
              , ic_binds  = dfun_ev_binds_var
-             , ic_info   = InstSkol }
+             , ic_info   = skol_info }
 
        -- Create the result bindings
        ; self_dict <- newDict clas inst_tys
@@ -1335,6 +1329,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
        }
  where
    dfun_id = instanceDFunId ispec
+   dfun_ty = idType dfun_id
    loc     = getSrcSpan dfun_id
 
 addDFunPrags :: DFunId -> [Id] -> DFunId
@@ -1442,7 +1437,8 @@ Notice that
 ************************************************************************
 -}
 
-tcSuperClasses :: DFunId -> Class -> [TcTyVar] -> [EvVar] -> [TcType]
+tcSuperClasses :: SkolemInfoAnon -> DFunId -> Class -> [TcTyVar]
+               -> [EvVar]
                -> TcEvBinds
                -> TcThetaType
                -> TcM ([EvVar], LHsBinds GhcTc, Bag Implication)
@@ -1454,15 +1450,16 @@ tcSuperClasses :: DFunId -> Class -> [TcTyVar] -> [EvVar] -> [TcType]
 -- See Note [Recursive superclasses] for why this is so hard!
 -- In effect, we build a special-purpose solver for the first step
 -- of solving each superclass constraint
-tcSuperClasses dfun_id cls tyvars dfun_evs inst_tys dfun_ev_binds sc_theta
+tcSuperClasses skol_info dfun_id cls tyvars dfun_evs dfun_ev_binds sc_theta
   = do { (ids, binds, implics) <- mapAndUnzip3M tc_super (zip sc_theta [fIRST_TAG..])
        ; return (ids, listToBag binds, listToBag implics) }
   where
     loc = getSrcSpan dfun_id
-    size = sizeTypes inst_tys
     tc_super (sc_pred, n)
       = do { (sc_implic, ev_binds_var, sc_ev_tm)
-                <- checkInstConstraints $ emitWanted (ScOrigin size) sc_pred
+                <- checkInstConstraints skol_info $
+                   emitWanted (ScOrigin IsClsInst NakedSc) sc_pred
+                   -- ScOrigin IsClsInst True: see Note [Solving superclass constraints]
 
            ; sc_top_name  <- newName (mkSuperDictAuxOcc n (getOccName cls))
            ; sc_ev_id     <- newEvVar sc_pred
@@ -1484,10 +1481,10 @@ tcSuperClasses dfun_id cls tyvars dfun_evs inst_tys dfun_ev_binds sc_theta
            ; return (sc_top_id, L (noAnnSrcSpan loc) bind, sc_implic) }
 
 -------------------
-checkInstConstraints :: TcM result
+checkInstConstraints :: SkolemInfoAnon -> TcM result
                      -> TcM (Implication, EvBindsVar, result)
 -- See Note [Typechecking plan for instance declarations]
-checkInstConstraints thing_inside
+checkInstConstraints skol_info thing_inside
   = do { (tclvl, wanted, result) <- pushLevelAndCaptureConstraints  $
                                     thing_inside
 
@@ -1496,7 +1493,7 @@ checkInstConstraints thing_inside
        ; let implic' = implic { ic_tclvl  = tclvl
                               , ic_wanted = wanted
                               , ic_binds  = ev_binds_var
-                              , ic_info   = InstSkol }
+                              , ic_info   = skol_info }
 
        ; return (implic', ev_binds_var, result) }
 
@@ -1549,82 +1546,120 @@ definition.  More precisely:
 To achieve the Superclass Invariant, in a dfun definition we can
 generate a guaranteed-non-bottom superclass witness from:
   (sc1) one of the dictionary arguments itself (all non-bottom)
-  (sc2) an immediate superclass of a smaller dictionary
+  (sc2) an immediate superclass of a non-bottom dictionary that is
+        /Paterson-smaller/ than the instance head
+        See Note [The PatersonSize of a type] in GHC.Tc.Utils.TcType
   (sc3) a call of a dfun (always returns a dictionary constructor)
 
-The tricky case is (sc2).  We proceed by induction on the size of
-the (type of) the dictionary, defined by GHC.Tc.Validity.sizeTypes.
-Let's suppose we are building a dictionary of size 3, and
-suppose the Superclass Invariant holds of smaller dictionaries.
-Then if we have a smaller dictionary, its immediate superclasses
-will be non-bottom by induction.
+The tricky case is (sc2).  We proceed by induction on the size of the
+(type of) the dictionary, defined by GHC.Tc.Utils.TcType.pSizeType.  Let's
+suppose we are building a dictionary of size 3 (the "head"), and suppose
+the Superclass Invariant holds of smaller dictionaries.  Then if we have a
+smaller dictionary, its immediate superclasses will be non-bottom by
+induction.
 
-What does "we have a smaller dictionary" mean?  It might be
-one of the arguments of the instance, or one of its superclasses.
+Why "Paterson-smaller"? See Note [Paterson conditions] in GHC.Tc.Validity.
+We want to be sure that the superclass dictionary is smaller /for any
+ground instatiation/ of the instance, so we need to account for type
+variables that occur more than once, and for type families (#20666).  And
+that's exactly what the Paterson conditions check!
+
 Here is an example, taken from CmmExpr:
        class Ord r => UserOfRegs r a where ...
 (i1)   instance UserOfRegs r a => UserOfRegs r (Maybe a) where
 (i2)   instance (Ord r, UserOfRegs r CmmReg) => UserOfRegs r CmmExpr where
 
-For (i1) we can get the (Ord r) superclass by selection from (UserOfRegs r a),
-since it is smaller than the thing we are building (UserOfRegs r (Maybe a).
+For (i1) we can get the (Ord r) superclass by selection from
+(UserOfRegs r a), since it (i.e. UserOfRegs r a) is smaller than the
+thing we are building, namely (UserOfRegs r (Maybe a)).
 
-But for (i2) that isn't the case, so we must add an explicit, and
-perhaps surprising, (Ord r) argument to the instance declaration.
+But for (i2) that isn't the case: (UserOfRegs r CmmReg) is not smaller
+than the thing we are building (UserOfRegs r CmmExpr), so we can't use
+the superclasses of the former.  Hence we must instead add an explicit,
+and perhaps surprising, (Ord r) argument to the instance declaration.
 
 Here's another example from #6161:
 
-       class       Super a => Duper a  where ...
-       class Duper (Fam a) => Foo a    where ...
-(i3)   instance Foo a => Duper (Fam a) where ...
-(i4)   instance              Foo Float where ...
+       class         Super a => Duper a  where ...
+       class Duper (Maybe a) => Foo a    where ...
+(i3)   instance Foo a => Duper (Maybe a) where ...
+(i4)   instance                Foo Float where ...
 
 It would be horribly wrong to define
-   dfDuperFam :: Foo a -> Duper (Fam a)  -- from (i3)
-   dfDuperFam d = MkDuper (sc_sel1 (sc_sel2 d)) ...
+   dfDuperMaybe :: Foo a -> Duper (Maybe a)  -- from (i3)
+   dfDuperMaybe d = MkDuper (sc_sel1 (sc_sel2 d)) ...
 
    dfFooFloat :: Foo Float               -- from (i4)
-   dfFooFloat = MkFoo (dfDuperFam dfFooFloat) ...
+   dfFooFloat = MkFoo (dfDuperMaybe dfFooFloat) ...
 
-Now the Super superclass of Duper is definitely bottom!
+Let's expand the RHS of dfFooFloat:
+   dfFooFloat = MkFoo (MkDuper (sc_sel1 (sc_sel2 dfFooFloat)) ...) ...
+That superclass argument to MkDuper is bottom!
 
-This won't happen because when processing (i3) we can use the
-superclasses of (Foo a), which is smaller, namely Duper (Fam a).  But
-that is *not* smaller than the target so we can't take *its*
-superclasses.  As a result the program is rightly rejected, unless you
-add (Super (Fam a)) to the context of (i3).
+This program gets rejected because:
+* When processing (i3) we need to construct a dictionary for Super
+  (Maybe a), to put in the superclass field of (Duper (Maybe a)).
+* We /can/ use the superclasses of (Foo a), because the latter is
+  smaller than the head of the instance, namely Duper (Maybe a).
+* So we know (by (sc2)) that this Duper (Maybe a) dictionary is
+  non-bottom.  But because (Duper (Maybe a)) is not smaller than the
+  instance head (Duper (Maybe a)), we can't take *its* superclasses.
+As a result the program is rightly rejected, unless you add
+(Super (Maybe a)) to the context of (i3).
+
+Wrinkle (W1):
+    (sc2) says we only get a non-bottom dict if the dict we are
+    selecting from is itself non-bottom.  So in a superclass chain,
+    all the dictionaries in the chain must be non-bottom.
+        class C a => D3 a
+        class D2 a [[Maybe b]] => D1 a b
+        class D3 a             => D2 a b
+        class C a => E a b
+        instance D1 a b => E a [b]
+    The instance needs the wanted superclass (C a).  We can get it
+    by superclass selection from
+       D1 a b --> D2 a [[Maybe b]] --> D3 a --> C a
+    But on the way we go through the too-big (D2 a [[Maybe b]]), and
+    we don't know that is non-bottom.
 
 Note [Solving superclass constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-How do we ensure that every superclass witness is generated by
-one of (sc1) (sc2) or (sc3) in Note [Recursive superclasses].
+How do we ensure that every superclass witness in an instance declaration
+is generated by one of (sc1) (sc2) or (sc3) in Note [Recursive superclasses]?
 Answer:
 
-  * Superclass "wanted" constraints have CtOrigin of (ScOrigin size)
-    where 'size' is the size of the instance declaration. e.g.
-          class C a => D a where...
-          instance blah => D [a] where ...
-    The wanted superclass constraint for C [a] has origin
-    ScOrigin size, where size = size( D [a] ).
+  * The "given" constraints of an instance decl have CtOrigin of
+    (GivenOrigin (InstSkol head_size)), where head_size is the
+    PatersonSize of the head of the instance declaration.  E.g. in
+        instance D a => C [a]
+    the `[G] D a` constraint has a CtOrigin whose head_size is the
+    PatersonSize of (C [a]).
+
+  * When we make a superclass selection from a Given (transitively)
+    we give it a CtOrigin of (GivenSCOrigin skol_info sc_depth blocked).
+
+    The 'blocked :: Bool' flag says if the superclass can be used to
+    solve a superclass Wanted. The new superclass is blocked unless:
+
+       it is the superclass of an unblocked dictionary (wrinkle (W1)),
+       that is Paterson-smaller than the instance head.
+
+    This is implemented in GHC.Tc.Solver.Canonical.mk_strict_superclasses
+    (in the mk_given_loc helper function).
+
+  * Superclass "Wanted" constraints have CtOrigin of (ScOrigin NakedSc)
+    The 'NakedSc' says that this is a naked superclass Wanted; we must
+    be careful when solving it.
 
   * (sc1) When we rewrite such a wanted constraint, it retains its
     origin.  But if we apply an instance declaration, we can set the
-    origin to (ScOrigin infinity), thus lifting any restrictions by
-    making prohibitedSuperClassSolve return False.
+    origin to (ScOrigin NotNakedSc), thus lifting any restrictions by
+    making prohibitedSuperClassSolve return False. This happens
+    in GHC.Tc.Solver.Interact.checkInstanceOK.
 
   * (sc2) ScOrigin wanted constraints can't be solved from a
     superclass selection, except at a smaller type.  This test is
-    implemented by GHC.Tc.Solver.Interact.prohibitedSuperClassSolve
-
-  * The "given" constraints of an instance decl have CtOrigin
-    GivenOrigin InstSkol.
-
-  * When we make a superclass selection from InstSkol we use
-    a CtOrigin of (InstSCOrigin size), where 'size' is the size of
-    the constraint whose superclass we are taking.  And similarly
-    when taking the superclass of an InstSCOrigin.  This is implemented
-    in GHC.Tc.Solver.Canonical.mk_strict_superclasses (in the
-    mk_given_loc helper function).
+    implemented by GHC.Tc.Solver.InertSet.prohibitedSuperClassSolve
 
 Note [Silent superclass arguments] (historical interest only)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1697,7 +1732,7 @@ tcMethod
 - Use tcValBinds to do the checking
 -}
 
-tcMethods :: DFunId -> Class
+tcMethods :: SkolemInfoAnon -> DFunId -> Class
           -> [TcTyVar] -> [EvVar]
           -> [TcType]
           -> TcEvBinds
@@ -1707,7 +1742,7 @@ tcMethods :: DFunId -> Class
           -> TcM ([Id], LHsBinds GhcTc, Bag Implication)
         -- The returned inst_meth_ids all have types starting
         --      forall tvs. theta => ...
-tcMethods dfun_id clas tyvars dfun_ev_vars inst_tys
+tcMethods skol_info dfun_id clas tyvars dfun_ev_vars inst_tys
                   dfun_ev_binds (spec_inst_prags, prag_fn) op_items
                   (InstBindings { ib_binds      = binds
                                 , ib_tyvars     = lexical_tvs
@@ -1740,10 +1775,10 @@ tcMethods dfun_id clas tyvars dfun_ev_vars inst_tys
     tc_item :: ClassOpItem -> TcM (Id, LHsBind GhcTc, Maybe Implication)
     tc_item (sel_id, dm_info)
       | Just (user_bind, bndr_loc, prags) <- findMethodBind (idName sel_id) binds prag_fn
-      = tcMethodBody clas tyvars dfun_ev_vars inst_tys
-                              dfun_ev_binds is_derived hs_sig_fn
-                              spec_inst_prags prags
-                              sel_id user_bind bndr_loc
+      = tcMethodBody skol_info clas tyvars dfun_ev_vars inst_tys
+                     dfun_ev_binds is_derived hs_sig_fn
+                     spec_inst_prags prags
+                     sel_id user_bind bndr_loc
       | otherwise
       = do { traceTc "tc_def" (ppr sel_id)
            ; tc_default sel_id dm_info }
@@ -1754,7 +1789,7 @@ tcMethods dfun_id clas tyvars dfun_ev_vars inst_tys
 
     tc_default sel_id (Just (dm_name, _))
       = do { (meth_bind, inline_prags) <- mkDefMethBind inst_loc dfun_id clas sel_id dm_name
-           ; tcMethodBody clas tyvars dfun_ev_vars inst_tys
+           ; tcMethodBody skol_info clas tyvars dfun_ev_vars inst_tys
                           dfun_ev_binds is_derived hs_sig_fn
                           spec_inst_prags inline_prags
                           sel_id meth_bind inst_loc }
@@ -1872,13 +1907,14 @@ Instead, we take the much simpler approach of always disabling
 -}
 
 ------------------------
-tcMethodBody :: Class -> [TcTyVar] -> [EvVar] -> [TcType]
+tcMethodBody :: SkolemInfoAnon
+             -> Class -> [TcTyVar] -> [EvVar] -> [TcType]
              -> TcEvBinds -> Bool
              -> HsSigFun
              -> [LTcSpecPrag] -> [LSig GhcRn]
              -> Id -> LHsBind GhcRn -> SrcSpan
              -> TcM (TcId, LHsBind GhcTc, Maybe Implication)
-tcMethodBody clas tyvars dfun_ev_vars inst_tys
+tcMethodBody skol_info clas tyvars dfun_ev_vars inst_tys
                      dfun_ev_binds is_derived
                      sig_fn spec_inst_prags prags
                      sel_id (L bind_loc meth_bind) bndr_loc
@@ -1896,7 +1932,7 @@ tcMethodBody clas tyvars dfun_ev_vars inst_tys
             -- taking instance signature into account might change the type of
             -- the local_meth_id
        ; (meth_implic, ev_binds_var, tc_bind)
-             <- checkInstConstraints $
+             <- checkInstConstraints skol_info $
                 tcMethodBodyHelp sig_fn sel_id local_meth_id (L bind_loc lm_bind)
 
        ; global_meth_id <- addInlinePrags global_meth_id prags
@@ -2353,9 +2389,9 @@ instDeclCtxt1 hs_inst_ty
 
 instDeclCtxt2 :: Type -> SDoc
 instDeclCtxt2 dfun_ty
-  = inst_decl_ctxt (ppr (mkClassPred cls tys))
+  = inst_decl_ctxt (ppr head_ty)
   where
-    (_,_,cls,tys) = tcSplitDFunTy dfun_ty
+    (_,_,head_ty) = tcSplitQuantPredTy dfun_ty
 
 inst_decl_ctxt :: SDoc -> SDoc
 inst_decl_ctxt doc = hang (text "In the instance declaration for")

@@ -60,10 +60,12 @@ instance Number n
       => Add (n:@Zero) One (n:@One)
 instance AddDigit n One r'
       => Add (n:@One) One (r':@Zero)
-instance (Number n1, Digit d1, Number n2, Digit n2
-         ,Add n1 n2 nr', AddDigit (d1:@nr') d2 r)
+instance ( Number n1, Digit d1, Number n2, Digit n2
+         , Add n1 n2 nr', AddDigit (d1:@nr') d2 r
+         , Number r)  -- Added when fixing #20666
+                      -- Because (AddDigit (d1:@nr') d2 r) is not
+                      -- Paterson-smaller than the instance head
       => Add (n1:@d1) (n2:@d2) r
-
 
 foo = show $ add (One:@Zero) (One:@One)
 

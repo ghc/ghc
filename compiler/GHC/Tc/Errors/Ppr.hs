@@ -2602,7 +2602,7 @@ pprTcSolverReportMsg ctxt@(CEC {cec_encl = implics})
             -- Don't suggest fixes for the provided context of a pattern
             -- synonym; the right fix is to bind more in the pattern
         show_fixes (ctxtFixes has_ambigs pred implics
-                    ++ drv_fixes)
+                    ++ drv_fixes ++ naked_sc_fixes)
       , ppWhen (not (null candidates))
         (hang (text "There are instances for similar types:")
             2 (vcat (map ppr candidates)))
@@ -2673,7 +2673,7 @@ pprTcSolverReportMsg ctxt@(CEC {cec_encl = implics})
                    StandAloneDerivOrigin              -> [drv_fix True]
                    DerivOriginDC _ _       standalone -> [drv_fix standalone]
                    DerivOriginCoerce _ _ _ standalone -> [drv_fix standalone]
-                   _                -> []
+                   _                                  -> []
 
     drv_fix standalone_wildcard
       | standalone_wildcard
@@ -2681,6 +2681,25 @@ pprTcSolverReportMsg ctxt@(CEC {cec_encl = implics})
       | otherwise
       = hang (text "use a standalone 'deriving instance' declaration,")
            2 (text "so you can specify the instance context yourself")
+
+    -- naked_sc_fix: try to produce a helpful error message for
+    -- superclass constraints caught by the subtleties described by
+    -- Note [Recursive superclasses] in GHC.TyCl.Instance
+    naked_sc_fixes
+      | ScOrigin _ NakedSc <- orig  -- A superclass wanted with no instance decls used yet
+      , any non_tyvar_preds useful_givens  -- Some non-tyvar givens
+      = [vcat [ text "If the constraint looks soluble from a superclass of the instance context,"
+              , text "read 'Undecidable instances and loopy superclasses' in the user manual" ]]
+      | otherwise = []
+
+    non_tyvar_preds :: UserGiven -> Bool
+    non_tyvar_preds = any non_tyvar_pred . ic_given
+
+    non_tyvar_pred :: EvVar -> Bool
+    -- Tells if the Given is of form (C ty1 .. tyn), where the tys are not all tyvars
+    non_tyvar_pred given = case getClassPredTys_maybe (idType given) of
+                             Just (_, tys) -> not (all isTyVarTy tys)
+                             Nothing       -> False
 
 pprTcSolverReportMsg (CEC {cec_encl = implics}) (OverlappingInstances item matches unifiers) =
   vcat
@@ -3513,7 +3532,7 @@ show_fixes (f:fs) = sep [ text "Possible fix:"
 ctxtFixes :: Bool -> PredType -> [Implication] -> [SDoc]
 ctxtFixes has_ambig_tvs pred implics
   | not has_ambig_tvs
-  , isTyVarClassPred pred
+  , isTyVarClassPred pred   -- Don't suggest adding (Eq T) to the context, say
   , (skol:skols) <- usefulContext implics pred
   , let what | null skols
              , SigSkol (PatSynCtxt {}) _ _ <- skol

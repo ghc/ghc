@@ -18,16 +18,16 @@ T14884.hs:4:5: error: [GHC-88464]
           with foldMap @[] @(IO ()) @Char
           (imported from ‘Prelude’ at T14884.hs:1:8-13
            (and originally defined in ‘Data.Foldable’))
+        id :: forall a. a -> a
+          with id @(String -> IO ())
+          (imported from ‘Prelude’ at T14884.hs:1:8-13
+           (and originally defined in ‘GHC.Base’))
         ($) :: forall a b. (a -> b) -> a -> b
           with ($) @GHC.Types.LiftedRep @String @(IO ())
           (imported from ‘Prelude’ at T14884.hs:1:8-13
            (and originally defined in ‘GHC.Base’))
         ($!) :: forall a b. (a -> b) -> a -> b
           with ($!) @GHC.Types.LiftedRep @String @(IO ())
-          (imported from ‘Prelude’ at T14884.hs:1:8-13
-           (and originally defined in ‘GHC.Base’))
-        id :: forall a. a -> a
-          with id @(String -> IO ())
           (imported from ‘Prelude’ at T14884.hs:1:8-13
            (and originally defined in ‘GHC.Base’))
 
@@ -40,7 +40,7 @@ T14884.hs:4:7: error: [GHC-39999]
           -- Defined in ‘Data.Either’
         instance Show Ordering -- Defined in ‘GHC.Show’
         ...plus 26 others
-        ...plus 28 instances involving out-of-scope types
+        ...plus 29 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the first argument of ‘_’, namely ‘print’
       In the expression: _ print "abc"

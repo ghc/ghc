@@ -1633,12 +1633,17 @@ mightEqualLater inert_set given_pred given_loc wanted_pred wanted_loc
       = False
     can_unify lhs_tv _other _rhs_ty = mentions_meta_ty_var lhs_tv
 
-prohibitedSuperClassSolve :: CtLoc -> CtLoc -> Bool
--- See Note [Solving superclass constraints] in GHC.Tc.TyCl.Instance
-prohibitedSuperClassSolve from_loc solve_loc
-  | InstSCOrigin _ given_size <- ctLocOrigin from_loc
-  , ScOrigin wanted_size <- ctLocOrigin solve_loc
-  = given_size >= wanted_size
+prohibitedSuperClassSolve :: CtLoc    -- ^ is it loopy to use this one ...
+                          -> CtLoc    -- ^ ... to solve this one?
+                          -> Bool     -- ^ True ==> don't solve it
+-- See Note [Solving superclass constraints] in GHC.Tc.TyCl.Instance, (sc2)
+prohibitedSuperClassSolve given_loc wanted_loc
+  | GivenSCOrigin _ _ blocked <- ctLocOrigin given_loc
+  , blocked
+  , ScOrigin _ NakedSc <- ctLocOrigin wanted_loc
+  = True    -- Prohibited if the Wanted is a superclass
+            -- and the Given has come via a superclass selection from
+            -- a predicate bigger than the head
   | otherwise
   = False
 

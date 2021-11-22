@@ -391,7 +391,7 @@ reportImplic ctxt implic@(Implic { ic_skols  = tvs
 
 warnRedundantConstraints :: SolverReportErrCtxt -> TcLclEnv -> SkolemInfoAnon -> [EvVar] -> TcM ()
 -- See Note [Tracking redundant constraints] in GHC.Tc.Solver
-warnRedundantConstraints ctxt env info ev_vars
+warnRedundantConstraints ctxt env info redundant_evs
  | null redundant_evs
  = return ()
 
@@ -423,18 +423,6 @@ warnRedundantConstraints ctxt env info ev_vars
                 []
           ; reportDiagnostic msg }
 
-   redundant_evs =
-       filterOut is_type_error $
-       case info of -- See Note [Redundant constraints in instance decls]
-         InstSkol -> filterOut (improving . idType) ev_vars
-         _        -> ev_vars
-
-   -- See #15232
-   is_type_error = isJust . userTypeError_maybe . idType
-
-   improving pred -- (transSuperClasses p) does not include p
-     = any isImprovementPred (pred : transSuperClasses pred)
-
 reportBadTelescope :: SolverReportErrCtxt -> TcLclEnv -> SkolemInfoAnon -> [TcTyVar] -> TcM ()
 reportBadTelescope ctxt env (ForAllSkol telescope) skols
   = do { msg <- mkErrorReport
@@ -448,23 +436,6 @@ reportBadTelescope ctxt env (ForAllSkol telescope) skols
 
 reportBadTelescope _ _ skol_info skols
   = pprPanic "reportBadTelescope" (ppr skol_info $$ ppr skols)
-
-{- Note [Redundant constraints in instance decls]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-For instance declarations, we don't report unused givens if
-they can give rise to improvement.  Example (#10100):
-    class Add a b ab | a b -> ab, a ab -> b
-    instance Add Zero b b
-    instance Add a b ab => Add (Succ a) b (Succ ab)
-The context (Add a b ab) for the instance is clearly unused in terms
-of evidence, since the dictionary has no fields.  But it is still
-needed!  With the context, a wanted constraint
-   Add (Succ Zero) beta (Succ Zero)
-we will reduce to (Add Zero beta Zero), and thence we get beta := Zero.
-But without the context we won't find beta := Zero.
-
-This only matters in instance declarations..
--}
 
 -- | Should we completely ignore this constraint in error reporting?
 -- It *must* be the case that any constraint for which this returns True

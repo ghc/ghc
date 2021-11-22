@@ -232,10 +232,8 @@ pprInstances ispecs = vcat (map pprInstance ispecs)
 
 instanceHead :: ClsInst -> ([TyVar], Class, [Type])
 -- Returns the head, using the fresh tyvars from the ClsInst
-instanceHead (ClsInst { is_tvs = tvs, is_tys = tys, is_dfun = dfun })
+instanceHead (ClsInst { is_tvs = tvs, is_cls = cls, is_tys = tys })
    = (tvs, cls, tys)
-   where
-     (_, _, cls, _) = tcSplitDFunTy (idType dfun)
 
 -- | Collects the names of concrete types and type constructors that make
 -- up the head of a class instance. For instance, given `class Foo a b`:

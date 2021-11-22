@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE RecursiveDo #-}
 
 module GHC.Tc.Solver.Canonical(
      canonicalize,
@@ -530,7 +531,7 @@ mk_strict_superclasses rec_clss (CtGiven { ctev_evar = evar, ctev_loc = loc })
     classSCSelIds cls
   where
     dict_ids  = mkTemplateLocals theta
-    size      = sizeTypes tys
+    this_size = pSizeClassPred cls tys
 
     do_one_given sel_id
       | isUnliftedType sc_pred
@@ -570,37 +571,38 @@ mk_strict_superclasses rec_clss (CtGiven { ctev_evar = evar, ctev_loc = loc })
             `App` (evId evar `mkVarApps` (tvs ++ dict_ids))
             `mkVarApps` sc_tvs
 
-    sc_loc
-       | isCTupleClass cls
-       = loc   -- For tuple predicates, just take them apart, without
-               -- adding their (large) size into the chain.  When we
-               -- get down to a base predicate, we'll include its size.
-               -- #10335
+    sc_loc | isCTupleClass cls
+           = loc   -- For tuple predicates, just take them apart, without
+                   -- adding their (large) size into the chain.  When we
+                   -- get down to a base predicate, we'll include its size.
+                   -- #10335
 
-       |  isEqPredClass cls
-       || cls `hasKey` coercibleTyConKey
-       = loc   -- The only superclasses of ~, ~~, and Coercible are primitive
-               -- equalities, and they don't use the InstSCOrigin mechanism
-               -- detailed in Note [Solving superclass constraints] in
-               -- GHC.Tc.TyCl.Instance. Skip for a tiny performance win.
+           |  isEqPredClass cls || cls `hasKey` coercibleTyConKey
+           = loc   -- The only superclasses of ~, ~~, and Coercible are primitive
+                   -- equalities, and they don't use the GivenSCOrigin mechanism
+                   -- detailed in Note [Solving superclass constraints] in
+                   -- GHC.Tc.TyCl.Instance. Skip for a tiny performance win.
 
-         -- See Note [Solving superclass constraints] in GHC.Tc.TyCl.Instance
-         -- for explanation of InstSCOrigin and Note [Replacement vs keeping] in
-         -- GHC.Tc.Solver.Interact for why we need OtherSCOrigin and depths
-       | otherwise
-       = loc { ctl_origin = new_orig }
-       where
-         new_orig = case ctLocOrigin loc of
-            -- these cases are when we have something that's already a superclass constraint
-           InstSCOrigin  sc_depth n  -> InstSCOrigin  (sc_depth + 1) (n `max` size)
-           OtherSCOrigin sc_depth si -> OtherSCOrigin (sc_depth + 1) si
+           | otherwise
+           = loc { ctl_origin = mk_sc_origin (ctLocOrigin loc) }
 
-            -- these cases do not already have a superclass constraint: depth starts at 1
-           GivenOrigin InstSkol      -> InstSCOrigin  1 size
-           GivenOrigin other_skol    -> OtherSCOrigin 1 other_skol
+    -- See Note [Solving superclass constraints] in GHC.Tc.TyCl.Instance
+    -- for explanation of GivenSCOrigin and Note [Replacement vs keeping] in
+    -- GHC.Tc.Solver.Interact for why we need depths
+    mk_sc_origin :: CtOrigin -> CtOrigin
+    mk_sc_origin (GivenSCOrigin skol_info sc_depth already_blocked)
+      = GivenSCOrigin skol_info (sc_depth + 1)
+                      (already_blocked || newly_blocked skol_info)
 
-           other_orig                -> pprPanic "Given constraint without given origin" $
-                                        ppr evar $$ ppr other_orig
+    mk_sc_origin (GivenOrigin skol_info)
+      = -- These cases do not already have a superclass constraint: depth starts at 1
+        GivenSCOrigin skol_info 1 (newly_blocked skol_info)
+
+    mk_sc_origin other_orig = pprPanic "Given constraint without given origin" $
+                              ppr evar $$ ppr other_orig
+
+    newly_blocked (InstSkol _ head_size) = isJust (this_size `ltPatersonSize` head_size)
+    newly_blocked _                      = False
 
 mk_strict_superclasses rec_clss ev tvs theta cls tys
   | all noFreeVarsOfType tys
@@ -861,16 +863,27 @@ solveForAll ev@(CtWanted { ctev_dest = dest, ctev_rewriters = rewriters, ctev_lo
     -- This setLclEnv is important: the emitImplicationTcS uses that
     -- TcLclEnv for the implication, and that in turn sets the location
     -- for the Givens when solving the constraint (#21006)
-    do { skol_info <- mkSkolemInfo QuantCtxtSkol
-       ; let empty_subst = mkEmptySubst $ mkInScopeSet $
+    do { let empty_subst = mkEmptySubst $ mkInScopeSet $
                            tyCoVarsOfTypes (pred:theta) `delVarSetList` tvs
-       ; (subst, skol_tvs) <- tcInstSkolTyVarsX skol_info empty_subst tvs
-       ; given_ev_vars <- mapM newEvVar (substTheta subst theta)
+             is_qc = IsQC (ctLocOrigin loc)
 
+         -- rec {..}: see Note [Keeping SkolemInfo inside a SkolemTv]
+         --           in GHC.Tc.Utils.TcType
+         -- Very like the code in tcSkolDFunType
+       ; rec { skol_info <- mkSkolemInfo skol_info_anon
+             ; (subst, skol_tvs) <- tcInstSkolTyVarsX skol_info empty_subst tvs
+             ; let inst_pred  = substTy    subst pred
+                   inst_theta = substTheta subst theta
+                   skol_info_anon = InstSkol is_qc (get_size inst_pred) }
+
+       ; given_ev_vars <- mapM newEvVar inst_theta
        ; (lvl, (w_id, wanteds))
              <- pushLevelNoWorkList (ppr skol_info) $
-                do { wanted_ev <- newWantedEvVarNC loc rewriters $
-                                  substTy subst pred
+                do { let loc' = setCtLocOrigin loc (ScOrigin is_qc NakedSc)
+                         -- Set the thing to prove to have a ScOrigin, so we are
+                         -- careful about its termination checks.
+                         -- See (QC-INV) in Note [Solving a Wanted forall-constraint]
+                   ; wanted_ev <- newWantedEvVarNC loc' rewriters inst_pred
                    ; return ( ctEvEvId wanted_ev
                             , unitBag (mkNonCanonical wanted_ev)) }
 
@@ -882,6 +895,12 @@ solveForAll ev@(CtWanted { ctev_dest = dest, ctev_rewriters = rewriters, ctev_lo
               , et_binds = ev_binds, et_body = w_id }
 
       ; stopWith ev "Wanted forall-constraint" }
+  where
+    -- Getting the size of the head is a bit horrible
+    -- because of the special treament for class predicates
+    get_size pred = case classifyPredType pred of
+                      ClassPred cls tys -> pSizeClassPred cls tys
+                      _                 -> pSizeType pred
 
  -- See Note [Solving a Given forall-constraint]
 solveForAll ev@(CtGiven {}) tvs _theta pred pend_sc
@@ -901,6 +920,23 @@ and discharge df thus:
     df = /\ab. \g1 g2. let <binds> in d
 where <binds> is filled in by solving the implication constraint.
 All the machinery is to hand; there is little to do.
+
+The tricky point is about termination: see #19690.  We want to maintain
+the invariant (QC-INV):
+
+  (QC-INV) Every quantified constraint returns a non-bottom dictionary
+
+just as every top-level instance declaration guarantees to return a non-bottom
+dictionary.  But as #19690 shows, it is possible to get a bottom dicionary
+by superclass selection if we aren't careful.  The situation is very similar
+to that described in Note [Recursive superclasses] in GHC.Tc.TyCl.Instance;
+and we use the same solution:
+
+* Give the Givens a CtOrigin of (GivenOrigin (InstSkol IsQC head_size))
+* Give the Wanted a CtOrigin of (ScOrigin IsQC NakedSc)
+
+Both of these things are done in solveForAll.  Now the mechanism described
+in Note [Solving superclass constraints] in GHC.Tc.TyCl.Instance takes over.
 
 Note [Solving a Given forall-constraint]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

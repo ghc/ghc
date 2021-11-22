@@ -86,6 +86,7 @@ module GHC.Tc.Utils.TcType (
   checkValidClsArgs, hasTyVarHead,
   isRigidTy,
 
+
   -- Re-exported from GHC.Core.TyCo.Compare
   -- mainly just for back-compat reasons
   eqType, eqTypes, nonDetCmpType, nonDetCmpTypes, eqTypeX,
@@ -130,6 +131,18 @@ module GHC.Tc.Utils.TcType (
   isFunPtrTy,          -- :: Type -> Bool
   tcSplitIOType_maybe, -- :: Type -> Maybe Type
 
+  ---------------------------------
+  -- Patersons sizes
+  PatersonSize(..), PatersonSizeFailure(..),
+  ltPatersonSize,
+  pSizeZero, pSizeOne,
+  pSizeType, pSizeTypeX, pSizeTypes,
+  pSizeClassPred, pSizeClassPredX,
+  pSizeTyConApp,
+  noMoreTyVars, allDistinctTyVars,
+  TypeSize, sizeType, sizeTypes, scopedSort,
+  isTerminatingClass, isStuckTypeFamily,
+
   --------------------------------
   -- Reexported from Kind
   Kind, liftedTypeKind, constraintKind,
@@ -152,7 +165,7 @@ module GHC.Tc.Utils.TcType (
 
   isClassPred, isEqPrimPred, isIPLikePred, isEqPred, isEqPredClass,
   mkClassPred,
-  tcSplitDFunTy, tcSplitDFunHead, tcSplitMethodTy,
+  tcSplitQuantPredTy, tcSplitDFunTy, tcSplitDFunHead, tcSplitMethodTy,
   isRuntimeRepVar, isFixedRuntimeRepKind,
   isVisiblePiTyBinder, isInvisiblePiTyBinder,
 
@@ -191,8 +204,6 @@ module GHC.Tc.Utils.TcType (
   pprType, pprParendType, pprTypeApp,
   pprTheta, pprParendTheta, pprThetaArrowTy, pprClassPred,
   pprTCvBndr, pprTCvBndrs,
-
-  TypeSize, sizeType, sizeTypes, scopedSort,
 
   ---------------------------------
   -- argument visibility
@@ -244,7 +255,7 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import Data.IORef
 import Data.List.NonEmpty( NonEmpty(..) )
-import Data.List ( partition )
+import Data.List ( partition, nub, (\\) )
 
 import GHC.Generics ( Generic )
 
@@ -585,13 +596,32 @@ vanillaSkolemTv for a TyVar.
 
 But ultimately I want to separate Type from TcType, and in that case
 we would need to enforce the separation.
+
+Note [Keeping SkolemInfo inside a SkolemTv]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A SkolemTv contains a SkolemInfo, which describes the binding side of that
+TcTyVar.  This is very convenient to a consumer of a SkolemTv, but it is
+a bit awkward for the /producer/.  Why? Because sometimes we can't produce
+the SkolemInfo until we have the TcTyVars!
+
+Example: in `GHC.Tc.Utils.Unify.tcTopSkolemise` we create SkolemTvs whose
+`SkolemInfo` is `SigSkol`, whose arguments in turn mention the newly-created
+SkolemTvs.  So we a RecrusiveDo idiom, like this:
+
+  rec { (wrap, tv_prs, given, rho_ty) <- skolemise skol_info expected_ty
+      ; skol_info <- mkSkolemInfo (SigSkol ctxt expected_ty tv_prs) }
+
+Note that the `skol_info` can't be created until we have the `tv_prs` returned
+by `skolemise`. Note also that `skolemise` had better be lazy in `skol_info`.
+
+All uses of this idiom should be flagged with a reference to this Note.
 -}
 
 -- A TyVarDetails is inside a TyVar
 -- See Note [TyVars and TcTyVars during type checking]
 data TcTyVarDetails
   = SkolemTv      -- A skolem
-       SkolemInfo
+       SkolemInfo -- See Note [Keeping SkolemInfo inside a SkolemTv]
        TcLevel    -- Level of the implication that binds it
                   -- See GHC.Tc.Utils.Unify Note [Deeper level on the left] for
                   --     how this level number is used
@@ -1581,20 +1611,23 @@ tcIsTyVarTy (TyVarTy _)   = True
 tcIsTyVarTy _             = False
 
 -----------------------
-tcSplitDFunTy :: Type -> ([TyVar], [Type], Class, [Type])
--- Split the type of a dictionary function
--- We don't use tcSplitSigmaTy,  because a DFun may (with NDP)
--- have non-Pred arguments, such as
---     df :: forall m. (forall b. Eq b => Eq (m b)) -> C m
---
--- Also NB splitFunTys, not tcSplitFunTys;
+tcSplitQuantPredTy :: Type -> ([TyVar], [Type], PredType)
+-- Split up the type of a quantified predicate
+--    forall tys, theta => head
+-- NB splitFunTys, not tcSplitFunTys;
 -- the latter specifically stops at PredTy arguments,
 -- and we don't want to do that here
-tcSplitDFunTy ty
+tcSplitQuantPredTy ty
   = case tcSplitForAllInvisTyVars ty of { (tvs, rho)    ->
-    case splitFunTys rho             of { (theta, tau)  ->
-    case tcSplitDFunHead tau         of { (clas, tys)   ->
-    (tvs, map scaledThing theta, clas, tys) }}}
+    case splitFunTys rho             of { (theta, head) ->
+    (tvs, map scaledThing theta, head) }}
+
+tcSplitDFunTy :: Type -> ([TyVar], [Type], Class, [Type])
+-- Split the type of a dictionary function
+tcSplitDFunTy ty
+  = case tcSplitQuantPredTy ty of { (tvs, theta, head)  ->
+    case tcSplitDFunHead head  of { (clas, tys)   ->
+    (tvs, theta, clas, tys) }}
 
 tcSplitDFunHead :: Type -> (Class, [Type])
 tcSplitDFunHead = getClassPredTys
@@ -1645,8 +1678,8 @@ checkValidClsArgs :: Bool -> Class -> [KindOrType] -> Bool
 -- If the Bool is True (flexible contexts), return True (i.e. ok)
 -- Otherwise, check that the type (not kind) args are all headed by a tyvar
 --   E.g. (Eq a) accepted, (Eq (f a)) accepted, but (Eq Int) rejected
--- This function is here rather than in GHC.Tc.Validity because it is
--- called from GHC.Tc.Solver, which itself is imported by GHC.Tc.Validity
+-- This function is here in GHC.Tc.Utils.TcType, rather than in GHC.Tc.Validity,
+-- because it is called from GHC.Tc.Solver, which itself is imported by GHC.Tc.Validity
 checkValidClsArgs flexible_contexts cls kts
   | flexible_contexts = True
   | otherwise         = all hasTyVarHead tys
@@ -2261,71 +2294,11 @@ Reason: the back end falls over with panic "primRepHint:VoidRep";
 {-
 ************************************************************************
 *                                                                      *
-        The "Paterson size" of a type
+        Visiblities
 *                                                                      *
 ************************************************************************
 -}
 
-{-
-Note [Paterson conditions on PredTypes]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We are considering whether *class* constraints terminate
-(see Note [Paterson conditions]). Precisely, the Paterson conditions
-would have us check that "the constraint has fewer constructors and variables
-(taken together and counting repetitions) than the head.".
-
-However, we can be a bit more refined by looking at which kind of constraint
-this actually is. There are two main tricks:
-
- 1. It seems like it should be OK not to count the tuple type constructor
-    for a PredType like (Show a, Eq a) :: Constraint, since we don't
-    count the "implicit" tuple in the ThetaType itself.
-
-    In fact, the Paterson test just checks *each component* of the top level
-    ThetaType against the size bound, one at a time. By analogy, it should be
-    OK to return the size of the *largest* tuple component as the size of the
-    whole tuple.
-
- 2. Once we get into an implicit parameter or equality we
-    can't get back to a class constraint, so it's safe
-    to say "size 0".  See #4200.
-
-NB: we don't want to detect PredTypes in sizeType (and then call
-sizePred on them), or we might get an infinite loop if that PredType
-is irreducible. See #5581.
--}
-
-type TypeSize = IntWithInf
-
-sizeType :: Type -> TypeSize
--- Size of a type: the number of variables and constructors
--- Ignore kinds altogether
-sizeType = go
-  where
-    go ty | Just exp_ty <- coreView ty = go exp_ty
-    go (TyVarTy {})                    = 1
-    go (TyConApp tc tys)
-      | isTypeFamilyTyCon tc     = infinity  -- Type-family applications can
-                                             -- expand to any arbitrary size
-      | otherwise                = sizeTypes (filterOutInvisibleTypes tc tys) + 1
-                                   -- Why filter out invisible args?  I suppose any
-                                   -- size ordering is sound, but why is this better?
-                                   -- I came across this when investigating #14010.
-    go (LitTy {})                = 1
-    go (FunTy _ w arg res)       = go w + go arg + go res + 1
-    go (AppTy fun arg)           = go fun + go arg
-    go (ForAllTy (Bndr tv vis) ty)
-        | isVisibleForAllTyFlag vis = go (tyVarKind tv) + go ty + 1
-        | otherwise                 = go ty + 1
-    go (CastTy ty _)                = go ty
-    go (CoercionTy {})              = 0
-
-sizeTypes :: [Type] -> TypeSize
-sizeTypes tys = sum (map sizeType tys)
-
------------------------------------------------------------------------------------
------------------------------------------------------------------------------------
------------------------
 -- | For every arg a tycon can take, the returned list says True if the argument
 -- is taken visibly, and False otherwise. Ends with an infinite tail of Trues to
 -- allow for oversaturation.
@@ -2347,3 +2320,231 @@ isNextArgVisible ty
   | otherwise                              = True
     -- this second case might happen if, say, we have an unzonked TauTv.
     -- But TauTvs can't range over types that take invisible arguments
+
+{-
+************************************************************************
+*                                                                      *
+                     Paterson sizes
+*                                                                      *
+************************************************************************
+-}
+
+{- Note [The PatersonSize of a type]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The PatersonSize of type is something we can compare, with `ltPatersonSize`,
+to determine if the Paterson conditions are satisfied for an instance
+declaration.  See Note [Paterson conditions] in GHC.Tc.Validity.
+
+There are some wrinkles
+
+(PS1) Once we get into an implicit parameter or equality we
+      can't get back to a class constraint, so it's safe
+      to say "size 0".  See #4200.
+
+      We do this with isTerminatingClass
+
+Note [Invisible arguments and termination]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When checking the ​Paterson conditions for termination an instance
+declaration, we check for the number of "constructors and variables"
+in the instance head and constraints. Question: Do we look at
+
+ * All the arguments, visible or invisible?
+ * Just the visible arguments?
+
+I think both will ensure termination, provided we are consistent.
+Currently we are /not/ consistent, which is really a bug.  It's
+described in #15177, which contains a number of examples.
+The suspicious bits are the calls to filterOutInvisibleTypes.
+See also #11833.
+
+Note [Stuck type families]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+A type-family application generally has infinite size (PS_TyFam);
+see (PC3) in Note [Paterson conditions] in GHC.Tc.Validity.
+
+But a couple of built-in type families have no axioms, and can never
+expand into anything else.  They are:
+
+* (TypeError "stuff").  E.g. consider
+
+     type family F a where
+       F Int  = Bool
+       F Bool = Char
+       F _    = TypeError "Bad"
+
+  We don't want to complain about possible non-termination of F, in
+  GHC.Tc.Validity.checkFamInstRhs.  cf indexed-types/should_fail/T13271
+
+* (Any @k).
+
+For now we treat them as being size zero, but (#22696) I think we should
+actually treat them as big (like any other ype family) because we don't
+want to abstract over them in e.g. validDerivPred.
+
+The type-family termination test, in GHC.Tc.Validity.checkFamInstRhs, already
+has a separate call to isStuckTypeFamily, so the `F` above will still be accepted.
+-}
+
+
+data PatersonSizeFailure
+  = PSF_TyFam TyCon     -- Type family
+  | PSF_Size            -- Too many type constructors/variables
+  | PSF_TyVar [TyVar]   -- These type variables appear more often than in instance head;
+                        --   no duplicates in this list
+
+--------------------------------------
+
+data PatersonSize    -- See Note [Paterson conditions] in GHC.Tc.Validity
+  = PS_TyFam TyCon   -- Mentions a type family; infinite size
+
+  | PS_Vanilla { ps_tvs :: [TyVar]  -- Free tyvars, including repetitions;
+               , ps_size :: Int     -- Number of type constructors and variables
+    }
+  -- Always after expanding synonyms
+  -- Always ignore coercions (not user written)
+  -- ToDo: ignore invisible arguments?  See Note [Invisible arguments and termination]
+
+instance Outputable PatersonSize where
+  ppr (PS_TyFam tc) = text "PS_TyFam" <+> ppr tc
+  ppr (PS_Vanilla { ps_tvs = tvs, ps_size = size })
+    = text "PS_Vanilla" <> braces (sep [ text "ps_tvs =" <+> ppr tvs <> comma
+                                       , text "ps_size =" <+> int size ])
+
+pSizeZero, pSizeOne :: PatersonSize
+pSizeZero = PS_Vanilla { ps_tvs = [], ps_size = 0 }
+pSizeOne  = PS_Vanilla { ps_tvs = [], ps_size = 1 }
+
+ltPatersonSize :: PatersonSize    -- Size of constraint
+               -> PatersonSize    -- Size of instance head; never PS_TyFam
+               -> Maybe PatersonSizeFailure
+-- (ps1 `ltPatersonSize` ps2) returns
+--     Nothing iff ps1 is strictly smaller than p2
+--     Just ps_fail says what went wrong
+ltPatersonSize (PS_TyFam tc) _ = Just (PSF_TyFam tc)
+ltPatersonSize (PS_Vanilla { ps_tvs = tvs1, ps_size = s1 })
+               (PS_Vanilla { ps_tvs = tvs2, ps_size = s2 })
+  | s1 >= s2                                = Just PSF_Size
+  | bad_tvs@(_:_) <- noMoreTyVars tvs1 tvs2 = Just (PSF_TyVar bad_tvs)
+  | otherwise                               = Nothing -- OK!
+ltPatersonSize (PS_Vanilla {}) (PS_TyFam tc)
+  = pprPanic "ltPSize" (ppr tc)
+    -- Impossible because we never have a type family in an instance head
+
+noMoreTyVars :: [TyVar]  -- Free vars (with repetitions) of the constraint C
+             -> [TyVar]  -- Free vars (with repetitions) of the head H
+             -> [TyVar]  -- TyVars that appear more often in C than H;
+                         --   no repetitions in this list
+noMoreTyVars tvs head_tvs
+  = nub (tvs \\ head_tvs)  -- The (\\) is list difference; e.g.
+                           --   [a,b,a,a] \\ [a,a] = [b,a]
+                           -- So we are counting repetitions
+
+addPSize :: PatersonSize -> PatersonSize -> PatersonSize
+addPSize ps1@(PS_TyFam {}) _ = ps1
+addPSize _ ps2@(PS_TyFam {}) = ps2
+addPSize (PS_Vanilla { ps_tvs = tvs1, ps_size = s1 })
+         (PS_Vanilla { ps_tvs = tvs2, ps_size = s2 })
+  = PS_Vanilla { ps_tvs = tvs1 ++ tvs2, ps_size = s1 + s2 }
+    -- (++) is not very performant, but the types
+    -- are user-written and never large
+
+pSizeType :: Type -> PatersonSize
+pSizeType = pSizeTypeX emptyVarSet
+
+pSizeTypes :: [Type] -> PatersonSize
+pSizeTypes = pSizeTypesX emptyVarSet pSizeZero
+
+-- Paterson size of a type, retaining repetitions, and expanding synonyms
+-- This ignores coercions, as coercions aren't user-written
+pSizeTypeX :: VarSet -> Type -> PatersonSize
+pSizeTypeX bvs ty | Just exp_ty <- coreView ty = pSizeTypeX bvs exp_ty
+pSizeTypeX bvs (TyVarTy tv)
+  | tv `elemVarSet` bvs                  = pSizeOne
+  | otherwise                            = PS_Vanilla { ps_tvs = [tv], ps_size = 1 }
+pSizeTypeX _   (LitTy {})                = pSizeOne
+pSizeTypeX bvs (TyConApp tc tys)         = pSizeTyConAppX bvs tc tys
+pSizeTypeX bvs (AppTy fun arg)           = pSizeTypeX bvs fun `addPSize` pSizeTypeX bvs arg
+pSizeTypeX bvs (FunTy _ w arg res)       = pSizeTypeX bvs w `addPSize` pSizeTypeX bvs arg `addPSize`
+                                           pSizeTypeX bvs res
+pSizeTypeX bvs (ForAllTy (Bndr tv _) ty) = pSizeTypeX bvs (tyVarKind tv) `addPSize`
+                                           pSizeTypeX (bvs `extendVarSet` tv) ty
+pSizeTypeX bvs (CastTy ty _)             = pSizeTypeX bvs ty
+pSizeTypeX _   (CoercionTy {})           = pSizeOne
+
+pSizeTypesX :: VarSet -> PatersonSize -> [Type] -> PatersonSize
+pSizeTypesX bvs sz tys = foldr (addPSize . pSizeTypeX bvs) sz tys
+
+pSizeTyConApp :: TyCon -> [Type] -> PatersonSize
+pSizeTyConApp = pSizeTyConAppX emptyVarSet
+
+pSizeTyConAppX :: VarSet -> TyCon -> [Type] -> PatersonSize
+-- Open question: do we count all args, or just the visible ones?
+-- See Note [Invisible arguments and termination]
+pSizeTyConAppX bvs tc tys
+  | isTypeFamilyTyCon tc = pSizeTyFamApp tc
+  | otherwise            = pSizeTypesX bvs pSizeOne tys
+
+pSizeTyFamApp :: TyCon -> PatersonSize
+-- See Note [Stuck type families]
+pSizeTyFamApp tc
+ | isStuckTypeFamily tc = pSizeZero
+ | otherwise            = PS_TyFam tc
+
+pSizeClassPred :: Class -> [Type] -> PatersonSize
+pSizeClassPred = pSizeClassPredX emptyVarSet
+
+pSizeClassPredX :: VarSet -> Class -> [Type] -> PatersonSize
+pSizeClassPredX bvs cls tys
+  | isTerminatingClass cls -- See (PS1) in Note [The PatersonSize of a type]
+  = pSizeZero
+  | otherwise
+  = pSizeTypesX bvs pSizeOne $
+    filterOutInvisibleTypes (classTyCon cls) tys
+    -- filterOutInvisibleTypes Yuk!  See Note [Invisible arguments and termination]
+
+isStuckTypeFamily :: TyCon -> Bool
+-- See Note [Stuck type families]
+isStuckTypeFamily tc
+  =  tc `hasKey` errorMessageTypeErrorFamKey
+  || tc `hasKey` anyTyConKey
+
+-- | When this says "True", ignore this class constraint during
+-- a termination check
+-- See (PS1) in Note [The PatersonSize of a type]
+isTerminatingClass :: Class -> Bool
+isTerminatingClass cls
+  = isIPClass cls    -- Implicit parameter constraints always terminate because
+                     -- there are no instances for them --- they are only solved
+                     -- by "local instances" in expressions
+    || isEqPredClass cls
+    || cls `hasKey` typeableClassKey
+            -- Typeable constraints are bigger than they appear due
+            -- to kind polymorphism, but we can never get instance divergence this way
+    || cls `hasKey` coercibleTyConKey
+
+allDistinctTyVars :: TyVarSet -> [KindOrType] -> Bool
+-- (allDistinctTyVars tvs tys) returns True if tys are
+-- a) all tyvars
+-- b) all distinct
+-- c) disjoint from tvs
+allDistinctTyVars _    [] = True
+allDistinctTyVars tkvs (ty : tys)
+  = case getTyVar_maybe ty of
+      Nothing -> False
+      Just tv | tv `elemVarSet` tkvs -> False
+              | otherwise -> allDistinctTyVars (tkvs `extendVarSet` tv) tys
+
+-----------------------
+type TypeSize = IntWithInf
+
+sizeType :: Type -> TypeSize
+-- Size of a type: the number of variables and constructors
+sizeType ty = toTypeSize (pSizeType ty)
+
+sizeTypes :: [Type] -> TypeSize
+sizeTypes tys = toTypeSize (foldr (addPSize . pSizeType) pSizeZero tys)
+
+toTypeSize :: PatersonSize -> TypeSize
+toTypeSize (PS_TyFam {})                   =  infinity
+toTypeSize (PS_Vanilla { ps_size = size }) = mkIntWithInf size

@@ -73,7 +73,7 @@ import Control.Monad
 import Data.Foldable      ( toList )
 import Data.List          ( partition )
 import Data.List.NonEmpty ( NonEmpty(..) )
-import GHC.Data.Maybe     ( mapMaybe )
+import GHC.Data.Maybe     ( mapMaybe, isJust )
 
 {-
 *********************************************************************************
@@ -1199,10 +1199,12 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
        -- NB: bound_theta are constraints we want to quantify over,
        --     including the psig_theta, which we always quantify over
        -- NB: bound_theta are fully zonked
+       -- rec {..}: see Note [Keeping SkolemInfo inside a SkolemTv]
+       --           in GHC.Tc.Utils.TcType
        ; rec { (qtvs, bound_theta, co_vars) <- decideQuantification skol_info infer_mode rhs_tclvl
                                                      name_taus partial_sigs
                                                      quant_pred_candidates
-             ;  bound_theta_vars <- mapM TcM.newEvVar bound_theta
+             ; bound_theta_vars <- mapM TcM.newEvVar bound_theta
 
              ; let full_theta = map idType bound_theta_vars
              ; skol_info <- mkSkolemInfo (InferSkol [ (name, mkSigmaTy [] full_theta ty)
@@ -2490,18 +2492,7 @@ setImplicationStatus implic@(Implic { ic_status     = status
 
       ; bad_telescope <- checkBadTelescope implic
 
-      ; let (used_givens, unused_givens)
-              | warnRedundantGivens info
-              = partition (`elemVarSet` need_inner) givens
-              | otherwise = (givens, [])   -- None to report
-
-            minimal_used_givens = mkMinimalBySCs evVarPred used_givens
-            is_minimal = (`elemVarSet` mkVarSet minimal_used_givens)
-
-            warn_givens
-              | not (null unused_givens) = unused_givens
-              | warnRedundantGivens info = filterOut is_minimal used_givens
-              | otherwise                = []
+      ; let warn_givens = findUnnecessaryGivens info need_inner givens
 
             discard_entire_implication  -- Can we discard the entire implication?
               =  null warn_givens           -- No warning from this implication
@@ -2540,6 +2531,67 @@ setImplicationStatus implic@(Implic { ic_status     = status
      = False       -- Tnen we don't need to keep it
      | otherwise
      = True        -- Otherwise, keep it
+
+findUnnecessaryGivens :: SkolemInfoAnon -> VarSet -> [EvVar] -> [EvVar]
+findUnnecessaryGivens info need_inner givens
+  | not (warnRedundantGivens info)   -- Don't report redundant constraints at all
+  = []
+
+  | not (null unused_givens)         -- Some givens are literally unused
+  = unused_givens
+
+   | otherwise                       -- All givens are used, but some might
+   = redundant_givens                -- still be redundant e.g. (Eq a, Ord a)
+
+  where
+    in_instance_decl = case info of { InstSkol {} -> True; _ -> False }
+                       -- See Note [Redundant constraints in instance decls]
+
+    unused_givens = filterOut is_used givens
+
+    is_used given =   is_type_error given
+                  ||  (given `elemVarSet` need_inner)
+                  ||  (in_instance_decl && is_improving (idType given))
+
+    minimal_givens = mkMinimalBySCs evVarPred givens
+    is_minimal = (`elemVarSet` mkVarSet minimal_givens)
+    redundant_givens
+      | in_instance_decl = []
+      | otherwise        = filterOut is_minimal givens
+
+    -- See #15232
+    is_type_error = isJust . userTypeError_maybe . idType
+
+    is_improving pred -- (transSuperClasses p) does not include p
+      = any isImprovementPred (pred : transSuperClasses pred)
+
+{- Note [Redundant constraints in instance decls]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Instance declarations are special in two ways:
+
+* We don't report unused givens if they can give rise to improvement.
+  Example (#10100):
+    class Add a b ab | a b -> ab, a ab -> b
+    instance Add Zero b b
+    instance Add a b ab => Add (Succ a) b (Succ ab)
+  The context (Add a b ab) for the instance is clearly unused in terms
+  of evidence, since the dictionary has no fields.  But it is still
+  needed!  With the context, a wanted constraint
+     Add (Succ Zero) beta (Succ Zero)
+  we will reduce to (Add Zero beta Zero), and thence we get beta := Zero.
+  But without the context we won't find beta := Zero.
+
+  This only matters in instance declarations.
+
+* We don't report givens that are a superclass of another given. E.g.
+       class Ord r => UserOfRegs r a where ...
+       instance (Ord r, UserOfRegs r CmmReg) => UserOfRegs r CmmExpr where
+  The (Ord r) is not redundant, even though it is a superclass of
+  (UserOfRegs r CmmReg).  See Note [Recursive superclasses] in GHC.Tc.TyCl.Instance.
+
+  Again this is specific to instance declarations.
+-}
+
 
 checkBadTelescope :: Implication -> TcS Bool
 -- True <=> the skolems form a bad telescope

@@ -28,7 +28,7 @@ import GHC.Tc.Deriv.Utils
 import GHC.Tc.TyCl.Class( instDeclCtxt3, tcATDefault )
 import GHC.Tc.Utils.Env
 import GHC.Tc.Deriv.Generate
-import GHC.Tc.Validity( allDistinctTyVars, checkValidInstHead )
+import GHC.Tc.Validity( checkValidInstHead )
 import GHC.Core.InstEnv
 import GHC.Tc.Utils.Instantiate
 import GHC.Core.FamInstEnv
