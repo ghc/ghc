@@ -82,6 +82,11 @@ data Direction = Fwd | Bwd
 
 type TransferFun f = CmmBlock -> FactBase f -> FactBase f
 
+-- | `TransferFun` abstracted over `n` (the node type)
+type TransferFun' (n :: Extensibility -> Extensibility -> Type) f =
+    Block n C C -> FactBase f -> FactBase f
+
+
 -- | Function for rewrtiting and analysis combined. To be used with
 -- @rewriteCmm@.
 --
@@ -90,20 +95,26 @@ type TransferFun f = CmmBlock -> FactBase f -> FactBase f
 -- to the particular monads through SPECIALIZE).
 type RewriteFun f = CmmBlock -> FactBase f -> UniqSM (CmmBlock, FactBase f)
 
+-- | `RewriteFun` abstracted over `n` (the node type)
+type RewriteFun' (n :: Extensibility -> Extensibility -> Type) f =
+    Block n C C -> FactBase f -> UniqSM (Block n C C, FactBase f)
+
 analyzeCmmBwd, analyzeCmmFwd
-    :: DataflowLattice f
-    -> TransferFun f
-    -> CmmGraph
+    :: (NonLocal node)
+    => DataflowLattice f
+    -> TransferFun' node f
+    -> GenCmmGraph node
     -> FactBase f
     -> FactBase f
 analyzeCmmBwd = analyzeCmm Bwd
 analyzeCmmFwd = analyzeCmm Fwd
 
 analyzeCmm
-    :: Direction
+    :: (NonLocal node)
+    => Direction
     -> DataflowLattice f
-    -> TransferFun f
-    -> CmmGraph
+    -> TransferFun' node f
+    -> GenCmmGraph node
     -> FactBase f
     -> FactBase f
 analyzeCmm dir lattice transfer cmmGraph initFact =
@@ -117,12 +128,13 @@ analyzeCmm dir lattice transfer cmmGraph initFact =
 
 -- Fixpoint algorithm.
 fixpointAnalysis
-    :: forall f.
-       Direction
+    :: forall f node.
+       (NonLocal node)
+    => Direction
     -> DataflowLattice f
-    -> TransferFun f
+    -> TransferFun' node f
     -> Label
-    -> LabelMap CmmBlock
+    -> LabelMap (Block node C C)
     -> FactBase f
     -> FactBase f
 fixpointAnalysis direction lattice do_block entry blockmap = loop start
@@ -155,20 +167,22 @@ fixpointAnalysis direction lattice do_block entry blockmap = loop start
     loop _ !fbase1 = fbase1
 
 rewriteCmmBwd
-    :: DataflowLattice f
-    -> RewriteFun f
-    -> CmmGraph
+    :: (NonLocal node)
+    => DataflowLattice f
+    -> RewriteFun' node f
+    -> GenCmmGraph node
     -> FactBase f
-    -> UniqSM (CmmGraph, FactBase f)
+    -> UniqSM (GenCmmGraph node, FactBase f)
 rewriteCmmBwd = rewriteCmm Bwd
 
 rewriteCmm
-    :: Direction
+    :: (NonLocal node)
+    => Direction
     -> DataflowLattice f
-    -> RewriteFun f
-    -> CmmGraph
+    -> RewriteFun' node f
+    -> GenCmmGraph node
     -> FactBase f
-    -> UniqSM (CmmGraph, FactBase f)
+    -> UniqSM (GenCmmGraph node, FactBase f)
 rewriteCmm dir lattice rwFun cmmGraph initFact = {-# SCC rewriteCmm #-} do
     let entry = g_entry cmmGraph
         hooplGraph = g_graph cmmGraph
@@ -180,14 +194,15 @@ rewriteCmm dir lattice rwFun cmmGraph initFact = {-# SCC rewriteCmm #-} do
     return (cmmGraph {g_graph = GMany NothingO blockMap2 NothingO}, facts)
 
 fixpointRewrite
-    :: forall f.
-       Direction
+    :: forall f node.
+       NonLocal node
+    => Direction
     -> DataflowLattice f
-    -> RewriteFun f
+    -> RewriteFun' node f
     -> Label
-    -> LabelMap CmmBlock
+    -> LabelMap (Block node C C)
     -> FactBase f
-    -> UniqSM (LabelMap CmmBlock, FactBase f)
+    -> UniqSM (LabelMap (Block node C C), FactBase f)
 fixpointRewrite dir lattice do_block entry blockmap = loop start blockmap
   where
     -- Sorting the blocks helps to minimize the number of times we need to
@@ -204,9 +219,9 @@ fixpointRewrite dir lattice do_block entry blockmap = loop start blockmap
 
     loop
         :: IntHeap            -- ^ Worklist, i.e., blocks to process
-        -> LabelMap CmmBlock  -- ^ Rewritten blocks.
+        -> LabelMap (Block node C C)  -- ^ Rewritten blocks.
         -> FactBase f         -- ^ Current facts.
-        -> UniqSM (LabelMap CmmBlock, FactBase f)
+        -> UniqSM (LabelMap (Block node C C), FactBase f)
     loop todo !blocks1 !fbase1
       | Just (index, todo1) <- IntSet.minView todo = do
         -- Note that we use the *original* block here. This is important.
@@ -309,7 +324,7 @@ sortBlocks direction entry blockmap =
 -- * for a backward analysis we need to re-analyze all the predecessors, but
 -- * for a forward analysis, we only need to re-analyze the current block
 --   (and that will in turn propagate facts into its successors).
-mkDepBlocks :: Direction -> [CmmBlock] -> LabelMap IntSet
+mkDepBlocks :: NonLocal node => Direction -> [Block node C C] -> LabelMap IntSet
 mkDepBlocks Fwd blocks = go blocks 0 mapEmpty
   where
     go []     !_ !dep_map = dep_map
@@ -396,7 +411,7 @@ mkFactBase lattice = foldl' add mapEmpty
 
 -- | Folds backward over all nodes of an open-open block.
 -- Strict in the accumulator.
-foldNodesBwdOO :: (CmmNode O O -> f -> f) -> Block CmmNode O O -> f -> f
+foldNodesBwdOO :: (node O O -> f -> f) -> Block node O O -> f -> f
 foldNodesBwdOO funOO = go
   where
     go (BCat b1 b2) f = go b1 $! go b2 f
@@ -411,11 +426,11 @@ foldNodesBwdOO funOO = go
 -- dataflow facts).
 -- Strict in both accumulated parts.
 foldRewriteNodesBwdOO
-    :: forall f.
-       (CmmNode O O -> f -> UniqSM (Block CmmNode O O, f))
-    -> Block CmmNode O O
+    :: forall f node.
+       (node O O -> f -> UniqSM (Block node O O, f))
+    -> Block node O O
     -> f
-    -> UniqSM (Block CmmNode O O, f)
+    -> UniqSM (Block node O O, f)
 foldRewriteNodesBwdOO rewriteOO initBlock initFacts = go initBlock initFacts
   where
     go (BCons node1 block1) !fact1 = (rewriteOO node1 `comp` go block1) fact1

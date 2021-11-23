@@ -4,3 +4,4 @@ test('cmm_sink_sp', [ only_ways(['optasm']), grep_errmsg('(\[Sp.*\]).*(=).*(\[.*
 
 test('T16930', normal, makefile_test, ['T16930'])
 test('T17442', normal, compile, [''])
+test('T20725', normal, compile, ['-package ghc'])
