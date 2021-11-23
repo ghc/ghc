@@ -219,6 +219,7 @@ data XXPatGhcTc
   -- See Note [Rebindable syntax and HsExpansion].
   | ExpansionPat (Pat GhcRn) (Pat GhcTc)
 
+
 -- See Note [Rebindable syntax and HsExpansion].
 data HsPatExpansion a b
   = HsPatExpanded a b

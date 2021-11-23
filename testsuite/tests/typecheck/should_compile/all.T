@@ -807,3 +807,4 @@ test('T20661', [extra_files(['T20661.hs', 'T20661.hs-boot', 'T20661_aux.hs'])], 
 test('T20873', normal, compile, [''])
 test('T20873b', [extra_files(['T20873b_aux.hs'])], multimod_compile, ['T20873b', '-v0'])
 test('StaticPtrTypeFamily', normal, compile, [''])
+test('T17594a', normal, compile, [''])

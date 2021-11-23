@@ -694,7 +694,7 @@ zonkMatch :: Anno (GRHS GhcTc (LocatedA (body GhcTc))) ~ SrcAnn NoEpAnns
           -> TcM (LMatch GhcTc (LocatedA (body GhcTc)))
 zonkMatch env zBody (L loc match@(Match { m_pats = pats
                                         , m_grhss = grhss }))
-  = do  { (env1, new_pats) <- zonkMatchPats env pats
+  = do  { (env1, new_pats) <- zonkLMatchPats env pats
         ; new_grhss <- zonkGRHSs env1 zBody grhss
         ; return (L loc (match { m_pats = new_pats, m_grhss = new_grhss })) }
 
@@ -1339,6 +1339,15 @@ zonkPat :: ZonkEnv -> LPat GhcTc -> TcM (ZonkEnv, LPat GhcTc)
 -- to the right)
 zonkPat env pat = wrapLocSndMA (zonk_pat env) pat
 
+zonkLMatchPat :: ZonkEnv -> LMatchPat GhcTc -> TcM (ZonkEnv, LMatchPat GhcTc)
+zonkLMatchPat env (L l (VisPat x pat))
+  = do { (env', p') <- zonkPat env pat
+       ; return (env', L l (VisPat x p'))}
+zonkLMatchPat env (L l (InvisTyVarPat t (L l' idp)))
+  = do { (env', (L _ idp')) <- wrapLocSndM (zonkTyBndrX env) (L noSrcSpan idp)
+       ; return (env', L l (InvisTyVarPat t (L l' idp')))}
+zonkLMatchPat env p = return (env, p)
+
 zonk_pat :: ZonkEnv -> Pat GhcTc -> TcM (ZonkEnv, Pat GhcTc)
 zonk_pat env (ParPat x lpar p rpar)
   = do  { (env', p') <- zonkPat env p
@@ -1485,15 +1494,11 @@ zonkPats env (pat:pats) = do { (env1, pat') <- zonkPat env pat
                              ; (env', pats') <- zonkPats env1 pats
                              ; return (env', pat':pats') }
 
-zonkMatchPats :: ZonkEnv -> [LMatchPat GhcTc] -> TcM (ZonkEnv, [LMatchPat GhcTc])
-zonkMatchPats env [] = return (env, [])
-zonkMatchPats env (pat:pats) =
-  case pat of
-    L l (VisPat x lpat) -> do { (env1, pat') <- zonkPat env lpat
-                              ; (env', pats') <- zonkMatchPats env1 pats
-                              ; return (env', L l (VisPat x pat') : pats')
-                              }
-    _                   -> panic "we don't have other patters at the moment"
+zonkLMatchPats :: ZonkEnv -> [LMatchPat GhcTc] -> TcM (ZonkEnv, [LMatchPat GhcTc])
+zonkLMatchPats env [] = return (env, [])
+zonkLMatchPats env (pat:pats) = do { (env1, pat') <- zonkLMatchPat env pat
+                                   ; (env', pats') <- zonkLMatchPats env1 pats
+                                   ; return (env', pat' : pats') }
 
 {-
 ************************************************************************

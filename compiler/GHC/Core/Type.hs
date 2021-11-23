@@ -49,7 +49,7 @@ module GHC.Core.Type (
         mkSpecForAllTy, mkSpecForAllTys,
         mkVisForAllTys, mkTyCoInvForAllTy,
         mkInfForAllTy, mkInfForAllTys,
-        splitForAllTyCoVars,
+        splitForAllTyVars, splitForAllTyCoVars,
         splitForAllReqTVBinders, splitForAllInvisTVBinders,
         splitForAllTyCoVarBinders,
         splitForAllTyCoVar_maybe, splitForAllTyCoVar,
@@ -99,7 +99,7 @@ module GHC.Core.Type (
         mkAnonBinder,
         isAnonTyCoBinder,
         binderVar, binderVars, binderType, binderArgFlag,
-        tyCoBinderType, tyCoBinderVar_maybe,
+        tyCoBinderType, tyCoBinderMult, tyCoBinderVar_maybe,
         tyBinderType,
         binderRelevantType_maybe,
         isVisibleArgFlag, isInvisibleArgFlag, isVisibleBinder,
@@ -2302,6 +2302,10 @@ tyCoBinderVar_maybe _          = Nothing
 tyCoBinderType :: TyCoBinder -> Type
 tyCoBinderType (Named tvb) = binderType tvb
 tyCoBinderType (Anon _ ty)   = scaledThing ty
+
+tyCoBinderMult :: TyCoBinder -> Mult
+tyCoBinderMult (Anon _ ty) = scaledMult ty
+tyCoBinderMult _           = Many
 
 tyBinderType :: TyBinder -> Type
 tyBinderType (Named (Bndr tv _))

@@ -1,6 +1,8 @@
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies        #-}
 {-# LANGUAGE TupleSections       #-}
 
+{-# OPTIONS_GHC -Wno-overlapping-patterns #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
@@ -45,7 +47,6 @@ import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Ppr( debugPprType )
 import GHC.Tc.Utils.Concrete ( mkWpFun )
 import GHC.Tc.Utils.Env
-import GHC.Tc.Utils.Instantiate
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.TcType
@@ -59,9 +60,10 @@ import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Origin
 import GHC.Types.Name( isSystemName )
-
+import GHC.Tc.Utils.Instantiate
 import GHC.Core.TyCon
 import GHC.Builtin.Types
+import GHC.Types.SrcLoc
 import GHC.Types.Var as Var
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
@@ -75,7 +77,6 @@ import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 
 import GHC.Exts      ( inline )
-import Control.Monad
 import Control.Arrow ( second )
 import qualified Data.Semigroup as S ( (<>) )
 
@@ -282,54 +283,116 @@ passed in.
 
 -}
 
+zipLMatchPats
+  :: Type
+  -> [LMatchPat GhcRn]           -- User-written patterns
+  -> ( [(TyCoBinder, Maybe (LMatchPat GhcRn))] -- Zipped binders
+     , [LMatchPat GhcRn]         -- Leftover user-written patters
+     , Type )                    -- Remainder of the type signature
+zipLMatchPats fun_ty matchpats = zip_matchpats [] emptyTCvSubst fun_ty matchpats
+  where
+    finalise acc pats subst ty = (reverse acc, pats, substTy subst ty)
+    zip_matchpats acc subst ty matchpats
+      | (pat : pats) <- matchpats
+      , Just (b,ty') <- tcSplitPiTy_maybe ty
+      , let (subst', tb') = substTyCoBndr subst b
+      = if isInvisibleBinder b
+           then
+             case pat of
+               pat'@(L _ (InvisTyVarPat _ _)) -> zip_matchpats ((tb', Just pat') : acc) subst' ty' pats
+               pat'@(L _ (InvisWildTyPat _ )) -> zip_matchpats ((tb', Just pat') : acc) subst' ty' pats
+               _                              -> zip_matchpats ((tb', Nothing) : acc) subst' ty' matchpats
+           else
+             case pat of
+               pat'@(L _ (VisPat _ _)) -> zip_matchpats ((tb', Just pat') : acc) subst' ty' pats
+               _                       -> zip_matchpats ((tb', Nothing) : acc) subst' ty' matchpats
+      | otherwise
+      = finalise acc matchpats subst ty
+
 -- Use this one when you have an "expected" type.
 -- This function skolemises at each polytype.
 matchExpectedFunTys :: forall a.
                        SDoc   -- See Note [Herald for matchExpectedFunTys]
                     -> UserTypeCtxt
-                    -> Arity
-                    -> ExpRhoType      -- Skolemised
-                    -> ([Scaled ExpSigmaType] -> ExpRhoType -> TcM a)
+                    -> [LMatchPat GhcRn]
+                    -> ExpSigmaType
+                    -> ([TyCoBinder] -> ExpSigmaType -> TcM a)
                     -> TcM (HsWrapper, a)
 -- If    matchExpectedFunTys n ty = (_, wrap)
 -- then  wrap : (t1 -> ... -> tn -> ty_r) ~> ty,
 --   where [t1, ..., tn], ty_r are passed to the thing_inside
-matchExpectedFunTys herald ctx arity orig_ty thing_inside
+matchExpectedFunTys herald ctx lmatchpats orig_ty thing_inside
   = case orig_ty of
-      Check ty -> go [] arity ty
-      _        -> defer [] arity orig_ty
+      Check ty -> go [] lmatchpats ty
+      _        -> defer [] lmatchpats orig_ty
   where
-    -- Skolemise any foralls /before/ the zero-arg case
-    -- so that we guarantee to return a rho-type
-    go acc_arg_tys n ty
+    go bndrs matchpats@(_:pats) ty
+      | (zipped_binders@(pair : _),_,_) <- zipLMatchPats ty matchpats
+      , Just (_,ty') <- tcSplitFunTy_maybe ty
+      = do { traceTc "zipped binders are" (ppr zipped_binders)
+           ; case (pair, ty) of
+               ((bndr@(Anon VisArg scaled_arg_ty), Just pat@(L _ (VisPat _ _))), FunTy { ft_af = VisArg, ft_res = res_ty }) -> do
+                 { (wrap_res, result) <- go (bndr : bndrs) pats res_ty
+                 ; traceTc "current vispat" (ppr pat)
+                 ; fun_wrap <- mkWpFun idHsWrapper wrap_res scaled_arg_ty res_ty (WpFunFunExpTy orig_ty)
+                                  -- ; let names = collectPatBinders CollNoDictBinders lpat
+                                  -- ; ids <- tcLookupLocalIds names
+                 ; return ( fun_wrap, result ) --; tcExtendIdEnv ids $ return ( fun_wrap, result )
+                 }
+               ((bndr@(Named (Bndr _ Specified)), Just pat@(L _ (InvisTyVarPat _ _))), ForAllTy (Bndr var Specified) ty') -> do
+                 { (wrap_res, result) <- go (bndr : bndrs) pats ty'
+                 ; traceTc "current invispat" (ppr pat)
+                 ; let wrap_gen = WpTyLam var
+                 ; return (wrap_gen <.> wrap_res, result) }
+               ((bndr@(Named (Bndr _ Specified)), Just (L _ (InvisWildTyPat _))), ForAllTy (Bndr var Specified) ty') -> do
+                 { (wrap_res, result) <- go (bndr : bndrs) pats ty'
+                 ; let wrap_gen = WpTyLam var
+                 ; return (wrap_gen <.> wrap_res, result) }
+               _ -> go (fst pair : bndrs) pats ty'
+            }
+{-
+    go bndrs (pat@(L _ (VisPat _ _)):pats) (FunTy { ft_mult = mult, ft_af = VisArg, ft_arg = arg_ty, ft_res = res_ty })
+      = do { (wrap_res, result) <- go (Anon VisArg scaled_arg_ty : bndrs) pats res_ty
+           ; traceTc "matchExpectedFunTys: current visible pattern" (ppr pat)
+           ; fun_wrap <- mkWpFun idHsWrapper wrap_res scaled_arg_ty res_ty (WpFunFunExpTy orig_ty)
+           ; return ( fun_wrap, result ) }
+      where
+        scaled_arg_ty = mkScaled mult arg_ty
+-}
+{-
+    go bndrs (pat@(L _ (InvisTyVarPat _ _)): pats) (ForAllTy bndr@(Bndr var Specified) ty')
+      = do { (wrap_res, result) <- go (Named bndr : bndrs) pats ty'
+           ; let wrap_gen = WpTyLam var
+           ; traceTc "matchExpectedFunTys: current invisible pattern" (ppr pat)
+           ; return (wrap_gen <.> wrap_res, result) }
+
+    go bndrs (L _ (InvisWildTyPat _): pats) (ForAllTy bndr@(Bndr var Inferred) ty')
+      = do { (wrap_res, result) <- go (Named bndr : bndrs) pats ty'
+           ; let wrap_gen = WpTyLam var
+           ; return (wrap_gen <.> wrap_res, result) }
+-}
+    go vars pats ty
       | (tvs, theta, _) <- tcSplitSigmaTy ty
-      , not (null tvs && null theta)
-      = do { (wrap_gen, (wrap_res, result)) <- tcSkolemise ctx ty $ \ty' ->
-                                               go acc_arg_tys n ty'
+      , not (null theta && null tvs)
+      = do { (wrap_gen, (wrap_res, result)) <- tcSkolemiseScoped ctx ty $ \ty' ->
+                                                      go vars pats ty'
            ; return (wrap_gen <.> wrap_res, result) }
 
     -- No more args; do this /before/ tcView, so
     -- that we do not unnecessarily unwrap synonyms
-    go acc_arg_tys 0 rho_ty
-      = do { result <- thing_inside (reverse acc_arg_tys) (mkCheckExpType rho_ty)
+    go bndrs [] ty
+      = do { result <- thing_inside (reverse bndrs) (mkCheckExpType ty)
            ; return (idHsWrapper, result) }
 
-    go acc_arg_tys n ty
-      | Just ty' <- tcView ty = go acc_arg_tys n ty'
+    go bndrs pats ty
+      | Just ty' <- tcView ty = go bndrs pats ty'
 
-    go acc_arg_tys n (FunTy { ft_mult = mult, ft_af = af, ft_arg = arg_ty, ft_res = res_ty })
-      = assert (af == VisArg) $
-        do { (wrap_res, result) <- go ((Scaled mult $ mkCheckExpType arg_ty) : acc_arg_tys)
-                                      (n-1) res_ty
-           ; fun_wrap <- mkWpFun idHsWrapper wrap_res (Scaled mult arg_ty) res_ty (WpFunFunExpTy orig_ty)
-           ; return ( fun_wrap, result ) }
-
-    go acc_arg_tys n ty@(TyVarTy tv)
+    go bndrs pats ty@(TyVarTy tv)
       | isMetaTyVar tv
       = do { cts <- readMetaTyVar tv
            ; case cts of
-               Indirect ty' -> go acc_arg_tys n ty'
-               Flexi        -> defer acc_arg_tys n (mkCheckExpType ty) }
+               Indirect ty' -> go bndrs pats ty'
+               Flexi        -> defer bndrs pats (mkCheckExpType ty) }
 
        -- In all other cases we bale out into ordinary unification
        -- However unlike the meta-tyvar case, we are sure that the
@@ -346,30 +409,68 @@ matchExpectedFunTys herald ctx arity orig_ty thing_inside
        --
        -- But in that case we add specialized type into error context
        -- anyway, because it may be useful. See also #9605.
-    go acc_arg_tys n ty = addErrCtxtM (mk_ctxt acc_arg_tys ty) $
-                          defer acc_arg_tys n (mkCheckExpType ty)
+    go bndrs lmatchpats ty = addErrCtxtM (mk_ctxt bndrs ty) $
+                          defer bndrs lmatchpats (mkCheckExpType ty)
 
     ------------
-    defer :: [Scaled ExpSigmaType] -> Arity -> ExpRhoType -> TcM (HsWrapper, a)
-    defer acc_arg_tys n fun_ty
-      = do { more_arg_tys <- replicateM n (mkScaled <$> newFlexiTyVarTy multiplicityTy <*> newInferExpType)
-           ; res_ty       <- newInferExpType
-           ; result       <- thing_inside (reverse acc_arg_tys ++ more_arg_tys) res_ty
-           ; more_arg_tys <- mapM (\(Scaled m t) -> Scaled m <$> readExpType t) more_arg_tys
-           ; res_ty       <- readExpType res_ty
-           ; let unif_fun_ty = mkVisFunTys more_arg_tys res_ty
+
+    defer :: [TyCoBinder] -> [LMatchPat GhcRn] -> ExpSigmaType -> TcM (HsWrapper, a)
+    defer bndrs pats fun_ty
+      = do { bndrs'        <- mapM patToBndr pats
+           ; res_ty        <- newInferExpType
+           ; result        <- thing_inside (reverse bndrs ++ bndrs') res_ty
+           ; res_ty        <- readExpType res_ty
+           -- ; let tys = map (\bndr -> Scaled (tyCoBinderMult bndr) (tyBinderType bndr)) bndrs'
+           ; let unif_fun_ty = mkPiTys bndrs' res_ty
            ; wrap <- tcSubType AppOrigin ctx unif_fun_ty fun_ty
                          -- Not a good origin at all :-(
            ; return (wrap, result) }
 
+    patToBndr :: LMatchPat GhcRn -> TcM TyCoBinder
+    patToBndr (L _ (VisPat _ _)) =
+      do { ki <- newOpenTypeKind
+         ; ty <- newFlexiTyVarTy ki
+         ; mult <- newFlexiTyVarTy multiplicityTy
+         ; return (Anon VisArg (Scaled mult ty))
+         }
+    patToBndr (L _ (InvisTyVarPat _ _)) =
+      do { var <- newOpenFlexiTyVar
+         ; return (Named (Bndr var Specified))
+         }
+    patToBndr (L _ (InvisWildTyPat _)) =
+      do { var <- newOpenFlexiTyVar
+         ; return (Named (Bndr var Inferred))
+         }
+
     ------------
-    mk_ctxt :: [Scaled ExpSigmaType] -> TcType -> TidyEnv -> TcM (TidyEnv, SDoc)
-    mk_ctxt arg_tys res_ty env
-      = mkFunTysMsg env herald arg_tys' res_ty arity
-      where
-        arg_tys' = map (\(Scaled u v) -> Scaled u (checkingExpType "matchExpectedFunTys" v)) $
-                   reverse arg_tys
-            -- this is safe b/c we're called from "go"
+    mk_ctxt :: [TyCoBinder] -> TcType -> TidyEnv -> TcM (TidyEnv, SDoc)
+    mk_ctxt bndrs res_ty env
+      = mkPiTysMsg env herald (reverse bndrs) res_ty lmatchpats
+
+mkPiTysMsg :: TidyEnv -> SDoc -> [TyCoBinder] -> TcType -> [LMatchPat GhcRn]
+           -> TcM (TidyEnv, SDoc)
+mkPiTysMsg env herald bndrs res_ty lmatchpats
+  = do { let fun = mkPiTys bndrs res_ty
+       ; (env', fun_ty) <- zonkTidyTcType env fun
+       ; let (all_arg_tys, _) = splitFunTys fun_ty
+             n_fun_args = length all_arg_tys
+             all_lpats  = length (discardLInvisPats lmatchpats)
+
+             (all_forall_args, _) = splitForAllTyVars fun_ty
+             n_forall_args = length all_forall_args
+             all_invis_pats = length (discardLVisPats lmatchpats)
+
+             full_herald = herald <+> speakNOf all_lpats (text "value argument")
+
+             msg | all_invis_pats <= n_forall_args && all_lpats <= n_fun_args  -- Enough args, in the end
+                 = text "In the result of a function call"
+                 | otherwise
+                 = hang (full_herald <> comma)
+                      2 (sep [ text "but its type" <+> quotes (pprType fun_ty)
+                             , if n_fun_args == 0 then text "has none"
+                               else text "has only" <+> speakN n_fun_args])
+
+       ; return (env', msg) }
 
 mkFunTysMsg :: TidyEnv -> SDoc -> [Scaled TcType] -> TcType -> Arity
             -> TcM (TidyEnv, SDoc)

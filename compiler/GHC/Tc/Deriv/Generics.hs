@@ -361,7 +361,7 @@ mkBindsRep dflags gk dit@(DerivInstTys{dit_rep_tc = tycon}) = (binds, sigs)
         -- to save some allocations during typechecking.
         -- See Note [Generics compilation speed tricks]
         from_eqn = mkHsCaseAlt x_Pat $ mkM1_E
-                                     $ nlHsPar $ nlHsCase x_Expr from_matches
+                                       $ nlHsPar $ nlHsCase x_Expr from_matches
         to_eqn   = mkHsCaseAlt (mkM1_P x_Pat) $ nlHsCase x_Expr to_matches
 
         from_matches  = [mkHsCaseAlt pat rhs | (pat,rhs) <- from_alts]

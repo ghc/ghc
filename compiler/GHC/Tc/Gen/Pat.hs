@@ -340,21 +340,6 @@ tc_lpat pat_ty penv (L span pat) thing_inside
                                           thing_inside
         ; return (L span pat', res) }
 
-tc_lmatchpat :: Scaled ExpSigmaType
-             -> Checker (LMatchPat GhcRn) (LMatchPat GhcTc)
-tc_lmatchpat pat_ty penv (L l (VisPat x pat)) thing_inside
-  = do  { (pat', res) <- tc_lpat pat_ty penv pat thing_inside
-        ; return (L l (VisPat x pat'), res) }
-tc_lmatchpat _ _ _ _ = panic "we don't have that yet"
-
-tc_lmatchpats :: [Scaled ExpSigmaType]
-              -> Checker [LMatchPat GhcRn] [LMatchPat GhcTc]
-tc_lmatchpats tys penv pats
-  = assertPpr (equalLength pats tys) (ppr pats $$ ppr tys) $
-    tcMultiple (\ penv' (p,t) -> tc_lmatchpat t penv' p)
-               penv
-               (zipEqual "tc_lmatchpat" pats tys)
-
 tc_lpats :: [Scaled ExpSigmaType]
          -> Checker [LPat GhcRn] [LPat GhcTc]
 tc_lpats tys penv pats
@@ -362,6 +347,31 @@ tc_lpats tys penv pats
     tcMultiple (\ penv' (p,t) -> tc_lpat t penv' p)
                penv
                (zipEqual "tc_lpats" pats tys)
+
+tc_lmatchpat :: Scaled ExpSigmaType
+             -> Checker (LMatchPat GhcRn) (LMatchPat GhcTc)
+tc_lmatchpat pat_ty penv pat@(L l (VisPat x p)) thing_inside
+  = do { (pat', res) <- tc_lpat pat_ty penv p thing_inside
+       ; traceTc "tc_lmatchpat: current visible pattern" (ppr pat)
+       ; return (L l (VisPat x pat'), res) }
+tc_lmatchpat (Scaled _ ty) penv pat@(L l' (InvisTyVarPat x (L l name))) thing_inside
+  = do { unExp <- readExpType ty
+       ; let id = mkTyVar name unExp
+       ; (res,_) <- tcCheckUsage name unExp $ tcExtendTyVarEnv [id] thing_inside
+       ; traceTc "tc_lmatchpat: current invisible pattern" (ppr pat)
+       ; return (L l' (InvisTyVarPat x (L l id)), res) }
+tc_lmatchpat ty _ (L l' (InvisWildTyPat _)) thing_inside
+  = do { res <- thing_inside
+       ; unExp <- readExpType (scaledThing ty)
+       ; return (L l' (InvisWildTyPat unExp), res) }
+
+tc_lmatchpats :: [Scaled ExpSigmaType]
+           -> Checker [LMatchPat GhcRn] [LMatchPat GhcTc]
+tc_lmatchpats tys penv pats
+  = assertPpr (equalLength pats tys) (ppr pats $$ ppr tys) $
+    tcMultiple (\ penv' (p,t) -> tc_lmatchpat t penv' p)
+               penv
+               (zipEqual "tc_lmatchpats" pats tys)
 
 --------------------
 -- See Note [Wrapper returned from tcSubMult] in GHC.Tc.Utils.Unify.
