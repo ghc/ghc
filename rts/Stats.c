@@ -69,7 +69,7 @@ static Time *GC_coll_cpu = NULL;
 static Time *GC_coll_elapsed = NULL;
 static Time *GC_coll_max_pause = NULL;
 
-static void statsPrintf( char *s, ... ) GNUC3_ATTRIBUTE(format (PRINTF, 1, 2));
+static int statsPrintf( char *s, ... ) GNUC3_ATTRIBUTE(format (PRINTF, 1, 2));
 static void statsFlush( void );
 static void statsClose( void );
 
@@ -994,8 +994,10 @@ static void report_summary(const RTSSummaryStats* sum)
 
         for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
             int prefix_length = 0;
-            statsPrintf("%*s" "gen[%" FMT_Word32 "%n",
-                        col_width[0], "", g, &prefix_length);
+            prefix_length = statsPrintf("%*s" "gen[%" FMT_Word32,
+                        col_width[0], "", g);
+            if (prefix_length < 0)
+                prefix_length = 0;
             prefix_length -= col_width[0];
             int suffix_length = col_width[1] + prefix_length;
             suffix_length =
@@ -1715,19 +1717,21 @@ void getRTSStats( RTSStats *s )
    Dumping stuff in the stats file, or via the debug message interface
    -------------------------------------------------------------------------- */
 
-void
+int
 statsPrintf( char *s, ... )
 {
+    int ret = 0;
     FILE *sf = RtsFlags.GcFlags.statsFile;
     va_list ap;
 
     va_start(ap,s);
     if (sf == NULL) {
-        vdebugBelch(s,ap);
+        ret = vdebugBelch(s,ap);
     } else {
-        vfprintf(sf, s, ap);
+        ret = vfprintf(sf, s, ap);
     }
     va_end(ap);
+    return ret;
 }
 
 static void

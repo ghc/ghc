@@ -36,7 +36,7 @@
 
 // Default to the stdio implementation of these hooks.
 RtsMsgFunction *fatalInternalErrorFn = rtsFatalInternalErrorFn;
-RtsMsgFunction *debugMsgFn           = rtsDebugMsgFn;
+RtsMsgFunctionRetLen *debugMsgFn           = rtsDebugMsgFn;
 RtsMsgFunction *errorMsgFn           = rtsErrorMsgFn;
 RtsMsgFunction *sysErrorMsgFn        = rtsSysErrorMsgFn;
 
@@ -108,10 +108,10 @@ debugBelch(const char*s, ...)
   va_end(ap);
 }
 
-void
+int
 vdebugBelch(const char*s, va_list ap)
 {
-  (*debugMsgFn)(s,ap);
+  return (*debugMsgFn)(s,ap);
 }
 
 /* -----------------------------------------------------------------------------
@@ -291,16 +291,16 @@ rtsSysErrorMsgFn(const char *s, va_list ap)
 #endif
 }
 
-void
+int
 rtsDebugMsgFn(const char *s, va_list ap)
 {
+  int r;
 #if defined(mingw32_HOST_OS)
   /* Ensure we're in text mode so newlines get encoded properly.  */
   int mode = _setmode (_fileno(stderr), _O_TEXT);
   if (isGUIApp())
   {
      char buf[BUFSIZE];
-         int r;
 
          r = vsnprintf(buf, BUFSIZE, s, ap);
          if (r > 0 && r < BUFSIZE) {
@@ -311,12 +311,13 @@ rtsDebugMsgFn(const char *s, va_list ap)
 #endif
   {
      /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
-     vfprintf(stderr, s, ap);
+     r = vfprintf(stderr, s, ap);
      fflush(stderr);
   }
 #if defined(mingw32_HOST_OS)
   _setmode (_fileno(stderr), mode);
 #endif
+  return r;
 }
 
 

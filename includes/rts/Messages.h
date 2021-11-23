@@ -85,20 +85,21 @@ void vsysErrorBelch(const char *s, va_list ap);
 void debugBelch(const char *s, ...)
    GNUC3_ATTRIBUTE(format (PRINTF, 1, 2));
 
-void vdebugBelch(const char *s, va_list ap);
+int vdebugBelch(const char *s, va_list ap);
 
 
 /* Hooks for redirecting message generation: */
 
 typedef void RtsMsgFunction(const char *, va_list);
+typedef int RtsMsgFunctionRetLen(const char *, va_list);
 
 extern RtsMsgFunction *fatalInternalErrorFn;
-extern RtsMsgFunction *debugMsgFn;
+extern RtsMsgFunctionRetLen *debugMsgFn;
 extern RtsMsgFunction *errorMsgFn;
 
 /* Default stdio implementation of the message hooks: */
 
 extern RtsMsgFunction rtsFatalInternalErrorFn;
-extern RtsMsgFunction rtsDebugMsgFn;
+extern RtsMsgFunctionRetLen rtsDebugMsgFn;
 extern RtsMsgFunction rtsErrorMsgFn;
 extern RtsMsgFunction rtsSysErrorMsgFn;
