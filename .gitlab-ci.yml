@@ -537,7 +537,7 @@ release-x86_64-freebsd:
 # x86_64-darwin
 #################################
 
-validate-x86_64-darwin:
+.build-x86_64-darwin:
   extends: .validate-hadrian
   stage: full-build
   tags:
@@ -546,8 +546,6 @@ validate-x86_64-darwin:
   variables:
     NIX_SYSTEM: x86_64-darwin
     BUILD_FLAVOUR: "validate"
-    GHC_VERSION: 8.10.4
-    CABAL_INSTALL_VERSION: 3.2.0.0
     BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-apple-darwin.tar.xz"
     MACOSX_DEPLOYMENT_TARGET: "10.10"
     # Only Sierra and onwards supports clock_gettime. See #12858
@@ -569,9 +567,6 @@ validate-x86_64-darwin:
     BIN_DIST_NAME: "ghc-x86_64-apple-darwin"
     # Due to #19025
     IGNORE_PERF_FAILURES: "all"
-  after_script:
-    - .gitlab/ci.sh clean
-    - cat ci-timings
 
   script: |
     # fix up config.sub in libraries for the time.
@@ -584,25 +579,38 @@ validate-x86_64-darwin:
     .gitlab/ci.sh test_hadrian
     .gitlab/ci.sh save_cache
 
+  after_script:
+    - .gitlab/ci.sh clean
+    - cat ci-timings
+
   artifacts:
     when: always
     expire_in: 2 week
+
+validate-x86_64-darwin:
+  extends: .build-x86_64-darwin
   rules:
     - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
 
-validate-aarch64-darwin:
+release-x86_64-darwin:
+  <<: *release
+  extends: .build-x86_64-darwin
+  stage: full-build
+
+#################################
+# aarch64-darwin
+#################################
+
+.build-aarch64-darwin:
   extends: .validate-hadrian
   stage: full-build
   tags:
     - aarch64-darwin-m1
-
   variables:
     NIX_SYSTEM: aarch64-darwin
     BUILD_FLAVOUR: "validate"
     TEST_TYPE: test
     MAKE_ARGS: "-Werror"
-    GHC_VERSION: 8.10.3
-    CABAL_INSTALL_VERSION: 3.2.0.0
     BIN_DIST_PREP_TAR_COMP: "ghc-arm64-apple-darwin.tar.xz"
     MACOSX_DEPLOYMENT_TARGET: "11.0"
     CPUS: 8
@@ -614,9 +622,6 @@ validate-aarch64-darwin:
     TEST_ENV: "aarch64-darwin-hadrian"
     # Capi_Ctype_001 Capi_Ctype_002 T12010: Due to #20393
     BROKEN_TESTS: "Capi_Ctype_001 Capi_Ctype_002 T12010"
-  after_script:
-    - .gitlab/ci.sh clean
-    - cat ci-timings
 
   script: |
     # fix up config.sub in libraries for the time.
@@ -629,11 +634,23 @@ validate-aarch64-darwin:
     .gitlab/ci.sh test_hadrian
     .gitlab/ci.sh save_cache
 
+  after_script:
+    - .gitlab/ci.sh clean
+    - cat ci-timings
+
   artifacts:
     when: always
     expire_in: 2 week
+
+validate-aarch64-darwin:
+  extends: .build-aarch64-darwin
   rules:
     - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
+
+release-aarch64-darwin:
+  <<: *release
+  extends: .build-aarch64-darwin
+  stage: full-build
 
 .validate-linux:
   extends: .validate
