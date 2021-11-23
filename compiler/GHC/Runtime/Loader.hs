@@ -50,7 +50,6 @@ import GHC.Types.Name.Reader   ( RdrName, ImportSpec(..), ImpDeclSpec(..)
                                , ImpItemSpec(..), mkGlobalRdrEnv, lookupGRE_RdrName
                                , greMangledName, mkRdrQual )
 
-import GHC.Unit.Env      (UnitEnv(..))
 import GHC.Unit.Finder         ( findPluginModule, FindResult(..) )
 import GHC.Driver.Config.Finder ( initFinderOpts )
 import GHC.Unit.Module   ( Module, ModuleName )
