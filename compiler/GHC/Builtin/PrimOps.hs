@@ -47,6 +47,7 @@ import GHC.Types.Unique  ( Unique)
 import GHC.Builtin.Uniques (mkPrimOpIdUnique, mkPrimOpWrapperUnique )
 import GHC.Unit.Types    ( Unit )
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Data.FastString
 
 {-
@@ -567,7 +568,38 @@ primOpIsDiv op = case op of
   DoubleDivOp     -> True
   _               -> False
 
+-- | True of primops that have an externally visible (e.g., from other threads
+-- or processes) side-effect like 'putMVar#', as opposed to a local side-effect
+-- like 'writeMutVar#'.
+--
+-- Like 'primOpIsDiv', this flag should ultimately end up in primops.txt.pp, but
+-- it's such a special case that it can just remain here for now.
+primOpHasExternallyVisibleSideEffects :: PrimOp -> Bool
+primOpHasExternallyVisibleSideEffects op
+  = assertPpr (not res || primOpHasSideEffects op) (ppr op) res
+  where
+    res = case op of
+      -- Array ops generally aren't thread-safe, so they count as local
+      -- side-effects. There's the exception of CAS Ops:
+      CasArrayOp -> True
+      CasSmallArrayOp -> True
+      -- Similarly for ByteArray ops. Exceptions:
+      AtomicReadByteArrayOp_Int -> True
+      AtomicWriteByteArrayOp_Int -> True
+      CasByteArrayOp_Int -> True
+      FetchAddByteArrayOp_Int -> True
+      FetchSubByteArrayOp_Int -> True
+      FetchAndByteArrayOp_Int -> True
+      FetchNandByteArrayOp_Int -> True
+      FetchOrByteArrayOp_Int -> True
+      FetchXorByteArrayOp_Int -> True
+      -- Addr#:
+      InterlockedExchange_Word -> True
 
+
+      RaiseIOOp -> True
+      CatchOp   -> True
+      _         -> False
 
 {-
 ************************************************************************

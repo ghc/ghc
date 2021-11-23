@@ -648,9 +648,8 @@ Note [Which scrutinees may throw precise exceptions]
 This is the specification of 'exprMayThrowPreciseExceptions',
 which is important for Scenario 2 of
 Note [Precise exceptions and strictness analysis] in GHC.Types.Demand.
-Ideally, we'd discover
 
-For a term-level expression @f a1 ... an :: ty@ we determine that
+For a term-level expression @f a1 ... an :: ty@ we return
   1. False  If ty is *not* @State# RealWorld@ or an unboxed tuple thereof.
             This check is done by 'forcesRealWorld'.
             (Why not simply unboxed pairs as above? This is motivated by
