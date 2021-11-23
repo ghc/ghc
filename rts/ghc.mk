@@ -362,6 +362,7 @@ WARNING_OPTS += -Wnested-externs
 WARNING_OPTS += -Wredundant-decls
 # Some gccs annoyingly enable this archaic specimen by default
 WARNING_OPTS += -Wno-aggregate-return
+WARNING_OPTS += -Wno-unused-label
 
 # These ones are hard to avoid:
 #WARNING_OPTS += -Wconversion
