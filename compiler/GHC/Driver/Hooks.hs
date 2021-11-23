@@ -142,7 +142,7 @@ data Hooks = Hooks
                                          -> HomePackageTable -> IO SuccessFlag))
   , runRnSpliceHook        :: !(Maybe (HsSplice GhcRn -> RnM (HsSplice GhcRn)))
   , getValueSafelyHook     :: !(Maybe (HscEnv -> Maybe ModuleNameWithIsBoot -> Name -> Type
-                                                          -> IO (Maybe HValue)))
+                                         -> IO (Either Type HValue)))
   , createIservProcessHook :: !(Maybe (CreateProcess -> IO ProcessHandle))
   , stgToCmmHook           :: !(Maybe (DynFlags -> Module -> InfoTableProvMap -> [TyCon] -> CollectedCCs
                                  -> [CgStgTopBinding] -> HpcInfo -> Stream IO CmmGroup ModuleLFInfos))

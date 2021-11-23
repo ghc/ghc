@@ -50,6 +50,7 @@ import GHC.Types.Name.Reader   ( RdrName, ImportSpec(..), ImpDeclSpec(..)
                                , ImpItemSpec(..), mkGlobalRdrEnv, lookupGRE_RdrName
                                , greMangledName, mkRdrQual )
 
+import GHC.Unit.Env      (UnitEnv(..))
 import GHC.Unit.Finder         ( findPluginModule, FindResult(..) )
 import GHC.Driver.Config.Finder ( initFinderOpts )
 import GHC.Unit.Module   ( Module, ModuleName )
@@ -134,14 +135,23 @@ loadPlugin' occ_name plugin_name hsc_env mnwib mod_name
             Just (name, mod_iface) ->
 
      do { plugin_tycon <- forceLoadTyCon hsc_env plugin_name
-        ; mb_plugin <- getValueSafely hsc_env mnwib name (mkTyConTy plugin_tycon)
-        ; case mb_plugin of
-            Nothing ->
-                throwGhcExceptionIO (CmdLineError $ showSDoc dflags $ hsep
+        ; eith_plugin <- getValueSafely hsc_env mnwib name (mkTyConTy plugin_tycon)
+        ; case eith_plugin of
+            Left actual_type ->
+                throwGhcExceptionIO (CmdLineError $
+                    showSDocForUser dflags (ue_units (hsc_unit_env hsc_env))
+                      printQualification $ hsep
                           [ text "The value", ppr name
+                          , text "with type", ppr actual_type
                           , text "did not have the type"
                           , ppr pluginTyConName, text "as required"])
-            Just plugin -> return (plugin, mod_iface) } } }
+                where
+                    printQualification = QueryQualify {
+                            queryQualifyName    = alwaysQualifyNames,
+                            queryQualifyModule  = neverQualifyModules,
+                            queryQualifyPackage = neverQualifyPackages
+                        }
+            Right plugin -> return (plugin, mod_iface) } } }
 
 
 -- | Force the interfaces for the given modules to be loaded. The 'SDoc' parameter is used
@@ -186,22 +196,22 @@ forceLoadTyCon hsc_env con_name = do
 -- * If the Name does not exist in the module
 -- * If the link failed
 
-getValueSafely :: HscEnv -> Maybe ModuleNameWithIsBoot -> Name -> Type -> IO (Maybe a)
+getValueSafely :: HscEnv -> Maybe ModuleNameWithIsBoot -> Name -> Type -> IO (Either Type a)
 getValueSafely hsc_env mnwib val_name expected_type = do
-  mb_hval <- case getValueSafelyHook hooks of
+  eith_hval <- case getValueSafelyHook hooks of
     Nothing -> getHValueSafely interp hsc_env mnwib val_name expected_type
     Just h  -> h                      hsc_env mnwib val_name expected_type
-  case mb_hval of
-    Nothing   -> return Nothing
-    Just hval -> do
+  case eith_hval of
+    Left actual_type -> return (Left actual_type)
+    Right hval -> do
       value <- lessUnsafeCoerce logger "getValueSafely" hval
-      return (Just value)
+      return (Right value)
   where
     interp = hscInterp hsc_env
     logger = hsc_logger hsc_env
     hooks  = hsc_hooks hsc_env
 
-getHValueSafely :: Interp -> HscEnv -> Maybe ModuleNameWithIsBoot -> Name -> Type -> IO (Maybe HValue)
+getHValueSafely :: Interp -> HscEnv -> Maybe ModuleNameWithIsBoot -> Name -> Type -> IO (Either Type HValue)
 getHValueSafely interp hsc_env mnwib val_name expected_type = do
     forceLoadNameModuleInterface hsc_env (text "contains a name used in an invocation of getHValueSafely") val_name
     -- Now look up the names for the value and type constructor in the type environment
@@ -222,8 +232,8 @@ getHValueSafely interp hsc_env mnwib val_name expected_type = do
                 hval <- do
                   v <- loadName interp hsc_env mnwib val_name
                   wormhole interp v
-                return (Just hval)
-             else return Nothing
+                return (Right hval)
+             else return (Left (idType id))
         Just val_thing -> throwCmdLineErrorS dflags $ wrongTyThingError val_name val_thing
    where dflags = hsc_dflags hsc_env
 

@@ -1,1 +1,1 @@
-<command line>: The value plugin did not have the type Plugin as required
+<command line>: The value Simple.BadlyTypedPlugin.plugin with type Int did not have the type GHC.Driver.Plugin as required
