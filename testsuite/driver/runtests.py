@@ -9,11 +9,13 @@ import signal
 import sys
 import os
 import io
+import operator
 import shutil
 import tempfile
 import time
 import re
 import traceback
+from functools import reduce
 from pathlib import Path
 
 # We don't actually need subprocess in runtests.py, but:
@@ -361,6 +363,9 @@ def cleanup_and_exit(exitcode):
         shutil.rmtree(tempdir, ignore_errors=True)
     exit(exitcode)
 
+def geometric_mean(xs: List[float]) -> float:
+    return reduce(operator.mul, xs)**(1. / len(xs))
+
 def tabulate_metrics(metrics: List[PerfMetric]) -> None:
     abbrevLen = get_abbrev_hash_length()
     hasBaseline = any([x.baseline is not None for x in metrics])
@@ -399,6 +404,15 @@ def tabulate_metrics(metrics: List[PerfMetric]) -> None:
         "{}".format(x.change.hint())
     )) for x in sorted(metrics, key =
                       lambda m: (m.stat.test, m.stat.way, m.stat.metric))]
+    geoMean = geometric_mean([
+        x.stat.value / x.baseline.perfStat.value
+        for x in metrics
+        if x.baseline is not None
+    ])
+    dataRows += [
+        row(("", "", "", "", "", "", "", "")),
+        row(("geo. mean", "", "", "", "", "", "{:+4.1f}%".format(100*(geoMean-1)), ""))
+    ]
     print_table(headerRows, dataRows, 1)
     print("")
     if hasBaseline:
