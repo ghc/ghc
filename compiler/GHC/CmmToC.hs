@@ -436,12 +436,18 @@ pprMachOpApp platform mop args
   | otherwise
   = pprMachOpApp' platform mop args
 
--- Comparisons in C have type 'int', but we want type W_ (this is what
--- resultRepOfMachOp says).  The other C operations inherit their type
--- from their operands, so no casting is required.
+-- | The type of most operations is determined by the operands. However, there are a few exceptions. For these we explicitly cast the result.
 machOpNeedsCast :: MachOp -> Maybe SDoc
 machOpNeedsCast mop
+    -- Comparisons in C have type 'int', but we want type W_ (this is what
+    -- resultRepOfMachOp says).
   | isComparisonMachOp mop = Just mkW_
+    -- A shift operation like (a >> b) where a::Word8 and b::Word has type Word
+    -- in C yet we want a Word8
+  | w <- shiftMachOp mop   = let ty
+                                   | signedOp mop = machRep_S_CType platform w
+                                   | otherwise    = machRep_U_CType platform w
+                             in Just $ parens ty
   | otherwise              = Nothing
 
 pprMachOpApp' :: Platform -> MachOp -> [CmmExpr] -> SDoc
@@ -768,6 +774,12 @@ signedOp (MO_S_Shr  _)    = True
 signedOp (MO_SS_Conv _ _) = True
 signedOp (MO_SF_Conv _ _) = True
 signedOp _                = False
+
+shiftOp :: MachOp -> Maybe Width
+shiftOp (MO_Shl w)        = Just w
+shiftOp (MO_U_Shr w)      = Just w
+shiftOp (MO_S_Shr w)      = Just w
+shiftOp _                 = Nothing
 
 floatComparison :: MachOp -> Bool  -- comparison between float args
 floatComparison (MO_F_Eq   _) = True
