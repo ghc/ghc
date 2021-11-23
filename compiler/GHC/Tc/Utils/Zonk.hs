@@ -1466,26 +1466,13 @@ zonkPats env (pat:pats) = do { (env1, pat') <- zonkPat env pat
                              ; (env', pats') <- zonkPats env1 pats
                              ; return (env', pat':pats') }
 
-<<<<<<< HEAD
 zonkLMatchPats :: ZonkEnv -> [LMatchPat GhcTc] -> TcM (ZonkEnv, [LMatchPat GhcTc])
 zonkLMatchPats env [] = return (env, [])
 zonkLMatchPats env (pat:pats) = do { (env1, pat') <- zonkLMatchPat env pat
                                    ; (env', pats') <- zonkLMatchPats env1 pats
                                    ; return (env', pat' : pats') }
 
-||||||| parent of bb42152455 (parser and renamer checkpoint)
-=======
-zonkMatchPats :: ZonkEnv -> [LMatchPat GhcTc] -> TcM (ZonkEnv, [LMatchPat GhcTc])
-zonkMatchPats env [] = return (env, [])
-zonkMatchPats env (pat:pats) =
-  case pat of
-    L l (VisPat x lpat) -> do { (env1, pat') <- zonkPat env lpat
-                              ; (env', pats') <- zonkMatchPats env1 pats
-                              ; return (env', L l (VisPat x pat') : pats')
-                              }
-    _                   -> panic "we don't have other patters at the moment"
 
->>>>>>> bb42152455 (parser and renamer checkpoint)
 {-
 ************************************************************************
 *                                                                      *
