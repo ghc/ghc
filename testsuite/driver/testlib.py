@@ -32,6 +32,8 @@ extra_src_files = {'T4198': ['exitminus1.c']} # TODO: See #12223
 
 from my_typing import *
 
+from threading import Timer
+
 global pool_sema
 if config.use_threads:
     import threading
@@ -39,6 +41,23 @@ if config.use_threads:
 
 global wantToStop
 wantToStop = False
+
+global title_update_timer
+title_update_timer = None
+
+# Update terminal title
+# useful progress indicator even when make test VERBOSE=1
+# Debounce the updates to avoid spamming them.
+def update_terminal_title(progress_args):
+    global title_update_timer
+    if config.supports_colors:
+      def worker():
+          print("\033]0;{0} {1} of {2} {3}\007".format(*progress_args), end="")
+          sys.stdout.flush()
+      if title_update_timer:
+        title_update_timer.cancel()
+      title_update_timer=Timer(0.05,worker)
+      title_update_timer.start()
 
 # I have no idea what the type of this is
 global thisdir_settings
@@ -1173,11 +1192,7 @@ def do_test(name: TestName,
     else:
         if_verbose(3, "=====> {0} {1} of {2} {3}".format(*progress_args))
 
-    # Update terminal title
-    # useful progress indicator even when make test VERBOSE=1
-    if config.supports_colors:
-        print("\033]0;{0} {1} of {2} {3}\007".format(*progress_args), end="")
-        sys.stdout.flush()
+    update_terminal_title(progress_args)
 
     # Clean up prior to the test, so that we can't spuriously conclude
     # that it passed on the basis of old run outputs.
