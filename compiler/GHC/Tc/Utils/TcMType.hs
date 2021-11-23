@@ -79,7 +79,7 @@ module GHC.Tc.Utils.TcMType (
   zonkTyCoVarsAndFVList,
 
   zonkTcType, zonkTcTypes, zonkCo,
-  zonkTyCoVarKind, zonkTyCoVarKindBinder,
+  zonkTyCoVarKind, zonkTyCoVarKindBinder, zonkTyCoBinder,
   zonkEvVar, zonkWC, zonkImplication, zonkSimples,
   zonkId, zonkCoVar,
   zonkCt, zonkSkolemInfo, zonkSkolemInfoAnon,
@@ -2324,6 +2324,12 @@ zonkTyCoVarKind tv = do { kind' <- zonkTcType (tyVarKind tv)
 zonkTyCoVarKindBinder :: (VarBndr TyCoVar fl) -> TcM (VarBndr TyCoVar fl)
 zonkTyCoVarKindBinder (Bndr tv fl) = do { kind' <- zonkTcType (tyVarKind tv)
                                         ; return $ Bndr (setTyVarKind tv kind') fl }
+
+zonkTyCoBinder :: TyCoBinder -> TcM TyCoBinder
+zonkTyCoBinder (Anon flag (Scaled mult ty)) = do { ty' <- zonkTcType ty
+                                                 ; return $ Anon flag (Scaled mult ty') }
+zonkTyCoBinder (Named tv)     = do { tv' <- zonkTyCoVarKindBinder tv
+                                   ; return $ Named tv' }
 
 {-
 ************************************************************************
