@@ -30,6 +30,16 @@ useable by most UNIX debugging tools.
 
     If ⟨n⟩ is omitted, level 2 is assumed.
 
+Note that for stack unwinding to be reliable, all libraries, including foreign
+libraries and those shipped with GHC such as ``base``, must be compiled with
+unwinding information. GHC binary distributions configured in this way are
+provided for a select number of platforms; other platforms are advised to build
+using Hadrian's ``+debug_info`` flavour transformer. Note as well that the
+built-in unwinding support provided by the ``base`` library's
+:base-ref:`GHC.ExecutionStack` module requires that the runtime system be built
+with ``libdw`` support enabled (using the ``--enable-dwarf-unwind`` flag to
+``configure`` while building the compiler) and a platform which ``libdw``
+supports.
 
 Tutorial
 --------
