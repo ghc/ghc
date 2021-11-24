@@ -58,6 +58,14 @@
     represented by their associated fixed-width unlifted types rather than
     `Int#` (resp. `Word#`).
 
+  * Additions to `Data.Bits`:
+
+    - Newtypes `And`, `Ior`, `Xor` and `Iff` which wrap their argument,
+      and whose `Semigroup` instances are defined using `(.&.)`, `(.|.)`, `xor`
+      and ```\x y -> complement (x `xor` y)```, respectively.
+
+    - `oneBits :: FiniteBits a => a`, `oneBits = complement zeroBits`.
+
 ## 4.15.0.0 *Feb 2021*
 
   * `openFile` now calls the `open` system call with an `interruptible` FFI
