@@ -46,6 +46,7 @@ flavourTransformers = M.fromList
     , "omit_pragmas" =: omitPragmas
     , "ipe" =: enableIPE
     , "fully_static" =: fullyStatic
+    , "collect_timings" =: collectTimings
     ]
   where (=:) = (,)
 
@@ -245,6 +246,20 @@ fullyStatic flavour =
         , builder (Ghc CompileCWithGhc) ? pure [ "-fPIC", "-optc", "-static"]
         , builder (Ghc LinkHs) ? pure [ "-optl", "-static" ]
         ]
+
+-- | Build stage2 dependencies with options to enable collection of compiler
+-- stats.
+collectTimings :: Flavour -> Flavour
+collectTimings =
+  -- Why both -ddump-timings *and* -v?
+  -- In contrast to -ddump-timings, -v will seq the whole CoreProgram and
+  -- produce less missleading information; otherwise, due to laziness some
+  -- allocations might be attributed to a subsequent pass instead of the pass
+  -- that has been causing the allocation. So we want -v.
+  -- On the other hand, -v doesn't work with -ddump-to-file, so we need
+  -- -ddump-timings.
+  addArgs $ notStage0 ? builder (Ghc CompileHs) ?
+    pure ["-ddump-to-file", "-ddump-timings", "-v"]
 
 
 -- * CLI and <root>/hadrian.settings options
