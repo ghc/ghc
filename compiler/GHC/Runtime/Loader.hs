@@ -143,7 +143,7 @@ loadPlugin' occ_name plugin_name hsc_env mnwib mod_name
                           [ text "The value", ppr name
                           , text "with type", ppr actual_type
                           , text "did not have the type"
-                          , ppr pluginTyConName, text "as required"])
+                          , text "GHC.Plugins.Plugin"
                           , text "as required"])
             Right plugin -> return (plugin, mod_iface) } } }
 
