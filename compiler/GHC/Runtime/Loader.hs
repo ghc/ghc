@@ -183,7 +183,7 @@ forceLoadTyCon hsc_env con_name = do
 -- | Loads the value corresponding to a 'Name' if that value has the given 'Type'. This only provides limited safety
 -- in that it is up to the user to ensure that that type corresponds to the type you try to use the return value at!
 --
--- If the value found was not of the correct type, returns @Nothing@. Any other condition results in an exception:
+-- If the value found was not of the correct type, returns @Left <actual_type>@. Any other condition results in an exception:
 --
 -- * If we could not load the names module
 -- * If the thing being loaded is not a value
