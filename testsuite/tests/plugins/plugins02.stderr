@@ -1,1 +1,1 @@
-<command line>: The value Simple.BadlyTypedPlugin.plugin with type Int did not have the type GHC.Driver.Plugin as required
+<command line>: The value Simple.BadlyTypedPlugin.plugin with type GHC.Types.Int did not have the type GHC.Plugins.Plugin as required
