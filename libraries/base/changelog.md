@@ -19,6 +19,14 @@
 
   * `returnA` is defined as `Control.Category.id` instead of `arr id`.
 
+  * Added symbolic synonyms for `xor` and shift operators to `Data.Bits`:
+
+    - `.^.` (`xor`),
+    - `.>>.` and `!>>.` (`shiftR` and `unsafeShiftR`),
+    - `.<<.` and `!<<.` (`shiftL` and `unsafeShiftL`).
+
+    These new operators have the same fixity as the originals.
+
 ## 4.16.0.0 *Nov 2021*
 
   * The unary tuple type, `Solo`, is now exported by `Data.Tuple`.
@@ -80,6 +88,14 @@
 
   * Comparison constraints in `Data.Type.Ord` (e.g. `<=`) now use the new
     `GHC.TypeError.Assert` type family instead of type equality with `~`.
+
+  * Additions to `Data.Bits`:
+
+    - Newtypes `And`, `Ior`, `Xor` and `Iff` which wrap their argument,
+      and whose `Semigroup` instances are defined using `(.&.)`, `(.|.)`, `xor`
+      and ```\x y -> complement (x `xor` y)```, respectively.
+
+    - `oneBits :: FiniteBits a => a`, `oneBits = complement zeroBits`.
 
 ## 4.15.0.0 *TBA*
 
