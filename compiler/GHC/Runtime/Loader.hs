@@ -139,17 +139,12 @@ loadPlugin' occ_name plugin_name hsc_env mnwib mod_name
             Left actual_type ->
                 throwGhcExceptionIO (CmdLineError $
                     showSDocForUser dflags (ue_units (hsc_unit_env hsc_env))
-                      printQualification $ hsep
+                      alwaysQualify $ hsep
                           [ text "The value", ppr name
                           , text "with type", ppr actual_type
                           , text "did not have the type"
                           , ppr pluginTyConName, text "as required"])
-                where
-                    printQualification = QueryQualify {
-                            queryQualifyName    = alwaysQualifyNames,
-                            queryQualifyModule  = neverQualifyModules,
-                            queryQualifyPackage = neverQualifyPackages
-                        }
+                          , text "as required"])
             Right plugin -> return (plugin, mod_iface) } } }
 
 
