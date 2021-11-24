@@ -3720,7 +3720,7 @@ qvar    :: { LocatedN RdrName }
 -- *after* we see the close paren.
 
 field :: { Located FastString  }
-      : VARID { sL1 $1 $! getVARID $1 }
+      : varid { reLocN $ fmap (occNameFS . rdrNameOcc) $1 }
 
 qvarid :: { LocatedN RdrName }
         : varid               { $1 }
