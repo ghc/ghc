@@ -433,22 +433,57 @@ pprMachOpApp platform op args
         isMulMayOfloOp _ = False
 
 pprMachOpApp platform mop args
-  | Just ty <- machOpNeedsCast mop
+  | Just ty <- machOpNeedsCast platform mop (map (cmmExprType platform) args)
   = ty <> parens (pprMachOpApp' platform mop args)
   | otherwise
   = pprMachOpApp' platform mop args
 
+{-
+Note [Zero-extending sub-word signed results]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider a program like (from #20634):
+
+    test() {
+        bits64 ret;
+        bits8 a,b;
+        a = 0xe1 :: bits8;       // == -31 signed
+        b = %quot(a, 3::bits8);  // == -10 signed
+        ret = %zx64(a);          // == 0xf6 unsigned
+        return (ret);
+    }
+
+This program should return 0xf6 == 246. However, we need to be very careful
+with when dealing with the result of the %quot. For instance, one might be
+tempted produce code like:
+
+    StgWord8 a = 0xe1U;
+    StgInt8  b = (StgInt8) a / (StgInt8) 0x3U;
+    StgWord ret = (W_) b;
+
+However, this would be wrong; by widening `b` directly from `StgInt8` to
+`StgWord` we will get sign-extension semantics: rather than 0xf6 we will get
+0xfffffffffffffff6. To avoid this we must first cast `b` back to `StgWord8`,
+ensuring that we get zero-extension semantics when we widen up to `StgWord`.
+-}
+
 -- | The type of most operations is determined by the operands. However, there are a few exceptions. For these we explicitly cast the result.
-machOpNeedsCast :: MachOp -> Maybe SDoc
-machOpNeedsCast mop
+machOpNeedsCast :: Platform -> MachOp -> [CmmType] -> Maybe SDoc
+machOpNeedsCast platform mop args
     -- Comparisons in C have type 'int', but we want type W_ (this is what
     -- resultRepOfMachOp says).
   | isComparisonMachOp mop = Just mkW_
+
+    -- See Note [Zero-extended sub-word signed results]
+  | signedOp mop
+  , res_ty <- machOpResultType platform mop args
+  , not $ isFloatType res_ty -- only integer operations, not MO_SF_Conv
+  , let w = typeWidth res_ty
+  , w < wordWidth platform
+  = Just $ parens (machRep_U_CType platform w)
+
     -- A shift operation like (a >> b) where a::Word8 and b::Word has type Word
     -- in C yet we want a Word8
-  | w <- shiftMachOp mop   = let ty
-                                   | signedOp mop = machRep_S_CType platform w
-                                   | otherwise    = machRep_U_CType platform w
+  | Just w <- shiftOp mop  = let ty = machRep_U_CType platform w
                              in Just $ parens ty
   | otherwise              = Nothing
 
