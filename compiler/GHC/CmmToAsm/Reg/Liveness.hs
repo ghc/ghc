@@ -1024,15 +1024,15 @@ liveness1 platform liveregs blockmap (LiveInstr instr _)
         = (liveregs1, LiveInstr instr
                         (Just $ Liveness
                         { liveBorn      = emptyUniqSet
-                        , liveDieRead   = mkUniqSet r_dying
-                        , liveDieWrite  = mkUniqSet w_dying }))
+                        , liveDieRead   = r_dying
+                        , liveDieWrite  = w_dying }))
 
         | otherwise
         = (liveregs_br, LiveInstr instr
                         (Just $ Liveness
                         { liveBorn      = emptyUniqSet
                         , liveDieRead   = mkUniqSet r_dying_br
-                        , liveDieWrite  = mkUniqSet w_dying }))
+                        , liveDieWrite  = w_dying }))
 
         where
             !(RU read written) = regUsageOfInstr platform instr
@@ -1044,10 +1044,12 @@ liveness1 platform liveregs blockmap (LiveInstr instr _)
 
             -- registers that are not live beyond this point, are recorded
             --  as dying here.
-            r_dying     = [ reg | reg <- read, reg `notElem` written,
+            r_dying     = mkUniqSet
+                          [ reg | reg <- read, reg `notElem` written,
                               not (elementOfUniqSet reg liveregs) ]
 
-            w_dying     = [ reg | reg <- written,
+            w_dying     = mkUniqSet
+                          [ reg | reg <- written,
                              not (elementOfUniqSet reg liveregs) ]
 
             -- union in the live regs from all the jump destinations of this
@@ -1067,6 +1069,6 @@ liveness1 platform liveregs blockmap (LiveInstr instr _)
             -- registers that are live only in the branch targets should
             -- be listed as dying here.
             live_branch_only = live_from_branch `minusUniqSet` liveregs
-            r_dying_br  = nonDetEltsUniqSet (mkUniqSet r_dying `unionUniqSets`
+            r_dying_br  = nonDetEltsUniqSet (r_dying `unionUniqSets`
                                              live_branch_only)
                           -- See Note [Unique Determinism and code generation]
