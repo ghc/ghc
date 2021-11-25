@@ -211,17 +211,15 @@ hptAllInstances hsc_env
 -- | Find instances visible from the given set of imports
 hptInstancesBelow :: HscEnv -> ModuleName -> Set ModuleNameWithIsBoot -> ([ClsInst], [FamInst])
 hptInstancesBelow hsc_env mn mns =
-  let (insts, famInsts) =
-        unzip $ hptSomeThingsBelowUs (\mod_info ->
-                                     let details = hm_details mod_info
-                                     -- Don't include instances for the current module
-                                     in if moduleName (mi_module (hm_iface mod_info)) == mn
-                                          then []
-                                          else [(md_insts details, md_fam_insts details)])
-                             True -- Include -hi-boot
-                             hsc_env
-                             mns
-  in (concat insts, concat famInsts)
+  hptSomeThingsBelowUs (\mod_info ->
+                       let details = hm_details mod_info
+                       -- Don't include instances for the current module
+                       in if moduleName (mi_module (hm_iface mod_info)) == mn
+                            then mempty
+                            else (md_insts details, md_fam_insts details))
+               True -- Include -hi-boot
+               hsc_env
+               mns
 
 -- | Get rules from modules "below" this one (in the dependency sense)
 hptRules :: HscEnv -> Set ModuleNameWithIsBoot -> [CoreRule]
@@ -267,13 +265,13 @@ hptModulesBelow hsc_env mn = filtered_mods $ [ mnwib |  NodeKey_Module mnwib <- 
 
 -- | Get things from modules "below" this one (in the dependency sense)
 -- C.f Inst.hptInstances
-hptSomeThingsBelowUs :: (HomeModInfo -> [a]) -> Bool -> HscEnv -> Set ModuleNameWithIsBoot -> [a]
+hptSomeThingsBelowUs :: Monoid a => (HomeModInfo -> a) -> Bool -> HscEnv -> Set ModuleNameWithIsBoot -> a
 hptSomeThingsBelowUs extract include_hi_boot hsc_env deps
-  | isOneShot (ghcMode (hsc_dflags hsc_env)) = []
+  | isOneShot (ghcMode (hsc_dflags hsc_env)) = mempty
 
   | otherwise
   = let hpt = hsc_HPT hsc_env
-    in
+    in mconcat
     [ thing
     |   -- Find each non-hi-boot module below me
       GWIB { gwib_mod = mod, gwib_isBoot = is_boot } <- Set.toList (hptModulesBelow hsc_env deps)
@@ -286,15 +284,14 @@ hptSomeThingsBelowUs extract include_hi_boot hsc_env deps
     , mod /= moduleName gHC_PRIM
 
         -- Look it up in the HPT
-    , let things = case lookupHpt hpt mod of
+    , let thing = case lookupHpt hpt mod of
                     Just info -> extract info
-                    Nothing -> pprTrace "WARNING in hptSomeThingsBelowUs" msg []
+                    Nothing -> pprTrace "WARNING in hptSomeThingsBelowUs" msg mempty
           msg = vcat [text "missing module" <+> ppr mod,
                       text "Probable cause: out-of-date interface files"]
                         -- This really shouldn't happen, but see #962
+    ]
 
-        -- And get its dfuns
-    , thing <- things ]
 
 
 -- | Deal with gathering annotations in from all possible places
