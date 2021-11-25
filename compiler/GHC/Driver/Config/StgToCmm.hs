@@ -57,6 +57,7 @@ initStgToCmmConfig dflags mod = StgToCmmConfig
   , stgToCmmAvx           = isAvxEnabled                   dflags
   , stgToCmmAvx2          = isAvx2Enabled                  dflags
   , stgToCmmAvx512f       = isAvx512fEnabled               dflags
+  , stgToCmmTickyAP       = gopt Opt_Ticky_AP dflags
   } where profile  = targetProfile dflags
           platform = profilePlatform profile
           bk_end  = backend dflags

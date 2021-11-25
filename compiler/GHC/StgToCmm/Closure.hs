@@ -65,6 +65,7 @@ module GHC.StgToCmm.Closure (
         cafBlackHoleInfoTable,
         indStaticInfoTable,
         staticClosureNeedsLink,
+        mkClosureInfoTableLabel
     ) where
 
 import GHC.Prelude
@@ -642,7 +643,7 @@ getCallMethod _ _ _ _ _ _ _ _ = panic "Unknown call method"
 
 data ClosureInfo
   = ClosureInfo {
-        closureName :: !Name,           -- The thing bound to this closure
+        closureName :: !Id,           -- The thing bound to this closure
            -- we don't really need this field: it's only used in generating
            -- code for ticky and profiling, and we could pass the information
            -- around separately, but it doesn't do much harm to keep it here.
@@ -679,13 +680,12 @@ mkClosureInfo :: Profile
               -> String         -- String descriptor
               -> ClosureInfo
 mkClosureInfo profile is_static id lf_info tot_wds ptr_wds val_descr
-  = ClosureInfo { closureName      = name
+  = ClosureInfo { closureName      = id
                 , closureLFInfo    = lf_info
                 , closureInfoLabel = info_lbl   -- These three fields are
                 , closureSMRep     = sm_rep     -- (almost) an info table
                 , closureProf      = prof }     -- (we don't have an SRT yet)
   where
-    name       = idName id
     sm_rep     = mkHeapRep profile is_static ptr_wds nonptr_wds (lfClosureType lf_info)
     prof       = mkProfilingInfo profile id val_descr
     nonptr_wds = tot_wds - ptr_wds
@@ -839,6 +839,7 @@ closureLocalEntryLabel platform
   | platformTablesNextToCode platform = toInfoLbl  platform . closureInfoLabel
   | otherwise                         = toEntryLbl platform . closureInfoLabel
 
+-- | Get the info table label for a *thunk*.
 mkClosureInfoTableLabel :: Platform -> Id -> LambdaFormInfo -> CLabel
 mkClosureInfoTableLabel platform id lf_info
   = case lf_info of

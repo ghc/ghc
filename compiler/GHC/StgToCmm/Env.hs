@@ -17,7 +17,7 @@ module GHC.StgToCmm.Env (
 
         bindArgsToRegs, bindToReg, rebindToReg,
         bindArgToReg, idToReg,
-        getCgIdInfo,
+        getCgIdInfo, getCgInfo_maybe,
         maybeLetNoEscape,
         ) where
 
@@ -43,6 +43,9 @@ import GHC.Types.Var.Env
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
+
+import GHC.Builtin.Names (getUnique)
+
 
 -------------------------------------
 --        Manipulating CgIdInfo
@@ -149,6 +152,12 @@ getCgIdInfo id
           else
               cgLookupPanic id -- Bug
         }}}
+
+-- | Retrieve cg info for a name if it already exists.
+getCgInfo_maybe :: Name -> FCode (Maybe CgIdInfo)
+getCgInfo_maybe name
+  = do  { local_binds <- getBinds -- Try local bindings first
+        ; return $ lookupVarEnv_Directly local_binds (getUnique name) }
 
 cgLookupPanic :: Id -> FCode a
 cgLookupPanic id

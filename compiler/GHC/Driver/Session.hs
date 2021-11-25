@@ -2332,6 +2332,8 @@ dynamic_flags_deps = [
         (NoArg (setGeneralFlag Opt_Ticky_Allocd))
   , make_ord_flag defGhcFlag "ticky-LNE"
         (NoArg (setGeneralFlag Opt_Ticky_LNE))
+  , make_ord_flag defGhcFlag "ticky-ap-thunk"
+        (NoArg (setGeneralFlag Opt_Ticky_AP))
   , make_ord_flag defGhcFlag "ticky-dyn-thunk"
         (NoArg (setGeneralFlag Opt_Ticky_Dyn_Thunk))
   , make_ord_flag defGhcFlag "ticky-tag-checks"

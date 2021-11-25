@@ -61,6 +61,7 @@ data StgToCmmConfig = StgToCmmConfig
   , stgToCmmAllowExtendedAddSubInstrs :: !Bool   -- ^ Allowed to generate AddWordC, SubWordC, Add2, etc.
   , stgToCmmAllowIntMul2Instr         :: !Bool   -- ^ Allowed to generate IntMul2 instruction
   , stgToCmmAllowFabsInstrs           :: !Bool   -- ^ Allowed to generate Fabs instructions
+  , stgToCmmTickyAP                   :: !Bool   -- ^ Disable use of precomputed standard thunks.
   ------------------------------ SIMD flags ------------------------------------
   -- Each of these flags checks vector compatibility with the backend requested
   -- during compilation. In essence, this means checking for @-fllvm@ which is
