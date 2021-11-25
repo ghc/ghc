@@ -212,7 +212,7 @@ cgRhs :: Id
                )
 
 cgRhs id (StgRhsCon cc con mn _ts args)
-  = withNewTickyCounterCon (idName id) con $
+  = withNewTickyCounterCon id con mn $
     buildDynCon id mn True cc con (assertNonVoidStgArgs args)
       -- con args are always non-void,
       -- see Note [Post-unarisation invariants] in GHC.Stg.Unarise
@@ -223,14 +223,16 @@ cgRhs id (StgRhsClosure fvs cc upd_flag args body)
     checkFunctionArgTags (text "TagCheck Failed: Rhs of" <> ppr id) id args
     profile <- getProfile
     check_tags <- stgToCmmDoTagCheck <$> getStgToCmmConfig
-    mkRhsClosure profile check_tags id cc (nonVoidIds (dVarSetElems fvs)) upd_flag args body
-
+    use_std_ap_thunk <- stgToCmmTickyAP <$> getStgToCmmConfig
+    mkRhsClosure profile use_std_ap_thunk check_tags id cc (nonVoidIds (dVarSetElems fvs)) upd_flag args body
 
 ------------------------------------------------------------------------
 --              Non-constructor right hand sides
 ------------------------------------------------------------------------
 
-mkRhsClosure :: Profile -> Bool
+mkRhsClosure :: Profile
+             -> Bool                            -- Omit AP Thunks to improve profiling
+             -> Bool                            -- Lint tag inference checks
              -> Id -> CostCentreStack
              -> [NonVoid Id]                    -- Free vars
              -> UpdateFlag
@@ -274,7 +276,7 @@ for semi-obvious reasons.
 -}
 
 ---------- See Note [Selectors] ------------------
-mkRhsClosure    profile _check_tags bndr _cc
+mkRhsClosure    profile _ _check_tags bndr _cc
                 [NonVoid the_fv]                -- Just one free var
                 upd_flag                -- Updatable thunk
                 []                      -- A thunk
@@ -307,7 +309,7 @@ mkRhsClosure    profile _check_tags bndr _cc
     in cgRhsStdThunk bndr lf_info [StgVarArg the_fv]
 
 ---------- See Note [Ap thunks] ------------------
-mkRhsClosure    profile check_tags bndr _cc
+mkRhsClosure    profile use_std_ap check_tags bndr _cc
                 fvs
                 upd_flag
                 []                      -- No args; a thunk
@@ -316,7 +318,8 @@ mkRhsClosure    profile check_tags bndr _cc
   -- We are looking for an "ApThunk"; see data con ApThunk in GHC.StgToCmm.Closure
   -- of form (x1 x2 .... xn), where all the xi are locals (not top-level)
   -- So the xi will all be free variables
-  | args `lengthIs` (n_fvs-1)  -- This happens only if the fun_id and
+  | use_std_ap
+  , args `lengthIs` (n_fvs-1)  -- This happens only if the fun_id and
                                -- args are all distinct local variables
                                -- The "-1" is for fun_id
     -- Missed opportunity:   (f x x) is not detected
@@ -340,7 +343,7 @@ mkRhsClosure    profile check_tags bndr _cc
     payload = StgVarArg fun_id : args
 
 ---------- Default case ------------------
-mkRhsClosure profile _check_tags bndr cc fvs upd_flag args body
+mkRhsClosure profile _use_ap _check_tags bndr cc fvs upd_flag args body
   = do  { let lf_info = mkClosureLFInfo (profilePlatform profile) bndr NotTopLevel fvs upd_flag args
         ; (id_info, reg) <- rhsIdInfo bndr lf_info
         ; return (id_info, gen_code lf_info reg) }
@@ -404,13 +407,13 @@ cgRhsStdThunk bndr lf_info payload
        }
  where
  gen_code reg  -- AHA!  A STANDARD-FORM THUNK
-  = withNewTickyCounterStdThunk (lfUpdatable lf_info) (idName bndr) $
+  = withNewTickyCounterStdThunk (lfUpdatable lf_info) (bndr) payload $
     do
   {     -- LAY OUT THE OBJECT
     mod_name <- getModuleName
-  ; cfg      <- getStgToCmmConfig
-  ; let profile  = stgToCmmProfile  cfg
-  ; let platform = stgToCmmPlatform cfg
+  ; profile  <- getProfile
+  ; platform <- getPlatform
+  ; let
         header = if isLFThunk lf_info then ThunkHeader else StdHeader
         (tot_wds, ptr_wds, payload_w_offsets)
             = mkVirtHeapOffsets profile header
@@ -476,7 +479,8 @@ closureCodeBody top_lvl bndr cl_info cc [] body fv_details
   = withNewTickyCounterThunk
         (isStaticClosure cl_info)
         (closureUpdReqd cl_info)
-        (closureName cl_info) $
+        (closureName cl_info)
+        (map fst fv_details) $
     emitClosureProcAndInfoTable top_lvl bndr lf_info info_tbl [] $
       \(_, node, _) -> thunkCode cl_info fv_details cc node body
    where
@@ -488,7 +492,7 @@ closureCodeBody top_lvl bndr cl_info cc args@(arg0:_) body fv_details
         arity = length args
     in
     -- See Note [OneShotInfo overview] in GHC.Types.Basic.
-    withNewTickyCounterFun (isOneShotBndr arg0) (closureName cl_info)
+    withNewTickyCounterFun (isOneShotBndr arg0) (closureName cl_info) (map fst fv_details)
         nv_args $ do {
 
         ; let

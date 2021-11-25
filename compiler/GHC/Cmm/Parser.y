@@ -1519,6 +1519,7 @@ parseCmmFile dflags this_mod home_unit filename = do
         let fstate = F.initFCodeState (profilePlatform $ targetProfile dflags)
         let fcode = do
               ((), cmm) <- getCmm $ unEC code "global" (initEnv (targetProfile dflags)) [] >> return ()
+              -- See Note [Mapping Info Tables to Source Positions] (IPE Maps)
               let used_info = map (cmmInfoTableToInfoProvEnt this_mod)
                                               (mapMaybe topInfoTable cmm)
               ((), cmm2) <- getCmm $ mapM_ emitInfoTableProv used_info

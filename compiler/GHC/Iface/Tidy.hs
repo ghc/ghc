@@ -370,7 +370,7 @@ tidyProgram hsc_env  (ModGuts { mg_module           = mod
 
   = Err.withTiming logger
                    (text "CoreTidy"<+>brackets (ppr mod))
-                   (const ()) $
+                   (const ()) $!
     do  { let { omit_prags = gopt Opt_OmitInterfacePragmas dflags
               ; expose_all = gopt Opt_ExposeAllUnfoldings  dflags
               ; print_unqual = mkPrintUnqualified (hsc_unit_env hsc_env) rdr_env

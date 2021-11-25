@@ -17,7 +17,7 @@
  */
 StgEntCounter top_ct
         = { 0, 0, 0,
-            "TOP", "",
+            "TOP", "", NULL,
             0, 0, NULL };
 
 /* Data structure used in ``registering'' one of these counters. */
@@ -377,13 +377,13 @@ printRegisteredCounterInfo (FILE *tf)
       fprintf(tf,"\nThe following table is explained by https://gitlab.haskell.org/ghc/ghc/wikis/debugging/ticky-ticky\nAll allocation numbers are in bytes.\n");
       fprintf(tf,"\n**************************************************\n\n");
     }
-    fprintf(tf, "%11s%11s%11s  %-23s %s\n",
+    fprintf(tf, "%11s%12s%12s  %-63s %s\n",
             "Entries", "Alloc", "Alloc'd", "Non-void Arguments", "STG Name");
     fprintf(tf, "--------------------------------------------------------------------------------\n");
     /* Function name at the end so it doesn't mess up the tabulation */
 
     for (p = ticky_entry_ctrs; p != NULL; p = p->link) {
-        fprintf(tf, "%11" FMT_Int "%11" FMT_Int "%11" FMT_Int " %3lu %-20.20s %s",
+        fprintf(tf, "%11" FMT_Int "%12" FMT_Int "%12" FMT_Int " %3lu %-60.60s %s",
                 p->entry_count,
                 p->allocs,
                 p->allocd,
