@@ -462,9 +462,29 @@ However, this would be wrong; by widening `b` directly from `StgInt8` to
 `StgWord` we will get sign-extension semantics: rather than 0xf6 we will get
 0xfffffffffffffff6. To avoid this we must first cast `b` back to `StgWord8`,
 ensuring that we get zero-extension semantics when we widen up to `StgWord`.
+
+Note [When in doubt, cast arguments as unsigned]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In general C's signed-ness behavior can lead to surprising results and
+consequently we are very explicit about ensuring that arguments have the
+correct signedness. For instance, consider a program like
+
+    test() {
+        bits64 ret, a, b;
+        a = %neg(43 :: bits64);
+        b = %neg(0x443c70fa3e465120 :: bits64);
+        ret = %modu(a, b);
+        return (ret);
+    }
+
+In this case both `a` and `b` will be StgInts in the generated C (since
+`MO_Neg` is a signed operation). However, we want to ensure that we perform an
+*unsigned* modulus operation, therefore we must be careful to cast both arguments
+to StgWord.
 -}
 
--- | The type of most operations is determined by the operands. However, there are a few exceptions. For these we explicitly cast the result.
+-- | The result type of most operations is determined by the operands. However,
+-- there are a few exceptions. For these we explicitly cast the result.
 machOpNeedsCast :: Platform -> MachOp -> [CmmType] -> Maybe SDoc
 machOpNeedsCast platform mop args
     -- Comparisons in C have type 'int', but we want type W_ (this is what
@@ -498,9 +518,13 @@ pprMachOpApp' platform mop args
 
   where
         -- Cast needed for signed integer ops
-    pprArg e | signedOp    mop = cCast platform (machRep_S_CType platform (typeWidth (cmmExprType platform e))) e
-             | needsFCasts mop = cCast platform (machRep_F_CType (typeWidth (cmmExprType platform e))) e
-             | otherwise       = pprExpr1 platform e
+    pprArg e
+      | signedOp    mop = cCast platform (machRep_S_CType platform width) e
+      | needsFCasts mop = cCast platform (machRep_F_CType width) e
+        -- See Note [When in doubt, cast arguments as unsigned]
+      | otherwise       = cCast platform (machRep_U_CType platform width) e
+      where
+        width = typeWidth (cmmExprType platform e)
     needsFCasts (MO_F_Eq _)   = False
     needsFCasts (MO_F_Ne _)   = False
     needsFCasts (MO_F_Neg _)  = True
