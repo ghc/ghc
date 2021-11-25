@@ -212,13 +212,16 @@ addToUDFM_C f m k v = addToUDFM_C_Directly f m (getUnique k) v
 
 addListToUDFM :: Uniquable key => UniqDFM key elt -> [(key,elt)] -> UniqDFM key elt
 addListToUDFM = foldl' (\m (k, v) -> addToUDFM m k v)
+{-# INLINEABLE addListToUDFM #-}
 
 addListToUDFM_Directly :: UniqDFM key elt -> [(Unique,elt)] -> UniqDFM key elt
 addListToUDFM_Directly = foldl' (\m (k, v) -> addToUDFM_Directly m k v)
+{-# INLINEABLE addListToUDFM_Directly #-}
 
 addListToUDFM_Directly_C
   :: (elt -> elt -> elt) -> UniqDFM key elt -> [(Unique,elt)] -> UniqDFM key elt
 addListToUDFM_Directly_C f = foldl' (\m (k, v) -> addToUDFM_C_Directly f m k v)
+{-# INLINEABLE addListToUDFM_Directly_C #-}
 
 delFromUDFM :: Uniquable key => UniqDFM key elt -> key -> UniqDFM key elt
 delFromUDFM (UDFM m i) k = UDFM (M.delete (getKey $ getUnique k) m) i

@@ -139,9 +139,11 @@ zipToUFM ks vs = assert (length ks == length vs ) innerZip emptyUFM ks vs
 
 listToUFM :: Uniquable key => [(key,elt)] -> UniqFM key elt
 listToUFM = foldl' (\m (k, v) -> addToUFM m k v) emptyUFM
+{-# INLINEABLE listToUFM #-}
 
 listToUFM_Directly :: [(Unique, elt)] -> UniqFM key elt
 listToUFM_Directly = foldl' (\m (u, v) -> addToUFM_Directly m u v) emptyUFM
+{-# INLINEABLE listToUFM_Directly #-}
 
 listToIdentityUFM :: Uniquable key => [key] -> UniqFM key key
 listToIdentityUFM = foldl' (\m x -> addToUFM m x x) emptyUFM
@@ -152,6 +154,7 @@ listToUFM_C
   -> [(key, elt)]
   -> UniqFM key elt
 listToUFM_C f = foldl' (\m (k, v) -> addToUFM_C f m k v) emptyUFM
+{-# INLINEABLE listToUFM_C #-}
 
 addToUFM :: Uniquable key => UniqFM key elt -> key -> elt  -> UniqFM key elt
 addToUFM (UFM m) k v = UFM (M.insert (getKey $ getUnique k) v m)
