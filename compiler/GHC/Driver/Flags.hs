@@ -264,6 +264,7 @@ data GeneralFlag
    | Opt_Ticky_Allocd
    | Opt_Ticky_LNE
    | Opt_Ticky_Dyn_Thunk
+   | Opt_Ticky_AP                    -- ^ Use regular thunks even when we could use std ap thunks in order to get entry counts
    | Opt_RPath
    | Opt_RelativeDynlibPaths
    | Opt_Hpc

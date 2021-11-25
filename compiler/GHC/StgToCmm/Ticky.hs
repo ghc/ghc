@@ -117,6 +117,7 @@ import GHC.Cmm.Utils
 import GHC.Cmm.CLabel
 import GHC.Runtime.Heap.Layout
 
+
 import GHC.Types.Name
 import GHC.Types.Id
 import GHC.Types.Basic
@@ -138,6 +139,11 @@ import GHC.Core.Predicate
 import Data.Maybe
 import qualified Data.Char
 import Control.Monad ( when )
+import GHC.Types.Id.Info
+import GHC.Utils.Trace
+import GHC.StgToCmm.Env (getCgInfo_maybe)
+import Data.Coerce (coerce)
+import GHC.Utils.Json
 
 -----------------------------------------------------------------------------
 --
@@ -145,23 +151,72 @@ import Control.Monad ( when )
 --
 -----------------------------------------------------------------------------
 
+-- | "Arguments" for a ticky counter. FVs for thunks, actual arguments for functions.
+tickyArgArity :: TickyClosureType -> Int
+tickyArgArity (TickyFun _ _fvs args) = length args
+tickyArgArity (TickyLNE args) = length args
+tickyArgArity (TickyCon{}) = 0
+tickyArgArity (TickyThunk{}) = 0
+
+tickyArgDesc :: TickyClosureType -> String
+tickyArgDesc arg_info =
+  case arg_info of
+    TickyFun _ _fvs args -> map (showTypeCategory . idType . fromNonVoid) args
+    TickyLNE args -> map (showTypeCategory . idType . fromNonVoid) args
+    TickyThunk{} -> ""
+    TickyCon{} -> ""
+
+tickyFvDesc :: TickyClosureType -> String
+tickyFvDesc arg_info =
+  case arg_info of
+    TickyFun _ fvs _args -> map (showTypeCategory . idType . fromNonVoid) fvs
+    TickyLNE{} -> ""
+    TickyThunk _ _ fvs -> map (showTypeCategory . stgArgType) fvs
+    TickyCon{} -> ""
+
+instance ToJson TickyClosureType where
+    json info = case info of
+      (TickyFun {})   -> mkInfo (tickyFvDesc info) (tickyArgDesc info) "fun"
+      (TickyLNE {})   -> mkInfo []                 (tickyArgDesc info) "lne"
+      (TickyThunk uf _ _) -> mkInfo (tickyFvDesc info) []              ("thk" ++ if uf then "_u" else "")
+      (TickyCon{})    -> mkInfo []                 []                  "con"
+      where
+        mkInfo :: String -> String -> String -> JsonDoc
+        mkInfo fvs args ty =
+          JSObject
+              [("type", json "entCntr")
+              ,("subTy", json ty)
+              ,("fvs_c", json (length fvs))
+              ,("fvs" , json fvs)
+              ,("args", json args)
+              ]
+
+tickyEntryDesc :: (SDocContext -> TickyClosureType -> String)
+tickyEntryDesc ctxt = renderWithContext ctxt . renderJSON . json
+-- tickyEntryDesc ctxt info = tickyFvDesc info ++ ";" ++ tickyArgDesc info
+
 data TickyClosureType
     = TickyFun
         Bool -- True <-> single entry
+        [NonVoid Id] -- ^ FVs
+        [NonVoid Id] -- ^ Args
     | TickyCon
         DataCon -- the allocated constructor
+        ConstructorNumber
     | TickyThunk
         Bool -- True <-> updateable
         Bool -- True <-> standard thunk (AP or selector), has no entry counter
+        [StgArg] -- ^ FVS, StgArg because for thunks these can also be literals.
     | TickyLNE
+        [NonVoid Id] -- ^ Args
 
-withNewTickyCounterFun :: Bool -> Name  -> [NonVoid Id] -> FCode a -> FCode a
-withNewTickyCounterFun single_entry = withNewTickyCounter (TickyFun single_entry)
+withNewTickyCounterFun :: Bool -> Id -> [NonVoid Id] -> [NonVoid Id] -> FCode a -> FCode a
+withNewTickyCounterFun single_entry f fvs args = withNewTickyCounter (TickyFun single_entry fvs args) f
 
-withNewTickyCounterLNE :: Name  -> [NonVoid Id] -> FCode a -> FCode a
-withNewTickyCounterLNE nm args code = do
+withNewTickyCounterLNE :: Id  ->  [NonVoid Id] -> FCode a -> FCode a
+withNewTickyCounterLNE nm  args code = do
   b <- tickyLNEIsOn
-  if not b then code else withNewTickyCounter TickyLNE nm args code
+  if not b then code else withNewTickyCounter (TickyLNE args) nm code
 
 thunkHasCounter :: Bool -> FCode Bool
 thunkHasCounter isStatic = do
@@ -171,46 +226,50 @@ thunkHasCounter isStatic = do
 withNewTickyCounterThunk
   :: Bool -- ^ static
   -> Bool -- ^ updateable
-  -> Name
+  -> Id
+  -> [NonVoid Id] -- ^ Free vars
   -> FCode a
   -> FCode a
-withNewTickyCounterThunk isStatic isUpdatable name code = do
+withNewTickyCounterThunk isStatic isUpdatable name fvs code = do
     has_ctr <- thunkHasCounter isStatic
     if not has_ctr
       then code
-      else withNewTickyCounter (TickyThunk isUpdatable False) name [] code
+      else withNewTickyCounter (TickyThunk isUpdatable False (map StgVarArg $ coerce fvs)) name code
 
 withNewTickyCounterStdThunk
   :: Bool -- ^ updateable
-  -> Name
+  -> Id
+  -> [StgArg] -- ^ Free vars + function
   -> FCode a
   -> FCode a
-withNewTickyCounterStdThunk isUpdatable name code = do
+withNewTickyCounterStdThunk isUpdatable name fvs code = do
     has_ctr <- thunkHasCounter False
     if not has_ctr
       then code
-      else withNewTickyCounter (TickyThunk isUpdatable True) name [] code
+      else withNewTickyCounter (TickyThunk isUpdatable True fvs) name code
 
 withNewTickyCounterCon
-  :: Name
+  :: Id
   -> DataCon
+  -> ConstructorNumber
   -> FCode a
   -> FCode a
-withNewTickyCounterCon name datacon code = do
+withNewTickyCounterCon name datacon info code = do
     has_ctr <- thunkHasCounter False
     if not has_ctr
       then code
-      else withNewTickyCounter (TickyCon datacon) name [] code
+      else withNewTickyCounter (TickyCon datacon info) name code
 
 -- args does not include the void arguments
-withNewTickyCounter :: TickyClosureType -> Name -> [NonVoid Id] -> FCode a -> FCode a
-withNewTickyCounter cloType name args m = do
-  lbl <- emitTickyCounter cloType name args
+withNewTickyCounter :: TickyClosureType -> Id -> FCode a -> FCode a
+withNewTickyCounter cloType name m = do
+  lbl <- emitTickyCounter cloType name
   setTickyCtrLabel lbl m
 
-emitTickyCounter :: TickyClosureType -> Name -> [NonVoid Id] -> FCode CLabel
-emitTickyCounter cloType name args
-  = let ctr_lbl = mkRednCountsLabel name in
+emitTickyCounter :: TickyClosureType -> Id -> FCode CLabel
+emitTickyCounter cloType tickee
+  = let name = idName tickee in
+    let ctr_lbl = mkRednCountsLabel name in
     (>> return ctr_lbl) $
     ifTicky $ do
         { dflags <- getDynFlags
@@ -226,13 +285,13 @@ emitTickyCounter cloType name args
               ppr_for_ticky_name =
                 let n = ppr name
                     ext = case cloType of
-                              TickyFun single_entry -> parens $ hcat $ punctuate comma $
+                              TickyFun single_entry _ _-> parens $ hcat $ punctuate comma $
                                   [text "fun"] ++ [text "se"|single_entry]
-                              TickyCon datacon -> parens (text "con:" <+> ppr (dataConName datacon))
-                              TickyThunk upd std -> parens $ hcat $ punctuate comma $
+                              TickyCon datacon _cn -> parens (text "con:" <+> ppr (dataConName datacon))
+                              TickyThunk upd std _-> parens $ hcat $ punctuate comma $
                                   [text "thk"] ++ [text "se"|not upd] ++ [text "std"|std]
-                              TickyLNE | isInternalName name -> parens (text "LNE")
-                                       | otherwise -> panic "emitTickyCounter: how is this an external LNE?"
+                              TickyLNE _ | isInternalName name -> parens (text "LNE")
+                                         | otherwise -> panic "emitTickyCounter: how is this an external LNE?"
                     p = case hasHaskellName parent of
                             -- NB the default "top" ticky ctr does not
                             -- have a Haskell name
@@ -241,9 +300,43 @@ emitTickyCounter cloType name args
                 in if isInternalName name
                    then n <+> parens (ppr mod_name) <+> ext <+> p
                    else n <+> ext <+> p
+        ; this_mod <- getModuleName
+        ; let t = case cloType of
+                    TickyCon {} -> "C"
+                    TickyFun {} -> "F"
+                    TickyThunk {} -> "T"
+                    TickyLNE {} -> "L"
+        ; info_lbl <- case cloType of
+                            TickyCon dc mn -> case mn of
+                                               NoNumber -> return $! CmmLabel $ mkConInfoTableLabel (dataConName dc) DefinitionSite
+                                               (Numbered n) -> return $! CmmLabel $ mkConInfoTableLabel (dataConName dc) (UsageSite this_mod n)
+                            TickyFun {} ->
+                              -- pprTrace "tickyF" (text t <> colon <> ppr name <+> ppr (mkInfoTableLabel name NoCafRefs) $$ ppr mod_name) $
+                              return $! CmmLabel $ mkInfoTableLabel name NoCafRefs
+
+                            TickyThunk _ std_thunk fvs
+                              | not std_thunk
+                              -> -- pprTrace "tickyThunk" (text t <> colon <> ppr name <+> ppr (mkInfoTableLabel name NoCafRefs))
+                                 return $! CmmLabel $ mkInfoTableLabel name NoCafRefs
+                              -- IPE Maps have no entry for std thunks.
+                              | otherwise
+                              -> do
+                                    lf_info <- getCgInfo_maybe name
+                                    profile <- getProfile
+                                    case lf_info of
+                                      Just (CgIdInfo { cg_lf = cg_lf@(LFThunk {})})
+                                          -> -- pprTrace "tickyThunkStd" empty $ return $
+                                            return $! CmmLabel $ mkClosureInfoTableLabel (profilePlatform profile) tickee cg_lf -- zeroCLit platform
+                                      _   -> pprTraceDebug "tickyThunkUnknown" (text t <> colon <> ppr name <+> ppr (mkInfoTableLabel name NoCafRefs))
+                                            return $! zeroCLit platform
+
+                            TickyLNE {} -> -- pprTrace "tickyLNE" (text t <> colon <> ppr name <+> ppr (mkInfoTableLabel name NoCafRefs)) $
+                                   return $! zeroCLit platform
+                            -- _ -> CmmLabel $ mkInfoTableLabel name NoCafRefs
+
 
         ; fun_descr_lit <- newStringCLit $ showSDocDebug dflags ppr_for_ticky_name
-        ; arg_descr_lit <- newStringCLit $ map (showTypeCategory . idType . fromNonVoid) args
+        ; arg_descr_lit <- newStringCLit $ tickyEntryDesc ctx cloType
         ; emitDataLits ctr_lbl
         -- Must match layout of includes/rts/Ticky.h's StgEntCounter
         --
@@ -251,10 +344,11 @@ emitTickyCounter cloType name args
         -- before, but the code generator wasn't handling that
         -- properly and it led to chaos, panic and disorder.
             [ mkIntCLit platform 0,               -- registered?
-              mkIntCLit platform (length args),   -- Arity
+              mkIntCLit platform (tickyArgArity cloType),   -- Arity
               mkIntCLit platform 0,               -- Heap allocated for this thing
               fun_descr_lit,
               arg_descr_lit,
+              info_lbl,
               zeroCLit platform,          -- Entries into this thing
               zeroCLit platform,          -- Heap allocated by this thing
               zeroCLit platform           -- Link to next StgEntCounter

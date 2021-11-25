@@ -1701,6 +1701,16 @@ Using “ticky-ticky” profiling (for implementors)
 
     Track allocations of dynamic thunks.
 
+.. ghc-flag:: -ticky-ap-thunk
+    :shortdesc: Don't use standard AP thunks on order to get more reliable entry counters.
+    :type: dynamic
+    :category:
+
+    This basically allows us to get accurate entry counters for code like `f x y` at the cost of code size.
+    We do this but not using the precomputed standard AP thunk code.
+
+GHC's ticky-ticky profiler provides a low-level facility for tracking
+entry and allocation counts of particular individual closures.
 Because ticky-ticky profiling requires a certain familiarity with GHC
 internals, we have moved the documentation to the GHC developers wiki.
 Take a look at its
