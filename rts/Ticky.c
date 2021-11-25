@@ -17,7 +17,7 @@
  */
 StgEntCounter top_ct
         = { 0, 0, 0,
-            "TOP", "",
+            "TOP", "", NULL,
             0, 0, NULL };
 
 /* Data structure used in ``registering'' one of these counters. */

@@ -26,6 +26,7 @@ typedef struct _StgEntCounter {
                                 /* (rest of args are in registers) */
     char        *str;           /* name of the thing */
     char        *arg_kinds;     /* info about the args types */
+    StgInfoTable *info;         /* Info table corresponding to this closure */
     StgInt      entry_count;    /* Trips to fast entry code */
     StgInt      allocs;         /* number of allocations by this fun */
     struct _StgEntCounter *link;/* link to chain them all together */

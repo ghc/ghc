@@ -121,6 +121,7 @@ import GHC.Cmm.Utils
 import GHC.Cmm.CLabel
 import GHC.Runtime.Heap.Layout
 
+
 import GHC.Types.Name
 import GHC.Types.Id
 import GHC.Types.Basic
@@ -139,6 +140,7 @@ import GHC.Core.Predicate
 import Data.Maybe
 import qualified Data.Char
 import Control.Monad ( when )
+import GHC.Types.Id.Info
 
 -----------------------------------------------------------------------------
 --
@@ -151,18 +153,19 @@ data TickyClosureType
         Bool -- True <-> single entry
     | TickyCon
         DataCon -- the allocated constructor
+        ConstructorNumber
     | TickyThunk
         Bool -- True <-> updateable
         Bool -- True <-> standard thunk (AP or selector), has no entry counter
     | TickyLNE
 
-withNewTickyCounterFun :: Bool -> Name  -> [NonVoid Id] -> FCode a -> FCode a
+withNewTickyCounterFun :: Bool -> Name ->  [NonVoid Id] -> FCode a -> FCode a
 withNewTickyCounterFun single_entry = withNewTickyCounter (TickyFun single_entry)
 
-withNewTickyCounterLNE :: Name  -> [NonVoid Id] -> FCode a -> FCode a
-withNewTickyCounterLNE nm args code = do
+withNewTickyCounterLNE :: Name  ->  [NonVoid Id] -> FCode a -> FCode a
+withNewTickyCounterLNE nm  args code = do
   b <- tickyLNEIsOn
-  if not b then code else withNewTickyCounter TickyLNE nm args code
+  if not b then code else withNewTickyCounter TickyLNE nm  args code
 
 thunkHasCounter :: Bool -> FCode Bool
 thunkHasCounter isStatic = do
@@ -195,13 +198,14 @@ withNewTickyCounterStdThunk isUpdatable name code = do
 withNewTickyCounterCon
   :: Name
   -> DataCon
+  -> ConstructorNumber
   -> FCode a
   -> FCode a
-withNewTickyCounterCon name datacon code = do
+withNewTickyCounterCon name datacon info code = do
     has_ctr <- thunkHasCounter False
     if not has_ctr
       then code
-      else withNewTickyCounter (TickyCon datacon) name [] code
+      else withNewTickyCounter (TickyCon datacon info) name [] code
 
 -- args does not include the void arguments
 withNewTickyCounter :: TickyClosureType -> Name -> [NonVoid Id] -> FCode a -> FCode a
@@ -209,7 +213,7 @@ withNewTickyCounter cloType name args m = do
   lbl <- emitTickyCounter cloType name args
   setTickyCtrLabel lbl m
 
-emitTickyCounter :: TickyClosureType -> Name -> [NonVoid Id] -> FCode CLabel
+emitTickyCounter :: TickyClosureType -> Name ->  [NonVoid Id] -> FCode CLabel
 emitTickyCounter cloType name args
   = let ctr_lbl = mkRednCountsLabel name in
     (>> return ctr_lbl) $
@@ -229,7 +233,7 @@ emitTickyCounter cloType name args
                     ext = case cloType of
                               TickyFun single_entry -> parens $ hcat $ punctuate comma $
                                   [text "fun"] ++ [text "se"|single_entry]
-                              TickyCon datacon -> parens (text "con:" <+> ppr (dataConName datacon))
+                              TickyCon datacon _cn -> parens (text "con:" <+> ppr (dataConName datacon))
                               TickyThunk upd std -> parens $ hcat $ punctuate comma $
                                   [text "thk"] ++ [text "se"|not upd] ++ [text "std"|std]
                               TickyLNE | isInternalName name -> parens (text "LNE")
@@ -242,6 +246,13 @@ emitTickyCounter cloType name args
                 in if isInternalName name
                    then n <+> parens (ppr mod_name) <+> ext <+> p
                    else n <+> ext <+> p
+        ; this_mod <- getModuleName
+        ; let info_lbl = case cloType of
+                            TickyCon dc mn -> case mn of
+                                               NoNumber -> mkConInfoTableLabel (dataConName dc) DefinitionSite
+                                               (Numbered n) -> mkConInfoTableLabel (dataConName dc) (UsageSite this_mod n)
+                            _ -> mkClosureLabel name NoCafRefs
+
 
         ; let ctx = (initSDocContext dflags defaultDumpStyle)
                       { sdocPprDebug = True }
@@ -258,6 +269,7 @@ emitTickyCounter cloType name args
               mkIntCLit platform 0,               -- Heap allocated for this thing
               fun_descr_lit,
               arg_descr_lit,
+              CmmLabel info_lbl,
               zeroCLit platform,          -- Entries into this thing
               zeroCLit platform,          -- Heap allocated by this thing
               zeroCLit platform           -- Link to next StgEntCounter
