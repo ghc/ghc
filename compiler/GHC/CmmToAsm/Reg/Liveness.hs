@@ -1001,7 +1001,7 @@ livenessBack
 livenessBack _        liveregs _        done []  = (liveregs, done)
 
 livenessBack platform liveregs blockmap acc (instr : instrs)
- = let  (liveregs', instr')     = liveness1 platform liveregs blockmap instr
+ = let  !(!liveregs', instr')     = liveness1 platform liveregs blockmap instr
    in   livenessBack platform liveregs' blockmap (instr' : acc) instrs
 
 
