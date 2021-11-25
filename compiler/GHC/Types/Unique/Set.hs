@@ -74,12 +74,14 @@ unitUniqSet x = UniqSet $ unitUFM x x
 
 mkUniqSet :: Uniquable a => [a] -> UniqSet a
 mkUniqSet = foldl' addOneToUniqSet emptyUniqSet
+{-# INLINEABLE mkUniqSet #-}
 
 addOneToUniqSet :: Uniquable a => UniqSet a -> a -> UniqSet a
 addOneToUniqSet (UniqSet set) x = UniqSet (addToUFM set x x)
 
 addListToUniqSet :: Uniquable a => UniqSet a -> [a] -> UniqSet a
 addListToUniqSet = foldl' addOneToUniqSet
+{-# INLINEABLE addListToUniqSet #-}
 
 delOneFromUniqSet :: Uniquable a => UniqSet a -> a -> UniqSet a
 delOneFromUniqSet (UniqSet s) a = UniqSet (delFromUFM s a)
@@ -89,10 +91,12 @@ delOneFromUniqSet_Directly (UniqSet s) u = UniqSet (delFromUFM_Directly s u)
 
 delListFromUniqSet :: Uniquable a => UniqSet a -> [a] -> UniqSet a
 delListFromUniqSet (UniqSet s) l = UniqSet (delListFromUFM s l)
+{-# INLINEABLE delListFromUniqSet #-}
 
 delListFromUniqSet_Directly :: UniqSet a -> [Unique] -> UniqSet a
 delListFromUniqSet_Directly (UniqSet s) l =
     UniqSet (delListFromUFM_Directly s l)
+{-# INLINEABLE delListFromUniqSet_Directly #-}
 
 unionUniqSets :: UniqSet a -> UniqSet a -> UniqSet a
 unionUniqSets (UniqSet s) (UniqSet t) = UniqSet (plusUFM s t)
