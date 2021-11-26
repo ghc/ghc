@@ -81,6 +81,10 @@ Compiler
         sameByteArray# :: ByteArray# -> ByteArray# -> Int#
         sameArrayArray# :: ArrayArray# -> ArrayArray# -> Int#
 
+Runtime system
+~~~~~~~~~~~~~~
+- dtrace probe points are now provided for linux, adding to the existing support for darwin and FreeBSD. To compile a ghc with this included configure with ``--enable-dtrace`` and ensure libsystemtap is available.
+
 ``ghc`` library
 ~~~~~~~~~~~~~~~
 
