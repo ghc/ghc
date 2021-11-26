@@ -153,7 +153,7 @@ type instance XRuleD      (GhcPass _) = NoExtField
 type instance XSpliceD    (GhcPass _) = NoExtField
 type instance XDocD       (GhcPass _) = NoExtField
 type instance XRoleAnnotD (GhcPass _) = NoExtField
-type instance XXHsDecl    (GhcPass _) = NoExtCon
+type instance XXHsDecl    (GhcPass _) = DataConCantHappen
 
 -- | Partition a list of HsDecls into function/pattern bindings, signatures,
 -- type family declarations, type family instances, and documentation comments.
@@ -188,7 +188,7 @@ partitionBindsAndSigs = go
         _ -> pprPanic "partitionBindsAndSigs" (ppr decl)
 
 type instance XCHsGroup (GhcPass _) = NoExtField
-type instance XXHsGroup (GhcPass _) = NoExtCon
+type instance XXHsGroup (GhcPass _) = DataConCantHappen
 
 
 emptyGroup, emptyRdrGroup, emptyRnGroup :: HsGroup (GhcPass p)
@@ -309,7 +309,7 @@ instance (OutputableBndrId p) => Outputable (HsGroup (GhcPass p)) where
           vcat_mb gap (Just d  : ds) = gap $$ d $$ vcat_mb blankLine ds
 
 type instance XSpliceDecl      (GhcPass _) = NoExtField
-type instance XXSpliceDecl     (GhcPass _) = NoExtCon
+type instance XXSpliceDecl     (GhcPass _) = DataConCantHappen
 
 instance OutputableBndrId p
        => Outputable (SpliceDecl (GhcPass p)) where
@@ -338,10 +338,10 @@ type instance XClassDecl    GhcPs = (EpAnn [AddEpAnn], AnnSortKey, LayoutInfo)  
 type instance XClassDecl    GhcRn = NameSet -- FVs
 type instance XClassDecl    GhcTc = NameSet -- FVs
 
-type instance XXTyClDecl    (GhcPass _) = NoExtCon
+type instance XXTyClDecl    (GhcPass _) = DataConCantHappen
 
 type instance XCTyFamInstDecl (GhcPass _) = EpAnn [AddEpAnn]
-type instance XXTyFamInstDecl (GhcPass _) = NoExtCon
+type instance XXTyFamInstDecl (GhcPass _) = DataConCantHappen
 
 -- Dealing with names
 
@@ -464,7 +464,7 @@ instance OutputableBndrId p => Outputable (FunDep (GhcPass p)) where
   ppr = pprFunDep
 
 type instance XCFunDep    (GhcPass _) = EpAnn [AddEpAnn]
-type instance XXFunDep    (GhcPass _) = NoExtCon
+type instance XXFunDep    (GhcPass _) = DataConCantHappen
 
 pprFundeps :: OutputableBndrId p => [FunDep (GhcPass p)] -> SDoc
 pprFundeps []  = empty
@@ -482,7 +482,7 @@ pprFunDep (FunDep _ us vs) = hsep [interppSP us, arrow, interppSP vs]
 ********************************************************************* -}
 
 type instance XCTyClGroup (GhcPass _) = NoExtField
-type instance XXTyClGroup (GhcPass _) = NoExtCon
+type instance XXTyClGroup (GhcPass _) = DataConCantHappen
 
 
 {- *********************************************************************
@@ -495,10 +495,10 @@ type instance XNoSig            (GhcPass _) = NoExtField
 type instance XCKindSig         (GhcPass _) = NoExtField
 
 type instance XTyVarSig         (GhcPass _) = NoExtField
-type instance XXFamilyResultSig (GhcPass _) = NoExtCon
+type instance XXFamilyResultSig (GhcPass _) = DataConCantHappen
 
 type instance XCFamilyDecl    (GhcPass _) = EpAnn [AddEpAnn]
-type instance XXFamilyDecl    (GhcPass _) = NoExtCon
+type instance XXFamilyDecl    (GhcPass _) = DataConCantHappen
 
 
 ------------- Functions over FamilyDecls -----------
@@ -525,7 +525,7 @@ resultVariableName _                = Nothing
 ------------- Pretty printing FamilyDecls -----------
 
 type instance XCInjectivityAnn  (GhcPass _) = EpAnn [AddEpAnn]
-type instance XXInjectivityAnn  (GhcPass _) = NoExtCon
+type instance XXInjectivityAnn  (GhcPass _) = DataConCantHappen
 
 instance OutputableBndrId p
        => Outputable (FamilyDecl (GhcPass p)) where
@@ -569,10 +569,10 @@ instance OutputableBndrId p
 ********************************************************************* -}
 
 type instance XCHsDataDefn    (GhcPass _) = NoExtField
-type instance XXHsDataDefn    (GhcPass _) = NoExtCon
+type instance XXHsDataDefn    (GhcPass _) = DataConCantHappen
 
 type instance XCHsDerivingClause    (GhcPass _) = EpAnn [AddEpAnn]
-type instance XXHsDerivingClause    (GhcPass _) = NoExtCon
+type instance XXHsDerivingClause    (GhcPass _) = DataConCantHappen
 
 instance OutputableBndrId p
        => Outputable (HsDerivingClause (GhcPass p)) where
@@ -592,7 +592,7 @@ instance OutputableBndrId p
 
 type instance XDctSingle (GhcPass _) = NoExtField
 type instance XDctMulti  (GhcPass _) = NoExtField
-type instance XXDerivClauseTys (GhcPass _) = NoExtCon
+type instance XXDerivClauseTys (GhcPass _) = DataConCantHappen
 
 instance OutputableBndrId p => Outputable (DerivClauseTys (GhcPass p)) where
   ppr (DctSingle _ ty) = ppr ty
@@ -602,7 +602,7 @@ type instance XStandaloneKindSig GhcPs = EpAnn [AddEpAnn]
 type instance XStandaloneKindSig GhcRn = NoExtField
 type instance XStandaloneKindSig GhcTc = NoExtField
 
-type instance XXStandaloneKindSig (GhcPass p) = NoExtCon
+type instance XXStandaloneKindSig (GhcPass p) = DataConCantHappen
 
 standaloneKindSigName :: StandaloneKindSig (GhcPass p) -> IdP (GhcPass p)
 standaloneKindSigName (StandaloneKindSig _ lname _) = unLoc lname
@@ -610,7 +610,7 @@ standaloneKindSigName (StandaloneKindSig _ lname _) = unLoc lname
 type instance XConDeclGADT (GhcPass _) = EpAnn [AddEpAnn]
 type instance XConDeclH98  (GhcPass _) = EpAnn [AddEpAnn]
 
-type instance XXConDecl (GhcPass _) = NoExtCon
+type instance XXConDecl (GhcPass _) = DataConCantHappen
 
 getConNames :: ConDecl GhcRn -> [LocatedN Name]
 getConNames ConDeclH98  {con_name  = name}  = [name]
@@ -728,7 +728,7 @@ ppr_con_names = pprWithCommas (pprPrefixOcc . unLoc)
 -}
 
 type instance XCFamEqn    (GhcPass _) r = EpAnn [AddEpAnn]
-type instance XXFamEqn    (GhcPass _) r = NoExtCon
+type instance XXFamEqn    (GhcPass _) r = DataConCantHappen
 
 type instance Anno (FamEqn (GhcPass p) _) = SrcSpanAnnA
 
@@ -738,7 +738,7 @@ type instance XCClsInstDecl    GhcPs = (EpAnn [AddEpAnn], AnnSortKey) -- TODO:AZ
 type instance XCClsInstDecl    GhcRn = NoExtField
 type instance XCClsInstDecl    GhcTc = NoExtField
 
-type instance XXClsInstDecl    (GhcPass _) = NoExtCon
+type instance XXClsInstDecl    (GhcPass _) = DataConCantHappen
 
 ----------------- Instances of all kinds -------------
 
@@ -752,7 +752,7 @@ type instance XTyFamInstD   GhcPs = NoExtField
 type instance XTyFamInstD   GhcRn = NoExtField
 type instance XTyFamInstD   GhcTc = NoExtField
 
-type instance XXInstDecl    (GhcPass _) = NoExtCon
+type instance XXInstDecl    (GhcPass _) = DataConCantHappen
 
 instance OutputableBndrId p
        => Outputable (TyFamInstDecl (GhcPass p)) where
@@ -881,7 +881,7 @@ instDeclDataFamInsts inst_decls
 -}
 
 type instance XCDerivDecl    (GhcPass _) = EpAnn [AddEpAnn]
-type instance XXDerivDecl    (GhcPass _) = NoExtCon
+type instance XXDerivDecl    (GhcPass _) = DataConCantHappen
 
 type instance Anno OverlapMode = SrcSpanAnnP
 
@@ -963,7 +963,7 @@ type instance XCDefaultDecl    GhcPs = EpAnn [AddEpAnn]
 type instance XCDefaultDecl    GhcRn = NoExtField
 type instance XCDefaultDecl    GhcTc = NoExtField
 
-type instance XXDefaultDecl    (GhcPass _) = NoExtCon
+type instance XXDefaultDecl    (GhcPass _) = DataConCantHappen
 
 instance OutputableBndrId p
        => Outputable (DefaultDecl (GhcPass p)) where
@@ -986,7 +986,7 @@ type instance XForeignExport   GhcPs = EpAnn [AddEpAnn]
 type instance XForeignExport   GhcRn = NoExtField
 type instance XForeignExport   GhcTc = Coercion
 
-type instance XXForeignDecl    (GhcPass _) = NoExtCon
+type instance XXForeignDecl    (GhcPass _) = DataConCantHappen
 
 instance OutputableBndrId p
        => Outputable (ForeignDecl (GhcPass p)) where
@@ -1009,13 +1009,13 @@ type instance XCRuleDecls    GhcPs = EpAnn [AddEpAnn]
 type instance XCRuleDecls    GhcRn = NoExtField
 type instance XCRuleDecls    GhcTc = NoExtField
 
-type instance XXRuleDecls    (GhcPass _) = NoExtCon
+type instance XXRuleDecls    (GhcPass _) = DataConCantHappen
 
 type instance XHsRule       GhcPs = EpAnn HsRuleAnn
 type instance XHsRule       GhcRn = HsRuleRn
 type instance XHsRule       GhcTc = HsRuleRn
 
-type instance XXRuleDecl    (GhcPass _) = NoExtCon
+type instance XXRuleDecl    (GhcPass _) = DataConCantHappen
 
 type instance Anno (SourceText, RuleName) = SrcAnn NoEpAnns
 
@@ -1035,7 +1035,7 @@ flattenRuleDecls decls = concatMap (rds_rules . unLoc) decls
 
 type instance XCRuleBndr    (GhcPass _) = EpAnn [AddEpAnn]
 type instance XRuleBndrSig  (GhcPass _) = EpAnn [AddEpAnn]
-type instance XXRuleBndr    (GhcPass _) = NoExtCon
+type instance XXRuleBndr    (GhcPass _) = DataConCantHappen
 
 instance (OutputableBndrId p) => Outputable (RuleDecls (GhcPass p)) where
   ppr (HsRules { rds_src = st
@@ -1076,10 +1076,10 @@ type instance XWarnings      GhcPs = EpAnn [AddEpAnn]
 type instance XWarnings      GhcRn = NoExtField
 type instance XWarnings      GhcTc = NoExtField
 
-type instance XXWarnDecls    (GhcPass _) = NoExtCon
+type instance XXWarnDecls    (GhcPass _) = DataConCantHappen
 
 type instance XWarning      (GhcPass _) = EpAnn [AddEpAnn]
-type instance XXWarnDecl    (GhcPass _) = NoExtCon
+type instance XXWarnDecl    (GhcPass _) = DataConCantHappen
 
 
 instance OutputableBndrId p
@@ -1103,7 +1103,7 @@ instance OutputableBndrId p
 -}
 
 type instance XHsAnnotation (GhcPass _) = EpAnn AnnPragma
-type instance XXAnnDecl     (GhcPass _) = NoExtCon
+type instance XXAnnDecl     (GhcPass _) = DataConCantHappen
 
 instance (OutputableBndrId p) => Outputable (AnnDecl (GhcPass p)) where
     ppr (HsAnnotation _ _ provenance expr)
@@ -1128,7 +1128,7 @@ type instance XCRoleAnnotDecl GhcPs = EpAnn [AddEpAnn]
 type instance XCRoleAnnotDecl GhcRn = NoExtField
 type instance XCRoleAnnotDecl GhcTc = NoExtField
 
-type instance XXRoleAnnotDecl (GhcPass _) = NoExtCon
+type instance XXRoleAnnotDecl (GhcPass _) = DataConCantHappen
 
 type instance Anno (Maybe Role) = SrcAnn NoEpAnns
 

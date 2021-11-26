@@ -122,7 +122,7 @@ type instance XCImportDecl  GhcPs = EpAnn EpAnnImportDecl
 type instance XCImportDecl  GhcRn = NoExtField
 type instance XCImportDecl  GhcTc = NoExtField
 
-type instance XXImportDecl  (GhcPass _) = NoExtCon
+type instance XXImportDecl  (GhcPass _) = DataConCantHappen
 
 type instance Anno ModuleName = SrcSpanAnnA
 type instance Anno [LocatedA (IE (GhcPass p))] = SrcSpanAnnL
@@ -303,7 +303,7 @@ type instance XIEModuleContents  GhcTc = NoExtField
 type instance XIEGroup           (GhcPass _) = NoExtField
 type instance XIEDoc             (GhcPass _) = NoExtField
 type instance XIEDocNamed        (GhcPass _) = NoExtField
-type instance XXIE               (GhcPass _) = NoExtCon
+type instance XXIE               (GhcPass _) = DataConCantHappen
 
 type instance Anno (LocatedA (IE (GhcPass p))) = SrcSpanAnnA
 

@@ -1235,7 +1235,7 @@ class UnXRec p => CollectPass p where
 instance IsPass p => CollectPass (GhcPass p) where
   collectXXPat _ flag ext =
     case ghcPass @p of
-      GhcPs -> noExtCon ext
+      GhcPs -> dataConCantHappen ext
       GhcRn
         | HsPatExpanded _ pat <- ext
         -> collect_pat flag pat

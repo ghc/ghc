@@ -82,7 +82,6 @@ import GHC.Types.Name (Name)
 import GHC.Driver.Session
 import qualified GHC.LanguageExtensions as LangExt
 import Data.Data
-import Data.Void
 
 
 type instance XWildPat GhcPs = NoExtField
@@ -139,7 +138,7 @@ type instance XViewPat GhcTc = Type
 
 type instance XSplicePat GhcPs = NoExtField
 type instance XSplicePat GhcRn = NoExtField
-type instance XSplicePat GhcTc = Void -- See Note [Constructor cannot occur]
+type instance XSplicePat GhcTc = DataConCantHappen
 
 type instance XLitPat    (GhcPass _) = NoExtField
 
@@ -155,7 +154,7 @@ type instance XSigPat GhcPs = EpAnn [AddEpAnn]
 type instance XSigPat GhcRn = NoExtField
 type instance XSigPat GhcTc = Type
 
-type instance XXPat GhcPs = NoExtCon
+type instance XXPat GhcPs = DataConCantHappen
 type instance XXPat GhcRn = HsPatExpansion (Pat GhcRn) (Pat GhcRn)
   -- Original pattern and its desugaring/expansion.
   -- See Note [Rebindable syntax and HsExpansion].
@@ -356,7 +355,7 @@ pprPat (ConPat { pat_con = con
 
 pprPat (XPat ext) = case ghcPass @p of
 #if __GLASGOW_HASKELL__ < 811
-  GhcPs -> noExtCon ext
+  GhcPs -> dataConCantHappen ext
 #endif
   GhcRn -> case ext of
     HsPatExpanded orig _ -> pprPat orig
@@ -567,7 +566,7 @@ isIrrefutableHsPat' is_strict = goL
 
     go (XPat ext)          = case ghcPass @p of
 #if __GLASGOW_HASKELL__ < 811
-      GhcPs -> noExtCon ext
+      GhcPs -> dataConCantHappen ext
 #endif
       GhcRn -> case ext of
         HsPatExpanded _ pat -> go pat
@@ -630,7 +629,7 @@ patNeedsParens p = go @p
     go (ViewPat {})      = True
     go (XPat ext)        = case ghcPass @q of
 #if __GLASGOW_HASKELL__ < 901
-      GhcPs -> noExtCon ext
+      GhcPs -> dataConCantHappen ext
 #endif
       GhcRn -> case ext of
         HsPatExpanded orig _ -> go orig

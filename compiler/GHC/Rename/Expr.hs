@@ -2190,7 +2190,7 @@ isStrictPattern (L loc pat) =
     SplicePat{}     -> True
     XPat ext        -> case ghcPass @p of
 #if __GLASGOW_HASKELL__ < 811
-      GhcPs -> noExtCon ext
+      GhcPs -> dataConCantHappen ext
 #endif
       GhcRn
         | HsPatExpanded _ p <- ext

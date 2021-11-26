@@ -70,7 +70,6 @@ import Data.Data hiding (Fixity(..))
 import qualified Data.Data as Data (Fixity(..))
 import qualified Data.Kind
 import Data.Maybe (isJust)
-import Data.Void  ( Void )
 import Data.Foldable ( toList )
 
 {- *********************************************************************
@@ -190,30 +189,6 @@ type instance PendingTcSplice' (GhcPass _) = PendingTcSplice
 
 -- ---------------------------------------------------------------------
 
-{- Note [Constructor cannot occur]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Some data constructors can't occur in certain phases; e.g. the output
-of the type checker never has OverLabel. We signal this by
-* setting the extension field to Void
-* using dataConCantHappen in the cases that can't happen
-
-For example:
-
-   type instance XOverLabel GhcTc = Void
-
-   dsExpr :: HsExpr GhcTc -> blah
-   dsExpr (HsOverLabel x _) = dataConCantHappen x
-
-The function dataConCantHappen is defined thus:
-   dataConCantHappen :: Void -> a
-   dataConCantHappen x = case x of {}
-(i.e. identically to Data.Void.absurd, but more helpfully named).
-Remember Void is a type whose only element is bottom.
-
-It would be better to omit the pattern match altogether, but we
-could only do that if the extension field was strict (#18764).
--}
-
 -- API Annotations types
 
 data EpAnnHsCase = EpAnnHsCase
@@ -231,7 +206,7 @@ type instance XVar           (GhcPass _) = NoExtField
 
 -- Record selectors at parse time are HsVar; they convert to HsRecSel
 -- on renaming.
-type instance XRecSel              GhcPs = Void
+type instance XRecSel              GhcPs = DataConCantHappen
 type instance XRecSel              GhcRn = NoExtField
 type instance XRecSel              GhcTc = NoExtField
 
@@ -241,7 +216,7 @@ type instance XLam           (GhcPass _) = NoExtField
 -- Note [Handling overloaded and rebindable constructs]
 type instance XOverLabel     GhcPs = EpAnnCO
 type instance XOverLabel     GhcRn = EpAnnCO
-type instance XOverLabel     GhcTc = Void  -- See Note [Constructor cannot occur]
+type instance XOverLabel     GhcTc = DataConCantHappen
 
 -- ---------------------------------------------------------------------
 
@@ -257,7 +232,7 @@ type instance XUnboundVar    GhcTc = HoleExprRef
 
 type instance XIPVar         GhcPs = EpAnnCO
 type instance XIPVar         GhcRn = EpAnnCO
-type instance XIPVar         GhcTc = Void -- See Note [Constructor cannot occur]
+type instance XIPVar         GhcTc = DataConCantHappen
 type instance XOverLitE      (GhcPass _) = EpAnnCO
 type instance XLitE          (GhcPass _) = EpAnnCO
 
@@ -274,7 +249,7 @@ type instance XAppTypeE      GhcTc = Type
 -- Note [Handling overloaded and rebindable constructs]
 type instance XOpApp         GhcPs = EpAnn [AddEpAnn]
 type instance XOpApp         GhcRn = Fixity
-type instance XOpApp         GhcTc = Void  -- See Note [Constructor cannot occur]
+type instance XOpApp         GhcTc = DataConCantHappen
 
 -- SectionL, SectionR not present in GhcTc pass; see GHC.Rename.Expr
 -- Note [Handling overloaded and rebindable constructs]
@@ -282,8 +257,8 @@ type instance XSectionL      GhcPs = EpAnnCO
 type instance XSectionR      GhcPs = EpAnnCO
 type instance XSectionL      GhcRn = EpAnnCO
 type instance XSectionR      GhcRn = EpAnnCO
-type instance XSectionL      GhcTc = Void  -- See Note [Constructor cannot occur]
-type instance XSectionR      GhcTc = Void  -- See Note [Constructor cannot occur]
+type instance XSectionL      GhcTc = DataConCantHappen
+type instance XSectionR      GhcTc = DataConCantHappen
 
 
 type instance XNegApp        GhcPs = EpAnn [AddEpAnn]
@@ -341,13 +316,13 @@ type instance XRecordUpd     GhcTc = RecordUpdTc
 
 type instance XGetField     GhcPs = EpAnnCO
 type instance XGetField     GhcRn = NoExtField
-type instance XGetField     GhcTc = Void
+type instance XGetField     GhcTc = DataConCantHappen
 -- HsGetField is eliminated by the renamer. See [Handling overloaded
 -- and rebindable constructs].
 
 type instance XProjection     GhcPs = EpAnn AnnProjection
 type instance XProjection     GhcRn = NoExtField
-type instance XProjection     GhcTc = Void
+type instance XProjection     GhcTc = DataConCantHappen
 -- HsProjection is eliminated by the renamer. See [Handling overloaded
 -- and rebindable constructs].
 
@@ -361,14 +336,14 @@ type instance XArithSeq      GhcTc = PostTcExpr
 
 type instance XBracket       GhcPs = EpAnn [AddEpAnn]
 type instance XBracket       GhcRn = EpAnn [AddEpAnn]
-type instance XBracket       GhcTc = Void -- See Note [Constructor cannot occur]
+type instance XBracket       GhcTc = DataConCantHappen
 
-type instance XRnBracketOut  GhcPs = Void -- See Note [Constructor cannot occur]
+type instance XRnBracketOut  GhcPs = DataConCantHappen
 type instance XRnBracketOut  GhcRn = NoExtField
-type instance XRnBracketOut  GhcTc = Void -- See Note [Constructor cannot occur]
+type instance XRnBracketOut  GhcTc = DataConCantHappen
 
-type instance XTcBracketOut  GhcPs = Void -- See Note [Constructor cannot occur]
-type instance XTcBracketOut  GhcRn = Void -- See Note [Constructor cannot occur]
+type instance XTcBracketOut  GhcPs = DataConCantHappen
+type instance XTcBracketOut  GhcRn = DataConCantHappen
 type instance XTcBracketOut  GhcTc = Type -- Type of the TcBracketOut
 
 type instance XSpliceE       (GhcPass _) = EpAnnCO
@@ -414,10 +389,10 @@ data AnnsIf
 -- ---------------------------------------------------------------------
 
 type instance XSCC           (GhcPass _) = EpAnn AnnPragma
-type instance XXPragE        (GhcPass _) = NoExtCon
+type instance XXPragE        (GhcPass _) = DataConCantHappen
 
 type instance XCDotFieldOcc (GhcPass _) = EpAnn AnnFieldLabel
-type instance XXDotFieldOcc (GhcPass _) = NoExtCon
+type instance XXDotFieldOcc (GhcPass _) = DataConCantHappen
 
 type instance XPresent         (GhcPass _) = EpAnn [AddEpAnn]
 
@@ -425,7 +400,7 @@ type instance XMissing         GhcPs = EpAnn EpaLocation
 type instance XMissing         GhcRn = NoExtField
 type instance XMissing         GhcTc = Scaled Type
 
-type instance XXTupArg         (GhcPass _) = NoExtCon
+type instance XXTupArg         (GhcPass _) = DataConCantHappen
 
 tupArgPresent :: HsTupArg (GhcPass p) -> Bool
 tupArgPresent (Present {}) = True
@@ -438,7 +413,7 @@ tupArgPresent (Missing {}) = False
 *                                                                      *
 ********************************************************************* -}
 
-type instance XXExpr GhcPs = NoExtCon
+type instance XXExpr GhcPs = DataConCantHappen
 type instance XXExpr GhcRn = HsExpansion (HsExpr GhcRn) (HsExpr GhcRn)
 type instance XXExpr GhcTc = XXExprGhcTc
 -- HsExpansion: see Note [Rebindable syntax and HsExpansion] below
@@ -1106,8 +1081,8 @@ type instance XCmdDo      GhcTc = Type
 
 type instance XCmdWrap    (GhcPass _) = NoExtField
 
-type instance XXCmd       GhcPs = NoExtCon
-type instance XXCmd       GhcRn = NoExtCon
+type instance XXCmd       GhcPs = DataConCantHappen
+type instance XXCmd       GhcRn = DataConCantHappen
 type instance XXCmd       GhcTc = HsWrap HsCmd
 
 type instance Anno [LocatedA (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsCmd (GhcPass pr))))]
@@ -1126,7 +1101,7 @@ type instance XCmdTop  GhcPs = NoExtField
 type instance XCmdTop  GhcRn = CmdSyntaxTable GhcRn -- See Note [CmdSyntaxTable]
 type instance XCmdTop  GhcTc = CmdTopTc
 
-type instance XXCmdTop (GhcPass _) = NoExtCon
+type instance XXCmdTop (GhcPass _) = DataConCantHappen
 
 instance (OutputableBndrId p) => Outputable (HsCmd (GhcPass p)) where
     ppr cmd = pprCmd cmd
@@ -1249,10 +1224,10 @@ type instance XMG         GhcPs b = NoExtField
 type instance XMG         GhcRn b = NoExtField
 type instance XMG         GhcTc b = MatchGroupTc
 
-type instance XXMatchGroup (GhcPass _) b = NoExtCon
+type instance XXMatchGroup (GhcPass _) b = DataConCantHappen
 
 type instance XCMatch (GhcPass _) b = EpAnn [AddEpAnn]
-type instance XXMatch (GhcPass _) b = NoExtCon
+type instance XXMatch (GhcPass _) b = DataConCantHappen
 
 instance (OutputableBndrId pr, Outputable body)
             => Outputable (Match (GhcPass pr) body) where
@@ -1286,7 +1261,7 @@ hsLMatchPats (L _ (Match { m_pats = pats })) = pats
 -- item. So this can never be used in practice.
 type instance XCGRHSs (GhcPass _) _ = EpAnnComments
 
-type instance XXGRHSs (GhcPass _) _ = NoExtCon
+type instance XXGRHSs (GhcPass _) _ = DataConCantHappen
 
 data GrhsAnn
   = GrhsAnn {
@@ -1298,7 +1273,7 @@ type instance XCGRHS (GhcPass _) _ = EpAnn GrhsAnn
                                    -- Location of matchSeparator
                                    -- TODO:AZ does this belong on the GRHS, or GRHSs?
 
-type instance XXGRHS (GhcPass _) b = NoExtCon
+type instance XXGRHS (GhcPass _) b = DataConCantHappen
 
 pprMatches :: (OutputableBndrId idR, Outputable body)
            => MatchGroup (GhcPass idR) body -> SDoc
@@ -1446,17 +1421,17 @@ type instance XRecStmt         (GhcPass _) GhcPs b = EpAnn AnnList
 type instance XRecStmt         (GhcPass _) GhcRn b = NoExtField
 type instance XRecStmt         (GhcPass _) GhcTc b = RecStmtTc
 
-type instance XXStmtLR         (GhcPass _) (GhcPass _) b = NoExtCon
+type instance XXStmtLR         (GhcPass _) (GhcPass _) b = DataConCantHappen
 
 type instance XParStmtBlock  (GhcPass pL) (GhcPass pR) = NoExtField
-type instance XXParStmtBlock (GhcPass pL) (GhcPass pR) = NoExtCon
+type instance XXParStmtBlock (GhcPass pL) (GhcPass pR) = DataConCantHappen
 
 type instance XApplicativeArgOne GhcPs = NoExtField
 type instance XApplicativeArgOne GhcRn = FailOperator GhcRn
 type instance XApplicativeArgOne GhcTc = FailOperator GhcTc
 
 type instance XApplicativeArgMany (GhcPass _) = NoExtField
-type instance XXApplicativeArg    (GhcPass _) = NoExtCon
+type instance XXApplicativeArg    (GhcPass _) = DataConCantHappen
 
 instance (Outputable (StmtLR (GhcPass idL) (GhcPass idL) (LHsExpr (GhcPass idL))),
           Outputable (XXParStmtBlock (GhcPass idL) (GhcPass idR)))
@@ -1633,8 +1608,8 @@ type instance XTypedSplice   (GhcPass _) = EpAnn [AddEpAnn]
 type instance XUntypedSplice (GhcPass _) = EpAnn [AddEpAnn]
 type instance XQuasiQuote    (GhcPass _) = NoExtField
 type instance XSpliced       (GhcPass _) = NoExtField
-type instance XXSplice       GhcPs       = NoExtCon
-type instance XXSplice       GhcRn       = NoExtCon
+type instance XXSplice       GhcPs       = DataConCantHappen
+type instance XXSplice       GhcRn       = DataConCantHappen
 type instance XXSplice       GhcTc       = HsSplicedT
 
 -- See Note [Running typed splices in the zonker]
@@ -1761,8 +1736,8 @@ pprSplice (HsQuasiQuote _ n q _ s)      = ppr_quasi n q s
 pprSplice (HsSpliced _ _ thing)         = ppr thing
 pprSplice (XSplice x)                   = case ghcPass @p of
 #if __GLASGOW_HASKELL__ < 811
-                                            GhcPs -> noExtCon x
-                                            GhcRn -> noExtCon x
+                                            GhcPs -> dataConCantHappen x
+                                            GhcRn -> dataConCantHappen x
 #endif
                                             GhcTc -> case x of
                                                        HsSplicedT _ -> text "Unevaluated typed splice"
@@ -1784,7 +1759,7 @@ type instance XDecBrG     (GhcPass _) = NoExtField
 type instance XTypBr      (GhcPass _) = NoExtField
 type instance XVarBr      (GhcPass _) = NoExtField
 type instance XTExpBr     (GhcPass _) = NoExtField
-type instance XXBracket   (GhcPass _) = NoExtCon
+type instance XXBracket   (GhcPass _) = DataConCantHappen
 
 instance OutputableBndrId p
           => Outputable (HsBracket (GhcPass p)) where
