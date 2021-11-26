@@ -607,13 +607,17 @@ multCard (Card a) (Card b)
 -- isn't any evaluation at all. If you don't care, simply use '(:*)'.
 data Demand
   = BotDmd
-  -- ^ A bottoming demand, produced by a diverging function, hence there is no
+  -- ^ A bottoming demand, produced by a diverging function ('C_10'), hence there is no
   -- 'SubDemand' that describes how it was evaluated.
+
   | AbsDmd
   -- ^ An absent demand: Evaluated exactly 0 times ('C_00'), hence there is no
   -- 'SubDemand' that describes how it was evaluated.
+
   | D !CardNonAbs !SubDemand
   -- ^ Don't use this internal data constructor; use '(:*)' instead.
+  -- Since BotDmd deals with 'C_10' and AbsDmd deals with 'C_00', the
+  -- cardinality component is CardNonAbs
   deriving Eq
 
 -- | Only meant to be used in the pattern synonym below!
@@ -1561,10 +1565,12 @@ isTopDmdType :: DmdType -> Bool
 isTopDmdType (DmdType env args div)
   = div == topDiv && null args && isEmptyVarEnv env
 
+{-   Unused
 -- | The demand type of an unspecified expression that is guaranteed to
 -- throw a (precise or imprecise) exception or diverge.
 exnDmdType :: DmdType
 exnDmdType = DmdType emptyDmdEnv [] exnDiv
+-}
 
 dmdTypeDepth :: DmdType -> Arity
 dmdTypeDepth = length . dt_args
@@ -1626,21 +1632,66 @@ findIdDemand (DmdType fv _ res) id
 -- exception, we act as if there is an additional control flow path that is
 -- taken if e throws a precise exception. The demand type of this control flow
 -- path
---   * is lazy and absent ('topDmd') in all free variables and arguments
+--   * is lazy and absent ('topDmd') and boxed in all free variables and arguments
 --   * has 'exnDiv' 'Divergence' result
+-- See Note [Precise exceptions and strictness analysis]
+--
 -- So we can simply take a variant of 'nopDmdType', 'exnDmdType'.
 -- Why not 'nopDmdType'? Because then the result of 'e' can never be 'exnDiv'!
 -- That means failure to drop dead-ends, see #18086.
--- See Note [Precise exceptions and strictness analysis]
 deferAfterPreciseException :: DmdType -> DmdType
-deferAfterPreciseException = lubDmdType exnDmdType
+-- deferAfterPreciseException = lubDmdType exnDmdType
+deferAfterPreciseException (DmdType fvs ds r)
+  = DmdType (mapVarEnv defer fvs)
+            (map defer ds)
+            (r `lubDivergence` ExnOrDiv)
+  where
+    defer :: Demand -> Demand
+    defer AbsDmd = AbsDmd
+    defer BotDmd = AbsDmd
+    defer (D n sd) = lubCard n C_00 :* lubSubDmd sd (Poly Boxed C_00)
+
+    -- Roughly:  defer d = d `lubDmd` D C_00 (Poly Boxed C_00)
+    -- It is very important that we `lub` with `Boxed`; see
+    --     Note [deferAfterPreciseException]
+    -- But that formulation fails the assert in :*,
+    --     because (D C_00 (Poly Boxed C_00)) is not a legal demand
+    -- So we write defer out more explicitly here
 
 -- | See 'keepAliveDmdEnv'.
 keepAliveDmdType :: DmdType -> VarSet -> DmdType
 keepAliveDmdType (DmdType fvs ds res) vars =
   DmdType (fvs `keepAliveDmdEnv` vars) ds res
 
-{-
+{- Note [deferAfterPreciseException]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The big picture is in Note [Precise exceptions and strictness analysis]
+The idea is that we want to treat
+   case <I/O operation> of (# s', r #) -> rhs
+
+as if it was
+   case <I/O operation> of
+      Just (# s', r #) -> rhs
+      Nothing          -> error
+
+That is, the I/O operation might throw an exception, so that 'rhs' never
+gets reached.  For example, we don't want to be strict in the strict free
+variables of 'rhs'.
+
+So roughly speaking:
+  deferAfterPreciseException = lubDmdType (DmdType emptyDmdEnv [] exnDiv)
+
+But that doesn't work quite right for boxity becasuse
+   case <I/O operation> of
+      (# s', r) -> f x
+
+uses `x` *boxed*.  If we `lub` it with `(DmdType emptyDmdEnv [] exnDiv)`
+we'll get an *unboxed* demand on `x`, which led to #20746.  There is
+a fuller example in that ticket.
+
+TL;DR: deferAfterPreciseException is very careful to preserve boxity
+in its argument.
+
 Note [Demand type Divergence]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In contrast to DmdSigs, DmdTypes are elicited under a specific incoming demand.
