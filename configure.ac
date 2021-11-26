@@ -123,22 +123,22 @@ AC_SUBST(WithGhc,$GHC)
 AC_ARG_ENABLE(bootstrap-with-devel-snapshot,
 [AS_HELP_STRING([--enable-bootstrap-with-devel-snapshot],
                 [Allow bootstrapping using a development snapshot of GHC.  This is not guaranteed to work.])],
-        EnableBootstrapWithDevelSnaphost=YES,
-        EnableBootstrapWithDevelSnaphost=NO
+  [FP_CAPITALIZE_YES_NO(["$enableval"], [EnableBootstrapWithDevelSnaphost])],
+  [EnableBootstrapWithDevelSnaphost=NO]
 )
 
 AC_ARG_ENABLE(tarballs-autodownload,
 [AS_HELP_STRING([--enable-tarballs-autodownload],
                 [Automatically download Windows distribution binaries if needed.])],
-        TarballsAutodownload=YES,
-        TarballsAutodownload=NO
+  [FP_CAPITALIZE_YES_NO(["$enableval"], [TarballsAutodownload])],
+  [TarballsAutodownload=NO]
 )
 
 AC_ARG_ENABLE(distro-toolchain,
 [AS_HELP_STRING([--enable-distro-toolchain],
                 [Do not use bundled Windows toolchain binaries.])],
-        EnableDistroToolchain=YES,
-        EnableDistroToolchain=NO
+  [FP_CAPITALIZE_YES_NO(["$enableval"], [EnableDistroToolchain])],
+  [EnableDistroToolchain=NO]
 )
 
 if test "$EnableDistroToolchain" = "YES"; then
@@ -149,8 +149,8 @@ AC_ARG_ENABLE(asserts-all-ways,
 [AC_HELP_STRING([--enable-asserts-all-ways],
                 [Usually ASSERTs are only compiled in the DEBUG way,
                  this will enable them in all ways.])],
-        EnableAssertsAllWays=YES,
-        EnableAssertsAllWays=NO
+  [FP_CAPITALIZE_YES_NO(["$enableval"], [EnableAssertsAllWays])],
+  [EnableAssertsAllWays=NO]
 )
 if test "$enable_asserts_all_ways" = "yes" ; then
    AC_DEFINE([USE_ASSERTS_ALL_WAYS], [1], [Compile-in ASSERTs in all ways.])
@@ -159,13 +159,11 @@ fi
 AC_ARG_ENABLE(native-io-manager,
 [AS_HELP_STRING([--enable-native-io-manager],
                 [Enable the native I/O manager by default.])],
-        EnableNativeIOManager=YES,
-        EnableNativeIOManager=NO
+  [FP_CAPITALIZE_YES_NO(["$enableval"], [EnableNativeIOManager])],
+  [EnableNativeIOManager=NO]
 )
-
 if test "$EnableNativeIOManager" = "YES"; then
   AC_DEFINE_UNQUOTED([DEFAULT_NATIVE_IO_MANAGER], [1], [Enable Native I/O manager as default.])
-
 fi
 
 
