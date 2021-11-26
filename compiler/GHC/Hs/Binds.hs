@@ -71,7 +71,7 @@ Global bindings (where clauses)
 type instance XHsValBinds      (GhcPass pL) (GhcPass pR) = EpAnn AnnList
 type instance XHsIPBinds       (GhcPass pL) (GhcPass pR) = EpAnn AnnList
 type instance XEmptyLocalBinds (GhcPass pL) (GhcPass pR) = NoExtField
-type instance XXHsLocalBindsLR (GhcPass pL) (GhcPass pR) = NoExtCon
+type instance XXHsLocalBindsLR (GhcPass pL) (GhcPass pR) = DataConCantHappen
 
 -- ---------------------------------------------------------------------
 -- Deal with ValBindsOut
@@ -99,16 +99,16 @@ type instance XPatBind    GhcTc (GhcPass pR) = Type    -- Type of the GRHSs
 type instance XVarBind    (GhcPass pL) (GhcPass pR) = NoExtField
 type instance XAbsBinds   (GhcPass pL) (GhcPass pR) = NoExtField
 type instance XPatSynBind (GhcPass pL) (GhcPass pR) = NoExtField
-type instance XXHsBindsLR (GhcPass pL) (GhcPass pR) = NoExtCon
+type instance XXHsBindsLR (GhcPass pL) (GhcPass pR) = DataConCantHappen
 
 type instance XABE       (GhcPass p) = NoExtField
-type instance XXABExport (GhcPass p) = NoExtCon
+type instance XXABExport (GhcPass p) = DataConCantHappen
 
 type instance XPSB         (GhcPass idL) GhcPs = EpAnn [AddEpAnn]
 type instance XPSB         (GhcPass idL) GhcRn = NameSet
 type instance XPSB         (GhcPass idL) GhcTc = NameSet
 
-type instance XXPatSynBind (GhcPass idL) (GhcPass idR) = NoExtCon
+type instance XXPatSynBind (GhcPass idL) (GhcPass idR) = DataConCantHappen
 
 {-
 Note [AbsBinds]
@@ -543,7 +543,7 @@ type instance XIPBinds       GhcTc = TcEvBinds -- binds uses of the
                                                -- implicit parameters
 
 
-type instance XXHsIPBinds    (GhcPass p) = NoExtCon
+type instance XXHsIPBinds    (GhcPass p) = DataConCantHappen
 
 isEmptyIPBindsPR :: HsIPBinds (GhcPass p) -> Bool
 isEmptyIPBindsPR (IPBinds _ is) = null is
@@ -552,7 +552,7 @@ isEmptyIPBindsTc :: HsIPBinds GhcTc -> Bool
 isEmptyIPBindsTc (IPBinds ds is) = null is && isEmptyTcEvBinds ds
 
 type instance XCIPBind    (GhcPass p) = EpAnn [AddEpAnn]
-type instance XXIPBind    (GhcPass p) = NoExtCon
+type instance XXIPBind    (GhcPass p) = DataConCantHappen
 
 instance OutputableBndrId p
        => Outputable (HsIPBinds (GhcPass p)) where
@@ -585,10 +585,10 @@ type instance XMinimalSig       (GhcPass p) = EpAnn [AddEpAnn]
 type instance XSCCFunSig        (GhcPass p) = EpAnn [AddEpAnn]
 type instance XCompleteMatchSig (GhcPass p) = EpAnn [AddEpAnn]
 
-type instance XXSig             (GhcPass p) = NoExtCon
+type instance XXSig             (GhcPass p) = DataConCantHappen
 
 type instance XFixitySig  (GhcPass p) = NoExtField
-type instance XXFixitySig (GhcPass p) = NoExtCon
+type instance XXFixitySig (GhcPass p) = DataConCantHappen
 
 data AnnSig
   = AnnSig {

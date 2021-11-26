@@ -1890,7 +1890,7 @@ instance HiePass p => ToHie (LocatedA (HsSplice (GhcPass p))) where
         []
       XSplice x -> case hiePass @p of
 #if __GLASGOW_HASKELL__ < 811
-                     HieRn -> noExtCon x
+                     HieRn -> dataConCantHappen x
 #endif
                      HieTc -> case x of
                                 HsSplicedT _ -> []

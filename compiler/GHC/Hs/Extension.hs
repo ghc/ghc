@@ -32,8 +32,6 @@ import GHC.Types.SrcLoc (GenLocated(..), unLoc)
 import GHC.Utils.Panic
 import GHC.Parser.Annotation
 
-import Data.Void
-
 {-
 Note [IsPass]
 ~~~~~~~~~~~~~
@@ -115,12 +113,12 @@ instance MapXRec (GhcPass p) where
 --   wrapXRec = noLocA
 
 {-
-Note [NoExtCon and strict fields]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [DataConCantHappen and strict fields]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Currently, any unused TTG extension constructor will generally look like the
 following:
 
-  type instance XXHsDecl (GhcPass _) = NoExtCon
+  type instance XXHsDecl (GhcPass _) = DataConCantHappen
   data HsDecl p
     = ...
     | XHsDecl !(XXHsDecl p)
@@ -132,17 +130,17 @@ the following function which consumes an HsDecl:
 
   ex :: HsDecl GhcPs -> HsDecl GhcRn
   ...
-  ex (XHsDecl nec) = noExtCon nec
+  ex (XHsDecl nec) = dataConCantHappen nec
 
 Because `p` equals GhcPs (i.e., GhcPass 'Parsed), XHsDecl's field has the type
-NoExtCon. But since (1) the field is strict and (2) NoExtCon is an empty data
-type, there is no possible way to reach the right-hand side of the XHsDecl
-case. As a result, the coverage checker concludes that the XHsDecl case is
-inaccessible, so it can be removed.
+DataConCantHappen. But since (1) the field is strict and (2) DataConCantHappen
+is an empty data type, there is no possible way to reach the right-hand side
+of the XHsDecl case. As a result, the coverage checker concludes that
+the XHsDecl case is inaccessible, so it can be removed.
 (See Note [Strict argument type constraints] in GHC.HsToCore.Pmc.Solver for
 more on how this works.)
 
-Bottom line: if you add a TTG extension constructor that uses NoExtCon, make
+Bottom line: if you add a TTG extension constructor that uses DataConCantHappen, make
 sure that any uses of it as a field are strict.
 -}
 
@@ -218,10 +216,6 @@ type OutputableBndrId pass =
   , Outputable (GenLocated (Anno (IdGhcP (NoGhcTcPass pass))) (IdGhcP (NoGhcTcPass pass)))
   , IsPass pass
   )
-
--- | See Note [Constructor cannot occur]
-dataConCantHappen :: Void -> a
-dataConCantHappen = absurd
 
 -- useful helper functions:
 pprIfPs :: forall p. IsPass p => (p ~ 'Parsed => SDoc) -> SDoc

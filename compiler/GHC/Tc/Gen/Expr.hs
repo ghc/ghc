@@ -881,7 +881,7 @@ tcExpr e@(HsRnBracketOut _ brack ps) res_ty = tcUntypedBracket e brack ps res_ty
 tcExpr (HsOverLabel {})    ty = pprPanic "tcExpr:HsOverLabel"  (ppr ty)
 tcExpr (SectionL {})       ty = pprPanic "tcExpr:SectionL"    (ppr ty)
 tcExpr (SectionR {})       ty = pprPanic "tcExpr:SectionR"    (ppr ty)
-tcExpr (HsTcBracketOut {}) ty = pprPanic "tcExpr:HsTcBracketOut"    (ppr ty)
+tcExpr (HsTcBracketOut x _ _ _) _ = dataConCantHappen x
 
 
 {-

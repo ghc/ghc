@@ -65,7 +65,7 @@ See also Note [IsPass] and Note [NoGhcTc] in GHC.Hs.Extension.
 -- | A placeholder type for TTG extension points that are not currently
 -- unused to represent any particular value.
 --
--- This should not be confused with 'NoExtCon', which are found in unused
+-- This should not be confused with 'DataConCantHappen', which are found in unused
 -- extension /constructors/ and therefore should never be inhabited. In
 -- contrast, 'NoExtField' is used in extension /points/ (e.g., as the field of
 -- some constructor), so it must have an inhabitant to construct AST passes
@@ -80,24 +80,43 @@ instance Outputable NoExtField where
 noExtField :: NoExtField
 noExtField = NoExtField
 
--- | Used in TTG extension constructors that have yet to be extended with
--- anything. If an extension constructor has 'NoExtCon' as its field, it is
--- not intended to ever be constructed anywhere, and any function that consumes
--- the extension constructor can eliminate it by way of 'noExtCon'.
---
--- This should not be confused with 'NoExtField', which are found in unused
--- extension /points/ (not /constructors/) and therefore can be inhabited.
+{-
+Note [Constructor cannot occur]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Some data constructors can't occur in certain phases; e.g. the output
+of the type checker never has OverLabel. We signal this by
+* setting the extension field to DataConCantHappen
+* using dataConCantHappen in the cases that can't happen
 
--- See also [NoExtCon and strict fields].
-data NoExtCon
+For example:
+
+   type instance XOverLabel GhcTc = DataConCantHappen
+
+   dsExpr :: HsExpr GhcTc -> blah
+   dsExpr (HsOverLabel x _) = dataConCantHappen x
+
+The function dataConCantHappen is defined thus:
+   dataConCantHappen :: DataConCantHappen -> a
+   dataConCantHappen x = case x of {}
+(i.e. identically to Data.Void.absurd, but more helpfully named).
+Remember DataConCantHappen is a type whose only element is bottom.
+
+This should not be confused with 'NoExtField', which are found in unused
+extension /points/ (not /constructors/) and therefore can be inhabited.
+
+It would be better to omit the pattern match altogether, but we
+can only do that if the extension field was strict (#18764).
+See also [DataConCantHappen and strict fields].
+-}
+data DataConCantHappen
   deriving (Data,Eq,Ord)
 
-instance Outputable NoExtCon where
-  ppr = noExtCon
+instance Outputable DataConCantHappen where
+  ppr = dataConCantHappen
 
--- | Eliminate a 'NoExtCon'. Much like 'Data.Void.absurd'.
-noExtCon :: NoExtCon -> a
-noExtCon x = case x of {}
+-- | Eliminate a 'DataConCantHappen'. See Note [Constructor cannot happen].
+dataConCantHappen :: DataConCantHappen -> a
+dataConCantHappen x = case x of {}
 
 -- | GHC's L prefixed variants wrap their vanilla variant in this type family,
 -- to add 'SrcLoc' info via 'Located'. Other passes than 'GhcPass' not

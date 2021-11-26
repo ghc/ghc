@@ -149,7 +149,7 @@ type instance XHsForAllVis   (GhcPass _) = EpAnnForallTy
 type instance XHsForAllInvis (GhcPass _) = EpAnnForallTy
                                            -- Location of 'forall' and '.'
 
-type instance XXHsForAllTelescope (GhcPass _) = NoExtCon
+type instance XXHsForAllTelescope (GhcPass _) = DataConCantHappen
 
 type EpAnnForallTy = EpAnn (AddEpAnn, AddEpAnn)
   -- ^ Location of 'forall' and '->' for HsForAllVis
@@ -163,7 +163,7 @@ type instance XHsQTvs GhcPs = NoExtField
 type instance XHsQTvs GhcRn = HsQTvsRn
 type instance XHsQTvs GhcTc = HsQTvsRn
 
-type instance XXLHsQTyVars  (GhcPass _) = NoExtCon
+type instance XXLHsQTyVars  (GhcPass _) = DataConCantHappen
 
 mkHsForAllVisTele ::EpAnnForallTy ->
   [LHsTyVarBndr () (GhcPass p)] -> HsForAllTelescope (GhcPass p)
@@ -192,22 +192,22 @@ type instance XHsOuterExplicit GhcPs _    = EpAnnForallTy
 type instance XHsOuterExplicit GhcRn _    = NoExtField
 type instance XHsOuterExplicit GhcTc flag = [VarBndr TyVar flag]
 
-type instance XXHsOuterTyVarBndrs (GhcPass _) = NoExtCon
+type instance XXHsOuterTyVarBndrs (GhcPass _) = DataConCantHappen
 
 type instance XHsWC              GhcPs b = NoExtField
 type instance XHsWC              GhcRn b = [Name]
 type instance XHsWC              GhcTc b = [Name]
 
-type instance XXHsWildCardBndrs (GhcPass _) _ = NoExtCon
+type instance XXHsWildCardBndrs (GhcPass _) _ = DataConCantHappen
 
 type instance XHsPS GhcPs = EpAnn EpaLocation
 type instance XHsPS GhcRn = HsPSRn
 type instance XHsPS GhcTc = HsPSRn
 
-type instance XXHsPatSigType (GhcPass _) = NoExtCon
+type instance XXHsPatSigType (GhcPass _) = DataConCantHappen
 
 type instance XHsSig (GhcPass _) = NoExtField
-type instance XXHsSigType (GhcPass _) = NoExtCon
+type instance XXHsSigType (GhcPass _) = DataConCantHappen
 
 hsSigWcType :: forall p. UnXRec p => LHsSigWcType p -> LHsType p
 hsSigWcType = sig_body . unXRec @p . hswc_body
@@ -262,7 +262,7 @@ mkEmptyWildCardBndrs x = HsWC { hswc_body = x
 type instance XUserTyVar    (GhcPass _) = EpAnn [AddEpAnn]
 type instance XKindedTyVar  (GhcPass _) = EpAnn [AddEpAnn]
 
-type instance XXTyVarBndr   (GhcPass _) = NoExtCon
+type instance XXTyVarBndr   (GhcPass _) = DataConCantHappen
 
 -- | Return the attached flag
 hsTyVarBndrFlag :: HsTyVarBndr flag (GhcPass pass) -> flag
@@ -361,7 +361,7 @@ pprHsArrow (HsLinearArrow _) = lollipop
 pprHsArrow (HsExplicitMult _ p _) = mulArrow (ppr p)
 
 type instance XConDeclField  (GhcPass _) = EpAnn [AddEpAnn]
-type instance XXConDeclField (GhcPass _) = NoExtCon
+type instance XXConDeclField (GhcPass _) = DataConCantHappen
 
 instance OutputableBndrId p
        => Outputable (ConDeclField (GhcPass p)) where
@@ -807,7 +807,7 @@ type instance XCFieldOcc GhcPs = NoExtField
 type instance XCFieldOcc GhcRn = Name
 type instance XCFieldOcc GhcTc = Id
 
-type instance XXFieldOcc (GhcPass _) = NoExtCon
+type instance XXFieldOcc (GhcPass _) = DataConCantHappen
 
 mkFieldOcc :: LocatedN RdrName -> FieldOcc GhcPs
 mkFieldOcc rdr = FieldOcc noExtField rdr
@@ -821,7 +821,7 @@ type instance XAmbiguous GhcPs = NoExtField
 type instance XAmbiguous GhcRn = NoExtField
 type instance XAmbiguous GhcTc = Id
 
-type instance XXAmbiguousFieldOcc (GhcPass _) = NoExtCon
+type instance XXAmbiguousFieldOcc (GhcPass _) = DataConCantHappen
 
 instance Outputable (AmbiguousFieldOcc (GhcPass p)) where
   ppr = ppr . rdrNameAmbiguousFieldOcc

@@ -55,7 +55,7 @@ type instance XHsInteger    (GhcPass _) = SourceText
 type instance XHsRat        (GhcPass _) = NoExtField
 type instance XHsFloatPrim  (GhcPass _) = NoExtField
 type instance XHsDoublePrim (GhcPass _) = NoExtField
-type instance XXLit         (GhcPass _) = NoExtCon
+type instance XXLit         (GhcPass _) = DataConCantHappen
 
 data OverLitRn
   = OverLitRn {
@@ -98,7 +98,7 @@ pprXOverLit GhcPs noExt = ppr noExt
 pprXOverLit GhcRn OverLitRn{ ol_from_fun = from_fun } = ppr from_fun
 pprXOverLit GhcTc OverLitTc{ ol_witness = witness } = pprExpr witness
 
-type instance XXOverLit (GhcPass _) = NoExtCon
+type instance XXOverLit (GhcPass _) = DataConCantHappen
 
 overLitType :: HsOverLit GhcTc -> Type
 overLitType (OverLit OverLitTc{ ol_type = ty } _) = ty
