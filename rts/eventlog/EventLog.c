@@ -1686,7 +1686,7 @@ static void postTickyCounterDef(EventsBuf *eb, StgEntCounter *p)
     postWord16(eb, (uint16_t) p->arity);
     postString(eb, p->arg_kinds);
     postString(eb, p->str);
-    postWord64(eb, (HsWord64)(p->info));
+    postWord64(eb, (W_) (INFO_PTR_TO_STRUCT(p->info)));
 }
 
 void postTickyCounterDefs(StgEntCounter *counters)

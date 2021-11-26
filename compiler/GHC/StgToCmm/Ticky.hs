@@ -141,6 +141,7 @@ import Data.Maybe
 import qualified Data.Char
 import Control.Monad ( when )
 import GHC.Types.Id.Info
+import GHC.Utils.Trace
 
 -----------------------------------------------------------------------------
 --
@@ -247,11 +248,21 @@ emitTickyCounter cloType name args
                    then n <+> parens (ppr mod_name) <+> ext <+> p
                    else n <+> ext <+> p
         ; this_mod <- getModuleName
+        ; let t = case cloType of
+                    TickyCon {} -> "C"
+                    TickyFun {} -> "F"
+                    TickyThunk {} -> "T"
+                    TickyLNE {} -> "L"
         ; let info_lbl = case cloType of
                             TickyCon dc mn -> case mn of
-                                               NoNumber -> mkConInfoTableLabel (dataConName dc) DefinitionSite
-                                               (Numbered n) -> mkConInfoTableLabel (dataConName dc) (UsageSite this_mod n)
-                            _ -> mkClosureLabel name NoCafRefs
+                                               NoNumber -> CmmLabel $ mkConInfoTableLabel (dataConName dc) DefinitionSite
+                                               (Numbered n) -> CmmLabel $ mkConInfoTableLabel (dataConName dc) (UsageSite this_mod n)
+                            TickyFun {} ->
+                              pprTrace "tickyF" (text t <> colon <> ppr name <+> ppr (mkInfoTableLabel name NoCafRefs) $$ ppr mod_name) $
+                              CmmLabel $ mkInfoTableLabel name NoCafRefs
+
+                            _ -> pprTrace "ticky" (text t <> colon <> ppr name <+> ppr (mkInfoTableLabel name NoCafRefs)) $ zeroCLit platform
+                            _ -> CmmLabel $ mkInfoTableLabel name NoCafRefs
 
 
         ; let ctx = (initSDocContext dflags defaultDumpStyle)
@@ -269,7 +280,7 @@ emitTickyCounter cloType name args
               mkIntCLit platform 0,               -- Heap allocated for this thing
               fun_descr_lit,
               arg_descr_lit,
-              CmmLabel info_lbl,
+              info_lbl,
               zeroCLit platform,          -- Entries into this thing
               zeroCLit platform,          -- Heap allocated by this thing
               zeroCLit platform           -- Link to next StgEntCounter
