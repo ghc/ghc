@@ -1,0 +1,133 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 70, types: 113, coercions: 18, joins: 0/2}
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+Foo.$trModule4 :: GHC.Prim.Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+Foo.$trModule4 = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+Foo.$trModule3 :: GHC.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+Foo.$trModule3 = GHC.Types.TrNameS Foo.$trModule4
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+Foo.$trModule2 :: GHC.Prim.Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+Foo.$trModule2 = "Foo"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+Foo.$trModule1 :: GHC.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+Foo.$trModule1 = GHC.Types.TrNameS Foo.$trModule2
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+Foo.$trModule :: GHC.Types.Module
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+Foo.$trModule = GHC.Types.Module Foo.$trModule3 Foo.$trModule1
+
+-- RHS size: {terms: 5, types: 8, coercions: 0, joins: 0/0}
+Foo.f1 [InlPrag=NOINLINE]
+  :: Int
+     -> GHC.Prim.State# GHC.Prim.RealWorld
+     -> (# GHC.Prim.State# GHC.Prim.RealWorld, Int #)
+[GblId, Arity=2, Str=<L><L>, Cpr=1, Unf=OtherCon []]
+Foo.f1
+  = \ (n :: Int)
+      (s [OS=OneShot] :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+      (# s, n #)
+
+-- RHS size: {terms: 1, types: 0, coercions: 6, joins: 0/0}
+foogle [InlPrag=[final]] :: Int -> IO Int
+[GblId,
+ Arity=2,
+ Str=<L><L>,
+ Cpr=1,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=True)}]
+foogle
+  = Foo.f1
+    `cast` (<Int>_R %<'Many>_N ->_R Sym (GHC.Types.N:IO[0] <Int>_R)
+            :: (Int
+                -> GHC.Prim.State# GHC.Prim.RealWorld
+                -> (# GHC.Prim.State# GHC.Prim.RealWorld, Int #))
+               ~R# (Int -> IO Int))
+
+-- RHS size: {terms: 35, types: 38, coercions: 12, joins: 0/2}
+Foo.$wf [InlPrag=[2]]
+  :: forall {a}. Show a => a -> (# Int -> IO Int, Int -> IO Int #)
+[GblId,
+ Arity=2,
+ Str=<MP(A,MCM(L),A)><L>,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [30 0] 181 10}]
+Foo.$wf
+  = \ (@a) ($dShow :: Show a) (x :: a) ->
+      let {
+        lvl :: String
+        [LclId]
+        lvl = show @a $dShow x } in
+      let {
+        g :: Int
+             -> GHC.Prim.State# GHC.Prim.RealWorld
+             -> (# GHC.Prim.State# GHC.Prim.RealWorld, Int #)
+        [LclId, Arity=2, Str=<1L><L>, Unf=OtherCon []]
+        g = \ (y :: Int) (s :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+              case y of wild { GHC.Types.I# x1 ->
+              case GHC.Prim.># x1 2# of {
+                __DEFAULT -> Foo.f1 wild s;
+                1# ->
+                  case GHC.IO.Handle.Text.hPutStr2
+                         GHC.IO.Handle.FD.stdout lvl GHC.Types.True s
+                  of
+                  { (# ipv, ipv1 #) ->
+                  Foo.f1 wild ipv
+                  }
+              }
+              } } in
+      (# g
+         `cast` (<Int>_R %<'Many>_N ->_R Sym (GHC.Types.N:IO[0] <Int>_R)
+                 :: (Int
+                     -> GHC.Prim.State# GHC.Prim.RealWorld
+                     -> (# GHC.Prim.State# GHC.Prim.RealWorld, Int #))
+                    ~R# (Int -> IO Int)),
+         g
+         `cast` (<Int>_R %<'Many>_N ->_R Sym (GHC.Types.N:IO[0] <Int>_R)
+                 :: (Int
+                     -> GHC.Prim.State# GHC.Prim.RealWorld
+                     -> (# GHC.Prim.State# GHC.Prim.RealWorld, Int #))
+                    ~R# (Int -> IO Int)) #)
+
+-- RHS size: {terms: 11, types: 26, coercions: 0, joins: 0/0}
+f [InlPrag=[2]]
+  :: forall {a}. Show a => a -> (Int -> IO Int, Int -> IO Int)
+[GblId,
+ Arity=2,
+ Str=<MP(A,MCM(L),A)><L>,
+ Cpr=1,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=False)
+         Tmpl= \ (@a) ($dShow [Occ=Once1] :: Show a) (x [Occ=Once1] :: a) ->
+                 case Foo.$wf @a $dShow x of
+                 { (# ww [Occ=Once1], ww1 [Occ=Once1] #) ->
+                 (ww, ww1)
+                 }}]
+f = \ (@a) ($dShow :: Show a) (x :: a) ->
+      case Foo.$wf @a $dShow x of { (# ww, ww1 #) -> (ww, ww1) }
+
+
+

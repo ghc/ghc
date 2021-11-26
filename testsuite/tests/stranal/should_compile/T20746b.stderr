@@ -1,0 +1,77 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 33, types: 78, coercions: 21, joins: 0/0}
+
+-- RHS size: {terms: 5, types: 8, coercions: 0, joins: 0/0}
+T20746b.mightThrow1 [InlPrag=NOINLINE]
+  :: Int
+     -> GHC.Prim.State# GHC.Prim.RealWorld
+     -> (# GHC.Prim.State# GHC.Prim.RealWorld, Int #)
+[GblId, Arity=2, Str=<L><L>, Cpr=1, Unf=OtherCon []]
+T20746b.mightThrow1
+  = \ (n :: Int)
+      (s [OS=OneShot] :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+      (# s, n #)
+
+-- RHS size: {terms: 1, types: 0, coercions: 6, joins: 0/0}
+mightThrow [InlPrag=[final]] :: Int -> IO Int
+[GblId,
+ Arity=2,
+ Str=<L><L>,
+ Cpr=1,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=True)}]
+mightThrow
+  = T20746b.mightThrow1
+    `cast` (<Int>_R %<'Many>_N ->_R Sym (GHC.Types.N:IO[0] <Int>_R)
+            :: (Int
+                -> GHC.Prim.State# GHC.Prim.RealWorld
+                -> (# GHC.Prim.State# GHC.Prim.RealWorld, Int #))
+               ~R# (Int -> IO Int))
+
+Rec {
+-- RHS size: {terms: 22, types: 32, coercions: 0, joins: 0/0}
+T20746b.f1 [Occ=LoopBreaker]
+  :: Bool
+     -> (Int, Int, Int)
+     -> GHC.Prim.State# GHC.Prim.RealWorld
+     -> (# GHC.Prim.State# GHC.Prim.RealWorld, (Int, Int, Int) #)
+[GblId, Arity=3, Str=<1L><1L><L>, Cpr=1, Unf=OtherCon []]
+T20746b.f1
+  = \ (ds :: Bool)
+      (trp :: (Int, Int, Int))
+      (eta [OS=OneShot] :: GHC.Prim.State# GHC.Prim.RealWorld) ->
+      case ds of {
+        False -> T20746b.f1 GHC.Types.True trp eta;
+        True ->
+          case trp of wild1 { (a, b, c) ->
+          case T20746b.mightThrow1 a eta of { (# ipv, ipv1 #) ->
+          (# ipv, wild1 #)
+          }
+          }
+      }
+end Rec }
+
+-- RHS size: {terms: 1, types: 0, coercions: 15, joins: 0/0}
+f :: Bool -> (Int, Int, Int) -> IO (Int, Int, Int)
+[GblId,
+ Arity=3,
+ Str=<1L><1L><L>,
+ Cpr=1,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=True)}]
+f = T20746b.f1
+    `cast` (<Bool>_R
+            %<'Many>_N ->_R <(Int, Int, Int)>_R
+            %<'Many>_N ->_R Sym (GHC.Types.N:IO[0] <(Int, Int, Int)>_R)
+            :: (Bool
+                -> (Int, Int, Int)
+                -> GHC.Prim.State# GHC.Prim.RealWorld
+                -> (# GHC.Prim.State# GHC.Prim.RealWorld, (Int, Int, Int) #))
+               ~R# (Bool -> (Int, Int, Int) -> IO (Int, Int, Int)))
+
+
+
