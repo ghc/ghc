@@ -608,3 +608,5 @@ test('T23400', [], compile_and_run, ['-with-rtsopts -A8k'])
 test('IOManager', [js_skip, when(arch('wasm32'), skip), when(opsys('mingw32'), skip),
                    pre_cmd('$MAKE -s --no-print-directory IOManager.hs')],
                   compile_and_run, [''])
+
+test('dtrace', [extra_files(['Dtrace.hs', 'dtrace.sh'])], makefile_test, ['dtrace'])

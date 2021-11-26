@@ -162,3 +162,7 @@ HSC2HS_OPTS = --cc="$(TEST_CC)" $(addprefix --cflag=,$(TEST_CC_OPTS)) --ld=$(TES
 
 IOManager.hs: IOManager.hsc
 	'$(HSC2HS)' $(HSC2HS_OPTS) $<
+
+.PHONY: dtrace
+dtrace:
+	./dtrace.sh
