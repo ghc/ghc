@@ -503,3 +503,6 @@ test('decodeMyStack', normal, compile_and_run, ['-finfo-table-map'])
 test('decodeMyStack_underflowFrames', [extra_run_opts('+RTS -kc8K -RTS')], compile_and_run, ['-finfo-table-map -rtsopts'])
 # -finfo-table-map intentionally missing
 test('decodeMyStack_emptyListForMissingFlag', [ignore_stdout, ignore_stderr], compile_and_run, [''])
+
+# this test is commented out because it requires bpftrace and sudo
+# test('dtrace', [extra_files(['Dtrace.hs', 'dtrace.sh'])], makefile_test, ['dtrace'])

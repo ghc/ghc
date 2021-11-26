@@ -147,3 +147,7 @@ EventlogOutput_IPE:
 	"$(TEST_HC)" -debug -finfo-table-map -v0 EventlogOutput.hs
 	./EventlogOutput +RTS -va 2> EventlogOutput_IPE.stderr.log
 	grep "IPE:" EventlogOutput_IPE.stderr.log
+
+.PHONY: dtrace
+dtrace:
+	./dtrace.sh
