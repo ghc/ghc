@@ -13,10 +13,6 @@ else
    fp_cv_ld_no_compact_unwind=no
 fi
 rm -rf conftest*])
-if test "$fp_cv_ld_no_compact_unwind" = yes; then
-  LdHasNoCompactUnwind=YES
-else
-  LdHasNoCompactUnwind=NO
-fi
+FP_CAPITALIZE_YES_NO(["$fp_cv_ld_no_compact_unwind"], [LdHasNoCompactUnwind])
 AC_SUBST([LdHasNoCompactUnwind])
 ])# FP_PROG_LD_NO_COMPACT_UNWIND

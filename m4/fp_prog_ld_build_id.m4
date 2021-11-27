@@ -13,11 +13,7 @@ else
    fp_cv_ld_build_id=no
 fi
 rm -rf conftest*])
-if test "$fp_cv_ld_build_id" = yes; then
-  LdHasBuildId=YES
-else
-  LdHasBuildId=NO
-fi
+FP_CAPITALIZE_YES_NO(["$fp_cv_ld_build_id"], [LdHasBuildId])
 AC_SUBST([LdHasBuildId])
 ])# FP_PROG_LD_BUILD_ID
 

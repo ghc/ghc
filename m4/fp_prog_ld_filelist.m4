@@ -20,10 +20,6 @@ AC_CACHE_CHECK([whether ld understands -filelist], [fp_cv_ld_has_filelist],
     fi
     rm -rf conftest*
 ])
-if test "$fp_cv_ld_has_filelist" = yes; then
-    LdHasFilelist=YES
-else
-    LdHasFilelist=NO
-fi
+FP_CAPITALIZE_YES_NO(["$fp_cv_ld_has_filelist"], [LdHasFilelist])
 AC_SUBST([LdHasFilelist])
 ])# FP_PROG_LD_FILELIST
