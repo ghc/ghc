@@ -95,10 +95,10 @@ test-suite spec
   --     version of `hspec` & `hspec-discover` to ensure
   --     intercompatibility
   build-depends:
-    , hspec                          >= 2.4.4    && < 2.9
+    , hspec                          >= 2.4.4    && < 2.10
 
   build-tool-depends:
-    , hspec-discover:hspec-discover  >= 2.4.4    && < 2.9
+    , hspec-discover:hspec-discover  >= 2.4.4    && < 2.10
 
 test-suite fixtures
   type:             exitcode-stdio-1.0

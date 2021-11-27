@@ -184,7 +184,7 @@ test-suite spec
                , ghc-paths       ^>= 0.1.0.12
                , haddock-library ^>= 1.9.0
                , xhtml           ^>= 3000.2.2
-               , hspec           ^>= 2.8
+               , hspec           ^>= 2.9
                , parsec          ^>= 3.1.13.0
                , QuickCheck      >= 2.11  && ^>= 2.14
 
@@ -205,7 +205,7 @@ test-suite spec
                , transformers
 
   build-tool-depends:
-    hspec-discover:hspec-discover ^>= 2.8
+    hspec-discover:hspec-discover ^>= 2.9
 
 source-repository head
   type:     git
