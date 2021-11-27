@@ -124,6 +124,7 @@ instance Hashable TestMode
 instance NFData   TestMode
 
 -- | Note [Dtrace probes]
+-- ~~~~~~~~~~~~~~~~~~~~~~
 --
 -- We use Dtrace to define "User statically defined tracepoints" (USDTs) for
 -- the RTS. (See @rts/RtsProbes.d@ for the probe declarations.)

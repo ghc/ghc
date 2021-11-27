@@ -83,7 +83,7 @@ Compiler
 
 Runtime system
 ~~~~~~~~~~~~~~
-- dtrace probe points are now provided for linux, adding to the existing support for darwin and FreeBSD. To compile a ghc with this included configure with ``--enable-dtrace`` and ensure libsystemtap is available.
+- DTrace probe points are now provided on Linux, adding to the existing support for Darwin and FreeBSD. To compile GHC with DTrace support pass the ``--enable-dtrace`` flag to `configure` and ensure that `libsystemtap` is available.
 
 ``ghc`` library
 ~~~~~~~~~~~~~~~
