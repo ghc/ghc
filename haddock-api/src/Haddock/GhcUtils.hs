@@ -114,7 +114,7 @@ pretty = showPpr
 -- instantiated at DocNameI instead of (GhcPass _).
 
 -- | Like 'hsTyVarName' from GHC API, but not instantiated at (GhcPass _)
-hsTyVarBndrName :: forall flag n. (XXTyVarBndr n ~ NoExtCon, UnXRec n)
+hsTyVarBndrName :: forall flag n. (XXTyVarBndr n ~ DataConCantHappen, UnXRec n)
                 => HsTyVarBndr flag n -> IdP n
 hsTyVarBndrName (UserTyVar _ _ name) = unXRec @n name
 hsTyVarBndrName (KindedTyVar _ _ name _) = unXRec @n name
