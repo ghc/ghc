@@ -298,7 +298,7 @@ stat_startNonmovingGc ()
 {
     ACQUIRE_LOCK(&stats_mutex);
     start_nonmoving_gc_cpu = getCurrentThreadCPUTime();
-    start_nonmoving_gc_elapsed = getProcessCPUTime();
+    start_nonmoving_gc_elapsed = getProcessElapsedTime();
     RELEASE_LOCK(&stats_mutex);
 }
 
@@ -306,7 +306,7 @@ void
 stat_endNonmovingGc ()
 {
     Time cpu = getCurrentThreadCPUTime();
-    Time elapsed = getProcessCPUTime();
+    Time elapsed = getProcessElapsedTime();
 
     ACQUIRE_LOCK(&stats_mutex);
     stats.gc.nonmoving_gc_elapsed_ns = elapsed - start_nonmoving_gc_elapsed;
