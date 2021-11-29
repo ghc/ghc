@@ -212,7 +212,7 @@ cgRhs :: Id
                )
 
 cgRhs id (StgRhsCon cc con mn _ts args)
-  = withNewTickyCounterCon (idName id) con mn $
+  = withNewTickyCounterCon id con mn $
     buildDynCon id mn True cc con (assertNonVoidStgArgs args)
       -- con args are always non-void,
       -- see Note [Post-unarisation invariants] in GHC.Stg.Unarise
@@ -400,7 +400,7 @@ cgRhsStdThunk bndr lf_info payload
        }
  where
  gen_code reg  -- AHA!  A STANDARD-FORM THUNK
-  = withNewTickyCounterStdThunk (lfUpdatable lf_info) (idName bndr) $
+  = withNewTickyCounterStdThunk (lfUpdatable lf_info) (bndr) $
     do
   {     -- LAY OUT THE OBJECT
     mod_name <- getModuleName

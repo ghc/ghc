@@ -142,6 +142,7 @@ import qualified Data.Char
 import Control.Monad ( when )
 import GHC.Types.Id.Info
 import GHC.Utils.Trace
+import GHC.StgToCmm.Env (getCgInfo_maybe)
 
 -----------------------------------------------------------------------------
 --
@@ -160,10 +161,10 @@ data TickyClosureType
         Bool -- True <-> standard thunk (AP or selector), has no entry counter
     | TickyLNE
 
-withNewTickyCounterFun :: Bool -> Name ->  [NonVoid Id] -> FCode a -> FCode a
+withNewTickyCounterFun :: Bool -> Id ->  [NonVoid Id] -> FCode a -> FCode a
 withNewTickyCounterFun single_entry = withNewTickyCounter (TickyFun single_entry)
 
-withNewTickyCounterLNE :: Name  ->  [NonVoid Id] -> FCode a -> FCode a
+withNewTickyCounterLNE :: Id  ->  [NonVoid Id] -> FCode a -> FCode a
 withNewTickyCounterLNE nm  args code = do
   b <- tickyLNEIsOn
   if not b then code else withNewTickyCounter TickyLNE nm  args code
@@ -176,7 +177,7 @@ thunkHasCounter isStatic = do
 withNewTickyCounterThunk
   :: Bool -- ^ static
   -> Bool -- ^ updateable
-  -> Name
+  -> Id
   -> FCode a
   -> FCode a
 withNewTickyCounterThunk isStatic isUpdatable name code = do
@@ -187,7 +188,7 @@ withNewTickyCounterThunk isStatic isUpdatable name code = do
 
 withNewTickyCounterStdThunk
   :: Bool -- ^ updateable
-  -> Name
+  -> Id
   -> FCode a
   -> FCode a
 withNewTickyCounterStdThunk isUpdatable name code = do
@@ -197,7 +198,7 @@ withNewTickyCounterStdThunk isUpdatable name code = do
       else withNewTickyCounter (TickyThunk isUpdatable True) name [] code
 
 withNewTickyCounterCon
-  :: Name
+  :: Id
   -> DataCon
   -> ConstructorNumber
   -> FCode a
@@ -209,14 +210,15 @@ withNewTickyCounterCon name datacon info code = do
       else withNewTickyCounter (TickyCon datacon info) name [] code
 
 -- args does not include the void arguments
-withNewTickyCounter :: TickyClosureType -> Name -> [NonVoid Id] -> FCode a -> FCode a
+withNewTickyCounter :: TickyClosureType -> Id -> [NonVoid Id] -> FCode a -> FCode a
 withNewTickyCounter cloType name args m = do
   lbl <- emitTickyCounter cloType name args
   setTickyCtrLabel lbl m
 
-emitTickyCounter :: TickyClosureType -> Name ->  [NonVoid Id] -> FCode CLabel
-emitTickyCounter cloType name args
-  = let ctr_lbl = mkRednCountsLabel name in
+emitTickyCounter :: TickyClosureType -> Id ->  [NonVoid Id] -> FCode CLabel
+emitTickyCounter cloType tickee args
+  = let name = idName tickee in
+    let ctr_lbl = mkRednCountsLabel name in
     (>> return ctr_lbl) $
     ifTicky $ do
         { dflags <- getDynFlags
@@ -253,25 +255,32 @@ emitTickyCounter cloType name args
                     TickyFun {} -> "F"
                     TickyThunk {} -> "T"
                     TickyLNE {} -> "L"
-        ; let info_lbl = case cloType of
+        ; info_lbl <- case cloType of
                             TickyCon dc mn -> case mn of
-                                               NoNumber -> CmmLabel $ mkConInfoTableLabel (dataConName dc) DefinitionSite
-                                               (Numbered n) -> CmmLabel $ mkConInfoTableLabel (dataConName dc) (UsageSite this_mod n)
+                                               NoNumber -> return $! CmmLabel $ mkConInfoTableLabel (dataConName dc) DefinitionSite
+                                               (Numbered n) -> return $! CmmLabel $ mkConInfoTableLabel (dataConName dc) (UsageSite this_mod n)
                             TickyFun {} ->
-                              pprTrace "tickyF" (text t <> colon <> ppr name <+> ppr (mkInfoTableLabel name NoCafRefs) $$ ppr mod_name) $
-                              CmmLabel $ mkInfoTableLabel name NoCafRefs
+                              -- pprTrace "tickyF" (text t <> colon <> ppr name <+> ppr (mkInfoTableLabel name NoCafRefs) $$ ppr mod_name) $
+                              return $! CmmLabel $ mkInfoTableLabel name NoCafRefs
 
                             TickyThunk _ std_thunk
                               | not std_thunk
-                              -> pprTrace "tickyThunk" (text t <> colon <> ppr name <+> ppr (mkInfoTableLabel name NoCafRefs))
-                                 CmmLabel $ mkInfoTableLabel name NoCafRefs
+                              -> -- pprTrace "tickyThunk" (text t <> colon <> ppr name <+> ppr (mkInfoTableLabel name NoCafRefs))
+                                 return $! CmmLabel $ mkInfoTableLabel name NoCafRefs
                               -- IPE Maps have no entry for std thunks.
                               | otherwise
-                              -> pprTrace "tickyThunk" (text t <> colon <> ppr name <+> ppr (mkInfoTableLabel name NoCafRefs))
-                                 zeroCLit platform
+                              -> do
+                                    lf_info <- getCgInfo_maybe name
+                                    profile <- getProfile
+                                    case lf_info of
+                                      Just (CgIdInfo { cg_lf = cg_lf@(LFThunk _top _ _ std_form _)})
+                                          -> pprTrace "tickyThunkStd" empty $ return $
+                                             CmmLabel $ mkClosureInfoTableLabel (profilePlatform profile) tickee cg_lf -- zeroCLit platform
+                                      _   -> pprTrace "tickyThunkUnknown" (text t <> colon <> ppr name <+> ppr (mkInfoTableLabel name NoCafRefs))
+                                            return $! zeroCLit platform
 
                             TickyLNE {} -> -- pprTrace "tickyLNE" (text t <> colon <> ppr name <+> ppr (mkInfoTableLabel name NoCafRefs)) $
-                                   zeroCLit platform
+                                   return $! zeroCLit platform
                             -- _ -> CmmLabel $ mkInfoTableLabel name NoCafRefs
 
 
@@ -296,6 +305,7 @@ emitTickyCounter cloType name args
               zeroCLit platform           -- Link to next StgEntCounter
             ]
         }
+
 
 -- -----------------------------------------------------------------------------
 -- Ticky stack frames
