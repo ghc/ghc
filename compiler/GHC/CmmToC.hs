@@ -482,11 +482,13 @@ correct signedness. For instance, consider a program like
 In this case both `a` and `b` will be StgInts in the generated C (since
 `MO_Neg` is a signed operation). However, we want to ensure that we perform an
 *unsigned* modulus operation, therefore we must be careful to cast both arguments
-to StgWord.
+to StgWord. We do this for any operation where the signedness of the argument
+may affect the operation's semantics.
 -}
 
 -- | The result type of most operations is determined by the operands. However,
--- there are a few exceptions. For these we explicitly cast the result.
+-- there are a few exceptions: particularly operations which might get promoted
+-- to a signed result. For these we explicitly cast the result.
 machOpNeedsCast :: Platform -> MachOp -> [CmmType] -> Maybe SDoc
 machOpNeedsCast platform mop args
     -- Comparisons in C have type 'int', but we want type W_ (this is what
@@ -499,13 +501,29 @@ machOpNeedsCast platform mop args
   , not $ isFloatType res_ty -- only integer operations, not MO_SF_Conv
   , let w = typeWidth res_ty
   , w < wordWidth platform
-  = Just $ parens (machRep_U_CType platform w)
+  = cast_it w
 
     -- A shift operation like (a >> b) where a::Word8 and b::Word has type Word
     -- in C yet we want a Word8
-  | Just w <- shiftOp mop  = let ty = machRep_U_CType platform w
-                             in Just $ parens ty
+  | Just w <- shiftOp mop  = cast_it w
+
+    -- The results of these operations may be promoted to signed values
+    -- due to C11 section 6.3.1.1.
+  | MO_Add w <- mop        = cast_it w
+  | MO_Sub w <- mop        = cast_it w
+  | MO_Mul w <- mop        = cast_it w
+  | MO_U_Quot w <- mop     = cast_it w
+  | MO_U_Rem  w <- mop     = cast_it w
+  | MO_And w <- mop        = cast_it w
+  | MO_Or  w <- mop        = cast_it w
+  | MO_Xor w <- mop        = cast_it w
+  | MO_Not w <- mop        = cast_it w
+
   | otherwise              = Nothing
+  where
+    cast_it w =
+      let ty = machRep_U_CType platform w
+      in Just $ parens ty
 
 pprMachOpApp' :: Platform -> MachOp -> [CmmExpr] -> SDoc
 pprMachOpApp' platform mop args
@@ -519,19 +537,31 @@ pprMachOpApp' platform mop args
     _     -> panic "PprC.pprMachOp : machop with wrong number of args"
 
   where
-        -- Cast needed for signed integer ops
     pprArg e
-      | signedOp    mop = cCast platform (machRep_S_CType platform width) e
       | needsFCasts mop = cCast platform (machRep_F_CType width) e
+        -- Cast needed for signed integer ops
+      | signedOp    mop = cCast platform (machRep_S_CType platform width) e
         -- See Note [When in doubt, cast arguments as unsigned]
-      | otherwise       = cCast platform (machRep_U_CType platform width) e
+      | needsUnsignedCast mop
+                        = cCast platform (machRep_U_CType platform width) e
+      | otherwise       = pprExpr1 platform e
       where
         width = typeWidth (cmmExprType platform e)
-    needsFCasts (MO_F_Eq _)   = False
-    needsFCasts (MO_F_Ne _)   = False
+
     needsFCasts (MO_F_Neg _)  = True
     needsFCasts (MO_F_Quot _) = True
     needsFCasts mop  = floatComparison mop
+
+    -- See Note [When in doubt, cast arguments as unsigned]
+    needsUnsignedCast (MO_Mul    _) = True
+    needsUnsignedCast (MO_U_Shr  _) = True
+    needsUnsignedCast (MO_U_Quot _) = True
+    needsUnsignedCast (MO_U_Rem  _) = True
+    needsUnsignedCast (MO_U_Ge   _) = True
+    needsUnsignedCast (MO_U_Le   _) = True
+    needsUnsignedCast (MO_U_Gt   _) = True
+    needsUnsignedCast (MO_U_Lt   _) = True
+    needsUnsignedCast _             = False
 
 -- --------------------------------------------------------------------------
 -- Literals
