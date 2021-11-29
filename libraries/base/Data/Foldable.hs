@@ -317,13 +317,27 @@ class Foldable t where
     foldr :: (a -> b -> b) -> b -> t a -> b
     foldr f z t = appEndo (foldMap (Endo #. f) t) z
 
-    -- | Right-associative fold of a structure, strict in the accumulator.
-    -- This is rarely what you want.
+    -- | 'foldr'' is a variant of 'foldr' that performs strict reduction from
+    -- right to left, i.e. starting with the right-most element.  The input
+    -- structure /must/ be finite, otherwise 'foldr'' runs out of space
+    -- (/diverges/).
+    --
+    -- If you want a strict right fold in constant space, you need a structure
+    -- that supports faster than \(\mathcal{O}(n)\) access to the right-most
+    -- element, such as @Seq@ from the @containers@ package.
+    --
+    -- This method does not run in constant space for structures such as lists
+    -- that don't support efficient right-to-left iteration and so require
+    -- \(\mathcal{O}(n)\) space to perform right-to-left reduction.  Use of
+    -- this method with such a structure is a hint that the chosen structure
+    -- may be a poor fit for the task at hand.  If the order in which the
+    -- elements are combined is not important, use 'foldl'' instead.
     --
     -- @since 4.6.0.0
     foldr' :: (a -> b -> b) -> b -> t a -> b
     foldr' f z0 = \ xs ->
-        foldl (\ k x -> oneShot (\ z -> z `seq` k (f x z))) id xs z0
+        foldl (\ (k::b->b) (x::a) -> oneShot (\ (z::b) -> z `seq` k (f x z)))
+              (id::b->b) xs z0
     -- Mirror image of 'foldl''.
 
     -- | Left-associative fold of a structure, lazy in the accumulator.  This
