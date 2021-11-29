@@ -4,6 +4,11 @@ version: 1.0.2
 license: BSD-3-Clause
 maintainer: glasgow-haskell-users@haskell.org
 build-type: Simple
+
+extra-source-files:
+  -- This file needs to be in the package but shouldn't be compiled on its own.
+  xxhash.c
+
 flag libm
   default: @CabalHaveLibm@
 flag librt
@@ -570,10 +575,6 @@ library
                fs.c
                -- I wish we had wildcards..., this would be:
                -- *.c hooks/**/*.c sm/**/*.c eventlog/**/*.c linker/**/*.c
-
-    extra-source-files:
-               -- This file needs to be in the package but shouldn't be compiled on its own.
-               xxhash.c
 
     if os(windows)
        c-sources: win32/AsyncMIO.c
