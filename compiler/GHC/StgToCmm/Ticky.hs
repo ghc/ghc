@@ -261,8 +261,18 @@ emitTickyCounter cloType name args
                               pprTrace "tickyF" (text t <> colon <> ppr name <+> ppr (mkInfoTableLabel name NoCafRefs) $$ ppr mod_name) $
                               CmmLabel $ mkInfoTableLabel name NoCafRefs
 
-                            _ -> pprTrace "ticky" (text t <> colon <> ppr name <+> ppr (mkInfoTableLabel name NoCafRefs)) $ zeroCLit platform
-                            _ -> CmmLabel $ mkInfoTableLabel name NoCafRefs
+                            TickyThunk _ std_thunk
+                              | not std_thunk
+                              -> pprTrace "tickyThunk" (text t <> colon <> ppr name <+> ppr (mkInfoTableLabel name NoCafRefs))
+                                 CmmLabel $ mkInfoTableLabel name NoCafRefs
+                              -- IPE Maps have no entry for std thunks.
+                              | otherwise
+                              -> pprTrace "tickyThunk" (text t <> colon <> ppr name <+> ppr (mkInfoTableLabel name NoCafRefs))
+                                 zeroCLit platform
+
+                            TickyLNE {} -> -- pprTrace "tickyLNE" (text t <> colon <> ppr name <+> ppr (mkInfoTableLabel name NoCafRefs)) $
+                                   zeroCLit platform
+                            -- _ -> CmmLabel $ mkInfoTableLabel name NoCafRefs
 
 
         ; let ctx = (initSDocContext dflags defaultDumpStyle)
