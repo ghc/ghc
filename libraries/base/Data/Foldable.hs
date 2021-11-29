@@ -723,9 +723,10 @@ instance Foldable [] where
     foldl'  = List.foldl'
     foldl1  = List.foldl1
     foldr   = List.foldr
+    foldr'  = List.foldr'
+    foldr1  = List.foldr1
     foldMap = (mconcat .) . map -- See Note [Monoidal list folds]
     fold    = mconcat           -- See Note [Monoidal list folds]
-    foldr1  = List.foldr1
     length  = List.length
     maximum = List.maximum
     minimum = List.minimum

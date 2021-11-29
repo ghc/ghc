@@ -20,14 +20,19 @@
 module GHC.List (
    -- [] (..),          -- built-in syntax; can't be used in export list
 
-   map, (++), filter, concat,
-   head, last, tail, init, uncons, null, length, (!!),
-   foldl, foldl', foldl1, foldl1', scanl, scanl1, scanl', foldr, foldr1,
-   scanr, scanr1, iterate, iterate', repeat, replicate, cycle,
-   take, drop, sum, product, maximum, minimum, splitAt, takeWhile, dropWhile,
-   span, break, reverse, and, or,
-   any, all, elem, notElem, lookup,
-   concatMap,
+   -- List-monomorphic Foldable methods and misc functions
+   foldr, foldr', foldr1,
+   foldl, foldl', foldl1,
+   null, length, elem, notElem,
+   maximum, minimum, sum, product, and, or, any, all,
+
+   -- Other functions
+   foldl1', concat, concatMap,
+   map, (++), filter, lookup,
+   head, last, tail, init, uncons, (!!),
+   scanl, scanl1, scanl', scanr, scanr1,
+   iterate, iterate', repeat, replicate, cycle,
+   take, drop, splitAt, takeWhile, dropWhile, span, break, reverse,
    zip, zip3, zipWith, zipWith3, unzip, unzip3,
    errorEmptyList,
 
@@ -550,8 +555,36 @@ Based on nofib benchmarks, this is bad for performance. Therefore, we instead
 match on everything past the :, which is just the tail of scanl.
 -}
 
--- foldr, foldr1, scanr, and scanr1 are the right-to-left duals of the
+-- foldr, foldr', foldr1, scanr, and scanr1 are the right-to-left duals of the
 -- above functions.
+
+-- | 'foldr'' is a variant of 'foldr' that begins list reduction from the last
+-- element and evaluates the accumulator strictly as it unwinds the stack back
+-- to the beginning of the list.  The input list /must/ be finite, otherwise
+-- 'foldr'' runs out of space (/diverges/).
+--
+-- Note that if the function that combines the accumulated value with each
+-- element is strict in the accumulator, other than a possible improvement
+-- in the constant factor, you get the same \(\mathcal{O}(n)\) space cost
+-- as with just 'foldr'.
+--
+-- If you want a strict right fold in constant space, you need a structure
+-- that supports faster than \(\mathcal{O}(n)\) access to the right-most
+-- element, such as @Seq@ from the @containers@ package.
+--
+-- Use of this function is a hint that the @[]@ structure may be a poor fit
+-- for the task at hand.  If the order in which the elements are combined is
+-- not important, use 'foldl'' instead.
+--
+-- >>> foldr' (+) [1..4]  -- Use foldl' instead!
+-- 10
+-- >>> foldr' (&&) [True, False, True, True] -- Use foldr instead!
+-- False
+-- >>> foldr' (||) [False, False, True, True] -- Use foldr instead!
+-- True
+foldr' :: (a -> b -> b) -> b -> [a] -> b
+foldr' f z0 xs = foldl f' id xs z0
+  where f' k x z = k $! f x z
 
 -- | 'foldr1' is a variant of 'foldr' that has no starting value argument,
 -- and thus must be applied to non-empty lists. Note that unlike 'foldr', the accumulated value must be of the same type as the list elements.
