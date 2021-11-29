@@ -686,7 +686,6 @@ function save_cache () {
 
 function clean() {
   rm -R tmp
-  run "$MAKE" --quiet clean || true
   run rm -Rf _build
 }
 
