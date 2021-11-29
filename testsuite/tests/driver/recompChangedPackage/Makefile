@@ -22,8 +22,8 @@ recompChangedPackage:
 
 	# Now add PLib to q.. Main should be recompiled
 
-	$(GHC_PKG) --package-db tmp.d list
-	$(GHC_PKG) --package-db tmp.d unregister q-0.1.0.0
+	'$(GHC_PKG)' --package-db tmp.d list
+	'$(GHC_PKG)' --package-db tmp.d unregister q-0.1.0.0
 	rm PLib.hs
 
 	(cd q; cp q.cabal2 q.cabal)
