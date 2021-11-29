@@ -196,11 +196,11 @@ findToolDir False top_dir = go 0 (top_dir </> "..") []
               InstallationError $ "could not detect mingw toolchain in the following paths: " ++ show tried
           | otherwise = do
               let try = path </> "mingw"
-              let tried = tried ++ [try]
+              let tried' = tried ++ [try]
               oneLevel <- doesDirectoryExist try
               if oneLevel
                 then return (Just path)
-                else go (k+1) (path </> "..") tried
+                else go (k+1) (path </> "..") tried'
 findToolDir True _ = return Nothing
 #else
 findToolDir _ _ = return Nothing
