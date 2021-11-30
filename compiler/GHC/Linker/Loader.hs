@@ -54,7 +54,6 @@ import GHC.Tc.Utils.Monad
 import GHC.Runtime.Interpreter
 import GHCi.RemoteTypes
 
-import GHC.Iface.Load
 
 import GHC.ByteCode.Linker
 import GHC.ByteCode.Asm
@@ -72,7 +71,6 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Utils.Constants (isWindowsHost, isDarwinHost)
-import GHC.Utils.Misc
 import GHC.Utils.Error
 import GHC.Utils.Logger
 import GHC.Utils.TmpFs
@@ -82,7 +80,6 @@ import GHC.Unit.Finder
 import GHC.Unit.Module
 import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.Deps
-import GHC.Unit.Home
 import GHC.Unit.Home.ModInfo
 import GHC.Unit.State as Packages
 
@@ -118,6 +115,12 @@ import System.Win32.Info (getSystemDirectory)
 import GHC.Utils.Exception
 import qualified Data.Map as M
 import Data.Either (partitionEithers)
+
+import GHC.Unit.Module.Graph
+import GHC.Types.SourceFile
+import GHC.Utils.Misc
+import GHC.Iface.Load
+import GHC.Unit.Home
 
 uninitialised :: a
 uninitialised = panic "Loader not initialised"
@@ -210,7 +213,6 @@ loadDependencies
   -> IO (LoaderState, SuccessFlag)
 loadDependencies interp hsc_env pls span needed_mods = do
 --   initLoaderState (hsc_dflags hsc_env) dl
-   let hpt = hsc_HPT hsc_env
    let dflags = hsc_dflags hsc_env
    -- The interpreter and dynamic linker can only handle object code built
    -- the "normal" way, i.e. no non-std ways like profiling or ticky-ticky.
@@ -219,11 +221,11 @@ loadDependencies interp hsc_env pls span needed_mods = do
    maybe_normal_osuf <- checkNonStdWay dflags interp (fst span)
 
    -- Find what packages and linkables are required
-   (lnks, all_lnks, pkgs) <- getLinkDeps hsc_env hpt pls
+   (lnks, all_lnks, pkgs) <- getLinkDeps hsc_env pls
                                maybe_normal_osuf (fst span) needed_mods
 
    let pls1 =
-        case (snd span) of
+        case snd span of
           Just mn -> pls { module_deps = M.insertWith (++) mn all_lnks (module_deps pls) }
           Nothing -> pls
 
@@ -310,8 +312,9 @@ reallyInitLoaderState interp hsc_env = do
   -- (a) initialise the C dynamic linker
   initObjLinker interp
 
+
   -- (b) Load packages from the command-line (Note [preload packages])
-  pls <- loadPackages' interp hsc_env (preloadUnits (hsc_units hsc_env)) pls0
+  pls <- unitEnv_foldWithKey (\k u env -> k >>= \pls' -> loadPackages' interp (hscSetActiveUnitId u hsc_env) (preloadUnits (homeUnitEnv_units env)) pls') (return pls0) (hsc_HUG hsc_env)
 
   -- steps (c), (d) and (e)
   loadCmdLineLibs' interp hsc_env pls
@@ -323,13 +326,33 @@ loadCmdLineLibs interp hsc_env = do
   modifyLoaderState_ interp $ \pls ->
     loadCmdLineLibs' interp hsc_env pls
 
-loadCmdLineLibs'
+
+loadCmdLineLibs' :: Interp -> HscEnv -> LoaderState -> IO LoaderState
+loadCmdLineLibs' interp hsc_env pls = snd <$>
+    foldM
+      (\(done', pls') cur_uid ->  load done' cur_uid pls')
+      (Set.empty, pls)
+      (hsc_all_home_unit_ids hsc_env)
+
+  where
+    load :: Set.Set UnitId -> UnitId -> LoaderState -> IO (Set.Set UnitId, LoaderState)
+    load done uid pls | uid `Set.member` done = return (done, pls)
+    load done uid pls = do
+      let hsc' = hscSetActiveUnitId uid hsc_env
+      -- Load potential dependencies first
+      (done', pls') <- foldM (\(done', pls') uid -> load done' uid pls') (done, pls)
+                          (homeUnitDepends (hsc_units hsc'))
+      pls'' <- loadCmdLineLibs'' interp hsc' pls'
+      return $ (Set.insert uid done', pls'')
+
+loadCmdLineLibs''
   :: Interp
   -> HscEnv
   -> LoaderState
   -> IO LoaderState
-loadCmdLineLibs' interp hsc_env pls =
+loadCmdLineLibs'' interp hsc_env pls =
   do
+
       let dflags@(DynFlags { ldInputs = cmdline_ld_inputs
                            , libraryPaths = lib_paths_base})
             = hsc_dflags hsc_env
@@ -661,7 +684,7 @@ failNonStd dflags srcspan = dieWith dflags srcspan $
             Prof -> "with -prof"
             Dyn -> "with -dynamic"
 
-getLinkDeps :: HscEnv -> HomePackageTable
+getLinkDeps :: HscEnv
             -> LoaderState
             -> Maybe FilePath                   -- replace object suffixes?
             -> SrcSpan                          -- for error messages
@@ -669,13 +692,21 @@ getLinkDeps :: HscEnv -> HomePackageTable
             -> IO ([Linkable], [Linkable], [UnitId])     -- ... then link these first
 -- Fails with an IO exception if it can't find enough files
 
-getLinkDeps hsc_env hpt pls replace_osuf span mods
+getLinkDeps hsc_env pls replace_osuf span mods
 -- Find all the packages and linkables that a set of modules depends on
  = do {
         -- 1.  Find the dependent home-pkg-modules/packages from each iface
         -- (omitting modules from the interactive package, which is already linked)
-      ; (mods_s, pkgs_s) <- follow_deps (filterOut isInteractiveModule mods)
-                                        emptyUniqDSet emptyUniqDSet;
+      ; (mods_s, pkgs_s) <-
+          -- Why two code paths here? There is a significant amount of repeated work
+          -- performed calculating transitive dependencies
+          -- if --make uses the oneShot code path (see MultiLayerModulesTH_* tests)
+          if isOneShot (ghcMode dflags)
+            then follow_deps (filterOut isInteractiveModule mods)
+                              emptyUniqDSet emptyUniqDSet;
+            else do
+              (pkgs, mmods) <- unzip <$> mapM get_mod_info all_home_mods
+              return (catMaybes mmods, Set.toList (Set.unions (init_pkg_set : pkgs)))
 
       ; let
         -- 2.  Exclude ones already linked
@@ -683,11 +714,11 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
             (mods_needed, mods_got) = partitionEithers (map split_mods mods_s)
             pkgs_needed = pkgs_s `minusList` pkgs_loaded pls
 
-            split_mods mod_name =
-                let is_linked = find ((== mod_name) . (moduleName . linkableModule)) (objs_loaded pls ++ bcos_loaded pls)
+            split_mods mod =
+                let is_linked = find ((== mod) . (linkableModule)) (objs_loaded pls ++ bcos_loaded pls)
                 in case is_linked of
                      Just linkable -> Right linkable
-                     Nothing -> Left mod_name
+                     Nothing -> Left mod
 
         -- 3.  For each dependent module, find its linkable
         --     This will either be in the HPT or (in the case of one-shot
@@ -698,16 +729,62 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
       ; return (lnks_needed, mods_got ++ lnks_needed, pkgs_needed) }
   where
     dflags = hsc_dflags hsc_env
+    mod_graph = hsc_mod_graph hsc_env
 
-        -- The ModIface contains the transitive closure of the module dependencies
-        -- within the current package, *except* for boot modules: if we encounter
-        -- a boot module, we have to find its real interface and discover the
-        -- dependencies of that.  Hence we need to traverse the dependency
-        -- tree recursively.  See bug #936, testcase ghci/prog007.
+    -- This code is used in `--make` mode to calculate the home package and unit dependencies
+    -- for a set of modules.
+    --
+    -- It is significantly more efficient to use the shared transitive dependency
+    -- calculation than to compute the transitive dependency set in the same manner as oneShot mode.
+
+    -- It is also a matter of correctness to use the module graph so that dependencies between home units
+    -- is resolved correctly.
+    make_deps_loop :: (Set.Set UnitId, Set.Set NodeKey) -> [ModNodeKeyWithUid] -> (Set.Set UnitId, Set.Set NodeKey)
+    make_deps_loop found [] = found
+    make_deps_loop found@(found_units, found_mods) (nk:nexts)
+      | NodeKey_Module nk `Set.member` found_mods = make_deps_loop found nexts
+      | otherwise =
+        case M.lookup (NodeKey_Module nk) (mgTransDeps mod_graph) of
+            Just trans_deps ->
+              let deps = Set.insert (NodeKey_Module nk) trans_deps
+                  -- See #936 and the ghci.prog007 test for why we have to continue traversing through
+                  -- boot modules.
+                  todo_boot_mods = [ModNodeKeyWithUid (GWIB mn NotBoot) uid | NodeKey_Module (ModNodeKeyWithUid (GWIB mn IsBoot) uid) <- Set.toList trans_deps]
+              in make_deps_loop (found_units, deps `Set.union` found_mods) (todo_boot_mods ++ nexts)
+            Nothing ->
+              let (ModNodeKeyWithUid _ uid) = nk
+              in make_deps_loop (uid `Set.insert` found_units, found_mods) nexts
+
+    mkNk m = ModNodeKeyWithUid (GWIB (moduleName m) NotBoot) (moduleUnitId m)
+    (init_pkg_set, all_deps) = make_deps_loop (Set.empty, Set.empty) $ map mkNk (filterOut isInteractiveModule mods)
+
+    all_home_mods = [with_uid | NodeKey_Module with_uid <- Set.toList all_deps]
+
+    get_mod_info (ModNodeKeyWithUid gwib uid) =
+      case lookupHug (hsc_HUG hsc_env) uid (gwib_mod gwib) of
+        Just hmi ->
+          let iface = (hm_iface hmi)
+              mmod = case mi_hsc_src iface of
+                      HsBootFile -> link_boot_mod_error (mi_module iface)
+                      _ -> return $ Just (mi_module iface)
+
+          in (dep_direct_pkgs (mi_deps iface),) <$>  mmod
+        Nothing ->
+          let err = text "getLinkDeps: Home module not loaded" <+> ppr (gwib_mod gwib) <+> ppr uid
+          in throwGhcExceptionIO (ProgramError (showSDoc dflags err))
+
+
+       -- This code is used in one-shot mode to traverse downwards through the HPT
+       -- to find all link dependencies.
+       -- The ModIface contains the transitive closure of the module dependencies
+       -- within the current package, *except* for boot modules: if we encounter
+       -- a boot module, we have to find its real interface and discover the
+       -- dependencies of that.  Hence we need to traverse the dependency
+       -- tree recursively.  See bug #936, testcase ghci/prog007.
     follow_deps :: [Module]             -- modules to follow
-                -> UniqDSet ModuleName         -- accum. module dependencies
+                -> UniqDSet Module         -- accum. module dependencies
                 -> UniqDSet UnitId          -- accum. package dependencies
-                -> IO ([ModuleName], [UnitId]) -- result
+                -> IO ([Module], [UnitId]) -- result
     follow_deps []     acc_mods acc_pkgs
         = return (uniqDSetToList acc_mods, uniqDSetToList acc_pkgs)
     follow_deps (mod:mods) acc_mods acc_pkgs
@@ -728,22 +805,24 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
             pkg_deps = dep_direct_pkgs deps
             (boot_deps, mod_deps) = flip partitionWith (Set.toList (dep_direct_mods deps)) $
               \case
-                GWIB m IsBoot  -> Left m
-                GWIB m NotBoot -> Right m
+                (_, GWIB m IsBoot)  -> Left m
+                (_, GWIB m NotBoot) -> Right m
 
-            mod_deps' = filter (not . (`elementOfUniqDSet` acc_mods)) (boot_deps ++ mod_deps)
-            acc_mods'  = addListToUniqDSet acc_mods (moduleName mod : mod_deps)
+            mod_deps' = filter (not . (`elementOfUniqDSet` acc_mods)) (map (mkHomeModule home_unit) $ boot_deps ++ mod_deps)
+            acc_mods'  = addListToUniqDSet acc_mods (mod : map (mkHomeModule home_unit) mod_deps)
             acc_pkgs'  = addListToUniqDSet acc_pkgs (Set.toList pkg_deps)
           --
           if not (isHomeUnit home_unit pkg)
              then follow_deps mods acc_mods (addOneToUniqDSet acc_pkgs' (toUnitId pkg))
-             else follow_deps (map (mkHomeModule home_unit) mod_deps' ++ mods)
+             else follow_deps (mod_deps' ++ mods)
                               acc_mods' acc_pkgs'
         where
-            msg = text "need to link module" <+> ppr mod <+>
+           msg = text "need to link module" <+> ppr mod <+>
                   text "due to use of Template Haskell"
 
 
+
+    link_boot_mod_error :: Module -> IO a
     link_boot_mod_error mod =
         throwGhcExceptionIO (ProgramError (showSDoc dflags (
             text "module" <+> ppr mod <+>
@@ -759,8 +838,8 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
 
         -- This one is a build-system bug
 
-    get_linkable osuf mod_name      -- A home-package module
-        | Just mod_info <- lookupHpt hpt mod_name
+    get_linkable osuf mod      -- A home-package module
+        | Just mod_info <- lookupHugByModule mod (hsc_HUG hsc_env)
         = adjust_linkable (Maybes.expectJust "getLinkDeps" (hm_linkable mod_info))
         | otherwise
         = do    -- It's not in the HPT because we are in one shot mode,
@@ -769,10 +848,10 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
              let home_unit = hsc_home_unit hsc_env
              let dflags = hsc_dflags hsc_env
              let fopts = initFinderOpts dflags
-             mb_stuff <- findHomeModule fc fopts home_unit mod_name
+             mb_stuff <- findHomeModule fc fopts home_unit (moduleName mod)
              case mb_stuff of
                   Found loc mod -> found loc mod
-                  _ -> no_obj mod_name
+                  _ -> no_obj (moduleName mod)
         where
             found loc mod = do {
                 -- ...and then find the linkable for it

@@ -32,7 +32,7 @@ module GHC.Tc.Utils.Monad(
   getEpsVar,
   getEps,
   updateEps, updateEps_,
-  getHpt, getEpsAndHpt,
+  getHpt, getEpsAndHug,
 
   -- * Arrow scopes
   newArrowScope, escapeArrowScope,
@@ -597,9 +597,9 @@ updateEps_ upd_fn = updateEps (\eps -> (upd_fn eps, ()))
 getHpt :: TcRnIf gbl lcl HomePackageTable
 getHpt = do { env <- getTopEnv; return (hsc_HPT env) }
 
-getEpsAndHpt :: TcRnIf gbl lcl (ExternalPackageState, HomePackageTable)
-getEpsAndHpt = do { env <- getTopEnv; eps <- liftIO $ hscEPS env
-                  ; return (eps, hsc_HPT env) }
+getEpsAndHug :: TcRnIf gbl lcl (ExternalPackageState, HomeUnitGraph)
+getEpsAndHug = do { env <- getTopEnv; eps <- liftIO $ hscEPS env
+                  ; return (eps, hsc_HUG env) }
 
 -- | A convenient wrapper for taking a @MaybeErr SDoc a@ and throwing
 -- an exception if it is an error.

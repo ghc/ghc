@@ -31,6 +31,7 @@ module Language.Haskell.TH.Syntax
 import Data.Data hiding (Fixity(..))
 import Data.IORef
 import System.IO.Unsafe ( unsafePerformIO )
+import System.FilePath
 import GHC.IO.Unsafe    ( unsafeDupableInterleaveIO )
 import Control.Monad (liftM)
 import Control.Monad.IO.Class (MonadIO (..))
@@ -103,6 +104,7 @@ class (MonadIO m, MonadFail m) => Quasi m where
   qRunIO :: IO a -> m a
   qRunIO = liftIO
   -- ^ Input/output (dangerous)
+  qGetPackageRoot :: m FilePath
 
   qAddDependentFile :: FilePath -> m ()
 
@@ -154,6 +156,7 @@ instance Quasi IO where
   qReifyConStrictness _ = badIO "reifyConStrictness"
   qLocation             = badIO "currentLocation"
   qRecover _ _          = badIO "recover" -- Maybe we could fix this?
+  qGetPackageRoot       = badIO "getProjectRoot"
   qAddDependentFile _   = badIO "addDependentFile"
   qAddTempFile _        = badIO "addTempFile"
   qAddTopDecls _        = badIO "addTopDecls"
@@ -708,6 +711,27 @@ location = Q qLocation
 runIO :: IO a -> Q a
 runIO m = Q (qRunIO m)
 
+-- | Get the package root for the current package which is being compiled.
+-- This can be set explicitly with the -package-root flag but is normally
+-- just the current working directory.
+--
+-- The motivation for this flag is to provide a principled means to remove the
+-- assumption from splices that they will be executed in the directory where the
+-- cabal file resides. Projects such as haskell-language-server can't and don't
+-- change directory when compiling files but instead set the -package-root flag
+-- appropiately.
+getPackageRoot :: Q FilePath
+getPackageRoot = Q qGetPackageRoot
+
+-- | The input is a filepath, which if relative is offset by the package root.
+makeRelativeToProject :: FilePath -> Q FilePath
+makeRelativeToProject fp | isRelative fp = do
+  root <- getPackageRoot
+  return (root </> fp)
+makeRelativeToProject fp = return fp
+
+
+
 -- | Record external files that runIO is using (dependent upon).
 -- The compiler can then recognize that it should re-compile the Haskell file
 -- when an external file changes.
@@ -858,6 +882,7 @@ instance Quasi Q where
   qReifyConStrictness = reifyConStrictness
   qLookupName         = lookupName
   qLocation           = location
+  qGetPackageRoot     = getPackageRoot
   qAddDependentFile   = addDependentFile
   qAddTempFile        = addTempFile
   qAddTopDecls        = addTopDecls

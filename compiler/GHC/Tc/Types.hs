@@ -1374,16 +1374,16 @@ peCategory NoDataKindsDC          = "data constructor"
 -}
 
 
-mkModDeps :: Set ModuleNameWithIsBoot
-          -> ModuleNameEnv ModuleNameWithIsBoot
-mkModDeps deps = S.foldl' add emptyUFM deps
+mkModDeps :: Set (UnitId, ModuleNameWithIsBoot)
+          -> InstalledModuleEnv ModuleNameWithIsBoot
+mkModDeps deps = S.foldl' add emptyInstalledModuleEnv deps
   where
-    add env elt = addToUFM env (gwib_mod elt) elt
+    add env (uid, elt) = extendInstalledModuleEnv env (mkModule uid (gwib_mod elt)) elt
 
-plusModDeps :: ModuleNameEnv ModuleNameWithIsBoot
-            -> ModuleNameEnv ModuleNameWithIsBoot
-            -> ModuleNameEnv ModuleNameWithIsBoot
-plusModDeps = plusUFM_C plus_mod_dep
+plusModDeps :: InstalledModuleEnv ModuleNameWithIsBoot
+            -> InstalledModuleEnv ModuleNameWithIsBoot
+            -> InstalledModuleEnv ModuleNameWithIsBoot
+plusModDeps = plusInstalledModuleEnv plus_mod_dep
   where
     plus_mod_dep r1@(GWIB { gwib_mod = m1, gwib_isBoot = boot1 })
                  r2@(GWIB {gwib_mod = m2, gwib_isBoot = boot2})
@@ -1396,12 +1396,12 @@ plusModDeps = plusUFM_C plus_mod_dep
 
 emptyImportAvails :: ImportAvails
 emptyImportAvails = ImportAvails { imp_mods          = emptyModuleEnv,
-                                   imp_direct_dep_mods = emptyUFM,
+                                   imp_direct_dep_mods = emptyInstalledModuleEnv,
                                    imp_dep_direct_pkgs = S.empty,
                                    imp_sig_mods      = [],
                                    imp_trust_pkgs    = S.empty,
                                    imp_trust_own_pkg = False,
-                                   imp_boot_mods   = emptyUFM,
+                                   imp_boot_mods   = emptyInstalledModuleEnv,
                                    imp_orphs         = [],
                                    imp_finsts        = [] }
 

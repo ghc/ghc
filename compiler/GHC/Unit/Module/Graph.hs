@@ -6,9 +6,9 @@
 module GHC.Unit.Module.Graph
    ( ModuleGraph
    , ModuleGraphNode(..)
+   , nodeDependencies
    , emptyMG
    , mkModuleGraph
-   , mkModuleGraph'
    , extendMG
    , extendMGInst
    , extendMG'
@@ -16,7 +16,6 @@ module GHC.Unit.Module.Graph
    , mapMG
    , mgModSummaries
    , mgModSummaries'
-   , mgExtendedModSummaries
    , mgElemModule
    , mgLookupModule
    , mgBootModules
@@ -35,8 +34,11 @@ module GHC.Unit.Module.Graph
    , mkNodeKey
    , msKey
 
-   )
 
+   , moduleGraphNodeUnitId
+
+   , ModNodeKeyWithUid(..)
+   )
 where
 
 import GHC.Prelude
@@ -60,8 +62,8 @@ import GHC.Utils.Outputable
 import System.FilePath
 import qualified Data.Map as Map
 import GHC.Types.Unique.DSet
-import GHC.Types.SrcLoc
 import qualified Data.Set as Set
+import GHC.Linker.Static
 
 -- | A '@ModuleGraphNode@' is a node in the '@ModuleGraph@'.
 -- Edges between nodes mark dependencies arising from module imports
@@ -69,18 +71,48 @@ import qualified Data.Set as Set
 data ModuleGraphNode
   -- | Instantiation nodes track the instantiation of other units
   -- (backpack dependencies) with the holes (signatures) of the current package.
-  = InstantiationNode InstantiatedUnit
+  = InstantiationNode UnitId InstantiatedUnit
   -- | There is a module summary node for each module, signature, and boot module being built.
-  | ModuleNode ExtendedModSummary
+  | ModuleNode [NodeKey] ModSummary
+  -- | Link nodes are whether are are creating a linked product (ie executable/shared object etc) for a unit.
+  | LinkNode [NodeKey] UnitId
 
-moduleGraphNodeModule :: ModuleGraphNode -> Maybe ExtendedModSummary
+moduleGraphNodeModule :: ModuleGraphNode -> Maybe ModSummary
 moduleGraphNodeModule (InstantiationNode {}) = Nothing
-moduleGraphNodeModule (ModuleNode ems)    = Just ems
+moduleGraphNodeModule (LinkNode {})          = Nothing
+moduleGraphNodeModule (ModuleNode _ ms)     = Just ms
+
+moduleGraphNodeUnitId :: ModuleGraphNode -> UnitId
+moduleGraphNodeUnitId mgn =
+  case mgn of
+    InstantiationNode uid _iud -> uid
+    ModuleNode _ ms           -> toUnitId (moduleUnit (ms_mod ms))
+    LinkNode _ uid             -> uid
 
 instance Outputable ModuleGraphNode where
   ppr = \case
-    InstantiationNode iuid -> ppr iuid
-    ModuleNode ems -> ppr ems
+    InstantiationNode _ iuid -> ppr iuid
+    ModuleNode nks ms -> ppr (ms_mnwib ms) <+> ppr nks
+    LinkNode uid _     -> text "LN:" <+> ppr uid
+
+data NodeKey = NodeKey_Unit {-# UNPACK #-} !InstantiatedUnit
+             | NodeKey_Module {-# UNPACK #-} !ModNodeKeyWithUid
+             | NodeKey_Link !UnitId
+  deriving (Eq, Ord)
+
+instance Outputable NodeKey where
+  ppr nk = pprNodeKey nk
+
+pprNodeKey :: NodeKey -> SDoc
+pprNodeKey (NodeKey_Unit iu) = ppr iu
+pprNodeKey (NodeKey_Module mk) = ppr mk
+pprNodeKey (NodeKey_Link uid)  = ppr uid
+
+data ModNodeKeyWithUid = ModNodeKeyWithUid { mnkModuleName :: ModuleNameWithIsBoot
+                                           , mnkUnitId     :: UnitId } deriving (Eq, Ord)
+
+instance Outputable ModNodeKeyWithUid where
+  ppr (ModNodeKeyWithUid mnwib uid) = ppr uid <> colon <> ppr mnwib
 
 -- | A '@ModuleGraph@' contains all the nodes from the home package (only). See
 -- '@ModuleGraphNode@' for information about the nodes.
@@ -121,8 +153,9 @@ needsTemplateHaskellOrQQ mg = mg_needs_th_or_qq mg
 mapMG :: (ModSummary -> ModSummary) -> ModuleGraph -> ModuleGraph
 mapMG f mg@ModuleGraph{..} = mg
   { mg_mss = flip fmap mg_mss $ \case
-      InstantiationNode iuid -> InstantiationNode iuid
-      ModuleNode (ExtendedModSummary ms bds) -> ModuleNode (ExtendedModSummary (f ms) bds)
+      InstantiationNode uid iuid -> InstantiationNode uid iuid
+      LinkNode uid nks -> LinkNode uid nks
+      ModuleNode deps ms  -> ModuleNode deps (f ms)
   , mg_non_boot = mapModuleEnv f mg_non_boot
   }
 
@@ -133,10 +166,7 @@ mgTransDeps :: ModuleGraph -> Map.Map NodeKey (Set.Set NodeKey)
 mgTransDeps = mg_trans_deps
 
 mgModSummaries :: ModuleGraph -> [ModSummary]
-mgModSummaries mg = [ m | ModuleNode (ExtendedModSummary m _) <- mgModSummaries' mg ]
-
-mgExtendedModSummaries :: ModuleGraph -> [ExtendedModSummary]
-mgExtendedModSummaries mg = [ ems | ModuleNode ems <- mgModSummaries' mg ]
+mgModSummaries mg = [ m | ModuleNode _ m <- mgModSummaries' mg ]
 
 mgModSummaries' :: ModuleGraph -> [ModuleGraphNode]
 mgModSummaries' = mg_mss
@@ -159,9 +189,9 @@ isTemplateHaskellOrQQNonBoot ms =
 
 -- | Add an ExtendedModSummary to ModuleGraph. Assumes that the new ModSummary is
 -- not an element of the ModuleGraph.
-extendMG :: ModuleGraph -> ExtendedModSummary -> ModuleGraph
-extendMG ModuleGraph{..} ems@(ExtendedModSummary ms _) = ModuleGraph
-  { mg_mss = ModuleNode ems : mg_mss
+extendMG :: ModuleGraph -> [NodeKey] -> ModSummary -> ModuleGraph
+extendMG ModuleGraph{..} deps ms = ModuleGraph
+  { mg_mss = ModuleNode deps ms : mg_mss
   , mg_trans_deps = td
   , mg_non_boot = case isBootSummary ms of
       IsBoot -> mg_non_boot
@@ -172,24 +202,25 @@ extendMG ModuleGraph{..} ems@(ExtendedModSummary ms _) = ModuleGraph
   , mg_needs_th_or_qq = mg_needs_th_or_qq || isTemplateHaskellOrQQNonBoot ms
   }
   where
-    (gg, _lookup_node) = moduleGraphNodes False (ModuleNode ems : mg_mss)
+    (gg, _lookup_node) = moduleGraphNodes False (ModuleNode deps ms : mg_mss)
     td = allReachable gg (mkNodeKey . node_payload)
 
-extendMGInst :: ModuleGraph -> InstantiatedUnit -> ModuleGraph
-extendMGInst mg depUnitId = mg
-  { mg_mss = InstantiationNode depUnitId : mg_mss mg
+extendMGInst :: ModuleGraph -> UnitId -> InstantiatedUnit -> ModuleGraph
+extendMGInst mg uid depUnitId = mg
+  { mg_mss = InstantiationNode uid depUnitId : mg_mss mg
   }
+
+extendMGLink :: ModuleGraph -> UnitId -> [NodeKey] -> ModuleGraph
+extendMGLink mg uid nks = mg { mg_mss = LinkNode nks uid : mg_mss mg }
 
 extendMG' :: ModuleGraph -> ModuleGraphNode -> ModuleGraph
 extendMG' mg = \case
-  InstantiationNode depUnitId -> extendMGInst mg depUnitId
-  ModuleNode ems -> extendMG mg ems
+  InstantiationNode uid depUnitId -> extendMGInst mg uid depUnitId
+  ModuleNode deps ms -> extendMG mg deps ms
+  LinkNode deps uid   -> extendMGLink mg uid deps
 
-mkModuleGraph :: [ExtendedModSummary] -> ModuleGraph
-mkModuleGraph = foldr (flip extendMG) emptyMG
-
-mkModuleGraph' :: [ModuleGraphNode] -> ModuleGraph
-mkModuleGraph' = foldr (flip extendMG') emptyMG
+mkModuleGraph :: [ModuleGraphNode] -> ModuleGraph
+mkModuleGraph = foldr (flip extendMG') emptyMG
 
 -- | This function filters out all the instantiation nodes from each SCC of a
 -- topological sort. Use this with care, as the resulting "strongly connected components"
@@ -198,8 +229,9 @@ mkModuleGraph' = foldr (flip extendMG') emptyMG
 filterToposortToModules
   :: [SCC ModuleGraphNode] -> [SCC ModSummary]
 filterToposortToModules = mapMaybe $ mapMaybeSCC $ \case
-  InstantiationNode _ -> Nothing
-  ModuleNode (ExtendedModSummary node _) -> Just node
+  InstantiationNode _ _ -> Nothing
+  LinkNode{} -> Nothing
+  ModuleNode _deps node -> Just node
   where
     -- This higher order function is somewhat bogus,
     -- as the definition of "strongly connected component"
@@ -213,9 +245,17 @@ filterToposortToModules = mapMaybe $ mapMaybeSCC $ \case
         as -> Just $ CyclicSCC as
 
 showModMsg :: DynFlags -> Bool -> ModuleGraphNode -> SDoc
-showModMsg _ _ (InstantiationNode indef_unit) =
+showModMsg dflags _ (LinkNode {}) =
+      let staticLink = case ghcLink dflags of
+                          LinkStaticLib -> True
+                          _ -> False
+
+          platform  = targetPlatform dflags
+          exe_file  = exeFileName platform staticLink (outputFile_ dflags)
+      in text exe_file
+showModMsg _ _ (InstantiationNode _uid indef_unit) =
   ppr $ instUnitInstanceOf indef_unit
-showModMsg dflags recomp (ModuleNode (ExtendedModSummary mod_summary _)) =
+showModMsg dflags recomp (ModuleNode _ mod_summary) =
   if gopt Opt_HideSourcePaths dflags
       then text mod_str
       else hsep $
@@ -240,7 +280,6 @@ showModMsg dflags recomp (ModuleNode (ExtendedModSummary mod_summary _)) =
 
 
 
-
 type SummaryNode = Node Int ModuleGraphNode
 
 summaryNodeKey :: SummaryNode -> Int
@@ -257,21 +296,22 @@ summaryNodeSummary = node_payload
 -- .hs, by introducing a cycle.  Additionally, it ensures that we will always
 -- process the .hs-boot before the .hs, and so the HomePackageTable will always
 -- have the most up to date information.
-unfilteredEdges :: Bool -> ModuleGraphNode -> [NodeKey]
-unfilteredEdges drop_hs_boot_nodes = \case
-    InstantiationNode iuid ->
-      NodeKey_Module . flip GWIB NotBoot <$> uniqDSetToList (instUnitHoles iuid)
-    ModuleNode (ExtendedModSummary ms bds) ->
-      [ NodeKey_Unit inst_unit | inst_unit <- bds ] ++
-      (NodeKey_Module . flip GWIB hs_boot_key . unLoc <$> ms_home_srcimps ms) ++
-      [ NodeKey_Module $ GWIB (ms_mod_name ms) IsBoot
+nodeDependencies :: Bool -> ModuleGraphNode -> [NodeKey]
+nodeDependencies drop_hs_boot_nodes = \case
+    LinkNode deps _uid -> deps
+    InstantiationNode uid iuid ->
+      NodeKey_Module . (\mod -> ModNodeKeyWithUid (GWIB mod NotBoot) uid)  <$> uniqDSetToList (instUnitHoles iuid)
+    ModuleNode deps ms ->
+      [ NodeKey_Module $ (ModNodeKeyWithUid (GWIB (ms_mod_name ms) IsBoot) (ms_unitid ms))
       | not $ drop_hs_boot_nodes || ms_hsc_src ms == HsBootFile
-      ] ++
-      (NodeKey_Module . flip GWIB NotBoot     . unLoc <$> ms_home_imps ms)
+      ] ++ map drop_hs_boot deps
   where
     -- Drop hs-boot nodes by using HsSrcFile as the key
     hs_boot_key | drop_hs_boot_nodes = NotBoot -- is regular mod or signature
                 | otherwise          = IsBoot
+
+    drop_hs_boot (NodeKey_Module (ModNodeKeyWithUid (GWIB mn IsBoot) uid)) = (NodeKey_Module (ModNodeKeyWithUid (GWIB mn hs_boot_key) uid))
+    drop_hs_boot x = x
 
 moduleGraphNodes :: Bool -> [ModuleGraphNode]
   -> (Graph SummaryNode, NodeKey -> Maybe SummaryNode)
@@ -295,39 +335,30 @@ moduleGraphNodes drop_hs_boot_nodes summaries =
 
     -- We use integers as the keys for the SCC algorithm
     nodes :: [SummaryNode]
-    nodes = [ DigraphNode s key $ out_edge_keys $ unfilteredEdges drop_hs_boot_nodes s
+    nodes = [ DigraphNode s key $ out_edge_keys $ nodeDependencies drop_hs_boot_nodes s
             | (s, key) <- numbered_summaries
              -- Drop the hi-boot ones if told to do so
             , case s of
-                InstantiationNode _ -> True
-                ModuleNode ems -> not $ isBootSummary (emsModSummary ems) == IsBoot && drop_hs_boot_nodes
+                InstantiationNode {} -> True
+                LinkNode {} -> True
+                ModuleNode _ ms -> not $ isBootSummary ms == IsBoot && drop_hs_boot_nodes
             ]
 
     out_edge_keys :: [NodeKey] -> [Int]
     out_edge_keys = mapMaybe lookup_key
         -- If we want keep_hi_boot_nodes, then we do lookup_key with
         -- IsBoot; else False
-
-type ModNodeKey = ModuleNameWithIsBoot
-
-data NodeKey = NodeKey_Unit {-# UNPACK #-} !InstantiatedUnit | NodeKey_Module {-# UNPACK #-} !ModNodeKey
-  deriving (Eq, Ord)
-
-instance Outputable NodeKey where
-  ppr nk = pprNodeKey nk
-
 newtype NodeMap a = NodeMap { unNodeMap :: Map.Map NodeKey a }
   deriving (Functor, Traversable, Foldable)
 
 mkNodeKey :: ModuleGraphNode -> NodeKey
 mkNodeKey = \case
-  InstantiationNode x -> NodeKey_Unit x
-  ModuleNode x -> NodeKey_Module $ ms_mnwib (emsModSummary x)
+  InstantiationNode _ iu -> NodeKey_Unit iu
+  ModuleNode _ x -> NodeKey_Module $ msKey x
+  LinkNode _ uid   -> NodeKey_Link uid
 
-msKey :: ModSummary -> ModuleNameWithIsBoot
-msKey = ms_mnwib
+msKey :: ModSummary -> ModNodeKeyWithUid
+msKey ms = ModNodeKeyWithUid (ms_mnwib ms) (ms_unitid ms)
 
-pprNodeKey :: NodeKey -> SDoc
-pprNodeKey (NodeKey_Unit iu) = ppr iu
-pprNodeKey (NodeKey_Module mk) = ppr mk
+type ModNodeKey = ModuleNameWithIsBoot
 

@@ -17,7 +17,7 @@ import GHC.Platform.Profile
 import GHC.Platform.Ways
 import GHC.Utils.Panic.Plain
 import GHC.Driver.Session
-import GHC.Driver.Env.Types
+import GHC.Driver.Env
 import GHC.Driver.Errors.Types
 import GHC.Data.Maybe
 import GHC.Prelude
@@ -212,7 +212,7 @@ cantFindErr using_cabal cannot_find _ unit_env profile tried_these mod_name find
   = cannot_find <+> quotes (ppr mod_name)
     $$ more_info
   where
-    mhome_unit = ue_home_unit unit_env
+    mhome_unit = ue_homeUnit unit_env
     more_info
       = case find_result of
             NoPackage pkg

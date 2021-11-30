@@ -73,7 +73,6 @@ import GHC.Types.Basic  ( TopLevelFlag(..) )
 import GHC.Types.SourceText
 import GHC.Types.Id
 import GHC.Types.HpcInfo
-import GHC.Types.Unique.FM
 import GHC.Types.Error
 import GHC.Types.PkgQual
 
@@ -217,7 +216,7 @@ rnImports imports = do
     clobberSourceImports imp_avails =
       imp_avails { imp_boot_mods = imp_boot_mods' }
       where
-        imp_boot_mods' = mergeUFM combJ id (const mempty)
+        imp_boot_mods' = mergeInstalledModuleEnv combJ id (const emptyInstalledModuleEnv)
                             (imp_boot_mods imp_avails)
                             (imp_direct_dep_mods imp_avails)
 
@@ -327,6 +326,7 @@ rnImportDecl this_mod
     let imp_mod_name = unLoc loc_imp_mod_name
         doc = ppr imp_mod_name <+> import_reason
 
+    hsc_env <- getTopEnv
     unit_env <- hsc_unit_env <$> getTopEnv
     let pkg_qual = renameRawPkgQual unit_env raw_pkg_qual
 
@@ -348,7 +348,7 @@ rnImportDecl this_mod
                             -- or the name of this_mod's package.  Yurgh!
                             -- c.f. GHC.findModule, and #9997
              NoPkgQual         -> True
-             ThisPkg _         -> True
+             ThisPkg uid       -> uid == homeUnitId_ (hsc_dflags hsc_env)
              OtherPkg _        -> False))
          (addErr $ TcRnUnknownMessage $ mkPlainError noHints $
            (text "A module cannot import itself:" <+> ppr imp_mod_name))
@@ -413,6 +413,7 @@ rnImportDecl this_mod
 
     hsc_env <- getTopEnv
     let home_unit = hsc_home_unit hsc_env
+        other_home_units = hsc_all_home_unit_ids hsc_env
         imv = ImportedModsVal
             { imv_name        = qual_mod_name
             , imv_span        = locA loc
@@ -421,7 +422,7 @@ rnImportDecl this_mod
             , imv_all_exports = potential_gres
             , imv_qualified   = qual_only
             }
-        imports = calculateAvails home_unit iface mod_safe' want_boot (ImportedByUser imv)
+        imports = calculateAvails home_unit other_home_units iface mod_safe' want_boot (ImportedByUser imv)
 
     -- Complain if we import a deprecated module
     case mi_warns iface of
@@ -463,9 +464,13 @@ renamePkgQual :: UnitEnv -> Maybe FastString -> PkgQual
 renamePkgQual unit_env mb_pkg = case mb_pkg of
   Nothing -> NoPkgQual
   Just pkg_fs
-    | Just uid <- homeUnitId <$> ue_home_unit unit_env
-    , pkg_fs == fsLit "this" || pkg_fs == unitFS uid
+    | Just uid <- homeUnitId <$> ue_homeUnit unit_env
+    , pkg_fs == fsLit "this"
     -> ThisPkg uid
+
+    | Just (uid, _) <- find (fromMaybe False . fmap (== pkg_fs) . snd) home_names
+    -> ThisPkg uid
+
 
     | Just uid <- lookupPackageName (ue_units unit_env) (PackageName pkg_fs)
     -> OtherPkg uid
@@ -474,16 +479,25 @@ renamePkgQual unit_env mb_pkg = case mb_pkg of
     -> OtherPkg (UnitId pkg_fs)
        -- not really correct as pkg_fs is unlikely to be a valid unit-id but
        -- we will report the failure later...
+  where
+    home_names  = map (\uid -> (uid, mkFastString <$> thisPackageName (homeUnitEnv_dflags (ue_findHomeUnitEnv uid unit_env)))) hpt_deps
+
+    units = ue_units unit_env
+
+    hpt_deps :: [UnitId]
+    hpt_deps  = homeUnitDepends units
+
 
 -- | Calculate the 'ImportAvails' induced by an import of a particular
 -- interface, but without 'imp_mods'.
 calculateAvails :: HomeUnit
+                -> S.Set UnitId
                 -> ModIface
                 -> IsSafeImport
                 -> IsBootInterface
                 -> ImportedBy
                 -> ImportAvails
-calculateAvails home_unit iface mod_safe' want_boot imported_by =
+calculateAvails home_unit other_home_units iface mod_safe' want_boot imported_by =
   let imp_mod    = mi_module iface
       imp_sem_mod= mi_semantic_module iface
       orph_iface = mi_orphan (mi_final_exts iface)
@@ -545,24 +559,24 @@ calculateAvails home_unit iface mod_safe' want_boot imported_by =
         | isHomeUnit home_unit pkg = ptrust
         | otherwise = False
 
-      dependent_pkgs = if isHomeUnit home_unit pkg
+      dependent_pkgs = if (toUnitId pkg) `elem` other_home_units
                         then S.empty
                         else S.singleton ipkg
 
-      direct_mods = mkModDeps $ if isHomeUnit home_unit pkg
-                      then S.singleton (GWIB (moduleName imp_mod) want_boot)
+      direct_mods = mkModDeps $ if toUnitId pkg `elem` other_home_units
+                      then S.singleton (moduleUnitId imp_mod, (GWIB (moduleName imp_mod) want_boot))
                       else S.empty
 
       dep_boot_mods_map = mkModDeps (dep_boot_mods deps)
 
       boot_mods
         -- If we are looking for a boot module, it must be HPT
-        | IsBoot <- want_boot = addToUFM dep_boot_mods_map (moduleName imp_mod) (GWIB (moduleName imp_mod) IsBoot)
+        | IsBoot <- want_boot = extendInstalledModuleEnv dep_boot_mods_map (toUnitId <$> imp_mod) (GWIB (moduleName imp_mod) IsBoot)
         -- Now we are importing A properly, so don't go looking for
         -- A.hs-boot
         | isHomeUnit home_unit pkg = dep_boot_mods_map
         -- There's no boot files to find in external imports
-        | otherwise = emptyUFM
+        | otherwise = emptyInstalledModuleEnv
 
       sig_mods =
         if is_sig

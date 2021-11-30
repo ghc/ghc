@@ -31,7 +31,10 @@ module GHC (
         DynFlags(..), GeneralFlag(..), Severity(..), Backend(..), gopt,
         GhcMode(..), GhcLink(..),
         parseDynamicFlags, parseTargetFiles,
-        getSessionDynFlags, setSessionDynFlags,
+        getSessionDynFlags,
+        setTopSessionDynFlags,
+        setSessionDynFlags,
+        setUnitDynFlags,
         getProgramDynFlags, setProgramDynFlags,
         getInteractiveDynFlags, setInteractiveDynFlags,
         interpretPackageEnv,
@@ -425,6 +428,7 @@ import System.IO.Error  ( isDoesNotExistError )
 import System.Environment ( getEnv, getProgName )
 import System.Directory
 import Data.List (isPrefixOf)
+import qualified Data.Set as S
 
 
 -- %************************************************************************
@@ -632,22 +636,80 @@ checkBrokenTablesNextToCode' logger dflags
 -- 'setSessionDynFlags' sets both @DynFlags@, and 'getSessionDynFlags'
 -- retrieves the program @DynFlags@ (for backwards compatibility).
 
-
--- | Updates both the interactive and program DynFlags in a Session.
--- This also reads the package database (unless it has already been
--- read), and prepares the compilers knowledge about packages.  It can
--- be called again to load new packages: just add new package flags to
--- (packageFlags dflags).
-setSessionDynFlags :: GhcMonad m => DynFlags -> m ()
+-- This is a compatability function which sets dynflags for the top session
+-- as well as the unit.
+setSessionDynFlags :: (HasCallStack, GhcMonad m) => DynFlags -> m ()
 setSessionDynFlags dflags0 = do
+  hsc_env <- getSession
+  logger <- getLogger
+  dflags <- checkNewDynFlags logger dflags0
+  let all_uids = hsc_all_home_unit_ids hsc_env
+  case S.toList all_uids of
+    [uid] -> do
+      setUnitDynFlagsNoCheck uid dflags
+      modifySession (hscSetActiveUnitId (homeUnitId_ dflags))
+      dflags' <- getDynFlags
+      setTopSessionDynFlags dflags'
+    [] -> panic "nohue"
+    _ -> panic "setSessionDynFlags can only be used with a single home unit"
+
+
+setUnitDynFlags :: GhcMonad m => UnitId -> DynFlags -> m ()
+setUnitDynFlags uid dflags0 = do
   logger <- getLogger
   dflags1 <- checkNewDynFlags logger dflags0
-  hsc_env <- getSession
-  let old_unit_env    = hsc_unit_env hsc_env
-  let cached_unit_dbs = ue_unit_dbs old_unit_env
-  (dbs,unit_state,home_unit,mconstants) <- liftIO $ initUnits logger dflags1 cached_unit_dbs
+  setUnitDynFlagsNoCheck uid dflags1
 
-  dflags <- liftIO $ updatePlatformConstants dflags1 mconstants
+setUnitDynFlagsNoCheck :: GhcMonad m => UnitId -> DynFlags -> m ()
+setUnitDynFlagsNoCheck uid dflags1 = do
+  logger <- getLogger
+  hsc_env <- getSession
+
+  let old_hue = ue_findHomeUnitEnv uid (hsc_unit_env hsc_env)
+  let cached_unit_dbs = homeUnitEnv_unit_dbs old_hue
+  (dbs,unit_state,home_unit,mconstants) <- liftIO $ initUnits logger dflags1 cached_unit_dbs (hsc_all_home_unit_ids hsc_env)
+  updated_dflags <- liftIO $ updatePlatformConstants dflags1 mconstants
+
+  let upd hue =
+       hue
+          { homeUnitEnv_units = unit_state
+          , homeUnitEnv_unit_dbs = Just dbs
+          , homeUnitEnv_dflags = updated_dflags
+          , homeUnitEnv_home_unit = Just home_unit
+          }
+
+  let unit_env = ue_updateHomeUnitEnv upd uid (hsc_unit_env hsc_env)
+
+  let dflags = updated_dflags
+
+  let unit_env0 = unit_env
+        { ue_platform        = targetPlatform dflags
+        , ue_namever         = ghcNameVersion dflags
+        }
+
+  -- if necessary, change the key for the currently active unit
+  -- as the dynflags might have been changed
+  let !unit_env1 =
+        if homeUnitId_ dflags /= ue_currentUnit unit_env
+          then
+            ue_renameUnitId
+                  (ue_currentUnit unit_env)
+                  (homeUnitId_ dflags)
+                  unit_env0
+          else unit_env0
+
+  modifySession $ \h -> h{ hsc_unit_env  = unit_env1
+                         }
+
+  invalidateModSummaryCache
+
+
+
+
+setTopSessionDynFlags :: GhcMonad m => DynFlags -> m ()
+setTopSessionDynFlags dflags = do
+  hsc_env <- getSession
+  logger  <- getLogger
 
   -- Interpreter
   interp <- if gopt Opt_ExternalInterpreter dflags
@@ -685,22 +747,10 @@ setSessionDynFlags dflags0 = do
       return Nothing
 #endif
 
-  let unit_env = UnitEnv
-        { ue_platform  = targetPlatform dflags
-        , ue_namever   = ghcNameVersion dflags
-        , ue_home_unit = Just home_unit
-        , ue_hpt       = ue_hpt old_unit_env
-        , ue_eps       = ue_eps old_unit_env
-        , ue_units     = unit_state
-        , ue_unit_dbs  = Just dbs
-        }
 
-  modifySession $ \h -> hscSetFlags dflags $
+  modifySession $ \h -> hscSetFlags dflags
                         h{ hsc_IC = (hsc_IC h){ ic_dflags = dflags }
                          , hsc_interp = hsc_interp h <|> interp
-                           -- we only update the interpreter if there wasn't
-                           -- already one set up
-                         , hsc_unit_env = unit_env
                          }
 
   invalidateModSummaryCache
@@ -722,22 +772,35 @@ setProgramDynFlags_ invalidate_needed dflags = do
   let changed = packageFlagsChanged dflags_prev dflags0
   if changed
     then do
-        old_unit_env <- hsc_unit_env <$> getSession
-        let cached_unit_dbs = ue_unit_dbs old_unit_env
-        (dbs,unit_state,home_unit,mconstants) <- liftIO $ initUnits logger dflags0 cached_unit_dbs
+        -- additionally, set checked dflags so we don't lose fixes
+        old_unit_env <- ue_setFlags dflags0 . hsc_unit_env <$> getSession
 
-        dflags1 <- liftIO $ updatePlatformConstants dflags0 mconstants
+        home_unit_graph <- forM (ue_home_unit_graph old_unit_env) $ \homeUnitEnv -> do
+          let cached_unit_dbs = homeUnitEnv_unit_dbs homeUnitEnv
+              dflags = homeUnitEnv_dflags homeUnitEnv
+              old_hpt = homeUnitEnv_hpt homeUnitEnv
+              home_units = unitEnv_keys (ue_home_unit_graph old_unit_env)
 
+          (dbs,unit_state,home_unit,mconstants) <- liftIO $ initUnits logger dflags cached_unit_dbs home_units
+
+          updated_dflags <- liftIO $ updatePlatformConstants dflags0 mconstants
+          pure HomeUnitEnv
+            { homeUnitEnv_units = unit_state
+            , homeUnitEnv_unit_dbs = Just dbs
+            , homeUnitEnv_dflags = updated_dflags
+            , homeUnitEnv_hpt = old_hpt
+            , homeUnitEnv_home_unit = Just home_unit
+            }
+
+        let dflags1 = homeUnitEnv_dflags $ unitEnv_lookup (ue_currentUnit old_unit_env) home_unit_graph
         let unit_env = UnitEnv
-              { ue_platform  = targetPlatform dflags1
-              , ue_namever   = ghcNameVersion dflags1
-              , ue_home_unit = Just home_unit
-              , ue_hpt       = ue_hpt old_unit_env
-              , ue_eps       = ue_eps old_unit_env
-              , ue_units     = unit_state
-              , ue_unit_dbs  = Just dbs
+              { ue_platform        = targetPlatform dflags1
+              , ue_namever         = ghcNameVersion dflags1
+              , ue_home_unit_graph = home_unit_graph
+              , ue_current_unit    = ue_currentUnit old_unit_env
+              , ue_eps             = ue_eps old_unit_env
               }
-        modifySession $ \h -> hscSetFlags dflags1 $ h{ hsc_unit_env = unit_env }
+        modifySession $ \h -> hscSetFlags dflags1 h{ hsc_unit_env = unit_env }
     else modifySession (hscSetFlags dflags0)
 
   when invalidate_needed $ invalidateModSummaryCache
@@ -828,7 +891,8 @@ parseTargetFiles :: DynFlags -> [String] -> (DynFlags, [(String, Maybe Phase)], 
 parseTargetFiles dflags0 fileish_args =
   let
     normal_fileish_paths = map normalise_hyp fileish_args
-    (srcs, objs)         = partition_args normal_fileish_paths [] []
+    (srcs, raw_objs)         = partition_args normal_fileish_paths [] []
+    objs = map (augmentByWorkingDirectory dflags0) raw_objs
 
     dflags1 = dflags0 { ldInputs = map (FileOption "") objs
                                    ++ ldInputs dflags0 }
@@ -1025,7 +1089,7 @@ unitIdOrHomeUnit mUnitId = do
 workingDirectoryChanged :: GhcMonad m => m ()
 workingDirectoryChanged = do
   hsc_env <- getSession
-  liftIO $ flushFinderCaches (hsc_FC hsc_env) (hsc_home_unit hsc_env)
+  liftIO $ flushFinderCaches (hsc_FC hsc_env) (hsc_unit_env hsc_env)
 
 
 -- %************************************************************************
@@ -1389,7 +1453,7 @@ availsToGlobalRdrEnv mod_name avails
 
 getHomeModuleInfo :: HscEnv -> Module -> IO (Maybe ModuleInfo)
 getHomeModuleInfo hsc_env mdl =
-  case lookupHpt (hsc_HPT hsc_env) (moduleName mdl) of
+  case lookupHugByModule mdl (hsc_HUG hsc_env) of
     Nothing  -> return Nothing
     Just hmi -> do
       let details = hm_details hmi
@@ -1643,25 +1707,22 @@ findModule mod_name maybe_pkg = do
 
 findQualifiedModule :: GhcMonad m => PkgQual -> ModuleName -> m Module
 findQualifiedModule pkgqual mod_name = withSession $ \hsc_env -> do
-  let fc        = hsc_FC hsc_env
   let home_unit = hsc_home_unit hsc_env
-  let units     = hsc_units hsc_env
   let dflags    = hsc_dflags hsc_env
-  let fopts     = initFinderOpts dflags
   case pkgqual of
-    ThisPkg _ -> do
-      home <- lookupLoadedHomeModule mod_name
+    ThisPkg uid -> do
+      home <- lookupLoadedHomeModule uid mod_name
       case home of
         Just m  -> return m
         Nothing -> liftIO $ do
-           res <- findImportedModule fc fopts units home_unit mod_name pkgqual
+           res <- findImportedModule hsc_env mod_name pkgqual
            case res of
              Found loc m | not (isHomeModule home_unit m) -> return m
                          | otherwise -> modNotLoadedError dflags m loc
              err -> throwOneError $ noModError hsc_env noSrcSpan mod_name err
 
     _ -> liftIO $ do
-      res <- findImportedModule fc fopts units home_unit mod_name pkgqual
+      res <- findImportedModule hsc_env mod_name pkgqual
       case res of
         Found _ m -> return m
         err       -> throwOneError $ noModError hsc_env noSrcSpan mod_name err
@@ -1693,7 +1754,7 @@ lookupModule mod_name maybe_pkg = do
 
 lookupQualifiedModule :: GhcMonad m => PkgQual -> ModuleName -> m Module
 lookupQualifiedModule NoPkgQual mod_name = withSession $ \hsc_env -> do
-  home <- lookupLoadedHomeModule mod_name
+  home <- lookupLoadedHomeModule (homeUnitId $ hsc_home_unit hsc_env) mod_name
   case home of
     Just m  -> return m
     Nothing -> liftIO $ do
@@ -1707,9 +1768,9 @@ lookupQualifiedModule NoPkgQual mod_name = withSession $ \hsc_env -> do
         err       -> throwOneError $ noModError hsc_env noSrcSpan mod_name err
 lookupQualifiedModule pkgqual mod_name = findQualifiedModule pkgqual mod_name
 
-lookupLoadedHomeModule :: GhcMonad m => ModuleName -> m (Maybe Module)
-lookupLoadedHomeModule mod_name = withSession $ \hsc_env ->
-  case lookupHpt (hsc_HPT hsc_env) mod_name of
+lookupLoadedHomeModule :: GhcMonad m => UnitId -> ModuleName -> m (Maybe Module)
+lookupLoadedHomeModule uid mod_name = withSession $ \hsc_env ->
+  case lookupHug  (hsc_HUG hsc_env) uid mod_name  of
     Just mod_info      -> return (Just (mi_module (hm_iface mod_info)))
     _not_a_home_module -> return Nothing
 

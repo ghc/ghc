@@ -134,6 +134,7 @@ import GHC.Tc.Utils.Instantiate (instDFunType)
 import GHC.Tc.Solver (simplifyWantedsTcM)
 import GHC.Tc.Utils.Monad
 import GHC.Core.Class (classTyCon)
+import GHC.Unit.Env
 
 -- -----------------------------------------------------------------------------
 -- running a statement interactively
@@ -150,7 +151,7 @@ getHistoryModule = breakInfo_module . historyBreakInfo
 getHistorySpan :: HscEnv -> History -> SrcSpan
 getHistorySpan hsc_env History{..} =
   let BreakInfo{..} = historyBreakInfo in
-  case lookupHpt (hsc_HPT hsc_env) (moduleName breakInfo_module) of
+  case lookupHugByModule breakInfo_module (hsc_HUG hsc_env) of
     Just hmi -> modBreaks_locs (getModBreaks hmi) ! breakInfo_number
     _ -> panic "getHistorySpan"
 
@@ -161,7 +162,7 @@ getHistorySpan hsc_env History{..} =
 findEnclosingDecls :: HscEnv -> BreakInfo -> [String]
 findEnclosingDecls hsc_env (BreakInfo modl ix) =
    let hmi = expectJust "findEnclosingDecls" $
-             lookupHpt (hsc_HPT hsc_env) (moduleName modl)
+             lookupHugByModule modl (hsc_HUG hsc_env)
        mb = getModBreaks hmi
    in modBreaks_decls mb ! ix
 
@@ -1248,8 +1249,7 @@ showModule mod_summary =
     withSession $ \hsc_env -> do
         interpreted <- moduleIsBootOrNotObjectLinkable mod_summary
         let dflags = hsc_dflags hsc_env
-        -- extendModSummaryNoDeps because the message doesn't look at the deps
-        return (showSDoc dflags $ showModMsg dflags interpreted (ModuleNode (extendModSummaryNoDeps mod_summary)))
+        return (showSDoc dflags $ showModMsg dflags interpreted (ModuleNode [] mod_summary))
 
 moduleIsBootOrNotObjectLinkable :: GhcMonad m => ModSummary -> m Bool
 moduleIsBootOrNotObjectLinkable mod_summary = withSession $ \hsc_env ->

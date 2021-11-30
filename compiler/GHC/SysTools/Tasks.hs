@@ -48,10 +48,20 @@ runUnlit logger dflags args = traceToolCommand logger "unlit" $ do
   runSomething logger "Literate pre-processor" prog
                (map Option opts ++ args)
 
+-- | Prepend the working directory to the search path.
+augmentImports :: DynFlags  -> [FilePath] -> [FilePath]
+augmentImports dflags fps | Nothing <- workingDirectory dflags  = fps
+augmentImports _ [] = []
+augmentImports _ [x] = [x]
+augmentImports dflags ("-include":fp:fps) = "-include" : augmentByWorkingDirectory dflags fp  : augmentImports dflags fps
+augmentImports dflags (fp1: fp2: fps) = fp1 : augmentImports dflags (fp2:fps)
+
 runCpp :: Logger -> DynFlags -> [Option] -> IO ()
 runCpp logger dflags args = traceToolCommand logger "cpp" $ do
+  let opts = getOpts dflags opt_P
+      modified_imports = augmentImports dflags opts
   let (p,args0) = pgm_P dflags
-      args1 = map Option (getOpts dflags opt_P)
+      args1 = map Option modified_imports
       args2 = [Option "-Werror" | gopt Opt_WarnIsError dflags]
                 ++ [Option "-Wundef" | wopt Opt_WarnCPPUndef dflags]
   mb_env <- getGccEnv args2

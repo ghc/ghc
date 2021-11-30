@@ -407,6 +407,7 @@ Library
         GHC.Driver.Pipeline
         GHC.Driver.Pipeline.Execute
         GHC.Driver.Pipeline.LogQueue
+        GHC.Driver.Pipeline.LogQueuePar
         GHC.Driver.Pipeline.Phases
         GHC.Driver.Pipeline.Monad
         GHC.Driver.Plugins

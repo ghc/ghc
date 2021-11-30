@@ -37,7 +37,7 @@ fingerprintDynFlags :: HscEnv -> Module
 
 fingerprintDynFlags hsc_env this_mod nameio =
     let dflags@DynFlags{..} = hsc_dflags hsc_env
-        mainis   = if mainModIs hsc_env == this_mod then Just mainFunIs else Nothing
+        mainis   = if mainModIs (hsc_HUE hsc_env) == this_mod then Just mainFunIs else Nothing
                       -- see #5878
         -- pkgopts  = (homeUnit home_unit, sort $ packageFlags dflags)
         safeHs   = setSafeMode safeHaskell

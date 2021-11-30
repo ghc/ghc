@@ -30,7 +30,6 @@ import GHC.Types.Annotations ( AnnEnv, emptyAnnEnv )
 import GHC.Types.CompleteMatch
 import GHC.Types.TypeEnv
 import GHC.Types.Unique.DSet
-import GHC.Types.Unique.FM
 
 import Data.IORef
 
@@ -62,7 +61,7 @@ initExternalUnitCache = ExternalUnitCache <$> newIORef initExternalPackageState
 
 initExternalPackageState :: ExternalPackageState
 initExternalPackageState = EPS
-  { eps_is_boot          = emptyUFM
+  { eps_is_boot          = emptyInstalledModuleEnv
   , eps_PIT              = emptyPackageIfaceTable
   , eps_free_holes       = emptyInstalledModuleEnv
   , eps_PTE              = emptyTypeEnv
@@ -89,7 +88,7 @@ initExternalPackageState = EPS
 -- their interface files
 data ExternalPackageState
   = EPS {
-        eps_is_boot :: !(ModuleNameEnv ModuleNameWithIsBoot),
+        eps_is_boot :: !(InstalledModuleEnv ModuleNameWithIsBoot),
                 -- ^ In OneShot mode (only), home-package modules
                 -- accumulate in the external package state, and are
                 -- sucked in lazily.  For these home-pkg modules

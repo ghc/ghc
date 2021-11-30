@@ -183,7 +183,8 @@ withBkpSession cid insts deps session_type do_this = do
                  , not (null insts) = sub_comp (key_base p) </> uid_str
                  | otherwise = sub_comp (key_base p)
 
-        mk_temp_env hsc_env = hscUpdateFlags (\dflags -> mk_temp_dflags (hsc_units hsc_env) dflags) hsc_env
+        mk_temp_env hsc_env =
+          hscUpdateFlags (\dflags -> mk_temp_dflags (hsc_units hsc_env) dflags) hsc_env
         mk_temp_dflags unit_state dflags = dflags
             { backend = case session_type of
                             TcSession -> NoBackend
@@ -322,7 +323,7 @@ buildUnit session cid insts lunit = do
     conf <- withBkpSession cid insts deps_w_rns session $ do
 
         dflags <- getDynFlags
-        mod_graph <- hsunitModuleGraph (unLoc lunit)
+        mod_graph <- hsunitModuleGraph False (unLoc lunit)
 
         msg <- mkBackpackMsg
         (ok, _) <- load' [] LoadAllTargets (Just msg) mod_graph
@@ -412,7 +413,7 @@ compileExe lunit = do
     forM_ (zip [1..] deps) $ \(i, dep) ->
         compileInclude (length deps) (i, dep)
     withBkpExeSession deps_w_rns $ do
-        mod_graph <- hsunitModuleGraph (unLoc lunit)
+        mod_graph <- hsunitModuleGraph True (unLoc lunit)
         msg <- mkBackpackMsg
         (ok, _) <- load' [] LoadAllTargets (Just msg) mod_graph
         when (failed ok) (liftIO $ exitWith (ExitFailure 1))
@@ -432,19 +433,21 @@ addUnit u = do
                , unitDatabaseUnits = [u]
                }
          in return (dbs ++ [newdb]) -- added at the end because ordering matters
-    (dbs,unit_state,home_unit,mconstants) <- liftIO $ initUnits logger dflags0 (Just newdbs)
+    (dbs,unit_state,home_unit,mconstants) <- liftIO $ initUnits logger dflags0 (Just newdbs) (hsc_all_home_unit_ids hsc_env)
 
     -- update platform constants
     dflags <- liftIO $ updatePlatformConstants dflags0 mconstants
 
-    let unit_env = UnitEnv
+    let unit_env = ue_setUnits unit_state $ ue_setUnitDbs (Just dbs) $ UnitEnv
           { ue_platform  = targetPlatform dflags
           , ue_namever   = ghcNameVersion dflags
-          , ue_home_unit = Just home_unit
-          , ue_hpt       = ue_hpt old_unit_env
+          , ue_current_unit = homeUnitId home_unit
+
+          , ue_home_unit_graph =
+                unitEnv_singleton
+                    (homeUnitId home_unit)
+                    (mkHomeUnitEnv dflags (ue_hpt old_unit_env) (Just home_unit))
           , ue_eps       = ue_eps old_unit_env
-          , ue_units     = unit_state
-          , ue_unit_dbs  = Just dbs
           }
     setSession $ hscSetFlags dflags $ hsc_env { hsc_unit_env = unit_env }
 
@@ -565,7 +568,7 @@ mkBackpackMsg = do
                 msg <> showModMsg dflags (recompileRequired recomp) node
                     <> reason
       in case node of
-        InstantiationNode _ ->
+        InstantiationNode _ _ ->
           case recomp of
             MustCompile -> showMsg (text "Instantiating ") empty
             UpToDate
@@ -573,7 +576,7 @@ mkBackpackMsg = do
               | otherwise -> return ()
             RecompBecause reason -> showMsg (text "Instantiating ")
                                             (text " [" <> pprWithUnitState state (ppr reason) <> text "]")
-        ModuleNode _ ->
+        ModuleNode _ _ ->
           case recomp of
             MustCompile -> showMsg (text "Compiling ") empty
             UpToDate
@@ -581,6 +584,7 @@ mkBackpackMsg = do
               | otherwise -> return ()
             RecompBecause reason -> showMsg (text "Compiling ")
                                             (text " [" <> pprWithUnitState state (ppr reason) <> text "]")
+        LinkNode _ _ -> showMsg (text "Linking ")  empty
 
 -- | 'PprStyle' for Backpack messages; here we usually want the module to
 -- be qualified (so we can tell how it was instantiated.) But we try not
@@ -709,18 +713,21 @@ convertHsModuleId (HsModuleId (L _ hsuid) (L _ modname)) = mkModule (convertHsCo
 --
 -- We don't bother trying to support GHC.Driver.Make for now, it's more trouble
 -- than it's worth for inline modules.
-hsunitModuleGraph :: HsUnit HsComponentId -> BkpM ModuleGraph
-hsunitModuleGraph unit = do
+hsunitModuleGraph :: Bool -> HsUnit HsComponentId -> BkpM ModuleGraph
+hsunitModuleGraph do_link unit = do
     hsc_env <- getSession
 
     let decls = hsunitBody unit
         pn = hsPackageName (unLoc (hsunitName unit))
         home_unit = hsc_home_unit hsc_env
 
+        sig_keys = flip map (homeUnitInstantiations home_unit) $ \(mod_name, _) -> NodeKey_Module (ModNodeKeyWithUid (GWIB mod_name NotBoot) (homeUnitId home_unit))
+        keys = [NodeKey_Module (ModNodeKeyWithUid gwib (homeUnitId home_unit)) | (DeclD hsc_src lmodname _) <- map unLoc decls, let gwib = GWIB (unLoc lmodname) (hscSourceToIsBoot hsc_src) ]
+
     --  1. Create a HsSrcFile/HsigFile summary for every
     --  explicitly mentioned module/signature.
     let get_decl (L _ (DeclD hsc_src lmodname mb_hsmod)) =
-          Just `fmap` summariseDecl pn hsc_src lmodname mb_hsmod
+          Just `fmap` summariseDecl pn hsc_src lmodname mb_hsmod (keys ++ sig_keys)
         get_decl _ = return Nothing
     nodes <- catMaybes `fmap` mapM get_decl decls
 
@@ -729,18 +736,17 @@ hsunitModuleGraph unit = do
     --  requirement.
     let hsig_set = Set.fromList
           [ ms_mod_name ms
-          | ExtendedModSummary { emsModSummary = ms } <- nodes
+          | ModuleNode _ ms <- nodes
           , ms_hsc_src ms == HsigFile
           ]
     req_nodes <- fmap catMaybes . forM (homeUnitInstantiations home_unit) $ \(mod_name, _) ->
         if Set.member mod_name hsig_set
             then return Nothing
-            else fmap (Just . extendModSummaryNoDeps) $ summariseRequirement pn mod_name
-            -- Using extendModSummaryNoDeps here is okay because we're making a leaf node
-            -- representing a signature that can't depend on any other unit.
+            else fmap Just $ summariseRequirement pn mod_name
 
-    let graph_nodes = (ModuleNode <$> (nodes ++ req_nodes)) ++ (instantiationNodes (hsc_units hsc_env))
+    let graph_nodes = nodes ++ req_nodes ++ (instantiationNodes (homeUnitId $ hsc_home_unit hsc_env) (hsc_units hsc_env))
         key_nodes = map mkNodeKey graph_nodes
+        all_nodes = graph_nodes ++ [LinkNode key_nodes (homeUnitId $ hsc_home_unit hsc_env) | do_link]
     -- This error message is not very good but .bkp mode is just for testing so
     -- better to be direct rather than pretty.
     when
@@ -748,10 +754,10 @@ hsunitModuleGraph unit = do
       (pprPanic "Duplicate nodes keys in backpack file" (ppr key_nodes))
 
     -- 3. Return the kaboodle
-    return $ mkModuleGraph' $ graph_nodes
+    return $ mkModuleGraph $ all_nodes
 
 
-summariseRequirement :: PackageName -> ModuleName -> BkpM ModSummary
+summariseRequirement :: PackageName -> ModuleName -> BkpM ModuleGraphNode
 summariseRequirement pn mod_name = do
     hsc_env <- getSession
     let dflags = hsc_dflags hsc_env
@@ -773,7 +779,7 @@ summariseRequirement pn mod_name = do
 
     extra_sig_imports <- liftIO $ findExtraSigImports hsc_env HsigFile mod_name
 
-    return ModSummary {
+    let ms = ModSummary {
         ms_mod = mod,
         ms_hsc_src = HsigFile,
         ms_location = location,
@@ -802,39 +808,31 @@ summariseRequirement pn mod_name = do
         ms_hspp_opts = dflags,
         ms_hspp_buf = Nothing
         }
+    let nodes = [NodeKey_Module (ModNodeKeyWithUid (GWIB mn NotBoot) (homeUnitId home_unit)) | mn <- extra_sig_imports ]
+    return (ModuleNode nodes ms)
 
 summariseDecl :: PackageName
               -> HscSource
               -> Located ModuleName
               -> Maybe (Located HsModule)
-              -> BkpM ExtendedModSummary
-summariseDecl pn hsc_src (L _ modname) (Just hsmod) = hsModuleToModSummary pn hsc_src modname hsmod
-summariseDecl _pn hsc_src lmodname@(L loc modname) Nothing
-    = do hsc_env <- getSession
-         -- TODO: this looks for modules in the wrong place
-         r <- liftIO $ summariseModule hsc_env
-                         emptyModNodeMap -- GHC API recomp not supported
-                         (hscSourceToIsBoot hsc_src)
-                         lmodname
-                         Nothing -- GHC API buffer support not supported
-                         [] -- No exclusions
-         case r of
-            Nothing -> throwOneError $ fmap GhcDriverMessage
-                                     $ mkPlainErrorMsgEnvelope loc (DriverBackpackModuleNotFound modname)
-            Just (Left err) -> throwErrors (fmap GhcDriverMessage err)
-            Just (Right summary) -> return summary
+              -> [NodeKey]
+              -> BkpM ModuleGraphNode
+summariseDecl pn hsc_src (L _ modname) (Just hsmod) home_keys = hsModuleToModSummary home_keys pn hsc_src modname hsmod
+summariseDecl _pn _ _ Nothing _
+    = error "mp"
 
 -- | Up until now, GHC has assumed a single compilation target per source file.
 -- Backpack files with inline modules break this model, since a single file
 -- may generate multiple output files.  How do we decide to name these files?
 -- Should there only be one output file? This function our current heuristic,
 -- which is we make a "fake" module and use that.
-hsModuleToModSummary :: PackageName
+hsModuleToModSummary :: [NodeKey]
+                     -> PackageName
                      -> HscSource
                      -> ModuleName
                      -> Located HsModule
-                     -> BkpM ExtendedModSummary
-hsModuleToModSummary pn hsc_src modname
+                     -> BkpM ModuleGraphNode
+hsModuleToModSummary home_keys pn hsc_src modname
                      hsmod = do
     let imps = hsmodImports (unLoc hsmod)
         loc  = getLoc hsmod
@@ -890,9 +888,7 @@ hsModuleToModSummary pn hsc_src modname
       let home_unit = hsc_home_unit hsc_env
       let fc        = hsc_FC hsc_env
       addHomeModuleToFinder fc home_unit modname location
-    return $ ExtendedModSummary
-      { emsModSummary =
-          ModSummary {
+    let ms = ModSummary {
             ms_mod = this_mod,
             ms_hsc_src = hsc_src,
             ms_location = location,
@@ -923,8 +919,12 @@ hsModuleToModSummary pn hsc_src modname
             ms_iface_date = hi_timestamp,
             ms_hie_date = hie_timestamp
           }
-      , emsInstantiatedUnits = inst_deps
-      }
+
+    -- Now, what are the dependencies.
+    let inst_nodes = map NodeKey_Unit inst_deps
+        mod_nodes  = [k | (_, mnwib) <- msDeps ms, let k = NodeKey_Module (ModNodeKeyWithUid (fmap unLoc mnwib) (moduleUnitId this_mod)), k `elem` home_keys]
+
+    return (ModuleNode (mod_nodes ++ inst_nodes) ms)
 
 -- | Create a new, externally provided hashed unit id from
 -- a hash.

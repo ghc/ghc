@@ -112,6 +112,7 @@ import qualified GHC.Data.BooleanFormula as BF
 import Control.Monad
 import GHC.Parser.Annotation
 import GHC.Driver.Env.KnotVars
+import GHC.Unit.Env
 
 {-
 This module takes
@@ -538,8 +539,8 @@ tcHiBootIface hsc_src mod
                 -- (it's been replaced by the mother module) so we can't check it.
                 -- And that's fine, because if M's ModInfo is in the HPT, then
                 -- it's been compiled once, and we don't need to check the boot iface
-          then do { hpt <- getHpt
-                 ; case lookupHpt hpt (moduleName mod) of
+          then do { (_, hug) <- getEpsAndHug
+                 ; case lookupHugByModule mod hug  of
                       Just info | mi_boot (hm_iface info) == IsBoot
                                 -> mkSelfBootInfo (hm_iface info) (hm_details info)
                       _ -> return NoSelfBoot }
@@ -550,14 +551,7 @@ tcHiBootIface hsc_src mod
         -- to check consistency against, rather than just when we notice
         -- that an hi-boot is necessary due to a circular import.
         { hsc_env <- getTopEnv
-        ; let nc        = hsc_NC hsc_env
-        ; let fc        = hsc_FC hsc_env
-        ; let home_unit = hsc_home_unit hsc_env
-        ; let units     = hsc_units hsc_env
-        ; let dflags    = hsc_dflags hsc_env
-        ; let logger    = hsc_logger hsc_env
-        ; let hooks     = hsc_hooks hsc_env
-        ; read_result <- liftIO $ findAndReadIface logger nc fc hooks units home_unit dflags
+        ; read_result <- liftIO $ findAndReadIface hsc_env
                                 need (fst (getModuleInstantiation mod)) mod
                                 IsBoot  -- Hi-boot file
 
@@ -574,7 +568,7 @@ tcHiBootIface hsc_src mod
         -- a SOURCE import) or that our hi-boot file has mysteriously
         -- disappeared.
     do  { eps <- getEps
-        ; case lookupUFM (eps_is_boot eps) (moduleName mod) of
+        ; case lookupInstalledModuleEnv (eps_is_boot eps) (toUnitId <$> mod) of
             -- The typical case
             Nothing -> return NoSelfBoot
             -- error cases

@@ -94,7 +94,6 @@ import GHC.Types.SourceText
 import GHC.Types.SourceFile
 import GHC.Types.SafeHaskell
 import GHC.Types.TypeEnv
-import GHC.Types.Unique.FM
 import GHC.Types.Unique.DSet
 import GHC.Types.SrcLoc
 import GHC.Types.TyThing
@@ -109,7 +108,7 @@ import GHC.Unit.State
 import GHC.Unit.Home
 import GHC.Unit.Home.ModInfo
 import GHC.Unit.Finder
-import GHC.Unit.Env ( ue_hpt )
+import GHC.Unit.Env
 
 import GHC.Data.Maybe
 
@@ -318,12 +317,7 @@ loadSrcInterface_maybe doc mod want_boot maybe_pkg
   -- interface; it will call the Finder again, but the ModLocation will be
   -- cached from the first search.
   = do hsc_env <- getTopEnv
-       let fc = hsc_FC hsc_env
-       let dflags = hsc_dflags hsc_env
-       let fopts = initFinderOpts dflags
-       let units = hsc_units hsc_env
-       let home_unit = hsc_home_unit hsc_env
-       res <- liftIO $ findImportedModule fc fopts units home_unit mod maybe_pkg
+       res <- liftIO $ findImportedModule hsc_env mod maybe_pkg
        case res of
            Found _ mod -> initIfaceTcRn $ loadInterface doc mod (ImportByUser want_boot)
            -- TODO: Make sure this error message is good
@@ -449,7 +443,7 @@ loadInterface doc_str mod from
     logger <- getLogger
     withTimingSilent logger (text "loading interface") (pure ()) $ do
         {       -- Read the state
-          (eps,hpt) <- getEpsAndHpt
+          (eps,hug) <- getEpsAndHug
         ; gbl_env <- getGblEnv
 
         ; liftIO $ trace_if logger (text "Considering whether to load" <+> ppr mod <+> ppr from)
@@ -457,7 +451,7 @@ loadInterface doc_str mod from
                 -- Check whether we have the interface already
         ; hsc_env <- getTopEnv
         ; let home_unit = hsc_home_unit hsc_env
-        ; case lookupIfaceByModule hpt (eps_PIT eps) mod of {
+        ; case lookupIfaceByModule hug (eps_PIT eps) mod of {
             Just iface
                 -> return (Succeeded iface) ;   -- Already loaded
                         -- The (src_imp == mi_boot iface) test checks that the already-loaded
@@ -497,7 +491,7 @@ loadInterface doc_str mod from
         in
         initIfaceLcl (mi_semantic_module iface) loc_doc (mi_boot iface) $
 
-        dontLeakTheHPT $ do
+        dontLeakTheHUG $ do
 
         --      Load the new ModIface into the External Package State
         -- Even home-package interfaces loaded by loadInterface
@@ -515,6 +509,11 @@ loadInterface doc_str mod from
         --     If we do loadExport first the wrong info gets into the cache (unless we
         --      explicitly tag each export which seems a bit of a bore)
 
+        ; when (not (isOneShot (ghcMode (hsc_dflags hsc_env)))
+                && moduleUnitId mod `elem` hsc_all_home_unit_ids hsc_env
+                && not (mod == gHC_PRIM))
+
+                (pprPanic "loadInterface" (ppr hug $$ doc_str $$ ppr mod $$ ppr (moduleUnitId mod) $$ callStackDoc))
         ; ignore_prags      <- goptM Opt_IgnoreInterfacePragmas
         ; new_eps_decls     <- tcIfaceDecls ignore_prags (mi_decls iface)
         ; new_eps_insts     <- mapM tcIfaceInst (mi_insts iface)
@@ -630,8 +629,8 @@ home-package modules however, so it's safe for the HPT to be empty.
 -}
 
 -- Note [GHC Heap Invariants]
-dontLeakTheHPT :: IfL a -> IfL a
-dontLeakTheHPT thing_inside = do
+dontLeakTheHUG :: IfL a -> IfL a
+dontLeakTheHUG thing_inside = do
   env <- getTopEnv
   let
     inOneShot =
@@ -656,10 +655,11 @@ dontLeakTheHPT thing_inside = do
          keepFor20509 hmi
           | isHoleModule (mi_semantic_module (hm_iface hmi)) = True
           | otherwise = False
+         pruneHomeUnitEnv hme = hme { homeUnitEnv_hpt = emptyHomePackageTable }
          !unit_env
           = old_unit_env
-             { ue_hpt = if anyHpt keepFor20509 (ue_hpt old_unit_env) then ue_hpt old_unit_env
-                                                                     else emptyHomePackageTable
+             { ue_home_unit_graph = if anyHpt keepFor20509 (ue_hpt old_unit_env) then ue_home_unit_graph old_unit_env
+                                                                                 else unitEnv_map pruneHomeUnitEnv (ue_home_unit_graph old_unit_env)
              }
        in
        hsc_env {  hsc_targets      = panic "cleanTopEnv: hsc_targets"
@@ -709,14 +709,8 @@ computeInterface
   -> IO (MaybeErr SDoc (ModIface, FilePath))
 computeInterface hsc_env doc_str hi_boot_file mod0 = do
   massert (not (isHoleModule mod0))
-  let name_cache = hsc_NC hsc_env
-  let fc         = hsc_FC hsc_env
   let home_unit  = hsc_home_unit hsc_env
-  let units      = hsc_units hsc_env
-  let dflags     = hsc_dflags hsc_env
-  let logger     = hsc_logger hsc_env
-  let hooks      = hsc_hooks hsc_env
-  let find_iface m = findAndReadIface logger name_cache fc hooks units home_unit dflags doc_str
+  let find_iface m = findAndReadIface hsc_env doc_str
                                       m mod0 hi_boot_file
   case getModuleInstantiation mod0 of
       (imod, Just indef) | isHomeUnitIndefinite home_unit ->
@@ -749,7 +743,7 @@ moduleFreeHolesPrecise doc_str mod
         let insts = instUnitInsts (moduleUnit indef)
         liftIO $ trace_if logger (text "Considering whether to load" <+> ppr mod <+>
                  text "to compute precise free module holes")
-        (eps, hpt) <- getEpsAndHpt
+        (eps, hpt) <- getEpsAndHug
         case tryEpsAndHpt eps hpt `firstJust` tryDepsCache eps imod insts of
             Just r -> return (Succeeded r)
             Nothing -> readAndCache imod insts
@@ -763,14 +757,7 @@ moduleFreeHolesPrecise doc_str mod
             _otherwise -> Nothing
     readAndCache imod insts = do
         hsc_env <- getTopEnv
-        let nc        = hsc_NC hsc_env
-        let fc        = hsc_FC hsc_env
-        let home_unit = hsc_home_unit hsc_env
-        let units     = hsc_units hsc_env
-        let dflags    = hsc_dflags hsc_env
-        let logger    = hsc_logger hsc_env
-        let hooks     = hsc_hooks hsc_env
-        mb_iface <- liftIO $ findAndReadIface logger nc fc hooks units home_unit dflags
+        mb_iface <- liftIO $ findAndReadIface hsc_env
                                               (text "moduleFreeHolesPrecise" <+> doc_str)
                                               imod mod NotBoot
         case mb_iface of
@@ -804,7 +791,7 @@ wantHiBootFile home_unit eps mod from
              -- We never import boot modules from other packages!
 
           | otherwise
-          -> case lookupUFM (eps_is_boot eps) (moduleName mod) of
+          -> case lookupInstalledModuleEnv (eps_is_boot eps) (toUnitId <$> mod) of
                 Just (GWIB { gwib_isBoot = is_boot }) ->
                   Succeeded is_boot
                 Nothing ->
@@ -862,13 +849,7 @@ See #8320.
 -}
 
 findAndReadIface
-  :: Logger
-  -> NameCache
-  -> FinderCache
-  -> Hooks
-  -> UnitState
-  -> HomeUnit
-  -> DynFlags
+  :: HscEnv
   -> SDoc            -- ^ Reason for loading the iface (used for tracing)
   -> InstalledModule -- ^ The unique identifier of the on-disk module we're looking for
   -> Module          -- ^ The *actual* module we're looking for.  We use
@@ -876,8 +857,18 @@ findAndReadIface
                      -- module we read out.
   -> IsBootInterface -- ^ Looking for .hi-boot or .hi file
   -> IO (MaybeErr SDoc (ModIface, FilePath))
-findAndReadIface logger name_cache fc hooks unit_state home_unit dflags doc_str mod wanted_mod hi_boot_file = do
+findAndReadIface hsc_env doc_str mod wanted_mod hi_boot_file = do
+
   let profile = targetProfile dflags
+      unit_state = hsc_units hsc_env
+      fc         = hsc_FC hsc_env
+      name_cache = hsc_NC hsc_env
+      home_unit  = hsc_home_unit hsc_env
+      dflags     = hsc_dflags hsc_env
+      logger     = hsc_logger hsc_env
+      hooks      = hsc_hooks hsc_env
+      other_fopts = initFinderOpts . homeUnitEnv_dflags <$> (hsc_HUG hsc_env)
+
 
   trace_if logger (sep [hsep [text "Reading",
                            if hi_boot_file == IsBoot
@@ -899,7 +890,7 @@ findAndReadIface logger name_cache fc hooks unit_state home_unit dflags doc_str 
       else do
           let fopts = initFinderOpts dflags
           -- Look for the file
-          mb_found <- liftIO (findExactModule fc fopts unit_state home_unit mod)
+          mb_found <- liftIO (findExactModule fc fopts other_fopts unit_state home_unit mod)
           case mb_found of
               InstalledFound (addBootSuffixLocn_maybe hi_boot_file -> loc) mod -> do
                   -- See Note [Home module load error]

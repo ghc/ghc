@@ -5,13 +5,13 @@ module GHC.Driver.Pipeline.LogQueue ( LogQueue(..)
                                   , finishLogQueue
                                   , writeLogQueue
                                   , parLogAction
-                                  , printLogs
 
                                   , LogQueueQueue(..)
                                   , initLogQueue
                                   , allLogQueues
                                   , newLogQueueQueue
-                                  , dequeueLogQueueQueue
+
+                                  , logThread
                                   ) where
 
 import GHC.Prelude
@@ -22,6 +22,7 @@ import GHC.Types.SrcLoc
 import GHC.Utils.Logger
 import qualified Data.IntMap as IM
 import Control.Concurrent.STM
+import Control.Monad
 
 -- LogQueue Abstraction
 
@@ -99,3 +100,24 @@ dequeueLogQueueQueue (LogQueueQueue n lqq) = case IM.minViewWithKey lqq of
                                                 Just ((k, v), lqq') | k == n -> Just (v, LogQueueQueue (n + 1) lqq')
                                                 _ -> Nothing
 
+logThread :: Int -> Int -> Logger -> TVar Bool -- Signal that no more new logs will be added, clear the queue and exit
+                    -> TVar LogQueueQueue -- Queue for logs
+                    -> IO (IO ())
+logThread _ _ logger stopped lqq_var = do
+  finished_var <- newEmptyMVar
+  _ <- forkIO $ print_logs *> putMVar finished_var ()
+  return (takeMVar finished_var)
+  where
+    finish = mapM (printLogs logger)
+
+    print_logs = join $ atomically $ do
+      lqq <- readTVar lqq_var
+      case dequeueLogQueueQueue lqq of
+        Just (lq, lqq') -> do
+          writeTVar lqq_var lqq'
+          return (printLogs logger lq *> print_logs)
+        Nothing -> do
+          -- No log to print, check if we are finished.
+          stopped <- readTVar stopped
+          if not stopped then retry
+                         else return (finish (allLogQueues lqq))

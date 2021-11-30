@@ -79,6 +79,7 @@ emptyHomePackageTable  = emptyUDFM
 lookupHpt :: HomePackageTable -> ModuleName -> Maybe HomeModInfo
 lookupHpt = lookupUDFM
 
+
 lookupHptDirectly :: HomePackageTable -> Unique -> Maybe HomeModInfo
 lookupHptDirectly = lookupUDFM_Directly
 
@@ -132,7 +133,6 @@ lookupHptByModule hpt mod
 pprHPT :: HomePackageTable -> SDoc
 -- A bit arbitrary for now
 pprHPT hpt = pprUDFM hpt $ \hms ->
-    vcat [ hang (ppr (mi_module (hm_iface hm)))
-              2 (ppr (md_types (hm_details hm)))
+    vcat [ ppr (mi_module (hm_iface hm))
          | hm <- hms ]
 

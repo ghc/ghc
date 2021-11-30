@@ -14,6 +14,9 @@ import GHC.Fingerprint
 import GHC.Platform.Ways
 
 import Data.IORef
+import GHC.Data.FastString
+import GHC.Utils.Outputable
+import qualified Data.Set as Set
 
 -- | The 'FinderCache' maps modules to the result of
 -- searching for that module. It records the results of searching for
@@ -30,6 +33,17 @@ data InstalledFindResult
   = InstalledFound ModLocation InstalledModule
   | InstalledNoPackage UnitId
   | InstalledNotFound [FilePath] (Maybe UnitId)
+
+instance Outputable InstalledFindResult where
+  ppr (InstalledFound {}) = text "FOUND"
+  ppr (InstalledNoPackage {}) = text "NOPACKAGE"
+  ppr (InstalledNotFound {})  = text "NOT FOUND"
+
+instance Outputable FindResult where
+  ppr (Found _ml m) = text "FOUND: " <+> ppr m <+> ppr (moduleUnit m)
+  ppr (NoPackage uid) = text "NF" <+> ppr uid
+  ppr (FoundMultiple ms) = text "MULT" <+> ppr ms
+  ppr (NotFound {}) = text "NF"
 
 -- | The result of searching for an imported module.
 --
@@ -86,6 +100,10 @@ data FinderOpts = FinderOpts
   , finder_enableSuggestions :: Bool
       -- ^ If we encounter unknown modules, should we suggest modules
       -- that have a similar name.
+  , finder_workingDirectory :: Maybe FilePath
+  , finder_thisPackageName  :: Maybe FastString
+  , finder_hiddenModules    :: Set.Set ModuleName
+  , finder_reexportedModules :: Set.Set ModuleName
   , finder_hieDir :: Maybe FilePath
   , finder_hieSuf :: String
   , finder_hiDir :: Maybe FilePath
@@ -95,4 +113,4 @@ data FinderOpts = FinderOpts
   , finder_objectSuf :: String
   , finder_dynObjectSuf :: String
   , finder_stubDir :: Maybe FilePath
-  }
+  } deriving Show

@@ -337,6 +337,10 @@ data DriverMessage where
   -}
   DriverCannotImportFromUntrustedPackage :: !UnitState -> !Module -> DriverMessage
 
+  DriverRedirectedNoMain :: !ModuleName -> DriverMessage
+
+  DriverHomePackagesNotClosed :: ![UnitId] -> DriverMessage
+
 -- | Pass to a 'DriverMessage' the information whether or not the
 -- '-fbuilding-cabal-package' flag is set.
 data BuildingCabalPackage

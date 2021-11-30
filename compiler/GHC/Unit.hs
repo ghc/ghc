@@ -24,7 +24,7 @@ import GHC.Unit.State
 Note [About Units]
 ~~~~~~~~~~~~~~~~~~
 
-Haskell users are used to manipulate Cabal packages. These packages are
+Haskell users are used to manipulating Cabal packages. These packages are
 identified by:
    - a package name :: String
    - a package version :: Version

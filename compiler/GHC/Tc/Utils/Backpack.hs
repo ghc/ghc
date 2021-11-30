@@ -18,7 +18,6 @@ module GHC.Tc.Utils.Backpack (
 import GHC.Prelude
 
 
-import GHC.Driver.Config.Finder
 import GHC.Driver.Env
 import GHC.Driver.Ppr
 import GHC.Driver.Session
@@ -306,17 +305,13 @@ implicitRequirements :: HscEnv
 implicitRequirements hsc_env normal_imports
   = fmap concat $
     forM normal_imports $ \(mb_pkg, L _ imp) -> do
-        found <- findImportedModule fc fopts units home_unit imp mb_pkg
+        found <- findImportedModule hsc_env imp mb_pkg
         case found of
             Found _ mod | not (isHomeModule home_unit mod) ->
                 return (uniqDSetToList (moduleFreeHoles mod))
             _ -> return []
   where
-    fc        = hsc_FC hsc_env
     home_unit = hsc_home_unit hsc_env
-    units     = hsc_units hsc_env
-    dflags    = hsc_dflags hsc_env
-    fopts     = initFinderOpts dflags
 
 -- | Like @implicitRequirements'@, but returns either the module name, if it is
 -- a free hole, or the instantiated unit the imported module is from, so that
@@ -328,15 +323,11 @@ implicitRequirementsShallow
   -> IO ([ModuleName], [InstantiatedUnit])
 implicitRequirementsShallow hsc_env normal_imports = go ([], []) normal_imports
  where
-  fc        = hsc_FC hsc_env
   home_unit = hsc_home_unit hsc_env
-  units     = hsc_units hsc_env
-  dflags    = hsc_dflags hsc_env
-  fopts        = initFinderOpts dflags
 
   go acc [] = pure acc
   go (accL, accR) ((mb_pkg, L _ imp):imports) = do
-    found <- findImportedModule fc fopts units home_unit imp mb_pkg
+    found <- findImportedModule hsc_env imp mb_pkg
     let acc' = case found of
           Found _ mod | not (isHomeModule home_unit mod) ->
               case moduleUnit mod of
@@ -375,7 +366,7 @@ tcRnCheckUnit hsc_env uid =
    initTc hsc_env
           HsigFile -- bogus
           False
-          (mainModIs hsc_env)
+          (mainModIs (hsc_HUE hsc_env))
           (realSrcLocSpan (mkRealSrcLoc (fsLit loc_str) 0 0)) -- bogus
     $ checkUnit uid
   where
@@ -568,12 +559,8 @@ mergeSignatures
     let inner_mod  = tcg_semantic_mod tcg_env
     let mod_name   = moduleName (tcg_mod tcg_env)
     let unit_state = hsc_units hsc_env
-    let fc         = hsc_FC hsc_env
-    let nc         = hsc_NC hsc_env
     let home_unit  = hsc_home_unit hsc_env
     let dflags     = hsc_dflags hsc_env
-    let logger     = hsc_logger hsc_env
-    let hooks      = hsc_hooks hsc_env
 
     -- STEP 1: Figure out all of the external signature interfaces
     -- we are going to merge in.
@@ -588,7 +575,7 @@ mergeSignatures
             ctx = initSDocContext dflags defaultUserStyle
         fmap fst
          . withException ctx
-         $ findAndReadIface logger nc fc hooks unit_state home_unit dflags
+         $ findAndReadIface hsc_env
                             (text "mergeSignatures") im m NotBoot
 
     -- STEP 3: Get the unrenamed exports of all these interfaces,
@@ -883,8 +870,9 @@ mergeSignatures
             -- supposed to include itself in its dep_orphs/dep_finsts.  See #13214
             iface' = iface { mi_final_exts = (mi_final_exts iface){ mi_orphan = False, mi_finsts = False } }
             home_unit = hsc_home_unit hsc_env
+            other_home_units = hsc_all_home_unit_ids hsc_env
             avails = plusImportAvails (tcg_imports tcg_env) $
-                        calculateAvails home_unit iface' False NotBoot ImportedBySystem
+                        calculateAvails home_unit other_home_units iface' False NotBoot ImportedBySystem
         return tcg_env {
             tcg_inst_env = inst_env,
             tcg_insts    = insts,
@@ -953,6 +941,7 @@ checkImplements impl_mod req_mod@(Module uid mod_name) = do
   hsc_env <- getTopEnv
   let unit_state = hsc_units hsc_env
       home_unit  = hsc_home_unit hsc_env
+      other_home_units = hsc_all_home_unit_ids hsc_env
   addErrCtxt (impl_msg unit_state impl_mod req_mod) $ do
     let insts = instUnitInsts uid
 
@@ -973,7 +962,7 @@ checkImplements impl_mod req_mod@(Module uid mod_name) = do
     loadModuleInterfaces (text "Loading orphan modules (from implementor of hsig)")
                          (dep_orphs (mi_deps impl_iface))
 
-    let avails = calculateAvails home_unit
+    let avails = calculateAvails home_unit other_home_units
                     impl_iface False{- safe -} NotBoot ImportedBySystem
         fix_env = mkNameEnv [ (greMangledName rdr_elt, FixItem occ f)
                             | (occ, f) <- mi_fixities impl_iface
@@ -999,14 +988,7 @@ checkImplements impl_mod req_mod@(Module uid mod_name) = do
     let sig_mod = mkModule (VirtUnit uid) mod_name
         isig_mod = fst (getModuleInstantiation sig_mod)
     hsc_env <- getTopEnv
-    let nc        = hsc_NC hsc_env
-    let fc        = hsc_FC hsc_env
-    let home_unit = hsc_home_unit hsc_env
-    let units     = hsc_units hsc_env
-    let dflags    = hsc_dflags hsc_env
-    let logger    = hsc_logger hsc_env
-    let hooks     = hsc_hooks hsc_env
-    mb_isig_iface <- liftIO $ findAndReadIface logger nc fc hooks units home_unit dflags
+    mb_isig_iface <- liftIO $ findAndReadIface hsc_env
                                                (text "checkImplements 2")
                                                isig_mod sig_mod NotBoot
     isig_iface <- case mb_isig_iface of

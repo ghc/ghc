@@ -171,6 +171,16 @@ instance Diagnostic DriverMessage where
                    <> (pprWithUnitState state $ ppr (moduleUnit m))
                    <> text ") the module resides in isn't trusted."
                ]
+    DriverRedirectedNoMain mod_name
+      -> mkSimpleDecorated $ (text
+                       ("Output was redirected with -o, " ++
+                       "but no output will be generated.") $$
+                       (text "There is no module named" <+>
+                       quotes (ppr mod_name) <> text "."))
+    DriverHomePackagesNotClosed needed_unit_ids
+      -> mkSimpleDecorated $ vcat ([text "Home units are not closed."
+                                  , text "It is necessary to also load the following units:" ]
+                                  ++ map (\uid -> text "-" <+> ppr uid) needed_unit_ids)
 
   diagnosticReason = \case
     DriverUnknownMessage m
@@ -216,6 +226,10 @@ instance Diagnostic DriverMessage where
     DriverPackageNotTrusted{}
       -> ErrorWithoutFlag
     DriverCannotImportFromUntrustedPackage{}
+      -> ErrorWithoutFlag
+    DriverRedirectedNoMain {}
+      -> ErrorWithoutFlag
+    DriverHomePackagesNotClosed {}
       -> ErrorWithoutFlag
 
   diagnosticHints = \case
@@ -264,4 +278,8 @@ instance Diagnostic DriverMessage where
     DriverMarkedTrustworthyButInferredSafe{}
       -> noHints
     DriverCannotImportFromUntrustedPackage{}
+      -> noHints
+    DriverRedirectedNoMain {}
+      -> noHints
+    DriverHomePackagesNotClosed {}
       -> noHints

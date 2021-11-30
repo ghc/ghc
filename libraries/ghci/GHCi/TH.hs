@@ -194,6 +194,7 @@ instance TH.Quasi GHCiQ where
   qReifyModule m = ghcCmd (ReifyModule m)
   qReifyConStrictness name = ghcCmd (ReifyConStrictness name)
   qLocation = fromMaybe noLoc . qsLocation <$> getState
+  qGetPackageRoot        = ghcCmd GetPackageRoot
   qAddDependentFile file = ghcCmd (AddDependentFile file)
   qAddTempFile suffix = ghcCmd (AddTempFile suffix)
   qAddTopDecls decls = ghcCmd (AddTopDecls decls)

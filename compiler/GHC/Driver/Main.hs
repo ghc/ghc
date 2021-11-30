@@ -39,9 +39,10 @@ module GHC.Driver.Main
     (
     -- * Making an HscEnv
       newHscEnv
+    , newHscEnvWithHUG
 
     -- * Compiling complete source files
-    , Messager, batchMsg
+    , Messager, batchMsg, batchMultiMsg
     , HscBackendAction (..), HscRecompStatus (..)
     , initModDetails
     , hscMaybeWriteIface
@@ -250,14 +251,22 @@ import Data.List.NonEmpty (NonEmpty ((:|)))
 %********************************************************************* -}
 
 newHscEnv :: DynFlags -> IO HscEnv
-newHscEnv dflags = do
+newHscEnv dflags = newHscEnvWithHUG dflags (homeUnitId_ dflags) home_unit_graph
+  where
+    home_unit_graph = unitEnv_singleton
+                        (homeUnitId_ dflags)
+                        (mkHomeUnitEnv dflags emptyHomePackageTable Nothing)
+
+newHscEnvWithHUG :: DynFlags -> UnitId -> HomeUnitGraph -> IO HscEnv
+newHscEnvWithHUG top_dynflags cur_unit home_unit_graph = do
     nc_var  <- initNameCache 'r' knownKeyNames
     fc_var  <- initFinderCache
     logger  <- initLogger
     tmpfs   <- initTmpFs
-    unit_env <- initUnitEnv (ghcNameVersion dflags) (targetPlatform dflags)
-    return HscEnv {  hsc_dflags         = dflags
-                  ,  hsc_logger         = setLogFlags logger (initLogFlags dflags)
+    let dflags = homeUnitEnv_dflags $ unitEnv_lookup cur_unit home_unit_graph
+    unit_env <- initUnitEnv cur_unit home_unit_graph (ghcNameVersion dflags) (targetPlatform dflags)
+    return HscEnv { hsc_dflags = top_dynflags
+                  , hsc_logger         = setLogFlags logger (initLogFlags top_dynflags)
                   ,  hsc_targets        = []
                   ,  hsc_mod_graph      = emptyMG
                   ,  hsc_IC             = emptyInteractiveContext dflags
@@ -730,8 +739,7 @@ hscRecompStatus
   = do
     let
         msg what = case mHscMessage of
-          -- We use extendModSummaryNoDeps because extra backpack deps are only needed for batch mode
-          Just hscMessage -> hscMessage hsc_env mod_index what (ModuleNode (extendModSummaryNoDeps mod_summary))
+          Just hscMessage -> hscMessage hsc_env mod_index what (ModuleNode [] mod_summary)
           Nothing -> return ()
 
       -- First check to see if the interface file agrees with the
@@ -1109,31 +1117,33 @@ oneShotMsg logger recomp =
         _        -> return ()
 
 batchMsg :: Messager
-batchMsg hsc_env mod_index recomp node = case node of
-    InstantiationNode _ ->
-        case recomp of
-            MustCompile -> showMsg (text "Instantiating ") empty
-            UpToDate
-                | logVerbAtLeast logger 2 -> showMsg (text "Skipping  ") empty
-                | otherwise -> return ()
-            RecompBecause reason -> showMsg (text "Instantiating ")
-                                            (text " [" <> pprWithUnitState state (ppr reason) <> text "]")
-    ModuleNode _ ->
-        case recomp of
-            MustCompile -> showMsg (text "Compiling ") empty
-            UpToDate
-                | logVerbAtLeast logger 2 -> showMsg (text "Skipping  ") empty
-                | otherwise -> return ()
-            RecompBecause reason -> showMsg (text "Compiling ")
-                                            (text " [" <> pprWithUnitState state (ppr reason) <> text "]")
+batchMsg = batchMsgWith (\_ _ _ _ -> empty)
+batchMultiMsg :: Messager
+batchMultiMsg = batchMsgWith (\_ _ _ node -> brackets (ppr (moduleGraphNodeUnitId node)))
+
+batchMsgWith :: (HscEnv -> (Int, Int) -> RecompileRequired -> ModuleGraphNode -> SDoc) -> Messager
+batchMsgWith extra hsc_env_start mod_index recomp node =
+      case recomp of
+        MustCompile -> showMsg (text herald) empty
+        UpToDate
+          | logVerbAtLeast logger 2 -> showMsg (text "Skipping") empty
+          | otherwise -> return ()
+        RecompBecause reason -> showMsg (text herald)
+                                        (text " [" <> pprWithUnitState state (ppr reason) <> text "]")
     where
+        herald = case node of
+                    LinkNode {} -> "Linking"
+                    InstantiationNode {} -> "Instantiating"
+                    ModuleNode {} -> "Compiling"
+        hsc_env = hscSetActiveUnitId (moduleGraphNodeUnitId node) hsc_env_start
         dflags = hsc_dflags hsc_env
         logger = hsc_logger hsc_env
         state  = hsc_units hsc_env
         showMsg msg reason =
             compilationProgressMsg logger $
             (showModuleIndex mod_index <>
-            msg <> showModMsg dflags (recompileRequired recomp) node)
+            msg <+> showModMsg dflags (recompileRequired recomp) node)
+                <> extra hsc_env mod_index recomp node
                 <> reason
 
 --------------------------------------------------------------
@@ -1422,8 +1432,8 @@ hscCheckSafe' m l = do
         hsc_env <- getHscEnv
         hsc_eps <- liftIO $ hscEPS hsc_env
         let pkgIfaceT = eps_PIT hsc_eps
-            homePkgT  = hsc_HPT hsc_env
-            iface     = lookupIfaceByModule homePkgT pkgIfaceT m
+            hug       = hsc_HUG hsc_env
+            iface     = lookupIfaceByModule hug pkgIfaceT m
         -- the 'lookupIfaceByModule' method will always fail when calling from GHCi
         -- as the compiler hasn't filled in the various module tables
         -- so we need to call 'getModuleInterface' to load from disk

@@ -16,6 +16,7 @@ module GHC.Unit.Types
    , InstalledModule
    , InstantiatedModule
    , mkModule
+   , moduleUnitId
    , pprModule
    , pprInstantiatedModule
    , moduleFreeHoles
@@ -116,6 +117,9 @@ data GenModule unit = Module
 
 -- | A Module is a pair of a 'Unit' and a 'ModuleName'.
 type Module = GenModule Unit
+
+moduleUnitId :: Module -> UnitId
+moduleUnitId = toUnitId . moduleUnit
 
 -- | A 'InstalledModule' is a 'Module' whose unit is identified with an
 -- 'UnitId'.

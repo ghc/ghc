@@ -1209,6 +1209,10 @@ instance TH.Quasi TcM where
         -- we'll only fail higher up.
   qRecover recover main = tryTcDiscardingErrs recover main
 
+  qGetPackageRoot = do
+    dflags <- getDynFlags
+    return $ fromMaybe "." (workingDirectory dflags)
+
   qAddDependentFile fp = do
     ref <- fmap tcg_dependent_files getGblEnv
     dep_files <- readTcRef ref
@@ -1625,6 +1629,7 @@ handleTHMessage msg = case msg of
     wrapTHResult $ (map B.pack <$> getAnnotationsByTypeRep lookup tyrep)
   ReifyModule m -> wrapTHResult $ TH.qReifyModule m
   ReifyConStrictness nm -> wrapTHResult $ TH.qReifyConStrictness nm
+  GetPackageRoot -> wrapTHResult $ TH.qGetPackageRoot
   AddDependentFile f -> wrapTHResult $ TH.qAddDependentFile f
   AddTempFile s -> wrapTHResult $ TH.qAddTempFile s
   AddModFinalizer r -> do

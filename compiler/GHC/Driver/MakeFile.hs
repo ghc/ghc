@@ -16,7 +16,6 @@ where
 import GHC.Prelude
 
 import qualified GHC
-import GHC.Driver.Config.Finder
 import GHC.Driver.Monad
 import GHC.Driver.Session
 import GHC.Driver.Ppr
@@ -215,14 +214,15 @@ processDeps dflags _ _ _ _ (CyclicSCC nodes)
     throwGhcExceptionIO $ ProgramError $
       showSDoc dflags $ GHC.cyclicModuleErr nodes
 
-processDeps dflags _ _ _ _ (AcyclicSCC (InstantiationNode node))
+processDeps dflags _ _ _ _ (AcyclicSCC (InstantiationNode _uid node))
   =     -- There shouldn't be any backpack instantiations; report them as well
     throwGhcExceptionIO $ ProgramError $
       showSDoc dflags $
         vcat [ text "Unexpected backpack instantiation in dependency graph while constructing Makefile:"
              , nest 2 $ ppr node ]
+processDeps _dflags _ _ _ _ (AcyclicSCC (LinkNode {})) = return ()
 
-processDeps dflags hsc_env excl_mods root hdl (AcyclicSCC (ModuleNode (ExtendedModSummary node _)))
+processDeps dflags hsc_env excl_mods root hdl (AcyclicSCC (ModuleNode _ node))
   = do  { let extra_suffixes = depSuffixes dflags
               include_pkg_deps = depIncludePkgDeps dflags
               src_file  = msHsFilePath node
@@ -290,14 +290,9 @@ findDependency  :: HscEnv
                 -> Bool                 -- Record dependency on package modules
                 -> IO (Maybe FilePath)  -- Interface file
 findDependency hsc_env srcloc pkg imp is_boot include_pkg_deps = do
-  let fc        = hsc_FC hsc_env
-  let home_unit = hsc_home_unit hsc_env
-  let units     = hsc_units hsc_env
-  let dflags    = hsc_dflags hsc_env
-  let fopts     = initFinderOpts dflags
   -- Find the module; this will be fast because
   -- we've done it once during downsweep
-  r <- findImportedModule fc fopts units home_unit imp pkg
+  r <- findImportedModule hsc_env imp pkg
   case r of
     Found loc _
         -- Home package: just depend on the .hi or hi-boot file
@@ -394,10 +389,9 @@ dumpModCycles logger module_graph
   | otherwise
   = putMsg logger (hang (text "Module cycles found:") 2 pp_cycles)
   where
-    topoSort = filterToposortToModules $
-      GHC.topSortModuleGraph True module_graph Nothing
+    topoSort = GHC.topSortModuleGraph True module_graph Nothing
 
-    cycles :: [[ModSummary]]
+    cycles :: [[ModuleGraphNode]]
     cycles =
       [ c | CyclicSCC c <- topoSort ]
 
@@ -405,14 +399,16 @@ dumpModCycles logger module_graph
                         $$ pprCycle c $$ blankLine
                      | (n,c) <- [1..] `zip` cycles ]
 
-pprCycle :: [ModSummary] -> SDoc
+pprCycle :: [ModuleGraphNode] -> SDoc
 -- Print a cycle, but show only the imports within the cycle
 pprCycle summaries = pp_group (CyclicSCC summaries)
   where
     cycle_mods :: [ModuleName]  -- The modules in this cycle
-    cycle_mods = map (moduleName . ms_mod) summaries
+    cycle_mods = map (moduleName . ms_mod) [ms | ModuleNode _ ms <- summaries]
 
-    pp_group (AcyclicSCC ms) = pp_ms ms
+    pp_group :: SCC ModuleGraphNode -> SDoc
+    pp_group (AcyclicSCC (ModuleNode _ ms)) = pp_ms ms
+    pp_group (AcyclicSCC _) = empty
     pp_group (CyclicSCC mss)
         = assert (not (null boot_only)) $
                 -- The boot-only list must be non-empty, else there would
@@ -421,14 +417,15 @@ pprCycle summaries = pp_group (CyclicSCC summaries)
           pp_ms loop_breaker $$ vcat (map pp_group groups)
         where
           (boot_only, others) = partition is_boot_only mss
-          is_boot_only ms = not (any in_group (map snd (ms_imps ms)))
+          is_boot_only (ModuleNode _ ms) = not (any in_group (map snd (ms_imps ms)))
+          is_boot_only  _ = False
           in_group (L _ m) = m `elem` group_mods
-          group_mods = map (moduleName . ms_mod) mss
+          group_mods = map (moduleName . ms_mod) [ms | ModuleNode _ ms <- mss]
 
-          loop_breaker = head boot_only
+          loop_breaker = head ([ms | ModuleNode _ ms  <- boot_only])
           all_others   = tail boot_only ++ others
-          groups = filterToposortToModules $
-            GHC.topSortModuleGraph True (mkModuleGraph $ extendModSummaryNoDeps <$> all_others) Nothing
+          groups =
+            GHC.topSortModuleGraph True (mkModuleGraph all_others) Nothing
 
     pp_ms summary = text mod_str <> text (take (20 - length mod_str) (repeat ' '))
                        <+> (pp_imps empty (map snd (ms_imps summary)) $$

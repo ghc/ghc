@@ -121,6 +121,7 @@ import Data.Either      ( partitionEithers )
 import qualified Data.Set as Set
 
 import Data.Time        ( getCurrentTime )
+import GHC.Iface.Recomp
 
 -- Simpler type synonym for actions in the pipeline monad
 type P m = TPipelineClass TPhase m
@@ -301,9 +302,10 @@ compileOne' mHscMessage
          = (Interpreter, gopt_set (dflags2 { backend = Interpreter }) Opt_ForceRecomp)
          | otherwise
          = (backend dflags, dflags2)
-       dflags  = dflags3 { includePaths = addImplicitQuoteInclude old_paths [current_dir] }
+       dflags  = dflags3 { includePaths = offsetIncludePaths dflags3 $ addImplicitQuoteInclude old_paths [current_dir] }
        upd_summary = summary { ms_hspp_opts = dflags }
        hsc_env = hscSetFlags dflags hsc_env0
+
 
 -- ---------------------------------------------------------------------------
 -- Link
@@ -364,6 +366,7 @@ link :: GhcLink                 -- ^ interactive or batch
      -> DynFlags                -- ^ dynamic flags
      -> UnitEnv                 -- ^ unit environment
      -> Bool                    -- ^ attempt linking in batch mode?
+     -> Maybe (RecompileRequired -> IO ())
      -> HomePackageTable        -- ^ what to link
      -> IO SuccessFlag
 
@@ -374,13 +377,13 @@ link :: GhcLink                 -- ^ interactive or batch
 -- exports main, i.e., we have good reason to believe that linking
 -- will succeed.
 
-link ghcLink logger tmpfs hooks dflags unit_env batch_attempt_linking hpt =
+link ghcLink logger tmpfs hooks dflags unit_env batch_attempt_linking mHscMessage hpt =
   case linkHook hooks of
       Nothing -> case ghcLink of
           NoLink        -> return Succeeded
-          LinkBinary    -> link' logger tmpfs dflags unit_env batch_attempt_linking hpt
-          LinkStaticLib -> link' logger tmpfs dflags unit_env batch_attempt_linking hpt
-          LinkDynLib    -> link' logger tmpfs dflags unit_env batch_attempt_linking hpt
+          LinkBinary    -> link' logger tmpfs dflags unit_env batch_attempt_linking mHscMessage hpt
+          LinkStaticLib -> link' logger tmpfs dflags unit_env batch_attempt_linking mHscMessage hpt
+          LinkDynLib    -> link' logger tmpfs dflags unit_env batch_attempt_linking mHscMessage hpt
           LinkInMemory
               | platformMisc_ghcWithInterpreter $ platformMisc dflags
               -> -- Not Linking...(demand linker will do the job)
@@ -399,10 +402,11 @@ link' :: Logger
       -> DynFlags                -- ^ dynamic flags
       -> UnitEnv                 -- ^ unit environment
       -> Bool                    -- ^ attempt linking in batch mode?
+      -> Maybe (RecompileRequired -> IO ())
       -> HomePackageTable        -- ^ what to link
       -> IO SuccessFlag
 
-link' logger tmpfs dflags unit_env batch_attempt_linking hpt
+link' logger tmpfs dflags unit_env batch_attempt_linking mHscMessager hpt
    | batch_attempt_linking
    = do
         let
@@ -436,12 +440,12 @@ link' logger tmpfs dflags unit_env batch_attempt_linking hpt
 
         linking_needed <- linkingNeeded logger dflags unit_env staticLink linkables pkg_deps
 
-        if not (gopt Opt_ForceRecomp dflags) && not linking_needed
+        forM_ mHscMessager $ \hscMessage -> hscMessage linking_needed
+        if not (gopt Opt_ForceRecomp dflags) && (linking_needed == UpToDate)
            then do debugTraceMsg logger 2 (text exe_file <+> text "is up to date, linking not required.")
                    return Succeeded
            else do
 
-        compilationProgressMsg logger (text "Linking " <> text exe_file <> text " ...")
 
         -- Don't showPass in Batch mode; doLink will do that for us.
         let link = case ghcLink dflags of
@@ -462,7 +466,7 @@ link' logger tmpfs dflags unit_env batch_attempt_linking hpt
         return Succeeded
 
 
-linkingNeeded :: Logger -> DynFlags -> UnitEnv -> Bool -> [Linkable] -> [UnitId] -> IO Bool
+linkingNeeded :: Logger -> DynFlags -> UnitEnv -> Bool -> [Linkable] -> [UnitId] -> IO RecompileRequired
 linkingNeeded logger dflags unit_env staticLink linkables pkg_deps = do
         -- if the modification time on the executable is later than the
         -- modification times on all of the objects and libraries, then omit
@@ -472,7 +476,7 @@ linkingNeeded logger dflags unit_env staticLink linkables pkg_deps = do
       exe_file   = exeFileName platform staticLink (outputFile_ dflags)
   e_exe_time <- tryIO $ getModificationUTCTime exe_file
   case e_exe_time of
-    Left _  -> return True
+    Left _  -> return MustCompile
     Right t -> do
         -- first check object files and extra_ld_inputs
         let extra_ld_inputs = [ f | FileOption _ f <- ldInputs dflags ]
@@ -480,7 +484,7 @@ linkingNeeded logger dflags unit_env staticLink linkables pkg_deps = do
         let (errs,extra_times) = partitionEithers e_extra_times
         let obj_times =  map linkableTime linkables ++ extra_times
         if not (null errs) || any (t <) obj_times
-            then return True
+            then return (RecompBecause ObjectsChanged)
             else do
 
         -- next, check libraries. XXX this only checks Haskell libraries,
@@ -490,13 +494,18 @@ linkingNeeded logger dflags unit_env staticLink linkables pkg_deps = do
                             lib <- unitHsLibs (ghcNameVersion dflags) (ways dflags) c ]
 
         pkg_libfiles <- mapM (uncurry (findHSLib platform (ways dflags))) pkg_hslibs
-        if any isNothing pkg_libfiles then return True else do
+        if any isNothing pkg_libfiles then return (RecompBecause LibraryChanged) else do
         e_lib_times <- mapM (tryIO . getModificationUTCTime)
                           (catMaybes pkg_libfiles)
         let (lib_errs,lib_times) = partitionEithers e_lib_times
         if not (null lib_errs) || any (t <) lib_times
-           then return True
-           else checkLinkInfo logger dflags unit_env pkg_deps exe_file
+           then return (RecompBecause LibraryChanged)
+           else do
+            res <- checkLinkInfo logger dflags unit_env pkg_deps exe_file
+            if res
+              then return (RecompBecause FlagsChanged)
+              else return UpToDate
+
 
 findHSLib :: Platform -> Ways -> [String] -> String -> IO (Maybe FilePath)
 findHSLib platform ws dirs lib = do

@@ -375,18 +375,18 @@ tcRnImports hsc_env import_decls
   = do  { (rn_imports, rdr_env, imports, hpc_info) <- rnImports import_decls ;
 
         ; this_mod <- getModule
-        ; let { dep_mods :: ModuleNameEnv ModuleNameWithIsBoot
-              ; dep_mods = imp_direct_dep_mods imports
-
-                -- We want instance declarations from all home-package
+        ; gbl_env <- getGblEnv
+        ; let { -- We want instance declarations from all home-package
                 -- modules below this one, including boot modules, except
                 -- ourselves.  The 'except ourselves' is so that we don't
                 -- get the instances from this module's hs-boot file.  This
                 -- filtering also ensures that we don't see instances from
                 -- modules batch (@--make@) compiled before this one, but
                 -- which are not below this one.
-              ; (home_insts, home_fam_insts) = hptInstancesBelow hsc_env (moduleName this_mod)
-                                                                 (S.fromList (nonDetEltsUFM dep_mods))
+              ; (home_insts, home_fam_insts) =
+
+                    hptInstancesBelow hsc_env (homeUnitId $ hsc_home_unit hsc_env) (GWIB (moduleName this_mod)(hscSourceToIsBoot (tcg_src gbl_env)))
+
               } ;
 
                 -- Record boot-file info in the EPS, so that it's
@@ -1790,7 +1790,7 @@ checkMainType :: TcGblEnv -> TcRn WantedConstraints
 -- See Note [Dealing with main]
 checkMainType tcg_env
   = do { hsc_env <- getTopEnv
-       ; if tcg_mod tcg_env /= mainModIs hsc_env
+       ; if tcg_mod tcg_env /= mainModIs (hsc_HUE hsc_env)
          then return emptyWC else
 
     do { rdr_env <- getGlobalRdrEnv
@@ -1822,7 +1822,7 @@ checkMain explicit_mod_hdr export_ies
       ; tcg_env <- getGblEnv
 
       ; let dflags      = hsc_dflags hsc_env
-            main_mod    = mainModIs hsc_env
+            main_mod    = mainModIs (hsc_HUE hsc_env)
             main_occ    = getMainOcc dflags
 
             exported_mains :: [Name]
@@ -2972,7 +2972,7 @@ pprTcGblEnv (TcGblEnv { tcg_type_env  = type_env,
          , ppr_fam_insts fam_insts
          , ppr_rules rules
          , text "Dependent modules:" <+>
-                pprUFM (imp_direct_dep_mods imports) (ppr . sort)
+                (ppr . sort . installedModuleEnvElts $ imp_direct_dep_mods imports)
          , text "Dependent packages:" <+>
                 ppr (S.toList $ imp_dep_direct_pkgs imports)]
                 -- The use of sort is just to reduce unnecessary

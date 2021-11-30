@@ -108,7 +108,7 @@ getModuleInstantiation m =
 getUnitInstantiations :: Unit -> (UnitId, Maybe InstantiatedUnit)
 getUnitInstantiations (VirtUnit iuid)           = (instUnitInstanceOf iuid, Just iuid)
 getUnitInstantiations (RealUnit (Definite uid)) = (uid, Nothing)
-getUnitInstantiations HoleUnit                  = error "Hole unit"
+getUnitInstantiations (HoleUnit {})             = error "Hole unit"
 
 -- | Remove instantiations of the given instantiated unit
 uninstantiateInstantiatedUnit :: InstantiatedUnit -> InstantiatedUnit

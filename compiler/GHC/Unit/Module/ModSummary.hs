@@ -4,9 +4,7 @@
 -- | A ModSummary is a node in the compilation manager's dependency graph
 -- (ModuleGraph)
 module GHC.Unit.Module.ModSummary
-   ( ExtendedModSummary (..)
-   , extendModSummaryNoDeps
-   , ModSummary (..)
+   ( ModSummary (..)
    , ms_unitid
    , ms_installed_mod
    , ms_mod_name
@@ -20,6 +18,7 @@ module GHC.Unit.Module.ModSummary
    , msHsFilePath
    , msObjFilePath
    , msDynObjFilePath
+   , msDeps
    , isBootSummary
    , findTarget
    )
@@ -47,21 +46,6 @@ import GHC.Utils.Outputable
 
 import Data.Time
 
--- | Enrichment of 'ModSummary' with backpack dependencies
-data ExtendedModSummary = ExtendedModSummary
-  { emsModSummary :: {-# UNPACK #-} !ModSummary
-  , emsInstantiatedUnits :: [InstantiatedUnit]
-  -- ^ Extra backpack deps
-  -- NB: This is sometimes left empty in situations where the instantiated units
-  -- would not be used. See call sites of 'extendModSummaryNoDeps'.
-  }
-
-instance Outputable ExtendedModSummary where
-  ppr = \case
-    ExtendedModSummary ms bds -> ppr ms <+> ppr bds
-
-extendModSummaryNoDeps :: ModSummary -> ExtendedModSummary
-extendModSummaryNoDeps ms = ExtendedModSummary ms []
 
 -- | Data for a module node in a 'ModuleGraph'. Module nodes of the module graph
 -- are one of:
@@ -127,22 +111,23 @@ ms_plugin_imps ms = map ((NoPkgQual,) . noLoc) (pluginModNames (ms_hspp_opts ms)
 -- say, each of these module names could be a home import if an appropriately
 -- named file existed.  (This is in contrast to package qualified imports, which
 -- are guaranteed not to be home imports.)
-home_imps :: [(PkgQual, Located ModuleName)] -> [Located ModuleName]
-home_imps imps = fmap snd (filter (maybe_home . fst) imps)
+home_imps :: [(PkgQual, Located ModuleName)] -> [(PkgQual, Located ModuleName)]
+home_imps imps = filter (maybe_home . fst) imps
   where maybe_home NoPkgQual    = True
         maybe_home (ThisPkg _)  = True
         maybe_home (OtherPkg _) = False
 
 -- | Like 'ms_home_imps', but for SOURCE imports.
-ms_home_srcimps :: ModSummary -> [Located ModuleName]
-ms_home_srcimps = home_imps . ms_srcimps
+ms_home_srcimps :: ModSummary -> ([Located ModuleName])
+-- [] here because source imports can only refer to the current package.
+ms_home_srcimps = map snd . home_imps . ms_srcimps
 
 -- | All of the (possibly) home module imports from a
 -- 'ModSummary'; that is to say, each of these module names
 -- could be a home import if an appropriately named file
 -- existed.  (This is in contrast to package qualified
 -- imports, which are guaranteed not to be home imports.)
-ms_home_imps :: ModSummary -> [Located ModuleName]
+ms_home_imps :: ModSummary -> ([(PkgQual, Located ModuleName)])
 ms_home_imps = home_imps . ms_imps
 
 -- The ModLocation contains both the original source filename and the
@@ -169,12 +154,25 @@ isBootSummary ms = if ms_hsc_src ms == HsBootFile then IsBoot else NotBoot
 ms_mnwib :: ModSummary -> ModuleNameWithIsBoot
 ms_mnwib ms = GWIB (ms_mod_name ms) (isBootSummary ms)
 
+-- | Returns the dependencies of the ModSummary s.
+msDeps :: ModSummary -> ([(PkgQual, GenWithIsBoot (Located ModuleName))])
+msDeps s =
+           [ (NoPkgQual, d)
+           | m <- ms_home_srcimps s
+           , d <- [ GWIB { gwib_mod = m, gwib_isBoot = IsBoot }
+                  ]
+           ]
+        ++ [ (pkg, (GWIB { gwib_mod = m, gwib_isBoot = NotBoot }))
+           | (pkg, m) <- ms_imps s
+           ]
+
 instance Outputable ModSummary where
    ppr ms
       = sep [text "ModSummary {",
              nest 3 (sep [text "ms_hs_hash = " <> text (show (ms_hs_hash ms)),
                           text "ms_mod =" <+> ppr (ms_mod ms)
                                 <> text (hscSourceString (ms_hsc_src ms)) <> comma,
+                          text "unit =" <+> ppr (ms_unitid ms),
                           text "ms_textual_imps =" <+> ppr (ms_textual_imps ms),
                           text "ms_srcimps =" <+> ppr (ms_srcimps ms)]),
              char '}'

@@ -51,7 +51,6 @@ import GHC.Driver.Session as DynFlags
 import GHC.Driver.Ppr hiding (printForUser)
 import GHC.Utils.Error hiding (traceCmd)
 import GHC.Driver.Monad ( modifySession )
-import GHC.Driver.Config.Finder (initFinderOpts)
 import GHC.Driver.Config.Parser (initParserOpts)
 import GHC.Driver.Config.Diagnostic
 import qualified GHC
@@ -162,6 +161,7 @@ import GHC.IO.Handle ( hFlushAll )
 import GHC.TopHandler ( topHandler )
 
 import GHCi.Leak
+import qualified GHC.Unit.Module.Graph as GHC
 
 -----------------------------------------------------------------------------
 
@@ -228,7 +228,7 @@ ghciCommands = map mkCmd [
   ("main",      keepGoing runMain,              completeFilename),
   ("print",     keepGoing printCmd,             completeExpression),
   ("quit",      quit,                           noCompletion),
-  ("reload",    keepGoing' reloadModule,        noCompletion),
+  ("reload",    keepGoingMulti' reloadModule,   noCompletion),
   ("reload!",   keepGoing' reloadModuleDefer,   noCompletion),
   ("run",       keepGoing runRun,               completeFilename),
   ("script",    keepGoing' scriptCmd,           completeFilename),
@@ -294,15 +294,28 @@ flagWordBreakChars = " \t\n"
 keepGoing :: (String -> GHCi ()) -> (String -> InputT GHCi Bool)
 keepGoing a str = keepGoing' (lift . a) str
 
-keepGoing' :: Monad m => (String -> m ()) -> String -> m Bool
-keepGoing' a str = a str >> return False
+keepGoing' :: GhciMonad m => (a -> m ()) -> a -> m Bool
+keepGoing' a str = do
+  in_multi <- inMultiMode
+  if in_multi
+    then
+      liftIO $ hPutStrLn stderr "Command is not supported (yet) in multi-mode"
+    else
+      a str
+  return False
+
+-- For commands which are actually support in multi-mode, initially just :reload
+keepGoingMulti' :: GhciMonad m => (String -> m ()) -> String -> m Bool
+keepGoingMulti' a str = a str >> return False
+
+inMultiMode :: GhciMonad m => m Bool
+inMultiMode = multiMode <$> getGHCiState
 
 keepGoingPaths :: ([FilePath] -> InputT GHCi ()) -> (String -> InputT GHCi Bool)
 keepGoingPaths a str
  = do case toArgsNoLoc str of
-          Left err -> liftIO $ hPutStrLn stderr err
-          Right args -> a args
-      return False
+          Left err -> liftIO $ hPutStrLn stderr err >> return False
+          Right args -> keepGoing' a args
 
 defShortHelpText :: String
 defShortHelpText = "use :? for help.\n"
@@ -457,9 +470,12 @@ default_prompt_cont = generatePromptFunctionFromString "ghci| "
 default_args :: [String]
 default_args = []
 
-interactiveUI :: GhciSettings -> [(FilePath, Maybe Phase)] -> Maybe [String]
+interactiveUI :: GhciSettings -> [(FilePath, Maybe UnitId, Maybe Phase)] -> Maybe [String]
               -> Ghc ()
 interactiveUI config srcs maybe_exprs = do
+   -- This is a HACK to make sure dynflags are not overwritten when setting
+   -- options. When GHCi is made properly multi component it should be removed.
+   modifySession (\env -> hscSetActiveUnitId (hscActiveUnitId env) env)
    -- HACK! If we happen to get into an infinite loop (eg the user
    -- types 'let x=x in x' at the prompt), then the thread will block
    -- on a blackhole, and become unreachable during GC.  The GC will
@@ -518,6 +534,8 @@ interactiveUI config srcs maybe_exprs = do
    default_editor <- liftIO $ findEditor
    eval_wrapper <- mkEvalWrapper default_progname default_args
    let prelude_import = simpleImportDecl preludeModuleName
+   hsc_env <- GHC.getSession
+   let in_multi = length (hsc_all_home_unit_ids hsc_env) > 1
    startGHCi (runGHCi srcs maybe_exprs)
         GHCiState{ progname           = default_progname,
                    args               = default_args,
@@ -527,6 +545,7 @@ interactiveUI config srcs maybe_exprs = do
                    stop               = default_stop,
                    editor             = default_editor,
                    options            = [],
+                   multiMode          = in_multi,
                    localConfig        = SourceLocalConfig,
                    -- We initialize line number as 0, not 1, because we use
                    -- current line number while reporting errors which is
@@ -621,7 +640,7 @@ withGhcConfig right left = do
                right dir
         _ -> left
 
-runGHCi :: [(FilePath, Maybe Phase)] -> Maybe [String] -> GHCi ()
+runGHCi :: [(FilePath, Maybe UnitId, Maybe Phase)] -> Maybe [String] -> GHCi ()
 runGHCi paths maybe_exprs = do
   dflags <- getDynFlags
   let
@@ -704,13 +723,12 @@ runGHCi paths maybe_exprs = do
     -- Importantly, if $PWD/.ghci was ignored due to configuration,
     -- explicitly specifying it does cause it to be processed.
 
-  -- Perform a :load for files given on the GHCi command line
+  -- Perform a :reload for files given on the GHCi command line
+  -- The appropiate targets will already be set
   -- When in -e mode, if the load fails then we want to stop
   -- immediately rather than going on to evaluate the expression.
   when (not (null paths)) $ do
      ok <- ghciHandle (\e -> do showException e; return Failed) $
-                -- TODO: this is a hack.
-                runInputTWithPrefs defaultPrefs defaultSettings $
                     loadModule paths
      when (isJust maybe_exprs && failed ok) $
         liftIO (exitWith (ExitFailure 1))
@@ -1629,7 +1647,7 @@ changeDirectory dir = do
         liftIO $ putStrLn "Warning: changing directory causes all loaded modules to be unloaded,\nbecause the search path has changed."
   -- delete targets and all eventually defined breakpoints (#1620)
   clearAllTargets
-  setContextAfterLoad False []
+  setContextAfterLoad False Nothing
   GHC.workingDirectoryChanged
   dir' <- expandPath dir
   liftIO $ setCurrentDirectory dir'
@@ -1684,7 +1702,7 @@ editFile str =
 -- Our strategy is to pick the first module that failed to load,
 -- or otherwise the first target.
 --
--- XXX: Can we figure out what happened if the depndecy analysis fails
+-- XXX: Can we figure out what happened if the dependency analysis fails
 --      (e.g., because the porgrammeer mistyped the name of a module)?
 -- XXX: Can we figure out the location of an error to pass to the editor?
 -- XXX: if we could figure out the list of errors that occurred during the
@@ -1692,11 +1710,12 @@ editFile str =
 -- of those.
 chooseEditFile :: GHC.GhcMonad m => m String
 chooseEditFile =
-  do let hasFailed x = fmap not $ GHC.isLoaded $ GHC.ms_mod_name x
+  do let hasFailed (GHC.ModuleNode _deps x) = fmap not $ GHC.isLoaded $ GHC.ms_mod_name x
+         hasFailed _ = return False
 
      graph <- GHC.getModuleGraph
      failed_graph <-
-       GHC.mkModuleGraph . fmap extendModSummaryNoDeps <$> filterM hasFailed (GHC.mgModSummaries graph)
+       GHC.mkModuleGraph <$> filterM hasFailed (GHC.mgModSummaries' graph)
      let order g  = flattenSCCs $ filterToposortToModules $
            GHC.topSortModuleGraph True g Nothing
          pick xs  = case xs of
@@ -1969,24 +1988,24 @@ wrapDeferTypeErrors load =
     (\originalFlags -> void $ GHC.setProgramDynFlags originalFlags)
     (\_ -> load)
 
-loadModule :: GhciMonad m => [(FilePath, Maybe Phase)] -> m SuccessFlag
+loadModule :: GhciMonad m => [(FilePath, Maybe UnitId, Maybe Phase)] -> m SuccessFlag
 loadModule fs = do
   (_, result) <- runAndPrintStats (const Nothing) (loadModule' fs)
   either (liftIO . Exception.throwIO) return result
 
 -- | @:load@ command
 loadModule_ :: GhciMonad m => [FilePath] -> m ()
-loadModule_ fs = void $ loadModule (zip fs (repeat Nothing))
+loadModule_ fs = void $ loadModule (zip3 fs (repeat Nothing) (repeat Nothing))
 
 loadModuleDefer :: GhciMonad m => [FilePath] -> m ()
 loadModuleDefer = wrapDeferTypeErrors . loadModule_
 
-loadModule' :: GhciMonad m => [(FilePath, Maybe Phase)] -> m SuccessFlag
+loadModule' :: GhciMonad m => [(FilePath, Maybe UnitId, Maybe Phase)] -> m SuccessFlag
 loadModule' files = do
-  let (filenames, phases) = unzip files
+  let (filenames, uids, phases) = unzip3 files
   exp_filenames <- mapM expandPath filenames
-  let files' = zip exp_filenames phases
-  targets <- mapM (\(file, phase) -> GHC.guessTarget file Nothing phase) files'
+  let files' = zip3 exp_filenames uids phases
+  targets <- mapM (\(file, uid, phase) -> GHC.guessTarget file uid phase) files'
 
   -- NOTE: we used to do the dependency anal first, so that if it
   -- fails we didn't throw away the current set of modules.  This would
@@ -2035,13 +2054,9 @@ addModule files = do
     checkTargetModule :: GHC.GhcMonad m => ModuleName -> m Bool
     checkTargetModule m = do
       hsc_env <- GHC.getSession
-      let fc        = hsc_FC hsc_env
       let home_unit = hsc_home_unit hsc_env
-      let units     = hsc_units hsc_env
-      let dflags    = hsc_dflags hsc_env
-      let fopts     = initFinderOpts dflags
       result <- liftIO $
-        Finder.findImportedModule fc fopts units home_unit m (ThisPkg (homeUnitId home_unit))
+        Finder.findImportedModule hsc_env m (ThisPkg (homeUnitId home_unit))
       case result of
         Found _ _ -> return True
         _ -> (liftIO $ putStrLn $
@@ -2064,10 +2079,13 @@ unAddModule files = do
 
 -- | @:reload@ command
 reloadModule :: GhciMonad m => String -> m ()
-reloadModule m = void $ doLoadAndCollectInfo True loadTargets
+reloadModule m = do
+  session <- GHC.getSession
+  let home_unit = homeUnitId (hsc_home_unit session)
+  void $ doLoadAndCollectInfo True (loadTargets home_unit)
   where
-    loadTargets | null m    = LoadAllTargets
-                | otherwise = LoadUpTo (GHC.mkModuleName m)
+    loadTargets hu | null m    = LoadAllTargets
+                | otherwise = LoadUpTo (GHC.mkModuleName m, hu)
 
 reloadModuleDefer :: GhciMonad m => String -> m ()
 reloadModuleDefer = wrapDeferTypeErrors . reloadModule
@@ -2131,34 +2149,40 @@ afterLoad ok retain_context = do
   discardTickArrays
   loaded_mods <- getLoadedModules
   modulesLoadedMsg ok loaded_mods
-  setContextAfterLoad retain_context loaded_mods
+  graph <- GHC.getModuleGraph
+  setContextAfterLoad retain_context (Just graph)
 
-setContextAfterLoad :: GhciMonad m => Bool -> [GHC.ModSummary] -> m ()
-setContextAfterLoad keep_ctxt [] = do
+setContextAfterLoad :: GhciMonad m => Bool -> Maybe GHC.ModuleGraph -> m ()
+setContextAfterLoad keep_ctxt Nothing = do
   setContextKeepingPackageModules keep_ctxt []
-setContextAfterLoad keep_ctxt ms = do
+setContextAfterLoad keep_ctxt (Just graph) = do
   -- load a target if one is available, otherwise load the topmost module.
   targets <- GHC.getTargets
-  case [ m | Just m <- map (findTarget ms) targets ] of
+  loaded_graph <- filterM is_loaded $ GHC.mgModSummaries' graph
+  case [ m | Just m <- map (findTarget loaded_graph) targets ] of
         []    ->
-          let graph = GHC.mkModuleGraph $ extendModSummaryNoDeps <$> ms
-              graph' = flattenSCCs $ filterToposortToModules $
-                GHC.topSortModuleGraph True graph Nothing
-          in load_this (last graph')
+          let graph' = flattenSCCs $ filterToposortToModules $
+                GHC.topSortModuleGraph True (GHC.mkModuleGraph loaded_graph) Nothing
+          in case graph' of
+              [] -> setContextKeepingPackageModules keep_ctxt []
+              xs -> load_this (last xs)
         (m:_) ->
           load_this m
  where
+   is_loaded (GHC.ModuleNode _ ms) = GHC.isLoaded (ms_mod_name ms)
+   is_loaded _ = return False
+
    findTarget mds t
-    = case filter (`matches` t) mds of
+    = case mapMaybe (`matches` t) mds of
         []    -> Nothing
         (m:_) -> Just m
 
-   summary `matches` Target { targetId = TargetModule m }
-        = GHC.ms_mod_name summary == m
-   summary `matches` Target { targetId = TargetFile f _ }
-        | Just f' <- GHC.ml_hs_file (GHC.ms_location summary)   = f == f'
-   _ `matches` _
-        = False
+   (GHC.ModuleNode _ summary) `matches` Target { targetId = TargetModule m }
+        = if GHC.ms_mod_name summary == m then Just summary else Nothing
+   (GHC.ModuleNode _ summary) `matches` Target { targetId = TargetFile f _ }
+        | Just f' <- GHC.ml_hs_file (GHC.ms_location summary)   =
+          if f == f' then Just summary else Nothing
+   _ `matches` _ = Nothing
 
    load_this summary | m <- GHC.ms_mod summary = do
         is_interp <- GHC.moduleIsInterpreted m
@@ -3115,7 +3139,7 @@ newDynFlags interactive_only minus_opts = do
             let units = preloadUnits (hsc_units hsc_env)
             liftIO $ Loader.loadPackages interp hsc_env units
           -- package flags changed, we can't re-use any of the old context
-          setContextAfterLoad False []
+          setContextAfterLoad False Nothing
           -- and copy the package flags to the interactive DynFlags
           idflags <- GHC.getInteractiveDynFlags
           GHC.setInteractiveDynFlags

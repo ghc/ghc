@@ -23,7 +23,6 @@ import GHC.Prelude
 
 import GHC.Types.SafeHaskell
 import GHC.Types.Name
-import GHC.Types.Unique.FM
 
 import GHC.Unit.Module.Name
 import GHC.Unit.Module.Imported
@@ -38,6 +37,7 @@ import GHC.Utils.Outputable
 import Data.List (sortBy, sort, partition)
 import Data.Set (Set)
 import qualified Data.Set as Set
+import Data.Bifunctor
 
 -- | Dependency information about ALL modules and packages below this one
 -- in the import hierarchy. This is the serialisable version of `ImportAvails`.
@@ -50,7 +50,7 @@ import qualified Data.Set as Set
 --
 -- See Note [Transitive Information in Dependencies]
 data Dependencies = Deps
-   { dep_direct_mods :: Set ModuleNameWithIsBoot
+   { dep_direct_mods :: Set (UnitId, ModuleNameWithIsBoot)
       -- ^ All home-package modules which are directly imported by this one.
 
    , dep_direct_pkgs :: Set UnitId
@@ -72,7 +72,7 @@ data Dependencies = Deps
       -- when the module is imported as a safe import
       -- (Safe Haskell). See Note [Tracking Trust Transitively] in GHC.Rename.Names
 
-   , dep_boot_mods :: Set ModuleNameWithIsBoot
+   , dep_boot_mods :: Set (UnitId, ModuleNameWithIsBoot)
       -- ^ All modules which have boot files below this one, and whether we
       -- should use the boot file or not.
       -- This information is only used to populate the eps_is_boot field.
@@ -109,15 +109,15 @@ mkDependencies :: HomeUnit -> Module -> ImportAvails -> [Module] -> Dependencies
 mkDependencies home_unit mod imports plugin_mods =
   let (home_plugins, external_plugins) = partition (isHomeUnit home_unit . moduleUnit) plugin_mods
       plugin_units = Set.fromList (map (toUnitId . moduleUnit) external_plugins)
-      all_direct_mods = foldr (\mn m -> addToUFM m mn (GWIB mn NotBoot))
+      all_direct_mods = foldr (\mn m -> extendInstalledModuleEnv m mn (GWIB (moduleName mn) NotBoot))
                               (imp_direct_dep_mods imports)
-                              (map moduleName home_plugins)
+                              (map (fmap toUnitId) home_plugins)
 
-      modDepsElts = Set.fromList . nonDetEltsUFM
+      modDepsElts = Set.fromList . installedModuleEnvElts
         -- It's OK to use nonDetEltsUFM here because sorting by module names
         -- restores determinism
 
-      direct_mods = modDepsElts (delFromUFM all_direct_mods (moduleName mod))
+      direct_mods = first moduleUnit `Set.map` modDepsElts (delInstalledModuleEnv all_direct_mods (toUnitId <$> mod))
             -- M.hi-boot can be in the imp_dep_mods, but we must remove
             -- it before recording the modules on which this one depends!
             -- (We want to retain M.hi-boot in imp_dep_mods so that
@@ -137,7 +137,7 @@ mkDependencies home_unit mod imports plugin_mods =
 
       -- If there's a non-boot import, then it shadows the boot import
       -- coming from the dependencies
-      source_mods = modDepsElts (imp_boot_mods imports)
+      source_mods = first moduleUnit `Set.map` modDepsElts (imp_boot_mods imports)
 
       sig_mods = filter (/= (moduleName mod)) $ imp_sig_mods imports
 
@@ -227,8 +227,8 @@ pprDeps unit_state (Deps { dep_direct_mods = dmods
           text "family instance modules:" <+> fsep (map ppr finsts)
         ]
   where
-    ppr_mod (GWIB mod IsBoot)  = ppr mod <+> text "[boot]"
-    ppr_mod (GWIB mod NotBoot) = ppr mod
+    ppr_mod (uid, (GWIB mod IsBoot))  = ppr uid <> colon <> ppr mod <+> text "[boot]"
+    ppr_mod (uid, (GWIB mod NotBoot)) = ppr uid <> colon <> ppr mod
 
     ppr_set :: Outputable a => (a -> SDoc) -> Set a -> SDoc
     ppr_set w = fsep . fmap w . Set.toAscList
@@ -478,7 +478,7 @@ data ImportAvails
           -- different packages. (currently not the case, but might be in the
           -- future).
 
-        imp_direct_dep_mods :: ModuleNameEnv ModuleNameWithIsBoot,
+        imp_direct_dep_mods :: InstalledModuleEnv ModuleNameWithIsBoot,
           -- ^ Home-package modules directly imported by the module being compiled.
 
         imp_dep_direct_pkgs :: Set UnitId,
@@ -499,7 +499,7 @@ data ImportAvails
           -- we are dependent on a trustworthy module in that package.
           -- See Note [Tracking Trust Transitively] in "GHC.Rename.Names"
 
-        imp_boot_mods :: ModuleNameEnv ModuleNameWithIsBoot,
+        imp_boot_mods :: InstalledModuleEnv ModuleNameWithIsBoot,
           -- ^ Domain is all modules which have hs-boot files, and whether
           -- we should import the boot version of interface file. Only used
           -- in one-shot mode to populate eps_is_boot.
