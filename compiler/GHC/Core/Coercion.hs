@@ -1772,7 +1772,8 @@ composeSteppers step1 step2 rec_nts tc tys
 unwrapNewTypeStepper :: NormaliseStepper Coercion
 unwrapNewTypeStepper rec_nts tc tys
   | Just (ty', co) <- instNewTyCon_maybe tc tys
-  = case checkRecTc rec_nts tc of
+  = -- pprTrace "unNS" (ppr tc <+> ppr (getUnique tc) <+> ppr tys $$ ppr ty' $$ ppr rec_nts) $
+    case checkRecTc rec_nts tc of
       Just rec_nts' -> NS_Step rec_nts' ty' co
       Nothing       -> NS_Abort
 
@@ -1796,6 +1797,8 @@ topNormaliseTypeX :: NormaliseStepper ev
                   -> Type -> Maybe (ev, Type)
 topNormaliseTypeX stepper plus ty
  | Just (tc, tys) <- splitTyConApp_maybe ty
+ -- SPJ: The default threshold for initRecTc is 100 which is extremely dangerous
+ --      for certain type synonyms, we should think about reducing it (see #20990)
  , NS_Step rec_nts ty' ev <- stepper initRecTc tc tys
  = go rec_nts ev ty'
  | otherwise

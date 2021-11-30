@@ -1,5 +1,5 @@
 
-T16247a.hs:21:21: error:
+T16247a.hs:21:28: error:
     • These kind and type variables: p k
       are out of dependency order. Perhaps try this ordering:
         k (p :: k)

@@ -1,0 +1,6 @@
+
+KcConDeclSkolem2.hs:8:19: error:
+    • Expected kind ‘k0’, but ‘a’ has kind ‘k0 -> *’
+    • In the first argument of ‘a’, namely ‘a’
+      In the type ‘(a a)’
+      In the definition of data constructor ‘MkD’

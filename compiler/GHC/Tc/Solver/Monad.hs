@@ -1228,6 +1228,9 @@ instance Monad TcS where
   m >>= k   = mkTcS $ \ebs -> do
     unTcS m ebs >>= (\r -> unTcS (k r) ebs)
 
+instance MonadIO TcS where
+  liftIO act = TcS $ \_env -> liftIO act
+
 instance MonadFail TcS where
   fail err  = mkTcS $ \_ -> fail err
 
@@ -1503,7 +1506,7 @@ nestTcS (TcS thing_inside)
 
        ; return res }
 
-emitImplicationTcS :: TcLevel -> SkolemInfo
+emitImplicationTcS :: TcLevel -> SkolemInfoAnon
                    -> [TcTyVar]        -- Skolems
                    -> [EvVar]          -- Givens
                    -> Cts              -- Wanteds
@@ -1524,7 +1527,7 @@ emitImplicationTcS new_tclvl skol_info skol_tvs givens wanteds
        ; emitImplication imp
        ; return (TcEvBinds (ic_binds imp)) }
 
-emitTvImplicationTcS :: TcLevel -> SkolemInfo
+emitTvImplicationTcS :: TcLevel -> SkolemInfoAnon
                      -> [TcTyVar]        -- Skolems
                      -> Cts              -- Wanteds
                      -> TcS ()
@@ -2001,8 +2004,8 @@ matchGlobalInst :: DynFlags
 matchGlobalInst dflags short_cut cls tys
   = wrapTcS (TcM.matchGlobalInst dflags short_cut cls tys)
 
-tcInstSkolTyVarsX :: TCvSubst -> [TyVar] -> TcS (TCvSubst, [TcTyVar])
-tcInstSkolTyVarsX subst tvs = wrapTcS $ TcM.tcInstSkolTyVarsX subst tvs
+tcInstSkolTyVarsX :: SkolemInfo -> TCvSubst -> [TyVar] -> TcS (TCvSubst, [TcTyVar])
+tcInstSkolTyVarsX skol_info subst tvs = wrapTcS $ TcM.tcInstSkolTyVarsX skol_info subst tvs
 
 -- Creating and setting evidence variables and CtFlavors
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

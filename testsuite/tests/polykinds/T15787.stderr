@@ -2,7 +2,7 @@
 T15787.hs:16:14: error:
     • Expected a type, but ‘k’ has kind ‘ob1’
       ‘ob1’ is a rigid type variable bound by
-        the data constructor ‘Kl’
+        the type signature for ‘Kl’
         at T15787.hs:16:3-43
     • In the type ‘k’
       In the definition of data constructor ‘Kl’

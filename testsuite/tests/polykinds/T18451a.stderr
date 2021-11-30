@@ -1,5 +1,5 @@
 
-T18451a.hs:10:8: error:
+T18451a.hs:10:15: error:
     • These kind and type variables: a b (c :: Const Type b)
       are out of dependency order. Perhaps try this ordering:
         (b :: k) (a :: Const (*) b) (c :: Const (*) b)

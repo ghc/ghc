@@ -1,0 +1,9 @@
+
+T19482.hs:11:25: error:
+    • Expected kind ‘[r]’, but ‘s’ has kind ‘r’
+      ‘r’ is a rigid type variable bound by
+        the instance declaration
+        at T19482.hs:10:10-35
+    • In the type ‘s’
+      In the expression: testF @r @s
+      In an equation for ‘bugList’: bugList = testF @r @s

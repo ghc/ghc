@@ -35,7 +35,7 @@ module GHC.Tc.Errors.Types (
   , SolverReport(..), SolverReportSupplementary(..)
   , ReportWithCtxt(..)
   , ReportErrCtxt(..)
-  , getUserGivens, discardProvCtxtGivens, getSkolemInfo
+  , getUserGivens, discardProvCtxtGivens
   , TcReportMsg(..), TcReportInfo(..)
   , CND_Extra(..)
   , mkTcReportWithInfo
@@ -57,9 +57,9 @@ import {-# SOURCE #-} GHC.Tc.Types (TcIdSigInfo)
 import {-# SOURCE #-} GHC.Tc.Errors.Hole.FitTypes (HoleFit)
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Evidence (EvBindsVar)
-import GHC.Tc.Types.Origin (CtOrigin (ProvCtxtOrigin), TypedThing, TyVarBndrs, SkolemInfo (SigSkol, UnkSkol, RuntimeUnkSkol), FRROrigin, UserTypeCtxt (PatSynCtxt))
+import GHC.Tc.Types.Origin (CtOrigin (ProvCtxtOrigin), SkolemInfoAnon (SigSkol), UserTypeCtxt (PatSynCtxt), TyVarBndrs, TypedThing, FRROrigin)
 import GHC.Tc.Types.Rank (Rank)
-import GHC.Tc.Utils.TcType (TcType, isRuntimeUnkSkol)
+import GHC.Tc.Utils.TcType (TcType)
 import GHC.Types.Error
 import GHC.Types.FieldLabel (FieldLabelString)
 import GHC.Types.Name (Name, OccName, getSrcLoc)
@@ -83,13 +83,11 @@ import GHC.Unit.State (UnitState)
 import GHC.Unit.Module.Name (ModuleName)
 import GHC.Types.Basic
 import GHC.Utils.Misc (filterOut)
-import GHC.Utils.Trace (pprTraceUserWarning)
 import qualified GHC.LanguageExtensions as LangExt
 
 import qualified Data.List.NonEmpty as NE
 import           Data.Typeable hiding (TyCon)
 import qualified Data.Semigroup as Semigroup
-import Data.List (partition)
 
 {-
 Note [Migrating TcM Messages]
@@ -188,7 +186,7 @@ data TcRnMessage where
 
       Test cases: T9939, T10632, T18036a, T20602, PluralS, T19296.
   -}
-  TcRnRedundantConstraints :: [Id] -> (SkolemInfo, Bool) -> TcRnMessage
+  TcRnRedundantConstraints :: [Id] -> (SkolemInfoAnon, Bool) -> TcRnMessage
 
   {-| TcRnInaccessibleCode is a warning that is emitted when the RHS of a pattern
       match is inaccessible, because the constraint solver has detected a contradiction.
@@ -1979,31 +1977,6 @@ discardProvCtxtGivens orig givens  -- See Note [discardProvCtxtGivens]
     discard _ _                                                  = False
 
 
-getSkolemInfo :: [Implication] -> [TcTyVar]
-              -> [(SkolemInfo, [TcTyVar])]                    -- #14628
--- Get the skolem info for some type variables
--- from the implication constraints that bind them.
---
--- In the returned (skolem, tvs) pairs, the 'tvs' part is non-empty
-getSkolemInfo _ []
-  = []
-
-getSkolemInfo [] tvs
-  | all isRuntimeUnkSkol tvs = [(RuntimeUnkSkol, tvs)]        -- #14628
-  | otherwise = -- See https://gitlab.haskell.org/ghc/ghc/-/issues?label_name[]=No%20skolem%20info
-      pprTraceUserWarning msg [(UnkSkol,tvs)]
-  where
-    msg = text "No skolem info - we could not find the origin of the following variables" <+> ppr tvs
-       $$ text "This should not happen, please report it as a bug following the instructions at:"
-       $$ text "https://gitlab.haskell.org/ghc/ghc/wikis/report-a-bug"
-
-
-getSkolemInfo (implic:implics) tvs
-  | null tvs_here =                            getSkolemInfo implics tvs
-  | otherwise   = (ic_info implic, tvs_here) : getSkolemInfo implics tvs_other
-  where
-    (tvs_here, tvs_other) = partition (`elem` ic_skols implic) tvs
-
 -- | An error reported after constraint solving.
 -- This is usually, some sort of unsolved constraint error,
 -- but we try to be specific about the precise problem we encountered.
@@ -2313,6 +2286,8 @@ data HoleError
   = OutOfScopeHole [ImportError]
   -- | Report a typed hole, or wildcard, with additional information.
   | HoleError HoleSort
+              [TcTyVar]                     -- Other type variables which get computed on the way.
+              [(SkolemInfoAnon, [TcTyVar])] -- Zonked and grouped skolems for the type of the hole.
 
 -- | A message that aims to explain why two types couldn't be seen
 -- to be representationally equal.

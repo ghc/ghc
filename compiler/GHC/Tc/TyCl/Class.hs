@@ -13,7 +13,6 @@
 module GHC.Tc.TyCl.Class
    ( tcClassSigs
    , tcClassDecl2
-   , ClassScopedTVEnv
    , findMethodBind
    , instantiateMethod
    , tcClassMinimalDef
@@ -39,7 +38,7 @@ import GHC.Tc.Utils.Unify
 import GHC.Tc.Utils.Instantiate( tcSuperSkolTyVars )
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Utils.TcMType
-import GHC.Core.Type     ( piResultTys, substTyVar )
+import GHC.Core.Type     ( piResultTys )
 import GHC.Core.Predicate
 import GHC.Core.Multiplicity
 import GHC.Tc.Types.Origin
@@ -68,7 +67,6 @@ import GHC.Data.Maybe
 import GHC.Types.Basic
 import GHC.Data.Bag
 import GHC.Data.BooleanFormula
-import GHC.Utils.Misc
 
 import Control.Monad
 import Data.List ( mapAccumL, partition )
@@ -189,16 +187,10 @@ tcClassSigs clas sigs def_methods
 ************************************************************************
 -}
 
--- | Maps class names to the type variables that scope over their bodies.
--- See @Note [Scoped tyvars in a TcTyCon]@ in "GHC.Core.TyCon".
-type ClassScopedTVEnv = NameEnv [(Name, TyVar)]
-
-tcClassDecl2 :: ClassScopedTVEnv         -- Class scoped type variables
-             -> LTyClDecl GhcRn          -- The class declaration
+tcClassDecl2 :: LTyClDecl GhcRn          -- The class declaration
              -> TcM (LHsBinds GhcTc)
 
-tcClassDecl2 class_scoped_tv_env
-             (L _ (ClassDecl {tcdLName = class_name, tcdSigs = sigs,
+tcClassDecl2 (L _ (ClassDecl {tcdLName = class_name, tcdSigs = sigs,
                                 tcdMeths = default_binds}))
   = recoverM (return emptyLHsBinds) $
     setSrcSpan (getLocA class_name) $
@@ -212,32 +204,26 @@ tcClassDecl2 class_scoped_tv_env
         --      dm1 = \d -> case ds d of (a,b,c) -> a
         -- And since ds is big, it doesn't get inlined, so we don't get good
         -- default methods.  Better to make separate AbsBinds for each
+
+        ; skol_info <- mkSkolemInfo (TyConSkol ClassFlavour (getName class_name))
+        ; tc_lvl    <- getTcLevel
         ; let (tyvars, _, _, op_items) = classBigSig clas
               prag_fn = mkPragEnv sigs default_binds
               sig_fn  = mkHsSigFun sigs
-              (skol_subst, clas_tyvars) = tcSuperSkolTyVars tyvars
+              (_skol_subst, clas_tyvars) = tcSuperSkolTyVars tc_lvl skol_info tyvars
+                    -- This make skolemTcTyVars, but does not clone,
+                    -- so we can put them in scope with tcExtendTyVarEnv
               pred = mkClassPred clas (mkTyVarTys clas_tyvars)
-              scoped_tyvars =
-                case lookupNameEnv class_scoped_tv_env (unLoc class_name) of
-                  Just tvs -> tvs
-                  Nothing  -> pprPanic "tcClassDecl2: Class name not in tcg_class_scoped_tvs_env"
-                                       (ppr class_name)
-              -- The substitution returned by tcSuperSkolTyVars maps each type
-              -- variable to a TyVarTy, so it is safe to call getTyVar below.
-              scoped_clas_tyvars =
-                mapSnd ( getTyVar ("tcClassDecl2: Super-skolem substitution maps "
-                                   ++ "type variable to non-type variable")
-                       . substTyVar skol_subst ) scoped_tyvars
         ; this_dict <- newEvVar pred
 
         ; let tc_item = tcDefMeth clas clas_tyvars this_dict
                                   default_binds sig_fn prag_fn
-        ; dm_binds <- tcExtendNameTyVarEnv scoped_clas_tyvars $
+        ; dm_binds <- tcExtendTyVarEnv clas_tyvars $
                       mapM tc_item op_items
 
         ; return (unionManyBags dm_binds) }
 
-tcClassDecl2 _ d = pprPanic "tcClassDecl2" (ppr d)
+tcClassDecl2 d = pprPanic "tcClassDecl2" (ppr d)
 
 tcDefMeth :: Class -> [TyVar] -> EvVar -> LHsBinds GhcRn
           -> HsSigFun -> TcPragEnv -> ClassOpItem

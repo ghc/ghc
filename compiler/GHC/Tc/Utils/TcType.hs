@@ -25,7 +25,7 @@ module GHC.Tc.Utils.TcType (
   TcType, TcSigmaType, TcRhoType, TcTauType, TcPredType, TcThetaType,
   TcTyVar, TcTyVarSet, TcDTyVarSet, TcTyCoVarSet, TcDTyCoVarSet,
   TcKind, TcCoVar, TcTyCoVar, TcTyVarBinder, TcInvisTVBinder, TcReqTVBinder,
-  TcTyCon, KnotTied,
+  TcTyCon, MonoTcTyCon, PolyTcTyCon, TcTyConBinder, KnotTied,
 
   ExpType(..), InferResult(..), ExpSigmaType, ExpRhoType, mkCheckExpType,
 
@@ -35,11 +35,10 @@ module GHC.Tc.Utils.TcType (
   TcLevel(..), topTcLevel, pushTcLevel, isTopTcLevel,
   strictlyDeeperThan, deeperThanOrSame, sameDepthAs,
   tcTypeLevel, tcTyVarLevel, maxTcLevel,
-  promoteSkolem, promoteSkolemX, promoteSkolemsX,
   --------------------------------
   -- MetaDetails
-  TcTyVarDetails(..), pprTcTyVarDetails, vanillaSkolemTv, superSkolemTv,
-  MetaDetails(Flexi, Indirect), MetaInfo(..),
+  TcTyVarDetails(..), pprTcTyVarDetails, vanillaSkolemTvUnk,
+  MetaDetails(Flexi, Indirect), MetaInfo(..), skolemSkolInfo,
   isImmutableTyVar, isSkolemTyVar, isMetaTyVar,  isMetaTyVarTy, isTyVarTy,
   tcIsTcTyVar, isTyVarTyVar, isOverlappableTyVar,  isTyConableTyVar,
   isAmbiguousTyVar, isCycleBreakerTyVar, metaTyVarRef, metaTyVarInfo,
@@ -230,10 +229,10 @@ import GHC.Utils.Panic.Plain
 import GHC.Utils.Error( Validity'(..), Validity )
 import qualified GHC.LanguageExtensions as LangExt
 
-import Data.List  ( mapAccumL )
--- import Data.Functor.Identity( Identity(..) )
 import Data.IORef
 import Data.List.NonEmpty( NonEmpty(..) )
+import {-# SOURCE #-} GHC.Tc.Types.Origin ( unkSkol, SkolemInfo )
+
 
 {-
 ************************************************************************
@@ -341,7 +340,12 @@ type TcTyCoVar = Var    -- Either a TcTyVar or a CoVar
 type TcTyVarBinder     = TyVarBinder
 type TcInvisTVBinder   = InvisTVBinder
 type TcReqTVBinder     = ReqTVBinder
-type TcTyCon           = TyCon   -- these can be the TcTyCon constructor
+
+-- See Note [TcTyCon, MonoTcTyCon, and PolyTcTyCon]
+type TcTyCon       = TyCon
+type MonoTcTyCon   = TcTyCon
+type PolyTcTyCon   = TcTyCon
+type TcTyConBinder = TyConBinder -- With skolem TcTyVars
 
 -- These types do not have boxy type variables in them
 type TcPredType     = PredType
@@ -354,6 +358,51 @@ type TcTyVarSet     = TyVarSet
 type TcTyCoVarSet   = TyCoVarSet
 type TcDTyVarSet    = DTyVarSet
 type TcDTyCoVarSet  = DTyCoVarSet
+
+{- Note [TcTyCon, MonoTcTyCon, and PolyTcTyCon]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+See Note [How TcTyCons work] in GHC.Tc.TyCl
+
+Invariants:
+
+* TcTyCon: a TyCon built with the TcTyCon constructor
+
+* TcTyConBinder: a TyConBinder with a TcTyVar inside (not a TyVar)
+
+* TcTyCons contain TcTyVars
+
+* MonoTcTyCon:
+  - Flag tcTyConIsPoly = False
+
+  - tyConScopedTyVars is important; maps a Name to a TyVarTv unification variable
+    The order is important: Specified then Required variables.   E.g. in
+        data T a (b :: k) = ...
+    the order will be [k, a, b].
+
+    NB: There are no Inferred binders in tyConScopedTyVars; 'a' may
+    also be poly-kinded, but that kind variable will be added by
+    generaliseTcTyCon, in the passage to a PolyTcTyCon.
+
+  - tyConBinders are irrelevant; we just use tcTyConScopedTyVars
+    Well not /quite/ irrelevant: its length gives the number of Required binders,
+    and so allows up to distinguish between the Specified and Required elements of
+    tyConScopedTyVars.
+
+* PolyTcTyCon:
+  - Flag tcTyConIsPoly = True; this is used only to short-cut zonking
+
+  - tyConBinders are still TcTyConBinders, but they are /skolem/ TcTyVars,
+    with fixed kinds: no unification variables here
+
+    tyConBinders includes the Inferred binders if any
+
+    tyConBinders uses the Names from the original, renamed program.
+
+  - tcTyConScopedTyVars is irrelevant: just use (binderVars tyConBinders)
+    All the types have been swizzled back to use the original Names
+    See Note [tyConBinders and lexical scoping] in GHC.Core.TyCon
+
+-}
 
 {- *********************************************************************
 *                                                                      *
@@ -480,6 +529,7 @@ we would need to enforce the separation.
 -- See Note [TyVars and TcTyVars]
 data TcTyVarDetails
   = SkolemTv      -- A skolem
+       SkolemInfo
        TcLevel    -- Level of the implication that binds it
                   -- See GHC.Tc.Utils.Unify Note [Deeper level on the left] for
                   --     how this level number is used
@@ -494,12 +544,8 @@ data TcTyVarDetails
            , mtv_ref   :: IORef MetaDetails
            , mtv_tclvl :: TcLevel }  -- See Note [TcLevel invariants]
 
-vanillaSkolemTv, superSkolemTv :: TcTyVarDetails
--- See Note [Binding when looking up instances] in GHC.Core.InstEnv
-vanillaSkolemTv = SkolemTv topTcLevel False  -- Might be instantiated
-superSkolemTv   = SkolemTv topTcLevel True   -- Treat this as a completely distinct type
-                  -- The choice of level number here is a bit dodgy, but
-                  -- topTcLevel works in the places that vanillaSkolemTv is used
+vanillaSkolemTvUnk :: HasCallStack => TcTyVarDetails
+vanillaSkolemTvUnk = SkolemTv unkSkol topTcLevel False
 
 instance Outputable TcTyVarDetails where
   ppr = pprTcTyVarDetails
@@ -507,8 +553,8 @@ instance Outputable TcTyVarDetails where
 pprTcTyVarDetails :: TcTyVarDetails -> SDoc
 -- For debugging
 pprTcTyVarDetails (RuntimeUnk {})      = text "rt"
-pprTcTyVarDetails (SkolemTv lvl True)  = text "ssk" <> colon <> ppr lvl
-pprTcTyVarDetails (SkolemTv lvl False) = text "sk"  <> colon <> ppr lvl
+pprTcTyVarDetails (SkolemTv _sk lvl True)  = text "ssk" <> colon <> ppr lvl
+pprTcTyVarDetails (SkolemTv _sk lvl False) = text "sk"  <> colon <> ppr lvl
 pprTcTyVarDetails (MetaTv { mtv_info = info, mtv_tclvl = tclvl })
   = ppr info <> colon <> ppr tclvl
 
@@ -678,7 +724,7 @@ tcTyVarLevel :: TcTyVar -> TcLevel
 tcTyVarLevel tv
   = case tcTyVarDetails tv of
           MetaTv { mtv_tclvl = tv_lvl } -> tv_lvl
-          SkolemTv tv_lvl _             -> tv_lvl
+          SkolemTv _ tv_lvl _           -> tv_lvl
           RuntimeUnk                    -> topTcLevel
 
 
@@ -695,32 +741,6 @@ tcTypeLevel ty
 
 instance Outputable TcLevel where
   ppr (TcLevel us) = ppr us
-
-promoteSkolem :: TcLevel -> TcTyVar -> TcTyVar
-promoteSkolem tclvl skol
-  | tclvl < tcTyVarLevel skol
-  = assert (isTcTyVar skol && isSkolemTyVar skol )
-    setTcTyVarDetails skol (SkolemTv tclvl (isOverlappableTyVar skol))
-
-  | otherwise
-  = skol
-
--- | Change the TcLevel in a skolem, extending a substitution
-promoteSkolemX :: TcLevel -> TCvSubst -> TcTyVar -> (TCvSubst, TcTyVar)
-promoteSkolemX tclvl subst skol
-  = assert (isTcTyVar skol && isSkolemTyVar skol )
-    (new_subst, new_skol)
-  where
-    new_skol
-      | tclvl < tcTyVarLevel skol
-      = setTcTyVarDetails (updateTyVarKind (substTy subst) skol)
-                          (SkolemTv tclvl (isOverlappableTyVar skol))
-      | otherwise
-      = updateTyVarKind (substTy subst) skol
-    new_subst = extendTvSubstWithClone subst skol new_skol
-
-promoteSkolemsX :: TcLevel -> TCvSubst -> [TcTyVar] -> (TCvSubst, [TcTyVar])
-promoteSkolemsX tclvl = mapAccumL (promoteSkolemX tclvl)
 
 {- *********************************************************************
 *                                                                      *
@@ -1034,10 +1054,19 @@ isSkolemTyVar tv
         MetaTv {} -> False
         _other    -> True
 
+skolemSkolInfo :: TcTyVar -> SkolemInfo
+skolemSkolInfo tv
+  = assert (isSkolemTyVar tv) $
+    case tcTyVarDetails tv of
+      SkolemTv skol_info _ _ -> skol_info
+      RuntimeUnk -> panic "RuntimeUnk"
+      MetaTv {} -> panic "skolemSkolInfo"
+
+
 isOverlappableTyVar tv
   | isTyVar tv -- See Note [Coercion variables in free variable lists]
   = case tcTyVarDetails tv of
-        SkolemTv _ overlappable -> overlappable
+        SkolemTv _ _ overlappable -> overlappable
         _                       -> False
   | otherwise = False
 

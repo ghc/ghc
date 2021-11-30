@@ -34,6 +34,7 @@ module GHC.Utils.Panic
    , cmdLineError
    , cmdLineErrorIO
    , callStackDoc
+   , prettyCallStackDoc
 
    , Exception.Exception(..)
    , showException
@@ -289,9 +290,12 @@ withSignalHandlers act = do
   act `MC.finally` mayUninstallHandlers
 
 callStackDoc :: HasCallStack => SDoc
-callStackDoc =
+callStackDoc = prettyCallStackDoc callStack
+
+prettyCallStackDoc :: CallStack -> SDoc
+prettyCallStackDoc cs =
     hang (text "Call stack:")
-       4 (vcat $ map text $ lines (prettyCallStack callStack))
+       4 (vcat $ map text $ lines (prettyCallStack cs))
 
 -- | Panic with an assertion failure, recording the given file and
 -- line number. Should typically be accessed with the ASSERT family of macros

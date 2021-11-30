@@ -536,6 +536,7 @@ tcExtendKindEnv extra_env thing_inside
 -- Scoped type and kind variables
 tcExtendTyVarEnv :: [TyVar] -> TcM r -> TcM r
 tcExtendTyVarEnv tvs thing_inside
+  -- MP: This silently coerces TyVar to TcTyVar.
   = tcExtendNameTyVarEnv (mkTyVarNamePairs tvs) thing_inside
 
 tcExtendNameTyVarEnv :: [(Name,TcTyVar)] -> TcM r -> TcM r
@@ -745,7 +746,7 @@ tcInitTidyEnv
        = do { let (env', occ') = tidyOccName env (nameOccName name)
                   name'  = tidyNameOcc name occ'
                   tyvar1 = setTyVarName tyvar name'
-            ; tyvar2 <- zonkTcTyVarToTyVar tyvar1
+            ; tyvar2 <- zonkTcTyVarToTcTyVar tyvar1
               -- Be sure to zonk here!  Tidying applies to zonked
               -- types, so if we don't zonk we may create an
               -- ill-kinded type (#14175)

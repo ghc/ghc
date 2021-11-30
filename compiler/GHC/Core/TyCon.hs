@@ -25,7 +25,7 @@ module GHC.Core.TyCon(
         mkRequiredTyConBinder,
         mkAnonTyConBinder, mkAnonTyConBinders,
         tyConBinderArgFlag, tyConBndrVisArgFlag, isNamedTyConBinder,
-        isVisibleTyConBinder, isInvisibleTyConBinder,
+        isVisibleTyConBinder, isInvisibleTyConBinder, isVisibleTcbVis,
 
         -- ** Field labels
         tyConFieldLabels, lookupTyConFieldLabel,
@@ -640,6 +640,8 @@ They fit together like so:
   Note that there are three binders here, including the
   kind variable k.
 
+  See Note [tyConBinders and lexical scoping]
+
 * See Note [VarBndrs, TyCoVarBinders, TyConBinders, and visibility] in GHC.Core.TyCo.Rep
   for what the visibility flag means.
 
@@ -668,7 +670,47 @@ They fit together like so:
 * For an algebraic data type, or data instance, the tyConResKind is
   always (TYPE r); that is, the tyConBinders are enough to saturate
   the type constructor.  I'm not quite sure why we have this invariant,
-  but it's enforced by etaExpandAlgTyCon
+  but it's enforced by splitTyConKind
+
+Note [tyConBinders and lexical scoping]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In a TyCon, and a PolyTcTyCon, we obey the following rule:
+
+   The Name of the TyConBinder is precisely
+       the lexically scoped Name from the original declaration
+       (precisely = both OccName and Unique)
+
+For example,
+   data T a (b :: wombat) = MkT
+We will get tyConBinders of [k, wombat, a::k, b::wombat]
+The 'k' is made up; the user didn't specify it.  But for the kind of 'b'
+we must use 'wombat'.
+
+Why do we have this invariant?
+
+* Similarly, when typechecking default definitions for class methods, in
+  GHC.Tc.TyCl.Class.tcClassDecl2, we only have the (final) Class available;
+  but the variables bound in that class must be in scope.  Eample (#19738):
+
+    type P :: k -> Type
+    data P a = MkP
+
+    type T :: k -> Constraint
+    class T (a :: j) where
+      f :: P a
+      f = MkP @j @a  -- 'j' must be in scope when we typecheck 'f'
+
+* When typechecking `deriving` clauses for top-level data declarations, the
+  tcTyConScopedTyVars are brought into scope in through the `di_scoped_tvs`
+  field of GHC.Tc.Deriv.DerivInfo. Example (#16731):
+
+    class C x1 x2
+
+    type T :: a -> Type
+    data T (x :: z) deriving (C z)
+
+  When typechecking `C z`, we want `z` to map to `a`, which is exactly what the
+  tcTyConScopedTyVars for T give us.
 -}
 
 instance OutputableBndr tv => Outputable (VarBndr tv TyConBndrVis) where
@@ -727,7 +769,7 @@ data TyCon
         tyConName   :: Name,     -- ^ Name of the constructor
 
         -- See Note [The binders/kind/arity fields of a TyCon]
-        tyConBinders :: [TyConBinder], -- ^ Full binders
+        tyConBinders :: [TyConBinder],    -- ^ Full binders
         tyConResKind :: Kind,             -- ^ Result kind
         tyConKind    :: Kind,             -- ^ Kind of this TyCon
         tyConArity   :: Arity,            -- ^ Arity
@@ -947,15 +989,18 @@ data TyCon
           -- arguments to the type constructor; see the use
           -- of tyConArity in generaliseTcTyCon
 
-        tcTyConScopedTyVars :: [(Name,TyVar)],
+        tcTyConScopedTyVars :: [(Name,TcTyVar)],
           -- ^ Scoped tyvars over the tycon's body
-          -- See Note [Scoped tyvars in a TcTyCon]
+          -- The range is always a skolem or TcTyVar, be
+          -- MonoTcTyCon only: see Note [Scoped tyvars in a TcTyCon]
 
         tcTyConIsPoly     :: Bool, -- ^ Is this TcTyCon already generalized?
+                                   -- Used only to make zonking more efficient
 
         tcTyConFlavour :: TyConFlavour
                            -- ^ What sort of 'TyCon' this represents.
       }
+
 {- Note [Scoped tyvars in a TcTyCon]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The tcTyConScopedTyVars field records the lexicial-binding connection
@@ -970,37 +1015,8 @@ where
    * required_tvs the same as tyConTyVars
    * tyConArity = length required_tvs
 
-There are some situations where we need to keep the tcTyConScopedTyVars around
-for later use, even after the TcTyCon has been zonked away:
-
-* When typechecking `deriving` clauses for top-level data declarations, the
-  tcTyConScopedTyVars are brought into scope in through the `di_scoped_tvs`
-  field of GHC.Tc.Deriv.DerivInfo. Example (#16731):
-
-    class C x1 x2
-
-    type T :: a -> Type
-    data T (x :: z) deriving (C z)
-
-  When typechecking `C z`, we want `z` to map to `a`, which is exactly what the
-  tcTyConScopedTyVars for T give us.
-
-* Similarly, when typechecking default definitions for class methods, the
-  tcTyConScopedTyVars ought to be brought into scope. Example (#19738):
-
-    type P :: k -> Type
-    data P a = MkP
-
-    type T :: k -> Constraint
-    class T (a :: j) where
-      f :: P a
-      f = MkP @j @a
-
-  We pass the tcTyConScopedTyVars to GHC.Tc.TyCl.Class.tcClassDecl2, the
-  function responsible for typechecking the default definition of `f`, by way
-  of a ClassScopedTVEnv, which maps each class name to its scoped tyvars.
-
-See also Note [How TcTyCons work] in GHC.Tc.TyCl
+tcTyConScopedTyVars are used only for MonoTcTyCons, not PolyTcTyCons.
+See Note [TcTyCon, MonoTcTyCon, and PolyTcTyCon] in GHC.Tc.Utils.TcType.
 
 Note [Promoted GADT data constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -507,13 +507,18 @@ mkPredOrigin origin t_or_k pred = PredOrigin pred origin t_or_k
 mkThetaOrigin :: CtOrigin -> TypeOrKind
               -> [TyVar] -> [TyVar] -> ThetaType -> ThetaType
               -> ThetaOrigin
-mkThetaOrigin origin t_or_k skols metas givens
-  = ThetaOrigin skols metas givens . map (mkPredOrigin origin t_or_k)
+mkThetaOrigin origin t_or_k skols metas givens wanteds
+  = ThetaOrigin { to_anyclass_skols  = skols
+                , to_anyclass_metas  = metas
+                , to_anyclass_givens = givens
+                , to_wanted_origins  = map (mkPredOrigin origin t_or_k) wanteds }
 
 -- A common case where the ThetaOrigin only contains wanted constraints, with
 -- no givens or locally scoped type variables.
 mkThetaOriginFromPreds :: [PredOrigin] -> ThetaOrigin
-mkThetaOriginFromPreds = ThetaOrigin [] [] []
+mkThetaOriginFromPreds origins
+  = ThetaOrigin { to_anyclass_skols = [], to_anyclass_metas = []
+                , to_anyclass_givens = [], to_wanted_origins = origins }
 
 substPredOrigin :: HasCallStack => TCvSubst -> PredOrigin -> PredOrigin
 substPredOrigin subst (PredOrigin pred origin t_or_k)

@@ -6,7 +6,7 @@ T17963.hs:15:23: error:
         ob :: TYPE rep
       ‘rep’ is a rigid type variable bound by
         the class declaration for ‘Category'’
-        at T17963.hs:13:27-29
+        at T17963.hs:14:18-35
     • In the first argument of ‘cat’, namely ‘a’
       In the type signature: id' :: forall a. cat a a
       In the class declaration for ‘Category'’

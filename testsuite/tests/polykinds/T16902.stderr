@@ -2,7 +2,7 @@
 T16902.hs:12:10: error:
     • Expected a type, but found something with kind ‘a’
       ‘a’ is a rigid type variable bound by
-        the data constructor ‘MkF’
+        the type signature for ‘MkF’
         at T16902.hs:12:3-12
     • In the type ‘F a’
       In the definition of data constructor ‘MkF’

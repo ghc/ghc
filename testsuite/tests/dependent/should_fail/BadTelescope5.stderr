@@ -2,7 +2,7 @@
 BadTelescope5.hs:10:81: error:
     • Expected kind ‘k’, but ‘d’ has kind ‘Proxy a’
       ‘k’ is a rigid type variable bound by
-        an explicit forall a k (b :: k) (c :: Proxy b) (d :: Proxy a)
+        the type signature for ‘bar’
         at BadTelescope5.hs:10:17
     • In the second argument of ‘SameKind’, namely ‘d’
       In the type signature:

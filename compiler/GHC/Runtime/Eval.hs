@@ -1060,7 +1060,7 @@ getDictionaryBindings :: PredType -> TcM CtEvidence
 getDictionaryBindings theta = do
   dictName <- newName (mkDictOcc (mkVarOcc "magic"))
   let dict_var = mkVanillaGlobal dictName theta
-  loc <- getCtLocM (GivenOrigin UnkSkol) Nothing
+  loc <- getCtLocM (GivenOrigin (getSkolemInfo unkSkol)) Nothing
 
   -- Generate a wanted here because at the end of constraint
   -- solving, most derived constraints get thrown away, which in certain

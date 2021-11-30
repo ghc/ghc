@@ -1,2 +1,2 @@
-C :: j -> Constraint
-T :: forall j -> j -> Type
+C :: k -> Constraint
+T :: forall k -> k -> Type

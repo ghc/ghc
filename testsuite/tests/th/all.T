@@ -340,7 +340,7 @@ test('T10828a', normal, compile_fail, ['-v0'])
 test('T10828b', normal, compile_fail, ['-v0'])
 test('T10891', normal, compile, ['-v0'])
 test('T10945', normal, compile_fail, ['-v0'])
-test('T10946', expect_broken(10946), compile, ['-v0'])
+test('T10946', normal, compile_fail, ['-v0'])
 test('T10734', normal, compile_and_run, ['-v0'])
 test('T10819', [], multimod_compile,
      ['T10819.hs', '-v0 ' + config.ghc_th_way_flags])

@@ -1,0 +1,6 @@
+
+KcConDeclSkolem.hs:9:15: error:
+    • Expected kind ‘k’, but ‘a’ has kind ‘k -> k0’
+    • In the first argument of ‘Proxy’, namely ‘(a :: k)’
+      In the type ‘Proxy (a :: k)’
+      In the definition of data constructor ‘D’

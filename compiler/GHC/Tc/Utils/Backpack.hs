@@ -229,14 +229,14 @@ check_inst sig_inst = do
     mapM_ tcLookupImported_maybe (nameSetElemsStable (orphNamesOfClsInst sig_inst))
     -- Based off of 'simplifyDeriv'
     let ty = idType (instanceDFunId sig_inst)
-        skol_info = InstSkol
         -- Based off of tcSplitDFunTy
         (tvs, theta, pred) =
            case tcSplitForAllInvisTyVars ty of { (tvs, rho)    ->
            case splitFunTys rho             of { (theta, pred) ->
            (tvs, theta, pred) }}
         origin = InstProvidedOrigin (tcg_semantic_mod tcg_env) sig_inst
-    (skol_subst, tvs_skols) <- tcInstSkolTyVars tvs -- Skolemize
+    skol_info <- mkSkolemInfo InstSkol
+    (skol_subst, tvs_skols) <- tcInstSkolTyVars skol_info tvs -- Skolemize
     (tclvl,cts) <- pushTcLevelM $ do
        wanted <- newWanted origin
                            (Just TypeLevel)
@@ -253,7 +253,7 @@ check_inst sig_inst = do
        return $ wanted : givens
     unsolved <- simplifyWantedsTcM cts
 
-    (implic, _) <- buildImplicationFor tclvl skol_info tvs_skols [] unsolved
+    (implic, _) <- buildImplicationFor tclvl (getSkolemInfo skol_info) tvs_skols [] unsolved
     reportAllUnsolved (mkImplicWC implic)
 
 -- | For a module @modname@ of type 'HscSource', determine the list

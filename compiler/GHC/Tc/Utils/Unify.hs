@@ -1,5 +1,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections       #-}
+{-# LANGUAGE RecursiveDo       #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
@@ -863,12 +864,14 @@ tcSkolemise, tcSkolemiseScoped
 -- tcSkolemiseScoped and tcSkolemise
 
 tcSkolemiseScoped ctxt expected_ty thing_inside
-  = do { (wrap, tv_prs, given, rho_ty) <- topSkolemise expected_ty
-       ; let skol_tvs  = map snd tv_prs
-             skol_info = SigSkol ctxt expected_ty tv_prs
+  = do {
+       ; rec { (wrap, tv_prs, given, rho_ty) <- topSkolemise skol_info expected_ty
+             ; let skol_tvs  = map snd tv_prs
+             ; skol_info <- mkSkolemInfo (SigSkol ctxt expected_ty tv_prs)
+       }
 
        ; (ev_binds, res)
-             <- checkConstraints skol_info skol_tvs given $
+             <- checkConstraints (getSkolemInfo skol_info) skol_tvs given $
                 tcExtendNameTyVarEnv tv_prs               $
                 thing_inside rho_ty
 
@@ -879,13 +882,15 @@ tcSkolemise ctxt expected_ty thing_inside
   = do { res <- thing_inside expected_ty
        ; return (idHsWrapper, res) }
   | otherwise
-  = do  { (wrap, tv_prs, given, rho_ty) <- topSkolemise expected_ty
+  = do  {
+        ; rec { (wrap, tv_prs, given, rho_ty) <- topSkolemise skol_info expected_ty
 
-        ; let skol_tvs  = map snd tv_prs
-              skol_info = SigSkol ctxt expected_ty tv_prs
+              ; let skol_tvs  = map snd tv_prs
+              ; skol_info <- mkSkolemInfo (SigSkol ctxt expected_ty tv_prs)
+        }
 
         ; (ev_binds, result)
-              <- checkConstraints skol_info skol_tvs given $
+              <- checkConstraints (getSkolemInfo skol_info) skol_tvs given $
                  thing_inside rho_ty
 
         ; return (wrap <.> mkWpLet ev_binds, result) }
@@ -902,7 +907,7 @@ tcSkolemiseET ctxt (Check ty) thing_inside
   = tcSkolemise ctxt ty $ \rho_ty ->
     thing_inside (mkCheckExpType rho_ty)
 
-checkConstraints :: SkolemInfo
+checkConstraints :: SkolemInfoAnon
                  -> [TcTyVar]           -- Skolems
                  -> [EvVar]             -- Given
                  -> TcM result
@@ -938,33 +943,39 @@ emitResidualTvConstraint :: SkolemInfo -> [TcTyVar]
                          -> TcLevel -> WantedConstraints -> TcM ()
 emitResidualTvConstraint skol_info skol_tvs tclvl wanted
   | not (isEmptyWC wanted) ||
-    checkTelescopeSkol skol_info
+    checkTelescopeSkol skol_info_anon
   = -- checkTelescopeSkol: in this case, /always/ emit this implication
     -- even if 'wanted' is empty. We need the implication so that we check
     -- for a bad telescope. See Note [Skolem escape and forall-types] in
     -- GHC.Tc.Gen.HsType
-    do { implic <- buildTvImplication skol_info skol_tvs tclvl wanted
+    do { implic <- buildTvImplication skol_info_anon skol_tvs tclvl wanted
        ; emitImplication implic }
 
   | otherwise  -- Empty 'wanted', emit nothing
   = return ()
+  where
+     skol_info_anon = getSkolemInfo skol_info
 
-buildTvImplication :: SkolemInfo -> [TcTyVar]
+buildTvImplication :: SkolemInfoAnon -> [TcTyVar]
                    -> TcLevel -> WantedConstraints -> TcM Implication
 buildTvImplication skol_info skol_tvs tclvl wanted
-  = do { ev_binds <- newNoTcEvBinds  -- Used for equalities only, so all the constraints
+  = assertPpr (all (isSkolemTyVar <||> isTyVarTyVar) skol_tvs) (ppr skol_tvs) $
+    do { ev_binds <- newNoTcEvBinds  -- Used for equalities only, so all the constraints
                                      -- are solved by filling in coercion holes, not
                                      -- by creating a value-level evidence binding
        ; implic   <- newImplication
 
-       ; return (implic { ic_tclvl     = tclvl
-                        , ic_skols     = skol_tvs
-                        , ic_given_eqs = NoGivenEqs
-                        , ic_wanted    = wanted
-                        , ic_binds     = ev_binds
-                        , ic_info      = skol_info }) }
+       ; let implic' = implic { ic_tclvl     = tclvl
+                              , ic_skols     = skol_tvs
+                              , ic_given_eqs = NoGivenEqs
+                              , ic_wanted    = wanted
+                              , ic_binds     = ev_binds
+                              , ic_info      = skol_info }
 
-implicationNeeded :: SkolemInfo -> [TcTyVar] -> [EvVar] -> TcM Bool
+       ; checkImplicationInvariants implic'
+       ; return implic' }
+
+implicationNeeded :: SkolemInfoAnon -> [TcTyVar] -> [EvVar] -> TcM Bool
 -- See Note [When to build an implication]
 implicationNeeded skol_info skol_tvs given
   | null skol_tvs
@@ -984,7 +995,7 @@ implicationNeeded skol_info skol_tvs given
   | otherwise     -- Non-empty skolems or givens
   = return True   -- Definitely need an implication
 
-alwaysBuildImplication :: SkolemInfo -> Bool
+alwaysBuildImplication :: SkolemInfoAnon -> Bool
 -- See Note [When to build an implication]
 alwaysBuildImplication _ = False
 
@@ -1001,7 +1012,7 @@ alwaysBuildImplication (FamInstSkol {})   = True
 alwaysBuildImplication _                  = False
 -}
 
-buildImplicationFor :: TcLevel -> SkolemInfo -> [TcTyVar]
+buildImplicationFor :: TcLevel -> SkolemInfoAnon -> [TcTyVar]
                    -> [EvVar] -> WantedConstraints
                    -> TcM (Bag Implication, TcEvBinds)
 buildImplicationFor tclvl skol_info skol_tvs given wanted
@@ -1026,6 +1037,7 @@ buildImplicationFor tclvl skol_info skol_tvs given wanted
                               , ic_wanted = wanted
                               , ic_binds  = ev_binds_var
                               , ic_info   = skol_info }
+       ; checkImplicationInvariants implic'
 
        ; return (unitBag implic', TcEvBinds ev_binds_var) }
 

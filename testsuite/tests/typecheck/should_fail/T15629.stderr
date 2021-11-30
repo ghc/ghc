@@ -6,21 +6,21 @@ T15629.hs:26:31: error:
                                                            (F x ab) (F x z)
                                                          -> *’
       ‘z’ is a rigid type variable bound by
-        an explicit forall z ab
+        the type signature for ‘g’
         at T15629.hs:26:17
       ‘ab’ is a rigid type variable bound by
-        an explicit forall z ab
+        the type signature for ‘g’
         at T15629.hs:26:19-20
     • In the first argument of ‘Proxy’, namely
         ‘((Comp (F1Sym :: x ~> F x z) F2Sym) :: F x ab ~> F x ab)’
       In the type signature:
-        g :: forall z ab.
-             Proxy ((Comp (F1Sym :: x ~> F x z) F2Sym) :: F x ab ~> F x ab)
+        g :: forall z ab. Proxy ((Comp (F1Sym :: x
+                                                 ~> F x z) F2Sym) :: F x ab ~> F x ab)
       In an equation for ‘f’:
           f _
             = ()
             where
                 g ::
-                  forall z ab.
-                  Proxy ((Comp (F1Sym :: x ~> F x z) F2Sym) :: F x ab ~> F x ab)
+                  forall z ab. Proxy ((Comp (F1Sym :: x ~> F x z) F2Sym) :: F x ab
+                                                                            ~> F x ab)
                 g = sg Proxy Proxy

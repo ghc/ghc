@@ -1,9 +1,9 @@
 
 T14904a.hs:10:6: error:
-    • Expected kind ‘forall (a :: k). g a’, but ‘f’ has kind ‘k1’
-      Cannot equate type variable ‘k1’
-      with a kind involving polytypes: forall (a :: k). g a
-      ‘k1’ is a rigid type variable bound by
+    • Expected kind ‘forall (a :: k1). g a’, but ‘f’ has kind ‘k’
+      Cannot equate type variable ‘k’
+      with a kind involving polytypes: forall (a :: k1). g a
+      ‘k’ is a rigid type variable bound by
         a family instance declaration
         at T14904a.hs:10:3-30
     • In the first argument of ‘F’, namely ‘(f :: forall a. g a)’

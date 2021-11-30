@@ -4,7 +4,7 @@ T11142.hs:9:49: error:
         because kind variable ‘k’ would escape its scope
       This (rigid, skolem) kind variable is bound by
         an explicit forall k (a :: k)
-        at T11142.hs:9:19-49
+        at T11142.hs:9:26-35
     • In the second argument of ‘SameKind’, namely ‘b’
       In the type signature:
         foo :: forall b. (forall k (a :: k). SameKind a b) -> ()

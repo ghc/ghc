@@ -2,7 +2,6 @@
 T15694.hs:23:35: error:
     • Expected kind ‘k1 -> k0’, but ‘f a1’ has kind ‘ks’
       ‘ks’ is a rigid type variable bound by
-        an explicit forall ks k (f :: k -> ks) (a1 :: k) (ctx :: Ctx ks)
-                           (ks1 :: Type) k1 (a2 :: k1) (ctx1 :: Ctx ks1) a3
+        the type signature for ‘ASSO’
         at T15694.hs:19:30-31
     • In the first argument of ‘(~~)’, namely ‘f a1 a2’

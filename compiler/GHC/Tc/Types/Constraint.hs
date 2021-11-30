@@ -51,7 +51,7 @@ module GHC.Tc.Types.Constraint (
         Implication(..), implicationPrototype, checkTelescopeSkol,
         ImplicStatus(..), isInsolubleStatus, isSolvedStatus,
         UserGiven, getUserGivensFromImplics,
-        HasGivenEqs(..),
+        HasGivenEqs(..), checkImplicationInvariants,
         SubGoalDepth, initialSubGoalDepth, maxSubGoalDepth,
         bumpSubGoalDepth, subGoalDepthExceeded,
         CtLoc(..), ctLocSpan, ctLocEnv, ctLocLevel, ctLocOrigin,
@@ -90,6 +90,7 @@ import GHC.Core.Type
 import GHC.Core.Coercion
 import GHC.Core.Class
 import GHC.Core.TyCon
+import GHC.Types.Name
 import GHC.Types.Var
 
 import GHC.Tc.Utils.TcType
@@ -99,7 +100,6 @@ import GHC.Tc.Types.Origin
 import GHC.Core
 
 import GHC.Core.TyCo.Ppr
-import GHC.Types.Name.Occurrence
 import GHC.Utils.FV
 import GHC.Types.Var.Set
 import GHC.Driver.Session
@@ -110,9 +110,12 @@ import GHC.Types.SrcLoc
 import GHC.Data.Bag
 import GHC.Utils.Misc
 import GHC.Utils.Panic
+import GHC.Utils.Constants (debugIsOn)
+import GHC.Utils.Trace
 
-import Control.Monad ( msum )
+import Control.Monad ( msum, when )
 import qualified Data.Semigroup ( (<>) )
+import Data.Maybe( mapMaybe )
 
 -- these are for CheckTyEqResult
 import Data.Word  ( Word8 )
@@ -1315,9 +1318,13 @@ data Implication
       ic_tclvl :: TcLevel,       -- TcLevel of unification variables
                                  -- allocated /inside/ this implication
 
-      ic_skols :: [TcTyVar],     -- Introduced skolems
-      ic_info  :: SkolemInfo,    -- See Note [Skolems in an implication]
-                                 -- See Note [Shadowing in a constraint]
+      ic_info  :: SkolemInfoAnon,    -- See Note [Skolems in an implication]
+                                     -- See Note [Shadowing in a constraint]
+
+      ic_skols :: [TcTyVar],     -- Introduced skolems; always skolem TcTyVars
+                                 -- Their level numbers should be precisely ic_tclvl
+                                 -- Their SkolemInfo should be precisely ic_info (almost)
+                                 --       See Note [Implication invariants]
 
       ic_given  :: [EvVar],      -- Given evidence variables
                                  --   (order does not matter)
@@ -1470,7 +1477,7 @@ instance Outputable ImplicStatus where
   ppr (IC_Solved { ics_dead = dead })
     = text "Solved" <+> (braces (text "Dead givens =" <+> ppr dead))
 
-checkTelescopeSkol :: SkolemInfo -> Bool
+checkTelescopeSkol :: SkolemInfoAnon -> Bool
 -- See Note [Checking telescopes]
 checkTelescopeSkol (ForAllSkol {}) = True
 checkTelescopeSkol _               = False
@@ -1633,10 +1640,138 @@ never see it.
 
 ************************************************************************
 *                                                                      *
-            Pretty printing
+            Invariant checking (debug only)
 *                                                                      *
 ************************************************************************
+
+Note [Implication invariants]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The skolems of an implication have the following invariants, which are checked
+by checkImplicationInvariants:
+
+a) They are all SkolemTv TcTyVars; no TyVars, no unification variables
+b) Their TcLevel matches the ic_lvl for the implication
+c) Their SkolemInfo matches the implication.
+
+Actually (c) is not quite true.  Consider
+   data T a = forall b. MkT a b
+
+In tcConDecl for MkT we'll create an implication with ic_info of
+DataConSkol; but the type variable 'a' will have a SkolemInfo of
+TyConSkol.  So we allow the tyvar to have a SkolemInfo of TyConFlav if
+the implication SkolemInfo is DataConSkol.
 -}
+
+checkImplicationInvariants, check_implic :: (HasCallStack, Applicative m) => Implication -> m ()
+{-# INLINE checkImplicationInvariants #-}
+-- Nothing => OK, Just doc => doc gives info
+checkImplicationInvariants implic = when debugIsOn (check_implic implic)
+
+check_implic implic@(Implic { ic_tclvl = lvl
+                            , ic_info = skol_info
+                            , ic_skols = skols })
+  | null bads = pure ()
+  | otherwise = massertPpr False (vcat [ text "checkImplicationInvariants failure"
+                                       , nest 2 (vcat bads)
+                                       , ppr implic ])
+  where
+    bads = mapMaybe check skols
+
+    check :: TcTyVar -> Maybe SDoc
+    check tv | not (isTcTyVar tv)
+             = pprTrace "checkImplicationInvariants: not TcTyVar" (ppr tv) Nothing
+               -- Happens in 'deriving' code so I am punting for now
+               -- Just (ppr tv <+> text "is not a TcTyVar")
+             | otherwise
+             = check_details tv (tcTyVarDetails tv)
+
+    check_details :: TcTyVar -> TcTyVarDetails -> Maybe SDoc
+    check_details tv (SkolemTv tv_skol_info tv_lvl _)
+      | not (tv_lvl == lvl)
+      = Just (vcat [ ppr tv <+> text "has level" <+> ppr tv_lvl
+                   , text "ic_lvl" <+> ppr lvl ])
+      | not (skol_info `checkSkolInfoAnon` skol_info_anon)
+      = Just (vcat [ ppr tv <+> text "has skol info" <+> ppr skol_info_anon
+                   , text "ic_info" <+> ppr skol_info ])
+      | otherwise
+      = Nothing
+      where
+        skol_info_anon = getSkolemInfo tv_skol_info
+    check_details tv details
+      = Just (ppr tv <+> text "is not a SkolemTv" <+> ppr details)
+
+checkSkolInfoAnon :: SkolemInfoAnon   -- From the implication
+                  -> SkolemInfoAnon   -- From the type variable
+                  -> Bool             -- True <=> ok
+-- Used only for debug-checking; checkImplicationInvariants
+-- So it doesn't matter much if its's incomplete
+checkSkolInfoAnon sk1 sk2 = go sk1 sk2
+  where
+    go (SigSkol c1 t1 s1)   (SigSkol c2 t2 s2)   = c1==c2 && t1 `tcEqType` t2 && s1==s2
+    go (SigTypeSkol cx1)    (SigTypeSkol cx2)    = cx1==cx2
+
+    go (ForAllSkol _)       (ForAllSkol _)       = True
+
+    go (IPSkol ips1)        (IPSkol ips2)        = ips1 == ips2
+    go (DerivSkol pred1)    (DerivSkol pred2)    = pred1 `tcEqType` pred2
+    go (TyConSkol f1 n1)    (TyConSkol f2 n2)    = f1==f2 && n1==n2
+    go (DataConSkol n1)     (DataConSkol n2)     = n1==n2
+    go InstSkol             InstSkol             = True
+    go FamInstSkol          FamInstSkol          = True
+    go BracketSkol          BracketSkol          = True
+    go (RuleSkol n1)        (RuleSkol n2)        = n1==n2
+    go (PatSkol c1 _)       (PatSkol c2 _)       = getName c1 == getName c2
+       -- Too tedious to compare the HsMatchContexts
+    go (InferSkol ids1)     (InferSkol ids2)     = equalLength ids1 ids2 &&
+                                                   and (zipWith eq_pr ids1 ids2)
+    go (UnifyForAllSkol t1) (UnifyForAllSkol t2) = t1 `tcEqType` t2
+    go ReifySkol            ReifySkol            = True
+    go QuantCtxtSkol        QuantCtxtSkol        = True
+    go RuntimeUnkSkol       RuntimeUnkSkol       = True
+    go ArrowReboundIfSkol   ArrowReboundIfSkol   = True
+    go (UnkSkol _)          (UnkSkol _)          = True
+
+    -------- Three slightly strange special cases --------
+    go (DataConSkol _)      (TyConSkol f _)      = h98_data_decl f
+    -- In the H98 declaration  data T a = forall b. MkT a b
+    -- in tcConDecl for MkT we'll have a SkolemInfo in the implication of
+    -- DataConSkol, but the type variable 'a' will have a SkolemInfo of TyConSkol
+
+    go (DataConSkol _)      FamInstSkol          = True
+    -- In  data/newtype instance T a = MkT (a -> a),
+    -- in tcConDecl for MkT we'll have a SkolemInfo in the implication of
+    -- DataConSkol, but 'a' will have SkolemInfo of FamInstSkol
+
+    go FamInstSkol          InstSkol             = True
+    -- In instance C (T a) where { type F (T a) b = ... }
+    -- we have 'a' with SkolemInfo InstSkol, but we make an implication wi
+    -- SkolemInfo of FamInstSkol.  Very like the ConDecl/TyConSkol case
+
+    go (ForAllSkol _)       _                    = True
+    -- Telescope tests: we need a ForAllSkol to force the telescope
+    -- test, but the skolems might come from (say) a family instance decl
+    --    type instance forall a. F [a] = a->a
+
+    go (SigTypeSkol DerivClauseCtxt) (TyConSkol f _) = h98_data_decl f
+    -- e.g.   newtype T a = MkT ... deriving blah
+    -- We use the skolems from T (TyConSkol) when typechecking
+    -- the deriving clauses (SigTypeSkol DerivClauseCtxt)
+
+    go _ _ = False
+
+    eq_pr :: (Name,TcType) -> (Name,TcType) -> Bool
+    eq_pr (i1,_) (i2,_) = i1==i2 -- Types may be differently zonked
+
+    h98_data_decl DataTypeFlavour = True
+    h98_data_decl NewtypeFlavour  = True
+    h98_data_decl _               = False
+
+
+{- *********************************************************************
+*                                                                      *
+            Pretty printing
+*                                                                      *
+********************************************************************* -}
 
 pprEvVars :: [EvVar] -> SDoc    -- Print with their types
 pprEvVars ev_vars = vcat (map pprEvVarWithType ev_vars)
@@ -2195,7 +2330,7 @@ mkKindLoc s1 s2 loc = setCtLocOrigin (toKindLoc loc)
 toKindLoc :: CtLoc -> CtLoc
 toKindLoc loc = loc { ctl_t_or_k = Just KindLevel }
 
-mkGivenLoc :: TcLevel -> SkolemInfo -> TcLclEnv -> CtLoc
+mkGivenLoc :: TcLevel -> SkolemInfoAnon -> TcLclEnv -> CtLoc
 mkGivenLoc tclvl skol_info env
   = CtLoc { ctl_origin = GivenOrigin skol_info
           , ctl_env    = setLclEnvTcLevel env tclvl

@@ -1,5 +1,5 @@
 
-T16762.hs:11:3: error:
+T16762.hs:11:17: error:
     • These kind and type variables: a kx (b :: kx)
       are out of dependency order. Perhaps try this ordering:
         kx (a :: kx) (b :: kx)

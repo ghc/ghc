@@ -1,0 +1,23 @@
+
+T20969.hs:10:40: error:
+    • No instance for (TH.Lift a) arising from a use of ‘TH.liftTyped’
+    • In the expression: TH.liftTyped _ :: TH.Code TH.Q a
+      In the first argument of ‘fromList’, namely
+        ‘[TH.liftTyped _ :: TH.Code TH.Q a, [|| x ||]]’
+      In the first argument of ‘sequenceCode’, namely
+        ‘(fromList [TH.liftTyped _ :: TH.Code TH.Q a, [|| x ||]])’
+
+T20969.hs:10:53: error:
+    • Found hole: _ :: a
+      Where: ‘a’ is a rigid type variable bound by
+               the type signature for:
+                 glumber :: forall a. Num a => a -> Seq a
+               at T20969.hs:9:1-40
+    • In the first argument of ‘TH.liftTyped’, namely ‘_’
+      In the expression: TH.liftTyped _ :: TH.Code TH.Q a
+      In the first argument of ‘fromList’, namely
+        ‘[TH.liftTyped _ :: TH.Code TH.Q a, [|| x ||]]’
+    • Relevant bindings include
+        x :: a (bound at T20969.hs:10:9)
+        glumber :: a -> Seq a (bound at T20969.hs:10:1)
+      Valid hole fits include x :: a (bound at T20969.hs:10:9)

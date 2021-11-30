@@ -1,11 +1,11 @@
 
 T16221a.hs:6:49: error:
-    • Expected kind ‘k’, but ‘b’ has kind ‘k2’
-      ‘k2’ is a rigid type variable bound by
+    • Expected kind ‘k’, but ‘b’ has kind ‘k1’
+      ‘k1’ is a rigid type variable bound by
         an explicit forall k (b :: k)
         at T16221a.hs:6:20
       ‘k’ is a rigid type variable bound by
-        the data constructor ‘MkT2’
+        the data type declaration for ‘T2’
         at T16221a.hs:6:20
     • In the second argument of ‘SameKind’, namely ‘b’
       In the type ‘(SameKind a b)’
