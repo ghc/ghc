@@ -15,7 +15,8 @@ module GHC.Tc.Types.Origin (
   redundantConstraintsSpan,
 
   -- SkolemInfo
-  SkolemInfo(..), pprSigSkolInfo, pprSkolInfo,
+  SkolemInfo(..), SkolemInfoAnon(..), mkSkolemInfo, getSkolemInfo, pprSigSkolInfo, pprSkolInfo,
+  unkSkol, unkSkolAnon,
 
   -- CtOrigin
   CtOrigin(..), exprCtOrigin, lexprCtOrigin, matchesCtOrigin, grhssCtOrigin,
@@ -38,7 +39,6 @@ module GHC.Tc.Types.Origin (
   ) where
 
 import GHC.Prelude
-import GHC.Utils.Misc (HasCallStack)
 
 import GHC.Tc.Utils.TcType
 
@@ -62,7 +62,10 @@ import GHC.Data.FastString
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Trace
+import GHC.Stack
+import GHC.Utils.Monad
+import GHC.Types.Unique
+import GHC.Types.Unique.Supply
 
 {- *********************************************************************
 *                                                                      *
@@ -97,7 +100,7 @@ data UserTypeCtxt
   | PatSigCtxt          -- Type sig in pattern
                         --   eg  f (x::t) = ...
                         --   or  (x::t, y) = e
-  | RuleSigCtxt Name    -- LHS of a RULE forall
+  | RuleSigCtxt FastString Name    -- LHS of a RULE forall
                         --    RULE "foo" forall (x :: a -> a). f (Just x) = ...
   | ForSigCtxt Name     -- Foreign import or export signature
   | DefaultDeclCtxt     -- Types in a default declaration
@@ -124,6 +127,7 @@ data UserTypeCtxt
   | DataKindCtxt Name   -- The kind of a data/newtype (instance)
   | TySynKindCtxt Name  -- The kind of the RHS of a type synonym
   | TyFamResKindCtxt Name   -- The result kind of a type family
+  deriving( Eq ) -- Just for checkSkolInfoAnon
 
 -- | Report Redundant Constraints.
 data ReportRedundantConstraints
@@ -132,6 +136,7 @@ data ReportRedundantConstraints
                      -- is the SrcSpan for the constraints
                      -- E.g. f :: (Eq a, Ord b) => blah
                      -- The span is for the (Eq a, Ord b)
+  deriving( Eq )  -- Just for checkSkolInfoAnon
 
 reportRedundantConstraints :: ReportRedundantConstraints -> Bool
 reportRedundantConstraints NoRRC        = False
@@ -158,7 +163,7 @@ redundantConstraintsSpan _ = noSrcSpan
 pprUserTypeCtxt :: UserTypeCtxt -> SDoc
 pprUserTypeCtxt (FunSigCtxt n _)  = text "the type signature for" <+> quotes (ppr n)
 pprUserTypeCtxt (InfSigCtxt n)    = text "the inferred type for" <+> quotes (ppr n)
-pprUserTypeCtxt (RuleSigCtxt n)   = text "the type signature for" <+> quotes (ppr n)
+pprUserTypeCtxt (RuleSigCtxt _ n) = text "the type signature for" <+> quotes (ppr n)
 pprUserTypeCtxt (ExprSigCtxt _)   = text "an expression type signature"
 pprUserTypeCtxt KindSigCtxt       = text "a kind signature"
 pprUserTypeCtxt (StandaloneKindSigCtxt n) = text "a standalone kind signature for" <+> quotes (ppr n)
@@ -198,10 +203,31 @@ isSigMaybe _                = Nothing
 ************************************************************************
 -}
 
--- SkolemInfo gives the origin of *given* constraints
---   a) type variables are skolemised
---   b) an implication constraint is generated
+-- | 'SkolemInfo' stores the origin of a skolem type variable,
+-- so that we can display this information to the user in case of a type error.
+--
+-- The 'Unique' field allows us to report all skolem type variables bound in the
+-- same place in a single report.
 data SkolemInfo
+  = SkolemInfo
+      Unique -- ^ used to common up skolem variables bound at the same location (only used in pprSkols)
+      SkolemInfoAnon -- ^ the information about the origin of the skolem type variable
+
+instance Uniquable SkolemInfo where
+  getUnique (SkolemInfo u _) = u
+
+-- | 'SkolemInfoAnon' stores the origin of a skolem type variable (e.g. bound by
+-- a user-written forall, the header of a data declaration, a deriving clause, ...).
+--
+-- This information is displayed when reporting an error message, such as
+--
+--  @"Couldn't match 'k' with 'l'"@
+--
+-- This allows us to explain where the type variable came from.
+--
+-- When several skolem type variables are bound at once, prefer using 'SkolemInfo',
+-- which stores a 'Unique' which allows these type variables to be reported
+data SkolemInfoAnon
   = SigSkol -- A skolem that is created by instantiating
             -- a programmer-supplied type signature
             -- Location of the binding site is on the TyVar
@@ -259,12 +285,41 @@ data SkolemInfo
 
   | RuntimeUnkSkol      -- Runtime skolem from the GHCi debugger      #14628
 
-  | UnkSkol             -- Unhelpful info (until I improve it)
+  | ArrowReboundIfSkol  -- Bound by the expected type of the rebound arrow ifThenElse command.
+
+  | UnkSkol CallStack
+
+
+-- | Use this when you can't specify a helpful origin for
+-- some skolem type variable.
+--
+-- We're hoping to be able to get rid of this entirely, but for the moment
+-- it's still needed.
+unkSkol :: HasCallStack => SkolemInfo
+unkSkol = SkolemInfo (mkUniqueGrimily 0) unkSkolAnon
+
+unkSkolAnon :: HasCallStack => SkolemInfoAnon
+unkSkolAnon = UnkSkol callStack
+
+-- | Wrap up the origin of a skolem type variable with a new 'Unique',
+-- so that we can common up skolem type variables whose 'SkolemInfo'
+-- shares a certain 'Unique'.
+mkSkolemInfo :: MonadIO m => SkolemInfoAnon -> m SkolemInfo
+mkSkolemInfo sk_anon = do
+  u <- liftIO $! uniqFromMask 's'
+  return (SkolemInfo u sk_anon)
+
+getSkolemInfo :: SkolemInfo -> SkolemInfoAnon
+getSkolemInfo (SkolemInfo _ skol_anon) = skol_anon
+
 
 instance Outputable SkolemInfo where
+  ppr (SkolemInfo _ sk_info ) = ppr sk_info
+
+instance Outputable SkolemInfoAnon where
   ppr = pprSkolInfo
 
-pprSkolInfo :: SkolemInfo -> SDoc
+pprSkolInfo :: SkolemInfoAnon -> SDoc
 -- Complete the sentence "is a rigid type variable bound by..."
 pprSkolInfo (SigSkol cx ty _) = pprSigSkolInfo cx ty
 pprSkolInfo (SigTypeSkol cx)  = pprUserTypeCtxt cx
@@ -281,18 +336,20 @@ pprSkolInfo (PatSkol cl mc)   = sep [ pprPatSkolInfo cl
 pprSkolInfo (InferSkol ids)   = hang (text "the inferred type" <> plural ids <+> text "of")
                                    2 (vcat [ ppr name <+> dcolon <+> ppr ty
                                            | (name,ty) <- ids ])
-pprSkolInfo (UnifyForAllSkol ty) = text "the type" <+> ppr ty
+pprSkolInfo (UnifyForAllSkol ty)  = text "the type" <+> ppr ty
 pprSkolInfo (TyConSkol flav name) = text "the" <+> ppr flav <+> text "declaration for" <+> quotes (ppr name)
-pprSkolInfo (DataConSkol name)= text "the data constructor" <+> quotes (ppr name)
-pprSkolInfo ReifySkol         = text "the type being reified"
+pprSkolInfo (DataConSkol name)    = text "the type signature for" <+> quotes (ppr name)
+pprSkolInfo ReifySkol             = text "the type being reified"
 
 pprSkolInfo (QuantCtxtSkol {}) = text "a quantified context"
 pprSkolInfo RuntimeUnkSkol     = text "Unknown type from GHCi runtime"
+pprSkolInfo ArrowReboundIfSkol = text "the expected type of a rebound if-then-else command"
 
--- UnkSkol
+-- unkSkol
 -- For type variables the others are dealt with by pprSkolTvBinding.
 -- For Insts, these cases should not happen
-pprSkolInfo UnkSkol = warnPprTrace True "pprSkolInfo: UnkSkol" empty $ text "UnkSkol"
+pprSkolInfo (UnkSkol cs) = text "UnkSkol (please report this as a bug)" $$ prettyCallStackDoc cs
+
 
 pprSigSkolInfo :: UserTypeCtxt -> TcType -> SDoc
 -- The type is already tidied
@@ -391,7 +448,7 @@ instance Outputable TyVarBndrs where
 data CtOrigin
   = -- | A given constraint from a user-written type signature. The
     -- 'SkolemInfo' inside gives more information.
-    GivenOrigin SkolemInfo
+    GivenOrigin SkolemInfoAnon
 
   -- The following are other origins for given constraints that cannot produce
   -- new skolems -- hence no SkolemInfo.
@@ -422,7 +479,7 @@ data CtOrigin
   -- Note [Use only the best local instance], both in GHC.Tc.Solver.Interact.
   | OtherSCOrigin ScDepth -- ^ The number of superclass selections necessary to
                           -- get this constraint
-                  SkolemInfo   -- ^ Where the sub-class constraint arose from
+                  SkolemInfoAnon   -- ^ Where the sub-class constraint arose from
                                -- (used only for printing)
 
   -- All the others are for *wanted* constraints

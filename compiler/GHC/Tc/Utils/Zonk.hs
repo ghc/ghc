@@ -37,7 +37,7 @@ module GHC.Tc.Utils.Zonk (
         zonkCoToCo,
         zonkEvBinds, zonkTcEvBinds,
         zonkTcMethInfoToMethInfoX,
-        lookupTyVarOcc
+        lookupTyVarX
   ) where
 
 import GHC.Prelude
@@ -1776,7 +1776,7 @@ change.  But in some cases it makes a HUGE difference: see test
 T9198 and #19668.  So yes, it seems worth it.
 -}
 
-zonkTyVarOcc :: ZonkEnv -> TyVar -> TcM TcType
+zonkTyVarOcc :: ZonkEnv -> TcTyVar -> TcM Type
 zonkTyVarOcc env@(ZonkEnv { ze_flexi = flexi
                           , ze_tv_env = tv_env
                           , ze_meta_tv_env = mtv_env_ref }) tv
@@ -1791,13 +1791,19 @@ zonkTyVarOcc env@(ZonkEnv { ze_flexi = flexi
                   Just ty -> return ty
                   Nothing -> do { mtv_details <- readTcRef ref
                                 ; zonk_meta ref mtv_details } }
-  | otherwise
+  | otherwise  -- This should never really happen;
+               -- TyVars should not occur in the typechecker
   = lookup_in_tv_env
 
   where
     lookup_in_tv_env    -- Look up in the env just as we do for Ids
       = case lookupVarEnv tv_env tv of
-          Nothing  -> mkTyVarTy <$> updateTyVarKindM (zonkTcTypeToTypeX env) tv
+          Nothing  -> -- TyVar/SkolemTv/RuntimeUnk that isn't in the ZonkEnv
+                      -- This can happen for RuntimeUnk variables (which
+                      -- should stay as RuntimeUnk), but I think it should
+                      -- not happen for SkolemTv.
+                      mkTyVarTy <$> updateTyVarKindM (zonkTcTypeToTypeX env) tv
+
           Just tv' -> return (mkTyVarTy tv')
 
     zonk_meta ref Flexi
@@ -1814,9 +1820,11 @@ zonkTyVarOcc env@(ZonkEnv { ze_flexi = flexi
       = do { updTcRef mtv_env_ref (\env -> extendVarEnv env tv ty)
            ; return ty }
 
-lookupTyVarOcc :: ZonkEnv -> TcTyVar -> Maybe TyVar
-lookupTyVarOcc (ZonkEnv { ze_tv_env = tv_env }) tv
-  = lookupVarEnv tv_env tv
+lookupTyVarX :: ZonkEnv -> TcTyVar -> TyVar
+lookupTyVarX (ZonkEnv { ze_tv_env = tv_env }) tv
+  = case lookupVarEnv tv_env tv of
+       Just tv -> tv
+       Nothing -> pprPanic "lookupTyVarOcc" (ppr tv $$ ppr tv_env)
 
 commitFlexi :: ZonkFlexi -> TcTyVar -> Kind -> TcM Type
 -- Only monadic so we can do tc-tracing

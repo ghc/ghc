@@ -56,7 +56,7 @@ tidyVarBndr tidy_env@(occ_env, subst) var
 
 avoidNameClashes :: [TyCoVar] -> TidyEnv -> TidyEnv
 -- Seed the occ_env with clashes among the names, see
--- Note [Tidying multiple names at once] in GHC.Types.Names.OccName
+-- Note [Tidying multiple names at once] in GHC.Types.Name.Occurrence
 avoidNameClashes tvs (occ_env, subst)
   = (avoidClashesOccEnv occ_env occs, subst)
   where

@@ -2,7 +2,7 @@
 T16344a.hs:11:36: error:
     • Expected a type, but ‘a’ has kind ‘ka’
       ‘ka’ is a rigid type variable bound by
-        the data constructor ‘MkT2’
+        the data type declaration for ‘T2’
         at T16344a.hs:11:9-10
     • In the second argument of ‘T2’, namely ‘a’
       In the type ‘(T2 Type a)’

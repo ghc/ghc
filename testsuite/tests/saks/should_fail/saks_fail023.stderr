@@ -1,4 +1,4 @@
 
 saks_fail023.hs:10:1: error:
-    • Expected kind ‘k’, but ‘a’ has kind ‘*’
+    • Expected a type, but ‘a’ has kind ‘k’
     • In the class declaration for ‘C’

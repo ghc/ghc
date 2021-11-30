@@ -1,0 +1,7 @@
+
+saks_fail026.hs:8:1: error:
+    • Expected kind ‘kx’, but ‘b’ has kind ‘*’
+      ‘kx’ is a rigid type variable bound by
+        the type family declaration for ‘F3’
+        at saks_fail026.hs:7:19-20
+    • In the type family declaration for ‘F3’

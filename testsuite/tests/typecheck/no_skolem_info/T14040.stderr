@@ -1,0 +1,60 @@
+
+T14040.hs:26:46: error:
+    • Couldn't match kind ‘k1’ with ‘WeirdList z’
+      Expected kind ‘WeirdList k1’,
+        but ‘xs’ has kind ‘WeirdList (WeirdList z)’
+    • because kind variable ‘z’ would escape its scope
+    This (rigid, skolem) kind variable is bound by
+      an explicit forall (z :: Type) (x :: z)
+                         (xs :: WeirdList (WeirdList z))
+      at T14040.hs:25:26-77
+    • In the second argument of ‘p’, namely ‘xs’
+      In the type ‘Sing wl
+                   -> (forall (y :: Type). p _ WeirdNil)
+                      -> (forall (z :: Type) (x :: z) (xs :: WeirdList (WeirdList z)).
+                          Sing x -> Sing xs -> p _ xs -> p _ (WeirdCons x xs))
+                         -> p _ wl’
+      In the type signature:
+        elimWeirdList :: forall (a :: Type)
+                                (wl :: WeirdList a)
+                                (p :: forall (x :: Type). x -> WeirdList x -> Type). Sing wl
+                                                                                     -> (forall (y :: Type).
+                                                                                         p _ WeirdNil)
+                                                                                        -> (forall (z :: Type)
+                                                                                                   (x :: z)
+                                                                                                   (xs :: WeirdList (WeirdList z)).
+                                                                                            Sing x
+                                                                                            -> Sing xs
+                                                                                               -> p _ xs
+                                                                                                  -> p _ (WeirdCons x xs))
+                                                                                           -> p _ wl
+
+T14040.hs:27:27: error:
+    • Couldn't match kind ‘k0’ with ‘z’
+      Expected kind ‘WeirdList k0’,
+        but ‘WeirdCons x xs’ has kind ‘WeirdList z’
+    • because kind variable ‘z’ would escape its scope
+    This (rigid, skolem) kind variable is bound by
+      an explicit forall (z :: Type) (x :: z)
+                         (xs :: WeirdList (WeirdList z))
+      at T14040.hs:25:26-77
+    • In the second argument of ‘p’, namely ‘(WeirdCons x xs)’
+      In the type ‘Sing wl
+                   -> (forall (y :: Type). p _ WeirdNil)
+                      -> (forall (z :: Type) (x :: z) (xs :: WeirdList (WeirdList z)).
+                          Sing x -> Sing xs -> p _ xs -> p _ (WeirdCons x xs))
+                         -> p _ wl’
+      In the type signature:
+        elimWeirdList :: forall (a :: Type)
+                                (wl :: WeirdList a)
+                                (p :: forall (x :: Type). x -> WeirdList x -> Type). Sing wl
+                                                                                     -> (forall (y :: Type).
+                                                                                         p _ WeirdNil)
+                                                                                        -> (forall (z :: Type)
+                                                                                                   (x :: z)
+                                                                                                   (xs :: WeirdList (WeirdList z)).
+                                                                                            Sing x
+                                                                                            -> Sing xs
+                                                                                               -> p _ xs
+                                                                                                  -> p _ (WeirdCons x xs))
+                                                                                           -> p _ wl

@@ -3,7 +3,7 @@ T13780a.hs:9:40: error:
     • Couldn't match kind ‘a’ with ‘Bool’
       Expected kind ‘Foo a’, but ‘MkFoo’ has kind ‘Foo Bool’
       ‘a’ is a rigid type variable bound by
-        the data constructor ‘SMkFoo’
+        a family instance declaration
         at T13780a.hs:9:20-31
     • In the second argument of ‘(~)’, namely ‘MkFoo’
       In the definition of data constructor ‘SMkFoo’

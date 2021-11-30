@@ -7,6 +7,9 @@
 module GHC.Tc.Errors.Ppr
   ( pprTypeDoesNotHaveFixedRuntimeRep
   , pprScopeError
+  --
+  , tidySkolemInfo
+  , tidySkolemInfoAnon
   )
   where
 
@@ -74,6 +77,8 @@ import Data.Function (on)
 import Data.List ( groupBy, sortBy, tails
                  , partition, unfoldr )
 import Data.Ord ( comparing )
+import Data.Bifunctor
+import GHC.Types.Name.Env
 
 
 instance Diagnostic TcRnMessage where
@@ -2117,9 +2122,9 @@ pprTcReportInfo _ (Ambiguity prepend_msg (ambig_kvs, ambig_tvs)) = msg
       | otherwise -- "The type variable 't0' is ambiguous"
       = text "The" <+> what <+> text "variable" <> plural tkvs
         <+> pprQuotedList tkvs <+> isOrAre tkvs <+> text "ambiguous"
-pprTcReportInfo ctxt (TyVarInfo tv) =
+pprTcReportInfo ctxt (TyVarInfo tv ) =
   case tcTyVarDetails tv of
-    SkolemTv {}   -> pprSkols ctxt [tv]
+    SkolemTv sk_info _ _   -> pprSkols ctxt [(getSkolemInfo sk_info, [tv])]
     RuntimeUnk {} -> quotes (ppr tv) <+> text "is an interactive-debugger skolem"
     MetaTv {}     -> empty
 pprTcReportInfo _ (NonInjectiveTyFam tc) =
@@ -2210,7 +2215,7 @@ pprHoleError _ (Hole { hole_ty, hole_occ = occ }) (OutOfScopeHole imp_errs)
       | boring_type = hang herald 2 (ppr occ)
       | otherwise   = hang herald 2 (pp_occ_with_type occ hole_ty)
     boring_type = isTyVarTy hole_ty
-pprHoleError ctxt (Hole { hole_ty, hole_occ }) (HoleError sort) =
+pprHoleError ctxt (Hole { hole_ty, hole_occ}) (HoleError sort other_tvs hole_skol_info) =
   vcat [ hole_msg
        , tyvars_msg
        , case sort of { ExprHole {} -> expr_hole_hint; _ -> type_hole_hint } ]
@@ -2241,10 +2246,7 @@ pprHoleError ctxt (Hole { hole_ty, hole_occ }) (HoleError sort) =
     tyvars = tyCoVarsOfTypeList hole_ty
     tyvars_msg = ppUnless (null tyvars) $
                  text "Where:" <+> (vcat (map loc_msg other_tvs)
-                                    $$ pprSkols ctxt skol_tvs)
-       where
-         (skol_tvs, other_tvs) = partition is_skol tyvars
-         is_skol tv = isTcTyVar tv && isSkolemTyVar tv
+                                    $$ pprSkols ctxt hole_skol_info)
                       -- Coercion variables can be free in the
                       -- hole, via kind casts
     expr_hole_hint                       -- Give hint for, say,   f x = _x
@@ -2379,7 +2381,7 @@ ctxtFixes has_ambig_tvs pred implics
     ppr_skol (PatSkol (PatSynCon ps)   _) = text "the pattern synonym"  <+> quotes (ppr ps)
     ppr_skol skol_info = ppr skol_info
 
-usefulContext :: [Implication] -> PredType -> [SkolemInfo]
+usefulContext :: [Implication] -> PredType -> [SkolemInfoAnon]
 -- usefulContext picks out the implications whose context
 -- the programmer might plausibly augment to solve 'pred'
 usefulContext implics pred
@@ -2464,15 +2466,67 @@ pprWithArising (ct:cts)
 *                                                                      *
 **********************************************************************-}
 
-pprSkols :: ReportErrCtxt -> [TcTyVar] -> SDoc
-pprSkols ctxt tvs
-  = vcat (map pp_one (getSkolemInfo (cec_encl ctxt) tvs))
+
+tidySkolemInfo :: TidyEnv -> SkolemInfo -> SkolemInfo
+tidySkolemInfo env (SkolemInfo u sk_anon) = SkolemInfo u (tidySkolemInfoAnon env sk_anon)
+
+----------------
+tidySkolemInfoAnon :: TidyEnv -> SkolemInfoAnon -> SkolemInfoAnon
+tidySkolemInfoAnon env (DerivSkol ty)         = DerivSkol (tidyType env ty)
+tidySkolemInfoAnon env (SigSkol cx ty tv_prs) = tidySigSkol env cx ty tv_prs
+tidySkolemInfoAnon env (InferSkol ids)        = InferSkol (mapSnd (tidyType env) ids)
+tidySkolemInfoAnon env (UnifyForAllSkol ty)   = UnifyForAllSkol (tidyType env ty)
+tidySkolemInfoAnon _   info                   = info
+
+tidySigSkol :: TidyEnv -> UserTypeCtxt
+            -> TcType -> [(Name,TcTyVar)] -> SkolemInfoAnon
+-- We need to take special care when tidying SigSkol
+-- See Note [SigSkol SkolemInfo] in "GHC.Tc.Types.Origin"
+tidySigSkol env cx ty tv_prs
+  = SigSkol cx (tidy_ty env ty) tv_prs'
   where
-    pp_one (UnkSkol, tvs)
+    tv_prs' = mapSnd (tidyTyCoVarOcc env) tv_prs
+    inst_env = mkNameEnv tv_prs'
+
+    tidy_ty env (ForAllTy (Bndr tv vis) ty)
+      = ForAllTy (Bndr tv' vis) (tidy_ty env' ty)
+      where
+        (env', tv') = tidy_tv_bndr env tv
+
+    tidy_ty env ty@(FunTy InvisArg w arg res) -- Look under  c => t
+      = ty { ft_mult = tidy_ty env w,
+             ft_arg = tidyType env arg,
+             ft_res = tidy_ty env res }
+
+    tidy_ty env ty = tidyType env ty
+
+    tidy_tv_bndr :: TidyEnv -> TyCoVar -> (TidyEnv, TyCoVar)
+    tidy_tv_bndr env@(occ_env, subst) tv
+      | Just tv' <- lookupNameEnv inst_env (tyVarName tv)
+      = ((occ_env, extendVarEnv subst tv tv'), tv')
+
+      | otherwise
+      = tidyVarBndr env tv
+
+pprSkols :: ReportErrCtxt -> [(SkolemInfoAnon, [TcTyVar])] -> SDoc
+pprSkols ctxt zonked_ty_vars
+  =
+      let tidy_ty_vars = map (bimap (tidySkolemInfoAnon (cec_tidy ctxt)) id) zonked_ty_vars
+      in vcat (map pp_one tidy_ty_vars)
+  where
+
+    no_msg = text "No skolem info - we could not find the origin of the following variables" <+> ppr zonked_ty_vars
+       $$ text "This should not happen, please report it as a bug following the instructions at:"
+       $$ text "https://gitlab.haskell.org/ghc/ghc/wikis/report-a-bug"
+
+
+    pp_one (UnkSkol cs, tvs)
       = vcat [ hang (pprQuotedList tvs)
                  2 (is_or_are tvs "a" "(rigid, skolem)")
              , nest 2 (text "of unknown origin")
-             , nest 2 (text "bound at" <+> ppr (foldr1 combineSrcSpans (map getSrcSpan tvs)))
+             , nest 2 (text "bound at" <+> ppr (skolsSpan tvs))
+             , no_msg
+             , prettyCallStackDoc cs
              ]
     pp_one (RuntimeUnkSkol, tvs)
       = hang (pprQuotedList tvs)
@@ -2481,12 +2535,15 @@ pprSkols ctxt tvs
       = vcat [ hang (pprQuotedList tvs)
                   2 (is_or_are tvs "a"  "rigid" <+> text "bound by")
              , nest 2 (pprSkolInfo skol_info)
-             , nest 2 (text "at" <+> ppr (foldr1 combineSrcSpans (map getSrcSpan tvs))) ]
+             , nest 2 (text "at" <+> ppr (skolsSpan tvs)) ]
 
     is_or_are [_] article adjective = text "is" <+> text article <+> text adjective
                                       <+> text "type variable"
     is_or_are _   _       adjective = text "are" <+> text adjective
                                       <+> text "type variables"
+
+skolsSpan :: [TcTyVar] -> SrcSpan
+skolsSpan skol_tvs = foldr1 combineSrcSpans (map getSrcSpan skol_tvs)
 
 {- *********************************************************************
 *                                                                      *

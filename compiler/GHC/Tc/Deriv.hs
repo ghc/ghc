@@ -439,6 +439,7 @@ makeDerivSpecs :: [DerivInfo]
                -> TcM [EarlyDerivSpec]
 makeDerivSpecs deriv_infos deriv_decls
   = do  { eqns1 <- sequenceA
+                      -- MP: scoped_tvs here magically converts TyVar into TcTyVar
                      [ deriveClause rep_tc scoped_tvs dcs (deriv_clause_preds dct) err_ctxt
                      | DerivInfo { di_rep_tc = rep_tc
                                  , di_scoped_tvs = scoped_tvs
@@ -633,6 +634,8 @@ deriveStandalone (L loc (DerivDecl _ deriv_ty mb_lderiv_strat overlap_mode))
        ; traceTc "Deriving strategy (standalone deriving)" $
            vcat [ppr mb_lderiv_strat, ppr deriv_ty]
        ; (mb_lderiv_strat, via_tvs) <- tcDerivStrategy mb_lderiv_strat
+       ; traceTc "Deriving strategy (standalone deriving) 2" $
+           vcat [ppr mb_lderiv_strat, ppr via_tvs]
        ; (cls_tvs, deriv_ctxt, cls, inst_tys)
            <- tcExtendTyVarEnv via_tvs $
               tcStandaloneDerivInstType ctxt deriv_ty

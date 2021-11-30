@@ -1,5 +1,5 @@
 
-BadTelescope2.hs:9:8: error:
+BadTelescope2.hs:9:15: error:
     • These kind and type variables: a k (b :: k)
       are out of dependency order. Perhaps try this ordering:
         k (a :: k) (b :: k)

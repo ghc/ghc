@@ -184,7 +184,8 @@ tc_cmd env (HsCmdIf x fun@(SyntaxExprRn {}) pred b1 b2) res_ty -- Rebindable syn
         -- For arrows, need ifThenElse :: forall r. T -> r -> r -> r
         -- because we're going to apply it to the environment, not
         -- the return value.
-        ; (_, [r_tv]) <- tcInstSkolTyVars [alphaTyVar]
+        ; skol_info <- mkSkolemInfo ArrowReboundIfSkol
+        ; (_, [r_tv]) <- tcInstSkolTyVars skol_info [alphaTyVar]
         ; let r_ty = mkTyVarTy r_tv
         ; checkTc (not (r_tv `elemVarSet` tyCoVarsOfType pred_ty))
                   TcRnArrowIfThenElsePredDependsOnResultTy

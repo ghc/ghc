@@ -1,1 +1,1 @@
-T :: forall x -> Type
+T :: forall a -> Type

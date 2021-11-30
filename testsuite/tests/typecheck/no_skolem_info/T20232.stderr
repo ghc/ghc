@@ -1,0 +1,9 @@
+
+T20232.hs:7:5: error:
+    • Couldn't match type ‘p’ with ‘'One’
+        arising from multiplicity of ‘x’
+      ‘p’ is a rigid type variable bound by
+        a pattern with constructor: C :: forall a. (a -> a) -> C a,
+        in a case alternative
+        at T20232.hs:7:19-21
+    • In an equation for ‘f’: f b x = case b of C h -> h x

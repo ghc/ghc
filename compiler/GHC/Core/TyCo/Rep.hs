@@ -1051,7 +1051,7 @@ mkForAllTys tyvars ty = foldr ForAllTy ty tyvars
 
 -- | Wraps foralls over the type using the provided 'InvisTVBinder's from left to right
 mkInvisForAllTys :: [InvisTVBinder] -> Type -> Type
-mkInvisForAllTys tyvars ty = foldr ForAllTy ty $ tyVarSpecToBinders tyvars
+mkInvisForAllTys tyvars = mkForAllTys (tyVarSpecToBinders tyvars)
 
 mkPiTy :: TyCoBinder -> Type -> Type
 mkPiTy (Anon af ty1) ty2        = mkScaledFunTy af ty1 ty2

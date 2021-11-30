@@ -1,0 +1,9 @@
+
+T20680.hs:26:50: error:
+    • Couldn't match kind ‘k’ with ‘*’
+      Expected kind ‘* -> *’, but ‘Rec1 f’ has kind ‘k -> *’
+      ‘k’ is a rigid type variable bound by
+        the deriving clause for ‘Base1 (Rec1 f)’
+        at T20680.hs:26:14-29
+    • In the first argument of ‘FunctorL’, namely ‘(Rec1 f)’
+      In the stand-alone deriving instance for ‘FunctorL (Rec1 f)’

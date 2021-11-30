@@ -2,10 +2,10 @@
 TyVarTvKinds3.hs:9:62: error:
     • Expected kind ‘k1’, but ‘b’ has kind ‘k2’
       ‘k2’ is a rigid type variable bound by
-        an explicit forall k1 k2 (a :: k1) (b :: k2)
+        the type signature for ‘MkBad’
         at TyVarTvKinds3.hs:9:22-23
       ‘k1’ is a rigid type variable bound by
-        an explicit forall k1 k2 (a :: k1) (b :: k2)
+        the type signature for ‘MkBad’
         at TyVarTvKinds3.hs:9:19-20
     • In the second argument of ‘SameKind’, namely ‘b’
       In the first argument of ‘Bad’, namely ‘(SameKind a b)’

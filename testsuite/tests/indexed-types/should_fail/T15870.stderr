@@ -6,7 +6,7 @@ T15870.hs:32:34: error:
         a :: k
       Expected kind ‘Optic a’, but ‘g2’ has kind ‘Optic b’
       ‘k’ is a rigid type variable bound by
-        a family instance declaration
+        the instance declaration
         at T15870.hs:(27,1)-(32,35)
     • In the second argument of ‘Get’, namely ‘g2’
       In the type ‘Get a g2’

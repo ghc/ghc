@@ -809,3 +809,4 @@ test('T20873b', [extra_files(['T20873b_aux.hs'])], multimod_compile, ['T20873b',
 test('StaticPtrTypeFamily', normal, compile, [''])
 test('T20946', normal, compile, [''])
 test('T20996', normal, compile, [''])
+test('T20732', normal, compile, [''])

@@ -1,15 +1,15 @@
 
 T12033.hs:12:22: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘v -> t’
-      Where: ‘t’ is a rigid type variable bound by
+      Where: ‘v’ is a rigid type variable bound by
+               the type signature for:
+                 tripleStoreToRuleSet :: forall v. v -> v
+               at T12033.hs:6:1-30
+             ‘t’ is a rigid type variable bound by
                the inferred types of
                  makeTuple :: v -> t
                  makeExpression :: v -> t
                at T12033.hs:(11,4)-(13,39)
-             ‘v’ is a rigid type variable bound by
-               the type signature for:
-                 tripleStoreToRuleSet :: forall v. v -> v
-               at T12033.hs:6:1-30
     • In the type signature: makeExpression :: _
       In an equation for ‘tripleStoreToRuleSet’:
           tripleStoreToRuleSet getAtom

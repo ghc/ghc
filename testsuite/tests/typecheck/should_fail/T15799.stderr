@@ -1,9 +1,5 @@
 
 T15799.hs:46:62: error:
-    Expected a constraint, but ‘UnOp b <= a’ has kind ‘*’
-
-T15799.hs:46:67: error:
     • Couldn't match kind ‘TypeLits.Natural’ with ‘Op Nat’
-      Expected kind ‘Op (Op Nat)’, but ‘b’ has kind ‘Op Nat’
-    • In the first argument of ‘UnOp’, namely ‘b’
-      In the first argument of ‘(<=)’, namely ‘UnOp b’
+      Expected kind ‘Op Nat’, but ‘UnOp b’ has kind ‘Nat’
+    • In the first argument of ‘(<=)’, namely ‘UnOp b’

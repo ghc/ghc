@@ -406,12 +406,12 @@ tcPatSynSig name sig_ty@(L _ (HsSig{sig_bndrs = hs_outer_bndrs, sig_body = hs_ty
   , (ex_hs_tvbndrs, hs_prov, hs_body_ty) <- splitLHsSigmaTyInvis hs_ty1
   = do { traceTc "tcPatSynSig 1" (ppr sig_ty)
 
-       ; let skol_info = DataConSkol name
+       ; skol_info <- mkSkolemInfo (DataConSkol name)
        ; (tclvl, wanted, (outer_bndrs, (ex_bndrs, (req, prov, body_ty))))
            <- pushLevelAndSolveEqualitiesX "tcPatSynSig"           $
                      -- See Note [solveEqualities in tcPatSynSig]
-              tcOuterTKBndrs skol_info hs_outer_bndrs $
-              tcExplicitTKBndrs ex_hs_tvbndrs         $
+              tcOuterTKBndrs skol_info hs_outer_bndrs   $
+              tcExplicitTKBndrs skol_info ex_hs_tvbndrs $
               do { req     <- tcHsContext hs_req
                  ; prov    <- tcHsContext hs_prov
                  ; body_ty <- tcHsOpenType hs_body_ty
@@ -432,7 +432,7 @@ tcPatSynSig name sig_ty@(L _ (HsSig{sig_bndrs = hs_outer_bndrs, sig_body = hs_ty
        ; let ungen_patsyn_ty = build_patsyn_type implicit_bndrs univ_bndrs
                                                  req ex_bndrs prov body_ty
        ; traceTc "tcPatSynSig" (ppr ungen_patsyn_ty)
-       ; kvs <- kindGeneralizeAll ungen_patsyn_ty
+       ; kvs <- kindGeneralizeAll skol_info ungen_patsyn_ty
        ; reportUnsolvedEqualities skol_info kvs tclvl wanted
                -- See Note [Report unsolved equalities in tcPatSynSig]
 

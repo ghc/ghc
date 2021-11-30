@@ -1,0 +1,4 @@
+
+T20916.hs:8:10: error:
+    • Different names for the same type variable: ‘p’ and ‘q’
+    • In the data type declaration for ‘T3’
