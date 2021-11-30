@@ -1,5 +1,5 @@
-[1 of 4] Compiling T13068[boot]     ( T13068.hs-boot, T13068.o-boot )
-[2 of 4] Compiling T13068a          ( T13068a.hs, T13068a.o )
+[1 of 5] Compiling T13068[boot]     ( T13068.hs-boot, T13068.o-boot )
+[2 of 5] Compiling T13068a          ( T13068a.hs, T13068a.o )
 
 T13068a.hs:3:10: error:
     • Cannot define instance for abstract class ‘C’

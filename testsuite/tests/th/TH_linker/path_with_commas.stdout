@@ -1,4 +1,4 @@
 Reading package info from "test.pkg" ... done.
-[1 of 1] Compiling Main             ( Main.hs, Main.o )
-Linking Main ...
+[1 of 2] Compiling Main             ( Main.hs, Main.o )
+[2 of 2] Linking Main
 hello

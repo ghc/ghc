@@ -36,7 +36,7 @@ unit eqmap where
         -- Need to insert redundant constraint to make it work...
         insert :: Eq k => k -> a -> Map k a -> Map k a
         insert k v (Assoc xs) = Assoc ((k,v):xs)
-unit main where
+unit top where
     dependency user[Map=ordmap:Map] (User as User.Ord)
     dependency user[Map=eqmap:Map] (User as User.Eq)
 

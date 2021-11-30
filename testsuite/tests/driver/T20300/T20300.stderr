@@ -1,4 +1,4 @@
 [1 of 4] Compiling T[boot]          ( T.hs-boot, nothing )
 [2 of 4] Compiling S                ( S.hs, S.o, S.dyn_o )
-[3 of 4] Compiling T                ( T.hs, T.o, T.dyn_o )
+[3 of 4] Compiling T                ( T.hs, nothing )
 [4 of 4] Compiling Top              ( Top.hs, nothing )

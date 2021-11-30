@@ -1,6 +1,6 @@
 testing -ddump-cmm-verbose for T16930 ...
-[1 of 1] Compiling Main             ( T16930.hs, T16930.o )
-Linking T16930 ...
+[1 of 2] Compiling Main             ( T16930.hs, T16930.o )
+[2 of 2] Linking T16930
 T16930.dump-cmm-caf
 T16930.dump-cmm-cfg
 T16930.dump-cmm-cps

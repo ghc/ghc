@@ -11,3 +11,4 @@ T14365B.hs-boot:7:1: error:
         Cannot derive instances in hs-boot files
         Write an instance declaration instead
     • In the stand-alone deriving instance for ‘Foldable Foo’
+[3 of 3] Compiling T14365B          ( T14365B.hs, T14365B.o )

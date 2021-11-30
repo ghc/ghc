@@ -51,6 +51,8 @@ import GHC.Utils.Outputable
 import GHC.Types.Basic
 import GHC.Unit.Home
 import GHC.Unit.Finder
+import GHC.Unit.Env
+import GHC.Unit.Home.ModInfo
 import GHC.Driver.Config.Finder
 
 import GHC.Data.Stream as Stream (collect, yield)

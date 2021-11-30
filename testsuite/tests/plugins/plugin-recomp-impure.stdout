@@ -1,4 +1,4 @@
-[1 of 1] Compiling Main             ( plugin-recomp-test.hs, plugin-recomp-test.o )
-Linking plugin-recomp-test ...
-[1 of 1] Compiling Main             ( plugin-recomp-test.hs, plugin-recomp-test.o ) [Impure plugin forced recompilation]
-Linking plugin-recomp-test ...
+[1 of 2] Compiling Main             ( plugin-recomp-test.hs, plugin-recomp-test.o )
+[2 of 2] Linking plugin-recomp-test
+[1 of 2] Compiling Main             ( plugin-recomp-test.hs, plugin-recomp-test.o ) [Impure plugin forced recompilation]
+[2 of 2] Linking plugin-recomp-test [Objects changed]

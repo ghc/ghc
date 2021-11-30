@@ -350,3 +350,5 @@ test('T7388', normal, ghci_script, ['T7388.script'])
 test('T20627', normal, ghci_script, ['T20627.script'])
 test('T20473a', normal, ghci_script, ['T20473a.script'])
 test('T20473b', normal, ghci_script, ['T20473b.script'])
+test('T20587', [extra_files(['../shell.hs'])], ghci_script,
+                ['T20587.script'])

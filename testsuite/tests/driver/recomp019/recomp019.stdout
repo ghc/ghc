@@ -1,11 +1,11 @@
 first run
-[1 of 3] Compiling B                ( B.hs, B.o )
-[2 of 3] Compiling C                ( C.hs, C.o )
-[3 of 3] Compiling Main             ( Main.hs, Main.o )
-Linking Main ...
+[1 of 4] Compiling B                ( B.hs, B.o )
+[2 of 4] Compiling C                ( C.hs, C.o )
+[3 of 4] Compiling Main             ( Main.hs, Main.o )
+[4 of 4] Linking Main
 5
 [1 of 1] Compiling B                ( B.hs, nothing ) [Source file changed]
 second run
-[1 of 3] Compiling B                ( B.hs, B.o ) [Missing object file]
-Linking Main ...
+[1 of 4] Compiling B                ( B.hs, B.o ) [Missing object file]
+[4 of 4] Linking Main [Objects changed]
 15

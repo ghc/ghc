@@ -1,2 +1,2 @@
 
-<no location info>: no such module: ‘ThisDoesNotExist’
+<no location info>: error: no such module: ‘main:ThisDoesNotExist’

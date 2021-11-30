@@ -1,6 +1,6 @@
 "1.0"
 Preprocessing executable 'test' for b-1.0..
 Building executable 'test' for b-1.0..
-[1 of 2] Compiling B                ( B.hs, dist/build/test/test-tmp/B.o ) [A package changed]
-Linking dist/build/test/test ...
+[1 of 3] Compiling B                ( B.hs, dist/build/test/test-tmp/B.o ) [A package changed]
+[3 of 3] Linking dist/build/test/test [Objects changed]
 "2.0"

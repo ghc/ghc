@@ -1,4 +1,4 @@
-[1 of 3] Compiling M1               ( src-lib/M1.hs, src-lib/M1.o )
-[2 of 3] Compiling Main             ( src-exe/Main.hs, src-exe/Main.o )
-[3 of 3] Compiling AltMain          ( src-exe/AltMain.hs, src-exe/AltMain.o )
-Linking src-exe/AltMain ...
+[1 of 4] Compiling M1               ( src-lib/M1.hs, src-lib/M1.o )
+[2 of 4] Compiling Main             ( src-exe/Main.hs, src-exe/Main.o )
+[3 of 4] Compiling AltMain          ( src-exe/AltMain.hs, src-exe/AltMain.o )
+[4 of 4] Linking src-exe/AltMain

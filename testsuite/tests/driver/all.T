@@ -299,3 +299,4 @@ test('T20439', normal, run_command,
       {compiler} -E -fno-code -XCPP -v Foo.hs 2>&1 | grep "Copying" | sed "s/.*to//" '])
 test('T20459', normal, multimod_compile_fail,
      ['T20459B', ''])
+test('MultiRootsErr', normal, multimod_compile_fail, ['MultiRootsErr', 'MultiRootsErr'])

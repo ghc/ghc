@@ -16,3 +16,7 @@ T11068:
 MultiModulesRecomp:
 	./genMultiLayerModules
 	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 MultiLayerModules.hs
+
+MultiComponentModulesRecomp:
+	'$(PYTHON)' genMultiComp.py
+	TEST_HC='$(TEST_HC)' TEST_HC_OPTS='$(TEST_HC_OPTS)' ./run

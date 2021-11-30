@@ -1,7 +1,7 @@
-[1 of 2] Compiling OverloadedRecFldsFail12_A ( OverloadedRecFldsFail12_A.hs, OverloadedRecFldsFail12_A.o )
-[2 of 2] Compiling Main             ( overloadedrecfldsfail12.hs, overloadedrecfldsfail12.o )
+[1 of 3] Compiling OverloadedRecFldsFail12_A ( OverloadedRecFldsFail12_A.hs, OverloadedRecFldsFail12_A.o )
+[2 of 3] Compiling Main             ( overloadedrecfldsfail12.hs, overloadedrecfldsfail12.o )
 
- overloadedrecfldsfail12.hs:13:5:
+overloadedrecfldsfail12.hs:13:5: error:
     Ambiguous occurrence ‘foo’
     It could refer to
        either the field ‘foo’,
@@ -9,7 +9,7 @@
               (and originally defined at OverloadedRecFldsFail12_A.hs:5:16-18)
            or the field ‘foo’, defined at overloadedrecfldsfail12.hs:6:16
 
- overloadedrecfldsfail12.hs:16:5:
+overloadedrecfldsfail12.hs:16:5: error:
     Ambiguous occurrence ‘foo’
     It could refer to
        either the field ‘foo’,

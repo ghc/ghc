@@ -1,7 +1,7 @@
-[1 of 3] Compiling A                ( A.hs, nothing )
-[2 of 3] Compiling B                ( B.hs, nothing )
-[3 of 3] Compiling Main             ( C.hs, nothing )
+[1 of 4] Compiling A                ( A.hs, nothing )
+[2 of 4] Compiling B                ( B.hs, nothing )
+[3 of 4] Compiling Main             ( C.hs, nothing )
 Middle
 End
-[2 of 3] Compiling B                ( B.hs, nothing ) [Source file changed]
-[3 of 3] Compiling Main             ( C.hs, nothing ) [B changed]
+[2 of 4] Compiling B                ( B.hs, nothing ) [Source file changed]
+[3 of 4] Compiling Main             ( C.hs, nothing ) [B changed]

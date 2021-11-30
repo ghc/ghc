@@ -1,6 +1,6 @@
-[1 of 1] Compiling Main             ( T17586.hs, T17586.o )
-Linking T17586 ...
+[1 of 2] Compiling Main             ( T17586.hs, T17586.o )
+[2 of 2] Linking T17586
 hello world
-[1 of 1] Compiling Main             ( T17586.hs, T17586.o ) [Flags changed]
-Linking T17586 ...
+[1 of 2] Compiling Main             ( T17586.hs, T17586.o ) [Flags changed]
+[2 of 2] Linking T17586 [Objects changed]
 hello world

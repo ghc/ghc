@@ -4,9 +4,9 @@ SafeLang12.hs:3:14: warning:
 
 SafeLang12_B.hs:3:14: warning:
     -XTemplateHaskell is not allowed in Safe Haskell; ignoring -XTemplateHaskell
-[1 of 3] Compiling SafeLang12_A     ( SafeLang12_A.hs, SafeLang12_A.o )
-[2 of 3] Compiling SafeLang12_B     ( SafeLang12_B.hs, SafeLang12_B.o )
-[3 of 3] Compiling Main             ( SafeLang12.hs, SafeLang12.o )
+[1 of 4] Compiling SafeLang12_A     ( SafeLang12_A.hs, SafeLang12_A.o )
+[2 of 4] Compiling SafeLang12_B     ( SafeLang12_B.hs, SafeLang12_B.o )
+[3 of 4] Compiling Main             ( SafeLang12.hs, SafeLang12.o )
 
 SafeLang12.hs:1:1: error:
     Top-level splices are not permitted without TemplateHaskell

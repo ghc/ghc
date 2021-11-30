@@ -293,6 +293,35 @@ test('MultiLayerModulesRecomp',
      multimod_compile,
      ['MultiLayerModules', '-v0'])
 
+
+# A performance test for calculating link dependencies in --make mode.
+test('MultiLayerModulesTH_Make',
+     [ collect_compiler_stats('bytes allocated',3),
+       pre_cmd('./genMultiLayerModulesTH; $TEST_HC $TEST_HC_OPTS MultiLayerModulesPrep -dynamic-too -v0'),
+       extra_files(['genMultiLayerModulesTH']),
+       compile_timeout_multiplier(5)
+       # this is _a lot_
+       # but this test has been failing every now and then,
+       # especially on i386. Let's just give it some room
+       # to complete successfully reliably everywhere.
+     ],
+     multimod_compile_fail,
+     ['MultiLayerModules', '-v0'])
+
+# A performance test for calculating link dependencies in -c mode.
+test('MultiLayerModulesTH_OneShot',
+     [ collect_compiler_stats('bytes allocated',3),
+       pre_cmd('./genMultiLayerModulesTH; cp MultiLayerModules.hs MultiLayerModulesTH_OneShot.hs; $TEST_HC $TEST_HC_OPTS MultiLayerModulesPrep -dynamic-too -v0'),
+       extra_files(['genMultiLayerModulesTH']),
+       compile_timeout_multiplier(5)
+       # this is _a lot_
+       # but this test has been failing every now and then,
+       # especially on i386. Let's just give it some room
+       # to complete successfully reliably everywhere.
+     ],
+     compile_fail,
+     ['-v0'])
+
 test('MultiLayerModulesDefsGhci',
      [ collect_compiler_residency(15),
        pre_cmd('./genMultiLayerModulesDefs'),
@@ -318,6 +347,24 @@ test('MultiLayerModulesNoCode',
      ],
      ghci_script,
      ['MultiLayerModulesNoCode.script'])
+
+test('MultiComponentModulesRecomp',
+     [ collect_compiler_stats('bytes allocated', 2),
+       pre_cmd('$MAKE -s --no-print-directory MultiComponentModulesRecomp'),
+       extra_files(['genMultiComp.py']),
+       compile_timeout_multiplier(5)
+     ],
+     multiunit_compile,
+     [['unitp%d' % n for n in range(30)], '-fno-code -fwrite-interface -v0'])
+
+test('MultiComponentModules',
+     [ collect_compiler_stats('bytes allocated', 2),
+       pre_cmd('$PYTHON ./genMultiComp.py'),
+       extra_files(['genMultiComp.py']),
+       compile_timeout_multiplier(5)
+     ],
+     multiunit_compile,
+     [['unitp%d' % n for n in range(30)], '-fno-code -fwrite-interface -v0'])
 
 test('ManyConstructors',
      [ collect_compiler_stats('bytes allocated',2),

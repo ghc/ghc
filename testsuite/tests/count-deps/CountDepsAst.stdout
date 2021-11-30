@@ -1,4 +1,4 @@
-Found 277 Language.Haskell.Syntax module dependencies
+Found 302 Language.Haskell.Syntax module dependencies
 GHC.Builtin.Names
 GHC.Builtin.PrimOps
 GHC.Builtin.Types
@@ -15,10 +15,15 @@ GHC.Cmm.Dataflow.Label
 GHC.Cmm.Expr
 GHC.Cmm.MachOp
 GHC.Cmm.Node
+GHC.Cmm.Ppr.Expr
 GHC.Cmm.Switch
 GHC.Cmm.Type
+GHC.Cmm.Utils
 GHC.CmmToAsm.CFG.Weight
 GHC.CmmToAsm.Config
+GHC.CmmToAsm.Ppr
+GHC.CmmToLlvm.Base
+GHC.CmmToLlvm.Regs
 GHC.Core
 GHC.Core.Class
 GHC.Core.Coercion
@@ -122,7 +127,18 @@ GHC.Iface.Ext.Fields
 GHC.Iface.Recomp.Binary
 GHC.Iface.Syntax
 GHC.Iface.Type
+GHC.Linker.Dynamic
+GHC.Linker.ExtraObj
+GHC.Linker.MacOS
+GHC.Linker.Static
 GHC.Linker.Types
+GHC.Linker.Unit
+GHC.Linker.Windows
+GHC.Llvm
+GHC.Llvm.MetaData
+GHC.Llvm.Ppr
+GHC.Llvm.Syntax
+GHC.Llvm.Types
 GHC.Parser.Annotation
 GHC.Parser.Errors.Basic
 GHC.Parser.Errors.Ppr
@@ -148,13 +164,21 @@ GHC.Prelude
 GHC.Runtime.Context
 GHC.Runtime.Eval.Types
 GHC.Runtime.Heap.Layout
+GHC.Runtime.Interpreter
 GHC.Runtime.Interpreter.Types
 GHC.Settings
 GHC.Settings.Config
 GHC.Settings.Constants
+GHC.Settings.IO
 GHC.Stg.Syntax
 GHC.StgToCmm.Types
+GHC.SysTools
+GHC.SysTools.Ar
 GHC.SysTools.BaseDir
+GHC.SysTools.Elf
+GHC.SysTools.Info
+GHC.SysTools.Process
+GHC.SysTools.Tasks
 GHC.SysTools.Terminal
 GHC.Tc.Errors.Hole.FitTypes
 GHC.Tc.Errors.Ppr
@@ -244,6 +268,7 @@ GHC.Unit.Parser
 GHC.Unit.Ppr
 GHC.Unit.State
 GHC.Unit.Types
+GHC.Utils.Asm
 GHC.Utils.Binary
 GHC.Utils.Binary.Typeable
 GHC.Utils.BufHandle
