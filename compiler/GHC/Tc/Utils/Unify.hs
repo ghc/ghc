@@ -1,5 +1,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections       #-}
+{-# LANGUAGE RecursiveDo       #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
@@ -863,9 +864,12 @@ tcSkolemise, tcSkolemiseScoped
 -- tcSkolemiseScoped and tcSkolemise
 
 tcSkolemiseScoped ctxt expected_ty thing_inside
-  = do { (wrap, tv_prs, given, rho_ty) <- topSkolemise expected_ty
-       ; let skol_tvs  = map snd tv_prs
-             skol_info = SigSkol ctxt expected_ty tv_prs
+  -- MP: What to do here?
+  = do {
+       ; rec { (wrap, tv_prs, given, rho_ty) <- topSkolemise skol_info expected_ty
+             ; let skol_tvs  = map snd tv_prs
+                   skol_info = SigSkol ctxt expected_ty tv_prs
+       }
 
        ; (ev_binds, res)
              <- checkConstraints skol_info skol_tvs given $
@@ -879,10 +883,13 @@ tcSkolemise ctxt expected_ty thing_inside
   = do { res <- thing_inside expected_ty
        ; return (idHsWrapper, res) }
   | otherwise
-  = do  { (wrap, tv_prs, given, rho_ty) <- topSkolemise expected_ty
+    -- MP: Not sure what to do here.
+  = do  {
+        ; rec { (wrap, tv_prs, given, rho_ty) <- topSkolemise skol_info expected_ty
 
-        ; let skol_tvs  = map snd tv_prs
-              skol_info = SigSkol ctxt expected_ty tv_prs
+              ; let skol_tvs  = map snd tv_prs
+                    skol_info = SigSkol ctxt expected_ty tv_prs
+        }
 
         ; (ev_binds, result)
               <- checkConstraints skol_info skol_tvs given $

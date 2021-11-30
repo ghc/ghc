@@ -1,4 +1,4 @@
-
+{-# LANGUAGE RecursiveDo #-}
 
 module GHC.Tc.Solver(
        InferMode(..), simplifyInfer, findInferredDiff,
@@ -227,9 +227,9 @@ simplifyAndEmitFlatConstraints wanted
                          -- Emit the bad constraints, wrapped in an implication
                          -- See Note [Wrapping failing kind equalities]
                          ; tclvl  <- TcM.getTcLevel
-                         ; implic <- buildTvImplication UnkSkol [] (pushTcLevel tclvl) wanted
+                         ; implic <- buildTvImplication unkSkol [] (pushTcLevel tclvl) wanted
                                     --                  ^^^^^^   |  ^^^^^^^^^^^^^^^^^
-                                    -- it's OK to use UnkSkol    |  we must increase the TcLevel,
+                                    -- it's OK to use unkSkol    |  we must increase the TcLevel,
                                     -- because we don't bind     |  as explained in
                                     -- any skolem variables here |  Note [Wrapping failing kind equalities]
                          ; emitImplication implic
@@ -903,7 +903,7 @@ tcCheckGivens inerts given_ids = do
   (sat, new_inerts) <- runTcSInerts inerts $ do
     traceTcS "checkGivens {" (ppr inerts <+> ppr given_ids)
     lcl_env <- TcS.getLclEnv
-    let given_loc = mkGivenLoc topTcLevel UnkSkol lcl_env
+    let given_loc = mkGivenLoc topTcLevel unkSkol lcl_env
     let given_cts = mkGivens given_loc (bagToList given_ids)
     -- See Note [Superclasses and satisfiability]
     solveSimpleGivens given_cts
@@ -1052,7 +1052,9 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
                                    , pred <- sig_inst_theta sig ]
 
        ; dep_vars <- candidateQTyVarsOfTypes (psig_tv_tys ++ psig_theta ++ map snd name_taus)
-       ; qtkvs <- quantifyTyVars DefaultNonStandardTyVars dep_vars
+
+      ; let skol_info = InferSkol name_taus
+       ; qtkvs <- quantifyTyVars skol_info DefaultNonStandardTyVars dep_vars
        ; traceTc "simplifyInfer: empty WC" (ppr name_taus $$ ppr qtkvs)
        ; return (qtkvs, [], emptyTcEvBinds, False) }
 
@@ -1104,10 +1106,16 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
        -- NB: bound_theta are constraints we want to quantify over,
        --     including the psig_theta, which we always quantify over
        -- NB: bound_theta are fully zonked
-       ; (qtvs, bound_theta, co_vars) <- decideQuantification infer_mode rhs_tclvl
+       ; rec { (qtvs, bound_theta, co_vars) <- decideQuantification skol_info infer_mode rhs_tclvl
                                                      name_taus partial_sigs
                                                      quant_pred_candidates
-       ; bound_theta_vars <- mapM TcM.newEvVar bound_theta
+             ;  bound_theta_vars <- mapM TcM.newEvVar bound_theta
+
+             ; let full_theta = map idType bound_theta_vars
+             ; let skol_info = InferSkol [ (name, mkSigmaTy [] full_theta ty)
+                                         | (name, ty) <- name_taus ]
+       }
+
 
        -- Now emit the residual constraint
        ; emitResidualConstraints rhs_tclvl ev_binds_var
@@ -1182,7 +1190,7 @@ findInferredDiff annotated_theta inferred_theta
     do { lcl_env   <- TcM.getLclEnv
        ; given_ids <- mapM TcM.newEvVar annotated_theta
        ; wanteds   <- newWanteds AnnOrigin inferred_theta
-       ; let given_loc = mkGivenLoc topTcLevel UnkSkol lcl_env
+       ; let given_loc = mkGivenLoc topTcLevel unkSkol lcl_env
              given_cts = mkGivens given_loc given_ids
 
        ; residual <- runTcSDeriveds $
@@ -1308,7 +1316,8 @@ If the monomorphism restriction does not apply, then we quantify as follows:
 -}
 
 decideQuantification
-  :: InferMode
+  :: SkolemInfo
+  -> InferMode
   -> TcLevel
   -> [(Name, TcTauType)]   -- Variables to be generalised
   -> [TcIdSigInst]         -- Partial type signatures (if any)
@@ -1317,7 +1326,7 @@ decideQuantification
          , [PredType]      -- and this context (fully zonked)
          , VarSet)
 -- See Note [Deciding quantification]
-decideQuantification infer_mode rhs_tclvl name_taus psigs candidates
+decideQuantification skol_info infer_mode rhs_tclvl name_taus psigs candidates
   = do { -- Step 1: find the mono_tvs
        ; (mono_tvs, candidates, co_vars) <- decideMonoTyVars infer_mode
                                               name_taus psigs candidates
@@ -1327,7 +1336,7 @@ decideQuantification infer_mode rhs_tclvl name_taus psigs candidates
        ; candidates <- defaultTyVarsAndSimplify rhs_tclvl mono_tvs candidates
 
        -- Step 3: decide which kind/type variables to quantify over
-       ; qtvs <- decideQuantifiedTyVars name_taus psigs candidates
+       ; qtvs <- decideQuantifiedTyVars skol_info name_taus psigs candidates
 
        -- Step 4: choose which of the remaining candidate
        --         predicates to actually quantify over
@@ -1525,12 +1534,13 @@ defaultTyVarsAndSimplify rhs_tclvl mono_tvs candidates
 
 ------------------
 decideQuantifiedTyVars
-   :: [(Name,TcType)]   -- Annotated theta and (name,tau) pairs
+   :: SkolemInfo
+   -> [(Name,TcType)]   -- Annotated theta and (name,tau) pairs
    -> [TcIdSigInst]     -- Partial signatures
    -> [PredType]        -- Candidates, zonked
    -> TcM [TyVar]
 -- Fix what tyvars we are going to quantify over, and quantify them
-decideQuantifiedTyVars name_taus psigs candidates
+decideQuantifiedTyVars skol_info name_taus psigs candidates
   = do {     -- Why psig_tys? We try to quantify over everything free in here
              -- See Note [Quantification and partial signatures]
              --     Wrinkles 2 and 3
@@ -1569,7 +1579,7 @@ decideQuantifiedTyVars name_taus psigs candidates
            , text "grown_tcvs =" <+> ppr grown_tcvs
            , text "dvs =" <+> ppr dvs_plus])
 
-       ; quantifyTyVars DefaultNonStandardTyVars dvs_plus }
+       ; quantifyTyVars skol_info DefaultNonStandardTyVars dvs_plus }
 
 ------------------
 growThetaTyVars :: ThetaType -> TyCoVarSet -> TyCoVarSet
@@ -2773,7 +2783,7 @@ disambigGroup (default_ty:default_tys) group@(the_tv, wanteds)
       | Just subst <- mb_subst
       = do { lcl_env <- TcS.getLclEnv
            ; tc_lvl <- TcS.getTcLevel
-           ; let loc = mkGivenLoc tc_lvl UnkSkol lcl_env
+           ; let loc = mkGivenLoc tc_lvl unkSkol lcl_env
            -- Equality constraints are possible due to type defaulting plugins
            ; wanted_evs <- mapM (newWantedNC loc . substTy subst . ctPred)
                                 wanteds

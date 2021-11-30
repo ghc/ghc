@@ -912,7 +912,11 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty_scaled
                   -- We want to create a well-kinded substitution, so
                   -- that the instantiated type is well-kinded
 
-        ; (tenv, ex_tvs') <- tcInstSuperSkolTyVarsX tenv1 ex_tvs
+        ; let mc = case pe_ctxt penv of
+                     LamPat mc -> mc
+                     LetPat {} -> PatBindRhs
+        ; let skol_info = PatSkol (RealDataCon data_con) mc
+        ; (tenv, ex_tvs') <- tcInstSuperSkolTyVarsX skol_info tenv1 ex_tvs
                      -- Get location from monad, not from ex_tvs
                      -- This freshens: See Note [Freshen existentials]
                      -- Why "super"? See Note [Binding when lookup up instances]
@@ -953,10 +957,6 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty_scaled
         { let theta'     = substTheta tenv (eqSpecPreds eq_spec ++ theta)
                            -- order is *important* as we generate the list of
                            -- dictionary binders from theta'
-              skol_info = PatSkol (RealDataCon data_con) mc
-              mc = case pe_ctxt penv of
-                     LamPat mc -> mc
-                     LetPat {} -> PatBindRhs
 
         ; when (not (null eq_spec) || any isEqPred theta) warnMonoLocalBinds
 
@@ -993,7 +993,11 @@ tcPatSynPat penv (L con_span con_name) pat_syn pat_ty arg_pats thing_inside
         ; let all_arg_tys = ty : prov_theta ++ (map scaledThing arg_tys)
         ; checkGADT (PatSynCon pat_syn) ex_tvs all_arg_tys penv
 
-        ; (tenv, ex_tvs') <- tcInstSuperSkolTyVarsX subst ex_tvs
+        ; let skol_info = case pe_ctxt penv of
+                            LamPat mc -> PatSkol (PatSynCon pat_syn) mc
+                            LetPat {} -> unkSkol -- Doesn't matter
+
+        ; (tenv, ex_tvs') <- tcInstSuperSkolTyVarsX skol_info subst ex_tvs
            -- This freshens: Note [Freshen existentials]
 
         ; let ty'         = substTy tenv ty
@@ -1019,9 +1023,6 @@ tcPatSynPat penv (L con_span con_name) pat_syn pat_ty arg_pats thing_inside
 
         ; prov_dicts' <- newEvVars prov_theta'
 
-        ; let skol_info = case pe_ctxt penv of
-                            LamPat mc -> PatSkol (PatSynCon pat_syn) mc
-                            LetPat {} -> UnkSkol -- Doesn't matter
 
         ; req_wrap <- instCall (OccurrenceOf con_name) (mkTyVarTys univ_tvs') req_theta'
                       -- Origin (OccurrenceOf con_name):

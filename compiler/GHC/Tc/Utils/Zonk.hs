@@ -3,6 +3,7 @@
 {-# LANGUAGE TypeFamilies     #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+{-# LANGUAGE LambdaCase #-}
 
 {-
 (c) The University of Glasgow 2006
@@ -1775,6 +1776,7 @@ change.  But in some cases it makes a HUGE difference: see test
 T9198 and #19668.  So yes, it seems worth it.
 -}
 
+
 zonkTyVarOcc :: ZonkEnv -> TyVar -> TcM TcType
 zonkTyVarOcc env@(ZonkEnv { ze_flexi = flexi
                           , ze_tv_env = tv_env
@@ -1794,9 +1796,12 @@ zonkTyVarOcc env@(ZonkEnv { ze_flexi = flexi
   = lookup_in_tv_env
 
   where
+
     lookup_in_tv_env    -- Look up in the env just as we do for Ids
       = case lookupVarEnv tv_env tv of
-          Nothing  -> mkTyVarTy <$> updateTyVarKindM (zonkTcTypeToTypeX env) tv
+          Nothing  -> do
+              tv' <- updateTyVarKindM (zonkTcTypeToTypeX env) tv
+              mkTyVarTy <$> zonkTyVarSkolemInfo tv'
           Just tv' -> return (mkTyVarTy tv')
 
     zonk_meta ref Flexi
@@ -1812,6 +1817,8 @@ zonkTyVarOcc env@(ZonkEnv { ze_flexi = flexi
     finish_meta ty
       = do { updTcRef mtv_env_ref (\env -> extendVarEnv env tv ty)
            ; return ty }
+
+
 
 lookupTyVarOcc :: ZonkEnv -> TcTyVar -> Maybe TyVar
 lookupTyVarOcc (ZonkEnv { ze_tv_env = tv_env }) tv

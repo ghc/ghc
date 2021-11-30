@@ -1992,8 +1992,8 @@ matchGlobalInst :: DynFlags
 matchGlobalInst dflags short_cut cls tys
   = wrapTcS (TcM.matchGlobalInst dflags short_cut cls tys)
 
-tcInstSkolTyVarsX :: TCvSubst -> [TyVar] -> TcS (TCvSubst, [TcTyVar])
-tcInstSkolTyVarsX subst tvs = wrapTcS $ TcM.tcInstSkolTyVarsX subst tvs
+tcInstSkolTyVarsX :: SkolemInfo -> TCvSubst -> [TyVar] -> TcS (TCvSubst, [TcTyVar])
+tcInstSkolTyVarsX skol_info subst tvs = wrapTcS $ TcM.tcInstSkolTyVarsX skol_info subst tvs
 
 -- Creating and setting evidence variables and CtFlavors
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

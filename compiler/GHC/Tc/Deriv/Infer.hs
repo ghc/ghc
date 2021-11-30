@@ -718,7 +718,7 @@ simplifyDeriv :: PredType -- ^ @C inst_ty@, head of the instance we are
               -> TcM ThetaType -- ^ Needed constraints (after simplification),
                                -- i.e. @['PredType']@.
 simplifyDeriv pred tvs thetas
-  = do { (skol_subst, tvs_skols) <- tcInstSkolTyVars tvs -- Skolemize
+  = do { (skol_subst, tvs_skols) <- tcInstSkolTyVars (DerivSkol pred) tvs -- Skolemize
                 -- The constraint solving machinery
                 -- expects *TcTyVars* not TyVars.
                 -- We use *non-overlappable* (vanilla) skolems

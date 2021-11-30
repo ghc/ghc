@@ -393,13 +393,18 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
        ; checkTc (all (isManyDataConTy . scaledMult) arg_tys) $
            TcRnLinearPatSyn sig_body_ty
 
+       ; let skol_info = SigSkol (PatSynCtxt name) pat_ty []
+                         -- The type here is a bit bogus, but we do not print
+                         -- the type for PatSynCtxt, so it doesn't matter
+                         -- See Note [Skolem info for pattern synonyms] in "GHC.Tc.Types.Origin"
+
          -- Skolemise the quantified type variables. This is necessary
          -- in order to check the actual pattern type against the
          -- expected type. Even though the tyvars in the type are
          -- already skolems, this step changes their TcLevels,
          -- avoiding level-check errors when unifying.
-       ; (skol_subst0, skol_univ_bndrs) <- skolemiseTvBndrsX emptyTCvSubst univ_bndrs
-       ; (skol_subst, skol_ex_bndrs)    <- skolemiseTvBndrsX skol_subst0   ex_bndrs
+       ; (skol_subst0, skol_univ_bndrs) <- skolemiseTvBndrsX skol_info emptyTCvSubst univ_bndrs
+       ; (skol_subst, skol_ex_bndrs)    <- skolemiseTvBndrsX skol_info skol_subst0   ex_bndrs
        ; let skol_univ_tvs   = binderVars skol_univ_bndrs
              skol_ex_tvs     = binderVars skol_ex_bndrs
              skol_req_theta  = substTheta skol_subst0 req_theta
@@ -436,10 +441,6 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
                                        skol_arg_tys
               ; return (ex_tvs', prov_dicts, args') }
 
-       ; let skol_info = SigSkol (PatSynCtxt name) pat_ty []
-                         -- The type here is a bit bogus, but we do not print
-                         -- the type for PatSynCtxt, so it doesn't matter
-                         -- See Note [Skolem info for pattern synonyms] in "GHC.Tc.Types.Origin"
        ; (implics, ev_binds) <- buildImplicationFor tclvl skol_info skol_univ_tvs
                                                     req_dicts wanted
 
@@ -480,15 +481,15 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
                 -- See Note [Pattern synonyms and higher rank types]
            ; return (mkLHsWrap wrap $ nlHsVar arg_id) }
 
-skolemiseTvBndrsX :: TCvSubst -> [VarBndr TyVar flag]
+skolemiseTvBndrsX :: SkolemInfo -> TCvSubst -> [VarBndr TyVar flag]
                   -> TcM (TCvSubst, [VarBndr TcTyVar flag])
 -- Make new TcTyVars, all skolems with levels, but do not clone
 -- The level is one level deeper than the current level
 -- See Note [Skolemising when checking a pattern synonym]
-skolemiseTvBndrsX orig_subst tvs
+skolemiseTvBndrsX skol_info orig_subst tvs
   = do { tc_lvl <- getTcLevel
        ; let pushed_lvl = pushTcLevel tc_lvl
-             details    = SkolemTv pushed_lvl False
+             details    = SkolemTv skol_info pushed_lvl False
 
              mk_skol_tv_x :: TCvSubst -> VarBndr TyVar flag
                           -> (TCvSubst, VarBndr TcTyVar flag)

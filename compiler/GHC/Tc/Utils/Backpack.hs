@@ -236,7 +236,7 @@ check_inst sig_inst = do
            case splitFunTys rho             of { (theta, pred) ->
            (tvs, theta, pred) }}
         origin = InstProvidedOrigin (tcg_semantic_mod tcg_env) sig_inst
-    (skol_subst, tvs_skols) <- tcInstSkolTyVars tvs -- Skolemize
+    (skol_subst, tvs_skols) <- tcInstSkolTyVars skol_info tvs -- Skolemize
     (tclvl,cts) <- pushTcLevelM $ do
        wanted <- newWanted origin
                            (Just TypeLevel)

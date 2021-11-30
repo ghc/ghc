@@ -2249,7 +2249,7 @@ def normalise_callstacks(s: str) -> str:
         location = normalise_slashes_(location)
         return ', called at {0}:<line>:<column> in <package-id>:'.format(location)
     # Ignore line number differences in call stacks (#10834).
-    s = re.sub(callSite_re, repl, s)
+    #s = re.sub(callSite_re, repl, s)
     # Ignore the change in how we identify implicit call-stacks
     s = s.replace('from ImplicitParams', 'from HasCallStack')
     if not opts.keep_prof_callstacks:

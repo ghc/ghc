@@ -1700,7 +1700,7 @@ reifyInstances' th_nm th_tys
 
         ; (tclvl, wanted, (tvs, ty))
             <- pushLevelAndSolveEqualitiesX "reifyInstances"  $
-               bindImplicitTKBndrs_Skol tv_names              $
+               bindImplicitTKBndrs_Skol ReifySkol tv_names              $
                tcInferLHsType rn_ty
 
         ; tvs <- zonkAndScopedSort tvs

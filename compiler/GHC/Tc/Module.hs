@@ -2653,7 +2653,7 @@ tcRnType hsc_env flexi normalise rdr_type
        ; massertPpr (isEmptyBag empty_binds) (ppr empty_binds)
 
        -- Do kind generalisation; see Note [Kind-generalise in tcRnType]
-       ; kvs <- kindGeneralizeAll kind
+       ; kvs <- kindGeneralizeAll unkSkol kind
 
        ; e <- mkEmptyZonkEnv flexi
        ; ty  <- zonkTcTypeToTypeX e ty

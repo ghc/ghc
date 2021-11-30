@@ -103,6 +103,7 @@ import Data.List (nubBy, partition)
 import Data.List.NonEmpty ( NonEmpty(..) )
 import qualified Data.Set as Set
 import Data.Tuple( swap )
+import GHC.Stack
 
 {-
 ************************************************************************
@@ -699,7 +700,7 @@ kcTyClGroup kisig_env decls
 
         ; inferred_tcs
             <- tcExtendKindEnvWithTyCons checked_tcs  $
-               pushLevelAndSolveEqualities UnkSkol [] $
+               pushLevelAndSolveEqualities unkSkol [] $
                      -- We are going to kind-generalise, so unification
                      -- variables in here must be one level in
                do {  -- Step 1: Bind kind variables for all decls
@@ -907,7 +908,7 @@ generaliseTcTyCon (tc, scoped_prs, tc_res_kind)
 
        -- Step 2b: quantify, mainly meaning skolemise the free variables
        -- Returned 'inferred' are scope-sorted and skolemised
-       ; inferred <- quantifyTyVars DefaultNonStandardTyVars dvs2
+       ; inferred <- quantifyTyVars unkSkol DefaultNonStandardTyVars dvs2
 
        ; traceTc "generaliseTcTyCon: pre zonk"
            (vcat [ text "tycon =" <+> ppr tc
@@ -1578,7 +1579,7 @@ kcTyClDecl :: TyClDecl GhcRn -> TcTyCon -> TcM ()
 
 kcTyClDecl (DataDecl { tcdLName    = (L _ name), tcdDataDefn = defn }) tycon
   | HsDataDefn { dd_ctxt = ctxt, dd_cons = cons, dd_ND = new_or_data } <- defn
-  = bindTyClTyVars name $ \ _ _ _ ->
+  = bindTyClTyVars unkSkol name $ \ _ _ _ ->
        -- NB: binding these tyvars isn't necessary for GADTs, but it does no
        -- harm.  For GADTs, each data con brings its own tyvars into scope,
        -- and the ones from this bindTyClTyVars are either not mentioned or
@@ -1589,14 +1590,14 @@ kcTyClDecl (DataDecl { tcdLName    = (L _ name), tcdDataDefn = defn }) tycon
        }
 
 kcTyClDecl (SynDecl { tcdLName = L _ name, tcdRhs = rhs }) _tycon
-  = bindTyClTyVars name $ \ _ _ res_kind ->
+  = bindTyClTyVars unkSkol name $ \ _ _ res_kind ->
     discardResult $ tcCheckLHsType rhs (TheKind res_kind)
         -- NB: check against the result kind that we allocated
         -- in inferInitialKinds.
 
 kcTyClDecl (ClassDecl { tcdLName = L _ name
                       , tcdCtxt = ctxt, tcdSigs = sigs }) _tycon
-  = bindTyClTyVars name $ \ _ _ _ ->
+  = bindTyClTyVars unkSkol name $ \ _ _ _ ->
     do  { _ <- tcHsContext ctxt
         ; mapM_ (wrapLocMA_ kc_sig) sigs }
   where
@@ -1665,7 +1666,7 @@ kcConDecl new_or_data tc_res_kind (ConDeclH98
   , con_mb_cxt = ex_ctxt, con_args = args })
   = addErrCtxt (dataConCtxt [name]) $
     discardResult                   $
-    bindExplicitTKBndrs_Tv ex_tvs $
+    bindExplicitTKBndrs_Tv unkSkol ex_tvs $
     do { _ <- tcHsContext ex_ctxt
        ; kcConH98Args new_or_data tc_res_kind args
          -- We don't need to check the telescope here,
@@ -1680,7 +1681,7 @@ kcConDecl new_or_data
   = -- See Note [kcConDecls: kind-checking data type decls]
     addErrCtxt (dataConCtxt names) $
     discardResult                      $
-    bindOuterSigTKBndrs_Tv outer_bndrs $
+    bindOuterSigTKBndrs_Tv unkSkol outer_bndrs $
         -- Why "_Tv"?  See Note [Using TyVarTvs for kind-checking GADTs]
     do { _ <- tcHsContext cxt
        ; traceTc "kcConDecl:GADT {" (ppr names $$ ppr res_ty)
@@ -2415,14 +2416,14 @@ tcTyClDecl1 _parent roles_info
 *                                                                      *
 ********************************************************************* -}
 
-tcClassDecl1 :: RolesInfo -> Name -> Maybe (LHsContext GhcRn)
+tcClassDecl1 :: HasCallStack => RolesInfo -> Name -> Maybe (LHsContext GhcRn)
              -> LHsBinds GhcRn -> [LHsFunDep GhcRn] -> [LSig GhcRn]
              -> [LFamilyDecl GhcRn] -> [LTyFamDefltDecl GhcRn]
              -> TcM Class
 tcClassDecl1 roles_info class_name hs_ctxt meths fundeps sigs ats at_defs
   = fixM $ \ clas ->
     -- We need the knot because 'clas' is passed into tcClassATs
-    bindTyClTyVars class_name $ \ _ binders res_kind ->
+    bindTyClTyVars skol_info class_name $ \ _ binders res_kind ->
     do { checkClassKindSig res_kind
        ; traceTc "tcClassDecl 1" (ppr class_name $$ ppr binders)
        ; let tycon_name = class_name        -- We use the same name
@@ -2484,7 +2485,7 @@ tcClassDecl1 roles_info class_name hs_ctxt meths fundeps sigs ats at_defs
                                 ppr fds)
        ; return clas }
   where
-    skol_info = TyConSkol ClassFlavour class_name
+    skol_info = TyConSkol callStack ClassFlavour class_name
     tc_fundep :: GHC.Hs.FunDep GhcRn -> TcM ([Var],[Var])
     tc_fundep (FunDep _ tvs1 tvs2)
                            = do { tvs1' <- mapM (tcLookupTyVar . unLoc) tvs1 ;
@@ -2708,7 +2709,7 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info
                               , fdResultSig = L _ sig
                               , fdInjectivityAnn = inj })
   | DataFamily <- fam_info
-  = bindTyClTyVars tc_name $ \ _ binders res_kind -> do
+  = bindTyClTyVars unkSkol tc_name $ \ _ binders res_kind -> do
   { traceTc "tcFamDecl1 data family:" (ppr tc_name)
   ; checkFamFlag tc_name
 
@@ -2734,7 +2735,7 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info
   ; return tycon }
 
   | OpenTypeFamily <- fam_info
-  = bindTyClTyVars tc_name $ \ _ binders res_kind -> do
+  = bindTyClTyVars unkSkol tc_name $ \ _ binders res_kind -> do
   { traceTc "tcFamDecl1 open type family:" (ppr tc_name)
   ; checkFamFlag tc_name
   ; inj' <- tcInjectivity binders inj
@@ -2751,7 +2752,7 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info
          -- the variables in the header scope only over the injectivity
          -- declaration but this is not involved here
        ; (inj', binders, res_kind)
-            <- bindTyClTyVars tc_name $ \ _ binders res_kind ->
+            <- bindTyClTyVars unkSkol tc_name $ \ _ binders res_kind ->
                do { inj' <- tcInjectivity binders inj
                   ; return (inj', binders, res_kind) }
 
@@ -2849,7 +2850,7 @@ tcInjectivity tcbs (Just (L loc (InjectivityAnn _ _ lInjNames)))
 tcTySynRhs :: RolesInfo -> Name
            -> LHsType GhcRn -> TcM TyCon
 tcTySynRhs roles_info tc_name hs_ty
-  = bindTyClTyVars tc_name $ \ _ binders res_kind ->
+  = bindTyClTyVars skol_info tc_name $ \ _ binders res_kind ->
     do { env <- getLclEnv
        ; traceTc "tc-syn" (ppr tc_name $$ ppr (tcl_env env))
        ; rhs_ty <- pushLevelAndSolveEqualities skol_info (binderVars binders) $
@@ -2871,7 +2872,7 @@ tcTySynRhs roles_info tc_name hs_ty
        ; let roles = roles_info tc_name
        ; return (buildSynTyCon tc_name binders res_kind roles rhs_ty) }
   where
-    skol_info = TyConSkol TypeSynonymFlavour tc_name
+    skol_info = TyConSkol callStack TypeSynonymFlavour tc_name
 
 tcDataDefn :: SDoc -> RolesInfo -> Name
            -> HsDataDefn GhcRn -> TcM (TyCon, [DerivInfo])
@@ -2883,7 +2884,7 @@ tcDataDefn err_ctxt roles_info tc_name
                                                -- via inferInitialKinds
                        , dd_cons = cons
                        , dd_derivs = derivs })
-  = bindTyClTyVars tc_name $ \ tctc tycon_binders res_kind ->
+  = bindTyClTyVars skol_info tc_name $ \ tctc tycon_binders res_kind ->
        -- 'tctc' is a 'TcTyCon' and has the 'tcTyConScopedTyVars' that we need
        -- unlike the finalized 'tycon' defined above which is an 'AlgTyCon'
        --
@@ -2949,7 +2950,7 @@ tcDataDefn err_ctxt roles_info tc_name
        ; traceTc "tcDataDefn" (ppr tc_name $$ ppr tycon_binders $$ ppr extra_bndrs)
        ; return (tycon, [deriv_info]) }
   where
-    skol_info = TyConSkol flav tc_name
+    skol_info = TyConSkol callStack flav tc_name
     flav = newOrDataToFlavour new_or_data
 
     -- Abstract data types in hsig files can have arbitrary kinds,
@@ -2997,7 +2998,7 @@ kcTyFamInstEqn tc_fam_tc
        ; checkTyFamInstEqn tc_fam_tc eqn_tc_name hs_pats
 
        ; discardResult $
-         bindOuterFamEqnTKBndrs_Q_Tv outer_bndrs $
+         bindOuterFamEqnTKBndrs_Q_Tv unkSkol outer_bndrs $
          do { (_fam_app, res_kind) <- tcFamTyPats tc_fam_tc hs_pats
             ; tcCheckLHsType hs_rhs_ty (TheKind res_kind) }
              -- Why "_Tv" here?  Consider (#14066)
@@ -3132,7 +3133,7 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
        -- in GHC.Tc.Gen.HsType.kcCheckDeclHeader_cusk
        ; (tclvl, wanted, (outer_tvs, (lhs_ty, rhs_ty)))
                <- pushLevelAndSolveEqualitiesX "tcTyFamInstEqnGuts" $
-                  bindOuterFamEqnTKBndrs outer_hs_bndrs             $
+                  bindOuterFamEqnTKBndrs FamInstSkol outer_hs_bndrs             $
                   do { (lhs_ty, rhs_kind) <- tcFamTyPats fam_tc hs_pats
                        -- Ensure that the instance is consistent with its
                        -- parent class (#16008)
@@ -3148,7 +3149,7 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
 
        -- See Note [Generalising in tcTyFamInstEqnGuts]
        ; dvs  <- candidateQTyVarsOfTypes (lhs_ty : mkTyVarTys outer_tvs)
-       ; qtvs <- quantifyTyVars TryNotToDefaultNonStandardTyVars dvs
+       ; qtvs <- quantifyTyVars unkSkol TryNotToDefaultNonStandardTyVars dvs
        ; reportUnsolvedEqualities FamInstSkol qtvs tclvl wanted
        ; checkFamTelescope tclvl outer_hs_bndrs outer_tvs
 
@@ -3398,7 +3399,7 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs res_kind tag_map
 
        ; (tclvl, wanted, (exp_tvbndrs, (ctxt, arg_tys, field_lbls, stricts)))
            <- pushLevelAndSolveEqualitiesX "tcConDecl:H98"  $
-              tcExplicitTKBndrs explicit_tkv_nms            $
+              tcExplicitTKBndrs unkSkol explicit_tkv_nms            $
               do { ctxt <- tcHsContext hs_ctxt
                  ; let exp_kind = getArgExpKind new_or_data res_kind
                  ; btys <- tcConH98Args exp_kind hs_args
@@ -3425,7 +3426,7 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs res_kind tag_map
          -- the kvs below are those kind variables entirely unmentioned by the user
          --   and discovered only by generalization
 
-       ; kvs <- kindGeneralizeAll fake_ty
+       ; kvs <- kindGeneralizeAll unkSkol fake_ty
 
        ; let skol_tvs = tc_tvs ++ kvs ++ binderVars exp_tvbndrs
        ; reportUnsolvedEqualities skol_info skol_tvs tclvl wanted
@@ -3513,7 +3514,7 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
 
        ; outer_tv_bndrs <- scopedSortOuter outer_bndrs
 
-       ; tkvs <- kindGeneralizeAll (mkInvisForAllTys outer_tv_bndrs $
+       ; tkvs <- kindGeneralizeAll skol_info (mkInvisForAllTys outer_tv_bndrs $
                                     mkPhiTy ctxt $
                                     mkVisFunTys arg_tys $
                                     res_ty)

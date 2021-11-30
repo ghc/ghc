@@ -72,6 +72,7 @@ import GHC.Utils.Misc
 
 import Control.Monad
 import Data.List ( mapAccumL, partition )
+import GHC.Stack
 
 {-
 Dictionary handling
@@ -215,7 +216,7 @@ tcClassDecl2 class_scoped_tv_env
         ; let (tyvars, _, _, op_items) = classBigSig clas
               prag_fn = mkPragEnv sigs default_binds
               sig_fn  = mkHsSigFun sigs
-              (skol_subst, clas_tyvars) = tcSuperSkolTyVars tyvars
+              (skol_subst, clas_tyvars) = tcSuperSkolTyVars unkSkol tyvars
               pred = mkClassPred clas (mkTyVarTys clas_tyvars)
               scoped_tyvars =
                 case lookupNameEnv class_scoped_tv_env (unLoc class_name) of
@@ -335,7 +336,7 @@ tcDefMeth clas tyvars this_dict binds_in hs_sig_fn prag_fn
 
   | otherwise = pprPanic "tcDefMeth" (ppr sel_id)
   where
-    skol_info = TyConSkol ClassFlavour (getName clas)
+    skol_info = TyConSkol callStack ClassFlavour (getName clas)
     sel_name = idName sel_id
     no_prag_fn = emptyPragEnv   -- No pragmas for local_meth_id;
                                 -- they are all for meth_id

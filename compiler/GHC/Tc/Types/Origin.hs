@@ -13,7 +13,7 @@ module GHC.Tc.Types.Origin (
   redundantConstraintsSpan,
 
   -- SkolemInfo
-  SkolemInfo(..), pprSigSkolInfo, pprSkolInfo,
+  SkolemInfo(..), pprSigSkolInfo, pprSkolInfo, unkSkol,
 
   -- CtOrigin
   CtOrigin(..), exprCtOrigin, lexprCtOrigin, matchesCtOrigin, grhssCtOrigin,
@@ -59,6 +59,7 @@ import GHC.Data.FastString
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Trace
+import GHC.Stack
 
 {- *********************************************************************
 *                                                                      *
@@ -120,6 +121,7 @@ data UserTypeCtxt
   | DataKindCtxt Name   -- The kind of a data/newtype (instance)
   | TySynKindCtxt Name  -- The kind of the RHS of a type synonym
   | TyFamResKindCtxt Name   -- The result kind of a type family
+  deriving (Eq)
 
 -- | Report Redundant Constraints.
 data ReportRedundantConstraints
@@ -128,6 +130,7 @@ data ReportRedundantConstraints
                      -- is the SrcSpan for the constraints
                      -- E.g. f :: (Eq a, Ord b) => blah
                      -- The span is for the (Eq a, Ord b)
+  deriving (Eq)
 
 reportRedundantConstraints :: ReportRedundantConstraints -> Bool
 reportRedundantConstraints NoRRC        = False
@@ -243,7 +246,7 @@ data SkolemInfo
   | UnifyForAllSkol     -- We are unifying two for-all types
        TcType           -- The instantiated type *inside* the forall
 
-  | TyConSkol TyConFlavour Name  -- bound in a type declaration of the given flavour
+  | TyConSkol CallStack TyConFlavour Name  -- bound in a type declaration of the given flavour
 
   | DataConSkol Name    -- bound as an existential in a Haskell98 datacon decl or
                         -- as any variable in a GADT datacon decl
@@ -255,7 +258,18 @@ data SkolemInfo
 
   | RuntimeUnkSkol      -- Runtime skolem from the GHCi debugger      #14628
 
-  | UnkSkol             -- Unhelpful info (until I improve it)
+  | UnkSkol CallStack            -- Unhelpful info (until I improve it)
+
+
+
+instance Eq SkolemInfo where
+  (SigSkol uc t _) == (SigSkol uc' t' _) = uc == uc' && t `eqType` t'
+  (SigTypeSkol uc) == (SigTypeSkol uc')  = uc == uc'
+  (ForAllSkol {})  == ForAllSkol {}      = True
+
+
+unkSkol :: HasCallStack => SkolemInfo
+unkSkol = UnkSkol callStack
 
 instance Outputable SkolemInfo where
   ppr = pprSkolInfo
@@ -278,17 +292,17 @@ pprSkolInfo (InferSkol ids)   = hang (text "the inferred type" <> plural ids <+>
                                    2 (vcat [ ppr name <+> dcolon <+> ppr ty
                                            | (name,ty) <- ids ])
 pprSkolInfo (UnifyForAllSkol ty) = text "the type" <+> ppr ty
-pprSkolInfo (TyConSkol flav name) = text "the" <+> ppr flav <+> text "declaration for" <+> quotes (ppr name)
+pprSkolInfo (TyConSkol cs flav name) = text "the" <+> ppr flav <+> text "declaration for" <+> quotes (ppr name) $$ prettyCallStackDoc cs
 pprSkolInfo (DataConSkol name)= text "the data constructor" <+> quotes (ppr name)
 pprSkolInfo ReifySkol         = text "the type being reified"
 
 pprSkolInfo (QuantCtxtSkol {}) = text "a quantified context"
 pprSkolInfo RuntimeUnkSkol     = text "Unknown type from GHCi runtime"
 
--- UnkSkol
+-- unkSkol
 -- For type variables the others are dealt with by pprSkolTvBinding.
 -- For Insts, these cases should not happen
-pprSkolInfo UnkSkol = warnPprTrace True (text "pprSkolInfo: UnkSkol") $ text "UnkSkol"
+pprSkolInfo (UnkSkol cs) = warnPprTrace True (text "pprSkolInfo: unkSkol") $ text "UnkSkol" $$ prettyCallStackDoc cs
 
 pprSigSkolInfo :: UserTypeCtxt -> TcType -> SDoc
 -- The type is already tidied

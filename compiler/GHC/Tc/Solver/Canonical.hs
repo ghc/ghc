@@ -874,7 +874,7 @@ solveForAll ev tvs theta pred pend_sc
     do { let skol_info = QuantCtxtSkol
              empty_subst = mkEmptyTCvSubst $ mkInScopeSet $
                            tyCoVarsOfTypes (pred:theta) `delVarSetList` tvs
-       ; (subst, skol_tvs) <- tcInstSkolTyVarsX empty_subst tvs
+       ; (subst, skol_tvs) <- tcInstSkolTyVarsX skol_info empty_subst tvs
        ; given_ev_vars <- mapM newEvVar (substTheta subst theta)
 
        ; (lvl, (w_id, wanteds))
@@ -1348,11 +1348,11 @@ can_eq_nc_forall ev eq_rel s1 s2
         else
    do { traceTcS "Creating implication for polytype equality" $ ppr ev
       ; let empty_subst1 = mkEmptyTCvSubst $ mkInScopeSet free_tvs
-      ; (subst1, skol_tvs) <- tcInstSkolTyVarsX empty_subst1 $
+      ; let skol_info = UnifyForAllSkol phi1
+      ; (subst1, skol_tvs) <- tcInstSkolTyVarsX skol_info empty_subst1 $
                               binderVars bndrs1
 
-      ; let skol_info = UnifyForAllSkol phi1
-            phi1' = substTy subst1 phi1
+      ; let phi1' = substTy subst1 phi1
 
             -- Unify the kinds, extend the substitution
             go :: [TcTyVar] -> TCvSubst -> [TyVarBinder]

@@ -225,7 +225,8 @@ report_unsolved type_errors expr_holes
        ; traceTc "reportUnsolved (before zonking and tidying)" (ppr wanted)
 
        ; wanted <- zonkWC wanted   -- Zonk to reveal all information
-       ; let tidy_env = tidyFreeTyCoVars emptyTidyEnv free_tvs
+
+       ; let
              free_tvs = filterOut isCoVar $
                         tyCoVarsOfWCList wanted
                         -- tyCoVarsOfWC returns free coercion *holes*, even though
@@ -234,8 +235,12 @@ report_unsolved type_errors expr_holes
                         -- no sense. Really we should not return those holes at all;
                         -- for now we just filter them out.
 
+       ; free_tvs' <- mapM zonkTyVarSkolemInfo free_tvs
+
+       ; let tidy_env = tidyFreeTyCoVars emptyTidyEnv free_tvs';
+
        ; traceTc "reportUnsolved (after zonking):" $
-         vcat [ text "Free tyvars:" <+> pprTyVars free_tvs
+         vcat [ text "Free tyvars:" <+> pprTyVars free_tvs'
               , text "Tidy env:" <+> ppr tidy_env
               , text "Wanted:" <+> ppr wanted ]
 
@@ -1909,7 +1914,7 @@ addition to superclasses (see Note [Remove redundant provided dicts]
 in GHC.Tc.TyCl.PatSyn).
 -}
 
-extraTyVarEqInfo :: ReportErrCtxt -> TcTyVar -> TcType -> Report
+extraTyVarEqInfo :: HasCallStack => ReportErrCtxt -> TcTyVar -> TcType -> Report
 -- Add on extra info about skolem constants
 -- NB: The types themselves are already tidied
 extraTyVarEqInfo ctxt tv1 ty2
@@ -1919,7 +1924,7 @@ extraTyVarEqInfo ctxt tv1 ty2
                     Just (tv, _) -> extraTyVarInfo ctxt tv
                     Nothing      -> empty
 
-extraTyVarInfo :: ReportErrCtxt -> TcTyVar -> SDoc
+extraTyVarInfo :: HasCallStack => ReportErrCtxt -> TcTyVar -> SDoc
 extraTyVarInfo ctxt tv
   = assertPpr (isTyVar tv) (ppr tv) $
     case tcTyVarDetails tv of
@@ -3147,14 +3152,15 @@ mkAmbigMsg prepend_msg ct
       = text "The" <+> what <+> text "variable" <> plural tkvs
         <+> pprQuotedList tkvs <+> isOrAre tkvs <+> text "ambiguous"
 
-pprSkols :: ReportErrCtxt -> [TcTyVar] -> SDoc
+pprSkols :: HasCallStack => ReportErrCtxt -> [TcTyVar] -> SDoc
 pprSkols ctxt tvs
   = vcat (map pp_one (getSkolemInfo (cec_encl ctxt) tvs))
   where
-    pp_one (UnkSkol, tvs)
+    pp_one (UnkSkol cs, tvs)
       = vcat [ hang (pprQuotedList tvs)
                  2 (is_or_are tvs "a" "(rigid, skolem)")
              , nest 2 (text "of unknown origin")
+             , prettyCallStackDoc cs
              , nest 2 (text "bound at" <+> ppr (foldr1 combineSrcSpans (map getSrcSpan tvs)))
              ]
     pp_one (RuntimeUnkSkol, tvs)
@@ -3187,7 +3193,9 @@ getSkolemInfo :: [Implication] -> [TcTyVar]
 -- In the returned (skolem, tvs) pairs, the 'tvs' part is non-empty
 getSkolemInfo _ []
   = []
-
+getSkolemInfo _ tvs =
+  map (\tv -> (skolemSkolInfo tv, [tv])) tvs
+  {-
 getSkolemInfo [] tvs
   | all isRuntimeUnkSkol tvs = [(RuntimeUnkSkol, tvs)]        -- #14628
   | otherwise = -- See https://gitlab.haskell.org/ghc/ghc/-/issues?label_name[]=No%20skolem%20info
@@ -3196,7 +3204,7 @@ getSkolemInfo [] tvs
     msg = text "No skolem info - we could not find the origin of the following variables" <+> ppr tvs
        $$ text "This should not happen, please report it as a bug following the instructions at:"
        $$ text "https://gitlab.haskell.org/ghc/ghc/wikis/report-a-bug"
-
+       -}
 
 getSkolemInfo (implic:implics) tvs
   | null tvs_here =                            getSkolemInfo implics tvs

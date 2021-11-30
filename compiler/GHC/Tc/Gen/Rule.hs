@@ -119,10 +119,10 @@ tcRule (HsRule { rd_ext  = ext
                , rd_rhs  = rhs })
   = addErrCtxt (ruleCtxt name)  $
     do { traceTc "---- Rule ------" (pprFullRuleName rname)
-
+       ; let skol_info  = RuleSkol name
         -- Note [Typechecking rules]
        ; (tc_lvl, stuff) <- pushTcLevelM $
-                            generateRuleConstraints ty_bndrs tm_bndrs lhs rhs
+                            generateRuleConstraints skol_info ty_bndrs tm_bndrs lhs rhs
 
        ; let (id_bndrs, lhs', lhs_wanted
                       , rhs', rhs_wanted, rule_ty) = stuff
@@ -151,7 +151,7 @@ tcRule (HsRule { rd_ext  = ext
 
        -- See Note [Re-quantify type variables in rules]
        ; forall_tkvs <- candidateQTyVarsOfTypes (rule_ty : map idType tpl_ids)
-       ; qtkvs <- quantifyTyVars DefaultNonStandardTyVars forall_tkvs
+       ; qtkvs <- quantifyTyVars skol_info DefaultNonStandardTyVars forall_tkvs
        ; traceTc "tcRule" (vcat [ pprFullRuleName rname
                                 , ppr forall_tkvs
                                 , ppr qtkvs
@@ -164,7 +164,6 @@ tcRule (HsRule { rd_ext  = ext
        -- For the LHS constraints we must solve the remaining constraints
        -- (a) so that we report insoluble ones
        -- (b) so that we bind any soluble ones
-       ; let skol_info = RuleSkol name
        ; (lhs_implic, lhs_binds) <- buildImplicationFor tc_lvl skol_info qtkvs
                                          lhs_evs residual_lhs_wanted
        ; (rhs_implic, rhs_binds) <- buildImplicationFor tc_lvl skol_info qtkvs
@@ -180,15 +179,16 @@ tcRule (HsRule { rd_ext  = ext
                          , rd_lhs  = mkHsDictLet lhs_binds lhs'
                          , rd_rhs  = mkHsDictLet rhs_binds rhs' } }
 
-generateRuleConstraints :: Maybe [LHsTyVarBndr () GhcRn] -> [LRuleBndr GhcRn]
+generateRuleConstraints :: SkolemInfo
+                        -> Maybe [LHsTyVarBndr () GhcRn] -> [LRuleBndr GhcRn]
                         -> LHsExpr GhcRn -> LHsExpr GhcRn
                         -> TcM ( [TcId]
                                , LHsExpr GhcTc, WantedConstraints
                                , LHsExpr GhcTc, WantedConstraints
                                , TcType )
-generateRuleConstraints ty_bndrs tm_bndrs lhs rhs
+generateRuleConstraints skol_info ty_bndrs tm_bndrs lhs rhs
   = do { ((tv_bndrs, id_bndrs), bndr_wanted) <- captureConstraints $
-                                                tcRuleBndrs ty_bndrs tm_bndrs
+                                                tcRuleBndrs skol_info ty_bndrs tm_bndrs
               -- bndr_wanted constraints can include wildcard hole
               -- constraints, which we should not forget about.
               -- It may mention the skolem type variables bound by
@@ -204,15 +204,15 @@ generateRuleConstraints ty_bndrs tm_bndrs lhs rhs
        ; return (id_bndrs, lhs', all_lhs_wanted, rhs', rhs_wanted, rule_ty) } }
 
 -- See Note [TcLevel in type checking rules]
-tcRuleBndrs :: Maybe [LHsTyVarBndr () GhcRn] -> [LRuleBndr GhcRn]
+tcRuleBndrs :: SkolemInfo -> Maybe [LHsTyVarBndr () GhcRn] -> [LRuleBndr GhcRn]
             -> TcM ([TcTyVar], [Id])
-tcRuleBndrs (Just bndrs) xs
-  = do { (tybndrs1,(tys2,tms)) <- bindExplicitTKBndrs_Skol bndrs $
+tcRuleBndrs skol_info (Just bndrs) xs
+  = do { (tybndrs1,(tys2,tms)) <- bindExplicitTKBndrs_Skol skol_info bndrs $
                                   tcRuleTmBndrs xs
        ; let tys1 = binderVars tybndrs1
        ; return (tys1 ++ tys2, tms) }
 
-tcRuleBndrs Nothing xs
+tcRuleBndrs _ Nothing xs
   = tcRuleTmBndrs xs
 
 -- See Note [TcLevel in type checking rules]

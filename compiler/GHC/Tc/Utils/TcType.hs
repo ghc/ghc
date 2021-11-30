@@ -38,8 +38,9 @@ module GHC.Tc.Utils.TcType (
   promoteSkolem, promoteSkolemX, promoteSkolemsX,
   --------------------------------
   -- MetaDetails
-  TcTyVarDetails(..), pprTcTyVarDetails, vanillaSkolemTv, superSkolemTv,
-  MetaDetails(Flexi, Indirect), MetaInfo(..),
+  TcTyVarDetails(..), pprTcTyVarDetails, vanillaSkolemTv, vanillaSkolemTvUnk, superSkolemTv,
+  updateSkolInfo, updateSkolInfoM,
+  MetaDetails(Flexi, Indirect), MetaInfo(..), skolemSkolInfo,
   isImmutableTyVar, isSkolemTyVar, isMetaTyVar,  isMetaTyVarTy, isTyVarTy,
   tcIsTcTyVar, isTyVarTyVar, isOverlappableTyVar,  isTyConableTyVar,
   isAmbiguousTyVar, isCycleBreakerTyVar, metaTyVarRef, metaTyVarInfo,
@@ -234,6 +235,9 @@ import Data.List  ( mapAccumL )
 -- import Data.Functor.Identity( Identity(..) )
 import Data.IORef
 import Data.List.NonEmpty( NonEmpty(..) )
+import {-# SOURCE #-} GHC.Tc.Types.Origin
+import Data.Functor.Identity
+
 
 {-
 ************************************************************************
@@ -480,6 +484,7 @@ we would need to enforce the separation.
 -- See Note [TyVars and TcTyVars]
 data TcTyVarDetails
   = SkolemTv      -- A skolem
+       SkolemInfo
        TcLevel    -- Level of the implication that binds it
                   -- See GHC.Tc.Utils.Unify Note [Deeper level on the left] for
                   --     how this level number is used
@@ -494,12 +499,22 @@ data TcTyVarDetails
            , mtv_ref   :: IORef MetaDetails
            , mtv_tclvl :: TcLevel }  -- See Note [TcLevel invariants]
 
-vanillaSkolemTv, superSkolemTv :: TcTyVarDetails
+vanillaSkolemTv, superSkolemTv :: SkolemInfo -> TcTyVarDetails
 -- See Note [Binding when looking up instances] in GHC.Core.InstEnv
-vanillaSkolemTv = SkolemTv topTcLevel False  -- Might be instantiated
-superSkolemTv   = SkolemTv topTcLevel True   -- Treat this as a completely distinct type
+vanillaSkolemTv sk = SkolemTv sk topTcLevel False  -- Might be instantiated
+superSkolemTv   sk = SkolemTv sk topTcLevel True   -- Treat this as a completely distinct type
                   -- The choice of level number here is a bit dodgy, but
                   -- topTcLevel works in the places that vanillaSkolemTv is used
+
+vanillaSkolemTvUnk :: HasCallStack => TcTyVarDetails
+vanillaSkolemTvUnk = vanillaSkolemTv unkSkol
+
+updateSkolInfo :: (SkolemInfo -> SkolemInfo) -> TcTyVarDetails  -> TcTyVarDetails
+updateSkolInfo f d = runIdentity (updateSkolInfoM (Identity . f) d)
+
+updateSkolInfoM :: Applicative m => (SkolemInfo -> m SkolemInfo) -> TcTyVarDetails -> m TcTyVarDetails
+updateSkolInfoM f (SkolemTv v a b) = (\v' -> SkolemTv v' a b) <$> f v
+updateSkolInfoM _ td = pure td
 
 instance Outputable TcTyVarDetails where
   ppr = pprTcTyVarDetails
@@ -507,8 +522,8 @@ instance Outputable TcTyVarDetails where
 pprTcTyVarDetails :: TcTyVarDetails -> SDoc
 -- For debugging
 pprTcTyVarDetails (RuntimeUnk {})      = text "rt"
-pprTcTyVarDetails (SkolemTv lvl True)  = text "ssk" <> colon <> ppr lvl
-pprTcTyVarDetails (SkolemTv lvl False) = text "sk"  <> colon <> ppr lvl
+pprTcTyVarDetails (SkolemTv _sk lvl True)  = text "ssk" <> colon <> ppr lvl
+pprTcTyVarDetails (SkolemTv _sk lvl False) = text "sk"  <> colon <> ppr lvl
 pprTcTyVarDetails (MetaTv { mtv_info = info, mtv_tclvl = tclvl })
   = ppr info <> colon <> ppr tclvl
 
@@ -678,7 +693,7 @@ tcTyVarLevel :: TcTyVar -> TcLevel
 tcTyVarLevel tv
   = case tcTyVarDetails tv of
           MetaTv { mtv_tclvl = tv_lvl } -> tv_lvl
-          SkolemTv tv_lvl _             -> tv_lvl
+          SkolemTv _ tv_lvl _             -> tv_lvl
           RuntimeUnk                    -> topTcLevel
 
 
@@ -700,7 +715,7 @@ promoteSkolem :: TcLevel -> TcTyVar -> TcTyVar
 promoteSkolem tclvl skol
   | tclvl < tcTyVarLevel skol
   = assert (isTcTyVar skol && isSkolemTyVar skol )
-    setTcTyVarDetails skol (SkolemTv tclvl (isOverlappableTyVar skol))
+    setTcTyVarDetails skol (SkolemTv (skolemSkolInfo skol) tclvl (isOverlappableTyVar skol))
 
   | otherwise
   = skol
@@ -714,7 +729,7 @@ promoteSkolemX tclvl subst skol
     new_skol
       | tclvl < tcTyVarLevel skol
       = setTcTyVarDetails (updateTyVarKind (substTy subst) skol)
-                          (SkolemTv tclvl (isOverlappableTyVar skol))
+                          (SkolemTv (skolemSkolInfo skol) tclvl (isOverlappableTyVar skol))
       | otherwise
       = updateTyVarKind (substTy subst) skol
     new_subst = extendTvSubstWithClone subst skol new_skol
@@ -1034,10 +1049,19 @@ isSkolemTyVar tv
         MetaTv {} -> False
         _other    -> True
 
+skolemSkolInfo :: TcTyVar -> SkolemInfo
+skolemSkolInfo tv
+  = assert (isSkolemTyVar tv) $
+    case tcTyVarDetails tv of
+      SkolemTv skol_info _ _ -> skol_info
+      RuntimeUnk -> panic "RuntimeUnk"
+      MetaTv {} -> panic "skolemSkolInfo"
+
+
 isOverlappableTyVar tv
   | isTyVar tv -- See Note [Coercion variables in free variable lists]
   = case tcTyVarDetails tv of
-        SkolemTv _ overlappable -> overlappable
+        SkolemTv _ _ overlappable -> overlappable
         _                       -> False
   | otherwise = False
 

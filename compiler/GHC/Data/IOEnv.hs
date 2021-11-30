@@ -61,7 +61,8 @@ import Control.Concurrent (forkIO, killThread)
 
 
 newtype IOEnv env a = IOEnv' (env -> IO a)
-  deriving (MonadThrow, MonadCatch, MonadMask) via (ReaderT env IO)
+  deriving (MonadThrow, MonadCatch, MonadMask, MonadFix) via (ReaderT env IO)
+
 
 -- See Note [The one-shot state monad trick] in GHC.Utils.Monad
 instance Functor (IOEnv env) where

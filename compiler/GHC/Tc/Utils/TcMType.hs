@@ -3,6 +3,7 @@
 {-# LANGUAGE TupleSections   #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+{-# LANGUAGE LambdaCase #-}
 {-
 (c) The University of Glasgow 2006
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
@@ -77,7 +78,7 @@ module GHC.Tc.Utils.TcMType (
   zonkTyCoVarKind, zonkTyCoVarKindBinder,
   zonkEvVar, zonkWC, zonkImplication, zonkSimples,
   zonkId, zonkCoVar,
-  zonkCt, zonkSkolemInfo,
+  zonkCt, zonkSkolemInfo, zonkTyVarSkolemInfo,
 
   ---------------------------------
   -- Promotion, defaulting, skolemisation
@@ -146,6 +147,7 @@ import GHC.Utils.Trace
 import Control.Monad
 import GHC.Data.Maybe
 import qualified Data.Semigroup as Semi
+import GHC.Tc.Utils.TcType
 
 {-
 ************************************************************************
@@ -839,10 +841,10 @@ newNamedAnonMetaTyVar tyvar_name meta_info kind
         ; return tyvar }
 
 -- makes a new skolem tv
-newSkolemTyVar :: Name -> Kind -> TcM TcTyVar
-newSkolemTyVar name kind
+newSkolemTyVar :: SkolemInfo -> Name -> Kind -> TcM TcTyVar
+newSkolemTyVar skol_info name kind
   = do { lvl <- getTcLevel
-       ; return (mkTcTyVar name kind (SkolemTv lvl False)) }
+       ; return (mkTcTyVar name kind (SkolemTv skol_info lvl False)) }
 
 newTyVarTyVar :: Name -> Kind -> TcM TcTyVar
 -- See Note [TyVarTv]
@@ -1692,7 +1694,8 @@ For more information about deterministic sets see
 Note [Deterministic UniqFM] in GHC.Types.Unique.DFM.
 -}
 
-quantifyTyVars :: NonStandardDefaultingStrategy
+quantifyTyVars :: SkolemInfo
+               -> NonStandardDefaultingStrategy
                -> CandidatesQTvs   -- See Note [Dependent type variables]
                                    -- Already zonked
                -> TcM [TcTyVar]
@@ -1703,7 +1706,7 @@ quantifyTyVars :: NonStandardDefaultingStrategy
 -- invariants on CandidateQTvs, we do not have to filter out variables
 -- free in the environment here. Just quantify unconditionally, subject
 -- to the restrictions in Note [quantifyTyVars].
-quantifyTyVars ns_strat dvs
+quantifyTyVars skol_info ns_strat dvs
        -- short-circuit common case
   | isEmptyCandidates dvs
   = do { traceTc "quantifyTyVars has nothing to quantify" empty
@@ -1740,7 +1743,7 @@ quantifyTyVars ns_strat dvs
                            -- kind signature, we have the class variables in
                            -- scope, and they are TyVars not TcTyVars
       | otherwise
-      = Just <$> skolemiseQuantifiedTyVar tkv
+      = Just <$> skolemiseQuantifiedTyVar skol_info tkv
 
 isQuantifiableTv :: TcLevel   -- Level of the context, outside the quantification
                  -> TcTyVar
@@ -1763,13 +1766,13 @@ zonkAndSkolemise tyvar
      -- This is important for error messages. If we don't do this, then
      -- we get bad locations in, e.g., typecheck/should_fail/T2688
   = do { zonked_tyvar <- zonkTcTyVarToTyVar tyvar
-       ; skolemiseQuantifiedTyVar zonked_tyvar }
+       ; skolemiseQuantifiedTyVar unkSkol zonked_tyvar }
 
   | otherwise
   = assertPpr (isImmutableTyVar tyvar || isCoVar tyvar) (pprTyVar tyvar) $
     zonkTyCoVarKind tyvar
 
-skolemiseQuantifiedTyVar :: TcTyVar -> TcM TcTyVar
+skolemiseQuantifiedTyVar :: SkolemInfo -> TcTyVar -> TcM TcTyVar
 -- The quantified type variables often include meta type variables
 -- we want to freeze them into ordinary type variables
 -- The meta tyvar is updated to point to the new skolem TyVar.  Now any
@@ -1781,14 +1784,14 @@ skolemiseQuantifiedTyVar :: TcTyVar -> TcM TcTyVar
 -- This function is called on both kind and type variables,
 -- but kind variables *only* if PolyKinds is on.
 
-skolemiseQuantifiedTyVar tv
+skolemiseQuantifiedTyVar skol_info tv
   = case tcTyVarDetails tv of
       SkolemTv {} -> do { kind <- zonkTcType (tyVarKind tv)
                         ; return (setTyVarKind tv kind) }
         -- It might be a skolem type variable,
         -- for example from a user type signature
 
-      MetaTv {} -> skolemiseUnboundMetaTyVar tv
+      MetaTv {} -> skolemiseUnboundMetaTyVar skol_info tv
 
       _other -> pprPanic "skolemiseQuantifiedTyVar" (ppr tv) -- RuntimeUnk
 
@@ -1900,12 +1903,12 @@ defaultTyVars ns_strat dvs
   where
     (dep_kvs, nondep_tvs) = candidateVars dvs
 
-skolemiseUnboundMetaTyVar :: TcTyVar -> TcM TyVar
+skolemiseUnboundMetaTyVar :: SkolemInfo -> TcTyVar -> TcM TyVar
 -- We have a Meta tyvar with a ref-cell inside it
 -- Skolemise it, so that we are totally out of Meta-tyvar-land
 -- We create a skolem TcTyVar, not a regular TyVar
 --   See Note [Zonking to Skolem]
-skolemiseUnboundMetaTyVar tv
+skolemiseUnboundMetaTyVar skol_info tv
   = assertPpr (isMetaTyVar tv) (ppr tv) $
     do  { when debugIsOn (check_empty tv)
         ; here <- getSrcSpanM    -- Get the location from "here"
@@ -1925,7 +1928,7 @@ skolemiseUnboundMetaTyVar tv
         ; return final_tv }
 
   where
-    details = SkolemTv (metaTyVarTcLevel tv) False
+    details = SkolemTv skol_info (metaTyVarTcLevel tv) False
     check_empty tv       -- [Sept 04] Check for non-empty.
       = when debugIsOn $  -- See note [Silly Type Synonym]
         do { cts <- readMetaTyVar tv
@@ -2421,6 +2424,13 @@ zonkSkolemInfo (InferSkol ntys) = do { ntys' <- mapM do_one ntys
     do_one (n, ty) = do { ty' <- zonkTcType ty; return (n, ty') }
 zonkSkolemInfo skol_info = return skol_info
 
+zonkTyVarSkolemInfo :: TyVar -> TcM TyVar
+zonkTyVarSkolemInfo =
+  updateTcTyVarDetailsM (\case { SkolemTv sk_info lvl over -> do
+                                      sk_info' <- zonkSkolemInfo sk_info
+                                      return (SkolemTv sk_info' lvl over)
+                                   ; det -> return det })
+
 {-
 %************************************************************************
 %*                                                                      *
@@ -2490,7 +2500,9 @@ zonkTcTyVar tv
   = zonk_kind_and_return
   where
     zonk_kind_and_return = do { z_tv <- zonkTyCoVarKind tv
-                              ; return (mkTyVarTy z_tv) }
+                             -- ; pprTraceM "zonk_kind" (ppr tv $$ ppr z_tv)
+                              ; mkTyVarTy <$> pure z_tv --updateTcTyVarDetailsM (updateSkolInfoM zonkSkolemInfo) z_tv
+                              }
 
 -- Variant that assumes that any result of zonking is still a TyVar.
 -- Should be used only on skolems and TyVarTvs

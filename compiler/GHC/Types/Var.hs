@@ -89,17 +89,17 @@ module GHC.Types.Var (
 
         -- ** Modifying 'TyVar's
         setTyVarName, setTyVarUnique, setTyVarKind, updateTyVarKind,
-        updateTyVarKindM,
+        updateTyVarKindM, updateTcTyVarDetailsM,
 
         nonDetCmpVar
 
-    ) where
+    ,updateTcTyVarSkolemInfo) where
 
 import GHC.Prelude
 
 import {-# SOURCE #-}   GHC.Core.TyCo.Rep( Type, Kind, Mult )
 import {-# SOURCE #-}   GHC.Core.TyCo.Ppr( pprKind )
-import {-# SOURCE #-}   GHC.Tc.Utils.TcType( TcTyVarDetails, pprTcTyVarDetails, vanillaSkolemTv )
+import {-# SOURCE #-}   GHC.Tc.Utils.TcType( TcTyVarDetails, pprTcTyVarDetails, vanillaSkolemTv, vanillaSkolemTvUnk, updateSkolInfo )
 import {-# SOURCE #-}   GHC.Types.Id.Info( IdDetails, IdInfo, coVarDetails, isCoVarDetails,
                                            vanillaIdInfo, pprIdDetails )
 import {-# SOURCE #-}   GHC.Builtin.Types ( manyDataConTy )
@@ -113,6 +113,11 @@ import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 
 import Data.Data
+import GHC.Utils.Trace
+import GHC.IO.Unsafe
+import GHC.Stack.CCS
+import {-# SOURCE #-} GHC.Tc.Types.Origin
+
 
 {-
 ************************************************************************
@@ -749,6 +754,14 @@ updateTyVarKindM update tv
   = do { k' <- update (tyVarKind tv)
        ; return $ tv {varType = k'} }
 
+updateTcTyVarSkolemInfo ::  (SkolemInfo -> SkolemInfo) -> TyVar -> TyVar
+updateTcTyVarSkolemInfo update (TcTyVar a b c details) = TcTyVar a b c (updateSkolInfo update details)
+updateTcTyVarSkolemInfo _ ty_var = ty_var
+
+updateTcTyVarDetailsM :: Monad m => (TcTyVarDetails -> m TcTyVarDetails) -> TyVar -> m TyVar
+updateTcTyVarDetailsM update (TcTyVar a b c details) = TcTyVar a b c <$> update details
+updateTcTyVarDetailsM _ ty_var = return ty_var
+
 mkTyVar :: Name -> Kind -> TyVar
 mkTyVar name kind = TyVar { varName    = name
                           , realUnique = getKey (nameUnique name)
@@ -767,7 +780,7 @@ mkTcTyVar name kind details
 tcTyVarDetails :: TyVar -> TcTyVarDetails
 -- See Note [TcTyVars and TyVars in the typechecker] in GHC.Tc.Utils.TcType
 tcTyVarDetails (TcTyVar { tc_tv_details = details }) = details
-tcTyVarDetails (TyVar {})                            = vanillaSkolemTv
+tcTyVarDetails tv@(TyVar {})                            = vanillaSkolemTvUnk --pprTrace "tyVar" (text $ show (unsafePerformIO $ whereFrom tv)) $ vanillaSkolemTvUnk
 tcTyVarDetails var = pprPanic "tcTyVarDetails" (ppr var <+> dcolon <+> pprKind (tyVarKind var))
 
 setTcTyVarDetails :: TyVar -> TcTyVarDetails -> TyVar

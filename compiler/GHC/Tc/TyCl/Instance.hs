@@ -493,7 +493,7 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = hs_ty, cid_binds = binds
         ; let (tyvars, theta, clas, inst_tys) = tcSplitDFunTy dfun_ty
              -- NB: tcHsClsInstType does checkValidInstance
 
-        ; (subst, skol_tvs) <- tcInstSkolTyVars tyvars
+        ; (subst, skol_tvs) <- tcInstSkolTyVars InstSkol tyvars
         ; let tv_skol_prs = [ (tyVarName tv, skol_tv)
                             | (tv, skol_tv) <- tyvars `zip` skol_tvs ]
               -- Map from the skolemized Names to the original Names.
@@ -876,7 +876,7 @@ tcDataFamInstHeader mb_clsinfo fam_tc outer_bndrs fixity
   = do { traceTc "tcDataFamInstHeader {" (ppr fam_tc <+> ppr hs_pats)
        ; (tclvl, wanted, (scoped_tvs, (stupid_theta, lhs_ty, master_res_kind, instance_res_kind)))
             <- pushLevelAndSolveEqualitiesX "tcDataFamInstHeader" $
-               bindOuterFamEqnTKBndrs outer_bndrs                 $
+               bindOuterFamEqnTKBndrs FamInstSkol outer_bndrs                 $
                do { stupid_theta <- tcHsContext hs_ctxt
                   ; (lhs_ty, lhs_kind) <- tcFamTyPats fam_tc hs_pats
                   ; (lhs_applied_ty, lhs_applied_kind)
@@ -915,7 +915,7 @@ tcDataFamInstHeader mb_clsinfo fam_tc outer_bndrs fixity
 
        -- See GHC.Tc.TyCl Note [Generalising in tcFamTyPatsGuts]
        ; dvs  <- candidateQTyVarsOfTypes (lhs_ty : mkTyVarTys scoped_tvs)
-       ; qtvs <- quantifyTyVars TryNotToDefaultNonStandardTyVars dvs
+       ; qtvs <- quantifyTyVars FamInstSkol TryNotToDefaultNonStandardTyVars dvs
        ; reportUnsolvedEqualities FamInstSkol qtvs tclvl wanted
 
        -- Zonk the patterns etc into the Type world
@@ -962,7 +962,7 @@ tcDataFamInstHeader mb_clsinfo fam_tc outer_bndrs fixity
       = do { sig_kind <- tcLHsKindSig data_ctxt hs_kind
            ; lvl <- getTcLevel
            ; let (tvs, inner_kind) = tcSplitForAllInvisTyVars sig_kind
-           ; (subst, _tvs') <- tcInstSkolTyVarsAt lvl False emptyTCvSubst tvs
+           ; (subst, _tvs') <- tcInstSkolTyVarsAt unkSkol lvl False emptyTCvSubst tvs
              -- Perhaps surprisingly, we don't need the skolemised tvs themselves
            ; return (substTy subst inner_kind) }
 
@@ -1211,7 +1211,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
     setSrcSpan loc                              $
     addErrCtxt (instDeclCtxt2 (idType dfun_id)) $
     do {  -- Instantiate the instance decl with skolem constants
-       ; (inst_tyvars, dfun_theta, inst_head) <- tcSkolDFunType dfun_id
+       ; (inst_tyvars, dfun_theta, inst_head) <- tcSkolDFunType InstSkol dfun_id
        ; dfun_ev_vars <- newEvVars dfun_theta
                      -- We instantiate the dfun_id with superSkolems.
                      -- See Note [Subtle interaction of recursion and overlap]
