@@ -215,7 +215,7 @@ infixl 5 $$, $+$
 data Doc
   = Empty                                            -- empty
   | NilAbove Doc                                     -- text "" $$ x
-  | TextBeside !TextDetails {-# UNPACK #-} !Int Doc  -- text s <> x
+  | TextBeside !TextDetails {-# UNPACK #-} !Int !Doc  -- text s <> x
   | Nest {-# UNPACK #-} !Int Doc                     -- nest k x
   | Union Doc Doc                                    -- ul `union` ur
   | NoDoc                                            -- The empty set of documents
