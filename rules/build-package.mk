@@ -99,7 +99,7 @@ endif
 # Each Haskell compilation in this package will depend on the
 # package-data.mk file because e.g. if the version of the package
 # changes we need to recompile everything in it.
-$1_$2_PKGDATA_DEP = $1/$2/package-data.mk
+$1_$2_PKGDATA_DEP = $$($1_$2_PKGDATA)
 endif
 
 $(call hs-sources,$1,$2)
