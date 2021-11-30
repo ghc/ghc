@@ -121,15 +121,17 @@ $1_$2_CONFIGURE_OPTS += --with-ar="$$(AR_STAGE$3)"
 $1_$2_CONFIGURE_OPTS += $$(if $$(ALEX),--with-alex="$$(ALEX)")
 $1_$2_CONFIGURE_OPTS += $$(if $$(HAPPY),--with-happy="$$(HAPPY)")
 
+$1_$2_PKGDATA = $1/$2/package-data.mk
+
 ifneq "$$(BINDIST)" "YES"
 ifneq "$$(NO_GENERATED_MAKEFILE_RULES)" "YES"
-$1/$2/inplace-pkg-config : $1/$2/package-data.mk
-$1/$2/build/$$(or $$($1_EXECUTABLE),$$($1_$2_PROGNAME),.)/autogen/cabal_macros.h : $1/$2/package-data.mk
+$1/$2/inplace-pkg-config : $$($1_$2_PKGDATA)
+$1/$2/build/$$(or $$($1_EXECUTABLE),$$($1_$2_PROGNAME),.)/autogen/cabal_macros.h : $$($1_$2_PKGDATA)
 
 # This rule configures the package, generates the package-data.mk file
 # for our build system, and registers the package for use in-place in
 # the build tree.
-$1/$2/package-data.mk : $$$$(ghc-cabal_INPLACE) $$($1_$2_GHC_PKG_DEP) $1/$$($1_PACKAGE).cabal $$(wildcard $1/configure) $$(LAX_DEPS_FOLLOW) $$$$($1_$2_HC_CONFIG_DEP)
+$$($1_$2_PKGDATA) : $$$$(ghc-cabal_INPLACE) $$($1_$2_GHC_PKG_DEP) $1/$$($1_PACKAGE).cabal $$(wildcard $1/configure) $$(LAX_DEPS_FOLLOW) $$$$($1_$2_HC_CONFIG_DEP)
 # Checking packages built with the bootstrapping compiler would
 # generally be a waste of time. Either we will rebuild them with
 # stage1/stage2, or we don't really care about them.
@@ -145,7 +147,7 @@ endif
 endif # NO_GENERATED_MAKEFILE_RULES
 endif # BINDIST
 
-PACKAGE_DATA_MKS += $1/$2/package-data.mk
+PACKAGE_DATA_MKS += $$($1_$2_PKGDATA)
 
 $(call profEnd, build-package-data($1,$2,$3))
 endef
