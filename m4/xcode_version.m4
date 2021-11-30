@@ -5,7 +5,7 @@ AC_DEFUN([XCODE_VERSION],[
     if test "$TargetVendor_CPP" = "apple"
     then
         AC_MSG_CHECKING(Xcode version)
-        XcodeVersion=`(xcode-select -p >& /dev/null && xcodebuild -version) | grep Xcode | sed "s/Xcode //"`
+        XcodeVersion=`(xcode-select -p > /dev/null 2>&1 && xcodebuild -version) | grep Xcode | sed "s/Xcode //"`
         # Old Xcode versions don't actually give the Xcode version
         if test "$XcodeVersion" = ""
         then
