@@ -109,6 +109,7 @@ static void *itimer_thread_func(void *_handle_tick)
 
     // Relaxed is sufficient: If we don't see that exited was set in one iteration we will
     // see it next time.
+    TSAN_ANNOTATE_BENIGN_RACE(&exited, "itimer_thread_func");
     while (!RELAXED_LOAD(&exited)) {
         if (USE_TIMERFD_FOR_ITIMER) {
             ssize_t r = read(timerfd, &nticks, sizeof(nticks));
