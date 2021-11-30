@@ -105,7 +105,7 @@ AC_DEFUN([FPTOOLS_SET_PLATFORM_VARS],
     $2Vendor_CPP=`  echo "[$]$2Vendor"   | sed -e 's/\./_/g' -e 's/-/_/g'`
     $2OS_CPP=`      echo "[$]$2OS"       | sed -e 's/\./_/g' -e 's/-/_/g'`
 
-    echo "GHC $1  : [$]$2Platform"
+    AC_MSG_NOTICE([GHC ]$1[ : $]$2[Platform])
 
     AC_SUBST($2Platform)
     AC_SUBST($2Platform_CPP)
