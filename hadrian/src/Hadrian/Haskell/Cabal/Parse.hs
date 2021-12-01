@@ -33,7 +33,6 @@ import qualified Distribution.Simple.Program.Types             as C
 import qualified Distribution.Simple.Configure                 as C (getPersistBuildConfig)
 import qualified Distribution.Simple.Build                     as C
 import qualified Distribution.Types.ComponentLocalBuildInfo    as C
-import qualified Distribution.Types.ComponentRequestedSpec     as C
 import qualified Distribution.InstalledPackageInfo             as Installed
 import qualified Distribution.Simple.PackageIndex              as C
 import qualified Distribution.Text                             as C
@@ -52,7 +51,10 @@ import Hadrian.Haskell.Cabal
 import Hadrian.Haskell.Cabal.Type
 import Hadrian.Oracles.Cabal
 import Hadrian.Oracles.ArgsHash
+import Settings.Builders.Common (packageDatabaseArgs )
 import Hadrian.Target
+import Oracles.Setting (setting, Setting(..))
+import Rules.Generate
 
 import Base
 import Builder
@@ -201,34 +203,13 @@ data MainSourceType = HsMain | CppMain | CMain
 -- | Parse the 'ContextData' of a given 'Context'.
 resolveContextData :: Context -> Action ContextData
 resolveContextData context@Context {..} = do
-    -- TODO: This is conceptually wrong!
-    -- We should use the gpd, the flagAssignment and compiler, hostPlatform, and
-    -- other information from the lbi. And then compute the finalised PD (flags,
-    -- satisfiable dependencies, platform, compiler info, deps, gpd).
-    --
-    -- let (Right (pd,_)) = C.finalizePackageDescription flags (const True) platform (compilerInfo compiler) [] gpd
-    --
-    -- However when using the new-build path's this might change.
-
-    -- Read the package description from the Cabal file
-    gpd <- genericPackageDescription <$> readPackageData package
-
-    -- Configure the package with the GHC for this stage
-    (compiler, platform) <- configurePackageGHC package stage
-
-
     cPath <- Context.contextPath context
     lbi <- liftIO $ C.getPersistBuildConfig cPath
-
-    let flags = C.flagAssignment lbi
-
-        (Right (pd,_)) = C.finalizePD flags C.defaultComponentRequestedSpec
-                         (const True) platform (C.compilerInfo compiler) [] gpd
 
     -- Note: the @cPath@ is ignored. The path that's used is the 'buildDir' path
     -- from the local build info @lbi@.
     pdi <- liftIO $ getHookedBuildInfo [pkgPath package, cPath -/- "build"]
-    let pd'  = C.updatePackageDescription pdi pd
+    let pd'  = C.updatePackageDescription pdi (C.localPkgDescr lbi)
         lbi' = lbi { C.localPkgDescr = pd' }
 
     -- TODO: Get rid of deprecated 'externalPackageDeps' and drop -Wno-deprecations
@@ -266,7 +247,7 @@ resolveContextData context@Context {..} = do
             -- @library-dirs@ here.
             _ -> error "No (or multiple) GHC rts package is registered!"
 
-        (buildInfo, modules, mainIs) = biModules pd'
+        (buildInfo, modules, mainIs) = biModules (C.localPkgDescr lbi)
 
         classifyMain :: FilePath -> MainSourceType
         classifyMain fp
