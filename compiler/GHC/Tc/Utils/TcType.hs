@@ -235,7 +235,7 @@ import Data.List  ( mapAccumL )
 -- import Data.Functor.Identity( Identity(..) )
 import Data.IORef
 import Data.List.NonEmpty( NonEmpty(..) )
-import {-# SOURCE #-} GHC.Tc.Types.Origin
+import {-# SOURCE #-} GHC.Tc.Types.Origin ( unkSkol, SkolemInfo )
 import Data.Functor.Identity
 
 

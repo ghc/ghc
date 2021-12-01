@@ -864,7 +864,6 @@ tcSkolemise, tcSkolemiseScoped
 -- tcSkolemiseScoped and tcSkolemise
 
 tcSkolemiseScoped ctxt expected_ty thing_inside
-  -- MP: What to do here?
   = do {
        ; rec { (wrap, tv_prs, given, rho_ty) <- topSkolemise skol_info expected_ty
              ; let skol_tvs  = map snd tv_prs
@@ -883,7 +882,6 @@ tcSkolemise ctxt expected_ty thing_inside
   = do { res <- thing_inside expected_ty
        ; return (idHsWrapper, res) }
   | otherwise
-    -- MP: Not sure what to do here.
   = do  {
         ; rec { (wrap, tv_prs, given, rho_ty) <- topSkolemise skol_info expected_ty
 

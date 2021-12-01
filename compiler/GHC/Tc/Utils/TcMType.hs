@@ -147,7 +147,6 @@ import GHC.Utils.Trace
 import Control.Monad
 import GHC.Data.Maybe
 import qualified Data.Semigroup as Semi
-import GHC.Tc.Utils.TcType
 
 {-
 ************************************************************************

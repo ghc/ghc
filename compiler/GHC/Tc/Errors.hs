@@ -77,7 +77,6 @@ import GHC.Utils.FV ( fvVarList, unionFV )
 
 import GHC.Data.Bag
 import GHC.Data.FastString
-import GHC.Utils.Trace (pprTraceUserWarning)
 import GHC.Data.List.SetOps ( equivClasses, nubOrdBy )
 import GHC.Data.Maybe
 import qualified GHC.Data.Strict as Strict
@@ -235,12 +234,10 @@ report_unsolved type_errors expr_holes
                         -- no sense. Really we should not return those holes at all;
                         -- for now we just filter them out.
 
-       ; free_tvs' <- mapM zonkTyVarSkolemInfo free_tvs
-
-       ; let tidy_env = tidyFreeTyCoVars emptyTidyEnv free_tvs';
+       ; let tidy_env = tidyFreeTyCoVars emptyTidyEnv free_tvs;
 
        ; traceTc "reportUnsolved (after zonking):" $
-         vcat [ text "Free tyvars:" <+> pprTyVars free_tvs'
+         vcat [ text "Free tyvars:" <+> pprTyVars free_tvs
               , text "Tidy env:" <+> ppr tidy_env
               , text "Wanted:" <+> ppr wanted ]
 
@@ -3204,13 +3201,13 @@ getSkolemInfo [] tvs
     msg = text "No skolem info - we could not find the origin of the following variables" <+> ppr tvs
        $$ text "This should not happen, please report it as a bug following the instructions at:"
        $$ text "https://gitlab.haskell.org/ghc/ghc/wikis/report-a-bug"
-       -}
 
 getSkolemInfo (implic:implics) tvs
   | null tvs_here =                            getSkolemInfo implics tvs
   | otherwise   = (ic_info implic, tvs_here) : getSkolemInfo implics tvs_other
   where
     (tvs_here, tvs_other) = partition (`elem` ic_skols implic) tvs
+    -}
 
 -----------------------
 -- relevantBindings looks at the value environment and finds values whose

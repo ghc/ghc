@@ -362,7 +362,7 @@ checkValidType ctxt ty
                = case ctxt of
                  DefaultDeclCtxt-> MustBeMonoType
                  PatSigCtxt     -> rank0
-                 RuleSigCtxt _  -> rank1
+                 RuleSigCtxt {} -> rank1
                  TySynCtxt _    -> rank0
 
                  ExprSigCtxt {} -> rank1

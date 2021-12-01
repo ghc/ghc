@@ -99,7 +99,7 @@ import GHC.Prelude
 
 import {-# SOURCE #-}   GHC.Core.TyCo.Rep( Type, Kind, Mult )
 import {-# SOURCE #-}   GHC.Core.TyCo.Ppr( pprKind )
-import {-# SOURCE #-}   GHC.Tc.Utils.TcType( TcTyVarDetails, pprTcTyVarDetails, vanillaSkolemTv, vanillaSkolemTvUnk, updateSkolInfo )
+import {-# SOURCE #-}   GHC.Tc.Utils.TcType( TcTyVarDetails, pprTcTyVarDetails, vanillaSkolemTvUnk, updateSkolInfo )
 import {-# SOURCE #-}   GHC.Types.Id.Info( IdDetails, IdInfo, coVarDetails, isCoVarDetails,
                                            vanillaIdInfo, pprIdDetails )
 import {-# SOURCE #-}   GHC.Builtin.Types ( manyDataConTy )
@@ -113,11 +113,8 @@ import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 
 import Data.Data
-import GHC.Utils.Trace
-import GHC.IO.Unsafe
-import GHC.Stack.CCS
-import {-# SOURCE #-} GHC.Tc.Types.Origin
 
+import {-# SOURCE #-} GHC.Tc.Types.Origin ( SkolemInfo )
 
 {-
 ************************************************************************
@@ -780,7 +777,7 @@ mkTcTyVar name kind details
 tcTyVarDetails :: TyVar -> TcTyVarDetails
 -- See Note [TcTyVars and TyVars in the typechecker] in GHC.Tc.Utils.TcType
 tcTyVarDetails (TcTyVar { tc_tv_details = details }) = details
-tcTyVarDetails tv@(TyVar {})                            = vanillaSkolemTvUnk --pprTrace "tyVar" (text $ show (unsafePerformIO $ whereFrom tv)) $ vanillaSkolemTvUnk
+tcTyVarDetails (TyVar {})                            = vanillaSkolemTvUnk --pprTrace "tyVar" (text $ show (unsafePerformIO $ whereFrom tv)) $ vanillaSkolemTvUnk
 tcTyVarDetails var = pprPanic "tcTyVarDetails" (ppr var <+> dcolon <+> pprKind (tyVarKind var))
 
 setTcTyVarDetails :: TyVar -> TcTyVarDetails -> TyVar

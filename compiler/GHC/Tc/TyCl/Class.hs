@@ -216,7 +216,8 @@ tcClassDecl2 class_scoped_tv_env
         ; let (tyvars, _, _, op_items) = classBigSig clas
               prag_fn = mkPragEnv sigs default_binds
               sig_fn  = mkHsSigFun sigs
-              (skol_subst, clas_tyvars) = tcSuperSkolTyVars unkSkol tyvars
+              skol_info = TyConSkol callStack ClassFlavour (getName class_name)
+              (skol_subst, clas_tyvars) = tcSuperSkolTyVars skol_info tyvars
               pred = mkClassPred clas (mkTyVarTys clas_tyvars)
               scoped_tyvars =
                 case lookupNameEnv class_scoped_tv_env (unLoc class_name) of

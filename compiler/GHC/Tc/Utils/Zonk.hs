@@ -1801,7 +1801,7 @@ zonkTyVarOcc env@(ZonkEnv { ze_flexi = flexi
       = case lookupVarEnv tv_env tv of
           Nothing  -> do
               tv' <- updateTyVarKindM (zonkTcTypeToTypeX env) tv
-              mkTyVarTy <$> zonkTyVarSkolemInfo tv'
+              return $ mkTyVarTy tv'
           Just tv' -> return (mkTyVarTy tv')
 
     zonk_meta ref Flexi

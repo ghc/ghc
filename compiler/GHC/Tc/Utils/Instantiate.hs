@@ -559,10 +559,8 @@ tcInstSkolTyVarsAt skol_info lvl overlappable subst tvs
   = freshenTyCoVarsX new_skol_tv subst tvs
   where
     new_skol_tv name kind =
-      let new_tv = mkTcTyVar name kind sk_details
-          sk_details = SkolemTv skol_info' lvl overlappable
-          skol_info' = skol_info
-      in new_tv
+      let sk_details = SkolemTv skol_info lvl overlappable
+      in mkTcTyVar name kind sk_details
 
 
 ------------------

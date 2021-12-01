@@ -122,7 +122,7 @@ tcRule (HsRule { rd_ext  = ext
        ; let skol_info  = RuleSkol name
         -- Note [Typechecking rules]
        ; (tc_lvl, stuff) <- pushTcLevelM $
-                            generateRuleConstraints skol_info ty_bndrs tm_bndrs lhs rhs
+                            generateRuleConstraints name ty_bndrs tm_bndrs lhs rhs
 
        ; let (id_bndrs, lhs', lhs_wanted
                       , rhs', rhs_wanted, rule_ty) = stuff
@@ -179,16 +179,16 @@ tcRule (HsRule { rd_ext  = ext
                          , rd_lhs  = mkHsDictLet lhs_binds lhs'
                          , rd_rhs  = mkHsDictLet rhs_binds rhs' } }
 
-generateRuleConstraints :: SkolemInfo
+generateRuleConstraints :: FastString
                         -> Maybe [LHsTyVarBndr () GhcRn] -> [LRuleBndr GhcRn]
                         -> LHsExpr GhcRn -> LHsExpr GhcRn
                         -> TcM ( [TcId]
                                , LHsExpr GhcTc, WantedConstraints
                                , LHsExpr GhcTc, WantedConstraints
                                , TcType )
-generateRuleConstraints skol_info ty_bndrs tm_bndrs lhs rhs
+generateRuleConstraints rule_name ty_bndrs tm_bndrs lhs rhs
   = do { ((tv_bndrs, id_bndrs), bndr_wanted) <- captureConstraints $
-                                                tcRuleBndrs skol_info ty_bndrs tm_bndrs
+                                                tcRuleBndrs rule_name ty_bndrs tm_bndrs
               -- bndr_wanted constraints can include wildcard hole
               -- constraints, which we should not forget about.
               -- It may mention the skolem type variables bound by
@@ -204,38 +204,38 @@ generateRuleConstraints skol_info ty_bndrs tm_bndrs lhs rhs
        ; return (id_bndrs, lhs', all_lhs_wanted, rhs', rhs_wanted, rule_ty) } }
 
 -- See Note [TcLevel in type checking rules]
-tcRuleBndrs :: SkolemInfo -> Maybe [LHsTyVarBndr () GhcRn] -> [LRuleBndr GhcRn]
+tcRuleBndrs :: FastString -> Maybe [LHsTyVarBndr () GhcRn] -> [LRuleBndr GhcRn]
             -> TcM ([TcTyVar], [Id])
-tcRuleBndrs skol_info (Just bndrs) xs
-  = do { (tybndrs1,(tys2,tms)) <- bindExplicitTKBndrs_Skol skol_info bndrs $
-                                  tcRuleTmBndrs xs
+tcRuleBndrs rule_name (Just bndrs) xs
+  = do { (tybndrs1,(tys2,tms)) <- bindExplicitTKBndrs_Skol (RuleSkol rule_name) bndrs $
+                                  tcRuleTmBndrs rule_name xs
        ; let tys1 = binderVars tybndrs1
        ; return (tys1 ++ tys2, tms) }
 
-tcRuleBndrs _ Nothing xs
-  = tcRuleTmBndrs xs
+tcRuleBndrs rule_name Nothing xs
+  = tcRuleTmBndrs rule_name xs
 
 -- See Note [TcLevel in type checking rules]
-tcRuleTmBndrs :: [LRuleBndr GhcRn] -> TcM ([TcTyVar],[Id])
-tcRuleTmBndrs [] = return ([],[])
-tcRuleTmBndrs (L _ (RuleBndr _ (L _ name)) : rule_bndrs)
+tcRuleTmBndrs :: FastString -> [LRuleBndr GhcRn] -> TcM ([TcTyVar],[Id])
+tcRuleTmBndrs _ [] = return ([],[])
+tcRuleTmBndrs rule_name (L _ (RuleBndr _ (L _ name)) : rule_bndrs)
   = do  { ty <- newOpenFlexiTyVarTy
-        ; (tyvars, tmvars) <- tcRuleTmBndrs rule_bndrs
+        ; (tyvars, tmvars) <- tcRuleTmBndrs rule_name rule_bndrs
         ; return (tyvars, mkLocalId name Many ty : tmvars) }
-tcRuleTmBndrs (L _ (RuleBndrSig _ (L _ name) rn_ty) : rule_bndrs)
+tcRuleTmBndrs rule_name (L _ (RuleBndrSig _ (L _ name) rn_ty) : rule_bndrs)
 --  e.g         x :: a->a
 --  The tyvar 'a' is brought into scope first, just as if you'd written
 --              a::*, x :: a->a
 --  If there's an explicit forall, the renamer would have already reported an
 --   error for each out-of-scope type variable used
-  = do  { let ctxt = RuleSigCtxt name
+  = do  { let ctxt = RuleSigCtxt rule_name name
         ; (_ , tvs, id_ty) <- tcHsPatSigType ctxt HM_Sig rn_ty OpenKind
         ; let id  = mkLocalId name Many id_ty
                     -- See Note [Typechecking pattern signature binders] in GHC.Tc.Gen.HsType
 
               -- The type variables scope over subsequent bindings; yuk
         ; (tyvars, tmvars) <- tcExtendNameTyVarEnv tvs $
-                                   tcRuleTmBndrs rule_bndrs
+                                   tcRuleTmBndrs rule_name rule_bndrs
         ; return (map snd tvs ++ tyvars, id : tmvars) }
 
 ruleCtxt :: FastString -> SDoc

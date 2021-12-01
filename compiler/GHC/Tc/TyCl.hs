@@ -1579,7 +1579,7 @@ kcTyClDecl :: TyClDecl GhcRn -> TcTyCon -> TcM ()
 
 kcTyClDecl (DataDecl { tcdLName    = (L _ name), tcdDataDefn = defn }) tycon
   | HsDataDefn { dd_ctxt = ctxt, dd_cons = cons, dd_ND = new_or_data } <- defn
-  = bindTyClTyVars unkSkol name $ \ _ _ _ ->
+  = bindTyClTyVars (TyConSkol callStack DataTypeFlavour name) name $ \ _ _ _ ->
        -- NB: binding these tyvars isn't necessary for GADTs, but it does no
        -- harm.  For GADTs, each data con brings its own tyvars into scope,
        -- and the ones from this bindTyClTyVars are either not mentioned or
@@ -1590,14 +1590,14 @@ kcTyClDecl (DataDecl { tcdLName    = (L _ name), tcdDataDefn = defn }) tycon
        }
 
 kcTyClDecl (SynDecl { tcdLName = L _ name, tcdRhs = rhs }) _tycon
-  = bindTyClTyVars unkSkol name $ \ _ _ res_kind ->
+  = bindTyClTyVars (TyConSkol callStack TypeSynonymFlavour name) name $ \ _ _ res_kind ->
     discardResult $ tcCheckLHsType rhs (TheKind res_kind)
         -- NB: check against the result kind that we allocated
         -- in inferInitialKinds.
 
 kcTyClDecl (ClassDecl { tcdLName = L _ name
                       , tcdCtxt = ctxt, tcdSigs = sigs }) _tycon
-  = bindTyClTyVars unkSkol name $ \ _ _ _ ->
+  = bindTyClTyVars (TyConSkol callStack ClassFlavour name) name $ \ _ _ _ ->
     do  { _ <- tcHsContext ctxt
         ; mapM_ (wrapLocMA_ kc_sig) sigs }
   where
@@ -1681,7 +1681,7 @@ kcConDecl new_or_data
   = -- See Note [kcConDecls: kind-checking data type decls]
     addErrCtxt (dataConCtxt names) $
     discardResult                      $
-    bindOuterSigTKBndrs_Tv unkSkol outer_bndrs $
+    bindOuterSigTKBndrs_Tv (DataConSkol (unLoc (head names))) outer_bndrs $
         -- Why "_Tv"?  See Note [Using TyVarTvs for kind-checking GADTs]
     do { _ <- tcHsContext cxt
        ; traceTc "kcConDecl:GADT {" (ppr names $$ ppr res_ty)
@@ -2709,7 +2709,7 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info
                               , fdResultSig = L _ sig
                               , fdInjectivityAnn = inj })
   | DataFamily <- fam_info
-  = bindTyClTyVars unkSkol tc_name $ \ _ binders res_kind -> do
+  = bindTyClTyVars (TyConSkol callStack (DataFamilyFlavour Nothing) tc_name) tc_name $ \ _ binders res_kind -> do
   { traceTc "tcFamDecl1 data family:" (ppr tc_name)
   ; checkFamFlag tc_name
 
@@ -2735,7 +2735,7 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info
   ; return tycon }
 
   | OpenTypeFamily <- fam_info
-  = bindTyClTyVars unkSkol tc_name $ \ _ binders res_kind -> do
+  = bindTyClTyVars (TyConSkol callStack (OpenTypeFamilyFlavour Nothing) tc_name) tc_name $ \ _ binders res_kind -> do
   { traceTc "tcFamDecl1 open type family:" (ppr tc_name)
   ; checkFamFlag tc_name
   ; inj' <- tcInjectivity binders inj
@@ -2998,7 +2998,7 @@ kcTyFamInstEqn tc_fam_tc
        ; checkTyFamInstEqn tc_fam_tc eqn_tc_name hs_pats
 
        ; discardResult $
-         bindOuterFamEqnTKBndrs_Q_Tv unkSkol outer_bndrs $
+         bindOuterFamEqnTKBndrs_Q_Tv FamInstSkol outer_bndrs $
          do { (_fam_app, res_kind) <- tcFamTyPats tc_fam_tc hs_pats
             ; tcCheckLHsType hs_rhs_ty (TheKind res_kind) }
              -- Why "_Tv" here?  Consider (#14066)
@@ -3399,7 +3399,7 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs res_kind tag_map
 
        ; (tclvl, wanted, (exp_tvbndrs, (ctxt, arg_tys, field_lbls, stricts)))
            <- pushLevelAndSolveEqualitiesX "tcConDecl:H98"  $
-              tcExplicitTKBndrs unkSkol explicit_tkv_nms            $
+              tcExplicitTKBndrs explicit_tkv_nms            $
               do { ctxt <- tcHsContext hs_ctxt
                  ; let exp_kind = getArgExpKind new_or_data res_kind
                  ; btys <- tcConH98Args exp_kind hs_args

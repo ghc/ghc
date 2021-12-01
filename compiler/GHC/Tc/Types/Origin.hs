@@ -34,7 +34,6 @@ module GHC.Tc.Types.Origin (
   ) where
 
 import GHC.Prelude
-import GHC.Utils.Misc (HasCallStack)
 
 import GHC.Tc.Utils.TcType
 
@@ -94,7 +93,7 @@ data UserTypeCtxt
   | PatSigCtxt          -- Type sig in pattern
                         --   eg  f (x::t) = ...
                         --   or  (x::t, y) = e
-  | RuleSigCtxt Name    -- LHS of a RULE forall
+  | RuleSigCtxt FastString Name    -- LHS of a RULE forall
                         --    RULE "foo" forall (x :: a -> a). f (Just x) = ...
   | ForSigCtxt Name     -- Foreign import or export signature
   | DefaultDeclCtxt     -- Types in a default declaration
@@ -121,7 +120,6 @@ data UserTypeCtxt
   | DataKindCtxt Name   -- The kind of a data/newtype (instance)
   | TySynKindCtxt Name  -- The kind of the RHS of a type synonym
   | TyFamResKindCtxt Name   -- The result kind of a type family
-  deriving (Eq)
 
 -- | Report Redundant Constraints.
 data ReportRedundantConstraints
@@ -130,7 +128,6 @@ data ReportRedundantConstraints
                      -- is the SrcSpan for the constraints
                      -- E.g. f :: (Eq a, Ord b) => blah
                      -- The span is for the (Eq a, Ord b)
-  deriving (Eq)
 
 reportRedundantConstraints :: ReportRedundantConstraints -> Bool
 reportRedundantConstraints NoRRC        = False
@@ -157,7 +154,7 @@ redundantConstraintsSpan _ = noSrcSpan
 pprUserTypeCtxt :: UserTypeCtxt -> SDoc
 pprUserTypeCtxt (FunSigCtxt n _)  = text "the type signature for" <+> quotes (ppr n)
 pprUserTypeCtxt (InfSigCtxt n)    = text "the inferred type for" <+> quotes (ppr n)
-pprUserTypeCtxt (RuleSigCtxt n)   = text "the type signature for" <+> quotes (ppr n)
+pprUserTypeCtxt (RuleSigCtxt _ n) = text "the type signature for" <+> quotes (ppr n)
 pprUserTypeCtxt (ExprSigCtxt _)   = text "an expression type signature"
 pprUserTypeCtxt KindSigCtxt       = text "a kind signature"
 pprUserTypeCtxt (StandaloneKindSigCtxt n) = text "a standalone kind signature for" <+> quotes (ppr n)
@@ -262,12 +259,6 @@ data SkolemInfo
 
 
 
-instance Eq SkolemInfo where
-  (SigSkol uc t _) == (SigSkol uc' t' _) = uc == uc' && t `eqType` t'
-  (SigTypeSkol uc) == (SigTypeSkol uc')  = uc == uc'
-  (ForAllSkol {})  == ForAllSkol {}      = True
-
-
 unkSkol :: HasCallStack => SkolemInfo
 unkSkol = UnkSkol callStack
 
@@ -292,7 +283,7 @@ pprSkolInfo (InferSkol ids)   = hang (text "the inferred type" <> plural ids <+>
                                    2 (vcat [ ppr name <+> dcolon <+> ppr ty
                                            | (name,ty) <- ids ])
 pprSkolInfo (UnifyForAllSkol ty) = text "the type" <+> ppr ty
-pprSkolInfo (TyConSkol cs flav name) = text "the" <+> ppr flav <+> text "declaration for" <+> quotes (ppr name) $$ prettyCallStackDoc cs
+pprSkolInfo (TyConSkol _cs flav name) = text "the" <+> ppr flav <+> text "declaration for" <+> quotes (ppr name)
 pprSkolInfo (DataConSkol name)= text "the data constructor" <+> quotes (ppr name)
 pprSkolInfo ReifySkol         = text "the type being reified"
 

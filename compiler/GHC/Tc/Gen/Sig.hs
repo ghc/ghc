@@ -411,7 +411,7 @@ tcPatSynSig name sig_ty@(L _ (HsSig{sig_bndrs = hs_outer_bndrs, sig_body = hs_ty
            <- pushLevelAndSolveEqualitiesX "tcPatSynSig"           $
                      -- See Note [solveEqualities in tcPatSynSig]
               tcOuterTKBndrs skol_info hs_outer_bndrs $
-              tcExplicitTKBndrs skol_info ex_hs_tvbndrs         $
+              tcExplicitTKBndrs ex_hs_tvbndrs         $
               do { req     <- tcHsContext hs_req
                  ; prov    <- tcHsContext hs_prov
                  ; body_ty <- tcHsOpenType hs_body_ty

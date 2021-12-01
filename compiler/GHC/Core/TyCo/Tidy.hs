@@ -27,7 +27,7 @@ import GHC.Types.Var.Env
 import GHC.Utils.Misc (strictMap)
 
 import Data.List (mapAccumL)
-import {-# SOURCE #-} GHC.Tc.Utils.TcMType
+import {-# SOURCE #-} GHC.Tc.Utils.TcMType ( tidySkolemInfo )
 
 {-
 %************************************************************************
@@ -119,10 +119,8 @@ tidyTyCoVarOcc :: TidyEnv -> TyCoVar -> TyCoVar
 tidyTyCoVarOcc env@(_, subst) tv
   = case lookupVarEnv subst tv of
         Nothing  ->
-          updateTcTyVarSkolemInfo (upd_details env) $ updateVarType (tidyType env) tv
+          updateTcTyVarSkolemInfo (tidySkolemInfo env) $ updateVarType (tidyType env) tv
         Just tv' -> tv'
-    where
-      upd_details skol_info = tidySkolemInfo skol_info
 
 ---------------
 

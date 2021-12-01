@@ -386,7 +386,7 @@ kcClassSigType :: [LocatedN Name] -> LHsSigType GhcRn -> TcM ()
 kcClassSigType names
     sig_ty@(L _ (HsSig { sig_bndrs = hs_outer_bndrs, sig_body = hs_ty }))
   = addSigCtxt (funsSigCtxt names) sig_ty $
-    do { _ <- bindOuterSigTKBndrs_Tv unkSkol hs_outer_bndrs    $
+    do { _ <- bindOuterSigTKBndrs_Tv (SigTypeSkol (funsSigCtxt names)) hs_outer_bndrs    $
               tcLHsType hs_ty liftedTypeKind
        ; return () }
 
@@ -1173,7 +1173,7 @@ tc_hs_type mode (HsOpTy _ ty1 (L _ op) ty2) exp_kind
 
 --------- Foralls
 tc_hs_type mode (HsForAllTy { hst_tele = tele, hst_body = ty }) exp_kind
-  = do { (tv_bndrs, ty') <- tcTKTelescope unkSkol mode tele $
+  = do { (tv_bndrs, ty') <- tcTKTelescope mode tele $
                             tc_lhs_type mode ty exp_kind
                  -- Pass on the mode from the type, to any wildcards
                  -- in kind signatures on the forall'd variables
@@ -2462,7 +2462,7 @@ kcInferDeclHeader name flav
   -- No standalane kind signature and no CUSK.
   -- See note [Required, Specified, and Inferred for types] in GHC.Tc.TyCl
   = addTyConFlavCtxt name flav $
-    do { let skol_info = unkSkol
+    do { let skol_info = TyConSkol callStack flav name
        ; (scoped_kvs, (tc_tvs, res_kind))
            -- Why bindImplicitTKBndrs_Q_Tv which uses newTyVarTyVar?
            -- See Note [Inferring kinds for type declarations] in GHC.Tc.TyCl
@@ -3033,20 +3033,19 @@ expectedKindInCtxt _                   = OpenKind
 --    HsForAllTelescope
 --------------------------------------
 
-tcTKTelescope :: SkolemInfo
-              -> TcTyMode
+tcTKTelescope :: TcTyMode
               -> HsForAllTelescope GhcRn
               -> TcM a
               -> TcM ([TcTyVarBinder], a)
-tcTKTelescope skol_info mode tele thing_inside = case tele of
+tcTKTelescope mode tele thing_inside = case tele of
   HsForAllVis { hsf_vis_bndrs = bndrs }
-    -> do { (req_tv_bndrs, thing) <- tcExplicitTKBndrsX skol_info skol_mode bndrs thing_inside
+    -> do { (req_tv_bndrs, thing) <- tcExplicitTKBndrsX skol_mode bndrs thing_inside
             -- req_tv_bndrs :: [VarBndr TyVar ()],
             -- but we want [VarBndr TyVar ArgFlag]
           ; return (tyVarReqToBinders req_tv_bndrs, thing) }
 
   HsForAllInvis { hsf_invis_bndrs = bndrs }
-    -> do { (inv_tv_bndrs, thing) <- tcExplicitTKBndrsX skol_info skol_mode bndrs thing_inside
+    -> do { (inv_tv_bndrs, thing) <- tcExplicitTKBndrsX skol_mode bndrs thing_inside
             -- inv_tv_bndrs :: [VarBndr TyVar Specificity],
             -- but we want [VarBndr TyVar ArgFlag]
           ; return (tyVarSpecToBinders inv_tv_bndrs, thing) }
@@ -3154,7 +3153,7 @@ tcOuterTKBndrsX skol_mode skol_info outer_bndrs thing_inside
            ; return ( HsOuterImplicit{hso_ximplicit = imp_tvs'}
                     , thing) }
       HsOuterExplicit{hso_bndrs = exp_bndrs} ->
-        do { (exp_tvs', thing) <- tcExplicitTKBndrsX skol_info skol_mode exp_bndrs thing_inside
+        do { (exp_tvs', thing) <- tcExplicitTKBndrsX skol_mode exp_bndrs thing_inside
            ; return ( HsOuterExplicit { hso_xexplicit = exp_tvs'
                                       , hso_bndrs     = exp_bndrs }
                     , thing) }
@@ -3164,28 +3163,26 @@ tcOuterTKBndrsX skol_mode skol_info outer_bndrs thing_inside
 --------------------------------------
 
 tcExplicitTKBndrs :: OutputableBndrFlag flag 'Renamed
-                  => SkolemInfo
-                  -> [LHsTyVarBndr flag GhcRn]
+                  => [LHsTyVarBndr flag GhcRn]
                   -> TcM a
                   -> TcM ([VarBndr TyVar flag], a)
-tcExplicitTKBndrs skol_info = tcExplicitTKBndrsX skol_info (smVanilla { sm_clone = True })
+tcExplicitTKBndrs = tcExplicitTKBndrsX (smVanilla { sm_clone = True })
 
 tcExplicitTKBndrsX :: OutputableBndrFlag flag 'Renamed
-                   => SkolemInfo
-                   -> SkolemMode
+                   => SkolemMode
                    -> [LHsTyVarBndr flag GhcRn]
                    -> TcM a
                    -> TcM ([VarBndr TyVar flag], a)
 -- Push level, capture constraints,
 -- and emit an implication constraint with a ForAllSkol ic_info,
 -- so that it is subject to a telescope test.
-tcExplicitTKBndrsX skol_info skol_mode bndrs thing_inside
-  = do { (tclvl, wanted, (skol_tvs, res))
+tcExplicitTKBndrsX skol_mode bndrs thing_inside
+  = do { ; let skol_info = ForAllSkol (fsep (map ppr bndrs))
+       ; (tclvl, wanted, (skol_tvs, res))
              <- pushLevelAndCaptureConstraints $
                 bindExplicitTKBndrsX skol_info skol_mode bndrs $
                 thing_inside
 
-       ; let skol_info = ForAllSkol (fsep (map ppr bndrs))
              -- Notice that we use ForAllSkol here, ignoring the enclosing
              -- skol_info unlike tc_implicit_tk_bndrs, because the bad-telescope
              -- test applies only to ForAllSkol
@@ -3941,7 +3938,7 @@ tcHsPartialSigType ctxt sig_ty
             <- solveEqualities "tcHsPartialSigType" $
                -- See Note [Failure in local type signatures]
                bindNamedWildCardBinders sig_wcs             $ \ wcs ->
-               bindOuterSigTKBndrs_Tv_M unkSkol mode hs_outer_bndrs $
+               bindOuterSigTKBndrs_Tv_M (SigTypeSkol ctxt) mode hs_outer_bndrs $
                do {   -- Instantiate the type-class context; but if there
                       -- is an extra-constraints wildcard, just discard it here
                     (theta, wcx) <- tcPartialContext mode hs_ctxt
