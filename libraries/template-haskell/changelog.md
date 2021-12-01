@@ -7,6 +7,7 @@
   * Add support for Overloaded Record Dot.
     Introduces `getFieldE :: Quote m => m Exp -> String -> m Exp` and
     `projectionE :: Quote m => [String] -> m Exp`.
+  * Add `instance Lift ByteArray`.
 
   * Add `PromotedInfixT` and `PromotedUInfixT`, which are analogs to `InfixT`
     and `UInfixT` that ensure that if a dynamically bound name (i.e. a name

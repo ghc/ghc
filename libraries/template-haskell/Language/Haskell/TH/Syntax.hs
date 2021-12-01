@@ -3,7 +3,7 @@
              RankNTypes, RoleAnnotations, ScopedTypeVariables,
              MagicHash, KindSignatures, PolyKinds, TypeApplications, DataKinds,
              GADTs, UnboxedTuples, UnboxedSums, TypeInType, TypeOperators,
-             Trustworthy, DeriveFunctor #-}
+             Trustworthy, DeriveFunctor, BangPatterns, RecordWildCards, ImplicitParams #-}
 
 {-# OPTIONS_GHC -fno-warn-inline-rule-shadowing #-}
 
@@ -61,9 +61,20 @@ import Prelude
 import Foreign.ForeignPtr
 import Foreign.C.String
 import Foreign.C.Types
+import GHC.Stack
 
 #if __GLASGOW_HASKELL__ >= 901
 import GHC.Types ( Levity(..) )
+#endif
+
+#if __GLASGOW_HASKELL__ >= 903
+import Data.Array.Byte (ByteArray(..))
+import GHC.Exts
+  ( ByteArray#, unsafeFreezeByteArray#, copyAddrToByteArray#, newByteArray#
+  , isByteArrayPinned#, isTrue#, sizeofByteArray#, unsafeCoerce#, byteArrayContents#
+  , copyByteArray#, newPinnedByteArray#)
+import GHC.ForeignPtr (ForeignPtr(..), ForeignPtrContents(..))
+import GHC.ST (ST(..), runST)
 #endif
 
 -----------------------------------------------------
@@ -1073,6 +1084,51 @@ instance Lift Addr# where
   liftTyped x = unsafeCodeCoerce (lift x)
   lift x
     = return (LitE (StringPrimL (map (fromIntegral . ord) (unpackCString# x))))
+
+#if __GLASGOW_HASKELL__ >= 903
+
+-- |
+-- @since 2.19.0.0
+instance Lift ByteArray where
+  liftTyped x = unsafeCodeCoerce (lift x)
+  lift (ByteArray b) = return
+    (AppE (AppE (VarE addrToByteArrayName) (LitE (IntegerL (fromIntegral len))))
+      (LitE (BytesPrimL (Bytes ptr 0 (fromIntegral len)))))
+    where
+      len# = sizeofByteArray# b
+      len = I# len#
+      pb :: ByteArray#
+      !(ByteArray pb)
+        | isTrue# (isByteArrayPinned# b) = ByteArray b
+        | otherwise = runST $ ST $
+          \s -> case newPinnedByteArray# len# s of
+            (# s', mb #) -> case copyByteArray# b 0# mb 0# len# s' of
+              s'' -> case unsafeFreezeByteArray# mb s'' of
+                (# s''', ret #) -> (# s''', ByteArray ret #)
+      ptr :: ForeignPtr Word8
+      ptr = ForeignPtr (byteArrayContents# pb) (PlainPtr (unsafeCoerce# pb))
+
+
+-- We can't use a TH quote in this module because we're in the template-haskell
+-- package, so we conconct this quite defensive solution to make the correct name
+-- which will work if the package name or module name changes in future.
+addrToByteArrayName :: Name
+addrToByteArrayName = helper
+  where
+    helper :: HasCallStack => Name
+    helper =
+      case head (getCallStack ?callStack) of
+        (_, SrcLoc{..}) -> mkNameG_v srcLocPackage srcLocModule "addrToByteArray"
+
+
+addrToByteArray :: Int -> Addr# -> ByteArray
+addrToByteArray (I# len) addr = runST $ ST $
+  \s -> case newByteArray# len s of
+    (# s', mb #) -> case copyAddrToByteArray# addr mb 0# len s' of
+      s'' -> case unsafeFreezeByteArray# mb s'' of
+        (# s''', ret #) -> (# s''', ByteArray ret #)
+
+#endif
 
 instance Lift a => Lift (Maybe a) where
   liftTyped x = unsafeCodeCoerce (lift x)
