@@ -323,15 +323,15 @@ class Foldable t where
     -- (/diverges/).
     --
     -- If you want a strict right fold in constant space, you need a structure
-    -- that supports faster than \(\mathcal{O}(n)\) access to the right-most
-    -- element, such as @Seq@ from the @containers@ package.
+    -- that supports faster than /O(n)/ access to the right-most element, such
+    -- as @Seq@ from the @containers@ package.
     --
     -- This method does not run in constant space for structures such as lists
     -- that don't support efficient right-to-left iteration and so require
-    -- \(\mathcal{O}(n)\) space to perform right-to-left reduction.  Use of
-    -- this method with such a structure is a hint that the chosen structure
-    -- may be a poor fit for the task at hand.  If the order in which the
-    -- elements are combined is not important, use 'foldl'' instead.
+    -- /O(n)/ space to perform right-to-left reduction.  Use of this method
+    -- with such a structure is a hint that the chosen structure may be a poor
+    -- fit for the task at hand.  If the order in which the elements are
+    -- combined is not important, use 'foldl'' instead.
     --
     -- @since 4.6.0.0
     foldr' :: (a -> b -> b) -> b -> t a -> b
@@ -359,8 +359,8 @@ class Foldable t where
     -- 'foldl'' instead of 'foldl'.  The reason for this is that the latter
     -- does not force the /inner/ results (e.g. @z \`f\` x1@ in the above
     -- example) before applying them to the operator (e.g. to @(\`f\` x2)@).
-    -- This results in a thunk chain \(\mathcal{O}(n)\) elements long, which
-    -- then must be evaluated from the outside-in.
+    -- This results in a thunk chain /O(n)/ elements long, which then must be
+    -- evaluated from the outside-in.
     --
     -- For a general 'Foldable' structure this should be semantically identical
     -- to:
@@ -2370,11 +2370,11 @@ elements in a single pass.
 -- >      in s / fromIntegral l
 --
 -- The above example is somewhat contrived, some structures keep track of their
--- length internally, and can return it in \(\mathcal{O}(1)\) time, so this
--- particular recipe for averages is not always the most efficient.  In
--- general, composite aggregate functions of large structures benefit from
--- single-pass reduction.  This is especially the case when reuse of a list and
--- memoisation of its elements is thereby avoided,
+-- length internally, and can return it in /O(1)/ time, so this particular
+-- recipe for averages is not always the most efficient.  In general, composite
+-- aggregate functions of large structures benefit from single-pass reduction.
+-- This is especially the case when reuse of a list and memoisation of its
+-- elements is thereby avoided.
 
 --------------
 
@@ -2498,12 +2498,12 @@ elements in a single pass.
 -- $linear
 --
 -- It is perhaps worth noting that since the __`elem`__ function in the
--- Foldable class carries only an __`Eq`__ constraint on the element type,
+-- 'Foldable' class carries only an __`Eq`__ constraint on the element type,
 -- search for the presence or absence of an element in the structure generally
--- takes \(\mathcal{O}(n)\) time, even for ordered structures like __@Set@__
--- that are potentially capable of performing the search faster.  (The @member@
--- function of the @Set@ module carries an `Ord` constraint, and can perform
--- the search in \(\mathcal{O}(log\ n)\) time).
+-- takes /O(n)/ time, even for ordered structures like __@Set@__ that are
+-- potentially capable of performing the search faster.  (The @member@ function
+-- of the @Set@ module carries an `Ord` constraint, and can perform the search
+-- in /O(log n)/ time).
 --
 -- An alternative to Foldable's __`elem`__ method is required in order to
 -- abstract potentially faster than linear search over general container
