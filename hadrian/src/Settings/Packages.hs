@@ -351,39 +351,38 @@ rtsPackageArgs = package rts ? do
 
           -- We're after pur performance here. So make sure fast math and
           -- vectorization is enabled.
-          , input "**/Hash.c" ? pure
-            [ "-O3" ]
+          , input "**/Hash.c" ? pure [ "-O3" ]
 
-            , inputs ["**/Evac.c", "**/Evac_thr.c"] ? arg "-funroll-loops"
+          , inputs ["**/Evac.c", "**/Evac_thr.c"] ? arg "-funroll-loops"
 
-            , speedHack ?
-              inputs [ "**/Evac.c", "**/Evac_thr.c"
-                     , "**/Scav.c", "**/Scav_thr.c"
-                     , "**/Compact.c", "**/GC.c" ] ? arg "-fno-PIC"
-            -- @-static@ is necessary for these bits, as otherwise the NCG
-            -- generates dynamic references.
-            , speedHack ?
-              inputs [ "**/Updates.c", "**/StgMiscClosures.c"
-                     , "**/PrimOps.c", "**/Apply.c"
-                     , "**/AutoApply.c" ] ? pure ["-fno-PIC", "-static"]
+          , speedHack ?
+            inputs [ "**/Evac.c", "**/Evac_thr.c"
+                   , "**/Scav.c", "**/Scav_thr.c"
+                   , "**/Compact.c", "**/GC.c" ] ? arg "-fno-PIC"
+          -- @-static@ is necessary for these bits, as otherwise the NCG
+          -- generates dynamic references.
+          , speedHack ?
+            inputs [ "**/Updates.c", "**/StgMiscClosures.c"
+                   , "**/PrimOps.c", "**/Apply.c"
+                   , "**/AutoApply.c" ] ? pure ["-fno-PIC", "-static"]
 
-            -- inlining warnings happen in Compact
-            , inputs ["**/Compact.c"] ? arg "-Wno-inline"
+          -- inlining warnings happen in Compact
+          , inputs ["**/Compact.c"] ? arg "-Wno-inline"
 
-            -- emits warnings about call-clobbered registers on x86_64
-            , inputs [ "**/StgCRun.c"
-                     , "**/win32/ConsoleHandler.c", "**/win32/ThrIOManager.c"] ? arg "-w"
-            -- The above warning suppression flags are a temporary kludge.
-            -- While working on this module you are encouraged to remove it and fix
-            -- any warnings in the module. See:
-            -- https://gitlab.haskell.org/ghc/ghc/wikis/working-conventions#Warnings
+          -- emits warnings about call-clobbered registers on x86_64
+          , inputs [ "**/StgCRun.c"
+                   , "**/win32/ConsoleHandler.c", "**/win32/ThrIOManager.c"] ? arg "-w"
+          -- The above warning suppression flags are a temporary kludge.
+          -- While working on this module you are encouraged to remove it and fix
+          -- any warnings in the module. See:
+          -- https://gitlab.haskell.org/ghc/ghc/wikis/working-conventions#Warnings
 
-            , (not <$> flag CcLlvmBackend) ?
-              inputs ["**/Compact.c"] ? arg "-finline-limit=2500"
+          , (not <$> flag CcLlvmBackend) ?
+            inputs ["**/Compact.c"] ? arg "-finline-limit=2500"
 
-            , input "**/RetainerProfile.c" ? flag CcLlvmBackend ?
-              arg "-Wno-incompatible-pointer-types"
-            ]
+          , input "**/RetainerProfile.c" ? flag CcLlvmBackend ?
+            arg "-Wno-incompatible-pointer-types"
+          ]
 
     mconcat
         [ builder (Cabal Flags) ? mconcat
