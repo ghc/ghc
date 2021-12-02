@@ -38,6 +38,9 @@ import qualified Distribution.Simple.PackageIndex              as C
 import qualified Distribution.Text                             as C
 import qualified Distribution.Types.LocalBuildInfo             as C
 import qualified Distribution.Types.MungedPackageId            as C
+#if MIN_VERSION_Cabal(3,5,0)
+import qualified Distribution.Utils.Path                       as C
+#endif
 import qualified Distribution.Utils.ShortText                  as C
 #if !MIN_VERSION_Cabal(3,4,0)
 import qualified Distribution.Types.CondTree                   as C
@@ -273,7 +276,11 @@ resolveContextData context@Context {..} = do
           , mainIs          = fmap (first C.display) mainIs
           , modules         = map C.display modules
           , otherModules    = map C.display $ C.otherModules buildInfo
-          , srcDirs         = C.hsSourceDirs buildInfo
+          , srcDirs         =
+#if MIN_VERSION_Cabal(3,5,0)
+                              map C.getSymbolicPath
+#endif
+                                  (C.hsSourceDirs buildInfo)
           , depIds          = depIds
           , depNames        = map (C.display . C.mungedName . snd) extDeps
           , includeDirs     = C.includeDirs     buildInfo
