@@ -137,4 +137,5 @@ test('T20496', multiline_grep_errmsg(r"rnd\n( .*\n)*"), compile, ['-ddump-tc-tra
 test('T20375', normal, compile, [''])
 test('T20387', normal, compile, [''])
 test('T20501', normal, compile, [''])
+test('T20719', normal, compile, [''])
 test('T20994', normal, compile, [''])

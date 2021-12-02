@@ -88,7 +88,7 @@ Overall plan
 3.  Add the derived bindings, generating InstInfos
 -}
 
-data EarlyDerivSpec = InferTheta (DerivSpec [ThetaOrigin])
+data EarlyDerivSpec = InferTheta (DerivSpec ThetaSpec)
                     | GivenTheta (DerivSpec ThetaType)
         -- InferTheta ds => the context for the instance should be inferred
         --      In this case ds_theta is the list of all the sets of
@@ -102,7 +102,7 @@ data EarlyDerivSpec = InferTheta (DerivSpec [ThetaOrigin])
         -- See Note [Inferring the instance context] in GHC.Tc.Deriv.Infer
 
 splitEarlyDerivSpec :: [EarlyDerivSpec]
-                    -> ([DerivSpec [ThetaOrigin]], [DerivSpec ThetaType])
+                    -> ([DerivSpec ThetaSpec], [DerivSpec ThetaType])
 splitEarlyDerivSpec [] = ([],[])
 splitEarlyDerivSpec (InferTheta spec : specs) =
     case splitEarlyDerivSpec specs of (is, gs) -> (spec : is, gs)
@@ -1137,14 +1137,40 @@ mkEqnHelp :: Maybe OverlapMode
 mkEqnHelp overlap_mode tvs cls cls_args deriv_ctxt deriv_strat = do
   is_boot <- tcIsHsBootOrSig
   when is_boot $ bale_out DerivErrBootFileFound
+
+  let pred = mkClassPred cls cls_args
+  skol_info <- mkSkolemInfo (DerivSkol pred)
+  (tvs', cls_args', deriv_strat') <-
+    skolemise_when_inferring_context skol_info deriv_ctxt
+  let deriv_env = DerivEnv
+                    { denv_overlap_mode = overlap_mode
+                    , denv_tvs          = tvs'
+                    , denv_cls          = cls
+                    , denv_inst_tys     = cls_args'
+                    , denv_ctxt         = deriv_ctxt
+                    , denv_skol_info    = skol_info
+                    , denv_strat        = deriv_strat' }
   runReaderT mk_eqn deriv_env
   where
-    deriv_env = DerivEnv { denv_overlap_mode = overlap_mode
-                         , denv_tvs          = tvs
-                         , denv_cls          = cls
-                         , denv_inst_tys     = cls_args
-                         , denv_ctxt         = deriv_ctxt
-                         , denv_strat        = deriv_strat }
+    skolemise_when_inferring_context ::
+         SkolemInfo -> DerivContext
+      -> TcM ([TcTyVar], [TcType], Maybe (DerivStrategy GhcTc))
+    skolemise_when_inferring_context skol_info deriv_ctxt =
+      case deriv_ctxt of
+        -- In order to infer an instance context, we must later make use of
+        -- the constraint solving machinery, which expects TcTyVars rather
+        -- than TyVars. We skolemise the type variables with non-overlappable
+        -- (vanilla) skolems.
+        -- See Note [Overlap and deriving] in GHC.Tc.Deriv.Infer.
+        InferContext{} -> do
+          (skol_subst, tvs') <- tcInstSkolTyVars skol_info tvs
+          let cls_args'    = substTys skol_subst cls_args
+              deriv_strat' = fmap (mapDerivStrategy (substTy skol_subst))
+                                  deriv_strat
+          pure (tvs', cls_args', deriv_strat')
+        -- If the instance context is supplied, we don't need to skolemise
+        -- at all.
+        SupplyContext{} -> pure (tvs, cls_args, deriv_strat)
 
     bale_out =
       failWithTc . TcRnCannotDeriveInstance cls cls_args deriv_strat NoGeneralizedNewtypeDeriving
@@ -1308,7 +1334,9 @@ mk_eqn_from_mechanism mechanism
                 , denv_tvs          = tvs
                 , denv_cls          = cls
                 , denv_inst_tys     = inst_tys
-                , denv_ctxt         = deriv_ctxt } <- ask
+                , denv_ctxt         = deriv_ctxt
+                , denv_skol_info    = skol_info } <- ask
+       user_ctxt <- askDerivUserTypeCtxt
        doDerivInstErrorChecks1 mechanism
        loc       <- lift getSrcSpanM
        dfun_name <- lift $ newDFunName cls inst_tys loc
@@ -1321,6 +1349,8 @@ mk_eqn_from_mechanism mechanism
                    , ds_name = dfun_name, ds_tvs = tvs'
                    , ds_cls = cls, ds_tys = inst_tys'
                    , ds_theta = inferred_constraints
+                   , ds_skol_info = skol_info
+                   , ds_user_ctxt = user_ctxt
                    , ds_overlap = overlap_mode
                    , ds_standalone_wildcard = wildcard
                    , ds_mechanism = mechanism' } }
@@ -1331,6 +1361,8 @@ mk_eqn_from_mechanism mechanism
                    , ds_name = dfun_name, ds_tvs = tvs
                    , ds_cls = cls, ds_tys = inst_tys
                    , ds_theta = theta
+                   , ds_skol_info = skol_info
+                   , ds_user_ctxt = user_ctxt
                    , ds_overlap = overlap_mode
                    , ds_standalone_wildcard = Nothing
                    , ds_mechanism = mechanism }

@@ -121,7 +121,6 @@ import GHC.Data.Bag
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Utils.Constants (debugIsOn)
-import GHC.Utils.Trace
 
 import Data.Coerce
 import Data.Monoid ( Endo(..) )
@@ -1539,9 +1538,7 @@ check_implic implic@(Implic { ic_tclvl = lvl
 
     check :: TcTyVar -> Maybe SDoc
     check tv | not (isTcTyVar tv)
-             = pprTrace "checkImplicationInvariants: not TcTyVar" (ppr tv) Nothing
-               -- Happens in 'deriving' code so I am punting for now
-               -- Just (ppr tv <+> text "is not a TcTyVar")
+             = Just (ppr tv <+> text "is not a TcTyVar")
              | otherwise
              = check_details tv (tcTyVarDetails tv)
 

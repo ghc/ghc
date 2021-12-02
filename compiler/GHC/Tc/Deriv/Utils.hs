@@ -10,13 +10,15 @@
 -- | Error-checking and other utilities for @deriving@ clauses or declarations.
 module GHC.Tc.Deriv.Utils (
         DerivM, DerivEnv(..),
-        DerivSpec(..), pprDerivSpec, setDerivSpecTheta,
+        DerivSpec(..), pprDerivSpec, setDerivSpecTheta, zonkDerivSpec,
         DerivSpecMechanism(..), derivSpecMechanismToStrategy, isDerivSpecStock,
-        isDerivSpecNewtype, isDerivSpecAnyClass, isDerivSpecVia,
+        isDerivSpecNewtype, isDerivSpecAnyClass,
+        isDerivSpecVia, zonkDerivSpecMechanism,
         DerivContext(..), OriginativeDerivStatus(..), StockGenFns(..),
-        isStandaloneDeriv, isStandaloneWildcardDeriv, mkDerivOrigin,
-        PredOrigin(..), ThetaOrigin(..), mkPredOrigin,
-        mkThetaOrigin, mkThetaOriginFromPreds, substPredOrigin,
+        isStandaloneDeriv, isStandaloneWildcardDeriv,
+        askDerivUserTypeCtxt, mkDerivOrigin,
+        PredSpec(..), ThetaSpec,
+        mkDirectThetaSpec, substPredSpec, captureThetaSpecConstraints,
         checkOriginativeSideConditions, hasStockDeriving,
         std_class_via_coercible, non_coercible_class,
         newDerivClsInst, extendLocalInstEnv
@@ -47,9 +49,12 @@ import GHC.Tc.Deriv.Generate
 import GHC.Tc.Deriv.Functor
 import GHC.Tc.Deriv.Generics
 import GHC.Tc.Errors.Types
+import GHC.Tc.Types.Constraint (WantedConstraints, mkNonCanonical)
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcType
+import GHC.Tc.Utils.Unify (tcSubTypeSigma)
+import GHC.Tc.Utils.Zonk
 import GHC.Builtin.Names.TH (liftClassKey)
 import GHC.Core.TyCon
 import GHC.Core.Type
@@ -57,6 +62,7 @@ import GHC.Utils.Misc
 import GHC.Types.Var.Set
 
 import Control.Monad.Trans.Reader
+import Data.Foldable (traverse_)
 import Data.Maybe
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Data.List.SetOps (assocMaybe)
@@ -84,6 +90,16 @@ isStandaloneWildcardDeriv = asks (go . denv_ctxt)
     go (InferContext wildcard) = isJust wildcard
     go (SupplyContext {})      = False
 
+-- | Return 'InstDeclCtxt' if processing with a standalone @deriving@
+-- declaration or 'DerivClauseCtxt' if processing a @deriving@ clause.
+askDerivUserTypeCtxt :: DerivM UserTypeCtxt
+askDerivUserTypeCtxt = asks (go . denv_ctxt)
+  where
+    go :: DerivContext -> UserTypeCtxt
+    go (SupplyContext {})     = InstDeclCtxt True
+    go (InferContext Just{})  = InstDeclCtxt True
+    go (InferContext Nothing) = DerivClauseCtxt
+
 -- | @'mkDerivOrigin' wc@ returns 'StandAloneDerivOrigin' if @wc@ is 'True',
 -- and 'DerivClauseOrigin' if @wc@ is 'False'. Useful for error-reporting.
 mkDerivOrigin :: Bool -> CtOrigin
@@ -98,7 +114,13 @@ data DerivEnv = DerivEnv
   { denv_overlap_mode :: Maybe OverlapMode
     -- ^ Is this an overlapping instance?
   , denv_tvs          :: [TyVar]
-    -- ^ Universally quantified type variables in the instance
+    -- ^ Universally quantified type variables in the instance. If the
+    --   @denv_ctxt@ is 'InferContext', these will be 'TcTyVar' skolems.
+    --   If the @denv_ctxt@ is 'SupplyContext', these will be ordinary 'TyVar's.
+    --   See @Note [Overlap and deriving]@ in "GHC.Tc.Deriv.Infer".
+    --
+    --   All type variables that appear in the 'denv_inst_tys', 'denv_ctxt',
+    --   'denv_skol_info', and 'denv_strat' should come from 'denv_tvs'.
   , denv_cls          :: Class
     -- ^ Class for which we need to derive an instance
   , denv_inst_tys     :: [Type]
@@ -109,6 +131,9 @@ data DerivEnv = DerivEnv
     --   'InferContext' for @deriving@ clauses, or for standalone deriving that
     --   uses a wildcard constraint.
     --   See @Note [Inferring the instance context]@.
+  , denv_skol_info    :: SkolemInfo
+    -- ^ The 'SkolemInfo' used to skolemise the @denv_tvs@ in the case where
+    --   the 'denv_ctxt' is 'InferContext'.
   , denv_strat        :: Maybe (DerivStrategy GhcTc)
     -- ^ 'Just' if user requests a particular deriving strategy.
     --   Otherwise, 'Nothing'.
@@ -120,6 +145,7 @@ instance Outputable DerivEnv where
                 , denv_cls          = cls
                 , denv_inst_tys     = inst_tys
                 , denv_ctxt         = ctxt
+                , denv_skol_info    = skol_info
                 , denv_strat        = mb_strat })
     = hang (text "DerivEnv")
          2 (vcat [ text "denv_overlap_mode" <+> ppr overlap_mode
@@ -127,6 +153,7 @@ instance Outputable DerivEnv where
                  , text "denv_cls"          <+> ppr cls
                  , text "denv_inst_tys"     <+> ppr inst_tys
                  , text "denv_ctxt"         <+> ppr ctxt
+                 , text "denv_skol_info"    <+> ppr skol_info
                  , text "denv_strat"        <+> ppr mb_strat ])
 
 data DerivSpec theta = DS { ds_loc                 :: SrcSpan
@@ -135,6 +162,8 @@ data DerivSpec theta = DS { ds_loc                 :: SrcSpan
                           , ds_theta               :: theta
                           , ds_cls                 :: Class
                           , ds_tys                 :: [Type]
+                          , ds_skol_info           :: SkolemInfo
+                          , ds_user_ctxt           :: UserTypeCtxt
                           , ds_overlap             :: Maybe OverlapMode
                           , ds_standalone_wildcard :: Maybe SrcSpan
                               -- See Note [Inferring the instance context]
@@ -143,10 +172,19 @@ data DerivSpec theta = DS { ds_loc                 :: SrcSpan
         -- This spec implies a dfun declaration of the form
         --       df :: forall tvs. theta => C tys
         -- The Name is the name for the DFun we'll build
-        -- The tyvars bind all the variables in the theta
+        -- The tyvars bind all the variables in the rest of the DerivSpec.
+        -- If we are inferring an instance context, the tyvars will be TcTyVar
+        -- skolems. After the instance context inference is over, the tyvars
+        -- will be zonked to TyVars. See
+        -- Note [Overlap and deriving] in GHC.Tc.Deriv.Infer.
 
         -- the theta is either the given and final theta, in standalone deriving,
         -- or the not-yet-simplified list of constraints together with their origin
+
+        -- The ds_skol_info is the SkolemInfo that was used to skolemise the
+        -- TcTyVars (if we are inferring an instance context). The ds_user_ctxt
+        -- is the UserTypeCtxt that allows error messages to know if we are in
+        -- a deriving clause or a standalone deriving declaration.
 
         -- ds_mechanism specifies the means by which GHC derives the instance.
         -- See Note [Deriving strategies] in GHC.Tc.Deriv
@@ -165,7 +203,7 @@ Example:
 
 pprDerivSpec :: Outputable theta => DerivSpec theta -> SDoc
 pprDerivSpec (DS { ds_loc = l, ds_name = n, ds_tvs = tvs, ds_cls = c,
-                   ds_tys = tys, ds_theta = rhs,
+                   ds_tys = tys, ds_theta = rhs, ds_skol_info = skol_info,
                    ds_standalone_wildcard = wildcard, ds_mechanism = mech })
   = hang (text "DerivSpec")
        2 (vcat [ text "ds_loc                  =" <+> ppr l
@@ -174,6 +212,7 @@ pprDerivSpec (DS { ds_loc = l, ds_name = n, ds_tvs = tvs, ds_cls = c,
                , text "ds_cls                  =" <+> ppr c
                , text "ds_tys                  =" <+> ppr tys
                , text "ds_theta                =" <+> ppr rhs
+               , text "ds_skol_info            =" <+> ppr skol_info
                , text "ds_standalone_wildcard  =" <+> ppr wildcard
                , text "ds_mechanism            =" <+> ppr mech ])
 
@@ -183,6 +222,24 @@ instance Outputable theta => Outputable (DerivSpec theta) where
 -- | Set the 'ds_theta' in a 'DerivSpec'.
 setDerivSpecTheta :: theta' -> DerivSpec theta -> DerivSpec theta'
 setDerivSpecTheta theta ds = ds{ds_theta = theta}
+
+-- | Zonk the 'TcTyVar's in a 'DerivSpec' to 'TyVar's.
+-- See @Note [What is zonking?]@ in "GHC.Tc.Utils.TcMType".
+--
+-- This is only used in the final zonking step when inferring
+-- the context for a derived instance.
+-- See @Note [Overlap and deriving]@ in "GHC.Tc.Deriv.Infer".
+zonkDerivSpec :: DerivSpec ThetaType -> TcM (DerivSpec ThetaType)
+zonkDerivSpec ds@(DS { ds_tvs = tvs, ds_theta = theta
+                     , ds_tys = tys, ds_mechanism = mechanism
+                     }) = do
+  (ze, tvs') <- zonkTyBndrs tvs
+  theta'     <- zonkTcTypesToTypesX ze theta
+  tys'       <- zonkTcTypesToTypesX ze tys
+  mechanism' <- zonkDerivSpecMechanism ze mechanism
+  pure ds{ ds_tvs = tvs', ds_theta = theta'
+         , ds_tys = tys', ds_mechanism = mechanism'
+         }
 
 -- | What action to take in order to derive a class instance.
 -- See @Note [DerivEnv and DerivSpecMechanism]@, as well as
@@ -242,6 +299,44 @@ isDerivSpecAnyClass _                 = False
 
 isDerivSpecVia (DerivSpecVia{}) = True
 isDerivSpecVia _                = False
+
+-- | Zonk the 'TcTyVar's in a 'DerivSpecMechanism' to 'TyVar's.
+-- See @Note [What is zonking?]@ in "GHC.Tc.Utils.TcMType".
+--
+-- This is only used in the final zonking step when inferring
+-- the context for a derived instance.
+-- See @Note [Overlap and deriving]@ in "GHC.Tc.Deriv.Infer".
+zonkDerivSpecMechanism :: ZonkEnv -> DerivSpecMechanism -> TcM DerivSpecMechanism
+zonkDerivSpecMechanism ze mechanism =
+  case mechanism of
+    DerivSpecStock { dsm_stock_dit     = dit
+                   , dsm_stock_gen_fns = gen_fns
+                   } -> do
+      dit' <- zonkDerivInstTys ze dit
+      pure $ DerivSpecStock { dsm_stock_dit     = dit'
+                            , dsm_stock_gen_fns = gen_fns
+                            }
+    DerivSpecNewtype { dsm_newtype_dit    = dit
+                     , dsm_newtype_rep_ty = rep_ty
+                     } -> do
+      dit'    <- zonkDerivInstTys ze dit
+      rep_ty' <- zonkTcTypeToTypeX ze rep_ty
+      pure $ DerivSpecNewtype { dsm_newtype_dit    = dit'
+                              , dsm_newtype_rep_ty = rep_ty'
+                              }
+    DerivSpecAnyClass ->
+      pure DerivSpecAnyClass
+    DerivSpecVia { dsm_via_cls_tys = cls_tys
+                 , dsm_via_inst_ty = inst_ty
+                 , dsm_via_ty      = via_ty
+                 } -> do
+      cls_tys' <- zonkTcTypesToTypesX ze cls_tys
+      inst_ty' <- zonkTcTypeToTypeX ze inst_ty
+      via_ty'  <- zonkTcTypeToTypeX ze via_ty
+      pure $ DerivSpecVia { dsm_via_cls_tys = cls_tys'
+                          , dsm_via_inst_ty = inst_ty'
+                          , dsm_via_ty      = via_ty'
+                          }
 
 instance Outputable DerivSpecMechanism where
   ppr (DerivSpecStock{dsm_stock_dit = dit})
@@ -446,34 +541,43 @@ data StockGenFns = StockGenFns
 -- otherwise knows how to generate code for (possibly requiring the use of a
 -- language extension), such as Eq, Ord, Ix, Data, Generic, etc.)
 
--- | A 'PredType' annotated with the origin of the constraint 'CtOrigin',
--- and whether or the constraint deals in types or kinds.
-data PredOrigin = PredOrigin PredType CtOrigin TypeOrKind
+-- | A 'PredSpec' specifies a constraint to emitted when inferring the
+-- instance context for a derived instance in 'GHC.Tc.Deriv.simplifyInfer'.
+data PredSpec
+  = -- | An ordinary 'PredSpec' that directly stores a 'PredType', which
+    -- will be emitted as a wanted constraint in the constraint solving
+    -- machinery. This is the simple case, as there are no skolems,
+    -- metavariables, or given constraints involved.
+    SimplePredSpec
+      { sps_pred :: TcPredType
+        -- ^ The constraint to emit as a wanted
+      , sps_origin :: CtOrigin
+        -- ^ The origin of the constraint
+      , sps_type_or_kind :: TypeOrKind
+        -- ^ Whether the constraint is a type or kind
+      }
+  | -- | A special 'PredSpec' that is only used by @DeriveAnyClass@. This
+    -- will check if @stps_ty_actual@ is a subtype of (i.e., more polymorphic
+    -- than) @stps_ty_expected@ in the constraint solving machinery, emitting an
+    -- implication constraint as a side effect. For more details on how this
+    -- works, see @Note [Gathering and simplifying constraints for DeriveAnyClass]@
+    -- in "GHC.Tc.Deriv.Infer".
+    SubTypePredSpec
+      { stps_ty_actual :: TcSigmaType
+        -- ^ The actual type. In the context of @DeriveAnyClass@, this is the
+        -- default method type signature.
+      , stps_ty_expected :: TcSigmaType
+        -- ^ The expected type. In the context of @DeriveAnyClass@, this is the
+        -- original method type signature.
+      , stps_origin :: CtOrigin
+        -- ^ The origin of the constraint
+      }
 
--- | A list of wanted 'PredOrigin' constraints ('to_wanted_origins') to
--- simplify when inferring a derived instance's context. These are used in all
--- deriving strategies, but in the particular case of @DeriveAnyClass@, we
--- need extra information. In particular, we need:
---
--- * 'to_anyclass_skols', the list of type variables bound by a class method's
---   regular type signature, which should be rigid.
---
--- * 'to_anyclass_metas', the list of type variables bound by a class method's
---   default type signature. These can be unified as necessary.
---
--- * 'to_anyclass_givens', the list of constraints from a class method's
---   regular type signature, which can be used to help solve constraints
---   in the 'to_wanted_origins'.
---
--- (Note that 'to_wanted_origins' will likely contain type variables from the
--- derived type class or data type, neither of which will appear in
--- 'to_anyclass_skols' or 'to_anyclass_metas'.)
---
--- For all other deriving strategies, it is always the case that
--- 'to_anyclass_skols', 'to_anyclass_metas', and 'to_anyclass_givens' are
--- empty.
---
--- Here is an example to illustrate this:
+-- | A list of 'PredSpec' constraints to simplify when inferring a
+-- derived instance's context. For the @stock@, @newtype@, and @via@ deriving
+-- strategies, these will consist of 'SimplePredSpec's, and for
+-- @DeriveAnyClass@, these will consist of 'SubTypePredSpec's. Here is an
+-- example to illustrate the latter:
 --
 -- @
 -- class Foo a where
@@ -488,75 +592,119 @@ data PredOrigin = PredOrigin PredType CtOrigin TypeOrKind
 -- data Quux q = Quux deriving anyclass Foo
 -- @
 --
--- Then it would generate two 'ThetaOrigin's, one for each method:
+-- Then it would generate two 'SubTypePredSpec's, one for each method:
 --
 -- @
--- [ ThetaOrigin { to_anyclass_skols  = [b]
---               , to_anyclass_metas  = [y]
---               , to_anyclass_givens = [Ix b]
---               , to_wanted_origins  = [ Show (Quux q), Ix y
---                                      , (Quux q -> b -> String) ~
---                                        (Quux q -> y -> String)
---                                      ] }
--- , ThetaOrigin { to_anyclass_skols  = []
---               , to_anyclass_metas  = []
---               , to_anyclass_givens = [Eq (Quux q)]
---               , to_wanted_origins  = [ Ord (Quux q)
---                                      , (Quux q -> Quux q -> Bool) ~
---                                        (Quux q -> Quux q -> Bool)
---                                      ] }
+-- [ SubTypePredSpec
+--     { stps_ty_actual   = forall y. (Show (Quux q), Ix y) => Quux q -> y -> String
+--     , stps_ty_expected = forall b.                (Ix b) => Quux q -> b -> String
+--     , stps_ty_origin   = DerivClauseCtxt
+--     }
+-- , SubTypePredSpec
+--     { stps_ty_actual   = Ord (Quux q) => Quux q -> Quux q -> Bool
+--     , stps_ty_expected = Eq  (Quux q) => Quux q -> Quux q -> Bool
+--     , stps_ty_origin   = DerivClauseCtxt
+--     }
 -- ]
 -- @
 --
 -- (Note that the type variable @q@ is bound by the data type @Quux@, and thus
--- it appears in neither 'to_anyclass_skols' nor 'to_anyclass_metas'.)
+-- appears free in the 'stps_ty_actual's and 'stps_ty_expected's.)
 --
 -- See @Note [Gathering and simplifying constraints for DeriveAnyClass]@
--- in "GHC.Tc.Deriv.Infer" for an explanation of how 'to_wanted_origins' are
--- determined in @DeriveAnyClass@, as well as how 'to_anyclass_skols',
--- 'to_anyclass_metas', and 'to_anyclass_givens' are used.
-data ThetaOrigin
-  = ThetaOrigin { to_anyclass_skols  :: [TyVar]
-                , to_anyclass_metas  :: [TyVar]
-                , to_anyclass_givens :: ThetaType
-                , to_wanted_origins  :: [PredOrigin] }
+-- in "GHC.Tc.Deriv.Infer" for an explanation of how these 'SubTypePredSpec's
+-- are used to compute implication constraints.
+type ThetaSpec = [PredSpec]
 
-instance Outputable PredOrigin where
-  ppr (PredOrigin ty _ _) = ppr ty -- The origin is not so interesting when debugging
+instance Outputable PredSpec where
+  ppr (SimplePredSpec{sps_pred = ty}) =
+    hang (text "SimplePredSpec")
+       2 (vcat [ text "sps_pred" <+> ppr ty ])
+  ppr (SubTypePredSpec { stps_ty_actual = ty_actual
+                       , stps_ty_expected = ty_expected }) =
+    hang (text "SubTypePredSpec")
+       2 (vcat [ text "stps_ty_actual"   <+> ppr ty_actual
+               , text "stps_ty_expected" <+> ppr ty_expected
+               ])
 
-instance Outputable ThetaOrigin where
-  ppr (ThetaOrigin { to_anyclass_skols  = ac_skols
-                   , to_anyclass_metas  = ac_metas
-                   , to_anyclass_givens = ac_givens
-                   , to_wanted_origins  = wanted_origins })
-    = hang (text "ThetaOrigin")
-         2 (vcat [ text "to_anyclass_skols  =" <+> ppr ac_skols
-                 , text "to_anyclass_metas  =" <+> ppr ac_metas
-                 , text "to_anyclass_givens =" <+> ppr ac_givens
-                 , text "to_wanted_origins  =" <+> ppr wanted_origins ])
+-- | Build a list of 'SimplePredSpec's, using the supplied 'CtOrigin' and
+-- 'TypeOrKind' values for each 'PredType'.
+mkDirectThetaSpec :: CtOrigin -> TypeOrKind -> ThetaType -> ThetaSpec
+mkDirectThetaSpec origin t_or_k =
+  map (\p -> SimplePredSpec
+               { sps_pred = p
+               , sps_origin = origin
+               , sps_type_or_kind = t_or_k
+               })
 
-mkPredOrigin :: CtOrigin -> TypeOrKind -> PredType -> PredOrigin
-mkPredOrigin origin t_or_k pred = PredOrigin pred origin t_or_k
+substPredSpec :: HasCallStack => TCvSubst -> PredSpec -> PredSpec
+substPredSpec subst ps =
+  case ps of
+    SimplePredSpec { sps_pred = pred
+                   , sps_origin = origin
+                   , sps_type_or_kind = t_or_k
+                   }
+      -> SimplePredSpec { sps_pred = substTy subst pred
+                        , sps_origin = origin
+                        , sps_type_or_kind = t_or_k
+                        }
 
-mkThetaOrigin :: CtOrigin -> TypeOrKind
-              -> [TyVar] -> [TyVar] -> ThetaType -> ThetaType
-              -> ThetaOrigin
-mkThetaOrigin origin t_or_k skols metas givens wanteds
-  = ThetaOrigin { to_anyclass_skols  = skols
-                , to_anyclass_metas  = metas
-                , to_anyclass_givens = givens
-                , to_wanted_origins  = map (mkPredOrigin origin t_or_k) wanteds }
+    SubTypePredSpec { stps_ty_actual = ty_actual
+                    , stps_ty_expected = ty_expected
+                    , stps_origin = origin
+                    }
+      -> SubTypePredSpec { stps_ty_actual = substTy subst ty_actual
+                         , stps_ty_expected = substTy subst ty_expected
+                         , stps_origin = origin
+                         }
 
--- A common case where the ThetaOrigin only contains wanted constraints, with
--- no givens or locally scoped type variables.
-mkThetaOriginFromPreds :: [PredOrigin] -> ThetaOrigin
-mkThetaOriginFromPreds origins
-  = ThetaOrigin { to_anyclass_skols = [], to_anyclass_metas = []
-                , to_anyclass_givens = [], to_wanted_origins = origins }
+-- | Capture wanted constraints from a 'ThetaSpec'.
+captureThetaSpecConstraints ::
+     UserTypeCtxt -- ^ Used to inform error messages as to whether
+                  -- we are in a @deriving@ clause or a standalone
+                  -- @deriving@ declaration
+  -> ThetaSpec    -- ^ The specs from which constraints will be created
+  -> TcM (TcLevel, WantedConstraints)
+captureThetaSpecConstraints user_ctxt theta =
+  pushTcLevelM $ mk_wanteds theta
+  where
+    -- Create the constraints we need to solve. For stock and newtype
+    -- deriving, these constraints will be simple wanted constraints
+    -- like (C a, Ord b).
+    -- But with DeriveAnyClass, we make an implication constraint.
+    -- See Note [Gathering and simplifying constraints for DeriveAnyClass]
+    -- in GHC.Tc.Deriv.Infer.
+    mk_wanteds :: ThetaSpec -> TcM WantedConstraints
+    mk_wanteds preds
+      = do { (_, wanteds) <- captureConstraints $
+                             traverse_ emit_constraints preds
+           ; pure wanteds }
 
-substPredOrigin :: HasCallStack => TCvSubst -> PredOrigin -> PredOrigin
-substPredOrigin subst (PredOrigin pred origin t_or_k)
-  = PredOrigin (substTy subst pred) origin t_or_k
+    -- Emit the appropriate constraints depending on what sort of
+    -- PredSpec we are dealing with.
+    emit_constraints :: PredSpec -> TcM ()
+    emit_constraints ps =
+      case ps of
+        -- For constraints like (C a, Ord b), emit the
+        -- constraints directly as simple wanted constraints.
+        SimplePredSpec { sps_pred = wanted
+                       , sps_origin = orig
+                       , sps_type_or_kind = t_or_k
+                       } -> do
+          ev <- newWanted orig (Just t_or_k) wanted
+          emitSimple (mkNonCanonical ev)
+
+        -- For DeriveAnyClass, check if ty_actual is a subtype of
+        -- ty_expected, which emits an implication constraint as a
+        -- side effect. See
+        -- Note [Gathering and simplifying constraints for DeriveAnyClass].
+        -- in GHC.Tc.Deriv.Infer.
+        SubTypePredSpec { stps_ty_actual   = ty_actual
+                        , stps_ty_expected = ty_expected
+                        , stps_origin      = orig
+                        } -> do
+          _ <- tcSubTypeSigma orig user_ctxt ty_actual ty_expected
+          return ()
 
 {-
 ************************************************************************

@@ -39,7 +39,7 @@ module GHC.Tc.Deriv.Generate (
 
         getPossibleDataCons,
         DerivInstTys(..), buildDataConInstArgEnv,
-        derivDataConInstArgTys, substDerivInstTys
+        derivDataConInstArgTys, substDerivInstTys, zonkDerivInstTys
     ) where
 
 import GHC.Prelude
@@ -65,6 +65,7 @@ import GHC.Types.SrcLoc
 import GHC.Core.TyCon
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcType
+import GHC.Tc.Utils.Zonk
 import GHC.Tc.Validity ( checkValidCoAxBranch )
 import GHC.Core.Coercion.Axiom ( coAxiomSingleBranch )
 import GHC.Builtin.Types.Prim
@@ -2694,6 +2695,12 @@ getPossibleDataCons tycon tycon_args = filter isPossible $ tyConDataCons tycon
 -- @dit_cls_tys ++ ['mkTyConApp' dit_tc dit_tc_args]@. Other parts of the
 -- instance declaration can be found in the 'DerivEnv'. For example, the @Cls@
 -- in the example above corresponds to the 'denv_cls' field of 'DerivEnv'.
+--
+-- Similarly, the type variables that appear in a 'DerivInstTys' value are the
+-- same type variables as the 'denv_tvs' in the parent 'DerivEnv'. Accordingly,
+-- if we are inferring an instance context, the type variables will be 'TcTyVar'
+-- skolems. Otherwise, they will be ordinary 'TyVar's.
+-- See @Note [Overlap and deriving]@ in "GHC.Tc.Deriv.Infer".
 data DerivInstTys = DerivInstTys
   { dit_cls_tys     :: [Type]
     -- ^ Other arguments to the class except the last
@@ -2770,6 +2777,26 @@ substDerivInstTys subst
     cls_tys'     = substTys subst cls_tys
     tc_args'     = substTys subst tc_args
     rep_tc_args' = substTys subst rep_tc_args
+
+-- | Zonk the 'TcTyVar's in a 'DerivInstTys' value to 'TyVar's.
+-- See @Note [What is zonking?]@ in "GHC.Tc.Utils.TcMType".
+--
+-- This is only used in the final zonking step when inferring
+-- the context for a derived instance.
+-- See @Note [Overlap and deriving]@ in "GHC.Tc.Deriv.Infer".
+zonkDerivInstTys :: ZonkEnv -> DerivInstTys -> TcM DerivInstTys
+zonkDerivInstTys ze dit@(DerivInstTys { dit_cls_tys = cls_tys
+                                      , dit_tc_args = tc_args
+                                      , dit_rep_tc = rep_tc
+                                      , dit_rep_tc_args = rep_tc_args }) = do
+  cls_tys'     <- zonkTcTypesToTypesX ze cls_tys
+  tc_args'     <- zonkTcTypesToTypesX ze tc_args
+  rep_tc_args' <- zonkTcTypesToTypesX ze rep_tc_args
+  pure dit{ dit_cls_tys         = cls_tys'
+          , dit_tc_args         = tc_args'
+          , dit_rep_tc_args     = rep_tc_args'
+          , dit_dc_inst_arg_env = buildDataConInstArgEnv rep_tc rep_tc_args'
+          }
 
 {-
 Note [Auxiliary binders]
