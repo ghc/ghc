@@ -27,7 +27,7 @@ import GHC.Types.Var.Env
 import GHC.Utils.Misc (strictMap)
 
 import Data.List (mapAccumL)
-import {-# SOURCE #-} GHC.Tc.Utils.TcMType ( tidySkolemInfo )
+import {-# SOURCE #-} GHC.Tc.Utils.TcMType ( )
 
 {-
 %************************************************************************
