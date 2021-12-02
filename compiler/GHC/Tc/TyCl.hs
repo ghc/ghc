@@ -1577,7 +1577,7 @@ kcTyClDecl :: TyClDecl GhcRn -> TcTyCon -> TcM ()
 --    result kind signature have already been dealt with
 --    by inferInitialKind, so we can ignore them here.
 
-kcTyClDecl (DataDecl { tcdLName    = (L _ name), tcdDataDefn = defn }) tycon
+kcTyClDecl (DataDecl { tcdLName    = (L _ _name), tcdDataDefn = defn }) tycon
   | HsDataDefn { dd_ctxt = ctxt, dd_cons = cons, dd_ND = new_or_data } <- defn
   = --bindTyClTyVars (TyConSkol callStack DataTypeFlavour name) name $ \ _ binders _ ->
 
@@ -1591,14 +1591,14 @@ kcTyClDecl (DataDecl { tcdLName    = (L _ name), tcdDataDefn = defn }) tycon
        ; kcConDecls new_or_data (tyConResKind tycon) cons
        }
 
-kcTyClDecl (SynDecl { tcdLName = L _ name, tcdRhs = rhs }) tycon
+kcTyClDecl (SynDecl { tcdLName = L _ _name, tcdRhs = rhs }) tycon
   = tcExtendNameTyVarEnv (tcTyConScopedTyVars tycon) $
     let res_kind = tyConResKind tycon
     in discardResult $ tcCheckLHsType rhs (TheKind res_kind)
         -- NB: check against the result kind that we allocated
         -- in inferInitialKinds.
 
-kcTyClDecl (ClassDecl { tcdLName = L _ name
+kcTyClDecl (ClassDecl { tcdLName = L _ _name
                       , tcdCtxt = ctxt, tcdSigs = sigs }) tycon
   = tcExtendNameTyVarEnv (tcTyConScopedTyVars tycon) $
     do  { _ <- tcHsContext ctxt

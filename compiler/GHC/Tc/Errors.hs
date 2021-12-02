@@ -90,6 +90,7 @@ import Data.List        ( groupBy, partition, mapAccumL
 import Data.Ord         ( comparing )
 -- import Data.Semigroup   ( Semigroup )
 import qualified Data.Semigroup as Semigroup
+import GHC.Utils.Trace
 
 
 {-
