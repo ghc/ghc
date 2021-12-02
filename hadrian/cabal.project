@@ -1,7 +1,7 @@
 packages: ./
 
 -- This essentially freezes the build plan for hadrian
-index-state: 2021-03-03T13:52:16Z
+index-state: 2021-11-29T22:22:49Z
 
 -- N.B. Compile with -O0 since this is not a performance-critical executable
 -- and the Cabal takes nearly twice as long to build with -O1. See #16817.
