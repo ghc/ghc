@@ -363,8 +363,11 @@ def cleanup_and_exit(exitcode):
         shutil.rmtree(tempdir, ignore_errors=True)
     exit(exitcode)
 
-def geometric_mean(xs: List[float]) -> float:
-    return reduce(operator.mul, xs)**(1. / len(xs))
+def geometric_mean(xs):
+    if len(xs) > 0:
+      return reduce(operator.mul, xs)**(1. / len(xs))
+    else:
+      return 1
 
 def tabulate_metrics(metrics: List[PerfMetric]) -> None:
     abbrevLen = get_abbrev_hash_length()
