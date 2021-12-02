@@ -118,8 +118,8 @@ tidyOpenTyCoVar env@(_, subst) tyvar
 tidyTyCoVarOcc :: TidyEnv -> TyCoVar -> TyCoVar
 tidyTyCoVarOcc env@(_, subst) tv
   = case lookupVarEnv subst tv of
-        Nothing  ->
-          updateTcTyVarSkolemInfo (tidySkolemInfo env) $ updateVarType (tidyType env) tv
+        Nothing  -> updateVarType (tidyType env) tv
+--          updateTcTyVarSkolemInfo (tidySkolemInfo env) $
         Just tv' -> tv'
 
 ---------------

@@ -1579,7 +1579,9 @@ kcTyClDecl :: TyClDecl GhcRn -> TcTyCon -> TcM ()
 
 kcTyClDecl (DataDecl { tcdLName    = (L _ name), tcdDataDefn = defn }) tycon
   | HsDataDefn { dd_ctxt = ctxt, dd_cons = cons, dd_ND = new_or_data } <- defn
-  = bindTyClTyVars (TyConSkol callStack DataTypeFlavour name) name $ \ _ _ _ ->
+  = --bindTyClTyVars (TyConSkol callStack DataTypeFlavour name) name $ \ _ binders _ ->
+
+    tcExtendNameTyVarEnv (tcTyConScopedTyVars tycon) $
        -- NB: binding these tyvars isn't necessary for GADTs, but it does no
        -- harm.  For GADTs, each data con brings its own tyvars into scope,
        -- and the ones from this bindTyClTyVars are either not mentioned or
@@ -1589,15 +1591,16 @@ kcTyClDecl (DataDecl { tcdLName    = (L _ name), tcdDataDefn = defn }) tycon
        ; kcConDecls new_or_data (tyConResKind tycon) cons
        }
 
-kcTyClDecl (SynDecl { tcdLName = L _ name, tcdRhs = rhs }) _tycon
-  = bindTyClTyVars (TyConSkol callStack TypeSynonymFlavour name) name $ \ _ _ res_kind ->
-    discardResult $ tcCheckLHsType rhs (TheKind res_kind)
+kcTyClDecl (SynDecl { tcdLName = L _ name, tcdRhs = rhs }) tycon
+  = tcExtendNameTyVarEnv (tcTyConScopedTyVars tycon) $
+    let res_kind = tyConResKind tycon
+    in discardResult $ tcCheckLHsType rhs (TheKind res_kind)
         -- NB: check against the result kind that we allocated
         -- in inferInitialKinds.
 
 kcTyClDecl (ClassDecl { tcdLName = L _ name
-                      , tcdCtxt = ctxt, tcdSigs = sigs }) _tycon
-  = bindTyClTyVars (TyConSkol callStack ClassFlavour name) name $ \ _ _ _ ->
+                      , tcdCtxt = ctxt, tcdSigs = sigs }) tycon
+  = tcExtendNameTyVarEnv (tcTyConScopedTyVars tycon) $
     do  { _ <- tcHsContext ctxt
         ; mapM_ (wrapLocMA_ kc_sig) sigs }
   where
@@ -3149,7 +3152,8 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
 
        -- See Note [Generalising in tcTyFamInstEqnGuts]
        ; dvs  <- candidateQTyVarsOfTypes (lhs_ty : mkTyVarTys outer_tvs)
-       ; qtvs <- quantifyTyVars unkSkol TryNotToDefaultNonStandardTyVars dvs
+       -- MP: @rae these qtvs end up in a no skolem info message for T14904a
+       ; qtvs <- quantifyTyVars FamInstSkol TryNotToDefaultNonStandardTyVars dvs
        ; reportUnsolvedEqualities FamInstSkol qtvs tclvl wanted
        ; checkFamTelescope tclvl outer_hs_bndrs outer_tvs
 

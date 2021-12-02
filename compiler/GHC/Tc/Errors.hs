@@ -1299,7 +1299,9 @@ mkHoleError lcl_name_cache tidy_simples ctxt hole@(Hole { hole_occ = occ
                             then validHoleFits ctxt tidy_simples hole
                             else return (ctxt, empty)
 
-       ; let err = important hole_msg `mappend`
+
+       ; zonked_skol_tvs <- mapM zonkTyVarSkolemInfo skol_tvs
+       ; let err = important (hole_msg zonked_skol_tvs) `mappend`
                    mk_relevant_bindings (binds_msg $$ constraints_msg) `mappend`
                    valid_hole_fits sub_msg
 
@@ -1315,16 +1317,16 @@ mkHoleError lcl_name_cache tidy_simples ctxt hole@(Hole { hole_occ = occ
     hole_kind   = tcTypeKind hole_ty
     tyvars      = tyCoVarsOfTypeList hole_ty
 
-    hole_msg = case sort of
+    hole_msg zonked_skol_tvs = case sort of
       ExprHole _ -> vcat [ hang (text "Found hole:")
                             2 (pp_occ_with_type occ hole_ty)
-                         , tyvars_msg, expr_hole_hint ]
+                         , tyvars_msg zonked_skol_tvs, expr_hole_hint ]
       TypeHole -> vcat [ hang (text "Found type wildcard" <+> quotes (ppr occ))
                             2 (text "standing for" <+> quotes pp_hole_type_with_kind)
-                       , tyvars_msg, type_hole_hint ]
+                       , tyvars_msg zonked_skol_tvs, type_hole_hint ]
       ConstraintHole -> vcat [ hang (text "Found extra-constraints wildcard standing for")
                                   2 (quotes $ pprType hole_ty)  -- always kind constraint
-                             , tyvars_msg, type_hole_hint ]
+                             , tyvars_msg zonked_skol_tvs, type_hole_hint ]
 
     pp_hole_type_with_kind
       | isLiftedTypeKind hole_kind
@@ -1334,12 +1336,13 @@ mkHoleError lcl_name_cache tidy_simples ctxt hole@(Hole { hole_occ = occ
       | otherwise
       = pprType hole_ty <+> dcolon <+> pprKind hole_kind
 
-    tyvars_msg = ppUnless (null tyvars) $
+    is_skol tv = isTcTyVar tv && isSkolemTyVar tv
+    (skol_tvs, other_tvs) = partition is_skol tyvars
+
+    tyvars_msg zonked_skol_tvs = ppUnless (null tyvars) $
                  text "Where:" <+> (vcat (map loc_msg other_tvs)
-                                    $$ pprSkols ctxt skol_tvs)
+                                    $$ pprSkols ctxt zonked_skol_tvs)
        where
-         (skol_tvs, other_tvs) = partition is_skol tyvars
-         is_skol tv = isTcTyVar tv && isSkolemTyVar tv
                       -- Coercion variables can be free in the
                       -- hole, via kind casts
 
@@ -1647,7 +1650,11 @@ mkTyVarEqErr :: ReportErrCtxt -> Report -> Ct
 mkTyVarEqErr ctxt report ct tv1 ty2
   = do { traceTc "mkTyVarEqErr" (ppr ct $$ ppr tv1 $$ ppr ty2)
        ; dflags <- getDynFlags
-       ; return $ mkTyVarEqErr' dflags ctxt report ct tv1 ty2 }
+       ; zonked_skol_tv <- zonkTyVarSkolemInfo tv1
+       ; zonked_ty2 <- case tcGetCastedTyVar_maybe ty2 of
+                    Just (tv, co) -> flip mkCastTy co . mkTyVarTy <$> zonkTyVarSkolemInfo tv
+                    Nothing      -> pure ty2
+       ; return $ mkTyVarEqErr' dflags ctxt report ct zonked_skol_tv zonked_ty2 }
 
 mkTyVarEqErr' :: DynFlags -> ReportErrCtxt -> Report -> Ct
               -> TcTyVar -> TcType -> Report

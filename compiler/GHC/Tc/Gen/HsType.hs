@@ -4181,7 +4181,7 @@ tcHsPatSigType ctxt hole_mode
     new_implicit_tv name
       = do { kind <- newMetaKindVar
            ; tv   <- case ctxt of
-                       RuleSigCtxt {}  -> newSkolemTyVar unkSkol name kind
+                       RuleSigCtxt rname _  -> newSkolemTyVar (RuleSkol rname) name kind
                        _              -> newPatSigTyVar name kind
                        -- See Note [Typechecking pattern signature binders]
              -- NB: tv's Name may be fresh (in the case of newPatSigTyVar)
