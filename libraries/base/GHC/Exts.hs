@@ -24,23 +24,28 @@
 
 module GHC.Exts
        (
-        -- * Representations of some basic types
-        Int(..),Word(..),Float(..),Double(..),
-        Char(..),
+        -- * Primitive types
+
+        FUN, TYPE, -- See https://gitlab.haskell.org/ghc/ghc/issues/18302
+
+        -- ** Pointer types
         Ptr(..), FunPtr(..),
 
-        -- * The maximum tuple size
-        maxTupleSize,
+        -- ** Other primitive types
+        module GHC.Types,
 
         -- * Primitive operations
-        FUN, -- See https://gitlab.haskell.org/ghc/ghc/issues/18302
+
         module GHC.Prim,
         module GHC.Prim.Ext,
-        shiftL#, shiftRL#, iShiftL#, iShiftRA#, iShiftRL#,
-        isTrue#,
-        Void#, -- Previously exported by GHC.Prim
 
-        -- * Pointer comparison operations
+        -- ** Running 'RealWorld' state thread
+        runRW#,
+
+        -- ** Bit shift operations
+        shiftL#, shiftRL#, iShiftL#, iShiftRA#, iShiftRL#,
+
+        -- ** Pointer comparison operations
         -- See `Note [Pointer comparison operations]` in primops.txt.pp
         reallyUnsafePtrEquality,
         eqStableName#,
@@ -57,10 +62,10 @@ module GHC.Exts
         sameTVar#,
         sameIOPort#,
 
-        -- * Compat wrapper
+        -- ** Compat wrapper
         atomicModifyMutVar#,
 
-        -- * Resize functions
+        -- ** Resize functions
         --
         -- | Resizing arrays of boxed elements is currently handled in
         -- library space (rather than being a primop) since there is not
@@ -68,13 +73,20 @@ module GHC.Exts
         -- may become primops in a future release of GHC.
         resizeSmallMutableArray#,
 
-        -- * Fusion
+        -- ** Fusion
         build, augment,
 
-        -- * Overloaded string literals
+        -- * Overloaded lists
+        IsList(..),
+
+        -- * Transform comprehensions
+        Down(..), groupWith, sortWith, the,
+
+        -- * Strings
+        -- ** Overloaded string literals
         IsString(..),
 
-        -- * CString
+        -- ** CString
         unpackCString#,
         unpackAppendCString#,
         unpackFoldrCString#,
@@ -83,59 +95,46 @@ module GHC.Exts
         cstringLength#,
 
         -- * Debugging
+        -- ** Breakpoints
         breakpoint, breakpointCond,
 
-        -- * Ids with special behaviour
-        inline, noinline, lazy, oneShot, considerAccessible, SPEC (..),
-
-        -- * Running 'RealWorld' state thread
-        runRW#,
-
-        -- * Casting class dictionaries with single methods
-        withDict,
-
-        -- * Safe coercions
-        --
-        -- | These are available from the /Trustworthy/ module "Data.Coerce" as well
-        --
-        -- @since 4.7.0.0
-        Data.Coerce.coerce, Data.Coerce.Coercible,
-
-        -- * Very unsafe coercion
-        unsafeCoerce#,
-
-        -- * Equality
-        type (~~),
-
-        -- * Representation polymorphism
-        GHC.Prim.TYPE, RuntimeRep(..), Levity(..),
-        LiftedRep, UnliftedRep, UnliftedType,
-        VecCount(..), VecElem(..),
-
-        -- * Transform comprehensions
-        Down(..), groupWith, sortWith, the,
-
-        -- * Event logging
+        -- ** Event logging
         traceEvent,
 
-        -- * SpecConstr annotations
-        SpecConstrAnnotation(..),
-
-        -- * The call stack
+        -- ** The call stack
         currentCallStack,
 
-        -- * The Constraint kind
-        Constraint,
+        -- * Ids with special behaviour
+        inline, noinline, lazy, oneShot, considerAccessible,
 
-        -- * The Any type
-        Any,
+        -- * SpecConstr annotations
+        SpecConstrAnnotation(..), SPEC (..),
 
-        -- * Overloaded lists
-        IsList(..)
+        -- * Coercions
+        -- ** Safe coercions
+        --
+        -- | These are available from the /Trustworthy/ module "Data.Coerce" as well.
+        --
+        -- @since 4.7.0.0
+        Data.Coerce.coerce,
+
+        -- ** Very unsafe coercion
+        unsafeCoerce#,
+
+        -- ** Casting class dictionaries with single methods
+        withDict,
+
+        -- * The maximum tuple size
+        maxTupleSize,
        ) where
 
-import GHC.Prim hiding ( coerce, TYPE )
-import qualified GHC.Prim
+import GHC.Prim hiding ( coerce )
+import GHC.Types
+  hiding ( IO   -- Exported from "GHC.IO"
+         , Type -- Exported from "Data.Kind"
+
+           -- GHC's internal representation of 'TyCon's, for 'Typeable'
+         , Module, TrName, TyCon, TypeLitSort, KindRep, KindBndr )
 import qualified GHC.Prim.Ext
 import GHC.Base hiding ( coerce )
 import GHC.Ptr

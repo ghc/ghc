@@ -27,6 +27,7 @@ module GHC.Types (
         --    Lists:          []( [], (:) )
         --    Type equality:  (~)( Eq# )
 
+        -- * Built-in types
         Bool(..), Char(..), Int(..), Word(..),
         Float(..), Double(..),
         Ordering(..), IO(..),
@@ -34,7 +35,11 @@ module GHC.Types (
         SPEC(..),
         Symbol,
         Any,
+
+        -- * Type equality
         type (~~), Coercible,
+
+        -- * Representation polymorphism
         TYPE, Levity(..), RuntimeRep(..),
         LiftedRep, UnliftedRep,
         Type, UnliftedType, Constraint,
@@ -45,12 +50,12 @@ module GHC.Types (
         VecCount(..), VecElem(..),
         Void#,
 
+        -- * Multiplicity types
+        Multiplicity(..), MultMul,
+
         -- * Runtime type representation
         Module(..), TrName(..), TyCon(..), TypeLitSort(..),
         KindRep(..), KindBndr,
-
-        -- * Multiplicity Types
-        Multiplicity(..), MultMul
     ) where
 
 import GHC.Prim

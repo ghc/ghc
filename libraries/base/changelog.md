@@ -27,6 +27,8 @@
 
     These new operators have the same fixity as the originals.
 
+  * `GHC.Exts` now re-exports `Multiplicity` and `MultMul`.
+
 ## 4.16.0.0 *Nov 2021*
 
   * The unary tuple type, `Solo`, is now exported by `Data.Tuple`.
