@@ -1119,7 +1119,7 @@ mmapForLinker (size_t bytes, uint32_t prot, uint32_t flags, int fd, int offset)
 mmap_again:
 #endif
 
-   if (mmap_32bit_base != 0) {
+   if (mmap_32bit_base != NULL) {
        map_addr = mmap_32bit_base;
    }
 
@@ -1128,6 +1128,10 @@ mmap_again:
    IF_DEBUG(linker_verbose,
             debugBelch("mmapForLinker: \tflags      %#0x\n",
                        MAP_PRIVATE | tryMap32Bit | fixed | flags));
+   IF_DEBUG(linker_verbose,
+            debugBelch("mmapForLinker: \tsize       %#0zx\n", bytes));
+   IF_DEBUG(linker_verbose,
+            debugBelch("mmapForLinker: \tmap_addr   %p\n", map_addr));
 
    result = mmap(map_addr, size, prot,
                  MAP_PRIVATE|tryMap32Bit|fixed|flags, fd, offset);
@@ -1140,10 +1144,9 @@ mmap_again:
 
 #if defined(MAP_LOW_MEM)
    if (RtsFlags.MiscFlags.linkerAlwaysPic) {
-   } else if (mmap_32bit_base != 0) {
-       if (result == map_addr) {
-           mmap_32bit_base = (StgWord8*)map_addr + size;
-       } else {
+       /* make no attempt at mapping low memory if we are assuming PIC */
+   } else if (mmap_32bit_base != NULL) {
+       if (result != map_addr) {
            if ((W_)result > 0x80000000) {
                // oops, we were given memory over 2Gb
                munmap(result,size);
@@ -1164,9 +1167,7 @@ mmap_again:
 #endif
            } else {
                // hmm, we were given memory somewhere else, but it's
-               // still under 2Gb so we can use it.  Next time, ask
-               // for memory right after the place we just got some
-               mmap_32bit_base = (StgWord8*)result + size;
+               // still under 2Gb so we can use it.
            }
        }
    } else {
@@ -1186,10 +1187,7 @@ mmap_again:
 #elif (defined(aarch64_TARGET_ARCH) || defined(aarch64_HOST_ARCH))
     // for aarch64 we need to make sure we stay within 4GB of the
     // mmap_32bit_base, and we also do not want to update it.
-//    if (mmap_32bit_base != (void*)&stg_upd_frame_info) {
-    if (result == map_addr) {
-        mmap_32bit_base = (void*)((uintptr_t)map_addr + size);
-    } else {
+    if (result != map_addr) {
         // upper limit 4GB - size of the object file - 1mb wiggle room.
         if(llabs((uintptr_t)result - (uintptr_t)&stg_upd_frame_info) > (2<<32) - size - (2<<20)) {
             // not within range :(
@@ -1200,20 +1198,23 @@ mmap_again:
             // TODO: some abort/mmap_32bit_base recomputation based on
             //       if mmap_32bit_base is changed, or still at stg_upd_frame_info
             goto mmap_again;
-        } else {
-            mmap_32bit_base = (void*)((uintptr_t)result + size);
         }
     }
-//   }
 #endif
 
-   IF_DEBUG(linker_verbose,
-            debugBelch("mmapForLinker: mapped %" FMT_Word
-                       " bytes starting at %p\n", (W_)size, result));
-   IF_DEBUG(linker_verbose,
-            debugBelch("mmapForLinker: done\n"));
+    if (mmap_32bit_base != NULL) {
+       // Next time, ask for memory right after our new mapping to maximize the
+       // chance that we get low memory.
+        mmap_32bit_base = (void*) ((uintptr_t)result + size);
+    }
 
-   return result;
+    IF_DEBUG(linker_verbose,
+             debugBelch("mmapForLinker: mapped %" FMT_Word
+                        " bytes starting at %p\n", (W_)size, result));
+    IF_DEBUG(linker_verbose,
+             debugBelch("mmapForLinker: done\n"));
+
+    return result;
 }
 
 /*
