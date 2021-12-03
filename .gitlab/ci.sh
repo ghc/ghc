@@ -219,7 +219,6 @@ function set_toolchain_paths() {
     *) fail "bad toolchain_source"
   esac
 
-  export CC
   export GHC
   export CABAL
   export HAPPY
@@ -254,7 +253,6 @@ function setup() {
   info "====================================================="
   info "Toolchain versions"
   info "====================================================="
-  show_tool CC
   show_tool GHC
   show_tool CABAL
   show_tool HAPPY
