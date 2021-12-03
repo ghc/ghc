@@ -462,6 +462,7 @@ usage_text[] = {
 "  -Dp  DEBUG: prof",
 "  -Da  DEBUG: apply",
 "  -Dl  DEBUG: linker",
+"  -DL  DEBUG: linker (verbose)",
 "  -Dm  DEBUG: stm",
 "  -Dz  DEBUG: stack squeezing",
 "  -Dc  DEBUG: program coverage",
@@ -2145,6 +2146,7 @@ static void read_debug_flags(const char* arg)
             break;
         case 'L':
             RtsFlags.DebugFlags.linker_verbose = true;
+            RtsFlags.DebugFlags.linker = true;
             break;
         case 'a':
             RtsFlags.DebugFlags.apply = true;
