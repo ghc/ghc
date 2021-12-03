@@ -1361,6 +1361,7 @@ recommended for everyday use!
 .. rts-flag::  -Dp  DEBUG: prof
 .. rts-flag::  -Da  DEBUG: apply
 .. rts-flag::  -Dl  DEBUG: linker
+.. rts-flag::  -DL  DEBUG: linker (verbose); implies :rts-flag:`-Dl`
 .. rts-flag::  -Dm  DEBUG: stm
 .. rts-flag::  -Dz  DEBUG: stack squeezing
 .. rts-flag::  -Dc  DEBUG: program coverage
