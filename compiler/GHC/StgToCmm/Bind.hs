@@ -400,7 +400,7 @@ cgRhsStdThunk bndr lf_info payload
        }
  where
  gen_code reg  -- AHA!  A STANDARD-FORM THUNK
-  = withNewTickyCounterStdThunk (lfUpdatable lf_info) (bndr) [] $ -- TODO
+  = withNewTickyCounterStdThunk (lfUpdatable lf_info) (bndr) payload $ -- TODO
     do
   {     -- LAY OUT THE OBJECT
     mod_name <- getModuleName

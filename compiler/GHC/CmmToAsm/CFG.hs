@@ -98,6 +98,9 @@ type Prob = Double
 type Edge = (BlockId, BlockId)
 type Edges = [Edge]
 
+
+foo = 1
+
 newtype EdgeWeight
   = EdgeWeight { weightToDouble :: Double }
   deriving (Eq,Ord,Enum,Num,Real,Fractional)
