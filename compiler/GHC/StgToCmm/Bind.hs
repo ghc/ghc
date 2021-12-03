@@ -400,7 +400,7 @@ cgRhsStdThunk bndr lf_info payload
        }
  where
  gen_code reg  -- AHA!  A STANDARD-FORM THUNK
-  = withNewTickyCounterStdThunk (lfUpdatable lf_info) (bndr) $
+  = withNewTickyCounterStdThunk (lfUpdatable lf_info) (bndr) [] $ -- TODO
     do
   {     -- LAY OUT THE OBJECT
     mod_name <- getModuleName
@@ -472,7 +472,8 @@ closureCodeBody top_lvl bndr cl_info cc [] body fv_details
   = withNewTickyCounterThunk
         (isStaticClosure cl_info)
         (closureUpdReqd cl_info)
-        (closureName cl_info) $
+        (closureName cl_info)
+        (map fst fv_details) $
     emitClosureProcAndInfoTable top_lvl bndr lf_info info_tbl [] $
       \(_, node, _) -> thunkCode cl_info fv_details cc node body
    where

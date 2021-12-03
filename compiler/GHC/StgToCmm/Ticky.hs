@@ -143,12 +143,30 @@ import Control.Monad ( when )
 import GHC.Types.Id.Info
 import GHC.Utils.Trace
 import GHC.StgToCmm.Env (getCgInfo_maybe)
+import Data.Coerce (coerce)
 
 -----------------------------------------------------------------------------
 --
 -- Ticky-ticky profiling
 --
 -----------------------------------------------------------------------------
+
+-- | Ticky "arg" info. Describes args for functions and fvs for thunks.
+data TickyArgs = FunArgs [NonVoid Id] | ThunkFvs [StgArg] | NoArgs
+
+-- | "Arguments" for a ticky counter. FVs for thunks, actual arguments for functions.
+tickyArgArity :: TickyArgs -> Int
+tickyArgArity (FunArgs args) = length args
+tickyArgArity (ThunkFvs fvs) = length fvs
+tickyArgArity (NoArgs) = 0
+
+
+tickyArgDesc :: TickyArgs -> String
+tickyArgDesc arg_info =
+  case arg_info of
+    NoArgs -> ""
+    ThunkFvs fvs -> map (showTypeCategory . stgArgType) fvs
+    FunArgs args -> map (showTypeCategory . idType . fromNonVoid) args
 
 data TickyClosureType
     = TickyFun
@@ -161,13 +179,13 @@ data TickyClosureType
         Bool -- True <-> standard thunk (AP or selector), has no entry counter
     | TickyLNE
 
-withNewTickyCounterFun :: Bool -> Id ->  [NonVoid Id] -> FCode a -> FCode a
-withNewTickyCounterFun single_entry = withNewTickyCounter (TickyFun single_entry)
+withNewTickyCounterFun :: Bool -> Id -> [NonVoid Id] -> FCode a -> FCode a
+withNewTickyCounterFun single_entry f args = withNewTickyCounter (TickyFun single_entry) f (FunArgs args)
 
 withNewTickyCounterLNE :: Id  ->  [NonVoid Id] -> FCode a -> FCode a
 withNewTickyCounterLNE nm  args code = do
   b <- tickyLNEIsOn
-  if not b then code else withNewTickyCounter TickyLNE nm  args code
+  if not b then code else withNewTickyCounter TickyLNE nm (FunArgs args) code
 
 thunkHasCounter :: Bool -> FCode Bool
 thunkHasCounter isStatic = do
@@ -178,24 +196,26 @@ withNewTickyCounterThunk
   :: Bool -- ^ static
   -> Bool -- ^ updateable
   -> Id
+  -> [NonVoid Id]
   -> FCode a
   -> FCode a
-withNewTickyCounterThunk isStatic isUpdatable name code = do
+withNewTickyCounterThunk isStatic isUpdatable name fvs code = do
     has_ctr <- thunkHasCounter isStatic
     if not has_ctr
       then code
-      else withNewTickyCounter (TickyThunk isUpdatable False) name [] code
+      else withNewTickyCounter (TickyThunk isUpdatable False) name (ThunkFvs $ map StgVarArg $ coerce fvs) code
 
 withNewTickyCounterStdThunk
   :: Bool -- ^ updateable
   -> Id
+  -> [StgArg]
   -> FCode a
   -> FCode a
-withNewTickyCounterStdThunk isUpdatable name code = do
+withNewTickyCounterStdThunk isUpdatable name fvs code = do
     has_ctr <- thunkHasCounter False
     if not has_ctr
       then code
-      else withNewTickyCounter (TickyThunk isUpdatable True) name [] code
+      else withNewTickyCounter (TickyThunk isUpdatable True) name (ThunkFvs fvs) code
 
 withNewTickyCounterCon
   :: Id
@@ -207,16 +227,16 @@ withNewTickyCounterCon name datacon info code = do
     has_ctr <- thunkHasCounter False
     if not has_ctr
       then code
-      else withNewTickyCounter (TickyCon datacon info) name [] code
+      else withNewTickyCounter (TickyCon datacon info) name NoArgs code
 
 -- args does not include the void arguments
-withNewTickyCounter :: TickyClosureType -> Id -> [NonVoid Id] -> FCode a -> FCode a
+withNewTickyCounter :: TickyClosureType -> Id -> TickyArgs -> FCode a -> FCode a
 withNewTickyCounter cloType name args m = do
   lbl <- emitTickyCounter cloType name args
   setTickyCtrLabel lbl m
 
-emitTickyCounter :: TickyClosureType -> Id ->  [NonVoid Id] -> FCode CLabel
-emitTickyCounter cloType tickee args
+emitTickyCounter :: TickyClosureType -> Id -> TickyArgs -> FCode CLabel
+emitTickyCounter cloType tickee arg_info
   = let name = idName tickee in
     let ctr_lbl = mkRednCountsLabel name in
     (>> return ctr_lbl) $
@@ -273,10 +293,10 @@ emitTickyCounter cloType tickee args
                                     lf_info <- getCgInfo_maybe name
                                     profile <- getProfile
                                     case lf_info of
-                                      Just (CgIdInfo { cg_lf = cg_lf@(LFThunk _top _ _ std_form _)})
+                                      Just (CgIdInfo { cg_lf = cg_lf@(LFThunk {})})
                                           -> pprTrace "tickyThunkStd" empty $ return $
                                              CmmLabel $ mkClosureInfoTableLabel (profilePlatform profile) tickee cg_lf -- zeroCLit platform
-                                      _   -> pprTrace "tickyThunkUnknown" (text t <> colon <> ppr name <+> ppr (mkInfoTableLabel name NoCafRefs))
+                                      _   -> pprTraceDebug "tickyThunkUnknown" (text t <> colon <> ppr name <+> ppr (mkInfoTableLabel name NoCafRefs))
                                             return $! zeroCLit platform
 
                             TickyLNE {} -> -- pprTrace "tickyLNE" (text t <> colon <> ppr name <+> ppr (mkInfoTableLabel name NoCafRefs)) $
@@ -287,7 +307,7 @@ emitTickyCounter cloType tickee args
         ; let ctx = (initSDocContext dflags defaultDumpStyle)
                       { sdocPprDebug = True }
         ; fun_descr_lit <- newStringCLit $ renderWithContext ctx ppr_for_ticky_name
-        ; arg_descr_lit <- newStringCLit $ map (showTypeCategory . idType . fromNonVoid) args
+        ; arg_descr_lit <- newStringCLit $ tickyArgDesc arg_info
         ; emitDataLits ctr_lbl
         -- Must match layout of rts/include/rts/Ticky.h's StgEntCounter
         --
@@ -295,7 +315,7 @@ emitTickyCounter cloType tickee args
         -- before, but the code generator wasn't handling that
         -- properly and it led to chaos, panic and disorder.
             [ mkIntCLit platform 0,               -- registered?
-              mkIntCLit platform (length args),   -- Arity
+              mkIntCLit platform (tickyArgArity arg_info),   -- Arity
               mkIntCLit platform 0,               -- Heap allocated for this thing
               fun_descr_lit,
               arg_descr_lit,
