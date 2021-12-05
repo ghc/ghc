@@ -274,7 +274,7 @@ of ``-W(no-)*``.
 
     :since: 8.10
 
-    Warns on qualified imports of core library modules which are subject to
+    Warns on unqualified imports of core library modules which are subject to
     change in future GHC releases. Currently the following modules are covered
     by this warning:
 
