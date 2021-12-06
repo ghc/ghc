@@ -1,0 +1,13 @@
+
+T20654a.hs:7:9: error:
+    • Couldn't match type: forall a. a -> a
+                     with: Int -> Int
+        arising from a functional dependency between constraints:
+          ‘?poly::Int -> Int’
+            arising from a use of implicit parameter ‘?poly’ at T20654a.hs:7:9-13
+          ‘?poly::forall a. a -> a’
+            arising from the type signature for:
+                           foo :: (?poly::forall a. a -> a) => Int -> Int at T20654a.hs:6:1-48
+    • In the expression: ?poly
+      In the expression: ?poly x
+      In an equation for ‘foo’: foo x = ?poly x

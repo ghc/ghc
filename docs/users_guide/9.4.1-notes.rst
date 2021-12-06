@@ -17,6 +17,14 @@ Compiler
   all the checks are now done during typechecking. The error messages
   now contain more detailed information about the specific check that was performed.
 
+- The parsing of implicit parameters is slightly more permissive, as GHC now allows ::
+
+      foo :: (?ip :: forall a. a -> a)
+
+  without requiring parentheses around ``forall a. a -> a``. Note that implicit
+  parameters with such kinds are unlikely to be very useful, due to
+  :ghc-ticket:`18759`.
+
 ``base`` library
 ~~~~~~~~~~~~~~~~
 

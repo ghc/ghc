@@ -1,0 +1,4 @@
+
+T20654b.hs:6:17: error:
+    • Expected a type, but ‘?ip2 :: Int’ has kind ‘Constraint’
+    • In the type signature: bar :: (?ip1 :: ?ip2 :: Int) => Int
