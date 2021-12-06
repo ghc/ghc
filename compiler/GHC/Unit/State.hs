@@ -31,6 +31,7 @@ module GHC.Unit.State (
         unsafeLookupUnitId,
 
         lookupPackageName,
+        resolvePackageImport,
         improveUnit,
         searchPackageId,
         listVisibleModuleNames,
@@ -534,6 +535,8 @@ unsafeLookupUnitId state uid = case lookupUnitId state uid of
 
 -- | Find the unit we know about with the given package name (e.g. @foo@), if any
 -- (NB: there might be a locally defined unit name which overrides this)
+-- This function is unsafe to use in general because it doesn't respect package
+-- visibility.
 lookupPackageName :: UnitState -> PackageName -> Maybe UnitId
 lookupPackageName pkgstate n = lookupUFM (packageNameMap pkgstate) n
 
@@ -541,6 +544,21 @@ lookupPackageName pkgstate n = lookupUFM (packageNameMap pkgstate) n
 searchPackageId :: UnitState -> PackageId -> [UnitInfo]
 searchPackageId pkgstate pid = filter ((pid ==) . unitPackageId)
                                (listUnitInfo pkgstate)
+
+-- | Find the UnitId which an import qualified by a package import comes from.
+-- Compared to 'lookupPackageName', this function correctly accounts for visibility,
+-- renaming and thinning.
+resolvePackageImport :: UnitState -> ModuleName -> PackageName -> Maybe UnitId
+resolvePackageImport unit_st mn pn = do
+  -- 1. Find all modules providing the ModuleName (this accounts for visibility/thinning etc)
+  providers <- Map.lookup mn (moduleNameProvidersMap unit_st)
+  -- 2. Get the UnitIds of the candidates
+  let candidates_uid = map (toUnitId . moduleUnit) $ Map.keys providers
+  -- 3. Get the package names of the candidates
+  let candidates_units = map (\ui -> ((unitPackageName ui), unitId ui))
+                              $ mapMaybe (\uid -> Map.lookup uid (unitInfoMap unit_st)) candidates_uid
+  -- 4. Check to see if the PackageName helps us disambiguate any candidates.
+  lookup pn candidates_units
 
 -- | Create a Map UnitId UnitInfo
 --

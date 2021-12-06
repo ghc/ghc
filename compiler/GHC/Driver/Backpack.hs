@@ -863,7 +863,7 @@ hsModuleToModSummary pn hsc_src modname
         implicit_imports = mkPrelImports modname loc
                                          implicit_prelude imps
 
-        rn_pkg_qual = renameRawPkgQual (hsc_unit_env hsc_env)
+        rn_pkg_qual = renameRawPkgQual (hsc_unit_env hsc_env) modname
         convImport (L _ i) = (rn_pkg_qual (ideclPkgQual i), reLoc $ ideclName i)
 
     extra_sig_imports <- liftIO $ findExtraSigImports hsc_env hsc_src modname

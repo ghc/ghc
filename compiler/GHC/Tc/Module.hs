@@ -272,7 +272,7 @@ tcRnModuleTcRnM hsc_env mod_sum
 
         ; -- TODO This is a little skeevy; maybe handle a bit more directly
           let { simplifyImport (L _ idecl) =
-                  ( renameRawPkgQual (hsc_unit_env hsc_env) (ideclPkgQual idecl)
+                  ( renameRawPkgQual (hsc_unit_env hsc_env) (unLoc $ ideclName idecl) (ideclPkgQual idecl)
                   , reLoc $ ideclName idecl)
               }
         ; raw_sig_imports <- liftIO
@@ -2056,7 +2056,7 @@ runTcInteractive hsc_env thing_inside
             case i of                   -- force above: see #15111
                 IIModule n -> getOrphans n NoPkgQual
                 IIDecl i   -> getOrphans (unLoc (ideclName i))
-                                         (renameRawPkgQual (hsc_unit_env hsc_env) (ideclPkgQual i))
+                                         (renameRawPkgQual (hsc_unit_env hsc_env) (unLoc $ ideclName i) (ideclPkgQual i))
 
        ; let imports = emptyImportAvails {
                             imp_orphs = orphs

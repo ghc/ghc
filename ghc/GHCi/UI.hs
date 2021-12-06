@@ -2199,7 +2199,7 @@ keepPackageImports = filterM is_pkg_import
      is_pkg_import :: GHC.GhcMonad m => InteractiveImport -> m Bool
      is_pkg_import (IIModule _) = return False
      is_pkg_import (IIDecl d)
-         = do pkgqual <- GHC.renameRawPkgQualM (ideclPkgQual d)
+         = do pkgqual <- GHC.renameRawPkgQualM (unLoc $ ideclName d) (ideclPkgQual d)
               e <- MC.try $ GHC.findQualifiedModule pkgqual mod_name
               case e :: Either SomeException Module of
                 Left _  -> return False
@@ -2555,7 +2555,7 @@ guessCurrentModule cmd
        case (head imports) of
           IIModule m -> GHC.findQualifiedModule NoPkgQual m
           IIDecl d   -> do
-            pkgqual <- GHC.renameRawPkgQualM (ideclPkgQual d)
+            pkgqual <- GHC.renameRawPkgQualM (unLoc $ ideclName d) (ideclPkgQual d)
             GHC.findQualifiedModule pkgqual (unLoc (ideclName d))
 
 -- without bang, show items in context of their parents and omit children
@@ -2752,7 +2752,7 @@ checkAdd ii = do
 
     IIDecl d -> do
        let modname = unLoc (ideclName d)
-       pkgqual <- GHC.renameRawPkgQualM (ideclPkgQual d)
+       pkgqual <- GHC.renameRawPkgQualM modname (ideclPkgQual d)
        m <- GHC.lookupQualifiedModule pkgqual modname
        when safe $ do
            t <- GHC.isModuleTrusted m
