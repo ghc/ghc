@@ -1955,7 +1955,7 @@ getPreprocessedImports hsc_env src_fn mb_phase maybe_buf = do
           mimps <- getImports popts imp_prelude pi_hspp_buf pi_hspp_fn src_fn
           return (first (mkMessages . fmap mkDriverPsHeaderMessage . getMessages) mimps)
   let rn_pkg_qual = renameRawPkgQual (hsc_unit_env hsc_env)
-  let rn_imps = fmap (first rn_pkg_qual)
+  let rn_imps = fmap (\(pk, lmn@(L _ mn)) -> (rn_pkg_qual mn pk, lmn))
   let pi_srcimps = rn_imps pi_srcimps'
   let pi_theimps = rn_imps pi_theimps'
   return PreprocessedImports {..}

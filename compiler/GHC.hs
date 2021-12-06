@@ -1637,7 +1637,7 @@ showRichTokenStream ts = go startLoc ts ""
 -- using the algorithm that is used for an @import@ declaration.
 findModule :: GhcMonad m => ModuleName -> Maybe FastString -> m Module
 findModule mod_name maybe_pkg = do
-  pkg_qual <- renamePkgQualM maybe_pkg
+  pkg_qual <- renamePkgQualM mod_name maybe_pkg
   findQualifiedModule pkg_qual mod_name
 
 
@@ -1673,11 +1673,11 @@ modNotLoadedError dflags m loc = throwGhcExceptionIO $ CmdLineError $ showSDoc d
    quotes (ppr (moduleName m)) <+>
    parens (text (expectJust "modNotLoadedError" (ml_hs_file loc)))
 
-renamePkgQualM :: GhcMonad m => Maybe FastString -> m PkgQual
-renamePkgQualM p = withSession $ \hsc_env -> pure (renamePkgQual (hsc_unit_env hsc_env) p)
+renamePkgQualM :: GhcMonad m => ModuleName -> Maybe FastString -> m PkgQual
+renamePkgQualM mn p = withSession $ \hsc_env -> pure (renamePkgQual (hsc_unit_env hsc_env) mn p)
 
-renameRawPkgQualM :: GhcMonad m => RawPkgQual -> m PkgQual
-renameRawPkgQualM p = withSession $ \hsc_env -> pure (renameRawPkgQual (hsc_unit_env hsc_env) p)
+renameRawPkgQualM :: GhcMonad m => ModuleName -> RawPkgQual -> m PkgQual
+renameRawPkgQualM mn p = withSession $ \hsc_env -> pure (renameRawPkgQual (hsc_unit_env hsc_env) mn p)
 
 -- | Like 'findModule', but differs slightly when the module refers to
 -- a source file, and the file has not been loaded via 'load'.  In
@@ -1688,7 +1688,7 @@ renameRawPkgQualM p = withSession $ \hsc_env -> pure (renameRawPkgQual (hsc_unit
 --
 lookupModule :: GhcMonad m => ModuleName -> Maybe FastString -> m Module
 lookupModule mod_name maybe_pkg = do
-  pkgqual <- renamePkgQualM maybe_pkg
+  pkgqual <- renamePkgQualM mod_name maybe_pkg
   lookupQualifiedModule pkgqual mod_name
 
 lookupQualifiedModule :: GhcMonad m => PkgQual -> ModuleName -> m Module
