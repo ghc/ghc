@@ -373,6 +373,7 @@ class Foldable t where
     -- >>> foldl (\a _ -> a) 0 $ repeat 1
     -- * Hangs forever *
     --
+    -- WARNING: When it comes to lists, you always want to use either 'foldl'' or 'foldr' instead.
     foldl :: (b -> a -> b) -> b -> t a -> b
     foldl f z t = appEndo (getDual (foldMap (Dual . Endo . flip f) t)) z
     -- There's no point mucking around with coercions here,
@@ -604,6 +605,8 @@ class Foldable t where
     -- >>> maximum Nothing
     -- *** Exception: maximum: empty structure
     --
+    -- WARNING: This function is partial for possibly-empty structures like lists.
+    --
     -- @since 4.8.0.0
     maximum :: forall a . Ord a => t a -> a
     maximum = fromMaybe (errorWithoutStackTrace "maximum: empty structure") .
@@ -629,6 +632,8 @@ class Foldable t where
     --
     -- >>> minimum Nothing
     -- *** Exception: minimum: empty structure
+    --
+    -- WARNING: This function is partial for possibly-empty structures like lists.
     --
     -- @since 4.8.0.0
     minimum :: forall a . Ord a => t a -> a
@@ -1180,6 +1185,8 @@ msum = asum
 -- >>> concat [[1, 2, 3], [4, 5], [6], []]
 -- [1,2,3,4,5,6]
 --
+-- WARNING: This function takes O(n^2) time in the total number of elements
+-- when the 't' is '[]'.
 concat :: Foldable t => t [a] -> [a]
 concat xs = build (\c n -> foldr (\x y -> foldr c y x) n xs)
 {-# INLINE concat #-}
@@ -1313,6 +1320,8 @@ all p = getAll #. foldMap (All #. p)
 --
 -- >>> maximumBy (compare `on` length) ["Hello", "World", "!", "Longest", "bar"]
 -- "Longest"
+--
+-- WARNING: This function is partial for possibly-empty structures like lists.
 
 -- See Note [maximumBy/minimumBy space usage]
 maximumBy :: Foldable t => (a -> a -> Ordering) -> t a -> a
@@ -1335,6 +1344,8 @@ maximumBy cmp = fromMaybe (errorWithoutStackTrace "maximumBy: empty structure")
 --
 -- >>> minimumBy (compare `on` length) ["Hello", "World", "!", "Longest", "bar"]
 -- "!"
+--
+-- WARNING: This function is partial for possibly-empty structures like lists.
 
 -- See Note [maximumBy/minimumBy space usage]
 minimumBy :: Foldable t => (a -> a -> Ordering) -> t a -> a
@@ -2419,7 +2430,9 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
 -- The more general methods of the 'Foldable' class are now exported by the
 -- "Prelude" in place of the original List-specific methods (see the
 -- [FTP Proposal](https://wiki.haskell.org/Foldable_Traversable_In_Prelude)).
--- The List-specific variants are still available in "Data.List".
+-- The List-specific variants are for now still available in "GHC.OldList", but
+-- that module is intended only as a transitional aid, and may be removed in
+-- the future.
 --
 -- Surprises can arise from the @Foldable@ instance of the 2-tuple @(a,)@ which
 -- now behaves as a 1-element @Foldable@ container in its second slot.  In
