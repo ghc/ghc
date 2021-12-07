@@ -810,8 +810,7 @@ closureLocalEntryLabel platform
   | platformTablesNextToCode platform = toInfoLbl  platform . closureInfoLabel
   | otherwise                         = toEntryLbl platform . closureInfoLabel
 
--- | Get the info table for a thunk. This can also be one of the std thunks
--- that come built into the RTS.
+-- | Get the info table label for a *thunk*.
 mkClosureInfoTableLabel :: Platform -> Id -> LambdaFormInfo -> CLabel
 mkClosureInfoTableLabel platform id lf_info
   = case lf_info of

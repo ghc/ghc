@@ -196,7 +196,7 @@ withNewTickyCounterThunk
   :: Bool -- ^ static
   -> Bool -- ^ updateable
   -> Id
-  -> [NonVoid Id]
+  -> [NonVoid Id] -- ^ Free vars
   -> FCode a
   -> FCode a
 withNewTickyCounterThunk isStatic isUpdatable name fvs code = do
@@ -208,7 +208,7 @@ withNewTickyCounterThunk isStatic isUpdatable name fvs code = do
 withNewTickyCounterStdThunk
   :: Bool -- ^ updateable
   -> Id
-  -> [StgArg]
+  -> [StgArg] -- ^ Free vars + function
   -> FCode a
   -> FCode a
 withNewTickyCounterStdThunk isUpdatable name fvs code = do
@@ -294,7 +294,7 @@ emitTickyCounter cloType tickee arg_info
                                     profile <- getProfile
                                     case lf_info of
                                       Just (CgIdInfo { cg_lf = cg_lf@(LFThunk {})})
-                                          -> pprTrace "tickyThunkStd" empty $ return $
+                                          -> -- pprTrace "tickyThunkStd" empty $ return $
                                              CmmLabel $ mkClosureInfoTableLabel (profilePlatform profile) tickee cg_lf -- zeroCLit platform
                                       _   -> pprTraceDebug "tickyThunkUnknown" (text t <> colon <> ppr name <+> ppr (mkInfoTableLabel name NoCafRefs))
                                             return $! zeroCLit platform
@@ -325,7 +325,6 @@ emitTickyCounter cloType tickee arg_info
               zeroCLit platform           -- Link to next StgEntCounter
             ]
         }
-
 
 -- -----------------------------------------------------------------------------
 -- Ticky stack frames

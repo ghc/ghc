@@ -91,7 +91,6 @@ import GHC.Types.Unique.FM
 import GHC.Data.Maybe
 import Control.Monad
 import qualified Data.Map.Strict as Map
-import GHC.Utils.Trace
 
 --------------------------------------------------------------------------
 --
