@@ -3404,6 +3404,7 @@ fFlagsDeps = [
   flagSpec "solve-constant-dicts"             Opt_SolveConstantDicts,
   flagSpec "catch-bottoms"                    Opt_CatchBottoms,
   flagSpec "alignment-sanitisation"           Opt_AlignmentSanitisation,
+  flagSpec "check-prim-bounds"                Opt_DoBoundsChecking,
   flagSpec "num-constant-folding"             Opt_NumConstantFolding,
   flagSpec "show-warning-groups"              Opt_ShowWarnGroups,
   flagSpec "hide-source-paths"                Opt_HideSourcePaths,

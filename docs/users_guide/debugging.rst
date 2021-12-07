@@ -938,6 +938,18 @@ Checking for consistency
     cases. This is helpful when debugging demand analysis or type checker bugs
     which can sometimes manifest as segmentation faults.
 
+.. ghc-flag:: -fcheck-prim-bounds
+    :shortdesc: Instrument array primops with bounds checks.
+    :type: dynamic
+
+    Typically primops operations like ``writeArray#`` exhibit unsafe behavior,
+    relying on the user to perform any bounds checking. This flag instructs the
+    code generator to instrument such operations with bound checking logic
+    which aborts the program when an out-of-bounds access is detected.
+
+    Note that this is only intended to be used as a debugging measure, not as
+    the primary means of catching out-of-bounds accesses.
+
 .. _checking-determinism:
 
 Checking for determinism

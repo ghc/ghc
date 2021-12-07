@@ -328,3 +328,12 @@ rtsBadAlignmentBarf()
 {
     barf("Encountered incorrectly aligned pointer. This can't be good.");
 }
+
+// Used by code generator
+void rtsOutOfBoundsAccess(void) GNUC3_ATTRIBUTE(__noreturn__);
+
+void
+rtsOutOfBoundsAccess()
+{
+    barf("Encountered out of bounds array access.");
+}
