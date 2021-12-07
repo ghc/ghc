@@ -3,7 +3,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-import Data.List
+import Data.List (sortBy, intercalate, isPrefixOf)
 import Data.Data
 import Control.Monad.IO.Class
 import GHC.Types.SrcLoc
