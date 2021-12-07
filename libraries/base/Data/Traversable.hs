@@ -654,6 +654,7 @@ foldMapDefault = coerce (traverse @t @(Const m) @a @())
 ------------------
 
 -- $effectful
+-- #effectful#
 --
 -- The 'traverse' and 'mapM' methods have analogues in the "Data.Foldable"
 -- module.  These are 'traverse_' and 'mapM_', and their flipped variants

@@ -1542,7 +1542,7 @@ elements in a single pass.
 -- $overview
 --
 -- #overview#
--- The Foldabla class generalises some common "Data.List" functions to
+-- The Foldable class generalises some common "Data.List" functions to
 -- structures that can be reduced to a summary value one element at a time.
 --
 -- == Left and right folds
@@ -1954,8 +1954,8 @@ elements in a single pass.
 --   in some monads are conditionally lazy and can /short-circuit/ a chain of
 --   computations.  The below folds will terminate as early as possible, but
 --   even infinite loops can be productive here, when evaluated solely for
---   their stream of IO side-effects.  See "Data.Traversable#validation"
---   for some additional discussion.
+--   their stream of IO side-effects.  See "Data.Traversable#effectful"
+--   for discussion of related functions.
 --
 --     @
 --     `traverse_`  :: (Foldable t, Applicative f) => (a -> f b) -> t a -> f ()
