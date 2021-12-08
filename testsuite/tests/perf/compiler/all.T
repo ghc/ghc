@@ -380,14 +380,6 @@ test('T14683',
      multimod_compile,
      ['T14683', '-v0'])
 
-test('Naperian',
-     [ reqlib('vector'),
-       only_ways(['optasm']),
-       collect_compiler_stats('bytes allocated',2),
-     ],
-     compile,
-     [''])
-
 test ('T9630',
       [ collect_compiler_residency(15),
         collect_compiler_stats('bytes allocated', 2),

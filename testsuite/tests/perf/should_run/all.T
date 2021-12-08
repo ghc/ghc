@@ -400,7 +400,3 @@ test('T19347',
     compile_and_run,
     ['-O'])
 
-test ('T19474',
-      [ collect_stats('bytes allocated', 5), reqlib('vector') ],
-      compile_and_run,
-      ['-v0 -O'])

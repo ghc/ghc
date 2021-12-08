@@ -73,7 +73,6 @@ test('cgrun064', normal, compile_and_run, [''])
 test('cgrun065', normal, compile_and_run, [''])
 test('cgrun066', normal, compile_and_run, [''])
 test('cgrun067', [extra_files(['Cgrun067A.hs'])], compile_and_run, [''])
-test('cgrun068', reqlib('random'), compile_and_run, [''])
 test('cgrun069',
      [ omit_ways(['ghci'])],
      multi_compile_and_run,
@@ -132,7 +131,6 @@ test('Word2Float64', unless(wordsize(64), skip), compile_and_run, [''])
 test('T7361', normal, compile_and_run, [''])
 test('T7600', normal, compile_and_run, [''])
 test('T8103', only_ways(['normal']), compile_and_run, [''])
-test('T7953', reqlib('random'), compile_and_run, [''])
 test('T8256', normal, compile_and_run, ['-dcore-lint -O1'])
 test('T6084',normal, compile_and_run, ['-O2'])
 test('CgStaticPointers', [when(doing_ghci(), extra_hc_opts('-fobject-code'))],
@@ -143,7 +141,6 @@ test('StaticArraySize', [when(doing_ghci(), extra_hc_opts('-fobject-code'))],
      compile_and_run, ['-O2'])
 test('StaticByteArraySize', normal, compile_and_run, ['-O2'])
 test('CopySmallArray', normal, compile_and_run, [''])
-test('CopySmallArrayStressTest', reqlib('random'), compile_and_run, [''])
 test('SizeOfSmallArray', normal, compile_and_run, [''])
 test('NewSmallArray', normal, compile_and_run, [''])
 test('T9001', normal, compile_and_run, [''])

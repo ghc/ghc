@@ -52,8 +52,6 @@ if config.platform.startswith('i386-'):
 else:
     opts = ''
 
-test('ffi009', [when(fast(), skip), reqlib('random')], compile_and_run, [opts])
-
 test('ffi010', normal, compile_and_run, [''])
 test('ffi011', normal, compile_and_run, [''])
 
@@ -225,7 +223,7 @@ test('T17471', [omit_ways(['ghci'])], compile_and_run,
 
 test('IncallAffinity',
      [req_smp, only_ways(['threaded1', 'threaded2']),
-      # Unregisterised build doesn't support 
+      # Unregisterised build doesn't support
       when(unregisterised(), skip)],
      compile_and_run,
      ['IncallAffinity_c.c -no-hs-main'])

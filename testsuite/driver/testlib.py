@@ -141,9 +141,6 @@ def no_lint( name, opts ):
        [opt for opt in opts.compiler_always_flags \
             if opt not in ['-dcore-lint', '-dstg-lint', '-dcmm-lint']]
 
-def reqlib( lib ):
-    return lambda name, opts, l=lib: _reqlib (name, opts, l )
-
 def stage1(name, opts):
     # See Note [Why is there no stage1 setup function?]
     framework_fail(name, 'stage1 setup function does not exist',
@@ -205,15 +202,6 @@ def have_library(lib: str) -> bool:
         have_lib_cache[lib] = got_it
 
     return got_it
-
-def _reqlib( name, opts, lib ):
-    if not have_library(lib):
-        opts.expect = 'missing-lib'
-        opts.skip   = True
-    else:
-        opts.extra_hc_opts = opts.extra_hc_opts + ' -package ' + lib + ' '
-        for db in config.test_package_db:
-            opts.extra_hc_opts = opts.extra_hc_opts + ' -package-db=' + db + ' '
 
 def _req_hadrian_deps(name,opts,deps):
     opts.hadrian_deps.update(deps)
