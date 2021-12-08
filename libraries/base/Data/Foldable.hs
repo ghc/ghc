@@ -1696,8 +1696,9 @@ elements in a single pass.
 --
 -- > myconcat xs = foldr (\a b -> a ++ b) [] xs
 --
--- is subtantially cheaper (linear in the length of the consumed portion of the
--- final list, thus e.g. constant time/space for just the first element) than:
+-- is substantially cheaper (linear in the length of the consumed portion of
+-- the final list, thus e.g. constant time/space for just the first element)
+-- than:
 --
 -- > revconcat xs = foldr (\a b -> b ++ a) [] xs
 --
@@ -1888,7 +1889,7 @@ elements in a single pass.
 -- $shortcircuit
 --
 -- #short#
--- Examples of short-cicuit reduction include various boolean predicates that
+-- Examples of short-circuit reduction include various boolean predicates that
 -- test whether some or all the elements of a structure satisfy a given
 -- condition.  Because these don't necessarily consume the entire list, they
 -- typically employ `foldr` with an operator that is conditionally strict in
@@ -1923,7 +1924,7 @@ elements in a single pass.
 -- * Boolean predicate folds.
 --   These functions examine elements strictly until a condition is met,
 --   but then return a result ignoring the rest (lazy in the tail).  These
---   may loop forever given an unbounded input where no elements satisy the
+--   may loop forever given an unbounded input where no elements satisfy the
 --   termination condition.
 --
 --     @
@@ -2382,7 +2383,7 @@ elements in a single pass.
 -- #laws#
 --
 -- The type constructor 'Endo' from "Data.Monoid", associates with each type
--- __@b@__ the __@newtype@__-encapulated type of functions mapping __@b@__ to
+-- __@b@__ the __@newtype@__-encapsulated type of functions mapping __@b@__ to
 -- itself.  Functions from a type to itself are called /endomorphisms/, hence
 -- the name /Endo/.  The type __@Endo b@__ is a 'Monoid' under function
 -- composition:
@@ -2419,7 +2420,7 @@ elements in a single pass.
 -- > foldl f z t = appEndo (getDual (foldMap (Dual . Endo . flip f) t)) z
 --
 -- When the elements of the structure are taken from a 'Monoid', the
--- defintion of 'fold' must agree with __@foldMap id@__:
+-- definition of 'fold' must agree with __@foldMap id@__:
 --
 -- > fold = foldMap id
 --
