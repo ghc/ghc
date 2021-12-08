@@ -11,7 +11,6 @@ test('IOError002',      normal, compile_and_run, [''])
 test('finalization001', normal, compile_and_run, [''])
 test('hClose001', [], compile_and_run, [''])
 test('hClose002', [normalise_win32_io_errors], compile_and_run, [''])
-test('hClose003',       reqlib('unix'), compile_and_run, ['-package unix'])
 test('hFileSize001',    normal, compile_and_run, [''])
 test('hFileSize002', [omit_ways(['ghci'])], compile_and_run, [''])
 test('hFlush001', [], compile_and_run, [''])
@@ -95,8 +94,6 @@ test('concio001', [normal, multi_cpu_race],
      makefile_test, ['test.concio001'])
 test('concio001.thr', [extra_files(['concio001.hs']), multi_cpu_race],
      makefile_test, ['test.concio001.thr'])
-
-test('concio002', reqlib('process'), compile_and_run, [''])
 
 test('T2122', [], compile_and_run, [''])
 test('T3307', [], makefile_test, ['T3307-test'])

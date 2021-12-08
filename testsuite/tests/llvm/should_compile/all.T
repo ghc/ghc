@@ -15,7 +15,6 @@ def ignore_llvm_and_vortex( msg ):
 
 # test('T5486', normal, compile, [''])
 test('T5681', [normal, normalise_errmsg_fun(ignore_llvm_and_vortex)], compile, [''])
-test('T6158', [reqlib('vector'), reqlib('primitive')], compile, ['-package vector -package primitive'])
 test('T7571', [cmm_src, normalise_errmsg_fun(ignore_llvm_and_vortex)], compile, ['-no-hs-main'])
 test('T7575', unless(wordsize(32), skip), compile, [''])
 test('T8131b', [normal, normalise_errmsg_fun(ignore_llvm_and_vortex)], compile, [''])

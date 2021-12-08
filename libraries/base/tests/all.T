@@ -83,7 +83,6 @@ test('length001',
 
 test('ratio001', 	normal, compile_and_run, [''])
 
-test('rand001',		reqlib('random'), compile_and_run, [''])
 test('reads001',		normal, compile_and_run, [''])
 test('show001',		normal, compile_and_run, [''])
 test('text001',		normal, compile_and_run, [''])
@@ -220,10 +219,8 @@ test('T9681', normal, compile_fail, [''])
 test('T8089',
      [exit_code(99), run_timeout_multiplier(0.01)],
      compile_and_run, [''])
-test('hWaitForInput-accurate-socket', reqlib('unix'), compile_and_run, [''])
 test('T8684', expect_broken(8684), compile_and_run, [''])
 test('hWaitForInput-accurate-stdin', [expect_broken_for(16535, threaded_ways), omit_ways(['ghci'])], compile_and_run, [''])
-test('hWaitForInput-accurate-pipe', reqlib('unix'), compile_and_run, [''])
 test('T9826',normal, compile_and_run,[''])
 test('T9848',
         [ collect_stats('bytes allocated')

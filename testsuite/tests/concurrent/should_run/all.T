@@ -21,10 +21,6 @@ test('conc071', omit_ways(concurrent_ways), compile_and_run, [''])
 test('conc072', only_ways(concurrent_ways), compile_and_run, [''])
 test('conc073', normal, compile_and_run, [''])
 
-# vector code must get inlined to become non-allocating
-test('T367',
-     [reqlib('vector'), omit_ways(['ghci']), run_timeout_multiplier(0.001)],
-     compile_and_run, ['-O2 -fno-omit-yields'])
 test('T367_letnoescape',
      [run_timeout_multiplier(0.02), expect_broken_for(7297,['optllvm'])],
      compile_and_run, ['-fno-omit-yields'])
@@ -42,9 +38,6 @@ test('T3429', [ extra_run_opts('+RTS -C0.001 -RTS'),
 # without -O, goes into an infinite loop
 test('T4030', normal, compile_and_run, ['-O'])
 
-# each of these runs for about a second
-test('throwto001', [reqlib('random'), extra_run_opts('1000 2000')],
-                   compile_and_run, [''])
 test('throwto002', normal, compile_and_run, [''])
 test('throwto003', normal, compile_and_run, [''])
 
@@ -106,11 +99,6 @@ test('allocLimit4', [ extra_run_opts('+RTS -xq300k -RTS'),
                       omit_ways(['ghci']) ],
                     compile_and_run, [''])
 
-test('performGC', [ only_ways(['threaded1','threaded2']), req_smp,
-                    reqlib('random'),
-                    extra_run_opts('400 +RTS -qg -RTS') ],
-                    compile_and_run, [''])
-
 # -----------------------------------------------------------------------------
 # These tests we only do for a full run
 
@@ -142,20 +130,6 @@ test('conc019', extra_run_opts('+RTS -K16m -RTS'), compile_and_run, [''])
 test('conc020', normal, compile_and_run, [''])
 test('conc021', [ omit_ways(['ghci']), exit_code(1) ], compile_and_run, [''])
 test('conc022', normal, compile_and_run, [''])
-
-# On Windows, the non-threaded RTS creates a real OS thread for each
-# threadDelay.  conc023 creates 5000 concurrent threadDelays, and the
-# resulting creation of OS threads seems to cause the system to run
-# out of memory sometimes (I'm not sure exactly how/why this happens,
-# but the threaded RTS fixes it).  See #1197.
-if config.platform == 'i386-unknown-mingw32':
-   conc023_ways = only_ways(['threaded1','threaded2'])
-else:
-   conc023_ways = normal
-
-test('conc023', [when(fast(), skip),
-                 reqlib('random'), multi_cpu_race,
-                 conc023_ways], compile_and_run, [''])
 
 test('conc024', normal, compile_and_run, [''])
 test('conc025', normal, compile_and_run, [''])
@@ -250,9 +224,6 @@ test('setnumcapabilities001',
        req_smp ],
      compile_and_run, [''])
 
-# omit ghci, which can't handle unboxed tuples:
-test('compareAndSwap', [omit_ways(['ghci','hpc']), reqlib('primitive')], compile_and_run, [''])
-
 test('hs_try_putmvar001',
      [
      when(opsys('mingw32'),skip), # uses pthread APIs in the C code
@@ -284,5 +255,4 @@ test('hs_try_putmvar003',
 
 # Check forkIO exception determinism under optimization
 test('T13330', normal, compile_and_run, ['-O'])
-test('T13916', [reqlib('vector'), reqlib('stm'), reqlib('async')],
-     compile_and_run, ['-O2'])
+

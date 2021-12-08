@@ -30,17 +30,15 @@ test('ghci010', skip, ghci_script, ['ghci010.script'])
 test('ghci011', normal, ghci_script, ['ghci011.script'])
 test('ghci012', normal, ghci_script, ['ghci012.script'])
 test('ghci013', normal, ghci_script, ['ghci013.script'])
-test('ghci014', reqlib('QuickCheck'), ghci_script, ['ghci014.script'])
 
 # Ignore stderr from ghci015, the output is non-deterministic
 # (has occasional "thread blocked indefinitely" exceptions), and this
 # is part of the test.
 # But don't silence both stderr and stdout, as then the test would trivially
 # pass when ghci015.hs has errors.
-test('ghci015', [reqlib('stm'), ignore_stderr], ghci_script, ['ghci015.script'])
+test('ghci015', [ignore_stderr], ghci_script, ['ghci015.script'])
 
 test('ghci016', expect_broken(552), ghci_script, ['ghci016.script'])
-test('ghci017', [reqlib('haskell98'), extra_run_opts('-hide-package haskell98')], ghci_script, ['ghci017.script'])
 test('ghci018', normal, ghci_script, ['ghci018.script'])
 test('ghci019', normal, ghci_script, ['ghci019.script'])
 test('ghci020', normal, ghci_script, ['ghci020.script'])
@@ -137,8 +135,7 @@ test('Defer02', extra_files(['../../typecheck/should_run/Defer01.hs']), ghci_scr
 test('T5820', normal, ghci_script, ['T5820.script'])
 test('T5836', normal, ghci_script, ['T5836.script'])
 test('T5979',
-    [reqlib('transformers'),
-     normalise_slashes,
+    [normalise_slashes,
      normalise_version("transformers")],
     ghci_script, ['T5979.script'])
 test('T5975a',
