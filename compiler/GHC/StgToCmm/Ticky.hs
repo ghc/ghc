@@ -675,20 +675,21 @@ showTypeCategory ty
   | otherwise = case tcSplitTyConApp_maybe ty of
   Nothing -> '.'
   Just (tycon, _) ->
-    (if isUnliftedTyCon tycon then Data.Char.toLower else id) $
     let anyOf us = getUnique tycon `elem` us in
     case () of
       _ | anyOf [funTyConKey] -> '>'
-        | anyOf [charPrimTyConKey, charTyConKey] -> 'C'
-        | anyOf [doublePrimTyConKey, doubleTyConKey] -> 'D'
-        | anyOf [floatPrimTyConKey, floatTyConKey] -> 'F'
-        | anyOf [intPrimTyConKey, int32PrimTyConKey, int64PrimTyConKey,
-                 intTyConKey, int8TyConKey, int16TyConKey, int32TyConKey, int64TyConKey
-                ] -> 'I'
-        | anyOf [wordPrimTyConKey, word32PrimTyConKey, word64PrimTyConKey, wordTyConKey,
-                 word8TyConKey, word16TyConKey, word32TyConKey, word64TyConKey
-                ] -> 'W'
+        | anyOf [charTyConKey] -> 'C'
+        | anyOf [charPrimTyConKey] -> 'c'
+        | anyOf [doubleTyConKey] -> 'D'
+        | anyOf [doublePrimTyConKey] -> 'd'
+        | anyOf [floatTyConKey] -> 'F'
+        | anyOf [floatPrimTyConKey] -> 'f'
+        | anyOf [intTyConKey, int8TyConKey, int16TyConKey, int32TyConKey, int64TyConKey] -> 'I'
+        | anyOf [intPrimTyConKey, int8PrimTyConKey, int16PrimTyConKey, int32PrimTyConKey, int64PrimTyConKey] -> 'i'
+        | anyOf [wordTyConKey, word8TyConKey, word16TyConKey, word32TyConKey, word64TyConKey] -> 'W'
+        | anyOf [wordPrimTyConKey, word8PrimTyConKey, word16PrimTyConKey, word32PrimTyConKey, word64PrimTyConKey] -> 'w'
         | anyOf [listTyConKey] -> 'L'
+        | isUnboxedTupleTyCon tycon -> 't'
         | isTupleTyCon tycon       -> 'T'
         | isPrimTyCon tycon        -> 'P'
         | isEnumerationTyCon tycon -> 'E'

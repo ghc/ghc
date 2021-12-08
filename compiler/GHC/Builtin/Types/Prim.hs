@@ -609,11 +609,10 @@ PrimRep in the promoted data constructor itself: see TyCon.promDcRepInfo.
 tYPETyCon :: TyCon
 tYPETyConName :: Name
 
-tYPETyCon = mkKindTyCon tYPETyConName
+tYPETyCon = mkPrimTyCon tYPETyConName
                         (mkTemplateAnonTyConBinders [runtimeRepTy])
                         liftedTypeKind
                         [Nominal]
-                        (mkPrelTyConRepName tYPETyConName)
 
 --------------------------
 -- ... and now their names
@@ -977,7 +976,7 @@ RealWorld; it's only used in the type system, to parameterise State#.
 -}
 
 realWorldTyCon :: TyCon
-realWorldTyCon = mkLiftedPrimTyCon realWorldTyConName [] liftedTypeKind []
+realWorldTyCon = mkPrimTyCon realWorldTyConName [] liftedTypeKind []
 realWorldTy :: Type
 realWorldTy          = mkTyConTy realWorldTyCon
 realWorldStatePrimTy :: Type
