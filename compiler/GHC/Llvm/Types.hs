@@ -156,21 +156,6 @@ data LlvmStatic
 -- ** Operations on LLVM Basic Types and Variables
 --
 
--- | LLVM code generator options
-data LlvmOpts = LlvmOpts
-   { llvmOptsPlatform             :: !Platform -- ^ Target platform
-   , llvmOptsFillUndefWithGarbage :: !Bool     -- ^ Fill undefined literals with garbage values
-   , llvmOptsSplitSections        :: !Bool     -- ^ Split sections
-   }
-
--- | Get LlvmOptions from DynFlags
-initLlvmOpts :: DynFlags -> LlvmOpts
-initLlvmOpts dflags = LlvmOpts
-   { llvmOptsPlatform             = targetPlatform dflags
-   , llvmOptsFillUndefWithGarbage = gopt Opt_LlvmFillUndefWithGarbage dflags
-   , llvmOptsSplitSections        = gopt Opt_SplitSections dflags
-   }
-
 garbageLit :: LlvmType -> Maybe LlvmLit
 garbageLit t@(LMInt w)     = Just (LMIntLit (0xbbbbbbbbbbbbbbb0 `mod` (2^w)) t)
   -- Use a value that looks like an untagged pointer, so we are more

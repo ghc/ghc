@@ -11,6 +11,7 @@ import GHC.Prelude
 
 import GHC.Llvm
 import GHC.CmmToLlvm.Base
+import GHC.CmmToLlvm.Config
 
 import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
@@ -110,9 +111,9 @@ llvmSectionType p t = case t of
 -- | Format a Cmm Section into a LLVM section name
 llvmSection :: Section -> LlvmM LMSection
 llvmSection (Section t suffix) = do
-  opts <- getLlvmOpts
-  let splitSect = llvmOptsSplitSections opts
-      platform  = llvmOptsPlatform opts
+  opts <- getConfig
+  let splitSect = lcgSplitSections opts
+      platform  = lcgPlatform opts
   if not splitSect
   then return Nothing
   else do

@@ -9,11 +9,10 @@ module GHC.CmmToLlvm.Ppr (
 
 import GHC.Prelude
 
-import GHC.Driver.Ppr
-
 import GHC.Llvm
 import GHC.CmmToLlvm.Base
 import GHC.CmmToLlvm.Data
+import GHC.CmmToLlvm.Config
 
 import GHC.Cmm.CLabel
 import GHC.Cmm
@@ -27,21 +26,21 @@ import GHC.Types.Unique
 --
 
 -- | Pretty print LLVM data code
-pprLlvmData :: LlvmOpts -> LlvmData -> SDoc
-pprLlvmData opts (globals, types) =
+pprLlvmData :: LCGConfig -> LlvmData -> SDoc
+pprLlvmData cfg (globals, types) =
     let ppLlvmTys (LMAlias    a) = ppLlvmAlias a
         ppLlvmTys (LMFunction f) = ppLlvmFunctionDecl f
         ppLlvmTys _other         = empty
 
         types'   = vcat $ map ppLlvmTys types
-        globals' = ppLlvmGlobals opts globals
+        globals' = ppLlvmGlobals cfg globals
     in types' $+$ globals'
 
 
 -- | Pretty print LLVM code
 pprLlvmCmmDecl :: LlvmCmmDecl -> LlvmM (SDoc, [LlvmVar])
 pprLlvmCmmDecl (CmmData _ lmdata) = do
-  opts <- getLlvmOpts
+  opts <- getConfig
   return (vcat $ map (pprLlvmData opts) lmdata, [])
 
 pprLlvmCmmDecl (CmmProc mb_info entry_lbl live (ListGraph blks))
@@ -54,13 +53,12 @@ pprLlvmCmmDecl (CmmProc mb_info entry_lbl live (ListGraph blks))
            lmblocks = map (\(BasicBlock id stmts) ->
                                 LlvmBlock (getUnique id) stmts) blks
 
-       funDec <- llvmFunSig live lbl link
-       dflags <- getDynFlags
-       opts <- getLlvmOpts
+       funDec   <- llvmFunSig live lbl link
+       cfg      <- getConfig
        platform <- getPlatform
-       let buildArg = fsLit . showSDoc dflags . ppPlainName opts
+       let buildArg = fsLit . renderWithContext (lcgContext cfg). ppPlainName cfg
            funArgs = map buildArg (llvmFunArgs platform live)
-           funSect = llvmFunSection opts (decName funDec)
+           funSect = llvmFunSection cfg (decName funDec)
 
        -- generate the info table
        prefix <- case mb_info of
@@ -94,7 +92,7 @@ pprLlvmCmmDecl (CmmProc mb_info entry_lbl live (ListGraph blks))
                             (Just $ LMBitc (LMStaticPointer defVar)
                                            i8Ptr)
 
-       return (ppLlvmGlobal opts alias $+$ ppLlvmFunction opts fun', [])
+       return (ppLlvmGlobal cfg alias $+$ ppLlvmFunction cfg fun', [])
 
 
 -- | The section we are putting info tables and their entry code into, should

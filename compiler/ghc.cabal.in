@@ -280,6 +280,7 @@ Library
         GHC.CmmToLlvm
         GHC.CmmToLlvm.Base
         GHC.CmmToLlvm.CodeGen
+        GHC.CmmToLlvm.Config
         GHC.CmmToLlvm.Data
         GHC.CmmToLlvm.Mangler
         GHC.CmmToLlvm.Ppr
@@ -386,6 +387,7 @@ Library
         GHC.Driver.CodeOutput
         GHC.Driver.Config
         GHC.Driver.Config.CmmToAsm
+        GHC.Driver.Config.CmmToLlvm
         GHC.Driver.Config.Diagnostic
         GHC.Driver.Config.Finder
         GHC.Driver.Config.Logger

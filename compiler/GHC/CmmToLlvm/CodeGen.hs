@@ -8,14 +8,12 @@ module GHC.CmmToLlvm.CodeGen ( genLlvmProc ) where
 
 import GHC.Prelude
 
-import GHC.Driver.Session
-import GHC.Driver.Ppr
-
 import GHC.Platform
 import GHC.Platform.Regs ( activeStgRegs )
 
 import GHC.Llvm
 import GHC.CmmToLlvm.Base
+import GHC.CmmToLlvm.Config
 import GHC.CmmToLlvm.Regs
 
 import GHC.Cmm.BlockId
@@ -692,14 +690,13 @@ getFunPtr funTy targ = case targ of
 
     ForeignTarget expr _ -> do
         (v1, stmts, top) <- exprToVar expr
-        dflags <- getDynFlags
         let fty = funTy $ fsLit "dynamic"
             cast = case getVarType v1 of
                 ty | isPointer ty -> LM_Bitcast
                 ty | isInt ty     -> LM_Inttoptr
 
-                ty -> panic $ "genCall: Expr is of bad type for function"
-                              ++ " call! (" ++ showSDoc dflags (ppr ty) ++ ")"
+                ty -> pprPanic "genCall: Expr is of bad type for function" $
+                  text " call! " <> lparen <> ppr ty <> rparen
 
         (v2,s1) <- doExpr (pLift fty) $ Cast cast v1 (pLift fty)
         return (v2, stmts `snocOL` s1, top)
@@ -728,13 +725,12 @@ arg_vars [] (vars, stmts, tops)
 
 arg_vars ((e, AddrHint):rest) (vars, stmts, tops)
   = do (v1, stmts', top') <- exprToVar e
-       dflags <- getDynFlags
        let op = case getVarType v1 of
                ty | isPointer ty -> LM_Bitcast
                ty | isInt ty     -> LM_Inttoptr
 
-               a  -> panic $ "genCall: Can't cast llvmType to i8*! ("
-                           ++ showSDoc dflags (ppr a) ++ ")"
+               a  -> pprPanic "genCall: Can't cast llvmType to i8*! " $
+                lparen <>  ppr a <> rparen
 
        (v2, s1) <- doExpr i8Ptr $ Cast op v1 i8Ptr
        arg_vars rest (vars ++ [v2], stmts `appOL` stmts' `snocOL` s1,
@@ -768,8 +764,7 @@ castVar signage v t | getVarType v == t
             = return (v, Nop)
 
             | otherwise
-            = do dflags <- getDynFlags
-                 platform <- getPlatform
+            = do platform <- getPlatform
                  let op = case (getVarType v, t) of
                       (LMInt n, LMInt m)
                           -> if n < m then extend else LM_Trunc
@@ -783,8 +778,11 @@ castVar signage v t | getVarType v == t
                       (vt, _) | isPointer vt && isPointer t -> LM_Bitcast
                       (vt, _) | isVector vt && isVector t   -> LM_Bitcast
 
-                      (vt, _) -> panic $ "castVars: Can't cast this type ("
-                                  ++ showSDoc dflags (ppr vt) ++ ") to (" ++ showSDoc dflags (ppr t) ++ ")"
+                      (vt, _) -> pprPanic "castVars: Can't cast this type " $
+                                lparen <> ppr vt <> rparen
+                                <> text " to " <>
+                                lparen <> ppr t <> rparen
+
                  doExpr t $ Cast op v t
     where extend = case signage of
             Signed      -> LM_Sext
@@ -800,11 +798,12 @@ cmmPrimOpRetValSignage mop = case mop of
 -- | Decide what C function to use to implement a CallishMachOp
 cmmPrimOpFunctions :: CallishMachOp -> LlvmM LMString
 cmmPrimOpFunctions mop = do
-
-  dflags <- getDynFlags
+  cfg      <- getConfig
   platform <- getPlatform
-  let intrinTy1 = "p0i8.p0i8." ++ showSDoc dflags (ppr $ llvmWord platform)
-      intrinTy2 = "p0i8." ++ showSDoc dflags (ppr $ llvmWord platform)
+  let render = renderWithContext (lcgContext cfg)
+      lcgIsBmi2Enabled = lcgBmiVersion cfg >= Just BMI2
+      intrinTy1 = "p0i8.p0i8." ++ render (ppr $ llvmWord platform)
+      intrinTy2 = "p0i8."      ++ render (ppr $ llvmWord platform)
       unsupported = panic ("cmmPrimOpFunctions: " ++ show mop
                         ++ " not supported here")
       dontReach64 = panic ("cmmPrimOpFunctions: " ++ show mop
@@ -867,33 +866,28 @@ cmmPrimOpFunctions mop = do
     MO_SuspendThread -> fsLit $ "suspendThread"
     MO_ResumeThread  -> fsLit $ "resumeThread"
 
-    (MO_PopCnt w) -> fsLit $ "llvm.ctpop."      ++ showSDoc dflags (ppr $ widthToLlvmInt w)
-    (MO_BSwap w)  -> fsLit $ "llvm.bswap."      ++ showSDoc dflags (ppr $ widthToLlvmInt w)
-    (MO_BRev w)   -> fsLit $ "llvm.bitreverse." ++ showSDoc dflags (ppr $ widthToLlvmInt w)
-    (MO_Clz w)    -> fsLit $ "llvm.ctlz."       ++ showSDoc dflags (ppr $ widthToLlvmInt w)
-    (MO_Ctz w)    -> fsLit $ "llvm.cttz."       ++ showSDoc dflags (ppr $ widthToLlvmInt w)
+    (MO_PopCnt w) -> fsLit $ "llvm.ctpop."      ++ render (ppr $ widthToLlvmInt w)
+    (MO_BSwap w)  -> fsLit $ "llvm.bswap."      ++ render (ppr $ widthToLlvmInt w)
+    (MO_BRev w)   -> fsLit $ "llvm.bitreverse." ++ render (ppr $ widthToLlvmInt w)
+    (MO_Clz w)    -> fsLit $ "llvm.ctlz."       ++ render (ppr $ widthToLlvmInt w)
+    (MO_Ctz w)    -> fsLit $ "llvm.cttz."       ++ render (ppr $ widthToLlvmInt w)
 
-    (MO_Pdep w)   ->  let w' = showSDoc dflags (ppr $ widthInBits w)
-                      in  if isBmi2Enabled dflags
+    (MO_Pdep w)   ->  let w' = render (ppr $ widthInBits w)
+                      in  if lcgIsBmi2Enabled
                             then fsLit $ "llvm.x86.bmi.pdep."   ++ w'
                             else fsLit $ "hs_pdep"              ++ w'
-    (MO_Pext w)   ->  let w' = showSDoc dflags (ppr $ widthInBits w)
-                      in  if isBmi2Enabled dflags
+    (MO_Pext w)   ->  let w' = render (ppr $ widthInBits w)
+                      in  if lcgIsBmi2Enabled
                             then fsLit $ "llvm.x86.bmi.pext."   ++ w'
                             else fsLit $ "hs_pext"              ++ w'
 
     (MO_Prefetch_Data _ )-> fsLit "llvm.prefetch"
 
-    MO_AddIntC w    -> fsLit $ "llvm.sadd.with.overflow."
-                             ++ showSDoc dflags (ppr $ widthToLlvmInt w)
-    MO_SubIntC w    -> fsLit $ "llvm.ssub.with.overflow."
-                             ++ showSDoc dflags (ppr $ widthToLlvmInt w)
-    MO_Add2 w       -> fsLit $ "llvm.uadd.with.overflow."
-                             ++ showSDoc dflags (ppr $ widthToLlvmInt w)
-    MO_AddWordC w   -> fsLit $ "llvm.uadd.with.overflow."
-                             ++ showSDoc dflags (ppr $ widthToLlvmInt w)
-    MO_SubWordC w   -> fsLit $ "llvm.usub.with.overflow."
-                             ++ showSDoc dflags (ppr $ widthToLlvmInt w)
+    MO_AddIntC w  -> fsLit $ "llvm.sadd.with.overflow." ++ render (ppr $ widthToLlvmInt w)
+    MO_SubIntC w  -> fsLit $ "llvm.ssub.with.overflow." ++ render (ppr $ widthToLlvmInt w)
+    MO_Add2 w     -> fsLit $ "llvm.uadd.with.overflow." ++ render (ppr $ widthToLlvmInt w)
+    MO_AddWordC w -> fsLit $ "llvm.uadd.with.overflow." ++ render (ppr $ widthToLlvmInt w)
+    MO_SubWordC w -> fsLit $ "llvm.usub.with.overflow." ++ render (ppr $ widthToLlvmInt w)
 
     MO_S_Mul2    {}  -> unsupported
     MO_S_QuotRem {}  -> unsupported
@@ -960,14 +954,13 @@ genJump (CmmLit (CmmLabel lbl)) live = do
 genJump expr live = do
     fty <- llvmFunTy live
     (vf, stmts, top) <- exprToVar expr
-    dflags <- getDynFlags
 
     let cast = case getVarType vf of
          ty | isPointer ty -> LM_Bitcast
          ty | isInt ty     -> LM_Inttoptr
 
-         ty -> panic $ "genJump: Expr is of bad type for function call! ("
-                     ++ showSDoc dflags (ppr ty) ++ ")"
+         ty -> pprPanic "genJump: Expr is of bad type for function call! "
+                $ lparen <> ppr ty <> rparen
 
     (v1, s1) <- doExpr (pLift fty) $ Cast cast vf (pLift fty)
     (stgRegs, stgStmts) <- funEpilogue live
@@ -1078,9 +1071,8 @@ genStore_slow addr val meta = do
     (vval,  stmts2, top2) <- exprToVar val
 
     let stmts = stmts1 `appOL` stmts2
-    dflags <- getDynFlags
     platform <- getPlatform
-    opts <- getLlvmOpts
+    cfg      <- getConfig
     case getVarType vaddr of
         -- sometimes we need to cast an int to a pointer before storing
         LMPointer ty@(LMPointer _) | getVarType vval == llvmWord platform -> do
@@ -1101,9 +1093,9 @@ genStore_slow addr val meta = do
         other ->
             pprPanic "genStore: ptr not right type!"
                     (PprCmm.pprExpr platform addr <+> text (
-                        "Size of Ptr: " ++ show (llvmPtrBits platform) ++
+                        "Size of Ptr: "   ++ show (llvmPtrBits platform) ++
                         ", Size of var: " ++ show (llvmWidthInBits platform other) ++
-                        ", Var: " ++ showSDoc dflags (ppVar opts vaddr)))
+                        ", Var: "         ++ renderWithContext (lcgContext cfg) (ppVar cfg vaddr)))
 
 
 -- | Unconditional branch
@@ -1128,22 +1120,22 @@ genCondBranch cond idT idF likely = do
             let s1 = BranchIf vc' labelT labelF
             return (stmts1 `appOL` stmts2 `snocOL` s1, top1 ++ top2)
         else do
-            dflags <- getDynFlags
-            opts <- getLlvmOpts
-            panic $ "genCondBranch: Cond expr not bool! (" ++ showSDoc dflags (ppVar opts vc) ++ ")"
+            cfg <- getConfig
+            pprPanic "genCondBranch: Cond expr not bool! " $
+              lparen <> ppVar cfg vc <> rparen
 
 
 -- | Generate call to llvm.expect.x intrinsic. Assigning result to a new var.
 genExpectLit :: Integer -> LlvmType -> LlvmVar -> LlvmM (LlvmVar, StmtData)
 genExpectLit expLit expTy var = do
-  dflags <- getDynFlags
+  cfg <- getConfig
 
   let
     lit = LMLitVar $ LMIntLit expLit expTy
 
     llvmExpectName
-      | isInt expTy = fsLit $ "llvm.expect." ++ showSDoc dflags (ppr expTy)
-      | otherwise   = panic $ "genExpectedLit: Type not an int!"
+      | isInt expTy = fsLit $ "llvm.expect." ++ renderWithContext (lcgContext cfg) (ppr expTy)
+      | otherwise   = panic "genExpectedLit: Type not an int!"
 
   (llvmExpect, stmts, top) <-
     getInstrinct llvmExpectName expTy [expTy, expTy]
@@ -1593,6 +1585,7 @@ genMachOp_slow opt op [x, y] = case op of
 
     where
         binLlvmOp ty binOp allow_y_cast = do
+          cfg      <- getConfig
           platform <- getPlatform
           runExprData $ do
             vx <- exprToVarW x
@@ -1610,10 +1603,8 @@ genMachOp_slow opt op [x, y] = case op of
                | otherwise
                -> do
                     -- Error. Continue anyway so we can debug the generated ll file.
-                    dflags <- getDynFlags
-                    let style = PprCode CStyle
-                        toString doc = renderWithContext (initSDocContext dflags style) doc
-                        cmmToStr = (lines . toString . PprCmm.pprExpr platform)
+                    let render   = renderWithContext (lcgContext cfg)
+                        cmmToStr = (lines . render . PprCmm.pprExpr platform)
                     statement $ Comment $ map fsLit $ cmmToStr x
                     statement $ Comment $ map fsLit $ cmmToStr y
                     doExprW (ty vx) $ binOp vx vy
@@ -1630,8 +1621,7 @@ genMachOp_slow opt op [x, y] = case op of
         -- comparisons while LLVM return i1. Need to extend to llvmWord type
         -- if expected. See Note [Literals and branch conditions].
         genBinComp opt cmp = do
-            ed@(v1, stmts, top) <- binLlvmOp (\_ -> i1) (Compare cmp) False
-            dflags <- getDynFlags
+            ed@(v1, stmts, top) <- binLlvmOp (const i1) (Compare cmp) False
             platform <- getPlatform
             if getVarType v1 == i1
                 then case i1Expected opt of
@@ -1641,8 +1631,8 @@ genMachOp_slow opt op [x, y] = case op of
                         (v2, s1) <- doExpr w_ $ Cast LM_Zext v1 w_
                         return (v2, stmts `snocOL` s1, top)
                 else
-                    panic $ "genBinComp: Compare returned type other then i1! "
-                        ++ (showSDoc dflags $ ppr $ getVarType v1)
+                    pprPanic "genBinComp: Compare returned type other then i1! "
+                               (ppr $ getVarType v1)
 
         genBinMach op = binLlvmOp getVarType (LlvmOp op) False
 
@@ -1657,13 +1647,12 @@ genMachOp_slow opt op [x, y] = case op of
         isSMulOK :: Width -> CmmExpr -> CmmExpr -> LlvmM ExprData
         isSMulOK _ x y = do
           platform <- getPlatform
-          dflags <- getDynFlags
           runExprData $ do
             vx <- exprToVarW x
             vy <- exprToVarW y
 
             let word  = getVarType vx
-            let word2 = LMInt $ 2 * (llvmWidthInBits platform $ getVarType vx)
+            let word2 = LMInt $ 2 * llvmWidthInBits platform (getVarType vx)
             let shift = llvmWidthInBits platform word
             let shift1 = toIWord platform (shift - 1)
             let shift2 = toIWord platform shift
@@ -1680,7 +1669,8 @@ genMachOp_slow opt op [x, y] = case op of
                     doExprW word $ LlvmOp LM_MO_Sub rlow2 rhigh2
 
                 else
-                    panic $ "isSMulOK: Not bit type! (" ++ showSDoc dflags (ppr word) ++ ")"
+                    pprPanic "isSMulOK: Not bit type! " $
+                        lparen <> ppr word <> rparen
 
         panicOp = panic $ "LLVM.CodeGen.genMachOp_slow: unary op encountered"
                        ++ "with two arguments! (" ++ show op ++ ")"
@@ -1760,8 +1750,7 @@ genLoad_fast atomic e r n ty = do
 genLoad_slow :: Atomic -> CmmExpr -> CmmType -> [MetaAnnot] -> LlvmM ExprData
 genLoad_slow atomic e ty meta = do
   platform <- getPlatform
-  dflags <- getDynFlags
-  opts <- getLlvmOpts
+  cfg      <- getConfig
   runExprData $ do
     iptr <- exprToVarW e
     case getVarType iptr of
@@ -1775,9 +1764,9 @@ genLoad_slow atomic e ty meta = do
 
         other -> pprPanic "exprToVar: CmmLoad expression is not right type!"
                      (PprCmm.pprExpr platform e <+> text (
-                         "Size of Ptr: " ++ show (llvmPtrBits platform) ++
+                         "Size of Ptr: "   ++ show (llvmPtrBits platform) ++
                          ", Size of var: " ++ show (llvmWidthInBits platform other) ++
-                         ", Var: " ++ showSDoc dflags (ppVar opts iptr)))
+                         ", Var: " ++ renderWithContext (lcgContext cfg) (ppVar cfg iptr)))
   where
     loadInstr ptr | atomic    = ALoad SyncSeqCst False ptr
                   | otherwise = Load ptr
@@ -1789,21 +1778,21 @@ genLoad_slow atomic e ty meta = do
 getCmmReg :: CmmReg -> LlvmM LlvmVar
 getCmmReg (CmmLocal (LocalReg un _))
   = do exists <- varLookup un
-       dflags <- getDynFlags
        case exists of
          Just ety -> return (LMLocalVar un $ pLift ety)
-         Nothing  -> panic $ "getCmmReg: Cmm register " ++ showSDoc dflags (ppr un) ++ " was not allocated!"
+         Nothing  -> pprPanic "getCmmReg: Cmm register " $
+                        ppr un <> text " was not allocated!"
            -- This should never happen, as every local variable should
            -- have been assigned a value at some point, triggering
            -- "funPrologue" to allocate it on the stack.
 
 getCmmReg (CmmGlobal g)
-  = do onStack <- checkStackReg g
-       dflags <- getDynFlags
+  = do onStack  <- checkStackReg g
        platform <- getPlatform
        if onStack
          then return (lmGlobalRegVar platform g)
-         else panic $ "getCmmReg: Cmm register " ++ showSDoc dflags (ppr g) ++ " not stack-allocated!"
+         else pprPanic "getCmmReg: Cmm register " $
+                ppr g <> text " not stack-allocated!"
 
 -- | Return the value of a given register, as well as its type. Might
 -- need to be load from stack.

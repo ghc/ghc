@@ -16,6 +16,7 @@ import GHC.Prelude
 import GHC.Llvm
 import GHC.CmmToLlvm.Base
 import GHC.CmmToLlvm.CodeGen
+import GHC.CmmToLlvm.Config
 import GHC.CmmToLlvm.Data
 import GHC.CmmToLlvm.Ppr
 import GHC.CmmToLlvm.Regs
@@ -34,7 +35,6 @@ import GHC.Data.FastString
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Logger
-import GHC.SysTools ( figureLlvmVersion )
 import qualified GHC.Data.Stream as Stream
 
 import Control.Monad ( when, forM_ )
@@ -44,10 +44,10 @@ import System.IO
 -- -----------------------------------------------------------------------------
 -- | Top-level of the LLVM Code generator
 --
-llvmCodeGen :: Logger -> DynFlags -> Handle
+llvmCodeGen :: Logger -> LCGConfig -> Handle
                -> Stream.Stream IO RawCmmGroup a
                -> IO a
-llvmCodeGen logger dflags h cmm_stream
+llvmCodeGen logger cfg h cmm_stream
   = withTiming logger (text "LLVM CodeGen") (const ()) $ do
        bufh <- newBufHandle h
 
@@ -55,20 +55,20 @@ llvmCodeGen logger dflags h cmm_stream
        showPass logger "LLVM CodeGen"
 
        -- get llvm version, cache for later use
-       mb_ver <- figureLlvmVersion logger dflags
+       let mb_ver = lcgLlvmVersion cfg
 
        -- warn if unsupported
        forM_ mb_ver $ \ver -> do
          debugTraceMsg logger 2
               (text "Using LLVM version:" <+> text (llvmVersionStr ver))
-         let doWarn = wopt Opt_WarnUnsupportedLlvmVersion dflags
+         let doWarn = lcgDoWarn cfg
          when (not (llvmVersionSupported ver) && doWarn) $ putMsg logger $
            "You are using an unsupported version of LLVM!" $$
            "Currently only" <+> text (llvmVersionStr supportedLlvmVersionLowerBound) <+>
            "to" <+> text (llvmVersionStr supportedLlvmVersionUpperBound) <+> "is supported." <+>
            "System LLVM version: " <> text (llvmVersionStr ver) $$
            "We will try though..."
-         let isS390X = platformArch (targetPlatform dflags) == ArchS390X
+         let isS390X = platformArch (lcgPlatform cfg)  == ArchS390X
          let major_ver = head . llvmVersionList $ ver
          when (isS390X && major_ver < 10 && doWarn) $ putMsg logger $
            "Warning: For s390x the GHC calling convention is only supported since LLVM version 10." <+>
@@ -81,15 +81,15 @@ llvmCodeGen logger dflags h cmm_stream
            llvm_ver = fromMaybe supportedLlvmVersionLowerBound mb_ver
 
        -- run code generation
-       a <- runLlvm logger dflags llvm_ver bufh $
-         llvmCodeGen' dflags cmm_stream
+       a <- runLlvm logger cfg llvm_ver bufh $
+         llvmCodeGen' cfg cmm_stream
 
        bFlush bufh
 
        return a
 
-llvmCodeGen' :: DynFlags -> Stream.Stream IO RawCmmGroup a -> LlvmM a
-llvmCodeGen' dflags cmm_stream
+llvmCodeGen' :: LCGConfig -> Stream.Stream IO RawCmmGroup a -> LlvmM a
+llvmCodeGen' cfg cmm_stream
   = do  -- Preamble
         renderLlvm header
         ghcInternalFunctions
@@ -99,8 +99,7 @@ llvmCodeGen' dflags cmm_stream
         a <- Stream.consume cmm_stream liftIO llvmGroupLlvmGens
 
         -- Declare aliases for forward references
-        opts <- getLlvmOpts
-        renderLlvm . pprLlvmData opts =<< generateExternDecls
+        renderLlvm . pprLlvmData cfg =<< generateExternDecls
 
         -- Postamble
         cmmUsedLlvmGens
@@ -109,8 +108,9 @@ llvmCodeGen' dflags cmm_stream
   where
     header :: SDoc
     header =
-      let target = platformMisc_llvmTarget $ platformMisc dflags
-      in     text ("target datalayout = \"" ++ getDataLayout (llvmConfig dflags) target ++ "\"")
+      let target  = lcgPlatformMisc cfg
+          llvmCfg = lcgLlvmConfig cfg
+      in     text ("target datalayout = \"" ++ getDataLayout llvmCfg target ++ "\"")
          $+$ text ("target triple = \"" ++ target ++ "\"")
 
     getDataLayout :: LlvmConfig -> String -> String
@@ -158,8 +158,8 @@ cmmDataLlvmGens statics
        mapM_ regGlobal gs
        gss' <- mapM aliasify $ gs
 
-       opts <- getLlvmOpts
-       renderLlvm $ pprLlvmData opts (concat gss', concat tss)
+       cfg <- getConfig
+       renderLlvm $ pprLlvmData cfg (concat gss', concat tss)
 
 -- | Complete LLVM code generation phase for a single top-level chunk of Cmm.
 cmmLlvmGen ::RawCmmDecl -> LlvmM ()
@@ -203,8 +203,8 @@ cmmMetaLlvmPrelude = do
               -- just a name on its own. Previously `null` was accepted as the
               -- name.
               Nothing -> [ MetaStr name ]
-  opts <- getLlvmOpts
-  renderLlvm $ ppLlvmMetas opts metas
+  cfg <- getConfig
+  renderLlvm $ ppLlvmMetas cfg metas
 
 -- -----------------------------------------------------------------------------
 -- | Marks variables as used where necessary
@@ -222,12 +222,11 @@ cmmUsedLlvmGens = do
   -- Which is the LLVM way of protecting them against getting removed.
   ivars <- getUsedVars
   let cast x = LMBitc (LMStaticPointer (pVarLift x)) i8Ptr
-      ty     = (LMArray (length ivars) i8Ptr)
+      ty     = LMArray (length ivars) i8Ptr
       usedArray = LMStaticArray (map cast ivars) ty
       sectName  = Just $ fsLit "llvm.metadata"
       lmUsedVar = LMGlobalVar (fsLit "llvm.used") ty Appending sectName Nothing Constant
       lmUsed    = LMGlobal lmUsedVar (Just usedArray)
-  opts <- getLlvmOpts
   if null ivars
      then return ()
-     else renderLlvm $ pprLlvmData opts ([lmUsed], [])
+     else getConfig >>= renderLlvm . flip pprLlvmData ([lmUsed], [])

@@ -22,9 +22,9 @@ module GHC.CmmToLlvm.Base (
         LlvmM,
         runLlvm, withClearVars, varLookup, varInsert,
         markStackReg, checkStackReg,
-        funLookup, funInsert, getLlvmVer, getDynFlags,
+        funLookup, funInsert, getLlvmVer,
         dumpIfSetLlvm, renderLlvm, markUsedVar, getUsedVars,
-        ghcInternalFunctions, getPlatform, getLlvmOpts,
+        ghcInternalFunctions, getPlatform, getConfig,
 
         getMetaUniqueId,
         setUniqMeta, getUniqMeta, liftIO,
@@ -46,6 +46,7 @@ import GHC.Utils.Panic
 
 import GHC.Llvm
 import GHC.CmmToLlvm.Regs
+import GHC.CmmToLlvm.Config
 
 import GHC.Cmm.CLabel
 import GHC.Cmm.Ppr.Expr ()
@@ -149,10 +150,10 @@ llvmInfAlign :: Platform -> LMAlign
 llvmInfAlign platform = Just (platformWordSizeInBytes platform)
 
 -- | Section to use for a function
-llvmFunSection :: LlvmOpts -> LMString -> LMSection
+llvmFunSection :: LCGConfig -> LMString -> LMSection
 llvmFunSection opts lbl
-    | llvmOptsSplitSections opts = Just (concatFS [fsLit ".text.", lbl])
-    | otherwise                  = Nothing
+    | lcgSplitSections opts = Just (concatFS [fsLit ".text.", lbl])
+    | otherwise             = Nothing
 
 -- | A Function's arguments
 llvmFunArgs :: Platform -> LiveGlobalRegs -> [LlvmVar]
@@ -263,9 +264,6 @@ llvmPtrBits platform = widthInBits $ typeWidth $ gcWord platform
 -- * Llvm Version
 --
 
-newtype LlvmVersion = LlvmVersion { llvmVersionNE :: NE.NonEmpty Int }
-  deriving (Eq, Ord)
-
 parseLlvmVersion :: String -> Maybe LlvmVersion
 parseLlvmVersion =
     fmap LlvmVersion . NE.nonEmpty . go [] . dropWhile (not . isDigit)
@@ -303,21 +301,20 @@ llvmVersionList = NE.toList . llvmVersionNE
 --
 
 data LlvmEnv = LlvmEnv
-  { envVersion :: LlvmVersion      -- ^ LLVM version
-  , envOpts    :: LlvmOpts         -- ^ LLVM backend options
-  , envDynFlags :: DynFlags        -- ^ Dynamic flags
-  , envLogger :: !Logger           -- ^ Logger
-  , envOutput :: BufHandle         -- ^ Output buffer
-  , envMask :: !Char               -- ^ Mask for creating unique values
-  , envFreshMeta :: MetaId         -- ^ Supply of fresh metadata IDs
-  , envUniqMeta :: UniqFM Unique MetaId   -- ^ Global metadata nodes
-  , envFunMap :: LlvmEnvMap        -- ^ Global functions so far, with type
-  , envAliases :: UniqSet LMString -- ^ Globals that we had to alias, see [Llvm Forward References]
-  , envUsedVars :: [LlvmVar]       -- ^ Pointers to be added to llvm.used (see @cmmUsedLlvmGens@)
+  { envVersion   :: LlvmVersion      -- ^ LLVM version
+  , envConfig    :: !LCGConfig       -- ^ Configuration for LLVM code gen
+  , envLogger    :: !Logger          -- ^ Logger
+  , envOutput    :: BufHandle        -- ^ Output buffer
+  , envMask      :: !Char            -- ^ Mask for creating unique values
+  , envFreshMeta :: MetaId           -- ^ Supply of fresh metadata IDs
+  , envUniqMeta  :: UniqFM Unique MetaId   -- ^ Global metadata nodes
+  , envFunMap    :: LlvmEnvMap       -- ^ Global functions so far, with type
+  , envAliases   :: UniqSet LMString -- ^ Globals that we had to alias, see [Llvm Forward References]
+  , envUsedVars  :: [LlvmVar]        -- ^ Pointers to be added to llvm.used (see @cmmUsedLlvmGens@)
 
     -- the following get cleared for every function (see @withClearVars@)
-  , envVarMap :: LlvmEnvMap        -- ^ Local variables so far, with type
-  , envStackRegs :: [GlobalReg]    -- ^ Non-constant registers (alloca'd in the function prelude)
+  , envVarMap    :: LlvmEnvMap       -- ^ Local variables so far, with type
+  , envStackRegs :: [GlobalReg]      -- ^ Non-constant registers (alloca'd in the function prelude)
   }
 
 type LlvmEnvMap = UniqFM Unique LlvmType
@@ -334,20 +331,16 @@ instance Monad LlvmM where
     m >>= f  = LlvmM $ \env -> do (x, env') <- runLlvmM m env
                                   runLlvmM (f x) env'
 
-instance HasDynFlags LlvmM where
-    getDynFlags = LlvmM $ \env -> return (envDynFlags env, env)
-
 instance HasLogger LlvmM where
     getLogger = LlvmM $ \env -> return (envLogger env, env)
 
 
 -- | Get target platform
 getPlatform :: LlvmM Platform
-getPlatform = llvmOptsPlatform <$> getLlvmOpts
+getPlatform = lcgPlatform <$> getConfig
 
--- | Get LLVM options
-getLlvmOpts :: LlvmM LlvmOpts
-getLlvmOpts = LlvmM $ \env -> return (envOpts env, env)
+getConfig :: LlvmM LCGConfig
+getConfig = LlvmM $ \env -> return (envConfig env, env)
 
 instance MonadUnique LlvmM where
     getUniqueSupplyM = do
@@ -364,23 +357,22 @@ liftIO m = LlvmM $ \env -> do x <- m
                               return (x, env)
 
 -- | Get initial Llvm environment.
-runLlvm :: Logger -> DynFlags -> LlvmVersion -> BufHandle -> LlvmM a -> IO a
-runLlvm logger dflags ver out m = do
+runLlvm :: Logger -> LCGConfig -> LlvmVersion -> BufHandle -> LlvmM a -> IO a
+runLlvm logger cfg ver out m = do
     (a, _) <- runLlvmM m env
     return a
-  where env = LlvmEnv { envFunMap = emptyUFM
-                      , envVarMap = emptyUFM
+  where env = LlvmEnv { envFunMap    = emptyUFM
+                      , envVarMap    = emptyUFM
                       , envStackRegs = []
-                      , envUsedVars = []
-                      , envAliases = emptyUniqSet
-                      , envVersion = ver
-                      , envOpts = initLlvmOpts dflags
-                      , envDynFlags = dflags
-                      , envLogger = logger
-                      , envOutput = out
-                      , envMask = 'n'
+                      , envUsedVars  = []
+                      , envAliases   = emptyUniqSet
+                      , envVersion   = ver
+                      , envConfig    = cfg
+                      , envLogger    = logger
+                      , envOutput    = out
+                      , envMask      = 'n'
                       , envFreshMeta = MetaId 0
-                      , envUniqMeta = emptyUFM
+                      , envUniqMeta  = emptyUFM
                       }
 
 -- | Get environment (internal)
@@ -435,9 +427,8 @@ renderLlvm :: Outp.SDoc -> LlvmM ()
 renderLlvm sdoc = do
 
     -- Write to output
-    dflags <- getDynFlags
+    ctx <- lcgContext <$> getConfig
     out <- getEnv envOutput
-    let ctx = initSDocContext dflags (Outp.PprCode Outp.CStyle)
     liftIO $ Outp.bufLeftRenderSDoc ctx out sdoc
 
     -- Dump, if requested
@@ -499,12 +490,10 @@ ghcInternalFunctions = do
 -- | Pretty print a 'CLabel'.
 strCLabel_llvm :: CLabel -> LlvmM LMString
 strCLabel_llvm lbl = do
-    dflags <- getDynFlags
+    ctx <- lcgContext <$> getConfig
     platform <- getPlatform
     let sdoc = pprCLabel platform CStyle lbl
-        str = Outp.renderWithContext
-                  (initSDocContext dflags (Outp.PprCode Outp.CStyle))
-                  sdoc
+        str = Outp.renderWithContext ctx sdoc
     return (fsLit str)
 
 -- ----------------------------------------------------------------------------

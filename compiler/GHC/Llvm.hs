@@ -10,9 +10,6 @@
 --
 
 module GHC.Llvm (
-        LlvmOpts (..),
-        initLlvmOpts,
-
         -- * Modules, Functions and Blocks
         LlvmModule(..),
 
