@@ -400,9 +400,9 @@ def tabulate_metrics(metrics: List[PerfMetric]) -> None:
           if x.baseline is not None else "",
         "{}".format(x.baseline.perfStat.test_env)
           if x.baseline is not None else "",
-        "{:13.1f}".format(x.baseline.perfStat.value)
+        "{:13,d}".format(int(x.baseline.perfStat.value))
           if x.baseline is not None else "",
-        "{:13.1f}".format(x.stat.value),
+        "{:13,d}".format(int(x.stat.value)),
         strDiff(x),
         "{}".format(x.change.hint())
     )) for x in sorted(metrics, key =
