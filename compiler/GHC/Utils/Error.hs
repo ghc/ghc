@@ -10,7 +10,7 @@
 
 module GHC.Utils.Error (
         -- * Basic types
-        Validity'(..), Validity, andValid, allValid, isValid, getInvalids, orValid,
+        Validity'(..), Validity, andValid, allValid, getInvalids, orValid,
         Severity(..),
 
         -- * Messages
@@ -197,10 +197,6 @@ data Validity' a
 
 -- | Monomorphic version of @Validity'@ specialised for 'SDoc's.
 type Validity = Validity' SDoc
-
-isValid :: Validity' a -> Bool
-isValid IsValid       = True
-isValid (NotValid {}) = False
 
 andValid :: Validity' a -> Validity' a -> Validity' a
 andValid IsValid v = v

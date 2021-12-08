@@ -118,7 +118,6 @@ module GHC.Tc.Utils.TcType (
   isFFIPrimArgumentTy, -- :: DynFlags -> Type -> Bool
   isFFIPrimResultTy,   -- :: DynFlags -> Type -> Bool
   isFFILabelTy,        -- :: Type -> Bool
-  isFFITy,             -- :: Type -> Bool
   isFunPtrTy,          -- :: Type -> Bool
   tcSplitIOType_maybe, -- :: Type -> Maybe Type
 
@@ -228,7 +227,7 @@ import GHC.Data.List.SetOps ( getNth, findDupsEq )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
-import GHC.Utils.Error( Validity'(..), Validity, isValid )
+import GHC.Utils.Error( Validity'(..), Validity )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Data.List  ( mapAccumL )
@@ -2200,10 +2199,6 @@ tcSplitIOType_maybe ty
         _ ->
             Nothing
 
-isFFITy :: Type -> Bool
--- True for any TyCon that can possibly be an arg or result of an FFI call
-isFFITy ty = isValid (checkRepTyCon legalFFITyCon ty)
-
 isFFIArgumentTy :: DynFlags -> Safety -> Type -> Validity
 -- Checks for valid argument type for a 'foreign import'
 isFFIArgumentTy dflags safety ty
@@ -2332,17 +2327,19 @@ legalOutgoingTyCon :: DynFlags -> Safety -> TyCon -> Validity
 legalOutgoingTyCon dflags _ tc
   = marshalableTyCon dflags tc
 
-legalFFITyCon :: TyCon -> Validity
--- True for any TyCon that can possibly be an arg or result of an FFI call
-legalFFITyCon tc
-  | isUnliftedTyCon tc = IsValid
-  | tc == unitTyCon    = IsValid
-  | otherwise          = boxedMarshalableTyCon tc
+-- Check for marshalability of a primitive type.
+-- We exclude lifted types such as RealWorld and TYPE.
+-- They can technically appear in types, e.g.
+-- f :: RealWorld -> TYPE LiftedRep -> RealWorld
+-- f x _ = x
+-- but there are no values of type RealWorld or TYPE LiftedRep,
+-- so it doesn't make sense to use them in FFI.
+marshalablePrimTyCon :: TyCon -> Bool
+marshalablePrimTyCon tc = isPrimTyCon tc && not (isLiftedTypeKind (tyConResKind tc))
 
 marshalableTyCon :: DynFlags -> TyCon -> Validity
 marshalableTyCon dflags tc
-  | isUnliftedTyCon tc
-  , not (isUnboxedTupleTyCon tc || isUnboxedSumTyCon tc)
+  | marshalablePrimTyCon tc
   , not (null (tyConPrimRep tc)) -- Note [Marshalling void]
   = validIfUnliftedFFITypes dflags
   | otherwise
@@ -2366,11 +2363,8 @@ boxedMarshalableTyCon tc
 
 legalFIPrimArgTyCon :: DynFlags -> TyCon -> Validity
 -- Check args of 'foreign import prim', only allow simple unlifted types.
--- Strictly speaking it is unnecessary to ban unboxed tuples and sums here since
--- currently they're of the wrong kind to use in function args anyway.
 legalFIPrimArgTyCon dflags tc
-  | isUnliftedTyCon tc
-  , not (isUnboxedTupleTyCon tc || isUnboxedSumTyCon tc)
+  | marshalablePrimTyCon tc
   = validIfUnliftedFFITypes dflags
   | otherwise
   = NotValid unlifted_only
@@ -2379,9 +2373,11 @@ legalFIPrimResultTyCon :: DynFlags -> TyCon -> Validity
 -- Check result type of 'foreign import prim'. Allow simple unlifted
 -- types and also unboxed tuple and sum result types.
 legalFIPrimResultTyCon dflags tc
-  | isUnliftedTyCon tc
-  , isUnboxedTupleTyCon tc || isUnboxedSumTyCon tc
-     || not (null (tyConPrimRep tc))   -- Note [Marshalling void]
+  | marshalablePrimTyCon tc
+  , not (null (tyConPrimRep tc))   -- Note [Marshalling void]
+  = validIfUnliftedFFITypes dflags
+
+  | isUnboxedTupleTyCon tc || isUnboxedSumTyCon tc
   = validIfUnliftedFFITypes dflags
 
   | otherwise

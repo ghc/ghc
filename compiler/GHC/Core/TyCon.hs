@@ -35,8 +35,6 @@ module GHC.Core.TyCon(
         mkClassTyCon,
         mkFunTyCon,
         mkPrimTyCon,
-        mkKindTyCon,
-        mkLiftedPrimTyCon,
         mkTupleTyCon,
         mkSumTyCon,
         mkDataTyConRhs,
@@ -68,7 +66,6 @@ module GHC.Core.TyCon(
         isOpenTypeFamilyTyCon, isClosedSynFamilyTyConWithAxiom_maybe,
         tyConInjectivityInfo,
         isBuiltInSynFamTyCon_maybe,
-        isUnliftedTyCon,
         isGadtSyntaxTyCon, isInjectiveTyCon, isGenerativeTyCon, isGenInjAlgRhs,
         isTyConAssoc, tyConAssoc_maybe, tyConFlavourAssoc_maybe,
         isImplicitTyCon,
@@ -906,11 +903,6 @@ data TyCon
         tcRoles       :: [Role], -- ^ The role for each type variable
                                  -- This list has length = tyConArity
                                  -- See also Note [TyCon Role signatures]
-
-        isUnlifted   :: Bool,    -- ^ Most primitive tycons are unlifted (may
-                                 -- not contain bottom) but other are lifted,
-                                 -- e.g. @RealWorld@
-                                 -- Only relevant if tyConKind = *
 
         primRepName :: TyConRepName   -- ^ The 'Typeable' representation.
                                       -- A cached version of
@@ -1970,39 +1962,17 @@ mkTcTyCon name binders res_kind scoped_tvs poly flav
 noTcTyConScopedTyVars :: [(Name, TcTyVar)]
 noTcTyConScopedTyVars = []
 
--- | Create an unlifted primitive 'TyCon', such as @Int#@.
+-- | Create an primitive 'TyCon', such as @Int#@, @Type@ or @RealWorld#@
+-- Primitive TyCons are marshalable iff not lifted.
+-- If you'd like to change this, modify marshalablePrimTyCon.
 mkPrimTyCon :: Name -> [TyConBinder]
-            -> Kind   -- ^ /result/ kind
-                      -- Must answer 'True' to 'isFixedRuntimeRepKind' (no representation polymorphism).
-            -> [Role] -> TyCon
+            -> Kind    -- ^ /result/ kind
+                       -- Must answer 'True' to 'isFixedRuntimeRepKind' (i.e., no representation polymorphism).
+                       -- (If you need a representation-polymorphic PrimTyCon,
+                       -- change tcHasFixedRuntimeRep, marshalablePrimTyCon, reifyTyCon for PrimTyCons.)
+            -> [Role]
+            -> TyCon
 mkPrimTyCon name binders res_kind roles
-  = mkPrimTyCon' name binders res_kind roles True (mkPrelTyConRepName name)
-
--- | Kind constructors
-mkKindTyCon :: Name -> [TyConBinder]
-            -> Kind  -- ^ /result/ kind
-            -> [Role] -> Name -> TyCon
-mkKindTyCon name binders res_kind roles rep_nm
-  = tc
-  where
-    tc = mkPrimTyCon' name binders res_kind roles False rep_nm
-
--- | Create a lifted primitive 'TyCon' such as @RealWorld@
-mkLiftedPrimTyCon :: Name -> [TyConBinder]
-                  -> Kind   -- ^ /result/ kind
-                  -> [Role] -> TyCon
-mkLiftedPrimTyCon name binders res_kind roles
-  = mkPrimTyCon' name binders res_kind roles False rep_nm
-  where rep_nm = mkPrelTyConRepName name
-
-mkPrimTyCon' :: Name -> [TyConBinder]
-             -> Kind    -- ^ /result/ kind
-                        -- Must answer 'True' to 'isFixedRuntimeRepKind' (i.e., no representation polymorphism).
-                        -- (If you need a representation-polymorphic PrimTyCon,
-                        -- change tcHasFixedRuntimeRep.)
-             -> [Role]
-             -> Bool -> TyConRepName -> TyCon
-mkPrimTyCon' name binders res_kind roles is_unlifted rep_nm
   = let tc =
           PrimTyCon {
               tyConName    = name,
@@ -2013,8 +1983,7 @@ mkPrimTyCon' name binders res_kind roles is_unlifted rep_nm
               tyConArity   = length roles,
               tyConNullaryTy = mkNakedTyConTy tc,
               tcRoles      = roles,
-              isUnlifted   = is_unlifted,
-              primRepName  = rep_nm
+              primRepName  = mkPrelTyConRepName name
           }
     in tc
 
@@ -2100,19 +2069,6 @@ isAbstractTyCon _ = False
 isPrimTyCon :: TyCon -> Bool
 isPrimTyCon (PrimTyCon {}) = True
 isPrimTyCon _              = False
-
--- | Is this 'TyCon' unlifted (i.e. cannot contain bottom)? Note that this can
--- only be true for primitive and unboxed-tuple 'TyCon's
-isUnliftedTyCon :: TyCon -> Bool
-isUnliftedTyCon (PrimTyCon  {isUnlifted = is_unlifted})
-  = is_unlifted
-isUnliftedTyCon (AlgTyCon { algTcRhs = rhs } )
-  | TupleTyCon { tup_sort = sort } <- rhs
-  = not (isBoxed (tupleSortBoxity sort))
-isUnliftedTyCon (AlgTyCon { algTcRhs = rhs } )
-  | SumTyCon {} <- rhs
-  = True
-isUnliftedTyCon _ = False
 
 -- | Returns @True@ if the supplied 'TyCon' resulted from either a
 -- @data@ or @newtype@ declaration

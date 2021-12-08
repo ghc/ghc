@@ -461,12 +461,6 @@ It has these properties:
   * It is wired-in so we can easily refer to it where we don't have a name
     environment (e.g. see Rules.matchRule for one example)
 
-  * If (Any k) is the type of a value, it must be a /lifted/ value. So
-    if we have (Any @(TYPE rr)) then rr must be 'LiftedRep.  See
-    Note [TYPE and RuntimeRep] in GHC.Builtin.Types.Prim.  This is a convenient
-    invariant, and makes isUnliftedTyCon well-defined; otherwise what
-    would (isUnliftedTyCon Any) be?
-
 It's used to instantiate un-constrained type variables after type checking. For
 example, 'length' has type
 
