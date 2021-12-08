@@ -189,11 +189,14 @@ instance ToJson TickyClosureType where
         mkInfo fvs args =
           JSObject
               [("type", json "entCntr")
+              ,("fvs_c", json (length fvs))
+              ,("fvs" , json fvs)
               ,("args", json args)
-              ,("fvs" , json fvs)]
+              ]
 
 tickyEntryDesc :: (SDocContext -> TickyClosureType -> String)
 tickyEntryDesc ctxt = renderWithContext ctxt . renderJSON . json
+-- tickyEntryDesc ctxt info = tickyFvDesc info ++ ";" ++ tickyArgDesc info
 
 data TickyClosureType
     = TickyFun
