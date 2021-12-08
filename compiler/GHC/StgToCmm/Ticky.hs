@@ -144,6 +144,7 @@ import GHC.Types.Id.Info
 import GHC.Utils.Trace
 import GHC.StgToCmm.Env (getCgInfo_maybe)
 import Data.Coerce (coerce)
+import GHC.Utils.Json
 
 -----------------------------------------------------------------------------
 --
@@ -152,40 +153,70 @@ import Data.Coerce (coerce)
 -----------------------------------------------------------------------------
 
 -- | Ticky "arg" info. Describes args for functions and fvs for thunks.
-data TickyArgs = FunArgs [NonVoid Id] | ThunkFvs [StgArg] | NoArgs
+data TickyEntryDesc = DescFunThunk [NonVoid Id] [NonVoid Id] | DescFunArgs [NonVoid Id] | DescThunkFvs [StgArg] | DescTickyCon
 
 -- | "Arguments" for a ticky counter. FVs for thunks, actual arguments for functions.
-tickyArgArity :: TickyArgs -> Int
-tickyArgArity (FunArgs args) = length args
-tickyArgArity (ThunkFvs fvs) = length fvs
-tickyArgArity (NoArgs) = 0
+tickyArgArity :: TickyClosureType -> Int
+tickyArgArity (TickyFun _ _fvs args) = length args
+tickyArgArity (TickyLNE args) = length args
+tickyArgArity (TickyCon{}) = 0
+tickyArgArity (TickyThunk{}) = 0
 
-
-tickyArgDesc :: TickyArgs -> String
+tickyArgDesc :: TickyClosureType -> String
 tickyArgDesc arg_info =
   case arg_info of
-    NoArgs -> ""
-    ThunkFvs fvs -> map (showTypeCategory . stgArgType) fvs
-    FunArgs args -> map (showTypeCategory . idType . fromNonVoid) args
+    TickyFun _ _fvs args -> map (showTypeCategory . idType . fromNonVoid) args
+    TickyLNE args -> map (showTypeCategory . idType . fromNonVoid) args
+    TickyThunk{} -> ""
+    TickyCon{} -> ""
+
+tickyFvDesc :: TickyClosureType -> String
+tickyFvDesc arg_info =
+  case arg_info of
+    TickyFun _ fvs _args -> map (showTypeCategory . idType . fromNonVoid) fvs
+    TickyLNE{} -> ""
+    TickyThunk _ _ fvs -> map (showTypeCategory . stgArgType) fvs
+    TickyCon{} -> ""
+
+instance ToJson TickyClosureType where
+    json info = case info of
+      (TickyFun {})   -> mkInfo (tickyFvDesc info) (tickyArgDesc info)
+      (TickyLNE {})   -> mkInfo []                 (tickyArgDesc info)
+      (TickyThunk {}) -> mkInfo (tickyFvDesc info) []
+      (TickyCon{})    -> mkInfo []                 []
+      where
+        mkInfo :: String -> String -> JsonDoc
+        mkInfo fvs args =
+          JSObject
+              [("type", json "entCntr")
+              ,("args", json args)
+              ,("fvs" , json fvs)]
+
+tickyEntryDesc :: (SDocContext -> TickyClosureType -> String)
+tickyEntryDesc ctxt = renderWithContext ctxt . renderJSON . json
 
 data TickyClosureType
     = TickyFun
         Bool -- True <-> single entry
+        [NonVoid Id] -- ^ FVs
+        [NonVoid Id] -- ^ Args
     | TickyCon
         DataCon -- the allocated constructor
         ConstructorNumber
     | TickyThunk
         Bool -- True <-> updateable
         Bool -- True <-> standard thunk (AP or selector), has no entry counter
+        [StgArg] -- ^ FVS, StgArg because for thunks these can also be literals.
     | TickyLNE
+        [NonVoid Id] -- ^ Args
 
-withNewTickyCounterFun :: Bool -> Id -> [NonVoid Id] -> FCode a -> FCode a
-withNewTickyCounterFun single_entry f args = withNewTickyCounter (TickyFun single_entry) f (FunArgs args)
+withNewTickyCounterFun :: Bool -> Id -> [NonVoid Id] -> [NonVoid Id] -> FCode a -> FCode a
+withNewTickyCounterFun single_entry f fvs args = withNewTickyCounter (TickyFun single_entry fvs args) f
 
 withNewTickyCounterLNE :: Id  ->  [NonVoid Id] -> FCode a -> FCode a
 withNewTickyCounterLNE nm  args code = do
   b <- tickyLNEIsOn
-  if not b then code else withNewTickyCounter TickyLNE nm (FunArgs args) code
+  if not b then code else withNewTickyCounter (TickyLNE args) nm code
 
 thunkHasCounter :: Bool -> FCode Bool
 thunkHasCounter isStatic = do
@@ -203,7 +234,7 @@ withNewTickyCounterThunk isStatic isUpdatable name fvs code = do
     has_ctr <- thunkHasCounter isStatic
     if not has_ctr
       then code
-      else withNewTickyCounter (TickyThunk isUpdatable False) name (ThunkFvs $ map StgVarArg $ coerce fvs) code
+      else withNewTickyCounter (TickyThunk isUpdatable False (map StgVarArg $ coerce fvs)) name code
 
 withNewTickyCounterStdThunk
   :: Bool -- ^ updateable
@@ -215,7 +246,7 @@ withNewTickyCounterStdThunk isUpdatable name fvs code = do
     has_ctr <- thunkHasCounter False
     if not has_ctr
       then code
-      else withNewTickyCounter (TickyThunk isUpdatable True) name (ThunkFvs fvs) code
+      else withNewTickyCounter (TickyThunk isUpdatable True fvs) name code
 
 withNewTickyCounterCon
   :: Id
@@ -227,16 +258,16 @@ withNewTickyCounterCon name datacon info code = do
     has_ctr <- thunkHasCounter False
     if not has_ctr
       then code
-      else withNewTickyCounter (TickyCon datacon info) name NoArgs code
+      else withNewTickyCounter (TickyCon datacon info) name code
 
 -- args does not include the void arguments
-withNewTickyCounter :: TickyClosureType -> Id -> TickyArgs -> FCode a -> FCode a
-withNewTickyCounter cloType name args m = do
-  lbl <- emitTickyCounter cloType name args
+withNewTickyCounter :: TickyClosureType -> Id -> FCode a -> FCode a
+withNewTickyCounter cloType name m = do
+  lbl <- emitTickyCounter cloType name
   setTickyCtrLabel lbl m
 
-emitTickyCounter :: TickyClosureType -> Id -> TickyArgs -> FCode CLabel
-emitTickyCounter cloType tickee arg_info
+emitTickyCounter :: TickyClosureType -> Id -> FCode CLabel
+emitTickyCounter cloType tickee
   = let name = idName tickee in
     let ctr_lbl = mkRednCountsLabel name in
     (>> return ctr_lbl) $
@@ -254,13 +285,13 @@ emitTickyCounter cloType tickee arg_info
               ppr_for_ticky_name =
                 let n = ppr name
                     ext = case cloType of
-                              TickyFun single_entry -> parens $ hcat $ punctuate comma $
+                              TickyFun single_entry _ _-> parens $ hcat $ punctuate comma $
                                   [text "fun"] ++ [text "se"|single_entry]
                               TickyCon datacon _cn -> parens (text "con:" <+> ppr (dataConName datacon))
-                              TickyThunk upd std -> parens $ hcat $ punctuate comma $
+                              TickyThunk upd std _-> parens $ hcat $ punctuate comma $
                                   [text "thk"] ++ [text "se"|not upd] ++ [text "std"|std]
-                              TickyLNE | isInternalName name -> parens (text "LNE")
-                                       | otherwise -> panic "emitTickyCounter: how is this an external LNE?"
+                              TickyLNE _ | isInternalName name -> parens (text "LNE")
+                                         | otherwise -> panic "emitTickyCounter: how is this an external LNE?"
                     p = case hasHaskellName parent of
                             -- NB the default "top" ticky ctr does not
                             -- have a Haskell name
@@ -283,7 +314,7 @@ emitTickyCounter cloType tickee arg_info
                               -- pprTrace "tickyF" (text t <> colon <> ppr name <+> ppr (mkInfoTableLabel name NoCafRefs) $$ ppr mod_name) $
                               return $! CmmLabel $ mkInfoTableLabel name NoCafRefs
 
-                            TickyThunk _ std_thunk
+                            TickyThunk _ std_thunk fvs
                               | not std_thunk
                               -> -- pprTrace "tickyThunk" (text t <> colon <> ppr name <+> ppr (mkInfoTableLabel name NoCafRefs))
                                  return $! CmmLabel $ mkInfoTableLabel name NoCafRefs
@@ -307,7 +338,7 @@ emitTickyCounter cloType tickee arg_info
         ; let ctx = (initSDocContext dflags defaultDumpStyle)
                       { sdocPprDebug = True }
         ; fun_descr_lit <- newStringCLit $ renderWithContext ctx ppr_for_ticky_name
-        ; arg_descr_lit <- newStringCLit $ tickyArgDesc arg_info
+        ; arg_descr_lit <- newStringCLit $ tickyEntryDesc ctx cloType
         ; emitDataLits ctr_lbl
         -- Must match layout of rts/include/rts/Ticky.h's StgEntCounter
         --
@@ -315,7 +346,7 @@ emitTickyCounter cloType tickee arg_info
         -- before, but the code generator wasn't handling that
         -- properly and it led to chaos, panic and disorder.
             [ mkIntCLit platform 0,               -- registered?
-              mkIntCLit platform (tickyArgArity arg_info),   -- Arity
+              mkIntCLit platform (tickyArgArity cloType),   -- Arity
               mkIntCLit platform 0,               -- Heap allocated for this thing
               fun_descr_lit,
               arg_descr_lit,

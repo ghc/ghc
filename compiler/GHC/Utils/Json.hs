@@ -1,4 +1,6 @@
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
 module GHC.Utils.Json where
 
 import GHC.Prelude
@@ -54,3 +56,6 @@ escapeJsonString = concatMap escapeChar
 
 class ToJson a where
   json :: a -> JsonDoc
+
+instance ToJson String where
+  json = JSString . escapeJsonString

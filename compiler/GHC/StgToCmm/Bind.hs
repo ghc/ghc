@@ -490,7 +490,7 @@ closureCodeBody top_lvl bndr cl_info cc args@(arg0:_) body fv_details
         arity = length args
     in
     -- See Note [OneShotInfo overview] in GHC.Types.Basic.
-    withNewTickyCounterFun (isOneShotBndr arg0) (closureName cl_info)
+    withNewTickyCounterFun (isOneShotBndr arg0) (closureName cl_info) (map fst fv_details)
         nv_args $ do {
 
         ; let
