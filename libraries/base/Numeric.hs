@@ -78,7 +78,7 @@ import qualified Text.Read.Lex as L
 -- -----------------------------------------------------------------------------
 -- Reading
 
--- | Reads an /unsigned/ 'Integral' value in an arbitrary base.
+-- | Reads an /unsigned/ integral value in an arbitrary base.
 readInt :: Num a
   => a                  -- ^ the base
   -> (Char -> Bool)     -- ^ a predicate distinguishing valid digits in this base
