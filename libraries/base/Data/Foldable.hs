@@ -1184,9 +1184,6 @@ msum = asum
 --
 -- >>> concat [[1, 2, 3], [4, 5], [6], []]
 -- [1,2,3,4,5,6]
---
--- WARNING: This function takes O(n^2) time in the total number of elements
--- when the 't' is '[]'.
 concat :: Foldable t => t [a] -> [a]
 concat xs = build (\c n -> foldr (\x y -> foldr c y x) n xs)
 {-# INLINE concat #-}
