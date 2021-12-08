@@ -39,6 +39,7 @@ import qualified Data.Map as Map
 import GHC.Linker.Types
 import GHC.Linker.Loader ( getLoaderState )
 import GHC.Types.SourceFile
+import GHC.Unit.Finder
 
 {- Note [Module self-dependency]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -146,7 +147,7 @@ mkObjectUsage pit hsc_env mnwib = do
 
     msg m = moduleNameString (moduleName m) ++ "[TH] changed"
 
-    fing mmsg fn = UsageFile fn <$> getFileHash fn <*> pure mmsg
+    fing mmsg fn = UsageFile fn <$> lookupFileCache (hsc_FC hsc_env) fn <*> pure mmsg
 
     unlinkedToUsage m ul =
       case nameOfObject_maybe ul of
