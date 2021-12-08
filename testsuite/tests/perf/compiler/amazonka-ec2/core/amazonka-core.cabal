@@ -1,0 +1,75 @@
+name:                  amazonka-core
+version:               1.6.1
+synopsis:              Core data types and functionality for Amazonka libraries.
+homepage:              https://github.com/brendanhay/amazonka
+bug-reports:           https://github.com/brendanhay/amazonka/issues
+license:               MPL-2.0
+license-file:          LICENSE
+author:                Brendan Hay
+maintainer:            Brendan Hay <brendan.g.hay+amazonka@gmail.com>
+copyright:             Copyright (c) 2013-2017 Brendan Hay
+category:              Network, AWS, Cloud, Distributed Computing
+build-type:            Simple
+extra-source-files:    README.md
+cabal-version:         >= 1.10
+
+description:
+    Core data types, functionality and serialisation primitives for
+    Amazonka related Amazon Web Services SDKs.
+    .
+    The external interface of this library is stable with respect to the
+    downstream Amazonka libraries, only, and as such is not suitable
+    for use in non-Amazonka projects.
+
+source-repository head
+    type:              git
+    location:          git://github.com/brendanhay/amazonka.git
+    subdir:            core
+
+flag old-locale
+    description:       Use old-locale and time < 1.5
+    default:           False
+
+library
+    default-language:  Haskell2010
+    hs-source-dirs:    src
+
+    ghc-options:
+        -Wall
+        -fwarn-incomplete-uni-patterns
+        -fwarn-incomplete-record-updates
+        -funbox-strict-fields
+
+    exposed-modules:
+          Network.AWS.Prelude
+        , Network.AWS.Lens
+
+    other-modules:
+          Data.Attoparsec.ByteString.Buffer
+        , Data.Attoparsec.Internal
+        , Data.Attoparsec.Internal.Compat
+        , Data.Attoparsec.Internal.Fhthagn
+        , Data.Attoparsec.Internal.Types
+        , Data.Attoparsec.Text
+        , Data.Attoparsec.Text.Buffer
+        , Data.Attoparsec.Text.Internal
+        , Data.Tagged
+        , Text.XML
+
+        , Network.AWS.Data.Base64
+        , Network.AWS.Data.ByteString
+        , Network.AWS.Data.Headers
+        , Network.AWS.Data.List1
+        , Network.AWS.Data.Query
+        , Network.AWS.Data.Text
+        , Network.AWS.Data.Time
+        , Network.AWS.Data.XML
+        , Network.AWS.Types
+
+    build-depends:
+          base                 >= 4.7 && < 5
+        , bytestring           >= 0.9
+        , containers
+        , deepseq              >= 1.4
+        , text                 >= 1.1
+        , time       >= 1.5
