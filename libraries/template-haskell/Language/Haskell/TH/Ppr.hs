@@ -1,4 +1,5 @@
 {-# LANGUAGE Safe #-}
+{-# LANGUAGE LambdaCase #-}
 -- | contains a prettyprinter for the
 -- Template Haskell datatypes
 
@@ -760,44 +761,52 @@ pprStrictType = pprBangType
 
 ------------------------------
 pprParendType :: Type -> Doc
-pprParendType (VarT v)            = pprName' Applied v
+pprParendType (VarT v)               = pprName' Applied v
 -- `Applied` is used here instead of `ppr` because of infix names (#13887)
-pprParendType (ConT c)            = pprName' Applied c
-pprParendType (TupleT 0)          = text "()"
-pprParendType (TupleT 1)          = pprParendType (ConT (tupleTypeName 1))
-pprParendType (TupleT n)          = parens (hcat (replicate (n-1) comma))
-pprParendType (UnboxedTupleT n)   = hashParens $ hcat $ replicate (n-1) comma
-pprParendType (UnboxedSumT arity) = hashParens $ hcat $ replicate (arity-1) bar
-pprParendType ArrowT              = parens (text "->")
-pprParendType MulArrowT           = text "FUN"
-pprParendType ListT               = text "[]"
-pprParendType (LitT l)            = pprTyLit l
-pprParendType (PromotedT c)       = text "'" <> pprName' Applied c
-pprParendType (PromotedTupleT 0)  = text "'()"
-pprParendType (PromotedTupleT 1)  = pprParendType (PromotedT (tupleDataName 1))
-pprParendType (PromotedTupleT n)  = quoteParens (hcat (replicate (n-1) comma))
-pprParendType PromotedNilT        = text "'[]"
-pprParendType PromotedConsT       = text "'(:)"
-pprParendType StarT               = char '*'
-pprParendType ConstraintT         = text "Constraint"
-pprParendType (SigT ty k)         = parens (ppr ty <+> text "::" <+> ppr k)
-pprParendType WildCardT           = char '_'
-pprParendType (InfixT x n y)      = parens (ppr x <+> pprName' Infix n <+> ppr y)
-pprParendType t@(UInfixT {})      = parens (pprUInfixT t)
-pprParendType (ParensT t)         = ppr t
+pprParendType (ConT c)               = pprName' Applied c
+pprParendType (TupleT 0)             = text "()"
+pprParendType (TupleT 1)             = pprParendType (ConT (tupleTypeName 1))
+pprParendType (TupleT n)             = parens (hcat (replicate (n-1) comma))
+pprParendType (UnboxedTupleT n)      = hashParens $ hcat $ replicate (n-1) comma
+pprParendType (UnboxedSumT arity)    = hashParens $ hcat $ replicate (arity-1) bar
+pprParendType ArrowT                 = parens (text "->")
+pprParendType MulArrowT              = text "FUN"
+pprParendType ListT                  = text "[]"
+pprParendType (LitT l)               = pprTyLit l
+pprParendType (PromotedT c)          = text "'" <> pprName' Applied c
+pprParendType (PromotedTupleT 0)     = text "'()"
+pprParendType (PromotedTupleT 1)     = pprParendType (PromotedT (tupleDataName 1))
+pprParendType (PromotedTupleT n)     = quoteParens (hcat (replicate (n-1) comma))
+pprParendType PromotedNilT           = text "'[]"
+pprParendType PromotedConsT          = text "'(:)"
+pprParendType StarT                  = char '*'
+pprParendType ConstraintT            = text "Constraint"
+pprParendType (SigT ty k)            = parens (ppr ty <+> text "::" <+> ppr k)
+pprParendType WildCardT              = char '_'
+pprParendType t@(InfixT {})          = parens (pprInfixT t)
+pprParendType t@(UInfixT {})         = parens (pprInfixT t)
+pprParendType t@(PromotedInfixT {})  = parens (pprInfixT t)
+pprParendType t@(PromotedUInfixT {}) = parens (pprInfixT t)
+pprParendType (ParensT t)            = ppr t
 pprParendType tuple | (TupleT n, args) <- split tuple
                     , length args == n
                     = parens (commaSep args)
-pprParendType (ImplicitParamT n t)= text ('?':n) <+> text "::" <+> ppr t
-pprParendType EqualityT           = text "(~)"
-pprParendType t@(ForallT {})      = parens (ppr t)
-pprParendType t@(ForallVisT {})   = parens (ppr t)
-pprParendType t@(AppT {})         = parens (ppr t)
-pprParendType t@(AppKindT {})     = parens (ppr t)
+pprParendType (ImplicitParamT n t)   = text ('?':n) <+> text "::" <+> ppr t
+pprParendType EqualityT              = text "(~)"
+pprParendType t@(ForallT {})         = parens (ppr t)
+pprParendType t@(ForallVisT {})      = parens (ppr t)
+pprParendType t@(AppT {})            = parens (ppr t)
+pprParendType t@(AppKindT {})        = parens (ppr t)
 
-pprUInfixT :: Type -> Doc
-pprUInfixT (UInfixT x n y) = pprUInfixT x <+> pprName' Infix n <+> pprUInfixT y
-pprUInfixT t               = ppr t
+pprInfixT :: Type -> Doc
+pprInfixT = \case
+  (InfixT x n y)          -> with x n y ""  ppr
+  (UInfixT x n y)         -> with x n y ""  pprInfixT
+  (PromotedInfixT x n y)  -> with x n y "'" ppr
+  (PromotedUInfixT x n y) -> with x n y "'" pprInfixT
+  t                       -> ppr t
+  where
+    with x n y prefix ppr' = ppr' x <+> text prefix <> pprName' Infix n <+> ppr' y
 
 instance Ppr Type where
     ppr (ForallT tvars ctxt ty) = sep [pprForall tvars ctxt, ppr ty]

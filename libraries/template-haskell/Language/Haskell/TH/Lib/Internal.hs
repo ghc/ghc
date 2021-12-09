@@ -698,6 +698,16 @@ uInfixT t1 n t2 = do t1' <- t1
                      t2' <- t2
                      pure (UInfixT t1' n t2')
 
+promotedInfixT :: Quote m => m Type -> Name -> m Type -> m Type
+promotedInfixT t1 n t2 = do t1' <- t1
+                            t2' <- t2
+                            pure (PromotedInfixT t1' n t2')
+
+promotedUInfixT :: Quote m => m Type -> Name -> m Type -> m Type
+promotedUInfixT t1 n t2 = do t1' <- t1
+                             t2' <- t2
+                             pure (PromotedUInfixT t1' n t2')
+
 parensT :: Quote m => m Type -> m Type
 parensT t = do t' <- t
                pure (ParensT t')

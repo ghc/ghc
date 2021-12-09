@@ -1119,15 +1119,17 @@ We must be quite careful about adding parens:
 
 Note [Converting UInfix]
 ~~~~~~~~~~~~~~~~~~~~~~~~
-When converting @UInfixE@, @UInfixP@, and @UInfixT@ values, we want to readjust
-the trees to reflect the fixities of the underlying operators:
+When converting @UInfixE@, @UInfixP@, @UInfixT@, and @PromotedUInfixT@ values,
+we want to readjust the trees to reflect the fixities of the underlying
+operators:
 
   UInfixE x * (UInfixE y + z) ---> (x * y) + z
 
 This is done by the renamer (see @mkOppAppRn@, @mkConOppPatRn@, and
-@mkHsOpTyRn@ in GHC.Rename.HsType), which expects that the input will be completely
-right-biased for types and left-biased for everything else. So we left-bias the
-trees of @UInfixP@ and @UInfixE@ and right-bias the trees of @UInfixT@.
+@mkHsOpTyRn@ in GHC.Rename.HsType), which expects that the input will be
+completely right-biased for types and left-biased for everything else. So we
+left-bias the trees of @UInfixP@ and @UInfixE@ and right-bias the trees of
+@UInfixT@ and @PromotedUnfixT@.
 
 Sample input:
 
@@ -1603,8 +1605,25 @@ cvtTypeKind ty_str ty
                    }
 
            UInfixT t1 s t2
-             -> do { t2' <- cvtType t2
-                   ; t <- cvtOpAppT t1 s t2'
+             -> do { s' <- tconNameN s
+                   ; t2' <- cvtType t2
+                   ; t <- cvtOpAppT t1 s' t2'
+                   ; mk_apps (unLoc t) tys'
+                   } -- Note [Converting UInfix]
+
+           PromotedInfixT t1 s t2
+             -> do { s'  <- cName s
+                   ; t1' <- cvtType t1
+                   ; t2' <- cvtType t2
+                   ; mk_apps
+                      (HsTyVar noAnn IsPromoted (noLocA s'))
+                      ([HsValArg t1', HsValArg t2'] ++ tys')
+                   }
+
+           PromotedUInfixT t1 s t2
+             -> do { s' <- cNameN s
+                   ; t2' <- cvtType t2
+                   ; t <- cvtOpAppT t1 s' t2'
                    ; mk_apps (unLoc t) tys'
                    } -- Note [Converting UInfix]
 
@@ -1769,14 +1788,18 @@ provided @y@ is.
 
 See the @cvtOpApp@ documentation for how this function works.
 -}
-cvtOpAppT :: TH.Type -> TH.Name -> LHsType GhcPs -> CvtM (LHsType GhcPs)
+cvtOpAppT :: TH.Type -> LocatedN RdrName -> LHsType GhcPs -> CvtM (LHsType GhcPs)
 cvtOpAppT (UInfixT x op2 y) op1 z
-  = do { l <- cvtOpAppT y op1 z
-       ; cvtOpAppT x op2 l }
+  = do { op2' <- tconNameN op2
+       ; l <- cvtOpAppT y op1 z
+       ; cvtOpAppT x op2' l }
+cvtOpAppT (PromotedUInfixT x op2 y) op1 z
+  = do { op2' <- cNameN op2
+       ; l <- cvtOpAppT y op1 z
+       ; cvtOpAppT x op2' l }
 cvtOpAppT x op y
-  = do { op' <- tconNameN op
-       ; x' <- cvtType x
-       ; returnLA (mkHsOpTy x' op' y) }
+  = do { x' <- cvtType x
+       ; returnLA (mkHsOpTy x' op y) }
 
 cvtKind :: TH.Kind -> CvtM (LHsKind GhcPs)
 cvtKind = cvtTypeKind "kind"

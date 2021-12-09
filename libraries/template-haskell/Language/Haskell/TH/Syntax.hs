@@ -1986,9 +1986,10 @@ But how should we parse @a + b * c@? If we don't know the fixities of
 @+@ and @*@, we don't know whether to parse it as @a + (b * c)@ or @(a
 + b) * c@.
 
-In cases like this, use 'UInfixE', 'UInfixP', or 'UInfixT', which stand for
-\"unresolved infix expression/pattern/type\", respectively. When the compiler
-is given a splice containing a tree of @UInfixE@ applications such as
+In cases like this, use 'UInfixE', 'UInfixP', 'UInfixT', or 'PromotedUInfixT',
+which stand for \"unresolved infix expression/pattern/type/promoted
+constructor\", respectively. When the compiler is given a splice containing a
+tree of @UInfixE@ applications such as
 
 > UInfixE
 >   (UInfixE e1 op1 e2)
@@ -2003,7 +2004,8 @@ reassociate the tree as necessary.
 
     > (a + b * c) + d * e
 
-  * 'InfixE', 'InfixP', and 'InfixT' expressions are never reassociated.
+  * 'InfixE', 'InfixP', 'InfixT', and 'PromotedInfixT' expressions are never
+    reassociated.
 
   * The 'UInfixE' constructor doesn't support sections. Sections
     such as @(a *)@ have no ambiguity, so 'InfixE' suffices. For longer
@@ -2030,8 +2032,8 @@ reassociate the tree as necessary.
     > [p| a : b : c |] :: Q Pat
     > [t| T + T |] :: Q Type
 
-    will never contain 'UInfixE', 'UInfixP', 'UInfixT', 'InfixT', 'ParensE',
-    'ParensP', or 'ParensT' constructors.
+    will never contain 'UInfixE', 'UInfixP', 'UInfixT', 'PromotedUInfixT',
+    'InfixT', 'PromotedInfixT, 'ParensE', 'ParensP', or 'ParensT' constructors.
 
 -}
 
@@ -2624,35 +2626,39 @@ data PatSynArgs
   deriving( Show, Eq, Ord, Data, Generic )
 
 data Type = ForallT [TyVarBndr Specificity] Cxt Type -- ^ @forall \<vars\>. \<ctxt\> => \<type\>@
-          | ForallVisT [TyVarBndr ()] Type  -- ^ @forall \<vars\> -> \<type\>@
-          | AppT Type Type                -- ^ @T a b@
-          | AppKindT Type Kind            -- ^ @T \@k t@
-          | SigT Type Kind                -- ^ @t :: k@
-          | VarT Name                     -- ^ @a@
-          | ConT Name                     -- ^ @T@
-          | PromotedT Name                -- ^ @'T@
-          | InfixT Type Name Type         -- ^ @T + T@
-          | UInfixT Type Name Type        -- ^ @T + T@
-                                          --
-                                          -- See "Language.Haskell.TH.Syntax#infix"
-          | ParensT Type                  -- ^ @(T)@
+          | ForallVisT [TyVarBndr ()] Type -- ^ @forall \<vars\> -> \<type\>@
+          | AppT Type Type                 -- ^ @T a b@
+          | AppKindT Type Kind             -- ^ @T \@k t@
+          | SigT Type Kind                 -- ^ @t :: k@
+          | VarT Name                      -- ^ @a@
+          | ConT Name                      -- ^ @T@
+          | PromotedT Name                 -- ^ @'T@
+          | InfixT Type Name Type          -- ^ @T + T@
+          | UInfixT Type Name Type         -- ^ @T + T@
+                                           --
+                                           -- See "Language.Haskell.TH.Syntax#infix"
+          | PromotedInfixT Type Name Type  -- ^ @T :+: T@
+          | PromotedUInfixT Type Name Type -- ^ @T :+: T@
+                                           --
+                                           -- See "Language.Haskell.TH.Syntax#infix"
+          | ParensT Type                   -- ^ @(T)@
 
           -- See Note [Representing concrete syntax in types]
-          | TupleT Int                    -- ^ @(,), (,,), etc.@
-          | UnboxedTupleT Int             -- ^ @(\#,\#), (\#,,\#), etc.@
-          | UnboxedSumT SumArity          -- ^ @(\#|\#), (\#||\#), etc.@
-          | ArrowT                        -- ^ @->@
-          | MulArrowT                     -- ^ @FUN@
-          | EqualityT                     -- ^ @~@
-          | ListT                         -- ^ @[]@
-          | PromotedTupleT Int            -- ^ @'(), '(,), '(,,), etc.@
-          | PromotedNilT                  -- ^ @'[]@
-          | PromotedConsT                 -- ^ @(':)@
-          | StarT                         -- ^ @*@
-          | ConstraintT                   -- ^ @Constraint@
-          | LitT TyLit                    -- ^ @0,1,2, etc.@
-          | WildCardT                     -- ^ @_@
-          | ImplicitParamT String Type    -- ^ @?x :: t@
+          | TupleT Int                     -- ^ @(,), (,,), etc.@
+          | UnboxedTupleT Int              -- ^ @(\#,\#), (\#,,\#), etc.@
+          | UnboxedSumT SumArity           -- ^ @(\#|\#), (\#||\#), etc.@
+          | ArrowT                         -- ^ @->@
+          | MulArrowT                      -- ^ @FUN@
+          | EqualityT                      -- ^ @~@
+          | ListT                          -- ^ @[]@
+          | PromotedTupleT Int             -- ^ @'(), '(,), '(,,), etc.@
+          | PromotedNilT                   -- ^ @'[]@
+          | PromotedConsT                  -- ^ @(':)@
+          | StarT                          -- ^ @*@
+          | ConstraintT                    -- ^ @Constraint@
+          | LitT TyLit                     -- ^ @0,1,2, etc.@
+          | WildCardT                      -- ^ @_@
+          | ImplicitParamT String Type     -- ^ @?x :: t@
       deriving( Show, Eq, Ord, Data, Generic )
 
 data Specificity = SpecifiedSpec          -- ^ @a@

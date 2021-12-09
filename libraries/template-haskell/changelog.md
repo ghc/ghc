@@ -3,9 +3,16 @@
 ## 2.19.0.0
 
   * Add `DefaultD` constructor to support Haskell `default` declarations.
-  * Add support for Overloaded Record Dot. 
+
+  * Add support for Overloaded Record Dot.
     Introduces `getFieldE :: Quote m => m Exp -> String -> m Exp` and
     `projectionE :: Quote m => [String] -> m Exp`.
+
+  * Add `PromotedInfixT` and `PromotedUInfixT`, which are analogs to `InfixT`
+    and `UInfixT` that ensure that if a dynamically bound name (i.e. a name
+    with `NameFlavour` `NameS` or `NameQ`; the flavours produced by `mkName`)
+    is used as operator, it will be bound to a promoted data constructor rather
+    than a type constructor, if both are in scope.
 
 ## 2.18.0.0
   * The types of `ConP` and `conP` have been changed to allow for an additional list
