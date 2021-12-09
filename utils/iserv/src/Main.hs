@@ -8,7 +8,7 @@
 --
 module Main (main) where
 
-import Lib (serv)
+import IServ (serv)
 
 import GHCi.Message
 import GHCi.Signals
