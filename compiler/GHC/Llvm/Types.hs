@@ -13,7 +13,6 @@ import Data.Char
 import Numeric
 
 import GHC.Platform
-import GHC.Driver.Session
 import GHC.Data.FastString
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
