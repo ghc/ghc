@@ -1069,43 +1069,43 @@ release-x86_64-linux-centos7:
   extends: .build-x86_64-linux-centos7
 
 #################################
-# x86_64-linux-fedora27
+# x86_64-linux-fedora33
 #################################
 
-.build-x86_64-linux-fedora27:
+.build-x86_64-linux-fedora33:
   extends: .validate-linux
   stage: full-build
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora27:$DOCKER_REV"
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora33:$DOCKER_REV"
   variables:
-    # LLVM 10 is not available for Fedora27
+    # LLVM 10 is not available for Fedora33
     LLC: /bin/false
     OPT: /bin/false
-    TEST_ENV: "x86_64-linux-fedora27"
+    TEST_ENV: "x86_64-linux-fedora33"
   cache:
-    key: linux-x86_64-fedora27-$CACHE_REV
+    key: linux-x86_64-fedora33-$CACHE_REV
   artifacts:
     when: always
     # These are used for head.hackage jobs therefore we keep them around for
     # longer.
     expire_in: 8 week
 
-validate-x86_64-linux-fedora27:
-  extends: .build-x86_64-linux-fedora27
+validate-x86_64-linux-fedora33:
+  extends: .build-x86_64-linux-fedora33
   variables:
-    BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-fedora27-linux.tar.xz"
+    BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-fedora33-linux.tar.xz"
   rules:
     - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
 
-release-x86_64-linux-fedora27-dwarf:
+release-x86_64-linux-fedora33-dwarf:
   <<: *release
-  extends: .build-x86_64-linux-fedora27
+  extends: .build-x86_64-linux-fedora33
   variables:
     HADDOCK_HYPERLINKED_SOURCES: "yes"
     CONFIGURE_ARGS: "--enable-dwarf-unwind"
     BUILD_FLAVOUR: dwarf
     IGNORE_PERF_FAILURES: "all"
-    BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-fedora27-linux-dwarf.tar.xz"
-    TEST_ENV: "x86_64-linux-fedora27-dwarf"
+    BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-fedora33-linux-dwarf.tar.xz"
+    TEST_ENV: "x86_64-linux-fedora33-dwarf"
 
 ############################################################
 # Validation via Pipelines (Windows)
@@ -1301,7 +1301,7 @@ source-tarball:
 # Triggering jobs in the ghc/head.hackage project requires that we have a job
 # token for that repository. Furthermore the head.hackage CI job must have
 # access to an unprivileged access token with the ability to query the ghc/ghc
-# project such that it can find the job ID of the fedora27 job for the current
+# project such that it can find the job ID of the fedora33 job for the current
 # pipeline.
 
 .hackage:
