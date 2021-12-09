@@ -419,15 +419,19 @@ def tabulate_metrics(metrics: List[PerfMetric]) -> None:
         "{}".format(x.change.hint())
     )) for x in sorted(metrics, key =
                       lambda m: (m.stat.test, m.stat.way, m.stat.metric))]
-    geoMean = geometric_mean([
+
+    changes = [
         x.stat.value / x.baseline.perfStat.value
         for x in metrics
         if x.baseline is not None
-    ])
+    ]
     dataRows += [
         row(("", "", "", "", "", "", "", "")),
-        row(("geo. mean", "", "", "", "", "", "{:+4.1f}%".format(100*(geoMean-1)), ""))
+        row(("geo. mean", "", "", "", "", "", "{:+4.1f}%".format(100*(geometric_mean(changes)-1)), "")),
+        row(("minimum  ", "", "", "", "", "", "{:+4.1f}%".format(100*(min(changes)-1)), "")),
+        row(("maximum  ", "", "", "", "", "", "{:+4.1f}%".format(100*(max(changes)-1)), "")),
     ]
+
     print_table(headerRows, dataRows, 1)
     print("")
     if hasBaseline:
