@@ -51,8 +51,7 @@ confdefs.h
 stage0
 stage1
 stage2
-_build
-_validatebuild
+_*
 */generated/
 */ghc-stage1
 .shake.*
