@@ -1,5 +1,5 @@
 {-# LANGUAGE RankNTypes, RecordWildCards, GADTs, ScopedTypeVariables #-}
-module Lib (serv) where
+module IServ (serv) where
 
 import GHCi.Run
 import GHCi.TH
