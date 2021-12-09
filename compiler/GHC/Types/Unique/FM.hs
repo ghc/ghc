@@ -64,6 +64,7 @@ module GHC.Types.Unique.FM (
         intersectUFM_C,
         disjointUFM,
         equalKeysUFM,
+        diffUFM,
         nonDetStrictFoldUFM, foldUFM, nonDetStrictFoldUFM_DirectlyM,
         anyUFM, allUFM, seqEltsUFM,
         mapUFM, mapUFM_Directly,
@@ -468,6 +469,28 @@ unsafeCastUFMKey (UFM m) = UFM m
 -- Determines whether two 'UniqFM's contain the same keys.
 equalKeysUFM :: UniqFM key a -> UniqFM key b -> Bool
 equalKeysUFM (UFM m1) (UFM m2) = liftEq (\_ _ -> True) m1 m2
+
+-- | An edit on type @a@, relating an element of a container (like an entry in a
+-- map or a line in a file) before and after.
+data Edit a
+  = Removed !a    -- ^ Element was removed from the container
+  | Added !a      -- ^ Element was added to the container
+  | Changed !a !a -- ^ Element was changed. Carries the values before and after
+  deriving Eq
+
+instance Outputable a => Outputable (Edit a) where
+  ppr (Removed a) = text "-" <> ppr a
+  ppr (Added a) = text "+" <> ppr a
+  ppr (Changed l r) = ppr l <> text "->" <> ppr r
+
+-- A very convient function to have for debugging:
+-- | Computes the diff of two 'UniqFM's in terms of 'Edit's.
+-- Equal points will not be present in the result map at all.
+diffUFM :: Eq a => UniqFM key a -> UniqFM key a -> UniqFM key (Edit a)
+diffUFM = mergeUFM both (mapUFM Removed) (mapUFM Added)
+  where
+    both x y | x == y    = Nothing
+             | otherwise = Just $! Changed x y
 
 -- Instances
 
