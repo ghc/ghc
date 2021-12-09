@@ -1,5 +1,6 @@
 setTestOpts([extra_run_opts('-ignore-dot-ghci'),
              when(config.have_ext_interp, extra_ways(['ghci-ext'])), # test with -fexternal-interpreter
+             when(arch('aarch64') and opsys('darwin'), fragile_for(20804, ['ghci-ext'])),
              normalise_slashes])
 
 

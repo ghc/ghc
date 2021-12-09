@@ -243,7 +243,8 @@ test('T8035', normal, compile_and_run, [''])
 test('T8209', [ req_smp, only_ways(threaded_ways), ignore_stdout ],
               compile_and_run, [''])
 
-test('T8242', [ req_smp, only_ways(threaded_ways), ignore_stdout ],
+test('T8242', [ req_smp, only_ways(threaded_ways), ignore_stdout,
+                when(arch('aarch64') and opsys('darwin'), expect_broken_for(20804, ['ghci', 'ghci-ext'])) ],
               compile_and_run, [''])
 
 test('T8124', [ only_ways(threaded_ways), omit_ways(['ghci']),

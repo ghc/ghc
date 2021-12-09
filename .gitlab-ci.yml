@@ -554,8 +554,6 @@ release-x86_64-freebsd:
     HADRIAN_ARGS: "--docs=no-sphinx"
     TEST_ENV: "x86_64-darwin-hadrian"
     BIN_DIST_NAME: "ghc-x86_64-apple-darwin"
-    # Capi_Ctype_001 Capi_Ctype_002 T12010: Due to #20393
-    BROKEN_TESTS: "Capi_Ctype_001 Capi_Ctype_002 T12010"
     # Due to #19025
     IGNORE_PERF_FAILURES: "all"
 

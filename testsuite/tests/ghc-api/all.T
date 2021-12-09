@@ -8,7 +8,8 @@ test('T9595', extra_run_opts('"' + config.libdir + '"'),
               compile_and_run,
               ['-package ghc'])
 test('T10508_api', [ extra_run_opts('"' + config.libdir + '"'),
-                     req_rts_linker ],
+                     req_rts_linker,
+                     when(arch('aarch64') and opsys('darwin'), fragile_for(20804, ['ghci-ext'])) ],
                    compile_and_run,
                    ['-package ghc'])
 test('T10942', extra_run_opts('"' + config.libdir + '"'),
