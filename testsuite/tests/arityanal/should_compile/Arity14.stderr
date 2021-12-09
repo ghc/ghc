@@ -1,8 +1,8 @@
 
 ==================== Tidy Core ====================
-Result size of Tidy Core = {terms: 57, types: 87, coercions: 0, joins: 0/3}
+Result size of Tidy Core = {terms: 57, types: 81, coercions: 0, joins: 0/3}
 
--- RHS size: {terms: 3, types: 3, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 3, types: 2, coercions: 0, joins: 0/0}
 F14.f1 :: forall {t}. t -> t
 [GblId, Arity=1, Str=<1L>, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)}]
 F14.f1 = \ (@t) (y :: t) -> y
@@ -12,7 +12,7 @@ F14.f2 :: Integer
 [GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
 F14.f2 = GHC.Num.Integer.IS 1#
 
--- RHS size: {terms: 35, types: 24, coercions: 0, joins: 0/3}
+-- RHS size: {terms: 35, types: 23, coercions: 0, joins: 0/3}
 F14.$wf14 [InlPrag=[2]] :: forall {t}. (t -> t -> Bool) -> Num t => t -> t -> t -> t
 [GblId, Arity=4, Str=<SCS(C1(A))><LP(LCL(C1(L)),A,A,A,A,A,MCM(L))><L><L>, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [60 90 0 0] 300 0}]
 F14.$wf14
@@ -23,7 +23,7 @@ F14.$wf14
         lvl = fromInteger @t $dNum F14.f2 } in
       letrec {
         f3 [Occ=LoopBreaker, Dmd=SCS(C1(L))] :: t -> t -> t -> t
-        [LclId, Arity=2, Str=<L><L>, Unf=OtherCon []]
+        [LclId, Arity=2, Str=<L><L>]
         f3
           = \ (n :: t) (x :: t) ->
               case ww x n of {
@@ -37,7 +37,7 @@ F14.$wf14
               }; } in
       f3 eta eta1
 
--- RHS size: {terms: 13, types: 34, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 13, types: 33, coercions: 0, joins: 0/0}
 f14 [InlPrag=[2]] :: forall {t}. (Ord t, Num t) => t -> t -> t -> t
 [GblId,
  Arity=4,

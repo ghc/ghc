@@ -1,6 +1,6 @@
 
 ==================== Tidy Core ====================
-Result size of Tidy Core = {terms: 149, types: 110, coercions: 0, joins: 2/7}
+Result size of Tidy Core = {terms: 149, types: 104, coercions: 0, joins: 2/7}
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 F11.fib3 :: Integer
@@ -51,7 +51,7 @@ F11.fib1 :: Integer
 [GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
 F11.fib1 = GHC.Num.Integer.IS 0#
 
--- RHS size: {terms: 52, types: 27, coercions: 0, joins: 0/5}
+-- RHS size: {terms: 52, types: 26, coercions: 0, joins: 0/5}
 F11.$wfib [InlPrag=[2]] :: forall {t} {a}. (t -> t -> Bool) -> (Num t, Num a) => t -> a
 [GblId, Arity=4, Str=<SCS(C1(A))><LP(A,LCL(C1(L)),A,A,A,A,L)><LP(LCL(C1(L)),A,A,A,A,A,MCM(L))><L>, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [60 150 60 0] 460 0}]
 F11.$wfib
@@ -74,7 +74,7 @@ F11.$wfib
         lvl3 = fromInteger @t $dNum F11.fib1 } in
       letrec {
         fib4 [Occ=LoopBreaker, Dmd=SCS(!L)] :: t -> a
-        [LclId, Arity=1, Str=<L>, Unf=OtherCon []]
+        [LclId, Arity=1, Str=<L>]
         fib4
           = \ (ds :: t) ->
               case ww ds lvl3 of {
@@ -87,7 +87,7 @@ F11.$wfib
               }; } in
       fib4 eta
 
--- RHS size: {terms: 14, types: 20, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 14, types: 19, coercions: 0, joins: 0/0}
 fib [InlPrag=[2]] :: forall {t} {a}. (Eq t, Num t, Num a) => t -> a
 [GblId,
  Arity=4,
@@ -111,7 +111,7 @@ F11.f11f1 :: Integer -> Integer
 [GblId, Arity=1, Str=<SL>, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 30 0}]
 F11.f11f1 = \ (y :: Integer) -> GHC.Num.Integer.integerAdd F11.f11_x y
 
--- RHS size: {terms: 3, types: 3, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 3, types: 2, coercions: 0, joins: 0/0}
 f11f :: forall {p}. p -> Integer -> Integer
 [GblId, Arity=2, Str=<A><SL>, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)}]
 f11f = \ (@p) _ [Occ=Dead] -> F11.f11f1

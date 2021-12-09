@@ -941,13 +941,13 @@ strictifyDictDmd :: Type -> Demand -> Demand
 strictifyDictDmd ty (n :* Prod b ds)
   | not (isAbs n)
   , Just field_tys <- as_non_newtype_dict ty
-  = C_1N :* mkProd b (zipWith strictifyDictDmd field_tys ds)
+  = C_1N :* mkProd b (strictZipWith strictifyDictDmd field_tys ds)
       -- main idea: ensure it's strict
   where
     -- | Return a TyCon and a list of field types if the given
     -- type is a non-newtype dictionary type
     as_non_newtype_dict ty
-      | Just (tycon, _arg_tys, _data_con, map scaledThing -> inst_con_arg_tys)
+      | Just (tycon, _arg_tys, _data_con, strictMap scaledThing -> inst_con_arg_tys)
           <- splitDataProductType_maybe ty
       , not (isNewTyCon tycon) -- We might accidentally force a knot here and diverge
       , isClassTyCon tycon
@@ -1051,7 +1051,7 @@ stripBoxityDmd (n :* sd) = n :* stripBoxitySubDmd sd
 
 stripBoxitySubDmd :: SubDemand -> SubDemand
 stripBoxitySubDmd (Poly _ n) = Poly Boxed n
-stripBoxitySubDmd (Prod _ ds) = mkProd Boxed $! map stripBoxityDmd ds
+stripBoxitySubDmd (Prod _ ds) = mkProd Boxed $! strictMap stripBoxityDmd ds
 stripBoxitySubDmd (Call n sd) = mkCall n (stripBoxitySubDmd sd)
 
 {- Note [Strict demands]
@@ -1660,17 +1660,17 @@ multDmdType C_10 _                     = botDmdType -- We may pick any 'DmdType'
 multDmdType n    (DmdType fv args div) =
   -- pprTrace "multDmdType" (ppr n $$ ppr fv $$ ppr div $$ ppr (multDmdEnv n fv)) $
   DmdType (multDmdEnv n fv)
-          (map (multDmd n) args)
+          (strictMap (multDmd n) args)
           (multDivergence n div)
 
-peelFV :: DmdType -> Var -> (DmdType, Demand)
-peelFV (DmdType fv ds res) id = -- pprTrace "rfv" (ppr id <+> ppr dmd $$ ppr fv)
-                               (DmdType fv' ds res, dmd)
+peelFV :: Id -> Divergence -> DmdEnv -> (DmdEnv, Demand)
+peelFV id div fv = -- pprTrace "rfv" (ppr id <+> ppr dmd $$ ppr fv)
+                   (fv', dmd)
   where
   -- Force these arguments so that old `Env` is not retained.
   !fv' = fv `delVarEnv` id
   -- See Note [Default demand on free variables and arguments]
-  !dmd  = lookupVarEnv fv id `orElse` defaultFvDmd res
+  !dmd  = lookupVarEnv fv id `orElse` defaultFvDmd div
 
 addDemand :: Demand -> DmdType -> DmdType
 addDemand dmd (DmdType fv ds res) = DmdType fv (dmd:ds) res
@@ -1699,7 +1699,7 @@ keepAliveDmdType vars (DmdType fvs ds res) =
 
 stripBoxityDmdType :: DmdType -> DmdType
 stripBoxityDmdType (DmdType fvs ds res) =
-  DmdType (mapVarEnv stripBoxityDmd fvs) (map stripBoxityDmd ds) res
+  DmdType (mapVarEnv stripBoxityDmd fvs) (strictMap stripBoxityDmd ds) res
 
 {-
 Note [Demand type Divergence]
@@ -2028,7 +2028,7 @@ dmdTransformDictSelSig (DmdSig (DmdType _ [_ :* prod] _)) call_sd
    | (n, sd') <- peelCallDmd call_sd
    , Prod _ sig_ds <- prod
    = multDmdType n $
-     DmdType emptyDmdEnv [C_11 :* mkProd Unboxed (map (enhance sd') sig_ds)] topDiv
+     DmdType emptyDmdEnv [C_11 :* mkProd Unboxed (strictMap (enhance sd') sig_ds)] topDiv
    | otherwise
    = nopDmdType -- See Note [Demand transformer for a dictionary selector]
   where
@@ -2174,7 +2174,7 @@ zapUsedOnceDemand = kill_usage $ KillFlags
 --   signature
 zapUsedOnceSig :: DmdSig -> DmdSig
 zapUsedOnceSig (DmdSig (DmdType env ds r))
-    = DmdSig (DmdType env (map zapUsedOnceDemand ds) r)
+    = DmdSig (DmdType env (strictMap zapUsedOnceDemand ds) r)
 
 data KillFlags = KillFlags
     { kf_abs         :: Bool
@@ -2198,7 +2198,7 @@ kill_usage_sd :: KillFlags -> SubDemand -> SubDemand
 kill_usage_sd kfs (Call n sd)
   | kf_called_once kfs        = mkCall (lubCard C_1N n) (kill_usage_sd kfs sd)
   | otherwise                 = mkCall n                (kill_usage_sd kfs sd)
-kill_usage_sd kfs (Prod b ds) = mkProd b (map (kill_usage kfs) ds)
+kill_usage_sd kfs (Prod b ds) = mkProd b (strictMap (kill_usage kfs) ds)
 kill_usage_sd _   sd          = sd
 
 {- *********************************************************************
@@ -2222,7 +2222,7 @@ trimToType ts (n :* sd)
   = n :* go sd ts
   where
     go (Prod b ds) (TsProd tss)
-      | equalLength ds tss    = mkProd b (zipWith trimToType tss ds)
+      | equalLength ds tss    = mkProd b (strictZipWith trimToType tss ds)
     go (Call n sd) (TsFun ts) = mkCall n (go sd ts)
     go sd@Poly{}   _          = sd
     go _           _          = topSubDmd
@@ -2234,7 +2234,7 @@ trimBoxity BotDmd    = BotDmd
 trimBoxity (n :* sd) = n :* go sd
   where
     go (Poly _ n)  = Poly Boxed n
-    go (Prod _ ds) = mkProd Boxed (map trimBoxity ds)
+    go (Prod _ ds) = mkProd Boxed (strictMap trimBoxity ds)
     go (Call n sd) = mkCall n $ go sd
 
 {-

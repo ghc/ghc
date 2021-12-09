@@ -182,7 +182,7 @@ mapMaybeRule
       case f of { Rule @s ww ww1 ->
       let {
         lvl :: Result s (Maybe b)
-        [LclId, Unf=OtherCon []]
+        [LclId]
         lvl = T18013a.Result @s @(Maybe b) ww (GHC.Maybe.Nothing @b) } in
       T18013a.Rule
         @IO

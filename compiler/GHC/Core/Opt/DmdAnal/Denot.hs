@@ -11,6 +11,7 @@
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE UnboxedTuples #-}
 
 module GHC.Core.Opt.DmdAnal.Denot
    ( DmdAnalOpts(..)
@@ -278,12 +279,12 @@ denotBindLetUp env id rhs denot_body = do
   trans_body <- denot_body env -- NB: No sig for id
   trans_rhs  <- denotMultiExpr  env rhs
   -- TODO: We might want to `registerTransformer` here
-  let !peel_id = buildFindBndrDmd env NonRecursive id
+  let !peel_id = findBndrDmd env NonRecursive id
   !keep_alive <- keepAlive env (bndrRuleAndUnfoldingIdsList id)
   let trans_bind eval_sd = do
         keep_alive_dmds <- keep_alive () -- so that we see the top usages as early as possible
         S2 body_ty id_dmd <- peel_id <$> trans_body eval_sd
-        let id_dmd' = finaliseBoxity (ae_fam_envs env) (ae_inl_fun env) (idType id) id_dmd
+        let !id_dmd' = finaliseBoxity (ae_fam_envs env) (ae_inl_fun env) (idType id) id_dmd
         writeIdDemand id id_dmd'
         rhs_ty <- trans_rhs id_dmd'
         return $! body_ty `plusDmdType` rhs_ty `plusDmdType` keep_alive_dmds
@@ -314,7 +315,7 @@ denotBindLetDown top_lvl env bind denot_body = do
   trans_body <- denot_body env'
   traverse_ trackCall (bindersOf bind) -- because we read the lazy_fvs
 
-  let !peel_ids = buildFindBndrsDmds env' rec_flag (bindersOf bind)
+  let !peel_ids = findBndrsDmds env' rec_flag (bindersOf bind)
   -- pprTraceM "bletdn" (ppr (map fst pairs) $$ ppr rec_flag)
   let trans_bind eval_sd = do
         body_ty <- trans_body eval_sd
@@ -361,13 +362,13 @@ denotMultiExpr env e = do
   return trans_e_multi
 
 nullaryCase :: DmdType -> Builder (SubDemand :~> DmdType)
-nullaryCase dmd_ty = return $! const (pure dmd_ty)
+nullaryCase !dmd_ty = return $ const (pure dmd_ty)
 
 unaryCase :: AnalEnv -> CoreExpr -> (DmdType -> DmdType)
           -> Builder (SubDemand :~> DmdType)
 unaryCase env e map_ty = do
   trans <- denotExpr env e
-  return (fmap map_ty . trans)
+  return $! fmap map_ty . trans
 
 -- Main Demand Analysis machinery
 denotExpr
@@ -383,8 +384,8 @@ denotExpr _ Lit{}         = nullaryCase nopDmdType
 denotExpr _ Type{}        = nullaryCase nopDmdType -- Doesn't happen, in fact
 denotExpr _ (Coercion co) = nullaryCase (unitDmdType (coercionDmdEnv co))
 
-denotExpr env (Cast e co)      = unaryCase env e (`plusDmdType` mkPlusDmdArg (coercionDmdEnv co))
-denotExpr env (Tick _ e)       = unaryCase env e id
+denotExpr env (Cast e co) = unaryCase env e (`plusDmdType` mkPlusDmdArg (coercionDmdEnv co))
+denotExpr env (Tick _ e)  = unaryCase env e id
 
 denotExpr env (App fun Type{}) = unaryCase env fun id
 denotExpr env (App fun arg   ) = do
@@ -403,15 +404,15 @@ denotExpr env (App fun arg   ) = do
 denotExpr env (Lam var body) | isTyVar var = unaryCase env body id
 denotExpr env (Lam id  body) | otherwise   = do
   trans_body <- denotExpr env body
-  let !peel_id = buildFindBndrDmd env NonRecursive id
+  let !peel_id = findBndrDmd env NonRecursive id
   return $ \eval_sd -> do
     let !(n, body_sd) = peelCallDmd eval_sd
     S2 body_ty id_dmd <- peel_id <$> trans_body body_sd
     -- See Note [Finalising boxity for demand signature] in "GHC.Core.Opt.WorkWrap.Utils"
     -- and Note [Do not unbox class dictionaries]
     let !id_dmd' = finaliseBoxity (ae_fam_envs env) (ae_inl_fun env) (idType id) id_dmd
-    let lam_ty = addDemand id_dmd' body_ty
     writeIdDemand id id_dmd'
+    let !lam_ty = addDemand id_dmd' body_ty
     return $! multDmdType n lam_ty
 
 denotExpr env (Let bind body) = do
@@ -424,17 +425,16 @@ denotExpr env (Case scrut case_bndr _ty alts) = do
   let !is_single_data_alt
         | [Alt (DataAlt dc) _ _] <- alts = isJust $ tyConSingleAlgDataCon_maybe $ dataConTyCon dc
         | otherwise                      = False
-  let !preserve_prec_exception
-        | exprMayThrowPreciseException (ae_fam_envs env) scrut = deferAfterPreciseException
-        | otherwise                                            = id
+  let !may_throw_precise = exprMayThrowPreciseException (ae_fam_envs env) scrut
   return $ \eval_sd -> do
     S3 scrut_sd case_bndr_dmd alt_ty <- trans_alts eval_sd
     writeIdDemand case_bndr case_bndr_dmd
     -- See Note [Precise exceptions and strictness analysis] in "GHC.Types.Demand"
-    let !alt_ty' = preserve_prec_exception alt_ty
+    let !alt_ty' | may_throw_precise = deferAfterPreciseException alt_ty
+                 | otherwise         = alt_ty
     let !scrut_sd'
           | is_single_data_alt = scrut_sd
-          | Prod{} <- scrut_sd = topSubDmd -- Prod doesn't make sense for non-Prod types
+          | Prod{} <- scrut_sd = topSubDmd -- Prod doesn't make sense for non-single data alt types
           | otherwise          = scrut_sd
     scrut_ty <- trans_scrut scrut_sd'
     return $! alt_ty' `plusDmdType` toPlusDmdArg scrut_ty
@@ -456,22 +456,20 @@ denotAlts env case_bndr alts = do
 denotAlt :: AnalEnv -> Id -> Alt Var -> Builder (SubDemand :~> STriple SubDemand Demand DmdType)
 denotAlt env case_bndr (Alt _ fld_bndrs rhs) = do
   trans_rhs <- denotExpr env rhs
-  -- Rebuild the annotated Case and its single Alt
-  let !peel_bndrs     = buildFindBndrsDmds env NonRecursive fld_bndrs
-  let !peel_case_bndr = buildFindBndrDmd env NonRecursive case_bndr
-  -- The transformer
+  let !peel_bndrs     = findBndrsDmds env NonRecursive fld_bndrs
+  let !peel_case_bndr = findBndrDmd env NonRecursive case_bndr
   return $ \eval_sd -> do
     rhs_ty <- trans_rhs eval_sd
-    let S2 alt_ty  fld_dmds      = peel_bndrs rhs_ty
-    let S2 alt_ty' case_bndr_dmd = peel_case_bndr alt_ty
+    let !(S2 alt_ty  fld_dmds)      = peel_bndrs rhs_ty
+    let !(S2 alt_ty' case_bndr_dmd) = peel_case_bndr alt_ty
     -- Evaluation cardinality on the case binder is irrelevant and a no-op.
     -- What matters is its nested sub-demand!
     -- NB: If case_bndr_dmd is absDmd, boxity will say Unboxed, which is
     -- what we want, because then `seq` will put a `seqDmd` on its scrut.
-    let (_ :* case_bndr_sd) = case_bndr_dmd
+    let !(_ :* case_bndr_sd) = case_bndr_dmd
         -- See Note [Demand on the scrutinee of a product case]
         -- See Note [Demand on case-alternative binders]
-        S2 scrut_sd fld_dmds' = addCaseBndrDmd case_bndr_sd fld_dmds
+        !(S2 scrut_sd fld_dmds') = addCaseBndrDmd case_bndr_sd fld_dmds
     writeBndrsDemands fld_bndrs fld_dmds'
     return $! S3 scrut_sd case_bndr_dmd alt_ty'
 
@@ -745,7 +743,7 @@ strict in |y|.
 -}
 
 liftPureTransformer :: (SubDemand -> DmdType) -> Builder (SubDemand :~> DmdType)
-liftPureTransformer trans = return (\sd -> pure (trans sd))
+liftPureTransformer trans = return (\(!sd) -> pure (trans sd))
 
 denotVar
   :: AnalEnv                 -- ^ The analysis environment
@@ -802,7 +800,7 @@ denotVar env var
   --   * Case and constructor field binders
   | otherwise
   = -- pprTrace "denotVar:other" (vcat [ppr var, ppr (nonDetKeysUFM $ ae_sigs env)]) $
-    liftPureTransformer (\sd -> unitDmdType (unitVarEnv var (C_11 :* sd)))
+    liftPureTransformer (\sd -> unitDmdType $! unitVarEnv var $! (C_11 :* sd))
 
 {- *********************************************************************
 *                                                                      *
@@ -837,7 +835,7 @@ denotRhsSig top_lvl env rec_flag pairs = fix_all env pairs
 
     fix_all env []            = return env
     fix_all env ((id,rhs):bs) = registerTransformer id $ do
-      env_body <- fix_all (extendAnalEnv top_lvl env id) bs
+      !env_body <- fix_all (extendAnalEnv top_lvl env id) bs
       let !env_rhs | isRec rec_flag = env_body
                    | otherwise      = env   -- prevents shadowing errors
 
@@ -846,7 +844,7 @@ denotRhsSig top_lvl env rec_flag pairs = fix_all env pairs
 
       -- adjustInlFun: See Note [Do not unbox class dictionaries]
       trans_rhs <- denotExpr (adjustInlFun id env_rhs) rhs
-      keep_alive <- keepAlive env_rhs (bndrRuleAndUnfoldingIdsList id)
+      !keep_alive <- keepAlive env_rhs (bndrRuleAndUnfoldingIdsList id)
       let !arity = idArity id
 
       -- Note that the transformer below makes no attempts to widen eval_sd
@@ -888,14 +886,15 @@ denotRhsSig top_lvl env rec_flag pairs = fix_all env pairs
 denotCall :: AnalEnv -> Id -> Builder (SubDemand :~> DmdType)
 denotCall env id = do
   let !arity = idArity id
+  let !is_join_id = isJoinId id
   do_the_call <- trackCall id
   return $ \eval_sd -> do
     let S2 card body_sd = peelManyCalls arity eval_sd
     if isAbs card
       then return nopDmdType
       else do
-        let widened_body_sd
-              | isJoinId id
+        let !widened_body_sd
+              | is_join_id
               -- See Note [Demand analysis for join points]
               -- See Note [Invariants on join points] invariant 2b, in GHC.Core
               --     rhs_arity matches the join arity of the join point
@@ -903,7 +902,7 @@ denotCall env id = do
               | otherwise
               -- See Note [Unboxed demand on function bodies returning small products]
               = unboxedWhenSmall env id topSubDmd
-        let single_call_sd = mkCalledOnceDmds arity widened_body_sd
+        let !single_call_sd = mkCalledOnceDmds arity widened_body_sd
         dmd_ty <- do_the_call single_call_sd
         return $! multDmdType card dmd_ty
 
@@ -1495,38 +1494,60 @@ adjustInlFun id env
   | isStableUnfolding (realIdUnfolding id) = env { ae_inl_fun = InsideInlineableFun }
   | otherwise                              = env { ae_inl_fun = NotInsideInlineableFun }
 
-buildFindBndrDmd :: AnalEnv -> RecFlag -> Id -> DmdType -> SPair DmdType Demand
+
+findBndrDmd :: AnalEnv -> RecFlag -> Id -> DmdType -> SPair DmdType Demand
 -- See Note [Trimming a demand to a type]
-buildFindBndrDmd env rec_flag bndr = \dmd_ty ->
-  let (dmd_ty', dmd) = dmd_ty `peelFV` bndr
-  in S2 dmd_ty' (strictify (trimToType ts dmd))
+findBndrDmd env rec_flag bndr = \(DmdType fvs args div) ->
+  let (# !fvs', !dmd #) = worker div fvs
+  in S2 (DmdType fvs' args div) dmd
   where
+    !worker = find_bndr_dmd env rec_flag bndr
+{-# INLINE findBndrDmd #-}
+
+-- The manually worker/wrappered hot loop of 'findBndrDmd' and 'findBndrsDmds'.
+-- Why wouldn't DmdAnal catch this? Because of the staging that is going on here.
+-- We return a lambda of type `Divergence -> DmdEnv -> (# DmdEnv, Demand #)`.
+-- We could never inline a wrapper of a lambda that we return because of
+-- higher-ordnerness, so we have to optimise it ourselves.
+find_bndr_dmd :: AnalEnv -> RecFlag -> Id -> Divergence -> DmdEnv -> (# DmdEnv, Demand #)
+find_bndr_dmd env rec_flag bndr = \div fv_dmds ->
+  -- Intentionally arity 3 so that we cache eval of all the where bindings below
+  let !(!fv_dmds', !dmd) = peelFV bndr div fv_dmds
+      !dmd' | strictify  = strictifyDictDmd id_ty $! trimToType ts dmd
+            | otherwise  = trimToType ts dmd
+  in (# fv_dmds', dmd' #)
+  where
+    !_ = idUnique bndr
     !id_ty = idType bndr
     !fam_envs = ae_fam_envs env
     !ts = findTypeShape fam_envs id_ty
-    !strictify
-      | dmd_strict_dicts $ ae_opts env
-      , isNonRec rec_flag
+    !strictify = dmd_strict_dicts (ae_opts env) && isNonRec rec_flag
            -- We never want to strictify a recursive let. At one point SG forgot
            -- this guard and got strange ghc/alloc regressions somewhere in
            -- Text.Read.Lex.lexStrItem in e.g. T11303b and a bunch of others
-      = strictifyDictDmd id_ty
-      | otherwise
-      = id
+{-# INLINE find_bndr_dmd #-}
 
-buildFindBndrsDmds :: AnalEnv -> RecFlag -> [Var] -> DmdType -> SPair DmdType [Demand]
+findBndrsDmds :: AnalEnv -> RecFlag -> [Var] -> DmdType -> SPair DmdType [Demand]
 -- Return the demands on the Ids in the [Var]
-buildFindBndrsDmds env rec_flag bs = case bs of
-  []               -> \dmd_ty -> S2 dmd_ty []
+findBndrsDmds env rec_flag bs = \(DmdType fvs args div) ->
+  let (# !fvs', !dmds #) = worker div fvs
+  in S2 (DmdType fvs' args div) dmds
+  where
+    !worker = find_bndrs_dmds env rec_flag bs
+{-# INLINE findBndrsDmds #-}
+
+find_bndrs_dmds :: AnalEnv -> RecFlag -> [Var] -> Divergence -> DmdEnv -> (# DmdEnv, [Demand] #)
+find_bndrs_dmds env rec_flag bs = case bs of
+  []               -> \_div fv_dmds -> (# fv_dmds, [] #)
   b:bs'
     | not (isId b) -> rest
-    | otherwise    -> cur `seq` \dmd_ty -> -- seq cur so that we don't close over env and whatnot
-        let S2 dmd_ty'  dmd  = cur dmd_ty
-            S2 dmd_ty'' dmds = rest dmd_ty'
-        in S2 dmd_ty'' (dmd:dmds)
+    | otherwise    -> \div fv_dmds ->
+        let !(# !fv_dmds',  !dmd  #) = cur div fv_dmds
+            !(# !fv_dmds'', !dmds #) = rest div fv_dmds'
+        in (# fv_dmds'', dmd:dmds #)
     where
-      !rest = buildFindBndrsDmds env rec_flag bs'
-      cur = buildFindBndrDmd env rec_flag b
+      !rest = find_bndrs_dmds env rec_flag bs'
+      !cur = find_bndr_dmd env rec_flag b
 
 {- Note [Making dictionaries strict]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

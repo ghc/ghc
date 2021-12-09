@@ -70,14 +70,16 @@ annotateProgram :: DmdAnnotations -> CoreProgram -> CoreProgram
 annotateProgram anns = runIdentity . traverseBinders (Identity . annotate)
   where
     annotate bndr | isTyVar bndr = bndr
-                  | otherwise = annotate_sig $ annotate_demand bndr
+                  | otherwise    = annotate_sig $ annotate_demand bndr
     annotate_sig bndr
       | Just sig <- lookupVarEnv (da_sigs anns) bndr
+      , sig /= idDmdSig bndr
       = bndr `setIdDmdSig` sig
       | otherwise
       = bndr
     annotate_demand bndr
       | Just dmd <- lookupVarEnv (da_demands anns) bndr
+      , dmd /= idDemandInfo bndr
       = bndr `setIdDemandInfo` dmd
       | otherwise
       = bndr
@@ -128,7 +130,7 @@ writeIdDemand id dmd = EvalM $ getEnv >>= \env ->
 -- `[Var]` which will be filtered out.
 writeBndrsDemands :: HasCallStack => [Var] -> [Demand] -> EvalM ()
 writeBndrsDemands vars dmds = EvalM $ getEnv >>= \env -> do
-  let prs = zipEqual "writeBndrsDemands" (filter isRuntimeVar vars) dmds
+  let prs = strictZipWith (,) (filter isRuntimeVar vars) dmds
   liftIO $ modifyIORef' (ee_demands env) (`extendVarEnvList` prs)
 
 -- | Write out a demand signature. Delayed 'setIdDmdSig'.

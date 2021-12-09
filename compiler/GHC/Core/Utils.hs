@@ -2291,24 +2291,31 @@ locBind loc b1 b2 diffs = map addLoc diffs
 -- | A traversal over all 'CoreBndr's in the given 'CoreProgram'.
 -- Can be instantiated at 'Const' to get a setter.
 traverseBinders :: Applicative f => (CoreBndr -> f CoreBndr) -> CoreProgram -> f CoreProgram
-traverseBinders f = traverse bind
+traverseBinders f = traverse' bind
   where
-    bind (NonRec b rhs) = NonRec <$> f b <*> expr rhs
-    bind (Rec prs) = Rec <$> traverse (\(b, rhs) -> (,) <$> f b <*> expr rhs) prs
+    f <$!> a = (f $!) <$> a
+    f <*!> a = fmap ($!) f <*> a
+    traverse' f = go
+      where
+        go []     = pure []
+        go (x:xs) = (:) <$!> f x <*!> go xs
+
+    bind (NonRec b rhs) = NonRec <$!> f b <*!> expr rhs
+    bind (Rec prs) = Rec <$!> traverse' (\(b, rhs) -> (,) <$!> f b <*!> expr rhs) prs
 
     expr e = case e of
       Var{} -> pure e
       Lit{} -> pure e
       Coercion{} -> pure e
       Type{} -> pure e
-      Tick t e' -> Tick t <$> expr e'
-      Cast e' co -> Cast <$> expr e' <*> pure co
-      Lam b body -> Lam <$> f b <*> expr body
-      App fun arg -> App <$> expr fun <*> expr arg
-      Let bs body -> Let <$> bind bs <*> expr body
-      Case scrut bndr ty alts -> Case <$> expr scrut <*> f bndr <*> pure ty <*> traverse alt alts
+      Tick t e' -> Tick t <$!> expr e'
+      Cast e' co -> Cast <$!> expr e' <*!> pure co
+      Lam b body -> Lam <$!> f b <*!> expr body
+      App fun arg -> App <$!> expr fun <*!> expr arg
+      Let bs body -> Let <$!> bind bs <*!> expr body
+      Case scrut bndr ty alts -> Case <$!> expr scrut <*!> f bndr <*!> pure ty <*!> traverse' alt alts
 
-    alt (Alt con bndrs rhs) = Alt con <$> traverse f bndrs <*> expr rhs
+    alt (Alt con bndrs rhs) = Alt con <$!> traverse' f bndrs <*!> expr rhs
 {-# INLINE traverseBinders #-}
 
 {-
