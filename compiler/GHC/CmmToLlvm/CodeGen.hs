@@ -800,10 +800,8 @@ cmmPrimOpFunctions :: CallishMachOp -> LlvmM LMString
 cmmPrimOpFunctions mop = do
   cfg      <- getConfig
   platform <- getPlatform
-  let render = renderWithContext (lcgContext cfg)
-      lcgIsBmi2Enabled = lcgBmiVersion cfg >= Just BMI2
-      intrinTy1 = "p0i8.p0i8." ++ render (ppr $ llvmWord platform)
-      intrinTy2 = "p0i8."      ++ render (ppr $ llvmWord platform)
+  let !isBmi2Enabled = lcgBmiVersion cfg >= Just BMI2
+      !is32bit       = platformWordSize platform == PW4
       unsupported = panic ("cmmPrimOpFunctions: " ++ show mop
                         ++ " not supported here")
       dontReach64 = panic ("cmmPrimOpFunctions: " ++ show mop
@@ -858,36 +856,149 @@ cmmPrimOpFunctions mop = do
     MO_F64_Acosh  -> fsLit "acosh"
     MO_F64_Atanh  -> fsLit "atanh"
 
-    MO_Memcpy _   -> fsLit $ "llvm.memcpy."  ++ intrinTy1
-    MO_Memmove _  -> fsLit $ "llvm.memmove." ++ intrinTy1
-    MO_Memset _   -> fsLit $ "llvm.memset."  ++ intrinTy2
-    MO_Memcmp _   -> fsLit $ "memcmp"
+    -- In the following ops, it looks like we could factorize the concatenation
+    -- of the bit size, and indeed it was like this before, e.g.
+    --
+    --     MO_PopCnt w -> fsLit $ "llvm.ctpop.i" ++ wbits w
+    -- or
+    --     MO_Memcpy _ -> fsLit $ "llvm.memcpy."  ++ intrinTy1
+    --
+    -- however it meant that FastStrings were not built from constant string
+    -- literals, hence they weren't matching the "fslit" rewrite rule in
+    -- GHC.Data.FastString that computes the string size at compilation time.
 
-    MO_SuspendThread -> fsLit $ "suspendThread"
-    MO_ResumeThread  -> fsLit $ "resumeThread"
+    MO_Memcpy _
+      | is32bit   -> fsLit "llvm.memcpy.p0i8.p0i8.i32"
+      | otherwise -> fsLit "llvm.memcpy.p0i8.p0i8.i64"
+    MO_Memmove _
+      | is32bit   -> fsLit "llvm.memmove.p0i8.p0i8.i32"
+      | otherwise -> fsLit "llvm.memmove.p0i8.p0i8.i64"
+    MO_Memset _
+       | is32bit   -> fsLit "llvm.memset.p0i8.i32"
+       | otherwise -> fsLit "llvm.memset.p0i8.i64"
+    MO_Memcmp _   -> fsLit "memcmp"
 
-    (MO_PopCnt w) -> fsLit $ "llvm.ctpop."      ++ render (ppr $ widthToLlvmInt w)
-    (MO_BSwap w)  -> fsLit $ "llvm.bswap."      ++ render (ppr $ widthToLlvmInt w)
-    (MO_BRev w)   -> fsLit $ "llvm.bitreverse." ++ render (ppr $ widthToLlvmInt w)
-    (MO_Clz w)    -> fsLit $ "llvm.ctlz."       ++ render (ppr $ widthToLlvmInt w)
-    (MO_Ctz w)    -> fsLit $ "llvm.cttz."       ++ render (ppr $ widthToLlvmInt w)
+    MO_SuspendThread -> fsLit "suspendThread"
+    MO_ResumeThread  -> fsLit "resumeThread"
 
-    (MO_Pdep w)   ->  let w' = render (ppr $ widthInBits w)
-                      in  if lcgIsBmi2Enabled
-                            then fsLit $ "llvm.x86.bmi.pdep."   ++ w'
-                            else fsLit $ "hs_pdep"              ++ w'
-    (MO_Pext w)   ->  let w' = render (ppr $ widthInBits w)
-                      in  if lcgIsBmi2Enabled
-                            then fsLit $ "llvm.x86.bmi.pext."   ++ w'
-                            else fsLit $ "hs_pext"              ++ w'
+    MO_PopCnt w -> case w of
+      W8   -> fsLit "llvm.ctpop.i8"
+      W16  -> fsLit "llvm.ctpop.i16"
+      W32  -> fsLit "llvm.ctpop.i32"
+      W64  -> fsLit "llvm.ctpop.i64"
+      W128 -> fsLit "llvm.ctpop.i128"
+      W256 -> fsLit "llvm.ctpop.i256"
+      W512 -> fsLit "llvm.ctpop.i512"
+    MO_BSwap w  -> case w of
+      W8   -> fsLit "llvm.bswap.i8"
+      W16  -> fsLit "llvm.bswap.i16"
+      W32  -> fsLit "llvm.bswap.i32"
+      W64  -> fsLit "llvm.bswap.i64"
+      W128 -> fsLit "llvm.bswap.i128"
+      W256 -> fsLit "llvm.bswap.i256"
+      W512 -> fsLit "llvm.bswap.i512"
+    MO_BRev w   -> case w of
+      W8   -> fsLit "llvm.bitreverse.i8"
+      W16  -> fsLit "llvm.bitreverse.i16"
+      W32  -> fsLit "llvm.bitreverse.i32"
+      W64  -> fsLit "llvm.bitreverse.i64"
+      W128 -> fsLit "llvm.bitreverse.i128"
+      W256 -> fsLit "llvm.bitreverse.i256"
+      W512 -> fsLit "llvm.bitreverse.i512"
+    MO_Clz w    -> case w of
+      W8   -> fsLit "llvm.ctlz.i8"
+      W16  -> fsLit "llvm.ctlz.i16"
+      W32  -> fsLit "llvm.ctlz.i32"
+      W64  -> fsLit "llvm.ctlz.i64"
+      W128 -> fsLit "llvm.ctlz.i128"
+      W256 -> fsLit "llvm.ctlz.i256"
+      W512 -> fsLit "llvm.ctlz.i512"
+    MO_Ctz w    -> case w of
+      W8   -> fsLit "llvm.cttz.i8"
+      W16  -> fsLit "llvm.cttz.i16"
+      W32  -> fsLit "llvm.cttz.i32"
+      W64  -> fsLit "llvm.cttz.i64"
+      W128 -> fsLit "llvm.cttz.i128"
+      W256 -> fsLit "llvm.cttz.i256"
+      W512 -> fsLit "llvm.cttz.i512"
+    MO_Pdep w
+      | isBmi2Enabled -> case w of
+          W8   -> fsLit "llvm.x86.bmi.pdep.8"
+          W16  -> fsLit "llvm.x86.bmi.pdep.16"
+          W32  -> fsLit "llvm.x86.bmi.pdep.32"
+          W64  -> fsLit "llvm.x86.bmi.pdep.64"
+          W128 -> fsLit "llvm.x86.bmi.pdep.128"
+          W256 -> fsLit "llvm.x86.bmi.pdep.256"
+          W512 -> fsLit "llvm.x86.bmi.pdep.512"
+      | otherwise -> case w of
+          W8   -> fsLit "hs_pdep8"
+          W16  -> fsLit "hs_pdep16"
+          W32  -> fsLit "hs_pdep32"
+          W64  -> fsLit "hs_pdep64"
+          W128 -> fsLit "hs_pdep128"
+          W256 -> fsLit "hs_pdep256"
+          W512 -> fsLit "hs_pdep512"
+    MO_Pext w
+      | isBmi2Enabled -> case w of
+          W8   -> fsLit "llvm.x86.bmi.pext.8"
+          W16  -> fsLit "llvm.x86.bmi.pext.16"
+          W32  -> fsLit "llvm.x86.bmi.pext.32"
+          W64  -> fsLit "llvm.x86.bmi.pext.64"
+          W128 -> fsLit "llvm.x86.bmi.pext.128"
+          W256 -> fsLit "llvm.x86.bmi.pext.256"
+          W512 -> fsLit "llvm.x86.bmi.pext.512"
+      | otherwise -> case w of
+          W8   -> fsLit "hs_pext8"
+          W16  -> fsLit "hs_pext16"
+          W32  -> fsLit "hs_pext32"
+          W64  -> fsLit "hs_pext64"
+          W128 -> fsLit "hs_pext128"
+          W256 -> fsLit "hs_pext256"
+          W512 -> fsLit "hs_pext512"
 
-    (MO_Prefetch_Data _ )-> fsLit "llvm.prefetch"
+    MO_AddIntC w    -> case w of
+      W8   -> fsLit "llvm.sadd.with.overflow.i8"
+      W16  -> fsLit "llvm.sadd.with.overflow.i16"
+      W32  -> fsLit "llvm.sadd.with.overflow.i32"
+      W64  -> fsLit "llvm.sadd.with.overflow.i64"
+      W128 -> fsLit "llvm.sadd.with.overflow.i128"
+      W256 -> fsLit "llvm.sadd.with.overflow.i256"
+      W512 -> fsLit "llvm.sadd.with.overflow.i512"
+    MO_SubIntC w    -> case w of
+      W8   -> fsLit "llvm.ssub.with.overflow.i8"
+      W16  -> fsLit "llvm.ssub.with.overflow.i16"
+      W32  -> fsLit "llvm.ssub.with.overflow.i32"
+      W64  -> fsLit "llvm.ssub.with.overflow.i64"
+      W128 -> fsLit "llvm.ssub.with.overflow.i128"
+      W256 -> fsLit "llvm.ssub.with.overflow.i256"
+      W512 -> fsLit "llvm.ssub.with.overflow.i512"
+    MO_Add2 w       -> case w of
+      W8   -> fsLit "llvm.uadd.with.overflow.i8"
+      W16  -> fsLit "llvm.uadd.with.overflow.i16"
+      W32  -> fsLit "llvm.uadd.with.overflow.i32"
+      W64  -> fsLit "llvm.uadd.with.overflow.i64"
+      W128 -> fsLit "llvm.uadd.with.overflow.i128"
+      W256 -> fsLit "llvm.uadd.with.overflow.i256"
+      W512 -> fsLit "llvm.uadd.with.overflow.i512"
+    MO_AddWordC w   -> case w of
+      W8   -> fsLit "llvm.uadd.with.overflow.i8"
+      W16  -> fsLit "llvm.uadd.with.overflow.i16"
+      W32  -> fsLit "llvm.uadd.with.overflow.i32"
+      W64  -> fsLit "llvm.uadd.with.overflow.i64"
+      W128 -> fsLit "llvm.uadd.with.overflow.i128"
+      W256 -> fsLit "llvm.uadd.with.overflow.i256"
+      W512 -> fsLit "llvm.uadd.with.overflow.i512"
+    MO_SubWordC w   -> case w of
+      W8   -> fsLit "llvm.usub.with.overflow.i8"
+      W16  -> fsLit "llvm.usub.with.overflow.i16"
+      W32  -> fsLit "llvm.usub.with.overflow.i32"
+      W64  -> fsLit "llvm.usub.with.overflow.i64"
+      W128 -> fsLit "llvm.usub.with.overflow.i128"
+      W256 -> fsLit "llvm.usub.with.overflow.i256"
+      W512 -> fsLit "llvm.usub.with.overflow.i512"
 
-    MO_AddIntC w  -> fsLit $ "llvm.sadd.with.overflow." ++ render (ppr $ widthToLlvmInt w)
-    MO_SubIntC w  -> fsLit $ "llvm.ssub.with.overflow." ++ render (ppr $ widthToLlvmInt w)
-    MO_Add2 w     -> fsLit $ "llvm.uadd.with.overflow." ++ render (ppr $ widthToLlvmInt w)
-    MO_AddWordC w -> fsLit $ "llvm.uadd.with.overflow." ++ render (ppr $ widthToLlvmInt w)
-    MO_SubWordC w -> fsLit $ "llvm.usub.with.overflow." ++ render (ppr $ widthToLlvmInt w)
+
+    MO_Prefetch_Data _ -> fsLit "llvm.prefetch"
 
     MO_S_Mul2    {}  -> unsupported
     MO_S_QuotRem {}  -> unsupported
