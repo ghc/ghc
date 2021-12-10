@@ -520,3 +520,8 @@ test('hard_hole_fits', # Testing multiple hole-fits with lots in scope for #1687
 test('T16875',  # Testing one hole-fit with a lot in scope for #16875
      collect_compiler_stats('bytes allocated', 2),
      compile, ['-fdefer-type-errors -fno-max-valid-hole-fits -package ghc'])
+test ('T20261', 
+      [collect_compiler_stats('all')],
+      compile,
+      [''])
+
