@@ -5,6 +5,7 @@
            , BangPatterns
            , NondecreasingIndentation
            , MagicHash
+           , LambdaCase
   #-}
 {-# OPTIONS_GHC -Wno-unused-matches #-}
 {-# OPTIONS_HADDOCK not-home #-}
@@ -550,8 +551,7 @@ lazyBuffersToString CRLF = loop '\0' where
 --  * 'isPermissionError' if another system resource limit would be exceeded.
 
 hPutChar :: Handle -> Char -> IO ()
-hPutChar handle c = do
-    c `seq` return ()
+hPutChar handle !c = do
     wantWritableHandle "hPutChar" handle $ \ handle_  ->
       hPutcBuffered handle_ c
 
@@ -616,13 +616,15 @@ hPutStr handle str = hPutStr' handle str False
 -- | The same as 'hPutStr', but adds a newline character.
 hPutStrLn :: Handle -> String -> IO ()
 hPutStrLn handle str = hPutStr' handle str True
-  -- An optimisation: we treat hPutStrLn specially, to avoid the
-  -- overhead of a single putChar '\n', which is quite high now that we
-  -- have to encode eagerly.
 
 {-# NOINLINE hPutStr' #-}
 hPutStr' :: Handle -> String -> Bool -> IO ()
 hPutStr' handle str add_nl =
+  -- An optimisation: hPutStr' takes an additional "add_nl" boolean parameter to
+  -- implement hPutStrLn efficiently. When LineBuffering or BlockBuffering modes
+  -- are enabled, it performs the encoding of the string and of the new-line
+  -- character(s) in the same loop, directly flushing buffers appropriately at
+  -- the end if LineBuffering mode is used.
   do
     (buffer_mode, nl) <-
          wantWritableHandle "hPutStr" handle $ \h_ -> do
@@ -662,37 +664,42 @@ getSpareBuffer Handle__{haCharBuffer=ref, haBuffers=spare_ref, haBufferMode=mode
 -- NB. performance-critical code: eyeball the Core.
 writeBlocks :: Handle -> Bool -> Bool -> Newline -> Buffer CharBufElem -> String -> IO ()
 writeBlocks hdl line_buffered add_nl nl
-            buf@Buffer{ bufRaw=raw, bufSize=len } s =
-  let
-   shoveString :: Int -> [Char] -> [Char] -> IO ()
-   shoveString !n [] [] =
-        commitBuffer hdl raw len n False{-no flush-} True{-release-}
-   shoveString !n [] rest =
-        shoveString n rest []
-   shoveString !n (c:cs) rest
-     -- n+1 so we have enough room to write '\r\n' if necessary
-     | n + 1 >= len = do
-        commitBuffer hdl raw len n False{-flush-} False
-        shoveString 0 (c:cs) rest
-     | c == '\n'  =  do
-        n' <- if nl == CRLF
-              then do
-                n1 <- writeCharBuf raw n  '\r'
-                writeCharBuf raw n1 '\n'
-              else
-                writeCharBuf raw n c
-        if line_buffered
+            buf@Buffer{ bufRaw=raw, bufSize=len } s = shoveString 0 s
+  where
+   {-# INLINE new_line #-} -- we don't want to allocate a closure for it
+   new_line !n = do
+     n1 <- case nl of
+            CRLF -> writeCharBuf raw n '\r'
+            _    -> pure n
+     n2 <- writeCharBuf raw n1 '\n'
+     if line_buffered
         then do
           -- end of line, so write and flush
-          commitBuffer hdl raw len n' True{-flush-} False
-          shoveString 0 cs rest
+          commitBuffer hdl raw len n2 True{-flush-} False
+          pure 0
         else
-          shoveString n' cs rest
-     | otherwise = do
+          pure n2
+
+   shoveString !n = \case
+    [] -> if add_nl
+            then do
+              n' <- new_line n
+              commitBuffer hdl raw len n' False{-no flush-} True{-release-}
+            else
+              commitBuffer hdl raw len n False{-no flush-} True{-release-}
+
+    -- n+1 so we have enough room to write '\r\n' if necessary
+    cs | n + 1 >= len -> do
+        commitBuffer hdl raw len n False{-flush-} False
+        shoveString 0 cs
+
+    ('\n':cs) -> do
+        n' <- new_line n
+        shoveString n' cs
+
+    (c:cs) -> do
         n' <- writeCharBuf raw n c
-        shoveString n' cs rest
-  in
-  shoveString 0 s (if add_nl then "\n" else "")
+        shoveString n' cs
 
 -- -----------------------------------------------------------------------------
 -- commitBuffer handle buf sz count flush release
