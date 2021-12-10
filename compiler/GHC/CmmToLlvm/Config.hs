@@ -25,6 +25,7 @@ data LCGConfig = LCGConfig
   , lcgLlvmVersion          :: Maybe LlvmVersion -- ^ version of Llvm we're using
   , lcgDoWarn               :: !Bool         -- ^ True ==> warn unsupported Llvm version
   , lcgPlatformMisc         :: !String       -- ^ mirror DynFlags platformMisc_llvmTarget
-  , lcgLlvmConfig           :: LlvmConfig    -- ^ mirror DynFlags LlvmConfig NB. this field must be lazy
-                                             -- see Note [LLVM Configuration] in "GHC.SysTools"
+  , lcgLlvmConfig           :: !LlvmConfig   -- ^ mirror DynFlags LlvmConfig.
+    -- see Note [LLVM Configuration] in "GHC.SysTools". This can be strict since
+    -- GHC.Driver.Config.CmmToLlvm.initLCGConfig verifies the files are present.
   }
