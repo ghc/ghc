@@ -150,10 +150,10 @@ llvmInfAlign :: Platform -> LMAlign
 llvmInfAlign platform = Just (platformWordSizeInBytes platform)
 
 -- | Section to use for a function
-llvmFunSection :: LCGConfig -> LMString -> LMSection
+llvmFunSection :: LlvmCgConfig -> LMString -> LMSection
 llvmFunSection opts lbl
-    | lcgSplitSections opts = Just (concatFS [fsLit ".text.", lbl])
-    | otherwise             = Nothing
+    | llvmCgSplitSection opts = Just (concatFS [fsLit ".text.", lbl])
+    | otherwise               = Nothing
 
 -- | A Function's arguments
 llvmFunArgs :: Platform -> LiveGlobalRegs -> [LlvmVar]
@@ -302,7 +302,7 @@ llvmVersionList = NE.toList . llvmVersionNE
 
 data LlvmEnv = LlvmEnv
   { envVersion   :: LlvmVersion      -- ^ LLVM version
-  , envConfig    :: !LCGConfig       -- ^ Configuration for LLVM code gen
+  , envConfig    :: !LlvmCgConfig    -- ^ Configuration for LLVM code gen
   , envLogger    :: !Logger          -- ^ Logger
   , envOutput    :: BufHandle        -- ^ Output buffer
   , envMask      :: !Char            -- ^ Mask for creating unique values
@@ -337,9 +337,9 @@ instance HasLogger LlvmM where
 
 -- | Get target platform
 getPlatform :: LlvmM Platform
-getPlatform = lcgPlatform <$> getConfig
+getPlatform = llvmCgPlatform <$> getConfig
 
-getConfig :: LlvmM LCGConfig
+getConfig :: LlvmM LlvmCgConfig
 getConfig = LlvmM $ \env -> return (envConfig env, env)
 
 instance MonadUnique LlvmM where
@@ -357,7 +357,7 @@ liftIO m = LlvmM $ \env -> do x <- m
                               return (x, env)
 
 -- | Get initial Llvm environment.
-runLlvm :: Logger -> LCGConfig -> LlvmVersion -> BufHandle -> LlvmM a -> IO a
+runLlvm :: Logger -> LlvmCgConfig -> LlvmVersion -> BufHandle -> LlvmM a -> IO a
 runLlvm logger cfg ver out m = do
     (a, _) <- runLlvmM m env
     return a
@@ -427,7 +427,7 @@ renderLlvm :: Outp.SDoc -> LlvmM ()
 renderLlvm sdoc = do
 
     -- Write to output
-    ctx <- lcgContext <$> getConfig
+    ctx <- llvmCgContext <$> getConfig
     out <- getEnv envOutput
     liftIO $ Outp.bufLeftRenderSDoc ctx out sdoc
 
@@ -490,7 +490,7 @@ ghcInternalFunctions = do
 -- | Pretty print a 'CLabel'.
 strCLabel_llvm :: CLabel -> LlvmM LMString
 strCLabel_llvm lbl = do
-    ctx <- lcgContext <$> getConfig
+    ctx <- llvmCgContext <$> getConfig
     platform <- getPlatform
     let sdoc = pprCLabel platform CStyle lbl
         str = Outp.renderWithContext ctx sdoc

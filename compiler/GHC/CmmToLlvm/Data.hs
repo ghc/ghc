@@ -112,8 +112,8 @@ llvmSectionType p t = case t of
 llvmSection :: Section -> LlvmM LMSection
 llvmSection (Section t suffix) = do
   opts <- getConfig
-  let splitSect = lcgSplitSections opts
-      platform  = lcgPlatform opts
+  let splitSect = llvmCgSplitSection opts
+      platform  = llvmCgPlatform     opts
   if not splitSect
   then return Nothing
   else do

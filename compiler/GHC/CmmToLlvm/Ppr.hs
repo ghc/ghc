@@ -26,7 +26,7 @@ import GHC.Types.Unique
 --
 
 -- | Pretty print LLVM data code
-pprLlvmData :: LCGConfig -> LlvmData -> SDoc
+pprLlvmData :: LlvmCgConfig -> LlvmData -> SDoc
 pprLlvmData cfg (globals, types) =
     let ppLlvmTys (LMAlias    a) = ppLlvmAlias a
         ppLlvmTys (LMFunction f) = ppLlvmFunctionDecl f
@@ -56,7 +56,7 @@ pprLlvmCmmDecl (CmmProc mb_info entry_lbl live (ListGraph blks))
        funDec   <- llvmFunSig live lbl link
        cfg      <- getConfig
        platform <- getPlatform
-       let buildArg = fsLit . renderWithContext (lcgContext cfg). ppPlainName cfg
+       let buildArg = fsLit . renderWithContext (llvmCgContext cfg). ppPlainName cfg
            funArgs = map buildArg (llvmFunArgs platform live)
            funSect = llvmFunSection cfg (decName funDec)
 

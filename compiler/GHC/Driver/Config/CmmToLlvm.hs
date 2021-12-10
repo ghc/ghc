@@ -1,5 +1,5 @@
 module GHC.Driver.Config.CmmToLlvm
-  ( initLCGConfig
+  ( initLlvmCgConfig
   ) where
 
 import GHC.Prelude
@@ -11,20 +11,20 @@ import GHC.Utils.Outputable
 import GHC.Utils.Logger
 
 -- | Initialize the Llvm code generator configuration from DynFlags
-initLCGConfig :: Logger -> DynFlags -> IO LCGConfig
-initLCGConfig logger dflags = do
+initLlvmCgConfig :: Logger -> DynFlags -> IO LlvmCgConfig
+initLlvmCgConfig logger dflags = do
   version <- figureLlvmVersion logger dflags
-  pure $! LCGConfig {
-    lcgPlatform               = targetPlatform dflags
-    , lcgContext              = initSDocContext dflags (PprCode CStyle)
-    , lcgFillUndefWithGarbage = gopt Opt_LlvmFillUndefWithGarbage dflags
-    , lcgSplitSections        = gopt Opt_SplitSections dflags
-    , lcgBmiVersion           = case platformArch (targetPlatform dflags) of
-                                   ArchX86_64 -> bmiVersion dflags
-                                   ArchX86    -> bmiVersion dflags
-                                   _          -> Nothing
-    , lcgLlvmVersion          = version
-    , lcgDoWarn               = wopt Opt_WarnUnsupportedLlvmVersion dflags
-    , lcgPlatformMisc         = platformMisc_llvmTarget $! platformMisc dflags
-    , lcgLlvmConfig           = llvmConfig dflags
+  pure $! LlvmCgConfig {
+    llvmCgPlatform               = targetPlatform dflags
+    , llvmCgContext              = initSDocContext dflags (PprCode CStyle)
+    , llvmCgFillUndefWithGarbage = gopt Opt_LlvmFillUndefWithGarbage dflags
+    , llvmCgSplitSection         = gopt Opt_SplitSections dflags
+    , llvmCgBmiVersion           = case platformArch (targetPlatform dflags) of
+                                      ArchX86_64 -> bmiVersion dflags
+                                      ArchX86    -> bmiVersion dflags
+                                      _          -> Nothing
+    , llvmCgLlvmVersion          = version
+    , llvmCgDoWarn               = wopt Opt_WarnUnsupportedLlvmVersion dflags
+    , llvmCgLlvmTarget           = platformMisc_llvmTarget $! platformMisc dflags
+    , llvmCgLlvmConfig           = llvmConfig dflags
     }

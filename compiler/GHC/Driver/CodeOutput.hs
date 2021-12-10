@@ -29,7 +29,7 @@ import GHC.Cmm.CLabel
 import GHC.Driver.Session
 import GHC.Driver.Config.Finder    (initFinderOpts)
 import GHC.Driver.Config.CmmToAsm  (initNCGConfig)
-import GHC.Driver.Config.CmmToLlvm (initLCGConfig)
+import GHC.Driver.Config.CmmToLlvm (initLlvmCgConfig)
 import GHC.Driver.Ppr
 import GHC.Driver.Backend
 
@@ -189,7 +189,7 @@ outputAsm logger dflags this_mod location filenm cmm_stream = do
 
 outputLlvm :: Logger -> DynFlags -> FilePath -> Stream IO RawCmmGroup a -> IO a
 outputLlvm logger dflags filenm cmm_stream = do
-  lcg_config <- initLCGConfig logger dflags
+  lcg_config <- initLlvmCgConfig logger dflags
   {-# SCC "llvm_output" #-} doOutput filenm $
     \f -> {-# SCC "llvm_CodeGen" #-}
       llvmCodeGen logger lcg_config f cmm_stream

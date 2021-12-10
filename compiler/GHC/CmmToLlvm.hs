@@ -44,7 +44,7 @@ import System.IO
 -- -----------------------------------------------------------------------------
 -- | Top-level of the LLVM Code generator
 --
-llvmCodeGen :: Logger -> LCGConfig -> Handle
+llvmCodeGen :: Logger -> LlvmCgConfig -> Handle
                -> Stream.Stream IO RawCmmGroup a
                -> IO a
 llvmCodeGen logger cfg h cmm_stream
@@ -55,20 +55,20 @@ llvmCodeGen logger cfg h cmm_stream
        showPass logger "LLVM CodeGen"
 
        -- get llvm version, cache for later use
-       let mb_ver = lcgLlvmVersion cfg
+       let mb_ver = llvmCgLlvmVersion cfg
 
        -- warn if unsupported
        forM_ mb_ver $ \ver -> do
          debugTraceMsg logger 2
               (text "Using LLVM version:" <+> text (llvmVersionStr ver))
-         let doWarn = lcgDoWarn cfg
+         let doWarn = llvmCgDoWarn cfg
          when (not (llvmVersionSupported ver) && doWarn) $ putMsg logger $
            "You are using an unsupported version of LLVM!" $$
            "Currently only" <+> text (llvmVersionStr supportedLlvmVersionLowerBound) <+>
            "to" <+> text (llvmVersionStr supportedLlvmVersionUpperBound) <+> "is supported." <+>
            "System LLVM version: " <> text (llvmVersionStr ver) $$
            "We will try though..."
-         let isS390X = platformArch (lcgPlatform cfg)  == ArchS390X
+         let isS390X = platformArch (llvmCgPlatform cfg)  == ArchS390X
          let major_ver = head . llvmVersionList $ ver
          when (isS390X && major_ver < 10 && doWarn) $ putMsg logger $
            "Warning: For s390x the GHC calling convention is only supported since LLVM version 10." <+>
@@ -88,7 +88,7 @@ llvmCodeGen logger cfg h cmm_stream
 
        return a
 
-llvmCodeGen' :: LCGConfig -> Stream.Stream IO RawCmmGroup a -> LlvmM a
+llvmCodeGen' :: LlvmCgConfig -> Stream.Stream IO RawCmmGroup a -> LlvmM a
 llvmCodeGen' cfg cmm_stream
   = do  -- Preamble
         renderLlvm header
@@ -108,8 +108,8 @@ llvmCodeGen' cfg cmm_stream
   where
     header :: SDoc
     header =
-      let target  = lcgPlatformMisc cfg
-          llvmCfg = lcgLlvmConfig cfg
+      let target  = llvmCgLlvmTarget cfg
+          llvmCfg = llvmCgLlvmConfig cfg
       in     text ("target datalayout = \"" ++ getDataLayout llvmCfg target ++ "\"")
          $+$ text ("target triple = \"" ++ target ++ "\"")
 

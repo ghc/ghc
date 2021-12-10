@@ -800,7 +800,7 @@ cmmPrimOpFunctions :: CallishMachOp -> LlvmM LMString
 cmmPrimOpFunctions mop = do
   cfg      <- getConfig
   platform <- getPlatform
-  let !isBmi2Enabled = lcgBmiVersion cfg >= Just BMI2
+  let !isBmi2Enabled = llvmCgBmiVersion cfg >= Just BMI2
       !is32bit       = platformWordSize platform == PW4
       unsupported = panic ("cmmPrimOpFunctions: " ++ show mop
                         ++ " not supported here")
@@ -1206,7 +1206,7 @@ genStore_slow addr val meta = do
                     (PprCmm.pprExpr platform addr <+> text (
                         "Size of Ptr: "   ++ show (llvmPtrBits platform) ++
                         ", Size of var: " ++ show (llvmWidthInBits platform other) ++
-                        ", Var: "         ++ renderWithContext (lcgContext cfg) (ppVar cfg vaddr)))
+                        ", Var: "         ++ renderWithContext (llvmCgContext cfg) (ppVar cfg vaddr)))
 
 
 -- | Unconditional branch
@@ -1245,7 +1245,7 @@ genExpectLit expLit expTy var = do
     lit = LMLitVar $ LMIntLit expLit expTy
 
     llvmExpectName
-      | isInt expTy = fsLit $ "llvm.expect." ++ renderWithContext (lcgContext cfg) (ppr expTy)
+      | isInt expTy = fsLit $ "llvm.expect." ++ renderWithContext (llvmCgContext cfg) (ppr expTy)
       | otherwise   = panic "genExpectedLit: Type not an int!"
 
   (llvmExpect, stmts, top) <-
@@ -1714,7 +1714,7 @@ genMachOp_slow opt op [x, y] = case op of
                | otherwise
                -> do
                     -- Error. Continue anyway so we can debug the generated ll file.
-                    let render   = renderWithContext (lcgContext cfg)
+                    let render   = renderWithContext (llvmCgContext cfg)
                         cmmToStr = (lines . render . PprCmm.pprExpr platform)
                     statement $ Comment $ map fsLit $ cmmToStr x
                     statement $ Comment $ map fsLit $ cmmToStr y
@@ -1877,7 +1877,7 @@ genLoad_slow atomic e ty meta = do
                      (PprCmm.pprExpr platform e <+> text (
                          "Size of Ptr: "   ++ show (llvmPtrBits platform) ++
                          ", Size of var: " ++ show (llvmWidthInBits platform other) ++
-                         ", Var: " ++ renderWithContext (lcgContext cfg) (ppVar cfg iptr)))
+                         ", Var: " ++ renderWithContext (llvmCgContext cfg) (ppVar cfg iptr)))
   where
     loadInstr ptr | atomic    = ALoad SyncSeqCst False ptr
                   | otherwise = Load ptr
