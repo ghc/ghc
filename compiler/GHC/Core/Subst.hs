@@ -370,7 +370,7 @@ substIdBndr :: SDoc
 
 substIdBndr _doc rec_subst subst@(Subst in_scope env tvs cvs) old_id
   = -- pprTrace "substIdBndr" (doc $$ ppr old_id $$ ppr in_scope) $
-    (Subst (in_scope `InScopeSet.extendInScopeSet` new_id) new_env tvs cvs, new_id)
+    (Subst new_in_scope new_env tvs cvs, new_id)
   where
     id1 = uniqAway in_scope old_id      -- id1 is cloned if necessary
     id2 | no_type_change = id1
@@ -384,14 +384,15 @@ substIdBndr _doc rec_subst subst@(Subst in_scope env tvs cvs) old_id
         -- new_id has the right IdInfo
         -- The lazy-set is because we're in a loop here, with
         -- rec_subst, when dealing with a mutually-recursive group
-    new_id = maybeModifyIdInfo mb_new_info id2
+    !new_id = maybeModifyIdInfo mb_new_info id2
     mb_new_info = substIdInfo rec_subst id2 (idInfo id2)
         -- NB: unfolding info may be zapped
 
         -- Extend the substitution if the unique has changed
         -- See the notes with substTyVarBndr for the delVarEnv
-    new_env | no_change = delVarEnv env old_id
-            | otherwise = extendVarEnv env old_id (Var new_id)
+    !new_in_scope = in_scope `InScopeSet.extendInScopeSet` new_id
+    !new_env | no_change = delVarEnv env old_id
+             | otherwise = extendVarEnv env old_id (Var new_id)
 
     no_change = id1 == old_id
         -- See Note [Extending the IdSubstEnv]
@@ -443,13 +444,14 @@ clone_id    :: Subst                    -- Substitution for the IdInfo
             -> (Subst, Id)              -- Transformed pair
 
 clone_id rec_subst subst@(Subst in_scope idvs tvs cvs) (old_id, uniq)
-  = (Subst (in_scope `InScopeSet.extendInScopeSet` new_id) new_idvs tvs new_cvs, new_id)
+  = (Subst new_in_scope new_idvs tvs new_cvs, new_id)
   where
     id1     = setVarUnique old_id uniq
     id2     = substIdType subst id1
-    new_id  = maybeModifyIdInfo (substIdInfo rec_subst id2 (idInfo old_id)) id2
-    (new_idvs, new_cvs) | isCoVar old_id = (idvs, extendVarEnv cvs old_id (mkCoVarCo new_id))
-                        | otherwise      = (extendVarEnv idvs old_id (Var new_id), cvs)
+    !new_id = maybeModifyIdInfo (substIdInfo rec_subst id2 (idInfo old_id)) id2
+    !new_in_scope = in_scope `InScopeSet.extendInScopeSet` new_id
+    (!new_idvs, !new_cvs) | isCoVar old_id = (idvs, extendVarEnv cvs old_id (mkCoVarCo new_id))
+                          | otherwise      = (extendVarEnv idvs old_id (Var new_id), cvs)
 
 {-
 ************************************************************************
