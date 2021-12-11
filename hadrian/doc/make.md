@@ -11,11 +11,9 @@ are looking for a more verbose and comprehensive document, you should head to
 For GHC hackers already used to the Make build system, here is what you need to
 know:
 
-- You can still boot and configure yourself.
+- You still need to `boot` and `configure` yourself.
 - Use `hadrian/build.{sh, bat}` instead of `make`. It supports `-j`. This build
   script will from now on be referred to as simply `build`.
-- Add the `-c` flag if you want hadrian to boot and configure the source tree
-  for you.
 - Build products are not in `inplace` anymore, but `_build` by default. Your
   stage 2 GHC would then be at `_build/stage1/bin/ghc` (because it's built by
   the stage 1 compiler).

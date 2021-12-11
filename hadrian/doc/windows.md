@@ -20,8 +20,7 @@ stack exec -- pacman -S autoconf automake-wrapper make patch python tar --noconf
 stack build
 
 # Build GHC
-# Note that the --configure flag is required only for the first build
-stack exec hadrian -- --directory ".." -j --flavour=quickest --configure
+stack exec hadrian -- --directory ".." -j --flavour=quickest
 
 # Test GHC
 cd ..

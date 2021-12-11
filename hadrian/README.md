@@ -32,9 +32,7 @@ hadrian/build.bat -j
 ```
 
 Here flag `-j` enables parallelism and is optional. We will further refer to the
-build script simply as `build`. Note that Hadrian can also run the `boot` and
-`configure` scripts automatically for you if you pass the flag `--configure`,
-or simply `-c`. See the overview of command line flags below.
+build script simply as `build`.
 
 Notes:
 
@@ -77,16 +75,6 @@ doesn't have any "inplace" logic left any more. This option is therefore useful
 for GHC developers who want to build GHC in different ways or at different
 commits, from the same source directory, and have the build products sit in
 different, isolated folders.
-
-* `--configure` or `-c`: use this flag to run the `boot` and `configure` scripts
-automatically, so that you don't have to remember to run them manually as you
-normally do when using Make (typically only in the first build):
-    ```bash
-    ./boot
-    ./configure # On Windows run ./configure --enable-tarballs-autodownload
-    ```
-    Beware that with this flag Hadrian may do network I/O on Windows to download
-    necessary tarballs, which may sometimes be undesirable.
 
 * `--flavour=FLAVOUR`: choose a build flavour. The following settings are
 currently supported: `default`, `quick`, `quickest`, `perf`, `prof`, `devel1`
@@ -227,7 +215,7 @@ you can tell hadrian to build the compiler and also run the linters:
 * `build clean` removes all build artefacts.
 
 * `build distclean` additionally remove the mingw tarballs and fs* files created
-  by configure.
+  by `configure`.
 
 * `build -B` forces Shake to rerun all rules, even if the previous build results
 are still up-to-date.
@@ -338,15 +326,6 @@ Troubleshooting
 ---------------
 
 Here are a few simple suggestions that might help you fix the build:
-
-* If Hadrian fails with the message
-  `Configuration file hadrian/cfg/system.config is missing`, you have probably
-  forgotten to pass the `--configure` flag during the first build.
-
-* With the `--configure` (`-c`) flag, Hadrian sometimes fetches a wrong
-  Happy saying something like: `HappyTemplate-arrays-coerce: openFile: does not exist`
-  (as mentioned [here](https://github.com/haskell/cabal/issues/5867)), in
-  which case you might be better off running `./configure` manually before Hadrian.
 
 * The call to `build test` sometimes fails with
   `libCffi_p.a: copyFile: does not exist` (as noticed
