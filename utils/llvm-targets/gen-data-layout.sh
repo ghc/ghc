@@ -114,6 +114,13 @@ TARGETS=(
     "aarch64-unknown-netbsd"
 
     #########################
+    # OpenBSD
+    #########################
+
+    "x86_64-unknown-openbsd"
+    "i386-unknown-openbsd"
+
+    #########################
     # Other
     #########################
 
