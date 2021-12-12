@@ -659,6 +659,11 @@ WINDRES = $(INPLACE_MINGW)/bin/windres
 endif
 
 #-----------------------------------------------------------------------------
+# Python for testsuite driver and code generators
+#
+PYTHON=@PythonCmd@
+
+#-----------------------------------------------------------------------------
 # Mingwex Library
 #
 HaveLibMingwEx	= @HaveLibMingwEx@
