@@ -32,7 +32,6 @@ import GHC.Core.Type
 
 import GHC.Types.Avail
 import GHC.Types.Fixity.Env
-import GHC.Types.Id ( isRecordSelector )
 import GHC.Types.Id.Info ( IdDetails(..) )
 import GHC.Types.Name
 import GHC.Types.Name.Env
@@ -68,7 +67,7 @@ This scheme deals well with shadowing.  For example:
 Here we must display info about constructor A, but its type T has been
 shadowed by the second declaration.  But it has a respectable
 qualified name (Ghci1.T), and its source location says where it was
-defined.
+defined, and it can also be used with the qualified name.
 
 So the main invariant continues to hold, that in any session an
 original name M.T only refers to one unique thing.  (In a previous
@@ -242,7 +241,9 @@ data InteractiveContext
 
          ic_tythings   :: [TyThing],
              -- ^ TyThings defined by the user, in reverse order of
-             -- definition (ie most recent at the front)
+             -- definition (ie most recent at the front).
+             -- Also used in GHC.Tc.Module.runTcInteractive to fill the type
+             -- checker environment.
              -- See Note [ic_tythings]
 
          ic_gre_cache :: IcGlobalRdrEnv,
@@ -331,20 +332,32 @@ icInteractiveModule (InteractiveContext { ic_mod_index = index })
   = mkInteractiveModule index
 
 -- | This function returns the list of visible TyThings (useful for
--- e.g. showBindings)
+-- e.g. showBindings).
+--
+-- It picks only those TyThings that are not shadowed by later definitions on the interpreter,
+-- to not clutter :showBindings with shadowed ids, which would show up as Ghci9.foo.
+--
+-- Some TyThings define many names; we include them if _any_ name is still
+-- available unqualified.
 icInScopeTTs :: InteractiveContext -> [TyThing]
-icInScopeTTs = ic_tythings
+icInScopeTTs ictxt = filter in_scope_unqualified (ic_tythings ictxt)
+  where
+    in_scope_unqualified thing = or
+        [ unQualOK gre
+        | avail <- tyThingAvailInfo thing
+        , name <- availNames avail
+        , Just gre <- [lookupGRE_Name (icReaderEnv ictxt) name]
+        ]
+
 
 -- | Get the PrintUnqualified function based on the flags and this InteractiveContext
 icPrintUnqual :: UnitEnv -> InteractiveContext -> PrintUnqualified
 icPrintUnqual unit_env ictxt = mkPrintUnqualified unit_env (icReaderEnv ictxt)
 
 -- | extendInteractiveContext is called with new TyThings recently defined to update the
--- InteractiveContext to include them.  Ids are easily removed when shadowed,
--- but Classes and TyCons are not.  Some work could be done to determine
--- whether they are entirely shadowed, but as you could still have references
--- to them (e.g. instances for classes or values of the type for TyCons), it's
--- not clear whether removing them is even the appropriate behavior.
+-- InteractiveContext to include them. By putting new things first, unqualified
+-- use will pick the most recently defined thing with a given name, while
+-- still keeping the old names in scope in their qualified form (Ghci1.foo).
 extendInteractiveContext :: InteractiveContext
                          -> [TyThing]
                          -> [ClsInst] -> [FamInst]
@@ -355,7 +368,7 @@ extendInteractiveContext ictxt new_tythings new_cls_insts new_fam_insts defaults
   = ictxt { ic_mod_index  = ic_mod_index ictxt + 1
                             -- Always bump this; even instances should create
                             -- a new mod_index (#9426)
-          , ic_tythings   = new_tythings ++ old_tythings
+          , ic_tythings   = new_tythings ++ ic_tythings ictxt
           , ic_gre_cache  = ic_gre_cache  ictxt `icExtendIcGblRdrEnv` new_tythings
           , ic_instances  = ( new_cls_insts ++ old_cls_insts
                             , new_fam_insts ++ fam_insts )
@@ -365,9 +378,6 @@ extendInteractiveContext ictxt new_tythings new_cls_insts new_fam_insts defaults
           , ic_fix_env    = fix_env  -- See Note [Fixity declarations in GHCi]
           }
   where
-    new_ids = [id | AnId id <- new_tythings]
-    old_tythings = filterOut (shadowed_by new_ids) (ic_tythings ictxt)
-
     -- Discard old instances that have been fully overridden
     -- See Note [Override identical instances in GHCi]
     (cls_insts, fam_insts) = ic_instances ictxt
@@ -379,20 +389,11 @@ extendInteractiveContextWithIds ictxt new_ids
   | null new_ids = ictxt
   | otherwise
   = ictxt { ic_mod_index  = ic_mod_index ictxt + 1
-          , ic_tythings   = new_tythings ++ old_tythings
+          , ic_tythings   = new_tythings ++ ic_tythings ictxt
           , ic_gre_cache  = ic_gre_cache ictxt `icExtendIcGblRdrEnv` new_tythings
           }
   where
     new_tythings = map AnId new_ids
-    old_tythings = filterOut (shadowed_by new_ids) (ic_tythings ictxt)
-
-shadowed_by :: [Id] -> TyThing -> Bool
-shadowed_by ids = shadowed
-  where
-    -- Keep record selectors because they might be needed by HasField (#19322)
-    shadowed (AnId id) | isRecordSelector id = False
-    shadowed tything = getOccName tything `elemOccSet` new_occs
-    new_occs = mkOccSet (map getOccName ids)
 
 setInteractivePrintName :: InteractiveContext -> Name -> InteractiveContext
 setInteractivePrintName ic n = ic{ic_int_print = n}

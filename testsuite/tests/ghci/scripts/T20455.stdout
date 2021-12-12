@@ -1,0 +1,5 @@
+"first l"
+"second l"
+Ghci1.l :: String 	-- Defined at <interactive>:1:5
+t :: Ghci5.T 	-- Defined at <interactive>:11:1
+t :: Ghci5.T

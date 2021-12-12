@@ -1,0 +1,10 @@
+
+<interactive>:3:1: error:
+    • Variable not in scope: ll
+    • Perhaps you meant one of these:
+        ‘Ghci1.l’ (imported from Ghci1), ‘l’ (line 2),
+        ‘all’ (imported from Prelude)
+
+<no location info>: error:
+    Could not find module ‘Ghci1’
+    It is not a module in the current program, or in any known package.

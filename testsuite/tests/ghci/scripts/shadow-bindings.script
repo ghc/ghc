@@ -1,0 +1,48 @@
+-- Exercising the behaviour of :show bindings and shadowing
+let foo = True
+foo && True
+putStrLn "Expecting foo = True"
+:show bindings
+
+let foo = False
+foo && True
+putStrLn "Expecting foo = False"
+:show bindings
+:reload
+
+data T = A | B
+:show bindings
+-- shadow T
+data T = C
+putStrLn "Expecting T and Ghci1.T"
+:show bindings
+:reload
+
+data T = A | B
+-- shadow just A and B
+data T' = A | B'
+putStrLn "Expecting T and T'"
+:show bindings
+:reload
+
+
+data T = A | B
+-- shadow all
+data T = A | B | C
+putStrLn "Expecting only T, no Ghci1.T"
+:show bindings
+:reload
+
+
+-- Now with record selectors
+data T = A {foo :: Bool}
+putStrLn "Expecting T and foo with function type"
+:show bindings
+let foo = True
+putStrLn "Expecting T and foo :: Bool"
+:show bindings
+data T = A
+putStrLn "Expecting foo, T"
+:show bindings
+
+
