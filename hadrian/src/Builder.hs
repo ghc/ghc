@@ -3,7 +3,7 @@ module Builder (
     -- * Data types
     ArMode (..), CcMode (..), ConfigurationInfo (..), DependencyType (..),
     GhcMode (..), GhcPkgMode (..), HaddockMode (..), TestMode(..), SphinxMode (..),
-    TarMode (..), Builder (..),
+    TarMode (..), GitMode (..), Builder (..), Win32TarballsMode(..),
 
     -- * Builder properties
     builderProvenance, systemBuilderPath, builderPath, isSpecified, needBuilder,
@@ -37,6 +37,10 @@ import Context
 import Oracles.Flag
 import Oracles.Setting (setting, Setting(..))
 import Packages
+
+import GHC.IO.Encoding (getFileSystemEncoding)
+import qualified Data.ByteString as BS
+import qualified GHC.Foreign as GHC
 
 -- | C compiler can be used in two different modes:
 -- * Compile or preprocess a source file.
@@ -123,6 +127,21 @@ instance Binary   TestMode
 instance Hashable TestMode
 instance NFData   TestMode
 
+-- | Git is used to create source distributions
+data GitMode = ListFiles deriving (Eq, Generic, Show)
+
+instance Binary   GitMode
+instance Hashable GitMode
+instance NFData   GitMode
+
+data Win32TarballsMode = ListTarballs | VerifyTarballs | DownloadTarballs deriving (Eq, Generic, Show)
+
+instance Binary   Win32TarballsMode
+instance Hashable Win32TarballsMode
+instance NFData   Win32TarballsMode
+
+
+
 -- | A 'Builder' is a (usually external) command invoked in a separate process
 -- via 'cmd'. Here are some examples:
 -- * 'Alex' is a lexical analyser generator that builds @Lexer.hs@ from @Lexer.x@.
@@ -163,6 +182,8 @@ data Builder = Alex
              | Unlit
              | Xelatex
              | Makeindex  -- ^ from xelatex
+             | Git GitMode
+             | Win32Tarballs Win32TarballsMode
              deriving (Eq, Generic, Show)
 
 instance Binary   Builder
@@ -255,6 +276,19 @@ instance H.Builder Builder where
               withTempFile $ \temp -> do
                 () <- cmd' [path] (buildArgs ++ ["--only-report-hadrian-deps", temp])
                 readFile' temp
+        Git ListFiles -> do
+          path <- builderPath builder
+          withResources buildResources $ do
+              -- NUL separated list of files
+              -- We need to read this in the filesystem encoding
+              enc <- liftIO getFileSystemEncoding
+              Stdout stdout <- cmd' BinaryPipes [path] buildArgs
+              liftIO $ BS.useAsCStringLen stdout $ \fp -> GHC.peekCStringLen enc fp
+        Win32Tarballs ListTarballs -> do
+          path <- builderPath builder
+          withResources buildResources $ do
+              Stdout stdout <- cmd' [path] buildArgs
+              pure stdout
         _ -> error $ "Builder " ++ show builder ++ " can not be asked!"
 
     runBuilderWith :: Builder -> BuildInfo -> Action ()
@@ -388,8 +422,10 @@ systemBuilderPath builder = case builder of
     Testsuite _     -> fromKey "python"
     Sphinx _        -> fromKey "sphinx-build"
     Tar _           -> fromKey "tar"
+    Git _           -> fromKey "git"
     Xelatex         -> fromKey "xelatex"
     Makeindex       -> fromKey "makeindex"
+    Win32Tarballs _ -> fromKey "python"
     _               -> error $ "No entry for " ++ show builder ++ inCfg
   where
     inCfg = " in " ++ quote configFile ++ " file."

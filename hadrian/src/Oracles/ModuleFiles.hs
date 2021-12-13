@@ -1,6 +1,7 @@
 {-# LANGUAGE TypeFamilies #-}
 module Oracles.ModuleFiles (
     decodeModule, encodeModule, findGenerator, hsSources, hsObjects,
+    determineBuilder,
     moduleFilesOracle
     ) where
 

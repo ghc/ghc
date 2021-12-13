@@ -43,6 +43,8 @@ import Settings.Builders.RunTest
 import Settings.Builders.Xelatex
 import Settings.Packages
 import Settings.Warnings
+import qualified Hadrian.Builder.Git
+import Settings.Builders.Win32Tarballs
 
 -- | Packages that are built by default. You can change this in "UserSettings".
 defaultPackages :: Stage -> Action [Package]
@@ -261,6 +263,7 @@ defaultBuilderArgs = mconcat
     , runTestBuilderArgs
     , validateBuilderArgs
     , xelatexBuilderArgs
+    , win32TarballsArgs
     -- Generic builders from the Hadrian library:
     , builder (Ar Pack         ) ? Hadrian.Builder.Ar.args Pack
     , builder (Ar Unpack       ) ? Hadrian.Builder.Ar.args Unpack
@@ -269,7 +272,9 @@ defaultBuilderArgs = mconcat
     , builder (Sphinx ManMode  ) ? Hadrian.Builder.Sphinx.args ManMode
     , builder (Sphinx InfoMode ) ? Hadrian.Builder.Sphinx.args InfoMode
     , builder (Tar Create      ) ? Hadrian.Builder.Tar.args Create
-    , builder (Tar Extract     ) ? Hadrian.Builder.Tar.args Extract ]
+    , builder (Tar Extract     ) ? Hadrian.Builder.Tar.args Extract
+    , Hadrian.Builder.Git.gitArgs
+    ]
 
 -- | All 'Package'-dependent command line arguments.
 defaultPackageArgs :: Args

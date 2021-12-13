@@ -18,7 +18,7 @@ module Hadrian.Utilities (
     -- * File system operations
     copyFile, copyFileUntracked, createFileLink, fixFile,
     makeExecutable, moveFile, removeFile, createDirectory, copyDirectory,
-    moveDirectory, removeDirectory,
+    moveDirectory, removeDirectory, removeFile_,
 
     -- * Diagnostic info
     Colour (..), ANSIColour (..), putColoured, shouldUseColor,
@@ -54,6 +54,7 @@ import qualified Data.HashMap.Strict    as Map
 import qualified System.Directory.Extra as IO
 import qualified System.Info.Extra      as IO
 import qualified System.IO              as IO
+import System.IO.Error (isPermissionError)
 
 -- | Extract a value from a singleton list, or terminate with an error message
 -- if the list does not contain exactly one value.
@@ -322,6 +323,15 @@ copyFile source target = do
     putProgressInfo =<< renderAction "Copy file" source target
     quietly $ copyFileChanged source target
 
+-- | Remove a file or a link, but don't worry if it fails
+removeFile_ :: FilePath -> IO ()
+removeFile_ x =
+    (IO.removeFile x >> IO.removeDirectoryLink x) `IO.catch` \e ->
+        when (isPermissionError e) $ IO.handle (\(_ :: IO.IOException) -> pure ()) $ do
+            perms <- IO.getPermissions x
+            IO.setPermissions x perms{IO.readable = True, IO.searchable = True, IO.writable = True}
+            IO.removeFile x
+
 -- | Copy a file without tracking the source. Create the target directory if missing.
 copyFileUntracked :: FilePath -> FilePath -> Action ()
 copyFileUntracked source target = do
@@ -346,6 +356,7 @@ makeExecutable :: FilePath -> Action ()
 makeExecutable file = do
     putProgressInfo $ "| Make " ++ quote file ++ " executable."
     quietly $ cmd "chmod +x " [file]
+
 
 -- | Move a file. Note that we cannot track the source, because it is moved.
 moveFile :: FilePath -> FilePath -> Action ()
