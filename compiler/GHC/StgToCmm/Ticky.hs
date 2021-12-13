@@ -152,9 +152,6 @@ import GHC.Utils.Json
 --
 -----------------------------------------------------------------------------
 
--- | Ticky "arg" info. Describes args for functions and fvs for thunks.
-data TickyEntryDesc = DescFunThunk [NonVoid Id] [NonVoid Id] | DescFunArgs [NonVoid Id] | DescThunkFvs [StgArg] | DescTickyCon
-
 -- | "Arguments" for a ticky counter. FVs for thunks, actual arguments for functions.
 tickyArgArity :: TickyClosureType -> Int
 tickyArgArity (TickyFun _ _fvs args) = length args
@@ -180,15 +177,16 @@ tickyFvDesc arg_info =
 
 instance ToJson TickyClosureType where
     json info = case info of
-      (TickyFun {})   -> mkInfo (tickyFvDesc info) (tickyArgDesc info)
-      (TickyLNE {})   -> mkInfo []                 (tickyArgDesc info)
-      (TickyThunk {}) -> mkInfo (tickyFvDesc info) []
-      (TickyCon{})    -> mkInfo []                 []
+      (TickyFun {})   -> mkInfo (tickyFvDesc info) (tickyArgDesc info) "fun"
+      (TickyLNE {})   -> mkInfo []                 (tickyArgDesc info) "lne"
+      (TickyThunk uf _ _) -> mkInfo (tickyFvDesc info) []              ("thk" ++ if uf then "_u" else "")
+      (TickyCon{})    -> mkInfo []                 []                  "con"
       where
-        mkInfo :: String -> String -> JsonDoc
-        mkInfo fvs args =
+        mkInfo :: String -> String -> String -> JsonDoc
+        mkInfo fvs args ty =
           JSObject
               [("type", json "entCntr")
+              ,("subTy", json ty)
               ,("fvs_c", json (length fvs))
               ,("fvs" , json fvs)
               ,("args", json args)
