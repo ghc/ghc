@@ -1274,12 +1274,15 @@ in this (which it previously was):
 
 --------------------
 exprIsWorkFree :: CoreExpr -> Bool   -- See Note [exprIsWorkFree]
-exprIsWorkFree = exprIsCheapX isWorkFreeApp
+exprIsWorkFree e = exprIsCheapX isWorkFreeApp e
 
 exprIsCheap :: CoreExpr -> Bool
-exprIsCheap = exprIsCheapX isCheapApp
+exprIsCheap e = exprIsCheapX isCheapApp e
 
 exprIsCheapX :: CheapAppFun -> CoreExpr -> Bool
+{-# INLINE exprIsCheapX #-}
+-- allow specialization of exprIsCheap and exprIsWorkFree
+-- instead of having an unknown call to ok_app
 exprIsCheapX ok_app e
   = ok e
   where
