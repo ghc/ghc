@@ -38,6 +38,15 @@ def fetch_arch(arch: str):
 
     verify(arch)
 
+def list_arch(arch: str):
+    d = DEST / arch
+    manifest_url = file_url(arch, 'MANIFEST')
+    req = urllib.request.urlopen(manifest_url)
+    files = req.read().decode('UTF-8').split('\n')
+    print(d / 'SHA256SUMS')
+    for fname in files:
+      print(d / fname)
+
 def verify(arch: str):
     if not Path(DEST / arch / "SHA256SUMS").is_file():
         print("SHA256SUMS doesn't exist; have you fetched?", file=stderr)
@@ -48,14 +57,14 @@ def verify(arch: str):
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument('mode', choices=['verify', 'download'])
+    parser.add_argument('mode', choices=['verify', 'download', 'list'])
     parser.add_argument(
         'arch',
         choices=ARCHS + ['all'],
         help="Architecture to fetch (either i686, x86_64, sources, or all)")
     args = parser.parse_args()
 
-    action = fetch_arch if args.mode == 'download' else verify
+    action = { 'download' : fetch_arch, 'verify' : verify, 'list' : list_arch }[args.mode]
     if args.arch == 'all':
         for arch in ARCHS:
             action(arch)

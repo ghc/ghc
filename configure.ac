@@ -923,6 +923,7 @@ fi
 dnl ** check for xelatex
 AC_PATH_PROG(XELATEX,xelatex)
 AC_PATH_PROG(MAKEINDEX,makeindex)
+AC_PATH_PROG(GIT,git)
 
 dnl ** check for makeinfo
 AC_PATH_PROG(MAKEINFO,makeinfo)
@@ -1395,6 +1396,7 @@ echo "\
    sphinx-build : $SPHINXBUILD
    xelatex      : $XELATEX
    makeinfo     : $MAKEINFO
+   git          : $GIT
 
    Using LLVM tools
       clang : $ClangCmd

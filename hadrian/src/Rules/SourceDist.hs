@@ -1,141 +1,151 @@
 module Rules.SourceDist (sourceDistRules) where
 
-import Hadrian.Oracles.DirectoryContents
-
 import Base
 import Builder
 import Context
 import Oracles.Setting
 import Packages
-import Rules.Clean
+import Utilities (askWithResources, build)
+import Hadrian.Target (target)
+import qualified System.Directory.Extra as IO
+import qualified Control.Exception.Base as IO
+import Oracles.ModuleFiles (determineBuilder)
 
 sourceDistRules :: Rules ()
-sourceDistRules = do
+sourceDistRules = alternatives $ do
     root <- buildRootRules
     "source-dist" ~> do
-        -- We clean the source tree first.
-        -- See https://github.com/snowleopard/hadrian/issues/384.
-        -- TODO: Do we still need to clean the tree?
-        cleanSourceTree
         version <- setting ProjectVersion
         need [root -/- "source-dist" -/- ("ghc-" ++ version ++ "-src.tar.xz")]
+        need [root -/- "source-dist" -/- ("ghc-" ++ version ++ "-testsuite.tar.xz")]
+        need [root -/- "source-dist" -/- ("ghc-" ++ version ++ "-windows-extra-src.tar.xz")]
         putSuccess "| Done"
-    root -/- "source-dist" -/- "ghc-*-src.tar.xz" %> \fname -> do
-        let tarName   = takeFileName fname
-            dropTarXz = dropExtension . dropExtension
-            treeDir   = dropTarXz tarName
-            treePath  = root -/- "source-dist" -/- treeDir
-        prepareTree treePath
-        runBuilderWithCmdOptions
-            [Cwd $ root -/- "source-dist"]
-            (Tar Create)
-            ["cJf", tarName,  treeDir]
-            ["cJf", tarName] [treeDir]
+
+    -- Ordering of rules is important so that windows-extra-src matches before src
+    root -/- "source-dist" -/- "ghc-*-windows-extra-src.tar.xz" %>
+      archiveSourceTree prepareWindowsExtraTree
+    root -/- "source-dist" -/- "ghc-*-testsuite.tar.xz" %>
+      archiveSourceTree prepareTestsuiteTree
+    root -/- "source-dist" -/- "ghc-*-src.tar.xz" %>
+      archiveSourceTree prepareTree
     "GIT_COMMIT_ID" %> \fname ->
         writeFileChanged fname =<< setting ProjectGitCommitId
     "VERSION" %> \fname ->
         writeFileChanged fname =<< setting ProjectVersion
 
+    -- Rules to download mingw tarballs
+    let mingw_tarballs_stamp = "ghc-tarballs/mingw-w64/.mingw-w64.download.stamp"
+    ["ghc-tarballs/mingw-w64/*/*.tar.*","ghc-tarballs/mingw-w64/*/SHA256SUMS"]  |%> \_ ->
+      need [mingw_tarballs_stamp]
+    mingw_tarballs_stamp %> \stamp -> do
+      build (target (vanillaContext Stage1 compiler) (Win32Tarballs DownloadTarballs) [] [])
+      writeFile' stamp "OK"
+
+
+archiveSourceTree :: (FilePath -> Action ()) -> FilePath -> Action ()
+archiveSourceTree prepare fname = do
+  root <- buildRoot
+  version <- setting ProjectVersion
+  let dropTarXz = dropExtension . dropExtension
+      tarName   = takeFileName fname
+      dirName   = dropTarXz tarName
+      baseName  = "ghc-" ++ version
+      treeDir   = dirName -/- baseName
+      treePath  = sourceDistRoot -/- treeDir
+      sourceDistRoot = root -/- "source-dist"
+  removeDirectory treePath
+  prepare treePath
+  runBuilderWithCmdOptions
+      [Cwd $ sourceDistRoot -/- dirName]
+      (Tar Create)
+      ["chJf", ".." -/- tarName,  baseName]
+      ["chJf", ".." -/- tarName] [baseName]
+
+
+-- | This creates a symlink to the 'source' at 'target'
+-- $tar -h$ will eventually copy the source into the tarball
+-- This is also how `make sdist` works.
+-- 1. It preserves relative symlinks
+-- 2. It copies non-empty directories also. This is because git includes
+--    directories in its output if they are non empty.
+copyFileSourceDist :: FilePath -> FilePath -> Action ()
+copyFileSourceDist source target = do
+  isSymlink <- liftIO $ IO.pathIsSymbolicLink source
+  if isSymlink then do
+    link_target <- liftIO $ IO.getSymbolicLinkTarget source
+    when (not $ isRelative link_target) $
+      error ("source-dist: tried to create non-relative symlink in source dist: " ++ show link_target)
+    putProgressInfo =<< renderAction ("Create symlink (" ++ link_target ++ ")") source target
+    isDirectory <- liftIO $ IO.doesDirectoryExist source
+    when (not isDirectory) $
+      need [source]
+    let createLink src tgt
+          | isDirectory = liftIO $ IO.createDirectoryLink src tgt
+          | otherwise = liftIO $ IO.createFileLink src tgt
+    let dir = takeDirectory target
+    liftIO $ IO.createDirectoryIfMissing True dir
+    liftIO $ removeFile_ target
+    createLink link_target target
+  else do
+    isDirectory <- liftIO $ IO.doesDirectoryExist source
+    if isDirectory then do
+      contents <- liftIO $ IO.listDirectory source
+      when (not $ null contents) $ -- Git only includes directories in the output if they are empty
+        error ("source-dist: non-empty dir" ++ show source)
+      createDirectory target
+    else createFileLink source target
+
+prepareTestsuiteTree :: FilePath -> Action ()
+prepareTestsuiteTree dest = do
+  top <- topDirectory
+  let testsuiteFiles = filter testFilter . split (=='\NUL')
+      testFilter file = not (null file) && ("testsuite//" ?== file)
+  files <- testsuiteFiles <$> askWithResources [] (target (vanillaContext Stage1 compiler) (Git ListFiles) [] [])
+  forM_ files $ \source -> do
+    let target = dest -/- source
+    copyFileSourceDist (top -/- source) target
+
+prepareWindowsExtraTree :: FilePath -> Action ()
+prepareWindowsExtraTree dest = do
+  top <- topDirectory
+
+  files <- lines <$> askWithResources [] (target (vanillaContext Stage1 compiler) (Win32Tarballs ListTarballs) [] [])
+  need files
+  build (target (vanillaContext Stage1 compiler) (Win32Tarballs VerifyTarballs) [] [])
+
+  createDirectory dest
+  liftIO $ IO.createFileLink (top -/- "ghc-tarballs") (dest -/- "ghc-tarballs")
+
 prepareTree :: FilePath -> Action ()
 prepareTree dest = do
-    root <- buildRoot
-    mapM_ cpDir  srcDirs
-    mapM_ cpFile srcFiles
-    copyAlexHappyFiles root
+    out <- askWithResources [] (target (vanillaContext Stage1 compiler) (Git ListFiles) [] [])
+    top <- topDirectory
+    let files = ["GIT_COMMIT_ID", "VERSION"] ++ getFiles out
+    need ["GIT_COMMIT_ID", "VERSION"]
+    forM_ files $ \source -> do
+      let target = dest -/- source
+      copyFileSourceDist (top -/- source) target
+    copyAlexHappyFiles
   where
 
-    copyAlexHappyFiles root =
+    getFiles = filter treeFilter . split (=='\NUL')
+    treeFilter file = not (null file) && not ("testsuite//" ?== file)
+
+    copyAlexHappyFiles =
       forM_ alexHappyFiles $ \(stg, pkg, inp, out) -> do
-        let dir = root -/- buildDir (Context stg pkg vanilla)
+        let ctx = Context stg pkg vanilla
             srcInputFile = dest -/- pkgPath pkg -/- inp
+            generatedFile = dest -/- pkgPath pkg -/- out
+            Just builder = determineBuilder stg inp
+
         -- We first make sure that the generated file is... generated.
-        need [ dir -/- out ]
-        -- We then copy the generated file in the source dist, right
-        -- next to the input file.
-        copyFile (dir -/- out)
-                 (dest -/- pkgPath pkg -/- out)
+        build $ target ctx builder [srcInputFile] [generatedFile]
+
         -- We finally add a ".source" suffix to the input file to
         -- prevent it from being used when building GHC, since the
         -- generated file being there already should prevent
         -- the need for the original input.
         moveFile srcInputFile (srcInputFile <.> "source")
-
-    cpFile a = copyFile a (dest -/- a)
-    cpDir  a = copyDirectoryContents (Not excluded) a (dest -/- a)
-    excluded = Or
-        [ Test "**/.*"
-        , Test "**/#*"
-        , Test "**/*-SAVE"
-        , Test "**/*.orig"
-        , Test "**/*.rej"
-        , Test "**/*~"
-        , Test "**/autom4te*"
-        , Test "**/dist"
-        , Test "**/dist-install"
-        , Test "**/log"
-        , Test "**/stage0"
-        , Test "**/stage1"
-        , Test "**/stage2"
-        , Test "**/stage3"
-        , Test "hadrian/.cabal-sandbox"
-        , Test "hadrian/.stack-work"
-        , Test "hadrian/UserSettings.hs"
-        , Test "hadrian/cabal.sandbox.config"
-        , Test "hadrian/cfg/system.config"
-        , Test "hadrian/bin"
-        , Test "hadrian/dist"
-        , Test "hadrian/dist-newstyle"
-        , Test "libraries/**/*.buildinfo"
-        , Test "libraries/**/GNUmakefile"
-        , Test "libraries/**/config.log"
-        , Test "libraries/**/config.status"
-        , Test "libraries/**/ghc.mk"
-        , Test "libraries/**/include/Hs*Config.h"
-        , Test "libraries/dph"
-        , Test "libraries/primitive"
-        , Test "libraries/random"
-        , Test "libraries/vector"
-        , Test "rts/rts.cabal"
-        , Test "mk/build.mk" ]
-    srcDirs =
-        [ "bindisttest"
-        , "compiler"
-        , "distrib"
-        , "docs"
-        , "docs"
-        , "driver"
-        , "ghc"
-        , "hadrian"
-        , "includes"
-        , "libffi"
-        , "libffi-tarballs"
-        , "libraries"
-        , "mk"
-        , "rts"
-        , "rules"
-        , "utils"
-        , "m4" ]
-    srcFiles =
-        [ "GIT_COMMIT_ID"
-        , "HACKING.md"
-        , "INSTALL.md"
-        , "LICENSE"
-        , "MAKEHELP.md"
-        , "Makefile"
-        , "README.md"
-        , "VERSION"
-        , "aclocal.m4"
-        , "boot"
-        , "config.guess"
-        , "config.sub"
-        , "configure"
-        , "configure.ac"
-        , "ghc.mk"
-        , "install-sh"
-        , "packages"
-        , "llvm-targets"
-        , "llvm-passes"
-        ]
 
     -- (stage, package, input file, output file)
     alexHappyFiles =
