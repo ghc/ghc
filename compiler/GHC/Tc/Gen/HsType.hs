@@ -386,7 +386,9 @@ kcClassSigType :: [LocatedN Name] -> LHsSigType GhcRn -> TcM ()
 kcClassSigType names
     sig_ty@(L _ (HsSig { sig_bndrs = hs_outer_bndrs, sig_body = hs_ty }))
   = addSigCtxt (funsSigCtxt names) sig_ty $
-    do { _ <- bindOuterSigTKBndrs_Tv (SigTypeSkol (funsSigCtxt names)) hs_outer_bndrs    $
+    --MP: I suspect this is wrong, like the other kind checking cases.
+    do { skol_info <- mkSkolemInfo ((SigTypeSkol (funsSigCtxt names)))
+       ; _ <- bindOuterSigTKBndrs_Tv skol_info hs_outer_bndrs    $
               tcLHsType hs_ty liftedTypeKind
        ; return () }
 
@@ -394,7 +396,8 @@ tcClassSigType :: [LocatedN Name] -> LHsSigType GhcRn -> TcM Type
 -- Does not do validity checking
 tcClassSigType names sig_ty
   = addSigCtxt sig_ctxt sig_ty $
-    do { (implic, ty) <- tc_lhs_sig_type skol_info sig_ty (TheKind liftedTypeKind)
+    do { skol_info <- mkSkolemInfo skol_info_anon
+       ; (implic, ty) <- tc_lhs_sig_type skol_info sig_ty (TheKind liftedTypeKind)
        ; emitImplication implic
        ; return ty }
        -- Do not zonk-to-Type, nor perform a validity check
@@ -415,7 +418,7 @@ tcClassSigType names sig_ty
        -- painfully delicate.
   where
     sig_ctxt = funsSigCtxt names
-    skol_info = SigTypeSkol sig_ctxt
+    skol_info_anon = SigTypeSkol sig_ctxt
 
 tcHsSigType :: UserTypeCtxt -> LHsSigType GhcRn -> TcM Type
 -- Does validity checking
@@ -423,7 +426,7 @@ tcHsSigType :: UserTypeCtxt -> LHsSigType GhcRn -> TcM Type
 tcHsSigType ctxt sig_ty
   = addSigCtxt ctxt sig_ty $
     do { traceTc "tcHsSigType {" (ppr sig_ty)
-
+       ; skol_info <- mkSkolemInfo skol_info
           -- Generalise here: see Note [Kind generalisation]
        ; (implic, ty) <- tc_lhs_sig_type skol_info sig_ty  (expectedKindInCtxt ctxt)
 
@@ -592,6 +595,7 @@ tc_top_lhs_type tyki ctxt (L loc sig_ty@(HsSig { sig_bndrs = hs_outer_bndrs
                                                , sig_body = body }))
   = setSrcSpanA loc $
     do { traceTc "tc_top_lhs_type {" (ppr sig_ty)
+       ; skol_info <- mkSkolemInfo skol_info_anon
        ; (tclvl, wanted, (outer_bndrs, ty))
               <- pushLevelAndSolveEqualitiesX "tc_top_lhs_type"    $
                  tcOuterTKBndrs skol_info hs_outer_bndrs $
@@ -609,7 +613,7 @@ tc_top_lhs_type tyki ctxt (L loc sig_ty@(HsSig { sig_bndrs = hs_outer_bndrs
        ; traceTc "tc_top_lhs_type }" (vcat [ppr sig_ty, ppr final_ty])
        ; return final_ty }
   where
-    skol_info = SigTypeSkol ctxt
+    skol_info_anon = SigTypeSkol ctxt
 
 -----------------
 tcHsDeriv :: LHsSigType GhcRn -> TcM ([TyVar], Class, [Type], [Kind])
@@ -2377,7 +2381,8 @@ kcCheckDeclHeader_cusk name flav
   -- CUSK case
   -- See note [Required, Specified, and Inferred for types] in GHC.Tc.TyCl
   = addTyConFlavCtxt name flav $
-    do {  (tclvl, wanted, (scoped_kvs, (tc_tvs, res_kind)))
+    do { skol_info <- mkSkolemInfo skol_info_anon
+       ; (tclvl, wanted, (scoped_kvs, (tc_tvs, res_kind)))
            <- pushLevelAndSolveEqualitiesX "kcCheckDeclHeader_cusk" $
               bindImplicitTKBndrs_Q_Skol skol_info kv_ns                      $
               bindExplicitTKBndrs_Q_Skol skol_info ctxt_kind hs_tvs           $
@@ -2442,7 +2447,7 @@ kcCheckDeclHeader_cusk name flav
 
        ; return tycon }
   where
-    skol_info = TyConSkol callStack flav name
+    skol_info_anon = TyConSkol callStack flav name
     ctxt_kind | tcFlavourIsOpen flav = TheKind liftedTypeKind
               | otherwise            = AnyKind
 
@@ -2462,7 +2467,7 @@ kcInferDeclHeader name flav
   -- No standalane kind signature and no CUSK.
   -- See note [Required, Specified, and Inferred for types] in GHC.Tc.TyCl
   = addTyConFlavCtxt name flav $
-    do { let skol_info = TyConSkol callStack flav name
+    do { skol_info <- mkSkolemInfo (TyConSkol callStack flav name)
        ; (scoped_kvs, (tc_tvs, res_kind))
            -- Why bindImplicitTKBndrs_Q_Tv which uses newTyVarTyVar?
            -- See Note [Inferring kinds for type declarations] in GHC.Tc.TyCl
@@ -2545,7 +2550,7 @@ kcCheckDeclHeader_sig kisig name flav
           -- Convert each ZippedBinder to TyConBinder        for  tyConBinders
           --                       and to [(Name, TcTyVar)]  for  tcTyConScopedTyVars
         ; (vis_tcbs, concat -> explicit_tv_prs) <- mapAndUnzipM zipped_to_tcb zipped_binders
-        ; let skol_info       = TyConSkol callStack flav name
+        ; skol_info  <- mkSkolemInfo (TyConSkol callStack flav name)
 
         ; (tclvl, wanted, (implicit_tvs, (invis_binders, r_ki)))
              <- pushLevelAndSolveEqualitiesX "kcCheckDeclHeader_sig" $  -- #16687
@@ -3177,7 +3182,7 @@ tcExplicitTKBndrsX :: OutputableBndrFlag flag 'Renamed
 -- and emit an implication constraint with a ForAllSkol ic_info,
 -- so that it is subject to a telescope test.
 tcExplicitTKBndrsX skol_mode bndrs thing_inside
-  = do { ; let skol_info = ForAllSkol (fsep (map ppr bndrs))
+  = do { skol_info <- mkSkolemInfo (ForAllSkol (fsep (map ppr bndrs)))
        ; (tclvl, wanted, (skol_tvs, res))
              <- pushLevelAndCaptureConstraints $
                 bindExplicitTKBndrsX skol_info skol_mode bndrs $
@@ -3469,6 +3474,7 @@ bindTyClTyVars skol_info tycon_name thing_inside
              binders    = tyConBinders tycon
        ; traceTc "bindTyClTyVars" (ppr tycon_name <+> ppr binders $$ ppr scoped_prs)
        ; let scoped_prs' = map skolemise_pair scoped_prs
+       ; traceTc "bindTyClTyVars" (ppr tycon_name <+> ppr binders $$ ppr scoped_prs')
        ; tcExtendNameTyVarEnv scoped_prs' $
          thing_inside tycon binders res_kind }
   where
@@ -3934,11 +3940,12 @@ tcHsPartialSigType ctxt sig_ty
   , (hs_ctxt, hs_tau) <- splitLHsQualTy body_ty
   = addSigCtxt ctxt sig_ty $
     do { mode <- mkHoleMode TypeLevel HM_Sig
+       ; skol_info <- mkSkolemInfo (SigTypeSkol ctxt)
        ; (outer_bndrs, (wcs, wcx, theta, tau))
             <- solveEqualities "tcHsPartialSigType" $
                -- See Note [Failure in local type signatures]
                bindNamedWildCardBinders sig_wcs             $ \ wcs ->
-               bindOuterSigTKBndrs_Tv_M (SigTypeSkol ctxt) mode hs_outer_bndrs $
+               bindOuterSigTKBndrs_Tv_M skol_info mode hs_outer_bndrs $
                do {   -- Instantiate the type-class context; but if there
                       -- is an extra-constraints wildcard, just discard it here
                     (theta, wcx) <- tcPartialContext mode hs_ctxt
@@ -4181,7 +4188,9 @@ tcHsPatSigType ctxt hole_mode
     new_implicit_tv name
       = do { kind <- newMetaKindVar
            ; tv   <- case ctxt of
-                       RuleSigCtxt rname _  -> newSkolemTyVar (RuleSkol rname) name kind
+                       RuleSigCtxt rname _  -> do
+                        skol_info <- mkSkolemInfo (RuleSkol rname)
+                        newSkolemTyVar skol_info name kind
                        _              -> newPatSigTyVar name kind
                        -- See Note [Typechecking pattern signature binders]
              -- NB: tv's Name may be fresh (in the case of newPatSigTyVar)

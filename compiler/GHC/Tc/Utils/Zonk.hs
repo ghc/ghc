@@ -1799,9 +1799,7 @@ zonkTyVarOcc env@(ZonkEnv { ze_flexi = flexi
 
     lookup_in_tv_env    -- Look up in the env just as we do for Ids
       = case lookupVarEnv tv_env tv of
-          Nothing  -> do
-              tv' <- updateTyVarKindM (zonkTcTypeToTypeX env) tv
-              return $ mkTyVarTy tv'
+          Nothing  -> mkTyVarTy <$> updateTyVarKindM (zonkTcTypeToTypeX env) tv
           Just tv' -> return (mkTyVarTy tv')
 
     zonk_meta ref Flexi

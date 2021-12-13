@@ -1306,7 +1306,7 @@ data Implication
                                  -- allocated /inside/ this implication
 
       ic_skols :: [TcTyVar],     -- Introduced skolems
-      ic_info  :: SkolemInfo,    -- See Note [Skolems in an implication]
+      ic_info  :: SkolemInfoAnon,    -- See Note [Skolems in an implication]
                                  -- See Note [Shadowing in a constraint]
 
       ic_given  :: [EvVar],      -- Given evidence variables
@@ -1454,7 +1454,7 @@ instance Outputable ImplicStatus where
   ppr (IC_Solved { ics_dead = dead })
     = text "Solved" <+> (braces (text "Dead givens =" <+> ppr dead))
 
-checkTelescopeSkol :: SkolemInfo -> Bool
+checkTelescopeSkol :: SkolemInfoAnon -> Bool
 -- See Note [Checking telescopes]
 checkTelescopeSkol (ForAllSkol {}) = True
 checkTelescopeSkol _               = False
@@ -2179,7 +2179,7 @@ mkKindLoc s1 s2 loc = setCtLocOrigin (toKindLoc loc)
 toKindLoc :: CtLoc -> CtLoc
 toKindLoc loc = loc { ctl_t_or_k = Just KindLevel }
 
-mkGivenLoc :: TcLevel -> SkolemInfo -> TcLclEnv -> CtLoc
+mkGivenLoc :: TcLevel -> SkolemInfoAnon -> TcLclEnv -> CtLoc
 mkGivenLoc tclvl skol_info env
   = CtLoc { ctl_origin = GivenOrigin skol_info
           , ctl_env    = setLclEnvTcLevel env tclvl

@@ -718,14 +718,14 @@ simplifyDeriv :: PredType -- ^ @C inst_ty@, head of the instance we are
               -> TcM ThetaType -- ^ Needed constraints (after simplification),
                                -- i.e. @['PredType']@.
 simplifyDeriv pred tvs thetas
-  = do { (skol_subst, tvs_skols) <- tcInstSkolTyVars (DerivSkol pred) tvs -- Skolemize
+  = do { skol_info <- mkSkolemInfo (DerivSkol pred)
+       ; (skol_subst, tvs_skols) <- tcInstSkolTyVars skol_info tvs -- Skolemize
                 -- The constraint solving machinery
                 -- expects *TcTyVars* not TyVars.
                 -- We use *non-overlappable* (vanilla) skolems
                 -- See Note [Overlap and deriving]
 
        ; let skol_set  = mkVarSet tvs_skols
-             skol_info = DerivSkol pred
              doc = text "deriving" <+> parens (ppr pred)
 
              mk_given_ev :: PredType -> TcM EvVar
@@ -766,7 +766,7 @@ simplifyDeriv pred tvs thetas
                = do { ac_given_evs <- mapM mk_given_ev ac_givens
                     ; (_, wanteds)
                         <- captureConstraints $
-                           checkConstraints skol_info ac_skols ac_given_evs $
+                           checkConstraints (getSkolemInfo skol_info) ac_skols ac_given_evs $
                               -- The checkConstraints bumps the TcLevel, and
                               -- wraps the wanted constraints in an implication,
                               -- when (but only when) necessary
@@ -841,7 +841,7 @@ simplifyDeriv pred tvs thetas
        --    forall tvs. min_theta => solved_wanteds
        ; min_theta_vars <- mapM newEvVar min_theta
        ; (leftover_implic, _)
-           <- buildImplicationFor tc_lvl skol_info tvs_skols
+           <- buildImplicationFor tc_lvl (getSkolemInfo skol_info) tvs_skols
                                   min_theta_vars solved_wanteds
        -- This call to simplifyTop is purely for error reporting
        -- See Note [Error reporting for deriving clauses]

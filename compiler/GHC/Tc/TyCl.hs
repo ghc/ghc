@@ -1577,11 +1577,15 @@ kcTyClDecl :: TyClDecl GhcRn -> TcTyCon -> TcM ()
 --    result kind signature have already been dealt with
 --    by inferInitialKind, so we can ignore them here.
 
+-- NB these equations just extend the type environment with carefully constructed
+-- TcTyVars rather than create skolemised variables for the bound variables.
+-- - inferInitialKinds makes the TcTyCon where the  tyvars are TcTyVars
+-- - In this function, those TcTyVars are unified with other kind variables during
+-- - kind inference (see [How TcTyCons work])
+
 kcTyClDecl (DataDecl { tcdLName    = (L _ _name), tcdDataDefn = defn }) tycon
   | HsDataDefn { dd_ctxt = ctxt, dd_cons = cons, dd_ND = new_or_data } <- defn
-  = --bindTyClTyVars (TyConSkol callStack DataTypeFlavour name) name $ \ _ binders _ ->
-
-    tcExtendNameTyVarEnv (tcTyConScopedTyVars tycon) $
+  = tcExtendNameTyVarEnv (tcTyConScopedTyVars tycon) $
        -- NB: binding these tyvars isn't necessary for GADTs, but it does no
        -- harm.  For GADTs, each data con brings its own tyvars into scope,
        -- and the ones from this bindTyClTyVars are either not mentioned or
@@ -1684,7 +1688,9 @@ kcConDecl new_or_data
   = -- See Note [kcConDecls: kind-checking data type decls]
     addErrCtxt (dataConCtxt names) $
     discardResult                      $
-    bindOuterSigTKBndrs_Tv (DataConSkol (unLoc (head names))) outer_bndrs $
+    mkSkolemInfo (DataConSkol (unLoc (head names))) >>= \skol_info ->
+    -- Not sure this is right, should just extend rather than skolemise but no test
+    bindOuterSigTKBndrs_Tv skol_info outer_bndrs $
         -- Why "_Tv"?  See Note [Using TyVarTvs for kind-checking GADTs]
     do { _ <- tcHsContext cxt
        ; traceTc "kcConDecl:GADT {" (ppr names $$ ppr res_ty)
@@ -2426,6 +2432,7 @@ tcClassDecl1 :: HasCallStack => RolesInfo -> Name -> Maybe (LHsContext GhcRn)
 tcClassDecl1 roles_info class_name hs_ctxt meths fundeps sigs ats at_defs
   = fixM $ \ clas ->
     -- We need the knot because 'clas' is passed into tcClassATs
+    mkSkolemInfo skol_info_anon >>= \skol_info ->
     bindTyClTyVars skol_info class_name $ \ _ binders res_kind ->
     do { checkClassKindSig res_kind
        ; traceTc "tcClassDecl 1" (ppr class_name $$ ppr binders)
@@ -2488,7 +2495,7 @@ tcClassDecl1 roles_info class_name hs_ctxt meths fundeps sigs ats at_defs
                                 ppr fds)
        ; return clas }
   where
-    skol_info = TyConSkol callStack ClassFlavour class_name
+    skol_info_anon = TyConSkol callStack ClassFlavour class_name
     tc_fundep :: GHC.Hs.FunDep GhcRn -> TcM ([Var],[Var])
     tc_fundep (FunDep _ tvs1 tvs2)
                            = do { tvs1' <- mapM (tcLookupTyVar . unLoc) tvs1 ;
@@ -2712,7 +2719,8 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info
                               , fdResultSig = L _ sig
                               , fdInjectivityAnn = inj })
   | DataFamily <- fam_info
-  = bindTyClTyVars (TyConSkol callStack (DataFamilyFlavour Nothing) tc_name) tc_name $ \ _ binders res_kind -> do
+  = mkSkolemInfo (TyConSkol callStack (DataFamilyFlavour Nothing) tc_name) >>= \skol_info ->
+    bindTyClTyVars skol_info tc_name $ \ _ binders res_kind -> do
   { traceTc "tcFamDecl1 data family:" (ppr tc_name)
   ; checkFamFlag tc_name
 
@@ -2738,7 +2746,9 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info
   ; return tycon }
 
   | OpenTypeFamily <- fam_info
-  = bindTyClTyVars (TyConSkol callStack (OpenTypeFamilyFlavour Nothing) tc_name) tc_name $ \ _ binders res_kind -> do
+  =
+    mkSkolemInfo (TyConSkol callStack (OpenTypeFamilyFlavour Nothing) tc_name) >>= \skol_info ->
+    bindTyClTyVars skol_info tc_name $ \ _ binders res_kind -> do
   { traceTc "tcFamDecl1 open type family:" (ppr tc_name)
   ; checkFamFlag tc_name
   ; inj' <- tcInjectivity binders inj
@@ -2853,7 +2863,7 @@ tcInjectivity tcbs (Just (L loc (InjectivityAnn _ _ lInjNames)))
 tcTySynRhs :: RolesInfo -> Name
            -> LHsType GhcRn -> TcM TyCon
 tcTySynRhs roles_info tc_name hs_ty
-  = bindTyClTyVars skol_info tc_name $ \ _ binders res_kind ->
+  = mkSkolemInfo skol_info_anon >>= \skol_info -> bindTyClTyVars skol_info tc_name $ \ _ binders res_kind ->
     do { env <- getLclEnv
        ; traceTc "tc-syn" (ppr tc_name $$ ppr (tcl_env env))
        ; rhs_ty <- pushLevelAndSolveEqualities skol_info (binderVars binders) $
@@ -2875,7 +2885,7 @@ tcTySynRhs roles_info tc_name hs_ty
        ; let roles = roles_info tc_name
        ; return (buildSynTyCon tc_name binders res_kind roles rhs_ty) }
   where
-    skol_info = TyConSkol callStack TypeSynonymFlavour tc_name
+    skol_info_anon = TyConSkol callStack TypeSynonymFlavour tc_name
 
 tcDataDefn :: SDoc -> RolesInfo -> Name
            -> HsDataDefn GhcRn -> TcM (TyCon, [DerivInfo])
@@ -2887,7 +2897,9 @@ tcDataDefn err_ctxt roles_info tc_name
                                                -- via inferInitialKinds
                        , dd_cons = cons
                        , dd_derivs = derivs })
-  = bindTyClTyVars skol_info tc_name $ \ tctc tycon_binders res_kind ->
+  =
+    mkSkolemInfo skol_info_anon >>= \skol_info ->
+    bindTyClTyVars skol_info tc_name $ \ tctc tycon_binders res_kind ->
        -- 'tctc' is a 'TcTyCon' and has the 'tcTyConScopedTyVars' that we need
        -- unlike the finalized 'tycon' defined above which is an 'AlgTyCon'
        --
@@ -2953,7 +2965,7 @@ tcDataDefn err_ctxt roles_info tc_name
        ; traceTc "tcDataDefn" (ppr tc_name $$ ppr tycon_binders $$ ppr extra_bndrs)
        ; return (tycon, [deriv_info]) }
   where
-    skol_info = TyConSkol callStack flav tc_name
+    skol_info_anon = TyConSkol callStack flav tc_name
     flav = newOrDataToFlavour new_or_data
 
     -- Abstract data types in hsig files can have arbitrary kinds,
@@ -3001,7 +3013,8 @@ kcTyFamInstEqn tc_fam_tc
        ; checkTyFamInstEqn tc_fam_tc eqn_tc_name hs_pats
 
        ; discardResult $
-         bindOuterFamEqnTKBndrs_Q_Tv FamInstSkol outer_bndrs $
+         mkSkolemInfo FamInstSkol >>= \skol_info ->
+         bindOuterFamEqnTKBndrs_Q_Tv skol_info outer_bndrs $
          do { (_fam_app, res_kind) <- tcFamTyPats tc_fam_tc hs_pats
             ; tcCheckLHsType hs_rhs_ty (TheKind res_kind) }
              -- Why "_Tv" here?  Consider (#14066)
@@ -3131,12 +3144,12 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
 
        -- By now, for type families (but not data families) we should
        -- have checked that the number of patterns matches tyConArity
-
+       ; skol_info <- mkSkolemInfo FamInstSkol
        -- This code is closely related to the code
        -- in GHC.Tc.Gen.HsType.kcCheckDeclHeader_cusk
        ; (tclvl, wanted, (outer_tvs, (lhs_ty, rhs_ty)))
                <- pushLevelAndSolveEqualitiesX "tcTyFamInstEqnGuts" $
-                  bindOuterFamEqnTKBndrs FamInstSkol outer_hs_bndrs             $
+                  bindOuterFamEqnTKBndrs skol_info outer_hs_bndrs             $
                   do { (lhs_ty, rhs_kind) <- tcFamTyPats fam_tc hs_pats
                        -- Ensure that the instance is consistent with its
                        -- parent class (#16008)
@@ -3153,8 +3166,8 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
        -- See Note [Generalising in tcTyFamInstEqnGuts]
        ; dvs  <- candidateQTyVarsOfTypes (lhs_ty : mkTyVarTys outer_tvs)
        -- MP: @rae these qtvs end up in a no skolem info message for T14904a
-       ; qtvs <- quantifyTyVars FamInstSkol TryNotToDefaultNonStandardTyVars dvs
-       ; reportUnsolvedEqualities FamInstSkol qtvs tclvl wanted
+       ; qtvs <- quantifyTyVars skol_info TryNotToDefaultNonStandardTyVars dvs
+       ; reportUnsolvedEqualities skol_info qtvs tclvl wanted
        ; checkFamTelescope tclvl outer_hs_bndrs outer_tvs
 
        ; traceTc "tcTyFamInstEqnGuts 2" $
@@ -3194,8 +3207,8 @@ checkFamTelescope tclvl hs_outer_bndrs outer_tvs
   | HsOuterExplicit { hso_bndrs = bndrs } <- hs_outer_bndrs
   , (b_first : _) <- bndrs
   , let b_last    = last bndrs
-        skol_info = ForAllSkol (fsep (map ppr bndrs))
-  = setSrcSpan (combineSrcSpans (getLocA b_first) (getLocA b_last)) $
+  = setSrcSpan (combineSrcSpans (getLocA b_first) (getLocA b_last)) $ do
+    skol_info <- mkSkolemInfo (ForAllSkol (fsep (map ppr bndrs)))
     emitResidualTvConstraint skol_info outer_tvs tclvl emptyWC
   | otherwise
   = return ()
@@ -3400,6 +3413,7 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs res_kind tag_map
          --                        , hsq_explicit = {f,b} }
 
        ; traceTc "tcConDecl 1" (vcat [ ppr name, ppr explicit_tkv_nms ])
+       ; skol_info <- mkSkolemInfo (DataConSkol name)
 
        ; (tclvl, wanted, (exp_tvbndrs, (ctxt, arg_tys, field_lbls, stricts)))
            <- pushLevelAndSolveEqualitiesX "tcConDecl:H98"  $
@@ -3473,8 +3487,6 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs res_kind tag_map
                   --      that way checkValidDataCon can complain if it's wrong.
 
        ; return [dc] }
-  where
-    skol_info = DataConSkol name
 
 tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
   -- NB: don't use res_kind here, as it's ill-scoped. Instead,
@@ -3486,7 +3498,7 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
   = addErrCtxt (dataConCtxt names) $
     do { traceTc "tcConDecl 1 gadt" (ppr names)
        ; let (L _ name : _) = names
-
+       ; skol_info <- mkSkolemInfo skol_info_anon
        ; (tclvl, wanted, (outer_bndrs, (ctxt, arg_tys, res_ty, field_lbls, stricts)))
            <- pushLevelAndSolveEqualitiesX "tcConDecl:GADT" $
               tcOuterTKBndrs skol_info outer_hs_bndrs       $
@@ -3562,7 +3574,7 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
              }
        ; mapM buildOneDataCon names }
   where
-    skol_info = DataConSkol (unLoc (head names))
+    skol_info_anon = DataConSkol (unLoc (head names))
 
 {- Note [GADT return types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~

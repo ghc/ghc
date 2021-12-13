@@ -867,11 +867,11 @@ tcSkolemiseScoped ctxt expected_ty thing_inside
   = do {
        ; rec { (wrap, tv_prs, given, rho_ty) <- topSkolemise skol_info expected_ty
              ; let skol_tvs  = map snd tv_prs
-                   skol_info = SigSkol ctxt expected_ty tv_prs
+             ; skol_info <- mkSkolemInfo (SigSkol ctxt expected_ty tv_prs)
        }
 
        ; (ev_binds, res)
-             <- checkConstraints skol_info skol_tvs given $
+             <- checkConstraints (getSkolemInfo skol_info) skol_tvs given $
                 tcExtendNameTyVarEnv tv_prs               $
                 thing_inside rho_ty
 
@@ -886,11 +886,11 @@ tcSkolemise ctxt expected_ty thing_inside
         ; rec { (wrap, tv_prs, given, rho_ty) <- topSkolemise skol_info expected_ty
 
               ; let skol_tvs  = map snd tv_prs
-                    skol_info = SigSkol ctxt expected_ty tv_prs
+              ; skol_info <- mkSkolemInfo (SigSkol ctxt expected_ty tv_prs)
         }
 
         ; (ev_binds, result)
-              <- checkConstraints skol_info skol_tvs given $
+              <- checkConstraints (getSkolemInfo skol_info) skol_tvs given $
                  thing_inside rho_ty
 
         ; return (wrap <.> mkWpLet ev_binds, result) }
@@ -907,7 +907,7 @@ tcSkolemiseET ctxt (Check ty) thing_inside
   = tcSkolemise ctxt ty $ \rho_ty ->
     thing_inside (mkCheckExpType rho_ty)
 
-checkConstraints :: SkolemInfo
+checkConstraints :: SkolemInfoAnon
                  -> [TcTyVar]           -- Skolems
                  -> [EvVar]             -- Given
                  -> TcM result
@@ -943,7 +943,7 @@ emitResidualTvConstraint :: SkolemInfo -> [TcTyVar]
                          -> TcLevel -> WantedConstraints -> TcM ()
 emitResidualTvConstraint skol_info skol_tvs tclvl wanted
   | not (isEmptyWC wanted) ||
-    checkTelescopeSkol skol_info
+    checkTelescopeSkol (getSkolemInfo skol_info)
   = -- checkTelescopeSkol: in this case, /always/ emit this implication
     -- even if 'wanted' is empty. We need the implication so that we check
     -- for a bad telescope. See Note [Skolem escape and forall-types] in
@@ -967,9 +967,9 @@ buildTvImplication skol_info skol_tvs tclvl wanted
                         , ic_given_eqs = NoGivenEqs
                         , ic_wanted    = wanted
                         , ic_binds     = ev_binds
-                        , ic_info      = skol_info }) }
+                        , ic_info      = getSkolemInfo skol_info }) }
 
-implicationNeeded :: SkolemInfo -> [TcTyVar] -> [EvVar] -> TcM Bool
+implicationNeeded :: SkolemInfoAnon -> [TcTyVar] -> [EvVar] -> TcM Bool
 -- See Note [When to build an implication]
 implicationNeeded skol_info skol_tvs given
   | null skol_tvs
@@ -989,7 +989,7 @@ implicationNeeded skol_info skol_tvs given
   | otherwise     -- Non-empty skolems or givens
   = return True   -- Definitely need an implication
 
-alwaysBuildImplication :: SkolemInfo -> Bool
+alwaysBuildImplication :: SkolemInfoAnon -> Bool
 -- See Note [When to build an implication]
 alwaysBuildImplication _ = False
 
@@ -1006,7 +1006,7 @@ alwaysBuildImplication (FamInstSkol {})   = True
 alwaysBuildImplication _                  = False
 -}
 
-buildImplicationFor :: TcLevel -> SkolemInfo -> [TcTyVar]
+buildImplicationFor :: TcLevel -> SkolemInfoAnon -> [TcTyVar]
                    -> [EvVar] -> WantedConstraints
                    -> TcM (Bag Implication, TcEvBinds)
 buildImplicationFor tclvl skol_info skol_tvs given wanted

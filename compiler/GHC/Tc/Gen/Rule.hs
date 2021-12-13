@@ -119,7 +119,7 @@ tcRule (HsRule { rd_ext  = ext
                , rd_rhs  = rhs })
   = addErrCtxt (ruleCtxt name)  $
     do { traceTc "---- Rule ------" (pprFullRuleName rname)
-       ; let skol_info  = RuleSkol name
+       ; skol_info <- mkSkolemInfo (RuleSkol name)
         -- Note [Typechecking rules]
        ; (tc_lvl, stuff) <- pushTcLevelM $
                             generateRuleConstraints name ty_bndrs tm_bndrs lhs rhs
@@ -164,9 +164,9 @@ tcRule (HsRule { rd_ext  = ext
        -- For the LHS constraints we must solve the remaining constraints
        -- (a) so that we report insoluble ones
        -- (b) so that we bind any soluble ones
-       ; (lhs_implic, lhs_binds) <- buildImplicationFor tc_lvl skol_info qtkvs
+       ; (lhs_implic, lhs_binds) <- buildImplicationFor tc_lvl (getSkolemInfo skol_info) qtkvs
                                          lhs_evs residual_lhs_wanted
-       ; (rhs_implic, rhs_binds) <- buildImplicationFor tc_lvl skol_info qtkvs
+       ; (rhs_implic, rhs_binds) <- buildImplicationFor tc_lvl (getSkolemInfo skol_info) qtkvs
                                          lhs_evs rhs_wanted
 
        ; emitImplications (lhs_implic `unionBags` rhs_implic)
@@ -207,7 +207,8 @@ generateRuleConstraints rule_name ty_bndrs tm_bndrs lhs rhs
 tcRuleBndrs :: FastString -> Maybe [LHsTyVarBndr () GhcRn] -> [LRuleBndr GhcRn]
             -> TcM ([TcTyVar], [Id])
 tcRuleBndrs rule_name (Just bndrs) xs
-  = do { (tybndrs1,(tys2,tms)) <- bindExplicitTKBndrs_Skol (RuleSkol rule_name) bndrs $
+  = do { skol_info <- mkSkolemInfo (RuleSkol rule_name)
+       ; (tybndrs1,(tys2,tms)) <- bindExplicitTKBndrs_Skol skol_info bndrs $
                                   tcRuleTmBndrs rule_name xs
        ; let tys1 = binderVars tybndrs1
        ; return (tys1 ++ tys2, tms) }

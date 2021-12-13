@@ -13,7 +13,7 @@ module GHC.Tc.Types.Origin (
   redundantConstraintsSpan,
 
   -- SkolemInfo
-  SkolemInfo(..), pprSigSkolInfo, pprSkolInfo, unkSkol,
+  SkolemInfo(..), SkolemInfoAnon(..), mkSkolemInfo, getSkolemInfo, pprSigSkolInfo, pprSkolInfo, unkSkol,
 
   -- CtOrigin
   CtOrigin(..), exprCtOrigin, lexprCtOrigin, matchesCtOrigin, grhssCtOrigin,
@@ -59,6 +59,9 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Trace
 import GHC.Stack
+import GHC.Utils.Monad
+import GHC.Types.Unique
+import GHC.Types.Unique.Supply
 
 {- *********************************************************************
 *                                                                      *
@@ -194,10 +197,15 @@ isSigMaybe _                = Nothing
 ************************************************************************
 -}
 
+data SkolemInfo = SkolemInfo Unique SkolemInfoAnon
+
+instance Uniquable SkolemInfo where
+  getUnique (SkolemInfo u _) = u
+
 -- SkolemInfo gives the origin of *given* constraints
 --   a) type variables are skolemised
 --   b) an implication constraint is generated
-data SkolemInfo
+data SkolemInfoAnon
   = SigSkol -- A skolem that is created by instantiating
             -- a programmer-supplied type signature
             -- Location of the binding site is on the TyVar
@@ -255,17 +263,30 @@ data SkolemInfo
 
   | RuntimeUnkSkol      -- Runtime skolem from the GHCi debugger      #14628
 
-  | UnkSkol CallStack            -- Unhelpful info (until I improve it)
+  | UnkSkol CallStack
+
 
 
 
 unkSkol :: HasCallStack => SkolemInfo
-unkSkol = UnkSkol callStack
+unkSkol = SkolemInfo (mkUniqueGrimily 0) (UnkSkol callStack)
+
+mkSkolemInfo :: MonadIO m => SkolemInfoAnon -> m SkolemInfo
+mkSkolemInfo sk_anon = do
+  u <- liftIO $! uniqFromMask 's'
+  return (SkolemInfo u sk_anon)
+
+getSkolemInfo :: SkolemInfo -> SkolemInfoAnon
+getSkolemInfo (SkolemInfo _ skol_anon) = skol_anon
+
 
 instance Outputable SkolemInfo where
+  ppr (SkolemInfo _ sk_info ) = ppr sk_info
+
+instance Outputable SkolemInfoAnon where
   ppr = pprSkolInfo
 
-pprSkolInfo :: SkolemInfo -> SDoc
+pprSkolInfo :: SkolemInfoAnon -> SDoc
 -- Complete the sentence "is a rigid type variable bound by..."
 pprSkolInfo (SigSkol cx ty _) = pprSigSkolInfo cx ty
 pprSkolInfo (SigTypeSkol cx)  = pprUserTypeCtxt cx
@@ -293,7 +314,8 @@ pprSkolInfo RuntimeUnkSkol     = text "Unknown type from GHCi runtime"
 -- unkSkol
 -- For type variables the others are dealt with by pprSkolTvBinding.
 -- For Insts, these cases should not happen
-pprSkolInfo (UnkSkol cs) = warnPprTrace True (text "pprSkolInfo: unkSkol") $ text "UnkSkol" $$ prettyCallStackDoc cs
+pprSkolInfo (UnkSkol cs) =  warnPprTrace True (text "pprSkolInfo: unkSkol") $ text "UnkSkol" $$ prettyCallStackDoc cs
+
 
 pprSigSkolInfo :: UserTypeCtxt -> TcType -> SDoc
 -- The type is already tidied
@@ -366,7 +388,7 @@ in the right place.  So we proceed as follows:
 data CtOrigin
   = -- | A given constraint from a user-written type signature. The
     -- 'SkolemInfo' inside gives more information.
-    GivenOrigin SkolemInfo
+    GivenOrigin SkolemInfoAnon
 
   -- The following are other origins for given constraints that cannot produce
   -- new skolems -- hence no SkolemInfo.
@@ -397,7 +419,7 @@ data CtOrigin
   -- Note [Use only the best local instance], both in GHC.Tc.Solver.Interact.
   | OtherSCOrigin ScDepth -- ^ The number of superclass selections necessary to
                           -- get this constraint
-                  SkolemInfo   -- ^ Where the sub-class constraint arose from
+                  SkolemInfoAnon   -- ^ Where the sub-class constraint arose from
                                -- (used only for printing)
 
   -- All the others are for *wanted* constraints

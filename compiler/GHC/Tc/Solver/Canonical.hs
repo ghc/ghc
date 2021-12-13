@@ -871,8 +871,8 @@ solveForAll :: CtEvidence -> [TyVar] -> TcThetaType -> PredType -> Bool
 solveForAll ev tvs theta pred pend_sc
   | CtWanted { ctev_dest = dest } <- ev
   = -- See Note [Solving a Wanted forall-constraint]
-    do { let skol_info = QuantCtxtSkol
-             empty_subst = mkEmptyTCvSubst $ mkInScopeSet $
+    do { skol_info <- mkSkolemInfo QuantCtxtSkol
+       ; let empty_subst = mkEmptyTCvSubst $ mkInScopeSet $
                            tyCoVarsOfTypes (pred:theta) `delVarSetList` tvs
        ; (subst, skol_tvs) <- tcInstSkolTyVarsX skol_info empty_subst tvs
        ; given_ev_vars <- mapM newEvVar (substTheta subst theta)
@@ -884,7 +884,7 @@ solveForAll ev tvs theta pred pend_sc
                    ; return ( ctEvEvId wanted_ev
                             , unitBag (mkNonCanonical wanted_ev)) }
 
-      ; ev_binds <- emitImplicationTcS lvl skol_info skol_tvs
+      ; ev_binds <- emitImplicationTcS lvl (getSkolemInfo skol_info) skol_tvs
                                        given_ev_vars wanteds
 
       ; setWantedEvTerm dest $
@@ -1348,7 +1348,7 @@ can_eq_nc_forall ev eq_rel s1 s2
         else
    do { traceTcS "Creating implication for polytype equality" $ ppr ev
       ; let empty_subst1 = mkEmptyTCvSubst $ mkInScopeSet free_tvs
-      ; let skol_info = UnifyForAllSkol phi1
+      ; skol_info <- mkSkolemInfo (UnifyForAllSkol phi1)
       ; (subst1, skol_tvs) <- tcInstSkolTyVarsX skol_info empty_subst1 $
                               binderVars bndrs1
 
@@ -1380,7 +1380,7 @@ can_eq_nc_forall ev eq_rel s1 s2
 
       ; (lvl, (all_co, wanteds)) <- pushLevelNoWorkList (ppr skol_info) $
                                     go skol_tvs empty_subst2 bndrs2
-      ; emitTvImplicationTcS lvl skol_info skol_tvs wanteds
+      ; emitTvImplicationTcS lvl (getSkolemInfo skol_info) skol_tvs wanteds
 
       ; setWantedEq orig_dest all_co
       ; stopWith ev "Deferred polytype equality" } }

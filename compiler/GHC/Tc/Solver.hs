@@ -903,7 +903,7 @@ tcCheckGivens inerts given_ids = do
   (sat, new_inerts) <- runTcSInerts inerts $ do
     traceTcS "checkGivens {" (ppr inerts <+> ppr given_ids)
     lcl_env <- TcS.getLclEnv
-    let given_loc = mkGivenLoc topTcLevel unkSkol lcl_env
+    let given_loc = mkGivenLoc topTcLevel (getSkolemInfo unkSkol) lcl_env
     let given_cts = mkGivens given_loc (bagToList given_ids)
     -- See Note [Superclasses and satisfiability]
     solveSimpleGivens given_cts
@@ -1053,7 +1053,7 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
 
        ; dep_vars <- candidateQTyVarsOfTypes (psig_tv_tys ++ psig_theta ++ map snd name_taus)
 
-      ; let skol_info = InferSkol name_taus
+       ; skol_info <- mkSkolemInfo (InferSkol name_taus)
        ; qtkvs <- quantifyTyVars skol_info DefaultNonStandardTyVars dep_vars
        ; traceTc "simplifyInfer: empty WC" (ppr name_taus $$ ppr qtkvs)
        ; return (qtkvs, [], emptyTcEvBinds, False) }
@@ -1112,8 +1112,8 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
              ;  bound_theta_vars <- mapM TcM.newEvVar bound_theta
 
              ; let full_theta = map idType bound_theta_vars
-             ; let skol_info = InferSkol [ (name, mkSigmaTy [] full_theta ty)
-                                         | (name, ty) <- name_taus ]
+             ; skol_info <- mkSkolemInfo (InferSkol [ (name, mkSigmaTy [] full_theta ty)
+                                                    | (name, ty) <- name_taus ])
        }
 
 
@@ -1190,7 +1190,7 @@ findInferredDiff annotated_theta inferred_theta
     do { lcl_env   <- TcM.getLclEnv
        ; given_ids <- mapM TcM.newEvVar annotated_theta
        ; wanteds   <- newWanteds AnnOrigin inferred_theta
-       ; let given_loc = mkGivenLoc topTcLevel unkSkol lcl_env
+       ; let given_loc = mkGivenLoc topTcLevel (getSkolemInfo unkSkol) lcl_env
              given_cts = mkGivens given_loc given_ids
 
        ; residual <- runTcSDeriveds $
@@ -2140,7 +2140,7 @@ checkBadTelescope (Implic { ic_info  = info
       | otherwise
       = go (later_skols `extendVarSet` one_skol) earlier_skols
 
-warnRedundantGivens :: SkolemInfo -> Bool
+warnRedundantGivens :: SkolemInfoAnon -> Bool
 warnRedundantGivens (SigSkol ctxt _ _)
   = case ctxt of
        FunSigCtxt _ rrc -> reportRedundantConstraints rrc
@@ -2783,7 +2783,7 @@ disambigGroup (default_ty:default_tys) group@(the_tv, wanteds)
       | Just subst <- mb_subst
       = do { lcl_env <- TcS.getLclEnv
            ; tc_lvl <- TcS.getTcLevel
-           ; let loc = mkGivenLoc tc_lvl unkSkol lcl_env
+           ; let loc = mkGivenLoc tc_lvl (getSkolemInfo unkSkol) lcl_env
            -- Equality constraints are possible due to type defaulting plugins
            ; wanted_evs <- mapM (newWantedNC loc . substTy subst . ctPred)
                                 wanteds

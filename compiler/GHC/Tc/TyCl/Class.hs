@@ -213,10 +213,11 @@ tcClassDecl2 class_scoped_tv_env
         --      dm1 = \d -> case ds d of (a,b,c) -> a
         -- And since ds is big, it doesn't get inlined, so we don't get good
         -- default methods.  Better to make separate AbsBinds for each
+
+        ; skol_info <- mkSkolemInfo (TyConSkol callStack ClassFlavour (getName class_name))
         ; let (tyvars, _, _, op_items) = classBigSig clas
               prag_fn = mkPragEnv sigs default_binds
               sig_fn  = mkHsSigFun sigs
-              skol_info = TyConSkol callStack ClassFlavour (getName class_name)
               (skol_subst, clas_tyvars) = tcSuperSkolTyVars skol_info tyvars
               pred = mkClassPred clas (mkTyVarTys clas_tyvars)
               scoped_tyvars =

@@ -1212,6 +1212,7 @@ data TcSEnv
 ---------------
 newtype TcS a = TcS { unTcS :: TcSEnv -> TcM a } deriving (Functor)
 
+
 -- | Smart constructor for 'TcS', as describe in Note [The one-shot state
 -- monad trick] in "GHC.Utils.Monad".
 mkTcS :: (TcSEnv -> TcM a) -> TcS a
@@ -1224,6 +1225,9 @@ instance Applicative TcS where
 instance Monad TcS where
   m >>= k   = mkTcS $ \ebs -> do
     unTcS m ebs >>= (\r -> unTcS (k r) ebs)
+
+instance MonadIO TcS where
+  liftIO act = TcS $ \_env -> liftIO act
 
 instance MonadFail TcS where
   fail err  = mkTcS $ \_ -> fail err
@@ -1497,7 +1501,7 @@ nestTcS (TcS thing_inside)
 
        ; return res }
 
-emitImplicationTcS :: TcLevel -> SkolemInfo
+emitImplicationTcS :: TcLevel -> SkolemInfoAnon
                    -> [TcTyVar]        -- Skolems
                    -> [EvVar]          -- Givens
                    -> Cts              -- Wanteds
@@ -1518,7 +1522,7 @@ emitImplicationTcS new_tclvl skol_info skol_tvs givens wanteds
        ; emitImplication imp
        ; return (TcEvBinds (ic_binds imp)) }
 
-emitTvImplicationTcS :: TcLevel -> SkolemInfo
+emitTvImplicationTcS :: TcLevel -> SkolemInfoAnon
                      -> [TcTyVar]        -- Skolems
                      -> Cts              -- Wanteds
                      -> TcS ()

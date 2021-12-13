@@ -492,8 +492,8 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = hs_ty, cid_binds = binds
     do  { dfun_ty <- tcHsClsInstType (InstDeclCtxt False) hs_ty
         ; let (tyvars, theta, clas, inst_tys) = tcSplitDFunTy dfun_ty
              -- NB: tcHsClsInstType does checkValidInstance
-
-        ; (subst, skol_tvs) <- tcInstSkolTyVars InstSkol tyvars
+        ; skol_info <- mkSkolemInfo InstSkol
+        ; (subst, skol_tvs) <- tcInstSkolTyVars skol_info tyvars
         ; let tv_skol_prs = [ (tyVarName tv, skol_tv)
                             | (tv, skol_tv) <- tyvars `zip` skol_tvs ]
               -- Map from the skolemized Names to the original Names.
@@ -874,9 +874,10 @@ tcDataFamInstHeader
 tcDataFamInstHeader mb_clsinfo fam_tc outer_bndrs fixity
                     hs_ctxt hs_pats m_ksig new_or_data
   = do { traceTc "tcDataFamInstHeader {" (ppr fam_tc <+> ppr hs_pats)
+       ; skol_info <- mkSkolemInfo FamInstSkol
        ; (tclvl, wanted, (scoped_tvs, (stupid_theta, lhs_ty, master_res_kind, instance_res_kind)))
             <- pushLevelAndSolveEqualitiesX "tcDataFamInstHeader" $
-               bindOuterFamEqnTKBndrs FamInstSkol outer_bndrs                 $
+               bindOuterFamEqnTKBndrs skol_info outer_bndrs                 $
                do { stupid_theta <- tcHsContext hs_ctxt
                   ; (lhs_ty, lhs_kind) <- tcFamTyPats fam_tc hs_pats
                   ; (lhs_applied_ty, lhs_applied_kind)
@@ -915,8 +916,8 @@ tcDataFamInstHeader mb_clsinfo fam_tc outer_bndrs fixity
 
        -- See GHC.Tc.TyCl Note [Generalising in tcFamTyPatsGuts]
        ; dvs  <- candidateQTyVarsOfTypes (lhs_ty : mkTyVarTys scoped_tvs)
-       ; qtvs <- quantifyTyVars FamInstSkol TryNotToDefaultNonStandardTyVars dvs
-       ; reportUnsolvedEqualities FamInstSkol qtvs tclvl wanted
+       ; qtvs <- quantifyTyVars skol_info TryNotToDefaultNonStandardTyVars dvs
+       ; reportUnsolvedEqualities skol_info qtvs tclvl wanted
 
        -- Zonk the patterns etc into the Type world
        ; ze           <- mkEmptyZonkEnv NoFlexi
@@ -962,7 +963,8 @@ tcDataFamInstHeader mb_clsinfo fam_tc outer_bndrs fixity
       = do { sig_kind <- tcLHsKindSig data_ctxt hs_kind
            ; lvl <- getTcLevel
            ; let (tvs, inner_kind) = tcSplitForAllInvisTyVars sig_kind
-           ; (subst, _tvs') <- tcInstSkolTyVarsAt (SigTypeSkol data_ctxt) lvl False emptyTCvSubst tvs
+           ; skol_info <- mkSkolemInfo (SigTypeSkol data_ctxt)
+           ; (subst, _tvs') <- tcInstSkolTyVarsAt skol_info lvl False emptyTCvSubst tvs
              -- Perhaps surprisingly, we don't need the skolemised tvs themselves
            ; return (substTy subst inner_kind) }
 
@@ -1211,7 +1213,8 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
     setSrcSpan loc                              $
     addErrCtxt (instDeclCtxt2 (idType dfun_id)) $
     do {  -- Instantiate the instance decl with skolem constants
-       ; (inst_tyvars, dfun_theta, inst_head) <- tcSkolDFunType InstSkol dfun_id
+       ; skol_info <- mkSkolemInfo InstSkol
+       ; (inst_tyvars, dfun_theta, inst_head) <- tcSkolDFunType skol_info dfun_id
        ; dfun_ev_vars <- newEvVars dfun_theta
                      -- We instantiate the dfun_id with superSkolems.
                      -- See Note [Subtle interaction of recursion and overlap]

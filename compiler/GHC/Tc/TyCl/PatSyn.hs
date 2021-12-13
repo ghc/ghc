@@ -393,7 +393,7 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
        ; checkTc (all (isManyDataConTy . scaledMult) arg_tys) $
            TcRnLinearPatSyn sig_body_ty
 
-       ; let skol_info = SigSkol (PatSynCtxt name) pat_ty []
+       ; skol_info <- mkSkolemInfo (SigSkol (PatSynCtxt name) pat_ty [])
                          -- The type here is a bit bogus, but we do not print
                          -- the type for PatSynCtxt, so it doesn't matter
                          -- See Note [Skolem info for pattern synonyms] in "GHC.Tc.Types.Origin"
@@ -441,7 +441,7 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
                                        skol_arg_tys
               ; return (ex_tvs', prov_dicts, args') }
 
-       ; (implics, ev_binds) <- buildImplicationFor tclvl skol_info skol_univ_tvs
+       ; (implics, ev_binds) <- buildImplicationFor tclvl (getSkolemInfo skol_info) skol_univ_tvs
                                                     req_dicts wanted
 
        -- Solve the constraints now, because we are about to make a PatSyn,

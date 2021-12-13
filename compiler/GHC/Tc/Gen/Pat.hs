@@ -915,7 +915,7 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty_scaled
         ; let mc = case pe_ctxt penv of
                      LamPat mc -> mc
                      LetPat {} -> PatBindRhs
-        ; let skol_info = PatSkol (RealDataCon data_con) mc
+        ; skol_info <- mkSkolemInfo (PatSkol (RealDataCon data_con) mc)
         ; (tenv, ex_tvs') <- tcInstSuperSkolTyVarsX skol_info tenv1 ex_tvs
                      -- Get location from monad, not from ex_tvs
                      -- This freshens: See Note [Freshen existentials]
@@ -962,7 +962,7 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty_scaled
 
         ; given <- newEvVars theta'
         ; (ev_binds, (arg_pats', res))
-             <- checkConstraints skol_info ex_tvs' given $
+             <- checkConstraints (getSkolemInfo skol_info) ex_tvs' given $
                 tcConArgs (RealDataCon data_con) arg_tys_scaled tenv penv arg_pats thing_inside
 
         ; let res_pat = ConPat
@@ -993,9 +993,9 @@ tcPatSynPat penv (L con_span con_name) pat_syn pat_ty arg_pats thing_inside
         ; let all_arg_tys = ty : prov_theta ++ (map scaledThing arg_tys)
         ; checkGADT (PatSynCon pat_syn) ex_tvs all_arg_tys penv
 
-        ; let skol_info = case pe_ctxt penv of
-                            LamPat mc -> PatSkol (PatSynCon pat_syn) mc
-                            LetPat {} -> unkSkol -- Doesn't matter
+        ; skol_info <- case pe_ctxt penv of
+                            LamPat mc -> mkSkolemInfo (PatSkol (PatSynCon pat_syn) mc)
+                            LetPat {} -> return unkSkol -- Doesn't matter
 
         ; (tenv, ex_tvs') <- tcInstSuperSkolTyVarsX skol_info subst ex_tvs
            -- This freshens: Note [Freshen existentials]
@@ -1031,7 +1031,7 @@ tcPatSynPat penv (L con_span con_name) pat_syn pat_ty arg_pats thing_inside
 
         ; traceTc "checkConstraints {" Outputable.empty
         ; (ev_binds, (arg_pats', res))
-             <- checkConstraints skol_info ex_tvs' prov_dicts' $
+             <- checkConstraints (getSkolemInfo skol_info) ex_tvs' prov_dicts' $
                 tcConArgs (PatSynCon pat_syn) arg_tys_scaled tenv penv arg_pats thing_inside
 
         ; traceTc "checkConstraints }" (ppr ev_binds)

@@ -406,7 +406,7 @@ tcPatSynSig name sig_ty@(L _ (HsSig{sig_bndrs = hs_outer_bndrs, sig_body = hs_ty
   , (ex_hs_tvbndrs, hs_prov, hs_body_ty) <- splitLHsSigmaTyInvis hs_ty1
   = do { traceTc "tcPatSynSig 1" (ppr sig_ty)
 
-       ; let skol_info = DataConSkol name
+       ; skol_info <- mkSkolemInfo (DataConSkol name)
        ; (tclvl, wanted, (outer_bndrs, (ex_bndrs, (req, prov, body_ty))))
            <- pushLevelAndSolveEqualitiesX "tcPatSynSig"           $
                      -- See Note [solveEqualities in tcPatSynSig]

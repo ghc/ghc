@@ -68,7 +68,7 @@ module GHC.Tc.Utils.TcMType (
   --------------------------------
   -- Zonking and tidying
   zonkTidyTcType, zonkTidyTcTypes, zonkTidyOrigin, zonkTidyOrigins,
-  tidyEvVar, tidyCt, tidyHole, tidySkolemInfo,
+  tidyEvVar, tidyCt, tidyHole, tidySkolemInfo, tidySkolemInfoAnon,
     zonkTcTyVar, zonkTcTyVars,
   zonkTcTyVarToTyVar, zonkInvisTVBinder,
   zonkTyCoVarsAndFV, zonkTcTypeAndFV, zonkDTyCoVarSetAndFV,
@@ -2332,7 +2332,7 @@ zonkImplication implic@(Implic { ic_skols  = skols
   = do { skols'  <- mapM zonkTyCoVarKind skols  -- Need to zonk their kinds!
                                                 -- as #7230 showed
        ; given'  <- mapM zonkEvVar given
-       ; info'   <- zonkSkolemInfo info
+       ; info'   <- zonkSkolemInfoAnon info
        ; wanted' <- zonkWCRec wanted
        ; return (implic { ic_skols  = skols'
                         , ic_given  = given'
@@ -2415,13 +2415,16 @@ zonkCtEvidence ctev
        }
 
 zonkSkolemInfo :: SkolemInfo -> TcM SkolemInfo
-zonkSkolemInfo (SigSkol cx ty tv_prs)  = do { ty' <- zonkTcType ty
+zonkSkolemInfo (SkolemInfo uid sk_anon) = SkolemInfo uid <$> zonkSkolemInfoAnon sk_anon
+
+zonkSkolemInfoAnon :: SkolemInfoAnon -> TcM SkolemInfoAnon
+zonkSkolemInfoAnon (SigSkol cx ty tv_prs)  = do { ty' <- zonkTcType ty
                                             ; return (SigSkol cx ty' tv_prs) }
-zonkSkolemInfo (InferSkol ntys) = do { ntys' <- mapM do_one ntys
+zonkSkolemInfoAnon (InferSkol ntys) = do { ntys' <- mapM do_one ntys
                                      ; return (InferSkol ntys') }
   where
     do_one (n, ty) = do { ty' <- zonkTcType ty; return (n, ty') }
-zonkSkolemInfo skol_info = return skol_info
+zonkSkolemInfoAnon skol_info = return skol_info
 
 zonkTyVarSkolemInfo :: TyVar -> TcM TyVar
 zonkTyVarSkolemInfo =
@@ -2565,12 +2568,12 @@ zonkTidyTcTypes = zonkTidyTcTypes' []
 
 zonkTidyOrigin :: TidyEnv -> CtOrigin -> TcM (TidyEnv, CtOrigin)
 zonkTidyOrigin env (GivenOrigin skol_info)
-  = do { skol_info1 <- zonkSkolemInfo skol_info
-       ; let skol_info2 = tidySkolemInfo env skol_info1
+  = do { skol_info1 <- zonkSkolemInfoAnon skol_info
+       ; let skol_info2 = tidySkolemInfoAnon env skol_info1
        ; return (env, GivenOrigin skol_info2) }
 zonkTidyOrigin env (OtherSCOrigin sc_depth skol_info)
-  = do { skol_info1 <- zonkSkolemInfo skol_info
-       ; let skol_info2 = tidySkolemInfo env skol_info1
+  = do { skol_info1 <- zonkSkolemInfoAnon skol_info
+       ; let skol_info2 = tidySkolemInfoAnon env skol_info1
        ; return (env, OtherSCOrigin sc_depth skol_info2) }
 zonkTidyOrigin env orig@(TypeEqOrigin { uo_actual   = act
                                       , uo_expected = exp })
@@ -2624,16 +2627,19 @@ tidyHole env h@(Hole { hole_ty = ty }) = h { hole_ty = tidyType env ty }
 tidyEvVar :: TidyEnv -> EvVar -> EvVar
 tidyEvVar env var = updateIdTypeAndMult (tidyType env) var
 
-----------------
 tidySkolemInfo :: TidyEnv -> SkolemInfo -> SkolemInfo
-tidySkolemInfo env (DerivSkol ty)         = DerivSkol (tidyType env ty)
-tidySkolemInfo env (SigSkol cx ty tv_prs) = tidySigSkol env cx ty tv_prs
-tidySkolemInfo env (InferSkol ids)        = InferSkol (mapSnd (tidyType env) ids)
-tidySkolemInfo env (UnifyForAllSkol ty)   = UnifyForAllSkol (tidyType env ty)
-tidySkolemInfo _   info                   = info
+tidySkolemInfo env (SkolemInfo u sk_anon) = SkolemInfo u (tidySkolemInfoAnon env sk_anon)
+
+----------------
+tidySkolemInfoAnon :: TidyEnv -> SkolemInfoAnon -> SkolemInfoAnon
+tidySkolemInfoAnon env (DerivSkol ty)         = DerivSkol (tidyType env ty)
+tidySkolemInfoAnon env (SigSkol cx ty tv_prs) = tidySigSkol env cx ty tv_prs
+tidySkolemInfoAnon env (InferSkol ids)        = InferSkol (mapSnd (tidyType env) ids)
+tidySkolemInfoAnon env (UnifyForAllSkol ty)   = UnifyForAllSkol (tidyType env ty)
+tidySkolemInfoAnon _   info                   = info
 
 tidySigSkol :: TidyEnv -> UserTypeCtxt
-            -> TcType -> [(Name,TcTyVar)] -> SkolemInfo
+            -> TcType -> [(Name,TcTyVar)] -> SkolemInfoAnon
 -- We need to take special care when tidying SigSkol
 -- See Note [SigSkol SkolemInfo] in "GHC.Tc.Types.Origin"
 tidySigSkol env cx ty tv_prs

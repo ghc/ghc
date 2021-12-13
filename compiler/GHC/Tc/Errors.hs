@@ -5,6 +5,8 @@
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE ParallelListComp #-}
 
 module GHC.Tc.Errors(
        reportUnsolved, reportAllUnsolved, warnAllUnsolved,
@@ -48,6 +50,7 @@ import GHC.Types.SrcLoc
 import GHC.Types.Basic
 import GHC.Types.Error
 import GHC.Types.Unique.Set ( nonDetEltsUniqSet )
+import qualified GHC.Types.Unique.Map as UM
 
 import GHC.Rename.Unbound ( unknownNameSuggestions, WhatLooking(..) )
 import GHC.Unit.Module
@@ -86,10 +89,12 @@ import Data.Foldable    ( toList )
 import Data.Functor     ( (<&>) )
 import Data.Function    ( on )
 import Data.List        ( groupBy, partition, mapAccumL
-                        , sortBy, tails, unfoldr )
+                        , sortBy, tails, unfoldr, sort )
 import Data.Ord         ( comparing )
 -- import Data.Semigroup   ( Semigroup )
 import qualified Data.Semigroup as Semigroup
+import Data.Bifunctor
+import GHC.Utils.Trace
 
 
 {-
@@ -450,7 +455,7 @@ reportImplic ctxt implic@(Implic { ic_skols = tvs
         -- (see Note [Skolems in an implication] in GHC.Tc.Types.Constraint)
         -- but tidying goes wrong on out-of-order constraints;
         -- so we sort them here before tidying
-    info'   = tidySkolemInfo env1 info
+    info'   = tidySkolemInfoAnon env1 info
     implic' = implic { ic_skols = tvs'
                      , ic_given = map (tidyEvVar env1) given
                      , ic_info  = info' }
@@ -475,7 +480,7 @@ reportImplic ctxt implic@(Implic { ic_skols = tvs
               IC_BadTelescope -> True
               _               -> False
 
-warnRedundantConstraints :: ReportErrCtxt -> TcLclEnv -> SkolemInfo -> [EvVar] -> TcM ()
+warnRedundantConstraints :: ReportErrCtxt -> TcLclEnv -> SkolemInfoAnon -> [EvVar] -> TcM ()
 -- See Note [Tracking redundant constraints] in GHC.Tc.Solver
 warnRedundantConstraints ctxt env info ev_vars
  | null redundant_evs
@@ -511,7 +516,7 @@ warnRedundantConstraints ctxt env info ev_vars
    improving pred -- (transSuperClasses p) does not include p
      = any isImprovementPred (pred : transSuperClasses pred)
 
-reportBadTelescope :: ReportErrCtxt -> TcLclEnv -> SkolemInfo -> [TcTyVar] -> TcM ()
+reportBadTelescope :: ReportErrCtxt -> TcLclEnv -> SkolemInfoAnon -> [TcTyVar] -> TcM ()
 reportBadTelescope ctxt env (ForAllSkol telescope) skols
   = do { msg <- mkErrorReport ErrorWithoutFlag ctxt env (important doc)
        ; reportDiagnostic msg }
@@ -1300,8 +1305,8 @@ mkHoleError lcl_name_cache tidy_simples ctxt hole@(Hole { hole_occ = occ
                             else return (ctxt, empty)
 
 
-       ; zonked_skol_tvs <- mapM zonkTyVarSkolemInfo skol_tvs
-       ; let err = important (hole_msg zonked_skol_tvs) `mappend`
+       ; skol_msg <- pprSkols ctxt =<< mapM zonkTyVarSkolemInfo skol_tvs
+       ; let err = important (hole_msg skol_msg) `mappend`
                    mk_relevant_bindings (binds_msg $$ constraints_msg) `mappend`
                    valid_hole_fits sub_msg
 
@@ -1317,16 +1322,16 @@ mkHoleError lcl_name_cache tidy_simples ctxt hole@(Hole { hole_occ = occ
     hole_kind   = tcTypeKind hole_ty
     tyvars      = tyCoVarsOfTypeList hole_ty
 
-    hole_msg zonked_skol_tvs = case sort of
+    hole_msg skol_msg = case sort of
       ExprHole _ -> vcat [ hang (text "Found hole:")
                             2 (pp_occ_with_type occ hole_ty)
-                         , tyvars_msg zonked_skol_tvs, expr_hole_hint ]
+                         , tyvars_msg skol_msg, expr_hole_hint ]
       TypeHole -> vcat [ hang (text "Found type wildcard" <+> quotes (ppr occ))
                             2 (text "standing for" <+> quotes pp_hole_type_with_kind)
-                       , tyvars_msg zonked_skol_tvs, type_hole_hint ]
+                       , tyvars_msg skol_msg, type_hole_hint ]
       ConstraintHole -> vcat [ hang (text "Found extra-constraints wildcard standing for")
                                   2 (quotes $ pprType hole_ty)  -- always kind constraint
-                             , tyvars_msg zonked_skol_tvs, type_hole_hint ]
+                             , tyvars_msg skol_msg, type_hole_hint ]
 
     pp_hole_type_with_kind
       | isLiftedTypeKind hole_kind
@@ -1339,9 +1344,9 @@ mkHoleError lcl_name_cache tidy_simples ctxt hole@(Hole { hole_occ = occ
     is_skol tv = isTcTyVar tv && isSkolemTyVar tv
     (skol_tvs, other_tvs) = partition is_skol tyvars
 
-    tyvars_msg zonked_skol_tvs = ppUnless (null tyvars) $
+    tyvars_msg skol_msg = ppUnless (null tyvars) $
                  text "Where:" <+> (vcat (map loc_msg other_tvs)
-                                    $$ pprSkols ctxt zonked_skol_tvs)
+                                    $$ skol_msg)
        where
                       -- Coercion variables can be free in the
                       -- hole, via kind casts
@@ -1650,29 +1655,26 @@ mkTyVarEqErr :: ReportErrCtxt -> Report -> Ct
 mkTyVarEqErr ctxt report ct tv1 ty2
   = do { traceTc "mkTyVarEqErr" (ppr ct $$ ppr tv1 $$ ppr ty2)
        ; dflags <- getDynFlags
-       ; zonked_skol_tv <- zonkTyVarSkolemInfo tv1
-       ; zonked_ty2 <- case tcGetCastedTyVar_maybe ty2 of
-                    Just (tv, co) -> flip mkCastTy co . mkTyVarTy <$> zonkTyVarSkolemInfo tv
-                    Nothing      -> pure ty2
-       ; return $ mkTyVarEqErr' dflags ctxt report ct zonked_skol_tv zonked_ty2 }
+       ; mkTyVarEqErr' dflags ctxt report ct tv1 ty2 }
 
 mkTyVarEqErr' :: DynFlags -> ReportErrCtxt -> Report -> Ct
-              -> TcTyVar -> TcType -> Report
+              -> TcTyVar -> TcType -> TcM Report
 mkTyVarEqErr' dflags ctxt report ct tv1 ty2
      -- impredicativity is a simple error to understand; try it first
   | check_eq_result `cterHasProblem` cteImpredicative
-  = let msg = vcat [ (if isSkolemTyVar tv1
+  = do
+    let msg = vcat [ (if isSkolemTyVar tv1
                       then text "Cannot equate type variable"
                       else text "Cannot instantiate unification variable")
                      <+> quotes (ppr tv1)
                    , hang (text "with a" <+> what <+> text "involving polytypes:") 2 (ppr ty2) ]
-    in
        -- Unlike the other reports, this discards the old 'report_important'
        -- instead of augmenting it.  This is because the details are not likely
        -- to be helpful since this is just an unimplemented feature.
-    mconcat [ headline_msg
+    extra_info <- extraTyVarEqInfo ctxt tv1 ty2
+    return $ mconcat [ headline_msg
             , important msg
-            , if isSkolemTyVar tv1 then extraTyVarEqInfo ctxt tv1 ty2 else mempty
+            , if isSkolemTyVar tv1 then extra_info else mempty
             , report ]
 
   | isSkolemTyVar tv1  -- ty2 won't be a meta-tyvar; we would have
@@ -1680,8 +1682,10 @@ mkTyVarEqErr' dflags ctxt report ct tv1 ty2
     || isTyVarTyVar tv1 && not (isTyVarTy ty2)
     || ctEqRel ct == ReprEq
      -- The cases below don't really apply to ReprEq (except occurs check)
-  = mconcat [ headline_msg
-            , extraTyVarEqInfo ctxt tv1 ty2
+  = do
+    extra_info <- extraTyVarEqInfo ctxt tv1 ty2
+    return $ mconcat [ headline_msg
+            , extra_info
             , suggestAddSig ctxt ty1 ty2
             , report
             ]
@@ -1704,7 +1708,7 @@ mkTyVarEqErr' dflags ctxt report ct tv1 ty2
 
         tyvar_binding tv = ppr tv <+> dcolon <+> ppr (tyVarKind tv)
     in
-    mconcat [headline_msg, extra2, extra3, report]
+    return $ mconcat [headline_msg, extra2, extra3, report]
 
   -- If the immediately-enclosing implication has 'tv' a skolem, and
   -- we know by now its an InferSkol kind of skolem, then presumably
@@ -1713,10 +1717,15 @@ mkTyVarEqErr' dflags ctxt report ct tv1 ty2
   | (implic:_) <- cec_encl ctxt
   , Implic { ic_skols = skols } <- implic
   , tv1 `elem` skols
-  = mconcat [ misMatchMsg ctxt ct ty1 ty2
-            , extraTyVarEqInfo ctxt tv1 ty2
-            , report
-            ]
+  = do
+  extra_info <- extraTyVarEqInfo ctxt tv1 ty2
+
+  return $
+
+    mconcat [ misMatchMsg ctxt ct ty1 ty2
+             , extra_info
+             , report
+             ]
 
   -- Check for skolem escape
   | (implic:_) <- cec_encl ctxt   -- Get the innermost context
@@ -1741,7 +1750,7 @@ mkTyVarEqErr' dflags ctxt report ct tv1 ty2
                         , nest 2 $ text "at" <+>
                           ppr (tcl_loc (ic_env implic)) ] ]
     in
-    mconcat [msg, tv_extra, report]
+    return $ mconcat [msg, tv_extra, report]
 
   -- Nastiest case: attempt to unify an untouchable variable
   -- So tv is a meta tyvar (or started that way before we
@@ -1751,7 +1760,7 @@ mkTyVarEqErr' dflags ctxt report ct tv1 ty2
   | (implic:_) <- cec_encl ctxt   -- Get the innermost context
   , Implic { ic_given = given, ic_tclvl = lvl, ic_info = skol_info } <- implic
   = assertPpr (not (isTouchableMetaTyVar lvl tv1))
-              (ppr tv1 $$ ppr lvl) $  -- See Note [Error messages for untouchables]
+              (ppr tv1 $$ ppr lvl) $ do -- See Note [Error messages for untouchables]
     let msg         = misMatchMsg ctxt ct ty1 ty2
         tclvl_extra = important $
              nest 2 $
@@ -1760,13 +1769,12 @@ mkTyVarEqErr' dflags ctxt report ct tv1 ty2
                  , nest 2 $ text "bound by" <+> ppr skol_info
                  , nest 2 $ text "at" <+>
                    ppr (tcl_loc (ic_env implic)) ]
-        tv_extra = extraTyVarEqInfo ctxt tv1 ty2
         add_sig  = suggestAddSig ctxt ty1 ty2
-    in
-    mconcat [msg, tclvl_extra, tv_extra, add_sig, report]
+    tv_extra <- extraTyVarEqInfo ctxt tv1 ty2
+    return $ mconcat [msg, tclvl_extra, tv_extra, add_sig, report]
 
   | otherwise
-  = reportEqErr ctxt report ct (mkTyVarTy tv1) ty2
+  = return $ reportEqErr ctxt report ct (mkTyVarTy tv1) ty2
         -- This *can* happen (#6123)
         -- Consider an ambiguous top-level constraint (a ~ F a)
         -- Not an occurs check, because F is a type function.
@@ -1918,23 +1926,23 @@ addition to superclasses (see Note [Remove redundant provided dicts]
 in GHC.Tc.TyCl.PatSyn).
 -}
 
-extraTyVarEqInfo :: HasCallStack => ReportErrCtxt -> TcTyVar -> TcType -> Report
+extraTyVarEqInfo :: HasCallStack => ReportErrCtxt -> TcTyVar -> TcType -> TcM Report
 -- Add on extra info about skolem constants
 -- NB: The types themselves are already tidied
 extraTyVarEqInfo ctxt tv1 ty2
-  = important (extraTyVarInfo ctxt tv1 $$ ty_extra ty2)
+  = important <$> (($$) <$> extraTyVarInfo ctxt tv1 <*> ty_extra ty2)
   where
     ty_extra ty = case tcGetCastedTyVar_maybe ty of
                     Just (tv, _) -> extraTyVarInfo ctxt tv
-                    Nothing      -> empty
+                    Nothing      -> return empty
 
-extraTyVarInfo :: HasCallStack => ReportErrCtxt -> TcTyVar -> SDoc
+extraTyVarInfo :: HasCallStack => ReportErrCtxt -> TcTyVar -> TcM SDoc
 extraTyVarInfo ctxt tv
   = assertPpr (isTyVar tv) (ppr tv) $
     case tcTyVarDetails tv of
           SkolemTv {}   -> pprSkols ctxt [tv]
-          RuntimeUnk {} -> quotes (ppr tv) <+> text "is an interactive-debugger skolem"
-          MetaTv {}     -> empty
+          RuntimeUnk {} -> return $ quotes (ppr tv) <+> text "is an interactive-debugger skolem"
+          MetaTv {}     -> return empty
 
 suggestAddSig :: ReportErrCtxt -> TcType -> TcType -> Report
 -- See Note [Suggest adding a type signature]
@@ -2785,7 +2793,7 @@ discardProvCtxtGivens orig givens  -- See Note [discardProvCtxtGivens]
     discard n (Implic { ic_info = SigSkol (PatSynCtxt n') _ _ }) = n == n'
     discard _ _                                                  = False
 
-usefulContext :: [Implication] -> PredType -> [SkolemInfo]
+usefulContext :: [Implication] -> PredType -> [SkolemInfoAnon]
 -- usefulContext picks out the implications whose context
 -- the programmer might plausibly augment to solve 'pred'
 usefulContext implics pred
@@ -3156,10 +3164,21 @@ mkAmbigMsg prepend_msg ct
       = text "The" <+> what <+> text "variable" <> plural tkvs
         <+> pprQuotedList tkvs <+> isOrAre tkvs <+> text "ambiguous"
 
-pprSkols :: HasCallStack => ReportErrCtxt -> [TcTyVar] -> SDoc
+pprSkols :: HasCallStack => ReportErrCtxt -> [TcTyVar] -> TcM SDoc
 pprSkols ctxt tvs
-  = vcat (map pp_one (getSkolemInfo (cec_encl ctxt) tvs))
+  = do
+      pprTraceM "ty_vars" (ppr tvs)
+      pprTraceM "ty_vars" (ppr skolem_list)
+      zonked_ty_vars <- mapM (firstM zonkSkolemInfo) skolem_list
+      let tidy_ty_vars = map (bimap (getSkolemInfo . tidySkolemInfo (cec_tidy ctxt)) (map fst)) zonked_ty_vars
+      return $ vcat (map pp_one tidy_ty_vars)
   where
+    group_skolems :: UM.UniqMap SkolemInfo ([(TcTyVar, Int)])
+    group_skolems = bagToList <$> UM.listToUniqMap_C unionBags [(skolemSkolInfo tv, unitBag (tv, n)) | tv <- tvs | n <- [0..]]
+
+    skolem_list = sortBy (comparing (sort . map snd . snd . pprTraceIt "sort")) (UM.nonDetEltsUniqMap group_skolems)
+
+
     pp_one (UnkSkol cs, tvs)
       = vcat [ hang (pprQuotedList tvs)
                  2 (is_or_are tvs "a" "(rigid, skolem)")
@@ -3188,33 +3207,6 @@ getAmbigTkvs ct
     tkvs       = tyCoVarsOfCtList ct
     ambig_tkvs = filter isAmbiguousTyVar tkvs
     dep_tkv_set = tyCoVarsOfTypes (map tyVarKind tkvs)
-
-getSkolemInfo :: [Implication] -> [TcTyVar]
-              -> [(SkolemInfo, [TcTyVar])]                    -- #14628
--- Get the skolem info for some type variables
--- from the implication constraints that bind them.
---
--- In the returned (skolem, tvs) pairs, the 'tvs' part is non-empty
-getSkolemInfo _ []
-  = []
-getSkolemInfo _ tvs =
-  map (\tv -> (skolemSkolInfo tv, [tv])) tvs
-  {-
-getSkolemInfo [] tvs
-  | all isRuntimeUnkSkol tvs = [(RuntimeUnkSkol, tvs)]        -- #14628
-  | otherwise = -- See https://gitlab.haskell.org/ghc/ghc/-/issues?label_name[]=No%20skolem%20info
-      pprTraceUserWarning msg [(UnkSkol,tvs)]
-  where
-    msg = text "No skolem info - we could not find the origin of the following variables" <+> ppr tvs
-       $$ text "This should not happen, please report it as a bug following the instructions at:"
-       $$ text "https://gitlab.haskell.org/ghc/ghc/wikis/report-a-bug"
-
-getSkolemInfo (implic:implics) tvs
-  | null tvs_here =                            getSkolemInfo implics tvs
-  | otherwise   = (ic_info implic, tvs_here) : getSkolemInfo implics tvs_other
-  where
-    (tvs_here, tvs_other) = partition (`elem` ic_skols implic) tvs
-    -}
 
 -----------------------
 -- relevantBindings looks at the value environment and finds values whose
