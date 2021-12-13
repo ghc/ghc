@@ -11,8 +11,25 @@ If you want to bootstrap with ghc-8.10.5 then run the ./bootstrap script with th
 
     bootstrap.py -d plan-bootstrap-8.10.5.json -w /path/to-ghc
 
+This default option will download the dependencies using the network.
+
 The result of the bootstrap script will be a hadrian binary in
 `_build/bin/hadrian`.
+
+Alternatively, you can provide a tarball with the source of any dependencies.
+
+    bootstrap.py -d plan-bootstrap-8.10.5.json -w /path/to-ghc -s sources-tarball.tar.gz
+
+Which dependencies you need can be queried using the `list-sources` option.
+
+    bootstrap.py list-sources -d plan-bootstrap-8.10.5.json
+
+This produces `fetch_plan.json` which tells you where to get each source from.
+You can instruct the script to create the tarball using the `fetch` option.
+
+    bootstrap.py fetch -d plan-bootstrap-8.10.5.json -o sources-tarball.tar.gz
+
+## Generating the bootstrap plans
 
 There is a script (using nix) which can be used to generate the bootstrap plans for the range
 of supported GHC versions using nix.
