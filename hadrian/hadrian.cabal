@@ -41,6 +41,7 @@ executable hadrian
                        , Hadrian.Builder.Ar
                        , Hadrian.Builder.Sphinx
                        , Hadrian.Builder.Tar
+                       , Hadrian.Builder.Git
                        , Hadrian.BuildPath
                        , Hadrian.Expression
                        , Hadrian.Haskell.Cabal
@@ -102,6 +103,7 @@ executable hadrian
                        , Settings.Builders.Make
                        , Settings.Builders.MergeObjects
                        , Settings.Builders.RunTest
+                       , Settings.Builders.Win32Tarballs
                        , Settings.Builders.Xelatex
                        , Settings.Default
                        , Settings.Flavours.Benchmark

@@ -29,6 +29,7 @@ xelatex        = @XELATEX@
 makeindex      = @MAKEINDEX@
 makeinfo       = @MAKEINFO@
 bourne-shell   = @SH@
+git            = @GIT@
 
 # Python 3 is required to run test driver.
 # See: https://github.com/ghc/ghc/blob/master/testsuite/mk/boilerplate.mk#L220
