@@ -1239,27 +1239,46 @@ doc-tarball:
 
 source-tarball:
   stage: packaging
-  needs: [validate-x86_64-linux-deb9-unreg-hadrian]
   tags:
     - x86_64-linux
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV"
   dependencies: []
-  rules:
-    - if: '$RELEASE_JOB == "yes"'
-      when: always
   artifacts:
     paths:
       - ghc-*.tar.xz
-      - version
+      - hadrian-bootstrap-sources-*.tar.gz
   script:
-    - python3 mk/get-win32-tarballs.py download all
     - ./boot
     - ./configure
-    - make sdist
-    - mv sdistprep/*.xz  .
-    - make show! --quiet VALUE=ProjectVersion > version
-    - source version
-    - echo "$ProjectVersion" > version
+    - ./hadrian/build source-dist
+    - mv _build/source-dist/*.xz  .
+    - python3 ./hadrian/bootstrap/bootstrap.py -w $GHC fetch -o hadrian-bootstrap-sources-$GHC_VERSION
+
+test-bootstrap:
+  stage: packaging
+  needs: [source-tarball]
+  tags:
+    - x86_64-linux
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV"
+  dependencies: [source-tarball]
+  script:
+    - mkdir test-bootstrap
+    - tar -xf ghc-*[0-9]-src.tar.xz -C test-bootstrap
+    - tar -xf ghc-*-testsuite.tar.xz -C test-bootstrap
+    - cp hadrian-bootstrap-sources-*.tar.gz test-bootstrap/ghc-*
+    - pushd test-bootstrap/ghc-*
+    - python3 ./hadrian/bootstrap/bootstrap.py -w $GHC --bootstrap-sources hadrian-bootstrap-sources-*.tar.gz
+    - export HADRIAN_PATH="$PWD/_build/bin/hadrian"
+    - .gitlab/ci.sh setup
+    - .gitlab/ci.sh configure
+    - .gitlab/ci.sh build_hadrian
+    - .gitlab/ci.sh test_hadrian
+    - popd
+    - rm -Rf test-bootstrap
+  variables:
+    TEST_ENV: "x86_64-linux-deb10-hadrian"
+    BIN_DIST_NAME: "ghc-x86_64-deb10-linux"
+    BUILD_FLAVOUR: "validate"
 
 
 ############################################################

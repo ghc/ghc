@@ -581,13 +581,16 @@ function run_hadrian() {
   if [ -z "${BIGNUM_BACKEND:-}" ]; then BIGNUM_BACKEND="gmp"; fi
   read -r -a args <<< "${HADRIAN_ARGS:-}"
   if [ -n "${VERBOSE:-}" ]; then args+=("-V"); fi
-  run hadrian/build-cabal \
-    --flavour="$BUILD_FLAVOUR" \
-    -j"$cores" \
-    --broken-test="${BROKEN_TESTS:-}" \
-    --bignum=$BIGNUM_BACKEND \
-    "${args[@]+"${args[@]}"}" \
-    "$@"
+  # Before running the compiler, unset variables gitlab env vars as these
+  # can destabilise the performance test (see #20341)
+  (unset $(compgen -v | grep CI_*);
+    run "${HADRIAN_PATH:-hadrian/build-cabal}" \
+      --flavour="$BUILD_FLAVOUR" \
+      -j"$cores" \
+      --broken-test="${BROKEN_TESTS:-}" \
+      --bignum=$BIGNUM_BACKEND \
+      "${args[@]+"${args[@]}"}" \
+      "$@")
 }
 
 # A convenience function to allow debugging in the CI environment.
