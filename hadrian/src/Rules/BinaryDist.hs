@@ -234,6 +234,11 @@ bindistRules = do
           -- shipping it
           removeFile (bindistFilesDir -/- mingwStamp)
 
+        -- Include bash-completion script in binary distributions. We don't
+        -- currently install this but merely include it for the user's
+        -- reference. See #20802.
+        copyDirectory ("utils" -/- "completion") bindistFilesDir
+
         -- These scripts are only necessary in the configure/install
         -- workflow which is not supported on windows.
         -- TODO: Instead of guarding against windows, we could offer the
