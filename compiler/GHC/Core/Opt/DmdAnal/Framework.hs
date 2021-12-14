@@ -47,11 +47,12 @@ import Control.Monad
 import Control.Monad.Trans.State.Strict
 import Control.Monad.ST
 
-import Data.Coerce
 import Data.Functor.Identity
 import Data.IORef
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
+import Data.IntMap.Strict (IntMap)
+import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Graph as Graph
 
 import GHC.Utils.Trace
@@ -187,19 +188,21 @@ evalCall callee eval_sd = EvalM $ getEnv >>= \env -> liftIO $ do
   first_visit <- not <$> hasBeenVisited env prio
   -- pprTraceM "do_call" (ppr callee <+> ppr inp' <+> ppr callee_unstable <+> ppr first_visit)
   let do_call = callee_unstable && first_visit
-  if not do_call
+  outp' <- if not do_call
     then return outp
     else do
       TransApprox _ _ outp' <- evalNode env prio
       return outp'
+  trackDynamicCall env prio
+  return outp'
 
 -----------------------------
 -- Building a DmdFramework --
 -----------------------------
 
-newtype Prio = Prio { unPrio :: Int } deriving (Eq, Ord, Ix, Outputable)
-
-newtype PrioSet = PrioSet IntSet
+type Prio = Int
+type PrioSet = IntSet
+type PrioMap a = IntMap a
 
 -- | A data-flow framework for computing the demand properties of a
 -- 'CoreProgram'. Constructed with 'runBuilder', evaluated with 'evalFramework'.
@@ -234,7 +237,7 @@ registerTransformer id (Builder build_id) = Builder $ do
   old_id <- bs_cur_id <$> get
   modify' (\bs -> bs{bs_cur_id=id})
   S2 trans a <- build_id
-  let !node = TN id trans (Prio $ -1) -- we'll replace the -1 in depAnal
+  let !node = TN id trans (-1) -- we'll replace the -1 in depAnal
   modify' $ \bs@BS{bs_trans_nodes = nodes} ->
     bs {bs_trans_nodes = extendVarEnv nodes id node, bs_cur_id = old_id}
   return a
@@ -272,17 +275,17 @@ depAnal deps nodes = runST $ {-# SCC "depAnal" #-} do
   let node2vtx id = expectJust "node2vtx" $ lookupVarEnv node2vtx_env id
   let deps_graph = map node2vtx . maybe [] bagToList . lookupVarEnv deps <$> vtx2node_arr
   let priorities = reverse $ Graph.topSort deps_graph -- Urgh, we have to wait for reverseTopSort
-  let prio2vtx_arr = UArr.listArray bounds priorities :: UArray Int Int
-  let vtx2prio_arr = UArr.array     bounds $ zipWith (\p n -> (n, p)) [0..] priorities :: UArray Int Int
-  let prio2vtx prio = prio2vtx_arr UArr.! unPrio prio
-  let vtx2prio vtx  = Prio $ vtx2prio_arr UArr.! vtx
+  let prio2vtx_arr = UArr.listArray bounds priorities :: UArray Prio Graph.Vertex
+  let vtx2prio_arr = UArr.array     bounds $ zipWith (\p n -> (n, p)) [0..] priorities :: UArray Graph.Vertex Prio
+  let prio2vtx prio = prio2vtx_arr UArr.! prio
+  let vtx2prio vtx  = vtx2prio_arr UArr.! vtx
   let nodes_with_prios = mapVarEnv (\node -> node{tn_prio = vtx2prio $ node2vtx $ tn_id node}) nodes
       -- referrers is the transposed graph of deps
-  let referrers = Graph.transposeG deps_graph :: Array Int [Int]
+  let referrers = Graph.transposeG deps_graph :: Array Graph.Vertex [Graph.Vertex]
       -- ... but we should rather cache the *priorities* of those referrers,
       -- because that's the set that we will keep on adding to our priority queue.
-      vtx2prio_assoc (vtx,refs) = (vtx2prio vtx, coerce IntSet.fromList $ map vtx2prio refs)
-      referrer_prios = array (coerce bounds) $ map vtx2prio_assoc $ assocs referrers
+      vtx2prio_assoc (vtx,refs) = (vtx2prio vtx, IntSet.fromList $ map vtx2prio refs)
+      referrer_prios = array bounds $ map vtx2prio_assoc $ assocs referrers
       prio2node = vtx2node . prio2vtx
   -- let pprArr arr = ppr (assocs arr)
   -- let pprUArr arr = ppr (UArr.assocs arr)
@@ -297,27 +300,31 @@ depAnal deps nodes = runST $ {-# SCC "depAnal" #-} do
 
 data EvalEnv
   = EE
-  { ee_framework :: !DmdFramework
-  , ee_approxs   :: !(IOArray Prio TransApprox)
-  , ee_unstable  :: !(IORef PrioSet)
-  , ee_visited   :: !(IORef PrioSet)
-  , ee_changed   :: !(IORef Bool)
-  , ee_lazy_fvs  :: !(IORef (IdEnv DmdEnv))
-  , ee_demands   :: !(IORef (IdEnv Demand))
-  , ee_sigs      :: !(IORef (IdEnv DmdSig))
+  { ee_framework    :: !DmdFramework
+  , ee_approxs      :: !(IOArray Prio TransApprox)
+  , ee_unstable     :: !(IORef PrioSet)
+  , ee_visited      :: !(IORef PrioSet)
+  , ee_active_eval  :: !(IORef Prio)
+  , ee_active_evals :: !(IORef (PrioMap PrioSet))
+  , ee_changed      :: !(IORef Bool)
+  , ee_lazy_fvs     :: !(IORef (IdEnv DmdEnv))
+  , ee_demands      :: !(IORef (IdEnv Demand))
+  , ee_sigs         :: !(IORef (IdEnv DmdSig))
   }
 
 initEvalEnv :: DmdFramework -> IO EvalEnv
 initEvalEnv fw = do
   let !n = sizeUFM (df_trans_nodes fw)
-  approxs  <- newArray (Prio 0, Prio $ n-1) botTransApprox
-  unstable <- newIORef $ PrioSet $ IntSet.fromDistinctAscList [0..n-1]
-  visited  <- newIORef $ PrioSet IntSet.empty
-  changed  <- newIORef False
-  lazy_fvs <- newIORef emptyVarEnv
-  demands  <- newIORef emptyVarEnv
-  sigs     <- newIORef emptyVarEnv
-  return $! EE fw approxs unstable visited changed lazy_fvs demands sigs
+  approxs      <- newArray (0, n-1) botTransApprox
+  unstable     <- newIORef $ IntSet.fromDistinctAscList [0..n-1]
+  visited      <- newIORef IntSet.empty
+  active_eval  <- newIORef 0
+  active_evals <- newIORef IntMap.empty
+  changed      <- newIORef False
+  lazy_fvs     <- newIORef emptyVarEnv
+  demands      <- newIORef emptyVarEnv
+  sigs         <- newIORef emptyVarEnv
+  return $! EE fw approxs unstable visited active_eval active_evals changed lazy_fvs demands sigs
 
 node2prio :: EvalEnv -> Id -> Prio
 node2prio env id = expectJust "node2prio" $ tn_prio <$> lookupVarEnv (df_trans_nodes (ee_framework env)) id
@@ -330,7 +337,7 @@ getTransNode env id =
   expectJust "getTransNode" $ lookupVarEnv (df_trans_nodes (ee_framework env)) id
 
 referrers :: EvalEnv -> Prio -> [Id]
-referrers env n = map (prio2node env) $ coerce IntSet.toList prios
+referrers env n = map (prio2node env) $ IntSet.toList prios
   where
     prios = referrerPrios env n
 
@@ -341,28 +348,41 @@ referrerPrios env n = referrers `seq` -- keep alive referrers for trace messages
 dequeueUnstable :: EvalEnv -> IO (Maybe Prio)
 dequeueUnstable env = do
   queue <- readIORef (ee_unstable env)
-  case coerce IntSet.minView queue of
+  case IntSet.minView queue of
     Nothing -> return Nothing
     Just (!next, !queue') -> do
       writeIORef (ee_unstable env) queue'
       return $! Just $! next
 
 deleteUnstable :: EvalEnv -> Prio -> IO ()
-deleteUnstable env n = modifyIORef' (ee_unstable env) (coerce IntSet.delete n)
+deleteUnstable env n = modifyIORef' (ee_unstable env) (IntSet.delete n)
 
 isUnstable :: EvalEnv -> Prio -> IO Bool
 isUnstable env n = -- pprTrace "isUnstable" (ppr n) $
-  coerce IntSet.member n <$> readIORef (ee_unstable env)
+  IntSet.member n <$> readIORef (ee_unstable env)
 
 enqueueUnstable :: EvalEnv -> Prio -> IO ()
 enqueueUnstable env n = -- pprTrace "enqueueUnstable" (ppr n) $
-  modifyIORef' (ee_unstable env) $ coerce IntSet.insert n
+  modifyIORef' (ee_unstable env) $ IntSet.insert n
 
 enqueueUnstableReferrers :: EvalEnv -> Prio -> IO ()
 enqueueUnstableReferrers env changed_node_prio = do
-  -- pprTraceM "enqueueUnstableReferrers" (ppr (referrers env changed_node_id) $$ ppr (referrerPrios env changed_node_id))
+  active_evals <- readIORef (ee_active_evals env)
+  let static_referrers = referrerPrios env changed_node_prio
+  -- Some of the referrers might be actively eval'd at the moment.
+  -- We do finer-grained dependency tracking for those, in the PrioSets
+  -- carried in ee_active_evals.
+      !active_referrers = IntMap.restrictKeys active_evals static_referrers
+      !inactive_referrers = IntSet.difference static_referrers (IntMap.keysSet active_referrers)
+
+      is_affected calls = IntSet.member changed_node_prio calls
+      !affected_active_referrers = IntMap.keysSet $ IntMap.filter is_affected active_referrers
+  -- pprTraceM "enqueueUnstableReferrers" (ppr changed_node_prio $$ ppr (referrers env changed_node_prio) $$ ppr (referrerPrios env changed_node_prio) $$ ppr active_referrers $$ ppr affected_active_referrers)
   modifyIORef' (ee_unstable env) $ \queue ->
-    coerce IntSet.union queue $ referrerPrios env changed_node_prio
+    -- The following is conservative and simple:
+    -- IntSet.unions [queue, static_referrers]
+    -- The following is conservative and more precise (a subset of the former), but a little more complex:
+    IntSet.unions [queue, inactive_referrers, affected_active_referrers]
 
 readTransApprox :: EvalEnv -> Prio -> IO TransApprox
 readTransApprox env = readArray (ee_approxs env)
@@ -371,13 +391,18 @@ writeTransApprox :: EvalEnv -> Prio -> TransApprox -> IO ()
 writeTransApprox env = writeArray (ee_approxs env)
 
 clearVisited :: EvalEnv -> IO ()
-clearVisited env = writeIORef (ee_visited env) (coerce IntSet.empty)
+clearVisited env = writeIORef (ee_visited env) IntSet.empty
 
 addVisited :: EvalEnv -> Prio -> IO ()
-addVisited env prio = modifyIORef' (ee_visited env) (coerce IntSet.insert prio)
+addVisited env prio = modifyIORef' (ee_visited env) (IntSet.insert prio)
 
 hasBeenVisited :: EvalEnv -> Prio -> IO Bool
-hasBeenVisited env n = coerce IntSet.member n <$> readIORef (ee_visited env)
+hasBeenVisited env n = IntSet.member n <$> readIORef (ee_visited env)
+
+trackDynamicCall :: EvalEnv -> Prio -> IO ()
+trackDynamicCall env callee_prio = do
+  caller_prio <- readIORef (ee_active_eval env)
+  modifyIORef' (ee_active_evals env) (IntMap.adjust (IntSet.insert callee_prio) caller_prio)
 
 finaliseEvalEnv :: EvalEnv -> IO DmdAnnotations
 finaliseEvalEnv env = DA <$> readIORef (ee_demands env) <*> readIORef (ee_sigs env)
@@ -403,17 +428,23 @@ evalFramework fw = {-# SCC "evalFramework" #-} unsafePerformIO $ do
     clearVisited env
   finaliseEvalEnv env
 
-withFreshChangedFlag :: EvalEnv -> IO a -> IO a
-withFreshChangedFlag env m = do
-  old_changed <- readIORef (ee_changed env)
+prepareNextEval :: EvalEnv -> Prio -> IO a -> IO a
+prepareNextEval env node_prio m = do
+  addVisited env node_prio
+  modifyIORef' (ee_active_evals env) (IntMap.insert node_prio IntSet.empty)
+  old_active_eval <- readIORef (ee_active_eval env)
+  old_changed     <- readIORef (ee_changed env)
+  writeIORef (ee_active_eval env) node_prio
+  writeIORef (ee_changed     env) False
+  deleteUnstable env node_prio -- eval is imminent, so this node is now considered stable
   a <- m
-  writeIORef (ee_changed env) old_changed
+  writeIORef (ee_changed     env) old_changed
+  writeIORef (ee_active_eval env) old_active_eval
+  modifyIORef' (ee_active_evals env) (IntMap.delete node_prio)
   return a
 
 evalNode :: EvalEnv -> Prio -> IO TransApprox
-evalNode env node_prio = withFreshChangedFlag env $ do
-  deleteUnstable env node_prio
-  addVisited env node_prio
+evalNode env node_prio = prepareNextEval env node_prio $ do
   let node_id = prio2node env node_prio
   let node = getTransNode env node_id
   _approx@(TransApprox n inp _outp) <- readTransApprox env node_prio
