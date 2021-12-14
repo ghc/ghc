@@ -9,6 +9,7 @@ import Packages
 import Settings.Builders.Common
 import qualified Data.Set    as Set
 import Flavour
+import qualified Context.Type as C
 
 getTestSetting :: TestSetting -> Expr String
 getTestSetting key = expr $ testSetting key
@@ -54,7 +55,8 @@ runTestGhcFlags = do
 -- mirrors @testsuite/mk/test.mk@.
 runTestBuilderArgs :: Args
 runTestBuilderArgs = builder Testsuite ? do
-    pkgs     <- expr $ stagePackages Stage1
+    ctx <- getContext
+    pkgs     <- expr $ stagePackages (C.stage ctx)
     libTests <- expr $ filterM doesDirectoryExist $ concat
             [ [ pkgPath pkg -/- "tests", pkgPath pkg -/- "tests-ghc" ]
             | pkg <- pkgs, isLibrary pkg, pkg /= rts, pkg /= libffi ]

@@ -50,7 +50,7 @@ getProgramContexts stage = do
   tPackages <- testsuitePackages
   -- TODO: Shall we use Stage2 for testsuite packages instead?
   let allPackages = sPackages
-                ++ if stage == Stage1 then tPackages else []
+                 ++ tPackages
   fmap concat . forM allPackages $ \pkg -> do
     -- the iserv pkg results in three different programs at
     -- the moment, ghc-iserv (built the vanilla way),
