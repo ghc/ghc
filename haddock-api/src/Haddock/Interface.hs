@@ -56,11 +56,11 @@ import qualified Data.Set as Set
 import GHC hiding (verbosity)
 import GHC.Data.FastString (unpackFS)
 import GHC.Data.Graph.Directed
-import GHC.Driver.Env (hscUpdateFlags, hsc_home_unit, hsc_logger, hsc_static_plugins, hsc_units)
+import GHC.Driver.Env
 import GHC.Driver.Monad (modifySession, withTimingM)
 import GHC.Driver.Session hiding (verbosity)
 import GHC.HsToCore.Docs (getMainDeclBinder)
-import GHC.Plugins (Outputable, Plugin (..), PluginWithArgs (..), StaticPlugin (..), defaultPlugin, keepRenamedSource)
+import GHC.Plugins
 import GHC.Tc.Types (TcGblEnv (..), TcM)
 import GHC.Tc.Utils.Env (tcLookupGlobal)
 import GHC.Tc.Utils.Monad (getTopEnv, setGblEnv)
@@ -145,10 +145,12 @@ createIfaces verbosity modules flags instIfaceMap = do
 
   let
     installHaddockPlugin :: HscEnv -> HscEnv
-    installHaddockPlugin hsc_env = hscUpdateFlags (flip gopt_set Opt_PluginTrustworthy) $ hsc_env
-      { hsc_static_plugins =
-          haddockPlugin : hsc_static_plugins hsc_env
-      }
+    installHaddockPlugin hsc_env =
+      let 
+        old_plugins = hsc_plugins hsc_env
+        new_plugins = old_plugins { staticPlugins = haddockPlugin : staticPlugins old_plugins }
+        hsc_env'    = hsc_env { hsc_plugins = new_plugins }
+      in hscUpdateFlags (flip gopt_set Opt_PluginTrustworthy) hsc_env'
 
   -- Note that we would rather use withTempSession but as long as we
   -- have the separate attachInstances step we need to keep the session
