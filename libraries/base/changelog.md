@@ -35,6 +35,10 @@
 
   * Fix the `Ord1` instance for `Data.Ord.Down` to reverse sort order.
 
+  * Any Haskell type that wraps a C pointer type has been changed from
+    `Ptr ()` to `CUIntPtr`. For typical glibc based platforms, the
+    affected type is `CTimer`.
+
 ## 4.16.0.0 *Nov 2021*
 
   * The unary tuple type, `Solo`, is now exported by `Data.Tuple`.
