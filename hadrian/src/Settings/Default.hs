@@ -1,6 +1,6 @@
 module Settings.Default (
     -- * Packages that are build by default and for the testsuite
-    defaultPackages, testsuitePackages,
+    defaultPackages, testsuitePackages, stage0Packages,
 
     -- * Default build ways
     defaultLibraryWays, defaultRtsWays,
@@ -68,6 +68,7 @@ stage0Packages = do
              , genapply
              , genprimopcode
              , ghc
+             , runGhc
              , ghcBoot
              , ghcBootTh
              , ghcHeap
@@ -76,6 +77,7 @@ stage0Packages = do
              , haddock
              , hsc2hs
              , hpc
+             , hpcBin
              , mtl
              , parsec
              , templateHaskell

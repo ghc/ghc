@@ -521,6 +521,12 @@ function test_hadrian() {
 
   run_hadrian \
     test \
+    --test-root-dirs=testsuite/tests/stage1 \
+    --test-compiler=stage1 \
+    "runtest.opts+=${RUNTEST_ARGS:-}"
+
+  run_hadrian \
+    test \
     --summary-junit=./junit.xml \
     --test-have-intree-files \
     --test-compiler="$TOP/_build/install/bin/ghc$exe" \

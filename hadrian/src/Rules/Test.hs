@@ -65,6 +65,26 @@ testRules = do
         -- Reasons why this is required are not entirely clear.
         cmd ["bash"] ["-c", ghc0Path ++ " " ++ ghcConfigHsPath ++ " -o " ++ (root -/- ghcConfigProgPath)]
 
+    -- we need to create wrappers to test the stage1 compiler
+    -- as the stage1 compiler needs the stage2 libraries
+    -- to have any hope of passing tests.
+    root -/- "stage1-test/bin/*" %> \path -> do
+      let prog = takeBaseName path
+          stage0prog = root -/- "stage0/bin" -/- prog <.> exe
+      need [stage0prog]
+      abs_prog_path <- liftIO (IO.canonicalizePath stage0prog)
+      -- Use the stage1 package database
+      pkgDb <- liftIO . IO.makeAbsolute =<< packageDbPath Stage1
+      if prog `elem` ["ghc","runghc"] then do
+          let flags = [ "-no-user-package-db", "-hide-package", "ghc" , "-package-env","-","-package-db",pkgDb]
+          writeFile' path $ unlines ["#!/bin/sh",unwords ((abs_prog_path : flags) ++ ["${1+\"$@\"}"])]
+          makeExecutable path
+      else if prog == "ghc-pkg" then do
+        let flags = ["--no-user-package-db", "--global-package-db", pkgDb]
+        writeFile' path $ unlines ["#!/bin/sh",unwords ((abs_prog_path : flags) ++ ["${1+\"$@\"}"])]
+        makeExecutable path
+      else createFileLink abs_prog_path path
+
     -- Rules for building check-ppr, check-exact and
     -- check-ppr-annotations with the compiler we are going to test
     -- (in-tree or out-of-tree).
@@ -76,16 +96,15 @@ testRules = do
 
             -- when we're about to test an in-tree compiler, just build the package
             -- normally, NOT stage3, as there are no rules for stage4 yet
-            if (testGhc `elem` ["stage1", "stage2"])
-              then do
-                let stg = stageOf testGhc
+            case stageOf testGhc of
+              Just stg -> do
                 fs <- pkgFile stg progPkg
                 need [fs]
                 prog_path <- programPath =<< programContext stg progPkg
                 abs_prog_path <- liftIO (IO.canonicalizePath prog_path)
                 createFileLink abs_prog_path path
             -- otherwise, build it by directly invoking ghc
-              else do
+              Nothing -> do
                 top <- topDirectory
                 depsPkgs <- packageDependencies <$> readPackageData progPkg
                 bindir <- getBinaryDirectory testGhc
@@ -106,9 +125,8 @@ testRules = do
         alwaysRerun
         args <- userSetting defaultTestArgs
         let testGhc = testCompiler args
-            stg = stageOf testGhc
         ghcPath <- getCompilerPath testGhc
-        when (testGhc `elem` ["stage1", "stage2", "stage3"]) $
+        whenJust (stageOf testGhc) $ \stg ->
             need . (:[]) =<< programPath (Context stg ghc vanilla)
         need [root -/- ghcConfigProgPath]
         cmd [FileStdout $ root -/- ghcConfigPath] (root -/- ghcConfigProgPath)
@@ -126,14 +144,9 @@ testRules = do
         args <- userSetting defaultTestArgs
 
         let testCompilerArg = testCompiler args
+
         ghcPath <- getCompilerPath testCompilerArg
 
-        -- TODO This approach doesn't work.
-        -- Set environment variables for test's Makefile.
-        env <- sequence
-            [ builderEnvironment "MAKE" $ Make ""
-            , builderEnvironment "TEST_HC" $ Ghc CompileHs Stage2
-            , AddEnv "TEST_HC_OPTS" <$> runTestGhcFlags ]
 
         makePath        <- builderPath $ Make ""
         top             <- topDirectory
@@ -171,7 +184,8 @@ testRules = do
             -- which is in turn included by all test 'Makefile's.
             setEnv "ghc_config_mk" (top -/- root -/- ghcConfigPath)
 
-        let test_target tt = target (vanillaContext Stage2 compiler) (Testsuite tt) [] []
+        let stg = fromMaybe Stage2 $ stageOf testCompilerArg
+        let test_target tt = target (vanillaContext stg compiler) (Testsuite tt) [] []
 
         -- We need to ask the testsuite if it needs any extra hadrian dependencies for the
         -- tests it is going to run,
@@ -183,7 +197,7 @@ testRules = do
         -- Execute the test target.
         -- We override the verbosity setting to make sure the user can see
         -- the test output: https://gitlab.haskell.org/ghc/ghc/issues/15951.
-        withVerbosity Diagnostic $ buildWithCmdOptions env $ test_target RunTest
+        withVerbosity Diagnostic $ buildWithCmdOptions [] $ test_target RunTest
 
 -- | Given a test compiler and a hadrian dependency (target), check if we
 -- can build the target with the compiler
@@ -195,7 +209,7 @@ testRules = do
 -- We should have built them already by this point, but
 isOkToBuild :: TestArgs -> String -> Bool
 isOkToBuild args target
-   = isInTreeCompiler (testCompiler args)
+   = stageOf (testCompiler args) `elem` [Just Stage1, Just Stage2]
   || testHasInTreeFiles args
   || target `elem` map fst5 checkPrograms
   where
@@ -223,40 +237,47 @@ timeoutProgBuilder = do
 needTestBuilders :: Action ()
 needTestBuilders = do
     testGhc <- testCompiler <$> userSetting defaultTestArgs
-    when (isInTreeCompiler testGhc)
-         (needTestsuitePackages testGhc)
+    whenJust (stageOf testGhc)
+             needTestsuitePackages
 
 -- | Build extra programs and libraries required by testsuite
--- 'testGhc' has to be one of "stage1", "stage2" or "stage3"
-needTestsuitePackages :: String -> Action ()
-needTestsuitePackages testGhc = do
-  let stg = stageOf testGhc
-  allpkgs   <- packages <$> flavour
-  stgpkgs   <- allpkgs (succ stg)
-  let pkgs = filter (\p -> not $ "iserv" `isInfixOf` pkgName p)
-                    (stgpkgs ++ [ timeout | windowsHost ])
-  need =<< mapM (pkgFile stg) pkgs
-  needIservBins
+needTestsuitePackages :: Stage -> Action ()
+needTestsuitePackages stg = do
+  allpkgs <- packages <$> flavour
+  -- We need the libraries of the successor stage
+  libpkgs <- map (Stage1,) . filter isLibrary <$> allpkgs (succ stg)
+  -- And the executables of the current stage
+  exepkgs <- map (stg,) . filter isProgram <$> allpkgs stg
+  -- Don't require lib:ghc or lib:cabal when testing the stage1 compiler
+  -- This is a hack, but a major usecase for testing the stage1 compiler is
+  -- so that we can use it even if ghc stage2 fails to build
+  -- Unfortunately, we still need the liba
+  let pkgs = filter (\(_,p) -> not $ "iserv" `isInfixOf` pkgName p || ((pkgName p `elem` ["ghc", "Cabal"]) && stg == Stage0))
+                    (libpkgs ++ exepkgs ++ [ (stg,timeout) | windowsHost ])
+  need =<< mapM (uncurry pkgFile) pkgs
+  needIservBins stg
+  root <- buildRoot
+  -- require the shims for testing stage1
+  need =<< sequence [(\f -> root -/- "stage1-test/bin" -/- takeFileName f) <$> (pkgFile Stage0 p) | (Stage0,p) <- exepkgs]
 
 -- stage 1 ghc lives under stage0/bin,
 -- stage 2 ghc lives under stage1/bin, etc
-stageOf :: String -> Stage
-stageOf "stage1" = Stage0
-stageOf "stage2" = Stage1
-stageOf "stage3" = Stage2
-stageOf _ = error "unexpected stage argument"
+stageOf :: String -> Maybe Stage
+stageOf "stage1" = Just Stage0
+stageOf "stage2" = Just Stage1
+stageOf "stage3" = Just Stage2
+stageOf _ = Nothing
 
-needIservBins :: Action ()
-needIservBins = do
-  testGhc <- testCompiler <$> userSetting defaultTestArgs
-  let stg = stageOf testGhc
-      ws = [vanilla, profiling, dynamic]
+needIservBins :: Stage -> Action ()
+needIservBins stg = do
+  let ws = [vanilla, profiling, dynamic]
   progs <- catMaybes <$> mapM (canBuild stg) ws
   need progs
   where
     -- Only build iserv binaries if all dependencies are built the right
     -- way already. In particular this fixes the case of no_profiled_libs
     -- not working with the testsuite, see #19624
+    canBuild Stage0 _ = pure Nothing
     canBuild stg w = do
       contextDeps <- contextDependencies (Context stg iserv w)
       ws <- forM contextDeps $ \c ->
