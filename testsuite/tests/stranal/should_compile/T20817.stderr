@@ -1,0 +1,358 @@
+
+==================== Demand analysis ====================
+Result size of Demand analysis
+  = {terms: 102, types: 178, coercions: 0, joins: 0/0}
+
+Rec {
+-- RHS size: {terms: 53, types: 64, coercions: 0, joins: 0/0}
+f [Occ=LoopBreaker]
+  :: forall {a} {b} {c} {d} {e} {t} {t} {t} {t} {t} {t} {t} {t}.
+     Bool
+     -> (a, b, c, d, e)
+     -> t
+     -> t
+     -> t
+     -> t
+     -> t
+     -> t
+     -> t
+     -> t
+     -> (a, b, c, t, t, t, t, t, t, t, t)
+[LclIdX,
+ Arity=10,
+ Str=<1L><1P(L,L,L,A,A)><L><L><L><L><L><L><L><L>,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [50 20 0 0 0 0 0 0 0 0] 150 10}]
+f = \ (@a)
+      (@b)
+      (@c)
+      (@d)
+      (@e)
+      (@t)
+      (@t)
+      (@t)
+      (@t)
+      (@t)
+      (@t)
+      (@t)
+      (@t)
+      (ds [Dmd=1L] :: Bool)
+      (ds [Dmd=1P(L,L,L,A,A)] :: (a, b, c, d, e))
+      (b1 :: t)
+      (b2 :: t)
+      (b3 :: t)
+      (b4 :: t)
+      (b5 :: t)
+      (b6 :: t)
+      (b7 :: t)
+      (b8 :: t) ->
+      case ds of {
+        False ->
+          f @a
+            @b
+            @c
+            @d
+            @e
+            @t
+            @t
+            @t
+            @t
+            @t
+            @t
+            @t
+            @t
+            GHC.Types.True
+            ds
+            b1
+            b2
+            b3
+            b4
+            b5
+            b6
+            b7
+            b8;
+        True ->
+          case ds of { (x, y, z, ds [Dmd=A], ds [Dmd=A]) ->
+          (x, y, z, b1, b2, b3, b4, b5, b6, b7, b8)
+          }
+      }
+end Rec }
+
+Rec {
+-- RHS size: {terms: 33, types: 44, coercions: 0, joins: 0/0}
+g [Occ=LoopBreaker]
+  :: forall {a} {b} {c} {d} {e} {t} {t} {t}.
+     Bool -> (a, b, c, d, e) -> t -> t -> t -> (a, b, c, t, t, t)
+[LclIdX,
+ Arity=5,
+ Str=<1L><1!P(L,L,L,A,A)><L><L><L>,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [50 20 0 0 0] 100 10}]
+g = \ (@a)
+      (@b)
+      (@c)
+      (@d)
+      (@e)
+      (@t)
+      (@t)
+      (@t)
+      (ds [Dmd=1L] :: Bool)
+      (ds [Dmd=1!P(L,L,L,A,A)] :: (a, b, c, d, e))
+      (b1 :: t)
+      (b2 :: t)
+      (b3 :: t) ->
+      case ds of {
+        False -> g @a @b @c @d @e @t @t @t GHC.Types.True ds b1 b2 b3;
+        True ->
+          case ds of { (x, y, z, ds [Dmd=A], ds [Dmd=A]) ->
+          (x, y, z, b1, b2, b3)
+          }
+      }
+end Rec }
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$trModule :: GHC.Prim.Addr#
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+$trModule = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$trModule :: GHC.Types.TrName
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+$trModule = GHC.Types.TrNameS $trModule
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$trModule :: GHC.Prim.Addr#
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+$trModule = "Foo"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$trModule :: GHC.Types.TrName
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+$trModule = GHC.Types.TrNameS $trModule
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+Foo.$trModule :: GHC.Types.Module
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+Foo.$trModule = GHC.Types.Module $trModule $trModule
+
+
+
+
+==================== Demand analysis ====================
+Result size of Demand analysis
+  = {terms: 137, types: 260, coercions: 0, joins: 0/0}
+
+Rec {
+-- RHS size: {terms: 53, types: 64, coercions: 0, joins: 0/0}
+f [Occ=LoopBreaker]
+  :: forall {a} {b} {c} {d} {e} {t} {t} {t} {t} {t} {t} {t} {t}.
+     Bool
+     -> (a, b, c, d, e)
+     -> t
+     -> t
+     -> t
+     -> t
+     -> t
+     -> t
+     -> t
+     -> t
+     -> (a, b, c, t, t, t, t, t, t, t, t)
+[LclIdX,
+ Arity=10,
+ Str=<1L><1P(L,L,L,A,A)><L><L><L><L><L><L><L><L>,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [50 20 0 0 0 0 0 0 0 0] 150 10}]
+f = \ (@a)
+      (@b)
+      (@c)
+      (@d)
+      (@e)
+      (@t)
+      (@t)
+      (@t)
+      (@t)
+      (@t)
+      (@t)
+      (@t)
+      (@t)
+      (ds [Dmd=1L] :: Bool)
+      (ds [Dmd=1P(L,L,L,A,A)] :: (a, b, c, d, e))
+      (b1 :: t)
+      (b2 :: t)
+      (b3 :: t)
+      (b4 :: t)
+      (b5 :: t)
+      (b6 :: t)
+      (b7 :: t)
+      (b8 :: t) ->
+      case ds of {
+        False ->
+          f @a
+            @b
+            @c
+            @d
+            @e
+            @t
+            @t
+            @t
+            @t
+            @t
+            @t
+            @t
+            @t
+            GHC.Types.True
+            ds
+            b1
+            b2
+            b3
+            b4
+            b5
+            b6
+            b7
+            b8;
+        True ->
+          case ds of { (x, y, z, ds [Dmd=A], ds [Dmd=A]) ->
+          (x, y, z, b1, b2, b3, b4, b5, b6, b7, b8)
+          }
+      }
+end Rec }
+
+Rec {
+-- RHS size: {terms: 34, types: 36, coercions: 0, joins: 0/0}
+$wg [InlPrag=[2],
+     Occ=LoopBreaker,
+     Dmd=LCL(C1(C1(C1(C1(C1(C1(!L)))))))]
+  :: forall {a} {b} {c} {d} {e} {t} {t} {t}.
+     Bool -> a -> b -> c -> t -> t -> t -> (# a, b, c, t, t, t #)
+[LclId,
+ Arity=7,
+ Str=<1L><L><L><L><L><L><L>,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [30 0 0 0 0 0 0] 100 10}]
+$wg
+  = \ (@a)
+      (@b)
+      (@c)
+      (@d)
+      (@e)
+      (@t)
+      (@t)
+      (@t)
+      (ds [Dmd=1L] :: Bool)
+      (ww :: a)
+      (ww :: b)
+      (ww :: c)
+      (b1 :: t)
+      (b2 :: t)
+      (b3 :: t) ->
+      case ds of {
+        False ->
+          $wg @a @b @c @d @e @t @t @t GHC.Types.True ww ww ww b1 b2 b3;
+        True -> (# ww, ww, ww, b1, b2, b3 #)
+      }
+end Rec }
+
+-- RHS size: {terms: 33, types: 62, coercions: 0, joins: 0/0}
+g [InlPrag=[2]]
+  :: forall {a} {b} {c} {d} {e} {t} {t} {t}.
+     Bool -> (a, b, c, d, e) -> t -> t -> t -> (a, b, c, t, t, t)
+[LclIdX,
+ Arity=5,
+ Str=<1L><1!P(L,L,L,A,A)><L><L><L>,
+ Cpr=1,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=5,unsat_ok=True,boring_ok=False)
+         Tmpl= \ (@a)
+                 (@b)
+                 (@c)
+                 (@d)
+                 (@e)
+                 (@t)
+                 (@t)
+                 (@t)
+                 (ds [Occ=Once1, Dmd=SL] :: Bool)
+                 (ds [Occ=Once1!, Dmd=S!P(L,L,L,A,A)] :: (a, b, c, d, e))
+                 (b1 [Occ=Once1] :: t)
+                 (b2 [Occ=Once1] :: t)
+                 (b3 [Occ=Once1] :: t) ->
+                 case ds of
+                 { (ww [Occ=Once1], ww [Occ=Once1], ww [Occ=Once1],
+                    _ [Occ=Dead, Dmd=A], _ [Occ=Dead, Dmd=A]) ->
+                 case $wg @a @b @c @d @e @t @t @t ds ww ww ww b1 b2 b3 of
+                 { (# ww [Occ=Once1], ww [Occ=Once1], ww [Occ=Once1],
+                      ww [Occ=Once1], ww [Occ=Once1], ww [Occ=Once1] #) ->
+                 (ww, ww, ww, ww, ww, ww)
+                 }
+                 }}]
+g = \ (@a)
+      (@b)
+      (@c)
+      (@d)
+      (@e)
+      (@t)
+      (@t)
+      (@t)
+      (ds [Dmd=1L] :: Bool)
+      (ds [Dmd=1!P(L,L,L,A,A)] :: (a, b, c, d, e))
+      (b1 :: t)
+      (b2 :: t)
+      (b3 :: t) ->
+      case ds of { (ww, ww, ww, ww [Dmd=A], ww [Dmd=A]) ->
+      case $wg @a @b @c @d @e @t @t @t ds ww ww ww b1 b2 b3 of
+      { (# ww, ww, ww, ww, ww, ww #) ->
+      (ww, ww, ww, ww, ww, ww)
+      }
+      }
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$trModule :: GHC.Prim.Addr#
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+$trModule = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$trModule :: GHC.Types.TrName
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+$trModule = GHC.Types.TrNameS $trModule
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$trModule :: GHC.Prim.Addr#
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+$trModule = "Foo"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$trModule :: GHC.Types.TrName
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+$trModule = GHC.Types.TrNameS $trModule
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+Foo.$trModule :: GHC.Types.Module
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+Foo.$trModule = GHC.Types.Module $trModule $trModule
+
+
+
