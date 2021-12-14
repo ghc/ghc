@@ -493,6 +493,10 @@ isSingleton _   = False
 notNull :: Foldable f => f a -> Bool
 notNull = not . null
 
+-- | Utility function to go from a singleton list to it's element.
+--
+-- Wether or not the argument is a singleton list is only checked
+-- in debug builds.
 only :: [a] -> a
 #if defined(DEBUG)
 only [a] = a
