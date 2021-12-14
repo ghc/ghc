@@ -284,7 +284,7 @@ data InteractiveContext
          ic_cwd :: Maybe FilePath,
              -- ^ virtual CWD of the program
 
-         ic_plugins :: ![LoadedPlugin]
+         ic_plugins :: !Plugins
              -- ^ Cache of loaded plugins. We store them here to avoid having to
              -- load them everytime we switch to the interctive context.
     }
@@ -321,7 +321,7 @@ emptyInteractiveContext dflags
        ic_default    = Nothing,
        ic_resume     = [],
        ic_cwd        = Nothing,
-       ic_plugins    = []
+       ic_plugins    = emptyPlugins
        }
 
 icReaderEnv :: InteractiveContext -> GlobalRdrEnv

@@ -265,8 +265,7 @@ newHscEnv dflags = do
                   ,  hsc_type_env_vars  = emptyKnotVars
                   ,  hsc_interp         = Nothing
                   ,  hsc_unit_env       = unit_env
-                  ,  hsc_plugins        = []
-                  ,  hsc_static_plugins = []
+                  ,  hsc_plugins        = emptyPlugins
                   ,  hsc_hooks          = emptyHooks
                   ,  hsc_tmpfs          = tmpfs
                   }
@@ -479,7 +478,7 @@ hscParse' mod_summary
             let applyPluginAction p opts
                   = parsedResultAction p opts mod_summary
             hsc_env <- getHscEnv
-            withPlugins hsc_env applyPluginAction res
+            withPlugins (hsc_plugins hsc_env) applyPluginAction res
 
 checkBidirectionFormatChars :: PsLoc -> StringBuffer -> Maybe (NonEmpty (PsLoc, Char, String))
 checkBidirectionFormatChars start_loc sb

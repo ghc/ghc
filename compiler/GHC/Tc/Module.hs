@@ -3071,7 +3071,7 @@ Type Checker Plugins
 
 withTcPlugins :: HscEnv -> TcM a -> TcM a
 withTcPlugins hsc_env m =
-    case catMaybes $ mapPlugins hsc_env tcPlugin of
+    case catMaybes $ mapPlugins (hsc_plugins hsc_env) tcPlugin of
        []      -> m  -- Common fast case
        plugins -> do
                 ev_binds_var <- newTcEvBinds
@@ -3096,7 +3096,7 @@ withTcPlugins hsc_env m =
 
 withDefaultingPlugins :: HscEnv -> TcM a -> TcM a
 withDefaultingPlugins hsc_env m =
-  do case catMaybes $ mapPlugins hsc_env defaultingPlugin of
+  do case catMaybes $ mapPlugins (hsc_plugins hsc_env) defaultingPlugin of
        [] -> m  -- Common fast case
        plugins  -> do (plugins,stops) <- mapAndUnzipM start_plugin plugins
                       -- This ensures that dePluginStop is called even if a type
@@ -3114,7 +3114,7 @@ withDefaultingPlugins hsc_env m =
 
 withHoleFitPlugins :: HscEnv -> TcM a -> TcM a
 withHoleFitPlugins hsc_env m =
-  case catMaybes $ mapPlugins hsc_env holeFitPlugin of
+  case catMaybes $ mapPlugins (hsc_plugins hsc_env) holeFitPlugin of
     [] -> m  -- Common fast case
     plugins -> do (plugins,stops) <- mapAndUnzipM start_plugin plugins
                   -- This ensures that hfPluginStop is called even if a type
@@ -3136,7 +3136,7 @@ runRenamerPlugin :: TcGblEnv
                  -> TcM (TcGblEnv, HsGroup GhcRn)
 runRenamerPlugin gbl_env hs_group = do
     hsc_env <- getTopEnv
-    withPlugins hsc_env
+    withPlugins (hsc_plugins hsc_env)
       (\p opts (e, g) -> ( mark_plugin_unsafe (hsc_dflags hsc_env)
                             >> renamedResultAction p opts e g))
       (gbl_env, hs_group)
@@ -3159,7 +3159,7 @@ getRenamedStuff tc_result
 runTypecheckerPlugin :: ModSummary -> TcGblEnv -> TcM TcGblEnv
 runTypecheckerPlugin sum gbl_env = do
     hsc_env <- getTopEnv
-    withPlugins hsc_env
+    withPlugins (hsc_plugins hsc_env)
       (\p opts env -> mark_plugin_unsafe (hsc_dflags hsc_env)
                         >> typeCheckResultAction p opts sum env)
       gbl_env

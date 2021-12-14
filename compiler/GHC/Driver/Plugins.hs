@@ -7,7 +7,9 @@
 
 module GHC.Driver.Plugins (
       -- * Plugins
-      Plugin(..)
+      Plugins (..)
+    , emptyPlugins
+    , Plugin(..)
     , defaultPlugin
     , CommandLineOption
       -- ** Recompilation checking
@@ -45,7 +47,7 @@ module GHC.Driver.Plugins (
     , HoleFitPluginR
 
       -- * Internal
-    , PluginWithArgs(..), plugins, pluginRecompile'
+    , PluginWithArgs(..), pluginsWithArgs, pluginRecompile'
     , LoadedPlugin(..), lpModuleName
     , StaticPlugin(..)
     , mapPlugins, withPlugins, withPlugins_
@@ -251,25 +253,47 @@ keepRenamedSource _ gbl_env group =
 type PluginOperation m a = Plugin -> [CommandLineOption] -> a -> m a
 type ConstPluginOperation m a = Plugin -> [CommandLineOption] -> a -> m ()
 
-plugins :: HscEnv -> [PluginWithArgs]
-plugins hsc_env =
-  map lpPlugin (hsc_plugins hsc_env) ++
-  map spPlugin (hsc_static_plugins hsc_env)
+data Plugins = Plugins
+  { staticPlugins :: ![StaticPlugin]
+      -- ^ Static plugins which do not need dynamic loading. These plugins are
+      -- intended to be added by GHC API users directly to this list.
+      --
+      -- To add dynamically loaded plugins through the GHC API see
+      -- 'addPluginModuleName' instead.
+
+  , loadedPlugins :: ![LoadedPlugin]
+      -- ^ Plugins dynamically loaded after processing arguments. What
+      -- will be loaded here is directed by DynFlags.pluginModNames.
+      -- Arguments are loaded from DynFlags.pluginModNameOpts.
+      --
+      -- The purpose of this field is to cache the plugins so they
+      -- don't have to be loaded each time they are needed.  See
+      -- 'GHC.Runtime.Loader.initializePlugins'.
+  }
+
+emptyPlugins :: Plugins
+emptyPlugins = Plugins [] []
+
+
+pluginsWithArgs :: Plugins -> [PluginWithArgs]
+pluginsWithArgs plugins =
+  map lpPlugin (loadedPlugins plugins) ++
+  map spPlugin (staticPlugins plugins)
 
 -- | Perform an operation by using all of the plugins in turn.
-withPlugins :: Monad m => HscEnv -> PluginOperation m a -> a -> m a
-withPlugins hsc_env transformation input = foldM go input (plugins hsc_env)
+withPlugins :: Monad m => Plugins -> PluginOperation m a -> a -> m a
+withPlugins plugins transformation input = foldM go input (pluginsWithArgs plugins)
   where
     go arg (PluginWithArgs p opts) = transformation p opts arg
 
-mapPlugins :: HscEnv -> (Plugin -> [CommandLineOption] -> a) -> [a]
-mapPlugins hsc_env f = map (\(PluginWithArgs p opts) -> f p opts) (plugins hsc_env)
+mapPlugins :: Plugins -> (Plugin -> [CommandLineOption] -> a) -> [a]
+mapPlugins plugins f = map (\(PluginWithArgs p opts) -> f p opts) (pluginsWithArgs plugins)
 
 -- | Perform a constant operation by using all of the plugins in turn.
-withPlugins_ :: Monad m => HscEnv -> ConstPluginOperation m a -> a -> m ()
-withPlugins_ hsc_env transformation input
+withPlugins_ :: Monad m => Plugins -> ConstPluginOperation m a -> a -> m ()
+withPlugins_ plugins transformation input
   = mapM_ (\(PluginWithArgs p opts) -> transformation p opts input)
-          (plugins hsc_env)
+          (pluginsWithArgs plugins)
 
 type FrontendPluginAction = [String] -> [(String, Maybe Phase)] -> Ghc ()
 data FrontendPlugin = FrontendPlugin {

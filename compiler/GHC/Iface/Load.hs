@@ -575,7 +575,7 @@ loadInterface doc_str mod from
 
         ; -- invoke plugins with *full* interface, not final_iface, to ensure
           -- that plugins have access to declarations, etc.
-          res <- withPlugins hsc_env (\p -> interfaceLoadAction p) iface
+          res <- withPlugins (hsc_plugins hsc_env) (\p -> interfaceLoadAction p) iface
         ; return (Succeeded res)
     }}}}
 

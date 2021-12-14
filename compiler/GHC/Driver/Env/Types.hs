@@ -85,21 +85,8 @@ data HscEnv
                 -- ^ target code interpreter (if any) to use for TH and GHCi.
                 -- See Note [Target code interpreter]
 
-        , hsc_plugins :: ![LoadedPlugin]
-                -- ^ plugins dynamically loaded after processing arguments. What
-                -- will be loaded here is directed by DynFlags.pluginModNames.
-                -- Arguments are loaded from DynFlags.pluginModNameOpts.
-                --
-                -- The purpose of this field is to cache the plugins so they
-                -- don't have to be loaded each time they are needed.  See
-                -- 'GHC.Runtime.Loader.initializePlugins'.
-
-        , hsc_static_plugins :: ![StaticPlugin]
-                -- ^ static plugins which do not need dynamic loading. These plugins are
-                -- intended to be added by GHC API users directly to this list.
-                --
-                -- To add dynamically loaded plugins through the GHC API see
-                -- 'addPluginModuleName' instead.
+        , hsc_plugins :: !Plugins
+                -- ^ Plugins
 
         , hsc_unit_env :: UnitEnv
                 -- ^ Unit environment (unit state, home unit, etc.).

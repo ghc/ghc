@@ -68,7 +68,9 @@ main = do
       target <- guessTarget "static-plugins-module.hs" Nothing Nothing
       setTargets [target]
 
-      modifySession (\hsc_env -> hsc_env { hsc_static_plugins = the_plugins})
+      modifySession $ \hsc_env ->
+        let old_plugins = hsc_plugins hsc_env
+        in hsc_env { hsc_plugins = old_plugins { staticPlugins = the_plugins } }
 
       dflags <- getSessionDynFlags
       setSessionDynFlags dflags { outputFile_ = Nothing }

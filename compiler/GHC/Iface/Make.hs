@@ -51,7 +51,7 @@ import GHC.Core.Unify( RoughMatchTc(..) )
 import GHC.Driver.Env
 import GHC.Driver.Backend
 import GHC.Driver.Session
-import GHC.Driver.Plugins (LoadedPlugin(..))
+import GHC.Driver.Plugins
 
 import GHC.Types.Id
 import GHC.Types.Fixity.Env
@@ -197,7 +197,7 @@ mkIfaceTc hsc_env safe_mode mod_details mod_summary
                     }
   = do
           let used_names = mkUsedNames tc_result
-          let pluginModules = map lpModule (hsc_plugins hsc_env)
+          let pluginModules = map lpModule (loadedPlugins (hsc_plugins hsc_env))
           let home_unit = hsc_home_unit hsc_env
           let deps = mkDependencies home_unit
                                     (tcg_mod tc_result)

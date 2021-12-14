@@ -19,7 +19,7 @@ import GHC.Driver.Config.Finder
 import GHC.Driver.Env
 import GHC.Driver.Session
 import GHC.Driver.Ppr
-import GHC.Driver.Plugins ( PluginRecompile(..), PluginWithArgs(..), pluginRecompile', plugins )
+import GHC.Driver.Plugins
 
 import GHC.Iface.Syntax
 import GHC.Iface.Recomp.Binary
@@ -333,7 +333,7 @@ checkVersions hsc_env mod_summary iface
        ; if recompileRequired recomp then return (recomp, Nothing) else do {
        ; recomp <- checkDependencies hsc_env mod_summary iface
        ; if recompileRequired recomp then return (recomp, Just iface) else do {
-       ; recomp <- checkPlugins hsc_env iface
+       ; recomp <- checkPlugins (hsc_plugins hsc_env) iface
        ; if recompileRequired recomp then return (recomp, Nothing) else do {
 
 
@@ -362,28 +362,27 @@ checkVersions hsc_env mod_summary iface
 
 
 -- | Check if any plugins are requesting recompilation
-checkPlugins :: HscEnv -> ModIface -> IfG RecompileRequired
-checkPlugins hsc_env iface = liftIO $ do
-  new_fingerprint <- fingerprintPlugins hsc_env
+checkPlugins :: Plugins -> ModIface -> IfG RecompileRequired
+checkPlugins plugins iface = liftIO $ do
+  recomp <- recompPlugins plugins
+  let new_fingerprint = fingerprintPluginRecompile recomp
   let old_fingerprint = mi_plugin_hash (mi_final_exts iface)
-  pr <- mconcat <$> mapM pluginRecompile' (plugins hsc_env)
-  return $
-    pluginRecompileToRecompileRequired old_fingerprint new_fingerprint pr
+  return $ pluginRecompileToRecompileRequired old_fingerprint new_fingerprint recomp
 
-fingerprintPlugins :: HscEnv -> IO Fingerprint
-fingerprintPlugins hsc_env =
-  fingerprintPlugins' $ plugins hsc_env
+recompPlugins :: Plugins -> IO PluginRecompile
+recompPlugins plugins = mconcat <$> mapM pluginRecompile' (pluginsWithArgs plugins)
 
-fingerprintPlugins' :: [PluginWithArgs] -> IO Fingerprint
-fingerprintPlugins' plugins = do
-  res <- mconcat <$> mapM pluginRecompile' plugins
-  return $ case res of
-      NoForceRecompile -> fingerprintString "NoForceRecompile"
-      ForceRecompile   -> fingerprintString "ForceRecompile"
-      -- is the chance of collision worth worrying about?
-      -- An alternative is to fingerprintFingerprints [fingerprintString
-      -- "maybeRecompile", fp]
-      (MaybeRecompile fp) -> fp
+fingerprintPlugins :: Plugins -> IO Fingerprint
+fingerprintPlugins plugins = fingerprintPluginRecompile <$> recompPlugins plugins
+
+fingerprintPluginRecompile :: PluginRecompile -> Fingerprint
+fingerprintPluginRecompile recomp = case recomp of
+  NoForceRecompile  -> fingerprintString "NoForceRecompile"
+  ForceRecompile    -> fingerprintString "ForceRecompile"
+  -- is the chance of collision worth worrying about?
+  -- An alternative is to fingerprintFingerprints [fingerprintString
+  -- "maybeRecompile", fp]
+  MaybeRecompile fp -> fp
 
 
 pluginRecompileToRecompileRequired
@@ -1164,7 +1163,7 @@ addFingerprints hsc_env iface0
 
    hpc_hash <- fingerprintHpcFlags dflags putNameLiterally
 
-   plugin_hash <- fingerprintPlugins hsc_env
+   plugin_hash <- fingerprintPlugins (hsc_plugins hsc_env)
 
    -- the ABI hash depends on:
    --   - decls

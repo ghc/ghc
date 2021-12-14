@@ -74,14 +74,16 @@ import GHC.Unit.Types (ModuleNameWithIsBoot)
 initializePlugins :: HscEnv -> Maybe ModuleNameWithIsBoot -> IO HscEnv
 initializePlugins hsc_env mnwib
     -- plugins not changed
-  | map lpModuleName (hsc_plugins hsc_env) == reverse (pluginModNames dflags)
+  | loaded_plugins <- loadedPlugins (hsc_plugins hsc_env)
+  , map lpModuleName loaded_plugins == reverse (pluginModNames dflags)
    -- arguments not changed
-  , all same_args (hsc_plugins hsc_env)
-  = return hsc_env -- no need to reload plugins
+  , all same_args loaded_plugins
+  = return hsc_env -- no need to reload plugins FIXME: doesn't take static plugins into account
   | otherwise
   = do loaded_plugins <- loadPlugins hsc_env mnwib
-       let hsc_env' = hsc_env { hsc_plugins = loaded_plugins }
-       withPlugins hsc_env' driverPlugin hsc_env'
+       let plugins' = (hsc_plugins hsc_env) { loadedPlugins = loaded_plugins }
+       let hsc_env' = hsc_env { hsc_plugins = plugins' }
+       withPlugins (hsc_plugins hsc_env') driverPlugin hsc_env'
   where
     plugin_args = pluginModNameOpts dflags
     same_args p = paArguments (lpPlugin p) == argumentsForPlugin p plugin_args

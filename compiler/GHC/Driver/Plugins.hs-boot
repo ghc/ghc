@@ -5,6 +5,9 @@ module GHC.Driver.Plugins where
 import GHC.Prelude ()
 
 data Plugin
+data Plugins
+
+emptyPlugins :: Plugins
 
 data LoadedPlugin
 data StaticPlugin

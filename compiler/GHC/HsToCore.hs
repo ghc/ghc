@@ -22,6 +22,7 @@ import GHC.Driver.Session
 import GHC.Driver.Config
 import GHC.Driver.Env
 import GHC.Driver.Backend
+import GHC.Driver.Plugins
 
 import GHC.Hs
 
@@ -90,7 +91,6 @@ import GHC.Unit.Module.Deps
 
 import Data.List (partition)
 import Data.IORef
-import GHC.Driver.Plugins ( LoadedPlugin(..) )
 
 {-
 ************************************************************************
@@ -196,7 +196,7 @@ deSugar hsc_env
         ; endPassIO hsc_env print_unqual CoreDesugarOpt ds_binds ds_rules_for_imps
 
         ; let used_names = mkUsedNames tcg_env
-              pluginModules = map lpModule (hsc_plugins hsc_env)
+              pluginModules = map lpModule (loadedPlugins (hsc_plugins hsc_env))
               home_unit = hsc_home_unit hsc_env
         ; let deps = mkDependencies home_unit
                                     (tcg_mod tcg_env)
