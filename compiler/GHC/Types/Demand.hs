@@ -148,7 +148,7 @@ is the important trait. Unboxing implies eager evaluation of an argument and
 we don't want to change the termination properties of the function. One way
 to ensure that is to unbox strict arguments only, but strictness is only a
 sufficient condition for evaluatedness.
-See Note [Unboxing evaluated arguments] in "GHC.Core.Opt.WorkWrap.Utils", where
+See Note [Unboxing evaluated arguments] in "GHC.Core.Opt.DmdAnal", where
 we manage to unbox *strict fields* of unboxed arguments that the function is not
 actually strict in, simply by realising that those fields have to be evaluated.
 
@@ -200,8 +200,8 @@ two fields". By contrast, the demand signature of 'ann' above would look like
 
 A demand signature like <1P(1!L)> -- Boxed outside but Unboxed in the field --
 doesn't make a lot of sense, as we can never unbox the field without unboxing
-the containing record. See Note [Finalising boxity for demand signature] in
-"GHC.Core.Opt.WorkWrap.Utils" for how we avoid to spread this and other kinds of
+the containing record. See Note [Finalising boxity for demand signatures] in
+"GHC.Core.Opt.DmdAnal" for how we avoid to spread this and other kinds of
 misinformed boxities.
 
 Due to various practical reasons, Boxity Analysis is not conservative at times.
@@ -337,6 +337,12 @@ update h@(Huge{f1=True}) = (False, h{f1=False})
 update h                 = (True,  h)
 ```
 Here, we decide to unbox 'h' because it's used Unboxed in the first branch.
+
+Another real-life example (c.f. !7182) is in the code compiled for
+GHC.Core.Unify.  Here the two mutually-recursive functions:
+  * `unify_ty` takes its UMEnv argument boxed, but
+  * `uVar` takes its UMEnv argument unboxed.
+So the UMEnv ends up getting reboxed every time around the loop.
 
 Note that this is fundamentally working around a phase problem, namely that the
 results of boxity analysis depend on CPR analysis (and vice versa, of course).

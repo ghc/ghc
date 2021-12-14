@@ -1065,8 +1065,9 @@ transferIdInfo exported_id local_id
 dmdAnal :: Logger -> DynFlags -> FamInstEnvs -> [CoreRule] -> CoreProgram -> IO CoreProgram
 dmdAnal logger dflags fam_envs rules binds = do
   let !opts = DmdAnalOpts
-               { dmd_strict_dicts = gopt Opt_DictsStrict dflags
-               , dmd_unbox_width  = dmdUnboxWidth dflags
+               { dmd_strict_dicts    = gopt Opt_DictsStrict dflags
+               , dmd_unbox_width     = dmdUnboxWidth dflags
+               , dmd_max_worker_args = maxWorkerArgs dflags
                }
       binds_plus_dmds = dmdAnalProgram opts fam_envs rules binds
   Logger.putDumpFileMaybe logger Opt_D_dump_str_signatures "Strictness signatures" FormatText $

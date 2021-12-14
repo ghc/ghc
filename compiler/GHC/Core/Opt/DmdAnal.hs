@@ -31,6 +31,7 @@ import GHC.Types.Id
 import GHC.Core.Utils
 import GHC.Core.TyCon
 import GHC.Core.Type
+import GHC.Core.Predicate ( isClassPred )
 import GHC.Core.FVs      ( rulesRhsFreeIds, bndrRuleAndUnfoldingIds )
 import GHC.Core.Coercion ( Coercion )
 import GHC.Core.TyCo.FVs ( coVarsOfCos )
@@ -39,7 +40,7 @@ import GHC.Core.Opt.Arity ( typeArity )
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
-import GHC.Data.Maybe         ( isJust )
+import GHC.Data.Maybe         ( isJust, orElse )
 import GHC.Builtin.PrimOps
 import GHC.Builtin.Types.Prim ( realWorldStatePrimTy )
 import GHC.Types.Unique.Set
@@ -57,8 +58,9 @@ _ = pprTrace -- Tired of commenting out the import all the time
 
 -- | Options for the demand analysis
 data DmdAnalOpts = DmdAnalOpts
-   { dmd_strict_dicts :: !Bool -- ^ Use strict dictionaries
-   , dmd_unbox_width  :: !Int  -- ^ Use strict dictionaries
+   { dmd_strict_dicts    :: !Bool -- ^ Use strict dictionaries
+   , dmd_unbox_width     :: !Int  -- ^ Use strict dictionaries
+   , dmd_max_worker_args :: !Int
    }
 
 -- This is a strict alternative to (,)
@@ -278,8 +280,9 @@ dmdAnalBindLetUp top_lvl env id rhs anal_body = WithDmdType final_ty (R (NonRec 
   where
     WithDmdType body_ty body'   = anal_body env
     WithDmdType body_ty' id_dmd = findBndrDmd env body_ty id
-    -- See Note [Finalising boxity for demand signature] in "GHC.Core.Opt.WorkWrap.Utils"
-    id_dmd'            = finaliseBoxity (ae_fam_envs env) NotInsideInlineableFun (idType id) id_dmd
+    -- See Note [Finalising boxity for demand signatures]
+
+    id_dmd'            = finaliseLetBoxity (ae_fam_envs env) (idType id) id_dmd
     !id'               = setBindIdDemandInfo top_lvl id id_dmd'
     (rhs_ty, rhs')     = dmdAnalStar env (dmdTransformThunkDmd rhs id_dmd') rhs
 
@@ -867,7 +870,7 @@ dmdAnalRhsSig
 -- See Note [NOINLINE and strictness]
 dmdAnalRhsSig top_lvl rec_flag env let_dmd id rhs
   = -- pprTrace "dmdAnalRhsSig" (ppr id $$ ppr let_dmd $$ ppr sig $$ ppr lazy_fv) $
-    (env', lazy_fv, id', rhs')
+    (final_env, lazy_fv, final_id, final_rhs)
   where
     rhs_arity = idArity id
     -- See Note [Demand signatures are computed for a threshold demand based on idArity]
@@ -885,13 +888,15 @@ dmdAnalRhsSig top_lvl rec_flag env let_dmd id rhs
       = unboxedWhenSmall (ae_opts env) (unboxableResultWidth env id) topSubDmd
 
     -- See Note [Do not unbox class dictionaries]
-    WithDmdType rhs_dmd_ty rhs' = dmdAnal (adjustInlFun id env) rhs_dmd rhs
-    DmdType rhs_fv rhs_dmds rhs_div = rhs_dmd_ty
+    WithDmdType rhs_dmd_ty rhs' = dmdAnal env rhs_dmd rhs
+    DmdType rhs_fv rhs_dmds rhs_div    = rhs_dmd_ty
+    (final_rhs_dmds, final_rhs) = finaliseArgBoxities env id rhs_arity rhs'
+                                  `orElse` (rhs_dmds, rhs')
 
-    sig = mkDmdSigForArity rhs_arity (DmdType sig_fv rhs_dmds rhs_div)
+    sig = mkDmdSigForArity rhs_arity (DmdType sig_fv final_rhs_dmds rhs_div)
 
-    id' = id `setIdDmdSig` sig
-    !env' = extendAnalEnv top_lvl env id' sig
+    final_id   = id `setIdDmdSig` sig
+    !final_env = extendAnalEnv top_lvl env final_id sig
 
     -- See Note [Aggregated demand for cardinality]
     -- FIXME: That Note doesn't explain the following lines at all. The reason
@@ -1156,6 +1161,369 @@ this, that actually happened in practice.
 
 {- *********************************************************************
 *                                                                      *
+             Finalising boxity
+*                                                                      *
+********************************************************************* -}
+
+{- Note [Finalising boxity for demand signatures]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The worker/wrapper pass must strictly adhere to the boxity decisions
+encoded in the demand signature, because that is the information that
+demand analysis propagates throughout the program. Failing to
+implement the strategy laid out in the signature can result in
+reboxing in unexpected places. Hence, we must completely anticipate
+unboxing decisions during demand analysis and reflect these decicions
+in demand annotations. That is the job of 'finaliseArgBoxities',
+which is defined here and called from demand analysis.
+
+Here is a list of different Notes it has to take care of:
+
+  * Note [No lazy, Unboxed demands in demand signature] such as `L!P(L)` in
+    general, but still allow Note [Unboxing evaluated arguments]
+  * Note [No nested Unboxed inside Boxed in demand signature] such as `1P(1!L)`
+  * Implement fixes for corner cases Note [Do not unbox class dictionaries]
+    and Note [mkWWstr and unsafeCoerce]
+
+Then, in worker/wrapper blindly trusts the boxity info in the demand signature
+and will not look at strictness info *at all*, in 'wantToUnboxArg'.
+
+Note [Finalising boxity for let-bound Ids]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+  let x = e in body
+where the demand on 'x' is 1!P(blah).  We want to unbox x according to
+Note [Thunk splitting] in GHC.Core.Opt.WorkWrap.  We must do this becuase
+worker/wrapper ignores stricness and looks only at boxity flags; so if
+x's demand is L!P(blah) we might still split it (wrongly).  We want to
+switch to Boxed on any lazy demand.
+
+That is what finaliseLetBoxity does.  It has no worker-arg budget, so it
+is much simpler than finaliseArgBoxities.
+
+Note [No nested Unboxed inside Boxed in demand signature]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+```
+f p@(x,y)
+  | even (x+y) = []
+  | otherwise  = [p]
+```
+Demand analysis will infer that the function body puts a demand of `1P(1!L,1!L)`
+on 'p', e.g., Boxed on the outside but Unboxed on the inside. But worker/wrapper
+can't unbox the pair components without unboxing the pair! So we better say
+`1P(1L,1L)` in the demand signature in order not to spread wrong Boxity info.
+That happens via the call to trimBoxity in 'finaliseArgBoxities'/'finaliseLetBoxity'.
+
+Note [No lazy, Unboxed demands in demand signature]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider T19407:
+
+  data Huge = Huge Bool () ... () -- think: DynFlags
+  data T = T { h :: Huge, n :: Int }
+  f t@(T h _) = g h t
+  g (H b _ ... _) t = if b then 1 else n t
+
+The body of `g` puts (approx.) demand `L!P(A,1)` on `t`. But we better
+not put that demand in `g`'s demand signature, because worker/wrapper will not
+in general unbox a lazy-and-unboxed demand like `L!P(..)`.
+(The exception are known-to-be-evaluated arguments like strict fields,
+see Note [Unboxing evaluated arguments].)
+
+The program above is an example where spreading misinformed boxity through the
+signature is particularly egregious. If we give `g` that signature, then `f`
+puts demand `S!P(1!P(1L,A,..),ML)` on `t`. Now we will unbox `t` in `f` it and
+we get
+
+  f (T (H b _ ... _) n) = $wf b n
+  $wf b n = $wg b (T (H b x ... x) n)
+  $wg = ...
+
+Massive reboxing in `$wf`! Solution: Trim boxity on lazy demands in
+'trimBoxity', modulo Note [Unboxing evaluated arguments].
+
+Note [Unboxing evaluated arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this program (due to Roman):
+
+    data X a = X !a
+
+    foo :: X Int -> Int -> Int
+    foo x@(X a) n = go 0
+     where
+       go i | i < n     = a + go (i+1)
+            | otherwise = 0
+
+We want the worker for 'foo' to look like this:
+
+    $wfoo :: Int# -> Int# -> Int#
+
+with the first argument unboxed, so that it is not eval'd each time around the
+'go' loop (which would otherwise happen, since 'foo' is not strict in 'a'). It
+is sound for the wrapper to pass an unboxed arg because X is strict
+(see Note [Strictness and Unboxing] in "GHC.Core.Opt.DmdAnal"), so its argument
+must be evaluated. And if we *don't* pass an unboxed argument, we can't even
+repair it by adding a `seq` thus:
+
+    foo (X a) n = a `seq` go 0
+
+because the seq is discarded (very early) since X is strict!
+
+So here's what we do
+
+* Since this has nothing to do with how 'foo' uses 'a', we leave demand
+  analysis alone, but account for the additional evaluatedness when
+  annotating the binder 'finaliseArgBoxities', which will retain the Unboxed
+  boxity on 'a' in the definition of 'foo' in the demand 'L!P(L)'; meaning
+  it's used lazily but unboxed nonetheless. This seems to contradict Note
+  [No lazy, Unboxed demands in demand signature], but we know that 'a' is
+  evaluated and thus can be unboxed.
+
+* When 'finaliseArgBoxities' decides to unbox a record, it will zip the field demands
+  together with the respective 'StrictnessMark'. In case of 'x', it will pair
+  up the lazy field demand 'L!P(L)' on 'a' with 'MarkedStrict' to account for
+  the strict field.
+
+* Said 'StrictnessMark' is passed to the recursive invocation of 'go_args' in
+  'finaliseArgBoxities' when deciding whether to unbox 'a'. 'a' was used lazily, but
+  since it also says 'MarkedStrict', we'll retain the 'Unboxed' boxity on 'a'.
+
+* Worker/wrapper will consult 'wantToUnboxArg' for its unboxing decision. It will
+  /not/ look at the strictness bits of the demand, only at Boxity flags. As such,
+  it will happily unbox 'a' despite the lazy demand on it.
+
+The net effect is that boxity analysis and the w/w transformation are more
+aggressive about unboxing the strict arguments of a data constructor than when
+looking at strictness info exclusively. It is very much like (Nested) CPR, which
+needs its nested fields to be evaluated in order for it to unbox nestedly.
+
+There is the usual danger of reboxing, which as usual we ignore. But
+if X is monomorphic, and has an UNPACK pragma, then this optimisation
+is even more important.  We don't want the wrapper to rebox an unboxed
+argument, and pass an Int to $wfoo!
+
+This works in nested situations like T10482
+
+    data family Bar a
+    data instance Bar (a, b) = BarPair !(Bar a) !(Bar b)
+    newtype instance Bar Int = Bar Int
+
+    foo :: Bar ((Int, Int), Int) -> Int -> Int
+    foo f k = case f of BarPair x y ->
+              case burble of
+                 True -> case x of
+                           BarPair p q -> ...
+                 False -> ...
+
+The extra eagerness lets us produce a worker of type:
+     $wfoo :: Int# -> Int# -> Int# -> Int -> Int
+     $wfoo p# q# y# = ...
+
+even though the `case x` is only lazily evaluated.
+
+--------- Historical note ------------
+We used to add data-con strictness demands when demand analysing case
+expression. However, it was noticed in #15696 that this misses some cases. For
+instance, consider the program (from T10482)
+
+    data family Bar a
+    data instance Bar (a, b) = BarPair !(Bar a) !(Bar b)
+    newtype instance Bar Int = Bar Int
+
+    foo :: Bar ((Int, Int), Int) -> Int -> Int
+    foo f k =
+      case f of
+        BarPair x y -> case burble of
+                          True -> case x of
+                                    BarPair p q -> ...
+                          False -> ...
+
+We really should be able to assume that `p` is already evaluated since it came
+from a strict field of BarPair. This strictness would allow us to produce a
+worker of type:
+
+    $wfoo :: Int# -> Int# -> Int# -> Int -> Int
+    $wfoo p# q# y# = ...
+
+even though the `case x` is only lazily evaluated
+
+Indeed before we fixed #15696 this would happen since we would float the inner
+`case x` through the `case burble` to get:
+
+    foo f k =
+      case f of
+        BarPair x y -> case x of
+                          BarPair p q -> case burble of
+                                          True -> ...
+                                          False -> ...
+
+However, after fixing #15696 this could no longer happen (for the reasons
+discussed in ticket:15696#comment:76). This means that the demand placed on `f`
+would then be significantly weaker (since the False branch of the case on
+`burble` is not strict in `p` or `q`).
+
+Consequently, we now instead account for data-con strictness in mkWWstr_one,
+applying the strictness demands to the final result of DmdAnal. The result is
+that we get the strict demand signature we wanted even if we can't float
+the case on `x` up through the case on `burble`.
+
+Note [Do not unbox class dictionaries]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If we have
+   f :: Ord a => [a] -> Int -> a
+   {-# INLINABLE f #-}
+and we worker/wrapper f, we'll get a worker with an INLINABLE pragma
+(see Note [Worker/wrapper for INLINABLE functions] in GHC.Core.Opt.WorkWrap),
+which can still be specialised by the type-class specialiser, something like
+   fw :: Ord a => [a] -> Int# -> a
+
+BUT if f is strict in the Ord dictionary, we might unpack it, to get
+   fw :: (a->a->Bool) -> [a] -> Int# -> a
+and the type-class specialiser can't specialise that. An example is #6056.
+
+But in any other situation, a dictionary is just an ordinary value,
+and can be unpacked.  So we track the INLINABLE pragma, and discard the boxity
+flag in finaliseArgBoxities (see the isClassPred test).
+
+Historical note: #14955 describes how I got this fix wrong the first time.
+
+Note that the simplicity of this fix implies that INLINE functions (such as
+wrapper functions after the WW run) will never say that they unbox class
+dictionaries. That's not ideal, but not worth losing sleep over, as INLINE
+functions will have been inlined by the time we run demand analysis so we'll
+see the unboxing around the worker in client modules. I got aware of the issue
+in T5075 by the change in boxity of loop between demand analysis runs.
+
+Note [Worker argument budget]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In 'finaliseArgBoxities' we don't want to generate workers with zillions of
+argument when, say given a strict record with zillions of fields.  So we
+limit the maximum number of worker args to the maximum of
+  - -fmax-worker-args=N
+  - The number of args in the original function; if it already has has
+    zillions of arguments we don't want to seek /fewer/ args in the worker.
+(Maybe we should /add/ them instead of maxing?)
+
+We pursue a "layered" strategy for unboxing: we unbox the top level of the
+argument(s), subject to budget; if there are any arguments left we unbox the
+next layer, using that depleted budget.
+
+To achieve this, we use the classic almost-circular programming technique in
+which we we write one pass that takes a lazy list of the Budgets for every
+layer.
+-}
+
+data Budgets = MkB Arity Budgets   -- An infinite list of arity budgets
+
+incTopBudget :: Budgets -> Budgets
+incTopBudget (MkB n bg) = MkB (n+1) bg
+
+positiveTopBudget :: Budgets -> Bool
+positiveTopBudget (MkB n _) = n >= 0
+
+finaliseArgBoxities :: AnalEnv -> Id -> Arity -> CoreExpr
+                    -> Maybe ([Demand], CoreExpr)
+finaliseArgBoxities env fn arity rhs
+  | arity > count isId bndrs  -- Can't find enough binders
+  = Nothing  -- This happens if we have   f = g
+             -- Then there are no binders; we don't worker/wrapper; and we
+             -- simply want to give f the same demand signature as g
+
+  | otherwise
+  = Just (arg_dmds', add_demands arg_dmds' rhs)
+    -- add_demands: we must attach the final boxities to the lambda-binders
+    -- of the function, both because that's kosher, and because CPR analysis
+    -- uses the info on the binders directly.
+  where
+    opts            = ae_opts env
+    fam_envs        = ae_fam_envs env
+    is_inlinable_fn = isStableUnfolding (realIdUnfolding fn)
+    (bndrs, _body)  = collectBinders rhs
+    max_wkr_args    = dmd_max_worker_args opts `max` arity
+                      -- See Note [Worker argument budget]
+
+    -- This is the key line, which uses almost-circular programming
+    -- The remaining budget from one layer becomes the initial
+    -- budget for the next layer down.  See Note [Worker argument budget]
+    (remaining_budget, arg_dmds') = go_args (MkB max_wkr_args remaining_budget) arg_triples
+
+    arg_triples :: [(Type, StrictnessMark, Demand)]
+    arg_triples = take arity $
+                  map mk_triple $
+                  filter isRuntimeVar bndrs
+
+    mk_triple :: Id -> (Type,StrictnessMark,Demand)
+    mk_triple bndr | is_cls_arg ty = (ty, NotMarkedStrict, trimBoxity dmd)
+                   | otherwise     = (ty, NotMarkedStrict, dmd)
+                   where
+                     ty  = idType bndr
+                     dmd = idDemandInfo bndr
+
+    -- is_cls_arg: see Note [Do not unbox class dictionaries]
+    is_cls_arg arg_ty = is_inlinable_fn && isClassPred arg_ty
+
+    go_args :: Budgets -> [(Type,StrictnessMark,Demand)] -> (Budgets, [Demand])
+    go_args bg triples = mapAccumL go_arg bg triples
+
+    go_arg :: Budgets -> (Type,StrictnessMark,Demand) -> (Budgets, Demand)
+    go_arg bg@(MkB bg_top bg_inner) (ty, str_mark, dmd@(n :* _))
+      = case wantToUnboxArg fam_envs ty dmd of
+          DropAbsent   -> (bg,                      dmd)
+          StopUnboxing -> (MkB (bg_top-1) bg_inner, trimBoxity dmd)
+
+          Unbox DataConPatContext{dcpc_dc=dc, dcpc_tc_args=tc_args} dmds
+            -> (MkB (bg_top-1) final_bg_inner, final_dmd)
+            where
+              dc_arity = dataConRepArity dc
+              arg_tys  = dubiousDataConInstArgTys dc tc_args
+              (bg_inner', dmds') = go_args (incTopBudget bg_inner) $
+                                   zip3 arg_tys (dataConRepStrictness dc) dmds
+              dmd' = n :* (mkProd Unboxed $! dmds')
+              (final_bg_inner, final_dmd)
+                  | dmds `lengthIs` dc_arity
+                  , isStrict n || isMarkedStrict str_mark
+                     -- isStrict: see Note [No lazy, Unboxed demands in demand signature]
+                     -- isMarkedStrict: see Note [Unboxing evaluated arguments]
+                  , positiveTopBudget bg_inner'
+                  = (bg_inner', dmd')
+                  | otherwise
+                  = (bg_inner, trimBoxity dmd)
+
+    add_demands :: [Demand] -> CoreExpr -> CoreExpr
+    -- Attach the demands to the outer lambdas of this expression
+    add_demands [] e = e
+    add_demands (dmd:dmds) (Lam v e)
+      | isTyVar v = Lam v (add_demands (dmd:dmds) e)
+      | otherwise = Lam (v `setIdDemandInfo` dmd) (add_demands dmds e)
+    add_demands dmds e = pprPanic "add_demands" (ppr dmds $$ ppr e)
+
+finaliseLetBoxity
+  :: FamInstEnvs
+  -> Type                   -- ^ Type of the let-bound Id
+  -> Demand                 -- ^ How the Id is used
+  -> Demand
+-- See Note [Finalising boxity for let-bound Ids]
+-- This function is like finaliseArgBoxities, but much simpler because
+-- it has no "budget".  It simply unboxes strict demands, and stops
+-- when it reaches a lazy one.
+finaliseLetBoxity env ty dmd
+  = go ty NotMarkedStrict dmd
+  where
+    go ty mark dmd@(n :* _) =
+      case wantToUnboxArg env ty dmd of
+        DropAbsent   -> dmd
+        StopUnboxing -> trimBoxity dmd
+        Unbox DataConPatContext{dcpc_dc=dc, dcpc_tc_args=tc_args} dmds
+          | isStrict n || isMarkedStrict mark
+          , dmds `lengthIs` dataConRepArity dc
+          , let arg_tys = dubiousDataConInstArgTys dc tc_args
+                dmds'   = strictZipWith3 go arg_tys (dataConRepStrictness dc) dmds
+          -> n :* (mkProd Unboxed $! dmds')
+          | otherwise
+          -> trimBoxity dmd
+
+
+{- *********************************************************************
+*                                                                      *
                       Fixpoints
 *                                                                      *
 ********************************************************************* -}
@@ -1366,11 +1734,8 @@ annotateLamIdBndr env dmd_ty id
     -- pprTrace "annLamBndr" (vcat [ppr id, ppr dmd_ty, ppr final_ty]) $
     WithDmdType main_ty new_id
   where
-    -- See Note [Finalising boxity for demand signature] in "GHC.Core.Opt.WorkWrap.Utils"
-    -- and Note [Do not unbox class dictionaries]
-    dmd'    = finaliseBoxity (ae_fam_envs env) (ae_inl_fun env) (idType id) dmd
-    new_id  = setIdDemandInfo id dmd'
-    main_ty = addDemand dmd' dmd_ty'
+    new_id  = setIdDemandInfo id dmd
+    main_ty = addDemand dmd dmd_ty'
     WithDmdType dmd_ty' dmd = findBndrDmd env dmd_ty id
 
 {- Note [NOINLINE and strictness]
@@ -1455,9 +1820,6 @@ data AnalEnv = AE
    , ae_virgin    :: !Bool -- ^ True on first iteration only
                            -- See Note [Initialising strictness]
    , ae_fam_envs  :: !FamInstEnvs
-   , ae_inl_fun   :: !InsideInlineableFun
-                           -- ^ Whether we analyse the body of an inlineable fun.
-                           -- See Note [Do not unbox class dictionaries].
    }
 
         -- We use the se_env to tell us whether to
@@ -1481,7 +1843,6 @@ emptyAnalEnv opts fam_envs
          , ae_sigs         = emptySigEnv
          , ae_virgin       = True
          , ae_fam_envs     = fam_envs
-         , ae_inl_fun      = NotInsideInlineableFun
          }
 
 emptySigEnv :: SigEnv
@@ -1508,13 +1869,6 @@ lookupSigEnv env id = lookupVarEnv (ae_sigs env) id
 
 nonVirgin :: AnalEnv -> AnalEnv
 nonVirgin env = env { ae_virgin = False }
-
--- | Sets 'ae_inl_fun' according to whether the given 'Id' has an inlineable
--- unfolding. See Note [Do not unbox class dictionaries].
-adjustInlFun :: Id -> AnalEnv -> AnalEnv
-adjustInlFun id env
-  | isStableUnfolding (realIdUnfolding id) = env { ae_inl_fun = InsideInlineableFun }
-  | otherwise                              = env { ae_inl_fun = NotInsideInlineableFun }
 
 findBndrsDmds :: AnalEnv -> DmdType -> [Var] -> WithDmdType [Demand]
 -- Return the demands on the Ids in the [Var]

@@ -17,9 +17,9 @@ T19871.f6: <1!P(A,A,A,A,A,1L,A,A,A,A,A,A)>
 T19871.f7: <1!P(A,A,A,A,A,A,1L,A,A,A,A,A)>
 T19871.f8: <1!P(A,A,A,A,A,A,A,1L,A,A,A,A)>
 T19871.f9: <1!P(A,A,A,A,A,A,A,A,1L,A,A,A)>
-T19871.guarded: <MCM(L)><1!P(SL,L,L,L,L,L,L,L,L,L,L,L)>
+T19871.guarded: <MCM(L)><1P(SL,L,L,L,L,L,L,L,L,L,L,L)>
 T19871.sumIO: <1!P(1L)><1!L><L>
-T19871.update: <1!P(SL,L,L,L,L,L,L,L,L,L,L,L)>
+T19871.update: <1P(SL,L,L,L,L,L,L,L,L,L,L,L)>
 
 
 
@@ -65,8 +65,8 @@ T19871.f6: <1!P(A,A,A,A,A,1L,A,A,A,A,A,A)>
 T19871.f7: <1!P(A,A,A,A,A,A,1L,A,A,A,A,A)>
 T19871.f8: <1!P(A,A,A,A,A,A,A,1L,A,A,A,A)>
 T19871.f9: <1!P(A,A,A,A,A,A,A,A,1L,A,A,A)>
-T19871.guarded: <MCM(L)><1!P(SL,L,L,L,L,L,L,L,L,L,L,L)>
+T19871.guarded: <MCM(L)><1P(SL,L,L,L,L,L,L,L,L,L,L,L)>
 T19871.sumIO: <1!P(1L)><1!L><L>
-T19871.update: <1!P(SL,L,L,L,L,L,L,L,L,L,L,L)>
+T19871.update: <1P(SL,L,L,L,L,L,L,L,L,L,L,L)>
 
 
