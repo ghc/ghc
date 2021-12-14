@@ -152,7 +152,6 @@ import GHC.Platform
 import GHC.Types.Unique.Set
 import GHC.Utils.Misc
 import GHC.Core.Ppr ( {- instances -} )
-import GHC.CmmToAsm.Config
 import GHC.Types.SrcLoc
 
 -- -----------------------------------------------------------------------------
@@ -1177,21 +1176,21 @@ isLocalCLabel this_mod lbl =
 -- that data resides in a DLL or not. [Win32 only.]
 -- @labelDynamic@ returns @True@ if the label is located
 -- in a DLL, be it a data reference or not.
-labelDynamic :: NCGConfig -> CLabel -> Bool
-labelDynamic config lbl =
+labelDynamic :: Module -> Platform -> Bool -> CLabel -> Bool
+labelDynamic this_mod platform external_dynamic_refs lbl =
   case lbl of
    -- is the RTS in a DLL or not?
    RtsLabel _ ->
-     externalDynamicRefs && (this_unit /= rtsUnitId)
+     external_dynamic_refs && (this_unit /= rtsUnitId)
 
    IdLabel n _ _ ->
-     externalDynamicRefs && isDynLinkName platform this_mod n
+     external_dynamic_refs && isDynLinkName platform this_mod n
 
    -- When compiling in the "dyn" way, each package is to be linked into
    -- its own shared library.
    CmmLabel lbl_unit _ _ _
-    | os == OSMinGW32 -> externalDynamicRefs && (this_unit /= lbl_unit)
-    | otherwise       -> externalDynamicRefs
+    | os == OSMinGW32 -> external_dynamic_refs && (this_unit /= lbl_unit)
+    | otherwise       -> external_dynamic_refs
 
    LocalBlockLabel _    -> False
 
@@ -1209,7 +1208,7 @@ labelDynamic config lbl =
             -- When compiling in the "dyn" way, each package is to be
             -- linked into its own DLL.
             ForeignLabelInPackage pkgId ->
-                externalDynamicRefs && (this_unit /= pkgId)
+                external_dynamic_refs && (this_unit /= pkgId)
 
        else -- On Mac OS X and on ELF platforms, false positives are OK,
             -- so we claim that all foreign imports come from dynamic
@@ -1217,24 +1216,20 @@ labelDynamic config lbl =
             True
 
    CC_Label cc ->
-     externalDynamicRefs && not (ccFromThisModule cc this_mod)
+     external_dynamic_refs && not (ccFromThisModule cc this_mod)
 
    -- CCS_Label always contains a CostCentre defined in the current module
    CCS_Label _ -> False
    IPE_Label {} -> True
 
    HpcTicksLabel m ->
-     externalDynamicRefs && this_mod /= m
+     external_dynamic_refs && this_mod /= m
 
    -- Note that DynamicLinkerLabels do NOT require dynamic linking themselves.
    _                 -> False
   where
-    externalDynamicRefs = ncgExternalDynamicRefs config
-    platform = ncgPlatform config
-    os = platformOS platform
-    this_mod = ncgThisModule config
+    os        = platformOS platform
     this_unit = toUnitId (moduleUnit this_mod)
-
 
 -----------------------------------------------------------------------------
 -- Printing out CLabels.

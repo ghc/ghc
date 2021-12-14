@@ -209,6 +209,13 @@ absoluteLabel lbl
 -- pointers, code stubs and GOT offsets look like is located in the
 -- module CLabel.
 
+-- | Helper to check whether the data resides in a DLL or not, see @labelDynamic@
+ncgLabelDynamic :: NCGConfig -> CLabel -> Bool
+ncgLabelDynamic config = labelDynamic (ncgThisModule config)
+                                      (ncgPlatform config)
+                                      (ncgExternalDynamicRefs config)
+
+
 -- We have to decide which labels need to be accessed
 -- indirectly or via a piece of stub code.
 data LabelAccessStyle
@@ -247,7 +254,7 @@ howToAccessLabel config _arch OSMinGW32 _kind lbl
 
         -- If the target symbol is in another PE we need to access it via the
         --      appropriate __imp_SYMBOL pointer.
-        | labelDynamic config lbl
+        | ncgLabelDynamic config lbl
         = AccessViaSymbolPtr
 
         -- Target symbol is in the same PE as the caller, so just access it directly.
@@ -262,7 +269,7 @@ howToAccessLabel config ArchAArch64 _os _kind lbl
         | not (ncgExternalDynamicRefs config)
         = AccessDirectly
 
-        | labelDynamic config lbl
+        | ncgLabelDynamic config lbl
         = AccessViaSymbolPtr
 
         | otherwise
@@ -279,7 +286,7 @@ howToAccessLabel config ArchAArch64 _os _kind lbl
 --
 howToAccessLabel config arch OSDarwin DataReference lbl
         -- data access to a dynamic library goes via a symbol pointer
-        | labelDynamic config lbl
+        | ncgLabelDynamic config lbl
         = AccessViaSymbolPtr
 
         -- when generating PIC code, all cross-module data references must
@@ -300,7 +307,7 @@ howToAccessLabel config arch OSDarwin JumpReference lbl
         -- stack alignment is only right for regular calls.
         -- Therefore, we have to go via a symbol pointer:
         | arch == ArchX86 || arch == ArchX86_64 || arch == ArchAArch64
-        , labelDynamic config lbl
+        , ncgLabelDynamic config lbl
         = AccessViaSymbolPtr
 
 
@@ -310,7 +317,7 @@ howToAccessLabel config arch OSDarwin _kind lbl
         -- them automatically, neither on Aarch64 (arm64).
         | arch /= ArchX86_64
         , arch /= ArchAArch64
-        , labelDynamic config lbl
+        , ncgLabelDynamic config lbl
         = AccessViaStub
 
         | otherwise
@@ -362,7 +369,7 @@ howToAccessLabel config arch os DataReference lbl
         | osElfTarget os
         = case () of
             -- A dynamic label needs to be accessed via a symbol pointer.
-          _ | labelDynamic config lbl
+          _ | ncgLabelDynamic config lbl
             -> AccessViaSymbolPtr
 
             -- For PowerPC32 -fPIC, we have to access even static data
@@ -390,18 +397,19 @@ howToAccessLabel config arch os DataReference lbl
 
 howToAccessLabel config arch os CallReference lbl
         | osElfTarget os
-        , labelDynamic config lbl && not (ncgPIC config)
+        , ncgLabelDynamic config lbl
+        , not (ncgPIC config)
         = AccessDirectly
 
         | osElfTarget os
         , arch /= ArchX86
-        , labelDynamic config lbl
+        , ncgLabelDynamic config lbl
         , ncgPIC config
         = AccessViaStub
 
 howToAccessLabel config _arch os _kind lbl
         | osElfTarget os
-        = if labelDynamic config lbl
+        = if ncgLabelDynamic config lbl
             then AccessViaSymbolPtr
             else AccessDirectly
 

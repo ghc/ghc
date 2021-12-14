@@ -167,6 +167,7 @@ Library
         GHC.Cmm.CallConv
         GHC.Cmm.CLabel
         GHC.Cmm.CommonBlockElim
+        GHC.Cmm.Config
         GHC.Cmm.ContFlowOpt
         GHC.Cmm.Dataflow
         GHC.Cmm.Dataflow.Block
@@ -386,6 +387,7 @@ Library
         GHC.Driver.CmdLine
         GHC.Driver.CodeOutput
         GHC.Driver.Config
+        GHC.Driver.Config.Cmm
         GHC.Driver.Config.CmmToAsm
         GHC.Driver.Config.CmmToLlvm
         GHC.Driver.Config.Diagnostic

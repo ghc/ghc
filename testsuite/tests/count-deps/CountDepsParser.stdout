@@ -1,4 +1,4 @@
-Found 283 GHC.Parser module dependencies
+Found 282 GHC.Parser module dependencies
 GHC.Builtin.Names
 GHC.Builtin.PrimOps
 GHC.Builtin.Types
@@ -18,7 +18,6 @@ GHC.Cmm.Node
 GHC.Cmm.Switch
 GHC.Cmm.Type
 GHC.CmmToAsm.CFG.Weight
-GHC.CmmToAsm.Config
 GHC.Core
 GHC.Core.Class
 GHC.Core.Coercion

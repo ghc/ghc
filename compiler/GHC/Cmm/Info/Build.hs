@@ -23,6 +23,7 @@ import GHC.Platform.Profile
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Cmm.BlockId
+import GHC.Cmm.Config
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
 import GHC.Cmm.Dataflow.Label
@@ -33,7 +34,6 @@ import GHC.Data.Graph.Directed
 import GHC.Cmm.CLabel
 import GHC.Cmm
 import GHC.Cmm.Utils
-import GHC.Driver.Session
 import GHC.Data.Maybe
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -41,7 +41,6 @@ import GHC.Runtime.Heap.Layout
 import GHC.Types.Unique.Supply
 import GHC.Types.CostCentre
 import GHC.StgToCmm.Heap
-import GHC.Driver.Config.CmmToAsm
 
 import Control.Monad
 import Data.Map.Strict (Map)
@@ -793,16 +792,16 @@ resolveCAF platform srtMap lbl@(CAFLabel l) =
 -- declarations to the ModuleSRTInfo.
 --
 doSRTs
-  :: DynFlags
+  :: CmmConfig
   -> ModuleSRTInfo
   -> [(CAFEnv, [CmmDecl])]
   -> [(CAFSet, CmmDecl)]
   -> IO (ModuleSRTInfo, [CmmDeclSRTs])
 
-doSRTs dflags moduleSRTInfo procs data_ = do
+doSRTs cfg moduleSRTInfo procs data_ = do
   us <- mkSplitUniqSupply 'u'
 
-  let profile = targetProfile dflags
+  let profile = cmmProfile cfg
 
   -- Ignore the original grouping of decls, and combine all the
   -- CAFEnvs into a single CAFEnv.
@@ -827,7 +826,7 @@ doSRTs dflags moduleSRTInfo procs data_ = do
       decls = map snd data_ ++ concat procss
       staticFuns = mapFromList (getStaticFuns decls)
 
-      platform = targetPlatform dflags
+      platform = cmmPlatform cfg
 
   -- Put the decls in dependency order. Why? So that we can implement
   -- [Inline] and [Filter].  If we need to refer to an SRT that has
@@ -860,9 +859,9 @@ doSRTs dflags moduleSRTInfo procs data_ = do
       (result, moduleSRTInfo') =
         initUs_ us $
         flip runStateT moduleSRTInfo $ do
-          nonCAFs <- mapM (doSCC dflags staticFuns static_data) sccs
+          nonCAFs <- mapM (doSCC cfg staticFuns static_data) sccs
           cAFs <- forM cafsWithSRTs $ \(l, cafLbl, cafs) ->
-            oneSRT dflags staticFuns [BlockLabel l] [cafLbl]
+            oneSRT cfg staticFuns [BlockLabel l] [cafLbl]
                    True{-is a CAF-} cafs static_data
           return (nonCAFs ++ cAFs)
 
@@ -904,7 +903,7 @@ doSRTs dflags moduleSRTInfo procs data_ = do
 
 -- | Build the SRT for a strongly-connected component of blocks
 doSCC
-  :: DynFlags
+  :: CmmConfig
   -> LabelMap CLabel -- which blocks are static function entry points
   -> Set CLabel -- static data
   -> SCC (SomeLabel, CAFLabel, Set CAFLabel)
@@ -915,14 +914,14 @@ doSCC
         , Bool                   -- Whether the group has CAF references
         )
 
-doSCC dflags staticFuns static_data (AcyclicSCC (l, cafLbl, cafs)) =
-  oneSRT dflags staticFuns [l] [cafLbl] False cafs static_data
+doSCC cfg staticFuns static_data (AcyclicSCC (l, cafLbl, cafs)) =
+  oneSRT cfg staticFuns [l] [cafLbl] False cafs static_data
 
-doSCC dflags staticFuns static_data (CyclicSCC nodes) = do
+doSCC cfg staticFuns static_data (CyclicSCC nodes) = do
   -- build a single SRT for the whole cycle, see Note [recursive SRTs]
   let (lbls, caf_lbls, cafsets) = unzip3 nodes
       cafs = Set.unions cafsets
-  oneSRT dflags staticFuns lbls caf_lbls False cafs static_data
+  oneSRT cfg staticFuns lbls caf_lbls False cafs static_data
 
 
 {- Note [recursive SRTs]
@@ -951,7 +950,7 @@ references to static function closures.
 
 -- | Build an SRT for a set of blocks
 oneSRT
-  :: DynFlags
+  :: CmmConfig
   -> LabelMap CLabel            -- which blocks are static function entry points
   -> [SomeLabel]                -- blocks in this set
   -> [CAFLabel]                 -- labels for those blocks
@@ -965,15 +964,14 @@ oneSRT
        , Bool                         -- Whether the group has CAF references
        )
 
-oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
+oneSRT cfg staticFuns lbls caf_lbls isCAF cafs static_data = do
   topSRT <- get
 
   let
     this_mod = thisModule topSRT
-    config = initNCGConfig dflags this_mod
-    profile = targetProfile dflags
+    profile  = cmmProfile cfg
     platform = profilePlatform profile
-    srtMap = moduleSRTMap topSRT
+    srtMap   = moduleSRTMap topSRT
 
     blockids = getBlockLabels lbls
 
@@ -1070,7 +1068,7 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
           -- when dynamic linking is used we cannot guarantee that the offset
           -- between the SRT and the info table will fit in the offset field.
           -- Consequently we build a singleton SRT in this case.
-          not (labelDynamic config lbl)
+          not (labelDynamic this_mod platform (cmmExternalDynamicRefs cfg) lbl)
 
           -- MachO relocations can't express offsets between compilation units at
           -- all, so we are always forced to build a singleton SRT in this case.

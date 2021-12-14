@@ -10,19 +10,20 @@ module GHC.Cmm.Pipeline (
 import GHC.Prelude
 
 import GHC.Cmm
-import GHC.Cmm.Lint
-import GHC.Cmm.Info.Build
-import GHC.Cmm.CommonBlockElim
-import GHC.Cmm.Switch.Implement
-import GHC.Cmm.ProcPoint
+import GHC.Cmm.Config
 import GHC.Cmm.ContFlowOpt
-import GHC.Cmm.LayoutStack
-import GHC.Cmm.Sink
+import GHC.Cmm.CommonBlockElim
 import GHC.Cmm.Dataflow.Collections
+import GHC.Cmm.Info.Build
+import GHC.Cmm.Lint
+import GHC.Cmm.LayoutStack
+import GHC.Cmm.ProcPoint
+import GHC.Cmm.Sink
+import GHC.Cmm.Switch.Implement
 
 import GHC.Types.Unique.Supply
 import GHC.Driver.Session
-import GHC.Driver.Backend
+import GHC.Driver.Config.Cmm
 import GHC.Utils.Error
 import GHC.Utils.Logger
 import GHC.Driver.Env
@@ -43,23 +44,23 @@ cmmPipeline
  -> IO (ModuleSRTInfo, CmmGroupSRTs) -- Output CPS transformed C--
 
 cmmPipeline hsc_env srtInfo prog = do
-  let logger = hsc_logger hsc_env
-  let dflags = hsc_dflags hsc_env
-  let forceRes (info, group) = info `seq` foldr (\decl r -> decl `seq` r) () group
-  let platform = targetPlatform dflags
+  let logger    = hsc_logger hsc_env
+  let cmmConfig = initCmmConfig (hsc_dflags hsc_env)
+  let forceRes (info, group) = info `seq` foldr seq () group
+  let platform = cmmPlatform cmmConfig
   withTimingSilent logger (text "Cmm pipeline") forceRes $ do
-     tops <- {-# SCC "tops" #-} mapM (cpsTop logger platform dflags) prog
+     tops <- {-# SCC "tops" #-} mapM (cpsTop logger platform cmmConfig) prog
 
      let (procs, data_) = partitionEithers tops
-     (srtInfo, cmms) <- {-# SCC "doSRTs" #-} doSRTs dflags srtInfo procs data_
+     (srtInfo, cmms) <- {-# SCC "doSRTs" #-} doSRTs cmmConfig srtInfo procs data_
      dumpWith logger Opt_D_dump_cmm_cps "Post CPS Cmm" FormatCMM (pdoc platform cmms)
 
      return (srtInfo, cmms)
 
 
-cpsTop :: Logger -> Platform -> DynFlags -> CmmDecl -> IO (Either (CAFEnv, [CmmDecl]) (CAFSet, CmmDecl))
+cpsTop :: Logger -> Platform -> CmmConfig -> CmmDecl -> IO (Either (CAFEnv, [CmmDecl]) (CAFSet, CmmDecl))
 cpsTop _logger platform _ p@(CmmData _ statics) = return (Right (cafAnalData platform statics, p))
-cpsTop logger platform dflags proc =
+cpsTop logger platform cfg proc =
     do
       ----------- Control-flow optimisations ----------------------------------
 
@@ -76,15 +77,17 @@ cpsTop logger platform dflags proc =
 
       ----------- Eliminate common blocks -------------------------------------
       g <- {-# SCC "elimCommonBlocks" #-}
-           condPass Opt_CmmElimCommonBlocks elimCommonBlocks g
+           condPass (cmmOptElimCommonBlks cfg) elimCommonBlocks g
                          Opt_D_dump_cmm_cbe "Post common block elimination"
 
       -- Any work storing block Labels must be performed _after_
       -- elimCommonBlocks
 
       ----------- Implement switches ------------------------------------------
-      g <- {-# SCC "createSwitchPlans" #-}
-           runUniqSM $ cmmImplementSwitchPlans (backend dflags) platform g
+      g <- if cmmDoCmmSwitchPlans cfg
+             then {-# SCC "createSwitchPlans" #-}
+                  runUniqSM $ cmmImplementSwitchPlans platform g
+             else pure g
       dump Opt_D_dump_cmm_switch "Post switch plan" g
 
       ----------- Proc points -------------------------------------------------
@@ -106,13 +109,13 @@ cpsTop logger platform dflags proc =
       (g, stackmaps) <-
            {-# SCC "layoutStack" #-}
            if do_layout
-              then runUniqSM $ cmmLayoutStack dflags proc_points entry_off g
+              then runUniqSM $ cmmLayoutStack cfg proc_points entry_off g
               else return (g, mapEmpty)
       dump Opt_D_dump_cmm_sp "Layout Stack" g
 
       ----------- Sink and inline assignments  --------------------------------
       g <- {-# SCC "sink" #-} -- See Note [Sinking after stack layout]
-           condPass Opt_CmmSink (cmmSink platform) g
+           condPass (cmmOptSink cfg) (cmmSink platform) g
                     Opt_D_dump_cmm_sink "Sink assignments"
 
       ------------- CAF analysis ----------------------------------------------
@@ -142,7 +145,7 @@ cpsTop logger platform dflags proc =
 
       ----------- Control-flow optimisations -----------------------------
       g <- {-# SCC "cmmCfgOpts(2)" #-}
-           return $ if gopt Opt_CmmControlFlow dflags
+           return $ if cmmOptControlFlow cfg
                     then map (cmmCfgOptsProc splitting_proc_points) g
                     else g
       g <- return (map removeUnreachableBlocksProc g)
@@ -151,13 +154,13 @@ cpsTop logger platform dflags proc =
 
       return (Left (cafEnv, g))
 
-  where dump = dumpGraph logger platform dflags
+  where dump = dumpGraph logger platform (cmmDoLinting cfg)
 
         dumps flag name
            = mapM_ (dumpWith logger flag name FormatCMM . pdoc platform)
 
-        condPass flag pass g dumpflag dumpname =
-            if gopt flag dflags
+        condPass do_opt pass g dumpflag dumpname =
+            if do_opt
                then do
                     g <- return $ pass g
                     dump dumpflag dumpname g
@@ -168,14 +171,7 @@ cpsTop logger platform dflags proc =
         -- tablesNextToCode is off.  The latter is because we have no
         -- label to put on info tables for basic blocks that are not
         -- the entry point.
-        splitting_proc_points = backend dflags /= NCG
-                             || not (platformTablesNextToCode platform)
-                             || -- Note [inconsistent-pic-reg]
-                                usingInconsistentPicReg
-        usingInconsistentPicReg
-           = case (platformArch platform, platformOS platform, positionIndependent dflags)
-             of   (ArchX86, OSDarwin, pic) -> pic
-                  _                        -> False
+        splitting_proc_points = cmmSplitProcPoints cfg
 
 -- Note [Sinking after stack layout]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -347,9 +343,9 @@ runUniqSM m = do
   return (initUs_ us m)
 
 
-dumpGraph :: Logger -> Platform -> DynFlags -> DumpFlag -> String -> CmmGraph -> IO ()
-dumpGraph logger platform dflags flag name g = do
-  when (gopt Opt_DoCmmLinting dflags) $ do_lint g
+dumpGraph :: Logger -> Platform -> Bool -> DumpFlag -> String -> CmmGraph -> IO ()
+dumpGraph logger platform do_linting flag name g = do
+  when do_linting $ do_lint g
   dumpWith logger flag name FormatCMM (pdoc platform g)
  where
   do_lint g = case cmmLintGraph platform g of
