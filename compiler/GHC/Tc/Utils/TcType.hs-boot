@@ -1,6 +1,6 @@
 module GHC.Tc.Utils.TcType where
 import GHC.Utils.Outputable( SDoc )
-import GHC.Prelude ( Bool, Applicative )
+import GHC.Prelude ( Bool )
 import {-# SOURCE #-} GHC.Types.Var ( TcTyVar )
 import {-# SOURCE #-} GHC.Core.TyCo.Rep
 import {-# SOURCE #-} GHC.Tc.Types.Origin
@@ -18,5 +18,3 @@ isTyConableTyVar :: TcTyVar -> Bool
 
 tcEqType :: HasDebugCallStack => Type -> Type -> Bool
 
-updateSkolInfo :: (SkolemInfo -> SkolemInfo) -> TcTyVarDetails -> TcTyVarDetails
-updateSkolInfoM :: Applicative m => (SkolemInfo -> m SkolemInfo) -> TcTyVarDetails -> m TcTyVarDetails

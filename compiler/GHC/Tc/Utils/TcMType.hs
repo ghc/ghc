@@ -78,7 +78,7 @@ module GHC.Tc.Utils.TcMType (
   zonkTyCoVarKind, zonkTyCoVarKindBinder,
   zonkEvVar, zonkWC, zonkImplication, zonkSimples,
   zonkId, zonkCoVar,
-  zonkCt, zonkSkolemInfo, zonkTyVarSkolemInfo,
+  zonkCt, zonkSkolemInfo,
 
   ---------------------------------
   -- Promotion, defaulting, skolemisation
@@ -2426,13 +2426,6 @@ zonkSkolemInfoAnon (InferSkol ntys) = do { ntys' <- mapM do_one ntys
     do_one (n, ty) = do { ty' <- zonkTcType ty; return (n, ty') }
 zonkSkolemInfoAnon skol_info = return skol_info
 
-zonkTyVarSkolemInfo :: TyVar -> TcM TyVar
-zonkTyVarSkolemInfo =
-  updateTcTyVarDetailsM (\case { SkolemTv sk_info lvl over -> do
-                                      sk_info' <- zonkSkolemInfo sk_info
-                                      return (SkolemTv sk_info' lvl over)
-                                   ; det -> return det })
-
 {-
 %************************************************************************
 %*                                                                      *
@@ -2502,8 +2495,7 @@ zonkTcTyVar tv
   = zonk_kind_and_return
   where
     zonk_kind_and_return = do { z_tv <- zonkTyCoVarKind tv
-                             -- ; pprTraceM "zonk_kind" (ppr tv $$ ppr z_tv)
-                              ; mkTyVarTy <$> pure z_tv --updateTcTyVarDetailsM (updateSkolInfoM zonkSkolemInfo) z_tv
+                              ; mkTyVarTy <$> pure z_tv
                               }
 
 -- Variant that assumes that any result of zonking is still a TyVar.

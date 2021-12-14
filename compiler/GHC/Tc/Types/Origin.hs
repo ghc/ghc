@@ -251,7 +251,7 @@ data SkolemInfoAnon
   | UnifyForAllSkol     -- We are unifying two for-all types
        TcType           -- The instantiated type *inside* the forall
 
-  | TyConSkol CallStack TyConFlavour Name  -- bound in a type declaration of the given flavour
+  | TyConSkol TyConFlavour Name  -- bound in a type declaration of the given flavour
 
   | DataConSkol Name    -- bound as an existential in a Haskell98 datacon decl or
                         -- as any variable in a GADT datacon decl
@@ -304,7 +304,7 @@ pprSkolInfo (InferSkol ids)   = hang (text "the inferred type" <> plural ids <+>
                                    2 (vcat [ ppr name <+> dcolon <+> ppr ty
                                            | (name,ty) <- ids ])
 pprSkolInfo (UnifyForAllSkol ty) = text "the type" <+> ppr ty
-pprSkolInfo (TyConSkol _cs flav name) = text "the" <+> ppr flav <+> text "declaration for" <+> quotes (ppr name)
+pprSkolInfo (TyConSkol flav name) = text "the" <+> ppr flav <+> text "declaration for" <+> quotes (ppr name)
 pprSkolInfo (DataConSkol name)= text "the data constructor" <+> quotes (ppr name)
 pprSkolInfo ReifySkol         = text "the type being reified"
 

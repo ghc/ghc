@@ -39,7 +39,6 @@ module GHC.Tc.Utils.TcType (
   --------------------------------
   -- MetaDetails
   TcTyVarDetails(..), pprTcTyVarDetails, vanillaSkolemTv, vanillaSkolemTvUnk, superSkolemTv,
-  updateSkolInfo, updateSkolInfoM,
   MetaDetails(Flexi, Indirect), MetaInfo(..), skolemSkolInfo,
   isImmutableTyVar, isSkolemTyVar, isMetaTyVar,  isMetaTyVarTy, isTyVarTy,
   tcIsTcTyVar, isTyVarTyVar, isOverlappableTyVar,  isTyConableTyVar,
@@ -236,7 +235,6 @@ import Data.List  ( mapAccumL )
 import Data.IORef
 import Data.List.NonEmpty( NonEmpty(..) )
 import {-# SOURCE #-} GHC.Tc.Types.Origin ( unkSkol, SkolemInfo )
-import Data.Functor.Identity
 
 
 {-
@@ -508,13 +506,6 @@ superSkolemTv   sk = SkolemTv sk topTcLevel True   -- Treat this as a completely
 
 vanillaSkolemTvUnk :: HasCallStack => TcTyVarDetails
 vanillaSkolemTvUnk = vanillaSkolemTv unkSkol
-
-updateSkolInfo :: (SkolemInfo -> SkolemInfo) -> TcTyVarDetails  -> TcTyVarDetails
-updateSkolInfo f d = runIdentity (updateSkolInfoM (Identity . f) d)
-
-updateSkolInfoM :: Applicative m => (SkolemInfo -> m SkolemInfo) -> TcTyVarDetails -> m TcTyVarDetails
-updateSkolInfoM f (SkolemTv v a b) = (\v' -> SkolemTv v' a b) <$> f v
-updateSkolInfoM _ td = pure td
 
 instance Outputable TcTyVarDetails where
   ppr = pprTcTyVarDetails

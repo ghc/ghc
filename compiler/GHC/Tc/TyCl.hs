@@ -103,7 +103,6 @@ import Data.List (nubBy, partition)
 import Data.List.NonEmpty ( NonEmpty(..) )
 import qualified Data.Set as Set
 import Data.Tuple( swap )
-import GHC.Stack
 
 {-
 ************************************************************************
@@ -1673,7 +1672,7 @@ kcConDecl new_or_data tc_res_kind (ConDeclH98
   , con_mb_cxt = ex_ctxt, con_args = args })
   = addErrCtxt (dataConCtxt [name]) $
     discardResult                   $
-    bindExplicitTKBndrs_Tv unkSkol ex_tvs $
+    bindExplicitTKBndrs_Tv ex_tvs $
     do { _ <- tcHsContext ex_ctxt
        ; kcConH98Args new_or_data tc_res_kind args
          -- We don't need to check the telescope here,
@@ -1688,9 +1687,8 @@ kcConDecl new_or_data
   = -- See Note [kcConDecls: kind-checking data type decls]
     addErrCtxt (dataConCtxt names) $
     discardResult                      $
-    mkSkolemInfo (DataConSkol (unLoc (head names))) >>= \skol_info ->
     -- Not sure this is right, should just extend rather than skolemise but no test
-    bindOuterSigTKBndrs_Tv skol_info outer_bndrs $
+    bindOuterSigTKBndrs_Tv outer_bndrs $
         -- Why "_Tv"?  See Note [Using TyVarTvs for kind-checking GADTs]
     do { _ <- tcHsContext cxt
        ; traceTc "kcConDecl:GADT {" (ppr names $$ ppr res_ty)
@@ -2495,7 +2493,7 @@ tcClassDecl1 roles_info class_name hs_ctxt meths fundeps sigs ats at_defs
                                 ppr fds)
        ; return clas }
   where
-    skol_info_anon = TyConSkol callStack ClassFlavour class_name
+    skol_info_anon = TyConSkol ClassFlavour class_name
     tc_fundep :: GHC.Hs.FunDep GhcRn -> TcM ([Var],[Var])
     tc_fundep (FunDep _ tvs1 tvs2)
                            = do { tvs1' <- mapM (tcLookupTyVar . unLoc) tvs1 ;
@@ -2719,7 +2717,7 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info
                               , fdResultSig = L _ sig
                               , fdInjectivityAnn = inj })
   | DataFamily <- fam_info
-  = mkSkolemInfo (TyConSkol callStack (DataFamilyFlavour Nothing) tc_name) >>= \skol_info ->
+  = mkSkolemInfo (TyConSkol (DataFamilyFlavour Nothing) tc_name) >>= \skol_info ->
     bindTyClTyVars skol_info tc_name $ \ _ binders res_kind -> do
   { traceTc "tcFamDecl1 data family:" (ppr tc_name)
   ; checkFamFlag tc_name
@@ -2747,7 +2745,7 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info
 
   | OpenTypeFamily <- fam_info
   =
-    mkSkolemInfo (TyConSkol callStack (OpenTypeFamilyFlavour Nothing) tc_name) >>= \skol_info ->
+    mkSkolemInfo (TyConSkol (OpenTypeFamilyFlavour Nothing) tc_name) >>= \skol_info ->
     bindTyClTyVars skol_info tc_name $ \ _ binders res_kind -> do
   { traceTc "tcFamDecl1 open type family:" (ppr tc_name)
   ; checkFamFlag tc_name
@@ -2885,7 +2883,7 @@ tcTySynRhs roles_info tc_name hs_ty
        ; let roles = roles_info tc_name
        ; return (buildSynTyCon tc_name binders res_kind roles rhs_ty) }
   where
-    skol_info_anon = TyConSkol callStack TypeSynonymFlavour tc_name
+    skol_info_anon = TyConSkol TypeSynonymFlavour tc_name
 
 tcDataDefn :: SDoc -> RolesInfo -> Name
            -> HsDataDefn GhcRn -> TcM (TyCon, [DerivInfo])
@@ -2965,7 +2963,7 @@ tcDataDefn err_ctxt roles_info tc_name
        ; traceTc "tcDataDefn" (ppr tc_name $$ ppr tycon_binders $$ ppr extra_bndrs)
        ; return (tycon, [deriv_info]) }
   where
-    skol_info_anon = TyConSkol callStack flav tc_name
+    skol_info_anon = TyConSkol flav tc_name
     flav = newOrDataToFlavour new_or_data
 
     -- Abstract data types in hsig files can have arbitrary kinds,
@@ -3013,8 +3011,7 @@ kcTyFamInstEqn tc_fam_tc
        ; checkTyFamInstEqn tc_fam_tc eqn_tc_name hs_pats
 
        ; discardResult $
-         mkSkolemInfo FamInstSkol >>= \skol_info ->
-         bindOuterFamEqnTKBndrs_Q_Tv skol_info outer_bndrs $
+         bindOuterFamEqnTKBndrs_Q_Tv outer_bndrs $
          do { (_fam_app, res_kind) <- tcFamTyPats tc_fam_tc hs_pats
             ; tcCheckLHsType hs_rhs_ty (TheKind res_kind) }
              -- Why "_Tv" here?  Consider (#14066)
@@ -3444,7 +3441,7 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs res_kind tag_map
          -- the kvs below are those kind variables entirely unmentioned by the user
          --   and discovered only by generalization
 
-       ; kvs <- kindGeneralizeAll unkSkol fake_ty
+       ; kvs <- kindGeneralizeAll skol_info fake_ty
 
        ; let skol_tvs = tc_tvs ++ kvs ++ binderVars exp_tvbndrs
        ; reportUnsolvedEqualities skol_info skol_tvs tclvl wanted

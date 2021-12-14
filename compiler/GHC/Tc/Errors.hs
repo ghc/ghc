@@ -230,7 +230,7 @@ report_unsolved type_errors expr_holes
 
        ; wanted <- zonkWC wanted   -- Zonk to reveal all information
 
-       ; let
+       ; let tidy_env = tidyFreeTyCoVars emptyTidyEnv free_tvs;
              free_tvs = filterOut isCoVar $
                         tyCoVarsOfWCList wanted
                         -- tyCoVarsOfWC returns free coercion *holes*, even though
@@ -238,8 +238,6 @@ report_unsolved type_errors expr_holes
                         -- turn may mention variables bound further in, which makes
                         -- no sense. Really we should not return those holes at all;
                         -- for now we just filter them out.
-
-       ; let tidy_env = tidyFreeTyCoVars emptyTidyEnv free_tvs;
 
        ; traceTc "reportUnsolved (after zonking):" $
          vcat [ text "Free tyvars:" <+> pprTyVars free_tvs
@@ -1305,7 +1303,7 @@ mkHoleError lcl_name_cache tidy_simples ctxt hole@(Hole { hole_occ = occ
                             else return (ctxt, empty)
 
 
-       ; skol_msg <- pprSkols ctxt =<< mapM zonkTyVarSkolemInfo skol_tvs
+       ; skol_msg <- pprSkols ctxt skol_tvs
        ; let err = important (hole_msg skol_msg) `mappend`
                    mk_relevant_bindings (binds_msg $$ constraints_msg) `mappend`
                    valid_hole_fits sub_msg
@@ -1936,7 +1934,7 @@ extraTyVarEqInfo ctxt tv1 ty2
                     Just (tv, _) -> extraTyVarInfo ctxt tv
                     Nothing      -> return empty
 
-extraTyVarInfo :: HasCallStack => ReportErrCtxt -> TcTyVar -> TcM SDoc
+extraTyVarInfo :: ReportErrCtxt -> TcTyVar -> TcM SDoc
 extraTyVarInfo ctxt tv
   = assertPpr (isTyVar tv) (ppr tv) $
     case tcTyVarDetails tv of
@@ -3164,11 +3162,9 @@ mkAmbigMsg prepend_msg ct
       = text "The" <+> what <+> text "variable" <> plural tkvs
         <+> pprQuotedList tkvs <+> isOrAre tkvs <+> text "ambiguous"
 
-pprSkols :: HasCallStack => ReportErrCtxt -> [TcTyVar] -> TcM SDoc
+pprSkols :: ReportErrCtxt -> [TcTyVar] -> TcM SDoc
 pprSkols ctxt tvs
   = do
-      pprTraceM "ty_vars" (ppr tvs)
-      pprTraceM "ty_vars" (ppr skolem_list)
       zonked_ty_vars <- mapM (firstM zonkSkolemInfo) skolem_list
       let tidy_ty_vars = map (bimap (getSkolemInfo . tidySkolemInfo (cec_tidy ctxt)) (map fst)) zonked_ty_vars
       return $ vcat (map pp_one tidy_ty_vars)

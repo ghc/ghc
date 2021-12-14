@@ -89,17 +89,16 @@ module GHC.Types.Var (
 
         -- ** Modifying 'TyVar's
         setTyVarName, setTyVarUnique, setTyVarKind, updateTyVarKind,
-        updateTyVarKindM, updateTcTyVarDetailsM,
+        updateTyVarKindM,
 
         nonDetCmpVar
-
-    ,updateTcTyVarSkolemInfo) where
+        ) where
 
 import GHC.Prelude
 
 import {-# SOURCE #-}   GHC.Core.TyCo.Rep( Type, Kind, Mult )
 import {-# SOURCE #-}   GHC.Core.TyCo.Ppr( pprKind )
-import {-# SOURCE #-}   GHC.Tc.Utils.TcType( TcTyVarDetails, pprTcTyVarDetails, vanillaSkolemTvUnk, updateSkolInfo )
+import {-# SOURCE #-}   GHC.Tc.Utils.TcType( TcTyVarDetails, pprTcTyVarDetails, vanillaSkolemTvUnk )
 import {-# SOURCE #-}   GHC.Types.Id.Info( IdDetails, IdInfo, coVarDetails, isCoVarDetails,
                                            vanillaIdInfo, pprIdDetails )
 import {-# SOURCE #-}   GHC.Builtin.Types ( manyDataConTy )
@@ -114,7 +113,6 @@ import GHC.Utils.Panic.Plain
 
 import Data.Data
 
-import {-# SOURCE #-} GHC.Tc.Types.Origin ( SkolemInfo )
 
 {-
 ************************************************************************
@@ -751,13 +749,6 @@ updateTyVarKindM update tv
   = do { k' <- update (tyVarKind tv)
        ; return $ tv {varType = k'} }
 
-updateTcTyVarSkolemInfo ::  (SkolemInfo -> SkolemInfo) -> TyVar -> TyVar
-updateTcTyVarSkolemInfo update (TcTyVar a b c details) = TcTyVar a b c (updateSkolInfo update details)
-updateTcTyVarSkolemInfo _ ty_var = ty_var
-
-updateTcTyVarDetailsM :: Monad m => (TcTyVarDetails -> m TcTyVarDetails) -> TyVar -> m TyVar
-updateTcTyVarDetailsM update (TcTyVar a b c details) = TcTyVar a b c <$> update details
-updateTcTyVarDetailsM _ ty_var = return ty_var
 
 mkTyVar :: Name -> Kind -> TyVar
 mkTyVar name kind = TyVar { varName    = name
