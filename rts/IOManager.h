@@ -155,5 +155,20 @@ void insertIntoSleepingQueue(StgTSO *tso, LowResTime target);
 #define USED_IF_THREADS_AND_NOT_MINGW32 STG_UNUSED
 #endif
 
+/* -----------------------------------------------------------------------------
+ * INLINE functions... private from here on down.
+ *
+ * Some of these hooks are performance sensitive so parts of them are
+ * implemented here so they can be inlined.
+ * -----------------------------------------------------------------------------
+ */
+
+/* TODO: rename and replace these macros by inline functions
+ * these have been moved here from Scheduler.h
+ */
+#if !defined(THREADED_RTS)
+#define EMPTY_BLOCKED_QUEUE(cap)  (emptyQueue(cap->iomgr->blocked_queue_hd))
+#define EMPTY_SLEEPING_QUEUE(cap) (emptyQueue(cap->iomgr->sleeping_queue))
+#endif
 
 #include "EndPrivate.h"

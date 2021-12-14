@@ -174,22 +174,6 @@ truncateRunQueue(Capability *cap)
     cap->n_run_queue = 0;
 }
 
-#if !defined(THREADED_RTS)
-#define EMPTY_BLOCKED_QUEUE(cap)  (emptyQueue(cap->iomgr->blocked_queue_hd))
-#define EMPTY_SLEEPING_QUEUE(cap) (emptyQueue(cap->iomgr->sleeping_queue))
-#endif
-
-INLINE_HEADER bool
-emptyThreadQueues(Capability *cap)
-{
-    return emptyRunQueue(cap)
-#if !defined(THREADED_RTS)
-        // TODO replace this by a test that deferrs to the active I/O manager
-        && EMPTY_BLOCKED_QUEUE(cap) && EMPTY_SLEEPING_QUEUE(cap)
-#endif
-    ;
-}
-
 #endif /* !IN_STG_CODE */
 
 #include "EndPrivate.h"

@@ -143,6 +143,7 @@ static void startWorkerTasks (uint32_t from USED_IF_THREADS,
 #endif
 static void scheduleStartSignalHandlers (Capability *cap);
 static void scheduleCheckBlockedThreads (Capability *cap);
+static bool emptyThreadQueues(Capability *cap);
 static void scheduleProcessInbox(Capability **cap);
 static void scheduleDetectDeadlock (Capability **pcap, Task *task);
 static void schedulePushWork(Capability *cap, Task *task);
@@ -166,6 +167,7 @@ static void deleteAllThreads (void);
 #if defined(FORKPROCESS_PRIMOP_SUPPORTED)
 static void deleteThread_(StgTSO *tso);
 #endif
+
 
 /* ---------------------------------------------------------------------------
    Main scheduling loop.
@@ -915,6 +917,18 @@ scheduleCheckBlockedThreads(Capability *cap USED_IF_NOT_THREADS)
     }
 #endif
 }
+
+static bool
+emptyThreadQueues(Capability *cap)
+{
+    return emptyRunQueue(cap)
+#if !defined(THREADED_RTS)
+        // TODO replace this by a test that deferrs to the active I/O manager
+        && EMPTY_BLOCKED_QUEUE(cap) && EMPTY_SLEEPING_QUEUE(cap)
+#endif
+    ;
+}
+
 
 /* ----------------------------------------------------------------------------
  * Detect deadlock conditions and attempt to resolve them.
