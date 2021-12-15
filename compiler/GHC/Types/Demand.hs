@@ -1490,9 +1490,13 @@ keepAliveDmdEnv env vs
                   | otherwise    = dmd
 
 -- | Characterises how an expression
+--
 --    * Evaluates its free variables ('dt_env')
 --    * Evaluates its arguments ('dt_args')
 --    * Diverges on every code path or not ('dt_div')
+--
+-- Equality is defined modulo 'defaultFvDmd's in 'dt_env'.
+-- See Note [Demand type Equality].
 data DmdType
   = DmdType
   { dt_env  :: !DmdEnv     -- ^ Demand on explicitly-mentioned free variables
@@ -1501,13 +1505,13 @@ data DmdType
                           -- See Note [Demand type Divergence]
   }
 
+-- | See Note [Demand type Equality].
 instance Eq DmdType where
   (==) (DmdType fv1 ds1 div1)
-       (DmdType fv2 ds2 div2) = nonDetUFMToList fv1 == nonDetUFMToList fv2
-         -- It's OK to use nonDetUFMToList here because we're testing for
-         -- equality and even though the lists will be in some arbitrary
-         -- Unique order, it is the same order for both
-                              && ds1 == ds2 && div1 == div2
+       (DmdType fv2 ds2 div2) =  div1 == div2 && ds1 == ds2 -- cheap checks first
+                              && canonicalise div1 fv1 == canonicalise div2 fv2
+       where
+         canonicalise div fv = filterUFM (/= defaultFvDmd div) fv
 
 -- | Compute the least upper bound of two 'DmdType's elicited /by the same
 -- incoming demand/!
@@ -1519,6 +1523,7 @@ lubDmdType d1 d2
     (DmdType fv1 ds1 r1) = etaExpandDmdType n d1
     (DmdType fv2 ds2 r2) = etaExpandDmdType n d2
 
+    -- See Note [Demand type Equality]
     lub_fv  = plusVarEnv_CD lubDmd fv1 (defaultFvDmd r1) fv2 (defaultFvDmd r2)
     lub_ds  = zipWithEqual "lubDmdType" lubDmd ds1 ds2
     lub_div = lubDivergence r1 r2
@@ -1661,6 +1666,31 @@ now f puts a strictness demand of C1(C1(L)) onto its argument, which is unleashe
 on err via the App rule. In contrast to weaker head strictness, this demand is
 strong enough to unleash err's signature and hence we see that the whole
 expression diverges!
+
+Note [Demand type Equality]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+What is the difference between the DmdType <L>{x->A} and <L>?
+Answer: There is none! They have the exact same semantics, because any var that
+is not mentioned in 'dt_env' implicitly has demand 'defaultFvDmd', based on
+the divergence of the demand type 'dt_div'.
+Similarly, <B>b{x->B, y->A} is the same as <B>b{y->A}, because the default FV
+demand of BotDiv is B. But neither is equal to <B>b, because y has demand B in
+the latter, not A as before.
+
+NB: 'dt_env' technically can't stand for its own, because it doesn't tell us the
+demand on FVs that don't appear in the DmdEnv. Hence 'PlusDmdArg' carries along
+a 'Divergence', for example.
+
+The Eq instance of DmdType must reflect that, otherwise we can get into monotonicity
+issues during fixed-point iteration (<L>{x->A} /= <L> /= <L>{x->A} /= ...).
+It does so by filtering out any default FV demands prior to comparing 'dt_env'.
+An alternative would be to maintain an invariant that there are no default FV demands
+in 'dt_env' to begin with, but that seems more involved to maintain in the current
+implementation.
+
+Note that 'lubDmdType' maintains this kind of equality by using 'plusVarEnv_CD',
+involving 'defaultFvDmd' for any entries present in one 'dt_env' but not the
+other.
 
 Note [Asymmetry of 'plus*']
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
