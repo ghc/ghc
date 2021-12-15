@@ -1,7 +1,9 @@
 -- | This module exists to work nicely with the QualifiedDo
 -- extension.
+--
 -- @
 -- import qualified Language.Haskell.TH.CodeDo as Code
+--
 -- myExample :: Monad m => Code m a -> Code m a -> Code m a
 -- myExample opt1 opt2 =
 --   Code.do
