@@ -146,14 +146,6 @@ peekRunQueue (Capability *cap)
 
 void promoteInRunQueue (Capability *cap, StgTSO *tso);
 
-/* Check whether various thread queues are empty
- */
-INLINE_HEADER bool
-emptyQueue (StgTSO *q)
-{
-    return (q == END_TSO_QUEUE);
-}
-
 INLINE_HEADER bool
 emptyRunQueue(Capability *cap)
 {

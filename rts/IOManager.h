@@ -140,6 +140,14 @@ void appendToIOBlockedQueue(StgTSO *tso);
 void insertIntoSleepingQueue(StgTSO *tso, LowResTime target);
 #endif
 
+/* Check to see if there are any pending timeouts or I/O operations
+ * in progress with the I/O manager.
+ *
+ * This is used by the scheduler as part of deadlock-detection, and the
+ * "context switch as often as possible" test.
+ */
+INLINE_HEADER bool anyPendingTimeoutsOrIO(CapIOManager *iomgr);
+
 
 /* Pedantic warning cleanliness
  */
@@ -163,12 +171,32 @@ void insertIntoSleepingQueue(StgTSO *tso, LowResTime target);
  * -----------------------------------------------------------------------------
  */
 
-/* TODO: rename and replace these macros by inline functions
- * these have been moved here from Scheduler.h
- */
-#if !defined(THREADED_RTS)
-#define EMPTY_BLOCKED_QUEUE(cap)  (emptyQueue(cap->iomgr->blocked_queue_hd))
-#define EMPTY_SLEEPING_QUEUE(cap) (emptyQueue(cap->iomgr->sleeping_queue))
+INLINE_HEADER bool anyPendingTimeoutsOrIO(CapIOManager *iomgr USED_IF_NOT_THREADS)
+{
+#if defined(THREADED_RTS)
+    /* For the purpose of the scheduler, the threaded I/O managers never have
+       pending I/O or timers. Of course in reality they do, but they're
+       managed via other primitives that the scheduler can see into (threads,
+       MVars and foreign blocking calls).
+     */
+    return false;
+#else
+#if defined(mingw32_HOST_OS)
+    /* The MIO I/O manager uses the blocked_queue, while the WinIO does not.
+       Note: the latter fact makes this test useless for the WinIO I/O manager,
+       and is the probable cause of the complication in the scheduler with
+       having to call awaitEvent in multiple places.
+
+       None of the Windows I/O managers use the sleeping_queue
+     */
+    return (iomgr->blocked_queue_hd != END_TSO_QUEUE);
+#else
+    /* The select() I/O manager uses the blocked_queue and the sleeping_queue.
+     */
+    return (iomgr->blocked_queue_hd != END_TSO_QUEUE)
+        || (iomgr->sleeping_queue   != END_TSO_QUEUE);
 #endif
+#endif
+}
 
 #include "EndPrivate.h"
