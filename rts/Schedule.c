@@ -143,7 +143,6 @@ static void startWorkerTasks (uint32_t from USED_IF_THREADS,
 #endif
 static void scheduleStartSignalHandlers (Capability *cap);
 static void scheduleCheckBlockedThreads (Capability *cap);
-static bool emptyThreadQueues(Capability *cap);
 static void scheduleProcessInbox(Capability **cap);
 static void scheduleDetectDeadlock (Capability **pcap, Task *task);
 static void schedulePushWork(Capability *cap, Task *task);
@@ -399,8 +398,9 @@ schedule (Capability *initialCapability, Task *task)
      * the user specified "context switch as often as possible", with
      * +RTS -C0
      */
-    if (RtsFlags.ConcFlags.ctxtSwitchTicks == 0
-        && !emptyThreadQueues(cap)) {
+    if (RtsFlags.ConcFlags.ctxtSwitchTicks == 0 &&
+        (!emptyRunQueue(cap) ||
+          anyPendingTimeoutsOrIO(cap->iomgr))) {
         RELAXED_STORE(&cap->context_switch, 1);
     }
 
@@ -918,14 +918,6 @@ scheduleCheckBlockedThreads(Capability *cap USED_IF_NOT_THREADS)
 #endif
 }
 
-static bool
-emptyThreadQueues(Capability *cap)
-{
-    return emptyRunQueue(cap)
-        && !anyPendingTimeoutsOrIO(cap->iomgr);
-}
-
-
 /* ----------------------------------------------------------------------------
  * Detect deadlock conditions and attempt to resolve them.
  * ------------------------------------------------------------------------- */
@@ -940,7 +932,7 @@ scheduleDetectDeadlock (Capability **pcap, Task *task)
      * other tasks are waiting for work, we must have a deadlock of
      * some description.
      */
-    if ( emptyThreadQueues(cap) )
+    if ( emptyRunQueue(cap) && !anyPendingTimeoutsOrIO(cap->iomgr) )
     {
 #if defined(THREADED_RTS)
         /*
