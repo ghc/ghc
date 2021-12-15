@@ -2534,7 +2534,7 @@ dynamic_flags_deps = [
   , make_ord_flag defGhcFlag "ddump-rtti"
         (setDumpFlag Opt_D_dump_rtti)
   , make_ord_flag defGhcFlag "dcore-lint"
-        (NoArg (setGeneralFlag Opt_DoCoreLinting))
+        (NoArg (return ()))
   , make_ord_flag defGhcFlag "dlinear-core-lint"
         (NoArg (setGeneralFlag Opt_DoLinearCoreLinting))
   , make_ord_flag defGhcFlag "dstg-lint"
