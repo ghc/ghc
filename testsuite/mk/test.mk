@@ -17,6 +17,7 @@
 #  PLATFORM  -- if accepting a result, accept it for the current platform.
 #  OS        -- if accepting a result, accept it for all wordsizes of the
 #               current os.
+#  PERF_BASELINE_COMMIT - the baseline commit to use for performance tests.
 #
 # -----------------------------------------------------------------------------
 
@@ -301,6 +302,11 @@ endif
 ifeq "$(NO_PRINT_SUMMARY)" "YES"
 RUNTEST_OPTS +=  \
 	--no-print-summary
+endif
+
+ifneq "$(PERF_BASELINE_COMMIT)" ""
+RUNTEST_OPTS +=  \
+	--perf-baseline "$(PERF_BASELINE_COMMIT)"
 endif
 
 RUNTEST_OPTS +=  \

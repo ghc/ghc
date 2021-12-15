@@ -449,9 +449,11 @@ function push_perf_notes() {
 # Figure out which commit should be used by the testsuite driver as a
 # performance baseline. See Note [The CI Story].
 function determine_metric_baseline() {
-  PERF_BASELINE_COMMIT="$(git merge-base "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME" HEAD)"
-  export PERF_BASELINE_COMMIT
-  info "Using $PERF_BASELINE_COMMIT for performance metric baseline..."
+  if [ -n "${CI_MERGE_REQUEST_DIFF_BASE_SHA}:-}" ]; then
+    PERF_BASELINE_COMMIT="$CI_MERGE_REQUEST_DIFF_BASE_SHA"
+    export PERF_BASELINE_COMMIT
+    info "Using $PERF_BASELINE_COMMIT for performance metric baseline..."
+  fi
 }
 
 function test_make() {
@@ -660,6 +662,8 @@ fi
 if [ -n "${IGNORE_PERF_FAILURES:-}" ]; then
   RUNTEST_ARGS="--ignore-perf-failures=$IGNORE_PERF_FAILURES"
 fi
+
+determine_metric_baseline
 
 set_toolchain_paths
 
