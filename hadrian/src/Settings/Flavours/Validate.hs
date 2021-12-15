@@ -28,9 +28,9 @@ validateArgs = sourceArgs SourceArgs
                              -- See #11487
                            , notStage0 ? arg "-fllvm-fill-undef-with-garbage"
                            ]
-    , hsLibrary  = pure ["-O", "-dcore-lint", "-dno-debug-output"]
+    , hsLibrary  = pure ["-O", "-dno-debug-output"]
     , hsCompiler = mconcat [ stage0 ? pure ["-O2", "-DDEBUG"]
-                           , notStage0 ? pure ["-O", "-dcore-lint", "-dno-debug-output"]
+                           , notStage0 ? pure ["-O", "-dno-debug-output"]
                            ]
     , hsGhc      = pure ["-O"] }
 
