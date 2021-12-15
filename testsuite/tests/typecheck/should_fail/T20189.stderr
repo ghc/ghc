@@ -1,0 +1,12 @@
+
+T20189.hs:6:5: error:
+    • Found hole: _ :: t
+      Where: ‘t’ is a rigid type variable bound by
+               the type signature for:
+                 y :: forall t. (t ~ (forall x. Show x => x -> IO ())) => t
+               at T20189.hs:5:1-49
+    • In an equation for ‘y’: y = _
+    • Relevant bindings include y :: t (bound at T20189.hs:6:1)
+      Constraints include
+        t ~ (forall x. Show x => x -> IO ()) (from T20189.hs:5:1-49)
+      Valid hole fits include y :: t (bound at T20189.hs:6:1)
