@@ -2648,7 +2648,9 @@ data Type = ForallT [TyVarBndr Specificity] Cxt Type -- ^ @forall \<vars\>. \<ct
           | UnboxedTupleT Int              -- ^ @(\#,\#), (\#,,\#), etc.@
           | UnboxedSumT SumArity           -- ^ @(\#|\#), (\#||\#), etc.@
           | ArrowT                         -- ^ @->@
-          | MulArrowT                      -- ^ @FUN@
+          | MulArrowT                      -- ^ @%n ->@
+                                           --
+                                           -- Generalised arrow type with multiplicity argument
           | EqualityT                      -- ^ @~@
           | ListT                          -- ^ @[]@
           | PromotedTupleT Int             -- ^ @'(), '(,), '(,,), etc.@
