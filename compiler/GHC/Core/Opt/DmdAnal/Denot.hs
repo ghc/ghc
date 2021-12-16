@@ -857,6 +857,10 @@ denotRhsSig top_lvl env rec_flag pairs = fix_all env pairs
             let !rhs_fvs' = applyWhen (isTopLevel top_lvl) (multDmdEnv C_01)
                               -- discard confusing strictness info on top-level
                               -- vars, which must never end up strict anyway.
+                          $ filterVarEnv (/= defaultFvDmd rhs_div)
+                              -- We prune all the default FV demands here, so
+                              -- that we don't have to deal with default FV
+                              -- demands when comparing the lazy FVs
                           $ reuseBndrs rec_ids rhs_fvs
                               -- recursive binders will end up used many times
                               -- anyway and this speeds up fixed-point iteration

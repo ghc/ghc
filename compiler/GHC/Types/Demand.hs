@@ -45,7 +45,7 @@ module GHC.Types.Demand (
 
     -- * Demand environments
     DmdEnv, emptyDmdEnv,
-    keepAliveDmdEnv, multDmdEnv, reuseBndrs, stripBoxityDmdType,
+    keepAliveDmdEnv, multDmdEnv, reuseBndrs,
 
     -- * Divergence
     Divergence(..), topDiv, botDiv, exnDiv, lubDivergence, isDeadEndDiv,
@@ -58,8 +58,8 @@ module GHC.Types.Demand (
     -- *** PlusDmdArg
     PlusDmdArg, mkPlusDmdArg, toPlusDmdArg, plusDmdArg,
     -- ** Other operations
-    peelFV, findIdDemand, addDemand, splitDmdTy, deferAfterPreciseException,
-    keepAliveDmdType,
+    peelFV, findIdDemand, addDemand, defaultFvDmd, splitDmdTy,
+    deferAfterPreciseException, keepAliveDmdType, stripBoxityDmdType,
 
     -- * Demand signatures
     DmdSig(DmdSig), mkDmdSigForArity, mkClosedDmdSig,
