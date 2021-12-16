@@ -1316,22 +1316,35 @@ source-tarball:
     branch: "master"
     strategy: "depend"
 
-hackage:
+hackage-lint:
   extends: .hackage
+  variables:
+    EXTRA_HC_OPTS: "-dcore-lint"
   when: manual
 
-hackage-label:
+hackage-label-lint:
   extends: .hackage
+  variables:
+    EXTRA_HC_OPTS: "-dcore-lint"
   rules:
     - if: '$CI_MERGE_REQUEST_LABELS =~ /.*user-facing.*/'
 
-nightly-hackage:
+# The head.hackage job is split into two jobs because enabling `-dcore-lint`
+# affects the total allocation numbers for the simplifier portion significantly.
+nightly-hackage-lint:
   rules:
     - if: $NIGHTLY
   extends: .hackage
   variables:
-    # Generate logs for nightly builds
-    EXTRA_HC_OPTS: "-dcore-lint -ddump-timings"
+    EXTRA_HC_OPTS: "-dcore-lint"
+
+nightly-hackage-perf:
+  rules:
+    - if: $NIGHTLY
+  extends: .hackage
+  variables:
+    # Generate logs for nightly builds which include timing information.
+    EXTRA_HC_OPTS: "-ddump-timings"
 
 ############################################################
 # Nofib testing
