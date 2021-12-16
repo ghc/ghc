@@ -839,8 +839,7 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
                        traceTR (text "Not constructor" <+> ppr dcname)
                        let dflags = hsc_dflags hsc_env
                            tag = showPpr dflags dcname
-                       vars     <- replicateM (length pArgs)
-                                              (newVar liftedTypeKind)
+                       vars     <- mapM (const (newVar liftedTypeKind)) pArgs
                        subTerms <- sequence $ zipWith (\x tv ->
                            go (pred max_depth) tv tv x) pArgs vars
                        return (Term my_ty (Left ('<' : tag ++ ">")) a subTerms)

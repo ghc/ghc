@@ -58,7 +58,6 @@ import GHC.Platform
 import GHC.Types.Unique.FM (listToUFM, lookupUFM)
 import GHC.Types.Unique.Supply
 
-import Control.Monad (replicateM)
 import Data.Maybe (fromMaybe)
 
 
@@ -116,7 +115,7 @@ allocMoreStack platform slots (CmmProc info lbl live (ListGraph code)) = do
                         | entry `elem` infos -> infos
                         | otherwise          -> entry : infos
 
-    uniqs <- replicateM (length entries) getUniqueM
+    uniqs <- getUniquesM
 
     let
         delta = ((x + stackAlign - 1) `quot` stackAlign) * stackAlign -- round up

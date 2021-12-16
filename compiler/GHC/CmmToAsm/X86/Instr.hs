@@ -66,7 +66,6 @@ import GHC.Types.Unique.Supply
 import GHC.Types.Basic (Alignment)
 import GHC.Cmm.DebugBlock (UnwindTable)
 
-import Control.Monad
 import Data.Maybe       (fromMaybe)
 
 -- Format of an x86/x86_64 memory address, in bytes.
@@ -957,7 +956,7 @@ allocMoreStack _ _ top@(CmmData _ _) = return (top,[])
 allocMoreStack platform slots proc@(CmmProc info lbl live (ListGraph code)) = do
     let entries = entryBlocks proc
 
-    uniqs <- replicateM (length entries) getUniqueM
+    uniqs <- getUniquesM
 
     let
       delta = ((x + stackAlign - 1) `quot` stackAlign) * stackAlign -- round up

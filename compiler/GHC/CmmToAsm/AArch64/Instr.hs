@@ -28,7 +28,6 @@ import GHC.Types.Unique.Supply
 
 import GHC.Utils.Panic
 
-import Control.Monad (replicateM)
 import Data.Maybe (fromMaybe)
 
 import GHC.Stack
@@ -461,7 +460,7 @@ allocMoreStack _ _ top@(CmmData _ _) = return (top,[])
 allocMoreStack platform slots proc@(CmmProc info lbl live (ListGraph code)) = do
     let entries = entryBlocks proc
 
-    uniqs <- replicateM (length entries) getUniqueM
+    uniqs <- getUniquesM
 
     let
       delta = ((x + stackAlign - 1) `quot` stackAlign) * stackAlign -- round up
