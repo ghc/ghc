@@ -172,28 +172,29 @@ lazyFVRep = head
 -- of the call site. Clients will go through 'trackCall'.
 evalCall :: Id -> (SubDemand :~> DmdType)
 evalCall callee eval_sd = EvalM $ getEnv >>= \env -> liftIO $ do
-  let prio = node2prio env callee
-  TransApprox n inp outp <- readTransApprox env prio
+  let callee_prio = node2prio env callee
+  TransApprox n inp outp <- readTransApprox env callee_prio
   let inp' = inp `lubSubDmd` eval_sd
   when (inp /= inp') $ do -- change in input. callee might be unstable
     let approx' = TransApprox n inp' outp
-    writeTransApprox env prio approx'
-    enqueueUnstable env prio
+    writeTransApprox env callee_prio approx'
+    enqueueUnstable env callee_prio
   -- Now, if id really is unstable, evaluate it directly instead
   -- of finishing this transformer and returning to it afterwards in the next
   -- iteration of the fixed-point loop in 'evalFramework'.
   -- But only do so if we haven't already visited as part of this
   -- iteration of the fixed-point loop!
-  callee_unstable <- isUnstable env prio
-  first_visit <- not <$> hasBeenVisited env prio
-  -- pprTraceM "do_call" (ppr callee <+> ppr inp' <+> ppr callee_unstable <+> ppr first_visit)
-  let do_call = callee_unstable && first_visit
+  callee_unstable <- isUnstable env callee_prio
+  first_visit <- not <$> hasBeenVisited env callee_prio
+  higher_prio <- (> callee_prio) <$> readIORef (ee_active_eval env)
+  -- pprTraceM "do_call" (ppr callee <+> ppr inp' <+> ppr callee_unstable <+> ppr first_visit <+> ppr higher_prio)
+  let do_call = callee_unstable && first_visit && higher_prio
   outp' <- if not do_call
     then return outp
     else do
-      TransApprox _ _ outp' <- evalNode env prio
+      TransApprox _ _ outp' <- evalNode env callee_prio
       return outp'
-  trackDynamicCall env prio
+  trackDynamicCall env callee_prio
   return outp'
 
 -----------------------------
@@ -424,12 +425,17 @@ evalFramework fw = {-# SCC "evalFramework" #-} unsafePerformIO $ do
   writeTransApprox env root_prio (TransApprox 0 topSubDmd nopDmdType)
   _ <- evalNode env root_prio
   whileJust_ (dequeueUnstable env) $ \node_prio -> do
-    _new_approx <- evalNode env node_prio
     clearVisited env
+    void $ evalNode env node_prio
   finaliseEvalEnv env
 
 prepareNextEval :: EvalEnv -> Prio -> IO a -> IO a
 prepareNextEval env node_prio m = do
+  -- The following assert is in place to guarantee we don't re-evaluate
+  -- the same node as part of the same iteration. If for some reason we
+  -- decide to do that in the future, we have to think of a different
+  -- data structure for ee_active_evals.
+  assertPprM (not <$> hasBeenVisited env node_prio) (ppr (prio2node env node_prio) <+> ppr node_prio)
   addVisited env node_prio
   modifyIORef' (ee_active_evals env) (IntMap.insert node_prio IntSet.empty)
   old_active_eval <- readIORef (ee_active_eval env)
