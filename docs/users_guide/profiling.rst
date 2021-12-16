@@ -1707,6 +1707,37 @@ Using “ticky-ticky” profiling (for implementors)
     *by* each closure type. See :ghc-flag:`-ticky-allocd` to keep track of
     allocations *of* each closure type as well.
 
+
+GHC's ticky-ticky profiler provides a low-level facility for tracking
+entry and allocation counts of particular individual closures.
+Ticky-ticky profiling requires a certain familiarity with GHC
+internals, so it is best suited for expert users, but can provide an invaluable
+precise insight into the allocation behaviour of your programs.
+
+Getting started with ticky profiling consists of three steps.
+
+1. Add the ``-ticky`` flag when compiling a Haskell module to enable "ticky-ticky" profiling of that module. This makes GHC emit performance-counting instructions in every STG function.
+
+2. Add ``-ticky`` to the command line when linking, so that you link against a version of the runtime system that allows you to display the results. In fact, in the link phase -ticky implies -debug, so you get the debug version of the runtime system too.
+
+3. Then when running your program you can collect the results of the profiling in two ways.
+
+  * Using the eventlog, the :rts-flag:`-lT <-l ⟨flags⟩>` flag will emit ticky samples
+    to the eventlog periodically.
+    This has the advantage of being able to resolve dynamic behaviors over the program's
+    lifetime. See :ref:`ticky-event-format` for details on the event types
+    reported. The ticky information can be rendered into an interactive table
+    using eventlog2html.
+  * A legacy textual format is emitted using the :rts-flag:`-r ⟨file⟩` flag. This
+    produces a textual table containing information about how much each counter
+    ticked throughout the duration of the program.
+
+Additional Ticky Flags
+----------------------
+
+There are some additional flags which can be used to increase the number of
+ticky counters and the quality of the profile.
+
 .. ghc-flag:: -ticky-allocd
     :shortdesc: Track the number of times each closure type is allocated.
     :type: dynamic
@@ -1726,23 +1757,107 @@ Using “ticky-ticky” profiling (for implementors)
     :type: dynamic
     :category:
 
-    This basically allows us to get accurate entry counters for code like `f x y` at the cost of code size.
+    This allows us to get accurate entry counters for code like `f x y` at the cost of code size.
     We do this but not using the precomputed standard AP thunk code.
 
-GHC's ticky-ticky profiler provides a low-level facility for tracking
-entry and allocation counts of particular individual closures.
-Because ticky-ticky profiling requires a certain familiarity with GHC
-internals, we have moved the documentation to the GHC developers wiki.
-Take a look at its
-:ghc-wiki:`overview of the profiling options <commentary/profiling>`,
-which includes a link to the ticky-ticky profiling page.
 
-Note that ticky-ticky samples can be emitted in two formats: the eventlog,
-using the :rts-flag:`-lT <-l ⟨flags⟩>` event type, and a plain text
-summary format, using the :rts-flag:`-r ⟨file⟩` option. The former has the
-advantage of being able to resolve dynamic behaviors over the program's
-lifetime. See :ref:`ticky-event-format` for details on the event types
-reported.
+Understanding the Output of Ticky-Ticky profiles
+------------------------------------------------
+
+Once you have your rendered profile then you can begin to understand the allocation
+behaviour of your program. There are two classes of ticky-ticky counters.
+
+Name-specific counters
+
+  Each "name-specific counter" is associated with a name that is defined in the
+  result of the optimiser. For each such name, there are three possible counters:
+  entries, heap allocation by the named thing, and heap used to allocate that
+  named thing.
+
+Global counters
+
+  Each "global counter" describes some aspect of the entire program execution. For example, one global counter tracks total heap allocation; another tracks allocation for PAPs.
+
+In general you are probably interested mostly in the name-specific counters as these
+can provided detailed information about where allocates how much in your program.
+
+Information about name-specific counters
+----------------------------------------
+
+Name-specific counters provide the following information about a closure.
+
+* Entries - How many times the closure was entered.
+* Allocs  - How much is allocated by that closure.
+* Allod   - How much of that closure is allocated.
+* FVs     - The free variables captured by that closure.
+* Args    - The arguments that closure takes.
+
+The FVs and Args information is encoded using a small DSL.
+
++------------------+---------------------------------------------------+
+|Classification    |Description                                       |
++==================+===================================================+
+|+                 |dictionary                                       |
++------------------+---------------------------------------------------+
+|\>                |function                                         |
++------------------+---------------------------------------------------+
+|{C,I,F,D,W}       |   char, int, float, double, word                  |
++------------------+---------------------------------------------------+
+|{c,i,f,d,w}       |  unboxed ditto                                    |
++------------------+---------------------------------------------------+
+|T                 |  tuple                                            |
++------------------+---------------------------------------------------+
+|P                 | other primitive type                              |
++------------------+---------------------------------------------------+
+|p                 | unboxed primitive type                            |
++------------------+---------------------------------------------------+
+|L                 | list                                              |
++------------------+---------------------------------------------------+
+|E                 | enumeration type                                  |
++------------------+---------------------------------------------------+
+|S                 | Single constructor type                           |
++------------------+---------------------------------------------------+
+|M                 | Multi constructor type                            |
++------------------+---------------------------------------------------+
+|.                 |other type                                        |
++------------------+---------------------------------------------------+
+|-                 |reserved for others to mark as "uninteresting"   |
++------------------+---------------------------------------------------+
+
+In particular note that you can use the ticky profiler to see any function
+calls to dictionary arguments by searching the profile for the ``+`` classifier.
+This indicates that the function has failed to specialise for one reason or another.
+
+Examples
+--------
+
+TODO
+
+Information about global counters
+---------------------------------
+
+TODO
+
+
+Notes about ticky profiling
+---------------------------
+
+* You can mix together modules compiled with and without ``-ticky`` but you will
+  miss out on allocations from uninstrumented modules in the profile.
+
+* Linking with the ``-ticky`` has a quite severe performance impact on your program
+  so shouldn't be used for production builds.
+
+* Building with ``-ticky`` doesn't affect the optimisation of your program as the
+  counters are inserted after the optimiser has finished running.
+
+* When using the eventlog it is possible to combine together ticky-ticky and IPE
+  based profiling as each ticky counter definition has an associated info table.
+  This address can be looked up in the IPE map so that further information (such
+  as source location) can be determined about that closure.
+
+
+
 
 .. [1]
    :ghc-flag:`-fprof-auto` was known as ``-auto-all`` prior to
