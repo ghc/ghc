@@ -1,6 +1,33 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
+## 4.15.1.0 *December 2021*
+
+  * Bundled with GHC 9.0.2
+
+  * Various documentation improvements and fixes
+
+  * `GHC.Event.Manager`: Don't use one-shot kqueue on macOS.
+  This reverts a commit that removed the workaround for a
+  [bug](https://gitlab.haskell.org/ghc/ghc/-/issues/7651) in the OSX
+  implementation of kqueue. It turns out the bug still affects modern
+  macOS versions, so we keep the workaround for now.
+
+  * Check the buffer size *before* calling the continuation in withEncodedCString (#20107)
+
+  * Pass -DLIBICONV_PLUG when building base library on FreeBSD (#19958)
+
+  * Detect underflow in fromIntegral/Int->Natural rule (#20066)
+
+  * Make unsafeDupablePerformIO have a lazy demand (#19181)
+
+  * fix bogus rewrite rule for "fromIntegral/Int->Natural" `fromIntegral =
+    naturalFromWord . fromIntegral` (#19345)
+
+  * Fix accidental unsoundness in Data.Typeable.Internal.mkTypeLitFromString (#19288)
+
 ## 4.15.0.0 *January 2021*
+
+  * Bundled with GHC 9.0.1
 
   * Add `Functor`, `Applicative`, `Monad`, `MonadFix`, `Foldable`, `Traversable`,
     `Eq`, `Ord`, `Show`, `Read`, `Eq1`, `Ord1`, `Show1`, `Read1`, `Generic`,
@@ -25,7 +52,7 @@
     `ConcFlags`, `DebugFlags`, `CCFlags`, `DoHeapProfile`, `ProfFlags`,
     `DoTrace`, `TraceFlags`, `TickyFlags`, `ParFlags`, `RTSFlags`, `RTSStats`,
     `GCStats`, `ByteOrder`, `GeneralCategory`, `SrcLoc`
-    
+
   * Add rules `unpackUtf8`, `unpack-listUtf8` and `unpack-appendUtf8` to `GHC.Base`.
     They correspond to their ascii versions and hopefully make it easier
     for libraries to handle utf8 encoded strings efficiently.
@@ -36,7 +63,7 @@
   * Add `MonadFix` and `MonadZip` instances for `Complex`
 
   * Add `Ix` instances for tuples of size 6 through 15
-   
+
   * Correct `Bounded` instance and remove `Enum` and `Integral` instances for
     `Data.Ord.Down`.
 
