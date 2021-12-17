@@ -741,26 +741,33 @@ isLiftedRuntimeRep rep
   | otherwise
   = False
 
+isLiftedRuntimeRep_maybe :: Type -> Maybe Bool
+-- isLiftedRuntimeRep rr returns
+-- * Just True  if rr is LiftedRep :: RuntimeRep
+-- * Just False if rr is definitely not lifted, e.g. IntRep
+-- * Nothing    if not known (e.g. (a :: RuntimeRep))
+isLiftedRuntimeRep_maybe rep
+  | TyConApp rr_tc args <- coreFullView rep
+  , isPromotedDataCon rr_tc =
+      -- NB: args might be non-empty e.g. TupleRep [r1, .., rn]
+      if (rr_tc `hasKey` boxedRepDataConKey)
+        then case args of
+          [lev] | isLiftedLevity lev   -> Just True
+                | isUnliftedLevity lev -> Just False
+          _                            -> Nothing
+        else Just False
+        -- Avoid searching all the unlifted RuntimeRep type cons
+        -- In the RuntimeRep data type, only LiftedRep is lifted
+        -- But be careful of type families (F tys) :: RuntimeRep,
+        -- hence the isPromotedDataCon rr_tc
+isLiftedRuntimeRep_maybe _ = Nothing
+
 isUnliftedRuntimeRep :: Type -> Bool
 -- PRECONDITION: The type has kind RuntimeRep
 -- True of definitely-unlifted RuntimeReps
 -- False of           (LiftedRep :: RuntimeRep)
 --   and of variables (a :: RuntimeRep)
-isUnliftedRuntimeRep rep
-  | TyConApp rr_tc args <- coreFullView rep -- NB: args might be non-empty
-                                            --     e.g. TupleRep [r1, .., rn]
-  , isPromotedDataCon rr_tc =
-      -- NB: args might be non-empty e.g. TupleRep [r1, .., rn]
-      if (rr_tc `hasKey` boxedRepDataConKey)
-        then case args of
-          [lev] -> isUnliftedLevity lev
-          _     -> False
-        else True
-        -- Avoid searching all the unlifted RuntimeRep type cons
-        -- In the RuntimeRep data type, only LiftedRep is lifted
-        -- But be careful of type families (F tys) :: RuntimeRep,
-        -- hence the isPromotedDataCon rr_tc
-isUnliftedRuntimeRep _ = False
+isUnliftedRuntimeRep rep = isLiftedRuntimeRep_maybe rep == Just False
 
 -- | An INLINE helper for function such as 'isLiftedRuntimeRep' below.
 isNullaryTyConKeyApp :: Unique -> Type -> Bool
@@ -2397,10 +2404,7 @@ buildSynTyCon name binders res_kind roles rhs
 -- representation-polymorphic), and panics if the kind does not have the shape
 -- TYPE r.
 isLiftedType_maybe :: HasDebugCallStack => Type -> Maybe Bool
-isLiftedType_maybe ty = case coreFullView (getRuntimeRep ty) of
-  ty' | isLiftedRuntimeRep ty'  -> Just True
-  TyConApp {}                   -> Just False  -- Everything else is unlifted
-  _                             -> Nothing     -- representation-polymorphic
+isLiftedType_maybe ty = isLiftedRuntimeRep_maybe (getRuntimeRep ty)
 
 -- | See "Type#type_classification" for what an unlifted type is.
 -- Panics on representation-polymorphic types; See 'mightBeUnliftedType' for

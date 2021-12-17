@@ -674,7 +674,7 @@ addPhiTmCt nabla (PhiNotBotCt x)           = addNotBotCt nabla x
 filterUnliftedFields :: PmAltCon -> [Id] -> [Id]
 filterUnliftedFields con args =
   [ arg | (arg, bang) <- zipEqual "addPhiCt" args (pmAltConImplBangs con)
-        , isBanged bang || isUnliftedType (idType arg) ]
+        , isBanged bang || isLiftedType_maybe (idType arg) == Just False ]
 
 -- | Adds the constraint @x ~ ⊥@, e.g. that evaluation of a particular 'Id' @x@
 -- surely diverges. Quite similar to 'addConCt', only that it only cares about
