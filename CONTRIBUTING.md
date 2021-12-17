@@ -32,13 +32,9 @@ cd haddock
 
 ### Git Branches
 
-If your patch consists of glue code and interface changes with GHC, please
-open a Pull Request targeting the `ghc-head` branch.
-
-Otherwise, for improvements to the documentation generator,
-please base your pull request on the current GHC version branch
-(`ghc-9.0` for instance). The PR will be forward-ported to `ghc-head`
-so that documentation built within GHC can benefit from it.
+For improvements to the documentation generator,
+please base your pull request on the latest GHC version branch
+(`ghc-9.2` for instance). 
 
 ### Building the packages
 
@@ -74,4 +70,3 @@ cabal v2-test html-test latex-test hoogle-test hypsrc-test \
 
 
 [SSCCE]: http://sscce.org/
-
