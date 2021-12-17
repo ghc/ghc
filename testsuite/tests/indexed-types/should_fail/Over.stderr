@@ -1,10 +1,10 @@
 
 OverD.hs:1:1: error:
     Conflicting family instance declarations:
-      OverA.D [Int] [a] = Int -- Defined in module OverB
-      OverA.D [a] [Int] = Char -- Defined in module OverC
+      C [Int] [a] -- Defined in module OverB
+      C [a] [Int] -- Defined in module OverC
 
 OverD.hs:1:1: error:
     Conflicting family instance declarations:
-      C [Int] [a] -- Defined in module OverB
-      C [a] [Int] -- Defined in module OverC
+      OverA.D [Int] [a] = Int -- Defined in module OverB
+      OverA.D [a] [Int] = Char -- Defined in module OverC
