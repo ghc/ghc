@@ -926,6 +926,14 @@ freeReg 29 = False
 -- ip0 -- used for spill offset computations
 freeReg 16 = False
 
+#if defined(darwin_HOST_OS) || defined(ios_HOST_OS)
+-- x18 is reserved by the platform on Darwin/iOS, and can not be used
+-- More about ARM64 ABI that Apple platforms support:
+-- https://developer.apple.com/documentation/xcode/writing-arm64-code-for-apple-platforms
+-- https://github.com/Siguza/ios-resources/blob/master/bits/arm64.md
+freeReg 18 = False
+#endif
+
 # if defined(REG_Base)
 freeReg REG_Base  = False
 # endif
