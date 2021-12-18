@@ -18,6 +18,10 @@
  *   - the closure_type_names list in rts/Printer.c
  */
 
+/* CONSTR/THUNK/FUN_$A_$B mean they have $A pointers followed by $B
+ * non-pointers in their payloads.
+ */
+
 /* Object tag 0 raises an internal error */
 #define INVALID_OBJECT                0
 #define CONSTR                        1
