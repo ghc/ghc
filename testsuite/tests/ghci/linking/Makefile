@@ -24,7 +24,7 @@ else
 DLL = lib$1.so
 endif
 
-ifeq "$(FREEBSD)" "YES"
+ifeq "$(LIBCXX_PLATFORM)" "YES"
 LIBCXX=c++
 else
 LIBCXX=stdc++

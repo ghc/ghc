@@ -295,8 +295,11 @@ DARWIN = YES
 else
 DARWIN = NO
 endif
+# The platform is known to use libc++ as its main C++ library.
 ifeq "$(HostOS)" "freebsd"
-FREEBSD = YES
+LIBCXX_PLATFORM = YES
+else ifeq "$(HostOS)" "openbsd"
+LIBCXX_PLATFORM = YES
 else
-FREEBSD = NO
+LIBCXX_PLATFORM = NO
 endif
