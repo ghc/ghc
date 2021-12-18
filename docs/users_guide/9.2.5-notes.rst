@@ -21,6 +21,8 @@ Compiler
 
 - Fix a code generation panic when using SIMD types with unboxed sums (:ghc-ticket:`22187`).
 
+- Fix a code generation bug with the native code generator on aarch64 darwin leading to runtime segmentation faults due to an incorrect ABI (:ghc-ticket:`21964`)
+
 Runtime system
 --------------
 
