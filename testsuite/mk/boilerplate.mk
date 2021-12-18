@@ -303,3 +303,9 @@ LIBCXX_PLATFORM = YES
 else
 LIBCXX_PLATFORM = NO
 endif
+ifeq "$(HostOS)" "openbsd"
+# None required, dlopen and the like are in libc.
+LIBDL_NAME =
+else
+LIBDL_NAME = -ldl
+endif

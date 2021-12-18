@@ -15,7 +15,7 @@ T3807:
 	# when linking an executable).
 	# Hence we must explicitly linking with the RTS here.
 	'$(TEST_HC)' $(filter-out -rtsopts,$(TEST_HC_OPTS)) -v0 --make -dynamic -fPIC -shared T3807Export.hs T3807-export.c -o T3807test.so -flink-rts
-	'$(TEST_HC)' $(filter-out -rtsopts,$(TEST_HC_OPTS)) -no-auto-link-packages -no-hs-main T3807-load.c -o T3807-load -ldl
+	'$(TEST_HC)' $(filter-out -rtsopts,$(TEST_HC_OPTS)) -no-auto-link-packages -no-hs-main T3807-load.c -o T3807-load $(LIBDL_NAME)
 	./T3807-load
 
 .PHONY: T4464dyn
