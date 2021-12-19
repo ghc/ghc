@@ -33,6 +33,11 @@
 #include <elf.h> /* _DYNAMIC */
 #endif
 
+/* We must provide a prototype for environ since depending upon the libc
+ * version it may or may not be provided by unistd.h. See #20577.
+ */
+extern char **environ;
+
 /* -----------------------------------------------------------------------------
  * Symbols to be inserted into the RTS symbol table.
  */
@@ -59,8 +64,6 @@
       SymI_HasProto(signal_handlers)            \
       SymI_HasProto(stg_sig_install)            \
       SymI_HasProto(rtsTimerSignal)             \
-      SymI_HasProto(atexit)                     \
-      SymI_NeedsDataProto(environ)              \
       SymI_NeedsDataProto(nocldstop)
 #endif
 
@@ -1019,6 +1022,11 @@
 #define RTS_LIBGCC_SYMBOLS
 #endif
 
+// Symbols defined by libc
+#define RTS_LIBC_SYMBOLS                               \
+      SymI_HasProto_redirect(atexit, atexit, STRENGTH_STRONG) /* See Note [Strong symbols] */ \
+      SymI_HasProto(environ)
+
 /* entirely bogus claims about types of these symbols */
 #define SymI_NeedsProto(vvv)  extern void vvv(void);
 #define SymI_NeedsDataProto(vvv)  extern StgWord vvv[];
@@ -1045,6 +1053,7 @@ RTS_POSIX_ONLY_SYMBOLS
 RTS_MINGW_ONLY_SYMBOLS
 RTS_DARWIN_ONLY_SYMBOLS
 RTS_OPENBSD_ONLY_SYMBOLS
+RTS_LIBC_SYMBOLS
 RTS_LIBGCC_SYMBOLS
 RTS_LIBFFI_SYMBOLS
 #undef SymI_NeedsProto
