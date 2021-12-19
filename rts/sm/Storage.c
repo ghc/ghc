@@ -109,6 +109,7 @@ Mutex sm_mutex;
 
 static void allocNurseries (uint32_t from, uint32_t to);
 static void assignNurseriesToCapabilities (uint32_t from, uint32_t to);
+static StgInd * lockCAF (StgRegTable *reg, StgIndStatic *caf);
 
 void
 initGeneration (generation *gen, int g)
@@ -510,7 +511,7 @@ void listAllBlocks (ListBlocksCb cb, void *user)
 
    -------------------------------------------------------------------------- */
 
-STATIC_INLINE StgInd *
+static StgInd *
 lockCAF (StgRegTable *reg, StgIndStatic *caf)
 {
     const StgInfoTable *orig_info;

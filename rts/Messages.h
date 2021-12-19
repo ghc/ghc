@@ -29,10 +29,7 @@ doneWithMsgThrowTo (Capability *cap, MessageThrowTo *m)
     // where we are a bit more lenient (#19075).
     ASSERT(n_capabilities == 1 || m->header.info == &stg_WHITEHOLE_info);
     IF_NONMOVING_WRITE_BARRIER_ENABLED {
-      updateRemembSetPushClosure(cap, (StgClosure *) m->link);
-      updateRemembSetPushClosure(cap, (StgClosure *) m->source);
-      updateRemembSetPushClosure(cap, (StgClosure *) m->target);
-      updateRemembSetPushClosure(cap, (StgClosure *) m->exception);
+      updateRemembSetPushMessageThrowTo(cap, m);
     }
     OVERWRITING_CLOSURE((StgClosure*)m);
     unlockClosure((StgClosure*)m, &stg_MSG_NULL_info);
