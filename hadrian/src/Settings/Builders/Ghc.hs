@@ -169,8 +169,8 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
                       ]
                 ]
             , arg "-no-auto-link-packages"
-            ,      nonHsMainPackage pkg  ? arg "-no-hs-main"
-            , not (nonHsMainPackage pkg) ? arg "-rtsopts"
+            ,       nonHsMainPackage pkg  ? arg "-no-hs-main"
+            , (not (nonHsMainPackage pkg) && not (isLibrary pkg)) ? arg "-rtsopts"
             , pure [ "-l" ++ lib    | lib    <- libs    ]
             , pure [ "-L" ++ libDir | libDir <- libDirs ]
             , rtsFfiArg
