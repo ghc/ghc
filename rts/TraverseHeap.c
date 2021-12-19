@@ -1036,7 +1036,7 @@ traversePushStack(traverseState *ts, StgClosure *cp, stackElement *sep,
 /**
  * Call traversePushClosure for each of the children of a PAP/AP
  */
-STATIC_INLINE StgPtr
+static StgPtr
 traversePAP (traverseState *ts,
                     StgClosure *pap,    /* NOT tagged */
                     stackElement *sep,

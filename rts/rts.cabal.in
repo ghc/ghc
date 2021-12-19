@@ -466,6 +466,7 @@ library
                CheckUnload.c
                CloneStack.c
                ClosureFlags.c
+               ClosureSize.c
                Disassembler.c
                FileLock.c
                ForeignExports.c

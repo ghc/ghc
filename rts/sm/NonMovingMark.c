@@ -689,21 +689,26 @@ STATIC_INLINE bool needs_upd_rem_set_mark(StgClosure *p)
     }
 }
 
+static void finish_upd_rem_set_mark_large(bdescr* bd) {
+    // Someone else may have already marked it.
+    ACQUIRE_LOCK(&nonmoving_large_objects_mutex);
+    if (! (bd->flags & BF_MARKED)) {
+        bd->flags |= BF_MARKED;
+        dbl_link_remove(bd, &nonmoving_large_objects);
+        dbl_link_onto(bd, &nonmoving_marked_large_objects);
+        n_nonmoving_large_blocks -= bd->blocks;
+        n_nonmoving_marked_large_blocks += bd->blocks;
+    }
+    RELEASE_LOCK(&nonmoving_large_objects_mutex);
+}
+
 /* Set the mark bit; only to be called *after* we have fully marked the closure */
 STATIC_INLINE void finish_upd_rem_set_mark(StgClosure *p)
 {
     bdescr *bd = Bdescr((StgPtr) p);
     if (bd->flags & BF_LARGE) {
-        // Someone else may have already marked it.
-        ACQUIRE_LOCK(&nonmoving_large_objects_mutex);
-        if (! (bd->flags & BF_MARKED)) {
-            bd->flags |= BF_MARKED;
-            dbl_link_remove(bd, &nonmoving_large_objects);
-            dbl_link_onto(bd, &nonmoving_marked_large_objects);
-            n_nonmoving_large_blocks -= bd->blocks;
-            n_nonmoving_marked_large_blocks += bd->blocks;
-        }
-        RELEASE_LOCK(&nonmoving_large_objects_mutex);
+        // This function is extracted so that this function can be inline
+        finish_upd_rem_set_mark_large(bd);
     } else {
         struct NonmovingSegment *seg = nonmovingGetSegment((StgPtr) p);
         nonmoving_block_idx block_idx = nonmovingGetBlockIdx((StgPtr) p);
@@ -746,6 +751,13 @@ void updateRemembSetPushStack(Capability *cap, StgStack *stack)
             return;
         }
     }
+}
+
+void updateRemembSetPushMessageThrowTo(Capability *cap, MessageThrowTo *m) {
+    updateRemembSetPushClosure(cap, (StgClosure *) m->link);
+    updateRemembSetPushClosure(cap, (StgClosure *) m->source);
+    updateRemembSetPushClosure(cap, (StgClosure *) m->target);
+    updateRemembSetPushClosure(cap, (StgClosure *) m->exception);
 }
 
 /*********************************************************
