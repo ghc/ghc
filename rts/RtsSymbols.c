@@ -64,7 +64,6 @@ extern char **environ;
       SymI_HasProto(signal_handlers)            \
       SymI_HasProto(stg_sig_install)            \
       SymI_HasProto(rtsTimerSignal)             \
-      SymI_HasProto_redirect(atexit, atexit, STRENGTH_STRONG) /* See Note [Strong symbols] */ \
       SymI_NeedsDataProto(nocldstop)
 #endif
 
@@ -158,7 +157,6 @@ extern char **environ;
       SymI_HasProto(stg_asyncDoProczh)                   \
       SymI_HasProto(rts_InstallConsoleEvent)             \
       SymI_HasProto(rts_ConsoleHandlerDone)              \
-      SymI_HasProto(atexit)                              \
       RTS_WIN32_ONLY(SymI_NeedsProto(___chkstk_ms))      \
       RTS_WIN64_ONLY(SymI_NeedsProto(___chkstk_ms))      \
       RTS_WIN32_ONLY(SymI_HasProto(_imp___environ))      \
@@ -1055,6 +1053,11 @@ extern char **environ;
 #define RTS_LIBGCC_SYMBOLS
 #endif
 
+// Symbols defined by libc
+#define RTS_LIBC_SYMBOLS                               \
+      SymI_HasProto_redirect(atexit, atexit, STRENGTH_STRONG) /* See Note [Strong symbols] */ \
+      SymI_HasProto(environ)
+
 #if !defined(DYNAMIC) && defined(linux_HOST_OS)
 // we need these for static musl builds. However when
 // linking shared objects (DLLs) this will fail, hence
@@ -1092,6 +1095,7 @@ RTS_POSIX_ONLY_SYMBOLS
 RTS_MINGW_ONLY_SYMBOLS
 RTS_DARWIN_ONLY_SYMBOLS
 RTS_OPENBSD_ONLY_SYMBOLS
+RTS_LIBC_SYMBOLS
 RTS_LIBGCC_SYMBOLS
 RTS_FINI_ARRAY_SYMBOLS
 RTS_LIBFFI_SYMBOLS
