@@ -667,6 +667,14 @@ instance  Monad STM  where
     m >>= k     = bindSTM m k
     (>>) = (*>)
 
+-- | @since 4.17.0.0
+instance Semigroup a => Semigroup (STM a) where
+    (<>) = liftA2 (<>)
+
+-- | @since 4.17.0.0
+instance Monoid a => Monoid (STM a) where
+    mempty = pure mempty
+
 bindSTM :: STM a -> (a -> STM b) -> STM b
 bindSTM (STM m) k = STM ( \s ->
   case m s of
