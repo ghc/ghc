@@ -192,18 +192,16 @@ disableProfiledLibs flavour =
 -- | Build stage2 compiler with -fomit-interface-pragmas to reduce
 -- recompilation.
 omitPragmas :: Flavour -> Flavour
-omitPragmas =
-  let Right kv = parseKV "stage1.ghc.ghc.hs.opts += -fomit-interface-pragmas"
-      Right transformer = applySetting kv
-  in transformer
+omitPragmas = addArgs
+    $ notStage0 ? builder (Ghc CompileHs) ? package compiler
+    ? arg "-fomit-interface-pragmas"
 
 -- | Build stage2 dependencies with options to enable IPE debugging
 -- information.
 enableIPE :: Flavour -> Flavour
-enableIPE =
-  let Right kv = parseKV "stage1.*.ghc.hs.opts += -finfo-table-map -fdistinct-constructor-tables"
-      Right transformer = applySetting kv
-  in transformer
+enableIPE = addArgs
+    $ notStage0 ? builder (Ghc CompileHs)
+    ? pure ["-finfo-table-map", "-fdistinct-constructor-tables"]
 
 enableLateCCS :: Flavour -> Flavour
 enableLateCCS =
