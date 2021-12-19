@@ -177,7 +177,6 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
             , osxTarget ? pure (concat [ ["-framework", fmwk] | fmwk <- fmwks ])
             , debugged ? packageOneOf [ghc, iservProxy, iserv, remoteIserv] ?
               arg "-debug"
-
             ]
 
 findHsDependencies :: Args

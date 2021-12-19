@@ -146,7 +146,7 @@ testRules = do
                 top <- topDirectory
                 depsPkgs <- mod_pkgs . packageDependencies <$> readPackageData progPkg
                 bindir <- getBinaryDirectory testGhc
-                debugged <- ghcDebugged <$> flavour <*> pure Stage3
+                debugged <- ghcDebugged <$> flavour <*> pure (stageOf testGhc)
                 dynPrograms <- dynamicGhcPrograms =<< flavour
                 cmd [bindir </> "ghc" <.> exe] $
                     concatMap (\p -> ["-package", pkgName p]) depsPkgs ++
