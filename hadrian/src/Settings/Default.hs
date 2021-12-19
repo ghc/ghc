@@ -235,11 +235,11 @@ defaultFlavour = Flavour
     , libraryWays        = defaultLibraryWays
     , rtsWays            = defaultRtsWays
     , dynamicGhcPrograms = defaultDynamicGhcPrograms
-    , ghciWithDebugger   = False
-    , ghcProfiled        = False
-    , ghcDebugged        = False
+    , ghciWithDebugger   = const False
+    , ghcProfiled        = const False
+    , ghcDebugged        = const False
+    , ghcThreaded        = const True
     , ghcDebugAssertions = False
-    , ghcThreaded        = True
     , ghcDocs            = cmdDocsArgs }
 
 -- | Default logic for determining whether to build
