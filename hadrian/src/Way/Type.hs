@@ -1,3 +1,5 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE DerivingStrategies #-}
 module Way.Type where
 
 import Data.IntSet (IntSet)
@@ -37,9 +39,10 @@ instance Read WayUnit where
         "dyn"   -> [(Dynamic,"")]
         _       -> []
 
--- | Collection of 'WayUnit's that stands for the different ways source code
+-- | Collection of 'WayUnit's that stands for the different ways source codeA
 -- is to be built.
 newtype Way = Way IntSet
+  deriving newtype (Semigroup, Monoid)
 
 instance Binary Way where
     put (Way w) = put w
