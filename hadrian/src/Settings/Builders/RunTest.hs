@@ -98,7 +98,7 @@ inTreeCompilerArgs stg = do
     unregisterised      <- flag GhcUnregisterised
     withSMP             <- targetSupportsSMP
     debugAssertions     <- ghcDebugAssertions <$> flavour
-    profiled            <- ghcProfiled        <$> flavour
+    profiled            <- ghcProfiled        <$> flavour <*> pure stg
 
     os          <- setting HostOs
     arch        <- setting TargetArch

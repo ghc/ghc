@@ -162,19 +162,18 @@ enableThreadSanitizer = addArgs $ mconcat
 viaLlvmBackend :: Flavour -> Flavour
 viaLlvmBackend = addArgs $ notStage0 ? builder Ghc ? arg "-fllvm"
 
--- | Build the GHC executable with profiling enabled. It is also recommended
--- that you use this with @'dynamicGhcPrograms' = False@ since GHC does not
--- support loading of profiled libraries with the dynamically-linker.
+-- | Build the GHC executable with profiling enabled in stages 1 and later. It
+-- is also recommended that you use this with @'dynamicGhcPrograms' = False@
+-- since GHC does not support loading of profiled libraries with the
+-- dynamically-linker.
 enableProfiledGhc :: Flavour -> Flavour
 enableProfiledGhc flavour =
-    enableLateCCS flavour { rtsWays = addWays [profiling, threadedProfiling, debugProfiling, threadedDebugProfiling] (rtsWays flavour)
-            , libraryWays = addWays [profiling] (libraryWays flavour)
-            , ghcProfiled = True
+    enableLateCCS flavour { rtsWays = do
+                ws <- rtsWays flavour
+                pure $ (Set.map (\w -> w <> profiling) ws) <> ws
+            , libraryWays = (Set.singleton profiling <>) <$> (libraryWays flavour)
+            , ghcProfiled = (>= Stage1)
             }
-  where
-    addWays :: [Way] -> Ways -> Ways
-    addWays ways =
-      fmap (Set.union (Set.fromList ways))
 
 -- | Disable 'dynamicGhcPrograms'.
 disableDynamicGhcPrograms :: Flavour -> Flavour
@@ -270,7 +269,6 @@ collectTimings =
   -- -ddump-timings.
   addArgs $ notStage0 ? builder (Ghc CompileHs) ?
     pure ["-ddump-to-file", "-ddump-timings", "-v"]
-
 
 -- * CLI and <root>/hadrian.settings options
 
