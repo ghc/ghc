@@ -243,6 +243,14 @@ The supported transformers are listed below:
         <td>Build the stage2 libraries with IPE debugging information for use with -hi profiling.</td>
     </tr>
     <tr>
+        <td><code>debug_ghc</code></td>
+        <td>Build the stage2 compiler linked against the debug rts</td>
+    </tr>
+    <tr>
+        <td><code>debug_stage1_ghc</code></td>
+        <td>Build the stage1 compiler linked against the debug rts</td>
+    </tr>
+    <tr>
         <td><code>assertions</code></td>
         <td>Build the stage2 compiler with assertions enabled. </td>
     </tr>

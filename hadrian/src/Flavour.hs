@@ -49,6 +49,8 @@ flavourTransformers = M.fromList
     , "fully_static" =: fullyStatic
     , "collect_timings" =: collectTimings
     , "assertions" =: enableAssertions
+    , "debug_ghc" =: debugGhc Stage1
+    , "debug_stage1_ghc" =: debugGhc Stage0
     ]
   where (=:) = (,)
 
@@ -269,6 +271,15 @@ collectTimings =
   -- -ddump-timings.
   addArgs $ notStage0 ? builder (Ghc CompileHs) ?
     pure ["-ddump-to-file", "-ddump-timings", "-v"]
+
+-- | Build ghc with debug rts (i.e. -debug) in and after this stage
+debugGhc :: Stage -> Flavour -> Flavour
+debugGhc stage f = f
+  { ghcDebugged = (>= stage)
+  , rtsWays = do
+      ws <- rtsWays f
+      pure $ (Set.map (\w -> w <> debug) ws) <> ws
+  }
 
 -- * CLI and <root>/hadrian.settings options
 
