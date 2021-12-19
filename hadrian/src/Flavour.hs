@@ -206,10 +206,9 @@ enableIPE = addArgs
     ? pure ["-finfo-table-map", "-fdistinct-constructor-tables"]
 
 enableLateCCS :: Flavour -> Flavour
-enableLateCCS =
-  let Right kv = parseKV "stage1.*.ghc.hs.opts += -fprof-late"
-      Right transformer = applySetting kv
-  in transformer
+enableLateCCS = addArgs
+  $ notStage0 ? builder (Ghc CompileHs)
+  ? arg "-fprof-late"
 
 -- | Enable assertions for the stage2 compiler
 enableAssertions :: Flavour -> Flavour
