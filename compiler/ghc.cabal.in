@@ -376,6 +376,7 @@ Library
         GHC.Data.Maybe
         GHC.Data.OrdList
         GHC.Data.Pair
+        GHC.Data.SmallArray
         GHC.Data.Stream
         GHC.Data.Strict
         GHC.Data.StringBuffer

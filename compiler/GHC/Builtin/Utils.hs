@@ -78,10 +78,10 @@ import GHC.Hs.Doc
 import GHC.Unit.Module.ModIface (IfaceExport)
 
 import GHC.Data.List.SetOps
+import GHC.Data.SmallArray
 
 import Control.Applicative ((<|>))
 import Data.List        ( intercalate , find )
-import Data.Array
 import Data.Maybe
 import qualified Data.Map as Map
 
@@ -133,7 +133,7 @@ knownKeyNames
              , concatMap wired_tycon_kk_names wiredInTyCons
              , concatMap wired_tycon_kk_names typeNatTyCons
              , map idName wiredInIds
-             , map (idName . primOpId) allThePrimOps
+             , map idName allThePrimOpIds
              , map (idName . primOpWrapperId) allThePrimOps
              , basicKnownKeyNames
              , templateHaskellNames
@@ -238,13 +238,21 @@ sense of them in interface pragmas. It's cool, though they all have
 ************************************************************************
 -}
 
-primOpIds :: Array Int Id
--- A cache of the PrimOp Ids, indexed by PrimOp tag
-primOpIds = array (1,maxPrimOpTag) [ (primOpTag op, mkPrimOpId op)
-                                   | op <- allThePrimOps ]
+-- | A cache of the PrimOp Ids, indexed by PrimOp tag (0 indexed)
+primOpIds :: SmallArray Id
+{-# NOINLINE primOpIds #-}
+primOpIds = listToArray (maxPrimOpTag+1) primOpTag mkPrimOpId allThePrimOps
 
+-- | Get primop id.
+--
+-- Retrieve it from `primOpIds` cache without performing bounds checking.
 primOpId :: PrimOp -> Id
-primOpId op = primOpIds ! primOpTag op
+primOpId op = indexSmallArray primOpIds (primOpTag op)
+
+-- | All the primop ids, as a list
+allThePrimOpIds :: [Id]
+{-# INLINE allThePrimOpIds #-}
+allThePrimOpIds = map (indexSmallArray primOpIds) [0..maxPrimOpTag]
 
 {-
 ************************************************************************
@@ -257,7 +265,7 @@ primOpId op = primOpIds ! primOpTag op
 ghcPrimExports :: [IfaceExport]
 ghcPrimExports
  = map (avail . idName) ghcPrimIds ++
-   map (avail . idName . primOpId) allThePrimOps ++
+   map (avail . idName) allThePrimOpIds ++
    [ availTC n [n] []
    | tc <- exposedPrimTyCons, let n = tyConName tc  ]
 
@@ -265,7 +273,7 @@ ghcPrimDeclDocs :: DeclDocMap
 ghcPrimDeclDocs = DeclDocMap $ Map.fromList $ mapMaybe findName primOpDocs
   where
     names = map idName ghcPrimIds ++
-            map (idName . primOpId) allThePrimOps ++
+            map idName allThePrimOpIds ++
             map tyConName exposedPrimTyCons
     findName (nameStr, doc)
       | Just name <- find ((nameStr ==) . getOccString) names

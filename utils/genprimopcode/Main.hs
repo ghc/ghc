@@ -741,13 +741,13 @@ gen_primop_vector_tycons (Info _ entries)
 gen_primop_tag :: Info -> String
 gen_primop_tag (Info _ entries)
    = unlines (max_def_type : max_def :
-              tagOf_type : zipWith f primop_entries [1 :: Int ..])
+              tagOf_type : zipWith f primop_entries [0 :: Int ..])
      where
         primop_entries = concatMap desugarVectorSpec $ filter is_primop entries
         tagOf_type = "primOpTag :: PrimOp -> Int"
         f i n = "primOpTag " ++ cons i ++ " = " ++ show n
         max_def_type = "maxPrimOpTag :: Int"
-        max_def      = "maxPrimOpTag = " ++ show (length primop_entries)
+        max_def      = "maxPrimOpTag = " ++ show (length primop_entries - 1)
 
 gen_data_decl :: Info -> String
 gen_data_decl (Info _ entries) =
