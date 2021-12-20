@@ -28,25 +28,30 @@ import GHC.Prelude
 
 import GHC.Builtin.Types.Prim
 import GHC.Builtin.Types
-
-import GHC.Cmm.Type
-import GHC.Types.Demand
-import GHC.Types.Id      ( Id, mkVanillaGlobalWithInfo )
-import GHC.Types.Id.Info ( vanillaIdInfo, setCafInfo, CafInfo(NoCafRefs) )
-import GHC.Types.Name
+import GHC.Builtin.Uniques (mkPrimOpIdUnique, mkPrimOpWrapperUnique )
 import GHC.Builtin.Names ( gHC_PRIMOPWRAPPERS )
+
 import GHC.Core.TyCon    ( TyCon, isPrimTyCon, PrimRep(..) )
 import GHC.Core.Type
+
+import GHC.Cmm.Type
+
+import GHC.Types.Demand
+import GHC.Types.Id
+import GHC.Types.Id.Info
+import GHC.Types.Name
 import GHC.Types.RepType ( tyConPrimRep1 )
-import GHC.Types.Basic   ( Arity )
+import GHC.Types.Basic
 import GHC.Types.Fixity  ( Fixity(..), FixityDirection(..) )
 import GHC.Types.SrcLoc  ( wiredInSrcSpan )
 import GHC.Types.ForeignCall ( CLabelString )
 import GHC.Types.SourceText  ( SourceText(..) )
 import GHC.Types.Unique  ( Unique)
-import GHC.Builtin.Uniques (mkPrimOpIdUnique, mkPrimOpWrapperUnique )
+
 import GHC.Unit.Types    ( Unit )
+
 import GHC.Utils.Outputable
+
 import GHC.Data.FastString
 
 {-

@@ -34,7 +34,7 @@ import GHC.Prelude
 
 import GHC.Platform
 
-import {-# SOURCE #-} GHC.Types.Id.Make ( mkPrimOpId, voidPrimId )
+import GHC.Types.Id.Make ( voidPrimId )
 import GHC.Types.Id
 import GHC.Types.Literal
 import GHC.Types.Name.Occurrence ( occNameFS )
@@ -57,6 +57,7 @@ import GHC.Core.TyCon
 import GHC.Core.Map.Expr ( eqCoreExpr )
 
 import GHC.Builtin.PrimOps ( PrimOp(..), tagToEnumKey )
+import GHC.Builtin.PrimOps.Ids (primOpId)
 import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim
 import GHC.Builtin.Names
@@ -437,9 +438,9 @@ primOpRules nm = \case
                                         platform <- getPlatform
                                         pure $ mkCoreUbxTup [intPrimTy,intPrimTy,intPrimTy]
                                           [ Lit (zeroi platform)
-                                          , mkCoreApps (Var (mkPrimOpId IntSubOp))
+                                          , mkCoreApps (Var (primOpId IntSubOp))
                                               [ Lit (zeroi platform)
-                                              , mkCoreApps (Var (mkPrimOpId IntSrlOp))
+                                              , mkCoreApps (Var (primOpId IntSrlOp))
                                                 [ other
                                                 , mkIntLit platform (fromIntegral (platformWordSizeInBits platform - 1))
                                                 ]
@@ -1297,7 +1298,7 @@ subsumesPrimOp :: PrimOp -> PrimOp -> RuleM CoreExpr
 this `subsumesPrimOp` that = do
   [Var primop_id `App` e] <- getArgs
   matchPrimOpId that primop_id
-  return (Var (mkPrimOpId this) `App` e)
+  return (Var (primOpId this) `App` e)
 
 subsumedByPrimOp :: PrimOp -> RuleM CoreExpr
 subsumedByPrimOp primop = do
@@ -1310,7 +1311,7 @@ extendNarrowPassthrough :: PrimOp -> Integer -> RuleM CoreExpr
 extendNarrowPassthrough narrow_primop n = do
   [Var primop_id `App` x] <- getArgs
   matchPrimOpId narrow_primop primop_id
-  return (Var (mkPrimOpId WordAndOp) `App` x `App` Lit (LitNumber LitNumWord n))
+  return (Var (primOpId WordAndOp) `App` x `App` Lit (LitNumber LitNumWord n))
 
 -- | narrow subsumes bitwise `and` with full mask (cf #16402):
 --
@@ -1328,7 +1329,7 @@ narrowSubsumesAnd and_primop narrw n = do
   let mask = bit n -1
       g v (Lit (LitNumber _ m)) = do
          guard (m .&. mask == mask)
-         return (Var (mkPrimOpId narrw) `App` v)
+         return (Var (primOpId narrw) `App` v)
       g _ _ = mzero
   g x y <|> g y x
 
@@ -1727,7 +1728,7 @@ strengthReduction two_lit add_op = do -- Note [Strength reduction]
               , do [Lit mult_lit, arg] <- getArgs
                    guard (mult_lit == two_lit)
                    return arg ]
-  return $ Var (mkPrimOpId add_op) `App` arg `App` arg
+  return $ Var (primOpId add_op) `App` arg `App` arg
 
 -- Note [Strength reduction]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2028,7 +2029,7 @@ builtinRules
           [arg, Lit (LitNumber LitNumInt d)] <- getArgs
           Just n <- return $ exactLog2 d
           platform <- getPlatform
-          return $ Var (mkPrimOpId IntSraOp) `App` arg `App` mkIntVal platform n
+          return $ Var (primOpId IntSraOp) `App` arg `App` mkIntVal platform n
         ],
 
      mkBasicRule modIntName 2 $ msum
@@ -2038,7 +2039,7 @@ builtinRules
           [arg, Lit (LitNumber LitNumInt d)] <- getArgs
           Just _ <- return $ exactLog2 d
           platform <- getPlatform
-          return $ Var (mkPrimOpId IntAndOp)
+          return $ Var (primOpId IntAndOp)
             `App` arg `App` mkIntVal platform (d - 1)
         ]
      ]
@@ -3005,7 +3006,7 @@ pattern BinOpApp x op y = OpVal op `App` x `App` y
 -- | Match a primop
 pattern OpVal:: PrimOp  -> Arg CoreBndr
 pattern OpVal op <- Var (isPrimOpId_maybe -> Just op) where
-   OpVal op = Var (mkPrimOpId op)
+   OpVal op = Var (primOpId op)
 
 -- | Match a literal
 pattern L :: Integer -> Arg CoreBndr

@@ -30,6 +30,7 @@ import GHC.Unit
 
 import GHC.Builtin.Names
 import GHC.Builtin.PrimOps
+import GHC.Builtin.PrimOps.Ids (primOpId)
 import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim ( realWorldStatePrimTy )
 
@@ -67,7 +68,7 @@ import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Id
 import GHC.Types.Id.Info
-import GHC.Types.Id.Make ( realWorldPrimId, mkPrimOpId )
+import GHC.Types.Id.Make ( realWorldPrimId )
 import GHC.Types.Basic
 import GHC.Types.Name   ( NamedThing(..), nameSrcSpan, isInternalName )
 import GHC.Types.SrcLoc ( SrcSpan(..), realSrcLocSpan, mkRealSrcLoc )
@@ -1021,7 +1022,7 @@ cpeApp top_env expr
              ; (floats, k') <- case k of
                   Lam s body -> cpe_app (extendCorePrepEnvExpr env s s0) body rest (n-2)
                   _          -> cpe_app env k (CpeApp s0 : rest) (n-1)
-             ; let touchId = mkPrimOpId TouchOp
+             ; let touchId = primOpId TouchOp
                    expr = Case k' y result_ty [Alt DEFAULT [] rhs]
                    rhs = let scrut = mkApps (Var touchId) [Type arg_rep, Type arg_ty, arg, Var realWorldPrimId]
                          in Case scrut s2 result_ty [Alt DEFAULT [] (Var y)]

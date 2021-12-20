@@ -42,6 +42,7 @@ import GHC.Types.ForeignCall
 import GHC.Core
 import GHC.Types.Literal
 import GHC.Builtin.PrimOps
+import GHC.Builtin.PrimOps.Ids (primOpId)
 import GHC.Core.Type
 import GHC.Types.RepType
 import GHC.Core.DataCon
@@ -54,7 +55,6 @@ import GHC.Core.TyCo.Ppr ( pprType )
 import GHC.Utils.Error
 import GHC.Types.Unique
 import GHC.Builtin.Uniques
-import GHC.Builtin.Utils ( primOpId )
 import GHC.Data.FastString
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain

@@ -53,13 +53,13 @@ import GHC.Types.Name
 import GHC.Types.SourceText
 
 import GHC.Driver.Session
-import GHC.Builtin.Utils
 import GHC.Tc.Instance.Family
 import GHC.Core.FamInstEnv
 import GHC.Builtin.Names
 import GHC.Builtin.Names.TH
 import GHC.Types.Id.Make ( coerceId )
 import GHC.Builtin.PrimOps
+import GHC.Builtin.PrimOps.Ids (primOpId)
 import GHC.Types.SrcLoc
 import GHC.Core.TyCon
 import GHC.Tc.Utils.Env

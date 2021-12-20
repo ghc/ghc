@@ -31,11 +31,9 @@ module GHC.Builtin.Utils (
 
         -- * Miscellaneous
         wiredInIds, ghcPrimIds,
-        primOpRules, builtinRules,
 
         ghcPrimExports,
         ghcPrimDeclDocs,
-        primOpId,
 
         -- * Random other things
         maybeCharLikeCon, maybeIntLikeCon,
@@ -49,6 +47,7 @@ import GHC.Prelude
 
 import GHC.Builtin.Uniques
 import GHC.Builtin.PrimOps
+import GHC.Builtin.PrimOps.Ids
 import GHC.Builtin.Types
 import GHC.Builtin.Types.Literals ( typeNatTyCons )
 import GHC.Builtin.Types.Prim
@@ -56,7 +55,6 @@ import GHC.Builtin.Names.TH ( templateHaskellNames )
 import GHC.Builtin.Names
 
 import GHC.Core.ConLike ( ConLike(..) )
-import GHC.Core.Opt.ConstantFold
 import GHC.Core.DataCon
 import GHC.Core.Class
 import GHC.Core.TyCon
@@ -78,7 +76,6 @@ import GHC.Hs.Doc
 import GHC.Unit.Module.ModIface (IfaceExport)
 
 import GHC.Data.List.SetOps
-import GHC.Data.SmallArray
 
 import Control.Applicative ((<|>))
 import Data.List        ( intercalate , find )
@@ -230,29 +227,7 @@ knownNamesInfo = unitNameEnv coercibleTyConName $
 We let a lot of "non-standard" values be visible, so that we can make
 sense of them in interface pragmas. It's cool, though they all have
 "non-standard" names, so they won't get past the parser in user code.
-
-************************************************************************
-*                                                                      *
-                PrimOpIds
-*                                                                      *
-************************************************************************
 -}
-
--- | A cache of the PrimOp Ids, indexed by PrimOp tag (0 indexed)
-primOpIds :: SmallArray Id
-{-# NOINLINE primOpIds #-}
-primOpIds = listToArray (maxPrimOpTag+1) primOpTag mkPrimOpId allThePrimOps
-
--- | Get primop id.
---
--- Retrieve it from `primOpIds` cache without performing bounds checking.
-primOpId :: PrimOp -> Id
-primOpId op = indexSmallArray primOpIds (primOpTag op)
-
--- | All the primop ids, as a list
-allThePrimOpIds :: [Id]
-{-# INLINE allThePrimOpIds #-}
-allThePrimOpIds = map (indexSmallArray primOpIds) [0..maxPrimOpTag]
 
 {-
 ************************************************************************

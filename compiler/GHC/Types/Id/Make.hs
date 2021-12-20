@@ -19,7 +19,7 @@ have a standard form, namely:
 module GHC.Types.Id.Make (
         mkDictFunId, mkDictFunTy, mkDictSelId, mkDictSelRhs,
 
-        mkPrimOpId, mkFCallId,
+        mkFCallId,
 
         unwrapNewTypeBody, wrapFamInstBody,
         DataConBoxer(..), vanillaDataConBoxer,
@@ -33,16 +33,12 @@ module GHC.Types.Id.Make (
         coercionTokenId, coerceId,
         proxyHashId, noinlineId, noinlineIdName,
         coerceName, leftSectionName, rightSectionName,
-
-        -- Re-export error Ids
-        module GHC.Core.Opt.ConstantFold
     ) where
 
 import GHC.Prelude
 
 import GHC.Builtin.Types.Prim
 import GHC.Builtin.Types
-import GHC.Core.Opt.ConstantFold
 import GHC.Core.Type
 import GHC.Core.Multiplicity
 import GHC.Core.TyCo.Rep
@@ -61,17 +57,14 @@ import GHC.Core.TyCon
 import GHC.Core.Class
 import GHC.Types.Name.Set
 import GHC.Types.Name
-import GHC.Builtin.PrimOps
 import GHC.Types.ForeignCall
 import GHC.Core.DataCon
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Demand
 import GHC.Types.Cpr
-import GHC.Types.TyThing
 import GHC.Core
 import GHC.Types.Unique
-import GHC.Builtin.Uniques
 import GHC.Types.Unique.Supply
 import GHC.Builtin.Names
 import GHC.Types.Basic       hiding ( SuccessFlag(..) )
@@ -86,7 +79,6 @@ import GHC.Data.List.SetOps
 import GHC.Types.Var (VarBndr(Bndr))
 import qualified GHC.LanguageExtensions as LangExt
 
-import Data.Maybe       ( maybeToList )
 
 {-
 ************************************************************************
@@ -1284,38 +1276,10 @@ wrapFamInstBody tycon args body
 {-
 ************************************************************************
 *                                                                      *
-\subsection{Primitive operations}
+* Foreign calls
 *                                                                      *
 ************************************************************************
 -}
-
-mkPrimOpId :: PrimOp -> Id
-mkPrimOpId prim_op
-  = id
-  where
-    (tyvars,arg_tys,res_ty, arity, strict_sig) = primOpSig prim_op
-    ty   = mkForAllTys tyvars (mkVisFunTysMany arg_tys res_ty)
-    name = mkWiredInName gHC_PRIM (primOpOcc prim_op)
-                         (mkPrimOpIdUnique (primOpTag prim_op))
-                         (AnId id) UserSyntax
-    id   = mkGlobalId (PrimOpId prim_op) name ty info
-
-    -- PrimOps don't ever construct a product, but we want to preserve bottoms
-    cpr
-      | isDeadEndDiv (snd (splitDmdSig strict_sig)) = botCpr
-      | otherwise                                   = topCpr
-
-    info = noCafIdInfo
-           `setRuleInfo`           mkRuleInfo (maybeToList $ primOpRules name prim_op)
-           `setArityInfo`          arity
-           `setDmdSigInfo`     strict_sig
-           `setCprSigInfo`            mkCprSig arity cpr
-           `setInlinePragInfo`     neverInlinePragma
-           `setLevityInfoWithType` res_ty
-               -- We give PrimOps a NOINLINE pragma so that we don't
-               -- get silly warnings from Desugar.dsRule (the inline_shadows_rule
-               -- test) about a RULE conflicting with a possible inlining
-               -- cf #7287
 
 -- For each ccall we manufacture a separate CCallOpId, giving it
 -- a fresh unique, a type that is correct for this particular ccall,
