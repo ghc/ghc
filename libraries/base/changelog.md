@@ -39,6 +39,8 @@
     `Ptr ()` to `CUIntPtr`. For typical glibc based platforms, the
     affected type is `CTimer`.
 
+  * `Data.List` now defines `type List = []`.
+
 ## 4.16.0.0 *Nov 2021*
 
   * The unary tuple type, `Solo`, is now exported by `Data.Tuple`.

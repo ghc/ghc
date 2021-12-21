@@ -18,8 +18,9 @@
 module Data.List
    (
    -- * Basic functions
+     List
 
-     (++)
+   , (++)
    , head
    , last
    , tail
@@ -220,6 +221,8 @@ import Data.OldList hiding ( all, and, any, concat, concatMap, elem, find,
                              length, notElem, null, or, product, sum )
 
 import GHC.Base ( Bool(..), Eq((==)), otherwise )
+
+type List = []
 
 -- | The 'isSubsequenceOf' function takes two lists and returns 'True' if all
 -- the elements of the first list occur, in order, in the second. The
