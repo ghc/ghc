@@ -768,7 +768,7 @@ mkTcTyVar name kind details
 tcTyVarDetails :: TyVar -> TcTyVarDetails
 -- See Note [TcTyVars and TyVars in the typechecker] in GHC.Tc.Utils.TcType
 tcTyVarDetails (TcTyVar { tc_tv_details = details }) = details
-tcTyVarDetails (TyVar {})                            = vanillaSkolemTvUnk --pprTrace "tyVar" (text $ show (unsafePerformIO $ whereFrom tv)) $ vanillaSkolemTvUnk
+tcTyVarDetails (TyVar {})                            = vanillaSkolemTvUnk --pprTrace "tcTyVarDetailsTyVar" (prettyCallStackDoc $ varOrigin v) vanillaSkolemTvUnk --pprTrace "tyVar" (text $ show (unsafePerformIO $ whereFrom tv)) $ vanillaSkolemTvUnk
 tcTyVarDetails var = pprPanic "tcTyVarDetails" (ppr var <+> dcolon <+> pprKind (tyVarKind var))
 
 setTcTyVarDetails :: TyVar -> TcTyVarDetails -> TyVar

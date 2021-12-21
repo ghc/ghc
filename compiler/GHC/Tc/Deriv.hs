@@ -474,7 +474,7 @@ deriveClause rep_tc scoped_tvs mb_lderiv_strat deriv_preds err_ctxt
         , text "mb_lderiv_strat" <+> ppr mb_lderiv_strat ]
       tcExtendNameTyVarEnv scoped_tvs $ do
         (mb_lderiv_strat', via_tvs) <- tcDerivStrategy mb_lderiv_strat
-        tcExtendTyVarEnv via_tvs $
+        tcExtendTyVarEnv unkSkol via_tvs $
         -- Moreover, when using DerivingVia one can bind type variables in
         -- the `via` type as well, so these type variables must also be
         -- brought into scope.
@@ -634,7 +634,7 @@ deriveStandalone (L loc (DerivDecl _ deriv_ty mb_lderiv_strat overlap_mode))
            vcat [ppr mb_lderiv_strat, ppr deriv_ty]
        ; (mb_lderiv_strat, via_tvs) <- tcDerivStrategy mb_lderiv_strat
        ; (cls_tvs, deriv_ctxt, cls, inst_tys)
-           <- tcExtendTyVarEnv via_tvs $
+           <- tcExtendTyVarEnv unkSkol via_tvs $
               tcStandaloneDerivInstType ctxt deriv_ty
        ; let mb_deriv_strat = fmap unLoc mb_lderiv_strat
              tvs            = via_tvs ++ cls_tvs

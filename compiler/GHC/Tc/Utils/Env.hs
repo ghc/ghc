@@ -91,7 +91,7 @@ import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Types.Evidence (HsWrapper, idHsWrapper)
 import {-# SOURCE #-} GHC.Tc.Utils.Unify ( tcSubMult )
-import GHC.Tc.Types.Origin ( CtOrigin(UsageEnvironmentOf) )
+import GHC.Tc.Types.Origin ( CtOrigin(UsageEnvironmentOf), SkolemInfo () )
 
 import GHC.Core.UsageEnv
 import GHC.Core.InstEnv
@@ -534,9 +534,11 @@ tcExtendKindEnv extra_env thing_inside
 
 -----------------------
 -- Scoped type and kind variables
-tcExtendTyVarEnv :: [TyVar] -> TcM r -> TcM r
-tcExtendTyVarEnv tvs thing_inside
-  = tcExtendNameTyVarEnv (mkTyVarNamePairs tvs) thing_inside
+tcExtendTyVarEnv :: SkolemInfo -> [TyVar] -> TcM r -> TcM r
+tcExtendTyVarEnv skol_info tvs thing_inside
+  = tcExtendNameTyVarEnv (map go tvs) thing_inside
+    where
+      go tv = (tyVarName tv, mkTcTyVar (tyVarName tv) (tyVarKind tv) (vanillaSkolemTv skol_info))
 
 tcExtendNameTyVarEnv :: [(Name,TcTyVar)] -> TcM r -> TcM r
 tcExtendNameTyVarEnv binds thing_inside

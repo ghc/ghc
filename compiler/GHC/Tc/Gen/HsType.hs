@@ -127,7 +127,7 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Data.Maybe
 import GHC.Data.Bag( unitBag )
-import Data.List ( find )
+import Data.List ( find, mapAccumL )
 import Control.Monad
 
 {-
@@ -1976,6 +1976,7 @@ tcTyVar :: TcTyMode -> Name -> TcM (TcType, TcKind)
 tcTyVar mode name         -- Could be a tyvar, a tycon, or a datacon
   = do { traceTc "lk1" (ppr name)
        ; thing <- tcLookup name
+--       ; pprTraceM "tcTyVar" (ppr name $$ ppr thing)
        ; case thing of
            ATyVar _ tv -> return (mkTyVarTy tv, tyVarKind tv)
 
@@ -2545,7 +2546,8 @@ kcCheckDeclHeader_sig kisig name flav
 
           -- Convert each ZippedBinder to TyConBinder        for  tyConBinders
           --                       and to [(Name, TcTyVar)]  for  tcTyConScopedTyVars
-        ; (vis_tcbs, concat -> explicit_tv_prs) <- mapAndUnzipM zipped_to_tcb zipped_binders
+        ; skol_info <- mkSkolemInfo (TyConSkol flav name)
+        ; (vis_tcbs, concat -> explicit_tv_prs) <- mapAndUnzipM (zipped_to_tcb skol_info) zipped_binders
         ; skol_info  <- mkSkolemInfo (TyConSkol flav name)
 
         ; (tclvl, wanted, (implicit_tvs, (invis_binders, r_ki)))
@@ -2589,9 +2591,24 @@ kcCheckDeclHeader_sig kisig name flav
                      --   type family T a :: Maybe j where
                      --
                      -- Here we unify   Maybe k ~ Maybe j
-                   ; whenIsJust m_res_ki $ \res_ki ->
+
+--                   ; pprTraceM "invis_binders" (ppr invis_binders $$ ppr explicit_tv_prs $$  ppr r_ki $$ ppr m_res_ki)
+
+                   ; let skolemise_binders :: TCvSubst -> TyCoBinder -> (TCvSubst, TyCoBinder)
+                         skolemise_binders subst (Named (Bndr tv vis)) =
+
+
+                     --     pprTrace "tyvar" (ppr tv $$ ppr (tyVarKind tv) $$ ppr subst $$ ppr (substTy subst $ tyVarKind tv)) $
+                          let tv' = (mkTcTyVar (tyVarName tv) (substTy subst $ tyVarKind tv) (vanillaSkolemTv skol_info))
+                              subst' = extendTvSubst subst tv (mkTyVarTy tv')
+                          in (subst', Named (Bndr tv' vis))
+                         skolemise_binders subst b = (subst, b)
+
+                   ; whenIsJust m_res_ki $ \res_ki -> do
+                      let (subst, _binders') = mapAccumL skolemise_binders emptyTCvSubst invis_binders
                       discardResult $ -- See Note [discardResult in kcCheckDeclHeader_sig]
-                      unifyKind Nothing r_ki res_ki
+--                        pprTrace "subst_ty" (ppr $ substTy subst r_ki)
+                        unifyKind Nothing (substTy subst r_ki) res_ki
 
                    ; return (invis_binders, r_ki) }
 
@@ -2608,7 +2625,7 @@ kcCheckDeclHeader_sig kisig name flav
               tc              = mkTcTyCon name tcbs r_ki all_tv_prs True flav
 
         -- Check that there are no unsolved equalities
-        ; reportUnsolvedEqualities skol_info (binderVars tcbs) tclvl wanted
+        ; reportUnsolvedEqualities skol_info [] tclvl wanted
 
         ; traceTc "kcCheckDeclHeader_sig done:" $ vcat
           [ text "tyConName = " <+> ppr (tyConName tc)
@@ -2640,8 +2657,8 @@ kcCheckDeclHeader_sig kisig name flav
     --  * TyConBinder      for  tyConBinders
     --  * (Name, TcTyVar)  for  tcTyConScopedTyVars, if there's a user-written LHsTyVarBndr
     --
-    zipped_to_tcb :: ZippedBinder -> TcM (TyConBinder, [(Name, TcTyVar)])
-    zipped_to_tcb zb = case zb of
+    zipped_to_tcb :: SkolemInfo -> ZippedBinder -> TcM (TyConBinder, [(Name, TcTyVar)])
+    zipped_to_tcb skol_info zb = case zb of
 
       -- Inferred variable, no user-written binder.
       -- Example:   forall {k}.
@@ -2665,7 +2682,8 @@ kcCheckDeclHeader_sig kisig name flav
       ZippedBinder (Anon VisArg bndr_ki) (Just b) ->
         return $
           let v_name = getName b
-              tv = mkTyVar v_name (scaledThing bndr_ki)
+              skol_details = vanillaSkolemTv skol_info
+              tv = mkTcTyVar v_name (scaledThing bndr_ki) skol_details
               tcb = mkAnonTyConBinder VisArg tv
           in (tcb, [(v_name, tv)])
 
@@ -2684,7 +2702,8 @@ kcCheckDeclHeader_sig kisig name flav
     -- convert it to TyConBinder.
     invis_to_tcb :: TyCoBinder -> TcM TyConBinder
     invis_to_tcb tb = do
-      (tcb, stv) <- zipped_to_tcb (ZippedBinder tb Nothing)
+      -- unkSkol is not used.
+      (tcb, stv) <- zipped_to_tcb unkSkol (ZippedBinder tb Nothing)
       massert (null stv)
       return tcb
 
@@ -3483,15 +3502,24 @@ bindTyClTyVars skol_info tycon_name thing_inside
        ; let scoped_prs = tcTyConScopedTyVars tycon
              res_kind   = tyConResKind tycon
              binders    = tyConBinders tycon
-       ; traceTc "bindTyClTyVars" (ppr tycon_name <+> ppr binders $$ ppr scoped_prs)
        ; let scoped_prs' = map skolemise_pair scoped_prs
-       ; traceTc "bindTyClTyVars" (ppr tycon_name <+> ppr binders $$ ppr scoped_prs')
+ --      ; lcl_env <- tcl_env <$> getLclEnv
+--       ; th_body <- tcl_bndrs <$> getLclEnv
+       ; let (_, binders') = mapAccumL skolemise_binders emptyTCvSubst binders
        ; tcExtendNameTyVarEnv scoped_prs' $
-         thing_inside tycon binders res_kind }
+         thing_inside tycon binders' res_kind }
   where
     skolemise_pair :: (Name, TyVar) -> (Name, TcTyVar)
-    skolemise_pair (name, tyvar) =
+    skolemise_pair (name, tyvar) = -- pprTrace "tyvar" (ppr tyvar $$ ppr (tyVarKind tyvar)) $
       (name, mkTcTyVar (tyVarName tyvar) (tyVarKind tyvar) (vanillaSkolemTv skol_info))
+
+    skolemise_binders :: TCvSubst -> TyConBinder -> (TCvSubst, TyConBinder)
+    skolemise_binders subst (Bndr tv vis) =
+
+--      pprTrace "tyvar" (ppr tv $$ ppr (tyVarKind tv) $$ ppr subst $$ ppr (substTy subst $ tyVarKind tv)) $
+        let tv' = (mkTcTyVar (tyVarName tv) (substTy subst $ tyVarKind tv) (vanillaSkolemTv skol_info))
+            subst' = extendTvSubst subst tv (mkTyVarTy tv')
+        in (subst', Bndr tv' vis)
 
 
 {- *********************************************************************

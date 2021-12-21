@@ -3443,8 +3443,9 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs res_kind tag_map
 
        ; kvs <- kindGeneralizeAll skol_info fake_ty
 
-       ; let skol_tvs = tc_tvs ++ kvs ++ binderVars exp_tvbndrs
-       ; reportUnsolvedEqualities skol_info skol_tvs tclvl wanted
+     --  ; let skol_tvs = tc_tvs ++ kvs ++ binderVars exp_tvbndrs
+     --  ; pprTraceM "skol_tvs" (ppr tc_tvs $$ ppr kvs $$ ppr (binderVars (exp_tvbndrs)))
+       ; reportUnsolvedEqualities skol_info [] tclvl wanted
              -- The skol_info claims that all the variables are bound
              -- by the data constructor decl, whereas actually the
              -- univ_tvs are bound by the data type decl itself.  It

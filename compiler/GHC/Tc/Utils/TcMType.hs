@@ -930,9 +930,10 @@ readMetaTyVar :: TyVar -> TcM MetaDetails
 readMetaTyVar tyvar = assertPpr (isMetaTyVar tyvar) (ppr tyvar) $
                       readMutVar (metaTyVarRef tyvar)
 
-isFilledMetaTyVar_maybe :: TcTyVar -> TcM (Maybe Type)
+isFilledMetaTyVar_maybe :: HasCallStack => TcTyVar -> TcM (Maybe Type)
 isFilledMetaTyVar_maybe tv
- | MetaTv { mtv_ref = ref } <- tcTyVarDetails tv
+ | isTcTyVar tv
+ , MetaTv { mtv_ref = ref } <- tcTyVarDetails tv
  = do { cts <- readTcRef ref
       ; case cts of
           Indirect ty -> return (Just ty)
