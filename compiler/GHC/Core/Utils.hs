@@ -157,7 +157,7 @@ coreAltType alt@(Alt _ bs rhs)
 coreAltsType :: [CoreAlt] -> Type
 -- ^ Returns the type of the first alternative, which should be the same as for all alternatives
 coreAltsType (alt:_) = coreAltType alt
-coreAltsType []      = panic "corAltsType"
+coreAltsType []      = panic "coreAltsType"
 
 mkLamType  :: Var -> Type -> Type
 -- ^ Makes a @(->)@ type or an implicit forall type, depending

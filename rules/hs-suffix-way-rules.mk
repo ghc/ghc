@@ -33,7 +33,7 @@ else
 #
 # The order in which implicit rules are defined can influence a build.
 #
-# Case study: genprimpos/Lexer.hs
+# Case study: genprimops/Lexer.hs
 #
 # We have two implicit rules for creating .o files, which after instantiating
 # with a specific directory ($1=utils/genprimops) and distdir ($2=dist) look

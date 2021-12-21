@@ -1062,7 +1062,7 @@ Other
     :shortdesc: Don't generate bindings for Typeable methods
     :type: dynamic
 
-    This avoid generating Typeable-related bindings for modules and types. This
+    This avoids generating Typeable-related bindings for modules and types. This
     is useful when debugging because it gives smaller modules and dumps, but the
     compiler will panic if you try to use Typeable instances of things that you
     built with this flag.

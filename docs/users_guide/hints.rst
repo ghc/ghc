@@ -236,7 +236,7 @@ Look at the Core syntax!
     their Core code. ``lets`` are bad, ``cases`` are good, dictionaries
     (``d.⟨Class⟩.⟨Unique⟩``) [or anything overloading-ish] are bad,
     nested lambdas are bad, explicit data constructors are good,
-    primitive operations (e.g., ``eqInt#``) are good, ...
+    primitive operations (e.g., ``==#``) are good, ...
 
 Use strictness annotations:
     Putting a strictness annotation (``!``) on a constructor field helps

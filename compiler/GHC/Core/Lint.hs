@@ -775,7 +775,7 @@ Note [Representation polymorphism invariants] in GHC.Core. However, we do *not*
 want to do this in a compulsory unfolding. Compulsory unfoldings arise
 only internally, for things like newtype wrappers, dictionaries, and
 (notably) unsafeCoerce#. These might legitimately be representation-polymorphic;
-indeed representation-polyorphic unfoldings are a primary reason for the
+indeed representation-polymorphic unfoldings are a primary reason for the
 very existence of compulsory unfoldings (we can't compile code for
 the original, representation-polymorphic, binding).
 

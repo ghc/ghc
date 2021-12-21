@@ -1216,7 +1216,7 @@ data StmtLR idL idR body -- body should always be (LHs**** idR)
              -- ^ Post renaming has optional fail and bind / (>>=) operator.
              -- Post typechecking, also has multiplicity of the argument
              -- and the result type of the function passed to bind;
-             -- that is, (P, S) in (>>=) :: Q -> (R # P -> S) -> T
+             -- that is, (P, S) in (>>=) :: Q -> (R % P -> S) -> T
              -- See Note [The type of bind in Stmts]
              (LPat idL)
              body

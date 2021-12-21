@@ -798,7 +798,7 @@ def main() -> None:
     # HEAD~3           20000                 20000
     def strMetric(x):
         return '{:.2f}'.format(x.value) if x != None else ""
-    # Data is in colum major format, so transpose and pass to print_table.
+    # Data is in column major format, so transpose and pass to print_table.
     T = TypeVar('T')
     def transpose(xss: List[List[T]]) -> List[List[T]]:
         return list(map(list, zip(*xss)))

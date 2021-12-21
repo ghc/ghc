@@ -1311,7 +1311,7 @@ by saying ``-fno-wombat``.
     sub-demand* that says "Called at most once, where the result is used
     according to ``L``". The expression ``f `seq` f 1`` puts ``f`` under
     demand ``SC1(L)`` and serves as an example where the upper bound on
-    evaluation cardinality doesn't conincide with that of the call cardinality.
+    evaluation cardinality doesn't coincide with that of the call cardinality.
 
     Cardinality is always relative to the enclosing call cardinality, so
     ``g 1 2 + g 3 4`` puts ``g`` under demand ``SCS(C1(L))``, which says

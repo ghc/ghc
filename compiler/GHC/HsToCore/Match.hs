@@ -1010,11 +1010,11 @@ sameGroup (PgN l1)      (PgN l2)      = l1==l2  -- Order is significant
         -- Order is significant, match PgN after PgLit
         -- If the exponents are small check for value equality rather than syntactic equality
         -- This is implemented in the Eq instance for FractionalLit, we do this to avoid
-        -- computing the value of excessivly large rationals.
+        -- computing the value of excessively large rationals.
 sameGroup (PgOverS s1)  (PgOverS s2)  = s1==s2
 sameGroup (PgNpK l1)    (PgNpK l2)    = l1==l2  -- See Note [Grouping overloaded literal patterns]
 sameGroup (PgCo t1)     (PgCo t2)     = t1 `eqType` t2
-        -- CoPats are in the same goup only if the type of the
+        -- CoPats are in the same group only if the type of the
         -- enclosed pattern is the same. The patterns outside the CoPat
         -- always have the same type, so this boils down to saying that
         -- the two coercions are identical.

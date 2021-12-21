@@ -443,7 +443,7 @@ dropAssignments platform should_drop state assigs
 
 -- -----------------------------------------------------------------------------
 -- Try to inline assignments into a node.
--- This also does constant folding for primpops, since
+-- This also does constant folding for primops, since
 -- inlining opens up opportunities for doing so.
 
 tryToInline

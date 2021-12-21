@@ -11,7 +11,7 @@ test('mkGADTVars', normal, compile, [''])
 test('TypeLevelVec',normal,compile, [''])
 test('T9632', normal, compile, [''])
 
-# dynamic-paper used to run out of simplfier ticks because of
+# dynamic-paper used to run out of simplifier ticks because of
 # infinite inlining, but the new case-depth mechanism cuts that off,
 # so it now compiles fine.
 #

@@ -169,7 +169,7 @@ toIfaceTypeX :: VarSet -> Type -> IfaceType
 --    translates the tyvars in 'free' as IfaceFreeTyVars
 --
 -- Synonyms are retained in the interface type
-toIfaceTypeX fr (TyVarTy tv)   -- See Note [TcTyVars in IfaceType] in GHC.Iface.Type
+toIfaceTypeX fr (TyVarTy tv)   -- See Note [Free tyvars in IfaceType] in GHC.Iface.Type
   | tv `elemVarSet` fr         = IfaceFreeTyVar tv
   | otherwise                  = IfaceTyVar (toIfaceTyVar tv)
 toIfaceTypeX fr ty@(AppTy {})  =
@@ -282,7 +282,7 @@ toIfaceCoercionX fr co
     go (Refl ty)            = IfaceReflCo (toIfaceTypeX fr ty)
     go (GRefl r ty mco)     = IfaceGReflCo r (toIfaceTypeX fr ty) (go_mco mco)
     go (CoVarCo cv)
-      -- See [TcTyVars in IfaceType] in GHC.Iface.Type
+      -- See Note [Free tyvars in IfaceType] in GHC.Iface.Type
       | cv `elemVarSet` fr  = IfaceFreeCoVar cv
       | otherwise           = IfaceCoVarCo (toIfaceCoVar cv)
     go (HoleCo h)           = IfaceHoleCo  (coHoleCoVar h)

@@ -2881,7 +2881,7 @@ aexp2   :: { ECP }
         | overloaded_label              {% acsExpr (\cs -> sL1a $1 (HsOverLabel (comment (glRR $1) cs) $! unLoc $1)) }
         | literal                       { ECP $ pvA (mkHsLitPV $! $1) }
 -- This will enable overloaded strings permanently.  Normally the renamer turns HsString
--- into HsOverLit when -foverloaded-strings is on.
+-- into HsOverLit when -XOverloadedStrings is on.
 --      | STRING    { sL (getLoc $1) (HsOverLit $! mkHsIsString (getSTRINGs $1)
 --                                       (getSTRING $1) noExtField) }
         | INTEGER   { ECP $ mkHsOverLitPV (sL1a $1 $ mkHsIntegral   (getINTEGER  $1)) }

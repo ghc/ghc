@@ -1218,7 +1218,7 @@ Consider the Core program (from #11291),
 
 The late inlining logic in cpe_app would transform this into:
 
-   (case bot of {}) realWorldPrimId#
+   (case bot of {}) realWorld#
 
 Which would rise to a panic in CoreToStg.myCollectArgs, which expects only
 variables in function position.
@@ -1451,7 +1451,7 @@ maybeSaturate fn expr n_args
 
 Note [Eta expansion]
 ~~~~~~~~~~~~~~~~~~~~~
-Eta expand to match the arity claimed by the binder Remember,
+Eta expand to match the arity claimed by the binder. Remember,
 CorePrep must not change arity
 
 Eta expansion might not have happened already, because it is done by

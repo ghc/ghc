@@ -765,7 +765,7 @@ mkTcTyVar name kind details
         }
 
 tcTyVarDetails :: TyVar -> TcTyVarDetails
--- See Note [TcTyVars in the typechecker] in GHC.Tc.Utils.TcType
+-- See Note [TcTyVars and TyVars in the typechecker] in GHC.Tc.Utils.TcType
 tcTyVarDetails (TcTyVar { tc_tv_details = details }) = details
 tcTyVarDetails (TyVar {})                            = vanillaSkolemTv
 tcTyVarDetails var = pprPanic "tcTyVarDetails" (ppr var <+> dcolon <+> pprKind (tyVarKind var))

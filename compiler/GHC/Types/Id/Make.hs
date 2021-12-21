@@ -412,12 +412,12 @@ There is an exception: if `b` (more generally all the fields besides `a`) is
 unrestricted, then is perfectly possible to have a linear projection. Such a
 linear projection has as simple definition.
 
-  data Bar = MkBar { c :: C, d # Many :: D }
+  data Bar = MkBar { c :: C, d % Many :: D }
 
   c :: Bar %1 -> C
   c MkBar{ c=x, d=_} = x
 
-The `# Many` syntax, for records, does not exist yet. But there is one important
+The `% Many` syntax, for records, does not exist yet. But there is one important
 special case which already happens: when there is a single field (usually a
 newtype).
 
@@ -455,7 +455,7 @@ information. Implicitly, they are all unrestricted. See the linear types proposa
 https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0111-linear-types.rst .
 
 When translating to core `C => ...` is always translated to an unrestricted
-arrow `C # Many -> ...`.
+arrow `C % Many -> ...`.
 
 Therefore there is no loss of generality if we make all selectors unrestricted.
 
@@ -1530,7 +1530,7 @@ does not linger for long.
 
 -- See Note [Left and right sections] in GHC.Rename.Expr
 -- See Note [Wired-in Ids for rebindable syntax]
---   leftSection :: forall r1 r2 n (a:TYPE r1) (b:TYPE r2).
+--   leftSection :: forall r1 r2 n (a::TYPE r1) (b::TYPE r2).
 --                  (a %n-> b) -> a %n-> b
 --   leftSection f x = f x
 -- Important that it is eta-expanded, so that (leftSection undefined `seq` ())
@@ -1557,7 +1557,7 @@ leftSectionId = pcMiscPrelId leftSectionName ty info
 
 -- See Note [Left and right sections] in GHC.Rename.Expr
 -- See Note [Wired-in Ids for rebindable syntax]
---   rightSection :: forall r1 r2 r3 (a:TYPE r1) (b:TYPE r2) (c:TYPE r3).
+--   rightSection :: forall r1 r2 r3 n1 n2 (a::TYPE r1) (b::TYPE r2) (c::TYPE r3).
 --                   (a %n1 -> b %n2-> c) -> b %n2-> a %n1-> c
 --   rightSection f y x = f x y
 -- Again, multiplicity polymorphism is important

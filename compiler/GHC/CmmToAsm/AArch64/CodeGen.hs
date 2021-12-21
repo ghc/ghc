@@ -1265,7 +1265,7 @@ genCondBranch _ true false expr = do
 --
 -- To actually get the value of <symbol>, we'd need to ldr x0, x0 still, which
 -- for the first case can be optimized to use ldr x0, [x0, #:lo12:<symbol>]
--- instaed of the add instruction.
+-- instead of the add instruction.
 --
 -- As the memory model for AArch64 for PIC is considered to be +/- 4GB, we do
 -- not need to go through the GOT, unless we want to address the full address

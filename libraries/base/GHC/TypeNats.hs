@@ -127,7 +127,7 @@ After inlining and simplification, this ends up looking something like this:
 See Note [withDict] in "GHC.HsToCore.Expr" for details on how
 we actually construct the dictionary.
 
-Note that using `Any Nat` is not really correct, as multilple calls to
+Note that using `Any Nat` is not really correct, as multiple calls to
 `someNatVal` would violate coherence:
 
   type T = Any Nat

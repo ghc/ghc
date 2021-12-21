@@ -238,7 +238,7 @@ sanityCheckCfg m blockSet msg
       diff = (setUnion cfgNodes blockSet) `setDifference` (setIntersection cfgNodes blockSet) :: LabelSet
 
 -- | Filter the CFG with a custom function f.
---   Paramaeters are `f from to edgeInfo`
+--   Parameters are `f from to edgeInfo`
 filterEdges :: (BlockId -> BlockId -> EdgeInfo -> Bool) -> CFG -> CFG
 filterEdges f cfg =
     mapMapWithKey filterSources cfg

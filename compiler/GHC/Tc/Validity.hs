@@ -1606,7 +1606,7 @@ checkHasFieldInst _ tys = pprPanic "checkHasFieldInst" (ppr tys)
 Consider the (bogus)
      instance Eq Char#
 We elaborate to  'Eq (Char# |> UnivCo(hole))'  where the hole is an
-insoluble equality constraint for * ~ #.  We'll report the insoluble
+insoluble equality constraint for Type ~ TYPE WordRep.  We'll report the insoluble
 constraint separately, but we don't want to *also* complain that Eq is
 not applied to a type constructor.  So we look gaily look through
 CastTys here.

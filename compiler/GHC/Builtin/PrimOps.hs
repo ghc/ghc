@@ -467,7 +467,7 @@ Note [Implementation: how can_fail/has_side_effects affect transformations]
 How do we ensure that floating/duplication/discarding are done right
 in the simplifier?
 
-Two main predicates on primpops test these flags:
+Two main predicates on primops test these flags:
   primOpOkForSideEffects <=> not has_side_effects
   primOpOkForSpeculation <=> not (has_side_effects || can_fail)
 

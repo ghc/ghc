@@ -45,7 +45,7 @@ import GHC.Core.FVs     ( mkRuleInfo )
 import GHC.Core.Rules   ( lookupRule, getRules, initRuleOpts )
 import GHC.Core.Multiplicity
 
-import GHC.Types.Literal   ( litIsLifted ) --, mkLitInt ) -- temporalily commented out. See #8326
+import GHC.Types.Literal   ( litIsLifted ) --, mkLitInt ) -- temporarily commented out. See #8326
 import GHC.Types.SourceText
 import GHC.Types.Id
 import GHC.Types.Id.Make   ( seqId )

@@ -216,7 +216,7 @@ solveEqualities callsite thing_inside
 simplifyAndEmitFlatConstraints :: WantedConstraints -> TcM ()
 -- See Note [Failure in local type signatures]
 simplifyAndEmitFlatConstraints wanted
-  = do { -- Solve and zonk to esablish the
+  = do { -- Solve and zonk to establish the
          -- preconditions for floatKindEqualities
          wanted <- runTcSEqualities (solveWanteds wanted)
        ; wanted <- TcM.zonkWC wanted
@@ -2740,7 +2740,7 @@ findDefaultableGroups (default_tys, (ovl_strings, extended_defaults)) wanteds
         | otherwise         = all is_std_class clss && (any (isNumClass ovl_strings) clss)
 
     -- is_std_class adds IsString to the standard numeric classes,
-    -- when -foverloaded-strings is enabled
+    -- when -XOverloadedStrings is enabled
     is_std_class cls = isStandardClass cls ||
                        (ovl_strings && (cls `hasKey` isStringClassKey))
 
@@ -2792,14 +2792,14 @@ disambigGroup (default_ty:default_tys) group@(the_tv, wanteds)
       -- ill-kinded defaulting attempts like (Eq []) or (Foldable Int) here.
 
 -- In interactive mode, or with -XExtendedDefaultRules,
--- we default Show a to Show () to avoid graututious errors on "show []"
+-- we default Show a to Show () to avoid gratuitous errors on "show []"
 isInteractiveClass :: Bool   -- -XOverloadedStrings?
                    -> Class -> Bool
 isInteractiveClass ovl_strings cls
     = isNumClass ovl_strings cls || (classKey cls `elem` interactiveClassKeys)
 
     -- isNumClass adds IsString to the standard numeric classes,
-    -- when -foverloaded-strings is enabled
+    -- when -XOverloadedStrings is enabled
 isNumClass :: Bool   -- -XOverloadedStrings?
            -> Class -> Bool
 isNumClass ovl_strings cls

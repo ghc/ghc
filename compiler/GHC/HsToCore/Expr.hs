@@ -1227,7 +1227,7 @@ Some further observations about `withDict`:
   otherwise.
 
 * For examples of how `withDict` is used in the `base` library, see `withSNat`
-  in GHC.TypeNats, as well as `withSChar` and `withSSymbol` n GHC.TypeLits.
+  in GHC.TypeNats, as well as `withSChar` and `withSSymbol` in GHC.TypeLits.
 
 * The `r` is representation-polymorphic,
   to support things like `withTypeable` in `Data.Typeable.Internal`.

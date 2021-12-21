@@ -1912,7 +1912,7 @@ collectBindersPushingCo e
 Note [collectBindersPushingCo]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We just look for coercions of form
-   <type> # w -> blah
+   <type> % w -> blah
 (and similarly for foralls) to keep this function simple.  We could do
 more elaborate stuff, but it'd involve substitution etc.
 

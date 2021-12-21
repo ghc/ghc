@@ -173,7 +173,7 @@ guarantee that the code is safe. Or those modules compiled with
 Safe.
 
 This is why the RIO module is compiled with :extension:`Safe` or
-:extension:`Trustworthy`>, to allow the ``Danger`` module to import it. The
+:extension:`Trustworthy`, to allow the ``Danger`` module to import it. The
 :extension:`Trustworthy` flag doesn't place any restrictions on the module like
 :extension:`Safe` does (expect to restrict overlapping instances to `safe
 overlapping instances <#safe-overlapping-instances>`__). Instead the

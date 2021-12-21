@@ -926,7 +926,7 @@ ppr_ty ctxt_prec ty@(IfaceForAllTy {})          = ppr_sigma ctxt_prec ty
 ppr_ty ctxt_prec ty@(IfaceFunTy InvisArg _ _ _) = ppr_sigma ctxt_prec ty
 
 ppr_ty _         (IfaceFreeTyVar tyvar) = ppr tyvar  -- This is the main reason for IfaceFreeTyVar!
-ppr_ty _         (IfaceTyVar tyvar)     = ppr tyvar  -- See Note [TcTyVars in IfaceType]
+ppr_ty _         (IfaceTyVar tyvar)     = ppr tyvar  -- See Note [Free tyvars in IfaceType]
 ppr_ty ctxt_prec (IfaceTyConApp tc tys) = pprTyTcApp ctxt_prec tc tys
 ppr_ty ctxt_prec (IfaceTupleTy i p tys) = pprTuple ctxt_prec i p tys
 ppr_ty _         (IfaceLitTy n)         = pprIfaceTyLit n
@@ -1034,7 +1034,7 @@ as they appear during kind-checking of "newtype T :: TYPE r where..."
 -- @
 -- ($) :: forall (r :: GHC.Types.RuntimeRep) a (b :: TYPE r).
 --        (a -> b) -> a -> b
--- Just :: forall (k :: Multiplicity) a. a # k -> Maybe a
+-- Just :: forall (k :: Multiplicity) a. a % k -> Maybe a
 -- @
 --
 -- turns in to,
@@ -1722,7 +1722,7 @@ ppr_co ctxt_prec co@(IfaceForAllCo {})
       = let (tvs, co'') = split_co co' in ((name,kind_co):tvs,co'')
     split_co co' = ([], co')
 
--- Why these three? See Note [TcTyVars in IfaceType]
+-- Why these three? See Note [Free tyvars in IfaceType]
 ppr_co _ (IfaceFreeCoVar covar) = ppr covar
 ppr_co _ (IfaceCoVarCo covar)   = ppr covar
 ppr_co _ (IfaceHoleCo covar)    = braces (ppr covar)

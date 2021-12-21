@@ -2003,7 +2003,7 @@ Consider (#14270) a call like
     in ... f (K @(a |> co)) ...
 
 where 'co' is a coercion variable not in scope at f's definition site.
-If we aren't caereful we'll get
+If we aren't careful we'll get
 
     let $sf a co = e (K @(a |> co))
         RULE "SC:f" forall a co.  f (K @(a |> co)) = $sf a co

@@ -1410,7 +1410,7 @@ this case
 Here x contains an invalid shift and consequently we would like to rewrite it
 as follows:
 
-    let x = I# (error "invalid shift)
+    let x = I# (error "invalid shift")
     in ...
 
 This was originally done in the fix to #16449 but this breaks the let/app
@@ -3305,7 +3305,7 @@ Instead, we deal with turning one branch into DEFAULT in GHC.Core.Opt.Simplify.U
 
 Note [caseRules for dataToTag]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-See also Note [dataToTag#] in primpops.txt.pp
+See also Note [dataToTag#] in primops.txt.pp
 
 We want to transform
   case dataToTag x of

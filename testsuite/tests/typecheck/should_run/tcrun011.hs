@@ -1,7 +1,7 @@
 {-# LANGUAGE ExistentialQuantification, FlexibleContexts,
              MultiParamTypeClasses #-}
 
--- !!! Existential data tyes
+-- !!! Existential data types
 -- Hugs didn't like this one
 
 module Main (main) where

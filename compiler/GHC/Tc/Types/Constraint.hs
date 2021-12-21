@@ -1329,7 +1329,7 @@ data Implication
                                  -- hence for all the given evidence variables.
 
       ic_wanted :: WantedConstraints,  -- The wanteds
-                                       -- See Invariang (WantedInf) in GHC.Tc.Utils.TcType
+                                       -- See Invariant (WantedInf) in GHC.Tc.Utils.TcType
 
       ic_binds  :: EvBindsVar,    -- Points to the place to fill in the
                                   -- abstraction and bindings.

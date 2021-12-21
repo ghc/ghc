@@ -132,7 +132,7 @@ also sets :extension:`GADTSyntax` and :extension:`MonoLocalBinds`.
       alternatives must be rigid.
 
    A type is "rigid" if it is completely known to the compiler at its
-   binding site. The easiest way to ensure that a variable a rigid type
+   binding site. The easiest way to ensure that a variable has a rigid type
    is to give it a type signature. For more precise details see `Simple
    unification-based type inference for
    GADTs <https://research.microsoft.com/%7Esimonpj/papers/gadt/>`__. The

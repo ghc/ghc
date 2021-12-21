@@ -55,9 +55,9 @@
 
   This can only work if @wild@ is an unrestricted binder. Indeed, even with the
   extended typing rule (in the linter) for case expressions, if
-       case x of wild # 1 { p -> e}
+       case x of wild % 1 { p -> e}
   is well-typed, then
-       case x of wild # 1 { p -> e[wild\x] }
+       case x of wild % 1 { p -> e[wild\x] }
   is only well-typed if @e[wild\x] = e@ (that is, if @wild@ is not used in @e@
   at all). In which case, it is, of course, pointless to do the substitution
   anyway. So for a linear binder (and really anything which isn't unrestricted),
@@ -1594,7 +1594,7 @@ initialEnv float_lams binds
        , le_env       = emptyVarEnv }
   where
     in_scope_toplvl = emptyInScopeSet `extendInScopeSetList` bindersOfBinds binds
-      -- The Simplifier (see Note [Glomming] in GHC.Core.Opt.Occuranal) and
+      -- The Simplifier (see Note [Glomming] in GHC.Core.Opt.OccurAnal) and
       -- the specialiser (see Note [Top level scope] in GHC.Core.Opt.Specialise)
       -- may both produce top-level bindings where an early binding refers
       -- to a later one.  So here we put all the top-level binders in scope before

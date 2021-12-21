@@ -607,11 +607,11 @@ to generate `(\x -> op x e)`. See Historical
 Note [Desugaring operator sections]
 
 Here are their definitions:
-   leftSection :: forall r1 r2 n (a:TYPE r1) (b:TYPE r2).
+   leftSection :: forall r1 r2 n (a::TYPE r1) (b::TYPE r2).
                   (a %n-> b) -> a %n-> b
    leftSection f x = f x
 
-   rightSection :: forall r1 r2 r3 (a:TYPE r1) (b:TYPE r2) (c:TYPE r3).
+   rightSection :: forall r1 r2 r3 n1 n2 (a::TYPE r1) (b::TYPE r2) (c::TYPE r3).
                    (a %n1 -> b %n2-> c) -> b %n2-> a %n1-> c
    rightSection f y x = f x y
 
@@ -623,13 +623,13 @@ Note the wrinkles:
   Plus, infix operator applications would be trickier to make
   rebindable, so it'd be inconsistent to do so for sections.
 
-  TL;DR: we still us the renamer-expansion mechanism for operator
-  sections , but only to eliminate special-purpose code paths in the
+  TL;DR: we still use the renamer-expansion mechanism for operator
+  sections, but only to eliminate special-purpose code paths in the
   renamer and desugarer.
 
 * leftSection and rightSection must be representation-polymorphic, to allow
-  (+# 4#) and (4# +#) to work. See GHC.Types.Id.Make.
-  Note [Wired-in Ids for rebindable syntax] in
+  (+# 4#) and (4# +#) to work. See
+  Note [Wired-in Ids for rebindable syntax] in GHC.Types.Id.Make.
 
 * leftSection and rightSection must be multiplicity-polymorphic.
   (Test linear/should_compile/OldList showed this up.)
@@ -2159,7 +2159,7 @@ allowed this to be transformed into
 
   (\(x,y) -> \z -> C) <$> A <*> B
 
-then it could be lazier than the standard desuraging using >>=.  See #13875
+then it could be lazier than the standard desugaring using >>=.  See #13875
 for more examples.
 
 Thus, whenever we have a strict pattern match, we treat it as a

@@ -954,7 +954,7 @@ Note [VTA for out-of-scope functions]
 Suppose 'wurble' is not in scope, and we have
    (wurble @Int @Bool True 'x')
 
-Then the renamer will make (HsUnboundVar "wurble) for 'wurble',
+Then the renamer will make (HsUnboundVar "wurble") for 'wurble',
 and the typechecker will typecheck it with tcUnboundId, giving it
 a type 'alpha', and emitting a deferred Hole constraint, to
 be reported later.
@@ -978,7 +978,7 @@ We do /not/ want to fail altogether in this case (via failM) because
 that may abandon an entire instance decl, which (in the presence of
 -fdefer-type-errors) leads to leading to #17792.
 
-Downside; the typechecked term has lost its visible type arguments; we
+Downside: the typechecked term has lost its visible type arguments; we
 don't even kind-check them.  But let's jump that bridge if we come to
 it.  Meanwhile, let's not crash!
 

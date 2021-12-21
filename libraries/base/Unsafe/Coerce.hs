@@ -166,11 +166,11 @@ several ways
 
 (U7) We add a built-in RULE
        unsafeEqualityProof k t t  ==>  UnsafeRefl (Refl t)
-     to simplify the ase when the two tpyes are equal.
+     to simplify the case when the two types are equal.
 
 (U8) The is a super-magic RULE in GHC.base
          map coerce = coerce
-     (see Note [Getting the map/coerce RULE to work] in CoreOpt)
+     (see Note [Getting the map/coerce RULE to work] in GHC.Core.SimpleOpt)
      But it's all about turning coerce into a cast, and unsafeCoerce
      no longer does that.  So we need a separate map/unsafeCoerce
      RULE, in this module.

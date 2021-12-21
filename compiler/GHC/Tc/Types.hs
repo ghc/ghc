@@ -804,7 +804,7 @@ data TcLclEnv           -- Changes as we move inside an expression
             -- The ThBindEnv records the TH binding level of in-scope Names
             -- defined in this module (not imported)
             -- We can't put this info in the TypeEnv because it's needed
-            -- (and extended) in the renamer, for untyed splices
+            -- (and extended) in the renamer, for untyped splices
 
         tcl_arrow_ctxt :: ArrowCtxt,       -- Arrow-notation context
 
@@ -1174,7 +1174,7 @@ data IdBindingInfo -- See Note [Meaning of IdBindingInfo and ClosedTypeId]
 -- | IsGroupClosed describes a group of mutually-recursive bindings
 data IsGroupClosed
   = IsGroupClosed
-      (NameEnv RhsNames)  -- Free var info for the RHS of each binding in the goup
+      (NameEnv RhsNames)  -- Free var info for the RHS of each binding in the group
                           -- Used only for (static e) checks
 
       ClosedTypeId        -- True <=> all the free vars of the group are

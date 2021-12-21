@@ -988,7 +988,7 @@ runMeta' show_code ppr_hs run_and_convert expr
         -- to carry on.  Mind you, the staging restrictions mean we won't
         -- actually run f, but it still seems wrong. And, more concretely,
         -- see #5358 for an example that fell over when trying to
-        -- reify a function with a "?" kind in it.  (These don't occur
+        -- reify a function with an unlifted kind in it.  (These don't occur
         -- in type-correct programs.)
         ; failIfErrsM
 

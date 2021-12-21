@@ -1173,7 +1173,7 @@ data AlgTyConRhs
                              -- Watch out!  If any newtypes become transparent
                              -- again check #1072.
         nt_fixed_rep :: Bool
-                        -- ^ 'True' if the newtype has a know, fixed representation
+                        -- ^ 'True' if the newtype has a known, fixed representation
                         -- when fully applied to its arguments, 'False' otherwise.
                         -- This can only ever be 'False' with UnliftedNewtypes.
                         --

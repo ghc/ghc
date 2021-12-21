@@ -145,7 +145,7 @@ can contain 0, and multiplicities can't.
 Why do we need a 0 usage? A function which doesn't use its argument will be
 required to annotate it with `Many`:
 
-    \(x # Many) -> 0
+    \(x % Many) -> 0
 
 However, we cannot replace absence with Many when computing usages
 compositionally: in
@@ -289,7 +289,7 @@ In future work, instead of approximating we might add type families
 and allow users to write types involving operations on multiplicities.
 In this case, we could enforce more invariants in Mult, for example,
 enforce that it is in the form of a sum of products, and even
-that the sumands and factors are ordered somehow, to have more equalities.
+that the summands and factors are ordered somehow, to have more equalities.
 -}
 
 -- With only two multiplicities One and Many, we can always replace

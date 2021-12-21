@@ -584,7 +584,7 @@ data EvTypeable
     -- given a dictionaries for @s@ and @t@.
 
   | EvTypeableTrFun EvTerm EvTerm EvTerm
-    -- ^ Dictionary for @Typeable (s # w -> t)@,
+    -- ^ Dictionary for @Typeable (s % w -> t)@,
     -- given a dictionaries for @w@, @s@, and @t@.
 
   | EvTypeableTyLit EvTerm
