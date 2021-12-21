@@ -1157,10 +1157,10 @@ impspec :: { Located (Bool, LocatedL [LIE GhcPs]) }
 -----------------------------------------------------------------------------
 -- Fixity Declarations
 
-prec    :: { Located (SourceText,Int) }
-        : {- empty -}           { noLoc (NoSourceText,9) }
+prec    :: { Maybe (Located (SourceText,Int)) }
+        : {- empty -}           { Nothing }
         | INTEGER
-                 { sL1 $1 (getINTEGERs $1,fromInteger (il_value (getINTEGER $1))) }
+                 { Just (sL1 $1 (getINTEGERs $1,fromInteger (il_value (getINTEGER $1)))) }
 
 infix   :: { Located FixityDirection }
         : 'infix'                               { sL1 $1 InfixN  }
@@ -2550,10 +2550,18 @@ sigdecl :: { LHsDecl GhcPs }
                  ; acsA (\cs -> sLL (reLocN $1) (reLoc $>) $ SigD noExtField (sig cs) ) }}
 
         | infix prec ops
-              {% checkPrecP $2 $3 >>
-                 acsA (\cs -> sLL $1 $> $ SigD noExtField
-                        (FixSig (EpAnn (glR $1) [mj AnnInfix $1,mj AnnVal $2] cs) (FixitySig noExtField (fromOL $ unLoc $3)
-                                (Fixity (fst $ unLoc $2) (snd $ unLoc $2) (unLoc $1))))) }
+             {% do { mbPrecAnn <- traverse (\l2 -> do { checkPrecP l2 $3
+                                                      ; pure (mj AnnVal l2) })
+                                       $2
+                   ; let (fixText, fixPrec) = case $2 of
+                                                -- If an explicit precedence isn't supplied,
+                                                -- it defaults to maxPrecedence
+                                                Nothing -> (NoSourceText, maxPrecedence)
+                                                Just l2 -> (fst $ unLoc l2, snd $ unLoc l2)
+                   ; acsA (\cs -> sLL $1 $> $ SigD noExtField
+                            (FixSig (EpAnn (glR $1) (mj AnnInfix $1 : maybeToList mbPrecAnn) cs) (FixitySig noExtField (fromOL $ unLoc $3)
+                                    (Fixity fixText fixPrec (unLoc $1)))))
+                   }}
 
         | pattern_synonym_sig   { sL1 $1 . SigD noExtField . unLoc $ $1 }
 

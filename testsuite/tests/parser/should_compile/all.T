@@ -180,4 +180,5 @@ test('T19521', normal, compile, [''])
 test('T20186', normal, compile, [''])
 test('T20452', normal, compile, [''])
 
-test('DumpSemis',      normal, compile, ['-dsuppress-uniques -ddump-parsed-ast'])
+test('DumpSemis', normal, compile, ['-dsuppress-uniques -ddump-parsed-ast'])
+test('T20846',    normal, compile, ['-dsuppress-uniques -ddump-parsed-ast'])
