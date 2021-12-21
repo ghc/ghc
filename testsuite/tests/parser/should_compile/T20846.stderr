@@ -1,0 +1,155 @@
+
+==================== Parser AST ====================
+
+(L
+ { T20846.hs:1:1 }
+ (HsModule
+  (EpAnn
+   (Anchor
+    { T20846.hs:1:1 }
+    (UnchangedAnchor))
+   (AnnsModule
+    [(AddEpAnn AnnModule (EpaSpan { T20846.hs:1:1-6 }))
+    ,(AddEpAnn AnnWhere (EpaSpan { T20846.hs:1:15-19 }))]
+    (AnnList
+     (Nothing)
+     (Nothing)
+     (Nothing)
+     []
+     []))
+   (EpaCommentsBalanced
+    []
+    [(L
+      (Anchor
+       { T20846.hs:5:1 }
+       (UnchangedAnchor))
+      (EpaComment
+       (EpaEofComment)
+       { T20846.hs:5:1 }))]))
+  (VirtualBraces
+   (1))
+  (Just
+   (L
+    (SrcSpanAnn (EpAnnNotUsed) { T20846.hs:1:8-13 })
+    {ModuleName: T20846}))
+  (Nothing)
+  []
+  [(L
+    (SrcSpanAnn (EpAnn
+                 (Anchor
+                  { T20846.hs:3:1-11 }
+                  (UnchangedAnchor))
+                 (AnnListItem
+                  [])
+                 (EpaComments
+                  [])) { T20846.hs:3:1-11 })
+    (SigD
+     (NoExtField)
+     (FixSig
+      (EpAnn
+       (Anchor
+        { T20846.hs:3:1-6 }
+        (UnchangedAnchor))
+       [(AddEpAnn AnnInfix (EpaSpan { T20846.hs:3:1-6 }))]
+       (EpaComments
+        []))
+      (FixitySig
+       (NoExtField)
+       [(L
+         (SrcSpanAnn (EpAnnNotUsed) { T20846.hs:3:8-11 })
+         (Unqual
+          {OccName: ++++}))]
+       {Fixity: infixr 9}))))
+  ,(L
+    (SrcSpanAnn (EpAnn
+                 (Anchor
+                  { T20846.hs:4:1-18 }
+                  (UnchangedAnchor))
+                 (AnnListItem
+                  [])
+                 (EpaComments
+                  [])) { T20846.hs:4:1-18 })
+    (ValD
+     (NoExtField)
+     (FunBind
+      (NoExtField)
+      (L
+       (SrcSpanAnn (EpAnn
+                    (Anchor
+                     { T20846.hs:4:1-6 }
+                     (UnchangedAnchor))
+                    (NameAnn
+                     (NameParens)
+                     (EpaSpan { T20846.hs:4:1 })
+                     (EpaSpan { T20846.hs:4:2-5 })
+                     (EpaSpan { T20846.hs:4:6 })
+                     [])
+                    (EpaComments
+                     [])) { T20846.hs:4:1-6 })
+       (Unqual
+        {OccName: ++++}))
+      (MG
+       (NoExtField)
+       (L
+        (SrcSpanAnn (EpAnnNotUsed) { T20846.hs:4:1-18 })
+        [(L
+          (SrcSpanAnn (EpAnnNotUsed) { T20846.hs:4:1-18 })
+          (Match
+           (EpAnn
+            (Anchor
+             { T20846.hs:4:1-18 }
+             (UnchangedAnchor))
+            []
+            (EpaComments
+             []))
+           (FunRhs
+            (L
+             (SrcSpanAnn (EpAnn
+                          (Anchor
+                           { T20846.hs:4:1-6 }
+                           (UnchangedAnchor))
+                          (NameAnn
+                           (NameParens)
+                           (EpaSpan { T20846.hs:4:1 })
+                           (EpaSpan { T20846.hs:4:2-5 })
+                           (EpaSpan { T20846.hs:4:6 })
+                           [])
+                          (EpaComments
+                           [])) { T20846.hs:4:1-6 })
+             (Unqual
+              {OccName: ++++}))
+            (Prefix)
+            (NoSrcStrict))
+           []
+           (GRHSs
+            (EpaComments
+             [])
+            [(L
+              (SrcSpanAnn
+               (EpAnnNotUsed)
+               { T20846.hs:4:8-18 })
+              (GRHS
+               (EpAnn
+                (Anchor
+                 { T20846.hs:4:8-18 }
+                 (UnchangedAnchor))
+                (GrhsAnn
+                 (Nothing)
+                 (AddEpAnn AnnEqual (EpaSpan { T20846.hs:4:8 })))
+                (EpaComments
+                 []))
+               []
+               (L
+                (SrcSpanAnn (EpAnnNotUsed) { T20846.hs:4:10-18 })
+                (HsVar
+                 (NoExtField)
+                 (L
+                  (SrcSpanAnn (EpAnnNotUsed) { T20846.hs:4:10-18 })
+                  (Unqual
+                   {OccName: undefined}))))))]
+            (EmptyLocalBinds
+             (NoExtField)))))])
+       (FromSource))
+      [])))]
+  (Nothing)
+  (Nothing)))
