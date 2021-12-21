@@ -432,9 +432,9 @@ def baseline_metric(commit: GitHash,
     assert is_commit_hash(commit)
 
     # Get all recent commit hashes.
-    commit_hashes = baseline_commit_log(commit)
+    commit_hashes = baseline_commit_log(commit_hash(baseline_ref) if baseline_ref else commit)
 
-    baseline_commit = commit_hash(baseline_ref) if baseline_ref else None
+    baseline_commit = None
 
     def has_expected_change(commit: GitHash) -> bool:
         return get_allowed_perf_changes(commit).get(name) is not None
@@ -450,7 +450,8 @@ def baseline_metric(commit: GitHash,
             else:
                 return None
 
-        for depth, current_commit in list(enumerate(commit_hashes))[1:]:
+        for depth, current_commit in list(enumerate(commit_hashes)):
+            if current_commit == commit: continue
             # Check for a metric on this commit.
             current_metric = get_commit_metric(namespace, current_commit, test_env, name, metric, way)
             if current_metric is not None:
