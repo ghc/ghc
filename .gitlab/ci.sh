@@ -449,7 +449,7 @@ function push_perf_notes() {
 # Figure out which commit should be used by the testsuite driver as a
 # performance baseline. See Note [The CI Story].
 function determine_metric_baseline() {
-  if [ -n "${CI_MERGE_REQUEST_DIFF_BASE_SHA}:-}" ]; then
+  if [ -n "${CI_MERGE_REQUEST_DIFF_BASE_SHA:-}" ]; then
     PERF_BASELINE_COMMIT="$CI_MERGE_REQUEST_DIFF_BASE_SHA"
     export PERF_BASELINE_COMMIT
     info "Using $PERF_BASELINE_COMMIT for performance metric baseline..."
