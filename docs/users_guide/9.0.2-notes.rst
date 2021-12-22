@@ -1,0 +1,265 @@
+.. _release-9-0-2:
+
+Version 9.0.2
+==============
+
+The significant changes to the various parts of the compiler are listed in the
+following sections.
+
+The :ghc-flag:`LLVM backend <-fllvm>` of this release is to be used with LLVM versions 9
+through 12.
+
+Highlights
+----------
+
+- First-class support for Apple M1 hardware using GHC's LLVM ARM backend.
+
+- Fixes for a number of critical compiler and runtime system correctness bugs.
+
+- Improved compiler performance and memory usage.
+
+General bug fixes
+-----------------
+
+- Fix incorrect rewrite rules for ``fromInteger`` resulting in incorrect code
+  when compiling with optimisations (:ghc-ticket:`19345`, :ghc-ticket:`20066`).
+
+- Unify primary and secondary GHCi prompts (:ghc-ticket:`20042`).
+
+- Warn if Unicode Bidirectional Formatting characters are found in the source,
+  possibly misleading code reviewers (:ghc-ticket:`20263`).
+
+- Fix a memory leak in the simplifier, leading to the consumption of more memory
+  on each iteration (:ghc-ticket:`20134`).
+
+- Reduce memory usage in ``--make`` mode (:ghc-ticket:`13586`).
+
+- Fix a long standing bug in constraint solving which lead to incorrect build
+  failures (:ghc-ticket:`19315`).
+
+- Fix a a bug affecting the demand analyser which lead to runtime crashes when
+  compiling with optimisation (:ghc-ticket:`18638`).
+
+- Fix a bug where code may be unloaded prematurely when using the parallel
+  garbage collector (see :ghc-ticket:`19417`).
+
+- Fix a long standing GHC API bug affecting clients like HLS where async
+  exceptions used to cancel threads during typechecking would be caught by the
+  Template Haskell evaluator and reported as compile errors (:ghc-ticket:`19410`).
+
+- Fix an inconsistency in the way GHC calls typechecker plugins where slightly
+  different typechecker environment would be made available as an argument as
+  compared to the monadic environment (see :ghc-ticket:`19191`).
+
+- Greatly improve performance and memory usage while compiling modules with many
+  partial type signatures and ``-Wno-partial-type-signatures``
+
+- Fix a bug where the linker may during shutdown unload code before
+  libraries' ``atexit`` handlers have a chance to run (:ghc-ticket:`19297`).
+
+- Improvements to code generation (:ghc-ticket:`19581`).
+
+- Fix a bug where levity monomorphic programs would be incorrectly rejected
+  (:ghc-ticket:`19522`).
+
+- Fix a typechecker bug which lead to an assertion failure while compiling
+  certain programs with ``-XLinearTypes`` (:ghc-ticket:`19400`).
+
+- Fix some RTS statistic calculations when using more than one thread with the
+  parallel GC (:ghc-ticket:`19147`).
+
+- Fix a bug where an imported ``main`` function would not be recognised
+  (:ghc-ticket:`19397`).
+
+- Fix a bug where unboxed objects would be entered, leading to runtime crashes
+  (:ghc-ticket:`19645`).
+
+- Fix a regression causing compiler panics during the STG conversion
+  (:ghc-ticket:`19700`).
+
+- Disallow ``-XDerivingVia`` when ``-XSafe`` is on (:ghc-ticket:`19786`).
+
+- Fix a bug where using ``magicDict`` in GHCi would lead to a crash
+  (:ghc-ticket:`19667`).
+
+- Fix a bug with the constructed product result (CPR) analysis involving usages
+  of ``runRW#`` (:ghc-ticket:`19822`).
+
+- Fix a compiler performance issue causing exponential blowup during
+  zonking/typechecking (:ghc-ticket:`19668`).
+
+- Improve sharing of join points (:ghc-ticket:`19996`).
+
+- Fix a compiler panic involving used existential type variables
+  (:ghc-ticket:`19849`).
+
+- Avoid including the path source file in the interface fingerprint, allowing
+  interface files to be more portable (:ghc-ticket:`16956`).
+
+- Fix some timer races in the RTS possibly manifesting in :ghc-ticket:`18033` and
+  :ghc-ticket:`20132`.
+
+- Fix a crash on the non-moving GC due to incorrect logic for calculating the header
+  size for array write barries (:ghc-ticket:`19715`).
+
+- Fix a bug with the decoding of strings involving the null byte in the
+  optimiser (:ghc-ticket:`19976`).
+
+- Fix a bug with the parser leading to the incorrect rejection of programs
+  mixing infix operators and ``-XLexicalNegation`` (:ghc-ticket:`19838`).
+
+- Export more functions from ``GHC.Tc.Errors.Hole`` for use by plugin authors
+  (:ghc-ticket:`19864`).
+
+- Fix a bug in ``base`` leading to a high likelihood of space leaks when using
+  lazy bytestrings. (:ghc-ticket:`20107`).
+
+- Fix some memory ordering issues manifesting on aarch64-darwin due to an RTS
+  bug (:ghc-ticket:`20093`).
+
+- Fix a bug leading to typechecker errors being discarded inside splices
+  (:ghc-ticket:`20179`, :ghc-ticket:`19470`).
+
+- Fix some spurious warnings arising from the interaction between
+  ``-Wunused-packages`` and reexported modules (:ghc-ticket:`19518`,
+  :ghc-ticket:`19777`, :ghc-ticket:`20242`).
+
+- Fix an RTS bug causing ``allocateExec`` to fail with certain versions of
+  ``libffi`` (:ghc-ticket:`20051`).
+
+- Fix an RTS bug resulting a crash ``m32_allocator_init: Failed to map``
+  (:ghc-ticket:`19421`).
+
+- Stop leaking defunct llc processes (:ghc-ticket:`20305`).
+
+- Fix an bug with the non moving GC leading to crashes due to missing write
+  barriers (:ghc-ticket:`20399`, :ghc-ticket:`20414`).
+
+- Improve code generator performance by elminating a few thunks
+  (:ghc-ticket:`19471`).
+
+- Fix a memory leak when using GHCi with ``-fno-code`` (:ghc-ticket:`20509`).
+
+- Fix a bug in the RTS linker where ``mmapForLinkerMarkExecutable`` could be
+  called with a zero-length argument, leading to undefined behaviouar
+  (:ghc-ticket:`20648`).
+
+- Fix a bug with the GC resulting in object code being prematurely collected
+  object code leading to runtime crashes (:ghc-ticket:`20649`).
+
+- `GHC.Event.Manager`: Don't use one-shot kqueue on macOS. This reverts a
+  commit that removed the workaround for a bug (:ghc-ticket:`7651`) in the OSX
+  implementation of kqueue. It turns out the bug still affects modern macOS
+  versions, so we keep the workaround for now. (:ghc-ticket:`20662`).
+
+- Check the buffer size before calling the continuation in withEncodedCString
+  (:ghc-ticket:`20107`).
+
+- Pass -DLIBICONV_PLUG when building base library on FreeBSD (:ghc-ticket:`19958`).
+
+- Make unsafeDupablePerformIO have a lazy demand (:ghc-ticket:`19181`).
+
+- Fix accidental unsoundness in ``Data.Typeable.Internal.mkTypeLitFromString``
+  (:ghc-ticket:`19288`).
+
+Packaging fixes
+-----------------
+
+- Fix packaging of Windows extra tarballs (:ghc-ticket:`19316`).
+
+- Fix Windows build with autoconf >= 2.7.0 (:ghc-ticket:`19189`).
+
+- Fix make build system reading the ghc user package environment (:ghc-ticket:`18988`).
+
+- Fix leakage of GHC in PATH into build artifacts (:ghc-ticket:`19485`).
+
+- Include hyperlinked sources in released haddock documentation (:ghc-ticket:`19455`).
+
+- Don't include ``configure`` scripts in windows bindist. (:ghc-ticket:`19868`).
+
+- Always create both versioned and unversioned executables with the hadrian bindist. 
+  (:ghc-ticket:`20074`).
+
+- Give ``ghc-pkg`` the same version as ``ghc`` (:ghc-ticket:`20087`).
+
+- Bump process submodule to 1.6.13.2 , fixing a number of correctness bugs on
+  AArch64 Darwin backends (:ghc-ticket:`19994`).
+
+- Fix the location of haddock files in the installed pkgconfs (:ghc-ticket:`20427`).
+
+Portability fixes
+-----------------
+
+- Fix an issue making GHC unable to build on FreeBSD due to an undefined reference
+  to ``libiconv``. (:ghc-ticket:`19958`).
+
+- Match the C calling convention on platforms like s390x by sign/zero extending
+  parameters for foreign calls. (:ghc-ticket:`19023`).
+
+- Fix an issue resulting in build failures on certains platforms due to
+  conflicting types for ``environ`` (:ghc-ticket:`20512`).
+
+- Fix ``xxHash`` duplicate symbol errors on FreeBSD. (:ghc-ticket:`19948`).
+
+- Properly honour :ghc-flag:`-fno-use-rpaths` on darwin. (:ghc-ticket:`20004`).
+
+- Fix an issue causing libraries like ``network`` to fail building due to
+  incorrect linker paths. (:ghc-ticket:`19968`).
+
+- Fix a linking portability issue on macOS that resulted in undefined symbol
+  errors for ``___darwin_check_fd_set_overflow`` (:ghc-ticket:`19950`).
+
+- PowerPC: fix unsigned compare with 16-bit constants (:ghc-ticket:`19852`,
+  :ghc-ticket:`19609`)
+
+- Fix "undefined reference to libiconv" errors when compiling on FreeBSD
+  (:ghc-ticket:`19958`)
+
+- Allow the RTS to be compiled with a C++ compiler (:ghc-ticket:`20394`)
+
+- Don't rely on ``realpath`` in the binary distribution makefile
+  (:ghc-ticket:`19963`)
+
+Included libraries
+------------------
+
+The package database provided with this distribution also contains a number of
+packages other than GHC itself. See the changelogs provided with these packages
+for further change information.
+
+.. ghc-package-list::
+
+    libraries/array/array.cabal:             Dependency of ``ghc`` library
+    libraries/base/base.cabal:               Core library
+    libraries/binary/binary.cabal:           Dependency of ``ghc`` library
+    libraries/bytestring/bytestring.cabal:   Dependency of ``ghc`` library
+    libraries/Cabal/Cabal/Cabal.cabal:       Dependency of ``ghc-pkg`` utility
+    libraries/containers/containers/containers.cabal:   Dependency of ``ghc`` library
+    libraries/deepseq/deepseq.cabal:         Dependency of ``ghc`` library
+    libraries/directory/directory.cabal:     Dependency of ``ghc`` library
+    libraries/exceptions/exceptions.cabal:   Dependency of ``ghc`` and ``haskeline`` library
+    libraries/filepath/filepath.cabal:       Dependency of ``ghc`` library
+    compiler/ghc.cabal:                      The compiler itself
+    libraries/ghci/ghci.cabal:               The REPL interface
+    libraries/ghc-boot/ghc-boot.cabal:       Internal compiler library
+    libraries/ghc-boot-th/ghc-boot-th.cabal: Internal compiler library
+    libraries/ghc-compact/ghc-compact.cabal: Core library
+    libraries/ghc-heap/ghc-heap.cabal:       GHC heap-walking library
+    libraries/ghc-prim/ghc-prim.cabal:       Core library
+    libraries/haskeline/haskeline.cabal:     Dependency of ``ghci`` executable
+    libraries/hpc/hpc.cabal:                 Dependency of ``hpc`` executable
+    libraries/integer-gmp/integer-gmp.cabal: Core library
+    libraries/libiserv/libiserv.cabal:       Internal compiler library
+    libraries/mtl/mtl.cabal:                 Dependency of ``Cabal`` library
+    libraries/parsec/parsec.cabal:           Dependency of ``Cabal`` library
+    libraries/pretty/pretty.cabal:           Dependency of ``ghc`` library
+    libraries/process/process.cabal:         Dependency of ``ghc`` library
+    libraries/stm/stm.cabal:                 Dependency of ``haskeline`` library
+    libraries/template-haskell/template-haskell.cabal:     Core library
+    libraries/terminfo/terminfo.cabal:       Dependency of ``haskeline`` library
+    libraries/text/text.cabal:               Dependency of ``Cabal`` library
+    libraries/time/time.cabal:               Dependency of ``ghc`` library
+    libraries/transformers/transformers.cabal: Dependency of ``ghc`` library
+    libraries/unix/unix.cabal:               Dependency of ``ghc`` library
+    libraries/Win32/Win32.cabal:             Dependency of ``ghc`` library
+    libraries/xhtml/xhtml.cabal:             Dependency of ``haddock`` executable
