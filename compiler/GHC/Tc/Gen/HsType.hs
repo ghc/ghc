@@ -636,7 +636,7 @@ tcHsDeriv hs_ty
 tcDerivStrategy ::
      Maybe (LDerivStrategy GhcRn)
      -- ^ The deriving strategy
-  -> TcM (Maybe (LDerivStrategy GhcTc), [TyVar])
+  -> TcM (Maybe (LDerivStrategy GhcTc), Maybe ([TyVar], Type))
      -- ^ The typechecked deriving strategy and the tyvars that it binds
      -- (if using 'ViaStrategy').
 tcDerivStrategy mb_lds
@@ -648,7 +648,7 @@ tcDerivStrategy mb_lds
           pure (Just (L loc ds'), tvs)
   where
     tc_deriv_strategy :: DerivStrategy GhcRn
-                      -> TcM (DerivStrategy GhcTc, [TyVar])
+                      -> TcM (DerivStrategy GhcTc, Maybe ([TyVar], Type))
     tc_deriv_strategy (StockStrategy    _)
                                      = boring_case (StockStrategy noExtField)
     tc_deriv_strategy (AnyclassStrategy _)
@@ -658,10 +658,10 @@ tcDerivStrategy mb_lds
     tc_deriv_strategy (ViaStrategy ty) = do
       ty' <- checkNoErrs $ tcTopLHsType DerivClauseCtxt ty
       let (via_tvs, via_pred) = splitForAllTyCoVars ty'
-      pure (ViaStrategy via_pred, via_tvs)
+      pure (ViaStrategy via_pred, Just (via_tvs, via_pred))
 
-    boring_case :: ds -> TcM (ds, [TyVar])
-    boring_case ds = pure (ds, [])
+    boring_case :: ds -> TcM (ds, Maybe a)
+    boring_case ds = pure (ds, Nothing)
 
 tcHsClsInstType :: UserTypeCtxt    -- InstDeclCtxt or SpecInstCtxt
                 -> LHsSigType GhcRn

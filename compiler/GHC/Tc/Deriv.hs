@@ -439,6 +439,7 @@ makeDerivSpecs :: [DerivInfo]
                -> TcM [EarlyDerivSpec]
 makeDerivSpecs deriv_infos deriv_decls
   = do  { eqns1 <- sequenceA
+                      -- MP: scoped_tvs here magically converts TyVar into TcTyVar
                      [ deriveClause rep_tc scoped_tvs dcs (deriv_clause_preds dct) err_ctxt
                      | DerivInfo { di_rep_tc = rep_tc
                                  , di_scoped_tvs = scoped_tvs
@@ -473,8 +474,16 @@ deriveClause rep_tc scoped_tvs mb_lderiv_strat deriv_preds err_ctxt
         , text "tys"             <+> ppr tys
         , text "mb_lderiv_strat" <+> ppr mb_lderiv_strat ]
       tcExtendNameTyVarEnv scoped_tvs $ do
-        (mb_lderiv_strat', via_tvs) <- tcDerivStrategy mb_lderiv_strat
-        tcExtendTyVarEnv unkSkol via_tvs $
+        (mb_lderiv_strat', mvia_tvs) <- tcDerivStrategy mb_lderiv_strat
+
+        (extend_by, via_tvs) <- case mvia_tvs of
+                                  Just (tvs, ty) -> do
+                                    skol_info <- mkSkolemInfo (DerivSkol ty)
+                                    return $ (tcExtendTyVarEnv skol_info tvs, tvs)
+                                  Nothing -> return (id, [])
+
+        pprTraceM "via_tvs" (ppr via_tvs)
+        extend_by $
         -- Moreover, when using DerivingVia one can bind type variables in
         -- the `via` type as well, so these type variables must also be
         -- brought into scope.
@@ -632,9 +641,15 @@ deriveStandalone (L loc (DerivDecl _ deriv_ty mb_lderiv_strat overlap_mode))
        ; let ctxt = GHC.Tc.Types.Origin.InstDeclCtxt True
        ; traceTc "Deriving strategy (standalone deriving)" $
            vcat [ppr mb_lderiv_strat, ppr deriv_ty]
-       ; (mb_lderiv_strat, via_tvs) <- tcDerivStrategy mb_lderiv_strat
+       ; (mb_lderiv_strat, mvia_tvs) <- tcDerivStrategy mb_lderiv_strat
+       ; (extend_by, via_tvs) <- case mvia_tvs of
+                                  Just (tvs, ty) -> do
+                                    skol_info <- mkSkolemInfo (DerivSkol ty)
+                                    return $ (tcExtendTyVarEnv skol_info tvs, tvs)
+                                  Nothing -> return (id, [])
+       -- MP: Issue here because we don't yet have the Type to put in this hole
        ; (cls_tvs, deriv_ctxt, cls, inst_tys)
-           <- tcExtendTyVarEnv unkSkol via_tvs $
+           <- extend_by $
               tcStandaloneDerivInstType ctxt deriv_ty
        ; let mb_deriv_strat = fmap unLoc mb_lderiv_strat
              tvs            = via_tvs ++ cls_tvs

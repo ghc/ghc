@@ -133,7 +133,7 @@ import GHC.Types.Error
 import qualified GHC.LanguageExtensions as LangExt
 
 import Data.IORef
-import Data.List (intercalate)
+import Data.List (intercalate, mapAccumL)
 import Control.Monad
 import GHC.Driver.Env.KnotVars
 
@@ -536,9 +536,11 @@ tcExtendKindEnv extra_env thing_inside
 -- Scoped type and kind variables
 tcExtendTyVarEnv :: SkolemInfo -> [TyVar] -> TcM r -> TcM r
 tcExtendTyVarEnv skol_info tvs thing_inside
-  = tcExtendNameTyVarEnv (map go tvs) thing_inside
+  = tcExtendNameTyVarEnv (snd $ mapAccumL go emptyTCvSubst tvs) thing_inside
     where
-      go tv = (tyVarName tv, mkTcTyVar (tyVarName tv) (tyVarKind tv) (vanillaSkolemTv skol_info))
+      go subst tv =
+        let tv' = mkTcTyVar (tyVarName tv) (substTy subst (tyVarKind tv)) (vanillaSkolemTv skol_info)
+        in (extendTvSubst subst tv (mkTyVarTy tv'),  (tyVarName tv, tv'))
 
 tcExtendNameTyVarEnv :: [(Name,TcTyVar)] -> TcM r -> TcM r
 tcExtendNameTyVarEnv binds thing_inside
