@@ -551,7 +551,7 @@ searchPackageId pkgstate pid = filter ((pid ==) . unitPackageId)
 resolvePackageImport :: UnitState -> ModuleName -> PackageName -> Maybe UnitId
 resolvePackageImport unit_st mn pn = do
   -- 1. Find all modules providing the ModuleName (this accounts for visibility/thinning etc)
-  providers <- Map.lookup mn (moduleNameProvidersMap unit_st)
+  providers <- Map.filter originVisible <$> Map.lookup mn (moduleNameProvidersMap unit_st)
   -- 2. Get the UnitIds of the candidates
   let candidates_uid = map (toUnitId . moduleUnit) $ Map.keys providers
   -- 3. Get the package names of the candidates

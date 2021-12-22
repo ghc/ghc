@@ -22,6 +22,13 @@ package-imports-20779:
 	(cd q-2; $(SETUP) copy)
 	(cd q-2; $(SETUP) register)
 
+	# build q3
+	rm -rf q-3/dist
+	(cd q-3; $(CONFIGURE) --ipid "q-3")
+	(cd q-3; $(SETUP) build)
+	(cd q-3; $(SETUP) copy)
+	(cd q-3; $(SETUP) register)
+
 	# build p
 	rm -rf p/dist
 	(cd p; $(CONFIGURE) --ipid "p-1")
