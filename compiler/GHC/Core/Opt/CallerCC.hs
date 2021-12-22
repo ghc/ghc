@@ -79,12 +79,13 @@ doExpr env e@(Var v)
         ccName :: CcName
         ccName = mkFastString $ showSDoc (dflags env) nameDoc
     ccIdx <- getCCIndex' ccName
-    let span = case revParents env of
+    let count = gopt Opt_ProfCountEntries (dflags env)
+        span = case revParents env of
           top:_ -> nameSrcSpan $ varName top
           _     -> noSrcSpan
         cc = NormalCC (ExprCC ccIdx) ccName (thisModule env) span
         tick :: CoreTickish
-        tick = ProfNote cc True True
+        tick = ProfNote cc count True
     pure $ Tick tick e
   | otherwise = pure e
 doExpr _env e@(Lit _)       = pure e
