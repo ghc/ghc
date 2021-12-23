@@ -158,13 +158,12 @@ instance Binary BinData where
 
 dataHandle :: BinData -> IO BinHandle
 dataHandle (BinData size bin) = do
-  ixr <- newFastMutInt 0
-  szr <- newFastMutInt size
+  ints <- newFastMutInt2 0 size
   binr <- newIORef bin
-  return (BinMem noUserData ixr szr binr)
+  return (BinMem noUserData ints binr)
 
 handleData :: BinHandle -> IO BinData
-handleData (BinMem _ ixr _ binr) = BinData <$> readFastMutInt ixr <*> readIORef binr
+handleData h@(BinMem _ _ binr) = BinData <$> getBinIndex h <*> readIORef binr
 
 ---------------------------------------------------------------
 -- BinHandle
@@ -173,8 +172,7 @@ handleData (BinMem _ ixr _ binr) = BinData <$> readFastMutInt ixr <*> readIORef 
 data BinHandle
   = BinMem {                     -- binary data stored in an unboxed array
      bh_usr :: UserData,         -- sigh, need parameterized modules :-)
-     _off_r :: !FastMutInt,      -- the current offset
-     _sz_r  :: !FastMutInt,      -- size of the array (cached)
+     _ints  :: !FastMutInt2,     -- the current offset and size of the array (cached)
      _arr_r :: !(IORef BinArray) -- the array (bounds: (0,size-1))
     }
         -- XXX: should really store a "high water mark" for dumping out
@@ -186,11 +184,23 @@ getUserData bh = bh_usr bh
 setUserData :: BinHandle -> UserData -> BinHandle
 setUserData bh us = bh { bh_usr = us }
 
+getBinIndex :: BinHandle -> IO Int
+getBinIndex (BinMem _ ints _) = readFastMutInt ints
+
+putBinIndex :: BinHandle -> Int -> IO ()
+putBinIndex (BinMem _ ints _) x = writeFastMutInt ints x
+
+getArraySize :: BinHandle -> IO Int
+getArraySize (BinMem _ ints _) = readFastMutInt2 ints
+
+putArraySize :: BinHandle -> Int -> IO ()
+putArraySize (BinMem _ ints _) x = writeFastMutInt2 ints x
+
 -- | Get access to the underlying buffer.
 withBinBuffer :: BinHandle -> (ByteString -> IO a) -> IO a
-withBinBuffer (BinMem _ ix_r _ arr_r) action = do
+withBinBuffer h@(BinMem _ _ arr_r) action = do
   arr <- readIORef arr_r
-  ix <- readFastMutInt ix_r
+  ix <- getBinIndex h
   action $ BS.fromForeignPtr arr 0 ix
 
 unsafeUnpackBinBuffer :: ByteString -> IO BinHandle
@@ -239,19 +249,18 @@ openBinMem size
  | otherwise = do
    arr <- mallocForeignPtrBytes size
    arr_r <- newIORef arr
-   ix_r <- newFastMutInt 0
-   sz_r <- newFastMutInt size
-   return (BinMem noUserData ix_r sz_r arr_r)
+   ints <- newFastMutInt2 0 size
+   return (BinMem noUserData ints arr_r)
 
 tellBin :: BinHandle -> IO (Bin a)
-tellBin (BinMem _ r _ _) = do ix <- readFastMutInt r; return (BinPtr ix)
+tellBin h = BinPtr <$> getBinIndex h
 
 seekBin :: BinHandle -> Bin a -> IO ()
-seekBin h@(BinMem _ ix_r sz_r _) (BinPtr !p) = do
-  sz <- readFastMutInt sz_r
+seekBin h (BinPtr !p) = do
+  sz <- getArraySize h
   if (p >= sz)
-        then do expandBin h p; writeFastMutInt ix_r p
-        else writeFastMutInt ix_r p
+        then do expandBin h p; putBinIndex h p
+        else putBinIndex h p
 
 -- | SeekBin but without calling expandBin
 seekBinNoExpand :: BinHandle -> Bin a -> IO ()
@@ -262,10 +271,10 @@ seekBinNoExpand (BinMem _ ix_r sz_r _) (BinPtr !p) = do
         else writeFastMutInt ix_r p
 
 writeBinMem :: BinHandle -> FilePath -> IO ()
-writeBinMem (BinMem _ ix_r _ arr_r) fn = do
+writeBinMem bh@(BinMem _ _ arr_r) fn = do
   h <- openBinaryFile fn WriteMode
   arr <- readIORef arr_r
-  ix  <- readFastMutInt ix_r
+  ix  <- getBinIndex bh
   unsafeWithForeignPtr arr $ \p -> hPutBuf h p ix
   hClose h
 
@@ -292,21 +301,20 @@ readBinMem_ filesize h = do
   when (count /= filesize) $
        error ("Binary.readBinMem: only read " ++ show count ++ " bytes")
   arr_r <- newIORef arr
-  ix_r <- newFastMutInt 0
-  sz_r <- newFastMutInt filesize
-  return (BinMem noUserData ix_r sz_r arr_r)
+  ints <- newFastMutInt2 0 filesize
+  return (BinMem noUserData ints arr_r)
 
 -- expand the size of the array to include a specified offset
 expandBin :: BinHandle -> Int -> IO ()
-expandBin (BinMem _ _ sz_r arr_r) !off = do
-   !sz <- readFastMutInt sz_r
+expandBin h@(BinMem _ _ arr_r) !off = do
+   !sz <- getArraySize h
    let !sz' = getSize sz
    arr <- readIORef arr_r
    arr' <- mallocForeignPtrBytes sz'
    withForeignPtr arr $ \old ->
      withForeignPtr arr' $ \new ->
        copyBytes new old sz
-   writeFastMutInt sz_r sz'
+   putArraySize h sz'
    writeIORef arr_r arr'
    where
     getSize :: Int -> Int
@@ -357,14 +365,14 @@ foldGet' n bh init_b f = go 0 init_b
 --   After the action has run advance the index to the buffer
 --   by size bytes.
 putPrim :: BinHandle -> Int -> (Ptr Word8 -> IO ()) -> IO ()
-putPrim h@(BinMem _ ix_r sz_r arr_r) size f = do
-  ix <- readFastMutInt ix_r
-  sz <- readFastMutInt sz_r
+putPrim h@(BinMem _ _ arr_r) size f = do
+  ix <- getBinIndex h
+  sz <- getArraySize h
   when (ix + size > sz) $
     expandBin h (ix + size)
   arr <- readIORef arr_r
   unsafeWithForeignPtr arr $ \op -> f (op `plusPtr` ix)
-  writeFastMutInt ix_r (ix + size)
+  putBinIndex h (ix + size)
 
 -- -- | Similar to putPrim but advances the index by the actual number of
 -- -- bytes written.
@@ -379,16 +387,16 @@ putPrim h@(BinMem _ ix_r sz_r arr_r) size f = do
 --   writeFastMutInt ix_r (ix + written)
 
 getPrim :: BinHandle -> Int -> (Ptr Word8 -> IO a) -> IO a
-getPrim (BinMem _ ix_r sz_r arr_r) size f = do
-  ix <- readFastMutInt ix_r
-  sz <- readFastMutInt sz_r
+getPrim h@(BinMem _ _ arr_r) size f = do
+  ix <- getBinIndex h
+  sz <- getArraySize h
   when (ix + size > sz) $
       ioError (mkIOError eofErrorType "Data.Binary.getPrim" Nothing Nothing)
   arr <- readIORef arr_r
   w <- unsafeWithForeignPtr arr $ \p -> f (p `plusPtr` ix)
     -- This is safe WRT #17760 as we we guarantee that the above line doesn't
     -- diverge
-  writeFastMutInt ix_r (ix + size)
+  putBinIndex h (ix + size)
   return w
 
 putWord8 :: BinHandle -> Word8 -> IO ()
@@ -1027,10 +1035,11 @@ lazyGet bh = do
     p <- get bh -- a BinPtr
     p_a <- tellBin bh
     a <- unsafeInterleaveIO $ do
-        -- NB: Use a fresh off_r variable in the child thread, for thread
+        -- NB: Use a fresh offset variable in the child thread, for thread
         -- safety.
-        off_r <- newFastMutInt 0
-        getAt bh { _off_r = off_r } p_a
+        sz <- getArraySize bh
+        ints' <- newFastMutInt2 0 sz
+        getAt bh { _ints = ints' } p_a
     seekBin bh p -- skip over the object for now
     return a
 
