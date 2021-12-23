@@ -801,6 +801,7 @@ for example).
     :shortdesc: Set the rpath based on -L flags
     :type: dynamic
     :category: linking
+    :reverse: -fno-use-rpaths
 
     This flag is enabled by default and will set the rpath of the linked
     object to the library directories of dependent packages.
