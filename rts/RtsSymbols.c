@@ -33,10 +33,17 @@
 #include <elf.h> /* _DYNAMIC */
 #endif
 
+#if defined(HAVE_UNISTD_H)
+#include <unistd.h> /* environ */
+#endif
+
+#if !HAVE_DECL_ENVIRON
 /* We must provide a prototype for environ since depending upon the libc
- * version it may or may not be provided by unistd.h. See #20577.
+ * version it may or may not be provided by unistd.h. See #20577 and #20861.
  */
 extern char **environ;
+#endif
+
 
 /* -----------------------------------------------------------------------------
  * Symbols to be inserted into the RTS symbol table.
