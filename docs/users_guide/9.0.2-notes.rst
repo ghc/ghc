@@ -187,6 +187,20 @@ Packaging fixes
 
 - Fix the location of haddock files in the installed pkgconfs (:ghc-ticket:`20427`).
 
+- Bump ``process`` to 1.6.13.2
+
+- Bump ``terminfo`` to 0.4.1.5
+
+- Bump ``base`` to 4.15.1.0
+
+- Bump ``Win32`` to  2.10.1.1
+
+- Bump ``haskeline`` to 0.8.2
+
+- Bump ``ghc-bignum`` to 1.1
+
+- Bump ``haddock`` to 2.25.1
+
 Portability fixes
 -----------------
 
@@ -219,6 +233,8 @@ Portability fixes
 
 - Don't rely on ``realpath`` in the binary distribution makefile
   (:ghc-ticket:`19963`)
+
+- Fix "conflicting types for ‘environ’" error with certian glibc versions (:ghc-ticket:`20512`, :ghc-ticket:`20577`)
 
 Included libraries
 ------------------
