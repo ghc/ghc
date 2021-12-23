@@ -633,8 +633,8 @@ if [ "${CI_COMMIT_BRANCH:-}" == "master" ] &&  [ "${CI_PROJECT_PATH:-}" == "ghc/
     echo "Ignoring perf failures"
   fi
 fi
-if [ -n "${IGNORE_PERF_FAILURES:-}" ]; then
-  RUNTEST_ARGS="--ignore-perf-failures=$IGNORE_PERF_FAILURES"
+if [ "${IGNORE_PERF_FAILURES:-}" == "all" ]; then
+  RUNTEST_ARGS="--skip-perf-tests"
 fi
 
 set_toolchain_paths
