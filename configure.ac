@@ -947,6 +947,9 @@ AC_CHECK_HEADERS([sys/cpuset.h], [], [],
 #endif
 ]])
 
+dnl ** check whether a declaration for `environ` is provided by libc.
+FP_CHECK_ENVIRON
+
 dnl ** check if it is safe to include both <time.h> and <sys/time.h>
 AC_HEADER_TIME
 
