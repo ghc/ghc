@@ -965,11 +965,8 @@ deriveInstanceErrReasonHints :: Class
                              -> UsingGeneralizedNewtypeDeriving
                              -> DeriveInstanceErrReason
                              -> [GhcHint]
-deriveInstanceErrReasonHints cls newtype_deriving = \case
-  DerivErrNotWellKinded _ _ n_args_to_keep
-    | cls `hasKey` gen1ClassKey && n_args_to_keep >= 0
-    -> [suggestExtension LangExt.PolyKinds]
-    | otherwise
+deriveInstanceErrReasonHints _ newtype_deriving = \case
+  DerivErrNotWellKinded _ _ _
     -> noHints
   DerivErrSafeHaskellGenericInst  -> noHints
   DerivErrDerivingViaWrongKind{}  -> noHints

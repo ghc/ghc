@@ -1485,10 +1485,9 @@ defaultTyVarsAndSimplify rhs_tclvl mono_tvs candidates
                 -- the logic in decideMonoTyVars, which looks at
                 -- the constraints generated
 
-       ; poly_kinds  <- xoptM LangExt.PolyKinds
-       ; default_kvs <- mapM (default_one poly_kinds True)
+       ; default_kvs <- mapM default_one
                              (dVarSetElems cand_kvs)
-       ; default_tvs <- mapM (default_one poly_kinds False)
+       ; default_tvs <- mapM default_one
                              (dVarSetElems (cand_tvs `minusDVarSet` cand_kvs))
        ; let some_default = or default_kvs || or default_tvs
 
@@ -1498,17 +1497,14 @@ defaultTyVarsAndSimplify rhs_tclvl mono_tvs candidates
              | otherwise    -> return candidates
        }
   where
-    default_one poly_kinds is_kind_var tv
+    default_one tv
       | not (isMetaTyVar tv)
       = return False
       | tv `elemVarSet` mono_tvs
       = return False
       | otherwise
       = defaultTyVar
-          (if not poly_kinds && is_kind_var
-           then DefaultKindVars
-           else NonStandardDefaulting DefaultNonStandardTyVars)
-          -- NB: only pass 'DefaultKindVars' when we know we're dealing with a kind variable.
+          (NonStandardDefaulting DefaultNonStandardTyVars)
           tv
 
     simplify_cand candidates

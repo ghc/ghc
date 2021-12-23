@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, StandaloneDeriving, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE CPP, StandaloneDeriving, GeneralizedNewtypeDeriving, KindSignatures #-}
 
 -- |
 -- Types for referring to remote objects in Remote GHCi.  For more
@@ -26,6 +26,7 @@ import Data.Binary
 import Unsafe.Coerce
 import GHC.Exts
 import GHC.ForeignPtr
+import Data.Kind ( Type )
 
 -- -----------------------------------------------------------------------------
 -- RemotePtr
@@ -36,7 +37,7 @@ import GHC.ForeignPtr
 -- between machines of different word size. For example, when connecting to
 -- an iserv instance on a different architecture with different word size via
 -- -fexternal-interpreter.
-newtype RemotePtr a = RemotePtr Word64
+newtype RemotePtr (a :: Type) = RemotePtr Word64
 
 toRemotePtr :: Ptr a -> RemotePtr a
 toRemotePtr p = RemotePtr (fromIntegral (ptrToWordPtr p))
@@ -60,7 +61,7 @@ instance Show HValue where
   show _ = "<HValue>"
 
 -- | A reference to a remote value.  These are allocated and freed explicitly.
-newtype RemoteRef a = RemoteRef (RemotePtr ())
+newtype RemoteRef (a :: Type) = RemoteRef (RemotePtr ())
   deriving (Show, Binary)
 
 -- We can discard type information if we want

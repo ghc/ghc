@@ -1,8 +1,9 @@
-{-# LANGUAGE NoPolyKinds #-}
+{-# LANGUAGE KindSignatures #-}
 module GHC.Types.Var where
 
 import GHC.Prelude ()
 import {-# SOURCE #-} GHC.Types.Name
+import Data.Kind (Type)
   -- We compile this GHC with -XNoImplicitPrelude, so if there are no imports
   -- it does not seem to depend on anything. But it does! We must, for
   -- example, compile GHC.Types in the ghc-prim library first. So this
@@ -13,7 +14,7 @@ data ArgFlag
 data AnonArgFlag
 data Var
 instance NamedThing Var
-data VarBndr var argf
+data VarBndr (var :: Type) (argf :: Type)
 data Specificity
 type TyVar = Var
 type Id    = Var

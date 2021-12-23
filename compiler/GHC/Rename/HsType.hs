@@ -372,9 +372,6 @@ rnHsSigType ctx level
     (L loc sig_ty@(HsSig { sig_bndrs = outer_bndrs, sig_body = body }))
   = setSrcSpanA loc $
     do { traceRn "rnHsSigType" (ppr sig_ty)
-       ; case outer_bndrs of
-           HsOuterExplicit{} -> checkPolyKinds env sig_ty
-           HsOuterImplicit{} -> pure ()
        ; imp_vars <- filterInScopeM $ extractHsTyRdrTyVars body
        ; bindHsOuterTyVarBndrs ctx Nothing imp_vars outer_bndrs $ \outer_bndrs' ->
     do { (body', fvs) <- rnLHsTyKi env body
@@ -604,9 +601,8 @@ rnLHsTyKi env (L loc ty)
 
 rnHsTyKi :: RnTyKiEnv -> HsType GhcPs -> RnM (HsType GhcRn, FreeVars)
 
-rnHsTyKi env ty@(HsForAllTy { hst_tele = tele, hst_body = tau })
-  = do { checkPolyKinds env ty
-       ; bindHsForAllTelescope (rtke_ctxt env) tele $ \ tele' ->
+rnHsTyKi env (HsForAllTy { hst_tele = tele, hst_body = tau })
+  = do { bindHsForAllTelescope (rtke_ctxt env) tele $ \ tele' ->
     do { (tau',  fvs) <- rnLHsTyKi env tau
        ; return ( HsForAllTy { hst_xforall = noExtField
                              , hst_tele = tele' , hst_body =  tau' }
@@ -623,14 +619,7 @@ rnHsTyKi env ty@(HsQualTy { hst_ctxt = lctxt, hst_body = tau })
                 , fvs1 `plusFV` fvs2) }
 
 rnHsTyKi env (HsTyVar _ ip (L loc rdr_name))
-  = do { when (isRnKindLevel env && isRdrTyVar rdr_name) $
-         unlessXOptM LangExt.PolyKinds $ addErr $ TcRnUnknownMessage $ mkPlainError noHints $
-         withHsDocContext (rtke_ctxt env) $
-         vcat [ text "Unexpected kind variable" <+> quotes (ppr rdr_name)
-              , text "Perhaps you intended to use PolyKinds" ]
-           -- Any type variable at the kind level is illegal without the use
-           -- of PolyKinds (see #14710)
-       ; name <- rnTyVar env rdr_name
+  = do { name <- rnTyVar env rdr_name
        ; return (HsTyVar noAnn ip (L loc name), unitFV name) }
 
 rnHsTyKi env ty@(HsOpTy _ ty1 l_op ty2)
@@ -908,20 +897,6 @@ wildCardsAllowed env
 
 
 ---------------
--- | Ensures either that we're in a type or that -XPolyKinds is set
-checkPolyKinds :: Outputable ty
-                => RnTyKiEnv
-                -> ty      -- ^ type
-                -> RnM ()
-checkPolyKinds env ty
-  | isRnKindLevel env
-  = do { polykinds <- xoptM LangExt.PolyKinds
-       ; unless polykinds $
-         addErr $ TcRnUnknownMessage $ mkPlainError noHints $
-           (text "Illegal kind:" <+> ppr ty $$
-            text "Did you mean to enable PolyKinds?") }
-checkPolyKinds _ _ = return ()
-
 notInKinds :: Outputable ty
            => RnTyKiEnv
            -> ty

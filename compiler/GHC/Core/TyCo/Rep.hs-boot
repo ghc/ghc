@@ -1,8 +1,9 @@
-{-# LANGUAGE NoPolyKinds #-}
+{-# LANGUAGE KindSignatures #-}
 module GHC.Core.TyCo.Rep where
 
 import GHC.Utils.Outputable ( Outputable )
 import Data.Data  ( Data )
+import qualified Data.Kind as K
 import {-# SOURCE #-} GHC.Types.Var( Var, ArgFlag, AnonArgFlag )
 import {-# SOURCE #-} GHC.Core.TyCon ( TyCon )
 
@@ -13,7 +14,7 @@ data TyLit
 data TyCoBinder
 data MCoercion
 
-data Scaled a
+data Scaled (a :: K.Type)
 type Mult = Type
 
 type PredType = Type

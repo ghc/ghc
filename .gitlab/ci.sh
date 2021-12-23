@@ -538,7 +538,7 @@ function cabal_test() {
     -hidir tmp -odir tmp -fforce-recomp \
     -dumpdir "$OUT/dumps" -ddump-timings \
     +RTS --machine-readable "-t$OUT/rts.log" -RTS \
-    -ilibraries/Cabal/Cabal/src -XNoPolyKinds Distribution.Simple \
+    -ilibraries/Cabal/Cabal/src Distribution.Simple \
     "$@" 2>&1 | tee $OUT/log
   rm -Rf tmp
   end_section "Cabal test: $OUT"

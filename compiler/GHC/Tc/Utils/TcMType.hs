@@ -99,7 +99,6 @@ module GHC.Tc.Utils.TcMType (
 import GHC.Prelude
 
 import GHC.Driver.Session
-import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.Monad        -- TcType, amongst others
@@ -1827,40 +1826,12 @@ defaultTyVar def_strat tv
        ; writeMetaTyVar tv manyDataConTy
        ; return True }
 
-  | DefaultKindVars <- def_strat -- -XNoPolyKinds and this is a kind var: we must default it
-  = default_kind_var tv
-
   | otherwise
   = return False
 
   where
     default_ns_vars :: Bool
     default_ns_vars = defaultNonStandardTyVars def_strat
-    default_kind_var :: TyVar -> TcM Bool
-       -- defaultKindVar is used exclusively with -XNoPolyKinds
-       -- See Note [Defaulting with -XNoPolyKinds]
-       -- It takes an (unconstrained) meta tyvar and defaults it.
-       -- Works only on vars of type *; for other kinds, it issues an error.
-    default_kind_var kv
-      | isLiftedTypeKind (tyVarKind kv)
-      = do { traceTc "Defaulting a kind var to *" (ppr kv)
-           ; writeMetaTyVar kv liftedTypeKind
-           ; return True }
-      | otherwise
-      = do { addErr $ TcRnUnknownMessage $ mkPlainError noHints $
-               (vcat [ text "Cannot default kind variable" <+> quotes (ppr kv')
-                     , text "of kind:" <+> ppr (tyVarKind kv')
-                     , text "Perhaps enable PolyKinds or add a kind signature" ])
-           -- We failed to default it, so return False to say so.
-           -- Hence, it'll get skolemised.  That might seem odd, but we must either
-           -- promote, skolemise, or zap-to-Any, to satisfy GHC.Tc.Gen.HsType
-           --    Note [Recipe for checking a signature]
-           -- Otherwise we get level-number assertion failures. It doesn't matter much
-           -- because we are in an error situation anyway.
-           ; return False
-        }
-      where
-        (_, kv') = tidyOpenTyCoVar emptyTidyEnv kv
 
 -- | Default some unconstrained type variables, as specified
 -- by the defaulting options:
@@ -1874,13 +1845,9 @@ defaultTyVars :: NonStandardDefaultingStrategy
               -> CandidatesQTvs    -- ^ all candidates for quantification
               -> TcM [TcTyVar]     -- ^ those variables not defaulted
 defaultTyVars ns_strat dvs
-  = do { poly_kinds <- xoptM LangExt.PolyKinds
-       ; let
-           def_tvs, def_kvs :: DefaultingStrategy
+  = do { let
+           def_tvs :: DefaultingStrategy
            def_tvs = NonStandardDefaulting ns_strat
-           def_kvs
-             | poly_kinds = def_tvs
-             | otherwise  = DefaultKindVars
              -- As -XNoPolyKinds precludes polymorphic kind variables, we default them.
              -- For example:
              --
@@ -1891,7 +1858,7 @@ defaultTyVars ns_strat dvs
              -- Here we get `a :: TYPE r`, so to accept this program when -XNoPolyKinds is enabled
              -- we must default the kind variable `r :: RuntimeRep`.
              -- Test case: T20584.
-       ; defaulted_kvs <- mapM (defaultTyVar def_kvs) dep_kvs
+       ; defaulted_kvs <- mapM (defaultTyVar def_tvs) dep_kvs
        ; defaulted_tvs <- mapM (defaultTyVar def_tvs) nondep_tvs
        ; let undefaulted_kvs = [ kv | (kv, False) <- dep_kvs    `zip` defaulted_kvs ]
              undefaulted_tvs = [ tv | (tv, False) <- nondep_tvs `zip` defaulted_tvs ]

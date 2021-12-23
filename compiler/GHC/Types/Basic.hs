@@ -1881,23 +1881,11 @@ data NonStandardDefaultingStrategy
 -- | Specify whether to default kind variables, and type variables
 -- of kind 'RuntimeRep'/'Levity'/'Multiplicity'.
 data DefaultingStrategy
-  -- | Default kind variables:
-  --
-  --   - default kind variables of kind 'Type' to 'Type',
-  --   - default 'RuntimeRep'/'Levity'/'Multiplicity' kind variables
-  --     to 'LiftedRep'/'Lifted'/'Many', respectively.
-  --
-  -- When this strategy is used, it means that we have determined that
-  -- the variables we are considering defaulting are all kind variables.
-  --
-  -- Usually, we pass this option when -XNoPolyKinds is enabled.
-  = DefaultKindVars
   -- | Default (or don't default) non-standard variables, of kinds
   -- 'RuntimeRep', 'Levity' and 'Multiplicity'.
-  | NonStandardDefaulting NonStandardDefaultingStrategy
+  = NonStandardDefaulting NonStandardDefaultingStrategy
 
 defaultNonStandardTyVars :: DefaultingStrategy -> Bool
-defaultNonStandardTyVars DefaultKindVars                                          = True
 defaultNonStandardTyVars (NonStandardDefaulting DefaultNonStandardTyVars)         = True
 defaultNonStandardTyVars (NonStandardDefaulting TryNotToDefaultNonStandardTyVars) = False
 
@@ -1906,5 +1894,4 @@ instance Outputable NonStandardDefaultingStrategy where
   ppr TryNotToDefaultNonStandardTyVars = text "TryNotToDefaultNonStandardTyVars"
 
 instance Outputable DefaultingStrategy where
-  ppr DefaultKindVars            = text "DefaultKindVars"
   ppr (NonStandardDefaulting ns) = text "NonStandardDefaulting" <+> ppr ns

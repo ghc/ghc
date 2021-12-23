@@ -674,7 +674,7 @@ kcTyClGroup kisig_env decls
           --    3. Generalise the inferred kinds
           -- See Note [Kind checking for type and class decls]
 
-        ; cusks_enabled <- xoptM LangExt.CUSKs <&&> xoptM LangExt.PolyKinds
+        ; cusks_enabled <- xoptM LangExt.CUSKs
                     -- See Note [CUSKs and PolyKinds]
         ; let (kindless_decls, kinded_decls) = partitionWith get_kind decls
               kindless_names = mkNameSet $ map get_name kindless_decls

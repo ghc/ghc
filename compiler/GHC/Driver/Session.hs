@@ -1321,12 +1321,13 @@ languageExtensions (Just Haskell98)
        LangExt.DatatypeContexts,
        LangExt.TraditionalRecordSyntax,
        LangExt.FieldSelectors,
-       LangExt.NondecreasingIndentation
+       LangExt.NondecreasingIndentation,
            -- strictly speaking non-standard, but we always had this
            -- on implicitly before the option was added in 7.1, and
            -- turning it off breaks code, so we're keeping it on for
            -- backwards compatibility.  Cabal uses -XHaskell98 by
            -- default unless you specify another language.
+       LangExt.PolyKinds
       ]
 
 languageExtensions (Just Haskell2010)
@@ -1342,7 +1343,8 @@ languageExtensions (Just Haskell2010)
        LangExt.PatternGuards,
        LangExt.DoAndIfThenElse,
        LangExt.FieldSelectors,
-       LangExt.RelaxedPolyRec]
+       LangExt.RelaxedPolyRec,
+       LangExt.PolyKinds]
 
 languageExtensions (Just GHC2021)
     = [LangExt.ImplicitPrelude,
@@ -1356,6 +1358,7 @@ languageExtensions (Just GHC2021)
        LangExt.DoAndIfThenElse,
        LangExt.FieldSelectors,
        LangExt.RelaxedPolyRec,
+       LangExt.PolyKinds,
        -- Now the new extensions (not in Haskell2010)
        LangExt.BangPatterns,
        LangExt.BinaryLiterals,

@@ -1,7 +1,7 @@
-{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude, KindSignatures #-}
 
 module GHC.Real where
 
-import GHC.Types ()
+import GHC.Types (Type)
 
-class Integral a
+class Integral (a :: Type)
