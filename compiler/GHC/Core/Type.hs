@@ -1498,7 +1498,7 @@ tyConAppTyCon_maybe ty = case coreFullView ty of
   FunTy {}      -> Just funTyCon
   _             -> Nothing
 
-tyConAppTyCon :: Type -> TyCon
+tyConAppTyCon :: HasDebugCallStack => Type -> TyCon
 tyConAppTyCon ty = tyConAppTyCon_maybe ty `orElse` pprPanic "tyConAppTyCon" (ppr ty)
 
 -- | The same as @snd . splitTyConApp@

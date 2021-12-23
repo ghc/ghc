@@ -12,6 +12,7 @@
 module GHC.Hs.Dump (
         -- * Dumping ASTs
         showAstData,
+        showAstDataFull,
         BlankSrcSpan(..),
         BlankEpAnnotations(..),
     ) where
@@ -35,11 +36,17 @@ import GHC.Utils.Outputable
 import Data.Data hiding (Fixity)
 import qualified Data.ByteString as B
 
+-- | Should source spans be removed from output.
 data BlankSrcSpan = BlankSrcSpan | BlankSrcSpanFile | NoBlankSrcSpan
                   deriving (Eq,Show)
 
+-- | Should EpAnnotations be removed from output.
 data BlankEpAnnotations = BlankEpAnnotations | NoBlankEpAnnotations
                   deriving (Eq,Show)
+
+-- | Show the full AST as the compiler sees it.
+showAstDataFull :: Data a => a -> SDoc
+showAstDataFull = showAstData NoBlankSrcSpan NoBlankEpAnnotations
 
 -- | Show a GHC syntax tree. This parameterised because it is also used for
 -- comparing ASTs in ppr roundtripping tests, where the SrcSpan's are blanked

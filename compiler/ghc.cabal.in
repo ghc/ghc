@@ -280,6 +280,7 @@ Library
         GHC.Core.FVs
         GHC.Core.InstEnv
         GHC.Core.Lint
+        GHC.Core.LateCC
         GHC.Core.Make
         GHC.Core.Map.Expr
         GHC.Core.Map.Type

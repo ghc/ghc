@@ -35,7 +35,7 @@ import GHC.Cmm.Graph
 import GHC.Stg.Syntax
 import GHC.Cmm
 import GHC.Unit         ( rtsUnit )
-import GHC.Core.Type    ( Type, tyConAppTyCon )
+import GHC.Core.Type    ( Type, tyConAppTyCon_maybe )
 import GHC.Core.TyCon
 import GHC.Cmm.CLabel
 import GHC.Cmm.Info     ( closureInfoPtr )
@@ -49,6 +49,7 @@ import GHC.Utils.Panic.Plain
 import Data.Maybe
 
 import Control.Monad (liftM, when, unless)
+import GHC.Utils.Outputable
 
 ------------------------------------------------------------------------
 --      Primitive operations and foreign calls
@@ -1542,7 +1543,7 @@ emitPrimOp cfg primop =
     -- you used tagToEnum# in a non-monomorphic setting, e.g.,
     --         intToTg :: Enum a => Int -> a ; intToTg (I# x#) = tagToEnum# x#
     -- That won't work.
-    let tycon = tyConAppTyCon res_ty
+    let tycon = fromMaybe (pprPanic "tagToEnum#: Applied to non-concrete type" (ppr res_ty)) (tyConAppTyCon_maybe res_ty)
     massert (isEnumerationTyCon tycon)
     platform <- getPlatform
     pure [tagToClosure platform tycon amode]

@@ -28,7 +28,7 @@ module GHC.Core.Utils (
         exprIsCheap, exprIsExpandable, exprIsCheapX, CheapAppFun,
         exprIsHNF, exprOkForSpeculation, exprOkForSideEffects, exprIsWorkFree,
         exprIsConLike,
-        isCheapApp, isExpandableApp,
+        isCheapApp, isExpandableApp, isSaturatedConApp,
         exprIsTickedString, exprIsTickedString_maybe,
         exprIsTopLevelBindable,
         altsAreExhaustive,

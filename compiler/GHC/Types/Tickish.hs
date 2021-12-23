@@ -39,6 +39,7 @@ import GHC.Utils.Panic
 import Language.Haskell.Syntax.Extension ( NoExtField )
 
 import Data.Data
+import GHC.Utils.Outputable (Outputable (ppr), text)
 
 {- *********************************************************************
 *                                                                      *
@@ -334,6 +335,9 @@ data TickishPlacement =
     -- restrictive placement rule for ticks, as all tickishs have in
     -- common that they want to track runtime processes. The only
     -- legal placement rule for counting ticks.
+    -- NB: We generally try to move these as close to the relevant
+    -- runtime expression as possible. This means they get pushed through
+    -- tyoe arguments. E.g. we create `(tick f) @Bool` instead of `tick (f @Bool)`.
     PlaceRuntime
 
     -- | As @PlaceRuntime@, but we float the tick through all
@@ -354,7 +358,10 @@ data TickishPlacement =
     -- above example is safe.
   | PlaceCostCentre
 
-  deriving (Eq)
+  deriving (Eq,Show)
+
+instance Outputable TickishPlacement where
+  ppr = text . show
 
 -- | Placement behaviour we want for the ticks
 tickishPlace :: GenTickish pass -> TickishPlacement
