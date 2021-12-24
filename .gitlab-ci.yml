@@ -1353,7 +1353,7 @@ perf-nofib:
 # Ad-hoc performance testing
 ############################################################
 
-perf:
+.perf:
   stage: testing
   needs: [validate-x86_64-linux-deb9-dwarf, doc-tarball]
   dependencies:
