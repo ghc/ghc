@@ -203,6 +203,10 @@ Packaging fixes
 
 - Bump ``text`` to 1.2.5.0
 
+- Bump ``Cabal`` to 3.4.1.0
+
+- Bump ``directory`` to 1.3.6.2
+
 Portability fixes
 -----------------
 
