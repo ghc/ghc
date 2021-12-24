@@ -218,7 +218,8 @@ linkBinary' staticLink logger tmpfs dflags unit_env o_files dep_units = do
                       -- like
                       --     ld: warning: could not create compact unwind for .LFB3: non-standard register 5 being saved in prolog
                       -- on x86.
-                      ++ (if toolSettings_ldSupportsCompactUnwind toolSettings' &&
+                      ++ (if not (gopt Opt_CompactUnwind dflags) &&
+                             toolSettings_ldSupportsCompactUnwind toolSettings' &&
                              not staticLink &&
                              (platformOS platform == OSDarwin) &&
                              case platformArch platform of

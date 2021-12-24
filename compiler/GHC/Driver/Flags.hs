@@ -291,6 +291,7 @@ data GeneralFlag
    | Opt_Ticky_Dyn_Thunk
    | Opt_RPath
    | Opt_RelativeDynlibPaths
+   | Opt_CompactUnwind               -- ^ @-fcompact-unwind@
    | Opt_Hpc
    | Opt_FamAppCache
    | Opt_ExternalInterpreter
