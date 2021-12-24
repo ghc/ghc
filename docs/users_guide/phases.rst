@@ -1310,3 +1310,17 @@ for example).
     that do runtime dynamic linking, where code dynamically linked in
     the future might require the value of a CAF that would otherwise
     be garbage-collected.
+
+.. ghc-flag:: -fcompact-unwind
+    :shortdesc: Instruct the linker to produce a `__compact_unwind` section.
+    :type: dynamic
+    :category: linking
+
+    :since: 9.4.1, 9.2.2
+
+    This instructs the linker to produce an executable that supports Apple's
+    compact unwinding sections. These are used by C++ and Objective-C code
+    to unwind the stack when an exception occurs.
+
+    In theory, the older `__eh_frame` section should also be usable for this
+    purpose, but this does not always work.
