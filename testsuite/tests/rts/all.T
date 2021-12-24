@@ -33,6 +33,8 @@ test('derefnull',
       # Linux setups, so just ignore it. As long as we get
       # the right exit code we're OK.
       when(opsys('linux'), ignore_stderr),
+      # On OpenBSD the output varies depending on ulimit, exit code is enough.
+      when(opsys('openbsd'), ignore_stderr),
       # SIGBUS on OX X (PPC and x86 only; amd64 gives SEGV)
       # The output under OS X is too unstable to readily compare
       when(platform('i386-apple-darwin'), [ignore_stderr, exit_code(139)]),
@@ -63,6 +65,8 @@ test('divbyzero',
       # Linux setups, so just ignore it. As long as we get
       # the right exit code we're OK.
       when(opsys('linux'), ignore_stderr),
+      # On OpenBSD the output varies depending on ulimit, exit code is enough.
+      when(opsys('openbsd'), ignore_stderr),
       # PowerPC 64 bit and most likely PowerPC 32 bit processors
       # do not generate an exception (interrupt) for integer
       # division by zero but the result is undefined.
