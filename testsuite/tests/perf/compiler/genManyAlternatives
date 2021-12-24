@@ -24,11 +24,13 @@ MODULE=ManyAlternatives
 echo "module $MODULE where" > $MODULE.hs
 echo >> $MODULE.hs
 echo "data A$SIZE = A0" >> $MODULE.hs
-for i in $(seq -w 1 $SIZE); do
-  echo "  | A$i" >> $MODULE.hs
+i=1; while test $i -lt $SIZE; do
+  printf "  | A%03d\n" $i >> $MODULE.hs
+  i=$((i+1))
 done
 echo >> $MODULE.hs
 echo "f :: A$SIZE -> Int" >> $MODULE.hs
-for i in $(seq -w 1 $SIZE); do
-  echo "f A$i = 199$i" >> $MODULE.hs
+i=1; while test $i -lt $SIZE; do
+  printf "f A%03d = 199%03d\n" $i $i >> $MODULE.hs
+  i=$((i+1))
 done
