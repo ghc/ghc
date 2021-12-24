@@ -43,7 +43,7 @@ General bug fixes
 - Fix a bug where code may be unloaded prematurely when using the parallel
   garbage collector (see :ghc-ticket:`19417`).
 
-- Fix a long standing GHC API bug affecting clients like HLS where async
+- Fix a long standing GHC API bug affecting clients like Haskell Language Server where async
   exceptions used to cancel threads during typechecking would be caught by the
   Template Haskell evaluator and reported as compile errors (:ghc-ticket:`19410`).
 
@@ -145,17 +145,17 @@ General bug fixes
   (:ghc-ticket:`20648`).
 
 - Fix a bug with the GC resulting in object code being prematurely collected
-  object code leading to runtime crashes (:ghc-ticket:`20649`).
+  leading to runtime crashes (:ghc-ticket:`20649`).
 
-- `GHC.Event.Manager`: Don't use one-shot kqueue on macOS. This reverts a
+- ``GHC.Event.Manager``: Don't use one-shot kqueue on macOS. This reverts a
   commit that removed the workaround for a bug (:ghc-ticket:`7651`) in the OSX
   implementation of kqueue. It turns out the bug still affects modern macOS
   versions, so we keep the workaround for now. (:ghc-ticket:`20662`).
 
-- Check the buffer size before calling the continuation in withEncodedCString
+- Check the buffer size before calling the continuation in ``withEncodedCString``
   (:ghc-ticket:`20107`).
 
-- Pass -DLIBICONV_PLUG when building base library on FreeBSD (:ghc-ticket:`19958`).
+- Pass ``-DLIBICONV_PLUG`` when building base library on FreeBSD (:ghc-ticket:`19958`).
 
 - Make unsafeDupablePerformIO have a lazy demand (:ghc-ticket:`19181`).
 
@@ -175,9 +175,9 @@ Packaging fixes
 
 - Include hyperlinked sources in released haddock documentation (:ghc-ticket:`19455`).
 
-- Don't include ``configure`` scripts in windows bindist. (:ghc-ticket:`19868`).
+- Don't include ``configure`` scripts in Windows bindist. (:ghc-ticket:`19868`).
 
-- Always create both versioned and unversioned executables with the hadrian bindist. 
+- Ship both both versioned and unversioned executables with the hadrian bindist. 
   (:ghc-ticket:`20074`).
 
 - Give ``ghc-pkg`` the same version as ``ghc`` (:ghc-ticket:`20087`).
