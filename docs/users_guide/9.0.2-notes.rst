@@ -193,13 +193,15 @@ Packaging fixes
 
 - Bump ``base`` to 4.15.1.0
 
-- Bump ``Win32`` to  2.10.1.1
+- Bump ``Win32`` to  2.12.0.1
 
 - Bump ``haskeline`` to 0.8.2
 
 - Bump ``ghc-bignum`` to 1.1
 
 - Bump ``haddock`` to 2.25.1
+
+- Bump ``text`` to 1.2.5.0
 
 Portability fixes
 -----------------
