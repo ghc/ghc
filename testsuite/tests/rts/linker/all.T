@@ -25,6 +25,8 @@ test('T2615',
        when(opsys('darwin'), skip),
        # Solaris' linker does not support GNUish linker scripts
        when(opsys('solaris2'), skip),
+       # OpenBSD linker does not support GNUish linker scripts
+       when(opsys('openbsd'), expect_broken(20869)),
        pre_cmd('$MAKE -s --no-print-directory T2615-prep'),
        # Add current directory to dlopen search path
        cmd_prefix('LD_LIBRARY_PATH=$LD_LIBRARY_PATH:. '),
