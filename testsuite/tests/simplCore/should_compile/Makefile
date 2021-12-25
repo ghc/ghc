@@ -66,7 +66,7 @@ T13367:
 
 T8832:
 	$(RM) -f T8832.o T8832.hi
-	'$(TEST_HC)' $(TEST_HC_OPTS) $(T8832_WORDSIZE_OPTS) -O -c -ddump-simpl -dsuppress-ticks T8832.hs | grep '^[a-zA-Z0-9]\+ ='
+	'$(TEST_HC)' $(TEST_HC_OPTS) $(T8832_WORDSIZE_OPTS) -O -c -ddump-simpl -dsuppress-ticks T8832.hs | egrep '^[a-zA-Z0-9]+ ='
 
 T12603:
 	$(RM) -f T12603.o T12603.hi
