@@ -35,6 +35,8 @@ g :: ()
 g
 END
 
-for i in $(seq -w 1 $SIZE); do
+i=1
+while test $i -lt $SIZE; do
   echo "  | (A, A) <- f $i = ()" >> $MODULE.hs
+  i=$((i+1))
 done
