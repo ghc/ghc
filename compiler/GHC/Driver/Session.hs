@@ -39,6 +39,7 @@ module GHC.Driver.Session (
         lang_set,
         DynamicTooState(..), dynamicTooState, setDynamicNow,
         sccProfilingEnabled,
+        needSourceNotes,
         DynFlags(..),
         outputFile, objectSuf, ways,
         FlagSpec(..),
@@ -4777,6 +4778,11 @@ isBmi2Enabled dflags = case platformArch (targetPlatform dflags) of
 -- | Indicate if cost-centre profiling is enabled
 sccProfilingEnabled :: DynFlags -> Bool
 sccProfilingEnabled dflags = profileIsProfiling (targetProfile dflags)
+
+-- | Indicate whether we need to generate source notes
+needSourceNotes :: DynFlags -> Bool
+needSourceNotes dflags = debugLevel dflags > 0
+                       || gopt Opt_InfoTableMap dflags
 
 -- -----------------------------------------------------------------------------
 -- Linker/compiler information

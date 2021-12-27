@@ -62,7 +62,12 @@ collectStgBind (StgRec pairs) = do
 
 collectStgRhs :: Id -> StgRhs -> M StgRhs
 collectStgRhs bndr (StgRhsClosure ext cc us bs e)= do
-  e' <- collectExpr e
+  let
+    name = idName bndr
+    with_span = case nameSrcSpan name of
+                  RealSrcSpan pos _ -> id -- withSpan (pos, occNameString (getOccName name))
+                  _ -> id
+  e' <- with_span $ collectExpr e
   recordInfo bndr e'
   return $ StgRhsClosure ext cc us bs e'
 collectStgRhs _bndr (StgRhsCon cc dc _mn ticks args) = do

@@ -170,7 +170,7 @@ dsHsBind dflags b@(FunBind { fun_id = L loc fun
 
         ; core_wrap <- dsHsWrapper co_fn
         ; let body' = mkOptTickBox tick body
-              rhs   = core_wrap (mkLams args body')
+              rhs   = mkOptTickBox tick (core_wrap (mkLams args body'))
               core_binds@(id,_) = makeCorePair dflags fun False 0 rhs
               force_var
                   -- Bindings are strict when -XStrict is enabled

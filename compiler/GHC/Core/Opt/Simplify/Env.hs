@@ -32,7 +32,7 @@ module GHC.Core.Opt.Simplify.Env (
         SimplFloats(..), emptyFloats, mkRecFloats,
         mkFloatBind, addLetFloats, addJoinFloats, addFloats,
         extendFloats, wrapFloats,
-        doFloatFromRhs, getTopFloatBinds,
+        doFloatFromRhs, getTopFloatBinds, mapFloats,
 
         -- * LetFloats
         LetFloats, letFloatBinds, emptyLetFloats, unitLetFloat,
@@ -125,6 +125,9 @@ data SimplFloats
         -- these bindings land up.
       , sfInScope :: InScopeSet  -- All OutVars
       }
+
+mapFloats :: ((Id, CoreExpr) -> (Id, CoreExpr)) -> SimplFloats -> SimplFloats
+mapFloats f sf = sf { sfLetFloats = mapLetFloats (sfLetFloats sf) f }
 
 instance Outputable SimplFloats where
   ppr (SimplFloats { sfLetFloats = lf, sfJoinFloats = jf, sfInScope = is })

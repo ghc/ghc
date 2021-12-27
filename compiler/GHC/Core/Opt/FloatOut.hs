@@ -8,7 +8,7 @@
 
 
 
-module GHC.Core.Opt.FloatOut ( floatOutwards ) where
+module GHC.Core.Opt.FloatOut ( floatOutwards, wrapTick ) where
 
 import GHC.Prelude
 
@@ -418,7 +418,7 @@ floatExpr lam@(Lam (TB _ lam_spec) _)
 floatExpr (Tick tickish expr)
   | tickish `tickishScopesLike` SoftScope -- not scoped, can just float
   = case (atJoinCeiling $ floatExpr expr)    of { (fs, floating_defns, expr') ->
-    (fs, floating_defns, Tick tickish expr') }
+    (fs, wrapTick tickish floating_defns, Tick tickish expr') }
 
   | not (tickishCounts tickish) || tickishCanSplit tickish
   = case (atJoinCeiling $ floatExpr expr)    of { (fs, floating_defns, expr') ->

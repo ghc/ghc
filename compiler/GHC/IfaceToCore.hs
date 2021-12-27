@@ -1561,9 +1561,9 @@ tcIfaceExpr (IfaceLet (IfaceRec pairs) body)
 tcIfaceExpr (IfaceTick tickish expr) = do
     expr' <- tcIfaceExpr expr
     -- If debug flag is not set: Ignore source notes
-    dbgLvl <- fmap debugLevel getDynFlags
+    need_notes <- needSourceNotes <$> getDynFlags
     case tickish of
-      IfaceSource{} | dbgLvl == 0
+      IfaceSource{} | not (need_notes)
                     -> return expr'
       _otherwise    -> do
         tickish' <- tcIfaceTickish tickish
