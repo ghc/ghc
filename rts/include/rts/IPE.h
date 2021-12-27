@@ -28,4 +28,4 @@ typedef struct InfoProvEnt_ {
 } InfoProvEnt;
 
 void registerInfoProvList(InfoProvEnt **cc_list);
-InfoProvEnt *lookupIPE(StgInfoTable *info);
+InfoProvEnt *lookupIPE(const StgInfoTable *info);

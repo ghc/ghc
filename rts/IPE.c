@@ -157,7 +157,7 @@ void registerInfoProvList(InfoProvEnt **ent_list) {
     RELEASE_LOCK(&ipeMapLock);
 }
 
-InfoProvEnt *lookupIPE(StgInfoTable *info) {
+InfoProvEnt *lookupIPE(const StgInfoTable *info) {
     updateIpeMap();
     return lookupHashTable(ipeMap, (StgWord)info);
 }
