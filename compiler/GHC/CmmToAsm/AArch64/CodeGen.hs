@@ -1490,6 +1490,7 @@ genCCall target dest_regs arg_regs bid = do
         MO_AtomicRead w     -> mkCCall (atomicReadLabel w)
         MO_AtomicWrite w    -> mkCCall (atomicWriteLabel w)
         MO_Cmpxchg w        -> mkCCall (cmpxchgLabel w)
+        MO_Cmpxchg2 _       -> unsupported mop
         -- -- Should be an AtomicRMW variant eventually.
         -- -- Sequential consistent.
         -- TODO: this should be implemented properly!
