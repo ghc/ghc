@@ -374,13 +374,14 @@ extern char **environ;
    SymI_HasProto(unblockUserSignals)
 #else
 #define RTS_USER_SIGNALS_SYMBOLS             \
-   SymI_HasProto(registerIOCPHandle)      \
+   SymI_HasProto(registerIOCPHandle)         \
    SymI_HasProto(getOverlappedEntries)       \
    SymI_HasProto(completeSynchronousRequest) \
    SymI_HasProto(registerAlertableWait)      \
    SymI_HasProto(sendIOManagerEvent)         \
    SymI_HasProto(readIOManagerEvent)         \
    SymI_HasProto(getIOManagerEvent)          \
+   SymI_HasProto(ioManagerFinished)          \
    SymI_HasProto(console_handler)
 #endif
 

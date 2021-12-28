@@ -62,3 +62,10 @@ extern void startSignalHandlers(Capability *cap);
 extern int rts_waitConsoleHandlerCompletion(void);
 
 #endif /* THREADED_RTS */
+
+/*
+ * Function: finiUserSignals()
+ *
+ * Tear down and shut down user signal processing.
+ */
+extern void finiUserSignals(void);

@@ -577,6 +577,9 @@ hs_exit_(bool wait_foreign)
 #if defined(mingw32_HOST_OS)
    if (is_io_mng_native_p())
       hs_restoreConsoleCP();
+
+   /* Disable console signal handlers, we're going down!.  */
+   finiUserSignals ();
 #endif
 
     /* tear down statistics subsystem */

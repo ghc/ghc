@@ -231,13 +231,13 @@ import Foreign.C.Error
 import Foreign.C.String
 import Foreign.Ptr
 import Foreign.Marshal.Alloc
+import Foreign.Marshal.Utils (with)
 import Foreign.Storable
 import GHC.IO.SubSystem
 import GHC.IO.Windows.Handle (openFileAsTemp)
 import GHC.IO.Handle.Windows (mkHandleFromHANDLE)
 import GHC.IO.Device as IODevice
 import GHC.Real (fromIntegral)
-import Foreign.Marshal.Utils (new)
 #endif
 import Foreign.C.Types
 import System.Posix.Internals
@@ -527,17 +527,17 @@ openTempFile' loc tmp_dir template binary mode
       let label = if null prefix then "ghc" else prefix
       withCWString tmp_dir $ \c_tmp_dir ->
         withCWString label $ \c_template ->
-          withCWString suffix $ \c_suffix -> do
-            c_ptr <- new nullPtr
-            res <- c_createUUIDTempFileErrNo c_tmp_dir c_template c_suffix
-                                             c_ptr
-            if not res
-               then do errno <- getErrno
-                       ioError (errnoToIOError loc errno Nothing (Just tmp_dir))
-               else do c_p <- peek c_ptr
-                       filename <- peekCWString c_p
-                       free c_p
-                       handleResultsWinIO filename ((fromIntegral mode .&. o_EXCL) == o_EXCL)
+          withCWString suffix $ \c_suffix ->
+            with nullPtr $ \c_ptr -> do
+              res <- c_createUUIDTempFileErrNo c_tmp_dir c_template c_suffix c_ptr
+              if not res
+                 then do errno <- getErrno
+                         ioError (errnoToIOError loc errno Nothing (Just tmp_dir))
+                 else do c_p <- peek c_ptr
+                         filename <- peekCWString c_p
+                         free c_p
+                         let flags = fromIntegral mode .&. o_EXCL
+                         handleResultsWinIO filename (flags == o_EXCL)
 
     findTempNamePosix = do
       let label = if null prefix then "ghc" else prefix
