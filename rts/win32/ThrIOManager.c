@@ -161,3 +161,13 @@ ioManagerStart (void)
         rts_unlock(cap);
     }
 }
+
+/*
+ * Called to close the io_manager_event handle when the IO manager thread is
+ * terminating.
+ */
+void
+ioManagerFinished(void)
+{
+    CloseHandle(io_manager_event);
+}

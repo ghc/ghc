@@ -147,7 +147,7 @@
 
   There we initialize IO manager locale variables and.
   * call ioManagerStart()
-  * Creat a thread to execute "runner"
+  * Create a thread to execute "runner"
 
   We never truly shut down the IO Manager. While this means we
   might block forever on the IOPort if the IO Manager is no longer
@@ -274,6 +274,7 @@ void shutdownAsyncWinIO(bool wait_threads)
           WaitForSingleObject (workerThread, INFINITE);
         }
       completionPortHandle = INVALID_HANDLE_VALUE;
+      CloseHandle (workerThread);
       workerThread = NULL;
       workerThreadId = 0;
       free (entries);

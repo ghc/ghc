@@ -30,7 +30,7 @@ import GHC.IO
 import Foreign.C.String
 import Foreign.Marshal.Alloc (free)
 
-foreign import WINDOWS_CCONV safe "__hs_create_device_name"
+foreign import ccall safe "__hs_create_device_name"
     c_GetDevicePath :: CWString -> IO CWString
 
 -- | This function converts Windows paths between namespaces. More specifically
