@@ -1162,7 +1162,7 @@ io_mngr_loop _event mgr = go False
              exit <-
                case event_id of
                  _ | event_id == io_MANAGER_WAKEUP -> return False
-                 _ | event_id == io_MANAGER_DIE    -> return True
+                 _ | event_id == io_MANAGER_DIE    -> c_ioManagerFinished >> return True
                  0 -> return False -- spurious wakeup
                  _ -> do debugIO $ "handling console event: " ++ show (event_id `shiftR` 1)
                          start_console_handler (event_id `shiftR` 1)
@@ -1202,6 +1202,9 @@ foreign import ccall unsafe "getIOManagerEvent" -- in the RTS (ThrIOManager.c)
 -- * Wakeup events, which are not used by WINIO and will be ignored
 foreign import ccall unsafe "readIOManagerEvent" -- in the RTS (ThrIOManager.c)
   c_readIOManagerEvent :: IO Word32
+
+foreign import ccall unsafe "ioManagerFinished" -- in the RTS (ThrIOManager.c)
+  c_ioManagerFinished :: IO ()
 
 foreign import ccall unsafe "rtsSupportsBoundThreads" threadedIOMgr :: Bool
 

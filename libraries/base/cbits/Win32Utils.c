@@ -183,10 +183,9 @@ bool __createUUIDTempFileErrNo (wchar_t* pathName, wchar_t* prefix,
       RPC_WSTR guidStr;
       if (UuidToStringW ((UUID*)&guid, &guidStr) != S_OK)
         goto fail;
-
       /* We can't create a device path here since this path escapes the compiler
          so instead return a normal path and have openFile deal with it.  */
-      wchar_t* devName = malloc (sizeof (wchar_t) * wcslen (pathName));
+      wchar_t* devName = malloc (sizeof (wchar_t) * (wcslen (pathName) + 1));
       wcscpy (devName, pathName);
       int len = wcslen (devName) + wcslen (suffix) + wcslen (prefix)
               + wcslen (guidStr) + 3;
@@ -204,6 +203,7 @@ bool __createUUIDTempFileErrNo (wchar_t* pathName, wchar_t* prefix,
 
       free (devName);
       RpcStringFreeW (&guidStr);
+
       /* This should never happen because GUIDs are unique.  But in case hell
          froze over let's check anyway.  */
       DWORD dwAttrib = GetFileAttributesW (*tempFileName);

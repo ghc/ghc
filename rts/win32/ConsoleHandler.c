@@ -57,7 +57,7 @@ freeSignalHandlers(void) {
     /* Do nothing */
 }
 
-/* Seems to be a bit of an orphan...where used? */
+/* Called in hs_exit to clean up resources.  */
 void
 finiUserSignals(void)
 {
