@@ -1,0 +1,19 @@
+
+T19760.hs:11:41: error:
+    • Couldn't match kind ‘a'’ with ‘a’
+      Expected kind ‘Maybe a’, but ‘m'’ has kind ‘Maybe a'’
+      ‘a'’ is a rigid type variable bound by
+        an explicit forall a' (m' :: Maybe a')
+        at T19760.hs:11:18-19
+      ‘a’ is a rigid type variable bound by
+        the type signature for:
+          f :: forall a (p :: Maybe a -> *) (m :: Maybe a). p m
+        at T19760.hs:8:1-56
+    • In the first argument of ‘p’, namely ‘m'’
+      In the type signature: go :: forall a' (m' :: Maybe a'). p m'
+      In an equation for ‘f’:
+          f = go
+            where
+                go :: forall a' (m' :: Maybe a'). p m'
+                go = undefined
+    • Relevant bindings include f :: p m (bound at T19760.hs:9:1)

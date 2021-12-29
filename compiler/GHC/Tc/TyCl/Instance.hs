@@ -691,10 +691,9 @@ tcDataFamInstDecl mb_clsinfo tv_skol_env
        ; gadt_syntax <- dataDeclChecks fam_name new_or_data hs_ctxt hs_cons
           -- Do /not/ check that the number of patterns = tyConArity fam_tc
           -- See [Arity of data families] in GHC.Core.FamInstEnv
-       ; (qtvs, pats, unzonked_res_kind, res_kind, stupid_theta)
+       ; (qtvs, pats, _unzonked_res_kind, res_kind, stupid_theta)
              <- tcDataFamInstHeader mb_clsinfo fam_tc outer_bndrs fixity
                                     hs_ctxt hs_pats m_ksig new_or_data
---       ; pprTraceM "qtvs" (ppr qtvs)
        -- Eta-reduce the axiom if possible
        -- Quite tricky: see Note [Implementing eta reduction for data families]
        ; let (eta_pats, eta_tcbs) = eta_reduce fam_tc pats
@@ -718,7 +717,7 @@ tcDataFamInstDecl mb_clsinfo tv_skol_env
        --     we did it before the "extra" tvs from etaExpandAlgTyCon
        --     would always be eta-reduced
        --
-       ; (extra_tcbs, final_res_kind) <- etaExpandAlgTyCon full_tcbs res_kind
+       ; (extra_tcbs, final_res_kind) <- etaExpandAlgTyCon (binderVars full_tcbs) res_kind
 
        -- Check the result kind; it may come from a user-written signature.
        -- See Note [Datatype return kinds] in GHC.Tc.TyCl point 4(a)
@@ -740,11 +739,11 @@ tcDataFamInstDecl mb_clsinfo tv_skol_env
               , text "eta_tcbs" <+> ppr eta_tcbs ]
        ; skol_info <- mkSkolemInfo FamInstSkol
        ; (rep_tc, axiom) <- fixM $ \ ~(rec_rep_tc, _) ->
-           do { data_cons <- tcExtendTyVarEnv skol_info qtvs $
+           do { data_cons <- tcExtendTyVarEnv skol_info qtvs $ \subst _tvs ->
                   -- For H98 decls, the tyvars scope
                   -- over the data constructors
                   tcConDecls new_or_data (DDataInstance orig_res_ty)
-                             rec_rep_tc ty_binders unzonked_res_kind
+                             rec_rep_tc ty_binders (substTy subst final_res_kind)
                              hs_cons
 
               ; rep_tc_name <- newFamInstTyConName lfam_name pats

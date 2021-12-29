@@ -127,8 +127,9 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Data.Maybe
 import GHC.Data.Bag( unitBag )
-import Data.List ( find, mapAccumL )
+import Data.List ( find )
 import Control.Monad
+import Data.Bifunctor
 
 {-
         ----------------------------
@@ -2592,23 +2593,10 @@ kcCheckDeclHeader_sig kisig name flav
                      --
                      -- Here we unify   Maybe k ~ Maybe j
 
---                   ; pprTraceM "invis_binders" (ppr invis_binders $$ ppr explicit_tv_prs $$  ppr r_ki $$ ppr m_res_ki)
-
-                   ; let skolemise_binders :: TCvSubst -> TyCoBinder -> (TCvSubst, TyCoBinder)
-                         skolemise_binders subst (Named (Bndr tv vis)) =
-
-
-                     --     pprTrace "tyvar" (ppr tv $$ ppr (tyVarKind tv) $$ ppr subst $$ ppr (substTy subst $ tyVarKind tv)) $
-                          let tv' = (mkTcTyVar (tyVarName tv) (substTy subst $ tyVarKind tv) (vanillaSkolemTv skol_info))
-                              subst' = extendTvSubst subst tv (mkTyVarTy tv')
-                          in (subst', Named (Bndr tv' vis))
-                         skolemise_binders subst b = (subst, b)
-
                    ; whenIsJust m_res_ki $ \res_ki -> do
-                      let (subst, _binders') = mapAccumL skolemise_binders emptyTCvSubst invis_binders
-                      discardResult $ -- See Note [discardResult in kcCheckDeclHeader_sig]
---                        pprTrace "subst_ty" (ppr $ substTy subst r_ki)
-                        unifyKind Nothing (substTy subst r_ki) res_ki
+                      discardResult $
+                        tcExtendTyVarEnv skol_info (mapMaybe tyCoBinderVar_maybe invis_binders) $ \subst _vars ->  -- See Note [discardResult in kcCheckDeclHeader_sig]
+                          unifyKind Nothing (substTy subst r_ki) res_ki
 
                    ; return (invis_binders, r_ki) }
 
@@ -3493,7 +3481,7 @@ When we /must/ clone.
 
 bindTyClTyVars :: SkolemInfo
                -> Name
-               -> (TcTyCon -> [TyConBinder] -> Kind -> TcM a) -> TcM a
+               -> (TcTyCon -> [TyConBinder] -> [TcTyVar] -> TcKind -> TcM a) -> TcM a
 -- ^ Used for the type variables of a type or class decl
 -- in the "kind checking" and "type checking" pass,
 -- but not in the initial-kind run.
@@ -3502,24 +3490,19 @@ bindTyClTyVars skol_info tycon_name thing_inside
        ; let scoped_prs = tcTyConScopedTyVars tycon
              res_kind   = tyConResKind tycon
              binders    = tyConBinders tycon
-       ; let scoped_prs' = map skolemise_pair scoped_prs
+      -- ; pprTraceM "bindTyClTyVars" (ppr scoped_prs $$ ppr binders)
+--       ; let scoped_prs' = map skolemise_pair scoped_prs
  --      ; lcl_env <- tcl_env <$> getLclEnv
 --       ; th_body <- tcl_bndrs <$> getLclEnv
-       ; let (_, binders') = mapAccumL skolemise_binders emptyTCvSubst binders
-       ; tcExtendNameTyVarEnv scoped_prs' $
-         thing_inside tycon binders' res_kind }
+--       ; let (_, binders') = mapAccumL skolemise_binders emptyTCvSubst binders
+       ;
+         tcExtendTyVarEnv skol_info (binderVars binders) $ \subst tc_vars ->
+          let scoped_prs' = map (second (expect_tv . substTyVar subst)) scoped_prs
+          in tcExtendNameTyVarEnv scoped_prs' $
+              thing_inside tycon binders tc_vars res_kind }
   where
-    skolemise_pair :: (Name, TyVar) -> (Name, TcTyVar)
-    skolemise_pair (name, tyvar) = -- pprTrace "tyvar" (ppr tyvar $$ ppr (tyVarKind tyvar)) $
-      (name, mkTcTyVar (tyVarName tyvar) (tyVarKind tyvar) (vanillaSkolemTv skol_info))
-
-    skolemise_binders :: TCvSubst -> TyConBinder -> (TCvSubst, TyConBinder)
-    skolemise_binders subst (Bndr tv vis) =
-
---      pprTrace "tyvar" (ppr tv $$ ppr (tyVarKind tv) $$ ppr subst $$ ppr (substTy subst $ tyVarKind tv)) $
-        let tv' = (mkTcTyVar (tyVarName tv) (substTy subst $ tyVarKind tv) (vanillaSkolemTv skol_info))
-            subst' = extendTvSubst subst tv (mkTyVarTy tv')
-        in (subst', Bndr tv' vis)
+    expect_tv (TyVarTy tv ) = tv
+    expect_tv _ = panic "expect_tv"
 
 
 {- *********************************************************************
@@ -3678,7 +3661,7 @@ Hence using zonked_kinds when forming tvs'.
 -}
 
 -----------------------------------
-etaExpandAlgTyCon :: [TyConBinder]
+etaExpandAlgTyCon :: [TyVar] -- Doesn't matter if these are TcTyVar or TyVar
                   -> Kind   -- must be zonked
                   -> TcM ([TyConBinder], Kind)
 -- GADT decls can have a (perhaps partial) kind signature
@@ -3690,7 +3673,7 @@ etaExpandAlgTyCon :: [TyConBinder]
 -- It's a little trickier than you might think: see
 -- Note [TyConBinders for the result kind signature of a data type]
 -- See Note [Datatype return kinds] in GHC.Tc.TyCl
-etaExpandAlgTyCon tc_bndrs kind
+etaExpandAlgTyCon lhs_tvs kind
   = do  { loc     <- getSrcSpanM
         ; uniqs   <- newUniqueSupply
         ; rdr_env <- getLocalRdrEnv
@@ -3704,7 +3687,6 @@ etaExpandAlgTyCon tc_bndrs kind
               subst = mkEmptyTCvSubst (mkInScopeSet (mkVarSet lhs_tvs))
         ; return (go loc new_occs new_uniqs subst [] kind) }
   where
-    lhs_tvs  = map binderVar tc_bndrs
     lhs_occs = map getOccName lhs_tvs
 
     go loc occs uniqs subst acc kind

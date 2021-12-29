@@ -1,0 +1,27 @@
+
+T20063.hs:25:21: error:
+    • Could not deduce: ctx4 ~ (ctx0 :*& l0)
+      from the context: (ctx1 ~ 'Extend ctx7, ctx2 ~ 'Extend ctx8)
+        bound by a pattern with constructor:
+                   U :: forall {k} (ctx1 :: Context) (ctx2 :: Context) (l :: k).
+                        Rn ctx1 ctx2 -> Rn (ctx1 :*& l) (ctx2 :*& l),
+                 in an equation for ‘rnRename’
+        at T20063.hs:25:11-13
+      Expected: Idx ctx4
+        Actual: Idx (ctx0 :*& l0)
+      ‘ctx4’ is a rigid type variable bound by
+        the type signature for:
+          rnRename :: forall (ctx1 :: Context) (ctx2 :: Context)
+                             (ctx3 :: Context) (ctx4 :: Context).
+                      Rn ctx1 ctx2 -> Idx ctx3 -> Idx ctx4
+        at T20063.hs:24:1-48
+    • In the expression: T _
+      In an equation for ‘rnRename’: rnRename (U _) _ = T _
+    • Relevant bindings include
+        rnRename :: Rn ctx1 ctx2 -> Idx ctx3 -> Idx ctx4
+          (bound at T20063.hs:25:1)
+
+T20063.hs:26:17: error:
+    • The constructor ‘T’ should have 1 argument, but has been given none
+    • In the pattern: T
+      In an equation for ‘rnRename’: rnRename _ T = undefined

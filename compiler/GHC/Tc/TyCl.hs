@@ -2431,14 +2431,14 @@ tcClassDecl1 roles_info class_name hs_ctxt meths fundeps sigs ats at_defs
   = fixM $ \ clas ->
     -- We need the knot because 'clas' is passed into tcClassATs
     mkSkolemInfo skol_info_anon >>= \skol_info ->
-    bindTyClTyVars skol_info class_name $ \ _ binders res_kind ->
+    bindTyClTyVars skol_info class_name $ \ _ binders binder_sks res_kind ->
     do { checkClassKindSig res_kind
        ; traceTc "tcClassDecl 1" (ppr class_name $$ ppr binders)
        ; let tycon_name = class_name        -- We use the same name
              roles = roles_info tycon_name  -- for TyCon and Class
 
        ; (ctxt, fds, sig_stuff, at_stuff)
-            <- pushLevelAndSolveEqualities skol_info (binderVars binders) $
+            <- pushLevelAndSolveEqualities skol_info binder_sks $
                -- The (binderVars binders) is needed bring into scope the
                -- skolems bound by the class decl header (#17841)
                do { ctxt <- tcHsContext hs_ctxt
@@ -2718,7 +2718,7 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info
                               , fdInjectivityAnn = inj })
   | DataFamily <- fam_info
   = mkSkolemInfo (TyConSkol (DataFamilyFlavour Nothing) tc_name) >>= \skol_info ->
-    bindTyClTyVars skol_info tc_name $ \ _ binders res_kind -> do
+    bindTyClTyVars skol_info tc_name $ \ _ binders _skol_tvs res_kind -> do
   { traceTc "tcFamDecl1 data family:" (ppr tc_name)
   ; checkFamFlag tc_name
 
@@ -2746,7 +2746,7 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info
   | OpenTypeFamily <- fam_info
   =
     mkSkolemInfo (TyConSkol (OpenTypeFamilyFlavour Nothing) tc_name) >>= \skol_info ->
-    bindTyClTyVars skol_info tc_name $ \ _ binders res_kind -> do
+    bindTyClTyVars skol_info tc_name $ \ _ binders _skol_tvs res_kind -> do
   { traceTc "tcFamDecl1 open type family:" (ppr tc_name)
   ; checkFamFlag tc_name
   ; inj' <- tcInjectivity binders inj
@@ -2763,7 +2763,7 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info
          -- the variables in the header scope only over the injectivity
          -- declaration but this is not involved here
        ; (inj', binders, res_kind)
-            <- bindTyClTyVars unkSkol tc_name $ \ _ binders res_kind ->
+            <- bindTyClTyVars unkSkol tc_name $ \ _ binders _skol_tvs res_kind ->
                do { inj' <- tcInjectivity binders inj
                   ; return (inj', binders, res_kind) }
 
@@ -2861,10 +2861,11 @@ tcInjectivity tcbs (Just (L loc (InjectivityAnn _ _ lInjNames)))
 tcTySynRhs :: RolesInfo -> Name
            -> LHsType GhcRn -> TcM TyCon
 tcTySynRhs roles_info tc_name hs_ty
-  = mkSkolemInfo skol_info_anon >>= \skol_info -> bindTyClTyVars skol_info tc_name $ \ _ binders res_kind ->
+  = mkSkolemInfo skol_info_anon >>= \skol_info -> bindTyClTyVars skol_info tc_name $ \ _ binders skol_tvs res_kind ->
     do { env <- getLclEnv
        ; traceTc "tc-syn" (ppr tc_name $$ ppr (tcl_env env))
-       ; rhs_ty <- pushLevelAndSolveEqualities skol_info (binderVars binders) $
+       ; rhs_ty <- pushLevelAndSolveEqualities skol_info skol_tvs $
+                   --TODO: MP I think this should be TcKind, not Kind
                    tcCheckLHsType hs_ty (TheKind res_kind)
 
          -- See Note [Error on unconstrained meta-variables] in GHC.Tc.Utils.TcMType
@@ -2897,7 +2898,7 @@ tcDataDefn err_ctxt roles_info tc_name
                        , dd_derivs = derivs })
   =
     mkSkolemInfo skol_info_anon >>= \skol_info ->
-    bindTyClTyVars skol_info tc_name $ \ tctc tycon_binders res_kind ->
+    bindTyClTyVars skol_info tc_name $ \ tctc tycon_binders skol_tvs res_kind ->
        -- 'tctc' is a 'TcTyCon' and has the 'tcTyConScopedTyVars' that we need
        -- unlike the finalized 'tycon' defined above which is an 'AlgTyCon'
        --
@@ -2908,14 +2909,13 @@ tcDataDefn err_ctxt roles_info tc_name
        -- over GADT ConDecls as well; and it's awkward not to
     do { gadt_syntax <- dataDeclChecks tc_name new_or_data ctxt cons
          -- see Note [Datatype return kinds]
-       ; (extra_bndrs, final_res_kind) <- etaExpandAlgTyCon tycon_binders res_kind
+       ; (extra_bndrs, final_res_kind) <- etaExpandAlgTyCon (binderVars tycon_binders) res_kind
 
        ; tcg_env <- getGblEnv
        ; let hsc_src = tcg_src tcg_env
        ; unless (mk_permissive_kind hsc_src cons) $
          checkDataKindSig (DataDeclSort new_or_data) final_res_kind
 
-       ; let skol_tvs = binderVars tycon_binders
        ; stupid_tc_theta <- pushLevelAndSolveEqualities skol_info skol_tvs $
                             tcHsContext ctxt
 

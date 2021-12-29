@@ -1,0 +1,22 @@
+
+T19752.hs:12:10: error:
+    • Could not deduce: F b0 ~ a
+      from the context: F b ~ a
+        bound by the type signature for:
+                   f :: forall b. (F b ~ a) => a
+        at T19752.hs:12:10-23
+      Expected: forall b. (F b ~ a) => a
+        Actual: forall b. (F b ~ a) => a
+      ‘a’ is a rigid type variable bound by
+        the type signature for:
+          g :: forall a. a
+        at T19752.hs:9:1-16
+    • In the ambiguity check for ‘f’
+      To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
+      In the type signature: f :: (F b ~ a) => a
+      In an equation for ‘g’:
+          g = f
+            where
+                f :: (F b ~ a) => a
+                f = undefined
+    • Relevant bindings include g :: a (bound at T19752.hs:10:1)

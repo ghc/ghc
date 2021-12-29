@@ -28,7 +28,7 @@ import GHC.Tc.Types.Evidence( mkTcCoVarCo )
 import GHC.Core.Type
 import GHC.Core.TyCon( isTypeFamilyTyCon )
 import GHC.Types.Id
-import GHC.Types.Var( EvVar )
+import GHC.Types.Var( EvVar, tyVarName )
 import GHC.Types.Var.Set
 import GHC.Types.Basic ( RuleName, NonStandardDefaultingStrategy(..) )
 import GHC.Types.SrcLoc
@@ -156,6 +156,9 @@ tcRule (HsRule { rd_ext  = ext
                                 , ppr forall_tkvs
                                 , ppr qtkvs
                                 , ppr rule_ty
+                                , ppr ty_bndrs
+                                , ppr (
+                                         (qtkvs ++ tpl_ids))
                                 , vcat [ ppr id <+> dcolon <+> ppr (idType id) | id <- tpl_ids ]
                   ])
 
@@ -168,7 +171,6 @@ tcRule (HsRule { rd_ext  = ext
                                          lhs_evs residual_lhs_wanted
        ; (rhs_implic, rhs_binds) <- buildImplicationFor tc_lvl (getSkolemInfo skol_info) qtkvs
                                          lhs_evs rhs_wanted
-
        ; emitImplications (lhs_implic `unionBags` rhs_implic)
        ; return $ HsRule { rd_ext = ext
                          , rd_name = rname
@@ -193,8 +195,8 @@ generateRuleConstraints rule_name ty_bndrs tm_bndrs lhs rhs
               -- constraints, which we should not forget about.
               -- It may mention the skolem type variables bound by
               -- the RULE.  c.f. #10072
-
-       ; tcExtendTyVarEnv unkSkol tv_bndrs $
+--       ; pprTraceM "tv_bndrs" (ppr tv_bndrs)
+       ; tcExtendNameTyVarEnv [(tyVarName tv, tv) | tv <- tv_bndrs] $
          tcExtendIdEnv    id_bndrs $
     do { -- See Note [Solve order for RULES]
          ((lhs', rule_ty), lhs_wanted) <- captureConstraints (tcInferRho lhs)

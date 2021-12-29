@@ -33,7 +33,9 @@ T9834.hs:23:23: warning: [-Wdeferred-type-errors (in -Wdefault)]
       ‘a’ is a rigid type variable bound by
         the type signature for:
           afix :: forall a.
-                  (forall (q :: * -> *). Applicative q => Comp p q a -> Comp p q a)
+                  (forall (q1 :: * -> *).
+                   Applicative q1 =>
+                   Comp p q1 a -> Comp p q1 a)
                   -> p a
         at T9834.hs:22:11-74
     • In the first argument of ‘wrapIdComp’, namely ‘f’

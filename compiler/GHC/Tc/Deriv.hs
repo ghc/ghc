@@ -480,10 +480,9 @@ deriveClause rep_tc scoped_tvs mb_lderiv_strat deriv_preds err_ctxt
                                   Just (tvs, ty) -> do
                                     skol_info <- mkSkolemInfo (DerivSkol ty)
                                     return $ (tcExtendTyVarEnv skol_info tvs, tvs)
-                                  Nothing -> return (id, [])
+                                  Nothing -> return (\f -> f emptyTCvSubst [], [])
 
-        pprTraceM "via_tvs" (ppr via_tvs)
-        extend_by $
+        extend_by $ \_subst _vars ->
         -- Moreover, when using DerivingVia one can bind type variables in
         -- the `via` type as well, so these type variables must also be
         -- brought into scope.
@@ -646,10 +645,10 @@ deriveStandalone (L loc (DerivDecl _ deriv_ty mb_lderiv_strat overlap_mode))
                                   Just (tvs, ty) -> do
                                     skol_info <- mkSkolemInfo (DerivSkol ty)
                                     return $ (tcExtendTyVarEnv skol_info tvs, tvs)
-                                  Nothing -> return (id, [])
+                                  Nothing -> return (\f -> f emptyTCvSubst [], [])
        -- MP: Issue here because we don't yet have the Type to put in this hole
        ; (cls_tvs, deriv_ctxt, cls, inst_tys)
-           <- extend_by $
+           <- extend_by $ \_subst _vars ->
               tcStandaloneDerivInstType ctxt deriv_ty
        ; let mb_deriv_strat = fmap unLoc mb_lderiv_strat
              tvs            = via_tvs ++ cls_tvs

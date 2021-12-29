@@ -534,13 +534,15 @@ tcExtendKindEnv extra_env thing_inside
 
 -----------------------
 -- Scoped type and kind variables
-tcExtendTyVarEnv :: SkolemInfo -> [TyVar] -> TcM r -> TcM r
+tcExtendTyVarEnv :: SkolemInfo -> [TyVar] -> (TCvSubst -> [TcTyVar] -> TcM r) -> TcM r
 tcExtendTyVarEnv skol_info tvs thing_inside
-  = tcExtendNameTyVarEnv (snd $ mapAccumL go emptyTCvSubst tvs) thing_inside
+  = let (subst, tvs') = mapAccumL go emptyTCvSubst tvs
+    in tcExtendNameTyVarEnv tvs' (thing_inside subst (map snd tvs'))
     where
       go subst tv =
         let tv' = mkTcTyVar (tyVarName tv) (substTy subst (tyVarKind tv)) (vanillaSkolemTv skol_info)
         in (extendTvSubst subst tv (mkTyVarTy tv'),  (tyVarName tv, tv'))
+
 
 tcExtendNameTyVarEnv :: [(Name,TcTyVar)] -> TcM r -> TcM r
 tcExtendNameTyVarEnv binds thing_inside
