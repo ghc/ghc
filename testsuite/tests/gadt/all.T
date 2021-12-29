@@ -97,6 +97,7 @@ test('T3651', normal, compile_fail, [''])
 test('T3638', normal, compile, [''])
 
 test('gadtSyntax001', normal, compile, [''])
+test('gadtSyntax002', normal, compile, [''])
 test('gadtSyntaxFail001', normal, compile_fail, [''])
 test('gadtSyntaxFail002', normal, compile_fail, [''])
 test('gadtSyntaxFail003', normal, compile_fail, [''])

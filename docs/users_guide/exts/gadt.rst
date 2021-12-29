@@ -80,13 +80,32 @@ also sets :extension:`GADTSyntax` and :extension:`MonoLocalBinds`.
    each constructor must end with ``Term ty``, but the ``ty`` need not
    be a type variable (e.g. the ``Lit`` constructor).
 
+-  GADT constructors can include contexts and existential variables,
+   generalising existential quantification (:ref:`existential-quantification`).
+   For example: ::
+
+        data SomeShow where
+            SomeShow :: Show a => a -> SomeShow
+              -- `a` is existential, as it does not appear in the return type
+
+        data G a where
+            MkG :: (a ~ Int) => a -> a -> G a
+         -- essentially the same as:
+         -- MkG :: Int -> Int -> G Int
+
 -  It is permitted to declare an ordinary algebraic data type using
    GADT-style syntax. What makes a GADT into a GADT is not the syntax,
    but rather the presence of data constructors whose result type is not
-   just ``T a b``.
+   just ``T a b``, or which include contexts.
+
+-  A newtype may use GADT-style syntax, but it must declare an ordinary
+   data type, not a GADT. That is, the constructor must not bind
+   existential variables (as per :ref:`existential-quantification`)
+   nor include a context.
 
 -  You cannot use a ``deriving`` clause for a GADT; only for an ordinary
-   data type.
+   data type (possibly using GADT-style syntax). However, you can still use a
+   :ref:`stand-alone-deriving` declaration.
 
 -  As mentioned in :ref:`gadt-style`, record syntax is supported. For
    example:

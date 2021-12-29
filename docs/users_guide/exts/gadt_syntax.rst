@@ -19,6 +19,9 @@ explicitly. For example: ::
           Nothing :: Maybe a
           Just    :: a -> Maybe a
 
+      newtype Down a where
+        Down :: a -> Down a
+
 The form is called a "GADT-style declaration" because Generalised
 Algebraic Data Types, described in :ref:`gadt`, can only be declared
 using this form.
@@ -30,8 +33,8 @@ are equivalent: ::
       data Foo = forall a. MkFoo a (a -> Bool)
       data Foo' where { MKFoo :: a -> (a->Bool) -> Foo' }
 
-Any data type that can be declared in standard Haskell 98 syntax can
-also be declared using GADT-style syntax. The choice is largely
+Any datatype (or newtype) that can be declared in standard Haskell 98 syntax,
+can also be declared using GADT-style syntax. The choice is largely
 stylistic, but GADT-style declarations differ in one important respect:
 they treat class constraints on the data constructors differently.
 Specifically, if the constructor is given a type-class context, that
@@ -102,6 +105,10 @@ gives ``MkSet'`` the same type as ``MkSet`` above. But instead of
 implements this behaviour, odd though it is. But for GADT-style
 declarations, GHC's behaviour is much more useful, as well as much more
 intuitive.
+
+Note that the restrictions of :ref:`existential-restrictions` are still
+in place; for example, a newtype declared with ``GADTSyntax`` cannot
+use existential quantification.
 
 .. _formal-gadt-syntax:
 

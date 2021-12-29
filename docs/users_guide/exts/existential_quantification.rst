@@ -176,6 +176,8 @@ For example: ::
     upd4 g x = g { g2=x }   -- BAD (g2's type mentions c, which is not a simple
                             --      type-variable argument in G1's result type)
 
+.. _existential-restrictions:
+
 Restrictions
 ~~~~~~~~~~~~
 
