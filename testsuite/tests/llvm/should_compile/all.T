@@ -6,7 +6,7 @@ def f( name, opts ):
 setTestOpts(f)
 
 # Apples LLVM Toolchain knows about a `vortex` cpu (and possibly others), that
-# the stock LLVM toolchain doesn't know abotu and will warn about. Let's not
+# the stock LLVM toolchain doesn't know about and will warn about. Let's not
 # have test fail just because of processor name differences due to different
 # LLVM Toolchains.  GHC tries to pass what apple expects (on darwin), but can
 # be used with the stock LLVM toolchain as well.
