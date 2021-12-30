@@ -541,7 +541,7 @@ tcExtendTyVarEnv skol_info tvs thing_inside
     where
       go subst tv =
         let tv' = mkTcTyVar (tyVarName tv) (substTy subst (tyVarKind tv)) (vanillaSkolemTv skol_info)
-        in (extendTvSubst subst tv (mkTyVarTy tv'),  (tyVarName tv, tv'))
+        in (extendTvSubstWithClone subst tv tv',  (tyVarName tv, tv'))
 
 
 tcExtendNameTyVarEnv :: [(Name,TcTyVar)] -> TcM r -> TcM r
