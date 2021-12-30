@@ -646,7 +646,6 @@ deriveStandalone (L loc (DerivDecl _ deriv_ty mb_lderiv_strat overlap_mode))
                                     skol_info <- mkSkolemInfo (DerivSkol ty)
                                     return $ (tcExtendTyVarEnv skol_info tvs, tvs)
                                   Nothing -> return (\f -> f emptyTCvSubst [], [])
-       -- MP: Issue here because we don't yet have the Type to put in this hole
        ; (cls_tvs, deriv_ctxt, cls, inst_tys)
            <- extend_by $ \_subst _vars ->
               tcStandaloneDerivInstType ctxt deriv_ty

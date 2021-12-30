@@ -94,7 +94,6 @@ import Data.Ord         ( comparing )
 -- import Data.Semigroup   ( Semigroup )
 import qualified Data.Semigroup as Semigroup
 import Data.Bifunctor
-import GHC.Utils.Trace
 
 
 {-
@@ -230,7 +229,7 @@ report_unsolved type_errors expr_holes
 
        ; wanted <- zonkWC wanted   -- Zonk to reveal all information
 
-       ; let tidy_env = tidyFreeTyCoVars emptyTidyEnv free_tvs;
+       ; let tidy_env = tidyFreeTyCoVars emptyTidyEnv free_tvs
              free_tvs = filterOut isCoVar $
                         tyCoVarsOfWCList wanted
                         -- tyCoVarsOfWC returns free coercion *holes*, even though
@@ -3172,15 +3171,20 @@ pprSkols ctxt tvs
     group_skolems :: UM.UniqMap SkolemInfo ([(TcTyVar, Int)])
     group_skolems = bagToList <$> UM.listToUniqMap_C unionBags [(skolemSkolInfo tv, unitBag (tv, n)) | tv <- tvs | n <- [0..]]
 
-    skolem_list = sortBy (comparing (sort . map snd . snd . pprTraceIt "sort")) (UM.nonDetEltsUniqMap group_skolems)
+    skolem_list = sortBy (comparing (sort . map snd . snd)) (UM.nonDetEltsUniqMap group_skolems)
+
+    no_msg = text "No skolem info - we could not find the origin of the following variables" <+> ppr tvs
+       $$ text "This should not happen, please report it as a bug following the instructions at:"
+       $$ text "https://gitlab.haskell.org/ghc/ghc/wikis/report-a-bug"
 
 
     pp_one (UnkSkol cs, tvs)
       = vcat [ hang (pprQuotedList tvs)
                  2 (is_or_are tvs "a" "(rigid, skolem)")
              , nest 2 (text "of unknown origin")
-             , prettyCallStackDoc cs
              , nest 2 (text "bound at" <+> ppr (foldr1 combineSrcSpans (map getSrcSpan tvs)))
+             , no_msg
+             , prettyCallStackDoc cs
              ]
     pp_one (RuntimeUnkSkol, tvs)
       = hang (pprQuotedList tvs)

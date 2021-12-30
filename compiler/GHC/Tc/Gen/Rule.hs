@@ -157,8 +157,7 @@ tcRule (HsRule { rd_ext  = ext
                                 , ppr qtkvs
                                 , ppr rule_ty
                                 , ppr ty_bndrs
-                                , ppr (
-                                         (qtkvs ++ tpl_ids))
+                                , ppr (qtkvs ++ tpl_ids)
                                 , vcat [ ppr id <+> dcolon <+> ppr (idType id) | id <- tpl_ids ]
                   ])
 
@@ -195,7 +194,6 @@ generateRuleConstraints rule_name ty_bndrs tm_bndrs lhs rhs
               -- constraints, which we should not forget about.
               -- It may mention the skolem type variables bound by
               -- the RULE.  c.f. #10072
---       ; pprTraceM "tv_bndrs" (ppr tv_bndrs)
        ; tcExtendNameTyVarEnv [(tyVarName tv, tv) | tv <- tv_bndrs] $
          tcExtendIdEnv    id_bndrs $
     do { -- See Note [Solve order for RULES]

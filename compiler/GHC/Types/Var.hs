@@ -113,7 +113,6 @@ import GHC.Utils.Panic.Plain
 
 import Data.Data
 
-
 {-
 ************************************************************************
 *                                                                      *
@@ -749,7 +748,6 @@ updateTyVarKindM update tv
   = do { k' <- update (tyVarKind tv)
        ; return $ tv {varType = k'} }
 
-
 mkTyVar :: Name -> Kind -> TyVar
 mkTyVar name kind = TyVar { varName    = name
                           , realUnique = getKey (nameUnique name)
@@ -768,6 +766,7 @@ mkTcTyVar name kind details
 tcTyVarDetails :: TyVar -> TcTyVarDetails
 -- See Note [TcTyVars and TyVars in the typechecker] in GHC.Tc.Utils.TcType
 tcTyVarDetails (TcTyVar { tc_tv_details = details }) = details
+-- MP: This should never happen, but it does. Future work is to turn this into a panic.
 tcTyVarDetails (TyVar {})                            = vanillaSkolemTvUnk --pprTrace "tcTyVarDetailsTyVar" (prettyCallStackDoc $ varOrigin v) vanillaSkolemTvUnk --pprTrace "tyVar" (text $ show (unsafePerformIO $ whereFrom tv)) $ vanillaSkolemTvUnk
 tcTyVarDetails var = pprPanic "tcTyVarDetails" (ppr var <+> dcolon <+> pprKind (tyVarKind var))
 

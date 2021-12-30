@@ -773,7 +773,8 @@ generaliseTyClDecl inferred_tc_env (L _ decl)
     skolemise_tc_tycon tc_name
       = do { let tc = lookupNameEnv_NF inferred_tc_env tc_name
                       -- This lookup should not fail
-           ; scoped_prs <- mapSndM zonkAndSkolemise (tcTyConScopedTyVars tc)
+           ; skol_info <- mkSkolemInfo (TyConSkol (tyConFlavour tc) tc_name )
+           ; scoped_prs <- mapSndM (zonkAndSkolemise skol_info) (tcTyConScopedTyVars tc)
            ; return (tc, scoped_prs) }
 
     zonk_tc_tycon :: (TcTyCon, ScopedPairs) -> TcM (TcTyCon, ScopedPairs, TcKind)
@@ -2910,6 +2911,7 @@ tcDataDefn err_ctxt roles_info tc_name
     do { gadt_syntax <- dataDeclChecks tc_name new_or_data ctxt cons
          -- see Note [Datatype return kinds]
        ; (extra_bndrs, final_res_kind) <- etaExpandAlgTyCon (binderVars tycon_binders) res_kind
+       ; tcExtendTyVarEnv skol_info (binderVars extra_bndrs) $ \_subst extra_tvs -> do {
 
        ; tcg_env <- getGblEnv
        ; let hsc_src = tcg_src tcg_env
@@ -2941,10 +2943,11 @@ tcDataDefn err_ctxt roles_info tc_name
 
        ; tycon <- fixM $ \ rec_tycon -> do
              { let final_bndrs = tycon_binders `chkAppend` extra_bndrs
+                   final_tvs   = skol_tvs `chkAppend` extra_tvs
                    roles       = roles_info tc_name
              ; data_cons <- tcConDecls
                               new_or_data DDataType
-                              rec_tycon final_bndrs final_res_kind
+                              rec_tycon final_bndrs final_tvs final_res_kind
                               cons
              ; tc_rhs    <- mk_tc_rhs hsc_src rec_tycon data_cons
              ; tc_rep_nm <- newTyConRepName tc_name
@@ -2961,7 +2964,7 @@ tcDataDefn err_ctxt roles_info tc_name
                                     , di_clauses = derivs
                                     , di_ctxt = err_ctxt }
        ; traceTc "tcDataDefn" (ppr tc_name $$ ppr tycon_binders $$ ppr extra_bndrs)
-       ; return (tycon, [deriv_info]) }
+       ; return (tycon, [deriv_info]) } }
   where
     skol_info_anon = TyConSkol flav tc_name
     flav = newOrDataToFlavour new_or_data
@@ -3377,11 +3380,12 @@ tcConDecls :: NewOrData
            -> DataDeclInfo
            -> KnotTied TyCon            -- Representation TyCon
            -> [TyConBinder]             -- Binders of representation TyCon
+           -> [TcTyVar]                 -- Skolemised binder vars (use these when typechecking things)
            -> TcKind                    -- Result kind
            -> [LConDecl GhcRn] -> TcM [DataCon]
-tcConDecls new_or_data dd_info rep_tycon tmpl_bndrs res_kind
+tcConDecls new_or_data dd_info rep_tycon tmpl_bndrs skol_tvs res_kind
   = concatMapM $ addLocMA $
-    tcConDecl new_or_data dd_info rep_tycon tmpl_bndrs res_kind
+    tcConDecl new_or_data dd_info rep_tycon tmpl_bndrs skol_tvs res_kind
               (mkTyConTagMap rep_tycon)
     -- mkTyConTagMap: it's important that we pay for tag allocation here,
     -- once per TyCon. See Note [Constructor tag allocation], fixes #14657
@@ -3390,12 +3394,13 @@ tcConDecl :: NewOrData
           -> DataDeclInfo
           -> KnotTied TyCon   -- Representation tycon. Knot-tied!
           -> [TyConBinder]    -- Binders of representation TyCon
+          -> [TcTyVar]        -- Skolemised binders
           -> TcKind           -- Result kind
           -> NameEnv ConTag
           -> ConDecl GhcRn
           -> TcM [DataCon]
 
-tcConDecl new_or_data dd_info rep_tycon tc_bndrs res_kind tag_map
+tcConDecl new_or_data dd_info rep_tycon tc_bndrs skol_tvs res_kind tag_map
           (ConDeclH98 { con_name = lname@(L _ name)
                       , con_ex_tvs = explicit_tkv_nms
                       , con_mb_cxt = hs_ctxt
@@ -3443,9 +3448,8 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs res_kind tag_map
 
        ; kvs <- kindGeneralizeAll skol_info fake_ty
 
-     --  ; let skol_tvs = tc_tvs ++ kvs ++ binderVars exp_tvbndrs
-     --  ; pprTraceM "skol_tvs" (ppr tc_tvs $$ ppr kvs $$ ppr (binderVars (exp_tvbndrs)))
-       ; reportUnsolvedEqualities skol_info [] tclvl wanted
+       ; let all_skol_tvs = skol_tvs ++ kvs ++ binderVars exp_tvbndrs
+       ; reportUnsolvedEqualities skol_info all_skol_tvs tclvl wanted
              -- The skol_info claims that all the variables are bound
              -- by the data constructor decl, whereas actually the
              -- univ_tvs are bound by the data type decl itself.  It
@@ -3486,7 +3490,7 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs res_kind tag_map
 
        ; return [dc] }
 
-tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
+tcConDecl new_or_data dd_info rep_tycon tc_bndrs _skol_tvs _res_kind tag_map
   -- NB: don't use res_kind here, as it's ill-scoped. Instead,
   -- we get the res_kind by typechecking the result type.
           (ConDeclGADT { con_names = names

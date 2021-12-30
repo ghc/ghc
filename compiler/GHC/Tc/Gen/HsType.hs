@@ -1977,7 +1977,6 @@ tcTyVar :: TcTyMode -> Name -> TcM (TcType, TcKind)
 tcTyVar mode name         -- Could be a tyvar, a tycon, or a datacon
   = do { traceTc "lk1" (ppr name)
        ; thing <- tcLookup name
---       ; pprTraceM "tcTyVar" (ppr name $$ ppr thing)
        ; case thing of
            ATyVar _ tv -> return (mkTyVarTy tv, tyVarKind tv)
 
@@ -2551,9 +2550,9 @@ kcCheckDeclHeader_sig kisig name flav
         ; (vis_tcbs, concat -> explicit_tv_prs) <- mapAndUnzipM (zipped_to_tcb skol_info) zipped_binders
         ; skol_info  <- mkSkolemInfo (TyConSkol flav name)
 
-        ; (tclvl, wanted, (implicit_tvs, (invis_binders, r_ki)))
+        ; (tclvl, wanted, (implicit_tvs, (invis_binders, skol_tvs, r_ki)))
              <- pushLevelAndSolveEqualitiesX "kcCheckDeclHeader_sig" $  -- #16687
-                bindImplicitTKBndrs_Tv implicit_nms        $
+                bindImplicitTKBndrs_Tv implicit_nms                  $
                 tcExtendNameTyVarEnv explicit_tv_prs                 $
                 do { -- Check that inline kind annotations on binders are valid.
                      -- For example:
@@ -2593,12 +2592,14 @@ kcCheckDeclHeader_sig kisig name flav
                      --
                      -- Here we unify   Maybe k ~ Maybe j
 
-                   ; whenIsJust m_res_ki $ \res_ki -> do
-                      discardResult $
-                        tcExtendTyVarEnv skol_info (mapMaybe tyCoBinderVar_maybe invis_binders) $ \subst _vars ->  -- See Note [discardResult in kcCheckDeclHeader_sig]
+                   ;
+                    tcExtendTyVarEnv skol_info (mapMaybe tyCoBinderVar_maybe invis_binders) $ \subst skol_tvs ->  do
+                      -- See Note [discardResult in kcCheckDeclHeader_sig]
+                      whenIsJust m_res_ki $ \res_ki -> do
+                        discardResult $
                           unifyKind Nothing (substTy subst r_ki) res_ki
 
-                   ; return (invis_binders, r_ki) }
+                      return (invis_binders, skol_tvs, r_ki) }
 
         -- Convert each invisible TyCoBinder to TyConBinder for tyConBinders.
         ; invis_tcbs <- mapM invis_to_tcb invis_binders
@@ -2613,7 +2614,7 @@ kcCheckDeclHeader_sig kisig name flav
               tc              = mkTcTyCon name tcbs r_ki all_tv_prs True flav
 
         -- Check that there are no unsolved equalities
-        ; reportUnsolvedEqualities skol_info [] tclvl wanted
+        ; reportUnsolvedEqualities skol_info skol_tvs tclvl wanted
 
         ; traceTc "kcCheckDeclHeader_sig done:" $ vcat
           [ text "tyConName = " <+> ppr (tyConName tc)
@@ -3296,7 +3297,6 @@ bindExplicitTKBndrsX skol_mode@(SM { sm_parent = check_parent, sm_kind = ctxt_ki
       = do { kind <- tc_lhs_kind_sig tc_ki_mode (TyVarBndrKindCtxt name) lhs_kind
            ; newTyVarBndr skol_mode name kind }
 
-
 newTyVarBndr :: SkolemMode -> Name -> Kind -> TcM TcTyVar
 newTyVarBndr (SM { sm_clone = clone, sm_tvtv = tvtv }) name kind
   = do { name <- case clone of
@@ -3490,13 +3490,7 @@ bindTyClTyVars skol_info tycon_name thing_inside
        ; let scoped_prs = tcTyConScopedTyVars tycon
              res_kind   = tyConResKind tycon
              binders    = tyConBinders tycon
-      -- ; pprTraceM "bindTyClTyVars" (ppr scoped_prs $$ ppr binders)
---       ; let scoped_prs' = map skolemise_pair scoped_prs
- --      ; lcl_env <- tcl_env <$> getLclEnv
---       ; th_body <- tcl_bndrs <$> getLclEnv
---       ; let (_, binders') = mapAccumL skolemise_binders emptyTCvSubst binders
-       ;
-         tcExtendTyVarEnv skol_info (binderVars binders) $ \subst tc_vars ->
+       ; tcExtendTyVarEnv skol_info (binderVars binders) $ \subst tc_vars ->
           let scoped_prs' = map (second (expect_tv . substTyVar subst)) scoped_prs
           in tcExtendNameTyVarEnv scoped_prs' $
               thing_inside tycon binders tc_vars res_kind }

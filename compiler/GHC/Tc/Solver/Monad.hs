@@ -1212,7 +1212,6 @@ data TcSEnv
 ---------------
 newtype TcS a = TcS { unTcS :: TcSEnv -> TcM a } deriving (Functor)
 
-
 -- | Smart constructor for 'TcS', as describe in Note [The one-shot state
 -- monad trick] in "GHC.Utils.Monad".
 mkTcS :: (TcSEnv -> TcM a) -> TcS a

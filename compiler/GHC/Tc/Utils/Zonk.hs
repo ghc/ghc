@@ -3,7 +3,6 @@
 {-# LANGUAGE TypeFamilies     #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
-{-# LANGUAGE LambdaCase #-}
 
 {-
 (c) The University of Glasgow 2006

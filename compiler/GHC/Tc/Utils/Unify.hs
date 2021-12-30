@@ -957,7 +957,9 @@ emitResidualTvConstraint skol_info skol_tvs tclvl wanted
 buildTvImplication :: SkolemInfo -> [TcTyVar]
                    -> TcLevel -> WantedConstraints -> TcM Implication
 buildTvImplication skol_info skol_tvs tclvl wanted
-  = do { ev_binds <- newNoTcEvBinds  -- Used for equalities only, so all the constraints
+  =
+    assertPpr (all (isSkolemTyVar <||> isTyVarTyVar) skol_tvs) (ppr skol_tvs) $
+    do { ev_binds <- newNoTcEvBinds  -- Used for equalities only, so all the constraints
                                      -- are solved by filling in coercion holes, not
                                      -- by creating a value-level evidence binding
        ; implic   <- newImplication

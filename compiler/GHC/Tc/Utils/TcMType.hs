@@ -930,7 +930,7 @@ readMetaTyVar :: TyVar -> TcM MetaDetails
 readMetaTyVar tyvar = assertPpr (isMetaTyVar tyvar) (ppr tyvar) $
                       readMutVar (metaTyVarRef tyvar)
 
-isFilledMetaTyVar_maybe :: HasCallStack => TcTyVar -> TcM (Maybe Type)
+isFilledMetaTyVar_maybe :: TcTyVar -> TcM (Maybe Type)
 isFilledMetaTyVar_maybe tv
  | isTcTyVar tv
  , MetaTv { mtv_ref = ref } <- tcTyVarDetails tv
@@ -1754,19 +1754,19 @@ isQuantifiableTv outer_tclvl tcv
   | otherwise
   = False
 
-zonkAndSkolemise :: TcTyCoVar -> TcM TcTyCoVar
+zonkAndSkolemise :: SkolemInfo -> TcTyCoVar -> TcM TcTyCoVar
 -- A tyvar binder is never a unification variable (TauTv),
 -- rather it is always a skolem. It *might* be a TyVarTv.
 -- (Because non-CUSK type declarations use TyVarTvs.)
 -- Regardless, it may have a kind that has not yet been zonked,
 -- and may include kind unification variables.
-zonkAndSkolemise tyvar
+zonkAndSkolemise skol_info tyvar
   | isTyVarTyVar tyvar
      -- We want to preserve the binding location of the original TyVarTv.
      -- This is important for error messages. If we don't do this, then
      -- we get bad locations in, e.g., typecheck/should_fail/T2688
   = do { zonked_tyvar <- zonkTcTyVarToTyVar tyvar
-       ; skolemiseQuantifiedTyVar unkSkol zonked_tyvar }
+       ; skolemiseQuantifiedTyVar skol_info zonked_tyvar }
 
   | otherwise
   = assertPpr (isImmutableTyVar tyvar || isCoVar tyvar) (pprTyVar tyvar) $
@@ -2496,7 +2496,7 @@ zonkTcTyVar tv
   = zonk_kind_and_return
   where
     zonk_kind_and_return = do { z_tv <- zonkTyCoVarKind tv
-                              ; mkTyVarTy <$> pure z_tv
+                              ; return (mkTyVarTy z_tv)
                               }
 
 -- Variant that assumes that any result of zonking is still a TyVar.

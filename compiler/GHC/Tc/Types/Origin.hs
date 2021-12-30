@@ -57,7 +57,6 @@ import GHC.Data.FastString
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Trace
 import GHC.Stack
 import GHC.Utils.Monad
 import GHC.Types.Unique
@@ -263,6 +262,8 @@ data SkolemInfoAnon
 
   | RuntimeUnkSkol      -- Runtime skolem from the GHCi debugger      #14628
 
+  | ArrowReboundIfSkol  -- Bound by the expected type of the rebound arrow ifThenElse command.
+
   | UnkSkol CallStack
 
 
@@ -310,11 +311,12 @@ pprSkolInfo ReifySkol         = text "the type being reified"
 
 pprSkolInfo (QuantCtxtSkol {}) = text "a quantified context"
 pprSkolInfo RuntimeUnkSkol     = text "Unknown type from GHCi runtime"
+pprSkolInfo ArrowReboundIfSkol = text "the expected type of a rebound if-then-else command"
 
 -- unkSkol
 -- For type variables the others are dealt with by pprSkolTvBinding.
 -- For Insts, these cases should not happen
-pprSkolInfo (UnkSkol cs) =  warnPprTrace True (text "pprSkolInfo: unkSkol") $ text "UnkSkol" $$ prettyCallStackDoc cs
+pprSkolInfo (UnkSkol cs) = text "UnkSkol (please report this as a bug)" $$ prettyCallStackDoc cs
 
 
 pprSigSkolInfo :: UserTypeCtxt -> TcType -> SDoc

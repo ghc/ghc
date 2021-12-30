@@ -684,7 +684,7 @@ tcTyVarLevel :: TcTyVar -> TcLevel
 tcTyVarLevel tv
   = case tcTyVarDetails tv of
           MetaTv { mtv_tclvl = tv_lvl } -> tv_lvl
-          SkolemTv _ tv_lvl _             -> tv_lvl
+          SkolemTv _ tv_lvl _           -> tv_lvl
           RuntimeUnk                    -> topTcLevel
 
 

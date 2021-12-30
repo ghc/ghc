@@ -539,6 +539,7 @@ tcExtendTyVarEnv skol_info tvs thing_inside
   = let (subst, tvs') = mapAccumL go emptyTCvSubst tvs
     in tcExtendNameTyVarEnv tvs' (thing_inside subst (map snd tvs'))
     where
+      -- Perhaps should use tcInstSkolTyVars here, that does a lot more though.
       go subst tv =
         let tv' = mkTcTyVar (tyVarName tv) (substTy subst (tyVarKind tv)) (vanillaSkolemTv skol_info)
         in (extendTvSubstWithClone subst tv tv',  (tyVarName tv, tv'))
