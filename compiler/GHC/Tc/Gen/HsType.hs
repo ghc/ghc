@@ -3005,12 +3005,12 @@ these first.
 ********************************************************************* -}
 
 -- | Describes the kind expected in a certain context.
-data ContextKind = TheKind Kind   -- ^ a specific kind
+data ContextKind = TheKind TcKind   -- ^ a specific kind
                  | AnyKind        -- ^ any kind will do
                  | OpenKind       -- ^ something of the form @TYPE _@
 
 -----------------------
-newExpectedKind :: ContextKind -> TcM Kind
+newExpectedKind :: ContextKind -> TcM TcKind
 newExpectedKind (TheKind k)   = return k
 newExpectedKind AnyKind       = newMetaKindVar
 newExpectedKind OpenKind      = newOpenTypeKind

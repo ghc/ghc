@@ -196,14 +196,30 @@ isSigMaybe _                = Nothing
 ************************************************************************
 -}
 
-data SkolemInfo = SkolemInfo Unique SkolemInfoAnon
+-- | 'SkolemInfo' stores the origin of a skolem type variable,
+-- so that we can display this information to the user in case of a type error.
+--
+-- The 'Unique' field allows us to report all skolem type variables bound in the
+-- same place in a single report.
+data SkolemInfo
+  = SkolemInfo
+      Unique -- ^ used to common up skolem variables bound at the same location
+      SkolemInfoAnon -- ^ the information about the origin of the skolem type variable
 
 instance Uniquable SkolemInfo where
   getUnique (SkolemInfo u _) = u
 
--- SkolemInfo gives the origin of *given* constraints
---   a) type variables are skolemised
---   b) an implication constraint is generated
+-- | 'SkolemInfoAnon' stores the origin of a skolem type variable (e.g. bound by
+-- a user-written forall, the header of a data declaration, a deriving clause, ...).
+--
+-- This information is displayed when reporting an error message, such as
+--
+--  @"Couldn't match 'k' with 'l'"@
+--
+-- This allows us to explain where the type variable came from.
+--
+-- When several skolem type variables are bound at once, prefer using 'SkolemInfo',
+-- which stores a 'Unique' which allows these type variables to be reported
 data SkolemInfoAnon
   = SigSkol -- A skolem that is created by instantiating
             -- a programmer-supplied type signature
@@ -269,9 +285,17 @@ data SkolemInfoAnon
 
 
 
+-- | Use this when you can't specify a helpful origin for
+-- some skolem type variable.
+--
+-- We're hoping to be able to get rid of this entirely, but for the moment
+-- it's still needed.
 unkSkol :: HasCallStack => SkolemInfo
 unkSkol = SkolemInfo (mkUniqueGrimily 0) (UnkSkol callStack)
 
+-- | Wrap up the origin of a skolem type variable with a new 'Unique',
+-- so that we can common up skolem type variables whose 'SkolemInfo'
+-- shares a certain 'Unique'.
 mkSkolemInfo :: MonadIO m => SkolemInfoAnon -> m SkolemInfo
 mkSkolemInfo sk_anon = do
   u <- liftIO $! uniqFromMask 's'

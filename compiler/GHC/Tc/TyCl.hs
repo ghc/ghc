@@ -1581,7 +1581,7 @@ kcTyClDecl :: TyClDecl GhcRn -> TcTyCon -> TcM ()
 -- TcTyVars rather than create skolemised variables for the bound variables.
 -- - inferInitialKinds makes the TcTyCon where the  tyvars are TcTyVars
 -- - In this function, those TcTyVars are unified with other kind variables during
--- - kind inference (see [How TcTyCons work])
+--   kind inference (see [How TcTyCons work])
 
 kcTyClDecl (DataDecl { tcdLName    = (L _ _name), tcdDataDefn = defn }) tycon
   | HsDataDefn { dd_ctxt = ctxt, dd_cons = cons, dd_ND = new_or_data } <- defn
@@ -1624,7 +1624,7 @@ kcTyClDecl (FamDecl _ (FamilyDecl { fdInfo   = fd_info })) fam_tc
 -- This includes doing kind unification if the type is a newtype.
 -- See Note [Implementation of UnliftedNewtypes] for why we need
 -- the first two arguments.
-kcConArgTys :: NewOrData -> Kind -> [HsScaled GhcRn (LHsType GhcRn)] -> TcM ()
+kcConArgTys :: NewOrData -> TcKind -> [HsScaled GhcRn (LHsType GhcRn)] -> TcM ()
 kcConArgTys new_or_data res_kind arg_tys = do
   { let exp_kind = getArgExpKind new_or_data res_kind
   ; forM_ arg_tys (\(HsScaled mult ty) -> do _ <- tcCheckLHsType (getBangType ty) exp_kind
@@ -1633,7 +1633,7 @@ kcConArgTys new_or_data res_kind arg_tys = do
   }
 
 -- Kind-check the types of arguments to a Haskell98 data constructor.
-kcConH98Args :: NewOrData -> Kind -> HsConDeclH98Details GhcRn -> TcM ()
+kcConH98Args :: NewOrData -> TcKind -> HsConDeclH98Details GhcRn -> TcM ()
 kcConH98Args new_or_data res_kind con_args = case con_args of
   PrefixCon _ tys   -> kcConArgTys new_or_data res_kind tys
   InfixCon ty1 ty2  -> kcConArgTys new_or_data res_kind [ty1, ty2]
@@ -1641,14 +1641,14 @@ kcConH98Args new_or_data res_kind con_args = case con_args of
                        map (hsLinear . cd_fld_type . unLoc) flds
 
 -- Kind-check the types of arguments to a GADT data constructor.
-kcConGADTArgs :: NewOrData -> Kind -> HsConDeclGADTDetails GhcRn -> TcM ()
+kcConGADTArgs :: NewOrData -> TcKind -> HsConDeclGADTDetails GhcRn -> TcM ()
 kcConGADTArgs new_or_data res_kind con_args = case con_args of
   PrefixConGADT tys     ->   kcConArgTys new_or_data res_kind tys
   RecConGADT (L _ flds) _ -> kcConArgTys new_or_data res_kind $
                              map (hsLinear . cd_fld_type . unLoc) flds
 
 kcConDecls :: NewOrData
-           -> Kind             -- The result kind signature
+           -> TcKind             -- The result kind signature
                                --   Used only in H98 case
            -> [LConDecl GhcRn] -- The data constructors
            -> TcM ()
@@ -1662,7 +1662,7 @@ kcConDecls new_or_data tc_res_kind cons
 -- this type. See Note [Implementation of UnliftedNewtypes] for why
 -- we need the first two arguments.
 kcConDecl :: NewOrData
-          -> Kind  -- Result kind of the type constructor
+          -> TcKind  -- Result kind of the type constructor
                    -- Usually Type but can be TYPE UnliftedRep
                    -- or even TYPE r, in the case of unlifted newtype
                    -- Used only in H98 case
@@ -3663,7 +3663,7 @@ tcInferLHsTypeKind doesn't any gratuitous top-level casts.
 -- it is OpenKind for datatypes and liftedTypeKind.
 -- Why do we not check for -XUnliftedNewtypes? See point <Error Messages>
 -- in Note [Implementation of UnliftedNewtypes]
-getArgExpKind :: NewOrData -> Kind -> ContextKind
+getArgExpKind :: NewOrData -> TcKind -> ContextKind
 getArgExpKind NewType res_ki = TheKind res_ki
 getArgExpKind DataType _     = OpenKind
 
