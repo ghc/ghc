@@ -486,10 +486,10 @@ type GlobalRdrEnv = OccEnv [GlobalRdrElt]
 --
 -- An element of the 'GlobalRdrEnv'
 data GlobalRdrElt
-  = GRE { gre_name :: GreName      -- ^ See Note [GreNames]
-        , gre_par  :: Parent       -- ^ See Note [Parents]
-        , gre_lcl :: Bool          -- ^ True <=> the thing was defined locally
-        , gre_imp :: [ImportSpec]  -- ^ In scope through these imports
+  = GRE { gre_name :: !GreName      -- ^ See Note [GreNames]
+        , gre_par  :: !Parent       -- ^ See Note [Parents]
+        , gre_lcl :: !Bool          -- ^ True <=> the thing was defined locally
+        , gre_imp :: ![ImportSpec]  -- ^ In scope through these imports
     } deriving (Data, Eq)
          -- INVARIANT: either gre_lcl = True or gre_imp is non-empty
          -- See Note [GlobalRdrElt provenance]
