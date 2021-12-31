@@ -615,6 +615,7 @@ home-package modules however, so it's safe for the HPT to be empty.
 
 dontLeakTheHPT :: IfL a -> IfL a
 dontLeakTheHPT thing_inside = do
+  dflags <- getDynFlags
   let
     cleanTopEnv HscEnv{..} =
        let
@@ -640,9 +641,15 @@ dontLeakTheHPT thing_inside = do
               ,  hsc_HPT          = hpt
               , .. }
 
-  updTopEnv cleanTopEnv $ do
-  !_ <- getTopEnv        -- force the updTopEnv
-  thing_inside
+    cleanGblEnv gbl
+      | ghcMode dflags == OneShot = gbl
+      | otherwise = gbl { if_rec_types = Nothing }
+
+  updGblEnv cleanGblEnv $
+    updTopEnv cleanTopEnv $ do
+      !_ <- getTopEnv        -- force the updTopEnv
+      !_ <- getGblEnv
+      thing_inside
 
 
 -- | Returns @True@ if a 'ModIface' comes from an external package.
