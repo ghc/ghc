@@ -2424,7 +2424,7 @@ tcTyClDecl1 _parent roles_info
 *                                                                      *
 ********************************************************************* -}
 
-tcClassDecl1 :: HasCallStack => RolesInfo -> Name -> Maybe (LHsContext GhcRn)
+tcClassDecl1 :: RolesInfo -> Name -> Maybe (LHsContext GhcRn)
              -> LHsBinds GhcRn -> [LHsFunDep GhcRn] -> [LSig GhcRn]
              -> [LFamilyDecl GhcRn] -> [LTyFamDefltDecl GhcRn]
              -> TcM Class

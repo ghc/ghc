@@ -1923,7 +1923,7 @@ addition to superclasses (see Note [Remove redundant provided dicts]
 in GHC.Tc.TyCl.PatSyn).
 -}
 
-extraTyVarEqInfo :: HasCallStack => ReportErrCtxt -> TcTyVar -> TcType -> TcM Report
+extraTyVarEqInfo :: ReportErrCtxt -> TcTyVar -> TcType -> TcM Report
 -- Add on extra info about skolem constants
 -- NB: The types themselves are already tidied
 extraTyVarEqInfo ctxt tv1 ty2
