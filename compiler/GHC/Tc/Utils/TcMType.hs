@@ -932,6 +932,8 @@ readMetaTyVar tyvar = assertPpr (isMetaTyVar tyvar) (ppr tyvar) $
 
 isFilledMetaTyVar_maybe :: TcTyVar -> TcM (Maybe Type)
 isFilledMetaTyVar_maybe tv
+-- TODO: This should be an assertion that tv is definitely a TcTyVar but it fails
+-- at the moment (Jan 22)
  | isTcTyVar tv
  , MetaTv { mtv_ref = ref } <- tcTyVarDetails tv
  = do { cts <- readTcRef ref
