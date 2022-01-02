@@ -20,6 +20,7 @@ import GHC.Prelude
 import GHC.Iface.Env
 import GHC.Core.FamInstEnv( FamInstEnvs, mkNewTypeCoAxiom )
 import GHC.Builtin.Types( isCTupleTyConName, unboxedUnitTy )
+import GHC.Builtin.Names ( ipClassName )
 import GHC.Core.DataCon
 import GHC.Core.PatSyn
 import GHC.Types.Var
@@ -320,7 +321,10 @@ buildClass tycon_name binders roles fds
               -- (We used to call them D_C, but now we can have two different
               --  superclasses both called C!)
 
-        ; let use_newtype = False && isSingleton arg_tys
+        ; let use_newtype =
+                --isSingleton arg_tys
+                tycon_name == ipClassName
+
                 -- Use a newtype if the data constructor
                 --   (a) has exactly one value field
                 --       i.e. exactly one operation or superclass taken together
