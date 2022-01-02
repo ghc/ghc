@@ -5,6 +5,11 @@ license: BSD-3-Clause
 maintainer: glasgow-haskell-users@haskell.org
 build-type: Simple
 
+source-repository head
+    type:     git
+    location: https://gitlab.haskell.org/ghc/ghc.git
+    subdir:   rts
+
 extra-source-files:
   -- This file needs to be in the package but shouldn't be compiled on its own.
   xxhash.c
