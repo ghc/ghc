@@ -25,7 +25,7 @@ module GHC.Tc.Utils.TcType (
   TcType, TcSigmaType, TcRhoType, TcTauType, TcPredType, TcThetaType,
   TcTyVar, TcTyVarSet, TcDTyVarSet, TcTyCoVarSet, TcDTyCoVarSet,
   TcKind, TcCoVar, TcTyCoVar, TcTyVarBinder, TcInvisTVBinder, TcReqTVBinder,
-  TcTyCon, KnotTied,
+  TcTyCon, MonoTcTyCon, PolyTcTyCon, KnotTied,
 
   ExpType(..), InferResult(..), ExpSigmaType, ExpRhoType, mkCheckExpType,
 
@@ -343,7 +343,11 @@ type TcTyCoVar = Var    -- Either a TcTyVar or a CoVar
 type TcTyVarBinder     = TyVarBinder
 type TcInvisTVBinder   = InvisTVBinder
 type TcReqTVBinder     = ReqTVBinder
-type TcTyCon           = TyCon   -- these can be the TcTyCon constructor
+
+-- See Note [TcTyCon, MonoTcTyCon, and PolyTcTyCon]
+type TcTyCon     = TyCon
+type MonoTcTyCon = TcTyCon
+type PolyTcTyCon = TcTyCon
 
 -- These types do not have boxy type variables in them
 type TcPredType     = PredType
@@ -356,6 +360,24 @@ type TcTyVarSet     = TyVarSet
 type TcTyCoVarSet   = TyCoVarSet
 type TcDTyVarSet    = DTyVarSet
 type TcDTyCoVarSet  = DTyCoVarSet
+
+{- Note [TcTyCon, MonoTcTyCon, and PolyTcTyCon]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+See Note [How TcTyCons work] in GHC.Tc.TyCl
+
+Invariants:
+* TcTyCon: a TyCon built with the TcTyCon constructor
+
+* MonoTcTyCon:
+  - tyConBinders and tyConResultKind use TcTyVars
+  - their kinds may mention unification variables
+
+* PolyTcTyCon:
+   - tyConBinders and tyConResultKind use completely-final TyVars
+     No unification variables here
+   - The range of the tcTyConScopedTyVars are all /skolem/ TcTyVars,
+     not meta TyVarTvs
+-}
 
 {- *********************************************************************
 *                                                                      *

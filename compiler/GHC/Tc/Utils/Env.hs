@@ -91,7 +91,7 @@ import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Types.Evidence (HsWrapper, idHsWrapper)
 import {-# SOURCE #-} GHC.Tc.Utils.Unify ( tcSubMult )
-import GHC.Tc.Types.Origin ( CtOrigin(UsageEnvironmentOf), SkolemInfo () )
+import GHC.Tc.Types.Origin ( CtOrigin(UsageEnvironmentOf) )
 
 import GHC.Core.UsageEnv
 import GHC.Core.InstEnv
@@ -133,7 +133,7 @@ import GHC.Types.Error
 import qualified GHC.LanguageExtensions as LangExt
 
 import Data.IORef
-import Data.List (intercalate, mapAccumL)
+import Data.List (intercalate)
 import Control.Monad
 import GHC.Driver.Env.KnotVars
 
@@ -534,16 +534,9 @@ tcExtendKindEnv extra_env thing_inside
 
 -----------------------
 -- Scoped type and kind variables
-tcExtendTyVarEnv :: SkolemInfo -> [TyVar] -> (TCvSubst -> [TcTyVar] -> TcM r) -> TcM r
-tcExtendTyVarEnv skol_info tvs thing_inside
-  = let (subst, tvs') = mapAccumL go emptyTCvSubst tvs
-    in tcExtendNameTyVarEnv tvs' (thing_inside subst (map snd tvs'))
-    where
-      -- Perhaps should use tcInstSkolTyVars here, that does a lot more though.
-      go subst tv =
-        let tv' = mkTcTyVar (tyVarName tv) (substTy subst (tyVarKind tv)) (vanillaSkolemTv skol_info)
-        in (extendTvSubstWithClone subst tv tv',  (tyVarName tv, tv'))
-
+tcExtendTyVarEnv :: [TyVar] -> TcM r -> TcM r
+tcExtendTyVarEnv tvs thing_inside
+  = tcExtendNameTyVarEnv (mkTyVarNamePairs tvs) thing_inside
 
 tcExtendNameTyVarEnv :: [(Name,TcTyVar)] -> TcM r -> TcM r
 tcExtendNameTyVarEnv binds thing_inside
@@ -753,7 +746,7 @@ tcInitTidyEnv
        = do { let (env', occ') = tidyOccName env (nameOccName name)
                   name'  = tidyNameOcc name occ'
                   tyvar1 = setTyVarName tyvar name'
-            ; tyvar2 <- zonkTcTyVarToTyVar tyvar1
+            ; tyvar2 <- zonkTcTyVarToTcTyVar tyvar1
               -- Be sure to zonk here!  Tidying applies to zonked
               -- types, so if we don't zonk we may create an
               -- ill-kinded type (#14175)

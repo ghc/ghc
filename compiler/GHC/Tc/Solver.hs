@@ -58,6 +58,7 @@ import GHC.Core.Predicate
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcType
 import GHC.Core.Type
+import GHC.Core.TyCon    ( TyConBinder )
 import GHC.Builtin.Types ( liftedRepTy, manyDataConTy, liftedDataConTy )
 import GHC.Core.Unify    ( tcMatchTyKi )
 import GHC.Utils.Misc
@@ -163,17 +164,17 @@ simplifyTop wanteds
 
        ; return (evBindMapBinds binds1 `unionBags` binds2) }
 
-pushLevelAndSolveEqualities :: SkolemInfo -> [TcTyVar] -> TcM a -> TcM a
+pushLevelAndSolveEqualities :: SkolemInfoAnon -> [TyConBinder] -> TcM a -> TcM a
 -- Push level, and solve all resulting equalities
 -- If there are any unsolved equalities, report them
 -- and fail (in the monad)
 --
 -- Panics if we solve any non-equality constraints.  (In runTCSEqualities
 -- we use an error thunk for the evidence bindings.)
-pushLevelAndSolveEqualities skol_info skol_tvs thing_inside
+pushLevelAndSolveEqualities skol_info_anon tcbs thing_inside
   = do { (tclvl, wanted, res) <- pushLevelAndSolveEqualitiesX
                                       "pushLevelAndSolveEqualities" thing_inside
-       ; reportUnsolvedEqualities skol_info skol_tvs tclvl wanted
+       ; report_unsolved_equalities skol_info_anon (binderVars tcbs) tclvl wanted
        ; return res }
 
 pushLevelAndSolveEqualitiesX :: String -> TcM a
@@ -227,11 +228,11 @@ simplifyAndEmitFlatConstraints wanted
                          -- Emit the bad constraints, wrapped in an implication
                          -- See Note [Wrapping failing kind equalities]
                          ; tclvl  <- TcM.getTcLevel
-                         ; implic <- buildTvImplication unkSkol [] (pushTcLevel tclvl) wanted
-                                    --                  ^^^^^^   |  ^^^^^^^^^^^^^^^^^
-                                    -- it's OK to use unkSkol    |  we must increase the TcLevel,
-                                    -- because we don't bind     |  as explained in
-                                    -- any skolem variables here |  Note [Wrapping failing kind equalities]
+                         ; implic <- buildTvImplication unkSkolAnon [] (pushTcLevel tclvl) wanted
+                                        --                  ^^^^^^   |  ^^^^^^^^^^^^^^^^^
+                                        -- it's OK to use unkSkol    |  we must increase the TcLevel,
+                                        -- because we don't bind     |  as explained in
+                                        -- any skolem variables here |  Note [Wrapping failing kind equalities]
                          ; emitImplication implic
                          ; failM }
            Just (simples, holes)
@@ -460,13 +461,17 @@ reportUnsolvedEqualities :: SkolemInfo -> [TcTyVar] -> TcLevel
 --
 -- The provided SkolemInfo and [TcTyVar] arguments are used in an implication to
 -- provide skolem info for any errors.
---
 reportUnsolvedEqualities skol_info skol_tvs tclvl wanted
+  = report_unsolved_equalities (getSkolemInfo skol_info) skol_tvs tclvl wanted
+
+report_unsolved_equalities :: SkolemInfoAnon -> [TcTyVar] -> TcLevel
+                           -> WantedConstraints -> TcM ()
+report_unsolved_equalities skol_info_anon skol_tvs tclvl wanted
   | isEmptyWC wanted
   = return ()
   | otherwise
   = checkNoErrs $   -- Fail
-    do { implic <- buildTvImplication skol_info skol_tvs tclvl wanted
+    do { implic <- buildTvImplication skol_info_anon skol_tvs tclvl wanted
        ; reportAllUnsolved (mkImplicWC (unitBag implic)) }
 
 
@@ -1383,7 +1388,7 @@ decideMonoTyVars infer_mode name_taus psigs candidates
 
        -- If possible, we quantify over partial-sig qtvs, so they are
        -- not mono. Need to zonk them because they are meta-tyvar TyVarTvs
-       ; psig_qtvs <- mapM zonkTcTyVarToTyVar $ binderVars $
+       ; psig_qtvs <- mapM zonkTcTyVarToTcTyVar $ binderVars $
                       concatMap (map snd . sig_inst_skols) psigs
 
        ; psig_theta <- mapM TcM.zonkTcType $

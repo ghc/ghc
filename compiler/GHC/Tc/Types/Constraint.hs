@@ -1306,6 +1306,15 @@ data Implication
                                  -- allocated /inside/ this implication
 
       ic_skols :: [TcTyVar],     -- Introduced skolems
+         -- ic_skols are usually skolem TcTyVars, but can also be TyVars.
+         -- For example in tcClassDecl1 we do pushLevelAndSolveEqualities
+         -- with (binderVars binders) which are TyVars.  It is /very/ inconvenient
+         -- to skolemise these TyVar binders.
+         --
+         -- But in any case, having TyVars here is fine because
+         -- all that matters about ic_skols is their /identity/;
+         -- we could pretty much use a [Name] instead.
+
       ic_info  :: SkolemInfoAnon,    -- See Note [Skolems in an implication]
                                  -- See Note [Shadowing in a constraint]
 

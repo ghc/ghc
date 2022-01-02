@@ -1775,7 +1775,7 @@ change.  But in some cases it makes a HUGE difference: see test
 T9198 and #19668.  So yes, it seems worth it.
 -}
 
-zonkTyVarOcc :: ZonkEnv -> TyVar -> TcM TcType
+zonkTyVarOcc :: ZonkEnv -> TcTyVar -> TcM Type
 zonkTyVarOcc env@(ZonkEnv { ze_flexi = flexi
                           , ze_tv_env = tv_env
                           , ze_meta_tv_env = mtv_env_ref }) tv
@@ -1790,13 +1790,16 @@ zonkTyVarOcc env@(ZonkEnv { ze_flexi = flexi
                   Just ty -> return ty
                   Nothing -> do { mtv_details <- readTcRef ref
                                 ; zonk_meta ref mtv_details } }
-  | otherwise
+  | otherwise  -- This should never really happen;
+               -- TyVars should not occur in the typechecker
   = lookup_in_tv_env
 
   where
     lookup_in_tv_env    -- Look up in the env just as we do for Ids
       = case lookupVarEnv tv_env tv of
-          Nothing  -> mkTyVarTy <$> updateTyVarKindM (zonkTcTypeToTypeX env) tv
+          Nothing  -> -- A skolem TcTyVar that isn't in the ZonkEnv
+                      do { kind <- zonkTcTypeToTypeX env (tyVarKind tv)
+                         ; return (mkTyVarTy (mkTyVar (tyVarName tv) kind)) }
           Just tv' -> return (mkTyVarTy tv')
 
     zonk_meta ref Flexi

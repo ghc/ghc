@@ -474,15 +474,8 @@ deriveClause rep_tc scoped_tvs mb_lderiv_strat deriv_preds err_ctxt
         , text "tys"             <+> ppr tys
         , text "mb_lderiv_strat" <+> ppr mb_lderiv_strat ]
       tcExtendNameTyVarEnv scoped_tvs $ do
-        (mb_lderiv_strat', mvia_tvs) <- tcDerivStrategy mb_lderiv_strat
-
-        (extend_by, via_tvs) <- case mvia_tvs of
-                                  Just (tvs, ty) -> do
-                                    skol_info <- mkSkolemInfo (DerivSkol ty)
-                                    return $ (tcExtendTyVarEnv skol_info tvs, tvs)
-                                  Nothing -> return (\f -> f emptyTCvSubst [], [])
-
-        extend_by $ \_subst _vars ->
+        (mb_lderiv_strat', via_tvs) <- tcDerivStrategy mb_lderiv_strat
+        tcExtendTyVarEnv via_tvs $
         -- Moreover, when using DerivingVia one can bind type variables in
         -- the `via` type as well, so these type variables must also be
         -- brought into scope.
@@ -640,14 +633,9 @@ deriveStandalone (L loc (DerivDecl _ deriv_ty mb_lderiv_strat overlap_mode))
        ; let ctxt = GHC.Tc.Types.Origin.InstDeclCtxt True
        ; traceTc "Deriving strategy (standalone deriving)" $
            vcat [ppr mb_lderiv_strat, ppr deriv_ty]
-       ; (mb_lderiv_strat, mvia_tvs) <- tcDerivStrategy mb_lderiv_strat
-       ; (extend_by, via_tvs) <- case mvia_tvs of
-                                  Just (tvs, ty) -> do
-                                    skol_info <- mkSkolemInfo (DerivSkol ty)
-                                    return $ (tcExtendTyVarEnv skol_info tvs, tvs)
-                                  Nothing -> return (\f -> f emptyTCvSubst [], [])
+       ; (mb_lderiv_strat, via_tvs) <- tcDerivStrategy mb_lderiv_strat
        ; (cls_tvs, deriv_ctxt, cls, inst_tys)
-           <- extend_by $ \_subst _vars ->
+           <- tcExtendTyVarEnv via_tvs $
               tcStandaloneDerivInstType ctxt deriv_ty
        ; let mb_deriv_strat = fmap unLoc mb_lderiv_strat
              tvs            = via_tvs ++ cls_tvs

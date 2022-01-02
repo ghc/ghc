@@ -70,7 +70,7 @@ module GHC.Tc.Utils.TcMType (
   zonkTidyTcType, zonkTidyTcTypes, zonkTidyOrigin, zonkTidyOrigins,
   tidyEvVar, tidyCt, tidyHole, tidySkolemInfo, tidySkolemInfoAnon,
     zonkTcTyVar, zonkTcTyVars,
-  zonkTcTyVarToTyVar, zonkInvisTVBinder,
+  zonkTcTyVarToTcTyVar, zonkInvisTVBinder,
   zonkTyCoVarsAndFV, zonkTcTypeAndFV, zonkDTyCoVarSetAndFV,
   zonkTyCoVarsAndFVList,
 
@@ -1767,7 +1767,7 @@ zonkAndSkolemise skol_info tyvar
      -- We want to preserve the binding location of the original TyVarTv.
      -- This is important for error messages. If we don't do this, then
      -- we get bad locations in, e.g., typecheck/should_fail/T2688
-  = do { zonked_tyvar <- zonkTcTyVarToTyVar tyvar
+  = do { zonked_tyvar <- zonkTcTyVarToTcTyVar tyvar
        ; skolemiseQuantifiedTyVar skol_info zonked_tyvar }
 
   | otherwise
@@ -2498,22 +2498,21 @@ zonkTcTyVar tv
   = zonk_kind_and_return
   where
     zonk_kind_and_return = do { z_tv <- zonkTyCoVarKind tv
-                              ; return (mkTyVarTy z_tv)
-                              }
+                              ; return (mkTyVarTy z_tv) }
 
 -- Variant that assumes that any result of zonking is still a TyVar.
 -- Should be used only on skolems and TyVarTvs
-zonkTcTyVarToTyVar :: HasDebugCallStack => TcTyVar -> TcM TcTyVar
-zonkTcTyVarToTyVar tv
+zonkTcTyVarToTcTyVar :: HasDebugCallStack => TcTyVar -> TcM TcTyVar
+zonkTcTyVarToTcTyVar tv
   = do { ty <- zonkTcTyVar tv
        ; let tv' = case tcGetTyVar_maybe ty of
                      Just tv' -> tv'
-                     Nothing  -> pprPanic "zonkTcTyVarToTyVar"
+                     Nothing  -> pprPanic "zonkTcTyVarToTcTyVar"
                                           (ppr tv $$ ppr ty)
        ; return tv' }
 
-zonkInvisTVBinder :: VarBndr TcTyVar spec -> TcM (VarBndr TyVar spec)
-zonkInvisTVBinder (Bndr tv spec) = do { tv' <- zonkTcTyVarToTyVar tv
+zonkInvisTVBinder :: VarBndr TcTyVar spec -> TcM (VarBndr TcTyVar spec)
+zonkInvisTVBinder (Bndr tv spec) = do { tv' <- zonkTcTyVarToTcTyVar tv
                                       ; return (Bndr tv' spec) }
 
 -- zonkId is used *during* typechecking just to zonk the Id's type
@@ -2703,7 +2702,7 @@ naughtyQuantification :: TcType   -- original type user wanted to quantify
 naughtyQuantification orig_ty tv escapees
   = do { orig_ty1 <- zonkTcType orig_ty  -- in case it's not zonked
 
-       ; escapees' <- mapM zonkTcTyVarToTyVar $
+       ; escapees' <- mapM zonkTcTyVarToTcTyVar $
                       nonDetEltsUniqSet escapees
                      -- we'll just be printing, so no harmful non-determinism
 

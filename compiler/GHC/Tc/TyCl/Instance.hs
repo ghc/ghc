@@ -691,7 +691,7 @@ tcDataFamInstDecl mb_clsinfo tv_skol_env
        ; gadt_syntax <- dataDeclChecks fam_name new_or_data hs_ctxt hs_cons
           -- Do /not/ check that the number of patterns = tyConArity fam_tc
           -- See [Arity of data families] in GHC.Core.FamInstEnv
-       ; (qtvs, pats, res_kind, stupid_theta)
+       ; (qtvs, scoped_tvs, pats, res_kind, stupid_theta)
              <- tcDataFamInstHeader mb_clsinfo fam_tc outer_bndrs fixity
                                     hs_ctxt hs_pats m_ksig new_or_data
        -- Eta-reduce the axiom if possible
@@ -717,7 +717,7 @@ tcDataFamInstDecl mb_clsinfo tv_skol_env
        --     we did it before the "extra" tvs from etaExpandAlgTyCon
        --     would always be eta-reduced
        --
-       ; (extra_tcbs, final_res_kind) <- etaExpandAlgTyCon (binderVars full_tcbs) res_kind
+       ; (extra_tcbs, final_res_kind) <- etaExpandAlgTyCon full_tcbs res_kind
 
        -- Check the result kind; it may come from a user-written signature.
        -- See Note [Datatype return kinds] in GHC.Tc.TyCl point 4(a)
@@ -737,13 +737,12 @@ tcDataFamInstDecl mb_clsinfo tv_skol_env
               , text "final_res_kind:" <+> ppr final_res_kind
               , text "eta_pats" <+> ppr eta_pats
               , text "eta_tcbs" <+> ppr eta_tcbs ]
-       ; skol_info <- mkSkolemInfo FamInstSkol
        ; (rep_tc, axiom) <- fixM $ \ ~(rec_rep_tc, _) ->
-           do { data_cons <- tcExtendTyVarEnv skol_info qtvs $ \subst tvs ->
+           do { data_cons <- tcExtendTyVarEnv scoped_tvs $
                   -- For H98 decls, the tyvars scope
                   -- over the data constructors
                   tcConDecls new_or_data (DDataInstance orig_res_ty)
-                             rec_rep_tc ty_binders tvs (substTy subst final_res_kind)
+                             rec_rep_tc ty_binders final_res_kind
                              hs_cons
 
               ; rep_tc_name <- newFamInstTyConName lfam_name pats
@@ -865,7 +864,7 @@ tcDataFamInstHeader
     -> LexicalFixity -> Maybe (LHsContext GhcRn)
     -> HsTyPats GhcRn -> Maybe (LHsKind GhcRn)
     -> NewOrData
-    -> TcM ([TyVar], [Type], Kind, ThetaType)
+    -> TcM ([TyVar], [TcTyVar], [Type], Kind, ThetaType)
 -- The "header" of a data family instance is the part other than
 -- the data constructors themselves
 --    e.g.  data instance D [a] :: * -> * where ...
@@ -941,7 +940,7 @@ tcDataFamInstHeader mb_clsinfo fam_tc outer_bndrs fixity
            Just (_, pats) -> pure pats
            Nothing -> pprPanic "tcDataFamInstHeader" (ppr lhs_ty)
 
-       ; return (qtvs, pats, master_res_kind, stupid_theta) }
+       ; return (qtvs, scoped_tvs, pats, master_res_kind, stupid_theta) }
   where
     fam_name  = tyConName fam_tc
     data_ctxt = DataKindCtxt fam_name

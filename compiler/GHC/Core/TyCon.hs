@@ -25,7 +25,7 @@ module GHC.Core.TyCon(
         mkRequiredTyConBinder,
         mkAnonTyConBinder, mkAnonTyConBinders,
         tyConBinderArgFlag, tyConBndrVisArgFlag, isNamedTyConBinder,
-        isVisibleTyConBinder, isInvisibleTyConBinder,
+        isVisibleTyConBinder, isInvisibleTyConBinder, isVisibleTcbVis,
 
         -- ** Field labels
         tyConFieldLabels, lookupTyConFieldLabel,
@@ -668,7 +668,7 @@ They fit together like so:
 * For an algebraic data type, or data instance, the tyConResKind is
   always (TYPE r); that is, the tyConBinders are enough to saturate
   the type constructor.  I'm not quite sure why we have this invariant,
-  but it's enforced by etaExpandAlgTyCon
+  but it's enforced by splitTyConKind
 -}
 
 instance OutputableBndr tv => Outputable (VarBndr tv TyConBndrVis) where
@@ -947,8 +947,9 @@ data TyCon
           -- arguments to the type constructor; see the use
           -- of tyConArity in generaliseTcTyCon
 
-        tcTyConScopedTyVars :: [(Name,TyVar)],
+        tcTyConScopedTyVars :: [(Name,TcTyVar)],
           -- ^ Scoped tyvars over the tycon's body
+          -- The range is always a skolem or TcTyVar, be
           -- See Note [Scoped tyvars in a TcTyCon]
 
         tcTyConIsPoly     :: Bool, -- ^ Is this TcTyCon already generalized?

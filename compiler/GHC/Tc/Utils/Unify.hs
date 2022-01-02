@@ -943,22 +943,23 @@ emitResidualTvConstraint :: SkolemInfo -> [TcTyVar]
                          -> TcLevel -> WantedConstraints -> TcM ()
 emitResidualTvConstraint skol_info skol_tvs tclvl wanted
   | not (isEmptyWC wanted) ||
-    checkTelescopeSkol (getSkolemInfo skol_info)
+    checkTelescopeSkol skol_info_anon
   = -- checkTelescopeSkol: in this case, /always/ emit this implication
     -- even if 'wanted' is empty. We need the implication so that we check
     -- for a bad telescope. See Note [Skolem escape and forall-types] in
     -- GHC.Tc.Gen.HsType
-    do { implic <- buildTvImplication skol_info skol_tvs tclvl wanted
+    do { implic <- buildTvImplication skol_info_anon skol_tvs tclvl wanted
        ; emitImplication implic }
 
   | otherwise  -- Empty 'wanted', emit nothing
   = return ()
+  where
+     skol_info_anon = getSkolemInfo skol_info
 
-buildTvImplication :: SkolemInfo -> [TcTyVar]
+buildTvImplication :: SkolemInfoAnon -> [TcTyVar]
                    -> TcLevel -> WantedConstraints -> TcM Implication
 buildTvImplication skol_info skol_tvs tclvl wanted
-  =
-    assertPpr (all (isSkolemTyVar <||> isTyVarTyVar) skol_tvs) (ppr skol_tvs) $
+  = assertPpr (all (isSkolemTyVar <||> isTyVarTyVar) skol_tvs) (ppr skol_tvs) $
     do { ev_binds <- newNoTcEvBinds  -- Used for equalities only, so all the constraints
                                      -- are solved by filling in coercion holes, not
                                      -- by creating a value-level evidence binding
@@ -969,7 +970,7 @@ buildTvImplication skol_info skol_tvs tclvl wanted
                         , ic_given_eqs = NoGivenEqs
                         , ic_wanted    = wanted
                         , ic_binds     = ev_binds
-                        , ic_info      = getSkolemInfo skol_info }) }
+                        , ic_info      = skol_info }) }
 
 implicationNeeded :: SkolemInfoAnon -> [TcTyVar] -> [EvVar] -> TcM Bool
 -- See Note [When to build an implication]

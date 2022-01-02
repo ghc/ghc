@@ -13,7 +13,8 @@ module GHC.Tc.Types.Origin (
   redundantConstraintsSpan,
 
   -- SkolemInfo
-  SkolemInfo(..), SkolemInfoAnon(..), mkSkolemInfo, getSkolemInfo, pprSigSkolInfo, pprSkolInfo, unkSkol,
+  SkolemInfo(..), SkolemInfoAnon(..), mkSkolemInfo, getSkolemInfo, pprSigSkolInfo, pprSkolInfo,
+  unkSkol, unkSkolAnon,
 
   -- CtOrigin
   CtOrigin(..), exprCtOrigin, lexprCtOrigin, matchesCtOrigin, grhssCtOrigin,
@@ -291,7 +292,10 @@ data SkolemInfoAnon
 -- We're hoping to be able to get rid of this entirely, but for the moment
 -- it's still needed.
 unkSkol :: HasCallStack => SkolemInfo
-unkSkol = SkolemInfo (mkUniqueGrimily 0) (UnkSkol callStack)
+unkSkol = SkolemInfo (mkUniqueGrimily 0) unkSkolAnon
+
+unkSkolAnon :: HasCallStack => SkolemInfoAnon
+unkSkolAnon = UnkSkol callStack
 
 -- | Wrap up the origin of a skolem type variable with a new 'Unique',
 -- so that we can common up skolem type variables whose 'SkolemInfo'
