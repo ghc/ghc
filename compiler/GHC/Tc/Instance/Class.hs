@@ -41,6 +41,7 @@ import GHC.Core.Make ( mkCharExpr, mkNaturalExpr, mkStringExprFS )
 import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Core.Class
+import GHC.Core ( Expr(Cast, Type), mkConApp )
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -399,7 +400,8 @@ makeLitDict :: Class -> Type -> EvExpr -> TcM ClsInstResult
 --     String    -> SSymbol n
 --     SSymbol n -> KnownSymbol n
 makeLitDict clas ty et
-    | Just (_, co_dict) <- tcInstNewTyCon_maybe (classTyCon clas) [ty]
+    | Just dc <- tyConSingleDataCon_maybe (classTyCon clas)
+
           -- co_dict :: KnownNat n ~ SNat n
     , [ meth ]   <- classMethods clas
     , Just tcRep <- tyConAppTyCon_maybe (classMethodTy meth)
@@ -407,7 +409,7 @@ makeLitDict clas ty et
                     -- then tcRep is SNat
     , Just (_, co_rep) <- tcInstNewTyCon_maybe tcRep [ty]
           -- SNat n ~ Integer
-    , let ev_tm = mkEvCast et (mkTcSymCo (mkTcTransCo co_dict co_rep))
+    , let ev_tm = EvExpr $ mkConApp dc [Type ty, Cast et (mkTcSymCo co_rep)]
     = return $ OneInst { cir_new_theta = []
                        , cir_mk_ev     = \_ -> ev_tm
                        , cir_what      = BuiltinInstance }
