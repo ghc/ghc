@@ -44,8 +44,8 @@ import GHC.Tc.Types.Evidence
 import GHC.Tc.Utils.Monad
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep
+import GHC.Core.TyCon
 import GHC.Core.Multiplicity
-import GHC.Core.Coercion( instNewTyCon_maybe, mkSymCo )
 import GHC.Core
 import GHC.Core.Utils
 import GHC.Core.Make
@@ -1139,13 +1139,13 @@ ds_withDict wrapped_ty
     -- `class C a_1 ... a_n where op :: meth_ty`, where
     -- `meth_tvs = a_1 ... a_n` and `co` is a newtype coercion between
     -- `C` and `meth_ty`.
-  , Just (inst_meth_ty, co) <- instNewTyCon_maybe dict_tc dict_args
-    --    co :: C t1 ..tn ~R# st
+  , Just dc <- tyConSingleDataCon_maybe dict_tc
+  , ([], _, [inst_meth_ty]) <- dataConInstSig dc dict_args
     -- Check that `st` is equal to `meth_ty[t_i/a_i]`.
   , st `eqType` inst_meth_ty
  = do { sv <- newSysLocalDs mult1 st
        ; k  <- newSysLocalDs mult2 dt_to_r
-       ; let wd_rhs = mkLams [sv, k] $ Var k `App` Cast (Var sv) (mkSymCo co)
+       ; let wd_rhs = mkLams [sv, k] $ Var k `App` (mkConApp2 dc dict_args [sv])
        ; wd_id <- newSysLocalDs Many (exprType wd_rhs)
        ; let wd_id' = wd_id `setInlinePragma` inlineAfterSpecialiser
        ; pure $ Let (NonRec wd_id' wd_rhs) (Var wd_id') }
