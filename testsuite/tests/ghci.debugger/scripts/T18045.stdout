@@ -1,0 +1,14 @@
+Breakpoint 0 activated at T18045.hs:18:11-68
+[Stopped in Main.bfs._bfs, T18045.hs:18:11-68
+_result :: [(IntSet.Key, Int)] = _
+currli :: [IntSet.Key] = _
+dist :: Int = 0
+ncurr :: IntSet.IntSet = _
+nvisit :: IntSet.IntSet = _
+Stopped in Main.bfs._bfs, T18045.hs:18:11-68
+_result :: [(IntSet.Key, Int)] = _
+currli :: [IntSet.Key] = _
+dist :: Int = _
+ncurr :: IntSet.IntSet = _
+nvisit :: IntSet.IntSet = _
+1
