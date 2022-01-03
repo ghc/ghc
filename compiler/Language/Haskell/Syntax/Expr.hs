@@ -637,7 +637,7 @@ data HsExpr p
   -- | - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnStatic',
 
   -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
-  | HsStatic (XStatic p) -- Free variables of the body
+  | HsStatic (XStatic p) -- Free variables of the body, and type after typechecking
              (LHsExpr p)        -- Body
 
   ---------------------------------------

@@ -351,7 +351,9 @@ type instance XProc          (GhcPass _) = EpAnn [AddEpAnn]
 
 type instance XStatic        GhcPs = EpAnn [AddEpAnn]
 type instance XStatic        GhcRn = NameSet
-type instance XStatic        GhcTc = NameSet
+type instance XStatic        GhcTc = (NameSet, Type)
+  -- Free variables and type of expression, this is stored for convenience as wiring in
+  -- StaticPtr is a bit tricky (see #20150)
 
 type instance XPragE         (GhcPass _) = NoExtField
 

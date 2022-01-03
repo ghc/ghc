@@ -138,7 +138,7 @@ hsExprType e@(HsSpliceE{}) = pprPanic "hsExprType: Unexpected HsSpliceE"
                                       -- can't use `dataConCantHappen` since they are still present before
                                       -- than in the typechecked AST.
 hsExprType (HsProc _ _ lcmd_top) = lhsCmdTopType lcmd_top
-hsExprType (HsStatic _ e) = lhsExprType e
+hsExprType (HsStatic (_, ty) _s) = ty
 hsExprType (HsPragE _ _ e) = lhsExprType e
 hsExprType (XExpr (WrapExpr (HsWrap wrap e))) = hsWrapperType wrap $ hsExprType e
 hsExprType (XExpr (ExpansionExpr (HsExpanded _ tc_e))) = hsExprType tc_e
