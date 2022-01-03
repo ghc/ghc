@@ -455,9 +455,10 @@ tcExpr (HsStatic fvs expr) res_ty
                                              [p_ty]
         ; let wrap = mkWpEvVarApps [typeable_ev] <.> mkWpTyApps [expr_ty]
         ; loc <- getSrcSpanM
+        ; static_ptr_ty_con <- tcLookupTyCon staticPtrTyConName
         ; return $ mkHsWrapCo co $ HsApp noComments
                             (L (noAnnSrcSpan loc) $ mkHsWrap wrap fromStaticPtr)
-                            (L (noAnnSrcSpan loc) (HsStatic fvs expr'))
+                            (L (noAnnSrcSpan loc) (HsStatic (fvs, mkTyConApp static_ptr_ty_con [expr_ty]) expr'))
         }
 
 {-

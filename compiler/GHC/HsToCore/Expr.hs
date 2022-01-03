@@ -418,9 +418,9 @@ See Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable for an o
     g = ... makeStatic loc f ...
 -}
 
-dsExpr (HsStatic _ expr@(L loc _)) = do
+dsExpr (HsStatic (_, whole_ty) expr@(L loc _)) = do
     expr_ds <- dsLExpr expr
-    let ty = exprType expr_ds
+    let (_, [ty]) = splitTyConApp whole_ty
     makeStaticId <- dsLookupGlobalId makeStaticName
 
     dflags <- getDynFlags

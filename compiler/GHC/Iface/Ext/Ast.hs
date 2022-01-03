@@ -737,7 +737,6 @@ instance HiePass p => HasType (LocatedA (HsExpr (GhcPass p))) where
         HsLet _ _ _ _ body -> computeLType body
         RecordCon con_expr _ _ -> computeType con_expr
         ExprWithTySig _ e _ -> computeLType e
-        HsStatic _ e -> computeLType e
         HsPragE _ _ e -> computeLType e
         XExpr (ExpansionExpr (HsExpanded _ e)) -> computeType e
         XExpr (HsTick _ e) -> computeLType e

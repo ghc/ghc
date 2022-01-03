@@ -158,7 +158,6 @@ module GHC.Builtin.Types (
         naturalTy, naturalTyCon, naturalTyConName,
         naturalNSDataCon, naturalNSDataConName,
         naturalNBDataCon, naturalNBDataConName
-
     ) where
 
 import GHC.Prelude

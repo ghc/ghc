@@ -1,0 +1,6 @@
+Collecting type info for 1 module(s) ... 
+T20150.hs:(7,1)-(7,3): GHC.StaticPtr.StaticPtr GHC.Types.Int
+T20150.hs:(7,14)-(7,14): GHC.Types.Int
+T20150.hs:(7,7)-(7,14): GHC.StaticPtr.StaticPtr GHC.Types.Int
+T20150.hs:(7,7)-(7,14): GHC.StaticPtr.StaticPtr GHC.Types.Int -> GHC.StaticPtr.StaticPtr GHC.Types.Int
+T20150.hs:(7,7)-(7,14): GHC.StaticPtr.StaticPtr GHC.Types.Int

@@ -920,8 +920,9 @@ zonkExpr env (HsProc x pat body)
         ; return (HsProc x new_pat new_body) }
 
 -- StaticPointers extension
-zonkExpr env (HsStatic fvs expr)
-  = HsStatic fvs <$> zonkLExpr env expr
+zonkExpr env (HsStatic (fvs, ty) expr)
+  = do new_ty <- zonkTcTypeToTypeX env ty
+       HsStatic (fvs, new_ty) <$> zonkLExpr env expr
 
 zonkExpr env (XExpr (WrapExpr (HsWrap co_fn expr)))
   = do (env1, new_co_fn) <- zonkCoFn env co_fn
