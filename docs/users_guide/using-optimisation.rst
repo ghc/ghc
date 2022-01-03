@@ -247,7 +247,7 @@ by saying ``-fno-wombat``.
     :default: on
 
     Enables some control flow optimisations in the Cmm code
-    generator, merging basic blocks and avoiding jumps right after jumps. 
+    generator, merging basic blocks and avoiding jumps right after jumps.
 
 .. ghc-flag:: -fasm-shortcutting
     :shortdesc: Enable shortcutting on assembly. Implied by :ghc-flag:`-O2`.
@@ -319,14 +319,64 @@ by saying ``-fno-wombat``.
     block layout behaves the same as in 8.6 and earlier.
 
 .. ghc-flag:: -fcpr-anal
-    :shortdesc: Turn on CPR analysis in the demand analyser. Implied by :ghc-flag:`-O`.
+    :shortdesc: Turn on Constructed Product Result analysis. Implied by :ghc-flag:`-O`.
     :type: dynamic
     :reverse: -fno-cpr-anal
     :category:
 
     :default: on
 
-    Turn on CPR analysis in the demand analyser.
+    Turn on CPR analysis, which enables the worker/wrapper transformation (cf.
+    :ghc-flag:`-fworker-wrapper`) to unbox the result of a function, such as ::
+
+         sum :: [Int] -> Int
+         sum []     = 0
+         sum (x:xs) = x + sum xs
+
+    CPR analysis will see that each code path produces a *constructed product*
+    such as ``I# 0#`` in the first branch (where ``GHC.Exts.I#`` is the data
+    constructor of ``Int``, boxing up the the primitive integer literal ``0#``
+    of type ``Int#``) and optimise to ::
+
+         sum xs = I# ($wsum xs)
+         $wsum []        = 0#
+         $wsum (I# x:xs) = x# +# $wsum xs
+
+    and then ``sum`` can inline to potentially cancel away the ``I#`` box.
+
+    Here's an example of the function that *does not* return a constructed product: ::
+
+         f :: [Int] -> (Int -> Int) -> Int
+         f []     g = g 0
+         f (x:xs) g = x + f xs g
+
+    The expression ``g 0`` is not a constructed product, because we don't know
+    anything about ``g``.
+
+    CPR analysis also works *nestedly*, for example ::
+
+        sumIO :: [Int] -> IO Int
+        sumIO []     = return 0
+        sumIO (x:xs) = do
+          r <- sumIO xs
+          return $! x + r
+
+    Note the use of ``$!``: Without it, GHC would be unable to see that evaluation
+    of ``r`` and ``x`` terminates (and rapidly, at that). An alternative would be to
+    evaluate both with a bang pattern or a ``seq``, but the ``return $! <res>``
+    idiom should work more reliably and needs less thinking. The above example
+    will be optimised to ::
+
+        sumIO :: [Int] -> IO Int
+        sumIO xs = IO $ \s -> case $wsum xs s of
+          (# s', r #) -> (# s', I# r #)
+        $wsumIO :: [Int] -> (# RealWorld#, Int# #)
+        $wsumIO []        s = (# s, 0# #)
+        $wsumIO (I# x:xs) s = case $wsumIO xs of
+          (# s', r #) -> (# s', x +# r#)
+
+    And the latter can inline ``sumIO`` and cancel away the ``I#`` constructor.
+    Unboxing the result of a ``State`` action should work similarly.
 
 .. ghc-flag:: -fcse
     :shortdesc: Enable common sub-expression elimination. Implied by :ghc-flag:`-O`.
