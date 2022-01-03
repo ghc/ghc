@@ -93,6 +93,12 @@ also sets :extension:`GADTSyntax` and :extension:`MonoLocalBinds`.
          -- essentially the same as:
          -- MkG :: Int -> Int -> G Int
 
+   Note that, even though :extension:`GADTs` technically does not imply
+   :extension:`ExistentialQuantification`, enabling :extension:`GADTs`
+   does also enable the syntax for existential quantification: ::
+
+        data SomeShow = forall a. Show a => SomeShow a
+
 -  It is permitted to declare an ordinary algebraic data type using
    GADT-style syntax. What makes a GADT into a GADT is not the syntax,
    but rather the presence of data constructors whose result type is not
