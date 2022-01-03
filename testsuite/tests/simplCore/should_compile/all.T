@@ -377,3 +377,5 @@ test('T20200a', normal, compile, ['-O2'])
 test('T20200b', normal, compile, ['-O2'])
 test('T20200KG', [extra_files(['T20200KGa.hs', 'T20200KG.hs-boot'])], multimod_compile, ['T20200KG', '-v0 -O2 -fspecialise-aggressively'])
 test('T20639', normal, compile, ['-O2'])
+
+test('T20894', normal, compile, ['-dcore-lint -O1 -ddebug-output'])
