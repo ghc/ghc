@@ -21,7 +21,7 @@ module GHC.Core.Opt.Simplify.Utils (
         SimplCont(..), DupFlag(..), StaticEnv,
         isSimplified, contIsStop,
         contIsDupable, contResultType, contHoleType, contHoleScaling,
-        contIsTrivial, contArgs,
+        contIsTrivial, contArgs, contIsRhs,
         countArgs,
         mkBoringStop, mkRhsStop, mkLazyArgStop,
         interestingCallContext,
@@ -1562,7 +1562,8 @@ won't inline because 'e' is too big.
 
 rebuildLam :: SimplEnv
            -> [OutBndr] -> OutExpr
-           -> SimplCont -> SimplM OutExpr
+           -> Maybe RecFlag  -- Just => lambda is the RHS of a let(rec)
+           -> SimplM OutExpr
 -- (rebuildLam env bndrs body cont)
 -- returns expr which means the same as \bndrs. body
 --
@@ -1572,16 +1573,14 @@ rebuildLam :: SimplEnv
 --
 -- NB: the SimplEnv already includes the [OutBndr] in its in-scope set
 
-rebuildLam _env [] body _cont
+rebuildLam _env [] body _mb_rhs
   = return body
 
-rebuildLam env bndrs body cont
-  = do { dflags <- getDynFlags
+rebuildLam env bndrs body mb_rhs
+  = {-# SCC "rebuildLam" #-}
+    do { dflags <- getDynFlags
        ; try_eta dflags bndrs body }
   where
-    mb_rhs :: Maybe RecFlag   -- Just => continuation is the RHS of a let
-    mb_rhs = contIsRhs cont
-
     in_scope = getInScope env  -- Includes 'bndrs'
 
     try_eta :: DynFlags -> [OutBndr] -> OutExpr -> SimplM OutExpr

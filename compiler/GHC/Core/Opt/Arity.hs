@@ -140,7 +140,8 @@ exprArity :: CoreExpr -> Arity
 -- We do /not/ guarantee that exprArity e <= typeArity e
 -- You may need to do arity trimming after calling exprArity
 -- See Note [Arity trimming]
--- (If we do arity trimming here we have to do it at every cast.
+-- Reason: if we do arity trimming here we have take exprType
+--         and that can be expensive if there is a large cast
 exprArity e = go e
   where
     go (Var v)                     = idArity v
@@ -291,7 +292,11 @@ on the argument type to access the "state hack".
 We have the following invariants around typeArity
 
   (1) In any binding x = e,
-      idArity f <= typeArity (idType f)
+         idArity f <= typeArity (idType f)
+      Note that we enforce this only for /bindings/.  We do /not/ insist that
+         arityTypeArity (arityType e) <= typeArity (exprType e)
+      because that is quite a bit more expensive to guaranteed; it would
+      mean checking at every Cast in the recursive arityType, for example.
 
   (2) If typeArity (exprType e) = n,
       then manifestArity (etaExpand e n) = n
@@ -305,7 +310,7 @@ Why is this important?  Because
     each top-level Id, and in
 
   - In CorePrep we use etaExpand on each rhs, so that the visible lambdas
-    actually match that arity, which in turn means
+    Actually match that arity, which in turn means
     that the StgRhs has the right number of lambdas
 
 Suppose we have
@@ -329,9 +334,9 @@ and handle what typeArity says.
 
 Note [Arity trimming]
 ~~~~~~~~~~~~~~~~~~~~~
-Arity trimming, implemented by trimArityType, directly implements
-invariant (1) of Note [typeArity invariants]. Failing to do so, and
-hence breaking invariant (1) led to #5441.
+Invariant (1) of Note [typeArity invariants] is upheld by findRhsArity,
+which calls trimArityType to trim the ArityType to match the Arity of the
+binding.  Failing to do so, and hence breaking invariant (1) led to #5441.
 
 How to trim?  If we end in topDiv, it's easy.  But we must take great care with
 dead ends (i.e. botDiv). Suppose the expression was (\x y. error "urk"),
@@ -654,14 +659,16 @@ ArityType 'at', then
 
  * If @at = AT [o1,..,on] botDiv@ (notation: \o1..on.⊥), then @f x1..xn@
    definitely diverges. Partial applications to fewer than n args may *or
-   may not* diverge.
+   may not* diverge.  Ditto exnDiv.
 
    We allow ourselves to eta-expand bottoming functions, even
    if doing so may lose some `seq` sharing,
        let x = <expensive> in \y. error (g x y)
        ==> \y. let x = <expensive> in error (g x y)
 
- * If `f` has ArityType `at` we can eta-expand `f` by (aritTypeOneShots at)
+   See getBotArity.
+
+ * If `f` has ArityType `at` we can eta-expand `f` to have (aritTypeOneShots at)
    arguments without losing sharing. This function checks that the either
    there are no expensive expressions, or the lambdas are one-shots.
 
@@ -837,8 +844,7 @@ findRhsArity :: DynFlags -> RecFlag -> Id -> CoreExpr -> Arity -> ArityType
 --  (b) if is_bot=True, then e applied to n args is guaranteed bottom
 --
 -- Returns an ArityType that is guaranteed trimmed to typeArity of 'bndr'
--- See Note [Arity trimming]
---
+--         See Note [Arity trimming]
 findRhsArity dflags is_rec bndr rhs old_arity
   = case is_rec of
       Recursive    -> go 0 botArityType
@@ -2119,9 +2125,11 @@ tryEtaReduce bndrs body
 
     go remaining_bndrs fun co
       | all isTyVar remaining_bndrs
-        -- We might have  /\a \b. f [a] b, and we want to
-        -- eta-reduce to  /\a. f [a]
-        -- See #20040
+        -- If all the remaining_bnrs are tyvars, then the etad_exp
+        --    will be trivial, which is what we want.
+        -- e.g. We might have  /\a \b. f [a] b, and we want to
+        --      eta-reduce to  /\a. f [a]
+        -- We don't want to give up on this one: see #20040
       , remaining_bndrs `ltLength` bndrs
         -- Only reply Just if /something/ has happened
       , all ok_lam bndrs || ok_fun fun

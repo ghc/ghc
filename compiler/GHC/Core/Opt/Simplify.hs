@@ -386,7 +386,7 @@ simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
                         ; return (poly_floats, body3) }
 
         ; let env' = env `setInScopeFromF` rhs_floats
-        ; rhs' <- rebuildLam env' tvs' body3 rhs_cont
+        ; rhs' <- rebuildLam env' tvs' body3 (Just is_rec)
         ; (bind_float, env2) <- completeBind env' top_lvl is_rec Nothing bndr bndr1 rhs'
         ; return (rhs_floats `addFloats` bind_float, env2) }
 
@@ -948,7 +948,7 @@ addLetBndrInfo new_bndr new_arity_type new_unf
 
     -- Bottoming bindings: see Note [Bottoming bindings]
     info4 | isDeadEndDiv div = info3 `setDmdSigInfo` bot_sig
-                                     `setCprSigInfo`        bot_cpr
+                                     `setCprSigInfo` bot_cpr
           | otherwise        = info3
 
     bot_sig = mkClosedDmdSig (replicate new_arity topDmd) div
@@ -966,12 +966,12 @@ Suppose we have
    let x = error "urk"
    in ...(case x of <alts>)...
 or
-   let f = \x. error (x ++ "urk")
+   let f = \y. error (y ++ "urk")
    in ...(case f "foo" of <alts>)...
 
 Then we'd like to drop the dead <alts> immediately.  So it's good to
-propagate the info that x's RHS is bottom to x's IdInfo as rapidly as
-possible.
+propagate the info that x's (or f's) RHS is bottom to x's (or f's)
+IdInfo as rapidly as possible.
 
 We use tryEtaExpandRhs on every binding, and it turns out that the
 arity computation it performs (via GHC.Core.Opt.Arity.findRhsArity) already
@@ -1626,7 +1626,7 @@ simplLam env bndrs body (TickIt tickish cont)
 simplLam env bndrs body cont
   = do  { (env', bndrs')  <- simplLamBndrs env bndrs
         ; body'   <- simplExpr env' body
-        ; new_lam <- rebuildLam env' bndrs' body' cont
+        ; new_lam <- rebuildLam env' bndrs' body' (contIsRhs cont)
         ; rebuild env new_lam cont }
 
 -------------
