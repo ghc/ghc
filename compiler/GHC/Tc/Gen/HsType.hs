@@ -3539,7 +3539,7 @@ etaExpandAlgTyCon :: [TyConBinder]
 etaExpandAlgTyCon tc_bndrs kind
   = do  { loc     <- getSrcSpanM
         ; uniqs   <- newUniqueSupply
-        ; rdr_env <- getLocalRdrEnv
+        ; !rdr_env <- getLocalRdrEnv
         ; let new_occs = [ occ
                          | str <- allNameStrings
                          , let occ = mkOccName tvName str
@@ -3561,11 +3561,12 @@ etaExpandAlgTyCon tc_bndrs kind
             -> go loc occs' uniqs' subst' (tcb : acc) kind'
             where
               arg'   = substTy subst (scaledThing arg)
-              tv     = mkTyVar (mkInternalName uniq occ loc) arg'
+              -- Force the occ before making the TyVar as otherwise it retains the TcLclEnv
+              tv     = occ `seq` mkTyVar (mkInternalName uniq occ loc) arg'
               subst' = extendTCvInScope subst tv
               tcb    = Bndr tv (AnonTCB af)
               (uniq:uniqs') = uniqs
-              (occ:occs')   = occs
+              (!occ:occs')   = occs
 
           Just (Named (Bndr tv vis), kind')
             -> go loc occs uniqs subst' (tcb : acc) kind'
