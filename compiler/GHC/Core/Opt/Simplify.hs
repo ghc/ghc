@@ -1000,7 +1000,7 @@ simplExprC env expr cont
         ; -- pprTrace "simplExprC ret" (ppr expr $$ ppr expr') $
           -- pprTrace "simplExprC ret3" (ppr (seInScope env')) $
           -- pprTrace "simplExprC ret4" (ppr (seLetFloats env')) $
-          return (wrapFloats floats expr') }
+          return $! wrapFloats floats expr' }
 
 --------------------------------------------------
 simplExprF :: SimplEnv
@@ -3000,7 +3000,9 @@ simplAlt env scrut' _ case_bndr' cont' (Alt (DataAlt con) vs rhs)
               con_app   = mkConApp2 con inst_tys' vs'
 
         ; env'' <- addAltUnfoldings env' scrut' case_bndr' con_app
-        ; rhs' <- simplExprC env'' rhs cont'
+        -- Forced so that simplExprC forces wrapFloats which means we don't
+        -- retain the InScopeSet in SimplFloats
+        ; !rhs' <- simplExprC env'' rhs cont'
         ; return (Alt (DataAlt con) vs' rhs') }
 
 {- Note [Adding evaluatedness info to pattern-bound variables]
