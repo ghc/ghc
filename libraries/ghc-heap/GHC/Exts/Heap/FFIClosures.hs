@@ -29,12 +29,12 @@ module GHC.Exts.Heap.FFIClosures (module Reexport) where
 --
 -- # Future Work
 --
--- * Duplication of the code in the .hsc files could be reduced simply by
+-- - Duplication of the code in the .hsc files could be reduced simply by
 --   placing the code in a single .hsc.in file and `#include`ing it from each
 --   .hsc file. The .hsc files would only be responsible for setting the correct
 --   cpp defines. This currently doesn't work as hadrian doesn't know to copy
 --   the .hsc.in file to the build directory.
--- * The correct solution would be for the build system to run `hsc2hs` with the
+-- - The correct solution would be for the build system to run `hsc2hs` with the
 --   correct cpp defines once per RTS flavour.
 --
 
