@@ -8,7 +8,7 @@ import {-# SOURCE #-} Settings.Default
 quickestFlavour :: Flavour
 quickestFlavour = defaultFlavour
     { name        = "quickest"
-    , args        = defaultBuilderArgs <> quickestArgs <> defaultPackageArgs
+    , args        = defaultArgs <> quickestArgs
     , libraryWays = pure [vanilla]
     , rtsWays     = pure [vanilla, threaded, threadedLogging, logging]
     , dynamicGhcPrograms = return False }

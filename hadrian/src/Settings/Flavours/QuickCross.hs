@@ -9,7 +9,7 @@ import {-# SOURCE #-} Settings.Default
 quickCrossFlavour :: Flavour
 quickCrossFlavour = defaultFlavour
     { name        = "quick-cross"
-    , args        = defaultBuilderArgs <> quickCrossArgs <> defaultPackageArgs
+    , args        = defaultArgs <> quickCrossArgs
     , dynamicGhcPrograms = pure False
     , libraryWays = mconcat
                     [ pure [vanilla]

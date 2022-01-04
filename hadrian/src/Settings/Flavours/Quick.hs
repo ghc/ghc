@@ -13,7 +13,7 @@ import {-# SOURCE #-} Settings.Default
 quickFlavour :: Flavour
 quickFlavour = defaultFlavour
     { name        = "quick"
-    , args        = defaultBuilderArgs <> quickArgs <> defaultPackageArgs
+    , args        = defaultArgs <> quickArgs
     , libraryWays = mconcat
                     [ pure [vanilla]
                     , notStage0 ? platformSupportsSharedLibs ? pure [dynamic] ]

@@ -10,7 +10,7 @@ import {-# SOURCE #-} Settings.Default
 validateFlavour :: Flavour
 validateFlavour = werror $ defaultFlavour
     { name = "validate"
-    , args = defaultBuilderArgs <> validateArgs <> defaultPackageArgs
+    , args = defaultArgs <> validateArgs
     , libraryWays = mconcat [ pure [vanilla]
                             , notStage0 ? platformSupportsSharedLibs ? pure [dynamic]
                             ]

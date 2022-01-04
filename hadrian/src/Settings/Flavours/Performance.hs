@@ -8,7 +8,7 @@ import {-# SOURCE #-} Settings.Default
 performanceFlavour :: Flavour
 performanceFlavour = defaultFlavour
     { name = "perf"
-    , args = defaultBuilderArgs <> performanceArgs <> defaultPackageArgs }
+    , args = defaultArgs <> performanceArgs }
 
 performanceArgs :: Args
 performanceArgs = sourceArgs SourceArgs

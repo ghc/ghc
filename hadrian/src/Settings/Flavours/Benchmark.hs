@@ -8,7 +8,7 @@ import {-# SOURCE #-} Settings.Default
 benchmarkFlavour :: Flavour
 benchmarkFlavour = defaultFlavour
     { name = "bench"
-    , args = defaultBuilderArgs <> benchmarkArgs <> defaultPackageArgs
+    , args = defaultArgs <> benchmarkArgs
     , libraryWays = pure [vanilla]
     , rtsWays = pure [vanilla, threaded, logging, threadedLogging] }
 

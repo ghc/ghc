@@ -9,7 +9,7 @@ import {-# SOURCE #-} Settings.Default
 developmentFlavour :: Stage -> Flavour
 developmentFlavour ghcStage = defaultFlavour
     { name = "devel" ++ show (fromEnum ghcStage)
-    , args = defaultBuilderArgs <> developmentArgs ghcStage <> defaultPackageArgs
+    , args = defaultArgs <> developmentArgs ghcStage
     , libraryWays = pure [vanilla]
     , rtsWays = pure [vanilla, logging, debug, threaded, threadedLogging, threadedDebug]
     , dynamicGhcPrograms = return False }
