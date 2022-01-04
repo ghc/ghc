@@ -242,9 +242,13 @@ calcUnfoldingGuidance opts is_top_bottoming expr
         -> UnfNever   -- See Note [Do not inline top-level bottoming functions]
 
         | otherwise
-        -> UnfIfGoodArgs { ug_args  = map (mk_discount cased_bndrs) val_bndrs
-                         , ug_size  = size
-                         , ug_res   = scrut_discount }
+        ->
+
+          -- If you don't force this then we retain all the Ids
+          let !discounts = strictMap (mk_discount cased_bndrs) val_bndrs
+          in UnfIfGoodArgs { ug_args  = discounts
+                           , ug_size  = size
+                           , ug_res   = scrut_discount }
 
   where
     (bndrs, body) = collectBinders expr
