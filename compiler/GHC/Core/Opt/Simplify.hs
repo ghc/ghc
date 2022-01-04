@@ -2236,7 +2236,8 @@ tryRules env rules fn args call_cont
        ; return Nothing }
 
   where
-    ropts      = initRuleOpts dflags
+    -- Force this to avoid retaining DynFlags and hence SimplEnv
+    !ropts     = initRuleOpts dflags
     dflags     = seDynFlags env
     logger     = seLogger env
     zapped_env = zapSubstEnv env  -- See Note [zapSubstEnv]
