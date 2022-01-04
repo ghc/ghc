@@ -1,0 +1,14 @@
+main_0 = do {case 0 of
+             {0 -> 1};
+             System.IO.putStrLn "pass"}
+main_0 = do {let {day_1 = "mon"};
+             let {num_2 = case day_1 of
+                          {"mon" -> 0;
+                           "tue" -> 1;
+                           "wed" -> 3;
+                           "thu" -> 4;
+                           "fri" -> 5;
+                           "sat" -> 6;
+                           "sun" -> 7;
+                           _ -> 8}};
+             System.IO.putStrLn (GHC.Show.show day_1) GHC.Base.++ " is " (GHC.Show.show num_2)}
