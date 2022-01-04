@@ -36,7 +36,7 @@ module GHC.Tc.Utils.TcMType (
   --------------------------------
   -- Creating new evidence variables
   newEvVar, newEvVars, newDict,
-  newWanted, newWanteds, cloneWanted, cloneWC,
+  newWantedWithLoc, newWanted, newWanteds, cloneWanted, cloneWC,
   emitWanted, emitWantedEq, emitWantedEvVar, emitWantedEvVars,
   emitDerivedEqs,
   newTcEvBinds, newNoTcEvBinds, addTcEvBind,
@@ -186,17 +186,26 @@ newEvVar :: TcPredType -> TcRnIf gbl lcl EvVar
 newEvVar ty = do { name <- newSysName (predTypeOccName ty)
                  ; return (mkLocalIdOrCoVar name Many ty) }
 
-newWanted :: CtOrigin -> Maybe TypeOrKind -> PredType -> TcM CtEvidence
--- Deals with both equality and non-equality predicates
-newWanted orig t_or_k pty
-  = do loc <- getCtLocM orig t_or_k
-       d <- if isEqPrimPred pty then HoleDest  <$> newCoercionHole pty
+-- | Create a new Wanted constraint with the given 'CtLoc'.
+newWantedWithLoc :: CtLoc -> PredType -> TcM CtEvidence
+newWantedWithLoc loc pty
+  = do d <- if isEqPrimPred pty then HoleDest  <$> newCoercionHole pty
                                 else EvVarDest <$> newEvVar pty
        return $ CtWanted { ctev_dest = d
                          , ctev_pred = pty
                          , ctev_nosh = WDeriv
-                         , ctev_loc = loc }
+                         , ctev_loc  = loc }
 
+-- | Create a new Wanted constraint with the given 'CtOrigin', and
+-- location information taken from the 'TcM' environment.
+newWanted :: CtOrigin -> Maybe TypeOrKind -> PredType -> TcM CtEvidence
+-- Deals with both equality and non-equality predicates
+newWanted orig t_or_k pty
+  = do loc <- getCtLocM orig t_or_k
+       newWantedWithLoc loc pty
+
+-- | Create new Wanted constraints with the given 'CtOrigin',
+-- and location information taken from the 'TcM' environment.
 newWanteds :: CtOrigin -> ThetaType -> TcM [CtEvidence]
 newWanteds orig = mapM (newWanted orig Nothing)
 

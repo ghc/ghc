@@ -70,3 +70,17 @@ test('TcPlugin_RewritePerf'
     , [ 'TcPlugin_RewritePerf.hs'
       , '-dynamic -package ghc' if have_dynamic() else '-package ghc' ]
     )
+
+# See EmitWantedPlugin.hs for a description of this plugin.
+test('TcPlugin_EmitWanted'
+    , [ extra_files(
+        [ 'Definitions.hs'
+        , 'Common.hs'
+        , 'EmitWantedPlugin.hs'
+        , 'TcPlugin_EmitWanted.hs'
+        ])
+      ]
+    , multimod_compile_fail
+    , [ 'TcPlugin_EmitWanted.hs'
+      , '-dynamic -package ghc' if have_dynamic() else '-package ghc ' ]
+    )

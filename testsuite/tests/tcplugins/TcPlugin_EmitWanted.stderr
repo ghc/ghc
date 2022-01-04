@@ -1,0 +1,9 @@
+[1 of 4] Compiling Common           ( Common.hs, Common.o )
+[2 of 4] Compiling Definitions      ( Definitions.hs, Definitions.o )
+[3 of 4] Compiling EmitWantedPlugin ( EmitWantedPlugin.hs, EmitWantedPlugin.o )
+[4 of 4] Compiling TcPlugin_EmitWanted ( TcPlugin_EmitWanted.hs, TcPlugin_EmitWanted.o )
+
+TcPlugin_EmitWanted.hs:13:7: error:
+    • Couldn't match type ‘Bool’ with ‘()’ arising from a use of ‘foo’
+    • In the expression: foo
+      In an equation for ‘bar’: bar = foo

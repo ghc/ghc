@@ -66,7 +66,7 @@ import GHC.Core.FamInstEnv     ( FamInstEnv )
 import GHC.Tc.Utils.Monad      ( TcGblEnv, TcLclEnv, TcPluginM
                                , unsafeTcPluginTcM
                                , liftIO, traceTc )
-import GHC.Tc.Types.Constraint ( Ct, CtLoc, CtEvidence(..), ctLocOrigin )
+import GHC.Tc.Types.Constraint ( Ct, CtLoc, CtEvidence(..) )
 import GHC.Tc.Utils.TcMType    ( TcTyVar, TcType )
 import GHC.Tc.Utils.Env        ( TcTyThing )
 import GHC.Tc.Types.Evidence   ( CoercionHole, EvTerm(..)
@@ -162,10 +162,10 @@ zonkTcType = unsafeTcPluginTcM . TcM.zonkTcType
 zonkCt :: Ct -> TcPluginM Ct
 zonkCt = unsafeTcPluginTcM . TcM.zonkCt
 
--- | Create a new wanted constraint.
+-- | Create a new Wanted constraint with the given 'CtLoc'.
 newWanted :: CtLoc -> PredType -> TcPluginM CtEvidence
 newWanted loc pty
-  = unsafeTcPluginTcM (TcM.newWanted (ctLocOrigin loc) Nothing pty)
+  = unsafeTcPluginTcM (TcM.newWantedWithLoc loc pty)
 
 -- | Create a new derived constraint.
 newDerived :: CtLoc -> PredType -> TcPluginM CtEvidence

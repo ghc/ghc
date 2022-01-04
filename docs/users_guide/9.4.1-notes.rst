@@ -109,8 +109,16 @@ Compiler
   for computing the ``Type`` of an ``HsExpr GhcTc`` in a pure fashion.
   The ``hsLitType`` and ``hsPatType`` functions that previously lived in
   ``GHC.Tc.Utils.Zonk`` have been moved to this module.
+
 - A ``Typeable`` constraint has been added to ``fromStaticPtr`` in the
   class ``GHC.StaticPtr.IsStatic``. GHC automatically wraps each use of
   the ``static`` keyword with ``fromStaticPtr``. Because ``static`` requires
   its argument to be an instance of ``Typeable``, ``fromStaticPtr`` can
   safely carry this constraint as well.
+
+- The ``newWanted`` function exported by ``GHC.Tc.Plugin`` now passes on
+  the full ``CtLoc`` instead of reconstituting it from the type-checking
+  environment. This makes ``newWanted`` consistent with ``newGiven``.
+  For authors of type-checking plugins, this means you don't need to wrap
+  a call to ``newWanted`` in ``setCtLocM`` to create a new Wanted constraint
+  with the provided ``CtLoc``.
