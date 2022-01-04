@@ -35,9 +35,9 @@ module GHC.StgToCmm.Closure (
         isLFThunk, isLFReEntrant, lfUpdatable,
 
         -- * Used by other modules
-        CgLoc(..), SelfLoopInfo, CallMethod(..),
+        CgLoc(..), CallMethod(..),
         nodeMustPointToIt, isKnownFun, funTag, tagForArity,
-        CallOpts(..), getCallMethod,
+        getCallMethod,
 
         -- * ClosureInfo
         ClosureInfo,
@@ -78,6 +78,7 @@ import GHC.Cmm
 import GHC.Cmm.Utils
 import GHC.Cmm.Ppr.Expr() -- For Outputable instances
 import GHC.StgToCmm.Types
+import GHC.StgToCmm.Sequel
 
 import GHC.Types.CostCentre
 import GHC.Cmm.BlockId
@@ -99,6 +100,7 @@ import GHC.Utils.Misc
 
 import Data.Coerce (coerce)
 import qualified Data.ByteString.Char8 as BS8
+import GHC.StgToCmm.Config
 
 -----------------------------------------------------------------------------
 --                Data types and synonyms
@@ -125,8 +127,6 @@ pprCgLoc :: Platform -> CgLoc -> SDoc
 pprCgLoc platform = \case
    CmmLoc e    -> text "cmm" <+> pdoc platform e
    LneLoc b rs -> text "lne" <+> ppr b <+> ppr rs
-
-type SelfLoopInfo = (Id, BlockId, [LocalReg])
 
 -- used by ticky profiling
 isKnownFun :: LambdaFormInfo -> Bool
@@ -492,13 +492,7 @@ data CallMethod
         CLabel          --   The code label
         RepArity        --   Its arity
 
-data CallOpts = CallOpts
-   { co_profile       :: !Profile   -- ^ Platform profile
-   , co_loopification :: !Bool      -- ^ Loopification enabled (cf @-floopification@)
-   , co_ticky         :: !Bool      -- ^ Ticky profiling enabled (cf @-ticky@)
-   }
-
-getCallMethod :: CallOpts
+getCallMethod :: StgToCmmConfig
               -> Name           -- Function being applied
               -> Id             -- Function Id used to chech if it can refer to
                                 -- CAF's and whether the function is tail-calling
@@ -511,12 +505,11 @@ getCallMethod :: CallOpts
                                 -- tail calls using the same data constructor,
                                 -- JumpToIt. This saves us one case branch in
                                 -- cgIdApp
-              -> Maybe SelfLoopInfo -- can we perform a self-recursive tail call?
+              -> Maybe SelfLoopInfo -- can we perform a self-recursive tail-call
               -> CallMethod
 
-getCallMethod opts _ id _ n_args v_args _cg_loc
-              (Just (self_loop_id, block_id, args))
-  | co_loopification opts
+getCallMethod cfg _ id _  n_args v_args _cg_loc (Just (self_loop_id, block_id, args))
+  | stgToCmmLoopification cfg
   , id == self_loop_id
   , args `lengthIs` (n_args - v_args)
   -- If these patterns match then we know that:
@@ -527,14 +520,13 @@ getCallMethod opts _ id _ n_args v_args _cg_loc
   -- self-recursive tail calls] in GHC.StgToCmm.Expr for more details
   = JumpToIt block_id args
 
-getCallMethod opts name id (LFReEntrant _ arity _ _) n_args _v_args _cg_loc
-              _self_loop_info
+getCallMethod cfg name id (LFReEntrant _ arity _ _) n_args _v_args _cg_loc _self_loop_info
   | n_args == 0 -- No args at all
-  && not (profileIsProfiling (co_profile opts))
+  && not (profileIsProfiling (stgToCmmProfile cfg))
      -- See Note [Evaluating functions with profiling] in rts/Apply.cmm
   = assert (arity /= 0) ReturnIt
   | n_args < arity = SlowCall        -- Not enough args
-  | otherwise      = DirectEntry (enterIdLabel (profilePlatform (co_profile opts)) name (idCafInfo id)) arity
+  | otherwise      = DirectEntry (enterIdLabel (stgToCmmPlatform cfg) name (idCafInfo id)) arity
 
 getCallMethod _ _name _ LFUnlifted n_args _v_args _cg_loc _self_loop_info
   = assert (n_args == 0) ReturnIt
@@ -544,14 +536,14 @@ getCallMethod _ _name _ (LFCon _) n_args _v_args _cg_loc _self_loop_info
     -- n_args=0 because it'd be ill-typed to apply a saturated
     --          constructor application to anything
 
-getCallMethod opts name id (LFThunk _ _ updatable std_form_info is_fun)
+getCallMethod cfg name id (LFThunk _ _ updatable std_form_info is_fun)
               n_args _v_args _cg_loc _self_loop_info
   | is_fun      -- it *might* be a function, so we must "call" it (which is always safe)
   = SlowCall    -- We cannot just enter it [in eval/apply, the entry code
                 -- is the fast-entry code]
 
   -- Since is_fun is False, we are *definitely* looking at a data value
-  | updatable || co_ticky opts -- to catch double entry
+  | updatable || stgToCmmDoTicky cfg -- to catch double entry
       {- OLD: || opt_SMP
          I decided to remove this, because in SMP mode it doesn't matter
          if we enter the same thunk multiple times, so the optimisation
@@ -573,7 +565,7 @@ getCallMethod opts name id (LFThunk _ _ updatable std_form_info is_fun)
 
   | otherwise        -- Jump direct to code for single-entry thunks
   = assert (n_args == 0) $
-    DirectEntry (thunkEntryLabel (profilePlatform (co_profile opts)) name (idCafInfo id) std_form_info
+    DirectEntry (thunkEntryLabel (stgToCmmPlatform cfg) name (idCafInfo id) std_form_info
                 updatable) 0
 
 getCallMethod _ _name _ (LFUnknown True) _n_arg _v_args _cg_locs _self_loop_info
@@ -583,8 +575,7 @@ getCallMethod _ name _ (LFUnknown False) n_args _v_args _cg_loc _self_loop_info
   = assertPpr (n_args == 0) (ppr name <+> ppr n_args)
     EnterIt -- Not a function
 
-getCallMethod _ _name _ LFLetNoEscape _n_args _v_args (LneLoc blk_id lne_regs)
-              _self_loop_info
+getCallMethod _ _name _ LFLetNoEscape _n_args _v_args (LneLoc blk_id lne_regs) _self_loop_info
   = JumpToIt blk_id lne_regs
 
 getCallMethod _ _ _ _ _ _ _ _ = panic "Unknown call method"

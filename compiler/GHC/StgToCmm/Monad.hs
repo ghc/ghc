@@ -14,7 +14,7 @@
 module GHC.StgToCmm.Monad (
         FCode,        -- type
 
-        initC, runC, fixC,
+        initC, initFCodeState, runC, fixC,
         newUnique,
 
         emitLabel,
@@ -28,7 +28,7 @@ module GHC.StgToCmm.Monad (
 
         getCmm, aGraphToGraph, getPlatform, getProfile,
         getCodeR, getCode, getCodeScoped, getHeapUsage,
-        getCallOpts, getPtrOpts,
+        getContext,
 
         mkCmmIfThenElse, mkCmmIfThen, mkCmmIfGoto,
         mkCmmIfThenElse', mkCmmIfThen', mkCmmIfGoto',
@@ -45,7 +45,7 @@ module GHC.StgToCmm.Monad (
         setTickyCtrLabel, getTickyCtrLabel,
         tickScope, getTickScope,
 
-        withUpdFrameOff, getUpdFrameOff, initUpdFrameOff,
+        withUpdFrameOff, getUpdFrameOff,
 
         HeapUsage(..), VirtualHpOffset,        initHpUsage,
         getHpUsage,  setHpUsage, heapHWM,
@@ -54,13 +54,13 @@ module GHC.StgToCmm.Monad (
         getModuleName,
 
         -- ideally we wouldn't export these, but some other modules access internal state
-        getState, setState, getSelfLoop, withSelfLoop, getInfoDown, getDynFlags,
+        getState, setState, getSelfLoop, withSelfLoop, getStgToCmmConfig,
 
         -- more localised access to monad state
         CgIdInfo(..),
         getBinds, setBinds,
         -- out of general friendliness, we also export ...
-        CgInfoDownwards(..), CgState(..) -- non-abstract
+        StgToCmmConfig(..), CgState(..) -- non-abstract
     ) where
 
 import GHC.Prelude hiding( sequence, succ )
@@ -68,13 +68,13 @@ import GHC.Prelude hiding( sequence, succ )
 import GHC.Platform
 import GHC.Platform.Profile
 import GHC.Cmm
+import GHC.StgToCmm.Config
 import GHC.StgToCmm.Closure
-import GHC.Driver.Session
+import GHC.StgToCmm.Sequel
 import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Graph as CmmGraph
 import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
-import GHC.Cmm.Info
 import GHC.Runtime.Heap.Layout
 import GHC.Unit
 import GHC.Types.Id
@@ -109,24 +109,30 @@ import Data.List (mapAccumL)
 --    - the current heap usage
 --    - a UniqSupply
 --
---  - A reader monad, for CgInfoDownwards, containing
---    - DynFlags,
+--  - A reader monad, for StgToCmmConfig, containing
+--    - the profile,
 --    - the current Module
+--    - the debug level
+--    - a bunch of flags see StgToCmm.Config for full details
+
+--  - A second reader monad with:
 --    - the update-frame offset
 --    - the ticky counter label
 --    - the Sequel (the continuation to return to)
 --    - the self-recursive tail call information
+--    - The tick scope for new blocks and ticks
+--
 
 --------------------------------------------------------
 
-newtype FCode a = FCode' { doFCode :: CgInfoDownwards -> CgState -> (a, CgState) }
+newtype FCode a = FCode' { doFCode :: StgToCmmConfig -> FCodeState -> CgState -> (a, CgState) }
 
 -- Not derived because of #18202.
 -- See Note [The one-shot state monad trick] in GHC.Utils.Monad
 instance Functor FCode where
   fmap f (FCode m) =
-    FCode $ \info_down state ->
-      case m info_down state of
+    FCode $ \cfg fst state ->
+      case m cfg fst state of
         (x, state') -> (f x, state')
 
 -- This pattern synonym makes the simplifier monad eta-expand,
@@ -134,29 +140,31 @@ instance Functor FCode where
 -- See #18202.
 -- See Note [The one-shot state monad trick] in GHC.Utils.Monad
 {-# COMPLETE FCode #-}
-pattern FCode :: (CgInfoDownwards -> CgState -> (a, CgState))
+pattern FCode :: (StgToCmmConfig -> FCodeState -> CgState -> (a, CgState))
               -> FCode a
 pattern FCode m <- FCode' m
   where
-    FCode m = FCode' $ oneShot (\cgInfoDown -> oneShot (\state ->m cgInfoDown state))
+    FCode m = FCode' $ oneShot (\cfg -> oneShot
+                                 (\fstate -> oneShot
+                                   (\state -> m cfg fstate state)))
 
 instance Applicative FCode where
-    pure val = FCode (\_info_down state -> (val, state))
+    pure val = FCode (\_cfg _fstate state -> (val, state))
     {-# INLINE pure #-}
     (<*>) = ap
 
 instance Monad FCode where
     FCode m >>= k = FCode $
-        \info_down state ->
-            case m info_down state of
+        \cfg fstate state ->
+            case m cfg fstate state of
               (m_result, new_state) ->
                  case k m_result of
-                   FCode kcode -> kcode info_down new_state
+                   FCode kcode -> kcode cfg fstate new_state
     {-# INLINE (>>=) #-}
 
 instance MonadUnique FCode where
   getUniqueSupplyM = cgs_uniqs <$> getState
-  getUniqueM = FCode $ \_ st ->
+  getUniqueM = FCode $ \_ _ st ->
     let (u, us') = takeUniqFromSupply (cgs_uniqs st)
     in (u, st { cgs_uniqs = us' })
 
@@ -164,36 +172,18 @@ initC :: IO CgState
 initC  = do { uniqs <- mkSplitUniqSupply 'c'
             ; return (initCgState uniqs) }
 
-runC :: DynFlags -> Module -> CgState -> FCode a -> (a,CgState)
-runC dflags mod st fcode = doFCode fcode (initCgInfoDown dflags mod) st
+runC :: StgToCmmConfig -> FCodeState -> CgState -> FCode a -> (a, CgState)
+runC cfg fst st fcode = doFCode fcode cfg fst st
 
 fixC :: (a -> FCode a) -> FCode a
 fixC fcode = FCode $
-    \info_down state -> let (v, s) = doFCode (fcode v) info_down state
-                        in (v, s)
+    \cfg fstate state ->
+      let (v, s) = doFCode (fcode v) cfg fstate state
+      in (v, s)
 
 --------------------------------------------------------
 --        The code generator environment
 --------------------------------------------------------
-
--- This monadery has some information that it only passes
--- *downwards*, as well as some ``state'' which is modified
--- as we go along.
-
-data CgInfoDownwards        -- information only passed *downwards* by the monad
-  = MkCgInfoDown {
-        cgd_dflags    :: DynFlags,
-        cgd_mod       :: Module,            -- Module being compiled
-        cgd_updfr_off :: UpdFrameOffset,    -- Size of current update frame
-        cgd_ticky     :: CLabel,            -- Current destination for ticky counts
-        cgd_sequel    :: Sequel,            -- What to do at end of basic block
-        cgd_self_loop :: Maybe SelfLoopInfo,-- Which tail calls can be compiled
-                                            -- as local jumps? See Note
-                                            -- [Self-recursive tail calls] in
-                                            -- GHC.StgToCmm.Expr
-        cgd_tick_scope:: CmmTickScope       -- Tick scope for new blocks & ticks
-  }
-
 type CgBindings = IdEnv CgIdInfo
 
 data CgIdInfo
@@ -206,24 +196,6 @@ data CgIdInfo
 instance OutputableP Platform CgIdInfo where
   pdoc env (CgIdInfo { cg_id = id, cg_loc = loc })
     = ppr id <+> text "-->" <+> pdoc env loc
-
--- Sequel tells what to do with the result of this expression
-data Sequel
-  = Return              -- Return result(s) to continuation found on the stack.
-
-  | AssignTo
-        [LocalReg]      -- Put result(s) in these regs and fall through
-                        -- NB: no void arguments here
-                        --
-        Bool            -- Should we adjust the heap pointer back to
-                        -- recover space that's unused on this path?
-                        -- We need to do this only if the expression
-                        -- may allocate (e.g. it's a foreign call or
-                        -- allocating primOp)
-
-instance Outputable Sequel where
-    ppr Return = text "Return"
-    ppr (AssignTo regs b) = text "AssignTo" <+> ppr regs <+> ppr b
 
 -- See Note [sharing continuations] below
 data ReturnKind
@@ -297,24 +269,6 @@ data ReturnKind
 -- fall back to AssignedDirectly.
 --
 
-
-initCgInfoDown :: DynFlags -> Module -> CgInfoDownwards
-initCgInfoDown dflags mod
-  = MkCgInfoDown { cgd_dflags    = dflags
-                 , cgd_mod       = mod
-                 , cgd_updfr_off = initUpdFrameOff (targetPlatform dflags)
-                 , cgd_ticky     = mkTopTickyCtrLabel
-                 , cgd_sequel    = initSequel
-                 , cgd_self_loop = Nothing
-                 , cgd_tick_scope= GlobalScope }
-
-initSequel :: Sequel
-initSequel = Return
-
-initUpdFrameOff :: Platform -> UpdFrameOffset
-initUpdFrameOff platform = platformWordSizeInBytes platform -- space for the RA
-
-
 --------------------------------------------------------
 --        The code generator state
 --------------------------------------------------------
@@ -336,6 +290,17 @@ data CgState
 -- If you are wondering why you have to be careful forcing CgState then
 -- the reason is the knot-tying in 'getHeapUsage'. This problem is tracked
 -- in #19245
+
+data FCodeState =
+  MkFCodeState { fcs_upframeoffset :: UpdFrameOffset     -- ^ Size of current update frame UpdFrameOffset must be kept lazy or
+                                                         -- else the RTS will deadlock _and_ also experience a severe
+                                                         -- performance degredation
+              , fcs_sequel        :: !Sequel             -- ^ What to do at end of basic block
+              , fcs_selfloop      :: Maybe SelfLoopInfo  -- ^ Which tail calls can be compiled as local jumps?
+                                                         --   See Note [Self-recursive tail calls] in GHC.StgToCmm.Expr
+              , fcs_ticky         :: !CLabel             -- ^ Destination for ticky counts
+              , fcs_tickscope     :: !CmmTickScope       -- ^ Tick scope for new blocks & ticks
+              }
 
 data HeapUsage   -- See Note [Virtual and real heap pointers]
   = HeapUsage {
@@ -418,14 +383,14 @@ maxHpHw :: HeapUsage -> VirtualHpOffset -> HeapUsage
 hp_usg `maxHpHw` hw = hp_usg { virtHp = virtHp hp_usg `max` hw }
 
 --------------------------------------------------------
--- Operators for getting and setting the state and "info_down".
+-- Operators for getting and setting the state and "stgToCmmConfig".
 --------------------------------------------------------
 
 getState :: FCode CgState
-getState = FCode $ \_info_down state -> (state, state)
+getState = FCode $ \_cfg _fstate state -> (state, state)
 
 setState :: CgState -> FCode ()
-setState state = FCode $ \_info_down _ -> ((), state)
+setState state = FCode $ \_cfg _fstate _ -> ((), state)
 
 getHpUsage :: FCode HeapUsage
 getHpUsage = do
@@ -462,9 +427,9 @@ setBinds new_binds = do
         state <- getState
         setState $ state {cgs_binds = new_binds}
 
-withState :: FCode a -> CgState -> FCode (a,CgState)
-withState (FCode fcode) newstate = FCode $ \info_down state ->
-  case fcode info_down newstate of
+withCgState :: FCode a -> CgState -> FCode (a,CgState)
+withCgState (FCode fcode) newstate = FCode $ \cfg fstate state ->
+  case fcode cfg fstate newstate of
     (retval, state2) -> ((retval,state2), state)
 
 newUniqSupply :: FCode UniqSupply
@@ -486,68 +451,41 @@ newTemp rep = do { uniq <- getUniqueM
                  ; return (LocalReg uniq rep) }
 
 ------------------
-getInfoDown :: FCode CgInfoDownwards
-getInfoDown = FCode $ \info_down state -> (info_down,state)
+initFCodeState :: Platform -> FCodeState
+initFCodeState p =
+  MkFCodeState { fcs_upframeoffset = platformWordSizeInBytes p
+               , fcs_sequel        = Return
+               , fcs_selfloop      = Nothing
+               , fcs_ticky         = mkTopTickyCtrLabel
+               , fcs_tickscope     = GlobalScope
+               }
+
+getFCodeState :: FCode FCodeState
+getFCodeState = FCode $ \_ fstate state -> (fstate,state)
+
+-- basically local for the reader monad
+withFCodeState :: FCode a -> FCodeState -> FCode a
+withFCodeState (FCode fcode) fst = FCode $ \cfg _ state -> fcode cfg fst state
 
 getSelfLoop :: FCode (Maybe SelfLoopInfo)
-getSelfLoop = do
-        info_down <- getInfoDown
-        return $ cgd_self_loop info_down
+getSelfLoop = fcs_selfloop <$> getFCodeState
 
 withSelfLoop :: SelfLoopInfo -> FCode a -> FCode a
 withSelfLoop self_loop code = do
-        info_down <- getInfoDown
-        withInfoDown code (info_down {cgd_self_loop = Just self_loop})
-
-instance HasDynFlags FCode where
-    getDynFlags = liftM cgd_dflags getInfoDown
-
-getProfile :: FCode Profile
-getProfile = targetProfile <$> getDynFlags
-
-getPlatform :: FCode Platform
-getPlatform = profilePlatform <$> getProfile
-
-getCallOpts :: FCode CallOpts
-getCallOpts = do
-   dflags <- getDynFlags
-   profile <- getProfile
-   pure $ CallOpts
-    { co_profile       = profile
-    , co_loopification = gopt Opt_Loopification dflags
-    , co_ticky         = gopt Opt_Ticky dflags
-    }
-
-getPtrOpts :: FCode PtrOpts
-getPtrOpts = do
-   dflags <- getDynFlags
-   profile <- getProfile
-   pure $ PtrOpts
-      { po_profile     = profile
-      , po_align_check = gopt Opt_AlignmentSanitisation dflags
-      }
-
-
-withInfoDown :: FCode a -> CgInfoDownwards -> FCode a
-withInfoDown (FCode fcode) info_down = FCode $ \_ state -> fcode info_down state
-
--- ----------------------------------------------------------------------------
--- Get the current module name
-
-getModuleName :: FCode Module
-getModuleName = do { info <- getInfoDown; return (cgd_mod info) }
+        fstate <- getFCodeState
+        withFCodeState code (fstate {fcs_selfloop = Just self_loop})
 
 -- ----------------------------------------------------------------------------
 -- Get/set the end-of-block info
 
 withSequel :: Sequel -> FCode a -> FCode a
 withSequel sequel code
-  = do  { info  <- getInfoDown
-        ; withInfoDown code (info {cgd_sequel = sequel, cgd_self_loop = Nothing }) }
+  = do  { fstate <- getFCodeState
+        ; withFCodeState code (fstate { fcs_sequel = sequel
+                                      , fcs_selfloop = Nothing }) }
 
 getSequel :: FCode Sequel
-getSequel = do  { info <- getInfoDown
-                ; return (cgd_sequel info) }
+getSequel = fcs_sequel <$> getFCodeState
 
 -- ----------------------------------------------------------------------------
 -- Get/set the size of the update frame
@@ -561,35 +499,29 @@ getSequel = do  { info <- getInfoDown
 
 withUpdFrameOff :: UpdFrameOffset -> FCode a -> FCode a
 withUpdFrameOff size code
-  = do  { info  <- getInfoDown
-        ; withInfoDown code (info {cgd_updfr_off = size }) }
+  = do  { fstate <- getFCodeState
+        ; withFCodeState code (fstate {fcs_upframeoffset = size }) }
 
 getUpdFrameOff :: FCode UpdFrameOffset
-getUpdFrameOff
-  = do  { info  <- getInfoDown
-        ; return $ cgd_updfr_off info }
+getUpdFrameOff = fcs_upframeoffset <$> getFCodeState
 
 -- ----------------------------------------------------------------------------
 -- Get/set the current ticky counter label
 
 getTickyCtrLabel :: FCode CLabel
-getTickyCtrLabel = do
-        info <- getInfoDown
-        return (cgd_ticky info)
+getTickyCtrLabel = fcs_ticky <$> getFCodeState
 
 setTickyCtrLabel :: CLabel -> FCode a -> FCode a
 setTickyCtrLabel ticky code = do
-        info <- getInfoDown
-        withInfoDown code (info {cgd_ticky = ticky})
+        fstate <- getFCodeState
+        withFCodeState code (fstate {fcs_ticky = ticky})
 
 -- ----------------------------------------------------------------------------
 -- Manage tick scopes
 
 -- | The current tick scope. We will assign this to generated blocks.
 getTickScope :: FCode CmmTickScope
-getTickScope = do
-        info <- getInfoDown
-        return (cgd_tick_scope info)
+getTickScope = fcs_tickscope <$> getFCodeState
 
 -- | Places blocks generated by the given code into a fresh
 -- (sub-)scope. This will make sure that Cmm annotations in our scope
@@ -597,11 +529,33 @@ getTickScope = do
 -- way around.
 tickScope :: FCode a -> FCode a
 tickScope code = do
-        info <- getInfoDown
-        if debugLevel (cgd_dflags info) == 0 then code else do
+        cfg <- getStgToCmmConfig
+        fstate <- getFCodeState
+        if stgToCmmDebugLevel cfg == 0 then code else do
           u <- newUnique
-          let scope' = SubScope u (cgd_tick_scope info)
-          withInfoDown code info{ cgd_tick_scope = scope' }
+          let scope' = SubScope u (fcs_tickscope fstate)
+          withFCodeState code fstate{ fcs_tickscope = scope' }
+
+-- ----------------------------------------------------------------------------
+-- Config related helpers
+
+getStgToCmmConfig :: FCode StgToCmmConfig
+getStgToCmmConfig = FCode $ \cfg _ state -> (cfg,state)
+
+getProfile :: FCode Profile
+getProfile = stgToCmmProfile <$> getStgToCmmConfig
+
+getPlatform :: FCode Platform
+getPlatform = profilePlatform <$> getProfile
+
+getContext :: FCode SDocContext
+getContext = stgToCmmContext <$> getStgToCmmConfig
+
+-- ----------------------------------------------------------------------------
+-- Get the current module name
+
+getModuleName :: FCode Module
+getModuleName = stgToCmmThisModule <$> getStgToCmmConfig
 
 
 --------------------------------------------------------
@@ -618,14 +572,16 @@ forkClosureBody :: FCode () -> FCode ()
 
 forkClosureBody body_code
   = do  { platform <- getPlatform
-        ; info   <- getInfoDown
-        ; us     <- newUniqSupply
-        ; state  <- getState
-        ; let body_info_down = info { cgd_sequel    = initSequel
-                                    , cgd_updfr_off = initUpdFrameOff platform
-                                    , cgd_self_loop = Nothing }
+        ; cfg      <- getStgToCmmConfig
+        ; fstate   <- getFCodeState
+        ; us       <- newUniqSupply
+        ; state    <- getState
+        ; let fcs = fstate { fcs_sequel        = Return
+                           , fcs_upframeoffset = platformWordSizeInBytes platform
+                           , fcs_selfloop      = Nothing
+                           }
               fork_state_in = (initCgState us) { cgs_binds = cgs_binds state }
-              ((),fork_state_out) = doFCode body_code body_info_down fork_state_in
+              ((),fork_state_out) = doFCode body_code cfg fcs fork_state_in
         ; setState $ state `addCodeBlocksFrom` fork_state_out }
 
 forkLneBody :: FCode a -> FCode a
@@ -636,11 +592,12 @@ forkLneBody :: FCode a -> FCode a
 -- the successor.  In particular, any heap usage from the enclosed
 -- code is discarded; it should deal with its own heap consumption.
 forkLneBody body_code
-  = do  { info_down <- getInfoDown
-        ; us        <- newUniqSupply
-        ; state     <- getState
+  = do  { cfg   <- getStgToCmmConfig
+        ; us    <- newUniqSupply
+        ; state <- getState
+        ; fstate <- getFCodeState
         ; let fork_state_in = (initCgState us) { cgs_binds = cgs_binds state }
-              (result, fork_state_out) = doFCode body_code info_down fork_state_in
+              (result, fork_state_out) = doFCode body_code cfg fstate fork_state_in
         ; setState $ state `addCodeBlocksFrom` fork_state_out
         ; return result }
 
@@ -649,12 +606,13 @@ codeOnly :: FCode () -> FCode ()
 -- Do not affect anything else in the outer state
 -- Used in almost-circular code to prevent false loop dependencies
 codeOnly body_code
-  = do  { info_down <- getInfoDown
-        ; us        <- newUniqSupply
-        ; state     <- getState
+  = do  { cfg   <- getStgToCmmConfig
+        ; us    <- newUniqSupply
+        ; state <- getState
+        ; fstate <- getFCodeState
         ; let   fork_state_in = (initCgState us) { cgs_binds   = cgs_binds state
                                                  , cgs_hp_usg  = cgs_hp_usg state }
-                ((), fork_state_out) = doFCode body_code info_down fork_state_in
+                ((), fork_state_out) = doFCode body_code cfg fstate fork_state_in
         ; setState $ state `addCodeBlocksFrom` fork_state_out }
 
 forkAlts :: [FCode a] -> FCode [a]
@@ -664,11 +622,12 @@ forkAlts :: [FCode a] -> FCode [a]
 -- that the virtual Hp is moved on to the worst virtual Hp for the branches
 
 forkAlts branch_fcodes
-  = do  { info_down <- getInfoDown
-        ; us <- newUniqSupply
+  = do  { cfg   <- getStgToCmmConfig
+        ; us    <- newUniqSupply
         ; state <- getState
+        ; fstate <- getFCodeState
         ; let compile us branch
-                = (us2, doFCode branch info_down branch_state)
+                = (us2, doFCode branch cfg fstate branch_state)
                 where
                   (us1,us2) = splitUniqSupply us
                   branch_state = (initCgState us1) {
@@ -693,7 +652,7 @@ forkAltPair x y = do
 getCodeR :: FCode a -> FCode (a, CmmAGraph)
 getCodeR fcode
   = do  { state1 <- getState
-        ; (a, state2) <- withState fcode (state1 { cgs_stmts = mkNop })
+        ; (a, state2) <- withCgState fcode (state1 { cgs_stmts = mkNop })
         ; setState $ state2 { cgs_stmts = cgs_stmts state1  }
         ; return (a, cgs_stmts state2) }
 
@@ -706,7 +665,7 @@ getCodeScoped fcode
   = do  { state1 <- getState
         ; ((a, tscope), state2) <-
             tickScope $
-            flip withState state1 { cgs_stmts = mkNop } $
+            flip withCgState state1 { cgs_stmts = mkNop } $
             do { a   <- fcode
                ; scp <- getTickScope
                ; return (a, scp) }
@@ -725,10 +684,11 @@ getCodeScoped fcode
 
 getHeapUsage :: (VirtualHpOffset -> FCode a) -> FCode a
 getHeapUsage fcode
-  = do  { info_down <- getInfoDown
+  = do  { cfg <- getStgToCmmConfig
         ; state <- getState
+        ; fcstate <- getFCodeState
         ; let   fstate_in = state { cgs_hp_usg  = initHpUsage }
-                (r, fstate_out) = doFCode (fcode hp_hw) info_down fstate_in
+                (r, fstate_out) = doFCode (fcode hp_hw) cfg fcstate fstate_in
                 hp_hw = heapHWM (cgs_hp_usg fstate_out)        -- Loop here!
 
         ; setState $ fstate_out { cgs_hp_usg = cgs_hp_usg state }
@@ -757,8 +717,8 @@ emitTick = emitCgStmt . CgStmt . CmmTick
 
 emitUnwind :: [(GlobalReg, Maybe CmmExpr)] -> FCode ()
 emitUnwind regs = do
-  dflags <- getDynFlags
-  when (debugLevel dflags > 0) $
+  debug_level <- stgToCmmDebugLevel <$> getStgToCmmConfig
+  when (debug_level > 0) $
      emitCgStmt $ CgStmt $ CmmUnwind regs
 
 emitAssign :: CmmReg  -> CmmExpr -> FCode ()
@@ -838,7 +798,7 @@ getCmm :: FCode a -> FCode (a, CmmGroup)
 -- object splitting (at a later stage)
 getCmm code
   = do  { state1 <- getState
-        ; (a, state2) <- withState code (state1 { cgs_tops  = nilOL })
+        ; (a, state2) <- withCgState code (state1 { cgs_tops  = nilOL })
         ; setState $ state2 { cgs_tops = cgs_tops state1 }
         ; return (a, fromOL (cgs_tops state2)) }
 

@@ -44,8 +44,6 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 
-import GHC.Driver.Session
-
 
 -------------------------------------
 --        Manipulating CgIdInfo
@@ -84,16 +82,16 @@ mkRhsInit platform reg lf_info expr
 
 idInfoToAmode :: CgIdInfo -> CmmExpr
 -- Returns a CmmExpr for the *tagged* pointer
-idInfoToAmode (CgIdInfo { cg_loc = CmmLoc e }) = e
+idInfoToAmode CgIdInfo { cg_loc = CmmLoc e } = e
 idInfoToAmode cg_info
   = pprPanic "idInfoToAmode" (ppr (cg_id cg_info))        -- LneLoc
 
 -- | A tag adds a byte offset to the pointer
 addDynTag :: Platform -> CmmExpr -> DynTag -> CmmExpr
-addDynTag platform expr tag = cmmOffsetB platform expr tag
+addDynTag = cmmOffsetB
 
 maybeLetNoEscape :: CgIdInfo -> Maybe (BlockId, [LocalReg])
-maybeLetNoEscape (CgIdInfo { cg_loc = LneLoc blk_id args}) = Just (blk_id, args)
+maybeLetNoEscape CgIdInfo { cg_loc = LneLoc blk_id args} = Just (blk_id, args)
 maybeLetNoEscape _other                                      = Nothing
 
 
@@ -120,7 +118,7 @@ addBindsC new_bindings = do
 
 getCgIdInfo :: Id -> FCode CgIdInfo
 getCgIdInfo id
-  = do  { platform <- targetPlatform <$> getDynFlags
+  = do  { platform <- getPlatform
         ; local_binds <- getBinds -- Try local bindings first
         ; case lookupVarEnv local_binds id of {
             Just info -> return info ;
@@ -179,7 +177,7 @@ bindArgToReg :: NonVoid Id -> FCode LocalReg
 bindArgToReg nvid@(NonVoid id) = bindToReg nvid (mkLFArgument id)
 
 bindArgsToRegs :: [NonVoid Id] -> FCode [LocalReg]
-bindArgsToRegs args = mapM bindArgToReg args
+bindArgsToRegs = mapM bindArgToReg
 
 idToReg :: Platform -> NonVoid Id -> LocalReg
 -- Make a register from an Id, typically a function argument,

@@ -104,8 +104,9 @@ import GHC.Driver.Env
 import GHC.Driver.Errors
 import GHC.Driver.Errors.Types
 import GHC.Driver.CodeOutput
-import GHC.Driver.Config.Logger (initLogFlags)
-import GHC.Driver.Config.Parser (initParserOpts)
+import GHC.Driver.Config.Logger   (initLogFlags)
+import GHC.Driver.Config.Parser   (initParserOpts)
+import GHC.Driver.Config.StgToCmm (initStgToCmmConfig)
 import GHC.Driver.Config.Diagnostic
 import GHC.Driver.Hooks
 
@@ -1703,12 +1704,13 @@ hscInteractive hsc_env cgguts location = do
 hscCompileCmmFile :: HscEnv -> FilePath -> FilePath -> IO (Maybe FilePath)
 hscCompileCmmFile hsc_env filename output_filename = runHsc hsc_env $ do
     let dflags   = hsc_dflags hsc_env
-    let logger   = hsc_logger hsc_env
-    let profile  = targetProfile dflags
-    let hooks    = hsc_hooks hsc_env
-    let tmpfs    = hsc_tmpfs hsc_env
+        logger   = hsc_logger hsc_env
+        hooks    = hsc_hooks hsc_env
+        tmpfs    = hsc_tmpfs hsc_env
+        profile  = targetProfile dflags
         home_unit = hsc_home_unit hsc_env
         platform  = targetPlatform dflags
+        do_info_table = gopt Opt_InfoTableMap dflags
         -- Make up a module name to give the NCG. We can't pass bottom here
         -- lest we reproduce #11784.
         mod_name = mkModuleName $ "Cmm$" ++ FilePath.takeFileName filename
@@ -1736,11 +1738,11 @@ hscCompileCmmFile hsc_env filename output_filename = runHsc hsc_env $ do
             FormatCMM (pdoc platform cmmgroup)
 
         rawCmms <- case cmmToRawCmmHook hooks of
-          Nothing -> cmmToRawCmm logger profile        (Stream.yield cmmgroup)
-          Just h  -> h               dflags Nothing (Stream.yield cmmgroup)
+          Nothing -> cmmToRawCmm logger profile (Stream.yield cmmgroup)
+          Just h  -> h           dflags Nothing (Stream.yield cmmgroup)
 
         let foreign_stubs _ =
-              let ip_init = ipInitCode dflags cmm_mod ents
+              let ip_init   = ipInitCode do_info_table platform cmm_mod ents
               in NoStubs `appendStubC` ip_init
 
         (_output_filename, (_stub_h_exists, stub_c_exists), _foreign_fps, _caf_infos)
@@ -1785,17 +1787,17 @@ doCodeGen :: HscEnv -> Module -> InfoTableProvMap -> [TyCon]
          -- the C-- up front, which has a significant space cost.
 doCodeGen hsc_env this_mod denv data_tycons
               cost_centre_info stg_binds_w_fvs hpc_info = do
-    let dflags = hsc_dflags hsc_env
-    let logger = hsc_logger hsc_env
-    let hooks  = hsc_hooks hsc_env
-    let tmpfs  = hsc_tmpfs hsc_env
-    let platform = targetPlatform dflags
+    let dflags     = hsc_dflags hsc_env
+        logger     = hsc_logger hsc_env
+        hooks      = hsc_hooks  hsc_env
+        tmpfs      = hsc_tmpfs  hsc_env
+        platform   = targetPlatform dflags
 
     putDumpFileMaybe logger Opt_D_dump_stg_final "Final STG:" FormatSTG (pprGenStgTopBindings (initStgPprOpts dflags) stg_binds_w_fvs)
 
-    let stg_to_cmm = case stgToCmmHook hooks of
-                        Nothing -> StgToCmm.codeGen logger tmpfs
-                        Just h  -> h
+    let stg_to_cmm dflags mod = case stgToCmmHook hooks of
+                        Nothing -> StgToCmm.codeGen logger tmpfs (initStgToCmmConfig dflags mod)
+                        Just h  -> h                             (initStgToCmmConfig dflags mod)
 
     let cmm_stream :: Stream IO CmmGroup ModuleLFInfos
         -- See Note [Forcing of stg_binds]

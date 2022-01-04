@@ -56,6 +56,7 @@ module GHC.Types.Name (
         localiseName,
 
         nameSrcLoc, nameSrcSpan, pprNameDefnLoc, pprDefinedAt,
+        pprFullName, pprTickyName,
 
         -- ** Predicates on 'Name's
         isSystemName, isInternalName, isExternalName,
@@ -622,6 +623,31 @@ pprName (Name {n_sort = sort, n_uniq = uniq, n_occ = occ})
       External mod            -> pprExternal debug sty uniq mod occ False UserSyntax
       System                  -> pprSystem   debug sty uniq occ
       Internal                -> pprInternal debug sty uniq occ
+
+-- | Print fully qualified name (with unit-id, module and unique)
+pprFullName :: Module -> Name -> SDoc
+pprFullName this_mod Name{n_sort = sort, n_uniq = uniq, n_occ = occ} =
+  let mod = case sort of
+        WiredIn  m _ _ -> m
+        External m     -> m
+        System         -> this_mod
+        Internal       -> this_mod
+      in ftext (unitIdFS (moduleUnitId mod))
+         <> colon    <> ftext (moduleNameFS $ moduleName mod)
+         <> dot      <> ftext (occNameFS occ)
+         <> char '_' <> pprUniqueAlways uniq
+
+
+-- | Print a ticky ticky styled name
+--
+-- Module argument is the module to use for internal and system names. When
+-- printing the name in a ticky profile, the module name is included even for
+-- local things. However, ticky uses the format "x (M)" rather than "M.x".
+-- Hence, this function provides a separation from normal styling.
+pprTickyName :: Module -> Name -> SDoc
+pprTickyName this_mod name
+  | isInternalName name = pprName name <+> parens (ppr this_mod)
+  | otherwise           = pprName name
 
 -- | Print the string of Name unqualifiedly directly.
 pprNameUnqualified :: Name -> SDoc

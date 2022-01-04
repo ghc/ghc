@@ -26,6 +26,8 @@ module GHC.Cmm.Type
     , cmmVec
     , vecLength, vecElemType
     , isVecType
+
+    , DoAlignSanitisation
    )
 where
 
@@ -471,3 +473,6 @@ C calling convention rather early on in the compiler).  However, given
 this, the cons outweigh the pros.
 
 -}
+
+-- | is @-falignment-sanitisation@ enabled?
+type DoAlignSanitisation = Bool

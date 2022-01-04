@@ -11,8 +11,6 @@ module GHC.StgToCmm.Hpc ( initHpc, mkTickBox ) where
 import GHC.Prelude
 import GHC.Platform
 
-import GHC.Driver.Session
-
 import GHC.StgToCmm.Monad
 import GHC.StgToCmm.Utils
 
@@ -39,13 +37,13 @@ mkTickBox platform mod n
 
 -- | Emit top-level tables for HPC and return code to initialise
 initHpc :: Module -> HpcInfo -> FCode ()
-initHpc _ (NoHpcInfo {})
+initHpc _ NoHpcInfo{}
   = return ()
 initHpc this_mod (HpcInfo tickCount _hashNo)
-  = do dflags <- getDynFlags
-       when (gopt Opt_Hpc dflags) $
+  = do do_hpc <- stgToCmmOptHpc <$> getStgToCmmConfig
+       when do_hpc $
            emitDataLits (mkHpcTicksLabel this_mod)
-                        [ (CmmInt 0 W64)
+                        [ CmmInt 0 W64
                         | _ <- take tickCount [0 :: Int ..]
                         ]
 

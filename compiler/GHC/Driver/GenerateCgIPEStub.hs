@@ -19,11 +19,12 @@ import qualified GHC.Data.Stream as Stream
 import GHC.Driver.Env (hsc_dflags)
 import GHC.Driver.Flags (GeneralFlag (Opt_InfoTableMap))
 import GHC.Driver.Session (gopt, targetPlatform)
+import GHC.Driver.Config.StgToCmm
 import GHC.Plugins (HscEnv, NonCaffySet)
 import GHC.Prelude
 import GHC.Runtime.Heap.Layout (isStackRep)
 import GHC.Settings (Platform, platformUnregisterised)
-import GHC.StgToCmm.Monad (getCmm, initC, runC)
+import GHC.StgToCmm.Monad (getCmm, initC, runC, initFCodeState)
 import GHC.StgToCmm.Prof (initInfoTableProv)
 import GHC.StgToCmm.Types (CgInfos (..), ModuleLFInfos)
 import GHC.Types.IPE (InfoTableProvMap (provInfoTables), IpeSourceLocation)
@@ -177,8 +178,9 @@ The find the tick:
 
 generateCgIPEStub :: HscEnv -> Module -> InfoTableProvMap -> Stream IO CmmGroupSRTs (NonCaffySet, ModuleLFInfos) -> Stream IO CmmGroupSRTs CgInfos
 generateCgIPEStub hsc_env this_mod denv s = do
-  let dflags = hsc_dflags hsc_env
+  let dflags   = hsc_dflags hsc_env
       platform = targetPlatform dflags
+      fstate   = initFCodeState platform
   cgState <- liftIO initC
 
   -- Collect info tables, but only if -finfo-table-map is enabled, otherwise labeledInfoTablesWithTickishes is empty.
@@ -187,7 +189,7 @@ generateCgIPEStub hsc_env this_mod denv s = do
 
   -- Yield Cmm for Info Table Provenance Entries (IPEs)
   let denv' = denv {provInfoTables = Map.fromList (map (\(_, i, t) -> (cit_lbl i, t)) labeledInfoTablesWithTickishes)}
-      ((ipeStub, ipeCmmGroup), _) = runC dflags this_mod cgState $ getCmm (initInfoTableProv (map sndOfTriple labeledInfoTablesWithTickishes) denv' this_mod)
+      ((ipeStub, ipeCmmGroup), _) = runC (initStgToCmmConfig dflags this_mod) fstate cgState $ getCmm (initInfoTableProv (map sndOfTriple labeledInfoTablesWithTickishes) denv')
 
   (_, ipeCmmGroupSRTs) <- liftIO $ cmmPipeline hsc_env (emptySRT this_mod) ipeCmmGroup
   Stream.yield ipeCmmGroupSRTs

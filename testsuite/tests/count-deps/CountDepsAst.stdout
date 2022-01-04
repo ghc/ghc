@@ -1,4 +1,4 @@
-Found 278 Language.Haskell.Syntax module dependencies
+Found 279 Language.Haskell.Syntax module dependencies
 GHC.Builtin.Names
 GHC.Builtin.PrimOps
 GHC.Builtin.PrimOps.Ids
@@ -154,6 +154,7 @@ GHC.Settings
 GHC.Settings.Config
 GHC.Settings.Constants
 GHC.Stg.Syntax
+GHC.StgToCmm.Config
 GHC.StgToCmm.Types
 GHC.SysTools.BaseDir
 GHC.SysTools.Terminal

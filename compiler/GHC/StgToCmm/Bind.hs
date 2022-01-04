@@ -26,6 +26,7 @@ import GHC.Stg.Syntax
 import GHC.Platform
 import GHC.Platform.Profile
 
+import GHC.StgToCmm.Config
 import GHC.StgToCmm.Expr
 import GHC.StgToCmm.Monad
 import GHC.StgToCmm.Env
@@ -106,10 +107,9 @@ cgTopRhsClosure platform rec id ccs upd_flag args body =
 
   gen_code lf_info _closure_label
    = do { profile <- getProfile
-        ; dflags <- getDynFlags
         ; let name = idName id
         ; mod_name <- getModuleName
-        ; let descr         = closureDescription dflags mod_name name
+        ; let descr         = closureDescription mod_name name
               closure_info  = mkClosureInfo profile True id lf_info 0 0 descr
 
         -- We don't generate the static closure here, because we might
@@ -356,9 +356,8 @@ mkRhsClosure profile bndr cc fvs upd_flag args body
 
         -- MAKE CLOSURE INFO FOR THIS CLOSURE
         ; mod_name <- getModuleName
-        ; dflags <- getDynFlags
         ; let   name  = idName bndr
-                descr = closureDescription dflags mod_name name
+                descr = closureDescription mod_name name
                 fv_details :: [(NonVoid Id, ByteOff)]
                 header = if isLFThunk lf_info then ThunkHeader else StdHeader
                 (tot_wds, ptr_wds, fv_details)
@@ -404,15 +403,15 @@ cgRhsStdThunk bndr lf_info payload
     do
   {     -- LAY OUT THE OBJECT
     mod_name <- getModuleName
-  ; dflags <- getDynFlags
-  ; profile <- getProfile
-  ; let platform = profilePlatform profile
+  ; cfg      <- getStgToCmmConfig
+  ; let profile  = stgToCmmProfile  cfg
+  ; let platform = stgToCmmPlatform cfg
         header = if isLFThunk lf_info then ThunkHeader else StdHeader
         (tot_wds, ptr_wds, payload_w_offsets)
             = mkVirtHeapOffsets profile header
                 (addArgReps (nonVoidStgArgs payload))
 
-        descr = closureDescription dflags mod_name (idName bndr)
+        descr = closureDescription mod_name (idName bndr)
         closure_info = mkClosureInfo profile False       -- Not static
                                      bndr lf_info tot_wds ptr_wds
                                      descr
@@ -563,16 +562,18 @@ mkSlowEntryCode :: Id -> ClosureInfo -> [LocalReg] -> FCode ()
 -- Here, we emit the slow-entry code.
 mkSlowEntryCode bndr cl_info arg_regs -- function closure is already in `Node'
   | Just (_, ArgGen _) <- closureFunInfo cl_info
-  = do profile <- getProfile
-       platform <- getPlatform
+  = do cfg       <- getStgToCmmConfig
+       upd_frame <- getUpdFrameOff
        let node = idToReg platform (NonVoid bndr)
+           profile  = stgToCmmProfile  cfg
+           platform = stgToCmmPlatform cfg
            slow_lbl = closureSlowEntryLabel  platform cl_info
            fast_lbl = closureLocalEntryLabel platform cl_info
            -- mkDirectJump does not clobber `Node' containing function closure
            jump = mkJump profile NativeNodeCall
                                 (mkLblExpr fast_lbl)
                                 (map (CmmReg . CmmLocal) (node : arg_regs))
-                                (initUpdFrameOff platform)
+                                upd_frame
        tscope <- getTickScope
        emitProcWithConvention Slow Nothing slow_lbl
          (node : arg_regs) (jump, tscope)
@@ -620,9 +621,10 @@ blackHoleIt node_reg
 
 emitBlackHoleCode :: CmmExpr -> FCode ()
 emitBlackHoleCode node = do
-  dflags <- getDynFlags
-  profile <- getProfile
-  let platform = profilePlatform profile
+  cfg <- getStgToCmmConfig
+  let profile     = stgToCmmProfile  cfg
+      platform    = stgToCmmPlatform cfg
+      is_eager_bh = stgToCmmEagerBlackHole cfg
 
   -- Eager blackholing is normally disabled, but can be turned on with
   -- -feager-blackholing.  When it is on, we replace the info pointer
@@ -642,8 +644,7 @@ emitBlackHoleCode node = do
   -- Note the eager-blackholing check is here rather than in blackHoleOnEntry,
   -- because emitBlackHoleCode is called from GHC.Cmm.Parser.
 
-  let  eager_blackholing =  not (profileIsProfiling profile)
-                         && gopt Opt_EagerBlackHoling dflags
+  let  eager_blackholing =  not (profileIsProfiling profile) && is_eager_bh
              -- Profiling needs slop filling (to support LDV
              -- profiling), so currently eager blackholing doesn't
              -- work with profiling.
@@ -668,11 +669,11 @@ setupUpdate closure_info node body
       then do tickyUpdateFrameOmitted; body
       else do
           tickyPushUpdateFrame
-          dflags <- getDynFlags
+          cfg <- getStgToCmmConfig
           let
-              bh = blackHoleOnEntry closure_info &&
-                   not (sccProfilingEnabled dflags) &&
-                   gopt Opt_EagerBlackHoling dflags
+              bh = blackHoleOnEntry closure_info
+                && not (stgToCmmSCCProfiling cfg)
+                && stgToCmmEagerBlackHole cfg
 
               lbl | bh        = mkBHUpdInfoLabel
                   | otherwise = mkUpdInfoLabel
@@ -730,11 +731,12 @@ link_caf :: LocalReg           -- pointer to the closure
 -- This function returns the address of the black hole, so it can be
 -- updated with the new value when available.
 link_caf node = do
-  { profile <- getProfile
+  { cfg <- getStgToCmmConfig
         -- Call the RTS function newCAF, returning the newly-allocated
         -- blackhole indirection closure
   ; let newCAF_lbl = mkForeignLabel (fsLit "newCAF") Nothing
                                     ForeignLabelInExternalPackage IsFunction
+  ; let profile  = stgToCmmProfile cfg
   ; let platform = profilePlatform profile
   ; bh <- newTemp (bWord platform)
   ; emitRtsCallGen [(bh,AddrHint)] newCAF_lbl
@@ -744,8 +746,9 @@ link_caf node = do
 
   -- see Note [atomic CAF entry] in rts/sm/Storage.c
   ; updfr  <- getUpdFrameOff
-  ; ptr_opts <- getPtrOpts
-  ; let target = entryCode platform (closureInfoPtr ptr_opts (CmmReg (CmmLocal node)))
+  ; let align_check = stgToCmmAlignCheck cfg
+  ; let target      = entryCode platform
+                        (closureInfoPtr platform align_check (CmmReg (CmmLocal node)))
   ; emit =<< mkCmmIfThen
       (cmmEqWord platform (CmmReg (CmmLocal bh)) (zeroExpr platform))
         -- re-enter the CAF
@@ -762,17 +765,11 @@ link_caf node = do
 -- @closureDescription@ from the let binding information.
 
 closureDescription
-   :: DynFlags
-   -> Module            -- Module
+   :: Module            -- Module
    -> Name              -- Id of closure binding
    -> String
         -- Not called for StgRhsCon which have global info tables built in
         -- CgConTbls.hs with a description generated from the data constructor
-closureDescription dflags mod_name name
-  = let ctx = initSDocContext dflags defaultDumpStyle
-    -- defaultDumpStyle, because we want to see the unique on the Name.
-    in renderWithContext ctx (char '<' <>
-                    (if isExternalName name
-                      then ppr name -- ppr will include the module name prefix
-                      else pprModule mod_name <> char '.' <> ppr name) <>
-                    char '>')
+closureDescription mod_name name
+  = renderWithContext defaultSDocContext
+    (char '<' <> pprFullName mod_name name <> char '>')

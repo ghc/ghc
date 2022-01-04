@@ -429,7 +429,7 @@ altHeapCheckReturnsTo regs lret off code
 -- is more efficient), but cannot be optimized away in the non-allocating
 -- case because it may occur in a loop
 noEscapeHeapCheck :: [LocalReg] -> FCode a -> FCode a
-noEscapeHeapCheck regs code = altOrNoEscapeHeapCheck True regs code
+noEscapeHeapCheck = altOrNoEscapeHeapCheck True
 
 cannedGCReturnsTo :: Bool -> Bool -> CmmExpr -> [LocalReg] -> Label -> ByteOff
                   -> FCode a
@@ -605,9 +605,9 @@ do_checks :: Maybe CmmExpr    -- Should we check the stack?
           -> CmmAGraph        -- What to do on failure
           -> FCode ()
 do_checks mb_stk_hwm checkYield mb_alloc_lit do_gc = do
-  dflags <- getDynFlags
-  platform <- getPlatform
-  gc_id <- newBlockId
+  omit_yields <- stgToCmmOmitYields <$> getStgToCmmConfig
+  platform    <- getPlatform
+  gc_id       <- newBlockId
 
   let
     Just alloc_lit = mb_alloc_lit
@@ -644,13 +644,13 @@ do_checks mb_stk_hwm checkYield mb_alloc_lit do_gc = do
         | checkYield && isJust mb_stk_hwm -> emitLabel loop_header_id
     _otherwise -> return ()
 
-  if (isJust mb_alloc_lit)
+  if isJust mb_alloc_lit
     then do
      tickyHeapCheck
      emitAssign hpReg bump_hp
      emit =<< mkCmmIfThen' hp_oflo (alloc_n <*> mkBranch gc_id) (Just False)
     else
-      when (checkYield && not (gopt Opt_OmitYields dflags)) $ do
+      when (checkYield && not omit_yields) $ do
          -- Yielding if HpLim == 0
          let yielding = CmmMachOp (mo_wordEq platform)
                                   [CmmReg hpLimReg,

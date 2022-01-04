@@ -5,7 +5,6 @@ module GHC.Cmm.Info (
   srtEscape,
 
   -- info table accessors
-  PtrOpts (..),
   closureInfoPtr,
   entryCode,
   getConstrTag,
@@ -439,25 +438,19 @@ srtEscape platform = toStgHalfWord platform (-1)
 --
 -------------------------------------------------------------------------
 
-data PtrOpts = PtrOpts
-   { po_profile     :: !Profile -- ^ Platform profile
-   , po_align_check :: !Bool    -- ^ Insert alignment check (cf @-falignment-sanitisation@)
-   }
-
 -- | Wrap a 'CmmExpr' in an alignment check when @-falignment-sanitisation@ is
 -- enabled.
-wordAligned :: PtrOpts -> CmmExpr -> CmmExpr
-wordAligned opts e
-  | po_align_check opts
+wordAligned :: Platform -> DoAlignSanitisation -> CmmExpr -> CmmExpr
+wordAligned platform align_check e
+  | align_check
   = CmmMachOp (MO_AlignmentCheck (platformWordSizeInBytes platform) (wordWidth platform)) [e]
   | otherwise
   = e
-  where platform = profilePlatform (po_profile opts)
 
 -- | Takes a closure pointer and returns the info table pointer
-closureInfoPtr :: PtrOpts -> CmmExpr -> CmmExpr
-closureInfoPtr opts e =
-    CmmLoad (wordAligned opts e) (bWord (profilePlatform (po_profile opts)))
+closureInfoPtr :: Platform -> DoAlignSanitisation -> CmmExpr -> CmmExpr
+closureInfoPtr platform align_check e =
+    CmmLoad (wordAligned platform align_check e) (bWord platform)
 
 -- | Takes an info pointer (the first word of a closure) and returns its entry
 -- code
@@ -471,23 +464,21 @@ entryCode platform e =
 -- constructor tag obtained from the info table
 -- This lives in the SRT field of the info table
 -- (constructors don't need SRTs).
-getConstrTag :: PtrOpts -> CmmExpr -> CmmExpr
-getConstrTag opts closure_ptr
+getConstrTag :: Profile -> DoAlignSanitisation -> CmmExpr -> CmmExpr
+getConstrTag profile align_check closure_ptr
   = CmmMachOp (MO_UU_Conv (halfWordWidth platform) (wordWidth platform)) [infoTableConstrTag profile info_table]
   where
-    info_table = infoTable profile (closureInfoPtr opts closure_ptr)
+    info_table = infoTable profile (closureInfoPtr platform align_check closure_ptr)
     platform   = profilePlatform profile
-    profile    = po_profile opts
 
 -- | Takes a closure pointer, and return the closure type
 -- obtained from the info table
-cmmGetClosureType :: PtrOpts -> CmmExpr -> CmmExpr
-cmmGetClosureType opts closure_ptr
+cmmGetClosureType :: Profile -> DoAlignSanitisation -> CmmExpr -> CmmExpr
+cmmGetClosureType profile align_check closure_ptr
   = CmmMachOp (MO_UU_Conv (halfWordWidth platform) (wordWidth platform)) [infoTableClosureType profile info_table]
   where
-    info_table = infoTable profile (closureInfoPtr opts closure_ptr)
+    info_table = infoTable profile (closureInfoPtr platform align_check closure_ptr)
     platform   = profilePlatform profile
-    profile    = po_profile opts
 
 -- | Takes an info pointer (the first word of a closure)
 -- and returns a pointer to the first word of the standard-form

@@ -62,6 +62,7 @@ import GHC.Core.Type
 import GHC.Tc.Types
 import GHC.Stg.Syntax
 import GHC.StgToCmm.Types (ModuleLFInfos)
+import GHC.StgToCmm.Config
 import GHC.Cmm
 
 import GHCi.RemoteTypes
@@ -144,7 +145,7 @@ data Hooks = Hooks
   , getValueSafelyHook     :: !(Maybe (HscEnv -> Maybe ModuleNameWithIsBoot -> Name -> Type
                                          -> IO (Either Type HValue)))
   , createIservProcessHook :: !(Maybe (CreateProcess -> IO ProcessHandle))
-  , stgToCmmHook           :: !(Maybe (DynFlags -> Module -> InfoTableProvMap -> [TyCon] -> CollectedCCs
+  , stgToCmmHook           :: !(Maybe (StgToCmmConfig -> InfoTableProvMap -> [TyCon] -> CollectedCCs
                                  -> [CgStgTopBinding] -> HpcInfo -> Stream IO CmmGroup ModuleLFInfos))
   , cmmToRawCmmHook        :: !(forall a . Maybe (DynFlags -> Maybe Module -> Stream IO CmmGroupSRTs a
                                  -> IO (Stream IO RawCmmGroup a)))

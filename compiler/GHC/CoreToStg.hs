@@ -725,7 +725,7 @@ mkTopStgRhs dflags this_mod ccs bndr (PreStgRhs bndrs rhs)
   -- so this is not a function binding
   | StgConApp con mn args _ <- unticked_rhs
   , -- Dynamic StgConApps are updatable
-    not (isDllConApp dflags this_mod con args)
+    not (isDllConApp (targetPlatform dflags) (gopt Opt_ExternalDynamicRefs dflags) this_mod con args)
   = -- CorePrep does this right, but just to make sure
     assertPpr (not (isUnboxedTupleDataCon con || isUnboxedSumDataCon con))
               (ppr bndr $$ ppr con $$ ppr args)

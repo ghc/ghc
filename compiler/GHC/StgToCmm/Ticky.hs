@@ -109,6 +109,7 @@ import GHC.Platform.Profile
 
 import GHC.StgToCmm.ArgRep    ( slowCallPattern , toArgRep , argRepString )
 import GHC.StgToCmm.Closure
+import GHC.StgToCmm.Config
 import {-# SOURCE #-} GHC.StgToCmm.Foreign   ( emitPrimCall )
 import GHC.StgToCmm.Lit       ( newStringCLit )
 import GHC.StgToCmm.Monad
@@ -128,6 +129,7 @@ import GHC.Data.FastString
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
+import GHC.Utils.Monad (whenM)
 
 -- Turgid imports for showTypeCategory
 import GHC.Builtin.Names
@@ -138,7 +140,7 @@ import GHC.Core.Predicate
 
 import Data.Maybe
 import qualified Data.Char
-import Control.Monad ( when )
+import Control.Monad ( when, unless )
 
 -----------------------------------------------------------------------------
 --
@@ -161,13 +163,11 @@ withNewTickyCounterFun single_entry = withNewTickyCounter (TickyFun single_entry
 
 withNewTickyCounterLNE :: Name  -> [NonVoid Id] -> FCode a -> FCode a
 withNewTickyCounterLNE nm args code = do
-  b <- tickyLNEIsOn
+  b <- isEnabled stgToCmmTickyLNE
   if not b then code else withNewTickyCounter TickyLNE nm args code
 
 thunkHasCounter :: Bool -> FCode Bool
-thunkHasCounter isStatic = do
-  b <- tickyDynThunkIsOn
-  pure (not isStatic && b)
+thunkHasCounter isStatic = (not isStatic &&) <$> isEnabled stgToCmmTickyDynThunk
 
 withNewTickyCounterThunk
   :: Bool -- ^ static
@@ -214,19 +214,18 @@ emitTickyCounter cloType name args
   = let ctr_lbl = mkRednCountsLabel name in
     (>> return ctr_lbl) $
     ifTicky $ do
-        { dflags <- getDynFlags
-        ; platform <- getPlatform
+        { cfg    <- getStgToCmmConfig
         ; parent <- getTickyCtrLabel
         ; mod_name <- getModuleName
 
           -- When printing the name of a thing in a ticky file, we
           -- want to give the module name even for *local* things.  We
           -- print just "x (M)" rather that "M.x" to distinguish them
-          -- from the global kind.
-        ; let ppr_for_ticky_name :: SDoc
+          -- from the global kind by calling to @pprTickyName@
+        ; let platform = stgToCmmPlatform cfg
+              ppr_for_ticky_name :: SDoc
               ppr_for_ticky_name =
-                let n = ppr name
-                    ext = case cloType of
+                let ext = case cloType of
                               TickyFun single_entry -> parens $ hcat $ punctuate comma $
                                   [text "fun"] ++ [text "se"|single_entry]
                               TickyCon datacon -> parens (text "con:" <+> ppr (dataConName datacon))
@@ -239,12 +238,9 @@ emitTickyCounter cloType name args
                             -- have a Haskell name
                           Just pname -> text "in" <+> ppr (nameUnique pname)
                           _ -> empty
-                in if isInternalName name
-                   then n <+> parens (ppr mod_name) <+> ext <+> p
-                   else n <+> ext <+> p
+                in pprTickyName mod_name name <+> ext <+> p
 
-        ; let ctx = (initSDocContext dflags defaultDumpStyle)
-                      { sdocPprDebug = True }
+        ; let ctx = defaultSDocContext {sdocPprDebug = True}
         ; fun_descr_lit <- newStringCLit $ renderWithContext ctx ppr_for_ticky_name
         ; arg_descr_lit <- newStringCLit $ map (showTypeCategory . idType . fromNonVoid) args
         ; emitDataLits ctr_lbl
@@ -337,8 +333,8 @@ tickyEnterLNE = ifTicky $ do
 -- since the counter was registered already upon being alloc'd
 registerTickyCtrAtEntryDyn :: CLabel -> FCode ()
 registerTickyCtrAtEntryDyn ctr_lbl = do
-  already_registered <- tickyAllocdIsOn
-  when (not already_registered) $ registerTickyCtr ctr_lbl
+  already_registered <- isEnabled stgToCmmTickyAllocd
+  unless already_registered $ registerTickyCtr ctr_lbl
 
 -- | Register a ticky counter.
 --
@@ -566,33 +562,29 @@ tickyStackCheck = ifTicky $ bumpTickyCounter (fsLit "STK_CHK_ctr")
 -- -----------------------------------------------------------------------------
 -- Ticky utils
 
+isEnabled :: (StgToCmmConfig -> Bool) -> FCode Bool
+isEnabled = flip fmap getStgToCmmConfig
+
+runIfFlag :: (StgToCmmConfig -> Bool) -> FCode () -> FCode ()
+runIfFlag f = whenM (f <$> getStgToCmmConfig)
+
 ifTicky :: FCode () -> FCode ()
-ifTicky code =
-  getDynFlags >>= \dflags -> when (gopt Opt_Ticky dflags) code
-
-tickyAllocdIsOn :: FCode Bool
-tickyAllocdIsOn = gopt Opt_Ticky_Allocd `fmap` getDynFlags
-
-tickyLNEIsOn :: FCode Bool
-tickyLNEIsOn = gopt Opt_Ticky_LNE `fmap` getDynFlags
-
-tickyDynThunkIsOn :: FCode Bool
-tickyDynThunkIsOn = gopt Opt_Ticky_Dyn_Thunk `fmap` getDynFlags
+ifTicky = runIfFlag stgToCmmDoTicky
 
 ifTickyAllocd :: FCode () -> FCode ()
-ifTickyAllocd code = tickyAllocdIsOn >>= \b -> when b code
+ifTickyAllocd = runIfFlag stgToCmmTickyAllocd
 
 ifTickyLNE :: FCode () -> FCode ()
-ifTickyLNE code = tickyLNEIsOn >>= \b -> when b code
+ifTickyLNE = runIfFlag stgToCmmTickyLNE
 
 ifTickyDynThunk :: FCode () -> FCode ()
-ifTickyDynThunk code = tickyDynThunkIsOn >>= \b -> when b code
+ifTickyDynThunk = runIfFlag stgToCmmTickyDynThunk
 
 bumpTickyCounter :: FastString -> FCode ()
-bumpTickyCounter lbl = bumpTickyLbl (mkRtsCmmDataLabel lbl)
+bumpTickyCounter = bumpTickyLbl . mkRtsCmmDataLabel
 
 bumpTickyCounterBy :: FastString -> Int -> FCode ()
-bumpTickyCounterBy lbl = bumpTickyLblBy (mkRtsCmmDataLabel lbl)
+bumpTickyCounterBy = bumpTickyLblBy . mkRtsCmmDataLabel
 
 bumpTickyCounterByE :: FastString -> CmmExpr -> FCode ()
 bumpTickyCounterByE lbl = bumpTickyLblByE (mkRtsCmmDataLabel lbl)

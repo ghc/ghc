@@ -13,7 +13,6 @@ module GHC.Cmm.Parser.Monad (
   , failMsgPD
   , getProfile
   , getPlatform
-  , getPtrOpts
   , getHomeUnitId
   ) where
 
@@ -21,7 +20,6 @@ import GHC.Prelude
 
 import GHC.Platform
 import GHC.Platform.Profile
-import GHC.Cmm.Info
 
 import Control.Monad
 
@@ -68,15 +66,6 @@ getProfile = targetProfile <$> getDynFlags
 
 getPlatform :: PD Platform
 getPlatform = profilePlatform <$> getProfile
-
-getPtrOpts :: PD PtrOpts
-getPtrOpts = do
-   dflags <- getDynFlags
-   profile <- getProfile
-   pure $ PtrOpts
-      { po_profile     = profile
-      , po_align_check = gopt Opt_AlignmentSanitisation dflags
-      }
 
 -- | Return the UnitId of the home-unit. This is used to create labels.
 getHomeUnitId :: PD UnitId

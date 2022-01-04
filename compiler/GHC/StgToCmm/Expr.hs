@@ -91,9 +91,10 @@ cgExpr (StgOpApp (StgPrimOp DataToTagOp) [StgVarArg a] _res_ty) = do
   slow_path <- getCode $ do
       tmp <- newTemp (bWord platform)
       _ <- withSequel (AssignTo [tmp] False) (cgIdApp a [])
-      ptr_opts <- getPtrOpts
+      profile     <- getProfile
+      align_check <- stgToCmmAlignCheck <$> getStgToCmmConfig
       emitAssign (CmmLocal result_reg)
-        $ getConstrTag ptr_opts (cmmUntag platform (CmmReg (CmmLocal tmp)))
+        $ getConstrTag profile align_check (cmmUntag platform (CmmReg (CmmLocal tmp)))
 
   fast_path <- getCode $ do
       -- Return the constructor index from the pointer tag
@@ -102,9 +103,10 @@ cgExpr (StgOpApp (StgPrimOp DataToTagOp) [StgVarArg a] _res_ty) = do
             $ cmmSubWord platform tag (CmmLit $ mkWordCLit platform 1)
       -- Return the constructor index recorded in the info table
       return_info_tag <- getCode $ do
-          ptr_opts <- getPtrOpts
+          profile     <- getProfile
+          align_check <- stgToCmmAlignCheck <$> getStgToCmmConfig
           emitAssign (CmmLocal result_reg)
-            $ getConstrTag ptr_opts (cmmUntag platform amode)
+            $ getConstrTag profile align_check (cmmUntag platform amode)
 
       emit =<< mkCmmIfThenElse' is_too_big_tag return_info_tag return_ptr_tag (Just False)
 
@@ -540,9 +542,9 @@ isSimpleOp (StgFCallOp (CCall (CCallSpec _ _ safe)) _) _ = return $! not (playSa
 isSimpleOp (StgPrimOp DataToTagOp) _ = return False
 isSimpleOp (StgPrimOp op) stg_args                  = do
     arg_exprs <- getNonVoidArgAmodes stg_args
-    dflags <- getDynFlags
+    cfg       <- getStgToCmmConfig
     -- See Note [Inlining out-of-line primops and heap checks]
-    return $! shouldInlinePrimOp dflags op arg_exprs
+    return $! shouldInlinePrimOp cfg op arg_exprs
 isSimpleOp (StgPrimCallOp _) _                           = return False
 
 -----------------
@@ -615,9 +617,10 @@ cgAlts gc_plan bndr (AlgAlt tycon) alts
            else -- No, the get exact tag from info table when mAX_PTR_TAG
                 -- See Note [Double switching for big families]
               do
-                ptr_opts <- getPtrOpts
+                profile     <- getProfile
+                align_check <- stgToCmmAlignCheck <$> getStgToCmmConfig
                 let !untagged_ptr = cmmUntag platform (CmmReg bndr_reg)
-                    !itag_expr = getConstrTag ptr_opts untagged_ptr
+                    !itag_expr = getConstrTag profile align_check untagged_ptr
                     !info0 = first pred <$> via_info
                 if null via_ptr then
                   emitSwitch itag_expr info0 mb_deflt 0 (fam_sz - 1)
@@ -888,16 +891,16 @@ cgConApp con mn stg_args
 cgIdApp :: Id -> [StgArg] -> FCode ReturnKind
 cgIdApp fun_id args = do
     fun_info       <- getCgIdInfo fun_id
-    self_loop_info <- getSelfLoop
-    call_opts      <- getCallOpts
-    profile        <- getProfile
-    let fun_arg     = StgVarArg fun_id
-        fun_name    = idName    fun_id
-        fun         = idInfoToAmode fun_info
-        lf_info     = cg_lf         fun_info
-        n_args      = length args
-        v_args      = length $ filter (isZeroBitTy . stgArgType) args
-    case getCallMethod call_opts fun_name fun_id lf_info n_args v_args (cg_loc fun_info) self_loop_info of
+    cfg            <- getStgToCmmConfig
+    self_loop      <- getSelfLoop
+    let profile        = stgToCmmProfile  cfg
+        fun_arg        = StgVarArg fun_id
+        fun_name       = idName    fun_id
+        fun            = idInfoToAmode fun_info
+        lf_info        = cg_lf         fun_info
+        n_args         = length args
+        v_args         = length $ filter (isZeroBitTy . stgArgType) args
+    case getCallMethod cfg fun_name fun_id lf_info n_args v_args (cg_loc fun_info) self_loop of
             -- A value in WHNF, so we can just return it.
         ReturnIt
           | isZeroBitTy (idType fun_id) -> emitReturn []
@@ -975,7 +978,7 @@ cgIdApp fun_id args = do
 -- Implementation is spread across a couple of places in the code:
 --
 --   * FCode monad stores additional information in its reader environment
---     (cgd_self_loop field). This information tells us which function can
+--     (stgToCmmSelfLoop field). This information tells us which function can
 --     tail call itself in an optimized way (it is the function currently
 --     being compiled), what is the label of a loop header (L1 in example above)
 --     and information about local registers in which we should arguments
@@ -1008,7 +1011,7 @@ cgIdApp fun_id args = do
 --     command-line option.
 --
 --   * Command line option to turn loopification on and off is implemented in
---     DynFlags.
+--     DynFlags, then passed to StgToCmmConfig for this phase.
 --
 --
 -- Note [Void arguments in self-recursive tail calls]
@@ -1036,12 +1039,12 @@ cgIdApp fun_id args = do
 
 emitEnter :: CmmExpr -> FCode ReturnKind
 emitEnter fun = do
-  { ptr_opts <- getPtrOpts
-  ; platform <- getPlatform
-  ; profile <- getProfile
+  { platform <- getPlatform
+  ; profile  <- getProfile
   ; adjustHpBackwards
-  ; sequel <- getSequel
-  ; updfr_off <- getUpdFrameOff
+  ; sequel      <- getSequel
+  ; updfr_off   <- getUpdFrameOff
+  ; align_check <- stgToCmmAlignCheck <$> getStgToCmmConfig
   ; case sequel of
       -- For a return, we have the option of generating a tag-test or
       -- not.  If the value is tagged, we can return directly, which
@@ -1052,7 +1055,9 @@ emitEnter fun = do
       -- Right now, we do what the old codegen did, and omit the tag
       -- test, just generating an enter.
       Return -> do
-        { let entry = entryCode platform $ closureInfoPtr ptr_opts $ CmmReg nodeReg
+        { let entry = entryCode platform
+                $ closureInfoPtr platform align_check
+                $ CmmReg nodeReg
         ; emit $ mkJump profile NativeNodeCall entry
                         [cmmUntag platform fun] updfr_off
         ; return AssignedDirectly
@@ -1084,17 +1089,18 @@ emitEnter fun = do
       -- code in the enclosing case expression.
       --
       AssignTo res_regs _ -> do
-       { lret <- newBlockId
-       ; let (off, _, copyin) = copyInOflow profile NativeReturn (Young lret) res_regs []
+       { lret  <- newBlockId
        ; lcall <- newBlockId
-       ; updfr_off <- getUpdFrameOff
+       ; updfr_off   <- getUpdFrameOff
+       ; align_check <- stgToCmmAlignCheck <$> getStgToCmmConfig
+       ; let (off, _, copyin) = copyInOflow profile NativeReturn (Young lret) res_regs []
        ; let area = Young lret
        ; let (outArgs, regs, copyout) = copyOutOflow profile NativeNodeCall Call area
                                           [fun] updfr_off []
          -- refer to fun via nodeReg after the copyout, to avoid having
          -- both live simultaneously; this sometimes enables fun to be
          -- inlined in the RHS of the R1 assignment.
-       ; let entry = entryCode platform (closureInfoPtr ptr_opts (CmmReg nodeReg))
+       ; let entry = entryCode platform (closureInfoPtr platform align_check (CmmReg nodeReg))
              the_call = toCall entry (Just lret) updfr_off off outArgs regs
        ; tscope <- getTickScope
        ; emit $

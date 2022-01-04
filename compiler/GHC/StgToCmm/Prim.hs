@@ -20,6 +20,7 @@ import GHC.Prelude hiding ((<*>))
 import GHC.Platform
 import GHC.Platform.Profile
 
+import GHC.StgToCmm.Config
 import GHC.StgToCmm.Layout
 import GHC.StgToCmm.Foreign
 import GHC.StgToCmm.Monad
@@ -29,7 +30,6 @@ import GHC.StgToCmm.Heap
 import GHC.StgToCmm.Prof ( costCentreFrom )
 
 import GHC.Driver.Session
-import GHC.Driver.Backend
 import GHC.Types.Basic
 import GHC.Cmm.BlockId
 import GHC.Cmm.Graph
@@ -77,18 +77,18 @@ cgOpApp (StgFCallOp fcall ty) stg_args res_ty
       -- Note [Foreign call results]
 
 cgOpApp (StgPrimOp primop) args res_ty = do
-    dflags <- getDynFlags
+    cfg <- getStgToCmmConfig
     cmm_args <- getNonVoidArgAmodes args
-    cmmPrimOpApp dflags primop cmm_args (Just res_ty)
+    cmmPrimOpApp cfg primop cmm_args (Just res_ty)
 
 cgOpApp (StgPrimCallOp primcall) args _res_ty
   = do  { cmm_args <- getNonVoidArgAmodes args
         ; let fun = CmmLit (CmmLabel (mkPrimCallLabel primcall))
         ; emitCall (NativeNodeCall, NativeReturn) fun cmm_args }
 
-cmmPrimOpApp :: DynFlags -> PrimOp -> [CmmExpr] -> Maybe Type -> FCode ReturnKind
-cmmPrimOpApp dflags primop cmm_args mres_ty =
-  case emitPrimOp dflags primop cmm_args of
+cmmPrimOpApp :: StgToCmmConfig -> PrimOp -> [CmmExpr] -> Maybe Type -> FCode ReturnKind
+cmmPrimOpApp cfg primop cmm_args mres_ty =
+  case emitPrimOp cfg primop cmm_args of
     PrimopCmmEmit_Internal f ->
       let
          -- if the result type isn't explicitly given, we directly use the
@@ -119,8 +119,8 @@ asUnsigned w n = n .&. (bit (widthInBits w) - 1)
 --      Emitting code for a primop
 ------------------------------------------------------------------------
 
-shouldInlinePrimOp :: DynFlags -> PrimOp -> [CmmExpr] -> Bool
-shouldInlinePrimOp dflags op args = case emitPrimOp dflags op args of
+shouldInlinePrimOp :: StgToCmmConfig -> PrimOp -> [CmmExpr] -> Bool
+shouldInlinePrimOp cfg op args = case emitPrimOp cfg op args of
   PrimopCmmEmit_External -> False
   PrimopCmmEmit_Internal _ -> True
 
@@ -143,20 +143,22 @@ shouldInlinePrimOp dflags op args = case emitPrimOp dflags op args of
 -- might happen e.g. if there's enough static information, such as statically
 -- know arguments.
 emitPrimOp
-  :: DynFlags
+  :: StgToCmmConfig
   -> PrimOp            -- ^ The primop
   -> [CmmExpr]         -- ^ The primop arguments
   -> PrimopCmmEmit
-emitPrimOp dflags primop = case primop of
+emitPrimOp cfg primop =
+  let max_inl_alloc_size = fromIntegral (stgToCmmMaxInlAllocSize cfg)
+  in case primop of
   NewByteArrayOp_Char -> \case
     [(CmmLit (CmmInt n w))]
-      | asUnsigned w n <= fromIntegral (maxInlineAllocSize dflags)
+      | asUnsigned w n <= max_inl_alloc_size
       -> opIntoRegs  $ \ [res] -> doNewByteArrayOp res (fromInteger n)
     _ -> PrimopCmmEmit_External
 
   NewArrayOp -> \case
     [(CmmLit (CmmInt n w)), init]
-      | wordsToBytes platform (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags)
+      | wordsToBytes platform (asUnsigned w n) <= max_inl_alloc_size
       -> opIntoRegs $ \[res] -> doNewArrayOp res (arrPtrsRep platform (fromInteger n)) mkMAP_DIRTY_infoLabel
         [ (mkIntExpr platform (fromInteger n),
            fixedHdrSize profile + pc_OFFSET_StgMutArrPtrs_ptrs (platformConstants platform))
@@ -178,31 +180,31 @@ emitPrimOp dflags primop = case primop of
 
   CloneArrayOp -> \case
     [src, src_off, (CmmLit (CmmInt n w))]
-      | wordsToBytes platform (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags)
+      | wordsToBytes platform (asUnsigned w n) <= max_inl_alloc_size
       -> opIntoRegs $ \ [res] -> emitCloneArray mkMAP_FROZEN_CLEAN_infoLabel res src src_off (fromInteger n)
     _ -> PrimopCmmEmit_External
 
   CloneMutableArrayOp -> \case
     [src, src_off, (CmmLit (CmmInt n w))]
-      | wordsToBytes platform (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags)
+      | wordsToBytes platform (asUnsigned w n) <= max_inl_alloc_size
       -> opIntoRegs $ \ [res] -> emitCloneArray mkMAP_DIRTY_infoLabel res src src_off (fromInteger n)
     _ -> PrimopCmmEmit_External
 
   FreezeArrayOp -> \case
     [src, src_off, (CmmLit (CmmInt n w))]
-      | wordsToBytes platform (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags)
+      | wordsToBytes platform (asUnsigned w n) <= max_inl_alloc_size
       -> opIntoRegs $ \ [res] -> emitCloneArray mkMAP_FROZEN_CLEAN_infoLabel res src src_off (fromInteger n)
     _ -> PrimopCmmEmit_External
 
   ThawArrayOp -> \case
     [src, src_off, (CmmLit (CmmInt n w))]
-      | wordsToBytes platform (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags)
+      | wordsToBytes platform (asUnsigned w n) <= max_inl_alloc_size
       -> opIntoRegs $ \ [res] -> emitCloneArray mkMAP_DIRTY_infoLabel res src src_off (fromInteger n)
     _ -> PrimopCmmEmit_External
 
   NewSmallArrayOp -> \case
     [(CmmLit (CmmInt n w)), init]
-      | wordsToBytes platform (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags)
+      | wordsToBytes platform (asUnsigned w n) <= max_inl_alloc_size
       -> opIntoRegs $ \ [res] ->
         doNewArrayOp res (smallArrPtrsRep (fromInteger n)) mkSMAP_DIRTY_infoLabel
         [ (mkIntExpr platform (fromInteger n),
@@ -223,25 +225,25 @@ emitPrimOp dflags primop = case primop of
 
   CloneSmallArrayOp -> \case
     [src, src_off, (CmmLit (CmmInt n w))]
-      | wordsToBytes platform (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags)
+      | wordsToBytes platform (asUnsigned w n) <= max_inl_alloc_size
       -> opIntoRegs $ \ [res] -> emitCloneSmallArray mkSMAP_FROZEN_CLEAN_infoLabel res src src_off (fromInteger n)
     _ -> PrimopCmmEmit_External
 
   CloneSmallMutableArrayOp -> \case
     [src, src_off, (CmmLit (CmmInt n w))]
-      | wordsToBytes platform (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags)
+      | wordsToBytes platform (asUnsigned w n) <= max_inl_alloc_size
       -> opIntoRegs $ \ [res] -> emitCloneSmallArray mkSMAP_DIRTY_infoLabel res src src_off (fromInteger n)
     _ -> PrimopCmmEmit_External
 
   FreezeSmallArrayOp -> \case
     [src, src_off, (CmmLit (CmmInt n w))]
-      | wordsToBytes platform (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags)
+      | wordsToBytes platform (asUnsigned w n) <= max_inl_alloc_size
       -> opIntoRegs $ \ [res] -> emitCloneSmallArray mkSMAP_FROZEN_CLEAN_infoLabel res src src_off (fromInteger n)
     _ -> PrimopCmmEmit_External
 
   ThawSmallArrayOp -> \case
     [src, src_off, (CmmLit (CmmInt n w))]
-      | wordsToBytes platform (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags)
+      | wordsToBytes platform (asUnsigned w n) <= max_inl_alloc_size
       -> opIntoRegs $ \ [res] -> emitCloneSmallArray mkSMAP_DIRTY_infoLabel res src src_off (fromInteger n)
     _ -> PrimopCmmEmit_External
 
@@ -295,14 +297,14 @@ emitPrimOp dflags primop = case primop of
     emitPrimCall res MO_WriteBarrier []
     emitStore (cmmOffsetW platform mutv (fixedHdrSizeW profile)) var
 
-    ptrOpts <- getPtrOpts
     platform <- getPlatform
     mkdirtyMutVarCCall <- getCode $! emitCCall
       [{-no results-}]
       (CmmLit (CmmLabel mkDirty_MUT_VAR_Label))
       [(baseExpr, AddrHint), (mutv, AddrHint), (CmmReg old_val, AddrHint)]
     emit =<< mkCmmIfThen
-      (cmmEqWord platform (mkLblExpr mkMUT_VAR_CLEAN_infoLabel) (closureInfoPtr ptrOpts mutv))
+      (cmmEqWord platform (mkLblExpr mkMUT_VAR_CLEAN_infoLabel)
+       (closureInfoPtr platform (stgToCmmAlignCheck cfg) mutv))
       mkdirtyMutVarCCall
 
 --  #define sizzeofByteArrayzh(r,a) \
@@ -312,7 +314,7 @@ emitPrimOp dflags primop = case primop of
 
 --  #define sizzeofMutableByteArrayzh(r,a) \
 --      r = ((StgArrBytes *)(a))->bytes
-  SizeofMutableByteArrayOp -> emitPrimOp dflags SizeofByteArrayOp
+  SizeofMutableByteArrayOp -> emitPrimOp cfg SizeofByteArrayOp
 
 --  #define getSizzeofMutableByteArrayzh(r,a) \
 --      r = ((StgArrBytes *)(a))->bytes
@@ -394,15 +396,15 @@ emitPrimOp dflags primop = case primop of
     emit $ mkAssign (CmmLocal res) (cmmLoadIndexW platform arg
       (fixedHdrSizeW profile + bytesToWordsRoundUp platform (pc_OFFSET_StgMutArrPtrs_ptrs (platformConstants platform)))
         (bWord platform))
-  SizeofMutableArrayOp -> emitPrimOp dflags SizeofArrayOp
+  SizeofMutableArrayOp      -> emitPrimOp cfg SizeofArrayOp
   SizeofSmallArrayOp -> \[arg] -> opIntoRegs $ \[res] ->
     emit $ mkAssign (CmmLocal res)
      (cmmLoadIndexW platform arg
      (fixedHdrSizeW profile + bytesToWordsRoundUp platform (pc_OFFSET_StgSmallMutArrPtrs_ptrs (platformConstants platform)))
         (bWord platform))
 
-  SizeofSmallMutableArrayOp -> emitPrimOp dflags SizeofSmallArrayOp
-  GetSizeofSmallMutableArrayOp -> emitPrimOp dflags SizeofSmallArrayOp
+  SizeofSmallMutableArrayOp    -> emitPrimOp cfg SizeofSmallArrayOp
+  GetSizeofSmallMutableArrayOp -> emitPrimOp cfg SizeofSmallArrayOp
 
 -- IndexXXXoffAddr
 
@@ -850,7 +852,7 @@ emitPrimOp dflags primop = case primop of
 
 -- SIMD primops
   (VecBroadcastOp vcat n w) -> \[e] -> opIntoRegs $ \[res] -> do
-    checkVecCompatibility dflags vcat n w
+    checkVecCompatibility cfg vcat n w
     doVecPackOp (vecElemInjectCast platform vcat w) ty zeros (replicate n e) res
    where
     zeros :: CmmExpr
@@ -866,7 +868,7 @@ emitPrimOp dflags primop = case primop of
     ty = vecVmmType vcat n w
 
   (VecPackOp vcat n w) -> \es -> opIntoRegs $ \[res] -> do
-    checkVecCompatibility dflags vcat n w
+    checkVecCompatibility cfg vcat n w
     when (es `lengthIsNot` n) $
         panic "emitPrimOp: VecPackOp has wrong number of arguments"
     doVecPackOp (vecElemInjectCast platform vcat w) ty zeros es res
@@ -884,7 +886,7 @@ emitPrimOp dflags primop = case primop of
     ty = vecVmmType vcat n w
 
   (VecUnpackOp vcat n w) -> \[arg] -> opIntoRegs $ \res -> do
-    checkVecCompatibility dflags vcat n w
+    checkVecCompatibility cfg vcat n w
     when (res `lengthIsNot` n) $
         panic "emitPrimOp: VecUnpackOp has wrong number of results"
     doVecUnpackOp (vecElemProjectCast platform vcat w) ty arg res
@@ -893,56 +895,56 @@ emitPrimOp dflags primop = case primop of
     ty = vecVmmType vcat n w
 
   (VecInsertOp vcat n w) -> \[v,e,i] -> opIntoRegs $ \[res] -> do
-    checkVecCompatibility dflags vcat n w
+    checkVecCompatibility cfg vcat n w
     doVecInsertOp (vecElemInjectCast platform vcat w) ty v e i res
    where
     ty :: CmmType
     ty = vecVmmType vcat n w
 
   (VecIndexByteArrayOp vcat n w) -> \args -> opIntoRegs $ \res0 -> do
-    checkVecCompatibility dflags vcat n w
+    checkVecCompatibility cfg vcat n w
     doIndexByteArrayOp Nothing ty res0 args
    where
     ty :: CmmType
     ty = vecVmmType vcat n w
 
   (VecReadByteArrayOp vcat n w) -> \args -> opIntoRegs $ \res0 -> do
-    checkVecCompatibility dflags vcat n w
+    checkVecCompatibility cfg vcat n w
     doIndexByteArrayOp Nothing ty res0 args
    where
     ty :: CmmType
     ty = vecVmmType vcat n w
 
   (VecWriteByteArrayOp vcat n w) -> \args -> opIntoRegs $ \res0 -> do
-    checkVecCompatibility dflags vcat n w
+    checkVecCompatibility cfg vcat n w
     doWriteByteArrayOp Nothing ty res0 args
    where
     ty :: CmmType
     ty = vecVmmType vcat n w
 
   (VecIndexOffAddrOp vcat n w) -> \args -> opIntoRegs $ \res0 -> do
-    checkVecCompatibility dflags vcat n w
+    checkVecCompatibility cfg vcat n w
     doIndexOffAddrOp Nothing ty res0 args
    where
     ty :: CmmType
     ty = vecVmmType vcat n w
 
   (VecReadOffAddrOp vcat n w) -> \args -> opIntoRegs $ \res0 -> do
-    checkVecCompatibility dflags vcat n w
+    checkVecCompatibility cfg vcat n w
     doIndexOffAddrOp Nothing ty res0 args
    where
     ty :: CmmType
     ty = vecVmmType vcat n w
 
   (VecWriteOffAddrOp vcat n w) -> \args -> opIntoRegs $ \res0 -> do
-    checkVecCompatibility dflags vcat n w
+    checkVecCompatibility cfg vcat n w
     doWriteOffAddrOp Nothing ty res0 args
    where
     ty :: CmmType
     ty = vecVmmType vcat n w
 
   (VecIndexScalarByteArrayOp vcat n w) -> \args -> opIntoRegs $ \res0 -> do
-    checkVecCompatibility dflags vcat n w
+    checkVecCompatibility cfg vcat n w
     doIndexByteArrayOpAs Nothing vecty ty res0 args
    where
     vecty :: CmmType
@@ -952,7 +954,7 @@ emitPrimOp dflags primop = case primop of
     ty = vecCmmCat vcat w
 
   (VecReadScalarByteArrayOp vcat n w) -> \args -> opIntoRegs $ \res0 -> do
-    checkVecCompatibility dflags vcat n w
+    checkVecCompatibility cfg vcat n w
     doIndexByteArrayOpAs Nothing vecty ty res0 args
    where
     vecty :: CmmType
@@ -962,14 +964,14 @@ emitPrimOp dflags primop = case primop of
     ty = vecCmmCat vcat w
 
   (VecWriteScalarByteArrayOp vcat n w) -> \args -> opIntoRegs $ \res0 -> do
-    checkVecCompatibility dflags vcat n w
+    checkVecCompatibility cfg vcat n w
     doWriteByteArrayOp Nothing ty res0 args
    where
     ty :: CmmType
     ty = vecCmmCat vcat w
 
   (VecIndexScalarOffAddrOp vcat n w) -> \args -> opIntoRegs $ \res0 -> do
-    checkVecCompatibility dflags vcat n w
+    checkVecCompatibility cfg vcat n w
     doIndexOffAddrOpAs Nothing vecty ty res0 args
    where
     vecty :: CmmType
@@ -979,7 +981,7 @@ emitPrimOp dflags primop = case primop of
     ty = vecCmmCat vcat w
 
   (VecReadScalarOffAddrOp vcat n w) -> \args -> opIntoRegs $ \res0 -> do
-    checkVecCompatibility dflags vcat n w
+    checkVecCompatibility cfg vcat n w
     doIndexOffAddrOpAs Nothing vecty ty res0 args
    where
     vecty :: CmmType
@@ -989,7 +991,7 @@ emitPrimOp dflags primop = case primop of
     ty = vecCmmCat vcat w
 
   (VecWriteScalarOffAddrOp vcat n w) -> \args -> opIntoRegs $ \res0 -> do
-    checkVecCompatibility dflags vcat n w
+    checkVecCompatibility cfg vcat n w
     doWriteOffAddrOp Nothing ty res0 args
    where
     ty :: CmmType
@@ -1444,92 +1446,92 @@ emitPrimOp dflags primop = case primop of
   DoubleToFloatOp -> \args -> opTranslate args (MO_FF_Conv W64 W32)
 
   IntQuotRemOp -> \args -> opCallishHandledLater args $
-    if ncg && (x86ish || ppc) && not (quotRemCanBeOptimized args)
+    if allowQuotRem && not (quotRemCanBeOptimized args)
     then Left (MO_S_QuotRem  (wordWidth platform))
     else Right (genericIntQuotRemOp (wordWidth platform))
 
   Int8QuotRemOp -> \args -> opCallishHandledLater args $
-    if ncg && (x86ish || ppc) && not (quotRemCanBeOptimized args)
+    if allowQuotRem && not (quotRemCanBeOptimized args)
     then Left (MO_S_QuotRem W8)
     else Right (genericIntQuotRemOp W8)
 
   Int16QuotRemOp -> \args -> opCallishHandledLater args $
-    if ncg && (x86ish || ppc) && not (quotRemCanBeOptimized args)
+    if allowQuotRem && not (quotRemCanBeOptimized args)
     then Left (MO_S_QuotRem W16)
     else Right (genericIntQuotRemOp W16)
 
   Int32QuotRemOp -> \args -> opCallishHandledLater args $
-    if ncg && (x86ish || ppc) && not (quotRemCanBeOptimized args)
+    if allowQuotRem && not (quotRemCanBeOptimized args)
     then Left (MO_S_QuotRem W32)
     else Right (genericIntQuotRemOp W32)
 
   WordQuotRemOp -> \args -> opCallishHandledLater args $
-    if ncg && (x86ish || ppc) && not (quotRemCanBeOptimized args)
+    if allowQuotRem && not (quotRemCanBeOptimized args)
     then Left (MO_U_QuotRem  (wordWidth platform))
     else Right (genericWordQuotRemOp (wordWidth platform))
 
   WordQuotRem2Op -> \args -> opCallishHandledLater args $
-    if (ncg && (x86ish || ppc)) || llvm
+    if allowQuotRem2
     then Left (MO_U_QuotRem2 (wordWidth platform))
     else Right (genericWordQuotRem2Op platform)
 
   Word8QuotRemOp -> \args -> opCallishHandledLater args $
-    if ncg && (x86ish || ppc) && not (quotRemCanBeOptimized args)
+    if allowQuotRem && not (quotRemCanBeOptimized args)
     then Left (MO_U_QuotRem W8)
     else Right (genericWordQuotRemOp W8)
 
   Word16QuotRemOp -> \args -> opCallishHandledLater args $
-    if ncg && (x86ish || ppc) && not (quotRemCanBeOptimized args)
+    if allowQuotRem && not (quotRemCanBeOptimized args)
     then Left (MO_U_QuotRem W16)
     else Right (genericWordQuotRemOp W16)
 
   Word32QuotRemOp -> \args -> opCallishHandledLater args $
-    if ncg && (x86ish || ppc) && not (quotRemCanBeOptimized args)
+    if allowQuotRem && not (quotRemCanBeOptimized args)
     then Left (MO_U_QuotRem W32)
     else Right (genericWordQuotRemOp W32)
 
   WordAdd2Op -> \args -> opCallishHandledLater args $
-    if (ncg && (x86ish || ppc)) || llvm
+    if allowExtAdd
     then Left (MO_Add2       (wordWidth platform))
     else Right genericWordAdd2Op
 
   WordAddCOp -> \args -> opCallishHandledLater args $
-    if (ncg && (x86ish || ppc)) || llvm
+    if allowExtAdd
     then Left (MO_AddWordC   (wordWidth platform))
     else Right genericWordAddCOp
 
   WordSubCOp -> \args -> opCallishHandledLater args $
-    if (ncg && (x86ish || ppc)) || llvm
+    if allowExtAdd
     then Left (MO_SubWordC   (wordWidth platform))
     else Right genericWordSubCOp
 
   IntAddCOp -> \args -> opCallishHandledLater args $
-    if (ncg && (x86ish || ppc)) || llvm
+    if allowExtAdd
     then Left (MO_AddIntC    (wordWidth platform))
     else Right genericIntAddCOp
 
   IntSubCOp -> \args -> opCallishHandledLater args $
-    if (ncg && (x86ish || ppc)) || llvm
+    if allowExtAdd
     then Left (MO_SubIntC    (wordWidth platform))
     else Right genericIntSubCOp
 
   WordMul2Op -> \args -> opCallishHandledLater args $
-    if ncg && (x86ish || ppc) || llvm
+    if allowExtAdd
     then Left (MO_U_Mul2     (wordWidth platform))
     else Right genericWordMul2Op
 
   IntMul2Op  -> \args -> opCallishHandledLater args $
-    if ncg && x86ish || llvm
+    if allowInt2Mul
     then Left (MO_S_Mul2     (wordWidth platform))
     else Right genericIntMul2Op
 
   FloatFabsOp -> \args -> opCallishHandledLater args $
-    if (ncg && (x86ish || ppc || aarch64)) || llvm
+    if allowFab
     then Left MO_F32_Fabs
     else Right $ genericFabsOp W32
 
   DoubleFabsOp -> \args -> opCallishHandledLater args $
-    if (ncg && (x86ish || ppc || aarch64)) || llvm
+    if allowFab
     then Left MO_F64_Fabs
     else Right $ genericFabsOp W64
 
@@ -1643,8 +1645,8 @@ emitPrimOp dflags primop = case primop of
   KeepAliveOp -> panic "keepAlive# should have been eliminated in CorePrep"
 
  where
-  profile = targetProfile dflags
-  platform = profilePlatform profile
+  profile  = stgToCmmProfile  cfg
+  platform = stgToCmmPlatform cfg
   result_info = getPrimOpResultInfo primop
 
   opNop :: [CmmExpr] -> PrimopCmmEmit
@@ -1677,7 +1679,7 @@ emitPrimOp dflags primop = case primop of
   opTranslate64 args mkMop callish =
     case platformWordSize platform of
       -- LLVM and C `can handle larger than native size arithmetic natively.
-      _ | not ncg -> opTranslate args $ mkMop W64
+      _ | stgToCmmAllowBigArith cfg -> opTranslate args $ mkMop W64
       PW4 -> opCallish args callish
       PW8 -> opTranslate args $ mkMop W64
 
@@ -1731,17 +1733,11 @@ emitPrimOp dflags primop = case primop of
     [_, CmmLit (CmmInt n _) ] -> isJust (exactLog2 n)
     _                         -> False
 
-  ncg  = backend dflags == NCG
-  llvm = backend dflags == LLVM
-  x86ish = case platformArch platform of
-             ArchX86    -> True
-             ArchX86_64 -> True
-             _          -> False
-  ppc = case platformArch platform of
-          ArchPPC      -> True
-          ArchPPC_64 _ -> True
-          _            -> False
-  aarch64 = platformArch platform == ArchAArch64
+  allowQuotRem  = stgToCmmAllowQuotRemInstr         cfg
+  allowQuotRem2 = stgToCmmAllowQuotRem2             cfg
+  allowExtAdd   = stgToCmmAllowExtendedAddSubInstrs cfg
+  allowInt2Mul  = stgToCmmAllowIntMul2Instr         cfg
+  allowFab      = stgToCmmAllowFabsInstrs           cfg
 
 data PrimopCmmEmit
   -- | Out of line fake primop that's actually just a foreign call to other
@@ -2008,14 +2004,14 @@ genericWordMul2Op _ _ = panic "genericWordMul2Op"
 
 genericIntMul2Op :: GenericOp
 genericIntMul2Op [res_c, res_h, res_l] both_args@[arg_x, arg_y]
- = do dflags <- getDynFlags
-      platform <- getPlatform
+ = do cfg <- getStgToCmmConfig
       -- Implement algorithm from Hacker's Delight, 2nd edition, p.174
-      let t = cmmExprType platform arg_x
+      let t        = cmmExprType platform arg_x
+          platform = stgToCmmPlatform cfg
       p   <- newTemp t
       -- 1) compute the multiplication as if numbers were unsigned
       _ <- withSequel (AssignTo [p, res_l] False) $
-             cmmPrimOpApp dflags WordMul2Op both_args Nothing
+             cmmPrimOpApp cfg WordMul2Op both_args Nothing
       -- 2) correct the high bits of the unsigned result
       let carryFill x = CmmMachOp (MO_S_Shr ww) [x, wwm1]
           sub x y     = CmmMachOp (MO_Sub   ww) [x, y]
@@ -2299,14 +2295,13 @@ vecElemProjectCast _        _        _   =  Nothing
 --    it may very well be a design perspective that helps guide improving the NCG.
 
 
-checkVecCompatibility :: DynFlags -> PrimOpVecCat -> Length -> Width -> FCode ()
-checkVecCompatibility dflags vcat l w = do
-    when (backend dflags /= LLVM) $
-        sorry $ unlines ["SIMD vector instructions require the LLVM back-end."
-                         ,"Please use -fllvm."]
-    check vecWidth vcat l w
+checkVecCompatibility :: StgToCmmConfig -> PrimOpVecCat -> Length -> Width -> FCode ()
+checkVecCompatibility cfg vcat l w =
+  case stgToCmmVecInstrsErr cfg of
+    Nothing  -> check vecWidth vcat l w  -- We are in a compatible backend
+    Just err -> sorry err                -- incompatible backend, do panic
   where
-    platform = targetPlatform dflags
+    platform = stgToCmmPlatform cfg
     check :: Width -> PrimOpVecCat -> Length -> Width -> FCode ()
     check W128 FloatVec 4 W32 | not (isSseEnabled platform) =
         sorry $ "128-bit wide single-precision floating point " ++
@@ -2314,13 +2309,13 @@ checkVecCompatibility dflags vcat l w = do
     check W128 _ _ _ | not (isSse2Enabled platform) =
         sorry $ "128-bit wide integer and double precision " ++
                 "SIMD vector instructions require at least -msse2."
-    check W256 FloatVec _ _ | not (isAvxEnabled dflags) =
+    check W256 FloatVec _ _ | not (stgToCmmAvx cfg) =
         sorry $ "256-bit wide floating point " ++
                 "SIMD vector instructions require at least -mavx."
-    check W256 _ _ _ | not (isAvx2Enabled dflags) =
+    check W256 _ _ _ | not (stgToCmmAvx2 cfg) =
         sorry $ "256-bit wide integer " ++
                 "SIMD vector instructions require at least -mavx2."
-    check W512 _ _ _ | not (isAvx512fEnabled dflags) =
+    check W512 _ _ _ | not (stgToCmmAvx512f cfg) =
         sorry $ "512-bit wide " ++
                 "SIMD vector instructions require -mavx512f."
     check _ _ _ _ = return ()
@@ -3238,9 +3233,9 @@ doBoundsCheck :: CmmExpr  -- ^ accessed index
               -> CmmExpr  -- ^ array size (in elements)
               -> FCode ()
 doBoundsCheck idx sz = do
-    dflags <- getDynFlags
-    platform <- getPlatform
-    when (gopt Opt_DoBoundsChecking dflags) (doCheck platform)
+    do_bounds_check <- stgToCmmDoBoundsCheck <$> getStgToCmmConfig
+    platform        <- getPlatform
+    when do_bounds_check (doCheck platform)
   where
     doCheck platform = do
         boundsCheckFailed <- getCode $ emitCCall [] (mkLblExpr mkOutOfBoundsAccessLabel) []

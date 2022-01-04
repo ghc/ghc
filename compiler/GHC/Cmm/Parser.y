@@ -208,6 +208,7 @@ import qualified Prelude -- for happy-generated code
 import GHC.Driver.Session
 import GHC.Driver.Ppr
 import GHC.Driver.Config.Parser (initParserOpts)
+import GHC.Driver.Config.StgToCmm
 
 import GHC.Platform
 import GHC.Platform.Profile
@@ -217,13 +218,14 @@ import GHC.StgToCmm.Prof
 import GHC.StgToCmm.Heap
 import GHC.StgToCmm.Monad hiding ( getCode, getCodeR, getCodeScoped, emitLabel, emit
                                  , emitStore, emitAssign, emitOutOfLine, withUpdFrameOff
-                                 , getUpdFrameOff, getProfile, getPlatform, getPtrOpts )
+                                 , getUpdFrameOff, getProfile, getPlatform, getContext)
 import qualified GHC.StgToCmm.Monad as F
 import GHC.StgToCmm.Utils
 import GHC.StgToCmm.Foreign
 import GHC.StgToCmm.Expr
 import GHC.StgToCmm.Lit
 import GHC.StgToCmm.Closure
+import GHC.StgToCmm.Config
 import GHC.StgToCmm.Layout     hiding (ArgRep(..))
 import GHC.StgToCmm.Ticky
 import GHC.StgToCmm.Prof
@@ -238,7 +240,7 @@ import GHC.Cmm.Info
 import GHC.Cmm.BlockId
 import GHC.Cmm.Lexer
 import GHC.Cmm.CLabel
-import GHC.Cmm.Parser.Monad hiding (getPlatform, getProfile, getPtrOpts)
+import GHC.Cmm.Parser.Monad hiding (getPlatform, getProfile)
 import qualified GHC.Cmm.Parser.Monad as PD
 import GHC.Cmm.CallConv
 import GHC.Runtime.Heap.Layout
@@ -449,10 +451,10 @@ cmmproc :: { CmmParse () }
                 { do ((entry_ret_label, info, stk_formals, formals), agraph) <-
                        getCodeScoped $ loopDecls $ do {
                          (entry_ret_label, info, stk_formals) <- $1;
-                         dflags <- getDynFlags;
                          platform <- getPlatform;
+                         ctx      <- getContext;
                          formals <- sequence (fromMaybe [] $3);
-                         withName (showSDoc dflags (pdoc platform entry_ret_label))
+                         withName (renderWithContext ctx (pdoc platform entry_ret_label))
                            $4;
                          return (entry_ret_label, info, stk_formals, formals) }
                      let do_layout = isJust $3
@@ -925,8 +927,9 @@ nameToMachOp name =
 
 exprOp :: FastString -> [CmmParse CmmExpr] -> PD (CmmParse CmmExpr)
 exprOp name args_code = do
-  ptr_opts <- PD.getPtrOpts
-  case lookupUFM (exprMacros ptr_opts) name of
+  profile     <- PD.getProfile
+  align_check <- gopt Opt_AlignmentSanitisation <$> getDynFlags
+  case lookupUFM (exprMacros profile align_check) name of
      Just f  -> return $ do
         args <- sequence args_code
         return (f args)
@@ -934,21 +937,20 @@ exprOp name args_code = do
         mo <- nameToMachOp name
         return $ mkMachOp mo args_code
 
-exprMacros :: PtrOpts -> UniqFM FastString ([CmmExpr] -> CmmExpr)
-exprMacros ptr_opts = listToUFM [
+exprMacros :: Profile -> DoAlignSanitisation -> UniqFM FastString ([CmmExpr] -> CmmExpr)
+exprMacros profile align_check = listToUFM [
   ( fsLit "ENTRY_CODE",   \ [x] -> entryCode platform x ),
-  ( fsLit "INFO_PTR",     \ [x] -> closureInfoPtr ptr_opts x ),
-  ( fsLit "STD_INFO",     \ [x] -> infoTable profile x ),
+  ( fsLit "INFO_PTR",     \ [x] -> closureInfoPtr platform align_check x ),
+  ( fsLit "STD_INFO",     \ [x] -> infoTable    profile x ),
   ( fsLit "FUN_INFO",     \ [x] -> funInfoTable profile x ),
-  ( fsLit "GET_ENTRY",    \ [x] -> entryCode platform (closureInfoPtr ptr_opts x) ),
-  ( fsLit "GET_STD_INFO", \ [x] -> infoTable profile (closureInfoPtr ptr_opts x) ),
-  ( fsLit "GET_FUN_INFO", \ [x] -> funInfoTable profile (closureInfoPtr ptr_opts x) ),
+  ( fsLit "GET_ENTRY",    \ [x] -> entryCode platform   (closureInfoPtr platform align_check x) ),
+  ( fsLit "GET_STD_INFO", \ [x] -> infoTable profile    (closureInfoPtr platform align_check x) ),
+  ( fsLit "GET_FUN_INFO", \ [x] -> funInfoTable profile (closureInfoPtr platform align_check x) ),
   ( fsLit "INFO_TYPE",    \ [x] -> infoTableClosureType profile x ),
   ( fsLit "INFO_PTRS",    \ [x] -> infoTablePtrs profile x ),
   ( fsLit "INFO_NPTRS",   \ [x] -> infoTableNonPtrs profile x )
   ]
   where
-    profile  = po_profile ptr_opts
     platform = profilePlatform profile
 
 -- we understand a subset of C-- primitives:
@@ -1513,13 +1515,14 @@ parseCmmFile dflags this_mod home_unit filename = do
         return (warnings, errors, Nothing)
     POk pst code -> do
         st <- initC
+        let fstate = F.initFCodeState (profilePlatform $ targetProfile dflags)
         let fcode = do
               ((), cmm) <- getCmm $ unEC code "global" (initEnv (targetProfile dflags)) [] >> return ()
               let used_info = map (cmmInfoTableToInfoProvEnt this_mod)
                                               (mapMaybe topInfoTable cmm)
               ((), cmm2) <- getCmm $ mapM_ emitInfoTableProv used_info
               return (cmm ++ cmm2, used_info)
-            (cmm, _) = runC dflags no_module st fcode
+            (cmm, _) = runC (initStgToCmmConfig dflags no_module) fstate st fcode
             (warnings,errors) = getPsMessages pst
         if not (isEmptyMessages errors)
          then return (warnings, errors, Nothing)

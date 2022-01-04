@@ -8,6 +8,8 @@ module GHC.StgToCmm.Types
   , ArgDescr (..)
   , StandardFormInfo (..)
   , WordOff
+  , DoSCCProfiling
+  , DoExtDynRefs
   ) where
 
 import GHC.Prelude
@@ -229,3 +231,9 @@ instance Outputable StandardFormInfo where
   ppr NonStandardThunk = text "RegThunk"
   ppr (SelectorThunk w) = text "SelThunk:" <> ppr w
   ppr (ApThunk n) = text "ApThunk:" <> ppr n
+
+--------------------------------------------------------------------------------
+--                Gaining sight in a sea of blindness
+--------------------------------------------------------------------------------
+type DoSCCProfiling = Bool
+type DoExtDynRefs   = Bool

@@ -34,7 +34,7 @@ module GHC.StgToCmm.ExtCode (
         getCode, getCodeR, getCodeScoped,
         emitOutOfLine,
         withUpdFrameOff, getUpdFrameOff,
-        getProfile, getPlatform, getPtrOpts
+        getProfile, getPlatform, getContext
 )
 
 where
@@ -50,10 +50,8 @@ import GHC.StgToCmm.Monad (FCode, newUnique)
 import GHC.Cmm
 import GHC.Cmm.CLabel
 import GHC.Cmm.Graph
-import GHC.Cmm.Info
 
 import GHC.Cmm.BlockId
-import GHC.Driver.Session
 import GHC.Data.FastString
 import GHC.Unit.Module
 import GHC.Types.Unique.FM
@@ -61,6 +59,7 @@ import GHC.Types.Unique
 import GHC.Types.Unique.Supply
 
 import Control.Monad (ap)
+import GHC.Utils.Outputable (SDocContext)
 
 -- | The environment contains variable definitions or blockids.
 data Named
@@ -103,17 +102,14 @@ instance MonadUnique CmmParse where
     u <- getUniqueM
     return (decls, u)
 
-instance HasDynFlags CmmParse where
-    getDynFlags = EC (\_ _ d -> (d,) <$> getDynFlags)
-
 getProfile :: CmmParse Profile
 getProfile = EC (\_ _ d -> (d,) <$> F.getProfile)
 
 getPlatform :: CmmParse Platform
 getPlatform = EC (\_ _ d -> (d,) <$> F.getPlatform)
 
-getPtrOpts :: CmmParse PtrOpts
-getPtrOpts = EC (\_ _ d -> (d,) <$> F.getPtrOpts)
+getContext :: CmmParse SDocContext
+getContext = EC (\_ _ d -> (d,) <$> F.getContext)
 
 -- | Takes the variable declarations and imports from the monad
 --      and makes an environment, which is looped back into the computation.
@@ -127,7 +123,6 @@ loopDecls (EC fcode) =
         (_, a) <- F.fixC $ \ ~(decls, _) ->
           fcode c (addListToUFM e decls) globalDecls
         return (globalDecls, a)
-
 
 -- | Get the current environment from the monad.
 getEnv :: CmmParse Env

@@ -347,9 +347,9 @@ The pattern synonym approach is due to Sebastian Graaf (#18238)
 Do note that for monads for multiple arguments more than one oneShot
 function might be required. For example in FCode we use:
 
-    newtype FCode a = FCode' { doFCode :: CgInfoDownwards -> CgState -> (a, CgState) }
+    newtype FCode a = FCode' { doFCode :: StgToCmmConfig -> CgState -> (a, CgState) }
 
-    pattern FCode :: (CgInfoDownwards -> CgState -> (a, CgState))
+    pattern FCode :: (StgToCmmConfig -> CgState -> (a, CgState))
                   -> FCode a
     pattern FCode m <- FCode' m
       where

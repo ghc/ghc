@@ -29,11 +29,11 @@ module GHC.StgToCmm.Prof (
 import GHC.Prelude
 
 import GHC.Driver.Session
-import GHC.Driver.Ppr
 
 import GHC.Platform
 import GHC.Platform.Profile
 import GHC.StgToCmm.Closure
+import GHC.StgToCmm.Config
 import GHC.StgToCmm.Utils
 import GHC.StgToCmm.Monad
 import GHC.StgToCmm.Lit
@@ -56,7 +56,9 @@ import GHC.Driver.CodeOutput ( ipInitCode )
 import GHC.Utils.Encoding
 
 import Control.Monad
-import Data.Char (ord)
+import Data.Char       (ord)
+import Data.Bifunctor  (first)
+import GHC.Utils.Monad (whenM)
 
 -----------------------------------------------------------------------------
 --
@@ -72,7 +74,7 @@ ccType :: Platform -> CmmType -- Type of a cost centre
 ccType = bWord
 
 storeCurCCS :: CmmExpr -> CmmAGraph
-storeCurCCS e = mkAssign cccsReg e
+storeCurCCS = mkAssign cccsReg
 
 mkCCostCentre :: CostCentre -> CmmLit
 mkCCostCentre cc = CmmLabel (mkCCLabel cc)
@@ -139,9 +141,9 @@ We want this kind of code:
 saveCurrentCostCentre :: FCode (Maybe LocalReg)
         -- Returns Nothing if profiling is off
 saveCurrentCostCentre
-  = do dflags <- getDynFlags
-       platform <- getPlatform
-       if not (sccProfilingEnabled dflags)
+  = do sccProfilingEnabled <- stgToCmmSCCProfiling <$> getStgToCmmConfig
+       platform            <- getPlatform
+       if not sccProfilingEnabled
            then return Nothing
            else do local_cc <- newTemp (ccType platform)
                    emitAssign (CmmLocal local_cc) cccsExpr
@@ -163,7 +165,7 @@ restoreCurrentCostCentre (Just local_cc)
 profDynAlloc :: SMRep -> CmmExpr -> FCode ()
 profDynAlloc rep ccs
   = ifProfiling $
-    do profile <- targetProfile <$> getDynFlags
+    do profile <- getProfile
        let platform = profilePlatform profile
        profAlloc (mkIntExpr platform (heapClosureSizeW profile rep)) ccs
 
@@ -173,12 +175,12 @@ profDynAlloc rep ccs
 profAlloc :: CmmExpr -> CmmExpr -> FCode ()
 profAlloc words ccs
   = ifProfiling $
-        do profile <- targetProfile <$> getDynFlags
+        do profile <- getProfile
            let platform = profilePlatform profile
            let alloc_rep = rEP_CostCentreStack_mem_alloc platform
            emit $ addToMemE alloc_rep
                        (cmmOffsetB platform ccs (pc_OFFSET_CostCentreStack_mem_alloc (platformConstants platform)))
-                       (CmmMachOp (MO_UU_Conv (wordWidth platform) (typeWidth alloc_rep)) $
+                       (CmmMachOp (MO_UU_Conv (wordWidth platform) (typeWidth alloc_rep))
                            -- subtract the "profiling overhead", which is the
                            -- profiling header in a closure.
                            [CmmMachOp (mo_wordSub platform) [ words, mkIntExpr platform (profHdrSize profile)]]
@@ -194,21 +196,18 @@ enterCostCentreThunk closure =
       emit $ storeCurCCS (costCentreFrom platform closure)
 
 enterCostCentreFun :: CostCentreStack -> CmmExpr -> FCode ()
-enterCostCentreFun ccs closure =
-  ifProfiling $
-    if isCurrentCCS ccs
-       then do platform <- getPlatform
-               emitRtsCall rtsUnitId (fsLit "enterFunCCS")
-                   [(baseExpr, AddrHint),
-                    (costCentreFrom platform closure, AddrHint)] False
-       else return () -- top-level function, nothing to do
+enterCostCentreFun ccs closure = ifProfiling $
+    when (isCurrentCCS ccs) $
+    do platform <- getPlatform
+       emitRtsCall
+         rtsUnitId
+         (fsLit "enterFunCCS")
+         [(baseExpr, AddrHint), (costCentreFrom platform closure, AddrHint)]
+         False
+       -- otherwise we have a top-level function, nothing to do
 
 ifProfiling :: FCode () -> FCode ()
-ifProfiling code
-  = do profile <- targetProfile <$> getDynFlags
-       if profileIsProfiling profile
-           then code
-           else return ()
+ifProfiling = whenM (stgToCmmSCCProfiling <$> getStgToCmmConfig)
 
 ---------------------------------------------------------------
 --        Initialising Cost Centres & CCSs
@@ -224,7 +223,7 @@ initCostCentres (local_CCs, singleton_CCSs)
 
 emitCostCentreDecl :: CostCentre -> FCode ()
 emitCostCentreDecl cc = do
-  { dflags <- getDynFlags
+  { ctx      <- stgToCmmContext <$> getStgToCmmConfig
   ; platform <- getPlatform
   ; let is_caf | isCafCC cc = mkIntCLit platform (ord 'c') -- 'c' == is a CAF
                | otherwise  = zero platform
@@ -234,7 +233,7 @@ emitCostCentreDecl cc = do
                                         $ moduleName
                                         $ cc_mod cc)
   ; loc <- newByteStringCLit $ utf8EncodeString $
-                   showPpr dflags (costCentreSrcSpan cc)
+                   renderWithContext ctx (ppr $! costCentreSrcSpan cc)
   ; let
      lits = [ zero platform,  -- StgInt ccID,
               label,          -- char *label,
@@ -278,35 +277,39 @@ sizeof_ccs_words platform
    (ws,ms) = pc_SIZEOF_CostCentreStack (platformConstants platform) `divMod` platformWordSizeInBytes platform
 
 
-initInfoTableProv ::  [CmmInfoTable] -> InfoTableProvMap -> Module -> FCode CStub
+initInfoTableProv ::  [CmmInfoTable] -> InfoTableProvMap -> FCode CStub
 -- Emit the declarations
-initInfoTableProv infos itmap this_mod
+initInfoTableProv infos itmap
   = do
-       dflags <- getDynFlags
-       let ents = convertInfoProvMap dflags infos this_mod itmap
+       cfg <- getStgToCmmConfig
+       let ents       = convertInfoProvMap infos this_mod itmap
+           info_table = stgToCmmInfoTableMap cfg
+           platform   = stgToCmmPlatform     cfg
+           this_mod   = stgToCmmThisModule   cfg
        -- Output the actual IPE data
        mapM_ emitInfoTableProv ents
        -- Create the C stub which initialises the IPE map
-       return (ipInitCode dflags this_mod ents)
+       return (ipInitCode info_table platform this_mod ents)
 
 --- Info Table Prov stuff
 emitInfoTableProv :: InfoProvEnt  -> FCode ()
 emitInfoTableProv ip = do
-  { dflags <- getDynFlags
-  ; let mod = infoProvModule ip
-  ; let (src, label) = maybe ("", "") (\(s, l) -> (showPpr dflags s, l)) (infoTableProv ip)
-  ; platform <- getPlatform
-  ; let mk_string = newByteStringCLit . utf8EncodeString
+  { cfg <- getStgToCmmConfig
+  ; let mod      = infoProvModule ip
+        ctx      = stgToCmmContext  cfg
+        platform = stgToCmmPlatform cfg
+  ; let (src, label) = maybe ("", "") (first (renderWithContext ctx . ppr)) (infoTableProv ip)
+        mk_string    = newByteStringCLit . utf8EncodeString
   ; label <- mk_string label
   ; modl  <- newByteStringCLit (bytesFS $ moduleNameFS
-                                        $ moduleName
-                                        $ mod)
+                                        $ moduleName mod)
 
   ; ty_string  <- mk_string (infoTableType ip)
-  ; loc <- mk_string src
-  ; table_name <- mk_string (showPpr dflags (pprCLabel platform CStyle (infoTablePtr ip)))
-  ; closure_type <- mk_string
-                      (showPpr dflags (text $ show $ infoProvEntClosureType ip))
+  ; loc        <- mk_string src
+  ; table_name <- mk_string (renderWithContext ctx
+                             (pprCLabel platform CStyle (infoTablePtr ip)))
+  ; closure_type <- mk_string (renderWithContext ctx
+                               (text $ show $ infoProvEntClosureType ip))
   ; let
      lits = [ CmmLabel (infoTablePtr ip), -- Info table pointer
               table_name,     -- char *table_name
@@ -323,15 +326,12 @@ emitInfoTableProv ip = do
 -- Set the current cost centre stack
 
 emitSetCCC :: CostCentre -> Bool -> Bool -> FCode ()
-emitSetCCC cc tick push
- = do profile <- targetProfile <$> getDynFlags
-      let platform = profilePlatform profile
-      if not (profileIsProfiling profile)
-          then return ()
-          else do tmp <- newTemp (ccsType platform)
-                  pushCostCentre tmp cccsExpr cc
-                  when tick $ emit (bumpSccCount platform (CmmReg (CmmLocal tmp)))
-                  when push $ emit (storeCurCCS (CmmReg (CmmLocal tmp)))
+emitSetCCC cc tick push = ifProfiling $
+  do platform <- getPlatform
+     tmp      <- newTemp (ccsType platform)
+     pushCostCentre tmp cccsExpr cc
+     when tick $ emit (bumpSccCount platform (CmmReg (CmmLocal tmp)))
+     when push $ emit (storeCurCCS (CmmReg (CmmLocal tmp)))
 
 pushCostCentre :: LocalReg -> CmmExpr -> CostCentre -> FCode ()
 pushCostCentre result ccs cc

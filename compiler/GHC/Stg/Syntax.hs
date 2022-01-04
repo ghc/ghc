@@ -127,14 +127,19 @@ data StgArg
 -- | Does this constructor application refer to anything in a different
 -- *Windows* DLL?
 -- If so, we can't allocate it statically
-isDllConApp :: DynFlags -> Module -> DataCon -> [StgArg] -> Bool
-isDllConApp dflags this_mod con args
- | not (gopt Opt_ExternalDynamicRefs dflags) = False
+isDllConApp
+  :: Platform
+  -> Bool          -- is Opt_ExternalDynamicRefs enabled?
+  -> Module
+  -> DataCon
+  -> [StgArg]
+  -> Bool
+isDllConApp platform ext_dyn_refs this_mod con args
+ | not ext_dyn_refs    = False
  | platformOS platform == OSMinGW32
     = isDynLinkName platform this_mod (dataConName con) || any is_dll_arg args
  | otherwise = False
   where
-    platform = targetPlatform dflags
     -- NB: typePrimRep1 is legit because any free variables won't have
     -- unlifted type (there are no unlifted things at top level)
     is_dll_arg :: StgArg -> Bool

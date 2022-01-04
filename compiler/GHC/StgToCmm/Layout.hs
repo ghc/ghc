@@ -33,9 +33,6 @@ module GHC.StgToCmm.Layout (
 
 import GHC.Prelude hiding ((<*>))
 
-import GHC.Driver.Session
-import GHC.Driver.Ppr
-
 import GHC.StgToCmm.Closure
 import GHC.StgToCmm.Env
 import GHC.StgToCmm.ArgRep -- notably: ( slowCallPattern )
@@ -67,6 +64,8 @@ import GHC.Utils.Panic.Plain
 import GHC.Utils.Constants (debugIsOn)
 import GHC.Data.FastString
 import Control.Monad
+import GHC.StgToCmm.Config (stgToCmmPlatform)
+import GHC.StgToCmm.Types
 
 ------------------------------------------------------------------------
 --                Call and return sequences
@@ -196,9 +195,12 @@ directCall conv lbl arity stg_args
 slowCall :: CmmExpr -> [StgArg] -> FCode ReturnKind
 -- (slowCall fun args) applies fun to args, returning the results to Sequel
 slowCall fun stg_args
-  = do  dflags <- getDynFlags
-        profile <- getProfile
-        let platform = profilePlatform profile
+  = do  cfg <- getStgToCmmConfig
+        let profile   = stgToCmmProfile      cfg
+            platform  = stgToCmmPlatform     cfg
+            ctx       = stgToCmmContext      cfg
+            fast_pap  = stgToCmmFastPAPCalls cfg
+            align_sat = stgToCmmAlignCheck   cfg
         argsreps <- getArgRepsAmodes stg_args
         let (rts_fun, arity) = slowCallPattern (map fst argsreps)
 
@@ -206,18 +208,17 @@ slowCall fun stg_args
            r <- direct_call "slow_call" NativeNodeCall
                  (mkRtsApFastLabel rts_fun) arity ((P,Just fun):argsreps)
            emitComment $ mkFastString ("slow_call for " ++
-                                      showSDoc dflags (pdoc platform fun) ++
+                                      renderWithContext ctx (pdoc platform fun) ++
                                       " with pat " ++ unpackFS rts_fun)
            return r
 
         -- Note [avoid intermediate PAPs]
         let n_args = length stg_args
-        if n_args > arity && gopt Opt_FastPAPCalls dflags
+        if n_args > arity && fast_pap
            then do
-             ptr_opts <- getPtrOpts
              funv <- (CmmReg . CmmLocal) `fmap` assignTemp fun
              fun_iptr <- (CmmReg . CmmLocal) `fmap`
-                    assignTemp (closureInfoPtr ptr_opts (cmmUntag platform funv))
+               assignTemp (closureInfoPtr platform align_sat (cmmUntag platform funv))
 
              -- ToDo: we could do slightly better here by reusing the
              -- continuation from the slow call, which we have in r.
@@ -303,15 +304,14 @@ direct_call caller call_conv lbl arity args
   = emitCall (call_conv, NativeReturn) target (nonVArgs args)
 
   | otherwise       -- Note [over-saturated calls]
-  = do dflags <- getDynFlags
+  = do do_scc_prof <- stgToCmmSCCProfiling <$> getStgToCmmConfig
        emitCallWithExtraStack (call_conv, NativeReturn)
                               target
                               (nonVArgs fast_args)
-                              (nonVArgs (stack_args dflags))
+                              (nonVArgs (slowArgs rest_args do_scc_prof))
   where
     target = CmmLit (CmmLabel lbl)
     (fast_args, rest_args) = splitAt real_arity args
-    stack_args dflags = slowArgs dflags rest_args
     real_arity = case call_conv of
                    NativeNodeCall -> arity+1
                    _              -> arity
@@ -375,12 +375,11 @@ just more arguments that we are passing on the stack (cml_args).
 -- | 'slowArgs' takes a list of function arguments and prepares them for
 -- pushing on the stack for "extra" arguments to a function which requires
 -- fewer arguments than we currently have.
-slowArgs :: DynFlags -> [(ArgRep, Maybe CmmExpr)] -> [(ArgRep, Maybe CmmExpr)]
-slowArgs _ [] = []
-slowArgs dflags args -- careful: reps contains voids (V), but args does not
-  | sccProfilingEnabled dflags
-              = save_cccs ++ this_pat ++ slowArgs dflags rest_args
-  | otherwise =              this_pat ++ slowArgs dflags rest_args
+slowArgs :: [(ArgRep, Maybe CmmExpr)] -> DoSCCProfiling -> [(ArgRep, Maybe CmmExpr)]
+slowArgs []   _                    = mempty
+slowArgs args sccProfilingEnabled  -- careful: reps contains voids (V), but args does not
+  | sccProfilingEnabled = save_cccs ++ this_pat ++ slowArgs rest_args sccProfilingEnabled
+  | otherwise           =              this_pat ++ slowArgs rest_args sccProfilingEnabled
   where
     (arg_pat, n)            = slowCallPattern (map fst args)
     (call_args, rest_args)  = splitAt n args

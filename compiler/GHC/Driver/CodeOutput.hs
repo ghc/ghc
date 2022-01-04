@@ -336,9 +336,14 @@ profilingInitCode platform this_mod (local_CCs, singleton_CCSs)
 
 -- | Generate code to initialise info pointer origin
 -- See note [Mapping Info Tables to Source Positions]
-ipInitCode :: DynFlags -> Module -> [InfoProvEnt] -> CStub
-ipInitCode dflags this_mod ents
- = if not (gopt Opt_InfoTableMap dflags)
+ipInitCode
+  :: Bool            -- is Opt_InfoTableMap enabled or not
+  -> Platform
+  -> Module
+  -> [InfoProvEnt]
+  -> CStub
+ipInitCode do_info_table platform this_mod ents
+ = if not do_info_table
     then mempty
     else CStub $ vcat
     $  map emit_ipe_decl ents
@@ -351,7 +356,6 @@ ipInitCode dflags this_mod ents
                  ])
        ]
  where
-   platform = targetPlatform dflags
    emit_ipe_decl ipe =
        text "extern InfoProvEnt" <+> ipe_lbl <> text "[];"
      where ipe_lbl = pprCLabel platform CStyle (mkIPELabel ipe)

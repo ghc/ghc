@@ -70,7 +70,6 @@ import GHC.Types.Literal
 import GHC.Data.Graph.Directed
 import GHC.Utils.Misc
 import GHC.Types.Unique
-import GHC.Driver.Session
 import GHC.Data.FastString
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -84,7 +83,6 @@ import Data.List (sortBy)
 import Data.Ord
 import GHC.Types.Unique.Map
 import Data.Maybe
-import GHC.Driver.Ppr
 import qualified Data.List.NonEmpty as NE
 import GHC.Core.DataCon
 import GHC.Types.Unique.FM
@@ -99,7 +97,7 @@ import qualified Data.Map.Strict as Map
 --------------------------------------------------------------------------
 
 addToMemLbl :: CmmType -> CLabel -> Int -> CmmAGraph
-addToMemLbl rep lbl n = addToMem rep (CmmLit (CmmLabel lbl)) n
+addToMemLbl rep lbl = addToMem rep (CmmLit (CmmLabel lbl))
 
 addToMemLblE :: CmmType -> CLabel -> CmmExpr -> CmmAGraph
 addToMemLblE rep lbl = addToMemE rep (CmmLit (CmmLabel lbl))
@@ -157,12 +155,11 @@ tagToClosure platform tycon tag
 -------------------------------------------------------------------------
 
 emitRtsCall :: UnitId -> FastString -> [(CmmExpr,ForeignHint)] -> Bool -> FCode ()
-emitRtsCall pkg fun args safe = emitRtsCallGen [] (mkCmmCodeLabel pkg fun) args safe
+emitRtsCall pkg fun = emitRtsCallGen [] (mkCmmCodeLabel pkg fun)
 
 emitRtsCallWithResult :: LocalReg -> ForeignHint -> UnitId -> FastString
         -> [(CmmExpr,ForeignHint)] -> Bool -> FCode ()
-emitRtsCallWithResult res hint pkg fun args safe
-   = emitRtsCallGen [(res,hint)] (mkCmmCodeLabel pkg fun) args safe
+emitRtsCallWithResult res hint pkg = emitRtsCallGen [(res,hint)] . mkCmmCodeLabel pkg
 
 -- Make a call to an RTS C procedure
 emitRtsCallGen
@@ -172,7 +169,7 @@ emitRtsCallGen
    -> Bool -- True <=> CmmSafe call
    -> FCode ()
 emitRtsCallGen res lbl args safe
-  = do { platform <- targetPlatform <$> getDynFlags
+  = do { platform <- getPlatform
        ; updfr_off <- getUpdFrameOff
        ; let (caller_save, caller_load) = callerSaveVolatileRegs platform
        ; emit caller_save
@@ -599,14 +596,14 @@ cmmInfoTableToInfoProvEnt this_mod cmit =
 
 -- | Convert source information collected about identifiers in 'GHC.STG.Debug'
 -- to entries suitable for placing into the info table provenenance table.
-convertInfoProvMap :: DynFlags -> [CmmInfoTable] -> Module -> InfoTableProvMap -> [InfoProvEnt]
-convertInfoProvMap dflags defns this_mod (InfoTableProvMap (UniqMap dcenv) denv infoTableToSourceLocationMap) =
+convertInfoProvMap :: [CmmInfoTable] -> Module -> InfoTableProvMap -> [InfoProvEnt]
+convertInfoProvMap defns this_mod (InfoTableProvMap (UniqMap dcenv) denv infoTableToSourceLocationMap) =
   map (\cmit ->
     let cl = cit_lbl cmit
         cn  = rtsClosureType (cit_rep cmit)
 
         tyString :: Outputable a => a -> String
-        tyString t = showPpr dflags t
+        tyString = renderWithContext defaultSDocContext . ppr
 
         lookupClosureMap :: Maybe InfoProvEnt
         lookupClosureMap = case hasHaskellName cl >>= lookupUniqMap denv of
@@ -616,7 +613,7 @@ convertInfoProvMap dflags defns this_mod (InfoTableProvMap (UniqMap dcenv) denv 
         lookupDataConMap = do
             UsageSite _ n <- hasIdLabelInfo cl >>= getConInfoTableLocation
             -- This is a bit grimy, relies on the DataCon and Name having the same Unique, which they do
-            (dc, ns) <- (hasHaskellName cl >>= lookupUFM_Directly dcenv . getUnique)
+            (dc, ns) <- hasHaskellName cl >>= lookupUFM_Directly dcenv . getUnique
             -- Lookup is linear but lists will be small (< 100)
             return $ InfoProvEnt cl cn (tyString (dataConTyCon dc)) this_mod (join $ lookup n (NE.toList ns))
 

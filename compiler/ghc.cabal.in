@@ -378,6 +378,7 @@ Library
         GHC.Driver.Config.HsToCore
         GHC.Driver.Config.Logger
         GHC.Driver.Config.Parser
+        GHC.Driver.Config.StgToCmm
         GHC.Driver.Env
         GHC.Driver.Env.KnotVars
         GHC.Driver.Env.Types
@@ -549,6 +550,7 @@ Library
         GHC.StgToCmm.Bind
         GHC.StgToCmm.CgUtils
         GHC.StgToCmm.Closure
+        GHC.StgToCmm.Config
         GHC.StgToCmm.DataCon
         GHC.StgToCmm.Env
         GHC.StgToCmm.Expr
@@ -561,6 +563,7 @@ Library
         GHC.StgToCmm.Monad
         GHC.StgToCmm.Prim
         GHC.StgToCmm.Prof
+        GHC.StgToCmm.Sequel
         GHC.StgToCmm.Ticky
         GHC.StgToCmm.Types
         GHC.StgToCmm.Utils
