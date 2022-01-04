@@ -24,7 +24,7 @@ import Data.Typeable
 import GHC.Unit.Module (ModuleName, Module)
 import GHC.Hs.Extension (GhcTc)
 import GHC.Core.Coercion
-import GHC.Types.Name (Name)
+import GHC.Types.Name (Name, NameSpace)
 import GHC.Types.Basic (Activation, RuleName)
 import GHC.Parser.Errors.Basic
 import {-# SOURCE #-} Language.Haskell.Syntax.Expr
@@ -313,6 +313,14 @@ data GhcHint
         Triggered by: 'GHC.Tc.Errors.Types.TcRnForallIdentifier'
     -}
   | SuggestRenameForall
+
+    {-| Suggests to use the appropriate Template Haskell tick:
+        a single tick for a term-level 'NameSpace', or a double tick
+        for a type-level 'NameSpace'.
+
+        Triggered by: 'GHC.Tc.Errors.Types.TcRnIncorrectNameSpace'.
+    -}
+  | SuggestAppropriateTHTick NameSpace
 
 -- | An 'InstantiationSuggestion' for a '.hsig' file. This is generated
 -- by GHC in case of a 'DriverUnexpectedSignature' and suggests a way

@@ -1432,6 +1432,22 @@ data TcRnMessage where
   -}
   TcRnGADTMonoLocalBinds :: TcRnMessage
 
+  {-| TcRnIncorrectNameSpace is an error that occurs when a 'Name'
+      is used in the incorrect 'NameSpace', e.g. a type constructor
+      or class used in a term, or a term variable used in a type.
+
+      Example:
+
+        f x = Int
+
+      Test cases: T18740a, T20884.
+  -}
+  TcRnIncorrectNameSpace :: Name
+                         -> Bool -- ^ whether the error is happening
+                                 -- in a Template Haskell tick
+                                 -- (so we should give a Template Haskell hint)
+                         -> TcRnMessage
+
 -- | Which parts of a record field are affected by a particular error or warning.
 data RecordFieldPart
   = RecordFieldConstructor !Name

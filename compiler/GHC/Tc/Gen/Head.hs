@@ -71,6 +71,7 @@ import GHC.Tc.Types.Evidence
 import GHC.Builtin.Types( multiplicityTy )
 import GHC.Builtin.Names
 import GHC.Builtin.Names.TH( liftStringName, liftName )
+import GHC.Driver.Env
 import GHC.Driver.Session
 import GHC.Types.SrcLoc
 import GHC.Utils.Misc
@@ -759,21 +760,25 @@ tc_infer_id id_name
                   ppr thing <+> text "used where a value identifier was expected" }
   where
     fail_tycon tc = do
-      gre <- getGlobalRdrEnv
-      let msg = text "Illegal term-level use of the type constructor"
-                  <+> quotes (ppr (tyConName tc))
-          pprov = case lookupGRE_Name gre (tyConName tc) of
-            Just gre -> nest 2 (pprNameProvenance gre)
-            Nothing  -> empty
-      suggestions <- get_suggestions dataName
-      failWithTc (TcRnUnknownMessage $ mkPlainError noHints (msg $$ pprov $$ suggestions))
+       gre <- getGlobalRdrEnv
+       suggestions <- get_suggestions dataName
+       unit_state <- hsc_units <$> getTopEnv
+       let pprov = case lookupGRE_Name gre (tyConName tc) of
+                      Just gre -> nest 2 (pprNameProvenance gre)
+                      Nothing  -> empty
+           info = ErrInfo { errInfoContext = pprov, errInfoSupplementary = suggestions }
+           msg = TcRnMessageWithInfo unit_state
+               $ TcRnMessageDetailed info (TcRnIncorrectNameSpace (tyConName tc) False)
+       failWithTc msg
 
     fail_tyvar name = do
-      let msg = text "Illegal term-level use of the type variable"
-                  <+> quotes (ppr name)
-          pprov = nest 2 (text "bound at" <+> ppr (getSrcLoc name))
-      suggestions <- get_suggestions varName
-      failWithTc (TcRnUnknownMessage $ mkPlainError noHints (msg $$ pprov $$ suggestions))
+       suggestions <- get_suggestions varName
+       unit_state <- hsc_units <$> getTopEnv
+       let pprov = nest 2 (text "bound at" <+> ppr (getSrcLoc name))
+           info = ErrInfo { errInfoContext = pprov, errInfoSupplementary = suggestions }
+           msg = TcRnMessageWithInfo unit_state
+               $ TcRnMessageDetailed info (TcRnIncorrectNameSpace name False)
+       failWithTc msg
 
     get_suggestions ns = do
        let occ = mkOccNameFS ns (occNameFS (occName id_name))

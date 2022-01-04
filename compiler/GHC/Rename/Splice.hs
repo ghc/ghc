@@ -123,6 +123,7 @@ rnBracket e br_body
 rn_bracket :: ThStage -> HsBracket GhcPs -> RnM (HsBracket GhcRn, FreeVars)
 rn_bracket outer_stage br@(VarBr x flg rdr_name)
   = do { name <- lookupOccRn (unLoc rdr_name)
+       ; check_namespace flg name
        ; this_mod <- getModule
 
        ; when (flg && nameIsLocalOrFrom this_mod name) $
@@ -184,6 +185,15 @@ rn_bracket _ (DecBrG {}) = panic "rn_bracket: unexpected DecBrG"
 
 rn_bracket _ (TExpBr x e) = do { (e', fvs) <- rnLExpr e
                                ; return (TExpBr x e', fvs) }
+
+-- | Ensure that we are not using a term-level name in a type-level namespace
+-- or vice-versa. Throws a 'TcRnIncorrectNameSpace' error if there is a problem.
+check_namespace :: Bool -> Name -> RnM ()
+check_namespace is_single_tick nm
+  = unless (isValNameSpace ns == is_single_tick) $
+      failWithTc $ (TcRnIncorrectNameSpace nm True)
+  where
+    ns = nameNameSpace nm
 
 quotationCtxtDoc :: HsBracket GhcPs -> SDoc
 quotationCtxtDoc br_body

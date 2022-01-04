@@ -526,6 +526,21 @@ instance Diagnostic TcRnMessage where
       -> mkSimpleDecorated $
             fsep [ text "Pattern matching on GADTs without MonoLocalBinds"
                  , text "is fragile." ]
+    TcRnIncorrectNameSpace name _
+      -> mkSimpleDecorated $ msg
+        where
+          msg
+            -- We are in a type-level namespace,
+            -- and the name is incorrectly at the term-level.
+            | isValNameSpace ns
+            = text "The" <+> what <+> text "does not live in the type-level namespace"
+
+            -- We are in a term-level namespace,
+            -- and the name is incorrectly at the type-level.
+            | otherwise
+            = text "Illegal term-level use of the" <+> what
+          ns = nameNameSpace name
+          what = pprNameSpace ns <+> quotes (ppr name)
 
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -746,6 +761,8 @@ instance Diagnostic TcRnMessage where
       -> WarningWithFlag Opt_WarnForallIdentifier
     TcRnGADTMonoLocalBinds {}
       -> WarningWithFlag Opt_WarnGADTMonoLocalBinds
+    TcRnIncorrectNameSpace {}
+      -> ErrorWithoutFlag
 
   diagnosticHints = \case
     TcRnUnknownMessage m
@@ -960,6 +977,11 @@ instance Diagnostic TcRnMessage where
       -> [SuggestRenameForall]
     TcRnGADTMonoLocalBinds {}
       -> [suggestAnyExtension [LangExt.GADTs, LangExt.TypeFamilies]]
+    TcRnIncorrectNameSpace nm is_th_use
+      | is_th_use
+      -> [SuggestAppropriateTHTick $ nameNameSpace nm]
+      | otherwise
+      -> noHints
 
 deriveInstanceErrReasonHints :: Class
                              -> UsingGeneralizedNewtypeDeriving

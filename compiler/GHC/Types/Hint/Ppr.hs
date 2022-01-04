@@ -14,6 +14,7 @@ import GHC.Types.Hint
 
 import GHC.Hs.Expr ()   -- instance Outputable
 import GHC.Types.Id
+import GHC.Types.Name (isValNameSpace)
 import GHC.Unit.Types
 import GHC.Utils.Outputable
 
@@ -131,6 +132,12 @@ instance Outputable GhcHint where
               , quotes (text "forAll") <> comma <+>
                 quotes (text "for_all") <> comma <+> text "or" <+>
                 quotes (text "forall_") <> dot ]
+    SuggestAppropriateTHTick ns
+      -> text "Perhaps use a" <+> how_many <+> text "tick"
+        where
+          how_many
+            | isValNameSpace ns = text "single"
+            | otherwise         = text "double"
 
 perhapsAsPat :: SDoc
 perhapsAsPat = text "Perhaps you meant an as-pattern, which must not be surrounded by whitespace"
