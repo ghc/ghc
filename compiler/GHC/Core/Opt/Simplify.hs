@@ -2976,7 +2976,7 @@ simplAlt :: SimplEnv
          -> InAlt
          -> SimplM OutAlt
 
-simplAlt env _ imposs_deflt_cons case_bndr' cont' (Alt DEFAULT bndrs rhs)
+simplAlt env _ !imposs_deflt_cons case_bndr' cont' (Alt DEFAULT bndrs rhs)
   = ASSERT( null bndrs )
     do  { let env' = addBinderUnfolding env case_bndr'
                                         (mkOtherCon imposs_deflt_cons)
