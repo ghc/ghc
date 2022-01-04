@@ -49,6 +49,7 @@ import GHC.Types.Name.Set
 import GHC.Types.SrcLoc
 import GHC.Types.Basic
 import GHC.Types.Error
+import GHC.Types.Unique     ( getUnique )
 import GHC.Types.Unique.Set ( nonDetEltsUniqSet )
 import qualified GHC.Types.Unique.Map as UM
 
@@ -446,7 +447,7 @@ reportImplic ctxt implic@(Implic { ic_skols = tvs
   where
     tcl_env      = ic_env implic
     insoluble    = isInsolubleStatus status
-    (env1, tvs') = mapAccumL tidyVarBndr (cec_tidy ctxt) $
+    (env1, tvs') = mapAccumL tidy_skol (cec_tidy ctxt) $
                    scopedSort tvs
         -- scopedSort: the ic_skols may not be in dependency order
         -- (see Note [Skolems in an implication] in GHC.Tc.Types.Constraint)
@@ -476,6 +477,20 @@ reportImplic ctxt implic@(Implic { ic_skols = tvs
     bad_telescope = case status of
               IC_BadTelescope -> True
               _               -> False
+
+    -- The ic_skols can be TyVars, not TcTyVars.  But if we tidy them,
+    -- and then replace their /occurrences/ with the tidied TyVars, they
+    -- won't have any SkolemInfo in them.  So we tidy them to skolem TcTyVars
+    -- Very ugly, but works fine.
+    tidy_skol :: TidyEnv -> TcTyVar -> (TidyEnv, TcTyVar)
+    tidy_skol env tv = tidyVarBndr env tc_tv
+      where
+        tc_tv | isTcTyVar tv = tv
+              | otherwise    = mkTcTyVar (tyVarName tv) (tyVarKind tv) skol_details
+
+    skol_details :: TcTyVarDetails
+    skol_details = SkolemTv (SkolemInfo (getUnique evb) info) tc_lvl False
+                   -- False is pretty dubious, but it'll do for now
 
 warnRedundantConstraints :: ReportErrCtxt -> TcLclEnv -> SkolemInfoAnon -> [EvVar] -> TcM ()
 -- See Note [Tracking redundant constraints] in GHC.Tc.Solver
