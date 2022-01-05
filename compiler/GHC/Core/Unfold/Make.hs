@@ -301,14 +301,28 @@ mkCoreUnfolding :: UnfoldingSource -> Bool -> CoreExpr
                 -> UnfoldingGuidance -> Unfolding
 -- Occurrence-analyses the expression before capturing it
 mkCoreUnfolding src top_lvl expr guidance
-  = CoreUnfolding { uf_tmpl         = occurAnalyseExpr expr,
+  =
+
+  let is_value = exprIsHNF expr
+      is_conlike = exprIsConLike expr
+      is_work_free = exprIsWorkFree expr
+      is_expandable = exprIsExpandable expr
+  in
+  -- See #20905 for what is going on here. We are careful to make sure we only
+  -- have one copy of an unfolding around at once.
+  -- Note [Thoughtful forcing in mkCoreUnfolding]
+  CoreUnfolding { uf_tmpl         = is_value `seq`
+                                    is_conlike `seq`
+                                    is_work_free `seq`
+                                    is_expandable `seq`
+                                      occurAnalyseExpr expr,
                       -- See Note [Occurrence analysis of unfoldings]
                     uf_src          = src,
                     uf_is_top       = top_lvl,
-                    uf_is_value     = exprIsHNF        expr,
-                    uf_is_conlike   = exprIsConLike    expr,
-                    uf_is_work_free = exprIsWorkFree   expr,
-                    uf_expandable   = exprIsExpandable expr,
+                    uf_is_value     = is_value,
+                    uf_is_conlike   = is_conlike,
+                    uf_is_work_free = is_work_free,
+                    uf_expandable   = is_expandable,
                     uf_guidance     = guidance }
 
 ----------------
@@ -399,4 +413,45 @@ even though we have a stable inlining, so that strictness w/w takes
 place.  It makes a big difference to efficiency, and the w/w pass knows
 how to transfer the INLINABLE info to the worker; see WorkWrap
 Note [Worker/wrapper for INLINABLE functions]
+
+Note [Thoughtful forcing in mkCoreUnfolding]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Core expressions retained in unfoldings is one of biggest uses of memory when compiling
+a program. Therefore we have to be careful about retaining copies of old or redundant
+templates (see !6202 for a particularlly bad case).
+
+With that in mind we want to maintain the invariant that each unfolding only references
+a single CoreExpr. One place where we have to be careful is in mkCoreUnfolding.
+
+* The template of the unfolding is the result of performing occurence analysis
+  (Note [Occurrence analysis of unfoldings])
+* Predicates are applied to the unanalysed expression
+
+Therefore if we are not thoughtful about forcing you can end up in a situation where the
+template is forced but not all the predicates are forced so the unfolding will retain
+both the old and analysed expressions.
+
+I investigated this using ghc-debug and it was clear this situation did often arise:
+
+```
+(["ghc:GHC.Core:Lam","ghc-prim:GHC.Types:True","THUNK_1_0","THUNK_1_0","THUNK_1_0"],Count 4307)
+```
+
+Here the predicates are unforced but the template is forced.
+
+Therefore we basically had two options in order to fix this:
+
+1. Perform the predicates on the analysed expression.
+2. Force the predicates to remove retainer to the old expression if we force the template.
+
+Option 1 is bad because occurence analysis is expensive and destroys any sharing of the unfolding
+with the actual program. (Testing this approach showed peak 25G memory usage)
+
+Therefore we got for Option 2 which performs a little more work but compensates by
+reducing memory pressure.
+
+The result of fixing this led to a 1G reduction in peak memory usage (12G -> 11G) when
+compiling a very large module (peak 3 million terms). For more discussion see #20905.
 -}
+
