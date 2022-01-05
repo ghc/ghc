@@ -68,9 +68,7 @@ and Xelatex (only for PDF output).
 (NB: **Do you have multiple cores? Be sure to tell that to `make`!** This can
 save you hours of build time depending on your system configuration, and is
 almost always a win regardless of how many cores you have. As a simple rule,
-you should have about N+1 jobs, where `N` is the amount of cores you have; you
-can also set a shell variable `NUMJOBS=${NUMJOBS:-" -j$(expr $(nproc) + 1) "}`
-and then run `make $NUMJOBS`.)
+you should have about N+1 jobs, where `N` is the amount of cores you have.)
 
 The `./boot` step is only necessary if this is a tree checked out
 from git.  For source distributions downloaded from [GHC's web site][1],
