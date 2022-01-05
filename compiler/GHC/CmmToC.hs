@@ -1113,7 +1113,7 @@ pprReg r = case r of
 
 pprAsPtrReg :: CmmReg -> SDoc
 pprAsPtrReg (CmmGlobal (VanillaReg n gcp))
-  = warnPprTrace (gcp /= VGcPtr) (ppr n) $ char 'R' <> int n <> text ".p"
+  = warnPprTrace (gcp /= VGcPtr) "pprAsPtrReg" (ppr n) $ char 'R' <> int n <> text ".p"
 pprAsPtrReg other_reg = pprReg other_reg
 
 pprGlobalReg :: GlobalReg -> SDoc

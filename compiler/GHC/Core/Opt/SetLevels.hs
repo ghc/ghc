@@ -1703,7 +1703,7 @@ abstractVars dest_lvl (LE { le_subst = subst, le_lvl_env = lvl_env }) in_fvs
         -- and add the tyvars of the Id (if necessary)
     zap v | isId v = warnPprTrace (isStableUnfolding (idUnfolding v) ||
                            not (isEmptyRuleInfo (idSpecialisation v)))
-                           (text "absVarsOf: discarding info on" <+> ppr v) $
+                           "absVarsOf: discarding info on" (ppr v) $
                      setIdInfo v vanillaIdInfo
           | otherwise = v
 

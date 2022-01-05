@@ -288,7 +288,7 @@ pprSkolInfo RuntimeUnkSkol     = text "Unknown type from GHCi runtime"
 -- UnkSkol
 -- For type variables the others are dealt with by pprSkolTvBinding.
 -- For Insts, these cases should not happen
-pprSkolInfo UnkSkol = warnPprTrace True (text "pprSkolInfo: UnkSkol") $ text "UnkSkol"
+pprSkolInfo UnkSkol = warnPprTrace True "pprSkolInfo: UnkSkol" empty $ text "UnkSkol"
 
 pprSigSkolInfo :: UserTypeCtxt -> TcType -> SDoc
 -- The type is already tidied

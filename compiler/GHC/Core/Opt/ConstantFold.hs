@@ -1814,7 +1814,7 @@ tagToEnumRule = do
       return $ mkTyApps (Var (dataConWorkId dc)) tc_args
 
     -- See Note [tagToEnum#]
-    _ -> warnPprTrace True (text "tagToEnum# on non-enumeration type" <+> ppr ty) $
+    _ -> warnPprTrace True "tagToEnum# on non-enumeration type" (ppr ty) $
          return $ mkRuntimeErrorApp rUNTIME_ERROR_ID ty "tagToEnum# on non-enumeration type"
 
 ------------------------------

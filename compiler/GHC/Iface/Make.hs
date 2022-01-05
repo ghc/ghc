@@ -162,7 +162,7 @@ updateDecl decls (Just CgInfos{ cgNonCafs = NonCaffySet non_cafs, cgLFInfos = lf
     update_decl (IfaceId nm ty details infos)
       | let not_caffy = elemNameSet nm non_cafs
       , let mb_lf_info = lookupNameEnv lf_infos nm
-      , warnPprTrace (isNothing mb_lf_info) (text "Name without LFInfo:" <+> ppr nm) True
+      , warnPprTrace (isNothing mb_lf_info) "Name without LFInfo" (ppr nm) True
         -- Only allocate a new IfaceId if we're going to update the infos
       , isJust mb_lf_info || not_caffy
       = IfaceId nm ty details $

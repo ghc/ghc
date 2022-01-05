@@ -66,7 +66,7 @@ unionLists xs [y]
   | isIn "unionLists" y xs = xs
   | otherwise = y:xs
 unionLists xs ys
-  = warnPprTrace (lengthExceeds xs 100 || lengthExceeds ys 100) (ppr xs $$ ppr ys) $
+  = warnPprTrace (lengthExceeds xs 100 || lengthExceeds ys 100) "unionLists" (ppr xs $$ ppr ys) $
     [x | x <- xs, isn'tIn "unionLists" x ys] ++ ys
 
 -- | Calculate the set difference of two lists. This is
@@ -207,7 +207,7 @@ isIn msg x ys
     elem100 :: Eq a => Int -> a -> [a] -> Bool
     elem100 _ _ [] = False
     elem100 i x (y:ys)
-      | i > 100 = warnPprTrace True (text ("Over-long elem in " ++ msg)) (x `elem` (y:ys))
+      | i > 100 = warnPprTrace True ("Over-long elem in " ++ msg) empty (x `elem` (y:ys))
       | otherwise = x == y || elem100 (i + 1) x ys
 
 isn'tIn msg x ys
@@ -216,6 +216,6 @@ isn'tIn msg x ys
     notElem100 :: Eq a => Int -> a -> [a] -> Bool
     notElem100 _ _ [] =  True
     notElem100 i x (y:ys)
-      | i > 100 = warnPprTrace True (text ("Over-long notElem in " ++ msg)) (x `notElem` (y:ys))
+      | i > 100 = warnPprTrace True ("Over-long notElem in " ++ msg) empty (x `notElem` (y:ys))
       | otherwise = x /= y && notElem100 (i + 1) x ys
 # endif /* DEBUG */

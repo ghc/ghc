@@ -1931,7 +1931,7 @@ skolemiseUnboundMetaTyVar tv
         do { cts <- readMetaTyVar tv
            ; case cts of
                Flexi       -> return ()
-               Indirect ty -> warnPprTrace True (ppr tv $$ ppr ty) $
+               Indirect ty -> warnPprTrace True "skolemiseUnboundMetaTyVar" (ppr tv $$ ppr ty) $
                               return () }
 
 {- Note [Error on unconstrained meta-variables]

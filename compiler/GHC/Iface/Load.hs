@@ -540,7 +540,7 @@ loadInterface doc_str mod from
                             -- of one's own boot file! (one-shot only)
                             -- See Note [Loading your own hi-boot file]
 
-        ; warnPprTrace bad_boot (ppr mod) $
+        ; warnPprTrace bad_boot "loadInterface" (ppr mod) $
           updateEps_  $ \ eps ->
            if elemModuleEnv mod (eps_PIT eps) || is_external_sig mhome_unit iface
                 then eps

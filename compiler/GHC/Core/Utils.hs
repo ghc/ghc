@@ -293,8 +293,9 @@ mkCast (Coercion e_co) co
 
 mkCast (Cast expr co2) co
   = warnPprTrace (let { from_ty = coercionLKind co;
-               to_ty2  = coercionRKind co2 } in
-            not (from_ty `eqType` to_ty2))
+                        to_ty2  = coercionRKind co2 } in
+                     not (from_ty `eqType` to_ty2))
+             "mkCast"
              (vcat ([ text "expr:" <+> ppr expr
                    , text "co2:" <+> ppr co2
                    , text "co:" <+> ppr co ])) $
@@ -306,7 +307,7 @@ mkCast (Tick t expr) co
 mkCast expr co
   = let from_ty = coercionLKind co in
     warnPprTrace (not (from_ty `eqType` exprType expr))
-          (text "Trying to coerce" <+> text "(" <> ppr expr
+          "Trying to coerce" (text "(" <> ppr expr
           $$ text "::" <+> ppr (exprType expr) <> text ")"
           $$ ppr co $$ ppr (coercionType co)
           $$ callStackDoc) $

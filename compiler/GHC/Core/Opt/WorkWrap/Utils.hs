@@ -280,8 +280,8 @@ mkWwBodies opts fun_id arg_vars res_ty demands res_cpr
     too_many_args_for_join_point wrap_args
       | Just join_arity <- mb_join_arity
       , wrap_args `lengthExceeds` join_arity
-      = warnPprTrace True (text "Unable to worker/wrapper join point with arity " <+>
-                     int join_arity <+> text "but" <+>
+      = warnPprTrace True "Unable to worker/wrapper join point"
+                     (text "arity" <+> int join_arity <+> text "but" <+>
                      int (length wrap_args) <+> text "args") $
         True
       | otherwise
@@ -610,7 +610,7 @@ wantToUnboxResult fam_envs ty cpr
 
   where
     -- | See Note [non-algebraic or open body type warning]
-    open_body_ty_warning = warnPprTrace True (text "wantToUnboxResult: non-algebraic or open body type" <+> ppr ty) Nothing
+    open_body_ty_warning = warnPprTrace True "wantToUnboxResult: non-algebraic or open body type" (ppr ty) Nothing
 
 isLinear :: Scaled a -> Bool
 isLinear (Scaled w _ ) =

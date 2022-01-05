@@ -723,6 +723,7 @@ by LitRubbish (see Note [Drop absent bindings]) so there is no great harm.
 splitFun :: WwOpts -> Id -> CoreExpr -> UniqSM [(Id, CoreExpr)]
 splitFun ww_opts fn_id rhs
   = warnPprTrace (not (wrap_dmds `lengthIs` (arityInfo fn_info)))
+                 "splitFun"
                  (ppr fn_id <+> (ppr wrap_dmds $$ ppr cpr)) $
     do { mb_stuff <- mkWwBodies ww_opts fn_id arg_vars (exprType body) wrap_dmds cpr
        ; case mb_stuff of

@@ -82,8 +82,7 @@ occurAnalysePgm this_mod active_unf active_rule imp_rules binds
   = occ_anald_binds
 
   | otherwise   -- See Note [Glomming]
-  = warnPprTrace True (hang (text "Glomming in" <+> ppr this_mod <> colon)
-                        2 (ppr final_usage))
+  = warnPprTrace True "Glomming in" (hang (ppr this_mod <> colon) 2 (ppr final_usage))
     occ_anald_glommed_binds
   where
     init_env = initOccEnv { occ_rule_act = active_rule
@@ -3131,7 +3130,7 @@ decideJoinPointHood TopLevel _ _
 decideJoinPointHood NotTopLevel usage bndrs
   | isJoinId (head bndrs)
   = warnPprTrace (not all_ok)
-                 (text "OccurAnal failed to rediscover join point(s):" <+> ppr bndrs)
+                 "OccurAnal failed to rediscover join point(s)" (ppr bndrs)
                  all_ok
   | otherwise
   = all_ok

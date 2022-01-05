@@ -1442,7 +1442,7 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
 
   | otherwise   -- No calls or RHS doesn't fit our preconceptions
   = warnPprTrace (not (exprIsTrivial rhs) && notNull calls_for_me)
-          (text "Missed specialisation opportunity for" <+> ppr fn $$ _trace_doc) $
+          "Missed specialisation opportunity" (ppr fn $$ _trace_doc) $
           -- Note [Specialisation shape]
     -- pprTrace "specDefn: none" (ppr fn <+> ppr calls_for_me) $
     return ([], [], emptyUDs)
