@@ -605,8 +605,9 @@ idJoinArity id = isJoinId_maybe id `orElse` pprPanic "idJoinArity" (ppr id)
 
 asJoinId :: Id -> JoinArity -> JoinId
 asJoinId id arity = warnPprTrace (not (isLocalId id))
-                         (text "global id being marked as join var:" <+> ppr id) $
+                         "global id being marked as join var"  (ppr id) $
                     warnPprTrace (not (is_vanilla_or_join id))
+                         "asJoinId"
                          (ppr id <+> pprIdDetails (idDetails id)) $
                     id `setIdDetails` JoinId arity
   where

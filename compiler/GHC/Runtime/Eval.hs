@@ -669,8 +669,8 @@ rttiEnvironment hsc_env@HscEnv{hsc_IC=ic} = do
              Just new_ty -> do
               case improveRTTIType hsc_env old_ty new_ty of
                Nothing -> return $
-                        warnPprTrace True (text (":print failed to calculate the "
-                                           ++ "improvement for a type")) hsc_env
+                        warnPprTrace True (":print failed to calculate the "
+                                           ++ "improvement for a type") empty hsc_env
                Just subst -> do
                  let logger = hsc_logger hsc_env
                  putDumpFileMaybe logger Opt_D_dump_rtti "RTTI"

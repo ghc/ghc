@@ -690,7 +690,8 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
         -- about to begin, with '1' for the first
       | iteration_no > max_iterations   -- Stop if we've run out of iterations
       = warnPprTrace (debugIsOn && (max_iterations > 2))
-            ( hang (ppr this_mod <> colon <+> text "simplifier bailing out after"
+            "Simplifier bailing out"
+            ( hang (ppr this_mod <> text ", after"
                     <+> int max_iterations <+> text "iterations"
                     <+> (brackets $ hsep $ punctuate comma $
                          map (int . simplCountN) (reverse counts_so_far)))
@@ -995,7 +996,7 @@ shortMeOut ind_env exported_id local_id
     then
         if hasShortableIdInfo exported_id
         then True       -- See Note [Messing up the exported Id's IdInfo]
-        else warnPprTrace True (text "Not shorting out:" <+> ppr exported_id) False
+        else warnPprTrace True "Not shorting out" (ppr exported_id) False
     else
         False
 

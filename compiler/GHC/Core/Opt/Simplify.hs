@@ -3170,6 +3170,7 @@ addBinderUnfolding :: SimplEnv -> Id -> Unfolding -> SimplEnv
 addBinderUnfolding env bndr unf
   | debugIsOn, Just tmpl <- maybeUnfoldingTemplate unf
   = warnPprTrace (not (eqType (idType bndr) (exprType tmpl)))
+          "unfolding type mismatch"
           (ppr bndr $$ ppr (idType bndr) $$ ppr tmpl $$ ppr (exprType tmpl)) $
           modifyInScope env (bndr `setIdUnfolding` unf)
 
@@ -3336,7 +3337,7 @@ missingAlt :: SimplEnv -> Id -> [InAlt] -> SimplCont
                 -- it "sees" that the entire branch of an outer case is
                 -- inaccessible.  So we simply put an error case here instead.
 missingAlt env case_bndr _ cont
-  = warnPprTrace True (text "missingAlt" <+> ppr case_bndr) $
+  = warnPprTrace True "missingAlt" (ppr case_bndr) $
     -- See Note [Avoiding space leaks in OutType]
     let cont_ty = contResultType cont
     in seqType cont_ty `seq`

@@ -2226,8 +2226,8 @@ callToPats env bndr_occs call@(Call fn args con_env)
 
         ; -- pprTrace "callToPats"  (ppr args $$ ppr bndr_occs) $
           warnPprTrace (not (isEmptyVarSet bad_covars))
-              ( text "SpecConstr: bad covars:" <+> ppr bad_covars
-                $$ ppr call) $
+              "SpecConstr: bad covars"
+              (ppr bad_covars $$ ppr call) $
           if interesting && isEmptyVarSet bad_covars
           then
               -- pprTraceM "callToPatsOut" (
@@ -2530,7 +2530,7 @@ samePat (CP { cp_qvars = vs1, cp_args = as1 })
     same e1 (Tick _ e2) = same e1 e2
     same e1 (Cast e2 _) = same e1 e2
 
-    same e1 e2 = warnPprTrace (bad e1 || bad e2) (ppr e1 $$ ppr e2) $
+    same e1 e2 = warnPprTrace (bad e1 || bad e2) "samePat" (ppr e1 $$ ppr e2) $
                  False  -- Let, lambda, case should not occur
     bad (Case {}) = True
     bad (Let {})  = True

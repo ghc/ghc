@@ -372,7 +372,7 @@ toIfaceAppArgsX fr kind ty_args
         -- This is probably a compiler bug, so we print a trace and
         -- carry on as if it were FunTy.  Without the test for
         -- isEmptyTCvSubst we'd get an infinite loop (#15473)
-        warnPprTrace True (ppr kind $$ ppr ty_args) $
+        warnPprTrace True "toIfaceAppArgsX" (ppr kind $$ ppr ty_args) $
         IA_Arg (toIfaceTypeX fr t1) Required (go env ty ts1)
 
 tidyToIfaceType :: TidyEnv -> Type -> IfaceType

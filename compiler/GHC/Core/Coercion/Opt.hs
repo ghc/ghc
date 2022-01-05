@@ -296,7 +296,8 @@ opt_co4 env sym rep r (CoVarCo cv)
     cv1 = case lookupInScope (lcInScopeSet env) cv of
              Just cv1 -> cv1
              Nothing  -> warnPprTrace True
-                          (text "opt_co: not in scope:" <+> ppr cv $$ ppr env)
+                          "opt_co: not in scope"
+                          (ppr cv $$ ppr env)
                           cv
           -- cv1 might have a substituted kind!
 

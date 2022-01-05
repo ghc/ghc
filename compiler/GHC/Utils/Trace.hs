@@ -63,13 +63,13 @@ pprSTrace :: HasCallStack => SDoc -> a -> a
 pprSTrace doc = pprTrace "" (doc $$ traceCallStackDoc)
 
 -- | Just warn about an assertion failure, recording the given file and line number.
-warnPprTrace :: HasCallStack => Bool -> SDoc -> a -> a
-warnPprTrace _     _    x | not debugIsOn     = x
-warnPprTrace _     _msg x | unsafeHasNoDebugOutput = x
-warnPprTrace False _msg x = x
-warnPprTrace True   msg x
+warnPprTrace :: HasCallStack => Bool -> String -> SDoc -> a -> a
+warnPprTrace _     _s _    x | not debugIsOn     = x
+warnPprTrace _     _s _msg x | unsafeHasNoDebugOutput = x
+warnPprTrace False _s _msg x = x
+warnPprTrace True   s  msg x
   = pprDebugAndThen defaultSDocContext trace (text "WARNING:")
-                    (msg $$ withFrozenCallStack traceCallStackDoc )
+                    (text s $$ msg $$ withFrozenCallStack traceCallStackDoc )
                     x
 
 -- | For when we want to show the user a non-fatal WARNING so that they can

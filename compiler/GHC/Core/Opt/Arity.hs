@@ -655,8 +655,8 @@ findRhsArity dflags bndr rhs old_arity
       | otherwise               =
          -- Warn if more than 2 iterations. Why 2? See Note [Exciting arity]
          warnPprTrace (debugIsOn && n > 2)
-            (text "Exciting arity" $$ nest 2
-              ( ppr bndr <+> ppr cur_at <+> ppr next_at $$ ppr rhs)) $
+            "Exciting arity"
+            (nest 2 (ppr bndr <+> ppr cur_at <+> ppr next_at $$ ppr rhs)) $
             go (n+1) next_at
       where
         next_at = step cur_at
@@ -1622,7 +1622,7 @@ mkEtaWW orig_oss ppr_orig_expr in_scope orig_ty
        | otherwise       -- We have an expression of arity > 0,
                          -- but its type isn't a function, or a binder
                          -- does not have a fixed runtime representation
-       = warnPprTrace True ((ppr orig_oss <+> ppr orig_ty) $$ ppr_orig_expr)
+       = warnPprTrace True "mkEtaWW" ((ppr orig_oss <+> ppr orig_ty) $$ ppr_orig_expr)
          (getTCvInScope subst, EI [] MRefl)
         -- This *can* legitimately happen:
         -- e.g.  coerce Int (\x. x) Essentially the programmer is
@@ -1938,7 +1938,7 @@ etaExpandToJoinPoint join_arity expr
 
 etaExpandToJoinPointRule :: JoinArity -> CoreRule -> CoreRule
 etaExpandToJoinPointRule _ rule@(BuiltinRule {})
-  = warnPprTrace True (sep [text "Can't eta-expand built-in rule:", ppr rule])
+  = warnPprTrace True "Can't eta-expand built-in rule:" (ppr rule)
       -- How did a local binding get a built-in rule anyway? Probably a plugin.
     rule
 etaExpandToJoinPointRule join_arity rule@(Rule { ru_bndrs = bndrs, ru_rhs = rhs

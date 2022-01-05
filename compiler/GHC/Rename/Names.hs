@@ -371,7 +371,7 @@ rnImportDecl this_mod
 
     -- Compiler sanity check: if the import didn't say
     -- {-# SOURCE #-} we should not get a hi-boot file
-    warnPprTrace ((want_boot == NotBoot) && (mi_boot iface == IsBoot)) (ppr imp_mod_name) $ do
+    warnPprTrace ((want_boot == NotBoot) && (mi_boot iface == IsBoot)) "rnImportDecl" (ppr imp_mod_name) $ do
 
     -- Issue a user warning for a redundant {- SOURCE -} import
     -- NB that we arrange to read all the ordinary imports before
