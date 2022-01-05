@@ -804,6 +804,6 @@ test('T20584b', normal, compile, [''])
 test('T20588b', [extra_files(['T20588b.hs', 'T20588b.hs-boot', 'T20588b_aux.hs'])], multimod_compile, ['T20588b_aux.hs', '-v0'])
 test('T20588d', [extra_files(['T20588d.hs', 'T20588d.hs-boot', 'T20588d_aux.hs'])], multimod_compile, ['T20588d_aux.hs', '-v0'])
 test('T20661', [extra_files(['T20661.hs', 'T20661.hs-boot', 'T20661_aux.hs'])], multimod_compile, ['T20661_aux.hs', '-v0'])
-
 test('T20873', normal, compile, [''])
 test('T20873b', [extra_files(['T20873b_aux.hs'])], multimod_compile, ['T20873b', '-v0'])
+test('StaticPtrTypeFamily', normal, compile, [''])
