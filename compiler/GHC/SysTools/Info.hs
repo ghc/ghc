@@ -97,6 +97,7 @@ https://gcc.gnu.org/onlinedocs/gcc-5.2.0/gcc.pdf :
 neededLinkArgs :: LinkerInfo -> [Option]
 neededLinkArgs (GnuLD o)     = o
 neededLinkArgs (GnuGold o)   = o
+neededLinkArgs (Mold o)      = o
 neededLinkArgs (LlvmLLD o)   = o
 neededLinkArgs (DarwinLD o)  = o
 neededLinkArgs (SolarisLD o) = o
@@ -126,6 +127,8 @@ getLinkerInfo' logger dflags = do
 
       -- Try to grab the info from the process output.
       parseLinkerInfo stdo _stde _exitc
+        | any ("mold" `isPrefixOf`) stdo =
+          return (Mold [Option "-Wl,--no-as-needed"])
         | any ("GNU ld" `isPrefixOf`) stdo =
           -- GNU ld specifically needs to use less memory. This especially
           -- hurts on small object files. #5240.

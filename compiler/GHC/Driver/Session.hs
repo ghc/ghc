@@ -4840,6 +4840,7 @@ sccProfilingEnabled dflags = profileIsProfiling (targetProfile dflags)
 data LinkerInfo
   = GnuLD    [Option]
   | GnuGold  [Option]
+  | Mold     [Option]
   | LlvmLLD  [Option]
   | DarwinLD [Option]
   | SolarisLD [Option]

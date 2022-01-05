@@ -24,13 +24,15 @@ AC_DEFUN([FIND_LD],[
         # Manually iterate over possible names since we want to ensure that, e.g.,
         # if ld.lld is installed but gcc doesn't support -fuse-ld=lld, that we
         # then still try ld.gold and -fuse-ld=gold.
-        for possible_ld in ld.lld ld.gold ld; do
+        for possible_ld in mold ld.lld ld.gold ld; do
             TmpLd="" # In case the user set LD
             AC_CHECK_TARGET_TOOL([TmpLd], [$possible_ld])
             if test "x$TmpLd" = "x"; then continue; fi
 
             out=`$TmpLd --version`
             case $out in
+              "mold"*)
+                   FP_CC_LINKER_FLAG_TRY(mold, $2) ;;
               "GNU ld"*)
                    FP_CC_LINKER_FLAG_TRY(bfd, $2) ;;
               "GNU gold"*)
