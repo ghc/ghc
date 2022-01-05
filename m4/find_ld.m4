@@ -44,6 +44,8 @@ AC_DEFUN([FIND_LD],[
                    ;;
               "LLD"*)
                    FP_CC_LINKER_FLAG_TRY(lld, $2) ;;
+              *" LLD "*)
+                   FP_CC_LINKER_FLAG_TRY(lld, $2) ;;
               *) AC_MSG_NOTICE([unknown linker version $out]) ;;
             esac
             if test "z$$2" = "z"; then
