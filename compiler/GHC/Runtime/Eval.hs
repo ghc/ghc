@@ -573,7 +573,7 @@ bindLocalsAtBreakpoint hsc_env apStack_fhv (Just BreakInfo{..}) = do
 
        (ids, offsets, occs') = syncOccs mbPointers occs
 
-       free_tvs = tyCoVarsOfTypesList (result_ty:map idType ids)
+       free_tvs = tyCoVarsOfTypesWellScoped (result_ty:map idType ids)
 
    -- It might be that getIdValFromApStack fails, because the AP_STACK
    -- has been accidentally evaluated, or something else has gone wrong.
@@ -623,10 +623,11 @@ bindLocalsAtBreakpoint hsc_env apStack_fhv (Just BreakInfo{..}) = do
    newTyVars :: UniqSupply -> [TcTyVar] -> TCvSubst
      -- Similarly, clone the type variables mentioned in the types
      -- we have here, *and* make them all RuntimeUnk tyvars
-   newTyVars us tvs
-     = mkTvSubstPrs [ (tv, mkTyVarTy (mkRuntimeUnkTyVar name (tyVarKind tv)))
-                    | (tv, uniq) <- tvs `zip` uniqsFromSupply us
-                    , let name = setNameUnique (tyVarName tv) uniq ]
+   newTyVars us tvs = foldl' new_tv emptyTCvSubst (tvs `zip` uniqsFromSupply us)
+   new_tv subst (tv,uniq) = extendTCvSubstWithClone subst tv new_tv
+    where
+     new_tv = mkRuntimeUnkTyVar (setNameUnique (tyVarName tv) uniq)
+                                (substTy subst (tyVarKind tv))
 
    isPointer id | [rep] <- typePrimRep (idType id)
                 , isGcPtrRep rep                   = True

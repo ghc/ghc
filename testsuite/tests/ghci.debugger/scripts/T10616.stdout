@@ -1,0 +1,6 @@
+Breakpoint 0 activated at T10616.hs:5:9-20
+Breakpoint 1 activated at T10616.hs:6:7-11
+Stopped in Main.f, T10616.hs:5:9-20
+_result :: Bool = _
+d :: D a = A
+True
