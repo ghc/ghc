@@ -142,7 +142,7 @@ getLinkerInfo' logger dflags = do
           -- ELF specific flag, see Note [ELF needed shared libs]
           return (GnuGold [Option "-Wl,--no-as-needed"])
 
-        | any ("LLD" `isPrefixOf`) stdo =
+        | any (\line -> "LLD" `isPrefixOf` line || "LLD" `elem` words line) stdo =
           return (LlvmLLD $ map Option [ --see Note [ELF needed shared libs]
                                         "-Wl,--no-as-needed"])
 
