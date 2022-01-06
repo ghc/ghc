@@ -50,6 +50,7 @@ import GHC.Types.Unique  ( hasKey )
 import GHC.Builtin.Names ( coercibleTyConKey )
 
 import GHC.Data.Pair
+import GHC.Data.FastString
 import GHC.Utils.Misc
 import GHC.Data.Bag
 import GHC.Utils.Monad
@@ -161,42 +162,11 @@ canClassNC ev cls tys
        ; emitWork sc_cts
        ; canClass ev cls tys False fds }
 
-  | isWanted ev
-  , Just ip_name <- isCallStackPred cls tys
-  , isPushCallStackOrigin orig
-  -- If we're given a CallStack constraint that arose from a function
-  -- call, we need to push the current call-site onto the stack instead
-  -- of solving it directly from a given.
-  -- See Note [Overview of implicit CallStacks] in GHC.Tc.Types.Evidence
-  -- and Note [Solving CallStack constraints] in GHC.Tc.Solver.Types
-  = do { -- First we emit a new constraint that will capture the
-         -- given CallStack.
-       ; let new_loc = setCtLocOrigin loc (IPOccOrigin (HsIPName ip_name))
-                            -- We change the origin to IPOccOrigin so
-                            -- this rule does not fire again.
-                            -- See Note [Overview of implicit CallStacks]
-
-       ; new_ev <- newWantedEvVarNC new_loc pred
-
-         -- Then we solve the wanted by pushing the call-site
-         -- onto the newly emitted CallStack
-       ; let ev_cs = EvCsPushCall (callStackOriginFS orig)
-                                  (ctLocSpan loc) (ctEvExpr new_ev)
-       ; solveCallStack ev ev_cs
-
-       ; canClass new_ev cls tys
-                  False -- No superclasses
-                  False -- No top level instances for fundeps
-       }
-
   | otherwise
   = canClass ev cls tys (has_scs cls) fds
 
   where
     has_scs cls = not (null (classSCTheta cls))
-    loc  = ctEvLoc ev
-    orig = ctLocOrigin loc
-    pred = ctEvPred ev
     fds  = classHasFds cls
 
 solveCallStack :: CtEvidence -> EvCallStack -> TcS ()
@@ -938,7 +908,47 @@ canSpecial ev special_pred ty
        ; massertPpr (not $ isGivenOrigin $ ctEvOrigin ev)
            (text "canSpecial: Given Special constraint" $$ ppr ev)
        ; case special_pred of
-         { ConcretePrimPred -> canConcretePrim ev ty } }
+         { ConcretePrimPred -> canConcretePrim ev ty
+         ; IpPred ip_name -> canIpPred ev ip_name ty } }
+
+canIpPred :: CtEvidence -> FastString -> TcType -> TcS (StopOrContinue Ct)
+canIpPred ev ip_name ty
+  | isWanted ev
+  , isCallStackTy ty
+  , isPushCallStackOrigin orig
+  -- If we're given a CallStack constraint that arose from a function
+  -- call, we need to push the current call-site onto the stack instead
+  -- of solving it directly from a given.
+  -- See Note [Overview of implicit CallStacks] in GHC.Tc.Types.Evidence
+  -- and Note [Solving CallStack constraints] in GHC.Tc.Solver.Types
+  = do { -- First we emit a new constraint that will capture the
+         -- given CallStack.
+       ; let new_loc = setCtLocOrigin loc (IPOccOrigin (HsIPName ip_name))
+                            -- We change the origin to IPOccOrigin so
+                            -- this rule does not fire again.
+                            -- See Note [Overview of implicit CallStacks]
+
+       ; new_ev <- newWantedEvVarNC new_loc pred
+
+         -- Then we solve the wanted by pushing the call-site
+         -- onto the newly emitted CallStack
+       ; let ev_cs = EvCsPushCall (callStackOriginFS orig)
+                                  (ctLocSpan loc) (ctEvExpr new_ev)
+       ; solveCallStack ev ev_cs
+
+       -- ; canClass new_ev cls tys
+       --            False -- No superclasses
+       --            False -- No top level instances for fundeps
+       ; stopWith ev "canSpecial: CallStack" -- no idea what to do here
+       }
+
+  | otherwise
+  = stopWith ev "canSpecial: IP" -- no idea what to do here
+
+  where
+    loc  = ctEvLoc ev
+    orig = ctLocOrigin loc
+    pred = ctEvPred ev
 
 {- Note [Canonical Concrete# constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

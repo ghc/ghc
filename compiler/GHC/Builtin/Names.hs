@@ -434,9 +434,6 @@ basicKnownKeyNames
         -- Overloaded labels
         fromLabelClassOpName,
 
-        -- Implicit Parameters
-        ipClassName,
-
         -- Overloaded record fields
         hasFieldClassName,
 
@@ -1584,11 +1581,6 @@ fromLabelClassOpName :: Name
 fromLabelClassOpName
  = varQual gHC_OVER_LABELS (fsLit "fromLabel") fromLabelClassOpKey
 
--- Implicit Parameters
-ipClassName :: Name
-ipClassName
-  = clsQual gHC_CLASSES (fsLit "IP") ipClassKey
-
 -- Overloaded record fields
 hasFieldClassName :: Name
 hasFieldClassName
@@ -1838,7 +1830,7 @@ statePrimTyConKey, stableNamePrimTyConKey, stableNameTyConKey,
     funPtrTyConKey, tVarPrimTyConKey, eqPrimTyConKey,
     eqReprPrimTyConKey, eqPhantPrimTyConKey,
     compactPrimTyConKey, stackSnapshotPrimTyConKey,
-    concretePrimTyConKey :: Unique
+    concretePrimTyConKey, ipPrimTyConKey :: Unique
 statePrimTyConKey                       = mkPreludeTyConUnique 50
 stableNamePrimTyConKey                  = mkPreludeTyConUnique 51
 stableNameTyConKey                      = mkPreludeTyConUnique 52
@@ -1868,12 +1860,14 @@ tVarPrimTyConKey                        = mkPreludeTyConUnique 79
 compactPrimTyConKey                     = mkPreludeTyConUnique 80
 stackSnapshotPrimTyConKey               = mkPreludeTyConUnique 81
 concretePrimTyConKey                    = mkPreludeTyConUnique 82
+ipPrimTyConKey                          = mkPreludeTyConUnique 109 -- TODO: Renumber before merging
 
 eitherTyConKey :: Unique
 eitherTyConKey                          = mkPreludeTyConUnique 84
 
 nonEmptyTyConKey :: Unique
 nonEmptyTyConKey                        = mkPreludeTyConUnique 85
+
 
 -- Kind constructors
 liftedTypeKindTyConKey, unliftedTypeKindTyConKey,

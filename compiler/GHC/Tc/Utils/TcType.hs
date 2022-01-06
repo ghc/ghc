@@ -1767,16 +1767,6 @@ pickQuantifiablePreds qtvs theta
       = case classifyPredType pred of
 
           ClassPred cls tys
-            | Just {} <- isCallStackPred cls tys
-              -- NEVER infer a CallStack constraint.  Otherwise we let
-              -- the constraints bubble up to be solved from the outer
-              -- context, or be defaulted when we reach the top-level.
-              -- See Note [Overview of implicit CallStacks]
-            -> Nothing
-
-            | isIPClass cls
-            -> Just pred -- See note [Inheriting implicit parameters]
-
             | pick_cls_pred flex_ctxt cls tys
             -> Just pred
 
@@ -1790,6 +1780,16 @@ pickQuantifiablePreds qtvs theta
           IrredPred ty
             | tyCoVarsOfType ty `intersectsVarSet` qtvs
             -> Just pred
+
+          _ | isCallStackPredTy pred
+              -- NEVER infer a CallStack constraint.  Otherwise we let
+              -- the constraints bubble up to be solved from the outer
+              -- context, or be defaulted when we reach the top-level.
+              -- See Note [Overview of implicit CallStacks]
+            -> Nothing
+
+          SpecialPred (IpPred _) _
+            -> Just pred -- See note [Inheriting implicit parameters]
 
           _ -> Nothing
 

@@ -70,6 +70,7 @@ import GHC.Core.Coercion.Axiom
 import GHC.Core.Coercion
 import GHC.Core.Ppr ()   -- Instance OutputableBndr TyVar
 import GHC.Tc.Utils.TcType
+import GHC.Core.TyCo.Rep ( UnivCoProvenance( PluginProv ) ) -- FIXME
 import GHC.Core.Type
 import GHC.Core.TyCon
 import GHC.Core.DataCon ( DataCon, dataConWrapId )
@@ -1025,7 +1026,11 @@ instance Outputable EvTypeable where
 -- We expect the 'Type' to have the form `IP sym ty`,
 -- and return a 'Coercion' `co :: IP sym ty ~ ty`
 unwrapIP :: Type -> CoercionR
-unwrapIP ty =
+unwrapIP ty
+  = mkUnivCo (PluginProv "TODO") Representational ty ty'
+  where
+  (_tc, [_, ty']) = splitTyConApp ty
+  {-
   case unwrapNewTyCon_maybe tc of
     Just (_,_,ax) -> mkUnbranchedAxInstCo Representational ax tys []
     Nothing       -> pprPanic "unwrapIP" $
@@ -1033,6 +1038,7 @@ unwrapIP ty =
                          <+> text "is not a newtype!"
   where
   (tc, tys) = splitTyConApp ty
+  -}
 
 -- | Create a 'Coercion' that wraps a value in an implicit-parameter
 -- dictionary. See 'unwrapIP'.

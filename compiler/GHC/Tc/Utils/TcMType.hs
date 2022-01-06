@@ -313,6 +313,7 @@ predTypeOccName ty = case classifyPredType ty of
     SpecialPred special_pred _ ->
       case special_pred of
         ConcretePrimPred -> mkVarOccFS (fsLit "concr")
+        IpPred _ -> mkVarOccFS (fsLit "ip")
 
 -- | Create a new 'Implication' with as many sensible defaults for its fields
 -- as possible. Note that the 'ic_tclvl', 'ic_binds', and 'ic_info' fields do

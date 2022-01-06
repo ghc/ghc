@@ -47,9 +47,10 @@ import GHC.Tc.Utils.TcMType
 import GHC.Core.Reduction ( Reduction(..) )
 import GHC.Core.Multiplicity
 import GHC.Core.FamInstEnv( normaliseType )
+import GHC.Core.Predicate ( mkIpPred )
 import GHC.Tc.Instance.Family( tcGetFamInstEnvs )
 import GHC.Tc.Utils.TcType
-import GHC.Core.Type (mkStrLitTy, tidyOpenType, mkCastTy)
+import GHC.Core.Type (tidyOpenType, mkCastTy)
 import GHC.Builtin.Types ( mkBoxedTupleTy )
 import GHC.Builtin.Types.Prim
 import GHC.Types.SourceText
@@ -71,7 +72,6 @@ import GHC.Types.Basic
 import GHC.Types.CompleteMatch
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
-import GHC.Builtin.Names( ipClassName )
 import GHC.Tc.Validity (checkValidType)
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DSet
@@ -249,9 +249,8 @@ tcLocalBinds (HsValBinds x (XValBindsLR (NValBinds binds sigs))) thing_inside
 tcLocalBinds (HsValBinds _ (ValBinds {})) _ = panic "tcLocalBinds"
 
 tcLocalBinds (HsIPBinds x (IPBinds _ ip_binds)) thing_inside
-  = do  { ipClass <- tcLookupClass ipClassName
-        ; (given_ips, ip_binds') <-
-            mapAndUnzipM (wrapLocSndMA (tc_ip_bind ipClass)) ip_binds
+  = do  { (given_ips, ip_binds') <-
+            mapAndUnzipM (wrapLocSndMA tc_ip_bind) ip_binds
 
         -- If the binding binds ?x = E, we  must now
         -- discharge any ?x constraints in expr_lie
@@ -266,19 +265,17 @@ tcLocalBinds (HsIPBinds x (IPBinds _ ip_binds)) thing_inside
         -- I wonder if we should do these one at a time
         -- Consider     ?x = 4
         --              ?y = ?x + 1
-    tc_ip_bind ipClass (IPBind _ (Left (L _ ip)) expr)
+    tc_ip_bind (IPBind _ (Left (L _ ip)) expr)
        = do { ty <- newOpenFlexiTyVarTy
-            ; let p = mkStrLitTy $ hsIPNameFS ip
-            ; ip_id <- newDict ipClass [ p, ty ]
+            ; ip_id <- newEvVar (mkIpPred (hsIPNameFS ip) ty)
             ; expr' <- tcCheckMonoExpr expr ty
-            ; let d = toDict ipClass p ty `fmap` expr'
+            ; let d = toDict (hsIPNameFS ip) ty `fmap` expr'
             ; return (ip_id, (IPBind noAnn (Right ip_id) d)) }
-    tc_ip_bind _ (IPBind _ (Right {}) _) = panic "tc_ip_bind"
+    tc_ip_bind (IPBind _ (Right {}) _) = panic "tc_ip_bind"
 
     -- Coerces a `t` into a dictionary for `IP "x" t`.
     -- co : t -> IP "x" t
-    toDict ipClass x ty = mkHsWrap $ mkWpCastR $
-                          wrapIP $ mkClassPred ipClass [x,ty]
+    toDict x ty = mkHsWrap $ mkWpCastR $ wrapIP $ mkIpPred x ty
 
 {- Note [Implicit parameter untouchables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

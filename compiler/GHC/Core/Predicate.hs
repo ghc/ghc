@@ -20,6 +20,7 @@ module GHC.Core.Predicate (
 
   -- Special predicates
   SpecialPred(..), specialPredTyCon,
+  mkIpPred,
 
   -- Class predicates
   mkClassPred, isDictTy,
@@ -46,7 +47,7 @@ import GHC.Core.Coercion
 import GHC.Core.Multiplicity ( scaledThing )
 
 import GHC.Builtin.Names
-import GHC.Builtin.Types.Prim ( concretePrimTyCon )
+import GHC.Builtin.Types.Prim ( concretePrimTyCon, ipPrimTyCon )
 
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
@@ -96,6 +97,14 @@ classifyPredType ev_ty = case splitTyConApp_maybe ev_ty of
     Just (tc, [_ki, ty])
       | tc `hasKey` concretePrimTyConKey
       -> SpecialPred ConcretePrimPred ty
+
+    Just (tc, [sym, ty])
+      | tc `hasKey` ipPrimTyConKey
+      -- TODO: Can extract the literal from sym?
+      -- Will there always be a literal? Would be convenient.
+      -> case isStrLitTy sym of
+            Just l -> SpecialPred (IpPred l) ty
+            Nothing -> pprPanic "classifyPredType/IP" (ppr ev_ty)
 
     Just (tc, tys)
       | Just clas <- tyConClass_maybe tc
@@ -211,14 +220,21 @@ data SpecialPred
   --
   -- See Note [The Concrete mechanism] in GHC.Tc.Utils.Concrete for further details.
   = ConcretePrimPred
+
+  | IpPred FastString
   deriving stock Eq
 
 instance Outputable SpecialPred where
   ppr ConcretePrimPred = text "Concrete#"
+  ppr (IpPred fs) = text "?" <> ppr fs
 
 -- | Obtain the 'TyCon' associated with a special predicate.
 specialPredTyCon :: SpecialPred -> TyCon
 specialPredTyCon ConcretePrimPred = concretePrimTyCon
+specialPredTyCon (IpPred _) = error "Is this dead code?"
+
+mkIpPred :: FastString -> Type -> PredType
+mkIpPred fs ty = mkTyConApp ipPrimTyCon [mkStrLitTy fs, ty]
 
 {-------------------------------------------
 Predicates on PredType
@@ -324,8 +340,7 @@ isCallStackPredTy :: Type -> Bool
 -- True of HasCallStack, or IP "blah" CallStack
 isCallStackPredTy ty
   | Just (tc, tys) <- splitTyConApp_maybe ty
-  , Just cls <- tyConClass_maybe tc
-  , Just {} <- isCallStackPred cls tys
+  , Just {} <- isCallStackPred tc tys
   = True
   | otherwise
   = False
@@ -333,10 +348,10 @@ isCallStackPredTy ty
 -- | Is a 'PredType' a 'CallStack' implicit parameter?
 --
 -- If so, return the name of the parameter.
-isCallStackPred :: Class -> [Type] -> Maybe FastString
-isCallStackPred cls tys
+isCallStackPred :: TyCon -> [Type] -> Maybe FastString
+isCallStackPred tc tys
   | [ty1, ty2] <- tys
-  , isIPClass cls
+  , tc == ipPrimTyCon
   , isCallStackTy ty2
   = isStrLitTy ty1
   | otherwise

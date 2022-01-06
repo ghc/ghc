@@ -1279,10 +1279,7 @@ tc_hs_type mode rn_ty@(HsExplicitTupleTy _ tys) exp_kind
 tc_hs_type mode rn_ty@(HsIParamTy _ (L _ n) ty) exp_kind
   = do { massert (isTypeLevel (mode_tyki mode))
        ; ty' <- tc_lhs_type mode ty liftedTypeKind
-       ; let n' = mkStrLitTy $ hsIPNameFS n
-       ; ipClass <- tcLookupClass ipClassName
-       ; checkExpectedKind rn_ty (mkClassPred ipClass [n',ty'])
-                           constraintKind exp_kind }
+       ; checkExpectedKind rn_ty (mkIpPred (hsIPNameFS n) ty') constraintKind exp_kind }
 
 tc_hs_type _ rn_ty@(HsStarTy _ _) exp_kind
   -- Desugaring 'HsStarTy' to 'Data.Kind.Type' here means that we don't have to

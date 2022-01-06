@@ -27,7 +27,6 @@ module GHC.Tc.Solver.Types (
 import GHC.Prelude
 
 import GHC.Tc.Types.Constraint
-import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcType
 
 import GHC.Core.Class
@@ -135,13 +134,13 @@ emptyDictMap :: DictMap a
 emptyDictMap = emptyTcAppMap
 
 findDict :: DictMap a -> CtLoc -> Class -> [Type] -> Maybe a
-findDict m loc cls tys
+findDict m _loc cls tys
   | hasIPSuperClasses cls tys -- See Note [Tuples hiding implicit parameters]
   = Nothing
 
-  | Just {} <- isCallStackPred cls tys
-  , isPushCallStackOrigin (ctLocOrigin loc)
-  = Nothing             -- See Note [Solving CallStack constraints]
+  -- | Just {} <- isCallStackPred cls tys
+  -- , isPushCallStackOrigin (ctLocOrigin loc)
+  -- = Nothing             -- See Note [Solving CallStack constraints]
 
   | otherwise
   = findTcApp m (classTyCon cls) tys

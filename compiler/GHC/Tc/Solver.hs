@@ -550,8 +550,7 @@ defaultCallStacks wanteds
          ; setImplicationStatus (implic { ic_wanted = wanteds }) }
 
   defaultCallStack ct
-    | ClassPred cls tys <- classifyPredType (ctPred ct)
-    , Just {} <- isCallStackPred cls tys
+    | isCallStackPredTy (ctPred ct)
     = do { solveCallStack (ctEvidence ct) EvCsEmpty
          ; return Nothing }
 

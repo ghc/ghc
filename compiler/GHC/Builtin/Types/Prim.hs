@@ -103,6 +103,7 @@ module GHC.Builtin.Types.Prim(
         equalityTyCon,
 
         concretePrimTyCon,
+        ipPrimTyCon,
 
         -- * SIMD
 #include "primop-vector-tys-exports.hs-incl"
@@ -114,6 +115,7 @@ import {-# SOURCE #-} GHC.Builtin.Types
   ( runtimeRepTy, levityTy, unboxedTupleKind, liftedTypeKind
   , boxedRepDataConTyCon, vecRepDataConTyCon, tupleRepDataConTyCon
   , liftedRepTy, unliftedRepTy, zeroBitRepTy
+  , typeSymbolKind, constraintKind
   , intRepDataConTy
   , int8RepDataConTy, int16RepDataConTy, int32RepDataConTy, int64RepDataConTy
   , wordRepDataConTy
@@ -167,6 +169,7 @@ unexposedPrimTyCons
     , eqReprPrimTyCon
     , eqPhantPrimTyCon
     , concretePrimTyCon
+    , ipPrimTyCon
     ]
 
 -- | Primitive 'TyCon's that are defined in, and exported from, GHC.Prim.
@@ -242,7 +245,7 @@ charPrimTyConName, intPrimTyConName, int8PrimTyConName, int16PrimTyConName, int3
   weakPrimTyConName, threadIdPrimTyConName,
   eqPrimTyConName, eqReprPrimTyConName, eqPhantPrimTyConName,
   stackSnapshotPrimTyConName,
-  concretePrimTyConName :: Name
+  concretePrimTyConName, ipPrimTyConName :: Name
 charPrimTyConName             = mkPrimTc (fsLit "Char#") charPrimTyConKey charPrimTyCon
 intPrimTyConName              = mkPrimTc (fsLit "Int#") intPrimTyConKey  intPrimTyCon
 int8PrimTyConName             = mkPrimTc (fsLit "Int8#") int8PrimTyConKey int8PrimTyCon
@@ -283,6 +286,7 @@ bcoPrimTyConName              = mkPrimTc (fsLit "BCO") bcoPrimTyConKey bcoPrimTy
 weakPrimTyConName             = mkPrimTc (fsLit "Weak#") weakPrimTyConKey weakPrimTyCon
 threadIdPrimTyConName         = mkPrimTc (fsLit "ThreadId#") threadIdPrimTyConKey threadIdPrimTyCon
 concretePrimTyConName         = mkPrimTc (fsLit "Concrete#") concretePrimTyConKey concretePrimTyCon
+ipPrimTyConName               = mkPrimTc (fsLit "IP#") ipPrimTyConKey ipPrimTyCon
 
 {-
 ************************************************************************
@@ -1058,6 +1062,14 @@ concretePrimTyCon =
       -- Kind :: forall k. k -> TYPE (TupleRep '[])
       binders = mkTemplateTyConBinders [liftedTypeKind] (\[k] -> [k])
       res_kind = unboxedTupleKind []
+      roles   = [Nominal, Nominal]
+
+ipPrimTyCon :: TyCon
+ipPrimTyCon =
+  mkPrimTyCon ipPrimTyConName binders constraintKind roles
+    where
+      -- Kind :: Symbol -> Type -> Constraint
+      binders = mkTemplateAnonTyConBinders [typeSymbolKind, liftedTypeKind]
       roles   = [Nominal, Nominal]
 
 {- *********************************************************************

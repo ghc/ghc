@@ -37,6 +37,7 @@ import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Unify
 import GHC.Types.Basic
 import GHC.Types.Error
+import GHC.Core.Predicate ( mkIpPred )
 import GHC.Core.Multiplicity
 import GHC.Core.UsageEnv
 import GHC.Tc.Errors.Types
@@ -246,16 +247,14 @@ tcExpr e@(HsIPVar _ x) res_ty
               type variable as its type.  (Because res_ty may not
               be a tau-type.) -}
          ip_ty <- newOpenFlexiTyVarTy
-       ; let ip_name = mkStrLitTy (hsIPNameFS x)
-       ; ipClass <- tcLookupClass ipClassName
-       ; ip_var <- emitWantedEvVar origin (mkClassPred ipClass [ip_name, ip_ty])
+       ; let ip_name = hsIPNameFS x
+       ; ip_var <- emitWantedEvVar origin (mkIpPred ip_name ip_ty)
        ; tcWrapResult e
-                   (fromDict ipClass ip_name ip_ty (HsVar noExtField (noLocA ip_var)))
+                   (fromDict ip_name ip_ty (HsVar noExtField (noLocA ip_var)))
                    ip_ty res_ty }
   where
   -- Coerces a dictionary for `IP "x" t` into `t`.
-  fromDict ipClass x ty = mkHsWrap $ mkWpCastR $
-                          unwrapIP $ mkClassPred ipClass [x,ty]
+  fromDict x ty = mkHsWrap $ mkWpCastR $ unwrapIP $ mkIpPred x ty
   origin = IPOccOrigin x
 
 tcExpr (HsLam _ match) res_ty
