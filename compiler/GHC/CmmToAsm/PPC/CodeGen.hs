@@ -1912,8 +1912,15 @@ genCCall' config gcp target dest_regs args
                          -- "Single precision floating point values
                          -- are mapped to the second word in a single
                          -- doubleword"
-                         GCP64ELF 1      -> stackOffset' + 4
-                         _               -> stackOffset'
+                         GCP64ELF 1 -> stackOffset' + 4
+                         -- ELF v2 ABI Revision 1.5 Section 2.2.3.3. requires
+                         -- a single-precision floating-point value
+                         -- to be mapped to the least-significant
+                         -- word in a single doubleword.
+                         GCP64ELF 2 -> case platformByteOrder platform of
+                                       BigEndian    -> stackOffset' + 4
+                                       LittleEndian -> stackOffset'
+                         _          -> stackOffset'
                      | otherwise = stackOffset'
 
                 stackSlot = AddrRegImm sp (ImmInt stackOffset'')

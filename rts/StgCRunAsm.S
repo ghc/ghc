@@ -5,11 +5,11 @@
  * then functions StgRun/StgReturn are implemented in file StgCRun.c */
 #if !defined(USE_MINIINTERPRETER)
 
-#if defined(powerpc64le_HOST_ARCH)
-# if defined(linux_HOST_OS)
-/* 64-bit PowerPC ELF V2 ABI Revision 1.4
+#if defined(powerpc64le_HOST_ARCH) || defined(powerpc64_HOST_ARCH)
+# if defined(_CALL_ELF) && _CALL_ELF == 2
+/* 64-bit PowerPC ELF V2 ABI Revision 1.5
  *
- * Stack frame organization (see Figure 2.18, ELF V2 ABI Revision 1.4, p 31)
+ * Stack frame organization (see Figure 2.18, ELF V2 ABI Revision 1.5, p 34)
  *
  * +-> Back Chain (points to the prevoius stack frame)
  * |   Floating point register save area (f14-f31)
@@ -66,8 +66,10 @@ StgReturn:
         addi 12,1,-(8*18)
         bl _restgpr1_14
         b _restfpr_14
-# else // linux_HOST_OS
-# error Only Linux support for power64 little endian right now.
+
+	.section	.note.GNU-stack,"",@progbits
+# else // Not ELF v2
+# error Only ELF v2 supported.
 # endif
 
 #elif defined(powerpc_HOST_ARCH)
@@ -449,7 +451,7 @@ StgReturn:
 	ld.d	$fp,$sp,144
 	.cfi_restore 22
 	ld.d	$s0,$sp,136
-	.cfi_restore 23 
+	.cfi_restore 23
 	ld.d	$s1,$sp,128
 	.cfi_restore 24
 	ld.d	$s2,$sp,120

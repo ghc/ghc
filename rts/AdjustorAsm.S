@@ -2,8 +2,7 @@
 
 /* ******************************** PowerPC ******************************** */
 
-#if defined(powerpc_HOST_ARCH) || defined(powerpc64_HOST_ARCH)
-#if !(defined(powerpc_HOST_ARCH) && defined(linux_HOST_OS))
+#if defined(powerpc_HOST_ARCH) && defined(aix_HOST_OS) || defined(powerpc64_HOST_ARCH) && defined(__ELF__) && (!defined(_CALL_ELF) || _CALL_ELF == 1)
     /* The following code applies, with some differences,
        to all powerpc platforms except for powerpc32-linux,
        whose calling convention is annoyingly complex.
@@ -60,12 +59,12 @@ adjustorCode:
         /* save the link */
     mflr    0
     STORE   0, LINK_SLOT(1)
-    
+
         /* set up stack frame */
     LOAD    12, FRAMESIZE_OFF(2)
 #if defined(powerpc64_HOST_ARCH)
     stdux   1, 1, 12
-#else   
+#else
     stwux   1, 1, 12
 #endif /* defined(powerpc64_HOST_ARCH) */
 
@@ -108,7 +107,7 @@ L2:
     LOAD    12, WPTR_OFF(2)
     LOAD    0, 0(12)
         /* The function we're calling will never be a nested function,
-           so we don't load r11. 
+           so we don't load r11.
         */
     mtctr   0
     LOAD    2, WS(12)
@@ -118,8 +117,7 @@ L2:
     LOAD    0, LINK_SLOT(1)
     mtlr    0
     blr
-#endif /* !(defined(powerpc_HOST_ARCH) && defined(linux_HOST_OS)) */
-#endif /* defined(powerpc_HOST_ARCH) || defined(powerpc64_HOST_ARCH) */
+#endif
 
 /* mark stack as nonexecutable */
 #if defined(__linux__) && defined(__ELF__)

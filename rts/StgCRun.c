@@ -670,7 +670,7 @@ StgRunIsImplementedInAssembler(void)
    Everything is in assembler, so we don't have to deal with GCC...
    -------------------------------------------------------------------------- */
 
-#if defined(powerpc64_HOST_ARCH)
+#if defined(powerpc64_HOST_ARCH) && (!defined _CALL_ELF || _CALL_ELF == 1)
 /* 64-bit PowerPC ELF ABI 1.9
  *
  * Stack frame organization (see Figure 3-17, ELF ABI 1.9, p 14)
