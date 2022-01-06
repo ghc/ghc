@@ -38,9 +38,9 @@
 -- An overloaded label is represented by the 'HsOverLabel' constructor
 -- of 'HsExpr', which stores the 'FastString' text of the label and an
 -- optional id for the 'fromLabel' function to use (if
--- RebindableSyntax is enabled) .  The type-checker transforms it into
--- a call to 'fromLabel'.  See Note [Type-checking overloaded labels]
--- in GHC.Tc.Gen.Expr for more details in how type-checking works.
+-- RebindableSyntax is enabled) .  The renamer transforms it into
+-- a call to 'fromLabel'.
+-- See Note [Handling overloaded and rebindable constructs] in GHC.Rename.Expr.
 
 module GHC.OverloadedLabels
        ( IsLabel(..)
