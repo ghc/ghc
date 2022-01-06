@@ -14,11 +14,9 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS_SHELL_FUNCTIONS],
         powerpc)
             test -z "[$]2" || eval "[$]2=ArchPPC"
             ;;
-        powerpc64)
-            test -z "[$]2" || eval "[$]2=\"ArchPPC_64 ELF_V1\""
-            ;;
-        powerpc64le)
-            test -z "[$]2" || eval "[$]2=\"ArchPPC_64 ELF_V2\""
+        powerpc64*)
+            GHC_GET_POWER_ABI()
+            test -z "[$]2" || eval "[$]2=\"ArchPPC_64 $POWER_ABI\""
             ;;
         s390x)
             test -z "[$]2" || eval "[$]2=ArchS390X"

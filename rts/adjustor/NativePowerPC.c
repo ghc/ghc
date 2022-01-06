@@ -29,8 +29,7 @@ __asm__("obscure_ccall_ret_code:\n\t"
 extern void obscure_ccall_ret_code(void);
 #endif /* defined(linux_HOST_OS) */
 
-#if defined(powerpc_HOST_ARCH) || defined(powerpc64_HOST_ARCH)
-#if !(defined(powerpc_HOST_ARCH) && defined(linux_HOST_OS))
+#if defined(powerpc_HOST_ARCH) && defined(aix_HOST_OS) || defined(powerpc64_HOST_ARCH) && defined(__ELF__) && (!defined(_CALL_ELF) || _CALL_ELF == 1)
 
 /* !!! !!! WARNING: !!! !!!
  * This structure is accessed from AdjustorAsm.s
@@ -50,8 +49,7 @@ typedef struct AdjustorStub {
     StgInt          extrawords_plus_one;
 } AdjustorStub;
 
-#endif /* !(defined(powerpc_HOST_ARCH) && defined(linux_HOST_OS)) */
-#endif /* defined(powerpc_HOST_ARCH) || defined(powerpc64_HOST_ARCH) */
+#endif
 
 void initAdjustors(void) { }
 
