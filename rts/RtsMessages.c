@@ -73,6 +73,12 @@ errorBelch(const char*s, ...)
 }
 
 void
+_warnFail(const char*filename, unsigned int linenum)
+{
+    errorBelch("ASSERTION FAILED: file %s, line %u\n", filename, linenum);
+}
+
+void
 verrorBelch(const char*s, va_list ap)
 {
   (*errorMsgFn)(s,ap);

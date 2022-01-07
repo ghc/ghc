@@ -118,11 +118,19 @@ extern "C" {
 void _assertFail(const char *filename, unsigned int linenum)
    GNUC3_ATTRIBUTE(__noreturn__);
 
+void _warnFail(const char *filename, unsigned int linenum);
+
 #define CHECK(predicate)                        \
         if (RTS_LIKELY(predicate))              \
             /*null*/;                           \
         else                                    \
             _assertFail(__FILE__, __LINE__)
+
+#define CHECKWARN(predicate)                        \
+        if (RTS_LIKELY(predicate))              \
+            /*null*/;                           \
+        else                                    \
+            _warnFail(__FILE__, __LINE__)
 
 #define CHECKM(predicate, msg, ...)             \
         if (RTS_LIKELY(predicate))              \
@@ -133,9 +141,13 @@ void _assertFail(const char *filename, unsigned int linenum)
 #if !defined(DEBUG)
 #define ASSERT(predicate) /* nothing */
 #define ASSERTM(predicate,msg,...) /* nothing */
+#define WARN(predicate) /* nothing */
 #else
 #define ASSERT(predicate) CHECK(predicate)
 #define ASSERTM(predicate,msg,...) CHECKM(predicate,msg,##__VA_ARGS__)
+#define WARN(predicate) CHECKWARN(predicate)
+#undef ASSERTS_ENABLED
+
 #endif /* DEBUG */
 
 /*
