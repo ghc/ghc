@@ -660,8 +660,8 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_impl = implics
     is_dict _ (ClassPred {}) = True
     is_dict _ _              = False
 
-    is_ip _ (ClassPred cls _) = isIPClass cls
-    is_ip _ _                 = False
+    is_ip _ (SpecialPred (IpPred _ ) _) = True
+    is_ip _ _                           = False
 
     is_FRR ct (SpecialPred ConcretePrimPred _)
       | FixedRuntimeRepOrigin {} <- ctOrigin ct

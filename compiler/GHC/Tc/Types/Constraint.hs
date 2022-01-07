@@ -977,8 +977,8 @@ superClassesMightHelp (WC { wc_simple = simples, wc_impl = implics })
 
     might_help_ct ct = isWantedCt ct && not (is_ip ct)
 
-    is_ip (CDictCan { cc_class = cls }) = isIPClass cls
-    is_ip _                             = False
+    is_ip (CSpecialCan { cc_special_pred = IpPred _ }) = True
+    is_ip _                                            = False
 
 getPendingWantedScs :: Cts -> ([Ct], Cts)
 getPendingWantedScs simples
