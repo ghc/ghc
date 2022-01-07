@@ -29,7 +29,7 @@ module GHC.Core.Predicate (
   classMethodTy, classMethodInstTy,
 
   -- Implicit parameters
-  isIPLikePred, hasIPSuperClasses, isIPTyCon, isIPClass,
+  isIPLikePred, hasIPSuperClasses,
   isCallStackTy, isCallStackPred, isCallStackPredTy,
 
   -- Evidence variables
@@ -293,26 +293,22 @@ isCTupleClass cls = isTupleTyCon (classTyCon cls)
 *                                                                      *
 ********************************************************************* -}
 
-isIPTyCon :: TyCon -> Bool
-isIPTyCon tc = tc `hasKey` ipClassKey
-  -- Class and its corresponding TyCon have the same Unique
-
-isIPClass :: Class -> Bool
-isIPClass cls = cls `hasKey` ipClassKey
-
 isIPLikePred :: Type -> Bool
 -- See Note [Local implicit parameters]
 isIPLikePred = is_ip_like_pred initIPRecTc
 
-
 is_ip_like_pred :: RecTcChecker -> Type -> Bool
 is_ip_like_pred rec_clss ty
+  | Just (tc, _tys) <- splitTyConApp_maybe ty
+  , tc == ipPrimTyCon
+  = True
+
   | Just (tc, tys) <- splitTyConApp_maybe ty
   , Just rec_clss' <- if isTupleTyCon tc  -- Tuples never cause recursion
                       then Just rec_clss
                       else checkRecTc rec_clss tc
   , Just cls       <- tyConClass_maybe tc
-  = isIPClass cls || has_ip_super_classes rec_clss' cls tys
+  = has_ip_super_classes rec_clss' cls tys
 
   | otherwise
   = False -- Includes things like (D []) where D is
