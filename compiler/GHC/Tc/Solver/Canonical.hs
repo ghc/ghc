@@ -41,8 +41,8 @@ import GHC.Types.Var.Set( delVarSetList, anyVarSet )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
-import GHC.Builtin.Types ( anyTypeOfKind )
-import GHC.Builtin.Types.Prim ( concretePrimTyCon )
+import GHC.Builtin.Types ( anyTypeOfKind, typeSymbolKind )
+import GHC.Builtin.Types.Prim ( concretePrimTyCon, ipPrimTyCon )
 import GHC.Types.Name.Set
 import GHC.Types.Name.Reader
 import GHC.Hs.Type( HsIPName(..) )
@@ -939,16 +939,30 @@ canIpPred ev ip_name ty
        -- ; canClass new_ev cls tys
        --            False -- No superclasses
        --            False -- No top level instances for fundeps
-       ; stopWith ev "canSpecial: CallStack" -- no idea what to do here
+       ; canIpPred' new_ev ip_name ty
        }
 
   | otherwise
-  = stopWith ev "canSpecial: IP" -- no idea what to do here
+  = canIpPred' ev ip_name ty
 
   where
     loc  = ctEvLoc ev
     orig = ctLocOrigin loc
     pred = ctEvPred ev
+
+canIpPred' :: CtEvidence -> FastString -> TcType -> TcS (StopOrContinue Ct)
+canIpPred' ev ip_name ty
+  = assertPpr (ctEvRole ev == Nominal) (ppr ev $$ ppr ip_name $$ ppr ty) $
+    do { ty_redn@(Reduction _ xi) <- rewrite ev ty
+       ; let arg_reds = unzipRedns [mkReflRedn Nominal typeSymbolKind, ty_redn]
+             redn = mkTyConAppRedn Nominal ipPrimTyCon arg_reds
+             mk_ct new_ev = CSpecialCan { cc_ev = new_ev
+                                        , cc_special_pred = IpPred ip_name
+                                        , cc_xi = xi }
+       ; mb <- rewriteEvidence ev redn
+
+       ; traceTcS "canIpPred'" (vcat [ ppr ev, ppr xi, ppr mb ])
+       ; return (fmap mk_ct mb) }
 
 {- Note [Canonical Concrete# constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
