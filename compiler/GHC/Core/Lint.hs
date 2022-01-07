@@ -2370,6 +2370,9 @@ lint_axiom ax@(CoAxiom { co_ax_tc = tc, co_ax_branches = branches
     branch_list = fromBranches branches
 
     extra_checks
+      | tc == ipPrimTyCon
+      = return () -- TODO
+
       | isNewTyCon tc
       = do { CoAxBranch { cab_tvs     = tvs
                         , cab_eta_tvs = eta_tvs

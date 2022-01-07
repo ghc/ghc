@@ -70,11 +70,12 @@ import GHC.Core.Coercion.Axiom
 import GHC.Core.Coercion
 import GHC.Core.Ppr ()   -- Instance OutputableBndr TyVar
 import GHC.Tc.Utils.TcType
-import GHC.Core.TyCo.Rep ( UnivCoProvenance( PluginProv ) ) -- FIXME
 import GHC.Core.Type
 import GHC.Core.TyCon
 import GHC.Core.DataCon ( DataCon, dataConWrapId )
+import GHC.Core.FamInstEnv ( mkNewTypeCoAxiom )
 import GHC.Builtin.Names
+import GHC.Builtin.Types.Prim ( ipPrimTyCon )
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Core.Predicate
@@ -1027,18 +1028,15 @@ instance Outputable EvTypeable where
 -- and return a 'Coercion' `co :: IP sym ty ~ ty`
 unwrapIP :: Type -> CoercionR
 unwrapIP ty
-  = mkUnivCo (PluginProv "TODO") Representational ty ty'
+  = mkUnbranchedAxInstCo Representational ipCoAxiom tys []
   where
-  (_tc, [_, ty']) = splitTyConApp ty
-  {-
-  case unwrapNewTyCon_maybe tc of
-    Just (_,_,ax) -> mkUnbranchedAxInstCo Representational ax tys []
-    Nothing       -> pprPanic "unwrapIP" $
-                       text "The dictionary for" <+> quotes (ppr tc)
-                         <+> text "is not a newtype!"
+  (_tc, tys) = splitTyConApp ty
+
+ipCoAxiom :: CoAxiom Unbranched
+ipCoAxiom = mkNewTypeCoAxiom co_name ipPrimTyCon [sv, tv] [Nominal, Nominal] (mkTyVarTy tv)
   where
-  (tc, tys) = splitTyConApp ty
-  -}
+    co_name = tyConName ipPrimTyCon -- is this ok?
+    [sv, tv] = tyConVisibleTyVars ipPrimTyCon
 
 -- | Create a 'Coercion' that wraps a value in an implicit-parameter
 -- dictionary. See 'unwrapIP'.
