@@ -1,2 +1,4 @@
 :r
+:seti -fprint-explicit-foralls
+:t id
 :l abc
