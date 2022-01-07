@@ -1116,6 +1116,10 @@ check_pred_help under_syn env dflags ctxt pred
               -- in Note [Lift equality constraints when quantifying] in GHC.Tc.Utils.TcType
 
       ForAllPred _ theta head -> check_quant_pred env dflags ctxt pred theta head
+
+      SpecialPred (IpPred _) _ ->
+         checkTcM (okIPCtxt ctxt) (env, TcRnIllegalImplicitParam (tidyType env pred))
+
       _                       -> return ()
 
 check_eq_pred :: TidyEnv -> DynFlags -> PredType -> TcM ()
@@ -1176,10 +1180,6 @@ check_class_pred env dflags ctxt pred cls tys
   | isEqPredClass cls    -- (~) and (~~) are classified as classes,
                          -- but here we want to treat them as equalities
   = check_eq_pred env dflags pred
-
-  | isIPClass cls
-  = do { check_arity
-       ; checkTcM (okIPCtxt ctxt) (env, TcRnIllegalImplicitParam (tidyType env pred)) }
 
   | otherwise     -- Includes Coercible
   = do { check_arity
@@ -2836,10 +2836,7 @@ sizePred ty = goClass ty
 -- a termination check
 isTerminatingClass :: Class -> Bool
 isTerminatingClass cls
-  = isIPClass cls    -- Implicit parameter constraints always terminate because
-                     -- there are no instances for them --- they are only solved
-                     -- by "local instances" in expressions
-    || isEqPredClass cls
+  = isEqPredClass cls
     || cls `hasKey` typeableClassKey
     || cls `hasKey` coercibleTyConKey
 
