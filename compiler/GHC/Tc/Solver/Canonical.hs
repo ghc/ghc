@@ -903,13 +903,8 @@ we'll find a match in the InstEnv.
 
 -- | Canonicalise a 'SpecialPred' constraint.
 canSpecial :: CtEvidence -> SpecialPred -> TcType -> TcS (StopOrContinue Ct)
-canSpecial ev special_pred ty
-  = do { -- Special constraints should never appear in Givens.
-       ; massertPpr (not $ isGivenOrigin $ ctEvOrigin ev)
-           (text "canSpecial: Given Special constraint" $$ ppr ev)
-       ; case special_pred of
-         { ConcretePrimPred -> canConcretePrim ev ty
-         ; IpPred ip_name -> canIpPred ev ip_name ty } }
+canSpecial ev ConcretePrimPred ty = canConcretePrim ev ty
+canSpecial ev (IpPred ip_name) ty = canIpPred ev ip_name ty
 
 canIpPred :: CtEvidence -> FastString -> TcType -> TcS (StopOrContinue Ct)
 canIpPred ev ip_name ty
@@ -1002,7 +997,9 @@ here are some examples:
 -- See Note [Canonical Concrete# constraints] for details.
 canConcretePrim :: CtEvidence -> TcType -> TcS (StopOrContinue Ct)
 canConcretePrim ev ty
-  = do {
+  = do { -- Concrete# constraints should never appear in Givens.
+       ; massertPpr (not $ isGivenOrigin $ ctEvOrigin ev)
+           (text "canSpecial: Given Special constraint" $$ ppr ev)
        -- As per Note [The Concrete mechanism] in GHC.Tc.Instance.Class,
        -- in PHASE 1, we don't allow a 'Concrete#' constraint to be rewritten.
        -- We still need to zonk, otherwise we can end up stuck with a constraint
