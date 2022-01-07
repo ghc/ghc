@@ -1275,7 +1275,7 @@ stat_exitReport (void)
             Time exit_gc_cpu     = stats.gc_cpu_ns - start_exit_gc_cpu;
             Time exit_gc_elapsed = stats.gc_elapsed_ns - start_exit_gc_elapsed;
 
-            ASSERT(exit_gc_elapsed > 0);
+            WARN(exit_gc_elapsed > 0);
 
             sum.exit_cpu_ns     = end_exit_cpu
                                       - start_exit_cpu
@@ -1284,7 +1284,7 @@ stat_exitReport (void)
                                        - start_exit_elapsed
                                        - exit_gc_elapsed;
 
-            ASSERT(sum.exit_elapsed_ns >= 0);
+            WARN(sum.exit_elapsed_ns >= 0);
 
             stats.mutator_cpu_ns     = start_exit_cpu
                                  - end_init_cpu
@@ -1294,7 +1294,7 @@ stat_exitReport (void)
                                  - end_init_elapsed
                                  - (stats.gc_elapsed_ns - exit_gc_elapsed);
 
-            ASSERT(stats.mutator_elapsed_ns >= 0);
+            WARN(stats.mutator_elapsed_ns >= 0);
 
             if (stats.mutator_cpu_ns < 0) { stats.mutator_cpu_ns = 0; }
 
@@ -1302,7 +1302,7 @@ stat_exitReport (void)
             // and subtracting, so the parts should add up to the total exactly.
             // Note that stats->total_ns is captured a tiny bit later than
             // end_exit_elapsed, so we don't use it here.
-            ASSERT(stats.init_elapsed_ns // INIT
+            WARN(stats.init_elapsed_ns // INIT
                    + stats.mutator_elapsed_ns // MUT
                    + stats.gc_elapsed_ns // GC
                    + sum.exit_elapsed_ns // EXIT
@@ -1319,7 +1319,7 @@ stat_exitReport (void)
 
             // This assertion is probably not necessary; make sure the
             // subdivision with PROF also makes sense
-            ASSERT(stats.init_elapsed_ns // INIT
+            WARN(stats.init_elapsed_ns // INIT
                    + stats.mutator_elapsed_ns // MUT
                    + stats.gc_elapsed_ns // GC
                    + sum.exit_elapsed_ns // EXIT
@@ -1401,7 +1401,7 @@ stat_exitReport (void)
                                 - sum.exit_cpu_ns)
                 / TimeToSecondsDbl(stats.cpu_ns);
 
-            ASSERT(sum.productivity_cpu_percent >= 0);
+            WARN(sum.productivity_cpu_percent >= 0);
 
             sum.productivity_elapsed_percent =
                 TimeToSecondsDbl(stats.elapsed_ns
@@ -1410,7 +1410,7 @@ stat_exitReport (void)
                                 - sum.exit_elapsed_ns)
                 / TimeToSecondsDbl(stats.elapsed_ns);
 
-            ASSERT(sum.productivity_elapsed_percent >= 0);
+            WARN(sum.productivity_elapsed_percent >= 0);
 
             for(uint32_t g = 0; g < RtsFlags.GcFlags.generations; ++g) {
                 const generation* gen = &generations[g];
