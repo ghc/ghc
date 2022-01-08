@@ -756,7 +756,7 @@ addSolvedDict what item cls tys
   , instanceReturnsDictCon what
   = do { traceTcS "updSolvedSetTcs:" $ ppr item
        ; updInertTcS $ \ ics ->
-             ics { inert_solved_dicts = addDict (inert_solved_dicts ics) cls tys item } }
+             ics { inert_solved_dicts = addClassDict (inert_solved_dicts ics) cls tys item } }
   | otherwise
   = return ()
 
@@ -1070,7 +1070,7 @@ removeInertCt is ct =
   case ct of
 
     CDictCan  { cc_class = cl, cc_tyargs = tys } ->
-      is { inert_dicts = delDict (inert_dicts is) cl tys }
+      is { inert_dicts = delClassDict (inert_dicts is) cl tys }
 
     CEqCan    { cc_lhs  = lhs, cc_rhs = rhs } -> delEq is lhs rhs
 
@@ -1106,7 +1106,7 @@ lookupInInerts loc pty
 -- | Look up a dictionary inert.
 lookupInertDict :: InertCans -> CtLoc -> Class -> [Type] -> Maybe Ct
 lookupInertDict (IC { inert_dicts = dicts }) loc cls tys
-  = case findDict dicts loc cls tys of
+  = case findClassDict dicts loc cls tys of
       Just ct -> Just ct
       _       -> Nothing
 
@@ -1114,7 +1114,7 @@ lookupInertDict (IC { inert_dicts = dicts }) loc cls tys
 lookupSolvedDict :: InertSet -> CtLoc -> Class -> [Type] -> Maybe CtEvidence
 -- Returns just if exactly this predicate type exists in the solved.
 lookupSolvedDict (IS { inert_solved_dicts = solved }) loc cls tys
-  = case findDict solved loc cls tys of
+  = case findClassDict solved loc cls tys of
       Just ev -> Just ev
       _       -> Nothing
 

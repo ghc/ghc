@@ -1741,10 +1741,6 @@ semigroupClassKey, monoidClassKey :: Unique
 semigroupClassKey = mkPreludeClassUnique 47
 monoidClassKey    = mkPreludeClassUnique 48
 
--- Implicit Parameters
-ipClassKey :: Unique
-ipClassKey = mkPreludeClassUnique 49
-
 -- Overloaded record fields
 hasFieldClassNameKey :: Unique
 hasFieldClassNameKey = mkPreludeClassUnique 50

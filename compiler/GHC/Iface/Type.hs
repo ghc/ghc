@@ -1451,7 +1451,7 @@ pprTyTcApp ctxt_prec tc tys =
     sdocOption sdocPrintTypeAbbreviations $ \print_type_abbreviations ->
     getPprDebug $ \debug ->
 
-    if | ifaceTyConName tc `hasKey` ipClassKey
+    if | ifaceTyConName tc `hasKey` ipPrimTyConKey
        , IA_Arg (IfaceLitTy (IfaceStrTyLit n))
                 Required (IA_Arg ty Required IA_Nil) <- tys
        -> maybeParen ctxt_prec funPrec

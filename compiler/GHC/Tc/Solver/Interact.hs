@@ -18,10 +18,11 @@ import GHC.Core.InstEnv         ( DFunInstType )
 import GHC.Types.Var
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.TcType
-import GHC.Builtin.Names ( coercibleTyConKey, heqTyConKey, eqTyConKey, ipClassKey )
+import GHC.Builtin.Names ( coercibleTyConKey, heqTyConKey, eqTyConKey )
 import GHC.Core.Coercion.Axiom ( CoAxBranch (..), CoAxiom (..), TypeEqn, fromBranches, sfInteractInert, sfInteractTop )
 import GHC.Core.Class
 import GHC.Core.TyCon
+import GHC.Builtin.Types.Prim ( ipPrimTyCon )
 import GHC.Tc.Instance.FunDeps
 import GHC.Tc.Instance.Family
 import GHC.Tc.Instance.Class ( InstanceWhat(..), safeOverlap )
@@ -432,7 +433,10 @@ interactWithInertsStage wi
              CEqCan       {} -> interactEq      ics wi
              CIrredCan    {} -> interactIrred   ics wi
              CDictCan     {} -> interactDict    ics wi
-             CSpecialCan  {} -> continueWith wi -- cannot have Special Givens, so nothing to interact with
+             CSpecialCan  _ ConcretePrimPred _
+                            -> continueWith wi -- cannot have given concrete preds, so nothing to interact with.
+             CSpecialCan  _ (IpPred _) _
+                            -> interactIP ics wi
              _ -> pprPanic "interactWithInerts" (ppr wi) }
                 -- CNonCanonical have been canonicalised
 
@@ -1024,12 +1028,8 @@ interactDict inerts workItem@(CDictCan { cc_ev = ev_w, cc_class = cls, cc_tyargs
            KeepInert -> do { setEvBindIfWanted ev_w (ctEvTerm ev_i)
                            ; return $ Stop ev_w (text "Dict equal" <+> parens (ppr what_next)) }
            KeepWork  -> do { setEvBindIfWanted ev_i (ctEvTerm ev_w)
-                           ; updInertDicts $ \ ds -> delDict ds cls tys
+                           ; updInertDicts $ \ ds -> delClassDict ds cls tys
                            ; continueWith workItem } } }
-
-  | cls `hasKey` ipClassKey
-  , isGiven ev_w
-  = interactGivenIP inerts workItem
 
   | otherwise
   = do { addFunDepWork inerts ev_w cls
@@ -1099,7 +1099,7 @@ shortCutSolver dflags ev_w ev_i
                        , cir_what      = what }
                  | safeOverlap what
                  , all isTyFamFree preds  -- Note [Shortcut solving: type families]
-                 -> do { let solved_dicts' = addDict solved_dicts cls tys ev
+                 -> do { let solved_dicts' = addClassDict solved_dicts cls tys ev
                              -- solved_dicts': it is important that we add our goal
                              -- to the cache before we solve! Otherwise we may end
                              -- up in a loop while solving recursive dictionaries.
@@ -1131,7 +1131,7 @@ shortCutSolver dflags ev_w ev_i
     new_wanted_cached :: CtLoc -> DictMap CtEvidence -> TcPredType -> MaybeT TcS MaybeNew
     new_wanted_cached loc cache pty
       | ClassPred cls tys <- classifyPredType pty
-      = lift $ case findDict cache loc_w cls tys of
+      = lift $ case findClassDict cache loc_w cls tys of
           Just ctev -> return $ Cached (ctEvExpr ctev)
           Nothing   -> Fresh <$> newWantedNC loc pty
       | otherwise = mzero
@@ -1189,22 +1189,30 @@ addFunDepWork inerts work_ev cls
 **********************************************************************
 -}
 
+interactIP :: InertCans -> Ct -> TcS (StopOrContinue Ct)
+interactIP inerts workItem@(CSpecialCan { cc_ev = ev_w })
+  | isGiven ev_w
+  = interactGivenIP inerts workItem
+  | otherwise
+  = continueWith workItem
+
+interactIP _ wi = pprPanic "interactGivenIP" (ppr wi)
+
 interactGivenIP :: InertCans -> Ct -> TcS (StopOrContinue Ct)
 -- Work item is Given (?x:ty)
 -- See Note [Shadowing of Implicit Parameters]
-interactGivenIP inerts workItem@(CDictCan { cc_ev = ev, cc_class = cls
-                                          , cc_tyargs = tys@(ip_str:_) })
-  = do { updInertCans $ \cans -> cans { inert_dicts = addDict filtered_dicts cls tys workItem }
+interactGivenIP inerts workItem@(CSpecialCan { cc_ev = ev, cc_special_pred = IpPred ip_name , cc_xi = ty })
+  = do { updInertCans $ \cans -> cans { inert_dicts = addIpDict filtered_dicts ip_name ty workItem }
        ; stopWith ev "Given IP" }
   where
     dicts           = inert_dicts inerts
-    ip_dicts        = findDictsByClass dicts cls
+    ip_dicts        = findDictsByTyCon dicts ipPrimTyCon
     other_ip_dicts  = filterBag (not . is_this_ip) ip_dicts
-    filtered_dicts  = addDictsByClass dicts cls other_ip_dicts
+    filtered_dicts  = addIpDicts dicts other_ip_dicts
 
     -- Pick out any Given constraints for the same implicit parameter
-    is_this_ip (CDictCan { cc_ev = ev, cc_tyargs = ip_str':_ })
-       = isGiven ev && ip_str `tcEqType` ip_str'
+    is_this_ip (CSpecialCan { cc_ev = ev, cc_special_pred = IpPred ip_name' })
+       = isGiven ev && ip_name' == ip_name
     is_this_ip _ = False
 
 interactGivenIP _ wi = pprPanic "interactGivenIP" (ppr wi)

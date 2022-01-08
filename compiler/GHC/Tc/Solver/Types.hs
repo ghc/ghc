@@ -8,9 +8,9 @@
 -- | Utility types used within the constraint solver
 module GHC.Tc.Solver.Types (
     -- Inert CDictCans
-    DictMap, emptyDictMap, findDictsByClass, addDict, addDictCt,
-    addDictsByClass, delDict, foldDicts, filterDicts, findDict,
-    dictsToBag, partitionDicts,
+    DictMap, emptyDictMap, findDictsByClass, addDict, addClassDict, addIpDict, addDictCt,
+    addDictsByClass, addIpDicts, delDict, delClassDict, foldDicts, filterDicts,
+    findDictsByTyCon, findClassDict, dictsToBag, partitionDicts,
 
     FunEqMap, emptyFunEqs, foldFunEqs, findFunEq, insertFunEq,
     findFunEqsByTyCon,
@@ -34,7 +34,10 @@ import GHC.Core.Map.Type
 import GHC.Core.Predicate
 import GHC.Core.TyCon
 import GHC.Core.TyCon.Env
+import GHC.Core.Type ( mkStrLitTy )
+import GHC.Builtin.Types.Prim ( ipPrimTyCon )
 
+import GHC.Data.FastString
 import GHC.Data.Bag
 import GHC.Data.Maybe
 import GHC.Data.TrieMap
@@ -133,8 +136,8 @@ type DictMap a = TcAppMap a
 emptyDictMap :: DictMap a
 emptyDictMap = emptyTcAppMap
 
-findDict :: DictMap a -> CtLoc -> Class -> [Type] -> Maybe a
-findDict m _loc cls tys
+findClassDict :: DictMap a -> CtLoc -> Class -> [Type] -> Maybe a
+findClassDict m _loc cls tys
   | hasIPSuperClasses cls tys -- See Note [Tuples hiding implicit parameters]
   = Nothing
 
@@ -145,16 +148,28 @@ findDict m _loc cls tys
   | otherwise
   = findTcApp m (classTyCon cls) tys
 
+findDictsByTyCon :: DictMap a -> TyCon -> Bag a
+findDictsByTyCon m tc
+  | Just tm <- lookupDTyConEnv m tc = foldTM consBag tm emptyBag
+  | otherwise                       = emptyBag
+
 findDictsByClass :: DictMap a -> Class -> Bag a
-findDictsByClass m cls
-  | Just tm <- lookupDTyConEnv m (classTyCon cls) = foldTM consBag tm emptyBag
-  | otherwise                                     = emptyBag
+findDictsByClass m cls = findDictsByTyCon m (classTyCon cls)
 
-delDict :: DictMap a -> Class -> [Type] -> DictMap a
-delDict m cls tys = delTcApp m (classTyCon cls) tys
+delDict :: DictMap a -> TyCon -> [Type] -> DictMap a
+delDict m tc tys = delTcApp m tc tys
 
-addDict :: DictMap a -> Class -> [Type] -> a -> DictMap a
-addDict m cls tys item = insertTcApp m (classTyCon cls) tys item
+delClassDict :: DictMap a -> Class -> [Type] -> DictMap a
+delClassDict m cls tys = delDict m (classTyCon cls) tys
+
+addDict :: DictMap a -> TyCon -> [Type] -> a -> DictMap a
+addDict m tc tys item = insertTcApp m tc tys item
+
+addClassDict :: DictMap a -> Class -> [Type] -> a -> DictMap a
+addClassDict m cls tys item = addDict m (classTyCon cls) tys item
+
+addIpDict :: DictMap a -> FastString -> Type -> a -> DictMap a
+addIpDict m ip_name ty item = addDict m ipPrimTyCon [mkStrLitTy ip_name, ty] item
 
 addDictCt :: DictMap Ct -> TyCon -> [Type] -> Ct -> DictMap Ct
 -- Like addDict, but combines [W] and [D] to [WD]
@@ -183,6 +198,14 @@ addDictsByClass m cls items
     add ct@(CDictCan { cc_tyargs = tys }) tm = insertTM tys ct tm
     add ct _ = pprPanic "addDictsByClass" (ppr ct)
 
+addIpDicts :: DictMap Ct -> Bag Ct -> DictMap Ct
+addIpDicts m items
+  = extendDTyConEnv m ipPrimTyCon (foldr add emptyTM items)
+  where
+    add ct@(CSpecialCan { cc_special_pred = IpPred ip_name, cc_xi = ty }) tm
+      = insertTM [mkStrLitTy ip_name, ty] ct tm
+    add ct _ = pprPanic "addIpDicts" (ppr ct)
+
 filterDicts :: (Ct -> Bool) -> DictMap Ct -> DictMap Ct
 filterDicts f m = filterTcAppMap f m
 
@@ -192,7 +215,9 @@ partitionDicts f m = foldTcAppMap k m (emptyBag, emptyDictMap)
     k ct (yeses, noes) | f ct      = (ct `consBag` yeses, noes)
                        | otherwise = (yeses,              add ct noes)
     add ct@(CDictCan { cc_class = cls, cc_tyargs = tys }) m
-      = addDict m cls tys ct
+      = addClassDict m cls tys ct
+    add ct@(CSpecialCan { cc_special_pred = IpPred ip_name, cc_xi = ty }) m
+      = addIpDict m ip_name ty ct
     add ct _ = pprPanic "partitionDicts" (ppr ct)
 
 dictsToBag :: DictMap a -> Bag a
