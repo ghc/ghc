@@ -82,6 +82,9 @@ test('divbyzero',
       when(opsys('mingw32'), omit_ways(prof_ways))],
      compile_and_run, ['-with-rtsopts="--generate-stack-traces=no"'])
 
+def remove_parenthesis(s):
+    return re.sub(r'\s+\([^)]*\)', '', s)
+
 test('outofmem', [ when(opsys('darwin'), skip),
                    # this is believed to cause other processes to die
                    # that happen concurrently while the outofmem test
@@ -89,7 +92,8 @@ test('outofmem', [ when(opsys('darwin'), skip),
                    # windows, to prevent absolute exhaustion of memory
                    # and subsequent termination (and failure) of unrelated
                    # tests.
-                   when(opsys('mingw32'), skip) ],
+                   when(opsys('mingw32'), skip),
+		   normalise_errmsg_fun(remove_parenthesis)],
                  makefile_test, ['outofmem'])
 test('outofmem2', normal, makefile_test, ['outofmem2'])
 
