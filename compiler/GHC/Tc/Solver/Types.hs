@@ -9,8 +9,8 @@
 module GHC.Tc.Solver.Types (
     -- Inert CDictCans
     DictMap, emptyDictMap, findDictsByClass, addDict, addClassDict, addIpDict, addDictCt,
-    addDictsByClass, addIpDicts, delDict, delClassDict, foldDicts, filterDicts,
-    findDictsByTyCon, findClassDict, dictsToBag, partitionDicts,
+    addDictsByClass, addIpDicts, delDict, delClassDict, delIpDict, foldDicts, filterDicts,
+    findDictsByTyCon, findClassDict, findIpDict, dictsToBag, partitionDicts,
 
     FunEqMap, emptyFunEqs, foldFunEqs, findFunEq, insertFunEq,
     findFunEqsByTyCon,
@@ -27,6 +27,7 @@ module GHC.Tc.Solver.Types (
 import GHC.Prelude
 
 import GHC.Tc.Types.Constraint
+import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcType
 
 import GHC.Core.Class
@@ -148,6 +149,14 @@ findClassDict m _loc cls tys
   | otherwise
   = findTcApp m (classTyCon cls) tys
 
+findIpDict :: DictMap a -> CtLoc -> FastString -> Type -> Maybe a
+findIpDict m loc ip_name ty
+  |  isPushCallStackOrigin (ctLocOrigin loc)
+  = Nothing             -- See Note [Solving CallStack constraints]
+
+  | otherwise
+  = findTcApp m ipPrimTyCon [mkStrLitTy ip_name, ty] 
+
 findDictsByTyCon :: DictMap a -> TyCon -> Bag a
 findDictsByTyCon m tc
   | Just tm <- lookupDTyConEnv m tc = foldTM consBag tm emptyBag
@@ -161,6 +170,9 @@ delDict m tc tys = delTcApp m tc tys
 
 delClassDict :: DictMap a -> Class -> [Type] -> DictMap a
 delClassDict m cls tys = delDict m (classTyCon cls) tys
+
+delIpDict :: DictMap a -> FastString -> Type -> DictMap a
+delIpDict m ip_name ty = delDict m ipPrimTyCon [mkStrLitTy ip_name, ty]
 
 addDict :: DictMap a -> TyCon -> [Type] -> a -> DictMap a
 addDict m tc tys item = insertTcApp m tc tys item

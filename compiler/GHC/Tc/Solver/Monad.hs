@@ -68,7 +68,7 @@ module GHC.Tc.Solver.Monad (
     addInertCan, insertFunEq, addInertForAll,
     emitWorkNC, emitWork,
     isImprovable,
-    lookupInertDict,
+    lookupInertDict, lookupInertIp,
 
     -- The Model
     kickOutAfterUnification,
@@ -161,6 +161,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Logger
 import GHC.Utils.Misc (HasDebugCallStack)
 import GHC.Data.Bag as Bag
+import GHC.Data.FastString
 import GHC.Types.Unique.Supply
 import GHC.Tc.Types
 import GHC.Tc.Types.Origin
@@ -1107,6 +1108,12 @@ lookupInInerts loc pty
 lookupInertDict :: InertCans -> CtLoc -> Class -> [Type] -> Maybe Ct
 lookupInertDict (IC { inert_dicts = dicts }) loc cls tys
   = case findClassDict dicts loc cls tys of
+      Just ct -> Just ct
+      _       -> Nothing
+
+lookupInertIp :: InertCans -> CtLoc -> FastString -> Type -> Maybe Ct
+lookupInertIp (IC { inert_dicts = dicts }) loc ip_name ty
+  = case findIpDict dicts loc ip_name ty of
       Just ct -> Just ct
       _       -> Nothing
 

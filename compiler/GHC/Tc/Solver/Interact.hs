@@ -1190,9 +1190,25 @@ addFunDepWork inerts work_ev cls
 -}
 
 interactIP :: InertCans -> Ct -> TcS (StopOrContinue Ct)
-interactIP inerts workItem@(CSpecialCan { cc_ev = ev_w })
+interactIP inerts workItem@(CSpecialCan { cc_ev = ev_w, cc_special_pred = IpPred ip_name, cc_xi = ty })
+  | Just ct_i <- lookupInertIp inerts (ctEvLoc ev_w) ip_name ty
+  , let ev_i = ctEvidence ct_i
+  = do { -- Ths short-cut solver didn't fire, so we
+         -- solve ev_w from the matching inert ev_i we found
+         what_next <- solveOneFromTheOther ev_i ev_w
+       ; traceTcS "lookupInertDict" (ppr what_next)
+       ; case what_next of
+           KeepBoth  -> continueWith workItem
+           KeepInert -> do { setEvBindIfWanted ev_w (ctEvTerm ev_i)
+                           ; return $ Stop ev_w (text "Dict equal" <+> parens (ppr what_next)) }
+           KeepWork  -> do { setEvBindIfWanted ev_i (ctEvTerm ev_w)
+                           ; updInertDicts $ \ ds -> delIpDict ds ip_name ty
+                           ; continueWith workItem } }
+
+
   | isGiven ev_w
   = interactGivenIP inerts workItem
+
   | otherwise
   = continueWith workItem
 
@@ -1201,7 +1217,7 @@ interactIP _ wi = pprPanic "interactGivenIP" (ppr wi)
 interactGivenIP :: InertCans -> Ct -> TcS (StopOrContinue Ct)
 -- Work item is Given (?x:ty)
 -- See Note [Shadowing of Implicit Parameters]
-interactGivenIP inerts workItem@(CSpecialCan { cc_ev = ev, cc_special_pred = IpPred ip_name , cc_xi = ty })
+interactGivenIP inerts workItem@(CSpecialCan { cc_ev = ev, cc_special_pred = IpPred ip_name, cc_xi = ty })
   = do { updInertCans $ \cans -> cans { inert_dicts = addIpDict filtered_dicts ip_name ty workItem }
        ; stopWith ev "Given IP" }
   where
