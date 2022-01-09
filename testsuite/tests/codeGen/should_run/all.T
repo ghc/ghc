@@ -29,7 +29,7 @@ test('cgrun021', extra_ways(['nursery_chunks']), compile_and_run, [''])
 test('cgrun022', normal, compile_and_run, [''])
 test('cgrun024', normal, compile_and_run, [''])
 test('cgrun025',
-     [ extra_run_opts('cgrun025.hs'), exit_code(1)],
+     [ extra_run_opts('cgrun025.hs < /dev/null'), exit_code(1)],
      compile_and_run, [''])
 test('cgrun026', normal, compile_and_run, [''])
 test('cgrun027', normal, compile_and_run, [''])
