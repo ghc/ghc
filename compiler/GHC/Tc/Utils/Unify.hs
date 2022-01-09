@@ -335,16 +335,14 @@ matchExpectedFunTys herald ctx lmatchpats orig_ty thing_inside
                  { (wrap_res, result) <- go (bndr : bndrs) pats res_ty
                  ; traceTc "current vispat" (ppr pat)
                  ; fun_wrap <- mkWpFun idHsWrapper wrap_res scaled_arg_ty res_ty (WpFunFunExpTy orig_ty)
-                                  -- ; let names = collectPatBinders CollNoDictBinders lpat
-                                  -- ; ids <- tcLookupLocalIds names
-                 ; return ( fun_wrap, result ) --; tcExtendIdEnv ids $ return ( fun_wrap, result )
+                 ; return ( fun_wrap, result )
                  }
-               ((bndr@(Named (Bndr _ Specified)), Just pat@(L _ (InvisTyVarPat _ _))), ForAllTy (Bndr var Specified) ty') -> do
+               ((bndr@(Named (Bndr _ Specified)), Just pat@(L _ (InvisTyVarPat _ _))), ForAllTy (Bndr var _) ty') -> do
                  { (wrap_res, result) <- go (bndr : bndrs) pats ty'
                  ; traceTc "current invispat" (ppr pat)
                  ; let wrap_gen = WpTyLam var
                  ; return (wrap_gen <.> wrap_res, result) }
-               ((bndr@(Named (Bndr _ Specified)), Just (L _ (InvisWildTyPat _))), ForAllTy (Bndr var Specified) ty') -> do
+               ((bndr@(Named (Bndr _ Specified)), Just (L _ (InvisWildTyPat _))), ForAllTy (Bndr var _) ty') -> do
                  { (wrap_res, result) <- go (bndr : bndrs) pats ty'
                  ; let wrap_gen = WpTyLam var
                  ; return (wrap_gen <.> wrap_res, result) }

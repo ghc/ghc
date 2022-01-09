@@ -186,7 +186,7 @@ dsHsBind dflags b@(FunBind { fun_id = L loc fun
           --                          , ppr args, ppr core_binds, ppr body']) $
           return (force_var, [core_binds]) }
 
-dsHsBind dflags (PatBind { pat_lhs = pat, pat_rhs = grhss
+dsHsBind dflags (PatBind { pat_lhs = L _ (VisPat _ pat), pat_rhs = grhss
                          , pat_ext = ty
                          , pat_ticks = (rhs_tick, var_ticks) })
   = do  { rhss_nablas <- pmcGRHSs PatBindGuards grhss
@@ -200,6 +200,13 @@ dsHsBind dflags (PatBind { pat_lhs = pat, pat_rhs = grhss
                            then [force_var]
                            else []
         ; return (force_var', sel_binds) }
+
+dsHsBind _ (PatBind { pat_lhs = L _ (InvisTyVarPat _ lidp) })
+  = do { let id = varToCoreExpr (unLoc lidp)
+       ; return ([], [(unLoc lidp, id)])}
+
+dsHsBind _ (PatBind { pat_lhs = L _ (InvisWildTyPat _) })
+  = pure ([], [])
 
 dsHsBind dflags (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dicts
                           , abs_exports = exports

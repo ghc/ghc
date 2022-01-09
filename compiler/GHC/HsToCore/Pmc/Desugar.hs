@@ -11,7 +11,7 @@
 -- In terms of the paper, this module is concerned with Sections 3.1, Figure 4,
 -- in particular.
 module GHC.HsToCore.Pmc.Desugar (
-      desugarPatBind, desugarGRHSs, desugarMatches, desugarEmptyCase
+      desugarMatchPatBind, desugarGRHSs, desugarMatches, desugarEmptyCase
     ) where
 
 import GHC.Prelude
@@ -102,6 +102,11 @@ mkPmLitGrds x lit = do
                   , pm_con_dicts = []
                   , pm_con_args = [] }
   pure [grd]
+
+desugarMatchPat :: Id -> MatchPat GhcTc -> DsM [PmGrd]
+desugarMatchPat x (VisPat _ (L _ pat)) = desugarPat x pat
+desugarMatchPat x (InvisTyVarPat _ y)  = pure (mkPmLetVar (unLoc y) x)
+desugarMatchPat _ (InvisWildTyPat _)   = pure []
 
 -- | @desugarPat _ x pat@ transforms @pat@ into a '[PmGrd]', where
 -- the variable representing the match is @x@.
@@ -255,8 +260,7 @@ desugarLPat :: Id -> LPat GhcTc -> DsM [PmGrd]
 desugarLPat x = desugarPat x . unLoc
 
 desugarLMatchPat :: Id -> LMatchPat GhcTc -> DsM [PmGrd]
-desugarLMatchPat x (L _ (VisPat _ pat)) = desugarLPat x pat
-desugarLMatchPat _ _                    = panic "we don't have other patterns yet"
+desugarLMatchPat x lmatchpat = desugarMatchPat x (unLoc lmatchpat)
 
 -- | 'desugarLPat', but also select and return a new match var.
 desugarLPatV :: LPat GhcTc -> DsM (Id, [PmGrd])
@@ -319,10 +323,10 @@ desugarConPatOut x con univ_tys ex_tvs dicts = \case
       -- tracePm "ConPatOut" (ppr x $$ ppr con $$ ppr arg_ids)
       pure (con_grd : arg_grds)
 
-desugarPatBind :: SrcSpan -> Id -> Pat GhcTc -> DsM (PmPatBind Pre)
+desugarMatchPatBind :: SrcSpan -> Id -> MatchPat GhcTc -> DsM (PmPatBind Pre)
 -- See 'GrdPatBind' for how this simply repurposes GrdGRHS.
-desugarPatBind loc var pat =
-  PmPatBind . flip PmGRHS (SrcInfo (L loc (ppr pat))) . GrdVec <$> desugarPat var pat
+desugarMatchPatBind loc var pat =
+  PmPatBind . flip PmGRHS (SrcInfo (L loc (ppr pat))) . GrdVec <$> desugarMatchPat var pat
 
 desugarEmptyCase :: Id -> DsM PmEmptyCase
 desugarEmptyCase var = pure PmEmptyCase { pe_var = var }

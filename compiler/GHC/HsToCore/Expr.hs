@@ -211,7 +211,7 @@ dsUnliftedBind (PatBind {pat_lhs = pat, pat_rhs = grhss
              eqn = EqnInfo { eqn_pats = [upat],
                              eqn_orig = FromSource,
                              eqn_rhs = cantFailMatchResult body }
-       ; var    <- selectMatchVar Many upat
+       ; var    <- selectMatchPatVar Many (unLoc pat)
                     -- `var` will end up in a let binder, so the multiplicity
                     -- doesn't matter.
        ; result <- matchEquations PatBindRhs [var] [eqn] (exprType body)
@@ -751,7 +751,7 @@ dsExpr (HsTcBracketOut _ hs_wrapper x ps) = dsBracket hs_wrapper x ps
 dsExpr (HsSpliceE _ s)         = pprPanic "dsExpr:splice" (ppr s)
 
 -- Arrow notation extension
-dsExpr (HsProc _ pat cmd) = dsProcExpr pat cmd
+dsExpr (HsProc _ pat cmd) = dsProcExpr (mkVisMatchPat pat) cmd
 
 
 -- HsSyn constructs that just shouldn't be here, because
@@ -927,7 +927,7 @@ dsDo ctx stmts
       = do  { body     <- goL stmts
             ; rhs'     <- dsLExpr rhs
             ; var   <- selectSimpleMatchVarL (xbstc_boundResultMult xbs) pat
-            ; match <- matchSinglePatVar var Nothing (StmtCtxt (HsDoStmt ctx)) pat
+            ; match <- matchSinglePatVar var Nothing (StmtCtxt (HsDoStmt ctx)) (mkVisMatchPat pat)
                          (xbstc_boundResultType xbs) (cantFailMatchResult body)
             ; match_code <- dsHandleMonadicFailure ctx pat match (xbstc_failOp xbs)
             ; dsSyntaxExpr (xbstc_bindOp xbs) [rhs', Lam var match_code] }
@@ -948,7 +948,7 @@ dsDo ctx stmts
 
            ; let match_args (pat, fail_op) (vs,body)
                    = do { var   <- selectSimpleMatchVarL Many pat
-                        ; match <- matchSinglePatVar var Nothing (StmtCtxt (HsDoStmt ctx)) pat
+                        ; match <- matchSinglePatVar var Nothing (StmtCtxt (HsDoStmt ctx)) (mkVisMatchPat pat)
                                    body_ty (cantFailMatchResult body)
                         ; match_code <- dsHandleMonadicFailure ctx pat match fail_op
                         ; return (var:vs, match_code)

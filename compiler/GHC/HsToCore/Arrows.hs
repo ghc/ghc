@@ -273,21 +273,21 @@ mkHsEnvStackExpr env_ids stack_id
 --              where (xs) is the tuple of variables bound by p
 
 dsProcExpr
-        :: LPat GhcTc
+        :: LMatchPat GhcTc
         -> LHsCmdTop GhcTc
         -> DsM CoreExpr
 dsProcExpr pat (L _ (HsCmdTop (CmdTopTc _unitTy cmd_ty ids) cmd)) = do
     (meth_binds, meth_ids) <- mkCmdEnv ids
-    let locals = mkVarSet (collectPatBinders CollWithDictBinders pat)
+    let locals = mkVarSet (collectLMatchPatBinders CollWithDictBinders pat)
     (core_cmd, _free_vars, env_ids)
        <- dsfixCmd meth_ids locals unitTy cmd_ty cmd
     let env_ty = mkBigCoreVarTupTy env_ids
     let env_stk_ty = mkCorePairTy env_ty unitTy
     let env_stk_expr = mkCorePairExpr (mkBigCoreVarTup env_ids) mkCoreUnitExpr
     fail_expr <- mkFailExpr (ArrowMatchCtxt ProcExpr) env_stk_ty
-    var <- selectSimpleMatchVarL Many pat
+    var <- selectSimpleMatchPatVarL Many pat
     match_code <- matchSimply (Var var) (ArrowMatchCtxt ProcExpr) pat env_stk_expr fail_expr
-    let pat_ty = hsLPatType pat
+    let pat_ty = hsLMatchPatType pat
     let proc_code = do_premap meth_ids pat_ty env_stk_ty cmd_ty
                     (Lam var match_code)
                     core_cmd
@@ -411,7 +411,7 @@ dsCmd ids local_vars stack_ty res_ty
           = (L _ [L _ (Match { m_pats  = pats
                              , m_grhss = GRHSs _ [L _ (GRHS _ [] body)] _ })]) }))
         env_ids
-  = dsCmdLam ids local_vars stack_ty res_ty (discardLInvisPats pats) body env_ids
+  = dsCmdLam ids local_vars stack_ty res_ty pats body env_ids
 
 dsCmd ids local_vars stack_ty res_ty (HsCmdPar _ _ cmd _) env_ids
   = dsLCmd ids local_vars stack_ty res_ty cmd env_ids
@@ -559,7 +559,7 @@ dsCmd ids local_vars stack_ty res_ty
       (HsCmdLamCase _ mg@MG { mg_ext = MatchGroupTc [Scaled arg_mult arg_ty] _ }) env_ids = do
   arg_id <- newSysLocalDs arg_mult arg_ty
   let case_cmd  = noLocA $ HsCmdCase noExtField (nlHsVar arg_id) mg
-  dsCmdLam ids local_vars stack_ty res_ty [nlVarPat arg_id] case_cmd env_ids
+  dsCmdLam ids local_vars stack_ty res_ty [mkVisMatchPat (nlVarPat arg_id)] case_cmd env_ids
 
 -- D; ys |-a cmd : stk --> t
 -- ----------------------------------
@@ -691,7 +691,7 @@ dsCmdLam :: DsCmdEnv            -- arrow combinators
          -> IdSet               -- set of local vars available to this command
          -> Type                -- type of the stack (right-nested tuple)
          -> Type                -- return type of the command
-         -> [LPat GhcTc]        -- argument patterns to desugar
+         -> [LMatchPat GhcTc]   -- argument patterns to desugar
          -> LHsCmd GhcTc        -- body to desugar
          -> [Id]                -- list of vars in the input to this command
                                 -- This is typically fed back,
@@ -699,7 +699,7 @@ dsCmdLam :: DsCmdEnv            -- arrow combinators
          -> DsM (CoreExpr,      -- desugared expression
                  DIdSet)        -- subset of local vars that occur free
 dsCmdLam ids local_vars stack_ty res_ty pats body env_ids = do
-    let pat_vars = mkVarSet (collectPatsBinders CollWithDictBinders pats)
+    let pat_vars = mkVarSet (collectLMatchPatsBinders CollWithDictBinders pats)
     let local_vars' = pat_vars `unionVarSet` local_vars
         (pat_tys, stack_ty') = splitTypeAt (length pats) stack_ty
     (core_body, free_vars, env_ids')
@@ -865,7 +865,7 @@ dsCmdStmt ids local_vars out_ids (BindStmt _ pat cmd) env_ids = do
     fail_expr <- mkFailExpr (StmtCtxt (HsDoStmt (DoExpr Nothing))) out_ty
     pat_id    <- selectSimpleMatchVarL Many pat
     match_code
-      <- matchSimply (Var pat_id) (StmtCtxt (HsDoStmt (DoExpr Nothing))) pat body_expr fail_expr
+      <- matchSimply (Var pat_id) (StmtCtxt (HsDoStmt (DoExpr Nothing))) (mkVisMatchPat pat) body_expr fail_expr
     pair_id   <- newSysLocalDs Many after_c_ty
     let
         proj_expr = Lam pair_id (coreCasePair pair_id pat_id env_id match_code)
@@ -1094,7 +1094,7 @@ dsCmdStmts _ _ _ [] _ = panic "dsCmdStmts []"
 
 matchSimplys :: [CoreExpr]              -- Scrutinees
              -> HsMatchContext GhcRn    -- Match kind
-             -> [LPat GhcTc]            -- Patterns they should match
+             -> [LMatchPat GhcTc]            -- Patterns they should match
              -> CoreExpr                -- Return this if they all match
              -> CoreExpr                -- Return this if they don't
              -> DsM CoreExpr

@@ -20,7 +20,7 @@
 -- See Note [Language.Haskell.Syntax.* Hierarchy] for why not GHC.Hs.*
 module Language.Haskell.Syntax.Pat (
         Pat(..), LPat, MatchPat(..), LMatchPat,
-        isVis, discardLInvisPats, discardLVisPats, ConLikeP,
+        isVis, discardLInvisPats, discardLInvisPats', discardLVisPats, ConLikeP,
 
         HsConPatDetails, hsConPatArgs,
         HsRecFields(..), HsFieldBind(..), LHsFieldBind,
@@ -236,6 +236,15 @@ discardLInvisPats (x : xs) =
   case unXRec @pass x of
     VisPat _ pat -> pat : discardLInvisPats xs
     _            -> discardLInvisPats xs
+
+discardLInvisPats' :: forall pass. UnXRec pass => [MatchPat pass] -> [Pat pass]
+    -- this is a temporary function that we remove for the final version
+discardLInvisPats' [] = []
+discardLInvisPats' (x : xs) =
+  case x of
+    VisPat _ pat -> case unXRec @pass pat of
+      pat -> pat : discardLInvisPats' xs
+    _            -> discardLInvisPats' xs
 
 discardLVisPats :: forall pass. UnXRec pass => [LMatchPat pass] -> [MatchPat pass]
     -- this is a temporary function that we remove for the final version

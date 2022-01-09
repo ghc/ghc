@@ -154,21 +154,21 @@ matchOneConLike vars ty mult (eqn1 :| eqns)   -- All eqns for a single construct
                      }
 
               shift (_, eqn@(EqnInfo
-                             { eqn_pats = ConPat
+                             { eqn_pats = VisPat _ (L _ (ConPat
                                { pat_args = args
                                , pat_con_ext = ConPatTc
                                  { cpt_tvs = tvs
                                  , cpt_dicts = ds
                                  , cpt_binds = bind
                                  }
-                               } : pats
+                               })) : pats
                              }))
                 = do ds_bind <- dsTcEvBinds bind
                      return ( wrapBinds (tvs `zip` tvs1)
                             . wrapBinds (ds  `zip` dicts1)
                             . mkCoreLets ds_bind
                             , eqn { eqn_orig = Generated
-                                  , eqn_pats = conArgPats val_arg_tys args ++ pats }
+                                  , eqn_pats = map mkVisMatchPat' (conArgPats val_arg_tys args) ++ pats }
                             )
               shift (_, (EqnInfo { eqn_pats = ps })) = pprPanic "matchOneCon/shift" (ppr ps)
         ; let scaled_arg_tys = map (scaleScaled mult) val_arg_tys
@@ -185,7 +185,7 @@ matchOneConLike vars ty mult (eqn1 :| eqns)   -- All eqns for a single construct
 
         -- Divide into sub-groups; see Note [Record patterns]
         ; let groups :: [[(ConArgPats, EquationInfo)]]
-              groups = groupBy compatible_pats [ (pat_args (firstPat eqn), eqn)
+              groups = groupBy compatible_pats [ (pat_args (firstPat' eqn), eqn)
                                                | eqn <- eqn1:eqns ]
 
         ; match_results <- mapM (match_group arg_vars) groups
@@ -195,15 +195,15 @@ matchOneConLike vars ty mult (eqn1 :| eqns)   -- All eqns for a single construct
                               alt_wrapper = wrapper1,
                               alt_result = foldr1 combineMatchResults match_results } }
   where
-    ConPat { pat_con = L _ con1
-           , pat_args = args1
-           , pat_con_ext = ConPatTc
-             { cpt_arg_tys = arg_tys
-             , cpt_wrap = wrapper1
-             , cpt_tvs = tvs1
-             , cpt_dicts = dicts1
-             }
-           } = firstPat eqn1
+    VisPat _ (L _ (ConPat { pat_con = L _ con1
+                          , pat_args = args1
+                          , pat_con_ext = ConPatTc
+                            { cpt_arg_tys = arg_tys
+                            , cpt_wrap = wrapper1
+                            , cpt_tvs = tvs1
+                            , cpt_dicts = dicts1
+                            }
+                          })) = firstPat eqn1
     fields1 = map flSelector (conLikeFieldLabels con1)
 
     ex_tvs = conLikeExTyCoVars con1

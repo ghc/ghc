@@ -43,8 +43,9 @@ hsLPatType :: LPat GhcTc -> Type
 hsLPatType (L _ p) = hsPatType p
 
 hsLMatchPatType :: LMatchPat GhcTc -> Type
-hsLMatchPatType (L _ (VisPat _ p)) = hsPatType (unLoc p)
-hsLMatchPatType _                  = panic "we don't have that yes"
+hsLMatchPatType (L _ (VisPat _ p))           = hsPatType (unLoc p)
+hsLMatchPatType (L _ (InvisTyVarPat _ lipd)) = idType (unLoc lipd)
+hsLMatchPatType (L _ (InvisWildTyPat ty))    = ty
 
 hsPatType :: Pat GhcTc -> Type
 hsPatType (ParPat _ _ pat _)            = hsLPatType pat

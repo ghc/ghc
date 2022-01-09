@@ -275,7 +275,7 @@ matchBangs (var :| vars) ty eqns
 matchCoercion :: NonEmpty MatchId -> Type -> NonEmpty EquationInfo -> DsM (MatchResult CoreExpr)
 -- Apply the coercion to the match variable and then match that
 matchCoercion (var :| vars) ty (eqns@(eqn1 :| _))
-  = do  { let XPat (CoPat co pat _) = firstPat eqn1
+  = do  { let VisPat _ (L _ (XPat (CoPat co pat _))) = firstPat eqn1
         ; let pat_ty' = hsPatType pat
         ; var' <- newUniqueId var (idMult var) pat_ty'
         ; match_result <- match (var':vars) ty $ NEL.toList $
@@ -290,7 +290,7 @@ matchView (var :| vars) ty (eqns@(eqn1 :| _))
   = do  { -- we could pass in the expr from the PgView,
          -- but this needs to extract the pat anyway
          -- to figure out the type of the fresh variable
-         let TcViewPat viewExpr pat = firstPat eqn1
+         let VisPat _ (L _ (TcViewPat viewExpr pat)) = firstPat eqn1
          -- do the rest of the compilation
         ; let pat_ty' = hsPatType pat
         ; var' <- newUniqueId var (idMult var) pat_ty'
@@ -303,17 +303,17 @@ matchView (var :| vars) ty (eqns@(eqn1 :| _))
                     match_result) }
 
 -- decompose the first pattern and leave the rest alone
-decomposeFirstPat :: (Pat GhcTc -> Pat GhcTc) -> EquationInfo -> EquationInfo
+decomposeFirstPat :: (MatchPat GhcTc -> MatchPat GhcTc) -> EquationInfo -> EquationInfo
 decomposeFirstPat extractpat (eqn@(EqnInfo { eqn_pats = pat : pats }))
         = eqn { eqn_pats = extractpat pat : pats}
 decomposeFirstPat _ _ = panic "decomposeFirstPat"
 
-getCoPat, getBangPat, getViewPat :: Pat GhcTc -> Pat GhcTc
-getCoPat (XPat (CoPat _ pat _)) = pat
+getCoPat, getBangPat, getViewPat :: MatchPat GhcTc -> MatchPat GhcTc
+getCoPat (VisPat _ (L _ (XPat (CoPat _ pat _)))) = VisPat noExtField (L noSrcSpanA pat)
 getCoPat _                   = panic "getCoPat"
-getBangPat (BangPat _ pat  ) = unLoc pat
+getBangPat (VisPat _ (L _ ((BangPat _ pat))))    = VisPat noExtField pat
 getBangPat _                 = panic "getBangPat"
-getViewPat (TcViewPat _ pat) = pat
+getViewPat (VisPat _ (L _ (TcViewPat _ pat)))    = VisPat noExtField (L noSrcSpanA pat)
 getViewPat _                 = panic "getViewPat"
 
 -- | Use this pattern synonym to match on a 'ViewPat'.
@@ -403,8 +403,20 @@ tidyEqnInfo _ (EqnInfo { eqn_pats = [] })
   = panic "tidyEqnInfo"
 
 tidyEqnInfo v eqn@(EqnInfo { eqn_pats = pat : pats, eqn_orig = orig })
-  = do { (wrap, pat') <- tidy1 v orig pat
+  = do { (wrap, pat') <- tidy1' v orig pat
        ; return (wrap, eqn { eqn_pats = pat' : pats }) }
+
+tidy1' :: Id
+       -> Origin
+       -> MatchPat GhcTc
+       -> DsM (DsWrapper,
+               MatchPat GhcTc)
+tidy1' v o (VisPat ty (L loc pat))
+  = do { (wrap, pat') <- tidy1 v o pat
+       ; return (wrap, VisPat ty (L loc pat')) }
+tidy1' v _ (InvisTyVarPat _ (L _ var)) = return (wrapBind var v, InvisWildTyPat (idType var))
+tidy1' _ _ (InvisWildTyPat ty) = return (idDsWrapper, InvisWildTyPat ty)
+
 
 tidy1 :: Id                  -- The Id being scrutinised
       -> Origin              -- Was this a pattern the user wrote?
@@ -752,10 +764,10 @@ matchWrapper ctxt mb_scr (MG { mg_alts = L _ matches
         ; new_vars    <- case matches of
                            []    -> newSysLocalsDs arg_tys
                            (m:_) ->
-                            selectMatchVars (zipWithEqual "matchWrapper"
-                                              (\a b -> (scaledMult a, unLoc b))
-                                                arg_tys
-                                                (discardLInvisPats (hsLMatchPats m)))
+                            selectMatchPatVars (zipWithEqual "matchWrapper"
+                                                 (\a b -> (scaledMult a, unLoc b))
+                                                   arg_tys
+                                                  (hsLMatchPats m))
 
         -- Pattern match check warnings for /this match-group/.
         -- @rhss_nablas@ is a flat list of covered Nablas for each RHS.
@@ -776,7 +788,7 @@ matchWrapper ctxt mb_scr (MG { mg_alts = L _ matches
     mk_eqn_info :: LMatch GhcTc (LHsExpr GhcTc) -> (Nablas, NonEmpty Nablas) -> DsM EquationInfo
     mk_eqn_info (L _ (Match { m_pats = pats, m_grhss = grhss })) (pat_nablas, rhss_nablas)
       = do { dflags <- getDynFlags
-           ; let upats = map (unLoc . decideBangHood dflags) (discardLInvisPats pats)
+           ; let upats = map (unLoc . decideLMatchPatBangHood dflags) pats
            -- pat_nablas is the covered set *after* matching the pattern, but
            -- before any of the GRHSs. We extend the environment with pat_nablas
            -- (via updPmNablas) so that the where-clause of 'grhss' can profit
@@ -816,7 +828,7 @@ matchEquations ctxt vars eqns_info rhs_ty
 -- pattern. It returns an expression.
 matchSimply :: CoreExpr                 -- ^ Scrutinee
             -> HsMatchContext GhcRn     -- ^ Match kind
-            -> LPat GhcTc               -- ^ Pattern it should match
+            -> LMatchPat GhcTc          -- ^ Pattern it should match
             -> CoreExpr                 -- ^ Return this if it matches
             -> CoreExpr                 -- ^ Return this if it doesn't
             -> DsM CoreExpr
@@ -837,7 +849,7 @@ matchSimply scrut hs_ctx pat result_expr fail_expr = do
     match_result' <- matchSinglePat scrut hs_ctx pat rhs_ty match_result
     extractMatchResult match_result' fail_expr
 
-matchSinglePat :: CoreExpr -> HsMatchContext GhcRn -> LPat GhcTc
+matchSinglePat :: CoreExpr -> HsMatchContext GhcRn -> LMatchPat GhcTc
                -> Type -> MatchResult CoreExpr -> DsM (MatchResult CoreExpr)
 -- matchSinglePat ensures that the scrutinee is a variable
 -- and then calls matchSinglePatVar
@@ -851,7 +863,7 @@ matchSinglePat (Var var) ctx pat ty match_result
   = matchSinglePatVar var Nothing ctx pat ty match_result
 
 matchSinglePat scrut hs_ctx pat ty match_result
-  = do { var           <- selectSimpleMatchVarL Many pat
+  = do { var           <- selectSimpleMatchPatVarL Many pat
                             -- matchSinglePat is only used in matchSimply, which
                             -- is used in list comprehension, arrow notation,
                             -- and to create field selectors. All of which only
@@ -863,7 +875,7 @@ matchSinglePat scrut hs_ctx pat ty match_result
 
 matchSinglePatVar :: Id   -- See Note [Match Ids]
                   -> Maybe CoreExpr -- ^ The scrutinee the match id is bound to
-                  -> HsMatchContext GhcRn -> LPat GhcTc
+                  -> HsMatchContext GhcRn -> LMatchPat GhcTc
                   -> Type -> MatchResult CoreExpr -> DsM (MatchResult CoreExpr)
 matchSinglePatVar var mb_scrut ctx pat ty match_result
   = assertPpr (isInternalName (idName var)) (ppr var) $
@@ -874,7 +886,7 @@ matchSinglePatVar var mb_scrut ctx pat ty match_result
            addCoreScrutTmCs mb_scrut [var] $
            pmcPatBind (DsMatchContext ctx locn) var (unLoc pat)
 
-       ; let eqn_info = EqnInfo { eqn_pats = [unLoc (decideBangHood dflags pat)]
+       ; let eqn_info = EqnInfo { eqn_pats = [unLoc (decideLMatchPatBangHood dflags pat)]
                                 , eqn_orig = FromSource
                                 , eqn_rhs  = match_result }
        ; match [var] ty [eqn_info] }
@@ -931,7 +943,7 @@ groupEquations :: Platform -> [EquationInfo] -> [NonEmpty (PatGroup, EquationInf
 -- (b) none of the gi are empty
 -- The ordering of equations is unchanged
 groupEquations platform eqns
-  = NEL.groupBy same_gp $ [(patGroup platform (firstPat eqn), eqn) | eqn <- eqns]
+  = NEL.groupBy same_gp $ [(matchPatGroup platform (firstPat eqn), eqn) | eqn <- eqns]
   -- comprehension on NonEmpty
   where
     same_gp :: (PatGroup,EquationInfo) -> (PatGroup,EquationInfo) -> Bool
@@ -1175,6 +1187,10 @@ patGroup platform (XPat ext) = case ext of
   CoPat _ p _      -> PgCo (hsPatType p) -- Type of innelexp pattern
   ExpansionPat _ p -> patGroup platform p
 patGroup _ pat                          = pprPanic "patGroup" (ppr pat)
+
+matchPatGroup :: Platform -> MatchPat GhcTc -> PatGroup
+matchPatGroup platform (VisPat _ lpat) = patGroup platform (unLoc lpat)
+matchPatGroup _ _                      = PgAny
 
 {-
 Note [Grouping overloaded literal patterns]

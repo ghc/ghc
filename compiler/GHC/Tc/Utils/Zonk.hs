@@ -538,7 +538,7 @@ zonk_lbind env = wrapLocMA (zonk_bind env)
 zonk_bind :: ZonkEnv -> HsBind GhcTc -> TcM (HsBind GhcTc)
 zonk_bind env bind@(PatBind { pat_lhs = pat, pat_rhs = grhss
                             , pat_ext = ty})
-  = do  { (_env, new_pat) <- zonkPat env pat            -- Env already extended
+  = do  { (_env, new_pat) <- zonkLMatchPat env pat            -- Env already extended
         ; new_grhss <- zonkGRHSs env zonkLExpr grhss
         ; new_ty    <- zonkTcTypeToTypeX env ty
         ; return (bind { pat_lhs = new_pat, pat_rhs = new_grhss

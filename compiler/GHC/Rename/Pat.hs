@@ -22,7 +22,7 @@ general, all of these functions return a renamed thing, and a set of
 free variables.
 -}
 module GHC.Rename.Pat (-- main entry points
-              rnPat, rnBindPat, rnPatAndThen,
+              rnPat, rnBindPat, rnBindMatchPat, rnPatAndThen,
               rnLMatchPats, rnLMatchPat,
 
               NameMaker, applyNameMaker,     -- a utility for making names:
@@ -483,8 +483,12 @@ rnBindPat :: NameMaker
           -> RnM (LPat GhcRn, FreeVars)
    -- Returned FreeVars are the free variables of the pattern,
    -- of course excluding variables bound by this pattern
-
 rnBindPat name_maker pat = runCps (rnLPatAndThen name_maker pat)
+
+rnBindMatchPat :: NameMaker
+               -> LMatchPat GhcPs
+               -> RnM (LMatchPat GhcRn, FreeVars)
+rnBindMatchPat name_maker pat = runCps (rnLMatchPatAndThen name_maker pat)
 
 {-
 *********************************************************

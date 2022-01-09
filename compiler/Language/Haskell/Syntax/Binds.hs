@@ -29,7 +29,7 @@ import {-# SOURCE #-} Language.Haskell.Syntax.Expr
   , MatchGroup
   , GRHSs )
 import {-# SOURCE #-} Language.Haskell.Syntax.Pat
-  ( LPat )
+  ( LPat, LMatchPat )
 
 import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Type
@@ -245,7 +245,7 @@ data HsBindLR idL idR
   -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
   | PatBind {
         pat_ext    :: XPatBind idL idR, -- ^ See Note [Bind free vars]
-        pat_lhs    :: LPat idL,
+        pat_lhs    :: LMatchPat idL,
         pat_rhs    :: GRHSs idR (LHsExpr idR),
         pat_ticks  :: ([CoreTickish], [[CoreTickish]])
                -- ^ Ticks to put on the rhs, if any, and ticks to put on

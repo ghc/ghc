@@ -137,7 +137,7 @@ matchGuards (BindStmt _ pat bind_rhs : stmts) ctx nablas rhs rhs_ty = do
     match_result <- matchGuards stmts ctx nablas rhs rhs_ty
     core_rhs <- dsLExpr bind_rhs
     match_result' <- matchSinglePatVar match_var (Just core_rhs) (StmtCtxt ctx)
-                                       pat rhs_ty match_result
+                                       (mkVisMatchPat pat) rhs_ty match_result
     pure $ bindNonRec match_var core_rhs <$> match_result'
 
 matchGuards (LastStmt  {} : _) _ _ _ _ = panic "matchGuards LastStmt"

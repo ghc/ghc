@@ -8,7 +8,7 @@
 module GHC.Hs.Expr where
 
 import GHC.Utils.Outputable ( SDoc, Outputable )
-import Language.Haskell.Syntax.Pat ( LPat )
+import Language.Haskell.Syntax.Pat ( LMatchPat )
 import {-# SOURCE #-} GHC.Hs.Pat () -- for Outputable
 import GHC.Types.Basic ( SpliceExplicitFlag(..))
 import Language.Haskell.Syntax.Expr
@@ -34,7 +34,7 @@ pprSpliceDecl ::  (OutputableBndrId p)
 
 pprPatBind :: forall bndr p . (OutputableBndrId bndr,
                                OutputableBndrId p)
-           => LPat (GhcPass bndr) -> GRHSs (GhcPass p) (LHsExpr (GhcPass p)) -> SDoc
+           => LMatchPat (GhcPass bndr) -> GRHSs (GhcPass p) (LHsExpr (GhcPass p)) -> SDoc
 
 pprFunBind :: (OutputableBndrId idR)
            => MatchGroup (GhcPass idR) (LHsExpr (GhcPass idR)) -> SDoc

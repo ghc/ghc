@@ -34,9 +34,9 @@ module GHC.Hs.Pat (
         hsRecFields, hsRecFieldSel, hsRecFieldId, hsRecFieldsArgs,
         hsRecUpdFieldId, hsRecUpdFieldOcc, hsRecUpdFieldRdr,
 
-        mkPrefixConPat, mkCharLitPat, mkNilPat, mkVisMatchPat,
+        mkPrefixConPat, mkCharLitPat, mkNilPat, mkVisMatchPat, mkVisMatchPat',
 
-        isSimplePat,
+        isSimplePat, isSimpleMatchPat,
         looksLazyPatBind,
         isBangedLPat, isBangedLMatchPat,
         gParPat, patNeedsParens, parenthesizePat, parenthesizeLMatchPat,
@@ -183,6 +183,9 @@ type instance XXMatchPat (GhcPass _) = DataConCantHappen
 
 mkVisMatchPat :: LPat (GhcPass pass) -> LMatchPat (GhcPass pass)
 mkVisMatchPat lpat = L (getLoc lpat) (VisPat noExtField lpat)
+
+mkVisMatchPat' :: Pat (GhcPass pass) -> MatchPat (GhcPass pass)
+mkVisMatchPat' pat = VisPat noExtField (L noSrcSpanA pat)
 
 -- ---------------------------------------------------------------------
 
@@ -491,7 +494,9 @@ looksLazyPatBind :: HsBind (GhcPass p) -> Bool
 -- In particular, returns True of a pattern binding with a compound pattern, like (I# x)
 -- Looks through AbsBinds
 looksLazyPatBind (PatBind { pat_lhs = p })
-  = looksLazyLPat p
+  = case unLoc p of
+      VisPat _ lpat -> looksLazyLPat lpat
+      _             -> False
 looksLazyPatBind (AbsBinds { abs_binds = binds })
   = anyBag (looksLazyPatBind . unLoc) binds
 looksLazyPatBind _
@@ -622,6 +627,11 @@ isSimplePat p = case unLoc p of
   VarPat _ x -> Just (unLoc x)
   _ -> Nothing
 
+isSimpleMatchPat :: LMatchPat (GhcPass x) -> Maybe (IdP (GhcPass x))
+isSimpleMatchPat p = case unLoc p of
+  VisPat _ lpat -> isSimplePat lpat
+  InvisTyVarPat _ lipd -> Just (unLoc lipd)
+  _ -> Nothing
 
 {- Note [Unboxed sum patterns aren't irrefutable]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -432,7 +432,7 @@ rnBindLHS :: NameMaker
 rnBindLHS name_maker _ bind@(PatBind { pat_lhs = pat })
   = do
       -- we don't actually use the FV processing of rnPatsAndThen here
-      (pat',pat'_fvs) <- rnBindPat name_maker pat
+      (pat',pat'_fvs) <- rnBindMatchPat name_maker pat
       return (bind { pat_lhs = pat', pat_ext = pat'_fvs })
                 -- We temporarily store the pat's FVs in bind_fvs;
                 -- gets updated to the FVs of the whole bind
@@ -487,16 +487,16 @@ rnBind _ bind@(PatBind { pat_lhs = pat
                 -- Keep locally-defined Names
                 -- As well as dependency analysis, we need these for the
                 -- MonoLocalBinds test in GHC.Tc.Gen.Bind.decideGeneralisationPlan
-              bndrs = collectPatBinders CollNoDictBinders pat
+              bndrs = collectLMatchPatBinders CollNoDictBinders pat
               bind' = bind { pat_rhs  = grhss'
                            , pat_ext = fvs' }
 
               ok_nobind_pat
                   = -- See Note [Pattern bindings that bind no variables]
                     case unLoc pat of
-                       WildPat {}   -> True
-                       BangPat {}   -> True -- #9127, #13646
-                       SplicePat {} -> True
+                       VisPat _ (L _ WildPat {})   -> True
+                       VisPat _ (L _ BangPat {})   -> True -- #9127, #13646
+                       VisPat _ (L _ SplicePat {}) -> True
                        _            -> False
 
         -- Warn if the pattern binds no variables

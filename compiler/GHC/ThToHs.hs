@@ -182,7 +182,7 @@ cvtDec (TH.ValD pat body ds)
         ; body' <- cvtGuard body
         ; ds' <- cvtLocalDecs (text "a where clause") ds
         ; returnJustLA $ Hs.ValD noExtField $
-          PatBind { pat_lhs = pat'
+          PatBind { pat_lhs = mkVisMatchPat pat'
                   , pat_rhs = GRHSs emptyComments body' ds'
                   , pat_ext = noAnn
                   , pat_ticks = ([],[]) } }

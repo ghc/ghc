@@ -1236,7 +1236,7 @@ tcMonoBinds is_rec sig_fn no_gen
 
                 , mbis ) }
   where
-    bndrs = collectPatBinders CollNoDictBinders pat
+    bndrs = collectLMatchPatBinders CollNoDictBinders pat
 
 -- GENERAL CASE
 tcMonoBinds _ sig_fn no_gen binds
@@ -1354,7 +1354,7 @@ mono_id in the first place.
 
 data TcMonoBind         -- Half completed; LHS done, RHS not done
   = TcFunBind  MonoBindInfo  SrcSpan (MatchGroup GhcRn (LHsExpr GhcRn))
-  | TcPatBind [MonoBindInfo] (LPat GhcTc) (GRHSs GhcRn (LHsExpr GhcRn))
+  | TcPatBind [MonoBindInfo] (LMatchPat GhcTc) (GRHSs GhcRn (LHsExpr GhcRn))
               TcSigmaType
 
 tcLhs :: TcSigFun -> LetBndrSpec -> HsBind GhcRn -> TcM TcMonoBind
@@ -1412,7 +1412,7 @@ tcLhs sig_fn no_gen (PatBind { pat_lhs = pat, pat_rhs = grhss })
 
         ; return (TcPatBind mbis pat' grhss pat_ty) }
   where
-    bndr_names = collectPatBinders CollNoDictBinders pat
+    bndr_names = collectLMatchPatBinders CollNoDictBinders pat
     (nosig_names, sig_names) = partitionWith find_sig bndr_names
 
     find_sig :: Name -> Either Name (Name, TcIdSigInfo)
@@ -1730,7 +1730,7 @@ isClosedBndrGroup type_env binds
          in [(f, open_fvs)]
     bindFvs (PatBind { pat_lhs = pat, pat_ext = fvs })
        = let open_fvs = get_open_fvs fvs
-         in [(b, open_fvs) | b <- collectPatBinders CollNoDictBinders pat]
+         in [(b, open_fvs) | b <- collectLMatchPatBinders CollNoDictBinders pat]
     bindFvs _
        = []
 
@@ -1775,6 +1775,6 @@ isClosedBndrGroup type_env binds
 -- This one is called on LHS, when pat and grhss are both Name
 -- and on RHS, when pat is TcId and grhss is still Name
 patMonoBindsCtxt :: (OutputableBndrId p)
-                 => LPat (GhcPass p) -> GRHSs GhcRn (LHsExpr GhcRn) -> SDoc
+                 => LMatchPat (GhcPass p) -> GRHSs GhcRn (LHsExpr GhcRn) -> SDoc
 patMonoBindsCtxt pat grhss
   = hang (text "In a pattern binding:") 2 (pprPatBind pat grhss)
