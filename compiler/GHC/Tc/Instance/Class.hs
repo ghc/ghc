@@ -717,16 +717,13 @@ matchHasField dflags short_cut clas tys
                    ; let theta = mkPrimEqPred sel_ty (mkVisFunTyMany r_ty a_ty) : preds
 
                          -- Use the equality proof to cast the selector Id to
-                         -- type (r -> a), then use the newtype coercion to cast
-                         -- it to a HasField dictionary.
-                         mk_ev (ev1:evs) = evSelector sel_id tvs evs `evCast` co
+                         -- type (r -> a), then wrap it in a HasField dictionary.
+                         mk_ev (ev1:evs) =
+                            evDataConApp dc tys [evSelector sel_id tvs evs `Cast` co]
                            where
                              co = mkTcSubCo (evTermCoercion (EvExpr ev1))
-                                      `mkTcTransCo` mkTcSymCo co2
+                             Just dc = tyConSingleDataCon_maybe (classTyCon clas)
                          mk_ev [] = panic "matchHasField.mk_ev"
-
-                         Just (_, co2) = tcInstNewTyCon_maybe (classTyCon clas)
-                                                              tys
 
                          tvs = mkTyVarTys (map snd tv_prs)
 
