@@ -103,6 +103,7 @@ testRules = do
                     (if dynPrograms then ["-dynamic"] else [])
 
     root -/- ghcConfigPath %> \_ -> do
+        alwaysRerun
         args <- userSetting defaultTestArgs
         let testGhc = testCompiler args
             stg = stageOf testGhc
