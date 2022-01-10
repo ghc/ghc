@@ -97,14 +97,13 @@ dsCCall lbl args may_gc result_ty
   = do (unboxed_args, arg_wrappers) <- mapAndUnzipM unboxArg args
        (ccall_result_ty, res_wrapper) <- boxResult result_ty
        uniq <- newUnique
-       dflags <- getDynFlags
        let
            target = StaticTarget NoSourceText lbl Nothing True
            the_fcall    = CCall (CCallSpec target CCallConv may_gc)
-           the_prim_app = mkFCall dflags uniq the_fcall unboxed_args ccall_result_ty
+           the_prim_app = mkFCall uniq the_fcall unboxed_args ccall_result_ty
        return (foldr ($) (res_wrapper the_prim_app) arg_wrappers)
 
-mkFCall :: DynFlags -> Unique -> ForeignCall
+mkFCall :: Unique -> ForeignCall
         -> [CoreExpr]     -- Args
         -> Type           -- Result type
         -> CoreExpr
@@ -117,7 +116,7 @@ mkFCall :: DynFlags -> Unique -> ForeignCall
 -- Here we build a ccall thus
 --      (ccallid::(forall a b.  StablePtr (a -> b) -> Addr -> Char -> IO Addr))
 --                      a b s x c
-mkFCall dflags uniq the_fcall val_args res_ty
+mkFCall uniq the_fcall val_args res_ty
   = assert (all isTyVar tyvars) $ -- this must be true because the type is top-level
     mkApps (mkVarApps (Var the_fcall_id) tyvars) val_args
   where
@@ -125,7 +124,7 @@ mkFCall dflags uniq the_fcall val_args res_ty
     body_ty = (mkVisFunTysMany arg_tys res_ty)
     tyvars  = tyCoVarsOfTypeWellScoped body_ty
     ty      = mkInfForAllTys tyvars body_ty
-    the_fcall_id = mkFCallId dflags uniq the_fcall ty
+    the_fcall_id = mkFCallId uniq the_fcall ty
 
 unboxArg :: CoreExpr                    -- The supplied argument, not representation-polymorphic
          -> DsM (CoreExpr,              -- To pass as the actual argument

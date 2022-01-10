@@ -283,7 +283,7 @@ dsFCall fn_id co fcall mDeclHeader = do
         -- Build the worker
         worker_ty     = mkForAllTys tv_bndrs (mkVisFunTysMany (map idType work_arg_ids) ccall_result_ty)
         tvs           = map binderVar tv_bndrs
-        the_ccall_app = mkFCall dflags ccall_uniq fcall' val_args ccall_result_ty
+        the_ccall_app = mkFCall ccall_uniq fcall' val_args ccall_result_ty
         work_rhs      = mkLams tvs (mkLams work_arg_ids the_ccall_app)
         work_id       = mkSysLocal (fsLit "$wccall") work_uniq Many worker_ty
 
@@ -326,9 +326,8 @@ dsPrimCall fn_id co fcall = do
     args <- newSysLocalsDs arg_tys  -- no FFI representation polymorphism
 
     ccall_uniq <- newUnique
-    dflags <- getDynFlags
     let
-        call_app = mkFCall dflags ccall_uniq fcall (map Var args) io_res_ty
+        call_app = mkFCall ccall_uniq fcall (map Var args) io_res_ty
         rhs      = mkLams tvs (mkLams args call_app)
         rhs'     = Cast rhs co
     return ([(fn_id, rhs')], mempty, mempty)

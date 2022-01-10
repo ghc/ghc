@@ -30,6 +30,7 @@ import GHC.Prelude
 
 import GHC.Driver.Env
 import GHC.Driver.Session
+import GHC.Driver.Config.HsToCore
 
 import GHC.Hs
 

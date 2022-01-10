@@ -1471,8 +1471,7 @@ tcIfaceExpr (IfaceLit lit)
 tcIfaceExpr (IfaceFCall cc ty) = do
     ty' <- tcIfaceType ty
     u <- newUnique
-    dflags <- getDynFlags
-    return (Var (mkFCallId dflags u cc ty'))
+    return (Var (mkFCallId u cc ty'))
 
 tcIfaceExpr (IfaceTuple sort args)
   = do { args' <- mapM tcIfaceExpr args

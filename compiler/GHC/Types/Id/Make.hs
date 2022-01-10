@@ -24,7 +24,7 @@ module GHC.Types.Id.Make (
         unwrapNewTypeBody, wrapFamInstBody,
         DataConBoxer(..), vanillaDataConBoxer,
         mkDataConRep, mkDataConWorkId,
-        DataConBangOpts (..), BangOpts (..), initBangOpts,
+        DataConBangOpts (..), BangOpts (..),
 
         -- And some particular Ids; see below for why they are wired in
         wiredInIds, ghcPrimIds,
@@ -40,45 +40,46 @@ import GHC.Prelude
 
 import GHC.Builtin.Types.Prim
 import GHC.Builtin.Types
+import GHC.Builtin.Names
+
+import GHC.Core
 import GHC.Core.Type
 import GHC.Core.Multiplicity
 import GHC.Core.TyCo.Rep
 import GHC.Core.FamInstEnv
 import GHC.Core.Coercion
 import GHC.Core.Reduction
-import GHC.Tc.Utils.TcType as TcType
 import GHC.Core.Make
 import GHC.Core.FVs     ( mkRuleInfo )
 import GHC.Core.Utils   ( exprType, mkCast, mkDefaultCase )
 import GHC.Core.Unfold.Make
 import GHC.Core.SimpleOpt
-import GHC.Types.Literal
-import GHC.Types.SourceText
 import GHC.Core.TyCon
 import GHC.Core.Class
+import GHC.Core.DataCon
+
+import GHC.Types.Literal
+import GHC.Types.SourceText
 import GHC.Types.Name.Set
 import GHC.Types.Name
 import GHC.Types.ForeignCall
-import GHC.Core.DataCon
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Demand
 import GHC.Types.Cpr
-import GHC.Core
-import GHC.Types.Unique
 import GHC.Types.Unique.Supply
-import GHC.Builtin.Names
 import GHC.Types.Basic       hiding ( SuccessFlag(..) )
+import GHC.Types.Var (VarBndr(Bndr))
+
+import GHC.Tc.Utils.TcType as TcType
+
 import GHC.Utils.Misc
-import GHC.Driver.Session
-import GHC.Driver.Ppr
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
+
 import GHC.Data.FastString
 import GHC.Data.List.SetOps
-import GHC.Types.Var (VarBndr(Bndr))
-import qualified GHC.LanguageExtensions as LangExt
 
 
 {-
@@ -666,16 +667,6 @@ data BangOpts = BangOpts
   , bang_opt_unbox_disable :: !Bool -- ^ Disable automatic field unboxing (e.g. if we aren't optimising)
   , bang_opt_unbox_strict  :: !Bool -- ^ Unbox strict fields
   , bang_opt_unbox_small   :: !Bool -- ^ Unbox small strict fields
-  }
-
-initBangOpts :: DynFlags -> BangOpts
-initBangOpts dflags = BangOpts
-  { bang_opt_strict_data   = xopt LangExt.StrictData dflags
-  , bang_opt_unbox_disable = gopt Opt_OmitInterfacePragmas dflags
-      -- Don't unbox if we aren't optimising; rather arbitrarily,
-      -- we use -fomit-iface-pragmas as the indication
-  , bang_opt_unbox_strict  = gopt Opt_UnboxStrictFields dflags
-  , bang_opt_unbox_small   = gopt Opt_UnboxSmallStrictFields dflags
   }
 
 mkDataConRep :: DataConBangOpts
@@ -1310,14 +1301,14 @@ wrapFamInstBody tycon args body
 -- details of the ccall, type and all.  This means that the interface
 -- file reader can reconstruct a suitable Id
 
-mkFCallId :: DynFlags -> Unique -> ForeignCall -> Type -> Id
-mkFCallId dflags uniq fcall ty
+mkFCallId :: Unique -> ForeignCall -> Type -> Id
+mkFCallId uniq fcall ty
   = assert (noFreeVarsOfType ty) $
     -- A CCallOpId should have no free type variables;
     -- when doing substitutions won't substitute over it
     mkGlobalId (FCallId fcall) name ty info
   where
-    occ_str = showSDoc dflags (braces (ppr fcall <+> ppr ty))
+    occ_str = renderWithContext defaultSDocContext (braces (ppr fcall <+> ppr ty))
     -- The "occurrence name" of a ccall is the full info about the
     -- ccall; it is encoded, but may have embedded spaces etc!
 
