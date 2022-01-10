@@ -24,6 +24,7 @@ module GHC.Types.Id.Make (
         unwrapNewTypeBody, wrapFamInstBody,
         DataConBoxer(..), vanillaDataConBoxer,
         mkDataConRep, mkDataConWorkId,
+        DataConBangOpts (..), BangOpts (..), initBangOpts,
 
         -- And some particular Ids; see below for why they are wired in
         wiredInIds, ghcPrimIds,
@@ -654,14 +655,35 @@ and now case-of-known-constructor eliminates the redundant allocation.
 
 -}
 
-mkDataConRep :: DynFlags
+data DataConBangOpts
+  = FixedBangOpts [HsImplBang]
+    -- ^ Used for imported data constructors
+    -- See Note [Bangs on imported data constructors]
+  | SrcBangOpts !BangOpts
+
+data BangOpts = BangOpts
+  { bang_opt_strict_data   :: !Bool -- ^ Strict fields by default
+  , bang_opt_unbox_disable :: !Bool -- ^ Disable automatic field unboxing (e.g. if we aren't optimising)
+  , bang_opt_unbox_strict  :: !Bool -- ^ Unbox strict fields
+  , bang_opt_unbox_small   :: !Bool -- ^ Unbox small strict fields
+  }
+
+initBangOpts :: DynFlags -> BangOpts
+initBangOpts dflags = BangOpts
+  { bang_opt_strict_data   = xopt LangExt.StrictData dflags
+  , bang_opt_unbox_disable = gopt Opt_OmitInterfacePragmas dflags
+      -- Don't unbox if we aren't optimising; rather arbitrarily,
+      -- we use -fomit-iface-pragmas as the indication
+  , bang_opt_unbox_strict  = gopt Opt_UnboxStrictFields dflags
+  , bang_opt_unbox_small   = gopt Opt_UnboxSmallStrictFields dflags
+  }
+
+mkDataConRep :: DataConBangOpts
              -> FamInstEnvs
              -> Name
-             -> Maybe [HsImplBang]
-                -- See Note [Bangs on imported data constructors]
              -> DataCon
              -> UniqSM DataConRep
-mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
+mkDataConRep dc_bang_opts fam_envs wrap_name data_con
   | not wrapper_reqd
   = return NoDataConRep
 
@@ -748,10 +770,10 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
                                         -- if a user declared a wrong newtype we
                                         -- detect this later (see test T2334A)
       | otherwise
-      = case mb_bangs of
-          Nothing    -> zipWith (dataConSrcToImplBang dflags fam_envs)
-                                orig_arg_tys orig_bangs
-          Just bangs -> bangs
+      = case dc_bang_opts of
+          SrcBangOpts bang_opts -> zipWith (dataConSrcToImplBang bang_opts fam_envs)
+                                    orig_arg_tys orig_bangs
+          FixedBangOpts bangs   -> bangs
 
     (rep_tys_w_strs, wrappers)
       = unzip (zipWith dataConArgRep all_arg_tys (ev_ibangs ++ arg_ibangs))
@@ -971,16 +993,16 @@ newLocal name_stem (Scaled w ty) =
 -- never on the field of a newtype constructor.
 -- See @Note [HsImplBangs for newtypes]@.
 dataConSrcToImplBang
-   :: DynFlags
+   :: BangOpts
    -> FamInstEnvs
    -> Scaled Type
    -> HsSrcBang
    -> HsImplBang
 
-dataConSrcToImplBang dflags fam_envs arg_ty
+dataConSrcToImplBang bang_opts fam_envs arg_ty
                      (HsSrcBang ann unpk NoSrcStrict)
-  | xopt LangExt.StrictData dflags -- StrictData => strict field
-  = dataConSrcToImplBang dflags fam_envs arg_ty
+  | bang_opt_strict_data bang_opts -- StrictData => strict field
+  = dataConSrcToImplBang bang_opts fam_envs arg_ty
                   (HsSrcBang ann unpk SrcStrict)
   | otherwise -- no StrictData => lazy field
   = HsLazy
@@ -988,26 +1010,24 @@ dataConSrcToImplBang dflags fam_envs arg_ty
 dataConSrcToImplBang _ _ _ (HsSrcBang _ _ SrcLazy)
   = HsLazy
 
-dataConSrcToImplBang dflags fam_envs arg_ty
+dataConSrcToImplBang bang_opts fam_envs arg_ty
                      (HsSrcBang _ unpk_prag SrcStrict)
   | isUnliftedType (scaledThing arg_ty)
   = HsLazy  -- For !Int#, say, use HsLazy
             -- See Note [Data con wrappers and unlifted types]
 
-  | not (gopt Opt_OmitInterfacePragmas dflags) -- Don't unpack if -fomit-iface-pragmas
-          -- Don't unpack if we aren't optimising; rather arbitrarily,
-          -- we use -fomit-iface-pragmas as the indication
+  | not (bang_opt_unbox_disable bang_opts) -- Don't unpack if disabled
   , let mb_co   = topNormaliseType_maybe fam_envs (scaledThing arg_ty)
                      -- Unwrap type families and newtypes
         arg_ty' = case mb_co of
                     { Just redn -> scaledSet arg_ty (reductionReducedType redn)
                     ; Nothing   -> arg_ty }
-  , isUnpackableType dflags fam_envs (scaledThing arg_ty')
+  , isUnpackableType bang_opts fam_envs (scaledThing arg_ty')
   , (rep_tys, _) <- dataConArgUnpack arg_ty'
   , case unpk_prag of
       NoSrcUnpack ->
-        gopt Opt_UnboxStrictFields dflags
-            || (gopt Opt_UnboxSmallStrictFields dflags
+        bang_opt_unbox_strict bang_opts
+            || (bang_opt_unbox_small bang_opts
                 && rep_tys `lengthAtMost` 1) -- See Note [Unpack one-wide fields]
       srcUnpack -> isSrcUnpacked srcUnpack
   = case mb_co of
@@ -1103,13 +1123,13 @@ dataConArgUnpack (Scaled arg_mult arg_ty)
   = pprPanic "dataConArgUnpack" (ppr arg_ty)
     -- An interface file specified Unpacked, but we couldn't unpack it
 
-isUnpackableType :: DynFlags -> FamInstEnvs -> Type -> Bool
+isUnpackableType :: BangOpts -> FamInstEnvs -> Type -> Bool
 -- True if we can unpack the UNPACK the argument type
 -- See Note [Recursive unboxing]
 -- We look "deeply" inside rather than relying on the DataCons
 -- we encounter on the way, because otherwise we might well
 -- end up relying on ourselves!
-isUnpackableType dflags fam_envs ty
+isUnpackableType bang_opts fam_envs ty
   | Just data_con <- unpackable_type ty
   = ok_con_args emptyNameSet data_con
   | otherwise
@@ -1139,13 +1159,13 @@ isUnpackableType dflags fam_envs ty
       = True        -- NB True here, in contrast to False at top level
 
     attempt_unpack (HsSrcBang _ SrcUnpack NoSrcStrict)
-      = xopt LangExt.StrictData dflags
+      = bang_opt_strict_data bang_opts
     attempt_unpack (HsSrcBang _ SrcUnpack SrcStrict)
       = True
     attempt_unpack (HsSrcBang _  NoSrcUnpack SrcStrict)
       = True  -- Be conservative
     attempt_unpack (HsSrcBang _  NoSrcUnpack NoSrcStrict)
-      = xopt LangExt.StrictData dflags -- Be conservative
+      = bang_opt_strict_data bang_opts -- Be conservative
     attempt_unpack _ = False
 
     unpackable_type :: Type -> Maybe DataCon

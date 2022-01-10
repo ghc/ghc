@@ -1102,15 +1102,15 @@ tcIfaceDataCons tycon_name tycon tc_tybinders if_cons
 
         ; prom_rep_name <- newTyConRepName dc_name
 
+        ; let bang_opts = FixedBangOpts stricts
+            -- Pass the HsImplBangs (i.e. final decisions) to buildDataCon;
+            -- it'll use these to guide the construction of a worker.
+            -- See Note [Bangs on imported data constructors] in GHC.Types.Id.Make
+
         ; con <- buildDataCon (pprPanic "tcIfaceDataCons: FamInstEnvs" (ppr dc_name))
+                       bang_opts
                        dc_name is_infix prom_rep_name
                        (map src_strict if_src_stricts)
-                       (Just stricts)
-                       -- Pass the HsImplBangs (i.e. final
-                       -- decisions) to buildDataCon; it'll use
-                       -- these to guide the construction of a
-                       -- worker.
-                       -- See Note [Bangs on imported data constructors] in GHC.Types.Id.Make
                        lbl_names
                        univ_tvs ex_tvs user_tv_bndrs
                        eq_spec theta

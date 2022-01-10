@@ -36,7 +36,6 @@ import GHC.Tc.Utils.TcType
 import GHC.Core.Multiplicity
 
 import GHC.Types.SrcLoc( SrcSpan, noSrcSpan )
-import GHC.Driver.Session
 import GHC.Tc.Utils.Monad
 import GHC.Types.Unique.Supply
 import GHC.Utils.Misc
@@ -137,12 +136,11 @@ There are other ways we could do the check (discussion on #19739):
 
 ------------------------------------------------------
 buildDataCon :: FamInstEnvs
+            -> DataConBangOpts
             -> Name
             -> Bool                     -- Declared infix
             -> TyConRepName
             -> [HsSrcBang]
-            -> Maybe [HsImplBang]
-                -- See Note [Bangs on imported data constructors] in GHC.Types.Id.Make
            -> [FieldLabel]             -- Field labels
            -> [TyVar]                  -- Universals
            -> [TyCoVar]                -- Existentials
@@ -160,7 +158,7 @@ buildDataCon :: FamInstEnvs
 --   a) makes the worker Id
 --   b) makes the wrapper Id if necessary, including
 --      allocating its unique (hence monadic)
-buildDataCon fam_envs src_name declared_infix prom_info src_bangs impl_bangs
+buildDataCon fam_envs dc_bang_opts src_name declared_infix prom_info src_bangs
              field_lbls univ_tvs ex_tvs user_tvbs eq_spec ctxt arg_tys res_ty
              rep_tycon tag_map
   = do  { wrap_name <- newImplicitBinder src_name mkDataConWrapperOcc
@@ -171,7 +169,6 @@ buildDataCon fam_envs src_name declared_infix prom_info src_bangs impl_bangs
 
         ; traceIf (text "buildDataCon 1" <+> ppr src_name)
         ; us <- newUniqueSupply
-        ; dflags <- getDynFlags
         ; let stupid_ctxt = mkDataConStupidTheta rep_tycon (map scaledThing arg_tys) univ_tvs
               tag = lookupNameEnv_NF tag_map src_name
               -- See Note [Constructor tag allocation], fixes #14657
@@ -181,8 +178,7 @@ buildDataCon fam_envs src_name declared_infix prom_info src_bangs impl_bangs
                                    arg_tys res_ty NoRRI rep_tycon tag
                                    stupid_ctxt dc_wrk dc_rep
               dc_wrk = mkDataConWorkId work_name data_con
-              dc_rep = initUs_ us (mkDataConRep dflags fam_envs wrap_name
-                                                impl_bangs data_con)
+              dc_rep = initUs_ us (mkDataConRep dc_bang_opts fam_envs wrap_name data_con)
 
         ; traceIf (text "buildDataCon 2" <+> ppr src_name)
         ; return data_con }
@@ -343,14 +339,15 @@ buildClass tycon_name binders roles fds
               rec_tycon  = classTyCon rec_clas
               univ_bndrs = tyConInvisTVBinders binders
               univ_tvs   = binderVars univ_bndrs
+              bang_opts  = FixedBangOpts (map (const HsLazy) args)
 
         ; rep_nm   <- newTyConRepName datacon_name
         ; dict_con <- buildDataCon (panic "buildClass: FamInstEnvs")
+                                   bang_opts
                                    datacon_name
                                    False        -- Not declared infix
                                    rep_nm
                                    (map (const no_bang) args)
-                                   (Just (map (const HsLazy) args))
                                    [{- No fields -}]
                                    univ_tvs
                                    [{- no existentials -}]

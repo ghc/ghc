@@ -72,6 +72,7 @@ import GHC.Core.Unify
 
 import GHC.Types.Error
 import GHC.Types.Id
+import GHC.Types.Id.Make
 import GHC.Types.Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
@@ -3458,8 +3459,10 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs res_kind tag_map
        ; is_infix <- tcConIsInfixH98 name hs_args
        ; rep_nm   <- newTyConRepName name
        ; fam_envs <- tcGetFamInstEnvs
-       ; dc <- buildDataCon fam_envs name is_infix rep_nm
-                            stricts Nothing field_lbls
+       ; dflags   <- getDynFlags
+       ; let bang_opts = SrcBangOpts (initBangOpts dflags)
+       ; dc <- buildDataCon fam_envs bang_opts name is_infix rep_nm
+                            stricts field_lbls
                             tc_tvs ex_tvs user_tvbs
                             [{- no eq_preds -}] ctxt arg_tys
                             user_res_ty rep_tycon tag_map
@@ -3541,14 +3544,15 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
        -- Can't print univ_tvs, arg_tys etc, because we are inside the knot here
        ; traceTc "tcConDecl 2" (ppr names $$ ppr field_lbls)
        ; fam_envs <- tcGetFamInstEnvs
+       ; dflags <- getDynFlags
        ; let
            buildOneDataCon (L _ name) = do
              { is_infix <- tcConIsInfixGADT name hs_args
              ; rep_nm   <- newTyConRepName name
 
-             ; buildDataCon fam_envs name is_infix
-                            rep_nm
-                            stricts Nothing field_lbls
+             ; let bang_opts = SrcBangOpts (initBangOpts dflags)
+             ; buildDataCon fam_envs bang_opts name is_infix
+                            rep_nm stricts field_lbls
                             univ_tvs ex_tvs tvbndrs' eq_preds
                             ctxt' arg_tys' res_ty' rep_tycon tag_map
                   -- NB:  we put data_tc, the type constructor gotten from the
@@ -4412,7 +4416,7 @@ checkValidDataCon dflags existential_ok tc con
         ; let check_bang :: Type -> HsSrcBang -> HsImplBang -> Int -> TcM ()
               check_bang orig_arg_ty bang rep_bang n
                | HsSrcBang _ _ SrcLazy <- bang
-               , not (xopt LangExt.StrictData dflags)
+               , not (bang_opt_strict_data bang_opts)
                = addErrTc $ TcRnUnknownMessage $ mkPlainError noHints $
                  (bad_bang n (text "Lazy annotation (~) without StrictData"))
 
@@ -4434,7 +4438,7 @@ checkValidDataCon dflags existential_ok tc con
                -- If not optimising, we don't unpack (rep_bang is never
                -- HsUnpack), so don't complain!  This happens, e.g., in Haddock.
                -- See dataConSrcToImplBang.
-               , not (gopt Opt_OmitInterfacePragmas dflags)
+               , not (bang_opt_unbox_disable bang_opts)
                -- When typechecking an indefinite package in Backpack, we
                -- may attempt to UNPACK an abstract type.  The test here will
                -- conclude that this is unusable, but it might become usable
@@ -4479,11 +4483,12 @@ checkValidDataCon dflags existential_ok tc con
                    Just (f, _) -> ppr (tyConBinders f) ]
     }
   where
+    bang_opts = initBangOpts dflags
     con_name = dataConName con
     con_loc  = nameSrcSpan con_name
     ctxt = ConArgCtxt con_name
     is_strict = \case
-      NoSrcStrict -> xopt LangExt.StrictData dflags
+      NoSrcStrict -> bang_opt_strict_data bang_opts
       bang        -> isSrcStrict bang
 
     bad_bang n herald
