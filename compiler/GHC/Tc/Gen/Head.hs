@@ -6,6 +6,7 @@
 {-# LANGUAGE TupleSections       #-}
 {-# LANGUAGE TypeFamilies        #-}
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
+{-# LANGUAGE ViewPatterns        #-}
 {-# LANGUAGE DisambiguateRecordFields #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
@@ -752,8 +753,7 @@ tc_infer_id id_name
 
              AGlobal (AConLike (RealDataCon con)) -> tcInferDataCon con
              AGlobal (AConLike (PatSynCon ps)) -> tcInferPatSyn id_name ps
-             AGlobal (ATyCon tc) -> fail_tycon tc
-             ATcTyCon tc -> fail_tycon tc
+             (tcTyThingTyCon_maybe -> Just tc) -> fail_tycon tc -- TyCon or TcTyCon
              ATyVar name _ -> fail_tyvar name
 
              _ -> failWithTc $ TcRnUnknownMessage $ mkPlainError noHints $

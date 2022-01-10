@@ -1536,8 +1536,8 @@ tcInferTyAppHead :: TcTyMode -> LHsType GhcRn -> TcM (TcType, TcKind)
 -- application. In particular, for a HsTyVar (which includes type
 -- constructors, it does not zoom off into tcInferTyApps and family
 -- saturation
-tcInferTyAppHead mode (L _ (HsTyVar _ _ (L _ tv)))
-  = tcTyVar mode tv
+tcInferTyAppHead _ (L _ (HsTyVar _ _ (L _ tv)))
+  = tcTyVar tv
 tcInferTyAppHead mode ty
   = tc_infer_lhs_type mode ty
 
@@ -1558,7 +1558,7 @@ tcInferTyApps, tcInferTyApps_nosat
     -> LHsType GhcRn        -- ^ Function (for printing only)
     -> TcType               -- ^ Function
     -> [LHsTypeArg GhcRn]   -- ^ Args
-    -> TcM (TcType, TcKind) -- ^ (f args, args, result kind)
+    -> TcM (TcType, TcKind) -- ^ (f args, result kind)
 tcInferTyApps mode hs_ty fun hs_args
   = do { (f_args, res_k) <- tcInferTyApps_nosat mode hs_ty fun hs_args
        ; saturateFamApp f_args res_k }
@@ -1967,24 +1967,19 @@ tc_lhs_pred :: TcTyMode -> LHsType GhcRn -> TcM PredType
 tc_lhs_pred mode pred = tc_lhs_type mode pred constraintKind
 
 ---------------------------
-tcTyVar :: TcTyMode -> Name -> TcM (TcType, TcKind)
+tcTyVar :: Name -> TcM (TcType, TcKind)
 -- See Note [Type checking recursive type and class declarations]
 -- in GHC.Tc.TyCl
 -- This does not instantiate. See Note [Do not always instantiate eagerly in types]
-tcTyVar mode name         -- Could be a tyvar, a tycon, or a datacon
+tcTyVar name         -- Could be a tyvar, a tycon, or a datacon
   = do { traceTc "lk1" (ppr name)
        ; thing <- tcLookup name
        ; case thing of
            ATyVar _ tv -> return (mkTyVarTy tv, tyVarKind tv)
 
            -- See Note [Recursion through the kinds]
-           ATcTyCon tc_tc
-             -> do { check_tc tc_tc
-                   ; return (mkTyConTy tc_tc, tyConKind tc_tc) }
-
-           AGlobal (ATyCon tc)
-             -> do { check_tc tc
-                   ; return (mkTyConTy tc, tyConKind tc) }
+           (tcTyThingTyCon_maybe -> Just tc) -- TyCon or TcTyCon
+             -> return (mkTyConTy tc, tyConKind tc)
 
            AGlobal (AConLike (RealDataCon dc))
              -> do { data_kinds <- xoptM LangExt.DataKinds
@@ -2006,13 +2001,6 @@ tcTyVar mode name         -- Could be a tyvar, a tycon, or a datacon
 
            _  -> wrongThingErr "type" thing name }
   where
-    check_tc :: TyCon -> TcM ()
-    check_tc tc = do { data_kinds   <- xoptM LangExt.DataKinds
-                     ; unless (isTypeLevel (mode_tyki mode) ||
-                               data_kinds ||
-                               isKindTyCon tc) $
-                       promotionErr name NoDataKindsTC }
-
     -- We cannot promote a data constructor with a context that contains
     -- constraints other than equalities, so error if we find one.
     -- See Note [Constraints in kinds] in GHC.Core.TyCo.Rep
@@ -4279,7 +4267,6 @@ promotionErr name err
                               -> text "it has an unpromotable context"
                                  <+> quotes (ppr pred)
                FamDataConPE   -> text "it comes from a data family instance"
-               NoDataKindsTC  -> text "perhaps you intended to use DataKinds"
                NoDataKindsDC  -> text "perhaps you intended to use DataKinds"
                PatSynPE       -> text "pattern synonyms cannot be promoted"
                RecDataConPE   -> same_rec_group_msg

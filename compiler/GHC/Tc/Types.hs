@@ -46,7 +46,8 @@ module GHC.Tc.Types(
 
         -- Typechecker types
         TcTypeEnv, TcBinderStack, TcBinder(..),
-        TcTyThing(..), PromotionErr(..),
+        TcTyThing(..), tcTyThingTyCon_maybe,
+        PromotionErr(..),
         IdBindingInfo(..), ClosedTypeId, RhsNames,
         IsGroupClosed(..),
         SelfBootInfo(..),
@@ -1125,6 +1126,12 @@ data TcTyThing
 
   | APromotionErr PromotionErr
 
+-- | Matches on either a global 'TyCon' or a 'TcTyCon'.
+tcTyThingTyCon_maybe :: TcTyThing -> Maybe TyCon
+tcTyThingTyCon_maybe (AGlobal (ATyCon tc)) = Just tc
+tcTyThingTyCon_maybe (ATcTyCon tc_tc)      = Just tc_tc
+tcTyThingTyCon_maybe _                     = Nothing
+
 data PromotionErr
   = TyConPE          -- TyCon used in a kind before we are ready
                      --     data T :: T -> * where ...
@@ -1142,7 +1149,6 @@ data PromotionErr
 
   | RecDataConPE     -- Data constructor in a recursive loop
                      -- See Note [Recursion and promoting data constructors] in GHC.Tc.TyCl
-  | NoDataKindsTC    -- -XDataKinds not enabled (for a tycon)
   | NoDataKindsDC    -- -XDataKinds not enabled (for a datacon)
 
 instance Outputable TcTyThing where     -- Debugging only
@@ -1337,7 +1343,6 @@ instance Outputable PromotionErr where
   ppr (ConstrainedDataConPE pred) = text "ConstrainedDataConPE"
                                       <+> parens (ppr pred)
   ppr RecDataConPE                = text "RecDataConPE"
-  ppr NoDataKindsTC               = text "NoDataKindsTC"
   ppr NoDataKindsDC               = text "NoDataKindsDC"
 
 --------------
@@ -1362,7 +1367,6 @@ peCategory PatSynPE               = "pattern synonym"
 peCategory FamDataConPE           = "data constructor"
 peCategory ConstrainedDataConPE{} = "data constructor"
 peCategory RecDataConPE           = "data constructor"
-peCategory NoDataKindsTC          = "type constructor"
 peCategory NoDataKindsDC          = "data constructor"
 
 {-

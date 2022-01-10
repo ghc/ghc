@@ -1,0 +1,5 @@
+
+T20873c.hs:10:1: error:
+    • Illegal kind signature ‘Foo’
+        (Use KindSignatures to allow kind signatures)
+    • In the data declaration for ‘Foo’
