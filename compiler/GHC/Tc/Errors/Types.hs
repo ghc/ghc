@@ -1701,7 +1701,7 @@ data TcRnMessage where
      Example(s):
      foreign import prim "foo" foo :: ByteArray# -> (# Int#, Int# #)
 
-    Test cases: None
+    Test cases: ffi/should_fail/T20116
   -}
   TcRnForeignImportPrimExtNotSet :: ForeignImport -> TcRnMessage
 

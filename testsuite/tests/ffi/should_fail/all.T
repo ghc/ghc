@@ -16,6 +16,7 @@ test('T7506', normal, compile_fail, [''])
 test('T7243', normal, compile_fail, [''])
 test('T10461', normal, compile_fail, [''])
 test('T16702', normal, compile_fail, [''])
+test('T20116', normal, compile_fail, [''])
 
 # UnsafeReenter tests implementation of an undefined behavior (calling Haskell
 # from an unsafe foreign function) and only makes sense in non-threaded way

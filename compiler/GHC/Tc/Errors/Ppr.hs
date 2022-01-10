@@ -48,7 +48,6 @@ import {-# SOURCE #-} GHC.Tc.Types (getLclEnvLoc)
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Rank (Rank(..))
 import GHC.Tc.Utils.TcType
-import GHC.Types.Basic (UnboxedTupleOrSum(..), unboxedTupleOrSumExtension)
 import GHC.Types.Error
 import GHC.Types.FieldLabel (flIsOverloaded)
 import GHC.Types.Hint.Ppr () -- Outputable GhcHint
@@ -715,7 +714,7 @@ instance Diagnostic TcRnMessage where
 
     TcRnForeignImportPrimExtNotSet _decl
       -> mkSimpleDecorated $
-           text "Use GHCForeignImportPrim to allow `foreign import prim'."
+           text "`foreign import prim' requires GHCForeignImportPrim."
 
     TcRnForeignImportPrimSafeAnn _decl
       -> mkSimpleDecorated $
@@ -771,7 +770,7 @@ instance Diagnostic TcRnMessage where
                     text "because the data constructor for"
                     <+> quotes (ppr tc) <+> text "is not in scope"
                 UnliftedFFITypesNeeded ->
-                  innerMsg $$ text "To marshal unlifted types, use UnliftedFFITypes"
+                  innerMsg $$ text "UnliftedFFITypes is required to marshal unlifted types"
                 NotABoxedMarshalableTyCon -> innerMsg
                 ForeignLabelNotAPtr ->
                   innerMsg $$ text "A foreign-imported address (via &foo) must have type (Ptr a) or (FunPtr a)"
@@ -1298,7 +1297,7 @@ instance Diagnostic TcRnMessage where
     TcRnWarnDefaulting {}
       -> noHints
     TcRnForeignImportPrimExtNotSet{}
-      -> noHints
+      -> [suggestExtension LangExt.GHCForeignImportPrim]
     TcRnForeignImportPrimSafeAnn{}
       -> noHints
     TcRnForeignFunctionImportAsValue{}
@@ -1313,6 +1312,7 @@ instance Diagnostic TcRnMessage where
       -> case reason of
            TypeCannotBeMarshaled _ why
              | NewtypeDataConNotInScope{} <- why -> [SuggestImportingDataCon]
+             | UnliftedFFITypesNeeded <- why -> [suggestExtension LangExt.UnliftedFFITypes]
            _ -> noHints
     TcRnInvalidCIdentifier{}
       -> noHints

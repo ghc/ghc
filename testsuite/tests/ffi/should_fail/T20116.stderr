@@ -1,0 +1,6 @@
+
+T20116.hs:8:1: error:
+    • `foreign import prim' requires GHCForeignImportPrim.
+    • When checking declaration:
+        foreign import prim safe "test_lt" lt_s :: Int64# -> Int64# -> Int#
+    Suggested fix: Perhaps you intended to use GHCForeignImportPrim
