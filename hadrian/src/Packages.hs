@@ -7,7 +7,7 @@ module Packages (
     exceptions, filepath, genapply, genprimopcode, ghc, ghcBignum, ghcBoot, ghcBootTh,
     ghcCompact, ghcHeap, ghci, ghciWrapper, ghcPkg, ghcPrim, haddock, haskeline,
     hsc2hs, hp2ps, hpc, hpcBin, integerGmp, integerSimple, iserv, iservProxy,
-    libffi, libiserv, mtl, parsec, pretty, primitive, process, remoteIserv, rts,
+    libffi, libiserv, mtl, parsec, pretty, process, remoteIserv, rts,
     runGhc, stm, templateHaskell, terminfo, text, time, timeout, touchy,
     transformers, unlit, unix, win32, xhtml, ghcPackages, isGhcPackage,
 
@@ -90,7 +90,6 @@ libiserv            = lib  "libiserv"
 mtl                 = lib  "mtl"
 parsec              = lib  "parsec"
 pretty              = lib  "pretty"
-primitive           = lib  "primitive"
 process             = lib  "process"
 remoteIserv         = util "remote-iserv"
 rts                 = top  "rts"

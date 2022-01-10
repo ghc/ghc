@@ -43,8 +43,6 @@ ghcWarningsArgs = do
                                       , "-Wno-redundant-constraints"
                                       , "-Wno-simplifiable-class-constraints" ]
         , package pretty       ? pure [ "-Wno-unused-imports" ]
-        , package primitive    ? pure [ "-Wno-unused-imports"
-                                      , "-Wno-deprecations" ]
         , package rts          ? pure [ "-Wcpp-undef" ]
         , package terminfo     ? pure [ "-Wno-unused-imports" ]
         , package transformers ? pure [ "-Wno-unused-matches"
