@@ -136,6 +136,7 @@ runTestBuilderArgs = builder Testsuite ? do
             , arg "-e", arg $ "config.os="       ++ show os
             , arg "-e", arg $ "config.arch="     ++ show arch
             , arg "-e", arg $ "config.platform=" ++ show platform
+            , arg "-e", arg $ "config.stage="    ++ show (fromEnum (C.stage ctx) + 1)
 
             , arg "--config", arg $ "gs=gs"                           -- Use the default value as in test.mk
             , arg "--config", arg $ "timeout_prog=" ++ show (top -/- timeoutProg)
