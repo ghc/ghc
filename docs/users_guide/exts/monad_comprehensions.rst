@@ -35,8 +35,8 @@ Monad comprehensions support:
 
        [ x | x <- [1..10], x <= 5 ]
 
-   Guards are translated with the ``guard`` function, which requires a
-   ``MonadPlus`` instance: ::
+   Guards are translated with the ``guard`` function, which requires an
+   ``Alternative`` instance: ::
 
        do x <- [1..10]
           guard (x <= 5)
