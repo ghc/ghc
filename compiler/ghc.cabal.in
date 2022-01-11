@@ -750,6 +750,7 @@ Library
         GHC.Utils.Logger
         GHC.Utils.Misc
         GHC.Utils.Monad
+        GHC.Utils.Monad.EtaReader
         GHC.Utils.Monad.State.Strict
         GHC.Utils.Monad.State.Lazy
         GHC.Utils.Outputable

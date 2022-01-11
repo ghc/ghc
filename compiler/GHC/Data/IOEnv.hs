@@ -1,5 +1,6 @@
 
-{-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE GeneralisedNewtypeDeriving #-}
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE PatternSynonyms #-}
 --
 -- (c) The University of Glasgow 2002-2006
@@ -46,12 +47,11 @@ import Data.IORef       ( IORef, newIORef, readIORef, writeIORef, modifyIORef,
 import System.IO.Unsafe ( unsafeInterleaveIO )
 import System.IO        ( fixIO )
 import Control.Monad
-import Control.Monad.Trans.Reader
 import Control.Monad.Catch (MonadCatch, MonadMask, MonadThrow)
 import GHC.Utils.Monad
+import GHC.Utils.Monad.EtaReader
 import GHC.Utils.Logger
-import Control.Applicative (Alternative(..))
-import GHC.Exts( oneShot )
+import Control.Applicative (Alternative)
 import Control.Concurrent.MVar (newEmptyMVar, readMVar, putMVar)
 import Control.Concurrent (forkIO, killThread)
 
@@ -60,54 +60,18 @@ import Control.Concurrent (forkIO, killThread)
 ----------------------------------------------------------------------
 
 
-newtype IOEnv env a = IOEnv' (env -> IO a)
-  deriving (MonadThrow, MonadCatch, MonadMask) via (ReaderT env IO)
-
+-- The use of 'EtaReaderT' makes us eta-expand over @env@.
 -- See Note [The one-shot state monad trick] in GHC.Utils.Monad
-instance Functor (IOEnv env) where
-   fmap f (IOEnv g) = IOEnv $ \env -> fmap f (g env)
-   a <$ IOEnv g     = IOEnv $ \env -> g env >> pure a
-
-instance MonadIO (IOEnv env) where
-   liftIO f = IOEnv (\_ -> f)
-
-pattern IOEnv :: forall env a. (env -> IO a) -> IOEnv env a
-pattern IOEnv m <- IOEnv' m
-  where
-    IOEnv m = IOEnv' (oneShot m)
-
-{-# COMPLETE IOEnv #-}
-
-unIOEnv :: IOEnv env a -> (env -> IO a)
-unIOEnv (IOEnv m) = m
-
-instance Monad (IOEnv m) where
-    (>>=)  = thenM
-    (>>)   = (*>)
-
-instance MonadFail (IOEnv m) where
-    fail _ = failM -- Ignore the string
-
-instance Applicative (IOEnv m) where
-    pure = returnM
-    IOEnv f <*> IOEnv x = IOEnv (\ env -> f env <*> x env )
-    (*>) = thenM_
-
-returnM :: a -> IOEnv env a
-returnM a = IOEnv (\ _ -> return a)
-
-thenM :: IOEnv env a -> (a -> IOEnv env b) -> IOEnv env b
-thenM (IOEnv m) f = IOEnv (\ env -> do { r <- m env ;
-                                         unIOEnv (f r) env })
-
-thenM_ :: IOEnv env a -> IOEnv env b -> IOEnv env b
-thenM_ (IOEnv m) f = IOEnv (\ env -> do { _ <- m env ; unIOEnv f env })
+newtype IOEnv env a = IOEnv (EtaReaderT env IO a)
+  deriving newtype (Functor, Applicative, Monad, MonadFail,
+                    MonadIO, MonadThrow, MonadCatch, MonadMask,
+                    Alternative, MonadPlus)
 
 failM :: IOEnv env a
-failM = IOEnv (\ _ -> throwIO IOEnvFailure)
+failM = liftIO $ throwIO IOEnvFailure
 
 failWithM :: String -> IOEnv env a
-failWithM s = IOEnv (\ _ -> ioError (userError s))
+failWithM s = liftIO $ ioError (userError s)
 
 data IOEnvFailure = IOEnvFailure
 
@@ -140,7 +104,7 @@ instance ContainsModule env => HasModule (IOEnv env) where
 
 ---------------------------
 runIOEnv :: env -> IOEnv env a -> IO a
-runIOEnv env (IOEnv m) = m env
+runIOEnv env (IOEnv m) = runEtaReaderT m env
 
 
 ---------------------------
@@ -152,7 +116,7 @@ runIOEnv env (IOEnv m) = m env
   -- thunks.  Sigh.
 
 fixM :: (a -> IOEnv env a) -> IOEnv env a
-fixM f = IOEnv (\ env -> fixIO (\ r -> unIOEnv (f r) env))
+fixM f = IOEnv (EtaReaderT (\ env -> fixIO (\ r -> runIOEnv env (f r))))
 
 
 ---------------------------
@@ -164,7 +128,7 @@ tryM :: IOEnv env r -> IOEnv env (Either IOEnvFailure r)
 -- to UserErrors.  But, say, pattern-match failures in GHC itself should
 -- not be caught here, else they'll be reported as errors in the program
 -- begin compiled!
-tryM (IOEnv thing) = IOEnv (\ env -> tryIOEnvFailure (thing env))
+tryM (IOEnv (EtaReaderT thing)) = IOEnv (EtaReaderT (\ env -> tryIOEnvFailure (thing env)))
 
 tryIOEnvFailure :: IO a -> IO (Either IOEnvFailure a)
 tryIOEnvFailure = try
@@ -173,7 +137,7 @@ tryAllM :: IOEnv env r -> IOEnv env (Either SomeException r)
 -- Catch *all* synchronous exceptions
 -- This is used when running a Template-Haskell splice, when
 -- even a pattern-match failure is a programmer error
-tryAllM (IOEnv thing) = IOEnv (\ env -> safeTry (thing env))
+tryAllM (IOEnv (EtaReaderT thing)) = IOEnv (EtaReaderT (\ env -> safeTry (thing env)))
 
 -- | Like 'try', but doesn't catch asynchronous exceptions
 safeTry :: IO a -> IO (Either SomeException a)
@@ -191,24 +155,14 @@ safeTry act = do
         throwIO e
 
 tryMostM :: IOEnv env r -> IOEnv env (Either SomeException r)
-tryMostM (IOEnv thing) = IOEnv (\ env -> tryMost (thing env))
+tryMostM (IOEnv (EtaReaderT thing)) = IOEnv (EtaReaderT (\ env -> tryMost (thing env)))
 
 ---------------------------
 unsafeInterleaveM :: IOEnv env a -> IOEnv env a
-unsafeInterleaveM (IOEnv m) = IOEnv (\ env -> unsafeInterleaveIO (m env))
+unsafeInterleaveM (IOEnv (EtaReaderT m)) = IOEnv (EtaReaderT (\ env -> unsafeInterleaveIO (m env)))
 
 uninterruptibleMaskM_ :: IOEnv env a -> IOEnv env a
-uninterruptibleMaskM_ (IOEnv m) = IOEnv (\ env -> uninterruptibleMask_ (m env))
-
-----------------------------------------------------------------------
--- Alternative/MonadPlus
-----------------------------------------------------------------------
-
-instance Alternative (IOEnv env) where
-    empty   = IOEnv (const empty)
-    m <|> n = IOEnv (\env -> unIOEnv m env <|> unIOEnv n env)
-
-instance MonadPlus (IOEnv env)
+uninterruptibleMaskM_ (IOEnv (EtaReaderT m)) = IOEnv (EtaReaderT (\ env -> uninterruptibleMask_ (m env)))
 
 ----------------------------------------------------------------------
 -- Accessing input/output
@@ -247,14 +201,14 @@ atomicUpdMutVar' var upd = liftIO (atomicModifyIORef' var upd)
 
 getEnv :: IOEnv env env
 {-# INLINE getEnv #-}
-getEnv = IOEnv (\ env -> return env)
+getEnv = IOEnv ask
 
 -- | Perform a computation with a different environment
 setEnv :: env' -> IOEnv env' a -> IOEnv env a
 {-# INLINE setEnv #-}
-setEnv new_env (IOEnv m) = IOEnv (\ _ -> m new_env)
+setEnv new_env (IOEnv m) = IOEnv (withEtaReaderT (const new_env) m)
 
 -- | Perform a computation with an altered environment
 updEnv :: (env -> env') -> IOEnv env' a -> IOEnv env a
 {-# INLINE updEnv #-}
-updEnv upd (IOEnv m) = IOEnv (\ env -> m (upd env))
+updEnv f (IOEnv m) = IOEnv (withEtaReaderT f m)

@@ -37,7 +37,6 @@ import GHC.Data.OrdList
 import qualified Data.Semigroup as Semi
 import Data.List.NonEmpty ( NonEmpty(..) )
 import qualified Data.List.NonEmpty as NE
-import Data.Coerce
 
 -- | Coverage checking action. Can be composed 'leftToRight' or 'topToBottom'.
 newtype CheckAction a = CA { unCA :: Nablas -> DsM (CheckResult a) }
@@ -183,7 +182,7 @@ checkEmptyCase pe@(PmEmptyCase { pe_var = var }) = CA $ \inc -> do
   pure CheckResult { cr_ret = pe, cr_uncov = unc, cr_approx = mempty }
 
 checkPatBind :: (PmPatBind Pre) -> CheckAction (PmPatBind Post)
-checkPatBind = coerce checkGRHS
+checkPatBind (PmPatBind pb) = PmPatBind <$> checkGRHS pb
 
 {- Note [Checking EmptyCase]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
