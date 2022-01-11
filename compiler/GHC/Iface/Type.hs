@@ -251,13 +251,13 @@ data IfaceTyCon = IfaceTyCon { ifaceTyConName :: IfExtName
 data IfaceTyConSort = IfaceNormalTyCon          -- ^ a regular tycon
 
                     | IfaceTupleTyCon !Arity !TupleSort
-                      -- ^ e.g. @(a, b, c)@ or @(#a, b, c#)@.
+                      -- ^ a tuple, e.g. @(a, b, c)@ or @(#a, b, c#)@.
                       -- The arity is the tuple width, not the tycon arity
                       -- (which is twice the width in the case of unboxed
                       -- tuples).
 
                     | IfaceSumTyCon !Arity
-                      -- ^ e.g. @(a | b | c)@
+                      -- ^ an unboxed sum, e.g. @(# a | b | c #)@
 
                     | IfaceEqualityTyCon
                       -- ^ A heterogeneous equality TyCon
@@ -928,7 +928,7 @@ ppr_ty ctxt_prec ty@(IfaceFunTy InvisArg _ _ _) = ppr_sigma ctxt_prec ty
 ppr_ty _         (IfaceFreeTyVar tyvar) = ppr tyvar  -- This is the main reason for IfaceFreeTyVar!
 ppr_ty _         (IfaceTyVar tyvar)     = ppr tyvar  -- See Note [Free tyvars in IfaceType]
 ppr_ty ctxt_prec (IfaceTyConApp tc tys) = pprTyTcApp ctxt_prec tc tys
-ppr_ty ctxt_prec (IfaceTupleTy i p tys) = pprTuple ctxt_prec i p tys
+ppr_ty ctxt_prec (IfaceTupleTy i p tys) = pprTuple ctxt_prec i p tys -- always fully saturated
 ppr_ty _         (IfaceLitTy n)         = pprIfaceTyLit n
         -- Function types
 ppr_ty ctxt_prec (IfaceFunTy _ w ty1 ty2)  -- Should be VisArg
@@ -1461,9 +1461,13 @@ pprTyTcApp ctxt_prec tc tys =
        , not debug
        , arity == ifaceVisAppArgsLength tys
        -> pprTuple ctxt_prec sort (ifaceTyConIsPromoted info) tys
+           -- NB: pprTuple requires a saturated tuple.
 
        | IfaceSumTyCon arity <- ifaceTyConSort info
-       -> pprSum arity (ifaceTyConIsPromoted info) tys
+       , not debug
+       , arity == ifaceVisAppArgsLength tys
+       -> pprSum (ifaceTyConIsPromoted info) tys
+           -- NB: pprSum requires a saturated unboxed sum.
 
        | tc `ifaceTyConHasKey` consDataConKey
        , False <- print_kinds
@@ -1627,8 +1631,13 @@ ppr_iface_tc_app pp ctxt_prec tc tys
   | otherwise
   = pprIfacePrefixApp ctxt_prec (parens (ppr tc)) (map (pp appPrec) tys)
 
-pprSum :: Arity -> PromotionFlag -> IfaceAppArgs -> SDoc
-pprSum _arity is_promoted args
+-- | Pretty-print an unboxed sum type. The sum should be saturated:
+-- as many visible arguments as the arity of the sum.
+--
+-- NB: this always strips off the invisible 'RuntimeRep' arguments,
+-- even with `-fprint-explicit-runtime-reps` and `-fprint-explicit-kinds`.
+pprSum :: PromotionFlag -> IfaceAppArgs -> SDoc
+pprSum is_promoted args
   =   -- drop the RuntimeRep vars.
       -- See Note [Unboxed tuple RuntimeRep vars] in GHC.Core.TyCon
     let tys   = appArgsIfaceTypes args
@@ -1636,6 +1645,12 @@ pprSum _arity is_promoted args
     in pprPromotionQuoteI is_promoted
        <> sumParens (pprWithBars (ppr_ty topPrec) args')
 
+-- | Pretty-print a tuple type (boxed tuple, constraint tuple, unboxed tuple).
+-- The tuple should be saturated: as many visible arguments as the arity of
+-- the tuple.
+--
+-- NB: this always strips off the invisible 'RuntimeRep' arguments,
+-- even with `-fprint-explicit-runtime-reps` and `-fprint-explicit-kinds`.
 pprTuple :: PprPrec -> TupleSort -> PromotionFlag -> IfaceAppArgs -> SDoc
 pprTuple ctxt_prec sort promoted args =
   case promoted of

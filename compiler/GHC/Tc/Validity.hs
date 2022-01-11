@@ -56,6 +56,7 @@ import GHC.Tc.Instance.FunDeps
 import GHC.Core.FamInstEnv
    ( isDominatedBy, injectiveBranches, InjectivityCheckResult(..) )
 import GHC.Tc.Instance.Family
+import GHC.Types.Basic   ( UnboxedTupleOrSum(..), unboxedTupleOrSumExtension )
 import GHC.Types.Name
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
@@ -693,8 +694,14 @@ check_type ve (AppTy ty1 ty2)
 check_type ve ty@(TyConApp tc tys)
   | isTypeSynonymTyCon tc || isTypeFamilyTyCon tc
   = check_syn_tc_app ve ty tc tys
+
+  -- Check for unboxed tuples and unboxed sums: these
+  -- require the corresponding extension to be enabled.
   | isUnboxedTupleTyCon tc
-  = check_ubx_tuple ve ty tys
+  = check_ubx_tuple_or_sum UnboxedTupleType ve ty tys
+  | isUnboxedSumTyCon tc
+  = check_ubx_tuple_or_sum UnboxedSumType   ve ty tys
+
   | otherwise
   = mapM_ (check_arg_type False ve) tys
 
@@ -838,16 +845,17 @@ field to False.
 -}
 
 ----------------------------------------
-check_ubx_tuple :: ValidityEnv -> KindOrType -> [KindOrType] -> TcM ()
-check_ubx_tuple (ve@ValidityEnv{ve_tidy_env = env}) ty tys
-  = do  { ub_tuples_allowed <- xoptM LangExt.UnboxedTuples
-        ; checkTcM ub_tuples_allowed (env, TcRnUnboxedTupleTypeFuncArg (tidyType env ty))
+check_ubx_tuple_or_sum :: UnboxedTupleOrSum -> ValidityEnv -> KindOrType -> [KindOrType] -> TcM ()
+check_ubx_tuple_or_sum tup_or_sum (ve@ValidityEnv{ve_tidy_env = env}) ty tys
+  = do  { ub_thing_allowed <- xoptM $ unboxedTupleOrSumExtension tup_or_sum
+        ; checkTcM ub_thing_allowed
+            (env, TcRnUnboxedTupleOrSumTypeFuncArg tup_or_sum (tidyType env ty))
 
         ; impred <- xoptM LangExt.ImpredicativeTypes
         ; let rank' = if impred then ArbitraryRank else MonoTypeTyConArg
                 -- c.f. check_arg_type
                 -- However, args are allowed to be unlifted, or
-                -- more unboxed tuples, so can't use check_arg_ty
+                -- more unboxed tuples or sums, so can't use check_arg_ty
         ; mapM_ (check_type (ve{ve_rank = rank'})) tys }
 
 ----------------------------------------

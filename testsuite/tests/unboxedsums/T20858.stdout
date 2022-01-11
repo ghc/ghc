@@ -1,0 +1,18 @@
+S1 :: TYPE 'GHC.Types.WordRep
+      -> TYPE
+           ('GHC.Types.SumRep
+              '[ 'GHC.Types.IntRep, 'GHC.Types.DoubleRep, 'GHC.Types.WordRep])
+= (# | | #) Int# Double#
+S2 :: TYPE 'GHC.Types.DoubleRep
+      -> TYPE 'GHC.Types.WordRep
+      -> TYPE
+           ('GHC.Types.SumRep
+              '[ 'GHC.Types.IntRep, 'GHC.Types.DoubleRep, 'GHC.Types.WordRep])
+= (# | | #) Int#
+S3 :: TYPE 'GHC.Types.IntRep
+      -> TYPE 'GHC.Types.DoubleRep
+      -> TYPE 'GHC.Types.WordRep
+      -> TYPE
+           ('GHC.Types.SumRep
+              '[ 'GHC.Types.IntRep, 'GHC.Types.DoubleRep, 'GHC.Types.WordRep])
+= (# | | #)

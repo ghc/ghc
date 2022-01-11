@@ -1635,7 +1635,6 @@ data HsBracket p
   | TypBr  (XTypBr p)   (LHsType p)   -- [t| type  |]
   | VarBr  (XVarBr p)   Bool (LIdP p)
                                 -- True: 'x, False: ''T
-                                -- (The Bool flag is used only in pprHsBracket)
   | TExpBr (XTExpBr p) (LHsExpr p)    -- [||  expr  ||]
   | XBracket !(XXBracket p)           -- Extension point; see Note [Trees That Grow]
                                       -- in Language.Haskell.Syntax.Extension

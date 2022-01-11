@@ -635,8 +635,9 @@ data TcRnMessage where
   -}
   TcRnConstraintInKind :: !Type -> TcRnMessage
 
-  {-| TcRnUnboxedTupleTypeFuncArg is an error that occurs whenever an unboxed tuple type
-      is specified as a function argument.
+  {-| TcRnUnboxedTupleTypeFuncArg is an error that occurs whenever an unboxed tuple
+      or unboxed sum type is specified as a function argument, when the appropriate
+      extension (`-XUnboxedTuples` or `-XUnboxedSums`) isn't enabled.
 
       Examples(s):
         -- T15073.hs
@@ -652,7 +653,10 @@ data TcRnMessage where
                   deriving/should_fail/T15073a.hs
                   typecheck/should_fail/T16059d
   -}
-  TcRnUnboxedTupleTypeFuncArg :: !Type -> TcRnMessage
+  TcRnUnboxedTupleOrSumTypeFuncArg
+    :: UnboxedTupleOrSum -- ^ whether this is an unboxed tuple or an unboxed sum
+    -> !Type
+    -> TcRnMessage
 
   {-| TcRnLinearFuncInKind is an error that occurs whenever a linear function is
       specified in a kind.

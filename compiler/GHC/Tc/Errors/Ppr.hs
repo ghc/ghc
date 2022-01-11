@@ -25,6 +25,7 @@ import GHC.Data.Bag
 import GHC.Tc.Errors.Types
 import GHC.Tc.Types.Rank (Rank(..))
 import GHC.Tc.Utils.TcType (TcType, tcSplitForAllTyVars, mkClassPred)
+import GHC.Types.Basic (UnboxedTupleOrSum(..), unboxedTupleOrSumExtension)
 import GHC.Types.Error
 import GHC.Types.FieldLabel (FieldLabelString, flIsOverloaded, flSelector)
 import GHC.Types.Id (isRecordSelector)
@@ -201,10 +202,14 @@ instance Diagnostic TcRnMessage where
     TcRnConstraintInKind ty
       -> mkSimpleDecorated $
            text "Illegal constraint in a kind:" <+> pprType ty
-    TcRnUnboxedTupleTypeFuncArg ty
+    TcRnUnboxedTupleOrSumTypeFuncArg tuple_or_sum ty
       -> mkSimpleDecorated $
-           sep [ text "Illegal unboxed tuple type as function argument:"
+           sep [ text "Illegal unboxed" <+> what <+> text "type as function argument:"
                , pprType ty ]
+        where
+          what = case tuple_or_sum of
+            UnboxedTupleType -> text "tuple"
+            UnboxedSumType   -> text "sum"
     TcRnLinearFuncInKind ty
       -> mkSimpleDecorated $
            text "Illegal linear function in a kind:" <+> pprType ty
@@ -630,7 +635,7 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnConstraintInKind{}
       -> ErrorWithoutFlag
-    TcRnUnboxedTupleTypeFuncArg{}
+    TcRnUnboxedTupleOrSumTypeFuncArg{}
       -> ErrorWithoutFlag
     TcRnLinearFuncInKind{}
       -> ErrorWithoutFlag
@@ -852,8 +857,8 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnConstraintInKind{}
       -> noHints
-    TcRnUnboxedTupleTypeFuncArg{}
-      -> [suggestExtension LangExt.UnboxedTuples]
+    TcRnUnboxedTupleOrSumTypeFuncArg tuple_or_sum _
+      -> [suggestExtension $ unboxedTupleOrSumExtension tuple_or_sum]
     TcRnLinearFuncInKind{}
       -> noHints
     TcRnForAllEscapeError{}

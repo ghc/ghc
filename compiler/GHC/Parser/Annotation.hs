@@ -736,6 +736,14 @@ data NameAnn
       nann_close     :: EpaLocation,
       nann_trailing  :: [TrailingAnn]
       }
+  -- | Used for @(# | | #)@
+  | NameAnnBars {
+      nann_adornment :: NameAdornment,
+      nann_open      :: EpaLocation,
+      nann_bars      :: [EpaLocation],
+      nann_close     :: EpaLocation,
+      nann_trailing  :: [TrailingAnn]
+      }
   -- | Used for @()@, @(##)@, @[]@
   | NameAnnOnly {
       nann_adornment :: NameAdornment,
@@ -1274,6 +1282,8 @@ instance Outputable NameAnn where
     = text "NameAnn" <+> ppr a <+> ppr o <+> ppr n <+> ppr c <+> ppr t
   ppr (NameAnnCommas a o n c t)
     = text "NameAnnCommas" <+> ppr a <+> ppr o <+> ppr n <+> ppr c <+> ppr t
+  ppr (NameAnnBars a o n b t)
+    = text "NameAnnBars" <+> ppr a <+> ppr o <+> ppr n <+> ppr b <+> ppr t
   ppr (NameAnnOnly a o c t)
     = text "NameAnnOnly" <+> ppr a <+> ppr o <+> ppr c <+> ppr t
   ppr (NameAnnRArrow n t)

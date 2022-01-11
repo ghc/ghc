@@ -444,11 +444,9 @@ $tab          { warnTab }
 }
 
 <0> {
-  "(#" / { ifExtension UnboxedTuplesBit `alexOrPred`
-           ifExtension UnboxedSumsBit }
+  "(#" / { ifExtension UnboxedParensBit }
          { token IToubxparen }
-  "#)" / { ifExtension UnboxedTuplesBit `alexOrPred`
-           ifExtension UnboxedSumsBit }
+  "#)" / { ifExtension UnboxedParensBit }
          { token ITcubxparen }
 }
 
@@ -2732,8 +2730,7 @@ data ExtBits
   | RecursiveDoBit -- mdo
   | QualifiedDoBit -- .do and .mdo
   | UnicodeSyntaxBit -- the forall symbol, arrow symbols, etc
-  | UnboxedTuplesBit -- (# and #)
-  | UnboxedSumsBit -- (# and #)
+  | UnboxedParensBit -- (# and #)
   | DatatypeContextsBit
   | MonadComprehensionsBit
   | TransformComprehensionsBit
@@ -2814,8 +2811,7 @@ mkParserOpts extensionFlags diag_opts supported
       .|. RecursiveDoBit              `xoptBit` LangExt.RecursiveDo
       .|. QualifiedDoBit              `xoptBit` LangExt.QualifiedDo
       .|. UnicodeSyntaxBit            `xoptBit` LangExt.UnicodeSyntax
-      .|. UnboxedTuplesBit            `xoptBit` LangExt.UnboxedTuples
-      .|. UnboxedSumsBit              `xoptBit` LangExt.UnboxedSums
+      .|. UnboxedParensBit            `orXoptsBit` [LangExt.UnboxedTuples, LangExt.UnboxedSums]
       .|. DatatypeContextsBit         `xoptBit` LangExt.DatatypeContexts
       .|. TransformComprehensionsBit  `xoptBit` LangExt.TransformListComp
       .|. MonadComprehensionsBit      `xoptBit` LangExt.MonadComprehensions
@@ -2850,6 +2846,8 @@ mkParserOpts extensionFlags diag_opts supported
 
     xoptBit bit ext = bit `setBitIf` EnumSet.member ext extensionFlags
     xoptNotBit bit ext = bit `setBitIf` not (EnumSet.member ext extensionFlags)
+
+    orXoptsBit bit exts = bit `setBitIf` any (`EnumSet.member` extensionFlags) exts
 
     setBitIf :: ExtBits -> Bool -> ExtsBitmap
     b `setBitIf` cond | cond      = xbit b

@@ -147,6 +147,8 @@ Unboxed tuples
 .. extension:: UnboxedTuples
     :shortdesc: Enable the use of unboxed tuple syntax.
 
+    :implies: :extension:`UnboxedSums`
+
     :since: 6.8.1
 
 
@@ -200,6 +202,10 @@ example desugars like this:
 
 Indeed, the bindings can even be recursive.
 
+To refer to the unboxed tuple type constructors themselves, e.g. if you
+want to attach instances to them, use ``(# #)``, ``(#,#)``, ``(#,,#)``, etc.
+This mirrors the syntax for boxed tuples ``()``, ``(,)``, ``(,,)``, etc.
+
 .. _unboxed-sums:
 
 Unboxed sums
@@ -211,6 +217,7 @@ Unboxed sums
     :since: 8.2.1
 
     Enable the use of unboxed sum syntax.
+    Implied by :extension:`UnboxedTuples`.
 
 `-XUnboxedSums` enables new syntax for anonymous, unboxed sum types. The syntax
 for an unboxed sum type with N alternatives is ::
@@ -236,6 +243,14 @@ The pattern syntax reflects the term syntax: ::
     case x of
       (# (# i, str #) | #) -> ...
       (# | bool #) -> ...
+
+Note that spaces are always required around bars. For example, ``(# | 1# | | #)``
+is valid, but ``(# | 1# || #)`` and ``(#| 1# | | #)`` are both invalid.
+
+The type constructors themselves can be written in prefix form as ``(# | #)``,
+``(# | | #)``, ``(# | | | #)``, etc. Partial applications must also use prefix form,
+i.e. ``(# | #) Int#``. Saturated applications can be written either way,
+so that ``(# | #) Int# Float#`` is equivalent to ``(# Int# | Float# #)``.
 
 Unboxed sums are "unboxed" in the sense that, instead of allocating sums in the
 heap and representing values as pointers, unboxed sums are represented as their

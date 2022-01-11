@@ -3851,6 +3851,10 @@ impliedXFlags
     , (LangExt.TemplateHaskell, turnOn, LangExt.TemplateHaskellQuotes)
     , (LangExt.Strict, turnOn, LangExt.StrictData)
 
+    -- Historically only UnboxedTuples was required for unboxed sums to work.
+    -- To avoid breaking code, we make UnboxedTuples imply UnboxedSums.
+    , (LangExt.UnboxedTuples, turnOn, LangExt.UnboxedSums)
+
     -- The extensions needed to declare an H98 unlifted data type
     , (LangExt.UnliftedDatatypes, turnOn, LangExt.DataKinds)
     , (LangExt.UnliftedDatatypes, turnOn, LangExt.StandaloneKindSignatures)

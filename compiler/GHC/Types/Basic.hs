@@ -51,6 +51,7 @@ module GHC.Types.Basic (
         TupleSort(..), tupleSortBoxity, boxityTupleSort,
         tupleParens,
 
+        UnboxedTupleOrSum(..), unboxedTupleOrSumExtension,
         sumParens, pprAlternative,
 
         -- ** The OneShotInfo type
@@ -115,6 +116,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Binary
 import GHC.Types.SourceText
+import qualified GHC.LanguageExtensions as LangExt
 import Data.Data
 import qualified Data.Semigroup as Semi
 
@@ -877,6 +879,22 @@ pprAlternative :: (a -> SDoc) -- ^ The pretty printing function to use
                               -- printed and finally packed into a paragraph.
 pprAlternative pp x alt arity =
     fsep (replicate (alt - 1) vbar ++ [pp x] ++ replicate (arity - alt) vbar)
+
+-- | Are we dealing with an unboxed tuple or an unboxed sum?
+--
+-- Used when validity checking, see 'check_ubx_tuple_or_sum'.
+data UnboxedTupleOrSum
+  = UnboxedTupleType
+  | UnboxedSumType
+  deriving Eq
+
+instance Outputable UnboxedTupleOrSum where
+  ppr UnboxedTupleType = text "UnboxedTupleType"
+  ppr UnboxedSumType   = text "UnboxedSumType"
+
+unboxedTupleOrSumExtension :: UnboxedTupleOrSum -> LangExt.Extension
+unboxedTupleOrSumExtension UnboxedTupleType = LangExt.UnboxedTuples
+unboxedTupleOrSumExtension UnboxedSumType   = LangExt.UnboxedSums
 
 {-
 ************************************************************************

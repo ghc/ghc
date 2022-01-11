@@ -3100,6 +3100,12 @@ instance ExactPrint (LocatedN RdrName) where
         forM_ cs (\loc -> markKw (AddEpAnn AnnComma loc))
         markKw (AddEpAnn kwc c)
         markTrailing t
+      NameAnnBars a o bs c t -> do
+        let (kwo,kwc) = adornments a
+        markKw (AddEpAnn kwo o)
+        forM_ bs (\loc -> markKw (AddEpAnn AnnVbar loc))
+        markKw (AddEpAnn kwc c)
+        markTrailing t
       NameAnnOnly a o c t -> do
         markName a o Nothing c
         markTrailing t

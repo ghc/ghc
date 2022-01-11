@@ -25,6 +25,19 @@ Compiler
   parameters with such kinds are unlikely to be very useful, due to
   :ghc-ticket:`18759`.
 
+- Changes to the treatment of :extension:`UnboxedSums`:
+
+  - GHC can now parse unboxed sum type constructors ``(# | #)``, ``(# | | #)``,
+    ``(# | | | #)`, etc. Partial applications need to be written in prefix form,
+    e.g. ``(# | #) Int#``.
+
+  - Unboxed sums now require the :extension:`UnboxedSums` extension to be enabled.
+
+  - The :extension:`UnboxedTuples` extension now implies
+    :extension:`UnboxedSums`. This means that code using unboxed sums that
+    enabled the :extension:`UnboxedTuples` extension but didn't explicitly
+    enable :extension:`UnboxedSums` will continue to work without changes.
+
 ``base`` library
 ~~~~~~~~~~~~~~~~
 

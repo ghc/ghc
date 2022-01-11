@@ -202,7 +202,7 @@ import GHC.Utils.Panic.Plain
 
 import qualified Data.ByteString.Char8 as BS
 
-import Data.List        ( elemIndex )
+import Data.List        ( elemIndex, intersperse )
 
 alpha_tyvar :: [TyVar]
 alpha_tyvar = [alphaTyVar]
@@ -918,22 +918,30 @@ isBuiltInOcc_maybe occ =
 
       -- unboxed sum tycon
       _ | Just rest <- "(#" `BS.stripPrefix` name
-        , (pipes, rest') <- BS.span (=='|') rest
+        , (nb_pipes, rest') <- span_pipes rest
         , "#)" <- rest'
-             -> Just $ tyConName $ sumTyCon (1+BS.length pipes)
+             -> Just $ tyConName $ sumTyCon (1+nb_pipes)
 
       -- unboxed sum datacon
       _ | Just rest <- "(#" `BS.stripPrefix` name
-        , (pipes1, rest') <- BS.span (=='|') rest
+        , (nb_pipes1, rest') <- span_pipes rest
         , Just rest'' <- "_" `BS.stripPrefix` rest'
-        , (pipes2, rest''') <- BS.span (=='|') rest''
+        , (nb_pipes2, rest''') <- span_pipes rest''
         , "#)" <- rest'''
-             -> let arity = BS.length pipes1 + BS.length pipes2 + 1
-                    alt = BS.length pipes1 + 1
+             -> let arity = nb_pipes1 + nb_pipes2 + 1
+                    alt = nb_pipes1 + 1
                 in Just $ dataConName $ sumDataCon alt arity
       _ -> Nothing
   where
     name = bytesFS $ occNameFS occ
+
+    span_pipes :: BS.ByteString -> (Int, BS.ByteString)
+    span_pipes = go 0
+      where
+        go nb_pipes bs = case BS.uncons bs of
+          Just ('|',rest) -> go (nb_pipes + 1) rest
+          Just (' ',rest) -> go nb_pipes       rest
+          _               -> (nb_pipes, bs)
 
     choose_ns :: Name -> Name -> Name
     choose_ns tc dc
@@ -1236,16 +1244,16 @@ mkSumTyConOcc :: Arity -> OccName
 mkSumTyConOcc n = mkOccName tcName str
   where
     -- No need to cache these, the caching is done in mk_sum
-    str = '(' : '#' : bars ++ "#)"
-    bars = replicate (n-1) '|'
+    str = '(' : '#' : ' ' : bars ++ " #)"
+    bars = intersperse ' ' $ replicate (n-1) '|'
 
 -- | OccName for i-th alternative of n-ary unboxed sum data constructor.
 mkSumDataConOcc :: ConTag -> Arity -> OccName
 mkSumDataConOcc alt n = mkOccName dataName str
   where
     -- No need to cache these, the caching is done in mk_sum
-    str = '(' : '#' : bars alt ++ '_' : bars (n - alt - 1) ++ "#)"
-    bars i = replicate i '|'
+    str = '(' : '#' : ' ' : bars alt ++ '_' : bars (n - alt - 1) ++ " #)"
+    bars i = intersperse ' ' $ replicate i '|'
 
 -- | Type constructor for n-ary unboxed sum.
 sumTyCon :: Arity -> TyCon
