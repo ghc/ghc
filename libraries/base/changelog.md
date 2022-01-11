@@ -54,6 +54,10 @@
   * `fromInteger :: Integer -> Float/Double` now consistently round to the
     nearest value, with ties to even.
 
+  * The `Data.Int.Int{8,16,32}` (resp. `Data.Word.Word{8,16,32}`) types are now
+    represented by their associated fixed-width unlifted types rather than
+    `Int#` (resp. `Word#`).
+
 ## 4.15.0.0 *Feb 2021*
 
   * `openFile` now calls the `open` system call with an `interruptible` FFI
