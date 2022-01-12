@@ -1628,6 +1628,18 @@ pushAtom d p (StgVarArg var)
    | [] <- typePrimRep (idType var)
    = return (nilOL, 0)
 
+     -- Catch occurrences of nullary data-con workers. Not only is this an
+     -- optimisation, but it is necessary in the case of unlifted data types,
+     -- since the worker BCO is not in WHNF. See #20194.
+     --
+     -- TODO: We probably should do this for all saturated data-con worker
+     -- applications.
+   | Just data_con <- isDataConWorkId_maybe var
+   , isNullaryRepDataCon data_con
+   = do
+       platform <- targetPlatform <$> getDynFlags
+       return (unitOL (PACK data_con 0), wordSize platform)
+
    | isFCallId var
    = pprPanic "pushAtom: shouldn't get an FCallId here" (ppr var)
 
