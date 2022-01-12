@@ -16,6 +16,7 @@ import sys
 from math import ceil, trunc, floor, log
 from pathlib import Path, PurePath
 import collections
+import collections.abc
 import subprocess
 
 from testglobals import config, ghc_env, default_testopts, brokens, t, \
@@ -852,7 +853,7 @@ def join_normalisers(*a):
         Taken from http://stackoverflow.com/a/2158532/946226
         """
         for el in l:
-            if (isinstance(el, collections.Iterable)
+            if (isinstance(el, collections.abc.Iterable)
                 and not isinstance(el, (bytes, str))):
                 for sub in flatten(el):
                     yield sub
