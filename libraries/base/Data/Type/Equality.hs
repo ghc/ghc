@@ -145,8 +145,22 @@ instance a ~~ b => Enum (a :~~: b) where
 deriving instance a ~~ b => Bounded (a :~~: b)
 
 -- | This class contains types where you can learn the equality of two types
--- from information contained in /terms/. Typically, only singleton types should
--- inhabit this class.
+-- from information contained in /terms/.
+--
+-- The result should be @Just Refl@ if and only if the types applied to @f@ are
+-- equal:
+--
+-- @TestEquality (x :: f a) (y :: f b) = Just Refl ⟺ a = b@
+--
+-- Typically, only singleton types should inhabit this class. In that case type
+-- argument equality coincides with term equality:
+--
+-- @TestEquality (x :: f a) (y :: f b) = Just Refl ⟺ a = b ⟺ x = y@
+--
+-- @isJust (TestEquality x y) = x == y@
+--
+-- Singleton types are not required, however, and so the latter two would-be
+-- laws are not in fact valid in general.
 class TestEquality f where
   -- | Conditionally prove the equality of @a@ and @b@.
   testEquality :: f a -> f b -> Maybe (a :~: b)
