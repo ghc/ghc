@@ -215,11 +215,11 @@ mkProtoBCO
    -> name
    -> BCInstrList
    -> Either  [CgStgAlt] (CgStgRhs)
-        -- ^ original expression; for debugging only
-   -> Int
-   -> Word16
-   -> [StgWord]
-   -> Bool      -- True <=> is a return point, rather than a function
+                -- ^ original expression; for debugging only
+   -> Int       -- ^ arity
+   -> Word16    -- ^ bitmap size
+   -> [StgWord] -- ^ bitmap
+   -> Bool      -- ^ True <=> is a return point, rather than a function
    -> [FFIInfo]
    -> ProtoBCO name
 mkProtoBCO platform nm instrs_ordlist origin arity bitmap_size bitmap is_ret ffis
@@ -736,10 +736,10 @@ doTailCall init_d s p fn args = do
    do_pushes init_d args (map (atomRep platform) args)
   where
   do_pushes !d [] reps = do
-        assert (null reps ) return ()
+        assert (null reps) return ()
         (push_fn, sz) <- pushAtom d p (StgVarArg fn)
         platform <- profilePlatform <$> getProfile
-        assert (sz == wordSize platform ) return ()
+        assert (sz == wordSize platform) return ()
         let slide = mkSlideB platform (d - init_d + wordSize platform) (init_d - s)
             enter = if isUnliftedType (idType fn)
                     then RETURN_UNLIFTED P
@@ -877,6 +877,7 @@ doCase d s p scrut bndr alts
         isAlgCase = isAlgType bndr_ty
 
         -- given an alt, return a discr and code for it.
+        codeAlt :: CgStgAlt -> BcM (Discr, BCInstrList)
         codeAlt (DEFAULT, _, rhs)
            = do rhs_code <- schemeE d_alts s p_alts rhs
                 return (NoDiscr, rhs_code)
