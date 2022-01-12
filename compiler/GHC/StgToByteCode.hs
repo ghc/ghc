@@ -841,9 +841,8 @@ doCase d s p scrut bndr alts
         -- An unlifted value gets an extra info table pushed on top
         -- when it is returned.
         unlifted_itbl_size_b :: StackDepth
-        unlifted_itbl_size_b | ubx_tuple_frame              = 3 * wordSize platform
-                             | not (isUnliftedType bndr_ty) = 0
-                             | otherwise                    = wordSize platform
+        unlifted_itbl_size_b | ubx_tuple_frame              = 2 * wordSize platform -- TODO: Check this
+                             | otherwise                    = 0
 
         (bndr_size, tuple_info, args_offsets)
            | ubx_tuple_frame =
@@ -1007,8 +1006,8 @@ doCase d s p scrut bndr alts
      alt_final0 <- mkMultiBranch maybe_ncons alt_stuff
      -- Pop the frame header in the case of unlifted things.
      let alt_final
-           -- | ubx_tuple_frame        = mkSlideW 0 2 `mappend` alt_final0
-           -- | isUnliftedType bndr_ty = mkSlideW 0 1 `mappend` alt_final0
+           | ubx_tuple_frame        = mkSlideW 0 2 `mappend` alt_final0
+           | isUnliftedType bndr_ty = mkSlideW 0 1 `mappend` alt_final0
            | otherwise              = alt_final0
 
      let
