@@ -1004,7 +1004,12 @@ doCase d s p scrut bndr alts
         bitmap = intsToReverseBitmap platform bitmap_size'{-size-} pointers
 
      alt_stuff <- mapM codeAlt alts
-     alt_final <- mkMultiBranch maybe_ncons alt_stuff
+     alt_final0 <- mkMultiBranch maybe_ncons alt_stuff
+     -- Pop the frame header in the case of unlifted things.
+     let alt_final
+           -- | ubx_tuple_frame        = mkSlideW 0 2 `mappend` alt_final0
+           -- | isUnliftedType bndr_ty = mkSlideW 0 1 `mappend` alt_final0
+           | otherwise              = alt_final0
 
      let
          alt_bco_name = getName bndr
