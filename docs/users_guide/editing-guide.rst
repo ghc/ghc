@@ -420,6 +420,7 @@ user-substitutable tokens. In this document we use the convention, ``⟨subst⟩
 (note that these are angle brackets, ``U+27E8`` and ``U+27E9``, not
 less-than/greater-than signs).
 
+.. _references:
 
 reST reference materials
 ------------------------
