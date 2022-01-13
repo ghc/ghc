@@ -37,10 +37,10 @@ pattern State m <- State' m
     State m = State' (oneShot $ \s -> m s)
 
 instance Applicative (State s) where
-   pure x   = State $ \s -> (# x, s #)
+   pure x   = State $ \(!s) -> (# x, s #)
    m <*> n  = State $ \s -> case runState' m s of
                             (# f, !s' #) -> case runState' n s' of
-                                            (# x, s'' #) -> (# f x, s'' #)
+                                            (# x, !s'' #) -> (# f x, s'' #)
 
 instance Monad (State s) where
     m >>= n  = State $ \s -> case runState' m s of
@@ -48,19 +48,19 @@ instance Monad (State s) where
 
 state :: (s -> (a, s)) -> State s a
 state f = State $ \s -> case f s of
-                        (r, s') -> (# r, s' #)
+                        (r, !s') -> (# r, s' #)
 
 get :: State s s
-get = State $ \s -> (# s, s #)
+get = State $ \(!s) -> (# s, s #)
 
 gets :: (s -> a) -> State s a
-gets f = State $ \s -> (# f s, s #)
+gets f = State $ \(!s) -> (# f s, s #)
 
 put :: s -> State s ()
-put s' = State $ \_ -> (# (), s' #)
+put !s' = State $ \_ -> (# (), s' #)
 
 modify :: (s -> s) -> State s ()
-modify f = State $ \s -> (# (), f s #)
+modify f = State $ \s -> let !s' = f s in (# (), s' #)
 
 
 evalState :: State s a -> s -> a
@@ -75,4 +75,4 @@ execState s i = case runState' s i of
 
 runState :: State s a -> s -> (a, s)
 runState s i = case runState' s i of
-               (# a, s' #) -> (a, s')
+               (# a, !s' #) -> (a, s')
