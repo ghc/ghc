@@ -286,7 +286,6 @@ tryWakeupThread (Capability *cap, StgTSO *tso)
 
     switch (tso->why_blocked)
     {
-    case BlockedOnIOCompletion:
     case BlockedOnMVar:
     case BlockedOnMVarRead:
     {
@@ -888,8 +887,6 @@ printThreadBlockage(StgTSO *tso)
   case BlockedOnMVarRead:
     debugBelch("is blocked on atomic MVar read @ %p", tso->block_info.closure);
     break;
-  case BlockedOnIOCompletion:
-    debugBelch("is blocked on I/O Completion port @ %p", tso->block_info.closure);
     break;
   case BlockedOnBlackHole:
       debugBelch("is blocked on a black hole %p",

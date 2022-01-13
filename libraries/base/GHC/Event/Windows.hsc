@@ -542,18 +542,19 @@ withOverlappedEx mgr fname h async offset startCB completionCB = do
         signalThrow ex = failIfFalse_ (dbgMsg "signalThrow") $
                             writeIOPort signal (IOFailed ex)
     mask_ $ do
-      let completionCB' e b = completionCB e b >>= \result ->
-                                case result of
-                                  IOSuccess val -> signalReturn val
-                                  IOFailed  err -> signalThrow err
-      let callbackData = CompletionData h completionCB'
+      let completionCB' e b = do
+            result <- completionCB e b
+            case result of
+              IOSuccess val -> signalReturn val
+              IOFailed  err -> signalThrow err
+
       -- Note [Memory Management]
       -- These callback data and especially the overlapped structs have to keep
       -- alive throughout the entire lifetime of the requests.   Since this
       -- function will block until done so it can call completionCB at the end
       -- we can safely use dynamic memory management here and so reduce the
       -- possibility of memory errors.
-      withRequest async offset callbackData $ \hs_lpol cdData -> do
+      withRequest async offset h completionCB' $ \hs_lpol cdData -> do
         let ptr_lpol = hs_lpol `plusPtr` cdOffset
         let lpol = castPtr hs_lpol
         -- We need to add the payload before calling startCBResult, the reason being
@@ -1066,7 +1067,7 @@ processCompletion Manager{..} n delay = do
           when (oldDataPtr /= nullPtr && oldDataPtr /= castPtr nullReq) $
             do debugIO $ "exchanged: " ++ show oldDataPtr
                payload <- peek oldDataPtr :: IO CompletionData
-               let !cb = cdCallback payload
+               cb <- deRefStablePtr (cdCallback payload)
                reqs <- removeRequest
                debugIO $ "-1.. " ++ show reqs ++ " requests queued."
                status <- FFI.overlappedIOStatus (lpOverlapped oe)

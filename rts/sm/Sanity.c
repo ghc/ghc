@@ -729,7 +729,6 @@ checkTSO(StgTSO *tso)
         || tso->why_blocked == BlockedOnMVarRead
         || tso->why_blocked == BlockedOnBlackHole
         || tso->why_blocked == BlockedOnMsgThrowTo
-        || tso->why_blocked == BlockedOnIOCompletion
         || tso->why_blocked == NotBlocked
         ) {
         ASSERT(LOOKS_LIKE_CLOSURE_PTR(tso->block_info.closure));

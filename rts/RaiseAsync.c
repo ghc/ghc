@@ -175,7 +175,7 @@ throwToSelf (Capability *cap, StgTSO *tso, StgClosure *exception)
      - or it is masking exceptions (TSO_BLOCKEX)
 
    Currently, if the target is BlockedOnMVar, BlockedOnSTM,
-   BlockedOnIOCompletion or BlockedOnBlackHole then we acquire ownership of the
+   or BlockedOnBlackHole then we acquire ownership of the
    TSO by locking its parent container (e.g. the MVar) and then raise the
    exception.  We might change these cases to be more message-passing-like in
    the future.
@@ -344,7 +344,6 @@ check_target:
 
     case BlockedOnMVar:
     case BlockedOnMVarRead:
-    case BlockedOnIOCompletion:
     {
         /*
           To establish ownership of this TSO, we need to acquire a
@@ -370,8 +369,7 @@ check_target:
         // we have the MVar, let's check whether the thread
         // is still blocked on the same MVar.
         if ((target->why_blocked != BlockedOnMVar
-             && target->why_blocked != BlockedOnMVarRead
-             && target->why_blocked != BlockedOnIOCompletion)
+             && target->why_blocked != BlockedOnMVarRead)
             || (StgMVar *)target->block_info.closure != mvar) {
             unlockClosure((StgClosure *)mvar, info);
             goto retry;
@@ -683,7 +681,6 @@ removeFromQueues(Capability *cap, StgTSO *tso)
 
   case BlockedOnMVar:
   case BlockedOnMVarRead:
-  case BlockedOnIOCompletion:
       removeFromMVarBlockedQueue(tso);
       goto done;
 

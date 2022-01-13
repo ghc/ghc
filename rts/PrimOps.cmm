@@ -2152,7 +2152,7 @@ stg_readIOPortzh ( P_ ioport /* :: IOPort a */ )
         StgMVar_head(ioport) = q;
         StgTSO__link(CurrentTSO)       = q;
         StgTSO_block_info(CurrentTSO)  = ioport;
-        StgTSO_why_blocked(CurrentTSO) = BlockedOnIOCompletion::I16;
+        StgTSO_why_blocked(CurrentTSO) = BlockedOnMVar::I16;
 
         //Unlocks the closure as well
         jump stg_block_readmvar(ioport);
@@ -2258,8 +2258,8 @@ loop:
     // at this point.
 
     //Either there was no reader queued, or he must have been
-    //blocked on BlockedOnIOCompletion
-    ASSERT(why_blocked == BlockedOnIOCompletion);
+    //blocked on BlockedOnMVar
+    ASSERT(why_blocked == BlockedOnMVar);
 
     unlockClosure(ioport, info);
     return (1);

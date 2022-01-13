@@ -539,8 +539,6 @@ data BlockReason
         -- ^blocked in 'retry' in an STM transaction
   | BlockedOnForeignCall
         -- ^currently in a foreign call
-  | BlockedOnIOCompletion
-        -- ^currently blocked on an I/O Completion port
   | BlockedOnOther
         -- ^blocked on some other resource.  Without @-threaded@,
         -- I\/O and 'Control.Concurrent.threadDelay' show up as
@@ -579,7 +577,6 @@ threadStatus (ThreadId t) = IO $ \s ->
      mk_stat 11 = ThreadBlocked BlockedOnForeignCall
      mk_stat 12 = ThreadBlocked BlockedOnException
      mk_stat 14 = ThreadBlocked BlockedOnMVar -- possibly: BlockedOnMVarRead
-     mk_stat 15 = ThreadBlocked BlockedOnIOCompletion
      -- NB. these are hardcoded in rts/PrimOps.cmm
      mk_stat 16 = ThreadFinished
      mk_stat 17 = ThreadDied

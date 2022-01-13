@@ -386,8 +386,10 @@ data WhyBlocked
   | BlockedOnCCall
   | BlockedOnCCall_Interruptible
   | BlockedOnMsgThrowTo
-  | ThreadMigrating
+#if __GLASGOW_HASKELL__ >= 811 && __GLASGOW_HASKELL__ < 902
   | BlockedOnIOCompletion
+#endif
+  | ThreadMigrating
   | WhyBlockedUnknownValue Word16 -- ^ Please report this as a bug
   deriving (Eq, Show, Generic, Ord)
 

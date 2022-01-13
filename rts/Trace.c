@@ -173,7 +173,6 @@ static char *thread_stop_reasons[] = {
     [6 + BlockedOnSTM]          = "blocked on STM",
     [6 + BlockedOnDoProc]       = "blocked on asyncDoProc",
     [6 + BlockedOnCCall]        = "blocked on a foreign call",
-    [6 + BlockedOnIOCompletion] = "blocked on I/O Completion port",
     [6 + BlockedOnCCall_Interruptible] = "blocked on a foreign call (interruptible)",
     [6 + BlockedOnMsgThrowTo]   =  "blocked on throwTo",
     [6 + ThreadMigrating]       =  "migrating"

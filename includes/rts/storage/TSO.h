@@ -300,7 +300,6 @@ void dirty_STACK (Capability *cap, StgStack *stack);
         BlockedOnBlackHole     MessageBlackHole *   TSO->bq
 
         BlockedOnMVar          the MVAR             the MVAR's queue
-        BlockedOnIOCompletion  the PortEVent        the IOCP's queue
 
         BlockedOnSTM           END_TSO_QUEUE        STM wait queue(s)
         BlockedOnSTM           STM_AWOKEN           run queue

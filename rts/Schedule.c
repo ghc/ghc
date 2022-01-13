@@ -942,7 +942,6 @@ scheduleDetectDeadlock (Capability **pcap, Task *task)
          */
         if (SEQ_CST_LOAD(&recent_activity) != ACTIVITY_INACTIVE) return;
 #endif
-        if (task->incall->tso && task->incall->tso->why_blocked == BlockedOnIOCompletion) return;
 
         debugTrace(DEBUG_sched, "deadlocked, forcing major GC...");
 
@@ -979,31 +978,6 @@ scheduleDetectDeadlock (Capability **pcap, Task *task)
 
             return;
         }
-#endif
-
-#if !defined(THREADED_RTS)
-        /* Probably a real deadlock.  Send the current main thread the
-         * Deadlock exception.
-         */
-        if (task->incall->tso) {
-            switch (task->incall->tso->why_blocked) {
-            case BlockedOnSTM:
-            case BlockedOnBlackHole:
-            case BlockedOnMsgThrowTo:
-            case BlockedOnMVar:
-            case BlockedOnMVarRead:
-                throwToSingleThreaded(cap, task->incall->tso,
-                                      (StgClosure *)nonTermination_closure);
-                return;
-            case BlockedOnIOCompletion:
-                /* We're blocked waiting for an external I/O call, let's just
-                   chill for a bit.  */
-                return;
-            default:
-                barf("deadlock: main thread blocked in a strange way");
-            }
-        }
-        return;
 #endif
     }
 }
@@ -3220,11 +3194,6 @@ resurrectThreads (StgTSO *threads)
             throwToSingleThreaded(cap, tso,
                                   (StgClosure *)blockedIndefinitelyOnSTM_closure);
             break;
-        case BlockedOnIOCompletion:
-            /* I/O Ports may not be reachable by the GC as they may be getting
-             * notified by the RTS.  As such this call should be treated as if
-             * it is masking the exception.  */
-            continue;
         case NotBlocked:
             /* This might happen if the thread was blocked on a black hole
              * belonging to a thread that we've just woken up (raiseAsync
