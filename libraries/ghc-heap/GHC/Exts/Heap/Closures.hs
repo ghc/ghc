@@ -387,7 +387,6 @@ data WhyBlocked
   | BlockedOnCCall_Interruptible
   | BlockedOnMsgThrowTo
   | ThreadMigrating
-  | BlockedOnIOCompletion
   | WhyBlockedUnknownValue Word16 -- ^ Please report this as a bug
   deriving (Eq, Show, Generic, Ord)
 

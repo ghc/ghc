@@ -461,7 +461,6 @@ thread_TSO (StgTSO *tso)
         || tso->why_blocked == BlockedOnMVarRead
         || tso->why_blocked == BlockedOnBlackHole
         || tso->why_blocked == BlockedOnMsgThrowTo
-        || tso->why_blocked == BlockedOnIOCompletion
         || tso->why_blocked == NotBlocked
         ) {
         thread_(&tso->block_info.closure);

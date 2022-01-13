@@ -49,8 +49,6 @@ data BlockReason
               -- ^blocked in 'retry' in an STM transaction
         | BlockedOnForeignCall
               -- ^currently in a foreign call
-        | BlockedOnIOCompletion
-              -- ^currently blocked on an I/O Completion port
         | BlockedOnOther
               -- ^blocked on some other resource.  Without @-threaded@,
               -- I\/O and 'threadDelay' show up as 'BlockedOnOther', with @-threaded@
