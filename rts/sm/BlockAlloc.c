@@ -993,6 +993,14 @@ uint32_t returnMemoryToOS(uint32_t n /* megablocks */)
     uint32_t init_n;
     init_n = n;
 
+    // TODO: This is inefficient because this loop will essentially result in
+    // quadratic runtime behavior: for each call to `freeMBlocks`, the
+    // USE_LARGE_ADDRESS_SPACE implementation of it will walk the internal free
+    // list to insert it at the right position, and thus traverse all previously
+    // inserted values to get to it. We can do better though: both the internal
+    // free list and the `free_mblock_list` here are sorted, so one walk should
+    // be enough.
+
     // ToDo: not fair, we free all the memory starting with node 0.
     for (node = 0; n > 0 && node < n_numa_nodes; node++) {
         bd = free_mblock_list[node];
