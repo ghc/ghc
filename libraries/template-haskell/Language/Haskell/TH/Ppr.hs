@@ -452,7 +452,7 @@ ppr_data maybeInst ctxt t argsDoc ksig cs decs
                  Just n -> pprName' Applied n <+> argsDoc
                  Nothing -> argsDoc
             <+> ksigDoc <+> maybeWhere,
-         nest nestDepth (sep (pref $ map ppr cs)),
+         nest nestDepth (vcat (pref $ map ppr cs)),
          if null decs
            then empty
            else nest nestDepth
