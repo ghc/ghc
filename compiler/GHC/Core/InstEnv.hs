@@ -56,7 +56,6 @@ import Data.Maybe       ( isJust )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
-import GHC.Driver.Ppr
 import GHC.Data.Bag
 import Data.Semigroup
 
@@ -888,9 +887,6 @@ lookupInstEnv' (InstEnv rm) vis_mods cls tys
       = ((item, map (lookupTyVar subst) tpl_tvs) : acc)
       | otherwise
       = acc
-      where
-        tpl_tv_set = mkVarSet tpl_tvs
-        tys_tv_set = tyCoVarsOfTypes tys
 
 
     check_unifier :: PotentialUnifiers -> [ClsInst] -> PotentialUnifiers
@@ -926,6 +922,7 @@ lookupInstEnv' (InstEnv rm) vis_mods cls tys
                 OneUnifier cls ->
                   TwoOrMoreUnifiers (cls:item:
                     (getPotentialUnifiers $ check_unifier NoUnifiers items))
+                TwoOrMoreUnifiers {} -> panic "TwoOrMore"
 
       where
         tpl_tv_set = mkVarSet tpl_tvs
