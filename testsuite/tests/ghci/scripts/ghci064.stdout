@@ -29,8 +29,8 @@ instance [safe] MyShow w => MyShow [w]
 instance GHC.Generics.Generic [T] -- Defined in ‘GHC.Generics’
 instance Monoid [T] -- Defined in ‘GHC.Base’
 instance Semigroup [T] -- Defined in ‘GHC.Base’
-instance [safe] MyShow [T] -- Defined at ghci064.hs:8:10
 instance [safe] MyShow [T] -- Defined at ghci064.hs:16:10
+instance [safe] MyShow [T] -- Defined at ghci064.hs:8:10
 instance GHC.Generics.SingKind Bool -- Defined in ‘GHC.Generics’
 instance Foreign.Storable.Storable Bool
   -- Defined in ‘Foreign.Storable’

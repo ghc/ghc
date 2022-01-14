@@ -2344,7 +2344,7 @@ mkDictErr ctxt cts
     is_no_inst (ct, (matches, unifiers, _))
       =  no_givens
       && null matches
-      && (null unifiers || all (not . isAmbiguousTyVar) (tyCoVarsOfCtList ct))
+      && (nullUnifiers unifiers || all (not . isAmbiguousTyVar) (tyCoVarsOfCtList ct))
 
     lookup_cls_inst inst_envs ct
                 -- Note [Flattening in error message generation]
@@ -2409,7 +2409,7 @@ mk_dict_err ctxt@(CEC {cec_encl = implics}) (ct, (matches, unifiers, unsafe_over
              , nest 2 extra_note
              , vcat (pp_givens useful_givens)
              , mb_patsyn_prov `orElse` empty
-             , ppWhen (has_ambig_tvs && not (null unifiers && null useful_givens))
+             , ppWhen (has_ambig_tvs && not (nullUnifiers unifiers && null useful_givens))
                (vcat [ ppUnless lead_with_ambig ambig_msg, binds_msg, potential_msg ])
 
              , ppWhen (isNothing mb_patsyn_prov) $
@@ -2425,7 +2425,7 @@ mk_dict_err ctxt@(CEC {cec_encl = implics}) (ct, (matches, unifiers, unsafe_over
         orig = ctOrigin ct
         -- See Note [Highlighting ambiguous type variables]
         lead_with_ambig = has_ambig_tvs && not (any isRuntimeUnkSkol ambig_tvs)
-                        && not (null unifiers) && null useful_givens
+                        && not (nullUnifiers unifiers) && null useful_givens
 
         (has_ambig_tvs, ambig_msg) = mkAmbigMsg lead_with_ambig ct
         ambig_tvs = uncurry (++) (getAmbigTkvs ct)
@@ -2445,16 +2445,16 @@ mk_dict_err ctxt@(CEC {cec_encl = implics}) (ct, (matches, unifiers, unsafe_over
             <+> pprParendType pred
 
         potential_msg
-          = ppWhen (not (null unifiers) && want_potential orig) $
+          = ppWhen (not (nullUnifiers unifiers) && want_potential orig) $
             sdocOption sdocPrintPotentialInstances $ \print_insts ->
             getPprStyle $ \sty ->
-            pprPotentials (PrintPotentialInstances print_insts) sty potential_hdr unifiers
+            pprPotentials (PrintPotentialInstances print_insts) sty potential_hdr (getPotentialUnifiers unifiers)
 
         potential_hdr
           = vcat [ ppWhen lead_with_ambig $
                      text "Probable fix: use a type annotation to specify what"
                      <+> pprQuotedList ambig_tvs <+> text "should be."
-                 , text "These potential instance" <> plural unifiers
+                 , text "These potential instance" <> plural (getPotentialUnifiers unifiers)
                    <+> text "exist:"]
 
         mb_patsyn_prov :: Maybe SDoc
@@ -2510,9 +2510,9 @@ mk_dict_err ctxt@(CEC {cec_encl = implics}) (ct, (matches, unifiers, unsafe_over
              ,  sdocOption sdocPrintPotentialInstances $ \print_insts ->
                 getPprStyle $ \sty ->
                 pprPotentials (PrintPotentialInstances print_insts) sty (text "Matching instances:") $
-                ispecs ++ unifiers
+                ispecs ++ (getPotentialUnifiers unifiers)
 
-             ,  ppWhen (null matching_givens && isSingleton matches && null unifiers) $
+             ,  ppWhen (null matching_givens && isSingleton matches && nullUnifiers unifiers) $
                 -- Intuitively, some given matched the wanted in their
                 -- flattened or rewritten (from given equalities) form
                 -- but the matcher can't figure that out because the

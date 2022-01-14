@@ -11,6 +11,7 @@ The bits common to GHC.Tc.TyCl.Instance and GHC.Tc.Deriv.
 
 module GHC.Core.InstEnv (
         DFunId, InstMatch, ClsInstLookupResult,
+        PotentialUnifiers(..), getPotentialUnifiers, nullUnifiers,
         OverlapFlag(..), OverlapMode(..), setOverlapModeMaybe,
         ClsInst(..), DFunInstType, pprInstance, pprInstanceHdr, pprInstances,
         instanceHead, instanceSig, mkLocalInstance, mkImportedInstance,
@@ -55,6 +56,9 @@ import Data.Maybe       ( isJust )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
+import GHC.Driver.Ppr
+import GHC.Data.Bag
+import Data.Semigroup
 
 {-
 ************************************************************************
@@ -463,7 +467,7 @@ classInstances (InstEnvs { ie_global = pkg_ie, ie_local = home_ie, ie_visible = 
 -- We use this when we do signature checking in "GHC.Tc.Module"
 memberInstEnv :: InstEnv -> ClsInst -> Bool
 memberInstEnv (InstEnv rm) ins_item@(ClsInst { is_tcs = tcs } ) =
-    any (identicalDFunType ins_item) (lookupRM' (map roughMatchTcToLookup tcs) rm)
+    any (identicalDFunType ins_item) (fst $ lookupRM' (map roughMatchTcToLookup tcs) rm)
  where
   identicalDFunType cls1 cls2 =
     eqType (varType (is_dfun cls1)) (varType (is_dfun cls2))
@@ -745,7 +749,7 @@ type InstMatch = (ClsInst, [DFunInstType])
 
 type ClsInstLookupResult
      = ( [InstMatch]     -- Successful matches
-       , [ClsInst]       -- These don't match but do unify
+       , PotentialUnifiers  -- These don't match but do unify
        , [InstMatch] )   -- Unsafe overlapped instances under Safe Haskell
                          -- (see Note [Safe Haskell Overlapping Instances] in
                          -- GHC.Tc.Solver).
@@ -826,11 +830,34 @@ lookupUniqueInstEnv instEnv cls tys
       _other -> Left $ text "instance not found" <+>
                        (ppr $ mkTyConApp (classTyCon cls) tys)
 
+data PotentialUnifiers = NoUnifiers | OneUnifier ClsInst | TwoOrMoreUnifiers [ClsInst] -- LAZY!!
+
+instance Outputable PotentialUnifiers where
+  ppr NoUnifiers = text "NoUnifiers"
+  ppr xs = ppr (getPotentialUnifiers xs)
+
+instance Semigroup PotentialUnifiers where
+  NoUnifiers <> u = u
+  u <> NoUnifiers = u
+  u1 <> u2 = TwoOrMoreUnifiers (getPotentialUnifiers u1 ++ getPotentialUnifiers u2)
+
+instance Monoid PotentialUnifiers where
+  mempty = NoUnifiers
+
+getPotentialUnifiers :: PotentialUnifiers -> [ClsInst]
+getPotentialUnifiers NoUnifiers = []
+getPotentialUnifiers (OneUnifier item) = [item]
+getPotentialUnifiers (TwoOrMoreUnifiers cls) = cls
+
+nullUnifiers :: PotentialUnifiers -> Bool
+nullUnifiers NoUnifiers = True
+nullUnifiers _ = False
+
 lookupInstEnv' :: InstEnv          -- InstEnv to look in
                -> VisibleOrphanModules   -- But filter against this
                -> Class -> [Type]  -- What we are looking for
                -> ([InstMatch],    -- Successful matches
-                   [ClsInst])      -- These don't match but do unify
+                   PotentialUnifiers)      -- These don't match but do unify
                                    -- (no incoherent ones in here)
 -- The second component of the result pair happens when we look up
 --      Foo [a]
@@ -843,25 +870,38 @@ lookupInstEnv' :: InstEnv          -- InstEnv to look in
 -- giving a suitable error message
 
 lookupInstEnv' (InstEnv rm) vis_mods cls tys
-  = foldl' f ([], []) rough_matches
+  = pprTrace "lookupInstEnv'" (ppr cls <+> ppr (length rough_matches) <+> ppr tys <+> ppr rough_tcs)
+
+ -- pprTraceIt "lookupInstEnv'"
+  (foldr check_match [] rough_matches, check_unifier NoUnifiers (bagToList rough_unifiers))
   where
-    rough_matches = (lookupRM' rough_tcs rm)
+    (rough_matches, rough_unifiers) = lookupRM' rough_tcs rm
     rough_tcs  = LookupKnownTc (className cls) : roughMatchTcsLookup tys
 
     --------------
-    f :: ([InstMatch], [ClsInst]) -> ClsInst -> ([InstMatch], [ClsInst])
-    f acc@(ms, us) item@(ClsInst { is_tvs = tpl_tvs, is_tys = tpl_tys })
+    check_match :: ClsInst -> [InstMatch] -> [InstMatch]
+    check_match item@(ClsInst { is_tvs = tpl_tvs, is_tys = tpl_tys }) acc
       | not (instIsVisible vis_mods item)
       = acc  -- See Note [Instance lookup and orphan instances]
 
       | Just subst <- tcMatchTys tpl_tys tys
-      = ((item, map (lookupTyVar subst) tpl_tvs) : ms, us)
+      = ((item, map (lookupTyVar subst) tpl_tvs) : acc)
+      | otherwise
+      = acc
+      where
+        tpl_tv_set = mkVarSet tpl_tvs
+        tys_tv_set = tyCoVarsOfTypes tys
 
+
+    check_unifier :: PotentialUnifiers -> [ClsInst] -> PotentialUnifiers
+    check_unifier acc [] = acc
+    check_unifier acc (item@ClsInst { is_tvs = tpl_tvs, is_tys = tpl_tys }:items)
+      | [_] <- check_match item [] = check_unifier acc items
         -- Does not match, so next check whether the things unify
         -- See Note [Overlapping instances]
         -- Ignore ones that are incoherent: Note [Incoherent instances]
       | isIncoherent item
-      = acc
+      = check_unifier acc items
 
       | otherwise
       = ASSERT2( tys_tv_set `disjointVarSet` tpl_tv_set,
@@ -875,10 +915,16 @@ lookupInstEnv' (InstEnv rm) vis_mods cls tys
           -- We consider MaybeApart to be a case where the instance might
           -- apply in the future. This covers an instance like C Int and
           -- a target like [W] C (F a), where F is a type family.
-            SurelyApart              -> acc
+            SurelyApart              -> check_unifier acc items
               -- Note [Infinitary substitution in lookup]
-            MaybeApart MARInfinite _ -> acc
-            _                        -> (ms, item:us)
+            MaybeApart MARInfinite _ -> check_unifier acc items
+            _                        ->
+              case acc of
+                NoUnifiers -> check_unifier (OneUnifier item) items
+                OneUnifier cls ->
+                  TwoOrMoreUnifiers (cls:item:
+                    (getPotentialUnifiers $ check_unifier NoUnifiers items))
+
       where
         tpl_tv_set = mkVarSet tpl_tvs
         tys_tv_set = tyCoVarsOfTypes tys
@@ -903,7 +949,7 @@ lookupInstEnv check_overlap_safe
     (home_matches, home_unifs) = lookupInstEnv' home_ie vis_mods cls tys
     (pkg_matches,  pkg_unifs)  = lookupInstEnv' pkg_ie  vis_mods cls tys
     all_matches = home_matches ++ pkg_matches
-    all_unifs   = home_unifs   ++ pkg_unifs
+    all_unifs   = home_unifs   `mappend` pkg_unifs
     final_matches = foldr insert_overlapping [] all_matches
         -- Even if the unifs is non-empty (an error situation)
         -- we still prune the matches, so that the error message isn't
@@ -917,7 +963,7 @@ lookupInstEnv check_overlap_safe
 
     -- If the selected match is incoherent, discard all unifiers
     final_unifs = case final_matches of
-                    (m:_) | isIncoherent (fst m) -> []
+                    (m:_) | isIncoherent (fst m) -> NoUnifiers
                     _                            -> all_unifs
 
     -- NOTE [Safe Haskell isSafeOverlap]

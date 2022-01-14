@@ -42,6 +42,8 @@ import {-# SOURCE #-} GHC.Tc.Utils.TcType
 import Control.Monad (join)
 import Data.Data (Data)
 import GHC.Types.Var.Set
+import GHC.Utils.Misc
+import Data.Bifunctor
 
 {-
 Note [Rough maps of Types]
@@ -80,7 +82,6 @@ instance Outputable RoughMatchTc where
 isRoughOtherTc :: RoughMatchTc -> Bool
 isRoughOtherTc OtherTc      = True
 isRoughOtherTc (KnownTc {}) = False
-
 
 typeToRoughMatchLookupTc :: Type -> RoughMatchLookupTc
 typeToRoughMatchLookupTc ty
@@ -125,29 +126,40 @@ emptyRM = RMEmpty
 
 -- | Order of result is deterministic.
 lookupRM :: [RoughMatchLookupTc] -> RoughMap a -> [a]
-lookupRM tcs rm = bagToList (lookupRM' tcs rm)
+lookupRM tcs rm = bagToList (fst $ lookupRM' tcs rm)
+
 
 -- | N.B. Returns a 'Bag', which allows us to avoid rebuilding all of the lists
 -- we find in 'rm_empty', which would otherwise be necessary due to '++' if we
 -- returned a list.
-lookupRM' :: [RoughMatchLookupTc] -> RoughMap a -> Bag a
-lookupRM' _                  RMEmpty = emptyBag
-lookupRM' []                 rm      = listToBag $ elemsRM rm
-lookupRM' (LookupKnownTc tc : tcs) rm  = foldl' unionBags emptyBag
-                                       [ maybe emptyBag (lookupRM' tcs) (lookupDNameEnv (rm_known rm) tc)
-                                       , lookupRM' tcs (rm_unknown rm)
-                                       , rm_empty rm
-                                       ]
--- A SkolemTC does **not** match any KnownTC
-lookupRM' (NoKnownTc : tcs)  rm      = foldl' unionBags emptyBag
-                                       [ lookupRM' tcs (rm_unknown rm)
-                                       , rm_empty rm ]
+lookupRM' :: [RoughMatchLookupTc] -> RoughMap a -> (Bag a -- Potential matches
+                                                   , Bag a) -- Potential unifiers
+lookupRM' _                  RMEmpty = (emptyBag, emptyBag)
+lookupRM' []                 rm      = let m = listToBag $ elemsRM rm
+                                       in (m, m)
+lookupRM' (LookupKnownTc tc : tcs) rm  =
+  let (common_m, common_u) = lookupRM' tcs (rm_unknown rm)
+      (m, u) = maybe (emptyBag, emptyBag) (lookupRM' tcs) (lookupDNameEnv (rm_known rm) tc)
+  in (rm_empty rm `unionBags` common_m `unionBags` m , rm_empty rm `unionBags` common_u `unionBags` u)
+-- A SkolemTC does **not** match any KnownTC but can unify
+lookupRM' (NoKnownTc : tcs)  rm      =
 
-lookupRM' (LookupOtherTc : tcs)    rm  = foldl' unionBags emptyBag
-                                       [ foldl' unionBags emptyBag $ map (lookupRM' tcs) (eltsDNameEnv $ rm_known rm)
-                                       , lookupRM' tcs (rm_unknown rm)
-                                       , rm_empty rm
-                                       ]
+  let (u_m, _u_u) = lookupRM' tcs (rm_unknown rm)
+      empty = rm_empty rm
+  in (u_m `unionBags` empty -- Definitely don't match
+     , snd $ lookupRM' (LookupOtherTc : tcs) rm) -- But could unify..
+
+lookupRM' (LookupOtherTc : tcs)    rm  =
+  let (m, u) = bimap unionManyBags unionManyBags (mapAndUnzip (lookupRM' tcs) (eltsDNameEnv $ rm_known rm))
+      (u_m, u_u) = lookupRM' tcs (rm_unknown rm)
+  in (rm_empty rm `unionBags` u_m `unionBags` m
+     , rm_empty rm `unionBags` u_u `unionBags` u)
+
+{-
+  let m = foldl' unionBags emptyBag
+           [
+           , rm_empty rm ] in (m, m)
+           -}
 
 unionRM :: RoughMap a -> RoughMap a -> RoughMap a
 unionRM RMEmpty a = a

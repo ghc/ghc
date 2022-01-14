@@ -1714,7 +1714,7 @@ tcMissingParentClassWarn warnFlag isName shouldName
                            hsep [ text "This will become an error in"
                                 , text "a future release." ]
                  warnMsg _ = pure ()
-           ; when (null shouldInsts && null instanceMatches) $
+           ; when (nullUnifiers shouldInsts && null instanceMatches) $
                   warnMsg (is_tcs isInst)
            }
 

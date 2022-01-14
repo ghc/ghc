@@ -276,6 +276,7 @@ test('MultiLayerModules',
      multimod_compile,
      ['MultiLayerModules', '-v0'])
 
+# This test isolates the (F a[sk]) case
 test('InstanceMatching',
      [ collect_compiler_stats('bytes allocated',3),
        pre_cmd('$MAKE -s --no-print-directory InstanceMatching'),
@@ -289,6 +290,21 @@ test('InstanceMatching',
      ],
      multimod_compile_fail,
      ['Match', '-fno-code -fwrite-interface -v0'])
+
+# This module stresses the KnownTC and NoKnownTC (skolem variable) cases
+test('InstanceMatching1',
+     [ collect_compiler_stats('bytes allocated',3),
+       pre_cmd('./genMatchingTest 1'),
+       extra_files(['genMatchingTest']),
+       compile_timeout_multiplier(5)
+       # this is _a lot_
+       # but this test has been failing every now and then,
+       # especially on i386. Let's just give it some room
+       # to complete successfully reliably everywhere.
+     ],
+     multimod_compile,
+     ['Defs', '-fno-code -fwrite-interface -v0'])
+
 
 test('MultiLayerModulesNoCode',
      [ collect_compiler_residency(15),

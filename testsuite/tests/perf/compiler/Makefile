@@ -13,6 +13,8 @@ T11068:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O T11068b.hs
 	-'$(TEST_HC)' $(TEST_HC_OPTS) -c -O T11068.hs -ddump-simpl | grep 'Generic'
 
+# Type family skolems
 InstanceMatching:
-	./genMatchingTest
+	./genMatchingTest 0
 	'$(TEST_HC)' $(TEST_HC_OPTS) -fno-code -fwrite-interface Defs.hs
+
