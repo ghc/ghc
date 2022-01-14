@@ -311,3 +311,8 @@ test('test-echo-in-line-many-args',
      [extra_files(['echo-plugin/']),
       pre_cmd('$MAKE -s --no-print-directory -C echo-plugin package.test-echo-in-line-many-args TOP={top}')],
      makefile_test, [])
+
+test('plugins-external',
+     [extra_files(['shared-plugin/']),
+      pre_cmd('$MAKE -s --no-print-directory -C shared-plugin package.plugins01 TOP={top}')],
+     makefile_test, [])

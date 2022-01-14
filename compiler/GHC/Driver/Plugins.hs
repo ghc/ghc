@@ -1,4 +1,11 @@
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE CPP #-}
+
+#if defined(HAVE_INTERNAL_INTERPRETER)
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE UnboxedTuples #-}
+#endif
 
 
 -- | Definitions for writing /plugins/ for GHC. Plugins can hook into
@@ -14,6 +21,10 @@ module GHC.Driver.Plugins (
     , CommandLineOption
     , PsMessages(..)
     , ParsedResult(..)
+
+      -- * External plugins
+    , loadExternalPlugins
+
       -- ** Recompilation checking
     , purePlugin, impurePlugin, flagRecompile
     , PluginRecompile(..)
@@ -52,6 +63,7 @@ module GHC.Driver.Plugins (
     , PluginWithArgs(..), pluginsWithArgs, pluginRecompile'
     , LoadedPlugin(..), lpModuleName
     , StaticPlugin(..)
+    , ExternalPlugin(..)
     , mapPlugins, withPlugins, withPlugins_
     ) where
 
@@ -60,6 +72,7 @@ import GHC.Prelude
 import GHC.Driver.Env
 import GHC.Driver.Monad
 import GHC.Driver.Phases
+import GHC.Driver.Plugins.External
 
 import GHC.Unit.Module
 import GHC.Unit.Module.ModIface
@@ -75,8 +88,12 @@ import GHC.Core.Opt.Monad ( CoreM )
 import GHC.Core.Opt.Pipeline.Types ( CoreToDo )
 import GHC.Hs
 import GHC.Types.Error (Messages)
+import GHC.Linker.Types
+import GHC.Types.Unique.DFM
+
 import GHC.Utils.Fingerprint
-import GHC.Utils.Outputable (Outputable(..), text, (<+>))
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 
 import Data.List (sort)
 
@@ -85,8 +102,13 @@ import Data.List (sort)
 import qualified Data.Semigroup
 
 import Control.Monad
-import GHC.Linker.Types
-import GHC.Types.Unique.DFM
+
+#if defined(HAVE_INTERNAL_INTERPRETER)
+import GHCi.ObjLink
+import GHC.Exts (addrToAny#, Ptr(..))
+import GHC.Utils.Encoding
+#endif
+
 
 -- | Command line options gathered from the -PModule.Name:stuff syntax
 -- are given to you as this type
@@ -196,6 +218,14 @@ data LoadedPlugin = LoadedPlugin
   -- ^ the module containing the plugin
   }
 
+-- | External plugin loaded directly from a library without loading module
+-- interfaces
+data ExternalPlugin = ExternalPlugin
+  { epPlugin :: PluginWithArgs -- ^ Plugin with its arguments
+  , epUnit   :: String         -- ^ UnitId
+  , epModule :: String         -- ^ Module name
+  }
+
 -- | A static plugin with its arguments. For registering compiled-in plugins
 -- through the GHC API.
 data StaticPlugin = StaticPlugin
@@ -285,6 +315,10 @@ data Plugins = Plugins
       -- To add dynamically loaded plugins through the GHC API see
       -- 'addPluginModuleName' instead.
 
+  , externalPlugins :: ![ExternalPlugin]
+      -- ^ External plugins loaded directly from libraries without loading
+      -- module interfaces.
+
   , loadedPlugins :: ![LoadedPlugin]
       -- ^ Plugins dynamically loaded after processing arguments. What
       -- will be loaded here is directed by DynFlags.pluginModNames.
@@ -299,12 +333,17 @@ data Plugins = Plugins
   }
 
 emptyPlugins :: Plugins
-emptyPlugins = Plugins [] [] ([], emptyUDFM)
-
+emptyPlugins = Plugins
+  { staticPlugins    = []
+  , externalPlugins  = []
+  , loadedPlugins    = []
+  , loadedPluginDeps = ([], emptyUDFM)
+  }
 
 pluginsWithArgs :: Plugins -> [PluginWithArgs]
 pluginsWithArgs plugins =
   map lpPlugin (loadedPlugins plugins) ++
+  map epPlugin (externalPlugins plugins) ++
   map spPlugin (staticPlugins plugins)
 
 -- | Perform an operation by using all of the plugins in turn.
@@ -328,3 +367,53 @@ data FrontendPlugin = FrontendPlugin {
     }
 defaultFrontendPlugin :: FrontendPlugin
 defaultFrontendPlugin = FrontendPlugin { frontend = \_ _ -> return () }
+
+
+-- | Load external plugins
+loadExternalPlugins :: [ExternalPluginSpec] -> IO [ExternalPlugin]
+loadExternalPlugins [] = return []
+#if !defined(HAVE_INTERNAL_INTERPRETER)
+loadExternalPlugins _ = do
+  panic "loadExternalPlugins: can't load external plugins with GHC built without internal interpreter"
+#elif !defined(CAN_LOAD_DLL)
+loadExternalPlugins _ = do
+  panic "loadExternalPlugins: loading shared libraries isn't supported by this compiler"
+#else
+loadExternalPlugins ps = do
+  -- initialize the linker
+  initObjLinker RetainCAFs
+  -- load plugins
+  forM ps $ \(ExternalPluginSpec path unit mod_name opts) -> do
+    loadExternalPluginLib path
+    -- lookup symbol
+    let ztmp = zEncodeString mod_name ++ "_plugin_closure"
+        symbol
+          | null unit = ztmp
+          | otherwise = zEncodeString unit ++ "_" ++ ztmp
+    plugin <- lookupSymbol symbol >>= \case
+      Nothing -> pprPanic "loadExternalPlugins"
+                  (vcat [ text "Symbol not found"
+                        , text "  Library path: " <> text path
+                        , text "  Symbol      : " <> text symbol
+                        ])
+      Just (Ptr addr) -> case addrToAny# addr of
+        (# a #) -> pure a
+
+    pure $ ExternalPlugin (PluginWithArgs plugin opts) unit mod_name
+
+loadExternalPluginLib :: FilePath -> IO ()
+loadExternalPluginLib path = do
+  -- load library
+  loadDLL path >>= \case
+    Just errmsg -> pprPanic "loadExternalPluginLib"
+                    (vcat [ text "Can't load plugin library"
+                          , text "  Library path: " <> text path
+                          , text "  Error       : " <> text errmsg
+                          ])
+    Nothing -> do
+      -- resolve objects
+      resolveObjs >>= \case
+        True -> return ()
+        False -> pprPanic "loadExternalPluginLib" (text "Unable to resolve objects for library: " <> text path)
+
+#endif

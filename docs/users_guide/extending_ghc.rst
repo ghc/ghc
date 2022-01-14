@@ -268,7 +268,6 @@ option. The list of enabled plugins can be reset with the
     the command line is not possible. Instead ``:set -fclear-plugins`` can be
     used.
 
-
 As an example, in order to load the plugin exported by ``Foo.Plugin`` in
 the package ``foo-ghc-plugin``, and give it the parameter "baz", we
 would invoke GHC like this:
@@ -285,6 +284,19 @@ would invoke GHC like this:
     ...
     Linking Test ...
     $
+
+
+Plugins can be also be loaded from libraries directly. It allows plugins to be
+loaded in cross-compilers (as a workaround for #14335).
+
+.. ghc-flag:: -fplugin-library=⟨file-path⟩;⟨unit-id⟩;⟨module⟩;⟨args⟩
+    :shortdesc: Load a pre-compiled static plugin from an external library
+    :type: dynamic
+    :category: plugins
+
+    Arguments are specified in a list form, so a plugin specified to
+    :ghc-flag:`-fplugin-library=⟨file-path⟩;⟨unit-id⟩;⟨module⟩;⟨args⟩` will look
+    like ``'path/to/plugin;package-123;Plugin.Module;["Argument","List"]'``.
 
 Alternatively, core plugins can be specified with Template Haskell.
 

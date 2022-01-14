@@ -205,3 +205,18 @@ test-echo-in-turn-many-args:
 .PHONY: test-echo-in-line-many-args
 test-echo-in-line-many-args:
 	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) -v0 test-echo-in-line-many-args.hs -package-db echo-plugin/pkg.test-echo-in-line-many-args/local.package.conf
+
+
+ifeq "$(WINDOWS)" "YES"
+DLL = $1.dll
+else ifeq "$(DARWIN)" "YES"
+DLL = lib$1.dylib
+else
+DLL = lib$1.so
+endif
+
+.PHONY: plugins-external
+plugins-external:
+	cp shared-plugin/pkg.plugins01/dist/build/$(call DLL,HSsimple-plugin*) $(call DLL,HSsimple-plugin)
+	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) --make -v0 -fplugin-library "$(PWD)/$(call DLL,HSsimple-plugin);simple-plugin-1234;Simple.Plugin;[\"Plugin\",\"loaded\",\"from\",\"a shared lib\"]" plugins-external.hs
+	./plugins-external

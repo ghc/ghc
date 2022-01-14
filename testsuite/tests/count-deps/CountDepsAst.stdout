@@ -116,6 +116,7 @@ GHC.Driver.Phases
 GHC.Driver.Pipeline.Monad
 GHC.Driver.Pipeline.Phases
 GHC.Driver.Plugins
+GHC.Driver.Plugins.External
 GHC.Driver.Ppr
 GHC.Driver.Session
 GHC.Hs

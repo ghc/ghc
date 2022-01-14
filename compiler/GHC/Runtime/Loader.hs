@@ -26,6 +26,7 @@ import GHC.Driver.Session
 import GHC.Driver.Ppr
 import GHC.Driver.Hooks
 import GHC.Driver.Plugins
+import GHC.Driver.Plugins.External
 
 import GHC.Linker.Loader       ( loadModule, loadName )
 import GHC.Runtime.Interpreter ( wormhole )
@@ -75,22 +76,48 @@ import Data.List (unzip4)
 -- pluginModNames or pluginModNameOpts changes.
 initializePlugins :: HscEnv -> IO HscEnv
 initializePlugins hsc_env
-    -- plugins not changed
+    -- check that plugin specifications didn't change
+
+    -- dynamic plugins
   | loaded_plugins <- loadedPlugins (hsc_plugins hsc_env)
   , map lpModuleName loaded_plugins == reverse (pluginModNames dflags)
-   -- arguments not changed
   , all same_args loaded_plugins
-  = return hsc_env -- no need to reload plugins FIXME: doesn't take static plugins into account
+
+    -- external plugins
+  , external_plugins <- externalPlugins (hsc_plugins hsc_env)
+  , check_external_plugins external_plugins (externalPluginSpecs dflags)
+
+    -- FIXME: we should check static plugins too
+
+  = return hsc_env -- no change, no need to reload plugins
+
   | otherwise
   = do (loaded_plugins, links, pkgs) <- loadPlugins hsc_env
-       let plugins' = (hsc_plugins hsc_env) { loadedPlugins = loaded_plugins, loadedPluginDeps = (links, pkgs) }
+       external_plugins <- loadExternalPlugins (externalPluginSpecs dflags)
+       let plugins' = (hsc_plugins hsc_env) { staticPlugins    = staticPlugins (hsc_plugins hsc_env)
+                                            , externalPlugins  = external_plugins
+                                            , loadedPlugins    = loaded_plugins
+                                            , loadedPluginDeps = (links, pkgs)
+                                            }
        let hsc_env' = hsc_env { hsc_plugins = plugins' }
        withPlugins (hsc_plugins hsc_env') driverPlugin hsc_env'
   where
+    dflags = hsc_dflags hsc_env
+    -- dynamic plugins
     plugin_args = pluginModNameOpts dflags
     same_args p = paArguments (lpPlugin p) == argumentsForPlugin p plugin_args
     argumentsForPlugin p = map snd . filter ((== lpModuleName p) . fst)
-    dflags = hsc_dflags hsc_env
+    -- external plugins
+    check_external_plugin p spec = and
+      [ epUnit                p  == esp_unit_id spec
+      , epModule              p  == esp_module spec
+      , paArguments (epPlugin p) == esp_args spec
+      ]
+    check_external_plugins eps specs = case (eps,specs) of
+      ([]  , [])  -> True
+      (_   , [])  -> False -- some external plugin removed
+      ([]  , _ )  -> False -- some external plugin added
+      (p:ps,s:ss) -> check_external_plugin p s && check_external_plugins ps ss
 
 loadPlugins :: HscEnv -> IO ([LoadedPlugin], [Linkable], PkgsLoaded)
 loadPlugins hsc_env

@@ -229,6 +229,7 @@ import GHC.Builtin.Names ( mAIN_NAME )
 import GHC.Driver.Phases ( Phase(..), phaseInputExt )
 import GHC.Driver.Flags
 import GHC.Driver.Backend
+import GHC.Driver.Plugins.External
 import GHC.Settings.Config
 import GHC.Utils.CliOption
 import GHC.Core.Unfold
@@ -589,6 +590,9 @@ data DynFlags = DynFlags {
   frontendPluginOpts    :: [String],
     -- ^ the @-ffrontend-opt@ flags given on the command line, in *reverse*
     -- order that they're specified on the command line.
+
+  externalPluginSpecs   :: [ExternalPluginSpec],
+    -- ^ External plugins loaded from shared libraries
 
   --  For ghc -M
   depMakefile           :: FilePath,
@@ -1176,6 +1180,8 @@ defaultDynFlags mySettings =
         pluginModNameOpts       = [],
         frontendPluginOpts      = [],
 
+        externalPluginSpecs     = [],
+
         outputFile_             = Nothing,
         dynOutputFile_          = Nothing,
         outputHi                = Nothing,
@@ -1714,6 +1720,11 @@ addPluginModuleNameOption optflag d = d { pluginModNameOpts = (mkModuleName m, o
         option = case rest of
           [] -> "" -- should probably signal an error
           (_:plug_opt) -> plug_opt -- ignore the ':' from break
+
+addExternalPlugin :: String -> DynFlags -> DynFlags
+addExternalPlugin optflag d = case parseExternalPluginSpec optflag of
+  Just r  -> d { externalPluginSpecs = r : externalPluginSpecs d }
+  Nothing -> cmdLineError $ "Couldn't parse external plugin specification: " ++ optflag
 
 addFrontendPluginOption :: String -> DynFlags -> DynFlags
 addFrontendPluginOption s d = d { frontendPluginOpts = s : frontendPluginOpts d }
@@ -2694,6 +2705,8 @@ dynamic_flags_deps = [
   , make_ord_flag defGhcFlag "fplugin"     (hasArg addPluginModuleName)
   , make_ord_flag defGhcFlag "fclear-plugins" (noArg clearPluginModuleNames)
   , make_ord_flag defGhcFlag "ffrontend-opt" (hasArg addFrontendPluginOption)
+
+  , make_ord_flag defGhcFlag "fplugin-library" (hasArg addExternalPlugin)
 
         ------ Optimisation flags ------------------------------------------
   , make_dep_flag defGhcFlag "Onot"   (noArgM $ setOptLevel 0 )
