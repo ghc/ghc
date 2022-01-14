@@ -442,6 +442,11 @@ GarbageCollect (uint32_t collect_gen,
   memInventory(DEBUG_gc);
 #endif
 
+  // Defer all free calls for the megablock allocator to avoid quadratic runtime
+  // explosion when freeing a lot of memory in a single GC
+  // (https://gitlab.haskell.org/ghc/ghc/-/issues/19897).
+  deferMBlockFreeing();
+
   // do this *before* we start scavenging
   collectFreshWeakPtrs();
 
@@ -976,6 +981,11 @@ GarbageCollect (uint32_t collect_gen,
   RELEASE_SM_LOCK;
   resurrectThreads(resurrected_threads);
   ACQUIRE_SM_LOCK;
+
+  // Finally free the deferred mblocks by sorting the deferred free list and
+  // merging it into the actual sorted free list. This needs to happen here so
+  // that the `returnMemoryToOS` call down below can successfully free memory.
+  commitMBlockFreeing();
 
   if (major_gc) {
       W_ need_prealloc, need_live, need, got;

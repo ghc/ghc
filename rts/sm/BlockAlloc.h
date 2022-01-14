@@ -13,6 +13,9 @@
 bdescr *allocLargeChunk (W_ min, W_ max);
 bdescr *allocLargeChunkOnNode (uint32_t node, W_ min, W_ max);
 
+void deferMBlockFreeing(void);
+void commitMBlockFreeing(void);
+
 /* Debugging  -------------------------------------------------------------- */
 
 extern W_ countBlocks       (bdescr *bd);

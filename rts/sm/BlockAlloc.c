@@ -161,10 +161,22 @@ static void  initMBlock(void *mblock, uint32_t node);
 static bdescr *free_list[MAX_NUMA_NODES][NUM_FREE_LISTS];
 static bdescr *free_mblock_list[MAX_NUMA_NODES];
 
+// For avoiding quadratic runtime performance when freeing a large number of
+// mblocks during a single GC run, free will be deferred to a separate free list
+// that foregoes sorting and coalecense. As the final step in a GC run we can
+// then separately sort the deferred list, and merge it with the actual free
+// list in one go.
+static bool defer_mblock_frees;
+static bdescr *deferred_free_mblock_list[MAX_NUMA_NODES];
+
 W_ n_alloc_blocks;   // currently allocated blocks
 W_ hw_alloc_blocks;  // high-water allocated blocks
 
 W_ n_alloc_blocks_by_node[MAX_NUMA_NODES];
+
+
+static bdescr* splitDeferredList(bdescr* head);
+static void sortDeferredList(bdescr** head);
 
 /* -----------------------------------------------------------------------------
    Initialisation
@@ -371,6 +383,41 @@ split_block_low (bdescr *bd, W_ n)
     return bd;
 }
 
+
+/* Find a fitting block for the allocation request in the given free list.
+   Returns:
+     - not NULL: when an exact match was found in the free list.
+     - NULL: when no exact match was found. In this case, the out parameter
+       `best` can be inspected to get the best fitting block from the free list.
+ */
+static bdescr *
+alloc_mega_group_from_free_list (bdescr** free_list_head, StgWord n, bdescr** best)
+{
+    bdescr *bd, *prev;
+    *best = NULL;
+    prev = NULL;
+    for (bd = *free_list_head; bd != NULL; prev = bd, bd = bd->link)
+    {
+        if (bd->blocks == n)
+        {
+            if (prev) {
+                prev->link = bd->link;
+            } else {
+                *free_list_head = bd->link;
+            }
+            return bd;
+        }
+        else if (bd->blocks > n)
+        {
+            if (!*best || bd->blocks < (*best)->blocks)
+            {
+                *best = bd;
+            }
+        }
+    }
+    return NULL;
+}
+
 /* Only initializes the start pointers on the first megablock and the
  * blocks field of the first bdescr; callers are responsible for calling
  * initGroup afterwards.
@@ -378,34 +425,37 @@ split_block_low (bdescr *bd, W_ n)
 static bdescr *
 alloc_mega_group (uint32_t node, StgWord mblocks)
 {
-    bdescr *best, *bd, *prev;
+    bdescr *best, *bd;
     StgWord n;
 
     n = MBLOCK_GROUP_BLOCKS(mblocks);
 
-    best = NULL;
-    prev = NULL;
-    for (bd = free_mblock_list[node]; bd != NULL; prev = bd, bd = bd->link)
+    if(defer_mblock_frees)
     {
-        if (bd->blocks == n)
+        // Freeing mega groups is currently deferred. Try to serve new requests
+        // preferentially from our deferred free list.
+        bd = alloc_mega_group_from_free_list(&deferred_free_mblock_list[node], n, &best);
+        if(bd)
         {
-            if (prev) {
-                prev->link = bd->link;
-            } else {
-                free_mblock_list[node] = bd->link;
-            }
             return bd;
         }
-        else if (bd->blocks > n)
+        else if(!best)
         {
-            if (!best || bd->blocks < best->blocks)
-            {
-                best = bd;
-            }
+            // If there was neither an exact nor a best match, try the regular free list.
+            bd = alloc_mega_group_from_free_list(&free_mblock_list[node], n, &best);
         }
     }
+    else
+    {
+        // Otherwise, just always use the regular free list
+        bd = alloc_mega_group_from_free_list(&free_mblock_list[node], n, &best);
+    }
 
-    if (best)
+    if (bd)
+    {
+        return bd;
+    }
+    else if (best)
     {
         // we take our chunk off the end here.
         StgWord best_mblocks  = BLOCKS_TO_MBLOCKS(best->blocks);
@@ -758,30 +808,90 @@ free_mega_group (bdescr *mg)
     bdescr *bd, *prev;
     uint32_t node;
 
-    // Find the right place in the free list.  free_mblock_list is
-    // sorted by *address*, not by size as the free_list is.
-    prev = NULL;
     node = mg->node;
-    bd = free_mblock_list[node];
-    while (bd && bd->start < mg->start) {
-        prev = bd;
-        bd = bd->link;
-    }
 
-    // coalesce backwards
-    if (prev)
-    {
-        mg->link = prev->link;
-        prev->link = mg;
-        mg = coalesce_mblocks(prev);
+    if(defer_mblock_frees) {
+        // Put the block on the deferred free list without coalescing.
+        mg->link = deferred_free_mblock_list[node];
+        deferred_free_mblock_list[node] = mg;
+    } else {
+        // Find the right place in the free list.  free_mblock_list is
+        // sorted by *address*, not by size as the free_list is.
+        prev = NULL;
+        bd = free_mblock_list[node];
+        while (bd && bd->start < mg->start) {
+            prev = bd;
+            bd = bd->link;
+        }
+
+        // coalesce backwards
+        if (prev)
+        {
+            mg->link = prev->link;
+            prev->link = mg;
+            mg = coalesce_mblocks(prev);
+        }
+        else
+        {
+            mg->link = free_mblock_list[node];
+            free_mblock_list[node] = mg;
+        }
+        // coalesce forwards
+        coalesce_mblocks(mg);
+
+        IF_DEBUG(sanity, checkFreeListSanity());
     }
-    else
-    {
-        mg->link = free_mblock_list[node];
-        free_mblock_list[node] = mg;
+}
+
+static void
+free_deferred_mega_groups (uint32_t node)
+{
+    bdescr *mg, *bd, *prev, *new_head;
+
+    sortDeferredList(&deferred_free_mblock_list[node]);
+
+    new_head = deferred_free_mblock_list[node];
+    deferred_free_mblock_list[node] = NULL;
+
+    // Keeping track of the location in the free list
+    prev = NULL;
+    bd = free_mblock_list[node];
+
+    while(new_head != NULL) {
+        // Obtain mblock to free
+        mg = new_head;
+        new_head = new_head->link;
+
+        // Find the right place in the free list. This is similar to the process
+        // in `free_mega_group`, but we can exploit that the deferred list is
+        // sorted: the search starts out where the previous mblock was inserted.
+        // This means we only need to traverse the free list once to free all
+        // the mblocks, rather than once per mblock.
+        while (bd && bd->start < mg->start) {
+            prev = bd;
+            bd = bd->link;
+        }
+
+        // coalesce backwards
+        if (prev)
+        {
+            mg->link = prev->link;
+            prev->link = mg;
+            mg = coalesce_mblocks(prev);
+        }
+        else
+        {
+            mg->link = free_mblock_list[node];
+            free_mblock_list[node] = mg;
+        }
+
+        // coalesce forwards
+        coalesce_mblocks(mg);
+
+        // initialize search for next round
+        prev = mg;
+        bd = prev->link;
     }
-    // coalesce forwards
-    coalesce_mblocks(mg);
 
     IF_DEBUG(sanity, checkFreeListSanity());
 }
@@ -946,6 +1056,93 @@ initMBlock(void *mblock, uint32_t node)
              block += BLOCK_SIZE) {
         bd->start = (void*)block;
         bd->node = node;
+    }
+}
+
+// Find the midpoint of the linked list.
+static bdescr* splitDeferredList(bdescr* head) {
+    bdescr *fast, *slow, *second_half;
+
+    slow = head;
+    fast = slow->link;
+
+    while(fast != NULL) {
+        fast = fast->link;
+        if(fast) {
+            fast = fast->link;
+            slow = slow->link;
+        }
+    }
+
+    second_half = slow->link;
+    // Cap first list at half
+    slow->link = NULL;
+    return second_half;
+}
+
+static void sortDeferredList(bdescr** head) {
+    bdescr *first_half, *second_half, *cur;
+
+    if(*head == NULL || (*head)->link == NULL) {
+        // 0 or 1 elements, done
+        return;
+    }
+
+    first_half = *head;
+    second_half = splitDeferredList(*head);
+
+    sortDeferredList(&first_half);
+    sortDeferredList(&second_half);
+
+    // Sort by address
+    if(first_half->start < second_half->start) {
+        *head = first_half;
+        first_half = first_half->link;
+    } else {
+        *head = second_half;
+        second_half = second_half->link;
+    }
+    cur = *head;
+
+    while(first_half != NULL && second_half != NULL) {
+        if(first_half->start < second_half->start) {
+            cur->link = first_half;
+            first_half = first_half->link;
+        } else {
+            cur->link = second_half;
+            second_half = second_half->link;
+        }
+        cur = cur->link;
+    }
+
+    // Now one of the two is exhausted, so order doesn't matter
+    while(first_half != NULL) {
+        cur->link = first_half;
+        first_half = first_half->link;
+        cur = cur->link;
+    }
+    while(second_half != NULL) {
+        cur->link = second_half;
+        second_half = second_half->link;
+        cur = cur->link;
+    }
+}
+
+void deferMBlockFreeing() {
+    if(defer_mblock_frees) {
+        barf("MBlock freeing is already deferred");
+    }
+    defer_mblock_frees = true;
+}
+
+void commitMBlockFreeing() {
+    if(! defer_mblock_frees) {
+        barf("MBlock freeing was never deferred");
+    }
+    defer_mblock_frees = false;
+
+    for(uint32_t node = 0; node < n_numa_nodes; node++) {
+        free_deferred_mega_groups(node);
     }
 }
 
