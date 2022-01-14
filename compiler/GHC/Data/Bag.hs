@@ -73,7 +73,7 @@ unionManyBags xs = foldr unionBags EmptyBag xs
 
 unionBags :: Bag a -> Bag a -> Bag a
 unionBags EmptyBag b = b
-unionBags b EmptyBag = b
+--unionBags b EmptyBag = b
 unionBags b1 b2      = TwoBags b1 b2
 
 consBag :: a -> Bag a -> Bag a
@@ -84,13 +84,14 @@ snocBag bag elt = bag `unionBags` (unitBag elt)
 
 isEmptyBag :: Bag a -> Bool
 isEmptyBag EmptyBag = True
-isEmptyBag _        = False -- NB invariants
+isEmptyBag (TwoBags b1 b2) = isEmptyBag b1 && isEmptyBag b2
+isEmptyBag (ListBag xs) = null xs
+isEmptyBag _ = False
 
 isSingletonBag :: Bag a -> Bool
-isSingletonBag EmptyBag      = False
-isSingletonBag (UnitBag _)   = True
-isSingletonBag (TwoBags _ _) = False          -- Neither is empty
-isSingletonBag (ListBag xs)  = isSingleton xs
+isSingletonBag b = case bagToList b of
+                    [_] -> True
+                    _   -> False
 
 filterBag :: (a -> Bool) -> Bag a -> Bag a
 filterBag _    EmptyBag = EmptyBag
