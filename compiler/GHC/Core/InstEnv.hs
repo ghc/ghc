@@ -870,11 +870,11 @@ lookupInstEnv' :: InstEnv          -- InstEnv to look in
 -- giving a suitable error message
 
 lookupInstEnv' (InstEnv rm) vis_mods cls tys
-  = pprTrace "lookupInstEnv'" (ppr cls <+> ppr (length rough_matches) <+> ppr tys <+> ppr rough_tcs)
+  = -- pprTrace "lookupInstEnv'" (ppr cls <+> ppr (length rough_matches) <+> ppr tys <+> ppr rough_tcs <+> ppr (moduleSetElts vis_mods) $$  ppr r1 $$ ppr r2) (r1, r2)
+    (r1, r2)
 
- -- pprTraceIt "lookupInstEnv'"
-  (foldr check_match [] rough_matches, check_unifier NoUnifiers (bagToList rough_unifiers))
   where
+    (r1, r2) = (foldr check_match [] rough_matches, check_unifier NoUnifiers (bagToList rough_unifiers))
     (rough_matches, rough_unifiers) = lookupRM' rough_tcs rm
     rough_tcs  = LookupKnownTc (className cls) : roughMatchTcsLookup tys
 
@@ -896,6 +896,8 @@ lookupInstEnv' (InstEnv rm) vis_mods cls tys
     check_unifier :: PotentialUnifiers -> [ClsInst] -> PotentialUnifiers
     check_unifier acc [] = acc
     check_unifier acc (item@ClsInst { is_tvs = tpl_tvs, is_tys = tpl_tys }:items)
+      | not (instIsVisible vis_mods item)
+      = check_unifier acc items  -- See Note [Instance lookup and orphan instances]
       | [_] <- check_match item [] = check_unifier acc items
         -- Does not match, so next check whether the things unify
         -- See Note [Overlapping instances]
