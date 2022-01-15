@@ -38,6 +38,33 @@ Compiler
     enabled the :extension:`UnboxedTuples` extension but didn't explicitly
     enable :extension:`UnboxedSums` will continue to work without changes.
 
+- Constructed Product Result analysis (c.f. :ghc-flag:`-fcpr-anal`) has been
+  overhauled and will now unbox nestedly, if termination properties of the
+  function permit. This allows unboxing of constructed results returned by
+  ``IO`` actions. E.g.::
+
+      sumIO :: [Int] -> IO Int
+      sumIO []     = return 0
+      sumIO (x:xs) = do
+        r <- sumIO xs
+        return $! x + r
+
+  Note the use of ``$!``: Without it, GHC would be unable to see that evaluation
+  of ``r`` and ``x`` terminates (and rapidly, at that). An alternative would be to
+  evaluate both with a bang pattern or a ``seq``, but the ``return $! <res>``
+  idiom should work more reliably and needs less thinking.
+
+- Demand analysis (cf. :ghc-flag:`-fstrictness`) now integrates a
+  Boxity Analysis that tracks whether a function needs a parameter boxed. If
+  that is the case, the worker/wrapper transformation (cf.
+  :ghc-flag:`-fworker-wrapper`) will not unbox that parameter, leading to less
+  reboxing in many cases.
+
+  For reasons of backwards-compatible performance, you may find that the new
+  mechanism is too aggressive in a few cases (e.g., still unboxing a parameter
+  that is used boxed in a hot path). Do post a bug report with your example!
+  Then wrap the uses of the parameter in ``GHC.Exts.lazy`` for a short-term fix.
+
 ``base`` library
 ~~~~~~~~~~~~~~~~
 

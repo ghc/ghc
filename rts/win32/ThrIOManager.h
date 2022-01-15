@@ -15,4 +15,4 @@
 void ioManagerWakeup (void);
 void ioManagerDie (void);
 void ioManagerStart (void);
-
+void ioManagerFinished (void);

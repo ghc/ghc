@@ -6,15 +6,15 @@ for the Glasgow Haskell Compiler. Even more than this, it at times serves (for
 better or for worse) as a de-facto language standard, being the sole
 non-academic reference for many widely used language extensions.
 
-Since GHC 8.0, the User's Guide is authored in `ReStructuredText
-<https://en.wikipedia.org/wiki/ReStructuredText>`__ (or ReST or RST, for short)
+Since GHC 8.0, the User's Guide is authored in `reStructuredText
+<https://en.wikipedia.org/wiki/ReStructuredText>`__ (or reST or RST, for short)
 a rich but light-weight mark-up language aimed at producing documentation. The
-`Sphinx <http://sphinx-doc.org/>`__ tool is used to produce the final PDF and
+`Sphinx <https://www.sphinx-doc.org/>`__ tool is used to produce the final PDF and
 HTML documentation.
 
-This document (also written in ReST) serves as a brief introduction to ReST and to
+This document (also written in reST) serves as a brief introduction to reST and to
 document the conventions used in the User's Guide. This document is *not* intended
-to be a thorough guide to ReST. For this see the resources referenced
+to be a thorough guide to reST. For this see the resources referenced
 `below <#references>`__.
 
 Basics
@@ -91,7 +91,7 @@ The above would be rendered as,
 Headings
 ~~~~~~~~
 
-While ReST can accommodate a wide range of heading styles, we have standardized
+While reST can accommodate a wide range of heading styles, we have standardized
 on this convention in the User's Guide,
 
 .. code-block:: rest
@@ -141,7 +141,7 @@ Other languages
 Double-colon blocks are syntax-highlighted as Haskell by default. To avoid this
 use a
 ``.. code-block`` `directive
-<http://sphinx-doc.org/markup/code.html#directive-code-block>`__ with explicit
+<https://www.sphinx-doc.org/en/master/usage/restructuredtext/directives.html#directive-code-block>`__ with explicit
 language designation,
 
 .. code-block:: rest
@@ -314,7 +314,7 @@ There are a number of admonitions types,
     * warning
 
 
-.. _Admonitions: http://docutils.sourceforge.net/docs/ref/rst/directives.html#admonitions
+.. _Admonitions: https://docutils.sourceforge.io/docs/ref/rst/directives.html#admonitions
 
 Documenting command-line options and GHCi commands
 --------------------------------------------------
@@ -420,16 +420,17 @@ user-substitutable tokens. In this document we use the convention, ``⟨subst⟩
 (note that these are angle brackets, ``U+27E8`` and ``U+27E9``, not
 less-than/greater-than signs).
 
+.. _references:
 
-ReST reference materials
+reST reference materials
 ------------------------
 
-* `Sphinx ReST Primer`_: A great place to start.
-* `Sphinx extensions`_: How Sphinx extends ReST
-* `ReST reference`_: When you really need the details.
+* `Sphinx reST Primer`_: A great place to start.
+* `Sphinx extensions`_: How Sphinx extends reST
+* `reST reference`_: When you really need the details.
 * `Directives reference`_
 
-.. _Sphinx ReST Primer: http://sphinx-doc.org/rest.html
-.. _ReST reference: http://docutils.sourceforge.net/docs/ref/rst/restructuredtext.html
-.. _Sphinx extensions: http://sphinx-doc.org/markup/index.html
-.. _Directives reference: http://docutils.sourceforge.net/docs/ref/rst/directives.html#code
+.. _Sphinx reST Primer: https://www.sphinx-doc.org/en/master/usage/restructuredtext/basics.html
+.. _reST reference: https://docutils.sourceforge.io/docs/ref/rst/restructuredtext.html
+.. _Sphinx extensions: https://www.sphinx-doc.org/en/master/usage/extensions/index.html
+.. _Directives reference: https://docutils.sourceforge.io/docs/ref/rst/directives.html#code

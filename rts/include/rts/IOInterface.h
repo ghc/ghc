@@ -27,6 +27,7 @@ extern StgInt console_handler;
 void *   getIOManagerEvent  (void);
 HsWord32 readIOManagerEvent (void);
 void     sendIOManagerEvent (HsWord32 event);
+void     ioManagerFinished  (void);
 
 #else
 
