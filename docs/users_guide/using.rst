@@ -1313,7 +1313,7 @@ messages and in GHCi:
         header=:message=1:warning=1;35:error=1;31:fatal=1;31:margin=1;34
 
     Each value is expected to be a `Select Graphic Rendition (SGR) substring
-    <https://en.wikipedia.org/wiki/ANSI_escape_code#graphics>`_.  The
+    <https://en.wikipedia.org/wiki/ANSI_escape_code#SGR>`_.  The
     formatting of each element can inherit from parent elements.  For example,
     if ``header`` is left empty, it will inherit the formatting of
     ``message``.  Alternatively if ``header`` is set to ``1`` (bold), it will
