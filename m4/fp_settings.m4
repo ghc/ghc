@@ -1,104 +1,113 @@
 # FP_SETTINGS
 # ----------------------------------
 # Set the variables used in the settings file
-# See Note [tooldir: How GHC finds mingw on Windows]
 AC_DEFUN([FP_SETTINGS],
 [
-    if test "$windows" = YES -a "$EnableDistroToolchain" = "NO"
-    then
+    SettingsUseDistroMINGW="$EnableDistroToolchain"
+
+    if test "$windows" = YES -a "$EnableDistroToolchain" = "NO"; then
+        # Handle the Windows toolchain installed in FP_SETUP_WINDOWS_TOOLCHAIN.
+        # See Note [tooldir: How GHC finds mingw on Windows]
         mingw_bin_prefix='$$tooldir/mingw/bin/'
-        SettingsCCompilerCommand="${mingw_bin_prefix}gcc.exe"
-        SettingsHaskellCPPCommand="${mingw_bin_prefix}gcc.exe"
-        SettingsHaskellCPPFlags="$HaskellCPPArgs"
-        SettingsLdCommand="${mingw_bin_prefix}ld.exe"
-        # Overrides FIND_MERGE_OBJECTS in order to avoid hard-coding linker
-        # path on Windows (#18550).
-        SettingsMergeObjectsCommand="${SettingsLdCommand}"
-        SettingsMergeObjectsFlags="-r --oformat=pe-bigobj-x86-64"
-        SettingsArCommand="${mingw_bin_prefix}ar.exe"
-        SettingsRanlibCommand="${mingw_bin_prefix}ranlib.exe"
-        SettingsDllWrapCommand="${mingw_bin_prefix}dllwrap.exe"
-        SettingsWindresCommand="${mingw_bin_prefix}windres.exe"
-        SettingsTouchCommand='$$topdir/bin/touchy.exe'
-    elif test "$EnableDistroToolchain" = "YES"
-    then
-        SettingsCCompilerCommand="$(basename $CC)"
+        SettingsCCompilerCommand="${mingw_bin_prefix}clang.exe"
         SettingsCCompilerFlags="$CONF_CC_OPTS_STAGE2"
         SettingsCxxCompilerFlags="$CONF_CXX_OPTS_STAGE2"
-        SettingsHaskellCPPCommand="$(basename $HaskellCPPCmd)"
+        SettingsCCompilerLinkFlags="$CONF_GCC_LINKER_OPTS_STAGE2"
+        SettingsHaskellCPPCommand="${mingw_bin_prefix}clang.exe"
         SettingsHaskellCPPFlags="$HaskellCPPArgs"
-        SettingsLdCommand="$(basename $LdCmd)"
-        SettingsMergeObjectsCommand="$(basename $MergeObjsCmd)"
-        SettingsMergeObjectsFlags="$MergeObjsArgs"
-        SettingsArCommand="$(basename $ArCmd)"
-        SettingsDllWrapCommand="$(basename $DllWrapCmd)"
-        SettingsWindresCommand="$(basename $WindresCmd)"
+        SettingsLdCommand="${mingw_bin_prefix}ld.lld.exe"
+        SettingsLdFlags=""
+        # LLD does not support object merging (#21068)
+        SettingsMergeObjectsCommand=""
+        SettingsMergeObjectsFlags=""
+        SettingsArCommand="${mingw_bin_prefix}llvm-ar.exe"
+        SettingsRanlibCommand="${mingw_bin_prefix}llvm-ranlib.exe"
+        SettingsDllWrapCommand="${mingw_bin_prefix}llvm-dllwrap.exe"
+        SettingsWindresCommand="${mingw_bin_prefix}llvm-windres.exe"
         SettingsTouchCommand='$$topdir/bin/touchy.exe'
+
     else
+        # This case handles the "normal" platforms (e.g. not Windows) where we
+        # don't provide the toolchain.
+
         SettingsCCompilerCommand="$CC"
+        SettingsCCompilerFlags="$CONF_CC_OPTS_STAGE2"
+        SettingsCxxCompilerFlags="$CONF_CXX_OPTS_STAGE2"
         SettingsHaskellCPPCommand="$HaskellCPPCmd"
         SettingsHaskellCPPFlags="$HaskellCPPArgs"
+        SettingsCCompilerLinkFlags="$CONF_GCC_LINKER_OPTS_STAGE2"
         SettingsLdCommand="$LdCmd"
-        SettingsMergeObjectsCommand="$MergeObjsCmd"
-        SettingsMergeObjectsFlags="$MergeObjsArgs"
+        SettingsLdFlags="$CONF_LD_LINKER_OPTS_STAGE2"
         SettingsArCommand="$ArCmd"
         SettingsRanlibCommand="$RanlibCmd"
-        if test -z "$DllWrapCmd"
-        then
+        SettingsMergeObjectsCommand="$MergeObjsCmd"
+        SettingsMergeObjectsFlags="$MergeObjsArgs"
+
+        if test -z "$DllWrapCmd"; then
             SettingsDllWrapCommand="/bin/false"
         else
             SettingsDllWrapCommand="$DllWrapCmd"
         fi
-        if test -z "$WindresCmd"
-        then
+        if test -z "$WindresCmd"; then
             SettingsWindresCommand="/bin/false"
         else
             SettingsWindresCommand="$WindresCmd"
         fi
-       SettingsTouchCommand='touch'
+
+        if test "$HostOS" = "mingw32"; then
+            SettingsTouchCommand='$$topdir/bin/touchy.exe'
+        else
+            SettingsTouchCommand='touch'
+        fi
+
+        if test "$EnableDistroToolchain" = "YES"; then
+            # If the user specified --enable-distro-toolchain then we just use the
+            # executable names, not paths.
+            SettingsCCompilerCommand="$(basename $SettingsCCompilerCommand)"
+            SettingsHaskellCPPCommand="$(basename $SettingsHaskellCPPCommand)"
+            SettingsLdCommand="$(basename $SettingsLdCommand)"
+            SettingsMergeObjectsCommand="$(basename $SettingsMergeObjectsCommand)"
+            SettingsArCommand="$(basename $SettingsArCommand)"
+            SettingsDllWrapCommand="$(basename $SettingsDllWrapCommand)"
+            SettingsWindresCommand="$(basename $SettingsWindresCommand)"
+        fi
     fi
-    if test -z "$LibtoolCmd"
-    then
-      SettingsLibtoolCommand="libtool"
-    else
-      SettingsLibtoolCommand="$LibtoolCmd"
+
+    # Platform-agnostic tools
+    if test -z "$LibtoolCmd"; then
+        LibtoolCmd="libtool"
     fi
-    if test -z "$ClangCmd"
-    then
-        SettingsClangCommand="clang"
-    else
-        SettingsClangCommand="$ClangCmd"
+    SettingsLibtoolCommand="$LibtoolCmd"
+
+    if test -z "$ClangCmd"; then
+        ClangCmd="clang"
     fi
-    if test -z "$LlcCmd"
-    then
-      SettingsLlcCommand="llc"
-    else
-      SettingsLlcCommand="$LlcCmd"
+    SettingsClangCommand="$ClangCmd"
+
+    # LLVM backend tools
+    if test -z "$LlcCmd"; then
+        LlcCmd="llc"
     fi
-    if test -z "$OptCmd"
-    then
-      SettingsOptCommand="opt"
-    else
-      SettingsOptCommand="$OptCmd"
+    SettingsLlcCommand="$LlcCmd"
+
+    if test -z "$OptCmd"; then
+        OptCmd="opt"
     fi
-    if test -z "$OtoolCmd"
-    then
-      SettingsOtoolCommand="otool"
-    else
-      SettingsOtoolCommand="$OtoolCmd"
+    SettingsOptCommand="$OptCmd"
+
+    # Mac-only tools
+    if test -z "$OtoolCmd"; then
+        OtoolCmd="otool"
     fi
-    if test -z "$InstallNameToolCmd"
-    then
-      SettingsInstallNameToolCommand="install_name_tool"
-    else
-      SettingsInstallNameToolCommand="$InstallNameToolCmd"
+    SettingsOtoolCommand="$OtoolCmd"
+
+    if test -z "$InstallNameToolCmd"; then
+        InstallNameToolCmd="install_name_tool"
     fi
-    SettingsCCompilerFlags="$CONF_CC_OPTS_STAGE2"
-    SettingsCxxCompilerFlags="$CONF_CXX_OPTS_STAGE2"
-    SettingsCCompilerLinkFlags="$CONF_GCC_LINKER_OPTS_STAGE2"
+    SettingsInstallNameToolCommand="$InstallNameToolCmd"
+
     SettingsCCompilerSupportsNoPie="$CONF_GCC_SUPPORTS_NO_PIE"
-    SettingsLdFlags="$CONF_LD_LINKER_OPTS_STAGE2"
-    SettingsUseDistroMINGW="$EnableDistroToolchain"
+
     AC_SUBST(SettingsCCompilerCommand)
     AC_SUBST(SettingsHaskellCPPCommand)
     AC_SUBST(SettingsHaskellCPPFlags)

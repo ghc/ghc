@@ -1089,11 +1089,14 @@ enabled in the toolchain:
    suggests, this tells the linker to produce a bigobj-enabled COFF object, no a
    PE executable.
 
-We must enable bigobj output in a few places:
+Previously when we used ld.bfd we had to enable bigobj output in a few places:
 
  * When merging object files (GHC.Driver.Pipeline.Execute.joinObjectFiles)
 
  * When assembling (GHC.Driver.Pipeline.runPhase (RealPhase As ...))
+
+However, this is no longer necessary with ld.lld, which detects that the
+object is large on its own.
 
 Unfortunately the big object format is not supported on 32-bit targets so
 none of this can be used in that case.
