@@ -50,6 +50,15 @@ Switching on :extension:`ImpredicativeTypes`
   functions in many cases. For example, ``reverse xs`` will typecheck even if ``xs :: [forall a. a->a]``,
   by instantiating ``reverse`` at type ``forall a. a->a``.
 
+Note that the treatment of type-class constraints and implicit parameters remains entirely monomorphic,
+even with ImpredicativeTypes. Specifically:
+
+- You cannot apply a type class to a polymorphic type. This is illegal: ``f :: C (forall a. a->a) => [a] -> [a]``
+
+- You cannot give an instance declaration with a polymorphic argument. This is illegal: ``instance C (forall a. a->a)``
+
+- An implicit parameter cannot have a polymorphic type: ``g :: (?x :: forall a. a->a) => [a] -> [a]``
+
 For many years GHC has a special case for the function ``($)``, that allows it
 to typecheck an application like ``runST $ (do { ... })``, even though that
 instantiation may be impredicative.  This special case remains: even without
