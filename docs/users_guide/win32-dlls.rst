@@ -139,7 +139,7 @@ Haskell programs in general no longer support opening devices in the legacy
 format.
 
 See the
-`Windows documentation <https://msdn.microsoft.com/en-us/library/windows/desktop/aa365247.aspx>`_
+`Windows documentation <https://docs.microsoft.com/en-us/windows/win32/fileio/naming-a-file>`_
 for more details.
 
 
