@@ -5,6 +5,6 @@ T14888.hs:18:22-60: Splicing expression
     reify ''Functor' >>= stringE . pprint
   ======>
     "class T14888.Functor' (f_0 :: * -> *)
-    where T14888.fmap' :: forall (a_1 :: *) (b_2 :: *) .
-                          (a_1 -> b_2) -> f_0 a_1 -> f_0 b_2
+    where {T14888.fmap' :: forall (a_1 :: *) (b_2 :: *) .
+                           (a_1 -> b_2) -> f_0 a_1 -> f_0 b_2}
 instance T14888.Functor' ((->) r_3)"

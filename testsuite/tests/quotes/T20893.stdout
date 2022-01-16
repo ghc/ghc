@@ -12,3 +12,12 @@ main_0 = do {let {day_1 = "mon"};
                            "sun" -> 7;
                            _ -> 8}};
              System.IO.putStrLn (GHC.Show.show day_1) GHC.Base.++ " is " (GHC.Show.show num_2)}
+main_0 = do {let {color_1 = "red"};
+             let {id_2 = 1};
+             print_color_3 (color_1, id_2)}
+    where {print_color_3 (c_4,
+                          i_5) = System.IO.putStrLn (c_4 GHC.Base.++ (" is " GHC.Base.++ GHC.Show.show i_5))}
+main_0 = do {let {colors_1 = ["red", "green", "blue"]};
+             let {ids_2 = GHC.Base.map (\case
+                                        {"red" -> 0; "green" -> 1; "blue" -> 2}) colors_1};
+             System.IO.putStrLn (GHC.Show.show ids_2)}

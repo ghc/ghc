@@ -155,7 +155,7 @@ pprExp i (LamE [] e) = pprExp i e -- #13856
 pprExp i (LamE ps e) = parensIf (i > noPrec) $ char '\\' <> hsep (map (pprPat appPrec) ps)
                                            <+> text "->" <+> ppr e
 pprExp i (LamCaseE ms) = parensIf (i > noPrec)
-                       $ text "\\case" $$ nest nestDepth (ppr ms)
+                       $ text "\\case" $$ braces (semiSep ms)
 pprExp i (TupE es)
   | [Just e] <- es
   = pprExp i (ConE (tupleDataName 1) `AppE` e)
@@ -938,7 +938,7 @@ instance Ppr Range where
 ------------------------------
 where_clause :: [Dec] -> Doc
 where_clause [] = empty
-where_clause ds = nest nestDepth $ text "where" <+> vcat (map (ppr_dec False) ds)
+where_clause ds = nest nestDepth $ text "where" <+> braces (semiSepWith (ppr_dec False) ds)
 
 showtextl :: Show a => a -> Doc
 showtextl = text . map toLower . show
@@ -960,6 +960,11 @@ instance Ppr Loc where
            , text "-"
            , parens $ int end_ln <> comma <> int end_col ]
 
+-- Takes a separator and a pretty-printing function and prints a list of things
+-- separated by the separator followed by space.
+sepWith :: Doc -> (a -> Doc) -> [a] -> Doc
+sepWith sepDoc pprFun = sep . punctuate sepDoc . map pprFun
+
 -- Takes a list of printable things and prints them separated by commas followed
 -- by space.
 commaSep :: Ppr a => [a] -> Doc
@@ -968,12 +973,17 @@ commaSep = commaSepWith ppr
 -- Takes a list of things and prints them with the given pretty-printing
 -- function, separated by commas followed by space.
 commaSepWith :: (a -> Doc) -> [a] -> Doc
-commaSepWith pprFun = sep . punctuate comma . map pprFun
+commaSepWith pprFun = sepWith comma pprFun
 
 -- Takes a list of printable things and prints them separated by semicolons
 -- followed by space.
 semiSep :: Ppr a => [a] -> Doc
 semiSep = sep . punctuate semi . map ppr
+
+-- Takes a list of things and prints them with the given pretty-printing
+-- function, separated by semicolons followed by space.
+semiSepWith :: (a -> Doc) -> [a] -> Doc
+semiSepWith pprFun = sepWith semi pprFun
 
 -- Prints out the series of vertical bars that wraps an expression or pattern
 -- used in an unboxed sum.
