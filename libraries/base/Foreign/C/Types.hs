@@ -104,54 +104,54 @@ import GHC.Num
 
 -- | Haskell type representing the C @char@ type.
 -- /(The concrete types of "Foreign.C.Types#platform" are platform-specific.)/
-INTEGRAL_TYPE(CChar,HTYPE_CHAR)
+INTEGRAL_TYPE(CChar,"char",HTYPE_CHAR)
 -- | Haskell type representing the C @signed char@ type.
 -- /(The concrete types of "Foreign.C.Types#platform" are platform-specific.)/
-INTEGRAL_TYPE(CSChar,HTYPE_SIGNED_CHAR)
+INTEGRAL_TYPE(CSChar,"signed char",HTYPE_SIGNED_CHAR)
 -- | Haskell type representing the C @unsigned char@ type.
 -- /(The concrete types of "Foreign.C.Types#platform" are platform-specific.)/
-INTEGRAL_TYPE(CUChar,HTYPE_UNSIGNED_CHAR)
+INTEGRAL_TYPE(CUChar,"unsigned char",HTYPE_UNSIGNED_CHAR)
 
 -- | Haskell type representing the C @short@ type.
 -- /(The concrete types of "Foreign.C.Types#platform" are platform-specific.)/
-INTEGRAL_TYPE(CShort,HTYPE_SHORT)
+INTEGRAL_TYPE(CShort,"short",HTYPE_SHORT)
 -- | Haskell type representing the C @unsigned short@ type.
 -- /(The concrete types of "Foreign.C.Types#platform" are platform-specific.)/
-INTEGRAL_TYPE(CUShort,HTYPE_UNSIGNED_SHORT)
+INTEGRAL_TYPE(CUShort,"unsigned short",HTYPE_UNSIGNED_SHORT)
 
 -- | Haskell type representing the C @int@ type.
 -- /(The concrete types of "Foreign.C.Types#platform" are platform-specific.)/
-INTEGRAL_TYPE(CInt,HTYPE_INT)
+INTEGRAL_TYPE(CInt,"int",HTYPE_INT)
 -- | Haskell type representing the C @unsigned int@ type.
 -- /(The concrete types of "Foreign.C.Types#platform" are platform-specific.)/
-INTEGRAL_TYPE(CUInt,HTYPE_UNSIGNED_INT)
+INTEGRAL_TYPE(CUInt,"unsigned int",HTYPE_UNSIGNED_INT)
 
 -- | Haskell type representing the C @long@ type.
 -- /(The concrete types of "Foreign.C.Types#platform" are platform-specific.)/
-INTEGRAL_TYPE(CLong,HTYPE_LONG)
+INTEGRAL_TYPE(CLong,"long",HTYPE_LONG)
 -- | Haskell type representing the C @unsigned long@ type.
 -- /(The concrete types of "Foreign.C.Types#platform" are platform-specific.)/
-INTEGRAL_TYPE(CULong,HTYPE_UNSIGNED_LONG)
+INTEGRAL_TYPE(CULong,"unsigned long",HTYPE_UNSIGNED_LONG)
 
 -- | Haskell type representing the C @long long@ type.
 -- /(The concrete types of "Foreign.C.Types#platform" are platform-specific.)/
-INTEGRAL_TYPE(CLLong,HTYPE_LONG_LONG)
+INTEGRAL_TYPE(CLLong,"long long",HTYPE_LONG_LONG)
 -- | Haskell type representing the C @unsigned long long@ type.
 -- /(The concrete types of "Foreign.C.Types#platform" are platform-specific.)/
-INTEGRAL_TYPE(CULLong,HTYPE_UNSIGNED_LONG_LONG)
+INTEGRAL_TYPE(CULLong,"unsigned long long",HTYPE_UNSIGNED_LONG_LONG)
 
 -- | Haskell type representing the C @bool@ type.
 -- /(The concrete types of "Foreign.C.Types#platform" are platform-specific.)/
 --
 -- @since 4.10.0.0
-INTEGRAL_TYPE_WITH_CTYPE(CBool,bool,HTYPE_BOOL)
+INTEGRAL_TYPE(CBool,"bool",HTYPE_BOOL)
 
 -- | Haskell type representing the C @float@ type.
 -- /(The concrete types of "Foreign.C.Types#platform" are platform-specific.)/
-FLOATING_TYPE(CFloat,HTYPE_FLOAT)
+FLOATING_TYPE(CFloat,"float",HTYPE_FLOAT)
 -- | Haskell type representing the C @double@ type.
 -- /(The concrete types of "Foreign.C.Types#platform" are platform-specific.)/
-FLOATING_TYPE(CDouble,HTYPE_DOUBLE)
+FLOATING_TYPE(CDouble,"double",HTYPE_DOUBLE)
 -- XXX GHC doesn't support CLDouble yet
 
 {-# RULES
@@ -168,34 +168,34 @@ FLOATING_TYPE(CDouble,HTYPE_DOUBLE)
 
 -- | Haskell type representing the C @ptrdiff_t@ type.
 -- /(The concrete types of "Foreign.C.Types#platform" are platform-specific.)/
-INTEGRAL_TYPE(CPtrdiff,HTYPE_PTRDIFF_T)
+INTEGRAL_TYPE(CPtrdiff,"ptrdiff_t",HTYPE_PTRDIFF_T)
 -- | Haskell type representing the C @size_t@ type.
 -- /(The concrete types of "Foreign.C.Types#platform" are platform-specific.)/
-INTEGRAL_TYPE(CSize,HTYPE_SIZE_T)
+INTEGRAL_TYPE(CSize,"size_t",HTYPE_SIZE_T)
 -- | Haskell type representing the C @wchar_t@ type.
 -- /(The concrete types of "Foreign.C.Types#platform" are platform-specific.)/
-INTEGRAL_TYPE(CWchar,HTYPE_WCHAR_T)
+INTEGRAL_TYPE(CWchar,"wchar_t",HTYPE_WCHAR_T)
 -- | Haskell type representing the C @sig_atomic_t@ type.
 -- /(The concrete types of "Foreign.C.Types#platform" are platform-specific.)/
-INTEGRAL_TYPE(CSigAtomic,HTYPE_SIG_ATOMIC_T)
+INTEGRAL_TYPE(CSigAtomic,"sig_atomic_t",HTYPE_SIG_ATOMIC_T)
 
 -- | Haskell type representing the C @clock_t@ type.
 -- /(The concrete types of "Foreign.C.Types#platform" are platform-specific.)/
-ARITHMETIC_TYPE(CClock,HTYPE_CLOCK_T)
+ARITHMETIC_TYPE(CClock,"clock_t",HTYPE_CLOCK_T)
 -- | Haskell type representing the C @time_t@ type.
 -- /(The concrete types of "Foreign.C.Types#platform" are platform-specific.)/
-ARITHMETIC_TYPE(CTime,HTYPE_TIME_T)
+ARITHMETIC_TYPE(CTime,"time_t",HTYPE_TIME_T)
 -- | Haskell type representing the C @useconds_t@ type.
 -- /(The concrete types of "Foreign.C.Types#platform" are platform-specific.)/
 --
 -- @since 4.4.0.0
 
-ARITHMETIC_TYPE(CUSeconds,HTYPE_USECONDS_T)
+ARITHMETIC_TYPE(CUSeconds,"useconds_t",HTYPE_USECONDS_T)
 -- | Haskell type representing the C @suseconds_t@ type.
 -- /(The concrete types of "Foreign.C.Types#platform" are platform-specific.)/
 --
 -- @since 4.4.0.0
-ARITHMETIC_TYPE(CSUSeconds,HTYPE_SUSECONDS_T)
+ARITHMETIC_TYPE(CSUSeconds,"suseconds_t",HTYPE_SUSECONDS_T)
 
 -- FIXME: Implement and provide instances for Eq and Storable
 -- | Haskell type representing the C @FILE@ type.
@@ -208,10 +208,10 @@ data CFpos = CFpos
 -- /(The concrete types of "Foreign.C.Types#platform" are platform-specific.)/
 data CJmpBuf = CJmpBuf
 
-INTEGRAL_TYPE(CIntPtr,HTYPE_INTPTR_T)
-INTEGRAL_TYPE(CUIntPtr,HTYPE_UINTPTR_T)
-INTEGRAL_TYPE(CIntMax,HTYPE_INTMAX_T)
-INTEGRAL_TYPE(CUIntMax,HTYPE_UINTMAX_T)
+INTEGRAL_TYPE(CIntPtr,"intptr_t",HTYPE_INTPTR_T)
+INTEGRAL_TYPE(CUIntPtr,"uintptr_t",HTYPE_UINTPTR_T)
+INTEGRAL_TYPE(CIntMax,"intmax_t",HTYPE_INTMAX_T)
+INTEGRAL_TYPE(CUIntMax,"uintmax_t",HTYPE_UINTMAX_T)
 
 -- C99 types which are still missing include:
 -- wint_t, wctrans_t, wctype_t
