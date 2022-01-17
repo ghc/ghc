@@ -848,6 +848,9 @@ validate-x86_64-linux-deb10-debug:
     TEST_ENV: "x86_64-linux-deb10-debug"
     BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-deb10-linux-debug.tar.xz"
     HADDOCK_HYPERLINKED_SOURCES: "yes"
+    # Numa enabled for this build so at least one build tests the libnuma build.
+    # It could be any job but luckily for deb10-debug, I choose it.
+    ENABLE_NUMA: 1
   artifacts:
     when: always
     expire_in: 2 week
