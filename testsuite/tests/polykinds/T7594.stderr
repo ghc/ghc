@@ -1,6 +1,6 @@
 
 T7594.hs:37:12: error:
-    • Could not deduce: b ~ IO ()
+    • Could not deduce (b ~ IO ())
       from the context: (:&:) c0 Real a
         bound by a type expected by the context:
                    forall a. (:&:) c0 Real a => a -> b
@@ -10,8 +10,8 @@ T7594.hs:37:12: error:
       ‘b’ is a rigid type variable bound by
         the inferred type of bar2 :: b
         at T7594.hs:37:1-19
-      Possible fix: add a type signature for ‘bar2’
     • In the first argument of ‘app’, namely ‘print’
       In the expression: app print q2
       In an equation for ‘bar2’: bar2 = app print q2
     • Relevant bindings include bar2 :: b (bound at T7594.hs:37:1)
+    Suggested fix: Consider giving ‘bar2’ a type signature

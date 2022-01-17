@@ -2,12 +2,14 @@
 [2 of 2] Compiling Foo              ( valid_hole_fits.hs, valid_hole_fits.o )
 
 valid_hole_fits.hs:9:6: warning: [-Wdeferred-out-of-scope-variables (in -Wdefault)]
-    • Variable not in scope: putStrLn :: String -> IO ()
-    • Perhaps you meant one of these:
-        ‘System.IO.putStrLn’ (imported from System.IO),
-        ‘System.IO.putStr’ (imported from System.IO)
-      Perhaps you want to remove ‘putStrLn’ from the explicit hiding list
-      in the import of ‘Prelude’ (valid_hole_fits.hs:3:1-40).
+    Variable not in scope: putStrLn :: String -> IO ()
+    Suggested fixes:
+      • Perhaps use one of these:
+          ‘System.IO.putStrLn’ (imported from System.IO),
+          ‘System.IO.putStr’ (imported from System.IO)
+      • Perhaps you want to remove ‘putStrLn’
+        from the explicit hiding list in the import of ‘Prelude’
+        (valid_hole_fits.hs:3:1-40).
 
 valid_hole_fits.hs:17:17: warning: [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int -> IO Int

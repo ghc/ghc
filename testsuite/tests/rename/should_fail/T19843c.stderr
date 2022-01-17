@@ -1,4 +1,4 @@
 
 T19843c.hs:6:6: error:
     Not in scope: data constructor ‘Map.Map’
-    Module ‘Data.Map’ does not export ‘Map’.
+    NB: the module ‘Data.Map’ does not export ‘Map’.

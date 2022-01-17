@@ -1,6 +1,6 @@
 
 T13651.hs:12:8: error:
-    • Could not deduce: F cr (Bar h (Foo u)) ~ Bar h (Bar r u)
+    • Could not deduce (F cr (Bar h (Foo u)) ~ Bar h (Bar r u))
       from the context: (F cr cu ~ Bar h (Bar r u),
                          F cu cs ~ Bar (Foo h) (Bar u s))
         bound by the type signature for:

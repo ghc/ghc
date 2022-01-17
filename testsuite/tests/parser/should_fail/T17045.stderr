@@ -1,5 +1,6 @@
 
 T17045.hs:7:11: error:
     Not in scope: type constructor or class ‘String’
-    Perhaps you want to add ‘String’ to the import list
-    in the import of ‘Prelude’ (T17045.hs:5:1-27).
+    Suggested fix:
+      Perhaps you want to add ‘String’ to the import list
+      in the import of ‘Prelude’ (T17045.hs:5:1-27).

@@ -18,7 +18,7 @@ module GHC.Rename.Utils (
         warnForallIdentifier,
         checkUnusedRecordWildcard,
         mkFieldEnv,
-        unknownSubordinateErr, badQualBndrErr, typeAppErr,
+        badQualBndrErr, typeAppErr,
         wrapGenSpan, genHsVar, genLHsVar, genHsApp, genHsApps, genAppType,
         genHsIntegralLit, genHsTyLit,
         HsDocContext(..), pprHsDocContext,
@@ -593,12 +593,6 @@ addNameClashErrRn rdr_name gres
     (flds, non_flds) = NE.partition isRecFldGRE gres
     num_flds     = length flds
     num_non_flds = length non_flds
-
-
-unknownSubordinateErr :: SDoc -> RdrName -> SDoc
-unknownSubordinateErr doc op    -- Doc is "method of class" or
-                                -- "field of constructor"
-  = quotes (ppr op) <+> text "is not a (visible)" <+> doc
 
 
 dupNamesErr :: Outputable n => (n -> SrcSpan) -> NE.NonEmpty n -> RnM ()

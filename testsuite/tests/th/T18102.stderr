@@ -8,18 +8,20 @@ T18102.hs:11:22: error:
 
 T18102.hs:11:35: error:
     • Not in scope: ‘fromInteger’
-      Perhaps you want to add ‘fromInteger’ to the import list
-      in the import of ‘Prelude’ (T18102.hs:5:1-50).
     • In the Template Haskell quotation [|| if True then 10 else 15 ||]
       In the typed splice:
         $$(do _stuff <- [|| if True then 10 else 15 ||]
               return [])
+    Suggested fix:
+      Perhaps you want to add ‘fromInteger’ to the import list
+      in the import of ‘Prelude’ (T18102.hs:5:1-50).
 
 T18102.hs:11:43: error:
     • Not in scope: ‘fromInteger’
-      Perhaps you want to add ‘fromInteger’ to the import list
-      in the import of ‘Prelude’ (T18102.hs:5:1-50).
     • In the Template Haskell quotation [|| if True then 10 else 15 ||]
       In the typed splice:
         $$(do _stuff <- [|| if True then 10 else 15 ||]
               return [])
+    Suggested fix:
+      Perhaps you want to add ‘fromInteger’ to the import list
+      in the import of ‘Prelude’ (T18102.hs:5:1-50).

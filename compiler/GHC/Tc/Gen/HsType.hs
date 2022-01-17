@@ -1668,7 +1668,7 @@ tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args
       (HsValArg _ : _, Nothing)
         -> try_again_after_substing_or $
            do { let arrows_needed = n_initial_val_args all_args
-              ; co <- matchExpectedFunKind hs_ty arrows_needed substed_fun_ki
+              ; co <- matchExpectedFunKind (HsTypeRnThing $ unLoc hs_ty) arrows_needed substed_fun_ki
 
               ; fun' <- zonkTcType (fun `mkTcCastTy` co)
                      -- This zonk is essential, to expose the fruits
@@ -1925,7 +1925,7 @@ checkExpectedKind hs_ty ty act_kind exp_kind
 
        ; let origin = TypeEqOrigin { uo_actual   = act_kind'
                                    , uo_expected = exp_kind
-                                   , uo_thing    = Just (ppr hs_ty)
+                                   , uo_thing    = Just (HsTypeRnThing hs_ty)
                                    , uo_visible  = True } -- the hs_ty is visible
 
        ; traceTc "checkExpectedKindX" $
@@ -2683,7 +2683,7 @@ kcCheckDeclHeader_sig kisig name flav
         KindedTyVar _ _ v v_hs_ki -> do
           v_ki <- tcLHsKindSig (TyVarBndrKindCtxt (unLoc v)) v_hs_ki
           discardResult $ -- See Note [discardResult in kcCheckDeclHeader_sig]
-            unifyKind (Just (ppr v))
+            unifyKind (Just . NameThing $ unLoc v)
                       (tyBinderType tb)
                       v_ki
 
@@ -3163,7 +3163,7 @@ tcExplicitTKBndrsX skol_mode bndrs thing_inside
                 bindExplicitTKBndrsX skol_mode bndrs $
                 thing_inside
 
-       ; let skol_info = ForAllSkol (fsep (map ppr bndrs))
+       ; let skol_info = ForAllSkol (HsTyVarBndrsRn $ map unLoc bndrs)
              -- Notice that we use ForAllSkol here, ignoring the enclosing
              -- skol_info unlike tc_implicit_tk_bndrs, because the bad-telescope
              -- test applies only to ForAllSkol
@@ -3247,7 +3247,7 @@ bindExplicitTKBndrsX skol_mode@(SM { sm_parent = check_parent, sm_kind = ctxt_ki
       , Just (ATyVar _ tv) <- lookupNameEnv lcl_env name
       = do { kind <- tc_lhs_kind_sig tc_ki_mode (TyVarBndrKindCtxt name) lhs_kind
            ; discardResult $
-             unifyKind (Just (ppr name)) kind (tyVarKind tv)
+             unifyKind (Just . NameThing $ name) kind (tyVarKind tv)
                           -- This unify rejects:
                           --    class C (m :: * -> *) where
                           --      type F (m :: *) = ...

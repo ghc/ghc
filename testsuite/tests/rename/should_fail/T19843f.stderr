@@ -1,8 +1,8 @@
 
 T19843f.hs:8:12: error:
     Not in scope: ‘mup’
-    Perhaps you meant ‘mop’ (line 5)
+    Suggested fix: Perhaps use ‘mop’ (line 5)
 
 T19843f.hs:10:10: error:
     Not in scope: ‘mup’
-    Perhaps you meant ‘mop’ (line 5)
+    Suggested fix: Perhaps use ‘mop’ (line 5)

@@ -1,6 +1,6 @@
 
 T15361.hs:13:13: error:
-    • Could not deduce: a ~ c
+    • Could not deduce (a ~ c)
       from the context: b ~ a
         bound by a pattern with constructor:
                    HRefl :: forall {k1} (a :: k1). a :~~: a,

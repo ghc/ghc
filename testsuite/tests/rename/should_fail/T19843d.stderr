@@ -1,4 +1,4 @@
 
 T19843d.hs:7:6: error:
     Not in scope: data constructor ‘Map’
-    Perhaps you meant ‘Mup’ (line 5)
+    Suggested fix: Perhaps use ‘Mup’ (line 5)

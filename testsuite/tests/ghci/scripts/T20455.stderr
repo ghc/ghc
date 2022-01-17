@@ -1,7 +1,8 @@
 
 <interactive>:3:1: error:
-    • Variable not in scope: ll
-    • Perhaps you meant one of these:
+    Variable not in scope: ll
+    Suggested fix:
+      Perhaps use one of these:
         ‘Ghci1.l’ (imported from Ghci1), ‘l’ (line 2),
         ‘all’ (imported from Prelude)
 

@@ -4,4 +4,5 @@ T495.hs:4:12: error:
 
 T495.hs:7:12: error:
     The INLINE pragma for ‘lookup’ lacks an accompanying binding
-      (The INLINE pragma must be given where ‘lookup’ is declared)
+    Suggested fix:
+      Move the INLINE pragma to the declaration site of ‘lookup’.

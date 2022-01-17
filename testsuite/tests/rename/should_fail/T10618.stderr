@@ -1,6 +1,7 @@
 
 T10618.hs:3:22: error:
-    • Variable not in scope: (<|>) :: Maybe (Maybe a0) -> Maybe a1 -> t
-    • Perhaps you meant one of these:
+    Variable not in scope: (<|>) :: Maybe (Maybe a0) -> Maybe a1 -> t
+    Suggested fix:
+      Perhaps use one of these:
         ‘<>’ (imported from Prelude), ‘<$>’ (imported from Prelude),
         ‘<*>’ (imported from Prelude)

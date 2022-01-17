@@ -1,10 +1,11 @@
 
 <interactive>:2:1: error:
-    • Variable not in scope: git
-    • Perhaps you meant ‘it’ (line 1)
+    Variable not in scope: git
+    Suggested fix: Perhaps use ‘it’ (line 1)
 
 <interactive>:4:1: error:
-    • Variable not in scope: fit
-    • Perhaps you meant one of these:
+    Variable not in scope: fit
+    Suggested fix:
+      Perhaps use one of these:
         ‘Ghci1.it’ (imported from Ghci1), ‘it’ (line 3),
         ‘fst’ (imported from Prelude)

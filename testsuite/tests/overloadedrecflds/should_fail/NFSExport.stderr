@@ -1,5 +1,6 @@
 
 NFSExport.hs:2:27: error:
     Not in scope: ‘foo’
-    NB: ‘foo’ is a field selector belonging to the type ‘T’
-    that has been suppressed by NoFieldSelectors
+    Suggested fix:
+      Notice that ‘foo’ is a field selector belonging to the type ‘T’
+      that has been suppressed by NoFieldSelectors.

@@ -1,6 +1,7 @@
 
 NFSSuppressed.hs:9:5: error:
-    • Variable not in scope: foo
-    • Perhaps you meant data constructor ‘Foo’ (line 7)
-      NB: ‘foo’ is a field selector belonging to the type ‘Foo’
-      that has been suppressed by NoFieldSelectors
+    Variable not in scope: foo
+    Suggested fixes:
+      • Perhaps use data constructor ‘Foo’ (line 7)
+      • Notice that ‘foo’ is a field selector belonging to the type ‘Foo’
+        that has been suppressed by NoFieldSelectors.

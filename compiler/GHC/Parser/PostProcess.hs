@@ -126,6 +126,7 @@ import GHC.Unit.Module (ModuleName)
 import GHC.Types.Basic
 import GHC.Types.Error
 import GHC.Types.Fixity
+import GHC.Types.Hint
 import GHC.Types.SourceText
 import GHC.Parser.Types
 import GHC.Parser.Lexer
@@ -2788,8 +2789,9 @@ warnStarIsType span = addPsMessage span PsWarnStarIsType
 failOpFewArgs :: MonadP m => LocatedN RdrName -> m a
 failOpFewArgs (L loc op) =
   do { star_is_type <- getBit StarIsTypeBit
+     ; let is_star_type = if star_is_type then StarIsType else StarIsNotType
      ; addFatalError $ mkPlainErrorMsgEnvelope (locA loc) $
-         (PsErrOpFewArgs (StarIsType star_is_type) op) }
+         (PsErrOpFewArgs is_star_type op) }
 
 -----------------------------------------------------------------------------
 -- Misc utils

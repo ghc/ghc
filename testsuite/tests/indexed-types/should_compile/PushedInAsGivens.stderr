@@ -1,6 +1,6 @@
 
 PushedInAsGivens.hs:10:31: error:
-    • Could not deduce: a1 ~ a
+    • Could not deduce (a1 ~ a)
       from the context: F Int ~ [a1]
         bound by the type signature for:
                    foo :: forall a1. (F Int ~ [a1]) => a1 -> Int

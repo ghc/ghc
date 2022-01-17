@@ -1,34 +1,34 @@
 
-T19843h.hs:14:7:
-     No instance for (GHC.Records.HasField "mup" r4 a4)
+T19843h.hs:14:7: error:
+    • No instance for (GHC.Records.HasField "mup" r4 a4)
         arising from selecting the field ‘mup’
-      Perhaps you meant ‘mop’ (line 11)
-     In the expression: undefined.mup
+      Perhaps use ‘mop’ (line 11)
+    • In the expression: undefined.mup
       In an equation for ‘foo’: foo = undefined.mup
 
-T19843h.hs:16:7:
-     No instance for (GHC.Records.HasField "traverse" r3 a3)
+T19843h.hs:16:7: error:
+    • No instance for (GHC.Records.HasField "traverse" r3 a3)
         arising from selecting the field ‘traverse’
-     In the expression: undefined.traverse
+    • In the expression: undefined.traverse
       In an equation for ‘bar’: bar = undefined.traverse
 
-T19843h.hs:18:7:
-     No instance for (GHC.Records.HasField "getSum" r2 a2)
+T19843h.hs:18:7: error:
+    • No instance for (GHC.Records.HasField "getSum" r2 a2)
         arising from selecting the field ‘getSum’
-     In the expression: undefined.getSum
+    • In the expression: undefined.getSum
       In an equation for ‘baz’: baz = undefined.getSum
 
-T19843h.hs:20:8:
-     No instance for (GHC.Records.HasField "getAlt" r1 a1)
+T19843h.hs:20:8: error:
+    • No instance for (GHC.Records.HasField "getAlt" r1 a1)
         arising from selecting the field ‘getAlt’
-     In the expression: undefined.getAlt
+    • In the expression: undefined.getAlt
       In an equation for ‘quux’: quux = undefined.getAlt
 
-T19843h.hs:24:8:
-     No instance for (GHC.Records.HasField "getAll" r0 a0)
+T19843h.hs:24:8: error:
+    • No instance for (GHC.Records.HasField "getAll" r0 a0)
         arising from selecting the field ‘getAll’
-      Perhaps you meant ‘getAlt’ (imported from Data.Monoid)
+      Perhaps use ‘getAlt’ (imported from Data.Monoid)
       Perhaps you want to add ‘getAll’ to the import list
       in the import of ‘Data.Monoid’ (T19843h.hs:9:1-28).
-     In the expression: undefined.getAll
+    • In the expression: undefined.getAll
       In an equation for ‘quur’: quur = undefined.getAll

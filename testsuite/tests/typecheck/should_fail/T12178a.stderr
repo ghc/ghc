@@ -1,4 +1,5 @@
 
 T12178a.hs:7:12: error:
     The INLINE pragma for ‘C’ lacks an accompanying binding
-      (The INLINE pragma must be given where ‘C’ is declared)
+    Suggested fix:
+      Move the INLINE pragma to the declaration site of ‘C’.

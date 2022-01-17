@@ -14,7 +14,10 @@ import GHC.Types.Hint
 
 import GHC.Hs.Expr ()   -- instance Outputable
 import GHC.Types.Id
-import GHC.Types.Name (isValNameSpace)
+import GHC.Types.Name (NameSpace, pprDefinedAt, occNameSpace, pprNameSpace, isValNameSpace)
+import GHC.Types.Name.Reader (RdrName,ImpDeclSpec (..), rdrNameOcc, rdrNameSpace)
+import GHC.Types.SrcLoc (SrcSpan(..), srcSpanStartLine)
+import GHC.Unit.Module.Imported (ImportedModsVal(..))
 import GHC.Unit.Types
 import GHC.Utils.Outputable
 
@@ -91,9 +94,16 @@ instance Outputable GhcHint where
               , whenPprDebug (ppr bad_rule) ]
     SuggestIncreaseSimplifierIterations
       -> text "Set limit with -fconstraint-solver-iterations=n; n=0 for no limit"
-    SuggestUseTypeFromDataKind
+    SuggestUseTypeFromDataKind mb_rdr_name
       -> text "Use" <+> quotes (text "Type")
-           <+> text "from" <+> quotes (text "Data.Kind") <+> text "instead."
+         <+> text "from" <+> quotes (text "Data.Kind") <+> text "instead."
+         $$
+           maybe empty
+           (\rdr_name ->
+             text "NB: with NoStarIsType, " <> quotes (ppr rdr_name)
+             <+> text "is treated as a regular type operator.")
+           mb_rdr_name
+
     SuggestQualifiedAfterModuleName
       -> text "Place" <+> quotes (text "qualified")
           <+> text "after the module name."
@@ -138,6 +148,105 @@ instance Outputable GhcHint where
           how_many
             | isValNameSpace ns = text "single"
             | otherwise         = text "double"
+    SuggestDumpSlices
+      -> vcat [ text "If you bound a unique Template Haskell name (NameU)"
+              , text "perhaps via newName,"
+              , text "then -ddump-splices might be useful." ]
+    SuggestAddTick name
+      -> hsep [ text "Use"
+              , quotes (char '\'' <> ppr name)
+              , text "instead of"
+              , quotes (ppr name) <> dot ]
+    SuggestMoveToDeclarationSite what rdr_name
+      -> text "Move the" <+> what <+> text "to the declaration site of"
+         <+> quotes (ppr rdr_name) <> dot
+    SuggestSimilarNames tried_rdr_name similar_names
+      -> case similar_names of
+            n NE.:| [] -> text "Perhaps use" <+> pp_item n
+            _          -> sep [ text "Perhaps use one of these:"
+                              , nest 2 (pprWithCommas pp_item $ NE.toList similar_names) ]
+        where
+          tried_ns = occNameSpace $ rdrNameOcc tried_rdr_name
+          pp_item = pprSimilarName tried_ns
+    RemindFieldSelectorSuppressed rdr_name parents
+      -> text "Notice that" <+> quotes (ppr rdr_name)
+         <+> text "is a field selector" <+> whose
+         $$ text "that has been suppressed by NoFieldSelectors."
+      where
+        -- parents may be empty if this is a pattern synonym field without a selector
+        whose | null parents = empty
+              | otherwise    = text "belonging to the type" <> plural parents
+                                 <+> pprQuotedList parents
+    ImportSuggestion import_suggestion
+      -> pprImportSuggestion import_suggestion
 
 perhapsAsPat :: SDoc
 perhapsAsPat = text "Perhaps you meant an as-pattern, which must not be surrounded by whitespace"
+
+-- | Pretty-print an 'ImportSuggestion'.
+pprImportSuggestion :: ImportSuggestion -> SDoc
+pprImportSuggestion (CouldImportFrom mods occ_name)
+  | (mod, imv) NE.:| [] <- mods
+  = fsep
+      [ text "Perhaps you want to add"
+      , quotes (ppr occ_name)
+      , text "to the import list"
+      , text "in the import of"
+      , quotes (ppr mod)
+      , parens (ppr (imv_span imv)) <> dot
+      ]
+  | otherwise
+  = fsep
+      [ text "Perhaps you want to add"
+      , quotes (ppr occ_name)
+      , text "to one of these import lists:"
+      ]
+    $$
+    nest 2 (vcat
+        [ quotes (ppr mod) <+> parens (ppr (imv_span imv))
+        | (mod,imv) <- NE.toList mods
+        ])
+pprImportSuggestion (CouldUnhideFrom mods occ_name)
+  | (mod, imv) NE.:| [] <- mods
+  = fsep
+      [ text "Perhaps you want to remove"
+      , quotes (ppr occ_name)
+      , text "from the explicit hiding list"
+      , text "in the import of"
+      , quotes (ppr mod)
+      , parens (ppr (imv_span imv)) <> dot
+      ]
+  | otherwise
+  = fsep
+      [ text "Perhaps you want to remove"
+      , quotes (ppr occ_name)
+      , text "from the hiding clauses"
+      , text "in one of these imports:"
+      ]
+    $$
+    nest 2 (vcat
+        [ quotes (ppr mod) <+> parens (ppr (imv_span imv))
+        | (mod,imv) <- NE.toList mods
+        ])
+
+-- | Pretty-print a 'SimilarName'.
+pprSimilarName :: NameSpace -> SimilarName -> SDoc
+pprSimilarName _ (SimilarName name)
+  = quotes (ppr name) <+> parens (pprDefinedAt name)
+pprSimilarName tried_ns (SimilarRdrName rdr_name how_in_scope)
+  = case how_in_scope of
+      LocallyBoundAt loc ->
+        pp_ns rdr_name <+> quotes (ppr rdr_name) <+> loc'
+          where
+            loc' = case loc of
+              UnhelpfulSpan l -> parens (ppr l)
+              RealSrcSpan l _ -> parens (text "line" <+> int (srcSpanStartLine l))
+      ImportedBy is ->
+        pp_ns rdr_name <+> quotes (ppr rdr_name) <+>
+        parens (text "imported from" <+> ppr (is_mod is))
+
+  where
+    pp_ns :: RdrName -> SDoc
+    pp_ns rdr | ns /= tried_ns = pprNameSpace ns
+              | otherwise      = empty
+      where ns = rdrNameSpace rdr

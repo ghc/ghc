@@ -1,18 +1,17 @@
 
 T18572.hs:12:1: warning: [-Winaccessible-code (in -Wdefault)]
-    • Couldn't match type ‘'False’ with ‘'True’
-      Inaccessible code in
+    • Inaccessible code in
         a pattern with constructor: STrue :: SBool 'True,
         in a pattern binding
+      Couldn't match type ‘'False’ with ‘'True’
     • In the pattern: STrue
       In a pattern binding: STrue = SFalse
 
 T18572.hs:12:1: warning: [-Wincomplete-uni-patterns (in -Wall)]
     Pattern match(es) are non-exhaustive
     In a pattern binding:
-        Patterns of type  ‘SBool 'False’ not matched: SFalse
+        Patterns of type ‘SBool 'False’ not matched: SFalse
 
 T18572.hs:12:1: warning: [-Woverlapping-patterns (in -Wdefault)]
     Pattern match is redundant
     In a pattern binding: STrue = ...
-

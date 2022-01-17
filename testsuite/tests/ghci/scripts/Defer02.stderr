@@ -17,10 +17,10 @@ Defer01.hs:25:1: warning: [-Woverlapping-patterns (in -Wdefault)]
     In an equation for ‘c’: c (C2 x) = ...
 
 Defer01.hs:25:4: warning: [-Winaccessible-code (in -Wdefault)]
-    • Couldn't match type ‘Int’ with ‘Bool’
-      Inaccessible code in
+    • Inaccessible code in
         a pattern with constructor: C2 :: Bool -> C Bool,
         in an equation for ‘c’
+      Couldn't match type ‘Int’ with ‘Bool’
     • In the pattern: C2 x
       In an equation for ‘c’: c (C2 x) = True
 

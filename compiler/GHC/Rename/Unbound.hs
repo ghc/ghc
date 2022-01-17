@@ -1,3 +1,5 @@
+{-# LANGUAGE PatternSynonyms #-}
+
 {-
 
 This module contains helper functions for reporting and creating
@@ -18,7 +20,6 @@ module GHC.Rename.Unbound
    , unboundNameX
    , notInScopeErr
    , nameSpacesRelated
-   , exactNameErr
    )
 where
 
@@ -30,7 +31,6 @@ import GHC.Driver.Ppr
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Builtin.Names ( mkUnboundName, isUnboundName, getUnique)
-import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Misc
 
 import GHC.Data.Maybe
@@ -38,7 +38,10 @@ import GHC.Data.FastString
 
 import qualified GHC.LanguageExtensions as LangExt
 
-import GHC.Types.Error
+import GHC.Types.Hint
+  ( GhcHint (SuggestExtension, RemindFieldSelectorSuppressed, ImportSuggestion, SuggestSimilarNames)
+  , LanguageExtensionHint (SuggestSingleExtension)
+  , ImportSuggestion(..), SimilarName(..), HowInScope(..) )
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.Name
 import GHC.Types.Name.Reader
@@ -48,9 +51,12 @@ import GHC.Unit.Module
 import GHC.Unit.Module.Imported
 import GHC.Unit.Home.ModInfo
 
-import Data.List (sortBy, partition, nub)
-import Data.Function ( on )
 import GHC.Data.Bag
+import GHC.Utils.Outputable (empty)
+
+import Data.List (sortBy, partition, nub)
+import Data.List.NonEmpty ( pattern (:|), NonEmpty )
+import Data.Function ( on )
 
 {-
 ************************************************************************
@@ -96,112 +102,88 @@ reportUnboundName :: RdrName -> RnM Name
 reportUnboundName = reportUnboundName' WL_Anything
 
 unboundName :: LookingFor -> RdrName -> RnM Name
-unboundName lf rdr = unboundNameX lf rdr Outputable.empty
+unboundName lf rdr = unboundNameX lf rdr []
 
-unboundNameX :: LookingFor -> RdrName -> SDoc -> RnM Name
-unboundNameX looking_for rdr_name extra
+unboundNameX :: LookingFor -> RdrName -> [GhcHint] -> RnM Name
+unboundNameX looking_for rdr_name hints
   = do  { dflags <- getDynFlags
         ; let show_helpful_errors = gopt Opt_HelpfulErrors dflags
-              err = notInScopeErr (lf_where looking_for) rdr_name $$ extra
+              err = notInScopeErr (lf_where looking_for) rdr_name
         ; if not show_helpful_errors
-          then addErr (TcRnUnknownMessage $ mkPlainError noHints err)
+          then addErr $ TcRnNotInScope err rdr_name [] hints
           else do { local_env  <- getLocalRdrEnv
                   ; global_env <- getGlobalRdrEnv
                   ; impInfo <- getImports
                   ; currmod <- getModule
                   ; hpt <- getHpt
-                  ; let suggestions = unknownNameSuggestions_ looking_for
-                          dflags hpt currmod global_env local_env impInfo
-                          rdr_name
-                  ; addErr (TcRnUnknownMessage $ mkPlainError noHints (err $$ suggestions)) }
+                  ; let (imp_errs, suggs) =
+                          unknownNameSuggestions_ looking_for
+                            dflags hpt currmod global_env local_env impInfo
+                            rdr_name
+                  ; addErr $
+                      TcRnNotInScope err rdr_name imp_errs (hints ++ suggs) }
         ; return (mkUnboundNameRdr rdr_name) }
 
-notInScopeErr :: WhereLooking -> RdrName -> SDoc
+
+notInScopeErr :: WhereLooking -> RdrName -> NotInScopeError
 notInScopeErr where_look rdr_name
-  | Just name <- isExact_maybe rdr_name = exactNameErr name
-  | WL_LocalTop <- where_look = hang (text "No top-level binding for")
-      2 (what <+> quotes (ppr rdr_name) <+> text "in this module")
-  | otherwise = hang (text "Not in scope:")
-                 2 (what <+> quotes (ppr rdr_name))
-  where
-    what = pprNonVarNameSpace (occNameSpace (rdrNameOcc rdr_name))
-
-type HowInScope = Either SrcSpan ImpDeclSpec
-     -- Left loc    =>  locally bound at loc
-     -- Right ispec =>  imported as specified by ispec
-
+  | Just name <- isExact_maybe rdr_name
+  = NoExactName name
+  | WL_LocalTop <- where_look
+  = NoTopLevelBinding
+  | otherwise
+  = NotInScope
 
 -- | Called from the typechecker ("GHC.Tc.Errors") when we find an unbound variable
 unknownNameSuggestions :: WhatLooking -> DynFlags
                        -> HomePackageTable -> Module
                        -> GlobalRdrEnv -> LocalRdrEnv -> ImportAvails
-                       -> RdrName -> SDoc
+                       -> RdrName -> ([ImportError], [GhcHint])
 unknownNameSuggestions what_look = unknownNameSuggestions_ (LF what_look WL_Anywhere)
 
 unknownNameSuggestions_ :: LookingFor -> DynFlags
                        -> HomePackageTable -> Module
                        -> GlobalRdrEnv -> LocalRdrEnv -> ImportAvails
-                       -> RdrName -> SDoc
+                       -> RdrName -> ([ImportError], [GhcHint])
 unknownNameSuggestions_ looking_for dflags hpt curr_mod global_env local_env
-                          imports tried_rdr_name =
-    similarNameSuggestions looking_for dflags global_env local_env tried_rdr_name $$
-    importSuggestions looking_for global_env hpt
-                      curr_mod imports tried_rdr_name $$
-    extensionSuggestions tried_rdr_name $$
-    fieldSelectorSuggestions global_env tried_rdr_name
+                          imports tried_rdr_name = (imp_errs, suggs)
+  where
+    suggs = mconcat
+      [ if_ne (SuggestSimilarNames tried_rdr_name) $
+          similarNameSuggestions looking_for dflags global_env local_env tried_rdr_name
+      , map ImportSuggestion imp_suggs
+      , extensionSuggestions tried_rdr_name
+      , fieldSelectorSuggestions global_env tried_rdr_name ]
+    (imp_errs, imp_suggs) = importSuggestions looking_for global_env hpt curr_mod imports tried_rdr_name
+
+    if_ne :: (NonEmpty a -> b) -> [a] -> [b]
+    if_ne _ []       = []
+    if_ne f (a : as) = [f (a :| as)]
 
 -- | When the name is in scope as field whose selector has been suppressed by
 -- NoFieldSelectors, display a helpful message explaining this.
-fieldSelectorSuggestions :: GlobalRdrEnv -> RdrName -> SDoc
+fieldSelectorSuggestions :: GlobalRdrEnv -> RdrName -> [GhcHint]
 fieldSelectorSuggestions global_env tried_rdr_name
-  | null gres = Outputable.empty
-  | otherwise = text "NB:"
-      <+> quotes (ppr tried_rdr_name)
-      <+> text "is a field selector" <+> whose
-      $$ text "that has been suppressed by NoFieldSelectors"
+  | null gres = []
+  | otherwise = [RemindFieldSelectorSuppressed tried_rdr_name parents]
   where
     gres = filter isNoFieldSelectorGRE $
                lookupGRE_RdrName' tried_rdr_name global_env
     parents = [ parent | ParentIs parent <- map gre_par gres ]
 
-    -- parents may be empty if this is a pattern synonym field without a selector
-    whose | null parents = empty
-          | otherwise    = text "belonging to the type" <> plural parents
-                             <+> pprQuotedList parents
-
 similarNameSuggestions :: LookingFor -> DynFlags
                        -> GlobalRdrEnv -> LocalRdrEnv
-                       -> RdrName -> SDoc
+                       -> RdrName -> [SimilarName]
 similarNameSuggestions looking_for@(LF what_look where_look) dflags global_env
                        local_env tried_rdr_name
-  = case suggest of
-      []  -> Outputable.empty
-      [p] -> perhaps <+> pp_item p
-      ps  -> sep [ perhaps <+> text "one of these:"
-                 , nest 2 (pprWithCommas pp_item ps) ]
+  = fuzzyLookup (showPpr dflags tried_rdr_name) all_possibilities
   where
-    all_possibilities :: [(String, (RdrName, HowInScope))]
+    all_possibilities :: [(String, SimilarName)]
     all_possibilities = case what_look of
       WL_None -> []
-      _ -> [ (showPpr dflags r, (r, Left loc))
+      _ -> [ (showPpr dflags r, SimilarRdrName r (LocallyBoundAt loc))
            | (r,loc) <- local_possibilities local_env ]
         ++ [ (showPpr dflags r, rp) | (r, rp) <- global_possibilities global_env ]
-
-    suggest = fuzzyLookup (showPpr dflags tried_rdr_name) all_possibilities
-    perhaps = text "Perhaps you meant"
-
-    pp_item :: (RdrName, HowInScope) -> SDoc
-    pp_item (rdr, Left loc) = pp_ns rdr <+> quotes (ppr rdr) <+> loc' -- Locally defined
-        where loc' = case loc of
-                     UnhelpfulSpan l -> parens (ppr l)
-                     RealSrcSpan l _ -> parens (text "line" <+> int (srcSpanStartLine l))
-    pp_item (rdr, Right is) = pp_ns rdr <+> quotes (ppr rdr) <+>   -- Imported
-                              parens (text "imported from" <+> ppr (is_mod is))
-
-    pp_ns :: RdrName -> SDoc
-    pp_ns rdr | ns /= tried_ns = pprNameSpace ns
-              | otherwise      = Outputable.empty
-      where ns = rdrNameSpace rdr
 
     tried_occ     = rdrNameOcc tried_rdr_name
     tried_is_sym  = isSymOcc tried_occ
@@ -228,9 +210,9 @@ similarNameSuggestions looking_for@(LF what_look where_look) dflags global_env
                         , let occ = nameOccName name
                         , correct_name_space occ]
 
-    global_possibilities :: GlobalRdrEnv -> [(RdrName, (RdrName, HowInScope))]
+    global_possibilities :: GlobalRdrEnv -> [(RdrName, SimilarName)]
     global_possibilities global_env
-      | tried_is_qual = [ (rdr_qual, (rdr_qual, how))
+      | tried_is_qual = [ (rdr_qual, SimilarRdrName rdr_qual how)
                         | gre <- globalRdrEnvElts global_env
                         , isGreOk looking_for gre
                         , let occ = greOccName gre
@@ -238,14 +220,14 @@ similarNameSuggestions looking_for@(LF what_look where_look) dflags global_env
                         , (mod, how) <- qualsInScope gre
                         , let rdr_qual = mkRdrQual mod occ ]
 
-      | otherwise = [ (rdr_unqual, pair)
+      | otherwise = [ (rdr_unqual, sim)
                     | gre <- globalRdrEnvElts global_env
                     , isGreOk looking_for gre
                     , let occ = greOccName gre
                           rdr_unqual = mkRdrUnqual occ
                     , correct_name_space occ
-                    , pair <- case (unquals_in_scope gre, quals_only gre) of
-                                (how:_, _)    -> [ (rdr_unqual, how) ]
+                    , sim <- case (unquals_in_scope gre, quals_only gre) of
+                                (how:_, _)    -> [ SimilarRdrName rdr_unqual how ]
                                 ([],    pr:_) -> [ pr ]  -- See Note [Only-quals]
                                 ([],    [])   -> [] ]
 
@@ -262,98 +244,43 @@ similarNameSuggestions looking_for@(LF what_look where_look) dflags global_env
     --------------------
     unquals_in_scope :: GlobalRdrElt -> [HowInScope]
     unquals_in_scope (gre@GRE { gre_lcl = lcl, gre_imp = is })
-      | lcl       = [ Left (greDefinitionSrcSpan gre) ]
-      | otherwise = [ Right ispec
+      | lcl       = [ LocallyBoundAt (greDefinitionSrcSpan gre) ]
+      | otherwise = [ ImportedBy ispec
                     | i <- bagToList is, let ispec = is_decl i
                     , not (is_qual ispec) ]
 
 
     --------------------
-    quals_only :: GlobalRdrElt -> [(RdrName, HowInScope)]
+    quals_only :: GlobalRdrElt -> [SimilarName]
     -- Ones for which *only* the qualified version is in scope
     quals_only (gre@GRE { gre_imp = is })
-      = [ (mkRdrQual (is_as ispec) (greOccName gre), Right ispec)
+      = [ (SimilarRdrName (mkRdrQual (is_as ispec) (greOccName gre)) (ImportedBy ispec))
         | i <- bagToList is, let ispec = is_decl i, is_qual ispec ]
 
--- | Generate helpful suggestions if a qualified name Mod.foo is not in scope.
+
+-- | Generate errors and helpful suggestions if a qualified name Mod.foo is not in scope.
 importSuggestions :: LookingFor
                   -> GlobalRdrEnv
                   -> HomePackageTable -> Module
-                  -> ImportAvails -> RdrName -> SDoc
+                  -> ImportAvails -> RdrName -> ([ImportError], [ImportSuggestion])
 importSuggestions looking_for global_env hpt currMod imports rdr_name
-  | WL_LocalOnly <- lf_where looking_for       = Outputable.empty
-  | WL_LocalTop  <- lf_where looking_for       = Outputable.empty
-  | not (isQual rdr_name || isUnqual rdr_name) = Outputable.empty
+  | WL_LocalOnly <- lf_where looking_for       = ([], [])
+  | WL_LocalTop  <- lf_where looking_for       = ([], [])
+  | not (isQual rdr_name || isUnqual rdr_name) = ([], [])
   | null interesting_imports
   , Just name <- mod_name
   , show_not_imported_line name
-  = hsep
-      [ text "No module named"
-      , quotes (ppr name)
-      , text "is imported."
-      ]
+  = ([MissingModule name], [])
   | is_qualified
   , null helpful_imports
-  , [(mod,_)] <- interesting_imports
-  = hsep
-      [ text "Module"
-      , quotes (ppr mod)
-      , text "does not export"
-      , quotes (ppr occ_name) <> dot
-      ]
-  | is_qualified
-  , null helpful_imports
-  , not (null interesting_imports)
-  , mods <- map fst interesting_imports
-  = hsep
-      [ text "Neither"
-      , quotedListWithNor (map ppr mods)
-      , text "exports"
-      , quotes (ppr occ_name) <> dot
-      ]
-  | [(mod,imv)] <- helpful_imports_non_hiding
-  = fsep
-      [ text "Perhaps you want to add"
-      , quotes (ppr occ_name)
-      , text "to the import list"
-      , text "in the import of"
-      , quotes (ppr mod)
-      , parens (ppr (imv_span imv)) <> dot
-      ]
-  | not (null helpful_imports_non_hiding)
-  = fsep
-      [ text "Perhaps you want to add"
-      , quotes (ppr occ_name)
-      , text "to one of these import lists:"
-      ]
-    $$
-    nest 2 (vcat
-        [ quotes (ppr mod) <+> parens (ppr (imv_span imv))
-        | (mod,imv) <- helpful_imports_non_hiding
-        ])
-  | [(mod,imv)] <- helpful_imports_hiding
-  = fsep
-      [ text "Perhaps you want to remove"
-      , quotes (ppr occ_name)
-      , text "from the explicit hiding list"
-      , text "in the import of"
-      , quotes (ppr mod)
-      , parens (ppr (imv_span imv)) <> dot
-      ]
-  | not (null helpful_imports_hiding)
-  = fsep
-      [ text "Perhaps you want to remove"
-      , quotes (ppr occ_name)
-      , text "from the hiding clauses"
-      , text "in one of these imports:"
-      ]
-    $$
-    nest 2 (vcat
-        [ quotes (ppr mod) <+> parens (ppr (imv_span imv))
-        | (mod,imv) <- helpful_imports_hiding
-        ])
+  , (mod : mods) <- map fst interesting_imports
+  = ([ModulesDoNotExport (mod :| mods) occ_name], [])
+  | mod : mods <- helpful_imports_non_hiding
+  = ([], [CouldImportFrom (mod :| mods) occ_name])
+  | mod : mods <- helpful_imports_hiding
+  = ([], [CouldUnhideFrom (mod :| mods) occ_name])
   | otherwise
-  = Outputable.empty
+  = ([], [])
  where
   is_qualified = isQual rdr_name
   (mod_name, occ_name) = case rdr_name of
@@ -409,20 +336,21 @@ importSuggestions looking_for global_env hpt currMod imports rdr_name
                      , (mod, _) <- qualsInScope gre
                      ]
 
-extensionSuggestions :: RdrName -> SDoc
+extensionSuggestions :: RdrName -> [GhcHint]
 extensionSuggestions rdrName
   | rdrName == mkUnqual varName (fsLit "mdo") ||
     rdrName == mkUnqual varName (fsLit "rec")
-      = text "Perhaps you meant to use RecursiveDo"
-  | otherwise = Outputable.empty
+  = [SuggestExtension $ SuggestSingleExtension empty LangExt.RecursiveDo]
+  | otherwise
+  = []
 
 qualsInScope :: GlobalRdrElt -> [(ModuleName, HowInScope)]
 -- Ones for which the qualified version is in scope
 qualsInScope gre@GRE { gre_lcl = lcl, gre_imp = is }
       | lcl = case greDefinitionModule gre of
                 Nothing -> []
-                Just m  -> [(moduleName m, Left (greDefinitionSrcSpan gre))]
-      | otherwise = [ (is_as ispec, Right ispec)
+                Just m  -> [(moduleName m, LocallyBoundAt (greDefinitionSrcSpan gre))]
+      | otherwise = [ (is_as ispec, ImportedBy ispec)
                     | i <- bagToList is, let ispec = is_decl i ]
 
 isGreOk :: LookingFor -> GlobalRdrElt -> Bool
@@ -510,10 +438,3 @@ there are 2 cases, where we hide the last "no module is imported" line:
        and we have to check the current module in the last added entry of
        the HomePackageTable. (See test T15611b)
 -}
-
-exactNameErr :: Name -> SDoc
-exactNameErr name =
-  hang (text "The exact Name" <+> quotes (ppr name) <+> text "is not in scope")
-    2 (vcat [ text "Probable cause: you used a unique Template Haskell name (NameU), "
-            , text "perhaps via newName, but did not bind it"
-            , text "If that's it, then -ddump-splices might be useful" ])

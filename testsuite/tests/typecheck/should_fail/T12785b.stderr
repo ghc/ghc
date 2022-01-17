@@ -1,6 +1,6 @@
 
 T12785b.hs:30:65: error:
-    • Could not deduce: Payload ('S n) (Payload n s1) ~ s
+    • Could not deduce (Payload ('S n) (Payload n s1) ~ s)
         arising from a use of ‘SBranchX’
       from the context: m ~ 'S n
         bound by a pattern with constructor:

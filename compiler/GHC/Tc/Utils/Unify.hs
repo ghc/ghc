@@ -89,7 +89,7 @@ import qualified Data.Semigroup as S ( (<>) )
 --   returning an uninstantiated sigma-type
 matchActualFunTySigma
   :: SDoc -- See Note [Herald for matchExpectedFunTys]
-  -> Maybe SDoc                    -- The thing with type TcSigmaType
+  -> Maybe TypedThing             -- The thing with type TcSigmaType
   -> (Arity, [Scaled TcSigmaType]) -- Total number of value args in the call, and
                                    -- types of values args to which function has
                                    --   been applied already (reversed)
@@ -190,7 +190,7 @@ Ugh!
 -- for example in function application
 matchActualFunTysRho :: SDoc   -- See Note [Herald for matchExpectedFunTys]
                      -> CtOrigin
-                     -> Maybe SDoc  -- the thing with type TcSigmaType
+                     -> Maybe TypedThing -- the thing with type TcSigmaType
                      -> Arity
                      -> TcSigmaType
                      -> TcM (HsWrapper, [Scaled TcSigmaType], TcRhoType)
@@ -523,7 +523,7 @@ tcWrapResultO :: CtOrigin -> HsExpr GhcRn -> HsExpr GhcTc -> TcSigmaType -> ExpR
 tcWrapResultO orig rn_expr expr actual_ty res_ty
   = do { traceTc "tcWrapResult" (vcat [ text "Actual:  " <+> ppr actual_ty
                                       , text "Expected:" <+> ppr res_ty ])
-       ; wrap <- tcSubTypeNC orig GenSigCtxt (Just (ppr rn_expr)) actual_ty res_ty
+       ; wrap <- tcSubTypeNC orig GenSigCtxt (Just $ HsExprRnThing rn_expr) actual_ty res_ty
        ; return (mkHsWrap wrap expr) }
 
 tcWrapResultMono :: HsExpr GhcRn -> HsExpr GhcTc
@@ -545,7 +545,7 @@ unifyExpectedType :: HsExpr GhcRn
 unifyExpectedType rn_expr act_ty exp_ty
   = case exp_ty of
       Infer inf_res -> fillInferResult act_ty inf_res
-      Check exp_ty  -> unifyType (Just (ppr rn_expr)) act_ty exp_ty
+      Check exp_ty  -> unifyType (Just $ HsExprRnThing rn_expr) act_ty exp_ty
 
 ------------------------
 tcSubTypePat :: CtOrigin -> UserTypeCtxt
@@ -566,8 +566,8 @@ tcSubTypePat _ _ (Infer inf_res) ty_expected
 
 ---------------
 tcSubType :: CtOrigin -> UserTypeCtxt
-          -> TcSigmaType  -- Actual
-          -> ExpRhoType   -- Expected
+          -> TcSigmaType  -- ^ Actual
+          -> ExpRhoType   -- ^ Expected
           -> TcM HsWrapper
 -- Checks that 'actual' is more polymorphic than 'expected'
 tcSubType orig ctxt ty_actual ty_expected
@@ -575,11 +575,11 @@ tcSubType orig ctxt ty_actual ty_expected
     do { traceTc "tcSubType" (vcat [pprUserTypeCtxt ctxt, ppr ty_actual, ppr ty_expected])
        ; tcSubTypeNC orig ctxt Nothing ty_actual ty_expected }
 
-tcSubTypeNC :: CtOrigin       -- Used when instantiating
-            -> UserTypeCtxt   -- Used when skolemising
-            -> Maybe SDoc     -- The expression that has type 'actual' (if known)
-            -> TcSigmaType            -- Actual type
-            -> ExpRhoType             -- Expected type
+tcSubTypeNC :: CtOrigin          -- ^ Used when instantiating
+            -> UserTypeCtxt      -- ^ Used when skolemising
+            -> Maybe TypedThing -- ^ The expression that has type 'actual' (if known)
+            -> TcSigmaType       -- ^ Actual type
+            -> ExpRhoType        -- ^ Expected type
             -> TcM HsWrapper
 tcSubTypeNC inst_orig ctxt m_thing ty_actual res_ty
   = case res_ty of
@@ -1071,7 +1071,7 @@ The exported functions are all defined as versions of some
 non-exported generic functions.
 -}
 
-unifyType :: Maybe SDoc  -- ^ If present, the thing that has type ty1
+unifyType :: Maybe TypedThing  -- ^ If present, the thing that has type ty1
           -> TcTauType -> TcTauType    -- ty1, ty2
           -> TcM TcCoercionN           -- :: ty1 ~# ty2
 -- Actual and expected types
@@ -1081,7 +1081,7 @@ unifyType thing ty1 ty2
   where
     origin = TypeEqOrigin { uo_actual   = ty1
                           , uo_expected = ty2
-                          , uo_thing    = ppr <$> thing
+                          , uo_thing    = thing
                           , uo_visible  = True }
 
 unifyTypeET :: TcTauType -> TcTauType -> TcM CoercionN
@@ -1096,7 +1096,7 @@ unifyTypeET ty1 ty2
                           , uo_visible  = True }
 
 
-unifyKind :: Maybe SDoc -> TcKind -> TcKind -> TcM CoercionN
+unifyKind :: Maybe TypedThing -> TcKind -> TcKind -> TcM CoercionN
 unifyKind mb_thing ty1 ty2
   = uType KindLevel origin ty1 ty2
   where
@@ -1820,8 +1820,7 @@ causing this wibble in behavior seen here.
 
 -- | Breaks apart a function kind into its pieces.
 matchExpectedFunKind
-  :: Outputable fun
-  => fun             -- ^ type, only for errors
+  :: TypedThing     -- ^ type, only for errors
   -> Arity           -- ^ n: number of desired arrows
   -> TcKind          -- ^ fun_ kind
   -> TcM Coercion    -- ^ co :: fun_kind ~ (arg1 -> ... -> argn -> res)
@@ -1852,7 +1851,7 @@ matchExpectedFunKind hs_ty n k = go n k
            ; let new_fun = mkVisFunTysMany arg_kinds res_kind
                  origin  = TypeEqOrigin { uo_actual   = k
                                         , uo_expected = new_fun
-                                        , uo_thing    = Just (ppr hs_ty)
+                                        , uo_thing    = Just hs_ty
                                         , uo_visible  = True
                                         }
            ; uType KindLevel origin k new_fun }

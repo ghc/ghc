@@ -1,4 +1,4 @@
 
-T19843l.hs:7:12:
+T19843l.hs:7:12: error:
     Not in scope: type constructor or class ‘WrongName’
-    Perhaps you meant ‘FongName’ (line 4)
+    Suggested fix: Perhaps use ‘FongName’ (line 4)

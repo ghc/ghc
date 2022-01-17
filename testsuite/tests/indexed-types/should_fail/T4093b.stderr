@@ -1,6 +1,6 @@
 
 T4093b.hs:31:13: error:
-    • Could not deduce: e ~ C
+    • Could not deduce (e ~ C)
       from the context: (EitherCO e (A C O n) (A O O n) ~ A e O n,
                          EitherCO x (A C C n) (A C O n) ~ A C x n)
         bound by the type signature for:

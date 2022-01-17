@@ -4,11 +4,15 @@ readFail001.hs:25:11: error:
 
 readFail001.hs:38:32: error:
     Not in scope: type constructor or class ‘Leaf’
-    A data constructor of that name is in scope; did you mean DataKinds?
+    Suggested fix:
+      Perhaps you intended to use DataKinds
+      to refer to the data constructor of that name?
 
 readFail001.hs:38:41: error:
     Not in scope: type constructor or class ‘Leaf’
-    A data constructor of that name is in scope; did you mean DataKinds?
+    Suggested fix:
+      Perhaps you intended to use DataKinds
+      to refer to the data constructor of that name?
 
 readFail001.hs:107:30: error: Not in scope: data constructor ‘Foo’
 

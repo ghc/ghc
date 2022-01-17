@@ -73,6 +73,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
 import GHC.Types.Avail
+import GHC.Types.Hint
 import GHC.Types.Error
 import GHC.Unit.Module
 import GHC.Unit.Module.ModIface
@@ -97,10 +98,9 @@ import GHC.Rename.Unbound
 import GHC.Rename.Utils
 import qualified Data.Semigroup as Semi
 import Data.Either      ( partitionEithers )
-import Data.List        ( find, sortBy )
+import Data.List        ( find )
 import qualified Data.List.NonEmpty as NE
 import Control.Arrow    ( first )
-import Data.Function
 import GHC.Types.FieldLabel
 import GHC.Data.Bag
 import GHC.Types.PkgQual
@@ -300,7 +300,7 @@ lookupLocatedTopBndrRnN = wrapLocMA (lookupTopBndrRn WL_Anything)
 -- | Lookup an @Exact@ @RdrName@. See Note [Looking up Exact RdrNames].
 -- This never adds an error, but it may return one, see
 -- Note [Errors in lookup functions]
-lookupExactOcc_either :: Name -> RnM (Either SDoc Name)
+lookupExactOcc_either :: Name -> RnM (Either NotInScopeError Name)
 lookupExactOcc_either name
   | Just thing <- wiredInNameTyThing_maybe name
   , Just tycon <- case thing of
@@ -341,28 +341,12 @@ lookupExactOcc_either name
                             ; th_topnames <- readTcRef th_topnames_var
                             ; if name `elemNameSet` th_topnames
                               then return (Right name)
-                              else return (Left (exactNameErr name))
+                              else return (Left (NoExactName name))
                             }
                        }
-           gres -> return (Left (sameNameErr gres))   -- Ugh!  See Note [Template Haskell ambiguity]
+
+           gres -> return (Left (SameName gres)) -- Ugh!  See Note [Template Haskell ambiguity]
        }
-
-sameNameErr :: [GlobalRdrElt] -> SDoc
-sameNameErr [] = panic "addSameNameErr: empty list"
-sameNameErr gres@(_ : _)
-  = hang (text "Same exact name in multiple name-spaces:")
-       2 (vcat (map pp_one sorted_names) $$ th_hint)
-  where
-    sorted_names = sortBy (SrcLoc.leftmost_smallest `on` nameSrcSpan) (map greMangledName gres)
-    pp_one name
-      = hang (pprNameSpace (occNameSpace (getOccName name))
-              <+> quotes (ppr name) <> comma)
-           2 (text "declared at:" <+> ppr (nameSrcLoc name))
-
-    th_hint = vcat [ text "Probable cause: you bound a unique Template Haskell name (NameU),"
-                   , text "perhaps via newName, in different name-spaces."
-                   , text "If that's it, then -ddump-splices might be useful" ]
-
 
 -----------------------------------------------
 lookupInstDeclBndr :: Name -> SDoc -> RdrName -> RnM Name
@@ -393,7 +377,7 @@ lookupInstDeclBndr cls what rdr
                                 -- when it's used
                           cls doc rdr
        ; case mb_name of
-           Left err -> do { addErr (TcRnUnknownMessage $ mkPlainError noHints err)
+           Left err -> do { addErr (mkTcRnNotInScope rdr err)
                           ; return (mkUnboundNameRdr rdr) }
            Right nm -> return nm }
   where
@@ -441,7 +425,7 @@ lookupExactOrOrig rdr_name res k
        ; case men of
           FoundExactOrOrig n -> return (res n)
           ExactOrOrigError e ->
-            do { addErr (TcRnUnknownMessage $ mkPlainError noHints e)
+            do { addErr (mkTcRnNotInScope rdr_name e)
                ; return (res (mkUnboundNameRdr rdr_name)) }
           NotExactOrOrig     -> k }
 
@@ -457,9 +441,9 @@ lookupExactOrOrig_maybe rdr_name res k
            NotExactOrOrig     -> k }
 
 data ExactOrOrigResult = FoundExactOrOrig Name -- ^ Found an Exact Or Orig Name
-                       | ExactOrOrigError SDoc -- ^ The RdrName was an Exact
-                                                 -- or Orig, but there was an
-                                                 -- error looking up the Name
+                       | ExactOrOrigError NotInScopeError -- ^ The RdrName was an Exact
+                                                          -- or Orig, but there was an
+                                                          -- error looking up the Name
                        | NotExactOrOrig -- ^ The RdrName is neither an Exact nor
                                         -- Orig
 
@@ -848,7 +832,7 @@ lookupSubBndrOcc :: Bool
                  -> Name     -- Parent
                  -> SDoc
                  -> RdrName
-                 -> RnM (Either SDoc Name)
+                 -> RnM (Either NotInScopeError Name)
 -- Find all the things the rdr-name maps to
 -- and pick the one with the right parent namep
 lookupSubBndrOcc warn_if_deprec the_parent doc rdr_name = do
@@ -857,12 +841,12 @@ lookupSubBndrOcc warn_if_deprec the_parent doc rdr_name = do
       -- This happens for built-in classes, see mod052 for example
       lookupSubBndrOcc_helper True warn_if_deprec the_parent rdr_name
   case res of
-    NameNotFound -> return (Left (unknownSubordinateErr doc rdr_name))
+    NameNotFound -> return (Left (UnknownSubordinate doc))
     FoundChild _p child -> return (Right (greNameMangledName child))
     IncorrectParent {}
          -- See [Mismatched class methods and associated type families]
          -- in TcInstDecls.
-      -> return $ Left (unknownSubordinateErr doc rdr_name)
+      -> return $ Left (UnknownSubordinate doc)
 
 {-
 Note [Family instance binders]
@@ -1087,17 +1071,14 @@ lookup_demoted rdr_name
     -- Maybe it's the name of a *data* constructor
   = do { data_kinds <- xoptM LangExt.DataKinds
        ; star_is_type <- xoptM LangExt.StarIsType
-       ; let star_info = starInfo star_is_type rdr_name
+       ; let is_star_type = if star_is_type then StarIsType else StarIsNotType
+             star_is_type_hints = noStarIsTypeHints is_star_type rdr_name
        ; if data_kinds
             then do { mb_demoted_name <- lookupOccRn_maybe demoted_rdr
                     ; case mb_demoted_name of
-                        Nothing -> unboundNameX looking_for rdr_name star_info
+                        Nothing -> unboundNameX looking_for rdr_name star_is_type_hints
                         Just demoted_name ->
-                          do { let msg = TcRnUnknownMessage $
-                                     mkPlainDiagnostic (WarningWithFlag Opt_WarnUntickedPromotedConstructors)
-                                                       noHints
-                                                       (untickedPromConstrWarn demoted_name)
-                             ; addDiagnostic msg
+                          do { addDiagnostic $ TcRnUntickedPromotedConstructor demoted_name
                              ; return demoted_name } }
             else do { -- We need to check if a data constructor of this name is
                       -- in scope to give good error messages. However, we do
@@ -1105,8 +1086,11 @@ lookup_demoted rdr_name
                       -- constructor happens to be out of scope! See #13947.
                       mb_demoted_name <- discardErrs $
                                          lookupOccRn_maybe demoted_rdr
-                    ; let suggestion | isJust mb_demoted_name = suggest_dk
-                                     | otherwise = star_info
+                    ; let suggestion | isJust mb_demoted_name
+                                     , let additional = text "to refer to the data constructor of that name?"
+                                     = [SuggestExtension $ SuggestSingleExtension additional LangExt.DataKinds]
+                                     | otherwise
+                                     = star_is_type_hints
                     ; unboundNameX looking_for rdr_name suggestion } }
 
   | otherwise
@@ -1114,14 +1098,6 @@ lookup_demoted rdr_name
 
   where
     looking_for = LF WL_Constructor WL_Anywhere
-    suggest_dk = text "A data constructor of that name is in scope; did you mean DataKinds?"
-    untickedPromConstrWarn name =
-      text "Unticked promoted constructor" <> colon <+> quotes (ppr name) <> dot
-      $$
-      hsep [ text "Use"
-           , quotes (char '\'' <> ppr name)
-           , text "instead of"
-           , quotes (ppr name) <> dot ]
 
 -- If the given RdrName can be promoted to the type level and its promoted variant is in scope,
 -- lookup_promoted returns the corresponding type-level Name.
@@ -1822,7 +1798,7 @@ lookupSigCtxtOccRnN ctxt what
   = wrapLocMA $ \ rdr_name ->
     do { mb_name <- lookupBindGroupOcc ctxt what rdr_name
        ; case mb_name of
-           Left err   -> do { addErr (TcRnUnknownMessage $ mkPlainError noHints err)
+           Left err   -> do { addErr (mkTcRnNotInScope rdr_name err)
                             ; return (mkUnboundNameRdr rdr_name) }
            Right name -> return name }
 
@@ -1835,13 +1811,13 @@ lookupSigCtxtOccRn ctxt what
   = wrapLocMA $ \ rdr_name ->
     do { mb_name <- lookupBindGroupOcc ctxt what rdr_name
        ; case mb_name of
-           Left err   -> do { addErr (TcRnUnknownMessage $ mkPlainError noHints err)
+           Left err   -> do { addErr (mkTcRnNotInScope rdr_name err)
                             ; return (mkUnboundNameRdr rdr_name) }
            Right name -> return name }
 
 lookupBindGroupOcc :: HsSigCtxt
                    -> SDoc
-                   -> RdrName -> RnM (Either SDoc Name)
+                   -> RdrName -> RnM (Either NotInScopeError Name)
 -- Looks up the RdrName, expecting it to resolve to one of the
 -- bound names passed in.  If not, return an appropriate error message
 --
@@ -1903,30 +1879,22 @@ lookupBindGroupOcc ctxt what rdr_name
                  | otherwise                   -> bale_out_with local_msg
                Nothing                         -> bale_out_with candidates_msg }
 
-    bale_out_with msg
-        = return (Left (sep [ text "The" <+> what
-                                <+> text "for" <+> quotes (ppr rdr_name)
-                           , nest 2 $ text "lacks an accompanying binding"]
-                       $$ nest 2 msg))
+    bale_out_with hints = return (Left $ MissingBinding what hints)
 
-    local_msg = parens $ text "The"  <+> what <+> text "must be given where"
-                           <+> quotes (ppr rdr_name) <+> text "is declared"
+    local_msg = [SuggestMoveToDeclarationSite what rdr_name]
 
     -- Identify all similar names and produce a message listing them
-    candidates :: [Name] -> SDoc
+    candidates :: [Name] -> [GhcHint]
     candidates names_in_scope
-      = case similar_names of
-          []  -> Outputable.empty
-          [n] -> text "Perhaps you meant" <+> pp_item n
-          _   -> sep [ text "Perhaps you meant one of these:"
-                     , nest 2 (pprWithCommas pp_item similar_names) ]
+      | (nm : nms) <- map SimilarName similar_names
+      = [SuggestSimilarNames rdr_name (nm NE.:| nms)]
+      | otherwise
+      = []
       where
         similar_names
           = fuzzyLookup (unpackFS $ occNameFS $ rdrNameOcc rdr_name)
                         $ map (\x -> ((unpackFS $ occNameFS $ nameOccName x), x))
                               names_in_scope
-
-        pp_item x = quotes (ppr x) <+> parens (pprDefinedAt x)
 
 
 ---------------
@@ -1939,7 +1907,7 @@ lookupLocalTcNames ctxt what rdr_name
   = do { mb_gres <- mapM lookup (dataTcOccs rdr_name)
        ; let (errs, names) = partitionEithers mb_gres
        ; when (null names) $
-          addErr (TcRnUnknownMessage $ mkPlainError noHints (head errs)) -- Bleat about one only
+          addErr (head errs) -- Bleat about one only
        ; return names }
   where
     lookup rdr = do { this_mod <- getModule
@@ -1950,10 +1918,11 @@ lookupLocalTcNames ctxt what rdr_name
     guard_builtin_syntax this_mod rdr (Right name)
       | Just _ <- isBuiltInOcc_maybe (occName rdr)
       , this_mod /= nameModule name
-      = Left (hsep [text "Illegal", what, text "of built-in syntax:", ppr rdr])
+      = Left $ TcRnIllegalBuiltinSyntax what rdr
       | otherwise
       = Right (rdr, name)
-    guard_builtin_syntax _ _ (Left err) = Left err
+    guard_builtin_syntax _ _ (Left err)
+      = Left $ mkTcRnNotInScope rdr_name err
 
 dataTcOccs :: RdrName -> [RdrName]
 -- Return both the given name and the same name promoted to the TcClsName

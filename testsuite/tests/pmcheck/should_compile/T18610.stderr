@@ -9,9 +9,9 @@ T18610.hs:24:7: warning: [-Wincomplete-patterns (in -Wextra)]
         Patterns of type ‘(Bool, Bool)’ not matched: _
 
 T18610.hs:53:3: warning: [-Winaccessible-code (in -Wdefault)]
-    • Couldn't match type ‘Bool’ with ‘Int’
-      Inaccessible code in
+    • Inaccessible code in
         a pattern with constructor: Refl :: forall {k} (a :: k). a :~: a,
         in an equation for ‘k’
+      Couldn't match type ‘Bool’ with ‘Int’
     • In the pattern: Refl
       In an equation for ‘k’: k Refl _ | considerAccessible = 2

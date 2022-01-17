@@ -2,27 +2,29 @@
 T11680.hs:15:7: error: Variable not in scope: noMatches :: Bool
 
 T11680.hs:20:7: error:
-    • Variable not in scope: abce :: [a]
-    • Perhaps you meant ‘abcd’ (line 23)
+    Variable not in scope: abce :: [a]
+    Suggested fix: Perhaps use ‘abcd’ (line 23)
 
 T11680.hs:31:7: error: Variable not in scope: foo :: Int
 
 T11680.hs:39:7: error:
-    • Variable not in scope: bar :: ()
-    • Perhaps you meant one of these: ‘bat’ (line 42), ‘baz’ (line 45)
+    Variable not in scope: bar :: ()
+    Suggested fix:
+      Perhaps use one of these: ‘bat’ (line 42), ‘baz’ (line 45)
 
 T11680.hs:50:7: error: Variable not in scope: ns :: [Double]
 
 T11680.hs:55:7: error:
-    • Variable not in scope: intercalate
-    • Perhaps you meant ‘List.intercalate’ (imported from Data.List)
+    Variable not in scope: intercalate
+    Suggested fix:
+      Perhaps use ‘List.intercalate’ (imported from Data.List)
 
 T11680.hs:59:7: error:
-    • Variable not in scope: nub
-    • Perhaps you meant ‘List.nub’ (imported from Data.List)
+    Variable not in scope: nub
+    Suggested fix: Perhaps use ‘List.nub’ (imported from Data.List)
 
 T11680.hs:64:7: error: Variable not in scope: x :: t0 -> Int
 
 T11680.hs:69:7: error:
-    • Variable not in scope: cat :: ()
-    • Perhaps you meant ‘bat’ (line 42)
+    Variable not in scope: cat :: ()
+    Suggested fix: Perhaps use ‘bat’ (line 42)

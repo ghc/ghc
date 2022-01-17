@@ -1,9 +1,9 @@
 
 T18451.hs:10:58: error:
     • Expected kind ‘k0’, but ‘b’ has kind ‘k’
+      Type variable kinds:
+        a :: k0
+        k :: Const (*) a
     • In the second argument of ‘SameKind’, namely ‘b’
       In the type ‘forall (b :: k). SameKind a b’
       In the type declaration for ‘T’
-    • Type variable kinds:
-        a :: k0
-        k :: Const (*) a

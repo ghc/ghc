@@ -3191,7 +3191,7 @@ checkFamTelescope tclvl hs_outer_bndrs outer_tvs
   | HsOuterExplicit { hso_bndrs = bndrs } <- hs_outer_bndrs
   , (b_first : _) <- bndrs
   , let b_last    = last bndrs
-        skol_info = ForAllSkol (fsep (map ppr bndrs))
+        skol_info = ForAllSkol $ HsTyVarBndrsRn (map unLoc bndrs)
   = setSrcSpan (combineSrcSpans (getLocA b_first) (getLocA b_last)) $
     emitResidualTvConstraint skol_info outer_tvs tclvl emptyWC
   | otherwise

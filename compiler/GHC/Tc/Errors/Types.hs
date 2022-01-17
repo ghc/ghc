@@ -31,22 +31,43 @@ module GHC.Tc.Errors.Types (
   , associatedTyLastVarInKind
   , AssociatedTyNotParamOverLastTyVar(..)
   , associatedTyNotParamOverLastTyVar
+
+  , SolverReport(..), SolverReportSupplementary(..)
+  , ReportWithCtxt(..)
+  , ReportErrCtxt(..)
+  , getUserGivens, discardProvCtxtGivens, getSkolemInfo
+  , TcReportMsg(..), TcReportInfo(..)
+  , CND_Extra(..)
+  , mkTcReportWithInfo
+  , FitsMbSuppressed(..)
+  , ValidHoleFits(..), noValidHoleFits
+  , HoleFitDispConfig(..)
+  , RelevantBindings(..), pprRelevantBindings
+  , NotInScopeError(..), mkTcRnNotInScope
+  , ImportError(..)
+  , HoleError(..)
+  , CoercibleMsg(..)
+  , PotentialInstances(..)
   ) where
 
 import GHC.Prelude
 
 import GHC.Hs
 import {-# SOURCE #-} GHC.Tc.Types (TcIdSigInfo)
+import {-# SOURCE #-} GHC.Tc.Errors.Hole.FitTypes (HoleFit)
 import GHC.Tc.Types.Constraint
+import GHC.Tc.Types.Evidence (EvBindsVar)
+import GHC.Tc.Types.Origin (CtOrigin (ProvCtxtOrigin), TypedThing, TyVarBndrs, SkolemInfo (SigSkol, UnkSkol, RuntimeUnkSkol), FRROrigin, UserTypeCtxt (PatSynCtxt))
 import GHC.Tc.Types.Rank (Rank)
-import GHC.Tc.Utils.TcType (TcType)
+import GHC.Tc.Utils.TcType (TcType, isRuntimeUnkSkol)
 import GHC.Types.Error
 import GHC.Types.FieldLabel (FieldLabelString)
-import GHC.Types.Name (Name, OccName)
+import GHC.Types.Name (Name, OccName, getSrcLoc)
 import GHC.Types.Name.Reader
 import GHC.Types.SrcLoc
 import GHC.Types.TyThing (TyThing)
-import GHC.Types.Var (Id)
+import GHC.Types.Var (Id, TyCoVar, TyVar, TcTyVar)
+import GHC.Types.Var.Env (TidyEnv)
 import GHC.Types.Var.Set (TyVarSet, VarSet)
 import GHC.Unit.Types (Module)
 import GHC.Utils.Outputable
@@ -61,10 +82,14 @@ import GHC.Core.Type (Kind, Type, ThetaType, PredType)
 import GHC.Unit.State (UnitState)
 import GHC.Unit.Module.Name (ModuleName)
 import GHC.Types.Basic
+import GHC.Utils.Misc (filterOut)
+import GHC.Utils.Trace (pprTraceUserWarning)
 import qualified GHC.LanguageExtensions as LangExt
 
 import qualified Data.List.NonEmpty as NE
 import           Data.Typeable hiding (TyCon)
+import qualified Data.Semigroup as Semigroup
+import Data.List (partition)
 
 {-
 Note [Migrating TcM Messages]
@@ -137,6 +162,50 @@ data TcRnMessage where
                       -- some diagnostics with more detail.
                       -> !TcRnMessageDetailed
                       -> TcRnMessage
+
+  {-| TcRnSolverReport is the constructor used to report unsolved constraints
+      after constraint solving, as well as other errors such as hole fit errors.
+
+      See the documentation of the 'TcReportMsg' datatype for an overview
+      of the different errors.
+  -}
+  TcRnSolverReport :: [ReportWithCtxt]
+                   -> DiagnosticReason
+                   -> [GhcHint]
+                   -> TcRnMessage
+    -- TODO: split up TcRnSolverReport into several components,
+    -- so that we can compute the reason and hints, as opposed
+    -- to having to pass them here.
+
+  {-| TcRnRedundantConstraints is a warning that is emitted when a binding
+      has a user-written type signature which contains superfluous constraints.
+
+      Example:
+
+        f :: (Eq a, Ord a) => a -> a -> a
+        f x y = (x < y) || x == y
+          -- `Eq a` is superfluous: the `Ord a` constraint suffices.
+
+      Test cases: T9939, T10632, T18036a, T20602, PluralS, T19296.
+  -}
+  TcRnRedundantConstraints :: [Id] -> (SkolemInfo, Bool) -> TcRnMessage
+
+  {-| TcRnInaccessibleCode is a warning that is emitted when the RHS of a pattern
+      match is inaccessible, because the constraint solver has detected a contradiction.
+
+      Example:
+
+        data B a where { MkTrue :: B True; MkFalse :: B False }
+
+        foo :: B False -> Bool
+        foo MkFalse = False
+        foo MkTrue  = True -- Inaccessible: requires True ~ False
+
+    Test cases: T7293, T7294, T15558, T17646, T18572, T18610, tcfail167.
+  -}
+  TcRnInaccessibleCode :: Implication -- ^ The implication containing a contradiction.
+                       -> NE.NonEmpty ReportWithCtxt -- ^ The contradiction(s).
+                       -> TcRnMessage
 
   {-| A type which was expected to have a fixed runtime representation
       does not have a fixed runtime representation.
@@ -1416,7 +1485,7 @@ data TcRnMessage where
   -}
   TcRnArrowProcGADTPattern :: TcRnMessage
 
-  {- TcRnForallIdentifier is a warning (controlled with -Wforall-identifier) that occurs
+  {-| TcRnForallIdentifier is a warning (controlled with -Wforall-identifier) that occurs
      when a definition uses 'forall' as an identifier.
 
      Example:
@@ -1435,6 +1504,60 @@ data TcRnMessage where
       Test cases: T20485, T20485a
   -}
   TcRnGADTMonoLocalBinds :: TcRnMessage
+  {-| The TcRnNotInScope constructor is used for various not-in-scope errors.
+      See 'NotInScopeError' for more details. -}
+  TcRnNotInScope :: NotInScopeError  -- ^ what the problem is
+                 -> RdrName          -- ^ the name that is not in scope
+                 -> [ImportError]    -- ^ import errors that are relevant
+                 -> [GhcHint]        -- ^ hints, e.g. enable DataKinds to refer to a promoted data constructor
+                 -> TcRnMessage
+
+  {-| TcRnUntickedPromotedConstructor is a warning (controlled with -Wunticked-promoted-constructors
+      that is triggered by an unticked occurrence of a promoted data constructor.
+
+      Example:
+
+        data A = MkA
+        type family F (a :: A) where { F MkA = Bool }
+
+      Test case: T9778.
+  -}
+  TcRnUntickedPromotedConstructor :: Name
+                                  -> TcRnMessage
+
+  {-| TcRnIllegalBuiltinSyntax is an error that occurs when built-in syntax appears
+      in an unexpected location, e.g. as a data constructor or in a fixity declaration.
+
+      Examples:
+
+        infixl 5 :
+
+        data P = (,)
+
+      Test cases: rnfail042, T14907b, T15124, T15233.
+  -}
+  TcRnIllegalBuiltinSyntax :: SDoc -- ^ what kind of thing this is (a binding, fixity declaration, ...)
+                           -> RdrName
+                           -> TcRnMessage
+    -- TODO: remove the SDoc argument.
+
+  {-| TcRnWarnDefaulting is a warning (controlled by -Wtype-defaults)
+      that is triggered whenever a Wanted typeclass constraint
+      is solving through the defaulting of a type variable.
+
+      Example:
+
+        one = show 1
+        -- We get Wanteds Show a0, Num a0, and default a0 to Integer.
+
+      Test cases:
+        none (which are really specific to defaulting),
+        but see e.g. tcfail204.
+   -}
+  TcRnWarnDefaulting :: [Ct] -- ^ Wanted constraints in which defaulting occurred
+                     -> Maybe TyVar -- ^ The type variable being defaulted
+                     -> Type -- ^ The default type
+                     -> TcRnMessage
 
   {-| TcRnIncorrectNameSpace is an error that occurs when a 'Name'
       is used in the incorrect 'NameSpace', e.g. a type constructor
@@ -1703,3 +1826,590 @@ data AssociatedTyNotParamOverLastTyVar
 associatedTyNotParamOverLastTyVar :: Maybe TyCon -> AssociatedTyNotParamOverLastTyVar
 associatedTyNotParamOverLastTyVar (Just tc) = YesAssociatedTyNotParamOverLastTyVar tc
 associatedTyNotParamOverLastTyVar Nothing   = NoAssociatedTyNotParamOverLastTyVar
+
+--------------------------------------------------------------------------------
+-- Errors used in GHC.Tc.Errors
+
+{- Note [Error report]
+~~~~~~~~~~~~~~~~~~~~~~
+The idea is that error msgs are divided into three parts: the main msg, the
+context block ("In the second argument of ..."), and the relevant bindings
+block, which are displayed in that order, with a mark to divide them. The
+the main msg ('report_important') varies depending on the error
+in question, but context and relevant bindings are always the same, which
+should simplify visual parsing.
+
+See 'GHC.Tc.Errors.Types.SolverReport' and 'GHC.Tc.Errors.mkErrorReport'.
+-}
+
+-- | A collection of main error messages and supplementary information.
+--
+-- In practice, we will:
+--  - display the important messages first,
+--  - then the error context (e.g. by way of a call to 'GHC.Tc.Errors.mkErrorReport'),
+--  - then the supplementary information (e.g. relevant bindings, valid hole fits),
+--  - then the hints ("Possible fix: ...").
+--
+-- So this is mostly just a way of making sure that the error context appears
+-- early on rather than at the end of the message.
+--
+-- See Note [Error report] for details.
+data SolverReport
+  = SolverReport
+  { sr_important_msgs :: [ReportWithCtxt]
+  , sr_supplementary  :: [SolverReportSupplementary]
+  , sr_hints          :: [GhcHint]
+  }
+
+-- | Additional information to print in a 'SolverReport', after the
+-- important messages and after the error context.
+--
+-- See Note [Error report].
+data SolverReportSupplementary
+  = SupplementaryBindings RelevantBindings
+  | SupplementaryHoleFits ValidHoleFits
+  | SupplementaryCts      [(PredType, RealSrcSpan)]
+
+-- | A 'TcReportMsg', together with context (e.g. enclosing implication constraints)
+-- that are needed in order to report it.
+data ReportWithCtxt =
+  ReportWithCtxt
+    { reportContext :: ReportErrCtxt
+       -- ^ Context for what we wish to report.
+       -- This can change as we enter implications, so is
+       -- stored alongside the content.
+    , reportContent :: TcReportMsg
+      -- ^ The content of the message to report.
+    }
+
+instance Semigroup SolverReport where
+    SolverReport main1 supp1 hints1 <> SolverReport main2 supp2 hints2
+      = SolverReport (main1 ++ main2) (supp1 ++ supp2) (hints1 ++ hints2)
+
+instance Monoid SolverReport where
+    mempty = SolverReport [] [] []
+    mappend = (Semigroup.<>)
+
+-- | Context needed when reporting a 'TcReportMsg', such as
+-- the enclosing implication constraints or whether we are deferring type errors.
+data ReportErrCtxt
+    = CEC { cec_encl :: [Implication]  -- | Enclosing implications
+                                       --   (innermost first)
+                                       -- ic_skols and givens are tidied, rest are not
+          , cec_tidy  :: TidyEnv
+
+          , cec_binds :: EvBindsVar    -- Make some errors (depending on cec_defer)
+                                       -- into warnings, and emit evidence bindings
+                                       -- into 'cec_binds' for unsolved constraints
+
+          , cec_defer_type_errors :: DiagnosticReason -- Defer type errors until runtime
+
+          -- cec_expr_holes is a union of:
+          --   cec_type_holes - a set of typed holes: '_', '_a', '_foo'
+          --   cec_out_of_scope_holes - a set of variables which are
+          --                            out of scope: 'x', 'y', 'bar'
+          , cec_expr_holes :: DiagnosticReason -- Holes in expressions.
+          , cec_type_holes :: DiagnosticReason -- Holes in types.
+          , cec_out_of_scope_holes :: DiagnosticReason -- Out of scope holes.
+
+          , cec_warn_redundant :: Bool    -- | True <=> -Wredundant-constraints
+          , cec_expand_syns    :: Bool    -- | True <=> -fprint-expanded-synonyms
+
+          , cec_suppress :: Bool    -- | True <=> More important errors have occurred,
+                                    --            so create bindings if need be, but
+                                    --            don't issue any more errors/warnings
+                                    -- See Note [Suppressing error messages]
+      }
+
+getUserGivens :: ReportErrCtxt -> [UserGiven]
+-- One item for each enclosing implication
+getUserGivens (CEC {cec_encl = implics}) = getUserGivensFromImplics implics
+
+
+{- Note [discardProvCtxtGivens]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In most situations we call all enclosing implications "useful". There is one
+exception, and that is when the constraint that causes the error is from the
+"provided" context of a pattern synonym declaration:
+
+  pattern Pat :: (Num a, Eq a) => Show a   => a -> Maybe a
+             --  required      => provided => type
+  pattern Pat x <- (Just x, 4)
+
+When checking the pattern RHS we must check that it does actually bind all
+the claimed "provided" constraints; in this case, does the pattern (Just x, 4)
+bind the (Show a) constraint.  Answer: no!
+
+But the implication we generate for this will look like
+   forall a. (Num a, Eq a) => [W] Show a
+because when checking the pattern we must make the required
+constraints available, since they are needed to match the pattern (in
+this case the literal '4' needs (Num a, Eq a)).
+
+BUT we don't want to suggest adding (Show a) to the "required" constraints
+of the pattern synonym, thus:
+  pattern Pat :: (Num a, Eq a, Show a) => Show a => a -> Maybe a
+It would then typecheck but it's silly.  We want the /pattern/ to bind
+the alleged "provided" constraints, Show a.
+
+So we suppress that Implication in discardProvCtxtGivens.  It's
+painfully ad-hoc but the truth is that adding it to the "required"
+constraints would work.  Suppressing it solves two problems.  First,
+we never tell the user that we could not deduce a "provided"
+constraint from the "required" context. Second, we never give a
+possible fix that suggests to add a "provided" constraint to the
+"required" context.
+
+For example, without this distinction the above code gives a bad error
+message (showing both problems):
+
+  error: Could not deduce (Show a) ... from the context: (Eq a)
+         ... Possible fix: add (Show a) to the context of
+         the signature for pattern synonym `Pat' ...
+-}
+
+
+discardProvCtxtGivens :: CtOrigin -> [UserGiven] -> [UserGiven]
+discardProvCtxtGivens orig givens  -- See Note [discardProvCtxtGivens]
+  | ProvCtxtOrigin (PSB {psb_id = L _ name}) <- orig
+  = filterOut (discard name) givens
+  | otherwise
+  = givens
+  where
+    discard n (Implic { ic_info = SigSkol (PatSynCtxt n') _ _ }) = n == n'
+    discard _ _                                                  = False
+
+
+getSkolemInfo :: [Implication] -> [TcTyVar]
+              -> [(SkolemInfo, [TcTyVar])]                    -- #14628
+-- Get the skolem info for some type variables
+-- from the implication constraints that bind them.
+--
+-- In the returned (skolem, tvs) pairs, the 'tvs' part is non-empty
+getSkolemInfo _ []
+  = []
+
+getSkolemInfo [] tvs
+  | all isRuntimeUnkSkol tvs = [(RuntimeUnkSkol, tvs)]        -- #14628
+  | otherwise = -- See https://gitlab.haskell.org/ghc/ghc/-/issues?label_name[]=No%20skolem%20info
+      pprTraceUserWarning msg [(UnkSkol,tvs)]
+  where
+    msg = text "No skolem info - we could not find the origin of the following variables" <+> ppr tvs
+       $$ text "This should not happen, please report it as a bug following the instructions at:"
+       $$ text "https://gitlab.haskell.org/ghc/ghc/wikis/report-a-bug"
+
+
+getSkolemInfo (implic:implics) tvs
+  | null tvs_here =                            getSkolemInfo implics tvs
+  | otherwise   = (ic_info implic, tvs_here) : getSkolemInfo implics tvs_other
+  where
+    (tvs_here, tvs_other) = partition (`elem` ic_skols implic) tvs
+
+-- | An error reported after constraint solving.
+-- This is usually, some sort of unsolved constraint error,
+-- but we try to be specific about the precise problem we encountered.
+data TcReportMsg
+  -- NB: this datatype is only a first step in refactoring GHC.Tc.Errors
+  -- to use the diagnostic infrastructure (TcRnMessage etc).
+  -- If you see possible improvements, please go right ahead!
+
+  -- | Wrap a message with additional information.
+  --
+  -- Prefer using the 'mkTcReportWithInfo' smart constructor
+  = TcReportWithInfo TcReportMsg (NE.NonEmpty TcReportInfo)
+
+  -- | Quantified variables appear out of dependency order.
+  --
+  -- Example:
+  --
+  --   forall (a :: k) k. ...
+  --
+  -- Test cases: BadTelescope2, T16418, T16247, T16726, T18451.
+  | BadTelescope TyVarBndrs [TyCoVar]
+
+  -- | We came across a custom type error and we have decided to report it.
+  --
+  -- Example:
+  --
+  --   type family F a where
+  --     F a = TypeError (Text "error")
+  --
+  --   err :: F ()
+  --   err = ()
+  --
+  -- Test cases: CustomTypeErrors0{1,2,3,4,5}, T12104.
+  | UserTypeError Type
+
+  -- | We want to report an out of scope variable or a typed hole.
+  -- See 'HoleError'.
+  | ReportHoleError Hole HoleError
+
+  -- | A type equality between a type variable and a polytype.
+  --
+  -- Test cases: T12427a, T2846b, T10194, ...
+  | CannotUnifyWithPolytype Ct TyVar Type
+
+  -- | Couldn't unify two types or kinds.
+  --
+  --  Example:
+  --
+  --    3 + 3# -- can't match a lifted type with an unlifted type
+  --
+  --  Test cases: T1396, T8263, ...
+  | Mismatch
+      { mismatch_ea  :: Bool -- ^ Should this be phrased in terms of expected vs actual?
+      , mismatch_ct  :: Ct   -- ^ The constraint in which the mismatch originated.
+      , mismatch_ty1 :: Type -- ^ First type (the expected type if if mismatch_ea is True)
+      , mismatch_ty2 :: Type -- ^ Second type (the actual type if mismatch_ea is True)
+      }
+
+  -- | A type has an unexpected kind.
+  --
+  -- Test cases: T2994, T7609, ...
+  | KindMismatch
+      { kmismatch_what     :: TypedThing -- ^ What thing is 'kmismatch_actual' the kind of?
+      , kmismatch_expected :: Type
+      , kmismatch_actual   :: Type
+      }
+    -- TODO: combine 'Mismatch' and 'KindMismatch' messages.
+
+  -- | A mismatch between two types, which arose from a type equality.
+  --
+  -- Test cases: T1470, tcfail212.
+  | TypeEqMismatch
+      { teq_mismatch_ppr_explicit_kinds :: Bool
+      , teq_mismatch_ct  :: Ct
+      , teq_mismatch_ty1 :: Type
+      , teq_mismatch_ty2 :: Type
+      , teq_mismatch_expected :: Type -- ^ The overall expected type
+      , teq_mismatch_actual   :: Type -- ^ The overall actual type
+      , teq_mismatch_what     :: Maybe TypedThing -- ^ What thing is 'teq_mismatch_actual' the kind of?
+      }
+    -- TODO: combine 'Mismatch' and 'TypeEqMismatch' messages.
+
+   -- | A violation of the representation-polymorphism invariants,
+   -- i.e. an unsolved `Concrete# ty` constraint.
+   --
+   -- See 'FRROrigin' for more information.
+  | FixedRuntimeRepError [(FRROrigin, Type)]
+
+  -- | A skolem type variable escapes its scope.
+  --
+  -- Example:
+  --
+  --   data Ex where { MkEx :: a -> MkEx }
+  --   foo (MkEx x) = x
+  --
+  -- Test cases: TypeSkolEscape, T11142.
+  | SkolemEscape Ct Implication [TyVar]
+
+  -- | Trying to unify an untouchable variable, e.g. a variable from an outer scope.
+  --
+  -- Test case: Simple14
+  | UntouchableVariable TyVar Implication
+
+  -- | An equality between two types is blocked on a kind equality
+  -- beteen their kinds.
+  --
+  -- Test cases: none.
+  | BlockedEquality Ct
+
+  -- | Something was not applied to sufficiently many arguments.
+  --
+  --  Example:
+  --
+  --    instance Eq Maybe where {..}
+  --
+  -- Test case: T11563.
+  | ExpectingMoreArguments Int TypedThing
+
+  -- | Trying to use an unbound implicit parameter.
+  --
+  -- Example:
+  --
+  --    foo :: Int
+  --    foo = ?param
+  --
+  -- Test case: tcfail130.
+  | UnboundImplicitParams
+      (NE.NonEmpty Ct)
+
+  -- | Couldn't solve some Wanted constraints using the Givens.
+  -- This is the most commonly used constructor, used for generic
+  -- @"No instance for ..."@ and @"Could not deduce ... from"@ messages.
+  | CouldNotDeduce
+     { cnd_user_givens :: [Implication]
+        -- | The Wanted constraints we couldn't solve.
+        --
+        -- N.B.: the 'Ct' at the head of the list has been tidied,
+        -- perhaps not the others.
+     , cnd_wanted      :: NE.NonEmpty Ct
+
+       -- | Some additional info consumed by 'mk_supplementary_ea_msg'.
+     , cnd_extra       :: Maybe CND_Extra
+     }
+
+  -- | A constraint couldn't be solved because it contains
+  -- ambiguous type variables.
+  --
+  -- Example:
+  --
+  --   class C a b where
+  --     f :: (a,b)
+  --
+  --   x = fst f
+  --
+  --
+  -- Test case: T4921.
+  | AmbiguityPreventsSolvingCt
+      Ct -- ^ always a class constraint
+      ([TyVar], [TyVar]) -- ^ ambiguous kind and type variables, respectively
+
+  -- | Could not solve a constraint; there were several unifying candidate instances
+  -- but no matching instances. This is used to report as much useful information
+  -- as possible about why we couldn't choose any instance, e.g. because of
+  -- ambiguous type variables.
+  | CannotResolveInstance
+    { cannotResolve_ct :: Ct
+    , cannotResolve_unifiers     :: [ClsInst]
+    , cannotResolve_candidates   :: [ClsInst]
+    , cannotResolve_importErrors :: [ImportError]
+    , cannotResolve_suggestions  :: [GhcHint]
+    , cannotResolve_relevant_bindings :: RelevantBindings }
+      -- TODO: remove the fields of type [GhcHint] and RelevantBindings,
+      -- in order to handle them uniformly with other diagnostic messages.
+
+  -- | Could not solve a constraint using available instances
+  -- because the instances overlap.
+  --
+  -- Test cases: tcfail118, tcfail121, tcfail218.
+  | OverlappingInstances
+    { overlappingInstances_ct :: Ct
+    , overlappingInstances_matches  :: [ClsInst]
+    , overlappingInstances_unifiers :: [ClsInst] }
+
+  -- | Could not solve a constraint from instances because
+  -- instances declared in a Safe module cannot overlap instances
+  -- from other modules (with -XSafeHaskell).
+  --
+  -- Test cases: SH_Overlap{1,2,5,6,7,11}.
+  | UnsafeOverlap
+    { unsafeOverlap_ct :: Ct
+    , unsafeOverlap_matches :: [ClsInst]
+    , unsafeOverlapped      :: [ClsInst] }
+
+-- | Additional information to be given in a 'CouldNotDeduce' message,
+-- which is then passed on to 'mk_supplementary_ea_msg'.
+data CND_Extra = CND_Extra TypeOrKind Type Type
+
+-- | Additional information that can be appended to an existing 'TcReportMsg'.
+data TcReportInfo
+  -- NB: this datatype is only a first step in refactoring GHC.Tc.Errors
+  -- to use the diagnostic infrastructure (TcRnMessage etc).
+  -- It would be better for these constructors to not be so closely tied
+  -- to the constructors of 'TcReportMsg'.
+  -- If you see possible improvements, please go right ahead!
+
+  -- | Some type variables remained ambiguous: print them to the user.
+  = Ambiguity
+    { lead_with_ambig_msg :: Bool -- ^ True <=> start the message with "Ambiguous type variable ..."
+                                  --  False <=> create a message of the form "The type variable is ambiguous."
+    , ambig_tyvars        :: ([TyVar], [TyVar]) -- ^ Ambiguous kind and type variables, respectively.
+                                                -- Guaranteed to not both be empty.
+    }
+
+  -- | Specify some information about a type variable,
+  -- e.g. its 'SkolemInfo'.
+  | TyVarInfo TyVar
+
+  -- | Remind the user that a particular type family is not injective.
+  | NonInjectiveTyFam TyCon
+
+  -- | Explain why we couldn't coerce between two types. See 'CoercibleMsg'.
+  | ReportCoercibleMsg CoercibleMsg
+
+  -- | Display the expected and actual types.
+  | ExpectedActual
+     { ea_expected, ea_actual :: Type }
+
+  -- | Display the expected and actual types, after expanding type synonyms.
+  | ExpectedActualAfterTySynExpansion
+     { ea_expanded_expected, ea_expanded_actual :: Type }
+
+  -- | Explain how a kind equality originated.
+  | WhenMatching TcType TcType CtOrigin (Maybe TypeOrKind)
+
+  -- | Add some information to disambiguate errors in which
+  -- two 'Names' would otherwise appear to be identical.
+  --
+  -- See Note [Disambiguating (X ~ X) errors].
+  | SameOcc
+    { sameOcc_same_pkg :: Bool -- ^ Whether the two 'Name's also came from the same package.
+    , sameOcc_lhs :: Name
+    , sameOcc_rhs :: Name }
+
+  -- | Report some type variables that might be participating in an occurs-check failure.
+  | OccursCheckInterestingTyVars (NE.NonEmpty TyVar)
+
+-- | Some form of @"not in scope"@ error. See also the 'OutOfScopeHole'
+-- constructor of 'HoleError'.
+data NotInScopeError
+
+  -- | A run-of-the-mill @"not in scope"@ error.
+  = NotInScope
+
+  -- | An exact 'Name' was not in scope.
+  --
+  -- This usually indicates a problem with a Template Haskell splice.
+  --
+  -- Test cases: T5971, T18263.
+  | NoExactName Name
+
+  -- The same exact 'Name' occurs in multiple name-spaces.
+  --
+  -- This usually indicates a problem with a Template Haskell splice.
+  --
+  -- Test case: T7241.
+  | SameName [GlobalRdrElt] -- ^ always at least 2 elements
+
+  -- A type signature, fixity declaration, pragma, standalone kind signature...
+  -- is missing an associated binding.
+  | MissingBinding SDoc [GhcHint]
+    -- TODO: remove the SDoc argument.
+
+  -- | Couldn't find a top-level binding.
+  --
+  -- Happens when specifying an annotation for something that
+  -- is not in scope.
+  --
+  -- Test cases: annfail01, annfail02, annfail11.
+  | NoTopLevelBinding
+
+  -- | A class doesnt have a method with this name,
+  -- or, a class doesn't have an associated type with this name,
+  -- or, a record doesn't have a record field with this name.
+  | UnknownSubordinate SDoc
+
+-- | Create a @"not in scope"@ error message for the given 'RdrName'.
+mkTcRnNotInScope :: RdrName -> NotInScopeError -> TcRnMessage
+mkTcRnNotInScope rdr err = TcRnNotInScope err rdr [] noHints
+
+-- | Configuration for pretty-printing valid hole fits.
+data HoleFitDispConfig =
+  HFDC { showWrap, showWrapVars, showType, showProv, showMatches
+          :: Bool }
+
+-- | Report an error involving a 'Hole'.
+--
+-- This could be an out of scope data constructor or variable,
+-- a typed hole, or a wildcard in a type.
+data HoleError
+  -- | Report an out-of-scope data constructor or variable
+  -- masquerading as an expression hole.
+  --
+  -- See Note [Insoluble holes] in GHC.Tc.Types.Constraint.
+  -- See 'NotInScopeError' for other not-in-scope errors.
+  --
+  -- Test cases: T9177a.
+  = OutOfScopeHole [ImportError]
+  -- | Report a typed hole, or wildcard, with additional information.
+  | HoleError HoleSort
+
+-- | A message that aims to explain why two types couldn't be seen
+-- to be representationally equal.
+data CoercibleMsg
+  -- | Not knowing the role of a type constructor prevents us from
+  -- concluding that two types are representationally equal.
+  --
+  -- Example:
+  --
+  --   foo :: Applicative m => m (Sum Int)
+  --   foo = coerce (pure $ 1 :: Int)
+  --
+  -- We don't know what role `m` has, so we can't coerce `m Int` to `m (Sum Int)`.
+  --
+  -- Test cases: T8984, TcCoercibleFail.
+  = UnknownRoles Type
+
+  -- | The fact that a 'TyCon' is abstract prevents us from decomposing
+  -- a 'TyConApp' and deducing that two types are representationally equal.
+  --
+  -- Test cases: none.
+  | TyConIsAbstract TyCon
+
+  -- | We can't unwrap a newtype whose constructor is not in scope.
+  --
+  -- Example:
+  --
+  --   import Data.Ord (Down) -- NB: not importing the constructor
+  --   foo :: Int -> Down Int
+  --   foo = coerce
+  --
+  -- Test cases: TcCoercibleFail.
+  | OutOfScopeNewtypeConstructor TyCon DataCon
+
+-- | Explain a problem with an import.
+data ImportError
+  -- | Couldn't find a module with the requested name.
+  = MissingModule ModuleName
+  -- | The imported modules don't export what we're looking for.
+  | ModulesDoNotExport (NE.NonEmpty Module) OccName
+
+-- | This datatype collates instances that match or unifier,
+-- in order to report an error message for an unsolved typeclass constraint.
+data PotentialInstances
+  = PotentialInstances
+  { matches  :: [ClsInst]
+  , unifiers :: [ClsInst]
+  }
+
+-- | Append additional information to a `TcReportMsg`.
+mkTcReportWithInfo :: TcReportMsg -> [TcReportInfo] -> TcReportMsg
+mkTcReportWithInfo msg []
+  = msg
+mkTcReportWithInfo (TcReportWithInfo msg (prev NE.:| prevs)) infos
+  = TcReportWithInfo msg (prev NE.:| prevs ++ infos)
+mkTcReportWithInfo msg (info : infos)
+  = TcReportWithInfo msg (info NE.:| infos)
+
+-- | A collection of valid hole fits or refinement fits,
+-- in which some fits might have been suppressed.
+data FitsMbSuppressed
+  = Fits
+    { fits           :: [HoleFit]
+    , fitsSuppressed :: Bool  -- ^ Whether we have suppressed any fits because there were too many.
+    }
+
+-- | A collection of hole fits and refinement fits.
+data ValidHoleFits
+  = ValidHoleFits
+    { holeFits       :: FitsMbSuppressed
+    , refinementFits :: FitsMbSuppressed
+    }
+
+noValidHoleFits :: ValidHoleFits
+noValidHoleFits = ValidHoleFits (Fits [] False) (Fits [] False)
+
+data RelevantBindings
+  = RelevantBindings
+    { relevantBindingNamesAndTys :: [(Name, Type)]
+    , ranOutOfFuel               :: Bool -- ^ Whether we ran out of fuel generating the bindings.
+    }
+
+-- | Display some relevant bindings.
+pprRelevantBindings :: RelevantBindings -> SDoc
+-- This function should be in "GHC.Tc.Errors.Ppr",
+-- but's it's here for the moment as it's needed in "GHC.Tc.Errors".
+pprRelevantBindings (RelevantBindings bds ran_out_of_fuel) =
+  ppUnless (null bds) $
+    hang (text "Relevant bindings include")
+       2 (vcat (map ppr_binding bds) $$ ppWhen ran_out_of_fuel discardMsg)
+  where
+    ppr_binding (nm, tidy_ty) =
+      sep [ pprPrefixOcc nm <+> dcolon <+> ppr tidy_ty
+          , nest 2 (parens (text "bound at"
+               <+> ppr (getSrcLoc nm)))]
+
+discardMsg :: SDoc
+discardMsg = text "(Some bindings suppressed;" <+>
+             text "use -fmax-relevant-binds=N or -fno-max-relevant-binds)"

@@ -5,4 +5,4 @@ T13470.hs:11:11: error: Not in scope: ‘nan’
 
 T13470.hs:16:12: error:
     Not in scope: ‘x12345’
-    Perhaps you meant ‘x123456’ (line 16)
+    Suggested fix: Perhaps use ‘x123456’ (line 16)

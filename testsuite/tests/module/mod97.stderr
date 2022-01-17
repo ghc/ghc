@@ -1,6 +1,7 @@
 
 mod97.hs:4:9: error:
-    • Variable not in scope:
-        (==) :: GHC.Types.Char -> GHC.Types.Char -> t
-    • Perhaps you want to add ‘==’ to the import list in the import of
+    Variable not in scope:
+      (==) :: GHC.Types.Char -> GHC.Types.Char -> t
+    Suggested fix:
+      Perhaps you want to add ‘==’ to the import list in the import of
       ‘Prelude’ (mod97.hs:3:1-18).

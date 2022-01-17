@@ -1,5 +1,6 @@
 
 RenamingStar.hs:5:13: error:
     Operator applied to too few arguments: *
-    With NoStarIsType, ‘*’ is treated as a regular type operator. 
-    Did you mean to use ‘Type’ from Data.Kind instead?
+    Suggested fix:
+      Use ‘Type’ from ‘Data.Kind’ instead.
+      NB: with NoStarIsType, ‘*’ is treated as a regular type operator.

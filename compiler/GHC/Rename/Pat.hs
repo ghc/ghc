@@ -53,10 +53,10 @@ import GHC.Tc.Utils.Zonk   ( hsOverLitName )
 import GHC.Rename.Env
 import GHC.Rename.Fixity
 import GHC.Rename.Utils    ( HsDocContext(..), newLocalBndrRn, bindLocalNames
-                           , warnUnusedMatches, warnForallIdentifier
+                           , warnUnusedMatches, newLocalBndrRn
                            , checkUnusedRecordWildcard
                            , checkDupNames, checkDupAndShadowedNames
-                           , wrapGenSpan, genHsApps, genLHsVar, genHsIntegralLit )
+                           , wrapGenSpan, genHsApps, genLHsVar, genHsIntegralLit, warnForallIdentifier )
 import GHC.Rename.HsType
 import GHC.Builtin.Names
 import GHC.Types.Avail ( greNameMangledName )

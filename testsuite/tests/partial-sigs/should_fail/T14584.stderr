@@ -11,7 +11,7 @@ T14584.hs:56:41: warning: [-Wdeferred-type-errors (in -Wdefault)]
         act @_ @_ @act (fromSing @m (sing @m @a :: Sing _))
 
 T14584.hs:56:50: warning: [-Wdeferred-type-errors (in -Wdefault)]
-    • Could not deduce: m ~ *
+    • Could not deduce (m ~ *)
       from the context: (Action act, Monoid a, Good m)
         bound by the instance declaration at T14584.hs:54:10-89
       ‘m’ is a rigid type variable bound by

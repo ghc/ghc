@@ -51,12 +51,12 @@ import GHC.Rename.Env
 import GHC.Rename.Utils  ( HsDocContext(..), inHsDocContext, withHsDocContext
                          , mapFvRn, pprHsDocContext, bindLocalNamesFV
                          , typeAppErr, newLocalBndrRn, checkDupRdrNamesN
-                         , checkShadowedRdrNames
-                         , warnForallIdentifier )
+                         , checkShadowedRdrNames, warnForallIdentifier )
 import GHC.Rename.Fixity ( lookupFieldFixityRn, lookupFixityRn
                          , lookupTyFixityRn )
 import GHC.Rename.Unbound ( notInScopeErr, WhereLooking(WL_LocalOnly) )
 import GHC.Tc.Errors.Types
+import GHC.Tc.Errors.Ppr ( pprScopeError )
 import GHC.Tc.Utils.Monad
 import GHC.Types.Name.Reader
 import GHC.Builtin.Names
@@ -752,10 +752,11 @@ rnHsTyKi env (XHsType ty)
     check_in_scope :: RdrName -> RnM ()
     check_in_scope rdr_name = do
       mb_name <- lookupLocalOccRn_maybe rdr_name
+      -- TODO: refactor this to avoid TcRnUnknownMessage
       when (isNothing mb_name) $
         addErr $ TcRnUnknownMessage $ mkPlainError noHints $
           withHsDocContext (rtke_ctxt env) $
-          notInScopeErr WL_LocalOnly rdr_name
+          pprScopeError rdr_name (notInScopeErr WL_LocalOnly rdr_name)
 
 rnHsTyKi env ty@(HsExplicitListTy _ ip tys)
   = do { data_kinds <- xoptM LangExt.DataKinds

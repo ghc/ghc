@@ -1,6 +1,6 @@
 
 T12538.hs:37:8: error:
-    • Could not deduce: a' ~ Tagged Int a
+    • Could not deduce (a' ~ Tagged Int a)
       from the context: (TagImpl a a', b ~ DF a')
         bound by the instance declaration at T12538.hs:36:10-46
       Expected: Tagged Int a -> b

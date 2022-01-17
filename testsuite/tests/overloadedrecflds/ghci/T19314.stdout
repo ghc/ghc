@@ -1,12 +1,14 @@
 w :: [a] -> a
 x :: [a] -> a
 
-<interactive>:1:1:
-    • Variable not in scope: y
-    • NB: ‘y’ is a field selector
-      that has been suppressed by NoFieldSelectors
+<interactive>:1:1: error:
+    Variable not in scope: y
+    Suggested fix:
+      Notice that ‘y’ is a field selector
+      that has been suppressed by NoFieldSelectors.
 
-<interactive>:1:1:
-    • Variable not in scope: z
-    • NB: ‘z’ is a field selector
-      that has been suppressed by NoFieldSelectors
+<interactive>:1:1: error:
+    Variable not in scope: z
+    Suggested fix:
+      Notice that ‘z’ is a field selector
+      that has been suppressed by NoFieldSelectors.

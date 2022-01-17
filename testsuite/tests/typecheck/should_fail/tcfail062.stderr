@@ -1,8 +1,10 @@
 
-tcfail062.hs:34:6:
+tcfail062.hs:34:6: error:
     Not in scope: type variable ‘behaviouralExpression’
-    Perhaps you meant type constructor or class ‘BehaviouralExpression’ (line 25)
+    Suggested fix:
+      Perhaps use type constructor or class ‘BehaviouralExpression’ (line 25)
 
-tcfail062.hs:34:29:
+tcfail062.hs:34:29: error:
     Not in scope: type variable ‘behaviouralExpression’
-    Perhaps you meant type constructor or class ‘BehaviouralExpression’ (line 25)
+    Suggested fix:
+      Perhaps use type constructor or class ‘BehaviouralExpression’ (line 25)

@@ -1,4 +1,4 @@
 
 T12681.hs:4:17: error:
     Not in scope: ‘a’
-    Perhaps you meant ‘T12681a.a’ (imported from T12681a)
+    Suggested fix: Perhaps use ‘T12681a.a’ (imported from T12681a)

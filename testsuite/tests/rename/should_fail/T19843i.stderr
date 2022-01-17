@@ -1,5 +1,6 @@
 
-T19843i.hs:5:5:
+T19843i.hs:5:5: error:
     Not in scope: ‘M.getSum’
-    Perhaps you want to add ‘getSum’ to the import list
-    in the import of ‘Data.Monoid’ (T19843i.hs:3:1-32).
+    Suggested fix:
+      Perhaps you want to add ‘getSum’ to the import list
+      in the import of ‘Data.Monoid’ (T19843i.hs:3:1-32).

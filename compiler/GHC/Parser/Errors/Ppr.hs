@@ -14,10 +14,11 @@ import GHC.Parser.Errors.Basic
 import GHC.Parser.Errors.Types
 import GHC.Parser.Types
 import GHC.Types.Basic
+import GHC.Types.Hint
 import GHC.Types.Error
 import GHC.Types.Hint.Ppr (perhapsAsPat)
 import GHC.Types.SrcLoc
-import GHC.Types.Name.Reader (opIsAt, starInfo, rdrNameOcc, mkUnqual)
+import GHC.Types.Name.Reader ( opIsAt, rdrNameOcc, mkUnqual )
 import GHC.Types.Name.Occurrence (isSymOcc, occNameFS, varName)
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
@@ -272,10 +273,9 @@ instance Diagnostic PsMessage where
                 (ppr v)
     PsErrTupleSectionInPat
       -> mkSimpleDecorated $ text "Tuple section in pattern context"
-    PsErrOpFewArgs (StarIsType star_is_type) op
+    PsErrOpFewArgs _ op
       -> mkSimpleDecorated $
            text "Operator applied to too few arguments:" <+> ppr op
-           $$ starInfo star_is_type op
     PsErrVarForTyCon name
       -> mkSimpleDecorated $
            text "Expecting a type constructor but found a variable,"
@@ -610,7 +610,7 @@ instance Diagnostic PsMessage where
     PsWarnHaddockInvalidPos                       -> noHints
     PsWarnHaddockIgnoreMulti                      -> noHints
     PsWarnStarBinder                              -> [SuggestQualifyStarOperator]
-    PsWarnStarIsType                              -> [SuggestUseTypeFromDataKind]
+    PsWarnStarIsType                              -> [SuggestUseTypeFromDataKind Nothing]
     PsWarnUnrecognisedPragma                      -> noHints
     PsWarnImportPreQualified                      -> [ SuggestQualifiedAfterModuleName
                                                      , suggestExtension LangExt.ImportQualifiedPost]
@@ -668,7 +668,8 @@ instance Diagnostic PsMessage where
     PsErrUnsupportedBoxedSumPat{}                 -> noHints
     PsErrUnexpectedQualifiedConstructor{}         -> noHints
     PsErrTupleSectionInPat{}                      -> noHints
-    PsErrOpFewArgs{}                              -> noHints
+    PsErrOpFewArgs star_is_type op
+      -> noStarIsTypeHints star_is_type op
     PsErrVarForTyCon{}                            -> noHints
     PsErrMalformedEntityString                    -> noHints
     PsErrDotsInRecordUpdate                       -> noHints

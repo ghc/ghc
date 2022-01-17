@@ -1,6 +1,6 @@
 
 T15695.hs:40:14: warning: [-Wdeferred-type-errors (in -Wdefault)]
-    • Could not deduce: a2 ~ NA 'VO
+    • Could not deduce (a2 ~ NA 'VO)
       from the context: ((* -> * -> *) ~ (k -> k1 -> *), Either ~~ f,
                          ctx ~~ (a2 ':&: (a3 ':&: 'E)), f a2 ~~ f1, f1 a3 ~~ a4)
         bound by a pattern with pattern synonym:

@@ -781,7 +781,7 @@ tcExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = Left rbnds }) res_
               scrut_ty      = TcType.substTy scrut_subst  con1_res_ty
               con1_arg_tys' = map (TcType.substTy result_subst) con1_arg_tys
 
-        ; co_scrut <- unifyType (Just (ppr record_expr)) record_rho scrut_ty
+        ; co_scrut <- unifyType (Just . HsExprRnThing $ unLoc record_expr) record_rho scrut_ty
                 -- NB: normal unification is OK here (as opposed to subsumption),
                 -- because for this to work out, both record_rho and scrut_ty have
                 -- to be normal datatypes -- no contravariant stuff can go on

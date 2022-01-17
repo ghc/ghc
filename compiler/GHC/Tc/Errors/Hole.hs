@@ -32,6 +32,8 @@ where
 
 import GHC.Prelude
 
+import GHC.Tc.Errors.Types ( HoleFitDispConfig(..), FitsMbSuppressed(..)
+                           , ValidHoleFits(..), noValidHoleFits )
 import GHC.Tc.Types
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Types.Constraint
@@ -413,12 +415,6 @@ fits like (`id (_ :: a)` and `head (_ :: [a])`) when looking for fits of type
 `a`, where `a` is a skolem.
 -}
 
-data HoleFitDispConfig = HFDC { showWrap :: Bool
-                              , showWrapVars :: Bool
-                              , showType :: Bool
-                              , showProv :: Bool
-                              , showMatches :: Bool }
-
 -- We read the various -no-show-*-of-hole-fits flags
 -- and set the display config accordingly.
 getHoleFitDispConfig :: TcM HoleFitDispConfig
@@ -560,14 +556,13 @@ findValidHoleFits :: TidyEnv        -- ^ The tidy_env for zonking
                   -- ^ The  unsolved simple constraints in the implication for
                   -- the hole.
                   -> Hole
-                  -> TcM (TidyEnv, SDoc)
+                  -> TcM (TidyEnv, ValidHoleFits)
 findValidHoleFits tidy_env implics simples h@(Hole { hole_sort = ExprHole _
                                                    , hole_loc  = ct_loc
                                                    , hole_ty   = hole_ty }) =
   do { rdr_env <- getGlobalRdrEnv
      ; lclBinds <- getLocalBindings tidy_env ct_loc
      ; maxVSubs <- maxValidHoleFits <$> getDynFlags
-     ; hfdc <- getHoleFitDispConfig
      ; sortingAlg <- getHoleFitSortingAlg
      ; dflags <- getDynFlags
      ; hfPlugs <- tcg_hf_plugins <$> getGblEnv
@@ -607,12 +602,11 @@ findValidHoleFits tidy_env implics simples h@(Hole { hole_sort = ExprHole _
      ; let (pVDisc, limited_subs) = possiblyDiscard maxVSubs plugin_handled_subs
            vDiscards = pVDisc || searchDiscards
      ; subs_with_docs <- addHoleFitDocs limited_subs
-     ; let vMsg = ppUnless (null subs_with_docs) $
-                    hang (text "Valid hole fits include") 2 $
-                      vcat (map (pprHoleFit hfdc) subs_with_docs)
-                        $$ ppWhen vDiscards subsDiscardMsg
+     ; let subs = Fits subs_with_docs vDiscards
      -- Refinement hole fits. See Note [Valid refinement hole fits include ...]
-     ; (tidy_env, refMsg) <- if refLevel >= Just 0 then
+     ; (tidy_env, rsubs) <-
+       if refLevel >= Just 0
+       then
          do { maxRSubs <- maxRefHoleFits <$> getDynFlags
             -- We can use from just, since we know that Nothing >= _ is False.
             ; let refLvls = [1..(fromJust refLevel)]
@@ -640,14 +634,11 @@ findValidHoleFits tidy_env implics simples h@(Hole { hole_sort = ExprHole _
                     possiblyDiscard maxRSubs $ plugin_handled_rsubs
                   rDiscards = pRDisc || any fst refDs
             ; rsubs_with_docs <- addHoleFitDocs exact_last_rfits
-            ; return (tidy_env,
-                ppUnless (null rsubs_with_docs) $
-                  hang (text "Valid refinement hole fits include") 2 $
-                  vcat (map (pprHoleFit hfdc) rsubs_with_docs)
-                    $$ ppWhen rDiscards refSubsDiscardMsg) }
-       else return (tidy_env, empty)
+            ; return (tidy_env, Fits rsubs_with_docs rDiscards) }
+       else return (tidy_env, Fits [] False)
      ; traceTc "findingValidHoleFitsFor }" empty
-     ; return (tidy_env, vMsg $$ refMsg) }
+     ; let hole_fits = ValidHoleFits subs rsubs
+     ; return (tidy_env, hole_fits) }
   where
     -- We extract the TcLevel from the constraint.
     hole_lvl = ctLocLevel ct_loc
@@ -688,19 +679,6 @@ findValidHoleFits tidy_env implics simples h@(Hole { hole_sort = ExprHole _
                <*> sortHoleFitsByGraph (sort gblFits)
         where (lclFits, gblFits) = span hfIsLcl subs
 
-    subsDiscardMsg :: SDoc
-    subsDiscardMsg =
-        text "(Some hole fits suppressed;" <+>
-        text "use -fmax-valid-hole-fits=N" <+>
-        text "or -fno-max-valid-hole-fits)"
-
-    refSubsDiscardMsg :: SDoc
-    refSubsDiscardMsg =
-        text "(Some refinement hole fits suppressed;" <+>
-        text "use -fmax-refinement-hole-fits=N" <+>
-        text "or -fno-max-refinement-hole-fits)"
-
-
     -- Based on the flags, we might possibly discard some or all the
     -- fits we've found.
     possiblyDiscard :: Maybe Int -> [HoleFit] -> (Bool, [HoleFit])
@@ -709,7 +687,7 @@ findValidHoleFits tidy_env implics simples h@(Hole { hole_sort = ExprHole _
 
 
 -- We don't (as of yet) handle holes in types, only in expressions.
-findValidHoleFits env _ _ _ = return (env, empty)
+findValidHoleFits env _ _ _ = return (env, noValidHoleFits)
 
 -- See Note [Relevant constraints]
 relevantCts :: Type -> [Ct] -> [Ct]

@@ -12,6 +12,7 @@ import GHC.Hs
 import GHC.Parser.Types
 import GHC.Parser.Errors.Basic
 import GHC.Types.Error
+import GHC.Types.Hint
 import GHC.Types.Name.Occurrence (OccName)
 import GHC.Types.Name.Reader
 import GHC.Unit.Module.Name
@@ -451,8 +452,6 @@ data PsMessage
    | PsErrIllegalGadtRecordMultiplicity !(HsArrow GhcPs)
 
    | PsErrInvalidCApiImport
-
-newtype StarIsType = StarIsType Bool
 
 -- | Extra details about a parse error, which helps
 -- us in determining which should be the hints to

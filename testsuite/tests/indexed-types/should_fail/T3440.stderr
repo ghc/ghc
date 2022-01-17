@@ -1,6 +1,6 @@
 
 T3440.hs:11:22: error:
-    • Could not deduce: a1 ~ a
+    • Could not deduce (a1 ~ a)
       from the context: Fam a ~ Fam a1
         bound by a pattern with constructor:
                    GADT :: forall a. a -> Fam a -> GADT (Fam a),

@@ -25,6 +25,7 @@ module GHC.Tc.Types.Constraint (
         ctEvExpr, ctEvTerm, ctEvCoercion, ctEvEvId,
         tyCoVarsOfCt, tyCoVarsOfCts,
         tyCoVarsOfCtList, tyCoVarsOfCtsList,
+        ambigTkvsOfCt,
 
         CtIrredReason(..), HoleSet, isInsolubleReason,
 
@@ -49,6 +50,7 @@ module GHC.Tc.Types.Constraint (
 
         Implication(..), implicationPrototype, checkTelescopeSkol,
         ImplicStatus(..), isInsolubleStatus, isSolvedStatus,
+        UserGiven, getUserGivensFromImplics,
         HasGivenEqs(..),
         SubGoalDepth, initialSubGoalDepth, maxSubGoalDepth,
         bumpSubGoalDepth, subGoalDepthExceeded,
@@ -114,7 +116,7 @@ import qualified Data.Semigroup ( (<>) )
 
 -- these are for CheckTyEqResult
 import Data.Word  ( Word8 )
-import Data.List  ( intersperse )
+import Data.List  ( intersperse, partition )
 
 
 
@@ -740,6 +742,14 @@ tyCoFVsOfHole (Hole { hole_ty = ty }) = tyCoFVsOfType ty
 
 tyCoFVsOfBag :: (a -> FV) -> Bag a -> FV
 tyCoFVsOfBag tvs_of = foldr (unionFV . tvs_of) emptyFV
+
+ambigTkvsOfCt :: Ct -> ([Var],[Var])
+ambigTkvsOfCt ct
+  = partition (`elemVarSet` dep_tkv_set) ambig_tkvs
+  where
+    tkvs       = tyCoVarsOfCtList ct
+    ambig_tkvs = filter isAmbiguousTyVar tkvs
+    dep_tkv_set = tyCoVarsOfTypes (map tyVarKind tkvs)
 
 ---------------------------
 dropDerivedWC :: WantedConstraints -> WantedConstraints
@@ -1385,6 +1395,12 @@ data HasGivenEqs -- See Note [HasGivenEqs]
   | MaybeGivenEqs   -- Might have any kind of Given equalities; no floating out
                     --   is possible.
   deriving Eq
+
+type UserGiven = Implication
+
+getUserGivensFromImplics :: [Implication] -> [UserGiven]
+getUserGivensFromImplics implics
+  = reverse (filterOut (null . ic_given) implics)
 
 {- Note [HasGivenEqs]
 ~~~~~~~~~~~~~~~~~~~~~

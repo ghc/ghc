@@ -1,5 +1,6 @@
 
-qdofail003.hs:11:5:
+qdofail003.hs:11:5: error:
     Not in scope: ‘P.>>’
-    Perhaps you want to remove ‘>>’ from the explicit hiding list
-    in the import of ‘Prelude’ (qdofail003.hs:3:1-33).
+    Suggested fix:
+      Perhaps you want to remove ‘>>’ from the explicit hiding list
+      in the import of ‘Prelude’ (qdofail003.hs:3:1-33).

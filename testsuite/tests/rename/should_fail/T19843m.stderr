@@ -1,5 +1,6 @@
 
-T19843m.hs:9:12:
+T19843m.hs:9:12: error:
     Not in scope: type constructor or class ‘WrongName’
-    Perhaps you meant one of these:
-      ‘FongName’ (line 6), data constructor ‘LongName’ (line 5)
+    Suggested fix:
+      Perhaps use one of these:
+        ‘FongName’ (line 6), data constructor ‘LongName’ (line 5)

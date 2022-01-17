@@ -1,11 +1,12 @@
 
 T9177.hs:4:13: error:
     Not in scope: type variable ‘int’
-    Perhaps you meant type constructor or class ‘Int’ (imported from Prelude)
+    Suggested fix:
+      Perhaps use type constructor or class ‘Int’ (imported from Prelude)
 
 T9177.hs:7:14: error:
     Not in scope: type variable ‘integerr’
-    Perhaps you meant type constructor or class ‘Integer’ (imported from Prelude)
+    Suggested fix:
+      Perhaps use type constructor or class ‘Integer’ (imported from Prelude)
 
-T9177.hs:17:6: error:
-    Not in scope: data constructor ‘Fun’
+T9177.hs:17:6: error: Not in scope: data constructor ‘Fun’

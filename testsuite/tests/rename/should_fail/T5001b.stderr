@@ -1,4 +1,5 @@
 
 T5001b.hs:10:17: error:
     The INLINE pragma for ‘genum’ lacks an accompanying binding
-      (The INLINE pragma must be given where ‘genum’ is declared)
+    Suggested fix:
+      Move the INLINE pragma to the declaration site of ‘genum’.

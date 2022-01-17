@@ -1,6 +1,6 @@
 
 T9109.hs:8:13: error:
-    • Could not deduce: p ~ Bool
+    • Could not deduce (p ~ Bool)
       from the context: a ~ Bool
         bound by a pattern with constructor: GBool :: G Bool,
                  in an equation for ‘foo’
@@ -8,7 +8,7 @@ T9109.hs:8:13: error:
       ‘p’ is a rigid type variable bound by
         the inferred type of foo :: G a -> p
         at T9109.hs:8:1-16
-      Possible fix: add a type signature for ‘foo’
     • In the expression: True
       In an equation for ‘foo’: foo GBool = True
     • Relevant bindings include foo :: G a -> p (bound at T9109.hs:8:1)
+    Suggested fix: Consider giving ‘foo’ a type signature

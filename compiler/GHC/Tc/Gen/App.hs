@@ -862,7 +862,7 @@ tcInstFun do_ql inst_final (rn_fun, fun_ctxt) fun_sigma rn_args
     go1 delta acc so_far fun_ty
         (eva@(EValArg { eva_arg = ValArg arg, eva_ctxt = ctxt })  : rest_args)
       = do { (wrap, arg_ty, res_ty) <- matchActualFunTySigma herald
-                                          (Just (ppr rn_fun))
+                                          (Just $ HsExprRnThing rn_fun)
                                           (n_val_args, so_far) fun_ty
           ; (delta', arg') <- if do_ql
                               then addArgCtxt ctxt arg $
@@ -1238,7 +1238,7 @@ qlUnify delta ty1 ty2
           -- Passes the occurs check
       = do { let ty2_kind   = typeKind ty2
                  kappa_kind = tyVarKind kappa
-           ; co <- unifyKind (Just (ppr ty2)) ty2_kind kappa_kind
+           ; co <- unifyKind (Just (TypeThing ty2)) ty2_kind kappa_kind
                    -- unifyKind: see Note [Actual unification in qlUnify]
 
            ; traceTc "qlUnify:update" $

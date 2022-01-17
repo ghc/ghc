@@ -5,6 +5,7 @@
 module GHC.Tc.Errors.Hole where
 
 import GHC.Types.Var ( Id )
+import GHC.Tc.Errors.Types ( HoleFitDispConfig, ValidHoleFits )
 import GHC.Tc.Types  ( TcM )
 import GHC.Tc.Types.Constraint ( Ct, CtLoc, Hole, Implication )
 import GHC.Utils.Outputable ( SDoc )
@@ -18,7 +19,7 @@ import Data.Maybe ( Maybe )
 import Data.Int ( Int )
 
 findValidHoleFits :: TidyEnv -> [Implication] -> [Ct] -> Hole
-                  -> TcM (TidyEnv, SDoc)
+                  -> TcM (TidyEnv, ValidHoleFits)
 
 tcCheckHoleFit :: TypedHole -> TcSigmaType -> TcSigmaType
                -> TcM (Bool, HsWrapper)
@@ -30,7 +31,6 @@ tcFilterHoleFits :: Maybe Int -> TypedHole -> (TcType, [TcTyVar])
 getLocalBindings :: TidyEnv -> CtLoc -> TcM [Id]
 addHoleFitDocs :: [HoleFit] -> TcM [HoleFit]
 
-data HoleFitDispConfig
 data HoleFitSortingAlg
 
 pprHoleFit :: HoleFitDispConfig -> HoleFit -> SDoc

@@ -1,6 +1,6 @@
 
 T7525.hs:5:30: error:
-    • Could not deduce: ?b::Bool
+    • Could not deduce (?b::Bool)
         arising from a use of implicit parameter ‘?b’
       from the context: ?a::Bool
         bound by the implicit-parameter binding for ?a at T7525.hs:5:7-31

@@ -1,6 +1,6 @@
 
 T7230.hs:48:32: error:
-    • Could not deduce: (x :<<= x1) ~ 'True
+    • Could not deduce ((x :<<= x1) ~ 'True)
       from the context: Increasing xs ~ 'True
         bound by the type signature for:
                    crash :: forall (xs :: [Nat]).

@@ -1,5 +1,6 @@
 
-T19843j.hs:5:5:
-     Variable not in scope: guard
-     Perhaps you want to add ‘guard’ to the import list
-      in the import of ‘Control.Monad’ (T19843j.hs:3:1-31).
+T19843j.hs:5:5: error:
+    Variable not in scope: guard
+    Suggested fix:
+      Perhaps you want to add ‘guard’ to the import list in the import of
+      ‘Control.Monad’ (T19843j.hs:3:1-31).

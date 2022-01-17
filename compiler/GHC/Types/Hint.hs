@@ -5,6 +5,10 @@ module GHC.Types.Hint (
   , AvailableBindings(..)
   , InstantiationSuggestion(..)
   , LanguageExtensionHint(..)
+  , ImportSuggestion(..)
+  , HowInScope(..)
+  , SimilarName(..)
+  , StarIsType(..)
   , suggestExtension
   , suggestExtensionWithInfo
   , suggestExtensions
@@ -12,6 +16,7 @@ module GHC.Types.Hint (
   , suggestAnyExtension
   , suggestAnyExtensionWithInfo
   , useExtensionInOrderTo
+  , noStarIsTypeHints
   ) where
 
 import GHC.Prelude
@@ -24,10 +29,14 @@ import Data.Typeable
 import GHC.Unit.Module (ModuleName, Module)
 import GHC.Hs.Extension (GhcTc)
 import GHC.Core.Coercion
-import GHC.Types.Name (Name, NameSpace)
+import GHC.Types.Name (Name, NameSpace, OccName (occNameFS))
+import GHC.Types.Name.Reader (RdrName (Unqual), ImpDeclSpec)
+import GHC.Types.SrcLoc (SrcSpan)
 import GHC.Types.Basic (Activation, RuleName)
 import GHC.Parser.Errors.Basic
 import {-# SOURCE #-} Language.Haskell.Syntax.Expr
+import GHC.Unit.Module.Imported (ImportedModsVal)
+import GHC.Data.FastString (fsLit)
   -- This {-# SOURCE #-} import should be removable once
   -- 'Language.Haskell.Syntax.Bind' no longer depends on 'GHC.Tc.Types.Evidence'.
 
@@ -237,7 +246,7 @@ data GhcHint
         Test case(s): wcompat-warnings/WCompatWarningsOn.hs
 
     -}
-  | SuggestUseTypeFromDataKind
+  | SuggestUseTypeFromDataKind (Maybe RdrName)
 
     {-| Suggests placing the 'qualified' keyword /after/ the module name.
 
@@ -309,9 +318,9 @@ data GhcHint
     -}
   | SuggestFillInWildcardConstraint
 
-    {-| Suggests to use an identifier other than 'forall'
-        Triggered by: 'GHC.Tc.Errors.Types.TcRnForallIdentifier'
-    -}
+  {-| Suggests to use an identifier other than 'forall'
+      Triggered by: 'GHC.Tc.Errors.Types.TcRnForallIdentifier'
+  -}
   | SuggestRenameForall
 
     {-| Suggests to use the appropriate Template Haskell tick:
@@ -321,6 +330,59 @@ data GhcHint
         Triggered by: 'GHC.Tc.Errors.Types.TcRnIncorrectNameSpace'.
     -}
   | SuggestAppropriateTHTick NameSpace
+  {-| Suggests enabling -ddump-splices to help debug an issue
+      when a 'Name' is not in scope or is used in multiple
+      different namespaces (e.g. both as a data constructor
+      and a type constructor).
+
+      Concomitant with 'NoExactName' or 'SameName' errors,
+      see e.g. "GHC.Rename.Env.lookupExactOcc_either".
+      Test cases: T5971, T7241, T13937.
+   -}
+  | SuggestDumpSlices
+
+  {-| Suggests adding a tick to refer to a data constructor
+      at the type level.
+
+      Test case: T9778.
+  -}
+  | SuggestAddTick Name
+
+  {-| Something is split off from its corresponding declaration.
+      For example, a datatype is given a role declaration
+      in a different module.
+
+      Test cases: T495, T8485, T2713, T5533.
+   -}
+  | SuggestMoveToDeclarationSite
+      -- TODO: remove the SDoc argument.
+      SDoc -- ^ fixity declaration, role annotation, type signature, ...
+      RdrName -- ^ the 'RdrName' for the declaration site
+
+  {-| Suggest a similar name that the user might have meant,
+      e.g. suggest 'traverse' when the user has written @travrese@.
+
+      Test case: mod73.
+  -}
+  | SuggestSimilarNames RdrName (NE.NonEmpty SimilarName)
+
+  {-| Remind the user that the field selector has been suppressed
+      because of -XNoFieldSelectors.
+
+      Test cases: NFSSuppressed, records-nofieldselectors.
+  -}
+  | RemindFieldSelectorSuppressed
+      { suppressed_selector :: RdrName
+      , suppressed_parents  :: [Name] }
+
+  {-| Suggest importing from a module, removing a @hiding@ clause,
+      or explain to the user that we couldn't find a module
+      with the given 'ModuleName'.
+
+      Test cases: mod28, mod36, mod87, mod114, ...
+  -}
+  | ImportSuggestion ImportSuggestion
+
 
 -- | An 'InstantiationSuggestion' for a '.hsig' file. This is generated
 -- by GHC in case of a 'DriverUnexpectedSignature' and suggests a way
@@ -334,3 +396,101 @@ data GhcHint
 --     (Try passing -instantiated-with="MyStr=<MyStr>"
 --      replacing <MyStr> as necessary.)
 data InstantiationSuggestion = InstantiationSuggestion !ModuleName !Module
+
+-- | Suggest how to fix an import.
+data ImportSuggestion
+  -- | Some module exports what we want, but we aren't explicitly importing it.
+  = CouldImportFrom (NE.NonEmpty (Module, ImportedModsVal)) OccName
+  -- | Some module exports what we want, but we are explicitly hiding it.
+  | CouldUnhideFrom (NE.NonEmpty (Module, ImportedModsVal)) OccName
+
+-- | Explain how something is in scope.
+data HowInScope
+  -- | It was locally bound at this particular source location.
+  = LocallyBoundAt SrcSpan
+  -- | It was imported by this particular import declaration.
+  | ImportedBy ImpDeclSpec
+
+data SimilarName
+  = SimilarName Name
+  | SimilarRdrName RdrName HowInScope
+
+--------------------------------------------------------------------------------
+
+-- | Whether '*' is a synonym for 'Data.Kind.Type'.
+data StarIsType
+  = StarIsNotType
+  | StarIsType
+
+-- | Display info about the treatment of '*' under NoStarIsType.
+--
+-- With StarIsType, three properties of '*' hold:
+--
+--   (a) it is not an infix operator
+--   (b) it is always in scope
+--   (c) it is a synonym for Data.Kind.Type
+--
+-- However, the user might not know that they are working on a module with
+-- NoStarIsType and write code that still assumes (a), (b), and (c), which
+-- actually do not hold in that module.
+--
+-- Violation of (a) shows up in the parser. For instance, in the following
+-- examples, we have '*' not applied to enough arguments:
+--
+--   data A :: *
+--   data F :: * -> *
+--
+-- Violation of (b) or (c) show up in the renamer and the typechecker
+-- respectively. For instance:
+--
+--   type K = Either * Bool
+--
+-- This will parse differently depending on whether StarIsType is enabled,
+-- but it will parse nonetheless. With NoStarIsType it is parsed as a type
+-- operator, thus we have ((*) Either Bool). Now there are two cases to
+-- consider:
+--
+--   1. There is no definition of (*) in scope. In this case the renamer will
+--      fail to look it up. This is a violation of assumption (b).
+--
+--   2. There is a definition of the (*) type operator in scope (for example
+--      coming from GHC.TypeNats). In this case the user will get a kind
+--      mismatch error. This is a violation of assumption (c).
+--
+-- The user might unknowingly be working on a module with NoStarIsType
+-- or use '*' as 'Data.Kind.Type' out of habit. So it is important to give a
+-- hint whenever an assumption about '*' is violated. Unfortunately, it is
+-- somewhat difficult to deal with (c), so we limit ourselves to (a) and (b).
+--
+-- 'noStarIsTypeHints' returns appropriate hints to the user depending on the
+-- extensions enabled in the module and the name that triggered the error.
+-- That is, if we have NoStarIsType and the error is related to '*' or its
+-- Unicode variant, we will suggest using 'Data.Kind.Type'; otherwise we won't
+-- suggest anything.
+noStarIsTypeHints :: StarIsType -> RdrName -> [GhcHint]
+noStarIsTypeHints is_star_type rdr_name
+  -- One might ask: if can use `sdocOption sdocStarIsType` here, why bother to
+  -- take star_is_type as input? Why not refactor?
+  --
+  -- The reason is that `sdocOption sdocStarIsType` would indicate that
+  -- StarIsType is enabled in the module that tries to load the problematic
+  -- definition, not in the module that is being loaded.
+  --
+  -- So if we have 'data T :: *' in a module with NoStarIsType, then the hint
+  -- must be displayed even if we load this definition from a module (or GHCi)
+  -- with StarIsType enabled!
+  --
+  | isUnqualStar
+  , StarIsNotType <- is_star_type
+  = [SuggestUseTypeFromDataKind (Just rdr_name)]
+  | otherwise
+  = []
+  where
+    -- Does rdr_name look like the user might have meant the '*' kind by it?
+    -- We focus on unqualified stars specifically, because qualified stars are
+    -- treated as type operators even under StarIsType.
+    isUnqualStar
+      | Unqual occName <- rdr_name
+      = let fs = occNameFS occName
+        in fs == fsLit "*" || fs == fsLit "★"
+      | otherwise = False

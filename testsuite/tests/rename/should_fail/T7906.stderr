@@ -1,4 +1,5 @@
 
 T7906.hs:5:15: error:
     The INLINABLE pragma for ‘foo’ lacks an accompanying binding
-      (The INLINABLE pragma must be given where ‘foo’ is declared)
+    Suggested fix:
+      Move the INLINABLE pragma to the declaration site of ‘foo’.

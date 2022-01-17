@@ -4,9 +4,9 @@ tcfail167.hs:14:1: error: [-Woverlapping-patterns (in -Wdefault), -Werror=overla
     In an equation for ‘inaccessible’: inaccessible C2 = ...
 
 tcfail167.hs:14:14: error: [-Winaccessible-code (in -Wdefault), -Werror=inaccessible-code]
-    • Couldn't match type ‘Char’ with ‘Float’
-      Inaccessible code in
+    • Inaccessible code in
         a pattern with constructor: C2 :: T Float,
         in an equation for ‘inaccessible’
+      Couldn't match type ‘Char’ with ‘Float’
     • In the pattern: C2
       In an equation for ‘inaccessible’: inaccessible C2 = ' '

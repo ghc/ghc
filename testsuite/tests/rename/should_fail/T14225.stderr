@@ -1,3 +1,4 @@
+
 <interactive>:2:1: error:
     Not in scope: ‘M.fromJusr’
-    Perhaps you meant ‘M.fromJust’ (imported from Data.Maybe)
+    Suggested fix: Perhaps use ‘M.fromJust’ (imported from Data.Maybe)

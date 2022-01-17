@@ -1,5 +1,6 @@
 
 mod88.hs:5:5: error:
     Not in scope: data constructor ‘Prelude.Left’
-    Perhaps you want to add ‘Left’ to the import list in the import of
-    ‘Prelude’ (mod88.hs:4:1-30).
+    Suggested fix:
+      Perhaps you want to add ‘Left’ to the import list in the import of
+      ‘Prelude’ (mod88.hs:4:1-30).

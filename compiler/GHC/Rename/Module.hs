@@ -31,10 +31,9 @@ import GHC.Rename.Env
 import GHC.Rename.Utils ( HsDocContext(..), mapFvRn, bindLocalNames
                         , checkDupRdrNamesN, bindLocalNamesFV
                         , checkShadowedRdrNames, warnUnusedTypePatterns
-                        , warnForallIdentifier
                         , newLocalBndrsRn
                         , withHsDocContext, noNestedForallsContextsErr
-                        , addNoNestedForallsContextsErr, checkInferredVars )
+                        , addNoNestedForallsContextsErr, checkInferredVars, warnForallIdentifier )
 import GHC.Rename.Unbound ( mkUnboundName, notInScopeErr, WhereLooking(WL_Global) )
 import GHC.Rename.Names
 import GHC.Tc.Errors.Types
@@ -68,6 +67,7 @@ import GHC.Data.Graph.Directed ( SCC, flattenSCC, flattenSCCs, Node(..)
 import GHC.Types.Unique.Set
 import GHC.Data.OrdList
 import qualified GHC.LanguageExtensions as LangExt
+import GHC.Tc.Errors.Ppr (pprScopeError)
 
 import Control.Monad
 import Control.Arrow ( first )
@@ -1353,9 +1353,12 @@ badRuleLhsErr name lhs bad_e
     $$
     text "LHS must be of form (f e1 .. en) where f is not forall'd"
   where
-    err = case bad_e of
-            HsUnboundVar _ uv -> notInScopeErr WL_Global (mkRdrUnqual uv)
-            _                 -> text "Illegal expression:" <+> ppr bad_e
+    err =
+      case bad_e of
+        HsUnboundVar _ uv ->
+          let rdr = mkRdrUnqual uv
+          in  pprScopeError rdr $ notInScopeErr WL_Global (mkRdrUnqual uv)
+        _ -> text "Illegal expression:" <+> ppr bad_e
 
 {- **************************************************************
          *                                                      *

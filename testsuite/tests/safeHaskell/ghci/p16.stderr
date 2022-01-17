@@ -11,7 +11,7 @@
       for GHC's newtype-deriving extension
 
 <interactive>:19:9: error:
-    • Data constructor not in scope: T2 :: T -> t
-    • Perhaps you meant ‘T1’ (line 13)
+    Data constructor not in scope: T2 :: T -> t
+    Suggested fix: Perhaps use ‘T1’ (line 13)
 
 <interactive>:22:4: error: Variable not in scope: y

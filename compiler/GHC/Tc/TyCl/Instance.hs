@@ -898,7 +898,7 @@ tcDataFamInstHeader mb_clsinfo fam_tc outer_bndrs fixity
                   -- is compatible with the explicit signature (or Type, if there
                   -- is none)
                   ; let hs_lhs = nlHsTyConApp fixity (getName fam_tc) hs_pats
-                  ; _ <- unifyKind (Just (ppr hs_lhs)) lhs_applied_kind res_kind
+                  ; _ <- unifyKind (Just . HsTypeRnThing $ unLoc hs_lhs) lhs_applied_kind res_kind
 
                   ; traceTc "tcDataFamInstHeader" $
                     vcat [ ppr fam_tc, ppr m_ksig, ppr lhs_applied_kind, ppr res_kind ]

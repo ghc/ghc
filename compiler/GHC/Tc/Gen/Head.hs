@@ -47,7 +47,6 @@ import GHC.Tc.Utils.Instantiate
 import GHC.Tc.Instance.Family ( tcLookupDataFamInst )
 import GHC.Core.FamInstEnv    ( FamInstEnvs )
 import GHC.Core.UsageEnv      ( unitUE )
-import GHC.Rename.Utils       ( unknownSubordinateErr )
 import GHC.Rename.Unbound     ( unknownNameSuggestions, WhatLooking(..) )
 import GHC.Unit.Module        ( getModule )
 import GHC.Tc.Errors.Types
@@ -548,8 +547,8 @@ lookupParents is_selector rdr
 
 fieldNotInType :: RecSelParent -> RdrName -> TcRnMessage
 fieldNotInType p rdr
-  = TcRnUnknownMessage $ mkPlainError noHints $
-    unknownSubordinateErr (text "field of type" <+> quotes (ppr p)) rdr
+  = mkTcRnNotInScope rdr $
+    UnknownSubordinate (text "field of type" <+> quotes (ppr p))
 
 notSelector :: Name -> TcRnMessage
 notSelector field
@@ -676,10 +675,10 @@ tcInferOverLit lit@(OverLit { ol_val = val
     do { from_id <- tcLookupId from_name
        ; (wrap1, from_ty) <- topInstantiate orig (idType from_id)
 
-       ; (wrap2, sarg_ty, res_ty) <- matchActualFunTySigma herald mb_doc
+       ; (wrap2, sarg_ty, res_ty) <- matchActualFunTySigma herald mb_thing
                                                            (1, []) from_ty
        ; hs_lit <- mkOverLit val
-       ; co <- unifyType mb_doc (hsLitType hs_lit) (scaledThing sarg_ty)
+       ; co <- unifyType mb_thing (hsLitType hs_lit) (scaledThing sarg_ty)
 
        ; let lit_expr = L (l2l loc) $ mkHsWrapCo co $
                         HsLit noAnn hs_lit
@@ -691,9 +690,9 @@ tcInferOverLit lit@(OverLit { ol_val = val
                                              , ol_type = res_ty } }
        ; return (HsOverLit noAnn lit', res_ty) }
   where
-    orig   = LiteralOrigin lit
-    mb_doc = Just (ppr from_name)
-    herald = sep [ text "The function" <+> quotes (ppr from_name)
+    orig     = LiteralOrigin lit
+    mb_thing = Just (NameThing from_name)
+    herald   = sep [ text "The function" <+> quotes (ppr from_name)
                  , text "is applied to"]
 
 
@@ -760,25 +759,29 @@ tc_infer_id id_name
                   ppr thing <+> text "used where a value identifier was expected" }
   where
     fail_tycon tc = do
-       gre <- getGlobalRdrEnv
-       suggestions <- get_suggestions dataName
-       unit_state <- hsc_units <$> getTopEnv
-       let pprov = case lookupGRE_Name gre (tyConName tc) of
+      gre <- getGlobalRdrEnv
+      let nm = tyConName tc
+          pprov = case lookupGRE_Name gre nm of
                       Just gre -> nest 2 (pprNameProvenance gre)
                       Nothing  -> empty
-           info = ErrInfo { errInfoContext = pprov, errInfoSupplementary = suggestions }
-           msg = TcRnMessageWithInfo unit_state
-               $ TcRnMessageDetailed info (TcRnIncorrectNameSpace (tyConName tc) False)
-       failWithTc msg
+      fail_with_msg dataName nm pprov
 
-    fail_tyvar name = do
-       suggestions <- get_suggestions varName
-       unit_state <- hsc_units <$> getTopEnv
-       let pprov = nest 2 (text "bound at" <+> ppr (getSrcLoc name))
-           info = ErrInfo { errInfoContext = pprov, errInfoSupplementary = suggestions }
-           msg = TcRnMessageWithInfo unit_state
-               $ TcRnMessageDetailed info (TcRnIncorrectNameSpace name False)
-       failWithTc msg
+    fail_tyvar nm =
+      let pprov = nest 2 (text "bound at" <+> ppr (getSrcLoc nm))
+      in fail_with_msg varName nm pprov
+
+    fail_with_msg whatName nm pprov = do
+      (import_errs, hints) <- get_suggestions whatName
+      unit_state <- hsc_units <$> getTopEnv
+      let
+        -- TODO: unfortunate to have to convert to SDoc here.
+        -- This should go away once we refactor ErrInfo.
+        hint_msg = vcat $ map ppr hints
+        import_err_msg = vcat $ map ppr import_errs
+        info = ErrInfo { errInfoContext = pprov, errInfoSupplementary = import_err_msg $$ hint_msg }
+        msg = TcRnMessageWithInfo unit_state
+            $ TcRnMessageDetailed info (TcRnIncorrectNameSpace nm False)
+      failWithTc msg
 
     get_suggestions ns = do
        let occ = mkOccNameFS ns (occNameFS (occName id_name))

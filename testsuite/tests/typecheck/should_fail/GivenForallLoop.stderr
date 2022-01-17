@@ -1,6 +1,6 @@
 
 GivenForallLoop.hs:8:11: error:
-    • Could not deduce: a ~ b
+    • Could not deduce (a ~ b)
       from the context: a ~ (forall b1. F a b1)
         bound by the type signature for:
                    loopy :: forall a b. (a ~ (forall b1. F a b1)) => a -> b

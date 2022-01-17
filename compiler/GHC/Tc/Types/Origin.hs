@@ -1,4 +1,6 @@
-
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
@@ -19,6 +21,8 @@ module GHC.Tc.Types.Origin (
   CtOrigin(..), exprCtOrigin, lexprCtOrigin, matchesCtOrigin, grhssCtOrigin,
   isVisibleOrigin, toInvisibleOrigin,
   pprCtOrigin, isGivenOrigin,
+
+  TypedThing(..), TyVarBndrs(..),
 
   -- CtOrigin and CallStack
   isPushCallStackOrigin, callStackOriginFS,
@@ -212,8 +216,8 @@ data SkolemInfo
                  -- hence, we have less info
 
   | ForAllSkol  -- Bound by a user-written "forall".
-       SDoc        -- Shows just the binders, used when reporting a bad telescope
-                   -- See Note [Checking telescopes] in GHC.Tc.Types.Constraint
+      TyVarBndrs   -- Shows just the binders, used when reporting a bad telescope
+                    -- See Note [Checking telescopes] in GHC.Tc.Types.Constraint
 
   | DerivSkol Type      -- Bound by a 'deriving' clause;
                         -- the type is the instance we are trying to derive
@@ -264,7 +268,7 @@ pprSkolInfo :: SkolemInfo -> SDoc
 -- Complete the sentence "is a rigid type variable bound by..."
 pprSkolInfo (SigSkol cx ty _) = pprSigSkolInfo cx ty
 pprSkolInfo (SigTypeSkol cx)  = pprUserTypeCtxt cx
-pprSkolInfo (ForAllSkol tvs)  = text "an explicit forall" <+> tvs
+pprSkolInfo (ForAllSkol tvs)  = text "an explicit forall" <+> ppr tvs
 pprSkolInfo (IPSkol ips)      = text "the implicit-parameter binding" <> plural ips <+> text "for"
                                  <+> pprWithCommas ppr ips
 pprSkolInfo (DerivSkol pred)  = text "the deriving clause for" <+> quotes (ppr pred)
@@ -358,6 +362,32 @@ in the right place.  So we proceed as follows:
 ************************************************************************
 -}
 
+-- | Some thing which has a type.
+--
+-- This datatype is used when we want to report to the user
+-- that something has an unexpected type.
+data TypedThing
+  = HsTypeRnThing (HsType GhcRn)
+  | TypeThing Type
+  | HsExprRnThing (HsExpr GhcRn)
+  | NameThing Name
+
+-- | Some kind of type variable binder.
+--
+-- Used for reporting errors, in 'SkolemInfo' and 'TcReportMsg'.
+data TyVarBndrs
+  = forall flag. OutputableBndrFlag flag 'Renamed =>
+      HsTyVarBndrsRn [HsTyVarBndr flag GhcRn]
+
+instance Outputable TypedThing where
+  ppr (HsTypeRnThing ty) = ppr ty
+  ppr (TypeThing ty) = ppr ty
+  ppr (HsExprRnThing expr) = ppr expr
+  ppr (NameThing name) = ppr name
+
+instance Outputable TyVarBndrs where
+  ppr (HsTyVarBndrsRn bndrs) = fsep (map ppr bndrs)
+
 data CtOrigin
   = -- | A given constraint from a user-written type signature. The
     -- 'SkolemInfo' inside gives more information.
@@ -404,9 +434,10 @@ data CtOrigin
   | SpecPragOrigin UserTypeCtxt    -- Specialisation pragma for
                                    -- function or instance
 
+
   | TypeEqOrigin { uo_actual   :: TcType
                  , uo_expected :: TcType
-                 , uo_thing    :: Maybe SDoc
+                 , uo_thing    :: Maybe TypedThing
                        -- ^ The thing that has type "actual"
                  , uo_visible  :: Bool
                        -- ^ Is at least one of the three elements above visible?

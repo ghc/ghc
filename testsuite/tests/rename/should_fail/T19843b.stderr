@@ -1,4 +1,4 @@
 
-T19843b.hs:7:6:
-    • Data constructor not in scope: Map :: (a0 -> Bool) -> t -> t0
-    • Perhaps you meant variable ‘map’ (imported from Prelude)
+T19843b.hs:7:6: error:
+    Data constructor not in scope: Map :: (a0 -> Bool) -> t -> t0
+    Suggested fix: Perhaps use variable ‘map’ (imported from Prelude)

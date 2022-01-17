@@ -1,10 +1,10 @@
 [1 of 1] Processing p
-  [1 of 3] Compiling H1[sig]          ( p/H1.hsig, nothing )
-  [2 of 3] Compiling H2[sig]          ( p/H2.hsig, nothing )
-  [3 of 3] Compiling M                ( p/M.hs, nothing )
+  [1 of 3] Compiling H1[sig]          ( p\H1.hsig, nothing )
+  [2 of 3] Compiling H2[sig]          ( p\H2.hsig, nothing )
+  [3 of 3] Compiling M                ( p\M.hs, nothing )
 
 bkpfail24.bkp:14:15: error:
-    • Could not deduce: a ~ b
+    • Could not deduce (a ~ b)
       from the context: {H1.T} ~ {H2.T}
         bound by the type signature for:
                    f :: forall a b. ({H1.T} ~ {H2.T}) => a -> b

@@ -1,6 +1,7 @@
 
 mod136.hs:7:5: error:
     Variable not in scope: zipWith5
-    Perhaps you meant one of these:
-      ‘zipWith’ (imported from Mod136_A),
-      ‘zipWith3’ (imported from Mod136_A)
+    Suggested fix:
+      Perhaps use one of these:
+        ‘zipWith’ (imported from Mod136_A),
+        ‘zipWith3’ (imported from Mod136_A)

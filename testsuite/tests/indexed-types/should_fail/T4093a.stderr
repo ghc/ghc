@@ -1,6 +1,6 @@
 
 T4093a.hs:8:8: error:
-    • Could not deduce: e ~ ()
+    • Could not deduce (e ~ ())
       from the context: Foo e ~ Maybe e
         bound by the type signature for:
                    hang :: forall e. (Foo e ~ Maybe e) => Foo e

@@ -1,8 +1,10 @@
 
-T2713.hs:11:10:
+T2713.hs:11:10: error:
     The fixity signature for ‘.*.’ lacks an accompanying binding
-      (The fixity signature must be given where ‘.*.’ is declared)
+    Suggested fix:
+      Move the fixity signature to the declaration site of ‘.*.’.
 
-T2713.hs:12:1:
+T2713.hs:12:1: error:
     The type signature for ‘f’ lacks an accompanying binding
-      (The type signature must be given where ‘f’ is declared)
+    Suggested fix:
+      Move the type signature to the declaration site of ‘f’.
