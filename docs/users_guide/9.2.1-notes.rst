@@ -351,6 +351,17 @@ Eventlog
 ``base`` library
 ~~~~~~~~~~~~~~~~
 
+- The lifted fixed-width integer and word types (e.g.
+  ``Data.Int.Int8``, ``Data.Word.Word32``) are now represented by their associated
+  fixed-width unlifted types. For instance, while in previous GHC versions
+  ``Int8`` was defined as: ::
+
+    data Int8 = I8# Int#
+
+  As of GHC 9.2 it is rather defined as, ::
+
+    data Int8 = I8# Int8#
+
 - Character set metadata bumped to Unicode 13.0.0.
 
 - It's possible now to promote the ``Natural`` type: ::
