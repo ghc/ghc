@@ -2663,4 +2663,10 @@ which can be checked easily using ghc-debug.
         as it should be as we retain a copy of the ModDetails for too long.
    Where? pruneCache in GHC.Driver.Make
 
+4. No TcGblEnv or TcLclEnv are live after typechecking is completed.
+   Why? By the time we get to simplification all the data structures from typechecking
+        should be eliminated.
+   Where? No one place in the compiler. These leaks can be introduced by not suitable
+          forcing functions which take a TcLclEnv as an argument.
+
 -}
