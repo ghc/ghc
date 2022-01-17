@@ -1828,6 +1828,9 @@ commitFlexi flexi tv zonked_kind
         | isRuntimeRepTy zonked_kind
         -> do { traceTc "Defaulting flexi tyvar to LiftedRep:" (pprTyVar tv)
               ; return liftedRepTy }
+        | isLevityTy zonked_kind
+        -> do { traceTc "Defaulting flexi tyvar to Lifted:" (pprTyVar tv)
+              ; return liftedDataConTy }
         | isMultiplicityTy zonked_kind
         -> do { traceTc "Defaulting flexi tyvar to Many:" (pprTyVar tv)
               ; return manyDataConTy }

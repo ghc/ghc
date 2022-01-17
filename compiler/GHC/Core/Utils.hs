@@ -123,7 +123,7 @@ import qualified Data.Set as Set
 ************************************************************************
 -}
 
-exprType :: CoreExpr -> Type
+exprType :: HasDebugCallStack => CoreExpr -> Type
 -- ^ Recover the type of a well-typed Core expression. Fails when
 -- applied to the actual 'GHC.Core.Type' expression as it cannot
 -- really be said to have a type
@@ -229,7 +229,7 @@ Note that there might be existentially quantified coercion variables, too.
 -}
 
 -- Not defined with applyTypeToArg because you can't print from GHC.Core.
-applyTypeToArgs :: SDoc -> Type -> [CoreExpr] -> Type
+applyTypeToArgs :: HasDebugCallStack => SDoc -> Type -> [CoreExpr] -> Type
 -- ^ A more efficient version of 'applyTypeToArg' when we have several arguments.
 -- The first argument is just for debugging, and gives some context
 applyTypeToArgs pp_e op_ty args

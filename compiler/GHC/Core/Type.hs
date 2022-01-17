@@ -122,7 +122,8 @@ module GHC.Core.Type (
         -- *** Levity and boxity
         isLiftedType_maybe,
         isLiftedTypeKind, isUnliftedTypeKind, isBoxedTypeKind, pickyIsLiftedTypeKind,
-        isLiftedRuntimeRep, isUnliftedRuntimeRep, isBoxedRuntimeRep,
+        isLiftedRuntimeRep, isUnliftedRuntimeRep, isLiftedRuntimeRep_maybe,
+        isBoxedRuntimeRep,
         isLiftedLevity, isUnliftedLevity,
         isUnliftedType, isBoxedType, mightBeUnliftedType, isUnboxedTupleType, isUnboxedSumType,
         isAlgType, isDataFamilyAppType,
@@ -130,7 +131,7 @@ module GHC.Core.Type (
         isLevityTy, isLevityVar,
         isRuntimeRepTy, isRuntimeRepVar, isRuntimeRepKindedTy,
         dropRuntimeRepArgs,
-        getRuntimeRep,
+        getRuntimeRep, getLevity, getLevity_maybe,
 
         -- * Multiplicity
 
@@ -258,6 +259,7 @@ import {-# SOURCE #-} GHC.Builtin.Types
                                  ( charTy, naturalTy, listTyCon
                                  , typeSymbolKind, liftedTypeKind, unliftedTypeKind
                                  , liftedRepTy, unliftedRepTy, zeroBitRepTy
+                                 , boxedRepDataConTyCon
                                  , constraintKind, zeroBitTypeKind
                                  , unrestrictedFunTyCon
                                  , manyDataConTy, oneDataConTy )
@@ -731,42 +733,65 @@ isBoxedRuntimeRep_maybe rep
   | otherwise
   = Nothing
 
-isLiftedRuntimeRep :: Type -> Bool
--- isLiftedRuntimeRep is true of LiftedRep :: RuntimeRep
--- False of type variables (a :: RuntimeRep)
---   and of other reps e.g. (IntRep :: RuntimeRep)
-isLiftedRuntimeRep rep
-  | Just [lev] <- isTyConKeyApp_maybe boxedRepDataConKey rep
-  = isLiftedLevity lev
-  | otherwise
-  = False
-
-isUnliftedRuntimeRep :: Type -> Bool
--- PRECONDITION: The type has kind RuntimeRep
--- True of definitely-unlifted RuntimeReps
--- False of           (LiftedRep :: RuntimeRep)
---   and of variables (a :: RuntimeRep)
-isUnliftedRuntimeRep rep
-  | TyConApp rr_tc args <- coreFullView rep -- NB: args might be non-empty
-                                            --     e.g. TupleRep [r1, .., rn]
+-- | Check whether a type of kind 'RuntimeRep' is lifted, unlifted, or unknown.
+--
+-- @isLiftedRuntimeRep rr@ returns:
+--
+--   * @Just True @ if @rr@ is @LiftedRep :: RuntimeRep@
+--   * @Just False@ if @rr@ is definitely not lifted, e.g. @IntRep@
+--   * @Nothing   @ if not known (e.g. it's a type variable or a type family application).
+isLiftedRuntimeRep_maybe :: Type -> Maybe Bool
+isLiftedRuntimeRep_maybe rep
+  | TyConApp rr_tc args <- coreFullView rep
   , isPromotedDataCon rr_tc =
       -- NB: args might be non-empty e.g. TupleRep [r1, .., rn]
       if (rr_tc `hasKey` boxedRepDataConKey)
         then case args of
-          [lev] -> isUnliftedLevity lev
-          _     -> False
-        else True
+          [lev] | isLiftedLevity   lev -> Just True
+                | isUnliftedLevity lev -> Just False
+          _                            -> Nothing
+        else Just False
         -- Avoid searching all the unlifted RuntimeRep type cons
         -- In the RuntimeRep data type, only LiftedRep is lifted
         -- But be careful of type families (F tys) :: RuntimeRep,
         -- hence the isPromotedDataCon rr_tc
-isUnliftedRuntimeRep _ = False
+isLiftedRuntimeRep_maybe _ = Nothing
 
--- | An INLINE helper for function such as 'isLiftedRuntimeRep' below.
+-- | Check whether a type of kind 'RuntimeRep' is lifted.
+--
+-- 'isLiftedRuntimeRep' is:
+--
+--  * True of @LiftedRep :: RuntimeRep@
+--  * False of type variables, type family applications,
+--    and of other reps such as @IntRep :: RuntimeRep@.
+isLiftedRuntimeRep :: Type -> Bool
+isLiftedRuntimeRep rep
+  | Just True <- isLiftedRuntimeRep_maybe rep
+  = True
+  | otherwise
+  = False
+
+-- | Check whether a type of kind 'RuntimeRep' is unlifted.
+--
+--  * True of definitely unlifted 'RuntimeRep's such as
+--    'UnliftedRep', 'IntRep', 'FloatRep', ...
+--  * False of 'LiftedRep',
+--  * False for type variables and type family applications.
+isUnliftedRuntimeRep :: Type -> Bool
+isUnliftedRuntimeRep rep
+  | Just False <- isLiftedRuntimeRep_maybe rep
+  = True
+  | otherwise
+  = False
+
+-- | An INLINE helper for functions such as 'isLiftedLevity' and 'isUnliftedLevity'.
+--
+-- Checks whether the type is a nullary 'TyCon' application,
+-- for a 'TyCon' with the given 'Unique'.
 isNullaryTyConKeyApp :: Unique -> Type -> Bool
 isNullaryTyConKeyApp key ty
   | Just args <- isTyConKeyApp_maybe key ty
-  = assert (null args ) True
+  = assert (null args) True
   | otherwise
   = False
 {-# INLINE isNullaryTyConKeyApp #-}
@@ -2448,7 +2473,7 @@ dropRuntimeRepArgs :: [Type] -> [Type]
 dropRuntimeRepArgs = dropWhile isRuntimeRepKindedTy
 
 -- | Extract the RuntimeRep classifier of a type. For instance,
--- @getRuntimeRep_maybe Int = LiftedRep@. Returns 'Nothing' if this is not
+-- @getRuntimeRep_maybe Int = Just LiftedRep@. Returns 'Nothing' if this is not
 -- possible.
 getRuntimeRep_maybe :: HasDebugCallStack
                     => Type -> Maybe Type
@@ -2461,6 +2486,30 @@ getRuntimeRep ty
   = case getRuntimeRep_maybe ty of
       Just r  -> r
       Nothing -> pprPanic "getRuntimeRep" (ppr ty <+> dcolon <+> ppr (typeKind ty))
+
+-- | Extract the 'Levity' of a type. For example, @getLevity_maybe Int = Just Lifted@,
+-- @getLevity (Array# Int) = Just Unlifted@, @getLevity Float# = Nothing@.
+--
+-- Returns 'Nothing' if this is not possible. Does not look through type family applications.
+getLevity_maybe :: HasDebugCallStack => Type -> Maybe Type
+getLevity_maybe ty
+  | Just rep <- getRuntimeRep_maybe ty
+  , Just (tc, [lev]) <- splitTyConApp_maybe rep
+  , tc == boxedRepDataConTyCon
+  = Just lev
+  | otherwise
+  = Nothing
+
+-- | Extract the 'Levity' of a type. For example, @getLevity Int = Lifted@,
+-- or @getLevity (Array# Int) = Unlifted@.
+--
+-- Panics if this is not possible. Does not look through type family applications.
+getLevity :: HasDebugCallStack => Type -> Type
+getLevity ty
+  | Just lev <- getLevity_maybe ty
+  = lev
+  | otherwise
+  = pprPanic "getLevity" (ppr ty <+> dcolon <+> ppr (typeKind ty))
 
 isUnboxedTupleType :: Type -> Bool
 isUnboxedTupleType ty

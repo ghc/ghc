@@ -34,6 +34,9 @@ module GHC.Exts
         -- ** Other primitive types
         module GHC.Types,
 
+        -- ** Legacy interface for arrays of arrays
+        module GHC.ArrayArray,
+
         -- * Primitive operations
 
         module GHC.Prim,
@@ -55,8 +58,6 @@ module GHC.Exts
         sameSmallMutableArray#,
         sameByteArray#,
         sameMutableByteArray#,
-        sameArrayArray#,
-        sameMutableArrayArray#,
         sameMVar#,
         sameMutVar#,
         sameTVar#,
@@ -136,6 +137,7 @@ import GHC.Types
            -- GHC's internal representation of 'TyCon's, for 'Typeable'
          , Module, TrName, TyCon, TypeLitSort, KindRep, KindBndr )
 import qualified GHC.Prim.Ext
+import GHC.ArrayArray
 import GHC.Base hiding ( coerce )
 import GHC.Ptr
 import GHC.Stack

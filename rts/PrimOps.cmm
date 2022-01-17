@@ -391,16 +391,6 @@ stg_copyMutableArrayzh ( gcptr src, W_ src_off, gcptr dst, W_ dst_off, W_ n )
     copyMutableArray(src, src_off, dst, dst_off, n)
 }
 
-stg_copyArrayArrayzh ( gcptr src, W_ src_off, gcptr dst, W_ dst_off, W_ n )
-{
-    copyArray(src, src_off, dst, dst_off, n)
-}
-
-stg_copyMutableArrayArrayzh ( gcptr src, W_ src_off, gcptr dst, W_ dst_off, W_ n )
-{
-    copyMutableArray(src, src_off, dst, dst_off, n)
-}
-
 stg_cloneArrayzh ( gcptr src, W_ offset, W_ n )
 {
     cloneArray(stg_MUT_ARR_PTRS_FROZEN_CLEAN_info, src, offset, n)
@@ -449,43 +439,6 @@ stg_casArrayzh ( gcptr arr, W_ ind, gcptr old, gcptr new )
 
         return (0,new);
     }
-}
-
-stg_newArrayArrayzh ( W_ n /* words */ )
-{
-    W_ words, size, p;
-    gcptr arr;
-
-    MAYBE_GC_N(stg_newArrayArrayzh, n);
-
-    // the mark area contains one byte for each 2^MUT_ARR_PTRS_CARD_BITS words
-    // in the array, making sure we round up, and then rounding up to a whole
-    // number of words.
-    size = n + mutArrPtrsCardWords(n);
-    words = BYTES_TO_WDS(SIZEOF_StgMutArrPtrs) + size;
-    ("ptr" arr) = ccall allocateMightFail(MyCapability() "ptr",words);
-    if (arr == NULL) {
-        jump stg_raisezh(base_GHCziIOziException_heapOverflow_closure);
-    }
-    TICK_ALLOC_PRIM(SIZEOF_StgMutArrPtrs, WDS(size), 0);
-
-    SET_HDR(arr, stg_MUT_ARR_PTRS_DIRTY_info, W_[CCCS]);
-    StgMutArrPtrs_ptrs(arr) = n;
-    StgMutArrPtrs_size(arr) = size;
-
-    // Initialize card table to all-clean.
-    setCardsValue(arr, 0, n, 0);
-
-    // Initialise all elements of the array with a pointer to the new array
-    p = arr + SIZEOF_StgMutArrPtrs;
-  for:
-    if (p < arr + SIZEOF_StgMutArrPtrs + WDS(n)) (likely: True) {
-        W_[p] = arr;
-        p = p + WDS(1);
-        goto for;
-    }
-
-    return (arr);
 }
 
 

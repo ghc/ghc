@@ -26,8 +26,6 @@ module GHC.Prim.PtrEq
     sameSmallMutableArray#,
     sameByteArray#,
     sameMutableByteArray#,
-    sameArrayArray#,
-    sameMutableArrayArray#,
     sameMutVar#,
     sameTVar#,
     sameMVar#,
@@ -99,14 +97,6 @@ sameByteArray# = reallyUnsafePtrEquality#
 -- | Compare the underlying pointers of two mutable byte arrays.
 sameMutableByteArray# :: MutableByteArray# s -> MutableByteArray# s -> Int#
 sameMutableByteArray# = reallyUnsafePtrEquality#
-
--- | Compare the underlying pointers of two arrays of arrays.
-sameArrayArray# :: ArrayArray# -> ArrayArray# -> Int#
-sameArrayArray# = reallyUnsafePtrEquality#
-
--- | Compare the underlying pointers of two mutable arrays of arrays.
-sameMutableArrayArray# :: MutableArrayArray# s -> MutableArrayArray# s -> Int#
-sameMutableArrayArray# = reallyUnsafePtrEquality#
 
 -- | Compare the underlying pointers of two 'MutVar#'s.
 sameMutVar# :: MutVar# s a -> MutVar# s a -> Int#

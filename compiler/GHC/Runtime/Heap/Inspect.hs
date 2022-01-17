@@ -807,17 +807,19 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
          go max_depth my_ty old_ty ind
 -- We also follow references
       MutVarClosure{var=contents}
-         | Just (tycon,[world,contents_ty]) <- tcSplitTyConApp_maybe old_ty
+         | Just (tycon,[lev,world,contents_ty]) <- tcSplitTyConApp_maybe old_ty
              -> do
                   -- Deal with the MutVar# primitive
                   -- It does not have a constructor at all,
                   -- so we simulate the following one
                   -- MutVar# :: contents_ty -> MutVar# s contents_ty
-         traceTR (text "Following a MutVar")
-         contents_tv <- newVar liftedTypeKind
+         massert (tycon == mutVarPrimTyCon)
          massert (isUnliftedType my_ty)
+         traceTR (text "Following a MutVar")
+         let contents_kind = mkTYPEapp (mkTyConApp boxedRepDataConTyCon [lev])
+         contents_tv <- newVar contents_kind
          (mutvar_ty,_) <- instScheme $ quantifyType $ mkVisFunTyMany
-                            contents_ty (mkTyConApp tycon [world,contents_ty])
+                            contents_ty (mkTyConApp tycon [lev, world,contents_ty])
          addConstraint (mkVisFunTyMany contents_tv my_ty) mutvar_ty
          x <- go (pred max_depth) contents_tv contents_ty contents
          return (RefWrap my_ty x)
@@ -1039,11 +1041,14 @@ cvReconstructType hsc_env max_depth old_ty hval = runTR_maybe hsc_env $ do
     case clos of
       BlackholeClosure{indirectee=ind} -> go my_ty ind
       IndClosure{indirectee=ind} -> go my_ty ind
-      MutVarClosure{var=contents} -> do
-         tv'   <- newVar liftedTypeKind
-         world <- newVar liftedTypeKind
-         addConstraint my_ty (mkTyConApp mutVarPrimTyCon [world,tv'])
-         return [(tv', contents)]
+      MutVarClosure{var=contents}
+        | Just (_tycon,[lev,_world,_contents_ty]) <- tcSplitTyConApp_maybe my_ty
+        -> do
+        massert (_tycon == mutVarPrimTyCon)
+        tv'   <- newVar $ mkTYPEapp (mkTyConApp boxedRepDataConTyCon [lev])
+        world <- newVar liftedTypeKind
+        addConstraint my_ty $ mkMutVarPrimTy world tv'
+        return [(tv', contents)]
       APClosure {payload=pLoad} -> do                -- #19559 (incr)
         mapM_ (go my_ty) pLoad
         return []

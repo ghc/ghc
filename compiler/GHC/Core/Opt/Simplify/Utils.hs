@@ -588,9 +588,18 @@ mkArgInfo env fun rules n_val_args call_cont
 
       | Just (_, arg_ty, fun_ty') <- splitFunTy_maybe fun_ty        -- Add strict-type info
       , dmd : rest_dmds <- dmds
-      , let dmd' = case isLiftedType_maybe arg_ty of
-                       Just False -> strictifyDmd dmd
-                       _          -> dmd
+      , let dmd'
+             -- TODO: we should just use isLiftedType_maybe, but that
+             -- function is currently wrong (#20837).
+             | Just rr <- getRuntimeRep_maybe arg_ty
+             , Just False <- isLiftedRuntimeRep_maybe rr
+             -- The type is definitely unlifted, such as:
+             --   - TYPE (BoxedRep Unlifted)
+             --   - TYPE IntRep, TYPE FloatRep, ...
+             = strictifyDmd dmd
+             | otherwise
+             -- Could be definitely lifted, or we're not sure (e.g. levity-polymorphic).
+             = dmd
       = dmd' : add_type_strictness fun_ty' rest_dmds
           -- If the type is representation-polymorphic, we can't know whether
           -- it's strict. isLiftedType_maybe will return Just False only when

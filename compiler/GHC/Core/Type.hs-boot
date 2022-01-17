@@ -27,4 +27,6 @@ mkTYPEapp :: Type -> Type
 splitTyConApp_maybe :: HasDebugCallStack => Type -> Maybe (TyCon, [Type])
 tyConAppTyCon_maybe :: Type -> Maybe TyCon
 
+getLevity :: HasDebugCallStack => Type -> Type
+
 partitionInvisibleTypes :: TyCon -> [Type] -> ([Type], [Type])

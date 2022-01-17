@@ -603,9 +603,9 @@ closureField profile off = off + fixedHdrSize profile
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 --
 -- For certain types passed to foreign calls, we adjust the actual
--- value passed to the call.  For ByteArray#, Array#, SmallArray#,
--- and ArrayArray#, we pass the address of the array's payload, not
--- the address of the heap object. For example, consider
+-- value passed to the call.  For ByteArray#, Array# and SmallArray#,
+-- we pass the address of the array's payload, not the address of
+-- the heap object. For example, consider:
 --   foreign import "c_foo" foo :: ByteArray# -> Int# -> IO ()
 -- At a Haskell call like `foo x y`, we'll generate a C call that
 -- is more like
@@ -715,8 +715,6 @@ typeToStgFArgType :: Type -> StgFArgType
 typeToStgFArgType typ
   | tycon == arrayPrimTyCon = StgArrayType
   | tycon == mutableArrayPrimTyCon = StgArrayType
-  | tycon == arrayArrayPrimTyCon = StgArrayType
-  | tycon == mutableArrayArrayPrimTyCon = StgArrayType
   | tycon == smallArrayPrimTyCon = StgSmallArrayType
   | tycon == smallMutableArrayPrimTyCon = StgSmallArrayType
   | tycon == byteArrayPrimTyCon = StgByteArrayType

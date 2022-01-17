@@ -2,8 +2,7 @@
 
 module Main where
 
-import GHC.Prim
-import GHC.Base
+import GHC.Exts
 import GHC.ST
 import GHC.Word
 import Control.Monad

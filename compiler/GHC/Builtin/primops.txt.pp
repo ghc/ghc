@@ -1340,7 +1340,7 @@ primtype Array# a
 primtype MutableArray# s a
 
 primop  NewArrayOp "newArray#" GenPrimOp
-   Int# -> a -> State# s -> (# State# s, MutableArray# s a #)
+   Int# -> v -> State# s -> (# State# s, MutableArray# s v #)
    {Create a new mutable array with the specified number of elements,
     in the specified state thread,
     with each element containing the specified initial value.}
@@ -1349,14 +1349,14 @@ primop  NewArrayOp "newArray#" GenPrimOp
    has_side_effects = True
 
 primop  ReadArrayOp "readArray#" GenPrimOp
-   MutableArray# s a -> Int# -> State# s -> (# State# s, a #)
+   MutableArray# s v -> Int# -> State# s -> (# State# s, v #)
    {Read from specified index of mutable array. Result is not yet evaluated.}
    with
    has_side_effects = True
    can_fail         = True
 
 primop  WriteArrayOp "writeArray#" GenPrimOp
-   MutableArray# s a -> Int# -> a -> State# s -> State# s
+   MutableArray# s v -> Int# -> v -> State# s -> State# s
    {Write to specified index of mutable array.}
    with
    has_side_effects = True
@@ -1364,15 +1364,15 @@ primop  WriteArrayOp "writeArray#" GenPrimOp
    code_size        = 2 -- card update too
 
 primop  SizeofArrayOp "sizeofArray#" GenPrimOp
-   Array# a -> Int#
+   Array# v -> Int#
    {Return the number of elements in the array.}
 
 primop  SizeofMutableArrayOp "sizeofMutableArray#" GenPrimOp
-   MutableArray# s a -> Int#
+   MutableArray# s v -> Int#
    {Return the number of elements in the array.}
 
 primop  IndexArrayOp "indexArray#" GenPrimOp
-   Array# a -> Int# -> (# a #)
+   Array# v -> Int# -> (# v #)
    {Read from the specified index of an immutable array. The result is packaged
     into an unboxed unary tuple; the result itself is not yet
     evaluated. Pattern matching on the tuple forces the indexing of the
@@ -1384,20 +1384,20 @@ primop  IndexArrayOp "indexArray#" GenPrimOp
    can_fail         = True
 
 primop  UnsafeFreezeArrayOp "unsafeFreezeArray#" GenPrimOp
-   MutableArray# s a -> State# s -> (# State# s, Array# a #)
+   MutableArray# s v -> State# s -> (# State# s, Array# v #)
    {Make a mutable array immutable, without copying.}
    with
    has_side_effects = True
 
 primop  UnsafeThawArrayOp  "unsafeThawArray#" GenPrimOp
-   Array# a -> State# s -> (# State# s, MutableArray# s a #)
+   Array# v -> State# s -> (# State# s, MutableArray# s v #)
    {Make an immutable array mutable, without copying.}
    with
    out_of_line = True
    has_side_effects = True
 
 primop  CopyArrayOp "copyArray#" GenPrimOp
-  Array# a -> Int# -> MutableArray# s a -> Int# -> Int# -> State# s -> State# s
+  Array# v -> Int# -> MutableArray# s v -> Int# -> Int# -> State# s -> State# s
   {Given a source array, an offset into the source array, a
    destination array, an offset into the destination array, and a
    number of elements to copy, copy the elements from the source array
@@ -1411,7 +1411,7 @@ primop  CopyArrayOp "copyArray#" GenPrimOp
   can_fail         = True
 
 primop  CopyMutableArrayOp "copyMutableArray#" GenPrimOp
-  MutableArray# s a -> Int# -> MutableArray# s a -> Int# -> Int# -> State# s -> State# s
+  MutableArray# s v -> Int# -> MutableArray# s v -> Int# -> Int# -> State# s -> State# s
   {Given a source array, an offset into the source array, a
    destination array, an offset into the destination array, and a
    number of elements to copy, copy the elements from the source array
@@ -1425,7 +1425,7 @@ primop  CopyMutableArrayOp "copyMutableArray#" GenPrimOp
   can_fail         = True
 
 primop  CloneArrayOp "cloneArray#" GenPrimOp
-  Array# a -> Int# -> Int# -> Array# a
+  Array# v -> Int# -> Int# -> Array# v
   {Given a source array, an offset into the source array, and a number
    of elements to copy, create a new array with the elements from the
    source array. The provided array must fully contain the specified
@@ -1436,7 +1436,7 @@ primop  CloneArrayOp "cloneArray#" GenPrimOp
   can_fail         = True
 
 primop  CloneMutableArrayOp "cloneMutableArray#" GenPrimOp
-  MutableArray# s a -> Int# -> Int# -> State# s -> (# State# s, MutableArray# s a #)
+  MutableArray# s v -> Int# -> Int# -> State# s -> (# State# s, MutableArray# s v #)
   {Given a source array, an offset into the source array, and a number
    of elements to copy, create a new array with the elements from the
    source array. The provided array must fully contain the specified
@@ -1447,7 +1447,7 @@ primop  CloneMutableArrayOp "cloneMutableArray#" GenPrimOp
   can_fail         = True
 
 primop  FreezeArrayOp "freezeArray#" GenPrimOp
-  MutableArray# s a -> Int# -> Int# -> State# s -> (# State# s, Array# a #)
+  MutableArray# s v -> Int# -> Int# -> State# s -> (# State# s, Array# v #)
   {Given a source array, an offset into the source array, and a number
    of elements to copy, create a new array with the elements from the
    source array. The provided array must fully contain the specified
@@ -1458,7 +1458,7 @@ primop  FreezeArrayOp "freezeArray#" GenPrimOp
   can_fail         = True
 
 primop  ThawArrayOp "thawArray#" GenPrimOp
-  Array# a -> Int# -> Int# -> State# s -> (# State# s, MutableArray# s a #)
+  Array# v -> Int# -> Int# -> State# s -> (# State# s, MutableArray# s v #)
   {Given a source array, an offset into the source array, and a number
    of elements to copy, create a new array with the elements from the
    source array. The provided array must fully contain the specified
@@ -1469,7 +1469,7 @@ primop  ThawArrayOp "thawArray#" GenPrimOp
   can_fail         = True
 
 primop CasArrayOp  "casArray#" GenPrimOp
-   MutableArray# s a -> Int# -> a -> a -> State# s -> (# State# s, Int#, a #)
+   MutableArray# s v -> Int# -> v -> v -> State# s -> (# State# s, Int#, v #)
    {Given an array, an offset, the expected old value, and
     the new value, perform an atomic compare and swap (i.e. write the new
     value if the current value and the old value are the same pointer).
@@ -1477,7 +1477,7 @@ primop CasArrayOp  "casArray#" GenPrimOp
     the element at the offset after the operation completes. This means that
     on a success the new value is returned, and on a failure the actual old
     value (not the expected one) is returned. Implies a full memory barrier.
-    The use of a pointer equality on a lifted value makes this function harder
+    The use of a pointer equality on a boxed value makes this function harder
     to use correctly than {\tt casIntArray\#}. All of the difficulties
     of using {\tt reallyUnsafePtrEquality\#} correctly apply to
     {\tt casArray\#} as well.
@@ -1516,7 +1516,7 @@ primtype SmallArray# a
 primtype SmallMutableArray# s a
 
 primop  NewSmallArrayOp "newSmallArray#" GenPrimOp
-   Int# -> a -> State# s -> (# State# s, SmallMutableArray# s a #)
+   Int# -> v -> State# s -> (# State# s, SmallMutableArray# s v #)
    {Create a new mutable array with the specified number of elements,
     in the specified state thread,
     with each element containing the specified initial value.}
@@ -1525,7 +1525,7 @@ primop  NewSmallArrayOp "newSmallArray#" GenPrimOp
    has_side_effects = True
 
 primop  ShrinkSmallMutableArrayOp_Char "shrinkSmallMutableArray#" GenPrimOp
-   SmallMutableArray# s a -> Int# -> State# s -> State# s
+   SmallMutableArray# s v -> Int# -> State# s -> State# s
    {Shrink mutable array to new specified size, in
     the specified state thread. The new size argument must be less than or
     equal to the current size as reported by {\tt getSizeofSmallMutableArray\#}.}
@@ -1533,49 +1533,49 @@ primop  ShrinkSmallMutableArrayOp_Char "shrinkSmallMutableArray#" GenPrimOp
         has_side_effects = True
 
 primop  ReadSmallArrayOp "readSmallArray#" GenPrimOp
-   SmallMutableArray# s a -> Int# -> State# s -> (# State# s, a #)
+   SmallMutableArray# s v -> Int# -> State# s -> (# State# s, v #)
    {Read from specified index of mutable array. Result is not yet evaluated.}
    with
    has_side_effects = True
    can_fail         = True
 
 primop  WriteSmallArrayOp "writeSmallArray#" GenPrimOp
-   SmallMutableArray# s a -> Int# -> a -> State# s -> State# s
+   SmallMutableArray# s v -> Int# -> v -> State# s -> State# s
    {Write to specified index of mutable array.}
    with
    has_side_effects = True
    can_fail         = True
 
 primop  SizeofSmallArrayOp "sizeofSmallArray#" GenPrimOp
-   SmallArray# a -> Int#
+   SmallArray# v -> Int#
    {Return the number of elements in the array.}
 
 primop  SizeofSmallMutableArrayOp "sizeofSmallMutableArray#" GenPrimOp
-   SmallMutableArray# s a -> Int#
+   SmallMutableArray# s v -> Int#
    {Return the number of elements in the array. Note that this is deprecated
    as it is unsafe in the presence of shrink and resize operations on the
    same small mutable array.}
    with deprecated_msg = { Use 'getSizeofSmallMutableArray#' instead }
 
 primop  GetSizeofSmallMutableArrayOp "getSizeofSmallMutableArray#" GenPrimOp
-   SmallMutableArray# s a -> State# s -> (# State# s, Int# #)
+   SmallMutableArray# s v -> State# s -> (# State# s, Int# #)
    {Return the number of elements in the array.}
 
 primop  IndexSmallArrayOp "indexSmallArray#" GenPrimOp
-   SmallArray# a -> Int# -> (# a #)
+   SmallArray# v -> Int# -> (# v #)
    {Read from specified index of immutable array. Result is packaged into
     an unboxed singleton; the result itself is not yet evaluated.}
    with
    can_fail         = True
 
 primop  UnsafeFreezeSmallArrayOp "unsafeFreezeSmallArray#" GenPrimOp
-   SmallMutableArray# s a -> State# s -> (# State# s, SmallArray# a #)
+   SmallMutableArray# s v -> State# s -> (# State# s, SmallArray# v #)
    {Make a mutable array immutable, without copying.}
    with
    has_side_effects = True
 
 primop  UnsafeThawSmallArrayOp  "unsafeThawSmallArray#" GenPrimOp
-   SmallArray# a -> State# s -> (# State# s, SmallMutableArray# s a #)
+   SmallArray# v -> State# s -> (# State# s, SmallMutableArray# s v #)
    {Make an immutable array mutable, without copying.}
    with
    out_of_line = True
@@ -1585,7 +1585,7 @@ primop  UnsafeThawSmallArrayOp  "unsafeThawSmallArray#" GenPrimOp
 -- primops aren't inlined. It would be nice to keep track of both.
 
 primop  CopySmallArrayOp "copySmallArray#" GenPrimOp
-  SmallArray# a -> Int# -> SmallMutableArray# s a -> Int# -> Int# -> State# s -> State# s
+  SmallArray# v -> Int# -> SmallMutableArray# s v -> Int# -> Int# -> State# s -> State# s
   {Given a source array, an offset into the source array, a
    destination array, an offset into the destination array, and a
    number of elements to copy, copy the elements from the source array
@@ -1599,7 +1599,7 @@ primop  CopySmallArrayOp "copySmallArray#" GenPrimOp
   can_fail         = True
 
 primop  CopySmallMutableArrayOp "copySmallMutableArray#" GenPrimOp
-  SmallMutableArray# s a -> Int# -> SmallMutableArray# s a -> Int# -> Int# -> State# s -> State# s
+  SmallMutableArray# s v -> Int# -> SmallMutableArray# s v -> Int# -> Int# -> State# s -> State# s
   {Given a source array, an offset into the source array, a
    destination array, an offset into the destination array, and a
    number of elements to copy, copy the elements from the source array
@@ -1614,7 +1614,7 @@ primop  CopySmallMutableArrayOp "copySmallMutableArray#" GenPrimOp
   can_fail         = True
 
 primop  CloneSmallArrayOp "cloneSmallArray#" GenPrimOp
-  SmallArray# a -> Int# -> Int# -> SmallArray# a
+  SmallArray# v -> Int# -> Int# -> SmallArray# v
   {Given a source array, an offset into the source array, and a number
    of elements to copy, create a new array with the elements from the
    source array. The provided array must fully contain the specified
@@ -1625,7 +1625,7 @@ primop  CloneSmallArrayOp "cloneSmallArray#" GenPrimOp
   can_fail         = True
 
 primop  CloneSmallMutableArrayOp "cloneSmallMutableArray#" GenPrimOp
-  SmallMutableArray# s a -> Int# -> Int# -> State# s -> (# State# s, SmallMutableArray# s a #)
+  SmallMutableArray# s v -> Int# -> Int# -> State# s -> (# State# s, SmallMutableArray# s v #)
   {Given a source array, an offset into the source array, and a number
    of elements to copy, create a new array with the elements from the
    source array. The provided array must fully contain the specified
@@ -1636,7 +1636,7 @@ primop  CloneSmallMutableArrayOp "cloneSmallMutableArray#" GenPrimOp
   can_fail         = True
 
 primop  FreezeSmallArrayOp "freezeSmallArray#" GenPrimOp
-  SmallMutableArray# s a -> Int# -> Int# -> State# s -> (# State# s, SmallArray# a #)
+  SmallMutableArray# s v -> Int# -> Int# -> State# s -> (# State# s, SmallArray# v #)
   {Given a source array, an offset into the source array, and a number
    of elements to copy, create a new array with the elements from the
    source array. The provided array must fully contain the specified
@@ -1647,7 +1647,7 @@ primop  FreezeSmallArrayOp "freezeSmallArray#" GenPrimOp
   can_fail         = True
 
 primop  ThawSmallArrayOp "thawSmallArray#" GenPrimOp
-  SmallArray# a -> Int# -> Int# -> State# s -> (# State# s, SmallMutableArray# s a #)
+  SmallArray# v -> Int# -> Int# -> State# s -> (# State# s, SmallMutableArray# s v #)
   {Given a source array, an offset into the source array, and a number
    of elements to copy, create a new array with the elements from the
    source array. The provided array must fully contain the specified
@@ -1658,7 +1658,7 @@ primop  ThawSmallArrayOp "thawSmallArray#" GenPrimOp
   can_fail         = True
 
 primop CasSmallArrayOp  "casSmallArray#" GenPrimOp
-   SmallMutableArray# s a -> Int# -> a -> a -> State# s -> (# State# s, Int#, a #)
+   SmallMutableArray# s v -> Int# -> v -> v -> State# s -> (# State# s, Int#, v #)
    {Unsafe, machine-level atomic compare and swap on an element within an array.
     See the documentation of {\tt casArray\#}.}
    with
@@ -1969,114 +1969,6 @@ primop FetchXorByteArrayOp_Int "fetchXorIntArray#" GenPrimOp
     element before the operation. Implies a full memory barrier.}
    with has_side_effects = True
         can_fail = True
-
-
-------------------------------------------------------------------------
-section "Arrays of arrays"
-        {Operations on {\tt ArrayArray\#}. An {\tt ArrayArray\#} contains references to {\em unpointed}
-         arrays, such as {\tt ByteArray\#s}. Hence, it is not parameterised by the element types,
-         just like a {\tt ByteArray\#}, but it needs to be scanned during GC, just like an {\tt Array\#}.
-         We represent an {\tt ArrayArray\#} exactly as a {\tt Array\#}, but provide element-type-specific
-         indexing, reading, and writing.}
-------------------------------------------------------------------------
-
-primtype ArrayArray#
-
-primtype MutableArrayArray# s
-
-primop  NewArrayArrayOp "newArrayArray#" GenPrimOp
-   Int# -> State# s -> (# State# s, MutableArrayArray# s #)
-   {Create a new mutable array of arrays with the specified number of elements,
-    in the specified state thread, with each element recursively referring to the
-    newly created array.}
-   with
-   out_of_line = True
-   has_side_effects = True
-
-primop  UnsafeFreezeArrayArrayOp "unsafeFreezeArrayArray#" GenPrimOp
-   MutableArrayArray# s -> State# s -> (# State# s, ArrayArray# #)
-   {Make a mutable array of arrays immutable, without copying.}
-   with
-   has_side_effects = True
-
-primop  SizeofArrayArrayOp "sizeofArrayArray#" GenPrimOp
-   ArrayArray# -> Int#
-   {Return the number of elements in the array.}
-
-primop  SizeofMutableArrayArrayOp "sizeofMutableArrayArray#" GenPrimOp
-   MutableArrayArray# s -> Int#
-   {Return the number of elements in the array.}
-
-primop IndexArrayArrayOp_ByteArray "indexByteArrayArray#" GenPrimOp
-   ArrayArray# -> Int# -> ByteArray#
-   with can_fail = True
-
-primop IndexArrayArrayOp_ArrayArray "indexArrayArrayArray#" GenPrimOp
-   ArrayArray# -> Int# -> ArrayArray#
-   with can_fail = True
-
-primop  ReadArrayArrayOp_ByteArray "readByteArrayArray#" GenPrimOp
-   MutableArrayArray# s -> Int# -> State# s -> (# State# s, ByteArray# #)
-   with has_side_effects = True
-        can_fail = True
-
-primop  ReadArrayArrayOp_MutableByteArray "readMutableByteArrayArray#" GenPrimOp
-   MutableArrayArray# s -> Int# -> State# s -> (# State# s, MutableByteArray# s #)
-   with has_side_effects = True
-        can_fail = True
-
-primop  ReadArrayArrayOp_ArrayArray "readArrayArrayArray#" GenPrimOp
-   MutableArrayArray# s -> Int# -> State# s -> (# State# s, ArrayArray# #)
-   with has_side_effects = True
-        can_fail = True
-
-primop  ReadArrayArrayOp_MutableArrayArray "readMutableArrayArrayArray#" GenPrimOp
-   MutableArrayArray# s -> Int# -> State# s -> (# State# s, MutableArrayArray# s #)
-   with has_side_effects = True
-        can_fail = True
-
-primop  WriteArrayArrayOp_ByteArray "writeByteArrayArray#" GenPrimOp
-   MutableArrayArray# s -> Int# -> ByteArray# -> State# s -> State# s
-   with has_side_effects = True
-        can_fail = True
-
-primop  WriteArrayArrayOp_MutableByteArray "writeMutableByteArrayArray#" GenPrimOp
-   MutableArrayArray# s -> Int# -> MutableByteArray# s -> State# s -> State# s
-   with has_side_effects = True
-        can_fail = True
-
-primop  WriteArrayArrayOp_ArrayArray "writeArrayArrayArray#" GenPrimOp
-   MutableArrayArray# s -> Int# -> ArrayArray# -> State# s -> State# s
-   with has_side_effects = True
-        can_fail = True
-
-primop  WriteArrayArrayOp_MutableArrayArray "writeMutableArrayArrayArray#" GenPrimOp
-   MutableArrayArray# s -> Int# -> MutableArrayArray# s -> State# s -> State# s
-   with has_side_effects = True
-        can_fail = True
-
-primop  CopyArrayArrayOp "copyArrayArray#" GenPrimOp
-  ArrayArray# -> Int# -> MutableArrayArray# s -> Int# -> Int# -> State# s -> State# s
-  {Copy a range of the ArrayArray\# to the specified region in the MutableArrayArray\#.
-   Both arrays must fully contain the specified ranges, but this is not checked.
-   The two arrays must not be the same array in different states, but this is not checked either.}
-  with
-  out_of_line      = True
-  has_side_effects = True
-  can_fail         = True
-
-primop  CopyMutableArrayArrayOp "copyMutableArrayArray#" GenPrimOp
-  MutableArrayArray# s -> Int# -> MutableArrayArray# s -> Int# -> Int# -> State# s -> State# s
-  {Copy a range of the first MutableArrayArray# to the specified region in the second
-   MutableArrayArray#.
-   Both arrays must fully contain the specified ranges, but this is not checked.
-   The regions are allowed to overlap, although this is only possible when the same
-   array is provided as both the source and the destination.
-   }
-  with
-  out_of_line      = True
-  has_side_effects = True
-  can_fail         = True
 
 ------------------------------------------------------------------------
 section "Addr#"
@@ -2508,7 +2400,7 @@ primtype MutVar# s a
         {A {\tt MutVar\#} behaves like a single-element mutable array.}
 
 primop  NewMutVarOp "newMutVar#" GenPrimOp
-   a -> State# s -> (# State# s, MutVar# s a #)
+   v -> State# s -> (# State# s, MutVar# s v #)
    {Create {\tt MutVar\#} with specified initial value in specified state thread.}
    with
    out_of_line = True
@@ -2529,14 +2421,14 @@ primop  NewMutVarOp "newMutVar#" GenPrimOp
 -- at least.
 
 primop  ReadMutVarOp "readMutVar#" GenPrimOp
-   MutVar# s a -> State# s -> (# State# s, a #)
+   MutVar# s v -> State# s -> (# State# s, v #)
    {Read contents of {\tt MutVar\#}. Result is not yet evaluated.}
    with
    -- See Note [Why MutVar# ops can't fail]
    has_side_effects = True
 
 primop  WriteMutVarOp "writeMutVar#"  GenPrimOp
-   MutVar# s a -> a -> State# s -> State# s
+   MutVar# s v -> v -> State# s -> State# s
    {Write contents of {\tt MutVar\#}.}
    with
    -- See Note [Why MutVar# ops can't fail]
@@ -2580,7 +2472,22 @@ primop  AtomicModifyMutVar_Op "atomicModifyMutVar_#" GenPrimOp
    can_fail         = True
 
 primop  CasMutVarOp "casMutVar#" GenPrimOp
-  MutVar# s a -> a -> a -> State# s -> (# State# s, Int#, a #)
+  MutVar# s v -> v -> v -> State# s -> (# State# s, Int#, v #)
+   { Compare-and-swap: perform a pointer equality test between
+     the first value passed to this function and the value
+     stored inside the {\tt MutVar\#}. If the pointers are equal,
+     replace the stored value with the second value passed to this
+     function, otherwise do nothing.
+     Returns the final value stored inside the {\tt MutVar\#}.
+     The {\tt Int\#} indicates whether a swap took place,
+     with {\tt 1\#} meaning that we didn't swap, and {\tt 0\#}
+     that we did.
+     Implies a full memory barrier.
+     Because the comparison is done on the level of pointers,
+     all of the difficulties of using
+     {\tt reallyUnsafePtrEquality\#} correctly apply to
+     {\tt casMutVar\#} as well.
+   }
    with
    out_of_line = True
    has_side_effects = True
@@ -2603,10 +2510,10 @@ section "Exceptions"
 -- head-strict in 'ma': GHC.IO.catchException.
 
 primop  CatchOp "catch#" GenPrimOp
-          (State# RealWorld -> (# State# RealWorld, a #) )
-       -> (b -> State# RealWorld -> (# State# RealWorld, a #) )
+          (State# RealWorld -> (# State# RealWorld, o #) )
+       -> (w -> State# RealWorld -> (# State# RealWorld, o #) )
        -> State# RealWorld
-       -> (# State# RealWorld, a #)
+       -> (# State# RealWorld, o #)
    with
    strictness  = { \ _arity -> mkClosedDmdSig [ lazyApply1Dmd
                                                  , lazyApply2Dmd
@@ -2616,9 +2523,9 @@ primop  CatchOp "catch#" GenPrimOp
    has_side_effects = True
 
 primop  RaiseOp "raise#" GenPrimOp
-   a -> p
-      -- NB: "p" is the same as "b" except it is representation-polymorphic
-      -- (we shouldn't use "o" here as that would conflict with "a")
+   v -> p
+      -- NB: "v" is the same as "a" except levity-polymorphic,
+      -- and "p" is the same as "b" except representation-polymorphic
       -- See Note [Levity and representation polymorphic primops]
    with
    -- In contrast to 'raiseIO#', which throws a *precise* exception,
@@ -2633,7 +2540,7 @@ primop  RaiseOp "raise#" GenPrimOp
    can_fail = True
 
 primop  RaiseIOOp "raiseIO#" GenPrimOp
-   a -> State# RealWorld -> (# State# RealWorld, b #)
+   v -> State# RealWorld -> (# State# RealWorld, p #)
    with
    -- See Note [Precise exceptions and strictness analysis] in "GHC.Types.Demand"
    -- for why this is the *only* primop that has 'exnDiv'
@@ -2642,8 +2549,8 @@ primop  RaiseIOOp "raiseIO#" GenPrimOp
    has_side_effects = True
 
 primop  MaskAsyncExceptionsOp "maskAsyncExceptions#" GenPrimOp
-        (State# RealWorld -> (# State# RealWorld, a #))
-     -> (State# RealWorld -> (# State# RealWorld, a #))
+        (State# RealWorld -> (# State# RealWorld, o #))
+     -> (State# RealWorld -> (# State# RealWorld, o #))
    with
    strictness  = { \ _arity -> mkClosedDmdSig [strictOnceApply1Dmd,topDmd] topDiv }
                  -- See Note [Strictness for mask/unmask/catch]
@@ -2651,16 +2558,16 @@ primop  MaskAsyncExceptionsOp "maskAsyncExceptions#" GenPrimOp
    has_side_effects = True
 
 primop  MaskUninterruptibleOp "maskUninterruptible#" GenPrimOp
-        (State# RealWorld -> (# State# RealWorld, a #))
-     -> (State# RealWorld -> (# State# RealWorld, a #))
+        (State# RealWorld -> (# State# RealWorld, o #))
+     -> (State# RealWorld -> (# State# RealWorld, o #))
    with
    strictness  = { \ _arity -> mkClosedDmdSig [strictOnceApply1Dmd,topDmd] topDiv }
    out_of_line = True
    has_side_effects = True
 
 primop  UnmaskAsyncExceptionsOp "unmaskAsyncExceptions#" GenPrimOp
-        (State# RealWorld -> (# State# RealWorld, a #))
-     -> (State# RealWorld -> (# State# RealWorld, a #))
+        (State# RealWorld -> (# State# RealWorld, o #))
+     -> (State# RealWorld -> (# State# RealWorld, o #))
    with
    strictness  = { \ _arity -> mkClosedDmdSig [strictOnceApply1Dmd,topDmd] topDiv }
                  -- See Note [Strictness for mask/unmask/catch]
@@ -2680,8 +2587,8 @@ section "STM-accessible Mutable Variables"
 primtype TVar# s a
 
 primop  AtomicallyOp "atomically#" GenPrimOp
-      (State# RealWorld -> (# State# RealWorld, a #) )
-   -> State# RealWorld -> (# State# RealWorld, a #)
+      (State# RealWorld -> (# State# RealWorld, v #) )
+   -> State# RealWorld -> (# State# RealWorld, v #)
    with
    strictness  = { \ _arity -> mkClosedDmdSig [strictManyApply1Dmd,topDmd] topDiv }
                  -- See Note [Strictness for mask/unmask/catch]
@@ -2699,16 +2606,16 @@ primop  AtomicallyOp "atomically#" GenPrimOp
 --   retry# s1
 -- where 'e' would be unreachable anyway.  See #8091.
 primop  RetryOp "retry#" GenPrimOp
-   State# RealWorld -> (# State# RealWorld, a #)
+   State# RealWorld -> (# State# RealWorld, v #)
    with
    strictness  = { \ _arity -> mkClosedDmdSig [topDmd] botDiv }
    out_of_line = True
    has_side_effects = True
 
 primop  CatchRetryOp "catchRetry#" GenPrimOp
-      (State# RealWorld -> (# State# RealWorld, a #) )
-   -> (State# RealWorld -> (# State# RealWorld, a #) )
-   -> (State# RealWorld -> (# State# RealWorld, a #) )
+      (State# RealWorld -> (# State# RealWorld, v #) )
+   -> (State# RealWorld -> (# State# RealWorld, v #) )
+   -> (State# RealWorld -> (# State# RealWorld, v #) )
    with
    strictness  = { \ _arity -> mkClosedDmdSig [ lazyApply1Dmd
                                                  , lazyApply1Dmd
@@ -2718,9 +2625,9 @@ primop  CatchRetryOp "catchRetry#" GenPrimOp
    has_side_effects = True
 
 primop  CatchSTMOp "catchSTM#" GenPrimOp
-      (State# RealWorld -> (# State# RealWorld, a #) )
-   -> (b -> State# RealWorld -> (# State# RealWorld, a #) )
-   -> (State# RealWorld -> (# State# RealWorld, a #) )
+      (State# RealWorld -> (# State# RealWorld, v #) )
+   -> (b -> State# RealWorld -> (# State# RealWorld, v #) )
+   -> (State# RealWorld -> (# State# RealWorld, v #) )
    with
    strictness  = { \ _arity -> mkClosedDmdSig [ lazyApply1Dmd
                                                  , lazyApply2Dmd
@@ -2730,32 +2637,35 @@ primop  CatchSTMOp "catchSTM#" GenPrimOp
    has_side_effects = True
 
 primop  NewTVarOp "newTVar#" GenPrimOp
-       a
-    -> State# s -> (# State# s, TVar# s a #)
+       v
+    -> State# s -> (# State# s, TVar# s v #)
    {Create a new {\tt TVar\#} holding a specified initial value.}
    with
    out_of_line  = True
    has_side_effects = True
 
 primop  ReadTVarOp "readTVar#" GenPrimOp
-       TVar# s a
-    -> State# s -> (# State# s, a #)
-   {Read contents of {\tt TVar\#}.  Result is not yet evaluated.}
+       TVar# s v
+    -> State# s -> (# State# s, v #)
+   {Read contents of {\tt TVar\#} inside an STM transaction,
+    i.e. within a call to {\tt atomically\#}.
+    Does not force evaluation of the result.}
    with
    out_of_line  = True
    has_side_effects = True
 
 primop ReadTVarIOOp "readTVarIO#" GenPrimOp
-       TVar# s a
-    -> State# s -> (# State# s, a #)
-   {Read contents of {\tt TVar\#} outside an STM transaction}
+       TVar# s v
+    -> State# s -> (# State# s, v #)
+   {Read contents of {\tt TVar\#} outside an STM transaction.
+   Does not force evaluation of the result.}
    with
    out_of_line      = True
    has_side_effects = True
 
 primop  WriteTVarOp "writeTVar#" GenPrimOp
-       TVar# s a
-    -> a
+       TVar# s v
+    -> v
     -> State# s -> State# s
    {Write contents of {\tt TVar\#}.}
    with
@@ -2774,14 +2684,14 @@ primtype MVar# s a
         represented by {\tt (MutVar\# (Maybe a))}.) }
 
 primop  NewMVarOp "newMVar#"  GenPrimOp
-   State# s -> (# State# s, MVar# s a #)
+   State# s -> (# State# s, MVar# s v #)
    {Create new {\tt MVar\#}; initially empty.}
    with
    out_of_line = True
    has_side_effects = True
 
 primop  TakeMVarOp "takeMVar#" GenPrimOp
-   MVar# s a -> State# s -> (# State# s, a #)
+   MVar# s v -> State# s -> (# State# s, v #)
    {If {\tt MVar\#} is empty, block until it becomes full.
    Then remove and return its contents, and set it empty.}
    with
@@ -2789,7 +2699,7 @@ primop  TakeMVarOp "takeMVar#" GenPrimOp
    has_side_effects = True
 
 primop  TryTakeMVarOp "tryTakeMVar#" GenPrimOp
-   MVar# s a -> State# s -> (# State# s, Int#, a #)
+   MVar# s v -> State# s -> (# State# s, Int#, v #)
    {If {\tt MVar\#} is empty, immediately return with integer 0 and value undefined.
    Otherwise, return with integer 1 and contents of {\tt MVar\#}, and set {\tt MVar\#} empty.}
    with
@@ -2797,7 +2707,7 @@ primop  TryTakeMVarOp "tryTakeMVar#" GenPrimOp
    has_side_effects = True
 
 primop  PutMVarOp "putMVar#" GenPrimOp
-   MVar# s a -> a -> State# s -> State# s
+   MVar# s v -> v -> State# s -> State# s
    {If {\tt MVar\#} is full, block until it becomes empty.
    Then store value arg as its new contents.}
    with
@@ -2805,7 +2715,7 @@ primop  PutMVarOp "putMVar#" GenPrimOp
    has_side_effects = True
 
 primop  TryPutMVarOp "tryPutMVar#" GenPrimOp
-   MVar# s a -> a -> State# s -> (# State# s, Int# #)
+   MVar# s v -> v -> State# s -> (# State# s, Int# #)
    {If {\tt MVar\#} is full, immediately return with integer 0.
     Otherwise, store value arg as {\tt MVar\#}'s new contents, and return with integer 1.}
    with
@@ -2813,7 +2723,7 @@ primop  TryPutMVarOp "tryPutMVar#" GenPrimOp
    has_side_effects = True
 
 primop  ReadMVarOp "readMVar#" GenPrimOp
-   MVar# s a -> State# s -> (# State# s, a #)
+   MVar# s v -> State# s -> (# State# s, v #)
    {If {\tt MVar\#} is empty, block until it becomes full.
    Then read its contents without modifying the MVar, without possibility
    of intervention from other threads.}
@@ -2822,7 +2732,7 @@ primop  ReadMVarOp "readMVar#" GenPrimOp
    has_side_effects = True
 
 primop  TryReadMVarOp "tryReadMVar#" GenPrimOp
-   MVar# s a -> State# s -> (# State# s, Int#, a #)
+   MVar# s v -> State# s -> (# State# s, Int#, v #)
    {If {\tt MVar\#} is empty, immediately return with integer 0 and value undefined.
    Otherwise, return with integer 1 and contents of {\tt MVar\#}.}
    with
@@ -2830,7 +2740,7 @@ primop  TryReadMVarOp "tryReadMVar#" GenPrimOp
    has_side_effects = True
 
 primop  IsEmptyMVarOp "isEmptyMVar#" GenPrimOp
-   MVar# s a -> State# s -> (# State# s, Int# #)
+   MVar# s v -> State# s -> (# State# s, Int# #)
    {Return 1 if {\tt MVar\#} is empty; 0 otherwise.}
    with
    out_of_line = True
@@ -2847,24 +2757,27 @@ primtype IOPort# s a
         The main difference is that IOPort has no deadlock detection or
         deadlock breaking code that forcibly releases the lock. }
 
-primop  NewIOPortrOp "newIOPort#"  GenPrimOp
-   State# s -> (# State# s, IOPort# s a #)
+primop  NewIOPortOp "newIOPort#"  GenPrimOp
+   State# s -> (# State# s, IOPort# s v #)
    {Create new {\tt IOPort\#}; initially empty.}
    with
    out_of_line = True
    has_side_effects = True
 
 primop  ReadIOPortOp "readIOPort#" GenPrimOp
-   IOPort# s a -> State# s -> (# State# s, a #)
+   IOPort# s v -> State# s -> (# State# s, v #)
    {If {\tt IOPort\#} is empty, block until it becomes full.
-   Then remove and return its contents, and set it empty.}
+   Then remove and return its contents, and set it empty.
+   Throws an {\tt IOPortException} if another thread is already
+   waiting to read this {\tt IOPort\#}.}
    with
    out_of_line      = True
    has_side_effects = True
 
 primop  WriteIOPortOp "writeIOPort#" GenPrimOp
-   IOPort# s a -> a -> State# s -> (# State# s, Int# #)
-   {If {\tt IOPort\#} is full, immediately return with integer 0.
+   IOPort# s v -> v -> State# s -> (# State# s, Int# #)
+   {If {\tt IOPort\#} is full, immediately return with integer 0,
+    throwing an {\tt IOPortException}.
     Otherwise, store value arg as {\tt IOPort\#}'s new contents,
     and return with integer 1. }
    with
@@ -2918,7 +2831,7 @@ primtype ThreadId#
         other operations can be omitted.)}
 
 primop  ForkOp "fork#" GenPrimOp
-   (State# RealWorld -> (# State# RealWorld, a #))
+   (State# RealWorld -> (# State# RealWorld, o #))
    -> State# RealWorld -> (# State# RealWorld, ThreadId# #)
    with
    has_side_effects = True
@@ -2927,7 +2840,7 @@ primop  ForkOp "fork#" GenPrimOp
                                               , topDmd ] topDiv }
 
 primop  ForkOnOp "forkOn#" GenPrimOp
-   Int# -> (State# RealWorld -> (# State# RealWorld, a #))
+   Int# -> (State# RealWorld -> (# State# RealWorld, o #))
    -> State# RealWorld -> (# State# RealWorld, ThreadId# #)
    with
    has_side_effects = True
@@ -2983,12 +2896,12 @@ section "Weak pointers"
 
 primtype Weak# b
 
--- Note: "v" denotes a levity-polymorphic type variable
+-- N.B. "v" and "w" denote levity-polymorphic type variables.
 -- See Note [Levity and representation polymorphic primops]
 
 primop  MkWeakOp "mkWeak#" GenPrimOp
-   v -> b -> (State# RealWorld -> (# State# RealWorld, c #))
-     -> State# RealWorld -> (# State# RealWorld, Weak# b #)
+   v -> w -> (State# RealWorld -> (# State# RealWorld, c #))
+     -> State# RealWorld -> (# State# RealWorld, Weak# w #)
    { {\tt mkWeak# k v finalizer s} creates a weak reference to value {\tt k},
      with an associated reference to some value {\tt v}. If {\tt k} is still
      alive then {\tt v} can be retrieved using {\tt deRefWeak#}. Note that
@@ -2999,13 +2912,13 @@ primop  MkWeakOp "mkWeak#" GenPrimOp
    out_of_line      = True
 
 primop  MkWeakNoFinalizerOp "mkWeakNoFinalizer#" GenPrimOp
-   v -> b -> State# RealWorld -> (# State# RealWorld, Weak# b #)
+   v -> w -> State# RealWorld -> (# State# RealWorld, Weak# w #)
    with
    has_side_effects = True
    out_of_line      = True
 
 primop  AddCFinalizerToWeakOp "addCFinalizerToWeak#" GenPrimOp
-   Addr# -> Addr# -> Int# -> Addr# -> Weak# b
+   Addr# -> Addr# -> Int# -> Addr# -> Weak# w
           -> State# RealWorld -> (# State# RealWorld, Int# #)
    { {\tt addCFinalizerToWeak# fptr ptr flag eptr w} attaches a C
      function pointer {\tt fptr} to a weak pointer {\tt w} as a finalizer. If
@@ -3018,13 +2931,13 @@ primop  AddCFinalizerToWeakOp "addCFinalizerToWeak#" GenPrimOp
    out_of_line      = True
 
 primop  DeRefWeakOp "deRefWeak#" GenPrimOp
-   Weak# a -> State# RealWorld -> (# State# RealWorld, Int#, a #)
+   Weak# v -> State# RealWorld -> (# State# RealWorld, Int#, v #)
    with
    has_side_effects = True
    out_of_line      = True
 
 primop  FinalizeWeakOp "finalizeWeak#" GenPrimOp
-   Weak# a -> State# RealWorld -> (# State# RealWorld, Int#,
+   Weak# v -> State# RealWorld -> (# State# RealWorld, Int#,
               (State# RealWorld -> (# State# RealWorld, b #) ) #)
    { Finalize a weak pointer. The return value is an unboxed tuple
      containing the new state of the world and an "unboxed Maybe",
@@ -3050,30 +2963,30 @@ primtype StablePtr# a
 primtype StableName# a
 
 primop  MakeStablePtrOp "makeStablePtr#" GenPrimOp
-   a -> State# RealWorld -> (# State# RealWorld, StablePtr# a #)
+   v -> State# RealWorld -> (# State# RealWorld, StablePtr# v #)
    with
    has_side_effects = True
    out_of_line      = True
 
 primop  DeRefStablePtrOp "deRefStablePtr#" GenPrimOp
-   StablePtr# a -> State# RealWorld -> (# State# RealWorld, a #)
+   StablePtr# v -> State# RealWorld -> (# State# RealWorld, v #)
    with
    has_side_effects = True
    out_of_line      = True
 
 primop  EqStablePtrOp "eqStablePtr#" GenPrimOp
-   StablePtr# a -> StablePtr# a -> Int#
+   StablePtr# v -> StablePtr# v -> Int#
    with
    has_side_effects = True
 
 primop  MakeStableNameOp "makeStableName#" GenPrimOp
-   a -> State# RealWorld -> (# State# RealWorld, StableName# a #)
+   v -> State# RealWorld -> (# State# RealWorld, StableName# v #)
    with
    has_side_effects = True
    out_of_line      = True
 
 primop  StableNameToIntOp "stableNameToInt#" GenPrimOp
-   StableName# a -> Int#
+   StableName# v -> Int#
 
 ------------------------------------------------------------------------
 section "Compact normal form"

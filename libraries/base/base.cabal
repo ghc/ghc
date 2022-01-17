@@ -187,6 +187,7 @@ Library
         Foreign.StablePtr
         Foreign.Storable
         GHC.Arr
+        GHC.ArrayArray
         GHC.Base
         GHC.Bits
         GHC.ByteOrder

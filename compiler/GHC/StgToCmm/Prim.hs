@@ -176,16 +176,6 @@ emitPrimOp dflags primop = case primop of
       opIntoRegs $ \ [] -> doCopyMutableArrayOp src src_off dst dst_off (fromInteger n)
     _ -> PrimopCmmEmit_External
 
-  CopyArrayArrayOp -> \case
-    [src, src_off, dst, dst_off, (CmmLit (CmmInt n _))] ->
-      opIntoRegs $ \ [] -> doCopyArrayOp src src_off dst dst_off (fromInteger n)
-    _ -> PrimopCmmEmit_External
-
-  CopyMutableArrayArrayOp -> \case
-    [src, src_off, dst, dst_off, (CmmLit (CmmInt n _))] ->
-      opIntoRegs $ \ [] -> doCopyMutableArrayOp src src_off dst dst_off (fromInteger n)
-    _ -> PrimopCmmEmit_External
-
   CloneArrayOp -> \case
     [src, src_off, (CmmLit (CmmInt n w))]
       | wordsToBytes platform (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags)
@@ -373,10 +363,6 @@ emitPrimOp dflags primop = case primop of
     emit $ catAGraphs
       [ setInfo arg (CmmLit (CmmLabel mkMAP_FROZEN_DIRTY_infoLabel)),
         mkAssign (CmmLocal res) arg ]
-  UnsafeFreezeArrayArrayOp -> \[arg] -> opIntoRegs $ \[res] ->
-    emit $ catAGraphs
-      [ setInfo arg (CmmLit (CmmLabel mkMAP_FROZEN_DIRTY_infoLabel)),
-        mkAssign (CmmLocal res) arg ]
   UnsafeFreezeSmallArrayOp -> \[arg] -> opIntoRegs $ \[res] ->
     emit $ catAGraphs
       [ setInfo arg (CmmLit (CmmLabel mkSMAP_FROZEN_DIRTY_infoLabel)),
@@ -395,27 +381,6 @@ emitPrimOp dflags primop = case primop of
   WriteArrayOp -> \[obj, ix, v] -> opIntoRegs $ \[] ->
     doWritePtrArrayOp obj ix v
 
-  IndexArrayArrayOp_ByteArray -> \[obj, ix] -> opIntoRegs $ \[res] ->
-    doReadPtrArrayOp res obj ix
-  IndexArrayArrayOp_ArrayArray -> \[obj, ix] -> opIntoRegs $ \[res] ->
-    doReadPtrArrayOp res obj ix
-  ReadArrayArrayOp_ByteArray -> \[obj, ix] -> opIntoRegs $ \[res] ->
-    doReadPtrArrayOp res obj ix
-  ReadArrayArrayOp_MutableByteArray -> \[obj, ix] -> opIntoRegs $ \[res] ->
-    doReadPtrArrayOp res obj ix
-  ReadArrayArrayOp_ArrayArray -> \[obj, ix] -> opIntoRegs $ \[res] ->
-    doReadPtrArrayOp res obj ix
-  ReadArrayArrayOp_MutableArrayArray -> \[obj, ix] -> opIntoRegs $ \[res] ->
-    doReadPtrArrayOp res obj ix
-  WriteArrayArrayOp_ByteArray -> \[obj,ix,v] -> opIntoRegs $ \[] ->
-    doWritePtrArrayOp obj ix v
-  WriteArrayArrayOp_MutableByteArray -> \[obj,ix,v] -> opIntoRegs $ \[] ->
-    doWritePtrArrayOp obj ix v
-  WriteArrayArrayOp_ArrayArray -> \[obj,ix,v] -> opIntoRegs $ \[] ->
-    doWritePtrArrayOp obj ix v
-  WriteArrayArrayOp_MutableArrayArray -> \[obj,ix,v] -> opIntoRegs $ \[] ->
-    doWritePtrArrayOp obj ix v
-
   ReadSmallArrayOp -> \[obj, ix] -> opIntoRegs $ \[res] ->
     doReadSmallPtrArrayOp res obj ix
   IndexSmallArrayOp -> \[obj, ix] -> opIntoRegs $ \[res] ->
@@ -430,8 +395,6 @@ emitPrimOp dflags primop = case primop of
       (fixedHdrSizeW profile + bytesToWordsRoundUp platform (pc_OFFSET_StgMutArrPtrs_ptrs (platformConstants platform)))
         (bWord platform))
   SizeofMutableArrayOp -> emitPrimOp dflags SizeofArrayOp
-  SizeofArrayArrayOp -> emitPrimOp dflags SizeofArrayOp
-  SizeofMutableArrayArrayOp -> emitPrimOp dflags SizeofArrayOp
   SizeofSmallArrayOp -> \[arg] -> opIntoRegs $ \[res] ->
     emit $ mkAssign (CmmLocal res)
      (cmmLoadIndexW platform arg
@@ -1600,7 +1563,6 @@ emitPrimOp dflags primop = case primop of
   ShrinkMutableByteArrayOp_Char -> alwaysExternal
   ResizeMutableByteArrayOp_Char -> alwaysExternal
   ShrinkSmallMutableArrayOp_Char -> alwaysExternal
-  NewArrayArrayOp -> alwaysExternal
   NewMutVarOp -> alwaysExternal
   AtomicModifyMutVar2Op -> alwaysExternal
   AtomicModifyMutVar_Op -> alwaysExternal
@@ -1628,7 +1590,7 @@ emitPrimOp dflags primop = case primop of
   ReadMVarOp -> alwaysExternal
   TryReadMVarOp -> alwaysExternal
   IsEmptyMVarOp -> alwaysExternal
-  NewIOPortrOp -> alwaysExternal
+  NewIOPortOp -> alwaysExternal
   ReadIOPortOp -> alwaysExternal
   WriteIOPortOp -> alwaysExternal
   DelayOp -> alwaysExternal

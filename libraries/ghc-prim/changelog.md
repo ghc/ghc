@@ -20,24 +20,149 @@
   Note that the explicit type applications are required, as the call to
   `withDict` would be ambiguous otherwise.
 
+- Primitive types and functions which handle boxed values are now levity-polymorphic,
+  meaning that they now also work with unlifted boxed values (i.e. values whose type
+  has kind `TYPE (BoxedRep Unlifted)`).
+
+  The following type constructors are now levity-polymorphic:
+
+    - `Array#`, `SmallArray#`, `Weak#`, `StablePtr#`, `StableName#`,
+
+    - `MutableArray#`, `SmallMutableArray#`, `MutVar#`,
+      `TVar#`, `MVar#`, `IOPort#`.
+
+  For example, `Array#` used to have kind:
+
+  ```
+  Type -> UnliftedType
+  ```
+
+  but it now has kind:
+
+  ```
+  forall {l :: Levity}. TYPE (BoxedRep l) -> UnliftedType
+  ```
+
+  Similarly, `MutVar#` used to have kind:
+
+  ```
+  Type -> Type -> UnliftedType
+  ```
+
+  but it now has kind:
+
+  ```
+  forall {l :: Levity}. Type -> TYPE (BoxedRep l) -> UnliftedType
+  ```
+
+  This means that in `Array# a`, `MutableArray# s a`, `MutVar# s a`, ...,
+  the element type `a`, must always be boxed, but it can now either be lifted
+  or unlifted.
+  In particular, arrays and mutable variables can now be used to store
+  other arrays and mutable variables.
+
+  All functions which use these updated primitive types are also levity-polymorphic:
+
+    - all array operations (reading/writing/copying/...), for both arrays and small arrays,
+      mutable and immutable:
+
+      - `newArray#`, `readArray#`, `writeArray#`, `sizeofArray#`, `sizeofMutableArray#`, `indexArray#`,
+        `unsafeFreezeArray#`, `unsafeThawArray#`, `copyArray#`, `copyMutableArray#`, `cloneArray#`,
+        `cloneMutableArray#`, `freezeArray#`, `thawArray#`, `casArray#`,
+
+      - `newSmallArray#`, `shrinkSmallMutableArray#`, `readSmallArray#`, `writeSmallArray#`, `sizeofSmallArray#`,
+        `getSizeofSmallMutableArray#`, `indexSmallArray#`, `unsafeFreezeSmallArray#`,
+        `unsafeThawSmallArray#`, `copySmallArray#`, `copySmallMutableArray#`, `cloneSmallArray#`,
+        `cloneSmallMutableArray#`, `freezeSmallArray#`, `thawSmallArray#`, `casSmallArray#`,
+
+    - `newMutVar#`,`readMutVar#`,`writeMutV#`,`casMutVar#`,
+
+    - operations on `MVar#` and `TVar#`:
+
+      - `newTVar#`, `readTVar#`, `readTVarIO#`, `writeTVar#`,
+
+      - `newMVar#`, `takeMVar#`, `tryTakeMVar#`, `putMVar#`,
+        `tryPutMVar#`, `readMVar#`, `tryReadMVar#`,
+
+    - `STM` operations `atomically#`, `retry#`, `catchRetry#` and `catchSTM#`.
+
+    - `newIOPort#`, `readIOPort#`, `writeIOPort#`,
+
+    - `mkWeak#`, `mkWeakNoFinalizer#`, `addCFinalizerToWeak#`, `deRefWeak#`, `finalizeWeak#`,
+
+    - `makeStablePtr#`, `deRefStablePtr#`, `eqStablePtr#`, `makeStableName#`, `stableNameToInt#`,
+
+  For example, the full type of `newMutVar#` is now:
+
+  ```
+  newMutVar#
+    :: forall s {l :: Levity} (a :: TYPE (BoxedRep l)).
+       a -> State# s -> (# State# s, MVar# s a #)
+  ```
+
+  and the full type of `writeSmallArray#` is:
+
+  ```
+  writeSmallArray#
+    :: forall s {l :: Levity} (a :: TYPE ('BoxedRep l)).
+       SmallMutableArray# s a -> Int# -> a -> State# s -> State# s
+  ```
+
+- `ArrayArray#` and `MutableArrayArray#` have been moved from `GHC.Prim` to `GHC.Exts`.
+  They are deprecated, because their functionality is now subsumed by `Array#`
+  and `MutableArray#`.
+
 - `mkWeak#`, `mkWeakNoFinalizer#`, `touch#` and `keepAlive#` are now
   levity-polymorphic instead of representation-polymorphic. For instance:
 
   ```
   mkWeakNoFinalizer#
-    :: forall {l :: Levity} (a :: TYPE (BoxedRep l)) (b :: Type)
-    .  a -> b -> State# RealWorld -> (# State# RealWorld, Weak# b #)
+    :: forall {l :: Levity} (a :: TYPE ('BoxedRep l))
+              {k :: Levity} (b :: TYPE ('BoxedRep k)).
+       a -> b -> State# RealWorld -> (# State# RealWorld, Weak# b #)
   ```
 
-  That is, the type signature now quantifies over a variable of type `Levity`
-  instead of `RuntimeRep`. In addition, this variable is now inferred,
+  That is, the type signature now quantifies over the `Levity` of `a`
+  instead of its `RuntimeRep`. In addition, this variable is now inferred,
   instead of specified, meaning that it is no longer eligible for visible type application.
+  Note that `b` is now also levity-polymorphic, due to the change outlined in the
+  previous point.
 
-- The `RuntimeRep` parameter to `raise#` is now inferred:
+- Primitive functions for throwing and catching exceptions are now more polymorphic
+  than before. For example, `catch#` now has type:
 
   ```
-  raise# :: forall (a :: Type) {r :: RuntimeRep} (b :: TYPE r). a -> b
+  catch#
+    :: forall {r :: RuntimeRep} (a :: TYPE r)
+              {l :: Levity} (b :: TYPE ('BoxedRep l)).
+        ( State# RealWorld -> (# State# RealWorld, a #) )
+    -> ( b -> State# RealWorld -> (# State# RealWorld, a #) )
+    -> State# RealWorld -> (# State# RealWorld, a #)
   ```
+
+  The following functions are concerned:
+
+    - `catch#`,
+
+    - `raise#`, `raiseIO#`,
+
+    - `maskAsyncExceptions#`, `maskUninterruptible#`, `unmaskAsyncExceptions#`.
+
+  Note in particular that `raise#` is now both representation-polymorphic
+  (with an inferred `RuntimeRep` argument) and levity-polymorphic, with type:
+
+  ```
+  raise# :: forall {l :: Levity} (a :: TYPE (BoxedRep l))
+                   {r :: RuntimeRep} (b :: TYPE r).
+            a -> b
+  ```
+
+- ``fork#`` and ``forkOn#`` are now representation-polymorphic. For example, ``fork#``
+  now has type: ::
+
+      fork# :: forall {r :: RuntimeRep} (a :: TYPE r).
+               (State# RealWorld -> (# State# RealWorld, a #))
+            -> (State# RealWorld -> (# State# RealWorld, a #))
 
 - `reallyUnsafePtrEquality#` has been made more general, as it is now
    both levity-polymorphic and heterogeneous:
@@ -61,7 +186,7 @@
   - `eqStableName#`.
 
 - The following functions have been added to `GHC.Exts`:
- 
+
   ```
   sameArray# :: Array# a -> Array# a -> Int#
   sameSmallArray# :: SmallArray# a -> SmallArray# a -> Int#
