@@ -2077,7 +2077,14 @@ repP (ConPat NoExtField dc details)
 repP (NPat _ (L _ l) Nothing _) = do { a <- repOverloadedLiteral l
                                      ; repPlit a }
 repP (ViewPat _ e p) = do { e' <- repLE e; p' <- repLP p; repPview e' p' }
-repP p@(NPat _ _ (Just _) _) = notHandled (ThNegativeOverloadedPatterns p)
+repP p@(NPat _ (L _ l) (Just _) _)
+  | OverLitRn rebindable _ <- ol_ext l
+  , rebindable = notHandled (ThNegativeOverloadedPatterns p)
+  | HsIntegral i <- ol_val l = do { a <- repOverloadedLiteral l{ol_val = HsIntegral (negateIntegralLit i)}
+                                  ; repPlit a }
+  | HsFractional i <- ol_val l = do { a <- repOverloadedLiteral l{ol_val = HsFractional (negateFractionalLit i)}
+                                  ; repPlit a }
+  | otherwise = notHandled (ThExoticPattern p)
 repP (SigPat _ p t) = do { p' <- repLP p
                          ; t' <- repLTy (hsPatSigType t)
                          ; repPsig p' t' }
