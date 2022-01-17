@@ -47,7 +47,7 @@ module GHC.Core (
         collectArgs, stripNArgs, collectArgsTicks, flattenBinds,
 
         exprToType, exprToCoercion_maybe,
-        applyTypeToArg,
+        applyTypeToArg, wrapLamBody,
 
         isValArg, isTypeArg, isCoArg, isTyCoArg, valArgCount, valBndrCount,
         isRuntimeArg, isRuntimeVar,
@@ -1941,6 +1941,14 @@ collectArgs expr
   where
     go (App f a) as = go f (a:as)
     go e         as = (e, as)
+
+-- | fmap on the body of a lambda.
+--   wrapLamBody f (\x -> body) == (\x -> f body)
+wrapLamBody :: (CoreExpr -> CoreExpr) -> CoreExpr -> CoreExpr
+wrapLamBody f expr = go expr
+  where
+  go (Lam v body) = Lam v $ go body
+  go expr = f expr
 
 -- | Attempt to remove the last N arguments of a function call.
 -- Strip off any ticks or coercions encountered along the way and any

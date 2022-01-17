@@ -30,7 +30,6 @@ import GHC.Unit
 
 import GHC.Builtin.Names
 import GHC.Builtin.PrimOps
-import GHC.Builtin.PrimOps.Ids (primOpId)
 import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim ( realWorldStatePrimTy )
 
@@ -80,6 +79,7 @@ import GHC.Types.Unique.Supply
 import Data.List        ( unfoldr )
 import Data.Functor.Identity
 import Control.Monad
+import GHC.Builtin.PrimOps.Ids (primOpId)
 
 {-
 -- ---------------------------------------------------------------------------
@@ -949,8 +949,8 @@ instance Outputable ArgInfo where
 cpeApp :: CorePrepEnv -> CoreExpr -> UniqSM (Floats, CpeRhs)
 -- May return a CpeRhs because of saturating primops
 cpeApp top_env expr
-  = do { let (terminal, args, depth) = collect_args expr
-       ; cpe_app top_env terminal args depth
+  = do { let (terminal, args) = collect_args expr
+       ; cpe_app top_env terminal args
        }
 
   where
@@ -961,26 +961,24 @@ cpeApp top_env expr
     -- record casts and ticks.  Depth counts the number
     -- of arguments that would consume strictness information
     -- (so, no type or coercion arguments.)
-    collect_args :: CoreExpr -> (CoreExpr, [ArgInfo], Int)
-    collect_args e = go e [] 0
+    collect_args :: CoreExpr -> (CoreExpr, [ArgInfo])
+    collect_args e = go e []
       where
-        go (App fun arg)      as !depth
+        go (App fun arg)      as
             = go fun (CpeApp arg : as)
-                (if isTyCoArg arg then depth else depth + 1)
-        go (Cast fun co)      as depth
-            = go fun (CpeCast co : as) depth
-        go (Tick tickish fun) as depth
+        go (Cast fun co)      as
+            = go fun (CpeCast co : as)
+        go (Tick tickish fun) as
             | tickishPlace tickish == PlaceNonLam
             && tickish `tickishScopesLike` SoftScope
-            = go fun (CpeTick tickish : as) depth
-        go terminal as depth = (terminal, as, depth)
+            = go fun (CpeTick tickish : as)
+        go terminal as  = (terminal, as)
 
     cpe_app :: CorePrepEnv
             -> CoreExpr
             -> [ArgInfo]
-            -> Int
             -> UniqSM (Floats, CpeRhs)
-    cpe_app env (Var f) (CpeApp Type{} : CpeApp arg : args) depth
+    cpe_app env (Var f) (CpeApp Type{} : CpeApp arg : args)
         | f `hasKey` lazyIdKey          -- Replace (lazy a) with a, and
             -- See Note [lazyId magic] in GHC.Types.Id.Make
        || f `hasKey` noinlineIdKey      -- Replace (noinline a) with a
@@ -999,14 +997,13 @@ cpeApp top_env expr
         --      }
         --
         -- rather than the far superior "f x y".  Test case is par01.
-        = let (terminal, args', depth') = collect_args arg
-          in cpe_app env terminal (args' ++ args) (depth + depth' - 1)
+        = let (terminal, args') = collect_args arg
+          in cpe_app env terminal (args' ++ args)
 
     -- See Note [keepAlive# magic].
     cpe_app env
             (Var f)
             args
-            n
         | Just KeepAliveOp <- isPrimOpId_maybe f
         , CpeApp (Type arg_rep)
           : CpeApp (Type arg_ty)
@@ -1020,8 +1017,8 @@ cpeApp top_env expr
              ; s2 <- newVar realWorldStatePrimTy
              ; -- beta reduce if possible
              ; (floats, k') <- case k of
-                  Lam s body -> cpe_app (extendCorePrepEnvExpr env s s0) body rest (n-2)
-                  _          -> cpe_app env k (CpeApp s0 : rest) (n-1)
+                  Lam s body -> cpe_app (extendCorePrepEnvExpr env s s0) body rest
+                  _          -> cpe_app env k (CpeApp s0 : rest)
              ; let touchId = primOpId TouchOp
                    expr = Case k' y result_ty [Alt DEFAULT [] rhs]
                    rhs = let scrut = mkApps (Var touchId) [Type arg_rep, Type arg_ty, arg, Var realWorldPrimId]
@@ -1032,31 +1029,33 @@ cpeApp top_env expr
         | Just KeepAliveOp <- isPrimOpId_maybe f
         = panic "invalid keepAlive# application"
 
-    cpe_app env (Var f) (CpeApp _runtimeRep@Type{} : CpeApp _type@Type{} : CpeApp arg : rest) n
+    -- runRW# magic
+    cpe_app env (Var f) (CpeApp _runtimeRep@Type{} : CpeApp _type@Type{} : CpeApp arg : rest)
         | f `hasKey` runRWKey
         -- N.B. While it may appear that n == 1 in the case of runRW#
         -- applications, keep in mind that we may have applications that return
-        , n >= 1
+        , has_value_arg (CpeApp arg : rest)
         -- See Note [runRW magic]
         -- Replace (runRW# f) by (f realWorld#), beta reducing if possible (this
         -- is why we return a CorePrepEnv as well)
         = case arg of
-            Lam s body -> cpe_app (extendCorePrepEnv env s realWorldPrimId) body rest (n-2)
-            _          -> cpe_app env arg (CpeApp (Var realWorldPrimId) : rest) (n-1)
+            Lam s body -> cpe_app (extendCorePrepEnv env s realWorldPrimId) body rest
+            _          -> cpe_app env arg (CpeApp (Var realWorldPrimId) : rest)
              -- TODO: What about casts?
+        where
+          has_value_arg [] = False
+          has_value_arg (CpeApp arg:_rest)
+            | not (isTyCoArg arg) = True
+          has_value_arg (_:rest) = has_value_arg rest
 
-    cpe_app env (Var v) args depth
+    cpe_app env (Var v) args
       = do { v1 <- fiddleCCall v
            ; let e2 = lookupCorePrepEnv env v1
                  hd = getIdFromTrivialExpr_maybe e2
-           -- NB: depth from collect_args is right, because e2 is a trivial expression
-           -- and thus its embedded Id *must* be at the same depth as any
-           -- Apps it is under are type applications only (c.f.
-           -- exprIsTrivial).  But note that we need the type of the
-           -- expression, not the id.
            ; (app, floats) <- rebuild_app env args e2 emptyFloats stricts
            ; mb_saturate hd app floats depth }
         where
+          depth = val_args args
           stricts = case idDmdSig v of
                             DmdSig (DmdType _ demands _)
                               | listLengthCmp demands depth /= GT -> demands
@@ -1070,15 +1069,38 @@ cpeApp top_env expr
 
         -- We inlined into something that's not a var and has no args.
         -- Bounce it back up to cpeRhsE.
-    cpe_app env fun [] _ = cpeRhsE env fun
+    cpe_app env fun [] = cpeRhsE env fun
 
-        -- N-variable fun, better let-bind it
-    cpe_app env fun args depth
+    -- Here we get:
+    -- N-variable fun, better let-bind it
+    -- This case covers literals, apps, lams or let expressions applied to arguments.
+    -- Basically things we want to ANF before applying to arguments.
+    cpe_app env fun args
       = do { (fun_floats, fun') <- cpeArg env evalDmd fun
-                          -- The evalDmd says that it's sure to be evaluated,
-                          -- so we'll end up case-binding it
+                          -- If evalDmd says that it's sure to be evaluated,
+                          -- we'll end up case-binding it
            ; (app, floats) <- rebuild_app env args fun' fun_floats []
-           ; mb_saturate Nothing app floats depth }
+           ; mb_saturate Nothing app floats (val_args args) }
+
+    -- | Count the number of value arguments.
+    val_args :: [ArgInfo] -> Int
+    val_args args = go args 0
+      where
+        go [] !n = n
+        go (info:infos) n =
+          case info of
+            CpeCast {} -> go infos n
+            CpeTick tickish
+              | tickishPlace tickish == PlaceNonLam
+                && tickish `tickishScopesLike` SoftScope                 -> go infos n
+              -- If we can't guarantee a tick will be floated out of the application
+              -- we can't guarantee the value args following it will be applied.
+              | otherwise                             -> n
+            CpeApp e                                  -> go infos n'
+              where
+                !n'
+                  | isTyCoArg e = n
+                  | otherwise   = n+1
 
     -- Saturate if necessary
     mb_saturate head app floats depth =
