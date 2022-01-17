@@ -67,6 +67,7 @@ Environment variables affecting both build systems:
                     "decreases", or "all")
   HERMETIC          Take measures to avoid looking at anything in \$HOME
   CONFIGURE_ARGS    Arguments passed to configure script.
+  ENABLE_NUMA       Whether to enable numa support for the build (disabled by default)
   INSTALL_CONFIGURE_ARGS
                     Arguments passed to the binary distribution configure script
                     during installation of test toolchain.
@@ -384,6 +385,11 @@ function configure() {
   read -r -a args <<< "${CONFIGURE_ARGS:-}"
   if [[ -n "${target_triple:-}" ]]; then
     args+=("--target=$target_triple")
+  fi
+  if [[ -n "${ENABLE_NUMA:-}" ]]; then
+    args+=("--enable-numa")
+    else
+    args+=("--disable-numa")
   fi
 
   start_section "configuring"
