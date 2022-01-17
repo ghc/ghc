@@ -20,23 +20,20 @@
 #define FLOATING_CLASSES Fractional,Floating,RealFrac,RealFloat
 #define OPAQUE_CLASSES Eq,Ord,Storable
 
-#define ARITHMETIC_TYPE(T,B) \
-newtype T = T B deriving newtype (Read, Show, ARITHMETIC_CLASSES);
+#define ARITHMETIC_TYPE(T,THE_CTYPE,B) \
+newtype {-# CTYPE THE_CTYPE #-} T = T B deriving newtype (Read, Show, ARITHMETIC_CLASSES);
 
-#define INTEGRAL_TYPE(T,B) \
-newtype T = T B deriving newtype (Read, Show, ARITHMETIC_CLASSES, INTEGRAL_CLASSES);
-
-#define INTEGRAL_TYPE_WITH_CTYPE(T,THE_CTYPE,B) \
-newtype {-# CTYPE "THE_CTYPE" #-} T = T B \
+#define INTEGRAL_TYPE(T,THE_CTYPE,B) \
+newtype {-# CTYPE THE_CTYPE #-} T = T B \
     deriving newtype (Read, Show, ARITHMETIC_CLASSES, INTEGRAL_CLASSES);
 
-#define FLOATING_TYPE(T,B) \
-newtype T = T B deriving newtype (Read, Show, ARITHMETIC_CLASSES, FLOATING_CLASSES);
+#define FLOATING_TYPE(T,THE_CTYPE,B) \
+newtype {-# CTYPE THE_CTYPE #-} T = T B deriving newtype (Read, Show, ARITHMETIC_CLASSES, FLOATING_CLASSES);
 
 #define FLOATING_TYPE_WITH_CTYPE(T,THE_CTYPE,B) \
-newtype {-# CTYPE "THE_CTYPE" #-} T = T B \
+newtype {-# CTYPE THE_CTYPE #-} T = T B \
     deriving newtype (Read, Show, ARITHMETIC_CLASSES, FLOATING_CLASSES);
 
-#define OPAQUE_TYPE_WITH_CTYPE(T,THE_CTYPE,B) \
-newtype {-# CTYPE "THE_CTYPE" #-} T = T (B) \
+#define OPAQUE_TYPE(T,THE_CTYPE,B) \
+newtype {-# CTYPE THE_CTYPE #-} T = T (B) \
     deriving newtype (Show, OPAQUE_CLASSES);
