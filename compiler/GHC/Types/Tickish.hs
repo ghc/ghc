@@ -18,6 +18,7 @@ module GHC.Types.Tickish (
   mkNoCount,
   mkNoScope,
   tickishIsCode,
+  isProfTick,
   TickishPlacement(..),
   tickishPlace,
   tickishContains
@@ -317,6 +318,9 @@ tickishIsCode :: GenTickish pass -> Bool
 tickishIsCode SourceNote{} = False
 tickishIsCode _tickish     = True  -- all the rest for now
 
+isProfTick :: GenTickish pass -> Bool
+isProfTick ProfNote{} = True
+isProfTick _          = False
 
 -- | Governs the kind of expression that the tick gets placed on when
 -- annotating for example using @mkTick@. If we find that we want to
