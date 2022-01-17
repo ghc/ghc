@@ -10,4 +10,4 @@ test('T14931', [only_ways(['normal']), req_profiling, unless(have_dynamic(), ski
      makefile_test, ['T14931'])
 test('T15108', [only_ways(['normal']), req_profiling], compile, ['-O -prof -fprof-auto'])
 test('T19894', [only_ways(['normal']), req_profiling, extra_files(['T19894'])], multimod_compile, ['Main', '-v0 -O2 -prof -fprof-auto -iT19894'])
-test('T20938', [only_ways(['normal']), req_profiling, expect_broken(20938)], compile, ['-O -prof'])
+test('T20938', [only_ways(['normal']), req_profiling], compile, ['-O -prof'])

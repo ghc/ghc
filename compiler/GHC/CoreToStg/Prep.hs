@@ -792,7 +792,8 @@ cpeRhsE env (Let bind body)
        ; return (bind_floats `appendFloats` body_floats, expr') }
 
 cpeRhsE env (Tick tickish expr)
-  | tickishPlace tickish == PlaceNonLam && tickish `tickishScopesLike` SoftScope
+  -- Pull out ticks if they are allowed to be floated.
+  | floatableTick tickish
   = do { (floats, body) <- cpeRhsE env expr
          -- See [Floating Ticks in CorePrep]
        ; return (unitFloat (FloatTick tickish) `appendFloats` floats, body) }
@@ -946,11 +947,50 @@ instance Outputable ArgInfo where
   ppr (CpeCast co) = text "cast" <+> ppr co
   ppr (CpeTick tick) = text "tick" <+> ppr tick
 
+{- Note [Ticks and mandatory eta expansion]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Something like
+    `foo x = ({-# SCC foo #-} tagToEnum#) x :: Bool`
+caused a compiler panic in #20938. Why did this happen?
+The simplifier will eta-reduce the rhs giving us a partial
+application of tagToEnum#. The tick is then pushed inside the
+type argument. That is we get
+    `(Tick<foo> tagToEnum#) @Bool`
+CorePrep would go on to see a undersaturated tagToEnum# application
+and eta expand the expression under the tick. Giving us:
+    (Tick<scc> (\forall a. x -> tagToEnum# @a x) @Bool
+Suddenly tagToEnum# is applied to a polymorphic type and the code generator
+panics as it needs a concrete type to determine the representation.
+
+The problem in my eyes was that the tick covers a partial application
+of a primop. There is no clear semantic for such a construct as we can't
+partially apply a primop since they do not have bindings.
+We fix this by expanding the scope of such ticks slightly to cover the body
+of the eta-expanded expression.
+
+We do this by:
+* Checking if an application is headed by a primOpish thing.
+* If so we collect floatable ticks and usually but also profiling ticks
+  along with regular arguments.
+* When rebuilding the application we check if any profiling ticks appear
+  before the primop is fully saturated.
+* If the primop isn't fully satured we eta expand the primop application
+  and scope the tick to scope over the body of the saturated expression.
+
+Going back to #20938 this means starting with
+    `(Tick<foo> tagToEnum#) @Bool`
+we check if the function head is a primop (yes). This means we collect the
+profiling tick like if it was floatable. Giving us
+    (tagToEnum#, [CpeTick foo, CpeApp @Bool]).
+cpe_app filters out the tick as a underscoped tick on the expression
+`tagToEnum# @Bool`. During eta expansion we then put that tick back onto the
+body of the eta-expansion lambdas. Giving us `\x -> Tick<foo> (tagToEnum# @Bool x)`.
+-}
 cpeApp :: CorePrepEnv -> CoreExpr -> UniqSM (Floats, CpeRhs)
 -- May return a CpeRhs because of saturating primops
 cpeApp top_env expr
-  = do { let (terminal, args, depth) = collect_args expr
-       ; cpe_app top_env terminal args depth
+  = do { let (terminal, args) = collect_args expr
+       ; cpe_app top_env terminal args
        }
 
   where
@@ -961,26 +1001,34 @@ cpeApp top_env expr
     -- record casts and ticks.  Depth counts the number
     -- of arguments that would consume strictness information
     -- (so, no type or coercion arguments.)
-    collect_args :: CoreExpr -> (CoreExpr, [ArgInfo], Int)
-    collect_args e = go e [] 0
+    collect_args :: CoreExpr -> (CoreExpr, [ArgInfo])
+    collect_args e = go e []
       where
-        go (App fun arg)      as !depth
+        go (App fun arg)      as
             = go fun (CpeApp arg : as)
-                (if isTyCoArg arg then depth else depth + 1)
-        go (Cast fun co)      as depth
-            = go fun (CpeCast co : as) depth
-        go (Tick tickish fun) as depth
-            | tickishPlace tickish == PlaceNonLam
-            && tickish `tickishScopesLike` SoftScope
-            = go fun (CpeTick tickish : as) depth
-        go terminal as depth = (terminal, as, depth)
+        go (Cast fun co)      as
+            = go fun (CpeCast co : as)
+        go (Tick tickish fun) as
+            -- Profiling ticks are slightly less strict so we expand their scope
+            -- if they cover partial applications of things like primOps.
+            -- See Note [Ticks and mandatory eta expansion]
+            | floatableTick tickish || isProfTick tickish
+            , Var vh <- head
+            , Var head' <- lookupCorePrepEnv top_env vh
+            , hasNoBinding head'
+            = (head,as')
+            where
+              (head,as') = go fun (CpeTick tickish : as)
+
+        -- Terminal could still be an app if it's wrapped by a tick.
+        -- E.g. Tick<foo> (f x) can give us (f x) as terminal.
+        go terminal as = (terminal, as)
 
     cpe_app :: CorePrepEnv
             -> CoreExpr
             -> [ArgInfo]
-            -> Int
             -> UniqSM (Floats, CpeRhs)
-    cpe_app env (Var f) (CpeApp Type{} : CpeApp arg : args) depth
+    cpe_app env (Var f) (CpeApp Type{} : CpeApp arg : args)
         | f `hasKey` lazyIdKey          -- Replace (lazy a) with a, and
             -- See Note [lazyId magic] in GHC.Types.Id.Make
        || f `hasKey` noinlineIdKey      -- Replace (noinline a) with a
@@ -999,14 +1047,13 @@ cpeApp top_env expr
         --      }
         --
         -- rather than the far superior "f x y".  Test case is par01.
-        = let (terminal, args', depth') = collect_args arg
-          in cpe_app env terminal (args' ++ args) (depth + depth' - 1)
+        = let (terminal, args') = collect_args arg
+          in cpe_app env terminal (args' ++ args)
 
     -- See Note [keepAlive# magic].
     cpe_app env
             (Var f)
             args
-            n
         | Just KeepAliveOp <- isPrimOpId_maybe f
         , CpeApp (Type arg_rep)
           : CpeApp (Type arg_ty)
@@ -1020,8 +1067,8 @@ cpeApp top_env expr
              ; s2 <- newVar realWorldStatePrimTy
              ; -- beta reduce if possible
              ; (floats, k') <- case k of
-                  Lam s body -> cpe_app (extendCorePrepEnvExpr env s s0) body rest (n-2)
-                  _          -> cpe_app env k (CpeApp s0 : rest) (n-1)
+                  Lam s body -> cpe_app (extendCorePrepEnvExpr env s s0) body rest
+                  _          -> cpe_app env k (CpeApp s0 : rest)
              ; let touchId = primOpId TouchOp
                    expr = Case k' y result_ty [Alt DEFAULT [] rhs]
                    rhs = let scrut = mkApps (Var touchId) [Type arg_rep, Type arg_ty, arg, Var realWorldPrimId]
@@ -1032,31 +1079,37 @@ cpeApp top_env expr
         | Just KeepAliveOp <- isPrimOpId_maybe f
         = panic "invalid keepAlive# application"
 
-    cpe_app env (Var f) (CpeApp _runtimeRep@Type{} : CpeApp _type@Type{} : CpeApp arg : rest) n
+    -- runRW# magic
+    cpe_app env (Var f) (CpeApp _runtimeRep@Type{} : CpeApp _type@Type{} : CpeApp arg : rest)
         | f `hasKey` runRWKey
         -- N.B. While it may appear that n == 1 in the case of runRW#
         -- applications, keep in mind that we may have applications that return
-        , n >= 1
+        , has_value_arg (CpeApp arg : rest)
         -- See Note [runRW magic]
         -- Replace (runRW# f) by (f realWorld#), beta reducing if possible (this
         -- is why we return a CorePrepEnv as well)
         = case arg of
-            Lam s body -> cpe_app (extendCorePrepEnv env s realWorldPrimId) body rest (n-2)
-            _          -> cpe_app env arg (CpeApp (Var realWorldPrimId) : rest) (n-1)
+            Lam s body -> cpe_app (extendCorePrepEnv env s realWorldPrimId) body rest
+            _          -> cpe_app env arg (CpeApp (Var realWorldPrimId) : rest)
              -- TODO: What about casts?
+        where
+          has_value_arg [] = False
+          has_value_arg (CpeApp arg:_rest)
+            | not (isTyCoArg arg) = True
+          has_value_arg (_:rest) = has_value_arg rest
 
-    cpe_app env (Var v) args depth
+    cpe_app env (Var v) args
       = do { v1 <- fiddleCCall v
            ; let e2 = lookupCorePrepEnv env v1
                  hd = getIdFromTrivialExpr_maybe e2
-           -- NB: depth from collect_args is right, because e2 is a trivial expression
-           -- and thus its embedded Id *must* be at the same depth as any
-           -- Apps it is under are type applications only (c.f.
-           -- exprIsTrivial).  But note that we need the type of the
-           -- expression, not the id.
-           ; (app, floats) <- rebuild_app env args e2 emptyFloats stricts
-           ; mb_saturate hd app floats depth }
+                 -- Determine number of required arguments. See Note [Ticks and mandatory eta expansion]
+                 min_arity = case hd of
+                   Just v_hd -> if hasNoBinding v_hd then Just $! (idArity v_hd) else Nothing
+                   Nothing -> Nothing
+           ; (app, floats, unsat_ticks) <- rebuild_app env args e2 emptyFloats stricts min_arity
+           ; mb_saturate hd app floats unsat_ticks depth }
         where
+          depth = val_args args
           stricts = case idDmdSig v of
                             DmdSig (DmdType _ demands _)
                               | listLengthCmp demands depth /= GT -> demands
@@ -1070,22 +1123,45 @@ cpeApp top_env expr
 
         -- We inlined into something that's not a var and has no args.
         -- Bounce it back up to cpeRhsE.
-    cpe_app env fun [] _ = cpeRhsE env fun
+    cpe_app env fun [] = cpeRhsE env fun
 
-        -- N-variable fun, better let-bind it
-    cpe_app env fun args depth
+    -- Here we get:
+    -- N-variable fun, better let-bind it
+    -- This case covers literals, apps, lams or let expressions applied to arguments.
+    -- Basically things we want to ANF before applying to arguments.
+    cpe_app env fun args
       = do { (fun_floats, fun') <- cpeArg env evalDmd fun
-                          -- The evalDmd says that it's sure to be evaluated,
-                          -- so we'll end up case-binding it
-           ; (app, floats) <- rebuild_app env args fun' fun_floats []
-           ; mb_saturate Nothing app floats depth }
+                          -- If evalDmd says that it's sure to be evaluated,
+                          -- we'll end up case-binding it
+           ; (app, floats,unsat_ticks) <- rebuild_app env args fun' fun_floats [] Nothing
+           ; mb_saturate Nothing app floats unsat_ticks (val_args args) }
+
+    -- | Count the number of value arguments.
+    val_args :: [ArgInfo] -> Int
+    val_args args = go args 0
+      where
+        go [] !n = n
+        go (info:infos) n =
+          case info of
+            CpeCast {} -> go infos n
+            CpeTick tickish
+              | floatableTick tickish                 -> go infos n
+              -- If we can't guarantee a tick will be floated out of the application
+              -- we can't guarantee the value args following it will be applied.
+              | otherwise                             -> n
+            CpeApp e                                  -> go infos n'
+              where
+                !n'
+                  | isTyCoArg e = n
+                  | otherwise   = n+1
 
     -- Saturate if necessary
-    mb_saturate head app floats depth =
+    mb_saturate head app floats unsat_ticks depth =
        case head of
-         Just fn_id -> do { sat_app <- maybeSaturate fn_id app depth
+         Just fn_id -> do { sat_app <- maybeSaturate fn_id app depth unsat_ticks
                           ; return (floats, sat_app) }
-         _other              -> return (floats, app)
+         _other     -> do { massert (null unsat_ticks)
+                          ; return (floats, app) }
 
     -- Deconstruct and rebuild the application, floating any non-atomic
     -- arguments to the outside.  We collect the type of the expression,
@@ -1098,20 +1174,43 @@ cpeApp top_env expr
         -> CpeApp
         -> Floats
         -> [Demand]
-        -> UniqSM (CpeApp, Floats)
-    rebuild_app _ [] app floats ss
-      = assert (null ss) -- make sure we used all the strictness info
-        return (app, floats)
+        -> Maybe Arity
+        -> UniqSM (CpeApp
+                  ,Floats
+                  ,[CoreTickish] -- Underscoped ticks. See Note [Ticks and mandatory eta expansion]
+                  )
+    rebuild_app env args app floats ss req_depth =
+      rebuild_app' env args app floats ss [] (fromMaybe 0 req_depth)
 
-    rebuild_app env (a : as) fun' floats ss = case a of
+    rebuild_app'
+        :: CorePrepEnv
+        -> [ArgInfo] -- The arguments (inner to outer)
+        -> CpeApp
+        -> Floats
+        -> [Demand]
+        -> [CoreTickish]
+        -> Int -- Number of arguments required to satisfy minimal tick scopes.
+        -> UniqSM (CpeApp, Floats, [CoreTickish])
+    rebuild_app' _ [] app floats ss rt_ticks !_req_depth
+      = assert (null ss) -- make sure we used all the strictness info
+        return (app, floats, rt_ticks)
+
+    rebuild_app' env (a : as) fun' floats ss rt_ticks req_depth = case a of
+      -- See Note [Ticks and mandatory eta expansion]
+      _
+        | not (null rt_ticks)
+        , req_depth <= 0
+        ->
+            let tick_fun = foldr mkTick fun' rt_ticks
+            in rebuild_app' env (a : as) tick_fun floats ss rt_ticks req_depth
 
       CpeApp (Type arg_ty)
-        -> rebuild_app env as (App fun' (Type arg_ty')) floats ss
+        -> rebuild_app' env as (App fun' (Type arg_ty')) floats ss rt_ticks req_depth
         where
           arg_ty' = cpSubstTy env arg_ty
 
       CpeApp (Coercion co)
-        -> rebuild_app env as (App fun' (Coercion co')) floats ss
+        -> rebuild_app' env as (App fun' (Coercion co')) floats ss rt_ticks req_depth
         where
             co' = cpSubstCo env co
 
@@ -1122,16 +1221,21 @@ cpeApp top_env expr
                    (ss1 : ss_rest, False) -> (ss1,    ss_rest)
                    ([],            _)     -> (topDmd, [])
         (fs, arg') <- cpeArg top_env ss1 arg
-        rebuild_app env as (App fun' arg') (fs `appendFloats` floats) ss_rest
+        rebuild_app' env as (App fun' arg') (fs `appendFloats` floats) ss_rest rt_ticks (req_depth-1)
 
       CpeCast co
-        -> rebuild_app env as (Cast fun' co') floats ss
+        -> rebuild_app' env as (Cast fun' co') floats ss rt_ticks req_depth
         where
            co' = cpSubstCo env co
-
+      -- See Note [Ticks and mandatory eta expansion]
       CpeTick tickish
+        | tickishPlace tickish == PlaceRuntime
+        , req_depth > 0
+        -> assert (isProfTick tickish) $
+           rebuild_app' env as fun' floats ss (tickish:rt_ticks) req_depth
+        | otherwise
         -- See [Floating Ticks in CorePrep]
-        -> rebuild_app env as fun' (addFloat floats (FloatTick tickish)) ss
+        -> rebuild_app' env as fun' (addFloat floats (FloatTick tickish)) ss rt_ticks req_depth
 
 isLazyExpr :: CoreExpr -> Bool
 -- See Note [lazyId magic] in GHC.Types.Id.Make
@@ -1425,13 +1529,14 @@ applications here as well but due to this fragility (see #16846) we now deal
 with this another way, as described in Note [Primop wrappers] in GHC.Builtin.PrimOps.
 -}
 
-maybeSaturate :: Id -> CpeApp -> Int -> UniqSM CpeRhs
-maybeSaturate fn expr n_args
+maybeSaturate :: Id -> CpeApp -> Int -> [CoreTickish] -> UniqSM CpeRhs
+maybeSaturate fn expr n_args unsat_ticks
   | hasNoBinding fn        -- There's no binding
-  = return sat_expr
+  = return $ wrapLamBody (\body -> foldr mkTick body unsat_ticks) sat_expr
 
   | otherwise
-  = return expr
+  = assert (null unsat_ticks) $
+    return expr
   where
     fn_arity     = idArity fn
     excess_arity = fn_arity - n_args
@@ -1452,7 +1557,7 @@ maybeSaturate fn expr n_args
 
 Note [Eta expansion]
 ~~~~~~~~~~~~~~~~~~~~~
-Eta expand to match the arity claimed by the binder. Remember,
+Eta expand to match the arity claimed by the binder Remember,
 CorePrep must not change arity
 
 Eta expansion might not have happened already, because it is done by
@@ -2118,7 +2223,10 @@ wrapTicks (Floats flag floats0) expr =
         wrapBind t (NonRec binder rhs) = NonRec binder (mkTick t rhs)
         wrapBind t (Rec pairs)         = Rec (mapSnd (mkTick t) pairs)
 
-
+floatableTick :: GenTickish pass -> Bool
+floatableTick tickish =
+    tickishPlace tickish == PlaceNonLam &&
+    tickish `tickishScopesLike` SoftScope
 
 ------------------------------------------------------------------------------
 -- Numeric literals
