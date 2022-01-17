@@ -43,3 +43,4 @@ test(
         + (' -optcxx=-stdlib=libc++' if opsys('darwin') else '')
     ],
 )
+test('T15531', normal, compile, ['-Wall'])

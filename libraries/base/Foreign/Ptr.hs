@@ -79,13 +79,13 @@ foreign import ccall unsafe "freeHaskellFunctionPtr"
 -- | An unsigned integral type that can be losslessly converted to and from
 -- @Ptr@. This type is also compatible with the C99 type @uintptr_t@, and
 -- can be marshalled to and from that type safely.
-INTEGRAL_TYPE(WordPtr,Word)
+INTEGRAL_TYPE(WordPtr,"uintptr_t",Word)
         -- Word and Int are guaranteed pointer-sized in GHC
 
 -- | A signed integral type that can be losslessly converted to and from
 -- @Ptr@.  This type is also compatible with the C99 type @intptr_t@, and
 -- can be marshalled to and from that type safely.
-INTEGRAL_TYPE(IntPtr,Int)
+INTEGRAL_TYPE(IntPtr,"intptr_t",Int)
         -- Word and Int are guaranteed pointer-sized in GHC
 
 -- | casts a @Ptr@ to a @WordPtr@
