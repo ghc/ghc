@@ -430,6 +430,9 @@ PACKAGES_STAGE1 += base
 PACKAGES_STAGE1 += filepath
 PACKAGES_STAGE1 += array
 PACKAGES_STAGE1 += deepseq
+PACKAGES_STAGE1 += pretty
+PACKAGES_STAGE1 += ghc-boot-th
+PACKAGES_STAGE1 += template-haskell
 PACKAGES_STAGE1 += bytestring
 PACKAGES_STAGE1 += containers/containers
 
@@ -444,13 +447,10 @@ endif
 PACKAGES_STAGE1 += directory
 PACKAGES_STAGE1 += process
 PACKAGES_STAGE1 += hpc
-PACKAGES_STAGE1 += pretty
 PACKAGES_STAGE1 += binary
 PACKAGES_STAGE1 += transformers
 PACKAGES_STAGE1 += mtl
-PACKAGES_STAGE1 += ghc-boot-th
 PACKAGES_STAGE1 += ghc-boot
-PACKAGES_STAGE1 += template-haskell
 PACKAGES_STAGE1 += text
 PACKAGES_STAGE1 += parsec
 PACKAGES_STAGE1 += Cabal/Cabal
