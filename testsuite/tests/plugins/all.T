@@ -14,129 +14,125 @@ setTestOpts([
 
 
 test('plugins01',
-     [extra_files(['simple-plugin/']), only_ways([config.ghc_plugin_way]),
+     [extra_files(['simple-plugin/']),
       pre_cmd('$MAKE -s --no-print-directory -C simple-plugin package.plugins01 TOP={top}')],
      makefile_test, [])
 
 test('plugins02',
-     [extra_files(['simple-plugin/']), only_ways([config.ghc_plugin_way]),
+     [extra_files(['simple-plugin/']),
       pre_cmd('$MAKE -s --no-print-directory -C simple-plugin package.plugins02 TOP={top}')],
      compile_fail,
      ['-package-db simple-plugin/pkg.plugins02/local.package.conf -fplugin Simple.BadlyTypedPlugin -package simple-plugin ' + config.plugin_way_flags])
 
 test('plugins03',
-     [extra_files(['simple-plugin/']), only_ways([config.ghc_plugin_way]),
+     [extra_files(['simple-plugin/']),
       pre_cmd('$MAKE -s --no-print-directory -C simple-plugin package.plugins03 TOP={top}')],
      compile_fail,
      ['-package-db simple-plugin/pkg.plugins03/local.package.conf -fplugin Simple.NonExistentPlugin -package simple-plugin'])
 
 test('plugins04',
-     [extra_files(['HomePackagePlugin.hs']),
-      only_ways([config.ghc_plugin_way])],
+     [extra_files(['HomePackagePlugin.hs'])],
      multimod_compile_fail,
      ['plugins04', '-package ghc -fplugin HomePackagePlugin'])
 
-test('plugins05', [extra_files(['HomePackagePlugin.hs']),
-                   only_ways([config.ghc_plugin_way])],
-     multimod_compile_and_run, ['plugins05', '-package ghc'])
+test('plugins05', [extra_files(['HomePackagePlugin.hs'])],
+     multimod_compile_and_run, ['plugins05', '-package ghc ' + config.plugin_way_flags ])
 
 test('plugins06',
      [extra_files(['LinkerTicklingPlugin.hs']),
-      unless(have_dynamic(), skip),
-      only_ways([config.ghc_plugin_way])],
-     multimod_compile_and_run, ['plugins06', '-package ghc -dppr-debug'])
+      unless(have_dynamic(), skip)],
+     multimod_compile_and_run, ['plugins06', '-package ghc -dppr-debug ' + config.plugin_way_flags ])
 
 test('plugins07',
      [extra_files(['rule-defining-plugin/']),
-      only_ways([config.ghc_plugin_way]),
+
       pre_cmd('$MAKE -s --no-print-directory -C rule-defining-plugin package.plugins07 TOP={top}')],
      makefile_test, [])
 
 test('plugins08',
      [extra_files(['simple-plugin/']),
-      only_ways([config.ghc_plugin_way]),
+
       pre_cmd('$MAKE -s --no-print-directory -C simple-plugin package.plugins08 TOP={top}')],
      makefile_test, [])
 
 test('plugins09',
      [extra_files(['simple-plugin/']),
-      only_ways([config.ghc_plugin_way]),
+
       pre_cmd('$MAKE -s --no-print-directory -C simple-plugin package.plugins09 TOP={top}')],
      makefile_test, [])
 
 test('plugins10',
      [extra_files(['simple-plugin/', 'QuasiQuotation.hs']),
-      only_ways([config.ghc_plugin_way]),
+
       pre_cmd('$MAKE -s --no-print-directory -C simple-plugin package.plugins10 TOP={top}')],
      makefile_test, [])
 
 test('plugins11',
      [extra_files(['simple-plugin/']),
-      only_ways([config.ghc_plugin_way]),
+
       pre_cmd('$MAKE -s --no-print-directory -C simple-plugin package.plugins11 TOP={top}')],
      makefile_test, [])
 
 test('plugins12',
      [extra_files(['simple-plugin/']),
-      only_ways([config.ghc_plugin_way]),
+
       pre_cmd('$MAKE -s --no-print-directory -C simple-plugin package.plugins12 TOP={top}')],
      makefile_test, [])
 
 test('plugins13',
      [extra_files(['simple-plugin/', 'PluginFilteredExport.hs']),
-      only_ways([config.ghc_plugin_way]),
+
       pre_cmd('$MAKE -s --no-print-directory -C simple-plugin package.plugins13 TOP={top}')],
      makefile_test, [])
 
 test('plugins14',
      [extra_files(['simple-plugin/']),
-      only_ways([config.ghc_plugin_way]),
+
       pre_cmd('$MAKE -s --no-print-directory -C simple-plugin package.plugins14 TOP={top}')],
      makefile_test, [])
 
 test('plugins15',
      [extra_files(['simple-plugin/', 'MetaRemoveHelper.hs']),
-      only_ways([config.ghc_plugin_way]),
+
       pre_cmd('$MAKE -s --no-print-directory -C simple-plugin package.plugins15 TOP={top}')],
      makefile_test, [])
 
 test('T10420',
      [extra_files(['rule-defining-plugin/']),
-      only_ways([config.ghc_plugin_way]),
+
       pre_cmd('$MAKE -s --no-print-directory -C rule-defining-plugin package.T10420 TOP={top}')],
      makefile_test, [])
 
 test('T10294',
      [extra_files(['annotation-plugin/']),
-      only_ways([config.ghc_plugin_way]),
+
       pre_cmd('$MAKE -s --no-print-directory -C annotation-plugin package.T10294 TOP={top}')],
      makefile_test, [])
 
 test('T10294a',
      [extra_files(['annotation-plugin/']),
-      only_ways([config.ghc_plugin_way]),
+
       pre_cmd('$MAKE -s --no-print-directory -C annotation-plugin package.T10294a TOP={top}')],
      makefile_test, [])
 
-test('frontend01', [extra_files(['FrontendPlugin.hs']),
-                    only_ways([config.ghc_plugin_way]) ],
+test('frontend01', [extra_files(['FrontendPlugin.hs'])],
      makefile_test, [])
 
 test('T11244',
      [extra_files(['rule-defining-plugin/']),
-      only_ways([config.ghc_plugin_way]),
+
       pre_cmd('$MAKE -s --no-print-directory -C rule-defining-plugin package.T11244 TOP={top}')],
      makefile_test, [])
 
 test('T12567a',
      [extra_files(['T12567b.hs', 'simple-plugin/']),
-      only_ways([config.ghc_plugin_way]),
+
       pre_cmd('$MAKE -s --no-print-directory -C simple-plugin package.T12567a TOP={top}')],
      makefile_test, [])
 
 test('T14335',
      [extra_files(['simple-plugin/', 'plugins01.hs']),
-      only_ways([config.ghc_plugin_way]),
+
       pre_cmd('$MAKE -s --no-print-directory -C simple-plugin package.plugins01 TOP={top}')],
      compile_fail,
      ['-package-db simple-plugin/pkg.plugins01/local.package.conf -fplugin Simple.Plugin \
@@ -144,35 +140,35 @@ test('T14335',
 
 test('plugin-recomp-pure',
      [extra_files(['plugin-recomp/', 'plugin-recomp-test.hs']),
-      only_ways([config.ghc_plugin_way]),
+
       pre_cmd('$MAKE -s --no-print-directory -C plugin-recomp package.plugins01 TOP={top}')
       ],
      makefile_test, [])
 
 test('plugin-recomp-impure',
      [extra_files(['plugin-recomp/', 'plugin-recomp-test.hs']),
-      only_ways([config.ghc_plugin_way]),
+
       pre_cmd('$MAKE -s --no-print-directory -C plugin-recomp package.plugins01 TOP={top}')
       ],
      makefile_test, [])
 
 test('plugin-recomp-flags',
      [extra_files(['plugin-recomp/', 'plugin-recomp-test.hs']),
-      only_ways([config.ghc_plugin_way]),
+
       pre_cmd('$MAKE -s --no-print-directory -C plugin-recomp package.plugins01 TOP={top}')
       ],
      makefile_test, [])
 
 test('plugin-recomp-change',
      [extra_files(['plugin-recomp/', 'plugin-recomp-test.hs']),
-      only_ways([config.ghc_plugin_way]),
+
       pre_cmd('$MAKE -s --no-print-directory -C plugin-recomp package.plugins01 TOP={top}')
       ],
      makefile_test, [])
 
 test('plugin-recomp-change-prof',
      [extra_files(['plugin-recomp/', 'plugin-recomp-test.hs']),
-      only_ways([config.ghc_plugin_way]),
+
       pre_cmd('$MAKE -s --no-print-directory -C plugin-recomp package.plugins01 TOP={top}'),
       when(not config.have_profiling,skip)
       ],
@@ -188,7 +184,7 @@ test('static-plugins',
 
 test('T15858',
      [extra_files(['plugin-recomp/', 'plugin-recomp-test.hs']),
-#      only_ways([config.ghc_plugin_way]),
+#
       pre_cmd('$MAKE -s --no-print-directory -C plugin-recomp package.plugins01 TOP={top}'),
       extra_hc_opts("-package-db plugin-recomp/pkg.plugins01/local.package.conf ")
       ],
@@ -235,7 +231,6 @@ test('plugins-ghci', [extra_files(['HomePackagePlugin.hs']), only_ways(['ghci'])
 
 test('plugin-recomp-change-2',
      [extra_files(['plugin-recomp/', 'plugin-recomp-test.hs', 'PluginRecompTest.hs']),
-      only_ways([config.ghc_plugin_way]),
       pre_cmd('$MAKE -s --no-print-directory -C plugin-recomp package.plugins01 TOP={top}')
       ],
      makefile_test, [])
@@ -243,13 +238,12 @@ test('plugin-recomp-change-2',
 
 test('T20417',
      [extra_files(['plugin-recomp/', 'plugin-recomp-test.hs']),
-      only_ways([config.ghc_plugin_way]),
       pre_cmd('$MAKE -s --no-print-directory -C plugin-recomp package.plugins01 TOP={top}')
       ],
      makefile_test, [])
 
 test('T20218',
-     [extra_files(['simple-plugin/']), only_ways([config.ghc_plugin_way]),
+     [extra_files(['simple-plugin/']),
       pre_cmd('$MAKE -s --no-print-directory -C simple-plugin package.T20218 TOP={top}'),
       grep_errmsg(r'-lHSsimple-plugin'),
       ignore_stdout
@@ -257,33 +251,29 @@ test('T20218',
      makefile_test, [])
 
 test('T20218b',
-     [extra_files(['simple-plugin/']), only_ways([config.ghc_plugin_way]),
+     [extra_files(['simple-plugin/']),
       pre_cmd('$MAKE -s --no-print-directory -C simple-plugin package.T20218b TOP={top}')
       ],
      makefile_test, [])
 
 test('test-defaulting-plugin',
      [extra_files(['defaulting-plugin/']),
-      only_ways([config.ghc_plugin_way]),
       pre_cmd('$MAKE -s --no-print-directory -C defaulting-plugin package.test-defaulting-plugin TOP={top}')],
      makefile_test, [])
 
 test('test-defaulting-plugin-fail',
      [extra_files(['defaulting-plugin/']),
-      only_ways([config.ghc_plugin_way]),
       pre_cmd('$MAKE -s --no-print-directory -C defaulting-plugin package.test-defaulting-plugin-fail TOP={top}')],
      makefile_test, [])
 
 test('plugins-order',
      [extra_files(['plugin-recomp/', 'plugin-recomp-test.hs']),
-      only_ways([config.ghc_plugin_way]),
       pre_cmd('$MAKE -s --no-print-directory -C plugin-recomp package.plugins01 TOP={top}')
       ],
      makefile_test, [])
 
 test('plugins-order-pragma',
      [extra_files(['plugin-recomp/', 'plugin-recomp-test.hs']),
-      only_ways([config.ghc_plugin_way]),
       pre_cmd('$MAKE -s --no-print-directory -C plugin-recomp package.plugins01 TOP={top}')
       ],
      makefile_test, [])
