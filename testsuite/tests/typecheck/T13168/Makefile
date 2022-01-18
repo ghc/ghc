@@ -3,7 +3,7 @@ include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
 SETUP=../Setup -v0
-CONFIGURE=$(SETUP) configure --with-ghc='$(TEST_HC)' --ghc-options='$(TEST_HC_OPTS)' --package-db='$(PWD)/tmp.d' --prefix='$(PWD)/inst'
+CONFIGURE=$(SETUP) configure --with-ghc='$(TEST_HC)' --ghc-options='$(filter-out -rtsopts,$(TEST_HC_OPTS))' --package-db='$(PWD)/tmp.d' --prefix='$(PWD)/inst'
 
 T13168: clean
 	$(MAKE) -s --no-print-directory clean
