@@ -113,6 +113,11 @@ import GHC.IO.Handle.Types (Handle)
 #if defined(mingw32_HOST_OS)
 import Foreign.C
 import GHC.IO.Handle.FD (fdToHandle)
+# if defined(__IO_MANAGER_WINIO__)
+import GHC.IO.SubSystem ((<!>))
+import GHC.IO.Handle.Windows (handleToHANDLE)
+import GHC.Event.Windows (associateHandle')
+# endif
 #else
 import System.Posix as Posix
 #endif
@@ -606,7 +611,9 @@ foreign import ccall "io.h _close"
 foreign import ccall unsafe "io.h _get_osfhandle"
    _get_osfhandle :: CInt -> IO CInt
 
-runWithPipes createProc prog opts = do
+runWithPipesPOSIX :: (CreateProcess -> IO ProcessHandle)
+                  -> FilePath -> [String] -> IO (ProcessHandle, Handle, Handle)
+runWithPipesPOSIX createProc prog opts = do
     (rfd1, wfd1) <- createPipeFd -- we read on rfd1
     (rfd2, wfd2) <- createPipeFd -- we write on wfd2
     wh_client    <- _get_osfhandle wfd1
@@ -619,6 +626,27 @@ runWithPipes createProc prog opts = do
       where mkHandle :: CInt -> IO Handle
             mkHandle fd = (fdToHandle fd) `Ex.onException` (c__close fd)
 
+# if defined (__IO_MANAGER_WINIO__)
+runWithPipesNative :: (CreateProcess -> IO ProcessHandle)
+                   -> FilePath -> [String] -> IO (ProcessHandle, Handle, Handle)
+runWithPipesNative createProc prog opts = do
+    (rh, wfd1) <- createPipe -- we read on rfd1
+    (rfd2, wh) <- createPipe -- we write on wfd2
+    wh_client    <- handleToHANDLE wfd1
+    rh_client    <- handleToHANDLE rfd2
+    -- Associate the handle with the current manager
+    -- but don't touch the ones we're passing to the child
+    -- since it needs to register the handle with its own manager.
+    associateHandle' =<< handleToHANDLE rh
+    associateHandle' =<< handleToHANDLE wh
+    let args = show wh_client : show rh_client : opts
+    ph <- createProc (proc prog args)
+    return (ph, rh, wh)
+
+runWithPipes = runWithPipesPOSIX <!> runWithPipesNative
+# else
+runWithPipes = runWithPipesPOSIX
+# endif
 #else
 runWithPipes createProc prog opts = do
     (rfd1, wfd1) <- Posix.createPipe -- we read on rfd1

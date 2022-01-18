@@ -618,7 +618,7 @@ getBin h get leftover = go leftover (runGetIncremental get)
    go Nothing (Partial fun) = do
      -- putStrLn "before hGetSome"
      b <- B.hGetSome h (32*1024)
-     -- printf "hGetSome: %d\n" (B.length b)
+     -- putStrLn $ "hGetSome: " ++ show (B.length b)
      if B.null b
         then return Nothing
         else go Nothing (fun (Just b))

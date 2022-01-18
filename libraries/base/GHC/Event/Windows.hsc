@@ -68,7 +68,7 @@ module GHC.Event.Windows (
     module GHC.Event.Windows.ConsoleEvent
 ) where
 
--- define DEBUG 1
+-- #define DEBUG 1
 
 -- #define DEBUG_TRACE 1
 

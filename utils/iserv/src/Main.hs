@@ -21,6 +21,14 @@ import Data.IORef
 import System.Environment
 import System.Exit
 import Text.Printf
+#if defined(WINDOWS)
+import Foreign.Ptr (wordPtrToPtr)
+# if defined(__IO_MANAGER_WINIO__)
+import GHC.IO.SubSystem ((<!>))
+import GHC.IO.Handle.Windows (handleToHANDLE)
+import GHC.Event.Windows (associateHandle')
+# endif
+#endif
 
 dieWithUsage :: IO a
 dieWithUsage = do
@@ -36,12 +44,27 @@ dieWithUsage = do
 main :: IO ()
 main = do
   args <- getArgs
-  (wfd1, rfd2, rest) <-
+  (outh, inh, rest) <-
       case args of
         arg0:arg1:rest -> do
+#if defined(WINDOWS)
+            let wfd1 = wordPtrToPtr (read arg0)
+                rfd2 = wordPtrToPtr (read arg1)
+# if defined(__IO_MANAGER_WINIO__)
+            -- register the handles we received with
+            -- our I/O manager otherwise we can't use
+            -- them correctly.
+            return () <!> (do
+              associateHandle' wfd1
+              associateHandle' rfd2)
+# endif
+#else
             let wfd1 = read arg0
                 rfd2 = read arg1
-            return (wfd1, rfd2, rest)
+#endif
+            inh  <- getGhcHandle rfd2
+            outh <- getGhcHandle wfd1
+            return (outh, inh, rest)
         _ -> dieWithUsage
 
   (verbose, rest') <- case rest of
@@ -56,10 +79,7 @@ main = do
     dieWithUsage
 
   when verbose $
-    printf "GHC iserv starting (in: %d; out: %d)\n"
-      (fromIntegral rfd2 :: Int) (fromIntegral wfd1 :: Int)
-  inh  <- getGhcHandle rfd2
-  outh <- getGhcHandle wfd1
+    printf "GHC iserv starting (in: %s; out: %s)\n" (show inh) (show outh)
   installSignalHandlers
   lo_ref <- newIORef Nothing
   let pipe = Pipe{pipeRead = inh, pipeWrite = outh, pipeLeftovers = lo_ref}
