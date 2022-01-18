@@ -215,11 +215,11 @@ mkProtoBCO
    -> name
    -> BCInstrList
    -> Either  [CgStgAlt] (CgStgRhs)
-        -- ^ original expression; for debugging only
-   -> Int
-   -> Word16
-   -> [StgWord]
-   -> Bool      -- True <=> is a return point, rather than a function
+                -- ^ original expression; for debugging only
+   -> Int       -- ^ arity
+   -> Word16    -- ^ bitmap size
+   -> [StgWord] -- ^ bitmap
+   -> Bool      -- ^ True <=> is a return point, rather than a function
    -> [FFIInfo]
    -> ProtoBCO name
 mkProtoBCO platform nm instrs_ordlist origin arity bitmap_size bitmap is_ret ffis
@@ -736,10 +736,10 @@ doTailCall init_d s p fn args = do
    do_pushes init_d args (map (atomRep platform) args)
   where
   do_pushes !d [] reps = do
-        assert (null reps ) return ()
+        assert (null reps) return ()
         (push_fn, sz) <- pushAtom d p (StgVarArg fn)
         platform <- profilePlatform <$> getProfile
-        assert (sz == wordSize platform ) return ()
+        assert (sz == wordSize platform) return ()
         let slide = mkSlideB platform (d - init_d + wordSize platform) (init_d - s)
             enter = if isUnliftedType (idType fn)
                     then RETURN_UNLIFTED P
@@ -817,6 +817,8 @@ doCase d s p scrut bndr alts
           (isUnboxedTupleType bndr_ty || isUnboxedSumType bndr_ty) &&
           length non_void_arg_reps > 1
 
+        unlifted_alg_ty = isUnliftedType bndr_ty && isAlgCase
+
         non_void_arg_reps = non_void (typeArgReps platform bndr_ty)
 
         profiling
@@ -838,11 +840,12 @@ doCase d s p scrut bndr alts
                           not ubx_tuple_frame = 2 * wordSize platform
                         | otherwise = 0
 
-        -- An unlifted value gets an extra info table pushed on top
-        -- when it is returned.
+        -- The size of the return frame info table pointer if one exists
         unlifted_itbl_size_b :: StackDepth
-        unlifted_itbl_size_b | ubx_tuple_frame              = 3 * wordSize platform
-                             | not (isUnliftedType bndr_ty) = 0
+        unlifted_itbl_size_b | ubx_tuple_frame              = wordSize platform
+                             | not (isUnliftedType bndr_ty)
+                             -- See Note [Popping return frame for unlifted things]
+                             || unlifted_alg_ty             = 0
                              | otherwise                    = wordSize platform
 
         (bndr_size, tuple_info, args_offsets)
@@ -877,6 +880,7 @@ doCase d s p scrut bndr alts
         isAlgCase = isAlgType bndr_ty
 
         -- given an alt, return a discr and code for it.
+        codeAlt :: CgStgAlt -> BcM (Discr, BCInstrList)
         codeAlt (DEFAULT, _, rhs)
            = do rhs_code <- schemeE d_alts s p_alts rhs
                 return (NoDiscr, rhs_code)
@@ -924,16 +928,11 @@ doCase d s p scrut bndr alts
                         | (NonVoid arg, offset) <- args_offsets ]
                         p_alts
 
-                 -- unlifted datatypes have an infotable word on top
-                 unpack = if isUnliftedType bndr_ty
-                          then PUSH_L 1 `consOL`
-                               UNPACK (trunc16W size) `consOL`
-                               unitOL (SLIDE (trunc16W size) 1)
-                          else unitOL (UNPACK (trunc16W size))
              in do
              massert isAlgCase
              rhs_code <- schemeE stack_bot s p' rhs
-             return (my_discr alt, unpack `appOL` rhs_code)
+             return (my_discr alt,
+                     unitOL (UNPACK (trunc16W size)) `appOL` rhs_code)
            where
              real_bndrs = filterOut isTyVar bndrs
 
@@ -1003,7 +1002,23 @@ doCase d s p scrut bndr alts
         bitmap = intsToReverseBitmap platform bitmap_size'{-size-} pointers
 
      alt_stuff <- mapM codeAlt alts
-     alt_final <- mkMultiBranch maybe_ncons alt_stuff
+     alt_final0 <- mkMultiBranch maybe_ncons alt_stuff
+     -- Note [Popping return frame for unlifted things]
+     -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     -- When an unlifted value is returned, a special stg_ret_XXX_info frame will
+     -- be sitting on top of the stack. This mechanism is used to aid in switching
+     -- execution contexts between object code and interpreter. However, mkMultiBranch,
+     -- which produces the bytecode to discriminate the case alternatives, does not
+     -- account for that frame header and does branching based on the top of the stack.
+     -- Therefore, we must compensate for this by popping the frame header (2 words
+     -- for tuples and 1 word for other unlifted things) before passing control to
+     -- the case discrimination continuation. This ensures we are looking at the
+     -- right word and it also saves some stack space. Failing to account for this
+     -- was the cause of #20194.
+     let alt_final
+           | ubx_tuple_frame    = mkSlideW 0 2 `mappend` alt_final0
+           | unlifted_alg_ty    = mkSlideW 0 1 `mappend` alt_final0
+           | otherwise          = alt_final0
 
      let
          alt_bco_name = getName bndr
