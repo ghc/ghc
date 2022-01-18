@@ -4,6 +4,7 @@ module T16104_Plugin (plugin) where
 
 import GHC.Plugins
 import Data.Bits
+import System.IO
 
 plugin :: Plugin
 plugin = defaultPlugin {installCoreToDos = install}
@@ -14,7 +15,10 @@ plugin = defaultPlugin {installCoreToDos = install}
         check :: ModGuts -> CoreM ModGuts
         check m = do mbN <- thNameToGhcName 'complement
                      case mbN of
-                       Just _  -> liftIO $ putStrLn "Found complement!"
+                       Just _  -> do
+                        liftIO $ putStrLn "Found complement!"
+                        -- TODO: Remove #20791
+                        liftIO $ hFlush stdout
                        Nothing -> error "Failed to locate complement"
 
                      return m

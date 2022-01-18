@@ -2,6 +2,7 @@ module Simple.TrustworthyPlugin (plugin) where
 
 import GHC.Plugins
 import GHC.Tc.Utils.Monad
+import System.IO
 
 plugin :: Plugin
 plugin = defaultPlugin
@@ -14,4 +15,6 @@ plugin = defaultPlugin
       safe <- finalSafeMode dflags tcg
       print $ gopt Opt_PluginTrustworthy dflags
       putStrLn $ showPpr dflags safe
+      -- TODO: Remove #20791
+      hFlush stdout
       return tcg
