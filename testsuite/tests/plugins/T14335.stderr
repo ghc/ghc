@@ -1,1 +1,1 @@
-<command line>: Plugins require -fno-external-interpreter
+ghc: Plugins require -fno-external-interpreter
