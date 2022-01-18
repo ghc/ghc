@@ -1,5 +1,5 @@
 
-==================== Strictness signatures ====================
+==================== Demand signatures ====================
 Test.$tc'MkT:
 Test.$tcT:
 Test.$trModule:
@@ -17,7 +17,7 @@ Test.t2: 1
 
 
 
-==================== Strictness signatures ====================
+==================== Demand signatures ====================
 Test.$tc'MkT:
 Test.$tcT:
 Test.$trModule:

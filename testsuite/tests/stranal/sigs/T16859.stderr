@@ -1,5 +1,5 @@
 
-==================== Strictness signatures ====================
+==================== Demand signatures ====================
 T16859.$tc'External:
 T16859.$tc'Internal:
 T16859.$tc'Name:
@@ -37,7 +37,7 @@ T16859.n_uniq: 1
 
 
 
-==================== Strictness signatures ====================
+==================== Demand signatures ====================
 T16859.$tc'External:
 T16859.$tc'Internal:
 T16859.$tc'Name:

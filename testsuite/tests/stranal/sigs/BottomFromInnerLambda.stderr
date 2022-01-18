@@ -1,5 +1,5 @@
 
-==================== Strictness signatures ====================
+==================== Demand signatures ====================
 BottomFromInnerLambda.$trModule:
 BottomFromInnerLambda.expensive: <1!P(SL)>
 BottomFromInnerLambda.f: <1!P(SL)>
@@ -13,7 +13,7 @@ BottomFromInnerLambda.f:
 
 
 
-==================== Strictness signatures ====================
+==================== Demand signatures ====================
 BottomFromInnerLambda.$trModule:
 BottomFromInnerLambda.expensive: <1!P(1L)>
 BottomFromInnerLambda.f: <1!P(1L)>

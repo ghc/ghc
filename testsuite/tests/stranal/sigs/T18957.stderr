@@ -1,5 +1,5 @@
 
-==================== Strictness signatures ====================
+==================== Demand signatures ====================
 T18957.$trModule:
 T18957.g: <MCM(L)><1!L>
 T18957.h1: <SCM(L)><1!L>
@@ -19,7 +19,7 @@ T18957.seq':
 
 
 
-==================== Strictness signatures ====================
+==================== Demand signatures ====================
 T18957.$trModule:
 T18957.g: <MCM(L)><1!L>
 T18957.h1: <SCM(L)><1!L>

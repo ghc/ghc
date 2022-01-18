@@ -1,5 +1,5 @@
 
-==================== Strictness signatures ====================
+==================== Demand signatures ====================
 T19871.$tc'Huge:
 T19871.$tcHuge:
 T19871.$trModule:
@@ -47,7 +47,7 @@ T19871.update: 1
 
 
 
-==================== Strictness signatures ====================
+==================== Demand signatures ====================
 T19871.$tc'Huge:
 T19871.$tcHuge:
 T19871.$trModule:

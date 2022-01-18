@@ -1,5 +1,5 @@
 
-==================== Strictness signatures ====================
+==================== Demand signatures ====================
 T13380f.$trModule:
 T13380f.f: <1!L><1!L><L>
 T13380f.g: <1!L><ML><L>
@@ -21,7 +21,7 @@ T13380f.unsafeCall: 1(, 1)
 
 
 
-==================== Strictness signatures ====================
+==================== Demand signatures ====================
 T13380f.$trModule:
 T13380f.f: <1!L><1!L><L>
 T13380f.g: <1!L><ML><L>

@@ -1,5 +1,5 @@
 
-==================== Strictness signatures ====================
+==================== Demand signatures ====================
 T18907.$tc'H:
 T18907.$tcHuge:
 T18907.$trModule:
@@ -21,7 +21,7 @@ T18907.m: b
 
 
 
-==================== Strictness signatures ====================
+==================== Demand signatures ====================
 T18907.$tc'H:
 T18907.$tcHuge:
 T18907.$trModule:

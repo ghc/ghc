@@ -1,5 +1,5 @@
 
-==================== Strictness signatures ====================
+==================== Demand signatures ====================
 T8598.$trModule:
 T8598.fun: <1!L>
 
@@ -11,7 +11,7 @@ T8598.fun: 1
 
 
 
-==================== Strictness signatures ====================
+==================== Demand signatures ====================
 T8598.$trModule:
 T8598.fun: <1!L>
 

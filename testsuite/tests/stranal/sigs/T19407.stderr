@@ -1,5 +1,5 @@
 
-==================== Strictness signatures ====================
+==================== Demand signatures ====================
 T19407.$tc'Huge:
 T19407.$tc'T:
 T19407.$tcHuge:
@@ -25,7 +25,7 @@ T19407.n: 1
 
 
 
-==================== Strictness signatures ====================
+==================== Demand signatures ====================
 T19407.$tc'Huge:
 T19407.$tc'T:
 T19407.$tcHuge:

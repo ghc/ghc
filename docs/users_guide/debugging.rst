@@ -374,7 +374,7 @@ subexpression elimination pass.
     performed. This output includes various information that the simplifier uses
     to determine whether the inlining is beneficial.
 
-.. ghc-flag:: -ddump-stranal
+.. ghc-flag:: -ddump-dmdanal
     :shortdesc: Dump demand analysis output
     :type: dynamic
 
@@ -383,7 +383,7 @@ subexpression elimination pass.
     See :ghc-flag:`-fstrictness` for the syntax and semantics of demand
     annotations.
 
-.. ghc-flag:: -ddump-str-signatures
+.. ghc-flag:: -ddump-dmd-signatures
     :shortdesc: Dump top-level demand signatures
     :type: dynamic
 

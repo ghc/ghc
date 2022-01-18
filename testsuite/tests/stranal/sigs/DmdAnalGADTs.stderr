@@ -1,5 +1,5 @@
 
-==================== Strictness signatures ====================
+==================== Demand signatures ====================
 DmdAnalGADTs.$tc'A:
 DmdAnalGADTs.$tc'B:
 DmdAnalGADTs.$tcD:
@@ -27,7 +27,7 @@ DmdAnalGADTs.hasStrSig: 1
 
 
 
-==================== Strictness signatures ====================
+==================== Demand signatures ====================
 DmdAnalGADTs.$tc'A:
 DmdAnalGADTs.$tc'B:
 DmdAnalGADTs.$tcD:

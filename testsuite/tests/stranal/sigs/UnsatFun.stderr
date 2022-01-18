@@ -1,5 +1,5 @@
 
-==================== Strictness signatures ====================
+==================== Demand signatures ====================
 UnsatFun.$trModule:
 UnsatFun.f: <1!S><B>b
 UnsatFun.g: <1!S>b
@@ -23,7 +23,7 @@ UnsatFun.h3: 1
 
 
 
-==================== Strictness signatures ====================
+==================== Demand signatures ====================
 UnsatFun.$trModule:
 UnsatFun.f: <1!S><B>b
 UnsatFun.g: <1!S>b

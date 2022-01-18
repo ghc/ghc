@@ -1,5 +1,5 @@
 
-==================== Strictness signatures ====================
+==================== Demand signatures ====================
 T5075.$trModule:
 T5075.f: <S!P(A,A,SCS(C1(L)),A,A,A,A,A)><LP(A,A,LCL(C1(L)),A,A,A,L)><L>
 T5075.g: <1!L><S!L>
@@ -15,7 +15,7 @@ T5075.h:
 
 
 
-==================== Strictness signatures ====================
+==================== Demand signatures ====================
 T5075.$trModule:
 T5075.f: <1P(A,A,SCS(C1(L)),A,A,A,A,A)><LP(A,A,LCL(C1(L)),A,A,A,L)><L>
 T5075.g: <1!L><S!L>

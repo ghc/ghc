@@ -2473,9 +2473,15 @@ dynamic_flags_deps = [
         (setDumpFlag Opt_D_dump_call_arity)
   , make_ord_flag defGhcFlag "ddump-exitify"
         (setDumpFlag Opt_D_dump_exitify)
-  , make_ord_flag defGhcFlag "ddump-stranal"
+  , make_dep_flag defGhcFlag "ddump-stranal"
         (setDumpFlag Opt_D_dump_dmdanal)
-  , make_ord_flag defGhcFlag "ddump-str-signatures"
+        "Use `-ddump-dmdanal` instead"
+  , make_dep_flag defGhcFlag "ddump-str-signatures"
+        (setDumpFlag Opt_D_dump_dmd_signatures)
+        "Use `-ddump-dmd-signatures` instead"
+  , make_ord_flag defGhcFlag "ddump-dmdanal"
+        (setDumpFlag Opt_D_dump_dmdanal)
+  , make_ord_flag defGhcFlag "ddump-dmd-signatures"
         (setDumpFlag Opt_D_dump_dmd_signatures)
   , make_ord_flag defGhcFlag "ddump-cpranal"
         (setDumpFlag Opt_D_dump_cpranal)

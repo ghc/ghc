@@ -1,5 +1,5 @@
 
-==================== Strictness signatures ====================
+==================== Demand signatures ====================
 T17932.$tc'Options:
 T17932.$tc'X:
 T17932.$tcOptions:
@@ -19,7 +19,7 @@ T17932.flags:
 
 
 
-==================== Strictness signatures ====================
+==================== Demand signatures ====================
 T17932.$tc'Options:
 T17932.$tc'X:
 T17932.$tcOptions:

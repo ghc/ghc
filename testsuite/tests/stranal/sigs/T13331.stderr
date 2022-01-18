@@ -1,5 +1,5 @@
 
-==================== Strictness signatures ====================
+==================== Demand signatures ====================
 T13331.$tc'Bin:
 T13331.$tc'Tip:
 T13331.$tcMap:
@@ -17,7 +17,7 @@ T13331.naiveInsertInt:
 
 
 
-==================== Strictness signatures ====================
+==================== Demand signatures ====================
 T13331.$tc'Bin:
 T13331.$tc'Tip:
 T13331.$tcMap:

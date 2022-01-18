@@ -1,5 +1,5 @@
 
-==================== Strictness signatures ====================
+==================== Demand signatures ====================
 T16197b.$tc'Box:
 T16197b.$tc'T:
 T16197b.$tcBox:
@@ -19,7 +19,7 @@ T16197b.f: 1
 
 
 
-==================== Strictness signatures ====================
+==================== Demand signatures ====================
 T16197b.$tc'Box:
 T16197b.$tc'T:
 T16197b.$tcBox:

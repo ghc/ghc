@@ -1,5 +1,5 @@
 
-==================== Strictness signatures ====================
+==================== Demand signatures ====================
 HyperStrUse.$trModule:
 HyperStrUse.f: <1!P(1!L,A)><1L>
 
@@ -11,7 +11,7 @@ HyperStrUse.f: 1
 
 
 
-==================== Strictness signatures ====================
+==================== Demand signatures ====================
 HyperStrUse.$trModule:
 HyperStrUse.f: <1!P(1!L,A)><1L>
 

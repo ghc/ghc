@@ -1,7 +1,7 @@
 # This directory contains tests where we annotate functions with expected
 # type signatures, and verify that these actually those found by the compiler
 
-setTestOpts(extra_hc_opts('-ddump-str-signatures -ddump-cpr-signatures'))
+setTestOpts(extra_hc_opts('-ddump-dmd-signatures -ddump-cpr-signatures'))
 
 # We are testing the result of an optimization, so no use
 # running them in various runtimes

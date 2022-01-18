@@ -1,5 +1,5 @@
 
-==================== Strictness signatures ====================
+==================== Demand signatures ====================
 T18086.$trModule:
 T18086.m: <L>x
 T18086.panic: <L>x
@@ -13,7 +13,7 @@ T18086.panic: b
 
 
 
-==================== Strictness signatures ====================
+==================== Demand signatures ====================
 T18086.$trModule:
 T18086.m: <L>x
 T18086.panic: <L>x
