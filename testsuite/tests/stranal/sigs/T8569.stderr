@@ -1,5 +1,5 @@
 
-==================== Strictness signatures ====================
+==================== Demand signatures ====================
 T8569.addUp: <1L><L>
 
 
@@ -9,7 +9,7 @@ T8569.addUp:
 
 
 
-==================== Strictness signatures ====================
+==================== Demand signatures ====================
 T8569.addUp: <1L><L>
 
 

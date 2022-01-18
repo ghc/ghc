@@ -65,9 +65,9 @@ test('T17819',  [ grep_errmsg(r'(wfoo|wbar)') ], compile, ['-ddump-simpl'])
 # We care about the call demand on $wg
 test('T18903',  [ grep_errmsg(r'Dmd=\S+C\S+') ], compile, ['-ddump-simpl -dsuppress-uniques'])
 # We care about the call demand on $wg1 and $wg2
-test('T18894',  [ grep_errmsg(r'Dmd=\S+C\S+') ], compile, ['-ddump-stranal -dsuppress-uniques'])
+test('T18894',  [ grep_errmsg(r'Dmd=\S+C\S+') ], compile, ['-ddump-dmdanal -dsuppress-uniques'])
 # We care about the Arity 2 on eta, as a result of the annotated Dmd
-test('T18894b',  [ grep_errmsg(r'Arity=2') ], compile, ['-ddump-stranal -dsuppress-uniques -fno-call-arity -dppr-cols=200'])
+test('T18894b',  [ grep_errmsg(r'Arity=2') ], compile, ['-ddump-dmdanal -dsuppress-uniques -fno-call-arity -dppr-cols=200'])
 # We care about the workers of f,g,h,i:
 test('T18982',  [ grep_errmsg(r'\$w. .*Int#$') ], compile, ['-dppr-cols=1000 -ddump-simpl -dsuppress-idinfo -dsuppress-uniques'])
 # We care about the type of $wyeah. The unlifted Gram constructor should unbox
@@ -81,7 +81,7 @@ test('T19882b', normal, compile, [''])
 # We want that the 'go' joinrec in the unfolding has been worker/wrappered.
 # So we simply grep for 'jump $wgo' and hope we find more than 2 call sites:
 test('T20510', [ grep_errmsg(r'jump \$wgo') ], compile, ['-dsuppress-uniques -ddump-exitify'])
-test('T20817', [ grep_errmsg(r'Str') ], compile, ['-dsuppress-uniques -ddump-stranal'])
+test('T20817', [ grep_errmsg(r'Str') ], compile, ['-dsuppress-uniques -ddump-dmdanal'])
 # T21150: Check that t{,1,2} haven't been inlined.
 test('T21150', [ grep_errmsg(r'( t\d? :: Int)') ], compile, ['-dsuppress-uniques -ddump-exitify'])
 

@@ -1,5 +1,5 @@
 
-==================== Strictness signatures ====================
+==================== Demand signatures ====================
 T21081.blah: <LC(L,C(1,L))><1!P(1L)>
 T21081.blurg: <S!P(SL)>
 T21081.blurg2: <S!P(SL)>
@@ -45,7 +45,7 @@ T21081.snd':
 
 
 
-==================== Strictness signatures ====================
+==================== Demand signatures ====================
 T21081.blah: <LC(L,C(1,L))><1!P(1L)>
 T21081.blurg: <1!P(SL)>
 T21081.blurg2: <1!P(SL)>
