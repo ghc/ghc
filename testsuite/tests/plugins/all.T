@@ -119,8 +119,7 @@ test('T10294a',
      makefile_test, [])
 
 test('frontend01', [extra_files(['FrontendPlugin.hs']),
-                    only_ways([config.ghc_plugin_way]),
-                    unless(have_dynamic(), expect_broken(10301))],
+                    only_ways([config.ghc_plugin_way]) ],
      makefile_test, [])
 
 test('T11244',
