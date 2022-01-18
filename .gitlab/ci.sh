@@ -25,7 +25,10 @@ function time_it() {
   shift
   local start=$(date +%s)
   local res=0
-  $@ || res=$?
+  set +e
+  ( set -e ; $@ )
+  res=$?
+  set -e
   local end=$(date +%s)
   local delta=$(expr $end - $start)
 
