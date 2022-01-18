@@ -49,6 +49,7 @@ import GHC.Data.Maybe
 import GHC.Data.STuple
 import GHC.Builtin.PrimOps
 import GHC.Builtin.Types.Prim ( realWorldStatePrimTy )
+import GHC.Data.Graph.UnVar
 
 import Control.Monad
 import Data.Foldable
@@ -313,7 +314,6 @@ denotBindLetDown top_lvl env bind denot_body = do
            Rec ps        -> S2 Recursive    ps
   env' <- denotRhsSig top_lvl env rec_flag pairs
   trans_body <- denot_body env'
-  traverse_ trackCall (bindersOf bind) -- because we read the lazy_fvs
 
   let !peel_ids = findBndrsDmds env' rec_flag (bindersOf bind)
   -- pprTraceM "bletdn" (ppr (map fst pairs) $$ ppr rec_flag)
@@ -455,7 +455,7 @@ denotAlts env case_bndr alts = do
 
 denotAlt :: AnalEnv -> Id -> Alt Var -> Builder (SubDemand :~> STriple SubDemand Demand DmdType)
 denotAlt env case_bndr (Alt _ fld_bndrs rhs) = do
-  trans_rhs <- denotExpr env rhs
+  trans_rhs <- denotExpr env rhs -- NB: Since all binders in the program are fresh, we don't need to account for shadowing in env
   let !peel_bndrs     = findBndrsDmds env NonRecursive fld_bndrs
   let !peel_case_bndr = findBndrDmd env NonRecursive case_bndr
   return $ \eval_sd -> do
@@ -781,6 +781,7 @@ denotVar env var
       return $ \eval_sd -> do
         dmd_ty <- trans_call eval_sd
         -- Now add the demand on `var` itself
+        -- pprTraceM "denotCall:LetDown" (vcat [ppr var, ppr top_lvl, ppr eval_sd, ppr dmd_ty])
         return $! case top_lvl of
           NotTopLevel -> plusVarDmd dmd_ty var (C_11 :* eval_sd)
           TopLevel
@@ -834,13 +835,10 @@ denotRhsSig top_lvl env rec_flag pairs = fix_all env pairs
       | otherwise      = emptyUniqSet
 
     fix_all env []            = return env
-    fix_all env ((id,rhs):bs) = registerTransformer id $ do
+    fix_all env ((id,rhs):bs) = registerTransformer id (mkUnVarSet bind_ids) $ do
       !env_body <- fix_all (extendAnalEnv top_lvl env id) bs
       let !env_rhs | isRec rec_flag = env_body
                    | otherwise      = env   -- prevents shadowing errors
-
-      let read_old_lazy_fvs | isRec rec_flag = readLazyFVs bind_ids
-                            | otherwise      = pure emptyVarEnv
 
       -- adjustInlFun: See Note [Do not unbox class dictionaries]
       trans_rhs <- denotExpr (adjustInlFun id env_rhs) rhs
@@ -868,7 +866,7 @@ denotRhsSig top_lvl env rec_flag pairs = fix_all env pairs
 
             -- See Note [Lazy and unleashable free variables]
             -- and Note [Lazy free variables and monotonicity]
-            lazy_fvs <- read_old_lazy_fvs
+            lazy_fvs <- readLazyFVs bind_ids
             let !lazy_fvs' = lazy_fvs `addWeakDmds` rhs_fvs'
                 !sig_fvs   = rhs_fvs' `minusUFM` lazy_fvs'
             -- pprTraceM "lazy_fvs" (ppr id $$ ppr lazy_fvs $$ ppr rhs_fvs' $$ ppr lazy_fvs')

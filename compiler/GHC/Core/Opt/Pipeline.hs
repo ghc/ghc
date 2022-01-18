@@ -524,7 +524,11 @@ doCorePass pass guts = do
                                  addCallerCostCentres guts
 
     CoreFreshenUniques        -> {-# SCC "FreshenUniques" #-}
-                                 updateBinds freshenUniques
+                                 updateBindsM $ \binds -> liftIO $ do
+                                   let binds' = freshenUniques binds
+                                   Logger.putDumpFileMaybe logger Opt_D_dump_freshen
+                                     "Freshen uniques" FormatCore (pprCoreBindings binds')
+                                   pure binds'
 
     CoreDoPrintCore           -> {-# SCC "PrintCore" #-}
                                  liftIO $ printCore logger (mg_binds guts) >> return guts
