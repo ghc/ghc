@@ -1067,7 +1067,7 @@ dmdAnal logger dflags fam_envs rules binds = do
                , dmd_unbox_width  = dmdUnboxWidth dflags
                }
       binds_plus_dmds = dmdAnalProgram opts fam_envs rules binds
-  Logger.putDumpFileMaybe logger Opt_D_dump_str_signatures "Strictness signatures" FormatText $
+  Logger.putDumpFileMaybe logger Opt_D_dump_dmd_signatures "Demand signatures" FormatText $
     dumpIdInfoOfProgram (ppr . zapDmdEnvSig . dmdSigInfo) binds_plus_dmds
   -- See Note [Stamp out space leaks in demand analysis] in GHC.Core.Opt.DmdAnal
   seqBinds binds_plus_dmds `seq` return binds_plus_dmds
