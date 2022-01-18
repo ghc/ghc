@@ -2518,6 +2518,8 @@ label_self thread_name = do
 
 
 runPipelines :: Int -> HscEnv -> Maybe Messager -> [MakeAction] -> IO ()
+-- Don't even initialise plugins if there are no pipelines
+runPipelines _ _ _ [] = return ()
 runPipelines n_job orig_hsc_env mHscMessager all_pipelines = do
   liftIO $ label_self "main --make thread"
 
