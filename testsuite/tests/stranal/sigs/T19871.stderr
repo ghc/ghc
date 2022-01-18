@@ -1,5 +1,5 @@
 
-==================== Strictness signatures ====================
+==================== Demand signatures ====================
 T19871.absent: <1P(1L,ML,A,A,A,A,A,A,A,A,A,A)>
 T19871.ann: <1P(SL,L,L,L,L,L,L,L,L,L,L,L)>
 T19871.f1: <1!P(1L,A,A,A,A,A,A,A,A,A,A,A)>
@@ -41,7 +41,7 @@ T19871.update: 1
 
 
 
-==================== Strictness signatures ====================
+==================== Demand signatures ====================
 T19871.absent: <1P(1L,ML,A,A,A,A,A,A,A,A,A,A)>
 T19871.ann: <1P(SL,L,L,L,L,L,L,L,L,L,L,L)>
 T19871.f1: <1!P(1L,A,A,A,A,A,A,A,A,A,A,A)>

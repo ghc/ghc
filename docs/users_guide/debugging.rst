@@ -409,6 +409,12 @@ subexpression elimination pass.
     to determine whether the inlining is beneficial.
 
 .. ghc-flag:: -ddump-stranal
+    :shortdesc: *(deprecated)* Alias for :ghc-flag:`-ddump-dmdanal`
+    :type: dynamic
+
+    Has been renamed to :ghc-flag:`-ddump-dmdanal`.
+
+.. ghc-flag:: -ddump-dmdanal
     :shortdesc: Dump demand analysis output
     :type: dynamic
 
@@ -418,6 +424,12 @@ subexpression elimination pass.
     annotations.
 
 .. ghc-flag:: -ddump-str-signatures
+    :shortdesc: *(deprecated)* Alias for :ghc-flag:`-ddump-dmd-signatures`
+    :type: dynamic
+
+    Has been renamed to :ghc-flag:`-ddump-dmd-signatures`.
+
+.. ghc-flag:: -ddump-dmd-signatures
     :shortdesc: Dump top-level demand signatures
     :type: dynamic
 

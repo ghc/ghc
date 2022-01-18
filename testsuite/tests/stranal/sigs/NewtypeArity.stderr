@@ -1,5 +1,5 @@
 
-==================== Strictness signatures ====================
+==================== Demand signatures ====================
 Test.t: <1!P(L)><1!P(L)>
 Test.t2: <1!P(L)><1!P(L)>
 
@@ -11,7 +11,7 @@ Test.t2: 1
 
 
 
-==================== Strictness signatures ====================
+==================== Demand signatures ====================
 Test.t: <1!P(L)><1!P(L)>
 Test.t2: <1!P(L)><1!P(L)>
 

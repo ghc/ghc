@@ -1,5 +1,5 @@
 
-==================== Strictness signatures ====================
+==================== Demand signatures ====================
 UnsatFun.f: <1!P(S)><B>b
 UnsatFun.g: <1!P(S)>b
 UnsatFun.g': <MS>
@@ -21,7 +21,7 @@ UnsatFun.h3: 1
 
 
 
-==================== Strictness signatures ====================
+==================== Demand signatures ====================
 UnsatFun.f: <1!P(S)><B>b
 UnsatFun.g: <1!P(S)>b
 UnsatFun.g': <MS>

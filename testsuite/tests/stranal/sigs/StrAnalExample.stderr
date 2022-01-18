@@ -1,5 +1,5 @@
 
-==================== Strictness signatures ====================
+==================== Demand signatures ====================
 StrAnalExample.foo: <1L>
 
 
@@ -9,7 +9,7 @@ StrAnalExample.foo:
 
 
 
-==================== Strictness signatures ====================
+==================== Demand signatures ====================
 StrAnalExample.foo: <1L>
 
 

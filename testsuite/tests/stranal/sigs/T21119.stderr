@@ -1,5 +1,5 @@
 
-==================== Strictness signatures ====================
+==================== Demand signatures ====================
 T21119.$fMyShowInt: <1!A>
 T21119.$fMyShowTuple2: <1!A>
 T21119.get: <1!P(1!P(L),1!P(L))><1!P(L)><1L>
@@ -19,7 +19,7 @@ T21119.throwIndexError: b
 
 
 
-==================== Strictness signatures ====================
+==================== Demand signatures ====================
 T21119.$fMyShowInt: <1!A>
 T21119.$fMyShowTuple2: <1!A>
 T21119.get: <1!P(1!P(L),1!P(L))><1!P(L)><1L>

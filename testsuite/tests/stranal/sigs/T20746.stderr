@@ -1,5 +1,5 @@
 
-==================== Strictness signatures ====================
+==================== Demand signatures ====================
 Foo.f: <LP(A,L,A)><L>
 Foo.foogle: <L><L>
 
@@ -11,7 +11,7 @@ Foo.foogle: 1
 
 
 
-==================== Strictness signatures ====================
+==================== Demand signatures ====================
 Foo.f: <MP(A,1C(1,L),A)><L>
 Foo.foogle: <L><L>
 

@@ -1,5 +1,5 @@
 
-==================== Strictness signatures ====================
+==================== Demand signatures ====================
 Lib.$trModule:
 Lib.f: <S,1*U(U)><S,1*U(U)><L,U>
 
@@ -11,7 +11,7 @@ Lib.f:
 
 
 
-==================== Strictness signatures ====================
+==================== Demand signatures ====================
 Lib.$trModule: 
 Lib.f: <S,1*U(U)><S,1*U(U)><L,U>
 
