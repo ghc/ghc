@@ -475,7 +475,7 @@ by saying ``-fno-wombat``.
     Usually GHC black-holes a thunk only when it switches threads. This
     flag makes it do so as soon as the thunk is entered. See `Haskell on
     a shared-memory
-    multiprocessor <http://community.haskell.org/~simonmar/papers/multiproc.pdf>`__.
+    multiprocessor <https://simonmar.github.io/bib/papers/multiproc.pdf>`__.
 
     See :ref:`parallel-compile-options` for a discussion on its use.
 
@@ -520,7 +520,7 @@ by saying ``-fno-wombat``.
 
     Float let-bindings inwards, nearer their binding
     site. See `Let-floating: moving bindings to give faster programs
-    (ICFP'96) <https://research.microsoft.com/en-us/um/people/simonpj/papers/float.ps.gz>`__.
+    (ICFP'96) <https://www.microsoft.com/en-us/research/publication/let-floating-moving-bindings-to-give-faster-programs/>`__.
 
     This optimisation moves let bindings closer to their use site. The
     benefit here is that this may avoid unnecessary allocation if the
