@@ -77,7 +77,7 @@ parseWhyBlocked w = case w of
                         (#const BlockedOnCCall_Interruptible) -> BlockedOnCCall_Interruptible
                         (#const BlockedOnMsgThrowTo) -> BlockedOnMsgThrowTo
                         (#const ThreadMigrating) -> ThreadMigrating
-#if __GLASGOW_HASKELL__ >= 811 && __GLASGOW_HASKELL__ < 903
+#if __GLASGOW_HASKELL__ >= 811
                         (#const BlockedOnIOCompletion) -> BlockedOnIOCompletion
 #endif
                         _ -> WhyBlockedUnknownValue w

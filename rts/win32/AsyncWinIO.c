@@ -24,7 +24,6 @@
 #include <stdio.h>
 
 /* Note [Non-Threaded WINIO design]
-   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
    Compared to Async MIO, Async WINIO does all of the heavy processing at the
    Haskell side of things.  The same code as the threaded WINIO is re-used for
    the Non-threaded version.  Of course since we are in a non-threaded rts we
@@ -123,8 +122,10 @@
    See also Note [WINIO Manager design].
 
 
-  Note [Notifying the RTS/Haskell of completed events]
   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    Note [Notifying the RTS/Haskell of completed events]
+  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
   The C side runner can't directly create a haskell thread.
   With the current API of the haskell runtime this would be terrible
   unsound. In particular the GC assumes no heap objects are generated,
@@ -136,8 +137,10 @@
   ensures there is only one OS thread at a time making use of the haskell
   heap.
 
-  Note [Non-Threaded IO Manager startup sequence]
   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    Note [Non-Threaded IO Manager startup sequence]
+  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
   Under the new IO Manager we run a bit of initialization under
   hs_init(). The first call into actual IO manager code is a
   invocation of startupAsyncWinIO();

@@ -231,6 +231,14 @@ type CompletionCallback a = ErrCode   -- ^ 0 indicates success
 -- | Callback type that will be called when an I/O operation completes.
 type IOCallback = CompletionCallback ()
 
+-- | Wrap the IOCallback type into a FunPtr.
+foreign import ccall "wrapper"
+  wrapIOCallback :: IOCallback -> IO (FunPtr IOCallback)
+
+-- | Unwrap a FunPtr IOCallback to a normal Haskell function.
+foreign import ccall "dynamic"
+  mkIOCallback :: FunPtr IOCallback -> IOCallback
+
 -- | Structure that the I/O manager uses to associate callbacks with
 -- additional payload such as their OVERLAPPED structure and Win32 handle
 -- etc.  *Must* be kept in sync with that in `winio_structs.h` or horrible things
@@ -239,7 +247,7 @@ type IOCallback = CompletionCallback ()
 -- We keep the handle around for the benefit of ghc-external libraries making
 -- use of the manager.
 data CompletionData = CompletionData { cdHandle   :: !HANDLE
-                                     , cdCallback :: !(StablePtr IOCallback)
+                                     , cdCallback :: !IOCallback
                                      }
 
 instance Storable CompletionData where
@@ -247,13 +255,14 @@ instance Storable CompletionData where
     alignment _ = #{alignment CompletionData}
 
     peek ptr = do
-      cdCallback <- #{peek CompletionData, cdCallback} ptr
+      cdCallback <- mkIOCallback `fmap` #{peek CompletionData, cdCallback} ptr
       cdHandle   <- #{peek CompletionData, cdHandle} ptr
       let !cd = CompletionData{..}
       return cd
 
     poke ptr CompletionData{..} = do
-      #{poke CompletionData, cdCallback} ptr cdCallback
+      cb <- wrapIOCallback cdCallback
+      #{poke CompletionData, cdCallback} ptr cb
       #{poke CompletionData, cdHandle} ptr cdHandle
 
 ------------------------------------------------------------------------
@@ -393,10 +402,10 @@ pokeEventOverlapped lpol event = do
 --    the native OS Handle not the Haskell one. i.e. remote-iserv.
 
 -- See [Note AsyncHandles]
-withRequest :: Bool -> Word64 -> HANDLE -> IOCallback
+withRequest :: Bool -> Word64 -> CompletionData
             -> (Ptr HASKELL_OVERLAPPED -> Ptr CompletionData -> IO a)
             -> IO a
-withRequest async offset hdl cb f = do
+withRequest async offset cbData f =
     -- Create the completion record and store it.
     -- We only need the record when we enqueue a request, however if we
     -- delay creating it then we will run into a race condition where the
@@ -408,10 +417,7 @@ withRequest async offset hdl cb f = do
     --
     -- Todo: Use a memory pool for this so we don't have to hit malloc every
     --       time.  This would allow us to scale better.
-    cb_sptr <- newStablePtr cb
-    let cbData :: CompletionData
-        cbData = CompletionData hdl cb_sptr
-    r <- allocaBytes #{size HASKELL_OVERLAPPED} $ \hs_lpol ->
+    allocaBytes #{size HASKELL_OVERLAPPED} $ \hs_lpol ->
       with cbData $ \cdData -> do
         zeroOverlapped hs_lpol
         let lpol = castPtr hs_lpol
@@ -429,9 +435,6 @@ withRequest async offset hdl cb f = do
             -- Once the request has finished, close the object and free it.
             failIfFalse_ "withRequest (free)" $ c_CloseHandle event
             return res
-
-    freeStablePtr cb_sptr
-    return r
 
 
 -- | Create an event object for use when the HANDLE isn't asynchronous
