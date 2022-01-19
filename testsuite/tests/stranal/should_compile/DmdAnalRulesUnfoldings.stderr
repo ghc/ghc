@@ -56,7 +56,7 @@ go3
   = \ (x [Dmd=1L] :: GHC.Prim.Int#)
       (v [Dmd=1!L, OS=OneShot] :: Int) ->
       case v of { GHC.Types.I# ipv ->
-      case x of wild [Dmd=L!L] {
+      case x of wild {
         __DEFAULT ->
           go3 (GHC.Prim.+# wild 1#) (GHC.Types.I# (GHC.Prim.+# ipv wild));
         43# -> GHC.Types.I# (GHC.Prim.+# ipv 43#)
@@ -106,7 +106,7 @@ go3
   = \ (x [Dmd=1L] :: GHC.Prim.Int#)
       (v [Dmd=1!L, OS=OneShot] :: Int) ->
       case v of { GHC.Types.I# ipv ->
-      case x of wild [Dmd=L!L] {
+      case x of wild {
         __DEFAULT ->
           go3 (GHC.Prim.+# wild 1#) (GHC.Types.I# (GHC.Prim.+# ipv wild));
         42# -> GHC.Types.I# (GHC.Prim.+# ipv 42#)
@@ -203,7 +203,7 @@ $wgo3 [InlPrag=[2], Occ=LoopBreaker, Dmd=LCL(C1(L))]
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [31 0] 53 0}]
 $wgo3
   = \ (x [Dmd=1L] :: GHC.Prim.Int#) (ww :: GHC.Prim.Int#) ->
-      case x of wild [Dmd=L!L] {
+      case x of wild {
         __DEFAULT -> $wgo3 (GHC.Prim.+# wild 1#) (GHC.Prim.+# ww wild);
         43# -> GHC.Prim.+# ww 43#
       }
@@ -252,7 +252,7 @@ $wgo3 [InlPrag=[2], Occ=LoopBreaker, Dmd=LCL(C1(L))]
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [31 0] 53 0}]
 $wgo3
   = \ (x [Dmd=1L] :: GHC.Prim.Int#) (ww :: GHC.Prim.Int#) ->
-      case x of wild [Dmd=L!L] {
+      case x of wild {
         __DEFAULT -> $wgo3 (GHC.Prim.+# wild 1#) (GHC.Prim.+# ww wild);
         42# -> GHC.Prim.+# ww 42#
       }

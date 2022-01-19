@@ -349,14 +349,14 @@ boxedWins :: Boxity -> Boxity -> Boxity
 boxedWins Unboxed Unboxed = Unboxed
 boxedWins _       !_      = Boxed
 
-unboxedWins :: Boxity -> Boxity -> Boxity
-unboxedWins Boxed Boxed = Boxed
-unboxedWins _     !_    = Unboxed
+_unboxedWins :: Boxity -> Boxity -> Boxity
+_unboxedWins Boxed Boxed = Boxed
+_unboxedWins _     !_    = Unboxed
 
 lubBoxity :: Boxity -> Boxity -> Boxity
 -- See Note [Boxity analysis] for the lattice.
 -- See Note [lubBoxity and plusBoxity].
-lubBoxity = unboxedWins
+lubBoxity = boxedWins
 
 plusBoxity :: Boxity -> Boxity -> Boxity
 -- See Note [lubBoxity and plusBoxity].
