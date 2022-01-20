@@ -1545,11 +1545,11 @@ is32BitLit is32Bit lit
       CmmInt i W64              -> is32BitInteger i
       -- assume that labels are in the range 0-2^31-1: this assumes the
       -- small memory model (see gcc docs, -mcmodel=small).
-      CmmLabel _                -> True
+      CmmLabel _                -> False
       -- however we can't assume that label offsets are in this range
       -- (see #15570)
-      CmmLabelOff _ off         -> is32BitInteger (fromIntegral off)
-      CmmLabelDiffOff _ _ off _ -> is32BitInteger (fromIntegral off)
+      CmmLabelOff _ off         -> False
+      CmmLabelDiffOff _ _ off _ -> False
       _                         -> True
 is32BitLit _ _ = True
 
