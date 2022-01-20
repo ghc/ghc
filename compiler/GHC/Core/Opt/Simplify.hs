@@ -370,8 +370,8 @@ simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
 
         ; (rhs_floats, body3)
             <-  if not (doFloatFromRhs top_lvl is_rec False body_floats2 body2)
-                then                    -- No floating, revert to body1
-                     return (emptyFloats env, wrapFloats body_floats2 body1)
+                then -- Do not float; abandon prepareBinding entirely and revert to body1
+                     return (emptyFloats env, wrapFloats body_floats1 body1)
 
                 else if null tvs then   -- Simple floating
                      {-#SCC "simplLazyBind-simple-floating" #-}
@@ -450,15 +450,15 @@ completeNonRecX :: TopLevelFlag -> SimplEnv
 
 completeNonRecX top_lvl env is_strict old_bndr new_bndr new_rhs
   = assertPpr (not (isJoinId new_bndr)) (ppr new_bndr) $
-    do  { (prepd_floats, new_rhs) <- prepareBinding env top_lvl new_bndr new_rhs
+    do  { (prepd_floats, prepd_rhs) <- prepareBinding env top_lvl new_bndr new_rhs
         ; let floats = emptyFloats env `addLetFloats` prepd_floats
         ; (rhs_floats, rhs2) <-
-                if doFloatFromRhs NotTopLevel NonRecursive is_strict floats new_rhs
+                if doFloatFromRhs NotTopLevel NonRecursive is_strict floats prepd_rhs
                 then    -- Add the floats to the main env
                      do { tick LetFloatFromLet
-                        ; return (floats, new_rhs) }
-                else    -- Do not float; wrap the floats around the RHS
-                     return (emptyFloats env, wrapFloats floats new_rhs)
+                        ; return (floats, prepd_rhs) }
+                else    -- Do not float; abandon prepareBinding entirely and revert to new_rhs
+                     return (emptyFloats env, new_rhs)
 
         ; (bind_float, env2) <- completeBind (env `setInScopeFromF` rhs_floats)
                                              NotTopLevel Nothing
