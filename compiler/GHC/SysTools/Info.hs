@@ -127,13 +127,9 @@ getLinkerInfo' logger dflags = do
       -- Try to grab the info from the process output.
       parseLinkerInfo stdo _stde _exitc
         | any ("GNU ld" `isPrefixOf`) stdo =
-          -- GNU ld specifically needs to use less memory. This especially
-          -- hurts on small object files. #5240.
           -- Set DT_NEEDED for all shared libraries. #10110.
           -- TODO: Investigate if these help or hurt when using split sections.
-          return (GnuLD $ map Option ["-Wl,--hash-size=31",
-                                      "-Wl,--reduce-memory-overheads",
-                                      -- ELF specific flag
+          return (GnuLD $ map Option [ -- ELF specific flag
                                       -- see Note [ELF needed shared libs]
                                       "-Wl,--no-as-needed"])
 
@@ -173,12 +169,9 @@ getLinkerInfo' logger dflags = do
         -- Process creation is also fairly expensive on win32, so
         -- we short-circuit here.
         return $ GnuLD $ map Option
-          [ -- Reduce ld memory usage
-            "-Wl,--hash-size=31"
-          , "-Wl,--reduce-memory-overheads"
-            -- Emit gcc stack checks
+          [ -- Emit gcc stack checks
             -- Note [Windows stack usage]
-          , "-fstack-check"
+            "-fstack-check"
             -- Force static linking of libGCC
             -- Note [Windows static libGCC]
           , "-static-libgcc" ]
