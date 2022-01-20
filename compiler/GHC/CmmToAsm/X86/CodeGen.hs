@@ -3560,10 +3560,14 @@ genSwitch expr targets = do
                        ]
   else do
         (reg,e_code) <- getSomeReg indexExpr
+        tableReg <- getNewRegNat (intFormat (platformWordWidth platform))
         lbl <- getNewLabelNat
-        let op = OpAddr (AddrBaseIndex EABaseNone (EAIndex reg (platformWordSizeInBytes platform)) (ImmCLbl lbl))
+        let is32bit = target32Bit platform
+        let op = OpAddr (AddrBaseIndex (EABaseReg tableReg) (EAIndex reg (platformWordSizeInBytes platform)) (ImmInt 0))
             code = e_code `appOL` toOL [
-                    JMP_TBL op ids (Section ReadOnlyData lbl) lbl
+                    LEA (archWordFormat is32bit) (OpAddr (AddrBaseIndex EABaseRip EAIndexNone (ImmCLbl lbl))) (OpReg tableReg),
+                    MOV (archWordFormat is32bit) op (OpReg reg),
+                    JMP_TBL (OpReg reg) ids (Section ReadOnlyData lbl) lbl
                  ]
         return code
   where
