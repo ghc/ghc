@@ -149,6 +149,13 @@ The allocator is *not* thread-safe.
 /* Upper bound on the number of pages to keep in the free page pool */
 #define M32_MAX_FREE_PAGE_POOL_SIZE 64
 
+/* A utility to verify that a given address is "acceptable" for use by m32. */
+static bool
+is_okay_address(void *p) {
+  int8_t *here = &is_okay_address;
+  return ((int8_t *) p - here) < 0xffffffff;
+}
+
 /**
  * Page header
  *
@@ -179,7 +186,7 @@ struct m32_page_t {
 static void
 m32_filled_page_set_next(struct m32_page_t *page, struct m32_page_t *next)
 {
-  if (next > (struct m32_page_t *) 0xffffffff) {
+  if (! is_okay_address(next)) {
     barf("m32_filled_page_set_next: Page not in lower 32-bits");
   }
   page->filled_page.next = (uint32_t) (uintptr_t) next;
@@ -246,7 +253,7 @@ m32_alloc_page(void)
     const size_t pgsz = getPageSize();
     const size_t map_sz = pgsz * M32_MAP_PAGES;
     uint8_t *chunk = mmapAnonForLinker(map_sz);
-    if (chunk + map_sz > (uint8_t *) 0xffffffff) {
+    if (! is_okay_address(chunk + map_sz)) {
       barf("m32_alloc_page: failed to get allocation in lower 32-bits");
     }
 
@@ -393,7 +400,7 @@ m32_alloc(struct m32_allocator_t *alloc, size_t size, size_t alignment)
       if (page == NULL) {
           sysErrorBelch("m32_alloc: Failed to map pages for %zd bytes", size);
           return NULL;
-      } else if (page > (struct m32_page_t *) 0xffffffff) {
+      } else if (! is_okay_address(page)) {
           debugBelch("m32_alloc: warning: Allocation of %zd bytes resulted in pages above 4GB (%p)",
                      size, page);
       }
