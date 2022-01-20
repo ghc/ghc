@@ -38,6 +38,11 @@
   * Any Haskell type that wraps a C pointer type has been changed from
     `Ptr ()` to `CUIntPtr`. For typical glibc based platforms, the
     affected type is `CTimer`.
+  * The following Foreign C types now have an instance of `Ix`:
+    CChar, CSChar, CUChar, CShort, CUShort, CInt, CUInt, CLong, CULong,
+    CPtrdiff, CSize, CWchar, CSigAtomic, CLLong, CULLong, CBool, CIntPtr, CUIntPtr,
+    CIntMax, CUIntMax.
+
 
 ## 4.16.0.0 *Nov 2021*
 

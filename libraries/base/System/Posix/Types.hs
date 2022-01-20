@@ -134,10 +134,11 @@ import Foreign.C
 
 import GHC.Base
 import GHC.Enum
+import GHC.Ix
 import GHC.Num
+import GHC.Read
 import GHC.Real
 -- import GHC.Prim
-import GHC.Read
 import GHC.Show
 
 #include "CTypes.h"
