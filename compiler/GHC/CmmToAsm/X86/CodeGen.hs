@@ -1161,6 +1161,20 @@ getRegister' _ is32Bit (CmmLit (CmmInt 0 width))
     in
         return (Any format code)
 
+-- Handle symbol references.
+getRegister' platform _ (CmmLit lit)
+  | is_label lit
+  = do let format = cmmTypeFormat (cmmLitType platform lit)
+           imm = litToImm lit
+           op = OpAddr (AddrBaseIndex EABaseRip EAIndexNone imm)
+           code dst = unitOL (LEA format op (OpReg dst))
+       return (Any format code)
+  where
+    is_label (CmmLabel {})        = True
+    is_label (CmmLabelOff {})     = True
+    is_label (CmmLabelDiffOff {}) = True
+    is_label _                    = False
+
   -- optimisation for loading small literals on x86_64: take advantage
   -- of the automatic zero-extension from 32 to 64 bits, because the 32-bit
   -- instruction forms are shorter.
