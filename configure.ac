@@ -434,12 +434,12 @@ then
     set_up_tarballs
 
     mingwbin="$hardtop/inplace/mingw/bin/"
-    CC="${mingwbin}gcc.exe"
-    LD="${mingwbin}ld.exe"
+    CC="/mingw64/bin/clang.exe"
+    LD="/usr/bin/ld.lld.exe"
     NM="${mingwbin}nm.exe"
     RANLIB="${mingwbin}ranlib.exe"
     OBJDUMP="${mingwbin}objdump.exe"
-    MergeObjsCmd="$LD"
+    MergeObjsCmd="${mingwbin}ld.exe"
     MergeObjsArgs="-r --oformat=pe-bigobj-x86-64"
     fp_prog_ar="${mingwbin}ar.exe"
 

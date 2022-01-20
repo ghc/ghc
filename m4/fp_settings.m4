@@ -7,8 +7,6 @@ AC_DEFUN([FP_SETTINGS],
     if test "$windows" = YES -a "$EnableDistroToolchain" = "NO"
     then
         mingw_bin_prefix='$$tooldir/mingw/bin/'
-        SettingsCCompilerCommand="${mingw_bin_prefix}gcc.exe"
-        SettingsHaskellCPPCommand="${mingw_bin_prefix}gcc.exe"
         SettingsHaskellCPPFlags="$HaskellCPPArgs"
         SettingsLdCommand="${mingw_bin_prefix}ld.exe"
         # Overrides FIND_MERGE_OBJECTS in order to avoid hard-coding linker
