@@ -1158,6 +1158,22 @@ getRegister' _ is32Bit (CmmLit (CmmInt 0 width))
     in
         return (Any format code)
 
+-- Handle symbol references with LEA and %rip-relative addressing.
+-- See Note [%rip-relative addressing on x86-64].
+getRegister' platform is32Bit (CmmLit lit)
+  | is_label lit
+  , not is32Bit
+  = do let format = cmmTypeFormat (cmmLitType platform lit)
+           imm = litToImm lit
+           op = OpAddr (AddrBaseIndex EABaseRip EAIndexNone imm)
+           code dst = unitOL (LEA format op (OpReg dst))
+       return (Any format code)
+  where
+    is_label (CmmLabel {})        = True
+    is_label (CmmLabelOff {})     = True
+    is_label (CmmLabelDiffOff {}) = True
+    is_label _                    = False
+
   -- optimisation for loading small literals on x86_64: take advantage
   -- of the automatic zero-extension from 32 to 64 bits, because the 32-bit
   -- instruction forms are shorter.
