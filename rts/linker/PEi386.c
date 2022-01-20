@@ -2121,6 +2121,17 @@ addCopySection (ObjectCode *oc, Section *s, SectionKind kind,
  * Debugging operations.
  */
 
+typedef struct _SymX { SymbolName* name; uintptr_t loc; } SymX;
+
+static int comp (const void * elem1, const void * elem2)
+{
+    SymX f = *((SymX*)elem1);
+    SymX s = *((SymX*)elem2);
+    if (f.loc > s.loc) return  1;
+    if (f.loc < s.loc) return -1;
+    return 0;
+}
+
 pathchar*
 resolveSymbolAddr_PEi386 (pathchar* buffer, int size,
                           SymbolAddr* symbol, uintptr_t* top ){
@@ -2246,7 +2257,6 @@ resolveSymbolAddr_PEi386 (pathchar* buffer, int size,
     else if (obj)
     {
       /* Try to calculate from information inside the rts.  */
-      typedef struct _SymX { SymbolName* name; uintptr_t loc; } SymX;
       SymX* locs = stgCallocBytes (sizeof(SymX), obj->n_symbols,
                                    "resolveSymbolAddr");
       int blanks = 0;
@@ -2265,14 +2275,6 @@ resolveSymbolAddr_PEi386 (pathchar* buffer, int size,
               sx.loc  = (uintptr_t)a->value;
               locs[i] = sx;
           }
-      }
-      int comp (const void * elem1, const void * elem2)
-      {
-          SymX f = *((SymX*)elem1);
-          SymX s = *((SymX*)elem2);
-          if (f.loc > s.loc) return  1;
-          if (f.loc < s.loc) return -1;
-          return 0;
       }
       qsort (locs, obj->n_symbols, sizeof (SymX), comp);
       uintptr_t key  = (uintptr_t)symbol;
