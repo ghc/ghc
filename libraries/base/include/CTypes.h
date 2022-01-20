@@ -25,7 +25,7 @@ newtype {-# CTYPE THE_CTYPE #-} T = T B deriving newtype (Read, Show, ARITHMETIC
 
 #define INTEGRAL_TYPE(T,THE_CTYPE,B) \
 newtype {-# CTYPE THE_CTYPE #-} T = T B \
-    deriving newtype (Read, Show, ARITHMETIC_CLASSES, INTEGRAL_CLASSES);
+    deriving newtype (Read, Show, ARITHMETIC_CLASSES, INTEGRAL_CLASSES, Ix);
 
 #define FLOATING_TYPE(T,THE_CTYPE,B) \
 newtype {-# CTYPE THE_CTYPE #-} T = T B deriving newtype (Read, Show, ARITHMETIC_CLASSES, FLOATING_CLASSES);

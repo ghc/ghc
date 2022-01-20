@@ -62,6 +62,7 @@ import GHC.Read
 import GHC.Real
 import GHC.Show
 import GHC.Enum
+import GHC.Ix
 
 import Data.Bits
 import Foreign.Storable ( Storable(..) )

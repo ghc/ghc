@@ -98,6 +98,7 @@ import GHC.Real
 import GHC.Show
 import GHC.Read
 import GHC.Num
+import GHC.Ix
 
 #include "HsBaseConfig.h"
 #include "CTypes.h"

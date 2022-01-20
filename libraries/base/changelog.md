@@ -1,5 +1,12 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
-\
+
+## 4.16.1.0 *TBA*
+
+  * The following Foreign C types now have an instance of `Ix`:
+    CChar, CSChar, CUChar, CShort, CUShort, CInt, CUInt, CLong, CULong,
+    CPtrdiff, CSize, CWchar, CSigAtomic, CLLong, CULLong, CBool, CIntPtr, CUIntPtr,
+    CIntMax, CUIntMax.
+
 ## 4.16.0.0 *Nov 2021*
 
   * Shipped with GHC 9.2.1
