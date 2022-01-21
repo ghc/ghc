@@ -72,7 +72,7 @@ extern char **environ;
       SymI_HasProto(signal_handlers)            \
       SymI_HasProto(stg_sig_install)            \
       SymI_HasProto(rtsTimerSignal)             \
-      SymI_HasProto_redirect(atexit, atexit, STRENGTH_STRONG) /* See Note [Strong symbols] */ \
+      SymI_HasProto_redirect(atexit, atexit, STRENGTH_STRONG, SYM_TYPE_CODE) /* See Note [Strong symbols] */ \
       SymI_NeedsDataProto(nocldstop)
 #endif
 
@@ -180,9 +180,9 @@ extern char **environ;
       /* ^^ Need to figure out why this is needed.  */   \
       /* See Note [_iob_func symbol] */                  \
       RTS_WIN64_ONLY(SymI_HasProto_redirect(             \
-         __imp___acrt_iob_func, __rts_iob_func, STRENGTH_WEAK))   \
+         __imp___acrt_iob_func, __acrt_iob_func, STRENGTH_WEAK, SYM_TYPE_DATA))   \
       RTS_WIN32_ONLY(SymI_HasProto_redirect(             \
-         __imp____acrt_iob_func, __rts_iob_func, STRENGTH_WEAK))  \
+         __imp____acrt_iob_func, __acrt_iob_func, STRENGTH_WEAK, SYM_TYPE_DATA))  \
       SymI_HasProto(__mingw_vsnwprintf)                  \
       /* ^^ Need to figure out why this is needed.  */   \
       SymI_HasProto(__mingw_vfprintf)                    \
@@ -1100,7 +1100,7 @@ extern char **environ;
 #define SymE_HasProto(vvv)    SymI_HasProto(vvv)
 #endif
 #define SymI_HasProto(vvv) /**/
-#define SymI_HasProto_redirect(vvv,xxx,strength) /**/
+#define SymI_HasProto_redirect(vvv,xxx,strength,ty) /**/
 #define SymI_HasProto_deprecated(vvv) /**/
 RTS_SYMBOLS
 RTS_RET_SYMBOLS
@@ -1122,11 +1122,11 @@ RTS_LIBFFI_SYMBOLS
 #undef SymE_NeedsDataProto
 
 #define SymI_HasProto(vvv) { MAYBE_LEADING_UNDERSCORE_STR(#vvv), \
-                    (void*)(&(vvv)), STRENGTH_NORMAL },
+                    (void*)(&(vvv)), STRENGTH_NORMAL, SYM_TYPE_CODE },
 #define SymI_HasDataProto(vvv) \
                     SymI_HasProto(vvv)
 #define SymE_HasProto(vvv) { MAYBE_LEADING_UNDERSCORE_STR(#vvv), \
-            (void*)DLL_IMPORT_DATA_REF(vvv), STRENGTH_NORMAL },
+            (void*)DLL_IMPORT_DATA_REF(vvv), STRENGTH_NORMAL, SYM_TYPE_CODE },
 #define SymE_HasDataProto(vvv) \
                     SymE_HasProto(vvv)
 
@@ -1137,9 +1137,9 @@ RTS_LIBFFI_SYMBOLS
 
 // SymI_HasProto_redirect allows us to redirect references to one symbol to
 // another symbol.  See newCAF/newRetainedCAF/newGCdCAF for an example.
-#define SymI_HasProto_redirect(vvv,xxx,strength) \
+#define SymI_HasProto_redirect(vvv,xxx,strength,ty) \
     { MAYBE_LEADING_UNDERSCORE_STR(#vvv),    \
-      (void*)(&(xxx)), strength },
+      (void*)(&(xxx)), strength, ty },
 
 // SymI_HasProto_deprecated allows us to redirect references from their deprecated
 // names to the undeprecated ones. e.g. access -> _access.
@@ -1149,7 +1149,7 @@ RTS_LIBFFI_SYMBOLS
 // define them, since on Windows these functions shouldn't be in the top level
 // namespace, but we have them for POSIX compatibility.
 #define SymI_HasProto_deprecated(vvv)   \
-   { #vvv, (void*)0xBAADF00D, STRENGTH_WEAK },
+   { #vvv, (void*)0xBAADF00D, STRENGTH_WEAK, SYM_TYPE_CODE },
 
 RtsSymbolVal rtsSyms[] = {
       RTS_SYMBOLS
@@ -1169,5 +1169,5 @@ RtsSymbolVal rtsSyms[] = {
       // lazy pointers as nonlazy.
       { "dyld_stub_binding_helper", (void*)0xDEADBEEF, STRENGTH_NORMAL },
 #endif
-      { 0, 0, STRENGTH_NORMAL } /* sentinel */
+      { 0, 0, STRENGTH_NORMAL, SYM_TYPE_CODE } /* sentinel */
 };

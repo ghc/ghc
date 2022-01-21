@@ -38,6 +38,12 @@ typedef char SymbolName;
 typedef struct _ObjectCode ObjectCode;
 typedef struct _Section    Section;
 
+typedef enum _SymType {
+    SYM_TYPE_CODE,
+    SYM_TYPE_DATA,
+} SymType;
+
+
 #if defined(OBJFORMAT_ELF)
 #  include "linker/ElfTypes.h"
 #elif defined(OBJFORMAT_PEi386)
@@ -55,6 +61,7 @@ typedef struct _Symbol
 {
     SymbolName *name;
     SymbolAddr *addr;
+    SymType type;
 } Symbol_t;
 
 typedef struct NativeCodeRange_ {
@@ -340,7 +347,7 @@ extern Mutex linker_mutex;
 #if defined(OBJFORMAT_ELF) || defined(OBJFORMAT_MACHO)
 extern Mutex dl_mutex;
 #endif
-#endif
+#endif /* THREADED_RTS */
 
 /* Type of the initializer */
 typedef void (*init_t) (int argc, char **argv, char **env);
@@ -367,6 +374,7 @@ typedef struct _RtsSymbolInfo {
     SymbolAddr* value;
     ObjectCode *owner;
     SymStrength strength;
+    SymType type;
 } RtsSymbolInfo;
 
 void exitLinker( void );
@@ -396,11 +404,12 @@ int ghciInsertSymbolTable(
     const SymbolName* key,
     SymbolAddr* data,
     SymStrength weak,
+    SymType type,
     ObjectCode *owner);
 
 /* Lock-free version of lookupSymbol. When 'dependent' is not NULL, adds it as a
- * dependent to the owner of the symbol. */
-SymbolAddr* lookupDependentSymbol (SymbolName* lbl, ObjectCode *dependent);
+ * dependent to the owner of the symbol. The type of the symbol is stored in 'type'. */
+SymbolAddr* lookupDependentSymbol (SymbolName* lbl, ObjectCode *dependent, SymType *type);
 
 /* Perform TLSGD symbol lookup returning the address of the resulting GOT entry,
  * which in this case holds the module id and the symbol offset. */
