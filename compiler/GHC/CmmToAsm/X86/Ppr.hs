@@ -616,6 +616,26 @@ pprInstr platform i = case i of
                 II64 -> II32          -- 32-bit version is equivalent, and smaller
                 _    -> format
 
+
+   MOV II64 src@(OpImm imm) dst
+     -> pprFormatOpOp mov_mnemonic II64 src dst
+      where
+        mov_mnemonic
+          | need_movabs = text "movabs"
+          | otherwise   = text "mov"
+        need_movabs = case imm of
+          -- if we don't use "movabs", GAS assumes that we intend to load a
+          -- zero-extended 32-bit absolute, which is wrong (#16780)
+          ImmCLbl {}         -> True
+          ImmIndex {}        -> True
+          ImmConstantSum {}  -> True
+          ImmConstantDiff {} -> True
+          ImmInt _           -> False
+          ImmInteger _       -> False
+          ImmLit _           -> False
+          ImmFloat _         -> False
+          ImmDouble _        -> False
+
    MOV format src dst
      -> pprFormatOpOp (text "mov") format src dst
 
