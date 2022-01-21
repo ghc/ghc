@@ -152,7 +152,7 @@ The allocator is *not* thread-safe.
 /* A utility to verify that a given address is "acceptable" for use by m32. */
 static bool
 is_okay_address(void *p) {
-  int8_t *here = &is_okay_address;
+  int8_t *here = (int8_t*) &is_okay_address;
   return ((int8_t *) p - here) < 0xffffffff;
 }
 
@@ -400,8 +400,8 @@ m32_alloc(struct m32_allocator_t *alloc, size_t size, size_t alignment)
           sysErrorBelch("m32_alloc: Failed to map pages for %zd bytes", size);
           return NULL;
       } else if (! is_okay_address(page)) {
-          debugBelch("m32_alloc: warning: Allocation of %zd bytes resulted in pages above 4GB (%p)",
-                     size, page);
+          barf("m32_alloc: warning: Allocation of %zd bytes resulted in pages above 4GB (%p)",
+               size, page);
       }
       page->filled_page.size = alsize + size;
       m32_allocator_push_filled_list(&alloc->unprotected_list, (struct m32_page_t *) page);
