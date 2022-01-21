@@ -43,8 +43,6 @@ import Data.Array.IO
 import Data.Array.Unboxed (UArray)
 import qualified Data.Array.Unboxed as UArr
 import System.IO.Unsafe
-import System.IO
-import Text.Printf
 
 import Control.Monad
 import Control.Monad.Trans.State.Strict
@@ -309,8 +307,6 @@ data IterEnv
   -- Fields related to demand annotations:
   , ie_demands      :: !(IORef (IdEnv Demand))
   , ie_sigs         :: !(IORef (IdEnv DmdSig))
-  -- Fields related to debugging the analysis:
-  , ie_doc          :: !(IORef GEXFDoc)
   }
 
 newtype IterM a = IterM (IOEnv IterEnv a)
@@ -350,8 +346,7 @@ initIterEnv fw = do
   active_evals <- newIORef IntMap.empty
   demands      <- newIORef emptyVarEnv
   sigs         <- newIORef emptyVarEnv
-  doc          <- newIORef (emptyGEXFDoc fw)
-  return $! EE fw approxs lazy_fvs unstable_in unstable_out visited active_evals demands sigs doc
+  return $! EE fw approxs lazy_fvs unstable_in unstable_out visited active_evals demands sigs
 
 node2prio :: DmdFramework -> Id -> Prio
 node2prio fw id = tn_prio $ getTransNode fw id
@@ -394,14 +389,12 @@ deleteUnstable n = do
   modifyIterRef' ie_unstable_out (IntSet.delete n)
 
 enqueueUnstableIn :: Prio -> IterM ()
-enqueueUnstableIn n = do
+enqueueUnstableIn n =
   modifyIterRef' ie_unstable_in $ IntSet.insert n
-  when recordGEXF $ modifyIterRef' ie_doc $ gexfSetStability NSUnstable [n]
 
 enqueueUnstableOut :: Prio -> IterM ()
-enqueueUnstableOut n = do
+enqueueUnstableOut n =
   modifyIterRef' ie_unstable_out $ IntSet.insert n
-  when recordGEXF $ modifyIterRef' ie_doc $ gexfSetStability NSUnstable [n]
 
 enqueueUnstableReferrers :: Prio -> IterM ()
 enqueueUnstableReferrers changed_node_prio = do
@@ -425,7 +418,6 @@ enqueueUnstableReferrers changed_node_prio = do
     -- IntSet.union queue static_referrers
     -- The following is conservative and more precise (a subset of the former), but a little more complex:
     IntSet.union queue dynamic_referrers
-  when recordGEXF $ modifyIterRef' ie_doc $ gexfSetStability NSUnstable (IntSet.toList dynamic_referrers)
 
 readTransApprox :: Prio -> IterM TransApprox
 readTransApprox n = liftIOEnv $ \env -> readArray (ie_approxs env) n
@@ -434,11 +426,7 @@ writeTransApprox :: Prio -> TransApprox -> IterM ()
 writeTransApprox n approx = liftIOEnv $ \env -> writeArray (ie_approxs env) n approx
 
 clearVisited :: IterM ()
-clearVisited = do
-  when recordGEXF $ do
-    visited <- IntSet.toList <$> readIterRef ie_visited
-    when recordGEXF $ modifyIterRef' ie_doc $ gexfSetIterState ISInactive visited
-  writeIterRef ie_visited IntSet.empty
+clearVisited = writeIterRef ie_visited IntSet.empty
 
 addVisited :: Prio -> IterM ()
 addVisited prio = modifyIterRef' ie_visited (IntSet.insert prio)
@@ -517,9 +505,6 @@ evalFramework fw = {-# SCC "evalFramework" #-} execIterM fw $ do
     -- unstable <- IntSet.union <$> readIterRef ie_unstable_in <*> readIterRef ie_unstable_out
     -- pprTraceM "unstable" (ppr (take 10 (IntSet.toDescList unstable)))
     void $ evalNode (getTransNode fw (prio2node fw node_prio))
-  when recordGEXF $ do
-    doc <- readIterRef ie_doc
-    IterM $ liftIO $ writeXGMML doc "analysis.xgmml"
 
 prepareNextEval :: TransNode -> IterM a -> IterM a
 prepareNextEval node m = do
@@ -532,12 +517,8 @@ prepareNextEval node m = do
   addVisited node_prio
   modifyIterRef' ie_active_evals (IntMap.insert node_prio IntSet.empty)
   deleteUnstable node_prio -- eval is imminent, so this node is now considered stable
-  when recordGEXF $ modifyIterRef' ie_doc $ gexfSetIterState ISActive [node_prio]
   a <- m
   modifyIterRef' ie_active_evals (IntMap.delete node_prio)
-  when recordGEXF $ do
-    modifyIterRef' ie_doc $ gexfSetIterState ISVisited [node_prio]
-    modifyIterRef' ie_doc $ gexfSetStability NSStable  [node_prio]
   return a
 
 evalNode :: TransNode -> IterM TransApprox
@@ -566,167 +547,7 @@ evalNode node = prepareNextEval node $ do
   let _pp_chg = (if changed then text "CHANGED" else text "no change") <+> ppr (n+1)
   -- pprTraceM "evalNode }" (ppr _node_id <+> parens _pp_chg <> colon <+> ppr outp' <+> if changed then ppr (referrers _fw node_prio) else empty)
 
-  when changed $ do
-    when (recordGEXF) $ modifyIterRef' ie_doc $ gexfSetIterState ISChanged [node_prio]
+  when changed $
     enqueueUnstableReferrers node_prio
 
   return approx'
-
--------------------------------------------------------
--- A small XML library for generating GEXF documents --
--------------------------------------------------------
-
--- | A static switch controlling generation of a GEXF document for analysis
--- debugging purposes.
---
--- The GEXF can be loaded into the Gephi editor, where the full trace of the analysis
--- on the dependency graph can be inspected ad libitum.
-recordGEXF :: Bool
-recordGEXF = False
-
-data NodeInfo
-  = NI
-  { ni_stab :: !(IntMap NodeStability)
-  , ni_iter :: !(IntMap IterState)
-  }
-
-data IterState
-  = ISInactive  -- ^ Has not yet been evaluated in this round of fixed-poitn iteration.
-  | ISActive    -- ^ Node is currently under eval. It's unstable and visited, too.
-  | ISChanged   -- ^ Node has just concluded its eval and had changed its approx.
-  | ISVisited   -- ^ Node had already been eval'd during the current round of fixed-point loop and is now stable.
-
-data NodeStability = NSStable | NSUnstable
-
-emptyNodeInfo :: NodeInfo
-emptyNodeInfo = NI (IntMap.singleton 0 NSStable) (IntMap.singleton 0 ISInactive)
-
-displayNodeStability :: NodeStability -> String
-displayNodeStability stab = case stab of
-  NSStable   -> "stable"
-  NSUnstable -> "unstable"
-
-displayIterState :: IterState -> String
-displayIterState state = case state of
-  ISInactive -> "inactive"
-  ISActive   -> "active"
-  ISChanged  -> "changed"
-  ISVisited  -> "visited"
-
-data GEXFDoc
-  = GD
-  { gd_timestamp :: !Int
-  , gd_framework :: !DmdFramework
-  , gd_node_info :: !(PrioMap NodeInfo)
-  }
-
-emptyGEXFDoc :: DmdFramework -> GEXFDoc
-emptyGEXFDoc fw = GD 1 fw IntMap.empty
-
-gexfOverNodeInfo :: (Int -> NodeInfo -> NodeInfo) -> [Prio] -> GEXFDoc -> GEXFDoc
-gexfOverNodeInfo f prios doc@GD{gd_timestamp=now, gd_node_info=nis}
-  = doc{gd_timestamp=now+1, gd_node_info=nis'}
-  where
-    nis' = foldr (IntMap.alter (Just . f now . fromMaybe emptyNodeInfo)) nis prios
-
-gexfSetStability :: NodeStability -> [Prio] -> GEXFDoc -> GEXFDoc
-gexfSetStability stab = gexfOverNodeInfo f
-  where
-    f now ni = ni{ ni_stab=IntMap.insert now stab (ni_stab ni) }
-
-gexfSetIterState :: IterState -> [Prio] -> GEXFDoc -> GEXFDoc
-gexfSetIterState stab = gexfOverNodeInfo f
-  where
-    f now ni = ni{ ni_iter=IntMap.insert now stab (ni_iter ni) }
-
-_writeGEXF :: GEXFDoc -> FilePath -> IO ()
-_writeGEXF doc name = withFile name WriteMode $ \fh -> do
-  hPutStr fh $ unlines
-    [ "<gexf xmlns=\"http://www.gexf.net/1.1draft\""
-    , "      xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\""
-    , "      xsi:schemaLocation=\"http://www.gexf.net/1.1draft"
-    , "                          http://www.gexf.net/1.1draft/gexf.xsd\""
-    , "                          version=\"1.1\">"
-    , "  <graph mode=\"dynamic\" defaultedgetype=\"directed\">"
-    , "    <attributes class=\"node\" mode=\"dynamic\">"
-    , "      <attribute id=\"name\" title=\"Name\" type=\"string\"/>"
-    , "      <attribute id=\"prio\" title=\"Priority\" type=\"int\"/>"
-    , "      <attribute id=\"stab\" title=\"Stability\" type=\"string\"/>"
-    , "      <attribute id=\"state\" title=\"Iteration State\" type=\"string\"/>"
-    , "    </attributes>"
-    , "    <nodes>"
-    ]
-  let fw = gd_framework doc
-  let print_ln :: HPrintfType r => String -> r
-      print_ln fmt = hPrintf fh ("      " ++ fmt ++ "\n") -- fixed indent of 6
-      escape '<' = '('
-      escape '>' = ')'
-      escape c   = c
-      show_name :: Outputable a => a -> String
-      show_name = renderWithContext defaultSDocContext . ppr
-  forM_ (nonDetEltsUFM (df_trans_nodes fw)) $ \tn -> do
-    let ni = fromMaybe emptyNodeInfo $ IntMap.lookup (tn_prio tn) (gd_node_info doc)
-    print_ln "<node id=\"%d\" label=\"%s\">" (tn_prio tn) (map escape $ show_name (tn_id tn))
-    print_ln "  <attvalues>"
-    print_ln "    <attvalue for=\"name\" value=\"%s\" />" (map escape $ show_name (tn_id tn))
-    print_ln "    <attvalue for=\"prio\" value=\"%d\" />" (tn_prio tn)
-    let iters = ni_iter ni
-    forM_ (IntMap.assocs iters) $ \(timestamp, state) ->
-      case IntMap.lookupGT timestamp iters of
-        Just (next, _) -> print_ln "    <attvalue for=\"state\" start=\"%d\" end=\"%d\" value=\"%s\" />" timestamp (next-1) (displayIterState state)
-        Nothing        -> print_ln "    <attvalue for=\"state\" start=\"%d\" value=\"%s\" />" timestamp (displayIterState state)
-    let stabs = ni_stab ni
-    forM_ (IntMap.assocs stabs) $ \(timestamp, stab) ->
-      case IntMap.lookupGT timestamp stabs of
-        Just (next, _) -> print_ln "    <attvalue for=\"stab\" start=\"%d\" end=\"%d\" value=\"%s\" />" timestamp (next-1) (displayNodeStability stab)
-        Nothing        -> print_ln "    <attvalue for=\"stab\" start=\"%d\" value=\"%s\" />" timestamp (displayNodeStability stab)
-    print_ln "  </attvalues>"
-    print_ln "</node>"
-  hPutStr fh $ unlines
-    [ "    </nodes>"
-    , "    <edges>"
-    ]
-  forM_ (nonDetEltsUFM (df_trans_nodes fw)) $ \tn -> do
-    forM_ (IntSet.toList (referrerPrios fw (tn_prio tn))) $ \ref_prio -> do
-      print_ln "  <edge source=\"%d\" target=\"%d\" />" ref_prio (tn_prio tn)
-  hPutStr fh $ unlines
-    [ "    </edges>"
-    , "  </graph>"
-    , "</gexf>"
-    ]
-
-writeXGMML :: GEXFDoc -> FilePath -> IO ()
-writeXGMML doc name = withFile name WriteMode $ \fh -> do
-  hPutStr fh $ unlines
-    [ "<graph label=\"analysis\" directed=\"1\" start=\"0\">"
-    ]
-  let fw = gd_framework doc
-  let print_ln :: HPrintfType r => String -> r
-      print_ln fmt = hPrintf fh ("  " ++ fmt ++ "\n") -- fixed indent of 2
-      escape '<' = '('
-      escape '>' = ')'
-      escape c   = c
-      show_name :: Outputable a => a -> String
-      show_name = renderWithContext defaultSDocContext . ppr
-  forM_ (nonDetEltsUFM (df_trans_nodes fw)) $ \tn -> do
-    let ni = fromMaybe emptyNodeInfo $ IntMap.lookup (tn_prio tn) (gd_node_info doc)
-    print_ln "<node id=\"%d\" label=\"%s\" start=\"0\">" (tn_prio tn) (map escape $ show_name (tn_id tn))
-    -- print_ln "    <attvalue for=\"name\" value=\"%s\" />" (map escape $ show_name (tn_id tn))
-    -- print_ln "    <attvalue for=\"prio\" value=\"%d\" />" (tn_prio tn)
-    let iters = ni_iter ni
-    forM_ (IntMap.assocs iters) $ \(timestamp, state) ->
-      case IntMap.lookupGT timestamp iters of
-        Just (next, _) -> print_ln "  <att name=\"state\" type=\"string\" start=\"%d\" end=\"%d\" value=\"%s\" />" timestamp (next-1) (displayIterState state)
-        Nothing        -> print_ln "  <att name=\"state\" type=\"string\" start=\"%d\" value=\"%s\" />" timestamp (displayIterState state)
-    let stabs = ni_stab ni
-    forM_ (IntMap.assocs stabs) $ \(timestamp, stab) ->
-      case IntMap.lookupGT timestamp stabs of
-        Just (next, _) -> print_ln "  <att name=\"stab\" type=\"string\" start=\"%d\" end=\"%d\" value=\"%s\" />" timestamp (next-1) (displayNodeStability stab)
-        Nothing        -> print_ln "  <att name=\"stab\" type=\"string\" start=\"%d\" value=\"%s\" />" timestamp (displayNodeStability stab)
-    print_ln "</node>"
-  forM_ (nonDetEltsUFM (df_trans_nodes fw)) $ \tn -> do
-    forM_ (IntSet.toList (referrerPrios fw (tn_prio tn))) $ \ref_prio -> do
-      print_ln "<edge source=\"%d\" target=\"%d\" />" ref_prio (tn_prio tn)
-  hPutStr fh $ unlines
-    [ "</graph>"
-    ]
