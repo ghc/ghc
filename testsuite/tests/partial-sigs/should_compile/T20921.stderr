@@ -1,0 +1,20 @@
+
+T20921.hs:37:46: warning: [-Wpartial-type-signatures (in -Wdefault)]
+    • Found extra-constraints wildcard standing for ‘C i’
+      Where: ‘i’ is a rigid type variable bound by
+               the inferred type of quux :: (OK (Boo i), C i) => Int
+               at T20921.hs:37:21
+    • In the type signature:
+        quux :: forall (i :: Nat). (OK (Boo i), _) => Int
+      In the expression:
+        let
+          quux :: forall (i :: Nat). (OK (Boo i), _) => Int
+          quux = foo @(Boo i)
+        in quux @1 + quux @2
+      In an equation for ‘bar’:
+          bar
+            = let
+                quux :: forall (i :: Nat). (OK (Boo i), _) => Int
+                quux = foo @(Boo i)
+              in quux @1 + quux @2
+    • Relevant bindings include bar :: Int (bound at T20921.hs:35:1)
