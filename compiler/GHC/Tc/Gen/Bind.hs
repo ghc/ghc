@@ -794,6 +794,9 @@ mkExport prag_fn insoluble qtvs theta
                 -- This type is just going into tcSubType,
                 -- so Inferred vs. Specified doesn't matter
 
+        ; traceTc "mkExport" (vcat [ ppr poly_id <+> dcolon <+> ppr poly_ty
+                                   , ppr sel_poly_ty ])
+
         ; wrap <- if sel_poly_ty `eqType` poly_ty  -- NB: eqType ignores visibility
                   then return idHsWrapper  -- Fast path; also avoids complaint when we infer
                                            -- an ambiguous type and have AllowAmbiguousType

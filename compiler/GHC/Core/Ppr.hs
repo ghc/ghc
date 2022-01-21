@@ -22,6 +22,7 @@ module GHC.Core.Ppr (
         pprCoreExpr, pprParendExpr,
         pprCoreBinding, pprCoreBindings, pprCoreAlt,
         pprCoreBindingWithSize, pprCoreBindingsWithSize,
+        pprCoreBinder, pprCoreBinders,
         pprRules, pprOptCo
     ) where
 
@@ -356,7 +357,6 @@ and @pprCoreExpr@ functions.
 
 Note [Binding-site specific printing]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 pprCoreBinder and pprTypedLamBinder receive a BindingSite argument to adjust
 the information printed.
 
@@ -393,6 +393,10 @@ pprCoreBinder LetBind binder
 pprCoreBinder bind_site bndr
   = getPprDebug $ \debug ->
     pprTypedLamBinder bind_site debug bndr
+
+pprCoreBinders :: [Var] -> SDoc
+-- Print as lambda-binders, i.e. with their type
+pprCoreBinders vs = sep (map (pprCoreBinder LambdaBind) vs)
 
 pprUntypedBinder :: Var -> SDoc
 pprUntypedBinder binder
@@ -643,8 +647,7 @@ pprRule (Rule { ru_name = name, ru_act = act, ru_fn = fn,
                 ru_bndrs = tpl_vars, ru_args = tpl_args,
                 ru_rhs = rhs })
   = hang (doubleQuotes (ftext name) <+> ppr act)
-       4 (sep [text "forall" <+>
-                  sep (map (pprCoreBinder LambdaBind) tpl_vars) <> dot,
+       4 (sep [text "forall" <+> pprCoreBinders tpl_vars <> dot,
                nest 2 (ppr fn <+> sep (map pprArg tpl_args)),
                nest 2 (text "=" <+> pprCoreExpr rhs)
             ])

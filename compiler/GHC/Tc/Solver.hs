@@ -54,6 +54,7 @@ import GHC.Core.Predicate
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcType
 import GHC.Core.Type
+import GHC.Core.Ppr
 import GHC.Builtin.Types ( liftedRepTy, manyDataConTy )
 import GHC.Core.Unify    ( tcMatchTyKi )
 import GHC.Utils.Misc
@@ -672,7 +673,6 @@ than one path, this alternative doesn't work.
 
 Note [Safe Haskell Overlapping Instances Implementation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 How is this implemented? It's complicated! So we'll step through it all:
 
  1) `InstEnv.lookupInstEnv` -- Performs instance resolution, so this is where
@@ -1011,7 +1011,7 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
             <- setTcLevel rhs_tclvl $
                runTcSWithEvBinds ev_binds_var $
                solveWanteds (mkSimpleWC psig_evs `andWC` wanteds)
-               -- psig_evs : see Note [Add signature contexts as givens]
+               -- psig_evs : see Note [Add signature contexts as wanteds]
 
        -- Find quant_pred_candidates, the predicates that
        -- we'll consider quantifying over
@@ -1047,9 +1047,9 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
          -- All done!
        ; traceTc "} simplifyInfer/produced residual implication for quantification" $
          vcat [ text "quant_pred_candidates =" <+> ppr quant_pred_candidates
-              , text "psig_theta =" <+> ppr psig_theta
-              , text "bound_theta =" <+> ppr bound_theta
-              , text "qtvs ="       <+> ppr qtvs
+              , text "psig_theta ="     <+> ppr psig_theta
+              , text "bound_theta ="    <+> pprCoreBinders bound_theta_vars
+              , text "qtvs ="           <+> ppr qtvs
               , text "definite_error =" <+> ppr definite_error ]
 
        ; return ( qtvs, bound_theta_vars, TcEvBinds ev_binds_var, definite_error ) }
@@ -1107,7 +1107,14 @@ ctsPreds cts = [ ctEvPred ev | ct <- bagToList cts
                              , let ev = ctEvidence ct ]
 
 findInferredDiff :: TcThetaType -> TcThetaType -> TcM TcThetaType
+-- Given a partial type signature f :: (C a, D a, _) => blah
+-- and the inferred constraints (X a, D a, Y a, C a)
+-- compute the difference, which is what will fill in the "_" underscore,
+-- In this case the diff is (X a, Y a).
 findInferredDiff annotated_theta inferred_theta
+  | null annotated_theta   -- Short cut the common case when the user didn't
+  = return inferred_theta  -- write any constraints in the partial signature
+  | otherwise
   = pushTcLevelM_ $
     do { lcl_env   <- TcM.getLclEnv
        ; given_ids <- mapM TcM.newEvVar annotated_theta
@@ -1184,7 +1191,24 @@ We'll use plan InferGen because there are holes in the type.  But:
    fundeps
 
 Solution: in simplifyInfer, we add the constraints from the signature
-as extra Wanteds
+as extra Wanteds.
+
+Why Wanteds?  Wouldn't it be neater to treat them as Givens?  Alas
+that would mess up (GivenInv) in Note [TcLevel invariants].  Consider
+    f :: (Eq a, _) => blah1
+    f = ....g...
+    g :: (Eq b, _) => blah2
+    g = ...f...
+
+Then we have two psig_theta constraints (Eq a[tv], Eq b[tv]), both with
+TyVarTvs inside.  Ultimately a[tv] := b[tv], but only when we've solved
+all those constraints.  And both have level 1, so we can't put them as
+Givens when solving at level 1.
+
+Best to treat them as Wanteds.
+
+But see also #20076, which would be solved if they were Givens.
+
 
 ************************************************************************
 *                                                                      *
@@ -1265,17 +1289,23 @@ decideQuantification infer_mode rhs_tclvl name_taus psigs candidates
        -- into quantified skolems, so we have to zonk again
        ; candidates <- TcM.zonkTcTypes candidates
        ; psig_theta <- TcM.zonkTcTypes (concatMap sig_inst_theta psigs)
-       ; let quantifiable_candidates
-               = pickQuantifiablePreds (mkVarSet qtvs) candidates
+       ; let min_theta = mkMinimalBySCs id $  -- See Note [Minimize by Superclasses]
+                         pickQuantifiablePreds (mkVarSet qtvs) candidates
 
-             theta = mkMinimalBySCs id $  -- See Note [Minimize by Superclasses]
-                     psig_theta ++ quantifiable_candidates
-             -- NB: add psig_theta back in here, even though it's already
-             -- part of candidates, because we always want to quantify over
-             -- psig_theta, and pickQuantifiableCandidates might have
-             -- dropped some e.g. CallStack constraints.  c.f #14658
-             --                   equalities (a ~ Bool)
-             -- Remember, this is the theta for the residual constraint
+             min_psig_theta = mkMinimalBySCs id psig_theta
+
+       -- Add psig_theta back in here, even though it's already
+       -- part of candidates, because we always want to quantify over
+       -- psig_theta, and pickQuantifiableCandidates might have
+       -- dropped some e.g. CallStack constraints.  c.f #14658
+       --                   equalities (a ~ Bool)
+       -- It's helpful to use the same "find difference" algorithm here as
+       -- we use in GHC.Tc.Gen.Bind.chooseInferredQuantifiers (#20921)
+       -- See Note [Constraints in partial type signatures]
+       ; theta <- if null psig_theta
+                  then return min_theta  -- Fast path for the non-partial-sig case
+                  else do { diff <- findInferredDiff min_psig_theta min_theta
+                          ; return (min_psig_theta ++ diff) }
 
        ; traceTc "decideQuantification"
            (vcat [ text "infer_mode:" <+> ppr infer_mode
@@ -1287,7 +1317,39 @@ decideQuantification infer_mode rhs_tclvl name_taus psigs candidates
                  , text "theta:"      <+> ppr theta ])
        ; return (qtvs, theta, co_vars) }
 
-------------------
+{- Note [Constraints in partial type signatures]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we have a partial type signature
+    f :: (Eq a, C a, _) => blah
+
+We will ultimately quantify f over (Eq a, C a, <diff>), where
+
+   * <diff> is the result of
+         findInferredDiff (Eq a, C a) <quant-theta>
+     in GHC.Tc.Gen.Bind.chooseInferredQuantifiers
+
+   * <quant-theta> is the theta returned right here,
+     by decideQuantification
+
+At least for single functions we would like to quantify f over
+precisely the same theta as <quant-theta>, so that we get to take
+the short-cut path in GHC.Tc.Gen.Bind.mkExport, and avoid calling
+tcSubTypeSigma for impedence matching. Why avoid?  Because it falls
+over for ambiguous types (#20921).
+
+We can get precisely the same theta by using the same algorithm,
+findInferredDiff.
+
+All of this goes wrong if we have (a) mutual recursion, (b) mutiple
+partial type signatures, (c) with different constraints, and (d)
+ambiguous types.  Something like
+    f :: forall a. Eq a => F a -> _
+    f x = (undefined :: a) == g x undefined
+    g :: forall b. Show b => F b -> _ -> b
+    g x y = let _ = (f y, show x) in x
+But that's a battle for another day.
+-}
+
 decideMonoTyVars :: InferMode
                  -> [(Name,TcType)]
                  -> [TcIdSigInst]
