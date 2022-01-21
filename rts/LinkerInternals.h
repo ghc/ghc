@@ -38,9 +38,18 @@ typedef char SymbolName;
 typedef struct _ObjectCode ObjectCode;
 typedef struct _Section    Section;
 
+/*
+ * Note [Processing overflowed relocations]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * TODO
+ */
+
+/* What kind of thing a symbol identifies. We need to know this to determine how
+ * to process overflowing relocations. See Note [Processing overflowed relocations]. */
 typedef enum _SymType {
-    SYM_TYPE_CODE,
-    SYM_TYPE_DATA,
+    SYM_TYPE_CODE, /* the symbol is a function and can be relocated via a jump island */
+    SYM_TYPE_DATA, /* the symbol is data and can be relocated via a plain pointer */
+    SYM_TYPE_INDIRECT_DATA, /* see Note [Relocating iob_func on Windows] */
 } SymType;
 
 

@@ -240,6 +240,17 @@ static void ghciRemoveSymbolTable(StrHashTable *table, const SymbolName* key,
     stgFree(pinfo);
 }
 
+static const char *
+symbolTypeString (SymType type)
+{
+    switch (type) {
+        case SYM_TYPE_CODE: return "code";
+        case SYM_TYPE_DATA: return "data";
+        case SYM_TYPE_INDIRECT_DATA: return "indirect-data";
+        default: barf("symbolTypeString: unknown symbol type");
+    }
+}
+
 /* -----------------------------------------------------------------------------
  * Insert symbols into hash tables, checking for duplicates.
  *
@@ -283,7 +294,11 @@ int ghciInsertSymbolTable(
    }
    else if (pinfo->type != type)
    {
-       debugBelch("Symbol type mismatch\n"); // TODO
+       debugBelch("Symbol type mismatch.\n");
+       debugBelch("Symbol %s was defined by %s to be a %s symbol.\n",
+                  key, obj_name, symbolTypeString(type));
+       debugBelch("      yet was defined by %s to be a %s symbol.\n",
+                  pinfo->owner->fileName, symbolTypeString(pinfo->type));
        return 1;
    }
    else if (pinfo->strength == STRENGTH_STRONG)

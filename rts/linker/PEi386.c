@@ -1822,13 +1822,18 @@ makeSymbolExtra_PEi386( ObjectCode* oc, uint64_t index STG_UNUSED, size_t s, cha
 {
     SymbolExtra *extra = m32_alloc(oc->rx_m32, sizeof(SymbolExtra), 8);
 
-    extra->addr = (uint64_t)s;
     if (type == SYM_TYPE_CODE) {
         // jmp *-14(%rip)
+        extra->addr = (uint64_t)s;
         static uint8_t jmp[] = { 0xFF, 0x25, 0xF2, 0xFF, 0xFF, 0xFF };
         memcpy(extra->jumpIsland, jmp, 6);
         return (size_t)&extra->jumpIsland;
+    } else if (type == SYM_TYPE_INDIRECT_DATA) {
+        void *v = *(void**) s;
+        extra->addr = (uint64_t)v;
+        return (size_t)&extra->addr;
     } else {
+        extra->addr = (uint64_t)s;
         return (size_t)&extra->addr;
     }
 }
