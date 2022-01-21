@@ -22,6 +22,7 @@ import GHC.Prelude
 
 import GHC.Core.TyCon
 import GHC.Core.TyCon.Env
+import GHC.Utils.Outputable
 
 {-
 ************************************************************************
@@ -73,6 +74,9 @@ The function that manages all this is checkRecTc.
 data RecTcChecker = RC !Int (TyConEnv Int)
   -- The upper bound, and the number of times
   -- we have encountered each TyCon
+
+instance Outputable RecTcChecker where
+  ppr (RC n env) = text "RC:" <> int n <+> ppr env
 
 -- | Initialise a 'RecTcChecker' with 'defaultRecTcMaxBound'.
 initRecTc :: RecTcChecker
