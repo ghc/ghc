@@ -1,5 +1,8 @@
 :l Test3
 :b 1
 mymap id []
+:show breaks
 -- second load, should discard the breakpoints without blowing up
 :l Test3.hs
+:show breaks
+mymap id []

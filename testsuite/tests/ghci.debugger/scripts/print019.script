@@ -8,4 +8,4 @@ seq _t1 ()
 :p _t1
 :show bindings
 _t2
--- bogus!! _t2 has been resolved to type Char
+-- _t2 cannot be printed, its type is still unknown

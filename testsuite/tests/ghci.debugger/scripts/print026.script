@@ -1,4 +1,4 @@
--- test -fno-debug-with-show
+-- test -fprint-evld-with-show
 
 :m +Data.Sequence
 let l = fromList "abc"

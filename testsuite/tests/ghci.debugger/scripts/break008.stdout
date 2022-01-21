@@ -1,3 +1,6 @@
 Breakpoint 0 activated at Test3.hs:1:14-15
 Stopped in Main.mymap, Test3.hs:1:14-15
 _result :: [a] = _
+[0] Main Test3.hs:1:14-15 enabled
+No active breakpoints.
+[]

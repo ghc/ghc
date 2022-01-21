@@ -7,4 +7,3 @@ let a = MkT (1 :: Integer)
 seq a ()
 :p a
 a
--- Bang! "internal error: stg_ap_p_ret", triggered by the evaluation of a 

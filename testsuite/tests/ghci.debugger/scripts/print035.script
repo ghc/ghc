@@ -1,5 +1,5 @@
 -- Unboxed tuples in data constructor arguments need to be
--- handled correctly by RtClosureInspect
+-- handled correctly by GHC.Runtime.Heap.Inspect
 
 :set -XUnboxedTuples -fobject-code
 :l Unboxed
