@@ -168,8 +168,7 @@ struct m32_page_t {
     // unprotected_list or protected_list are linked together with this field.
     struct {
       uint32_t size;
-      uint32_t next; // this is a m32_page_t*, truncated to 32-bits. This is safe
-                     // as we are only allocating in the bottom 32-bits
+      struct m32_page_t *next;
     } filled_page;
 
     // Pages in the small-allocation nursery encode their current allocation
@@ -189,7 +188,7 @@ m32_filled_page_set_next(struct m32_page_t *page, struct m32_page_t *next)
   if (! is_okay_address(next)) {
     barf("m32_filled_page_set_next: Page not in lower 32-bits");
   }
-  page->filled_page.next = (uint32_t) (uintptr_t) next;
+  page->filled_page.next = next;
 }
 
 static struct m32_page_t *
