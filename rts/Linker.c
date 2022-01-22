@@ -234,6 +234,11 @@ symbolTypeString (SymType type)
     }
 }
 
+bool isTntcSymbol(const SymbolName *sym) {
+    // TODO
+    return false;
+}
+
 /* -----------------------------------------------------------------------------
  * Insert symbols into hash tables, checking for duplicates.
  *

@@ -482,6 +482,9 @@ pathchar*
 resolveSymbolAddr (pathchar* buffer, int size,
                    SymbolAddr* symbol, uintptr_t* top);
 
+/* See Note [Refuse to generate jump islands for _info symbols] */
+bool isTntcSymbol(const SymbolName *);
+
 /* defined in LoadArchive.c */
 bool isArchive (pathchar *path);
 HsInt loadArchive_ (pathchar *path);
