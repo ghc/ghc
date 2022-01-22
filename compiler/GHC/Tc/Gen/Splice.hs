@@ -618,7 +618,6 @@ tcSpliceExpr splice _
 
 {- Note [Collecting modFinalizers in typed splices]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 'qAddModFinalizer' of the @Quasi TcM@ instance adds finalizers in the local
 environment (see Note [Delaying modFinalizers in untyped splices] in
 GHC.Rename.Splice). Thus after executing the splice, we move the finalizers to the
@@ -679,12 +678,8 @@ tcTopSplice expr res_ty
 -- See Note [Running typed splices in the zonker]
 runTopSplice :: DelayedSplice -> TcM (HsExpr GhcTc)
 runTopSplice (DelayedSplice lcl_env orig_expr res_ty q_expr)
-  = do
-      errs_var <- getErrsVar
-      setLclEnv lcl_env $ setErrsVar errs_var $ do {
-         -- Set the errs_var to the errs_var from the current context,
-         -- otherwise error messages can go missing in GHCi (#19470)
-         zonked_ty <- zonkTcType res_ty
+  = restoreLclEnv lcl_env $
+    do { zonked_ty <- zonkTcType res_ty
        ; zonked_q_expr <- zonkTopLExpr q_expr
         -- See Note [Collecting modFinalizers in typed splices].
        ; modfinalizers_ref <- newTcRef []

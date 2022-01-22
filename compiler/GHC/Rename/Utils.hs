@@ -93,15 +93,14 @@ newLocalBndrsRn :: [LocatedN RdrName] -> RnM [Name]
 newLocalBndrsRn = mapM newLocalBndrRn
 
 bindLocalNames :: [Name] -> RnM a -> RnM a
-bindLocalNames names enclosed_scope
-  = do { lcl_env <- getLclEnv
-       ; let th_level  = thLevel (tcl_th_ctxt lcl_env)
-             th_bndrs' = extendNameEnvList (tcl_th_bndrs lcl_env)
-                           [ (n, (NotTopLevel, th_level)) | n <- names ]
-             rdr_env'  = extendLocalRdrEnvList (tcl_rdr lcl_env) names
-       ; setLclEnv (lcl_env { tcl_th_bndrs = th_bndrs'
-                            , tcl_rdr      = rdr_env' })
-                    enclosed_scope }
+bindLocalNames names
+  = updLclEnv $ \ lcl_env ->
+    let th_level  = thLevel (tcl_th_ctxt lcl_env)
+        th_bndrs' = extendNameEnvList (tcl_th_bndrs lcl_env)
+                    [ (n, (NotTopLevel, th_level)) | n <- names ]
+        rdr_env'  = extendLocalRdrEnvList (tcl_rdr lcl_env) names
+    in lcl_env { tcl_th_bndrs = th_bndrs'
+               , tcl_rdr      = rdr_env' }
 
 bindLocalNamesFV :: [Name] -> RnM (a, FreeVars) -> RnM (a, FreeVars)
 bindLocalNamesFV names enclosed_scope

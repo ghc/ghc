@@ -465,7 +465,7 @@ tcRnSrcDecls explicit_mod_hdr export_ies decls
       --  * the local env exposes the local Ids to simplifyTop,
       --    so that we get better error messages (monomorphism restriction)
       ; new_ev_binds <- {-# SCC "simplifyTop" #-}
-                        setEnvs (tcg_env, tcl_env) $
+                        restoreEnvs (tcg_env, tcl_env) $
                         do { lie_main <- checkMainType tcg_env
                            ; simplifyTop (lie `andWC` lie_main) }
 
@@ -474,6 +474,9 @@ tcRnSrcDecls explicit_mod_hdr export_ies decls
                    mkTypeableBinds
 
       ; traceTc "Tc9" empty
+      ; failIfErrsM    -- Stop now if if there have been errors
+                       -- Continuing is a waste of time; and we may get debug
+                       -- warnings when zonking about strangely-typed TyCons!
 
         -- Zonk the final code.  This must be done last.
         -- Even simplifyTop may do some unification.
@@ -506,18 +509,22 @@ tcRnSrcDecls explicit_mod_hdr export_ies decls
       --------- Deal with the exports ----------
       -- Can't be done earlier, because the export list must "see"
       -- the declarations created by the finalizers
-      ; tcg_env <- setEnvs (tcg_env, tcl_env) $
+      ; tcg_env <- restoreEnvs (tcg_env, tcl_env) $
                    rnExports explicit_mod_hdr export_ies
 
       --------- Emit the ':Main.main = runMainIO main' declaration ----------
       -- Do this /after/ rnExports, so that it can consult
       -- the tcg_exports created by rnExports
       ; (tcg_env, main_ev_binds)
-           <- setEnvs (tcg_env, tcl_env) $
+           <- restoreEnvs (tcg_env, tcl_env) $
               do { (tcg_env, lie) <- captureTopConstraints $
                                      checkMain explicit_mod_hdr export_ies
                  ; ev_binds <- simplifyTop lie
                  ; return (tcg_env, ev_binds) }
+
+      ; failIfErrsM    -- Stop now if if there have been errors
+                       -- Continuing is a waste of time; and we may get debug
+                       -- warnings when zonking about strangely-typed TyCons!
 
       ---------- Final zonking ---------------
       -- Zonk the new bindings arising from running the finalisers,
@@ -553,10 +560,7 @@ zonkTcGblEnv ev_binds tcg_env@(TcGblEnv { tcg_binds     = binds
   = {-# SCC "zonkTopDecls" #-}
     setGblEnv tcg_env $ -- This sets the GlobalRdrEnv which is used when rendering
                         --   error messages during zonking (notably levity errors)
-    do { failIfErrsM    -- Don't zonk if there have been errors
-                        -- It's a waste of time; and we may get debug warnings
-                        -- about strangely-typed TyCons!
-       ; let all_ev_binds = cur_ev_binds `unionBags` ev_binds
+    do { let all_ev_binds = cur_ev_binds `unionBags` ev_binds
        ; zonkTopDecls all_ev_binds binds rules imp_specs fords }
 
 -- | Runs TH finalizers and renames and typechecks the top-level declarations
@@ -570,7 +574,7 @@ run_th_modfinalizers = do
   else do
     writeTcRef th_modfinalizers_var []
     let run_finalizer (lcl_env, f) =
-            setLclEnv lcl_env (runRemoteModFinalizers f)
+            restoreLclEnv lcl_env (runRemoteModFinalizers f)
 
     (_, lie_th) <- captureTopConstraints $
                    mapM_ run_finalizer th_modfinalizers
@@ -579,7 +583,7 @@ run_th_modfinalizers = do
       -- we have to run tc_rn_src_decls to get them
     (tcg_env, tcl_env, lie_top_decls) <- tc_rn_src_decls []
 
-    setEnvs (tcg_env, tcl_env) $ do
+    restoreEnvs (tcg_env, tcl_env) $ do
       -- Subsequent rounds of finalizers run after any new constraints are
       -- simplified, or some types might not be complete when using reify
       -- (see #12777).
@@ -646,7 +650,7 @@ tc_rn_src_decls ds
                                       tcTopSrcDecls rn_decls
 
         -- If there is no splice, we're nearly done
-      ; setEnvs (tcg_env, tcl_env) $
+      ; restoreEnvs (tcg_env, tcl_env) $
         case group_tail of
           { Nothing -> return (tcg_env, tcl_env, lie1)
 
@@ -1498,14 +1502,14 @@ tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
                 -- the bindings produced in a Data instance.)
         traceTc "Tc5" empty ;
         tc_envs <- tcTopBinds val_binds val_sigs;
-        setEnvs tc_envs $ do {
+        restoreEnvs tc_envs $ do {
 
                 -- Now GHC-generated derived bindings, generics, and selectors
                 -- Do not generate warnings from compiler-generated code;
                 -- hence the use of discardWarnings
         tc_envs@(tcg_env, tcl_env)
             <- discardWarnings (tcTopBinds deriv_binds deriv_sigs) ;
-        setEnvs tc_envs $ do {  -- Environment doesn't change now
+        restoreEnvs tc_envs $ do {  -- Environment doesn't change now
 
                 -- Second pass over class and instance declarations,
                 -- now using the kind-checked decls
@@ -2058,34 +2062,31 @@ runTcInteractive hsc_env thing_inside
                 IIDecl i   -> getOrphans (unLoc (ideclName i))
                                          (renameRawPkgQual (hsc_unit_env hsc_env) (unLoc $ ideclName i) (ideclPkgQual i))
 
-       ; let imports = emptyImportAvails {
-                            imp_orphs = orphs
-                        }
+       ; let imports = emptyImportAvails { imp_orphs = orphs }
 
-       ; (gbl_env, lcl_env) <- getEnvs
-       ; let gbl_env' = gbl_env {
-                           tcg_rdr_env      = icReaderEnv icxt
-                         , tcg_type_env     = type_env
-                         , tcg_inst_env     = extendInstEnvList
-                                               (extendInstEnvList (tcg_inst_env gbl_env) ic_insts)
-                                               home_insts
-                         , tcg_fam_inst_env = extendFamInstEnvList
-                                               (extendFamInstEnvList (tcg_fam_inst_env gbl_env)
-                                                                     ic_finsts)
-                                               home_fam_insts
-                         , tcg_field_env    = mkNameEnv con_fields
-                              -- setting tcg_field_env is necessary
-                              -- to make RecordWildCards work (test: ghci049)
-                         , tcg_fix_env      = ic_fix_env icxt
-                         , tcg_default      = ic_default icxt
-                              -- must calculate imp_orphs of the ImportAvails
-                              -- so that instance visibility is done correctly
-                         , tcg_imports      = imports
-                         }
+             upd_envs (gbl_env, lcl_env) = (gbl_env', lcl_env')
+               where
+                 gbl_env' = gbl_env { tcg_rdr_env      = icReaderEnv icxt
+                                    , tcg_type_env     = type_env
+                                    , tcg_inst_env     = extendInstEnvList
+                                                          (extendInstEnvList (tcg_inst_env gbl_env) ic_insts)
+                                                          home_insts
+                                    , tcg_fam_inst_env = extendFamInstEnvList
+                                                          (extendFamInstEnvList (tcg_fam_inst_env gbl_env)
+                                                                                ic_finsts)
+                                                          home_fam_insts
+                                    , tcg_field_env    = mkNameEnv con_fields
+                                         -- setting tcg_field_env is necessary
+                                         -- to make RecordWildCards work (test: ghci049)
+                                    , tcg_fix_env      = ic_fix_env icxt
+                                    , tcg_default      = ic_default icxt
+                                         -- must calculate imp_orphs of the ImportAvails
+                                         -- so that instance visibility is done correctly
+                                    , tcg_imports      = imports }
 
-             lcl_env' = tcExtendLocalTypeEnv lcl_env lcl_ids
+                 lcl_env' = tcExtendLocalTypeEnv lcl_env lcl_ids
 
-       ; setEnvs (gbl_env', lcl_env') thing_inside }
+       ; updEnvs upd_envs thing_inside }
   where
     (home_insts, home_fam_insts) = hptAllInstances hsc_env
 
