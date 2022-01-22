@@ -131,6 +131,12 @@ isEmptyMessages (Messages msgs) = isEmptyBag msgs
 singleMessage :: MsgEnvelope e -> Messages e
 singleMessage e = addMessage e emptyMessages
 
+instance Diagnostic e => Outputable (Messages e) where
+  ppr msgs = braces (vcat (map ppr_one (bagToList (getMessages msgs))))
+     where
+       ppr_one :: MsgEnvelope e -> SDoc
+       ppr_one envelope = pprDiagnostic (errMsgDiagnostic envelope)
+
 {- Note [Discarding Messages]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -232,6 +238,10 @@ class Diagnostic a where
   diagnosticMessage :: a -> DecoratedSDoc
   diagnosticReason  :: a -> DiagnosticReason
   diagnosticHints   :: a -> [GhcHint]
+
+pprDiagnostic :: Diagnostic e => e -> SDoc
+pprDiagnostic e = vcat [ ppr (diagnosticReason e)
+                       , nest 2 (vcat (unDecorated (diagnosticMessage e))) ]
 
 -- | A generic 'Hint' message, to be used with 'DiagnosticMessage'.
 data DiagnosticHint = DiagnosticHint !SDoc
@@ -546,7 +556,6 @@ getCaretDiagnostic msg_class (RealSrcSpan span _) =
 
 {- Note [Intrinsic And Extrinsic Failures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 We distinguish between /intrinsic/ and /extrinsic/ failures. We classify in
 the former category those diagnostics which are /essentially/ failures, and
 their nature can't be changed. This is the case for 'ErrorWithoutFlag'. We
@@ -556,7 +565,7 @@ settings. It's important to be aware of such logic distinction, because when
 we are inside the typechecker or the desugarer, we are interested about
 intrinsic errors, and to bail out as soon as we find one of them. Conversely,
 if we find an /extrinsic/ one, for example because a particular 'WarningFlag'
-makes a warning and error, we /don't/ want to bail out, that's still not the
+makes a warning into an error, we /don't/ want to bail out, that's still not the
 right time to do so: Rather, we want to first collect all the diagnostics, and
 later classify and report them appropriately (in the driver).
 -}
