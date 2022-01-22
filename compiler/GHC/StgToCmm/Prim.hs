@@ -2515,9 +2515,9 @@ doCompareByteArraysOp res ba1 ba1_off ba2 ba2_off n = do
     platform <- getPlatform
 
     ifNonZero n $ do
-        let last_touched_idx off = cmmOffset platform (cmmAddWord platform off n) (-1)
-        doByteArrayBoundsCheck ba1_off (last_touched_idx ba1_off) b8 b8
-        doByteArrayBoundsCheck ba2_off (last_touched_idx ba2_off) b8 b8
+        let last_touched_idx off = cmmOffsetB platform (cmmAddWord platform off n) (-1)
+        doByteArrayBoundsCheck (last_touched_idx ba1_off) ba1 b8 b8
+        doByteArrayBoundsCheck (last_touched_idx ba2_off) ba2 b8 b8
 
     ba1_p <- assignTempE $ cmmOffsetExpr platform (cmmOffsetB platform ba1 (arrWordsHdrSize profile)) ba1_off
     ba2_p <- assignTempE $ cmmOffsetExpr platform (cmmOffsetB platform ba2 (arrWordsHdrSize profile)) ba2_off
@@ -2610,7 +2610,7 @@ emitCopyByteArray copy src src_off dst dst_off n = do
     platform <- getPlatform
 
     ifNonZero n $ do
-        let last_touched_idx off = cmmOffset platform (cmmAddWord platform off n) (-1)
+        let last_touched_idx off = cmmOffsetB platform (cmmAddWord platform off n) (-1)
         doByteArrayBoundsCheck (last_touched_idx src_off) src b8 b8
         doByteArrayBoundsCheck (last_touched_idx dst_off) dst b8 b8
 
@@ -2631,7 +2631,7 @@ doCopyByteArrayToAddrOp src src_off dst_p bytes = do
     profile <- getProfile
     platform <- getPlatform
     ifNonZero bytes $ do
-        let last_touched_idx off = cmmOffset platform (cmmAddWord platform off bytes) (-1)
+        let last_touched_idx off = cmmOffsetB platform (cmmAddWord platform off bytes) (-1)
         doByteArrayBoundsCheck (last_touched_idx src_off) src b8 b8
     src_p <- assignTempE $ cmmOffsetExpr platform (cmmOffsetB platform src (arrWordsHdrSize profile)) src_off
     emitMemcpyCall dst_p src_p bytes (mkAlignment 1)
@@ -2652,7 +2652,7 @@ doCopyAddrToByteArrayOp src_p dst dst_off bytes = do
     profile <- getProfile
     platform <- getPlatform
     ifNonZero bytes $ do
-        let last_touched_idx off = cmmOffset platform (cmmAddWord platform off bytes) (-1)
+        let last_touched_idx off = cmmOffsetB platform (cmmAddWord platform off bytes) (-1)
         doByteArrayBoundsCheck (last_touched_idx dst_off) dst b8 b8
     dst_p <- assignTempE $ cmmOffsetExpr platform (cmmOffsetB platform dst (arrWordsHdrSize profile)) dst_off
     emitMemcpyCall dst_p src_p bytes (mkAlignment 1)
@@ -2677,7 +2677,7 @@ doSetByteArrayOp ba off len c = do
     platform <- getPlatform
 
     doByteArrayBoundsCheck off ba b8 b8
-    doByteArrayBoundsCheck (cmmAddWord platform off c) ba b8 b8
+    doByteArrayBoundsCheck (cmmOffset platform (cmmAddWord platform off len) (-1)) ba b8 b8
 
     let byteArrayAlignment = wordAlignment platform -- known since BA is allocated on heap
         offsetAlignment = cmmExprAlignment off
@@ -3259,7 +3259,7 @@ doPtrArrayBoundsCheck
 doPtrArrayBoundsCheck idx arr = do
     profile <- getProfile
     platform <- getPlatform
-    let sz = CmmLoad (cmmOffset platform arr sz_off) (bWord platform)
+    let sz = CmmLoad (cmmOffsetB platform arr sz_off) (bWord platform)
         sz_off = fixedHdrSize profile + pc_OFFSET_StgMutArrPtrs_ptrs (platformConstants platform)
     doBoundsCheck idx sz
 
@@ -3270,7 +3270,7 @@ doSmallPtrArrayBoundsCheck
 doSmallPtrArrayBoundsCheck idx arr = do
     profile <- getProfile
     platform <- getPlatform
-    let sz = CmmLoad (cmmOffset platform arr sz_off) (bWord platform)
+    let sz = CmmLoad (cmmOffsetB platform arr sz_off) (bWord platform)
         sz_off = fixedHdrSize profile + pc_OFFSET_StgSmallMutArrPtrs_ptrs (platformConstants platform)
     doBoundsCheck idx sz
 
@@ -3283,7 +3283,7 @@ doByteArrayBoundsCheck
 doByteArrayBoundsCheck idx arr idx_ty elem_ty = do
     profile <- getProfile
     platform <- getPlatform
-    let sz = CmmLoad (cmmOffset platform arr sz_off) (bWord platform)
+    let sz = CmmLoad (cmmOffsetB platform arr sz_off) (bWord platform)
         sz_off = fixedHdrSize profile + pc_OFFSET_StgArrBytes_bytes (platformConstants platform)
         elem_sz = widthInBytes $ typeWidth elem_ty
         idx_sz = widthInBytes $ typeWidth idx_ty

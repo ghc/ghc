@@ -15,4 +15,5 @@ check_bounds_test('CheckBoundsIndexArray')
 check_bounds_test('CheckBoundsReadInt8Array')
 check_bounds_test('CheckBoundsReadWord8ArrayAsInt32')
 check_bounds_test('CheckBoundsCopyByteArray')
+check_bounds_test('CheckBoundsCompareByteArray')
 
