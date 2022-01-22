@@ -607,6 +607,9 @@ def have_vanilla( ) -> bool:
 def have_ncg( ) -> bool:
     return config.have_ncg
 
+def have_llvm( ) -> bool:
+    return config.have_llvm
+
 def have_dynamic( ) -> bool:
     ''' Were libraries built in the dynamic way? '''
     return config.have_dynamic
