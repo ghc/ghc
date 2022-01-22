@@ -214,7 +214,7 @@ casTest = do
 
 cas8Test :: IO ()
 cas8Test = do
-    tot <- race 0
+    tot <- race8 0
         (\ mba -> loop iters $ add mba 0 1)
         (\ mba -> loop iters $ add mba 0 2)
     assertEq (fromIntegral ((3 * fromIntegral iters) :: Word8)) tot "cas8Test"
@@ -228,7 +228,7 @@ cas8Test = do
 
 cas16Test :: IO ()
 cas16Test = do
-    tot <- race 0
+    tot <- race16 0
         (\ mba -> loop iters $ add mba 0 1)
         (\ mba -> loop iters $ add mba 0 2)
     assertEq (fromIntegral ((3 * fromIntegral iters) :: Word16)) tot "cas16Test"
@@ -242,7 +242,7 @@ cas16Test = do
 
 cas32Test :: IO ()
 cas32Test = do
-    tot <- race 0
+    tot <- race32 0
         (\ mba -> loop iters $ add mba 0 1)
         (\ mba -> loop iters $ add mba 0 2)
     assertEq (fromIntegral ((3 * fromIntegral iters) :: Word32)) tot "cas32Test"
@@ -399,6 +399,48 @@ race n0 thread1 thread2 = do
     mapM_ takeMVar [done1, done2]
     readIntArray mba 0
 
+race8 :: Int8                  -- ^ Initial value of array element
+     -> (MByteArray -> IO ())  -- ^ Thread 1 action
+     -> (MByteArray -> IO ())  -- ^ Thread 2 action
+     -> IO Int8                -- ^ Final value of array element
+race8 n0 thread1 thread2 = do
+    done1 <- newEmptyMVar
+    done2 <- newEmptyMVar
+    mba <- newByteArray (sizeOf (undefined :: Int8))
+    writeInt8Array mba 0 n0
+    forkIO $ thread1 mba >> putMVar done1 ()
+    forkIO $ thread2 mba >> putMVar done2 ()
+    mapM_ takeMVar [done1, done2]
+    readInt8Array mba 0
+
+race16 :: Int16                -- ^ Initial value of array element
+     -> (MByteArray -> IO ())  -- ^ Thread 1 action
+     -> (MByteArray -> IO ())  -- ^ Thread 2 action
+     -> IO Int16               -- ^ Final value of array element
+race16 n0 thread1 thread2 = do
+    done1 <- newEmptyMVar
+    done2 <- newEmptyMVar
+    mba <- newByteArray (sizeOf (undefined :: Int16))
+    writeInt16Array mba 0 n0
+    forkIO $ thread1 mba >> putMVar done1 ()
+    forkIO $ thread2 mba >> putMVar done2 ()
+    mapM_ takeMVar [done1, done2]
+    readInt16Array mba 0
+
+race32 :: Int32                -- ^ Initial value of array element
+     -> (MByteArray -> IO ())  -- ^ Thread 1 action
+     -> (MByteArray -> IO ())  -- ^ Thread 2 action
+     -> IO Int32               -- ^ Final value of array element
+race32 n0 thread1 thread2 = do
+    done1 <- newEmptyMVar
+    done2 <- newEmptyMVar
+    mba <- newByteArray (sizeOf (undefined :: Int32))
+    writeInt32Array mba 0 n0
+    forkIO $ thread1 mba >> putMVar done1 ()
+    forkIO $ thread2 mba >> putMVar done2 ()
+    mapM_ takeMVar [done1, done2]
+    readInt32Array mba 0
+
 -- | Create two threads that mutate the byte array passed to them
 -- concurrently. The array is one word large.
 raceAddr :: Word                -- ^ Initial value of array element
@@ -525,6 +567,21 @@ newByteArray (I# n#) = IO $ \ s# ->
 writeIntArray :: MByteArray -> Int -> Int -> IO ()
 writeIntArray (MBA mba#) (I# ix#) (I# n#) = IO $ \ s# ->
     case writeIntArray# mba# ix# n# s# of
+        s2# -> (# s2#, () #)
+
+writeInt8Array :: MByteArray -> Int -> Int8 -> IO ()
+writeInt8Array (MBA mba#) (I# ix#) (I8# n#) = IO $ \ s# ->
+    case writeInt8Array# mba# ix# n# s# of
+        s2# -> (# s2#, () #)
+
+writeInt16Array :: MByteArray -> Int -> Int16 -> IO ()
+writeInt16Array (MBA mba#) (I# ix#) (I16# n#) = IO $ \ s# ->
+    case writeInt16Array# mba# ix# n# s# of
+        s2# -> (# s2#, () #)
+
+writeInt32Array :: MByteArray -> Int -> Int32 -> IO ()
+writeInt32Array (MBA mba#) (I# ix#) (I32# n#) = IO $ \ s# ->
+    case writeInt32Array# mba# ix# n# s# of
         s2# -> (# s2#, () #)
 
 readIntArray :: MByteArray -> Int -> IO Int
