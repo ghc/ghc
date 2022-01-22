@@ -638,29 +638,28 @@ tc_extend_local_env top_lvl extra_env thing_inside
 -- that are bound together with extra_env and should not be regarded
 -- as free in the types of extra_env.
   = do  { traceTc "tc_extend_local_env" (ppr extra_env)
-        ; stage <- getStage
-        ; env0@(TcLclEnv { tcl_rdr      = rdr_env
-                         , tcl_th_bndrs = th_bndrs
-                         , tcl_env      = lcl_type_env }) <- getLclEnv
+        ; updLclEnv upd_lcl_env thing_inside }
+  where
+    upd_lcl_env env0@(TcLclEnv { tcl_th_ctxt  = stage
+                               , tcl_rdr      = rdr_env
+                               , tcl_th_bndrs = th_bndrs
+                               , tcl_env      = lcl_type_env })
+       = env0 { tcl_rdr = extendLocalRdrEnvList rdr_env
+                          [ n | (n, _) <- extra_env, isInternalName n ]
+                          -- The LocalRdrEnv contains only non-top-level names
+                          -- (GlobalRdrEnv handles the top level)
 
-        ; let thlvl = (top_lvl, thLevel stage)
+              , tcl_th_bndrs = extendNameEnvList th_bndrs
+                               [(n, thlvl) | (n, ATcId {}) <- extra_env]
+                               -- We only track Ids in tcl_th_bndrs
 
-              env1 = env0 { tcl_rdr = extendLocalRdrEnvList rdr_env
-                                      [ n | (n, _) <- extra_env, isInternalName n ]
-                                      -- The LocalRdrEnv contains only non-top-level names
-                                      -- (GlobalRdrEnv handles the top level)
-
-                         , tcl_th_bndrs = extendNameEnvList th_bndrs
-                                          [(n, thlvl) | (n, ATcId {}) <- extra_env]
-                                          -- We only track Ids in tcl_th_bndrs
-
-                         , tcl_env = extendNameEnvList lcl_type_env extra_env }
-
+              , tcl_env = extendNameEnvList lcl_type_env extra_env }
               -- tcl_rdr and tcl_th_bndrs: extend the local LocalRdrEnv and
               -- Template Haskell staging env simultaneously. Reason for extending
               -- LocalRdrEnv: after running a TH splice we need to do renaming.
+      where
+        thlvl = (top_lvl, thLevel stage)
 
-        ; setLclEnv env1 thing_inside }
 
 tcExtendLocalTypeEnv :: TcLclEnv -> [(Name, TcTyThing)] -> TcLclEnv
 tcExtendLocalTypeEnv lcl_env@(TcLclEnv { tcl_env = lcl_type_env }) tc_ty_things

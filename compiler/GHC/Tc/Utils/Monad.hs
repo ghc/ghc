@@ -20,9 +20,9 @@ module GHC.Tc.Utils.Monad(
   -- * Simple accessors
   discardResult,
   getTopEnv, updTopEnv, getGblEnv, updGblEnv,
-  setGblEnv, getLclEnv, updLclEnv, setLclEnv,
+  setGblEnv, getLclEnv, updLclEnv, setLclEnv, restoreLclEnv,
   updTopFlags,
-  getEnvs, setEnvs,
+  getEnvs, setEnvs, updEnvs, restoreEnvs,
   xoptM, doptM, goptM, woptM,
   setXOptM, unsetXOptM, unsetGOptM, unsetWOptM,
   whenDOptM, whenGOptM, whenWOptM,
@@ -109,7 +109,7 @@ module GHC.Tc.Utils.Monad(
   emitHole, emitHoles,
   discardConstraints, captureConstraints, tryCaptureConstraints,
   pushLevelAndCaptureConstraints,
-  pushTcLevelM_, pushTcLevelM, pushTcLevelsM,
+  pushTcLevelM_, pushTcLevelM,
   getTcLevel, setTcLevel, isTouchableTcM,
   getLclTypeEnv, setLclTypeEnv,
   traceTcConstraints,
@@ -189,7 +189,6 @@ import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Error
 import GHC.Utils.Panic
 import GHC.Utils.Constants (debugIsOn)
-import GHC.Utils.Misc
 import GHC.Utils.Logger
 import qualified GHC.Data.Strict as Strict
 
@@ -483,7 +482,7 @@ updGblEnv :: (gbl -> gbl) -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
 updGblEnv upd = updEnv (\ env@(Env { env_gbl = gbl }) ->
                           env { env_gbl = upd gbl })
 
-setGblEnv :: gbl -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
+setGblEnv :: gbl' -> TcRnIf gbl' lcl a -> TcRnIf gbl lcl a
 setGblEnv gbl_env = updEnv (\ env -> env { env_gbl = gbl_env })
 
 getLclEnv :: TcRnIf gbl lcl lcl
@@ -493,14 +492,65 @@ updLclEnv :: (lcl -> lcl) -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
 updLclEnv upd = updEnv (\ env@(Env { env_lcl = lcl }) ->
                           env { env_lcl = upd lcl })
 
+
 setLclEnv :: lcl' -> TcRnIf gbl lcl' a -> TcRnIf gbl lcl a
 setLclEnv lcl_env = updEnv (\ env -> env { env_lcl = lcl_env })
+
+restoreLclEnv :: TcLclEnv -> TcRnIf gbl TcLclEnv a -> TcRnIf gbl TcLclEnv a
+-- See Note [restoreLclEnv vs setLclEnv]
+restoreLclEnv new_lcl_env = updLclEnv upd
+  where
+    upd old_lcl_env =  new_lcl_env { tcl_errs  = tcl_errs  old_lcl_env
+                                   , tcl_lie   = tcl_lie   old_lcl_env
+                                   , tcl_usage = tcl_usage old_lcl_env }
 
 getEnvs :: TcRnIf gbl lcl (gbl, lcl)
 getEnvs = do { env <- getEnv; return (env_gbl env, env_lcl env) }
 
 setEnvs :: (gbl', lcl') -> TcRnIf gbl' lcl' a -> TcRnIf gbl lcl a
-setEnvs (gbl_env, lcl_env) = updEnv (\ env -> env { env_gbl = gbl_env, env_lcl = lcl_env })
+setEnvs (gbl_env, lcl_env) = setGblEnv gbl_env . setLclEnv lcl_env
+
+updEnvs :: ((gbl,lcl) -> (gbl, lcl)) -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
+updEnvs upd_envs = updEnv upd
+  where
+    upd env@(Env { env_gbl = gbl, env_lcl = lcl })
+      = env { env_gbl = gbl', env_lcl = lcl' }
+      where
+        !(gbl', lcl') = upd_envs (gbl, lcl)
+
+restoreEnvs :: (TcGblEnv, TcLclEnv) -> TcRn a -> TcRn a
+-- See Note [restoreLclEnv vs setLclEnv]
+restoreEnvs (gbl, lcl) = setGblEnv gbl . restoreLclEnv lcl
+
+{- Note [restoreLclEnv vs setLclEnv]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In the typechecker we use this idiom quite a lot
+   do { (gbl_env, lcl_env) <- tcRnSrcDecls ...
+      ; setGblEnv gbl_env $ setLclEnv lcl_env $
+        more_stuff }
+
+The `tcRnSrcDecls` extends the environments in `gbl_env` and `lcl_env`
+which we then want to be in scope in `more stuff`.
+
+The problem is that `lcl_env :: TcLclEnv` has an IORef for error
+messages `tcl_errs`, and another for constraints (`tcl_lie`),a and
+another for Linear Haskell usage information (`tcl_usage`).  Now
+suppose we change it a tiny bit
+   do { (gbl_env, lcl_env) <- checkNoErrs $
+                              tcRnSrcDecls ...
+      ; setGblEnv gbl_env $ setLclEnv lcl_env $
+        more_stuff }
+
+That should be innocuous.  But *alas*, `checkNoErrs` gathers errors in
+a fresh IORef *which is then captured in the returned `lcl_env`.  When
+we do the `setLclEnv` we'll make that captured IORef into the place
+where we gather error messages -- but no one is going to look at that!!!
+This led to #19470 and #20981.
+
+Solution: instead of setLclEnv use restoreLclEnv, which keeps the
+errors, constraints, and usage info from the /parent context/, setting
+everything else from the supplied TcLclEnv.
+-}
 
 -- Command-line flags
 
@@ -1033,9 +1083,9 @@ checkErr ok msg = unless ok (addErr msg)
 
 addMessages :: Messages TcRnMessage -> TcRn ()
 addMessages msgs1
-  = do { errs_var <- getErrsVar ;
-         msgs0 <- readTcRef errs_var ;
-         writeTcRef errs_var (unionMessages msgs0 msgs1) }
+  = do { errs_var <- getErrsVar
+       ; msgs0    <- readTcRef errs_var
+       ; writeTcRef errs_var (msgs0 `unionMessages` msgs1) }
 
 discardWarnings :: TcRn a -> TcRn a
 -- Ignore warnings inside the thing inside;
@@ -1343,10 +1393,8 @@ captureConstraints thing_inside
 -- returned usage information into the larger context appropriately.
 tcCollectingUsage :: TcM a -> TcM (UsageEnv,a)
 tcCollectingUsage thing_inside
-  = do { env0 <- getLclEnv
-       ; local_usage_ref <- newTcRef zeroUE
-       ; let env1 = env0 { tcl_usage = local_usage_ref }
-       ; result <- setLclEnv env1 thing_inside
+  = do { local_usage_ref <- newTcRef zeroUE
+       ; result <- updLclEnv (\env -> env { tcl_usage = local_usage_ref }) thing_inside
        ; local_usage <- readTcRef local_usage_ref
        ; return (local_usage,result) }
 
@@ -1789,10 +1837,10 @@ discardConstraints thing_inside = fst <$> captureConstraints thing_inside
 -- | The name says it all. The returned TcLevel is the *inner* TcLevel.
 pushLevelAndCaptureConstraints :: TcM a -> TcM (TcLevel, WantedConstraints, a)
 pushLevelAndCaptureConstraints thing_inside
-  = do { env <- getLclEnv
-       ; let tclvl' = pushTcLevel (tcl_tclvl env)
+  = do { tclvl <- getTcLevel
+       ; let tclvl' = pushTcLevel tclvl
        ; traceTc "pushLevelAndCaptureConstraints {" (ppr tclvl')
-       ; (res, lie) <- setLclEnv (env { tcl_tclvl = tclvl' }) $
+       ; (res, lie) <- updLclEnv (\env -> env { tcl_tclvl = tclvl' }) $
                        captureConstraints thing_inside
        ; traceTc "pushLevelAndCaptureConstraints }" (ppr tclvl')
        ; return (tclvl', lie, res) }
@@ -1803,20 +1851,10 @@ pushTcLevelM_ x = updLclEnv (\ env -> env { tcl_tclvl = pushTcLevel (tcl_tclvl e
 pushTcLevelM :: TcM a -> TcM (TcLevel, a)
 -- See Note [TcLevel assignment] in GHC.Tc.Utils.TcType
 pushTcLevelM thing_inside
-  = do { env <- getLclEnv
-       ; let tclvl' = pushTcLevel (tcl_tclvl env)
-       ; res <- setLclEnv (env { tcl_tclvl = tclvl' })
-                          thing_inside
+  = do { tclvl <- getTcLevel
+       ; let tclvl' = pushTcLevel tclvl
+       ; res <- updLclEnv (\env -> env { tcl_tclvl = tclvl' }) thing_inside
        ; return (tclvl', res) }
-
--- Returns pushed TcLevel
-pushTcLevelsM :: Int -> TcM a -> TcM (a, TcLevel)
-pushTcLevelsM num_levels thing_inside
-  = do { env <- getLclEnv
-       ; let tclvl' = nTimes num_levels pushTcLevel (tcl_tclvl env)
-       ; res <- setLclEnv (env { tcl_tclvl = tclvl' }) $
-                thing_inside
-       ; return (res, tclvl') }
 
 getTcLevel :: TcM TcLevel
 getTcLevel = do { env <- getLclEnv
