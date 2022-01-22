@@ -203,11 +203,11 @@ tcIfaceLclId occ
         }
 
 extendIfaceIdEnv :: [Id] -> IfL a -> IfL a
-extendIfaceIdEnv ids thing_inside
-  = do  { env <- getLclEnv
-        ; let { id_env' = extendFsEnvList (if_id_env env) pairs
-              ; pairs   = [(occNameFS (getOccName id), id) | id <- ids] }
-        ; setLclEnv (env { if_id_env = id_env' }) thing_inside }
+extendIfaceIdEnv ids
+  = updLclEnv $ \env ->
+    let { id_env' = extendFsEnvList (if_id_env env) pairs
+        ; pairs   = [(occNameFS (getOccName id), id) | id <- ids] }
+    in env { if_id_env = id_env' }
 
 
 tcIfaceTyVar :: FastString -> IfL TyVar
@@ -232,11 +232,11 @@ lookupIfaceVar (IfaceTvBndr (occ, _))
         ; return (lookupFsEnv (if_tv_env lcl) occ) }
 
 extendIfaceTyVarEnv :: [TyVar] -> IfL a -> IfL a
-extendIfaceTyVarEnv tyvars thing_inside
-  = do  { env <- getLclEnv
-        ; let { tv_env' = extendFsEnvList (if_tv_env env) pairs
-              ; pairs   = [(occNameFS (getOccName tv), tv) | tv <- tyvars] }
-        ; setLclEnv (env { if_tv_env = tv_env' }) thing_inside }
+extendIfaceTyVarEnv tyvars
+  = updLclEnv $ \env ->
+    let { tv_env' = extendFsEnvList (if_tv_env env) pairs
+        ; pairs   = [(occNameFS (getOccName tv), tv) | tv <- tyvars] }
+    in env { if_tv_env = tv_env' }
 
 extendIfaceEnvs :: [TyCoVar] -> IfL a -> IfL a
 extendIfaceEnvs tcvs thing_inside

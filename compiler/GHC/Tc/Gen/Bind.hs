@@ -179,13 +179,10 @@ tcTopBinds :: [(RecFlag, LHsBinds GhcRn)] -> [LSig GhcRn]
 -- The TcLclEnv has an extended type envt for the new bindings
 tcTopBinds binds sigs
   = do  { -- Pattern synonym bindings populate the global environment
-          (binds', (tcg_env, tcl_env)) <- tcValBinds TopLevel binds sigs $
-            do { gbl <- getGblEnv
-               ; lcl <- getLclEnv
-               ; return (gbl, lcl) }
+          (binds', (tcg_env, tcl_env)) <- tcValBinds TopLevel binds sigs getEnvs
         ; specs <- tcImpPrags sigs   -- SPECIALISE prags for imported Ids
 
-        ; complete_matches <- setEnvs (tcg_env, tcl_env) $ tcCompleteSigs sigs
+        ; complete_matches <- restoreEnvs (tcg_env, tcl_env) $ tcCompleteSigs sigs
         ; traceTc "complete_matches" (ppr binds $$ ppr sigs)
         ; traceTc "complete_matches" (ppr complete_matches)
 
