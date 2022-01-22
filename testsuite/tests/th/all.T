@@ -56,7 +56,7 @@ test('TH_spliceE5_prof',
       when(opsys('mingw32'), expect_broken(18271))],
      makefile_test, ['TH_spliceE5_prof'])
 
-test('TH_spliceE5_prof_ext', [req_profiling, only_ways(['normal'])],
+test('TH_spliceE5_prof_ext', [req_profiling, req_rts_linker, only_ways(['normal'])],
      makefile_test, ['TH_spliceE5_prof_ext'])
 
 test('TH_spliceD1', [], multimod_compile_fail,

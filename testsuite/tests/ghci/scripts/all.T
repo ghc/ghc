@@ -316,7 +316,9 @@ test('T17403', normal, ghci_script, ['T17403.script'])
 test('T17431', normal, ghci_script, ['T17431.script'])
 test('T17500', [extra_run_opts('-ddump-to-file -ddump-bcos')], ghci_script, ['T17500.script'])
 test('T17549', normal, ghci_script, ['T17549.script'])
-test('T17669', [extra_run_opts('-fexternal-interpreter -fobject-code')], ghci_script, ['T17669.script'])
+test('T17669', [extra_run_opts('-fexternal-interpreter -fobject-code'),
+                req_rts_linker ],
+     ghci_script, ['T17669.script'])
 test('T18330', [copy_files, extra_files(['../shell.hs', 'T18330.extra', 'T18330.hs'])
                , filter_stdout_lines(r'ghci>.*')
                , extra_hc_opts('-v1')]
