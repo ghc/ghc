@@ -59,13 +59,37 @@ import qualified Data.Graph as Graph
 import GHC.Utils.Trace
 _ = pprTrace -- Tired of commenting out the import all the time
 
+------------------
+-- FastMutIdEnv --
+------------------
+
+newtype FastMutIdEnv a = FMIE (IORef (IdEnv (IORef a)))
+
+emptyFastMutIdEnv :: IO (FastMutIdEnv a)
+emptyFastMutIdEnv = FMIE <$> newIORef emptyVarEnv
+
+lookupFastMutIdEnv :: FastMutIdEnv a -> IO (Id -> IO (Maybe a))
+lookupFastMutIdEnv (FMIE env_ref) = do
+  env <- readIORef env_ref
+  pure $ \id -> traverse readIORef (lookupVarEnv env id)
+
+insertFMIE :: FastMutIdEnv a -> Id -> a -> IO ()
+insertFMIE (FMIE env_ref) k v = do
+  env <- readIORef env_ref
+  case lookupVarEnv env k of
+    Just ref  ->  -- hot fast path
+      writeIORef ref $! v
+    Nothing -> do -- cold slow path
+      ref <- newIORef $! v
+      writeIORef env_ref $! extendVarEnv env k ref
+
 ---------------------------------
 -- Applying demand annotations --
 ---------------------------------
 
 data DmdAnnotations = DA
-  { da_demands :: !(IdEnv Demand)
-  , da_sigs    :: !(IdEnv DmdSig)
+  { da_demands :: !(Id -> Maybe Demand)
+  , da_sigs    :: !(Id -> Maybe DmdSig)
   }
 
 annotateProgram :: DmdAnnotations -> CoreProgram -> CoreProgram
@@ -74,13 +98,13 @@ annotateProgram anns = runIdentity . traverseBinders (Identity . annotate)
     annotate bndr | isTyVar bndr = bndr
                   | otherwise    = annotate_sig $ annotate_demand bndr
     annotate_sig bndr
-      | Just sig <- lookupVarEnv (da_sigs anns) bndr
+      | Just sig <- da_sigs anns bndr
       , sig /= idDmdSig bndr
       = bndr `setIdDmdSig` sig
       | otherwise
       = bndr
     annotate_demand bndr
-      | Just dmd <- lookupVarEnv (da_demands anns) bndr
+      | Just dmd <- da_demands anns bndr
       , dmd /= idDemandInfo bndr
       = bndr `setIdDemandInfo` dmd
       | otherwise
@@ -139,20 +163,20 @@ instance Outputable TransApprox where
 
 -- | Write out a demand annotation. Delayed 'setIdDemand'.
 writeIdDemand :: Id -> Demand -> EvalM ()
-writeIdDemand id dmd = EvalM $
-  modifyIterRef' ie_demands (\anns -> extendVarEnv anns id dmd)
+writeIdDemand id dmd = EvalM $ liftIOEnv $ \env ->
+  insertFMIE (ie_demands env) id dmd
 
 -- | Write out a bunch of demand annotations. There might be 'TyVar's among the
 -- `[Var]` which will be filtered out.
 writeBndrsDemands :: [Var] -> [Demand] -> EvalM ()
-writeBndrsDemands vars dmds = EvalM $ do
+writeBndrsDemands vars dmds = EvalM $ liftIOEnv $ \env -> do
   let prs = strictZipWith (,) (filter isRuntimeVar vars) dmds
-  modifyIterRef' ie_demands (`extendVarEnvList` prs)
+  forM_ prs $ \(id, dmd) -> insertFMIE (ie_demands env) id dmd
 
 -- | Write out a demand signature. Delayed 'setIdDmdSig'.
 writeIdDmdSig :: Id -> DmdSig -> EvalM ()
-writeIdDmdSig id sig = EvalM $
-  modifyIterRef' ie_sigs (\anns -> extendVarEnv anns id sig)
+writeIdDmdSig id sig = EvalM $ liftIOEnv $ \env -> do
+  insertFMIE (ie_sigs env) id sig
 
 -- | Write to the ref cell for the lazy free variables of this binding group.
 -- See Note [Lazy and unleashable free variables].
@@ -284,7 +308,7 @@ depAnal deps nodes = runST $ {-# SCC "depAnal" #-} do
 -------------------------------
 
 data IterEnv
-  = EE
+  = IE
   { ie_framework    :: !DmdFramework
   -- Fields related to current approximations:
   , ie_approxs      :: !(IOArray Prio TransApprox)
@@ -305,8 +329,8 @@ data IterEnv
   -- what is statically approximated in 'df_referrer_prios' of 'ie_framework'.
 
   -- Fields related to demand annotations:
-  , ie_demands      :: !(IORef (IdEnv Demand))
-  , ie_sigs         :: !(IORef (IdEnv DmdSig))
+  , ie_demands      :: !(FastMutIdEnv Demand)
+  , ie_sigs         :: !(FastMutIdEnv DmdSig)
   }
 
 newtype IterM a = IterM (IOEnv IterEnv a)
@@ -344,9 +368,9 @@ initIterEnv fw = do
   unstable_out <- newIORef IntSet.empty
   visited      <- newIORef IntSet.empty
   active_evals <- newIORef IntMap.empty
-  demands      <- newIORef emptyVarEnv
-  sigs         <- newIORef emptyVarEnv
-  return $! EE fw approxs lazy_fvs unstable_in unstable_out visited active_evals demands sigs
+  demands      <- emptyFastMutIdEnv
+  sigs         <- emptyFastMutIdEnv
+  return $! IE fw approxs lazy_fvs unstable_in unstable_out visited active_evals demands sigs
 
 node2prio :: DmdFramework -> Id -> Prio
 node2prio fw id = tn_prio $ getTransNode fw id
@@ -482,7 +506,12 @@ execIterM :: DmdFramework -> IterM () -> DmdAnnotations
 execIterM fw (IterM m) = unsafePerformIO $ do
   !env <- initIterEnv fw
   runIOEnv env m
-  DA <$> readIORef (ie_demands env) <*> readIORef (ie_sigs env)
+  -- ie_demands and ie_sigs are frozen from here-on.
+  -- Hence the below use of unsafePerformIO is safe.
+  let freeze_lookup env_ref = do
+        lookup_io <- lookupFastMutIdEnv env_ref
+        pure (unsafePerformIO . lookup_io)
+  DA <$> freeze_lookup (ie_demands env) <*> freeze_lookup (ie_sigs env)
 
 {-# INLINE whileJust_ #-}
 whileJust_ :: Monad m => m (Maybe a) -> (a -> m ()) -> m ()
