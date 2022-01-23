@@ -33,7 +33,7 @@ MonadFailErrors.hs:28:5: error:
             = do Just x <- undefined
                  undefined
 
-MonadFailErrors.hs:49:5: error:
+MonadFailErrors.hs:42:5: error:
     • No instance for (MonadFail ((->) r))
         arising from a do statement
         with the failable pattern ‘Just x’

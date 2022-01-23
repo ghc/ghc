@@ -26,7 +26,6 @@ module GHC.ST (
 
 import GHC.Base
 import GHC.Show
-import Control.Monad.Fail
 
 default ()
 
@@ -77,10 +76,6 @@ instance Monad (ST s) where
         case (m s) of { (# new_s, r #) ->
         case (k r) of { ST k2 ->
         (k2 new_s) }})
-
--- | @since 4.11.0.0
-instance MonadFail (ST s) where
-    fail s = errorWithoutStackTrace s
 
 -- | @since 4.11.0.0
 instance Semigroup a => Semigroup (ST s a) where

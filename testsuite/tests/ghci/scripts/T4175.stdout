@@ -41,10 +41,10 @@ type Maybe :: * -> *
 data Maybe a = Nothing | Just a
   	-- Defined in ‘GHC.Maybe’
 instance Traversable Maybe -- Defined in ‘Data.Traversable’
+instance MonadFail Maybe -- Defined in ‘Control.Monad.Fail’
 instance Foldable Maybe -- Defined in ‘Data.Foldable’
 instance Applicative Maybe -- Defined in ‘GHC.Base’
 instance Functor Maybe -- Defined in ‘GHC.Base’
-instance MonadFail Maybe -- Defined in ‘Control.Monad.Fail’
 instance Monad Maybe -- Defined in ‘GHC.Base’
 instance Semigroup a => Monoid (Maybe a) -- Defined in ‘GHC.Base’
 instance Semigroup a => Semigroup (Maybe a)

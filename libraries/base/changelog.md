@@ -43,6 +43,11 @@
     CPtrdiff, CSize, CWchar, CSigAtomic, CLLong, CULLong, CBool, CIntPtr, CUIntPtr,
     CIntMax, CUIntMax.
 
+  * Remove instances of `MonadFail` for the `ST` monad (lazy and strict) as per
+    the [Core Libraries proposal](https://github.com/haskell/core-libraries-committee/issues/33).
+    A [migration guide](https://github.com/haskell/core-libraries-committee/blob/main/guides/no-monadfail-st-inst.md)
+    is available.
+
 
 ## 4.16.0.0 *Nov 2021*
 

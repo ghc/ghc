@@ -190,10 +190,6 @@ instance Monad (ST s) where
        in
          unST (k r) new_s
 
--- | @since 4.10
-instance MonadFail (ST s) where
-    fail s = errorWithoutStackTrace s
-
 -- | Return the value computed by an 'ST' computation.
 -- The @forall@ ensures that the internal state used by the 'ST'
 -- computation is inaccessible to the rest of the program.

@@ -37,13 +37,6 @@ io = do
 
 
 
-st :: ST s a
-st = do
-    Just x <- undefined
-    undefined
-
-
-
 reader :: r -> a
 reader = do
     Just x <- undefined
