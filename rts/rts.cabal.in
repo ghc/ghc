@@ -10,10 +10,6 @@ source-repository head
     location: https://gitlab.haskell.org/ghc/ghc.git
     subdir:   rts
 
-extra-source-files:
-  -- This file needs to be in the package but shouldn't be compiled on its own.
-  xxhash.c
-
 flag libm
   default: @CabalHaveLibm@
 flag librt
