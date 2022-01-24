@@ -28,7 +28,7 @@ import GHC.Core.FVs
 import GHC.Core.Unfold
 import GHC.Core.Unfold.Make
 import GHC.Core.Make ( FloatBind(..) )
-import GHC.Core.Opt.OccurAnal( occurAnalyseExpr, occurAnalysePgm )
+import GHC.Core.Opt.OccurAnal( occurAnalyseExpr, occurAnalysePgm, zapLambdaBndrs )
 import GHC.Types.Literal
 import GHC.Types.Id
 import GHC.Types.Id.Info  ( realUnfoldingInfo, setUnfoldingInfo, setRuleInfo, IdInfo (..) )
@@ -332,20 +332,21 @@ simple_app env (App e1 e2) as
   = simple_app env e1 ((env, e2) : as)
 
 simple_app env e@(Lam {}) as@(_:_)
-  | (bndrs, body) <- collectBinders e
-  , let zapped_bndrs = zapLamBndrs (length as) bndrs
+  = do_beta env (zapLambdaBndrs e n_args) as
     -- Be careful to zap the lambda binders if necessary
     -- c.f. the Lam case of simplExprF1 in GHC.Core.Opt.Simplify
     -- Lacking this zap caused #19347, when we had a redex
     --   (\ a b. K a b) e1 e2
     -- where (as it happens) the eta-expanded K is produced by
     -- Note [Typechecking data constructors] in GHC.Tc.Gen.Head
-  = do_beta env zapped_bndrs body as
   where
-    do_beta env (b:bs) body (a:as)
+    n_args = length as
+
+    do_beta env (Lam b body) (a:as)
       | (env', mb_pr) <- simple_bind_pair env b Nothing a NotTopLevel
-      = wrapLet mb_pr $ do_beta env' bs body as
-    do_beta env bs body as = simple_app env (mkLams bs body) as
+      = wrapLet mb_pr $ do_beta env' body as
+    do_beta env body as
+      = simple_app env body as
 
 simple_app env (Tick t e) as
   -- Okay to do "(Tick t e) x ==> Tick t (e x)"?

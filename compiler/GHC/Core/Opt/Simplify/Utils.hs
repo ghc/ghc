@@ -149,11 +149,10 @@ data SimplCont
       , sc_cont :: SimplCont }
 
   -- The two strict forms have no DupFlag, because we never duplicate them
-  | StrictBind          -- (StrictBind x xs b K)[e] = let x = e in K[\xs.b]
-                        --       or, equivalently,  = K[ (\x xs.b) e ]
+  | StrictBind          -- (StrictBind x b K)[e] = let x = e in K[b]
+                        --       or, equivalently,  = K[ (\x.b) e ]
       { sc_dup   :: DupFlag        -- See Note [DupFlag invariants]
       , sc_bndr  :: InId
-      , sc_bndrs :: [InBndr]
       , sc_body  :: InExpr
       , sc_env   :: StaticEnv      -- See Note [StaticEnv invariant]
       , sc_cont  :: SimplCont }
@@ -483,9 +482,11 @@ contHoleScaling (ApplyToVal { sc_cont = k }) = contHoleScaling k
 contHoleScaling (TickIt _ k) = contHoleScaling k
 -------------------
 countArgs :: SimplCont -> Int
--- Count all arguments, including types, coercions, and other values
+-- Count all arguments, including types, coercions,
+-- and other values; skipping over casts.
 countArgs (ApplyToTy  { sc_cont = cont }) = 1 + countArgs cont
 countArgs (ApplyToVal { sc_cont = cont }) = 1 + countArgs cont
+countArgs (CastIt _ cont)                 = countArgs cont
 countArgs _                               = 0
 
 contArgs :: SimplCont -> (Bool, [ArgSummary], SimplCont)

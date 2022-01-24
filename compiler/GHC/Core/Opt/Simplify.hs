@@ -21,7 +21,7 @@ import GHC.Core.Opt.Simplify.Monad
 import GHC.Core.Type hiding ( substTy, substTyVar, extendTvSubst, extendCvSubst )
 import GHC.Core.Opt.Simplify.Env
 import GHC.Core.Opt.Simplify.Utils
-import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr )
+import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr, zapLambdaBndrs )
 import GHC.Core.Make       ( FloatBind, mkImpossibleExpr, castBottomExpr )
 import qualified GHC.Core.Make
 import GHC.Core.Coercion hiding ( substCo, substCoVar )
@@ -1153,16 +1153,14 @@ simplExprF1 env (App fun arg) cont
 
 simplExprF1 env expr@(Lam {}) cont
   = {-#SCC "simplExprF1-Lam" #-}
-    simplLam env zapped_bndrs body cont
-        -- The main issue here is under-saturated lambdas
+    simplLam env (zapLambdaBndrs expr n_args) cont
+        -- zapLambdaBndrs: the issue here is under-saturated lambdas
         --   (\x1. \x2. e) arg1
         -- Here x1 might have "occurs-once" occ-info, because occ-info
         -- is computed assuming that a group of lambdas is applied
         -- all at once.  If there are too few args, we must zap the
         -- occ-info, UNLESS the remaining binders are one-shot
   where
-    (bndrs, body) = collectBinders expr
-    zapped_bndrs = zapLamBndrs n_args bndrs
     n_args = countArgs cont
         -- NB: countArgs counts all the args (incl type args)
         -- and likewise drop counts all binders (incl type lambdas)
@@ -1191,7 +1189,7 @@ simplExprF1 env (Let (NonRec bndr rhs) body) cont
   = {-#SCC "simplNonRecJoinPoint" #-} simplNonRecJoinPoint env bndr' rhs' body cont
 
   | otherwise
-  = {-#SCC "simplNonRecE" #-} simplNonRecE env bndr (rhs, env) ([], body) cont
+  = {-#SCC "simplNonRecE" #-} simplNonRecE env bndr (rhs, env) body cont
 
 {- Note [Avoiding space leaks in OutType]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1449,12 +1447,12 @@ rebuild env expr cont
 
       StrictArg { sc_fun = fun, sc_cont = cont, sc_fun_ty = fun_ty }
         -> rebuildCall env (addValArgTo fun expr fun_ty ) cont
-      StrictBind { sc_bndr = b, sc_bndrs = bs, sc_body = body
+      StrictBind { sc_bndr = b, sc_body = body
                  , sc_env = se, sc_cont = cont }
         -> do { (floats1, env') <- simplNonRecX (se `setInScopeFromE` env) b expr
                                   -- expr satisfies let/app since it started life
                                   -- in a call to simplNonRecE
-              ; (floats2, expr') <- simplLam env' bs body cont
+              ; (floats2, expr') <- simplLam env' body cont
               ; return (floats1 `addFloats` floats2, expr') }
 
       ApplyToTy  { sc_arg_ty = ty, sc_cont = cont}
@@ -1598,41 +1596,47 @@ simplArg env dup_flag arg_env arg
 ************************************************************************
 -}
 
-simplLam :: SimplEnv -> [InId] -> InExpr -> SimplCont
+simplLam :: SimplEnv -> InExpr -> SimplCont
          -> SimplM (SimplFloats, OutExpr)
 
-simplLam env [] body cont
-  = simplExprF env body cont
+simplLam env (Lam bndr body) cont = simpl_lam env bndr body cont
+simplLam env expr            cont = simplExprF env expr cont
 
-simplLam env (bndr:bndrs) body (ApplyToTy { sc_arg_ty = arg_ty, sc_cont = cont })
+simpl_lam :: SimplEnv -> InBndr -> InExpr -> SimplCont
+          -> SimplM (SimplFloats, OutExpr)
+
+-- Type beta-reduction
+simpl_lam env bndr body (ApplyToTy { sc_arg_ty = arg_ty, sc_cont = cont })
   = do { tick (BetaReduction bndr)
-       ; simplLam (extendTvSubst env bndr arg_ty) bndrs body cont }
+       ; simplLam (extendTvSubst env bndr arg_ty) body cont }
 
-simplLam env (bndr:bndrs) body (ApplyToVal { sc_arg = arg, sc_env = arg_se
-                                           , sc_cont = cont, sc_dup = dup })
+-- Value beta-reduction
+simpl_lam env bndr body (ApplyToVal { sc_arg = arg, sc_env = arg_se
+                                    , sc_cont = cont, sc_dup = dup })
   | isSimplified dup  -- Don't re-simplify if we've simplified it once
                       -- See Note [Avoiding exponential behaviour]
   = do  { tick (BetaReduction bndr)
         ; (floats1, env') <- simplNonRecX env bndr arg
-        ; (floats2, expr') <- simplLam env' bndrs body cont
+        ; (floats2, expr') <- simplLam env' body cont
         ; return (floats1 `addFloats` floats2, expr') }
 
   | otherwise
   = do  { tick (BetaReduction bndr)
-        ; simplNonRecE env bndr (arg, arg_se) (bndrs, body) cont }
+        ; simplNonRecE env bndr (arg, arg_se) body cont }
 
-      -- Discard a non-counting tick on a lambda.  This may change the
-      -- cost attribution slightly (moving the allocation of the
-      -- lambda elsewhere), but we don't care: optimisation changes
-      -- cost attribution all the time.
-simplLam env bndrs body (TickIt tickish cont)
+-- Discard a non-counting tick on a lambda.  This may change the
+-- cost attribution slightly (moving the allocation of the
+-- lambda elsewhere), but we don't care: optimisation changes
+-- cost attribution all the time.
+simpl_lam env bndr body (TickIt tickish cont)
   | not (tickishCounts tickish)
-  = simplLam env bndrs body cont
+  = simpl_lam env bndr body cont
 
-        -- Not enough args, so there are real lambdas left to put in the result
-simplLam env bndrs body cont
-  = do  { (env', bndrs') <- simplLamBndrs env bndrs
-        ; body'   <- simplExpr env' body
+-- Not enough args, so there are real lambdas left to put in the result
+simpl_lam env bndr body cont
+  = do  { let (inner_bndrs, inner_body) = collectBinders body
+        ; (env', bndrs') <- simplLamBndrs env (bndr:inner_bndrs)
+        ; body'   <- simplExpr env' inner_body
         ; new_lam <- mkLam env' bndrs' body' cont
         ; rebuild env' new_lam cont }
 
@@ -1652,8 +1656,7 @@ simplNonRecE :: SimplEnv
              -> InId                    -- The binder, always an Id
                                         -- Never a join point
              -> (InExpr, SimplEnv)      -- Rhs of binding (or arg of lambda)
-             -> ([InBndr], InExpr)      -- Body of the let/lambda
-                                        --      \xs.e
+             -> InExpr                  -- Body of the let/lambda
              -> SimplCont
              -> SimplM (SimplFloats, OutExpr)
 
@@ -1661,27 +1664,22 @@ simplNonRecE :: SimplEnv
 --  * non-top-level non-recursive non-join-point lets in expressions
 --  * beta reduction
 --
--- simplNonRec env b (rhs, rhs_se) (bs, body) k
+-- simplNonRec env b (rhs, rhs_se) body k
 --   = let env in
---     cont< let b = rhs_se(rhs) in \bs.body >
+--     cont< let b = rhs_se(rhs) in body >
 --
 -- It deals with strict bindings, via the StrictBind continuation,
 -- which may abort the whole process
 --
 -- Precondition: rhs satisfies the let/app invariant
 --               Note [Core let/app invariant] in GHC.Core
---
--- The "body" of the binding comes as a pair of ([InId],InExpr)
--- representing a lambda; so we recurse back to simplLam
--- Why?  Because of the binder-occ-info-zapping done before
---       the call to simplLam in simplExprF (Lam ...)
 
-simplNonRecE env bndr (rhs, rhs_se) (bndrs, body) cont
+simplNonRecE env bndr (rhs, rhs_se) body cont
   | assert (isId bndr && not (isJoinId bndr) ) True
   , Just env' <- preInlineUnconditionally env NotTopLevel bndr rhs rhs_se
   = do { tick (PreInlineUnconditionally bndr)
        ; -- pprTrace "preInlineUncond" (ppr bndr <+> ppr rhs) $
-         simplLam env' bndrs body cont }
+         simplLam env' body cont }
 
   | otherwise
   = do { (env1, bndr1) <- simplNonRecBndr env bndr
@@ -1690,14 +1688,14 @@ simplNonRecE env bndr (rhs, rhs_se) (bndrs, body) cont
        -- See Note [Dark corner with representation polymorphism]
        ; if isStrictId bndr1 && sm_case_case (getMode env)
          then simplExprF (rhs_se `setInScopeFromE` env) rhs
-                   (StrictBind { sc_bndr = bndr, sc_bndrs = bndrs, sc_body = body
+                   (StrictBind { sc_bndr = bndr, sc_body = body
                                , sc_env = env, sc_cont = cont, sc_dup = NoDup })
 
        -- Deal with lazy bindings
          else do
        { (env2, bndr2) <- addBndrRules env1 bndr bndr1 Nothing
        ; (floats1, env3) <- simplLazyBind env2 NotTopLevel NonRecursive bndr bndr2 rhs rhs_se
-       ; (floats2, expr') <- simplLam env3 bndrs body cont
+       ; (floats2, expr') <- simplLam env3 body cont
        ; return (floats1 `addFloats` floats2, expr') } }
 
 ------------------
@@ -3433,14 +3431,14 @@ mkDupableContWithDmds env dmds (TickIt t cont)
         ; return (floats, TickIt t cont') }
 
 mkDupableContWithDmds env _
-     (StrictBind { sc_bndr = bndr, sc_bndrs = bndrs
-                 , sc_body = body, sc_env = se, sc_cont = cont})
+     (StrictBind { sc_bndr = bndr, sc_body = body
+                 , sc_env = se, sc_cont = cont})
 -- See Note [Duplicating StrictBind]
 -- K[ let x = <> in b ]  -->   join j x = K[ b ]
 --                             j <>
   = do { let sb_env = se `setInScopeFromE` env
        ; (sb_env1, bndr')      <- simplBinder sb_env bndr
-       ; (floats1, join_inner) <- simplLam sb_env1 bndrs body cont
+       ; (floats1, join_inner) <- simplLam sb_env1 body cont
           -- No need to use mkDupableCont before simplLam; we
           -- use cont once here, and then share the result if necessary
 
@@ -3565,7 +3563,7 @@ mkDupableStrictBind :: SimplEnv -> OutId -> OutExpr -> OutType
 mkDupableStrictBind env arg_bndr join_rhs res_ty
   | exprIsTrivial join_rhs   -- See point (2) of Note [Duplicating join points]
   = return (emptyFloats env
-           , StrictBind { sc_bndr = arg_bndr, sc_bndrs = []
+           , StrictBind { sc_bndr = arg_bndr
                         , sc_body = join_rhs
                         , sc_env  = zapSubstEnv env
                           -- See Note [StaticEnv invariant] in GHC.Core.Opt.Simplify.Utils
