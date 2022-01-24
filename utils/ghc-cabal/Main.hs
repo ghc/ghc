@@ -8,12 +8,12 @@ import qualified Distribution.ModuleName as ModuleName
 import Distribution.PackageDescription
 import Distribution.PackageDescription.Check hiding (doesFileExist)
 import Distribution.PackageDescription.Configuration
-import Distribution.PackageDescription.Parsec
 import Distribution.Package
 import Distribution.Simple
 import Distribution.Simple.Configure
 import Distribution.Simple.LocalBuildInfo
 import Distribution.Simple.GHC
+import Distribution.Simple.PackageDescription
 import Distribution.Simple.Program
 import Distribution.Simple.Program.HcPkg
 import Distribution.Simple.Setup (ConfigFlags(configStripLibs), fromFlagOrDefault, toFlag)
@@ -413,6 +413,7 @@ generate directory distdir config_args
           mkLibraryRelDir "rts"        = "rts/dist-install/build"
           mkLibraryRelDir "ghc"        = "compiler/stage2/build"
           mkLibraryRelDir "Cabal"      = "libraries/Cabal/Cabal/dist-install/build"
+          mkLibraryRelDir "Cabal-syntax" = "libraries/Cabal/Cabal-syntax/dist-install/build"
           mkLibraryRelDir "containers" = "libraries/containers/containers/dist-install/build"
           mkLibraryRelDir l            = "libraries/" ++ l ++ "/dist-install/build"
           libraryRelDirs = map mkLibraryRelDir transitiveDepNames

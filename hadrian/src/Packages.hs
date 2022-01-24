@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 module Packages (
     -- * GHC packages
-    array, base, binary, bytestring, cabal, checkPpr,
+    array, base, binary, bytestring, cabal, cabalSyntax, checkPpr,
     checkExact, countDeps,
     compareSizes, compiler, containers, deepseq, deriveConstants, directory,
     exceptions, filepath, genapply, genprimopcode, ghc, ghcBignum, ghcBoot, ghcBootTh,
@@ -32,7 +32,7 @@ import Oracles.Setting
 -- packages and modify build default build conditions in "UserSettings".
 ghcPackages :: [Package]
 ghcPackages =
-    [ array, base, binary, bytestring, cabal, checkPpr, checkExact, countDeps
+    [ array, base, binary, bytestring, cabalSyntax, cabal, checkPpr, checkExact, countDeps
     , compareSizes, compiler, containers, deepseq, deriveConstants, directory
     , exceptions, filepath, genapply, genprimopcode, ghc, ghcBignum, ghcBoot, ghcBootTh
     , ghcCompact, ghcHeap, ghci, ghciWrapper, ghcPkg, ghcPrim, haddock, haskeline, hsc2hs
@@ -50,6 +50,7 @@ array               = lib  "array"
 base                = lib  "base"
 binary              = lib  "binary"
 bytestring          = lib  "bytestring"
+cabalSyntax         = lib  "Cabal-syntax"    `setPath` "libraries/Cabal/Cabal-syntax"
 cabal               = lib  "Cabal"           `setPath` "libraries/Cabal/Cabal"
 checkPpr            = util "check-ppr"
 checkExact          = util "check-exact"

@@ -420,7 +420,7 @@ else # CLEANING
 # programs such as GHC and ghc-pkg, that we do not assume the stage0
 # compiler already has installed (or up-to-date enough).
 # Note that these must be given in topological order.
-PACKAGES_STAGE0 = binary transformers mtl hpc ghc-boot-th ghc-boot template-haskell text parsec Cabal/Cabal ghc-heap exceptions ghci
+PACKAGES_STAGE0 = binary transformers mtl hpc ghc-boot-th ghc-boot template-haskell text parsec Cabal/Cabal-syntax Cabal/Cabal ghc-heap exceptions ghci
 ifeq "$(Windows_Host)" "NO"
 PACKAGES_STAGE0 += terminfo
 endif
@@ -454,6 +454,7 @@ PACKAGES_STAGE1 += mtl
 PACKAGES_STAGE1 += ghc-boot
 PACKAGES_STAGE1 += text
 PACKAGES_STAGE1 += parsec
+PACKAGES_STAGE1 += Cabal/Cabal-syntax
 PACKAGES_STAGE1 += Cabal/Cabal
 PACKAGES_STAGE1 += ghc-compact
 PACKAGES_STAGE1 += ghc-heap
