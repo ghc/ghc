@@ -38,7 +38,7 @@ module GHC.Core.Utils (
         diffBinds,
 
         -- * Lambdas and eta reduction
-        tryEtaReduce, zapLamBndrs,
+        tryEtaReduce,
 
         -- * Manipulating data constructors and types
         exprToType, exprToCoercion_maybe,
@@ -93,7 +93,7 @@ import GHC.Types.Tickish
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Unique
-import GHC.Types.Basic     ( Arity, FullArgCount )
+import GHC.Types.Basic     ( Arity )
 import GHC.Types.Unique.Set
 
 import GHC.Data.FastString
@@ -2504,31 +2504,6 @@ we can eta-reduce    \x. f x  ===>  f
 
 This turned up in #7542.
 -}
-
-{- *********************************************************************
-*                                                                      *
-                  Zapping lambda binders
-*                                                                      *
-********************************************************************* -}
-
-zapLamBndrs :: FullArgCount -> [Var] -> [Var]
--- If (\xyz. t) appears under-applied to only two arguments,
--- we must zap the occ-info on x,y, because they appear under the \x
--- See Note [Occurrence analysis for lambda binders] in GHc.Core.Opt.OccurAnal
---
--- NB: both `arg_count` and `bndrs` include both type and value args/bndrs
-zapLamBndrs arg_count bndrs
-  | no_need_to_zap = bndrs
-  | otherwise      = zap_em arg_count bndrs
-  where
-    no_need_to_zap = all isOneShotBndr (drop arg_count bndrs)
-
-    zap_em :: FullArgCount -> [Var] -> [Var]
-    zap_em 0 bs = bs
-    zap_em _ [] = []
-    zap_em n (b:bs) | isTyVar b = b              : zap_em (n-1) bs
-                    | otherwise = zapLamIdInfo b : zap_em (n-1) bs
-
 
 {- *********************************************************************
 *                                                                      *
