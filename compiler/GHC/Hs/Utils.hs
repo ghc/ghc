@@ -1000,9 +1000,7 @@ isBangedHsBind (FunBind {fun_matches = matches})
   , FunRhs{mc_strictness = SrcStrict} <- m_ctxt match
   = True
 isBangedHsBind (PatBind {pat_lhs = pat})
-  = case unLoc pat of
-      VisPat _ lpat -> isBangedLPat lpat
-      _             -> False
+  = isBangedLPat pat
 isBangedHsBind _
   = False
 
@@ -1080,7 +1078,7 @@ collect_bind :: forall p idR. CollectPass p
              -> HsBindLR p idR
              -> [IdP p]
              -> [IdP p]
-collect_bind _ flag (PatBind { pat_lhs = p })           acc = collect_lmatchpat flag p acc
+collect_bind _ flag (PatBind { pat_lhs = p })           acc = collect_lpat flag p acc
 collect_bind _ _ (FunBind { fun_id = f })            acc = unXRec @p f : acc
 collect_bind _ _ (VarBind { var_id = f })            acc = f : acc
 collect_bind _ _ (AbsBinds { abs_exports = dbinds }) acc = map abe_poly dbinds ++ acc
@@ -1591,12 +1589,8 @@ hsValBindsImplicits (ValBinds _ binds _)
 lhsBindsImplicits :: LHsBindsLR GhcRn idR -> [(SrcSpan, [Name])]
 lhsBindsImplicits = foldBag (++) (lhs_bind . unLoc) []
   where
-    lhs_bind (PatBind { pat_lhs = lpat }) = lMatchPatImplicits lpat
+    lhs_bind (PatBind { pat_lhs = lpat }) = lPatImplicits lpat
     lhs_bind _ = []
-
-lMatchPatImplicits :: LMatchPat GhcRn -> [(SrcSpan, [Name])]
-lMatchPatImplicits (L _ (VisPat _ lpat)) = lPatImplicits lpat
-lMatchPatImplicits _                     = []
 
 lPatImplicits :: LPat GhcRn -> [(SrcSpan, [Name])]
 lPatImplicits = hs_lpat

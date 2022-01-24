@@ -345,7 +345,7 @@ addTickLHsBind (L pos (funBind@(FunBind { fun_id = L _ id }))) = do
 addTickLHsBind (L pos (pat@(PatBind { pat_lhs = lhs
                                     , pat_rhs = rhs }))) = do
 
-  let simplePatId = isSimpleMatchPat lhs
+  let simplePatId = isSimplePat lhs
 
   -- TODO: better name for rhs's for non-simple patterns?
   let name = maybe "(...)" getOccString simplePatId
@@ -373,7 +373,7 @@ addTickLHsBind (L pos (pat@(PatBind { pat_lhs = lhs
     patvar_tickss <- case simplePatId of
       Just{} -> return initial_patvar_tickss
       Nothing -> do
-        let patvars = map getOccString (collectLMatchPatBinders CollNoDictBinders lhs)
+        let patvars = map getOccString (collectPatBinders CollNoDictBinders lhs)
         patvar_ticks <- mapM (\v -> bindTick density v (locA pos) fvs) patvars
         return
           (zipWith mbCons patvar_ticks

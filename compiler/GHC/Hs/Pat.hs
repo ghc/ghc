@@ -494,9 +494,7 @@ looksLazyPatBind :: HsBind (GhcPass p) -> Bool
 -- In particular, returns True of a pattern binding with a compound pattern, like (I# x)
 -- Looks through AbsBinds
 looksLazyPatBind (PatBind { pat_lhs = p })
-  = case unLoc p of
-      VisPat _ lpat -> looksLazyLPat lpat
-      _             -> False
+  = looksLazyLPat p
 looksLazyPatBind (AbsBinds { abs_binds = binds })
   = anyBag (looksLazyPatBind . unLoc) binds
 looksLazyPatBind _

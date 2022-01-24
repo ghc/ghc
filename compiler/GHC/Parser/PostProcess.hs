@@ -653,7 +653,7 @@ mkPatSynMatchGroup (L loc patsyn_name) (L ld decls) =
   where
     fromDecl (L loc decl@(ValD _ (PatBind _
                                  -- AZ: where should these anns come from?
-                         (L _ (VisPat _ pat'@(L _ (ConPat noAnn ln@(L _ name) details))))
+                         pat@(L _ (ConPat noAnn ln@(L _ name) details))
                                rhs _))) =
         do { unless (name == patsyn_name) $
                wrongNameBindingErr (locA loc) decl
@@ -676,7 +676,7 @@ mkPatSynMatchGroup (L loc patsyn_name) (L ld decls) =
                                    , mc_fixity = Infix
                                    , mc_strictness = NoSrcStrict }
 
-               RecCon{} -> recordPatSynErr (locA loc) pat'
+               RecCon{} -> recordPatSynErr (locA loc) pat
            ; return $ L loc match }
     fromDecl (L loc decl) = extraDeclErr (locA loc) decl
 
@@ -1310,7 +1310,7 @@ checkPatBind loc annsIn (L _ (BangPat (EpAnn _ ans cs) (L _ (VarPat _ v))))
 
 checkPatBind loc annsIn lhs (L _ grhss) = do
   cs <- getCommentsFor loc
-  return (PatBind (EpAnn (spanAsAnchor loc) annsIn cs) (mkVisMatchPat lhs) grhss ([],[]))
+  return (PatBind (EpAnn (spanAsAnchor loc) annsIn cs) lhs grhss ([],[]))
 
 checkValSigLhs :: LHsExpr GhcPs -> P (LocatedN RdrName)
 checkValSigLhs (L _ (HsVar _ lrdr@(L _ v)))

@@ -1896,7 +1896,7 @@ rep_bind (L loc (FunBind { fun_id = fn
         ; ans <- repFun fn' (nonEmptyCoreList ms1)
         ; return (locA loc, ans) }
 
-rep_bind (L loc (PatBind { pat_lhs = L _ (VisPat _ pat)
+rep_bind (L loc (PatBind { pat_lhs = pat
                          , pat_rhs = GRHSs _ guards wheres }))
  =   do { patcore <- repLP pat
         ; (ss,wherecore) <- repBinds wheres
@@ -1904,8 +1904,6 @@ rep_bind (L loc (PatBind { pat_lhs = L _ (VisPat _ pat)
         ; ans  <- repVal patcore guardcore wherecore
         ; ans' <- wrapGenSyms ss ans
         ; return (locA loc, ans') }
-
-rep_bind (L _ (PatBind {})) = panic "rep_bind: other match pats"
 
 rep_bind (L _ (VarBind { var_id = v, var_rhs = e}))
  =   do { v' <- lookupBinder v

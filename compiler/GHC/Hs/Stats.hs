@@ -105,7 +105,7 @@ ppSourceStats short (L _ (HsModule{ hsmodExports = exports, hsmodImports = impor
     (inst_method_ds, method_specs, method_inlines, inst_type_ds, inst_data_ds)
         = sum5 (map inst_info inst_decls)
 
-    count_bind (PatBind { pat_lhs = L _ (VisPat _ (L _ (VarPat{}))) }) = (1,0,0)
+    count_bind (PatBind { pat_lhs = L _ (VarPat{}) }) = (1,0,0)
     count_bind (PatBind {})                           = (0,1,0)
     count_bind (FunBind {})                           = (0,1,0)
     count_bind (PatSynBind {})                        = (0,0,1)

@@ -1295,7 +1295,7 @@ pprFunBind matches = pprMatches matches
 -- Exported to GHC.Hs.Binds, which can't see the defn of HsMatchContext
 pprPatBind :: forall bndr p . (OutputableBndrId bndr,
                                OutputableBndrId p)
-           => LMatchPat (GhcPass bndr) -> GRHSs (GhcPass p) (LHsExpr (GhcPass p)) -> SDoc
+           => LPat (GhcPass bndr) -> GRHSs (GhcPass p) (LHsExpr (GhcPass p)) -> SDoc
 pprPatBind pat grhss
  = sep [ppr pat,
        nest 2 (pprGRHSs (PatBindRhs :: HsMatchContext (GhcPass p)) grhss)]

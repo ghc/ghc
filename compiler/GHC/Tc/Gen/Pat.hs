@@ -84,9 +84,9 @@ import GHC.Data.List.SetOps ( getNth )
 
 tcLetPat :: (Name -> Maybe TcId)
          -> LetBndrSpec
-         -> LMatchPat GhcRn -> Scaled ExpSigmaType
+         -> LPat GhcRn -> Scaled ExpSigmaType
          -> TcM a
-         -> TcM (LMatchPat GhcTc, a)
+         -> TcM (LPat GhcTc, a)
 tcLetPat sig_fn no_gen pat pat_ty thing_inside
   = do { bind_lvl <- getTcLevel
        ; let ctxt = LetPat { pc_lvl    = bind_lvl
@@ -96,7 +96,7 @@ tcLetPat sig_fn no_gen pat pat_ty thing_inside
                        , pe_ctxt = ctxt
                        , pe_orig = PatOrigin }
 
-       ; tc_lmatchpat pat_ty penv pat thing_inside }
+       ; tc_lpat pat_ty penv pat thing_inside }
 
 -----------------
 tcLMatchPats :: HsMatchContext GhcTc
