@@ -37,7 +37,6 @@ import GHC.Unit.Module ( moduleName, moduleNameFS
 import GHC.Iface.Env    ( newGlobalBinder )
 import GHC.Types.Name hiding ( varName )
 import GHC.Types.Name.Reader
-import GHC.Types.Fixity.Env
 import GHC.Types.SourceText
 import GHC.Types.Fixity
 import GHC.Types.Basic
@@ -77,11 +76,11 @@ For the generic representation we need to generate:
 \end{itemize}
 -}
 
-gen_Generic_binds :: GenericKind -> [Type] -> DerivInstTys
+gen_Generic_binds :: GenericKind -> (Name -> Fixity) -> [Type] -> DerivInstTys
                   -> TcM (LHsBinds GhcPs, [LSig GhcPs], FamInst)
-gen_Generic_binds gk inst_tys dit = do
+gen_Generic_binds gk get_fixity inst_tys dit = do
   dflags <- getDynFlags
-  repTyInsts <- tc_mkRepFamInsts gk inst_tys dit
+  repTyInsts <- tc_mkRepFamInsts gk get_fixity inst_tys dit
   let (binds, sigs) = mkBindsRep dflags gk dit
   return (binds, sigs, repTyInsts)
 
@@ -390,13 +389,14 @@ mkBindsRep dflags gk dit@(DerivInstTys{dit_rep_tc = tycon}) = (binds, sigs)
 --       type Rep_D a b = ...representation type for D ...
 --------------------------------------------------------------------------------
 
-tc_mkRepFamInsts :: GenericKind   -- Gen0 or Gen1
-                 -> [Type]        -- The type(s) to which Generic(1) is applied
-                                  -- in the generated instance
-                 -> DerivInstTys  -- Information about the last type argument,
-                                  -- including the data type's TyCon
-                 -> TcM FamInst   -- Generated representation0 coercion
-tc_mkRepFamInsts gk inst_tys dit@(DerivInstTys{dit_rep_tc = tycon}) =
+tc_mkRepFamInsts :: GenericKind      -- Gen0 or Gen1
+                 -> (Name -> Fixity) -- Get the Fixity for a data constructor Name
+                 -> [Type]           -- The type(s) to which Generic(1) is applied
+                                     -- in the generated instance
+                 -> DerivInstTys     -- Information about the last type argument,
+                                     -- including the data type's TyCon
+                 -> TcM FamInst      -- Generated representation0 coercion
+tc_mkRepFamInsts gk get_fixity inst_tys dit@(DerivInstTys{dit_rep_tc = tycon}) =
        -- Consider the example input tycon `D`, where data D a b = D_ a
        -- Also consider `R:DInt`, where { data family D x y :: * -> *
        --                               ; data instance D Int a b = D_ a }
@@ -426,7 +426,7 @@ tc_mkRepFamInsts gk inst_tys dit@(DerivInstTys{dit_rep_tc = tycon}) =
              where all_tyvars = tyConTyVars tycon
 
        -- `repTy` = D1 ... (C1 ... (S1 ... (Rec0 a))) :: * -> *
-     ; repTy <- tc_mkRepTy gk_ dit arg_ki
+     ; repTy <- tc_mkRepTy gk_ get_fixity dit arg_ki
 
        -- `rep_name` is a name we generate for the synonym
      ; mod <- getModule
@@ -526,6 +526,8 @@ argTyFold argVar (ArgTyAlg {ata_rec0 = mkRec0,
 
 tc_mkRepTy ::  -- Gen0_ or Gen1_, for Rep or Rep1
                GenericKind_
+               -- Get the Fixity for a data constructor Name
+            -> (Name -> Fixity)
                -- Information about the last type argument to Generic(1)
             -> DerivInstTys
                -- The kind of the representation type's argument
@@ -533,7 +535,7 @@ tc_mkRepTy ::  -- Gen0_ or Gen1_, for Rep or Rep1
             -> Kind
                -- Generated representation0 type
             -> TcM Type
-tc_mkRepTy gk_ dit@(DerivInstTys{dit_rep_tc = tycon}) k =
+tc_mkRepTy gk_ get_fixity dit@(DerivInstTys{dit_rep_tc = tycon}) k =
   do
     d1      <- tcLookupTyCon d1TyConName
     c1      <- tcLookupTyCon c1TyConName
@@ -572,8 +574,6 @@ tc_mkRepTy gk_ dit@(DerivInstTys{dit_rep_tc = tycon}) k =
     pDLzy      <- tcLookupPromDataCon decidedLazyDataConName
     pDStr      <- tcLookupPromDataCon decidedStrictDataConName
     pDUpk      <- tcLookupPromDataCon decidedUnpackDataConName
-
-    fix_env <- getFixityEnv
 
     let mkSum' a b = mkTyConApp plus  [k,a,b]
         mkProd a b = mkTyConApp times [k,a,b]
@@ -631,7 +631,7 @@ tc_mkRepTy gk_ dit@(DerivInstTys{dit_rep_tc = tycon}) k =
         ctName = mkStrLitTy . occNameFS . nameOccName . dataConName
         ctFix c
             | dataConIsInfix c
-            = case lookupFixity fix_env (dataConName c) of
+            = case get_fixity (dataConName c) of
                    Fixity _ n InfixL -> buildFix n pLA
                    Fixity _ n InfixR -> buildFix n pRA
                    Fixity _ n InfixN -> buildFix n pNA

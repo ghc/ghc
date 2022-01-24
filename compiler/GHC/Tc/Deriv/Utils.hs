@@ -584,8 +584,10 @@ hasStockDeriving clas
            ; return (binds, [], deriv_stuff, field_names) }
 
     generic gen_fn _ inst_tys dit
-      = do { (binds, sigs, faminst) <- gen_fn inst_tys dit
-           ; let field_names = all_field_names (dit_rep_tc dit)
+      = do { let tc = dit_rep_tc dit
+           ; fix_env <- getDataConFixityFun tc
+           ; (binds, sigs, faminst) <- gen_fn fix_env inst_tys dit
+           ; let field_names = all_field_names tc
            ; return (binds, sigs, unitBag (DerivFamInst faminst), field_names) }
 
     -- See Note [Deriving and unused record selectors]
@@ -626,7 +628,7 @@ getDataConFixityFun :: TyCon -> TcM (Name -> Fixity)
 -- If the TyCon is locally defined, we want the local fixity env;
 -- but if it is imported (which happens for standalone deriving)
 -- we need to get the fixity env from the interface file
--- c.f. GHC.Rename.Env.lookupFixity, and #9830
+-- c.f. GHC.Rename.Env.lookupFixity, #9830, and #20994
 getDataConFixityFun tc
   = do { this_mod <- getModule
        ; if nameIsLocalOrFrom this_mod name
