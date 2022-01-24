@@ -1,14 +1,14 @@
 
 T7453.hs:9:15: error:
-    • Couldn't match type ‘t’ with ‘p’
-      Expected: Id t
-        Actual: Id p
-      ‘t’ is a rigid type variable bound by
+    • Couldn't match type ‘t1’ with ‘t’
+      Expected: Id t1
+        Actual: Id t
+      ‘t1’ is a rigid type variable bound by
         the type signature for:
-          z :: forall t. Id t
+          z :: forall t1. Id t1
         at T7453.hs:8:11-19
-      ‘p’ is a rigid type variable bound by
-        the inferred type of cast1 :: p -> a
+      ‘t’ is a rigid type variable bound by
+        the inferred type of cast1 :: t -> a
         at T7453.hs:(7,1)-(10,30)
     • In the expression: aux
       In an equation for ‘z’:
@@ -24,21 +24,21 @@ T7453.hs:9:15: error:
                   where
                       aux = Id v
     • Relevant bindings include
-        aux :: Id p (bound at T7453.hs:10:21)
-        z :: Id t (bound at T7453.hs:9:11)
-        v :: p (bound at T7453.hs:7:7)
-        cast1 :: p -> a (bound at T7453.hs:7:1)
+        aux :: Id t (bound at T7453.hs:10:21)
+        z :: Id t1 (bound at T7453.hs:9:11)
+        v :: t (bound at T7453.hs:7:7)
+        cast1 :: t -> a (bound at T7453.hs:7:1)
 
 T7453.hs:15:15: error:
-    • Couldn't match type ‘t1’ with ‘p’
-      Expected: () -> t1
-        Actual: () -> p
-      ‘t1’ is a rigid type variable bound by
+    • Couldn't match type ‘t2’ with ‘t’
+      Expected: () -> t2
+        Actual: () -> t
+      ‘t2’ is a rigid type variable bound by
         the type signature for:
-          z :: forall t1. () -> t1
+          z :: forall t2. () -> t2
         at T7453.hs:14:11-22
-      ‘p’ is a rigid type variable bound by
-        the inferred type of cast2 :: p -> t
+      ‘t’ is a rigid type variable bound by
+        the inferred type of cast2 :: t -> t1
         at T7453.hs:(13,1)-(16,33)
     • In the expression: aux
       In an equation for ‘z’:
@@ -54,19 +54,19 @@ T7453.hs:15:15: error:
                   where
                       aux = const v
     • Relevant bindings include
-        aux :: forall {b}. b -> p (bound at T7453.hs:16:21)
-        z :: () -> t1 (bound at T7453.hs:15:11)
-        v :: p (bound at T7453.hs:13:7)
-        cast2 :: p -> t (bound at T7453.hs:13:1)
+        aux :: forall {b}. b -> t (bound at T7453.hs:16:21)
+        z :: () -> t2 (bound at T7453.hs:15:11)
+        v :: t (bound at T7453.hs:13:7)
+        cast2 :: t -> t1 (bound at T7453.hs:13:1)
 
 T7453.hs:21:15: error:
-    • Couldn't match expected type ‘t1’ with actual type ‘p’
-      ‘t1’ is a rigid type variable bound by
+    • Couldn't match expected type ‘t2’ with actual type ‘t’
+      ‘t2’ is a rigid type variable bound by
         the type signature for:
-          z :: forall t1. t1
+          z :: forall t2. t2
         at T7453.hs:20:11-16
-      ‘p’ is a rigid type variable bound by
-        the inferred type of cast3 :: p -> t
+      ‘t’ is a rigid type variable bound by
+        the inferred type of cast3 :: t -> t1
         at T7453.hs:(19,1)-(22,33)
     • In the expression: v
       In an equation for ‘z’:
@@ -82,7 +82,7 @@ T7453.hs:21:15: error:
                   where
                       aux = const v
     • Relevant bindings include
-        aux :: forall {b}. b -> p (bound at T7453.hs:22:21)
-        z :: t1 (bound at T7453.hs:21:11)
-        v :: p (bound at T7453.hs:19:7)
-        cast3 :: p -> t (bound at T7453.hs:19:1)
+        aux :: forall {b}. b -> t (bound at T7453.hs:22:21)
+        z :: t2 (bound at T7453.hs:21:11)
+        v :: t (bound at T7453.hs:19:7)
+        cast3 :: t -> t1 (bound at T7453.hs:19:1)

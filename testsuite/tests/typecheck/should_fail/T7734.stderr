@@ -2,23 +2,23 @@
 T7734.hs:4:13: error:
     • Couldn't match expected type ‘t’ with actual type ‘t -> t1’
       ‘t’ is a rigid type variable bound by
-        the inferred type of f :: (t -> t1) -> p -> t1
+        the inferred type of f :: (t -> t1) -> t2 -> t1
         at T7734.hs:4:1-13
     • In the first argument of ‘x’, namely ‘x’
       In the expression: x x
       In an equation for ‘f’: x `f` y = x x
     • Relevant bindings include
         x :: t -> t1 (bound at T7734.hs:4:1)
-        f :: (t -> t1) -> p -> t1 (bound at T7734.hs:4:3)
+        f :: (t -> t1) -> t2 -> t1 (bound at T7734.hs:4:3)
 
 T7734.hs:5:13: error:
     • Couldn't match expected type ‘t’ with actual type ‘t -> t1’
       ‘t’ is a rigid type variable bound by
-        the inferred type of & :: (t -> t1) -> p -> t1
+        the inferred type of & :: (t -> t1) -> t2 -> t1
         at T7734.hs:5:1-13
     • In the first argument of ‘x’, namely ‘x’
       In the expression: x x
       In an equation for ‘&’: (&) x y = x x
     • Relevant bindings include
         x :: t -> t1 (bound at T7734.hs:5:5)
-        (&) :: (t -> t1) -> p -> t1 (bound at T7734.hs:5:1)
+        (&) :: (t -> t1) -> t2 -> t1 (bound at T7734.hs:5:1)

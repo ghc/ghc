@@ -2,7 +2,7 @@
 test = C 1 32 1.2 1.23 'x' 1 1.2 1.23
 Breakpoint 0 activated at print022.hs:11:7
 Stopped in Main.f, print022.hs:11:7
-_result :: p = _
-x :: p = _
+_result :: t = _
+x :: t = _
 x = C2 1 (W# 32) (TwoFields 'a' 3)
 x :: T2

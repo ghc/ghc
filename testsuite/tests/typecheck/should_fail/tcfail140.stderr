@@ -1,6 +1,6 @@
 
 tcfail140.hs:11:7: error:
-    • Couldn't match expected type ‘t0 -> t’ with actual type ‘Int’
+    • Couldn't match expected type ‘t1 -> t’ with actual type ‘Int’
     • The function ‘f’ is applied to two value arguments,
         but its type ‘Int -> Int’ has only one
       In the expression: f 3 9
@@ -8,13 +8,13 @@ tcfail140.hs:11:7: error:
     • Relevant bindings include bar :: t (bound at tcfail140.hs:11:1)
 
 tcfail140.hs:13:10: error:
-    • Couldn't match expected type ‘t1 -> t’ with actual type ‘Int’
+    • Couldn't match expected type ‘t2 -> t3’ with actual type ‘Int’
     • The function ‘f’ is applied to two value arguments,
         but its type ‘Int -> Int’ has only one
       In the expression: 3 `f` 4
       In an equation for ‘rot’: rot xs = 3 `f` 4
     • Relevant bindings include
-        rot :: p -> t (bound at tcfail140.hs:13:1)
+        rot :: t -> t3 (bound at tcfail140.hs:13:1)
 
 tcfail140.hs:15:15: error:
     • Couldn't match expected type ‘a -> b’ with actual type ‘Int’
@@ -33,6 +33,6 @@ tcfail140.hs:17:8: error:
       In the expression: (\ Just x -> x) :: Maybe a -> a
 
 tcfail140.hs:20:1: error:
-    • Couldn't match expected type ‘Int’ with actual type ‘p0 -> Bool’
+    • Couldn't match expected type ‘Int’ with actual type ‘t0 -> Bool’
     • The equation(s) for ‘g’ have two value arguments,
         but its type ‘Int -> Int’ has only one

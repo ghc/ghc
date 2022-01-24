@@ -1,17 +1,17 @@
 
 tcfail099.hs:9:20: error:
-    • Couldn't match expected type ‘a’ with actual type ‘p’
+    • Couldn't match expected type ‘a’ with actual type ‘t’
       ‘a’ is a rigid type variable bound by
         a pattern with constructor: C :: forall a. (a -> Int) -> DS,
         in an equation for ‘call’
         at tcfail099.hs:9:7-9
-      ‘p’ is a rigid type variable bound by
-        the inferred type of call :: DS -> p -> Int
+      ‘t’ is a rigid type variable bound by
+        the inferred type of call :: DS -> t -> Int
         at tcfail099.hs:9:1-22
     • In the first argument of ‘f’, namely ‘arg’
       In the expression: f arg
       In an equation for ‘call’: call (C f) arg = f arg
     • Relevant bindings include
-        arg :: p (bound at tcfail099.hs:9:12)
+        arg :: t (bound at tcfail099.hs:9:12)
         f :: a -> Int (bound at tcfail099.hs:9:9)
-        call :: DS -> p -> Int (bound at tcfail099.hs:9:1)
+        call :: DS -> t -> Int (bound at tcfail099.hs:9:1)

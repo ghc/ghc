@@ -8,4 +8,4 @@ T8262.hs:5:15: error:
       In the expression: Just (1#)
       In an equation for ‘foo’: foo x = Just (1#)
     • Relevant bindings include
-        foo :: p -> Maybe a (bound at T8262.hs:5:1)
+        foo :: t -> Maybe a (bound at T8262.hs:5:1)

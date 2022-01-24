@@ -38,8 +38,8 @@ TYPE SIGNATURES
     (Monad m, Num t) =>
     (t -> m a1) -> (a1 -> a1 -> m a2) -> m a2
   test6 ::
-    forall {m :: * -> *} {a} {p}.
+    forall {m :: * -> *} {a} {t}.
     (Monad m, Num (m a)) =>
-    (m a -> m (m a)) -> p -> m a
+    (m a -> m (m a)) -> t -> m a
 Dependent modules: []
 Dependent packages: [base-4.16.0.0]

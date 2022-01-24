@@ -1,7 +1,7 @@
 
 read014.hs:4:1: warning: [-Wmissing-signatures (in -Wall)]
     Top-level binding with no type signature:
-      ng1 :: Num a => p -> a -> a
+      ng1 :: Num a => t -> a -> a
 
 read014.hs:4:5: warning: [-Wunused-matches (in -Wextra)]
     Defined but not used: ‘x’

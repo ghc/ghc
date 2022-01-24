@@ -7,7 +7,7 @@ VtaFail.hs:7:16: error:
           answer_nosig = pairup_nosig @Int @Bool 5 True
 
 VtaFail.hs:14:17: error:
-    • Cannot apply expression of type ‘p1 -> p1’
+    • Cannot apply expression of type ‘t2 -> t2’
       to a visible type argument ‘Int’
     • In the expression: (\ x -> x) @Int 12
       In an equation for ‘answer_lambda’:

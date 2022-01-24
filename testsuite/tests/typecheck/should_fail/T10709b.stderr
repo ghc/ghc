@@ -1,9 +1,9 @@
 
 T10709b.hs:6:22: error:
-    • Couldn't match type ‘p1’ with ‘forall a. IO a -> IO a’
-      Expected: (p1 -> IO ()) -> IO ()
+    • Couldn't match type ‘t2’ with ‘forall a. IO a -> IO a’
+      Expected: (t2 -> IO ()) -> IO ()
         Actual: ((forall a. IO a -> IO a) -> IO ()) -> IO ()
-      Cannot instantiate unification variable ‘p1’
+      Cannot instantiate unification variable ‘t2’
       with a type involving polytypes: forall a. IO a -> IO a
     • In the second argument of ‘(.)’, namely ‘mask’
       In the expression: (replicateM 2 . mask) (\ _ -> return ())
@@ -11,10 +11,10 @@ T10709b.hs:6:22: error:
           x4 = (replicateM 2 . mask) (\ _ -> return ())
 
 T10709b.hs:7:22: error:
-    • Couldn't match type ‘t0’ with ‘forall a1. IO a1 -> IO a1’
-      Expected: (t0 -> IO a) -> IO a
+    • Couldn't match type ‘t1’ with ‘forall a1. IO a1 -> IO a1’
+      Expected: (t1 -> IO a) -> IO a
         Actual: ((forall a1. IO a1 -> IO a1) -> IO a) -> IO a
-      Cannot instantiate unification variable ‘t0’
+      Cannot instantiate unification variable ‘t1’
       with a type involving polytypes: forall a1. IO a1 -> IO a1
     • In the second argument of ‘(.)’, namely ‘mask’
       In the expression: (replicateM 2 . mask) (\ x -> undefined x)
@@ -22,10 +22,10 @@ T10709b.hs:7:22: error:
           x5 = (replicateM 2 . mask) (\ x -> undefined x)
 
 T10709b.hs:8:22: error:
-    • Couldn't match type ‘p0’ with ‘forall a1. IO a1 -> IO a1’
-      Expected: (p0 -> IO a) -> IO a
+    • Couldn't match type ‘t0’ with ‘forall a1. IO a1 -> IO a1’
+      Expected: (t0 -> IO a) -> IO a
         Actual: ((forall a1. IO a1 -> IO a1) -> IO a) -> IO a
-      Cannot instantiate unification variable ‘p0’
+      Cannot instantiate unification variable ‘t0’
       with a type involving polytypes: forall a1. IO a1 -> IO a1
     • In the second argument of ‘(.)’, namely ‘mask’
       In the expression: (replicateM 2 . mask) (id (\ _ -> undefined))

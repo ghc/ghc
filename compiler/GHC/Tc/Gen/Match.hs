@@ -58,7 +58,7 @@ import GHC.Core.Multiplicity
 import GHC.Core.UsageEnv
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep ( TyCoBinder(..) )
-import GHC.Core.Type ( tyBinderType )
+import GHC.Core.Type ( tyBinderType, tyCoBinderMult )
 -- Create chunkified tuple tybes for monad comprehensions
 import GHC.Core.Make
 
@@ -229,13 +229,14 @@ tcMatches ctxt bndrs rhs_ty (MG { mg_alts = L l matches
   = do { tcEmitBindingUsage bottomUE
        ; bndrs' <- mapM zonkTyCoBinder bndrs
        ; let pat_tys = map tyBinderType bndrs'
+       ; let mult_pat_tys = map (\bndr -> Scaled (tyCoBinderMult bndr) (tyBinderType bndr)) bndrs'
        ; rhs_ty  <- expTypeToType rhs_ty
        ; _concrete_evs <- zipWithM
                        (\ i pat_ty ->
                          hasFixedRuntimeRep (FRRMatch (mc_what ctxt) i) pat_ty)
                        [1..] pat_tys
        ; return (MG { mg_alts = L l []
-                    , mg_ext = MatchGroupTc (fmap unrestricted pat_tys) rhs_ty
+                    , mg_ext = MatchGroupTc mult_pat_tys rhs_ty
                     , mg_origin = origin }) }
 
   | otherwise
@@ -244,13 +245,14 @@ tcMatches ctxt bndrs rhs_ty (MG { mg_alts = L l matches
        ; tcEmitBindingUsage $ supUEs usages
        ; bndrs' <- mapM zonkTyCoBinder bndrs
        ; let pat_tys = map tyBinderType bndrs'
+       ; let mult_pat_tys = map (\bndr -> Scaled (tyCoBinderMult bndr) (tyBinderType bndr)) bndrs'
        ; rhs_ty   <- readExpType rhs_ty
        ; _concrete_evs <- zipWithM
                        (\ i pat_ty ->
                          hasFixedRuntimeRep (FRRMatch (mc_what ctxt) i) pat_ty)
                        [1..] pat_tys
        ; return (MG { mg_alts   = L l matches'
-                    , mg_ext    = MatchGroupTc (fmap unrestricted pat_tys) rhs_ty
+                    , mg_ext    = MatchGroupTc mult_pat_tys rhs_ty
                     , mg_origin = origin }) }
 
 -------------
@@ -261,7 +263,7 @@ tcMatch :: (AnnoBody body) => TcMatchCtxt body
         -> TcM (LMatch GhcTc (LocatedA (body GhcTc)))
 
 tcMatch ctxt bndrs rhs_ty match
-  = wrapLocMA (tc_match ctxt (map (\bndr -> unrestricted . mkCheckExpType $ tyBinderType bndr) bndrs) rhs_ty) match
+  = wrapLocMA (tc_match ctxt (map (\bndr -> Scaled (tyCoBinderMult bndr) (mkCheckExpType $ tyBinderType bndr)) bndrs) rhs_ty) match
   where
     tc_match ctxt tys rhs_ty
              match@(Match { m_pats = lmatchpats, m_grhss = grhss })

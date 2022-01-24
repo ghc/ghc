@@ -1,20 +1,20 @@
 
 T7438.hs:6:14: error:
-    • Could not deduce (p ~ p1)
+    • Could not deduce (t ~ p)
       from the context: b ~ a
         bound by a pattern with constructor:
                    Nil :: forall {k} (a :: k). Thrist a a,
                  in an equation for ‘go’
         at T7438.hs:6:4-6
-      ‘p’ is a rigid type variable bound by
-        the inferred type of go :: Thrist a b -> p -> p1
+      ‘t’ is a rigid type variable bound by
+        the inferred type of go :: Thrist a b -> t -> p
         at T7438.hs:6:1-16
-      ‘p1’ is a rigid type variable bound by
-        the inferred type of go :: Thrist a b -> p -> p1
+      ‘p’ is a rigid type variable bound by
+        the inferred type of go :: Thrist a b -> t -> p
         at T7438.hs:6:1-16
     • In the expression: acc
       In an equation for ‘go’: go Nil acc = acc
     • Relevant bindings include
-        acc :: p (bound at T7438.hs:6:8)
-        go :: Thrist a b -> p -> p1 (bound at T7438.hs:6:1)
+        acc :: t (bound at T7438.hs:6:8)
+        go :: Thrist a b -> t -> p (bound at T7438.hs:6:1)
     Suggested fix: Consider giving ‘go’ a type signature

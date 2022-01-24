@@ -1,21 +1,21 @@
 
 gadt7.hs:16:38: error:
-    • Could not deduce (p ~ p1)
+    • Could not deduce (t ~ p)
       from the context: a ~ Int
         bound by a pattern with constructor: K :: T Int,
                  in a case alternative
         at gadt7.hs:16:33
-      ‘p’ is a rigid type variable bound by
-        the inferred type of i1b :: T a -> p -> p1
+      ‘t’ is a rigid type variable bound by
+        the inferred type of i1b :: T a -> t -> p
         at gadt7.hs:16:1-44
-      ‘p1’ is a rigid type variable bound by
-        the inferred type of i1b :: T a -> p -> p1
+      ‘p’ is a rigid type variable bound by
+        the inferred type of i1b :: T a -> t -> p
         at gadt7.hs:16:1-44
     • In the expression: y1
       In a case alternative: K -> y1
       In the expression: case t1 of K -> y1
     • Relevant bindings include
-        y1 :: p (bound at gadt7.hs:16:16)
-        y :: p (bound at gadt7.hs:16:7)
-        i1b :: T a -> p -> p1 (bound at gadt7.hs:16:1)
+        y1 :: t (bound at gadt7.hs:16:16)
+        y :: t (bound at gadt7.hs:16:7)
+        i1b :: T a -> t -> p (bound at gadt7.hs:16:1)
     Suggested fix: Consider giving ‘i1b’ a type signature

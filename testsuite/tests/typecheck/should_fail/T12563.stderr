@@ -1,15 +1,15 @@
 
 T12563.hs:8:15: error:
     • Couldn't match expected type ‘(forall a. f a) -> f r’
-                  with actual type ‘p’
-      Cannot equate type variable ‘p’
+                  with actual type ‘t’
+      Cannot equate type variable ‘t’
       with a type involving polytypes: (forall a. f a) -> f r
-      ‘p’ is a rigid type variable bound by
-        the inferred type of x :: p -> f r
+      ‘t’ is a rigid type variable bound by
+        the inferred type of x :: t -> f r
         at T12563.hs:8:1-15
     • In the first argument of ‘foo’, namely ‘g’
       In the expression: foo g
       In the expression: \ g -> foo g
     • Relevant bindings include
-        g :: p (bound at T12563.hs:8:6)
-        x :: p -> f r (bound at T12563.hs:8:1)
+        g :: t (bound at T12563.hs:8:6)
+        x :: t -> f r (bound at T12563.hs:8:1)

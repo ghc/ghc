@@ -330,19 +330,20 @@ matchExpectedFunTys herald ctx lmatchpats orig_ty thing_inside
       | (zipped_binders@(pair : _),_,_) <- zipLMatchPats ty matchpats
       , Just (_,ty') <- tcSplitFunTy_maybe ty
       = do { traceTc "zipped binders are" (ppr zipped_binders)
+           ; let bndr = fst pair
            ; case (pair, ty) of
-               ((bndr@(Anon VisArg scaled_arg_ty), Just pat@(L _ (VisPat _ _))), FunTy { ft_af = VisArg, ft_res = res_ty }) -> do
+               ((Anon VisArg scaled_arg_ty, Just pat@(L _ (VisPat _ _))), FunTy { ft_af = VisArg, ft_res = res_ty }) -> do
                  { (wrap_res, result) <- go (bndr : bndrs) pats res_ty
                  ; traceTc "current vispat" (ppr pat)
                  ; fun_wrap <- mkWpFun idHsWrapper wrap_res scaled_arg_ty res_ty (WpFunFunExpTy orig_ty)
                  ; return ( fun_wrap, result )
                  }
-               ((bndr@(Named (Bndr _ Specified)), Just pat@(L _ (InvisTyVarPat _ _))), ForAllTy (Bndr var _) ty') -> do
+               ((Named (Bndr _ Specified), Just pat@(L _ (InvisTyVarPat _ _))), ForAllTy (Bndr var _) ty') -> do
                  { (wrap_res, result) <- go (bndr : bndrs) pats ty'
                  ; traceTc "current invispat" (ppr pat)
                  ; let wrap_gen = WpTyLam var
                  ; return (wrap_gen <.> wrap_res, result) }
-               ((bndr@(Named (Bndr _ Specified)), Just (L _ (InvisWildTyPat _))), ForAllTy (Bndr var _) ty') -> do
+               ((Named (Bndr _ Specified), Just (L _ (InvisWildTyPat _))), ForAllTy (Bndr var _) ty') -> do
                  { (wrap_res, result) <- go (bndr : bndrs) pats ty'
                  ; let wrap_gen = WpTyLam var
                  ; return (wrap_gen <.> wrap_res, result) }
