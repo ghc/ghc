@@ -53,7 +53,6 @@ import GHC.Data.Graph.UnVar
 
 import Control.Monad
 import Data.Foldable
-import Data.Traversable
 
 import GHC.Utils.Trace
 _ = pprTrace -- Tired of commenting out the import all the time
@@ -315,31 +314,11 @@ denotBindLetDown top_lvl env bind denot_body = do
            Rec ps        -> S2 Recursive    ps
   env' <- denotRhsSig top_lvl env rec_flag pairs
   trans_body <- denot_body env'
-  -- TODO: Document the compiler perf optimisation of analysing
-  -- join point RHS ASAP
-  mb_trans_call_joins <-
-    if not $ isJoinBind bind
-      then pure Nothing
-      else fmap Just $ for (bindersOf bind) $ \join_id -> do
-        trans_call <- denotCall env join_id
-        return (trans_call . mkCalledOnceDmds (idArity join_id))
 
   let !peel_ids = findBndrsDmds env' rec_flag (bindersOf bind)
   -- pprTraceM "bletdn" (ppr (map fst pairs) $$ ppr rec_flag)
   let trans_bind eval_sd = do
         body_ty <- trans_body eval_sd
-
-        -- Below is a compiler perf optimisation: We know how the join point
-        -- will be called in advance from the demand on the join body, so we
-        -- evaluate it up-front (and then cache the results). Neat side-effect:
-        -- If the signature for the join point changes, other funs (must be
-        -- join points, too) in the join body that call that join point become
-        -- unstable and we will descend into them when we analyse the body.
-        -- Otherwise, we'd need an additional iteration to see that.
-        case mb_trans_call_joins of
-          Nothing               -> pure ()
-          Just trans_call_joins -> traverse_ ($ eval_sd) trans_call_joins
-
         -- see Note [Lazy and unleashable free variables]
         S2 bind_ty id_dmds <- peel_ids . addLazyFVs body_ty <$> readLazyFVs (bindersOf bind)
         zipWithM_ (writeBindIdDemand top_lvl) (bindersOf bind) id_dmds
