@@ -31,6 +31,7 @@ Executable ghc-pkg
                    containers,
                    filepath,
                    Cabal,
+                   Cabal-syntax,
                    binary,
                    ghc-boot,
                    bytestring

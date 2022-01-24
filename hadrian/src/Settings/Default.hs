@@ -62,6 +62,7 @@ stage0Packages :: Action [Package]
 stage0Packages = do
     cross <- flag CrossCompiling
     return $ [ binary
+             , cabalSyntax
              , cabal
              , compareSizes
              , compiler
