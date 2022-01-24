@@ -44,8 +44,7 @@ module GHC.Types.Demand (
     argOneShots, argsOneShots, saturatedByOneShots,
 
     -- * Demand environments
-    DmdEnv, emptyDmdEnv,
-    keepAliveDmdEnv, multDmdEnv, reuseBndrs,
+    DmdEnv, emptyDmdEnv, multDmdEnv, reuseBndrs,
 
     -- * Divergence
     Divergence(..), topDiv, botDiv, exnDiv, lubDivergence, isDeadEndDiv,
@@ -59,7 +58,7 @@ module GHC.Types.Demand (
     PlusDmdArg, mkPlusDmdArg, toPlusDmdArg, plusDmdArg,
     -- ** Other operations
     peelFV, findIdDemand, addDemand, defaultFvDmd, splitDmdTy,
-    deferAfterPreciseException, keepAliveDmdType, stripBoxityDmdType,
+    deferAfterPreciseException, stripBoxityDmdType,
 
     -- * Demand signatures
     DmdSig(DmdSig), mkDmdSigForArity, mkClosedDmdSig,
@@ -1511,23 +1510,6 @@ reuseBndrs bndrs env = adjustManyUFM reuse_bndr env (getUniqSet bndrs)
   where
     reuse_bndr dmd = multDmd C_1N dmd
 
--- | @keepAliveDmdType dt vs@ makes sure that the Ids in @vs@ have
--- /some/ usage in the returned demand types -- they are not Absent.
--- See Note [Absence analysis for stable unfoldings and RULES]
---     in "GHC.Core.Opt.DmdAnal".
-keepAliveDmdEnv :: IdSet -> DmdEnv -> DmdEnv
-keepAliveDmdEnv vs env
-  = nonDetStrictFoldVarSet add env vs
-  where
-    add :: Id -> DmdEnv -> DmdEnv
-    add v env = extendVarEnv_C add_dmd env v topDmd
-
-    add_dmd :: Demand -> Demand -> Demand
-    -- If the existing usage is Absent, make it used
-    -- Otherwise leave it alone
-    add_dmd dmd _ | isAbsDmd dmd = topDmd
-                  | otherwise    = dmd
-
 -- | Characterises how an expression
 --
 --    * Evaluates its free variables ('dt_env')
@@ -1691,11 +1673,6 @@ findIdDemand (DmdType fv _ res) id
 -- See Note [Precise exceptions and strictness analysis]
 deferAfterPreciseException :: DmdType -> DmdType
 deferAfterPreciseException = lubDmdType exnDmdType
-
--- | See 'keepAliveDmdEnv'.
-keepAliveDmdType :: VarSet -> DmdType -> DmdType
-keepAliveDmdType vars (DmdType fvs ds res) =
-  DmdType (keepAliveDmdEnv vars fvs) ds res
 
 stripBoxityDmdType :: DmdType -> DmdType
 stripBoxityDmdType (DmdType fvs ds res) =
