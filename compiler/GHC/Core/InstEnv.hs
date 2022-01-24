@@ -898,7 +898,7 @@ lookupInstEnv check_overlap_safe
     (pkg_matches,  pkg_unifs)  = lookupInstEnv' pkg_ie  vis_mods cls tys
     all_matches = home_matches ++ pkg_matches
     all_unifs   = home_unifs   ++ pkg_unifs
-    final_matches = foldr insert_overlapping [] all_matches
+    final_matches = pruneOverlappedMatches all_matches
         -- Even if the unifs is non-empty (an error situation)
         -- we still prune the matches, so that the error message isn't
         -- misleading (complaining of multiple matches when some should be
@@ -951,47 +951,252 @@ lookupInstEnv check_overlap_safe
         (isOrphan (is_orphan inst) || classArity (is_cls inst) > 1)
 
 ---------------
-insert_overlapping :: InstMatch -> [InstMatch] -> [InstMatch]
--- ^ Add a new solution, knocking out strictly less specific ones
--- See Note [Rules for instance lookup]
-insert_overlapping new_item [] = [new_item]
-insert_overlapping new_item@(new_inst,_) (old_item@(old_inst,_) : old_items)
-  | new_beats_old        -- New strictly overrides old
-  , not old_beats_new
-  , new_inst `can_override` old_inst
-  = insert_overlapping new_item old_items
 
-  | old_beats_new        -- Old strictly overrides new
-  , not new_beats_old
-  , old_inst `can_override` new_inst
-  = old_item : old_items
 
-  -- Discard incoherent instances; see Note [Incoherent instances]
-  | isIncoherent old_inst      -- Old is incoherent; discard it
-  = insert_overlapping new_item old_items
-  | isIncoherent new_inst      -- New is incoherent; discard it
-  = old_item : old_items
+{- Note [Instance overlap and guards]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The first step is to find all instances that /match/ the constraint
+we are trying to solve.  Next, using pruneOverlapped Matches, we eliminate
+from that list of instances any instances that are overlapped.  For example:
 
-  -- Equal or incomparable, and neither is incoherent; keep both
-  | otherwise
-  = old_item : insert_overlapping new_item old_items
-  where
+(A)   instance                      C [a] where ...
+(B)   instance {-# OVERLAPPING #-} C [[a] where ...
+(C)   instance C (Maybe a) where
 
-    new_beats_old = new_inst `more_specific_than` old_inst
-    old_beats_new = old_inst `more_specific_than` new_inst
+Suppose we are trying to solve C [[Bool]]. The lookup will return a list [A,B]
+of the first two instances, since both match.  (The Maybe instance doesn't match,
+so the lookup won't return (C).)  Then pruneOverlappedMatches removes (A),
+since (B) is more specific.  So we end up with just one match, (B).
 
-    -- `instB` can be instantiated to match `instA`
-    -- or the two are equal
-    instA `more_specific_than` instB
-      = isJust (tcMatchTys (is_tys instB) (is_tys instA))
+However pruneOverlappedMatches is a bit more subtle than you might think (#20946).
+Recall how we go about eliminating redundant instances, as described in
+Note [Rules for instance lookup].
 
-    instA `can_override` instB
-       = isOverlapping instA || isOverlappable instB
+  - When instance I1 is more specific than instance I2,
+  - and either I1 is overlapping or I2 is overlappable,
+
+then we can discard I2 in favour of I1. Note however that, as part of the instance
+resolution process, we don't want to immediately discard I2, as it can still be useful.
+For example, suppose we are trying to solve C [[Int]], and have instances:
+
+  I1: instance                  C [[Int]]
+  I2: instance {-# OVERLAPS #-} C [[a]]
+
+Both instances match. I2 is both overlappable and overlapping (that's what `OVERLAPS`
+means). Now I1 is more specific than I2, and I2 is overlappable, so we can discard I2.
+However, we should still keep I2 around when looking up instances, because it is
+overlapping and `I1` isn't: this means it can be used to eliminate other instances
+that I1 can't, such as:
+
+  I3: instance C [a]
+
+I3 is more general than both I1 and I2, but it is not overlappable, and I1
+is not overlapping. This means that we must use I2 to discard I3.
+
+To do this, in 'insert_overlapping', on top of keeping track of matching
+instances, we also keep track of /guards/, which are instances like I2
+which we will discard in the end (because we have a more specific match
+that overrides it) but might still be useful for eliminating other instances
+(like I3 in this example).
+
+
+(A) Definition of guarding instances (guards).
+
+    To add a matching instance G as a guard, it must satisfy the following conditions:
+
+      A1. G is overlapped by a more specific match, M,
+      A2. M is not overlapping,
+      A3. G is overlapping.
+
+    This means that we eliminate G from the set of matches (it is overriden by M),
+    but we keep it around until we are done with instance resolution because
+    it might still be useful to eliminate other matches.
+
+(B) Guards eliminate matches.
+
+    There are two situations in which guards can eliminate a match:
+
+      B1. We want to add a new instance, but it is overriden by a guard.
+          We can immediately discard the instance.
+
+          Example for B1:
+
+            Suppose we want to solve C [[Int]], with instances:
+
+              J1: instance                  C [[Int]]
+              J2: instance {-# OVERLAPS #-} C [[a]]
+              J3: instance                  C [a]
+
+          Processing them in order: we add J1 as a match, then J2 as a guard.
+          Now, when we come across J3, we can immediately discard it because
+          it is overriden by the guard J2.
+
+      B2. We have found a new guard. We must use it to discard matches
+          we have already found. This is necessary because we must obtain
+          the same result whether we process the instance or the guard first.
+
+          Example for B2:
+
+            Suppose we want to solve C [[Int]], with instances:
+
+              K1: instance                  C [[Int]]
+              K2: instance                  C [a]
+              K3: instance {-# OVERLAPS #-} C [[a]]
+
+            We start by considering K1 and K2. Neither has any overlapping flag set,
+            so we end up with two matches, {K1, K2}.
+            Next we look at K3: it is overriden by K1, but as K1 is not
+            overlapping this means K3 should function as a guard.
+            We must then ensure we eliminate K2 from the list of matches,
+            as K3 guards against it.
+
+(C) Adding guards.
+
+    When we already have collected some guards, and have come across a new
+    guard, we can simply add it to the existing list of guards.
+    We don't need to keep the set of guards minimal, as they will simply
+    be thrown away at the end: we are only interested in the matches.
+    Not having a minimal set of guards does not harm us, but it makes
+    the code simpler.
+-}
+
+-- | Collect class instance matches, including matches that we know
+-- are overridden but might still be useful to override other instances
+-- (which we call "guards").
+--
+-- See Note [Instance overlap and guards].
+data InstMatches
+  = InstMatches
+  { -- | Minimal matches: we have knocked out all strictly more general
+    -- matches that are overlapped by a match in this list.
+    instMatches :: [InstMatch]
+
+    -- | Guards: matches that we know we won't pick in the end,
+    -- but might still be useful for ruling out other instances,
+    -- as per #20946. See Note [Instance overlap and guards], (A).
+  , instGuards  :: [ClsInst]
+  }
+
+instance Outputable InstMatches where
+  ppr (InstMatches { instMatches = matches, instGuards = guards })
+    = text "InstMatches" <+>
+      braces (vcat [ text "instMatches:" <+> ppr matches
+                   , text "instGuards:" <+> ppr guards ])
+
+noMatches :: InstMatches
+noMatches = InstMatches { instMatches = [], instGuards = [] }
+
+pruneOverlappedMatches :: [InstMatch] -> [InstMatch]
+-- ^ Remove from the argument list any InstMatches for which another
+-- element of the list is more specific, and overlaps it, using the
+-- rules of Nove [Rules for instance lookup]
+pruneOverlappedMatches all_matches =
+  instMatches $ foldr insert_overlapping noMatches all_matches
+
+-- | Computes whether the first class instance overrides the second,
+-- i.e. the first is more specific and can overlap the second.
+--
+-- More precisely, @instA `overrides` instB@ returns 'True' precisely when:
+--
+--   - @instA@ is more specific than @instB@,
+--   - @instB@ is not more specific than @instA@,
+--   - @instA@ is overlapping OR @instB@ is overlappable.
+overrides :: ClsInst -> ClsInst -> Bool
+new_inst `overrides` old_inst
+  =  (new_inst `more_specific_than` old_inst)
+  && (not $ old_inst `more_specific_than` new_inst)
+  && (isOverlapping new_inst || isOverlappable old_inst)
        -- Overlap permitted if either the more specific instance
        -- is marked as overlapping, or the more general one is
        -- marked as overlappable.
        -- Latest change described in: #9242.
        -- Previous change: #3877, Dec 10.
+  where
+    -- `instB` can be instantiated to match `instA`
+    -- or the two are equal
+    instA `more_specific_than` instB
+      = isJust (tcMatchTys (is_tys instB) (is_tys instA))
+
+insert_overlapping :: InstMatch -> InstMatches -> InstMatches
+-- ^ Add a new solution, knocking out strictly less specific ones
+-- See Note [Rules for instance lookup] and Note [Instance overlap and guards].
+--
+-- /Property/: the order of insertion doesn't matter, i.e.
+-- @insert_overlapping inst1 (insert_overlapping inst2 matches)@
+-- gives the same result as @insert_overlapping inst2 (insert_overlapping inst1 matches)@.
+insert_overlapping
+  new_item@(new_inst,_)
+  old@(InstMatches { instMatches = old_items, instGuards = guards })
+  -- If any of the "guarding" instances override this item, discard it.
+  -- See Note [Instance overlap and guards], (B1).
+  | any (`overrides` new_inst) guards
+  = old
+  | otherwise
+  = insert_overlapping_new_item old_items
+
+  where
+    insert_overlapping_new_item :: [InstMatch] -> InstMatches
+    insert_overlapping_new_item []
+      = InstMatches { instMatches = [new_item], instGuards = guards }
+    insert_overlapping_new_item all_old_items@(old_item@(old_inst,_) : old_items)
+
+      -- New strictly overrides old: throw out the old from the list of matches,
+      -- but potentially keep it around as a guard if it can still be used
+      -- to eliminate other instances.
+      | new_inst `overrides` old_inst
+      , InstMatches { instMatches = final_matches
+                    , instGuards  = prev_guards }
+                    <- insert_overlapping_new_item old_items
+      = if isOverlapping new_inst || not (isOverlapping old_inst)
+        -- We're adding "new_inst" as a match.
+        -- If "new_inst" is not overlapping but "old_inst" is, we should
+        -- keep "old_inst" around as a guard.
+        -- See Note [Instance overlap and guards], (A).
+        then InstMatches { instMatches = final_matches
+                         , instGuards  = prev_guards }
+        else InstMatches { instMatches = final_matches
+                         , instGuards  = old_inst : prev_guards }
+        --                               ^^^^^^^^^^^^^^^^^^^^^^
+        --                    See Note [Instance overlap and guards], (C).
+
+
+      -- Old strictly overrides new: throw it out from the list of matches,
+      -- but potentially keep it around as a guard if it can still be used
+      -- to eliminate other instances.
+      | old_inst `overrides` new_inst
+      = if isOverlapping old_inst || not (isOverlapping new_inst)
+        -- We're discarding "new_inst", as it is overridden by "old_inst".
+        -- However, it might still be useful as a guard if "old_inst" is not overlapping
+        -- but "new_inst" is.
+        -- See Note [Instance overlap and guards], (A).
+        then InstMatches { instMatches = all_old_items
+                         , instGuards  = guards }
+        else InstMatches
+                  -- We're adding "new_inst" as a guard, so we must prune out
+                  -- any matches it overrides.
+                  -- See Note [Instance overlap and guards], (B2)
+                { instMatches =
+                    filter
+                      (\(old_inst,_) -> not (new_inst `overrides` old_inst))
+                      all_old_items
+
+                -- See Note [Instance overlap and guards], (C)
+                , instGuards = new_inst : guards }
+
+      -- Discard incoherent instances; see Note [Incoherent instances]
+      | isIncoherent old_inst -- Old is incoherent; discard it
+      = insert_overlapping_new_item old_items
+      | isIncoherent new_inst -- New is incoherent; discard it
+      = InstMatches { instMatches = all_old_items
+                    , instGuards  = guards }
+
+      -- Equal or incomparable, and neither is incoherent; keep both
+      | otherwise
+      , InstMatches { instMatches = final_matches
+                    , instGuards  = final_guards }
+                    <- insert_overlapping_new_item old_items
+      = InstMatches { instMatches = old_item : final_matches
+                    , instGuards  = final_guards }
 
 {-
 Note [Incoherent instances]
