@@ -8,9 +8,6 @@ module GHC.Data.SmallArray
   , SmallArray (..)
   , newSmallArray
   , writeSmallArray
-  , readSmallArray
-  , getSizeSmallArray
-  , resizeSmallArray
   , freezeSmallArray
   , unsafeFreezeSmallArray
   , indexSmallArray
@@ -40,36 +37,10 @@ writeSmallArray
   -> Int                   -- ^ index
   -> a                     -- ^ new element
   -> State# s
-  -> (# State# s, () #)
+  -> State# s
 {-# INLINE writeSmallArray #-}
-writeSmallArray (SmallMutableArray a) (I# i) x s = (# writeSmallArray# a i x s, () #)
+writeSmallArray (SmallMutableArray a) (I# i) x = writeSmallArray# a i x
 
-readSmallArray
-  :: SmallMutableArray s a -- ^ array
-  -> Int                   -- ^ index
-  -> State# s
-  -> (# State# s, a #)
-{-# INLINE readSmallArray #-}
-readSmallArray (SmallMutableArray a) (I# i) = readSmallArray# a i
-
-getSizeSmallArray
-  :: SmallMutableArray s a
-  -> State# s
-  -> (# State# s, Int #)
-{-# INLINE getSizeSmallArray #-}
-getSizeSmallArray (SmallMutableArray a) s = case getSizeofSmallMutableArray# a s of
-  (# s, i #) -> (# s, I# i #)
-
-resizeSmallArray
-  :: SmallMutableArray s a -- ^ array
-  -> Int                   -- ^ index
-  -> a
-  -> State# s
-  -> (# State# s, SmallMutableArray s a #)
-{-# INLINE resizeSmallArray #-}
-resizeSmallArray (SmallMutableArray a) (I# i) x s =
-  case resizeSmallMutableArray# a i x s of
-    (# s, sma #) -> (# s, SmallMutableArray sma #)
 
 -- | Copy and freeze a slice of a mutable array.
 freezeSmallArray
