@@ -98,11 +98,11 @@ noCheckDs :: DsM a -> DsM a
 noCheckDs = updTopFlags (\dflags -> foldl' wopt_unset dflags allPmCheckWarnings)
 
 -- | Check a pattern binding (let, where) for exhaustiveness.
-pmcPatBind :: DsMatchContext -> Id -> Pat GhcTc -> DsM ()
+pmcPatBind :: DsMatchContext -> Id -> MatchPat GhcTc -> DsM ()
 -- See Note [pmcPatBind only checks PatBindRhs]
 pmcPatBind ctxt@(DsMatchContext PatBindRhs loc) var p = do
   !missing <- getLdiNablas
-  pat_bind <- noCheckDs $ desugarPatBind loc var p
+  pat_bind <- noCheckDs $ desugarMatchPatBind loc var p
   tracePm "pmcPatBind {" (vcat [ppr ctxt, ppr var, ppr p, ppr pat_bind, ppr missing])
   result <- unCA (checkPatBind pat_bind) missing
   tracePm "}: " (ppr (cr_uncov result))

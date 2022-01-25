@@ -15,7 +15,7 @@ This module exports some utility functions of no great interest.
 -- | Utility functions for constructing Core syntax, principally for desugaring
 module GHC.HsToCore.Utils (
         EquationInfo(..),
-        firstPat, shiftEqns,
+        firstPat, firstPat', shiftEqns,
 
         MatchResult (..), CaseAlt(..),
         cantFailMatchResult, alwaysFailMatchResult,
@@ -39,10 +39,9 @@ module GHC.HsToCore.Utils (
 
         mkSelectorBinds,
 
-        selectSimpleMatchVarL, selectMatchVars, selectMatchVar,
-        selectMatchPatVars, selectMatchPatVar,
-        mkOptTickBox, mkBinaryTickBox, decideBangHood,
-        isTrueLHsExpr
+        selectSimpleMatchVarL, selectSimpleMatchPatVarL, selectMatchVars, selectMatchPatVar,
+        selectMatchPatVars, selectMatchVar, mkOptTickBox, mkBinaryTickBox, decideBangHood,
+        decideLMatchPatBangHood, isTrueLHsExpr
     ) where
 
 import GHC.Prelude
@@ -111,6 +110,10 @@ selectSimpleMatchVarL :: Mult -> LPat GhcTc -> DsM Id
 -- Postcondition: the returned Id has an Internal Name
 selectSimpleMatchVarL w pat = selectMatchVar w (unLoc pat)
 
+selectSimpleMatchPatVarL :: Mult -> LMatchPat GhcTc -> DsM Id
+-- Postcondition: the returned Id has an Internal Name
+selectSimpleMatchPatVarL w pat = selectMatchPatVar w (unLoc pat)
+
 -- (selectMatchVars ps tys) chooses variables of type tys
 -- to use for matching ps against.  If the pattern is a variable,
 -- we try to use that, to save inventing lots of fresh variables.
@@ -148,9 +151,9 @@ selectMatchVar _w (AsPat _ var _ _) = assert (isManyDataConTy _w ) (return (unLo
 selectMatchVar w other_pat        = newSysLocalDs w (hsPatType other_pat)
 
 selectMatchPatVar :: Mult -> MatchPat GhcTc -> DsM Id
-selectMatchPatVar w (VisPat _ (L _ pat))  = selectMatchVar w pat
-selectMatchPatVar _ (InvisTyVarPat _ var) = return (unLoc var)
-selectMatchPatVar _ (InvisWildTyPat ty)   = newPredVarDs ty
+selectMatchPatVar w (VisPat _ (L _ pat))   = selectMatchVar w pat
+selectMatchPatVar _ (InvisTyVarPat _ bndr) = return (hsLTyVarName bndr)
+selectMatchPatVar _ (InvisWildTyPat ty)    = newPredVarDs ty
 
 selectMatchPatVars :: [(Mult, MatchPat GhcTc)] -> DsM [Id]
 selectMatchPatVars ps = mapM (uncurry selectMatchPatVar) ps
@@ -205,8 +208,15 @@ The ``equation info'' used by @match@ is relatively complicated and
 worthy of a type synonym and a few handy functions.
 -}
 
-firstPat :: EquationInfo -> Pat GhcTc
+firstPat :: EquationInfo -> MatchPat GhcTc
 firstPat eqn = assert (notNull (eqn_pats eqn)) $ head (eqn_pats eqn)
+
+firstPat' :: EquationInfo -> Pat GhcTc
+firstPat' eqn = assert (notNull (discardLInvisPats' (eqn_pats eqn))) $ head (discardLInvisPats' (eqn_pats eqn))
+  where
+    discardLInvisPats' [] = []
+    discardLInvisPats' (VisPat _ pat : xs) = unLoc pat : discardLInvisPats' xs
+    discardLInvisPats' (_ : xs) = discardLInvisPats' xs
 
 shiftEqns :: Functor f => f EquationInfo -> f EquationInfo
 -- Drop the first pattern in each equation
@@ -752,7 +762,7 @@ mkSelectorBinds ticks pat val_expr
        ; let mk_bind tick bndr_var
                -- (mk_bind sv bv)  generates  bv = case sv of { pat -> bv }
                -- Remember, 'pat' binds 'bv'
-               = do { rhs_expr <- matchSimply (Var val_var) PatBindRhs pat'
+               = do { rhs_expr <- matchSimply (Var val_var) PatBindRhs (mkVisPat pat')
                                        (Var bndr_var)
                                        (Var bndr_var)  -- Neat hack
                       -- Neat hack: since 'pat' can't fail, the
@@ -767,7 +777,7 @@ mkSelectorBinds ticks pat val_expr
   | otherwise                          -- General case (C)
   = do { tuple_var  <- newSysLocalDs Many tuple_ty
        ; error_expr <- mkErrorAppDs pAT_ERROR_ID tuple_ty (ppr pat')
-       ; tuple_expr <- matchSimply val_expr PatBindRhs pat
+       ; tuple_expr <- matchSimply val_expr PatBindRhs (mkVisPat pat)
                                    local_tuple error_expr
        ; let mk_tup_bind tick binder
                = (binder, mkOptTickBox tick $
@@ -1069,6 +1079,13 @@ decideBangHood dflags lpat
            LazyPat _ lp' -> lp'
            BangPat _ _   -> lp
            _             -> L l (BangPat noExtField lp)
+
+decideLMatchPatBangHood :: DynFlags
+                        -> LMatchPat GhcTc
+                        -> LMatchPat GhcTc
+decideLMatchPatBangHood dflags (L l (VisPat x lpat)) =
+  L l (VisPat x (decideBangHood dflags lpat))
+decideLMatchPatBangHood _ matchpat = matchpat
 
 isTrueLHsExpr :: LHsExpr GhcTc -> Maybe (CoreExpr -> DsM CoreExpr)
 

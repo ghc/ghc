@@ -23,7 +23,7 @@ import GHC.Prelude
 import GHC.Hs
 import GHC.Tc.Gen.Pat
 import GHC.Core.Multiplicity
-import GHC.Core.Type ( toAnonTyCoBinder, tidyTyCoVarBinders, tidyTypes, tidyType, isManyDataConTy )
+import GHC.Core.Type ( tidyTyCoVarBinders, tidyTypes, tidyType, isManyDataConTy )
 import GHC.Core.TyCo.Subst( extendTvSubstWithClone )
 import GHC.Core.TyCo.Rep ( TyCoBinder(..) )
 import GHC.Tc.Errors.Types

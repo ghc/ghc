@@ -59,7 +59,6 @@ import GHC.Tc.Types.Evidence
 import GHC.Core.Multiplicity
 import GHC.Core.UsageEnv
 import GHC.Core.TyCon
-import GHC.Core.Type ( tyCoBinderScaledType )
 -- Create chunkified tuple tybes for monad comprehensions
 import GHC.Core.Make
 

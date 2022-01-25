@@ -602,7 +602,7 @@ matchLiterals (var :| vars) ty sub_groups
     match_group eqns@(firstEqn :| _)
         = do { dflags <- getDynFlags
              ; let platform = targetPlatform dflags
-             ; let LitPat _ hs_lit = firstPat firstEqn
+             ; let VisPat _ (L _ (LitPat _ hs_lit)) = firstPat firstEqn
              ; match_result <- match vars ty (NEL.toList $ shiftEqns eqns)
              ; return (hsLitKey platform hs_lit, match_result) }
 
@@ -651,7 +651,7 @@ hsLitKey _        l                   = pprPanic "hsLitKey" (ppr l)
 
 matchNPats :: NonEmpty Id -> Type -> NonEmpty EquationInfo -> DsM (MatchResult CoreExpr)
 matchNPats (var :| vars) ty (eqn1 :| eqns)    -- All for the same literal
-  = do  { let NPat _ (L _ lit) mb_neg eq_chk = firstPat eqn1
+  = do  { let VisPat _ (L _ (NPat _ (L _ lit) mb_neg eq_chk)) = firstPat eqn1
         ; lit_expr <- dsOverLit lit
         ; neg_lit <- case mb_neg of
                             Nothing  -> return lit_expr
@@ -681,7 +681,7 @@ We generate:
 matchNPlusKPats :: NonEmpty Id -> Type -> NonEmpty EquationInfo -> DsM (MatchResult CoreExpr)
 -- All NPlusKPats, for the *same* literal k
 matchNPlusKPats (var :| vars) ty (eqn1 :| eqns)
-  = do  { let NPlusKPat _ (L _ n1) (L _ lit1) lit2 ge minus
+  = do  { let VisPat _ (L _ (NPlusKPat _ (L _ n1) (L _ lit1) lit2 ge minus))
                 = firstPat eqn1
         ; lit1_expr   <- dsOverLit lit1
         ; lit2_expr   <- dsOverLit lit2
@@ -694,7 +694,7 @@ matchNPlusKPats (var :| vars) ty (eqn1 :| eqns)
                    fmap (foldr1 (.) wraps)                      $
                    match_result) }
   where
-    shift n1 eqn@(EqnInfo { eqn_pats = NPlusKPat _ (L _ n) _ _ _ _ : pats })
+    shift n1 eqn@(EqnInfo { eqn_pats = VisPat _ (L _ (NPlusKPat _ (L _ n) _ _ _ _)) : pats })
         = (wrapBind n n1, eqn { eqn_pats = pats })
         -- The wrapBind is a no-op for the first equation
     shift _ e = pprPanic "matchNPlusKPats/shift" (ppr e)

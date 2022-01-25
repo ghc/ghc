@@ -79,7 +79,7 @@ module GHC.Hs.Type (
         mkHsOpTy, mkHsAppTy, mkHsAppTys, mkHsAppKindTy,
         ignoreParens, hsSigWcType, hsPatSigType,
         hsTyKindSig,
-        setHsTyVarBndrFlag, hsTyVarBndrFlag,
+        setHsTyVarBndrFlag, hsTyVarBndrFlag, hsTyVarBndrTy,
 
         -- Printing
         pprHsType, pprHsForAll,
@@ -283,6 +283,10 @@ type instance XXTyVarBndr   (GhcPass _) = DataConCantHappen
 hsTyVarBndrFlag :: HsTyVarBndr flag (GhcPass pass) -> flag
 hsTyVarBndrFlag (UserTyVar _ fl _)     = fl
 hsTyVarBndrFlag (KindedTyVar _ fl _ _) = fl
+
+hsTyVarBndrTy :: HsTyVarBndr flag GhcTc -> Type
+hsTyVarBndrTy (UserTyVar _ _ lipd)     = idType (unLoc lipd)
+hsTyVarBndrTy (KindedTyVar _ _ lipd _) = idType (unLoc lipd)
 
 -- | Set the attached flag
 setHsTyVarBndrFlag :: flag -> HsTyVarBndr flag' (GhcPass pass)

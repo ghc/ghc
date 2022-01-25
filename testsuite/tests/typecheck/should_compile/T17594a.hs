@@ -1,13 +1,13 @@
 module T17594a where
 
-const'' :: a -> b -> a
-const'' @a x _ = x
+id1 :: forall a. a -> a
+id1 @a x = x
 
-pair :: forall a. a -> (a, a)
-pair @a x = (x :: a, x :: a)
+id2 :: forall a. a -> a
+id2 @_ x = x
 
-id' :: a -> a
-id' @a x = x
+id3 :: forall a. a -> a
+id3 @a (x :: a) = x
 
-const' :: a -> b -> a
-const' @a x _ = x
+const' :: forall a. a -> forall b. b -> a
+const' @a x @b y = x
