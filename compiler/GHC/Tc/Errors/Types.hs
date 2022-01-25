@@ -1893,29 +1893,28 @@ instance Monoid SolverReport where
 -- | Context needed when reporting a 'TcReportMsg', such as
 -- the enclosing implication constraints or whether we are deferring type errors.
 data ReportErrCtxt
-    = CEC { cec_encl :: [Implication]  -- | Enclosing implications
+    = CEC { cec_encl :: [Implication]  -- ^ Enclosing implications
                                        --   (innermost first)
                                        -- ic_skols and givens are tidied, rest are not
           , cec_tidy  :: TidyEnv
 
-          , cec_binds :: EvBindsVar    -- Make some errors (depending on cec_defer)
+          , cec_binds :: EvBindsVar    -- ^ We make some errors (depending on cec_defer)
                                        -- into warnings, and emit evidence bindings
                                        -- into 'cec_binds' for unsolved constraints
 
-          , cec_defer_type_errors :: DiagnosticReason -- Defer type errors until runtime
+          , cec_defer_type_errors :: DiagnosticReason -- ^ Whether to defer type errors until runtime
 
-          -- cec_expr_holes is a union of:
-          --   cec_type_holes - a set of typed holes: '_', '_a', '_foo'
-          --   cec_out_of_scope_holes - a set of variables which are
-          --                            out of scope: 'x', 'y', 'bar'
-          , cec_expr_holes :: DiagnosticReason -- Holes in expressions.
-          , cec_type_holes :: DiagnosticReason -- Holes in types.
-          , cec_out_of_scope_holes :: DiagnosticReason -- Out of scope holes.
+          -- We might throw a warning on an error when encountering a hole,
+          -- depending on the type of hole (expression hole, type hole, out of scope hole).
+          -- We store the reasons for reporting a diagnostic for each type of hole.
+          , cec_expr_holes :: DiagnosticReason -- ^ Reason for reporting holes in expressions.
+          , cec_type_holes :: DiagnosticReason -- ^ Reason for reporting holes in types.
+          , cec_out_of_scope_holes :: DiagnosticReason -- ^ Reason for reporting out of scope holes.
 
-          , cec_warn_redundant :: Bool    -- | True <=> -Wredundant-constraints
-          , cec_expand_syns    :: Bool    -- | True <=> -fprint-expanded-synonyms
+          , cec_warn_redundant :: Bool    -- ^ True <=> -Wredundant-constraints
+          , cec_expand_syns    :: Bool    -- ^ True <=> -fprint-expanded-synonyms
 
-          , cec_suppress :: Bool    -- | True <=> More important errors have occurred,
+          , cec_suppress :: Bool    -- ^ True <=> More important errors have occurred,
                                     --            so create bindings if need be, but
                                     --            don't issue any more errors/warnings
                                     -- See Note [Suppressing error messages]
