@@ -4,7 +4,7 @@
 
 from my_typing import *
 from pathlib import Path
-from perf_notes import MetricChange, PerfStat, Baseline, MetricOracles, GitRef
+from perf_notes import MetricChange, PerfStat, Baseline, MetricAcceptanceWindow, GitRef
 from datetime import datetime
 
 # -----------------------------------------------------------------------------
@@ -48,6 +48,9 @@ class TestConfig:
 
         # Path to Ghostscript
         self.gs = None # type: Optional[Path]
+
+        # Path to Linux `perf` tool
+        self.perf_path = None # type: Optional[Path]
 
         # Run tests requiring Haddock
         self.haddock = False
@@ -380,7 +383,7 @@ class TestOptions:
        #              , 10) }
        # This means no baseline is available for way1. For way 2, allow a 10%
        # deviation from 9300000000.
-       self.stats_range_fields = {} # type: Dict[MetricName, MetricOracles]
+       self.stats_range_fields = {} # type: Dict[MetricName, MetricAcceptanceWindow]
 
        # Is the test testing performance?
        self.is_stats_test = False
@@ -451,6 +454,9 @@ class TestOptions:
 
        # The extra hadrian dependencies we need for this particular test
        self.hadrian_deps = set(["test:ghc"]) # type: Set[str]
+
+       # Record these `perf-events` counters when compiling this test, if `perf` is available
+       self.compiler_perf_counters = [] # type: List[str]
 
 # The default set of options
 global default_testopts

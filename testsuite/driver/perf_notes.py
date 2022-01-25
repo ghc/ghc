@@ -123,10 +123,37 @@ AllowedPerfChange = NamedTuple('AllowedPerfChange',
                                 ('opts', Dict[str, str])
                                 ])
 
-MetricBaselineOracle = Callable[[WayName, GitHash], Baseline]
-MetricDeviationOracle = Callable[[WayName, GitHash], Optional[float]]
-MetricOracles = NamedTuple("MetricOracles", [("baseline", MetricBaselineOracle),
-                                             ("deviation", MetricDeviationOracle)])
+class MetricAcceptanceWindow:
+    """
+    A strategy for computing an acceptance window for a metric measurement
+    given a baseline value.
+    """
+    def get_bounds(self, baseline: float) -> Tuple[float, float]:
+        raise NotImplemented
+    def describe(self) -> str:
+        raise NotImplemented
+
+class AlwaysAccept(MetricAcceptanceWindow):
+    def get_bounds(self, baseline: float) -> Tuple[float, float]:
+        return (-1/0, +1/0)
+
+    def describe(self) -> str:
+        raise NotImplemented
+
+class RelativeMetricAcceptanceWindow(MetricAcceptanceWindow):
+    """
+    A MetricAcceptanceWindow which accepts measurements within tol-percent of
+    the baseline.
+    """
+    def __init__(self, tol: float):
+        """ Accept any metric within tol-percent of the baseline """
+        self.tol = tol / 100
+
+    def get_bounds(self, baseline: float) -> Tuple[float, float]:
+        return (baseline * (1-self.tol), baseline * (1+self.tol))
+
+    def describe(self) -> str:
+        return '+/- %1.1f%%' % (100*self.tol)
 
 def parse_perf_stat(stat_str: str) -> PerfStat:
     field_vals = stat_str.strip('\t').split('\t')
@@ -558,32 +585,38 @@ def get_commit_metric(gitNoteRef,
     _commit_metric_cache[cacheKeyA] = baseline_by_cache_key_b
     return baseline_by_cache_key_b.get(cacheKeyB)
 
-# Check test stats. This prints the results for the user.
-# actual: the PerfStat with actual value.
-# baseline: the expected Baseline value (this should generally be derived from baseline_metric())
-# tolerance_dev: allowed deviation of the actual value from the expected value.
-# allowed_perf_changes: allowed changes in stats. This is a dictionary as returned by get_allowed_perf_changes().
-# force_print: Print stats even if the test stat was in the tolerance range.
-# Returns a (MetricChange, pass/fail object) tuple. Passes if the stats are within the expected value ranges.
 def check_stats_change(actual: PerfStat,
                        baseline: Baseline,
-                       tolerance_dev,
+                       acceptance_window: MetricAcceptanceWindow,
                        allowed_perf_changes: Dict[TestName, List[AllowedPerfChange]] = {},
                        force_print = False
                        ) -> Tuple[MetricChange, Any]:
+    """
+    Check test stats. This prints the results for the user.
+
+    Parameters:
+    actual: the PerfStat with actual value
+    baseline: the expected Baseline value (this should generally be derived
+        from baseline_metric())
+    acceptance_window: allowed deviation of the actual value from the expected
+        value.
+    allowed_perf_changes: allowed changes in stats. This is a dictionary as
+        returned by get_allowed_perf_changes().
+    force_print: Print stats even if the test stat was in the tolerance range.
+
+    Returns a (MetricChange, pass/fail object) tuple. Passes if the stats are within the expected value ranges.
+    """
     expected_val = baseline.perfStat.value
     full_name = actual.test + ' (' + actual.way + ')'
 
-    lowerBound = trunc(           int(expected_val) * ((100 - float(tolerance_dev))/100))
-    upperBound = trunc(0.5 + ceil(int(expected_val) * ((100 + float(tolerance_dev))/100)))
-
-    actual_dev = round(((float(actual.value) * 100)/ int(expected_val)) - 100, 1)
+    lower_bound, upper_bound = acceptance_window.get_bounds(expected_val)
+    actual_dev = round(((float(actual.value) * 100)/ expected_val) - 100, 1)
 
     # Find the direction of change.
     change = MetricChange.NoChange
-    if actual.value < lowerBound:
+    if actual.value < lower_bound:
         change = MetricChange.Decrease
-    elif actual.value > upperBound:
+    elif actual.value > upper_bound:
         change = MetricChange.Increase
 
     # Is the change allowed?
@@ -608,14 +641,14 @@ def check_stats_change(actual: PerfStat,
         result = failBecause('stat ' + error, tag='stat')
 
     if not change_allowed or force_print:
-        length = max(len(str(x)) for x in [expected_val, lowerBound, upperBound, actual.value])
+        length = max(len(str(x)) for x in [expected_val, lower_bound, upper_bound, actual.value])
 
         def display(descr, val, extra):
             print(descr, str(val).rjust(length), extra)
 
-        display('    Expected    ' + full_name + ' ' + actual.metric + ':', expected_val, '+/-' + str(tolerance_dev) + '%')
-        display('    Lower bound ' + full_name + ' ' + actual.metric + ':', lowerBound, '')
-        display('    Upper bound ' + full_name + ' ' + actual.metric + ':', upperBound, '')
+        display('    Expected    ' + full_name + ' ' + actual.metric + ':', expected_val, acceptance_window.describe())
+        display('    Lower bound ' + full_name + ' ' + actual.metric + ':', lower_bound, '')
+        display('    Upper bound ' + full_name + ' ' + actual.metric + ':', upper_bound, '')
         display('    Actual      ' + full_name + ' ' + actual.metric + ':', actual.value, '')
         if actual.value != expected_val:
             display('    Deviation   ' + full_name + ' ' + actual.metric + ':', actual_dev, '%')
