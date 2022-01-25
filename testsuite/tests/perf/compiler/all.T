@@ -212,12 +212,17 @@ test('T12234',
      [''])
 
 # T12545 is sensitive to -dunique-increments changes, see #19414. I've seen
-# variations of as much as 4.8% by playing with that parameter, but I think
-# it's better to check with T12545.measure.sh that lower and upper bounds of
-# allocations indeed haven't changed and then simply accept the metric increase.
+# variations of as much as 4.8% by playing with that parameter,
+#
+# The issue with the test is that it does too little so is very sensitive to
+# any small variations during initialisation and in particular populating the
+# initial environments with wired-in things. Therefore it has a very high change
+# threshold so we catch if it regresses a lot but don't worry if it regresses a little.
+#
+# You can measure the variance by running T12545.measure.sh.
 test('T12545',
      [ only_ways(['normal']),
-       collect_compiler_stats('bytes allocated', 3), # Don't increase it, run T12545.measure.sh and leave a comment on #19414!
+       collect_compiler_stats('bytes allocated', 10), #
        extra_clean(['T12545a.hi', 'T12545a.o'])
      ],
      multimod_compile,
