@@ -1665,7 +1665,13 @@ Other environment variables
 .. index::
    single: environment variables
 
-GHC can also be configured using environment variables. Currently the only
-variable it supports is ``GHC_NO_UNICODE``, which, when set, disables Unicode
-output regardless of locale settings. ``GHC_NO_UNICODE`` can be set to anything
-+(event an empty string) to trigger this behaviour.
+GHC can also be configured using various environment variables.
+
+.. envvar:: GHC_NO_UNICODE
+
+    When non-empty, disables Unicode diagnostics output will be disabled of locale settings.
+
+.. envvar:: GHC_CHARENC
+
+    When set to ``UTF-8`` the compiler will always print UTF-8-encoded output, regardless
+    the current locale.
