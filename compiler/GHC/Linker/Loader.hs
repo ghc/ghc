@@ -70,7 +70,9 @@ import GHC.Types.Unique.DSet
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
+#if defined(CAN_LOAD_DLL)
 import GHC.Utils.Constants (isWindowsHost, isDarwinHost)
+#endif
 import GHC.Utils.Error
 import GHC.Utils.Logger
 import GHC.Utils.TmpFs
@@ -1310,11 +1312,13 @@ unload_wkr interp keep_linkables pls@LoaderState{..}  = do
 -- of DLL handles that rts/Linker.c maintains, and that in turn is
 -- used by lookupSymbol.  So we must call addDLL for each library
 -- just to get the DLL handle into the list.
+#if defined(CAN_LOAD_DLL)
 partOfGHCi :: [PackageName]
 partOfGHCi
  | isWindowsHost || isDarwinHost = []
  | otherwise = map (PackageName . mkFastString)
                    ["base", "template-haskell", "editline"]
+#endif
 
 showLS :: LibrarySpec -> String
 showLS (Objects nms)  = "(static) [" ++ intercalate ", " nms ++ "]"
@@ -1413,7 +1417,9 @@ loadPackage interp hsc_env pkg
 
         -- Complication: all the .so's must be loaded before any of the .o's.
         let known_dlls = [ dll  | DLLPath dll    <- classifieds ]
+#if defined(CAN_LOAD_DLL)
             dlls       = [ dll  | DLL dll        <- classifieds ]
+#endif
             objs       = [ obj  | Objects objs    <- classifieds
                                 , obj <- objs ]
             archs      = [ arch | Archive arch   <- classifieds ]
@@ -1504,6 +1510,7 @@ usage of `crash_early` flag is overly restrictive, we may lift the
 restriction very easily.
 -}
 
+#if defined(CAN_LOAD_DLL)
 -- we have already searched the filesystem; the strings passed to load_dyn
 -- can be passed directly to loadDLL.  They are either fully-qualified
 -- ("/usr/lib/libfoo.so"), or unqualified ("libfoo.so").  In the latter case,
@@ -1542,6 +1549,7 @@ loadFrameworks interp platform pkg
                     Nothing  -> return ()
                     Just err -> cmdLineErrorIO ("can't load framework: "
                                                 ++ fw ++ " (" ++ err ++ ")" )
+#endif
 
 -- Try to find an object file for a given library in the given paths.
 -- If it isn't present, we assume that addDLL in the RTS can find it,
@@ -1635,28 +1643,34 @@ locateLib interp hsc_env is_hs lib_dirs gcc_dirs lib
      hs_dyn_lib_name = lib ++ dynLibSuffix (ghcNameVersion dflags)
      hs_dyn_lib_file = platformHsSOName platform hs_dyn_lib_name
 
+#if defined(CAN_LOAD_DLL)
      so_name     = platformSOName platform lib
      lib_so_name = "lib" ++ so_name
      dyn_lib_file = case (arch, os) of
                              (ArchX86_64, OSSolaris2) -> "64" </> so_name
                              _ -> so_name
+#endif
 
      findObject    = liftM (fmap $ Objects . (:[]))  $ findFile dirs obj_file
      findDynObject = liftM (fmap $ Objects . (:[]))  $ findFile dirs dyn_obj_file
      findArchive   = let local name = liftM (fmap Archive) $ findFile dirs name
                      in  apply (map local arch_files)
      findHSDll     = liftM (fmap DLLPath) $ findFile dirs hs_dyn_lib_file
+#if defined(CAN_LOAD_DLL)
      findDll    re = let dirs' = if re == user then lib_dirs else gcc_dirs
                      in liftM (fmap DLLPath) $ findFile dirs' dyn_lib_file
      findSysDll    = fmap (fmap $ DLL . dropExtension . takeFileName) $
                         findSystemLibrary interp so_name
+#endif
      tryGcc        = let search   = searchForLibUsingGcc logger dflags
+#if defined(CAN_LOAD_DLL)
                          dllpath  = liftM (fmap DLLPath)
                          short    = dllpath $ search so_name lib_dirs
                          full     = dllpath $ search lib_so_name lib_dirs
+                         dlls     = [short, full]
+#endif
                          gcc name = liftM (fmap Archive) $ search name lib_dirs
                          files    = import_libs ++ arch_files
-                         dlls     = [short, full]
                          archives = map gcc files
                      in apply $
 #if defined(CAN_LOAD_DLL)
@@ -1698,7 +1712,9 @@ locateLib interp hsc_env is_hs lib_dirs gcc_dirs lib
                           else apply xs
 
      platform = targetPlatform dflags
+#if defined(CAN_LOAD_DLL)
      arch = platformArch platform
+#endif
      os = platformOS platform
 
 searchForLibUsingGcc :: Logger -> DynFlags -> String -> [FilePath] -> IO (Maybe FilePath)
