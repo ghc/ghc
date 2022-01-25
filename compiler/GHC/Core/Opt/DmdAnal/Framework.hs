@@ -68,20 +68,23 @@ newtype FastMutIdEnv a = FMIE (IORef (IdEnv (IORef a)))
 emptyFastMutIdEnv :: IO (FastMutIdEnv a)
 emptyFastMutIdEnv = FMIE <$> newIORef emptyVarEnv
 
+{-# INLINE lookupFastMutIdEnv #-}
 lookupFastMutIdEnv :: FastMutIdEnv a -> IO (Id -> IO (Maybe a))
 lookupFastMutIdEnv (FMIE env_ref) = do
   env <- readIORef env_ref
   pure $ \id -> traverse readIORef (lookupVarEnv env id)
 
-insertFMIE :: FastMutIdEnv a -> Id -> a -> IO ()
-insertFMIE (FMIE env_ref) k v = do
+{-# INLINE insertIfChangedFMIE #-}
+insertIfChangedFMIE :: Eq a => (Id -> a) -> FastMutIdEnv a -> Id -> a -> IO ()
+insertIfChangedFMIE get_fld (FMIE env_ref) k v = do
   env <- readIORef env_ref
   case lookupVarEnv env k of
-    Just ref  ->  -- hot fast path
+    Just ref  -> -- hot fast path
       writeIORef ref $! v
-    Nothing -> do -- cold slow path
-      ref <- newIORef $! v
-      writeIORef env_ref $! extendVarEnv env k ref
+    Nothing   -> -- cold slow path
+      when (get_fld k /= v) $ do -- no need to memorise the write if nothing changed anyway
+        ref <- newIORef $! v
+        writeIORef env_ref $! extendVarEnv env k ref
 
 ---------------------------------
 -- Applying demand annotations --
@@ -164,19 +167,19 @@ instance Outputable TransApprox where
 -- | Write out a demand annotation. Delayed 'setIdDemand'.
 writeIdDemand :: Id -> Demand -> EvalM ()
 writeIdDemand id dmd = EvalM $ liftIOEnv $ \env ->
-  insertFMIE (ie_demands env) id dmd
+  insertIfChangedFMIE idDemandInfo (ie_demands env) id dmd
 
 -- | Write out a bunch of demand annotations. There might be 'TyVar's among the
 -- `[Var]` which will be filtered out.
 writeBndrsDemands :: [Var] -> [Demand] -> EvalM ()
-writeBndrsDemands vars dmds = EvalM $ liftIOEnv $ \env -> do
+writeBndrsDemands vars dmds = do
   let prs = strictZipWith (,) (filter isRuntimeVar vars) dmds
-  forM_ prs $ \(id, dmd) -> insertFMIE (ie_demands env) id dmd
+  forM_ prs (uncurry writeIdDemand)
 
 -- | Write out a demand signature. Delayed 'setIdDmdSig'.
 writeIdDmdSig :: Id -> DmdSig -> EvalM ()
 writeIdDmdSig id sig = EvalM $ liftIOEnv $ \env -> do
-  insertFMIE (ie_sigs env) id sig
+  insertIfChangedFMIE idDmdSig (ie_sigs env) id sig
 
 -- | Write to the ref cell for the lazy free variables of this binding group.
 -- See Note [Lazy and unleashable free variables].
