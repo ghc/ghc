@@ -52,7 +52,7 @@ module GHC.Tc.Solver.Monad (
     getSolvedDicts, setSolvedDicts,
 
     getInstEnvs, getFamInstEnvs,                -- Getting the environments
-    getTopEnv, getGblEnv, getLclEnv,
+    getTopEnv, getGblEnv, getLclEnv, setLclEnv,
     getTcEvBindsVar, getTcLevel,
     getTcEvTyCoVars, getTcEvBindsMap, setTcEvBindsMap,
     tcLookupClass, tcLookupId,
@@ -1247,6 +1247,9 @@ wrapTcS :: TcM a -> TcS a
 -- and TcS is supposed to have limited functionality
 wrapTcS action = mkTcS $ \_env -> action -- a TcM action will not use the TcEvBinds
 
+wrap2TcS :: (TcM a -> TcM a) -> TcS a -> TcS a
+wrap2TcS fn (TcS thing) = mkTcS $ \env -> fn (thing env)
+
 wrapErrTcS :: TcM a -> TcS a
 -- The thing wrapped should just fail
 -- There's no static check; it's up to the user
@@ -1779,6 +1782,9 @@ getGblEnv = wrapTcS $ TcM.getGblEnv
 
 getLclEnv :: TcS TcLclEnv
 getLclEnv = wrapTcS $ TcM.getLclEnv
+
+setLclEnv :: TcLclEnv -> TcS a -> TcS a
+setLclEnv env = wrap2TcS (TcM.setLclEnv env)
 
 tcLookupClass :: Name -> TcS Class
 tcLookupClass c = wrapTcS $ TcM.tcLookupClass c

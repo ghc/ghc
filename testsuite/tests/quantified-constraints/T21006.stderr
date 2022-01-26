@@ -1,0 +1,7 @@
+
+T21006.hs:14:10: error:
+    • Couldn't match kind ‘Constraint’ with ‘*’
+      When matching types
+        b :: *
+        c :: Constraint
+    • In the instance declaration for ‘OpCode’
