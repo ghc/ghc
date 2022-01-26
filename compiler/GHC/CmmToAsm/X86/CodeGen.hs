@@ -542,6 +542,9 @@ iselExpr64 (CmmLoad addrTree ty) | isWord64 ty = do
 iselExpr64 (CmmReg (CmmLocal (LocalReg vu ty))) | isWord64 ty
    = return (ChildCode64 nilOL (RegVirtual $ mkVirtualReg vu II32))
 
+iselExpr64 (CmmMachOp (MO_UnalignedLoad ty) [ptr])
+   = iselExpr64 (CmmLoad ptr ty)
+
 -- we handle addition, but rather badly
 iselExpr64 (CmmMachOp (MO_Add _) [e1, CmmLit (CmmInt i _)]) = do
    ChildCode64 code1 r1lo <- iselExpr64 e1

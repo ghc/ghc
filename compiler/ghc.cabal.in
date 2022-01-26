@@ -197,8 +197,9 @@ Library
         GHC.Cmm.Sink
         GHC.Cmm.Switch
         GHC.Cmm.Switch.Implement
-        GHC.CmmToAsm
+        GHC.Cmm.Unaligned
         GHC.Cmm.LRegSet
+        GHC.CmmToAsm
         GHC.CmmToAsm.AArch64
         GHC.CmmToAsm.AArch64.CodeGen
         GHC.CmmToAsm.AArch64.Cond

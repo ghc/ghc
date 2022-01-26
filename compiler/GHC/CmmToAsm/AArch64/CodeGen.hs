@@ -618,7 +618,9 @@ getRegister' config plat expr
       return $ Any (intFormat width) (\dst -> off_code `appOL` code `snocOL` ADD (OpReg width dst) (OpReg width reg) (OpReg width off_r))
           where width = typeWidth (cmmRegType plat reg)
 
-
+    -- Unaligned loads can be handled without any trouble
+    CmmMachOp (MO_UnalignedLoad ty) [ptr] ->
+        getRegister (CmmLoad ptr ty)
 
     -- for MachOps, see GHC.Cmm.MachOp
     -- For CmmMachOp, see GHC.Cmm.Expr

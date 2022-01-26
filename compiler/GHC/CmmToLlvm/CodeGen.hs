@@ -1432,6 +1432,11 @@ genMachOp _ op [x] = case op of
             all0s = LMLitVar $ LMVectorLit (replicate len all0)
         in negateVec vecty all0s LM_MO_FSub
 
+    MO_UnalignedLoad ty -> do
+        (vptr, stmts, top) <- exprToVar x
+        (vr, stmts') <- doExpr (cmmToLlvmType ty) (Load vptr (Just 1))
+        return (vr, stmts `snocOL` stmts', top)
+
     MO_AlignmentCheck _ _ -> panic "-falignment-sanitisation is not supported by -fllvm"
 
     -- Handle unsupported cases explicitly so we get a warning
@@ -1687,6 +1692,8 @@ genMachOp_slow opt op [x, y] = case op of
 
     MO_VF_Neg {} -> panicOp
 
+    MO_UnalignedLoad {} -> panicOp
+
     MO_AlignmentCheck {} -> panicOp
 
 #if __GLASGOW_HASKELL__ < 811
@@ -1837,7 +1844,7 @@ genLoad_fast atomic e r n ty = do
                 case grt == ty' of
                      -- were fine
                      True -> do
-                         (var, s3) <- doExpr ty' (MExpr meta $ loadInstr ptr)
+                         (var, s3) <- doExpr ty' (MExpr meta $ mkLoad atomic ptr)
                          return (var, s1 `snocOL` s2 `snocOL` s3,
                                      [])
 
@@ -1845,16 +1852,13 @@ genLoad_fast atomic e r n ty = do
                      False -> do
                          let pty = pLift ty'
                          (ptr', s3) <- doExpr pty $ Cast LM_Bitcast ptr pty
-                         (var, s4) <- doExpr ty' (MExpr meta $ loadInstr ptr')
+                         (var, s4) <- doExpr ty' (MExpr meta $ mkLoad atomic ptr')
                          return (var, s1 `snocOL` s2 `snocOL` s3
                                     `snocOL` s4, [])
 
             -- If its a bit type then we use the slow method since
             -- we can't avoid casting anyway.
             False -> genLoad_slow atomic  e ty meta
-  where
-    loadInstr ptr | atomic    = ALoad SyncSeqCst False ptr
-                  | otherwise = Load ptr
 
 -- | Handle Cmm load expression.
 -- Generic case. Uses casts and pointer arithmetic if needed.
@@ -1866,22 +1870,33 @@ genLoad_slow atomic e ty meta = do
     iptr <- exprToVarW e
     case getVarType iptr of
         LMPointer _ ->
-                    doExprW (cmmToLlvmType ty) (MExpr meta $ loadInstr iptr)
+                    doExprW (cmmToLlvmType ty) (MExpr meta $ mkLoad atomic iptr)
 
         i@(LMInt _) | i == llvmWord platform -> do
                     let pty = LMPointer $ cmmToLlvmType ty
                     ptr <- doExprW pty $ Cast LM_Inttoptr iptr pty
-                    doExprW (cmmToLlvmType ty) (MExpr meta $ loadInstr ptr)
+                    doExprW (cmmToLlvmType ty) (MExpr meta $ mkLoad atomic ptr)
 
         other -> pprPanic "exprToVar: CmmLoad expression is not right type!"
                      (PprCmm.pprExpr platform e <+> text (
                          "Size of Ptr: "   ++ show (llvmPtrBits platform) ++
                          ", Size of var: " ++ show (llvmWidthInBits platform other) ++
                          ", Var: " ++ renderWithContext (llvmCgContext cfg) (ppVar cfg iptr)))
-  where
-    loadInstr ptr | atomic    = ALoad SyncSeqCst False ptr
-                  | otherwise = Load ptr
 
+mkLoad :: Atomic -> LlvmVar -> LlvmExpression
+mkLoad atomic ptr
+  | atomic      = ALoad SyncSeqCst False ptr
+  -- XXX: On x86, vector types need to be 16-byte aligned for aligned
+  -- access, but we have no way of guaranteeing that this is true with GHC
+  -- (we would need to modify the layout of the stack and closures, change
+  -- the storage manager, etc.). So, we blindly tell LLVM that *any* vector
+  -- store or load could be unaligned. In the future we may be able to
+  -- guarantee that certain vector access patterns are aligned, in which
+  -- case we will need a more granular way of specifying alignment.
+  | isVector ty = Load ptr (Just 1)
+  | otherwise   = Load ptr Nothing
+  where
+    ty = pLower (getVarType ptr)
 
 -- | Handle CmmReg expression. This will return a pointer to the stack
 -- location of the register. Throws an error if it isn't allocated on
@@ -1920,7 +1935,7 @@ getCmmRegVal reg =
  where loadFromStack = do
          ptr <- getCmmReg reg
          let ty = pLower $ getVarType ptr
-         (v, s) <- doExpr ty (Load ptr)
+         (v, s) <- doExpr ty (Load ptr Nothing)
          return (v, ty, unitOL s)
 
 -- | Allocate a local CmmReg on the stack

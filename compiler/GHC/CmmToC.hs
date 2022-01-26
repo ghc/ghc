@@ -851,6 +851,9 @@ pprMachOp_for_C platform mop = case mop of
                                 (panic $ "PprC.pprMachOp_for_C: MO_VF_Quot"
                                       ++ " should have been handled earlier!")
 
+        MO_UnalignedLoad ty
+                          -> text "read_unaligned_" <> machRepCType platform ty
+
         MO_AlignmentCheck {} -> panic "-falignment-santisation not supported by unregisterised backend"
 
 signedOp :: MachOp -> Bool      -- Argument type(s) are signed ints

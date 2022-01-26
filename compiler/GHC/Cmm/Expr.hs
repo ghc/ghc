@@ -54,7 +54,7 @@ import GHC.Types.Basic (Alignment, mkAlignment, alignmentOf)
 
 data CmmExpr
   = CmmLit !CmmLit               -- Literal
-  | CmmLoad !CmmExpr !CmmType   -- Read memory location
+  | CmmLoad !CmmExpr !CmmType   -- Read memory location (naturally aligned)
   | CmmReg !CmmReg              -- Contents of register
   | CmmMachOp MachOp [CmmExpr]  -- Machine operation (+, -, *, etc.)
   | CmmStackSlot Area {-# UNPACK #-} !Int

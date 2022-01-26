@@ -475,6 +475,10 @@ getRegister' _ platform (CmmLoad mem pk)
 
           where format = cmmTypeFormat pk
 
+-- Unaligned loads can be handled without any trouble
+getRegister' _ _ (CmmMachOp (MO_UnalignedLoad ty) [ptr])
+ = getRegister $ CmmLoad ptr ty
+
 -- catch simple cases of zero- or sign-extended load
 getRegister' _ _ (CmmMachOp (MO_UU_Conv W8 W32) [CmmLoad mem _]) = do
     Amode addr addr_code <- getAmode D mem
