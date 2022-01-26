@@ -948,10 +948,10 @@ getHasGivenEqs tclvl
                     , inert_given_eqs    = given_eqs
                     , inert_given_eq_lvl = ge_lvl })
               <- getInertCans
-       ; let insols = filterBag insolubleEqCt irreds
+       ; let given_insols = filterBag insoluble_given_equality irreds
                       -- Specifically includes ones that originated in some
                       -- outer context but were refined to an insoluble by
-                      -- a local equality; so do /not/ add ct_given_here.
+                      -- a local equality; so no level-check needed
 
              -- See Note [HasGivenEqs] in GHC.Tc.Types.Constraint, and
              -- Note [Tracking Given equalities] in GHC.Tc.Solver.InertSet
@@ -964,8 +964,11 @@ getHasGivenEqs tclvl
               , text "ge_lvl:" <+> ppr ge_lvl
               , text "ambient level:" <+> ppr tclvl
               , text "Inerts:" <+> ppr inerts
-              , text "Insols:" <+> ppr insols]
-       ; return (has_ge, insols) }
+              , text "Insols:" <+> ppr given_insols]
+       ; return (has_ge, given_insols) }
+  where
+    insoluble_given_equality ct
+       = insolubleEqCt ct && isGivenCt ct
 
 {- Note [Unsolved Derived equalities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
