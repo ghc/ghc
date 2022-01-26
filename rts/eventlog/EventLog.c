@@ -95,7 +95,7 @@ static eventlog_init_func_t *eventlog_header_funcs = NULL;
 
 #define EVENT_LOG_SIZE 2 * (1024 * 1024) // 2MB
 
-static int flushCount;
+static int flushCount = 0;
 
 // Struct for record keeping of buffer to store event types and events.
 //
