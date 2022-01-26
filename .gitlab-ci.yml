@@ -1242,7 +1242,7 @@ doc-tarball:
     - mv docs/*.tar.xz docs/index.html .
 
 source-tarball:
-  stage: packaging
+  stage: full-build
   tags:
     - x86_64-linux
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV"
@@ -1259,7 +1259,7 @@ source-tarball:
     - python3 ./hadrian/bootstrap/bootstrap.py -w $GHC fetch -o hadrian-bootstrap-sources-$GHC_VERSION
 
 test-bootstrap:
-  stage: packaging
+  stage: full-build
   needs: [source-tarball]
   tags:
     - x86_64-linux
