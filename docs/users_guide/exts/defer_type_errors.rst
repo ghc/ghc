@@ -3,6 +3,8 @@
 Deferring type errors to runtime
 ================================
 
+Since GHC 7.6.1.
+
 While developing, sometimes it is desirable to allow compilation to
 succeed even if there are type errors in the code. Consider the
 following case: ::

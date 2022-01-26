@@ -292,6 +292,8 @@ of ``-W(no-)*``.
     :reverse: -Wno-prepositive-qualified-module
     :category:
 
+    :since: 8.10
+
     Normally, imports are qualified prepositively: ``import qualified M``.
     By using :extension:`ImportQualifiedPost`, the qualified keyword can be used after the module name.
     Like so: ``import M qualified``. This will warn when the first, prepositive syntax is used.
@@ -337,6 +339,8 @@ of ``-W(no-)*``.
     :reverse: -fno-defer-type-errors
     :category:
 
+    :since: 7.6
+
     :implies: :ghc-flag:`-fdefer-typed-holes`, :ghc-flag:`-fdefer-out-of-scope-variables`
 
     Defer as many type errors as possible until runtime. At compile time
@@ -353,6 +357,8 @@ of ``-W(no-)*``.
     :type: dynamic
     :reverse: -fno-defer-typed-holes
     :category:
+
+    :since: 7.10
 
     Defer typed holes errors (errors about names with a leading underscore
     (e.g., “_”, “_foo”, “_bar”)) until runtime. This will turn the errors
@@ -389,6 +395,8 @@ of ``-W(no-)*``.
     :reverse: -Wno-deferred-out-of-scope-variables
     :category:
 
+    :since: 8.0
+
     Warn when a deferred out-of-scope variable is encountered.
 
 .. ghc-flag:: -Wpartial-type-signatures
@@ -415,6 +423,8 @@ of ``-W(no-)*``.
     :type: dynamic
     :reverse: -fno-helpful-errors
     :category:
+
+    :since: 7.4
 
     :default: on
 
@@ -835,6 +845,8 @@ of ``-W(no-)*``.
     :reverse: -Wno-duplicate-exports
     :category:
 
+    :since: at least 5.04
+
     :default: on
 
     .. index::
@@ -852,6 +864,8 @@ of ``-W(no-)*``.
     :type: dynamic
     :reverse: -Wno-hi-shadowing
     :category:
+
+    :since: at least 5.04, deprecated
 
     .. index::
        single: shadowing; interface files
@@ -995,6 +1009,8 @@ of ``-W(no-)*``.
     :type: dynamic
     :category:
 
+    :since: 8.10
+
     :default: 30
 
     The pattern match checker works by assigning symbolic values to each
@@ -1063,6 +1079,8 @@ of ``-W(no-)*``.
     :type: dynamic
     :reverse: -Wno-missing-fields
     :category:
+
+    :since: at least 5.04
 
     .. index::
        single: missing fields, warning
@@ -1134,6 +1152,8 @@ of ``-W(no-)*``.
     :reverse: -Wno-missing-methods
     :category:
 
+    :since: at least 5.04
+
     :default: on
 
     .. index::
@@ -1153,6 +1173,8 @@ of ``-W(no-)*``.
     :type: dynamic
     :reverse: -Wno-missing-signatures
     :category:
+
+    :since: at least 5.04
 
     :default: off
 
@@ -1304,6 +1326,8 @@ of ``-W(no-)*``.
     :reverse: -Wno-name-shadowing
     :category:
 
+    :since: at least 5.04
+
     .. index::
        single: shadowing, warning
 
@@ -1353,6 +1377,8 @@ of ``-W(no-)*``.
     :type: dynamic
     :reverse: -Wno-overlapping-patterns
     :category:
+
+    :since: at least 5.04
 
     .. index::
        single: overlapping patterns, warning
@@ -1534,6 +1560,8 @@ of ``-W(no-)*``.
     :reverse: -Wno-type-defaults
     :category:
 
+    :since: at least 5.04
+
     :default: off
 
     .. index::
@@ -1623,6 +1651,8 @@ of ``-W(no-)*``.
     :type: dynamic
     :reverse: -Wno-unused-binds
     :category:
+
+    :since: at least 5.04
 
     .. index::
        single: unused binds, warning
@@ -1723,6 +1753,8 @@ of ``-W(no-)*``.
     :reverse: -Wno-unused-imports
     :category:
 
+    :since: at least 5.04
+
     .. index::
        single: unused imports, warning
        single: imports, unused
@@ -1737,6 +1769,8 @@ of ``-W(no-)*``.
     :type: dynamic
     :reverse: -Wno-unused-matches
     :category:
+
+    :since: at least 5.04
 
     .. index::
        single: unused matches, warning

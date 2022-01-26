@@ -291,6 +291,7 @@ import qualified GHC.LanguageExtensions as LangExt
 -- If you modify anything in this file please make sure that your changes are
 -- described in the User's Guide. Please update the flag description in the
 -- users guide (docs/users_guide) whenever you add or change a flag.
+-- Please make sure you add ":since:" information to new flags.
 
 -- Note [Supporting CLI completion]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

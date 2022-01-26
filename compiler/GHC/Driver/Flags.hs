@@ -278,8 +278,8 @@ data GeneralFlag
    | Opt_LocalGhciHistory
    | Opt_NoIt
    | Opt_HelpfulErrors
-   | Opt_DeferTypeErrors
-   | Opt_DeferTypedHoles
+   | Opt_DeferTypeErrors             -- Since 7.6
+   | Opt_DeferTypedHoles             -- Since 7.10
    | Opt_DeferOutOfScopeVariables
    | Opt_PIC                         -- ^ @-fPIC@
    | Opt_PIE                         -- ^ @-fPIE@
