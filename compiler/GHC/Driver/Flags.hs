@@ -481,8 +481,8 @@ data WarningFlag =
    | Opt_WarnRedundantRecordWildcards
    | Opt_WarnWarningsDeprecations
    | Opt_WarnDeprecatedFlags
-   | Opt_WarnMissingMonadFailInstances -- since 8.0, has no effect since 8.8
-   | Opt_WarnSemigroup -- since 8.0
+   | Opt_WarnMissingMonadFailInstances               -- since 8.0, has no effect since 8.8
+   | Opt_WarnSemigroup                               -- since 8.0
    | Opt_WarnDodgyExports
    | Opt_WarnDodgyImports
    | Opt_WarnOrphans
@@ -510,40 +510,40 @@ data WarningFlag =
    | Opt_WarnDerivingTypeable
    | Opt_WarnDeferredTypeErrors
    | Opt_WarnDeferredOutOfScopeVariables
-   | Opt_WarnNonCanonicalMonadInstances   -- since 8.0
-   | Opt_WarnNonCanonicalMonadFailInstances   -- since 8.0, removed 8.8
-   | Opt_WarnNonCanonicalMonoidInstances  -- since 8.0
-   | Opt_WarnMissingPatternSynonymSignatures -- since 8.0
-   | Opt_WarnUnrecognisedWarningFlags     -- since 8.0
-   | Opt_WarnSimplifiableClassConstraints -- Since 8.2
-   | Opt_WarnCPPUndef                     -- Since 8.2
-   | Opt_WarnUnbangedStrictPatterns       -- Since 8.2
-   | Opt_WarnMissingHomeModules           -- Since 8.2
-   | Opt_WarnPartialFields                -- Since 8.4
+   | Opt_WarnNonCanonicalMonadInstances              -- since 8.0
+   | Opt_WarnNonCanonicalMonadFailInstances          -- since 8.0, removed 8.8
+   | Opt_WarnNonCanonicalMonoidInstances             -- since 8.0
+   | Opt_WarnMissingPatternSynonymSignatures         -- since 8.0
+   | Opt_WarnUnrecognisedWarningFlags                -- since 8.0
+   | Opt_WarnSimplifiableClassConstraints            -- Since 8.2
+   | Opt_WarnCPPUndef                                -- Since 8.2
+   | Opt_WarnUnbangedStrictPatterns                  -- Since 8.2
+   | Opt_WarnMissingHomeModules                      -- Since 8.2
+   | Opt_WarnPartialFields                           -- Since 8.4
    | Opt_WarnMissingExportList
    | Opt_WarnInaccessibleCode
-   | Opt_WarnStarIsType                   -- Since 8.6
-   | Opt_WarnStarBinder                   -- Since 8.6
-   | Opt_WarnImplicitKindVars             -- Since 8.6
+   | Opt_WarnStarIsType                              -- Since 8.6
+   | Opt_WarnStarBinder                              -- Since 8.6
+   | Opt_WarnImplicitKindVars                        -- Since 8.6
    | Opt_WarnSpaceAfterBang
-   | Opt_WarnMissingDerivingStrategies    -- Since 8.8
-   | Opt_WarnPrepositiveQualifiedModule   -- Since 8.10
-   | Opt_WarnUnusedPackages               -- Since 8.10
-   | Opt_WarnInferredSafeImports          -- Since 8.10
-   | Opt_WarnMissingSafeHaskellMode       -- Since 8.10
-   | Opt_WarnCompatUnqualifiedImports     -- Since 8.10
+   | Opt_WarnMissingDerivingStrategies               -- Since 8.8
+   | Opt_WarnPrepositiveQualifiedModule              -- Since 8.10
+   | Opt_WarnUnusedPackages                          -- Since 8.10
+   | Opt_WarnInferredSafeImports                     -- Since 8.10
+   | Opt_WarnMissingSafeHaskellMode                  -- Since 8.10
+   | Opt_WarnCompatUnqualifiedImports                -- Since 8.10
    | Opt_WarnDerivingDefaults
-   | Opt_WarnInvalidHaddock               -- Since 9.0
-   | Opt_WarnOperatorWhitespaceExtConflict  -- Since 9.2
-   | Opt_WarnOperatorWhitespace             -- Since 9.2
-   | Opt_WarnAmbiguousFields                -- Since 9.2
-   | Opt_WarnImplicitLift                 -- Since 9.2
-   | Opt_WarnMissingKindSignatures        -- Since 9.2
+   | Opt_WarnInvalidHaddock                          -- Since 9.0
+   | Opt_WarnOperatorWhitespaceExtConflict           -- Since 9.2
+   | Opt_WarnOperatorWhitespace                      -- Since 9.2
+   | Opt_WarnAmbiguousFields                         -- Since 9.2
+   | Opt_WarnImplicitLift                            -- Since 9.2
+   | Opt_WarnMissingKindSignatures                   -- Since 9.2
    | Opt_WarnMissingExportedPatternSynonymSignatures -- since 9.2
-   | Opt_WarnRedundantStrictnessFlags     -- Since 9.4
-   | Opt_WarnForallIdentifier             -- Since 9.4
-   | Opt_WarnUnicodeBidirectionalFormatCharacters -- Since 9.0.2
-   | Opt_WarnGADTMonoLocalBinds           -- Since 9.4
+   | Opt_WarnRedundantStrictnessFlags                -- Since 9.4
+   | Opt_WarnForallIdentifier                        -- Since 9.4
+   | Opt_WarnUnicodeBidirectionalFormatCharacters    -- Since 9.0.2
+   | Opt_WarnGADTMonoLocalBinds                      -- Since 9.4
    deriving (Eq, Ord, Show, Enum)
 
 -- | Return the names of a WarningFlag
