@@ -141,6 +141,7 @@ data BuildConfig
                 , tablesNextToCode :: Bool
                 , threadSanitiser :: Bool
                 , noSplitSections :: Bool
+                , testsuiteUsePerf :: Bool
                 }
 
 -- Extra arguments to pass to ./configure due to the BuildConfig
@@ -188,6 +189,7 @@ vanilla = BuildConfig
   , tablesNextToCode = True
   , threadSanitiser = False
   , noSplitSections = False
+  , testsuiteUsePerf = False
   }
 
 splitSectionsBroken :: BuildConfig -> BuildConfig
@@ -663,6 +665,7 @@ job arch opsys buildConfig = NamedJob { name = jobName, jobInfo = Job {..} }
           Emulator s       -> "CROSS_EMULATOR" =: s
           NoEmulatorNeeded -> mempty
       , if withNuma buildConfig then "ENABLE_NUMA" =: "1" else mempty
+      , if testsuiteUsePerf buildConfig then "RUNTEST_ARGS" =: "--config perf_path=perf" else mempty
       ]
 
     jobArtifacts = Artifacts
