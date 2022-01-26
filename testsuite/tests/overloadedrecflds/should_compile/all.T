@@ -10,4 +10,4 @@ test('T18999_NoFieldSelectors', normal, compile, [''])
 test('T18999_FieldSelectors', normal, compile, [''])
 test('T19154', normal, compile, [''])
 test('T20723', normal, compile, [''])
-
+test('T20989', normal, compile, [''])

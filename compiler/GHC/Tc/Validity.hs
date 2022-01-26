@@ -1417,6 +1417,10 @@ check_special_inst_head dflags is_boot is_sig ctxt clas cls_args
         ; when (safeInferOn dflags) (recordUnsafeInfer emptyMessages) }
 
   | clas_nm == hasFieldClassName
+  , not quantified_constraint
+  -- Don't do any validity checking for HasField contexts
+  -- inside quantified constraints (#20989): the validity checks
+  -- only apply to user-written instances.
   = checkHasFieldInst clas cls_args
 
   | isCTupleClass clas
