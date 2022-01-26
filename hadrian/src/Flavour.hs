@@ -6,6 +6,7 @@ module Flavour
   , flavourTransformers
   , addArgs
   , splitSections, splitSectionsIf
+  , disableTerminfo
   , enableThreadSanitizer
   , enableDebugInfo, enableTickyGhc
   , viaLlvmBackend
@@ -38,6 +39,7 @@ flavourTransformers = M.fromList
     , "debug_info" =: enableDebugInfo
     , "ticky_ghc" =: enableTickyGhc
     , "split_sections" =: splitSections
+    , "no_terminfo" =: disableTerminfo
     , "thread_sanitizer" =: enableThreadSanitizer
     , "llvm" =: viaLlvmBackend
     , "profiled_ghc" =: enableProfiledGhc
@@ -145,6 +147,13 @@ splitSections :: Flavour -> Flavour
 splitSections = splitSectionsIf (/=ghc)
 -- Disable section splitting for the GHC library. It takes too long and
 -- there is little benefit.
+
+-- | Disable @terminfo@ support.
+disableTerminfo :: Flavour -> Flavour
+disableTerminfo = addArgs $ mconcat
+    [ package compiler ? builder (Cabal Flags) ? arg "-terminfo"
+    , package haskeline ? builder (Cabal Flags) ? arg "-terminfo"
+    ]
 
 enableThreadSanitizer :: Flavour -> Flavour
 enableThreadSanitizer = addArgs $ mconcat

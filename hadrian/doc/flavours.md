@@ -206,6 +206,11 @@ The supported transformers are listed below:
             library due to the long linking times that this causes).</td>
     </tr>
     <tr>
+        <td><code>no_terminfo</code></td>
+        <td>Build the compiler without <code>terminfo</code> support. Some line
+        editing functionality will be unavailable.</td>
+    </tr>
+    <tr>
         <td><code>thread_sanitizer</code></td>
         <td>Build the runtime system with ThreadSanitizer support</td>
     </tr>
