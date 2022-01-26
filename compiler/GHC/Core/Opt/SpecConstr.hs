@@ -2199,8 +2199,7 @@ callToPats env bndr_occs call@(Call fn args con_env)
                 -- for an example. For explanation of determinism
                 -- considerations See Note [Unique Determinism] in GHC.Types.Unique.
 
-              in_scope_vars = getInScopeVars in_scope
-              is_in_scope v = v `elemVarSet` in_scope_vars
+              is_in_scope v = v `elemInScopeSet` in_scope
               qvars         = filterOut is_in_scope pat_fvs
                 -- Quantify over variables that are not in scope
                 -- at the call site

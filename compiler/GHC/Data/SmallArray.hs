@@ -7,7 +7,11 @@ module GHC.Data.SmallArray
   ( SmallMutableArray (..)
   , SmallArray (..)
   , newSmallArray
+  , getSizeSmallArray
+  , readSmallArray
   , writeSmallArray
+  , copySmallArray
+  , resizeSmallArray
   , freezeSmallArray
   , unsafeFreezeSmallArray
   , indexSmallArray
@@ -32,15 +36,55 @@ newSmallArray
 newSmallArray (I# sz) x s = case newSmallArray# sz x s of
   (# s', a #) -> (# s', SmallMutableArray a #)
 
+getSizeSmallArray
+  :: SmallMutableArray s a -- ^ array
+  -> State# s
+  -> (# State# s, Int #)
+{-# INLINE getSizeSmallArray #-}
+getSizeSmallArray (SmallMutableArray a) s = case getSizeofSmallMutableArray# a s of
+  (# s', n #) -> (# s', I# n #)
+
+
+readSmallArray
+  :: SmallMutableArray s a -- ^ array
+  -> Int                   -- ^ index
+  -> State# s
+  -> (# State# s, a #)
+{-# INLINE readSmallArray #-}
+readSmallArray (SmallMutableArray a) (I# i) s = readSmallArray# a i s
+
 writeSmallArray
   :: SmallMutableArray s a -- ^ array
   -> Int                   -- ^ index
   -> a                     -- ^ new element
   -> State# s
-  -> State# s
+  -> (# State# s, () #)
 {-# INLINE writeSmallArray #-}
-writeSmallArray (SmallMutableArray a) (I# i) x = writeSmallArray# a i x
+writeSmallArray (SmallMutableArray a) (I# i) x s = (# writeSmallArray# a i x s, () #)
 
+-- | Copy a slice of a mutable array.
+copySmallArray
+  :: SmallMutableArray s a -- ^ source
+  -> Int                   -- ^ offset in source
+  -> SmallMutableArray s a -- ^ destination
+  -> Int                   -- ^ offset in dest
+  -> Int                   -- ^ number of elements to copy
+  -> State# s
+  -> (# State# s, () #)
+{-# INLINE copySmallArray #-}
+copySmallArray (SmallMutableArray src) (I# offs_src) (SmallMutableArray dst) (I# offs_dst) (I# n) s =
+  (# copySmallMutableArray# src offs_src dst offs_dst n s, () #)
+
+resizeSmallArray
+  :: SmallMutableArray s a -- ^ array to resize
+  -> Int                   -- ^ new size of array
+  -> a                     -- ^ initial contents
+  -> State# s
+  -> (# State# s, SmallMutableArray s a #)
+{-# INLINE resizeSmallArray #-}
+resizeSmallArray (SmallMutableArray src) (I# size) x s =
+  case resizeSmallMutableArray# src size x s of
+    (# s', arr #) -> (# s', SmallMutableArray arr #)
 
 -- | Copy and freeze a slice of a mutable array.
 freezeSmallArray
