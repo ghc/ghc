@@ -2,8 +2,8 @@
 T19921.hs:29:8: error:
     • Could not deduce r arising from a use of ‘Dict’
       from the context: (x \/ y) \/ z
-        bound by a quantified context at T19921.hs:1:1
+        bound by a quantified context at T19921.hs:29:8-11
       or from: (x ⇒ r, (y \/ z) ⇒ r)
-        bound by a quantified context at T19921.hs:1:1
+        bound by a quantified context at T19921.hs:29:8-11
     • In the expression: Dict
       In an equation for ‘dict’: dict = Dict

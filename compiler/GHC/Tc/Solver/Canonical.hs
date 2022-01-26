@@ -871,6 +871,10 @@ solveForAll :: CtEvidence -> [TyVar] -> TcThetaType -> PredType -> Bool
 solveForAll ev tvs theta pred pend_sc
   | CtWanted { ctev_dest = dest } <- ev
   = -- See Note [Solving a Wanted forall-constraint]
+    setLclEnv (ctLocEnv loc) $
+       -- This setLclEnv is important: the emitImplicationTcS uses that
+       -- TcLclEnv for the implication, and that in turn sets the location
+       -- for the Givens when solving the constraint (#21006)
     do { let skol_info = QuantCtxtSkol
              empty_subst = mkEmptyTCvSubst $ mkInScopeSet $
                            tyCoVarsOfTypes (pred:theta) `delVarSetList` tvs
