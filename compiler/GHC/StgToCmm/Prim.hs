@@ -2222,7 +2222,7 @@ cmmLoadIndexOffExpr :: Platform
                     -> CmmExpr  -- Index
                     -> CmmExpr
 cmmLoadIndexOffExpr platform off ty base idx_ty idx
-   = CmmLoad (cmmIndexOffExpr platform off (typeWidth idx_ty) base idx) ty
+   = CmmLoad (cmmIndexOffExpr platform off (typeWidth idx_ty) base idx) ty NaturallyAligned
 
 setInfo :: CmmExpr -> CmmExpr -> CmmAGraph
 setInfo closure_ptr info_ptr = mkStore closure_ptr info_ptr
