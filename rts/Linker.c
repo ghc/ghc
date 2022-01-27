@@ -1098,6 +1098,9 @@ mmapAnonForLinker (size_t bytes)
      load address of the application.  As such we need to find a location to
      allocate at.   */
   void* region = allocaLocalBytes (bytes, &size);
+  if (region == NULL) {
+      return NULL;
+  }
   return VirtualAlloc(region, size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 }
 
