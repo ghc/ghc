@@ -190,7 +190,7 @@ mkTaggedObjectLoad platform reg base offset tag
 
 tagToClosure :: Platform -> TyCon -> CmmExpr -> CmmExpr
 tagToClosure platform tycon tag
-  = CmmLoad (cmmOffsetExprW platform closure_tbl tag) (bWord platform)
+  = cmmLoadBWord platform (cmmOffsetExprW platform closure_tbl tag)
   where closure_tbl = CmmLit (CmmLabel lbl)
         lbl = mkClosureTableLabel (tyConName tycon) NoCafRefs
 
@@ -616,7 +616,7 @@ whenUpdRemSetEnabled code = do
     platform <- getPlatform
     do_it <- getCode code
     let
-      enabled = CmmLoad (CmmLit $ CmmLabel mkNonmovingWriteBarrierEnabledLabel) (bWord platform)
+      enabled = cmmLoadBWord platform (CmmLit $ CmmLabel mkNonmovingWriteBarrierEnabledLabel)
       zero = zeroExpr platform
       is_enabled = cmmNeWord platform enabled zero
     the_if <- mkCmmIfThenElse' is_enabled do_it mkNop (Just False)

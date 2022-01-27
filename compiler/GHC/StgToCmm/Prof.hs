@@ -397,7 +397,7 @@ ldvEnter cl_ptr = do
         -- don't forget to subtract node's tag
         ldv_wd = ldvWord platform cl_ptr
         new_ldv_wd = cmmOrWord platform
-                        (cmmAndWord platform (CmmLoad ldv_wd (bWord platform))
+                        (cmmAndWord platform (cmmLoadBWord platform ldv_wd)
                                              (CmmLit (mkWordCLit platform (pc_ILDV_CREATE_MASK constants))))
                         (cmmOrWord platform (loadEra platform) (CmmLit (mkWordCLit platform (pc_ILDV_STATE_USE constants))))
     ifProfiling $

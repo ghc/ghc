@@ -304,10 +304,9 @@ saveThreadState profile = do
 
    , -- tso->stackobj->sp = Sp;
      mkStore (cmmOffset platform
-                        (CmmLoad (cmmOffset platform
+                        (cmmLoadBWord platform (cmmOffset platform
                                             (CmmReg (CmmLocal tso))
-                                            (tso_stackobj profile))
-                                 (bWord platform))
+                                            (tso_stackobj profile)))
                         (stack_SP profile))
              spExpr
 
@@ -445,7 +444,7 @@ closeNursery profile tso = do
     let alloc =
            CmmMachOp (mo_wordSub platform)
               [ cmmOffsetW platform hpExpr 1
-              , CmmLoad (nursery_bdescr_start platform cnreg) (bWord platform)
+              , cmmLoadBWord platform (nursery_bdescr_start platform cnreg)
               ]
 
         alloc_limit = cmmOffset platform (CmmReg tsoreg) (tso_alloc_limit profile)
@@ -474,9 +473,9 @@ loadThreadState profile = do
     -- tso = CurrentTSO;
     mkAssign (CmmLocal tso) currentTSOExpr,
     -- stack = tso->stackobj;
-    mkAssign (CmmLocal stack) (CmmLoad (cmmOffset platform (CmmReg (CmmLocal tso)) (tso_stackobj profile)) (bWord platform)),
+    mkAssign (CmmLocal stack) (cmmLoadBWord platform (cmmOffset platform (CmmReg (CmmLocal tso)) (tso_stackobj profile))),
     -- Sp = stack->sp;
-    mkAssign spReg (CmmLoad (cmmOffset platform (CmmReg (CmmLocal stack)) (stack_SP profile)) (bWord platform)),
+    mkAssign spReg (cmmLoadBWord platform (cmmOffset platform (CmmReg (CmmLocal stack)) (stack_SP profile))),
     -- SpLim = stack->stack + RESERVED_STACK_WORDS;
     mkAssign spLimReg (cmmOffsetW platform (cmmOffset platform (CmmReg (CmmLocal stack)) (stack_STACK profile))
                                 (pc_RESERVED_STACK_WORDS (platformConstants platform))),
@@ -544,12 +543,12 @@ openNursery profile tso = do
   -- stg_returnToStackTop in rts/StgStartup.cmm.
   pure $ catAGraphs [
      mkAssign cnreg currentNurseryExpr,
-     mkAssign bdfreereg  (CmmLoad (nursery_bdescr_free platform cnreg)  (bWord platform)),
+     mkAssign bdfreereg  (cmmLoadBWord platform (nursery_bdescr_free platform cnreg)),
 
      -- Hp = CurrentNursery->free - 1;
      mkAssign hpReg (cmmOffsetW platform (CmmReg bdfreereg) (-1)),
 
-     mkAssign bdstartreg (CmmLoad (nursery_bdescr_start platform cnreg) (bWord platform)),
+     mkAssign bdstartreg (cmmLoadBWord platform (nursery_bdescr_start platform cnreg)),
 
      -- HpLim = CurrentNursery->start +
      --              CurrentNursery->blocks*BLOCK_SIZE_W - 1;

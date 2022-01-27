@@ -63,6 +63,7 @@ import GHC.CmmToAsm.Types
 import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm
 import GHC.Cmm.CLabel
+import GHC.Cmm.Utils (cmmLoadBWord)
 
 import GHC.Types.Basic
 
@@ -134,7 +135,7 @@ cmmMakeDynamicReference config referenceKind lbl
         AccessViaSymbolPtr -> do
               let symbolPtr = mkDynamicLinkerLabel SymbolPtr lbl
               addImport symbolPtr
-              return $ CmmLoad (cmmMakePicReference config symbolPtr) (bWord platform)
+              return $ cmmLoadBWord platform (cmmMakePicReference config symbolPtr)
 
         AccessDirectly -> case referenceKind of
                 -- for data, we might have to make some calculations:

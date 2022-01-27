@@ -89,7 +89,7 @@ emitReturn results
        ; case sequel of
            Return ->
              do { adjustHpBackwards
-                ; let e = CmmLoad (CmmStackSlot Old updfr_off) (gcWord platform)
+                ; let e = cmmLoadGCWord platform (CmmStackSlot Old updfr_off)
                 ; emit (mkReturn profile (entryCode platform e) results updfr_off)
                 }
            AssignTo regs adjust ->

@@ -461,8 +461,8 @@ wordAligned opts e
 
 -- | Takes a closure pointer and returns the info table pointer
 closureInfoPtr :: PtrOpts -> CmmExpr -> CmmExpr
-closureInfoPtr opts e =
-    CmmLoad (wordAligned opts e) (bWord (profilePlatform (po_profile opts)))
+closureInfoPtr (PtrOpts profile align_check) e =
+    cmmLoadBWord  (profilePlatform profile) (wordAligned platform align_check e)
 
 -- | Takes an info pointer (the first word of a closure) and returns its entry
 -- code
@@ -470,7 +470,7 @@ entryCode :: Platform -> CmmExpr -> CmmExpr
 entryCode platform e =
  if platformTablesNextToCode platform
       then e
-      else CmmLoad e (bWord platform)
+      else cmmLoadBWord platform e
 
 -- | Takes a closure pointer, and return the *zero-indexed*
 -- constructor tag obtained from the info table

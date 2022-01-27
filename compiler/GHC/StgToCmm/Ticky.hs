@@ -376,7 +376,7 @@ registerTickyCtr ctr_lbl = do
     let locked = cmmEqWord platform (CmmReg $ CmmLocal old) (zeroExpr platform)
     emit =<< mkCmmIfThen locked register_stmts
 
-  let test = cmmEqWord platform (CmmLoad registeredp (bWord platform)) (zeroExpr platform)
+  let test = cmmEqWord platform (cmmLoadBWord platform registeredp) (zeroExpr platform)
   emit =<< mkCmmIfThen test cas_test
 
 tickyReturnOldCon, tickyReturnNewCon :: RepArity -> FCode ()
