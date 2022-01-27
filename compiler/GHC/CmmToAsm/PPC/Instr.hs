@@ -391,9 +391,6 @@ regUsageOfInstr platform instr
 interesting :: Platform -> Reg -> Bool
 interesting _        (RegVirtual _)              = True
 interesting platform (RegReal (RealRegSingle i)) = freeReg platform i
-interesting _        (RegReal (RealRegPair{}))
-    = panic "PPC.Instr.interesting: no reg pairs on this arch"
-
 
 
 -- | Apply a given mapping to all the register references in this

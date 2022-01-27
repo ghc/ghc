@@ -8,7 +8,6 @@ import GHC.Platform.Reg.Class
 import GHC.Platform.Reg
 
 import GHC.Utils.Outputable
-import GHC.Utils.Panic
 import GHC.Platform
 
 import Data.Word
@@ -38,9 +37,6 @@ releaseReg (RealRegSingle r) (FreeRegs g f)
     | r > 31    = FreeRegs g (f .|. (1 `shiftL` (r - 32)))
     | otherwise = FreeRegs (g .|. (1 `shiftL` r)) f
 
-releaseReg _ _
-        = panic "RegAlloc.Linear.PPC.releaseReg: bad reg"
-
 initFreeRegs :: Platform -> FreeRegs
 initFreeRegs platform = foldl' (flip releaseReg) noFreeRegs (allocatableRegs platform)
 
@@ -59,5 +55,3 @@ allocateReg (RealRegSingle r) (FreeRegs g f)
     | r > 31    = FreeRegs g (f .&. complement (1 `shiftL` (r - 32)))
     | otherwise = FreeRegs (g .&. complement (1 `shiftL` r)) f
 
-allocateReg _ _
-        = panic "RegAlloc.Linear.PPC.allocateReg: bad reg"

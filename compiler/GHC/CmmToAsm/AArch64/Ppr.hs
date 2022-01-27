@@ -339,7 +339,6 @@ pprOp plat op = case op of
 pprReg :: Width -> Reg -> SDoc
 pprReg w r = case r of
   RegReal    (RealRegSingle i) -> ppr_reg_no w i
-  RegReal    (RealRegPair{})   -> panic "AArch64.pprReg: no reg pairs on this arch!"
   -- virtual regs should not show up, but this is helpful for debugging.
   RegVirtual (VirtualRegI u)   -> text "%vI_" <> pprUniqueAlways u
   RegVirtual (VirtualRegF u)   -> text "%vF_" <> pprUniqueAlways u

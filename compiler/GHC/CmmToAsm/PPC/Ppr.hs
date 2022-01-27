@@ -199,7 +199,6 @@ pprReg :: Reg -> SDoc
 pprReg r
   = case r of
       RegReal    (RealRegSingle i) -> ppr_reg_no i
-      RegReal    (RealRegPair{})   -> panic "PPC.pprReg: no reg pairs on this arch"
       RegVirtual (VirtualRegI  u)  -> text "%vI_"   <> pprUniqueAlways u
       RegVirtual (VirtualRegHi u)  -> text "%vHi_"  <> pprUniqueAlways u
       RegVirtual (VirtualRegF  u)  -> text "%vF_"   <> pprUniqueAlways u

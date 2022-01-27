@@ -295,7 +295,6 @@ pprReg platform f r
       RegReal    (RealRegSingle i) ->
           if target32Bit platform then ppr32_reg_no f i
                                   else ppr64_reg_no f i
-      RegReal    (RealRegPair _ _) -> panic "X86.Ppr: no reg pairs on this arch"
       RegVirtual (VirtualRegI  u)  -> text "%vI_"   <> pprUniqueAlways u
       RegVirtual (VirtualRegHi u)  -> text "%vHi_"  <> pprUniqueAlways u
       RegVirtual (VirtualRegF  u)  -> text "%vF_"   <> pprUniqueAlways u

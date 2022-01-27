@@ -164,8 +164,6 @@ regUsageOfInstr platform instr = case instr of
         interesting _        (RegVirtual _)                 = True
         interesting _        (RegReal (RealRegSingle (-1))) = False
         interesting platform (RegReal (RealRegSingle i))    = freeReg platform i
-        interesting _        (RegReal (RealRegPair{}))
-            = panic "AArch64.Instr.interesting: no reg pairs on this arch"
 
 -- Save caller save registers
 -- This is x0-x18

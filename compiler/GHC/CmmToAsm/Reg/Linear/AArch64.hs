@@ -71,7 +71,6 @@ allocateReg (RealRegSingle r) (FreeRegs g f)
     | r < 32 && testBit g r = FreeRegs (clearBit g r) f
     | r > 31 = panic $ "Linear.AArch64.allocReg: double allocation of float reg v" ++ show (r - 32) ++ "; " ++ showBits f
     | otherwise = pprPanic "Linear.AArch64.allocReg" $ text ("double allocation of gp reg x" ++ show r ++ "; " ++ showBits g)
-allocateReg _ _ = panic "Linear.AArch64.allocReg: bad reg"
 
 -- we start from 28 downwards... the logic is similar to the ppc logic.
 -- 31 is Stack Pointer
@@ -134,4 +133,3 @@ releaseReg (RealRegSingle r) (FreeRegs g f)
   | r < 32 && testBit g r = pprPanic "Linear.AArch64.releaseReg" (text "can't release non-allocated reg x" <> int r)
   | r > 31 = FreeRegs g (setBit f (r - 32))
   | otherwise = FreeRegs (setBit g r) f
-releaseReg _ _ = pprPanic "Linear.AArch64.releaseReg" (text "bad reg")

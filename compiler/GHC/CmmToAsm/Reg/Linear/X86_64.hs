@@ -8,7 +8,6 @@ import GHC.Prelude
 import GHC.CmmToAsm.X86.Regs
 import GHC.Platform.Reg.Class
 import GHC.Platform.Reg
-import GHC.Utils.Panic
 import GHC.Platform
 import GHC.Utils.Outputable
 
@@ -23,9 +22,6 @@ noFreeRegs = FreeRegs 0
 releaseReg :: RealReg -> FreeRegs -> FreeRegs
 releaseReg (RealRegSingle n) (FreeRegs f)
         = FreeRegs (f .|. (1 `shiftL` n))
-
-releaseReg _ _
-        = panic "RegAlloc.Linear.X86_64.FreeRegs.releaseReg: no reg"
 
 initFreeRegs :: Platform -> FreeRegs
 initFreeRegs platform
@@ -47,8 +43,4 @@ getFreeRegs platform cls (FreeRegs f) = go f 0
 allocateReg :: RealReg -> FreeRegs -> FreeRegs
 allocateReg (RealRegSingle r) (FreeRegs f)
         = FreeRegs (f .&. complement (1 `shiftL` r))
-
-allocateReg _ _
-        = panic "RegAlloc.Linear.X86_64.FreeRegs.allocateReg: no reg"
-
 

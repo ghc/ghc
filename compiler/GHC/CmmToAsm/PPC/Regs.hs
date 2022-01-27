@@ -100,7 +100,6 @@ realRegSqueeze cls rr
                         | regNo < 32    -> 1     -- first fp reg is 32
                         | otherwise     -> 0
 
-                RealRegPair{}           -> 0
 
         RcDouble
          -> case rr of
@@ -108,7 +107,6 @@ realRegSqueeze cls rr
                         | regNo < 32    -> 0
                         | otherwise     -> 1
 
-                RealRegPair{}           -> 0
 
         _other -> 0
 
@@ -238,9 +236,6 @@ classOfRealReg :: RealReg -> RegClass
 classOfRealReg (RealRegSingle i)
         | i < 32        = RcInteger
         | otherwise     = RcDouble
-
-classOfRealReg (RealRegPair{})
-        = panic "regClass(ppr): no reg pairs on this architecture"
 
 showReg :: RegNo -> String
 showReg n

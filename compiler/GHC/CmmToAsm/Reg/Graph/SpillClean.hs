@@ -516,9 +516,6 @@ instance Uniquable Store where
         | RegReal (RealRegSingle i)     <- r
         = mkRegSingleUnique i
 
-        | RegReal (RealRegPair r1 r2)   <- r
-        = mkRegPairUnique (r1 * 65535 + r2)
-
         | otherwise
         = error $ "RegSpillClean.getUnique: found virtual reg during spill clean,"
                 ++ "only real regs expected."

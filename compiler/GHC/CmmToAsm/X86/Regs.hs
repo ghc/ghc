@@ -96,16 +96,11 @@ realRegSqueeze cls rr
                         | regNo < firstxmm -> 1
                         | otherwise     -> 0
 
-                RealRegPair{}           -> 0
-
         RcDouble
          -> case rr of
                 RealRegSingle regNo
                         | regNo >= firstxmm  -> 1
                         | otherwise     -> 0
-
-                RealRegPair{}           -> 0
-
 
         _other -> 0
 
@@ -249,7 +244,6 @@ classOfRealReg platform reg
             | i <= lastint platform -> RcInteger
             | i <= lastxmm platform -> RcDouble
             | otherwise             -> panic "X86.Reg.classOfRealReg registerSingle too high"
-        _   -> panic "X86.Regs.classOfRealReg: RegPairs on this arch"
 
 -- | Get the name of the register with this number.
 -- NOTE: fixme, we dont track which "way" the XMM registers are used
