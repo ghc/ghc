@@ -605,7 +605,8 @@ fixupStack old_stack new_stack = concatMap move new_locs
      move (r,n)
        | Just (_,m) <- lookupUFM old_map r, n == m = []
        | otherwise = [CmmStore (CmmStackSlot Old n)
-                               (CmmReg (CmmLocal r))]
+                               (CmmReg (CmmLocal r))
+                               NaturallyAligned]
 
 
 
@@ -703,7 +704,7 @@ setupStackFrame platform lbl liveness updfr_off ret_args stack0
 futureContinuation :: Block CmmNode O O -> Maybe BlockId
 futureContinuation middle = foldBlockNodesB f middle Nothing
    where f :: CmmNode a b -> Maybe BlockId -> Maybe BlockId
-         f (CmmStore (CmmStackSlot (Young l) _) (CmmLit (CmmBlock _))) _
+         f (CmmStore (CmmStackSlot (Young l) _) (CmmLit (CmmBlock _)) _) _
                = Just l
          f _ r = r
 
@@ -752,6 +753,7 @@ allocate platform ret_off live stackmap@StackMap{ sm_sp = sp0
                        select_save to_save (slot:stack)
                  -> let assig = CmmStore (CmmStackSlot Old n')
                                          (CmmReg (CmmLocal r))
+                                         NaturallyAligned
                         n' = plusW platform n 1
                    in
                         (to_save', stack', n', assig : assigs, (r,(r,n')):regs)
@@ -786,6 +788,7 @@ allocate platform ret_off live stackmap@StackMap{ sm_sp = sp0
                   n' = n + localRegBytes platform r
                   assig = CmmStore (CmmStackSlot Old n')
                                    (CmmReg (CmmLocal r))
+                                   NaturallyAligned
 
        trim_sp
           | not (null push_regs) = push_sp
@@ -995,7 +998,7 @@ elimStackStores stackmap stackmaps area_off nodes
     go _stackmap [] = []
     go stackmap (n:ns)
      = case n of
-         CmmStore (CmmStackSlot area m) (CmmReg (CmmLocal r))
+         CmmStore (CmmStackSlot area m) (CmmReg (CmmLocal r)) _
             | Just (_,off) <- lookupUFM (sm_regs stackmap) r
             , area_off area + m == off
             -> go stackmap ns

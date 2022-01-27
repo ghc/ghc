@@ -152,7 +152,7 @@ fixStgRegStmt platform stmt = fixAssign $ mapExpDeep fixExpr stmt
             let baseAddr = get_GlobalReg_addr platform reg
             in case reg `elem` activeStgRegs platform of
                 True  -> CmmAssign (CmmGlobal reg) src
-                False -> CmmStore baseAddr src
+                False -> CmmStore baseAddr src NaturallyAligned
         other_stmt -> other_stmt
 
     fixExpr expr = case expr of
