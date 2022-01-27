@@ -82,7 +82,6 @@ import GHC.Prelude
 
 import qualified GHC.CmmToAsm.X86   as X86
 import qualified GHC.CmmToAsm.PPC   as PPC
-import qualified GHC.CmmToAsm.SPARC as SPARC
 import qualified GHC.CmmToAsm.AArch64 as AArch64
 
 import GHC.CmmToAsm.Reg.Liveness
@@ -161,8 +160,6 @@ nativeCodeGen logger config modLoc h us cmms
       ArchX86_64    -> nCG' (X86.ncgX86_64  config)
       ArchPPC       -> nCG' (PPC.ncgPPC     config)
       ArchPPC_64 _  -> nCG' (PPC.ncgPPC     config)
-      ArchSPARC     -> nCG' (SPARC.ncgSPARC config)
-      ArchSPARC64   -> panic "nativeCodeGen: No NCG for SPARC64"
       ArchS390X     -> panic "nativeCodeGen: No NCG for S390X"
       ArchARM {}    -> panic "nativeCodeGen: No NCG for ARM"
       ArchAArch64   -> nCG' (AArch64.ncgAArch64 config)

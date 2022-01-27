@@ -26,13 +26,11 @@ import GHC.Platform
 --      allocateReg f r = filter (/= r) f
 
 import qualified GHC.CmmToAsm.Reg.Linear.PPC     as PPC
-import qualified GHC.CmmToAsm.Reg.Linear.SPARC   as SPARC
 import qualified GHC.CmmToAsm.Reg.Linear.X86     as X86
 import qualified GHC.CmmToAsm.Reg.Linear.X86_64  as X86_64
 import qualified GHC.CmmToAsm.Reg.Linear.AArch64 as AArch64
 
 import qualified GHC.CmmToAsm.PPC.Instr     as PPC.Instr
-import qualified GHC.CmmToAsm.SPARC.Instr   as SPARC.Instr
 import qualified GHC.CmmToAsm.X86.Instr     as X86.Instr
 import qualified GHC.CmmToAsm.AArch64.Instr as AArch64.Instr
 
@@ -66,19 +64,13 @@ instance FR AArch64.FreeRegs where
     frInitFreeRegs = AArch64.initFreeRegs
     frReleaseReg = \_ -> AArch64.releaseReg
 
-instance FR SPARC.FreeRegs where
-    frAllocateReg  = SPARC.allocateReg
-    frGetFreeRegs  = \_ -> SPARC.getFreeRegs
-    frInitFreeRegs = SPARC.initFreeRegs
-    frReleaseReg   = SPARC.releaseReg
-
 maxSpillSlots :: NCGConfig -> Int
 maxSpillSlots config = case platformArch (ncgPlatform config) of
    ArchX86       -> X86.Instr.maxSpillSlots config
    ArchX86_64    -> X86.Instr.maxSpillSlots config
    ArchPPC       -> PPC.Instr.maxSpillSlots config
    ArchS390X     -> panic "maxSpillSlots ArchS390X"
-   ArchSPARC     -> SPARC.Instr.maxSpillSlots config
+   ArchSPARC     -> panic "maxSpillSlots ArchSPARC"
    ArchSPARC64   -> panic "maxSpillSlots ArchSPARC64"
    ArchARM _ _ _ -> panic "maxSpillSlots ArchARM"
    ArchAArch64   -> AArch64.Instr.maxSpillSlots config

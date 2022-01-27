@@ -242,7 +242,6 @@ Library
         GHC.CmmToAsm.Reg.Linear.FreeRegs
         GHC.CmmToAsm.Reg.Linear.JoinToTargets
         GHC.CmmToAsm.Reg.Linear.PPC
-        GHC.CmmToAsm.Reg.Linear.SPARC
         GHC.CmmToAsm.Reg.Linear.StackMap
         GHC.CmmToAsm.Reg.Linear.State
         GHC.CmmToAsm.Reg.Linear.Stats
@@ -251,24 +250,6 @@ Library
         GHC.CmmToAsm.Reg.Liveness
         GHC.CmmToAsm.Reg.Target
         GHC.CmmToAsm.Reg.Utils
-        GHC.CmmToAsm.SPARC
-        GHC.CmmToAsm.SPARC.AddrMode
-        GHC.CmmToAsm.SPARC.Base
-        GHC.CmmToAsm.SPARC.CodeGen
-        GHC.CmmToAsm.SPARC.CodeGen.Amode
-        GHC.CmmToAsm.SPARC.CodeGen.Base
-        GHC.CmmToAsm.SPARC.CodeGen.CondCode
-        GHC.CmmToAsm.SPARC.CodeGen.Expand
-        GHC.CmmToAsm.SPARC.CodeGen.Gen32
-        GHC.CmmToAsm.SPARC.CodeGen.Gen64
-        GHC.CmmToAsm.SPARC.CodeGen.Sanity
-        GHC.CmmToAsm.SPARC.Cond
-        GHC.CmmToAsm.SPARC.Imm
-        GHC.CmmToAsm.SPARC.Instr
-        GHC.CmmToAsm.SPARC.Ppr
-        GHC.CmmToAsm.SPARC.Regs
-        GHC.CmmToAsm.SPARC.ShortcutJump
-        GHC.CmmToAsm.SPARC.Stack
         GHC.CmmToAsm.Types
         GHC.CmmToAsm.Utils
         GHC.CmmToAsm.X86
