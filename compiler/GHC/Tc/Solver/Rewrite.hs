@@ -865,8 +865,10 @@ rewrite_exact_fam_app tc tys
          { Just (redn, fr@(_, inert_eq_rel))
 
              | fr `eqCanRewriteFR` (flavour, eq_rel) ->
-                 do { traceRewriteM "rewrite family application with inert"
-                                (ppr tc <+> ppr xis $$ ppr redn)
+                 do { traceRewriteM "rewrite family application with inert" $
+                      vcat [ ppr tc <+> ppr xis
+                           , ppUnless (flavour == Derived) (ppr redn) ]
+                           -- Deriveds have no evidence, so we can't print the reduction
                     ; finish True (homogenise downgraded_redn) }
                -- this will sometimes duplicate an inert in the cache,
                -- but avoiding doing so had no impact on performance, and
