@@ -14,6 +14,13 @@ of warnings.
 To turn off an individual warning ``-W<wflag>``, use ``-Wno-<wflag>``.
 To reverse ``-Werror``, which makes all warnings into errors, use ``-Wwarn``.
 
+.. note::
+   In GHC < 8 the syntax for ``-W<wflag>`` was ``-fwarn-<wflag>``
+   (e.g. ``-fwarn-incomplete-patterns``).
+   This spelling is deprecated, but still accepted for backwards compatibility.
+   Likewise, ``-Wno-<wflag>`` used to be ``fno-warn-<wflag>``
+   (e.g. ``-fno-warn-incomplete-patterns``).
+
 
 .. ghc-flag:: -Wdefault
     :shortdesc: enable default flags
