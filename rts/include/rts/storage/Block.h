@@ -339,8 +339,6 @@ void freeChain(bdescr *p);
 void freeGroup_lock(bdescr *p);
 void freeChain_lock(bdescr *p);
 
-bdescr * splitBlockGroup (bdescr *bd, uint32_t blocks);
-
 /* Round a value to megablocks --------------------------------------------- */
 
 // We want to allocate an object around a given size, round it up or
