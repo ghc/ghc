@@ -16,7 +16,9 @@ TYPE SIGNATURES
     (Functor f, Num t, Num b) =>
     (t -> f b) -> f b
   test2b ::
-    forall {m :: * -> *} {t} {a}. (Monad m, Num t) => (t -> a) -> m a
+    forall {f :: * -> *} {t} {a}.
+    (Applicative f, Num t) =>
+    (t -> a) -> f a
   test2c ::
     forall {f :: * -> *} {t} {b}.
     (Functor f, Num t, Num b) =>
