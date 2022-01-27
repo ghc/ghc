@@ -1257,6 +1257,7 @@ getGhcVersionPathName dflags unit_env = do
       (x:_) -> return x
 
 -- Note [-fPIC for assembler]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- When compiling .c source file GHC's driver pipeline basically
 -- does the following two things:
 --   1. ${CC}              -S 'PIC_CFLAGS' source.c

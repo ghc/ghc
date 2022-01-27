@@ -160,7 +160,7 @@ typedef struct StgTSO_ {
      * stay negative until we get around to checking it.
      *
      * Use only PK_Int64/ASSIGN_Int64 macros to get/set the value of alloc_limit
-     * in C code otherwise you will cause alignment issues on SPARC
+     * in C code otherwise you will cause alignment issues
      */
     StgInt64  alloc_limit;     /* in bytes */
 

@@ -50,11 +50,6 @@ word8ToWord# w = w
 -- -----------------------------------------------------------------------------
 -- Converting floating-point literals to integrals for printing
 
--- ToDo: this code is currently shared between SPARC and LLVM.
---       Similar functions for (single precision) floats are
---       present in the SPARC backend only. We need to fix both
---       LLVM and SPARC.
-
 castDoubleToWord8Array :: STUArray s Int Double -> ST s (STUArray s Int Word8)
 castDoubleToWord8Array = U.castSTUArray
 

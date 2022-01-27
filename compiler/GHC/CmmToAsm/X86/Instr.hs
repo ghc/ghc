@@ -754,14 +754,7 @@ isMetaInstr instr
         DELTA{}         -> True
         _               -> False
 
-
-
----  TODO: why is there
 -- | Make a reg-reg move instruction.
---      On SPARC v8 there are no instructions to move directly between
---      floating point and integer regs. If we need to do that then we
---      have to go via memory.
---
 mkRegRegMoveInstr
     :: Platform
     -> Reg
