@@ -1301,6 +1301,10 @@ ocVerifyImage_PEi386 ( ObjectCode* oc )
       return false;
     }
 
+   i = 0;
+   IF_DEBUG(linker_verbose, i=1);
+   if (i == 0) return true;
+
    /* Print the section table. */
    debugBelch("\n" );
    for (i = 0; i < info->numberOfSections; i++) {
