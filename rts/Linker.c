@@ -295,7 +295,7 @@ int ghciInsertSymbolTable(
    else if (pinfo->type != type)
    {
        debugBelch("Symbol type mismatch.\n");
-       debugBelch("Symbol %s was defined by %s to be a %s symbol.\n",
+       debugBelch("Symbol %s was defined by %" PATH_FMT " to be a %s symbol.\n",
                   key, obj_name, symbolTypeString(type));
        debugBelch("      yet was defined by %s to be a %s symbol.\n",
                   pinfo->owner->fileName, symbolTypeString(pinfo->type));
@@ -1370,7 +1370,7 @@ freePreloadObjectFile (ObjectCode *oc)
  */
 void freeObjectCode (ObjectCode *oc)
 {
-    IF_DEBUG(linker, debugBelch("freeObjectCode: %s", oc->fileName));
+    IF_DEBUG(linker, debugBelch("freeObjectCode: %" PATH_FMT, oc->fileName));
 
     if (oc->type == DYNAMIC_OBJECT) {
 #if defined(OBJFORMAT_ELF)
@@ -1471,7 +1471,7 @@ mkOc( ObjectType type, pathchar *path, char *image, int imageSize,
    ObjectCode* oc;
 
 
-   IF_DEBUG(linker, debugBelch("mkOc: %s\n", path));
+   IF_DEBUG(linker, debugBelch("mkOc: %" PATH_FMT "\n", path));
    oc = stgMallocBytes(sizeof(ObjectCode), "mkOc(oc)");
 
    oc->info = NULL;
