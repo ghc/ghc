@@ -10,7 +10,6 @@
 #include "rts/PosixSource.h"
 #include "Rts.h"
 
-#include "Arena.h"
 #include "Capability.h"
 #include "Hash.h"
 #include "IPE.h"
