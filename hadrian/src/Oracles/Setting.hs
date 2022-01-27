@@ -280,8 +280,8 @@ ghcWithInterpreter = do
     goodOs <- anyTargetOs [ "mingw32", "cygwin32", "linux", "solaris2"
                           , "freebsd", "dragonfly", "netbsd", "openbsd"
                           , "darwin", "kfreebsdgnu" ]
-    goodArch <- anyTargetArch [ "i386", "x86_64", "powerpc", "sparc"
-                              , "sparc64", "arm", "aarch64", "s390x"
+    goodArch <- anyTargetArch [ "i386", "x86_64", "powerpc"
+                              , "arm", "aarch64", "s390x"
                               , "powerpc64", "powerpc64le" ]
     return $ goodOs && goodArch
 

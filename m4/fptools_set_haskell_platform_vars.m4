@@ -23,12 +23,6 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS_SHELL_FUNCTIONS],
         s390x)
             test -z "[$]2" || eval "[$]2=ArchS390X"
             ;;
-        sparc)
-            test -z "[$]2" || eval "[$]2=ArchSPARC"
-            ;;
-        sparc64)
-            test -z "[$]2" || eval "[$]2=ArchSPARC64"
-            ;;
         arm)
             GET_ARM_ISA()
             test -z "[$]2" || eval "[$]2=\"ArchARM \$ARM_ISA \$ARM_ISA_EXT \$ARM_ABI\""

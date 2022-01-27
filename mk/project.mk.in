@@ -40,7 +40,7 @@ ProjectGitCommitId = @ProjectGitCommitId@
 ################################################################################
 
 # A "platform" is the GNU cpu-type/manufacturer/operating-system target machine
-# specifier.  E.g. sparc-sun-solaris2
+# specifier.  E.g. x86_64-apple-darwin
 #
 # Build  platform: the platform on which we are doing this build
 # Host   platform: the platform on which these binaries will run

@@ -382,28 +382,6 @@ INLINE_HEADER StgDouble PK_DBL    (W_ p_src[])                 { return *(StgDou
 
 #else /* ALIGNMENT_DOUBLE > ALIGNMENT_VOID_P */
 
-/* Sparc uses two floating point registers to hold a double.  We can
- * write ASSIGN_DBL and PK_DBL by directly accessing the registers
- * independently - unfortunately this code isn't writable in C, we
- * have to use inline assembler.
- */
-#if defined(sparc_HOST_ARCH)
-
-#define ASSIGN_DBL(dst0,src) \
-    { StgPtr dst = (StgPtr)(dst0); \
-      __asm__("st %2,%0\n\tst %R2,%1" : "=m" (((P_)(dst))[0]), \
-   "=m" (((P_)(dst))[1]) : "f" (src)); \
-    }
-
-#define PK_DBL(src0) \
-    ( { StgPtr src = (StgPtr)(src0); \
-        register double d; \
-      __asm__("ld %1,%0\n\tld %2,%R0" : "=f" (d) : \
-   "m" (((P_)(src))[0]), "m" (((P_)(src))[1])); d; \
-    } )
-
-#else /* ! sparc_HOST_ARCH */
-
 INLINE_HEADER void     ASSIGN_DBL (W_ [], StgDouble);
 INLINE_HEADER StgDouble   PK_DBL     (W_ []);
 
@@ -440,8 +418,6 @@ INLINE_HEADER StgDouble PK_DBL(W_ p_src[])
     y.du.dlo = p_src[1];
     return(y.d);
 }
-
-#endif /* ! sparc_HOST_ARCH */
 
 #endif /* ALIGNMENT_DOUBLE > ALIGNMENT_UNSIGNED_INT */
 

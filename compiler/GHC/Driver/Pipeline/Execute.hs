@@ -319,16 +319,6 @@ runAsPhase with_cpp pipe_env hsc_env location input_fn = do
                           , not $ target32Bit (targetPlatform dflags)
                           ]
 
-        -- We only support SparcV9 and better because V8 lacks an atomic CAS
-        -- instruction so we have to make sure that the assembler accepts the
-        -- instruction set. Note that the user can still override this
-        -- (e.g., -mcpu=ultrasparc). GCC picks the "best" -mcpu flag
-        -- regardless of the ordering.
-        --
-        -- This is a temporary hack.
-                       ++ (if platformArch (targetPlatform dflags) == ArchSPARC
-                           then [GHC.SysTools.Option "-mcpu=v9"]
-                           else [])
                        ++ (if any (asmInfo ==) [Clang, AppleClang, AppleClang51]
                             then [GHC.SysTools.Option "-Qunused-arguments"]
                             else [])
@@ -452,17 +442,6 @@ runCcPhase cc_phase pipe_env hsc_env input_fn = do
                         isHomeUnitId home_unit baseUnitId
                           then [ "-DCOMPILING_BASE_PACKAGE" ]
                           else [])
-
-  -- We only support SparcV9 and better because V8 lacks an atomic CAS
-  -- instruction. Note that the user can still override this
-  -- (e.g., -mcpu=ultrasparc) as GCC picks the "best" -mcpu flag
-  -- regardless of the ordering.
-  --
-  -- This is a temporary hack. See #2872, commit
-  -- 5bd3072ac30216a505151601884ac88bf404c9f2
-                 ++ (if platformArch platform == ArchSPARC
-                     then ["-mcpu=v9"]
-                     else [])
 
                  -- GCC 4.6+ doesn't like -Wimplicit when compiling C++.
                  ++ (if (cc_phase /= Ccxx && cc_phase /= Cobjcxx)

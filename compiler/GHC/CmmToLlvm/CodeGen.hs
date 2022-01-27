@@ -192,10 +192,10 @@ genCall :: ForeignTarget -> [CmmFormal] -> [CmmActual] -> LlvmM StmtData
 -- Barriers need to be handled specially as they are implemented as LLVM
 -- intrinsic functions.
 genCall (PrimTarget MO_ReadBarrier) _ _ =
-    barrierUnless [ArchX86, ArchX86_64, ArchSPARC]
+    barrierUnless [ArchX86, ArchX86_64]
 
 genCall (PrimTarget MO_WriteBarrier) _ _ =
-    barrierUnless [ArchX86, ArchX86_64, ArchSPARC]
+    barrierUnless [ArchX86, ArchX86_64]
 
 genCall (PrimTarget MO_Touch) _ _ =
     return (nilOL, [])

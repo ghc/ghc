@@ -38,8 +38,6 @@ data Arch
    | ArchPPC
    | ArchPPC_64 PPC_64ABI
    | ArchS390X
-   | ArchSPARC
-   | ArchSPARC64
    | ArchARM ArmISA [ArmISAExt] ArmABI
    | ArchAArch64
    | ArchAlpha
@@ -126,8 +124,6 @@ stringEncodeArch = \case
   ArchPPC_64 ELF_V1 -> "powerpc64"
   ArchPPC_64 ELF_V2 -> "powerpc64le"
   ArchS390X         -> "s390x"
-  ArchSPARC         -> "sparc"
-  ArchSPARC64       -> "sparc64"
   ArchARM ARMv5 _ _ -> "armv5"
   ArchARM ARMv6 _ _ -> "armv6"
   ArchARM ARMv7 _ _ -> "armv7"

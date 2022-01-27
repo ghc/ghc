@@ -107,8 +107,6 @@ trivColorable platform virtualRegSqueeze realRegSqueeze RcInteger conflicts excl
                             ArchX86       -> 3
                             ArchX86_64    -> 5
                             ArchPPC       -> 16
-                            ArchSPARC     -> panic "trivColorable ArchSPARC"
-                            ArchSPARC64   -> panic "trivColorable ArchSPARC64"
                             ArchPPC_64 _  -> 15
                             ArchARM _ _ _ -> panic "trivColorable ArchARM"
                             -- We should be able to allocate *a lot* more in princple.
@@ -142,8 +140,6 @@ trivColorable platform virtualRegSqueeze realRegSqueeze RcFloat conflicts exclus
                             ArchX86       -> 0
                             ArchX86_64    -> 0
                             ArchPPC       -> 0
-                            ArchSPARC     -> panic "trivColorable ArchSPARC"
-                            ArchSPARC64   -> panic "trivColorable ArchSPARC64"
                             ArchPPC_64 _  -> 0
                             ArchARM _ _ _ -> panic "trivColorable ArchARM"
                             -- we can in princple address all the float regs as
@@ -179,8 +175,6 @@ trivColorable platform virtualRegSqueeze realRegSqueeze RcDouble conflicts exclu
                             -- "dont need to solve conflicts" count that
                             -- was chosen at some point in the past.
                             ArchPPC       -> 26
-                            ArchSPARC     -> panic "trivColorable ArchSPARC"
-                            ArchSPARC64   -> panic "trivColorable ArchSPARC64"
                             ArchPPC_64 _  -> 20
                             ArchARM _ _ _ -> panic "trivColorable ArchARM"
                             ArchAArch64   -> 32

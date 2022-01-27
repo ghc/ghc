@@ -412,8 +412,6 @@ store_load_barrier(void) {
     __asm__ __volatile__ ("sync" : : : "memory");
 #elif defined(s390x_HOST_ARCH)
     __asm__ __volatile__ ("bcr 14,0" : : : "memory");
-#elif defined(sparc_HOST_ARCH)
-    __asm__ __volatile__ ("membar #StoreLoad" : : : "memory");
 #elif defined(arm_HOST_ARCH)
     __asm__ __volatile__ ("dmb" : : : "memory");
 #elif defined(aarch64_HOST_ARCH)
@@ -437,9 +435,6 @@ load_load_barrier(void) {
     || defined(powerpc64le_HOST_ARCH)
     __asm__ __volatile__ ("lwsync" : : : "memory");
 #elif defined(s390x_HOST_ARCH)
-    __asm__ __volatile__ ("" : : : "memory");
-#elif defined(sparc_HOST_ARCH)
-    /* Sparc in TSO mode does not require load/load barriers. */
     __asm__ __volatile__ ("" : : : "memory");
 #elif defined(arm_HOST_ARCH)
     __asm__ __volatile__ ("dmb" : : : "memory");

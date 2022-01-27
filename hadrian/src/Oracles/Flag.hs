@@ -71,7 +71,6 @@ targetSupportsSMP = do
   armVer <- targetArmVersion
   goodArch <- anyTargetArch ["i386"
                             , "x86_64"
-                            , "sparc"
                             , "powerpc"
                             , "powerpc64"
                             , "powerpc64le"
