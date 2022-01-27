@@ -218,15 +218,14 @@ pprStmt platform stmt =
 
     CmmAssign dest src -> pprAssign platform dest src
 
-    CmmStore  dest src
+    CmmStore  dest src align
         | typeWidth rep == W64 && wordWidth platform /= W64
         -> (if isFloatType rep then text "ASSIGN_DBL"
                                else ptext (sLit ("ASSIGN_Word64"))) <>
            parens (mkP_ <> pprExpr1 platform dest <> comma <> pprExpr platform src) <> semi
 
         | otherwise
-        -> hsep [ pprExpr platform (CmmLoad dest rep NaturallyAligned), equals, pprExpr platform src <> semi ]
-                                                     -- TODO: Is this right?
+        -> hsep [ pprExpr platform (CmmLoad dest rep align), equals, pprExpr platform src <> semi ]
         where
           rep = cmmExprType platform src
 
@@ -1159,7 +1158,7 @@ te_Lit _ = return ()
 
 te_Stmt :: CmmNode e x -> TE ()
 te_Stmt (CmmAssign r e)         = te_Reg r >> te_Expr e
-te_Stmt (CmmStore l r)          = te_Expr l >> te_Expr r
+te_Stmt (CmmStore l r _)        = te_Expr l >> te_Expr r
 te_Stmt (CmmUnsafeForeignCall target rs es)
   = do  te_Target target
         mapM_ te_temp rs

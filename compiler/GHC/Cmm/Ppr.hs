@@ -213,8 +213,11 @@ pprNode platform node = pp_node <+> pp_debug
       CmmAssign reg expr -> ppr reg <+> equals <+> pdoc platform expr <> semi
 
       -- rep[lv] = expr;
-      CmmStore lv expr -> rep <> brackets (pdoc platform lv) <+> equals <+> pdoc platform expr <> semi
+      CmmStore lv expr align -> rep <> align_mark <> brackets (pdoc platform lv) <+> equals <+> pdoc platform expr <> semi
           where
+            align_mark = case align of
+                           Unaligned -> text "^"
+                           NaturallyAligned -> empty
             rep = ppr ( cmmExprType platform expr )
 
       -- call "ccall" foo(x, y)[r1, r2];

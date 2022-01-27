@@ -157,7 +157,7 @@ lintCmmMiddle node = case node of
                 then return ()
                 else cmmLintAssignErr (CmmAssign reg expr) erep reg_ty
 
-  CmmStore l r -> do
+  CmmStore l r _alignment -> do
             _ <- lintCmmExpr l
             _ <- lintCmmExpr r
             return ()

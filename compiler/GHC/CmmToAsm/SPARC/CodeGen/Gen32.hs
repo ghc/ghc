@@ -235,7 +235,7 @@ getRegister (CmmMachOp mop [x, y])
 
       _                 -> pprPanic "getRegister(sparc) - binary CmmMachOp (1)" (pprMachOp mop)
 
-getRegister (CmmLoad mem pk) = do
+getRegister (CmmLoad mem pk _) = do
     Amode src code <- getAmode mem
     let
         code__2 dst     = code `snocOL` LD (cmmTypeFormat pk) src dst

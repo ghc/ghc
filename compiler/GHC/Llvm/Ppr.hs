@@ -220,7 +220,8 @@ ppLlvmStatement opts stmt =
         BranchIf    cond ifT ifF  -> ind $ ppBranchIf opts cond ifT ifF
         Comment     comments      -> ind $ ppLlvmComments comments
         MkLabel     label         -> ppLlvmBlockLabel label
-        Store       value ptr     -> ind $ ppStore opts value ptr
+        Store       value ptr align
+                                  -> ind $ ppStore opts value ptr align
         Switch      scrut def tgs -> ind $ ppSwitch opts scrut def tgs
         Return      result        -> ind $ ppReturn opts result
         Expr        expr          -> ind $ ppLlvmExpression opts expr
@@ -367,7 +368,7 @@ ppCmpXChg opts addr old new s_ord f_ord =
   <+> ppSyncOrdering s_ord <+> ppSyncOrdering f_ord
 
 
-ppLoad :: LlvmOpts -> LlvmVar -> SDoc
+ppLoad :: LlvmOpts -> LlvmVar -> Maybe Int -> SDoc
 ppLoad opts var alignment =
   text "load" <+> ppr derefType <> comma <+> ppVar opts var <> align
   where
@@ -387,14 +388,14 @@ ppALoad opts ord st var =
   in text "load atomic" <+> ppr derefType <> comma <+> ppVar opts var <> sThreaded
             <+> ppSyncOrdering ord <> align
 
-ppStore :: LlvmOpts -> LlvmVar -> LlvmVar -> SDoc
-ppStore opts val dst
-    | isVecPtrVar dst = text "store" <+> ppVar opts val <> comma <+> ppVar opts dst <>
-                        comma <+> text "align 1"
-    | otherwise       = text "store" <+> ppVar opts val <> comma <+> ppVar opts dst
+ppStore :: LlvmOpts -> LlvmVar -> LlvmVar -> LMAlign -> SDoc
+ppStore opts val dst alignment =
+    text "store" <+> ppVar opts val <> comma <+> ppVar opts dst <> align
   where
-    isVecPtrVar :: LlvmVar -> Bool
-    isVecPtrVar = isVector . pLower . getVarType
+    align =
+      case alignment of
+        Just n  -> text ", align" <+> ppr n
+        Nothing -> empty
 
 
 ppCast :: LlvmOpts -> LlvmCastOp -> LlvmVar -> LlvmType -> SDoc

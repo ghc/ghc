@@ -611,7 +611,7 @@ conflicts platform (r, rhs, addr) node
   | foldRegsUsed platform (\b r' -> r == r' || b) False node        = True
 
   -- (3) a store to an address conflicts with a read of the same memory
-  | CmmStore addr' e <- node
+  | CmmStore addr' e _ <- node
   , memConflicts addr (loadAddr platform addr' (cmmExprWidth platform e)) = True
 
   -- (4) an assignment to Hp/Sp conflicts with a heap/stack read respectively

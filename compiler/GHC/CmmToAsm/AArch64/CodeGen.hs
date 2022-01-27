@@ -288,7 +288,7 @@ stmtToInstrs bid stmt = do
           where ty = cmmRegType platform reg
                 format = cmmTypeFormat ty
 
-      CmmStore addr src
+      CmmStore addr src _alignment
         | isFloatType ty         -> assignMem_FltCode format addr src
         | otherwise              -> assignMem_IntCode format addr src
           where ty = cmmExprType platform src

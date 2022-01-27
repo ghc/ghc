@@ -138,7 +138,7 @@ stmtToInstrs stmt = do
         where ty = cmmRegType platform reg
               format = cmmTypeFormat ty
 
-    CmmStore addr src
+    CmmStore addr src _
       | isFloatType ty  -> assignMem_FltCode format addr src
       | isWord64 ty     -> assignMem_I64Code      addr src
       | otherwise       -> assignMem_IntCode format addr src

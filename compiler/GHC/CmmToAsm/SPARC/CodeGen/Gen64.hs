@@ -88,7 +88,8 @@ assignReg_I64Code _ _
 iselExpr64 :: CmmExpr -> NatM ChildCode64
 
 -- Load a 64 bit word
-iselExpr64 (CmmLoad addrTree ty)
+-- TODO: Check Ben
+iselExpr64 (CmmLoad addrTree ty _)
  | isWord64 ty
  = do   Amode amode addr_code   <- getAmode addrTree
         let result
