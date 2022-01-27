@@ -724,8 +724,9 @@ emitUnwind regs = do
 emitAssign :: CmmReg  -> CmmExpr -> FCode ()
 emitAssign l r = emitCgStmt (CgStmt (CmmAssign l r))
 
+-- | Assumes natural alignment.
 emitStore :: CmmExpr  -> CmmExpr -> FCode ()
-emitStore l r = emitCgStmt (CgStmt (CmmStore l r))
+emitStore l r = emitCgStmt (CgStmt (CmmStore l r NaturallyAligned))
 
 emit :: CmmAGraph -> FCode ()
 emit ag

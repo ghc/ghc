@@ -261,7 +261,7 @@ generateCgIPEStub hsc_env this_mod denv s = do
       where
         find :: CLabel -> [CmmNode O O] -> Maybe IpeSourceLocation -> Maybe IpeSourceLocation
         find label (b : blocks) lastTick = case b of
-          (CmmStore _ (CmmLit (CmmLabel l))) -> if label == l then lastTick else find label blocks lastTick
+          (CmmStore _ (CmmLit (CmmLabel l)) _) -> if label == l then lastTick else find label blocks lastTick
           (CmmTick (SourceNote span name)) -> find label blocks $ Just (span, name)
           _ -> find label blocks lastTick
         find _ [] _ = Nothing

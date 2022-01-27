@@ -193,8 +193,9 @@ mkAssign     :: CmmReg  -> CmmExpr -> CmmAGraph
 mkAssign l (CmmReg r) | l == r  = mkNop
 mkAssign l r  = mkMiddle $ CmmAssign l r
 
+-- | Assumes natural alignment
 mkStore      :: CmmExpr -> CmmExpr -> CmmAGraph
-mkStore  l r  = mkMiddle $ CmmStore  l r
+mkStore  l r  = mkMiddle $ CmmStore  l r NaturallyAligned
 
 ---------- Control transfer
 mkJump          :: Profile -> Convention -> CmmExpr

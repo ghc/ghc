@@ -1023,10 +1023,10 @@ cmmStmtConFold stmt
                    CmmReg reg' | reg == reg' -> CmmComment (fsLit "nop")
                    new_src -> CmmAssign reg new_src
 
-        CmmStore addr src
+        CmmStore addr src align
            -> do addr' <- cmmExprConFold DataReference addr
                  src'  <- cmmExprConFold DataReference src
-                 return $ CmmStore addr' src'
+                 return $ CmmStore addr' src' align
 
         CmmCall { cml_target = addr }
            -> do addr' <- cmmExprConFold JumpReference addr
