@@ -502,7 +502,6 @@ Library
         GHC.Platform.Regs
         GHC.Platform.RISCV64
         GHC.Platform.S390X
-        GHC.Platform.SPARC
         GHC.Platform.Ways
         GHC.Platform.X86
         GHC.Platform.X86_64

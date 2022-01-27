@@ -51,10 +51,6 @@
 #define MACHREGS_powerpc  1
 #endif
 
-#if defined(sparc_HOST_ARCH)
-#define MACHREGS_sparc    1
-#endif
-
 #if defined(arm_HOST_ARCH)
 #define MACHREGS_arm      1
 #endif

@@ -1,8 +1,7 @@
 
 import GHC.Cmm.Expr
 #if !(defined(MACHREGS_i386) || defined(MACHREGS_x86_64) \
-    || defined(MACHREGS_sparc) || defined(MACHREGS_powerpc) \
-    || defined(MACHREGS_aarch64))
+    || defined(MACHREGS_powerpc) || defined(MACHREGS_aarch64))
 import GHC.Utils.Panic.Plain
 #endif
 import GHC.Platform.Reg
@@ -273,77 +272,6 @@ import GHC.Platform.Reg
 #  define fr30 62
 #  define fr31 63
 # endif
-
-#elif defined(MACHREGS_sparc)
-
-# define g0  0
-# define g1  1
-# define g2  2
-# define g3  3
-# define g4  4
-# define g5  5
-# define g6  6
-# define g7  7
-
-# define o0  8
-# define o1  9
-# define o2  10
-# define o3  11
-# define o4  12
-# define o5  13
-# define o6  14
-# define o7  15
-
-# define l0  16
-# define l1  17
-# define l2  18
-# define l3  19
-# define l4  20
-# define l5  21
-# define l6  22
-# define l7  23
-
-# define i0  24
-# define i1  25
-# define i2  26
-# define i3  27
-# define i4  28
-# define i5  29
-# define i6  30
-# define i7  31
-
-# define f0  32
-# define f1  33
-# define f2  34
-# define f3  35
-# define f4  36
-# define f5  37
-# define f6  38
-# define f7  39
-# define f8  40
-# define f9  41
-# define f10 42
-# define f11 43
-# define f12 44
-# define f13 45
-# define f14 46
-# define f15 47
-# define f16 48
-# define f17 49
-# define f18 50
-# define f19 51
-# define f20 52
-# define f21 53
-# define f22 54
-# define f23 55
-# define f24 56
-# define f25 57
-# define f26 58
-# define f27 59
-# define f28 60
-# define f29 61
-# define f30 62
-# define f31 63
 
 #elif defined(MACHREGS_s390x)
 
@@ -734,7 +662,7 @@ haveRegBase = False
 -- reg is the machine register it is stored in.
 globalRegMaybe :: GlobalReg -> Maybe RealReg
 #if defined(MACHREGS_i386) || defined(MACHREGS_x86_64) \
-    || defined(MACHREGS_sparc) || defined(MACHREGS_powerpc) \
+    || defined(MACHREGS_powerpc) \
     || defined(MACHREGS_arm) || defined(MACHREGS_aarch64) \
     || defined(MACHREGS_s390x) || defined(MACHREGS_riscv64)
 # if defined(REG_Base)
@@ -789,52 +717,22 @@ globalRegMaybe (FloatReg 5)             = Just (RealRegSingle REG_F5)
 globalRegMaybe (FloatReg 6)             = Just (RealRegSingle REG_F6)
 # endif
 # if defined(REG_D1)
-globalRegMaybe (DoubleReg 1)            =
-#  if defined(MACHREGS_sparc)
-                                          Just (RealRegPair REG_D1 (REG_D1 + 1))
-#  else
-                                          Just (RealRegSingle REG_D1)
-#  endif
+globalRegMaybe (DoubleReg 1)            = Just (RealRegSingle REG_D1)
 # endif
 # if defined(REG_D2)
-globalRegMaybe (DoubleReg 2)            =
-#  if defined(MACHREGS_sparc)
-                                          Just (RealRegPair REG_D2 (REG_D2 + 1))
-#  else
-                                          Just (RealRegSingle REG_D2)
-#  endif
+globalRegMaybe (DoubleReg 2)            = Just (RealRegSingle REG_D2)
 # endif
 # if defined(REG_D3)
-globalRegMaybe (DoubleReg 3)            =
-#  if defined(MACHREGS_sparc)
-                                          Just (RealRegPair REG_D3 (REG_D3 + 1))
-#  else
-                                          Just (RealRegSingle REG_D3)
-#  endif
+globalRegMaybe (DoubleReg 3)            = Just (RealRegSingle REG_D3)
 # endif
 # if defined(REG_D4)
-globalRegMaybe (DoubleReg 4)            =
-#  if defined(MACHREGS_sparc)
-                                          Just (RealRegPair REG_D4 (REG_D4 + 1))
-#  else
-                                          Just (RealRegSingle REG_D4)
-#  endif
+globalRegMaybe (DoubleReg 4)            = Just (RealRegSingle REG_D4)
 # endif
 # if defined(REG_D5)
-globalRegMaybe (DoubleReg 5)            =
-#  if defined(MACHREGS_sparc)
-                                          Just (RealRegPair REG_D5 (REG_D5 + 1))
-#  else
-                                          Just (RealRegSingle REG_D5)
-#  endif
+globalRegMaybe (DoubleReg 5)            = Just (RealRegSingle REG_D5)
 # endif
 # if defined(REG_D6)
-globalRegMaybe (DoubleReg 6)            =
-#  if defined(MACHREGS_sparc)
-                                          Just (RealRegPair REG_D6 (REG_D6 + 1))
-#  else
-                                          Just (RealRegSingle REG_D6)
-#  endif
+globalRegMaybe (DoubleReg 6)            = Just (RealRegSingle REG_D6)
 # endif
 # if MAX_REAL_XMM_REG != 0
 #  if defined(REG_XMM1)
@@ -1107,149 +1005,6 @@ freeReg REG_D5    = False
 freeReg REG_D6    = False
 # endif
 
-freeReg _ = True
-
-#elif defined(MACHREGS_sparc)
-
--- SPARC regs used by the OS / ABI
--- %g0(r0) is always zero
-freeReg g0  = False
-
--- %g5(r5) - %g7(r7)
---  are reserved for the OS
-freeReg g5  = False
-freeReg g6  = False
-freeReg g7  = False
-
--- %o6(r14)
---  is the C stack pointer
-freeReg o6  = False
-
--- %o7(r15)
---  holds the C return address
-freeReg o7  = False
-
--- %i6(r30)
---  is the C frame pointer
-freeReg i6  = False
-
--- %i7(r31)
---  is used for C return addresses
-freeReg i7  = False
-
--- %f0(r32) - %f1(r32)
---  are C floating point return regs
-freeReg f0  = False
-freeReg f1  = False
-
-{-
-freeReg regNo
-    -- don't release high half of double regs
-    | regNo >= f0
-    , regNo <  NCG_FirstFloatReg
-    , regNo `mod` 2 /= 0
-    = False
--}
-
-# if defined(REG_Base)
-freeReg REG_Base  = False
-# endif
-# if defined(REG_R1)
-freeReg REG_R1    = False
-# endif
-# if defined(REG_R2)
-freeReg REG_R2    = False
-# endif
-# if defined(REG_R3)
-freeReg REG_R3    = False
-# endif
-# if defined(REG_R4)
-freeReg REG_R4    = False
-# endif
-# if defined(REG_R5)
-freeReg REG_R5    = False
-# endif
-# if defined(REG_R6)
-freeReg REG_R6    = False
-# endif
-# if defined(REG_R7)
-freeReg REG_R7    = False
-# endif
-# if defined(REG_R8)
-freeReg REG_R8    = False
-# endif
-# if defined(REG_R9)
-freeReg REG_R9    = False
-# endif
-# if defined(REG_R10)
-freeReg REG_R10   = False
-# endif
-# if defined(REG_F1)
-freeReg REG_F1    = False
-# endif
-# if defined(REG_F2)
-freeReg REG_F2    = False
-# endif
-# if defined(REG_F3)
-freeReg REG_F3    = False
-# endif
-# if defined(REG_F4)
-freeReg REG_F4    = False
-# endif
-# if defined(REG_F5)
-freeReg REG_F5    = False
-# endif
-# if defined(REG_F6)
-freeReg REG_F6    = False
-# endif
-# if defined(REG_D1)
-freeReg REG_D1    = False
-# endif
-# if defined(REG_D1_2)
-freeReg REG_D1_2  = False
-# endif
-# if defined(REG_D2)
-freeReg REG_D2    = False
-# endif
-# if defined(REG_D2_2)
-freeReg REG_D2_2  = False
-# endif
-# if defined(REG_D3)
-freeReg REG_D3    = False
-# endif
-# if defined(REG_D3_2)
-freeReg REG_D3_2  = False
-# endif
-# if defined(REG_D4)
-freeReg REG_D4    = False
-# endif
-# if defined(REG_D4_2)
-freeReg REG_D4_2  = False
-# endif
-# if defined(REG_D5)
-freeReg REG_D5    = False
-# endif
-# if defined(REG_D5_2)
-freeReg REG_D5_2  = False
-# endif
-# if defined(REG_D6)
-freeReg REG_D6    = False
-# endif
-# if defined(REG_D6_2)
-freeReg REG_D6_2  = False
-# endif
-# if defined(REG_Sp)
-freeReg REG_Sp    = False
-# endif
-# if defined(REG_SpLim)
-freeReg REG_SpLim = False
-# endif
-# if defined(REG_Hp)
-freeReg REG_Hp    = False
-# endif
-# if defined(REG_HpLim)
-freeReg REG_HpLim = False
-# endif
 freeReg _ = True
 
 #else
