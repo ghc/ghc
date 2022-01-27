@@ -85,26 +85,6 @@ extern __thread gc_thread* gct;
 
 /* -------------------------------------------------------------------------- */
 
-/* Next up: On SPARC we can't pin gct to a register. Names like %l1
-   are just offsets into the register window, which change on each
-   function call.
-
-   There are eight global (non-window) registers, but they're used for other
-   purposes:
-
-    %g0     -- always zero
-    %g1     -- volatile over function calls, used by the linker
-    %g2-%g3 -- used as scratch regs by the C compiler (caller saves)
-    %g4     -- volatile over function calls, used by the linker
-    %g5-%g7 -- reserved by the OS
-*/
-#elif defined(sparc_HOST_ARCH)
-extern __thread gc_thread* gct;
-#define SET_GCT(to) gct = (to)
-#define DECLARE_GCT __thread gc_thread* gct;
-
-/* -------------------------------------------------------------------------- */
-
 /* Next up: generally, if REG_Base is defined and we're *not* using
    i386, then actually declare the needed register. The catch for i386
    here is that REG_Base is %ebx, but that is also used for -fPIC, so

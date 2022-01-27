@@ -87,9 +87,7 @@
  */
 #define X86_64_ELF_NONPIC_HACK (!RtsFlags.MiscFlags.linkerAlwaysPic)
 
-#if defined(sparc_HOST_ARCH)
-#  define ELF_TARGET_SPARC  /* Used inside <elf.h> */
-#elif defined(i386_HOST_ARCH)
+#if defined(i386_HOST_ARCH)
 #  define ELF_TARGET_386    /* Used inside <elf.h> */
 #elif defined(x86_64_HOST_ARCH)
 #  define ELF_TARGET_X64_64
@@ -1463,8 +1461,7 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
    return 1;
 }
 
-/* Do ELF relocations for which explicit addends are supplied.
-   sparc-solaris relocations appear to be of this form. */
+/* Do ELF relocations for which explicit addends are supplied. */
 static int
 do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
                           Elf_Shdr* shdr, int shnum )
@@ -1481,8 +1478,7 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
 #if defined(SHN_XINDEX)
    Elf_Word* shndx_table = get_shndx_table((Elf_Ehdr*)ehdrC);
 #endif
-#if defined(DEBUG) || defined(sparc_HOST_ARCH) || defined(powerpc_HOST_ARCH) \
-    || defined(x86_64_HOST_ARCH)
+#if defined(DEBUG) || defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH)
    /* This #if def only serves to avoid unused-var warnings. */
    Elf_Addr targ = (Elf_Addr) oc->sections[target_shndx].start;
 #endif
@@ -1500,24 +1496,19 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
    }
 
    for (j = 0; j < nent; j++) {
-#if defined(DEBUG) || defined(sparc_HOST_ARCH) || defined(powerpc_HOST_ARCH) \
-    || defined(x86_64_HOST_ARCH)
+#if defined(DEBUG) || defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH)
       /* This #if def only serves to avoid unused-var warnings. */
       Elf_Addr  offset = rtab[j].r_offset;
       Elf_Addr  P      = targ + offset;
       Elf_Addr  A      = rtab[j].r_addend;
 #endif
-#if defined(sparc_HOST_ARCH) || defined(powerpc_HOST_ARCH) \
-    || defined(x86_64_HOST_ARCH)
+#if defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH)
       Elf_Addr  value;
 #endif
       Elf_Addr  info   = rtab[j].r_info;
       Elf_Addr  S;
       void*     S_tmp;
-#     if defined(sparc_HOST_ARCH)
-      Elf_Word* pP = (Elf_Word*)P;
-      Elf_Word  w1, w2;
-#     elif defined(powerpc_HOST_ARCH)
+#     if defined(powerpc_HOST_ARCH)
       Elf_Sword delta;
 #     endif
 
@@ -1587,66 +1578,18 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
          IF_DEBUG(linker_verbose,debugBelch("`%s' resolves to %p\n", symbol, (void*)S));
       }
 
-#if defined(DEBUG) || defined(sparc_HOST_ARCH) || defined(powerpc_HOST_ARCH) \
-    || defined(x86_64_HOST_ARCH)
+#if defined(DEBUG) || defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH)
       IF_DEBUG(linker_verbose,debugBelch("Reloc: P = %p   S = %p   A = %p\n",
                                          (void*)P, (void*)S, (void*)A ));
       checkProddableBlock(oc, (void*)P, sizeof(Elf_Word));
 #endif
 
-#if defined(sparc_HOST_ARCH) || defined(powerpc_HOST_ARCH) \
-    || defined(x86_64_HOST_ARCH)
+#if defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH)
       value = S + A;
 #endif
 
       switch (ELF_R_TYPE(info)) {
-#        if defined(sparc_HOST_ARCH)
-         case R_SPARC_WDISP30:
-            w1 = *pP & 0xC0000000;
-            w2 = (Elf_Word)((value - P) >> 2);
-            CHECK((w2 & 0xC0000000) == 0);
-            w1 |= w2;
-            *pP = w1;
-            break;
-         case R_SPARC_HI22:
-            w1 = *pP & 0xFFC00000;
-            w2 = (Elf_Word)(value >> 10);
-            CHECK((w2 & 0xFFC00000) == 0);
-            w1 |= w2;
-            *pP = w1;
-            break;
-         case R_SPARC_LO10:
-            w1 = *pP & ~0x3FF;
-            w2 = (Elf_Word)(value & 0x3FF);
-            CHECK((w2 & ~0x3FF) == 0);
-            w1 |= w2;
-            *pP = w1;
-            break;
-
-         /* According to the Sun documentation:
-            R_SPARC_UA32
-            This relocation type resembles R_SPARC_32, except it refers to an
-            unaligned word. That is, the word to be relocated must be treated
-            as four separate bytes with arbitrary alignment, not as a word
-            aligned according to the architecture requirements.
-         */
-         case R_SPARC_UA32:
-            w2  = (Elf_Word)value;
-
-            // SPARC doesn't do misaligned writes of 32 bit words,
-            //       so we have to do this one byte-at-a-time.
-            char *pPc   = (char*)pP;
-            pPc[0]      = (char) ((Elf_Word)(w2 & 0xff000000) >> 24);
-            pPc[1]      = (char) ((Elf_Word)(w2 & 0x00ff0000) >> 16);
-            pPc[2]      = (char) ((Elf_Word)(w2 & 0x0000ff00) >> 8);
-            pPc[3]      = (char) ((Elf_Word)(w2 & 0x000000ff));
-            break;
-
-         case R_SPARC_32:
-            w2 = (Elf_Word)value;
-            *pP = w2;
-            break;
-#        elif defined(powerpc_HOST_ARCH)
+#        if defined(powerpc_HOST_ARCH)
          case R_PPC_ADDR16_LO:
             *(Elf32_Half*) P = value;
             break;

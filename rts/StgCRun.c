@@ -36,7 +36,7 @@
 #define ENABLE_UNWINDING
 #endif
 
-#if defined(sparc_HOST_ARCH) || defined(USE_MINIINTERPRETER)
+#if defined(USE_MINIINTERPRETER)
 /* include Stg.h first because we want real machine regs in here: we
  * have to get the value of R1 back from Stg land to C land intact.
  */
@@ -564,79 +564,6 @@ StgRunIsImplementedInAssembler(void)
 
 #endif /* x86-64 */
 
-/* -----------------------------------------------------------------------------
-   Sparc architecture
-
-   --
-   OLD COMMENT from GHC-3.02:
-
-   We want tailjumps to be calls, because `call xxx' is the only Sparc
-   branch that allows an arbitrary label as a target.  (Gcc's ``goto
-   *target'' construct ends up loading the label into a register and
-   then jumping, at the cost of two extra instructions for the 32-bit
-   load.)
-
-   When entering the threaded world, we stash our return address in a
-   known location so that \tr{%i7} is available as an extra
-   callee-saves register.  Of course, we have to restore this when
-   coming out of the threaded world.
-
-   I hate this god-forsaken architecture.  Since the top of the
-   reserved stack space is used for globals and the bottom is reserved
-   for outgoing arguments, we have to stick our return address
-   somewhere in the middle.  Currently, I'm allowing 100 extra
-   outgoing arguments beyond the first 6.  --JSM
-
-   Updated info (GHC 4.06): we don't appear to use %i7 any more, so
-   I'm not sure whether we still need to save it.  Incedentally, what
-   does the last paragraph above mean when it says "the top of the
-   stack is used for globals"?  What globals?  --SDM
-
-   Updated info (GHC 4.08.2): not saving %i7 any more (see below).
-   -------------------------------------------------------------------------- */
-
-#if defined(sparc_HOST_ARCH)
-
-StgRegTable *
-StgRun(StgFunPtr f, StgRegTable *basereg) {
-
-    unsigned char space[RESERVED_C_STACK_BYTES];
-#if 0
-    register void *i7 __asm__("%i7");
-    ((void **)(space))[100] = i7;
-#endif
-    f();
-    __asm__ volatile (
-                 ".align 4\n"
-                 ".global " STG_RETURN "\n"
-                 STG_RETURN ":"
-                 : : "p" (space) : "l0","l1","l2","l3","l4","l5","l6","l7");
-    /* we tell the C compiler that l0-l7 are clobbered on return to
-     * StgReturn, otherwise it tries to use these to save eg. the
-     * address of space[100] across the call.  The correct thing
-     * to do would be to save all the callee-saves regs, but we
-     * can't be bothered to do that.
-     *
-     * We also explicitly mark space as used since gcc eliminates it
-     * otherwise.
-     *
-     * The code that gcc generates for this little fragment is now
-     * terrible.  We could do much better by coding it directly in
-     * assembler.
-     */
-#if 0
-    /* updated 4.08.2: we don't save %i7 in the middle of the reserved
-     * space any more, since gcc tries to save its address across the
-     * call to f(), this gets clobbered in STG land and we end up
-     * dereferencing a bogus pointer in StgReturn.
-     */
-    __asm__ volatile ("ld %1,%0"
-                                : "=r" (i7) : "m" (((void **)(space))[100]));
-#endif
-    return (StgRegTable *)R1.i;
-}
-
-#endif
 
 /* -----------------------------------------------------------------------------
    PowerPC architecture

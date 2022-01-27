@@ -390,9 +390,6 @@ write_barrier(void) {
     __asm__ __volatile__ ("lwsync" : : : "memory");
 #elif defined(s390x_HOST_ARCH)
     __asm__ __volatile__ ("" : : : "memory");
-#elif defined(sparc_HOST_ARCH)
-    /* Sparc in TSO mode does not require store/store barriers. */
-    __asm__ __volatile__ ("" : : : "memory");
 #elif defined(arm_HOST_ARCH) || defined(aarch64_HOST_ARCH)
     __asm__ __volatile__ ("dmb  st" : : : "memory");
 #elif defined(riscv64_HOST_ARCH)

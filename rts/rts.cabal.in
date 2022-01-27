@@ -465,8 +465,6 @@ library
         c-sources: adjustor/NativePowerPC.c
       if arch(ia64)
         c-sources: adjustor/NativeIA64.c
-      if arch(sparc)
-        c-sources: adjustor/NativeSparc.c
 
     -- Use assembler STG entrypoint on archictures where it is used
     if arch(ppc) || arch(ppc64) || arch(s390x) || arch(riscv64)

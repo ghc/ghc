@@ -67,28 +67,6 @@ funPtrToInt (FunPtr a) = I## (addr2Int## a)
 
 mkJumpToAddr :: MonadFail m => EntryFunPtr-> m ItblCodes
 mkJumpToAddr a = case hostPlatformArch of
-    ArchSPARC -> pure $
-        -- After some consideration, we'll try this, where
-        -- 0x55555555 stands in for the address to jump to.
-        -- According to rts/include/rts/MachRegs.h, %g3 is very
-        -- likely indeed to be baggable.
-        --
-        --   0000 07155555              sethi   %hi(0x55555555), %g3
-        --   0004 8610E155              or      %g3, %lo(0x55555555), %g3
-        --   0008 81C0C000              jmp     %g3
-        --   000c 01000000              nop
-
-        let w32 = fromIntegral (funPtrToInt a)
-
-            hi22, lo10 :: Word32 -> Word32
-            lo10 x = x .&. 0x3FF
-            hi22 x = (x `shiftR` 10) .&. 0x3FFFF
-
-        in Right [ 0x07000000 .|. (hi22 w32),
-                   0x8610E000 .|. (lo10 w32),
-                   0x81C0C000,
-                   0x01000000 ]
-
     ArchPPC -> pure $
         -- We'll use r12, for no particular reason.
         -- 0xDEADBEEF stands for the address:
