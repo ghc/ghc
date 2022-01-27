@@ -666,12 +666,6 @@ assembler.
 
     Dump statistics from the register allocator.
 
-.. ghc-flag:: -ddump-asm-expanded
-    :shortdesc: Dump the result of the synthetic instruction expansion pass.
-    :type: dynamic
-
-    Dump the result of the synthetic instruction expansion pass.
-
 .. ghc-flag:: -ddump-asm
     :shortdesc: Dump final assembly
     :type: dynamic

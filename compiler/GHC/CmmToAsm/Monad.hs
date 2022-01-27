@@ -82,7 +82,6 @@ data NcgImpl statics instr jumpDest = NcgImpl {
     pprNatCmmDecl             :: NatCmmDecl statics instr -> SDoc,
     maxSpillSlots             :: Int,
     allocatableRegs           :: [RealReg],
-    ncgExpandTop              :: [NatCmmDecl statics instr] -> [NatCmmDecl statics instr],
     ncgAllocMoreStack         :: Int -> NatCmmDecl statics instr
                               -> UniqSM (NatCmmDecl statics instr, [(BlockId,BlockId)]),
     -- ^ The list of block ids records the redirected jumps to allow us to update

@@ -32,7 +32,6 @@ ncgAArch64 config
        ,maxSpillSlots             = AArch64.maxSpillSlots config
        ,allocatableRegs           = AArch64.allocatableRegs platform
        ,ncgAllocMoreStack         = AArch64.allocMoreStack platform
-       ,ncgExpandTop              = id
        ,ncgMakeFarBranches        = const id
        ,extractUnwindPoints       = const []
        ,invertCondBranches        = \_ _ -> id

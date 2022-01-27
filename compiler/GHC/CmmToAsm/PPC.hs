@@ -32,7 +32,6 @@ ncgPPC config = NcgImpl
    , maxSpillSlots             = PPC.maxSpillSlots config
    , allocatableRegs           = PPC.allocatableRegs platform
    , ncgAllocMoreStack         = PPC.allocMoreStack platform
-   , ncgExpandTop              = id
    , ncgMakeFarBranches        = PPC.makeFarBranches
    , extractUnwindPoints       = const []
    , invertCondBranches        = \_ _ -> id

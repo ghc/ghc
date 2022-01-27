@@ -669,29 +669,18 @@ cmmNativeGen logger modLoc ncgImpl us fileIds dbgMap cmm count
                 invert (CmmProc info lbl live (ListGraph blocks)) =
                     CmmProc info lbl live (ListGraph $ invertConds info blocks)
 
-        ---- expansion of SPARC synthetic instrs
-        let expanded =
-                {-# SCC "sparc_expand" #-}
-                ncgExpandTop ncgImpl branchOpt
-                --ncgExpandTop ncgImpl sequenced
-
-        putDumpFileMaybe logger
-                Opt_D_dump_asm_expanded "Synthetic instructions expanded"
-                FormatCMM
-                (vcat $ map (pprNatCmmDecl ncgImpl) expanded)
-
         -- generate unwinding information from cmm
         let unwinds :: BlockMap [UnwindPoint]
             unwinds =
                 {-# SCC "unwindingInfo" #-}
-                foldl' addUnwind mapEmpty expanded
+                foldl' addUnwind mapEmpty branchOpt
               where
                 addUnwind acc proc =
                     acc `mapUnion` computeUnwinding config ncgImpl proc
 
         return  ( usAlloc
                 , fileIds'
-                , expanded
+                , branchOpt
                 , lastMinuteImports ++ imports
                 , ppr_raStatsColor
                 , ppr_raStatsLinear
