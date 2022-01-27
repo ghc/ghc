@@ -246,16 +246,6 @@ static void addCopySection(
 static void releaseOcInfo(
     ObjectCode* oc);
 
-/* Add ld symbol for PE image base. */
-#if defined(__GNUC__)
-#define __ImageBase __MINGW_LSYMBOL(_image_base__)
-#endif
-
-/* Get the base of the module.       */
-/* This symbol is defined by ld.     */
-extern IMAGE_DOS_HEADER __ImageBase;
-#define __image_base (void*)((HINSTANCE)&__ImageBase)
-
 const Alignments pe_alignments[] = {
   { IMAGE_SCN_ALIGN_1BYTES   , 1   },
   { IMAGE_SCN_ALIGN_2BYTES   , 2   },
@@ -275,8 +265,10 @@ const Alignments pe_alignments[] = {
 
 const int pe_alignments_cnt = sizeof (pe_alignments) / sizeof (Alignments);
 const int default_alignment = 8;
-const int initHeapSizeMB    = 15;
+const int initHeapSizeMB    = 30;
+const int initHeapCommitMB  = 15;
 static HANDLE code_heap     = NULL;
+static void* code_heap_mem = NULL;
 
 /* See Note [_iob_func symbol]
    In order to emulate __iob_func the memory location needs to point the
@@ -290,10 +282,118 @@ const void* __rts_iob_func = (void*)&__acrt_iob_func;
 #define HEAP_LFH 2
 #define HeapOptimizeResources 3
 
+/********************************************
+ * Memory Management functions
+ ********************************************/
+
+static inline uintptr_t round_up(uintptr_t num, uint64_t factor)
+{
+  return num + factor - 1 - (num + factor - 1) % factor;
+}
+
+void *allocateBytes(void* baseAddr, unsigned sz, unsigned *req)
+{
+  SYSTEM_INFO sys;
+  GetSystemInfo(&sys);
+  const uint64_t max_range = 4294967296UL;
+  IF_DEBUG(linker, debugBelch("Base Address 0x%p\n", baseAddr));
+  IF_DEBUG(linker, debugBelch("Requesting mapping of %d bytes within range %"
+                              PRId64 " bytes\n", sz, max_range));
+
+  MEMORY_BASIC_INFORMATION info;
+  size_t res = VirtualQuery (baseAddr, &info, sizeof (info));
+
+  if (!res)
+    {
+      IF_DEBUG(linker, debugBelch("Querying 0x%p failed. Aborting..\n",
+                                  baseAddr));
+      return NULL;
+    }
+
+  IF_DEBUG(linker, debugBelch("Initial region 0x%p - 0x%p (%d)\n",
+                              info.AllocationBase,
+                              info.AllocationBase + info.RegionSize,
+                              info.RegionSize));
+  void* endAddr = baseAddr + max_range;
+
+  void *initialAddr = info.AllocationBase;
+  void *region = NULL;
+  while (!region
+         && abs (initialAddr - endAddr) <= max_range
+         && initialAddr < sys.lpMaximumApplicationAddress)
+  {
+    res = VirtualQuery (initialAddr, &info, sizeof (info));
+    IF_DEBUG(linker, debugBelch("Probing region 0x%p (0x%p) - 0x%p (%u) [%d] "
+                                "with base 0x%p\n", initialAddr,
+                                info.BaseAddress,
+                                info.BaseAddress + info.RegionSize,
+                                info.RegionSize, info.State,
+                                info.AllocationBase));
+    if (!res)
+      {
+      IF_DEBUG(linker, debugBelch("Querying 0x%p failed. Aborting..\n",
+                                  initialAddr));
+      return NULL;
+      }
+
+    if ((info.State & MEM_FREE) == MEM_FREE)
+      {
+        IF_DEBUG(linker, debugBelch("Free range at 0x%p of %zu bytes\n",
+                                    info.BaseAddress, info.RegionSize));
+        if (info.RegionSize >= sz)
+          {
+            if (info.AllocationBase == 0)
+              {
+                IF_DEBUG(linker, debugBelch("Range is unmapped, Allocation "
+                                            "required by granule...\n"));
+                *req = round_up (sz, sys.dwAllocationGranularity);
+                region
+                  = (void*)(uintptr_t)round_up ((uintptr_t)initialAddr,
+                                                sys.dwAllocationGranularity);
+                IF_DEBUG(linker, debugBelch("Requested %" PRId64 ", rounded: %"
+                                            PRId64 ".\n", sz, *req));
+                IF_DEBUG(linker, debugBelch("Aligned region claimed 0x%p -> "
+                                            "0x%p.\n", initialAddr, region));
+              }
+            else
+              {
+                IF_DEBUG(linker, debugBelch("Range is usable for us, "
+                                            "claiming...\n"));
+                *req = sz;
+                region = initialAddr;
+              }
+          }
+      }
+    initialAddr = info.BaseAddress + info.RegionSize;
+  }
+
+  return region;
+}
+
+void *allocaLocalBytes(unsigned sz, unsigned *req)
+{
+  return allocateBytes (GetModuleHandleW (NULL), sz, req);
+}
+
+/* Incline declaration, requires you to link to user-space ntdll.dll to work.
+   The last paramater isn't actually void* but we don't need the structure so
+   make it opague.  */
+__attribute__((stdcall))
+extern HANDLE RtlCreateHeap(
+  ULONG                Flags,
+  PVOID                HeapBase,
+  SIZE_T               ReserveSize,
+  SIZE_T               CommitSize,
+  PVOID                Lock,
+  void* Parameters
+);
+
 void initLinker_PEi386()
 {
     if (!ghciInsertSymbolTable(WSTR("(GHCi/Ld special symbols)"),
-                               symhash, "__image_base__", __image_base, HS_BOOL_TRUE, SYM_TYPE_CODE, NULL)) {
+                               symhash, "__image_base__",
+                               GetModuleHandleW (NULL), HS_BOOL_TRUE,
+                               SYM_TYPE_CODE, NULL)) {
         barf("ghciInsertSymbolTable failed");
     }
 
@@ -317,8 +417,19 @@ void initLinker_PEi386()
   /* Create a private heap which we will use to store all code and data.  */
   SYSTEM_INFO sSysInfo;
   GetSystemInfo(&sSysInfo);
-  code_heap = HeapCreate (HEAP_CREATE_ENABLE_EXECUTE,
-                          initHeapSizeMB * sSysInfo.dwPageSize , 0);
+  unsigned size = 0;
+  const unsigned initialResBytes = initHeapSizeMB * sSysInfo.dwPageSize;
+  const unsigned initialCommitBytes = initHeapCommitMB * sSysInfo.dwPageSize;
+  /* Region can be NULL, in which case we're letting the OS pick.  First figure
+     out where we can create the allocations within the range of the small
+     code model (+- 4GB).  */
+  void* region = allocaLocalBytes (initialResBytes, &size);
+  /* Then reserve the area for our use.  */
+  code_heap_mem = VirtualAlloc (region, size, MEM_RESERVE,
+                                PAGE_EXECUTE_READWRITE);
+  /* And finally create the action heap.  */
+  code_heap = RtlCreateHeap (HEAP_GROWABLE, region, initialResBytes,
+                             initialCommitBytes, NULL, NULL);
   if (!code_heap)
     barf ("Could not create private heap during initialization. Aborting.");
 
@@ -340,7 +451,9 @@ void exitLinker_PEi386()
   /* See Note [Memory allocation].  */
   if (code_heap) {
     HeapDestroy (code_heap);
+    VirtualFree (code_heap_mem, 0, MEM_RELEASE);
     code_heap = NULL;
+    code_heap_mem = NULL;
   }
 }
 
@@ -1974,7 +2087,7 @@ ocResolve_PEi386 ( ObjectCode* oc )
                        /* And retry */
                        v = S + A;
                        if (((int64_t) v > (int64_t) INT32_MAX) || ((int64_t) v < (int64_t) INT32_MIN)) {
-                           barf("IMAGE_REL_AMD64_ADDR32[NB]: High bits are set in %zx for %s",
+                           barf("IMAGE_REL_AMD64_ADDR32[NB]: High bits are set in 0x%zx for %s",
                                 v, (char *)symbol);
                        }
                    }
@@ -1993,7 +2106,7 @@ ocResolve_PEi386 ( ObjectCode* oc )
                        /* And retry */
                        v = S + (int32_t)A - ((intptr_t)pP) - 4;
                        if ((v > (int64_t) INT32_MAX) || (v < (int64_t) INT32_MIN)) {
-                           barf("IMAGE_REL_AMD64_REL32: High bits are set in %zx for %s",
+                           barf("IMAGE_REL_AMD64_REL32: High bits are set in 0x%zx for %s",
                                 v, (char *)symbol);
                        }
                    }

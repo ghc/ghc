@@ -1093,7 +1093,12 @@ resolveSymbolAddr (pathchar* buffer, int size,
 void *
 mmapAnonForLinker (size_t bytes)
 {
-  return VirtualAlloc(NULL, bytes, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+  unsigned size = 0;
+  /* For linking purposes we want to load code within a 4GB range from the
+     load address of the application.  As such we need to find a location to
+     allocate at.   */
+  void* region = allocaLocalBytes (bytes, &size);
+  return VirtualAlloc(region, size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 }
 
 void

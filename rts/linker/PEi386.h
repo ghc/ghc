@@ -4,7 +4,9 @@
 #include "LinkerInternals.h"
 #include "PathUtils.h"
 #include <windows.h>
+#include <stdint.h>
 #include <stdbool.h>
+#include <inttypes.h>
 
 #include "BeginPrivate.h"
 
@@ -171,5 +173,19 @@ because we have no stdcall convention on 64 bits.
 
 See #9218
 */
+
+/********************************************
+ * Memory Management functions
+ ********************************************/
+
+/* Try and find a location in the VMMAP to allocate SZ bytes starting at
+   BASEADDR.  If successful then location to use is returned and the amount of
+   bytes you *must* allocate is returned in REQ.  You are free to use less but
+   you must allocate the amount given in REQ.  If not successful NULL.  */
+void *allocateBytes(void* baseAddr, unsigned sz, unsigned *req);
+
+/* Same as the above, but use the current process's load address as the starting
+   point for memory allocations.  */
+void *allocaLocalBytes(unsigned sz, unsigned *req);
 
 #include "EndPrivate.h"
