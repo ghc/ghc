@@ -32,7 +32,7 @@ int main (int argc, char *argv[])
     for (i=0; i < ITERATIONS; i++) {
         r = loadObj(OBJPATH);
         if (!r) {
-            errorBelch("loadObj(%s) failed", OBJPATH);
+            errorBelch("loadObj(%" PATH_FMT ") failed", OBJPATH);
             exit(1);
         }
         r = resolveObjs();
@@ -63,7 +63,7 @@ int main (int argc, char *argv[])
     for (i=0; i < ITERATIONS; i++) {
         r = loadObj(OBJPATH);
         if (!r) {
-            errorBelch("loadObj(%s) failed", OBJPATH);
+            errorBelch("loadObj(%" PATH_FMT ") failed", OBJPATH);
             exit(1);
         }
         r = resolveObjs();

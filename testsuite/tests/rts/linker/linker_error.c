@@ -51,7 +51,7 @@ int main (int argc, char *argv[])
     for (i=0; i < ITERATIONS; i++) {
         r = loadObj(obj);
         if (!r) {
-            debugBelch("loadObj(%s) failed\n", obj);
+            debugBelch("loadObj(%" PATH_FMT ") failed\n", obj);
             continue;
         }
         r = resolveObjs();

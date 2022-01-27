@@ -1343,7 +1343,7 @@ freePreloadObjectFile (ObjectCode *oc)
  */
 void freeObjectCode (ObjectCode *oc)
 {
-    IF_DEBUG(linker, debugBelch("freeObjectCode: %s", oc->fileName));
+    IF_DEBUG(linker, debugBelch("freeObjectCode: %" PATH_FMT, oc->fileName));
 
     if (oc->type == DYNAMIC_OBJECT) {
 #if defined(OBJFORMAT_ELF)
@@ -1444,7 +1444,7 @@ mkOc( ObjectType type, pathchar *path, char *image, int imageSize,
    ObjectCode* oc;
 
 
-   IF_DEBUG(linker, debugBelch("mkOc: %s\n", path));
+   IF_DEBUG(linker, debugBelch("mkOc: %" PATH_FMT "\n", path));
    oc = stgMallocBytes(sizeof(ObjectCode), "mkOc(oc)");
 
    oc->info = NULL;
