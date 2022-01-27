@@ -142,8 +142,8 @@ getHiVRegFromLo reg
 --      the usual way.  We know what class they are, because that's part of
 --      the processor's architecture.
 --
-data RealReg
-        = RealRegSingle {-# UNPACK #-} !RegNo
+newtype RealReg
+        = RealRegSingle RegNo
         deriving (Eq, Show, Ord)
 
 instance Uniquable RealReg where
