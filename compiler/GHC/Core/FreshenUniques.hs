@@ -1,10 +1,11 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE MagicHash #-}
 
 module GHC.Core.FreshenUniques ( freshenUniques ) where
 
 import GHC.Prelude
 
-import GHC.Core
+import GHC.Core hiding (mkLet)
 import GHC.Core.Seq
 import GHC.Core.Utils
 import GHC.Core.Coercion hiding (substCo, substCoVar, substCoVarBndr) --(CvSubstEnv, coercionKind, coercionLKind, mkCoVarCo, coVarKindsTypesRole, mkCoercionType, mkNomReflCo, mkGReflCo, mkTyConAppCo, mkAppCo, mkForAllCo, mkFunCo, mkAxiomInstCo, mkUnivCo)
@@ -41,8 +42,6 @@ import Control.Monad.Trans.Class
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.State.Strict
 import Control.Monad.IO.Class
-
-import Data.Traversable
 
 import GHC.Utils.Trace
 _ = pprTrace -- Tired of commenting out the import all the time
@@ -398,12 +397,90 @@ freshenTopBinds binds = do
     -- pprTraceM "freshen" (ppr (length vars))
     return binds'
 
+{-# INLINE samePtr #-}
+samePtr :: a -> a -> Bool
+samePtr !a !b = case reallyUnsafePtrEquality# a b of
+  0# -> False
+  _  -> True
+
+{-# INLINE mkNonRec #-}
+mkNonRec :: CoreBind -> Id -> CoreExpr -> CoreBind
+mkNonRec old_bind new_b new_rhs = case old_bind of
+  NonRec old_b old_rhs
+    | samePtr old_b new_b, samePtr old_rhs new_rhs
+    -> old_bind
+  _ -> NonRec new_b new_rhs
+
+mkRec :: CoreBind -> [(Id, CoreExpr)] -> CoreBind
+mkRec old_bind new_pairs = case old_bind of
+  Rec old_pairs
+    | samePtr old_pairs new_pairs
+    -> old_bind
+  _ -> Rec new_pairs
+
+{-# INLINE mkPair #-}
+mkPair :: (a, b) -> a -> b -> (a, b)
+mkPair old_p@(old_a, old_b) new_a new_b
+  | samePtr old_a new_a, samePtr old_b new_b = old_p
+  | otherwise                                = (new_a, new_b)
+
+{-# INLINE mkCons #-}
+mkCons :: [a] -> a -> [a] -> [a]
+mkCons old_xs new_x new_xs' = case old_xs of
+  old_x : old_xs'
+    | samePtr old_x new_x, samePtr old_xs' new_xs'
+    -> old_xs
+  _ -> new_x:old_xs
+
+-- You should get the idea by now:
+{-# INLINE mkCoercion #-}
+mkCoercion :: CoreExpr -> Coercion -> CoreExpr
+mkCoercion old_e new_co = case old_e of Coercion old_co | samePtr old_co new_co -> old_e; _ -> Coercion new_co
+{-# INLINE mkType #-}
+mkType :: CoreExpr -> Type -> CoreExpr
+mkType old_e new_ty = case old_e of Type old_ty | samePtr old_ty new_ty -> old_e; _ -> Type new_ty
+{-# INLINE mkTicked #-}
+mkTicked :: CoreExpr -> CoreTickish -> CoreExpr -> CoreExpr
+mkTicked old_e new_t new_e' = case old_e of Tick old_t old_e' | samePtr old_t new_t, samePtr old_e' new_e' -> old_e; _ -> Tick new_t new_e'
+{-# INLINE mkCasted #-}
+mkCasted :: CoreExpr -> CoreExpr -> Coercion -> CoreExpr
+mkCasted old_e new_e' new_co = case old_e of Cast old_e' old_co | samePtr old_e' new_e', samePtr old_co new_co -> old_e; _ -> Cast new_e' new_co
+{-# INLINE mkApp #-}
+mkApp :: CoreExpr -> CoreExpr -> CoreExpr -> CoreExpr
+mkApp old_e new_f new_a = case old_e of App old_f old_a | samePtr old_f new_f, samePtr old_a new_a -> old_e; _ -> App new_f new_a
+{-# INLINE mkLam #-}
+mkLam :: CoreExpr -> CoreBndr -> CoreExpr -> CoreExpr
+mkLam old_e new_b new_body = case old_e of Lam old_b old_body | samePtr old_b new_b, samePtr old_body new_body -> old_e; _ -> Lam new_b new_body
+{-# INLINE mkLet #-}
+mkLet :: CoreExpr -> CoreBind -> CoreExpr -> CoreExpr
+mkLet old_e new_b new_body = case old_e of Let old_b old_body | samePtr old_b new_b, samePtr old_body new_body -> old_e; _ -> Let new_b new_body
+{-# INLINE mkCase #-}
+mkCase :: CoreExpr -> CoreExpr -> Id -> Type -> [CoreAlt] -> CoreExpr
+mkCase o_e n_scrut n_b n_ty n_alts = case o_e of Case o_scrut o_b o_ty o_alts | smp o_scrut n_scrut, smp o_b n_b, smp o_ty n_ty, smp o_alts n_alts  -> o_e; _ -> Case n_scrut n_b n_ty n_alts
+  where smp a b = samePtr a b
+{-# INLINE mkAlt #-}
+mkAlt :: CoreAlt -> AltCon -> [CoreBndr] -> CoreExpr -> CoreAlt
+mkAlt o_a n_con n_bs n_rhs = case o_a of Alt o_con o_bs o_rhs | smp o_con n_con, smp o_bs n_bs, smp o_rhs n_rhs -> o_a; _ -> Alt n_con n_bs n_rhs
+  where smp a b = samePtr a b
+
+forSameCheck :: Applicative f => [a] -> (a -> f a) -> f [a]
+forSameCheck xs f = go xs
+  where
+    go xs@[] = pure xs
+    go xs@(x:xs') = mkCons xs <$> f x <*> go xs'
+
+zipSameCheck :: [(a, b)] -> [a] -> [b] -> [(a, b)]
+zipSameCheck old_ps as bs = go old_ps as bs
+  where
+    go old_ps@(old_p:old_ps') (a:as) (b:bs) = (mkCons old_ps $! mkPair old_p a b) $! go old_ps' as bs
+    go _                      _      _      = []
+
 freshenTopBind :: CoreBind -> M CoreBind
 -- Binders are already fresh; see freshenTopBinds above
-freshenTopBind (NonRec b rhs) = NonRec b <$!> freshenExpr rhs
-freshenTopBind (Rec binds) = fmap Rec $ for binds $ \(b, rhs) -> do
+freshenTopBind bind@(NonRec b rhs) = mkNonRec bind b <$!> freshenExpr rhs
+freshenTopBind bind@(Rec pairs) = fmap (mkRec bind) $ forSameCheck pairs $ \p@(b, rhs) -> do
   !rhs' <- freshenExpr rhs
-  pure (b, rhs')
+  pure $! mkPair p b rhs'
 
 -- | `wrapSubstFunM f ids k` wraps a `substBndrs`-like function `f` such that
 --
@@ -419,69 +496,74 @@ wrapSubstFunM f ids k = ReaderT $ \subst -> do
   (!subst', !ids') <- liftIO $ f (subst `setInScope` in_scope) ids
   put $! substInScope subst'
   runReaderT (k ids') subst'
+{-# INLINE wrapSubstFunM #-}
 
 withSubstBndrM :: Var -> (Var -> M r) -> M r
 withSubstBndrM = wrapSubstFunM substBndr
+{-# INLINE withSubstBndrM #-}
 
 withSubstBndrsM :: [Var] -> ([Var] -> M r) -> M r
 withSubstBndrsM = wrapSubstFunM substBndrs
+{-# INLINE withSubstBndrsM #-}
 
 withSubstRecBndrsM :: [Id] -> ([Id] -> M r) -> M r
 withSubstRecBndrsM = wrapSubstFunM substRecBndrs
+{-# INLINE withSubstRecBndrsM #-}
 
 -- | The binders of the `CoreBind` are \"in scope\" in the
 -- continuation.
 freshenLocalBind :: CoreBind -> (CoreBind -> M r) -> M r
-freshenLocalBind (NonRec b rhs) k = do
+freshenLocalBind bind@(NonRec b rhs) k = do
   !rhs' <- freshenExpr rhs
-  withSubstBndrM b $ \(!b') -> k $! NonRec b' rhs'
-freshenLocalBind (Rec binds) k = do
-  let (bs, rhss) = unzip binds
+  withSubstBndrM b $ \(!b') -> k $! mkNonRec bind b' rhs'
+freshenLocalBind bind@(Rec pairs) k = do
+  let (bs, rhss) = unzip pairs
   withSubstRecBndrsM bs $ \(!bs') -> do
     !rhss' <- traverse freshenExpr rhss
-    k $! Rec $! zip bs' rhss'
+    k $! mkRec bind $! zipSameCheck pairs bs' rhss'
 
 freshenExpr :: CoreExpr -> M CoreExpr
 -- Quite like substExpr, but we freshen binders unconditionally.
 -- So maybe this is more like substExpr, if we had that
-freshenExpr (Coercion co) = do
+freshenExpr e@(Coercion co) = do
   subst <- ask
-  Coercion <$!> (liftIO $ substCo subst co)
-freshenExpr (Type t) = do
+  mkCoercion e <$!> (liftIO $ substCo subst co)
+freshenExpr e@(Type t) = do
   subst <- ask
-  Type <$!> (liftIO $ substTy subst t)
+  mkType e <$!> (liftIO $ substTy subst t)
 freshenExpr e@Lit{} = pure e
-freshenExpr (Var v) = do
+freshenExpr e@(Var v) = do
   subst <- ask
-  liftIO $ lookupIdSubst subst v
-freshenExpr (Tick t e) = do
+  !e'@(Var v') <- liftIO $ lookupIdSubst subst v
+  if v /= v' then pure e' else pure e
+freshenExpr e@(Tick t e') = do
   subst <- ask
-  t <- liftIO $ substTickish subst t
-  Tick t <$!> freshenExpr e
-freshenExpr (Cast e co) = do
+  t' <- liftIO $ substTickish subst t
+  mkTicked e t' <$!> freshenExpr e'
+freshenExpr e@(Cast e' co) = do
   subst <- ask
   co' <- liftIO $ substCo subst co
-  flip Cast co' <$!> freshenExpr e
-freshenExpr (App f a) = do
+  flip (mkCasted e) co' <$!> freshenExpr e'
+freshenExpr e@(App f a) = do
   !f' <- freshenExpr f
   !a' <- freshenExpr a
-  pure $ App f' a'
-freshenExpr (Lam b e) = withSubstBndrM b $ \(!b') -> do
-  !e' <- freshenExpr e
-  pure $ Lam b' e'
-freshenExpr (Let b e) = do
+  pure $! mkApp e f' a'
+freshenExpr e@(Lam b body) = withSubstBndrM b $ \(!b') -> do
+  !body' <- freshenExpr body
+  pure $! mkLam e b' body'
+freshenExpr e@(Let b body) = do
   freshenLocalBind b $ \(!b') -> do
-    !e' <- freshenExpr e
-    pure $ Let b' e'
-freshenExpr (Case e b ty alts) = do
-  !e' <- freshenExpr e
+    !body' <- freshenExpr body
+    pure $! mkLet e b' body'
+freshenExpr e@(Case scrut b ty alts) = do
+  !scrut' <- freshenExpr scrut
   withSubstBndrM b $ \(!b') -> do
     subst <- ask
     !ty' <- liftIO $ substTy subst ty
-    let do_alt (Alt con bs e) = withSubstBndrsM bs $ \(!bs') ->
-          Alt con bs' <$!> freshenExpr e
+    let do_alt alt@(Alt con bs e) = withSubstBndrsM bs $ \(!bs') ->
+          mkAlt alt con bs' <$!> freshenExpr e
     !alts' <- traverse do_alt alts
-    pure $ Case e' b' ty' alts'
+    pure $ mkCase e scrut' b' ty' alts'
 
 {-
 ************************************************************************
@@ -1139,10 +1221,11 @@ substBndr subst bndr
 -- | Applies 'substBndr' to a number of 'Var's, accumulating a new 'Subst' left-to-right
 substBndrs :: Subst -> [Var] -> IO (Subst, [Var])
 substBndrs subst [] = pure (subst, [])
-substBndrs subst (b:bs) = do
+substBndrs subst bs@(b:bs') = do
   (!subst', !b') <- substBndr subst b
-  (!subst'', !bs'') <- substBndrs subst' bs
-  pure (subst'', b':bs'')
+  (!subst'', !bs'') <- substBndrs subst' bs'
+  let !bs''' = mkCons bs b' bs''
+  pure (subst'', bs''')
 
 -- | Substitute in a mutually recursive group of 'Id's
 substRecBndrs :: Subst -> [Id] -> IO (Subst, [Id])
@@ -1151,10 +1234,11 @@ substRecBndrs subst bndrs = do
     let
       go :: Subst -> [Id] -> IO (Subst, [Id])
       go subst [] = pure (subst, [])
-      go subst (b:bs) = do
+      go subst bs@(b:bs') = do
         (subst', b') <- substIdBndr (text "rec-bndr") new_subst subst b
-        (subst'', bs'') <- go subst' bs
-        pure (subst'', b':bs'')
+        (subst'', bs'') <- go subst' bs'
+        let !bs''' = mkCons bs b' bs''
+        pure (subst'', bs''')
     go subst bndrs
   pure (new_subst, new_bndrs)
 
