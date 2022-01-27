@@ -102,12 +102,14 @@ addToMemLbl rep lbl = addToMem rep (CmmLit (CmmLabel lbl))
 addToMemLblE :: CmmType -> CLabel -> CmmExpr -> CmmAGraph
 addToMemLblE rep lbl = addToMemE rep (CmmLit (CmmLabel lbl))
 
+-- | @addToMem rep ptr n@ adds @n@ to the integer pointed-to by @ptr@.
 addToMem :: CmmType     -- rep of the counter
          -> CmmExpr     -- Address
          -> Int         -- What to add (a word)
          -> CmmAGraph
 addToMem rep ptr n = addToMemE rep ptr (CmmLit (CmmInt (toInteger n) (typeWidth rep)))
 
+-- | @addToMemE rep ptr n@ adds @n@ to the integer pointed-to by @ptr@.
 addToMemE :: CmmType    -- rep of the counter
           -> CmmExpr    -- Address
           -> CmmExpr    -- What to add (a word-typed expression)
