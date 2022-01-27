@@ -689,6 +689,8 @@ data CallishMachOp
   -- after this instruction.
   | MO_SuspendThread
   | MO_ResumeThread
+
+  | MO_UnalignedStore CmmType
   deriving (Eq, Show)
 
 -- | The operation to perform atomically.
@@ -707,13 +709,14 @@ pprCallishMachOp mo = text (show mo)
 -- | Return (results_hints,args_hints)
 callishMachOpHints :: CallishMachOp -> ([ForeignHint], [ForeignHint])
 callishMachOpHints op = case op of
-  MO_Memcpy _      -> ([], [AddrHint,AddrHint,NoHint])
-  MO_Memset _      -> ([], [AddrHint,NoHint,NoHint])
-  MO_Memmove _     -> ([], [AddrHint,AddrHint,NoHint])
-  MO_Memcmp _      -> ([], [AddrHint, AddrHint, NoHint])
-  MO_SuspendThread -> ([AddrHint], [AddrHint,NoHint])
-  MO_ResumeThread  -> ([AddrHint], [AddrHint])
-  _                -> ([],[])
+  MO_Memcpy _         -> ([], [AddrHint,AddrHint,NoHint])
+  MO_Memset _         -> ([], [AddrHint,NoHint,NoHint])
+  MO_Memmove _        -> ([], [AddrHint,AddrHint,NoHint])
+  MO_Memcmp _         -> ([], [AddrHint, AddrHint, NoHint])
+  MO_SuspendThread    -> ([AddrHint], [AddrHint,NoHint])
+  MO_ResumeThread     -> ([AddrHint], [AddrHint])
+  MO_UnalignedStore _ -> ([], [AddrHint,NoHint])
+  _                   -> ([],[])
   -- empty lists indicate NoHint
 
 -- | The alignment of a 'memcpy'-ish operation.

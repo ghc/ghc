@@ -207,11 +207,16 @@ genCall (PrimTarget (MO_UF_Conv w)) [dst] [e] = runStmtsDecls $ do
     castV <- lift $ mkLocalVar ty
     ve <- exprToVarW e
     statement $ Assignment castV $ Cast LM_Uitofp ve width
-    statement $ Store castV dstV
+    statement $ Store castV dstV Nothing
 
 genCall (PrimTarget (MO_UF_Conv _)) [_] args =
     panic $ "genCall: Too many arguments to MO_UF_Conv. " ++
     "Can only handle 1, given" ++ show (length args) ++ "."
+
+genCall (PrimTarget (MO_UnalignedStore _ty)) [] [ptr, val] = runStmtsDecls $ do
+    vptr <- exprToVarW ptr
+    vval <- exprToVarW val
+    statement $ Store vptr vval (Just 1)
 
 -- Handle prefetching data
 genCall t@(PrimTarget (MO_Prefetch_Data localityInt)) [] args
@@ -263,12 +268,12 @@ genCall (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n] = runStmtsDecls $
                AMO_Or   -> LAO_Or
                AMO_Xor  -> LAO_Xor
     retVar <- doExprW targetTy $ AtomicRMW op ptrVar nVar SyncSeqCst
-    statement $ Store retVar dstVar
+    statement $ Store retVar dstVar Nothing
 
 genCall (PrimTarget (MO_AtomicRead _)) [dst] [addr] = runStmtsDecls $ do
     dstV <- getCmmRegW (CmmLocal dst)
     v1 <- genLoadW True addr (localRegType dst)
-    statement $ Store v1 dstV
+    statement $ Store v1 dstV Nothing
 
 genCall (PrimTarget (MO_Cmpxchg _width))
         [dst] [addr, old, new] = runStmtsDecls $ do
@@ -282,7 +287,7 @@ genCall (PrimTarget (MO_Cmpxchg _width))
     retVar <- doExprW (LMStructU [targetTy,i1])
               $ CmpXChg ptrVar oldVar newVar SyncSeqCst SyncSeqCst
     retVar' <- doExprW targetTy $ ExtractV retVar 0
-    statement $ Store retVar' dstVar
+    statement $ Store retVar' dstVar Nothing
 
 genCall (PrimTarget (MO_Xchg _width)) [dst] [addr, val] = runStmtsDecls $ do
     dstV <- getCmmRegW (CmmLocal dst) :: WriterT LlvmAccum LlvmM LlvmVar
@@ -292,7 +297,7 @@ genCall (PrimTarget (MO_Xchg _width)) [dst] [addr, val] = runStmtsDecls $ do
         ptrExpr = Cast LM_Inttoptr addrVar ptrTy
     ptrVar <- doExprW ptrTy ptrExpr
     resVar <- doExprW (getVarType valVar) (AtomicRMW LAO_Xchg ptrVar valVar SyncSeqCst)
-    statement $ Store resVar dstV
+    statement $ Store resVar dstV Nothing
 
 genCall (PrimTarget (MO_AtomicWrite _width)) [] [addr, val] = runStmtsDecls $ do
     addrVar <- exprToVarW addr
@@ -352,8 +357,8 @@ genCall (PrimTarget (MO_U_Mul2 w)) [dstH, dstL] [lhs, rhs] = runStmtsDecls $ do
     retH <- doExprW width $ Cast LM_Trunc retShifted width
     dstRegL <- getCmmRegW (CmmLocal dstL)
     dstRegH <- getCmmRegW (CmmLocal dstH)
-    statement $ Store retL dstRegL
-    statement $ Store retH dstRegH
+    statement $ Store retL dstRegL Nothing
+    statement $ Store retH dstRegH Nothing
 
 genCall (PrimTarget (MO_S_Mul2 w)) [dstC, dstH, dstL] [lhs, rhs] = runStmtsDecls $ do
     let width = widthToLlvmInt w
@@ -384,9 +389,9 @@ genCall (PrimTarget (MO_S_Mul2 w)) [dstC, dstH, dstL] [lhs, rhs] = runStmtsDecls
     dstRegL <- getCmmRegW (CmmLocal dstL)
     dstRegH <- getCmmRegW (CmmLocal dstH)
     dstRegC <- getCmmRegW (CmmLocal dstC)
-    statement $ Store retL dstRegL
-    statement $ Store retH dstRegH
-    statement $ Store retC dstRegC
+    statement $ Store retL dstRegL Nothing
+    statement $ Store retH dstRegH Nothing
+    statement $ Store retC dstRegC Nothing
 
 -- MO_U_QuotRem2 is another case we handle by widening the registers to double
 -- the width and use normal LLVM instructions (similarly to the MO_U_Mul2). The
@@ -420,8 +425,8 @@ genCall (PrimTarget (MO_U_QuotRem2 w))
     retRem <- narrow retExtRem
     dstRegQ <- lift $ getCmmReg (CmmLocal dstQ)
     dstRegR <- lift $ getCmmReg (CmmLocal dstR)
-    statement $ Store retDiv dstRegQ
-    statement $ Store retRem dstRegR
+    statement $ Store retDiv dstRegQ Nothing
+    statement $ Store retRem dstRegR Nothing
 
 -- Handle the MO_{Add,Sub}IntC separately. LLVM versions return a record from
 -- which we need to extract the actual values.
@@ -528,7 +533,7 @@ genCall target res args = do
             vreg <- getCmmRegW (CmmLocal creg)
             if retTy == pLower (getVarType vreg)
                 then do
-                    statement $ Store v1 vreg
+                    statement $ Store v1 vreg Nothing
                     doReturn
                 else do
                     let ty = pLower $ getVarType vreg
@@ -540,7 +545,7 @@ genCall target res args = do
                                         ++ " returned type!"
 
                     v2 <- doExprW ty $ Cast op v1 ty
-                    statement $ Store v2 vreg
+                    statement $ Store v2 vreg Nothing
                     doReturn
 
 -- | Generate a call to an LLVM intrinsic that performs arithmetic operation
@@ -569,8 +574,8 @@ genCallWithOverflow t@(PrimTarget op) w [dstV, dstO] [lhs, rhs] = do
     (overflow, zext) <- doExpr width $ Cast LM_Zext overflowBit width
     dstRegV <- getCmmReg (CmmLocal dstV)
     dstRegO <- getCmmReg (CmmLocal dstO)
-    let storeV = Store value dstRegV
-        storeO = Store overflow dstRegO
+    let storeV = Store value dstRegV Nothing
+        storeO = Store overflow dstRegO Nothing
     return (stmts `snocOL` zext `snocOL` storeV `snocOL` storeO, top)
 genCallWithOverflow _ _ _ _ =
     panic "genCallExtract: wrong ForeignTarget or number of arguments"
@@ -635,7 +640,7 @@ genCallSimpleCast w t@(PrimTarget op) [dst] args = do
     (retV, s1)                  <- doExpr width $ Call StdCall fptr argsV' []
     (retVs', stmts5)            <- castVars (cmmPrimOpRetValSignage op) [(retV,dstTy)]
     let retV'                    = singletonPanic "genCallSimpleCast" retVs'
-    let s2                       = Store retV' dstV
+    let s2                       = mkStore retV' dstV
 
     let stmts = stmts2 `appOL` stmts4 `snocOL`
                 s1 `appOL` stmts5 `snocOL` s2
@@ -667,7 +672,7 @@ genCallSimpleCast2 w t@(PrimTarget op) [dst] args = do
     (retV, s1)                  <- doExpr width $ Call StdCall fptr argsV' []
     (retVs', stmts5)             <- castVars (cmmPrimOpRetValSignage op) [(retV,dstTy)]
     let retV'                    = singletonPanic "genCallSimpleCast2" retVs'
-    let s2                       = Store retV' dstV
+    let s2                       = mkStore retV' dstV
 
     let stmts = stmts2 `appOL` stmts4 `snocOL`
                 s1 `appOL` stmts5 `snocOL` s2
@@ -1017,6 +1022,7 @@ cmmPrimOpFunctions mop = do
     MO_AtomicWrite _ -> unsupported
     MO_Cmpxchg _     -> unsupported
     MO_Xchg _        -> unsupported
+    MO_UnalignedStore _ -> unsupported
 
     MO_I64_ToI       -> dontReach64
     MO_I64_FromI     -> dontReach64
@@ -1097,16 +1103,16 @@ genAssign reg val = do
       -- Some registers are pointer types, so need to cast value to pointer
       LMPointer _ | getVarType vval == llvmWord platform -> do
           (v, s1) <- doExpr ty $ Cast LM_Inttoptr vval ty
-          let s2 = Store v vreg
+          let s2 = mkStore v vreg
           return (stmts `snocOL` s1 `snocOL` s2, top2)
 
       LMVector _ _ -> do
           (v, s1) <- doExpr ty $ Cast LM_Bitcast vval ty
-          let s2 = Store v vreg
+          let s2 = mkStore v vreg
           return (stmts `snocOL` s1 `snocOL` s2, top2)
 
       _ -> do
-          let s1 = Store vval vreg
+          let s1 = mkStore vval vreg
           return (stmts `snocOL` s1, top2)
 
 
@@ -1157,7 +1163,7 @@ genStore_fast addr r n val
                 case pLower grt == getVarType vval of
                      -- were fine
                      True  -> do
-                         let s3 = MetaStmt meta $ Store vval ptr
+                         let s3 = MetaStmt meta $ mkStore vval ptr
                          return (stmts `appOL` s1 `snocOL` s2
                                  `snocOL` s3, top)
 
@@ -1165,7 +1171,7 @@ genStore_fast addr r n val
                      False -> do
                          let ty = (pLift . getVarType) vval
                          (ptr', s3) <- doExpr ty $ Cast LM_Bitcast ptr ty
-                         let s4 = MetaStmt meta $ Store vval ptr'
+                         let s4 = MetaStmt meta $ mkStore vval ptr'
                          return (stmts `appOL` s1 `snocOL` s2
                                  `snocOL` s3 `snocOL` s4, top)
 
@@ -1188,17 +1194,17 @@ genStore_slow addr val meta = do
         -- sometimes we need to cast an int to a pointer before storing
         LMPointer ty@(LMPointer _) | getVarType vval == llvmWord platform -> do
             (v, s1) <- doExpr ty $ Cast LM_Inttoptr vval ty
-            let s2 = MetaStmt meta $ Store v vaddr
+            let s2 = MetaStmt meta $ mkStore v vaddr
             return (stmts `snocOL` s1 `snocOL` s2, top1 ++ top2)
 
         LMPointer _ -> do
-            let s1 = MetaStmt meta $ Store vval vaddr
+            let s1 = MetaStmt meta $ mkStore vval vaddr
             return (stmts `snocOL` s1, top1 ++ top2)
 
         i@(LMInt _) | i == llvmWord platform -> do
             let vty = pLift $ getVarType vval
             (vptr, s1) <- doExpr vty $ Cast LM_Inttoptr vaddr vty
-            let s2 = MetaStmt meta $ Store vval vptr
+            let s2 = MetaStmt meta $ mkStore vval vptr
             return (stmts `snocOL` s1 `snocOL` s2, top1 ++ top2)
 
         other ->
@@ -1208,6 +1214,13 @@ genStore_slow addr val meta = do
                         ", Size of var: " ++ show (llvmWidthInBits platform other) ++
                         ", Var: "         ++ renderWithContext (llvmCgContext cfg) (ppVar cfg vaddr)))
 
+mkStore :: LlvmVar -> LlvmVar -> LlvmStatement
+mkStore dst val = Store dst val align
+  where
+    dstTy = pLower (getVarType dst)
+    align
+      | isVector dstTy = Just 1
+      | otherwise      = Nothing
 
 -- | Unconditional branch
 genBranch :: BlockId -> LlvmM StmtData
@@ -2062,7 +2075,7 @@ funPrologue live cmmBlocks = do
             rval  = if isLive r then arg else trash
             alloc = Assignment reg $ Alloca (pLower $ getVarType reg) 1
         markStackReg r
-        return $ toOL [alloc, Store rval reg]
+        return $ toOL [alloc, mkStore rval reg]
 
   return (concatOL stmtss `snocOL` jumpToEntry, [])
   where

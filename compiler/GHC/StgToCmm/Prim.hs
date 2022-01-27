@@ -2165,7 +2165,7 @@ doWriteOffAddrOp :: Maybe MachOp
                  -> [CmmExpr]
                  -> FCode ()
 doWriteOffAddrOp maybe_pre_write_cast idx_ty [] [addr,idx,val]
-   = mkBasicIndexedWrite 0 maybe_pre_write_cast addr idx_ty idx val
+   = mkBasicIndexedWrite NaturallyAligned 0 maybe_pre_write_cast addr idx_ty idx val
 doWriteOffAddrOp _ _ _ _
    = panic "GHC.StgToCmm.Prim: doWriteOffAddrOp"
 
@@ -2178,7 +2178,7 @@ doWriteByteArrayOp maybe_pre_write_cast idx_ty [] [addr,idx,val]
    = do profile <- getProfile
         platform <- getPlatform
         doByteArrayBoundsCheck idx addr idx_ty (cmmExprType platform val)
-        mkBasicIndexedWrite (arrWordsHdrSize profile) maybe_pre_write_cast addr idx_ty idx val
+        mkBasicIndexedWrite NaturallyAligned (arrWordsHdrSize profile) maybe_pre_write_cast addr idx_ty idx val
 doWriteByteArrayOp _ _ _ _
    = panic "GHC.StgToCmm.Prim: doWriteByteArrayOp"
 
@@ -2201,7 +2201,7 @@ doWritePtrArrayOp addr idx val
        -- referred to by val have happened before we write val into the array.
        -- See #12469 for details.
        emitPrimCall [] MO_WriteBarrier []
-       mkBasicIndexedWrite hdr_size Nothing addr ty idx val
+       mkBasicIndexedWrite NaturallyAligned hdr_size Nothing addr ty idx val
 
        emit (setInfo addr (CmmLit (CmmLabel mkMAP_DIRTY_infoLabel)))
        -- the write barrier.  We must write a byte into the mark table:
@@ -2237,18 +2237,23 @@ mkBasicIndexedRead alignment off mb_cast ty res base idx_ty idx
         emitAssign (CmmLocal res) x'
 
 
-mkBasicIndexedWrite :: ByteOff      -- Initial offset in bytes
+mkBasicIndexedWrite :: AlignmentSpec
+                    -> ByteOff      -- Initial offset in bytes
                     -> Maybe MachOp -- Optional value cast
                     -> CmmExpr      -- Base address
                     -> CmmType      -- Type of element by which we are indexing
                     -> CmmExpr      -- Index
                     -> CmmExpr      -- Value to write
                     -> FCode ()
-mkBasicIndexedWrite off Nothing base idx_ty idx val
+mkBasicIndexedWrite alignment off Nothing base idx_ty idx val
    = do platform <- getPlatform
-        emitStore (cmmIndexOffExpr platform off (typeWidth idx_ty) base idx) val
-mkBasicIndexedWrite off (Just cast) base idx_ty idx val
-   = mkBasicIndexedWrite off Nothing base idx_ty idx (CmmMachOp cast [val])
+        let ptr = cmmIndexOffExpr platform off (typeWidth idx_ty) base idx
+        let val_ty = cmmExprType platform val
+        case alignment of
+          NaturallyAligned -> emitStore ptr val
+          Unaligned        -> emitPrimCall [] (MO_UnalignedStore val_ty) [ptr, val]
+mkBasicIndexedWrite alignment off (Just cast) base idx_ty idx val
+   = mkBasicIndexedWrite alignment off Nothing base idx_ty idx (CmmMachOp cast [val])
 
 -- ----------------------------------------------------------------------------
 -- Misc utils
@@ -3063,7 +3068,7 @@ doWriteSmallPtrArrayOp addr idx val = do
     whenUpdRemSetEnabled $ emitUpdRemSetPush (CmmReg (CmmLocal tmp))
 
     emitPrimCall [] MO_WriteBarrier [] -- #12469
-    mkBasicIndexedWrite (smallArrPtrsHdrSize profile) Nothing addr ty idx val
+    mkBasicIndexedWrite NaturallyAligned (smallArrPtrsHdrSize profile) Nothing addr ty idx val
     emit (setInfo addr (CmmLit (CmmLabel mkSMAP_DIRTY_infoLabel)))
 
 ------------------------------------------------------------------------------
