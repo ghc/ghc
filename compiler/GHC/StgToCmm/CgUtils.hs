@@ -171,7 +171,7 @@ fixStgRegStmt platform stmt = fixAssign $ mapExpDeep fixExpr stmt
                     let baseAddr = get_GlobalReg_addr platform reg
                     in case reg of
                         BaseReg -> baseAddr
-                        _other  -> CmmLoad baseAddr (globalRegType platform reg)
+                        _other  -> CmmLoad baseAddr (globalRegType platform reg) NaturallyAligned
 
         CmmRegOff (CmmGlobal reg) offset ->
             -- RegOf leaves are just a shorthand form. If the reg maps

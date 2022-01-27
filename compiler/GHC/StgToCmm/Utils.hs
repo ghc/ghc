@@ -148,18 +148,18 @@ addToMemLblE rep lbl = addToMemE rep (CmmLit (CmmLabel lbl))
 
 -- | @addToMem rep ptr n@ adds @n@ to the integer pointed-to by @ptr@.
 addToMem :: CmmType     -- rep of the counter
-         -> CmmExpr     -- Address
+         -> CmmExpr     -- Naturally-aligned address
          -> Int         -- What to add (a word)
          -> CmmAGraph
 addToMem rep ptr n = addToMemE rep ptr (CmmLit (CmmInt (toInteger n) (typeWidth rep)))
 
 -- | @addToMemE rep ptr n@ adds @n@ to the integer pointed-to by @ptr@.
 addToMemE :: CmmType    -- rep of the counter
-          -> CmmExpr    -- Address
+          -> CmmExpr    -- Naturally-aligned address
           -> CmmExpr    -- What to add (a word-typed expression)
           -> CmmAGraph
 addToMemE rep ptr n
-  = mkStore ptr (CmmMachOp (MO_Add (typeWidth rep)) [CmmLoad ptr rep, n])
+  = mkStore ptr (CmmMachOp (MO_Add (typeWidth rep)) [CmmLoad ptr rep NaturallyAligned, n])
 
 
 -------------------------------------------------------------------------
@@ -179,7 +179,8 @@ mkTaggedObjectLoad platform reg base offset tag
              (CmmLoad (cmmOffsetB platform
                                   (CmmReg (CmmLocal base))
                                   (offset - tag))
-                      (localRegType reg))
+                      (localRegType reg)
+                      NaturallyAligned)
 
 -------------------------------------------------------------------------
 --
@@ -283,7 +284,9 @@ callerSaveGlobalReg platform reg
 callerRestoreGlobalReg :: Platform -> GlobalReg -> CmmAGraph
 callerRestoreGlobalReg platform reg
     = mkAssign (CmmGlobal reg)
-               (CmmLoad (get_GlobalReg_addr platform reg) (globalRegType platform reg))
+               (CmmLoad (get_GlobalReg_addr platform reg)
+                        (globalRegType platform reg)
+                        NaturallyAligned)
 
 
 -------------------------------------------------------------------------

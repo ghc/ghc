@@ -305,15 +305,16 @@ cmmIndexExpr platform width base idx =
     byte_off = CmmMachOp (MO_Shl idx_w) [idx, mkIntExpr platform (widthInLog width)]
 
 cmmLoadIndex :: Platform -> CmmType -> CmmExpr -> Int -> CmmExpr
-cmmLoadIndex platform ty expr ix = CmmLoad (cmmIndex platform (typeWidth ty) expr ix) ty
+cmmLoadIndex platform ty expr ix =
+    CmmLoad (cmmIndex platform (typeWidth ty) expr ix) ty NaturallyAligned -- TODO: Audit uses
 
--- | Load a non-pointer word.
+-- | Load a naturally-aligned non-pointer word.
 cmmLoadBWord :: Platform -> CmmExpr -> CmmExpr
-cmmLoadBWord platform ptr = CmmLoad ptr (bWord platform)
+cmmLoadBWord platform ptr = CmmLoad ptr (bWord platform) NaturallyAligned
 
--- | Load a GC pointer.
+-- | Load a naturally-aligned GC pointer.
 cmmLoadGCWord :: Platform -> CmmExpr -> CmmExpr
-cmmLoadGCWord platform ptr = CmmLoad ptr (gcWord platform)
+cmmLoadGCWord platform ptr = CmmLoad ptr (gcWord platform) NaturallyAligned
 
 -- The "B" variants take byte offsets
 cmmRegOffB :: CmmReg -> ByteOff -> CmmExpr
@@ -352,7 +353,8 @@ cmmLabelOffW :: Platform -> CLabel -> WordOff -> CmmLit
 cmmLabelOffW platform lbl wd_off = cmmLabelOffB lbl (wordsToBytes platform wd_off)
 
 cmmLoadIndexW :: Platform -> CmmExpr -> Int -> CmmType -> CmmExpr
-cmmLoadIndexW platform base off ty = CmmLoad (cmmOffsetW platform base off) ty
+cmmLoadIndexW platform base off ty =
+    CmmLoad (cmmOffsetW platform base off) ty NaturallyAligned -- TODO: Audit ses
 
 -----------------------
 cmmULtWord, cmmUGeWord, cmmUGtWord, cmmUShrWord,
@@ -403,7 +405,7 @@ cmmMkAssign platform expr uq =
 ---------------------------------------------------
 
 isTrivialCmmExpr :: CmmExpr -> Bool
-isTrivialCmmExpr (CmmLoad _ _)      = False
+isTrivialCmmExpr (CmmLoad _ _ _)    = False
 isTrivialCmmExpr (CmmMachOp _ _)    = False
 isTrivialCmmExpr (CmmLit _)         = True
 isTrivialCmmExpr (CmmReg _)         = True
@@ -411,7 +413,7 @@ isTrivialCmmExpr (CmmRegOff _ _)    = True
 isTrivialCmmExpr (CmmStackSlot _ _) = panic "isTrivialCmmExpr CmmStackSlot"
 
 hasNoGlobalRegs :: CmmExpr -> Bool
-hasNoGlobalRegs (CmmLoad e _)              = hasNoGlobalRegs e
+hasNoGlobalRegs (CmmLoad e _ _)            = hasNoGlobalRegs e
 hasNoGlobalRegs (CmmMachOp _ es)           = all hasNoGlobalRegs es
 hasNoGlobalRegs (CmmLit _)                 = True
 hasNoGlobalRegs (CmmReg (CmmLocal _))      = True
@@ -483,7 +485,7 @@ regsOverlap _ reg reg' = reg == reg'
 regUsedIn :: Platform -> CmmReg -> CmmExpr -> Bool
 regUsedIn platform = regUsedIn_ where
   _   `regUsedIn_` CmmLit _         = False
-  reg `regUsedIn_` CmmLoad e  _     = reg `regUsedIn_` e
+  reg `regUsedIn_` CmmLoad e _ _    = reg `regUsedIn_` e
   reg `regUsedIn_` CmmReg reg'      = regsOverlap platform reg reg'
   reg `regUsedIn_` CmmRegOff reg' _ = regsOverlap platform reg reg'
   reg `regUsedIn_` CmmMachOp _ es   = any (reg `regUsedIn_`) es

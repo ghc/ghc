@@ -268,7 +268,7 @@ genCall (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n] = runStmtsDecls $
 
 genCall (PrimTarget (MO_AtomicRead _)) [dst] [addr] = runStmtsDecls $ do
     dstV <- getCmmRegW (CmmLocal dst)
-    v1 <- genLoadW True addr (localRegType dst)
+    v1 <- genLoadW True addr (localRegType dst) NaturallyAligned
     statement $ Store v1 dstV
 
 genCall (PrimTarget (MO_Cmpxchg _width))
@@ -1249,8 +1249,8 @@ exprToVarOpt opt e = case e of
     CmmLit lit
         -> genLit opt lit
 
-    CmmLoad e' ty
-        -> genLoad False e' ty
+    CmmLoad e' ty align
+        -> genLoad False e' ty align
 
     -- Cmmreg in expression is the value, so must load. If you want actual
     -- reg pointer, call getCmmReg directly.
@@ -1684,40 +1684,40 @@ genMachOp_slow _ _ _ = panic "genMachOp: More than 2 expressions in MachOp!"
 
 
 -- | Handle CmmLoad expression.
-genLoad :: Atomic -> CmmExpr -> CmmType -> LlvmM ExprData
+genLoad :: Atomic -> CmmExpr -> CmmType -> AlignmentSpec -> LlvmM ExprData
 
 -- First we try to detect a few common cases and produce better code for
 -- these then the default case. We are mostly trying to detect Cmm code
 -- like I32[Sp + n] and use 'getelementptr' operations instead of the
 -- generic case that uses casts and pointer arithmetic
-genLoad atomic e@(CmmReg (CmmGlobal r)) ty
-    = genLoad_fast atomic e r 0 ty
+genLoad atomic e@(CmmReg (CmmGlobal r)) ty align
+    = genLoad_fast atomic e r 0 ty align
 
-genLoad atomic e@(CmmRegOff (CmmGlobal r) n) ty
-    = genLoad_fast atomic e r n ty
+genLoad atomic e@(CmmRegOff (CmmGlobal r) n) ty align
+    = genLoad_fast atomic e r n ty align
 
 genLoad atomic e@(CmmMachOp (MO_Add _) [
                             (CmmReg (CmmGlobal r)),
                             (CmmLit (CmmInt n _))])
-                ty
-    = genLoad_fast atomic e r (fromInteger n) ty
+                ty align
+    = genLoad_fast atomic e r (fromInteger n) ty align
 
 genLoad atomic e@(CmmMachOp (MO_Sub _) [
                             (CmmReg (CmmGlobal r)),
                             (CmmLit (CmmInt n _))])
-                ty
-    = genLoad_fast atomic e r (negate $ fromInteger n) ty
+                ty align
+    = genLoad_fast atomic e r (negate $ fromInteger n) ty align
 
 -- generic case
-genLoad atomic e ty
-    = getTBAAMeta topN >>= genLoad_slow atomic e ty
+genLoad atomic e ty align
+    = getTBAAMeta topN >>= genLoad_slow atomic e ty align
 
 -- | Handle CmmLoad expression.
 -- This is a special case for loading from a global register pointer
 -- offset such as I32[Sp+8].
 genLoad_fast :: Atomic -> CmmExpr -> GlobalReg -> Int -> CmmType
-             -> LlvmM ExprData
-genLoad_fast atomic e r n ty = do
+             -> AlignmentSpec -> LlvmM ExprData
+genLoad_fast atomic e r n ty align = do
     platform <- getPlatform
     (gv, grt, s1) <- getCmmRegVal (CmmGlobal r)
     meta          <- getTBAARegMeta r
@@ -1730,7 +1730,7 @@ genLoad_fast atomic e r n ty = do
                 case grt == ty' of
                      -- were fine
                      True -> do
-                         (var, s3) <- doExpr ty' (MExpr meta $ loadInstr ptr)
+                         (var, s3) <- doExpr ty' (MExpr meta $ mkLoad atomic ptr align)
                          return (var, s1 `snocOL` s2 `snocOL` s3,
                                      [])
 
@@ -1738,21 +1738,19 @@ genLoad_fast atomic e r n ty = do
                      False -> do
                          let pty = pLift ty'
                          (ptr', s3) <- doExpr pty $ Cast LM_Bitcast ptr pty
-                         (var, s4) <- doExpr ty' (MExpr meta $ loadInstr ptr')
+                         (var, s4) <- doExpr ty' (MExpr meta $ mkLoad atomic ptr' align)
                          return (var, s1 `snocOL` s2 `snocOL` s3
                                     `snocOL` s4, [])
 
             -- If its a bit type then we use the slow method since
             -- we can't avoid casting anyway.
-            False -> genLoad_slow atomic  e ty meta
-  where
-    loadInstr ptr | atomic    = ALoad SyncSeqCst False ptr
-                  | otherwise = Load ptr
+            False -> genLoad_slow atomic  e ty align meta
 
 -- | Handle Cmm load expression.
 -- Generic case. Uses casts and pointer arithmetic if needed.
-genLoad_slow :: Atomic -> CmmExpr -> CmmType -> [MetaAnnot] -> LlvmM ExprData
-genLoad_slow atomic e ty meta = do
+genLoad_slow :: Atomic -> CmmExpr -> CmmType -> AlignmentSpec -> [MetaAnnot]
+             -> LlvmM ExprData
+genLoad_slow atomic e ty align meta = do
   platform <- getPlatform
   dflags <- getDynFlags
   opts <- getLlvmOpts
@@ -1760,22 +1758,42 @@ genLoad_slow atomic e ty meta = do
     iptr <- exprToVarW e
     case getVarType iptr of
         LMPointer _ ->
-                    doExprW (cmmToLlvmType ty) (MExpr meta $ loadInstr iptr)
+                    doExprW (cmmToLlvmType ty) (MExpr meta $ mkLoad atomic iptr align)
 
         i@(LMInt _) | i == llvmWord platform -> do
                     let pty = LMPointer $ cmmToLlvmType ty
                     ptr <- doExprW pty $ Cast LM_Inttoptr iptr pty
-                    doExprW (cmmToLlvmType ty) (MExpr meta $ loadInstr ptr)
+                    doExprW (cmmToLlvmType ty) (MExpr meta $ mkLoad atomic ptr align)
 
         other -> pprPanic "exprToVar: CmmLoad expression is not right type!"
                      (PprCmm.pprExpr platform e <+> text (
                          "Size of Ptr: " ++ show (llvmPtrBits platform) ++
                          ", Size of var: " ++ show (llvmWidthInBits platform other) ++
                          ", Var: " ++ showSDoc dflags (ppVar opts iptr)))
-  where
-    loadInstr ptr | atomic    = ALoad SyncSeqCst False ptr
-                  | otherwise = Load ptr
 
+{-
+Note [Alignment of vector-typed values]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+On x86, vector types need to be 16-byte aligned for aligned
+access, but we have no way of guaranteeing that this is true with GHC
+(we would need to modify the layout of the stack and closures, change
+the storage manager, etc.). So, we blindly tell LLVM that *any* vector
+store or load could be unaligned. In the future we may be able to
+guarantee that certain vector access patterns are aligned, in which
+case we will need a more granular way of specifying alignment.
+-}
+
+mkLoad :: Atomic -> LlvmVar -> AlignmentSpec -> LlvmExpression
+mkLoad atomic ptr alignment
+  | atomic      = ALoad SyncSeqCst False ptr
+  | otherwise   = Load ptr align
+  where
+    ty = pLower (getVarType ptr)
+    align = case alignment of
+              -- See Note [Alignment of vector-typed values]
+              _ | is_vector    -> Just 1
+              Unaligned        -> Just 1
+              NaturallyAligned -> Nothing
 
 -- | Handle CmmReg expression. This will return a pointer to the stack
 -- location of the register. Throws an error if it isn't allocated on
@@ -1814,7 +1832,7 @@ getCmmRegVal reg =
  where loadFromStack = do
          ptr <- getCmmReg reg
          let ty = pLower $ getVarType ptr
-         (v, s) <- doExpr ty (Load ptr)
+         (v, s) <- doExpr ty (Load ptr Nothing)
          return (v, ty, unitOL s)
 
 -- | Allocate a local CmmReg on the stack
@@ -2105,8 +2123,8 @@ runStmtsDecls action = do
 getCmmRegW :: CmmReg -> WriterT LlvmAccum LlvmM LlvmVar
 getCmmRegW = lift . getCmmReg
 
-genLoadW :: Atomic -> CmmExpr -> CmmType -> WriterT LlvmAccum LlvmM LlvmVar
-genLoadW atomic e ty = liftExprData $ genLoad atomic e ty
+genLoadW :: Atomic -> CmmExpr -> CmmType -> AlignmentSpec -> WriterT LlvmAccum LlvmM LlvmVar
+genLoadW atomic e ty alignment = liftExprData $ genLoad atomic e ty alignment
 
 -- | Return element of single-element list; 'panic' if list is not a single-element list
 singletonPanic :: String -> [a] -> a

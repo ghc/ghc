@@ -243,7 +243,7 @@ ppLlvmExpression opts expr
         ExtractV   struct idx       -> ppExtractV opts struct idx
         Insert     vec elt idx      -> ppInsert opts vec elt idx
         GetElemPtr inb ptr indexes  -> ppGetElementPtr opts inb ptr indexes
-        Load       ptr              -> ppLoad opts ptr
+        Load       ptr align        -> ppLoad opts ptr align
         ALoad      ord st ptr       -> ppALoad opts ord st ptr
         Malloc     tp amount        -> ppMalloc opts tp amount
         AtomicRMW  aop tgt src ordering -> ppAtomicRMW opts aop tgt src ordering
@@ -366,20 +366,16 @@ ppCmpXChg opts addr old new s_ord f_ord =
   text "cmpxchg" <+> ppVar opts addr <> comma <+> ppVar opts old <> comma <+> ppVar opts new
   <+> ppSyncOrdering s_ord <+> ppSyncOrdering f_ord
 
--- XXX: On x86, vector types need to be 16-byte aligned for aligned access, but
--- we have no way of guaranteeing that this is true with GHC (we would need to
--- modify the layout of the stack and closures, change the storage manager,
--- etc.). So, we blindly tell LLVM that *any* vector store or load could be
--- unaligned. In the future we may be able to guarantee that certain vector
--- access patterns are aligned, in which case we will need a more granular way
--- of specifying alignment.
 
 ppLoad :: LlvmOpts -> LlvmVar -> SDoc
-ppLoad opts var = text "load" <+> ppr derefType <> comma <+> ppVar opts var <> align
+ppLoad opts var alignment =
+  text "load" <+> ppr derefType <> comma <+> ppVar opts var <> align
   where
     derefType = pLower $ getVarType var
-    align | isVector . pLower . getVarType $ var = text ", align 1"
-          | otherwise = empty
+    align =
+      case alignment of
+        Just n  -> text ", align" <+> ppr n
+        Nothing -> empty
 
 ppALoad :: LlvmOpts -> LlvmSyncOrdering -> SingleThreaded -> LlvmVar -> SDoc
 ppALoad opts ord st var =

@@ -29,7 +29,7 @@ import Control.Monad
 mkTickBox :: Platform -> Module -> Int -> CmmAGraph
 mkTickBox platform mod n
   = mkStore tick_box (CmmMachOp (MO_Add W64)
-                                [ CmmLoad tick_box b64
+                                [ CmmLoad tick_box b64 NaturallyAligned
                                 , CmmLit (CmmInt 1 W64)
                                 ])
   where

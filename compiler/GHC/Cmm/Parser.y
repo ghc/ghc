@@ -791,10 +791,13 @@ expr0   :: { CmmParse CmmExpr }
         | STRING                 { do s <- code (newStringCLit $1);
                                       return (CmmLit s) }
         | reg                    { $1 }
-        | type '[' expr ']'      { do e <- $3; return (CmmLoad e $1) }
+        | type dereference       { do (align, ptr) <- $2; return (CmmLoad ptr $1 align) }
         | '%' NAME '(' exprs0 ')' {% exprOp $2 $4 }
         | '(' expr ')'           { $2 }
 
+dereference :: { CmmParse (AlignmentSpec, CmmExpr) }
+        : '^' '[' expr ']'       { do ptr <- $3; return (Unaligned, ptr) }
+        | '[' expr ']'           { do ptr <- $2; return (NaturallyAligned, ptr) }
 
 -- leaving out the type of a literal gives you the native word size in C--
 maybe_ty :: { CmmType }

@@ -150,7 +150,12 @@ pprExpr9 :: Platform -> CmmExpr -> SDoc
 pprExpr9 platform e =
    case e of
         CmmLit    lit       -> pprLit1 platform lit
-        CmmLoad   expr rep  -> ppr rep <> brackets (pdoc platform expr)
+        CmmLoad   expr rep align
+                            -> let align_mark =
+                                       case align of
+                                         NaturallyAligned -> empty
+                                         Unaligned        -> text "^"
+                                in ppr rep <> align_mark <> brackets (pdoc platform expr)
         CmmReg    reg       -> ppr reg
         CmmRegOff  reg off  -> parens (ppr reg <+> char '+' <+> int off)
         CmmStackSlot a off  -> parens (ppr a   <+> char '+' <+> int off)

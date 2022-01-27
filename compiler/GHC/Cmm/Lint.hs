@@ -88,7 +88,7 @@ lintCmmBlock labels block
 -- byte/word mismatches.
 
 lintCmmExpr :: CmmExpr -> CmmLint CmmType
-lintCmmExpr (CmmLoad expr rep) = do
+lintCmmExpr (CmmLoad expr rep _alignment) = do
   _ <- lintCmmExpr expr
   -- Disabled, if we have the inlining phase before the lint phase,
   -- we can have funny offsets due to pointer tagging. -- EZY

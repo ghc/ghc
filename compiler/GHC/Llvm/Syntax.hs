@@ -252,7 +252,7 @@ data LlvmExpression
   {- |
     Load the value at location ptr
   -}
-  | Load LlvmVar
+  | Load LlvmVar LMAlign
 
   {- |
     Atomic load of the value at location ptr

@@ -464,9 +464,9 @@ wrapRecExp :: (CmmExpr -> CmmExpr) -> CmmExpr -> CmmExpr
 -- Take a transformer on expressions and apply it recursively.
 -- (wrapRecExp f e) first recursively applies itself to sub-expressions of e
 --                  then  uses f to rewrite the resulting expression
-wrapRecExp f (CmmMachOp op es)    = f (CmmMachOp op $ map (wrapRecExp f) es)
-wrapRecExp f (CmmLoad addr ty)    = f (CmmLoad (wrapRecExp f addr) ty)
-wrapRecExp f e                    = f e
+wrapRecExp f (CmmMachOp op es)       = f (CmmMachOp op $ map (wrapRecExp f) es)
+wrapRecExp f (CmmLoad addr ty align) = f (CmmLoad (wrapRecExp f addr) ty align)
+wrapRecExp f e                       = f e
 
 mapExp :: (CmmExpr -> CmmExpr) -> CmmNode e x -> CmmNode e x
 mapExp _ f@(CmmEntry{})                          = f
@@ -495,9 +495,9 @@ mapForeignTargetM _ (PrimTarget _)      = Nothing
 wrapRecExpM :: (CmmExpr -> Maybe CmmExpr) -> (CmmExpr -> Maybe CmmExpr)
 -- (wrapRecExpM f e) first recursively applies itself to sub-expressions of e
 --                   then  gives f a chance to rewrite the resulting expression
-wrapRecExpM f n@(CmmMachOp op es)  = maybe (f n) (f . CmmMachOp op)    (mapListM (wrapRecExpM f) es)
-wrapRecExpM f n@(CmmLoad addr ty)  = maybe (f n) (f . flip CmmLoad ty) (wrapRecExpM f addr)
-wrapRecExpM f e                    = f e
+wrapRecExpM f n@(CmmMachOp op es)       = maybe (f n) (f . CmmMachOp op)    (mapListM (wrapRecExpM f) es)
+wrapRecExpM f n@(CmmLoad addr ty align) = maybe (f n) (\addr' -> f $ CmmLoad addr' ty align) (wrapRecExpM f addr)
+wrapRecExpM f e                         = f e
 
 mapExpM :: (CmmExpr -> Maybe CmmExpr) -> CmmNode e x -> Maybe (CmmNode e x)
 mapExpM _ (CmmEntry{})              = Nothing
@@ -548,9 +548,9 @@ foldExpForeignTarget _   (PrimTarget _)      z = z
 -- Specifically (wrapRecExpf f e z) deals with CmmMachOp and CmmLoad
 -- itself, delegating all the other CmmExpr forms to 'f'.
 wrapRecExpf :: (CmmExpr -> z -> z) -> CmmExpr -> z -> z
-wrapRecExpf f e@(CmmMachOp _ es) z = foldr (wrapRecExpf f) (f e z) es
-wrapRecExpf f e@(CmmLoad addr _) z = wrapRecExpf f addr (f e z)
-wrapRecExpf f e                  z = f e z
+wrapRecExpf f e@(CmmMachOp _ es)   z = foldr (wrapRecExpf f) (f e z) es
+wrapRecExpf f e@(CmmLoad addr _ _) z = wrapRecExpf f addr (f e z)
+wrapRecExpf f e                    z = f e z
 
 foldExp :: (CmmExpr -> z -> z) -> CmmNode e x -> z -> z
 foldExp _ (CmmEntry {}) z                         = z

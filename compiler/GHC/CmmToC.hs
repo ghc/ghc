@@ -225,7 +225,8 @@ pprStmt platform stmt =
            parens (mkP_ <> pprExpr1 platform dest <> comma <> pprExpr platform src) <> semi
 
         | otherwise
-        -> hsep [ pprExpr platform (CmmLoad dest rep), equals, pprExpr platform src <> semi ]
+        -> hsep [ pprExpr platform (CmmLoad dest rep NaturallyAligned), equals, pprExpr platform src <> semi ]
+                                                     -- TODO: Is this right?
         where
           rep = cmmExprType platform src
 
@@ -372,10 +373,10 @@ pprSwitch platform e ids
 
 pprExpr :: Platform -> CmmExpr -> SDoc
 pprExpr platform e = case e of
-    CmmLit lit      -> pprLit platform lit
-    CmmLoad e ty    -> pprLoad platform e ty
-    CmmReg reg      -> pprCastReg reg
-    CmmRegOff reg 0 -> pprCastReg reg
+    CmmLit lit         -> pprLit platform lit
+    CmmLoad e ty align -> pprLoad platform e ty align
+    CmmReg reg         -> pprCastReg reg
+    CmmRegOff reg 0    -> pprCastReg reg
 
     -- CmmRegOff is an alias of MO_Add
     CmmRegOff reg i -> pprCastReg reg <> char '+' <>
@@ -386,13 +387,14 @@ pprExpr platform e = case e of
     CmmStackSlot _ _   -> panic "pprExpr: CmmStackSlot not supported!"
 
 
-pprLoad :: Platform -> CmmExpr -> CmmType -> SDoc
-pprLoad platform e ty
+pprLoad :: Platform -> CmmExpr -> CmmType -> AlignmentSpec -> SDoc
+pprLoad platform e ty _align
   | width == W64, wordWidth platform /= W64
   = (if isFloatType ty then text "PK_DBL"
                        else text "PK_Word64")
     <> parens (mkP_ <> pprExpr1 platform e)
 
+  -- TODO: exploit natural-alignment where possible
   | otherwise
   = case e of
         CmmReg r | isPtrReg r && width == wordWidth platform && not (isFloatType ty)
@@ -1173,7 +1175,7 @@ te_Target (PrimTarget{})           = return ()
 
 te_Expr :: CmmExpr -> TE ()
 te_Expr (CmmLit lit)            = te_Lit lit
-te_Expr (CmmLoad e _)           = te_Expr e
+te_Expr (CmmLoad e _ _)         = te_Expr e
 te_Expr (CmmReg r)              = te_Reg r
 te_Expr (CmmMachOp _ es)        = mapM_ te_Expr es
 te_Expr (CmmRegOff r _)         = te_Reg r

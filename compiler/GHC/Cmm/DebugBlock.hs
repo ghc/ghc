@@ -546,7 +546,7 @@ toUnwindExpr _ (CmmLit (CmmInt i _))       = UwConst (fromIntegral i)
 toUnwindExpr _ (CmmLit (CmmLabel l))       = UwLabel l
 toUnwindExpr _ (CmmRegOff (CmmGlobal g) i) = UwReg g i
 toUnwindExpr _ (CmmReg (CmmGlobal g))      = UwReg g 0
-toUnwindExpr platform (CmmLoad e _)               = UwDeref (toUnwindExpr platform e)
+toUnwindExpr platform (CmmLoad e _ _)             = UwDeref (toUnwindExpr platform e)
 toUnwindExpr platform e@(CmmMachOp op [e1, e2])   =
   case (op, toUnwindExpr platform e1, toUnwindExpr platform e2) of
     (MO_Add{}, UwReg r x, UwConst y) -> UwReg r (x + y)

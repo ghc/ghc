@@ -400,7 +400,7 @@ collectContInfo blocks
 procMiddle :: LabelMap StackMap -> CmmNode e x -> StackMap -> StackMap
 procMiddle stackmaps node sm
   = case node of
-     CmmAssign (CmmLocal r) (CmmLoad (CmmStackSlot area off) _)
+     CmmAssign (CmmLocal r) (CmmLoad (CmmStackSlot area off) _ _)
        -> sm { sm_regs = addToUFM (sm_regs sm) r (r,loc) }
         where loc = getStackLoc area off stackmaps
      CmmAssign (CmmLocal r) _other
@@ -1088,7 +1088,8 @@ insertReloads platform stackmap live =
                  -- This cmmOffset basically corresponds to manifesting
                  -- @CmmStackSlot Old sp_off@, see Note [SP old/young offsets]
                  (CmmLoad (cmmOffset platform spExpr (sp_off - reg_off))
-                          (localRegType reg))
+                          (localRegType reg)
+                          NaturallyAligned)
      | (reg, reg_off) <- stackSlotRegs stackmap
      , reg `elemRegSet` live
      ]

@@ -159,7 +159,7 @@ hash_block block =
 
         hash_e :: CmmExpr -> Word32
         hash_e (CmmLit l) = hash_lit l
-        hash_e (CmmLoad e _) = 67 + hash_e e
+        hash_e (CmmLoad e _ _) = 67 + hash_e e
         hash_e (CmmReg r) = hash_reg r
         hash_e (CmmMachOp _ es) = hash_list hash_e es -- pessimal - no operator check
         hash_e (CmmRegOff r i) = hash_reg r + cvt i
@@ -222,7 +222,7 @@ eqExprWith :: (BlockId -> BlockId -> Bool)
 eqExprWith eqBid = eq
  where
   CmmLit l1          `eq` CmmLit l2          = eqLit l1 l2
-  CmmLoad e1 _       `eq` CmmLoad e2 _       = e1 `eq` e2
+  CmmLoad e1 _ a1    `eq` CmmLoad e2 _ a2    = e1 `eq` e2 && a1 == a2
   CmmReg r1          `eq` CmmReg r2          = r1==r2
   CmmRegOff r1 i1    `eq` CmmRegOff r2 i2    = r1==r2 && i1==i2
   CmmMachOp op1 es1  `eq` CmmMachOp op2 es2  = op1==op2 && es1 `eqs` es2

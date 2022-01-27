@@ -529,7 +529,7 @@ iselExpr64 (CmmLit (CmmInt i _)) = do
                 ]
   return (ChildCode64 code rlo)
 
-iselExpr64 (CmmLoad addrTree ty) | isWord64 ty = do
+iselExpr64 (CmmLoad addrTree ty _) | isWord64 ty = do
    Amode addr addr_code <- getAmode addrTree
    (rlo,rhi) <- getNewRegPairNat II32
    let
@@ -695,49 +695,49 @@ getRegister' _ _ (CmmLit lit@(CmmFloat f w)) =
       loadFloatAmode w addr code
 
 -- catch simple cases of zero- or sign-extended load
-getRegister' _ _ (CmmMachOp (MO_UU_Conv W8 W32) [CmmLoad addr _]) = do
+getRegister' _ _ (CmmMachOp (MO_UU_Conv W8 W32) [CmmLoad addr _ _]) = do
   code <- intLoadCode (MOVZxL II8) addr
   return (Any II32 code)
 
-getRegister' _ _ (CmmMachOp (MO_SS_Conv W8 W32) [CmmLoad addr _]) = do
+getRegister' _ _ (CmmMachOp (MO_SS_Conv W8 W32) [CmmLoad addr _ _]) = do
   code <- intLoadCode (MOVSxL II8) addr
   return (Any II32 code)
 
-getRegister' _ _ (CmmMachOp (MO_UU_Conv W16 W32) [CmmLoad addr _]) = do
+getRegister' _ _ (CmmMachOp (MO_UU_Conv W16 W32) [CmmLoad addr _ _]) = do
   code <- intLoadCode (MOVZxL II16) addr
   return (Any II32 code)
 
-getRegister' _ _ (CmmMachOp (MO_SS_Conv W16 W32) [CmmLoad addr _]) = do
+getRegister' _ _ (CmmMachOp (MO_SS_Conv W16 W32) [CmmLoad addr _ _]) = do
   code <- intLoadCode (MOVSxL II16) addr
   return (Any II32 code)
 
 -- catch simple cases of zero- or sign-extended load
-getRegister' _ is32Bit (CmmMachOp (MO_UU_Conv W8 W64) [CmmLoad addr _])
+getRegister' _ is32Bit (CmmMachOp (MO_UU_Conv W8 W64) [CmmLoad addr _ _])
  | not is32Bit = do
   code <- intLoadCode (MOVZxL II8) addr
   return (Any II64 code)
 
-getRegister' _ is32Bit (CmmMachOp (MO_SS_Conv W8 W64) [CmmLoad addr _])
+getRegister' _ is32Bit (CmmMachOp (MO_SS_Conv W8 W64) [CmmLoad addr _ _])
  | not is32Bit = do
   code <- intLoadCode (MOVSxL II8) addr
   return (Any II64 code)
 
-getRegister' _ is32Bit (CmmMachOp (MO_UU_Conv W16 W64) [CmmLoad addr _])
+getRegister' _ is32Bit (CmmMachOp (MO_UU_Conv W16 W64) [CmmLoad addr _ _])
  | not is32Bit = do
   code <- intLoadCode (MOVZxL II16) addr
   return (Any II64 code)
 
-getRegister' _ is32Bit (CmmMachOp (MO_SS_Conv W16 W64) [CmmLoad addr _])
+getRegister' _ is32Bit (CmmMachOp (MO_SS_Conv W16 W64) [CmmLoad addr _ _])
  | not is32Bit = do
   code <- intLoadCode (MOVSxL II16) addr
   return (Any II64 code)
 
-getRegister' _ is32Bit (CmmMachOp (MO_UU_Conv W32 W64) [CmmLoad addr _])
+getRegister' _ is32Bit (CmmMachOp (MO_UU_Conv W32 W64) [CmmLoad addr _ _])
  | not is32Bit = do
   code <- intLoadCode (MOV II32) addr -- 32-bit loads zero-extend
   return (Any II64 code)
 
-getRegister' _ is32Bit (CmmMachOp (MO_SS_Conv W32 W64) [CmmLoad addr _])
+getRegister' _ is32Bit (CmmMachOp (MO_SS_Conv W32 W64) [CmmLoad addr _ _])
  | not is32Bit = do
   code <- intLoadCode (MOVSxL II32) addr
   return (Any II64 code)
@@ -1108,13 +1108,13 @@ getRegister' _ is32Bit (CmmMachOp mop [x, y]) = -- dyadic MachOps
            return (Fixed format result code)
 
 
-getRegister' _ _ (CmmLoad mem pk)
+getRegister' _ _ (CmmLoad mem pk _)
   | isFloatType pk
   = do
     Amode addr mem_code <- getAmode mem
     loadFloatAmode  (typeWidth pk) addr mem_code
 
-getRegister' _ is32Bit (CmmLoad mem pk)
+getRegister' _ is32Bit (CmmLoad mem pk _)
   | is32Bit && not (isWord64 pk)
   = do
     code <- intLoadCode instr mem
@@ -1132,7 +1132,7 @@ getRegister' _ is32Bit (CmmLoad mem pk)
         -- simpler we do our 8-bit arithmetic with full 32-bit registers.
 
 -- Simpler memory load code on x86_64
-getRegister' _ is32Bit (CmmLoad mem pk)
+getRegister' _ is32Bit (CmmLoad mem pk _)
  | not is32Bit
   = do
     code <- intLoadCode (MOV format) mem
@@ -1382,7 +1382,7 @@ getNonClobberedOperand (CmmLit lit) =
     then return (OpImm (litToImm lit), nilOL)
     else getNonClobberedOperand_generic (CmmLit lit)
 
-getNonClobberedOperand (CmmLoad mem pk) = do
+getNonClobberedOperand (CmmLoad mem pk _) = do
   is32Bit <- is32BitPlatform
   -- this logic could be simplified
   -- TODO FIXME
@@ -1406,7 +1406,7 @@ getNonClobberedOperand (CmmLoad mem pk) = do
       return (OpAddr src', mem_code `appOL` save_code)
     else
       -- if its a word or gcptr on 32bit?
-      getNonClobberedOperand_generic (CmmLoad mem pk)
+      getNonClobberedOperand_generic (CmmLoad mem pk NaturallyAligned)
 
 getNonClobberedOperand e = getNonClobberedOperand_generic e
 
@@ -1441,7 +1441,7 @@ getOperand (CmmLit lit) = do
     then return (OpImm (litToImm lit), nilOL)
     else getOperand_generic (CmmLit lit)
 
-getOperand (CmmLoad mem pk) = do
+getOperand (CmmLoad mem pk _) = do
   is32Bit <- is32BitPlatform
   use_sse2 <- sse2Enabled
   if (not (isFloatType pk) || use_sse2) && (if is32Bit then not (isWord64 pk) else True)
@@ -1449,7 +1449,7 @@ getOperand (CmmLoad mem pk) = do
        Amode src mem_code <- getAmode mem
        return (OpAddr src, mem_code)
      else
-       getOperand_generic (CmmLoad mem pk)
+       getOperand_generic (CmmLoad mem pk NaturallyAligned)
 
 getOperand e = getOperand_generic e
 
@@ -1459,7 +1459,7 @@ getOperand_generic e = do
     return (OpReg reg, code)
 
 isOperand :: Bool -> CmmExpr -> Bool
-isOperand _ (CmmLoad _ _) = True
+isOperand _ (CmmLoad _ _ _) = True
 isOperand is32Bit (CmmLit lit)  = is32BitLit is32Bit lit
                           || isSuitableFloatingPointLit lit
 isOperand _ _            = False
@@ -1517,7 +1517,7 @@ isSuitableFloatingPointLit (CmmFloat f _) = f /= 0.0
 isSuitableFloatingPointLit _ = False
 
 getRegOrMem :: CmmExpr -> NatM (Operand, InstrBlock)
-getRegOrMem e@(CmmLoad mem pk) = do
+getRegOrMem e@(CmmLoad mem pk _) = do
   is32Bit <- is32BitPlatform
   use_sse2 <- sse2Enabled
   if (not (isFloatType pk) || use_sse2) && (if is32Bit then not (isWord64 pk) else True)
@@ -1604,7 +1604,7 @@ condIntCode cond x y = do is32Bit <- is32BitPlatform
 condIntCode' :: Bool -> Cond -> CmmExpr -> CmmExpr -> NatM CondCode
 
 -- memory vs immediate
-condIntCode' is32Bit cond (CmmLoad x pk) (CmmLit lit)
+condIntCode' is32Bit cond (CmmLoad x pk _) (CmmLit lit)
  | is32BitLit is32Bit lit = do
     Amode x_addr x_code <- getAmode x
     let
@@ -1717,7 +1717,7 @@ assignReg_FltCode :: Format -> CmmReg  -> CmmExpr -> NatM InstrBlock
 -- specific case of adding/subtracting an integer to a particular address.
 -- ToDo: catch other cases where we can use an operation directly on a memory
 -- address.
-assignMem_IntCode pk addr (CmmMachOp op [CmmLoad addr2 _,
+assignMem_IntCode pk addr (CmmMachOp op [CmmLoad addr2 _ _,
                                                  CmmLit (CmmInt i _)])
    | addr == addr2, pk /= II64 || is32BitInteger i,
      Just instr <- check op
@@ -1756,7 +1756,7 @@ assignMem_IntCode pk addr src = do
 
 
 -- Assign; dst is a reg, rhs is mem
-assignReg_IntCode pk reg (CmmLoad src _) = do
+assignReg_IntCode pk reg (CmmLoad src _ _) = do
   load_code <- intLoadCode (MOV pk) src
   platform <- ncgPlatform <$> getConfig
   return (load_code (getRegisterReg platform reg))
@@ -1788,7 +1788,7 @@ assignReg_FltCode _ reg src = do
 
 genJump :: CmmExpr{-the branch target-} -> [Reg] -> NatM InstrBlock
 
-genJump (CmmLoad mem _) regs = do
+genJump (CmmLoad mem _ _) regs = do
   Amode target code <- getAmode mem
   return (code `snocOL` JMP (OpAddr target) regs)
 

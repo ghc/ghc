@@ -549,7 +549,7 @@ getRegister' config plat expr
         CmmLabelDiffOff _ _ _ _ -> pprPanic "getRegister' (CmmLit:CmmLabelOff): " (pdoc plat expr)
         CmmBlock _ -> pprPanic "getRegister' (CmmLit:CmmLabelOff): " (pdoc plat expr)
         CmmHighStackMark -> pprPanic "getRegister' (CmmLit:CmmLabelOff): " (pdoc plat expr)
-    CmmLoad mem rep -> do
+    CmmLoad mem rep _ -> do
       Amode addr addr_code <- getAmode plat mem
       let format = cmmTypeFormat rep
       return (Any format (\dst -> addr_code `snocOL` LDR format (OpReg (formatToWidth format) dst) (OpAddr addr)))

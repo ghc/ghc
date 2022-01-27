@@ -9,6 +9,7 @@ module GHC.Cmm.Expr
     ( CmmExpr(..), cmmExprType, cmmExprWidth, cmmExprAlignment, maybeInvertCmmExpr
     , CmmReg(..), cmmRegType, cmmRegWidth
     , CmmLit(..), cmmLitType
+    , AlignmentSpec(..)
     , LocalReg(..), localRegType
     , GlobalReg(..), isArgReg, globalRegType
     , spReg, hpReg, spLimReg, hpLimReg, nodeReg
@@ -53,12 +54,13 @@ import GHC.Types.Basic (Alignment, mkAlignment, alignmentOf)
 -----------------------------------------------------------------------------
 
 data CmmExpr
-  = CmmLit !CmmLit               -- Literal
-  | CmmLoad !CmmExpr !CmmType   -- Read memory location
+  = CmmLit !CmmLit              -- Literal
+  | CmmLoad !CmmExpr !CmmType !AlignmentSpec
+                                -- Read memory location
   | CmmReg !CmmReg              -- Contents of register
   | CmmMachOp MachOp [CmmExpr]  -- Machine operation (+, -, *, etc.)
   | CmmStackSlot Area {-# UNPACK #-} !Int
-                                -- addressing expression of a stack slot
+                                -- Addressing expression of a stack slot
                                 -- See Note [CmmStackSlot aliasing]
   | CmmRegOff !CmmReg !Int
         -- CmmRegOff reg i
@@ -69,12 +71,15 @@ data CmmExpr
 
 instance Eq CmmExpr where       -- Equality ignores the types
   CmmLit l1          == CmmLit l2          = l1==l2
-  CmmLoad e1 _       == CmmLoad e2 _       = e1==e2
+  CmmLoad e1 _ _     == CmmLoad e2 _ _     = e1==e2
   CmmReg r1          == CmmReg r2          = r1==r2
   CmmRegOff r1 i1    == CmmRegOff r2 i2    = r1==r2 && i1==i2
   CmmMachOp op1 es1  == CmmMachOp op2 es2  = op1==op2 && es1==es2
   CmmStackSlot a1 i1 == CmmStackSlot a2 i2 = a1==a2 && i1==i2
   _e1                == _e2                = False
+
+data AlignmentSpec = NaturallyAligned | Unaligned
+  deriving (Eq, Ord, Show)
 
 data CmmReg
   = CmmLocal  {-# UNPACK #-} !LocalReg
@@ -225,7 +230,7 @@ instance Outputable CmmLit where
 cmmExprType :: Platform -> CmmExpr -> CmmType
 cmmExprType platform = \case
    (CmmLit lit)        -> cmmLitType platform lit
-   (CmmLoad _ rep)     -> rep
+   (CmmLoad _ rep _)   -> rep
    (CmmReg reg)        -> cmmRegType platform reg
    (CmmMachOp op args) -> machOpResultType platform op (map (cmmExprType platform) args)
    (CmmRegOff reg _)   -> cmmRegType platform reg
@@ -385,7 +390,7 @@ instance (Ord r, UserOfRegs r CmmReg) => UserOfRegs r CmmExpr where
   {-# INLINEABLE foldRegsUsed #-}
   foldRegsUsed platform f !z e = expr z e
     where expr z (CmmLit _)          = z
-          expr z (CmmLoad addr _)    = foldRegsUsed platform f z addr
+          expr z (CmmLoad addr _ _)  = foldRegsUsed platform f z addr
           expr z (CmmReg r)          = foldRegsUsed platform f z r
           expr z (CmmMachOp _ exprs) = foldRegsUsed platform f z exprs
           expr z (CmmRegOff r _)     = foldRegsUsed platform f z r
