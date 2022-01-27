@@ -265,22 +265,12 @@ const Alignments pe_alignments[] = {
 
 const int pe_alignments_cnt = sizeof (pe_alignments) / sizeof (Alignments);
 const int default_alignment = 8;
-const int initHeapSizeMB    = 30;
-const int initHeapCommitMB  = 15;
-static HANDLE code_heap     = NULL;
-static void* code_heap_mem = NULL;
 
 /* See Note [_iob_func symbol]
    In order to emulate __iob_func the memory location needs to point the
    location of the I/O structures in memory.  As such we need RODATA to contain
    the pointer as a redirect.  Essentially it's a DATA DLL reference.  */
 const void* __rts_iob_func = (void*)&__acrt_iob_func;
-
-/* Low Fragmentation Heap, try to prevent heap from increasing in size when
-   space can simply be reclaimed.  These are enums missing from mingw-w64's
-   headers.  */
-#define HEAP_LFH 2
-#define HeapOptimizeResources 3
 
 /********************************************
  * Memory Management functions
@@ -375,19 +365,6 @@ void *allocaLocalBytes(unsigned sz, unsigned *req)
   return allocateBytes (GetModuleHandleW (NULL), sz, req);
 }
 
-/* Incline declaration, requires you to link to user-space ntdll.dll to work.
-   The last paramater isn't actually void* but we don't need the structure so
-   make it opague.  */
-__attribute__((stdcall))
-extern HANDLE RtlCreateHeap(
-  ULONG                Flags,
-  PVOID                HeapBase,
-  SIZE_T               ReserveSize,
-  SIZE_T               CommitSize,
-  PVOID                Lock,
-  void* Parameters
-);
-
 void initLinker_PEi386()
 {
     if (!ghciInsertSymbolTable(WSTR("(GHCi/Ld special symbols)"),
@@ -413,33 +390,6 @@ void initLinker_PEi386()
     addDLL(WSTR("user32"));
 #endif
 
-  /* See Note [Memory allocation].  */
-  /* Create a private heap which we will use to store all code and data.  */
-  SYSTEM_INFO sSysInfo;
-  GetSystemInfo(&sSysInfo);
-  unsigned size = 0;
-  const unsigned initialResBytes = initHeapSizeMB * sSysInfo.dwPageSize;
-  const unsigned initialCommitBytes = initHeapCommitMB * sSysInfo.dwPageSize;
-  /* Region can be NULL, in which case we're letting the OS pick.  First figure
-     out where we can create the allocations within the range of the small
-     code model (+- 4GB).  */
-  void* region = allocaLocalBytes (initialResBytes, &size);
-  /* Then reserve the area for our use.  */
-  code_heap_mem = VirtualAlloc (region, size, MEM_RESERVE,
-                                PAGE_EXECUTE_READWRITE);
-  /* And finally create the action heap.  */
-  code_heap = RtlCreateHeap (HEAP_GROWABLE, region, initialResBytes,
-                             initialCommitBytes, NULL, NULL);
-  if (!code_heap)
-    barf ("Could not create private heap during initialization. Aborting.");
-
-  /* Set some flags for the new code heap.  */
-  HeapSetInformation(code_heap, HeapEnableTerminationOnCorruption, NULL, 0);
-  unsigned long HeapInformation = HEAP_LFH;
-  HeapSetInformation(code_heap, HeapEnableTerminationOnCorruption,
-                     &HeapInformation, sizeof(HeapInformation));
-  HeapSetInformation(code_heap, HeapOptimizeResources, NULL, 0);
-
   /* Register the cleanup routine as an exit handler,  this gives other exit handlers
      a chance to run which may need linker information.  Exit handlers are ran in
      reverse registration order so this needs to be before the linker loads anything.  */
@@ -448,13 +398,6 @@ void initLinker_PEi386()
 
 void exitLinker_PEi386()
 {
-  /* See Note [Memory allocation].  */
-  if (code_heap) {
-    HeapDestroy (code_heap);
-    VirtualFree (code_heap_mem, 0, MEM_RELEASE);
-    code_heap = NULL;
-    code_heap_mem = NULL;
-  }
 }
 
 /* A list thereof. */
@@ -542,12 +485,9 @@ void freePreloadObjectFile_PEi386(ObjectCode *oc)
     }
 
     if (oc->info) {
-        if (oc->info->image) {
-            HeapFree(code_heap, 0, oc->info->image);
-            oc->info->image = NULL;
-        }
-        if (oc->info->ch_info)
+        if (oc->info->ch_info) {
            stgFree (oc->info->ch_info);
+        }
         stgFree (oc->info);
         oc->info = NULL;
     }
@@ -1706,11 +1646,10 @@ ocGetNames_PEi386 ( ObjectCode* oc )
          as we go along.  */
       if (!oc->info->image) {
         /* See Note [Memory allocation].  */
-        ASSERT(code_heap);
-        oc->info->image
-          = HeapAlloc (code_heap, HEAP_ZERO_MEMORY, oc->info->secBytesTotal);
+        oc->info->image = m32_alloc(oc->rx_m32, oc->info->secBytesTotal, 16);
         if (!oc->info->image)
-          barf ("Could not allocate any heap memory from private heap.");
+          barf("Could not allocate any heap memory from private heap (requested %" FMT_SizeT " bytes).",
+               oc->info->secBytesTotal);
       }
 
       CHECK(section.size == 0 || section.info->virtualSize == 0);
