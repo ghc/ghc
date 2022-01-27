@@ -2169,7 +2169,7 @@ doWritePtrArrayOp addr idx val
          ) (CmmLit (CmmInt 1 W8))
 
 loadArrPtrsSize :: Profile -> CmmExpr -> CmmExpr
-loadArrPtrsSize profile addr = CmmLoad (cmmOffsetB platform addr off) (bWord platform)
+loadArrPtrsSize profile addr = cmmLoadBWord platform (cmmOffsetB platform addr off)
  where off = fixedHdrSize profile + pc_OFFSET_StgMutArrPtrs_ptrs (profileConstants profile)
        platform = profilePlatform profile
 
@@ -3258,7 +3258,7 @@ doPtrArrayBoundsCheck
 doPtrArrayBoundsCheck idx arr = do
     profile <- getProfile
     platform <- getPlatform
-    let sz = CmmLoad (cmmOffsetB platform arr sz_off) (bWord platform)
+    let sz = cmmLoadBWord platform (cmmOffset platform arr sz_off)
         sz_off = fixedHdrSize profile + pc_OFFSET_StgMutArrPtrs_ptrs (platformConstants platform)
     doBoundsCheck idx sz
 
@@ -3269,7 +3269,7 @@ doSmallPtrArrayBoundsCheck
 doSmallPtrArrayBoundsCheck idx arr = do
     profile <- getProfile
     platform <- getPlatform
-    let sz = CmmLoad (cmmOffsetB platform arr sz_off) (bWord platform)
+    let sz = cmmLoadBWord platform (cmmOffset platform arr sz_off)
         sz_off = fixedHdrSize profile + pc_OFFSET_StgSmallMutArrPtrs_ptrs (platformConstants platform)
     doBoundsCheck idx sz
 
@@ -3282,7 +3282,7 @@ doByteArrayBoundsCheck
 doByteArrayBoundsCheck idx arr idx_ty elem_ty = do
     profile <- getProfile
     platform <- getPlatform
-    let sz = CmmLoad (cmmOffsetB platform arr sz_off) (bWord platform)
+    let sz = cmmLoadBWord platform (cmmOffset platform arr sz_off)
         sz_off = fixedHdrSize profile + pc_OFFSET_StgArrBytes_bytes (platformConstants platform)
         elem_sz = widthInBytes $ typeWidth elem_ty
         idx_sz = widthInBytes $ typeWidth idx_ty

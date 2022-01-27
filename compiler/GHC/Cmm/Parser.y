@@ -1289,8 +1289,7 @@ doReturn exprs_code = do
 mkReturnSimple  :: Profile -> [CmmActual] -> UpdFrameOffset -> CmmAGraph
 mkReturnSimple profile actuals updfr_off =
   mkReturn profile e actuals updfr_off
-  where e = entryCode platform (CmmLoad (CmmStackSlot Old updfr_off)
-                             (gcWord platform))
+  where e = entryCode platform (cmmLoadGCWord platform (CmmStackSlot Old updfr_off))
         platform = profilePlatform profile
 
 doRawJump :: CmmParse CmmExpr -> [GlobalReg] -> CmmParse ()

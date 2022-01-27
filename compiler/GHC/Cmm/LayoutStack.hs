@@ -1164,7 +1164,7 @@ lowerSafeForeignCall profile block
         -- different.  Hence we continue by jumping to the top stack frame,
         -- not by jumping to succ.
         jump = CmmCall { cml_target    = entryCode platform $
-                                         CmmLoad spExpr (bWord platform)
+                                         cmmLoadBWord platform spExpr
                        , cml_cont      = Just succ
                        , cml_args_regs = regs
                        , cml_args      = widthInBytes (wordWidth platform)

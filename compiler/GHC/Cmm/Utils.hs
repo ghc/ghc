@@ -31,6 +31,7 @@ module GHC.Cmm.Utils(
         cmmRegOffB, cmmOffsetB, cmmLabelOffB, cmmOffsetLitB, cmmOffsetExprB,
         cmmRegOffW, cmmOffsetW, cmmLabelOffW, cmmOffsetLitW, cmmOffsetExprW,
         cmmIndex, cmmIndexExpr, cmmLoadIndex, cmmLoadIndexW,
+        cmmLoadBWord, cmmLoadGCWord,
         cmmNegate,
         cmmULtWord, cmmUGeWord, cmmUGtWord, cmmUShrWord,
         cmmSLtWord,
@@ -305,6 +306,14 @@ cmmIndexExpr platform width base idx =
 
 cmmLoadIndex :: Platform -> CmmType -> CmmExpr -> Int -> CmmExpr
 cmmLoadIndex platform ty expr ix = CmmLoad (cmmIndex platform (typeWidth ty) expr ix) ty
+
+-- | Load a non-pointer word.
+cmmLoadBWord :: Platform -> CmmExpr -> CmmExpr
+cmmLoadBWord platform ptr = CmmLoad ptr (bWord platform)
+
+-- | Load a GC pointer.
+cmmLoadGCWord :: Platform -> CmmExpr -> CmmExpr
+cmmLoadGCWord platform ptr = CmmLoad ptr (gcWord platform)
 
 -- The "B" variants take byte offsets
 cmmRegOffB :: CmmReg -> ByteOff -> CmmExpr
