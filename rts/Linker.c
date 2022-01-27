@@ -297,7 +297,7 @@ int ghciInsertSymbolTable(
        debugBelch("Symbol type mismatch.\n");
        debugBelch("Symbol %s was defined by %" PATH_FMT " to be a %s symbol.\n",
                   key, obj_name, symbolTypeString(type));
-       debugBelch("      yet was defined by %s to be a %s symbol.\n",
+       debugBelch("      yet was defined by %" PATH_FMT " to be a %s symbol.\n",
                   pinfo->owner->fileName, symbolTypeString(pinfo->type));
        return 1;
    }
