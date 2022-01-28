@@ -1601,27 +1601,6 @@ ocVerifyImage_PEi386 ( ObjectCode* oc )
    return true;
 }
 
-/* Infer the type of a GNU-style import library symbol (e.g. __imp_f).  We do this by checking
- * to see whether there is a code symbol present in the symbol table. In
- * principle this could be quadratic, since we call this the every import-library
- * symbol in an ObjectCode. However, in practice import libraries only tend to be
- * unmerged archives and therefore have very few symbols. */
-static SymType
-findTypeOfImportLibSymbol( ObjectCode *oc, SymbolName *sname )
-{
-   for (unsigned int i = 0; i < (uint32_t)oc->n_symbols; i++) {
-       COFF_symbol* sym = &oc->info->symbols[i];
-       SymbolName *nm = get_sym_name (getSymShortName (oc->info, sym), oc);
-       if (strcmp(sname, nm) == 0) {
-           if (sym->og.Type == 0x20) {
-               // We found a matching code symbol
-               return SYM_TYPE_CODE;
-           }
-       }
-   }
-   return SYM_TYPE_DATA;
-}
-
 bool
 ocGetNames_PEi386 ( ObjectCode* oc )
 {
@@ -1694,45 +1673,11 @@ ocGetNames_PEi386 ( ObjectCode* oc )
 
       /* See Note [BFD import library].  */
       if (0==strncmp(".idata$7", section->info->name, 8)) {
-          kind = SECTIONKIND_BFD_IMPORT_LIBRARY;
+          kind = SECTIONKIND_BFD_IMPORT_LIBRARY_HEAD;
       }
 
       if (0==strncmp(".idata$6", section->info->name, 8)) {
-          /* The first two bytes contain the ordinal of the function
-             in the format of lowpart highpart. The two bytes combined
-             for the total range of 16 bits which is the function export limit
-             of DLLs.  */
-          SymbolName *sname = (SymbolName*)section->start+2;
-          COFF_symbol* sym = &oc->info->symbols[info->numberOfSymbols-1];
-          SymbolAddr *addr = get_sym_name( getSymShortName (info, sym), oc);
-
-          IF_DEBUG(linker,
-                   debugBelch("addImportSymbol '%s' => '%s'\n",
-                              sname, (char*)addr));
-
-          /* We're going to free any data associated with the import
-             library without copying the sections.  So we have to duplicate
-             the symbol name and values before the pointers become invalid.  */
-          sname = strdup (sname);
-          addr  = strdup (addr);
-          SymType sym_type = findTypeOfImportLibSymbol(oc, sname);
-          if (!ghciInsertSymbolTable(oc->fileName, symhash, sname,
-                                     addr, false, sym_type, oc)) {
-             releaseOcInfo (oc);
-             stgFree (oc->image);
-             oc->image = NULL;
-             return false;
-          }
-          setImportSymbol (oc, sname);
-
-          /* Don't process this oc any further. Just exit.  */
-          oc->n_symbols = 0;
-          oc->symbols   = NULL;
-          stgFree (oc->image);
-          oc->image = NULL;
-          releaseOcInfo (oc);
-          oc->status = OBJECT_DONT_RESOLVE;
-          return true;
+          kind = SECTIONKIND_BFD_IMPORT_LIBRARY;
       }
 
       /* Allocate space for any (local, anonymous) .bss sections. */
@@ -1900,9 +1845,13 @@ ocGetNames_PEi386 ( ObjectCode* oc )
           bss = (SymbolAddr*)((StgWord)bss + (StgWord)symValue);
           IF_DEBUG(linker_verbose, debugBelch("bss symbol @ %p %u\n", addr, symValue));
       }
+      else if (section && section->kind == SECTIONKIND_BFD_IMPORT_LIBRARY) {
+          setImportSymbol(oc, sname);
+          IF_DEBUG(linker_verbose, debugBelch("import symbol %s\n", sname));
+      }
       else if (secNumber > 0
                && section
-               && section->kind == SECTIONKIND_BFD_IMPORT_LIBRARY) {
+               && section->kind == SECTIONKIND_BFD_IMPORT_LIBRARY_HEAD) {
           /* This is an Gnu BFD import section. We should load the dll and lookup
              the symbols.
              See Note [BFD import library].  */
@@ -2307,11 +2256,12 @@ SymbolAddr *lookupSymbol_PEi386(SymbolName *lbl, ObjectCode *dependent, SymType 
             static HMODULE msvcrt = NULL;
             if (!msvcrt) msvcrt = GetModuleHandle("msvcrt");
             pinfo->value = GetProcAddress(msvcrt, symBuffer);
+            return pinfo->value;
         }
         else if (pinfo && pinfo->owner && isSymbolImport (pinfo->owner, lbl))
         {
             /* See Note [BFD import library].  */
-            HINSTANCE dllInstance = (HINSTANCE)lookupDependentSymbol(pinfo->value, NULL, type);
+            HINSTANCE dllInstance = (HINSTANCE)lookupDependentSymbol(pinfo->value, dependent, type);
             if (!dllInstance && pinfo->value)
                return pinfo->value;
 
@@ -2327,8 +2277,17 @@ SymbolAddr *lookupSymbol_PEi386(SymbolName *lbl, ObjectCode *dependent, SymType 
             pinfo->value = GetProcAddress((HMODULE)dllInstance, lbl);
             clearImportSymbol (pinfo->owner, lbl);
             return pinfo->value;
+        } else {
+            if (dependent) {
+                // Add dependent as symbol's owner's dependency
+                ObjectCode *owner = pinfo->owner;
+                if (owner) {
+                    // TODO: what does it mean for a symbol to not have an owner?
+                    insertHashSet(dependent->dependencies, (W_)owner);
+                }
+            }
+            return loadSymbol(lbl, pinfo);
         }
-        return loadSymbol(lbl, pinfo);
     }
 }
 

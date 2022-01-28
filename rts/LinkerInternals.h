@@ -100,6 +100,8 @@ typedef
           SECTIONKIND_DEBUG,
           /* Section belongs to an import section group. e.g. .idata$.  */
           SECTIONKIND_IMPORT,
+          /* Section defines the head section of a BFD-style import library, e.g. idata$7.  */
+          SECTIONKIND_BFD_IMPORT_LIBRARY_HEAD,
           /* Section defines an import library entry, e.g. idata$7.  */
           SECTIONKIND_BFD_IMPORT_LIBRARY,
           /* Unknown section */
