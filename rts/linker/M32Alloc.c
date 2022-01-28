@@ -346,7 +346,6 @@ m32_allocator_push_filled_list(struct m32_page_t **head, struct m32_page_t *page
  */
 void
 m32_allocator_flush(m32_allocator *alloc) {
-   debugBelch("m32_flush(%p)\n", alloc);
    for (int i=0; i<M32_MAX_PAGES; i++) {
      if (alloc->pages[i] == NULL) {
        continue;
@@ -383,11 +382,12 @@ m32_is_large_object(size_t size, size_t alignment)
 }
 
 static void
-m32_report_allocation(struct m32_allocator_t *alloc, void *addr, size_t size)
+m32_report_allocation(struct m32_allocator_t *alloc STG_UNUSED, void *addr STG_UNUSED, size_t size STG_UNUSED)
 {
-    debugBelch("m32_allocated(%p:%s): %p - %p\n",
-               alloc, alloc->executable ? "RX": "RW",
-               addr, (uint8_t*) addr + size);
+    IF_DEBUG(linker_verbose, debugBelch(
+      "m32_allocated(%p:%s): %p - %p\n",
+      alloc, alloc->executable ? "RX": "RW",
+      addr, (uint8_t*) addr + size));
 }
 
 /**

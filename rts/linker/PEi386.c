@@ -404,14 +404,15 @@ static inline uintptr_t round_up(uintptr_t num, uint64_t factor)
 static int virtualQuery(void *baseAddr, PMEMORY_BASIC_INFORMATION info)
 {
     int res = VirtualQuery (baseAddr, info, sizeof (*info));
-    IF_DEBUG(linker, debugBelch("Probing region 0x%p (0x%p) - 0x%p (%" FMT_SizeT ") [%ld] with base 0x%p\n",
-                                baseAddr,
-                                info->BaseAddress,
-                                (uint8_t *) info->BaseAddress + info->RegionSize,
-                                info->RegionSize, info->State,
-                                info->AllocationBase));
+    IF_DEBUG(linker_verbose,
+        debugBelch("Probing region 0x%p (0x%p) - 0x%p (%" FMT_SizeT ") [%ld] with base 0x%p\n",
+                   baseAddr,
+                   info->BaseAddress,
+                   (uint8_t *) info->BaseAddress + info->RegionSize,
+                   info->RegionSize, info->State,
+                   info->AllocationBase));
     if (!res) {
-        IF_DEBUG(linker, debugBelch("Querying 0x%p failed. Aborting..\n", baseAddr));
+        IF_DEBUG(linker_verbose, debugBelch("Querying 0x%p failed. Aborting..\n", baseAddr));
         return 1;
     }
     return 0;
@@ -429,12 +430,12 @@ static void *allocateBytes(void* baseAddr, size_t sz, size_t *req)
     SYSTEM_INFO sys;
     GetSystemInfo(&sys);
     const uint64_t max_range = 4294967296UL;
-    IF_DEBUG(linker, debugBelch("Base Address 0x%p\n", baseAddr));
-    IF_DEBUG(linker, debugBelch("Requesting mapping of %" FMT_SizeT " bytes within range %"
+    IF_DEBUG(linker_verbose, debugBelch("Base Address 0x%p\n", baseAddr));
+    IF_DEBUG(linker_verbose, debugBelch("Requesting mapping of %" FMT_SizeT " bytes within range %"
                                 PRId64 " bytes\n", sz, max_range));
 
     MEMORY_BASIC_INFORMATION info;
-    IF_DEBUG(linker, debugBelch("Initial query @ 0x%p...\n", baseAddr));
+    IF_DEBUG(linker_verbose, debugBelch("Initial query @ 0x%p...\n", baseAddr));
     int res = virtualQuery(baseAddr, &info);
     if (res) {
         return NULL;
@@ -453,7 +454,7 @@ static void *allocateBytes(void* baseAddr, size_t sz, size_t *req)
         }
 
         if ((info.State & MEM_FREE) == MEM_FREE) {
-            IF_DEBUG(linker, debugBelch("Free range at 0x%p of %zu bytes\n",
+            IF_DEBUG(linker_verbose, debugBelch("Free range at 0x%p of %zu bytes\n",
                                         info.BaseAddress, info.RegionSize));
 
             MEMORY_BASIC_INFORMATION info2;
@@ -462,20 +463,19 @@ static void *allocateBytes(void* baseAddr, size_t sz, size_t *req)
                 if (info.AllocationBase == 0) {
                     size_t needed_sz = round_up (sz, sys.dwAllocationGranularity);
                     if (info.RegionSize >= needed_sz) {
-                        IF_DEBUG(linker, debugBelch("Range is unmapped, Allocation "
+                        IF_DEBUG(linker_verbose, debugBelch("Range is unmapped, Allocation "
                                                     "required by granule...\n"));
                         *req = needed_sz;
                         region
                         = (void*)(uintptr_t)round_up ((uintptr_t)initialAddr,
                                                         sys.dwAllocationGranularity);
-                        IF_DEBUG(linker, debugBelch("Requested %" PRId64 ", rounded: %"
+                        IF_DEBUG(linker_verbose, debugBelch("Requested %" PRId64 ", rounded: %"
                                                     PRId64 ".\n", sz, *req));
-                        IF_DEBUG(linker, debugBelch("Aligned region claimed 0x%p -> "
+                        IF_DEBUG(linker_verbose, debugBelch("Aligned region claimed 0x%p -> "
                                                     "0x%p.\n", initialAddr, region));
                     }
                 } else {
-                    IF_DEBUG(linker, debugBelch("Range is usable for us, "
-                                                "claiming...\n"));
+                    IF_DEBUG(linker_verbose, debugBelch("Range is usable for us, claiming...\n"));
                     *req = sz;
                     region = initialAddr;
                 }
@@ -1397,8 +1397,6 @@ ocVerifyImage_PEi386 ( ObjectCode* oc )
       section->info->props       = sectab_i->Characteristics;
       section->info->virtualSize = sectab_i->Misc.VirtualSize;
       section->info->virtualAddr = sectab_i->VirtualAddress;
-      debugBelch("new section %d(%s): size=%lld, vsize=%lld vaddr=%llx\n",
-                 i, section->info->name, section->size, section->info->virtualSize, section->info->virtualAddr);
 
       COFF_reloc* reltab
         = (COFF_reloc*) (oc->image + sectab_i->PointerToRelocations);
@@ -1702,7 +1700,7 @@ ocGetNames_PEi386 ( ObjectCode* oc )
          * TODO: check if this comment is still relevant.
          */
         if (section->info->virtualSize == 0 && section->size == 0) {
-          debugBelch("skipping empty .bss section\n");
+          IF_DEBUG(linker_verbose, debugBelch("skipping empty .bss section\n"));
           continue;
         }
 
@@ -1711,7 +1709,7 @@ ocGetNames_PEi386 ( ObjectCode* oc )
         kind = SECTIONKIND_RWDATA;
         do_zero = true;
         do_copy = false;
-        debugBelch("BSS anon section\n");
+        IF_DEBUG(linker_verbose, debugBelch("BSS anon section\n"));
       }
 
       CHECK(section->size == 0 || section->info->virtualSize == 0);
@@ -1728,10 +1726,8 @@ ocGetNames_PEi386 ( ObjectCode* oc )
       uint8_t *start;
       if (kind == SECTIONKIND_CODE_OR_RODATA) {
           start = m32_alloc(oc->rx_m32, sz, alignment);
-          debugBelch("code section: %p - %p\n", oc->info->image, oc->info->image + sz);
       } else {
           start = m32_alloc(oc->rw_m32, sz, alignment);
-          debugBelch("data section: %p - %p\n", oc->info->image, oc->info->image + sz);
       }
       if (!start) {
         barf("Could not allocate any heap memory from private heap (requested %" FMT_SizeT " bytes).",
@@ -1743,8 +1739,6 @@ ocGetNames_PEi386 ( ObjectCode* oc )
       } else if (do_zero) {
         memset(start, 0, sz);
       }
-
-      debugBelch("final section(%s, %x) %p\n", section->info->name, kind, start);
 
       addSection(section, kind, SECTION_NOMEM, start, sz, 0, 0, 0);
       addProddableBlock(oc, oc->sections[i].start, sz);
@@ -1778,7 +1772,7 @@ ocGetNames_PEi386 ( ObjectCode* oc )
        addSection(&oc->sections[oc->n_sections-1],
                   SECTIONKIND_RWDATA, SECTION_MALLOC,
                   bss, globalBssSize, 0, 0, 0);
-       IF_DEBUG(linker, debugBelch("bss @ %p %" FMT_Word "\n", bss, globalBssSize));
+       IF_DEBUG(linker_verbose, debugBelch("bss @ %p %" FMT_Word "\n", bss, globalBssSize));
        addProddableBlock(oc, bss, globalBssSize);
    } else {
        addSection(&oc->sections[oc->n_sections-1],
@@ -1813,7 +1807,7 @@ ocGetNames_PEi386 ( ObjectCode* oc )
       case 0x00: type = SYM_TYPE_DATA; break;
       case 0x20: type = SYM_TYPE_CODE; break;
       default:
-          debugBelch("Invalid symbol type\n");
+          debugBelch("Invalid symbol type: 0x%x\n", sym->og.Type);
           return 1;
       }
 
@@ -1915,8 +1909,6 @@ ocGetNames_PEi386 ( ObjectCode* oc )
           break;
       }
 
-      debugBelch("symbol is %p\n", addr);
-
       if ((addr != NULL || isWeak)
          && (!section || (section && section->kind != SECTIONKIND_IMPORT))) {
          /* debugBelch("addSymbol %p `%s' Weak:%lld \n", addr, sname, isWeak); */
@@ -1979,20 +1971,20 @@ makeSymbolExtra_PEi386( ObjectCode* oc, uint64_t index STG_UNUSED, size_t s, cha
         extra->addr = (uint64_t)s;
         static uint8_t jmp[] = { 0xFF, 0x25, 0xF2, 0xFF, 0xFF, 0xFF };
         memcpy(extra->jumpIsland, jmp, 6);
-        debugBelch("makeSymbolExtra(code): %s -> %p\n", symbol, &extra->jumpIsland);
+        IF_DEBUG(linker_verbose, debugBelch("makeSymbolExtra(code): %s -> %p\n", symbol, &extra->jumpIsland));
         return (size_t)&extra->jumpIsland;
     } else if (type == SYM_TYPE_INDIRECT_DATA) {
         extra = m32_alloc(oc->rw_m32, sizeof(SymbolExtra), 8);
         CHECK(extra);
         void *v = *(void**) s;
         extra->addr = (uint64_t)v;
-        debugBelch("makeSymbolExtra(data): %s -> %p\n", symbol, &extra->addr);
+        IF_DEBUG(linker_verbose, debugBelch("makeSymbolExtra(data): %s -> %p\n", symbol, &extra->addr));
         return (size_t)&extra->addr;
     } else {
         extra = m32_alloc(oc->rw_m32, sizeof(SymbolExtra), 8);
         CHECK(extra);
         extra->addr = (uint64_t)s;
-        debugBelch("makeSymbolExtra(indirect-data): %s -> %p\n", symbol, &extra->addr);
+        IF_DEBUG(linker_verbose, debugBelch("makeSymbolExtra(indirect-data): %s -> %p\n", symbol, &extra->addr));
         return (size_t)&extra->addr;
     }
 }
@@ -2057,7 +2049,7 @@ ocResolve_PEi386 ( ObjectCode* oc )
                             reloc->Type,
                             reloc->VirtualAddress );
                             printName (getSymShortName (info, sym), oc);
-                            debugBelch("'\n" ));
+                  debugBelch("'\n" ));
 
          if (getSymStorageClass (info, sym) == IMAGE_SYM_CLASS_STATIC) {
             Section section = oc->sections[getSymSectionNumber (info, sym)-1];
