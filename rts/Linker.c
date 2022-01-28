@@ -871,9 +871,8 @@ HsInt insertSymbol(pathchar* obj_name, SymbolName* key, SymbolAddr* data)
 #if defined(OBJFORMAT_PEi386)
 SymbolAddr* lookupDependentSymbol (SymbolName* lbl, ObjectCode *dependent, SymType *type)
 {
-    (void)dependent; // TODO
     ASSERT_LOCK_HELD(&linker_mutex);
-    return lookupSymbol_PEi386(lbl, type);
+    return lookupSymbol_PEi386(lbl, dependent, type);
 }
 
 #else
@@ -1093,11 +1092,12 @@ resolveSymbolAddr (pathchar* buffer, int size,
 void *
 mmapAnonForLinker (size_t bytes)
 {
-  unsigned size = 0;
+  size_t size = 0;
   /* For linking purposes we want to load code within a 4GB range from the
      load address of the application.  As such we need to find a location to
      allocate at.   */
   void* region = allocaLocalBytes (bytes, &size);
+  debugBelch("mmapAnonForLinker: bytes=%" FMT_SizeT ", size=%" FMT_SizeT ", region=%p\n", bytes, size, region);
   if (region == NULL) {
       return NULL;
   }
@@ -1728,7 +1728,7 @@ HsInt loadOc (ObjectCode* oc)
 {
    int r;
 
-   IF_DEBUG(linker, debugBelch("loadOc: start (%s)\n", oc->fileName));
+   IF_DEBUG(linker, debugBelch("loadOc: start (%" PATH_FMT ")\n", oc->fileName));
 
    /* verify the in-memory image */
 #  if defined(OBJFORMAT_ELF)

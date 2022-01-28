@@ -379,7 +379,9 @@ Library
         -- ole32: provides UUID functionality.
         -- rpcrt4: provides RPC UUID creation.
         -- ntdll: provides access to functions to inspect window handles
-        extra-libraries: wsock32, user32, shell32, msvcrt, mingw32,
+        -- kernel32: provides GetConsoleCP
+        -- advapi32: unknown
+        extra-libraries: wsock32, user32, shell32, msvcrt, mingw32, kernel32, advapi32,
                          mingwex, ws2_32, shlwapi, ole32, rpcrt4, ntdll
         -- Minimum supported Windows version.
         -- These numbers can be found at:

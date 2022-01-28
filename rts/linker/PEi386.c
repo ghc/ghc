@@ -55,11 +55,61 @@
      COFF_IMPORT_LIB and commonly has the file extension .lib
 
    * GNU BFD import format - The import library format defined and used by GNU
-     tools. See note below.
+     tools and commonly has the file extension .dll.a . See note below.
+
+   Note [The need for import libraries]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   In its original incarnation, PE had no native support for dynamic linking.
+   Let's examine how dynamic linking is now implemented. Consider a simple
+   program with a reference to function and data symbols provided by a DLL:
+
+       // myprogram.c
+       #include <libfoo.h>
+       int do_something() {
+           libfoo_function();
+           return libfoo_data;
+       }
+
+   The header file shipped with libfoo will look like the following:
+
+       // libfoo.h
+       __declspec(dllimport) int libfoo_function();
+       __declspec(dllimport) int libfoo_data;
+
+   When the C compiler is compiling myprogram.c, it will see these dllimport
+   declarations and use them to produce a module definition (.def) file which
+   summarizes the symbols that we expect the DLL to export. This will look like:
+
+      EXPORTS
+        libfoo_function
+        libfoo_data DATA
+
+   The C compiler will pass this file to the `dlltool` utility, which will
+   generate an *import library* (note only ). The import library will contain
+   placeholder symbols (with names starting with `__imp_`), along with
+   instructions for the dynamic linker to fix-up these references to point to
+   the "real" symbol definition.
+   
+   For historical reasons involving lack of documentation, NDAs, and (probably)
+   Steve Balmer, there are two flavours of import flavours:
+
+    * Native Windows-style import libraries. These typically bear the .lib file
+      extension and encode their relocation information in the `.idata` section.
+      Documentation for this format is not available
+      [here](https://docs.microsoft.com/en-us/windows/win32/debug/pe-format#import-library-format).
+      These are handled in `checkAndLoadImportLibrary()`
+
+    * GNU BFD-style import libraries. These typically have the .dll.a
+      extension and encode the relocation information in a set of sections 
+      named `.idata$<N>` where `<N>` is an integer which encodes the section's
+      meaning. Somewhat ironically, despite being devised in response to the
+      native Windows format having no public documentation, there is no official
+      documentation for this format but Note [BFD import library] attempts to
+      summarize what we know.  These are handled in `ocGetNames_PEi386()`.
+
 
    Note [BFD import library]
    ~~~~~~~~~~~~~~~~~~~~~~~~~
-
    On Windows, compilers don't link directly to dynamic libraries.
    The reason for this is that the exports are not always by symbol, the
    Import Address Table (IAT) also allows exports by ordinal number
@@ -78,7 +128,7 @@
 
    Anyway, the Windows PE format specifies a simple and efficient format for
    this: It's essentially a list, saying these X symbols can be found in DLL y.
-   Commonly, y is a versioned name. e.g. liby_43.dll. This is an artifact of
+   Commonly, y is a versioned name. e.g. `liby_43.dll`. This is an artifact of
    the days when Windows did not support side-by-side assemblies. So the
    solution was to version the DLLs by renaming them to include explicit
    version numbers, and to then use the import libraries to point to the right
@@ -89,35 +139,62 @@
    have created their own format. This format is either named using the suffix
    .dll.a or .a depending on the tool that makes them. This format is
    undocumented. However the source of dlltool.c in binutils is pretty handy to
-   understant it.
+   understand it (see binutils/dlltool.c; grep for ".idata section description").
 
    To understand the implementation in GHC, this is what is important:
 
-   the .idata section group is used to hold this information. An import library
+   The import library is generally an archive containing one object file for
+   each imported symbol. In addition, there is a "head" object, which contains
+   the name of the DLL which the symbols are imported from, among other things.
+
+   The `.idata$` section group is used to hold this information. An import library
    object file will always have these section groups, but the specific
    configuration depends on what the purpose of the file is. They will also
    never have a CODE or DATA section, though depending on the tool that creates
    them they may have the section headers, which will mostly be empty.
 
-   You have to different possible configuration:
+   The import data sections consist of the following:
 
-   1) Those that define a redirection. In this case the .idata$7 section will
+     * `.idata$2` contains the Import Directory Table (IDT), which contains an entry
+       for each imported DLL. Each entry contains: a reference to the DLL's name
+       (in `.idata$7`) and references to its entries in the ILT and IAT sections.
+       This is contained in the head object.
+
+     * `.idata$6` contains the Hint Name Table (HNT). This is a table of
+       of (symbol ordinal, symbol name) pairs, which are referred to be the ILT
+       and IAT as described below.
+
+     * `.idata$5` contains the Import Address Table (IAT). This consists of an
+       array of pointers (one array for each imported DLL) which the loader will
+       update to point to the target symbol identified by the hint referenced by
+       the corresponding ILT entry. Moreover, the IAT pointers' initial values
+       also point to the corresponding HNT entry.
+
+     * `.idata$4` contains the Import Lookup Table (ILT). This contains an array
+       of references to HNT entries for each imported DLL.
+
+     * `.idata$7` contains the names of the imported DLLs. This is contained
+       in the head object.
+
+   You have two different possible configurations:
+
+   1) Those that define a redirection. In this case the `.idata$7` section will
       contain the name of the actual dll to load. This will be the only content
       of the section. In the symbol table, the last symbol will be the name
       used to refer to the dll in the relocation tables. This name will always
-      be in the format "symbol_name_iname", however when referred to, the format
-      "_head_symbol_name" is used.
+      be in the format `symbol_name_iname`, however when referred to, the format
+      `_head_symbol_name` is used.
 
-      We record this symbol early on during GetNames and load the dll and use
+      We record this symbol early on during `ocGetNames` and load the dll and use
       the module handle as the symbol address.
 
-   2) Symbol definitions. In this case .idata$6 will contain the symbol to load.
-      This is stored in the fixed format of 2-byte ordinals followed by a null
-      terminated string with the symbol name. The ordinal is to be used when
-      the dll does not export symbols by name. (NOTE: We don't currently
-      support this in the runtime linker, but it's easy to add should it be
-      needed). The last symbol in the symbol table of the section will contain
-      the name symbol which contains the dll name to use to resolve the
+   2) Symbol definitions. In this case the HNT (`.idata$6`) will contain the
+      symbol to load.  This is stored in the fixed format of 2-byte ordinals
+      followed by (null-terminated) symbol name. The ordinal is
+      to be used when the DLL does not export symbols by name. (note: We don't
+      currently support this in the runtime linker, but it's easy to add should
+      it be needed). The last symbol in the symbol table of the section will
+      contain the name symbol which contains the dll name to use to resolve the
       reference.
 
    As a technicality, this also means that the GCC format will allow us to use
@@ -126,47 +203,99 @@
    required for dynamic linking support for GHC. So the runtime linker now
    supports this too.
 
+
+   Example: Dynamic code references
+   --------------------------------
+   To see what such an import library looks like, let's first start with the case
+   of a function (e.g. `libfoo_function` above). The import library will contain
+   the following:
+
+        .section .text
+        # This stub (which Windows calls a thunk) is what calls to
+        # libfoo_function will hit if the symbol isn't declared with
+        # __declspec(dllimport)
+        libfoo_function:
+            jmp   *0x0(%rip)
+            .quad __imp_libfoo_function
+
+        .section .idata$5                               # IAT
+        # This is the location which the loader will
+        # update to point to the definition
+        #  of libfoo_function
+        __imp_libfoo_function:
+            .quad hint1 - __image_base__
+
+        .section .idata$4                               # ILT
+        # This (and hint1 below) is what tells the
+        # loader where __imp_libfoo_function should point
+        ilt1:
+            .quad hint1 - __image_base__
+
+        .section .idata$6                               # HNT
+        hint1:
+            .short ORDINAL_OF_libfoo_function
+            .asciiz "libfoo_function"
+
+   To handle a reference to an IAT entry like `__imp_libfoo_function`, the GHC
+   linker will (in `lookupSymbolInDLLs`) first strip off the `__imp_` prefix to
+   find the name of the referenced dynamic symbol. It then resolves the
+   symbol's address and allocates an `IndirectAddr` where it can place the
+   address, which it will return as the resolution of the `___libfoo_function`.
+
+   Example: Dynamic data references
+   --------------------------------
+   Let's now consider the import library for a data symbol. This is essentially
+   equivalent to the code case, but without the need to emit a thunk:
+
+        .section .idata$5                               # IAT
+        __imp_libfoo_data:
+            .quad hint2 - __image_base__
+
+        .section .idata$4                               # ILT
+        ilt2:
+            .quad hint2 - __image_base__
+
+        .section .idata$6                               # ILT
+        hint2:
+            .short ORDINAL_OF_libfoo_data
+            .asciiz "libfoo_data"
+
+
    Note [Memory allocation]
    ~~~~~~~~~~~~~~~~~~~~~~~~
+   The loading of an object begins in `preloadObjectFile`, which allocates a buffer,
+   `oc->image`, into which the object file is read. It then calls `ocVerifyImage`,
+   where we traverse the object file's header and populate `ObjectCode.sections`.
+   Specifically, we create a Section for each of the object's sections such
+   that:
 
-   Previously on Windows we would use VirtualAlloc to allocate enough space for
-   loading the entire object file into memory and keep it there for the duration
-   until the entire object file has been unloaded.
+     * the `.start` field points to its data in the mapped image
+     * the `.size` field reflects its intended size
+     * the .`info` field contains a `SectionFormatField` with other information
+       from its section header entry (namely `VirtualSize`, `VirtualAddress`, and
+       `Characteristics`)
 
-   This has a couple of problems, first of, VirtualAlloc and the other Virtual
-   functions interact directly with the memory manager. Requesting memory from
-   VirtualAlloc will always return whole pages (32k), aligned on a 4k boundary.
+   We then proceed to `ocGetNames`, where we again walk the section table header
+   and determine which sections need to be mapped and how (e.g. as readable-writable or
+   readable-executable). We then allocate memory for each section using the
+   appropriate m32 allocator and, where necessary, copy the data from
+   `section.start` (which points to the section in `oc->image`)
+   into the new allocation.  Finally, `addSection()` updates the `section.start` field
+   to reflect the section's new home. In addition, we also allocate space for
+   the global BSS section.
 
-   This means for an object file of size N kbytes, we're always wasting 32-N
-   kbytes of memory. Nothing else can access this memory.
+   At this point we have no further need for the preloaded image buffer,
+   `oc->image` and therefore free it.
 
-   Because of this we're now using HeapAlloc and other heap function to create
-   a private heap. Another solution would have been to write our own memory
-   manager to keep track of where we have free memory, but the private heap
-   solution is simpler.
+   Having populated the sections, we can proceed to add the object's symbols to
+   the symbol table. This is a matter of walking the object file's symbol table,
+   computing the symbol's address, and calling `ghciInsertSymbolTable`.
 
-   The private heap is created with full rights just as the pages we used to get
-   from VirtualAlloc (e.g. READ/WRITE/EXECUTE). In the end we end up using
-   memory much more efficiently than before. The downside is that heap memory
-   is always Allocated AND Committed, thus when the heap resizes the new size is
-   committed. It becomes harder to see how much we're actually using. This makes
-   it seem like for small programs that we're using more memory than before.
-   Certainly a clean GHCi startup will have a slightly higher commit count.
-
-   The second major change in how we allocate memory is that we no longer need
-   the entire object file. We now allocate the object file using normal malloc
-   and instead read bits from it. All tables are stored in the Object file info
-   table and are discarded as soon as they are no longer needed, e.g. after
-   relocation is finished. Only section data is kept around, but this data is
-   copied into the private heap.
-
-   The major knock on effect of this is that we have more memory to use in the
-   sub 2GB range, which means that Template Haskell should fail a lot less as we
-   will violate the small memory model much less than before.
+   Finally, we enter `ocResolve`, where we resolve relocations and and allocate
+   jump islands (using the m32 allocator for backing storage) as necessary.
 
    Note [Section alignment]
    ~~~~~~~~~~~~~~~~~~~~~~~~
-
    The Windows linker aligns memory to it's section alignment requirement by
    aligning it during the copying to the private heap. We also ensure that the
    trampoline "region" we reserve is 8 bytes aligned.
@@ -227,24 +356,14 @@ static bool checkIfDllLoaded(
 static uint32_t getSectionAlignment(
     Section section);
 
-static uint8_t* getAlignedMemory(
-    uint8_t* value,
-    Section section);
-
 static size_t getAlignedValue(
     size_t value,
     Section section);
 
-static void addCopySection(
-    ObjectCode *oc,
-    Section *s,
-    SectionKind kind,
-    SectionAlloc alloc,
-    void* start,
-    StgWord size);
-
 static void releaseOcInfo(
     ObjectCode* oc);
+
+static SymbolAddr *lookupSymbolInDLLs ( const SymbolName* lbl, ObjectCode *dependent );
 
 const Alignments pe_alignments[] = {
   { IMAGE_SCN_ALIGN_1BYTES   , 1   },
@@ -298,13 +417,20 @@ static int virtualQuery(void *baseAddr, PMEMORY_BASIC_INFORMATION info)
     return 0;
 }
 
-void *allocateBytes(void* baseAddr, unsigned sz, unsigned *req)
+
+/*
+ * Try and find a location in the VMMAP to allocate SZ bytes starting at
+ * BASEADDR.  If successful then location to use is returned and the amount of
+ * bytes you *must* allocate is returned in REQ.  You are free to use less but
+ * you must allocate the amount given in REQ.  If not successful NULL.
+ */
+static void *allocateBytes(void* baseAddr, size_t sz, size_t *req)
 {
     SYSTEM_INFO sys;
     GetSystemInfo(&sys);
     const uint64_t max_range = 4294967296UL;
     IF_DEBUG(linker, debugBelch("Base Address 0x%p\n", baseAddr));
-    IF_DEBUG(linker, debugBelch("Requesting mapping of %d bytes within range %"
+    IF_DEBUG(linker, debugBelch("Requesting mapping of %" FMT_SizeT " bytes within range %"
                                 PRId64 " bytes\n", sz, max_range));
 
     MEMORY_BASIC_INFORMATION info;
@@ -361,7 +487,7 @@ void *allocateBytes(void* baseAddr, unsigned sz, unsigned *req)
     return region;
 }
 
-void *allocaLocalBytes(unsigned sz, unsigned *req)
+void *allocaLocalBytes(size_t sz, size_t *req)
 {
   return allocateBytes (GetModuleHandleW (NULL), sz, req);
 }
@@ -377,18 +503,6 @@ void initLinker_PEi386()
 
 #if defined(mingw32_HOST_OS)
     addDLLHandle(WSTR("*.exe"), GetModuleHandle(NULL));
-   /*
-    * Most of these are included by base, but GCC always includes them
-    * So lets make sure we always have them too.
-    *
-    * In most cases they would have been loaded by the
-    * addDLLHandle above.
-    */
-    addDLL(WSTR("msvcrt"));
-    addDLL(WSTR("kernel32"));
-    addDLL(WSTR("advapi32"));
-    addDLL(WSTR("shell32"));
-    addDLL(WSTR("user32"));
 #endif
 
   /* Register the cleanup routine as an exit handler,  this gives other exit handlers
@@ -403,9 +517,6 @@ void exitLinker_PEi386()
 
 /* A list thereof. */
 static OpenedDLL* opened_dlls = NULL;
-
-/* A list thereof. */
-static IndirectAddr* indirects = NULL;
 
 /* Adds a DLL instance to the list of DLLs in which to search for symbols. */
 static void addDLLHandle(pathchar* dll_name, HINSTANCE instance) {
@@ -492,15 +603,6 @@ void freePreloadObjectFile_PEi386(ObjectCode *oc)
         stgFree (oc->info);
         oc->info = NULL;
     }
-
-    IndirectAddr *ia, *ia_next;
-    ia = indirects;
-    while (ia != NULL) {
-        ia_next = ia->next;
-        stgFree(ia);
-        ia = ia_next;
-    }
-    indirects = NULL;
 }
 
 static void releaseOcInfo(ObjectCode* oc) {
@@ -936,16 +1038,6 @@ static uint32_t getSectionAlignment(
 }
 
 /* ----------------------
- * return a memory location aligned to the section requirements
- */
-static uint8_t* getAlignedMemory(
-        uint8_t* value, Section section) {
-   uint32_t alignment = getSectionAlignment(section);
-   uintptr_t mask = (uintptr_t)alignment - 1;
-   return (uint8_t*)(((uintptr_t)value + mask) & ~mask);
-}
-
-/* ----------------------
  * return a value aligned to the section requirements
  */
 static size_t getAlignedValue(
@@ -1136,7 +1228,7 @@ zapTrailingAtSign ( SymbolName* sym )
 #endif
 
 SymbolAddr*
-lookupSymbolInDLLs ( const SymbolName* lbl )
+lookupSymbolInDLLs ( const SymbolName* lbl, ObjectCode *dependent )
 {
     OpenedDLL* o_dll;
     SymbolAddr* sym;
@@ -1150,6 +1242,7 @@ lookupSymbolInDLLs ( const SymbolName* lbl )
             return sym;
         }
 
+        // TODO: Drop this
         /* Ticket #2283.
            Long description: http://support.microsoft.com/kb/132044
            tl;dr:
@@ -1161,15 +1254,15 @@ lookupSymbolInDLLs ( const SymbolName* lbl )
             sym = GetProcAddress(o_dll->instance,
                                  lbl + 6 + STRIP_LEADING_UNDERSCORE);
             if (sym != NULL) {
-                IndirectAddr* ret;
-                ret = stgMallocBytes( sizeof(IndirectAddr), "lookupSymbolInDLLs" );
-                ret->addr = sym;
-                ret->next = indirects;
-                indirects = ret;
+                SymbolAddr** indirect = m32_alloc(dependent->rw_m32, sizeof(SymbolAddr*), 8);
+                if (indirect == NULL) {
+                    barf("lookupSymbolInDLLs: Failed to allocation indirection");
+                }
+                *indirect = sym;
                 IF_DEBUG(linker,
                   debugBelch("warning: %s from %S is linked instead of %s\n",
                              lbl+6+STRIP_LEADING_UNDERSCORE, o_dll->name, lbl));
-                return (void*) & ret->addr;
+                return (void*) indirect;
                }
         }
 
@@ -1304,6 +1397,8 @@ ocVerifyImage_PEi386 ( ObjectCode* oc )
       section->info->props       = sectab_i->Characteristics;
       section->info->virtualSize = sectab_i->Misc.VirtualSize;
       section->info->virtualAddr = sectab_i->VirtualAddress;
+      debugBelch("new section %d(%s): size=%lld, vsize=%lld vaddr=%llx\n",
+                 i, section->info->name, section->size, section->info->virtualSize, section->info->virtualAddr);
 
       COFF_reloc* reltab
         = (COFF_reloc*) (oc->image + sectab_i->PointerToRelocations);
@@ -1506,95 +1601,123 @@ ocVerifyImage_PEi386 ( ObjectCode* oc )
    return true;
 }
 
+/* Infer the type of a GNU-style import library symbol (e.g. __imp_f).  We do this by checking
+ * to see whether there is a code symbol present in the symbol table. In
+ * principle this could be quadratic, since we call this the every import-library
+ * symbol in an ObjectCode. However, in practice import libraries only tend to be
+ * unmerged archives and therefore have very few symbols. */
+static SymType
+findTypeOfImportLibSymbol( ObjectCode *oc, SymbolName *sname )
+{
+   for (unsigned int i = 0; i < (uint32_t)oc->n_symbols; i++) {
+       COFF_symbol* sym = &oc->info->symbols[i];
+       SymbolName *nm = get_sym_name (getSymShortName (oc->info, sym), oc);
+       if (strcmp(sname, nm) == 0) {
+           if (sym->og.Type == 0x20) {
+               // We found a matching code symbol
+               return SYM_TYPE_CODE;
+           }
+       }
+   }
+   return SYM_TYPE_DATA;
+}
+
 bool
 ocGetNames_PEi386 ( ObjectCode* oc )
 {
    bool has_code_section = false;
-
-   SymbolName* sname = NULL;
-   SymbolAddr* addr = NULL;
-   unsigned int   i;
-
    COFF_HEADER_INFO *info = oc->info->ch_info;
 
    /* Copy section information into the ObjectCode. */
 
-   for (i = 0; i < info->numberOfSections; i++) {
-      uint8_t* start;
-      uint8_t* end;
-      uint32_t sz;
-
+   for (unsigned int i = 0; i < info->numberOfSections; i++) {
       /* By default consider all section as CODE or DATA,
          which means we want to load them. */
       SectionKind kind = SECTIONKIND_CODE_OR_RODATA;
-      Section section  = oc->sections[i];
+      Section *section  = &oc->sections[i];
+      uint32_t alignment = getSectionAlignment(*section);
 
-      IF_DEBUG(linker, debugBelch("section name = %s\n", section.info->name ));
+      // These will be computed below and determine how we will handle the
+      // section
+      size_t sz = section->size;
+      bool do_copy = true;
+      bool do_zero = false;
+
+      IF_DEBUG(linker, debugBelch("section name = %s (%x)\n", section->info->name, section->info->props ));
 
       /* The PE file section flag indicates whether the section
          contains code or data. */
-      if (section.info->props & IMAGE_SCN_CNT_CODE) {
-          has_code_section = has_code_section || section.size > 0;
+      if (section->info->props & IMAGE_SCN_CNT_CODE) {
+          has_code_section = has_code_section || section->size > 0;
           kind = SECTIONKIND_CODE_OR_RODATA;
        }
 
-       if (section.info->props & IMAGE_SCN_CNT_INITIALIZED_DATA)
-           kind = SECTIONKIND_CODE_OR_RODATA;
+      if (section->info->props & IMAGE_SCN_CNT_INITIALIZED_DATA) {
+          kind = SECTIONKIND_RWDATA;
+      }
 
       /* Check next if it contains any uninitialized data */
-      if (section.info->props & IMAGE_SCN_CNT_UNINITIALIZED_DATA)
+      if (section->info->props & IMAGE_SCN_CNT_UNINITIALIZED_DATA) {
           kind = SECTIONKIND_RWDATA;
+          do_copy = false;
+      }
 
       /* Finally check if it can be discarded.
          This will also ignore .debug sections */
-      if (   section.info->props & IMAGE_SCN_MEM_DISCARDABLE
-          || section.info->props & IMAGE_SCN_LNK_REMOVE)
+      if (   section->info->props & IMAGE_SCN_MEM_DISCARDABLE
+          || section->info->props & IMAGE_SCN_LNK_REMOVE) {
           kind = SECTIONKIND_OTHER;
+      }
 
-      if (0==strncmp(".ctors", section.info->name, 6)) {
+      if (0==strncmp(".ctors", section->info->name, 6)) {
           kind = SECTIONKIND_INIT_ARRAY;
           oc->info->init = &oc->sections[i];
       }
 
-      if (0==strncmp(".dtors", section.info->name, 6)) {
+      if (0==strncmp(".dtors", section->info->name, 6)) {
           kind = SECTIONKIND_FINIT_ARRAY;
           oc->info->finit = &oc->sections[i];
       }
 
-      if (   0 == strncmp(".stab"     , section.info->name, 5 )
-          || 0 == strncmp(".stabstr"  , section.info->name, 8 )
-          || 0 == strncmp(".pdata"    , section.info->name, 6 )
-          || 0 == strncmp(".xdata"    , section.info->name, 6 )
-          || 0 == strncmp(".debug"    , section.info->name, 6 )
-          || 0 == strncmp(".rdata$zzz", section.info->name, 10))
+      if (   0 == strncmp(".stab"     , section->info->name, 5 )
+          || 0 == strncmp(".stabstr"  , section->info->name, 8 )
+          || 0 == strncmp(".pdata"    , section->info->name, 6 )
+          || 0 == strncmp(".xdata"    , section->info->name, 6 )
+          || 0 == strncmp(".debug"    , section->info->name, 6 )
+          || 0 == strncmp(".rdata$zzz", section->info->name, 10)) {
           kind = SECTIONKIND_DEBUG;
+      }
 
-      if (0==strncmp(".idata", section.info->name, 6))
+      if (0==strncmp(".idata", section->info->name, 6)) {
           kind = SECTIONKIND_IMPORT;
+      }
 
       /* See Note [BFD import library].  */
-      if (0==strncmp(".idata$7", section.info->name, 8))
-          kind = SECTIONKIND_IMPORT_LIBRARY;
+      if (0==strncmp(".idata$7", section->info->name, 8)) {
+          kind = SECTIONKIND_BFD_IMPORT_LIBRARY;
+      }
 
-      if (0==strncmp(".idata$6", section.info->name, 8)) {
+      if (0==strncmp(".idata$6", section->info->name, 8)) {
           /* The first two bytes contain the ordinal of the function
              in the format of lowpart highpart. The two bytes combined
              for the total range of 16 bits which is the function export limit
              of DLLs.  */
-          sname = (SymbolName*)section.start+2;
+          SymbolName *sname = (SymbolName*)section->start+2;
           COFF_symbol* sym = &oc->info->symbols[info->numberOfSymbols-1];
-          addr = get_sym_name( getSymShortName (info, sym), oc);
+          SymbolAddr *addr = get_sym_name( getSymShortName (info, sym), oc);
 
           IF_DEBUG(linker,
-                   debugBelch("addImportSymbol `%s' => `%s'\n",
+                   debugBelch("addImportSymbol '%s' => '%s'\n",
                               sname, (char*)addr));
-          /* We're going to free the any data associated with the import
+
+          /* We're going to free any data associated with the import
              library without copying the sections.  So we have to duplicate
              the symbol name and values before the pointers become invalid.  */
           sname = strdup (sname);
           addr  = strdup (addr);
+          SymType sym_type = findTypeOfImportLibSymbol(oc, sname);
           if (!ghciInsertSymbolTable(oc->fileName, symhash, sname,
-                                     addr, false, SYM_TYPE_DATA, oc)) {
+                                     addr, false, sym_type, oc)) {
              releaseOcInfo (oc);
              stgFree (oc->image);
              oc->image = NULL;
@@ -1613,10 +1736,7 @@ ocGetNames_PEi386 ( ObjectCode* oc )
       }
 
       /* Allocate space for any (local, anonymous) .bss sections. */
-      if (0==strncmp(".bss", section.info->name, 4)) {
-        uint32_t bss_sz;
-        uint8_t* zspace;
-
+      if (0==strncmp(".bss", section->info->name, 4)) {
         /* sof 10/05: the PE spec text isn't too clear regarding what
          * the SizeOfRawData field is supposed to hold for object
          * file sections containing just uninitialized data -- for executables,
@@ -1636,41 +1756,53 @@ ocGetNames_PEi386 ( ObjectCode* oc )
          *
          * TODO: check if this comment is still relevant.
          */
-        if (section.info->virtualSize == 0 && section.size == 0) continue;
+        if (section->info->virtualSize == 0 && section->size == 0) {
+          debugBelch("skipping empty .bss section\n");
+          continue;
+        }
+
         /* This is a non-empty .bss section.
             Allocate zeroed space for it */
-        bss_sz = section.info->virtualSize;
-        if (bss_sz < section.size) { bss_sz = section.size; }
-        zspace = stgCallocBytes(1, bss_sz, "ocGetNames_PEi386(anonymous bss)");
-        oc->sections[i].start = zspace;
-        oc->sections[i].size  = bss_sz;
-        section  = oc->sections[i];
-        /* debugBelch("BSS anon section at 0x%x\n", zspace); */
+        kind = SECTIONKIND_RWDATA;
+        do_zero = true;
+        do_copy = false;
+        debugBelch("BSS anon section\n");
       }
 
-      /* Allocate space for the sections since we have a real oc.
-         We initially mark it the region as non-accessible. But will adjust
-         as we go along.  */
-      if (!oc->info->image) {
-        /* See Note [Memory allocation].  */
-        oc->info->image = m32_alloc(oc->rx_m32, oc->info->secBytesTotal, 16);
-        if (!oc->info->image)
-          barf("Could not allocate any heap memory from private heap (requested %" FMT_SizeT " bytes).",
-               oc->info->secBytesTotal);
+      CHECK(section->size == 0 || section->info->virtualSize == 0);
+      if (sz < section->info->virtualSize) {
+          sz = section->info->virtualSize;
       }
 
-      CHECK(section.size == 0 || section.info->virtualSize == 0);
-      sz = section.size;
-      if (sz < section.info->virtualSize) sz = section.info->virtualSize;
-
-      start = section.start;
-      end   = start + sz;
-
-      if (kind != SECTIONKIND_OTHER && end > start) {
-          /* See Note [Section alignment].  */
-          addCopySection(oc, &oc->sections[i], kind, SECTION_NOMEM, start, sz);
-          addProddableBlock(oc, oc->sections[i].start, sz);
+      // Ignore these section types
+      if (kind == SECTIONKIND_OTHER || sz == 0) {
+        continue;
       }
+
+      // Allocate memory for the section.
+      uint8_t *start;
+      if (kind == SECTIONKIND_CODE_OR_RODATA) {
+          start = m32_alloc(oc->rx_m32, sz, alignment);
+          debugBelch("code section: %p - %p\n", oc->info->image, oc->info->image + sz);
+      } else {
+          start = m32_alloc(oc->rw_m32, sz, alignment);
+          debugBelch("data section: %p - %p\n", oc->info->image, oc->info->image + sz);
+      }
+      if (!start) {
+        barf("Could not allocate any heap memory from private heap (requested %" FMT_SizeT " bytes).",
+             oc->info->secBytesTotal);
+      }
+
+      if (do_copy) {
+        memcpy(start, section->start, sz);
+      } else if (do_zero) {
+        memset(start, 0, sz);
+      }
+
+      debugBelch("final section(%s, %x) %p\n", section->info->name, kind, start);
+
+      addSection(section, kind, SECTION_NOMEM, start, sz, 0, 0, 0);
+      addProddableBlock(oc, oc->sections[i].start, sz);
    }
 
    /* Copy exported symbols into the ObjectCode. */
@@ -1681,7 +1813,7 @@ ocGetNames_PEi386 ( ObjectCode* oc )
 
    /* Work out the size of the global BSS section */
    StgWord globalBssSize = 0;
-   for (i=0; i < info->numberOfSymbols; i++) {
+   for (unsigned int i=0; i < info->numberOfSymbols; i++) {
       COFF_symbol* sym = &oc->info->symbols[i];
       if (getSymSectionNumber (info, sym) == IMAGE_SYM_UNDEFINED
            && getSymValue (info, sym) > 0
@@ -1694,8 +1826,10 @@ ocGetNames_PEi386 ( ObjectCode* oc )
    /* Allocate BSS space */
    SymbolAddr* bss = NULL;
    if (globalBssSize > 0) {
-       bss = stgCallocBytes(1, globalBssSize,
-                            "ocGetNames_PEi386(non-anonymous bss)");
+       bss = m32_alloc(oc->rw_m32, globalBssSize, 16);
+       if (bss == NULL) {
+           barf("ocGetNames_PEi386: Failed to allocate global bss section");
+       }
        addSection(&oc->sections[oc->n_sections-1],
                   SECTIONKIND_RWDATA, SECTION_MALLOC,
                   bss, globalBssSize, 0, 0, 0);
@@ -1711,17 +1845,23 @@ ocGetNames_PEi386 ( ObjectCode* oc )
    stgFree (oc->image);
    oc->image = NULL;
 
-   for (i = 0; i < (uint32_t)oc->n_symbols; i++) {
+   for (unsigned int i = 0; i < (uint32_t)oc->n_symbols; i++) {
       COFF_symbol* sym = &oc->info->symbols[i];
 
       int32_t secNumber = getSymSectionNumber (info, sym);
       uint32_t symValue = getSymValue (info, sym);
       uint8_t symStorageClass = getSymStorageClass (info, sym);
 
-      addr = NULL;
+      SymbolAddr *addr = NULL;
       bool isWeak = false;
-      sname       = get_sym_name (getSymShortName (info, sym), oc);
+      SymbolName *sname = get_sym_name (getSymShortName (info, sym), oc);
       Section *section = secNumber > 0 ? &oc->sections[secNumber-1] : NULL;
+      debugBelch("sym %s (section %d): storage_class=%d   value=%x\n",
+                 sname, secNumber, symStorageClass, symValue);
+      if (section) {
+          debugBelch("  section %s: kind=%d, start=%p\n",
+                     section->info->name, section->kind, section->start);
+      }
 
       SymType type;
       switch (sym->og.Type) {
@@ -1735,7 +1875,7 @@ ocGetNames_PEi386 ( ObjectCode* oc )
       if (   secNumber != IMAGE_SYM_UNDEFINED
           && secNumber > 0
           && section
-          && section->kind != SECTIONKIND_IMPORT_LIBRARY) {
+          && section->kind != SECTIONKIND_BFD_IMPORT_LIBRARY) {
          /* This symbol is global and defined, viz, exported */
          /* for IMAGE_SYMCLASS_EXTERNAL
                 && !IMAGE_SYM_UNDEFINED,
@@ -1762,8 +1902,8 @@ ocGetNames_PEi386 ( ObjectCode* oc )
       }
       else if (secNumber > 0
                && section
-               && section->kind == SECTIONKIND_IMPORT_LIBRARY) {
-          /* This is an import section. We should load the dll and lookup
+               && section->kind == SECTIONKIND_BFD_IMPORT_LIBRARY) {
+          /* This is an Gnu BFD import section. We should load the dll and lookup
              the symbols.
              See Note [BFD import library].  */
           char* dllName = section->start;
@@ -1826,6 +1966,8 @@ ocGetNames_PEi386 ( ObjectCode* oc )
           break;
       }
 
+      debugBelch("symbol is %p\n", addr);
+
       if ((addr != NULL || isWeak)
          && (!section || (section && section->kind != SECTIONKIND_IMPORT))) {
          /* debugBelch("addSymbol %p `%s' Weak:%lld \n", addr, sname, isWeak); */
@@ -1879,20 +2021,29 @@ ocAllocateExtras_PEi386 ( ObjectCode* oc )
 static size_t
 makeSymbolExtra_PEi386( ObjectCode* oc, uint64_t index STG_UNUSED, size_t s, char* symbol STG_UNUSED, SymType type )
 {
-    SymbolExtra *extra = m32_alloc(oc->rx_m32, sizeof(SymbolExtra), 8);
+    SymbolExtra *extra;
 
     if (type == SYM_TYPE_CODE) {
         // jmp *-14(%rip)
+        extra = m32_alloc(oc->rx_m32, sizeof(SymbolExtra), 8);
+        CHECK(extra);
         extra->addr = (uint64_t)s;
         static uint8_t jmp[] = { 0xFF, 0x25, 0xF2, 0xFF, 0xFF, 0xFF };
         memcpy(extra->jumpIsland, jmp, 6);
+        debugBelch("makeSymbolExtra(code): %s -> %p\n", symbol, &extra->jumpIsland);
         return (size_t)&extra->jumpIsland;
     } else if (type == SYM_TYPE_INDIRECT_DATA) {
+        extra = m32_alloc(oc->rw_m32, sizeof(SymbolExtra), 8);
+        CHECK(extra);
         void *v = *(void**) s;
         extra->addr = (uint64_t)v;
+        debugBelch("makeSymbolExtra(data): %s -> %p\n", symbol, &extra->addr);
         return (size_t)&extra->addr;
     } else {
+        extra = m32_alloc(oc->rw_m32, sizeof(SymbolExtra), 8);
+        CHECK(extra);
         extra->addr = (uint64_t)s;
+        debugBelch("makeSymbolExtra(indirect-data): %s -> %p\n", symbol, &extra->addr);
         return (size_t)&extra->addr;
     }
 }
@@ -1951,9 +2102,9 @@ ocResolve_PEi386 ( ObjectCode* oc )
 
          IF_DEBUG(linker_verbose,
                   debugBelch(
-                            "reloc sec %2d num %3d:  type 0x%-4x   "
+                            "reloc sec %2d num %3d:  P=%p, type 0x%-4x   "
                             "vaddr 0x%-8lx   name `",
-                            i, j,
+                            i, j, pP,
                             reloc->Type,
                             reloc->VirtualAddress );
                             printName (getSymShortName (info, sym), oc);
@@ -1973,6 +2124,8 @@ ocResolve_PEi386 ( ObjectCode* oc )
                 return false;
             }
          }
+         IF_DEBUG(linker_verbose, debugBelch("S=%zx\n", S));
+
          /* All supported relocations write at least 4 bytes */
          checkProddableBlock(oc, pP, 4);
          switch (reloc->Type) {
@@ -2067,6 +2220,7 @@ ocResolve_PEi386 ( ObjectCode* oc )
                return false;
          }
 
+         debugBelch("Final reloc @ %p: %p\n", pP, *(void**) pP);
       }
    }
 
@@ -2118,7 +2272,7 @@ ocRunInit_PEi386 ( ObjectCode *oc )
   return true;
 }
 
-SymbolAddr *lookupSymbol_PEi386(SymbolName *lbl, SymType *type)
+SymbolAddr *lookupSymbol_PEi386(SymbolName *lbl, ObjectCode *dependent, SymType *type)
 {
     RtsSymbolInfo *pinfo;
 
@@ -2131,8 +2285,13 @@ SymbolAddr *lookupSymbol_PEi386(SymbolName *lbl, SymType *type)
 #if !defined(x86_64_HOST_ARCH)
         zapTrailingAtSign ( lbl );
 #endif
-        if (type) *type = SYM_TYPE_CODE; // TODO
-        sym = lookupSymbolInDLLs(lbl);
+        if (type) {
+            // Unfortunately we can only assume that this is the case. Ideally
+            // the user would have given us an import library, which would allow
+            // us to determine the symbol type precisely.
+            *type = SYM_TYPE_CODE;
+        }
+        sym = lookupSymbolInDLLs(lbl, dependent);
         return sym; // might be NULL if not found
     } else {
         if (type) *type = pinfo->type;
@@ -2171,33 +2330,6 @@ SymbolAddr *lookupSymbol_PEi386(SymbolName *lbl, SymType *type)
         }
         return loadSymbol(lbl, pinfo);
     }
-}
-
-/* -----------------------------------------------------------------------------
- * Section management.
- */
-
- /* See Note [Section alignment].  */
-static void
-addCopySection (ObjectCode *oc, Section *s, SectionKind kind,
-                SectionAlloc alloc, void* start, StgWord size) {
-  char* pos      = oc->info->image + oc->info->secBytesUsed;
-  char* newStart = (char*)getAlignedMemory ((uint8_t*)pos, *s);
-  memcpy (newStart, start, size);
-  uintptr_t offset = (uintptr_t)newStart - (uintptr_t)oc->info->image;
-  oc->info->secBytesUsed = (size_t)offset + size;
-  start = newStart;
-
-  /* Initially I wanted to apply the right memory protection to the region and
-      which would leaved the gaps in between the regions as inaccessible memory
-      to prevent exploits.
-      The problem is protection is always on page granularity, so we can use
-      less memory and be insecure or use more memory and be secure.
-      For now, I've chosen lower memory over secure as the first pass, this
-      doesn't regress security over the current implementation.  After this
-      patch I will change to different implementation that will fix the mem
-      protection and keep the memory size small.  */
-  addSection (s, kind, alloc, start, size, 0, 0, 0);
 }
 
 /* -----------------------------------------------------------------------------

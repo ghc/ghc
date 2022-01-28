@@ -101,7 +101,8 @@ typedef
           /* Section belongs to an import section group. e.g. .idata$.  */
           SECTIONKIND_IMPORT,
           /* Section defines an import library entry, e.g. idata$7.  */
-          SECTIONKIND_IMPORT_LIBRARY,
+          SECTIONKIND_BFD_IMPORT_LIBRARY,
+          /* Unknown section */
           SECTIONKIND_NOINFOAVAIL
         }
    SectionKind;
