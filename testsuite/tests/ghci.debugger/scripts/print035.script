@@ -5,6 +5,7 @@
 :l Unboxed
 :p o1
 :p o2
-force_them
+o1 `seq` ()
+o2 `seq` ()
 :p o1
 :p o2

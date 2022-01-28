@@ -1586,7 +1586,9 @@ nodeScore !env new_bndr lb_deps
     is_con_app (App f _)  = is_con_app f
     is_con_app (Lam _ e)  = is_con_app e
     is_con_app (Tick _ e) = is_con_app e
-    is_con_app _          = False
+    is_con_app (Let _ e)  = is_con_app e  -- let x = let y = blah in (a,b)
+    is_con_app _          = False         -- We will float the y out, so treat
+                                          -- the x-binding as a con-app (#20941)
 
 maxExprSize :: Int
 maxExprSize = 20  -- Rather arbitrary
@@ -1935,6 +1937,9 @@ occAnalUnfolding !env is_rec mb_join_arity unf
           (WithUsageDetails usage args') = occAnalList env' args
           final_usage     = markAllManyNonTail (delDetailsList usage bndrs)
                             `addLamCoVarOccs` bndrs
+                            `delDetailsList` bndrs
+              -- delDetailsList; no need to use tagLamBinders because we
+              -- never inline DFuns so the occ-info on binders doesn't matter
 
       unf -> WithUsageDetails emptyDetails unf
 
