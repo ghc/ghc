@@ -157,7 +157,7 @@ markCAFs (evac_fn evac, void *user)
     {
         c = (StgIndStatic *)UNTAG_STATIC_LIST_PTR(c);
         evac(user, &c->indirectee);
-        markObjectCode(c);
+        if (unload_mark_needed) markObjectCode(c);
     }
 
     for (StgIndStatic *c = revertible_caf_list;
@@ -166,6 +166,6 @@ markCAFs (evac_fn evac, void *user)
     {
         c = (StgIndStatic *)UNTAG_STATIC_LIST_PTR(c);
         evac(user, &c->indirectee);
-        markObjectCode(c);
+        if (unload_mark_needed) markObjectCode(c);
     }
 }
