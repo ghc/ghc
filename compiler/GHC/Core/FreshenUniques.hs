@@ -15,6 +15,7 @@ import GHC.Types.Var.Set
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.FVs
 import GHC.Core.FVs
+import GHC.Stack
 
 import GHC.Types.Name hiding (varName)
 import GHC.Types.Var
@@ -34,12 +35,11 @@ import GHC.Data.Maybe
 import GHC.IO hiding (liftIO)
 import System.IO
 import GHC.Exts
+import Data.IORef
 
 import Control.Monad
 import Control.Monad.Trans.Except
-import Control.Monad.Trans.Class
 import Control.Monad.Trans.Reader
-import Control.Monad.Trans.State.Strict
 import Control.Monad.IO.Class
 
 import Data.Traversable
@@ -80,7 +80,7 @@ type Bitmap = Word64
 
 data AMT a
   = Empty
-  | Leaf !Key !a
+  | Leaf !Key a
   | Inner !Prefix !Mask !Bitmap !(GrowableArray (AMT a))
   | Full !Prefix !Mask !(SmallMutableArray RealWorld (AMT a))
 
@@ -340,22 +340,27 @@ _amtToList n = case n of
     cs' <- traverse (IO . readSmallArray cs) [0..fromIntegral subkeyMask]
     concat <$> traverse _amtToList cs' -- urgh inefficient
 
-amtFromList :: [(Key, a)] -> IO (AMT a)
-amtFromList xs = foldM (flip (uncurry insertInplaceAMT)) emptyAMT xs
+newtype MUSet a = MUSet (IORef (AMT a))
 
-newtype MUSet a = MUSet (AMT a)
+emptyMUSet :: IO (MUSet a)
+emptyMUSet = MUSet <$> newIORef emptyAMT
 
-emptyMUSet :: MUSet a
-emptyMUSet = MUSet emptyAMT
+elemsMUSet :: MUSet a -> IO [a]
+elemsMUSet (MUSet ref) = do
+  amt <- readIORef ref
+  map snd <$> _amtToList amt
 
-mkMUSet :: Uniquable a => [a] -> IO (MUSet a)
-mkMUSet as = MUSet <$> amtFromList [(fromIntegral $ getKey $ getUnique a, a) | a <- as]
+extendMUSet :: Uniquable a => MUSet a -> a -> IO ()
+extendMUSet set a = extendMUSet_Directly set (getUnique a) a
 
-extendMUSet :: Uniquable a => MUSet a -> a -> IO (MUSet a)
-extendMUSet (MUSet amt) a = MUSet <$> insertInplaceAMT (fromIntegral $ getKey $ getUnique a) a amt
+extendMUSet_Directly :: MUSet a -> Unique -> a -> IO ()
+extendMUSet_Directly (MUSet ref) u a = do
+  amt <- readIORef ref
+  amt' <- insertInplaceAMT (fromIntegral $ getKey u) a amt
+  writeIORef ref $! amt'
 
 lookupMUSet :: Uniquable a => MUSet a -> a -> IO (Maybe a)
-lookupMUSet (MUSet amt) a = lookupAMT (fromIntegral $ getKey $ getUnique a) amt
+lookupMUSet (MUSet ref) a = readIORef ref >>= lookupAMT (fromIntegral $ getKey $ getUnique a)
 
 elemMUSet :: Uniquable a => a -> MUSet a -> IO Bool
 elemMUSet a muset = (not . isNothing) <$> lookupMUSet muset a
@@ -369,13 +374,15 @@ elemMUSet a muset = (not . isNothing) <$> lookupMUSet muset a
 ----------------------------------------
 ----------------------------------------
 
-type M a = ReaderT Subst (StateT InScopeSet IO) a
+type M a = ReaderT Subst IO a
 
 -- | Gives fresh uniques to all 'Var's ocurring in terms of the 'CoreProgram'.
 -- It works by bringing all 'Var's into scope at once through calls to
 -- 'substBndr'.
 freshenUniques :: CoreProgram -> CoreProgram
-freshenUniques prog = unsafePerformIO $ evalStateT (runReaderT (freshenTopBinds prog) emptySubst) emptyInScopeSet
+freshenUniques prog = unsafePerformIO $ do
+  in_scope <- emptyInScopeSet
+  runReaderT (freshenTopBinds prog) (mkEmptySubst in_scope)
 
 freshenTopBinds :: [CoreBind] -> M [CoreBind]
 freshenTopBinds binds = do
@@ -385,18 +392,17 @@ freshenTopBinds binds = do
   -- See also https://gitlab.haskell.org/ghc/ghc/-/issues/19529
   let bs = bindersOfBinds binds
   -- ... hence we bring them all into scope here, without substituting anything.
-  in_scope <- liftIO $ mkInScopeSet <$> mkMUSet bs
-  lift $ put $! in_scope
+  Subst in_scope _ _ _ <- ask
+  liftIO $ mapM_ (extendInScopeSet in_scope) bs
   -- And we can be sure that no shadowing has happened so far, hence the assert:
   -- massertPpr (sizeUSet (getInScopeVars in_scope) == length bs)
   --            (hang (text "Non-unique top-level Id(s)!") 2 $
   --              ppr (filter (\grp -> length grp > 1) (List.group bs)))
-  local (`setInScope` in_scope) $ do
-    binds' <- traverse freshenTopBind binds
-    -- (InScope (MUSet amt)) <- lift $ get
-    -- vars <- liftIO $ amtToList amt
-    -- pprTraceM "freshen" (ppr (length vars))
-    return binds'
+  binds' <- traverse freshenTopBind binds
+  -- (InScope (MUSet amt)) <- lift $ get
+  -- vars <- liftIO $ amtToList amt
+  -- pprTraceM "freshen" (ppr (length vars))
+  return binds'
 
 freshenTopBind :: CoreBind -> M CoreBind
 -- Binders are already fresh; see freshenTopBinds above
@@ -415,9 +421,7 @@ freshenTopBind (Rec binds) = fmap Rec $ for binds $ \(b, rhs) -> do
 --   4. After this function exits, the `InScopeSet` is still extended with `ids`.
 wrapSubstFunM :: (Subst -> ids -> IO (Subst, ids)) -> ids -> (ids -> M r) -> M r
 wrapSubstFunM f ids k = ReaderT $ \subst -> do
-  in_scope <- get
-  (!subst', !ids') <- liftIO $ f (subst `setInScope` in_scope) ids
-  put $! substInScope subst'
+  (!subst', !ids') <- liftIO $ f subst ids
   runReaderT (k ids') subst'
 
 withSubstBndrM :: Var -> (Var -> M r) -> M r
@@ -522,21 +526,25 @@ newtype InScopeSet = InScope (MUSet Var)
         -- for more detailed motivation. #20419 has further discussion.
 
 
-emptyInScopeSet :: InScopeSet
-emptyInScopeSet = InScope emptyMUSet
+emptyInScopeSet :: IO InScopeSet
+emptyInScopeSet = InScope <$> emptyMUSet
 
 --getInScopeVars ::  InScopeSet -> MUSet Var
 --getInScopeVars (InScope vs) = vs
 
-mkInScopeSet :: MUSet Var -> InScopeSet
-mkInScopeSet in_scope = InScope in_scope
+--mkInScopeSet :: MUSet Var -> InScopeSet
+--mkInScopeSet in_scope = InScope in_scope
 
-extendInScopeSet :: InScopeSet -> Var -> IO InScopeSet
-extendInScopeSet (InScope in_scope) v
-   = InScope <$> extendMUSet in_scope v
+extendInScopeSet :: HasCallStack => InScopeSet -> Var -> IO ()
+extendInScopeSet (InScope in_scope) v = do
+  extendMUSet in_scope v
 
-_elemInScopeSet :: Var -> InScopeSet -> IO Bool
-_elemInScopeSet v (InScope in_scope) = v `elemMUSet` in_scope
+extendInScopeSet_Directly :: HasCallStack => InScopeSet -> Unique -> Var -> IO ()
+extendInScopeSet_Directly (InScope in_scope) u v = do
+  extendMUSet_Directly in_scope u v
+
+elemInScopeSet :: Var -> InScopeSet -> IO Bool
+elemInScopeSet v (InScope in_scope) = v `elemMUSet` in_scope
 
 lookupInScopeSet :: InScopeSet -> Var -> IO (Maybe Var)
 lookupInScopeSet (InScope in_scope) v = lookupMUSet in_scope v
@@ -546,13 +554,10 @@ uniqAway :: InScopeSet -> Var -> IO Var
 -- have to change, and thereafter uses the successor to the last derived unique
 -- found in the in-scope set.
 uniqAway in_scope var = do
-  mb_other_var <- lookupInScopeSet in_scope var
-  case mb_other_var of
-    Nothing -> pure var
-    Just other_var -> do
-      var' <- uniqAway' in_scope var
-      pprTraceM "uniqAway" (ppr other_var $$ ppr var $$ ppr var')
-      return var'
+  b <- var `elemInScopeSet` in_scope
+  if not b
+    then pure var
+    else uniqAway' in_scope var
 
 uniqAway' :: InScopeSet -> Var -> IO Var
 -- This one *always* makes up a new variable
@@ -563,16 +568,16 @@ uniqAway' in_scope var
 -- given 'InScopeSet'. This must be used very carefully since one can very easily
 -- introduce non-unique 'Unique's this way. See Note [Local uniques].
 unsafeGetFreshLocalUnique :: InScopeSet -> IO Unique
-unsafeGetFreshLocalUnique (InScope (MUSet amt)) = do
+unsafeGetFreshLocalUnique (InScope (MUSet ref)) = do
   -- NB: The lookupLT below stops working correctly when the key is negative.
   -- Fortunately, that is never the case for local uniques, which have tag 'X'.
+  amt <- readIORef ref
   mb_uniq <- lookupLT_AMT (fromIntegral $ getKey maxLocalUnique) amt
-  pprTraceM "unsafeGetFreshLocalUnique1" (ppr mb_uniq $$ ppr (fromIntegral $ getKey maxLocalUnique :: Word64) $$ ppr (getKey maxLocalUnique))
+  -- pprTraceM "unsafeGetFreshLocalUnique1" (ppr mb_uniq $$ ppr (getKey maxLocalUnique))
   case mb_uniq of
     Just (uniq, _)
       | let uniq' = mkLocalUnique (fromIntegral uniq)
       , not $ uniq' `ltUnique` minLocalUnique
-      , pprTrace "unsafeGetFreshLocalUnique" (ppr uniq $$ ppr uniq' $$ ppr (incrUnique uniq')) True
       -> pure $! incrUnique uniq'
     _ -> pure $ minLocalUnique
 
@@ -612,29 +617,24 @@ isEmptySubst :: Subst -> Bool
 isEmptySubst (Subst _ id_env tv_env cv_env)
   = isEmptyVarEnv id_env && isEmptyVarEnv tv_env && isEmptyVarEnv cv_env
 
-emptySubst :: Subst
-emptySubst = Subst emptyInScopeSet emptyVarEnv emptyVarEnv emptyVarEnv
-
-setInScope :: Subst -> InScopeSet -> Subst
-setInScope (Subst _ ids tvs cvs) in_scope = Subst in_scope ids tvs cvs
-
--- | Find the in-scope set: see "GHC.Core.TyCo.Subst" Note [The substitution invariant]
-substInScope :: Subst -> InScopeSet
-substInScope (Subst in_scope _ _ _) = in_scope
+mkEmptySubst :: InScopeSet -> Subst
+mkEmptySubst in_scope = Subst in_scope emptyVarEnv emptyVarEnv emptyVarEnv
 
 -- | Find the substitution for an 'Id' in the 'Subst'
-lookupIdSubst :: Subst -> Id -> IO CoreExpr
-lookupIdSubst (Subst in_scope ids _ _) v
+lookupIdSubst :: HasCallStack => Subst -> Id -> IO CoreExpr
+lookupIdSubst (Subst in_scope@(InScope set) ids _ _) v
   | not (isLocalId v) = pure $ Var v
   | Just e  <- lookupVarEnv ids v = pure e
   | otherwise = do
       mb_v <- lookupInScopeSet in_scope v
-      pure $! case mb_v of
-        Just v -> Var v
+      case mb_v of
+        Just v -> pure $! Var v
         -- Vital! See Note [Extending the Subst]
         -- If v isn't in the InScopeSet, we panic, because
         -- it's a bad bug and we reallly want to know
-        Nothing -> pprPanic "lookupIdSubst" (ppr v)
+        Nothing -> do
+          elts <- elemsMUSet set
+          pprPanic "lookupIdSubst" (ppr v $$ ppr elts)
 
 {-
 ************************************************************************
@@ -750,8 +750,8 @@ substTyVarBndrUsing subst_fn subst@(Subst in_scope ienv tenv cenv) old_var = do
         --      (\x.e) with id_subst = [x |-> e']
         -- Here we must simply zap the substitution for x
 
-  in_scope' <- in_scope `extendInScopeSet` new_var
-  pure (Subst in_scope' ienv new_env cenv, new_var)
+  in_scope `extendInScopeSet` new_var
+  pure (Subst in_scope ienv new_env cenv, new_var)
 
 -- | Substitute a covar in a binding position, returning an
 -- extended subst and a new covar.
@@ -778,8 +778,8 @@ substCoVarBndrUsing subst_fn subst@(Subst in_scope ienv tenv cenv) old_var = do
     new_co         = mkCoVarCo new_var
     new_cenv | no_change = delVarEnv cenv old_var
              | otherwise = extendVarEnv cenv old_var new_co
-  in_scope' <- in_scope `extendInScopeSet` new_var
-  pure (Subst in_scope' ienv tenv new_cenv, new_var)
+  in_scope `extendInScopeSet` new_var
+  pure (Subst in_scope ienv tenv new_cenv, new_var)
 
 -- | Substitute within a 'Type'
 -- The substitution has to satisfy the invariants described in
@@ -787,7 +787,7 @@ substCoVarBndrUsing subst_fn subst@(Subst in_scope ienv tenv cenv) old_var = do
 substTy :: Subst -> Type  -> IO Type
 substTy subst ty
   | isEmptySubst subst = pure ty
-  | otherwise             = subst_ty subst ty
+  | otherwise          = subst_ty subst ty
 
 subst_ty :: Subst -> Type -> IO Type
 -- subst_ty is the main workhorse for type substitution
@@ -972,8 +972,8 @@ substForAllCoTyVarBndrUsing sym sco (Subst in_scope ienv tenv cenv) old_var old_
 
     no_change = no_kind_change && (new_var == old_var)
 
-  in_scope' <- in_scope `extendInScopeSet` new_var
-  pure (Subst in_scope' ienv new_env cenv, new_var, new_kind_co)
+  in_scope `extendInScopeSet` new_var
+  pure (Subst in_scope ienv new_env cenv, new_var, new_kind_co)
 
 substForAllCoCoVarBndrUsing :: Bool  -- apply sym to binder?
                             -> (Coercion -> IO Coercion)  -- transformation to kind co
@@ -998,8 +998,8 @@ substForAllCoCoVarBndrUsing sym sco (Subst in_scope ienv tenv cenv)
              | otherwise = extendVarEnv cenv old_var (mkCoVarCo new_var)
 
     no_change = no_kind_change && (new_var == old_var)
-  in_scope' <- in_scope `extendInScopeSet` new_var
-  pure (Subst in_scope' ienv tenv new_cenv, new_var, new_kind_co)
+  in_scope `extendInScopeSet` new_var
+  pure (Subst in_scope ienv tenv new_cenv, new_var, new_kind_co)
 
 substCoVar :: Subst -> CoVar -> Coercion
 substCoVar (Subst _ _ _ cenv) cv
@@ -1171,25 +1171,26 @@ substIdBndr _doc rec_subst subst@(Subst in_scope env tvs cvs) old_id = do
     no_type_change = (isEmptyVarEnv tvs && isEmptyVarEnv cvs) ||
                      (noFreeVarsOfType old_ty && noFreeVarsOfType old_w)
   id1 <- uniqAway in_scope old_id      -- id1 is cloned if necessary
+  -- pprTraceM "substIdBndr1" (ppr old_id <+> ppr id1)
   id2 <-
     if no_type_change
       then pure id1
       else updateIdTypeAndMultM (substTy subst) id1
   mb_new_info <- substIdInfo rec_subst id2 (idInfo id2)
-  let
-        -- new_id has the right IdInfo
-        -- The lazy-set is because we're in a loop here, with
-        -- rec_subst, when dealing with a mutually-recursive group
-    !new_id = maybeModifyIdInfo mb_new_info id2
         -- NB: unfolding info may be zapped
-
-    !new_env | no_change = delVarEnv env old_id
-             | otherwise = extendVarEnv env old_id (Var new_id)
-
-    no_change = id1 == old_id
-        -- See Note [Extending the Subst]
-        -- it's /not/ necessary to check mb_new_info and no_type_change
+  -- pprTraceM "substIdBndr4" (ppr old_id <+> ppr id1)
+  let !new_id = maybeModifyIdInfo mb_new_info id2
+      -- new_id has the right IdInfo
+  extendInScopeSet_Directly in_scope (getUnique id1) new_id
       -- Extend the substitution if the unique has changed
       -- See the notes with substTyVarBndr for the delVarEnv
-  !new_in_scope <- in_scope `extendInScopeSet` new_id
-  pure (Subst new_in_scope new_env tvs cvs, new_id)
+  -- The lazy-set is because we're in a loop here, with
+  -- rec_subst, when dealing with a mutually-recursive group
+  let
+    no_change = id1 == old_id
+    !new_env | no_change = delVarEnv env old_id
+             | otherwise = extendVarEnv env old_id (Var new_id)
+          -- See Note [Extending the Subst]
+          -- it's /not/ necessary to check mb_new_info and no_type_change
+
+  pure (Subst in_scope new_env tvs cvs, new_id)
