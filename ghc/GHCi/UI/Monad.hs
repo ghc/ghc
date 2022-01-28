@@ -15,6 +15,7 @@ module GHCi.UI.Monad (
         GHCiState(..), GhciMonad(..),
         GHCiOption(..), isOptionSet, setOption, unsetOption,
         Command(..), CommandResult(..), cmdSuccess,
+        CmdExecOutcome(..),
         LocalConfigBehaviour(..),
         PromptFunction,
         BreakLocation(..),
@@ -173,8 +174,8 @@ data Command
    = Command
    { cmdName           :: String
      -- ^ Name of GHCi command (e.g. "exit")
-   , cmdAction         :: String -> InputT GHCi Bool
-     -- ^ The 'Bool' value denotes whether to exit GHCi
+   , cmdAction         :: String -> InputT GHCi CmdExecOutcome
+     -- ^ The 'CmdExecOutcome' value denotes whether to exit GHCi cleanly or error out
    , cmdHidden         :: Bool
      -- ^ Commands which are excluded from default completion
      -- and @:help@ summary. This is usually set for commands not
@@ -182,6 +183,20 @@ data Command
    , cmdCompletionFunc :: CompletionFunc GHCi
      -- ^ 'CompletionFunc' for arguments
    }
+
+-- | Used to denote GHCi command execution result. Specifically, used to
+-- distinguish between two ghci execution modes - "REPL" and "Expression
+-- evaluation mode (ghc -e)". When in "REPL" mode, we don't want to exit
+-- GHCi session when error occurs, (which is when we use "CmdSuccess").
+-- Otherwise, when in expression evaluation mode, all command failures
+-- should lead to GHCi session termination (with ExitFailure 1) which is
+-- when "CmdFailure" is used(this is useful when executing scripts).
+-- "CleanExit" is used to signal end of GHCi session (for example, when
+-- ":quit" command is called).
+data CmdExecOutcome
+  = CleanExit
+  | CmdSuccess
+  | CmdFailure
 
 data CommandResult
    = CommandComplete

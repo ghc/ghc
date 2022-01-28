@@ -1,3 +1,4 @@
 
 <interactive>:0:19: error:
     Module ‘Data.List’ does not export ‘bogusIdentifier’
+1

@@ -1,0 +1,5 @@
+
+<interactive>:1:1: error:
+    Variable not in scope: abc :: IO String
+    Suggested fix: Perhaps use ‘abs’ (imported from Prelude)
+1

@@ -8,3 +8,5 @@
       In the first argument of ‘return’, namely ‘id’
       In the expression: return id
       In the second argument of ‘(.)’, namely ‘(\ _ -> return id)’
+unknown command ':macro'
+use :? for help.

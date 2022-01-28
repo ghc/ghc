@@ -1,0 +1,5 @@
+
+<interactive>:0:53: error:
+    Variable not in scope: main :: IO a0
+    Suggested fix: Perhaps use ‘min’ (imported from Prelude)
+1
