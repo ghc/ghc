@@ -1228,7 +1228,9 @@ ocVerifyImage_PEi386 ( ObjectCode* oc )
    }
 
    /* Initialize the last section's info field which contains the .bss
-      section, it doesn't need an info so set it to NULL.  */
+      section, the .info of which will be initialized by ocGetNames. Discard the
+      .info that we computed above. */
+  stgFree(sections[info->numberOfSections].info);
   sections[info->numberOfSections].info = NULL;
 
    /* Calculate space for trampolines nearby.
