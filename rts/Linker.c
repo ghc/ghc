@@ -1097,7 +1097,6 @@ mmapAnonForLinker (size_t bytes)
      load address of the application.  As such we need to find a location to
      allocate at.   */
   void* region = allocaLocalBytes (bytes, &size);
-  debugBelch("mmapAnonForLinker: bytes=%" FMT_SizeT ", size=%" FMT_SizeT ", region=%p\n", bytes, size, region);
   if (region == NULL) {
       return NULL;
   }
@@ -1812,7 +1811,7 @@ HsInt loadOc (ObjectCode* oc)
            oc->status = OBJECT_LOADED;
        }
    }
-   IF_DEBUG(linker, debugBelch("loadOc: done (%s).\n", oc->fileName));
+   IF_DEBUG(linker, debugBelch("loadOc: done (%" PATH_FMT ").\n", oc->fileName));
 
    return 1;
 }

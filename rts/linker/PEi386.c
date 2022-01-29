@@ -1795,12 +1795,6 @@ ocGetNames_PEi386 ( ObjectCode* oc )
       bool isWeak = false;
       SymbolName *sname = get_sym_name (getSymShortName (info, sym), oc);
       Section *section = secNumber > 0 ? &oc->sections[secNumber-1] : NULL;
-      debugBelch("sym %s (section %d): storage_class=%d   value=%x\n",
-                 sname, secNumber, symStorageClass, symValue);
-      if (section) {
-          debugBelch("  section %s: kind=%d, start=%p\n",
-                     section->info->name, section->kind, section->start);
-      }
 
       SymType type;
       switch (sym->og.Type) {
@@ -2161,7 +2155,7 @@ ocResolve_PEi386 ( ObjectCode* oc )
                return false;
          }
 
-         debugBelch("Final reloc @ %p: %p\n", pP, *(void**) pP);
+         //debugBelch("Final reloc @ %p: %p\n", pP, *(void**) pP);
       }
    }
 
