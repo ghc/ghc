@@ -287,7 +287,7 @@ m32_release_page(struct m32_page_t *page)
   ASSERT_PAGE_NOT_FREE(page);
 
   const size_t pgsz = getPageSize();
-  size_t sz = page->filled_page.size;
+  ssize_t sz = page->filled_page.size;
   IF_DEBUG(sanity, memset(page, 0xaa, sz));
 
   // Break the page, which may be a large multi-page allocation, into
