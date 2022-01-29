@@ -362,7 +362,7 @@ m32_allocator_flush(m32_allocator *alloc) {
      while (page != NULL) {
        struct m32_page_t *next = m32_filled_page_get_next(page);
        m32_allocator_push_filled_list(&alloc->protected_list, page);
-       mmapForLinkerMarkExecutable(page, page->filled_page.size);
+       mprotectForLinker(page, page->filled_page.size, MEM_READ_EXECUTE);
        page = next;
      }
      alloc->unprotected_list = NULL;

@@ -375,9 +375,17 @@ void exitLinker( void );
 void freeObjectCode (ObjectCode *oc);
 SymbolAddr* loadSymbol(SymbolName *lbl, RtsSymbolInfo *pinfo);
 
+/** Access modes for mprotectForLinker */
+typedef enum {
+    MEM_NO_ACCESS,
+    MEM_READ_ONLY,
+    MEM_READ_WRITE,
+    MEM_READ_EXECUTE,
+} MemoryAccess;
+
 void *mmapAnonForLinker (size_t bytes);
 void *mmapForLinker (size_t bytes, uint32_t prot, uint32_t flags, int fd, int offset);
-void mmapForLinkerMarkExecutable (void *start, size_t len);
+void mprotectForLinker(void *start, size_t len, MemoryAccess mode);
 void munmapForLinker (void *addr, size_t bytes, const char *caller);
 
 void addProddableBlock ( ObjectCode* oc, void* start, int size );

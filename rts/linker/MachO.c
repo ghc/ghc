@@ -1436,7 +1436,7 @@ ocMprotect_MachO( ObjectCode *oc )
         if(segment->size == 0) continue;
 
         if(segment->prot == SEGMENT_PROT_RX) {
-            mmapForLinkerMarkExecutable(segment->start, segment->size);
+            mprotectForLinker(segment->start, segment->size, MEM_READ_EXECUTE);
         }
     }
 
@@ -1451,7 +1451,7 @@ ocMprotect_MachO( ObjectCode *oc )
         if(section->alloc == SECTION_M32) continue;
         switch (section->kind) {
         case SECTIONKIND_CODE_OR_RODATA: {
-            mmapForLinkerMarkExecutable(section->mapped_start, section->mapped_size);
+            mprotectForLinker(section->mapped_start, section->mapped_size, MEM_READ_EXECUTE);
             break;
         }
         default:
