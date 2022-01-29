@@ -162,7 +162,9 @@ is_okay_address(void *p) {
 }
 
 enum m32_page_type {
-  FREE_PAGE, ACTIVE_PAGE, FILLED_PAGE,
+  FREE_PAGE,    // a page in the free page pool
+  NURSERY_PAGE, // a nursery page
+  FILLED_PAGE,  // a page on the filled list
 };
 
 /**
@@ -204,9 +206,10 @@ static void ASSERT_PAGE_ALIGNED(void *page) {
   }
 }
 static void ASSERT_VALID_PAGE(struct m32_page_t *page) {
+  ASSERT_PAGE_ALIGNED(page);
   switch (page->type) {
   case FREE_PAGE:
-  case ACTIVE_PAGE:
+  case NURSERY_PAGE:
   case FILLED_PAGE:
     break;
   default:
@@ -214,7 +217,10 @@ static void ASSERT_VALID_PAGE(struct m32_page_t *page) {
   }
 }
 static void ASSERT_PAGE_TYPE(struct m32_page_t *page, enum m32_page_type ty) {
-  if (page->type != ty) { barf("m32: invalid page type"); }
+  if (page->type != ty) { barf("m32: unexpected page type"); }
+}
+static void ASSERT_PAGE_NOT_FREE(struct m32_page_t *page) {
+  if (page->type == FREE_PAGE) { barf("m32: unexpected free page"); }
 }
 static void SET_PAGE_TYPE(struct m32_page_t *page, enum m32_page_type ty) {
   page->type = ty;
@@ -222,6 +228,7 @@ static void SET_PAGE_TYPE(struct m32_page_t *page, enum m32_page_type ty) {
 #else
 #define ASSERT_PAGE_ALIGNED(page)
 #define ASSERT_VALID_PAGE(page)
+#define ASSERT_PAGE_NOT_FREE(page)
 #define ASSERT_PAGE_TYPE(page, ty)
 #define SET_PAGE_TYPE(page, ty)
 #endif
@@ -266,6 +273,7 @@ struct m32_allocator_t {
  * We keep a small pool of free pages around to avoid fragmentation.
  */
 struct m32_page_t *m32_free_page_pool = NULL;
+/** Number of pages in free page pool */
 unsigned int m32_free_page_pool_size = 0;
 
 /**
@@ -275,12 +283,8 @@ static void
 m32_release_page(struct m32_page_t *page)
 {
   // Some sanity-checking
-#if defined(M32_DEBUG)
   ASSERT_VALID_PAGE(page);
-  if (page->type == FREE_PAGE) {
-    barf("m32_release_page: freeing already-free page");
-  }
-#endif
+  ASSERT_PAGE_NOT_FREE(page);
 
   const size_t pgsz = getPageSize();
   size_t sz = page->filled_page.size;
@@ -330,6 +334,7 @@ m32_alloc_page(void)
 #define GET_PAGE(i) ((struct m32_page_t *) (chunk + (i) * pgsz))
     for (int i=0; i < M32_MAP_PAGES; i++) {
       struct m32_page_t *page = GET_PAGE(i);
+      SET_PAGE_TYPE(page, FREE_PAGE);
       page->free_page.next = GET_PAGE(i+1);
     }
 
@@ -385,7 +390,6 @@ void m32_allocator_free(m32_allocator *alloc)
   m32_allocator_unmap_list(alloc->protected_list);
 
   /* free partially-filled pages */
-  const size_t pgsz = getPageSize();
   for (int i=0; i < M32_MAX_PAGES; i++) {
     if (alloc->pages[i]) {
       m32_release_page(alloc->pages[i]);
@@ -401,8 +405,6 @@ void m32_allocator_free(m32_allocator *alloc)
 static void
 m32_allocator_push_filled_list(struct m32_page_t **head, struct m32_page_t *page)
 {
-  ASSERT_PAGE_TYPE(page, ACTIVE_PAGE);
-  SET_PAGE_TYPE(page, FILLED_PAGE);
   m32_filled_page_set_next(page, *head);
   *head = page;
 }
@@ -429,6 +431,7 @@ m32_allocator_flush(m32_allocator *alloc) {
        m32_release_page(alloc->pages[i]);
      } else {
        // the page contains data, move it to the unprotected list
+       SET_PAGE_TYPE(alloc->pages[i], FILLED_PAGE);
        m32_allocator_push_filled_list(&alloc->unprotected_list, alloc->pages[i]);
      }
      alloc->pages[i] = NULL;
@@ -490,6 +493,7 @@ m32_alloc(struct m32_allocator_t *alloc, size_t size, size_t alignment)
           barf("m32_alloc: warning: Allocation of %zd bytes resulted in pages above 4GB (%p)",
                size, page);
       }
+      SET_PAGE_TYPE(page, FILLED_PAGE);
       page->filled_page.size = alsize + size;
       m32_allocator_push_filled_list(&alloc->unprotected_list, (struct m32_page_t *) page);
       uint8_t *res = (uint8_t *) page + alsize;
@@ -511,7 +515,7 @@ m32_alloc(struct m32_allocator_t *alloc, size_t size, size_t alignment)
 
       // page can contain the buffer?
       ASSERT_VALID_PAGE(alloc->pages[i]);
-      ASSERT_PAGE_TYPE(alloc->pages[i], ACTIVE_PAGE);
+      ASSERT_PAGE_TYPE(alloc->pages[i], NURSERY_PAGE);
       size_t alsize = ROUND_UP(alloc->pages[i]->current_size, alignment);
       if (size <= pgsz - alsize) {
          void * addr = (char*)alloc->pages[i] + alsize;
@@ -540,7 +544,7 @@ m32_alloc(struct m32_allocator_t *alloc, size_t size, size_t alignment)
    if (page == NULL) {
       return NULL;
    }
-   SET_PAGE_TYPE(page, ACTIVE_PAGE);
+   SET_PAGE_TYPE(page, NURSERY_PAGE);
    alloc->pages[empty]               = page;
    // Add header size and padding
    alloc->pages[empty]->current_size = size + ROUND_UP(sizeof(struct m32_page_t),alignment);
