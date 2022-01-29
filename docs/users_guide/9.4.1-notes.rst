@@ -65,6 +65,8 @@ Compiler
   that is used boxed in a hot path). Do post a bug report with your example!
   Then wrap the uses of the parameter in ``GHC.Exts.lazy`` for a short-term fix.
 
+- Support for Sun SPARC architecture has been dropped (:ghc-ticket:`16883`).
+
 ``base`` library
 ~~~~~~~~~~~~~~~~
 
