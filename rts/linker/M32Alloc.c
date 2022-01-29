@@ -373,7 +373,7 @@ m32_allocator_unmap_list(struct m32_page_t *head)
   while (head != NULL) {
     ASSERT_VALID_PAGE(head);
     struct m32_page_t *next = m32_filled_page_get_next(head);
-    munmapForLinker((void *) head, head->filled_page.size, "m32_allocator_unmap_list");
+    m32_release_page(head);
     head = next;
   }
 }
@@ -388,10 +388,9 @@ void m32_allocator_free(m32_allocator *alloc)
   m32_allocator_unmap_list(alloc->protected_list);
 
   /* free partially-filled pages */
-  const size_t pgsz = getPageSize();
   for (int i=0; i < M32_MAX_PAGES; i++) {
     if (alloc->pages[i]) {
-      munmapForLinker(alloc->pages[i], pgsz, "m32_allocator_free");
+      m32_release_page(alloc->pages[i]);
     }
   }
 
