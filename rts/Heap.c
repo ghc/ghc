@@ -8,6 +8,7 @@
 
 #include "Rts.h"
 #include "RtsAPI.h"
+#include "RtsUtils.h"
 
 #include "Capability.h"
 #include "Printer.h"
@@ -248,8 +249,9 @@ StgMutArrPtrs *heap_view_closurePtrs(Capability *cap, StgClosure *closure) {
     // First collect all pointers here, with the comfortable memory bound
     // of the whole closure. Afterwards we know how many pointers are in
     // the closure and then we can allocate space on the heap and copy them
-    // there
-    StgClosure *ptrs[size];
+    // there. Note that we cannot allocate this on the C stack as the closure
+    // may be, e.g., a large array.
+    StgClosure **ptrs = (StgClosure **) stgMallocBytes(sizeof(StgClosure *) * size, "heap_view_closurePtrs");
     StgWord nptrs = collect_pointers(closure, ptrs);
 
     size = nptrs + mutArrPtrsCardTableSize(nptrs);
@@ -263,6 +265,7 @@ StgMutArrPtrs *heap_view_closurePtrs(Capability *cap, StgClosure *closure) {
     for (StgWord i = 0; i<nptrs; i++) {
         arr->payload[i] = ptrs[i];
     }
+    free(ptrs);
 
     return arr;
 }
