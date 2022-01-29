@@ -152,7 +152,7 @@ The allocator is *not* thread-safe.
 /* How many pages should we map at once when re-filling the free page pool? */
 #define M32_MAP_PAGES 32
 /* Upper bound on the number of pages to keep in the free page pool */
-#define M32_MAX_FREE_PAGE_POOL_SIZE 64
+#define M32_MAX_FREE_PAGE_POOL_SIZE 256
 
 /* A utility to verify that a given address is "acceptable" for use by m32. */
 static bool
