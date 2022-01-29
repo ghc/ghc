@@ -678,7 +678,7 @@ T14452:
 .PHONY: T17786
 T17786:
 	# N.B. Check for the presence of caret diagnostics.
-	"$(TEST_HC)" $(TEST_HC_OPTS) -v "$(shell cygpath -w -a T17786.hs)" 2>&1 | grep --quiet '3 |'
+	"$(TEST_HC)" $(TEST_HC_OPTS) -fdiagnostics-show-caret -v "$(shell cygpath -w -a T17786.hs)" 2>&1 | grep --quiet '3 |'
 
 .PHONY: OneShotTH
 OneShotTH:
