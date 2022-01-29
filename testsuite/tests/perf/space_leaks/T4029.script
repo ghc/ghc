@@ -102,203 +102,203 @@
 
 -- Load a minimalist module and reload it 99 times
 :load T4029a
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
-:! echo >> T4029a.hs
+:! printf "" >> T4029a.hs
 :reload
 
 -- Load a more complex module 10 times
@@ -315,21 +315,21 @@
 
 -- Load a more complex module and reload it 9 times
 :load T4029b
-:! echo >> T4029b.hs
+:! printf "" >> T4029b.hs
 :reload
-:! echo >> T4029b.hs
+:! printf "" >> T4029b.hs
 :reload
-:! echo >> T4029b.hs
+:! printf "" >> T4029b.hs
 :reload
-:! echo >> T4029b.hs
+:! printf "" >> T4029b.hs
 :reload
-:! echo >> T4029b.hs
+:! printf "" >> T4029b.hs
 :reload
-:! echo >> T4029b.hs
+:! printf "" >> T4029b.hs
 :reload
-:! echo >> T4029b.hs
+:! printf "" >> T4029b.hs
 :reload
-:! echo >> T4029b.hs
+:! printf "" >> T4029b.hs
 :reload
-:! echo >> T4029b.hs
+:! printf "" >> T4029b.hs
 :reload
