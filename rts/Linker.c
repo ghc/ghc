@@ -1084,6 +1084,16 @@ resolveSymbolAddr (pathchar* buffer, int size,
 #endif /* OBJFORMAT_PEi386 */
 }
 
+static const char *memoryAccessDescription(MemoryAccess mode)
+{
+  switch (mode) {
+  case MEM_NO_ACCESS:    return "no-access";
+  case MEM_READ_ONLY:    return "read-only";
+  case MEM_READ_WRITE:   return "read-write";
+  case MEM_READ_EXECUTE: return "read-execute";
+  }
+}
+
 #if defined(mingw32_HOST_OS)
 
 //
@@ -1112,16 +1122,28 @@ munmapForLinker (void *addr, size_t bytes, const char *caller)
   }
 }
 
+/**
+ * Change the allowed access modes of a region of memory previously allocated
+ * with mmapAnonForLinker.
+ */
 void
-mmapForLinkerMarkExecutable(void *start, size_t len)
+mprotectForLinker(void *start, size_t len, MemoryAccess mode)
 {
   DWORD old;
   if (len == 0) {
     return;
   }
-  if (VirtualProtect(start, len, PAGE_EXECUTE_READ, &old) == 0) {
-    sysErrorBelch("mmapForLinkerMarkExecutable: failed to protect %zd bytes at %p",
-                  len, start);
+  DWORD prot;
+  switch (mode) {
+  case MEM_NO_ACCESS:    prot = PAGE_NOACCESS; break;
+  case MEM_READ_ONLY:    prot = PAGE_READONLY; break;
+  case MEM_READ_WRITE:   prot = PAGE_READWRITE; break;
+  case MEM_READ_EXECUTE: prot = PAGE_EXECUTE_READ; break;
+  }
+
+  if (VirtualProtect(start, len, prot, &old) == 0) {
+    sysErrorBelch("mprotectForLinker: failed to protect %zd bytes at %p as %s",
+                  len, start, memoryAccessDescription(mode));
     ASSERT(false);
   }
 }
@@ -1273,7 +1295,7 @@ void munmapForLinker (void *addr, size_t bytes, const char *caller)
  *
  * Consequently mmapForLinker now maps its memory with PROT_READ|PROT_WRITE.
  * After the linker has finished filling/relocating the mapping it must then
- * call mmapForLinkerMarkExecutable on the sections of the mapping which
+ * call mprotectForLinker on the sections of the mapping which
  * contain executable code.
  *
  * Note that the m32 allocator handles protection of its allocations. For this
@@ -1289,16 +1311,26 @@ void munmapForLinker (void *addr, size_t bytes, const char *caller)
  * Mark an portion of a mapping previously reserved by mmapForLinker
  * as executable (but not writable).
  */
-void mmapForLinkerMarkExecutable(void *start, size_t len)
+void mprotectForLinker(void *start, size_t len, MemoryAccess mode)
 {
     if (len == 0) {
       return;
     }
     IF_DEBUG(linker_verbose,
-             debugBelch("mmapForLinkerMarkExecutable: protecting %" FMT_Word
-                        " bytes starting at %p\n", (W_)len, start));
-    if (mprotect(start, len, PROT_READ|PROT_EXEC) == -1) {
-       barf("mmapForLinkerMarkExecutable: mprotect: %s\n", strerror(errno));
+             debugBelch("mprotectForLinker: protecting %" FMT_Word
+                        " bytes starting at %p as %s\n",
+                        (W_)len, start, memoryAccessDescription(mode)));
+
+    int prot;
+    switch (prot) {
+    case MEM_NO_ACCESS:    prot = 0; break;
+    case MEM_READ_ONLY:    prot = PROT_READ; break;
+    case MEM_READ_WRITE:   prot = PROT_READ | PROT_WRITE; break;
+    case MEM_READ_EXECUTE: prot = PROT_READ | PROT_EXEC; break;
+    }
+
+    if (mprotect(start, len, prot) == -1) {
+       barf("mprotectForLinker: mprotect: %s\n", strerror(errno));
     }
 }
 #endif

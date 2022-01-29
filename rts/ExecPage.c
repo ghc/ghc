@@ -15,7 +15,7 @@ ExecPage *allocateExecPage() {
 }
 
 void freezeExecPage(ExecPage *page) {
-    mmapForLinkerMarkExecutable(page, getPageSize());
+    mprotectForLinker(page, getPageSize(), MEM_READ_EXECUTE);
     flushExec(getPageSize(), page);
 }
 
