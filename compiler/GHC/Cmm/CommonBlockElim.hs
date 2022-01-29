@@ -222,7 +222,7 @@ eqExprWith :: (BlockId -> BlockId -> Bool)
 eqExprWith eqBid = eq
  where
   CmmLit l1          `eq` CmmLit l2          = eqLit l1 l2
-  CmmLoad e1 t1      `eq` CmmLoad e2 t2      = e1 `eq` e2 && t1 `cmmEqType` t2
+  CmmLoad e1 t1      `eq` CmmLoad e2 t2      = t1 `cmmEqType` t2 && e1 `eq` e2
   CmmReg r1          `eq` CmmReg r2          = r1==r2
   CmmRegOff r1 i1    `eq` CmmRegOff r2 i2    = r1==r2 && i1==i2
   CmmMachOp op1 es1  `eq` CmmMachOp op2 es2  = op1==op2 && es1 `eqs` es2
