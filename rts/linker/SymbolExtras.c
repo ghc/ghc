@@ -142,7 +142,7 @@ void ocProtectExtras(ObjectCode* oc)
      * non-executable.
      */
   } else if (USE_CONTIGUOUS_MMAP || RtsFlags.MiscFlags.linkerAlwaysPic) {
-    mmapForLinkerMarkExecutable(oc->symbol_extras, sizeof(SymbolExtra) * oc->n_symbol_extras);
+    mprotectForLinker(oc->symbol_extras, sizeof(SymbolExtra) * oc->n_symbol_extras, MEM_READ_EXECUTE);
   } else {
     /*
      * The symbol extras were allocated via m32. They will be protected when
