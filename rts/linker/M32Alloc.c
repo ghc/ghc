@@ -131,6 +131,11 @@ The allocator is *not* thread-safe.
 
 */
 
+// Enable internal consistency checking
+#if defined(DEBUG)
+#define M32_DEBUG
+#endif
+
 #define ROUND_UP(x,size) ((x + size - 1) & ~(size - 1))
 #define ROUND_DOWN(x,size) (x & ~(size - 1))
 
@@ -152,6 +157,12 @@ is_okay_address(void *p) {
   ssize_t displacement = (int8_t *) p - here;
   return (displacement > -0x7fffffff) && (displacement < 0x7fffffff);
 }
+
+enum m32_page_type {
+  FREE_PAGE,    // a page in the free page pool
+  NURSERY_PAGE, // a nursery page
+  FILLED_PAGE,  // a page on the filled list
+};
 
 /**
  * Page header
@@ -177,13 +188,55 @@ struct m32_page_t {
       struct m32_page_t *next;
     } free_page;
   };
+#if defined(M32_DEBUG)
+  enum m32_page_type type;
+#endif
+  uint8_t contents[];
 };
 
+/* Consistency-checking infrastructure */
+#if defined(M32_DEBUG)
+static void ASSERT_PAGE_ALIGNED(void *page) {
+  const size_t pgsz = getPageSize();
+  if ((((uintptr_t) page) & (pgsz-1)) != 0) {
+    barf("m32: invalid page alignment");
+  }
+}
+static void ASSERT_VALID_PAGE(struct m32_page_t *page) {
+  ASSERT_PAGE_ALIGNED(page);
+  switch (page->type) {
+  case FREE_PAGE:
+  case NURSERY_PAGE:
+  case FILLED_PAGE:
+    break;
+  default:
+    barf("m32: invalid page state\n");
+  }
+}
+static void ASSERT_PAGE_TYPE(struct m32_page_t *page, enum m32_page_type ty) {
+  if (page->type != ty) { barf("m32: unexpected page type"); }
+}
+static void ASSERT_PAGE_NOT_FREE(struct m32_page_t *page) {
+  if (page->type == FREE_PAGE) { barf("m32: unexpected free page"); }
+}
+static void SET_PAGE_TYPE(struct m32_page_t *page, enum m32_page_type ty) {
+  page->type = ty;
+}
+#else
+#define ASSERT_PAGE_ALIGNED(page)
+#define ASSERT_VALID_PAGE(page)
+#define ASSERT_PAGE_NOT_FREE(page)
+#define ASSERT_PAGE_TYPE(page, ty)
+#define SET_PAGE_TYPE(page, ty)
+#endif
+
+/* Accessors */
 static void
 m32_filled_page_set_next(struct m32_page_t *page, struct m32_page_t *next)
 {
-  if (! is_okay_address(next)) {
-    barf("m32_filled_page_set_next: Page not within 4GB of program text");
+  ASSERT_PAGE_TYPE(page, FILLED_PAGE);
+  if (next != NULL && ! is_okay_address(next)) {
+    barf("m32_filled_page_set_next: Page %p not within 4GB of program text", next);
   }
   page->filled_page.next = next;
 }
@@ -191,7 +244,8 @@ m32_filled_page_set_next(struct m32_page_t *page, struct m32_page_t *next)
 static struct m32_page_t *
 m32_filled_page_get_next(struct m32_page_t *page)
 {
-    return (struct m32_page_t *) (uintptr_t) page->filled_page.next;
+  ASSERT_PAGE_TYPE(page, FILLED_PAGE);
+  return (struct m32_page_t *) (uintptr_t) page->filled_page.next;
 }
 
 /**
@@ -216,21 +270,42 @@ struct m32_allocator_t {
  * We keep a small pool of free pages around to avoid fragmentation.
  */
 struct m32_page_t *m32_free_page_pool = NULL;
+/** Number of pages in free page pool */
 unsigned int m32_free_page_pool_size = 0;
-// TODO
 
 /**
- * Free a page or, if possible, place it in the free page pool.
+ * Free a filled page or, if possible, place it in the free page pool.
  */
 static void
 m32_release_page(struct m32_page_t *page)
 {
-  if (m32_free_page_pool_size < M32_MAX_FREE_PAGE_POOL_SIZE) {
-    page->free_page.next = m32_free_page_pool;
-    m32_free_page_pool = page;
-    m32_free_page_pool_size ++;
-  } else {
-    munmapForLinker((void *) page, getPageSize(), "m32_release_page");
+  // Some sanity-checking
+  ASSERT_VALID_PAGE(page);
+  ASSERT_PAGE_NOT_FREE(page);
+
+  const size_t pgsz = getPageSize();
+  ssize_t sz = page->filled_page.size;
+  IF_DEBUG(sanity, memset(page, 0xaa, sz));
+
+  // Break the page, which may be a large multi-page allocation, into
+  // individual pages for the page pool
+  while (sz > 0) {
+    if (m32_free_page_pool_size < M32_MAX_FREE_PAGE_POOL_SIZE) {
+      mprotectForLinker(page, pgsz, MEM_READ_WRITE);
+      SET_PAGE_TYPE(page, FREE_PAGE);
+      page->free_page.next = m32_free_page_pool;
+      m32_free_page_pool = page;
+      m32_free_page_pool_size ++;
+    } else {
+      break;
+    }
+    page = (struct m32_page_t *) ((uint8_t *) page + pgsz);
+    sz -= pgsz;
+  }
+
+  // The free page pool is full, release the rest back to the system
+  if (sz > 0) {
+    munmapForLinker((void *) page, ROUND_UP(sz, pgsz), "m32_release_page");
   }
 }
 
@@ -252,10 +327,12 @@ m32_alloc_page(void)
     if (! is_okay_address(chunk + map_sz)) {
       barf("m32_alloc_page: failed to allocate pages within 4GB of program text (got %p)", chunk);
     }
+    IF_DEBUG(sanity, memset(chunk, 0xaa, map_sz));
 
 #define GET_PAGE(i) ((struct m32_page_t *) (chunk + (i) * pgsz))
     for (int i=0; i < M32_MAP_PAGES; i++) {
       struct m32_page_t *page = GET_PAGE(i);
+      SET_PAGE_TYPE(page, FREE_PAGE);
       page->free_page.next = GET_PAGE(i+1);
     }
 
@@ -268,6 +345,7 @@ m32_alloc_page(void)
   struct m32_page_t *page = m32_free_page_pool;
   m32_free_page_pool = page->free_page.next;
   m32_free_page_pool_size --;
+  ASSERT_PAGE_TYPE(page, FREE_PAGE);
   return page;
 }
 
@@ -293,6 +371,7 @@ static void
 m32_allocator_unmap_list(struct m32_page_t *head)
 {
   while (head != NULL) {
+    ASSERT_VALID_PAGE(head);
     struct m32_page_t *next = m32_filled_page_get_next(head);
     munmapForLinker((void *) head, head->filled_page.size, "m32_allocator_unmap_list");
     head = next;
@@ -351,6 +430,7 @@ m32_allocator_flush(m32_allocator *alloc) {
        m32_release_page(alloc->pages[i]);
      } else {
        // the page contains data, move it to the unprotected list
+       SET_PAGE_TYPE(alloc->pages[i], FILLED_PAGE);
        m32_allocator_push_filled_list(&alloc->unprotected_list, alloc->pages[i]);
      }
      alloc->pages[i] = NULL;
@@ -360,6 +440,7 @@ m32_allocator_flush(m32_allocator *alloc) {
    if (alloc->executable) {
      struct m32_page_t *page = alloc->unprotected_list;
      while (page != NULL) {
+       ASSERT_PAGE_TYPE(page, FILLED_PAGE);
        struct m32_page_t *next = m32_filled_page_get_next(page);
        m32_allocator_push_filled_list(&alloc->protected_list, page);
        mprotectForLinker(page, page->filled_page.size, MEM_READ_EXECUTE);
@@ -400,6 +481,7 @@ m32_alloc(struct m32_allocator_t *alloc, size_t size, size_t alignment)
           barf("m32_alloc: warning: Allocation of %zd bytes resulted in pages above 4GB (%p)",
                size, page);
       }
+      SET_PAGE_TYPE(page, FILLED_PAGE);
       page->filled_page.size = alsize + size;
       m32_allocator_push_filled_list(&alloc->unprotected_list, (struct m32_page_t *) page);
       return (char*) page + alsize;
@@ -418,6 +500,8 @@ m32_alloc(struct m32_allocator_t *alloc, size_t size, size_t alignment)
       }
 
       // page can contain the buffer?
+      ASSERT_VALID_PAGE(alloc->pages[i]);
+      ASSERT_PAGE_TYPE(alloc->pages[i], NURSERY_PAGE);
       size_t alsize = ROUND_UP(alloc->pages[i]->current_size, alignment);
       if (size <= pgsz - alsize) {
          void * addr = (char*)alloc->pages[i] + alsize;
@@ -445,6 +529,7 @@ m32_alloc(struct m32_allocator_t *alloc, size_t size, size_t alignment)
    if (page == NULL) {
       return NULL;
    }
+   SET_PAGE_TYPE(page, NURSERY_PAGE);
    alloc->pages[empty]               = page;
    // Add header size and padding
    alloc->pages[empty]->current_size =
