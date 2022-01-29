@@ -213,7 +213,7 @@ static void ASSERT_VALID_PAGE(struct m32_page_t *page) {
   case FILLED_PAGE:
     break;
   default:
-    barf("m32_release_page: invalid page state\n");
+    barf("m32: invalid page state\n");
   }
 }
 static void ASSERT_PAGE_TYPE(struct m32_page_t *page, enum m32_page_type ty) {
@@ -294,6 +294,7 @@ m32_release_page(struct m32_page_t *page)
   // individual pages for the page pool
   while (sz > 0) {
     if (m32_free_page_pool_size < M32_MAX_FREE_PAGE_POOL_SIZE) {
+      mprotectForLinker(page, pgsz, MEM_READ_WRITE);
       SET_PAGE_TYPE(page, FREE_PAGE);
       page->free_page.next = m32_free_page_pool;
       m32_free_page_pool = page;
@@ -373,7 +374,7 @@ static void
 m32_allocator_unmap_list(struct m32_page_t *head)
 {
   while (head != NULL) {
-    ASSERT_PAGE_TYPE(head, FILLED_PAGE);
+    ASSERT_VALID_PAGE(head);
     struct m32_page_t *next = m32_filled_page_get_next(head);
     m32_release_page(head);
     head = next;
