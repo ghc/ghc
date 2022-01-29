@@ -161,38 +161,9 @@ is_okay_address(void *p) {
   return ((int8_t *) p - here) < 0xffffffff;
 }
 
-/* Consistency-checking infrastructure */
-#if defined(M32_DEBUG)
 enum m32_page_type {
   FREE_PAGE, ACTIVE_PAGE, FILLED_PAGE,
 };
-
-static void ASSERT_PAGE_ALIGNED(void *page) {
-  const size_t pgsz = getPageSize();
-  if ((uintptr_t) page & (pgsz-1) != 0) {
-    barf("m32: invalid page alignment");
-  }
-}
-static void ASSERT_VALID_PAGE(struct m32_page_t *page) {
-  switch (page->type) {
-  case FREE_PAGE:
-  case ACTIVE_PAGE:
-  case FILLED_PAGE:
-    break;
-  default:
-    barf("m32_release_page: invalid page state\n");
-  }
-}
-#define ASSERT_PAGE_TYPE(page, ty) \
-  if (page->type != ty) { barf("m32: invalid page type"); }
-#define SET_PAGE_TYPE(page, ty) \
-  page->type = ty;
-#else
-#define ASSERT_PAGE_ALIGNED(page)
-#define ASSERT_VALID_PAGE(page)
-#define ASSERT_PAGE_TYPE(page, ty)
-#define SET_PAGE_TYPE(page, ty)
-#endif
 
 /**
  * Page header
@@ -224,6 +195,38 @@ struct m32_page_t {
   uint8_t contents[];
 };
 
+/* Consistency-checking infrastructure */
+#if defined(M32_DEBUG)
+static void ASSERT_PAGE_ALIGNED(void *page) {
+  const size_t pgsz = getPageSize();
+  if ((((uintptr_t) page) & (pgsz-1)) != 0) {
+    barf("m32: invalid page alignment");
+  }
+}
+static void ASSERT_VALID_PAGE(struct m32_page_t *page) {
+  switch (page->type) {
+  case FREE_PAGE:
+  case ACTIVE_PAGE:
+  case FILLED_PAGE:
+    break;
+  default:
+    barf("m32_release_page: invalid page state\n");
+  }
+}
+static void ASSERT_PAGE_TYPE(struct m32_page_t *page, enum m32_page_type ty) {
+  if (page->type != ty) { barf("m32: invalid page type"); }
+}
+static void SET_PAGE_TYPE(struct m32_page_t *page, enum m32_page_type ty) {
+  page->type = ty;
+}
+#else
+#define ASSERT_PAGE_ALIGNED(page)
+#define ASSERT_VALID_PAGE(page)
+#define ASSERT_PAGE_TYPE(page, ty)
+#define SET_PAGE_TYPE(page, ty)
+#endif
+
+/* Accessors */
 static void
 m32_filled_page_set_next(struct m32_page_t *page, struct m32_page_t *next)
 {
