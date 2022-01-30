@@ -3,10 +3,11 @@
 set -e
 
 CABAL_INSTALL="${CABAL_INSTALL:-cabal}"
+GHC="${GHC:-ghc}"
 
 cd "$(dirname $0)"
-"$CABAL_INSTALL" build
-bin="$("$CABAL_INSTALL" list-bin ghc-notes)"
+"$CABAL_INSTALL" build -w "$GHC"
+bin="$("$CABAL_INSTALL" list-bin -w "$GHC" ghc-notes)"
 cd "$(git rev-parse --show-toplevel)"
 "$bin" broken-refs \
     | grep -v "utils/notes-util/expected-broken-note-refs:" \

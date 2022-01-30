@@ -192,6 +192,13 @@ ghc-linters:
     - if: $CI_MERGE_REQUEST_ID
     - *drafts-can-fail-lint
 
+lint-notes:
+  image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
+  extends: .lint
+  script:
+    - utils/notes-util/check.sh
+  dependencies: []
+
 # Run mypy Python typechecker on linter scripts.
 lint-linters:
   image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
