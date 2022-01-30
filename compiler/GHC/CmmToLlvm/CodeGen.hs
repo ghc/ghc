@@ -1104,10 +1104,10 @@ mkStore :: LlvmVar -> LlvmVar -> AlignmentSpec -> LlvmStatement
 mkStore vval vptr alignment =
     Store vval vptr align
   where
-    is_vector = isVector (pLower (getVarType vptr))
+    ty = pLower (getVarType vptr)
     align = case alignment of
               -- See Note [Alignment of vector-typed values]
-              _ | is_vector    -> Just 1
+              _ | isVector ty  -> Just 1
               Unaligned        -> Just 1
               NaturallyAligned -> Nothing
 
@@ -1795,14 +1795,14 @@ case we will need a more granular way of specifying alignment.
 -}
 
 mkLoad :: Atomic -> LlvmVar -> AlignmentSpec -> LlvmExpression
-mkLoad atomic ptr alignment
-  | atomic      = ALoad SyncSeqCst False ptr
-  | otherwise   = Load ptr align
+mkLoad atomic vptr alignment
+  | atomic      = ALoad SyncSeqCst False vptr
+  | otherwise   = Load vptr align
   where
-    ty = pLower (getVarType ptr)
+    ty = pLower (getVarType vptr)
     align = case alignment of
               -- See Note [Alignment of vector-typed values]
-              _ | is_vector    -> Just 1
+              _ | isVector ty  -> Just 1
               Unaligned        -> Just 1
               NaturallyAligned -> Nothing
 
