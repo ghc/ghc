@@ -57,7 +57,7 @@ import GHC.TypeNats.Internal(CmpNat)
 -- Prevously, this was an opaque data type, but it was changed to a type
 -- synonym.
 --
--- @since 4.15.0.0
+-- @since 4.16.0.0
 
 type Nat = Natural
 --------------------------------------------------------------------------------
