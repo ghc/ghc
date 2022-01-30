@@ -422,7 +422,7 @@ rnPats ctxt pats thing_inside
           -- Nor can we check incrementally for shadowing, else we'll
           --    complain *twice* about duplicates e.g. f (x,x) = ...
           --
-          -- See note [Don't report shadowing for pattern synonyms]
+          -- See Note [Don't report shadowing for pattern synonyms]
         ; let bndrs = collectPatsBinders CollNoDictBinders pats'
         ; addErrCtxt doc_pat $
           if isPatSynCtxt ctxt

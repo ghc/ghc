@@ -174,7 +174,7 @@ data RecordUpdTc = RecordUpdTc
                 -- For a data family, these are the type args of the
                 -- /representation/ type constructor
 
-      , rupd_wrap :: HsWrapper  -- See note [Record Update HsWrapper]
+      , rupd_wrap :: HsWrapper  -- See Note [Record Update HsWrapper]
       }
 
 -- | HsWrap appears only in typechecker output

@@ -92,7 +92,7 @@ cgTopRhsClosure platform rec id ccs upd_flag args body =
   -- shortcutting the whole process, and generating a lot less code
   -- (#7308). Eventually the IND_STATIC closure will be eliminated
   -- by assembly '.equiv' directives, where possible (#15155).
-  -- See note [emit-time elimination of static indirections] in "GHC.Cmm.CLabel".
+  -- See Note [emit-time elimination of static indirections] in "GHC.Cmm.CLabel".
   --
   -- Note: we omit the optimisation when this binding is part of a
   -- recursive group, because the optimisation would inhibit the black

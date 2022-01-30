@@ -368,7 +368,7 @@ import qualified GHC.LanguageExtensions as LangExt
 data IncludeSpecs
   = IncludeSpecs { includePathsQuote  :: [String]
                  , includePathsGlobal :: [String]
-                 -- | See note [Implicit include paths]
+                 -- | See Note [Implicit include paths]
                  , includePathsQuoteImplicit :: [String]
                  }
   deriving Show
@@ -387,7 +387,7 @@ addQuoteInclude spec paths  = let f = includePathsQuote spec
                               in spec { includePathsQuote = f ++ paths }
 
 -- | These includes are not considered while fingerprinting the flags for iface
--- | See note [Implicit include paths]
+-- | See Note [Implicit include paths]
 addImplicitQuoteInclude :: IncludeSpecs -> [String] -> IncludeSpecs
 addImplicitQuoteInclude spec paths  = let f = includePathsQuoteImplicit spec
                               in spec { includePathsQuoteImplicit = f ++ paths }

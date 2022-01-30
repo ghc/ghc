@@ -41,7 +41,7 @@ linkage lbl = if externallyVisibleCLabel lbl
 
 -- | Pass a CmmStatic section to an equivalent Llvm code.
 genLlvmData :: (Section, RawCmmStatics) -> LlvmM LlvmData
--- See note [emit-time elimination of static indirections] in "GHC.Cmm.CLabel".
+-- See Note [emit-time elimination of static indirections] in "GHC.Cmm.CLabel".
 genLlvmData (_, CmmStaticsRaw alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit ind, _, _])
   | lbl == mkIndStaticInfoLabel
   , let labelInd (CmmLabelOff l _) = Just l

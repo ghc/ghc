@@ -2362,7 +2362,7 @@ kcCheckDeclHeader_cusk name flav
               (HsQTvs { hsq_ext = kv_ns
                       , hsq_explicit = hs_tvs }) kc_res_ki
   -- CUSK case
-  -- See note [Required, Specified, and Inferred for types] in GHC.Tc.TyCl
+  -- See Note [Required, Specified, and Inferred for types] in GHC.Tc.TyCl
   = addTyConFlavCtxt name flav $
     do { skol_info <- mkSkolemInfo skol_info_anon
        ; (tclvl, wanted, (scoped_kvs, (tc_tvs, res_kind)))
@@ -2452,7 +2452,7 @@ kcInferDeclHeader name flav
               (HsQTvs { hsq_ext = kv_ns
                       , hsq_explicit = hs_tvs }) kc_res_ki
   -- No standalane kind signature and no CUSK.
-  -- See note [Required, Specified, and Inferred for types] in GHC.Tc.TyCl
+  -- See Note [Required, Specified, and Inferred for types] in GHC.Tc.TyCl
   = addTyConFlavCtxt name flav $
     do { (scoped_kvs, (tc_tvs, res_kind))
            -- Why bindImplicitTKBndrs_Q_Tv which uses newTyVarTyVar?

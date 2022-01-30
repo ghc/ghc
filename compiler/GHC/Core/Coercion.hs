@@ -1635,7 +1635,7 @@ mkFamilyTyConAppCo tc cos
   | otherwise
   = mkTyConAppCo Nominal tc cos
 
--- See note [Newtype coercions] in GHC.Core.TyCon
+-- See Note [Newtype coercions] in GHC.Core.TyCon
 
 mkPiCos :: Role -> [Var] -> Coercion -> Coercion
 mkPiCos r vs co = foldr (mkPiCo r) co vs

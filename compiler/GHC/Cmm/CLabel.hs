@@ -1617,7 +1617,7 @@ pprDynamicLinkerAsmLabel !platform dllInfo ppLbl =
 -- GNU assembly alias ('.equiv' directive). Sadly, there is
 -- no such thing as an alias to an imported symbol (conf.
 -- http://blog.omega-prime.co.uk/2011/07/06/the-sad-state-of-symbol-aliases/)
--- See note [emit-time elimination of static indirections].
+-- See Note [emit-time elimination of static indirections].
 --
 -- Precondition is that both labels represent the
 -- same semantic value.

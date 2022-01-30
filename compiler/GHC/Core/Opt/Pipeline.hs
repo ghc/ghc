@@ -301,7 +301,7 @@ getCoreToDo logger dflags
         runWhen strictness demand_analyser,
 
         runWhen exitification CoreDoExitify,
-            -- See note [Placement of the exitification pass]
+            -- See Note [Placement of the exitification pass]
 
         runWhen full_laziness $
            CoreDoFloatOutwards FloatOutSwitches {

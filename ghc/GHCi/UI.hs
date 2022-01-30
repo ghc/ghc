@@ -496,7 +496,7 @@ interactiveUI config srcs maybe_exprs = do
    -- The initial set of DynFlags used for interactive evaluation is the same
    -- as the global DynFlags, plus -XExtendedDefaultRules and
    -- -XNoMonomorphismRestriction.
-   -- See note [Changing language extensions for interactive evaluation] #10857
+   -- See Note [Changing language extensions for interactive evaluation] #10857
    dflags <- getDynFlags
    let dflags' = (xopt_set_unlessExplSpec
                       LangExt.ExtendedDefaultRules xopt_set)

@@ -593,7 +593,7 @@ instance Outputable Origin where
 --                              @'\{-\# INCOHERENT'@,
 --      'GHC.Parser.Annotation.AnnClose' @`\#-\}`@,
 
--- For details on above see note [exact print annotations] in "GHC.Parser.Annotation"
+-- For details on above see Note [exact print annotations] in "GHC.Parser.Annotation"
 data OverlapFlag = OverlapFlag
   { overlapMode   :: OverlapMode
   , isSafeOverlap :: Bool
@@ -677,7 +677,7 @@ data OverlapMode  -- See Note [Rules for instance lookup] in GHC.Core.InstEnv
     -- instance                   Foo [a]
     -- Without the Incoherent flag, we'd complain that
     -- instantiating 'b' would change which instance
-    -- was chosen. See also note [Incoherent instances] in "GHC.Core.InstEnv"
+    -- was chosen. See also Note [Incoherent instances] in "GHC.Core.InstEnv"
 
   deriving (Eq, Data)
 
@@ -1240,7 +1240,7 @@ instance Outputable CompilerPhase where
    ppr InitialPhase = text "InitialPhase"
    ppr FinalPhase   = text "FinalPhase"
 
--- See note [Pragma source text]
+-- See Note [Pragma source text]
 data Activation
   = AlwaysActive
   | ActiveBefore SourceText PhaseNum  -- Active only *strictly before* this phase

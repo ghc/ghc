@@ -124,7 +124,7 @@ import GHC.Data.Bag
 --           'GHC.Parser.Annotation.AnnVal'
 --           'GHC.Parser.Annotation.AnnTilde',
 
--- For details on above see note [exact print annotations] in "GHC.Parser.Annotation"
+-- For details on above see Note [exact print annotations] in "GHC.Parser.Annotation"
 data RdrName
   = Unqual OccName
         -- ^ Unqualified  name

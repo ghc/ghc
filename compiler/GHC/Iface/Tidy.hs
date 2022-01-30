@@ -1264,7 +1264,7 @@ tidyTopIdInfo uf_opts rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold
         `setArityInfo`      arity
         `setDmdSigInfo` final_sig
         `setCprSigInfo`        final_cpr
-        `setUnfoldingInfo`  minimal_unfold_info  -- See note [Preserve evaluatedness]
+        `setUnfoldingInfo`  minimal_unfold_info  -- See Note [Preserve evaluatedness]
                                                  -- in GHC.Core.Tidy
 
   | otherwise           -- Externally-visible Ids get the whole lot

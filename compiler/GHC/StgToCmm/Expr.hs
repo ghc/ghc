@@ -810,10 +810,10 @@ cgAlts _ _ _ _ = panic "cgAlts"
 -- tricky part is that the default case needs (logical) duplication.
 -- To do this we emit an extra label for it and branch to that from
 -- the second switch. This avoids duplicated codegen. See Trac #14373.
--- See note [Double switching for big families] for the mechanics
+-- See Note [Double switching for big families] for the mechanics
 -- involved.
 --
--- Also see note [Data constructor dynamic tags]
+-- Also see Note [Data constructor dynamic tags]
 -- and the wiki https://gitlab.haskell.org/ghc/ghc/wikis/commentary/rts/haskell-execution/pointer-tagging
 --
 

@@ -338,7 +338,7 @@ Some other notes about stupid contexts:
 -- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen',
 --             'GHC.Parser.Annotation.AnnClose','GHC.Parser.Annotation.AnnComma'
 
--- For details on above see note [exact print annotations] in GHC.Parser.Annotation
+-- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 data DataCon
   = MkData {
         dcName    :: Name,      -- This is the name of the *source data con*

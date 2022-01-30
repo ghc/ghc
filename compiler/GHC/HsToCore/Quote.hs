@@ -462,7 +462,7 @@ repTyClD (L loc (FamDecl { tcdFam = fam })) = liftM Just $
                                               repFamilyDecl (L loc fam)
 
 repTyClD (L loc (SynDecl { tcdLName = tc, tcdTyVars = tvs, tcdRhs = rhs }))
-  = do { tc1 <- lookupLOcc tc           -- See note [Binders and occurrences]
+  = do { tc1 <- lookupLOcc tc           -- See Note [Binders and occurrences]
        ; dec <- addTyClTyVarBinds tvs $ \bndrs ->
                 repSynDecl tc1 bndrs rhs
        ; return (Just (locA loc, dec)) }
@@ -470,7 +470,7 @@ repTyClD (L loc (SynDecl { tcdLName = tc, tcdTyVars = tvs, tcdRhs = rhs }))
 repTyClD (L loc (DataDecl { tcdLName = tc
                           , tcdTyVars = tvs
                           , tcdDataDefn = defn }))
-  = do { tc1 <- lookupLOcc tc           -- See note [Binders and occurrences]
+  = do { tc1 <- lookupLOcc tc           -- See Note [Binders and occurrences]
        ; dec <- addTyClTyVarBinds tvs $ \bndrs ->
                 repDataDefn tc1 (Left bndrs) defn
        ; return (Just (locA loc, dec)) }
@@ -479,7 +479,7 @@ repTyClD (L loc (ClassDecl { tcdCtxt = cxt, tcdLName = cls,
                              tcdTyVars = tvs, tcdFDs = fds,
                              tcdSigs = sigs, tcdMeths = meth_binds,
                              tcdATs = ats, tcdATDefs = atds }))
-  = do { cls1 <- lookupLOcc cls         -- See note [Binders and occurrences]
+  = do { cls1 <- lookupLOcc cls         -- See Note [Binders and occurrences]
        ; dec  <- addQTyVarBinds tvs $ \bndrs ->
            do { cxt1   <- repLContext cxt
           -- See Note [Scoped type variables in quotes]
@@ -551,7 +551,7 @@ repFamilyDecl decl@(L loc (FamilyDecl { fdInfo      = info
                                       , fdTyVars    = tvs
                                       , fdResultSig = L _ resultSig
                                       , fdInjectivityAnn = injectivity }))
-  = do { tc1 <- lookupLOcc tc           -- See note [Binders and occurrences]
+  = do { tc1 <- lookupLOcc tc           -- See Note [Binders and occurrences]
        ; let mkHsQTvs :: [LHsTyVarBndr () GhcRn] -> LHsQTyVars GhcRn
              mkHsQTvs tvs = HsQTvs { hsq_ext = []
                                    , hsq_explicit = tvs }
@@ -694,7 +694,7 @@ repTyFamEqn (FamEqn { feqn_tycon = tc_name
                     , feqn_pats = tys
                     , feqn_fixity = fixity
                     , feqn_rhs  = rhs })
-  = do { tc <- lookupLOcc tc_name     -- See note [Binders and occurrences]
+  = do { tc <- lookupLOcc tc_name     -- See Note [Binders and occurrences]
        ; addHsOuterFamEqnTyVarBinds outer_bndrs $ \mb_exp_bndrs ->
          do { tys1 <- case fixity of
                         Prefix -> repTyArgs (repNamedTyCon tc) tys
@@ -725,7 +725,7 @@ repDataFamInstD (DataFamInstDecl { dfid_eqn =
                                              , feqn_pats  = tys
                                              , feqn_fixity = fixity
                                              , feqn_rhs   = defn }})
-  = do { tc <- lookupLOcc tc_name         -- See note [Binders and occurrences]
+  = do { tc <- lookupLOcc tc_name         -- See Note [Binders and occurrences]
        ; addHsOuterFamEqnTyVarBinds outer_bndrs $ \mb_exp_bndrs ->
          do { tys1 <- case fixity of
                         Prefix -> repTyArgs (repNamedTyCon tc) tys

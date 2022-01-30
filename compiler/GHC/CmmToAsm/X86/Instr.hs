@@ -851,7 +851,7 @@ mkStackAllocInstr platform amount
         --    there are no expectations for volatile registers.
         --
         -- 3. When the target is a local branch point it is re-targeted
-        --    after the dealloc, preserving #2.  See note [extra spill slots].
+        --    after the dealloc, preserving #2.  See Note [extra spill slots].
         --
         -- We emit a call because the stack probes are quite involved and
         -- would bloat code size a lot.  GHC doesn't really have an -Os.

@@ -2471,7 +2471,7 @@ instance Outputable OccEncl where
   ppr OccScrut   = text "occScrut"
   ppr OccVanilla = text "occVanilla"
 
--- See note [OneShots]
+-- See Note [OneShots]
 type OneShots = [OneShotInfo]
 
 initOccEnv :: OccEnv
@@ -2758,7 +2758,7 @@ binding x = cb.  See #5028.
 NB: the OccInfo on /occurrences/ really doesn't matter much; the simplifier
 doesn't use it. So this is only to satisfy the perhaps-over-picky Lint.
 
-Historical note [no-case-of-case]
+Historical Note [no-case-of-case]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We *used* to suppress the binder-swap in case expressions when
 -fno-case-of-case is on.  Old remarks:
@@ -2773,7 +2773,7 @@ We *used* to suppress the binder-swap in case expressions when
 However, now the full-laziness pass itself reverses the binder-swap, so this
 check is no longer necessary.
 
-Historical note [Suppressing the case binder-swap]
+Historical Note [Suppressing the case binder-swap]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 This old note describes a problem that is also fixed by doing the
 binder-swap in OccAnal:

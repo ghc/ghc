@@ -573,7 +573,7 @@ lookupChildrenExport spec_parent rdr_items =
 -- | Given a resolved name in the children export list and a parent. Decide
 -- whether we are allowed to export the child with the parent.
 -- Invariant: gre_par == NoParent
--- See note [Typing Pattern Synonym Exports]
+-- See Note [Typing Pattern Synonym Exports]
 checkPatSynParent :: Name    -- ^ Alleged parent type constructor
                              -- User wrote T( P, Q )
                   -> Parent  -- The parent of P we discovered
@@ -612,7 +612,7 @@ checkPatSynParent parent NoParent gname
                    -> TcM ()
     handle_pat_syn doc ty_con pat_syn
 
-      -- 2. See note [Types of TyCon]
+      -- 2. See Note [Types of TyCon]
       | not $ isTyConWithSrcDataCons ty_con
       = addErrCtxt doc $ failWithTc TcRnPatSynBundledWithNonDataCon
 

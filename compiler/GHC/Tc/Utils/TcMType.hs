@@ -1971,7 +1971,7 @@ skolemiseUnboundMetaTyVar skol_info tv
         ; return final_tv }
   where
     check_empty tv       -- [Sept 04] Check for non-empty.
-      = when debugIsOn $  -- See note [Silly Type Synonym]
+      = when debugIsOn $  -- See Note [Silly Type Synonym]
         do { cts <- readMetaTyVar tv
            ; case cts of
                Flexi       -> return ()

@@ -1804,7 +1804,7 @@ pickQuantifiablePreds qtvs theta
             -> Nothing
 
             | isIPClass cls
-            -> Just pred -- See note [Inheriting implicit parameters]
+            -> Just pred -- See Note [Inheriting implicit parameters]
 
             | pick_cls_pred flex_ctxt cls tys
             -> Just pred

@@ -446,7 +446,7 @@ mkStackDeallocInstr platform n
 mkStackDeallocInstr _platform n = pprPanic "mkStackDeallocInstr" (int n)
 
 --
--- See note [extra spill slots] in X86/Instr.hs
+-- See Note [extra spill slots] in X86/Instr.hs
 --
 allocMoreStack
   :: Platform

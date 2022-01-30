@@ -19,7 +19,7 @@ module GHC.SysTools.BaseDir
 
 import GHC.Prelude
 
--- See note [Base Dir] for why some of this logic is shared with ghc-pkg.
+-- See Note [Base Dir] for why some of this logic is shared with ghc-pkg.
 import GHC.BaseDir
 
 import GHC.Utils.Panic

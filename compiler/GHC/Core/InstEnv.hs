@@ -1218,7 +1218,7 @@ if you can use one, use it."
 Should this logic only work when *all* candidates have the incoherent flag, or
 even when all but one have it? The right choice is the latter, which can be
 justified by comparing the behaviour with how -XIncoherentInstances worked when
-it was only about the unify-check (note [Overlapping instances]):
+it was only about the unify-check (Note [Overlapping instances]):
 
 Example:
         class C a b c where foo :: (a,b,c)

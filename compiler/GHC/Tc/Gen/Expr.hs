@@ -685,7 +685,7 @@ tcExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = Left rbnds }) res_
                            not (isRecordSelector sel_id),
                            let fld_name = idName sel_id ]
         ; unless (null bad_guys) (sequence bad_guys >> failM)
-        -- See note [Mixed Record Selectors]
+        -- See Note [Mixed Record Selectors]
         ; let (data_sels, pat_syn_sels) =
                 partition isDataConRecordSelector sel_ids
         ; massert (all isPatSynRecordSelector pat_syn_sels)

@@ -756,7 +756,7 @@ data Token
   | ITdependency
   | ITrequires
 
-  -- Pragmas, see  note [Pragma source text] in "GHC.Types.Basic"
+  -- Pragmas, see  Note [Pragma source text] in "GHC.Types.Basic"
   | ITinline_prag       SourceText InlineSpec RuleMatchInfo
   | ITspec_prag         SourceText                -- SPECIALISE
   | ITspec_inline_prag  SourceText Bool    -- SPECIALISE INLINE (or NOINLINE)
@@ -2379,7 +2379,7 @@ data PState = PState {
         -- The next three are used to implement Annotations giving the
         -- locations of 'noise' tokens in the source, so that users of
         -- the GHC API can do source to source conversions.
-        -- See note [exact print annotations] in GHC.Parser.Annotation
+        -- See Note [exact print annotations] in GHC.Parser.Annotation
         eof_pos :: Strict.Maybe (Strict.Pair RealSrcSpan RealSrcSpan), -- pos, gap to prior token
         header_comments :: Strict.Maybe [LEpaComment],
         comment_q :: [LEpaComment],

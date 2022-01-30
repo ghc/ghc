@@ -170,7 +170,7 @@ The interesting cases of the analysis:
    Tricky.
    We assume that it is really mutually recursive, i.e. that every variable
    calls one of the others, and that this is strongly connected (otherwise we
-   return an over-approximation, so that's ok), see note [Recursion and fixpointing].
+   return an over-approximation, so that's ok), see Note [Recursion and fixpointing].
 
    Let V = {v₁,...vₙ}.
    Assume that the vs have been analysed with an incoming demand and
@@ -567,7 +567,7 @@ callArityBind boring_vars ae_body int (NonRec v rhs)
     --          (vcat [ppr v, ppr ae_body, ppr int, ppr ae_rhs, ppr safe_arity])
     (final_ae, NonRec v' rhs')
   where
-    is_thunk = not (exprIsCheap rhs) -- see note [What is a thunk]
+    is_thunk = not (exprIsCheap rhs) -- see Note [What is a thunk]
     -- If v is boring, we will not find it in ae_body, but always assume (0, False)
     boring = v `elemVarSet` boring_vars
 
@@ -637,7 +637,7 @@ callArityBind boring_vars ae_body int b@(Rec binds)
 
             | otherwise
             -- We previously analyzed this with a different arity (or not at all)
-            = let is_thunk = not (exprIsCheap rhs) -- see note [What is a thunk]
+            = let is_thunk = not (exprIsCheap rhs) -- see Note [What is a thunk]
 
                   safe_arity | is_thunk    = 0  -- See Note [Thunks in recursive groups]
                              | otherwise   = new_arity

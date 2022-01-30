@@ -310,7 +310,7 @@ intersting.
 
 Expressions are interesting when they move an occurrence of a variable outside
 the recursive `go` that can benefit from being obviously called once, for example:
- * a local thunk that can then be inlined (see example in note [Exitification])
+ * a local thunk that can then be inlined (see example in Note [Exitification])
  * the parameter of a function, where the demand analyzer then can then
    see that it is called at most once, and hence improve the function’s
    strictness signature

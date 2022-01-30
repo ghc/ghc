@@ -326,7 +326,7 @@ buildClass tycon_name binders roles fds
                 --       i.e. exactly one operation or superclass taken together
                 --   (b) that value is of lifted type (which they always are, because
                 --       we box equality superclasses)
-                -- See note [Class newtypes and equality predicates]
+                -- See Note [Class newtypes and equality predicates]
 
                 -- We treat the dictionary superclasses as ordinary arguments.
                 -- That means that in the case of

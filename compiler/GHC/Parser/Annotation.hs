@@ -196,7 +196,7 @@ https://gitlab.haskell.org/ghc/ghc/wikis/api-annotations
 --
 -- Note: in general the names of these are taken from the
 -- corresponding token, unless otherwise noted
--- See note [exact print annotations] above for details of the usage
+-- See Note [exact print annotations] above for details of the usage
 data AnnKeywordId
     = AnnAnyclass
     | AnnAs

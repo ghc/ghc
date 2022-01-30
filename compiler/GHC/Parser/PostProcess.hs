@@ -922,7 +922,7 @@ mkRuleTyVarBndrs = fmap cvt_one
         tm_to_ty (Unqual occ) = Unqual (setOccNameSpace tvName occ)
         tm_to_ty _ = panic "mkRuleTyVarBndrs"
 
--- See note [Parsing explicit foralls in Rules] in Parser.y
+-- See Note [Parsing explicit foralls in Rules] in Parser.y
 checkRuleTyVarBndrNames :: [LHsTyVarBndr flag GhcPs] -> P ()
 checkRuleTyVarBndrNames = mapM_ (check . fmap hsTyVarName)
   where check (L loc (Unqual occ)) =

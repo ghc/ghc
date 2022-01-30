@@ -133,7 +133,7 @@ type LHsDecl p = XRec p (HsDecl p)
         --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnSemi'
         --
 
--- For details on above see note [exact print annotations] in GHC.Parser.Annotation
+-- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 
 -- | A Haskell Declaration
 data HsDecl p
@@ -401,7 +401,7 @@ data TyClDecl pass
     --             'GHC.Parser.Annotation.AnnEqual','GHC.Parser.Annotation.AnnRarrow',
     --             'GHC.Parser.Annotation.AnnVbar'
 
-    -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
+    -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
     FamDecl { tcdFExt :: XFamDecl pass, tcdFam :: FamilyDecl pass }
 
   | -- | @type@ declaration
@@ -409,7 +409,7 @@ data TyClDecl pass
     --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnType',
     --             'GHC.Parser.Annotation.AnnEqual',
 
-    -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
+    -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
     SynDecl { tcdSExt   :: XSynDecl pass          -- ^ Post renameer, FVs
             , tcdLName  :: LIdP pass              -- ^ Type constructor
             , tcdTyVars :: LHsQTyVars pass        -- ^ Type variables; for an
@@ -426,7 +426,7 @@ data TyClDecl pass
     --              'GHC.Parser.Annotation.AnnNewType','GHC.Parser.Annotation.AnnDcolon'
     --              'GHC.Parser.Annotation.AnnWhere',
 
-    -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
+    -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
     DataDecl { tcdDExt     :: XDataDecl pass       -- ^ Post renamer, CUSK flag, FVs
              , tcdLName    :: LIdP pass             -- ^ Type constructor
              , tcdTyVars   :: LHsQTyVars pass      -- ^ Type variables
@@ -453,7 +453,7 @@ data TyClDecl pass
         --                          'GHC.Parser.Annotation.AnnComma'
         --                          'GHC.Parser.Annotation.AnnRarrow'
 
-        -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
+        -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
   | XTyClDecl !(XXTyClDecl pass)
 
 data FunDep pass
@@ -798,14 +798,14 @@ data FamilyResultSig pass = -- see Note [FamilyResultSig]
     NoSig (XNoSig pass)
   -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' :
 
-  -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
+  -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 
   | KindSig  (XCKindSig pass) (LHsKind pass)
   -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' :
   --             'GHC.Parser.Annotation.AnnOpenP','GHC.Parser.Annotation.AnnDcolon',
   --             'GHC.Parser.Annotation.AnnCloseP'
 
-  -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
+  -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 
   | TyVarSig (XTyVarSig pass) (LHsTyVarBndr () pass)
   -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' :
@@ -813,7 +813,7 @@ data FamilyResultSig pass = -- see Note [FamilyResultSig]
   --             'GHC.Parser.Annotation.AnnCloseP', 'GHC.Parser.Annotation.AnnEqual'
   | XFamilyResultSig !(XXFamilyResultSig pass)
 
-  -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
+  -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 
 
 -- | Located type Family Declaration
@@ -839,7 +839,7 @@ data FamilyDecl pass = FamilyDecl
   --             'GHC.Parser.Annotation.AnnEqual', 'GHC.Parser.Annotation.AnnRarrow',
   --             'GHC.Parser.Annotation.AnnVbar'
 
-  -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
+  -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 
 
 -- | Located Injectivity Annotation
@@ -859,7 +859,7 @@ data InjectivityAnn pass
   -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' :
   --             'GHC.Parser.Annotation.AnnRarrow', 'GHC.Parser.Annotation.AnnVbar'
 
-  -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
+  -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
   | XInjectivityAnn !(XXInjectivityAnn pass)
 
 data FamilyInfo pass
@@ -919,7 +919,7 @@ data HsDataDefn pass   -- The payload of a data type defn
 
                  dd_derivs :: HsDeriving pass  -- ^ Optional 'deriving' clause
 
-             -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
+             -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
    }
   | XHsDataDefn !(XXHsDataDefn pass)
 
@@ -1022,7 +1022,7 @@ type LConDecl pass = XRec pass (ConDecl pass)
       -- ^ May have 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnSemi' when
       --   in a GADT constructor list
 
-  -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
+  -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 
 -- |
 --
@@ -1046,7 +1046,7 @@ type LConDecl pass = XRec pass (ConDecl pass)
 --            'GHC.Parser.Annotation.AnnDarrow','GHC.Parser.Annotation.AnnDarrow',
 --            'GHC.Parser.Annotation.AnnForall','GHC.Parser.Annotation.AnnDot'
 
--- For details on above see note [exact print annotations] in GHC.Parser.Annotation
+-- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 
 -- | data Constructor Declaration
 data ConDecl pass
@@ -1258,7 +1258,7 @@ type LTyFamInstEqn pass = XRec pass (TyFamInstEqn pass)
   -- ^ May have 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnSemi'
   --   when in a list
 
--- For details on above see note [exact print annotations] in GHC.Parser.Annotation
+-- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 
 -- | Haskell Type Patterns
 type HsTyPats pass = [LHsTypeArg pass]
@@ -1318,7 +1318,7 @@ data TyFamInstDecl pass
     --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnType',
     --           'GHC.Parser.Annotation.AnnInstance',
 
-    -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
+    -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
   | XTyFamInstDecl !(XXTyFamInstDecl pass)
 
 ----------------- Data family instances -------------
@@ -1336,7 +1336,7 @@ newtype DataFamInstDecl pass
     --           'GHC.Parser.Annotation.AnnWhere','GHC.Parser.Annotation.AnnOpen',
     --           'GHC.Parser.Annotation.AnnClose'
 
-    -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
+    -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 
 ----------------- Family instances (common types) -------------
 
@@ -1359,7 +1359,7 @@ data FamEqn pass rhs
     --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnEqual'
   | XFamEqn !(XXFamEqn pass rhs)
 
-    -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
+    -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 
 ----------------- Class instances -------------
 
@@ -1381,14 +1381,14 @@ data ClsInstDecl pass
          -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen',
          --                                    'GHC.Parser.Annotation.AnnClose',
 
-        -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
+        -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
       }
     -- ^
     --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnInstance',
     --           'GHC.Parser.Annotation.AnnWhere',
     --           'GHC.Parser.Annotation.AnnOpen','GHC.Parser.Annotation.AnnClose',
 
-    -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
+    -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
   | XClsInstDecl !(XXClsInstDecl pass)
 
 ----------------- Instances of all kinds -------------
@@ -1442,7 +1442,7 @@ data DerivDecl pass = DerivDecl
          --        'GHC.Parser.Annotation.AnnAnyClass', 'GHC.Parser.Annotation.AnnNewtype',
          --        'GHC.Parser.Annotation.AnnOpen','GHC.Parser.Annotation.AnnClose'
 
-  -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
+  -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
         }
   | XDerivDecl !(XXDerivDecl pass)
 
@@ -1501,7 +1501,7 @@ data DefaultDecl pass
         -- ^ - 'GHC.Parser.Annotation.AnnKeywordId's : 'GHC.Parser.Annotation.AnnDefault',
         --          'GHC.Parser.Annotation.AnnOpen','GHC.Parser.Annotation.AnnClose'
 
-        -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
+        -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
   | XDefaultDecl !(XXDefaultDecl pass)
 
 {-
@@ -1539,7 +1539,7 @@ data ForeignDecl pass
         --           'GHC.Parser.Annotation.AnnImport','GHC.Parser.Annotation.AnnExport',
         --           'GHC.Parser.Annotation.AnnDcolon'
 
-        -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
+        -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
   | XForeignDecl !(XXForeignDecl pass)
 
 {-
@@ -1689,7 +1689,7 @@ data RuleBndr pass
         --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen',
         --     'GHC.Parser.Annotation.AnnDcolon','GHC.Parser.Annotation.AnnClose'
 
-        -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
+        -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 
 collectRuleBndrSigTys :: [RuleBndr pass] -> [HsPatSigType pass]
 collectRuleBndrSigTys bndrs = [ty | RuleBndrSig _ _ ty <- bndrs]
@@ -1775,7 +1775,7 @@ data AnnDecl pass = HsAnnotation
       --           'GHC.Parser.Annotation.AnnModule'
       --           'GHC.Parser.Annotation.AnnClose'
 
-      -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
+      -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
   | XAnnDecl !(XXAnnDecl pass)
 
 -- | Annotation Provenance
@@ -1813,5 +1813,5 @@ data RoleAnnotDecl pass
       -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnType',
       --           'GHC.Parser.Annotation.AnnRole'
 
-      -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
+      -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
   | XRoleAnnotDecl !(XXRoleAnnotDecl pass)

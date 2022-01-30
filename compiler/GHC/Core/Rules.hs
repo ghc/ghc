@@ -400,7 +400,7 @@ lookupRule opts rule_env@(in_scope,_) is_active fn args rules
   where
     rough_args = map roughTopName args
 
-    -- Strip ticks from arguments, see note [Tick annotations in RULE
+    -- Strip ticks from arguments, see Note [Tick annotations in RULE
     -- matching]. We only collect ticks if a rule actually matches -
     -- this matters for performance tests.
     args' = map (stripTicksTopE tickishFloatable) args

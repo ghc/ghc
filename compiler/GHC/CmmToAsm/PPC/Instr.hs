@@ -97,7 +97,7 @@ mkStackAllocInstr' platform amount
     immAmount = ImmInt amount
 
 --
--- See note [extra spill slots] in X86/Instr.hs
+-- See Note [extra spill slots] in X86/Instr.hs
 --
 allocMoreStack
   :: Platform

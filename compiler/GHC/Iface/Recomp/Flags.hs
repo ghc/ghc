@@ -48,7 +48,7 @@ fingerprintDynFlags hsc_env this_mod nameio =
                 map fromEnum $ EnumSet.toList extensionFlags)
 
         -- avoid fingerprinting the absolute path to the directory of the source file
-        -- see note [Implicit include paths]
+        -- see Note [Implicit include paths]
         includePathsMinusImplicit = includePaths { includePathsQuoteImplicit = [] }
 
         -- -I, -D and -U flags affect CPP

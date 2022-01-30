@@ -216,7 +216,7 @@ simplTopBinds env0 binds0
                 -- so that if a rewrite rule has unexpectedly brought
                 -- anything into scope, then we don't get a complaint about that.
                 -- It's rather as if the top-level binders were imported.
-                -- See note [Glomming] in "GHC.Core.Opt.OccurAnal".
+                -- See Note [Glomming] in "GHC.Core.Opt.OccurAnal".
         -- See Note [Bangs in the Simplifier]
         ; !env1 <- {-#SCC "simplTopBinds-simplRecBndrs" #-} simplRecBndrs env0 (bindersOfBinds binds0)
         ; (floats, env2) <- {-#SCC "simplTopBinds-simpl_binds" #-} simpl_binds env1 binds0

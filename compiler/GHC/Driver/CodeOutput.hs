@@ -335,7 +335,7 @@ profilingInitCode platform this_mod (local_CCs, singleton_CCSs)
       <> semi
 
 -- | Generate code to initialise info pointer origin
--- See note [Mapping Info Tables to Source Positions]
+-- See Note [Mapping Info Tables to Source Positions]
 ipInitCode
   :: Bool            -- is Opt_InfoTableMap enabled or not
   -> Platform

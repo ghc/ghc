@@ -320,7 +320,7 @@ importSuggestions looking_for global_env hpt currMod imports rdr_name
   (helpful_imports_hiding, helpful_imports_non_hiding)
     = partition (imv_is_hiding . snd) helpful_imports
 
-  -- See note [When to show/hide the module-not-imported line]
+  -- See Note [When to show/hide the module-not-imported line]
   show_not_imported_line :: ModuleName -> Bool                    -- #15611
   show_not_imported_line modnam
       | modnam `elem` glob_mods               = False    -- #14225     -- 1

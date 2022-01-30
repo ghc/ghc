@@ -50,7 +50,7 @@ type LPat p = XRec p (Pat p)
 --
 -- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnBang'
 
--- For details on above see note [exact print annotations] in GHC.Parser.Annotation
+-- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 data Pat p
   =     ------------ Simple patterns ---------------
     WildPat     (XWildPat p)        -- ^ Wildcard Pattern
@@ -66,13 +66,13 @@ data Pat p
                 (LPat p)                -- ^ Lazy Pattern
     -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnTilde'
 
-    -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
+    -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 
   | AsPat       (XAsPat p)
                 (LIdP p) (LPat p)    -- ^ As pattern
     -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnAt'
 
-    -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
+    -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 
   | ParPat      (XParPat p)
                !(LHsToken "(" p)
@@ -82,12 +82,12 @@ data Pat p
     -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen' @'('@,
     --                                    'GHC.Parser.Annotation.AnnClose' @')'@
 
-    -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
+    -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
   | BangPat     (XBangPat p)
                 (LPat p)                -- ^ Bang pattern
     -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnBang'
 
-    -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
+    -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 
         ------------ Lists, tuples, arrays ---------------
   | ListPat     (XListPat p)
@@ -98,7 +98,7 @@ data Pat p
     -- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen' @'['@,
     --                                    'GHC.Parser.Annotation.AnnClose' @']'@
 
-    -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
+    -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 
   | TuplePat    (XTuplePat p)
                   -- after typechecking, holds the types of the tuple components
@@ -136,7 +136,7 @@ data Pat p
     --            'GHC.Parser.Annotation.AnnOpen' @'(#'@,
     --            'GHC.Parser.Annotation.AnnClose' @'#)'@
 
-    -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
+    -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 
         ------------ Constructor patterns ---------------
   | ConPat {
@@ -149,7 +149,7 @@ data Pat p
         ------------ View patterns ---------------
   -- | - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnRarrow'
 
-  -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
+  -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
   | ViewPat       (XViewPat p)
                   (LHsExpr p)
                   (LPat p)
@@ -159,7 +159,7 @@ data Pat p
   -- | - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen' @'$('@
   --        'GHC.Parser.Annotation.AnnClose' @')'@
 
-  -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
+  -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
   | SplicePat       (XSplicePat p)
                     (HsSplice p)    -- ^ Splice Pattern (Includes quasi-quotes)
 
@@ -185,7 +185,7 @@ data Pat p
   --
   -- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnVal' @'+'@
 
-  -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
+  -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
   | NPlusKPat       (XNPlusKPat p)           -- Type of overall pattern
                     (LIdP p)                 -- n+k pattern
                     (XRec p (HsOverLit p))   -- It'll always be an HsIntegral
@@ -200,7 +200,7 @@ data Pat p
         ------------ Pattern type signatures ---------------
   -- | - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnDcolon'
 
-  -- For details on above see note [exact print annotations] in GHC.Parser.Annotation
+  -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
   | SigPat          (XSigPat p)             -- After typechecker: Type
                     (LPat p)                -- Pattern with a type signature
                     (HsPatSigType (NoGhcTc p)) --  Signature can bind both
@@ -272,7 +272,7 @@ type HsRecUpdField p    = HsFieldBind (LAmbiguousFieldOcc p) (LHsExpr p)
 --
 -- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnEqual',
 --
--- For details on above see note [exact print annotations] in GHC.Parser.Annotation
+-- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 data HsFieldBind lhs rhs = HsFieldBind {
         hfbAnn :: XHsFieldBind lhs,
         hfbLHS :: lhs,

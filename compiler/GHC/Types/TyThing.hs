@@ -139,7 +139,7 @@ Examples:
 -- names returned by 'GHC.Iface.Load.ifaceDeclImplicitBndrs', in the sense that
 -- TyThing.getOccName should define a bijection between the two lists.
 -- This invariant is used in 'GHC.IfaceToCore.tc_iface_decl_fingerprint' (see
--- note [Tricky iface loop])
+-- Note [Tricky iface loop])
 -- The order of the list does not matter.
 implicitTyThings :: TyThing -> [TyThing]
 implicitTyThings (AnId _)       = []

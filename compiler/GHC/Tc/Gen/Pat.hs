@@ -325,7 +325,7 @@ tcMultiple tc_pat penv args thing_inside
                                    setErrCtxt err_ctxt $
                                    loop penv args
                 -- setErrCtxt: restore context before doing the next pattern
-                -- See note [Nesting] above
+                -- See Note [Nesting] above
 
                      ; return (p':ps', res) }
 

@@ -432,7 +432,7 @@ tcArrDoStmt env ctxt (RecStmt { recS_stmts = L l stmts, recS_later_ids = later_n
                 -- NB:  The rec_ids for the recursive things
                 --      already scope over this part. This binding may shadow
                 --      some of them with polymorphic things with the same Name
-                --      (see note [RecStmt] in GHC.Hs.Expr)
+                --      (see Note [RecStmt] in GHC.Hs.Expr)
 
         ; let rec_ids = takeList rec_names tup_ids
         ; later_ids <- tcLookupLocalIds later_names

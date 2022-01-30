@@ -11,8 +11,8 @@ their types differ.
 This was originally reported as #9291.
 
 There are two types of common code occurrences that we aim for, see
-note [Case 1: CSEing allocated closures] and
-note [Case 2: CSEing case binders] below.
+Note [Case 1: CSEing allocated closures] and
+Note [Case 2: CSEing case binders] below.
 
 
 Note [Case 1: CSEing allocated closures]
@@ -147,7 +147,7 @@ instance TrieMap ConAppMap where
 -- The CSE Env --
 -----------------
 
--- | The CSE environment. See note [CseEnv Example]
+-- | The CSE environment. See Note [CseEnv Example]
 data CseEnv = CseEnv
     { ce_conAppMap :: ConAppMap OutId
         -- ^ The main component of the environment is the trie that maps
@@ -245,7 +245,7 @@ addDataCon bndr dataCon args env
 -------------------
 forgetCse :: CseEnv -> CseEnv
 forgetCse env = env { ce_conAppMap = emptyTM }
-    -- See note [Free variables of an StgClosure]
+    -- See Note [Free variables of an StgClosure]
 
 addSubst :: OutId -> OutId -> CseEnv -> CseEnv
 addSubst from to env
@@ -387,7 +387,7 @@ stgCseAlt env ty case_bndr (DataAlt dataCon, args, rhs)
             = addDataCon case_bndr dataCon (map StgVarArg args') env1
             | otherwise
             = env1
-            -- see note [Case 2: CSEing case binders]
+            -- see Note [Case 2: CSEing case binders]
           rhs' = stgCseExpr env2 rhs
       in (DataAlt dataCon, args', rhs')
 stgCseAlt env _ _ (altCon, args, rhs)
@@ -427,14 +427,14 @@ stgCseRhs env bndr (StgRhsCon ccs dataCon mu ticks args)
       in (Nothing, env')
     | otherwise
     = let env' = addDataCon bndr dataCon args' env
-            -- see note [Case 1: CSEing allocated closures]
+            -- see Note [Case 1: CSEing allocated closures]
           pair = (bndr, StgRhsCon ccs dataCon mu ticks args')
       in (Just pair, env')
   where args' = substArgs env args
 
 stgCseRhs env bndr (StgRhsClosure ext ccs upd args body)
     = let (env1, args') = substBndrs env args
-          env2 = forgetCse env1 -- See note [Free variables of an StgClosure]
+          env2 = forgetCse env1 -- See Note [Free variables of an StgClosure]
           body' = stgCseExpr env2 body
       in (Just (substVar env bndr, StgRhsClosure ext ccs upd args' body'), env)
 
