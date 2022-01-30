@@ -224,6 +224,7 @@ schedule (Capability *initialCapability, Task *task)
     }
 
     // Note [shutdown]: The interruption / shutdown sequence.
+    // ~~~~~~~~~~~~~~~
     //
     // In order to cleanly shut down the runtime, we want to:
     //   * make sure that all main threads return to their callers
@@ -649,7 +650,7 @@ shouldYieldCapability (Capability *cap, Task *task, bool didGcLast)
     //     and this task it bound).
     //
     // Note [GC livelock]
-    //
+    // ~~~~~~~~~~~~~~~~~~
     // If we are interrupted to do a GC, then we do not immediately do
     // another one.  This avoids a starvation situation where one
     // Capability keeps forcing a GC and the other Capabilities make no

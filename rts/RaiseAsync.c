@@ -93,7 +93,7 @@ suspendComputation (Capability *cap, StgTSO *tso, StgUpdateFrame *stop_here)
    throwTo().
 
    Note [Throw to self when masked]
-
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
    When a StackOverflow occurs when the thread is masked, we want to
    defer the exception to when the thread becomes unmasked/hits an
    interruptible point.  We already have a mechanism for doing this,

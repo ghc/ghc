@@ -318,8 +318,8 @@ data UnitConfig = UnitConfig
    , unitConfigWays           :: !Ways          -- ^ Ways to use
 
    , unitConfigAllowVirtual   :: !Bool          -- ^ Allow virtual units
-      -- ^ Do we allow the use of virtual units instantiated on-the-fly (see Note
-      -- [About units] in GHC.Unit). This should only be true when we are
+      -- ^ Do we allow the use of virtual units instantiated on-the-fly (see
+      -- Note [About units] in GHC.Unit). This should only be true when we are
       -- type-checking an indefinite unit (not producing any code).
 
    , unitConfigProgramName    :: !String
@@ -1148,7 +1148,7 @@ findWiredInUnits logger prec_map pkgs vis_map = do
                            -- every non instantiated unit is an instance of
                            -- itself (required by Backpack...)
                            --
-                           -- See Note [About Units] in GHC.Unit
+                           -- See Note [About units] in GHC.Unit
                         }
                   | otherwise
                   = pkg
@@ -2180,7 +2180,7 @@ renameHoleModule :: UnitState -> ShHoleSubst -> Module -> Module
 renameHoleModule state = renameHoleModule' (unitInfoMap state) (preloadClosure state)
 
 -- | Substitutes holes in a 'Unit', suitable for renaming when
--- an include occurs; see Note [Representation of module/name variable].
+-- an include occurs; see Note [Representation of module/name variables].
 --
 -- @p[A=\<A>]@ maps to @p[A=\<B>]@ with @A=\<B>@.
 renameHoleUnit :: UnitState -> ShHoleSubst -> Unit -> Unit

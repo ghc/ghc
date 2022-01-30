@@ -1246,8 +1246,12 @@ tryUnfolding logger opts !case_depth id lone_variable
 
 
 {-
-Note [Unfold into lazy contexts], Note [RHS of lets]
+Note [Unfold into lazy contexts]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Merged into Note [RHS of lets].
+
+Note [RHS of lets]
+~~~~~~~~~~~~~~~~~~
 When the call is the argument of a function with a RULE, or the RHS of a let,
 we are a little bit keener to inline.  For example
      f y = (y,y,y)

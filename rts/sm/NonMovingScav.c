@@ -32,7 +32,7 @@ nonmovingScavengeOne (StgClosure *q)
         if (gct->failed_to_evac) {
             mvar->header.info = &stg_MVAR_DIRTY_info;
 
-            // Note [Dirty flags in the non-moving collector] in NonMoving.c
+            // See Note [Dirty flags in the non-moving collector] in NonMoving.c
             markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, (StgClosure *) mvar->head);
             markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, (StgClosure *) mvar->tail);
             markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, (StgClosure *) mvar->value);
@@ -52,7 +52,7 @@ nonmovingScavengeOne (StgClosure *q)
         if (gct->failed_to_evac) {
             tvar->header.info = &stg_TVAR_DIRTY_info;
 
-            // Note [Dirty flags in the non-moving collector] in NonMoving.c
+            // See Note [Dirty flags in the non-moving collector] in NonMoving.c
             markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, (StgClosure *) tvar->current_value);
             markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, (StgClosure *) tvar->first_watch_queue_entry);
         } else {
@@ -177,7 +177,7 @@ nonmovingScavengeOne (StgClosure *q)
         if (gct->failed_to_evac) {
             ((StgClosure *)q)->header.info = &stg_MUT_VAR_DIRTY_info;
 
-            // Note [Dirty flags in the non-moving collector] in NonMoving.c
+            // See Note [Dirty flags in the non-moving collector] in NonMoving.c
             markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, (StgClosure *) mv->var);
         } else {
             ((StgClosure *)q)->header.info = &stg_MUT_VAR_CLEAN_info;

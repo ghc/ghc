@@ -390,7 +390,8 @@ generate directory distdir config_args
           fixupRtsLibName x = x
           transitiveDepNames = map (display . packageName) transitive_dep_ids
 
-          -- Note [Msys2 path translation bug].
+          -- Note [Msys2 path translation bug]
+          -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
           -- Msys2 has an annoying bug in their path conversion code.
           -- Officially anything starting with a drive letter should not be
           -- subjected to path translations, however it seems to only consider

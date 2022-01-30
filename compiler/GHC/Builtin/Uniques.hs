@@ -143,7 +143,6 @@ getUnboxedSumName n
 
 -- Note [Uniques for tuple type and data constructors]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
---
 -- Wired-in type constructor keys occupy *two* slots:
 --    * u: the TyCon itself
 --    * u+1: the TyConRepName of the TyCon
@@ -156,7 +155,6 @@ getUnboxedSumName n
 {-
 Note [Unique layout for constraint tuple selectors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 Constraint tuples, like boxed and unboxed tuples, have their type and data
 constructor Uniques wired in (see
 Note [Uniques for tuple type and data constructors]). Constraint tuples are

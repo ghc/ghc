@@ -50,7 +50,7 @@ endef
 ifeq "$(TEST_HC)" ""
 
 # Note [Spaces in TEST_HC]
-#
+# ~~~~~~~~~~~~~~~~~~~~~~~~
 # Tests should be able to handle paths with spaces.
 #
 # One of the things ./validate (without --fast) does is check if binary
@@ -128,7 +128,7 @@ endif
 IN_TREE_COMPILER = NO
 
 # Note [The TEST_HC variable]
-#
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # As values of TEST_HC passed in by the user, we want to support:
 #  * both "ghc" and "/usr/bin/ghc"
 #      We use 'which' to convert the former to the latter.

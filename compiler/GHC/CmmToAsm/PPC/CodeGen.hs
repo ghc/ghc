@@ -738,6 +738,7 @@ temporary, then do the other computation, and then use the temporary:
 -}
 
 {- Note [Power instruction format]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In some instructions the 16 bit offset must be a multiple of 4, i.e.
 the two least significant bits must be zero. The "Power ISA" specification
 calls these instruction formats "DS-FORM" and the instructions with
@@ -1210,6 +1211,7 @@ genCCall (PrimTarget (MO_AtomicRead width)) [dst] [addr]
                                       ]
 
 -- Note [Seemingly useless cmp and bne]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- In Power ISA, Book II, Section 4.4.1, Instruction Synchronize Instruction
 -- the second paragraph says that isync may complete before storage accesses
 -- "associated" with a preceding instruction have been performed. The cmp
@@ -2535,12 +2537,14 @@ coerceFP2Int' (ArchPPC_64 _) _ toRep x = do
 coerceFP2Int' _ _ _ _ = panic "PPC.CodeGen.coerceFP2Int: unknown arch"
 
 -- Note [.LCTOC1 in PPC PIC code]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- The .LCTOC1 label is defined to point 32768 bytes into the GOT table
 -- to make the most of the PPC's 16-bit displacements.
 -- As 16-bit signed offset is used (usually via addi/lwz instructions)
 -- first element will have '-32768' offset against .LCTOC1.
 
 -- Note [implicit register in PPC PIC code]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- PPC generates calls by labels in assembly
 -- in form of:
 --     bl puts+32768@plt

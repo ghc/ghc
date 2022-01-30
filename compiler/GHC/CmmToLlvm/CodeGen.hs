@@ -1255,7 +1255,6 @@ genExpectLit expLit expTy var = do
 
 {- Note [Literals and branch conditions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 It is important that whenever we generate branch conditions for
 literals like '1', they are properly narrowed to an LLVM expression of
 type 'i1' (for bools.) Otherwise, nobody is happy. So when we convert

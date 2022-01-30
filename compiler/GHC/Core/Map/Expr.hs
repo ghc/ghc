@@ -206,7 +206,6 @@ eqCoreExpr e1 e2 = eqDeBruijnExpr (deBruijnize e1) (deBruijnize e2)
 
 {- Note [Alpha-equality for Coercion arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 The 'Coercion' constructor only appears in argument positions, and so, if the
 functions are equal, then the arguments must have equal types. Because the
 comparison for coercions (correctly) checks only their types, checking for
@@ -215,7 +214,6 @@ alpha-equality of the coercions is redundant.
 
 {- Note [Alpha-equality for let-bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 For /recursive/ let-bindings we need to check that the types of the binders
 are alpha-equivalent. Otherwise
 

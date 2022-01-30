@@ -59,7 +59,7 @@ data TickishPass
 
 {-
    Note [Tickish passes]
-
+   ~~~~~~~~~~~~~~~~~~~~~
    Tickish annotations store different information depending on
    where they are used. Here's a summary of the differences
    between the passes.

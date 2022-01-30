@@ -275,7 +275,6 @@ having to walk their full structures.
 
 {- Note [Kind caching]
    ~~~~~~~~~~~~~~~~~~~
-
 We cache the kind of the TypeRep in each TrTyCon and TrApp constructor.
 This is necessary to ensure that typeRepKind (which is used, at least, in
 deserialization and dynApply) is cheap. There are two reasons for this:

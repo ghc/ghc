@@ -268,8 +268,10 @@ typedef StgFunPtr       F_;
 /* foreign functions: */
 #define EFF_(f)   void f() /* See Note [External function prototypes] */
 
-/* Note [External function prototypes]  See #8965, #11395
+/* Note [External function prototypes]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+(see #8965, #11395)
+
 In generated C code we need to distinct between two types
 of external symbols:
 1.  Cmm functions declared by 'EF_' macro (External Functions)

@@ -167,6 +167,7 @@ pprAlignment words =
      text "__attribute__((aligned(" <> int (widthInBytes words) <> text ")))"
 
 -- Note [StgWord alignment]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~
 -- C codegen builds static closures as StgWord C arrays (pprWordArray).
 -- Their real C type is 'StgClosure'. Macros like UNTAG_CLOSURE assume
 -- pointers to 'StgClosure' are aligned at pointer size boundary:

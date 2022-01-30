@@ -480,10 +480,11 @@ INLINE_HEADER StgWord8 *mutArrPtrsCard (StgMutArrPtrs *a, W_ n)
    Replacing a closure with a different one.  We must call
    OVERWRITING_CLOSURE(p) on the old closure that is about to be
    overwritten.
+ */
 
+ /*
    Note [zeroing slop when overwriting closures]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
    When we overwrite a closure in the heap with a smaller one, in some scenarios
    we need to write zero words into "slop"; the memory that is left
    unoccupied. See Note [slop on the heap]

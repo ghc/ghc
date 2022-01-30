@@ -58,7 +58,6 @@ data CodingFailureMode
 
 -- Note [Roundtripping]
 -- ~~~~~~~~~~~~~~~~~~~~
---
 -- Roundtripping is based on the ideas of PEP383.
 --
 -- We used to use the range of private-use characters from 0xEF80 to

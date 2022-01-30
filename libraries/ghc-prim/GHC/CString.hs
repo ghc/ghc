@@ -135,9 +135,9 @@ Moreover, we want to make it CONLIKE, so that:
 All of this goes for unpackCStringUtf8# too.
 -}
 
-{- Note [Inlining of unpackFoldrCString]
+{-
+Note [Inlining of unpackFoldrCString]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 Usually the unpack-list rule turns unpackFoldrCString# into unpackCString#
 It also has a BuiltInRule in PrelRules.hs:
      unpackFoldrCString# "foo" c (unpackFoldrCString# "baz" c n)
@@ -154,9 +154,8 @@ when looking at nofib.
 This is especially important for elem which then results in an
 allocation free loop.
 
-  Note [unpackCString# iterating over addr]
+Note [unpackCString# iterating over addr]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 When unpacking unpackCString# and friends repeatedly return a cons cell
 containing:
 * The current character we just unpacked.
@@ -175,7 +174,6 @@ the string and the current offset, saving a word for each character unpacked.
 
 This has the additional advantage the we can guarantee that only the
 increment will happen in the loop.
-
 -}
 
 unpackCString# :: Addr# -> [Char]

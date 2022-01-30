@@ -27,8 +27,9 @@ module GHC.IO.Unsafe (
 
 import GHC.Base
 
-{- Note [unsafePerformIO and strictness]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{-
+Note [unsafePerformIO and strictness]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider this sub-expression (from tests/lib/should_run/memo002)
 
  unsafePerformIO (do { lockMemoTable

@@ -29,7 +29,6 @@ import Control.Monad
 
 -- Note [What is shortcutting]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
---
 -- Consider this Cmm code:
 --
 -- L1: ...
@@ -53,7 +52,6 @@ import Control.Monad
 
 -- Note [Control-flow optimisations]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
---
 -- This optimisation does three things:
 --
 --   - If a block finishes in an unconditional branch to another block
@@ -80,7 +78,6 @@ import Control.Monad
 
 -- Note [Shortcut call returns]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
---
 -- We are going to maintain the "current" graph (LabelMap CmmBlock) as
 -- we go, and also a mapping from BlockId to BlockId, representing
 -- continuation labels that we have renamed.  This latter mapping is
@@ -106,7 +103,6 @@ import Control.Monad
 
 -- Note [Shortcut call returns and proc-points]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
---
 -- Consider this code that you might get from a recursive
 -- let-no-escape:
 --

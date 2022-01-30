@@ -425,7 +425,7 @@ copyOutOflow profile conv transfer area actuals updfr_off extra_stack_stuff
 
 
 -- Note [Width of parameters]
---
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- Consider passing a small (< word width) primitive like Int8# to a function.
 -- It's actually non-trivial to do this without extending/narrowing:
 -- * Global registers are considered to have native word width (i.e., 64-bits on

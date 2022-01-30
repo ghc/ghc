@@ -1474,6 +1474,7 @@ declExtras fix_fn ann_fn rule_env inst_env fi_env dm_env decl
 
 
 {- Note [default method Name] (see also #15970)
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The Names for the default methods aren't available in Iface syntax.
 

@@ -107,7 +107,6 @@ EXTERN_INLINE void load_load_barrier(void);
 /*
  * Note [Heap memory barriers]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~
- *
  * Machines with weak memory ordering semantics have consequences for how
  * closures are observed and mutated. For example, consider a thunk that needs
  * to be updated to an indirection. In order for the indirection to be safe for

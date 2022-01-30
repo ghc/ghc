@@ -80,7 +80,7 @@
 #endif
 /*
    Note [runtime-linker-support]
-   -----------------------------
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
    When adding support for a new platform to the runtime linker please
    update `$TOP/configure.ac` under heading `Does target have runtime
    linker support?`.
@@ -94,7 +94,7 @@
    addresses of unloaded symbols.
 
    Note [runtime-linker-phases]
-   --------------------------------------
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
    Broadly the behavior of the runtime linker can be
    split into the following four phases:
 
@@ -247,7 +247,7 @@ static void ghciRemoveSymbolTable(StrHashTable *table, const SymbolName* key,
  */
 /*
  Note [weak-symbols-support]
- -------------------------------------
+ ~~~~~~~~~~~~~~~~~~~~~~~~~~~
  While ghciInsertSymbolTable does implement extensive
  logic for weak symbol support, weak symbols are not currently
  fully supported by the RTS. This code is mostly here for COMDAT
@@ -610,7 +610,7 @@ internal_dlopen(const char *dll_name)
 
 /*
   Note [RTLD_LOCAL]
-
+  ~~~~~~~~~~~~~~~~~
   In GHCi we want to be able to override previous .so's with newly
   loaded .so's when we recompile something.  This further implies that
   when we look up a symbol in internal_dlsym() we have to iterate
@@ -1716,6 +1716,7 @@ HsInt loadOc (ObjectCode* oc)
    }
 
    /* Note [loadOc orderings]
+      ~~~~~~~~~~~~~~~~~~~~~~~
       The order of `ocAllocateExtras` and `ocGetNames` matters. For MachO
       and ELF, `ocInit` and `ocGetNames` initialize a bunch of pointers based
       on the offset to `oc->image`, but `ocAllocateExtras` may relocate

@@ -74,7 +74,7 @@ cgOpApp :: StgOp        -- The op
 -- Foreign calls
 cgOpApp (StgFCallOp fcall ty) stg_args res_ty
   = cgForeignCall fcall ty stg_args res_ty
-      -- Note [Foreign call results]
+      -- See Note [Foreign call results]
 
 cgOpApp (StgPrimOp primop) args res_ty = do
     cfg <- getStgToCmmConfig
@@ -1716,7 +1716,6 @@ emitPrimOp cfg primop =
   alwaysExternal = \_ -> PrimopCmmEmit_External
   -- Note [QuotRem optimization]
   -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  --
   -- `quot` and `rem` with constant divisor can be implemented with fast bit-ops
   -- (shift, .&.).
   --

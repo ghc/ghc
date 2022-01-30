@@ -324,6 +324,7 @@ rnBndr2_var (RV2 { envL = envL, envR = envR, in_scope = in_scope }) bL bR
           | otherwise                          = uniqAway' in_scope bL
 
         -- Note [Rebinding]
+        -- ~~~~~~~~~~~~~~~~
         -- If the new var is the same as the old one, note that
         -- the extendVarEnv *deletes* any current renaming
         -- E.g.   (\x. \x. ...)  ~  (\y. \z. ...)

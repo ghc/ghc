@@ -158,6 +158,7 @@ StgWord8 the_gc_thread[sizeof(gc_thread) + 64 * sizeof(gen_workspace)]
 #endif // THREADED_RTS
 
 /* Note [n_gc_threads]
+   ~~~~~~~~~~~~~~~~~~~
 This is a global variable that originally tracked the number of threads
 participating in the current gc. It's meaning has diverged from this somewhat,
 as it does not distinguish betweeen idle and non-idle threads. An idle thread
@@ -2197,7 +2198,7 @@ bool doIdleGCWork(Capability *cap STG_UNUSED, bool all)
 
 
 /* Note [Synchronising work stealing]
- *
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  * During parallel garbage collections, idle gc threads will steal work from
  * other threads. If they see no work to steal then they will wait on a
  * condition variabl(gc_running_cv).
@@ -2243,6 +2244,7 @@ bool doIdleGCWork(Capability *cap STG_UNUSED, bool all)
  * */
 
 /* Note [Scaling retained memory]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  * Tickets: #19381 #19359 #14702
  *
  * After a spike in memory usage we have been conservative about returning

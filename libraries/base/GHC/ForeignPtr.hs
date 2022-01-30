@@ -165,7 +165,7 @@ data ForeignPtrContents
     -- The invariants that apply to 'MallocPtr' apply to 'PlainPtr' as well.
 
 -- Note [Why FinalPtr]
---
+-- ~~~~~~~~~~~~~~~~~~~
 -- FinalPtr exists as an optimization for foreign pointers created
 -- from Addr# literals. Most commonly, this happens in the bytestring
 -- library, where the combination of OverloadedStrings and a rewrite
@@ -376,7 +376,9 @@ addForeignPtrFinalizer (FunPtr fp) (ForeignPtr p c) = case c of
   MallocPtr     _ r -> insertCFinalizer r fp 0# nullAddr# p c
   _ -> errorWithoutStackTrace "GHC.ForeignPtr: attempt to add a finalizer to a plain pointer or a final pointer"
 
--- Note [MallocPtr finalizers] (#10904)
+-- Note [MallocPtr finalizers]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- Ticket: #10904
 --
 -- When we have C finalizers for a MallocPtr, the memory is
 -- heap-resident and would normally be recovered by the GC before the

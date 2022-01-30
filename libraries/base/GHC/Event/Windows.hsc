@@ -495,9 +495,8 @@ associateHandle Manager{..} h =
       FFI.associateHandleWithIOCP mgrIOCP h (fromIntegral $ ptrToWordPtr h)
 
 
-{- Note [Why use non-waiting getOverlappedResult requests.]
-   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
+{- Note [Why use non-waiting getOverlappedResult requests]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   When waiting for a request that is bound to be done soon
   we spin inside waitForCompletion. There are multiple reasons
   for this.
@@ -549,6 +548,7 @@ withOverlappedEx mgr fname h async offset startCB completionCB = do
               IOFailed  err -> signalThrow err
 
       -- Note [Memory Management]
+      -- ~~~~~~~~~~~~~~~~~~~~~~~~
       -- These callback data and especially the overlapped structs have to keep
       -- alive throughout the entire lifetime of the requests.   Since this
       -- function will block until done so it can call completionCB at the end

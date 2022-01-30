@@ -17,7 +17,6 @@ static ObjectCode *loading_obj = NULL;
 /*
  * Note [Tracking foreign exports]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
- *
  * Foreign exports are garbage collection roots. That is, things (e.g. CAFs)
  * depended upon by a module's `foreign export`s need to be kept alive for as
  * long an module is loaded. To ensure this we create a stable pointer to each

@@ -26,7 +26,7 @@ import GHC.Prelude
 import GHC.SysTools.Process
 
 {- Note [Run-time linker info]
-
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 See also: #5240, #6063, #10110
 
 Before 'runLink', we need to be sure to get the relevant information
@@ -57,7 +57,7 @@ circular dependency.
 -}
 
 {- Note [ELF needed shared libs]
-
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Some distributions change the link editor's default handling of
 ELF DT_NEEDED tags to include only those shared objects that are
 needed to resolve undefined symbols. For Template Haskell we need
@@ -71,7 +71,7 @@ The flag is only needed on ELF systems. On Windows (PE) and Mac OS X
 -}
 
 {- Note [Windows static libGCC]
-
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The GCC versions being upgraded to in #10726 are configured with
 dynamic linking of libgcc supported. This results in libgcc being
 linked dynamically when a shared library is created.
@@ -177,10 +177,10 @@ getLinkerInfo' logger dflags = do
             "-Wl,--hash-size=31"
           , "-Wl,--reduce-memory-overheads"
             -- Emit gcc stack checks
-            -- Note [Windows stack usage]
+            -- See Note [Windows stack allocations]
           , "-fstack-check"
             -- Force static linking of libGCC
-            -- Note [Windows static libGCC]
+            -- See Note [Windows static libGCC]
           , "-static-libgcc" ]
       _ -> do
         -- In practice, we use the compiler as the linker here. Pass

@@ -660,7 +660,6 @@ enqueueWorker (Capability* cap USED_IF_THREADS)
 /*
  * Note [Benign data race due to work-pushing]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
- *
  * #17276 points out a tricky data race (noticed by ThreadSanitizer) between
  * waitForWorkerCapability and schedulePushWork. In short, schedulePushWork
  * works as follows:
@@ -1039,7 +1038,6 @@ yieldCapability
 /*
  * Note [migrated bound threads]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
- *
  * There's a tricky case where:
  *    - cap A is running an unbound thread T1
  *    - there is a bound thread T2 at the head of the run queue on cap A
@@ -1060,7 +1058,6 @@ yieldCapability
  *
  * Note [migrated bound threads 2]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
- *
  * Second tricky case;
  *   - A bound Task becomes a GC thread
  *   - scheduleDoGC() migrates the thread belonging to this Task,

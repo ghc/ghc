@@ -821,7 +821,7 @@ mkWWBindPair ww_opts fn_id fn_info fn_args fn_body work_uniq div
 
     work_arity = length work_demands
 
-    -- See Note [Demand on the Worker]
+    -- See Note [Demand on the worker]
     single_call = saturatedByOneShots arity (demandInfo fn_info)
     worker_demand | single_call = mkWorkerDemand work_arity
                   | otherwise   = topDmd
@@ -845,7 +845,7 @@ mkStrWrapperInlinePrag :: InlinePragma -> [CoreRule] -> InlinePragma
 -- See Note [Wrapper activation]
 mkStrWrapperInlinePrag (InlinePragma { inl_act = act, inl_rule = rule_info }) rules
   = InlinePragma { inl_src    = SourceText "{-# INLINE"
-                 , inl_inline = NoUserInlinePrag -- See Note [Wrapper NoUserInline]
+                 , inl_inline = NoUserInlinePrag -- See Note [Wrapper NoUserInlinePrag]
                  , inl_sat    = Nothing
                  , inl_act    = activeAfter wrapper_phase
                  , inl_rule   = rule_info }  -- RuleMatchInfo is (and must be) unaffected

@@ -158,7 +158,7 @@ uint8_t* getSymShortName ( COFF_HEADER_INFO *info, COFF_symbol* sym );
 
 /*
 Note [mingw-w64 name decoration scheme]
-
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 What's going on with name decoration? Well, original code
 have some crufty and ad-hocish paths related mostly to very old
 mingw gcc/binutils/runtime combinations. Now mingw-w64 offers pretty

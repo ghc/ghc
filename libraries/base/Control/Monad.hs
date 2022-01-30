@@ -222,7 +222,7 @@ zipWithM f xs ys  =  sequenceA (zipWith f xs ys)
 zipWithM_         :: (Applicative m) => (a -> b -> m c) -> [a] -> [b] -> m ()
 {-# INLINE zipWithM_ #-}
 -- Inline so that fusion with zipWith and sequenceA have a chance to fire
--- See Note [Fusion for zipN/zipWithN] in List.hs]
+-- See Note [Fusion for zipN/zipWithN] in List.hs.
 zipWithM_ f xs ys =  sequenceA_ (zipWith f xs ys)
 
 {- | The 'foldM' function is analogous to 'Data.Foldable.foldl', except that its result is
@@ -262,7 +262,6 @@ foldM_ f a xs  = foldlM f a xs >> return ()
 {-
 Note [Worker/wrapper transform on replicateM/replicateM_]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 The implementations of replicateM and replicateM_ both leverage the
 worker/wrapper transform. The simpler implementation of replicateM_, as an
 example, would be:

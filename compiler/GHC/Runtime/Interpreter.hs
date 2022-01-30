@@ -121,7 +121,7 @@ import System.Process
 import GHC.Conc (pseq, par)
 
 {- Note [Remote GHCi]
-
+   ~~~~~~~~~~~~~~~~~~
 When the flag -fexternal-interpreter is given to GHC, interpreted code
 is run in a separate process called iserv, and we communicate with the
 external process over a pipe using Binary-encoded messages.
@@ -200,7 +200,7 @@ interpCmd interp msg = case interpInstance interp of
 
 
 -- Note [uninterruptibleMask_ and interpCmd]
---
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- If we receive an async exception, such as ^C, while communicating
 -- with the iserv process then we will be out-of-sync and not be able
 -- to recover.  Thus we use uninterruptibleMask_ during
@@ -510,6 +510,7 @@ unloadObj interp path = do
   interpCmd interp (UnloadObj path')
 
 -- Note [loadObj and relative paths]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- the iserv process might have a different current directory from the
 -- GHC process, so we must make paths absolute before sending them
 -- over.
@@ -635,7 +636,7 @@ runWithPipes createProc prog opts = do
 
 -- -----------------------------------------------------------------------------
 {- Note [External GHCi pointers]
-
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We have the following ways to reference things in GHCi:
 
 HValue

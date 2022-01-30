@@ -1261,6 +1261,7 @@ instance (Outputable tm, Outputable ty) => Outputable (HsArg tm ty) where
   ppr (HsArgPar sp)     = text "HsArgPar"  <+> ppr sp
 {-
 Note [HsArgPar]
+~~~~~~~~~~~~~~~
 A HsArgPar indicates that everything to the left of this in the argument list is
 enclosed in parentheses together with the function itself. It is necessary so
 that we can recreate the parenthesis structure in the original source after

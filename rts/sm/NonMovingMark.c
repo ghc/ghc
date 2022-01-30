@@ -159,7 +159,6 @@ StgIndStatic *debug_caf_list_snapshot = (StgIndStatic*)END_OF_CAF_LIST;
  *
  * Note [Eager update remembered set flushing]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
- *
  * We eagerly flush update remembered sets during minor GCs to avoid scenarios
  * like the following which could result in long sync pauses:
  *
@@ -199,7 +198,6 @@ StgIndStatic *debug_caf_list_snapshot = (StgIndStatic*)END_OF_CAF_LIST;
  *
  * Note [Concurrent read barrier on deRefWeak#]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
- *
  * In general the non-moving GC assumes that all pointers reachable from a
  * marked object are themselves marked (or in the mark queue). However,
  * weak pointers are an obvious exception to this rule. In particular,
@@ -596,7 +594,7 @@ inline void updateRemembSetPushThunk(Capability *cap, StgThunk *thunk)
  * we update the indirectee to ensure that the thunk's free variables remain
  * visible to the concurrent collector.
  *
- * See Note [Update rememembered set].
+ * See Note [Update remembered set].
  */
 void updateRemembSetPushThunkEager(Capability *cap,
                                    const StgThunkInfoTable *info,

@@ -1553,7 +1553,7 @@ readQResult i = do
     QFail str -> fail str
 
 {- Note [TH recover with -fexternal-interpreter]
-
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Recover is slightly tricky to implement.
 
 The meaning of "recover a b" is

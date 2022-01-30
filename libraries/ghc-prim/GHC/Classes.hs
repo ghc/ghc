@@ -587,7 +587,6 @@ x# `divInt32#` y# = ((x# `plusInt32#` bias#) `quotInt32#` y#) `subInt32#` hard#
 
 -- Note [divInt# implementation]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
---
 -- divInt# (truncated toward zero) is implemented with quotInt# (truncated
 -- toward negative infinity). They differ when inputs x and y have different signs:
 --  - x `rem` y has the sign of x and (x `quot` y)*y + (x `rem` y) == x
@@ -705,7 +704,6 @@ x# `modInt32#` y# = r# `plusInt32#` k#
 
 -- Note [modInt# implementation]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
---
 -- Similarly to divInt# (see Note [divInt# implementation]), we can derive the
 -- branchless implementation of modInt# as follows:
 --
@@ -823,7 +821,6 @@ x# `divModInt32#` y# = case (x# `plusInt32#` bias#) `quotRemInt32#` y# of
 
 -- Note [divModInt# implementation]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
---
 -- divModInt# is written by deriving the following code similarly to divInt# and
 -- modInt# (see Note [divInt# implementation] and Note [modInt#
 -- implementation]).

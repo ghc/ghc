@@ -370,7 +370,6 @@ void nonmovingSweepStableNameTable()
 
     /* Note [Sweeping stable names in the concurrent collector]
      * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-     *
      * When collecting concurrently we need to take care to avoid freeing
      * stable names the we didn't sweep this collection cycle. For instance,
      * consider the following situation:

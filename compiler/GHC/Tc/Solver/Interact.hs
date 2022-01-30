@@ -1632,8 +1632,8 @@ Now the second wanted comes along, but it cannot rewrite the given, so we simply
 At the end we spontaneously solve that guy, *reunifying*  [alpha := Int]
 
 We avoid this problem by orienting the resulting given so that the unification
-variable is on the left.  [Note that alternatively we could attempt to
-enforce this at canonicalization]
+variable is on the left (note that alternatively we could attempt to
+enforce this at canonicalization).
 
 See also Note [No touchables as FunEq RHS] in GHC.Tc.Solver.Monad; avoiding
 double unifications is the main reason we disallow touchable
@@ -2177,7 +2177,7 @@ chooseInstance work_item
        ; if isDerived ev
          then -- Use type-class instances for Deriveds, in the hope
               -- of generating some improvements
-              -- C.f. Example 3 of Note [The improvement story]
+              -- C.f. Example 3 of Note [The improvement story and derived shadows]
               -- It's easy because no evidence is involved
            do { dflags <- getDynFlags
               ; unless (subGoalDepthExceeded dflags (ctLocDepth deeper_loc)) $

@@ -374,7 +374,7 @@ checkInstCoverage :: Bool   -- Be liberal
                   -> Class -> [PredType] -> [Type]
                   -> Validity
 -- "be_liberal" flag says whether to use "liberal" coverage of
---              See Note [Coverage Condition] below
+--              See Note [Coverage condition] below
 --
 -- Return values
 --    Nothing  => no problems

@@ -992,6 +992,7 @@ def test(name: TestName,
             return
         else:
             # Note [Mutating config.only]
+            # ~~~~~~~~~~~~~~~~~~~~~~~~~~~
             # config.only is initially the set of tests requested by
             # the user (via 'make TEST='). We then remove all tests that
             # we've already seen (in .T files), so that we can later
@@ -2006,7 +2007,7 @@ def write_file(f: Path, s: str) -> None:
         h.write(s)
 
 # Note [Universal newlines]
-#
+# ~~~~~~~~~~~~~~~~~~~~~~~~~
 # We don't want to write any Windows style line endings ever, because
 # it would mean that `make accept` would touch every line of the file
 # when switching between Linux and Windows.
@@ -2202,7 +2203,7 @@ def grep_output(normaliser: OutputNormalizer, pattern_file, actual_file, is_subs
     return success
 
 # Note [Output comparison]
-#
+# ~~~~~~~~~~~~~~~~~~~~~~~~
 # We do two types of output comparison:
 #
 # 1. To decide whether a test has failed. We apply a `normaliser` and an
@@ -2218,7 +2219,7 @@ def grep_output(normaliser: OutputNormalizer, pattern_file, actual_file, is_subs
 #    possible (#10152).
 
 # Note [Null device handling]
-#
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # On windows the null device is 'nul' instead of '/dev/null'.
 # This can in principle be easily solved by using os.devnull.
 # Not doing so causes issues when python tries to read/write/open

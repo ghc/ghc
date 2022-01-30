@@ -764,8 +764,7 @@ StgInt TOTAL_CALLS=1;
 
 /*
 Note [RTS Stats Reporting]
-==========================
-
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 There are currently three reporting functions:
   * report_summary:
       Responsible for producing '+RTS -s' output.
@@ -948,7 +947,7 @@ static void report_summary(const RTSSummaryStats* sum)
                 sum->productivity_cpu_percent * 100,
                 sum->productivity_elapsed_percent * 100);
 
-    // See Note [Internal Counter Stats] for a description of the
+    // See Note [Internal Counters Stats] for a description of the
     // following counters. If you add a counter here, please remember
     // to update the Note.
     if (RtsFlags.MiscFlags.internalCounters) {
@@ -1474,7 +1473,7 @@ void stat_exit()
 }
 
 /* Note [Work Balance]
-----------------------
+~~~~~~~~~~~~~~~~~~~~~~
 Work balance is a measure of how evenly the work done during parallel garbage
 collection is spread across threads. To compute work balance we must take care
 to account for the number of GC threads changing between GCs. The statistics we
@@ -1553,7 +1552,7 @@ See #13830
 
 /*
 Note [Internal Counters Stats]
------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 What do the counts at the end of a '+RTS -s --internal-counters' report mean?
 They are detailed below. Most of these counters are used by multiple threads
 with no attempt at synchronisation. This means that reported values  may be

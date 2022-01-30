@@ -13,7 +13,7 @@ module GHCi.TH
   ) where
 
 {- Note [Remote Template Haskell]
-
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Here is an overview of how TH works with -fexternal-interpreter.
 
 Initialisation

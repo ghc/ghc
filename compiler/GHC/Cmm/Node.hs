@@ -105,7 +105,7 @@ data CmmNode e x where
 
   CmmSwitch
     :: CmmExpr       -- Scrutinee, of some integral type
-    -> SwitchTargets -- Cases. See [Note SwitchTargets]
+    -> SwitchTargets -- Cases. See Note [SwitchTargets]
     -> CmmNode O C
 
   CmmCall :: {                -- A native call or tail call
@@ -114,7 +114,9 @@ data CmmNode e x where
       cml_cont :: Maybe Label,
           -- Label of continuation (Nothing for return or tail call)
           --
-          -- Note [Continuation BlockIds]: these BlockIds are called
+          -- Note [Continuation BlockIds]
+          -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+          -- These BlockIds are called
           -- Continuation BlockIds, and are the only BlockIds that can
           -- occur in CmmExprs, namely as (CmmLit (CmmBlock b)) or
           -- (CmmStackSlot (Young b) _).
@@ -196,7 +198,6 @@ sequence.
 
 {- Note [Unsafe foreign calls clobber caller-save registers]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 A foreign call is defined to clobber any GlobalRegs that are mapped to
 caller-saves machine registers (according to the prevailing C ABI).
 GHC.StgToCmm.Utils.callerSaves tells you which GlobalRegs are caller-saves.
@@ -386,7 +387,6 @@ instance DefinerOfRegs GlobalReg (CmmNode e x) where
 
 -- Note [Safe foreign calls clobber STG registers]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
---
 -- During stack layout phase every safe foreign call is expanded into a block
 -- that contains unsafe foreign call (instead of safe foreign call) and ends
 -- with a normal call (See Note [Foreign calls]). This means that we must
@@ -642,8 +642,8 @@ data CmmTickScope
     -- the new block could have a combined tick scope a/c+b/d, which
     -- both tick<2> and tick<3> apply to.
 
--- Note [CmmTick scoping details]:
---
+-- Note [CmmTick scoping details]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- The scope of a @CmmTick@ is given by the @CmmEntry@ node of the
 -- same block. Note that as a result of this, optimisations making
 -- tick scopes more specific can *reduce* the amount of code a tick

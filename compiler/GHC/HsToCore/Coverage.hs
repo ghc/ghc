@@ -400,7 +400,7 @@ bindTick density name pos fvs = do
 
 
 -- Note [inline sccs]
---
+-- ~~~~~~~~~~~~~~~~~~
 -- The reason not to add ticks to INLINE functions is that this is
 -- sometimes handy for avoiding adding a tick to a particular function
 -- (see #6131)
@@ -1080,6 +1080,7 @@ noFVs :: FreeVars
 noFVs = emptyOccEnv
 
 -- Note [freevars]
+-- ~~~~~~~~~~~~~~~
 --   For breakpoints we want to collect the free variables of an
 --   expression for pinning on the HsTick.  We don't want to collect
 --   *all* free variables though: in particular there's no point pinning

@@ -384,7 +384,7 @@ list_broken:
 	$(MAKE) list_broken=YES
 
 # Note [Communicating options and variables to a submake]
-#
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Consider the following scenario:
 #   * A test foo is defined as
 #     test('foo', [], run_command, ['$MAKE footarget'])

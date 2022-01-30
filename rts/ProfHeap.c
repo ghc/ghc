@@ -1228,7 +1228,6 @@ heapCensusBlock(Census *census, bdescr *bd)
         while (p < bd->free && !*p) p++;
         /* Note [skipping slop in the heap profiler]
          * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-         *
          * We make sure to zero slop that can remain after a major GC so
          * here we can assume any slop words we see until the block's free
          * pointer are zero. Since info pointers are always nonzero we can

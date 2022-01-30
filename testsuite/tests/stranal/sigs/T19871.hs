@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -O2 -fforce-recomp #-}
 
--- | From Note [Boxity Analysis] and related Notes
+-- | From Note [Boxity analysis] and related Notes
 module T19871 where
 
 data Huge

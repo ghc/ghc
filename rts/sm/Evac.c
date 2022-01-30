@@ -43,7 +43,6 @@
 
 /* Note [Selector optimisation depth limit]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
- *
  * MAX_THUNK_SELECTOR_DEPTH is used to avoid long recursion of
  * eval_thunk_selector due to nested selector thunks. Note that this *only*
  * counts nested selector thunks, e.g. `fst (fst (... (fst x)))`. The collector
@@ -174,7 +173,6 @@ alloc_for_copy (uint32_t size, uint32_t gen_no)
 /*
  * Note [Non-moving GC: Marking evacuated objects]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
- *
  * When the non-moving collector is in use we must be careful to ensure that any
  * references to objects in the non-moving generation from younger generations
  * are pushed to the mark queue.
@@ -695,7 +693,7 @@ loop:
   if (!HEAP_ALLOCED_GC(q)) {
       if (!major_gc) return;
 
-      // Note [Object unloading] in CheckUnload.c
+      // See Note [Object unloading] in CheckUnload.c
       if (RTS_UNLIKELY(unload_mark_needed)) {
           markObjectCode(q);
       }
@@ -933,7 +931,7 @@ loop:
               return;
           }
           // Note [BLACKHOLE pointing to IND]
-          //
+          // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
           // BLOCKING_QUEUE can be overwritten by IND (see
           // wakeBlockingQueue()). However, when this happens we must
           // be updating the BLACKHOLE, so the BLACKHOLE's indirectee

@@ -99,7 +99,7 @@ The two analysis are not completely independent, as a higher arity can improve
 the information about what variables are being called once or multiple times.
 
 Note [Analysis I: The arity analysis]
-------------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The arity analysis is quite straightforward: The information about an
 expression is an
@@ -115,7 +115,7 @@ minimum (considering Nothing an infinity).
 
 
 Note [Analysis II: The Co-Called analysis]
-------------------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The second part is more sophisticated. For reasons explained below, it is not
 sufficient to simply know how often an expression evaluates a variable. Instead
@@ -438,7 +438,7 @@ callArityAnalProgram binds = binds'
   where
     (_, binds') = callArityTopLvl [] emptyVarSet binds
 
--- See Note [Analysing top-level-binds]
+-- See Note [Analysing top-level binds]
 callArityTopLvl :: [Var] -> VarSet -> [CoreBind] -> (CallArityRes, [CoreBind])
 callArityTopLvl exported _ []
     = ( calledMultipleTimes $ (emptyUnVarGraph, mkVarEnv $ [(v, 0) | v <- exported])

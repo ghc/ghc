@@ -84,7 +84,6 @@ newtype RegBitmap = RegBitmap { unRegBitmap :: Word32 }
 
 {- Note [GHCi TupleInfo]
 ~~~~~~~~~~~~~~~~~~~~~~~~
-
    This contains the data we need for passing unboxed tuples between
    bytecode and native code
 

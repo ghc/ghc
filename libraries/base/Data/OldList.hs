@@ -1361,6 +1361,7 @@ singleton x = [x]
 --
 
 -- Note [INLINE unfoldr]
+-- ~~~~~~~~~~~~~~~~~~~~~
 -- We treat unfoldr a little differently from some other forms for list fusion
 -- for two reasons:
 --

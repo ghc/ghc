@@ -515,9 +515,8 @@ INSTALL_PACKAGES += $(addprefix libraries/,$(PACKAGES_STAGE2))
 
 endif # CLEANING
 
-# -------------------------------------------
-# Note [Dependencies between package-data.mk files].
-
+# Note [Dependencies between package-data.mk files]
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # We cannot run ghc-cabal to configure a package until we have
 # configured and registered all of its dependencies.  So the following
 # hack forces all the configure steps to happen in exactly the following order:
@@ -1497,7 +1496,7 @@ endif
 	cd libraries/xhtml && rm -f Setup Setup.exe Setup.hi Setup.o
 
 # Note [No stage2 packages when CrossCompiling or Stage1Only]
-#
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # (first read Note [CrossCompiling vs Stage1Only] and
 #  Note [Stage1Only vs stage=1] in mk/config.mk.in)
 #

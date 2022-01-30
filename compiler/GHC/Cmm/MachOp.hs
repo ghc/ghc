@@ -340,9 +340,8 @@ isFloatComparison mop =
     MO_F_Lt {} -> True
     _other     -> False
 
--- -----------------------------------------------------------------------------
--- Inverting conditions
-
+-- Note [Inverting conditions]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- Sometimes it's useful to be able to invert the sense of a
 -- condition.  Not all conditional tests are invertible: in
 -- particular, floating point conditionals cannot be inverted, because

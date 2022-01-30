@@ -78,7 +78,7 @@ import Control.Monad.Trans.Class  ( lift )
 import Control.Applicative        ( (<|>) )
 
 {- Note [Updating HieAst for changes in the GHC AST]
-
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When updating the code in this file for changes in the GHC AST, you
 need to pay attention to the following things:
 
@@ -210,6 +210,7 @@ type TypecheckedSource = LHsBinds GhcTc
 
 
 {- Note [Name Remapping]
+   ~~~~~~~~~~~~~~~~~~~~~
 The Typechecker introduces new names for mono names in AbsBinds.
 We don't care about the distinction between mono and poly bindings,
 so we replace all occurrences of the mono name with the poly name.
@@ -415,6 +416,7 @@ concatM :: Monad m => [m [a]] -> m [a]
 concatM xs = concat <$> sequence xs
 
 {- Note [Capturing Scopes and other non local information]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 toHie is a local transformation, but scopes of bindings cannot be known locally,
 hence we have to push the relevant info down into the binding nodes.
 We use the following types (*Context and *Scoped) to wrap things and
@@ -459,6 +461,7 @@ data PScoped a = PS (Maybe Span)
   deriving (Typeable, Data) -- Pattern Scope
 
 {- Note [TyVar Scopes]
+   ~~~~~~~~~~~~~~~~~~~
 Due to -XScopedTypeVariables, type variables can be in scope quite far from
 their original binding. We resolve the scope of these type variables
 in a separate pass
@@ -512,6 +515,7 @@ tvScopes tvScope rhsScope xs =
   map (\(RS sc a)-> TVS tvScope sc a) $ listScopes rhsScope xs
 
 {- Note [Scoping Rules for SigPat]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Explicitly quantified variables in pattern type signatures are not
 brought into scope in the rhs, but implicitly quantified variables
 are (HsWC and HsIB).

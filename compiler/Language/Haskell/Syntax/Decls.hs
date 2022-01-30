@@ -430,7 +430,7 @@ data TyClDecl pass
     DataDecl { tcdDExt     :: XDataDecl pass       -- ^ Post renamer, CUSK flag, FVs
              , tcdLName    :: LIdP pass             -- ^ Type constructor
              , tcdTyVars   :: LHsQTyVars pass      -- ^ Type variables
-                              -- See Note [TyVar binders for associated declarations]
+                              -- See Note [TyVar binders for associated decls]
              , tcdFixity   :: LexicalFixity        -- ^ Fixity used in the declaration
              , tcdDataDefn :: HsDataDefn pass }
 
@@ -826,7 +826,7 @@ data FamilyDecl pass = FamilyDecl
   , fdTopLevel       :: TopLevelFlag                 -- used for printing only
   , fdLName          :: LIdP pass                    -- type constructor
   , fdTyVars         :: LHsQTyVars pass              -- type variables
-                       -- See Note [TyVar binders for associated declarations]
+                       -- See Note [TyVar binders for associated decls]
   , fdFixity         :: LexicalFixity                -- Fixity used in the declaration
   , fdResultSig      :: LFamilyResultSig pass        -- result signature
   , fdInjectivityAnn :: Maybe (LInjectivityAnn pass) -- optional injectivity ann

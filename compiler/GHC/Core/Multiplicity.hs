@@ -219,7 +219,7 @@ We have
 
 The goal is to maximise reuse of types between linear code and traditional
 code. This is argued at length in the proposal and the article (links in Note
-[Linear Types]).
+[Linear types]).
 
 Note [Polymorphisation of linear fields]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

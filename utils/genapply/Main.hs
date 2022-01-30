@@ -509,8 +509,8 @@ genMkPAP regstatus macro jump live ticker disamb
 
 
 -- Note [jump_SAVE_CCCS]
-
--- when profiling, if we have some extra arguments to apply that we
+-- ~~~~~~~~~~~~~~~~~~~~~
+-- When profiling, if we have some extra arguments to apply that we
 -- save to the stack, we must also save the current cost centre stack
 -- and restore it when applying the extra arguments.  This is all
 -- handled by the macro jump_SAVE_CCCS(target), defined in

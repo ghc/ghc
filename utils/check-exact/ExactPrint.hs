@@ -868,7 +868,6 @@ exactDataFamInstDecl an top_lvl
 {-
 Note [an and an2 in exactDataFamInstDecl]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 The exactDataFamInstDecl function is called to render a
 DataFamInstDecl within its surrounding context. This context is
 rendered via the 'pp_hdr' function, which uses the exact print

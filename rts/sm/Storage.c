@@ -399,7 +399,6 @@ void listAllBlocks (ListBlocksCb cb, void *user)
 /* -----------------------------------------------------------------------------
    Note [CAF management]
    ~~~~~~~~~~~~~~~~~~~~~
-
    The entry code for every CAF does the following:
 
       - calls newCAF, which builds a CAF_BLACKHOLE on the heap and atomically
@@ -434,7 +433,6 @@ void listAllBlocks (ListBlocksCb cb, void *user)
    ------------------
    Note [atomic CAF entry]
    ~~~~~~~~~~~~~~~~~~~~~~~
-
    With THREADED_RTS, newCAF() is required to be atomic (see
    #5558). This is because if two threads happened to enter the same
    CAF simultaneously, they would create two distinct CAF_BLACKHOLEs,
@@ -448,7 +446,6 @@ void listAllBlocks (ListBlocksCb cb, void *user)
    ------------------
    Note [GHCi CAFs]
    ~~~~~~~~~~~~~~~~
-
    For GHCI, we have additional requirements when dealing with CAFs:
 
       - we must *retain* all dynamically-loaded CAFs ever entered,
@@ -470,7 +467,6 @@ void listAllBlocks (ListBlocksCb cb, void *user)
    ------------------
    Note [Static objects under the nonmoving collector]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
    Static object management is a bit tricky under the nonmoving collector as we
    need to maintain a bit more state than in the moving collector. In
    particular, the moving collector uses the low bits of the STATIC_LINK field
@@ -597,6 +593,7 @@ newCAF(StgRegTable *reg, StgIndStatic *caf)
     if(keepCAFs && !(highMemDynamic && (void*) caf > (void*) 0x80000000))
     {
         // Note [dyn_caf_list]
+        // ~~~~~~~~~~~~~~~~~~~
         // If we are in GHCi _and_ we are using dynamic libraries,
         // then we can't redirect newCAF calls to newRetainedCAF (see below),
         // so we make newCAF behave almost like newRetainedCAF.
@@ -990,7 +987,6 @@ accountAllocation(Capability *cap, W_ n)
 
 /* Note [slop on the heap]
  * ~~~~~~~~~~~~~~~~~~~~~~~
- *
  * We use the term "slop" to refer to allocated memory on the heap which isn't
  * occupied by any closure. Usually closures are packet tightly into the heap
  * blocks, storage for one immediately following another. However there are
@@ -1549,7 +1545,7 @@ dirty_MVAR(StgRegTable *reg, StgClosure *p, StgClosure *old_val)
 
 /* -----------------------------------------------------------------------------
  * Note [allocation accounting]
- *
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  *   - When cap->r.rCurrentNusery moves to a new block in the nursery,
  *     we add the size of the used portion of the previous block to
  *     cap->total_allocated. (see finishedNurseryBlock())
@@ -1825,7 +1821,6 @@ _bdescr (StgPtr p)
 /*
 Note [Sources of Block Level Fragmentation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 Block level fragmentation is when there is unused space in megablocks.
 The amount of fragmentation can be calculated as the difference between the
 total size of allocated blocks and the total size of allocated megablocks.

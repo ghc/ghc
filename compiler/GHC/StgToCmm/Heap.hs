@@ -491,6 +491,7 @@ cannedGCEntryPoint platform regs
       _otherwise -> Nothing
 
 -- Note [stg_gc arguments]
+-- ~~~~~~~~~~~~~~~~~~~~~~~
 -- It might seem that we could avoid passing the arguments to the
 -- stg_gc function, because they are already in the right registers.
 -- While this is usually the case, it isn't always.  Sometimes the
@@ -670,7 +671,6 @@ do_checks mb_stk_hwm checkYield mb_alloc_lit do_gc = do
 
 -- Note [Self-recursive loop header]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
---
 -- Self-recursive loop header is required by loopification optimization (See
 -- Note [Self-recursive tail calls] in GHC.StgToCmm.Expr). We emit it if:
 --

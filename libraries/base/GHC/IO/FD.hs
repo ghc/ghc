@@ -537,8 +537,8 @@ fdWriteNonBlocking fd ptr _offset bytes = do
 #if !defined(mingw32_HOST_OS)
 
 {-
-NOTE [nonblock]:
-
+Note [nonblock]
+~~~~~~~~~~~~~~~
 Unix has broken semantics when it comes to non-blocking I/O: you can
 set the O_NONBLOCK flag on an FD, but it applies to the all other FDs
 attached to the same underlying file, pipe or TTY; there's no way to

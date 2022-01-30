@@ -136,6 +136,7 @@ foreign import WINDOWS_CCONV safe "windows.h GetQueuedCompletionStatusEx"
                                   -> Ptr ULONG -> DWORD -> BOOL -> IO BOOL
 
 -- | Note [Completion Ports]
+--   ~~~~~~~~~~~~~~~~~~~~~~~
 -- When an I/O operation has been queued by an operation
 -- (ReadFile/WriteFile/etc) it is placed in a queue that the driver uses when
 -- servicing IRQs.  This queue has some important properties:
@@ -343,7 +344,8 @@ pokeEventOverlapped lpol event = do
 ------------------------------------------------------------------------
 -- Request management
 
--- [Note AsyncHandles]
+-- Note [AsyncHandles]
+-- ~~~~~~~~~~~~~~~~~~~
 -- In `winio` we have designed it to work in asynchronous mode always.
 -- According to the MSDN documentation[1][2], when a handle is not opened
 -- in asynchronous mode then the operation would simply work but operate
@@ -392,7 +394,7 @@ pokeEventOverlapped lpol event = do
 --    invalid.  This is an issue because to pass `HANDLE`s we have to pass
 --    the native OS Handle not the Haskell one. i.e. remote-iserv.
 
--- See [Note AsyncHandles]
+-- See Note [AsyncHandles]
 withRequest :: Bool -> Word64 -> HANDLE -> IOCallback
             -> (Ptr HASKELL_OVERLAPPED -> Ptr CompletionData -> IO a)
             -> IO a

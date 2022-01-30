@@ -1046,7 +1046,7 @@ thLevel (Brack s _)   = thLevel s + 1
 thLevel (RunSplice _) = panic "thLevel: called when running a splice"
                         -- See Note [RunSplice ThLevel].
 
-{- Node [RunSplice ThLevel]
+{- Note [RunSplice ThLevel]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The 'RunSplice' stage is set when executing a splice, and only when running a
 splice. In particular it is not set when the splice is renamed or typechecked.

@@ -179,8 +179,8 @@ variations happen to; for example [a -> (a, b)].
 A TCvSubst is not idempotent, but, unlike the non-idempotent substitution
 we use during unifications, it must not be repeatedly applied.
 
-Note [Extending the TvSubstEnv]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Extending the TCvSubstEnv]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 See #tcvsubst_invariant# for the invariants that must hold.
 
 This invariant allows a short-cut when the subst envs are empty:

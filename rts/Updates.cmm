@@ -91,7 +91,7 @@ INFO_TABLE_RET ( stg_bh_upd_frame, UPDATE_FRAME,
 }
 
 /* Note [HpAlloc]
- *
+ * ~~~~~~~~~~~~~~
  * HpAlloc is required to be zero unless we just bumped Hp and failed
  * the heap check: see HeapStackCheck.cmm.  Failures that result from
  * HpAlloc being non-zero are very hard to track down, because they

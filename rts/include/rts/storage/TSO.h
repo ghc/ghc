@@ -191,10 +191,9 @@ typedef struct StgTSO_ {
 
 /* Note [StgStack dirtiness flags and concurrent marking]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
- *
- * Without concurrent collection by the nonmoving collector the stack dirtiness story
- * is quite simple: The stack is either STACK_DIRTY (meaning it has been added to mut_list)
- * or not.
+ * Without concurrent collection by the nonmoving collector the stack dirtiness
+ * story is quite simple: The stack is either STACK_DIRTY (meaning it has been
+ * added to mut_list) or not.
  *
  * However, things are considerably more complicated with concurrent collection
  * (namely, when nonmoving_write_barrier_enabled is set): In addition to adding

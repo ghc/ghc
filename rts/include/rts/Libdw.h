@@ -18,8 +18,8 @@
 /*
  * Note [Chunked stack representation]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
- *
  * Consider the stack,
+ *
  *     main                   calls                        (bottom of stack)
  *       func1                which in turn calls
  *         func2              which calls

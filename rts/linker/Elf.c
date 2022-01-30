@@ -110,9 +110,8 @@
 #endif
 
 /*
-
    Note [Many ELF Sections]
-
+   ~~~~~~~~~~~~~~~~~~~~~~~~
    The normal section number fields in ELF are limited to 16 bits, which runs
    out of bits when you try to cram in more sections than that.
 
@@ -1245,6 +1244,7 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
 
            if(needs_veneer) { /* overflow or thum interworking */
                // Note [PC bias]
+               // ~~~~~~~~~~~~~~
                // From the ELF for the ARM Architecture documentation:
                // > 4.6.1.1 Addends and PC-bias compensation
                // > A binary file may use REL or RELA relocations or a mixture

@@ -301,7 +301,7 @@ numericEnumFromThenTo e1 e2 e3
                                            | otherwise = (>= e3 + mid)
 
 {- Note [Numeric Stability of Enumerating Floating Numbers]
------------------------------------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When enumerate floating numbers, we could add the increment to the last number
 at every run (as what we did previously):
 

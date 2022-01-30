@@ -199,6 +199,7 @@ TL;DR: we make the `n_occ` field lazy.
 
 {-
 Note [About the NameSorts]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 1.  Initially, top-level Ids (including locally-defined ones) get External names,
     and all other local Ids get Internal names

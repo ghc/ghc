@@ -212,7 +212,7 @@ slowCall fun stg_args
                                       " with pat " ++ unpackFS rts_fun)
            return r
 
-        -- Note [avoid intermediate PAPs]
+        -- See Note [avoid intermediate PAPs]
         let n_args = length stg_args
         if n_args > arity && fast_pap
            then do
@@ -261,7 +261,7 @@ slowCall fun stg_args
 
 
 -- Note [avoid intermediate PAPs]
---
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- A slow call which needs multiple generic apply patterns will be
 -- almost guaranteed to create one or more intermediate PAPs when
 -- applied to a function that takes the correct number of arguments.
@@ -339,7 +339,7 @@ nonVArgs ((_,Just arg) : args) = arg : nonVArgs args
 
 {-
 Note [over-saturated calls]
-
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The natural thing to do for an over-saturated call would be to call
 the function with the correct number of arguments, and then apply the
 remaining arguments to the value returned, e.g.

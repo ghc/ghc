@@ -57,16 +57,15 @@ visitSwitches platform block
 
 -- Note [Floating switch expressions]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 -- When we translate a sparse switch into a search tree we would like
 -- to compute the value we compare against only once.
-
+--
 -- For this purpose we assign the switch expression to a local register
 -- and then use this register when constructing the actual binary tree.
-
+--
 -- This is important as the expression could contain expensive code like
 -- memory loads or divisions which we REALLY don't want to duplicate.
-
+--
 -- This happened in parts of the handwritten RTS Cmm code. See also #16933
 
 -- See Note [Floating switch expressions]

@@ -229,7 +229,7 @@ Mutex concurrent_coll_finished_lock;
  *  - Note [StgStack dirtiness flags and concurrent marking] (TSO.h) describes
  *    the protocol for concurrent marking of stacks.
  *
- *  - Note [Nonmoving write barrier in Perform{Take,Put}] (PrimOps.cmm) describes
+ *  - Note [Nonmoving write barrier in Perform{Put,Take}] (PrimOps.cmm) describes
  *    a tricky barrier necessary when resuming threads blocked on MVar
  *    operations.
  *
@@ -328,8 +328,8 @@ Mutex concurrent_coll_finished_lock;
  * The implementation details of this are described in Note [Non-moving GC:
  * Marking evacuated objects] in Evac.c.
  *
- * Note [Deadlock detection under the non-moving collector]
- * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * Note [Deadlock detection under nonmoving collector]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  * In GHC the garbage collector is responsible for identifying deadlocked
  * programs. Providing for this responsibility is slightly tricky in the
  * non-moving collector due to the existence of aging. In particular, the

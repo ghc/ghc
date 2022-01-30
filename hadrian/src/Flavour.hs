@@ -267,7 +267,6 @@ collectTimings =
 {-
 Note [Hadrian settings]
 ~~~~~~~~~~~~~~~~~~~~~~~
-
 Hadrian lets one customize GHC builds through the UserSettings module,
 where Hadrian users can override existing 'Flavour's or create entirely
 new ones, overriding/extending the options passed to some builder

@@ -552,7 +552,7 @@ usage_text[] = {
 
 /**
 Note [Windows Unicode Arguments]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 On Windows argv is usually encoded in the current Codepage which might not
 support unicode.
 
@@ -2587,7 +2587,7 @@ void freeRtsArgs(void)
 
 /*
 Note [OPTION_SAFE vs OPTION_UNSAFE]
-
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Ticket #3910 originally pointed out that the RTS options are a potential
 security problem. For example the -t -s or -S flags can be used to
 overwrite files. This would be bad in the context of CGI scripts or

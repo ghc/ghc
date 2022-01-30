@@ -18,10 +18,8 @@
 #include <stdio.h>
 
 /*
-
 Note [Compile Time Trickery]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 This file implements two versions of each of the `m32_*` functions. At the top
 of the file there is the real implementation (compiled in when
 `NEED_M32` is true) and a dummy implementation that exists only to
@@ -45,10 +43,8 @@ still check the call for syntax and correct function parameter types.
 #if defined(NEED_M32)
 
 /*
-
 Note [M32 Allocator]
 ~~~~~~~~~~~~~~~~~~~~
-
 A memory allocator that allocates only pages in the 32-bit range (lower 2GB).
 This is useful on 64-bit platforms to ensure that addresses of allocated
 objects can be referenced with a 32-bit relative offset.

@@ -150,7 +150,7 @@ instance Outputable CfgEdge where
 -- or has it been introduced during assembly codegen. We use this to maintain
 -- some information which would otherwise be lost during the
 -- Cmm \<-> asm transition.
--- See also Note [Inverting Conditional Branches]
+-- See also Note [Inverting conditions]
 data TransitionSource
   = CmmSource { trans_cmmNode :: (CmmNode O C)
               , trans_info :: BranchInfo }
@@ -248,7 +248,7 @@ filterEdges f cfg =
 
 
 {- Note [Updating the CFG during shortcutting]
-
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 See Note [What is shortcutting] in the control flow optimization
 code (GHC.Cmm.ContFlowOpt) for a slightly more in depth explanation on shortcutting.
 
@@ -1013,7 +1013,6 @@ mkGlobalWeights root localCfg
 
 {- Note [Static Branch Prediction]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 The work here has been based on the paper
 "Static Branch Prediction and Program Profile Analysis" by Y Wu, JR Larus.
 

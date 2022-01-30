@@ -45,7 +45,6 @@ default () -- Double and Integer aren't available yet
 
 {- Note [Pointer equality operations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 Many primitive types - such as Array#, ByteArray#, MVar#, ... - are boxed:
 they are represented by pointers to the underlying data. It is thus possible
 to directly compare these pointers for equality, as opposed to comparing
@@ -55,7 +54,7 @@ two arrays element-wise).
 To do this, GHC provides the primop reallyUnsafePtrEquality#, which is
 both levity-polymorphic and heterogeneous. As its name indicates, it is an
 unsafe operation which can yield unpredictable results, as explained in
-  Note [Pointer comparison operations] in primops.txt.pp
+Note [Pointer comparison operations] in primops.txt.pp
 
 For a more user-friendly interface, this module defines specialisations of
 the reallyUnsafePtrEquality# primop at various primitive types, such as
@@ -116,7 +115,6 @@ sameIOPort# = reallyUnsafePtrEquality#
 
 -- Note [Comparing stable names]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
---
 -- A StableName# is actually a pointer to a stable name object (SNO)
 -- containing an index into the stable name table (SNT). We
 -- used to compare StableName#s by following the pointers to the

@@ -27,7 +27,6 @@
 /*
 Note [The Info Table Provenance Entry (IPE) Map]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 IPEs are stored in a hash map from info table address (pointer) to IPE. This
 ensures cheap lookup and traversal.
 

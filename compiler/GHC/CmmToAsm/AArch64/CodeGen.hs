@@ -62,6 +62,7 @@ import GHC.Utils.Misc
 import GHC.Utils.Panic
 
 -- Note [General layout of an NCG]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- @cmmTopCodeGen@ will be our main entry point to code gen.  Here we'll get
 -- @RawCmmDecl@; see GHC.Cmm
 --
@@ -846,7 +847,7 @@ getRegister' config plat expr
         MO_Sub w -> intOp False w (\d x y -> unitOL $ annExpr expr (SUB d x y))
 
         -- Note [CSET]
-        --
+        -- ~~~~~~~~~~~
         -- Setting conditional flags: the architecture internally knows the
         -- following flag bits.  And based on thsoe comparisons as in the
         -- table below.

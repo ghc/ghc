@@ -295,7 +295,6 @@ tryFillBuffer encoder null_terminate from0 to_p to_sz_bytes = do
 {-
 Note [Check *before* fill in withEncodedCString]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 It's very important that the size check and readjustment peformed by tryFillBuffer
 happens before the continuation is called. The size check is the part which can
 fail, the call to the continuation never fails and so the caller should respond

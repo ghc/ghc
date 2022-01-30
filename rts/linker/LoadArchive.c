@@ -468,6 +468,7 @@ static HsInt loadArchive_ (pathchar *path)
 #if defined(OBJFORMAT_PEi386)
         /*
         * Note [MSVC import files (ext .lib)]
+        * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         * MSVC compilers store the object files in
         * the import libraries with extension .dll
         * so on Windows we should look for those too.

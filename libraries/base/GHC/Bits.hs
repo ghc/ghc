@@ -668,8 +668,9 @@ isBitSubType x y
     ySigned = isSigned     y
 {-# INLINE isBitSubType #-}
 
-{-      Note [Constant folding for rotate]
-        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{-
+Note [Constant folding for rotate]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The INLINE on the Int instance of rotate enables it to be constant
 folded.  For example:
      sumU . mapU (`rotate` 3) . replicateU 10000000 $ (7 :: Int)

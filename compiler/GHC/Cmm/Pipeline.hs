@@ -175,7 +175,6 @@ cpsTop logger platform cfg proc =
 
 -- Note [Sinking after stack layout]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
---
 -- In the past we considered running sinking pass also before stack
 -- layout, but after making some measurements we realized that:
 --
@@ -301,7 +300,7 @@ cpsTop logger platform cfg proc =
 --
 
 {- Note [inconsistent-pic-reg]
-
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 On x86/Darwin, PIC is implemented by inserting a sequence like
 
     call 1f
@@ -329,7 +328,7 @@ _GLOBAL_OFFSET_TABLE_, regardless of which entry point we arrived via.
 -}
 
 {- Note [unreachable blocks]
-
+   ~~~~~~~~~~~~~~~~~~~~~~~~~
 The control-flow optimiser sometimes leaves unreachable blocks behind
 containing junk code.  These aren't necessarily a problem, but
 removing them is good because it might save time in the native code

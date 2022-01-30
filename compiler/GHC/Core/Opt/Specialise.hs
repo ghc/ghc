@@ -809,7 +809,7 @@ canSpecImport dflags fn
 tryWarnMissingSpecs :: DynFlags -> [Id] -> Id -> [CallInfo] -> CoreM ()
 -- See Note [Warning about missed specialisations]
 tryWarnMissingSpecs dflags callers fn calls_for_fn
-  | isClassOpId fn = return () -- See Note [Missed specialization for ClassOps]
+  | isClassOpId fn = return () -- See Note [Missed specialisation for ClassOps]
   | wopt Opt_WarnMissedSpecs dflags
     && not (null callers)
     && allCallersInlined                  = doWarn $ WarningWithFlag Opt_WarnMissedSpecs
@@ -1434,7 +1434,7 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
         -- See Note [Auto-specialisation and RULES]
 
 --   && not (certainlyWillInline (idUnfolding fn))      -- And it's not small
---      See Note [Inline specialisation] for why we do not
+--      See Note [Inline specialisations] for why we do not
 --      switch off specialisation for inline functions
 
   = -- pprTrace "specDefn: some" (ppr fn $$ ppr calls_for_me $$ ppr existing_rules) $

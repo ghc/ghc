@@ -58,7 +58,6 @@ bool makeStubArmThm(Stub * s);
 /*
   Note [The ARM/Thumb Story]
   ~~~~~~~~~~~~~~~~~~~~~~~~~~
-
   Support for the ARM architecture is complicated by the fact that ARM has not
   one but several instruction encodings. The two relevant ones here are the
   original ARM encoding and Thumb, a more dense variant of ARM supporting only

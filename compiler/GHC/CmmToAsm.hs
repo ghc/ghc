@@ -192,7 +192,6 @@ data NativeGenAcc statics instr
 {-
 Note [Unwinding information in the NCG]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 Unwind information is a type of metadata which allows a debugging tool
 to reconstruct the values of machine registers at the time a procedure was
 entered. For the most part, the production of unwind information is handled by

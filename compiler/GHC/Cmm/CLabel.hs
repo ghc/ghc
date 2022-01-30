@@ -478,7 +478,7 @@ data IdLabelInfo
                         -- Note [Bytes label].
   | BlockInfoTable      -- ^ Like LocalInfoTable but for a proc-point block
                         -- instead of a closure entry-point.
-                        -- See Note [Proc-point local block entry-point].
+                        -- See Note [Proc-point local block entry-points].
 
   deriving (Eq, Ord)
 
@@ -587,7 +587,7 @@ mkBytesLabel name                 = IdLabel name NoCafRefs Bytes
 
 mkBlockInfoTableLabel :: Name -> CafInfo -> CLabel
 mkBlockInfoTableLabel name c = IdLabel name c BlockInfoTable
-                               -- See Note [Proc-point local block entry-point].
+                               -- See Note [Proc-point local block entry-points].
 
 -- Constructing Cmm Labels
 mkDirty_MUT_VAR_Label,
@@ -865,7 +865,7 @@ toEntryLbl platform lbl = case lbl of
    IdLabel n c (ConInfoTable k)  -> IdLabel n c (ConEntry k)
 
    IdLabel n _ BlockInfoTable    -> mkLocalBlockLabel (nameUnique n)
-                   -- See Note [Proc-point local block entry-point].
+                   -- See Note [Proc-point local block entry-points].
    IdLabel n c _                 -> IdLabel n c Entry
    CmmLabel m ext str CmmInfo    -> CmmLabel m ext str CmmEntry
    CmmLabel m ext str CmmRetInfo -> CmmLabel m ext str CmmRet
@@ -898,7 +898,6 @@ hasCAF _                            = False
 
 -- Note [ticky for LNE]
 -- ~~~~~~~~~~~~~~~~~~~~~
-
 -- Until 14 Feb 2013, every ticky counter was associated with a
 -- closure. Thus, ticky labels used IdLabel. It is odd that
 -- GHC.Cmm.Info.Build.cafTransfers would consider such a ticky label
@@ -1465,7 +1464,6 @@ pprCLabel !platform !sty lbl = -- see Note [Bangs in CLabel]
 
 -- Note [Internal proc labels]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
---
 -- Some tools (e.g. the `perf` utility on Linux) rely on the symbol table
 -- for resolution of function names. To help these tools we provide the
 -- (enabled by default) -fexpose-all-symbols flag which causes GHC to produce

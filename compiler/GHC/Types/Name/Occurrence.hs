@@ -132,6 +132,7 @@ data NameSpace = VarName        -- Variables, including "real" data constructors
                deriving( Eq, Ord )
 
 -- Note [Data Constructors]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~
 -- see also: Note [Data Constructor Naming] in GHC.Core.DataCon
 --
 -- $real_vs_source_data_constructors

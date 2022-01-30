@@ -1004,7 +1004,7 @@ The term oracle state is never obviously (i.e., without consulting the type
 oracle or doing inhabitation testing) contradictory. This implies a few
 invariants:
 * Whenever vi_pos overlaps with vi_neg according to 'eqPmAltCon', we refute.
-  This is implied by the Note [Pos/Neg invariant].
+  This is implied by the Note [The Pos/Neg invariant].
 * Whenever vi_neg subsumes a COMPLETE set, we refute. We consult vi_rcm to
   detect this, but we could just compare whole COMPLETE sets to vi_neg every
   time, if it weren't for performance.
@@ -1496,7 +1496,7 @@ matchConLikeResTy _   (TySt _ inert) ty (PatSynCon ps) = {-# SCC "matchConLikeRe
         then pure subst
         else mzero
 
-{- Note [Soundness and completeness]
+{- Note [Soundness and Completeness]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Soundness and completeness of the pattern-match checker depend entirely on the
 soundness and completeness of the inhabitation test.

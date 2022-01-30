@@ -188,7 +188,7 @@ do_operation fun h act m = do
             throwIO e
 
 -- Note [async]
---
+-- ~~~~~~~~~~~~
 -- If an asynchronous exception is raised during an I/O operation,
 -- normally it is fine to just re-throw the exception synchronously.
 -- However, if we are inside an unsafePerformIO or an
@@ -644,7 +644,6 @@ flushByteReadBuffer h_@Handle__{..} = do
 
 {- Note [Making offsets for append]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
   The WINIO subysstem keeps track of offsets for handles
   on the Haskell side of things instead of letting the OS
   handle it. This requires us to establish the correct offset

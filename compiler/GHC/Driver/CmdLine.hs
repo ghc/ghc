@@ -320,15 +320,15 @@ missingArgErr f = Left ("missing argument for flag: " ++ f)
 --------------------------------------------------------
 
 
--- See Note [Handling errors when parsing flags]
+-- See Note [Handling errors when parsing command-line flags]
 errorsToGhcException :: [(String,    -- Location
                           String)]   -- Error
                      -> GhcException
 errorsToGhcException errs =
     UsageError $ intercalate "\n" $ [ l ++ ": " ++ e | (l, e) <- errs ]
 
-{- Note [Handling errors when parsing commandline flags]
-
+{- Note [Handling errors when parsing command-line flags]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Parsing of static and mode flags happens before any session is started, i.e.,
 before the first call to 'GHC.withGhc'. Therefore, to report errors for
 invalid usage of these two types of flags, we can not call any function that

@@ -286,7 +286,7 @@ unsafeCoerce# :: forall (r1 :: RuntimeRep) (r2 :: RuntimeRep)
                         (a :: TYPE r1) (b :: TYPE r2).
                  a -> b
 unsafeCoerce# = error "GHC internal error: unsafeCoerce# not unfolded"
--- See (U10) of Note [Implementing unsafeCorece]
+-- See (U10) of Note [Implementing unsafeCoerce]
 -- The RHS is updated by Desugar.patchMagicDefns
 -- See Desugar Note [Wiring in unsafeCoerce#]
 

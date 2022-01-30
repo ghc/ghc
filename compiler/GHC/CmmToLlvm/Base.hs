@@ -591,7 +591,7 @@ aliasify (LMGlobal var val) = do
            ]
 
 -- Note [Llvm Forward References]
---
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- The issue here is that LLVM insists on being strongly typed at
 -- every corner, so the first time we mention something, we have to
 -- settle what type we assign to it. That makes things awkward, as Cmm

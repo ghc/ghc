@@ -3,7 +3,6 @@
 /*
 Note [Bit reversal primop]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 There are two main ways of reversing the bit order of a word: bit twiddling
 and using a lookup table.
 See [this excellent](https://stackoverflow.com/questions/746171/most-efficient-algorithm-for-bit-reversal-from-msb-lsb-to-lsb-msb-in-c this)

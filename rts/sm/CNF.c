@@ -36,7 +36,6 @@
 /*
   Note [Compact Normal Forms]
   ~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
   A compact normal form (CNF) is a region of memory containing one or more
   Haskell data structures.  The goals are:
 

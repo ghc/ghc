@@ -762,7 +762,7 @@ constraintKind   = mkTyConTy constraintKindTyCon
 *                                                                      *
 ************************************************************************
 
-Note [How tuples work]  See also Note [Known-key names] in GHC.Builtin.Names
+Note [How tuples work]
 ~~~~~~~~~~~~~~~~~~~~~~
 * There are three families of tuple TyCons and corresponding
   DataCons, expressed by the type BasicTypes.TupleSort:
@@ -813,6 +813,8 @@ Note [How tuples work]  See also Note [Known-key names] in GHC.Builtin.Names
   things: instead of serializing the OccName we just serialize the key. During
   deserialization we lookup the Name associated with the unique with the logic
   in GHC.Builtin.Uniques. See Note [Symbol table representation of names] for details.
+
+See also Note [Known-key names] in GHC.Builtin.Names.
 
 Note [One-tuples]
 ~~~~~~~~~~~~~~~~~

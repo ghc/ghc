@@ -22,7 +22,7 @@
 /* For defaults, see the @initRtsFlagsDefaults@ routine. */
 
 /* Note [Synchronization of flags and base APIs]
- *
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  * We provide accessors to RTS flags in base. (GHC.RTS module)
  * The API should be updated whenever RTS flags are modified.
  */
@@ -230,7 +230,7 @@ typedef struct _MISC_FLAGS {
                                           memory management for non-GC related
                                           tasks in the future, we'd respect it
                                           there as well. */
-    bool internalCounters;       /* See Note [Internal Counter Stats] */
+    bool internalCounters;       /* See Note [Internal Counters Stats] */
     bool linkerAlwaysPic;        /* Assume the object code is always PIC */
     StgWord linkerMemBase;       /* address to ask the OS for memory
                                   * for the linker, NULL ==> off */

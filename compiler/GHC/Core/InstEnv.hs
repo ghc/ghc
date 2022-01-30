@@ -869,7 +869,7 @@ lookupInstEnv' ie vis_mods cls tys
           -- apply in the future. This covers an instance like C Int and
           -- a target like [W] C (F a), where F is a type family.
             SurelyApart              -> find ms us        rest
-              -- Note [Infinitary substitution in lookup]
+              -- See Note [Infinitary substitution in lookup]
             MaybeApart MARInfinite _ -> find ms us        rest
             _                        -> find ms (item:us) rest
       where

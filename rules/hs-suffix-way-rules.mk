@@ -30,7 +30,7 @@ $1/$2/build/%.$$(dyn_osuf)-boot: $1/$2/build/%.$$(v_hisuf)-boot
 else
 
 # Note [Implicit rule search algorithm]
-#
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # The order in which implicit rules are defined can influence a build.
 #
 # Case study: genprimops/Lexer.hs

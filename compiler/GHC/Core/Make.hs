@@ -836,7 +836,6 @@ tYPE_ERROR_ID                   = mkRuntimeErrorId typeErrorName
 
 -- Note [aBSENT_SUM_FIELD_ERROR_ID]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
---
 -- Unboxed sums are transformed into unboxed tuples in GHC.Stg.Unarise.mkUbxSum
 -- and fields that can't be reached are filled with rubbish values. It's easy to
 -- come up with rubbish literal values: we use 0 (ints/words) and 0.0

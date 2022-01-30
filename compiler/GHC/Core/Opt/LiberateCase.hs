@@ -168,7 +168,7 @@ libCaseBind env (Rec pairs)
 
     ok_pair (id,_)
         =  idArity id > 0       -- Note [Only functions!]
-        && not (isDeadEndId id) -- Note [Not bottoming ids]
+        && not (isDeadEndId id) -- Note [Not bottoming Ids]
 
 {- Note [Not bottoming Ids]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -815,7 +815,7 @@ lookupFamInstEnvConflicts envs fam_inst@(FamInst { fi_axiom = new_axiom })
          if compatibleBranches (coAxiomSingleBranch old_axiom) new_branch
            then Nothing
            else Just noSubst
-      -- Note [Family instance overlap conflicts]
+      -- See Note [Family instance overlap conflicts]
 
     noSubst = panic "lookupFamInstEnvConflicts noSubst"
     new_branch = coAxiomSingleBranch new_axiom
@@ -826,7 +826,6 @@ lookupFamInstEnvConflicts envs fam_inst@(FamInst { fi_axiom = new_axiom })
 
 {- Note [Verifying injectivity annotation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 Injectivity means that the RHS of a type family uniquely determines the LHS (see
 Note [Type inference for type families with injectivity]).  The user informs us about
 injectivity using an injectivity annotation and it is GHC's task to verify that

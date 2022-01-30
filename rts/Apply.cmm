@@ -38,7 +38,7 @@ stg_ap_0_fast ( P_ fun )
 
 /*
   Note [Evaluating functions with profiling]
-
+  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   If we evaluate something like
 
     let f = {-# SCC "f" #-} g
@@ -461,8 +461,8 @@ for:
    -------------------------------------------------------------------------- */
 
 /*
- Note [AP_STACKs must be eagerly blackholed]
- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [AP_STACKs must be eagerly blackholed]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #13615 describes a nasty concurrency issue where we can enter into the
 middle of an ST action multiple times, resulting in duplication of effects.
 In short, the construction of an AP_STACK allows us to suspend a computation

@@ -1292,7 +1292,7 @@ updateDBCache verbosity db db_stack = do
       hasAnyAbiDepends x = length (abiDepends x) > 0
 
   -- warn when we find any (possibly-)bogus abi-depends fields;
-  -- Note [Recompute abi-depends]
+  -- See Note [Recompute abi-depends]
   when (verbosity >= Normal) $ do
     let definitelyBrokenPackages =
           nub
@@ -1341,7 +1341,6 @@ type PackageCacheFormat = GhcPkg.GenericUnitInfo
 
 {- Note [Recompute abi-depends]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 Like most fields, `ghc-pkg` relies on who-ever is performing package
 registration to fill in fields; this includes the `abi-depends` field present
 for the package.

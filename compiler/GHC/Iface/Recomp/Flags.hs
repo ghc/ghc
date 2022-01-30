@@ -109,7 +109,7 @@ fingerprintHpcFlags dflags@DynFlags{..} nameio =
 
 
 {- Note [path flags and recompilation]
-
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 There are several flags that we deliberately omit from the
 recompilation check; here we explain why.
 
@@ -140,7 +140,6 @@ The only path-related flag left is -hcsuf.
 
 {- Note [Ignoring some flag changes]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 Normally, --make tries to reuse only compilation products that are
 the same as those that would have been produced compiling from
 scratch. Sometimes, however, users would like to be more aggressive
@@ -159,7 +158,6 @@ options out of the flag hash, hashing them separately.
 
 {- Note [Repeated -optP hashing]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 We invoke fingerprintDynFlags for each compiled module to include
 the hash of relevant DynFlags in the resulting interface file.
 -optP (preprocessor) flags are part of that hash.

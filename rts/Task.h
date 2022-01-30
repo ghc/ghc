@@ -18,7 +18,6 @@
 /*
    Note [Definition of a Task]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
    A task is an OSThread that runs Haskell code.  Every OSThread that
    runs inside the RTS, whether as a worker created by the RTS or via
    an in-call from C to Haskell, has an associated Task.  The first
@@ -35,7 +34,6 @@
 
    Note [Ownership of Task]
    ~~~~~~~~~~~~~~~~~~~~~~~~
-
    Task ownership is a little tricky.  The default situation is that
    the Task is an OS-thread-local structure that is owned by the OS
    thread named in task->id.  An OS thread not currently executing

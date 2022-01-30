@@ -1858,7 +1858,7 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
 
     case UPDATE_FRAME:
         // Note [upd-black-hole]
-        //
+        // ~~~~~~~~~~~~~~~~~~~~~
         // In SMP, we can get update frames that point to indirections
         // when two threads evaluate the same thunk.  We do attempt to
         // discover this situation in threadPaused(), but it's

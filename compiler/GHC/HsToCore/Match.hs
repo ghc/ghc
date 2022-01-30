@@ -254,7 +254,7 @@ match (v:vs) ty eqns    -- Eqns *can* be empty
           maybeWarn $ filter (not . null) gs
 
 matchEmpty :: MatchId -> Type -> DsM (NonEmpty (MatchResult CoreExpr))
--- See Note [Empty case expressions]
+-- See Note [Empty case alternatives]
 matchEmpty var res_ty
   = return [MR_Fallible mk_seq]
   where
@@ -343,7 +343,7 @@ We do *not* desugar simply to
    error "empty case"
 or some such, because 'x' might be bound to (error "hello"), in which
 case we want to see that "hello" exception, not (error "empty case").
-See also Note [Case elimination: lifted case] in GHC.Core.Opt.Simplify.
+See also the "lifted case" discussion in Note [Case elimination] in GHC.Core.Opt.Simplify.
 
 
 ************************************************************************

@@ -652,7 +652,7 @@ void osCommitMemory(void *at, W_ size)
 }
 
 /* Note [MADV_FREE and MADV_DONTNEED]
- *
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  * madvise() provides flags with which one can release no longer needed pages
  * back to the kernel without having to munmap() (which is expensive).
  *

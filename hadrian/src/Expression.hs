@@ -100,7 +100,6 @@ way w = (w ==) <$> getWay
 {-
 Note [Stage Names]
 ~~~~~~~~~~~~~~~~~~
-
 Code referring to specific stages can be a bit tricky. In Hadrian, the stages
 have the same names they carried in the autoconf build system, but they are
 often referred to by the stage used to construct them. For example, the stage 1

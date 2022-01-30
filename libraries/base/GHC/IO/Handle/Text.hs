@@ -320,7 +320,7 @@ unpack_nl !buf !r !w acc0
                 return (str, w)
 
 -- Note [#5536]
---
+-- ~~~~~~~~~~~~
 -- We originally had
 --
 --    let c' = desurrogatifyRoundtripCharacter c in

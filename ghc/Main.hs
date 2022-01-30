@@ -567,7 +567,7 @@ parseModeFlags args = do
              Nothing     -> doMakeMode
              Just (m, _) -> m
 
-  -- See Note [Handling errors when parsing commandline flags]
+  -- See Note [Handling errors when parsing command-line flags]
   unless (null errs1 && null errs2) $ throwGhcException $ errorsToGhcException $
       map (("on the commandline", )) $ map (unLoc . errMsg) errs1 ++ errs2
 

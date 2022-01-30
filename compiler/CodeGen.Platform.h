@@ -834,7 +834,7 @@ freeReg :: RegNo -> Bool
 
 # if defined(MACHREGS_i386)
 freeReg esp = False -- %esp is the C stack pointer
-freeReg esi = False -- Note [esi/edi/ebp not allocatable]
+freeReg esi = False -- See Note [esi/edi/ebp not allocatable]
 freeReg edi = False
 freeReg ebp = False
 # endif
@@ -844,7 +844,7 @@ freeReg rsp = False  --        %rsp is the C stack pointer
 
 {-
 Note [esi/edi/ebp not allocatable]
-
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 %esi is mapped to R1, so %esi would normally be allocatable while it
 is not being used for R1.  However, %esi has no 8-bit version on x86,
 and the linear register allocator is not sophisticated enough to

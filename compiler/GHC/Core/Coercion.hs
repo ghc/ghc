@@ -843,7 +843,7 @@ mkAppCos :: Coercion
 mkAppCos co1 cos = foldl' mkAppCo co1 cos
 
 {- Note [Unused coercion variable in ForAllCo]
-
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 See Note [Unused coercion variable in ForAllTy] in GHC.Core.TyCo.Rep for the
 motivation for checking coercion variable in types.
 To lift the design choice to (ForAllCo cv kind_co body_co), we have two options:
@@ -2117,7 +2117,7 @@ liftCoSubstTyVar (LC subst env) r v
   = Just $ mkReflCo r (substTyVar subst v)
 
 {- Note [liftCoSubstVarBndr]
-
+   ~~~~~~~~~~~~~~~~~~~~~~~~~
 callback:
   'liftCoSubstVarBndrUsing' needs to be general enough to work in two
   situations:

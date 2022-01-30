@@ -127,7 +127,6 @@ atomicModifyIORef' ref f = do
 
 -- Note [atomicModifyIORef' definition]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
---
 -- atomicModifyIORef' was historically defined
 --
 --    atomicModifyIORef' ref f = do

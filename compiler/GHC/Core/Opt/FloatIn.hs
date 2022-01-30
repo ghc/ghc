@@ -353,7 +353,7 @@ So: rather than drop \tr{w}'s binding here, we add it onto the list of
 things to drop in the outer let's body, and let nature take its
 course.
 
-Note [extra_fvs (1): avoid floating into RHS]
+Note [extra_fvs (1)]: avoid floating into RHS
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider let x=\y....t... in body.  We do not necessarily want to float
 a binding for t into the RHS, because it'll immediately be floated out
@@ -371,7 +371,7 @@ can't have unboxed bindings.
 So we make "extra_fvs" which is the rhs_fvs of such bindings, and
 arrange to dump bindings that bind extra_fvs before the entire let.
 
-Note [extra_fvs (2): free variables of rules]
+Note [extra_fvs (2)]: free variables of rules
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
   let x{rule mentioning y} = rhs in body
@@ -504,7 +504,7 @@ fiBind :: Platform
 
 fiBind platform to_drop (AnnNonRec id ann_rhs@(rhs_fvs, rhs)) body_fvs
   = ( extra_binds ++ shared_binds          -- Land these before
-                                           -- See Note [extra_fvs (1,2)]
+                                           -- See Note [extra_fvs (1)] and Note [extra_fvs (2)]
     , FB (unitDVarSet id) rhs_fvs'         -- The new binding itself
           (FloatLet (NonRec id rhs'))
     , body_binds )                         -- Land these after
@@ -512,12 +512,12 @@ fiBind platform to_drop (AnnNonRec id ann_rhs@(rhs_fvs, rhs)) body_fvs
   where
     body_fvs2 = body_fvs `delDVarSet` id
 
-    rule_fvs = bndrRuleAndUnfoldingVarsDSet id        -- See Note [extra_fvs (2): free variables of rules]
+    rule_fvs = bndrRuleAndUnfoldingVarsDSet id        -- See Note [extra_fvs (2)]
     extra_fvs | noFloatIntoRhs NonRecursive id rhs
               = rule_fvs `unionDVarSet` rhs_fvs
               | otherwise
               = rule_fvs
-        -- See Note [extra_fvs (1): avoid floating into RHS]
+        -- See Note [extra_fvs (1)]
         -- No point in floating in only to float straight out again
         -- We *can't* float into ok-for-speculation unlifted RHSs
         -- But do float into join points
@@ -601,7 +601,7 @@ noFloatIntoArg expr expr_ty
    || all isTyVar (bndr:bndrs)     -- Wrinkle 1 (b)
       -- See Note [noFloatInto considerations] wrinkle 2
 
-  | otherwise  -- Note [noFloatInto considerations] wrinkle 2
+  | otherwise  -- See Note [noFloatInto considerations] wrinkle 2
   = exprIsTrivial deann_expr || exprIsHNF deann_expr
   where
     deann_expr = deAnnotate' expr
@@ -742,7 +742,6 @@ sepBindsByDropPoint platform is_case drop_pts floaters
 
 {- Note [Duplicating floats]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 For case expressions we duplicate the binding if it is reasonably
 small, and if it is not used in all the RHSs This is good for
 situations like

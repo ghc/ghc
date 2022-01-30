@@ -547,6 +547,7 @@ void osBindMBlocksToNode(
         void* temp;
         if (RtsFlags.GcFlags.numa) {
             /* Note [base memory]
+               ~~~~~~~~~~~~~~~~~~
                I would like to use addr here to specify the base
                memory of allocation. The problem is that the address
                we are requesting is too high. I can't figure out if it's

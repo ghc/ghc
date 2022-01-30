@@ -257,7 +257,7 @@ pprDwarfARanges platform arngs unitU =
 
 pprDwarfARange :: Platform -> DwarfARange -> SDoc
 pprDwarfARange platform arng =
-    -- Offset due to Note [Info offset].
+    -- Offset due to Note [Info Offset].
     pprWord platform (pdoc platform (dwArngStartLabel arng) <> text "-1")
     $$ pprWord platform length
   where
@@ -410,7 +410,6 @@ pprFrameBlock platform (DwarfFrameBlock hasInfo uws0) =
 
 -- Note [Info Offset]
 -- ~~~~~~~~~~~~~~~~~~
---
 -- GDB was pretty much written with C-like programs in mind, and as a
 -- result they assume that once you have a return address, it is a
 -- good idea to look at (PC-1) to unwind further - as that's where the

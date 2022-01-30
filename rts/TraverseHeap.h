@@ -97,7 +97,6 @@ typedef struct stackElement_ {
 typedef struct traverseState_ {
     /** Note [Profiling heap traversal visited bit]
      * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-     *
      * If the RTS is compiled with profiling enabled StgProfHeader can be used
      * by profiling code to store per-heap object information. Specifically the
      * 'hp_hdr' field is used to store heap profiling information.

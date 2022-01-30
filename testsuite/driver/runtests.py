@@ -601,7 +601,7 @@ else:
 cleanup_and_exit(exitcode)
 
 # Note [Running tests in /tmp]
-#
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Use LOCAL=0 to run tests in /tmp, to catch tests that use files from
 # the source directory without copying them to the test directory first.
 #

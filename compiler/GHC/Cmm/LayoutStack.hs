@@ -39,7 +39,7 @@ import Data.Array as Array
 import Data.List (nub)
 
 {- Note [Stack Layout]
-
+   ~~~~~~~~~~~~~~~~~~~
 The job of this pass is to
 
  - replace references to abstract stack Areas with fixed offsets from Sp.
@@ -141,7 +141,7 @@ Pass 2:
 
 
 Note [Two pass approach]
-
+~~~~~~~~~~~~~~~~~~~~~~~~
 The main reason for Pass 2 is being able to insert only the reloads that are
 needed and the fact that the two passes need different liveness information.
 Let's consider an example:
@@ -510,7 +510,7 @@ handleLastNode cfg procpoints liveness cont_info stackmaps
                                 , LabelMap StackMap )
 
      handleBranches
-         -- Note [diamond proc point]
+         -- See Note [diamond proc point]
        | Just l <- futureContinuation middle
        , (nub $ filter (`setMember` procpoints) $ successors last) == [l]
        = do
@@ -644,9 +644,8 @@ setupStackFrame platform lbl liveness updfr_off ret_args stack0
                          }
 
 
--- -----------------------------------------------------------------------------
 -- Note [diamond proc point]
---
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~
 -- This special case looks for the pattern we get from a typical
 -- tagged case expression:
 --
@@ -895,7 +894,7 @@ maybeAddSpAdj cfg sp0 sp_off block =
       where sp_unwind = CmmRegOff spReg (sp0 - platformWordSizeInBytes platform - sp_off)
 
 {- Note [SP old/young offsets]
-
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Sp(L) is the Sp offset on entry to block L relative to the base of the
 OLD area.
 
@@ -1098,7 +1097,7 @@ insertReloads platform stackmap live =
 
 {-
 Note [Lower safe foreign calls]
-
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We start with
 
    Sp[young(L1)] = L1

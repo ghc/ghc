@@ -203,7 +203,7 @@ push_todo_block(bdescr *bd, gen_workspace *ws)
 }
 
 /* Note [big objects]
-
+   ~~~~~~~~~~~~~~~~~~
    We can get an ordinary object (CONSTR, FUN, THUNK etc.) that is
    larger than a block (see #7919).  Let's call these "big objects".
    These objects don't behave like large objects - they live in

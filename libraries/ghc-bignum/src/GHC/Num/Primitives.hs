@@ -598,7 +598,6 @@ ioBool (IO io) s = case io s of
 
 -- Note [ghc-bignum exceptions]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
---
 -- `ghc-bignum` package can't depend on `base` package (it would create a cyclic
 -- dependency). Hence it can't import "Control.Exception" and throw exceptions
 -- the usual way. Instead it uses some wired-in functions from `ghc-prim` which

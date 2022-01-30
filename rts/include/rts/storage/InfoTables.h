@@ -235,7 +235,6 @@ typedef struct StgInfoTable_ {
 /*
  * Note [Encoding static reference tables]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
  * As static reference tables appear frequently in code, we use a special
  * compact encoding for the common case of a module defining only a few CAFs: We
  * produce one table containing a list of CAFs in the module and then include a

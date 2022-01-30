@@ -252,7 +252,7 @@ threadPaused(Capability *cap, StgTSO *tso)
         retry:
 #endif
             // Note [suspend duplicate work]
-            //
+            // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             // If the info table is a WHITEHOLE or a BLACKHOLE, then
             // another thread has claimed it (via the SET_INFO()
             // below), or is in the process of doing so.  In that case

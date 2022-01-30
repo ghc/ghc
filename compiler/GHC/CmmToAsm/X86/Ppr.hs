@@ -48,12 +48,8 @@ import GHC.Utils.Panic
 
 import Data.Word
 
--- -----------------------------------------------------------------------------
--- Printing this stuff out
---
---
 -- Note [Subsections Via Symbols]
---
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- If we are using the .subsections_via_symbols directive
 -- (available on recent versions of Darwin),
 -- we have to make sure that there is some kind of reference
@@ -163,7 +159,7 @@ pprBasicBlock config info_env (BasicBlock blockid instrs)
            ppWhen (ncgDwarfEnabled config) (pdoc platform (mkAsmTempEndLabel infoLbl) <> colon)
 
     -- Make sure the info table has the right .loc for the block
-    -- coming right after it. See [Note: Info Offset]
+    -- coming right after it. See Note [Info Offset]
     infoTableLoc = case instrs of
       (l@LOCATION{} : _) -> pprInstr platform l
       _other             -> empty

@@ -2257,7 +2257,7 @@ Consider this:
 
 * So we get a dict binding for Num (C d a), which is zonked to give
         a = ()
-  [Note Sept 04: now that we are zonking quantified type variables
+  Note (Sept 04): now that we are zonking quantified type variables
   on construction, the 'a' will be frozen as a regular tyvar on
   quantification, so the floated dict will still have type (C d a).
   Which renders this whole note moot; happily!]

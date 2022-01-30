@@ -68,7 +68,7 @@ newtype ST s a = ST { unST :: State s -> (a, State s) }
 data State s = S# (State# s)
 
 {- Note [Lazy ST and multithreading]
-
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We used to imagine that passing a polymorphic state token was all that we
 needed to keep state threads separate (see Launchbury and Peyton Jones, 1994:
 https://www.microsoft.com/en-us/research/publication/lazy-functional-state-threads/).
@@ -87,7 +87,7 @@ one we get from the previous computation, and the unlifted one we pull out of
 thin air. -}
 
 {- Note [Lazy ST: not producing lazy pairs]
-
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The fixST and strictToLazyST functions used to construct functions that
 produced lazy pairs. Why don't we need that laziness? The ST type is kept
 abstract, so no one outside this module can ever get their hands on a (result,

@@ -149,7 +149,7 @@ cgBind (StgRec pairs)
         ;  emit (catAGraphs inits <*> body) }
 
 {- Note [cgBind rec]
-
+   ~~~~~~~~~~~~~~~~~
    Recursive let-bindings are tricky.
    Consider the following pseudocode:
 
@@ -268,7 +268,7 @@ for semi-obvious reasons.
 
 -}
 
----------- Note [Selectors] ------------------
+---------- See Note [Selectors] ------------------
 mkRhsClosure    profile bndr _cc
                 [NonVoid the_fv]                -- Just one free var
                 upd_flag                -- Updatable thunk
@@ -301,7 +301,7 @@ mkRhsClosure    profile bndr _cc
     let lf_info = mkSelectorLFInfo bndr offset_into_int (isUpdatable upd_flag)
     in cgRhsStdThunk bndr lf_info [StgVarArg the_fv]
 
----------- Note [Ap thunks] ------------------
+---------- See Note [Ap thunks] ------------------
 mkRhsClosure    profile bndr _cc
                 fvs
                 upd_flag
@@ -526,7 +526,6 @@ closureCodeBody top_lvl bndr cl_info cc args@(arg0:_) body fv_details
 
 -- Note [NodeReg clobbered with loopification]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
---
 -- Previously we used to pass nodeReg (aka R1) here. With profiling, upon
 -- entering a closure, enterFunCCS was called with R1 passed to it. But since R1
 -- may get clobbered inside the body of a closure, and since a self-recursive

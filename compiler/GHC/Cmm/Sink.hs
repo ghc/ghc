@@ -472,7 +472,7 @@ tryToInline platform liveAfter node assigs =
 
   go usages live node skipped (a@(l,rhs,_) : rest)
    | cannot_inline            = dont_inline
-   | occurs_none              = discard  -- Note [discard during inlining]
+   | occurs_none              = discard  -- See Note [discard during inlining]
    | occurs_once              = inline_and_discard
    | isTrivial platform rhs   = inline_and_keep
    | otherwise                = dont_inline
@@ -496,7 +496,7 @@ tryToInline platform liveAfter node assigs =
                 live' = inline foldLocalRegsUsed platform (\m r -> insertLRegSet r m)
                                             live rhs
 
-        cannot_inline = skipped `regsUsedIn` rhs -- Note [dependent assignments]
+        cannot_inline = skipped `regsUsedIn` rhs -- See Note [dependent assignments]
                         || l `elemLRegSet` skipped
                         || not (okToInline platform rhs node)
 
@@ -519,8 +519,7 @@ tryToInline platform liveAfter node assigs =
         inl_exp other = other
 
 {- Note [Keeping assignemnts mentioned in skipped RHSs]
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     If we have to assignments: [z = y, y = e1] and we skip
     z we *must* retain the assignment y = e1. This is because
     we might inline "z = y" into another node later on so we
@@ -541,7 +540,7 @@ tryToInline platform liveAfter node assigs =
 -}
 
 {- Note [improveConditional]
-
+   ~~~~~~~~~~~~~~~~~~~~~~~~~
 cmmMachOpFold tries to simplify conditionals to turn things like
   (a == b) != 1
 into
@@ -579,7 +578,6 @@ improveConditional other = other
 
 -- Note [dependent assignments]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
---
 -- If our assignment list looks like
 --
 --    [ y = e,  x = ... y ... ]
@@ -690,7 +688,6 @@ conflicts platform (r, rhs, addr) node
 
 {- Note [Inlining foldRegsDefd]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
    foldRegsDefd is, after optimization, *not* a small function so
    it's only marked INLINEABLE, but not INLINE.
 
@@ -720,7 +717,6 @@ localRegistersConflict platform expr node =
 
 -- Note [Sinking and calls]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~
---
 -- We have three kinds of calls: normal (CmmCall), safe foreign (CmmForeignCall)
 -- and unsafe foreign (CmmUnsafeForeignCall). We perform sinking pass after
 -- stack layout (see Note [Sinking after stack layout]) which leads to two
@@ -803,7 +799,6 @@ data AbsMem
 
 -- Note [Foreign calls clobber heap]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
---
 -- It is tempting to say that foreign calls clobber only
 -- non-heap/stack memory, but unfortunately we break this invariant in
 -- the RTS.  For example, in stg_catch_retry_frame we call

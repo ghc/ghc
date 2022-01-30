@@ -55,7 +55,6 @@ import GHC.Types.Name.Set
 
 {- Note [SRTs]
    ~~~~~~~~~~~
-
 SRTs are the mechanism by which the garbage collector can determine
 the live CAFs in the program.
 
@@ -925,7 +924,7 @@ doSCC cfg staticFuns static_data (CyclicSCC nodes) = do
 
 
 {- Note [recursive SRTs]
-
+   ~~~~~~~~~~~~~~~~~~~~~
 If the dependency analyser has found us a recursive group of
 declarations, then we build a single SRT for the whole group, on the
 grounds that everything in the group is reachable from everything

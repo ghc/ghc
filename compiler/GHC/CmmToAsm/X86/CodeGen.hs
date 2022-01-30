@@ -129,7 +129,6 @@ cmmTopCodeGen (CmmData sec dat) =
 
 {- Note [Verifying basic blocks]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
    We want to guarantee a few things about the results
    of instruction selection.
 
@@ -231,7 +230,6 @@ addSpUnwindings instr = return $ unitOL instr
 
 {- Note [Keeping track of the current block]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 When generating instructions for Cmm we sometimes require
 the current block for things like retry loops.
 
@@ -2906,7 +2904,7 @@ evalArgs bid actuals
     newLocalReg ty = LocalReg <$> getUniqueM <*> pure ty
 
 -- Note [DIV/IDIV for bytes]
---
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~
 -- IDIV reminder:
 --   Size    Dividend   Divisor   Quotient    Remainder
 --   byte    %ax         r/m8      %al          %ah
@@ -2990,7 +2988,7 @@ genCCall32' target dest_regs args = do
         let
             -- Align stack to 16n for calls, assuming a starting stack
             -- alignment of 16n - word_size on procedure entry. Which we
-            -- maintiain. See Note [rts/StgCRun.c : Stack Alignment on X86]
+            -- maintiain. See Note [Stack Alignment on X86] in rts/StgCRun.c.
             sizes               = map (arg_size_bytes . cmmExprType platform) (reverse args)
             raw_arg_size        = sum sizes + platformWordSizeInBytes platform
             arg_pad_size        = (roundTo 16 $ raw_arg_size) - raw_arg_size
@@ -3605,10 +3603,8 @@ condIntReg cond x y = do
   return (Any II32 code)
 
 
------------------------------------------------------------
----          Note [SSE Parity Checks]                   ---
------------------------------------------------------------
-
+-- Note [SSE Parity Checks]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~
 -- We have to worry about unordered operands (eg. comparisons
 -- against NaN).  If the operands are unordered, the comparison
 -- sets the parity flag, carry flag and zero flag.

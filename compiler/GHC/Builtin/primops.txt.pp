@@ -149,7 +149,6 @@ defaults
 
 -- Note [When do out-of-line primops go in primops.txt.pp]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
---
 -- Out of line primops are those with a C-- implementation. But that
 -- doesn't mean they *just* have an C-- implementation. As mentioned in
 -- Note [Inlining out-of-line primops and heap checks], some out-of-line
@@ -2437,7 +2436,6 @@ primop  WriteMutVarOp "writeMutVar#"  GenPrimOp
 
 -- Note [Why not an unboxed tuple in atomicModifyMutVar2#?]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
---
 -- Looking at the type of atomicModifyMutVar2#, one might wonder why
 -- it doesn't return an unboxed tuple. e.g.,
 --
@@ -3173,7 +3171,6 @@ primop  ReallyUnsafePtrEqualityOp "reallyUnsafePtrEquality#" GenPrimOp
 
 -- Note [reallyUnsafePtrEquality# can_fail]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
---
 -- reallyUnsafePtrEquality# can't actually fail, per se, but we mark it
 -- can_fail anyway. Until 5a9a1738023a, GHC considered primops okay for
 -- speculation only when their arguments were known to be forced. This was
@@ -3264,7 +3261,7 @@ primop  DataToTagOp "dataToTag#" GenPrimOp
    a -> Int#  -- Zero-indexed; the first constructor has tag zero
    with
    strictness = { \ _arity -> mkClosedDmdSig [evalDmd] topDiv }
-   -- See Note [dataToTag# magic] in GHC.Core.Op.ConstantFold
+   -- See Note [dataToTag# magic] in GHC.Core.Opt.ConstantFold
 
 primop  TagToEnumOp "tagToEnum#" GenPrimOp
    Int# -> a

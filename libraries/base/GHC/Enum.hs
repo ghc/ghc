@@ -179,7 +179,6 @@ boundedEnumFromThen n1 n2
 {-
 Note [Stable Unfolding for list producers]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 The INLINABLE/INLINE pragmas ensure that we export stable (unoptimised)
 unfoldings in the interface file so we can do list fusion at usage sites.
 -}
@@ -892,6 +891,7 @@ instance  Enum Integer  where
  #-}
 
 {- Note [Enum Integer rules for literal 1]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The "1" rules above specialise for the common case where delta = 1,
 so that we can avoid the delta>=0 test in enumDeltaToIntegerFB.
 Then enumDeltaToInteger1FB is nice and small and can be inlined,

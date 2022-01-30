@@ -171,7 +171,7 @@ runMergeForeign _pipe_env hsc_env input_fn foreign_os = do
 runLlvmLlcPhase :: PipeEnv -> HscEnv -> FilePath -> IO FilePath
 runLlvmLlcPhase pipe_env hsc_env input_fn = do
     -- Note [Clamping of llc optimizations]
-    --
+    -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     -- See #13724
     --
     -- we clamp the llc optimization between [1,2]. This is because passing -O0
@@ -1077,7 +1077,6 @@ compileStub hsc_env stub_c = compileForeign hsc_env LangC stub_c
 {-
 Note [Produce big objects on Windows]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 The Windows Portable Executable object format has a limit of 32k sections, which
 we tend to blow through pretty easily. Thankfully, there is a "big object"
 extension, which raises this limit to 2^32. However, it must be explicitly
@@ -1272,7 +1271,7 @@ getGhcVersionPathName dflags unit_env = do
 --    +                       3c: R_SPARC_HI22        _GLOBAL_OFFSET_TABLE_-0x8
 
 {- Note [Don't normalise input filenames]
-
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Summary
   We used to normalise input filenames when starting the unlit phase. This
   broke hpc in `--make` mode with imported literate modules (#2991).

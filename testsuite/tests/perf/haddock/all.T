@@ -1,5 +1,5 @@
 # Note [Haddock runtime stats files]
-#
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # When one of the build systems builds a complete GHC distribution,
 # haddock gets built and then used to generate .haddock files for each
 # library. For that last step, both build systems pass an extra

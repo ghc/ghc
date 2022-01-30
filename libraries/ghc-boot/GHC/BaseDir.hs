@@ -2,7 +2,6 @@
 
 -- | Note [Base Dir]
 -- ~~~~~~~~~~~~~~~~~
---
 -- GHC's base directory or top directory containers miscellaneous settings and
 -- the package database.  The main compiler of course needs this directory to
 -- read those settings and read and write packages. ghc-pkg uses it to find the
@@ -12,6 +11,7 @@
 -- will expand `${top_dir}` inside strings so GHC doesn't need to know it's on
 -- installation location at build time. ghc-pkg also can expand those variables
 -- and so needs the top dir location to do that too.
+
 module GHC.BaseDir where
 
 import Prelude -- See Note [Why do we import Prelude here?]

@@ -93,7 +93,6 @@ extern char **environ;
 /*
  * Note [Strong symbols]
  * ~~~~~~~~~~~~~~~~~~~~~
- *
  * The notion of a *weak* symbol is fairly common in linking: a symbol is weak
  * if it is declared but not defined, allowing it to be defined by an object
  * which is loaded later. GHC generalizes this notion, allowing symbol
@@ -112,7 +111,6 @@ extern char **environ;
 /*
  * Note [Symbols for MinGW's printf]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
- *
  * The printf offered by Microsoft's libc implementation, msvcrt, is quite
  * incomplete, lacking support for even %ull. Consequently mingw-w64 offers its
  * own implementation which we enable. However, to be thread-safe the
@@ -132,7 +130,6 @@ extern char **environ;
  */
 /* Note [_iob_func symbol]
  * ~~~~~~~~~~~~~~~~~~~~~~~
- *
  * Microsoft in VS2013 to VS2015 transition made a backwards incompatible change
  * to the stdio function __iob_func.
  *

@@ -839,8 +839,7 @@ initModDetails hsc_env mod_summary iface =
 
 {-
 Note [ModDetails and --make mode]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 An interface file consists of two parts
 
 * The `ModIface` which ends up getting written to disk.
@@ -957,7 +956,6 @@ hscDesugarAndSimplify summary (FrontendTypecheck tc_result) tc_warnings mb_old_h
 {-
 Note [Writing interface files]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 We write one interface file per module and per compilation, except with
 -dynamic-too where we write two interface files (non-dynamic and dynamic).
 
@@ -1762,7 +1760,6 @@ hscCompileCmmFile hsc_env filename output_filename = runHsc hsc_env $ do
 {-
 Note [Forcing of stg_binds]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 The two last steps in the STG pipeline are:
 
 * Sorting the bindings in dependency order.
@@ -2073,7 +2070,6 @@ hscAddSptEntries hsc_env mnwib entries = do
 {-
   Note [Fixity declarations in GHCi]
   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
   To support fixity declarations on types defined within GHCi (as requested
   in #10018) we record the fixity environment in InteractiveContext.
   When we want to evaluate something GHC.Tc.Module.runTcInteractive pulls out this

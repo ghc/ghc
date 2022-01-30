@@ -1393,6 +1393,7 @@ simplTick env tickish expr cont
   getDoneId other = pprPanic "getDoneId" (ppr other)
 
 -- Note [case-of-scc-of-case]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- It's pretty important to be able to transform case-of-case when
 -- there's an SCC in the way.  For example, the following comes up
 -- in nofib/real/compress/Encode.hs:
@@ -1992,6 +1993,7 @@ simplIdF env var cont
               cont' = trimJoinCont var mb_join cont
           in simplExprF env' e cont'
               -- Note [zapSubstEnv]
+              -- ~~~~~~~~~~~~~~~~~~
               -- The template is already simplified, so don't re-substitute.
               -- This is VITAL.  Consider
               --      let x = e in

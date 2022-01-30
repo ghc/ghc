@@ -22,7 +22,7 @@
 
 {-
 Note [Differences between libraries/pretty and compiler/GHC/Utils/Ppr.hs]
-
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 For historical reasons, there are two different copies of `Pretty` in the GHC
 source tree:
  * `libraries/pretty` is a submodule containing
@@ -441,7 +441,7 @@ braces p       = char '{' <> p <> char '}'
 
 {-
 Note [Print Hexadecimal Literals]
-
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Relevant discussions:
  * Phabricator: https://phabricator.haskell.org/D4465
  * GHC Trac: https://gitlab.haskell.org/ghc/ghc/issues/14872

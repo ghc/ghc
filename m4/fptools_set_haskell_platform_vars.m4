@@ -116,7 +116,6 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS_SHELL_FUNCTIONS],
 
 # Note [autoconf assembler checks and -flto]
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#
 # Autoconf's AC_COMPILE_IFELSE macro is fragile in the case of checks
 # which require that the assembler is run. Specifically, GCC does not run
 # the assembler if invoked with `-c -flto`; it merely dumps its internal

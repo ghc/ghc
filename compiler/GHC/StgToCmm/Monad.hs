@@ -203,7 +203,7 @@ data ReturnKind
   | ReturnedTo BlockId ByteOff
 
 -- Note [sharing continuations]
---
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- ReturnKind says how the expression being compiled returned its
 -- results: either by assigning directly to the registers specified
 -- by the Sequel, or by returning to a continuation that does the

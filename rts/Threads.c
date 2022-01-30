@@ -570,7 +570,7 @@ threadStackOverflow (Capability *cap, StgTSO *tso)
                                  stg_min(tso->stackobj->stack + tso->stackobj->stack_size,
                                          tso->stackobj->sp+64)));
 
-        // Note [Throw to self when masked], also #767 and #8303.
+        // See Note [Throw to self when masked], also #767 and #8303.
         throwToSelf(cap, tso, (StgClosure *)stackOverflow_closure);
         return;
     }

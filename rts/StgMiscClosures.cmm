@@ -193,7 +193,7 @@ INFO_TABLE_RET( stg_ctoi_V, RET_BCO )
 }
 
 /*   Note [GHCi unboxed tuples stack spills]
-
+     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
    In the calling convention for compiled code, a tuple is returned
    in registers, with everything that doesn't fit spilled onto the STG
    stack.
@@ -334,7 +334,7 @@ MK_STG_CTOI_T(62)
 
 /*
   Note [GHCi tuple layout]
-
+  ~~~~~~~~~~~~~~~~~~~~~~~~
   the tuple_info word describes the register and stack usage of the tuple:
 
   [ ssss ssss rrrr rrrr rrrr rrrr rrrr rrrr ]
@@ -900,8 +900,8 @@ INFO_TABLE( stg_COMPACT_NFDATA_DIRTY, 0, 9, COMPACT_NFDATA, "COMPACT_NFDATA", "C
 { foreign "C" barf("COMPACT_NFDATA_DIRTY object (%p) entered!", R1) never returns; }
 
 /* ----------------------------------------------------------------------------
-   Note [CHARLIKE and INTLIKE closures.]
-
+   Note [CHARLIKE and INTLIKE closures]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
    These are static representations of Chars and small Ints, so that
    we can remove dynamic Chars and Ints during garbage collection and
    replace them with references to the static objects.

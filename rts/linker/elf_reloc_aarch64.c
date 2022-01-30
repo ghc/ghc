@@ -229,6 +229,7 @@ computeAddend(Section * section, Elf_Rel * rel,
             /* note: we are encoding bits [27:2] */
             if(!isInt64(26+2, V)) {
                 // Note [PC bias aarch64]
+                // ~~~~~~~~~~~~~~~~~~~~~~
                 // There is no PC bias to accommodate in the
                 // relocation of a place containing an instruction
                 // that formulates a PC-relative address. The program

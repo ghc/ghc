@@ -294,7 +294,7 @@ sortBlocks direction entry blockmap =
     fwd = revPostorderFrom blockmap entry
 
 -- Note [Backward vs forward analysis]
---
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- The forward and backward cases are not dual.  In the forward case, the entry
 -- points are known, and one simply traverses the body blocks from those points.
 -- In the backward case, something is known about the exit points, but a
@@ -350,7 +350,7 @@ updateFact
 updateFact fact_join dep_blocks (todo, fbase) lbl new_fact
   = case lookupFact lbl fbase of
       Nothing ->
-          -- Note [No old fact]
+          -- See Note [No old fact]
           let !z = mapInsert lbl new_fact fbase in (changed, z)
       Just old_fact ->
           case fact_join (OldFact old_fact) (NewFact new_fact) of
@@ -362,7 +362,7 @@ updateFact fact_join dep_blocks (todo, fbase) lbl new_fact
 
 {-
 Note [No old fact]
-
+~~~~~~~~~~~~~~~~~~
 We know that the new_fact is >= _|_, so we don't need to join.  However,
 if the new fact is also _|_, and we have already analysed its block,
 we don't need to record a change.  So there's a tradeoff here.  It turns

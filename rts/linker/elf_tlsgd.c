@@ -4,7 +4,7 @@
 
 /*
  * Note [TLSGD relocation]
- *
+ * ~~~~~~~~~~~~~~~~~~~~~~~
  * Quick background: FreeBSD's <ctype.h> is poisoned with static inline code
  * that gets compiled into every program that uses functions like isdigit(3).
  * When compiled "-c -fpic" for inclusion in position-independent ".a" files

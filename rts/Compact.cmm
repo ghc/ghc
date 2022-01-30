@@ -297,7 +297,7 @@ stg_compactAddWithSharingzh (P_ compact, P_ p)
     StgCompactNFData_hash(compact) = hash;
 
     // Note [compactAddWorker result]
-    //
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     // compactAddWorker needs somewhere to store the result - this is
     // so that it can be tail-recursive.  It must be an address that
     // doesn't move during GC, so we can't use heap or stack.

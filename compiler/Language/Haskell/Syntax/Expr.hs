@@ -1508,7 +1508,7 @@ In any other context than 'MonadComp', the fields for most of these
 
 
 Note [Applicative BodyStmt]
-
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 (#12143) For the purposes of ApplicativeDo, we treat any BodyStmt
 as if it was a BindStmt with a wildcard pattern.  For example,
 

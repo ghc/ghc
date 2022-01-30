@@ -576,7 +576,7 @@ wantToUnboxArg fam_envs ty (n :* sd)
   | Just (tc, tc_args, co) <- normSplitTyConApp_maybe fam_envs ty
   , Just dc <- tyConSingleAlgDataCon_maybe tc
   , let arity = dataConRepArity dc
-  , Just (Unboxed, ds) <- viewProd arity sd -- See Note [Boxity Analysis]
+  , Just (Unboxed, ds) <- viewProd arity sd -- See Note [Boxity analysis]
   -- NB: No strictness or evaluatedness checks here. That is done by
   -- 'finaliseBoxity'!
   = Unbox (DataConPatContext dc tc_args co) ds

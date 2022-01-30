@@ -349,6 +349,7 @@ shelarcy                <shelarcy@gmail.com>                # Uses this name onl
 Ömer Sinan Ağacan       <omeragacan@gmail.com>              <omer@well-typed.com>
 
 # Note [geoffw]
+# ~~~~~~~~~~~~~
 # From GHC wiki: "Geoff Washburn made the first implementation of GADTs in GHC"
 # Other possibilities (but not such a direct connection with GHC):
 #  * Geoff W. Hamilton
@@ -357,14 +358,16 @@ shelarcy                <shelarcy@gmail.com>                # Uses this name onl
 #    PhD student, OCaml, "Dynamic ADTs"
 #
 # Note [uid245]
+# ~~~~~~~~~~~~~
 # Circumstantial evidence only:
 # * Commit fafe43, "Avoid divide by zero", by simonm.
 # * Subsequent commit fd40a1, "avoid another divide by zero", by uid245.
 # * Three commits later 15e6ea, "urk, extra parenthesis crept in", by simonm. Same file section.
 #
 # Note [usrbincc]
+# ~~~~~~~~~~~~~~~
 # https://github.com/thlorenz/node-traceur/commit/59f97feae23763c456b70bb129dbe04004e9fe04
 #
 # Note [zhuang]
+# ~~~~~~~~~~~~~
 # http://comments.gmane.org/gmane.comp.lang.haskell.cvs.ghc/33473
-#EOF

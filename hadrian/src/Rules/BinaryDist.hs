@@ -463,7 +463,6 @@ createVersionWrapper versioned_exe install_path = do
 {-
 Note [Two Types of Wrappers]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 There are two different types of wrapper scripts.
 
 1. The wrapper scripts installed

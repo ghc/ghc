@@ -526,6 +526,7 @@ hwndWriteNonBlocking hwnd ptr offset bytes
         | otherwise                        = Mgr.ioFailed err
 
 -- Note [ReadFile/WriteFile]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~
 -- The results of these functions are somewhat different when working in an
 -- asynchronous manner. The returning bool has two meaning.
 --

@@ -434,7 +434,6 @@ fixIO k = do
 
 -- Note [Blackholing in fixIO]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
---
 -- We do our own explicit black holing here, because GHC's lazy
 -- blackholing isn't enough.  In an infinite loop, GHC may run the IO
 -- computation a few times before it notices the loop, which is wrong.

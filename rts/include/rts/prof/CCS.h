@@ -18,6 +18,7 @@
  * ---------------------------------------------------------------------------*/
 /*
  * Note [struct alignment]
+ * ~~~~~~~~~~~~~~~~~~~~~~~
  * NB. be careful to avoid unwanted padding between fields, by
  * putting the 8-byte fields on an 8-byte boundary.  Padding can
  * vary between C compilers, and we don't take into account any

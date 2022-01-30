@@ -82,7 +82,7 @@ bool doYouWantToGC(Capability *cap)
 /* -----------------------------------------------------------------------------
    Allocation accounting
 
-   See [Note allocation accounting] in Storage.c
+   See Note [allocation accounting] in Storage.c
    -------------------------------------------------------------------------- */
 
 //
@@ -126,7 +126,7 @@ void move_STACK (StgStack *src, StgStack *dest);
 
 /* -----------------------------------------------------------------------------
    Note [STATIC_LINK fields]
-
+   ~~~~~~~~~~~~~~~~~~~~~~~~~
    The low 2 bits of the static link field have the following meaning:
 
    00     we haven't seen this static object before
@@ -175,7 +175,7 @@ extern uint32_t prev_static_flag, static_flag;
 
 /* -----------------------------------------------------------------------------
    Note [CAF lists]
-
+   ~~~~~~~~~~~~~~~~
    dyn_caf_list  (CAFs chained through static_link)
       This is a chain of all CAFs in the program, used for
       dynamically-linked GHCi.

@@ -447,7 +447,7 @@ loadWithCache cache how_much = do
       else throwErrors (fmap GhcDriverMessage errs)
 
 -- Note [Unused packages]
---
+-- ~~~~~~~~~~~~~~~~~~~~~~
 -- Cabal passes `--package-id` flag for each direct dependency. But GHC
 -- loads them lazily, so when compilation is done, we have a list of all
 -- actually loaded packages. All the packages, specified on command line,
@@ -846,7 +846,6 @@ a pair of an `IO a` action and a `MVar a`, where to place the result.
 
 Note [--make mode]
 ~~~~~~~~~~~~~~~~~
-
 There are two main parts to `--make` mode.
 
 1. `downsweep`: Starts from the top of the module graph and computes dependencies.
@@ -857,7 +856,6 @@ computers how to build this ModuleGraph.
 
 Note [Upsweep]
 ~~~~~~~~~~~~~~
-
 Upsweep takes a 'ModuleGraph' as input, computes a build plan and then executes
 the plan in order to compile the project.
 
@@ -2638,7 +2636,7 @@ waitMakeAction :: MakeAction -> IO ()
 waitMakeAction (MakeAction _ mvar) = () <$ readMVar mvar
 
 {- Note [GHC Heap Invariants]
-
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~
 This note is a general place to explain some of the heap invariants which should
 hold for a program compiled with --make mode. These invariants are all things
 which can be checked easily using ghc-debug.

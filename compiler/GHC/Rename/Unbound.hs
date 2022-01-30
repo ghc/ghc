@@ -232,6 +232,7 @@ similarNameSuggestions looking_for@(LF what_look where_look) dflags global_env
                                 ([],    [])   -> [] ]
 
               -- Note [Only-quals]
+              -- ~~~~~~~~~~~~~~~~~
               -- The second alternative returns those names with the same
               -- OccName as the one we tried, but live in *qualified* imports
               -- e.g. if you have:

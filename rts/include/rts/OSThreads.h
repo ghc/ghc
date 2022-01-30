@@ -114,6 +114,7 @@ typedef DWORD ThreadLocalKey;
 #define INIT_COND_VAR  0
 
 /* Note [SRW locks]
+   ~~~~~~~~~~~~~~~~
    We have a choice for implementing Mutexes on Windows.  Standard
    Mutexes are kernel objects that require kernel calls to
    acquire/release, whereas CriticalSections are spin-locks that block

@@ -444,7 +444,7 @@ mergeStaticObjects specs = go [] specs
     go [] [] = []
 
 {- Note [preload packages]
-
+   ~~~~~~~~~~~~~~~~~~~~~~~
 Why do we need to preload packages from the command line?  This is an
 explanation copied from #2437:
 

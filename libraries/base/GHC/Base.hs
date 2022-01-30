@@ -150,7 +150,6 @@ default ()              -- Double isn't available yet
 {-
 Note [Depend on GHC.Num.Integer]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 The Integer type is special because GHC.CoreToStg.Prep.mkConvertNumLiteral
 lookups names in ghc-bignum interfaces to construct Integer literal values.
 Currently it reads the interface file whether or not the current module *has*

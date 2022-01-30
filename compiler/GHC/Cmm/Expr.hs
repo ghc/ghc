@@ -86,7 +86,7 @@ data CmmReg
 data Area
   = Old            -- See Note [Old Area]
   | Young {-# UNPACK #-} !BlockId  -- Invariant: must be a continuation BlockId
-                   -- See Note [Continuation BlockId] in GHC.Cmm.Node.
+                   -- See Note [Continuation BlockIds] in GHC.Cmm.Node.
   deriving (Eq, Ord, Show)
 
 {- Note [Old Area]
@@ -203,7 +203,7 @@ data CmmLit
 
   | CmmBlock {-# UNPACK #-} !BlockId     -- Code label
         -- Invariant: must be a continuation BlockId
-        -- See Note [Continuation BlockId] in GHC.Cmm.Node.
+        -- See Note [Continuation BlockIds] in GHC.Cmm.Node.
 
   | CmmHighStackMark -- A late-bound constant that stands for the max
                      -- #bytes of stack space used during a procedure.
@@ -410,7 +410,7 @@ data VGcPtr = VGcPtr | VNonGcPtr deriving( Eq, Show )
 -----------------------------------------------------------------------------
 {-
 Note [Overlapping global registers]
-
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The backend might not faithfully implement the abstraction of the STG
 machine with independent registers for different values of type
 GlobalReg. Specifically, certain pairs of registers (r1, r2) may

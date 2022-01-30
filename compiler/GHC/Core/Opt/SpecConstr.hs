@@ -1181,8 +1181,8 @@ data ArgOcc = NoOcc     -- Doesn't occur at all; or a type argument
             | ScrutOcc  -- See Note [ScrutOcc]
                  (DataConEnv [ArgOcc])   -- How the sub-components are used
 
-{- Note  [ScrutOcc]
-~~~~~~~~~~~~~~~~~~~
+{- Note [ScrutOcc]
+~~~~~~~~~~~~~~~~~~
 An occurrence of ScrutOcc indicates that the thing, or a `cast` version of the thing,
 is *only* taken apart or applied.
 
@@ -1316,7 +1316,7 @@ scExpr' env (Let (NonRec bndr rhs) body)
         ; rhs_info  <- scRecRhs env (bndr',rhs)
 
         ; let body_env2 = extendHowBound body_env [bndr'] RecFun
-                           -- Note [Local let bindings]
+                           -- See Note [Local let bindings]
               rhs'      = ri_new_rhs rhs_info
               body_env3 = extendValEnv body_env2 bndr' (isValue (sc_vals env) rhs')
 

@@ -1720,7 +1720,7 @@ ApplicativeDo
 ************************************************************************
 
 Note [ApplicativeDo]
-
+~~~~~~~~~~~~~~~~~~~~
 = Example =
 
 For a sequence of statements

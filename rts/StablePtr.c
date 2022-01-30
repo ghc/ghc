@@ -200,7 +200,7 @@ enlargeStablePtrTable(void)
 }
 
 /* Note [Enlarging the stable pointer table]
- *
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  * To enlarge the stable pointer table, we allocate a new table, copy the
  * existing entries, and then store the old version of the table in old_SPTs
  * until we free it during GC.  By not immediately freeing the old version

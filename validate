@@ -251,8 +251,8 @@ if [ $build_only -eq 1 ] ||
         echo "ValidateSpeed=$speed" >> mk/are-validating.mk
         echo "ValidateHpc=$hpc"     >> mk/are-validating.mk
 
-        # Note [Default build system verbosity].
-        #
+        # Note [Default build system verbosity]
+        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # From https://gitlab.haskell.org/ghc/ghc/wikis/design/build-system:
         #
         #   "The build system should clearly report what it's doing (and sometimes

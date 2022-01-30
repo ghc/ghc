@@ -110,7 +110,6 @@ hs_atomic_and64(StgWord x, StgWord64 val)
 
 // Note [__sync_fetch_and_nand usage]
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-//
 // The __sync_fetch_and_nand builtin is a bit of a disaster. It was introduced
 // in GCC long ago with silly semantics. Specifically:
 //

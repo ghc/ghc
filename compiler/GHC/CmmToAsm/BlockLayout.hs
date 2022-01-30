@@ -67,10 +67,9 @@ import GHC.Data.UnionFind
   * Feed this CFG into the block layout code (`sequenceTop`) in this
     module. Which will then produce a code layout based on the input weights.
 
-  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  ~~~ Note [Chain based CFG serialization]
-  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+  Note [Chain based CFG serialization]
+  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   For additional information also look at
   https://gitlab.haskell.org/ghc/ghc/wikis/commentary/compiler/code-layout
 
@@ -189,10 +188,9 @@ import GHC.Data.UnionFind
   While E does not follow X it's still beneficial to place them near each other.
   This can be advantageous if eg C,X,E will end up in the same cache line.
 
-  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  ~~~ Note [Triangle Control Flow]
-  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+  Note [Triangle Control Flow]
+  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   Checking if an argument is already evaluated leads to a somewhat
   special case  which looks like this:
 
@@ -240,10 +238,9 @@ import GHC.Data.UnionFind
   Assuming that Lwork is large the chance that the "call" ends up
   in the same cache line is also fairly small.
 
-  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  ~~~ Note [Layout relevant edge weights]
-  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+  Note [Layout relevant edge weights]
+  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   The input to the chain based code layout algorithm is a CFG
   with edges annotated with their frequency. The frequency
   of traversal corresponds quite well to the cost of not placing
@@ -373,9 +370,9 @@ takeL :: Int -> BlockChain -> [BlockId]
 takeL n (BlockChain blks) =
     take n . fromOL $ blks
 
+
 -- Note [Combining neighborhood chains]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 -- See also Note [Chain based CFG serialization]
 -- We have the chains (A-B-C-D) and (E-F) and an Edge C->E.
 --

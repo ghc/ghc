@@ -113,7 +113,6 @@ StgFunPtr StgReturn(void)
 /*
  * Note [Stack Alignment on X86]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
- *
  * On X86 (both 32bit and 64bit) we keep the stack aligned on function calls at
  * a 16-byte boundary. This is done because on a number of architectures the
  * ABI requires this (x64, Mac OSX 32bit/64bit) as well as interfacing with
@@ -149,7 +148,7 @@ StgFunPtr StgReturn(void)
  * for stg_stop_thread in StgStartup.cmm.
  *
  * Note [Windows Stack allocations]
- *
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  * On windows the stack has to be allocated 4k at a time, otherwise
  * we get a segfault.  This is done by using a helper ___chkstk_ms that is
  * provided by libgcc.  The Haskell side already knows how to handle this

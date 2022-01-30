@@ -127,7 +127,7 @@ exprArity e = go e
                  | otherwise       = go e
     go (Tick t e) | not (tickishIsCode t) = go e
     go (Cast e co)                 = trim_arity (go e) (coercionRKind co)
-                                        -- Note [exprArity invariant]
+                                        -- See Note [exprArity invariant]
     go (App e (Type _))            = go e
     go (App f a) | exprIsTrivial a = (go f - 1) `max` 0
         -- See Note [exprArity for applications]
@@ -155,7 +155,7 @@ typeArity ty
 
       | Just (tc,tys) <- splitTyConApp_maybe ty
       , Just (ty', _) <- instNewTyCon_maybe tc tys
-      , Just rec_nts' <- checkRecTc rec_nts tc  -- See Note [Expanding newtypes]
+      , Just rec_nts' <- checkRecTc rec_nts tc  -- See Note [Expanding newtypes and products]
                                                 -- in GHC.Core.TyCon
 --   , not (isClassTyCon tc)    -- Do not eta-expand through newtype classes
 --                              -- See Note [Newtype classes and eta expansion]
@@ -708,7 +708,7 @@ until it finds a stable arity type. Two wrinkles
   by the 'am_sigs' field in 'FindRhsArity', and 'lookupSigEnv' in the Var case
   of 'arityType'.
 
-Note [Exciting Arity]
+Note [Exciting arity]
 ~~~~~~~~~~~~~~~~~~~~~
 The fixed-point iteration in 'findRhsArity' stabilises very quickly in almost
 all cases. To get notified of cases where we need an usual number of iterations,
@@ -1047,8 +1047,8 @@ arityType env (App fun arg )
         --
 arityType env (Case scrut bndr _ alts)
   | exprIsDeadEnd scrut || null alts
-  = botArityType    -- Do not eta expand. See Note [Dealing with bottom (1)]
-  | not (pedanticBottoms env)  -- See Note [Dealing with bottom (2)]
+  = botArityType    -- Do not eta expand. See (1) in Note [Dealing with bottom]
+  | not (pedanticBottoms env)  -- See (2) in Note [Dealing with bottom]
   , myExprIsCheap env scrut (Just (idType bndr))
   = alts_type
   | exprOkForSpeculation scrut
@@ -1514,7 +1514,7 @@ etaInfoApp in_scope expr eis
         (subst', b') = Core.substBindSC subst b
 
     -- Beta-reduction if possible, pushing any intervening casts past
-    -- the argument. See Note [The EtaInfo mechansim]
+    -- the argument. See Note [The EtaInfo mechanism]
     go subst (Lam v e) (EI (b:bs) mco)
       | Just (arg,mco') <- pushMCoArg mco (varToCoreExpr b)
       = go (Core.extendSubst subst v arg) e (EI bs mco')

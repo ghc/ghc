@@ -157,7 +157,7 @@ allocateTopStrings interp topStrings = do
 
 {-
 Note [generating code for top-level string literal bindings]
-
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Here is a summary on how the byte code generator deals with top-level string
 literals:
 
@@ -1102,7 +1102,6 @@ layoutTuple profile start_off arg_ty reps =
 
 {- Note [unboxed tuple bytecodes and tuple_BCO]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
   We have the bytecode instructions RETURN_TUPLE and PUSH_ALTS_TUPLE to
   return and receive arbitrary unboxed tuples, respectively. These
   instructions use the helper data tuple_BCO and tuple_info.
@@ -1782,7 +1781,9 @@ mkMultiBranch maybe_ncons raw_ways = do
             | otherwise
             = return (testEQ (fst val) lbl_default `consOL` snd val)
 
-            -- Note [CASEFAIL] It may be that this case has no default
+            -- Note [CASEFAIL]
+            -- ~~~~~~~~~~~~~~~
+            -- It may be that this case has no default
             -- branch, but the alternatives are not exhaustive - this
             -- happens for GADT cases for example, where the types
             -- prove that certain branches are impossible.  We could

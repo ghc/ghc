@@ -691,7 +691,7 @@ pushResume hsc_env resume = hsc_env { hsc_IC = ictxt1 }
 
   {-
   Note [Syncing breakpoint info]
-
+  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   To display the values of the free variables for a single breakpoint, the
   function `GHC.Runtime.Eval.bindLocalsAtBreakpoint` pulls
   out the information from the fields `modBreaks_breakInfo` and

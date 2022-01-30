@@ -44,8 +44,7 @@ static int ticks_to_eventlog_flush = 0;
 
 /*
  Note [GC During Idle Time]
- --------------------------
-
+ ~~~~~~~~~~~~~~~~~~~~~~~~~~
  In the threaded RTS, a major GC can be performed during idle time (i.e., when
  no Haskell computations are ready to run).  This can be beneficial for two
  reasons.  First, running the GC during idle time makes it less likely that a GC

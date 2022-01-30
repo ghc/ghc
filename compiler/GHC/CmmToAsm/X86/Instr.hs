@@ -120,7 +120,7 @@ Hence GLDZ and GLD1.  Bwahahahahahahaha!
 
 {-
 Note [x86 Floating point precision]
-
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Intel's internal floating point registers are by default 80 bit
 extended precision.  This means that all operations done on values in
 registers are done at 80 bits, and unless the intermediate values are
@@ -795,6 +795,8 @@ mkJumpInstr id
         = [JXX ALWAYS id]
 
 -- Note [Windows stack layout]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 -- | On most OSes the kernel will place a guard page after the current stack
 --   page.  If you allocate larger than a page worth you may jump over this
 --   guard page.  Not only is this a security issue, but on certain OSes such
@@ -896,9 +898,8 @@ mkStackDeallocInstr platform amount
       _ -> panic "X86.mkStackDeallocInstr"
 
 
---
 -- Note [extra spill slots]
---
+-- ~~~~~~~~~~~~~~~~~~~~~~~~
 -- If the register allocator used more spill slots than we have
 -- pre-allocated (rESERVED_C_STACK_BYTES), then we must allocate more
 -- C stack space on entry and exit from this proc.  Therefore we

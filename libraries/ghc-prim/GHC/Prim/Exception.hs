@@ -20,7 +20,6 @@ default () -- Double and Integer aren't available yet
 
 -- Note [Arithmetic exceptions]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
---
 -- ghc-prim provides several functions to raise arithmetic exceptions
 -- (raiseDivZero, raiseUnderflow, raiseOverflow) that are wired-in the RTS.
 -- These exceptions are meant to be used by the package implementing arbitrary

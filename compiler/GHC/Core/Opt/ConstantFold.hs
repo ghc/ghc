@@ -1715,7 +1715,9 @@ guardDoubleDiv = do
   [Lit (LitDouble d1), Lit (LitDouble d2)] <- getArgs
   guard $ (d1 /=0 || d2 > 0) -- see Note [negative zero]
        && d2 /= 0            -- avoid NaN and Infinity/-Infinity
--- Note [negative zero] Avoid (0 / -d), otherwise 0/(-1) reduces to
+-- Note [negative zero]
+-- ~~~~~~~~~~~~~~~~~~~~
+-- Avoid (0 / -d), otherwise 0/(-1) reduces to
 -- zero, but we might want to preserve the negative zero here which
 -- is representable in Float/Double but not in (normalised)
 -- Rational. (#3676) Perhaps we should generate (0 :% (-1)) instead?
@@ -1732,14 +1734,12 @@ strengthReduction two_lit add_op = do -- Note [Strength reduction]
 
 -- Note [Strength reduction]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~
---
 -- This rule turns floating point multiplications of the form 2.0 * x and
 -- x * 2.0 into x + x addition, because addition costs less than multiplication.
 -- See #7116
 
 -- Note [What's true and false]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
---
 -- trueValInt and falseValInt represent true and false values returned by
 -- comparison primops for Char, Int, Word, Integer, Double, Float and Addr.
 -- True is represented as an unboxed 1# literal, while false is represented
@@ -1820,7 +1820,7 @@ tagToEnumRule = do
 
 ------------------------------
 dataToTagRule :: RuleM CoreExpr
--- See Note [dataToTag#] in primops.txt.pp
+-- See Note [dataToTag# magic].
 dataToTagRule = a `mplus` b
   where
     -- dataToTag (tagToEnum x)   ==>   x
@@ -2465,7 +2465,6 @@ match_cstring_length rule_env env _ [lit1]
      in Just (Lit (mkLitInt (roPlatform rule_env) (fromIntegral len)))
 match_cstring_length _ _ _ _ = Nothing
 
----------------------------------------------------
 {- Note [inlineId magic]
 ~~~~~~~~~~~~~~~~~~~~~~~~
 The call 'inline f' arranges that 'f' is inlined, regardless of
@@ -3306,7 +3305,7 @@ Instead, we deal with turning one branch into DEFAULT in GHC.Core.Opt.Simplify.U
 
 Note [caseRules for dataToTag]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-See also Note [dataToTag#] in primops.txt.pp
+See also Note [dataToTag# magic].
 
 We want to transform
   case dataToTag x of

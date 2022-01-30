@@ -640,8 +640,8 @@ lintLetBind top_lvl rec_flag binder rhs rhs_ty
            (badBndrTyMsg binder (text "unlifted"))
 
         -- Check that if the binder is at the top level and has type Addr#,
-        -- that it is a string literal, see
-        -- Note [Core top-level string literals].
+        -- that it is a string literal.
+        -- See Note [Core top-level string literals].
        ; checkL (not (isTopLevel top_lvl && binder_ty `eqType` addrPrimTy)
                  || exprIsTickedString rhs)
            (mkTopNonLitStrMsg binder)
@@ -1005,8 +1005,8 @@ lintCoreFun (Var var) nargs
   = lintIdOcc var nargs
 
 lintCoreFun (Lam var body) nargs
-  -- Act like lintCoreExpr of Lam, but *don't* call markAllJoinsBad; see
-  -- Note [Beta redexes]
+  -- Act like lintCoreExpr of Lam, but *don't* call markAllJoinsBad;
+  -- See Note [Beta redexes]
   | nargs /= 0
   = lintLambda var $ lintCoreFun body (nargs - 1)
 

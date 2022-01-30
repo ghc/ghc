@@ -103,7 +103,7 @@
 #endif
 
 // Note [Not true: ASSERT(Sp > SpLim)]
-//
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // SpLim has some headroom (RESERVED_STACK_WORDS) to allow for saving
 // any necessary state on the stack when returning to the scheduler
 // when a stack check fails..  The upshot of this is that Sp could be
@@ -117,7 +117,7 @@
    return cap;
 
 // Note [avoiding threadPaused]
-//
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Switching between the interpreter to compiled code can happen very
 // frequently, so we don't want to call threadPaused(), which is
 // expensive.  BUT we must be careful not to violate the invariant
@@ -1678,7 +1678,7 @@ run_BCO:
             SET_HDR(con, (StgInfoTable*)BCO_LIT(o_itbl), cap->r.rCCCS);
 
             // Note [Data constructor dynamic tags]
-            //
+            // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             // compute the pointer tag for the constructor and tag the pointer
             //
             //     - 1..(TAG_MASK-1): for first TAG_MASK-1 constructors

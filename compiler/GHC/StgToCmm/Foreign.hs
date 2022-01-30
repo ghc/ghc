@@ -127,7 +127,7 @@ cgForeignCall (CCall (CCallSpec target cconv safety)) typ stg_args res_ty
          }
 
 {- Note [safe foreign call convention]
-
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The simple thing to do for a safe foreign call would be the same as an
 unsafe one: just
 

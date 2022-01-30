@@ -166,7 +166,6 @@ stg_isMutableByteArrayPinnedzh ( gcptr mba )
 
 /* Note [LDV profiling and resizing arrays]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
- *
  * As far as the LDV profiler is concerned arrays are "inherently used" which
  * means we don't track their time of use and eventual destruction. We just
  * assume they get used.
@@ -1562,7 +1561,7 @@ stg_writeTVarzh (P_ tvar,     /* :: TVar a */
  * exception and never perform its take or put, and we'd end up with a
  * deadlock.
  *
- * Note [Nonmoving write barrier in Perform{Take,Put}]
+ * Note [Nonmoving write barrier in Perform{Put,Take}]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  * As noted in Note [Non-moving garbage collector] in NonMoving.c, the
  * non-moving GC requires that all overwritten pointers be pushed to the update
@@ -1825,7 +1824,7 @@ stg_putMVarzh ( P_ mvar, /* :: MVar a */
         StgMVarTSOQueue_tso(q)  = CurrentTSO;
 
         SET_HDR(q, stg_MVAR_TSO_QUEUE_info, CCS_SYSTEM);
-        //See Note [Heap memory barriers]
+        // See Note [Heap memory barriers]
         prim_write_barrier;
 
         if (StgMVar_head(mvar) == stg_END_TSO_QUEUE_closure) {
@@ -2036,7 +2035,7 @@ stg_readMVarzh ( P_ mvar, /* :: MVar a */ )
         StgMVarTSOQueue_tso(q)  = CurrentTSO;
 
         SET_HDR(q, stg_MVAR_TSO_QUEUE_info, CCS_SYSTEM);
-        //See Note [Heap memory barriers]
+        // See Note [Heap memory barriers]
         prim_write_barrier;
 
         StgTSO__link(CurrentTSO)       = q;
@@ -2169,7 +2168,7 @@ stg_readIOPortzh ( P_ ioport /* :: IOPort a */ )
         StgMVarTSOQueue_tso(q)  = CurrentTSO;
 
         SET_HDR(q, stg_MVAR_TSO_QUEUE_info, CCS_SYSTEM);
-        //See Note [Heap memory barriers]
+        // See Note [Heap memory barriers]
         prim_write_barrier;
 
         StgMVar_head(ioport) = q;

@@ -277,7 +277,9 @@ $1/$2/build/tmp/$$($1_$2_PROG) : $$($1_$2_$$($1_$2_PROGRAM_WAY)_HS_OBJS) $$($1_$
 endif
 endif # $1_$2_PROG_NEEDS_C_WRAPPER
 
-# Note [lib-depends] if this program is built with stage1 or greater, we
+# Note [lib-depends]
+# ~~~~~~~~~~~~~~~~~~
+# If this program is built with stage1 or greater, we
 # need to depend on the libraries too.  NB. since $(ALL_STAGE1_LIBS) and
 # $(ALL_RTS_LIBS) are not defined until after libraries/*/ghc.mk have
 # been included, this introduces an ordering dependency.

@@ -1218,12 +1218,12 @@ there is only dictionary selection (no construction) involved
 Note [exprIsCheap]
 ~~~~~~~~~~~~~~~~~~
 
-See also Note [Interaction of exprIsCheap and lone variables] in GHC.Core.Unfold
+See also Note [Interaction of exprIsWorkFree and lone variables] in GHC.Core.Unfold
 
 @exprIsCheap@ looks at a Core expression and returns \tr{True} if
 it is obviously in weak head normal form, or is cheap to get to WHNF.
-[Note that that's not the same as exprIsDupable; an expression might be
-big, and hence not dupable, but still cheap.]
+Note that that's not the same as exprIsDupable; an expression might be
+big, and hence not dupable, but still cheap.
 
 By ``cheap'' we mean a computation we're willing to:
         push inside a lambda, or
@@ -1951,7 +1951,7 @@ exprIsHNFlike is_con is_con_unf = is_hnf_like
 
 {-
 Note [exprIsHNF Tick]
-
+~~~~~~~~~~~~~~~~~~~~~
 We can discard source annotations on HNFs as long as they aren't
 tick-like:
 
@@ -2338,7 +2338,9 @@ There are some particularly delicate points here:
   The above is correct, but eta-reducing g would yield g=f, the linter will
   complain that g and f don't have the same type.
 
-* Note [Arity care]: we need to be careful if we just look at f's
+* Note [Arity care]
+  ~~~~~~~~~~~~~~~~~
+  We need to be careful if we just look at f's
   arity. Currently (Dec07), f's arity is visible in its own RHS (see
   Note [Arity robustness] in GHC.Core.Opt.Simplify.Env) so we must *not* trust the
   arity when checking that 'f' is a value.  Otherwise we will

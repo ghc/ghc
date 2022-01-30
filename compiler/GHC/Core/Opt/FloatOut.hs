@@ -280,7 +280,7 @@ splitRecFloats fs
                                                    -- non-rec
 
 installUnderLambdas :: Bag FloatBind -> CoreExpr -> CoreExpr
--- Note [Floating out of Rec rhss]
+-- See Note [Floating out of Rec rhss]
 installUnderLambdas floats e
   | isEmptyBag floats = e
   | otherwise         = go e
@@ -374,7 +374,6 @@ floatBody lvl arg       -- Used rec rhss, and case-alternative rhss
 
 {- Note [Floating past breakpoints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 We used to disallow floating out of breakpoint ticks (see #10052). However, I
 think this is too restrictive.
 
@@ -428,7 +427,7 @@ floatExpr (Tick tickish expr)
     in
     (fs, annotated_defns, Tick tickish expr') }
 
-  -- Note [Floating past breakpoints]
+  -- See Note [Floating past breakpoints]
   | Breakpoint{} <- tickish
   = case (floatExpr expr)    of { (fs, floating_defns, expr') ->
     (fs, floating_defns, Tick tickish expr') }

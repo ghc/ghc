@@ -430,7 +430,7 @@ mkFastString# a# = mkFastStringBytes ptr (ptrStrLength ptr)
   where ptr = Ptr a#
 
 {- Note [Updating the FastString table]
-
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We use a concurrent hashtable which contains multiple segments, each hash value
 always maps to the same segment. Read is lock-free, write to the a segment
 should acquire a lock for that segment to avoid race condition, writes to

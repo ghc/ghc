@@ -14,7 +14,7 @@ import Target
 import Utilities
 
 {- Note [Libffi indicating inputs]
-
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 First see https://gitlab.haskell.org/ghc/ghc/wikis/Developing-Hadrian for an
 explanation of "indicating input". Part of the definition is copied here for
 your convenience:

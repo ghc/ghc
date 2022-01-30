@@ -51,7 +51,7 @@ install show:
 	$(MAKE) --no-print-directory -f ghc.mk $@ BINDIST=YES NO_INCLUDE_DEPS=YES
 
 # Note [install-strip]
-#
+# ~~~~~~~~~~~~~~~~~~~~
 # install-strip is like install, but it strips the executable files while
 # installing them.
 #
@@ -191,7 +191,7 @@ endif
 endif
 
 # Note [validate and testsuite speed]
-#
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # There are 3 different validate and testsuite speed settings:
 # fast, normal and slow.
 #

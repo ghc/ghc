@@ -118,6 +118,7 @@ typedef enum {
 
 /*
  * Note [No typedefs for customizable types]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  * Some pointer-to-struct types are defined opaquely
  * first, and customized later to architecture/ABI-specific
  * instantiations. Having the usual

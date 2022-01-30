@@ -16,7 +16,7 @@
 utils/ghc-pkg_PACKAGE = ghc-pkg
 
 # Note [Why build certain utils twice?]
-#
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # We build certain utils twice: once with stage0, and once with stage1.
 # Examples are ghc-pkg and hsc2hs.
 #

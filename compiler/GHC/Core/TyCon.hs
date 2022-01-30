@@ -442,7 +442,7 @@ See #19367.
 type TyConBinder     = VarBndr TyVar   TyConBndrVis
 type TyConTyCoBinder = VarBndr TyCoVar TyConBndrVis
      -- Only PromotedDataCon has TyConTyCoBinders
-     -- See Note [Promoted GADT data construtors]
+     -- See Note [Promoted GADT data constructors]
 
 data TyConBndrVis
   = NamedTCB ArgFlag
@@ -1712,7 +1712,7 @@ isGcPtrRep UnliftedRep = True
 isGcPtrRep _           = False
 
 -- A PrimRep is compatible with another iff one can be coerced to the other.
--- See Note [bad unsafe coercion] in GHC.Core.Lint for when are two types coercible.
+-- See Note [Bad unsafe coercion] in GHC.Core.Lint for when are two types coercible.
 primRepCompatible :: Platform -> PrimRep -> PrimRep -> Bool
 primRepCompatible platform rep1 rep2 =
     (isUnboxed rep1 == isUnboxed rep2) &&
@@ -2436,7 +2436,7 @@ setTcTyConKind :: TyCon -> Kind -> TyCon
 -- Update the Kind of a TcTyCon
 -- The new kind is always a zonked version of its previous
 -- kind, so we don't need to update any other fields.
--- See Note [The Purely Kinded Invariant] in GHC.Tc.Gen.HsType
+-- See Note [The Purely Kinded Type Invariant (PKTI)] in GHC.Tc.Gen.HsType
 setTcTyConKind tc@(TcTyCon {}) kind = let tc' = tc { tyConKind = kind
                                                    , tyConNullaryTy = mkNakedTyConTy tc'
                                                        -- see Note [Sharing nullary TyCons]

@@ -133,7 +133,7 @@ GhcLibExtraHcOpts += -Wno-deprecated-flags
 GhcBootLibExtraHcOpts += -fno-warn-deprecated-flags
 
 # Note [Order of warning flags]
-#
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # In distdir-way-opts, build flags are added in the following order (this
 # list is not exhaustive):
 #

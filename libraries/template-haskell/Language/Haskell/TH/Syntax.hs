@@ -2592,7 +2592,6 @@ data Con = NormalC Name [BangType]       -- ^ @C Int a@
 
 -- Note [GADT return type]
 -- ~~~~~~~~~~~~~~~~~~~~~~~
---
 -- The return type of a GADT constructor does not necessarily match the name of
 -- the data type:
 --

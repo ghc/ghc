@@ -303,7 +303,7 @@ compileOne' mHscMessage
          = (Interpreter, gopt_set (dflags2 { backend = Interpreter }) Opt_ForceRecomp)
          | otherwise
          = (backend dflags, dflags2)
-      -- Note [Filepaths and Multiple Home Units]
+       -- See Note [Filepaths and Multiple Home Units]
        dflags  = dflags3 { includePaths = offsetIncludePaths dflags3 $ addImplicitQuoteInclude old_paths [current_dir] }
        upd_summary = summary { ms_hspp_opts = dflags }
        hsc_env = hscSetFlags dflags hsc_env0
@@ -314,7 +314,6 @@ compileOne' mHscMessage
 --
 -- Note [Dynamic linking on macOS]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
---
 -- Since macOS Sierra (10.14), the dynamic system linker enforces
 -- a limit on the Load Commands.  Specifically the Load Command Size
 -- Limit is at 32K (32768).  The Load Commands contain the install
@@ -906,10 +905,8 @@ pipelineStart pipe_env hsc_env input_fn =
    fromSuffix _          = return (Just input_fn)
 
 {-
-
 Note [The Pipeline Monad]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
-
 The pipeline is represented as a free monad by the `TPipelineClass` type synonym,
 which stipulates the general monadic interface for the pipeline and `MonadUse`, instantiated
 to `TPhase`, which indicates the actions available in the pipeline.

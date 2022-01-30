@@ -53,7 +53,9 @@
  * because LDV profiling relies on entering closures to mark them as
  * "used".
  *
- * Note [untag for prof]: when we enter a closure, the convention is
+ * Note [untag for prof]
+ * ~~~~~~~~~~~~~~~~~~~~~
+ * When we enter a closure, the convention is
  * that the closure pointer passed in the first argument is
  * *untagged*.  Without profiling we don't have to worry about this,
  * because we never enter a tagged pointer.

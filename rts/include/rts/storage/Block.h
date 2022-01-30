@@ -28,7 +28,7 @@
 #define BLOCK_SIZE   (1<<BLOCK_SHIFT)
 #else
 #define BLOCK_SIZE   (UNIT<<BLOCK_SHIFT)
-// Note [integer overflow]
+// See Note [integer overflow]
 #endif
 
 #define BLOCK_SIZE_W (BLOCK_SIZE/sizeof(W_))
@@ -43,7 +43,7 @@
 #define MBLOCK_SIZE    (1<<MBLOCK_SHIFT)
 #else
 #define MBLOCK_SIZE    (UNIT<<MBLOCK_SHIFT)
-// Note [integer overflow]
+// See Note [integer overflow]
 #endif
 
 #define MBLOCK_SIZE_W  (MBLOCK_SIZE/sizeof(W_))
@@ -60,7 +60,7 @@
 
 /*
  * Note [integer overflow]
- *
+ * ~~~~~~~~~~~~~~~~~~~~~~~
  * The UL suffix in BLOCK_SIZE and MBLOCK_SIZE promotes the expression
  * to an unsigned long, which means that expressions involving these
  * will be promoted to unsigned long, which makes integer overflow

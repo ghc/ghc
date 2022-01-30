@@ -82,9 +82,8 @@ import Data.Functor.Identity
 import Control.Monad
 
 {-
--- ---------------------------------------------------------------------------
--- Note [CorePrep Overview]
--- ---------------------------------------------------------------------------
+Note [CorePrep Overview]
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 The goal of this pass is to prepare for code generation.
 
@@ -2173,7 +2172,7 @@ newVar ty
 -- ---------------------------------------------------------------------------
 --
 -- Note [Floating Ticks in CorePrep]
---
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- It might seem counter-intuitive to float ticks by default, given
 -- that we don't actually want to move them if we can help it. On the
 -- other hand, nothing gets very far in CorePrep anyway, and we want

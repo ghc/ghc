@@ -62,7 +62,6 @@ fixST k = unsafeIOToST $ do
 
 {- Note [fixST]
    ~~~~~~~~~~~~
-
 For many years, we implemented fixST much like a pure fixpoint,
 using liftST:
 

@@ -147,7 +147,7 @@ pprBasicBlock config info_env (BasicBlock blockid instrs)
              then ppr (mkAsmTempEndLabel info_lbl) <> char ':'
              else empty)
     -- Make sure the info table has the right .loc for the block
-    -- coming right after it. See [Note: Info Offset]
+    -- coming right after it. See Note [Info Offset]
     infoTableLoc = case instrs of
       (l@LOCATION{} : _) -> pprInstr platform l
       _other             -> empty
@@ -187,11 +187,12 @@ pprGloblDecl platform lbl
   | otherwise = text "\t.globl " <> pdoc platform lbl
 
 -- Note [Always use objects for info tables]
--- See discussion in X86.Ppr
--- for why this is necessary.  Essentially we need to ensure that we never
--- pass function symbols when we migth want to lookup the info table.  If we
--- did, we could end up with procedure linking tables (PLT)s, and thus the
--- lookup wouldn't point to the function, but into the jump table.
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- See discussion in X86.Ppr for why this is necessary.  Essentially we need to
+-- ensure that we never pass function symbols when we migth want to lookup the
+-- info table.  If we did, we could end up with procedure linking tables
+-- (PLT)s, and thus the lookup wouldn't point to the function, but into the
+-- jump table.
 --
 -- Fun fact: The LLVMMangler exists to patch this issue su on the LLVM side as
 -- well.

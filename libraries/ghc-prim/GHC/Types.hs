@@ -84,7 +84,7 @@ This declaration is important for :info (->) command (issue #10145)
 
 -- | The regular function type
 type (->) = FUN 'Many
--- See Note [Linear Types] in Multiplicity
+-- See Note [Linear types] in Multiplicity
 
 {- *********************************************************************
 *                                                                      *
@@ -261,7 +261,6 @@ newtype IO a = IO (State# RealWorld -> (# State# RealWorld, a #))
 {-
 Note [Kind-changing of (~) and Coercible]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 (~) and Coercible are tricky to define. To the user, they must appear as
 constraints, but we cannot define them as such in Haskell. But we also cannot
 just define them only in GHC.Prim (like (->)), because we need a real module

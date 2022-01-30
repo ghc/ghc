@@ -1910,7 +1910,7 @@ mkDictErr ctxt cts
     -- but we really only want to report the latter
     elim_superclasses cts = mkMinimalBySCs ctPred cts
 
--- [Note: mk_dict_err]
+-- Note [mk_dict_err]
 -- ~~~~~~~~~~~~~~~~~~~
 -- Different dictionary error messages are reported depending on the number of
 -- matches and unifiers:

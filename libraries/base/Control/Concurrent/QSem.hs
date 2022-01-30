@@ -100,7 +100,7 @@ signalQSem (QSem m) =
     putMVar m r'
 
 -- Note [signal uninterruptible]
---
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 --   If we have
 --
 --      bracket waitQSem signalQSem (...)

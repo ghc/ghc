@@ -4,7 +4,6 @@ where
 
 {- Note [UniqFM and the register allocator]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
    Before UniqFM had a key type the register allocator
    wasn't picky about key types, using VirtualReg, Reg
    and Unique at various use sites for the same map.

@@ -1883,7 +1883,7 @@ parseDynamicFlagsFull activeFlags cmdline dflags0 args = do
   let ((leftover, errs, warns), dflags1)
           = runCmdLine (processArgs activeFlags args) dflags0
 
-  -- See Note [Handling errors when parsing commandline flags]
+  -- See Note [Handling errors when parsing command-line flags]
   let rdr = renderWithContext (initSDocContext dflags0 defaultUserStyle)
   unless (null errs) $ liftIO $ throwGhcExceptionIO $ errorsToGhcException $
     map ((rdr . ppr . getLoc &&& unLoc) . errMsg) $ errs
@@ -4586,8 +4586,8 @@ pieCCLDOpts dflags
 
 
 {-
-Note [No PIE while linking]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [No PIE when linking]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 As of 2016 some Linux distributions (e.g. Debian) have started enabling -pie by
 default in their gcc builds. This is incompatible with -r as it implies that we
 are producing an executable. Consequently, we must manually pass -no-pie to gcc

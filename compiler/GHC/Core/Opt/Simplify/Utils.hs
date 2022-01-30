@@ -1293,7 +1293,7 @@ preInlineUnconditionally env top_lvl bndr rhs rhs_env
   | not (one_occ (idOccInfo bndr))           = Nothing
   | not (isStableUnfolding unf)              = Just $! (extend_subst_with rhs)
 
-  -- Note [Stable unfoldings and preInlineUnconditionally]
+  -- See Note [Stable unfoldings and preInlineUnconditionally]
   | not (isInlinePragma inline_prag)
   , Just inl <- maybeUnfoldingTemplate unf   = Just $! (extend_subst_with inl)
   | otherwise                                = Nothing
@@ -1395,7 +1395,7 @@ our new view that inlining is like a RULE, so I'm sticking to the 'active'
 story for now.
 
 NB: unconditional inlining of this sort can introduce ticks in places that
-may seem surprising; for instance, the LHS of rules. See Note [Simplfying
+may seem surprising; for instance, the LHS of rules. See Note [Simplifying
 rules] for details.
 -}
 
@@ -2196,7 +2196,7 @@ prepareAlts scrut case_bndr' alts
 
 mkCase tries these things
 
-* Note [Nerge nested cases]
+* Note [Merge nested cases]
 * Note [Eliminate identity case]
 * Note [Scrutinee constant folding]
 

@@ -74,8 +74,8 @@ GhcStage2HcOpts=-O2 -haddock
 GhcStage3HcOpts=-O2 -haddock
 
 
-# Note [Stage number in build variables].
-#
+# Note [Stage number in build variables]
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # There are (unfortunately) two different naming schemes for build variables
 # specific to a certain stage.
 #
@@ -551,7 +551,7 @@ CrossCompilePrefix    = $(if $(filter YES,$(Stage1Only)),@CrossCompilePrefix@,)
 INSTALL_GHC_STAGE= $(if $(filter YES,$(Stage1Only)),1,2)
 
 # Note [CrossCompiling vs Stage1Only]
-#
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # There are 4 possible settings:
 #
 # 1 CrossCompiling=NO Stage1Only=NO
@@ -570,7 +570,7 @@ INSTALL_GHC_STAGE= $(if $(filter YES,$(Stage1Only)),1,2)
 # [1] https://gitlab.haskell.org/ghc/ghc/wikis/building/cross-compiling
 
 # Note [Stage1Only vs stage=1]
-#
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Stage1Only=YES means:
 #   - don't build ghc-stage2 (the executable)
 #   - don't build utils that rely on ghc-stage2
@@ -891,6 +891,7 @@ GhcLibHcOpts=
 endif
 
 # Note [Disable -O2 in unregisterised mode]
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Disable -O2 optimization in unregisterised mode. Otherwise amount
 # of generated C code # makes things very slow to compile (~5 minutes
 # on core-i7 for 'compiler/GHC/Hs/Expr.hs') and sometimes not compile

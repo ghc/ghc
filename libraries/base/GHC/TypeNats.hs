@@ -92,8 +92,9 @@ someNatVal :: Natural -> SomeNat
 someNatVal n = withSNat SomeNat (SNat n) Proxy
 {-# NOINLINE someNatVal #-} -- See Note [NOINLINE someNatVal]
 
-{- Note [NOINLINE someNatVal]
-
+{-
+Note [NOINLINE someNatVal]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 `someNatVal` converts a natural number to an existentially quantified
 dictionary for `KnownNat` (aka `SomeNat`).  The existential quantification
 is very important, as it captures the fact that we don't know the type

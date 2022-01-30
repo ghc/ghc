@@ -156,8 +156,8 @@ initSysTools top_dir = do
     Left (SettingsError_MissingData msg) -> pgmError msg
     Left (SettingsError_BadData msg) -> pgmError msg
 
-{- Note [Windows stack usage]
-
+{- Note [Windows stack allocations]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 See: #8870 (and #8834 for related info) and #12186
 
 On Windows, occasionally we need to grow the stack. In order to do

@@ -284,7 +284,7 @@ foldl k z0 xs =
 
 {-
 Note [Left folds via right fold]
-
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Implementing foldl et. al. via foldr is only a good idea if the compiler can
 optimize the resulting code (eta-expand the recursive "go"). See #7994.
 We hope that one of the two measure kick in:
@@ -309,7 +309,7 @@ inline FB functions because:
 * They are higher-order functions and therefore benefit from inlining.
 
 * When the final consumer is a left fold, inlining the FB functions is the only
-  way to make arity expansion happen. See Note [Left fold via right fold].
+  way to make arity expansion happen. See Note [Left folds via right fold].
 
 For this reason we mark all FB functions INLINE [0]. The [0] phase-specifier
 ensures that calls to FB functions can be written back to the original form
@@ -458,7 +458,7 @@ scanl                   = scanlGo
                                []   -> []
                                x:xs -> scanlGo f (f q x) xs)
 
--- Note [scanl rewrite rules]
+-- See Note [scanl rewrite rules]
 {-# RULES
 "scanl"  [~1] forall f a bs . scanl f a bs =
   build (\c n -> a `c` foldr (scanlFB f c) (constScanl n) bs a)
@@ -509,7 +509,7 @@ scanl' = scanlGo'
                             []   -> []
                             x:xs -> scanlGo' f (f q x) xs)
 
--- Note [scanl rewrite rules]
+-- See Note [scanl rewrite rules]
 {-# RULES
 "scanl'"  [~1] forall f a bs . scanl' f a bs =
   build (\c n -> a `c` foldr (scanlFB' f c) (flipSeqScanl' n) bs a)
@@ -529,7 +529,6 @@ flipSeqScanl' a !_b = a
 {-
 Note [scanl rewrite rules]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 In most cases, when we rewrite a form to one that can fuse, we try to rewrite it
 back to the original form if it does not fuse. For scanl, we do something a
 little different. In particular, we rewrite
@@ -651,7 +650,9 @@ scanrFB f c = \x ~(r, est) -> (f x r, r `c` est)
                  scanr f q0 ls
  #-}
 
-{- Note [scanrFB and evaluation]
+{-
+Note [scanrFB and evaluation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In a previous Version, the pattern match on the tuple in scanrFB used to be
 strict. If scanr is called with a build expression, the following would happen:
 The rule "scanr" would fire, and we obtain
@@ -1417,8 +1418,9 @@ foldr3_left _  z _ _  _      _     = z
                   foldr3 k z (build g) = g (foldr3_left k z) (\_ _ -> z)
  #-}
 
-{- Note [Fusion for foldrN]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{-
+Note [Fusion for foldrN]
+~~~~~~~~~~~~~~~~~~~~~~~~
 We arrange that foldr2, foldr3, etc is a good consumer for its first
 (left) list argument. Here's how. See below for the second, third
 etc list arguments

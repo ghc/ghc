@@ -1430,7 +1430,7 @@ lookupGreRn_maybe fos rdr_name
 {-
 
 Note [ Unbound vs Ambiguous Names ]
-
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 lookupGreRn_maybe deals with failures in two different ways. If a name
 is unbound then we return a `Nothing` but if the name is ambiguous
 then we raise an error and return a dummy name.

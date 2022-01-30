@@ -909,7 +909,6 @@ static void checkGeneration (generation *gen,
 #if defined(THREADED_RTS)
     // Note [heap sanity checking with SMP]
     // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    //
     // heap sanity checking doesn't work with SMP for two reasons:
     //
     //   * We can't zero the slop. However, we can sanity-check the heap after a

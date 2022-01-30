@@ -160,13 +160,13 @@ instance Integral Int8 where
         | otherwise                  = I8# (x# `modInt8#` y#)
     quotRem x@(I8# x#) y@(I8# y#)
         | y == 0                     = divZeroError
-          -- Note [Order of tests]
+          -- See Note [Order of tests]
         | y == (-1) && x == minBound = (overflowError, 0)
         | otherwise                  = case x# `quotRemInt8#` y# of
                                        (# q, r #) -> (I8# q, I8# r)
     divMod  x@(I8# x#) y@(I8# y#)
         | y == 0                     = divZeroError
-          -- Note [Order of tests]
+          -- See Note [Order of tests]
         | y == (-1) && x == minBound = (overflowError, 0)
         | otherwise                  = case  x# `divModInt8#` y# of
                                        (# d, m #) -> (I8# d, I8# m)
@@ -371,13 +371,13 @@ instance Integral Int16 where
         | otherwise                  = I16# (x# `modInt16#` y#)
     quotRem x@(I16# x#) y@(I16# y#)
         | y == 0                     = divZeroError
-          -- Note [Order of tests]
+          -- See Note [Order of tests]
         | y == (-1) && x == minBound = (overflowError, 0)
         | otherwise                  = case x# `quotRemInt16#` y# of
                                        (# q, r #) -> (I16# q, I16# r)
     divMod  x@(I16# x#) y@(I16# y#)
         | y == 0                     = divZeroError
-          -- Note [Order of tests]
+          -- See Note [Order of tests]
         | y == (-1) && x == minBound = (overflowError, 0)
         | otherwise                  = case x# `divModInt16#` y# of
                                        (# d, m #) -> (I16# d, I16# m)
@@ -579,13 +579,13 @@ instance Integral Int32 where
         | otherwise                  = I32# (x# `modInt32#` y#)
     quotRem x@(I32# x#) y@(I32# y#)
         | y == 0                     = divZeroError
-          -- Note [Order of tests]
+          -- See Note [Order of tests]
         | y == (-1) && x == minBound = (overflowError, 0)
         | otherwise                  = case x# `quotRemInt32#` y# of
                                        (# q, r #) -> (I32# q, I32# r)
     divMod  x@(I32# x#) y@(I32# y#)
         | y == 0                     = divZeroError
-          -- Note [Order of tests]
+          -- See Note [Order of tests]
         | y == (-1) && x == minBound = (overflowError, 0)
         | otherwise                  = case x# `divModInt32#` y# of
                                        (# d, m #) -> (I32# d, I32# m)
@@ -779,7 +779,7 @@ instance Enum Int64 where
 instance Integral Int64 where
     quot    x@(I64# x#) y@(I64# y#)
         | y == 0                     = divZeroError
-        | y == (-1) && x == minBound = overflowError -- Note [Order of tests]
+        | y == (-1) && x == minBound = overflowError -- See Note [Order of tests]
         | otherwise                  = I64# (x# `quotInt64#` y#)
     rem       (I64# x#) y@(I64# y#)
         | y == 0                     = divZeroError
@@ -791,7 +791,7 @@ instance Integral Int64 where
         | otherwise                  = I64# (x# `remInt64#` y#)
     div     x@(I64# x#) y@(I64# y#)
         | y == 0                     = divZeroError
-        | y == (-1) && x == minBound = overflowError -- Note [Order of tests]
+        | y == (-1) && x == minBound = overflowError -- See Note [Order of tests]
         | otherwise                  = I64# (x# `divInt64#` y#)
     mod       (I64# x#) y@(I64# y#)
         | y == 0                     = divZeroError
@@ -803,7 +803,7 @@ instance Integral Int64 where
         | otherwise                  = I64# (x# `modInt64#` y#)
     quotRem x@(I64# x#) y@(I64# y#)
         | y == 0                     = divZeroError
-          -- Note [Order of tests]
+          -- See Note [Order of tests]
         | y == (-1) && x == minBound = (overflowError, 0)
 #if WORD_SIZE_IN_BITS < 64
         -- we don't have quotRemInt64# primop yet
@@ -814,7 +814,7 @@ instance Integral Int64 where
 #endif
     divMod  x@(I64# x#) y@(I64# y#)
         | y == 0                     = divZeroError
-          -- Note [Order of tests]
+          -- See Note [Order of tests]
         | y == (-1) && x == minBound = (overflowError, 0)
 #if WORD_SIZE_IN_BITS < 64
         -- we don't have divModInt64# primop yet
@@ -952,8 +952,9 @@ instance Ix Int64 where
 
 -------------------------------------------------------------------------------
 
-{- Note [Order of tests]
-~~~~~~~~~~~~~~~~~~~~~~~~~
+{-
+Note [Order of tests]
+~~~~~~~~~~~~~~~~~~~~~
 (See #3065, #5161.) Suppose we had a definition like:
 
     quot x y

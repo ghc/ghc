@@ -59,7 +59,6 @@
 
    Note [BFD import library]
    ~~~~~~~~~~~~~~~~~~~~~~~~~
-
    On Windows, compilers don't link directly to dynamic libraries.
    The reason for this is that the exports are not always by symbol, the
    Import Address Table (IAT) also allows exports by ordinal number
@@ -128,7 +127,6 @@
 
    Note [Memory allocation]
    ~~~~~~~~~~~~~~~~~~~~~~~~
-
    Previously on Windows we would use VirtualAlloc to allocate enough space for
    loading the entire object file into memory and keep it there for the duration
    until the entire object file has been unloaded.
@@ -166,7 +164,6 @@
 
    Note [Section alignment]
    ~~~~~~~~~~~~~~~~~~~~~~~~
-
    The Windows linker aligns memory to it's section alignment requirement by
    aligning it during the copying to the private heap. We also ensure that the
    trampoline "region" we reserve is 8 bytes aligned.
@@ -1996,7 +1993,7 @@ ocResolve_PEi386 ( ObjectCode* oc )
 
 /*
   Note [ELF constant in PE file]
-
+  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   For some reason, the PE files produced by GHC contain a linux
   relocation constant 17 (0x11) in the object files. As far as I (Phyx-) can tell
   this constant doesn't seem like it's coming from GHC, or at least I could not find

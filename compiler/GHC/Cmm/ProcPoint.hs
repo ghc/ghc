@@ -428,7 +428,7 @@ attachContInfoTables _ other_decl
 
 {-
 Note [Direct reachability]
-
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 Block B is directly reachable from proc point P iff control can flow
 from P to B without passing through an intervening proc point.
 -}
@@ -437,7 +437,7 @@ from P to B without passing through an intervening proc point.
 
 {-
 Note [No simple dataflow]
-
+~~~~~~~~~~~~~~~~~~~~~~~~~
 Sadly, it seems impossible to compute the proc points using a single
 dataflow pass.  One might attempt to use this simple lattice:
 

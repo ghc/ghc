@@ -20,10 +20,8 @@ import GHC.Unit.Home
 import GHC.Unit.State
 
 {-
-
-Note [About Units]
+Note [About units]
 ~~~~~~~~~~~~~~~~~~
-
 Haskell users are used to manipulating Cabal packages. These packages are
 identified by:
    - a package name :: String
