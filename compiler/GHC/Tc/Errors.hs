@@ -82,7 +82,7 @@ import Control.Monad    ( unless, when, foldM, forM_ )
 import Data.Foldable    ( toList )
 import Data.Functor     ( (<&>) )
 import Data.Function    ( on )
-import Data.List        ( partition, mapAccumL, sort )
+import Data.List        ( partition, sort )
 import Data.List.NonEmpty ( NonEmpty(..), (<|) )
 import qualified Data.List.NonEmpty as NE ( map, reverse )
 import Data.List        ( sortBy )
@@ -357,7 +357,7 @@ reportImplic ctxt implic@(Implic { ic_skols  = tvs
          warnRedundantConstraints ctxt' tcl_env info' dead_givens }
   where
     insoluble    = isInsolubleStatus status
-    (env1, tvs') = mapAccumL tidyVarBndr (cec_tidy ctxt) $
+    (env1, tvs') = tidyVarBndrs (cec_tidy ctxt) $
                    scopedSort tvs
         -- scopedSort: the ic_skols may not be in dependency order
         -- (see Note [Skolems in an implication] in GHC.Tc.Types.Constraint)

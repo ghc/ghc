@@ -1,10 +1,10 @@
 
 T16245.hs:12:36: error:
-    • Expected kind ‘k’, but ‘b’ has kind ‘k1’
-      ‘k1’ is a rigid type variable bound by
+    • Expected kind ‘k1’, but ‘b’ has kind ‘k2’
+      ‘k2’ is a rigid type variable bound by
         the class declaration for ‘C’
         at T16245.hs:12:45
-      ‘k’ is a rigid type variable bound by
+      ‘k1’ is a rigid type variable bound by
         the class declaration for ‘C’
         at T16245.hs:12:1-62
     • In the second argument of ‘SameKind’, namely ‘b’

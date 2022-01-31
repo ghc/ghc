@@ -1,21 +1,21 @@
 
 T14369.hs:29:5: error:
-    • Couldn't match type ‘a’ with ‘a1’
-      Expected: Sing x -> Maybe (Demote a1)
-        Actual: Sing x -> Demote (Maybe a)
-      ‘a’ is a rigid type variable bound by
-        the type signature for:
-          f :: forall {a} (x :: forall a1. Maybe a1) a1.
-               SingKind a1 =>
-               Sing x -> Maybe (Demote a1)
-        at T14369.hs:28:1-80
+    • Couldn't match type ‘a1’ with ‘a2’
+      Expected: Sing x -> Maybe (Demote a2)
+        Actual: Sing x -> Demote (Maybe a1)
       ‘a1’ is a rigid type variable bound by
         the type signature for:
-          f :: forall {a} (x :: forall a1. Maybe a1) a1.
-               SingKind a1 =>
-               Sing x -> Maybe (Demote a1)
+          f :: forall {a1} (x :: forall a2. Maybe a2) a2.
+               SingKind a2 =>
+               Sing x -> Maybe (Demote a2)
+        at T14369.hs:28:1-80
+      ‘a2’ is a rigid type variable bound by
+        the type signature for:
+          f :: forall {a1} (x :: forall a2. Maybe a2) a2.
+               SingKind a2 =>
+               Sing x -> Maybe (Demote a2)
         at T14369.hs:28:1-80
     • In the expression: fromSing
       In an equation for ‘f’: f = fromSing
     • Relevant bindings include
-        f :: Sing x -> Maybe (Demote a1) (bound at T14369.hs:29:1)
+        f :: Sing x -> Maybe (Demote a2) (bound at T14369.hs:29:1)

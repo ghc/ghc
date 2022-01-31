@@ -1,13 +1,13 @@
 
 mod71.hs:4:9: error:
-    • Found hole: _ :: t1
-      Where: ‘t1’ is a rigid type variable bound by
-               the inferred type of f :: Num t => (t1 -> t -> t2) -> t2
+    • Found hole: _ :: t2
+      Where: ‘t2’ is a rigid type variable bound by
+               the inferred type of f :: Num t1 => (t2 -> t1 -> t3) -> t3
                at mod71.hs:4:1-11
     • In the first argument of ‘x’, namely ‘_’
       In the expression: x _ 1
       In an equation for ‘f’: f x = x _ 1
     • Relevant bindings include
-        x :: t1 -> t -> t2 (bound at mod71.hs:4:3)
-        f :: (t1 -> t -> t2) -> t2 (bound at mod71.hs:4:1)
-      Constraints include Num t (from mod71.hs:4:1-11)
+        x :: t2 -> t1 -> t3 (bound at mod71.hs:4:3)
+        f :: (t2 -> t1 -> t3) -> t3 (bound at mod71.hs:4:1)
+      Constraints include Num t1 (from mod71.hs:4:1-11)
