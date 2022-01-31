@@ -345,6 +345,8 @@ This might not necessarily show up in kind checking.
 checkValidType :: UserTypeCtxt -> Type -> TcM ()
 -- Checks that a user-written type is valid for the given context
 -- Assumes argument is fully zonked
+-- Assumes arugment is well-kinded;
+--    that is, checkValidType doesn't need to do kind checking
 -- Not used for instance decls; checkValidInstance instead
 checkValidType ctxt ty
   = do { traceTc "checkValidType" (ppr ty <+> text "::" <+> ppr (tcTypeKind ty))
@@ -738,11 +740,11 @@ check_type ve@(ValidityEnv{ ve_tidy_env = env, ve_ctxt = ctxt
         ; check_type (ve{ve_tidy_env = env'}) tau
                 -- Allow foralls to right of arrow
 
-        ; checkEscapingKind env' tvbs' theta tau }
+        }
   where
     (tvbs, phi)   = tcSplitForAllTyVarBinders ty
     (theta, tau)  = tcSplitPhiTy phi
-    (env', tvbs') = tidyTyCoVarBinders env tvbs
+    (env', _)     = tidyTyCoVarBinders env tvbs
 
 check_type (ve@ValidityEnv{ ve_tidy_env = env, ve_ctxt = ctxt
                           , ve_rank = rank })
@@ -908,50 +910,6 @@ check_arg_type type_syn (ve@ValidityEnv{ve_ctxt = ctxt, ve_rank = rank}) ty
         ; check_type (ve{ve_ctxt = ctxt', ve_rank = rank'}) ty }
 
 ----------------------------------------
-
--- | Reject type variables that would escape their escape through a kind.
--- See @Note [Type variables escaping through kinds]@.
-checkEscapingKind :: TidyEnv -> [TyVarBinder] -> ThetaType -> Type -> TcM ()
-checkEscapingKind env tvbs theta tau =
-  case occCheckExpand (binderVars tvbs) phi_kind of
-    -- Ensure that none of the tvs occur in the kind of the forall
-    -- /after/ expanding type synonyms.
-    -- See Note [Phantom type variables in kinds] in GHC.Core.Type
-    Nothing -> failWithTcM $ forAllEscapeErr env tvbs theta tau tau_kind
-    Just _  -> pure ()
-  where
-    tau_kind              = tcTypeKind tau
-    phi_kind | null theta = tau_kind
-             | otherwise  = liftedTypeKind
-        -- If there are any constraints, the kind is *. (#11405)
-
-forAllEscapeErr :: TidyEnv -> [TyVarBinder] -> ThetaType -> Type -> Kind
-                -> (TidyEnv, TcRnMessage)
-forAllEscapeErr env tvbs theta tau tau_kind
-  -- NB: Don't tidy the sigma type since the tvbs were already tidied
-  -- previously, and re-tidying them will make the names of type
-  -- variables different from tau_kind.
-  = (env, TcRnForAllEscapeError (mkSigmaTy tvbs theta tau) (tidyType env tau_kind))
-
-{-
-Note [Type variables escaping through kinds]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider:
-
-  type family T (r :: RuntimeRep) :: TYPE r
-  foo :: forall r. T r
-
-Something smells funny about the type of `foo`. If you spell out the kind
-explicitly, it becomes clearer from where the smell originates:
-
-  foo :: ((forall r. T r) :: TYPE r)
-
-The type variable `r` appears in the result kind, which escapes the scope of
-its binding site! This is not desirable, so we establish a validity check
-(`checkEscapingKind`) to catch any type variables that might escape through
-kinds in this way.
--}
-
 checkConstraintsOK :: ValidityEnv -> ThetaType -> Type -> TcM ()
 checkConstraintsOK ve theta ty
   | null theta                         = return ()
