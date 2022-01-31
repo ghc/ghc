@@ -183,18 +183,6 @@ llvm_ways     = [x[0] for x in config.way_flags.items()
 
 
 def get_compiler_info():
-    s = getStdout([config.compiler, '--info'])
-    s = re.sub('[\r\n]', '', s)
-    compilerInfoDict = dict(eval(s))
-    s = getStdout([config.compiler, '+RTS', '--info'])
-    s = re.sub('[\r\n]', '', s)
-    rtsInfoDict = dict(eval(s))
-
-    config.have_ncg = compilerInfoDict.get("Have native code generator", "NO") == "YES"
-
-    # Detect whether an LLVM toolhain is available
-    llc_path = compilerInfoDict.get("LLVM llc command")
-    config.have_llvm = shutil.which(llc_path) is not None
     if config.unregisterised:
         print("Unregisterised build; skipping LLVM ways...")
     elif config.have_llvm:
@@ -212,25 +200,14 @@ def get_compiler_info():
     # backend by default.
     config.ghc_built_by_llvm = not config.have_ncg and not config.unregisterised
 
-    config.have_RTS_linker = compilerInfoDict.get("target has RTS linker", "NO") == "YES"
     # external interpreter needs RTS linker support
     # If the field is not present (GHC 8.0 and earlier), assume we don't
     # have -fexternal-interpreter (though GHC 8.0 actually does)
     # so we can still run most tests.
-    config.have_ext_interp = compilerInfoDict.get("target has RTS linker", "NO") == "YES"
+    config.have_ext_interp = config.have_RTS_linker
 
     # See Note [Replacing backward slashes in config.libdir].
-    config.libdir = compilerInfoDict['LibDir'].replace('\\', '/')
-
-    if re.match(".*_p(_.*|$)", rtsInfoDict["RTS way"]):
-        config.compiler_profiled = True
-    else:
-        config.compiler_profiled = False
-
-    try:
-        config.package_conf_cache_file = compilerInfoDict["Global Package DB"] + '/package.cache'
-    except:
-        config.package_conf_cache_file = ''
+    config.libdir = config.libdir.replace('\\', '/')
 
     # See Note [WayFlags]
     if config.ghc_dynamic:

@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeApplications #-}
 module Settings.Builders.RunTest (runTestBuilderArgs, runTestGhcFlags) where
 
 import Hadrian.Utilities
@@ -10,6 +11,7 @@ import Settings.Builders.Common
 import qualified Data.Set    as Set
 import Flavour
 import qualified Context.Type as C
+import System.Directory (findExecutable)
 
 getTestSetting :: TestSetting -> Expr String
 getTestSetting key = expr $ testSetting key
@@ -51,6 +53,106 @@ runTestGhcFlags = do
         , pure "-dno-debug-output"
         ]
 
+
+data TestCompilerArgs = TestCompilerArgs{
+    hasDynamicRts, hasThreadedRts :: Bool
+ ,   libWays :: [Way]
+ ,   hasDynamic :: Bool
+ ,   leadingUnderscore :: Bool
+ ,   withNativeCodeGen :: Bool
+ ,   withInterpreter   :: Bool
+ ,   unregisterised    :: Bool
+ ,   withSMP           :: Bool
+ ,   debugged          :: Bool
+ ,   profiled          :: Bool
+ ,   os,arch, platform, wordsize :: String
+ ,   libdir :: FilePath
+ ,   have_llvm :: Bool
+ ,   rtsLinker :: Bool
+ ,   pkgConfCacheFile :: FilePath }
+
+
+-- | If the tree is in-compiler then we already know how we will build it so
+-- don't build anything in order to work out what we will build.
+--
+inTreeCompilerArgs :: Stage -> Expr TestCompilerArgs
+inTreeCompilerArgs stg = expr $ do
+
+
+    (hasDynamicRts, hasThreadedRts) <- do
+      ways <- interpretInContext (Context stg rts vanilla) getRtsWays
+      return (dynamic `elem` ways, threaded `elem` ways)
+    libWays <- interpretInContext (Context stg compiler vanilla) getLibraryWays
+    -- MP: We should be able to vary if stage1/stage2 is dynamic, ie a dynamic stage1
+    -- should be able to built a static stage2?
+    hasDynamic          <- flavour >>= dynamicGhcPrograms
+    -- LeadingUnderscore is a property of the system so if cross-compiling stage1/stage2 could
+    -- have different values? Currently not possible to express.
+    leadingUnderscore   <- flag LeadingUnderscore
+    -- MP: This setting seems to only dictate whether we turn on optasm as a compiler
+    -- way, but a lot of tests which use only_ways(optasm) seem to not test the NCG?
+    withNativeCodeGen   <- return True
+    withInterpreter     <- ghcWithInterpreter
+    unregisterised      <- flag GhcUnregisterised
+    withSMP             <- targetSupportsSMP
+    debugged            <- ghcDebugged <$> flavour
+    profiled            <- ghcProfiled <$> flavour
+
+    os          <- setting HostOs
+    arch        <- setting TargetArch
+    platform    <- setting TargetPlatform
+    wordsize    <- (show @Int . (*8) . read) <$> setting TargetWordSize
+
+    llc_cmd   <- settingsFileSetting SettingsFileSetting_LlcCommand
+    have_llvm <- liftIO (isJust <$> findExecutable llc_cmd)
+
+    pkgConfCacheFile <- packageDbPath stg <&> (-/- "package.cache")
+    libdir <- stageLibPath stg
+
+    rtsLinker <- (== "YES") <$> setting TargetHasRtsLinker
+
+    return TestCompilerArgs{..}
+
+ghcConfigPath :: FilePath
+ghcConfigPath = "test/ghcconfig"
+
+-- | If the compiler is out-of-tree then we have to query the compiler to work out
+-- facts about it.
+outOfTreeCompilerArgs :: String -> Expr TestCompilerArgs
+outOfTreeCompilerArgs testGhc = do
+
+    expr (do
+      root <- buildRoot
+      need [root -/- ghcConfigPath])
+    (hasDynamicRts, hasThreadedRts) <- do
+      ways <- expr testRTSSettings
+      return ("dyn" `elem` ways, "thr" `elem` ways)
+    libWays <- expr (inferLibraryWays testGhc)
+    hasDynamic          <- getBooleanSetting TestGhcDynamic
+    leadingUnderscore   <- getBooleanSetting TestLeadingUnderscore
+    withNativeCodeGen   <- getBooleanSetting TestGhcWithNativeCodeGen
+    withInterpreter     <- getBooleanSetting TestGhcWithInterpreter
+    unregisterised      <- getBooleanSetting TestGhcUnregisterised
+    withSMP             <- getBooleanSetting TestGhcWithSMP
+    debugged            <- getBooleanSetting TestGhcDebugged
+
+
+    os          <- getTestSetting TestHostOS
+    arch        <- getTestSetting TestTargetARCH_CPP
+    platform    <- getTestSetting TestTARGETPLATFORM
+    wordsize    <- getTestSetting TestWORDSIZE
+
+    llc_cmd   <- getTestSetting TestLLC
+    have_llvm <- expr (liftIO (isJust <$> findExecutable llc_cmd))
+    profiled <- getBooleanSetting TestGhcProfiled
+
+    pkgConfCacheFile <- getTestSetting TestGhcPackageDb <&> (-/- "package.cache")
+    libdir <-  getTestSetting TestGhcLibDir
+
+    rtsLinker <- getBooleanSetting TestGhcWithRtsLinker
+    return TestCompilerArgs{..}
+
+
 -- Command line arguments for invoking the @runtest.py@ script. A lot of this
 -- mirrors @testsuite/mk/test.mk@.
 runTestBuilderArgs :: Args
@@ -62,17 +164,16 @@ runTestBuilderArgs = builder Testsuite ? do
             | pkg <- pkgs, isLibrary pkg, pkg /= rts, pkg /= libffi ]
 
     testGhc <- expr (testCompiler <$> userSetting defaultTestArgs)
-    rtsWays <- expr testRTSSettings
-    libWays <- expr (inferLibraryWays testGhc)
-    let hasRtsWay w = elem w rtsWays
-        hasLibWay w = elem w libWays
-    hasDynamic          <- getBooleanSetting TestGhcDynamic
-    leadingUnderscore   <- getFlag LeadingUnderscore
-    withNativeCodeGen   <- getBooleanSetting TestGhcWithNativeCodeGen
-    withInterpreter     <- getBooleanSetting TestGhcWithInterpreter
-    unregisterised      <- getBooleanSetting TestGhcUnregisterised
-    withSMP             <- getBooleanSetting TestGhcWithSMP
-    debugged            <- getBooleanSetting TestGhcDebugged
+
+    TestCompilerArgs{..} <-
+      case stageOfTestCompiler testGhc of
+        Just stg -> inTreeCompilerArgs stg
+        Nothing -> outOfTreeCompilerArgs testGhc
+
+    -- MP: TODO, these should be queried from the test compiler?
+    bignumBackend <- getBignumBackend
+    bignumCheck   <- getBignumCheck
+
     keepFiles           <- expr (testKeepFiles <$> userSetting defaultTestArgs)
 
     accept <- expr (testAccept <$> userSetting defaultTestArgs)
@@ -84,15 +185,9 @@ runTestBuilderArgs = builder Testsuite ? do
     perfBaseline <- expr . liftIO $ lookupEnv "PERF_BASELINE_COMMIT"
 
     threads     <- shakeThreads <$> expr getShakeOptions
-    os          <- getTestSetting TestHostOS
-    arch        <- getTestSetting TestTargetARCH_CPP
-    platform    <- getTestSetting TestTARGETPLATFORM
-    wordsize    <- getTestSetting TestWORDSIZE
     top         <- expr $ topDirectory
     ghcFlags    <- expr runTestGhcFlags
     cmdrootdirs <- expr (testRootDirs <$> userSetting defaultTestArgs)
-    bignumBackend <- getBignumBackend
-    bignumCheck   <- getBignumCheck
     let defaultRootdirs = ("testsuite" -/- "tests") : libTests
         rootdirs | null cmdrootdirs = defaultRootdirs
                  | otherwise        = cmdrootdirs
@@ -102,6 +197,8 @@ runTestBuilderArgs = builder Testsuite ? do
 
     let asBool :: String -> Bool -> String
         asBool s b = s ++ show b
+
+        hasLibWay w = elem w libWays
 
     -- TODO: set CABAL_MINIMAL_BUILD/CABAL_PLUGIN_BUILD
     mconcat [ arg $ "testsuite/driver/runtests.py"
@@ -117,14 +214,26 @@ runTestBuilderArgs = builder Testsuite ? do
             , arg "-e", arg $ "config.exeext=" ++ quote (if null exe then "" else "."<>exe)
             , arg "-e", arg $ "config.compiler_debugged=" ++
               show debugged
+            -- MP: TODO, we do not need both, they get aliased to the same thing.
             , arg "-e", arg $ asBool "ghc_with_native_codegen=" withNativeCodeGen
+            , arg "-e", arg $ asBool "config.have_ncg=" withNativeCodeGen
+            , arg "-e", arg $ asBool "config.have_llvm=" have_llvm
+
+            , arg "-e", arg $ asBool "config.compiler_profiled=" profiled
+
+            , arg "-e", arg $ asBool "config.have_RTS_linker="  rtsLinker
+
+            , arg "-e", arg $ "config.package_conf_cache_file=" ++ show pkgConfCacheFile
+
+            , arg "-e", arg $ "config.libdir=" ++ show libdir
+
 
             , arg "-e", arg $ "config.have_interp=" ++ show withInterpreter
             , arg "-e", arg $ "config.unregisterised=" ++ show unregisterised
 
             , arg "-e", arg $ "ghc_compiler_always_flags=" ++ quote ghcFlags
-            , arg "-e", arg $ asBool "ghc_with_dynamic_rts="  (hasRtsWay "dyn")
-            , arg "-e", arg $ asBool "ghc_with_threaded_rts=" (hasRtsWay "thr")
+            , arg "-e", arg $ asBool "ghc_with_dynamic_rts="  (hasDynamicRts)
+            , arg "-e", arg $ asBool "ghc_with_threaded_rts=" (hasThreadedRts)
             , arg "-e", arg $ asBool "config.have_vanilla="   (hasLibWay vanilla)
             , arg "-e", arg $ asBool "config.have_dynamic="   (hasLibWay dynamic)
             , arg "-e", arg $ asBool "config.have_profiling=" (hasLibWay profiling)
