@@ -186,7 +186,7 @@ ghc-linters:
     - .gitlab/linters/check-makefiles.py commits $base $CI_COMMIT_SHA
     - .gitlab/linters/check-cpp.py commits $base $CI_COMMIT_SHA
     - .gitlab/linters/check-version-number.sh
-    - python3 utils/checkUniques/check-uniques.py .
+    - python3 testsuite/tests/linters/checkUniques/check-uniques.py .
   dependencies: []
   rules:
     - if: $CI_MERGE_REQUEST_ID

@@ -77,6 +77,8 @@ data Setting = BuildArch
              | TargetArchHaskell
              | TargetOsHaskell
              | TargetArmVersion
+             | TargetWordSize
+             | TargetHasRtsLinker
              | BourneShell
 
 -- TODO: Reduce the variety of similar flags (e.g. CPP and non-CPP versions).
@@ -176,6 +178,8 @@ setting key = lookupValueOrError configFile $ case key of
     TargetVendor       -> "target-vendor"
     TargetArchHaskell  -> "target-arch-haskell"
     TargetOsHaskell    -> "target-os-haskell"
+    TargetWordSize     -> "target-word-size"
+    TargetHasRtsLinker -> "target-has-rts-linker"
     BourneShell        -> "bourne-shell"
 
 -- | Look up the value of a 'SettingList' in @cfg/system.config@, tracking the

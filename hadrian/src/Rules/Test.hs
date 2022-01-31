@@ -50,6 +50,15 @@ checkPrograms =
     , ("test:count-deps",countDepsProgPath, countDepsSourcePath, countDepsExtra, countDeps)
     ]
 
+testsuiteDeps :: Rules ()
+testsuiteDeps =
+  "test:ghc" ~> do
+    args <- userSetting defaultTestArgs
+    let testCompilerArg = testCompiler args
+    case stageOf testCompilerArg of
+      Just stg -> needTestsuitePackages stg
+      Nothing -> return ()
+
 ghcConfigPath :: FilePath
 ghcConfigPath = "test/ghcconfig"
 
@@ -57,6 +66,8 @@ ghcConfigPath = "test/ghcconfig"
 testRules :: Rules ()
 testRules = do
     root <- buildRootRules
+
+    testsuiteDeps
 
     -- Using program shipped with testsuite to generate ghcconfig file.
     root -/- ghcConfigProgPath %> \_ -> do
@@ -135,15 +146,22 @@ testRules = do
     root -/- timeoutPath %> \_ -> timeoutProgBuilder
 
     "test" ~> do
-        needTestBuilders
-
-        -- TODO : Should we remove the previously generated config file?
-        -- Prepare Ghc configuration file for input compiler.
-        need [root -/- ghcConfigPath, root -/- timeoutPath]
 
         args <- userSetting defaultTestArgs
-
         let testCompilerArg = testCompiler args
+        let stg = fromMaybe Stage2 $ stageOf testCompilerArg
+        let test_target tt = target (vanillaContext stg compiler) (Testsuite tt) [] []
+
+        -- We need to ask the testsuite if it needs any extra hadrian dependencies for the
+        -- tests it is going to run,
+        -- for example "docs_haddock"
+        -- We then need to go and build these dependencies
+        extra_targets <- words <$> askWithResources [] (test_target GetExtraDeps)
+        need $ filter (isOkToBuild args) extra_targets
+
+        -- Prepare Ghc configuration file for input compiler.
+        need [root -/- timeoutPath]
+
 
         ghcPath <- getCompilerPath testCompilerArg
 
@@ -184,15 +202,6 @@ testRules = do
             -- which is in turn included by all test 'Makefile's.
             setEnv "ghc_config_mk" (top -/- root -/- ghcConfigPath)
 
-        let stg = fromMaybe Stage2 $ stageOf testCompilerArg
-        let test_target tt = target (vanillaContext stg compiler) (Testsuite tt) [] []
-
-        -- We need to ask the testsuite if it needs any extra hadrian dependencies for the
-        -- tests it is going to run,
-        -- for example "docs_haddock"
-        -- We then need to go and build these dependencies
-        extra_targets <- words <$> askWithResources [] (test_target GetExtraDeps)
-        need $ filter (isOkToBuild args) extra_targets
 
         -- Execute the test target.
         -- We override the verbosity setting to make sure the user can see
@@ -233,12 +242,6 @@ timeoutProgBuilder = do
                     , "exec " ++ python ++ " $0.py \"$@\"" ]
             writeFile' (root -/- timeoutPath) script
             makeExecutable (root -/- timeoutPath)
-
-needTestBuilders :: Action ()
-needTestBuilders = do
-    testGhc <- testCompiler <$> userSetting defaultTestArgs
-    whenJust (stageOf testGhc)
-             needTestsuitePackages
 
 -- | Build extra programs and libraries required by testsuite
 needTestsuitePackages :: Stage -> Action ()

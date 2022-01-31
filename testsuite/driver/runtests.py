@@ -274,27 +274,30 @@ def format_path(path):
 
 # On Windows we need to set $PATH to include the paths to all the DLLs
 # in order for the dynamic library tests to work.
-if windows:
-    pkginfo = getStdout([config.ghc_pkg, 'dump'])
-    topdir = config.libdir
+try:
     if windows:
+        pkginfo = getStdout([config.ghc_pkg, 'dump'])
+        topdir = config.libdir
         mingw = os.path.abspath(os.path.join(topdir, '../mingw/bin'))
         mingw = format_path(mingw)
         ghc_env['PATH'] = os.pathsep.join([ghc_env.get("PATH", ""), mingw])
-    for line in pkginfo.split('\n'):
-        if line.startswith('library-dirs:'):
-            path = line.rstrip()
-            path = re.sub('^library-dirs: ', '', path)
-            # Use string.replace instead of re.sub, because re.sub
-            # interprets backslashes in the replacement string as
-            # escape sequences.
-            path = path.replace('$topdir', topdir)
-            if path.startswith('"'):
-                path = re.sub('^"(.*)"$', '\\1', path)
-                path = re.sub('\\\\(.)', '\\1', path)
+        for line in pkginfo.split('\n'):
+            if line.startswith('library-dirs:'):
+                path = line.rstrip()
+                path = re.sub('^library-dirs: ', '', path)
+                # Use string.replace instead of re.sub, because re.sub
+                # interprets backslashes in the replacement string as
+                # escape sequences.
+                path = path.replace('$topdir', topdir)
+                if path.startswith('"'):
+                    path = re.sub('^"(.*)"$', '\\1', path)
+                    path = re.sub('\\\\(.)', '\\1', path)
 
-                path = format_path(path)
-                ghc_env['PATH'] = os.pathsep.join([path, ghc_env.get("PATH", "")])
+                    path = format_path(path)
+                    ghc_env['PATH'] = os.pathsep.join([path, ghc_env.get("PATH", "")])
+except FileNotFoundError as err:
+    print (err)
+    print ("Failed to modify PATH for windows... some tests might fail")
 
 testopts_local.x = TestOptions()
 
