@@ -275,12 +275,18 @@ def format_path(path):
 # On Windows we need to set $PATH to include the paths to all the DLLs
 # in order for the dynamic library tests to work.
 if windows:
-    pkginfo = getStdout([config.ghc_pkg, 'dump'])
+    try:
+        pkginfo = getStdout([config.ghc_pkg, 'dump'])
+    except FileNotFoundError as err:
+        # This can happen when we are only running tests which don't depend on ghc (ie linters)
+        # In that case we probably haven't built ghc-pkg yet so this query will fail.
+        print (err)
+        print ("Failed to call ghc-pkg for windows path modification... some tests might fail")
+        pkginfo = ""
     topdir = config.libdir
-    if windows:
-        mingw = os.path.abspath(os.path.join(topdir, '../mingw/bin'))
-        mingw = format_path(mingw)
-        ghc_env['PATH'] = os.pathsep.join([ghc_env.get("PATH", ""), mingw])
+    mingw = os.path.abspath(os.path.join(topdir, '../mingw/bin'))
+    mingw = format_path(mingw)
+    ghc_env['PATH'] = os.pathsep.join([ghc_env.get("PATH", ""), mingw])
     for line in pkginfo.split('\n'):
         if line.startswith('library-dirs:'):
             path = line.rstrip()

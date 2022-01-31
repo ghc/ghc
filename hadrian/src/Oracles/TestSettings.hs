@@ -5,6 +5,7 @@
 module Oracles.TestSettings
   ( TestSetting (..), testSetting, testRTSSettings
   , getCompilerPath, getBinaryDirectory, isInTreeCompiler
+  , stageOfTestCompiler
   ) where
 
 import Base
@@ -28,6 +29,7 @@ data TestSetting = TestHostOS
                  | TestGhcDebugged
                  | TestGhcWithNativeCodeGen
                  | TestGhcWithInterpreter
+                 | TestGhcWithRtsLinker
                  | TestGhcUnregisterised
                  | TestGhcWithSMP
                  | TestGhcDynamic
@@ -40,6 +42,9 @@ data TestSetting = TestHostOS
                  | TestGhcPackageDbFlag
                  | TestMinGhcVersion711
                  | TestMinGhcVersion801
+                 | TestLeadingUnderscore
+                 | TestGhcPackageDb
+                 | TestGhcLibDir
                  deriving (Show)
 
 -- | Lookup a test setting in @ghcconfig@ file.
@@ -57,6 +62,7 @@ testSetting key = do
         TestGhcDebugged           -> "GhcDebugged"
         TestGhcWithNativeCodeGen  -> "GhcWithNativeCodeGen"
         TestGhcWithInterpreter    -> "GhcWithInterpreter"
+        TestGhcWithRtsLinker      -> "GhcWithRtsLinker"
         TestGhcUnregisterised     -> "GhcUnregisterised"
         TestGhcWithSMP            -> "GhcWithSMP"
         TestGhcDynamic            -> "GhcDynamic"
@@ -69,6 +75,9 @@ testSetting key = do
         TestGhcPackageDbFlag      -> "GhcPackageDbFlag"
         TestMinGhcVersion711      -> "MinGhcVersion711"
         TestMinGhcVersion801      -> "MinGhcVersion801"
+        TestLeadingUnderscore     -> "LeadingUnderscore"
+        TestGhcPackageDb          -> "GhcGlobalPackageDb"
+        TestGhcLibDir             -> "GhcLibdir"
 
 -- | Get the RTS ways of the test compiler
 testRTSSettings :: Action [String]
@@ -92,7 +101,7 @@ getBinaryDirectory compiler = pure $ takeDirectory compiler
 -- | Get the path to the given @--test-compiler@.
 getCompilerPath :: String -> Action FilePath
 getCompilerPath "stage0" = setting SystemGhc
-getCompilerPath "stage1" = liftM2 (-/-) absoluteBuildRoot (pure "stage1-test/bin/ghc")
+getCompilerPath "stage1" = liftM2 (-/-) absoluteBuildRoot (pure ("stage1-test/bin/ghc" <.> exe))
 getCompilerPath "stage2" = liftM2 (-/-) topDirectory (fullPath Stage1 ghc)
 getCompilerPath "stage3" = liftM2 (-/-) topDirectory (fullPath Stage2 ghc)
 getCompilerPath compiler = pure compiler
@@ -103,3 +112,12 @@ isInTreeCompiler c = c `elem` ["stage1","stage2","stage3"]
 -- | Get the full path to the given program.
 fullPath :: Stage -> Package -> Action FilePath
 fullPath stage pkg = programPath =<< programContext stage pkg
+
+-- stage 1 ghc lives under stage0/bin,
+-- stage 2 ghc lives under stage1/bin, etc
+stageOfTestCompiler :: String -> Maybe Stage
+stageOfTestCompiler "stage1" = Just Stage0
+stageOfTestCompiler "stage2" = Just Stage1
+stageOfTestCompiler "stage3" = Just Stage2
+stageOfTestCompiler _ = Nothing
+

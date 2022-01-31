@@ -189,6 +189,14 @@ else
 RUNTEST_OPTS += -e ghc_with_smp=False
 endif
 
+ifeq "$(GhcWithRtsLinker)" "YES"
+RUNTEST_OPTS += -e config.have_RTS_linker=True
+else
+RUNTEST_OPTS += -e config.have_RTS_linker=False
+endif
+
+RUNTEST_OPTS += -e config.libdir="\"$(GhcLibdir)\""
+
 ifeq "$(WINDOWS)" "YES"
 RUNTEST_OPTS += -e windows=True
 else
