@@ -125,9 +125,7 @@
             (EpaComments
              [])
             [(L
-              (SrcSpanAnn
-               (EpAnnNotUsed)
-               { T20846.hs:4:8-18 })
+              { T20846.hs:4:8-18 }
               (GRHS
                (EpAnn
                 (Anchor
@@ -153,3 +151,5 @@
       [])))]
   (Nothing)
   (Nothing)))
+
+
