@@ -2,7 +2,7 @@
 T12844.hs:12:9: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found extra-constraints wildcard standing for
         ‘(Head rngs ~ '(r, r'), Foo rngs)’
-      Where: ‘r’, ‘r'’, ‘k’, ‘k1’, ‘rngs’
+      Where: ‘r’, ‘r'’, ‘k1’, ‘k2’, ‘rngs’
                are rigid type variables bound by
                the inferred type of
                  bar :: (Head rngs ~ '(r, r'), Foo rngs) => FooData rngs

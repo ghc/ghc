@@ -1,11 +1,11 @@
 
 T5853.hs:15:52: error:
-    • Could not deduce (Subst fa1 (Elem fb) ~ fb)
+    • Could not deduce (Subst fa2 (Elem fb) ~ fb)
         arising from a use of ‘<$>’
-      from the context: (F fa, Elem fb ~ Elem fb,
-                         Subst fa (Elem fb) ~ fb, Subst fb (Elem fa) ~ fa, F fa1,
-                         Elem fa1 ~ Elem fa1, Elem fa ~ Elem fa, Subst fa1 (Elem fa) ~ fa,
-                         Subst fa (Elem fa1) ~ fa1)
+      from the context: (F fa1, Elem fb ~ Elem fb,
+                         Subst fa1 (Elem fb) ~ fb, Subst fb (Elem fa1) ~ fa1, F fa2,
+                         Elem fa2 ~ Elem fa2, Elem fa1 ~ Elem fa1,
+                         Subst fa2 (Elem fa1) ~ fa1, Subst fa1 (Elem fa2) ~ fa2)
         bound by the RULE "map/map" at T5853.hs:15:2-57
       ‘fb’ is a rigid type variable bound by
         the RULE "map/map"
@@ -13,6 +13,6 @@ T5853.hs:15:52: error:
     • In the expression: (f . g) <$> xs
       When checking the rewrite rule "map/map"
     • Relevant bindings include
-        f :: Elem fa -> Elem fb (bound at T5853.hs:15:19)
-        g :: Elem fa1 -> Elem fa (bound at T5853.hs:15:21)
-        xs :: fa1 (bound at T5853.hs:15:23)
+        f :: Elem fa1 -> Elem fb (bound at T5853.hs:15:19)
+        g :: Elem fa2 -> Elem fa1 (bound at T5853.hs:15:21)
+        xs :: fa2 (bound at T5853.hs:15:23)

@@ -1,12 +1,12 @@
 
 readFail003.hs:4:27: error:
-    • Couldn't match expected type ‘(a, [a1], [a2])’
-                  with actual type ‘a’
-      ‘a’ is a rigid type variable bound by
+    • Couldn't match expected type ‘(a1, [a2], [a3])’
+                  with actual type ‘a1’
+      ‘a1’ is a rigid type variable bound by
         the inferred types of
-          a :: a
-          b :: [a1]
-          c :: [a2]
+          a :: a1
+          b :: [a2]
+          c :: [a3]
         at readFail003.hs:(4,1)-(8,26)
     • In the expression: a
       In a pattern binding:
@@ -17,6 +17,6 @@ readFail003.hs:4:27: error:
           where
               nullity = null
     • Relevant bindings include
-        a :: a (bound at readFail003.hs:4:3)
-        b :: [a1] (bound at readFail003.hs:4:5)
-        c :: [a2] (bound at readFail003.hs:4:7)
+        a :: a1 (bound at readFail003.hs:4:3)
+        b :: [a2] (bound at readFail003.hs:4:5)
+        c :: [a3] (bound at readFail003.hs:4:7)

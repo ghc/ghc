@@ -2,23 +2,23 @@
 T10403.hs:16:7: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found extra-constraints wildcard standing for ‘Functor f’
       Where: ‘f’ is a rigid type variable bound by
-               the inferred type of h1 :: Functor f => (a -> a1) -> f a -> H f
+               the inferred type of h1 :: Functor f => (a1 -> a2) -> f a1 -> H f
                at T10403.hs:18:1-41
     • In the type signature: h1 :: _ => _
 
 T10403.hs:16:12: warning: [-Wpartial-type-signatures (in -Wdefault)]
-    • Found type wildcard ‘_’ standing for ‘(a -> a1) -> f a -> H f’
-      Where: ‘a1’, ‘a’, ‘f’ are rigid type variables bound by
-               the inferred type of h1 :: Functor f => (a -> a1) -> f a -> H f
+    • Found type wildcard ‘_’ standing for ‘(a1 -> a2) -> f a1 -> H f’
+      Where: ‘a2’, ‘a1’, ‘f’ are rigid type variables bound by
+               the inferred type of h1 :: Functor f => (a1 -> a2) -> f a1 -> H f
                at T10403.hs:18:1-41
     • In the type signature: h1 :: _ => _
 
 T10403.hs:20:7: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’
-        standing for ‘(a -> a1) -> B t0 a -> H (B t0)’
+        standing for ‘(a1 -> a2) -> B t0 a1 -> H (B t0)’
       Where: ‘t0’ is an ambiguous type variable
-             ‘a1’, ‘a’ are rigid type variables bound by
-               the inferred type of h2 :: (a -> a1) -> B t0 a -> H (B t0)
+             ‘a2’, ‘a1’ are rigid type variables bound by
+               the inferred type of h2 :: (a1 -> a2) -> B t0 a1 -> H (B t0)
                at T10403.hs:23:1-41
     • In the type signature: h2 :: _
 
@@ -26,11 +26,11 @@ T10403.hs:29:8: warning: [-Wdeferred-type-errors (in -Wdefault)]
     • Couldn't match type ‘t0’ with ‘t’
       Expected: H (B t)
         Actual: H (B t0)
-        because type variable ‘t’ would escape its scope
-      This (rigid, skolem) type variable is bound by
-        the type signature for:
-          app2 :: forall t. H (B t)
-        at T10403.hs:28:1-15
+    • because type variable ‘t’ would escape its scope
+    This (rigid, skolem) type variable is bound by
+      the type signature for:
+        app2 :: forall t. H (B t)
+      at T10403.hs:28:1-15
     • In the expression: h2 (H . I) (B ())
       In an equation for ‘app2’: app2 = h2 (H . I) (B ())
     • Relevant bindings include

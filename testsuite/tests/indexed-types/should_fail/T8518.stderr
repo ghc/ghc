@@ -18,10 +18,10 @@ T8518.hs:14:18: error:
         callCont :: c -> Z c -> B c -> Maybe (F c) (bound at T8518.hs:14:1)
 
 T8518.hs:16:9: error:
-    • Couldn't match type: F t1
-                     with: Z t1 -> B t1 -> F t1
-      Expected: t -> t1 -> F t1
-        Actual: t -> t1 -> Z t1 -> B t1 -> F t1
+    • Couldn't match type: F t2
+                     with: Z t2 -> B t2 -> F t2
+      Expected: t1 -> t2 -> F t2
+        Actual: t1 -> t2 -> Z t2 -> B t2 -> F t2
     • In an equation for ‘callCont’:
           callCont c z b
             = rpt (4 :: Int) c z b
@@ -29,4 +29,4 @@ T8518.hs:16:9: error:
                 rpt 0 c' z' b' = fromJust (fst <$> (continue c' z' b'))
                 rpt i c' z' b' = let ... in rpt (i - 1) c''
     • Relevant bindings include
-        rpt :: t -> t1 -> F t1 (bound at T8518.hs:16:9)
+        rpt :: t1 -> t2 -> F t2 (bound at T8518.hs:16:9)

@@ -1,9 +1,9 @@
 
 mc25.hs:9:46: error:
-    • Couldn't match type ‘Int’ with ‘a -> t1’
-      Expected: (a -> t1) -> [a] -> [t a]
+    • Couldn't match type ‘Int’ with ‘a -> t2’
+      Expected: (a -> t2) -> [a] -> [t1 a]
         Actual: Int -> [a] -> [a]
     • In the expression: take
       In a stmt of a monad comprehension: then group by x using take
       In the expression: [x | x <- [1 .. 10], then group by x using take]
-    • Relevant bindings include z :: [t t1] (bound at mc25.hs:9:1)
+    • Relevant bindings include z :: [t1 t2] (bound at mc25.hs:9:1)

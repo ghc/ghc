@@ -1,26 +1,26 @@
 
 T12177.hs:3:19: error:
-    • Found hole: _ :: p2
-      Where: ‘p2’ is a rigid type variable bound by
-               the inferred type of bar :: p -> p1 -> p2
+    • Found hole: _ :: p3
+      Where: ‘p3’ is a rigid type variable bound by
+               the inferred type of bar :: p1 -> p2 -> p3
                at T12177.hs:3:1-19
     • In the expression: \ x -> _
       In the expression: \ x -> \ x -> _
       In an equation for ‘bar’: bar = \ x -> \ x -> _
     • Relevant bindings include
-        x :: p1 (bound at T12177.hs:3:14)
-        bar :: p -> p1 -> p2 (bound at T12177.hs:3:1)
+        x :: p2 (bound at T12177.hs:3:14)
+        bar :: p1 -> p2 -> p3 (bound at T12177.hs:3:1)
 
 T12177.hs:5:37: error:
-    • Found hole: _ :: p5
-      Where: ‘p5’ is a rigid type variable bound by
-               the inferred type of baz :: p -> p1 -> p2 -> p3 -> p4 -> p5
+    • Found hole: _ :: p6
+      Where: ‘p6’ is a rigid type variable bound by
+               the inferred type of baz :: p1 -> p2 -> p3 -> p4 -> p5 -> p6
                at T12177.hs:5:1-37
     • In the expression: \ z -> _
       In the expression: \ x -> \ z -> _
       In the expression: \ z -> \ x -> \ z -> ...
     • Relevant bindings include
-        z :: p4 (bound at T12177.hs:5:32)
-        x :: p3 (bound at T12177.hs:5:26)
-        y :: p1 (bound at T12177.hs:5:14)
-        baz :: p -> p1 -> p2 -> p3 -> p4 -> p5 (bound at T12177.hs:5:1)
+        z :: p5 (bound at T12177.hs:5:32)
+        x :: p4 (bound at T12177.hs:5:26)
+        y :: p2 (bound at T12177.hs:5:14)
+        baz :: p1 -> p2 -> p3 -> p4 -> p5 -> p6 (bound at T12177.hs:5:1)
