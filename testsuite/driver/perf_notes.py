@@ -19,7 +19,7 @@ import subprocess
 import time
 import sys
 
-from collections import namedtuple
+from collections import namedtuple, defaultdict
 from math import ceil, trunc
 
 from testutil import passed, failBecause, testing_metrics, print_table
@@ -399,6 +399,24 @@ def commit_log(commitOrRange, n=None):
     if n != None and actualN != n:
         print("Expected " + str(n) + " hashes, but git gave " + str(actualN) + ":\n" + output)
     return hashes
+
+def add_new_changes(changes, new_changes):
+   for key, new_change in new_changes.items():
+       changes[key].extend(new_change)
+
+def get_allowed_changes(baseline_ref: Optional[GitRef]) -> Dict[TestName, List[AllowedPerfChange]]:
+ if baseline_ref:
+        # The last 1000 commits in reverse order (starting from HEAD).
+        commit_hashes = baseline_commit_log(GitRef("HEAD"))
+        allowed_changes = defaultdict(list) # type: Dict[TestName, List[AllowedPerfChange]]
+        for commit in commit_hashes:
+            new_changes = get_allowed_perf_changes(commit)
+            if commit == baseline_ref: return dict(allowed_changes)
+            add_new_changes(allowed_changes, new_changes)
+        print("PERF_BASELINE_COMMIT not found in last 1000 commits...")
+        return dict()
+ else:
+        return get_allowed_perf_changes()
 
 # Cache of baseline values. This is a dict of dicts indexed on:
 # (useCiNamespace, commit) -> (test_env, test, metric, way) -> baseline
