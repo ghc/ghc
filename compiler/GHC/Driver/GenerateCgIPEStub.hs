@@ -17,10 +17,10 @@ import GHC.Data.Maybe (firstJusts)
 import GHC.Data.Stream (Stream, liftIO)
 import qualified GHC.Data.Stream as Stream
 import GHC.Driver.Env (hsc_dflags)
+import GHC.Driver.Env.Types (HscEnv)
 import GHC.Driver.Flags (GeneralFlag (Opt_InfoTableMap))
 import GHC.Driver.Session (gopt, targetPlatform)
 import GHC.Driver.Config.StgToCmm
-import GHC.Plugins (HscEnv, NonCaffySet)
 import GHC.Prelude
 import GHC.Runtime.Heap.Layout (isStackRep)
 import GHC.Settings (Platform, platformUnregisterised)
@@ -28,8 +28,10 @@ import GHC.StgToCmm.Monad (getCmm, initC, runC, initFCodeState)
 import GHC.StgToCmm.Prof (initInfoTableProv)
 import GHC.StgToCmm.Types (CgInfos (..), ModuleLFInfos)
 import GHC.Types.IPE (InfoTableProvMap (provInfoTables), IpeSourceLocation)
+import GHC.Types.Name.Set (NonCaffySet)
 import GHC.Types.Tickish (GenTickish (SourceNote))
 import GHC.Unit.Types (Module)
+import GHC.Utils.Misc
 
 {-
 Note [Stacktraces from Info Table Provenance Entries (IPE based stack unwinding)]
@@ -189,7 +191,7 @@ generateCgIPEStub hsc_env this_mod denv s = do
 
   -- Yield Cmm for Info Table Provenance Entries (IPEs)
   let denv' = denv {provInfoTables = Map.fromList (map (\(_, i, t) -> (cit_lbl i, t)) labeledInfoTablesWithTickishes)}
-      ((ipeStub, ipeCmmGroup), _) = runC (initStgToCmmConfig dflags this_mod) fstate cgState $ getCmm (initInfoTableProv (map sndOfTriple labeledInfoTablesWithTickishes) denv')
+      ((ipeStub, ipeCmmGroup), _) = runC (initStgToCmmConfig dflags this_mod) fstate cgState $ getCmm (initInfoTableProv (map sndOf3 labeledInfoTablesWithTickishes) denv')
 
   (_, ipeCmmGroupSRTs) <- liftIO $ cmmPipeline hsc_env (emptySRT this_mod) ipeCmmGroup
   Stream.yield ipeCmmGroupSRTs
@@ -204,9 +206,6 @@ generateCgIPEStub hsc_env this_mod denv s = do
 
     collectNothing :: [a] -> CmmGroupSRTs -> IO ([a], CmmGroupSRTs)
     collectNothing _ cmmGroupSRTs = pure ([], cmmGroupSRTs)
-
-    sndOfTriple :: (a, b, c) -> b
-    sndOfTriple (_, b, _) = b
 
     collectInfoTables :: CmmGroupSRTs -> [(Label, CmmInfoTable)]
     collectInfoTables cmmGroup = concat $ catMaybes $ map extractInfoTables cmmGroup
