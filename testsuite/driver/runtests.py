@@ -309,9 +309,10 @@ print('Compile ways: ' + ', '.join(config.compile_ways))
 
 # Try get allowed performance changes from the git commit.
 try:
-    config.allowed_perf_changes = Perf.get_allowed_perf_changes()
+    config.allowed_perf_changes = Perf.get_allowed_changes(config.baseline_commit)
 except subprocess.CalledProcessError:
     print('Failed to get allowed metric changes from the HEAD git commit message.')
+
 
 print('Allowing performance changes in: ' + ', '.join(config.allowed_perf_changes.keys()))
 
