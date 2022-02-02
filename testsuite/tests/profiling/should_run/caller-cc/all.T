@@ -1,3 +1,7 @@
+test('CallerCcParser', normal,
+     compile_and_run,
+     ['-package ghc'])
+
 setTestOpts(req_profiling)
 setTestOpts(extra_ways(['prof', 'ghci-ext-prof']))
 setTestOpts(only_ways(prof_ways))

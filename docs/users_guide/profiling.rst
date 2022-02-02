@@ -386,9 +386,9 @@ compiled program.
      * ``Data.List.map``
      * ``*.map``
      * ``*.parse*``
-     * ``*.<\\*>``
+     * ``*.<\*>``
 
-    The ``*`` character can be used literally by escaping (e.g. ``\\*``).
+    The ``*`` character can be used literally by escaping (e.g. ``\*``).
 
 .. ghc-flag:: -fprof-auto
     :shortdesc: Auto-add ``SCC``\\ s to all bindings not marked INLINE
