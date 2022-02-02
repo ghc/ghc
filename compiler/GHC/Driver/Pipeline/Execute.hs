@@ -284,7 +284,7 @@ runAsPhase with_cpp pipe_env hsc_env location input_fn = do
 
         -- LLVM from version 3.0 onwards doesn't support the OS X system
         -- assembler, so we use clang as the assembler instead. (#5636)
-        let (as_prog, get_asm_info) | backend dflags == LLVM
+        let (as_prog, get_asm_info) | backend dflags == Just LLVM
                     , platformOS platform == OSDarwin
                     = (GHC.SysTools.runClang, pure Clang)
                     | otherwise
@@ -500,7 +500,7 @@ runHscBackendPhase pipe_env hsc_env mod_name src_flavour location result = do
                 }
         -> case backend dflags of
           NoBackend -> panic "HscRecomp not relevant for NoBackend"
-          Interpreter -> do
+          Just Interpreter -> do
               -- In interpreted mode the regular codeGen backend is not run so we
               -- generate a interface without codeGen info.
               final_iface <- mkFullIface hsc_env partial_iface Nothing
@@ -519,7 +519,7 @@ runHscBackendPhase pipe_env hsc_env mod_name src_flavour location result = do
               let !linkable = LM unlinked_time (mkHomeModule (hsc_home_unit hsc_env) mod_name)
                              (hs_unlinked ++ stub_o)
               return ([], final_iface, Just linkable, panic "interpreter")
-          _ -> do
+          Just _ -> do
               output_fn <- phaseOutputFilenameNew next_phase pipe_env hsc_env (Just location)
               (outputFilename, mStub, foreign_files, cg_infos) <-
                 hscGenHardCode hsc_env cgguts mod_location output_fn
@@ -1040,7 +1040,7 @@ doCpp logger tmpfs dflags unit_env raw input_fn output_fn = do
                        ])
 
 getBackendDefs :: Logger -> DynFlags -> IO [String]
-getBackendDefs logger dflags | backend dflags == LLVM = do
+getBackendDefs logger dflags | backend dflags == Just LLVM = do
     llvmVer <- figureLlvmVersion logger dflags
     return $ case fmap llvmVersionList llvmVer of
                Just [m] -> [ "-D__GLASGOW_HASKELL_LLVM__=" ++ format (m,0) ]
@@ -1060,11 +1060,11 @@ hscPostBackendPhase HsBootFile _    =  StopLn
 hscPostBackendPhase HsigFile _      =  StopLn
 hscPostBackendPhase _ bcknd =
   case bcknd of
-        ViaC        -> HCc
-        NCG         -> As False
-        LLVM        -> LlvmOpt
-        NoBackend   -> StopLn
-        Interpreter -> StopLn
+        NoBackend        -> StopLn
+        Just Interpreter -> StopLn
+        Just ViaC        -> HCc
+        Just NCG         -> As False
+        Just LLVM        -> LlvmOpt
 
 
 compileStub :: HscEnv -> FilePath -> IO FilePath

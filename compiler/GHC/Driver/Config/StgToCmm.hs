@@ -58,8 +58,8 @@ initStgToCmmConfig dflags mod = StgToCmmConfig
   } where profile  = targetProfile dflags
           platform = profilePlatform profile
           bk_end  = backend dflags
-          ncg     = bk_end == NCG
-          llvm    = bk_end == LLVM
+          ncg     = bk_end == Just NCG
+          llvm    = bk_end == Just LLVM
           x86ish  = case platformArch platform of
                       ArchX86    -> True
                       ArchX86_64 -> True
@@ -70,5 +70,5 @@ initStgToCmmConfig dflags mod = StgToCmmConfig
                       _            -> False
           aarch64 = platformArch platform == ArchAArch64
           vec_err = case backend dflags of
-                      LLVM -> Nothing
-                      _    -> Just (unlines ["SIMD vector instructions require the LLVM back-end.", "Please use -fllvm."])
+                      Just LLVM -> Nothing
+                      _         -> Just (unlines ["SIMD vector instructions require the LLVM back-end.", "Please use -fllvm."])

@@ -1001,9 +1001,9 @@ hscMaybeWriteIface :: Logger -> DynFlags -> Bool -> ModIface -> Maybe Fingerprin
 hscMaybeWriteIface logger dflags is_simple iface old_iface mod_location = do
     let force_write_interface = gopt Opt_WriteInterface dflags
         write_interface = case backend dflags of
-                            NoBackend    -> False
-                            Interpreter  -> False
-                            _            -> True
+                            NoBackend         -> False
+                            Just Interpreter  -> False
+                            Just _            -> True
 
         write_iface dflags' iface =
           let !iface_name = if dynamicNow dflags' then ml_dyn_hi_file mod_location else ml_hi_file mod_location

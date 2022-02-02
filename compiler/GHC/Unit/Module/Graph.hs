@@ -276,9 +276,9 @@ showModMsg dflags recomp (ModuleNode _ mod_summary) =
     dyn_file = op $ msDynObjFilePath mod_summary
     obj_file = op $ msObjFilePath mod_summary
     message = case backend dflags of
-                Interpreter | recomp -> text "interpreted"
-                NoBackend            -> text "nothing"
-                _                    ->
+                Just Interpreter | recomp -> text "interpreted"
+                NoBackend                 -> text "nothing"
+                _                         ->
                   if gopt Opt_BuildDynamicToo  dflags
                     then text obj_file <> comma <+> text dyn_file
                     else text obj_file

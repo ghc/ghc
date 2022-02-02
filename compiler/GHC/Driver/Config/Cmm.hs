@@ -22,7 +22,7 @@ initCmmConfig dflags = CmmConfig
   , cmmGenStackUnwindInstr = debugLevel dflags > 0
   , cmmExternalDynamicRefs = gopt Opt_ExternalDynamicRefs dflags
   , cmmDoCmmSwitchPlans    = not . backendSupportsSwitch . backend $ dflags
-  , cmmSplitProcPoints     = (backend dflags /= NCG)
+  , cmmSplitProcPoints     = (backend dflags /= Just NCG)
                              || not (platformTablesNextToCode platform)
                              || usingInconsistentPicReg
   }

@@ -16,7 +16,7 @@ module Main (main) where
 
 -- The official GHC API
 import qualified GHC
-import GHC              (parseTargetFiles,  Ghc, GhcMonad(..), Backend (..),
+import GHC              (parseTargetFiles,  Ghc, GhcMonad(..), ActualBackend (..),
                           LoadHowMuch(..) )
 
 import GHC.Driver.CmdLine
@@ -175,14 +175,14 @@ main' postLoadMode units dflags0 args flagWarnings = do
   let dflt_backend = backend dflags0
       (mode, bcknd, link)
          = case postLoadMode of
-               DoInteractive   -> (CompManager, Interpreter,  LinkInMemory)
-               DoEval _        -> (CompManager, Interpreter,  LinkInMemory)
-               DoRun           -> (CompManager, Interpreter,  LinkInMemory)
-               DoMake          -> (CompManager, dflt_backend, LinkBinary)
-               DoBackpack      -> (CompManager, dflt_backend, LinkBinary)
-               DoMkDependHS    -> (MkDepend,    dflt_backend, LinkBinary)
-               DoAbiHash       -> (OneShot,     dflt_backend, LinkBinary)
-               _               -> (OneShot,     dflt_backend, LinkBinary)
+               DoInteractive   -> (CompManager, Just Interpreter, LinkInMemory)
+               DoEval _        -> (CompManager, Just Interpreter, LinkInMemory)
+               DoRun           -> (CompManager, Just Interpreter, LinkInMemory)
+               DoMake          -> (CompManager, dflt_backend,     LinkBinary)
+               DoBackpack      -> (CompManager, dflt_backend,     LinkBinary)
+               DoMkDependHS    -> (MkDepend,    dflt_backend,     LinkBinary)
+               DoAbiHash       -> (OneShot,     dflt_backend,     LinkBinary)
+               _               -> (OneShot,     dflt_backend,     LinkBinary)
 
   let dflags1 = dflags0{ ghcMode   = mode,
                          backend   = bcknd,
@@ -218,7 +218,7 @@ main' postLoadMode units dflags0 args flagWarnings = do
       GHC.parseDynamicFlags logger2 dflags2 args'
 
   let dflags4 = case bcknd of
-                Interpreter | not (gopt Opt_ExternalInterpreter dflags3) ->
+                Just Interpreter | not (gopt Opt_ExternalInterpreter dflags3) ->
                     let platform = targetPlatform dflags3
                         dflags3a = dflags3 { targetWays_ = hostFullWays }
                         dflags3b = foldl gopt_set dflags3a
@@ -364,7 +364,7 @@ checkOptions mode dflags srcs objs units = do
         else do
 
    case mode of
-      StopBefore StopC | backend dflags /= ViaC
+      StopBefore StopC | backend dflags /= Just ViaC
         -> throwGhcException $ UsageError $
            "the option -C is only available with an unregisterised GHC"
       StopBefore StopAs | ghcLink dflags == NoLink

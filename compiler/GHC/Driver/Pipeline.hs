@@ -259,9 +259,9 @@ compileOne' mHscMessage
        internalInterpreter = not (gopt Opt_ExternalInterpreter lcl_dflags)
 
        pipelineOutput = case bcknd of
-         Interpreter -> NoOutputFile
          NoBackend -> NoOutputFile
-         _ -> Persistent
+         Just Interpreter -> NoOutputFile
+         Just _ -> Persistent
 
        logger = hsc_logger hsc_env0
        tmpfs  = hsc_tmpfs hsc_env0
@@ -294,15 +294,16 @@ compileOne' mHscMessage
          = True
          | otherwise = False
        -- Figure out which backend we're using
-       (bcknd, dflags3)
+       dflags3
          -- #8042: When module was loaded with `*` prefix in ghci, but DynFlags
          -- suggest to generate object code (which may happen in case -fobject-code
          -- was set), force it to generate byte-code. This is NOT transitive and
          -- only applies to direct targets.
          | loadAsByteCode
-         = (Interpreter, gopt_set (dflags2 { backend = Interpreter }) Opt_ForceRecomp)
+         = gopt_set (dflags2 { backend = Just Interpreter }) Opt_ForceRecomp
          | otherwise
-         = (backend dflags, dflags2)
+         = dflags2
+       bcknd = backend dflags3
        -- See Note [Filepaths and Multiple Home Units]
        dflags  = dflags3 { includePaths = offsetIncludePaths dflags3 $ addImplicitQuoteInclude old_paths [current_dir] }
        upd_summary = summary { ms_hspp_opts = dflags }
@@ -835,11 +836,11 @@ hscPostBackendPipeline _ _ HsBootFile _ _ _   = return Nothing
 hscPostBackendPipeline _ _ HsigFile _ _ _     = return Nothing
 hscPostBackendPipeline pipe_env hsc_env _ bcknd ml input_fn =
   case bcknd of
-        ViaC        -> viaCPipeline HCc pipe_env hsc_env ml input_fn
-        NCG         -> Just <$> asPipeline False pipe_env hsc_env ml input_fn
-        LLVM        -> Just <$> llvmPipeline pipe_env hsc_env ml input_fn
-        NoBackend   -> return Nothing
-        Interpreter -> return Nothing
+        NoBackend        -> return Nothing
+        Just Interpreter -> return Nothing
+        Just ViaC        -> viaCPipeline HCc pipe_env hsc_env ml input_fn
+        Just NCG         -> Just <$> asPipeline False pipe_env hsc_env ml input_fn
+        Just LLVM        -> Just <$> llvmPipeline pipe_env hsc_env ml input_fn
 
 -- Pipeline from a given suffix
 pipelineStart :: P m => PipeEnv -> HscEnv -> FilePath -> m (Maybe FilePath)

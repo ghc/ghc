@@ -395,7 +395,7 @@ tidyProgram hsc_env  (ModGuts { mg_module           = mod
                   case backend dflags of
                     -- If we are compiling for the interpreter we will insert
                     -- any necessary SPT entries dynamically
-                    Interpreter -> id
+                    Just Interpreter -> id
                     -- otherwise add a C stub to do so
                     _              -> (`appendStubC` spt_init_code)
 

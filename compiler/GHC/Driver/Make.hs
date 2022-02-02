@@ -1711,7 +1711,7 @@ enableCodeGenWhen logger tmpfs condition should_modify staticLife dynLife unit_e
                               , ml_obj_file = o_file
                               , ml_dyn_hi_file = dyn_hi_file
                               , ml_dyn_obj_file = dyn_o_file }
-              , ms_hspp_opts = updOptLevel 0 $ dflags {backend = defaultBackendOf ms}
+              , ms_hspp_opts = updOptLevel 0 $ dflags { backend = Just $ defaultBackendOf ms }
               }
         pure (ModuleNode deps ms')
     enable_code_gen ms = return ms

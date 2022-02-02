@@ -1,8 +1,11 @@
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE PatternSynonyms #-}
 
 -- | Code generation backends
 module GHC.Driver.Backend
-   ( Backend (..)
+   ( Backend
+   , pattern NoBackend
+   , ActualBackend (..)
    , platformDefaultBackend
    , platformNcgSupported
    , backendProducesObject
@@ -19,7 +22,7 @@ import GHC.Platform
 -- (producing machine code, producing ByteCode for the interpreter) and
 -- supporting different platforms.
 --
-data Backend
+data ActualBackend
    = NCG           -- ^ Native code generator backend.
                    --
                    -- Compiles Cmm code into textual assembler, then relies on
@@ -72,19 +75,30 @@ data Backend
                    --
                    -- See "GHC.StgToByteCode"
 
-
-   | NoBackend     -- ^ No code generated.
-                   --
-                   -- Use this to disable code generation. It is particularly
-                   -- useful when GHC is used as a library for other purpose
-                   -- than generating code (e.g. to generate documentation with
-                   -- Haddock) or when the user requested it (via -fno-code) for
-                   -- some reason.
-
    deriving (Eq,Ord,Show,Read)
 
+-- | Sometimes we have a backend, and sometimes we do not.
+--
+-- Not inlining 'Nothing' into 'ActualBackend' will help lead towards things
+-- like e.g.
+--
+-- - Building for multiple backends at once, where we would switch from
+--   'Maybe ActualBackend' to 'Set ActualBackend', not 'Set (Maybe
+--   ActualBackend)'.
+--
+-- - Ensuring all backends can write to files. That would mean byte code can be
+--   written to a file (#21034), which makes 'ActualBackend' much more uniform.
+--   Conversely it's hard to imagine it would ever make sense for 'NoBackend' to
+--   write to a file!
+type Backend = Maybe ActualBackend
+
+{-# COMPLETE NoBackend, Just #-}
+
+pattern NoBackend :: Backend
+pattern NoBackend = Nothing
+
 -- | Default backend to use for the given platform.
-platformDefaultBackend :: Platform -> Backend
+platformDefaultBackend :: Platform -> ActualBackend
 platformDefaultBackend platform = if
       | platformUnregisterised platform -> ViaC
       | platformNcgSupported platform   -> NCG
@@ -108,11 +122,11 @@ platformNcgSupported platform = if
 
 -- | Will this backend produce an object file on the disk?
 backendProducesObject :: Backend -> Bool
-backendProducesObject ViaC        = True
-backendProducesObject NCG         = True
-backendProducesObject LLVM        = True
-backendProducesObject Interpreter = False
-backendProducesObject NoBackend   = False
+backendProducesObject (Just ViaC)        = True
+backendProducesObject (Just NCG)         = True
+backendProducesObject (Just LLVM)        = True
+backendProducesObject (Just Interpreter) = False
+backendProducesObject NoBackend          = False
 
 -- | Does this backend retain *all* top-level bindings for a module,
 -- rather than just the exported bindings, in the TypeEnv and compiled
@@ -124,8 +138,8 @@ backendProducesObject NoBackend   = False
 -- When no backend is used we also do it, so that Haddock can get access to the
 -- GlobalRdrEnv for a module after typechecking it.
 backendRetainsAllBindings :: Backend -> Bool
-backendRetainsAllBindings Interpreter = True
-backendRetainsAllBindings NoBackend   = True
-backendRetainsAllBindings ViaC        = False
-backendRetainsAllBindings NCG         = False
-backendRetainsAllBindings LLVM        = False
+backendRetainsAllBindings NoBackend          = True
+backendRetainsAllBindings (Just Interpreter) = True
+backendRetainsAllBindings (Just ViaC)        = False
+backendRetainsAllBindings (Just NCG)         = False
+backendRetainsAllBindings (Just LLVM)        = False

@@ -111,12 +111,13 @@ codeOutput logger tmpfs dflags unit_state this_mod filenm location genForeignStu
                 }
 
         ; a <- case backend dflags of
+            NoBackend -> panic "codeOutput: NoBackend"
+            Just b -> case b of
                  NCG         -> outputAsm logger dflags this_mod location filenm
                                           linted_cmm_stream
                  ViaC        -> outputC logger dflags filenm linted_cmm_stream pkg_deps
                  LLVM        -> outputLlvm logger dflags filenm linted_cmm_stream
                  Interpreter -> panic "codeOutput: Interpreter"
-                 NoBackend   -> panic "codeOutput: NoBackend"
         ; let stubs = genForeignStubs a
         ; stubs_exist <- outputForeignStubs logger tmpfs dflags unit_state this_mod location stubs
         ; return (filenm, stubs_exist, foreign_fps, a)

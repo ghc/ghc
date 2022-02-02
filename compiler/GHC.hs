@@ -2,6 +2,7 @@
 {-# LANGUAGE NondecreasingIndentation, ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections, NamedFieldPuns #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE TypeFamilies #-}
 
 -- -----------------------------------------------------------------------------
@@ -28,7 +29,7 @@ module GHC (
         needsTemplateHaskellOrQQ,
 
         -- * Flags and settings
-        DynFlags(..), GeneralFlag(..), Severity(..), Backend(..), gopt,
+        DynFlags(..), GeneralFlag(..), Severity(..), Backend, pattern NoBackend, ActualBackend(..), gopt,
         GhcMode(..), GhcLink(..),
         parseDynamicFlags, parseTargetFiles,
         getSessionDynFlags,

@@ -839,9 +839,9 @@ tcImpPrags prags
     not_specialising dflags
       | not (gopt Opt_Specialise dflags) = True
       | otherwise = case backend dflags of
-                      NoBackend   -> True
-                      Interpreter -> True
-                      _other      -> False
+                      NoBackend        -> True
+                      Just Interpreter -> True
+                      Just _other      -> False
 
 tcImpSpec :: (Name, Sig GhcRn) -> TcM [TcSpecPrag]
 tcImpSpec (name, prag)
