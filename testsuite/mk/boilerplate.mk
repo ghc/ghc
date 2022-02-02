@@ -231,6 +231,10 @@ ifeq "$(COUNT_DEPS)" ""
 COUNT_DEPS := $(abspath $(TOP)/../inplace/bin/count-deps)
 endif
 
+ifeq "$(NOTES_UTIL)" ""
+NOTES_UTIL := $(abspath $(TOP)/../inplace/bin/notes-util)
+endif
+
 # -----------------------------------------------------------------------------
 # configuration of TEST_HC
 

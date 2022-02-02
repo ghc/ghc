@@ -194,9 +194,12 @@ ghc-linters:
 
 lint-notes:
   image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
-  extends: .lint
+  extends: .lint-params
+  variables:
+    BUILD_FLAVOUR: default
   script:
-    - utils/notes-util/check.sh
+    - .gitlab/ci.sh configure
+    - .gitlab/ci.sh run_hadrian test --only="notes"
   dependencies: []
 
 # Run mypy Python typechecker on linter scripts.

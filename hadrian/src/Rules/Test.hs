@@ -43,21 +43,31 @@ countDepsSourcePath = "utils/count-deps/Main.hs"
 countDepsExtra :: Maybe String
 countDepsExtra = Just "-iutils/count-deps"
 
-checkPrograms :: [(String,FilePath, FilePath, Maybe String, Package)]
+noteLinterProgPath, noteLinterSourcePath :: FilePath
+noteLinterProgPath = "test/bin/notes-util" <.> exe
+noteLinterSourcePath = "utils/notes-util/Main.hs"
+noteLinterExtra :: Maybe String
+noteLinterExtra = Just "-iutils/notes-util"
+
+checkPrograms :: [(String,FilePath, FilePath, Maybe String, Package, Stage -> Stage)]
 checkPrograms =
-    [ ("test:check-ppr",checkPprProgPath, checkPprSourcePath, checkPprExtra, checkPpr)
-    , ("test:check-exact",checkExactProgPath, checkExactSourcePath, checkExactExtra, checkExact)
-    , ("test:count-deps",countDepsProgPath, countDepsSourcePath, countDepsExtra, countDeps)
+    [ ("test:check-ppr",checkPprProgPath, checkPprSourcePath, checkPprExtra, checkPpr, id)
+    , ("test:check-exact",checkExactProgPath, checkExactSourcePath, checkExactExtra, checkExact, id)
+    , ("test:count-deps",countDepsProgPath, countDepsSourcePath, countDepsExtra, countDeps, id)
+    , ("lint:notes-util", noteLinterProgPath, noteLinterSourcePath, noteLinterExtra, noteLinter, const Stage0)
     ]
 
-testsuiteDeps :: Rules ()
-testsuiteDeps =
-  "test:ghc" ~> do
+inTreeOutTree :: (Stage -> Action b) -> Action b -> Action b
+inTreeOutTree inTree outTree = do
     args <- userSetting defaultTestArgs
     let testCompilerArg = testCompiler args
     case stageOf testCompilerArg of
-      Just stg -> needTestsuitePackages stg
-      Nothing -> return ()
+      Just stg -> inTree stg
+      Nothing -> outTree
+
+testsuiteDeps :: Rules ()
+testsuiteDeps = do
+  "test:ghc" ~> inTreeOutTree (\stg -> needTestsuitePackages stg) (return ())
 
 ghcConfigPath :: FilePath
 ghcConfigPath = "test/ghcconfig"
@@ -99,7 +109,7 @@ testRules = do
     -- Rules for building check-ppr, check-exact and
     -- check-ppr-annotations with the compiler we are going to test
     -- (in-tree or out-of-tree).
-    forM_ checkPrograms $ \(name, progPath, sourcePath, mextra, progPkg) -> do
+    forM_ checkPrograms $ \(name, progPath, sourcePath, mextra, progPkg, mod_stage) -> do
         name ~> need [root -/- progPath]
         root -/- progPath %> \path -> do
             need [ sourcePath ]
@@ -109,9 +119,9 @@ testRules = do
             -- normally, NOT stage3, as there are no rules for stage4 yet
             case stageOf testGhc of
               Just stg -> do
-                fs <- pkgFile stg progPkg
+                fs <- pkgFile (mod_stage stg) progPkg
                 need [fs]
-                prog_path <- programPath =<< programContext stg progPkg
+                prog_path <- programPath =<< programContext (mod_stage stg) progPkg
                 abs_prog_path <- liftIO (IO.canonicalizePath prog_path)
                 createFileLink abs_prog_path path
             -- otherwise, build it by directly invoking ghc
@@ -196,6 +206,7 @@ testRules = do
             setEnv "CHECK_PPR" (top -/- root -/- checkPprProgPath)
             setEnv "CHECK_EXACT" (top -/- root -/- checkExactProgPath)
             setEnv "COUNT_DEPS" (top -/- root -/- countDepsProgPath)
+            setEnv "NOTES_UTIL" (top -/- root -/- noteLinterProgPath)
 
             -- This lets us bypass the need to generate a config
             -- through Make, which happens in testsuite/mk/boilerplate.mk
@@ -220,9 +231,9 @@ isOkToBuild :: TestArgs -> String -> Bool
 isOkToBuild args target
    = stageOf (testCompiler args) `elem` [Just Stage1, Just Stage2]
   || testHasInTreeFiles args
-  || target `elem` map fst5 checkPrograms
+  || target `elem` map fst6 checkPrograms
   where
-    fst5 (a,_,_,_,_) = a
+    fst6 (a,_,_,_,_, _) = a
 
 -- | Build the timeout program.
 -- See: https://github.com/ghc/ghc/blob/master/testsuite/timeout/Makefile#L23
