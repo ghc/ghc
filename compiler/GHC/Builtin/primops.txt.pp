@@ -1868,7 +1868,7 @@ primop  CopyAddrToByteArrayOp "copyAddrToByteArray#" GenPrimOp
 
 primop  SetByteArrayOp "setByteArray#" GenPrimOp
   MutableByteArray# s -> Int# -> Int# -> Int# -> State# s -> State# s
-  {{\tt setByteArray# ba off len c} sets the byte range {\tt [off, off+len]} of
+  {{\tt setByteArray# ba off len c} sets the byte range {\tt [off, off+len)} of
    the {\tt MutableByteArray#} to the byte {\tt c}.}
   with
   has_side_effects = True
