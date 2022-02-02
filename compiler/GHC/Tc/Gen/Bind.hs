@@ -413,8 +413,8 @@ tc_group top_lvl sig_fn prag_fn (Recursive, binds) closed thing_inside
     tc_scc (AcyclicSCC bind) = tc_sub_group NonRecursive [bind]
     tc_scc (CyclicSCC binds) = tc_sub_group Recursive    binds
 
-    tc_sub_group rec_tc binds =
-      tcPolyBinds sig_fn prag_fn Recursive rec_tc closed binds
+    tc_sub_group rec_tc binds = tcPolyBinds top_lvl sig_fn prag_fn
+                                            Recursive rec_tc closed binds
 
 recursivePatSynErr
   :: SrcSpan -- ^ The location of the first pattern synonym binding
@@ -437,7 +437,7 @@ tc_single _top_lvl sig_fn prag_fn
        }
 
 tc_single top_lvl sig_fn prag_fn lbind closed thing_inside
-  = do { (binds1, ids) <- tcPolyBinds sig_fn prag_fn
+  = do { (binds1, ids) <- tcPolyBinds top_lvl sig_fn prag_fn
                                       NonRecursive NonRecursive
                                       closed
                                       [lbind]
@@ -474,7 +474,7 @@ mkEdges sig_fn binds
                                      , bndr <- collectHsBindBinders CollNoDictBinders bind ]
 
 ------------------------
-tcPolyBinds :: TcSigFun -> TcPragEnv
+tcPolyBinds :: TopLevelFlag -> TcSigFun -> TcPragEnv
             -> RecFlag         -- Whether the group is really recursive
             -> RecFlag         -- Whether it's recursive after breaking
                                -- dependencies based on type signatures
@@ -493,7 +493,7 @@ tcPolyBinds :: TcSigFun -> TcPragEnv
 -- Knows nothing about the scope of the bindings
 -- None of the bindings are pattern synonyms
 
-tcPolyBinds sig_fn prag_fn rec_group rec_tc closed bind_list
+tcPolyBinds top_lvl sig_fn prag_fn rec_group rec_tc closed bind_list
   = setSrcSpan loc                              $
     recoverM (recoveryCode binder_names sig_fn) $ do
         -- Set up main recover; take advantage of any type sigs
@@ -501,7 +501,7 @@ tcPolyBinds sig_fn prag_fn rec_group rec_tc closed bind_list
     { traceTc "------------------------------------------------" Outputable.empty
     ; traceTc "Bindings for {" (ppr binder_names)
     ; dflags   <- getDynFlags
-    ; let plan = decideGeneralisationPlan dflags bind_list closed sig_fn
+    ; let plan = decideGeneralisationPlan dflags top_lvl closed sig_fn bind_list
     ; traceTc "Generalisation plan" (ppr plan)
     ; result@(_, poly_ids) <- case plan of
          NoGen              -> tcPolyNoGen rec_tc prag_fn sig_fn bind_list
@@ -1651,12 +1651,12 @@ instance Outputable GeneralisationPlan where
   ppr (CheckGen _ s) = text "CheckGen" <+> ppr s
 
 decideGeneralisationPlan
-   :: DynFlags -> [LHsBind GhcRn] -> IsGroupClosed -> TcSigFun
-   -> GeneralisationPlan
-decideGeneralisationPlan dflags lbinds closed sig_fn
+   :: DynFlags -> TopLevelFlag -> IsGroupClosed -> TcSigFun
+   -> [LHsBind GhcRn] -> GeneralisationPlan
+decideGeneralisationPlan dflags top_lvl closed sig_fn lbinds
   | has_partial_sigs                         = InferGen (and partial_sig_mrs)
   | Just (bind, sig) <- one_funbind_with_sig = CheckGen bind sig
-  | do_not_generalise closed                 = NoGen
+  | do_not_generalise                        = NoGen
   | otherwise                                = InferGen mono_restriction
   where
     binds = map unLoc lbinds
@@ -1672,16 +1672,21 @@ decideGeneralisationPlan dflags lbinds closed sig_fn
             <- mapMaybe sig_fn (collectHsBindListBinders CollNoDictBinders lbinds)
         , let (mtheta, _) = splitLHsQualTy (hsSigWcType hs_ty) ]
 
-    has_partial_sigs   = not (null partial_sig_mrs)
+    has_partial_sigs = not (null partial_sig_mrs)
 
     mono_restriction  = xopt LangExt.MonomorphismRestriction dflags
                      && any restricted binds
 
-    do_not_generalise (IsGroupClosed _ True) = False
+    do_not_generalise
+      | isTopLevel top_lvl             = False
+        -- See Note [Always generalise top-level bindings]
+
+      | IsGroupClosed _ True <- closed = False
         -- The 'True' means that all of the group's
         -- free vars have ClosedTypeId=True; so we can ignore
         -- -XMonoLocalBinds, and generalise anyway
-    do_not_generalise _ = xopt LangExt.MonoLocalBinds dflags
+
+      | otherwise = xopt LangExt.MonoLocalBinds dflags
 
     -- With OutsideIn, all nested bindings are monomorphic
     -- except a single function binding with a signature
@@ -1756,6 +1761,21 @@ isClosedBndrGroup type_env binds
                -- These won't be in the local type env.
                -- Ditto class method etc from the current module
 
+{- Note [Always generalise top-level bindings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+It is very confusing to apply NoGen to a top level binding. Consider (#20123):
+   module M where
+     x = 5
+     f y = (x, y)
+
+The MR means that x=5 is not generalise, so f's binding is no Closed.  So we'd
+be tempted to use NoGen. But that leads to f :: Any -> (Integer, Any), which
+is plain stupid.
+
+NoGen is good when we have call sites, but not at top level, where the
+function may be exported.  And it's easier to grok "MonoLocalBinds" as
+applying to, well, local bindings.
+-}
 
 {- *********************************************************************
 *                                                                      *
