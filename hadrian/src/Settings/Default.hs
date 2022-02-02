@@ -86,6 +86,7 @@ stage0Packages = do
              , text
              , transformers
              , unlit
+             , noteLinter
              ]
           ++ [ terminfo | not windowsHost, not cross ]
           ++ [ timeout  | windowsHost                ]

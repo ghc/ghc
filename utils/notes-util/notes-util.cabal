@@ -8,7 +8,7 @@ author:             Ben Gamari
 maintainer:         ben@smart-cactus.org
 copyright:          (c) 2022 Ben Gamari
 
-executable ghc-notes
+executable notes-util
     main-is:          Main.hs
     other-modules:    Notes
     build-depends:    base >= 4 && < 5 ,

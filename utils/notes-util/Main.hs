@@ -44,8 +44,11 @@ main = do
         files <- lines <$> readFile respFile
         return (parseMode mode, files)
       [mode] -> do
+        let excludeList =
+              [ "testsuite/tests/linters/notes.stdout"
+              , "utils/notes-util/test" ]
         files <- lines <$> readProcess "git" ["ls-tree", "--name-only", "-r", "HEAD"] ""
-        return (parseMode mode, files)
+        return (parseMode mode, filter (`notElem` excludeList) files)
       _ -> usage
 
     case mode of

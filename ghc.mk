@@ -545,6 +545,7 @@ utils/ghc-pkg/dist-install/package-data.mk: $(fixed_pkg_prev)
 utils/hsc2hs/dist-install/package-data.mk: $(fixed_pkg_prev)
 utils/compare_sizes/dist-install/package-data.mk: $(fixed_pkg_prev)
 utils/runghc/dist-install/package-data.mk: $(fixed_pkg_prev)
+utils/notes-util/dist-install/package-data.mk: $(fixed_pkg_prev)
 utils/iserv/stage2/package-data.mk: $(fixed_pkg_prev)
 utils/iserv/stage2_p/package-data.mk: $(fixed_pkg_prev)
 utils/iserv/stage2_dyn/package-data.mk: $(fixed_pkg_prev)
@@ -667,6 +668,7 @@ BUILD_DIRS += utils/hsc2hs
 BUILD_DIRS += utils/ghc-pkg
 BUILD_DIRS += utils/testremove
 BUILD_DIRS += utils/check-ppr
+BUILD_DIRS += utils/notes-util
 BUILD_DIRS += utils/check-exact
 BUILD_DIRS += utils/count-deps
 BUILD_DIRS += utils/ghc-cabal
