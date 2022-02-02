@@ -15,8 +15,6 @@ import GHC.Prelude as Prelude
 
 import GHC.Driver.Session
 import GHC.Driver.Backend
-import GHC.Driver.Ppr
-import GHC.Driver.Env
 
 import qualified GHC.Runtime.Interpreter as GHCi
 import GHCi.RemoteTypes
@@ -32,6 +30,10 @@ import GHC.Core.TyCon
 import GHC.Data.Maybe
 import GHC.Data.FastString
 import GHC.Data.Bag
+
+import GHC.Platform
+
+import GHC.Runtime.Interpreter.Types
 
 import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
@@ -73,7 +75,9 @@ import qualified Data.Set as Set
 -}
 
 addTicksToBinds
-        :: HscEnv
+        :: Logger
+        -> DynFlags
+        -> (Maybe Interp)
         -> Module
         -> ModLocation          -- ... off the current module
         -> NameSet              -- Exported Ids.  When we call addTicksToBinds,
@@ -83,9 +87,8 @@ addTicksToBinds
         -> LHsBinds GhcTc
         -> IO (LHsBinds GhcTc, HpcInfo, Maybe ModBreaks)
 
-addTicksToBinds hsc_env mod mod_loc exports tyCons binds
-  | let dflags = hsc_dflags hsc_env
-        passes = coveragePasses dflags
+addTicksToBinds logger dflags m_interp mod mod_loc exports tyCons binds
+  | let passes = coveragePasses dflags
   , not (null passes)
   , Just orig_file <- ml_hs_file mod_loc = do
 
@@ -95,7 +98,7 @@ addTicksToBinds hsc_env mod mod_loc exports tyCons binds
             let env = TTE
                       { fileName     = mkFastString orig_file2
                       , declPath     = []
-                      , tte_dflags   = dflags
+                      , tte_countEntries = gopt Opt_ProfCountEntries dflags
                       , exports      = exports
                       , inlines      = emptyVarSet
                       , inScope      = emptyVarSet
@@ -121,9 +124,8 @@ addTicksToBinds hsc_env mod mod_loc exports tyCons binds
      let tickCount = tickBoxCount st
          entries = reverse $ mixEntries st
      hashNo <- writeMixEntries dflags mod tickCount entries orig_file2
-     modBreaks <- mkModBreaks hsc_env mod tickCount entries
+     modBreaks <- mkModBreaks m_interp dflags mod tickCount entries
 
-     let logger = hsc_logger hsc_env
      putDumpFileMaybe logger Opt_D_dump_ticked "HPC" FormatHaskell
        (pprLHsBinds binds1)
 
@@ -144,12 +146,12 @@ guessSourceFile binds orig_file =
         _ -> orig_file
 
 
-mkModBreaks :: HscEnv -> Module -> Int -> [MixEntry_] -> IO (Maybe ModBreaks)
-mkModBreaks hsc_env mod count entries
-  | Just interp <- hsc_interp hsc_env
-  , breakpointsEnabled (hsc_dflags hsc_env) = do
+mkModBreaks :: Maybe Interp -> DynFlags -> Module -> Int -> [MixEntry_] -> IO (Maybe ModBreaks)
+mkModBreaks m_interp dflags mod count entries
+  | Just interp <- m_interp
+  , breakpointsEnabled dflags = do
     breakArray <- GHCi.newBreakArray interp (length entries)
-    ccs <- mkCCSArray hsc_env mod count entries
+    ccs <- mkCCSArray interp mod count entries
     let
            locsTicks  = listArray (0,count-1) [ span  | (span,_,_,_)  <- entries ]
            varsTicks  = listArray (0,count-1) [ vars  | (_,_,vars,_)  <- entries ]
@@ -164,21 +166,18 @@ mkModBreaks hsc_env mod count entries
   | otherwise = return Nothing
 
 mkCCSArray
-  :: HscEnv -> Module -> Int -> [MixEntry_]
+  :: Interp -> Module -> Int -> [MixEntry_]
   -> IO (Array BreakIndex (RemotePtr GHC.Stack.CCS.CostCentre))
-mkCCSArray hsc_env modul count entries =
-  case hsc_interp hsc_env of
-    Just interp | GHCi.interpreterProfiled interp -> do
+mkCCSArray interp modul count entries
+  | GHCi.interpreterProfiled interp = do
       let module_str = moduleNameString (moduleName modul)
       costcentres <- GHCi.mkCostCentres interp module_str (map mk_one entries)
       return (listArray (0,count-1) costcentres)
-
-    _ -> return (listArray (0,-1) [])
+  | otherwise = return (listArray (0,-1) [])
  where
-    dflags = hsc_dflags hsc_env
     mk_one (srcspan, decl_path, _, _) = (name, src)
       where name = concat (intersperse "." decl_path)
-            src = showSDoc dflags (ppr srcspan)
+            src = renderWithContext defaultSDocContext (ppr srcspan)
 
 
 writeMixEntries
@@ -1035,7 +1034,9 @@ addMixEntry ent = do
 
 data TickTransEnv = TTE { fileName     :: FastString
                         , density      :: TickDensity
-                        , tte_dflags   :: DynFlags
+                        , tte_countEntries :: !Bool
+                          -- ^ Whether the number of times functions are
+                          -- entered should be counted.
                         , exports      :: NameSet
                         , inlines      :: VarSet
                         , declPath     :: [String]
@@ -1108,9 +1109,6 @@ instance Monad TM where
                                      case unTM (k r1) env st1 of
                                        (r2,fv2,st2) ->
                                           (r2, fv1 `plusOccEnv` fv2, st2)
-
-instance HasDynFlags TM where
-  getDynFlags = TM $ \ env st -> (tte_dflags env, noFVs, st)
 
 -- | Get the next HPC cost centre index for a given centre name
 getCCIndexM :: FastString -> TM CostCentreIndex
@@ -1232,7 +1230,6 @@ mkTickish boxLabel countEntries topOnly pos fvs decl_path = do
       cc_name | topOnly   = head decl_path
               | otherwise = concat (intersperse "." decl_path)
 
-  dflags <- getDynFlags
   env <- getEnv
   case tickishType env of
     HpcTicks -> HpcTick (this_mod env) <$> addMixEntry me
@@ -1241,7 +1238,7 @@ mkTickish boxLabel countEntries topOnly pos fvs decl_path = do
       let nm = mkFastString cc_name
       flavour <- HpcCC <$> getCCIndexM nm
       let cc = mkUserCC nm (this_mod env) pos flavour
-          count = countEntries && gopt Opt_ProfCountEntries dflags
+          count = countEntries && tte_countEntries env
       return $ ProfNote cc count True{-scopes-}
 
     Breakpoints -> Breakpoint noExtField <$> addMixEntry me <*> pure ids
@@ -1332,9 +1329,9 @@ static void hpc_init_Main(void)
  hs_hpc_module("Main",8,1150288664,_hpc_tickboxes_Main_hpc);}
 -}
 
-hpcInitCode :: DynFlags -> Module -> HpcInfo -> CStub
+hpcInitCode :: Platform -> Module -> HpcInfo -> CStub
 hpcInitCode _ _ (NoHpcInfo {}) = mempty
-hpcInitCode dflags this_mod (HpcInfo tickCount hashNo)
+hpcInitCode platform this_mod (HpcInfo tickCount hashNo)
  = CStub $ vcat
     [ text "static void hpc_init_" <> ppr this_mod
          <> text "(void) __attribute__((constructor));"
@@ -1352,7 +1349,6 @@ hpcInitCode dflags this_mod (HpcInfo tickCount hashNo)
        ])
     ]
   where
-    platform  = targetPlatform dflags
     tickboxes = pprCLabel platform CStyle (mkHpcTicksLabel $ this_mod)
 
     module_name  = hcat (map (text.charToC) $ BS.unpack $
