@@ -139,6 +139,11 @@ restrictions:
   Since the runtime has no facilities for tracking mutation of a
   ``MutableByteArray#``, these can be safely mutated in any foreign
   function.
+* Note that ``safe`` FFI calls don't take any measures to keep their
+  arguments alive while the called C function runs. For arguments
+  who's live time doesn't extend past the FFI call ``keepAlive#`` or a
+  ``StablePtr`` should be used to ensure the argument isn't garbage
+  collected before the call finishes.
 
 None of these restrictions are enforced at compile time. Failure
 to heed these restrictions will lead to runtime errors that can be
@@ -1094,8 +1099,10 @@ Pinned Byte Arrays
 
 A pinned byte array is one that the garbage collector is not allowed
 to move. Consequently, it has a stable address that can be safely
-requested with ``byteArrayContents#``. There are a handful of
-primitive functions in :ghc-prim-ref:`GHC.Prim.`
+requested with ``byteArrayContents#``. Not that being pinned doesn't
+prevent the byteArray from being gc'ed in the same fashion a regular
+byte array would be.
+There are a handful of primitive functions in :ghc-prim-ref:`GHC.Prim.`
 used to enforce or check for pinnedness: ``isByteArrayPinned#``,
 ``isMutableByteArrayPinned#``, and ``newPinnedByteArray#``. A
 byte array can be pinned as a result of three possible causes:
