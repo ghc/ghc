@@ -1,0 +1,5 @@
+Expected parse: *.map CallerCcFilter {ccfModuleName = Nothing, ccfFuncName = PChar 'm' (PChar 'a' (PChar 'p' PEnd))}
+Expected parse: *.parse* CallerCcFilter {ccfModuleName = Nothing, ccfFuncName = PChar 'p' (PChar 'a' (PChar 'r' (PChar 's' (PChar 'e' (PWildcard PEnd)))))}
+Expected parse: Data.List.map CallerCcFilter {ccfModuleName = Just (ModuleName "Data.List"), ccfFuncName = PChar 'm' (PChar 'a' (PChar 'p' PEnd))}
+Expected parse: *.<\*> CallerCcFilter {ccfModuleName = Nothing, ccfFuncName = PChar '<' (PChar '*' (PChar '>' PEnd))}
+Expected failure: as.b parse error on as.b

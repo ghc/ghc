@@ -71,7 +71,6 @@ Library
                    hpc        == 0.6.*,
                    transformers == 0.5.*,
                    exceptions == 0.10.*,
-                   parsec,
                    ghc-boot   == @ProjectVersionMunged@,
                    ghc-heap   == @ProjectVersionMunged@,
                    ghci == @ProjectVersionMunged@

@@ -10,19 +10,19 @@
 -- flag.
 module GHC.Core.Opt.CallerCC
     ( addCallerCostCentres
-    , CallerCcFilter
+    , CallerCcFilter(..)
+    , NamePattern(..)
     , parseCallerCcFilter
     ) where
 
-import Data.Bifunctor
 import Data.Word (Word8)
 import Data.Maybe
-import qualified Text.Parsec as P
 
 import Control.Applicative
 import Control.Monad.Trans.State.Strict
 import Data.Either
 import Control.Monad
+import qualified Text.ParserCombinators.ReadP as P
 
 import GHC.Prelude
 import GHC.Utils.Outputable as Outputable
@@ -42,6 +42,7 @@ import GHC.Core
 import GHC.Core.Opt.Monad
 import GHC.Utils.Panic
 import qualified GHC.Utils.Binary as B
+import Data.Char
 
 addCallerCostCentres :: ModGuts -> CoreM ModGuts
 addCallerCostCentres guts = do
@@ -170,17 +171,17 @@ occNameMatches pat = go pat . occNameString
       = go rest s || go (PWildcard rest) (tail s)
     go _ _  = False
 
-type Parser = P.Parsec String ()
+type Parser = P.ReadP
 
 parseNamePattern :: Parser NamePattern
 parseNamePattern = pattern
   where
-    pattern = star <|> wildcard <|> char <|> end
+    pattern = star P.<++ wildcard P.<++ char P.<++ end
     star = PChar '*' <$ P.string "\\*" <*> pattern
     wildcard = do
       void $ P.char '*'
       PWildcard <$> pattern
-    char = PChar <$> P.anyChar <*> pattern
+    char = PChar <$> P.get <*> pattern
     end = PEnd <$ P.eof
 
 data CallerCcFilter
@@ -199,8 +200,10 @@ instance B.Binary CallerCcFilter where
   put_ bh (CallerCcFilter x y) = B.put_ bh x >> B.put_ bh y
 
 parseCallerCcFilter :: String -> Either String CallerCcFilter
-parseCallerCcFilter =
-    first show . P.parse parseCallerCcFilter' "caller-CC filter"
+parseCallerCcFilter inp =
+    case P.readP_to_S parseCallerCcFilter' inp of
+      ((result, ""):_) -> Right result
+      _ -> Left $ "parse error on " ++ inp
 
 parseCallerCcFilter' :: Parser CallerCcFilter
 parseCallerCcFilter' =
@@ -217,8 +220,8 @@ parseCallerCcFilter' =
 
     moduleName :: Parser String
     moduleName = do
-      c <- P.upper
-      cs <- some $ P.upper <|> P.lower <|> P.digit <|> P.oneOf "_"
-      rest <- optional $ P.try $ P.char '.' >> fmap ('.':) moduleName
+      c <- P.satisfy isUpper
+      cs <- P.munch1 (\c -> isUpper c || isLower c || isDigit c || c == '_')
+      rest <- optional $ P.char '.' >> fmap ('.':) moduleName
       return $ c : (cs ++ fromMaybe "" rest)
 
