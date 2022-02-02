@@ -2,7 +2,7 @@ variables:
   GIT_SSL_NO_VERIFY: "1"
 
   # Commit of ghc/ci-images repository from which to pull Docker images
-  DOCKER_REV: 4ed1a4f27828ba96a34662dc954335e29b470cd2
+  DOCKER_REV: 885dfba7f74583d6a394dbf711cc805178cfcc47
 
   # Sequential version number of all cached things.
   # Bump to invalidate GitLab CI cache.
@@ -935,6 +935,39 @@ nightly-x86_64-linux-deb10-llvm:
   variables:
     BUILD_FLAVOUR: perf-llvm
     TEST_ENV: "x86_64-linux-deb10-llvm"
+
+#################################
+# x86_64-linux-deb11
+#################################
+
+.build-x86_64-linux-deb11:
+  extends: .validate-linux
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb11:$DOCKER_REV"
+  variables:
+    TEST_ENV: "x86_64-linux-deb11"
+    BIN_DIST_PREP_TAR_COMP: "./ghc-x86_64-deb11-linux.tar.xz"
+  cache:
+    key: linux-x86_64-deb11-$CACHE_REV
+
+# Disabled to reduce CI load
+.validate-x86_64-linux-deb11:
+  extends: .build-x86_64-linux-deb11
+  stage: full-build
+  artifacts:
+    when: always
+    expire_in: 2 week
+
+release-x86_64-linux-deb11:
+  <<: *release
+  extends: .build-x86_64-linux-deb11
+  stage: full-build
+
+nightly-x86_64-linux-deb11:
+  <<: *nightly
+  extends: .build-x86_64-linux-deb11
+  stage: full-build
+  variables:
+    TEST_TYPE: slowtest
 
 #################################
 # x86_64-linux-ubuntu 20.04
