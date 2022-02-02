@@ -395,8 +395,8 @@ warnRedundantConstraints ctxt env info ev_vars
  = return ()
 
  | SigSkol user_ctxt _ _ <- info
- = setLclEnv env $  -- We want to add "In the type signature for f"
-                    -- to the error context, which is a bit tiresome
+ = restoreLclEnv env $  -- We want to add "In the type signature for f"
+                        -- to the error context, which is a bit tiresome
    setSrcSpan (redundantConstraintsSpan user_ctxt) $
    report_redundant_msg True
 
