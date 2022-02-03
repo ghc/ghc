@@ -9,7 +9,11 @@
 (c) University of Glasgow, 2007
 -}
 
-module GHC.HsToCore.Coverage (addTicksToBinds, hpcInitCode) where
+module GHC.HsToCore.Coverage
+  ( CoverageConfig (..)
+  , addTicksToBinds
+  , hpcInitCode
+  ) where
 
 import GHC.Prelude as Prelude
 
@@ -74,10 +78,17 @@ import qualified Data.Set as Set
 ************************************************************************
 -}
 
+data CoverageConfig = CoverageConfig
+  { coverageConfig_logger   :: Logger
+
+  -- FIXME: replace this with the specific fields of DynFlags we care about.
+  , coverageConfig_dynFlags :: DynFlags
+
+  , coverageConfig_mInterp  :: Maybe Interp
+  }
+
 addTicksToBinds
-        :: Logger
-        -> DynFlags
-        -> (Maybe Interp)
+        :: CoverageConfig
         -> Module
         -> ModLocation          -- ... off the current module
         -> NameSet              -- Exported Ids.  When we call addTicksToBinds,
@@ -87,7 +98,12 @@ addTicksToBinds
         -> LHsBinds GhcTc
         -> IO (LHsBinds GhcTc, HpcInfo, Maybe ModBreaks)
 
-addTicksToBinds logger dflags m_interp mod mod_loc exports tyCons binds
+addTicksToBinds (CoverageConfig
+                 { coverageConfig_logger = logger
+                 , coverageConfig_dynFlags = dflags
+                 , coverageConfig_mInterp = m_interp
+                 })
+                mod mod_loc exports tyCons binds
   | let passes = coveragePasses dflags
   , not (null passes)
   , Just orig_file <- ml_hs_file mod_loc = do

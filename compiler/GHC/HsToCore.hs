@@ -150,8 +150,12 @@ deSugar hsc_env
         ; (binds_cvr, ds_hpc_info, modBreaks)
                          <- if not (isHsBootOrSig hsc_src)
                               then addTicksToBinds
-                                       (hsc_logger hsc_env) (hsc_dflags hsc_env)
-                                       (hsc_interp hsc_env) mod mod_loc
+                                       (CoverageConfig
+                                        { coverageConfig_logger = hsc_logger hsc_env
+                                        , coverageConfig_dynFlags = hsc_dflags hsc_env
+                                        , coverageConfig_mInterp = hsc_interp hsc_env
+                                        })
+                                       mod mod_loc
                                        export_set (typeEnvTyCons type_env) binds
                               else return (binds, hpcInfo, Nothing)
         ; (msgs, mb_res) <- initDs hsc_env tcg_env $
