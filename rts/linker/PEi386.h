@@ -4,7 +4,9 @@
 #include "LinkerInternals.h"
 #include "PathUtils.h"
 #include <windows.h>
+#include <stdint.h>
 #include <stdbool.h>
+#include <inttypes.h>
 
 #include "BeginPrivate.h"
 
@@ -56,9 +58,8 @@ bool ocResolve_PEi386     ( ObjectCode* oc );
 bool ocRunInit_PEi386     ( ObjectCode *oc );
 bool ocGetNames_PEi386    ( ObjectCode* oc );
 bool ocVerifyImage_PEi386 ( ObjectCode* oc );
-SymbolAddr *lookupSymbol_PEi386(SymbolName *lbl, SymType *type);
-bool ocAllocateExtras_PEi386 ( ObjectCode* oc );
-SymbolAddr *lookupSymbolInDLLs ( const SymbolName* lbl );
+SymbolAddr *lookupSymbol_PEi386(SymbolName *lbl, ObjectCode *dependent, SymType *type);
+
 /* See Note [mingw-w64 name decoration scheme] */
 /* We use myindex to calculate array addresses, rather than
    simply doing the normal subscript thing.  That's because
@@ -124,13 +125,6 @@ struct _OpenedDLL {
     HINSTANCE instance;
 } OpenedDLL;
 
-/* A record for storing indirectly linked functions from DLLs. */
-typedef
-struct _IndirectAddr {
-    SymbolAddr*           addr;
-    struct _IndirectAddr* next;
-} IndirectAddr;
-
 /* Some alignment information.  */
 typedef
 struct _Alignments {
@@ -171,5 +165,13 @@ because we have no stdcall convention on 64 bits.
 
 See #9218
 */
+
+/********************************************
+ * Memory Management functions
+ ********************************************/
+
+/* Same as the above, but use the current process's load address as the starting
+   point for memory allocations.  */
+void *allocaLocalBytes(size_t sz, size_t *req);
 
 #include "EndPrivate.h"

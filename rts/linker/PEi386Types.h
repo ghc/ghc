@@ -17,10 +17,6 @@ struct SectionFormatInfo {
     uint64_t virtualAddr;
  };
 struct ObjectCodeFormatInfo {
-    size_t secBytesTotal;
-    size_t secBytesUsed;
-    char* image;
-    size_t trampoline;
     Section* init;
     Section* finit;
     COFF_HEADER_INFO* ch_info;

@@ -41,7 +41,16 @@ typedef struct _Section    Section;
 /*
  * Note [Processing overflowed relocations]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
- * TODO
+ * When processing relocations whose targets exceed the relocation's maximum
+ * displacement, we can take advantage of knowledge of the symbol type to avoid
+ * linker failures. In particular, if we know that a symbol is a code symbol
+ * then we can handle the relocation by creating a "jump island", a small bit
+ * of code which immediately jumps (with an instruction sequence capable of
+ * larger displacement) to the target.
+ *
+ * This is not possible for data symbols (or, for that matter, Haskell symbols
+ * when TNTC is in use). In these cases we have to rather fail and ask the user
+ * to recompile their program as position-independent.
  */
 
 /* What kind of thing a symbol identifies. We need to know this to determine how
@@ -49,7 +58,7 @@ typedef struct _Section    Section;
 typedef enum _SymType {
     SYM_TYPE_CODE, /* the symbol is a function and can be relocated via a jump island */
     SYM_TYPE_DATA, /* the symbol is data */
-    SYM_TYPE_INDIRECT_DATA, /* see Note [Relocating iob_func on Windows] */
+    SYM_TYPE_INDIRECT_DATA, /* see Note [_iob_func symbol] */
 } SymType;
 
 
@@ -100,8 +109,11 @@ typedef
           SECTIONKIND_DEBUG,
           /* Section belongs to an import section group. e.g. .idata$.  */
           SECTIONKIND_IMPORT,
+          /* Section defines the head section of a BFD-style import library, e.g. idata$7.  */
+          SECTIONKIND_BFD_IMPORT_LIBRARY_HEAD,
           /* Section defines an import library entry, e.g. idata$7.  */
-          SECTIONKIND_IMPORT_LIBRARY,
+          SECTIONKIND_BFD_IMPORT_LIBRARY,
+          /* Unknown section */
           SECTIONKIND_NOINFOAVAIL
         }
    SectionKind;
