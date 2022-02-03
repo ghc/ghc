@@ -404,7 +404,7 @@ hadrian-ghc-in-ghci:
 ############################################################
 
 .lint-params:
-  needs: [lint-submods]
+  needs: []
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV"
   extends: .lint
   before_script:
