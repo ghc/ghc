@@ -51,7 +51,6 @@ initStgToCmmConfig dflags mod = StgToCmmConfig
   , stgToCmmAllowQuotRem2             = (ncg && (x86ish || ppc)) || llvm
   , stgToCmmAllowExtendedAddSubInstrs = (ncg && (x86ish || ppc)) || llvm
   , stgToCmmAllowIntMul2Instr         = (ncg && x86ish) || llvm
-  , stgToCmmAllowFabsInstrs           = (ncg && (x86ish || ppc || aarch64)) || llvm
   -- SIMD flags
   , stgToCmmVecInstrsErr  = vec_err
   , stgToCmmAvx           = isAvxEnabled                   dflags
@@ -72,7 +71,6 @@ initStgToCmmConfig dflags mod = StgToCmmConfig
                       ArchPPC      -> True
                       ArchPPC_64 _ -> True
                       _            -> False
-          aarch64 = platformArch platform == ArchAArch64
           vec_err = case backend dflags of
                       LLVM -> Nothing
                       _    -> Just (unlines ["SIMD vector instructions require the LLVM back-end.", "Please use -fllvm."])

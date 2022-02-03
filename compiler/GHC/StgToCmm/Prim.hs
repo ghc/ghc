@@ -1103,6 +1103,7 @@ emitPrimOp cfg primop =
   DoubleExpOp    -> \args -> opCallish args MO_F64_Exp
   DoubleExpM1Op  -> \args -> opCallish args MO_F64_ExpM1
   DoubleSqrtOp   -> \args -> opCallish args MO_F64_Sqrt
+  DoubleFabsOp   -> \args -> opCallish args MO_F64_Fabs
 
   FloatPowerOp   -> \args -> opCallish args MO_F32_Pwr
   FloatSinOp     -> \args -> opCallish args MO_F32_Sin
@@ -1122,6 +1123,7 @@ emitPrimOp cfg primop =
   FloatExpOp     -> \args -> opCallish args MO_F32_Exp
   FloatExpM1Op   -> \args -> opCallish args MO_F32_ExpM1
   FloatSqrtOp    -> \args -> opCallish args MO_F32_Sqrt
+  FloatFabsOp    -> \args -> opCallish args MO_F32_Fabs
 
 -- Native word signless ops
 
@@ -1525,16 +1527,6 @@ emitPrimOp cfg primop =
     then Left (MO_S_Mul2     (wordWidth platform))
     else Right genericIntMul2Op
 
-  FloatFabsOp -> \args -> opCallishHandledLater args $
-    if allowFab
-    then Left MO_F32_Fabs
-    else Right $ genericFabsOp W32
-
-  DoubleFabsOp -> \args -> opCallishHandledLater args $
-    if allowFab
-    then Left MO_F64_Fabs
-    else Right $ genericFabsOp W64
-
   -- tagToEnum# is special: we need to pull the constructor
   -- out of the table, and perform an appropriate return.
   TagToEnumOp -> \[amode] -> PrimopCmmEmit_Internal $ \res_ty -> do
@@ -1736,7 +1728,6 @@ emitPrimOp cfg primop =
   allowQuotRem2 = stgToCmmAllowQuotRem2             cfg
   allowExtAdd   = stgToCmmAllowExtendedAddSubInstrs cfg
   allowInt2Mul  = stgToCmmAllowIntMul2Instr         cfg
-  allowFab      = stgToCmmAllowFabsInstrs           cfg
 
 data PrimopCmmEmit
   -- | Out of line fake primop that's actually just a foreign call to other
@@ -2025,34 +2016,6 @@ genericIntMul2Op [res_c, res_h, res_l] both_args@[arg_x, arg_y]
              , mkAssign (CmmLocal res_c) (rl res_h `neq` carryFill (rl res_l))
              ]
 genericIntMul2Op _ _ = panic "genericIntMul2Op"
-
--- This replicates what we had in libraries/base/GHC/Float.hs:
---
---    abs x    | x == 0    = 0 -- handles (-0.0)
---             | x >  0    = x
---             | otherwise = negateFloat x
-genericFabsOp :: Width -> GenericOp
-genericFabsOp w [res_r] [aa]
- = do platform <- getPlatform
-      let zero   = CmmLit (CmmFloat 0 w)
-
-          eq x y = CmmMachOp (MO_F_Eq w) [x, y]
-          gt x y = CmmMachOp (MO_F_Gt w) [x, y]
-
-          neg x  = CmmMachOp (MO_F_Neg w) [x]
-
-          g1 = catAGraphs [mkAssign (CmmLocal res_r) zero]
-          g2 = catAGraphs [mkAssign (CmmLocal res_r) aa]
-
-      res_t <- CmmLocal <$> newTemp (cmmExprType platform aa)
-      let g3 = catAGraphs [mkAssign res_t aa,
-                           mkAssign (CmmLocal res_r) (neg (CmmReg res_t))]
-
-      g4 <- mkCmmIfThenElse (gt aa zero) g2 g3
-
-      emit =<< mkCmmIfThenElse (eq aa zero) g1 g4
-
-genericFabsOp _ _ _ = panic "genericFabsOp"
 
 ------------------------------------------------------------------------------
 -- Helpers for translating various minor variants of array indexing.
