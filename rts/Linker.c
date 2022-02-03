@@ -33,6 +33,7 @@
 #include "linker/SymbolExtras.h"
 #include "PathUtils.h"
 #include "CheckUnload.h" // createOCSectionIndices
+#include "MemoryMap.h"
 
 #if !defined(mingw32_HOST_OS)
 #include "posix/Signals.h"
@@ -1106,6 +1107,7 @@ mmap_again:
                  MAP_PRIVATE|tryMap32Bit|fixed|flags, fd, offset);
 
    if (result == MAP_FAILED) {
+       reportMemoryMap();
        sysErrorBelch("mmap %" FMT_Word " bytes at %p",(W_)size,map_addr);
        errorBelch("Try specifying an address with +RTS -xm<addr> -RTS");
        return NULL;
@@ -1128,6 +1130,7 @@ mmap_again:
                fixed = MAP_FIXED;
                goto mmap_again;
 #else
+               reportMemoryMap();
                errorBelch("mmapForLinker: failed to mmap() memory below 2Gb; "
                           "asked for %lu bytes at %p. "
                           "Try specifying an address with +RTS -xm<addr> -RTS",

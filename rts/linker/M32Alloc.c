@@ -11,6 +11,7 @@
 #include "RtsUtils.h"
 #include "linker/M32Alloc.h"
 #include "LinkerInternals.h"
+#include "MemoryMap.h"
 
 #include <inttypes.h>
 #include <stdlib.h>
@@ -325,6 +326,7 @@ m32_alloc_page(void)
     const size_t map_sz = pgsz * M32_MAP_PAGES;
     uint8_t *chunk = mmapAnonForLinker(map_sz);
     if (! is_okay_address(chunk + map_sz)) {
+      reportMemoryMap();
       barf("m32_alloc_page: failed to allocate pages within 4GB of program text (got %p)", chunk);
     }
     IF_DEBUG(sanity, memset(chunk, 0xaa, map_sz));
@@ -477,6 +479,7 @@ m32_alloc(struct m32_allocator_t *alloc, size_t size, size_t alignment)
           sysErrorBelch("m32_alloc: Failed to map pages for %zd bytes", size);
           return NULL;
       } else if (! is_okay_address(page)) {
+          reportMemoryMap();
           barf("m32_alloc: warning: Allocation of %zd bytes resulted in pages above 4GB (%p)",
                size, page);
       }
