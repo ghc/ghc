@@ -16,5 +16,6 @@ executable notes-util
                       containers,
                       directory,
                       text,
-                      process
+                      process,
+                      array
     default-language: Haskell2010

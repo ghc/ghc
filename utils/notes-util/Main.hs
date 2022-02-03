@@ -27,13 +27,18 @@ main = do
 
     let printNoteDefs = putStrLn . unlines . map showNoteDef
         printNoteRefs = putStrLn . unlines . map showNoteRef
+        printNoteRefsSugg (bad, sugg) = do
+          putStrLn . showNoteRef $ bad
+          putStrLn $ "  >" ++ showNoteDef sugg
+
 
         parseMode :: String -> Maybe (NoteDb -> IO ())
         parseMode "dump"         = Just $ putStrLn . showNoteDb
         parseMode "unreferenced" = Just $ printNoteDefs . S.toList . unreferencedNotes
         parseMode "defs"         = Just $ printNoteDefs . allNoteDefs
         parseMode "refs"         = Just $ printNoteRefs . allNoteRefs
-        parseMode "broken-refs"  = Just $ printNoteRefs . brokenNoteRefs
+        parseMode "broken-refs"  = Just $ printNoteRefs . map fst . brokenNoteRefs
+        parseMode "broken-refs-suggest" = Just $ mapM_ printNoteRefsSugg . brokenNoteRefs
         parseMode _              = Nothing
 
     (mode, files) <- case args of
