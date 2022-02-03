@@ -3245,7 +3245,7 @@ genCCall64' target dest_regs args = do
 
     -- Align stack to 16n for calls, assuming a starting stack
     -- alignment of 16n - word_size on procedure entry. Which we
-    -- maintain. See Note [rts/StgCRun.c : Stack Alignment on X86]
+    -- maintain. See Note [Stack Alignment on X86] in rts/StgCRun.c
     let word_size = platformWordSizeInBytes platform
     (real_size, adjust_rsp) <-
         if (tot_arg_size + word_size) `rem` 16 == 0

@@ -1340,7 +1340,7 @@ runTcSDeriveds tcs
 
 
 -- | This variant of 'runTcSDeriveds' will immediatley fail upon encountering an
--- insoluble ct. See Note [Speeding up valid-hole fits]
+-- insoluble ct. See Note [Speeding up valid hole-fits]
 runTcSDerivedsEarlyAbort :: TcS a -> TcM a
 runTcSDerivedsEarlyAbort tcs
   = do { ev_binds_var <- TcM.newTcEvBinds

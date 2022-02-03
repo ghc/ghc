@@ -1042,7 +1042,6 @@ dsConLike con tvbs tys
   = do { ds_con <- dsHsConLike con
        ; ids    <- newSysLocalsDs tys
                    -- newSysLocalDs: /can/ be lev-poly; see
-                   -- Note [Checking representation-polymorphic data constructors]
        ; return (mkLams tvs $
                  mkLams ids $
                  ds_con `mkTyApps` mkTyVarTys tvs

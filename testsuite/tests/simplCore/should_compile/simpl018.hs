@@ -1,6 +1,6 @@
 {-# LANGUAGE UnboxedTuples #-}
 
--- See Note [Float coercions (unlifted)] in GHC.Core.Opt.Simplify
+-- See Note [Float coercions] in GHC.Core.Opt.Simplify
 -- This one gave a CoreLint error when compiled optimised
 --
 -- See also #1718, of which this is a simplified version

@@ -641,7 +641,7 @@ getPkgDatabases verbosity mode use_user use_cache expand_vars my_flags = do
     case [ f | FlagUserConfig f <- my_flags ] of
       _ | no_user_db -> return Nothing
       [] -> do
-        -- See Note [Settings File] about this file, and why we need GHC to share it with us.
+        -- See Note [Settings file] about this file, and why we need GHC to share it with us.
         let settingsFile = top_dir </> "settings"
         exists_settings_file <- doesFileExist settingsFile
         targetArchOS <- case exists_settings_file of

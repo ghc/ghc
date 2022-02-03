@@ -882,7 +882,7 @@ match renv subst (Type ty1) (Type ty2) _mco
   = match_ty renv subst ty1 ty2
 
 ------------------------ Coercions ---------------------
--- See Note [Coercion argument] for why this isn't really right
+-- See Note [Coercion arguments] for why this isn't really right
 match renv subst (Coercion co1) (Coercion co2) MRefl
   = match_co renv subst co1 co2
   -- The MCo case corresponds to matching  co ~ (co2 |> co3)
@@ -1054,7 +1054,7 @@ eta_reduce renv e@(Lam {})
 
 eta_reduce _ _ = Nothing
 
-{- Note [Eta reduction the target]
+{- Note [Eta reduction in the target]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Suppose we are faced with this (#19790)
    Template {x}  f x

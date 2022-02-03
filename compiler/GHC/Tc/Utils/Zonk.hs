@@ -872,7 +872,7 @@ zonkExpr env expr@(RecordCon { rcon_ext = con_expr, rcon_flds = rbinds })
                        , rcon_flds = new_rbinds }) }
 
 -- Record updates via dot syntax are replaced by desugared expressions
--- in the renamer. See Note [Rebindable Syntax and HsExpansion]. This
+-- in the renamer. See Note [Rebindable syntax and HsExpansion]. This
 -- is why we match on 'rupd_flds = Left rbinds' here and panic otherwise.
 zonkExpr env (RecordUpd { rupd_flds = Left rbinds
                         , rupd_expr = expr

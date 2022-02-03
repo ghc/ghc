@@ -750,7 +750,7 @@ withOverlappedEx mgr fname h async offset startCB completionCB = do
               -- otherwise the RTS will lock up until we get a result back.
               -- In the threaded case it can be beneficial to spin on the haskell
               -- side versus
-              -- See also Note [Why use non-waiting getOverlappedResult requests.]
+              -- See also Note [Why use non-waiting getOverlappedResult requests]
               res <- FFI.getOverlappedResult fhndl lpol False
               status <- FFI.overlappedIOStatus lpol
               case res of

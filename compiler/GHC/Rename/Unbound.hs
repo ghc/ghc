@@ -401,7 +401,7 @@ nameSpacesRelated dflags what_looking ns ns'
     promoted_datacons = [(dataName, [WL_Constructor]) | data_kinds]
 
 {-
-Note [Related name space]
+Note [Related name spaces]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 Name spaces are related if there is a chance to mean the one when one writes
 the other, i.e. variables <-> data constructors and type variables <-> type

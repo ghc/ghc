@@ -621,7 +621,7 @@ simplExprGently :: SimplEnv -> CoreExpr -> SimplM CoreExpr
 -- enforce that; it just simplifies the expression twice
 
 -- It's important that simplExprGently does eta reduction; see
--- Note [Simplifying the left-hand side of a RULE] above.  The
+-- Note [Simplify rule LHS] above.  The
 -- simplifier does indeed do eta reduction (it's in GHC.Core.Opt.Simplify.completeLam)
 -- but only if -O is on.
 
@@ -934,7 +934,7 @@ type IndEnv = IdEnv (Id, [CoreTickish]) -- Maps local_id -> exported_id, ticks
 shortOutIndirections :: CoreProgram -> CoreProgram
 shortOutIndirections binds
   | isEmptyVarEnv ind_env = binds
-  | no_need_to_flatten    = binds'                      -- See Note [Rules and indirect-zapping]
+  | no_need_to_flatten    = binds'                      -- See Note [Rules and indirection-zapping]
   | otherwise             = [Rec (flattenBinds binds')] -- for this no_need_to_flatten stuff
   where
     ind_env            = makeIndEnv binds
@@ -996,7 +996,7 @@ shortMeOut ind_env exported_id local_id
        not (local_id `elemVarEnv` ind_env)      -- Only if not already substituted for
     then
         if hasShortableIdInfo exported_id
-        then True       -- See Note [Messing up the exported Id's IdInfo]
+        then True       -- See Note [Messing up the exported Id's RULES]
         else warnPprTrace True "Not shorting out" (ppr exported_id) False
     else
         False
@@ -1005,7 +1005,7 @@ shortMeOut ind_env exported_id local_id
 hasShortableIdInfo :: Id -> Bool
 -- True if there is no user-attached IdInfo on exported_id,
 -- so we can safely discard it
--- See Note [Messing up the exported Id's IdInfo]
+-- See Note [Messing up the exported Id's RULES]
 hasShortableIdInfo id
   =  isEmptyRuleInfo (ruleInfo info)
   && isDefaultInlinePragma (inlinePragInfo info)

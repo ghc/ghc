@@ -2173,7 +2173,7 @@ instUnitToUnit state iuid =
 type ShHoleSubst = ModuleNameEnv Module
 
 -- | Substitutes holes in a 'Module'.  NOT suitable for being called
--- directly on a 'nameModule', see Note [Representation of module/name variable].
+-- directly on a 'nameModule', see Note [Representation of module/name variables].
 -- @p[A=\<A>]:B@ maps to @p[A=q():A]:B@ with @A=q():A@;
 -- similarly, @\<A>@ maps to @q():A@.
 renameHoleModule :: UnitState -> ShHoleSubst -> Module -> Module

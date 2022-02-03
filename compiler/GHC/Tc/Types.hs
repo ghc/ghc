@@ -1169,7 +1169,7 @@ instance Outputable TcTyThing where     -- Debugging only
 -- b) to figure out when a nested binding can be generalised,
 --    in 'GHC.Tc.Gen.Bind.decideGeneralisationPlan'.
 --
-data IdBindingInfo -- See Note [Meaning of IdBindingInfo and ClosedTypeId]
+data IdBindingInfo -- See Note [Meaning of IdBindingInfo]
     = NotLetBound
     | ClosedLet
     | NonClosedLet
@@ -1192,7 +1192,7 @@ type RhsNames = NameSet   -- Names of variables, mentioned on the RHS of
                           -- a definition, that are not Global or ClosedLet
 
 type ClosedTypeId = Bool
-  -- See Note [Meaning of IdBindingInfo and ClosedTypeId]
+  -- See Note [Meaning of IdBindingInfo]
 
 {- Note [Meaning of IdBindingInfo]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

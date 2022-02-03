@@ -1177,7 +1177,7 @@ tc_hs_type mode (HsForAllTy { hst_tele = tele, hst_body = ty }) exp_kind
                  -- Pass on the mode from the type, to any wildcards
                  -- in kind signatures on the forall'd variables
                  -- e.g.      f :: _ -> Int -> forall (a :: _). blah
-                 -- Why exp_kind?  See Note [Body kind of HsForAllTy]
+                 -- Why exp_kind?  See Note [Body kind of a HsForAllTy]
 
        -- Do not kind-generalise here!  See Note [Kind generalisation]
 
@@ -3149,7 +3149,7 @@ tcOuterTKBndrs skol_info
                                , sm_tvtv = SMDSkolemTv skol_info })
                     skol_info
   -- Do not clone the outer binders
-  -- See Note [Cloning for type variable binder] under "must not"
+  -- See Note [Cloning for type variable binders] under "must not"
 
 tcOuterTKBndrsX :: OutputableBndrFlag flag 'Renamed
                 => SkolemMode -> SkolemInfo

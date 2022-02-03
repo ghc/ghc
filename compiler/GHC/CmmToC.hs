@@ -497,7 +497,7 @@ machOpNeedsCast platform mop args
     -- resultRepOfMachOp says).
   | isComparisonMachOp mop = Just mkW_
 
-    -- See Note [Zero-extended sub-word signed results]
+    -- See Note [Zero-extending sub-word signed results]
   | signedOp mop
   , res_ty <- machOpResultType platform mop args
   , not $ isFloatType res_ty -- only integer operations, not MO_SF_Conv

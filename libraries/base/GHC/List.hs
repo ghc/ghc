@@ -1446,7 +1446,7 @@ Note [Fusion for zipN/zipWithN]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We arrange that zip, zip3, etc, and zipWith, zipWit3 etc, are all
 good consumers for their first (left) argument, and good producers.
-Here's how.  See Note [Fusion for foldr2] for why it can't fuse its
+Here's how.  See Note [Fusion for foldrN] for why it can't fuse its
 second (right) list argument.
 
 NB: Zips for larger tuples are in the List module.
@@ -1460,7 +1460,7 @@ NB: Zips for larger tuples are in the List module.
 * To give this rule a chance to fire, we give zip a NOLINLINE[1]
   pragma (although since zip is recursive it might not need it)
 
-* Now the rules for foldr2 (see Note [Fusion for foldr2]) may fire,
+* Now the rules for foldr2 (see Note [Fusion for foldrN]) may fire,
   or rules that fuse the build-produced output of zip.
 
 * If none of these fire, rule "zipList" (active only in phase 1)

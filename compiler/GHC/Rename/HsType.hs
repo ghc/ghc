@@ -961,8 +961,8 @@ bindHsQTyVars :: forall a b.
               -> (LHsQTyVars GhcRn -> Bool -> RnM (b, FreeVars))
                   -- The Bool is True <=> all kind variables used in the
                   -- kind signature are bound on the left.  Reason:
-                  -- the last clause of Note [CUSKs: Complete user-supplied
-                  -- kind signatures] in GHC.Hs.Decls
+                  -- the last clause of Note [CUSKs: complete user-supplied kind signatures]
+                  -- in GHC.Hs.Decls
               -> RnM (b, FreeVars)
 
 -- See Note [bindHsQTyVars examples]

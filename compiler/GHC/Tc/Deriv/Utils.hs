@@ -625,7 +625,7 @@ Currently, the only three stock derived classes that require this are Read,
 Show, and Generic, as their derived code all depend on the record selectors
 of the derived data type's constructors.
 
-See also Note [Newtype deriving and unused constructors] in GHC.Tc.Deriv for
+See also Note [Unused constructors and deriving clauses] in GHC.Tc.Deriv for
 another example of a similar trick.
 -}
 

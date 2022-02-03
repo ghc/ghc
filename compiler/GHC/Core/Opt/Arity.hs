@@ -1495,7 +1495,7 @@ etaInfoApp in_scope expr eis
       = go subst e (EI bs mco')
       where
         mco' = checkReflexiveMCo (Core.substCo subst co `mkTransMCoR` mco)
-               -- See Note [Check for reflexive casts in eta-expansion]
+               -- See Note [Check for reflexive casts in eta expansion]
 
     go subst (Case e b ty alts) eis
       = Case (Core.substExprSC subst e) b1 ty' alts'

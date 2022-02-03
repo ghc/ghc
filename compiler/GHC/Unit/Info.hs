@@ -59,7 +59,7 @@ import Data.List (isPrefixOf, stripPrefix)
 --    * UnitId: identifier used to generate code (cf 'UnitInfo')
 --
 -- These two identifiers are different for wired-in packages. See Note [About
--- Units] in "GHC.Unit"
+-- units] in "GHC.Unit"
 type GenUnitInfo unit = GenericUnitInfo PackageId PackageName unit ModuleName (GenModule (GenUnit unit))
 
 -- | Information about an installed unit (units are identified by their database
