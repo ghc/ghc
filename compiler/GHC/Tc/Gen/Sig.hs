@@ -409,7 +409,7 @@ tcPatSynSig name sig_ty@(L _ (HsSig{sig_bndrs = hs_outer_bndrs, sig_body = hs_ty
        ; skol_info <- mkSkolemInfo (DataConSkol name)
        ; (tclvl, wanted, (outer_bndrs, (ex_bndrs, (req, prov, body_ty))))
            <- pushLevelAndSolveEqualitiesX "tcPatSynSig"           $
-                     -- See Note [solveEqualities in tcPatSynSig]
+                     -- See Note [Report unsolved equalities in tcPatSynSig]
               tcOuterTKBndrs skol_info hs_outer_bndrs   $
               tcExplicitTKBndrs skol_info ex_hs_tvbndrs $
               do { req     <- tcHsContext hs_req

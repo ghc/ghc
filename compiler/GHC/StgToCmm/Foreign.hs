@@ -174,7 +174,7 @@ We will now generate this:
  L2:
   ... r ...
 
-And when the safe foreign call is lowered later (see Note [lower safe
+And when the safe foreign call is lowered later (see Note [Lower safe
 foreign calls]) we get this:
 
   suspendThread()

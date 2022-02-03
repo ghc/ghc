@@ -435,8 +435,8 @@ addBinding :: CSEnv            -- Includes InId->OutId cloning
 -- Extend the CSE env with a mapping [rhs -> out-id]
 -- unless we can instead just substitute [in-id -> rhs]
 --
--- It's possible for the binder to be a type variable (see
--- Note [Type-let] in GHC.Core), in which case we can just substitute.
+-- It's possible for the binder to be a type variable,
+-- in which case we can just substitute.
 addBinding env in_id out_id rhs' cse_done
   | not (isId in_id) = (extendCSSubst env in_id rhs',     out_id)
   | noCSE in_id      = (env,                              out_id)

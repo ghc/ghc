@@ -5,7 +5,7 @@ module GHC.Iface.Type
 where
 
 -- Empty import to influence the compilation ordering.
--- See Note [Depend on GHC.Integer] in GHC.Base
+-- See Note [Depend on GHC.Num.Integer] in GHC.Base
 import GHC.Base ()
 
 data IfaceAppArgs

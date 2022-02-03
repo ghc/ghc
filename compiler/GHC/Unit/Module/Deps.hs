@@ -420,7 +420,7 @@ hash of the module. The export hash is computed in `GHC.Iface.Recomp.addFingerpr
 -}
 
 {-
-Note [Structure of mod_boot_deps]
+Note [Structure of dep_boot_deps]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 In `-c` mode we always need to know whether to load the normal or boot version of

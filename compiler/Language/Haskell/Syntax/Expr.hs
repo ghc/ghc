@@ -539,7 +539,7 @@ data HsExpr p
   -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 
   -- This case only arises when the OverloadedRecordDot langauge
-  -- extension is enabled. See Note [Record Selectors in the AST].
+  -- extension is enabled. See Note [Record selectors in the AST].
   | HsGetField {
         gf_ext :: XGetField p
       , gf_expr :: LHsExpr p
@@ -549,7 +549,7 @@ data HsExpr p
   -- | Record field selector. e.g. @(.x)@ or @(.x.y)@
   --
   -- This case only arises when the OverloadedRecordDot langauge
-  -- extensions is enabled. See Note [Record Selectors in the AST].
+  -- extensions is enabled. See Note [Record selectors in the AST].
 
   --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpenP'
   --         'GHC.Parser.Annotation.AnnDot', 'GHC.Parser.Annotation.AnnCloseP'

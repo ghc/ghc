@@ -341,7 +341,7 @@ something at the bottom:
         RULE:  B.f @Int = $sf
 
 Applying this rule makes foo refer to $sf, although foo doesn't appear to
-depend on $sf.  (And, as in Note [Rules for imported functions], the
+depend on $sf.  (And, as in Note [IMP-RULES: local rules for imported functions], the
 dependency might be more indirect. For example, foo might mention C.t
 rather than B.f, where C.t eventually inlines to B.f.)
 
@@ -573,13 +573,13 @@ Consider this group, which is typical of what SpecConstr builds:
 So 'f' and 'fs' are in the same Rec group (since f refers to fs via its RULE).
 
 But watch out!  If 'fs' is not chosen as a loop breaker, we may get an infinite loop:
-  - the RULE is applied in f's RHS (see Note [Self-recursive rules] in GHC.Core.Opt.Simplify
+  - the RULE is applied in f's RHS (see Note [Rules for recursive functions] in GHC.Core.Opt.Simplify
   - fs is inlined (say it's small)
   - now there's another opportunity to apply the RULE
 
 This showed up when compiling Control.Concurrent.Chan.getChanContents.
 Hence the transitive rule_fv_env stuff described in
-Note [Rules and  loop breakers].
+Note [Rules and loop breakers].
 
 ------------------------------------------------------------
 Note [Finding join points]
@@ -1735,7 +1735,7 @@ lambda and casts, e.g.
 
 * Why do we take care to account for intervening casts? Answer:
   currently we don't do eta-expansion and cast-swizzling in a stable
-  unfolding (see Note [Eta-expansion inside stable unfoldings]).
+  unfolding (see Note [Eta-expansion in stable unfoldings]).
   So we can get
     f = \x. ((\y. ...x...y...) |> co)
   Now, since the lambdas aren't together, the occurrence analyser will

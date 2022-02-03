@@ -669,7 +669,7 @@ mkCastWrapperInlinePrag :: InlinePragma -> InlinePragma
 -- See Note [Cast worker/wrapper]
 mkCastWrapperInlinePrag (InlinePragma { inl_act = act, inl_rule = rule_info })
   = InlinePragma { inl_src    = SourceText "{-# INLINE"
-                 , inl_inline = NoUserInlinePrag -- See Note [Wrapper NoUserInline]
+                 , inl_inline = NoUserInlinePrag -- See Note [Wrapper NoUserInlinePrag]
                  , inl_sat    = Nothing      --     in GHC.Core.Opt.WorkWrap
                  , inl_act    = wrap_act     -- See Note [Wrapper activation]
                  , inl_rule   = rule_info }  --     in GHC.Core.Opt.WorkWrap
@@ -2087,7 +2087,7 @@ rebuildCall env info@(ArgInfo { ai_fun = fun, ai_args = rev_args
   | nr_wanted == 0 || no_more_args
   , let info' = info { ai_rules = Nothing }
   = -- We've accumulated a simplified call in <fun,rev_args>
-    -- so try rewrite rules; see Note [RULEs apply to simplified arguments]
+    -- so try rewrite rules; see Note [RULES apply to simplified arguments]
     -- See also Note [Rules for recursive functions]
     do { mb_match <- tryRules env rules fun (reverse rev_args) cont
        ; case mb_match of

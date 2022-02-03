@@ -175,7 +175,7 @@ data FractionalLit = FL
     , fl_neg :: Bool                        -- See Note [Negative zero]
     , fl_signi :: Rational                  -- The significand component of the literal
     , fl_exp :: Integer                     -- The exponent component of the literal
-    , fl_exp_base :: FractionalExponentBase -- See Note [Fractional exponent bases]
+    , fl_exp_base :: FractionalExponentBase -- See Note [fractional exponent bases]
     }
     deriving (Data, Show)
   -- The Show instance is required for the derived GHC.Parser.Lexer.Token instance when DEBUG is on

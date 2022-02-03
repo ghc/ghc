@@ -496,7 +496,7 @@ the sc_theta_ids at all. So our final construction is
   -}
 
 makeSuperClasses :: [Ct] -> TcS [Ct]
--- Returns strict superclasses, transitively, see Note [The superclasses story]
+-- Returns strict superclasses, transitively, see Note [The superclass story]
 -- See Note [The superclass story]
 -- The loop-breaking here follows Note [Expanding superclasses] in GHC.Tc.Utils.TcType
 -- Specifically, for an incoming (C t) constraint, we return all of (C t)'s
@@ -1392,7 +1392,7 @@ can_eq_nc_forall ev eq_rel s1 s2
 
  | otherwise
  = do { traceTcS "Omitting decomposition of given polytype equality" $
-        pprEq s1 s2    -- See Note [Do not decompose given polytype equalities]
+        pprEq s1 s2    -- See Note [Do not decompose Given polytype equalities]
       ; stopWith ev "Discard given polytype equality" }
 
  where

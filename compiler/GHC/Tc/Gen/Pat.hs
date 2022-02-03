@@ -918,7 +918,7 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty_scaled
         ; (tenv, ex_tvs') <- tcInstSuperSkolTyVarsX skol_info tenv1 ex_tvs
                      -- Get location from monad, not from ex_tvs
                      -- This freshens: See Note [Freshen existentials]
-                     -- Why "super"? See Note [Binding when lookup up instances]
+                     -- Why "super"? See Note [Binding when looking up instances]
                      -- in GHC.Core.InstEnv.
 
         ; let arg_tys' = substScaledTys tenv arg_tys

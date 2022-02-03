@@ -486,7 +486,7 @@ lintCoreBindings dflags pass local_in_scope binds
     -- we have eta-expanded data constructors with representation-polymorphic
     -- bindings; so we switch off the representation-polymorphism checks.
     -- The very simple optimiser will beta-reduce them away.
-    -- See Note [Checking representation-polymorphic data constructors]
+    -- See Note [Checking for representation-polymorphic built-ins]
     -- in GHC.HsToCore.Expr.
     check_fixed_rep = case pass of
                         CoreDesugar -> False
@@ -1920,7 +1920,7 @@ conceivably we could allow it. But we can always eta-expand such an
 "undersaturated" rule (see 'GHC.Core.Opt.Arity.etaExpandToJoinPointRule'), and in fact
 the simplifier would have to in order to deal with the RHS. So we take a
 conservative view and don't allow undersaturated rules for join points. See
-Note [Rules and join points] in "GHC.Core.Opt.OccurAnal" for further discussion.
+Note [Join points and unfoldings/rules] in "GHC.Core.Opt.OccurAnal" for further discussion.
 -}
 
 {-

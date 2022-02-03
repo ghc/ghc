@@ -1898,7 +1898,7 @@ generateMainBinding tcg_env main_name = do
     ; (ev_binds, main_expr) <- setMainCtxt main_name io_ty $
                                tcCheckMonoExpr main_expr_rn io_ty
 
-            -- See Note [Root-main Id]
+            -- See Note [Root-main id]
             -- Construct the binding
             --      :Main.main :: IO res_ty = runMainIO res_ty main
     ; run_main_id <- tcLookupId runMainIOName

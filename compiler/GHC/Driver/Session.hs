@@ -449,7 +449,7 @@ data DynFlags = DynFlags {
 
   llvmConfig            :: LlvmConfig,
     -- ^ N.B. It's important that this field is lazy since we load the LLVM
-    -- configuration lazily. See Note [LLVM Configuration] in "GHC.SysTools".
+    -- configuration lazily. See Note [LLVM configuration] in "GHC.SysTools".
   llvmOptLevel          :: Int,         -- ^ LLVM optimisation level
   verbosity             :: Int,         -- ^ Verbosity level: see Note [Verbosity levels]
   debugLevel            :: Int,         -- ^ How much debug information to produce
@@ -773,7 +773,7 @@ data LlvmTarget = LlvmTarget
   , lAttributes :: [String]
   }
 
--- | See Note [LLVM Configuration] in "GHC.SysTools".
+-- | See Note [LLVM configuration] in "GHC.SysTools".
 data LlvmConfig = LlvmConfig { llvmTargets :: [(String, LlvmTarget)]
                              , llvmPasses  :: [(Int, String)]
                              }

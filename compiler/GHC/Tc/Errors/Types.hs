@@ -125,7 +125,7 @@ existence of these two types, which for now remain a "necessary evil".
 -}
 
 -- The majority of TcRn messages come with extra context about the error,
--- and this newtype captures it. See Note [Migrating TcM messages].
+-- and this newtype captures it. See Note [Migrating TcM Messages].
 data ErrInfo = ErrInfo {
     errInfoContext :: !SDoc
     -- ^ Extra context associated to the error.

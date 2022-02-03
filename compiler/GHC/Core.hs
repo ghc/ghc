@@ -1120,7 +1120,7 @@ data CoreRule
                 -- arguments, it simply discards them; the returned 'CoreExpr'
                 -- is just the rewrite of 'ru_fn' applied to the first 'ru_nargs' args
     }
-                -- See Note [Extra args in rule matching] in GHC.Core.Rules
+                -- See Note [Extra args in the target] in GHC.Core.Rules
 
 -- | Rule options
 data RuleOpts = RuleOpts

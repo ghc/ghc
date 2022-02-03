@@ -113,7 +113,7 @@ data TCvSubst
              TvSubstEnv -- Substitutes both type and kind variables
              CvSubstEnv -- Substitutes coercion variables
         -- See Note [Substitutions apply only once]
-        -- and Note [Extending the TvSubstEnv]
+        -- and Note [Extending the TCvSubstEnv]
         -- and Note [Substituting types and coercions]
         -- and Note [The substitution invariant]
 
@@ -258,7 +258,7 @@ mkEmptyTCvSubst :: InScopeSet -> TCvSubst
 mkEmptyTCvSubst is = TCvSubst is emptyTvSubstEnv emptyCvSubstEnv
 
 isEmptyTCvSubst :: TCvSubst -> Bool
-         -- See Note [Extending the TvSubstEnv]
+         -- See Note [Extending the TCvSubstEnv]
 isEmptyTCvSubst (TCvSubst _ tenv cenv) = isEmptyVarEnv tenv && isEmptyVarEnv cenv
 
 mkTCvSubst :: InScopeSet -> (TvSubstEnv, CvSubstEnv) -> TCvSubst

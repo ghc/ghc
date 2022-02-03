@@ -74,7 +74,7 @@ vanillaConGrd scrut con arg_ids =
 -- where @b@ and @c@ are freshly allocated in @mkListGrds@ and @a@ is the match
 -- variable.
 mkListGrds :: Id -> [(Id, [PmGrd])] -> DsM [PmGrd]
--- See Note [Order of guards matter] for why we need to intertwine guards
+-- See Note [Order of guards matters] for why we need to intertwine guards
 -- on list elements.
 mkListGrds a []                  = pure [vanillaConGrd a nilDataCon []]
 mkListGrds a ((x, head_grds):xs) = do

@@ -183,7 +183,7 @@ In fact, even GHC.Core.Subst.simplOptExpr will do this, and simpleOptExpr
 runs on the output of the desugarer, so all is well by the end of
 the desugaring pass.
 
-See also Note [MatchIds] in GHC.HsToCore.Match
+See also Note [Match Ids] in GHC.HsToCore.Match
 
 ************************************************************************
 *                                                                      *

@@ -114,7 +114,7 @@ data DataConCantHappen
 instance Outputable DataConCantHappen where
   ppr = dataConCantHappen
 
--- | Eliminate a 'DataConCantHappen'. See Note [Constructor cannot happen].
+-- | Eliminate a 'DataConCantHappen'. See Note [Constructor cannot occur].
 dataConCantHappen :: DataConCantHappen -> a
 dataConCantHappen x = case x of {}
 

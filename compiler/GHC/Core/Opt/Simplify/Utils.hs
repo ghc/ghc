@@ -130,7 +130,7 @@ data SimplCont
   | ApplyToVal         -- (ApplyToVal arg K)[e] = K[ e arg ]
       { sc_dup     :: DupFlag   -- See Note [DupFlag invariants]
       , sc_hole_ty :: OutType   -- Type of the function, presumably (forall a. blah)
-                                -- See Note [The hole type in ApplyToTy/Val]
+                                -- See Note [The hole type in ApplyToTy]
       , sc_arg  :: InExpr       -- The argument,
       , sc_env  :: StaticEnv    -- see Note [StaticEnv invariant]
       , sc_cont :: SimplCont }
@@ -138,7 +138,7 @@ data SimplCont
   | ApplyToTy          -- (ApplyToTy ty K)[e] = K[ e ty ]
       { sc_arg_ty  :: OutType     -- Argument type
       , sc_hole_ty :: OutType     -- Type of the function, presumably (forall a. blah)
-                                  -- See Note [The hole type in ApplyToTy/Val]
+                                  -- See Note [The hole type in ApplyToTy]
       , sc_cont    :: SimplCont }
 
   | Select             -- (Select alts K)[e] = K[ case e of alts ]
@@ -453,7 +453,7 @@ contHoleType (StrictBind { sc_bndr = b, sc_dup = dup, sc_env = se })
   = perhapsSubstTy dup se (idType b)
 contHoleType (StrictArg  { sc_fun_ty = ty })  = funArgTy ty
 contHoleType (ApplyToTy  { sc_hole_ty = ty }) = ty  -- See Note [The hole type in ApplyToTy]
-contHoleType (ApplyToVal { sc_hole_ty = ty }) = ty  -- See Note [The hole type in ApplyToTy/Val]
+contHoleType (ApplyToVal { sc_hole_ty = ty }) = ty  -- See Note [The hole type in ApplyToTy]
 contHoleType (Select { sc_dup = d, sc_bndr =  b, sc_env = se })
   = perhapsSubstTy d se (idType b)
 
@@ -1621,7 +1621,7 @@ mkLam env bndrs body cont
       = do { tick (EtaReduction (head bndrs))
            ; return etad_lam }
 
-      | not (contIsRhs cont)   -- See Note [Eta-expanding lambdas]
+      | not (contIsRhs cont)   -- See Note [Eta expanding lambdas]
       , sm_eta_expand mode
       , any isRuntimeVar bndrs
       , let body_arity = {-# SCC "eta" #-} exprEtaExpandArity dflags body
@@ -2192,9 +2192,9 @@ prepareAlts scrut case_bndr' alts
 
 mkCase tries these things
 
-* Note [Merge nested cases]
-* Note [Eliminate identity case]
-* Note [Scrutinee constant folding]
+* Note [Merge Nested Cases]
+* Note [Eliminate Identity Case]
+* Note [Scrutinee Constant Folding]
 
 Note [Merge Nested Cases]
 ~~~~~~~~~~~~~~~~~~~~~~~~~

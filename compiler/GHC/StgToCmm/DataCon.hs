@@ -227,7 +227,7 @@ buildDynCon' binder mn actually_bound ccs con args
 For Char/Int closures there are some value closures
 built into the RTS. This is the case for all values in
 the range mINT_INTLIKE .. mAX_INTLIKE (or CHARLIKE).
-See Note [CHARLIKE and INTLIKE closures.] in the RTS code.
+See Note [CHARLIKE and INTLIKE closures] in the RTS code.
 
 Similarly zero-arity constructors have a closure
 in their defining Module we can use.

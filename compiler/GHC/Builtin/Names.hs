@@ -219,7 +219,6 @@ basicKnownKeyNames
         monoidClassName, memptyName, mappendName, mconcatName,
 
         -- The IO type
-        -- See Note [TyConRepNames for non-wired-in TyCons]
         ioTyConName, ioDataConName,
         runMainIOName,
         runRWName,

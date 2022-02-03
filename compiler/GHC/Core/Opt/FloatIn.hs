@@ -541,7 +541,7 @@ fiBind platform to_drop (AnnRec bindings) body_fvs
     (ids, rhss) = unzip bindings
     rhss_fvs = map freeVarsOf rhss
 
-        -- See Note [extra_fvs (1,2)]
+        -- See Note [extra_fvs (1)] and Note [extra_fvs (2)]
     rule_fvs = mapUnionDVarSet bndrRuleAndUnfoldingVarsDSet ids
     extra_fvs = rule_fvs `unionDVarSet`
                 unionDVarSets [ rhs_fvs | (bndr, (rhs_fvs, rhs)) <- bindings

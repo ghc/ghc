@@ -125,7 +125,7 @@ data Unlinked
          [SptEntry]    -- ^ A byte-code object, lives only in memory. Also
                        -- carries some static pointer table entries which
                        -- should be loaded along with the BCOs.
-                       -- See Note [Grant plan for static forms] in
+                       -- See Note [Grand plan for static forms] in
                        -- "GHC.Iface.Tidy.StaticPtrTable".
 
 instance Outputable Unlinked where

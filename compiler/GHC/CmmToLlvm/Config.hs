@@ -26,6 +26,6 @@ data LlvmCgConfig = LlvmCgConfig
   , llvmCgDoWarn            :: !Bool         -- ^ True ==> warn unsupported Llvm version
   , llvmCgLlvmTarget        :: !String       -- ^ target triple passed to LLVM
   , llvmCgLlvmConfig        :: !LlvmConfig   -- ^ mirror DynFlags LlvmConfig.
-    -- see Note [LLVM Configuration] in "GHC.SysTools". This can be strict since
+    -- see Note [LLVM configuration] in "GHC.SysTools". This can be strict since
     -- GHC.Driver.Config.CmmToLlvm.initLlvmCgConfig verifies the files are present.
   }
