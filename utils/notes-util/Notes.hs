@@ -11,6 +11,9 @@ import qualified Data.Text.Encoding as T
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import System.Directory (doesFileExist)
+import Data.Array
+import Data.List (sortBy)
+import Data.Ord
 
 data SrcLoc = SrcLoc { fileName :: FilePath
                      , row :: !Int
@@ -148,13 +151,33 @@ fileNotes fname = do
                    }
       else return mempty
 
-brokenNoteRefs :: NoteDb -> [NoteRef]
+brokenNoteRefs :: NoteDb -> [(NoteRef, NoteDef)]
 brokenNoteRefs db =
-    [ ref
+    [ (ref, best_match)
     | (_fname, refs) <- M.toList (noteRefs db)
     , ref <- S.toList refs
     , Nothing <- pure $ M.lookup (noteRefName ref) (noteDefs db)
+    , let best_match = bestLev  (show (noteRefName ref)) (concatMap S.toList (M.elems (noteDefs db)))
     ]
+
+bestLev :: String -> [NoteDef] -> NoteDef
+bestLev x ds = head $ sortBy (comparing (\d -> lev x (show (noteDefName d)))) ds
+
+
+lev:: (Eq a) => [a] -> [a] -> Int
+lev xs ys = levMemo ! (n, m)
+  where levMemo = array ((0,0),(n,m)) [((i,j),lev' i j) | i <- [0..n], j <- [0..m]]
+        n = length xs
+        m = length ys
+        xa = listArray (1, n) xs
+        ya = listArray (1, m) ys
+        lev' 0 v = v
+        lev' u 0 = u
+        lev' u v
+          | xa ! u == ya ! v = levMemo ! (u-1, v-1)
+          | otherwise        = 1 + minimum [levMemo ! (u, v-1),
+                                            levMemo ! (u-1, v),
+                                            levMemo ! (u-1, v-1)]
 
 unreferencedNotes :: NoteDb -> S.Set NoteDef
 unreferencedNotes db =
