@@ -1,8 +1,11 @@
 {-# LANGUAGE TupleSections #-}
+
 -- This module contains functions which implement
 -- the -finfo-table-map and -fdistinct-constructor-tables flags
-module GHC.Stg.Debug(collectDebugInformation) where
-
+module GHC.Stg.Debug
+  ( StgDebugOpts(..)
+  , collectDebugInformation
+  ) where
 
 import GHC.Prelude
 
@@ -15,7 +18,6 @@ import GHC.Types.IPE
 import GHC.Unit.Module
 import GHC.Types.Name   ( getName, getOccName, occNameString, nameSrcSpan)
 import GHC.Data.FastString
-import GHC.Driver.Session
 
 import Control.Monad (when)
 import Control.Monad.Trans.Reader
@@ -29,7 +31,12 @@ import Data.List.NonEmpty (NonEmpty(..))
 
 data SpanWithLabel = SpanWithLabel RealSrcSpan String
 
-data R = R { rDynFlags :: DynFlags, rModLocation :: ModLocation, rSpan :: Maybe SpanWithLabel }
+data StgDebugOpts = StgDebugOpts
+  { stgDebug_infoTableMap              :: !Bool
+  , stgDebug_distinctConstructorTables :: !Bool
+  }
+
+data R = R { rOpts :: StgDebugOpts, rModLocation :: ModLocation, rSpan :: Maybe SpanWithLabel }
 
 type M a = ReaderT R (State InfoTableProvMap) a
 
@@ -44,9 +51,9 @@ withSpan (new_s, new_l) act = local maybe_replace act
     maybe_replace r
       = r { rSpan = Just (SpanWithLabel new_s new_l) }
 
-collectDebugInformation :: DynFlags -> ModLocation -> [StgTopBinding] -> ([StgTopBinding], InfoTableProvMap)
-collectDebugInformation dflags ml bs =
-    runState (runReaderT (mapM collectTop bs) (R dflags ml Nothing)) emptyInfoTableProvMap
+collectDebugInformation :: StgDebugOpts -> ModLocation -> [StgTopBinding] -> ([StgTopBinding], InfoTableProvMap)
+collectDebugInformation opts ml bs =
+    runState (runReaderT (mapM collectTop bs) (R opts ml Nothing)) emptyInfoTableProvMap
 
 collectTop :: StgTopBinding -> M StgTopBinding
 collectTop (StgTopLifted t) = StgTopLifted <$> collectStgBind t
@@ -128,8 +135,8 @@ quickSourcePos _ _ = Nothing
 
 recordStgIdPosition :: Id -> Maybe SpanWithLabel -> Maybe SpanWithLabel -> M ()
 recordStgIdPosition id best_span ss = do
-  dflags <- asks rDynFlags
-  when (gopt Opt_InfoTableMap dflags) $ do
+  opts <- asks rOpts
+  when (stgDebug_infoTableMap opts) $ do
     cc <- asks rSpan
     --Useful for debugging why a certain Id gets given a certain span
     --pprTraceM "recordStgIdPosition" (ppr id $$ ppr cc $$ ppr best_span $$ ppr ss)
@@ -142,8 +149,8 @@ numberDataCon :: DataCon -> [StgTickish] -> M ConstructorNumber
 numberDataCon dc _ | isUnboxedTupleDataCon dc = return NoNumber
 numberDataCon dc _ | isUnboxedSumDataCon dc = return NoNumber
 numberDataCon dc ts = do
-  dflags <- asks rDynFlags
-  if not (gopt Opt_DistinctConstructorTables dflags) then return NoNumber else do
+  opts <- asks rOpts
+  if not (stgDebug_distinctConstructorTables opts) then return NoNumber else do
     env <- lift get
     mcc <- asks rSpan
     let !mbest_span = (\(SpanWithLabel rss l) -> (rss, l)) <$> (selectTick ts <|> mcc)

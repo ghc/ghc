@@ -41,9 +41,6 @@ import GHC.Prelude
 
 import GHC.Stg.Syntax
 
-import GHC.Driver.Session
-import GHC.Driver.Config.Diagnostic
-
 import GHC.Core.Lint        ( interactiveInScope )
 import GHC.Core.DataCon
 import GHC.Core             ( AltCon(..) )
@@ -51,6 +48,7 @@ import GHC.Core.Type
 
 import GHC.Types.Basic      ( TopLevelFlag(..), isTopLevel )
 import GHC.Types.CostCentre ( isCurrentCCS )
+import GHC.Types.Error      ( DiagnosticReason(WarningWithoutFlag) )
 import GHC.Types.Id
 import GHC.Types.Var.Set
 import GHC.Types.Name       ( getSrcLoc, nameIsLocalOrFrom )
@@ -72,7 +70,8 @@ import Control.Monad
 
 lintStgTopBindings :: forall a . (OutputablePass a, BinderP a ~ Id)
                    => Logger
-                   -> DynFlags
+                   -> DiagOpts
+                   -> StgPprOpts
                    -> InteractiveContext
                    -> Module -- ^ module being compiled
                    -> Bool   -- ^ have we run Unarise yet?
@@ -80,7 +79,7 @@ lintStgTopBindings :: forall a . (OutputablePass a, BinderP a ~ Id)
                    -> [GenStgTopBinding a]
                    -> IO ()
 
-lintStgTopBindings logger dflags ictxt this_mod unarised whodunnit binds
+lintStgTopBindings logger diag_opts opts ictxt this_mod unarised whodunnit binds
   = {-# SCC "StgLint" #-}
     case initL diag_opts this_mod unarised opts top_level_binds (lint_binds binds) of
       Nothing  ->
@@ -96,8 +95,6 @@ lintStgTopBindings logger dflags ictxt this_mod unarised whodunnit binds
                   text "*** End of Offense ***"])
         Err.ghcExit logger 1
   where
-    diag_opts = initDiagOpts dflags
-    opts = initStgPprOpts dflags
     -- Bring all top-level binds into scope because CoreToStg does not generate
     -- bindings in dependency order (so we may see a use before its definition).
     top_level_binds = extendVarSetList (mkVarSet (bindersOfTopBinds binds))

@@ -106,6 +106,8 @@ import GHC.Driver.Errors.Types
 import GHC.Driver.CodeOutput
 import GHC.Driver.Config.Logger   (initLogFlags)
 import GHC.Driver.Config.Parser   (initParserOpts)
+import GHC.Driver.Config.Stg.Ppr  (initStgPprOpts)
+import GHC.Driver.Config.Stg.Pipeline (initStgPipelineOpts)
 import GHC.Driver.Config.StgToCmm (initStgToCmmConfig)
 import GHC.Driver.Config.Diagnostic
 import GHC.Driver.Hooks
@@ -1867,7 +1869,8 @@ myCoreToStg logger dflags ictxt for_bytecode this_mod ml prepd_binds = do
 
     stg_binds_with_fvs
         <- {-# SCC "Stg2Stg" #-}
-           stg2stg logger dflags ictxt for_bytecode this_mod stg_binds
+           stg2stg logger ictxt (initStgPipelineOpts dflags for_bytecode)
+                   this_mod stg_binds
 
     return (stg_binds_with_fvs, denv, cost_centre_info)
 

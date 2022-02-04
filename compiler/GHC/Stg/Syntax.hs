@@ -58,7 +58,7 @@ module GHC.Stg.Syntax (
         bindersOf, bindersOfTop, bindersOfTopBinds,
 
         -- ppr
-        StgPprOpts(..), initStgPprOpts,
+        StgPprOpts(..),
         panicStgPprOpts, shortStgPprOpts,
         pprStgArg, pprStgExpr, pprStgRhs, pprStgBinding,
         pprGenStgTopBinding, pprStgTopBinding,
@@ -73,7 +73,6 @@ import Data.ByteString ( ByteString )
 import Data.Data   ( Data )
 import Data.List   ( intersperse )
 import GHC.Core.DataCon
-import GHC.Driver.Session
 import GHC.Types.ForeignCall ( ForeignCall )
 import GHC.Types.Id
 import GHC.Types.Name        ( isDynLinkName )
@@ -681,12 +680,6 @@ type OutputablePass pass =
 -- | STG pretty-printing options
 data StgPprOpts = StgPprOpts
    { stgSccEnabled :: !Bool -- ^ Enable cost-centres
-   }
-
--- | Initialize STG pretty-printing options from DynFlags
-initStgPprOpts :: DynFlags -> StgPprOpts
-initStgPprOpts dflags = StgPprOpts
-   { stgSccEnabled = sccProfilingEnabled dflags
    }
 
 -- | STG pretty-printing options used for panic messages

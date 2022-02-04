@@ -26,9 +26,9 @@ import GHC.Platform.Profile
 
 import GHC.Types.Basic
 import GHC.Types.Demand
-import GHC.Driver.Session
 import GHC.Types.Id
 import GHC.Runtime.Heap.Layout ( WordOff )
+import GHC.Stg.Lift.Config
 import GHC.Stg.Syntax
 import qualified GHC.StgToCmm.ArgRep  as StgToCmm.ArgRep
 import qualified GHC.StgToCmm.Closure as StgToCmm.Closure
@@ -342,7 +342,7 @@ tagSkeletonAlt (con, bndrs, rhs)
 -- | Combines several heuristics to decide whether to lambda-lift a given
 -- @let@-binding to top-level. See "GHC.Stg.Lift.Analysis#when" for details.
 goodToLift
-  :: DynFlags
+  :: StgLiftConfig
   -> TopLevelFlag
   -> RecFlag
   -> (DIdSet -> DIdSet) -- ^ An expander function, turning 'InId's into
@@ -352,7 +352,7 @@ goodToLift
   -> Maybe DIdSet       -- ^ @Just abs_ids@ <=> This binding is beneficial to
                         -- lift and @abs_ids@ are the variables it would
                         -- abstract over
-goodToLift dflags top_lvl rec_flag expander pairs scope = decide
+goodToLift cfg top_lvl rec_flag expander pairs scope = decide
   [ ("top-level", isTopLevel top_lvl) -- keep in sync with Note [When to lift]
   , ("memoized", any_memoized)
   , ("argument occurrences", arg_occs)
@@ -362,7 +362,7 @@ goodToLift dflags top_lvl rec_flag expander pairs scope = decide
   , ("args spill on stack", args_spill_on_stack)
   , ("increases allocation", inc_allocs)
   ] where
-      profile  = targetProfile dflags
+      profile  = c_targetProfile cfg
       platform = profilePlatform profile
       decide deciders
         | not (fancy_or deciders)
@@ -431,7 +431,7 @@ goodToLift dflags top_lvl rec_flag expander pairs scope = decide
       -- idArity f > 0 ==> known
       known_fun id = idArity id > 0
       abstracts_known_local_fun
-        = not (liftLamsKnown dflags) && any known_fun (dVarSetElems abs_ids)
+        = not (c_liftLamsKnown cfg) && any known_fun (dVarSetElems abs_ids)
 
       -- Number of arguments of a RHS in the current binding group if we decide
       -- to lift it
@@ -441,8 +441,8 @@ goodToLift dflags top_lvl rec_flag expander pairs scope = decide
         . (dVarSetElems abs_ids ++)
         . rhsLambdaBndrs
       max_n_args
-        | isRec rec_flag = liftLamsRecArgs dflags
-        | otherwise      = liftLamsNonRecArgs dflags
+        | isRec rec_flag = c_liftLamsRecArgs cfg
+        | otherwise      = c_liftLamsNonRecArgs cfg
       -- We have 5 hardware registers on x86_64 to pass arguments in. Any excess
       -- args are passed on the stack, which means slow memory accesses
       args_spill_on_stack

@@ -24,7 +24,7 @@ data ArchOS
       { archOS_arch :: Arch
       , archOS_OS   :: OS
       }
-   deriving (Read, Show, Eq)
+   deriving (Read, Show, Eq, Ord)
 
 -- | Architectures
 --
@@ -45,14 +45,14 @@ data Arch
    | ArchMipsel
    | ArchRISCV64
    | ArchJavaScript
-   deriving (Read, Show, Eq)
+   deriving (Read, Show, Eq, Ord)
 
 -- | ARM Instruction Set Architecture
 data ArmISA
    = ARMv5
    | ARMv6
    | ARMv7
-   deriving (Read, Show, Eq)
+   deriving (Read, Show, Eq, Ord)
 
 -- | ARM extensions
 data ArmISAExt
@@ -61,20 +61,20 @@ data ArmISAExt
    | VFPv3D16
    | NEON
    | IWMMX2
-   deriving (Read, Show, Eq)
+   deriving (Read, Show, Eq, Ord)
 
 -- | ARM ABI
 data ArmABI
    = SOFT
    | SOFTFP
    | HARD
-   deriving (Read, Show, Eq)
+   deriving (Read, Show, Eq, Ord)
 
 -- | PowerPC 64-bit ABI
 data PPC_64ABI
    = ELF_V1 -- ^ PowerPC64
    | ELF_V2 -- ^ PowerPC64 LE
-   deriving (Read, Show, Eq)
+   deriving (Read, Show, Eq, Ord)
 
 -- | Operating systems.
 --
@@ -95,7 +95,7 @@ data OS
    | OSQNXNTO
    | OSAIX
    | OSHurd
-   deriving (Read, Show, Eq)
+   deriving (Read, Show, Eq, Ord)
 
 
 -- Note [Platform Syntax]

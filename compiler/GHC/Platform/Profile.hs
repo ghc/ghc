@@ -23,6 +23,7 @@ data Profile = Profile
    { profilePlatform :: !Platform -- ^ Platform
    , profileWays     :: !Ways     -- ^ Ways
    }
+  deriving (Eq, Ord, Show, Read)
 
 -- | Get platform constants
 profileConstants :: Profile -> PlatformConstants

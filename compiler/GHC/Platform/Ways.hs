@@ -70,7 +70,7 @@ data Way
   | WayProf          -- ^ Profiling, enable cost-centre stacks and profiling reports
   | WayTracing       -- ^ (RTS only) enable event logging (tracing)
   | WayDyn           -- ^ Dynamic linking
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Read)
 
 type Ways = Set Way
 

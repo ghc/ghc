@@ -82,7 +82,7 @@ data Platform = Platform
    , platform_constants               :: !(Maybe PlatformConstants)
       -- ^ Constants such as structure offsets, type sizes, etc.
    }
-   deriving (Read, Show, Eq)
+   deriving (Read, Show, Eq, Ord)
 
 platformConstants :: Platform -> PlatformConstants
 platformConstants platform = case platform_constants platform of

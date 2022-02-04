@@ -378,6 +378,10 @@ Library
         GHC.Driver.Config.HsToCore
         GHC.Driver.Config.Logger
         GHC.Driver.Config.Parser
+        GHC.Driver.Config.Stg.Debug
+        GHC.Driver.Config.Stg.Lift
+        GHC.Driver.Config.Stg.Pipeline
+        GHC.Driver.Config.Stg.Ppr
         GHC.Driver.Config.StgToCmm
         GHC.Driver.Env
         GHC.Driver.Env.KnotVars
@@ -538,6 +542,7 @@ Library
         GHC.Stg.FVs
         GHC.Stg.Lift
         GHC.Stg.Lift.Analysis
+        GHC.Stg.Lift.Config
         GHC.Stg.Lift.Monad
         GHC.Stg.Lint
         GHC.Stg.Pipeline

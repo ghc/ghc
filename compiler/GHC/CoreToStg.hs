@@ -18,6 +18,7 @@ module GHC.CoreToStg ( coreToStg ) where
 import GHC.Prelude
 
 import GHC.Driver.Session
+import GHC.Driver.Config.Stg.Debug
 
 import GHC.Core
 import GHC.Core.Utils   ( exprType, findDefault, isJoinBind
@@ -244,7 +245,7 @@ coreToStg dflags this_mod ml pgm
     -- See Note [Mapping Info Tables to Source Positions]
     (!pgm'', !denv) =
         if gopt Opt_InfoTableMap dflags
-          then collectDebugInformation dflags ml pgm'
+          then collectDebugInformation (initStgDebugOpts dflags) ml pgm'
           else (pgm', emptyInfoTableProvMap)
 
     prof = ways dflags `hasWay` WayProf

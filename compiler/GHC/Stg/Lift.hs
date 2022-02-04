@@ -11,6 +11,7 @@ module GHC.Stg.Lift
    (
     -- * Late lambda lifting in STG
     -- $note
+   StgLiftConfig (..),
    stgLiftLams
    )
 where
@@ -18,9 +19,9 @@ where
 import GHC.Prelude
 
 import GHC.Types.Basic
-import GHC.Driver.Session
 import GHC.Types.Id
 import GHC.Stg.FVs ( annBindingFreeVars )
+import GHC.Stg.Lift.Config
 import GHC.Stg.Lift.Analysis
 import GHC.Stg.Lift.Monad
 import GHC.Stg.Syntax
@@ -125,8 +126,8 @@ import Data.Maybe ( isNothing )
 --
 -- (Mostly) textbook instance of the lambda lifting transformation, selecting
 -- which bindings to lambda lift by consulting 'goodToLift'.
-stgLiftLams :: Module -> DynFlags -> UniqSupply -> [InStgTopBinding] -> [OutStgTopBinding]
-stgLiftLams this_mod dflags us = runLiftM dflags us . foldr (liftTopLvl this_mod) (pure ())
+stgLiftLams :: Module -> StgLiftConfig -> UniqSupply -> [InStgTopBinding] -> [OutStgTopBinding]
+stgLiftLams this_mod cfg us = runLiftM cfg us . foldr (liftTopLvl this_mod) (pure ())
 
 liftTopLvl :: Module -> InStgTopBinding -> LiftM () -> LiftM ()
 liftTopLvl _ (StgTopStringLit bndr lit) rest = withSubstBndr bndr $ \bndr' -> do
@@ -168,8 +169,8 @@ withLiftedBindPairs top rec pairs scope k = do
   let (infos, rhss) = unzip pairs
   let bndrs = map binderInfoBndr infos
   expander <- liftedIdsExpander
-  dflags <- getDynFlags
-  case goodToLift dflags top rec expander pairs scope of
+  cfg <- getConfig
+  case goodToLift cfg top rec expander pairs scope of
     -- @abs_ids@ is the set of all variables that need to become parameters.
     Just abs_ids -> withLiftedBndrs abs_ids bndrs $ \bndrs' -> do
       -- Within this block, all binders in @bndrs@ will be noted as lifted, so

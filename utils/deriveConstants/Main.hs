@@ -880,7 +880,7 @@ writeHaskellType fn ws = atomicWriteFile fn xs
                    \import Prelude\n\
                    \import Data.Char\n\n\
                    \data PlatformConstants = PlatformConstants {"
-          footer = "  } deriving (Show,Read,Eq)\n\n"
+          footer = "  } deriving (Show, Read, Eq, Ord)\n\n"
           body = intercalate ",\n" (concatMap doWhat ws)
 
           doWhat (GetClosureSize name _) = ["      pc_" ++ name ++ " :: {-# UNPACK #-} !Int"]

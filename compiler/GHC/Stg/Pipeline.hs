@@ -9,7 +9,11 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
 
-module GHC.Stg.Pipeline ( stg2stg ) where
+module GHC.Stg.Pipeline
+  ( StgPipelineOpts (..)
+  , StgToDo (..)
+  , stg2stg
+  ) where
 
 import GHC.Prelude
 
@@ -21,11 +25,11 @@ import GHC.Stg.FVs      ( depSortWithAnnotStgPgm )
 import GHC.Stg.Unarise  ( unarise )
 import GHC.Stg.BcPrep   ( bcPrep )
 import GHC.Stg.CSE      ( stgCse )
-import GHC.Stg.Lift     ( stgLiftLams )
+import GHC.Stg.Lift     ( StgLiftConfig, stgLiftLams )
 import GHC.Unit.Module ( Module )
 import GHC.Runtime.Context ( InteractiveContext )
 
-import GHC.Driver.Session
+import GHC.Driver.Flags (DumpFlag(..))
 import GHC.Utils.Error
 import GHC.Types.Unique.Supply
 import GHC.Utils.Outputable
@@ -33,6 +37,14 @@ import GHC.Utils.Logger
 import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader
+
+data StgPipelineOpts = StgPipelineOpts
+  { stgPipeline_phases      :: ![StgToDo]
+  -- ^ Spec of what stg-to-stg passes to do
+  , stgPipeline_lint        :: !(Maybe DiagOpts)
+  -- ^ Should we lint the STG at various stages of the pipeline?
+  , stgPipeline_pprOpts     :: !StgPprOpts
+  }
 
 newtype StgM a = StgM { _unStgM :: ReaderT Char IO a }
   deriving (Functor, Applicative, Monad, MonadIO)
@@ -47,18 +59,17 @@ runStgM :: Char -> StgM a -> IO a
 runStgM mask (StgM m) = runReaderT m mask
 
 stg2stg :: Logger
-        -> DynFlags                  -- includes spec of what stg-to-stg passes to do
         -> InteractiveContext
-        -> Bool                      -- prepare for bytecode?
+        -> StgPipelineOpts
         -> Module                    -- module being compiled
         -> [StgTopBinding]           -- input program
         -> IO [CgStgTopBinding]        -- output program
-stg2stg logger dflags ictxt for_bytecode this_mod binds
+stg2stg logger ictxt opts this_mod binds
   = do  { dump_when Opt_D_dump_stg_from_core "Initial STG:" binds
         ; showPass logger "Stg2Stg"
         -- Do the main business!
         ; binds' <- runStgM 'g' $
-            foldM (do_stg_pass this_mod) binds (getStgToDo for_bytecode dflags)
+            foldM (do_stg_pass this_mod) binds (stgPipeline_phases opts)
 
           -- Dependency sort the program as last thing. The program needs to be
           -- in dependency order for the SRT algorithm to work (see
@@ -76,8 +87,11 @@ stg2stg logger dflags ictxt for_bytecode this_mod binds
 
   where
     stg_linter unarised
-      | gopt Opt_DoStgLinting dflags
-      = lintStgTopBindings logger dflags ictxt this_mod unarised
+      | Just diag_opts <- stgPipeline_lint opts
+      = lintStgTopBindings
+          logger
+          diag_opts ppr_opts
+          ictxt this_mod unarised
       | otherwise
       = \ _whodunnit _binds -> return ()
 
@@ -95,10 +109,10 @@ stg2stg logger dflags ictxt for_bytecode this_mod binds
             let binds' = {-# SCC "StgCse" #-} stgCse binds
             end_pass "StgCse" binds'
 
-          StgLiftLams -> do
+          StgLiftLams cfg -> do
             us <- getUniqueSupplyM
             --
-            let binds' = {-# SCC "StgLiftLams" #-} stgLiftLams this_mod dflags us binds
+            let binds' = {-# SCC "StgLiftLams" #-} stgLiftLams this_mod cfg us binds
             end_pass "StgLiftLams" binds'
 
           StgBcPrep -> do
@@ -114,14 +128,14 @@ stg2stg logger dflags ictxt for_bytecode this_mod binds
             liftIO (stg_linter True "Unarise" binds')
             return binds'
 
-    opts = initStgPprOpts dflags
+    ppr_opts = stgPipeline_pprOpts opts
     dump_when flag header binds
-      = putDumpFileMaybe logger flag header FormatSTG (pprStgTopBindings opts binds)
+      = putDumpFileMaybe logger flag header FormatSTG (pprStgTopBindings ppr_opts binds)
 
     end_pass what binds2
       = liftIO $ do -- report verbosely, if required
           putDumpFileMaybe logger Opt_D_verbose_stg2stg what
-            FormatSTG (vcat (map (pprStgTopBinding opts) binds2))
+            FormatSTG (vcat (map (pprStgTopBinding ppr_opts) binds2))
           stg_linter False what binds2
           return binds2
 
@@ -132,7 +146,7 @@ stg2stg logger dflags ictxt for_bytecode this_mod binds
 data StgToDo
   = StgCSE
   -- ^ Common subexpression elimination
-  | StgLiftLams
+  | StgLiftLams StgLiftConfig
   -- ^ Lambda lifting closure variables, trading stack/register allocation for
   -- heap allocation
   | StgStats
@@ -142,23 +156,4 @@ data StgToDo
   -- ^ Mandatory when compiling to bytecode
   | StgDoNothing
   -- ^ Useful for building up 'getStgToDo'
-  deriving Eq
-
--- | Which Stg-to-Stg passes to run. Depends on flags, ways etc.
-getStgToDo :: Bool -> DynFlags -> [StgToDo]
-getStgToDo for_bytecode dflags =
-  filter (/= StgDoNothing)
-    [ mandatory StgUnarise
-    -- Important that unarisation comes first
-    -- See Note [StgCse after unarisation] in GHC.Stg.CSE
-    , optional Opt_StgCSE StgCSE
-    , optional Opt_StgLiftLams StgLiftLams
-    , runWhen for_bytecode StgBcPrep
-    , optional Opt_StgStats StgStats
-    ] where
-      optional opt = runWhen (gopt opt dflags)
-      mandatory = id
-
-runWhen :: Bool -> StgToDo -> StgToDo
-runWhen True todo = todo
-runWhen _    _    = StgDoNothing
+  deriving (Show, Read, Eq, Ord)
