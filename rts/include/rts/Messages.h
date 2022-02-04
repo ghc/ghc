@@ -103,3 +103,5 @@ extern RtsMsgFunction rtsFatalInternalErrorFn;
 extern RtsMsgFunctionRetLen rtsDebugMsgFn;
 extern RtsMsgFunction rtsErrorMsgFn;
 extern RtsMsgFunction rtsSysErrorMsgFn;
+
+#undef PRINTF
