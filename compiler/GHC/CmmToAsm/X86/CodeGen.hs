@@ -437,6 +437,25 @@ temporary, then do the other computation, and then use the temporary:
     ... (tmp) ...
 -}
 
+{-
+Note [%rip-relative addressing on x86-64]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+On x86-64 GHC produces code for use in the "small" or, when `-fPIC` is set,
+"small PIC" code models defined by the x86-64 System V ABI (section 3.5.1 of
+specification version 0.99).
+
+In general the small code model would allow us to assume that code is located
+between 0 and 2^31 - 1. However, this is not true on Windows which, due to
+high-entropy ASLR, may place the executable image anywhere in 64-bit address
+space. This is problematic since immediate operands in x86-64 are generally
+32-bit sign-extended values (with the exception of the 64-bit MOVABS encoding).
+Consequently, to avoid overflowing we use %rip-relative addressing universally.
+Since %rip-relative addressing comes essentially for free and makes linking far
+easier, we use it even on non-Windows platforms.
+
+See also: the documentation for GCC's `-mcmodel=small` flag.
+-}
+
 
 -- | Check whether an integer will fit in 32 bits.
 --      A CmmInt is intended to be truncated to the appropriate
@@ -1156,7 +1175,7 @@ getRegister' platform is32Bit (CmmLit lit)
         -- signed literals that fit in 32 bits, but we want unsigned
         -- literals here.
         -- note2: all labels are small, because we're assuming the
-        -- small memory model (see gcc docs, -mcmodel=small).
+        -- small memory model. See Note [%rip-relative addressing on x86-64].
 
 getRegister' platform _ (CmmLit lit)
   = do let format = cmmTypeFormat (cmmLitType platform lit)
@@ -1292,6 +1311,14 @@ getAmode e = do
          | not (isLit y) -- we already handle valid literals above.
          -> x86_complex_amode x y 0 0
 
+      -- Handle labels with %rip-relative addressing since in general the image
+      -- may be loaded anywhere in the 64-bit address space (e.g. on Windows
+      -- with high-entropy ASLR). See Note [%rip-relative addressing on x86-64].
+      CmmLit lit
+         | not is32Bit
+         , is_label lit
+         -> return (Amode (AddrBaseIndex EABaseRip EAIndexNone (litToImm lit)) nilOL)
+
       CmmLit lit
          | is32BitLit is32Bit lit
          -> return (Amode (ImmAddr (litToImm lit) 0) nilOL)
@@ -1313,7 +1340,11 @@ getAmode e = do
       _ -> do
         (reg,code) <- getSomeReg e
         return (Amode (AddrBaseIndex (EABaseReg reg) EAIndexNone (ImmInt 0)) code)
-
+  where
+    is_label (CmmLabel{}) = True
+    is_label (CmmLabelOff{}) = True
+    is_label (CmmLabelDiffOff{}) = True
+    is_label _ = False
 
 
 -- | Like 'getAmode', but on 32-bit use simple register addressing
@@ -1522,7 +1553,7 @@ is32BitLit is32Bit lit
    | not is32Bit = case lit of
       CmmInt i W64              -> is32BitInteger i
       -- assume that labels are in the range 0-2^31-1: this assumes the
-      -- small memory model (see gcc docs, -mcmodel=small).
+      -- small memory model. Note [%rip-relative addressing on x86-64].
       CmmLabel _                -> True
       -- however we can't assume that label offsets are in this range
       -- (see #15570)
@@ -2864,11 +2895,21 @@ genSwitch expr targets = do
   else do
         (reg,e_code) <- getSomeReg indexExpr
         lbl <- getNewLabelNat
-        let op = OpAddr (AddrBaseIndex EABaseNone (EAIndex reg (platformWordSizeInBytes platform)) (ImmCLbl lbl))
-            code = e_code `appOL` toOL [
-                    JMP_TBL op ids (Section ReadOnlyData lbl) lbl
-                 ]
-        return code
+        let is32bit = target32Bit platform
+        if is32bit
+          then let op = OpAddr (AddrBaseIndex EABaseNone (EAIndex reg (platformWordSizeInBytes platform)) (ImmCLbl lbl))
+                   jmp_code = JMP_TBL op ids (Section ReadOnlyData lbl) lbl
+               in return $ e_code `appOL` unitOL jmp_code
+          else do
+            -- See Note [%rip-relative addressing on x86-64].
+            tableReg <- getNewRegNat (intFormat (platformWordWidth platform))
+            let op = OpAddr (AddrBaseIndex (EABaseReg tableReg) (EAIndex reg (platformWordSizeInBytes platform)) (ImmInt 0))
+                code = e_code `appOL` toOL
+                    [ LEA (archWordFormat is32bit) (OpAddr (AddrBaseIndex EABaseRip EAIndexNone (ImmCLbl lbl))) (OpReg tableReg)
+                    , MOV (archWordFormat is32bit) op (OpReg reg)
+                    , JMP_TBL (OpReg reg) ids (Section ReadOnlyData lbl) lbl
+                    ]
+            return code
   where
     (offset, blockIds) = switchTargetsToTable targets
     ids = map (fmap DestBlockId) blockIds
