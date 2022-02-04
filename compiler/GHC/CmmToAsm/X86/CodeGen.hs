@@ -1583,20 +1583,27 @@ getRegOrMem e = do
     return (OpReg reg, code)
 
 is32BitLit :: Platform -> CmmLit -> Bool
-is32BitLit platform lit
-   | not (target32Bit platform) = case lit of
+is32BitLit platform _lit
+   | target32Bit platform = True
+is32BitLit platform lit =
+   case lit of
       CmmInt i W64              -> is32BitInteger i
-      -- assume that labels are in the range 0-2^31-1: this assumes the
-      -- small memory model. Note [%rip-relative addressing on x86-64].
-      CmmLabel _                -> True
+      -- Except on Windows, assume that labels are in the range 0-2^31-1: this
+      -- assumes the small memory model. Note [%rip-relative addressing on
+      -- x86-64].
+      CmmLabel _                -> low_image
       -- however we can't assume that label offsets are in this range
       -- (see #15570)
-      CmmLabelOff _ off         -> is32BitInteger (fromIntegral off)
-      CmmLabelDiffOff _ _ off _ -> is32BitInteger (fromIntegral off)
+      CmmLabelOff _ off         -> low_image && is32BitInteger (fromIntegral off)
+      CmmLabelDiffOff _ _ off _ -> low_image && is32BitInteger (fromIntegral off)
       _                         -> True
-is32BitLit _ _ = True
-
-
+  where
+    -- Is the executable image certain to be located below 4GB? As noted in
+    -- Note [%rip-relative addressing on x86-64], this is not true on Windows.
+    low_image =
+      case platformOS platform of
+        OSMinGW32 -> False   -- See Note [%rip-relative addressing on x86-64]
+        _         -> True
 
 
 -- Set up a condition code for a conditional branch.
