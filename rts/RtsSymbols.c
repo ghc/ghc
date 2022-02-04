@@ -175,9 +175,9 @@ extern char **environ;
       /* ^^ Need to figure out why this is needed.  */   \
       /* See Note [_iob_func symbol] */                  \
       RTS_WIN64_ONLY(SymI_HasProto_redirect(             \
-         __imp___acrt_iob_func, __rts_iob_func, STRENGTH_WEAK))   \
+         __imp___acrt_iob_func, __rts_iob_func, STRENGTH_WEAK, SYM_TYPE_INDIRECT_DATA))   \
       RTS_WIN32_ONLY(SymI_HasProto_redirect(             \
-         __imp____acrt_iob_func, __rts_iob_func, STRENGTH_WEAK))  \
+         __imp____acrt_iob_func, __rts_iob_func, STRENGTH_WEAK, SYM_TYPE_INDIRECT_DATA))  \
       SymI_HasProto(__mingw_vsnwprintf)                  \
       /* ^^ Need to figure out why this is needed.  */   \
       SymI_HasProto(__mingw_vfprintf)                    \
@@ -1072,7 +1072,7 @@ extern char **environ;
 
 // Symbols defined by libc
 #define RTS_LIBC_SYMBOLS                               \
-      SymI_HasProto_redirect(atexit, atexit, STRENGTH_STRONG) /* See Note [Strong symbols] */ \
+      SymI_HasProto_redirect(atexit, atexit, STRENGTH_STRONG, CODE_TYPE_CODE) /* See Note [Strong symbols] */ \
       SymI_HasProto(environ)
 
 #if !defined(DYNAMIC) && defined(linux_HOST_OS)
@@ -1104,7 +1104,7 @@ extern char **environ;
 #define SymE_HasProto(vvv)    SymI_HasProto(vvv)
 #endif
 #define SymI_HasProto(vvv) /**/
-#define SymI_HasProto_redirect(vvv,xxx,strength) /**/
+#define SymI_HasProto_redirect(vvv,xxx,strength,ty) /**/
 #define SymI_HasProto_deprecated(vvv) /**/
 RTS_SYMBOLS
 RTS_RET_SYMBOLS
@@ -1142,9 +1142,9 @@ RTS_LIBFFI_SYMBOLS
 
 // SymI_HasProto_redirect allows us to redirect references to one symbol to
 // another symbol.  See newCAF/newRetainedCAF/newGCdCAF for an example.
-#define SymI_HasProto_redirect(vvv,xxx,strength) \
+#define SymI_HasProto_redirect(vvv,xxx,strength,ty) \
     { MAYBE_LEADING_UNDERSCORE_STR(#vvv),    \
-      (void*)(&(xxx)), strength, SYM_TYPE_CODE },
+      (void*)(&(xxx)), strength, ty },
 
 // SymI_HasProto_deprecated allows us to redirect references from their deprecated
 // names to the undeprecated ones. e.g. access -> _access.

@@ -1780,16 +1780,24 @@ ocAllocateExtras_PEi386 ( ObjectCode* oc )
 }
 
 static size_t
-makeSymbolExtra_PEi386( ObjectCode* oc, uint64_t index STG_UNUSED, size_t s, char* symbol STG_UNUSED )
+makeSymbolExtra_PEi386( ObjectCode* oc, uint64_t index STG_UNUSED, size_t s, char* symbol STG_UNUSED, SymType type )
 {
     SymbolExtra *extra = m32_alloc(oc->rx_m32, sizeof(SymbolExtra), 8);
 
-    // jmp *-14(%rip)
-    static uint8_t jmp[] = { 0xFF, 0x25, 0xF2, 0xFF, 0xFF, 0xFF };
-    extra->addr = (uint64_t)s;
-    memcpy(extra->jumpIsland, jmp, 6);
-
-    return (size_t)extra->jumpIsland;
+    if (type == SYM_TYPE_CODE) {
+        // jmp *-14(%rip)
+        extra->addr = (uint64_t)s;
+        static uint8_t jmp[] = { 0xFF, 0x25, 0xF2, 0xFF, 0xFF, 0xFF };
+        memcpy(extra->jumpIsland, jmp, 6);
+        return (size_t)&extra->jumpIsland;
+    } else if (type == SYM_TYPE_INDIRECT_DATA) {
+        void *v = *(void**) s;
+        extra->addr = (uint64_t)v;
+        return (size_t)&extra->addr;
+    } else {
+        extra->addr = (uint64_t)s;
+        return (size_t)&extra->addr;
+    }
 }
 
 void ocProtectExtras(ObjectCode* oc STG_UNUSED) { }
@@ -1842,6 +1850,8 @@ ocResolve_PEi386 ( ObjectCode* oc )
          uint64_t symIndex = reloc->SymbolTableIndex;
          sym = &oc->info->symbols[symIndex];
 
+         SymType sym_type;
+
          IF_DEBUG(linker_verbose,
                   debugBelch(
                             "reloc sec %2d num %3d:  type 0x%-4x   "
@@ -1859,7 +1869,7 @@ ocResolve_PEi386 ( ObjectCode* oc )
          } else {
             copyName ( getSymShortName (info, sym), oc, symbol,
                        sizeof(symbol)-1 );
-            S = (size_t) lookupDependentSymbol( (char*)symbol, oc, NULL );
+            S = (size_t) lookupDependentSymbol( (char*)symbol, oc, &sym_type );
             if ((void*)S == NULL) {
                 errorBelch(" | %" PATH_FMT ": unknown symbol `%s'", oc->fileName, symbol);
                 releaseOcInfo (oc);
@@ -1927,7 +1937,7 @@ ocResolve_PEi386 ( ObjectCode* oc )
                    if (((int64_t) v > (int64_t) INT32_MAX) || ((int64_t) v < (int64_t) INT32_MIN)) {
                        copyName (getSymShortName (info, sym), oc,
                                  symbol, sizeof(symbol)-1);
-                       S = makeSymbolExtra_PEi386(oc, symIndex, S, (char *)symbol);
+                       S = makeSymbolExtra_PEi386(oc, symIndex, S, (char *)symbol, sym_type);
                        /* And retry */
                        v = S + A;
 
@@ -1951,7 +1961,7 @@ ocResolve_PEi386 ( ObjectCode* oc )
                        /* Make the trampoline then */
                        copyName (getSymShortName (info, sym),
                                  oc, symbol, sizeof(symbol)-1);
-                       S = makeSymbolExtra_PEi386(oc, symIndex, S, (char *)symbol);
+                       S = makeSymbolExtra_PEi386(oc, symIndex, S, (char *)symbol, sym_type);
                        /* And retry */
                        v = S + (int32_t)A - ((intptr_t)pP) - 4;
                        if ((v > (int64_t) INT32_MAX) || (v < (int64_t) INT32_MIN)) {
