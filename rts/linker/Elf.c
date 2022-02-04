@@ -977,6 +977,13 @@ ocGetNames_ELF ( ObjectCode* oc )
                    }
                }
 
+               SymType sym_type;
+               if (ELF_ST_TYPE(symbol->elf_sym->st_info) == STT_FUNC) {
+                   sym_type = SYM_TYPE_CODE;
+               } else {
+                   sym_type = SYM_TYPE_DATA;
+               }
+
                /* And the decision is ... */
 
                if (symbol->addr != NULL) {
@@ -988,12 +995,13 @@ ocGetNames_ELF ( ObjectCode* oc )
                            setWeakSymbol(oc, nm);
                        }
                        if (!ghciInsertSymbolTable(oc->fileName, symhash,
-                                                  nm, symbol->addr, isWeak, oc)
+                                                  nm, symbol->addr, isWeak, sym_type, oc)
                            ) {
                            goto fail;
                        }
                        oc->symbols[curSymbol].name = nm;
                        oc->symbols[curSymbol].addr = symbol->addr;
+                       oc->symbols[curSymbol].type = sym_type;
                        curSymbol++;
                    }
                } else {
@@ -1123,7 +1131,7 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
            if (ELF_ST_BIND(symbol->elf_sym->st_info) == STB_LOCAL || strncmp(symbol->name, "_GLOBAL_OFFSET_TABLE_", 21) == 0) {
                S = (Elf_Addr)symbol->addr;
            } else {
-               S_tmp = lookupDependentSymbol( symbol->name, oc );
+               S_tmp = lookupDependentSymbol( symbol->name, oc, NULL );
                S = (Elf_Addr)S_tmp;
            }
            if (!S) {
@@ -1569,7 +1577,7 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
          } else {
             /* If not local, look up the name in our global table. */
             symbol = strtab + sym.st_name;
-            S_tmp = lookupDependentSymbol( symbol, oc );
+            S_tmp = lookupDependentSymbol( symbol, oc, NULL );
             S = (Elf_Addr)S_tmp;
          }
          if (!S) {
