@@ -221,6 +221,7 @@ testRules = do
             setEnv "COUNT_DEPS" (top -/- root -/- countDepsProgPath)
             setEnv "CABAL_MINIMAL_BUILD" cabal_min_build
             setEnv "CABAL_PLUGIN_BUILD" cabal_plugin_build
+            setEnv "CABAL_PACKAGE_DB" packageDbPathArg
 
             -- This lets us bypass the need to generate a config
             -- through Make, which happens in testsuite/mk/boilerplate.mk

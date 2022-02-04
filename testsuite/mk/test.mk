@@ -173,14 +173,14 @@ else
 RUNTEST_OPTS += -e config.have_fast_bignum=True
 endif
 
-CABAL_MINIMAL_BUILD = --enable-library-vanilla --disable-shared
+CABAL_MINIMAL_BUILD = --enable-library-vanilla --disable-shared $(CABAL_PACKAGE_DB)
 
 ifeq "$(GhcDynamic)" "YES"
 RUNTEST_OPTS += -e config.ghc_dynamic=True
-CABAL_PLUGIN_BUILD = --enable-shared --disable-library-vanilla
+CABAL_PLUGIN_BUILD = --enable-shared --disable-library-vanilla $(CABAL_PACKAGE_DB)
 else
 RUNTEST_OPTS += -e config.ghc_dynamic=False
-CABAL_PLUGIN_BUILD = --enable-library-vanilla --disable-shared
+CABAL_PLUGIN_BUILD = --enable-library-vanilla --disable-shared $(CABAL_PACKAGE_DB)
 endif
 
 ifeq "$(GhcWithSMP)" "YES"

@@ -47,41 +47,19 @@ packages: ./compiler
           ./utils/unlit
           ./utils/iserv
 
-constraints: ghc +internal-interpreter,
-             ghc-bin +internal-interpreter,
+constraints: ghc +internal-interpreter +dynamic-system-linke +terminfo,
+             ghc-bin +internal-interpreter +threaded,
              ghci +internal-interpreter,
              haddock +in-ghc-tree,
-             -- any.Cabal installed,
              any.array installed,
              any.base installed,
-             -- any.binary installed,
-             -- any.bytestring installed,
-             -- any.containers installed,
              any.deepseq installed,
-             -- any.directory installed,
-             -- any.exceptions installed,
              any.filepath installed,
              any.ghc-bignum installed,
              any.ghc-boot-th installed,
-             -- any.ghc-compact installed,
-             -- any.ghc-heap installed,
-             -- any.ghc-prim installed,
-             -- any.haskeline installed,
-             -- any.directory installed,
              any.integer-gmp installed,
-             -- any.mtl installed,
-             -- any.parsec installed,
              any.pretty installed,
-             -- any.process installed,
-             -- any.stm installed,
-             any.template-haskell installed,
-             -- any.terminfo installed,
-             -- any.text installed,
-             -- any.time installed,
-             -- any.transformers installed,
-             -- any.unix installed,
-             -- any.Win32 installed,
-             -- any.xhtml installed 
+             any.template-haskell installed
 
 allow-newer:
   ghc-paths:Cabal,
@@ -89,17 +67,18 @@ allow-newer:
   *:ghc-prim,
   tree-diff:time
 
-profiling: True
 debug-info: True
-executable-dynamic: True
 benchmarks: False
 tests: False
--- allow-boot-library-installs: True
 allow-boot-library-installs: False
 
 -- Workaround for https://github.com/haskell/cabal/issues/7297
-package ghc-bin
-  profiling: True
+package *
+  library-profiling: True
+  library-vanilla: True
+  library-dynamic: True
+  shared: True
+  executable-profiling: False
   executable-dynamic: True
 
 repository head.hackage.ghc.haskell.org

@@ -877,7 +877,7 @@ def normalise_win32_io_errors(name, opts):
 
 def normalise_version_( *pkgs ):
     def normalise_version__( str ):
-        return re.sub('(' + '|'.join(map(re.escape,pkgs)) + ')-[0-9.]+',
+        return re.sub('(' + '|'.join(map(re.escape,pkgs)) + ')-[0-9.]+(-[0-9a-f]+)?',
                       '\\1-<VERSION>', str)
     return normalise_version__
 
