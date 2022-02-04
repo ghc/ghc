@@ -49,6 +49,7 @@ typedef struct _Section    Section;
 typedef enum _SymType {
     SYM_TYPE_CODE, /* the symbol is a function and can be relocated via a jump island */
     SYM_TYPE_DATA, /* the symbol is data */
+    SYM_TYPE_INDIRECT_DATA, /* see Note [Relocating iob_func on Windows] */
 } SymType;
 
 
