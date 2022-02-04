@@ -1307,7 +1307,7 @@ getAmode e = do
       -- This is all just ridiculous, since it carefully undoes
       -- what mangleIndexTree has just done.
       CmmMachOp (MO_Sub _rep) [x, CmmLit lit@(CmmInt i _)]
-         | is32BitLit is32Bit lit
+         | is32BitLit platform lit
          -- assert (rep == II32)???
          -> do
             (x_reg, x_code) <- getSomeReg x
@@ -1315,7 +1315,7 @@ getAmode e = do
             return (Amode (AddrBaseIndex (EABaseReg x_reg) EAIndexNone off) x_code)
 
       CmmMachOp (MO_Add _rep) [x, CmmLit lit]
-         | is32BitLit is32Bit lit
+         | is32BitLit platform lit
          -- assert (rep == II32)???
          -> do
             (x_reg, x_code) <- getSomeReg x
@@ -1355,7 +1355,7 @@ getAmode e = do
          -> return (Amode (AddrBaseIndex EABaseRip EAIndexNone (litToImm lit)) nilOL)
 
       CmmLit lit
-         | is32BitLit is32Bit lit
+         | is32BitLit platform lit
          -> return (Amode (ImmAddr (litToImm lit) 0) nilOL)
 
       -- Literal with offsets too big (> 32 bits) fails during the linking phase
@@ -1428,9 +1428,8 @@ getNonClobberedOperand (CmmLit lit) =
     Amode addr code <- memConstant (mkAlignment $ widthInBytes w) lit
     return (OpAddr addr, code)
   else do
-    is32Bit <- is32BitPlatform
     platform <- getPlatform
-    if is32BitLit is32Bit lit && not (isFloatType (cmmLitType platform lit))
+    if is32BitLit platform lit && not (isFloatType (cmmLitType platform lit))
     then return (OpImm (litToImm lit), nilOL)
     else getNonClobberedOperand_generic (CmmLit lit)
 
@@ -1487,9 +1486,8 @@ getOperand (CmmLit lit) = do
       return (OpAddr addr, code)
     else do
 
-  is32Bit <- is32BitPlatform
   platform <- getPlatform
-  if is32BitLit is32Bit lit && not (isFloatType (cmmLitType platform lit))
+  if is32BitLit platform lit && not (isFloatType (cmmLitType platform lit))
     then return (OpImm (litToImm lit), nilOL)
     else getOperand_generic (CmmLit lit)
 
@@ -1510,9 +1508,10 @@ getOperand_generic e = do
     (reg, code) <- getSomeReg e
     return (OpReg reg, code)
 
-isOperand :: Bool -> CmmExpr -> Bool
+isOperand :: Platform -> CmmExpr -> Bool
 isOperand _ (CmmLoad _ _ _) = True
-isOperand is32Bit (CmmLit lit)  = is32BitLit is32Bit lit
+isOperand platform (CmmLit lit)
+                          = is32BitLit platform lit
                           || isSuitableFloatingPointLit lit
 isOperand _ _            = False
 
@@ -1583,9 +1582,9 @@ getRegOrMem e = do
     (reg, code) <- getNonClobberedReg e
     return (OpReg reg, code)
 
-is32BitLit :: Bool -> CmmLit -> Bool
-is32BitLit is32Bit lit
-   | not is32Bit = case lit of
+is32BitLit :: Platform -> CmmLit -> Bool
+is32BitLit platform lit
+   | not (target32Bit platform) = case lit of
       CmmInt i W64              -> is32BitInteger i
       -- assume that labels are in the range 0-2^31-1: this assumes the
       -- small memory model. Note [%rip-relative addressing on x86-64].
@@ -1650,14 +1649,14 @@ machOpToCond mo = case mo of
 -- passed back up the tree.
 
 condIntCode :: Cond -> CmmExpr -> CmmExpr -> NatM CondCode
-condIntCode cond x y = do is32Bit <- is32BitPlatform
-                          condIntCode' is32Bit cond x y
+condIntCode cond x y = do platform <- getPlatform
+                          condIntCode' platform cond x y
 
-condIntCode' :: Bool -> Cond -> CmmExpr -> CmmExpr -> NatM CondCode
+condIntCode' :: Platform -> Cond -> CmmExpr -> CmmExpr -> NatM CondCode
 
 -- memory vs immediate
-condIntCode' is32Bit cond (CmmLoad x pk _) (CmmLit lit)
- | is32BitLit is32Bit lit = do
+condIntCode' platform cond (CmmLoad x pk _) (CmmLit lit)
+ | is32BitLit platform lit = do
     Amode x_addr x_code <- getAmode x
     let
         imm  = litToImm lit
@@ -1668,8 +1667,8 @@ condIntCode' is32Bit cond (CmmLoad x pk _) (CmmLit lit)
 
 -- anything vs zero, using a mask
 -- TODO: Add some sanity checking!!!!
-condIntCode' is32Bit cond (CmmMachOp (MO_And _) [x,o2]) (CmmLit (CmmInt 0 pk))
-    | (CmmLit lit@(CmmInt mask _)) <- o2, is32BitLit is32Bit lit
+condIntCode' platform cond (CmmMachOp (MO_And _) [x,o2]) (CmmLit (CmmInt 0 pk))
+    | (CmmLit lit@(CmmInt mask _)) <- o2, is32BitLit platform lit
     = do
       (x_reg, x_code) <- getSomeReg x
       let
@@ -1688,9 +1687,8 @@ condIntCode' _ cond x (CmmLit (CmmInt 0 pk)) = do
     return (CondCode False cond code)
 
 -- anything vs operand
-condIntCode' is32Bit cond x y
- | isOperand is32Bit y = do
-    platform <- getPlatform
+condIntCode' platform cond x y
+ | isOperand platform y = do
     (x_reg, x_code) <- getNonClobberedReg x
     (y_op,  y_code) <- getOperand y
     let
@@ -1699,9 +1697,8 @@ condIntCode' is32Bit cond x y
     return (CondCode False cond code)
 -- operand vs. anything: invert the comparison so that we can use a
 -- single comparison instruction.
- | isOperand is32Bit x
+ | isOperand platform x
  , Just revcond <- maybeFlipCond cond = do
-    platform <- getPlatform
     (y_reg, y_code) <- getNonClobberedReg y
     (x_op,  x_code) <- getOperand x
     let
@@ -1710,8 +1707,7 @@ condIntCode' is32Bit cond x y
     return (CondCode False revcond code)
 
 -- anything vs anything
-condIntCode' _ cond x y = do
-  platform <- getPlatform
+condIntCode' platform cond x y = do
   (y_reg, y_code) <- getNonClobberedReg y
   (x_op, x_code) <- getRegOrMem x
   let
@@ -1785,9 +1781,9 @@ assignMem_IntCode pk addr (CmmMachOp op [CmmLoad addr2 _ _,
 
 -- general case
 assignMem_IntCode pk addr src = do
-    is32Bit <- is32BitPlatform
+    platform <- getPlatform
     Amode addr code_addr <- getAmode addr
-    (code_src, op_src)   <- get_op_RI is32Bit src
+    (code_src, op_src)   <- get_op_RI platform src
     let
         code = code_src `appOL`
                code_addr `snocOL`
@@ -1799,8 +1795,8 @@ assignMem_IntCode pk addr src = do
     --
     return code
   where
-    get_op_RI :: Bool -> CmmExpr -> NatM (InstrBlock,Operand)   -- code, operator
-    get_op_RI is32Bit (CmmLit lit) | is32BitLit is32Bit lit
+    get_op_RI :: Platform -> CmmExpr -> NatM (InstrBlock,Operand)   -- code, operator
+    get_op_RI platform (CmmLit lit) | is32BitLit platform lit
       = return (nilOL, OpImm (litToImm lit))
     get_op_RI _ op
       = do (reg,code) <- getNonClobberedReg op
@@ -3171,12 +3167,12 @@ genCCall64' target dest_regs args = do
               -- pass the arg into the given register
               reg_this_arg r
                 -- "operand" args can be directly assigned into r
-                | isOperand False arg = do
+                | isOperand platform arg = do
                     arg_code <- getAnyReg arg
                     return (code, (acode `appOL` arg_code r))
                 -- The last non-operand arg can be directly assigned after its
                 -- computation without going into a temporary register
-                | all (isOperand False) rest = do
+                | all (isOperand platform) rest = do
                     arg_code   <- getAnyReg arg
                     return (code `appOL` arg_code r,acode)
 
@@ -3815,14 +3811,14 @@ trivialCode :: Width -> (Operand -> Operand -> Instr)
             -> Maybe (Operand -> Operand -> Instr)
             -> CmmExpr -> CmmExpr -> NatM Register
 trivialCode width instr m a b
-    = do is32Bit <- is32BitPlatform
-         trivialCode' is32Bit width instr m a b
+    = do platform <- getPlatform
+         trivialCode' platform width instr m a b
 
-trivialCode' :: Bool -> Width -> (Operand -> Operand -> Instr)
+trivialCode' :: Platform -> Width -> (Operand -> Operand -> Instr)
              -> Maybe (Operand -> Operand -> Instr)
              -> CmmExpr -> CmmExpr -> NatM Register
-trivialCode' is32Bit width _ (Just revinstr) (CmmLit lit_a) b
-  | is32BitLit is32Bit lit_a = do
+trivialCode' platform width _ (Just revinstr) (CmmLit lit_a) b
+  | is32BitLit platform lit_a = do
   b_code <- getAnyReg b
   let
        code dst
