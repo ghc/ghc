@@ -196,6 +196,10 @@ data Instr
 
         -- Moves.
         | MOV         Format Operand Operand
+             -- ^ N.B. when used with the 'II64' 'Format', the source
+             -- operand is interpreted to be a 32-bit sign-extended value.
+             -- True 64-bit operands need to be moved with @MOVABS@, which we
+             -- currently don't use.
         | CMOV   Cond Format Operand Reg
         | MOVZxL      Format Operand Operand
               -- ^ The format argument is the size of operand 1 (the number of bits we keep)
