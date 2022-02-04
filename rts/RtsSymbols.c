@@ -1121,11 +1121,11 @@ RTS_LIBFFI_SYMBOLS
 #undef SymE_NeedsDataProto
 
 #define SymI_HasProto(vvv) { MAYBE_LEADING_UNDERSCORE_STR(#vvv), \
-                    (void*)(&(vvv)), STRENGTH_NORMAL },
+                    (void*)(&(vvv)), STRENGTH_NORMAL, SYM_TYPE_CODE },
 #define SymI_HasDataProto(vvv) \
                     SymI_HasProto(vvv)
 #define SymE_HasProto(vvv) { MAYBE_LEADING_UNDERSCORE_STR(#vvv), \
-            (void*)DLL_IMPORT_DATA_REF(vvv), STRENGTH_NORMAL },
+            (void*)DLL_IMPORT_DATA_REF(vvv), STRENGTH_NORMAL, SYM_TYPE_CODE },
 #define SymE_HasDataProto(vvv) \
                     SymE_HasProto(vvv)
 
@@ -1138,7 +1138,7 @@ RTS_LIBFFI_SYMBOLS
 // another symbol.  See newCAF/newRetainedCAF/newGCdCAF for an example.
 #define SymI_HasProto_redirect(vvv,xxx,strength) \
     { MAYBE_LEADING_UNDERSCORE_STR(#vvv),    \
-      (void*)(&(xxx)), strength },
+      (void*)(&(xxx)), strength, SYM_TYPE_CODE },
 
 // SymI_HasProto_deprecated allows us to redirect references from their deprecated
 // names to the undeprecated ones. e.g. access -> _access.
@@ -1148,7 +1148,7 @@ RTS_LIBFFI_SYMBOLS
 // define them, since on Windows these functions shouldn't be in the top level
 // namespace, but we have them for POSIX compatibility.
 #define SymI_HasProto_deprecated(vvv)   \
-   { #vvv, (void*)0xBAADF00D, STRENGTH_WEAK },
+   { #vvv, (void*)0xBAADF00D, STRENGTH_WEAK, SYM_TYPE_CODE },
 
 RtsSymbolVal rtsSyms[] = {
       RTS_SYMBOLS
@@ -1168,5 +1168,5 @@ RtsSymbolVal rtsSyms[] = {
       // lazy pointers as nonlazy.
       { "dyld_stub_binding_helper", (void*)0xDEADBEEF, STRENGTH_NORMAL },
 #endif
-      { 0, 0, STRENGTH_NORMAL } /* sentinel */
+      { 0, 0, STRENGTH_NORMAL, SYM_TYPE_CODE } /* sentinel */
 };

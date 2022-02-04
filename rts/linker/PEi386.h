@@ -56,7 +56,7 @@ bool ocResolve_PEi386     ( ObjectCode* oc );
 bool ocRunInit_PEi386     ( ObjectCode *oc );
 bool ocGetNames_PEi386    ( ObjectCode* oc );
 bool ocVerifyImage_PEi386 ( ObjectCode* oc );
-SymbolAddr *lookupSymbol_PEi386(SymbolName *lbl);
+SymbolAddr *lookupSymbol_PEi386(SymbolName *lbl, SymType *type);
 bool ocAllocateExtras_PEi386 ( ObjectCode* oc );
 SymbolAddr *lookupSymbolInDLLs ( const SymbolName* lbl );
 /* See Note [mingw-w64 name decoration scheme] */

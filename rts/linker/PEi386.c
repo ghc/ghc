@@ -183,10 +183,10 @@
 #include "RtsSymbolInfo.h"
 #include "GetEnv.h"
 #include "CheckUnload.h"
+#include "LinkerInternals.h"
 #include "linker/PEi386.h"
 #include "linker/PEi386Types.h"
 #include "linker/SymbolExtras.h"
-#include "LinkerInternals.h"
 
 #include <windows.h>
 #include <shfolder.h> /* SHGetFolderPathW */
@@ -205,7 +205,8 @@ static size_t makeSymbolExtra_PEi386(
     ObjectCode* oc,
     uint64_t index,
     size_t s,
-    SymbolName* symbol);
+    SymbolName* symbol,
+    SymType sym_type);
 #endif
 
 static void addDLLHandle(
@@ -289,7 +290,7 @@ const void* __rts_iob_func = (void*)&__acrt_iob_func;
 void initLinker_PEi386()
 {
     if (!ghciInsertSymbolTable(WSTR("(GHCi/Ld special symbols)"),
-                               symhash, "__image_base__", __image_base, HS_BOOL_TRUE, NULL)) {
+                               symhash, "__image_base__", __image_base, HS_BOOL_TRUE, SYM_TYPE_CODE, NULL)) {
         barf("ghciInsertSymbolTable failed");
     }
 
@@ -1536,7 +1537,7 @@ ocGetNames_PEi386 ( ObjectCode* oc )
           sname = strdup (sname);
           addr  = strdup (addr);
           if (!ghciInsertSymbolTable(oc->fileName, symhash, sname,
-                                     addr, false, oc)) {
+                                     addr, false, SYM_TYPE_DATA, oc)) {
              releaseOcInfo (oc);
              stgFree (oc->image);
              oc->image = NULL;
@@ -1666,6 +1667,15 @@ ocGetNames_PEi386 ( ObjectCode* oc )
       sname       = get_sym_name (getSymShortName (info, sym), oc);
       Section *section = secNumber > 0 ? &oc->sections[secNumber-1] : NULL;
 
+      SymType type;
+      switch (sym->og.Type) {
+      case 0x00: type = SYM_TYPE_DATA; break;
+      case 0x20: type = SYM_TYPE_CODE; break;
+      default:
+          debugBelch("Invalid symbol type\n");
+          return 1;
+      }
+
       if (   secNumber != IMAGE_SYM_UNDEFINED
           && secNumber > 0
           && section
@@ -1754,7 +1764,7 @@ ocGetNames_PEi386 ( ObjectCode* oc )
           stgFree(tmp);
           sname = strdup (sname);
           if (!ghciInsertSymbolTable(oc->fileName, symhash, sname,
-                                     addr, false, oc))
+                                     addr, false, type, oc))
                return false;
 
           break;
@@ -1768,12 +1778,13 @@ ocGetNames_PEi386 ( ObjectCode* oc )
          ASSERT(i < (uint32_t)oc->n_symbols);
          oc->symbols[i].name = sname;
          oc->symbols[i].addr = addr;
+         oc->symbols[i].type = type;
          if (isWeak) {
              setWeakSymbol(oc, sname);
          }
 
          if (! ghciInsertSymbolTable(oc->fileName, symhash, sname, addr,
-                                     isWeak, oc))
+                                     isWeak, type, oc))
              return false;
       } else {
           /* We're skipping the symbol, but if we ever load this
@@ -1889,7 +1900,7 @@ ocResolve_PEi386 ( ObjectCode* oc )
          } else {
             copyName ( getSymShortName (info, sym), oc, symbol,
                        sizeof(symbol)-1 );
-            S = (size_t) lookupDependentSymbol( (char*)symbol, oc );
+            S = (size_t) lookupDependentSymbol( (char*)symbol, oc, NULL );
             if ((void*)S == NULL) {
                 errorBelch(" | %" PATH_FMT ": unknown symbol `%s'", oc->fileName, symbol);
                 releaseOcInfo (oc);
@@ -2041,7 +2052,7 @@ ocRunInit_PEi386 ( ObjectCode *oc )
   return true;
 }
 
-SymbolAddr *lookupSymbol_PEi386(SymbolName *lbl)
+SymbolAddr *lookupSymbol_PEi386(SymbolName *lbl, SymType *type)
 {
     RtsSymbolInfo *pinfo;
 
@@ -2054,9 +2065,12 @@ SymbolAddr *lookupSymbol_PEi386(SymbolName *lbl)
 #if !defined(x86_64_HOST_ARCH)
         zapTrailingAtSign ( lbl );
 #endif
+        if (type) *type = SYM_TYPE_CODE; // TODO
         sym = lookupSymbolInDLLs(lbl);
         return sym; // might be NULL if not found
     } else {
+        if (type) *type = pinfo->type;
+
         // If Windows, perform initialization of uninitialized
         // Symbols from the C runtime which was loaded above.
         // We do this on lookup to prevent the hit when
@@ -2072,7 +2086,7 @@ SymbolAddr *lookupSymbol_PEi386(SymbolName *lbl)
         else if (pinfo && pinfo->owner && isSymbolImport (pinfo->owner, lbl))
         {
             /* See Note [BFD import library].  */
-            HINSTANCE dllInstance = (HINSTANCE)lookupDependentSymbol(pinfo->value, NULL);
+            HINSTANCE dllInstance = (HINSTANCE)lookupDependentSymbol(pinfo->value, NULL, type);
             if (!dllInstance && pinfo->value)
                return pinfo->value;
 

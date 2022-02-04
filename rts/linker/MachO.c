@@ -241,7 +241,7 @@ resolveImports(
             addr = (SymbolAddr*) (symbol->nlist->n_value);
             IF_DEBUG(linker, debugBelch("resolveImports: undefined external %s has value %p\n", symbol->name, addr));
         } else {
-            addr = lookupDependentSymbol(symbol->name, oc);
+            addr = lookupDependentSymbol(symbol->name, oc, NULL);
             IF_DEBUG(linker, debugBelch("resolveImports: looking up %s, %p\n", symbol->name, addr));
         }
 
@@ -506,7 +506,7 @@ relocateSectionAarch64(ObjectCode * oc, Section * section)
                      * or asking the system, if not found
                      * in the symbol hashmap
                      */
-                    value = (uint64_t)lookupDependentSymbol((char*)symbol->name, oc);
+                    value = (uint64_t)lookupDependentSymbol((char*)symbol->name, oc, NULL);
                     if(!value)
                         barf("Could not lookup symbol: %s!", symbol->name);
                 } else {
@@ -546,7 +546,7 @@ relocateSectionAarch64(ObjectCode * oc, Section * section)
                 uint64_t pc = (uint64_t)section->start + ri->r_address;
                 uint64_t value = 0;
                 if(symbol->nlist->n_type & N_EXT) {
-                    value = (uint64_t)lookupDependentSymbol((char*)symbol->name, oc);
+                    value = (uint64_t)lookupDependentSymbol((char*)symbol->name, oc, NULL);
                     if(!value)
                         barf("Could not lookup symbol: %s!", symbol->name);
                 } else {
@@ -739,7 +739,7 @@ relocateSection(ObjectCode* oc, int curSection)
                     // symtab, or it is undefined, meaning dlsym must be used
                     // to resolve it.
 
-                    addr = lookupDependentSymbol(nm, oc);
+                    addr = lookupDependentSymbol(nm, oc, NULL);
                     IF_DEBUG(linker_verbose,
                              debugBelch("relocateSection: looked up %s, "
                                         "external X86_64_RELOC_GOT or X86_64_RELOC_GOT_LOAD\n"
@@ -804,7 +804,7 @@ relocateSection(ObjectCode* oc, int curSection)
                                     nm, (void *)value));
             }
             else {
-                addr = lookupDependentSymbol(nm, oc);
+                addr = lookupDependentSymbol(nm, oc, NULL);
                 if (addr == NULL)
                 {
                      errorBelch("\nlookupSymbol failed in relocateSection (relocate external)\n"
@@ -1342,7 +1342,7 @@ ocGetNames_MachO(ObjectCode* oc)
                 if (oc->info->nlist[i].n_type & N_EXT)
                 {
                     if (   (oc->info->nlist[i].n_desc & N_WEAK_DEF)
-                        && lookupDependentSymbol(nm, oc)) {
+                        && lookupDependentSymbol(nm, oc, NULL)) {
                         // weak definition, and we already have a definition
                         IF_DEBUG(linker_verbose, debugBelch("    weak: %s\n", nm));
                     }
@@ -1350,12 +1350,15 @@ ocGetNames_MachO(ObjectCode* oc)
                     {
                             IF_DEBUG(linker_verbose, debugBelch("ocGetNames_MachO: inserting %s\n", nm));
                             SymbolAddr* addr = oc->info->macho_symbols[i].addr;
-
+                            MachOSection *sect = &oc->info->macho_sections[oc->info->macho_symbols[i].nlist->n_sect-1];
+                            // TODO: Make figure out how to determine this from the object file
+                            SymType sym_type = SYM_TYPE_CODE;
                             ghciInsertSymbolTable( oc->fileName
                                                  , symhash
                                                  , nm
                                                  , addr
                                                  , HS_BOOL_FALSE
+                                                 , sym_type
                                                  , oc);
 
                             oc->symbols[curSymbol].name = nm;
@@ -1392,10 +1395,12 @@ ocGetNames_MachO(ObjectCode* oc)
 
                 /* also set the final address to the macho_symbol */
                 oc->info->macho_symbols[i].addr = (void*)commonCounter;
+                /* TODO: Figure out how to determine this from object */
+                SymType sym_type = SYM_TYPE_CODE;
 
                 IF_DEBUG(linker_verbose, debugBelch("ocGetNames_MachO: inserting common symbol: %s\n", nm));
                 ghciInsertSymbolTable(oc->fileName, symhash, nm,
-                                       (void*)commonCounter, HS_BOOL_FALSE, oc);
+                                       (void*)commonCounter, HS_BOOL_FALSE, sym_type, oc);
                 oc->symbols[curSymbol].name = nm;
                 oc->symbols[curSymbol].addr = oc->info->macho_symbols[i].addr;
                 curSymbol++;
@@ -1517,7 +1522,7 @@ ocResolve_MachO(ObjectCode* oc)
                  * have the address.
                  */
                 if(NULL == symbol->addr) {
-                    symbol->addr = lookupDependentSymbol((char*)symbol->name, oc);
+                    symbol->addr = lookupDependentSymbol((char*)symbol->name, oc, NULL);
                     if(NULL == symbol->addr) {
                         errorBelch("Failed to lookup symbol: %s", symbol->name);
                         return 0;
