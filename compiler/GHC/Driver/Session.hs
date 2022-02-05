@@ -2210,7 +2210,7 @@ dynamic_flags_deps = [
         (noArg (\d -> d { ghcLink=LinkDynLib }))
   , make_ord_flag defGhcFlag "staticlib"
         (noArg (\d -> setGeneralFlag' Opt_LinkRts (d { ghcLink=LinkStaticLib })))
-  , make_ord_flag defGhcFlag "merge-objs"
+  , make_ord_flag defGhcFlag "-merge-objs"
         (noArg (\d -> d { ghcLink=LinkMergedObj }))
   , make_ord_flag defGhcFlag "dynload"            (hasArg parseDynLibLoaderMode)
   , make_ord_flag defGhcFlag "dylib-install-name" (hasArg setDylibInstallName)
