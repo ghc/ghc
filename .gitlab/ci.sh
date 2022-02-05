@@ -549,6 +549,7 @@ function test_hadrian() {
       --test-compiler=stage1 \
       "runtest.opts+=${RUNTEST_ARGS:-}"
   fi
+  shell
 
   run_hadrian \
     test \
