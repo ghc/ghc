@@ -1048,7 +1048,7 @@ installInteractivePrint (Just ipFun) exprmode = do
 runCommands :: InputT GHCi (Maybe String) -> InputT GHCi ()
 runCommands gCmd = runCommands' handler Nothing gCmd >> return ()
 
-runCommands' :: (SomeExceptionWithLocation -> GHCi Bool) -- ^ Exception handler
+runCommands' :: (SomeExceptionWithBacktrace -> GHCi Bool) -- ^ Exception handler
              -> Maybe (GHCi ()) -- ^ Source error handler
              -> InputT GHCi (Maybe String)
              -> InputT GHCi ()
@@ -1074,7 +1074,7 @@ runCommands' eh sourceErrorHandler gCmd = mask $ \unmask -> do
 -- this is relevant only to ghc -e, which will exit with status 1
 -- if the command was unsuccessful. GHCi will continue in either case.
 -- TODO: replace Bool with CmdExecOutcome
-runOneCommand :: (SomeExceptionWithLocation -> GHCi Bool) -> InputT GHCi (Maybe String)
+runOneCommand :: (SomeExceptionWithBacktrace -> GHCi Bool) -> InputT GHCi (Maybe String)
             -> InputT GHCi (Maybe Bool)
 runOneCommand eh gCmd = do
   -- run a previously queued command if there is one, otherwise get new
@@ -2241,7 +2241,7 @@ keepPackageImports = filterM is_pkg_import
      is_pkg_import (IIDecl d)
          = do pkgqual <- GHC.renameRawPkgQualM (unLoc $ ideclName d) (ideclPkgQual d)
               e <- MC.try $ GHC.findQualifiedModule pkgqual mod_name
-              case e :: Either SomeExceptionWithLocation Module of
+              case e :: Either SomeExceptionWithBacktrace Module of
                 Left _  -> return False
                 Right m -> return (not (isMainUnitModule m))
         where
@@ -4080,7 +4080,7 @@ breakById inp = do
     let (mod_str, top_level, fun_str) = splitIdent inp
         mod_top_lvl = combineModIdent mod_str top_level
     mb_mod <- catch (lookupModuleInscope mod_top_lvl)
-                    (\(_ :: SomeExceptionWithLocation) -> lookupModuleInGraph mod_str)
+                    (\(_ :: SomeExceptionWithBacktrace) -> lookupModuleInGraph mod_str)
       -- If the top-level name is not in scope, `lookupModuleInscope` will
       -- throw an exception, then lookup the module name in the module graph.
     mb_err_msg <- validateBP mod_str fun_str mb_mod
@@ -4493,13 +4493,13 @@ setBreakFlag  md ix enaDisa = do
 -- raising another exception.  We therefore don't put the recursive
 -- handler around the flushing operation, so if stderr is closed
 -- GHCi will just die gracefully rather than going into an infinite loop.
-handler :: GhciMonad m => SomeExceptionWithLocation -> m Bool
+handler :: GhciMonad m => SomeExceptionWithBacktrace -> m Bool
 handler exception = do
   flushInterpBuffers
   withSignalHandlers $
      ghciHandle handler (showException exception >> return False)
 
-showException :: MonadIO m => SomeExceptionWithLocation -> m ()
+showException :: MonadIO m => SomeExceptionWithBacktrace -> m ()
 showException se =
   liftIO $ case fromException se of
            -- omit the location for CmdLineError:
@@ -4531,13 +4531,13 @@ printErrAndMaybeExit = (>> failIfExprEvalMode) . GHC.printException
 -- in an exception loop (eg. let a = error a in a) the ^C exception
 -- may never be delivered.  Thanks to Marcin for pointing out the bug.
 
-ghciHandle :: (HasLogger m, ExceptionMonad m) => (SomeExceptionWithLocation -> m a) -> m a -> m a
+ghciHandle :: (HasLogger m, ExceptionMonad m) => (SomeExceptionWithBacktrace -> m a) -> m a -> m a
 ghciHandle h m = mask $ \restore -> do
                  -- Force dflags to avoid leaking the associated HscEnv
                  !log <- getLogger
                  catch (restore (GHC.prettyPrintGhcErrors log m)) $ \e -> restore (h e)
 
-ghciTry :: ExceptionMonad m => m a -> m (Either SomeExceptionWithLocation a)
+ghciTry :: ExceptionMonad m => m a -> m (Either SomeExceptionWithBacktrace a)
 ghciTry m = fmap Right m `catch` \e -> return $ Left e
 
 tryBool :: ExceptionMonad m => m a -> m Bool

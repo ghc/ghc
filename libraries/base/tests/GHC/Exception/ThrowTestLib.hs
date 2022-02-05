@@ -43,7 +43,7 @@ printBacktrace throwFunction mechs deepness e = do
       (\e -> printBacktraces e >> pure 42)
   pure ()
 
-printBacktraces :: SomeExceptionWithLocation -> IO ()
+printBacktraces :: SomeExceptionWithBacktrace -> IO ()
 printBacktraces = putStrLn . pprBacktraces
 
 -- Force creation of Stg stack return frames for IPE based backtraces.

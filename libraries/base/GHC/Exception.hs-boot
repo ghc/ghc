@@ -38,7 +38,7 @@ import {-# SOURCE #-} GHC.Exception.Type
 import GHC.Types ( Char, RuntimeRep, TYPE )
 import GHC.Stack.Types ( CallStack, HasCallStack )
 
-errorCallException :: [Char] -> SomeExceptionWithLocation
-errorCallWithCallStackException :: [Char] -> CallStack -> SomeExceptionWithLocation
+errorCallException :: [Char] -> SomeExceptionWithBacktrace
+errorCallWithCallStackException :: [Char] -> CallStack -> SomeExceptionWithBacktrace
 
 throw :: HasCallStack => forall (r :: RuntimeRep). forall (a :: TYPE r). forall e. Exception e => e -> a

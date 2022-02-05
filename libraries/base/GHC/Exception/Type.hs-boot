@@ -2,7 +2,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
 module GHC.Exception.Type
-  ( SomeExceptionWithLocation
+  ( SomeExceptionWithBacktrace
   , divZeroException
   , overflowException
   , ratioZeroDenomException
@@ -12,10 +12,10 @@ module GHC.Exception.Type
 
 import GHC.Num.Integer ()   -- See Note [Depend on GHC.Num.Integer] in GHC.Base
 
-data SomeExceptionWithLocation
+data SomeExceptionWithBacktrace
 divZeroException, overflowException,
-  ratioZeroDenomException, underflowException :: SomeExceptionWithLocation
+  ratioZeroDenomException, underflowException :: SomeExceptionWithBacktrace
 
 class Exception e
 
-instance Exception SomeExceptionWithLocation
+instance Exception SomeExceptionWithBacktrace

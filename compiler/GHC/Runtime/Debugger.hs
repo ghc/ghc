@@ -264,6 +264,6 @@ pprTypeAndContents id = do
       docs_term <- case e_term of
                       Right term -> showTerm term
                       Left  exn  -> return (text "*** Exception:" <+>
-                                            text (show (exn :: GHC.Prelude.SomeExceptionWithLocation)))
+                                            text (show (exn :: GHC.Prelude.SomeExceptionWithBacktrace)))
       return $ pprdId <+> equals <+> docs_term
     else return pprdId

@@ -840,17 +840,17 @@ hClose_impl h@(DuplexHandle _ r w) = do
   excs <- mapM (hClose' h) [r,w]
   hClose_maybethrow (listToMaybe (catMaybes excs)) h
 
-hClose_maybethrow :: Maybe SomeExceptionWithLocation -> Handle -> IO ()
+hClose_maybethrow :: Maybe SomeExceptionWithBacktrace -> Handle -> IO ()
 hClose_maybethrow Nothing  h = return ()
 hClose_maybethrow (Just e) h = hClose_rethrow e h
 
-hClose_rethrow :: SomeExceptionWithLocation -> Handle -> IO ()
+hClose_rethrow :: SomeExceptionWithBacktrace -> Handle -> IO ()
 hClose_rethrow e h =
   case fromException e of
     Just ioe -> ioError (augmentIOError ioe "hClose" h)
     Nothing  -> throwIO e
 
-hClose' :: Handle -> MVar Handle__ -> IO (Maybe SomeExceptionWithLocation)
+hClose' :: Handle -> MVar Handle__ -> IO (Maybe SomeExceptionWithBacktrace)
 hClose' h m = withHandle' "hClose" h m $ hClose_help
 
 -- hClose_help is also called by lazyRead (in GHC.IO.Handle.Text) when
@@ -859,7 +859,7 @@ hClose' h m = withHandle' "hClose" h m $ hClose_help
 -- careful with DuplexHandles though: we have to leave the closing to
 -- the finalizer in that case, because the write side may still be in
 -- use.
-hClose_help :: Handle__ -> IO (Handle__, Maybe SomeExceptionWithLocation)
+hClose_help :: Handle__ -> IO (Handle__, Maybe SomeExceptionWithBacktrace)
 hClose_help handle_ =
   case haType handle_ of
       ClosedHandle -> return (handle_,Nothing)
@@ -871,10 +871,10 @@ hClose_help handle_ =
               return (h_, if isJust mb_exc1 then mb_exc1 else mb_exc2)
 
 
-trymaybe :: IO () -> IO (Maybe SomeExceptionWithLocation)
+trymaybe :: IO () -> IO (Maybe SomeExceptionWithBacktrace)
 trymaybe io = (do io; return Nothing) `catchException` \e -> return (Just e)
 
-hClose_handle_ :: Handle__ -> IO (Handle__, Maybe SomeExceptionWithLocation)
+hClose_handle_ :: Handle__ -> IO (Handle__, Maybe SomeExceptionWithBacktrace)
 hClose_handle_ h_@Handle__{..} = do
 
     -- close the file descriptor, but not when this is the read

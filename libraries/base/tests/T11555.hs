@@ -5,5 +5,5 @@ import Control.Exception
 main :: IO ()
 main = catch (error "uh oh") handler
 
-handler :: SomeExceptionWithLocation -> IO ()
+handler :: SomeExceptionWithBacktrace -> IO ()
 handler _ = putStrLn "it failed"

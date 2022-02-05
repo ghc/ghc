@@ -262,4 +262,4 @@ testEnumWord64 = do
 
 
 mayBomb x = catch x (\(ErrorCall e) -> putStrLn ("error " ++ show e))
-  `catch` (\e -> putStrLn ("Fail: " ++ show (e :: SomeExceptionWithLocation)))
+  `catch` (\e -> putStrLn ("Fail: " ++ show (e :: SomeExceptionWithBacktrace)))

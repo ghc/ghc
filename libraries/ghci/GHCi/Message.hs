@@ -55,7 +55,7 @@ import System.IO
 import System.IO.Error
 
 #if __GLASGOW_HASKELL__ < 903
-type SomeExceptionWithLocation = SomeException
+type SomeExceptionWithBacktrace = SomeException
 #endif
 
 -- -----------------------------------------------------------------------------
@@ -398,7 +398,7 @@ data EvalResult a
 
 instance Binary a => Binary (EvalResult a)
 
--- SomeExceptionWithLocation can't be serialized because it contains dynamic
+-- SomeExceptionWithBacktrace can't be serialized because it contains dynamic
 -- types.  However, we do very limited things with the exceptions that
 -- are thrown by interpreted computations:
 --
@@ -415,13 +415,13 @@ data SerializableException
   | EOtherException String
   deriving (Generic, Show)
 
-toSerializableException :: SomeExceptionWithLocation -> SerializableException
+toSerializableException :: SomeExceptionWithBacktrace -> SerializableException
 toSerializableException ex
   | Just UserInterrupt <- fromException ex  = EUserInterrupt
   | Just (ec::ExitCode) <- fromException ex = (EExitCode ec)
-  | otherwise = EOtherException (show (ex :: SomeExceptionWithLocation))
+  | otherwise = EOtherException (show (ex :: SomeExceptionWithBacktrace))
 
-fromSerializableException :: SerializableException -> SomeExceptionWithLocation
+fromSerializableException :: SerializableException -> SomeExceptionWithBacktrace
 fromSerializableException EUserInterrupt = toException UserInterrupt
 fromSerializableException (EExitCode c) = toException c
 fromSerializableException (EOtherException str) = toException (ErrorCall str)

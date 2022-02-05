@@ -207,7 +207,7 @@ catch (IO io) handler = IO $ catch# io handler'
 -- details.
 catchAny :: IO a -> (forall e . Exception e => e -> IO a) -> IO a
 catchAny !(IO io) handler = IO $ catch# io handler'
-    where handler' (SomeExceptionWithLocation (SomeException e) _) = unIO (handler e)
+    where handler' (SomeExceptionWithBacktrace (SomeException e) _) = unIO (handler e)
 
 -- Using catchException here means that if `m` throws an
 -- 'IOError' /as an imprecise exception/, we will not catch
@@ -234,7 +234,7 @@ mplusIO m n = m `catchException` \ (_ :: IOError) -> n
 -- does not.
 throwIO :: (HasCallStack, Exception e) => e -> IO a
 throwIO e = do
-    let e'@(SomeExceptionWithLocation _ !bts) = toException e
+    let e'@(SomeExceptionWithBacktrace _ !bts) = toException e
     !bts' <- if null bts then
       collectBacktraces
     else
@@ -356,7 +356,7 @@ getMaskingState  = IO $ \s ->
 
 onException :: IO a -> IO b -> IO a
 onException io what = io `catchException` \e -> do _ <- what
-                                                   throwIO (e :: SomeExceptionWithLocation)
+                                                   throwIO (e :: SomeExceptionWithBacktrace)
 
 -- | Executes an IO computation with asynchronous
 -- exceptions /masked/.  That is, any thread which attempts to raise
@@ -505,9 +505,9 @@ Laziness can interact with @catch@-like operations in non-obvious ways (see,
 e.g. GHC #11555 and #13330). For instance, consider these subtly-different
 examples:
 
-> test1 = Control.Exception.catch (error "uh oh") (\(_ :: SomeExceptionWithLocation) -> putStrLn "it failed")
+> test1 = Control.Exception.catch (error "uh oh") (\(_ :: SomeExceptionWithBacktrace) -> putStrLn "it failed")
 >
-> test2 = GHC.IO.catchException (error "uh oh") (\(_ :: SomeExceptionWithLocation) -> putStrLn "it failed")
+> test2 = GHC.IO.catchException (error "uh oh") (\(_ :: SomeExceptionWithBacktrace) -> putStrLn "it failed")
 
 While @test1@ will print "it failed", @test2@ will print "uh oh".
 

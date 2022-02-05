@@ -45,7 +45,7 @@ isStep _ = True
 
 data ExecResult
   = ExecComplete
-       { execResult :: Either SomeExceptionWithLocation [Name]
+       { execResult :: Either SomeExceptionWithBacktrace [Name]
        , execAllocation :: Word64
        }
   | ExecBreak

@@ -4,7 +4,7 @@ f = do
   ma <- try $ evaluate a
   x <- case ma of
     Right str -> return a
-    Left  err -> return $ show (err :: SomeExceptionWithLocation)
+    Left  err -> return $ show (err :: SomeExceptionWithBacktrace)
   putStrLn x
   where
     a :: String

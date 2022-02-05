@@ -18,10 +18,10 @@ module GHC.Prelude
   ,module Bits
   ,shiftL, shiftR
 #if __GLASGOW_HASKELL__ < 903
-  ,SomeExceptionWithLocation
-  ,pattern SomeExceptionWithLocation
+  ,SomeExceptionWithBacktrace
+  ,pattern SomeExceptionWithBacktrace
 #else
-  ,SomeExceptionWithLocation(..)
+  ,SomeExceptionWithBacktrace(..)
 #endif
   ) where
 
@@ -48,7 +48,7 @@ import Data.Foldable as X (foldl')
 #if __GLASGOW_HASKELL__ < 903
 import Control.Exception ( SomeException(..) )
 #else
-import Control.Exception ( SomeExceptionWithLocation(..) )
+import Control.Exception ( SomeExceptionWithBacktrace(..) )
 #endif
 
 #if MIN_VERSION_base(4,16,0)
@@ -101,11 +101,11 @@ shiftR = Bits.unsafeShiftR
 #endif
 
 #if __GLASGOW_HASKELL__ < 903
-type SomeExceptionWithLocation = SomeException
+type SomeExceptionWithBacktrace = SomeException
 
-{-# COMPLETE SomeExceptionWithLocation #-}
-pattern SomeExceptionWithLocation :: forall. SomeException -> () -> SomeException
-pattern SomeExceptionWithLocation e unit <- (\x -> ((), x) -> (unit, e))
+{-# COMPLETE SomeExceptionWithBacktrace #-}
+pattern SomeExceptionWithBacktrace :: forall. SomeException -> () -> SomeException
+pattern SomeExceptionWithBacktrace e unit <- (\x -> ((), x) -> (unit, e))
   where
-    SomeExceptionWithLocation (SomeException e) _ = SomeException e
+    SomeExceptionWithBacktrace (SomeException e) _ = SomeException e
 #endif

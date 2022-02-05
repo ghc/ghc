@@ -1,5 +1,5 @@
 "=== Test Show instances ==="
-"SomeExceptionWithLocation:"
+"SomeExceptionWithBacktrace:"
 CustomException
 "SomeException:"
 CustomException
