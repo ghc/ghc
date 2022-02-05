@@ -14,7 +14,7 @@ AC_DEFUN([FP_SETTINGS],
         # Overrides FIND_MERGE_OBJECTS in order to avoid hard-coding linker
         # path on Windows (#18550).
         SettingsMergeObjectsCommand="${SettingsLdCommand}"
-        SettingsMergeObjectsFlags="-r --oformat=pe-bigobj-x86-64"
+        SettingsMergeObjectsFlags="-r"
         SettingsArCommand="${mingw_bin_prefix}llvm-ar.exe"
         SettingsRanlibCommand="${mingw_bin_prefix}llvm-ranlib.exe"
         SettingsDllWrapCommand="${mingw_bin_prefix}llvm-dllwrap.exe"

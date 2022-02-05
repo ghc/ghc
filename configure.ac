@@ -450,7 +450,7 @@ then
     OBJDUMP="${mingwbin}llvm-objdump.exe"
     DLLTOOL="${mingwbin}llvm-dlltool.exe"
     MergeObjsCmd="${mingwbin}ld.lld.exe"
-    MergeObjsArgs="-r --oformat=pe-bigobj-x86-64"
+    MergeObjsArgs="-r"
     AC_PATH_PROG([Genlib],[genlib])
 fi
 
