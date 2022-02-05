@@ -138,12 +138,10 @@ testRules = do
         args <- userSetting defaultTestArgs
         let testGhc = testCompiler args
         ghcPath <- getCompilerPath testGhc
-        case stageOf testGhc of
-          Just stg ->
-            need . (:[]) =<< programPath (Context stg ghc vanilla)
-          Nothing -> do
-            dir <- liftIO $ IO.getCurrentDirectory
-            need [makeRelative dir ghcPath]
+        whenJust (stageOf testGhc) $ \stg ->
+          need . (:[]) =<< programPath (Context stg ghc vanilla)
+        cwd <- liftIO $ IO.getCurrentDirectory
+        need [makeRelative cwd ghcPath]
         need [root -/- ghcConfigProgPath]
         cmd [FileStdout $ root -/- ghcConfigPath] (root -/- ghcConfigProgPath)
             [ghcPath]
