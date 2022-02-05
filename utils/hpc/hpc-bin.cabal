@@ -10,7 +10,7 @@ Synopsis: XXX
 Description: XXX
 Category: Development
 build-type: Simple
-cabal-version: >=1.10
+cabal-version: 2.0
 
 Executable hpc
     Default-Language: Haskell2010
@@ -34,3 +34,4 @@ Executable hpc
                    array      >= 0.1 && < 0.6,
                    hpc        >= 0.6.1 && < 0.7
 
+    build-tool-depends: happy:happy >= 1.20.0
