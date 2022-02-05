@@ -14,6 +14,7 @@ module GHC.Linker.Types
    , LinkableSet
    , mkLinkableSet
    , unionLinkableSet
+   , ObjFile
    , Unlinked(..)
    , SptEntry(..)
    , isObjectLinkable
@@ -148,9 +149,11 @@ instance Outputable Linkable where
      = (text "LinkableM" <+> parens (text (show when_made)) <+> ppr mod)
        $$ nest 3 (ppr unlinkeds)
 
+type ObjFile = FilePath
+
 -- | Objects which have yet to be linked by the compiler
 data Unlinked
-  = DotO FilePath      -- ^ An object file (.o)
+  = DotO ObjFile       -- ^ An object file (.o)
   | DotA FilePath      -- ^ Static archive file (.a)
   | DotDLL FilePath    -- ^ Dynamically linked library file (.so, .dll, .dylib)
   | BCOs CompiledByteCode

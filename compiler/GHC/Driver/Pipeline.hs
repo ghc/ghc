@@ -760,14 +760,12 @@ hscGenBackendPipeline pipe_env hsc_env mod_sum result = do
       Nothing -> return mlinkable
       Just o_fp -> do
         unlinked_time <- liftIO (liftIO getCurrentTime)
-        final_o <- use (T_MergeForeign pipe_env hsc_env o_fp fos)
-        let !linkable = LM unlinked_time
-                                    (ms_mod mod_sum)
-                                    [DotO final_o]
+        final_unlinked <- DotO <$> use (T_MergeForeign pipe_env hsc_env o_fp fos)
+        let !linkable = LM unlinked_time (ms_mod mod_sum) [final_unlinked]
         return (Just linkable)
   return (miface, final_linkable)
 
-asPipeline :: P m => Bool -> PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> m FilePath
+asPipeline :: P m => Bool -> PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> m ObjFile
 asPipeline use_cpp pipe_env hsc_env location input_fn = do
   use (T_As use_cpp pipe_env hsc_env location input_fn)
 
