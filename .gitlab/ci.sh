@@ -542,11 +542,13 @@ function test_hadrian() {
   fi
 
 
-  run_hadrian \
-    test \
-    --test-root-dirs=testsuite/tests/stage1 \
-    --test-compiler=stage1 \
-    "runtest.opts+=${RUNTEST_ARGS:-}"
+  if [ -z "$REINSTALL_GHC" ]; then
+    run_hadrian \
+      test \
+      --test-root-dirs=testsuite/tests/stage1 \
+      --test-compiler=stage1 \
+      "runtest.opts+=${RUNTEST_ARGS:-}"
+  fi
 
   run_hadrian \
     test \
