@@ -15,6 +15,6 @@ main = do
     m <- newEmptyMVar
     check
     takeMVar m `catch` \ex -> do
-        putStrLn $ "caught exception: " ++ show (ex :: SomeExceptionWithLocation)
+        putStrLn $ "caught exception: " ++ show (ex :: SomeExceptionWithBacktrace)
         check
     readIORef ref >>= print

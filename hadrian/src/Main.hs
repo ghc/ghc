@@ -134,7 +134,7 @@ handleShakeException shake_opts_var shake_run = do
       then
         hPrint stderr _e
       else
-        -- The SomeExceptionWithLocation here is normally an IOError which lacks
+        -- The SomeExceptionWithBacktrace here is normally an IOError which lacks
         -- very much structure, in the future we could try to catch
         -- a more structured exception and further refine the
         -- displayed output. https://github.com/ndmitchell/shake/pull/812

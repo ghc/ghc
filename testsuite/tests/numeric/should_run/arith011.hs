@@ -122,7 +122,7 @@ table2 nm op xs ys = do
  where
   op' x y = do s <- Control.Exception.catch
                         (evaluate (show (op x y)))
-                        (\e -> return (show (e :: SomeExceptionWithLocation)))
+                        (\e -> return (show (e :: SomeExceptionWithBacktrace)))
                putStrLn (show x ++ " " ++ nm ++ " " ++ show y ++ " = " ++ s)
 
 testReadShow zero = do

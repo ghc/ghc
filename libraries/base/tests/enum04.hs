@@ -8,7 +8,7 @@ import Control.Exception
 -- Float and Double).
 
 main = do
-  catch (evaluate [error "" :: Int ..] >> return ())     (\(e::SomeExceptionWithLocation) -> putStrLn "ok1")
-  catch (evaluate [error "" :: Integer ..] >> return ()) (\(e::SomeExceptionWithLocation) -> putStrLn "ok2")
-  catch (evaluate [error "" :: Float ..] >> return ())   (\(e::SomeExceptionWithLocation) -> putStrLn "ok3")
-  catch (evaluate [error "" :: Double ..] >> return ())  (\(e::SomeExceptionWithLocation) -> putStrLn "ok4")
+  catch (evaluate [error "" :: Int ..] >> return ())     (\(e::SomeExceptionWithBacktrace) -> putStrLn "ok1")
+  catch (evaluate [error "" :: Integer ..] >> return ()) (\(e::SomeExceptionWithBacktrace) -> putStrLn "ok2")
+  catch (evaluate [error "" :: Float ..] >> return ())   (\(e::SomeExceptionWithBacktrace) -> putStrLn "ok3")
+  catch (evaluate [error "" :: Double ..] >> return ())  (\(e::SomeExceptionWithBacktrace) -> putStrLn "ok4")

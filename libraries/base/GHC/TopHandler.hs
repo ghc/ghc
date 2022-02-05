@@ -154,10 +154,10 @@ runIOFastExit main = catch main topHandlerFastExit
 runNonIO :: a -> IO a
 runNonIO a = catch (a `seq` return a) topHandler
 
-topHandler :: SomeExceptionWithLocation -> IO a
+topHandler :: SomeExceptionWithBacktrace -> IO a
 topHandler err = catch (real_handler safeExit err) topHandler
 
-topHandlerFastExit :: SomeExceptionWithLocation -> IO a
+topHandlerFastExit :: SomeExceptionWithBacktrace -> IO a
 topHandlerFastExit err =
   catchException (real_handler fastExit err) topHandlerFastExit
 
@@ -165,7 +165,7 @@ topHandlerFastExit err =
 -- (e.g. evaluating the string passed to 'error' might generate
 --  another error, etc.)
 --
-real_handler :: (Int -> IO a) -> SomeExceptionWithLocation -> IO a
+real_handler :: (Int -> IO a) -> SomeExceptionWithBacktrace -> IO a
 real_handler exit se = do
   flushStdHandles -- before any error output
   case fromException se of

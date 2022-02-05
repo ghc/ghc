@@ -9,12 +9,12 @@ main = do
   m <- newEmptyMVar
   t1 <- mask_ $ forkIO $ do
           takeMVar m `catch` \e -> do stat 1 MaskedInterruptible
-                                      print (e::SomeExceptionWithLocation)
+                                      print (e::SomeExceptionWithBacktrace)
                                       throwIO e
   killThread t1
   t2 <- uninterruptibleMask_ $ forkIO $ do
           takeMVar m `catch` \e -> do stat 2 MaskedUninterruptible
-                                      print (e::SomeExceptionWithLocation)
+                                      print (e::SomeExceptionWithBacktrace)
                                       throwIO e
   killThread t2
   t3 <- mask_ $ forkIOWithUnmask $ \unmask ->

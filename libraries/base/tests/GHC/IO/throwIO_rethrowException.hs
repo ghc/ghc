@@ -21,10 +21,10 @@ main = do
         -- Throw for the first time.
         (throwIO CustomException)
         -- Throw for the second time.
-        (\(e :: SomeExceptionWithLocation) -> throwIO e)
+        (\(e :: SomeExceptionWithBacktrace) -> throwIO e)
     )
-    ( \(e :: SomeExceptionWithLocation) -> case e of
-        (SomeExceptionWithLocation _ bts) ->
+    ( \(e :: SomeExceptionWithBacktrace) -> case e of
+        (SomeExceptionWithBacktrace _ bts) ->
           case head bts of
             -- Only print the most significant location; i.e. the location
             -- where throw was called.

@@ -13,16 +13,16 @@ import GHC.Foreign
 import Control.Exception
 
 
-decode :: TextEncoding -> BS.ByteString -> IO (Either SomeExceptionWithLocation String)
+decode :: TextEncoding -> BS.ByteString -> IO (Either SomeExceptionWithBacktrace String)
 decode enc bs = try $ BS.useAsCStringLen bs $ peekCStringLen enc
 
-encode :: TextEncoding -> String -> IO (Either SomeExceptionWithLocation BS.ByteString)
+encode :: TextEncoding -> String -> IO (Either SomeExceptionWithBacktrace BS.ByteString)
 encode enc cs = try $ withCStringLen enc cs $ BS.packCStringLen
 
-decodeEncode :: TextEncoding -> BS.ByteString -> IO (Either SomeExceptionWithLocation BS.ByteString)
+decodeEncode :: TextEncoding -> BS.ByteString -> IO (Either SomeExceptionWithBacktrace BS.ByteString)
 decodeEncode enc bs = decode enc bs `bind` encode enc
 
-encodedecode :: TextEncoding -> String -> IO (Either SomeExceptionWithLocation String)
+encodedecode :: TextEncoding -> String -> IO (Either SomeExceptionWithBacktrace String)
 encodedecode enc bs = encode enc bs `bind` decode enc
 
 bind mx fxmy = do
@@ -79,7 +79,7 @@ testTruncations enc max_byte_length bs = do
             Nothing -> return ()
             Just es -> putStrLn ("Failed on consecutive truncated byte indexes " ++ show (i:js) ++ " (" ++ show (e:es) ++ ")")
 
-testTruncation :: TextEncoding -> BS.ByteString -> IO (Maybe (Int, SomeExceptionWithLocation))
+testTruncation :: TextEncoding -> BS.ByteString -> IO (Maybe (Int, SomeExceptionWithBacktrace))
 testTruncation enc expected = do
         --putStr (show i ++ ": ") >> hFlush stdout
         ei_e_actual <- decodeEncode enc expected

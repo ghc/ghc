@@ -13,7 +13,7 @@ trapHandler inVar caughtVar =
   `E.catch`
   (trapExc inVar caughtVar)
 
-trapExc :: MVar Int -> MVar () -> E.SomeExceptionWithLocation -> IO ()
+trapExc :: MVar Int -> MVar () -> E.SomeExceptionWithBacktrace -> IO ()
 -- If we have been killed then we are done
 trapExc inVar caughtVar  e
   | Just E.ThreadKilled <- E.fromException e  = return ()

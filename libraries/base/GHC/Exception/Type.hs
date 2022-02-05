@@ -20,7 +20,7 @@
 
 module GHC.Exception.Type
        ( Exception(..)    -- Class
-       , SomeExceptionWithLocation(..), SomeException(..), ArithException(..)
+       , SomeExceptionWithBacktrace(..), SomeException(..), ArithException(..)
         , addBacktrace
        , divZeroException, overflowException, ratioZeroDenomException
        , underflowException
@@ -34,24 +34,24 @@ import GHC.Show
 import GHC.Exception.Backtrace (Backtrace)
 
 {- |
-The @SomeExceptionWithLocation@ type is the root of the exception type hierarchy.
+The @SomeExceptionWithBacktrace@ type is the root of the exception type hierarchy.
 When an exception of type @e@ is thrown, behind the scenes it is
-encapsulated in a @SomeException@ which is wrapped by @SomeExceptionWithLocation@.
+encapsulated in a @SomeException@ which is wrapped by @SomeExceptionWithBacktrace@.
 This additional layer is used to provide a list of 'Backtrace's.
 
 @since 4.16.0.0
 -}
-data SomeExceptionWithLocation = SomeExceptionWithLocation !SomeException ![Backtrace]
+data SomeExceptionWithBacktrace = SomeExceptionWithBacktrace !SomeException ![Backtrace]
 
 -- | Former root of 'Exception's
--- Now 'SomeException' is usually wrapped by 'SomeExceptionWithLocation'.
+-- Now 'SomeException' is usually wrapped by 'SomeExceptionWithBacktrace'.
 -- 'SomeException' has been kept as a type for backwards compatibility.
 data SomeException = forall e . Exception e => SomeException !e
 
 -- @since 4.16.0.0
-instance Show SomeExceptionWithLocation where
+instance Show SomeExceptionWithBacktrace where
     -- | Just delegate to the wrapped 'Exception' @e@.
-    showsPrec p (SomeExceptionWithLocation (SomeException e) _) = showsPrec p e
+    showsPrec p (SomeExceptionWithBacktrace (SomeException e) _) = showsPrec p e
 
 -- | @since 3.0
 instance Show SomeException where
@@ -61,9 +61,9 @@ instance Show SomeException where
 -- | Add a 'Backtrace' to the list of backtraces.
 --
 -- @since 4.16.0.0
-addBacktrace :: Backtrace -> SomeExceptionWithLocation -> SomeExceptionWithLocation
-addBacktrace bt (SomeExceptionWithLocation e bts) =
-    SomeExceptionWithLocation e (bt : bts)
+addBacktrace :: Backtrace -> SomeExceptionWithBacktrace -> SomeExceptionWithBacktrace
+addBacktrace bt (SomeExceptionWithBacktrace e bts) =
+    SomeExceptionWithBacktrace e (bt : bts)
 
 {- |
 Any type that you wish to throw or catch as an exception must be an
@@ -97,10 +97,10 @@ of exceptions:
 >
 > instance Exception SomeCompilerException
 >
-> compilerExceptionToException :: Exception e => e -> SomeExceptionWithLocation
+> compilerExceptionToException :: Exception e => e -> SomeExceptionWithBacktrace
 > compilerExceptionToException = toException . SomeCompilerException
 >
-> compilerExceptionFromException :: Exception e => SomeExceptionWithLocation -> Maybe e
+> compilerExceptionFromException :: Exception e => SomeExceptionWithBacktrace -> Maybe e
 > compilerExceptionFromException x = do
 >     SomeCompilerException a <- fromException x
 >     cast a
@@ -117,10 +117,10 @@ of exceptions:
 >     toException = compilerExceptionToException
 >     fromException = compilerExceptionFromException
 >
-> frontendExceptionToException :: Exception e => e -> SomeExceptionWithLocation
+> frontendExceptionToException :: Exception e => e -> SomeExceptionWithBacktrace
 > frontendExceptionToException = toException . SomeFrontendException
 >
-> frontendExceptionFromException :: Exception e => SomeExceptionWithLocation -> Maybe e
+> frontendExceptionFromException :: Exception e => SomeExceptionWithBacktrace -> Maybe e
 > frontendExceptionFromException x = do
 >     SomeFrontendException a <- fromException x
 >     cast a
@@ -152,15 +152,15 @@ Caught MismatchedParentheses
 
 -}
 class (Typeable e, Show e) => Exception e where
-    -- | Represent the exception as 'SomeExceptionWithLocation'
-    -- If @e@ isn't already of type 'SomeExceptionWithLocation' this means some kind of wrapping.
-    toException   :: e -> SomeExceptionWithLocation
+    -- | Represent the exception as 'SomeExceptionWithBacktrace'
+    -- If @e@ isn't already of type 'SomeExceptionWithBacktrace' this means some kind of wrapping.
+    toException   :: e -> SomeExceptionWithBacktrace
     -- | Extract and cast the exception from it's wrapped representation
     -- If the exception cannot be casted to the expected type then the result is 'Nothing'.
-    fromException :: SomeExceptionWithLocation -> Maybe e
+    fromException :: SomeExceptionWithBacktrace -> Maybe e
 
-    toException e = SomeExceptionWithLocation (SomeException e) []
-    fromException (SomeExceptionWithLocation (SomeException e) _) = cast e
+    toException e = SomeExceptionWithBacktrace (SomeException e) []
+    fromException (SomeExceptionWithBacktrace (SomeException e) _) = cast e
 
     -- | Render this exception value in a human-friendly manner.
     --
@@ -171,13 +171,13 @@ class (Typeable e, Show e) => Exception e where
     displayException = show
 
 instance Exception SomeException where
-  toException e = SomeExceptionWithLocation e []
-  fromException (SomeExceptionWithLocation e _) = Just e
+  toException e = SomeExceptionWithBacktrace e []
+  fromException (SomeExceptionWithBacktrace e _) = Just e
 
-instance Exception SomeExceptionWithLocation where
+instance Exception SomeExceptionWithBacktrace where
     toException se = se
     fromException = Just
-    displayException (SomeExceptionWithLocation e _) = displayException e
+    displayException (SomeExceptionWithBacktrace e _) = displayException e
 
 -- |Arithmetic exceptions.
 data ArithException
@@ -191,7 +191,7 @@ data ArithException
            , Ord -- ^ @since 3.0
            )
 
-divZeroException, overflowException, ratioZeroDenomException, underflowException  :: SomeExceptionWithLocation
+divZeroException, overflowException, ratioZeroDenomException, underflowException  :: SomeExceptionWithBacktrace
 divZeroException        = toException DivideByZero
 overflowException       = toException Overflow
 ratioZeroDenomException = toException RatioZeroDenominator

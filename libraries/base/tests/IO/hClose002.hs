@@ -24,7 +24,7 @@ main = do
 
 showPossibleException :: IO () -> IO ()
 showPossibleException f = do e <- try f
-                             print (e :: Either SomeExceptionWithLocation ())
+                             print (e :: Either SomeExceptionWithBacktrace ())
 
 naughtyClose h =
   withHandle_ "naughtyClose" h $ \ Handle__{haDevice=dev} ->

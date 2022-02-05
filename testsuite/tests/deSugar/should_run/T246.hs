@@ -21,5 +21,5 @@ main = do { print (f funny)  -- Should work, because we test
 
           ; Control.Exception.catch
                   (print (g funny))        -- Should fail, because we test
-                  (\(_::SomeExceptionWithLocation) -> print "caught")   -- x first, and hit "undefined"
+                  (\(_::SomeExceptionWithBacktrace) -> print "caught")   -- x first, and hit "undefined"
           }

@@ -7,4 +7,4 @@ main = do
           m <- newEmptyMVar
           takeMVar m
           return ()
-  print (r::Either SomeExceptionWithLocation ())
+  print (r::Either SomeExceptionWithBacktrace ())

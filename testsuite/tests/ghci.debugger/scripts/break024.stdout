@@ -1,28 +1,28 @@
 Left user error (error)
 Stopped in <exception thrown>, <unknown>
-_exception :: e = SomeExceptionWithLocation
+_exception :: e = SomeExceptionWithBacktrace
                     (SomeException (GHC.IO.Exception.IOError ...)) []
-_exception = SomeExceptionWithLocation
+_exception = SomeExceptionWithBacktrace
                (SomeException
                   (GHC.IO.Exception.IOError
                      Nothing GHC.IO.Exception.UserError [] "error" Nothing Nothing))
                []
 *** Exception: user error (error)
 Stopped in <exception thrown>, <unknown>
-_exception :: e = SomeExceptionWithLocation
+_exception :: e = SomeExceptionWithBacktrace
                     (SomeException (GHC.IO.Exception.IOError ...)) []
-_exception = SomeExceptionWithLocation
+_exception = SomeExceptionWithBacktrace
                (SomeException
                   (GHC.IO.Exception.IOError
                      Nothing GHC.IO.Exception.UserError [] "error" Nothing Nothing))
                []
 Stopped in <exception thrown>, <unknown>
-_exception :: e = SomeExceptionWithLocation
+_exception :: e = SomeExceptionWithBacktrace
                     (SomeException (GHC.IO.Exception.IOError ...)) []
 Stopped in <exception thrown>, <unknown>
-_exception :: e = SomeExceptionWithLocation
+_exception :: e = SomeExceptionWithBacktrace
                     (SomeException (GHC.IO.Exception.IOError ...)) []
-_exception = SomeExceptionWithLocation
+_exception = SomeExceptionWithBacktrace
                (SomeException
                   (GHC.IO.Exception.IOError
                      Nothing GHC.IO.Exception.UserError [] "error" Nothing Nothing))

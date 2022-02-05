@@ -511,7 +511,7 @@ testEnumRatioInt = do
 
 
 mayBomb x = catch x (\(ErrorCall e) -> putStrLn ("error " ++ show e))
-   `catch` (\e -> putStrLn ("Fail: " ++ show (e :: SomeExceptionWithLocation)))
+   `catch` (\e -> putStrLn ("Fail: " ++ show (e :: SomeExceptionWithBacktrace)))
 
 test :: Show a => String -> String -> a -> IO ()
 test test_nm expected val = do

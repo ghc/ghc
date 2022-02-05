@@ -1,5 +1,5 @@
 Stopped in <exception thrown>, <unknown>
-_exception :: e = GHC.Exception.Type.SomeExceptionWithLocation
+_exception :: e = GHC.Exception.Type.SomeExceptionWithBacktrace
                     (GHC.Exception.Type.SomeException
                        (GHC.Exception.ErrorCallWithLocation ...))
                     []
@@ -7,7 +7,7 @@ _exception :: e = GHC.Exception.Type.SomeExceptionWithLocation
 Cannot determine current top-level binding after a break on error / exception.
 Use :stepmodule.
 Stopped in <exception thrown>, <unknown>
-_exception :: e = GHC.Exception.Type.SomeExceptionWithLocation
+_exception :: e = GHC.Exception.Type.SomeExceptionWithBacktrace
                     (GHC.Exception.Type.SomeException
                        (GHC.Exception.ErrorCallWithLocation ...))
                     []

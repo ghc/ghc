@@ -19,7 +19,7 @@
 module Control.Exception.Base (
 
         -- * The Exception type
-        SomeExceptionWithLocation(..),
+        SomeExceptionWithBacktrace(..),
         SomeException(..),
         Exception(..),
         IOException,
@@ -191,7 +191,7 @@ tryJust p a = do
 -- exception raised by the computation.
 onException :: IO a -> IO b -> IO a
 onException io what = io `catch` \e -> do _ <- what
-                                          throwIO (e :: SomeExceptionWithLocation)
+                                          throwIO (e :: SomeExceptionWithBacktrace)
 
 -----------------------------------------------------------------------------
 -- Some Useful Functions
@@ -409,9 +409,9 @@ patError                 s = throw (PatternMatchFail (untangle s "Non-exhaustive
 typeError                s = throw (TypeError        (unpackCStringUtf8# s))
 
 -- GHC's RTS calls this
-nonTermination :: SomeExceptionWithLocation
+nonTermination :: SomeExceptionWithBacktrace
 nonTermination = toException NonTermination
 
 -- GHC's RTS calls this
-nestedAtomically :: SomeExceptionWithLocation
+nestedAtomically :: SomeExceptionWithBacktrace
 nestedAtomically = toException NestedAtomically

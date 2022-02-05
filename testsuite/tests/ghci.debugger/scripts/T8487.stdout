@@ -1,4 +1,4 @@
-Breakpoint 0 activated at T8487.hs:(5,8)-(7,65)
-Stopped in Main.f, T8487.hs:(5,8)-(7,65)
+Breakpoint 0 activated at T8487.hs:(5,8)-(7,66)
+Stopped in Main.f, T8487.hs:(5,8)-(7,66)
 _result :: IO String = _
-ma :: Either SomeExceptionWithLocation String = Left _
+ma :: Either SomeExceptionWithBacktrace String = Left _

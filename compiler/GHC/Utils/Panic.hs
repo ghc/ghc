@@ -111,7 +111,7 @@ data GhcException
 
 instance Exception GhcException where
   -- TODO: Print stack traces here
-  fromException (SomeExceptionWithLocation (SomeException e) _)
+  fromException (SomeExceptionWithBacktrace (SomeException e) _)
     | Just ge <- cast e = Just ge
     | Just pge <- cast e = Just $
         case pge of
@@ -139,7 +139,7 @@ safeShowException e = do
     r <- try (return $! forceList (showException e))
     case r of
         Right msg -> return msg
-        Left e' -> safeShowException (e' :: SomeExceptionWithLocation)
+        Left e' -> safeShowException (e' :: SomeExceptionWithBacktrace)
     where
         forceList [] = []
         forceList xs@(x : xt) = x `seq` forceList xt `seq` xs
@@ -197,7 +197,7 @@ pgmErrorDoc x doc = throwGhcException (PprProgramError x doc)
 -- | Like try, but pass through UserInterrupt and Panic exceptions.
 --   Used when we want soft failures when reading interface files, for example.
 --   TODO: I'm not entirely sure if this is catching what we really want to catch
-tryMost :: IO a -> IO (Either SomeExceptionWithLocation a)
+tryMost :: IO a -> IO (Either SomeExceptionWithBacktrace a)
 tryMost action = do r <- try action
                     case r of
                         Left se ->

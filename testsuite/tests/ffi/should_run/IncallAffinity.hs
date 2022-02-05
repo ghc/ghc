@@ -11,7 +11,7 @@ foreign export ccall "capTest" capTest :: IO Int
 capTest :: IO Int
 capTest = catch go handle
   where
-    handle :: SomeExceptionWithLocation -> IO Int
+    handle :: SomeExceptionWithBacktrace -> IO Int
     handle e = do
       putStrLn $ "Failed " ++ (show e)
       return (-1)

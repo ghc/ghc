@@ -16,4 +16,4 @@ main = do
   threadDelay 1000
   killThread t
 
-  print x `E.catch` \e -> putStrLn ("main caught: " ++ show (e::SomeExceptionWithLocation))
+  print x `E.catch` \e -> putStrLn ("main caught: " ++ show (e::SomeExceptionWithBacktrace))

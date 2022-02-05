@@ -63,7 +63,7 @@ throw :: HasCallStack => forall (r :: RuntimeRep). forall (a :: TYPE r). forall 
 throw e =
   runRW#
     ( \s0 ->
-        let e'@(SomeExceptionWithLocation _ bts) = toException e
+        let e'@(SomeExceptionWithBacktrace _ bts) = toException e
          in if null bts
               then case unIO collectBacktraces s0 of
                 (# _, bts' #) ->
@@ -137,10 +137,10 @@ instance Show ErrorCall where
   showsPrec _ (ErrorCallWithLocation err loc) =
       showString err . showChar '\n' . showString loc
 
-errorCallException :: String -> SomeExceptionWithLocation
+errorCallException :: String -> SomeExceptionWithBacktrace
 errorCallException s = toException (ErrorCall s)
 
-errorCallWithCallStackException :: String -> CallStack -> SomeExceptionWithLocation
+errorCallWithCallStackException :: String -> CallStack -> SomeExceptionWithBacktrace
 errorCallWithCallStackException s stk = unsafeDupablePerformIO $ do
   ccsStack <- currentCallStack
   let
@@ -185,8 +185,8 @@ prettyCallStackLines cs = case getCallStack cs of
 -- | Pretty print a list of 'Backtrace's
 -- This function should be used to output the backtraces to a terminal.
 -- The format is subject to change. The caller should not depend on it.
-pprBacktraces :: SomeExceptionWithLocation -> String
-pprBacktraces (SomeExceptionWithLocation _ bts) = vcat $ fmap pprBacktrace bts
+pprBacktraces :: SomeExceptionWithBacktrace -> String
+pprBacktraces (SomeExceptionWithBacktrace _ bts) = vcat $ fmap pprBacktrace bts
 
 pprBacktrace :: Backtrace -> String
 pprBacktrace (IPEBacktrace entries) = "Info Table Provenance Entries (IPE) backtrace" ++ ":" $+$ nest 1 (vcat $ map pprStackEntry entries)

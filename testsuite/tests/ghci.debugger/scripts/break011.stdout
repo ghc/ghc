@@ -18,7 +18,7 @@ _result :: a
 Stopped at <unknown>
 _exception :: e
 already at the beginning of the history
-_exception = SomeExceptionWithLocation
+_exception = SomeExceptionWithBacktrace
                (SomeException
                   (ErrorCallWithLocation
                      "foo"
@@ -26,16 +26,17 @@ _exception = SomeExceptionWithLocation
   error, called at Test7.hs:2:18 in main:Main"))
                []
 _result :: a = _
-_exception :: SomeExceptionWithLocation = SomeExceptionWithLocation
-                                            (SomeException (ErrorCallWithLocation ...)) []
+_exception ::
+  SomeExceptionWithBacktrace = SomeExceptionWithBacktrace
+                                 (SomeException (ErrorCallWithLocation ...)) []
 *** Exception: foo
 CallStack (from HasCallStack):
   error, called at Test7.hs:2:18 in main:Main
 Stopped in <exception thrown>, <unknown>
-_exception :: e = SomeExceptionWithLocation
+_exception :: e = SomeExceptionWithBacktrace
                     (SomeException (ErrorCallWithLocation ...)) []
 Stopped in <exception thrown>, <unknown>
-_exception :: e = SomeExceptionWithLocation
+_exception :: e = SomeExceptionWithBacktrace
                     (SomeException (ErrorCallWithLocation ...)) []
 *** Exception: foo
 CallStack (from HasCallStack):

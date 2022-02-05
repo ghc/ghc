@@ -11,10 +11,10 @@ instance Exception CustomException
 main :: IO ()
 main = do
   print "=== Test Show instances ==="
-  print "SomeExceptionWithLocation:"
+  print "SomeExceptionWithBacktrace:"
   catch
     (throw CustomException)
-    (\(e :: SomeExceptionWithLocation) -> print e)
+    (\(e :: SomeExceptionWithBacktrace) -> print e)
 
   print "SomeException:"
   catch

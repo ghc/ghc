@@ -67,7 +67,7 @@ instance Show Backtrace where
   showsPrec _ (ExecutionBacktrace ccs) = showStackFrames ccs
   showsPrec p (IPEBacktrace stackEntries) = showsPrec p stackEntries
 
--- | How to collect a backtrace when an exception is thrown.
+-- | Which kind of backtrace to collect when an exception is thrown.
 data BacktraceMechanism
   = -- | collect a cost center stacktrace (only available when built with profiling)
     CostCenterBacktraceMech
