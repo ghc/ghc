@@ -68,30 +68,6 @@ The flag is only needed on ELF systems. On Windows (PE) and Mac OS X
 
 -}
 
-{- Note [Windows static libGCC]
-   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The GCC versions being upgraded to in #10726 are configured with
-dynamic linking of libgcc supported. This results in libgcc being
-linked dynamically when a shared library is created.
-
-This introduces thus an extra dependency on GCC dll that was not
-needed before by shared libraries created with GHC. This is a particular
-issue on Windows because you get a non-obvious error due to this missing
-dependency. This dependent dll is also not commonly on your path.
-
-For this reason using the static libgcc is preferred as it preserves
-the same behaviour that existed before. There are however some very good
-reasons to have the shared version as well as described on page 181 of
-https://gcc.gnu.org/onlinedocs/gcc-5.2.0/gcc.pdf :
-
-"There are several situations in which an application should use the
- shared ‘libgcc’ instead of the static version. The most common of these
- is when the application wishes to throw and catch exceptions across different
- shared libraries. In that case, each of the libraries as well as the application
- itself should use the shared ‘libgcc’. "
-
--}
-
 neededLinkArgs :: LinkerInfo -> [Option]
 neededLinkArgs (GnuLD o)     = o
 neededLinkArgs (GnuGold o)   = o
@@ -166,12 +142,10 @@ getLinkerInfo' logger dflags = do
         -- Process creation is also fairly expensive on win32, so
         -- we short-circuit here.
         return $ GnuLD $ map Option
-          [ -- Emit gcc stack checks
+          [ -- Emit stack checks
             -- See Note [Windows stack allocations]
            "-fstack-check"
-            -- Force static linking of libGCC
-            -- See Note [Windows static libGCC]
-          , "-static-libgcc" ]
+          ]
       _ -> do
         -- In practice, we use the compiler as the linker here. Pass
         -- -Wl,--version to get linker version info.
