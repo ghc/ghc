@@ -3497,7 +3497,7 @@ When invoked in the static way, GHCi will use the GHC RTS's static runtime
 linker to load object files for imported modules when available. However, when
 these modules are built with :ghc-flag:`-split-sections` this linking can be
 quite expensive. To reduce this cost, package managers and build systems may
-opt to produce a pre-linked *GHCi object* using the :ghc-flag:`-merge-objs`
+opt to produce a pre-linked *GHCi object* using the :ghc-flag:`--merge-objs`
 mode. This merges the per-module objects into a single object, collapsing
 function sections into a single text section which can be efficiently loaded by
 the runtime linker.
