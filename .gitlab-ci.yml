@@ -955,6 +955,7 @@ test-cabal-reinstall-x86_64-linux-deb10:
     - "cabal update --index=$HACKAGE_INDEX_STATE --project-file=cabal.project"
   variables:
     REINSTALL_GHC: "yes"
+    BUILD_FLAVOUR: default
 
 release-x86_64-linux-deb10-dwarf:
   <<: *release
