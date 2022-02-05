@@ -345,7 +345,7 @@ The available mode flags are:
     compile source files one at a time, or link objects together into an
     executable. See :ref:`options-order`.
 
-.. ghc-flag:: -merge-objs
+.. ghc-flag:: --merge-objs
     :shortdesc: Merge a set of objects into a GHCi library.
     :type: mode
     :category: phases
