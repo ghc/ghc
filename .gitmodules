@@ -52,7 +52,7 @@
 	ignore = untracked
 [submodule "libraries/directory"]
 	path = libraries/directory
-	url = https://gitlab.haskell.org/supersven/directory.git
+	url = https://gitlab.haskell.org/ghc/packages/directory.git
 	ignore = untracked
 [submodule "libraries/filepath"]
 	path = libraries/filepath
