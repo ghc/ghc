@@ -8,13 +8,16 @@ AC_DEFUN([FP_SETTINGS],
     then
         mingw_bin_prefix='$$tooldir/mingw/bin/'
         SettingsCCompilerCommand="${mingw_bin_prefix}clang.exe"
+        SettingsCCompilerFlags="--rtlib=compiler-rt"
+        SettingsCxxCompilerFlags="--rtlib=compiler-rt"
+        SettingsCCompilerLinkFlags="--rtlib=compiler-rt"
         SettingsHaskellCPPCommand="${mingw_bin_prefix}clang.exe"
         SettingsHaskellCPPFlags="$HaskellCPPArgs"
         SettingsLdCommand="${mingw_bin_prefix}ld.lld.exe"
         # Overrides FIND_MERGE_OBJECTS in order to avoid hard-coding linker
         # path on Windows (#18550).
-        SettingsMergeObjectsCommand="${SettingsLdCommand}"
-        SettingsMergeObjectsFlags="-r"
+        SettingsMergeObjectsCommand="${mingw_bin_prefix}ld.bfd.exe"
+        SettingsMergeObjectsFlags="-r --oformat=pe-bigobj-x86-64"
         SettingsArCommand="${mingw_bin_prefix}llvm-ar.exe"
         SettingsRanlibCommand="${mingw_bin_prefix}llvm-ranlib.exe"
         SettingsDllWrapCommand="${mingw_bin_prefix}llvm-dllwrap.exe"
