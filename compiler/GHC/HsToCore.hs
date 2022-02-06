@@ -20,6 +20,7 @@ import GHC.Prelude
 
 import GHC.Driver.Session
 import GHC.Driver.Config
+import GHC.Driver.Config.Core.Lint ( endPassHscEnvIO )
 import GHC.Driver.Config.HsToCore.Ticks
 import GHC.Driver.Config.HsToCore.Usage
 import GHC.Driver.Env
@@ -55,7 +56,6 @@ import GHC.Core.DataCon ( dataConWrapId )
 import GHC.Core.Make
 import GHC.Core.Rules
 import GHC.Core.Opt.Monad ( CoreToDo(..) )
-import GHC.Core.Lint     ( endPassIO )
 import GHC.Core.Ppr
 
 import GHC.Builtin.Names
@@ -211,7 +211,7 @@ deSugar hsc_env
         -- You might think it doesn't matter, but the simplifier brings all top-level
         -- things into the in-scope set before simplifying; so we get no unfolding for F#!
 
-        ; endPassIO hsc_env print_unqual CoreDesugar final_pgm rules_for_imps
+        ; endPassHscEnvIO hsc_env print_unqual CoreDesugar final_pgm rules_for_imps
         ; let simpl_opts = initSimpleOpts dflags
         ; let (ds_binds, ds_rules_for_imps, occ_anald_binds)
                 = simpleOptPgm simpl_opts mod final_pgm rules_for_imps
@@ -220,7 +220,7 @@ deSugar hsc_env
         ; putDumpFileMaybe logger Opt_D_dump_occur_anal "Occurrence analysis"
             FormatCore (pprCoreBindings occ_anald_binds $$ pprRules ds_rules_for_imps )
 
-        ; endPassIO hsc_env print_unqual CoreDesugarOpt ds_binds ds_rules_for_imps
+        ; endPassHscEnvIO hsc_env print_unqual CoreDesugarOpt ds_binds ds_rules_for_imps
 
         ; let used_names = mkUsedNames tcg_env
               pluginModules = map lpModule (loadedPlugins (hsc_plugins hsc_env))

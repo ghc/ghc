@@ -29,6 +29,7 @@ import GHC.Prelude
 
 import GHC.Driver.Env
 import GHC.Driver.Session
+import GHC.Driver.Config.Core.Lint ( initLintConfig )
 
 import GHC.Builtin.Types.Literals(typeNatCoAxiomRules)
 import GHC.Builtin.Types
@@ -94,6 +95,7 @@ import GHC.Types.SrcLoc
 import GHC.Types.TypeEnv
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DSet ( mkUniqDSet )
+import GHC.Types.Unique.Set ( nonDetEltsUniqSet )
 import GHC.Types.Unique.Supply
 import GHC.Types.Literal
 import GHC.Types.Var as Var
@@ -1224,7 +1226,7 @@ tcIfaceRule (IfaceRule {ifRuleName = name, ifActivation = act, ifRuleBndrs = bnd
                                         (nonDetEltsUFM $ if_id_env lcl_env) ++
                                         bndrs' ++
                                         exprsFreeIdsList args')
-                      ; case lintExpr dflags in_scope rhs' of
+                      ; case lintExpr (initLintConfig dflags in_scope) rhs' of
                           Nothing   -> return ()
                           Just errs -> do
                             logger <- getLogger
@@ -1780,10 +1782,10 @@ tcUnfoldingRhs is_compulsory toplvl name expr
     -- See Note [Linting Unfoldings from Interfaces] in GHC.Core.Lint
     when (isTopLevel toplvl) $
       whenGOptM Opt_DoCoreLinting $ do
-        in_scope <- get_in_scope
+        in_scope <- nonDetEltsUniqSet <$> get_in_scope
         dflags   <- getDynFlags
         logger   <- getLogger
-        case lintUnfolding is_compulsory dflags noSrcLoc in_scope core_expr' of
+        case lintUnfolding is_compulsory (initLintConfig dflags in_scope) noSrcLoc core_expr' of
           Nothing   -> return ()
           Just errs -> liftIO $
             displayLintResults logger False doc

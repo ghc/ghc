@@ -90,6 +90,7 @@ GHC.Driver.Backend
 GHC.Driver.Backend.Internal
 GHC.Driver.Backpack.Syntax
 GHC.Driver.CmdLine
+GHC.Driver.Config.Core.Lint
 GHC.Driver.Config.Diagnostic
 GHC.Driver.Config.Logger
 GHC.Driver.Env

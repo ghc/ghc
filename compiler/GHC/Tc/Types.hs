@@ -102,6 +102,7 @@ import GHC.Prelude
 import GHC.Platform
 
 import GHC.Driver.Env
+import GHC.Driver.Config.Core.Lint
 import GHC.Driver.Session
 import {-# SOURCE #-} GHC.Driver.Hooks
 
@@ -1821,7 +1822,8 @@ getRoleAnnots bndrs role_env
 -- axioms, but should check other aspects, too.
 lintGblEnv :: Logger -> DynFlags -> TcGblEnv -> TcM ()
 lintGblEnv logger dflags tcg_env =
-  liftIO $ lintAxioms logger dflags (text "TcGblEnv axioms") axioms
+  -- TODO empty list means no extra in scope from GHCi, is this correct?
+  liftIO $ lintAxioms logger (initLintConfig dflags []) (text "TcGblEnv axioms") axioms
   where
     axioms = typeEnvCoAxioms (tcg_type_env tcg_env)
 

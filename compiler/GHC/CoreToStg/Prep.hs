@@ -22,6 +22,7 @@ import GHC.Prelude
 import GHC.Platform
 
 import GHC.Driver.Session
+import GHC.Driver.Config.Core.Lint ( endPassHscEnvIO )
 import GHC.Driver.Env
 import GHC.Driver.Ppr
 
@@ -37,7 +38,6 @@ import GHC.Builtin.Types.Prim ( realWorldStatePrimTy )
 import GHC.Core.Utils
 import GHC.Core.Opt.Arity
 import GHC.Core.Opt.Monad ( CoreToDo(..) )
-import GHC.Core.Lint    ( endPassIO )
 import GHC.Core
 import GHC.Core.Make hiding( FloatBind(..) )   -- We use our own FloatBind here
 import GHC.Core.Type
@@ -253,7 +253,7 @@ corePrepPgm hsc_env this_mod mod_loc binds data_tycons =
                       floats2 <- corePrepTopBinds initialCorePrepEnv implicit_binds
                       return (deFloatTop (floats1 `appendFloats` floats2))
 
-    endPassIO hsc_env alwaysQualify CorePrep binds_out []
+    endPassHscEnvIO hsc_env alwaysQualify CorePrep binds_out []
     return binds_out
   where
     dflags = hsc_dflags hsc_env

@@ -8,6 +8,7 @@ import GHC.Core.Make
 import GHC.Core.Opt.CallArity (callArityRHS)
 import GHC.Types.Id.Make
 import GHC.SysTools
+import GHC.Driver.Config.Core.Lint
 import GHC.Driver.Session
 import GHC.Utils.Error
 import GHC.Utils.Outputable as Outputable
@@ -172,7 +173,7 @@ main = do
         dflags <- getSessionDynFlags
         logger <- getLogger
         liftIO $ forM_ exprs $ \(n,e) -> do
-            case lintExpr dflags [f,scrutf,scruta] e of
+            case lintExpr (initLintConfig dflags [f,scrutf,scruta]) e of
                 Just errs -> putMsg logger (pprMessageBag errs $$ text "in" <+> text n)
                 Nothing -> return ()
             putMsg logger (text n Outputable.<> char ':')

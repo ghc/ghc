@@ -12,26 +12,30 @@ See Note [Core Lint guarantee].
 -}
 
 module GHC.Core.Lint (
-    lintCoreBindings, lintUnfolding,
-    lintPassResult, lintInteractiveExpr, lintExpr,
+    LintPassResultConfig (..),
+    LintFlags (..),
+    StaticPtrCheck (..),
+    LintConfig (..),
+    WarnsAndErrs,
+
+    lintCoreBindings', lintUnfolding,
+    lintPassResult', lintExpr,
     lintAnnots, lintAxioms,
 
     interactiveInScope,
 
     -- ** Debug output
-    endPass, endPassIO,
+    endPassIO,
     displayLintResults, dumpPassResult
  ) where
 
 import GHC.Prelude
 
 import GHC.Driver.Session
-import GHC.Driver.Ppr
-import GHC.Driver.Env
-import GHC.Driver.Config.Diagnostic
 
 import GHC.Tc.Utils.TcType ( isFloatingPrimTy, isTyFamFree )
 import GHC.Unit.Module.ModGuts
+import GHC.Platform
 import GHC.Runtime.Context
 
 import GHC.Core
@@ -60,7 +64,6 @@ import GHC.Types.Literal
 import GHC.Types.Var as Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
-import GHC.Types.Unique.Set( nonDetEltsUniqSet )
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Id
@@ -95,7 +98,6 @@ import Data.List.NonEmpty ( NonEmpty(..), groupWith )
 import Data.List          ( partition )
 import Data.Maybe
 import GHC.Data.Pair
-import qualified GHC.LanguageExtensions as LangExt
 
 {-
 Note [Core Lint guarantee]
@@ -269,29 +271,24 @@ points but not the RHSes of value bindings (thunks and functions).
                  Beginning and ending passes
 *                                                                      *
 ************************************************************************
-
-These functions are not CoreM monad stuff, but they probably ought to
-be, and it makes a convenient place for them.  They print out stuff
-before and after core passes, and do Core Lint when necessary.
 -}
 
-endPass :: CoreToDo -> CoreProgram -> [CoreRule] -> CoreM ()
-endPass pass binds rules
-  = do { hsc_env <- getHscEnv
-       ; print_unqual <- getPrintUnqualified
-       ; liftIO $ endPassIO hsc_env print_unqual pass binds rules }
-
-endPassIO :: HscEnv -> PrintUnqualified
-          -> CoreToDo -> CoreProgram -> [CoreRule] -> IO ()
+endPassIO :: Logger
+           -> LintPassResultConfig
+           -> Bool -- dump core sizes
+           -> Bool -- lint pass result
+           -> PrintUnqualified
+           -> CoreToDo -> CoreProgram -> [CoreRule]
+           -> IO ()
 -- Used by the IO-is CorePrep too
-endPassIO hsc_env print_unqual pass binds rules
+endPassIO logger lp_cfg dump_core_sizes lint_pass_result print_unqual
+           pass binds rules
   = do { dumpPassResult logger dump_core_sizes print_unqual mb_flag
-                        (showSDoc dflags (ppr pass)) (pprPassDetails pass) binds rules
-       ; lintPassResult hsc_env pass binds }
+                        (renderWithContext defaultSDocContext (ppr pass))
+                        (pprPassDetails pass) binds rules
+       ; when lint_pass_result $ lintPassResult' logger lp_cfg pass binds
+       }
   where
-    dump_core_sizes = not (gopt Opt_SuppressCoreSizes dflags)
-    logger  = hsc_logger hsc_env
-    dflags  = hsc_dflags hsc_env
     mb_flag = case coreDumpFlag pass of
                 Just flag | logHasDumpFlag logger flag                    -> Just flag
                           | logHasDumpFlag logger Opt_D_verbose_core2core -> Just flag
@@ -366,18 +363,31 @@ coreDumpFlag (CoreDoPasses {})        = Nothing
 ************************************************************************
 -}
 
-lintPassResult :: HscEnv -> CoreToDo -> CoreProgram -> IO ()
-lintPassResult hsc_env pass binds
-  | not (gopt Opt_DoCoreLinting dflags)
-  = return ()
-  | otherwise
-  = do { let warns_and_errs = lintCoreBindings dflags pass (interactiveInScope $ hsc_IC hsc_env) binds
-       ; Err.showPass logger ("Core Linted result of " ++ showPpr dflags pass)
-       ; displayLintResults logger (showLintWarnings pass) (ppr pass)
-                            (pprCoreBindings binds) warns_and_errs }
-  where
-    dflags = hsc_dflags hsc_env
-    logger = hsc_logger hsc_env
+data LintPassResultConfig = LintPassResultConfig
+  { endPass_diagOpts      :: !DiagOpts
+  , endPass_platform      :: !Platform
+  , endPass_makeLinkFlags :: CoreToDo -> LintFlags
+  , endPass_localsInScope :: ![Var]
+  }
+
+lintPassResult' :: Logger -> LintPassResultConfig
+                -> CoreToDo -> CoreProgram -> IO ()
+lintPassResult' logger cfg pass binds
+  = do { let warns_and_errs = lintCoreBindings'
+               (LintConfig
+                { l_diagOpts = endPass_diagOpts cfg
+                , l_platform = endPass_platform cfg
+                , l_flags    = endPass_makeLinkFlags cfg pass
+                , l_vars     = endPass_localsInScope cfg
+                })
+               binds
+       ; Err.showPass logger $
+           "Core Linted result of " ++
+           renderWithContext defaultSDocContext (ppr pass)
+       ; displayLintResults logger
+                            (showLintWarnings pass) (ppr pass)
+                            (pprCoreBindings binds) warns_and_errs
+       }
 
 displayLintResults :: Logger
                    -> Bool -- ^ If 'True', display linter warnings.
@@ -418,19 +428,6 @@ showLintWarnings :: CoreToDo -> Bool
 showLintWarnings (CoreDoSimplify _ (SimplMode { sm_phase = InitialPhase })) = False
 showLintWarnings _ = True
 
-lintInteractiveExpr :: SDoc -- ^ The source of the linted expression
-                    -> HscEnv -> CoreExpr -> IO ()
-lintInteractiveExpr what hsc_env expr
-  | not (gopt Opt_DoCoreLinting dflags)
-  = return ()
-  | Just err <- lintExpr dflags (interactiveInScope $ hsc_IC hsc_env) expr
-  = displayLintResults logger False what (pprCoreExpr expr) (emptyBag, err)
-  | otherwise
-  = return ()
-  where
-    dflags = hsc_dflags hsc_env
-    logger = hsc_logger hsc_env
-
 interactiveInScope :: InteractiveContext -> [Var]
 -- In GHCi we may lint expressions, or bindings arising from 'deriving'
 -- clauses, that mention variables bound in the interactive context.
@@ -458,12 +455,12 @@ interactiveInScope ictxt
               -- where t is a RuntimeUnk (see TcType)
 
 -- | Type-check a 'CoreProgram'. See Note [Core Lint guarantee].
-lintCoreBindings :: DynFlags -> CoreToDo -> [Var] -> CoreProgram -> WarnsAndErrs
+lintCoreBindings' :: LintConfig -> CoreProgram -> WarnsAndErrs
 --   Returns (warnings, errors)
 -- If you edit this function, you may need to update the GHC formalism
 -- See Note [GHC Formalism]
-lintCoreBindings dflags pass local_in_scope binds
-  = initL dflags flags local_in_scope $
+lintCoreBindings' cfg binds
+  = initL cfg $
     addLoc TopLevelBindings           $
     do { checkL (null dups) (dupVars dups)
        ; checkL (null ext_dups) (dupExtVars ext_dups)
@@ -475,49 +472,6 @@ lintCoreBindings dflags pass local_in_scope binds
      -- This is because rewrite rules can bring something
      -- into use 'unexpectedly'; see Note [Glomming] in "GHC.Core.Opt.OccurAnal"
     binders = map fst all_pairs
-
-    flags = (defaultLintFlags dflags)
-               { lf_check_global_ids = check_globals
-               , lf_check_inline_loop_breakers = check_lbs
-               , lf_check_static_ptrs = check_static_ptrs
-               , lf_check_linearity = check_linearity
-               , lf_check_fixed_rep = check_fixed_rep }
-
-    -- In the output of the desugarer, before optimisation,
-    -- we have eta-expanded data constructors with representation-polymorphic
-    -- bindings; so we switch off the representation-polymorphism checks.
-    -- The very simple optimiser will beta-reduce them away.
-    -- See Note [Checking for representation-polymorphic built-ins]
-    -- in GHC.HsToCore.Expr.
-    check_fixed_rep = case pass of
-                        CoreDesugar -> False
-                        _           -> True
-
-    -- See Note [Checking for global Ids]
-    check_globals = case pass of
-                      CoreTidy -> False
-                      CorePrep -> False
-                      _        -> True
-
-    -- See Note [Checking for INLINE loop breakers]
-    check_lbs = case pass of
-                      CoreDesugar    -> False
-                      CoreDesugarOpt -> False
-                      _              -> True
-
-    -- See Note [Checking StaticPtrs]
-    check_static_ptrs | not (xopt LangExt.StaticPointers dflags) = AllowAnywhere
-                      | otherwise = case pass of
-                          CoreDoFloatOutwards _ -> AllowAtTopLevel
-                          CoreTidy              -> RejectEverywhere
-                          CorePrep              -> AllowAtTopLevel
-                          _                     -> AllowAnywhere
-
-    -- See Note [Linting linearity]
-    check_linearity = gopt Opt_DoLinearCoreLinting dflags || (
-                        case pass of
-                          CoreDesugar -> True
-                          _ -> False)
 
     (_, dups) = removeDups compare binders
 
@@ -552,18 +506,16 @@ hence the `TopLevelFlag` on `tcPragExpr` in GHC.IfaceToCore.
 -}
 
 lintUnfolding :: Bool             -- ^ True <=> is a compulsory unfolding
-              -> DynFlags
+              -> LintConfig
               -> SrcLoc
-              -> VarSet           -- ^ Treat these as in scope
               -> CoreExpr
               -> Maybe (Bag SDoc) -- Nothing => OK
 
-lintUnfolding is_compulsory dflags locn var_set expr
+lintUnfolding is_compulsory cfg locn expr
   | isEmptyBag errs = Nothing
   | otherwise       = Just errs
   where
-    vars = nonDetEltsUniqSet var_set
-    (_warns, errs) = initL dflags (defaultLintFlags dflags) vars $
+    (_warns, errs) = initL cfg $
                      if is_compulsory
                        -- See Note [Checking for representation polymorphism]
                      then noFixedRuntimeRepChecks linter
@@ -571,16 +523,15 @@ lintUnfolding is_compulsory dflags locn var_set expr
     linter = addLoc (ImportedUnfolding locn) $
              lintCoreExpr expr
 
-lintExpr :: DynFlags
-         -> [Var]               -- Treat these as in scope
+lintExpr :: LintConfig
          -> CoreExpr
          -> Maybe (Bag SDoc)  -- Nothing => OK
 
-lintExpr dflags vars expr
+lintExpr cfg expr
   | isEmptyBag errs = Nothing
   | otherwise       = Just errs
   where
-    (_warns, errs) = initL dflags (defaultLintFlags dflags) vars linter
+    (_warns, errs) = initL cfg linter
     linter = addLoc TopLevelBindings $
              lintCoreExpr expr
 
@@ -2304,7 +2255,7 @@ lintCoercion co@(UnivCo prov r ty1 ty2)
 
      validateCoercion :: PrimRep -> PrimRep -> LintM ()
      validateCoercion rep1 rep2
-       = do { platform <- targetPlatform <$> getDynFlags
+       = do { platform <- getPlatform
             ; checkWarnL (isUnBoxed rep1 == isUnBoxed rep2)
                          (report "between unboxed and boxed value")
             ; checkWarnL (TyCon.primRepSizeB platform rep1
@@ -2507,13 +2458,13 @@ lintCoercion (HoleCo h)
 -}
 
 lintAxioms :: Logger
-           -> DynFlags
+           -> LintConfig
            -> SDoc -- ^ The source of the linted axioms
            -> [CoAxiom Branched]
            -> IO ()
-lintAxioms logger dflags what axioms =
+lintAxioms logger cfg what axioms =
   displayLintResults logger True what (vcat $ map pprCoAxiom axioms) $
-  initL dflags (defaultLintFlags dflags) [] $
+  initL cfg $
   do { mapM_ lint_axiom axioms
      ; let axiom_groups = groupWith coAxiomTyCon axioms
      ; mapM_ lint_axiom_group axiom_groups }
@@ -2704,10 +2655,12 @@ data LintEnv
                                -- A subset of the InScopeSet in le_subst
                                -- See Note [Join points]
 
-       , le_dynflags :: DynFlags     -- DynamicFlags
        , le_ue_aliases :: NameEnv UsageEnv -- Assigns usage environments to the
                                            -- alias-like binders, as found in
                                            -- non-recursive lets.
+
+       , le_platform   :: Platform         -- ^ Target platform
+       , le_diagOpts   :: DiagOpts         -- ^ Target platform
        }
 
 data LintFlags
@@ -2728,15 +2681,6 @@ data StaticPtrCheck
     | RejectEverywhere
         -- ^ Reject any 'makeStatic' occurrence.
   deriving Eq
-
-defaultLintFlags :: DynFlags -> LintFlags
-defaultLintFlags dflags = LF { lf_check_global_ids = False
-                             , lf_check_inline_loop_breakers = True
-                             , lf_check_static_ptrs = AllowAnywhere
-                             , lf_check_linearity = gopt Opt_DoLinearCoreLinting dflags
-                             , lf_report_unsat_syns = True
-                             , lf_check_fixed_rep = True
-                             }
 
 newtype LintM a =
    LintM { unLintM ::
@@ -2884,8 +2828,8 @@ instance Monad LintM where
 instance MonadFail LintM where
     fail err = failWithL (text err)
 
-instance HasDynFlags LintM where
-  getDynFlags = LintM (\ e errs -> (Just (le_dynflags e), errs))
+getPlatform :: LintM Platform
+getPlatform = LintM (\ e errs -> (Just (le_platform e), errs))
 
 data LintLocInfo
   = RhsOf Id            -- The variable bound
@@ -2906,26 +2850,33 @@ data LintLocInfo
   | InCo   Coercion     -- Inside a coercion
   | InAxiom (CoAxiom Branched)   -- Inside a CoAxiom
 
-initL :: DynFlags
-      -> LintFlags
-      -> [Var]              -- ^ 'Id's that should be treated as being in scope
+data LintConfig = LintConfig
+  { l_diagOpts   :: !DiagOpts         -- ^ Diagnostics opts
+  , l_platform   :: !Platform         -- ^ Target platform
+  , l_flags      :: !LintFlags        -- ^ Linting the result of this pass
+  , l_vars       :: ![Var]            -- ^ 'Id's that should be treated as being in scope
+  }
+
+initL :: LintConfig
       -> LintM a            -- ^ Action to run
       -> WarnsAndErrs
-initL dflags flags vars m
+initL cfg m
   = case unLintM m env (emptyBag, emptyBag) of
       (Just _, errs) -> errs
       (Nothing, errs@(_, e)) | not (isEmptyBag e) -> errs
                              | otherwise -> pprPanic ("Bug in Lint: a failure occurred " ++
                                                       "without reporting an error message") empty
   where
-    (tcvs, ids) = partition isTyCoVar vars
-    env = LE { le_flags = flags
+    (tcvs, ids) = partition isTyCoVar $ l_vars cfg
+    env = LE { le_flags = l_flags cfg
              , le_subst = mkEmptyTCvSubst (mkInScopeSet (mkVarSet tcvs))
              , le_ids   = mkVarEnv [(id, (id,idType id)) | id <- ids]
              , le_joins = emptyVarSet
              , le_loc = []
-             , le_dynflags = dflags
-             , le_ue_aliases = emptyNameEnv }
+             , le_ue_aliases = emptyNameEnv
+             , le_platform = l_platform cfg
+             , le_diagOpts = l_diagOpts cfg
+             }
 
 setReportUnsat :: Bool -> LintM a -> LintM a
 -- Switch off lf_report_unsat_syns
@@ -2988,7 +2939,7 @@ addMsg is_error env msgs msg
                           , isGoodSrcSpan span ] of
                []    -> noSrcSpan
                (s:_) -> s
-   !diag_opts = initDiagOpts (le_dynflags env)
+   !diag_opts = le_diagOpts env
    mk_msg msg = mkLocMessage (mkMCDiagnostic diag_opts WarningWithoutFlag) msg_span
                              (msg $$ context)
 
@@ -3522,15 +3473,8 @@ lintAnnots pname pass guts = {-# SCC "lintAnnots" #-} do
 withoutAnnots :: (ModGuts -> CoreM ModGuts) -> ModGuts -> CoreM ModGuts
 withoutAnnots pass guts = do
   -- Remove debug flag from environment.
-  dflags <- getDynFlags
-  let removeFlag env = hscSetFlags (dflags { debugLevel = 0}) env
-      withoutFlag corem =
-          -- TODO: supply tag here as well ?
-        liftIO =<< runCoreM <$> fmap removeFlag getHscEnv <*> getRuleBase <*>
-                                getUniqMask <*> getModule <*>
-                                getVisibleOrphanMods <*>
-                                getPrintUnqualified <*> getSrcSpanM <*>
-                                pure corem
+  -- TODO: supply tag here as well ?
+  let withoutFlag = mapDynFlagsCoreM $ \(!dflags) -> dflags { debugLevel = 0 }
   -- Nuke existing ticks in module.
   -- TODO: Ticks in unfoldings. Maybe change unfolding so it removes
   -- them in absence of debugLevel > 0.
@@ -3541,5 +3485,6 @@ withoutAnnots pass guts = do
         NonRec b e -> NonRec b $ nukeTicks e
       nukeAnnotsMod mg@ModGuts{mg_binds=binds}
         = mg{mg_binds = map nukeAnnotsBind binds}
-  -- Perform pass with all changes applied
-  fmap fst $ withoutFlag $ pass (nukeAnnotsMod guts)
+  -- Perform pass with all changes applied. Drop the simple count so it doesn't
+  -- effect the total also
+  dropSimplCount $ withoutFlag $ pass (nukeAnnotsMod guts)

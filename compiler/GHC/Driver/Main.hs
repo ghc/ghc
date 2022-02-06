@@ -112,6 +112,7 @@ import GHC.Driver.Errors
 import GHC.Driver.Errors.Types
 import GHC.Driver.CodeOutput
 import GHC.Driver.Config.Cmm.Parser (initCmmParserConfig)
+import GHC.Driver.Config.Core.Lint ( endPassHscEnvIO, lintInteractiveExpr )
 import GHC.Driver.Config.Logger   (initLogFlags)
 import GHC.Driver.Config.Parser   (initParserOpts)
 import GHC.Driver.Config.Stg.Ppr  (initStgPprOpts)
@@ -155,7 +156,6 @@ import GHC.Iface.Ext.Debug  ( diffFile, validateScopes )
 import GHC.Core
 import GHC.Core.Tidy           ( tidyExpr )
 import GHC.Core.Type           ( Type, Kind )
-import GHC.Core.Lint           ( lintInteractiveExpr, endPassIO )
 import GHC.Core.Multiplicity
 import GHC.Core.Utils          ( exprType )
 import GHC.Core.ConLike
@@ -2281,7 +2281,7 @@ hscTidy hsc_env guts = do
   let all_tidy_binds = cg_binds cgguts
   let print_unqual   = mkPrintUnqualified (hsc_unit_env hsc_env) (mg_rdr_env guts)
 
-  endPassIO hsc_env print_unqual CoreTidy all_tidy_binds tidy_rules
+  endPassHscEnvIO hsc_env print_unqual CoreTidy all_tidy_binds tidy_rules
 
   -- If the endPass didn't print the rules, but ddump-rules is
   -- on, print now

@@ -40,6 +40,7 @@ import GHC.Core.Lint
 import GHC.Core.Type
   ( mkVisFunTyMany )
 
+import GHC.Driver.Config.Core.Lint
 import GHC.Driver.Session
   ( GeneralFlag(Opt_SuppressUniques), gopt_set )
 
@@ -90,6 +91,6 @@ main = do
     logger <- getLogger
     liftIO do
       forM_ test_exprs \ ( test_name, expr ) ->
-        forM_ ( lintExpr dflags in_scope expr ) \ errs ->
+        forM_ ( lintExpr (initLintConfig dflags in_scope) expr ) \ errs ->
           putMsg logger
             ( pprMessageBag errs $$ text "in" <+> text test_name )

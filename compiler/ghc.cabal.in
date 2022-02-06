@@ -397,6 +397,7 @@ Library
         GHC.Driver.Config.Cmm.Parser
         GHC.Driver.Config.CmmToAsm
         GHC.Driver.Config.CmmToLlvm
+        GHC.Driver.Config.Core.Lint
         GHC.Driver.Config.Core.Opt.Arity
         GHC.Driver.Config.Core.Opt.LiberateCase
         GHC.Driver.Config.Core.Opt.WorkWrap

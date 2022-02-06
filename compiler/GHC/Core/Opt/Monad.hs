@@ -26,10 +26,13 @@ module GHC.Core.Opt.Monad (
     -- * The monad
     CoreM, runCoreM,
 
+    mapDynFlagsCoreM, dropSimplCount,
+
     -- ** Reading from the monad
     getHscEnv, getModule,
     getRuleBase, getExternalRuleBase,
     getDynFlags, getPackageFamInstEnv,
+    getInteractiveContext,
     getVisibleOrphanMods, getUniqMask,
     getPrintUnqualified, getSrcSpanM,
 
@@ -72,6 +75,8 @@ import GHC.Utils.Monad
 import GHC.Data.FastString
 import GHC.Data.IOEnv hiding     ( liftIO, failM, failWithM )
 import qualified GHC.Data.IOEnv  as IOEnv
+
+import GHC.Runtime.Context ( InteractiveContext )
 
 import GHC.Unit.Module
 import GHC.Unit.Module.ModGuts
@@ -728,6 +733,20 @@ getUniqMask = read cr_uniq_mask
 
 -- Convenience accessors for useful fields of HscEnv
 
+-- | Adjust the dyn flags passed to the arugment action
+mapDynFlagsCoreM :: (DynFlags -> DynFlags) -> CoreM a -> CoreM a
+mapDynFlagsCoreM f m = CoreM $ do
+  !e <- getEnv
+  let !e' = e { cr_hsc_env = hscUpdateFlags f $ cr_hsc_env e }
+  liftIO $ runIOEnv e' $! unCoreM m
+
+-- | Drop the single count of the argument action so it doesn't effect
+-- the total.
+dropSimplCount :: CoreM a -> CoreM a
+dropSimplCount m = CoreM $ do
+  (a, _) <- unCoreM m
+  unCoreM $ pure a
+
 instance HasDynFlags CoreM where
     getDynFlags = fmap hsc_dflags getHscEnv
 
@@ -736,6 +755,9 @@ instance HasLogger CoreM where
 
 instance HasModule CoreM where
     getModule = read cr_module
+
+getInteractiveContext :: CoreM InteractiveContext
+getInteractiveContext = hsc_IC <$> getHscEnv
 
 getPackageFamInstEnv :: CoreM PackageFamInstEnv
 getPackageFamInstEnv = eps_fam_inst_env <$> get_eps
