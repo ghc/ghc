@@ -686,7 +686,7 @@ AC_SUBST(InstallNameToolCmd)
 # versions of LLVM simultaneously, but that stopped working around
 # 3.5/3.6 release of LLVM.
 LlvmMinVersion=9  # inclusive
-LlvmMaxVersion=13 # not inclusive
+LlvmMaxVersion=14 # not inclusive
 AC_SUBST([LlvmMinVersion])
 AC_SUBST([LlvmMaxVersion])
 sUPPORTED_LLVM_VERSION_MIN=$(echo \($LlvmMinVersion\) | sed 's/\./,/')
