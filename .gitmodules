@@ -44,7 +44,7 @@
 	ignore = untracked
 [submodule "libraries/array"]
 	path = libraries/array
-	url = https://gitlab.haskell.org/supersven/array.git
+	url = https://gitlab.haskell.org/ghc/packages/array.git
 	ignore = untracked
 [submodule "libraries/deepseq"]
 	path = libraries/deepseq
