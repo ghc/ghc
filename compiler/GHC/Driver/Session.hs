@@ -190,8 +190,6 @@ module GHC.Driver.Session (
         setUnsafeGlobalDynFlags,
 
         -- * SSE and AVX
-        isSseEnabled,
-        isSse2Enabled,
         isSse4_2Enabled,
         isBmiEnabled,
         isBmi2Enabled,
@@ -245,7 +243,7 @@ import GHC.Utils.Monad
 import GHC.Types.Error (DiagnosticReason(..))
 import GHC.Types.SrcLoc
 import GHC.Types.SafeHaskell
-import GHC.Types.Basic ( Alignment, alignmentOf, IntWithInf, treatZeroAsInf )
+import GHC.Types.Basic ( IntWithInf, treatZeroAsInf )
 import qualified GHC.Types.FieldLabel as FieldLabel
 import GHC.Data.FastString
 import GHC.Utils.TmpFs
@@ -4665,9 +4663,6 @@ compilerInfo dflags
     expandDirectories topd mtoold = expandToolDir useInplaceMinGW mtoold . expandTopDir topd
 
 
-wordAlignment :: Platform -> Alignment
-wordAlignment platform = alignmentOf (platformWordSizeInBytes platform)
-
 -- | Get target profile
 targetProfile :: DynFlags -> Profile
 targetProfile dflags = Profile (targetPlatform dflags) (ways dflags)
@@ -4792,31 +4787,6 @@ setUnsafeGlobalDynFlags dflags = do
 
 -- -----------------------------------------------------------------------------
 -- SSE and AVX
-
--- TODO: Instead of using a separate predicate (i.e. isSse2Enabled) to
--- check if SSE is enabled, we might have x86-64 imply the -msse2
--- flag.
-
-isSseEnabled :: Platform -> Bool
-isSseEnabled platform = case platformArch platform of
-    ArchX86_64 -> True
-    ArchX86    -> True
-    _          -> False
-
-isSse2Enabled :: Platform -> Bool
-isSse2Enabled platform = case platformArch platform of
-  -- We assume  SSE1 and SSE2 operations are available on both
-  -- x86 and x86_64. Historically we didn't default to SSE2 and
-  -- SSE1 on x86, which results in defacto nondeterminism for how
-  -- rounding behaves in the associated x87 floating point instructions
-  -- because variations in the spill/fpu stack placement of arguments for
-  -- operations would change the precision and final result of what
-  -- would otherwise be the same expressions with respect to single or
-  -- double precision IEEE floating point computations.
-    ArchX86_64 -> True
-    ArchX86    -> True
-    _          -> False
-
 
 isSse4_2Enabled :: DynFlags -> Bool
 isSse4_2Enabled dflags = sseVersion dflags >= Just SSE42

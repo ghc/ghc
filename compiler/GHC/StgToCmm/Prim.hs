@@ -29,7 +29,6 @@ import GHC.StgToCmm.Ticky
 import GHC.StgToCmm.Heap
 import GHC.StgToCmm.Prof ( costCentreFrom )
 
-import GHC.Driver.Session
 import GHC.Types.Basic
 import GHC.Cmm.BlockId
 import GHC.Cmm.Graph

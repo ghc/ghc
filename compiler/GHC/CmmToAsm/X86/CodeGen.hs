@@ -80,7 +80,6 @@ import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Data.FastString
-import GHC.Driver.Session
 import GHC.Utils.Misc
 import GHC.Types.Unique.Supply ( getUniqueM )
 
