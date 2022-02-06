@@ -241,7 +241,7 @@ lookupGNUArchiveIndex(int gnuFileIndexSize, char **fileName_,
     return true;
 }
 
-static HsInt loadArchive_ (pathchar *path)
+HsInt loadArchive_ (pathchar *path)
 {
     char *image = NULL;
     HsInt retcode = 0;
@@ -632,3 +632,21 @@ HsInt loadArchive (pathchar *path)
    RELEASE_LOCK(&linker_mutex);
    return r;
 }
+
+bool isArchive (pathchar *path)
+{
+    static const char ARCHIVE_HEADER[] = "!<arch>\n";
+    char buffer[10];
+    FILE *f = pathopen(path, WSTR("rb"));
+    if (f == NULL) {
+        return false;
+    }
+
+    size_t ret = fread(buffer, 1, sizeof(buffer), f);
+    if (ret < sizeof(buffer)) {
+        return false;
+    }
+    fclose(f);
+    return strncmp(ARCHIVE_HEADER, buffer, sizeof(ARCHIVE_HEADER)-1) == 0;
+}
+
