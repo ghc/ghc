@@ -32,6 +32,10 @@ module GHC.Platform
    , PlatformMisc(..)
    , SseVersion (..)
    , BmiVersion (..)
+   , wordAlignment
+   -- * SSE and AVX
+   , isSseEnabled
+   , isSse2Enabled
    -- * Platform constants
    , PlatformConstants(..)
    , lookupPlatformConstants
@@ -50,6 +54,7 @@ import GHC.Read
 import GHC.ByteOrder (ByteOrder(..))
 import GHC.Platform.Constants
 import GHC.Platform.ArchOS
+import GHC.Types.Basic (Alignment, alignmentOf)
 import GHC.Utils.Panic.Plain
 
 import Data.Word
@@ -83,6 +88,39 @@ data Platform = Platform
       -- ^ Constants such as structure offsets, type sizes, etc.
    }
    deriving (Read, Show, Eq, Ord)
+
+wordAlignment :: Platform -> Alignment
+wordAlignment platform = alignmentOf (platformWordSizeInBytes platform)
+
+-- -----------------------------------------------------------------------------
+-- SSE and AVX
+
+-- TODO: Instead of using a separate predicate (i.e. isSse2Enabled) to
+-- check if SSE is enabled, we might have x86-64 imply the -msse2
+-- flag.
+
+isSseEnabled :: Platform -> Bool
+isSseEnabled platform = case platformArch platform of
+    ArchX86_64 -> True
+    ArchX86    -> True
+    _          -> False
+
+isSse2Enabled :: Platform -> Bool
+isSse2Enabled platform = case platformArch platform of
+  -- We assume  SSE1 and SSE2 operations are available on both
+  -- x86 and x86_64. Historically we didn't default to SSE2 and
+  -- SSE1 on x86, which results in defacto nondeterminism for how
+  -- rounding behaves in the associated x87 floating point instructions
+  -- because variations in the spill/fpu stack placement of arguments for
+  -- operations would change the precision and final result of what
+  -- would otherwise be the same expressions with respect to single or
+  -- double precision IEEE floating point computations.
+    ArchX86_64 -> True
+    ArchX86    -> True
+    _          -> False
+
+-- -----------------------------------------------------------------------------
+-- Platform Constants
 
 platformConstants :: Platform -> PlatformConstants
 platformConstants platform = case platform_constants platform of

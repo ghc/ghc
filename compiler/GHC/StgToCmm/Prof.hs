@@ -28,8 +28,6 @@ module GHC.StgToCmm.Prof (
 
 import GHC.Prelude
 
-import GHC.Driver.Session
-
 import GHC.Platform
 import GHC.Platform.Profile
 import GHC.StgToCmm.Closure
