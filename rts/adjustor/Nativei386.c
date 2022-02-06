@@ -53,6 +53,9 @@ createAdjustor(int cconv, StgStablePtr hptr,
 
     {
         ExecPage *page = allocateExecPage();
+        if (page == NULL) {
+            barf("createAdjustor: failed to allocate executable page\n");
+        }
         uint8_t *adj_code = (uint8_t *) page;
         adj_code[0x00] = 0x58;  /* popl %eax  */
 
@@ -83,6 +86,9 @@ createAdjustor(int cconv, StgStablePtr hptr,
           We offload most of the work to AdjustorAsm.S.
         */
         ExecPage *page = allocateExecPage();
+        if (page == NULL) {
+            barf("createAdjustor: failed to allocate executable page\n");
+        }
         AdjustorStub *adjustorStub = (AdjustorStub *) page;
         int sz = totalArgumentSize(typeString);
 

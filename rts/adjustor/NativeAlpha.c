@@ -67,6 +67,9 @@ TODO: Depending on how much allocation overhead stgMallocBytes uses for
     {
         ASSERT(((StgWord64)wptr & 3) == 0);
         ExecPage *page = allocateExecPage();
+        if (page == NULL) {
+            barf("createAdjustor: failed to allocate executable page\n");
+        }
         StgWord64 *const code = (StgWord64 *) page;
 
         code[0] = 0x4610041246520414L;

@@ -145,6 +145,9 @@ createAdjustor(int cconv, StgStablePtr hptr,
             (typeString[3] == '\0')) {
 
             ExecPage *page = allocateExecPage();
+            if (page == NULL) {
+                barf("createAdjustor: failed to allocate executable page\n");
+            }
             StgWord8 *adj_code = (StgWord8*) page;
 
             *(StgInt32 *)adj_code        = 0x49c1894d;
@@ -167,6 +170,9 @@ createAdjustor(int cconv, StgStablePtr hptr,
         {
             bool fourthFloating = (typeString[3] == 'f' || typeString[3] == 'd');
             ExecPage *page = allocateExecPage();
+            if (page == NULL) {
+                barf("createAdjustor: failed to allocate executable page\n");
+            }
             StgWord8 *adj_code = (StgWord8*) page;
 
             *(StgInt32 *)adj_code        = 0x08ec8348;
@@ -266,6 +272,9 @@ createAdjustor(int cconv, StgStablePtr hptr,
 
         if (i < 6) {
             ExecPage *page = allocateExecPage();
+            if (page == NULL) {
+                barf("createAdjustor: failed to allocate executable page\n");
+            }
             StgWord8 *adj_code = (StgWord8*) page;
 
             *(StgInt32 *)adj_code        = 0x49c1894d;
@@ -284,6 +293,9 @@ createAdjustor(int cconv, StgStablePtr hptr,
         else
         {
             ExecPage *page = allocateExecPage();
+            if (page == NULL) {
+                barf("createAdjustor: failed to allocate executable page\n");
+            }
             StgWord8 *adj_code = (StgWord8*) page;
 
             *(StgInt32 *)adj_code        = 0x35ff5141;

@@ -151,6 +151,9 @@ createAdjustor(int cconv, StgStablePtr hptr,
                     // allocate space for at most 4 insns per parameter
                     // plus 14 more instructions.
         ExecPage *page = allocateExecPage();
+        if (page == NULL) {
+            barf("createAdjustor: failed to allocate executable page\n");
+        }
         unsigned *code = adjustor;
 
         *code++ = 0x48000008; // b *+8
@@ -303,6 +306,9 @@ createAdjustor(int cconv, StgStablePtr hptr,
         adjustorStub = stgMallocBytes(sizeof(AdjustorStub), "createAdjustor");
 #else
         ExecPage *page = allocateExecPage();
+        if (page == NULL) {
+            barf("createAdjustor: failed to allocate executable page\n");
+        }
         adjustorStub = (AdjustorStub *) page;
 #endif /* defined(FUNDESCS) */
         adjustor = adjustorStub;
