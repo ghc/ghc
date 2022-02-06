@@ -402,6 +402,7 @@ Library
         GHC.Driver.Config.Core.Opt.LiberateCase
         GHC.Driver.Config.Core.Opt.WorkWrap
         GHC.Driver.Config.Core.Rules
+        GHC.Driver.Config.CoreToStg.Prep
         GHC.Driver.Config.Diagnostic
         GHC.Driver.Config.Finder
         GHC.Driver.Config.HsToCore

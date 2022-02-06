@@ -25,6 +25,7 @@ module GHC.Core.Lint (
     interactiveInScope,
 
     -- ** Debug output
+    EndPassConfig (..),
     endPassIO,
     displayLintResults, dumpPassResult
  ) where
@@ -93,7 +94,7 @@ import qualified GHC.Utils.Error as Err
 import GHC.Utils.Logger
 
 import Control.Monad
-import Data.Foldable      ( toList )
+import Data.Foldable      ( for_, toList )
 import Data.List.NonEmpty ( NonEmpty(..), groupWith )
 import Data.List          ( partition )
 import Data.Maybe
@@ -273,20 +274,30 @@ points but not the RHSes of value bindings (thunks and functions).
 ************************************************************************
 -}
 
+-- | Configuration for boilerplate operations at the end of a
+-- compilation pass producing Core.
+data EndPassConfig = EndPassConfig
+  { ep_dumpCoreSizes :: !Bool
+  -- ^ Whether core bindings should be dumped with the size of what they
+  -- are binding (i.e. the size of the RHS of the binding).
+
+  , ep_lintPassResult :: !(Maybe LintPassResultConfig)
+  -- ^ Whether we should lint the result of this pass.
+  }
+
 endPassIO :: Logger
-           -> LintPassResultConfig
-           -> Bool -- dump core sizes
-           -> Bool -- lint pass result
-           -> PrintUnqualified
-           -> CoreToDo -> CoreProgram -> [CoreRule]
-           -> IO ()
+          -> EndPassConfig
+          -> PrintUnqualified
+          -> CoreToDo -> CoreProgram -> [CoreRule]
+          -> IO ()
 -- Used by the IO-is CorePrep too
-endPassIO logger lp_cfg dump_core_sizes lint_pass_result print_unqual
+endPassIO logger cfg print_unqual
            pass binds rules
-  = do { dumpPassResult logger dump_core_sizes print_unqual mb_flag
+  = do { dumpPassResult logger (ep_dumpCoreSizes cfg) print_unqual mb_flag
                         (renderWithContext defaultSDocContext (ppr pass))
                         (pprPassDetails pass) binds rules
-       ; when lint_pass_result $ lintPassResult' logger lp_cfg pass binds
+       ; for_ (ep_lintPassResult cfg) $ \lp_cfg ->
+           lintPassResult' logger lp_cfg pass binds
        }
   where
     mb_flag = case coreDumpFlag pass of
@@ -364,10 +375,10 @@ coreDumpFlag (CoreDoPasses {})        = Nothing
 -}
 
 data LintPassResultConfig = LintPassResultConfig
-  { endPass_diagOpts      :: !DiagOpts
-  , endPass_platform      :: !Platform
-  , endPass_makeLinkFlags :: CoreToDo -> LintFlags
-  , endPass_localsInScope :: ![Var]
+  { lpr_diagOpts      :: !DiagOpts
+  , lpr_platform      :: !Platform
+  , lpr_makeLintFlags :: !(CoreToDo -> LintFlags)
+  , lpr_localsInScope :: ![Var]
   }
 
 lintPassResult' :: Logger -> LintPassResultConfig
@@ -375,10 +386,10 @@ lintPassResult' :: Logger -> LintPassResultConfig
 lintPassResult' logger cfg pass binds
   = do { let warns_and_errs = lintCoreBindings'
                (LintConfig
-                { l_diagOpts = endPass_diagOpts cfg
-                , l_platform = endPass_platform cfg
-                , l_flags    = endPass_makeLinkFlags cfg pass
-                , l_vars     = endPass_localsInScope cfg
+                { l_diagOpts = lpr_diagOpts cfg
+                , l_platform = lpr_platform cfg
+                , l_flags    = lpr_makeLintFlags cfg pass
+                , l_vars     = lpr_localsInScope cfg
                 })
                binds
        ; Err.showPass logger $

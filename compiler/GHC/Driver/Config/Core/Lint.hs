@@ -4,6 +4,7 @@ module GHC.Driver.Config.Core.Lint
   , lintPassResult
   , lintCoreBindings
   , lintInteractiveExpr
+  , initEndPassConfig
   , initLintPassResultConfig
   , initLintConfig
   ) where
@@ -27,7 +28,6 @@ import GHC.Runtime.Context
 
 import GHC.Data.Bag
 
-import GHC.Utils.Logger
 import GHC.Utils.Outputable as Outputable
 
 {-
@@ -38,14 +38,9 @@ before and after core passes, and do Core Lint when necessary.
 
 endPass :: CoreToDo -> CoreProgram -> [CoreRule] -> CoreM ()
 endPass pass binds rules
-  = do { logger <- getLogger
-       ; m_ic <- getInteractiveContext
-       ; dflags <- getDynFlags
-       ; let dump_core_sizes = not (gopt Opt_SuppressCoreSizes dflags)
+  = do { hsc_env <- getHscEnv
        ; print_unqual <- getPrintUnqualified
-       ; liftIO $ endPassIO logger
-           (initLintPassResultConfig m_ic dflags)
-           dump_core_sizes (gopt Opt_DoCoreLinting dflags)
+       ; liftIO $ endPassHscEnvIO hsc_env
            print_unqual pass binds rules
        }
 
@@ -53,11 +48,9 @@ endPassHscEnvIO :: HscEnv -> PrintUnqualified
           -> CoreToDo -> CoreProgram -> [CoreRule] -> IO ()
 endPassHscEnvIO hsc_env print_unqual pass binds rules
   = do { let dflags  = hsc_dflags hsc_env
-       ; let dump_core_sizes = not (gopt Opt_SuppressCoreSizes dflags)
        ; endPassIO
            (hsc_logger hsc_env)
-           (initLintPassResultConfig (hsc_IC hsc_env) dflags)
-           dump_core_sizes (gopt Opt_DoCoreLinting dflags)
+           (initEndPassConfig (hsc_IC hsc_env) dflags)
            print_unqual pass binds rules
        }
 
@@ -96,12 +89,20 @@ lintInteractiveExpr what hsc_env expr
     dflags = hsc_dflags hsc_env
     logger = hsc_logger hsc_env
 
+initEndPassConfig :: InteractiveContext -> DynFlags -> EndPassConfig
+initEndPassConfig ic dflags = EndPassConfig
+  { ep_dumpCoreSizes = not (gopt Opt_SuppressCoreSizes dflags)
+  , ep_lintPassResult = if gopt Opt_DoCoreLinting dflags
+      then Just $ initLintPassResultConfig ic dflags
+      else Nothing
+  }
+
 initLintPassResultConfig :: InteractiveContext -> DynFlags -> LintPassResultConfig
 initLintPassResultConfig ic dflags = LintPassResultConfig
-  { endPass_diagOpts      = initDiagOpts dflags
-  , endPass_platform      = targetPlatform dflags
-  , endPass_makeLinkFlags = perPassFlags dflags
-  , endPass_localsInScope = interactiveInScope ic
+  { lpr_diagOpts      = initDiagOpts dflags
+  , lpr_platform      = targetPlatform dflags
+  , lpr_makeLintFlags = perPassFlags dflags
+  , lpr_localsInScope = interactiveInScope ic
   }
 
 perPassFlags :: DynFlags -> CoreToDo -> LintFlags
