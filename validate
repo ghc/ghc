@@ -192,7 +192,6 @@ if [ "$use_hadrian" = "NO" ]; then
         # See Note [Default build system verbosity].
         make="$make -s"
     fi
-    $make -C utils/checkUniques
 else
     if [ "$use_stack" = "NO" ]; then
         hadrian/build --help > /dev/null
