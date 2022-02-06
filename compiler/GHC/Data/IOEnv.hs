@@ -170,14 +170,14 @@ tryM (IOEnv thing) = IOEnv (\ env -> tryIOEnvFailure (thing env))
 tryIOEnvFailure :: IO a -> IO (Either IOEnvFailure a)
 tryIOEnvFailure = try
 
-tryAllM :: IOEnv env r -> IOEnv env (Either SomeExceptionWithBacktrace r)
+tryAllM :: IOEnv env r -> IOEnv env (Either SomeException r)
 -- Catch *all* synchronous exceptions
 -- This is used when running a Template-Haskell splice, when
 -- even a pattern-match failure is a programmer error
 tryAllM (IOEnv thing) = IOEnv (\ env -> safeTry (thing env))
 
 -- | Like 'try', but doesn't catch asynchronous exceptions
-safeTry :: IO a -> IO (Either SomeExceptionWithBacktrace a)
+safeTry :: IO a -> IO (Either SomeException a)
 safeTry act = do
   var <- newEmptyMVar
   -- uninterruptible because we want to mask around 'killThread', which is interruptible.
@@ -185,13 +185,13 @@ safeTry act = do
     -- Fork, so that 'act' is safe from all asynchronous exceptions other than the ones we send it
     t <- forkIO $ try (restore act) >>= putMVar var
     restore (readMVar var)
-      `catchException` \(e :: SomeExceptionWithBacktrace) -> do
+      `catchException` \(e :: SomeException) -> do
         -- Control reaches this point only if the parent thread was sent an async exception
         -- In that case, kill the 'act' thread and re-raise the exception
         killThread t
         throwIO e
 
-tryMostM :: IOEnv env r -> IOEnv env (Either SomeExceptionWithBacktrace r)
+tryMostM :: IOEnv env r -> IOEnv env (Either SomeException r)
 tryMostM (IOEnv thing) = IOEnv (\ env -> tryMost (thing env))
 
 ---------------------------

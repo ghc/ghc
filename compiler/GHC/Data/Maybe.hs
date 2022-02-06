@@ -1,5 +1,4 @@
 
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE KindSignatures #-}
@@ -31,6 +30,7 @@ import GHC.IO (catchException)
 
 import Control.Monad
 import Control.Monad.Trans.Maybe
+import Control.Exception (SomeException(..))
 import Data.Maybe
 import Data.Foldable ( foldlM )
 import GHC.Utils.Misc (HasCallStack)
@@ -96,7 +96,7 @@ liftMaybeT act = MaybeT $ Just `liftM` act
 tryMaybeT :: IO a -> MaybeT IO a
 tryMaybeT action = MaybeT $ catchException (Just `fmap` action) handler
   where
-    handler (SomeExceptionWithBacktrace _ _) = return Nothing
+    handler (_ :: SomeException) = return Nothing
 
 {-
 ************************************************************************

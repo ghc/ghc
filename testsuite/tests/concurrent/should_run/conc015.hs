@@ -27,13 +27,13 @@ main = do
         sum [1..1] `seq` -- give 'foo' a chance to be raised
           (restore $ myDelay 500000)
                 `Control.Exception.catch`
-                    \e -> putStrLn ("caught1: " ++ show (e::SomeExceptionWithBacktrace))
+                    \e -> putStrLn ("caught1: " ++ show (e::SomeException))
     threadDelay 10000
     takeMVar m2
    )
     `Control.Exception.catch`
        \e -> do print =<< getMaskingState
-                putStrLn ("caught2: " ++ show (e::SomeExceptionWithBacktrace))
+                putStrLn ("caught2: " ++ show (e::SomeException))
 
 -- compensate for the fact that threadDelay is non-interruptible
 -- on Windows with the threaded RTS in 6.6.

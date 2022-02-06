@@ -24,17 +24,17 @@ main = do
                myDelay 100000
              )
          ) `Control.Exception.catch`
-              \e -> putStrLn ("caught1: " ++ show (e::SomeExceptionWithBacktrace))
+              \e -> putStrLn ("caught1: " ++ show (e::SomeException))
         putMVar m2 ()
         -- blocked here, "bar" can't be delivered
         (sum [1..10000] `seq` return ())
           `Control.Exception.catch`
-              \e -> putStrLn ("caught2: " ++ show (e::SomeExceptionWithBacktrace))
+              \e -> putStrLn ("caught2: " ++ show (e::SomeException))
     -- unblocked here, "bar" delivered to "caught3"
     takeMVar m3
    )
    `Control.Exception.catch`
-       \e -> putStrLn ("caught3: " ++ show (e::SomeExceptionWithBacktrace))
+       \e -> putStrLn ("caught3: " ++ show (e::SomeException))
 
 -- compensate for the fact that threadDelay is non-interruptible
 -- on Windows with the threaded RTS in 6.6.

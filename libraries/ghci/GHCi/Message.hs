@@ -45,6 +45,7 @@ import Data.Dynamic
 import Data.Typeable (TypeRep)
 import Data.IORef
 import Data.Map (Map)
+import Data.Maybe (fromMaybe)
 import Foreign
 import GHC.Generics
 import GHC.Stack.CCS
@@ -53,10 +54,6 @@ import qualified Language.Haskell.TH.Syntax as TH
 import System.Exit
 import System.IO
 import System.IO.Error
-
-#if __GLASGOW_HASKELL__ < 903
-type SomeExceptionWithBacktrace = SomeException
-#endif
 
 -- -----------------------------------------------------------------------------
 -- The RPC protocol between GHC and the interactive server
@@ -415,16 +412,26 @@ data SerializableException
   | EOtherException String
   deriving (Generic, Show)
 
-toSerializableException :: SomeExceptionWithBacktrace -> SerializableException
+toSerializableException :: SomeException -> SerializableException
 toSerializableException ex
-  | Just UserInterrupt <- fromException ex  = EUserInterrupt
-  | Just (ec::ExitCode) <- fromException ex = (EExitCode ec)
-  | otherwise = EOtherException (show (ex :: SomeExceptionWithBacktrace))
+  | Just UserInterrupt <- (fromException . toException) ex  = EUserInterrupt
+  | Just (ec::ExitCode) <- (fromException . toException) ex = (EExitCode ec)
+  | otherwise = EOtherException (show (ex :: SomeException))
 
-fromSerializableException :: SerializableException -> SomeExceptionWithBacktrace
-fromSerializableException EUserInterrupt = toException UserInterrupt
-fromSerializableException (EExitCode c) = toException c
-fromSerializableException (EOtherException str) = toException (ErrorCall str)
+fromSerializableException :: SerializableException -> SomeException
+fromSerializableException EUserInterrupt = convertException UserInterrupt
+fromSerializableException (EExitCode c) = convertException c
+fromSerializableException (EOtherException str) = convertException (ErrorCall str)
+
+-- | Convert 'Exception' @e@ to 'SomeException'
+-- This is glue code to support both, 'SomeException' (old GHC) and
+-- @SomeExceptionWithBacktrace@ (new GHC) as 'Exception' roots.
+convertException :: Exception e => e -> SomeException
+-- All exceptions are convertible to 'SomeException',
+-- thus the 'Nothing' case should never happen!
+convertException e = fromMaybe
+                    (error "This should never happen!") $
+                    (fromException . toException) e
 
 instance Binary ExitCode
 instance Binary SerializableException

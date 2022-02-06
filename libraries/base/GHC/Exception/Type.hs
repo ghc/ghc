@@ -1,7 +1,6 @@
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE BangPatterns #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
 -----------------------------------------------------------------------------
@@ -41,12 +40,12 @@ This additional layer is used to provide a list of 'Backtrace's.
 
 @since 4.16.0.0
 -}
-data SomeExceptionWithBacktrace = SomeExceptionWithBacktrace !SomeException ![Backtrace]
+data SomeExceptionWithBacktrace = SomeExceptionWithBacktrace SomeException [Backtrace]
 
 -- | Former root of 'Exception's
 -- Now 'SomeException' is usually wrapped by 'SomeExceptionWithBacktrace'.
 -- 'SomeException' has been kept as a type for backwards compatibility.
-data SomeException = forall e . Exception e => SomeException !e
+data SomeException = forall e . Exception e => SomeException e
 
 -- @since 4.16.0.0
 instance Show SomeExceptionWithBacktrace where

@@ -201,7 +201,7 @@ data CmdExecOutcome
 data CommandResult
    = CommandComplete
    { cmdInput :: String
-   , cmdResult :: Either SomeExceptionWithBacktrace (Maybe Bool)
+   , cmdResult :: Either SomeException (Maybe Bool)
    , cmdStats :: ActionStats
    }
    | CommandIncomplete
@@ -441,7 +441,7 @@ runAndPrintStats
   :: GhciMonad m
   => (a -> Maybe Integer)
   -> m a
-  -> m (ActionStats, Either SomeExceptionWithBacktrace a)
+  -> m (ActionStats, Either SomeException a)
 runAndPrintStats getAllocs action = do
   result <- runWithStats getAllocs action
   case result of
@@ -455,7 +455,7 @@ runAndPrintStats getAllocs action = do
 
 runWithStats
   :: ExceptionMonad m
-  => (a -> Maybe Integer) -> m a -> m (ActionStats, Either SomeExceptionWithBacktrace a)
+  => (a -> Maybe Integer) -> m a -> m (ActionStats, Either SomeException a)
 runWithStats getAllocs action = do
   t0 <- liftIO getCurrentTime
   result <- MC.try action

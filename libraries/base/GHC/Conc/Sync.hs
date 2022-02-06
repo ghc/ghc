@@ -95,7 +95,6 @@ module GHC.Conc.Sync
 import Foreign
 import Foreign.C
 
-import Data.Typeable
 import Data.Maybe
 
 import GHC.Base
@@ -391,19 +390,19 @@ numSparks = IO $ \s -> case numSparks# s of (# s', n #) -> (# s', I# n #)
 
 foreign import ccall "&enabled_capabilities" enabled_capabilities :: Ptr CInt
 
-childHandler :: SomeExceptionWithBacktrace -> IO ()
+childHandler :: SomeException -> IO ()
 childHandler err = catch (real_handler err) childHandler
   -- We must use catch here rather than catchException. If the
   -- raised exception throws an (imprecise) exception, then real_handler err
   -- will do so as well. If we use catchException here, then we could miss
   -- that exception.
 
-real_handler :: SomeExceptionWithBacktrace -> IO ()
+real_handler :: SomeException -> IO ()
 real_handler se
-  | Just BlockedIndefinitelyOnMVar <- fromException se  =  return ()
-  | Just BlockedIndefinitelyOnSTM  <- fromException se  =  return ()
-  | Just ThreadKilled              <- fromException se  =  return ()
-  | Just StackOverflow             <- fromException se  =  reportStackOverflow
+  | Just BlockedIndefinitelyOnMVar <- (fromException . toException) se  =  return ()
+  | Just BlockedIndefinitelyOnSTM  <- (fromException . toException) se  =  return ()
+  | Just ThreadKilled              <- (fromException . toException) se  =  return ()
+  | Just StackOverflow             <- (fromException . toException) se  =  reportStackOverflow
   | otherwise                                           =  reportError se
 
 {- | 'killThread' raises the 'ThreadKilled' exception in the given
@@ -888,7 +887,7 @@ reportStackOverflow = do
      ThreadId tid <- myThreadId
      c_reportStackOverflow tid
 
-reportError :: SomeExceptionWithBacktrace -> IO ()
+reportError :: SomeException -> IO ()
 reportError ex = do
    handler <- getUncaughtExceptionHandler
    handler ex
@@ -902,13 +901,13 @@ foreign import ccall unsafe "reportHeapOverflow"
         reportHeapOverflow :: IO ()
 
 {-# NOINLINE uncaughtExceptionHandler #-}
-uncaughtExceptionHandler :: IORef (SomeExceptionWithBacktrace -> IO ())
+uncaughtExceptionHandler :: IORef (SomeException -> IO ())
 uncaughtExceptionHandler = unsafePerformIO (newIORef defaultHandler)
    where
-      defaultHandler :: SomeExceptionWithBacktrace -> IO ()
-      defaultHandler se@(SomeExceptionWithBacktrace (SomeException ex) _) = do
+      defaultHandler :: SomeException -> IO ()
+      defaultHandler se = do
          (hFlush stdout) `catchAny` (\ _ -> return ())
-         let msg = case cast ex of
+         let msg = case (fromException . toException) se of
                Just Deadlock -> "no threads to run:  infinite loop or deadlock?"
                _                  -> showsPrec 0 se ""
          withCString "%s" $ \cfmt ->
@@ -920,8 +919,8 @@ uncaughtExceptionHandler = unsafePerformIO (newIORef defaultHandler)
 foreign import ccall unsafe "HsBase.h errorBelch2"
    errorBelch :: CString -> CString -> IO ()
 
-setUncaughtExceptionHandler :: (SomeExceptionWithBacktrace -> IO ()) -> IO ()
+setUncaughtExceptionHandler :: (SomeException -> IO ()) -> IO ()
 setUncaughtExceptionHandler = writeIORef uncaughtExceptionHandler
 
-getUncaughtExceptionHandler :: IO (SomeExceptionWithBacktrace -> IO ())
+getUncaughtExceptionHandler :: IO (SomeException -> IO ())
 getUncaughtExceptionHandler = readIORef uncaughtExceptionHandler

@@ -9,4 +9,4 @@ import Control.Exception
 main = do
   id <- myThreadId
   Control.Exception.catch (killThread id) $
-     \e -> putStr (show (e::SomeExceptionWithBacktrace))
+     \e -> putStr (show (e::SomeException))

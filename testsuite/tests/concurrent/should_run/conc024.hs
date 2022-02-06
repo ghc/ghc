@@ -10,6 +10,6 @@ import System.Mem
 main = do
   id <- myThreadId
   forkIO (catch (do m <- newEmptyMVar; takeMVar m)
-                (\e -> throwTo id (e::SomeExceptionWithBacktrace)))
+                (\e -> throwTo id (e::SomeException)))
   catch (do yield; performGC; threadDelay 1000000)
-        (\e -> print (e::SomeExceptionWithBacktrace))
+        (\e -> print (e::SomeException))

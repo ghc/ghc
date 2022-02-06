@@ -154,10 +154,10 @@ runIOFastExit main = catch main topHandlerFastExit
 runNonIO :: a -> IO a
 runNonIO a = catch (a `seq` return a) topHandler
 
-topHandler :: SomeExceptionWithBacktrace -> IO a
+topHandler :: SomeException -> IO a
 topHandler err = catch (real_handler safeExit err) topHandler
 
-topHandlerFastExit :: SomeExceptionWithBacktrace -> IO a
+topHandlerFastExit :: SomeException -> IO a
 topHandlerFastExit err =
   catchException (real_handler fastExit err) topHandlerFastExit
 
@@ -165,10 +165,10 @@ topHandlerFastExit err =
 -- (e.g. evaluating the string passed to 'error' might generate
 --  another error, etc.)
 --
-real_handler :: (Int -> IO a) -> SomeExceptionWithBacktrace -> IO a
+real_handler :: (Int -> IO a) -> SomeException -> IO a
 real_handler exit se = do
   flushStdHandles -- before any error output
-  case fromException se of
+  case (fromException . toException) se of
       Just StackOverflow -> do
            reportStackOverflow
            exit 2
@@ -179,13 +179,13 @@ real_handler exit se = do
            reportHeapOverflow
            exit 251
 
-      _ -> case fromException se of
+      _ -> case (fromException . toException) se of
            -- only the main thread gets ExitException exceptions
            Just ExitSuccess     -> exit 0
            Just (ExitFailure n) -> exit n
 
            -- EPIPE errors received for stdout are ignored (#2699)
-           _ -> catch (case fromException se of
+           _ -> catch (case (fromException . toException) se of
                 Just IOError{ ioe_type = ResourceVanished,
                               ioe_errno = Just ioe,
                               ioe_handle = Just hdl }

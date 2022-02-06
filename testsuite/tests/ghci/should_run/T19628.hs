@@ -63,7 +63,7 @@ main = do
   print x2
   print x3
   print x4
-  print x5 `catch` \(e::SomeExceptionWithBacktrace) -> putStrLn "x5: exception"
-  print x6 `catch` \(e::SomeExceptionWithBacktrace) -> putStrLn "x6: exception"
+  print x5 `catch` \(e::SomeException) -> putStrLn "x5: exception"
+  print x6 `catch` \(e::SomeException) -> putStrLn "x6: exception"
   print x7
   print x8

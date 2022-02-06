@@ -111,7 +111,11 @@ data GhcException
 
 instance Exception GhcException where
   -- TODO: Print stack traces here
+#if __GLASGOW_HASKELL__ < 903
+  fromException (SomeException e)
+#else
   fromException (SomeExceptionWithBacktrace (SomeException e) _)
+#endif
     | Just ge <- cast e = Just ge
     | Just pge <- cast e = Just $
         case pge of
@@ -139,7 +143,7 @@ safeShowException e = do
     r <- try (return $! forceList (showException e))
     case r of
         Right msg -> return msg
-        Left e' -> safeShowException (e' :: SomeExceptionWithBacktrace)
+        Left e' -> safeShowException (e' :: SomeException)
     where
         forceList [] = []
         forceList xs@(x : xt) = x `seq` forceList xt `seq` xs
@@ -197,18 +201,18 @@ pgmErrorDoc x doc = throwGhcException (PprProgramError x doc)
 -- | Like try, but pass through UserInterrupt and Panic exceptions.
 --   Used when we want soft failures when reading interface files, for example.
 --   TODO: I'm not entirely sure if this is catching what we really want to catch
-tryMost :: IO a -> IO (Either SomeExceptionWithBacktrace a)
+tryMost :: IO a -> IO (Either SomeException a)
 tryMost action = do r <- try action
                     case r of
                         Left se ->
-                            case fromException se of
+                            case (fromException . toException) se of
                                 -- Some GhcException's we rethrow,
                                 Just (Signal _)  -> throwIO se
                                 Just (Panic _)   -> throwIO se
                                 -- others we return
                                 Just _           -> return (Left se)
                                 Nothing ->
-                                    case fromException se of
+                                    case (fromException . toException) se of
                                         -- All IOExceptions are returned
                                         Just (_ :: IOException) ->
                                             return (Left se)

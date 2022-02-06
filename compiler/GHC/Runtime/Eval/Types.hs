@@ -22,6 +22,7 @@ import GHC.Types.TyThing
 import GHC.Types.BreakInfo
 import GHC.Types.Name.Reader
 import GHC.Types.SrcLoc
+import GHC.Utils.Exception
 
 import Data.Word
 import GHC.Stack.CCS
@@ -45,7 +46,7 @@ isStep _ = True
 
 data ExecResult
   = ExecComplete
-       { execResult :: Either SomeExceptionWithBacktrace [Name]
+       { execResult :: Either SomeException [Name]
        , execAllocation :: Word64
        }
   | ExecBreak
