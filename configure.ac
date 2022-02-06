@@ -443,14 +443,19 @@ then
 
     mingwbin="$hardtop/inplace/mingw/bin/"
     CC="${mingwbin}clang.exe"
+    CFLAGS="-fuse-ld=lld --rtlib=compiler-rt"
+    CONF_CC_OPTS_STAGE1="--rtlib=compiler-rt"
+    CONF_CC_OPTS_STAGE2="--rtlib=compiler-rt"
+    CONF_GCC_LINKER_OPTS_STAGE1="-fuse-ld=lld --rtlib=compiler-rt"
+    CONF_GCC_LINKER_OPTS_STAGE2="-fuse-ld=lld --rtlib=compiler-rt"
     LD="${mingwbin}ld.lld.exe"
     NM="${mingwbin}llvm-nm.exe"
     AR="${mingwbin}llvm-ar.exe"
     RANLIB="${mingwbin}llvm-ranlib.exe"
     OBJDUMP="${mingwbin}llvm-objdump.exe"
     DLLTOOL="${mingwbin}llvm-dlltool.exe"
-    MergeObjsCmd="${mingwbin}ld.lld.exe"
-    MergeObjsArgs="-r"
+    MergeObjsCmd="${mingwbin}ld.bfd.exe"
+    MergeObjsArgs="-r --oformat=pe-bigobj-x86-64"
     AC_PATH_PROG([Genlib],[genlib])
 fi
 
