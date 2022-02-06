@@ -23,7 +23,7 @@ module GHC.Driver.Pipeline (
 
    -- * Interfaces for the compilation manager (interpreted/batch-mode)
    preprocess,
-   compileOne, compileOne',
+   compileOne',
    compileForeign, compileEmptyStub,
 
    -- * Linking
@@ -204,16 +204,6 @@ preprocess hsc_env input_fn mb_input_buf mb_phase =
 --
 -- NB.  No old interface can also mean that the source has changed.
 
-
-compileOne :: HscEnv
-           -> ModSummary      -- ^ summary for module being compiled
-           -> Int             -- ^ module N ...
-           -> Int             -- ^ ... of M
-           -> Maybe ModIface  -- ^ old interface, if we have one
-           -> Maybe Linkable  -- ^ old linkable, if we have one
-           -> IO HomeModInfo   -- ^ the complete HomeModInfo, if successful
-
-compileOne = compileOne' (Just batchMsg)
 
 compileOne' :: Maybe Messager
             -> HscEnv
