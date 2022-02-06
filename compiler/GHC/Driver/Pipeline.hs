@@ -480,7 +480,7 @@ linkingNeeded logger dflags unit_env staticLink linkables pkg_deps = do
       exe_file   = exeFileName platform staticLink (outputFile_ dflags)
   e_exe_time <- tryIO $ getModificationUTCTime exe_file
   case e_exe_time of
-    Left _  -> return MustCompile
+    Left _  -> return $ NeedsRecompile MustCompile
     Right t -> do
         -- first check object files and extra_ld_inputs
         let extra_ld_inputs = [ f | FileOption _ f <- ldInputs dflags ]
@@ -488,7 +488,7 @@ linkingNeeded logger dflags unit_env staticLink linkables pkg_deps = do
         let (errs,extra_times) = partitionEithers e_extra_times
         let obj_times =  map linkableTime linkables ++ extra_times
         if not (null errs) || any (t <) obj_times
-            then return (RecompBecause ObjectsChanged)
+            then return $ needsRecompileBecause ObjectsChanged
             else do
 
         -- next, check libraries. XXX this only checks Haskell libraries,
@@ -498,16 +498,16 @@ linkingNeeded logger dflags unit_env staticLink linkables pkg_deps = do
                             lib <- unitHsLibs (ghcNameVersion dflags) (ways dflags) c ]
 
         pkg_libfiles <- mapM (uncurry (findHSLib platform (ways dflags))) pkg_hslibs
-        if any isNothing pkg_libfiles then return (RecompBecause LibraryChanged) else do
+        if any isNothing pkg_libfiles then return $ needsRecompileBecause LibraryChanged else do
         e_lib_times <- mapM (tryIO . getModificationUTCTime)
                           (catMaybes pkg_libfiles)
         let (lib_errs,lib_times) = partitionEithers e_lib_times
         if not (null lib_errs) || any (t <) lib_times
-           then return (RecompBecause LibraryChanged)
+           then return $ needsRecompileBecause LibraryChanged
            else do
             res <- checkLinkInfo logger dflags unit_env pkg_deps exe_file
             if res
-              then return (RecompBecause FlagsChanged)
+              then return $ needsRecompileBecause FlagsChanged
               else return UpToDate
 
 

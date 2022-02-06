@@ -570,20 +570,20 @@ mkBackpackMsg = do
       in case node of
         InstantiationNode _ _ ->
           case recomp of
-            MustCompile -> showMsg (text "Instantiating ") empty
             UpToDate
               | verbosity (hsc_dflags hsc_env) >= 2 -> showMsg (text "Skipping  ") empty
               | otherwise -> return ()
-            RecompBecause reason -> showMsg (text "Instantiating ")
-                                            (text " [" <> pprWithUnitState state (ppr reason) <> text "]")
+            NeedsRecompile reason0 -> showMsg (text "Instantiating ") $ case reason0 of
+              MustCompile -> empty
+              RecompBecause reason -> text " [" <> pprWithUnitState state (ppr reason) <> text "]"
         ModuleNode _ _ ->
           case recomp of
-            MustCompile -> showMsg (text "Compiling ") empty
             UpToDate
               | verbosity (hsc_dflags hsc_env) >= 2 -> showMsg (text "Skipping  ") empty
               | otherwise -> return ()
-            RecompBecause reason -> showMsg (text "Compiling ")
-                                            (text " [" <> pprWithUnitState state (ppr reason) <> text "]")
+            NeedsRecompile reason0 -> showMsg (text "Compiling ") $ case reason0 of
+              MustCompile -> empty
+              RecompBecause reason -> text " [" <> pprWithUnitState state (ppr reason) <> text "]"
         LinkNode _ _ -> showMsg (text "Linking ")  empty
 
 -- | 'PprStyle' for Backpack messages; here we usually want the module to

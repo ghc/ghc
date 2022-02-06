@@ -745,38 +745,43 @@ hscRecompStatus
           Just hscMessage -> hscMessage hsc_env mod_index what (ModuleNode [] mod_summary)
           Nothing -> return ()
 
-      -- First check to see if the interface file agrees with the
-      -- source file.
+    -- First check to see if the interface file agrees with the
+    -- source file.
+    --
+    -- Save the interface that comes back from checkOldIface.
+    -- In one-shot mode we don't have the old iface until this
+    -- point, when checkOldIface reads it from the disk.
     (recomp_iface_reqd, mb_checked_iface)
           <- {-# SCC "checkOldIface" #-}
              liftIO $ checkOldIface hsc_env mod_summary mb_old_iface
-      -- Check to see whether the expected build products already exist.
-      -- If they don't exists then we trigger recompilation.
-    let lcl_dflags = ms_hspp_opts mod_summary
-    (recomp_obj_reqd, mb_linkable) <-
-      case () of
-        -- No need for a linkable, we're good to go
-        _ | NoBackend <- backend lcl_dflags   -> return (UpToDate, Nothing)
-          -- Interpreter can use either already loaded bytecode or loaded object code
-          | not (backendProducesObject (backend lcl_dflags)) -> do
-              res <- liftIO $ checkByteCode old_linkable
-              case res of
-                (_, Just{}) -> return res
-                _ -> liftIO $ checkObjects lcl_dflags old_linkable mod_summary
-          -- Need object files for making object files
-          | backendProducesObject (backend lcl_dflags) -> liftIO $ checkObjects lcl_dflags old_linkable mod_summary
-          | otherwise -> pprPanic "hscRecompStatus" (text $ show $ backend lcl_dflags)
-    let recomp_reqd = recomp_iface_reqd `mappend` recomp_obj_reqd
-    -- save the interface that comes back from checkOldIface.
-    -- In one-shot mode we don't have the old iface until this
-    -- point, when checkOldIface reads it from the disk.
     let mb_old_hash = fmap (mi_iface_hash . mi_final_exts) mb_checked_iface
-    msg recomp_reqd
-    case mb_checked_iface of
-        Just iface | not (recompileRequired recomp_reqd) ->
-          return $ HscUpToDate iface mb_linkable
-        _ ->
-          return $ HscRecompNeeded mb_old_hash
+    case recomp_iface_reqd of
+      NeedsRecompile _ -> do
+        msg recomp_iface_reqd
+        return $ HscRecompNeeded mb_old_hash
+      UpToDate -> do
+        -- Check to see whether the expected build products already exist.
+        -- If they don't exists then we trigger recompilation.
+        let lcl_dflags = ms_hspp_opts mod_summary
+        (recomp_obj_reqd, mb_linkable) <-
+          case () of
+            -- No need for a linkable, we're good to go
+            _ | NoBackend <- backend lcl_dflags   -> return (UpToDate, Nothing)
+              -- Interpreter can use either already loaded bytecode or loaded object code
+              | not (backendProducesObject (backend lcl_dflags)) -> do
+                  let res = checkByteCode old_linkable
+                  case res of
+                    (_, Just{}) -> return res
+                    _ -> liftIO $ checkObjects lcl_dflags old_linkable mod_summary
+              -- Need object files for making object files
+              | backendProducesObject (backend lcl_dflags) -> liftIO $ checkObjects lcl_dflags old_linkable mod_summary
+              | otherwise -> pprPanic "hscRecompStatus" (text $ show $ backend lcl_dflags)
+        msg recomp_obj_reqd
+        case (mb_checked_iface, recomp_obj_reqd) of
+            (Just iface, UpToDate) ->
+              return $ HscUpToDate iface mb_linkable
+            _ ->
+              return $ HscRecompNeeded mb_old_hash
 
 -- | Check that the .o files produced by compilation are already up-to-date
 -- or not.
@@ -795,7 +800,7 @@ checkObjects dflags mb_old_linkable summary = do
     checkDynamicObj k = if dt_enabled
                           then case (>=) <$> mb_dyn_obj_date <*> mb_if_date of
                                       Just True -> k
-                                      _ -> return (RecompBecause MissingDynObjectFile, Nothing)
+                                      _ -> return (needsRecompileBecause MissingDynObjectFile, Nothing)
                           -- Not in dynamic-too mode
                           else k
 
@@ -808,18 +813,18 @@ checkObjects dflags mb_old_linkable summary = do
                 | isObjectLinkable old_linkable, linkableTime old_linkable == obj_date
                 -> return $ (UpToDate, Just old_linkable)
               _ -> (UpToDate,) . Just <$> findObjectLinkable this_mod obj_fn obj_date
-      _ -> return (RecompBecause MissingObjectFile, Nothing)
+      _ -> return (needsRecompileBecause MissingObjectFile, Nothing)
 
 -- | Check to see if we can reuse the old linkable, by this point we will
 -- have just checked that the old interface matches up with the source hash, so
 -- no need to check that again here
-checkByteCode ::  Maybe Linkable -> IO (RecompileRequired, Maybe Linkable)
+checkByteCode :: Maybe Linkable -> (RecompileRequired, Maybe Linkable)
 checkByteCode mb_old_linkable =
   case mb_old_linkable of
     Just old_linkable
       | not (isObjectLinkable old_linkable)
-      -> return $ (UpToDate, Just old_linkable)
-    _ -> return $ (RecompBecause MissingBytecode, Nothing)
+      -> (UpToDate, Just old_linkable)
+    _ -> (needsRecompileBecause MissingBytecode, Nothing)
 
 --------------------------------------------------------------
 -- Compilers
@@ -1126,7 +1131,7 @@ oneShotMsg :: Logger -> RecompileRequired -> IO ()
 oneShotMsg logger recomp =
     case recomp of
         UpToDate -> compilationProgressMsg logger $ text "compilation IS NOT required"
-        _        -> return ()
+        NeedsRecompile _ -> return ()
 
 batchMsg :: Messager
 batchMsg = batchMsgWith (\_ _ _ _ -> empty)
@@ -1136,12 +1141,12 @@ batchMultiMsg = batchMsgWith (\_ _ _ node -> brackets (ppr (moduleGraphNodeUnitI
 batchMsgWith :: (HscEnv -> (Int, Int) -> RecompileRequired -> ModuleGraphNode -> SDoc) -> Messager
 batchMsgWith extra hsc_env_start mod_index recomp node =
       case recomp of
-        MustCompile -> showMsg (text herald) empty
         UpToDate
           | logVerbAtLeast logger 2 -> showMsg (text "Skipping") empty
           | otherwise -> return ()
-        RecompBecause reason -> showMsg (text herald)
-                                        (text " [" <> pprWithUnitState state (ppr reason) <> text "]")
+        NeedsRecompile reason0 -> showMsg (text herald) $ case reason0 of
+          MustCompile            -> empty
+          (RecompBecause reason) -> text " [" <> pprWithUnitState state (ppr reason) <> text "]"
     where
         herald = case node of
                     LinkNode {} -> "Linking"
