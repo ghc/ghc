@@ -92,7 +92,7 @@ static int virtualQuery(void *baseAddr, PMEMORY_BASIC_INFORMATION info)
 
 static inline uintptr_t round_up(uintptr_t num, uint64_t factor)
 {
-  return num + factor - 1 - (num + factor - 1) % factor;
+    return num + factor - 1 - (num + factor - 1) % factor;
 }
 
 /*
@@ -101,30 +101,22 @@ static inline uintptr_t round_up(uintptr_t num, uint64_t factor)
  * bytes you *must* allocate is returned in REQ.  You are free to use less but
  * you must allocate the amount given in REQ.  If not successful NULL.
  */
-static void *allocateBytes(void* baseAddr, size_t sz, size_t *req)
+static void *allocateBytes(void* baseAddr, void *endAddr, size_t sz, size_t *req)
 {
     SYSTEM_INFO sys;
     GetSystemInfo(&sys);
-    const uint64_t max_range = 4294967296UL;
-    IF_DEBUG(linker_verbose, debugBelch("Base Address 0x%p\n", baseAddr));
-    IF_DEBUG(linker_verbose, debugBelch("Requesting mapping of %" FMT_SizeT " bytes within range %"
-                                PRId64 " bytes\n", sz, max_range));
+
+    IF_DEBUG(linker_verbose, debugBelch("Requesting mapping of %" FMT_SizeT " bytes between %p and %p\n",
+                                sz, baseAddr, endAddr));
 
     MEMORY_BASIC_INFORMATION info;
-    IF_DEBUG(linker_verbose, debugBelch("Initial query @ 0x%p...\n", baseAddr));
-    int res = virtualQuery(baseAddr, &info);
-    if (res) {
-        return NULL;
-    }
-
-    uint8_t *endAddr = (uint8_t *) baseAddr + max_range;
-    uint8_t *initialAddr = info.AllocationBase;
+    uint8_t *initialAddr = baseAddr;
     uint8_t *region = NULL;
     while (!region
-           && (uint64_t) llabs(initialAddr - endAddr) <= max_range
+           && initialAddr <= (uint8_t *) endAddr
            && (void *) initialAddr < sys.lpMaximumApplicationAddress)
     {
-        res = virtualQuery(initialAddr, &info);
+        int res = virtualQuery(initialAddr, &info);
         if (res) {
             return NULL;
         }
@@ -133,8 +125,6 @@ static void *allocateBytes(void* baseAddr, size_t sz, size_t *req)
             IF_DEBUG(linker_verbose, debugBelch("Free range at 0x%p of %zu bytes\n",
                                         info.BaseAddress, info.RegionSize));
 
-            MEMORY_BASIC_INFORMATION info2;
-            res = virtualQuery(endAddr+1, &info2);
             if (info.RegionSize >= sz) {
                 if (info.AllocationBase == 0) {
                     size_t needed_sz = round_up (sz, sys.dwAllocationGranularity);
@@ -163,6 +153,42 @@ static void *allocateBytes(void* baseAddr, size_t sz, size_t *req)
     return region;
 }
 
+/* Find free address space for mapping anonymous memory. */
+static void *allocateLocalBytes(size_t sz, size_t *req)
+{
+    // We currently don't attempt to take address space from the region below
+    // the image as malloc() tends to like to use this space, but we could do if
+    // necessary.
+    size_t max_range = 0x7fffffff - sz;
+
+    static void *base_addr = NULL;
+    if (base_addr == NULL) {
+        base_addr = GetModuleHandleW(NULL);
+    }
+    uint8_t *end_addr = (uint8_t *) base_addr + max_range;
+
+    // We track the location of the last allocation to avoid having to
+    // do a linear search of address space looking for space on every allocation
+    // as this can easily devolve into quadratic complexity.
+    static void *last_alloca = NULL;
+    if (last_alloca == NULL) {
+        // Start the search at the image base
+        last_alloca = base_addr;
+    }
+
+    void *result = NULL;
+    result = allocateBytes (last_alloca, end_addr, sz, req);
+    if (result == NULL) {
+        // We failed to find suitable address space; restart the search at base_addr.
+        result = allocateBytes (base_addr, end_addr, sz, req);
+    }
+
+    if (result != NULL) {
+        last_alloca = (uint8_t *) result + *req;
+    }
+    return result;
+}
+
 static DWORD
 memoryAccessToProt(MemoryAccess access)
 {
@@ -187,7 +213,7 @@ mmapAnonForLinker (size_t bytes)
   /* For linking purposes we want to load code within a 4GB range from the
      load address of the application.  As such we need to find a location to
      allocate at.   */
-  void* region = allocateBytes (GetModuleHandleW (NULL), bytes, &size);
+  void* region = allocateLocalBytes (bytes, &size);
   if (region == NULL) {
       return NULL;
   }
