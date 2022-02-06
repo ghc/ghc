@@ -204,11 +204,6 @@ typedef struct {
   StgWord data;
 } StgIntCharlikeClosure;
 
-/* statically allocated */
-typedef struct {
-  StgHeader  header;
-} StgRetry;
-
 typedef struct _StgStableName {
   StgHeader      header;
   StgWord        sn;
