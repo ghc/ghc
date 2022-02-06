@@ -76,7 +76,7 @@
 	ignore = untracked
 [submodule "libraries/process"]
 	path = libraries/process
-	url = https://gitlab.haskell.org/supersven/process.git
+	url = https://gitlab.haskell.org/ghc/packages/process.git
 	ignore = untracked
 [submodule "libraries/unix"]
 	path = libraries/unix
