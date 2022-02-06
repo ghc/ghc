@@ -476,7 +476,7 @@ test('keep-cafs',
 # When -fcompact-unwind becomes default, generalize test to all platforms.
 test('T11829', unless(opsys('darwin'), skip), compile_and_run, ['T11829_c.cpp -lstdc++ -fcompact-unwind'])
 
-test('T16514', unless(opsys('mingw32'), skip), compile_and_run, ['T16514_c.cpp -lstdc++'])
+test('T16514', normal, compile_and_run, ['T16514_c.c'])
 test('test-zeroongc', extra_run_opts('-DZ'), compile_and_run, ['-debug'])
 
 test('T13676',
