@@ -1492,9 +1492,6 @@ foldMapDefault = coerce (traverse @t @(Const m) @a @())
 --
 -- @'traverse' 'pure' = 'pure'@
 --
--- (The naturality law is implied by parametricity and thus so is the
--- purity law [1, p15].)
---
 -- The superclass instances should satisfy the following:
 --
 --  * In the 'Functor' instance, 'fmap' should be equivalent to traversal
@@ -1513,7 +1510,7 @@ foldMapDefault = coerce (traverse @t @(Const m) @a @())
 
 -- $also
 --
---  * [1] \"The Essence of the Iterator Pattern\",
+--  * \"The Essence of the Iterator Pattern\",
 --    by Jeremy Gibbons and Bruno Oliveira,
 --    in /Mathematically-Structured Functional Programming/, 2006, online at
 --    <http://www.cs.ox.ac.uk/people/jeremy.gibbons/publications/#iterator>.
