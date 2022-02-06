@@ -8,7 +8,6 @@ import Packages
 import Utilities (askWithResources, build)
 import Hadrian.Target (target)
 import qualified System.Directory.Extra as IO
-import qualified Control.Exception.Base as IO
 import Oracles.ModuleFiles (determineBuilder)
 
 sourceDistRules :: Rules ()
