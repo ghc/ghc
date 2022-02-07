@@ -21,7 +21,7 @@
 #include <mach/vm_statistics.h>
 #endif
 
-#include "MemoryMap.h"
+#include "ReportMemoryMap.h"
 
 #if defined(mingw32_HOST_OS)
 
