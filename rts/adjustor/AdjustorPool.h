@@ -11,11 +11,11 @@ struct AdjustorContext {
     StgFunPtr wptr;
 };
 
-typedef void (*mk_adjustor_code_fn)(uint8_t *exec_code, const struct AdjustorContext *context, void *user_data);
+typedef void (*mk_adjustor_code_fn)(uint8_t *exec_code, const void *context, void *user_data);
 
-struct AdjustorPool *new_adjustor_pool(size_t code_size, mk_adjustor_code_fn make_code, void *user_data);
-void *alloc_adjustor(struct AdjustorPool *pool, struct AdjustorContext context);
-struct AdjustorContext free_adjustor(void *adjustor);
+struct AdjustorPool *new_adjustor_pool(size_t context_sz, size_t code_sz, mk_adjustor_code_fn make_code, void *user_data);
+void *alloc_adjustor(struct AdjustorPool *pool, void *context);
+void free_adjustor(void *adjustor, void *context);
 
 /* High-level interface: Adjustors from code template */
 struct AdjustorTemplate {

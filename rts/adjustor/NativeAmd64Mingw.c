@@ -91,15 +91,15 @@ createAdjustor(int cconv, StgStablePtr hptr,
             (typeString[2] == '\0') ||
             (typeString[3] == '\0'))
         {
-            return alloc_adjustor(simple_ccall_pool, context);
+            return alloc_adjustor(simple_ccall_pool, &context);
         }
         else
         {
             bool fourthFloating = (typeString[3] == 'f' || typeString[3] == 'd');
             if (fourthFloating) {
-                return alloc_adjustor(complex_float_ccall_pool, context);
+                return alloc_adjustor(complex_float_ccall_pool, &context);
             } else {
-                return alloc_adjustor(complex_nofloat_ccall_pool, context);
+                return alloc_adjustor(complex_nofloat_ccall_pool, &context);
             }
         }
     }
@@ -112,7 +112,8 @@ createAdjustor(int cconv, StgStablePtr hptr,
 
 void freeHaskellFunctionPtr(void* ptr)
 {
-    struct AdjustorContext context = free_adjustor(ptr);
+    struct AdjustorContext context;
+    free_adjustor(ptr, &context);
     freeStablePtr(context.hptr);
 }
 
