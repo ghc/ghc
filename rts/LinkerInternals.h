@@ -287,12 +287,6 @@ struct _ObjectCode {
        outside one of these is an error in the linker. */
     ProddableBlock* proddables;
 
-#if defined(ia64_HOST_ARCH)
-    /* Procedure Linkage Table for this object */
-    void *plt;
-    unsigned int pltIndex;
-#endif
-
 #if defined(NEED_SYMBOL_EXTRAS)
     SymbolExtra    *symbol_extras;
     unsigned long   first_symbol_extra;
