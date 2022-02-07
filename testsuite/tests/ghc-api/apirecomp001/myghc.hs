@@ -26,7 +26,7 @@ main = do
     logger <- getLogger
     (dflags, _, _) <- parseDynamicFlags logger dflags0
       (map (mkGeneralLocated "on the commandline") args)
-    setSessionDynFlags $ dflags { backend   = NoBackend
+    setSessionDynFlags $ dflags { backend   = noBackend
                                 , ghcLink   = LinkInMemory
                                 , verbosity = 0 -- silence please
                                 }
@@ -37,7 +37,7 @@ main = do
     prn "target nothing: ok"
 
     dflags <- getSessionDynFlags
-    setSessionDynFlags $ dflags { backend = Interpreter }
+    setSessionDynFlags $ dflags { backend = interpreterBackend }
     ok <- load LoadAllTargets
     when (failed ok) $ error "Couldn't load A.hs in interpreted mode"
     prn "target interpreted: ok"

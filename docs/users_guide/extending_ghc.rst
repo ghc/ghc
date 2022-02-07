@@ -1585,3 +1585,116 @@ you cannot from a ``DynFlags`` plugin register other plugins by just adding them
 to the ``plugins`` field of ``DynFlags``. In order to achieve this, you would
 have to load them yourself and store the result into the ``cachedPlugins``
 field of ``DynFlags``.
+
+
+Referring to back ends
+----------------------
+
+In versions of GHC numbered up to and including 9.4, a back end is
+referred to by name: type ``Backend``, from module
+``GHC.Driver.Backend``, is a simple enumeration type. In versions of GHC
+numbered 9.6 and higher, ``Backend`` is an abstract type. The module
+specifies predicates and functions associated with a back end.
+
+This change in representation requires changes in client code.
+
+Client code that only names back ends
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Suppose your client uses ``Backend`` only to mention back ends by name.
+That is, it never discriminates between back ends in a ``case``
+expression, function definition, or equality comparison. Then the
+simplest way for you to migrate your code is to replace each value
+constructor from version 9.4 with the corresponding value from 9.6:
+
++-----------------+------------------------+
+| Old value       | New value              |
++=================+========================+
+| ``NCG``         | ``ncgBackend``         |
++-----------------+------------------------+
+| ``LLVM``        | ``llvmBackend``        |
++-----------------+------------------------+
+| ``ViaC``        | ``viaCBackend``        |
++-----------------+------------------------+
+| ``Interpreter`` | ``interpreterBackend`` |
++-----------------+------------------------+
+| ``NoBackend``   | ``noBackend``          |
++-----------------+------------------------+
+
+Client code that discriminates among back ends
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Suppose your code makes decisions based on the value of an expression of
+type ``Backend``. Then the simplest way for you to migrate your
+decision-making code depends on the code’s form.
+
+-  If your decision-making is driven by an equality or inequality
+   predicate, an equivalent predicate may already be defined in module
+   ``GHC.Driver.Backend``. For example, if your client wants to be
+   sure that optimization levels above ``-O0`` are permitted, it might
+   have originally compared ``backend /= Interpreter``. But now there is
+   a predicate for that: it is
+   ``not (backendForcesOptimization0 backend)``.
+
+   If the predicate you want is not already defined, you will have to
+   fall back on the more general strategy defined below.
+
+-  If your decision-making is still driven by a predicate, but the
+   implementation of the predicate inspects the form of ``Backend``, you
+   may still be in luck. For example, if your client needs to know
+   whether the ``Backend`` wishes to write files to disk, it can query
+   ``backendWritesFiles backend``. In version 9.4, this predicate holds
+   for the NCG, LLVM, and Via-C back ends, but not for the interpreter
+   or for ``NoBackend``.
+
+-  In the general case, for any function definition, case expression, or
+   equality test that discriminates among back ends, you can use the
+   general migration strategy described below.
+
+General migration strategy for client code
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+From version 9.6 onward, each back end may be
+queried for its name:
+
+::
+
+   backendName :: Backend -> BackendName
+
+The ``BackendName`` type must be imported from module ``GHC.Driver.Backend.Internal``.
+It is defined to look the same as the old
+``Backend`` type:
+
+::
+
+   data BackendName
+      = NCG
+      | LLVM
+      | ViaC
+      | Interpreter
+      | NoBackend
+
+This type is also an instance of the ``Eq`` and ``Show`` classes.
+
+
+If your existing code discriminates among existing back ends using a
+``case`` expression, you need to apply ``backendName`` to the scrutinee.
+
+::
+
+   case backend dflags of  -- code using the 9.4 interface
+     NCG -> ...
+     LLVM -> ...
+     ...
+
+can become
+
+::
+
+   case backendName $ backend dflags of  -- code using the 9.6 interface
+     NCG -> ...
+     LLVM -> ...
+     ...
+
+Only the scrutinee changes, not the pattern matches. And if your pattern
+matches were complete before, they are still complete.

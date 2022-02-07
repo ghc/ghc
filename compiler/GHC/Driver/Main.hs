@@ -824,24 +824,24 @@ hscRecompStatus
         return $ HscRecompNeeded $ fmap (mi_iface_hash . mi_final_exts) mb_checked_iface
       UpToDateItem checked_iface -> do
         let lcl_dflags = ms_hspp_opts mod_summary
-        case backend lcl_dflags of
-          -- No need for a linkable, we're good to go
-          NoBackend -> do
-            msg $ UpToDate
-            return $ HscUpToDate checked_iface Nothing
+        if not (backendGeneratesCode (backend lcl_dflags)) then
+            -- No need for a linkable, we're good to go
+          do msg $ UpToDate
+             return $ HscUpToDate checked_iface Nothing
+        else
           -- Do need linkable
-          _ -> do
+          do
             -- Check to see whether the expected build products already exist.
             -- If they don't exists then we trigger recompilation.
             recomp_linkable_result <- case () of
                -- Interpreter can use either already loaded bytecode or loaded object code
-               _ | Interpreter <- backend lcl_dflags -> do
+               _ | backendCanReuseLoadedCode (backend lcl_dflags) -> do
                      let res = checkByteCode old_linkable
                      case res of
                        UpToDateItem _ -> pure res
                        _ -> liftIO $ checkObjects lcl_dflags old_linkable mod_summary
                  -- Need object files for making object files
-                 | backendProducesObject (backend lcl_dflags) -> liftIO $ checkObjects lcl_dflags old_linkable mod_summary
+                 | backendWritesFiles (backend lcl_dflags) -> liftIO $ checkObjects lcl_dflags old_linkable mod_summary
                  | otherwise -> pprPanic "hscRecompStatus" (text $ show $ backend lcl_dflags)
             case recomp_linkable_result of
               UpToDateItem linkable -> do
@@ -1001,7 +1001,7 @@ hscDesugarAndSimplify summary (FrontendTypecheck tc_result) tc_warnings mb_old_h
   -- interface file.
   case mb_desugar of
       -- Just cause we desugared doesn't mean we are generating code, see above.
-      Just desugared_guts | bcknd /= NoBackend -> do
+      Just desugared_guts | backendGeneratesCode bcknd -> do
           plugins <- liftIO $ readIORef (tcg_th_coreplugins tc_result)
           simplified_guts <- hscSimplify' plugins desugared_guts
 
@@ -1088,10 +1088,7 @@ hscMaybeWriteIface
   -> IO ()
 hscMaybeWriteIface logger dflags is_simple iface old_iface mod_location = do
     let force_write_interface = gopt Opt_WriteInterface dflags
-        write_interface = case backend dflags of
-                            NoBackend    -> False
-                            Interpreter  -> False
-                            _            -> True
+        write_interface = backendWritesFiles (backend dflags)
 
         write_iface dflags' iface =
           let !iface_name = if dynamicNow dflags' then ml_dyn_hi_file mod_location else ml_hi_file mod_location
@@ -2397,4 +2394,4 @@ showModuleIndex (i,n) = text "[" <> pad <> int i <> text " of " <> int n <> text
 writeInterfaceOnlyMode :: DynFlags -> Bool
 writeInterfaceOnlyMode dflags =
  gopt Opt_WriteInterface dflags &&
- NoBackend == backend dflags
+ not (backendGeneratesCode (backend dflags))

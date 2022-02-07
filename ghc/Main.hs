@@ -16,9 +16,10 @@ module Main (main) where
 
 -- The official GHC API
 import qualified GHC
-import GHC              (parseTargetFiles,  Ghc, GhcMonad(..), Backend (..),
+import GHC              (parseTargetFiles,  Ghc, GhcMonad(..),
                           LoadHowMuch(..) )
 
+import GHC.Driver.Backend
 import GHC.Driver.CmdLine
 import GHC.Driver.Env
 import GHC.Driver.Errors
@@ -175,9 +176,9 @@ main' postLoadMode units dflags0 args flagWarnings = do
   let dflt_backend = backend dflags0
       (mode, bcknd, link)
          = case postLoadMode of
-               DoInteractive   -> (CompManager, Interpreter,  LinkInMemory)
-               DoEval _        -> (CompManager, Interpreter,  LinkInMemory)
-               DoRun           -> (CompManager, Interpreter,  LinkInMemory)
+               DoInteractive   -> (CompManager, interpreterBackend,  LinkInMemory)
+               DoEval _        -> (CompManager, interpreterBackend,  LinkInMemory)
+               DoRun           -> (CompManager, interpreterBackend,  LinkInMemory)
                DoMake          -> (CompManager, dflt_backend, LinkBinary)
                DoBackpack      -> (CompManager, dflt_backend, LinkBinary)
                DoMkDependHS    -> (MkDepend,    dflt_backend, LinkBinary)
@@ -217,8 +218,9 @@ main' postLoadMode units dflags0 args flagWarnings = do
   (dflags3, fileish_args, dynamicFlagWarnings) <-
       GHC.parseDynamicFlags logger2 dflags2 args'
 
-  let dflags4 = case bcknd of
-                Interpreter | not (gopt Opt_ExternalInterpreter dflags3) ->
+  let dflags4 = if backendNeedsFullWays bcknd &&
+                   not (gopt Opt_ExternalInterpreter dflags3)
+                then
                     let platform = targetPlatform dflags3
                         dflags3a = dflags3 { targetWays_ = hostFullWays }
                         dflags3b = foldl gopt_set dflags3a
@@ -228,7 +230,7 @@ main' postLoadMode units dflags0 args flagWarnings = do
                                  $ concatMap (wayUnsetGeneralFlags platform)
                                              hostFullWays
                     in dflags3c
-                _ ->
+                else
                     dflags3
 
   let logger4 = setLogFlags logger2 (initLogFlags dflags4)
@@ -364,7 +366,7 @@ checkOptions mode dflags srcs objs units = do
         else do
 
    case mode of
-      StopBefore StopC | backend dflags /= ViaC
+      StopBefore StopC | not (backendGeneratesHc (backend dflags))
         -> throwGhcException $ UsageError $
            "the option -C is only available with an unregisterised GHC"
       StopBefore StopAs | ghcLink dflags == NoLink

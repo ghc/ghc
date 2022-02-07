@@ -62,12 +62,8 @@ initStaticPtrOpts hsc_env = do
 
       -- If we are compiling for the interpreter we will insert any necessary
       -- SPT entries dynamically, otherwise we add a C stub to do so
-    , opt_gen_cstub = case backend dflags of
-                        Interpreter -> False
-                        _           -> True
-
+    , opt_gen_cstub = backendWritesFiles (backend dflags)
     , opt_mk_string = mk_string
     , opt_static_ptr_info_datacon = static_ptr_info_datacon
     , opt_static_ptr_datacon      = static_ptr_datacon
     }
-

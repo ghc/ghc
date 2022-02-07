@@ -1758,7 +1758,7 @@ enableCodeGenWhen logger tmpfs staticLife dynLife unit_env mod_graph =
     enable_code_gen ms = return ms
 
     nocode_enable ms@(ModSummary { ms_hspp_opts = dflags }) =
-      backend dflags == NoBackend &&
+      not (backendGeneratesCode (backend dflags)) &&
       -- Don't enable codegen for TH on indefinite packages; we
       -- can't compile anything anyway! See #16219.
       isHomeUnitDefinite (ue_unitHomeUnit (ms_unitid ms) unit_env)

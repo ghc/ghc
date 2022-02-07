@@ -1415,8 +1415,8 @@ as follows:
     in ...
 
 This was originally done in the fix to #16449 but this breaks the let-can-float
-invariant (see Note [Core let-can-float invariant] in GHC.Core) as noted in
-#16742. For the reasons discussed in Note [Checking versus non-checking
+invariant (see Note [Core let-can-float invariant] in GHC.Core) as noted in #16742.
+For the reasons discussed in Note [Checking versus non-checking
 primops] (in the PrimOp module) there is no safe way to rewrite the argument of I#
 such that it bottoms.
 

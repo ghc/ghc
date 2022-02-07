@@ -179,7 +179,8 @@ cgTopBinding logger tmpfs cfg = \case
     StgTopStringLit id str -> do
         let label = mkBytesLabel (idName id)
         -- emit either a CmmString literal or dump the string in a file and emit a
-        -- CmmFileEmbed literal.
+        -- CmmFileEmbed literal.  If binary blobs aren't supported,
+        -- the threshold in `cfg` will be 0.
         -- See Note [Embedding large binary blobs] in GHC.CmmToAsm.Ppr
         let asString = case stgToCmmBinBlobThresh cfg of
               Just bin_blob_threshold -> fromIntegral (BS.length str) <= bin_blob_threshold

@@ -1,6 +1,6 @@
 
 when making flags consistent: warning:
-    Optimization flags conflict with --interactive; optimization flags ignored.
+    Optimization flags are incompatible with the byte-code interpreter; optimization flags ignored.
 
 <interactive>:10:25: error:
     • No instance for (Num a) arising from a use of ‘f’

@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveFunctor #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
@@ -34,8 +33,6 @@ module GHC.CmmToLlvm.Base (
 
         aliasify, llvmDefLabel
     ) where
-
-#include "ghc-llvm-version.h"
 
 import GHC.Prelude
 import GHC.Utils.Panic

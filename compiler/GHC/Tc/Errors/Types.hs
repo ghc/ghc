@@ -62,7 +62,7 @@ module GHC.Tc.Errors.Types (
   , CoercibleMsg(..)
   , PotentialInstances(..)
   , UnsupportedCallConvention(..)
-  , ExpectedBackends(..)
+  , ExpectedBackends
   , ArgOrResult(..)
   ) where
 
@@ -2008,11 +2008,8 @@ data TcRnMessage where
   -}
   TcRnUnpromotableThing :: !Name -> !PromotionErr -> TcRnMessage
 
--- | Specifies which backend code generators where expected for an FFI declaration
-data ExpectedBackends
-  = COrAsmOrLlvm         -- ^ C, Asm, or LLVM
-  | COrAsmOrLlvmOrInterp -- ^ C, Asm, LLVM, or interpreted
-  deriving Eq
+-- | Specifies which back ends can handle a requested foreign import or export
+type ExpectedBackends = [Backend]
 
 -- | Specifies which calling convention is unsupported on the current platform
 data UnsupportedCallConvention

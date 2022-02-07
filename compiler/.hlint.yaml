@@ -24,3 +24,11 @@
 - ignore: {name: Use fewer imports, within: [GHC.Parser, GHC.Cmm.Parser ] }
 - ignore: {name: Redundant return, within: [GHC.Data.FastString] }
 - ignore: {within: [GHC.Parser, GHC.Parser.Lexer, GHC.Parser.HaddockLex] }
+
+
+## Restricted modules
+
+- warn: {name: Avoid restricted module}
+# see comments in affected modules
+- modules: 
+   - {name: [GHC.Driver.Backend.Internal], within: [GHC.Driver.Backend], message: "This module is for clients of the GHC API only.  Do not use it within the compiler."}

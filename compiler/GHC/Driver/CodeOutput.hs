@@ -43,7 +43,6 @@ import GHC.Utils.TmpFs
 
 import GHC.Utils.Error
 import GHC.Utils.Outputable
-import GHC.Utils.Panic
 import GHC.Utils.Logger
 import GHC.Utils.Exception (bracket)
 import GHC.Utils.Ppr (Mode(..))
@@ -120,13 +119,11 @@ codeOutput logger tmpfs llvm_config dflags unit_state this_mod filenm location g
                   ; emitInitializerDecls this_mod stubs
                   ; return (stubs, a) }
 
-        ; (stubs, a) <- case backend dflags of
-                 NCG         -> outputAsm logger dflags this_mod location filenm
-                                          final_stream
-                 ViaC        -> outputC logger dflags filenm final_stream pkg_deps
-                 LLVM        -> outputLlvm logger llvm_config dflags filenm final_stream
-                 Interpreter -> panic "codeOutput: Interpreter"
-                 NoBackend   -> panic "codeOutput: NoBackend"
+        ; (stubs, a) <- case backendCodeOutput (backend dflags) of
+                 NcgCodeOutput  -> outputAsm logger dflags this_mod location filenm
+                                             final_stream
+                 ViaCCodeOutput -> outputC logger dflags filenm final_stream pkg_deps
+                 LlvmCodeOutput -> outputLlvm logger llvm_config dflags filenm final_stream
         ; stubs_exist <- outputForeignStubs logger tmpfs dflags unit_state this_mod location stubs
         ; return (filenm, stubs_exist, foreign_fps, a)
         }
@@ -313,8 +310,7 @@ outputForeignStubs logger tmpfs dflags unit_state mod location stubs
    cplusplus_ftr = "#if defined(__cplusplus)\n}\n#endif\n"
 
 
--- Don't use doOutput for dumping the f. export stubs
--- since it is more than likely that the stubs file will
+-- It is more than likely that the stubs file will
 -- turn out to be empty, in which case no file should be created.
 outputForeignStubs_help :: FilePath -> String -> String -> String -> IO Bool
 outputForeignStubs_help _fname ""      _header _footer = return False
@@ -392,5 +388,3 @@ ipInitCode do_info_table platform this_mod ents
                          | ipe <- ipes
                          ] ++ [text "NULL"])
       <> semi
-
-

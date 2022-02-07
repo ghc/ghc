@@ -268,7 +268,7 @@ tcCheckFIType :: [Scaled Type] -> Type -> ForeignImport -> TcM ForeignImport
 
 tcCheckFIType arg_tys res_ty idecl@(CImport (L lc cconv) safety mh l@(CLabel _) src)
   -- Foreign import label
-  = do checkCg (Right idecl) checkCOrAsmOrLlvmOrInterp
+  = do checkCg (Right idecl) backendValidityOfCImport
        -- NB check res_ty not sig_ty!
        --    In case sig_ty is (forall a. ForeignPtr a)
        check (isFFILabelTy (mkVisFunTys arg_tys res_ty))
@@ -281,7 +281,7 @@ tcCheckFIType arg_tys res_ty idecl@(CImport (L lc cconv) safety mh CWrapper src)
         -- The type must be of the form ft -> IO (FunPtr ft), where ft is a valid
         -- foreign type.  For legacy reasons ft -> IO (Ptr ft) is accepted, too.
         -- The use of the latter form is DEPRECATED, though.
-    checkCg (Right idecl) checkCOrAsmOrLlvmOrInterp
+    checkCg (Right idecl) backendValidityOfCImport
     cconv' <- checkCConv (Right idecl) cconv
     case arg_tys of
         [Scaled arg1_mult arg1_ty] -> do
@@ -297,7 +297,7 @@ tcCheckFIType arg_tys res_ty idecl@(CImport (L lc cconv) safety mh CWrapper src)
 tcCheckFIType arg_tys res_ty idecl@(CImport (L lc cconv) (L ls safety) mh
                                             (CFunction target) src)
   | isDynamicTarget target = do -- Foreign import dynamic
-      checkCg (Right idecl) checkCOrAsmOrLlvmOrInterp
+      checkCg (Right idecl) backendValidityOfCImport
       cconv' <- checkCConv (Right idecl) cconv
       case arg_tys of           -- The first arg must be Ptr or FunPtr
         []                ->
@@ -315,7 +315,7 @@ tcCheckFIType arg_tys res_ty idecl@(CImport (L lc cconv) (L ls safety) mh
       dflags <- getDynFlags
       checkTc (xopt LangExt.GHCForeignImportPrim dflags)
               (TcRnForeignImportPrimExtNotSet idecl)
-      checkCg (Right idecl) checkCOrAsmOrLlvmOrInterp
+      checkCg (Right idecl) backendValidityOfCImport
       checkCTarget idecl target
       checkTc (playSafe safety)
               (TcRnForeignImportPrimSafeAnn idecl)
@@ -324,7 +324,7 @@ tcCheckFIType arg_tys res_ty idecl@(CImport (L lc cconv) (L ls safety) mh
       checkForeignRes nonIOok checkSafe (isFFIPrimResultTy dflags) res_ty
       return idecl
   | otherwise = do              -- Normal foreign import
-      checkCg (Right idecl) checkCOrAsmOrLlvmOrInterp
+      checkCg (Right idecl) backendValidityOfCImport
       cconv' <- checkCConv (Right idecl) cconv
       checkCTarget idecl target
       dflags <- getDynFlags
@@ -342,7 +342,7 @@ tcCheckFIType arg_tys res_ty idecl@(CImport (L lc cconv) (L ls safety) mh
 -- that the C identifier is valid for C
 checkCTarget :: ForeignImport -> CCallTarget -> TcM ()
 checkCTarget idecl (StaticTarget _ str _ _) = do
-    checkCg (Right idecl) checkCOrAsmOrLlvmOrInterp
+    checkCg (Right idecl) backendValidityOfCImport
     checkTc (isCLabelString str) (TcRnInvalidCIdentifier str)
 
 checkCTarget _ DynamicTarget = panic "checkCTarget DynamicTarget"
@@ -415,7 +415,7 @@ tcFExport d = pprPanic "tcFExport" (ppr d)
 
 tcCheckFEType :: Type -> ForeignExport -> TcM ForeignExport
 tcCheckFEType sig_ty edecl@(CExport (L l (CExportStatic esrc str cconv)) src) = do
-    checkCg (Left edecl) checkCOrAsmOrLlvm
+    checkCg (Left edecl) backendValidityOfCExport
     checkTc (isCLabelString str) (TcRnInvalidCIdentifier str)
     cconv' <- checkCConv (Left edecl) cconv
     checkForeignArgs isFFIExternalTy arg_tys
@@ -497,32 +497,14 @@ checkSafe, noCheckSafe :: Bool
 checkSafe   = True
 noCheckSafe = False
 
--- | Checking a supported backend is in use
-checkCOrAsmOrLlvm :: Backend -> Validity' ExpectedBackends
-checkCOrAsmOrLlvm ViaC = IsValid
-checkCOrAsmOrLlvm NCG  = IsValid
-checkCOrAsmOrLlvm LLVM = IsValid
-checkCOrAsmOrLlvm _    = NotValid COrAsmOrLlvm
-
--- | Checking a supported backend is in use
-checkCOrAsmOrLlvmOrInterp :: Backend -> Validity' ExpectedBackends
-checkCOrAsmOrLlvmOrInterp ViaC        = IsValid
-checkCOrAsmOrLlvmOrInterp NCG         = IsValid
-checkCOrAsmOrLlvmOrInterp LLVM        = IsValid
-checkCOrAsmOrLlvmOrInterp Interpreter = IsValid
-checkCOrAsmOrLlvmOrInterp _           = NotValid COrAsmOrLlvmOrInterp
-
 checkCg :: Either ForeignExport ForeignImport -> (Backend -> Validity' ExpectedBackends) -> TcM ()
 checkCg decl check = do
     dflags <- getDynFlags
     let bcknd = backend dflags
-    case bcknd of
-      NoBackend -> return ()
-      _ ->
-        case check bcknd of
-          IsValid -> return ()
-          NotValid expectedBcknd ->
-            addErrTc $ TcRnIllegalForeignDeclBackend decl bcknd expectedBcknd
+    case check bcknd of
+      IsValid -> return ()
+      NotValid expectedBcknds ->
+        addErrTc $ TcRnIllegalForeignDeclBackend decl bcknd expectedBcknds
 
 -- Calling conventions
 

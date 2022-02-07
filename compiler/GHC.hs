@@ -27,7 +27,8 @@ module GHC (
         handleSourceError,
 
         -- * Flags and settings
-        DynFlags(..), GeneralFlag(..), Severity(..), Backend(..), gopt,
+        DynFlags(..), GeneralFlag(..), Severity(..), Backend, gopt,
+        ncgBackend, llvmBackend, viaCBackend, interpreterBackend, noBackend,
         GhcMode(..), GhcLink(..),
         parseDynamicFlags, parseTargetFiles,
         getSessionDynFlags,

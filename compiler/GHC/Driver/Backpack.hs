@@ -20,6 +20,7 @@ module GHC.Driver.Backpack (doBackpack) where
 
 import GHC.Prelude
 
+import GHC.Driver.Backend
 -- In a separate module because it hooks into the parser.
 import GHC.Driver.Backpack.Syntax
 import GHC.Driver.Config.Finder (initFinderOpts)
@@ -188,7 +189,7 @@ withBkpSession cid insts deps session_type do_this = do
           hscUpdateFlags (\dflags -> mk_temp_dflags (hsc_units hsc_env) dflags) hsc_env
         mk_temp_dflags unit_state dflags = dflags
             { backend = case session_type of
-                            TcSession -> NoBackend
+                            TcSession -> noBackend
                             _         -> backend dflags
             , ghcLink = case session_type of
                             TcSession -> NoLink
@@ -214,7 +215,7 @@ withBkpSession cid insts deps session_type do_this = do
                 -- Make sure to write interfaces when we are type-checking
                 -- indefinite packages.
                 TcSession
-                  | backend dflags /= NoBackend
+                  | backendSupportsInterfaceWriting $ backend dflags
                   -> EnumSet.insert Opt_WriteInterface (generalFlags dflags)
                 _ -> generalFlags dflags
 

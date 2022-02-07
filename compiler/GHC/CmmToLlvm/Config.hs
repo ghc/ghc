@@ -133,4 +133,3 @@ llvmVersionStr = intercalate "." . map show . llvmVersionList
 
 llvmVersionList :: LlvmVersion -> [Int]
 llvmVersionList = NE.toList . llvmVersionNE
-

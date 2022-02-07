@@ -8,6 +8,7 @@ import GHC.Driver.Backend
 import GHC.Driver.Session
 import GHC.Platform
 import GHC.Platform.Profile
+import GHC.Utils.Error
 import GHC.Unit.Module
 import GHC.Utils.Outputable
 
@@ -60,9 +61,11 @@ initStgToCmmConfig dflags mod = StgToCmmConfig
   } where profile  = targetProfile dflags
           platform = profilePlatform profile
           bk_end  = backend dflags
-          ncg     = bk_end == NCG
-          llvm    = bk_end == LLVM
           b_blob  = if not ncg then Nothing else binBlobThreshold dflags
+          (ncg, llvm) = case backendPrimitiveImplementation bk_end of
+                          GenericPrimitives -> (False, False)
+                          NcgPrimitives -> (True, False)
+                          LlvmPrimitives -> (False, True)
           x86ish  = case platformArch platform of
                       ArchX86    -> True
                       ArchX86_64 -> True
@@ -71,6 +74,6 @@ initStgToCmmConfig dflags mod = StgToCmmConfig
                       ArchPPC      -> True
                       ArchPPC_64 _ -> True
                       _            -> False
-          vec_err = case backend dflags of
-                      LLVM -> Nothing
-                      _    -> Just (unlines ["SIMD vector instructions require the LLVM back-end.", "Please use -fllvm."])
+          vec_err = case backendSimdValidity (backend dflags) of
+                      IsValid -> Nothing
+                      NotValid msg -> Just msg

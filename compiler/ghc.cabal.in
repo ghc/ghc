@@ -379,6 +379,7 @@ Library
         GHC.Data.TrieMap
         GHC.Data.UnionFind
         GHC.Driver.Backend
+        GHC.Driver.Backend.Internal
         GHC.Driver.Backpack
         GHC.Driver.Backpack.Syntax
         GHC.Driver.CmdLine

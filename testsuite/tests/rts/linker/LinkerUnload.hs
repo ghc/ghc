@@ -17,7 +17,7 @@ loadPackages = do
   [libdir] <- getArgs
   runGhc (Just libdir) $ do
     dflags <- getSessionDynFlags
-    let dflags' = dflags { backend = NoBackend
+    let dflags' = dflags { backend = noBackend
                          , ghcLink = LinkInMemory }
     setSessionDynFlags dflags'
     hsc_env <- getSession

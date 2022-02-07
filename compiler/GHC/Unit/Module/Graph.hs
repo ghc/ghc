@@ -271,10 +271,9 @@ showModMsg dflags recomp (ModuleNode _ mod_summary) =
     mod_str  = showPpr dflags mod ++ hscSourceString (ms_hsc_src mod_summary)
     dyn_file = op $ msDynObjFilePath mod_summary
     obj_file = op $ msObjFilePath mod_summary
-    message = case backend dflags of
-                Interpreter | recomp -> text "interpreted"
-                NoBackend            -> text "nothing"
-                _                    ->
+    message = case backendSpecialModuleSource (backend dflags) recomp of
+                Just special -> text special
+                Nothing ->
                   if gopt Opt_BuildDynamicToo  dflags
                     then text obj_file <> comma <+> text dyn_file
                     else text obj_file

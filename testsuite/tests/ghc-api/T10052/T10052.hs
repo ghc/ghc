@@ -23,7 +23,7 @@ runGhc' args act = do
       logger <- getLogger
       (dflags1, _leftover, _warns) <- parseDynamicFlags logger dflags0 flags
       let dflags2 = dflags1 {
-              backend   = Interpreter
+              backend   = interpreterBackend
             , ghcLink   = LinkInMemory
             , verbosity = 1
             }

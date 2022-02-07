@@ -2295,9 +2295,9 @@ dynamic_flags_deps = [
   , make_ord_flag defGhcFlag "keep-s-files"
         (NoArg (setGeneralFlag Opt_KeepSFiles))
   , make_ord_flag defGhcFlag "keep-llvm-file"
-        (NoArg $ setObjBackend LLVM >> setGeneralFlag Opt_KeepLlvmFiles)
+        (NoArg $ setObjBackend llvmBackend >> setGeneralFlag Opt_KeepLlvmFiles)
   , make_ord_flag defGhcFlag "keep-llvm-files"
-        (NoArg $ setObjBackend LLVM >> setGeneralFlag Opt_KeepLlvmFiles)
+        (NoArg $ setObjBackend llvmBackend >> setGeneralFlag Opt_KeepLlvmFiles)
      -- This only makes sense as plural
   , make_ord_flag defGhcFlag "keep-tmp-files"
         (NoArg (setGeneralFlag Opt_KeepTmpFiles))
@@ -2473,7 +2473,7 @@ dynamic_flags_deps = [
   , make_ord_flag defGhcFlag "ddump-asm-stats"
         (setDumpFlag Opt_D_dump_asm_stats)
   , make_ord_flag defGhcFlag "ddump-llvm"
-        (NoArg $ setObjBackend LLVM >> setDumpFlag' Opt_D_dump_llvm)
+        (NoArg $ setObjBackend llvmBackend >> setDumpFlag' Opt_D_dump_llvm)
   , make_ord_flag defGhcFlag "ddump-c-backend"
         (NoArg $ setDumpFlag' Opt_D_dump_c_backend)
   , make_ord_flag defGhcFlag "ddump-deriv"
@@ -2902,20 +2902,20 @@ dynamic_flags_deps = [
       (NoArg (setGeneralFlag Opt_InfoTableMap))
         ------ Compiler flags -----------------------------------------------
 
-  , make_ord_flag defGhcFlag "fasm"             (NoArg (setObjBackend NCG))
+  , make_ord_flag defGhcFlag "fasm"             (NoArg (setObjBackend ncgBackend))
   , make_ord_flag defGhcFlag "fvia-c"           (NoArg
          (deprecate $ "The -fvia-c flag does nothing; " ++
                       "it will be removed in a future GHC release"))
   , make_ord_flag defGhcFlag "fvia-C"           (NoArg
          (deprecate $ "The -fvia-C flag does nothing; " ++
                       "it will be removed in a future GHC release"))
-  , make_ord_flag defGhcFlag "fllvm"            (NoArg (setObjBackend LLVM))
+  , make_ord_flag defGhcFlag "fllvm"            (NoArg (setObjBackend llvmBackend))
 
   , make_ord_flag defFlag "fno-code"         (NoArg ((upd $ \d ->
-                  d { ghcLink=NoLink }) >> setBackend NoBackend))
+                  d { ghcLink=NoLink }) >> setBackend noBackend))
   , make_ord_flag defFlag "fbyte-code"
       (noArgM $ \dflags -> do
-        setBackend Interpreter
+        setBackend interpreterBackend
         pure $ gopt_set dflags Opt_ByteCode)
   , make_ord_flag defFlag "fobject-code"     $ NoArg $ do
       dflags <- liftEwM getCmdLineState
@@ -4415,7 +4415,7 @@ addReexportedModule p =
 -- code are allowed (requests for other target types are ignored).
 setBackend :: Backend -> DynP ()
 setBackend l = upd $ \ dfs ->
-  if ghcLink dfs /= LinkBinary || backendProducesObject l
+  if ghcLink dfs /= LinkBinary || backendWritesFiles l
   then dfs{ backend = l }
   else dfs
 
@@ -4427,7 +4427,7 @@ setObjBackend :: Backend -> DynP ()
 setObjBackend l = updM set
   where
    set dflags
-     | backendProducesObject (backend dflags)
+     | backendWritesFiles (backend dflags)
        = return $ dflags { backend = l }
      | otherwise = return dflags
 
@@ -4774,30 +4774,33 @@ makeDynFlagsConsistent dflags
 
    -- Via-C backend only supports unregisterised ABI. Switch to a backend
    -- supporting it if possible.
- | backend dflags == ViaC &&
+ | backendUnregisterisedAbiOnly (backend dflags) &&
    not (platformUnregisterised (targetPlatform dflags))
-    = case platformDefaultBackend (targetPlatform dflags) of
-         NCG ->  let dflags' = dflags { backend = NCG }
-                     warn = "Target platform doesn't use unregisterised ABI, so using native code generator rather than compiling via C"
-                 in loop dflags' warn
-         LLVM -> let dflags' = dflags { backend = LLVM }
-                     warn = "Target platform doesn't use unregisterised ABI, so using LLVM rather than compiling via C"
-                 in loop dflags' warn
-         _    -> pgmError "Compiling via C only supports unregisterised ABI but target platform doesn't use it."
+    = let b = platformDefaultBackend (targetPlatform dflags)
+      in if backendSwappableWithViaC b then
+           let dflags' = dflags { backend = b }
+               warn = "Target platform doesn't use unregisterised ABI, so using " ++
+                      backendDescription b ++ " rather than " ++
+                      backendDescription (backend dflags)
+           in loop dflags' warn
+         else
+           pgmError (backendDescription (backend dflags) ++
+                     " supports only unregisterised ABI but target platform doesn't use it.")
 
- | gopt Opt_Hpc dflags && backend dflags == Interpreter
+ | gopt Opt_Hpc dflags && not (backendSupportsHpc (backend dflags))
     = let dflags' = gopt_unset dflags Opt_Hpc
-          warn = "Hpc can't be used with byte-code interpreter. Ignoring -fhpc."
+          warn = "Hpc can't be used with " ++ backendDescription (backend dflags) ++
+                 ". Ignoring -fhpc."
       in loop dflags' warn
 
- | backend dflags `elem` [NCG, LLVM] &&
+ | backendSwappableWithViaC (backend dflags) &&
    platformUnregisterised (targetPlatform dflags)
-    = loop (dflags { backend = ViaC })
+    = loop (dflags { backend = viaCBackend })
            "Target platform uses unregisterised ABI, so compiling via C"
 
- | backend dflags == NCG &&
+ | backendNeedsPlatformNcgSupport (backend dflags) &&
    not (platformNcgSupported $ targetPlatform dflags)
-      = let dflags' = dflags { backend = LLVM }
+      = let dflags' = dflags { backend = llvmBackend }
             warn = "Native code generator doesn't support target platform, so using LLVM"
         in loop dflags' warn
 
@@ -4810,15 +4813,17 @@ makeDynFlagsConsistent dflags
     = loop (gopt_set dflags Opt_PIC)
            "Enabling -fPIC as it is always on for this platform"
 
- | backend dflags == Interpreter
+ | backendForcesOptimization0 (backend dflags)
  , let (dflags', changed) = updOptLevelChanged 0 dflags
  , changed
-    = loop dflags' "Optimization flags conflict with --interactive; optimization flags ignored."
+    = loop dflags' ("Optimization flags are incompatible with the " ++
+                   backendDescription (backend dflags) ++
+                                          "; optimization flags ignored.")
 
  | LinkInMemory <- ghcLink dflags
  , not (gopt Opt_ExternalInterpreter dflags)
  , hostIsProfiled
- , backendProducesObject (backend dflags)
+ , backendWritesFiles (backend dflags)
  , ways dflags `hasNotWay` WayProf
     = loop dflags{targetWays_ = addWay WayProf (targetWays_ dflags)}
          "Enabling -prof, because -fobject-code is enabled and GHCi is profiled"

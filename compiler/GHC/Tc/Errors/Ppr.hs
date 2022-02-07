@@ -41,7 +41,7 @@ import GHC.Core.Predicate
 import GHC.Core.Type
 
 import GHC.Driver.Flags
-
+import GHC.Driver.Backend
 import GHC.Hs
 
 import GHC.Tc.Errors.Types
@@ -737,12 +737,9 @@ instance Diagnostic TcRnMessage where
            text "possible missing & in foreign import of FunPtr"
 
     TcRnIllegalForeignDeclBackend _decl _backend expectedBknds
-      -> mkSimpleDecorated $ text "Illegal foreign declaration:" <+>
-           case expectedBknds of
-             COrAsmOrLlvm ->
-               text "requires unregisterised, llvm (-fllvm) or native code generation (-fasm)"
-             COrAsmOrLlvmOrInterp ->
-               text "requires interpreted, unregisterised, llvm or native code generation"
+      -> mkSimpleDecorated $
+         fsep (text "Illegal foreign declaration: requires one of these back ends:" :
+               commafyWith (text "or") (map (text . backendDescription) expectedBknds))
 
     TcRnUnsupportedCallConv _decl unsupportedCC
       -> mkSimpleDecorated $
@@ -1480,6 +1477,18 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnUnpromotableThing{}
       -> noHints
+
+
+-- | Change [x] to "x", [x, y] to "x and y", [x, y, z] to "x, y, and z",
+-- and so on.  The `and` stands for any `conjunction`, which is passed in.
+commafyWith :: SDoc -> [SDoc] -> [SDoc]
+commafyWith _ [] = []
+commafyWith _ [x] = [x]
+commafyWith conjunction [x, y] = [x <+> conjunction <+> y]
+commafyWith conjunction xs = addConjunction $ punctuate comma xs
+    where addConjunction [x, y] = [x, conjunction, y]
+          addConjunction (x : xs) = x : addConjunction xs
+          addConjunction _ = panic "commafyWith expected 2 or more elements"
 
 deriveInstanceErrReasonHints :: Class
                              -> UsingGeneralizedNewtypeDeriving

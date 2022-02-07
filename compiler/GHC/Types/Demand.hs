@@ -1940,9 +1940,9 @@ it preserved boxity in its argument. That was needed for code like
       (# s', r) -> f x
 
 which uses `x` *boxed*. If we `lub`bed it with `(DmdType emptyDmdEnv [] exnDiv)`
-we'd get an *unboxed* demand on `x` (because we let Unboxed win), which led to
-#20746.
-Nowadays with `lubBoxity = boxedWins` we don't need the complicated definition.
+we'd get an *unboxed* demand on `x` (because we let Unboxed win),
+which led to #20746.  Nowadays with `lubBoxity = boxedWins` we don't need
+the complicated definition.
 
 Note [Demand type Divergence]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

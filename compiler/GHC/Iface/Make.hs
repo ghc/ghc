@@ -340,7 +340,7 @@ mkIface_ hsc_env
      -- scope available. (#5534)
      maybeGlobalRdrEnv :: GlobalRdrEnv -> Maybe GlobalRdrEnv
      maybeGlobalRdrEnv rdr_env
-         | backendRetainsAllBindings (backend dflags) = Just rdr_env
+         | backendWantsGlobalBindings (backend dflags) = Just rdr_env
          | otherwise                                  = Nothing
 
      ifFamInstTcName = ifFamInstFam
