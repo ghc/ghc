@@ -8,97 +8,119 @@
 #include "RtsUtils.h"
 #include "StablePtr.h"
 #include "Adjustor.h"
+#include "AdjustorPool.h"
 
 #if defined(_WIN32)
 #include <windows.h>
 #endif
 
-extern void adjustorCode(void);
+// Defined in Nativei386Asm.S
+extern void ccall_adjustor(void);
 
-/* !!! !!! WARNING: !!! !!!
- * This structure is accessed from AdjustorAsm.s
- * Any changes here have to be mirrored in the offsets there.
- */
+/***************************************
+ * ccall adjustor
+ ***************************************/
 
-typedef struct AdjustorStub {
-    unsigned char   call[8];
+// Matches constants in Nativei386Asm.S
+struct CCallContext {
     StgStablePtr    hptr;
     StgFunPtr       wptr;
     StgInt          frame_size;
     StgInt          argument_size;
-} AdjustorStub;
+};
 
-void initAdjustors() { }
+#define CCALL_CONTEXT_LEN sizeof(struct CCallContext)
+#define CCALL_ADJUSTOR_LEN 10
 
-void*
-createAdjustor(int cconv, StgStablePtr hptr,
-               StgFunPtr wptr,
-               char *typeString STG_UNUSED
-    )
+static void mk_ccall_adjustor(uint8_t *code, const void *context, void *user_data STG_UNUSED)
 {
-    switch (cconv)
-    {
-    case 0: /* _stdcall */
+    /*
+      Most of the trickiness here is due to the need to keep the
+      stack pointer 16-byte aligned (see #5250).  That means we
+      can't just push another argument on the stack and call the
+      wrapper, we may have to shuffle the whole argument block.
+    */
+
+    // MOVL context, %eax
+    code[0] = 0xb8;
+    *(const void **) &code[1] = context;
+
+    // JMP ccall_adjustor
+    int32_t jmp_off = (uint8_t *) &ccall_adjustor - &code[10];
+    code[5] = 0xe9;
+    *(int32_t *) &code[6] = jmp_off;
+}
+
+/* adjustors to handle ccalls */
+static struct AdjustorPool *ccall_pool;
+
+/***************************************
+ * stdcall adjustor
+ ***************************************/
+
 #if !defined(darwin_HOST_OS)
+#define STDCALL_ADJUSTOR_LEN 0x0c
+
+static void mk_stdcall_adjustor(uint8_t *code, const void *context, void *user_data STG_UNUSED)
+{
     /* Magic constant computed by inspecting the code length of
        the following assembly language snippet
        (offset and machine code prefixed):
 
-     <0>:       58                popl   %eax              # temp. remove ret addr..
-     <1>:       68 fd fc fe fa    pushl  0xfafefcfd        # constant is large enough to
-                                                           # hold a StgStablePtr
-     <6>:       50                pushl  %eax              # put back ret. addr
-     <7>:       b8 fa ef ff 00    movl   $0x00ffeffa, %eax # load up wptr
-     <c>:       ff e0             jmp    %eax              # and jump to it.
+     <0>:       58                popl   %eax              # temp. remove return addr.
+     <1>:       b9 fd fc fe fa    movl   0xfafefcfd, %ecx  # constant is addr. of AdjustorContext
+     <6>:       ff 31             pushl  (%ecx)            # push hptr
+     <8>:       50                pushl  %eax              # put back return addr.
+     <9>:       ff 61 04          jmp    *4(%ecx)          # and jump to wptr
                 # the callee cleans up the stack
     */
+    code[0x00] = 0x58;  /* popl %eax  */
 
+    code[0x01] = 0xb9;  /* movl context (which is a dword immediate), %ecx */
+    *((const void **) &(code[0x02])) = context;
+
+    code[0x06] = 0xff; /* pushl (%ecx) */
+    code[0x07] = 0x31;
+
+    code[0x08] = 0x50; /* pushl %eax */
+
+    code[0x09] = 0xff; /* jmp *4(%ecx) */
+    code[0x0a] = 0x61;
+    code[0x0b] = 0x04;
+}
+
+static struct AdjustorPool *stdcall_pool;
+#endif
+
+void initAdjustors() {
+    ccall_pool = new_adjustor_pool(sizeof(struct CCallContext), CCALL_ADJUSTOR_LEN, mk_ccall_adjustor, NULL);
+#if !defined(darwin_HOST_OS)
+    stdcall_pool = new_adjustor_pool(sizeof(struct AdjustorContext), STDCALL_ADJUSTOR_LEN, mk_stdcall_adjustor, NULL);
+#endif
+}
+
+void*
+createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr,
+               char *typeString STG_UNUSED
+    )
+{
+
+    switch (cconv)
     {
-        ExecPage *page = allocateExecPage();
-        if (page == NULL) {
-            barf("createAdjustor: failed to allocate executable page\n");
-        }
-        uint8_t *adj_code = (uint8_t *) page;
-        adj_code[0x00] = 0x58;  /* popl %eax  */
-
-        adj_code[0x01] = 0x68;  /* pushl hptr (which is a dword immediate ) */
-        *((StgStablePtr*)(adj_code + 0x02)) = (StgStablePtr)hptr;
-
-        adj_code[0x06] = 0x50; /* pushl %eax */
-
-        adj_code[0x07] = 0xb8; /* movl  $wptr, %eax */
-        *((StgFunPtr*)(adj_code + 0x08)) = (StgFunPtr)wptr;
-
-        adj_code[0x0c] = 0xff; /* jmp %eax */
-        adj_code[0x0d] = 0xe0;
-
-        freezeExecPage(page);
-        return page;
-    }
+    case 0: { /* _stdcall */
+#if defined(darwin_HOST_OS)
+        barf("stdcall is not supported on Darwin")
+#else
+        struct AdjustorContext context = {
+            .hptr = hptr,
+            .wptr = wptr,
+        };
+        return alloc_adjustor(stdcall_pool, &context);
 #endif /* !defined(darwin_HOST_OS) */
+    }
 
     case 1: /* _ccall */
     {
-        /*
-          Most of the trickiness here is due to the need to keep the
-          stack pointer 16-byte aligned (see #5250).  That means we
-          can't just push another argument on the stack and call the
-          wrapper, we may have to shuffle the whole argument block.
-
-          We offload most of the work to AdjustorAsm.S.
-        */
-        ExecPage *page = allocateExecPage();
-        if (page == NULL) {
-            barf("createAdjustor: failed to allocate executable page\n");
-        }
-        AdjustorStub *adjustorStub = (AdjustorStub *) page;
-        int sz = totalArgumentSize(typeString);
-
-        adjustorStub->call[0] = 0xe8;
-        *(long*)&adjustorStub->call[1] = ((char*)&adjustorCode) - ((char*)page + 5);
-        adjustorStub->hptr = hptr;
-        adjustorStub->wptr = wptr;
-
             // The adjustor puts the following things on the stack:
             // 1.) %ebp link
             // 2.) padding and (a copy of) the arguments
@@ -107,16 +129,21 @@ createAdjustor(int cconv, StgStablePtr hptr,
             // 5.) return address (for returning to the adjustor)
             // All these have to add up to a multiple of 16.
 
+        int sz = totalArgumentSize(typeString);
             // first, include everything in frame_size
-        adjustorStub->frame_size = sz * 4 + 16;
+        StgInt frame_size = sz * 4 + 16;
             // align to 16 bytes
-        adjustorStub->frame_size = (adjustorStub->frame_size + 15) & ~15;
+        frame_size = (frame_size + 15) & ~15;
             // only count 2.) and 3.) as part of frame_size
-        adjustorStub->frame_size -= 12;
-        adjustorStub->argument_size = sz;
+        frame_size -= 12;
 
-        freezeExecPage(page);
-        return page;
+        struct CCallContext context = {
+            .hptr = hptr,
+            .wptr = wptr,
+            .frame_size = frame_size,
+            .argument_size = sz,
+        };
+        return alloc_adjustor(ccall_pool, &context);
     }
 
     default:
@@ -127,16 +154,7 @@ createAdjustor(int cconv, StgStablePtr hptr,
 void
 freeHaskellFunctionPtr(void* ptr)
 {
-    if ( *(unsigned char*)ptr != 0xe8 &&
-         *(unsigned char*)ptr != 0x58 ) {
-        errorBelch("freeHaskellFunctionPtr: not for me, guv! %p\n", ptr);
-        return;
-    }
-    if (*(unsigned char*)ptr == 0xe8) { /* Aha, a ccall adjustor! */
-        freeStablePtr(((AdjustorStub*)ptr)->hptr);
-    } else {
-        freeStablePtr(*((StgStablePtr*)((unsigned char*)ptr + 0x02)));
-    }
-
-    freeExecPage((ExecPage *) ptr);
+    struct AdjustorContext context;
+    free_adjustor(ptr, &context);
+    freeStablePtr(context.hptr);
 }

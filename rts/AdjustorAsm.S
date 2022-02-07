@@ -21,7 +21,7 @@
 #define WS          4
 #define LOAD        lwz
 #define STORE       stw
-#endif
+#endif /* defined(powerpc64_HOST_ARCH) */
 
     /* Some info about stack frame layout */
 #define LINK_SLOT           (2*WS)
@@ -42,7 +42,8 @@
 .csect .text[PR]
 #else
 .text
-#endif
+#endif /* defined(aix_HOST_OS) */
+
 #if LEADING_UNDERSCORE
     .globl _adjustorCode
 _adjustorCode:
@@ -53,7 +54,7 @@ _adjustorCode:
            in createAdjustor().
         */
 adjustorCode:
-#endif
+#endif /* LEADING_UNDERSCORE */
     /* On entry, r2 will point to the AdjustorStub data structure. */
 
         /* save the link */
@@ -66,7 +67,7 @@ adjustorCode:
     stdux   1, 1, 12
 #else   
     stwux   1, 1, 12
-#endif
+#endif /* defined(powerpc64_HOST_ARCH) */
 
         /* Save some regs so that we can use them.
            Note that we use the "Red Zone" below the stack pointer.
@@ -117,54 +118,8 @@ L2:
     LOAD    0, LINK_SLOT(1)
     mtlr    0
     blr
-#endif
-
-/* ********************************* i386 ********************************** */
-
-#elif defined(i386_HOST_ARCH)
-
-#define WS              4
-#define RETVAL_OFF      5
-#define HEADER_BYTES    8
-
-#define HPTR_OFF        HEADER_BYTES
-#define WPTR_OFF        (HEADER_BYTES + 1*WS)
-#define FRAMESIZE_OFF   (HEADER_BYTES + 2*WS)
-#define ARGWORDS_OFF    (HEADER_BYTES + 3*WS)
-
-#if defined(LEADING_UNDERSCORE)
-    .globl _adjustorCode
-_adjustorCode:
-#else
-    .globl adjustorCode
-adjustorCode:
-#endif
-    popl    %eax
-    subl    $RETVAL_OFF, %eax
-    
-    pushl   %ebp
-    movl    %esp, %ebp
-    
-    subl    FRAMESIZE_OFF(%eax), %esp
-
-    pushl   %esi
-    pushl   %edi
-        
-    leal    8(%ebp), %esi
-    leal    12(%esp), %edi
-    movl    ARGWORDS_OFF(%eax), %ecx
-    rep
-    movsl
-    
-    popl    %edi
-    popl    %esi
-    
-    pushl   HPTR_OFF(%eax)
-    call    *WPTR_OFF(%eax)
-    
-    leave
-    ret
-#endif
+#endif /* !(defined(powerpc_HOST_ARCH) && defined(linux_HOST_OS)) */
+#endif /* defined(powerpc_HOST_ARCH) || defined(powerpc64_HOST_ARCH) */
 
 /* mark stack as nonexecutable */
 #if defined(__linux__) && defined(__ELF__)

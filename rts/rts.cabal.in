@@ -452,7 +452,7 @@ library
     else
       -- Use GHC's native adjustors
       if arch(i386)
-        asm-sources: AdjustorAsm.S
+        asm-sources: adjustor/Nativei386Asm.S
         c-sources: adjustor/Nativei386.c
       if arch(x86_64)
         if os(mingw32)
