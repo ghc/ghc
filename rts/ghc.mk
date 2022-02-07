@@ -69,7 +69,7 @@ ifeq "$(UseLibffiForAdjustors)" "YES"
 rts_C_SRCS += rts/adjustor/LibffiAdjustor.c
 else
 ifneq "$(findstring $(TargetArch_CPP), i386)" ""
-rts_S_SRCS += rts/AdjustorAsm.S
+rts_S_SRCS += rts/adjustor/Nativei386Asm.S
 rts_C_SRCS += rts/adjustor/Nativei386.c
 else
 ifneq "$(findstring $(TargetArch_CPP), x86_64)" ""
