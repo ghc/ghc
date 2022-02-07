@@ -53,6 +53,8 @@ typedef struct AdjustorStub {
 #endif /* !(defined(powerpc_HOST_ARCH) && defined(linux_HOST_OS)) */
 #endif /* defined(powerpc_HOST_ARCH) || defined(powerpc64_HOST_ARCH) */
 
+void initAdjustors() { }
+
 void*
 createAdjustor(int cconv, StgStablePtr hptr,
                StgFunPtr wptr,

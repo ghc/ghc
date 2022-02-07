@@ -43,6 +43,8 @@ static void GNUC3_ATTRIBUTE(used) obscure_ccall_wrapper(void)
 
 extern void obscure_ccall_ret_code(void);
 
+void initAdjustors() { }
+
 void*
 createAdjustor(int cconv, StgStablePtr hptr,
                StgFunPtr wptr,

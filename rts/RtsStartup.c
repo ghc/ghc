@@ -24,6 +24,7 @@
 #include "Ticky.h"
 #include "StgRun.h"
 #include "Prelude.h"            /* fixupRTStoPreludeRefs */
+#include "Adjustor.h"           /* initAdjustors */
 #include "ThreadLabels.h"
 #include "sm/BlockAlloc.h"
 #include "Trace.h"
@@ -275,6 +276,9 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
    if (is_io_mng_native_p())
       initConsoleCP();
 #endif
+
+    /* Initialise the adjustors subsystem */
+    initAdjustors();
 
     /* Initialise the stats department, phase 1 */
     initStats1();

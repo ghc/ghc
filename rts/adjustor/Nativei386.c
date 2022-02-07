@@ -28,6 +28,8 @@ typedef struct AdjustorStub {
     StgInt          argument_size;
 } AdjustorStub;
 
+void initAdjustors() { }
+
 void*
 createAdjustor(int cconv, StgStablePtr hptr,
                StgFunPtr wptr,

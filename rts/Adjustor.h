@@ -5,3 +5,5 @@
 #pragma once
 
 int totalArgumentSize(const char *typeString);
+
+void initAdjustors(void);
