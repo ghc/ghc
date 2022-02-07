@@ -455,7 +455,8 @@ library
         asm-sources: AdjustorAsm.S
         c-sources: adjustor/Nativei386.c
       if arch(x86_64)
-        if opsys(mingw32)
+        if os(mingw32)
+          asm-sources: adjustor/NativeAmd64MingwAsm.S
           c-sources: adjustor/NativeAmd64Mingw.c
         else
           asm-sources: adjustor/NativeAmd64Asm.S
