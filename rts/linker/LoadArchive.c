@@ -7,6 +7,7 @@
 #include "LinkerInternals.h"
 #include "CheckUnload.h" // loaded_objects, insertOCSectionIndices
 #include "linker/M32Alloc.h"
+#include "linker/MMap.h"
 
 /* Platform specific headers */
 #if defined(OBJFORMAT_PEi386)
