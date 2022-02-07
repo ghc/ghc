@@ -38,21 +38,17 @@ endif
 # TEST_HC_OPTS is passed to every invocation of TEST_HC
 # in nested Makefiles
 TEST_HC_OPTS = -dcore-lint -dstg-lint -dcmm-lint \
-			   -no-user-$(GhcPackageDbFlag) -rtsopts $(EXTRA_HC_OPTS)
+			   -no-user-package-db -rtsopts $(EXTRA_HC_OPTS)
 
-ifeq "$(MinGhcVersion711)" "YES"
 # Don't warn about missing specialisations. They can only occur with `-O`, but
 # we want tests to produce the same output for all test ways.
 TEST_HC_OPTS += -fno-warn-missed-specialisations
 TEST_HC_OPTS += -fshow-warning-groups
-endif
 
-ifeq "$(MinGhcVersion801)" "YES"
 # Turn off any VT800 codes in the output or they wreak havoc on the
 # testsuite output.
 TEST_HC_OPTS += -fdiagnostics-color=never
 TEST_HC_OPTS += -fno-diagnostics-show-caret
-endif
 
 # See #15278.
 TEST_HC_OPTS += -Werror=compat

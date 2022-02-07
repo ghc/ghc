@@ -39,9 +39,6 @@ data TestSetting = TestHostOS
                  | TestLLC
                  | TestTEST_CC
                  | TestTEST_CC_OPTS
-                 | TestGhcPackageDbFlag
-                 | TestMinGhcVersion711
-                 | TestMinGhcVersion801
                  | TestLeadingUnderscore
                  | TestGhcPackageDb
                  | TestGhcLibDir
@@ -72,9 +69,6 @@ testSetting key = do
         TestLLC                   -> "LLC"
         TestTEST_CC               -> "TEST_CC"
         TestTEST_CC_OPTS          -> "TEST_CC_OPTS"
-        TestGhcPackageDbFlag      -> "GhcPackageDbFlag"
-        TestMinGhcVersion711      -> "MinGhcVersion711"
-        TestMinGhcVersion801      -> "MinGhcVersion801"
         TestLeadingUnderscore     -> "LeadingUnderscore"
         TestGhcPackageDb          -> "GhcGlobalPackageDb"
         TestGhcLibDir             -> "GhcLibdir"
