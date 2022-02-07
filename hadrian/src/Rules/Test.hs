@@ -67,7 +67,12 @@ inTreeOutTree inTree outTree = do
 
 testsuiteDeps :: Rules ()
 testsuiteDeps = do
-  "test:ghc" ~> inTreeOutTree (\stg -> needTestsuitePackages stg) (return ())
+  root <- buildRootRules
+  "test:ghc" ~> inTreeOutTree
+                    (\stg -> do
+                      needTestsuitePackages stg
+                      need [(root -/- ghcConfigPath)])
+                    (return ())
 
 ghcConfigPath :: FilePath
 ghcConfigPath = "test/ghcconfig"
