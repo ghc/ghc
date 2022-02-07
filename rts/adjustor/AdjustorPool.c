@@ -30,9 +30,9 @@
  * constructed even if we don't know the location of closure to which the
  * adjustor will eventually refer. Consequently, we can allocate an entire
  * page (a "chunk") of adjustors at a time, populate it with code, and remap
- * it as non-writable/executable.  Each adjustor's code is constructed to take
- * its closure pointer from another region of memory that we leave as
- * writable.
+ * it as non-writable/executable. Each adjustor's code is constructed to take
+ * its writable "context" (typically an StgStablePtr and StgFunPtr) from
+ * another region of memory that we leave as writable.
  *
  * To construct an AdjustorPool one uses newAdjustorPool and provide:
  *
@@ -117,6 +117,7 @@ struct AdjustorPool {
     void *user_data; /* user data to be passed to make_code */
 
     size_t adjustor_code_size; /* how many bytes of code does each adjustor require?  */
+    size_t context_size; /* how large is the context associated with each adjustor? */
     size_t chunk_slots; /* how many adjustors per chunk? */
     struct AdjustorChunk *free_list;
 #if defined(THREADED_RTS)
@@ -137,20 +138,25 @@ struct AdjustorChunk {
       /* the next chunk in the pool's free list */
     struct AdjustorExecPage *exec_page;
       /* an AdjustorExecPage containing the code for each adjustor */
-    struct AdjustorContext *contexts;
-      /* an AdjustorContext for each adjustor slot. This points to the contexts
+    void *contexts;
+      /* an context for each adjustor slot. This points to the contexts
        * array which lives after slot_bitmap */
     uint8_t slot_bitmap[];
       /* a bit for each adjustor slot; bit is set if the slot is allocated */
 };
 
 struct AdjustorPool *
-new_adjustor_pool(size_t code_size, mk_adjustor_code_fn make_code, void *user_data)
+new_adjustor_pool(
+        size_t context_size,
+        size_t code_size,
+        mk_adjustor_code_fn make_code,
+        void *user_data)
 {
     struct AdjustorPool *pool = stgMallocBytes(sizeof(struct AdjustorPool), "newAdjustorPool");
     const size_t code_alignment = 16;
     pool->make_code = make_code;
     pool->user_data = user_data;
+    pool->context_size = context_size;
     pool->adjustor_code_size = code_size;
     size_t usable_exec_page_sz = getPageSize() - ROUND_UP(sizeof(struct AdjustorExecPage), code_alignment);
     pool->chunk_slots = usable_exec_page_sz / ROUND_UP(code_size, code_alignment);
@@ -196,8 +202,15 @@ bitmap_get(uint8_t *bitmap, size_t idx)
     return bitmap[word_n] & bit;
 }
 
+static void *
+get_context(struct AdjustorChunk *chunk, size_t slot_idx)
+{
+    uint8_t *contexts = (uint8_t *) chunk->contexts;
+    return contexts + chunk->owner->context_size * slot_idx;
+}
+
 void *
-alloc_adjustor(struct AdjustorPool *pool, struct AdjustorContext context)
+alloc_adjustor(struct AdjustorPool *pool, void *context)
 {
     size_t slot_idx;
     struct AdjustorChunk *chunk;
@@ -222,9 +235,12 @@ alloc_adjustor(struct AdjustorPool *pool, struct AdjustorContext context)
         chunk->free_list_next = NULL;
     }
 
+    // update next_free and update bitmap
     ASSERT(bitmap_get(chunk->slot_bitmap, slot_idx));
     bitmap_set(chunk->slot_bitmap, slot_idx, true);
-    chunk->contexts[slot_idx] = context;
+
+    // fill in the context
+    memcpy(get_context(chunk, slot_idx), context, pool->context_size);
     void *adjustor = &chunk->exec_page->adjustor_code[pool->adjustor_code_size * slot_idx];
     RELEASE_LOCK(&pool->lock);
 
@@ -232,10 +248,10 @@ alloc_adjustor(struct AdjustorPool *pool, struct AdjustorContext context)
 }
 
 /* Free an adjustor previously allocated with alloc_adjustor, returning its
- * AdjustorContext.
+ * context
  */
-struct AdjustorContext
-free_adjustor(void *adjustor) {
+void
+free_adjustor(void *adjustor, void *context) {
     uintptr_t exec_page_mask = ~(getPageSize() - 1ULL);
     struct AdjustorExecPage *exec_page = (struct AdjustorExecPage *) ((uintptr_t) adjustor & exec_page_mask);
     if (exec_page->magic != ADJUSTOR_EXEC_PAGE_MAGIC) {
@@ -266,11 +282,10 @@ free_adjustor(void *adjustor) {
         chunk->first_free = slot_idx;
     }
 
-    struct AdjustorContext context = chunk->contexts[slot_idx];
-    chunk->contexts[slot_idx] = (struct AdjustorContext) { NULL, NULL };
+    memcpy(context, get_context(chunk, slot_idx), pool->context_size);
+    memset(get_context(chunk, slot_idx), 0, pool->context_size);
 
     RELEASE_LOCK(&pool->lock);
-    return context;
 }
 
 /* Must hold owner->lock */
@@ -285,7 +300,7 @@ alloc_adjustor_chunk(struct AdjustorPool *owner) {
 
     // N.B. pad bitmap to ensure that .contexts is aligned.
     size_t bitmap_sz = ROUND_UP(owner->chunk_slots, 8*sizeof(void*)) / 8;
-    size_t contexts_sz = sizeof(struct AdjustorContext) * owner->chunk_slots;
+    size_t contexts_sz = owner->context_size * owner->chunk_slots;
     size_t alloc_sz = sizeof(struct AdjustorChunk) + bitmap_sz + contexts_sz;
     struct AdjustorChunk *chunk = stgMallocBytes(alloc_sz, "allocAdjustorChunk");
     chunk->owner = owner;
@@ -297,12 +312,14 @@ alloc_adjustor_chunk(struct AdjustorPool *owner) {
 
     // initialize the slot bitmap
     memset(chunk->slot_bitmap, 0, bitmap_sz);
+    memset(chunk->contexts, 0, contexts_sz);
 
     size_t code_sz = owner->adjustor_code_size;
     for (size_t i = 0; i < owner->chunk_slots; i++) {
-        struct AdjustorContext *ctxt = &chunk->contexts[i];
-        owner->make_code(&exec_page->adjustor_code[i*code_sz], ctxt, owner->user_data);
-        *ctxt = (struct AdjustorContext) { NULL, NULL };
+        owner->make_code(
+                &exec_page->adjustor_code[i*code_sz],
+                get_context(chunk, i),
+                owner->user_data);
     }
 
     // Remap the executable page as executable
@@ -311,11 +328,13 @@ alloc_adjustor_chunk(struct AdjustorPool *owner) {
     return chunk;
 }
 
-static void mk_adjustor_from_template(
+static void
+mk_adjustor_from_template(
         uint8_t *exec_code,
-        const struct AdjustorContext *context,
+        const void *context,
         void *user_data)
 {
+    const struct AdjustorContext *adjustor_context = context;
     struct AdjustorTemplate *tmpl = (struct AdjustorTemplate *) user_data;
 
     // Copy the code
@@ -323,13 +342,19 @@ static void mk_adjustor_from_template(
 
     // Fix up the context pointer
     size_t context_off = (uint8_t *) tmpl->context_ptr - tmpl->code_start;
-    const struct AdjustorContext **context_ptr = (const struct AdjustorContext **) (exec_code + context_off);
-    *context_ptr = context;
+    const struct AdjustorContext **slot_context_ptr =
+        (const struct AdjustorContext **) (exec_code + context_off);
+    *slot_context_ptr = adjustor_context;
 }
 
-struct AdjustorPool *new_adjustor_pool_from_template(const struct AdjustorTemplate *tmpl)
+struct AdjustorPool *
+new_adjustor_pool_from_template(const struct AdjustorTemplate *tmpl)
 {
     size_t code_size = tmpl->code_end - tmpl->code_start;
-    return new_adjustor_pool(code_size, mk_adjustor_from_template, (void *) tmpl);
+    return new_adjustor_pool(
+            sizeof(struct AdjustorContext),
+            code_size,
+            mk_adjustor_from_template,
+            (void *) tmpl);
 }
 
