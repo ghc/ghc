@@ -653,9 +653,21 @@ declaration group. See the documentation for 'newDeclarationGroup' for more deta
 reifyInstances :: Name -> [Type] -> Q [InstanceDec]
 reifyInstances cls tys = Q (qReifyInstances cls tys)
 
-{- | @reifyRoles nm@ returns the list of roles associated with the parameters of
+{- | @reifyRoles nm@ returns the list of roles associated with the parameters
+(both visible and invisible) of
 the tycon @nm@. Fails if @nm@ cannot be found or is not a tycon.
 The returned list should never contain 'InferR'.
+
+An invisible parameter to a tycon is often a kind parameter. For example, if
+we have
+
+@
+type Proxy :: forall k. k -> Type
+data Proxy a = MkProxy
+@
+
+and @reifyRoles Proxy@, we will get @['NominalR', 'PhantomR']@. The 'NominalR' is
+the role of the invisible @k@ parameter. Kind parameters are always nominal.
 -}
 reifyRoles :: Name -> Q [Role]
 reifyRoles nm = Q (qReifyRoles nm)
