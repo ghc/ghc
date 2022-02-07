@@ -17,6 +17,7 @@
 #include "RtsSymbolInfo.h"
 #include "CheckUnload.h"
 #include "LinkerInternals.h"
+#include "linker/MMap.h"
 #include "linker/Elf.h"
 #include "linker/CacheFlush.h"
 #include "linker/M32Alloc.h"

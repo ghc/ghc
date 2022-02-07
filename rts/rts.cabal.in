@@ -547,6 +547,7 @@ library
                linker/Elf.c
                linker/LoadArchive.c
                linker/M32Alloc.c
+               linker/MMap.c
                linker/MachO.c
                linker/macho/plt.c
                linker/macho/plt_aarch64.c
