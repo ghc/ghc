@@ -78,8 +78,8 @@ void reportMemoryMap() {
     // Inspired by MacFUSE /proc implementation
     debugBelch("\nMemory map:\n");
     while (true) {
-        vm_size_t vmsize;
-        vm_address_t address;
+        mach_vm_size_t vmsize;
+        mach_vm_address_t address;
         vm_region_basic_info_data_t info;
         vm_region_flavor_t flavor = VM_REGION_BASIC_INFO;
         memory_object_name_t object;
@@ -88,8 +88,10 @@ void reportMemoryMap() {
             mach_vm_region(mach_task_self(), &address, &vmsize, flavor,
                            (vm_region_info_t)&info, &info_count, &object);
         if (kr == KERN_SUCCESS) {
-            debugBelch("%08lx-%08lx %8zuK %c%c%c/%c%c%c\n",
-                       address, (address + vmsize), (vmsize >> 10),
+            debugBelch("%p-%p %8zuK %c%c%c/%c%c%c\n",
+                       (void *) address,
+                       (void *) (address + vmsize),
+                       ((size_t) vmsize) >> 10,
                        (info.protection & VM_PROT_READ)        ? 'r' : '-',
                        (info.protection & VM_PROT_WRITE)       ? 'w' : '-',
                        (info.protection & VM_PROT_EXECUTE)     ? 'x' : '-',
