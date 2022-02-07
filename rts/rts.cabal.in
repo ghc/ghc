@@ -470,6 +470,7 @@ library
       asm-sources: StgCRunAsm.S
 
     c-sources: Adjustor.c
+               adjustor/AdjustorPool.c
                ExecPage.c
                Arena.c
                Capability.c

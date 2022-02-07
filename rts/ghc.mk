@@ -64,6 +64,7 @@ endif
 ifneq "$(CLEANING)" "YES"
 # N.B. we don't source config.mk when CLEANING=YES so none of the below
 # variables will be set. See #20166.
+rts_C_SRCS += rts/adjustor/AdjustorPool.c
 ifeq "$(UseLibffiForAdjustors)" "YES"
 rts_C_SRCS += rts/adjustor/LibffiAdjustor.c
 else
