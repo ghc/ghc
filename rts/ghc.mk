@@ -72,7 +72,11 @@ rts_S_SRCS += rts/AdjustorAsm.S
 rts_C_SRCS += rts/adjustor/Nativei386.c
 else
 ifneq "$(findstring $(TargetArch_CPP), x86_64)" ""
+ifneq "$(findstring $(TargetOS_CPP), mingw32)" ""
+rts_C_SRCS += rts/adjustor/NativeAmd64Mingw.c
+else
 rts_C_SRCS += rts/adjustor/NativeAmd64.c
+endif
 else
 ifneq "$(findstring $(TargetArch_CPP), powerpc64le powerpc)" ""
 rts_S_SRCS += rts/AdjustorAsm.S
