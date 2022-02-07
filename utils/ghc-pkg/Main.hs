@@ -1379,12 +1379,12 @@ recomputeValidAbiDeps db pkg =
   (pkg { GhcPkg.unitAbiDepends = newAbiDeps }, abiDepsUpdated)
   where
     newAbiDeps =
-      catMaybes . flip map (GhcPkg.unitAbiDepends pkg) $ \(k, _) ->
+      catMaybes . flip map (GhcPkg.unitDepends pkg) $ \k ->
         case filter (\d -> installedUnitId d == k) db of
           [x] -> Just (k, ST.pack $ unAbiHash (abiHash x))
           _   -> Nothing
     abiDepsUpdated =
-      GhcPkg.unitAbiDepends pkg /= newAbiDeps
+      not (null $ GhcPkg.unitAbiDepends pkg) && GhcPkg.unitAbiDepends pkg /= newAbiDeps
 
 
 -- | Convert from PackageCacheFormat to DbUnitInfo (the format used in
