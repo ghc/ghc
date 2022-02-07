@@ -836,12 +836,8 @@ tcImpPrags prags
     -- when we aren't specialising, or when we aren't generating
     -- code.  The latter happens when Haddocking the base library;
     -- we don't want complaints about lack of INLINABLE pragmas
-    not_specialising dflags
-      | not (gopt Opt_Specialise dflags) = True
-      | otherwise = case backend dflags of
-                      NoBackend   -> True
-                      Interpreter -> True
-                      _other      -> False
+    not_specialising dflags =
+      not (gopt Opt_Specialise dflags) || not (backendRespectsSpecialise (backend dflags))
 
 tcImpSpec :: (Name, Sig GhcRn) -> TcM [TcSpecPrag]
 tcImpSpec (name, prag)

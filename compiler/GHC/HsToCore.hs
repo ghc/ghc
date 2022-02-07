@@ -372,7 +372,7 @@ addExportFlagsAndRules bcknd exports keep_alive rules prs
         -- isExternalName separates the user-defined top-level names from those
         -- introduced by the type checker.
     is_exported :: Name -> Bool
-    is_exported | backendRetainsAllBindings bcknd = isExternalName
+    is_exported | backendWantsGlobalBindings bcknd = isExternalName
                 | otherwise                       = (`elemNameSet` exports)
 
 {-

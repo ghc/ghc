@@ -15,8 +15,6 @@ module GHC.StgToCmm ( codeGen ) where
 
 import GHC.Prelude as Prelude
 
-import GHC.Driver.Backend
-
 import GHC.StgToCmm.Prof (initCostCentres, ldvEnter)
 import GHC.StgToCmm.Monad
 import GHC.StgToCmm.Env
@@ -181,14 +179,14 @@ cgTopBinding logger tmpfs cfg = \case
     StgTopStringLit id str -> do
         let label = mkBytesLabel (idName id)
         -- emit either a CmmString literal or dump the string in a file and emit a
-        -- CmmFileEmbed literal.
+        -- CmmFileEmbed literal.  If binary blobs aren't supported,
+        -- the threshold in `cfg` will be 0.
         -- See Note [Embedding large binary blobs] in GHC.CmmToAsm.Ppr
         let bin_blob_threshold = stgToCmmBinBlobThresh cfg
-            isNCG    = platformDefaultBackend (stgToCmmPlatform cfg) == NCG
             isSmall  = fromIntegral (BS.length str) <= bin_blob_threshold
             asString = bin_blob_threshold == 0 || isSmall
 
-            (lit,decl) = if not isNCG || asString
+            (lit,decl) = if asString
               then mkByteStringCLit label str
               else mkFileEmbedLit label $ unsafePerformIO $ do
                      bFile <- newTempName logger tmpfs (stgToCmmTmpDir cfg) TFL_CurrentModule ".dat"

@@ -393,12 +393,12 @@ tidyProgram hsc_env  (ModGuts { mg_module           = mod
         ; let { platform = targetPlatform (hsc_dflags hsc_env)
               ; spt_init_code = sptModuleInitCode platform mod spt_entries
               ; add_spt_init_code =
-                  case backend dflags of
+                  if backendSptIsDynamic (backend dflags)
                     -- If we are compiling for the interpreter we will insert
                     -- any necessary SPT entries dynamically
-                    Interpreter -> id
+                    then id
                     -- otherwise add a C stub to do so
-                    _              -> (`appendStubC` spt_init_code)
+                    else (`appendStubC` spt_init_code)
 
               -- The completed type environment is gotten from
               --      a) the types and classes defined here (plus implicit things)

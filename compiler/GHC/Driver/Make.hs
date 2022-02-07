@@ -1446,9 +1446,10 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
        -- for dependencies of modules that have -XTemplateHaskell,
        -- otherwise those modules will fail to compile.
        -- See Note [-fno-code mode] #8025
-       th_enabled_nodes <- case backend dflags of
-                              NoBackend -> enableCodeGenForTH logger tmpfs unit_env all_nodes
-                              _ -> return all_nodes
+       th_enabled_nodes <- if backendGeneratesCode (backend dflags) then
+                               return all_nodes
+                           else
+                               enableCodeGenForTH logger tmpfs unit_env all_nodes
        if null all_root_errs
          then return (all_errs, th_enabled_nodes)
          else pure $ (all_root_errs, [])
@@ -1653,7 +1654,7 @@ enableCodeGenForTH logger tmpfs unit_env =
   where
     condition = isTemplateHaskellOrQQNonBoot
     should_modify ms@(ModSummary { ms_hspp_opts = dflags }) =
-      backend dflags == NoBackend &&
+      not (backendGeneratesCode $ backend dflags) &&
       -- Don't enable codegen for TH on indefinite packages; we
       -- can't compile anything anyway! See #16219.
       isHomeUnitDefinite (ue_unitHomeUnit (ms_unitid ms) unit_env)

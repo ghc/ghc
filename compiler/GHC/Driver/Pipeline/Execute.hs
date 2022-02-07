@@ -29,6 +29,7 @@ import GHC.Unit.Module.Status
 import GHC.Unit.Module.ModIface
 import GHC.Linker.Types
 import GHC.Driver.Backend
+import GHC.Driver.Backend.Refunctionalize
 import GHC.Driver.Session
 import GHC.Driver.CmdLine
 import GHC.Unit.Module.ModSummary
@@ -44,7 +45,7 @@ import GHC.Utils.TmpFs
 import GHC.Platform
 import Data.List (intercalate, isInfixOf)
 import GHC.Unit.Env
-import GHC.SysTools.Info
+--import GHC.SysTools.Info
 import GHC.Utils.Error
 import Data.Maybe
 import GHC.CmmToLlvm.Mangler
@@ -70,7 +71,6 @@ import Data.IORef
 import GHC.Types.Name.Env
 import GHC.Platform.Ways
 import GHC.Platform.ArchOS
-import GHC.CmmToLlvm.Base ( llvmVersionList )
 import {-# SOURCE #-} GHC.Driver.Pipeline (compileForeign, compileEmptyStub)
 import GHC.Settings
 import System.IO
@@ -284,13 +284,11 @@ runAsPhase with_cpp pipe_env hsc_env location input_fn = do
 
         -- LLVM from version 3.0 onwards doesn't support the OS X system
         -- assembler, so we use clang as the assembler instead. (#5636)
-        let (as_prog, get_asm_info) | backend dflags == LLVM
-                    , platformOS platform == OSDarwin
-                    = (GHC.SysTools.runClang, pure Clang)
-                    | otherwise
-                    = (GHC.SysTools.runAs, getAssemblerInfo logger dflags)
-
-        asmInfo <- get_asm_info
+        let (as_prog, get_asm_info) =
+                ( applyAssemblerProg $ backendAssemblerProg (backend dflags)
+                , applyAssemblerInfoGetter $ backendAssemblerInfoGetter (backend dflags)
+                )
+        asmInfo <- get_asm_info logger dflags platform
 
         let cmdline_include_paths = includePaths dflags
         let pic_c_flags = picCCOpts dflags
@@ -310,6 +308,7 @@ runAsPhase with_cpp pipe_env hsc_env location input_fn = do
               = withAtomicRename outputFilename $ \temp_outputFilename ->
                     as_prog
                        logger dflags
+                       platform
                        (local_includes ++ global_includes
                        -- See Note [-fPIC for assembler]
                        ++ map GHC.SysTools.Option pic_c_flags
@@ -498,28 +497,10 @@ runHscBackendPhase pipe_env hsc_env mod_name src_flavour location result = do
                   hscs_partial_iface = partial_iface,
                   hscs_old_iface_hash = mb_old_iface_hash
                 }
-        -> case backend dflags of
-          NoBackend -> panic "HscRecomp not relevant for NoBackend"
-          Interpreter -> do
-              -- In interpreted mode the regular codeGen backend is not run so we
-              -- generate a interface without codeGen info.
-              final_iface <- mkFullIface hsc_env partial_iface Nothing
-              hscMaybeWriteIface logger dflags True final_iface mb_old_iface_hash location
-
-              (hasStub, comp_bc, spt_entries) <- hscInteractive hsc_env cgguts mod_location
-
-              stub_o <- case hasStub of
-                        Nothing -> return []
-                        Just stub_c -> do
-                            stub_o <- compileStub hsc_env stub_c
-                            return [DotO stub_o]
-
-              let hs_unlinked = [BCOs comp_bc spt_entries]
-              unlinked_time <- getCurrentTime
-              let !linkable = LM unlinked_time (mkHomeModule (hsc_home_unit hsc_env) mod_name)
-                             (hs_unlinked ++ stub_o)
-              return ([], final_iface, Just linkable, panic "interpreter")
-          _ -> do
+        -> if not (backendGeneratesCode (backend dflags)) then
+             panic "HscRecomp not relevant for NoBackend"
+           else if backendWritesFiles (backend dflags) then
+             do
               output_fn <- phaseOutputFilenameNew next_phase pipe_env hsc_env (Just location)
               (outputFilename, mStub, foreign_files, cg_infos) <-
                 hscGenHardCode hsc_env cgguts mod_location output_fn
@@ -538,6 +519,27 @@ runHscBackendPhase pipe_env hsc_env mod_name src_flavour location result = do
               -- In future we can split up the driver logic more so that this function
               -- is in TPipeline and in this branch we can invoke the rest of the backend phase.
               return (fos, final_iface, Nothing, outputFilename)
+
+           else
+              -- In interpreted mode the regular codeGen backend is not run so we
+              -- generate a interface without codeGen info.
+            do
+              final_iface <- mkFullIface hsc_env partial_iface Nothing
+              hscMaybeWriteIface logger dflags True final_iface mb_old_iface_hash location
+
+              (hasStub, comp_bc, spt_entries) <- hscInteractive hsc_env cgguts mod_location
+
+              stub_o <- case hasStub of
+                        Nothing -> return []
+                        Just stub_c -> do
+                            stub_o <- compileStub hsc_env stub_c
+                            return [DotO stub_o]
+
+              let hs_unlinked = [BCOs comp_bc spt_entries]
+              unlinked_time <- getCurrentTime
+              let !linkable = LM unlinked_time (mkHomeModule (hsc_home_unit hsc_env) mod_name)
+                             (hs_unlinked ++ stub_o)
+              return ([], final_iface, Just linkable, panic "interpreter")
 
 
 runUnlitPhase :: HscEnv -> FilePath -> FilePath -> IO FilePath
@@ -987,7 +989,7 @@ doCpp logger tmpfs dflags unit_env raw input_fn output_fn = do
           [ "-D__AVX512F__"  | isAvx512fEnabled  dflags ] ++
           [ "-D__AVX512PF__" | isAvx512pfEnabled dflags ]
 
-    backend_defs <- getBackendDefs logger dflags
+    backend_defs <- applyCDefs (backendCDefs $ backend dflags) logger dflags
 
     let th_defs = [ "-D__GLASGOW_HASKELL_TH__" ]
     -- Default CPP defines in Haskell source
@@ -1039,32 +1041,12 @@ doCpp logger tmpfs dflags unit_env raw input_fn output_fn = do
                        , GHC.SysTools.FileOption "" output_fn
                        ])
 
-getBackendDefs :: Logger -> DynFlags -> IO [String]
-getBackendDefs logger dflags | backend dflags == LLVM = do
-    llvmVer <- figureLlvmVersion logger dflags
-    return $ case fmap llvmVersionList llvmVer of
-               Just [m] -> [ "-D__GLASGOW_HASKELL_LLVM__=" ++ format (m,0) ]
-               Just (m:n:_) -> [ "-D__GLASGOW_HASKELL_LLVM__=" ++ format (m,n) ]
-               _ -> []
-  where
-    format (major, minor)
-      | minor >= 100 = error "getBackendDefs: Unsupported minor version"
-      | otherwise = show $ (100 * major + minor :: Int) -- Contract is Int
-
-getBackendDefs _ _ =
-    return []
 
 -- | What phase to run after one of the backend code generators has run
 hscPostBackendPhase :: HscSource -> Backend -> Phase
 hscPostBackendPhase HsBootFile _    =  StopLn
 hscPostBackendPhase HsigFile _      =  StopLn
-hscPostBackendPhase _ bcknd =
-  case bcknd of
-        ViaC        -> HCc
-        NCG         -> As False
-        LLVM        -> LlvmOpt
-        NoBackend   -> StopLn
-        Interpreter -> StopLn
+hscPostBackendPhase _ bcknd = backendNormalSuccessorPhase bcknd
 
 
 compileStub :: HscEnv -> FilePath -> IO FilePath

@@ -57,6 +57,7 @@ module GHC.Utils.Error (
         ghcExit,
         prettyPrintGhcErrors,
         traceCmd,
+        traceSystoolCommand,
 
         sortMsgBag
     ) where
@@ -461,6 +462,20 @@ traceCmd logger phase_name cmd_line action = do
   loggerTraceFlush logger
    -- And run it!
   action `catchIO` handle_exn
+
+
+-- * Tracing utility
+
+-- | Record in the eventlog when the given tool command starts
+--   and finishes, prepending the given 'String' with
+--   \"systool:\", to easily be able to collect and process
+--   all the systool events.
+--
+--   For those events to show up in the eventlog, you need
+--   to run GHC with @-v2@ or @-ddump-timings@.
+traceSystoolCommand :: Logger -> String -> IO a -> IO a
+traceSystoolCommand logger tool = withTiming logger (text "systool:" <> text tool) (const ())
+
 
 {- Note [withTiming]
 ~~~~~~~~~~~~~~~~~~~~

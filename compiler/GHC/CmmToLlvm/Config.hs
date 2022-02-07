@@ -8,13 +8,9 @@ where
 import GHC.Prelude
 import GHC.Platform
 
+import GHC.CmmToLlvm.LlvmVersion
 import GHC.Utils.Outputable
 import GHC.Driver.Session
-
-import qualified Data.List.NonEmpty as NE
-
-newtype LlvmVersion = LlvmVersion { llvmVersionNE :: NE.NonEmpty Int }
-  deriving (Eq, Ord)
 
 data LlvmCgConfig = LlvmCgConfig
   { llvmCgPlatform          :: !Platform     -- ^ Target platform

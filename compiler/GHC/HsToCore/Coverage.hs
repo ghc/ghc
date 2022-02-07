@@ -1083,7 +1083,7 @@ coveragePasses dflags =
 
 -- | Should we produce 'Breakpoint' ticks?
 breakpointsEnabled :: DynFlags -> Bool
-breakpointsEnabled dflags = backend dflags == Interpreter
+breakpointsEnabled dflags = backendWantsBreakpointTicks (backend dflags)
 
 -- | Tickishs that only make sense when their source code location
 -- refers to the current file. This might not always be true due to

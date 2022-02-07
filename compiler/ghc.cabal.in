@@ -267,6 +267,7 @@ Library
         GHC.CmmToLlvm.Mangler
         GHC.CmmToLlvm.Ppr
         GHC.CmmToLlvm.Regs
+        GHC.CmmToLlvm.LlvmVersion
         GHC.Cmm.Type
         GHC.Cmm.Utils
         GHC.Core
@@ -366,6 +367,9 @@ Library
         GHC.Data.TrieMap
         GHC.Data.UnionFind
         GHC.Driver.Backend
+        GHC.Driver.Backend.Types
+        GHC.Driver.Backend.Refunctionalize
+        GHC.Driver.Backend.Legacy
         GHC.Driver.Backpack
         GHC.Driver.Backpack.Syntax
         GHC.Driver.CmdLine

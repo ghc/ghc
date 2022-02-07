@@ -268,7 +268,7 @@ tcCheckFIType :: [Scaled Type] -> Type -> ForeignImport -> TcM ForeignImport
 
 tcCheckFIType arg_tys res_ty (CImport (L lc cconv) safety mh l@(CLabel _) src)
   -- Foreign import label
-  = do checkCg checkCOrAsmOrLlvmOrInterp
+  = do checkCg backendValidityOfCImport
        -- NB check res_ty not sig_ty!
        --    In case sig_ty is (forall a. ForeignPtr a)
        check (isFFILabelTy (mkVisFunTys arg_tys res_ty)) (illegalForeignTyErr Outputable.empty)
@@ -280,7 +280,7 @@ tcCheckFIType arg_tys res_ty (CImport (L lc cconv) safety mh CWrapper src) = do
         -- The type must be of the form ft -> IO (FunPtr ft), where ft is a valid
         -- foreign type.  For legacy reasons ft -> IO (Ptr ft) is accepted, too.
         -- The use of the latter form is DEPRECATED, though.
-    checkCg checkCOrAsmOrLlvmOrInterp
+    checkCg backendValidityOfCImport
     cconv' <- checkCConv cconv
     case arg_tys of
         [Scaled arg1_mult arg1_ty] -> do
@@ -296,7 +296,7 @@ tcCheckFIType arg_tys res_ty (CImport (L lc cconv) safety mh CWrapper src) = do
 tcCheckFIType arg_tys res_ty idecl@(CImport (L lc cconv) (L ls safety) mh
                                             (CFunction target) src)
   | isDynamicTarget target = do -- Foreign import dynamic
-      checkCg checkCOrAsmOrLlvmOrInterp
+      checkCg backendValidityOfCImport
       cconv' <- checkCConv cconv
       case arg_tys of           -- The first arg must be Ptr or FunPtr
         []                ->
@@ -315,7 +315,7 @@ tcCheckFIType arg_tys res_ty idecl@(CImport (L lc cconv) (L ls safety) mh
       checkTc (xopt LangExt.GHCForeignImportPrim dflags)
               (TcRnUnknownMessage $ mkPlainError noHints $
                text "Use GHCForeignImportPrim to allow `foreign import prim'.")
-      checkCg checkCOrAsmOrLlvmOrInterp
+      checkCg backendValidityOfCImport
       checkCTarget target
       checkTc (playSafe safety)
               (TcRnUnknownMessage $ mkPlainError noHints $
@@ -325,7 +325,7 @@ tcCheckFIType arg_tys res_ty idecl@(CImport (L lc cconv) (L ls safety) mh
       checkForeignRes nonIOok checkSafe (isFFIPrimResultTy dflags) res_ty
       return idecl
   | otherwise = do              -- Normal foreign import
-      checkCg checkCOrAsmOrLlvmOrInterp
+      checkCg backendValidityOfCImport
       cconv' <- checkCConv cconv
       checkCTarget target
       dflags <- getDynFlags
@@ -345,7 +345,7 @@ tcCheckFIType arg_tys res_ty idecl@(CImport (L lc cconv) (L ls safety) mh
 -- that the C identifier is valid for C
 checkCTarget :: CCallTarget -> TcM ()
 checkCTarget (StaticTarget _ str _ _) = do
-    checkCg checkCOrAsmOrLlvmOrInterp
+    checkCg backendValidityOfCImport
     checkTc (isCLabelString str) (badCName str)
 
 checkCTarget DynamicTarget = panic "checkCTarget DynamicTarget"
@@ -421,7 +421,7 @@ tcFExport d = pprPanic "tcFExport" (ppr d)
 
 tcCheckFEType :: Type -> ForeignExport -> TcM ForeignExport
 tcCheckFEType sig_ty (CExport (L l (CExportStatic esrc str cconv)) src) = do
-    checkCg checkCOrAsmOrLlvm
+    checkCg backendValidityOfCExport
     checkTc (isCLabelString str) (badCName str)
     cconv' <- checkCConv cconv
     checkForeignArgs isFFIExternalTy arg_tys
@@ -505,34 +505,14 @@ checkSafe, noCheckSafe :: Bool
 checkSafe   = True
 noCheckSafe = False
 
--- | Checking a supported backend is in use
-checkCOrAsmOrLlvm :: Backend -> Validity
-checkCOrAsmOrLlvm ViaC = IsValid
-checkCOrAsmOrLlvm NCG  = IsValid
-checkCOrAsmOrLlvm LLVM = IsValid
-checkCOrAsmOrLlvm _
-  = NotValid (text "requires unregisterised, llvm (-fllvm) or native code generation (-fasm)")
-
--- | Checking a supported backend is in use
-checkCOrAsmOrLlvmOrInterp :: Backend -> Validity
-checkCOrAsmOrLlvmOrInterp ViaC        = IsValid
-checkCOrAsmOrLlvmOrInterp NCG         = IsValid
-checkCOrAsmOrLlvmOrInterp LLVM        = IsValid
-checkCOrAsmOrLlvmOrInterp Interpreter = IsValid
-checkCOrAsmOrLlvmOrInterp _
-  = NotValid (text "requires interpreted, unregisterised, llvm or native code generation")
-
 checkCg :: (Backend -> Validity) -> TcM ()
 checkCg check = do
     dflags <- getDynFlags
     let bcknd = backend dflags
-    case bcknd of
-      NoBackend -> return ()
-      _ ->
-        case check bcknd of
-          IsValid      -> return ()
-          NotValid err ->
-            addErrTc (TcRnUnknownMessage $ mkPlainError noHints $ text "Illegal foreign declaration:" <+> err)
+    case check bcknd of
+      IsValid      -> return ()
+      NotValid err ->
+        addErrTc (TcRnUnknownMessage $ mkPlainError noHints $ text "Illegal foreign declaration:" <+> err)
 
 -- Calling conventions
 

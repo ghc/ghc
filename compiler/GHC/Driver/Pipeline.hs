@@ -258,10 +258,7 @@ compileOne' mHscMessage
        isProfWay   = hasWay (ways lcl_dflags) WayProf
        internalInterpreter = not (gopt Opt_ExternalInterpreter lcl_dflags)
 
-       pipelineOutput = case bcknd of
-         Interpreter -> NoOutputFile
-         NoBackend -> NoOutputFile
-         _ -> Persistent
+       pipelineOutput = backendPipelineOutput bcknd
 
        logger = hsc_logger hsc_env0
        tmpfs  = hsc_tmpfs hsc_env0
@@ -300,7 +297,7 @@ compileOne' mHscMessage
          -- was set), force it to generate byte-code. This is NOT transitive and
          -- only applies to direct targets.
          | loadAsByteCode
-         = (Interpreter, gopt_set (dflags2 { backend = Interpreter }) Opt_ForceRecomp)
+         = (interpreterBackend, gopt_set (dflags2 { backend = interpreterBackend }) Opt_ForceRecomp)
          | otherwise
          = (backend dflags, dflags2)
        -- See Note [Filepaths and Multiple Home Units]
@@ -548,7 +545,7 @@ compileFile hsc_env stop_phase (src, _mb_phase) = do
         -- When linking, the -o argument refers to the linker's output.
         -- otherwise, we use it as the name for the pipeline's output.
         output
-         | NoBackend <- backend dflags, notStopPreprocess = NoOutputFile
+         | not (backendGeneratesCode (backend dflags)), notStopPreprocess = NoOutputFile
                 -- avoid -E -fno-code undesirable interactions. see #20439
          | NoStop <- stop_phase, not (isNoLink ghc_link) = Persistent
                 -- -o foo applies to linker
@@ -601,7 +598,7 @@ compileForeign hsc_env lang stub_c = do
               LangCxx    -> viaCPipeline Ccxx
               LangObjc   -> viaCPipeline Cobjc
               LangObjcxx -> viaCPipeline Cobjcxx
-              LangAsm    -> \pe hsc_env ml fp -> Just <$> asPipeline True pe hsc_env ml fp
+              LangAsm    -> \pe hsc_env ml fp -> asPipeline True pe hsc_env ml fp
 #if __GLASGOW_HASKELL__ < 811
               RawObject  -> panic "compileForeign: should be unreachable"
 #endif
@@ -749,19 +746,19 @@ hscPipeline pipe_env (hsc_env_with_plugins, mod_sum, hsc_recomp_status) = do
 
 hscBackendPipeline :: P m => PipeEnv -> HscEnv -> ModSummary -> HscBackendAction -> m (ModIface, Maybe Linkable)
 hscBackendPipeline pipe_env hsc_env mod_sum result =
-  case backend (hsc_dflags hsc_env) of
-    NoBackend ->
-      case result of
-        HscUpdate iface ->  return (iface, Nothing)
-        HscRecomp {} -> (,) <$> liftIO (mkFullIface hsc_env (hscs_partial_iface result) Nothing) <*> pure Nothing
-    -- TODO: Why is there not a linkable?
-    -- Interpreter -> (,) <$> use (T_IO (mkFullIface hsc_env (hscs_partial_iface result) Nothing)) <*> pure Nothing
-    _ -> do
+  if backendGeneratesCode (backend (hsc_dflags hsc_env)) then
+    do
       res <- hscGenBackendPipeline pipe_env hsc_env mod_sum result
       when (gopt Opt_BuildDynamicToo (hsc_dflags hsc_env)) $ do
           let dflags' = setDynamicNow (hsc_dflags hsc_env) -- set "dynamicNow"
           () <$ hscGenBackendPipeline pipe_env (hscSetFlags dflags' hsc_env) mod_sum result
       return res
+  else
+    case result of
+      HscUpdate iface ->  return (iface, Nothing)
+      HscRecomp {} -> (,) <$> liftIO (mkFullIface hsc_env (hscs_partial_iface result) Nothing) <*> pure Nothing
+    -- TODO: Why is there not a linkable?
+    -- Interpreter -> (,) <$> use (T_IO (mkFullIface hsc_env (hscs_partial_iface result) Nothing)) <*> pure Nothing
 
 hscGenBackendPipeline :: P m
   => PipeEnv
@@ -788,28 +785,28 @@ hscGenBackendPipeline pipe_env hsc_env mod_sum result = do
         return (Just linkable)
   return (miface, final_linkable)
 
-asPipeline :: P m => Bool -> PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> m FilePath
+asPipeline :: P m => Bool -> PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> m (Maybe FilePath)
 asPipeline use_cpp pipe_env hsc_env location input_fn = do
-  use (T_As use_cpp pipe_env hsc_env location input_fn)
+  Just <$> use (T_As use_cpp pipe_env hsc_env location input_fn)
 
 viaCPipeline :: P m => Phase -> PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> m (Maybe FilePath)
 viaCPipeline c_phase pipe_env hsc_env location input_fn = do
   out_fn <- use (T_Cc c_phase pipe_env hsc_env input_fn)
   case stop_phase pipe_env of
     StopC -> return Nothing
-    _ -> Just <$> asPipeline False pipe_env hsc_env location out_fn
+    _ -> asPipeline False pipe_env hsc_env location out_fn
 
-llvmPipeline :: P m => PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> m FilePath
+llvmPipeline :: P m => PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> m (Maybe FilePath)
 llvmPipeline pipe_env hsc_env location fp = do
   opt_fn <- use (T_LlvmOpt pipe_env hsc_env fp)
   llvmLlcPipeline pipe_env hsc_env location opt_fn
 
-llvmLlcPipeline :: P m => PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> m FilePath
+llvmLlcPipeline :: P m => PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> m (Maybe FilePath)
 llvmLlcPipeline pipe_env hsc_env location opt_fn = do
   llc_fn <- use (T_LlvmLlc pipe_env hsc_env opt_fn)
   llvmManglePipeline pipe_env hsc_env location llc_fn
 
-llvmManglePipeline :: P m  => PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> m FilePath
+llvmManglePipeline :: P m  => PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> m (Maybe FilePath)
 llvmManglePipeline pipe_env hsc_env location llc_fn = do
   mangled_fn <-
     if gopt Opt_NoLlvmMangler (hsc_dflags hsc_env)
@@ -829,17 +826,6 @@ cmmPipeline pipe_env hsc_env input_fn = do
   case mo_fn of
     Nothing -> panic "CMM pipeline - produced no .o file"
     Just mo_fn -> use (T_MergeForeign pipe_env hsc_env mo_fn fos)
-
-hscPostBackendPipeline :: P m => PipeEnv -> HscEnv -> HscSource -> Backend -> Maybe ModLocation -> FilePath -> m (Maybe FilePath)
-hscPostBackendPipeline _ _ HsBootFile _ _ _   = return Nothing
-hscPostBackendPipeline _ _ HsigFile _ _ _     = return Nothing
-hscPostBackendPipeline pipe_env hsc_env _ bcknd ml input_fn =
-  case bcknd of
-        ViaC        -> viaCPipeline HCc pipe_env hsc_env ml input_fn
-        NCG         -> Just <$> asPipeline False pipe_env hsc_env ml input_fn
-        LLVM        -> Just <$> llvmPipeline pipe_env hsc_env ml input_fn
-        NoBackend   -> return Nothing
-        Interpreter -> return Nothing
 
 -- Pipeline from a given suffix
 pipelineStart :: P m => PipeEnv -> HscEnv -> FilePath -> m (Maybe FilePath)
@@ -870,7 +856,7 @@ pipelineStart pipe_env hsc_env input_fn =
    c :: P m => Phase -> m (Maybe FilePath)
    c phase = viaCPipeline phase pipe_env hsc_env Nothing input_fn
    as :: P m => Bool -> m (Maybe FilePath)
-   as use_cpp = Just <$> asPipeline use_cpp pipe_env hsc_env Nothing input_fn
+   as use_cpp = asPipeline use_cpp pipe_env hsc_env Nothing input_fn
 
    objFromLinkable (_, Just (LM _ _ [DotO lnk])) = Just lnk
    objFromLinkable _ = Nothing
@@ -896,9 +882,9 @@ pipelineStart pipe_env hsc_env input_fn =
    fromSuffix "cxx"      = c Ccxx
    fromSuffix "s"        = as False
    fromSuffix "S"        = as True
-   fromSuffix "ll"       = Just <$> llvmPipeline pipe_env hsc_env Nothing input_fn
-   fromSuffix "bc"       = Just <$> llvmLlcPipeline pipe_env hsc_env Nothing input_fn
-   fromSuffix "lm_s"     = Just <$> llvmManglePipeline pipe_env hsc_env Nothing input_fn
+   fromSuffix "ll"       = llvmPipeline pipe_env hsc_env Nothing input_fn
+   fromSuffix "bc"       = llvmLlcPipeline pipe_env hsc_env Nothing input_fn
+   fromSuffix "lm_s"     = llvmManglePipeline pipe_env hsc_env Nothing input_fn
    fromSuffix "o"        = return (Just input_fn)
    fromSuffix "cmm"      = Just <$> cmmCppPipeline pipe_env hsc_env input_fn
    fromSuffix "cmmcpp"   = Just <$> cmmPipeline pipe_env hsc_env input_fn
@@ -926,3 +912,21 @@ The structure of the code as a free monad also means that the return type of eac
 phase is a lot more flexible.
 
 -}
+
+
+----------------------------------------------------------------
+hscPostBackendPipeline :: TPipelineClass TPhase m => PipeEnv -> HscEnv -> HscSource -> Backend -> Maybe ModLocation -> FilePath -> m (Maybe FilePath)
+hscPostBackendPipeline _ _ HsBootFile _ _ _   = return Nothing
+hscPostBackendPipeline _ _ HsigFile _ _ _     = return Nothing
+hscPostBackendPipeline pipe_env hsc_env _ bcknd ml input_fn =
+  applyPostHscPipeline (backendPostHscPipeline bcknd) pipe_env hsc_env ml input_fn
+
+
+applyPostHscPipeline
+    :: TPipelineClass TPhase m
+    => DefunctionalizedPostHscPipeline
+    -> PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> m (Maybe FilePath)
+applyPostHscPipeline NcgPostHscPipeline = asPipeline False
+applyPostHscPipeline ViaCPostHscPipeline = viaCPipeline HCc
+applyPostHscPipeline LlvmPostHscPipeline = llvmPipeline
+applyPostHscPipeline NoPostHscPipeline = \_ _ _ _ -> return Nothing

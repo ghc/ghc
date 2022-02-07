@@ -3,7 +3,6 @@ module GHC.Driver.Config.Cmm
   ) where
 
 import GHC.Cmm.Config
-import GHC.Cmm.Switch (backendSupportsSwitch)
 
 import GHC.Driver.Session
 import GHC.Driver.Backend
@@ -21,8 +20,8 @@ initCmmConfig dflags = CmmConfig
   , cmmOptSink             = gopt Opt_CmmSink             dflags
   , cmmGenStackUnwindInstr = debugLevel dflags > 0
   , cmmExternalDynamicRefs = gopt Opt_ExternalDynamicRefs dflags
-  , cmmDoCmmSwitchPlans    = not . backendSupportsSwitch . backend $ dflags
-  , cmmSplitProcPoints     = (backend dflags /= NCG)
+  , cmmDoCmmSwitchPlans    = not . backendHasNativeSwitch . backend $ dflags
+  , cmmSplitProcPoints     = not (backendSupportsUnsplitProcPoints (backend dflags))
                              || not (platformTablesNextToCode platform)
                              || usingInconsistentPicReg
   }
