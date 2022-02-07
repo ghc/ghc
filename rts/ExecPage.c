@@ -6,8 +6,8 @@
  */
 
 #include "Rts.h"
-#include "LinkerInternals.h"
 #include "sm/OSMem.h"
+#include "linker/MMap.h"
 
 ExecPage *allocateExecPage() {
     ExecPage *page = (ExecPage *) mmapAnonForLinker(getPageSize());

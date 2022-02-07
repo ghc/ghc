@@ -10,7 +10,7 @@
 #include "sm/OSMem.h"
 #include "RtsUtils.h"
 #include "linker/M32Alloc.h"
-#include "LinkerInternals.h"
+#include "linker/MMap.h"
 #include "ReportMemoryMap.h"
 
 #include <inttypes.h>
