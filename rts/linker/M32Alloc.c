@@ -11,7 +11,7 @@
 #include "RtsUtils.h"
 #include "linker/M32Alloc.h"
 #include "LinkerInternals.h"
-#include "MemoryMap.h"
+#include "ReportMemoryMap.h"
 
 #include <inttypes.h>
 #include <stdlib.h>
