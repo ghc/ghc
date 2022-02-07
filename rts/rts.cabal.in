@@ -489,7 +489,7 @@ library
                Libdw.c
                LibdwPool.c
                Linker.c
-               MemoryMap.c
+               ReportMemoryMap.c
                Messages.c
                OldARMAtomic.c
                PathUtils.c
