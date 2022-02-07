@@ -33,7 +33,7 @@
 #include "linker/SymbolExtras.h"
 #include "PathUtils.h"
 #include "CheckUnload.h" // createOCSectionIndices
-#include "MemoryMap.h"
+#include "ReportMemoryMap.h"
 
 #if !defined(mingw32_HOST_OS)
 #include "posix/Signals.h"
