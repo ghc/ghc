@@ -25,6 +25,7 @@ import GHC.Tc.Solver.InertSet
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.EvTerm
 import GHC.Core.Class
+import GHC.Core.DataCon ( dataConName )
 import GHC.Core.TyCon
 import GHC.Core.Multiplicity
 import GHC.Core.TyCo.Rep   -- cleverly decomposes types, good for completeness checking
@@ -1153,7 +1154,7 @@ can_eq_nc' _rewritten rdr_env envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
 
   | ReprEq <- eq_rel
   , Just stuff2 <- tcTopNormaliseNewTypeTF_maybe envs rdr_env ty2
-  = can_eq_newtype_nc ev IsSwapped  ty2 stuff2 ty1 ps_ty1
+  = can_eq_newtype_nc ev IsSwapped ty2 stuff2 ty1 ps_ty1
 
 -- Then, get rid of casts
 can_eq_nc' rewritten _rdr_env _envs ev eq_rel (CastTy ty1 co1) _ ty2 ps_ty2
@@ -2486,7 +2487,10 @@ canEqCanLHSFinish ev eq_rel swapped lhs rhs
        ; massert (canEqLHSKind lhs `eqType` tcTypeKind rhs)
 
      -- by now, (TyEq:N) is already satisfied (if applicable)
-       ; massert (not bad_newtype)
+       ; assertPprM ty_eq_N_OK $
+           vcat [ text "CanEqCanLHSFinish: (TyEq:N) not satisfied"
+                , text "rhs:" <+> ppr rhs
+                ]
 
      -- guarantees (TyEq:OC), (TyEq:F)
      -- Must do the occurs check even on tyvar/tyvar
@@ -2547,12 +2551,20 @@ canEqCanLHSFinish ev eq_rel swapped lhs rhs
 
     lhs_ty = canEqLHSType lhs
 
-    -- This is about (TyEq:N)
-    bad_newtype | ReprEq <- eq_rel
-                , Just tc <- tyConAppTyCon_maybe rhs
-                = isNewTyCon tc
-                | otherwise
-                = False
+    -- This is about (TyEq:N): check that we don't have a newtype
+    -- whose constructor is in scope at the top-level of the RHS.
+    ty_eq_N_OK :: TcS Bool
+    ty_eq_N_OK
+      | ReprEq <- eq_rel
+      , Just tc <- tyConAppTyCon_maybe rhs
+      , Just con <- newTyConDataCon_maybe tc
+      -- #21010: only a problem if the newtype constructor is in scope
+      -- yet we didn't rewrite it away.
+      = do { rdr_env <- getGlobalRdrEnvTcS
+           ; let con_in_scope = isJust $ lookupGRE_Name rdr_env (dataConName con)
+           ; return $ not con_in_scope }
+      | otherwise
+      = return True
 
 -- | Solve a reflexive equality constraint
 canEqReflexive :: CtEvidence    -- ty ~ ty
