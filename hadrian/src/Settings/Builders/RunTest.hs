@@ -106,8 +106,10 @@ inTreeCompilerArgs stg = expr $ do
     llc_cmd   <- settingsFileSetting SettingsFileSetting_LlcCommand
     have_llvm <- liftIO (isJust <$> findExecutable llc_cmd)
 
-    pkgConfCacheFile <- packageDbPath stg <&> (-/- "package.cache")
-    libdir <- stageLibPath stg
+    top         <- topDirectory
+
+    pkgConfCacheFile <- (top -/-) <$> (packageDbPath stg <&> (-/- "package.cache"))
+    libdir <- (top -/-) <$> stageLibPath stg
 
     rtsLinker <- (== "YES") <$> setting TargetHasRtsLinker
 
