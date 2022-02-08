@@ -157,17 +157,18 @@ Quick Look treats application chains specially.  What is an
 "application chain"?  See Fig 2, of the QL paper: "A quick look at
 impredicativity" (ICFP'20). Here's the syntax:
 
-app :: head
-     | app expr            -- HsApp: ordinary application
-     | app @type           -- HsTypeApp: VTA
-     | expr `head` expr    -- OpApp: infix applications
-     | ( app )             -- HsPar: parens
-     | {-# PRAGMA #-} app  -- HsPragE: pragmas
+app ::= head
+     |  app expr            -- HsApp: ordinary application
+     |  app @type           -- HsTypeApp: VTA
+     |  expr `head` expr    -- OpApp: infix applications
+     |  ( app )             -- HsPar: parens
+     |  {-# PRAGMA #-} app  -- HsPragE: pragmas
 
 head ::= f             -- HsVar:    variables
       |  fld           -- HsRecFld: record field selectors
       |  (expr :: ty)  -- ExprWithTySig: expr with user type sig
       |  lit           -- HsOverLit: overloaded literals
+      |  $([| head |])    -- HsSpliceE+HsSpliced+HsSplicedExpr: untyped TH expression splices
       |  other_expr    -- Other expressions
 
 When tcExpr sees something that starts an application chain (namely,
@@ -185,7 +186,7 @@ There is no special treatment for HsUnboundVar, HsOverLit etc, because
 we can't get a polytype from them.
 
 Left and right sections (e.g. (x +) and (+ x)) are not yet supported.
-Probably left sections (x +) would be esay to add, since x is the
+Probably left sections (x +) would be easy to add, since x is the
 first arg of (+); but right sections are not so easy.  For symmetry
 reasons I've left both unchanged, in GHC.Tc.Gen.Expr.
 
@@ -196,6 +197,16 @@ dealt with by tcApp, even when it is not applied to anything. Consider
 Clearly this should work!  But it will /only/ work because if we
 instantiate that (forall b. b) impredicatively!  And that only happens
 in tcApp.
+
+We also wish to typecheck application chains with untyped Template Haskell
+splices in the head, such as this example from #21038:
+    data Foo = MkFoo (forall a. a -> a)
+    f = $([| MkFoo |]) $ \x -> x
+This should typecheck just as if the TH splice was never in the way—that is,
+just as if the user had written `MkFoo $ \x -> x`. We could conceivably have
+a case for typed TH expression splices too, but it wouldn't be useful in
+practice, since the types of typed TH expressions aren't allowed to have
+polymorphic types, such as the type of MkFoo.
 
 Note [tcApp: typechecking applications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
