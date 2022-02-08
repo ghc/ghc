@@ -177,13 +177,10 @@ mmap_again:
            if ((W_)result > 0x80000000) {
                // oops, we were given memory over 2Gb
                munmap(result,size);
-#if defined(freebsd_HOST_OS)  || \
-    defined(kfreebsdgnu_HOST_OS) || \
-    defined(dragonfly_HOST_OS)
-               // Some platforms require MAP_FIXED.  This is normally
-               // a bad idea, because MAP_FIXED will overwrite
-               // existing mappings.
-               fixed = MAP_FIXED;
+#if defined(MAP_TRYFIXED)
+               // Some platforms require MAP_FIXED. We use MAP_TRYFIXED since
+               // MAP_FIXED will overwrite existing mappings.
+               fixed = MAP_TRYFIXED;
                goto mmap_again;
 #else
                reportMemoryMap();
