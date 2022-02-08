@@ -9,8 +9,8 @@ module Expression (
 
     -- ** Predicates
     (?), stage, stage0, stage1, stage2, notStage0, threadedBootstrapper,
-     package, notPackage, packageOneOf, libraryPackage, builder, way, input,
-     inputs, output, outputs,
+     eventLoggingBootstrapper, package, notPackage, packageOneOf,
+     libraryPackage, builder, way, input, inputs, output, outputs,
 
     -- ** Evaluation
     interpret, interpretInContext,
@@ -131,6 +131,10 @@ notStage0 = notM stage0
 --   in Settings.Packages for details.
 threadedBootstrapper :: Predicate
 threadedBootstrapper = expr (flag BootstrapThreadedRts)
+
+-- | Whether or not the bootstrapping compiler provides an event-logging RTS.
+eventLoggingBootstrapper :: Predicate
+eventLoggingBootstrapper = expr (flag BootstrapEventLoggingRts)
 
 -- | Is a certain package /not/ built right now?
 notPackage :: Package -> Predicate

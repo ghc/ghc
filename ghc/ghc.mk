@@ -67,6 +67,11 @@ else
 ghc_stage1_CONFIGURE_OPTS += -f-threaded
 endif
 
+# Same for an event-logging RTS.
+ifeq "$(GhcEventLoggingRts)" "NO"
+ghc_stage1_CONFIGURE_OPTS += -f-eventlog
+endif
+
 ifeq "$(GhcProfiled)" "YES"
 ghc_stage2_PROGRAM_WAY = p
 endif

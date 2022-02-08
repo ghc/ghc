@@ -212,12 +212,20 @@ if test "$WithGhc" != ""; then
   dnl See Note [Linking ghc-bin against threaded stage0 RTS] in
   dnl hadrian/src/Settings/Packages.hs for details.
   dnl SMP support which implies a registerised stage0 is also required (see issue 18266)
-  if echo ${RTS_WAYS_STAGE0} | grep '.*thr.*' 2>&1 >/dev/null && \
+  if echo ${RTS_WAYS_STAGE0} | tr ' ' '\n' | grep '^thr$' 2>&1 >/dev/null && \
      test "$SUPPORT_SMP_STAGE0" = "YES"
   then
       AC_SUBST(GhcThreadedRts, YES)
   else
       AC_SUBST(GhcThreadedRts, NO)
+  fi
+
+  dnl Same for an event-logging RTS.
+  if echo ${RTS_WAYS_STAGE0} | tr ' ' '\n' | grep '^l$' 2>&1 >/dev/null
+  then
+      AC_SUBST(GhcEventLoggingRts, YES)
+  else
+      AC_SUBST(GhcEventLoggingRts, NO)
   fi
 fi
 
@@ -1364,6 +1372,7 @@ echo "\
    Bootstrapping using   : $WithGhc
       which is version   : $GhcVersion
       with threaded RTS? : $GhcThreadedRts
+      with eventlog RTS? : $GhcEventLoggingRts
 "
 
 if test "x$CcLlvmBackend" = "xYES"; then

@@ -169,6 +169,9 @@ GhcWithSMP := $(strip $(if $(filter YESNO, $(ArchSupportsSMP)$(GhcUnregisterised
 # Whether or not the bootstrapping GHC supplies a threaded RTS.
 GhcThreadedRts = @GhcThreadedRts@
 
+# Whether or not the bootstrapping GHC supplies an event-logging RTS.
+GhcEventLoggingRts = @GhcEventLoggingRts@
+
 # Whether to include GHCi in the compiler.  Depends on whether the RTS linker
 # has support for this OS/ARCH combination.
 
