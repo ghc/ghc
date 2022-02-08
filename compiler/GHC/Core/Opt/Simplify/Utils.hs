@@ -63,6 +63,8 @@ import GHC.Core.DataCon ( dataConWorkId, isNullaryRepDataCon )
 import GHC.Core.Multiplicity
 import GHC.Core.Opt.ConstantFold
 
+import GHC.Driver.Config.Core.Opt.Arity
+
 import GHC.Types.Name
 import GHC.Types.Id
 import GHC.Types.Id.Info
@@ -1824,12 +1826,6 @@ tryEtaExpandRhs env bndr rhs
                    ATop []     -> False
                    ABot {}     -> True
 -}
-
-initArityOpts :: DynFlags -> ArityOpts
-initArityOpts dflags = ArityOpts
-  { ao_ped_bot = gopt Opt_PedanticBottoms dflags
-  , ao_dicts_cheap = gopt Opt_DictsCheap dflags
-  }
 
 {-
 Note [Eta-expanding at let bindings]
