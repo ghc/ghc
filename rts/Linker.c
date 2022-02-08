@@ -1315,10 +1315,9 @@ preloadObjectFile (pathchar *path)
     * See also the misalignment logic for darwin below.
     */
 #if defined(darwin_HOST_OS) || defined(openbsd_HOST_OS)
-   image = mmapForLinker(fileSize, PROT_READ|PROT_WRITE, MAP_PRIVATE, fd, 0);
+   image = mmapForLinker(fileSize, MEM_READ_WRITE, MAP_PRIVATE, fd, 0);
 #else
-   image = mmapForLinker(fileSize, PROT_READ|PROT_WRITE|PROT_EXEC,
-                MAP_PRIVATE, fd, 0);
+   image = mmapForLinker(fileSize, MEM_READ_WRITE_EXECUTE, MAP_PRIVATE, fd, 0);
 #endif
 
    if (image == MAP_FAILED) {
