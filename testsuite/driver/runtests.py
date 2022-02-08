@@ -121,7 +121,7 @@ if args.test_package_db:
     config.test_package_db = args.test_package_db
 
 if args.only:
-    config.only = args.only
+    config.only = set(args.only)
     config.run_only_some_tests = True
 
 if args.way:
