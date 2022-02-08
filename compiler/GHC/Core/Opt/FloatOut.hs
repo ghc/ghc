@@ -18,7 +18,7 @@ import GHC.Core.Make
 import GHC.Core.Opt.Arity ( exprArity, etaExpand )
 import GHC.Core.Opt.Monad ( FloatOutSwitches(..) )
 
-import GHC.Driver.Session
+import GHC.Driver.Flags  ( DumpFlag (..) )
 import GHC.Utils.Logger
 import GHC.Types.Id      ( Id, idArity, idType, isDeadEndId,
                            isJoinId, isJoinId_maybe )

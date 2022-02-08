@@ -22,15 +22,11 @@ module GHC.Core.Rules (
         -- * Misc. CoreRule helpers
         rulesOfBinds, getRules, pprRulesForUser,
 
-        lookupRule, mkRule, roughTopNames, initRuleOpts
+        lookupRule, mkRule, roughTopNames
     ) where
 
 import GHC.Prelude
 
-import GHC.Driver.Session      ( DynFlags, gopt, targetPlatform, homeUnitId_ )
-import GHC.Driver.Flags
-
-import GHC.Unit.Types    ( primUnitId, bignumUnitId )
 import GHC.Unit.Module   ( Module )
 import GHC.Unit.Module.Env
 
@@ -544,18 +540,6 @@ matchRule _ rule_env is_active _ args rough_args
   | not (is_active act)               = Nothing
   | ruleCantMatch tpl_tops rough_args = Nothing
   | otherwise = matchN rule_env rule_name tpl_vars tpl_args args rhs
-
-
--- | Initialize RuleOpts from DynFlags
-initRuleOpts :: DynFlags -> RuleOpts
-initRuleOpts dflags = RuleOpts
-  { roPlatform                = targetPlatform dflags
-  , roNumConstantFolding      = gopt Opt_NumConstantFolding dflags
-  , roExcessRationalPrecision = gopt Opt_ExcessPrecision dflags
-    -- disable bignum rules in ghc-prim and ghc-bignum itself
-  , roBignumRules             = homeUnitId_ dflags /= primUnitId
-                                && homeUnitId_ dflags /= bignumUnitId
-  }
 
 
 ---------------------------------------

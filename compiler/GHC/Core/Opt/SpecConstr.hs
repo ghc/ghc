@@ -799,7 +799,7 @@ specConstrProgram guts
       this_mod <- getModule
       let binds' = reverse $ fst $ initUs us $ do
                     -- Note [Top-level recursive groups]
-                    (env, binds) <- goEnv (initScEnv dflags this_mod annos)
+                    (env, binds) <- goEnv (initScEnv (initScOpts dflags this_mod) annos)
                                           (mg_binds guts)
                         -- binds is identical to (mg_binds guts), except that the
                         -- binders on the LHS have been replaced by extendBndr
@@ -904,24 +904,38 @@ scrutinised in the body.  True <=> ignore that, and specialise whenever
 the function is applied to a data constructor.
 -}
 
-data ScEnv = SCE { sc_dflags    :: DynFlags,
-                   sc_uf_opts   :: !UnfoldingOpts, -- ^ Unfolding options
-                   sc_module    :: !Module,
-                   sc_size      :: Maybe Int,   -- Size threshold
-                                                -- Nothing => no limit
+-- | Options for Specializing over constructors in Core.
+data SpecConstrOpts = SpecConstrOpts
+  { sc_max_args  :: !Int
+  -- ^ The threshold at which a worker-wrapper transformation used as part of
+  -- this pass will no longer happen, measured in the number of arguments.
 
-                   sc_count     :: Maybe Int,   -- Max # of specialisations for any one fn
-                                                -- Nothing => no limit
-                                                -- See Note [Avoiding exponential blowup]
+  , sc_debug     :: !Bool
+  -- ^ Whether to print debug information
 
-                   sc_recursive :: Int,         -- Max # of specialisations over recursive type.
-                                                -- Stops ForceSpecConstr from diverging.
+  , sc_uf_opts   :: !UnfoldingOpts
+  -- ^ Unfolding options
 
-                   sc_keen     :: Bool,         -- Specialise on arguments that are known
-                                                -- constructors, even if they are not
-                                                -- scrutinised in the body.  See
-                                                -- Note [Making SpecConstr keener]
+  , sc_module    :: !Module
+  -- ^ The name of the module being processed
 
+  , sc_size      :: !(Maybe Int)
+  -- ^ Size threshold: Nothing => no limit
+
+  , sc_count     :: !(Maybe Int)
+  -- ^ Max # of specialisations for any one function. Nothing => no limit.
+  -- See Note [Avoiding exponential blowup].
+
+  , sc_recursive :: !Int
+  -- ^ Max # of specialisations over recursive type. Stops
+  -- ForceSpecConstr from diverging.
+
+  , sc_keen      :: !Bool
+  -- ^ Specialise on arguments that are known constructors, even if they are
+  -- not scrutinised in the body. See Note [Making SpecConstr keener].
+  }
+
+data ScEnv = SCE { sc_opts      :: !SpecConstrOpts,
                    sc_force     :: Bool,        -- Force specialisation?
                                                 -- See Note [Forcing specialisation]
 
@@ -957,15 +971,21 @@ instance Outputable Value where
    ppr LambdaVal         = text "<Lambda>"
 
 ---------------------
-initScEnv :: DynFlags -> Module -> UniqFM Name SpecConstrAnnotation -> ScEnv
-initScEnv dflags this_mod anns
-  = SCE { sc_dflags      = dflags,
+initScOpts :: DynFlags -> Module -> SpecConstrOpts
+initScOpts dflags this_mod = SpecConstrOpts
+        { sc_max_args    = maxWorkerArgs dflags,
+          sc_debug       = hasPprDebug dflags,
           sc_uf_opts     = unfoldingOpts dflags,
           sc_module      = this_mod,
           sc_size        = specConstrThreshold dflags,
           sc_count       = specConstrCount     dflags,
           sc_recursive   = specConstrRecursive dflags,
-          sc_keen        = gopt Opt_SpecConstrKeen dflags,
+          sc_keen        = gopt Opt_SpecConstrKeen dflags
+        }
+
+initScEnv :: SpecConstrOpts -> UniqFM Name SpecConstrAnnotation -> ScEnv
+initScEnv opts anns
+  = SCE { sc_opts        = opts,
           sc_force       = False,
           sc_subst       = emptySubst,
           sc_how_bound   = emptyVarEnv,
@@ -1091,9 +1111,12 @@ decreaseSpecCount :: ScEnv -> Int -> ScEnv
 -- See Note [Avoiding exponential blowup]
 decreaseSpecCount env n_specs
   = env { sc_force = False   -- See Note [Forcing specialisation]
-        , sc_count = case sc_count env of
+        , sc_opts = (sc_opts env)
+            { sc_count = case sc_count $ sc_opts env of
                        Nothing -> Nothing
-                       Just n  -> Just (n `div` (n_specs + 1)) }
+                       Just n  -> Just $! (n `div` (n_specs + 1))
+            }
+        }
         -- The "+1" takes account of the original function;
         -- See Note [Avoiding exponential blowup]
 
@@ -1506,9 +1529,9 @@ scTopBindEnv env (NonRec bndr rhs)
 scTopBind :: ScEnv -> ScUsage -> CoreBind -> UniqSM (ScUsage, CoreBind)
 
 scTopBind env body_usage (Rec prs)
-  | Just threshold <- sc_size env
+  | Just threshold <- sc_size $ sc_opts env
   , not force_spec
-  , not (all (couldBeSmallEnoughToInline (sc_uf_opts env) threshold) rhss)
+  , not (all (couldBeSmallEnoughToInline (sc_uf_opts $ sc_opts env) threshold) rhss)
                 -- No specialisation
   = -- pprTrace "scTopBind: nospec" (ppr bndrs) $
     do  { (rhs_usgs, rhss')   <- mapAndUnzipM (scExpr env) rhss
@@ -1623,6 +1646,7 @@ specRec :: TopLevelFlag -> ScEnv
 specRec top_lvl env body_usg rhs_infos
   = go 1 seed_calls nullUsage init_spec_infos
   where
+    opts = sc_opts env
     (seed_calls, init_spec_infos)    -- Note [Seeding top-level recursive groups]
        | isTopLevel top_lvl
        , any (isExportedId . ri_fn) rhs_infos   -- Seed from body and RHSs
@@ -1652,8 +1676,8 @@ specRec top_lvl env body_usg rhs_infos
 
       -- Limit recursive specialisation
       -- See Note [Limit recursive specialisation]
-      | n_iter > sc_recursive env  -- Too many iterations of the 'go' loop
-      , sc_force env || isNothing (sc_count env)
+      | n_iter > sc_recursive opts  -- Too many iterations of the 'go' loop
+      , sc_force env || isNothing (sc_count opts)
            -- If both of these are false, the sc_count
            -- threshold will prevent non-termination
       , any ((> the_limit) . si_n_specs) spec_infos
@@ -1672,7 +1696,7 @@ specRec top_lvl env body_usg rhs_infos
             ; go (n_iter + 1) (scu_calls extra_usg) all_usg new_spec_infos }
 
     -- See Note [Limit recursive specialisation]
-    the_limit = case sc_count env of
+    the_limit = case sc_count opts of
                   Nothing  -> 10    -- Ugh!
                   Just max -> max
 
@@ -1860,7 +1884,7 @@ spec_one env fn arg_bndrs body (call_pat, rule_number)
                               -- since `length(qvars) + void + length(extra_bndrs) = length spec_call_args`
                               dropTail (length extra_bndrs) spec_call_args
               inline_act = idInlineActivation fn
-              this_mod   = sc_module env
+              this_mod   = sc_module $ sc_opts env
               rule       = mkRule this_mod True {- Auto -} True {- Local -}
                                   rule_name inline_act fn_name qvars pats rule_rhs
                            -- See Note [Transfer activation]
@@ -2205,9 +2229,8 @@ callsToNewPats env fn spec_info@(SI { si_specs = done_specs }) bndr_occs calls
 
               -- Remove ones that have too many worker variables
               small_pats = filterOut too_big non_dups
-              max_args = maxWorkerArgs (sc_dflags env)
               too_big (CP { cp_qvars = vars, cp_args = args })
-                = not (isWorkerSmallEnough max_args (valArgCount args) vars)
+                = not (isWorkerSmallEnough (sc_max_args $ sc_opts env) (valArgCount args) vars)
                   -- We are about to construct w/w pair in 'spec_one'.
                   -- Omit specialisation leading to high arity workers.
                   -- See Note [Limit w/w arity] in GHC.Core.Opt.WorkWrap.Utils
@@ -2244,7 +2267,7 @@ trim_pats env fn (SI { si_n_specs = done_spec_count }) pats
     n_pats         = length pats
     spec_count'    = n_pats + done_spec_count
     n_remaining    = max_specs - done_spec_count
-    mb_scc         = sc_count env
+    mb_scc         = sc_count $ sc_opts env
     Just max_specs = mb_scc
 
     sorted_pats = map fst $
@@ -2269,7 +2292,7 @@ trim_pats env fn (SI { si_n_specs = done_spec_count }) pats
           n_cons _           = 0
 
     emit_trace result
-       | debugIsOn || hasPprDebug (sc_dflags env)
+       | debugIsOn || sc_debug (sc_opts env)
          -- Suppress this scary message for ordinary users!  #5125
        = pprTrace "SpecConstr" msg result
        | otherwise
@@ -2480,7 +2503,7 @@ argToPat1 env in_scope val_env arg arg_occ _arg_str
     mb_scrut dc = case arg_occ of
                 ScrutOcc bs | Just occs <- lookupUFM bs dc
                             -> Just (occs)  -- See Note [Reboxing]
-                _other      | sc_force env || sc_keen env
+                _other      | sc_force env || sc_keen (sc_opts env)
                             -> Just (repeat UnkOcc)
                             | otherwise
                             -> Nothing

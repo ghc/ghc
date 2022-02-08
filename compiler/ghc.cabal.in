@@ -335,6 +335,7 @@ Library
         GHC.Core.Predicate
         GHC.Core.Reduction
         GHC.Core.Rules
+        GHC.Core.Rules.Config
         GHC.Core.Seq
         GHC.Core.SimpleOpt
         GHC.Core.Stats
@@ -399,6 +400,7 @@ Library
         GHC.Driver.Config.Core.Opt.Arity
         GHC.Driver.Config.Core.Opt.LiberateCase
         GHC.Driver.Config.Core.Opt.WorkWrap
+        GHC.Driver.Config.Core.Rules
         GHC.Driver.Config.Diagnostic
         GHC.Driver.Config.Finder
         GHC.Driver.Config.HsToCore

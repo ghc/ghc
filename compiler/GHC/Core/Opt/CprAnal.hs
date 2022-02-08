@@ -10,7 +10,7 @@ module GHC.Core.Opt.CprAnal ( cprAnalProgram ) where
 
 import GHC.Prelude
 
-import GHC.Driver.Session
+import GHC.Driver.Flags ( DumpFlag (..) )
 
 import GHC.Builtin.Names ( runRWKey )
 

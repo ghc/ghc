@@ -43,8 +43,10 @@ import GHC.Core.Opt.Arity ( ArityType, exprArity, getBotArity
                           , typeArity, arityTypeArity, etaExpandAT )
 import GHC.Core.SimpleOpt ( exprIsConApp_maybe, joinPointBinding_maybe, joinPointBindings_maybe )
 import GHC.Core.FVs     ( mkRuleInfo )
-import GHC.Core.Rules   ( lookupRule, getRules, initRuleOpts )
+import GHC.Core.Rules   ( lookupRule, getRules )
 import GHC.Core.Multiplicity
+
+import GHC.Driver.Config.Core.Rules ( initRuleOpts )
 
 import GHC.Types.Literal   ( litIsLifted ) --, mkLitInt ) -- temporarily commented out. See #8326
 import GHC.Types.SourceText

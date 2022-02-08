@@ -15,13 +15,14 @@ import GHC.Driver.Plugins ( withPlugins, installCoreToDos )
 import GHC.Driver.Env
 import GHC.Driver.Config.Core.Opt.LiberateCase ( initLiberateCaseOpts )
 import GHC.Driver.Config.Core.Opt.WorkWrap ( initWorkWrapOpts )
+import GHC.Driver.Config.Core.Rules ( initRuleOpts )
 import GHC.Platform.Ways  ( hasWay, Way(WayProf) )
 
 import GHC.Core
 import GHC.Core.Opt.CSE  ( cseProgram )
 import GHC.Core.Rules   ( mkRuleBase,
                           extendRuleBaseList, ruleCheckProgram, addRuleInfo,
-                          getRules, initRuleOpts )
+                          getRules )
 import GHC.Core.Ppr     ( pprCoreBindings, pprCoreExpr )
 import GHC.Core.Opt.OccurAnal ( occurAnalysePgm, occurAnalyseExpr )
 import GHC.Core.Stats   ( coreBindsSize, coreBindsStats, exprSize )

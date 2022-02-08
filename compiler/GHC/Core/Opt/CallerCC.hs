@@ -27,7 +27,6 @@ import qualified Text.ParserCombinators.ReadP as P
 import GHC.Prelude
 import GHC.Utils.Outputable as Outputable
 import GHC.Driver.Session
-import GHC.Driver.Ppr
 import GHC.Types.CostCentre
 import GHC.Types.CostCentre.State
 import GHC.Types.Name hiding (varName)
@@ -52,7 +51,7 @@ addCallerCostCentres guts = do
       env = Env
         { thisModule = mg_module guts
         , ccState = newCostCentreState
-        , dflags = dflags
+        , countEntries = gopt Opt_ProfCountEntries dflags
         , revParents = []
         , filters = filters
         }
@@ -78,9 +77,9 @@ doExpr env e@(Var v)
           hcat (punctuate dot (map ppr (parents env))) <> parens (text "calling:" <> ppr v)
 
         ccName :: CcName
-        ccName = mkFastString $ showSDoc (dflags env) nameDoc
+        ccName = mkFastString $ renderWithContext defaultSDocContext nameDoc
     ccIdx <- getCCIndex' ccName
-    let count = gopt Opt_ProfCountEntries (dflags env)
+    let count = countEntries env
         span = case revParents env of
           top:_ -> nameSrcSpan $ varName top
           _     -> noSrcSpan
@@ -109,7 +108,7 @@ getCCIndex' name = state (getCCIndex name)
 
 data Env = Env
   { thisModule  :: Module
-  , dflags      :: DynFlags
+  , countEntries :: !Bool
   , ccState     :: CostCentreState
   , revParents  :: [Id]
   , filters     :: [CallerCcFilter]

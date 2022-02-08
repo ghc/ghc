@@ -85,7 +85,7 @@ module GHC.Core (
         -- * Core rule data types
         CoreRule(..), RuleBase,
         RuleName, RuleFun, IdUnfoldingFun, InScopeEnv,
-        RuleEnv(..), RuleOpts(..), mkRuleEnv, emptyRuleEnv,
+        RuleEnv(..), RuleOpts, mkRuleEnv, emptyRuleEnv,
 
         -- ** Operations on 'CoreRule's
         ruleArity, ruleName, ruleIdName, ruleActivation,
@@ -100,6 +100,7 @@ import GHC.Types.Var.Env( InScopeSet )
 import GHC.Types.Var
 import GHC.Core.Type
 import GHC.Core.Coercion
+import GHC.Core.Rules.Config ( RuleOpts )
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env( NameEnv )
@@ -1200,14 +1201,6 @@ data CoreRule
                 -- is just the rewrite of 'ru_fn' applied to the first 'ru_nargs' args
     }
                 -- See Note [Extra args in the target] in GHC.Core.Rules
-
--- | Rule options
-data RuleOpts = RuleOpts
-   { roPlatform                :: !Platform -- ^ Target platform
-   , roNumConstantFolding      :: !Bool     -- ^ Enable more advanced numeric constant folding
-   , roExcessRationalPrecision :: !Bool     -- ^ Cut down precision of Rational values to that of Float/Double if disabled
-   , roBignumRules             :: !Bool     -- ^ Enable rules for bignums
-   }
 
 -- | The 'InScopeSet' in the 'InScopeEnv' is a /superset/ of variables that are
 -- currently in scope. See Note [The InScopeSet invariant].
