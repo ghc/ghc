@@ -299,7 +299,7 @@ hptSomeThingsBelowUs extract include_hi_boot hsc_env uid mn
     [ thing
     |
     -- Find each non-hi-boot module below me
-      (ModNodeKeyWithUid (GWIB { gwib_mod = mod, gwib_isBoot = is_boot }) uid) <- Set.toList (hptModulesBelow hsc_env uid mn)
+      (ModNodeKeyWithUid (GWIB { gwib_mod = mod, gwib_isBoot = is_boot }) mod_uid) <- Set.toList (hptModulesBelow hsc_env uid mn)
     , include_hi_boot || (is_boot == NotBoot)
 
         -- unsavoury: when compiling the base package with --make, we
@@ -307,12 +307,15 @@ hptSomeThingsBelowUs extract include_hi_boot hsc_env uid mn
         -- be in the HPT, because we never compile it; it's in the EPT
         -- instead. ToDo: clean up, and remove this slightly bogus filter:
     , mod /= moduleName gHC_PRIM
+    , not (mod == gwib_mod mn && uid == mod_uid)
 
         -- Look it up in the HPT
-    , let things = case lookupHug hug uid mod of
+    , let things = case lookupHug hug mod_uid mod of
                     Just info -> extract info
                     Nothing -> pprTrace "WARNING in hptSomeThingsBelowUs" msg mempty
           msg = vcat [text "missing module" <+> ppr mod,
+                     text "When starting from"  <+> ppr mn,
+                     text "below:" <+> ppr (hptModulesBelow hsc_env uid mn),
                       text "Probable cause: out-of-date interface files"]
                         -- This really shouldn't happen, but see #962
     , thing <- things
