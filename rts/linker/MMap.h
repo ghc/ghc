@@ -55,6 +55,7 @@ typedef enum {
     MEM_READ_ONLY,
     MEM_READ_WRITE,
     MEM_READ_EXECUTE,
+    MEM_READ_WRITE_EXECUTE,
 } MemoryAccess;
 
 extern void *mmap_32bit_base;
@@ -73,7 +74,7 @@ void munmapForLinker (void *addr, size_t bytes, const char *caller);
 //
 // Note that this not available on Windows since file mapping on Windows is
 // sufficiently different to warrant its own interface.
-void *mmapForLinker (size_t bytes, uint32_t prot, uint32_t flags, int fd, int offset);
+void *mmapForLinker (size_t bytes, MemoryAccess prot, uint32_t flags, int fd, int offset);
 #endif
 
 #include "EndPrivate.h"
