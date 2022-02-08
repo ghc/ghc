@@ -38,7 +38,7 @@ import Data.List (isSuffixOf)
 import Foreign.C
 import Foreign.Marshal.Array
 import System.Posix.Internals
-#elif defined(freebsd_HOST_OS)
+#elif defined(freebsd_HOST_OS) || defined(netbsd_HOST_OS)
 import Control.Exception (catch, throw)
 import Foreign.C
 import Foreign.Marshal.Alloc
@@ -92,7 +92,7 @@ getExecutablePath :: IO FilePath
 --
 -- If the operating system provides a reliable way to determine the current
 -- executable, return the query action, otherwise return @Nothing@.  The action
--- is defined on FreeBSD, Linux, MacOS and Windows.
+-- is defined on FreeBSD, Linux, MacOS, NetBSD, and Windows.
 --
 -- Even where the query action is defined, there may be situations where no
 -- result is available, e.g. if the executable file was deleted while the
@@ -188,9 +188,9 @@ executablePath = Just (check <$> getExecutablePath) where
           | otherwise = Just s
 
 --------------------------------------------------------------------------------
--- FreeBSD
+-- FreeBSD / NetBSD
 
-#elif defined(freebsd_HOST_OS)
+#elif defined(freebsd_HOST_OS) || defined(netbsd_HOST_OS)
 
 foreign import ccall unsafe "sysctl"
   c_sysctl
@@ -219,11 +219,19 @@ getExecutablePath = do
   where
     barf = throwErrno "getExecutablePath"
     mib =
+#  if defined(freebsd_HOST_OS)
       [ (#const CTL_KERN)
       , (#const KERN_PROC)
       , (#const KERN_PROC_PATHNAME)
       , -1   -- current process
       ]
+#  elif defined(netbsd_HOST_OS)
+      [ (#const CTL_KERN)
+      , (#const KERN_PROC_ARGS)
+      , -1   -- current process
+      , (#const KERN_PROC_PATHNAME)
+      ]
+#  endif
 
 executablePath = Just (fmap Just getExecutablePath `catch` f)
   where
