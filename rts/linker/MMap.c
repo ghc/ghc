@@ -53,6 +53,23 @@ static const char *memoryAccessDescription(MemoryAccess mode)
   }
 }
 
+/* A region of memory that we might map into. */
+struct MemoryRegion {
+    void *start;
+    void *end;
+    void *last;
+      /* the end of the last mapping which we made into this region.
+       * this is where we will start searching next time we need to allocate.
+       */
+};
+
+#define LOW_ADDR 0x01000000
+static struct MemoryRegion allMemory = {
+    .start = (void *) LOW_ADDR,
+    .end = (void *) -1,
+    .last = (void *) LOW_ADDR
+};
+
 #if defined(mingw32_HOST_OS)
 
 static DWORD
@@ -123,122 +140,115 @@ memoryAccessToProt(MemoryAccess access)
     }
 }
 
-//
-// Returns NULL on failure.
-//
+static void *
+doMmap(void *map_addr, size_t bytes, int prot, uint32_t flags, int fd, int offset)
+{
+    flags |= MAP_PRIVATE;
+
+    IF_DEBUG(linker_verbose,
+             debugBelch("mmapForLinker: \tprotection %#0x\n", prot));
+    IF_DEBUG(linker_verbose,
+             debugBelch("mmapForLinker: \tflags      %#0x\n", flags));
+    IF_DEBUG(linker_verbose,
+             debugBelch("mmapForLinker: \tsize       %#0zx\n", bytes));
+    IF_DEBUG(linker_verbose,
+             debugBelch("mmapForLinker: \tmap_addr   %p\n", map_addr));
+
+    void * result = mmap(map_addr, bytes, prot, flags, fd, offset);
+    if (result == MAP_FAILED) {
+        sysErrorBelch("mmap %zx bytes at %p", bytes, map_addr);
+        reportMemoryMap();
+        errorBelch("Try specifying an address with +RTS -xm<addr> -RTS");
+        return NULL;
+    }
+    return result;
+}
+
+
+static struct MemoryRegion *
+nearImage(void) {
+    static struct MemoryRegion region = { NULL, NULL, NULL };
+    if (region.end == NULL) {
+        region.start = mmap_32bit_base;
+        region.end = (uint8_t *) region.start + 0x80000000;
+        region.last = region.start;
+    }
+    return &region;
+}
+
+static void *
+mmapInRegion (
+        struct MemoryRegion *region,
+        size_t bytes,
+        MemoryAccess access,
+        uint32_t flags,
+        int fd,
+        int offset)
+{
+    bool wrapped = false;
+    int prot = memoryAccessToProt(access);
+    void *p = region->last;
+    while (1) {
+        void *result = doMmap(p, bytes, prot, flags, fd, offset);
+        if (result == NULL) {
+            // The mapping failed
+            return NULL;
+        } else if (result < region->start) {
+            // Uh oh, we assume that mmap() will only give us a
+            // an address at or after the requested address.
+            // Try again.
+            p = (uint8_t *) result + bytes;
+        } else if (result < region->end) {
+            // Success!
+            region->last = (uint8_t *) result + bytes;
+            return result;
+        } else if (wrapped) {
+            // We failed to find a suitable mapping
+            munmap(result, bytes);
+            reportMemoryMap();
+            errorBelch("mmapForLinker: failed to mmap() memory below 2Gb; "
+                       "asked for %zu bytes at %p. "
+                       "Try specifying an address with +RTS -xm<addr> -RTS",
+                       bytes, p);
+            return NULL;
+        }
+
+        // mmap() gave us too high an address; wrap around and try again
+        munmap(result, bytes);
+        wrapped = true;
+        p = region->start;
+    }
+}
+
+/*
+ * Map memory for code.
+ * Returns NULL on failure.
+ */
 void *
 mmapForLinker (size_t bytes, MemoryAccess access, uint32_t flags, int fd, int offset)
 {
-   void *map_addr = NULL;
-   void *result;
-   size_t size;
-   uint32_t tryMap32Bit = RtsFlags.MiscFlags.linkerAlwaysPic
-     ? 0
-     : TRY_MAP_32BIT;
-   static uint32_t fixed = 0;
-   int prot = memoryAccessToProt(access);
+    bytes = roundUpToPage(bytes);
+    struct MemoryRegion *region;
 
-   IF_DEBUG(linker_verbose, debugBelch("mmapForLinker: start\n"));
-   size = roundUpToPage(bytes);
-
-#if defined(MAP_LOW_MEM)
-mmap_again:
-#endif
-
-   if (mmap_32bit_base != NULL) {
-       map_addr = mmap_32bit_base;
-   }
-
-   IF_DEBUG(linker_verbose,
-            debugBelch("mmapForLinker: \tprotection %#0x\n", prot));
-   IF_DEBUG(linker_verbose,
-            debugBelch("mmapForLinker: \tflags      %#0x\n",
-                       MAP_PRIVATE | tryMap32Bit | fixed | flags));
-   IF_DEBUG(linker_verbose,
-            debugBelch("mmapForLinker: \tsize       %#0zx\n", bytes));
-   IF_DEBUG(linker_verbose,
-            debugBelch("mmapForLinker: \tmap_addr   %p\n", map_addr));
-
-   result = mmap(map_addr, size, prot,
-                 MAP_PRIVATE|tryMap32Bit|fixed|flags, fd, offset);
-
-   if (result == MAP_FAILED) {
-       reportMemoryMap();
-       sysErrorBelch("mmap %" FMT_Word " bytes at %p",(W_)size,map_addr);
-       errorBelch("Try specifying an address with +RTS -xm<addr> -RTS");
-       return NULL;
-   }
-
-#if defined(MAP_LOW_MEM)
-   if (RtsFlags.MiscFlags.linkerAlwaysPic) {
-       /* make no attempt at mapping low memory if we are assuming PIC */
-   } else if (mmap_32bit_base != NULL) {
-       if (result != map_addr) {
-           if ((W_)result > 0x80000000) {
-               // oops, we were given memory over 2Gb
-               munmap(result,size);
-#if defined(MAP_TRYFIXED)
-               // Some platforms require MAP_FIXED. We use MAP_TRYFIXED since
-               // MAP_FIXED will overwrite existing mappings.
-               fixed = MAP_TRYFIXED;
-               goto mmap_again;
-#else
-               reportMemoryMap();
-               errorBelch("mmapForLinker: failed to mmap() memory below 2Gb; "
-                          "asked for %lu bytes at %p. "
-                          "Try specifying an address with +RTS -xm<addr> -RTS",
-                          size, map_addr);
-               return NULL;
-#endif
-           } else {
-               // hmm, we were given memory somewhere else, but it's
-               // still under 2Gb so we can use it.
-           }
-       }
-   } else {
-       if ((W_)result > 0x80000000) {
-           // oops, we were given memory over 2Gb
-           // ... try allocating memory somewhere else?;
-           debugTrace(DEBUG_linker,
-                      "MAP_32BIT didn't work; gave us %lu bytes at 0x%p",
-                      bytes, result);
-           munmap(result, size);
-
-           // Set a base address and try again... (guess: 1Gb)
-           mmap_32bit_base = (void*)0x40000000;
-           goto mmap_again;
-       }
-   }
-#elif (defined(aarch64_TARGET_ARCH) || defined(aarch64_HOST_ARCH))
-    // for aarch64 we need to make sure we stay within 4GB of the
-    // mmap_32bit_base, and we also do not want to update it.
-    if (result != map_addr) {
-        // upper limit 4GB - size of the object file - 1mb wiggle room.
-        if(llabs((uintptr_t)result - (uintptr_t)&stg_upd_frame_info) > (2<<32) - size - (2<<20)) {
-            // not within range :(
-            debugTrace(DEBUG_linker,
-                        "MAP_32BIT didn't work; gave us %lu bytes at 0x%p",
-                        bytes, result);
-            munmap(result, size);
-            // TODO: some abort/mmap_32bit_base recomputation based on
-            //       if mmap_32bit_base is changed, or still at stg_upd_frame_info
-            goto mmap_again;
-        }
-    }
-#endif
-
-    if (mmap_32bit_base != NULL) {
-       // Next time, ask for memory right after our new mapping to maximize the
-       // chance that we get low memory.
-        mmap_32bit_base = (void*) ((uintptr_t)result + size);
+    IF_DEBUG(linker_verbose, debugBelch("mmapForLinker: start\n"));
+    if (RtsFlags.MiscFlags.linkerAlwaysPic) {
+        /* make no attempt at mapping low memory if we are assuming PIC */
+        region = &allMemory;
+    } else {
+        region = nearImage();
     }
 
+    /* Use MAP_32BIT if appropriate */
+    if (region->end <= (void *) 0xffffffff) {
+        flags |= TRY_MAP_32BIT;
+    }
+
+    void *result = mmapInRegion(region, bytes, access, flags, fd, offset);
     IF_DEBUG(linker_verbose,
-             debugBelch("mmapForLinker: mapped %" FMT_Word
-                        " bytes starting at %p\n", (W_)size, result));
+             debugBelch("mmapForLinker: mapped %zd bytes starting at %p\n",
+                        bytes, result));
     IF_DEBUG(linker_verbose,
              debugBelch("mmapForLinker: done\n"));
-
     return result;
 }
 
@@ -248,16 +258,16 @@ mmap_again:
 void *
 mmapAnonForLinker (size_t bytes)
 {
-  return mmapForLinker (bytes, MEM_READ_WRITE, MAP_ANONYMOUS, -1, 0);
+    return mmapForLinker (bytes, MEM_READ_WRITE, MAP_ANONYMOUS, -1, 0);
 }
 
 void munmapForLinker (void *addr, size_t bytes, const char *caller)
 {
-  int r = munmap(addr, bytes);
-  if (r == -1) {
-    // Should we abort here?
-    sysErrorBelch("munmap: %s", caller);
-  }
+    int r = munmap(addr, bytes);
+    if (r == -1) {
+        // Should we abort here?
+        sysErrorBelch("munmap: %s", caller);
+    }
 }
 
 /* Note [Memory protection in the linker]
@@ -288,7 +298,7 @@ void munmapForLinker (void *addr, size_t bytes, const char *caller)
 void mprotectForLinker(void *start, size_t len, MemoryAccess mode)
 {
     if (len == 0) {
-      return;
+        return;
     }
     IF_DEBUG(linker_verbose,
              debugBelch("mprotectForLinker: protecting %" FMT_Word
