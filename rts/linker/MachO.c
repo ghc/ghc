@@ -1218,7 +1218,7 @@ ocGetNames_MachO(ObjectCode* oc)
                 unsigned nstubs = numberOfStubsForSection(oc, sec_idx);
                 unsigned stub_space = STUB_SIZE * nstubs;
 
-                void * mem = mmapForLinker(section->size+stub_space, PROT_READ | PROT_WRITE, MAP_ANON, -1, 0);
+                void * mem = mmapForLinker(section->size+stub_space, MEM_READ_WRITE, MAP_ANON, -1, 0);
 
                 if( mem == MAP_FAILED ) {
                     sysErrorBelch("failed to mmap allocated memory to load section %d. "
