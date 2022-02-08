@@ -450,6 +450,8 @@ tcInferAppHead_maybe fun args
       ExprWithTySig _ e hs_ty   -> add_head_ctxt fun args $
                                    Just <$> tcExprWithSig e hs_ty
       HsOverLit _ lit           -> Just <$> tcInferOverLit lit
+      HsSpliceE _ (HsSpliced _ _ (HsSplicedExpr e))
+                                -> tcInferAppHead_maybe e args
       _                         -> return Nothing
 
 add_head_ctxt :: HsExpr GhcRn -> [HsExprArg 'TcpRn] -> TcM a -> TcM a
