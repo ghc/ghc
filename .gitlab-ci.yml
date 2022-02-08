@@ -613,7 +613,6 @@ validate-x86_64-darwin:
 release-x86_64-darwin:
   <<: *release
   extends: .build-x86_64-darwin
-  stage: full-build
 
 #################################
 # aarch64-darwin
@@ -668,7 +667,6 @@ validate-aarch64-darwin:
 release-aarch64-darwin:
   <<: *release
   extends: .build-aarch64-darwin
-  stage: full-build
 
 .validate-linux:
   extends: .validate
@@ -718,6 +716,10 @@ nightly-aarch64-linux-deb10:
   extends: .build-aarch64-linux-deb10
   variables:
     TEST_TYPE: slowtest
+
+release-aarch64-linux-deb10:
+  <<: *release
+  extends: .build-aarch64-linux-deb10
 
 .build-aarch64-linux-deb10-llvm:
   extends: .build-aarch64-linux-deb10
@@ -783,6 +785,10 @@ nightly-armv7-linux-deb10:
   variables:
     TEST_TYPE: slowtest
 
+release-armv7-linux-deb10:
+  <<: *release
+  extends: .build-armv7-linux-deb10
+
 #################################
 # i386-linux-deb9
 #################################
@@ -810,6 +816,10 @@ nightly-i386-linux-deb9:
   extends: .build-i386-linux-deb9
   variables:
     TEST_TYPE: slowtest
+
+release-i386-linux-deb9:
+  <<: *release
+  extends: .build-i386-linux-deb9
 
 #################################
 # x86_64-linux-deb10
@@ -1043,20 +1053,18 @@ validate-x86_64-linux-alpine-hadrian:
     - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
 
 release-x86_64-linux-alpine-integer-simple:
-  extends:
-    - .build-x86_64-linux-alpine-hadrian
-    - .release
+  <<: *release
+  extends: .build-x86_64-linux-alpine-hadrian
   variables:
     BIGNUM_BACKEND: native
-    BUILD_FLAVOUR: "validate+fully_static"
+    BUILD_FLAVOUR: "perf+fully_static"
 
 release-x86_64-linux-alpine-integer-gmp:
-  extends:
-    - .build-x86_64-linux-alpine-hadrian
-    - .release
+  <<: *release
+  extends: .build-x86_64-linux-alpine-hadrian
   variables:
     BIGNUM_BACKEND: gmp
-    BUILD_FLAVOUR: "validate+fully_static"
+    BUILD_FLAVOUR: "perf+fully_static"
 
 nightly-x86_64-linux-alpine:
   <<: *nightly
@@ -1099,6 +1107,7 @@ release-x86_64-linux-centos7:
     LLC: /bin/false
     OPT: /bin/false
     TEST_ENV: "x86_64-linux-fedora33"
+    BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-fedora33-linux.tar.xz"
   cache:
     key: linux-x86_64-fedora33-$CACHE_REV
   artifacts:
@@ -1109,16 +1118,18 @@ release-x86_64-linux-centos7:
 
 validate-x86_64-linux-fedora33:
   extends: .build-x86_64-linux-fedora33
-  variables:
-    BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-fedora33-linux.tar.xz"
   rules:
     - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
+
+release-x86_64-linux-fedora33:
+  <<: *release
+  extends: .build-x86_64-linux-fedora33
+
 
 release-x86_64-linux-fedora33-dwarf:
   <<: *release
   extends: .build-x86_64-linux-fedora33
   variables:
-    HADDOCK_HYPERLINKED_SOURCES: "yes"
     CONFIGURE_ARGS: "--enable-dwarf-unwind"
     BUILD_FLAVOUR: dwarf
     IGNORE_PERF_FAILURES: "all"
@@ -1233,19 +1244,12 @@ nightly-x86_64-windows:
 release-x86_64-windows:
   <<: *release
   extends: .build-x86_64-windows-hadrian
-  variables:
-    BUILD_FLAVOUR: "perf"
-    IGNORE_PERF_FAILURES: "all"
-    HADDOCK_HYPERLINKED_SOURCES: "yes"
 
 release-x86_64-windows-integer-simple:
   <<: *release
   extends: .build-x86_64-windows-hadrian
   variables:
-    HADDOCK_HYPERLINKED_SOURCES: "yes"
     BIGNUM_BACKEND: native
-    IGNORE_PERF_FAILURES: "all"
-    BUILD_FLAVOUR: "perf"
     BIN_DIST_NAME: "ghc-x86_64-mingw32-unknown-nogmp"
 
 
