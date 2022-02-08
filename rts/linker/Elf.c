@@ -650,7 +650,7 @@ mapObjectFileSection (int fd, Elf_Word offset, Elf_Word size,
 
     pageOffset = roundDownToPage(offset);
     pageSize = roundUpToPage(offset-pageOffset+size);
-    p = mmapForLinker(pageSize, PROT_READ | PROT_WRITE, 0, fd, pageOffset);
+    p = mmapForLinker(pageSize, MEM_READ_WRITE, 0, fd, pageOffset);
     if (p == NULL) return NULL;
     *mapped_size = pageSize;
     *mapped_offset = pageOffset;

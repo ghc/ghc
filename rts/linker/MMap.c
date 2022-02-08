@@ -47,11 +47,27 @@ static const char *memoryAccessDescription(MemoryAccess mode)
   case MEM_READ_ONLY:    return "read-only";
   case MEM_READ_WRITE:   return "read-write";
   case MEM_READ_EXECUTE: return "read-execute";
+  case MEM_READ_WRITE_EXECUTE:
+                         return "read-write-execute";
   default: barf("invalid MemoryAccess");
   }
 }
 
 #if defined(mingw32_HOST_OS)
+
+static DWORD
+memoryAccessToProt(MemoryAccess access)
+{
+  switch (access) {
+  case MEM_NO_ACCESS:    return PAGE_NOACCESS;
+  case MEM_READ_ONLY:    return PAGE_READONLY;
+  case MEM_READ_WRITE:   return PAGE_READWRITE;
+  case MEM_READ_EXECUTE: return PAGE_EXECUTE_READ;
+  case MEM_READ_WRITE_EXECUTE:
+                         return PAGE_EXECUTE_READWRITE;
+  default: barf("invalid MemoryAccess");
+  }
+}
 
 //
 // Returns NULL on failure.
@@ -82,14 +98,7 @@ mprotectForLinker(void *start, size_t len, MemoryAccess mode)
   if (len == 0) {
     return;
   }
-  DWORD prot;
-  switch (mode) {
-  case MEM_NO_ACCESS:    prot = PAGE_NOACCESS; break;
-  case MEM_READ_ONLY:    prot = PAGE_READONLY; break;
-  case MEM_READ_WRITE:   prot = PAGE_READWRITE; break;
-  case MEM_READ_EXECUTE: prot = PAGE_EXECUTE_READ; break;
-  default: barf("invalid MemoryAccess");
-  }
+  DWORD prot = memoryAccessToProt(mode);
 
   if (VirtualProtect(start, len, prot, &old) == 0) {
     sysErrorBelch("mprotectForLinker: failed to protect %zd bytes at %p as %s",
@@ -99,11 +108,26 @@ mprotectForLinker(void *start, size_t len, MemoryAccess mode)
 }
 
 #elif RTS_LINKER_USE_MMAP
+
+static int
+memoryAccessToProt(MemoryAccess access)
+{
+    switch (access) {
+    case MEM_NO_ACCESS:    return 0;
+    case MEM_READ_ONLY:    return PROT_READ;
+    case MEM_READ_WRITE:   return PROT_READ | PROT_WRITE;
+    case MEM_READ_EXECUTE: return PROT_READ | PROT_EXEC;
+    case MEM_READ_WRITE_EXECUTE:
+                           return PROT_READ | PROT_WRITE | PROT_EXEC;
+    default: barf("invalid MemoryAccess");
+    }
+}
+
 //
 // Returns NULL on failure.
 //
 void *
-mmapForLinker (size_t bytes, uint32_t prot, uint32_t flags, int fd, int offset)
+mmapForLinker (size_t bytes, MemoryAccess access, uint32_t flags, int fd, int offset)
 {
    void *map_addr = NULL;
    void *result;
@@ -112,6 +136,7 @@ mmapForLinker (size_t bytes, uint32_t prot, uint32_t flags, int fd, int offset)
      ? 0
      : TRY_MAP_32BIT;
    static uint32_t fixed = 0;
+   int prot = memoryAccessToProt(access);
 
    IF_DEBUG(linker_verbose, debugBelch("mmapForLinker: start\n"));
    size = roundUpToPage(bytes);
@@ -226,7 +251,7 @@ mmap_again:
 void *
 mmapAnonForLinker (size_t bytes)
 {
-  return mmapForLinker (bytes, PROT_READ|PROT_WRITE, MAP_ANONYMOUS, -1, 0);
+  return mmapForLinker (bytes, MEM_READ_WRITE, MAP_ANONYMOUS, -1, 0);
 }
 
 void munmapForLinker (void *addr, size_t bytes, const char *caller)
@@ -273,14 +298,7 @@ void mprotectForLinker(void *start, size_t len, MemoryAccess mode)
                         " bytes starting at %p as %s\n",
                         (W_)len, start, memoryAccessDescription(mode)));
 
-    int prot;
-    switch (mode) {
-    case MEM_NO_ACCESS:    prot = 0; break;
-    case MEM_READ_ONLY:    prot = PROT_READ; break;
-    case MEM_READ_WRITE:   prot = PROT_READ | PROT_WRITE; break;
-    case MEM_READ_EXECUTE: prot = PROT_READ | PROT_EXEC; break;
-    default: barf("invalid MemoryAccess");
-    }
+    int prot = memoryAccessToProt(mode);
 
     if (mprotect(start, len, prot) == -1) {
         sysErrorBelch("mprotectForLinker: failed to protect %zd bytes at %p as %s",
