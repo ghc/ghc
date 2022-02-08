@@ -2181,8 +2181,9 @@ diffBinds top env binds1 = go (length binds1) env binds1
             else (warn env binds1 binds2, env)
        go fuel env ((bndr1,expr1):binds1) binds2
           | let matchExpr (bndr,expr) =
-                  (not top || null (diffIdInfo env bndr bndr1)) &&
+                  (isTyVar bndr || not top || null (diffIdInfo env bndr bndr1)) &&
                   null (diffExpr top (rnBndr2 env bndr1 bndr) expr1 expr)
+
           , (binds2l, (bndr2,_):binds2r) <- break matchExpr binds2
           = go (length binds1) (rnBndr2 env bndr1 bndr2)
                 binds1 (binds2l ++ binds2r)
@@ -2205,6 +2206,12 @@ diffBinds top env binds1 = go (length binds1) env binds1
        diffBind env (bndr1,expr1) (bndr2,expr2)
          | ds@(_:_) <- diffExpr top env expr1 expr2
          = locBind "in binding" bndr1 bndr2 ds
+         -- Special case for TyVar, which we checked were bound to the same types in
+         -- diffExpr, but don't have any IdInfo we would panic if called diffIdInfo.
+         -- These let-bound types are created temporarily by the simplifier but inlined
+         -- immediately.
+         | isTyVar bndr1 && isTyVar bndr2
+         = []
          | otherwise
          = diffIdInfo env bndr1 bndr2
 
