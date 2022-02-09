@@ -227,6 +227,14 @@ pprGNUSectionHeader config t suffix =
       ReadOnlyData16 | OSMinGW32 <- platformOS platform
                                  -> text ".rdata$cst16"
                      | otherwise -> text ".rodata.cst16"
+      InitArray
+        | OSMinGW32 <- platformOS platform
+                    -> text ".ctors"
+        | otherwise -> text ".init_array"
+      FiniArray
+        | OSMinGW32 <- platformOS platform
+                    -> text ".dtors"
+        | otherwise -> text ".fini_array"
       CString
         | OSMinGW32 <- platformOS platform
                     -> text ".rdata"
@@ -251,7 +259,7 @@ pprXcoffSectionHeader t = case t of
   ReadOnlyData16          -> text ".csect .text[PR] # ReadOnlyData16"
   CString                 -> text ".csect .text[PR] # CString"
   UninitialisedData       -> text ".csect .data[BS]"
-  OtherSection _          -> panic "pprXcoffSectionHeader: unknown section type"
+  _                       -> panic "pprXcoffSectionHeader: unknown section type"
 
 pprDarwinSectionHeader :: SectionType -> SDoc
 pprDarwinSectionHeader t = case t of
@@ -261,5 +269,7 @@ pprDarwinSectionHeader t = case t of
   RelocatableReadOnlyData -> text ".const_data"
   UninitialisedData       -> text ".data"
   ReadOnlyData16          -> text ".const"
+  InitArray               -> text ".section\t__DATA,__mod_init_func,mod_init_funcs"
+  FiniArray               -> panic "pprDarwinSectionHeader: fini not supported"
   CString                 -> text ".section\t__TEXT,__cstring,cstring_literals"
   OtherSection _          -> panic "pprDarwinSectionHeader: unknown section type"
