@@ -9,6 +9,14 @@ author:              Herbert Valerio Riedel
 maintainer:          hvr@gnu.org
 category:            Numeric, Algebra
 build-type:          Simple
+
+homepage:            https://www.haskell.org/ghc/
+bug-reports:         https://gitlab.haskell.org/ghc/ghc/issues/new
+source-repository head
+    type:     git
+    location: https://gitlab.haskell.org/ghc/ghc.git
+    subdir:   libraries/integer-gmp
+
 description:
     This package used to provide an implementation of the standard 'Integer'
     type based on the
