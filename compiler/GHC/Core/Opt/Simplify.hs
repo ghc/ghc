@@ -1310,8 +1310,15 @@ simplTick env tickish expr cont
   -- application context, allowing the normal case and application
   -- optimisations to fire.
   | tickish `tickishScopesLike` SoftScope
-  = do { (floats, expr') <- simplExprF env expr cont
-       ; return (floats, mkTick tickish expr')
+  = do { -- pprTraceM "simpl_tick1" (ppr tickish)
+       ; (floats, expr') <- simplExprF env expr cont
+       --; pprTraceM "simpl_tick" (ppr floats $$ ppr tickish $$ ppr floats $$ ppr expr $$ ppr cont $$ ppr expr')
+       ; let wrap_float (b,rhs) = (zapIdDmdSig (setIdArity b 0),
+                                   mkTick (mkNoCount tickish) rhs)
+              -- when wrapping a float with mkTick, we better zap the Id's
+              -- strictness info and arity, because it might be wrong now.
+       ; let floats' = mapFloats wrap_float floats
+       ; return (floats', mkTick tickish expr')
        }
 
   -- Push tick inside if the context looks like this will allow us to

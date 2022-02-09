@@ -69,6 +69,9 @@ import Trace.Hpc.Util
 import qualified Data.ByteString as BS
 import Data.Set (Set)
 import qualified Data.Set as Set
+import GHC.Utils.Trace
+import GHC.Tc.Types.Evidence
+import GHC.Core
 
 {-
 ************************************************************************
@@ -286,11 +289,14 @@ addTickLHsBinds = mapBagM addTickLHsBind
 
 addTickLHsBind :: LHsBind GhcTc -> TM (LHsBind GhcTc)
 addTickLHsBind (L pos bind@(AbsBinds { abs_binds   = binds,
+                                       abs_ev_binds = evbinds,
                                        abs_exports = abs_exports })) =
   withEnv add_exports $
     withEnv add_inlines $ do
       binds' <- addTickLHsBinds binds
-      return $ L pos $ bind { abs_binds = binds' }
+      ev <- mapM (addTickEvBinds (locA pos)) evbinds
+      pprTraceM "len_binds" (ppr (length evbinds) $$ ppr abs_exports)
+      return $ L pos $ bind { abs_binds = binds', abs_ev_binds = ev }
   where
    -- in AbsBinds, the Id on each binding is not the actual top-level
    -- Id that we are defining, they are related by the abs_exports
@@ -310,7 +316,7 @@ addTickLHsBind (L pos bind@(AbsBinds { abs_binds   = binds,
                       | ABE{ abe_poly = pid, abe_mono = mid } <- abs_exports
                       , isInlinePragma (idInlinePragma pid) ] }
 
-addTickLHsBind (L pos (funBind@(FunBind { fun_id = L _ id }))) = do
+addTickLHsBind (L pos (funBind@(FunBind { fun_id = L loc id, fun_ext = wrapper }))) = do
   let name = getOccString id
   decl_path <- getPathEntry
   density <- getDensity
@@ -328,6 +334,8 @@ addTickLHsBind (L pos (funBind@(FunBind { fun_id = L _ id }))) = do
         getFreeVars $
         addPathEntry name $
         addTickMatchGroup False (fun_matches funBind)
+
+  wrapper' <- addPathEntry name $ addTickHsWrapper (locA loc) wrapper
 
   blackListed <- isBlackListed (locA pos)
   exported_names <- liftM exports getEnv
@@ -348,7 +356,8 @@ addTickLHsBind (L pos (funBind@(FunBind { fun_id = L _ id }))) = do
 
   let mbCons = maybe Prelude.id (:)
   return $ L pos $ funBind { fun_matches = mg
-                           , fun_tick = tick `mbCons` fun_tick funBind }
+                           , fun_tick = tick `mbCons` fun_tick funBind
+                           , fun_ext = wrapper' }
 
    where
    -- a binding is a simple pattern binding if it is a funbind with
@@ -399,6 +408,36 @@ addTickLHsBind (L pos (pat@(PatBind { pat_lhs = lhs
 -- Only internal stuff, not from source, uses VarBind, so we ignore it.
 addTickLHsBind var_bind@(L _ (VarBind {})) = return var_bind
 addTickLHsBind patsyn_bind@(L _ (PatSynBind {})) = return patsyn_bind
+
+addTickHsWrapper :: SrcSpan -> HsWrapper -> TM HsWrapper
+addTickHsWrapper pos (WpCompose w1 w2)= WpCompose <$> addTickHsWrapper pos w1 <*> addTickHsWrapper pos w2
+addTickHsWrapper pos (WpLet ev_binds) = WpLet <$> addTickEvBinds pos ev_binds
+addTickHsWrapper _ wrap = return wrap
+
+
+addTickEvBinds :: SrcSpan -> TcEvBinds -> TM TcEvBinds
+addTickEvBinds (RealSrcSpan pos _) (EvBinds ev_b) = do
+  pprTraceM "addTickEvBinds" (ppr pos $$ ppr ev_b)
+  EvBinds <$> mapM (addTickEvBind pos) ev_b
+addTickEvBinds pos u = do
+  pprTraceM "FAIL-addTickEvBinds" (ppr pos <+> ppr u)
+  return u
+
+addTickEvBind :: RealSrcSpan -> EvBind -> TM EvBind
+addTickEvBind pos eb = do
+  pprTraceM "addTickEvBind" (ppr pos)
+  rhs' <- addPathEntry (occNameString (getOccName (eb_lhs eb))) $  addTickEvTerm pos (eb_rhs eb)
+  return $ eb { eb_rhs = rhs' }
+
+addTickEvTerm :: RealSrcSpan -> EvTerm -> TM EvTerm
+addTickEvTerm pos (EvExpr e) = do
+  pprTraceM "addTickEvBindEv" (ppr pos)
+  decl_path <- getPathEntry
+  return $ EvExpr (Tick (SourceNote pos (concat (intersperse "." decl_path))) e)
+addTickEvTerm _ e = return e
+
+
+
 
 bindTick
   :: TickDensity -> String -> SrcSpan -> FreeVars -> TM (Maybe CoreTickish)
@@ -647,7 +686,8 @@ addTickHsExpr (HsProc x pat cmdtop) =
         liftM2 (HsProc x)
                 (addTickLPat pat)
                 (liftL (addTickHsCmdTop) cmdtop)
-addTickHsExpr (XExpr (WrapExpr (HsWrap w e))) =
+addTickHsExpr (XExpr (WrapExpr (HsWrap w e))) = do
+        pprTraceM "wrap_expr" (ppr w)
         liftM (XExpr . WrapExpr . HsWrap w) $
               (addTickHsExpr e)        -- Explicitly no tick on inside
 addTickHsExpr (XExpr (ExpansionExpr (HsExpanded a b))) =
