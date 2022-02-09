@@ -1047,17 +1047,13 @@ data TickTransEnv = TTE { fileName     :: FastString
 data TickishType = ProfNotes | HpcTicks | Breakpoints | SourceNotes
                  deriving (Eq)
 
-sourceNotesEnabled :: DynFlags -> Bool
-sourceNotesEnabled dflags =
-  (debugLevel dflags > 0) || (gopt Opt_InfoTableMap dflags)
-
 coveragePasses :: DynFlags -> [TickishType]
 coveragePasses dflags =
     ifa (breakpointsEnabled dflags)          Breakpoints $
     ifa (gopt Opt_Hpc dflags)                HpcTicks $
     ifa (sccProfilingEnabled dflags &&
          profAuto dflags /= NoProfAuto)      ProfNotes $
-    ifa (sourceNotesEnabled dflags)          SourceNotes []
+    ifa (needSourceNotes dflags)          SourceNotes []
   where ifa f x xs | f         = x:xs
                    | otherwise = xs
 
