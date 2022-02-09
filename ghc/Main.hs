@@ -1056,7 +1056,7 @@ dumpUnitsSimple hsc_env = putMsg (hsc_logger hsc_env) (pprUnitsSimple (hsc_units
 doFrontend :: ModuleName -> [(String, Maybe Phase)] -> Ghc ()
 doFrontend modname srcs = do
     hsc_env <- getSession
-    frontend_plugin <- liftIO $ loadFrontendPlugin hsc_env modname
+    (frontend_plugin, _pkgs, _deps) <- liftIO $ loadFrontendPlugin hsc_env modname -- TODO do these need to recorded?
     frontend frontend_plugin
       (reverse $ frontendPluginOpts (hsc_dflags hsc_env)) srcs
 

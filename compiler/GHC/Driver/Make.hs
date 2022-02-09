@@ -1166,16 +1166,15 @@ upsweep_mod hsc_env mHscMessage old_hmi summary mod_index nmods =  do
   -- This function only does anything if the linkable produced is a BCO, which only happens with the
   -- bytecode backend, no need to guard against the backend type additionally.
   addSptEntries (hscUpdateHPT (\hpt -> addToHpt hpt (ms_mod_name summary) hmi) hsc_env)
-                (ms_mnwib summary)
                 (hm_linkable hmi)
 
   return hmi
 
 -- | Add the entries from a BCO linkable to the SPT table, see
 -- See Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable.
-addSptEntries :: HscEnv -> ModuleNameWithIsBoot -> Maybe Linkable -> IO ()
-addSptEntries hsc_env mnwib mlinkable =
-  hscAddSptEntries hsc_env (Just mnwib)
+addSptEntries :: HscEnv -> Maybe Linkable -> IO ()
+addSptEntries hsc_env mlinkable =
+  hscAddSptEntries hsc_env
      [ spt
      | Just linkable <- [mlinkable]
      , unlinked <- linkableUnlinked linkable
@@ -2523,7 +2522,7 @@ runPipelines _ _ _ [] = return ()
 runPipelines n_job orig_hsc_env mHscMessager all_pipelines = do
   liftIO $ label_self "main --make thread"
 
-  plugins_hsc_env <- initializePlugins orig_hsc_env Nothing
+  plugins_hsc_env <- initializePlugins orig_hsc_env
   case n_job of
     1 -> runSeqPipelines plugins_hsc_env mHscMessager all_pipelines
     _n -> runParPipelines n_job plugins_hsc_env mHscMessager all_pipelines

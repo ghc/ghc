@@ -79,6 +79,8 @@ import Data.List (sort)
 import qualified Data.Semigroup
 
 import Control.Monad
+import GHC.Linker.Types
+import GHC.Types.Unique.DFM
 
 -- | Command line options gathered from the -PModule.Name:stuff syntax
 -- are given to you as this type
@@ -269,10 +271,13 @@ data Plugins = Plugins
       -- The purpose of this field is to cache the plugins so they
       -- don't have to be loaded each time they are needed.  See
       -- 'GHC.Runtime.Loader.initializePlugins'.
+  , loadedPluginDeps :: !([Linkable], PkgsLoaded)
+  -- ^ The object files required by the loaded plugins
+  -- See Note [Plugin dependencies]
   }
 
 emptyPlugins :: Plugins
-emptyPlugins = Plugins [] []
+emptyPlugins = Plugins [] [] ([], emptyUDFM)
 
 
 pluginsWithArgs :: Plugins -> [PluginWithArgs]

@@ -72,6 +72,7 @@ import GHC.Data.Bag
 
 import qualified Data.Kind
 import System.Process
+import GHC.Linker.Types
 
 {-
 ************************************************************************
@@ -134,16 +135,15 @@ data Hooks = Hooks
   , tcForeignExportsHook   :: !(Maybe ([LForeignDecl GhcRn]
             -> TcM (LHsBinds GhcTc, [LForeignDecl GhcTc], Bag GlobalRdrElt)))
   , hscFrontendHook        :: !(Maybe (ModSummary -> Hsc FrontendResult))
-  , hscCompileCoreExprHook ::
-               !(Maybe (HscEnv -> (SrcSpan, Maybe ModuleNameWithIsBoot) -> CoreExpr -> IO ForeignHValue))
+  , hscCompileCoreExprHook :: !(Maybe (HscEnv -> SrcSpan -> CoreExpr -> IO (ForeignHValue, [Linkable], PkgsLoaded)))
   , ghcPrimIfaceHook       :: !(Maybe ModIface)
   , runPhaseHook           :: !(Maybe PhaseHook)
   , runMetaHook            :: !(Maybe (MetaHook TcM))
   , linkHook               :: !(Maybe (GhcLink -> DynFlags -> Bool
                                          -> HomePackageTable -> IO SuccessFlag))
   , runRnSpliceHook        :: !(Maybe (HsSplice GhcRn -> RnM (HsSplice GhcRn)))
-  , getValueSafelyHook     :: !(Maybe (HscEnv -> Maybe ModuleNameWithIsBoot -> Name -> Type
-                                         -> IO (Either Type HValue)))
+  , getValueSafelyHook     :: !(Maybe (HscEnv -> Name -> Type
+                                         -> IO (Either Type (HValue, [Linkable], PkgsLoaded))))
   , createIservProcessHook :: !(Maybe (CreateProcess -> IO ProcessHandle))
   , stgToCmmHook           :: !(Maybe (StgToCmmConfig -> InfoTableProvMap -> [TyCon] -> CollectedCCs
                                  -> [CgStgTopBinding] -> HpcInfo -> Stream IO CmmGroup ModuleLFInfos))

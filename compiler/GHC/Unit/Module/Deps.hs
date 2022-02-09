@@ -52,10 +52,13 @@ import Data.Bifunctor
 data Dependencies = Deps
    { dep_direct_mods :: Set (UnitId, ModuleNameWithIsBoot)
       -- ^ All home-package modules which are directly imported by this one.
+      -- This may include modules from other units when using multiple home units
 
    , dep_direct_pkgs :: Set UnitId
       -- ^ All packages directly imported by this module
       -- I.e. packages to which this module's direct imports belong.
+      -- Does not include other home units when using multiple home units.
+      -- Modules from these units will go in `dep_direct_mods`
 
    , dep_plugin_pkgs :: Set UnitId
       -- ^ All units needed for plugins
