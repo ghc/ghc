@@ -166,12 +166,4 @@ because we have no stdcall convention on 64 bits.
 See #9218
 */
 
-/********************************************
- * Memory Management functions
- ********************************************/
-
-/* Same as the above, but use the current process's load address as the starting
-   point for memory allocations.  */
-void *allocaLocalBytes(size_t sz, size_t *req);
-
 #include "EndPrivate.h"
