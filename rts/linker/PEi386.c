@@ -767,11 +767,6 @@ pathchar* findSystemLibrary_PEi386( pathchar* dll_name )
 
 HsPtr addLibrarySearchPath_PEi386(pathchar* dll_path)
 {
-    HINSTANCE hDLL = LoadLibraryW(L"Kernel32.DLL");
-    LPAddDLLDirectory AddDllDirectory = (LPAddDLLDirectory)(void*)GetProcAddress((HMODULE)hDLL, "AddDllDirectory");
-
-    HsPtr result = NULL;
-
     const unsigned int init_buf_size = 4096;
     int bufsize                      = init_buf_size;
 
@@ -788,40 +783,7 @@ HsPtr addLibrarySearchPath_PEi386(pathchar* dll_path)
         }
     }
 
-    if (AddDllDirectory) {
-        result = AddDllDirectory(abs_path);
-    }
-    else
-    {
-        warnMissingKBLibraryPaths();
-        WCHAR* str = stgMallocBytes(sizeof(WCHAR) * init_buf_size, "addLibrarySearchPath_PEi386(2)");
-        wResult = GetEnvironmentVariableW(L"PATH", str, bufsize);
-
-        if (wResult > init_buf_size) {
-            str = realloc(str, sizeof(WCHAR) * wResult);
-            bufsize = wResult;
-            wResult = GetEnvironmentVariableW(L"PATH", str, bufsize);
-            if (!wResult) {
-                sysErrorBelch("addLibrarySearchPath[GetEnvironmentVariableW]: %" PATH_FMT " (Win32 error %lu)", dll_path, GetLastError());
-            }
-        }
-
-        bufsize = wResult + 2 + pathlen(abs_path);
-        wchar_t* newPath = stgMallocBytes(sizeof(wchar_t) * bufsize, "addLibrarySearchPath_PEi386(3)");
-
-        wcscpy(newPath, abs_path);
-        wcscat(newPath, L";");
-        wcscat(newPath, str);
-        if (!SetEnvironmentVariableW(L"PATH", (LPCWSTR)newPath)) {
-            sysErrorBelch("addLibrarySearchPath[SetEnvironmentVariableW]: %" PATH_FMT " (Win32 error %lu)", abs_path, GetLastError());
-        }
-
-        stgFree(newPath);
-        stgFree(abs_path);
-
-        return str;
-    }
-
+    HsPtr result = AddDllDirectory(abs_path);
     if (!result) {
         sysErrorBelch("addLibrarySearchPath: %" PATH_FMT " (Win32 error %lu)", abs_path, GetLastError());
         stgFree(abs_path);
@@ -837,19 +799,8 @@ bool removeLibrarySearchPath_PEi386(HsPtr dll_path_index)
     bool result = false;
 
     if (dll_path_index != NULL) {
-        HINSTANCE hDLL = LoadLibraryW(L"Kernel32.DLL");
-        LPRemoveDLLDirectory RemoveDllDirectory = (LPRemoveDLLDirectory)(void*)GetProcAddress((HMODULE)hDLL, "RemoveDllDirectory");
-
-        if (RemoveDllDirectory) {
-            result = RemoveDllDirectory(dll_path_index);
-            // dll_path_index is now invalid, do not use it after this point.
-        }
-        else
-        {
-            warnMissingKBLibraryPaths();
-            result = SetEnvironmentVariableW(L"PATH", (LPCWSTR)dll_path_index);
-            stgFree(dll_path_index);
-        }
+        result = RemoveDllDirectory(dll_path_index);
+        // dll_path_index is now invalid, do not use it after this point.
 
         if (!result) {
             sysErrorBelch("removeLibrarySearchPath: (Win32 error %lu)", GetLastError());
