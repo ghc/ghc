@@ -72,6 +72,7 @@ import GHC.Types.Name.Ppr
 
 import Control.Monad
 import qualified GHC.LanguageExtensions as LangExt
+import GHC.Types.Unique.Supply (initUs_)
 {-
 ************************************************************************
 *                                                                      *
@@ -487,7 +488,7 @@ doCorePass pass guts = do
                                  simplifyPgm pass guts
 
     CoreCSE                   -> {-# SCC "CommonSubExpr" #-}
-                                 updateBinds cseProgram
+                                 updateBinds (\binds -> initUs_ us (cseProgram binds))
 
     CoreLiberateCase          -> {-# SCC "LiberateCase" #-}
                                  updateBinds (liberateCase dflags)

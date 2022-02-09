@@ -8,6 +8,8 @@
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
+{-# OPTIONS_GHC -Wname-shadowing #-}
+{-# OPTIONS_GHC -g4 #-}
 
 module GHC.Core.Opt.CSE (cseProgram, cseOneExpr) where
 
@@ -30,9 +32,12 @@ import GHC.Utils.Outputable
 import GHC.Types.Basic
 import GHC.Types.Tickish
 import GHC.Core.Map.Expr
-import GHC.Utils.Misc   ( filterOut, equalLength )
+import GHC.Utils.Misc   ( filterOut, equalLength, HasCallStack )
 import GHC.Utils.Panic
-import Data.List        ( mapAccumL )
+import GHC.Types.Unique.Supply (runUniqSMIO, UniqSM)
+import GHC.Utils.Monad
+import System.IO.Unsafe (unsafePerformIO)
+import GHC.Utils.Trace (pprTrace)
 
 {-
                         Simple common sub-expression
@@ -344,72 +349,83 @@ the program; it's a kind of synthetic key for recursive bindings.
 ************************************************************************
 -}
 
-cseProgram :: CoreProgram -> CoreProgram
-cseProgram binds = snd (mapAccumL (cseBind TopLevel) emptyCSEnv binds)
+cseProgram :: CoreProgram -> UniqSM CoreProgram
+cseProgram binds = snd <$> (mapAccumLM (cseBind TopLevel) emptyCSEnv binds)
 
-cseBind :: TopLevelFlag -> CSEnv -> CoreBind -> (CSEnv, CoreBind)
+
+cseBind :: TopLevelFlag -> CSEnv -> CoreBind -> UniqSM (CSEnv, CoreBind)
 cseBind toplevel env (NonRec b e)
-  = (env2, NonRec b2 e2)
+  = do
+    (env2, (b2, e2)) <- cse_bind toplevel env1 (b,e) b1
+    return (env2, NonRec b2 e2)
   where
     (env1, b1)       = addBinder env b
-    (env2, (b2, e2)) = cse_bind toplevel env1 (b,e) b1
 
-cseBind toplevel env (Rec [(in_id, rhs)])
-  | noCSE in_id
-  = (env1, Rec [(out_id, rhs')])
+cseBind toplevel env (Rec [(in_id, rhs)]) = do
+  let (env1, [out_id]) = addRecBinders env [in_id]
+  rhs'  <- cseExpr env1 rhs
+  case () of
+        _ | noCSE in_id
+          -> return (env1, Rec [(out_id, rhs')])
 
-  -- See Note [CSE for recursive bindings]
-  | Just previous <- lookupCSRecEnv env out_id rhs''
-  , let previous' = mkTicks ticks previous
-        out_id'   = delayInlining toplevel out_id
-  = -- We have a hit in the recursive-binding cache
-    (extendCSSubst env1 in_id previous', NonRec out_id' previous')
+          -- See Note [CSE for recursive bindings]
+          | Just previous <- lookupCSRecEnv env out_id rhs''
+          , let previous' = mkTicks ticks previous
+                out_id'   = delayInlining toplevel out_id
+          -> -- We have a hit in the recursive-binding cache
+            return (extendCSSubst env1 in_id previous', NonRec out_id' previous')
 
-  | otherwise
-  = (extendCSRecEnv env1 out_id rhs'' id_expr', Rec [(zapped_id, rhs')])
+          | otherwise
+          -> return (extendCSRecEnv env1 out_id rhs'' id_expr', Rec [(zapped_id, rhs')])
 
-  where
-    (env1, [out_id]) = addRecBinders env [in_id]
-    rhs'  = cseExpr env1 rhs
-    rhs'' = stripTicksE tickishFloatable rhs'
-    ticks = stripTicksT tickishFloatable rhs'
-    id_expr'  = varToCoreExpr out_id
-    zapped_id = zapIdUsageInfo out_id
+          where
+            rhs'' = stripTicksE tickishFloatable rhs'
+            ticks = stripTicksT tickishFloatable rhs'
+            id_expr'  = varToCoreExpr out_id
+            zapped_id = zapIdUsageInfo out_id
+
 
 cseBind toplevel env (Rec pairs)
-  = (env2, Rec pairs')
+  = do
+    (env2, pairs') <- mapAccumLM do_one env1 (zip pairs bndrs1)
+    return (env2, Rec pairs')
   where
     (env1, bndrs1) = addRecBinders env (map fst pairs)
-    (env2, pairs') = mapAccumL do_one env1 (zip pairs bndrs1)
 
-    do_one env (pr, b1) = cse_bind toplevel env pr b1
+    do_one env_one (pr, b1) = cse_bind toplevel env_one pr b1
 
 -- | Given a binding of @in_id@ to @in_rhs@, and a fresh name to refer
 -- to @in_id@ (@out_id@, created from addBinder or addRecBinders),
 -- first try to CSE @in_rhs@, and then add the resulting (possibly CSE'd)
 -- binding to the 'CSEnv', so that we attempt to CSE any expressions
 -- which are equal to @out_rhs@.
-cse_bind :: TopLevelFlag -> CSEnv -> (InId, InExpr) -> OutId -> (CSEnv, (OutId, OutExpr))
-cse_bind toplevel env (in_id, in_rhs) out_id
-  | isTopLevel toplevel, exprIsTickedString in_rhs
-      -- See Note [Take care with literal strings]
-  = (env', (out_id', in_rhs))
+cse_bind :: TopLevelFlag -> CSEnv -> (InId, InExpr) -> OutId -> UniqSM (CSEnv, (OutId, OutExpr))
+cse_bind toplevel env (in_id, in_rhs) out_id = do
+  -- There seems to be some sort of knot-tying going on here.
+  -- Which is why we must use a lazy match here.
+  ~(cse_done, out_rhs) <- try_for_cse env in_rhs
+  let (env', out_id') = addBinding env in_id out_id out_rhs cse_done
+  let out_id'' | cse_done  = zapStableUnfolding $
+                          delayInlining toplevel out_id'
+               | otherwise = out_id'
 
-  | Just arity <- isJoinId_maybe in_id
-      -- See Note [Look inside join-point binders]
-  = let (params, in_body) = collectNBinders arity in_rhs
-        (env', params') = addBinders env params
-        out_body = tryForCSE env' in_body
-    in (env, (out_id, mkLams params' out_body))
+  case () of
+    _
+      | isTopLevel toplevel, exprIsTickedString in_rhs
+          -- See Note [Take care with literal strings]
+      -> return (env', (out_id', in_rhs))
 
-  | otherwise
-  = (env', (out_id'', out_rhs))
-  where
-    (env', out_id') = addBinding env in_id out_id out_rhs cse_done
-    (cse_done, out_rhs)  = try_for_cse env in_rhs
-    out_id'' | cse_done  = zapStableUnfolding $
-                           delayInlining toplevel out_id'
-             | otherwise = out_id'
+      | Just arity <- isJoinId_maybe in_id
+          -- See Note [Look inside join-point binders]
+      -> let (params, in_body) = collectNBinders arity in_rhs
+             (env'', params') = addBinders env params
+          in do
+            out_body <- tryForCSE env'' in_body
+            return (env, (out_id, mkLams params' out_body))
+
+      | otherwise
+      -> return (env', (out_id'', out_rhs))
+
 
 delayInlining :: TopLevelFlag -> Id -> Id
 -- Add a NOINLINE[2] if the Id doesn't have an INLNE pragma already
@@ -465,12 +481,12 @@ addBinding env in_id out_id rhs' cse_done
 -- | Given a binder `let x = e`, this function
 -- determines whether we should add `e -> x` to the cs_map
 noCSE :: InId -> Bool
-noCSE id =  not (isAlwaysActive (idInlineActivation id)) &&
-            not (noUserInlineSpec (inlinePragmaSpec (idInlinePragma id)))
+noCSE in_id =  not (isAlwaysActive (idInlineActivation in_id)) &&
+            not (noUserInlineSpec (inlinePragmaSpec (idInlinePragma in_id)))
              -- See Note [CSE for INLINE and NOINLINE]
-         || isAnyInlinePragma (idInlinePragma id)
+         || isAnyInlinePragma (idInlinePragma in_id)
              -- See Note [CSE for stable unfoldings]
-         || isJoinId id
+         || isJoinId in_id
              -- See Note [CSE for join points?]
 
 
@@ -601,101 +617,104 @@ very bad in GHC.Tc.Solver.Flatten.flatten_ty_con_app
 
 -}
 
-tryForCSE :: CSEnv -> InExpr -> OutExpr
-tryForCSE env expr = snd (try_for_cse env expr)
+tryForCSE :: CSEnv -> InExpr -> UniqSM OutExpr
+tryForCSE env expr = snd <$> (try_for_cse env expr)
 
-try_for_cse :: CSEnv -> InExpr -> (Bool, OutExpr)
+try_for_cse :: CSEnv -> InExpr -> UniqSM (Bool, OutExpr)
 -- (False, e') => We did not CSE the entire expression,
 --                but we might have CSE'd some sub-expressions,
 --                yielding e'
 --
 -- (True, te') => We CSE'd the entire expression,
 --                yielding the trivial expression te'
-try_for_cse env expr
-  | Just e <- lookupCSEnv env expr'' = (True,  mkTicks ticks e)
-  | otherwise                        = (False, expr')
-    -- The varToCoreExpr is needed if we have
-    --   case e of xco { ...case e of yco { ... } ... }
-    -- Then CSE will substitute yco -> xco;
-    -- but these are /coercion/ variables
-  where
-    expr'  = cseExpr env expr
-    expr'' = stripTicksE tickishFloatable expr'
-    ticks  = stripTicksT tickishFloatable expr'
+try_for_cse env expr = do
+    expr'  <- cseExpr env expr
+    let expr'' = stripTicksE tickishFloatable expr'
+    let ticks  = stripTicksT tickishFloatable expr'
     -- We don't want to lose the source notes when a common sub
     -- expression gets eliminated. Hence we push all (!) of them on
     -- top of the replaced sub-expression. This is probably not too
     -- useful in practice, but upholds our semantics.
+    case () of
+      _ | Just e <- lookupCSEnv env expr'' -> return (True,  mkTicks ticks e)
+        | otherwise                        -> return (False, expr')
 
 -- | Runs CSE on a single expression.
 --
 -- This entry point is not used in the compiler itself, but is provided
 -- as a convenient entry point for users of the GHC API.
+{-# NOINLINE cseOneExpr #-}
 cseOneExpr :: InExpr -> OutExpr
-cseOneExpr e = cseExpr env e
-  where env = emptyCSEnv {cs_subst = mkEmptySubst (mkInScopeSet (exprFreeVars e)) }
+cseOneExpr e = unsafePerformIO . runUniqSMIO 's' $ -- We use unsafePerformIO to avoid needless api breaks.
+    cseExpr env e
+      where env = emptyCSEnv {cs_subst = mkEmptySubst (mkInScopeSet (exprFreeVars e)) }
 
-cseExpr :: CSEnv -> InExpr -> OutExpr
-cseExpr env (Type t)              = Type (substTy (csEnvSubst env) t)
-cseExpr env (Coercion c)          = Coercion (substCo (csEnvSubst env) c)
-cseExpr _   (Lit lit)             = Lit lit
-cseExpr env (Var v)               = lookupSubst env v
-cseExpr env (App f a)             = App (cseExpr env f) (tryForCSE env a)
-cseExpr env (Tick t e)            = Tick t (cseExpr env e)
-cseExpr env (Cast e co)           = Cast (tryForCSE env e) (substCo (csEnvSubst env) co)
+cseExpr :: CSEnv -> InExpr -> UniqSM OutExpr
+cseExpr env (Type t)              = return $ Type (substTy (csEnvSubst env) t)
+cseExpr env (Coercion c)          = return $ Coercion (substCo (csEnvSubst env) c)
+cseExpr _   (Lit lit)             = return $ Lit lit
+cseExpr env (Var v)               = return $ lookupSubst env v
+cseExpr env (App f a)             = pure App <*> (cseExpr env f) <*> (tryForCSE env a)
+cseExpr env (Tick t e)            = (Tick t) <$> (cseExpr env e)
+cseExpr env (Cast e co)           = pure Cast <*> (tryForCSE env e) <*> pure (substCo (csEnvSubst env) co)
 cseExpr env (Lam b e)             = let (env', b') = addBinder env b
-                                    in Lam b' (cseExpr env' e)
-cseExpr env (Let bind e)          = let (env', bind') = cseBind NotTopLevel env bind
-                                    in Let bind' (cseExpr env' e)
+                                    in (Lam b') <$> (cseExpr env' e)
+cseExpr env (Let bind e)          = do
+                                      (env', bind') <- cseBind NotTopLevel env bind
+                                      (Let bind') <$> (cseExpr env' e)
 cseExpr env (Case e bndr ty alts) = cseCase env e bndr ty alts
 
-cseCase :: CSEnv -> InExpr -> InId -> InType -> [InAlt] -> OutExpr
+cseCase :: CSEnv -> InExpr -> InId -> InType -> [InAlt] -> UniqSM OutExpr
 cseCase env scrut bndr ty alts
-  = Case scrut1 bndr3 ty' $
-    combineAlts alt_env (map cse_alt alts)
-  where
-    ty' = substTy (csEnvSubst env) ty
-    (cse_done, scrut1) = try_for_cse env scrut
+  = do
+    let !ty' = substTy (csEnvSubst env) ty
+    ~(cse_done, scrut1) <- try_for_cse env scrut
 
-    bndr1 = zapIdOccInfo bndr
-      -- Zapping the OccInfo is needed because the extendCSEnv
-      -- in cse_alt may mean that a dead case binder
-      -- becomes alive, and Lint rejects that
-    (env1, bndr2)    = addBinder env bndr1
-    (alt_env, bndr3) = addBinding env1 bndr bndr2 scrut1 cse_done
-         -- addBinding: see Note [CSE for case expressions]
+    let bndr1 = zapIdOccInfo bndr
+          -- Zapping the OccInfo is needed because the extendCSEnv
+          -- in cse_alt may mean that a dead case binder
+          -- becomes alive, and Lint rejects that
+        (env1, bndr2)    = addBinder env bndr1
+        (alt_env, bndr3) = addBinding env1 bndr bndr2 scrut1 cse_done
+            -- addBinding: see Note [CSE for case expressions]
 
-    con_target :: OutExpr
-    con_target = lookupSubst alt_env bndr
+    let con_target :: OutExpr
+        con_target = lookupSubst alt_env bndr
 
-    arg_tys :: [OutType]
-    arg_tys = tyConAppArgs (idType bndr3)
+        arg_tys :: [OutType]
+        arg_tys = tyConAppArgs (idType bndr3)
 
-    -- See Note [CSE for case alternatives]
-    cse_alt (Alt (DataAlt con) args rhs)
-        = Alt (DataAlt con) args' (tryForCSE new_env rhs)
-        where
-          (env', args') = addBinders alt_env args
-          new_env       = extendCSEnv env' con_expr con_target
-          con_expr      = mkAltExpr (DataAlt con) args' arg_tys
+        -- See Note [CSE for case alternatives]
+        cse_alt (Alt (DataAlt con) args rhs)
+            = Alt (DataAlt con) args' <$> (tryForCSE new_env rhs)
+            where
+              (env', args') = addBinders alt_env args
+              new_env       = extendCSEnv env' con_expr con_target
+              con_expr      = mkAltExpr (DataAlt con) args' arg_tys
 
-    cse_alt (Alt con args rhs)
-        = Alt con args' (tryForCSE env' rhs)
-        where
-          (env', args') = addBinders alt_env args
+        cse_alt (Alt con args rhs)
+            = Alt con args' <$> (tryForCSE env' rhs)
+            where
+              (env', args') = addBinders alt_env args
 
-combineAlts :: CSEnv -> [OutAlt] -> [OutAlt]
+    csed_alts <- (mapM cse_alt alts)
+    alts_out <- combineAlts alt_env csed_alts
+    return (Case scrut1 bndr3 ty' alts_out)
+
+
+combineAlts :: CSEnv -> [OutAlt] -> UniqSM [OutAlt]
 -- See Note [Combine case alternatives]
-combineAlts env alts
-  | (Just alt1, rest_alts) <- find_bndr_free_alt alts
+combineAlts env in_alts
+  | (Just alt1, rest_alts) <- find_bndr_free_alt in_alts
   , Alt _ bndrs1 rhs1 <- alt1
   , let filtered_alts = filterOut (identical_alt rhs1) rest_alts
   , not (equalLength rest_alts filtered_alts)
-  = assertPpr (null bndrs1) (ppr alts) $
+  = return $
+    assertPpr (null bndrs1) (ppr in_alts) $
     Alt DEFAULT [] rhs1 : filtered_alts
 
   | otherwise
-  = alts
+  = return in_alts
   where
     in_scope = substInScope (csEnvSubst env)
 
@@ -707,7 +726,7 @@ combineAlts env alts
     find_bndr_free_alt (alt@(Alt _ bndrs _) : alts)
       | null bndrs = (Just alt, alts)
       | otherwise  = case find_bndr_free_alt alts of
-                       (mb_bf, alts) -> (mb_bf, alt:alts)
+                       (mb_bf, alts_free) -> (mb_bf, alt:alts_free)
 
     identical_alt rhs1 (Alt _ _ rhs) = eqExpr in_scope rhs1 rhs
        -- Even if this alt has binders, they will have been cloned
@@ -804,9 +823,10 @@ emptyCSEnv :: CSEnv
 emptyCSEnv = CS { cs_map = emptyCoreMap, cs_rec_map = emptyCoreMap
                 , cs_subst = emptySubst }
 
-lookupCSEnv :: CSEnv -> OutExpr -> Maybe OutExpr
+lookupCSEnv :: HasCallStack => CSEnv -> OutExpr -> Maybe OutExpr
 lookupCSEnv (CS { cs_map = csmap }) expr
-  = lookupCoreMap csmap expr
+  = -- pprTrace "lookup" (ppr callStackDoc $$ ppr expr) $
+    lookupCoreMap csmap expr
 
 extendCSEnv :: CSEnv -> OutExpr -> OutExpr -> CSEnv
 extendCSEnv cse expr triv_expr

@@ -222,9 +222,9 @@ mkSplitUniqSupply c
         (# s4, MkSplitUniqSupply (mask .|. u) x y #)
         }}}}
 
-runUniqSMIO :: UniqSM a -> IO a
-runUniqSMIO m = do
-  us <- mkSplitUniqSupply 'u'
+runUniqSMIO :: Char -> UniqSM a -> IO a
+runUniqSMIO !c m = do
+  us <- mkSplitUniqSupply c
   return (initUs_ us m)
 
 #if !MIN_VERSION_GLASGOW_HASKELL(9,1,0,0)

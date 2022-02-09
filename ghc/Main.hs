@@ -89,6 +89,8 @@ import qualified Data.Set as Set
 import Data.Maybe
 import Prelude
 
+import GHC.Debug.Stub
+
 -----------------------------------------------------------------------------
 -- ToDo:
 
@@ -101,8 +103,10 @@ import Prelude
 -----------------------------------------------------------------------------
 -- GHC's command-line interface
 
-main :: IO ()
-main = do
+main = withGhcDebug normalMain
+
+normalMain :: IO ()
+normalMain = do
    hSetBuffering stdout LineBuffering
    hSetBuffering stderr LineBuffering
 
