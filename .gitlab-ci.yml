@@ -664,6 +664,10 @@ validate-aarch64-linux-deb10:
     when: always
     expire_in: 2 week
 
+release-aarch64-linux-deb10:
+  <<: *release
+  extends: .build-aarch64-linux-deb10
+
 nightly-aarch64-linux-deb10:
   <<: *nightly
   extends: .build-aarch64-linux-deb10
@@ -749,6 +753,10 @@ validate-i386-linux-deb9:
     when: always
     expire_in: 2 week
 
+release-i386-linux-deb9:
+  <<: *release
+  extends: .build-i386-linux-deb9
+
 nightly-i386-linux-deb9:
   <<: *nightly
   extends: .build-i386-linux-deb9
@@ -801,9 +809,6 @@ validate-x86_64-linux-deb9-debug:
     TEST_TYPE: slowtest
     TEST_ENV: "x86_64-linux-deb9-debug"
     BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-deb9-linux-debug.tar.xz"
-    # Numa enabled for this build so at least one build tests the libnuma build.
-    # It could be any job but luckily for deb10-debug, I choose it.
-    ENABLE_NUMA: 1
   artifacts:
     when: always
     expire_in: 2 week
@@ -889,7 +894,6 @@ release-x86_64-linux-deb10-dwarf:
   variables:
     CONFIGURE_ARGS: "--enable-dwarf-unwind"
     BUILD_FLAVOUR: dwarf
-    IGNORE_PERF_FAILURES: "all"
     TEST_ENV: "x86_64-linux-deb10-dwarf"
     BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-deb10-linux-dwarf.tar.xz"
   artifacts:
@@ -1031,6 +1035,7 @@ release-x86_64-linux-centos7:
     LLC: /bin/false
     OPT: /bin/false
     TEST_ENV: "x86_64-linux-fedora27"
+    BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-fedora27-linux.tar.xz"
   cache:
     key: linux-x86_64-fedora27-$CACHE_REV
   artifacts:
@@ -1041,17 +1046,17 @@ release-x86_64-linux-centos7:
 
 validate-x86_64-linux-fedora27:
   extends: .build-x86_64-linux-fedora27
-  variables:
-    BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-fedora27-linux.tar.xz"
+
+release-x86_64-linux-fedora27:
+  <<: *release
+  extends: .build-x86_64-linux-fedora27
 
 release-x86_64-linux-fedora27-dwarf:
   <<: *release
   extends: .build-x86_64-linux-fedora27
   variables:
-    HADDOCK_HYPERLINKED_SOURCES: "yes"
     CONFIGURE_ARGS: "--enable-dwarf-unwind"
     BUILD_FLAVOUR: dwarf
-    IGNORE_PERF_FAILURES: "all"
     BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-fedora27-linux-dwarf.tar.xz"
     TEST_ENV: "x86_64-linux-fedora27-dwarf"
 
@@ -1166,8 +1171,6 @@ release-x86_64-windows:
   <<: *release
   extends: .build-x86_64-windows-hadrian
   variables:
-    BUILD_FLAVOUR: "perf"
-    HADDOCK_HYPERLINKED_SOURCES: "yes"
     # --skip-perf is incompatible with IGNORE_PERF_FAILURES.
     IGNORE_PERF_FAILURES: ""
 
@@ -1175,10 +1178,7 @@ release-x86_64-windows-integer-simple:
   <<: *release
   extends: .build-x86_64-windows-hadrian
   variables:
-    HADDOCK_HYPERLINKED_SOURCES: "yes"
     BIGNUM_BACKEND: native
-    IGNORE_PERF_FAILURES: "all"
-    BUILD_FLAVOUR: "perf"
     BIN_DIST_NAME: "ghc-x86_64-mingw32-unknown-nogmp"
     # --skip-perf is incompatible with IGNORE_PERF_FAILURES.
     IGNORE_PERF_FAILURES: ""
