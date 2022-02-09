@@ -569,6 +569,7 @@ ppStatic opts st = case st of
   LMStaticStr   s t -> ppr t <> text " c\"" <> ftext s <> text "\\00\""
   LMStaticArray d t -> ppr t <> text " [" <> ppCommaJoin (map (ppStatic opts) d) <> char ']'
   LMStaticStruc d t -> ppr t <> text "<{" <> ppCommaJoin (map (ppStatic opts) d) <> text "}>"
+  LMStaticStrucU d t -> ppr t <> text "{" <> ppCommaJoin (map (ppStatic opts) d) <> text "}"
   LMStaticPointer v -> ppVar opts v
   LMTrunc v t       -> ppr t <> text " trunc (" <> ppStatic opts v <> text " to " <> ppr t <> char ')'
   LMBitc v t        -> ppr t <> text " bitcast (" <> ppStatic opts v <> text " to " <> ppr t <> char ')'

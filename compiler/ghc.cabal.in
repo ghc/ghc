@@ -189,6 +189,7 @@ Library
         GHC.Cmm.Graph
         GHC.Cmm.Info
         GHC.Cmm.Info.Build
+        GHC.Cmm.InitFini
         GHC.Cmm.LayoutStack
         GHC.Cmm.Lexer
         GHC.Cmm.Lint

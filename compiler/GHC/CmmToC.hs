@@ -40,6 +40,7 @@ import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow.Graph
 import GHC.Cmm.Utils
 import GHC.Cmm.Switch
+import GHC.Cmm.InitFini
 
 import GHC.Types.ForeignCall
 import GHC.Types.Unique.Set
@@ -99,6 +100,9 @@ pprTop platform = \case
   -- Chunks of static data.
 
   -- We only handle (a) arrays of word-sized things and (b) strings.
+
+  cmm_data | Just (initOrFini, clbls) <- isInitOrFiniArray cmm_data ->
+    pprCtorArray platform initOrFini clbls
 
   (CmmData section (CmmStaticsRaw lbl [CmmString str])) ->
     pprExternDecl platform lbl $$
@@ -1487,3 +1491,19 @@ pprHexVal platform w rep = parens ctype <> rawlit
              (q,r) = w' `quotRem` 16
              dig | r < 10    = char (chr (fromInteger r + ord '0'))
                  | otherwise = char (chr (fromInteger r - 10 + ord 'a'))
+
+-- | Construct a constructor/finalizer function. Instead of emitting a
+-- initializer/finalizer array we rather just emit a single function, annotated
+-- with the appropriate C attribute, which then calls each of the initializers.
+pprCtorArray :: Platform -> InitOrFini -> [CLabel] -> SDoc
+pprCtorArray platform initOrFini lbls =
+       decls
+    <> text "static __attribute__((" <> attribute <> text "))"
+    <> text "void _hs_" <> attribute <> text "()"
+    <> braces body
+  where
+    body = vcat [ pprCLabel platform CStyle lbl <> text " ();" | lbl <- lbls ]
+    decls = vcat [ text "void" <+> pprCLabel platform CStyle lbl <> text " (void);" | lbl <- lbls ]
+    attribute = case initOrFini of
+                  IsInitArray -> text "constructor"
+                  IsFiniArray -> text "destructor"

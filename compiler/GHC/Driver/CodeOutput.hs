@@ -4,7 +4,7 @@
 \section{Code output phase}
 -}
 
-
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module GHC.Driver.CodeOutput
    ( codeOutput
@@ -23,7 +23,7 @@ import GHC.CmmToLlvm    ( llvmCodeGen )
 
 import GHC.CmmToC           ( cmmToC )
 import GHC.Cmm.Lint         ( cmmLint )
-import GHC.Cmm              ( RawCmmGroup )
+import GHC.Cmm
 import GHC.Cmm.CLabel
 
 import GHC.Driver.Session
@@ -70,7 +70,8 @@ import qualified Data.Set as Set
 -}
 
 codeOutput
-    :: Logger
+    :: forall a.
+       Logger
     -> TmpFs
     -> DynFlags
     -> UnitState
@@ -110,17 +111,38 @@ codeOutput logger tmpfs dflags unit_state this_mod filenm location genForeignStu
                 ; return cmm
                 }
 
-        ; a <- case backend dflags of
+        ; let final_stream :: Stream IO RawCmmGroup (ForeignStubs, a)
+              final_stream = do
+                  { a <- linted_cmm_stream
+                  ; let stubs = genForeignStubs a
+                  ; emitInitializerDecls this_mod stubs
+                  ; return (stubs, a) }
+
+        ; (stubs, a) <- case backend dflags of
                  NCG         -> outputAsm logger dflags this_mod location filenm
-                                          linted_cmm_stream
-                 ViaC        -> outputC logger dflags filenm linted_cmm_stream pkg_deps
-                 LLVM        -> outputLlvm logger dflags filenm linted_cmm_stream
+                                          final_stream
+                 ViaC        -> outputC logger dflags filenm final_stream pkg_deps
+                 LLVM        -> outputLlvm logger dflags filenm final_stream
                  Interpreter -> panic "codeOutput: Interpreter"
                  NoBackend   -> panic "codeOutput: NoBackend"
-        ; let stubs = genForeignStubs a
         ; stubs_exist <- outputForeignStubs logger tmpfs dflags unit_state this_mod location stubs
         ; return (filenm, stubs_exist, foreign_fps, a)
         }
+
+-- | See Note [Initializers and finalizers in Cmm] in GHC.Cmm.InitFini for details.
+emitInitializerDecls :: Module -> ForeignStubs -> Stream IO RawCmmGroup ()
+emitInitializerDecls this_mod (ForeignStubs _ cstub)
+  | initializers <- getInitializers cstub
+  , not $ null initializers =
+      let init_array = CmmData sect statics
+          lbl = mkInitializerArrayLabel this_mod
+          sect = Section InitArray lbl
+          statics = CmmStaticsRaw lbl
+            [ CmmStaticLit $ CmmLabel fn_name
+            | fn_name <- initializers
+            ]
+    in Stream.yield [init_array]
+emitInitializerDecls _ _ = return ()
 
 doOutput :: String -> (Handle -> IO a) -> IO a
 doOutput filenm io_action = bracket (openFile filenm WriteMode) hClose io_action
@@ -221,7 +243,7 @@ outputForeignStubs logger tmpfs dflags unit_state mod location stubs
      NoStubs ->
         return (False, Nothing)
 
-     ForeignStubs (CHeader h_code) (CStub c_code) -> do
+     ForeignStubs (CHeader h_code) (CStub c_code _ _) -> do
         let
             stub_c_output_d = pprCode CStyle c_code
             stub_c_output_w = showSDoc dflags stub_c_output_d
@@ -298,20 +320,18 @@ outputForeignStubs_help fname doc_str header footer
 -- | Generate code to initialise cost centres
 profilingInitCode :: Platform -> Module -> CollectedCCs -> CStub
 profilingInitCode platform this_mod (local_CCs, singleton_CCSs)
- = CStub $ vcat
-    $  map emit_cc_decl local_CCs
-    ++ map emit_ccs_decl singleton_CCSs
-    ++ [emit_cc_list local_CCs]
-    ++ [emit_ccs_list singleton_CCSs]
-    ++ [ text "static void prof_init_" <> ppr this_mod
-            <> text "(void) __attribute__((constructor));"
-       , text "static void prof_init_" <> ppr this_mod <> text "(void)"
-       , braces (vcat
-                 [ text "registerCcList" <> parens local_cc_list_label <> semi
-                 , text "registerCcsList" <> parens singleton_cc_list_label <> semi
-                 ])
-       ]
+ = initializerCStub platform fn_name decls body
  where
+   fn_name = mkInitializerStubLabel this_mod "prof_init"
+   decls = vcat
+        $  map emit_cc_decl local_CCs
+        ++ map emit_ccs_decl singleton_CCSs
+        ++ [emit_cc_list local_CCs]
+        ++ [emit_ccs_list singleton_CCSs]
+   body = vcat
+        [ text "registerCcList" <> parens local_cc_list_label <> semi
+        , text "registerCcsList" <> parens singleton_cc_list_label <> semi
+        ]
    emit_cc_decl cc =
        text "extern CostCentre" <+> cc_lbl <> text "[];"
      where cc_lbl = pdoc platform (mkCCLabel cc)
@@ -343,19 +363,14 @@ ipInitCode
   -> [InfoProvEnt]
   -> CStub
 ipInitCode do_info_table platform this_mod ents
- = if not do_info_table
-    then mempty
-    else CStub $ vcat
-    $  map emit_ipe_decl ents
-    ++ [emit_ipe_list ents]
-    ++ [ text "static void ip_init_" <> ppr this_mod
-            <> text "(void) __attribute__((constructor));"
-       , text "static void ip_init_" <> ppr this_mod <> text "(void)"
-       , braces (vcat
-                 [ text "registerInfoProvList" <> parens local_ipe_list_label <> semi
-                 ])
-       ]
+  | not do_info_table = mempty
+  | otherwise = initializerCStub platform fn_nm decls body
  where
+   fn_nm = mkInitializerStubLabel this_mod "ip_init"
+   decls = vcat
+        $  map emit_ipe_decl ents
+        ++ [emit_ipe_list ents]
+   body = text "registerInfoProvList" <> parens local_ipe_list_label <> semi
    emit_ipe_decl ipe =
        text "extern InfoProvEnt" <+> ipe_lbl <> text "[];"
      where ipe_lbl = pprCLabel platform CStyle (mkIPELabel ipe)

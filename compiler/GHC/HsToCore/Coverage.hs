@@ -1343,23 +1343,18 @@ static void hpc_init_Main(void)
 hpcInitCode :: Platform -> Module -> HpcInfo -> CStub
 hpcInitCode _ _ (NoHpcInfo {}) = mempty
 hpcInitCode platform this_mod (HpcInfo tickCount hashNo)
- = CStub $ vcat
-    [ text "static void hpc_init_" <> ppr this_mod
-         <> text "(void) __attribute__((constructor));"
-    , text "static void hpc_init_" <> ppr this_mod <> text "(void)"
-    , braces (vcat [
-        text "extern StgWord64 " <> tickboxes <>
-               text "[]" <> semi,
-        text "hs_hpc_module" <>
-          parens (hcat (punctuate comma [
-              doubleQuotes full_name_str,
-              int tickCount, -- really StgWord32
-              int hashNo,    -- really StgWord32
-              tickboxes
-            ])) <> semi
-       ])
-    ]
+ = initializerCStub platform fn_name decls body
   where
+    fn_name = mkInitializerStubLabel this_mod "hpc"
+    decls = text "extern StgWord64 " <> tickboxes <> text "[]" <> semi
+    body = text "hs_hpc_module" <>
+              parens (hcat (punctuate comma [
+                  doubleQuotes full_name_str,
+                  int tickCount, -- really StgWord32
+                  int hashNo,    -- really StgWord32
+                  tickboxes
+                ])) <> semi
+
     tickboxes = pprCLabel platform CStyle (mkHpcTicksLabel $ this_mod)
 
     module_name  = hcat (map (text.charToC) $ BS.unpack $

@@ -140,6 +140,7 @@ data LlvmStatic
   | LMStaticStr LMString LlvmType       -- ^ Defines a static 'LMString'
   | LMStaticArray [LlvmStatic] LlvmType -- ^ A static array
   | LMStaticStruc [LlvmStatic] LlvmType -- ^ A static structure type
+  | LMStaticStrucU [LlvmStatic] LlvmType -- ^ A static structure type
   | LMStaticPointer LlvmVar             -- ^ A pointer to other data
 
   -- static expressions, could split out but leave
@@ -191,6 +192,7 @@ getStatType (LMUninitType    t) = t
 getStatType (LMStaticStr   _ t) = t
 getStatType (LMStaticArray _ t) = t
 getStatType (LMStaticStruc _ t) = t
+getStatType (LMStaticStrucU _ t) = t
 getStatType (LMStaticPointer v) = getVarType v
 getStatType (LMTrunc       _ t) = t
 getStatType (LMBitc        _ t) = t

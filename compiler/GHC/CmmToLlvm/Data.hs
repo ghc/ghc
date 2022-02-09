@@ -15,6 +15,7 @@ import GHC.CmmToLlvm.Config
 
 import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
+import GHC.Cmm.InitFini
 import GHC.Cmm
 import GHC.Platform
 
@@ -65,6 +66,14 @@ genLlvmData (_, CmmStaticsRaw alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit i
 
     pure ([LMGlobal aliasDef $ Just orig], [tyAlias])
 
+-- See Note [Initializers and finalizers in Cmm] in GHC.Cmm.InitFini.
+genLlvmData (sect, statics)
+  | Just (initOrFini, clbls) <- isInitOrFiniArray (CmmData sect statics)
+  = let var = case initOrFini of
+                IsInitArray -> fsLit "llvm.global_ctors"
+                IsFiniArray -> fsLit "llvm.global_dtors"
+    in genGlobalLabelArray var clbls
+
 genLlvmData (sec, CmmStaticsRaw lbl xs) = do
     label <- strCLabel_llvm lbl
     static <- mapM genData xs
@@ -88,6 +97,37 @@ genLlvmData (sec, CmmStaticsRaw lbl xs) = do
 
     return ([globDef], [tyAlias])
 
+-- | Produce an initializer or finalizer array declaration.
+-- See Note [Initializers and finalizers in Cmm] in GHC.Cmm.InitFini for
+-- details.
+genGlobalLabelArray :: FastString -> [CLabel] -> LlvmM LlvmData
+genGlobalLabelArray var_nm clbls = do
+    lbls <- mapM strCLabel_llvm clbls
+    decls <- mapM mkFunDecl lbls
+    let entries = map toArrayEntry lbls
+        static = LMStaticArray entries arr_ty
+        arr = LMGlobal arr_var (Just static)
+    return ([arr], decls)
+  where
+    mkFunDecl :: LMString -> LlvmM LlvmType
+    mkFunDecl fn_lbl = do
+        let fn_ty = mkFunTy fn_lbl
+        funInsert fn_lbl fn_ty
+        return (fn_ty)
+
+    toArrayEntry :: LMString -> LlvmStatic
+    toArrayEntry fn_lbl =
+        let fn_var = LMGlobalVar fn_lbl (LMPointer $ mkFunTy fn_lbl) Internal Nothing Nothing Global
+            fn = LMStaticPointer fn_var
+            null = LMStaticLit (LMNullLit i8Ptr)
+            prio = LMStaticLit $ LMIntLit 0xffff i32
+        in LMStaticStrucU [prio, fn, null] entry_ty
+
+    arr_var = LMGlobalVar var_nm arr_ty Internal Nothing Nothing Global
+    mkFunTy lbl = LMFunction $ LlvmFunctionDecl lbl ExternallyVisible CC_Ccc LMVoid FixedArgs [] Nothing
+    entry_ty = LMStructU [i32, LMPointer $ mkFunTy $ fsLit "placeholder", LMPointer i8]
+    arr_ty = LMArray (length clbls) entry_ty
+
 -- | Format the section type part of a Cmm Section
 llvmSectionType :: Platform -> SectionType -> FastString
 llvmSectionType p t = case t of
@@ -106,7 +146,10 @@ llvmSectionType p t = case t of
     CString                 -> case platformOS p of
                                  OSMinGW32 -> fsLit ".rdata$str"
                                  _         -> fsLit ".rodata.str"
-    (OtherSection _)        -> panic "llvmSectionType: unknown section type"
+
+    InitArray               -> panic "llvmSectionType: InitArray"
+    FiniArray               -> panic "llvmSectionType: FiniArray"
+    OtherSection _          -> panic "llvmSectionType: unknown section type"
 
 -- | Format a Cmm Section into a LLVM section name
 llvmSection :: Section -> LlvmM LMSection
