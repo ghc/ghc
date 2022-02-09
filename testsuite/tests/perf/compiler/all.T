@@ -145,6 +145,13 @@ test('T9872b',
       ],
      compile_fail,
      [''])
+test('T9872b_defer',
+     [ only_ways(['normal']),
+       collect_compiler_stats('bytes allocated', 1),
+       high_memory_usage
+      ],
+     compile,
+     ['-fdefer-type-errors'])
 test('T9872c',
      [ only_ways(['normal']),
        collect_compiler_stats('bytes allocated', 1),
@@ -158,6 +165,30 @@ test('T9872d',
       ],
      compile,
      [''])
+test ('T8095',
+      [ only_ways(['normal']),
+        collect_compiler_stats('bytes allocated',1) ],
+      compile,
+      ['-v0 -O'])
+test ('T13386',
+      [ only_ways(['normal']),
+        collect_compiler_stats('bytes allocated',1) ],
+      compile,
+      ['-v0 -O0'])
+test ('T15703',
+      [ only_ways(['normal']),
+        collect_compiler_stats('bytes allocated',1)
+      , extra_files(['T15703_aux.hs'])
+      ],
+      multimod_compile,
+      ['T15703', '-v0 -O'])
+test ('LargeRecord',
+      [ only_ways(['normal']),
+        collect_compiler_stats('bytes allocated',1)
+      , extra_files(['SuperRecord.hs'])
+      ],
+      multimod_compile,
+      ['LargeRecord', '-v0 -O'])
 
 test('T9961',
      [ only_ways(['normal']),
