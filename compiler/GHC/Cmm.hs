@@ -184,6 +184,8 @@ data SectionType
   | RelocatableReadOnlyData
   | UninitialisedData
   | ReadOnlyData16      -- .rodata.cst16 on x86_64, 16-byte aligned
+  | InitArray           -- .init_array on ELF, .ctor on Windows
+  | FiniArray           -- .fini_array on ELF, .dtor on Windows
   | CString
   | OtherSection String
   deriving (Show)
@@ -201,6 +203,8 @@ sectionProtection (Section t _) = case t of
     ReadOnlyData            -> ReadOnlySection
     RelocatableReadOnlyData -> WriteProtectedSection
     ReadOnlyData16          -> ReadOnlySection
+    InitArray               -> ReadOnlySection
+    FiniArray               -> ReadOnlySection
     CString                 -> ReadOnlySection
     Data                    -> ReadWriteSection
     UninitialisedData       -> ReadWriteSection

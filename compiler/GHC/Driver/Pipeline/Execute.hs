@@ -130,7 +130,7 @@ runPhase (T_Cmm pipe_env hsc_env input_fn) = do
   output_fn <- phaseOutputFilenameNew next_phase pipe_env hsc_env Nothing
   mstub <- hscCompileCmmFile hsc_env input_fn output_fn
   stub_o <- mapM (compileStub hsc_env) mstub
-  let foreign_os = (maybeToList stub_o)
+  let foreign_os = maybeToList stub_o
   return (foreign_os, output_fn)
 
 runPhase (T_Cc phase pipe_env hsc_env input_fn) = runCcPhase phase pipe_env hsc_env input_fn
@@ -1089,11 +1089,14 @@ enabled in the toolchain:
    suggests, this tells the linker to produce a bigobj-enabled COFF object, no a
    PE executable.
 
-We must enable bigobj output in a few places:
+Previously when we used ld.bfd we had to enable bigobj output in a few places:
 
  * When merging object files (GHC.Driver.Pipeline.Execute.joinObjectFiles)
 
  * When assembling (GHC.Driver.Pipeline.runPhase (RealPhase As ...))
+
+However, this is no longer necessary with ld.lld, which detects that the
+object is large on its own.
 
 Unfortunately the big object format is not supported on 32-bit targets so
 none of this can be used in that case.
@@ -1117,7 +1120,8 @@ via gcc.
 -}
 
 joinObjectFiles :: HscEnv -> [FilePath] -> FilePath -> IO ()
-joinObjectFiles hsc_env o_files output_fn = do
+joinObjectFiles hsc_env o_files output_fn
+  | can_merge_objs = do
   let toolSettings' = toolSettings dflags
       ldIsGnuLd = toolSettings_ldIsGnuLd toolSettings'
       ld_r args = GHC.SysTools.runMergeObjects (hsc_logger hsc_env) (hsc_tmpfs hsc_env) (hsc_dflags hsc_env) (
@@ -1147,7 +1151,12 @@ joinObjectFiles hsc_env o_files output_fn = do
                 GHC.SysTools.FileOption "" filelist]
      else
           ld_r (map (GHC.SysTools.FileOption "") o_files)
+
+  | otherwise = do
+  withAtomicRename output_fn $ \tmp_ar ->
+      liftIO $ runAr logger dflags Nothing $ map Option $ ["rc", tmp_ar] ++ o_files
   where
+    can_merge_objs = False -- XXX
     dflags = hsc_dflags hsc_env
     tmpfs = hsc_tmpfs hsc_env
     logger = hsc_logger hsc_env

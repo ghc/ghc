@@ -821,61 +821,11 @@ pathchar* findSystemLibrary_PEi386( pathchar* dll_name )
 
 HsPtr addLibrarySearchPath_PEi386(pathchar* dll_path)
 {
-    HINSTANCE hDLL = LoadLibraryW(L"Kernel32.DLL");
-    LPAddDLLDirectory AddDllDirectory = (LPAddDLLDirectory)(void*)GetProcAddress((HMODULE)hDLL, "AddDllDirectory");
+    // Make sure the path is an absolute path in UNC-style to ensure that we
+    // aren't subject to the MAX_PATH restriction. See #21059.
+    wchar_t *abs_path = __rts_create_device_name(dll_path);
 
-    HsPtr result = NULL;
-
-    const unsigned int init_buf_size = 4096;
-    int bufsize                      = init_buf_size;
-
-    // Make sure the path is an absolute path
-    WCHAR* abs_path = stgMallocBytes(sizeof(WCHAR) * init_buf_size, "addLibrarySearchPath_PEi386(1)");
-    DWORD wResult = GetFullPathNameW(dll_path, bufsize, abs_path, NULL);
-    if (!wResult){
-        IF_DEBUG(linker, debugBelch("addLibrarySearchPath[GetFullPathNameW]: %" PATH_FMT " (Win32 error %lu)", dll_path, GetLastError()));
-    }
-    else if (wResult > init_buf_size) {
-        abs_path = realloc(abs_path, sizeof(WCHAR) * wResult);
-        if (!GetFullPathNameW(dll_path, bufsize, abs_path, NULL)) {
-            IF_DEBUG(linker, debugBelch("addLibrarySearchPath[GetFullPathNameW]: %" PATH_FMT " (Win32 error %lu)", dll_path, GetLastError()));
-        }
-    }
-
-    if (AddDllDirectory) {
-        result = AddDllDirectory(abs_path);
-    }
-    else
-    {
-        warnMissingKBLibraryPaths();
-        WCHAR* str = stgMallocBytes(sizeof(WCHAR) * init_buf_size, "addLibrarySearchPath_PEi386(2)");
-        wResult = GetEnvironmentVariableW(L"PATH", str, bufsize);
-
-        if (wResult > init_buf_size) {
-            str = realloc(str, sizeof(WCHAR) * wResult);
-            bufsize = wResult;
-            wResult = GetEnvironmentVariableW(L"PATH", str, bufsize);
-            if (!wResult) {
-                sysErrorBelch("addLibrarySearchPath[GetEnvironmentVariableW]: %" PATH_FMT " (Win32 error %lu)", dll_path, GetLastError());
-            }
-        }
-
-        bufsize = wResult + 2 + pathlen(abs_path);
-        wchar_t* newPath = stgMallocBytes(sizeof(wchar_t) * bufsize, "addLibrarySearchPath_PEi386(3)");
-
-        wcscpy(newPath, abs_path);
-        wcscat(newPath, L";");
-        wcscat(newPath, str);
-        if (!SetEnvironmentVariableW(L"PATH", (LPCWSTR)newPath)) {
-            sysErrorBelch("addLibrarySearchPath[SetEnvironmentVariableW]: %" PATH_FMT " (Win32 error %lu)", abs_path, GetLastError());
-        }
-
-        stgFree(newPath);
-        stgFree(abs_path);
-
-        return str;
-    }
-
+    HsPtr result = AddDllDirectory(abs_path);
     if (!result) {
         sysErrorBelch("addLibrarySearchPath: %" PATH_FMT " (Win32 error %lu)", abs_path, GetLastError());
         stgFree(abs_path);
@@ -891,19 +841,8 @@ bool removeLibrarySearchPath_PEi386(HsPtr dll_path_index)
     bool result = false;
 
     if (dll_path_index != NULL) {
-        HINSTANCE hDLL = LoadLibraryW(L"Kernel32.DLL");
-        LPRemoveDLLDirectory RemoveDllDirectory = (LPRemoveDLLDirectory)(void*)GetProcAddress((HMODULE)hDLL, "RemoveDllDirectory");
-
-        if (RemoveDllDirectory) {
-            result = RemoveDllDirectory(dll_path_index);
-            // dll_path_index is now invalid, do not use it after this point.
-        }
-        else
-        {
-            warnMissingKBLibraryPaths();
-            result = SetEnvironmentVariableW(L"PATH", (LPCWSTR)dll_path_index);
-            stgFree(dll_path_index);
-        }
+        result = RemoveDllDirectory(dll_path_index);
+        // dll_path_index is now invalid, do not use it after this point.
 
         if (!result) {
             sysErrorBelch("removeLibrarySearchPath: (Win32 error %lu)", GetLastError());
@@ -2138,6 +2077,17 @@ SymbolAddr *lookupSymbol_PEi386(SymbolName *lbl, ObjectCode *dependent, SymType 
  * Debugging operations.
  */
 
+typedef struct _SymX { SymbolName* name; uintptr_t loc; } SymX;
+
+static int comp (const void * elem1, const void * elem2)
+{
+    SymX f = *((SymX*)elem1);
+    SymX s = *((SymX*)elem2);
+    if (f.loc > s.loc) return  1;
+    if (f.loc < s.loc) return -1;
+    return 0;
+}
+
 pathchar*
 resolveSymbolAddr_PEi386 (pathchar* buffer, int size,
                           SymbolAddr* symbol, uintptr_t* top ){
@@ -2263,7 +2213,6 @@ resolveSymbolAddr_PEi386 (pathchar* buffer, int size,
     else if (obj)
     {
       /* Try to calculate from information inside the rts.  */
-      typedef struct _SymX { SymbolName* name; uintptr_t loc; } SymX;
       SymX* locs = stgCallocBytes (sizeof(SymX), obj->n_symbols,
                                    "resolveSymbolAddr");
       int blanks = 0;
@@ -2282,14 +2231,6 @@ resolveSymbolAddr_PEi386 (pathchar* buffer, int size,
               sx.loc  = (uintptr_t)a->value;
               locs[i] = sx;
           }
-      }
-      int comp (const void * elem1, const void * elem2)
-      {
-          SymX f = *((SymX*)elem1);
-          SymX s = *((SymX*)elem2);
-          if (f.loc > s.loc) return  1;
-          if (f.loc < s.loc) return -1;
-          return 0;
       }
       qsort (locs, obj->n_symbols, sizeof (SymX), comp);
       uintptr_t key  = (uintptr_t)symbol;

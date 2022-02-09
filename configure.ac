@@ -442,15 +442,20 @@ then
     set_up_tarballs
 
     mingwbin="$hardtop/inplace/mingw/bin/"
-    CC="${mingwbin}gcc.exe"
-    LD="${mingwbin}ld.exe"
-    NM="${mingwbin}nm.exe"
-    RANLIB="${mingwbin}ranlib.exe"
-    OBJDUMP="${mingwbin}objdump.exe"
-    MergeObjsCmd="$LD"
+    CC="${mingwbin}clang.exe"
+    CFLAGS="-fuse-ld=lld --rtlib=compiler-rt"
+    CONF_CC_OPTS_STAGE1="--rtlib=compiler-rt"
+    CONF_CC_OPTS_STAGE2="--rtlib=compiler-rt"
+    CONF_GCC_LINKER_OPTS_STAGE1="-fuse-ld=lld --rtlib=compiler-rt"
+    CONF_GCC_LINKER_OPTS_STAGE2="-fuse-ld=lld --rtlib=compiler-rt"
+    LD="${mingwbin}ld.lld.exe"
+    NM="${mingwbin}llvm-nm.exe"
+    AR="${mingwbin}llvm-ar.exe"
+    RANLIB="${mingwbin}llvm-ranlib.exe"
+    OBJDUMP="${mingwbin}llvm-objdump.exe"
+    DLLTOOL="${mingwbin}llvm-dlltool.exe"
+    MergeObjsCmd="${mingwbin}ld.bfd.exe"
     MergeObjsArgs="-r --oformat=pe-bigobj-x86-64"
-    fp_prog_ar="${mingwbin}ar.exe"
-
     AC_PATH_PROG([Genlib],[genlib])
 fi
 
@@ -681,7 +686,7 @@ AC_SUBST(InstallNameToolCmd)
 # versions of LLVM simultaneously, but that stopped working around
 # 3.5/3.6 release of LLVM.
 LlvmMinVersion=9  # inclusive
-LlvmMaxVersion=13 # not inclusive
+LlvmMaxVersion=14 # not inclusive
 AC_SUBST([LlvmMinVersion])
 AC_SUBST([LlvmMaxVersion])
 sUPPORTED_LLVM_VERSION_MIN=$(echo \($LlvmMinVersion\) | sed 's/\./,/')

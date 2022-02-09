@@ -369,25 +369,11 @@ runRanlib logger dflags args = traceToolCommand logger "ranlib" $ do
 
 runWindres :: Logger -> DynFlags -> [Option] -> IO ()
 runWindres logger dflags args = traceToolCommand logger "windres" $ do
-  let cc = pgm_c dflags
-      cc_args = map Option (sOpt_c (settings dflags))
+  let cc_args = map Option (sOpt_c (settings dflags))
       windres = pgm_windres dflags
       opts = map Option (getOpts dflags opt_windres)
-      quote x = "\"" ++ x ++ "\""
-      args' = -- If windres.exe and gcc.exe are in a directory containing
-              -- spaces then windres fails to run gcc. We therefore need
-              -- to tell it what command to use...
-              [ Option ("--preprocessor=" ++ quote cc) ]
-              ++ map (Option . ("--preprocessor-arg=" ++) . quote)
-                     (map showOpt opts ++ ["-E", "-xc", "-DRC_INVOKED"])
-              -- ...but if we do that then if windres calls popen then
-              -- it can't understand the quoting, so we have to use
-              -- --use-temp-file so that it interprets it correctly.
-              -- See #1828.
-              ++ [ Option "--use-temp-file" ]
-              ++ args
   mb_env <- getGccEnv cc_args
-  runSomethingFiltered logger id "Windres" windres args' Nothing mb_env
+  runSomethingFiltered logger id "Windres" windres (opts ++ args) Nothing mb_env
 
 touch :: Logger -> DynFlags -> String -> String -> IO ()
 touch logger dflags purpose arg = traceToolCommand logger "touch" $

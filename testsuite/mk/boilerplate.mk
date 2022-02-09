@@ -304,6 +304,8 @@ ifeq "$(HostOS)" "freebsd"
 LIBCXX_PLATFORM = YES
 else ifeq "$(HostOS)" "openbsd"
 LIBCXX_PLATFORM = YES
+else ifeq "$(HostOS)" "mingw32"
+LIBCXX_PLATFORM = YES
 else
 LIBCXX_PLATFORM = NO
 endif

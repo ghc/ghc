@@ -43,6 +43,7 @@ import GHC.Tc.Utils.TcType
 
 import GHC.Cmm.Expr
 import GHC.Cmm.Utils
+import GHC.Cmm.CLabel
 import GHC.Driver.Ppr
 import GHC.Types.ForeignCall
 import GHC.Builtin.Types
@@ -95,11 +96,12 @@ dsForeigns' []
   = return (NoStubs, nilOL)
 dsForeigns' fos = do
     mod <- getModule
+    platform <- targetPlatform <$> getDynFlags
     fives <- mapM do_ldecl fos
     let
         (hs, cs, idss, bindss) = unzip4 fives
         fe_ids = concat idss
-        fe_init_code = foreignExportsInitialiser mod fe_ids
+        fe_init_code = foreignExportsInitialiser platform mod fe_ids
     --
     return (ForeignStubs
              (mconcat hs)
@@ -298,7 +300,7 @@ dsFCall fn_id co fcall mDeclHeader = do
                                                 simpl_opts
                                                 wrap_rhs'
 
-    return ([(work_id, work_rhs), (fn_id_w_inl, wrap_rhs')], mempty, CStub cDoc)
+    return ([(work_id, work_rhs), (fn_id_w_inl, wrap_rhs')], mempty, CStub cDoc [] [])
 
 {-
 ************************************************************************
@@ -526,7 +528,9 @@ mkFExportCBits :: DynFlags
                    Int          -- total size of arguments
                   )
 mkFExportCBits dflags c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
- = (header_bits, c_bits, type_string,
+ = ( header_bits
+   , CStub body [] []
+   , type_string,
     sum [ widthInBytes (typeWidth rep) | (_,_,_,rep) <- aug_arg_info] -- all the args
          -- NB. the calculation here isn't strictly speaking correct.
          -- We have a primitive Haskell type (eg. Int#, Double#), and
@@ -646,7 +650,7 @@ mkFExportCBits dflags c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
 
 
   -- finally, the whole darn thing
-  c_bits = CStub $
+  body =
     space $$
     extern_decl $$
     fun_proto  $$
@@ -682,9 +686,8 @@ mkFExportCBits dflags c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
      , rbrace
      ]
 
-
-foreignExportsInitialiser :: Module -> [Id] -> CStub
-foreignExportsInitialiser mod hs_fns =
+foreignExportsInitialiser :: Platform -> Module -> [Id] -> CStub
+foreignExportsInitialiser platform mod hs_fns =
    -- Initialise foreign exports by registering a stable pointer from an
    -- __attribute__((constructor)) function.
    -- The alternative is to do this from stginit functions generated in
@@ -695,21 +698,18 @@ foreignExportsInitialiser mod hs_fns =
    -- (this is bad for big umbrella modules like Graphics.Rendering.OpenGL)
    --
    -- See Note [Tracking foreign exports] in rts/ForeignExports.c
-   CStub $ vcat
-    [ text "static struct ForeignExportsList" <+> list_symbol <+> equals
+   initializerCStub platform fn_nm list_decl fn_body
+  where
+    fn_nm       = mkInitializerStubLabel mod "fexports"
+    mod_str     = pprModuleName (moduleName mod)
+    fn_body     = text "registerForeignExports" <> parens (char '&' <> list_symbol) <> semi
+    list_symbol = text "stg_exports_" <> mod_str
+    list_decl   = text "static struct ForeignExportsList" <+> list_symbol <+> equals
          <+> braces (
            text ".exports = " <+> export_list <> comma <+>
            text ".n_entries = " <+> ppr (length hs_fns))
          <> semi
-    , text "static void " <> ctor_symbol <> text "(void)"
-         <+> text " __attribute__((constructor));"
-    , text "static void " <> ctor_symbol <> text "()"
-    , braces (text "registerForeignExports" <> parens (char '&' <> list_symbol) <> semi)
-    ]
-  where
-    mod_str = pprModuleName (moduleName mod)
-    ctor_symbol = text "stginit_export_" <> mod_str
-    list_symbol = text "stg_exports_" <> mod_str
+
     export_list = braces $ pprWithCommas closure_ptr hs_fns
 
     closure_ptr :: Id -> SDoc
