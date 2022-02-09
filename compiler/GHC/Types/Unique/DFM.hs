@@ -57,6 +57,7 @@ module GHC.Types.Unique.DFM (
         listToUDFM, listToUDFM_Directly,
         udfmMinusUFM, ufmMinusUDFM,
         partitionUDFM,
+        udfmRestrictKeys,
         anyUDFM, allUDFM,
         pprUniqDFM, pprUDFM,
 
@@ -309,6 +310,9 @@ filterUDFM_Directly :: (Unique -> elt -> Bool) -> UniqDFM key elt -> UniqDFM key
 filterUDFM_Directly p (UDFM m i) = UDFM (M.filterWithKey p' m) i
   where
   p' k (TaggedVal v _) = p (getUnique k) v
+
+udfmRestrictKeys :: UniqDFM key elt -> UniqDFM key elt2 -> UniqDFM key elt
+udfmRestrictKeys (UDFM a i) (UDFM b _) = UDFM (M.restrictKeys a (M.keysSet b)) i
 
 -- | Converts `UniqDFM` to a list, with elements in deterministic order.
 -- It's O(n log n) while the corresponding function on `UniqFM` is O(n).

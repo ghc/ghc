@@ -856,7 +856,7 @@ setInteractiveDynFlags dflags = do
 
     -- Initialise (load) plugins in the interactive environment with the new
     -- DynFlags
-    plugin_env <- liftIO $ flip initializePlugins Nothing $ mkInteractiveHscEnv $
+    plugin_env <- liftIO $ initializePlugins $ mkInteractiveHscEnv $
                     hsc_env0 { hsc_IC = ic0 { ic_dflags = dflags'' }}
 
     -- Update both plugins cache and DynFlags in the interactive context.

@@ -11,6 +11,9 @@ module GHC.Linker.Types
    , LoaderState (..)
    , uninitializedLoader
    , Linkable(..)
+   , LinkableSet
+   , mkLinkableSet
+   , unionLinkableSet
    , Unlinked(..)
    , SptEntry(..)
    , isObjectLinkable
@@ -21,11 +24,13 @@ module GHC.Linker.Types
    , isInterpretable
    , byteCodeOfObject
    , LibrarySpec(..)
+   , LoadedPkgInfo(..)
+   , PkgsLoaded
    )
 where
 
 import GHC.Prelude
-import GHC.Unit                ( UnitId, Module, ModuleNameWithIsBoot )
+import GHC.Unit                ( UnitId, Module )
 import GHC.ByteCode.Types      ( ItblEnv, CompiledByteCode )
 import GHC.Fingerprint.Type    ( Fingerprint )
 import GHCi.RemoteTypes        ( ForeignHValue )
@@ -40,7 +45,9 @@ import GHC.Utils.Panic
 import Control.Concurrent.MVar
 import Data.Time               ( UTCTime )
 import Data.Maybe
-import qualified Data.Map as M
+import GHC.Unit.Module.Env
+import GHC.Types.Unique.DSet
+import GHC.Types.Unique.DFM
 
 
 {- **********************************************************************
@@ -75,19 +82,15 @@ data LoaderState = LoaderState
         -- module in the image is replaced, the itbl_env must be updated
         -- appropriately.
 
-    , bcos_loaded :: ![Linkable]
+    , bcos_loaded :: !LinkableSet
         -- ^ The currently loaded interpreted modules (home package)
 
-    , objs_loaded :: ![Linkable]
+    , objs_loaded :: !LinkableSet
         -- ^ And the currently-loaded compiled modules (home package)
 
-    , pkgs_loaded :: ![UnitId]
+    , pkgs_loaded :: !PkgsLoaded
         -- ^ The currently-loaded packages; always object code
-        -- Held, as usual, in dependency order; though I am not sure if
-        -- that is really important
-    , hs_objs_loaded :: ![LibrarySpec]
-    , non_hs_objs_loaded :: ![LibrarySpec]
-    , module_deps :: M.Map ModuleNameWithIsBoot [Linkable]
+        -- haskell libraries, system libraries, transitive dependencies
 
     , temp_sos :: ![(FilePath, String)]
         -- ^ We need to remember the name of previous temporary DLL/.so
@@ -98,6 +101,23 @@ uninitializedLoader :: IO Loader
 uninitializedLoader = Loader <$> newMVar Nothing
 
 type ClosureEnv = NameEnv (Name, ForeignHValue)
+type PkgsLoaded = UniqDFM UnitId LoadedPkgInfo
+
+data LoadedPkgInfo
+  = LoadedPkgInfo
+  { loaded_pkg_uid         :: !UnitId
+  , loaded_pkg_hs_objs     :: ![LibrarySpec]
+  , loaded_pkg_non_hs_objs :: ![LibrarySpec]
+  , loaded_pkg_trans_deps  :: UniqDSet UnitId
+  }
+
+instance Outputable LoadedPkgInfo where
+  ppr (LoadedPkgInfo uid hs_objs non_hs_objs trans_deps) =
+    vcat [ppr uid
+         , ppr hs_objs
+         , ppr non_hs_objs
+         , ppr trans_deps ]
+
 
 -- | Information we can use to dynamically link modules into the compiler
 data Linkable = LM {
@@ -110,6 +130,18 @@ data Linkable = LM {
     --
     -- INVARIANT: A valid linkable always has at least one 'Unlinked' item.
  }
+
+type LinkableSet = ModuleEnv Linkable
+
+mkLinkableSet :: [Linkable] -> LinkableSet
+mkLinkableSet ls = mkModuleEnv [(linkableModule l, l) | l <- ls]
+
+unionLinkableSet :: LinkableSet -> LinkableSet -> LinkableSet
+unionLinkableSet = plusModuleEnv_C go
+  where
+    go l1 l2
+      | linkableTime l1 > linkableTime l2 = l1
+      | otherwise = l2
 
 instance Outputable Linkable where
   ppr (LM when_made mod unlinkeds)

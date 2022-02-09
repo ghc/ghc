@@ -671,7 +671,7 @@ runHscPhase pipe_env hsc_env0 input_fn src_flavour = do
   -- run the compiler!
   let msg :: Messager
       msg hsc_env _ what _ = oneShotMsg (hsc_logger hsc_env) what
-  plugin_hsc_env' <- initializePlugins hsc_env (Just $ ms_mnwib mod_summary)
+  plugin_hsc_env' <- initializePlugins hsc_env
 
   -- Need to set the knot-tying mutable variable for interface
   -- files. See GHC.Tc.Utils.TcGblEnv.tcg_type_env_var.

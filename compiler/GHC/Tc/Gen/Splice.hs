@@ -1011,13 +1011,12 @@ runMeta' show_code ppr_hs run_and_convert expr
 
         -- Compile and link it; might fail if linking fails
         ; src_span <- getSrcSpanM
-        ; mnwib <- getMnwib
         ; traceTc "About to run (desugared)" (ppr ds_expr)
         ; either_hval <- tryM $ liftIO $
-                         GHC.Driver.Main.hscCompileCoreExpr hsc_env (src_span, Just mnwib) ds_expr
+                         GHC.Driver.Main.hscCompileCoreExpr hsc_env src_span ds_expr
         ; case either_hval of {
             Left exn   -> fail_with_exn "compile and link" exn ;
-            Right hval -> do
+            Right (hval, needed_mods, needed_pkgs) -> do
 
         {       -- Coerce it to Q t, and run it
 
@@ -1031,6 +1030,7 @@ runMeta' show_code ppr_hs run_and_convert expr
                 --
                 -- See Note [Exceptions in TH]
           let expr_span = getLocA expr
+        ; recordThNeededRuntimeDeps needed_mods needed_pkgs
         ; either_tval <- tryAllM $
                          setSrcSpan expr_span $ -- Set the span so that qLocation can
                                                 -- see where this splice is

@@ -238,7 +238,7 @@ compileOne' mHscMessage
                addFilesToClean tmpfs TFL_GhcSession $
                    [ml_obj_file $ ms_location summary]
 
-   plugin_hsc_env <- initializePlugins hsc_env (Just (ms_mnwib summary))
+   plugin_hsc_env <- initializePlugins hsc_env
    let pipe_env = mkPipeEnv NoStop input_fn pipelineOutput
    status <- hscRecompStatus mHscMessage plugin_hsc_env upd_summary
                 mb_old_iface mb_old_linkable (mod_index, nmods)

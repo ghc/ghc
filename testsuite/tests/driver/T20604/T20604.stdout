@@ -1,0 +1,11 @@
+A1
+A
+addDependentFile "/home/matt/ghc-numa/_build/stage1/lib/../lib/x86_64-linux-ghc-9.3.20220210/libHSghc-prim-0.8.0-ghc9.3.20220210.so" 9f60cabb62a3305daa26440cde34be2b
+addDependentFile "/home/matt/ghc-numa/_build/stage1/lib/../lib/x86_64-linux-ghc-9.3.20220210/libHSghc-bignum-1.3-ghc9.3.20220210.so" 5da53b9a870ae800132527a10de182ef
+addDependentFile "/home/matt/ghc-numa/_build/stage1/lib/../lib/x86_64-linux-ghc-9.3.20220210/libHSbase-4.16.0.0-ghc9.3.20220210.so" ed1808d3e2f7368d81345094adfea50f
+addDependentFile "/home/matt/ghc-numa/_build/stage1/lib/../lib/x86_64-linux-ghc-9.3.20220210/libHSfilepath-1.4.2.1-ghc9.3.20220210.so" 08b9514f12122be71c467bddf9edf99b
+addDependentFile "/home/matt/ghc-numa/_build/stage1/lib/../lib/x86_64-linux-ghc-9.3.20220210/libHSghc-boot-th-9.3-ghc9.3.20220210.so" 165417fb87110cd768173641e96854d7
+addDependentFile "/home/matt/ghc-numa/_build/stage1/lib/../lib/x86_64-linux-ghc-9.3.20220210/libHSarray-0.5.4.0-ghc9.3.20220210.so" 267bb3b9d1d59920b08f6d81ddb1f5f4
+addDependentFile "/home/matt/ghc-numa/_build/stage1/lib/../lib/x86_64-linux-ghc-9.3.20220210/libHSdeepseq-1.4.7.0-ghc9.3.20220210.so" 4d4f1682b257ae7674e1dc6b84f1f8ae
+addDependentFile "/home/matt/ghc-numa/_build/stage1/lib/../lib/x86_64-linux-ghc-9.3.20220210/libHSpretty-1.1.3.6-ghc9.3.20220210.so" dd0fddaebe5d06357fe1748efefd1705
+addDependentFile "/home/matt/ghc-numa/_build/stage1/lib/../lib/x86_64-linux-ghc-9.3.20220210/libHStemplate-haskell-2.18.0.0-ghc9.3.20220210.so" 72cdf17fd485c6bb49e684730a0a55b6

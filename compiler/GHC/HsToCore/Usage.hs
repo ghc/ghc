@@ -37,9 +37,9 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 
 import GHC.Linker.Types
-import GHC.Linker.Loader ( getLoaderState )
-import GHC.Types.SourceFile
 import GHC.Unit.Finder
+import GHC.Types.Unique.DFM
+import GHC.Driver.Plugins
 
 {- Note [Module self-dependency]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -63,14 +63,14 @@ its dep_orphs. This was the cause of #14128.
 mkUsedNames :: TcGblEnv -> NameSet
 mkUsedNames TcGblEnv{ tcg_dus = dus } = allUses dus
 
-mkUsageInfo :: HscEnv -> Module -> HscSource -> ImportedMods -> NameSet -> [FilePath]
-            -> [(Module, Fingerprint)] -> IO [Usage]
-mkUsageInfo hsc_env this_mod src dir_imp_mods used_names dependent_files merged
+mkUsageInfo :: HscEnv -> Module -> ImportedMods -> NameSet -> [FilePath]
+            -> [(Module, Fingerprint)] -> [Linkable] -> PkgsLoaded -> IO [Usage]
+mkUsageInfo hsc_env this_mod dir_imp_mods used_names dependent_files merged needed_links needed_pkgs
   = do
     eps <- hscEPS hsc_env
     hashes <- mapM getFileHash dependent_files
     -- Dependencies on object files due to TH and plugins
-    object_usages <- mkObjectUsage (eps_PIT eps) hsc_env (GWIB (moduleName this_mod) (hscSourceToIsBoot src))
+    object_usages <- mkObjectUsage (eps_PIT eps) hsc_env needed_links needed_pkgs
     let mod_usages = mk_mod_usage_info (eps_PIT eps) hsc_env this_mod
                                        dir_imp_mods used_names
         usages = mod_usages ++ [ UsageFile { usg_file_path = f
@@ -124,24 +124,38 @@ One way to improve this is to either:
     of the module and the implementation hashes of its dependencies, and then
     compare implementation hashes for recompilation. Creation of implementation
     hashes is however potentially expensive.
+
+    A serious issue with the interface hash idea is that if you include an
+    interface hash, that hash also needs to depend on the hash of its
+    dependencies. Therefore, if any of the transitive dependencies of a modules
+    gets updated then you need to recompile the module in case the interface
+    hash has changed irrespective if the module uses TH or not.
+
+    This is important to maintain the invariant that the information in the
+    interface file is always up-to-date.
+
+
+    See #20790 (comment 3)
+-}
+
+{-
+Note [Object File Dependencies]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In addition to the Note [Plugin dependencies] above, for TH we also need to record
+the hashes of object files that the TH code is required to load. These are
+calculated by the loader in `getLinkDeps` and are accumulated in each individual
+`TcGblEnv`, in `tcg_th_needed_deps`. We read this just before compute the UsageInfo
+to inject the appropriate dependencies.
 -}
 
 -- | Find object files corresponding to the transitive closure of given home
 -- modules and direct object files for pkg dependencies
-mkObjectUsage :: PackageIfaceTable -> HscEnv -> ModuleNameWithIsBoot -> IO [Usage]
-mkObjectUsage pit hsc_env mnwib = do
-  case hsc_interp hsc_env of
-      Just interp -> do
-        mps <- getLoaderState interp
-        case mps of
-          Just ps -> do
-            let ls = fromMaybe [] $ Map.lookup mnwib (module_deps ps)
-                ds = hs_objs_loaded ps
-            concat <$> sequence (map linkableToUsage ls ++ map librarySpecToUsage ds)
-          Nothing -> return []
-      Nothing -> return []
-
-
+mkObjectUsage :: PackageIfaceTable -> HscEnv -> [Linkable] -> PkgsLoaded -> IO [Usage]
+mkObjectUsage pit hsc_env th_links_needed th_pkgs_needed = do
+      let ls = ordNubOn linkableModule  (th_links_needed ++ plugins_links_needed)
+          ds = concatMap loaded_pkg_hs_objs $ eltsUDFM (plusUDFM th_pkgs_needed plugin_pkgs_needed) -- TODO possibly record loaded_pkg_non_hs_objs as well
+          (plugins_links_needed, plugin_pkgs_needed) = loadedPluginDeps $ hsc_plugins hsc_env
+      concat <$> sequence (map linkableToUsage ls ++ map librarySpecToUsage ds)
   where
     linkableToUsage (LM _ m uls) = mapM (unlinkedToUsage m) uls
 

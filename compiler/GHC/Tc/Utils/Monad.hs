@@ -58,7 +58,7 @@ module GHC.Tc.Utils.Monad(
   getRdrEnvs, getImports,
   getFixityEnv, extendFixityEnv, getRecFieldEnv,
   getDeclaredDefaultTys,
-  addDependentFiles, getMnwib,
+  addDependentFiles,
 
   -- * Error management
   getSrcSpanM, setSrcSpan, setSrcSpanA, addLocM, addLocMA, inGeneratedCode,
@@ -116,7 +116,7 @@ module GHC.Tc.Utils.Monad(
   emitNamedTypeHole, IsExtraConstraint(..), emitAnonTypeHole,
 
   -- * Template Haskell context
-  recordThUse, recordThSpliceUse,
+  recordThUse, recordThSpliceUse, recordThNeededRuntimeDeps,
   keepAlive, getStage, getStageAndBindLevel, setStage,
   addModFinalizersWithLclEnv,
 
@@ -222,6 +222,8 @@ import {-# SOURCE #-} GHC.Tc.Utils.Env    ( tcInitTidyEnv )
 
 import qualified Data.Map as Map
 import GHC.Driver.Env.KnotVars
+import GHC.Linker.Types
+import GHC.Types.Unique.DFM
 
 {-
 ************************************************************************
@@ -263,6 +265,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
         th_state_var         <- newIORef Map.empty ;
         th_remote_state_var  <- newIORef Nothing ;
         th_docs_var          <- newIORef Map.empty ;
+        th_needed_deps_var   <- newIORef ([], emptyUDFM) ;
         next_wrapper_num     <- newIORef emptyModuleEnv ;
         let {
              -- bangs to avoid leaking the env (#19356)
@@ -311,6 +314,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
                 tcg_ann_env        = emptyAnnEnv,
                 tcg_th_used        = th_var,
                 tcg_th_splice_used = th_splice_var,
+                tcg_th_needed_deps = th_needed_deps_var,
                 tcg_exports        = [],
                 tcg_imports        = emptyImportAvails,
                 tcg_used_gres     = used_gre_var,
@@ -962,11 +966,6 @@ addDependentFiles fs = do
 getSrcSpanM :: TcRn SrcSpan
         -- Avoid clash with Name.getSrcLoc
 getSrcSpanM = do { env <- getLclEnv; return (RealSrcSpan (tcl_loc env) Strict.Nothing) }
-
-getMnwib :: TcRn ModuleNameWithIsBoot
-getMnwib = do
-  gbl_env <- getGblEnv
-  return $ GWIB (moduleName $ tcg_mod gbl_env) (hscSourceToIsBoot (tcg_src gbl_env))
 
 -- See Note [Error contexts in generated code]
 inGeneratedCode :: TcRn Bool
@@ -2009,6 +2008,15 @@ recordThUse = do { env <- getGblEnv; writeTcRef (tcg_th_used env) True }
 
 recordThSpliceUse :: TcM ()
 recordThSpliceUse = do { env <- getGblEnv; writeTcRef (tcg_th_splice_used env) True }
+
+recordThNeededRuntimeDeps :: [Linkable] -> PkgsLoaded -> TcM ()
+recordThNeededRuntimeDeps new_links new_pkgs
+  = do { env <- getGblEnv
+       ; updTcRef (tcg_th_needed_deps env) $ \(needed_links, needed_pkgs) ->
+           let links = new_links ++ needed_links
+               !pkgs = plusUDFM needed_pkgs new_pkgs
+               in (links, pkgs)
+       }
 
 keepAlive :: Name -> TcRn ()     -- Record the name in the keep-alive set
 keepAlive name

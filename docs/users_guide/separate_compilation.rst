@@ -705,6 +705,24 @@ beautiful sight!
 
 You can read about :ghc-wiki:`how all this works <commentary/compiler/recompilation-avoidance>` in the GHC commentary.
 
+Recompilation for Template Haskell and Plugins
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Recompilation checking gets a bit more complicated when using Template Haskell or
+plugins. Both these features execute code at compile time and so if any of the
+executed code changes then it's necessary to recompile the module. Consider the
+top-level splice::
+
+  main = $(foo bar [| () |])
+
+When the module is compiled ``foo bar [| () |]`` will be evaluated and the resulting
+code placed into the program. The dependencies of the expression are calculated
+and stored during module compilation. When the interface file is written, additional
+dependencies are created on the object file dependencies of the expression. For instance,
+if ``foo`` is from module ``A`` and ``bar`` is from module ``B``, the module will
+now depend on ``A.o`` and ``B.o``, if either of these change then the module will
+be recompiled.
+
 .. _mutual-recursion:
 
 How to compile mutually recursive modules

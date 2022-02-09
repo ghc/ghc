@@ -175,6 +175,7 @@ import GHCi.RemoteTypes
 
 import qualified Language.Haskell.TH as TH
 import GHC.Driver.Env.KnotVars
+import GHC.Linker.Types
 
 -- | A 'NameShape' is a substitution on 'Name's that can be used
 -- to refine the identities of a hole while we are renaming interfaces
@@ -520,6 +521,10 @@ data TcGblEnv
           -- ^ @True@ \<=> A Template Haskell splice was used.
           --
           -- Splices disable recompilation avoidance (see #481)
+
+        tcg_th_needed_deps :: TcRef ([Linkable], PkgsLoaded),
+          -- ^ The set of runtime dependencies required by this module
+          -- See Note [Object File Dependencies]
 
         tcg_dfun_n  :: TcRef OccSet,
           -- ^ Allows us to choose unique DFun names.
