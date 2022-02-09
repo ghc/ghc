@@ -767,21 +767,9 @@ pathchar* findSystemLibrary_PEi386( pathchar* dll_name )
 
 HsPtr addLibrarySearchPath_PEi386(pathchar* dll_path)
 {
-    const unsigned int init_buf_size = 4096;
-    int bufsize                      = init_buf_size;
-
-    // Make sure the path is an absolute path
-    WCHAR* abs_path = stgMallocBytes(sizeof(WCHAR) * init_buf_size, "addLibrarySearchPath_PEi386(1)");
-    DWORD wResult = GetFullPathNameW(dll_path, bufsize, abs_path, NULL);
-    if (!wResult){
-        IF_DEBUG(linker, debugBelch("addLibrarySearchPath[GetFullPathNameW]: %" PATH_FMT " (Win32 error %lu)", dll_path, GetLastError()));
-    }
-    else if (wResult > init_buf_size) {
-        abs_path = realloc(abs_path, sizeof(WCHAR) * wResult);
-        if (!GetFullPathNameW(dll_path, bufsize, abs_path, NULL)) {
-            IF_DEBUG(linker, debugBelch("addLibrarySearchPath[GetFullPathNameW]: %" PATH_FMT " (Win32 error %lu)", dll_path, GetLastError()));
-        }
-    }
+    // Make sure the path is an absolute path in UNC-style to ensure that we
+    // aren't subject to the MAX_PATH restriction. See #21059.
+    wchar_t *abs_path = __rts_create_device_name(dll_path);
 
     HsPtr result = AddDllDirectory(abs_path);
     if (!result) {
