@@ -166,5 +166,7 @@ pprSectionType s = doubleQuotes $ case s of
   ReadOnlyData16          -> text "readonly16"
   RelocatableReadOnlyData -> text "relreadonly"
   UninitialisedData       -> text "uninitialised"
+  InitArray               -> text "initarray"
+  FiniArray               -> text "finiarray"
   CString                 -> text "cstring"
   OtherSection s'         -> text s'

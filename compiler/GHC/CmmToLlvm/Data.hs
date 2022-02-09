@@ -65,6 +65,20 @@ genLlvmData (_, CmmStaticsRaw alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit i
 
     pure ([LMGlobal aliasDef $ Just orig], [tyAlias])
 
+genLlvmData (Section InitArray _, CmmStaticsRaw _ lits) = do
+    let labels = [ lbl
+                 | CmmStaticLit (CmmLabel lbl) <- lits
+                 ]
+    decl <- genGlobalLabelArray "llvm.global_ctors" labels
+    pure ([decl], [])
+
+genLlvmData (Section FiniArray _, CmmStaticsRaw _ lits) = do
+    let labels = [ lbl
+                 | CmmStaticLit (CmmLabel lbl) <- lits
+                 ]
+    decl <- genGlobalLabelArray "llvm.globaldtors" labels
+    pure ([decl], [])
+
 genLlvmData (sec, CmmStaticsRaw lbl xs) = do
     label <- strCLabel_llvm lbl
     static <- mapM genData xs
@@ -88,6 +102,20 @@ genLlvmData (sec, CmmStaticsRaw lbl xs) = do
 
     return ([globDef], [tyAlias])
 
+-- | Produce a initializer or finalizer array declaration.
+genGlobalLabelArray :: String -> [CLabel] -> LlvmM LMGlobal
+genGlobalLabelArray _var_nm _lbls = do
+    error "TODO"
+    {-
+    return $ LMGlobal var (Just static)
+  where
+    var = LMVar var_nm
+    static = LMStaticArray vars ty
+    vars =
+    ty = LMArray (length lbls) LMLabel
+    ctor_ty = LMStruct [LMInt 32, LMPointer LMLabel
+    -}
+
 -- | Format the section type part of a Cmm Section
 llvmSectionType :: Platform -> SectionType -> FastString
 llvmSectionType p t = case t of
@@ -106,7 +134,10 @@ llvmSectionType p t = case t of
     CString                 -> case platformOS p of
                                  OSMinGW32 -> fsLit ".rdata$str"
                                  _         -> fsLit ".rodata.str"
-    (OtherSection _)        -> panic "llvmSectionType: unknown section type"
+
+    InitArray               -> panic "llvmSectionType: InitArray"
+    FiniArray               -> panic "llvmSectionType: FiniArray"
+    OtherSection _          -> panic "llvmSectionType: unknown section type"
 
 -- | Format a Cmm Section into a LLVM section name
 llvmSection :: Section -> LlvmM LMSection

@@ -259,11 +259,12 @@ sptCreateStaticBinds hsc_env this_mod binds
 -- its fingerprint.
 sptModuleInitCode :: Platform -> Module -> [SptEntry] -> CStub
 sptModuleInitCode _        _        [] = mempty
-sptModuleInitCode platform this_mod entries = CStub $ vcat
-    [ text "static void hs_spt_init_" <> ppr this_mod
-           <> text "(void) __attribute__((constructor));"
-    , text "static void hs_spt_init_" <> ppr this_mod <> text "(void)"
-    , braces $ vcat $
+sptModuleInitCode platform this_mod entries =
+    initializerCStub platform init_fn_nm empty init_fn_body `mappend`
+    initializerCStub platform fini_fn_nm empty fini_fn_body
+  where
+    init_fn_nm = mkInitializerStubLabel this_mod "spt"
+    init_fn_body = vcat
         [  text "static StgWord64 k" <> int i <> text "[2] = "
            <> pprFingerprint fp <> semi
         $$ text "extern StgPtr "
@@ -277,17 +278,15 @@ sptModuleInitCode platform this_mod entries = CStub $ vcat
         <> semi
         |  (i, SptEntry n fp) <- zip [0..] entries
         ]
-    , text "static void hs_spt_fini_" <> ppr this_mod
-           <> text "(void) __attribute__((destructor));"
-    , text "static void hs_spt_fini_" <> ppr this_mod <> text "(void)"
-    , braces $ vcat $
+
+    fini_fn_nm = mkFinalizerStubLabel this_mod "spt"
+    fini_fn_body = vcat
         [  text "StgWord64 k" <> int i <> text "[2] = "
            <> pprFingerprint fp <> semi
         $$ text "hs_spt_remove" <> parens (char 'k' <> int i) <> semi
         | (i, (SptEntry _ fp)) <- zip [0..] entries
         ]
-    ]
-  where
+
     pprFingerprint :: Fingerprint -> SDoc
     pprFingerprint (Fingerprint w1 w2) =
       braces $ hcat $ punctuate comma

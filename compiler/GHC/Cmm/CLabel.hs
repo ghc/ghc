@@ -41,6 +41,11 @@ module GHC.Cmm.CLabel (
         mkBitmapLabel,
         mkStringLitLabel,
 
+        mkInitializerStubLabel,
+        mkInitializerArrayLabel,
+        mkFinalizerStubLabel,
+        mkFinalizerArrayLabel,
+
         mkAsmTempLabel,
         mkAsmTempDerivedLabel,
         mkAsmTempEndLabel,
@@ -258,6 +263,8 @@ data CLabel
   | CCS_Label CostCentreStack
   | IPE_Label InfoProvEnt
 
+    -- | A per-module metadata label.
+  | ModuleLabel !Module ModuleLabelKind
 
   -- | These labels are generated and used inside the NCG only.
   --    They are special variants of a label used for dynamic linking
@@ -273,7 +280,6 @@ data CLabel
 
   -- | A label before an info table to prevent excessive dead-stripping on darwin
   | DeadStripPreventer CLabel
-
 
   -- | Per-module table of tick locations
   | HpcTicksLabel Module
@@ -293,6 +299,19 @@ instance Show CLabel where
 
 instance Outputable CLabel where
   ppr = text . show
+
+data ModuleLabelKind
+    = MLK_Initializer String
+    | MLK_InitializerArray
+    | MLK_Finalizer String
+    | MLK_FinalizerArray
+    deriving (Eq, Ord)
+
+instance Outputable ModuleLabelKind where
+    ppr MLK_InitializerArray = text "init_arr"
+    ppr (MLK_Initializer s)  = text ("init__" ++ s)
+    ppr MLK_FinalizerArray   = text "fini_arr"
+    ppr (MLK_Finalizer s)    = text ("fini__" ++ s)
 
 isIdLabel :: CLabel -> Bool
 isIdLabel IdLabel{} = True
@@ -358,6 +377,9 @@ instance Ord CLabel where
     compare a1 a2
   compare (IPE_Label a1) (IPE_Label a2) =
     compare a1 a2
+  compare (ModuleLabel m1 k1) (ModuleLabel m2 k2) =
+    compare m1 m2 `thenCmp`
+    compare k1 k2
   compare (DynamicLinkerLabel a1 b1) (DynamicLinkerLabel a2 b2) =
     compare a1 a2 `thenCmp`
     compare b1 b2
@@ -402,6 +424,8 @@ instance Ord CLabel where
   compare _ SRTLabel{} = GT
   compare (IPE_Label {}) _ = LT
   compare  _ (IPE_Label{}) = GT
+  compare (ModuleLabel {}) _ = LT
+  compare  _ (ModuleLabel{}) = GT
 
 -- | Record where a foreign label is stored.
 data ForeignLabelSource
@@ -826,6 +850,19 @@ mkDeadStripPreventer lbl        = DeadStripPreventer lbl
 mkStringLitLabel :: Unique -> CLabel
 mkStringLitLabel                = StringLitLabel
 
+mkInitializerStubLabel :: Module -> String -> CLabel
+mkInitializerStubLabel mod s    = ModuleLabel mod (MLK_Initializer s)
+
+mkInitializerArrayLabel :: Module -> CLabel
+mkInitializerArrayLabel mod     = ModuleLabel mod MLK_InitializerArray
+
+
+mkFinalizerStubLabel :: Module -> String -> CLabel
+mkFinalizerStubLabel mod s      = ModuleLabel mod (MLK_Finalizer s)
+
+mkFinalizerArrayLabel :: Module -> CLabel
+mkFinalizerArrayLabel mod       = ModuleLabel mod MLK_FinalizerArray
+
 mkAsmTempLabel :: Uniquable a => a -> CLabel
 mkAsmTempLabel a                = AsmTempLabel (getUnique a)
 
@@ -948,6 +985,7 @@ needsCDecl l@(ForeignLabel{})           = not (isMathFun l)
 needsCDecl (CC_Label _)                 = True
 needsCDecl (CCS_Label _)                = True
 needsCDecl (IPE_Label {})               = True
+needsCDecl (ModuleLabel {})             = True
 needsCDecl (HpcTicksLabel _)            = True
 needsCDecl (DynamicLinkerLabel {})      = panic "needsCDecl DynamicLinkerLabel"
 needsCDecl PicBaseLabel                 = panic "needsCDecl PicBaseLabel"
@@ -1071,6 +1109,7 @@ externallyVisibleCLabel (IdLabel name _ info)   = isExternalName name && externa
 externallyVisibleCLabel (CC_Label _)            = True
 externallyVisibleCLabel (CCS_Label _)           = True
 externallyVisibleCLabel (IPE_Label {})          = True
+externallyVisibleCLabel (ModuleLabel {})        = True
 externallyVisibleCLabel (DynamicLinkerLabel _ _)  = False
 externallyVisibleCLabel (HpcTicksLabel _)       = True
 externallyVisibleCLabel (LargeBitmapLabel _)    = False
@@ -1131,11 +1170,20 @@ labelType (StringLitLabel _)                    = DataLabel
 labelType (CC_Label _)                          = DataLabel
 labelType (CCS_Label _)                         = DataLabel
 labelType (IPE_Label {})                        = DataLabel
+labelType (ModuleLabel _ kind)                  = moduleLabelKindType kind
 labelType (DynamicLinkerLabel _ _)              = DataLabel -- Is this right?
 labelType PicBaseLabel                          = DataLabel
 labelType (DeadStripPreventer _)                = DataLabel
 labelType (HpcTicksLabel _)                     = DataLabel
 labelType (LargeBitmapLabel _)                  = DataLabel
+
+moduleLabelKindType :: ModuleLabelKind -> CLabelType
+moduleLabelKindType kind =
+  case kind of
+    MLK_Initializer _    -> CodeLabel
+    MLK_InitializerArray -> DataLabel
+    MLK_Finalizer _      -> CodeLabel
+    MLK_FinalizerArray   -> DataLabel
 
 idInfoLabelType :: IdLabelInfo -> CLabelType
 idInfoLabelType info =
@@ -1451,7 +1499,7 @@ pprCLabel !platform !sty lbl = -- see Note [Bangs in CLabel]
    CC_Label cc   -> maybe_underscore $ ppr cc
    CCS_Label ccs -> maybe_underscore $ ppr ccs
    IPE_Label (InfoProvEnt l _ _ m _) -> maybe_underscore $ (pprCode CStyle (pdoc platform l) <> text "_" <> ppr m <> text "_ipe")
-
+   ModuleLabel mod kind        -> maybe_underscore $ ppr mod <> text "_" <> ppr kind
 
    CmmLabel _ _ fs CmmCode     -> maybe_underscore $ ftext fs
    CmmLabel _ _ fs CmmData     -> maybe_underscore $ ftext fs
