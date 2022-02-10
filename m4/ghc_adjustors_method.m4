@@ -22,7 +22,6 @@ AC_DEFUN([GHC_ADJUSTORS_METHOD],
   )
 
   AC_MSG_CHECKING([whether to use libffi for adjustors])
-  AC_MSG_RESULT([$UseLibffiForAdjustors])
   if test "$UseLibffiForAdjustors" = "yes" ; then
       # Use libffi is the user explicitly requested it
       AdjustorType="libffi"
@@ -37,9 +36,11 @@ AC_DEFUN([GHC_ADJUSTORS_METHOD],
   case "$AdjustorType" in
   libffi)
       UseLibffiForAdjustors=YES
+      AC_MSG_RESULT([yes])
       ;;
   native)
       UseLibffiForAdjustors=NO
+      AC_MSG_RESULT([no])
       ;;
   *)
       AC_MSG_ERROR([Internal error: Invalid AdjustorType])
