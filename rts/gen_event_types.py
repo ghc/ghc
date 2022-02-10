@@ -135,7 +135,7 @@ event_types = [
     # Ticky-ticky profiling
     EventType(210, 'TICKY_COUNTER_DEF',            VariableLength,        'Ticky-ticky entry counter definition'),
     EventType(211, 'TICKY_COUNTER_SAMPLE',         4*[Word64],            'Ticky-ticky entry counter sample'),
-    EventType(212, 'TICKY_COUNTER_BEGIN_SAMPLE',   4*[Word64],            'Ticky-ticky entry counter sample'),
+    EventType(212, 'TICKY_COUNTER_BEGIN_SAMPLE',   [],                    'Ticky-ticky entry counter begin sample'),
 ]
 
 def check_events() -> Dict[int, EventType]:
