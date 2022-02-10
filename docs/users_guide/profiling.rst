@@ -441,14 +441,14 @@ compiled program.
 .. ghc-flag:: -fprof-late-ccs
     :shortdesc: Auto-add ``SCC``\\ s to all top level bindings *after* the optimizer has run.
     :type: dynamic
-    :reverse: -fno-prof-auto
+    :reverse: -fno-prof-late-ccs
     :category:
 
     Adds an automatic ``SCC`` annotation to all top level bindings late in the core pipeline after
     the optimizer has run. This means these cost centres will not interfere with core-level optimizations
     and the resulting profile will be closer to the performance profile of an optimized non-profiled
     executable.
-    While the results of this are generally very good some of the compiler internal names
+    While the results of this are generally very informative some of the compiler internal names
     will leak into the profile.
 
 .. ghc-flag:: -fprof-cafs
