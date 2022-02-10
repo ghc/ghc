@@ -120,7 +120,7 @@ event_types = [
 
     EventType(167, 'PROF_SAMPLE_COST_CENTRE',      VariableLength,        'Time profile cost-centre stack'),
     EventType(168, 'PROF_BEGIN',                   [Word64],              'Start of a time profile'),
-    EventType(169, 'IPE',                          [Word64],              'Start of a time profile'),
+    EventType(169, 'IPE',                          VariableLength,        'An IPE entry'),
 
     EventType(181, 'USER_BINARY_MSG',              VariableLength,        'User binary message'),
 
