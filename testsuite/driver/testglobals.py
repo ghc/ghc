@@ -447,7 +447,7 @@ class TestOptions:
        self.copy_files = False
 
        # The extra hadrian dependencies we need for this particular test
-       self.hadrian_deps = set() # type: Set[str]
+       self.hadrian_deps = set(["test:ghc"]) # type: Set[str]
 
 # The default set of options
 global default_testopts
