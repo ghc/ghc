@@ -100,7 +100,7 @@ event_types = [
     # Range 60 - 80 is used by eden for parallel tracing.
     # See http://www.mathematik.uni-marburg.de/~eden/
 
-    EventType(90, 'MEM_RETURN',       [CapNo, Word64, Word64, Word64],    'The RTS attempted to return heap memory to the OS'),
+    EventType(90, 'MEM_RETURN',       [CapsetId, Word32, Word32, Word32],    'The RTS attempted to return heap memory to the OS'),
     EventType(91, 'BLOCKS_SIZE',      [CapsetId, Word64],                 'Report the size of the heap in blocks'),
 
     # Range 100 - 139 is reserved for Mercury.
