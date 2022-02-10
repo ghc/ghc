@@ -125,12 +125,12 @@ def setTestOpts( f ):
 # type TestOpt = (name :: String, opts :: Object) -> IO ()
 
 def normal( name, opts ):
-    opts.hadrian_deps.update(["test:ghc"])
     return;
 
 # A test with no hadrian built dependencies, including the test compiler
 # This is used for linters.
 def no_deps( name, opts):
+    opts.hadrian_deps = set()
     return;
 
 def skip( name, opts ):
