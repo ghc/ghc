@@ -34,6 +34,7 @@ There are two ways to get a source tree:
   *See the GHC team's working conventions regarding [how to contribute a patch to GHC](https://gitlab.haskell.org/ghc/ghc/wikis/working-conventions/fixing-bugs).* First time contributors are encouraged to get started by just sending a Merge Request.
 
 
+
 Building & Installing
 =====================
 

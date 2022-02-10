@@ -56,7 +56,10 @@ getProgramPath :: Stage -> Package -> Action FilePath
 getProgramPath Stage0 _ =
   error ("Cannot build a stage 0 executable target: " ++
          "it is the boot compiler's toolchain")
-getProgramPath stage pkg = programPath (vanillaContext (pred stage) pkg)
+getProgramPath stage pkg = do
+  p <- programPath (vanillaContext (pred stage) pkg)
+  liftIO (print p)
+  return p
 
 
 -- | A phony @autocomplete@ rule that prints all valid setting keys
