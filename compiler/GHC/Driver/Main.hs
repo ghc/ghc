@@ -1803,9 +1803,6 @@ doCodeGen hsc_env this_mod denv data_tycons
         tmpfs      = hsc_tmpfs  hsc_env
         platform   = targetPlatform dflags
 
-    putDumpFileMaybe logger Opt_D_dump_stg_cg "CodeGenInput STG:" FormatSTG
-        (pprGenStgTopBindings (initStgPprOpts dflags) stg_binds_w_fvs)
-
     -- Do tag inference on optimized STG
     (!stg_post_infer,export_tag_info) <-
         {-# SCC "StgTagFields" #-} inferTags dflags logger this_mod stg_binds_w_fvs
@@ -1890,6 +1887,9 @@ myCoreToStg logger dflags ictxt for_bytecode this_mod ml prepd_binds = do
         <- {-# SCC "Stg2Stg" #-}
            stg2stg logger ictxt (initStgPipelineOpts dflags for_bytecode)
                    this_mod stg_binds
+
+    putDumpFileMaybe logger Opt_D_dump_stg_cg "CodeGenInput STG:" FormatSTG
+        (pprGenStgTopBindings (initStgPprOpts dflags) stg_binds_with_fvs)
 
     return (stg_binds_with_fvs, denv, cost_centre_info)
 
