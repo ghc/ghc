@@ -50,17 +50,25 @@ main = do opts <- parseArgs
           case mode of
               Gen_Haskell_Type ->
                   writeHaskellType fn
-                      [ what | (wh, what) <- wanteds "OS must not matter"
+                      [ what | (wh, what) <- wanteds Nothing -- OS must not matter
                              , wh `elem` [Haskell, Both] ]
               Gen_Computed cm ->
-                  do os <- getOption "target os"   o_targetOS
+                  do os_str  <- getOption "target os"   o_targetOS
                      tmpdir  <- getOption "tmpdir"      o_tmpdir
                      gccProg <- getOption "gcc program" o_gccProg
                      nmProg  <- getOption "nm program"  o_nmProg
-                     let verbose = o_verbose opts
+                     let os = case os_str of
+                                "ghcjs"   -> GHCJS
+                                "aix"     -> AIX
+                                "openbsd" -> OpenBSD
+                                "mingw32" -> Windows
+                                _         -> DefaultOS
+                         verbose = o_verbose opts
                          gccFlags = o_gccFlags opts
-                     rs <- getWanted verbose os tmpdir gccProg gccFlags nmProg
-                                     (o_objdumpProg opts)
+                     rs <- case os of
+                             GHCJS -> getWantedGHCJS
+                             _     -> getWanted verbose os tmpdir gccProg gccFlags nmProg
+                                        (o_objdumpProg opts)
                      let haskellRs = [ what
                                      | (wh, what) <- rs
                                      , wh `elem` [Haskell, Both] ]
@@ -79,6 +87,14 @@ data Options = Options {
                    o_objdumpProg :: Maybe FilePath,
                    o_targetOS :: Maybe String
                }
+
+data OS
+   = DefaultOS
+   | GHCJS
+   | AIX
+   | OpenBSD
+   | Windows
+   deriving (Show, Eq)
 
 -- | Write a file atomically
 --
@@ -289,7 +305,7 @@ defSize w nameBase cExpr = [(w, GetWord ("SIZEOF_" ++ nameBase) (Fst cExpr))]
 defClosureSize :: Where -> Name -> CExpr -> Wanteds
 defClosureSize w nameBase cExpr = [(w, GetClosureSize ("SIZEOF_" ++ nameBase) (Fst cExpr))]
 
-wanteds :: String -> Wanteds
+wanteds :: Maybe OS -> Wanteds
 wanteds os = concat
           [-- Control group constant for integrity check; this
            -- round-tripped constant is used for testing that
@@ -610,7 +626,7 @@ wanteds os = concat
            -- Note that this conditional part only affects the C headers.
            -- That's important, as it means we get the same PlatformConstants
            -- type on all platforms.
-          ,if os == "mingw32"
+          ,if os == Just Windows
            then concat [structSize  C "StgAsyncIOResult"
                        ,structField C "StgAsyncIOResult" "reqID"
                        ,structField C "StgAsyncIOResult" "len"
@@ -676,22 +692,22 @@ wanteds os = concat
           ,constantBool    Haskell "USE_INLINE_SRT_FIELD" "defined(USE_INLINE_SRT_FIELD)"
           ]
 
-getWanted :: Bool -> String -> FilePath -> FilePath -> [String] -> FilePath -> Maybe FilePath
+getWanted :: Bool -> OS -> FilePath -> FilePath -> [String] -> FilePath -> Maybe FilePath
              -> IO Results
 getWanted verbose os tmpdir gccProgram gccFlags nmProgram mobjdumpProgram
-    = do let cStuff = unlines (headers ++ concatMap (doWanted . snd) (wanteds os))
+    = do let cStuff = unlines (headers ++ concatMap (doWanted . snd) (wanteds (Just os)))
              cFile = tmpdir </> "tmp.c"
              oFile = tmpdir </> "tmp.o"
          atomicWriteFile cFile cStuff
          execute verbose gccProgram (gccFlags ++ ["-c", cFile, "-o", oFile])
          xs <- case os of
-                 "openbsd" -> readProcess objdumpProgam ["--syms", oFile] ""
-                 "aix"     -> readProcess objdumpProgam ["--syms", oFile] ""
-                 _         -> readProcess nmProgram ["-P", oFile] ""
+                 OpenBSD -> readProcess objdumpProgam ["--syms", oFile] ""
+                 AIX     -> readProcess objdumpProgam ["--syms", oFile] ""
+                 _       -> readProcess nmProgram ["-P", oFile] ""
 
          let ls = lines xs
              m = Map.fromList $ case os of
-                 "aix" -> parseAixObjdump ls
+                 AIX   -> parseAixObjdump ls
                  _     -> mapMaybe parseNmLine ls
 
          case Map.lookup "CONTROL_GROUP_CONST_291" m of
@@ -704,7 +720,7 @@ getWanted verbose os tmpdir gccProgram gccFlags nmProgram mobjdumpProgram
                               ++ "to 'configure'.\n"
              Just x     -> die ("unexpected value round-tripped for CONTROL_GROUP_CONST_291: " ++ show x)
 
-         mapM (lookupResult m) (wanteds os)
+         mapM (lookupResult m) (wanteds (Just os))
     where headers = ["#define IN_STG_CODE 0",
                      "",
                      "/*",
@@ -721,7 +737,7 @@ getWanted verbose os tmpdir gccProgram gccFlags nmProgram mobjdumpProgram
                      -- FIXME: rts/PosixSource.h should include ghcplatform.h
                      -- which should set this. There is a mismatch host/target
                      -- again...
-                     if os == "mingw32" then "#define mingw32_HOST_OS 1" else "",
+                     if os == Windows then "#define mingw32_HOST_OS 1" else "",
                      "",
                      "#include \"rts/PosixSource.h\"",
                      "#include \"Rts.h\"",
@@ -872,6 +888,36 @@ getWanted verbose os tmpdir gccProgram gccFlags nmProgram mobjdumpProgram
               = return (w, ClosurePayloadMacro name)
           lookupResult _ (w, FieldTypeGcptrMacro name)
               = return (w, FieldTypeGcptrMacro name)
+
+-- The JavaScript backend doesn't require the native-RTS constants, so we filter those here,
+-- and provide reasonable presets for any remaining constants. This way, `deriveConstants`
+-- can still produce a valid constants file (required by GHC), without the side-effect of
+-- producing a c file.
+getWantedGHCJS :: IO Results
+getWantedGHCJS = mapM lookupResult (wanteds (Just GHCJS))
+  where
+    ghcjsHardCoded :: Map String Integer
+    ghcjsHardCoded = Map.fromList [ ("WORD_SIZE", 4)
+                                  , ("DOUBLE_SIZE", 8)
+                                  , ("CINT_SIZE", 4)
+                                  , ("CLONG_SIZE", 4)
+                                  , ("CLONG_LONG_SIZE", 8)
+                                  ]
+
+    lookupResult :: (Where, What Fst) -> IO (Where, What Snd)
+    lookupResult (w, GetWord name _) | Just res <- Map.lookup name ghcjsHardCoded
+                 = return (w, GetWord name (Snd res))
+    lookupResult (w, what) = return $ case what of
+      GetWord             name _ -> (w, GetWord             name (Snd 0))
+      GetInt              name _ -> (w, GetWord             name (Snd 0))
+      GetNatural          name _ -> (w, GetWord             name (Snd 0))
+      GetBool             name _ -> (w, GetBool             name (Snd False))
+      GetFieldType        name _ -> (w, GetFieldType        name (Snd 1))
+      GetClosureSize      name _ -> (w, GetClosureSize      name (Snd 1))
+      StructFieldMacro    name   -> (w, StructFieldMacro    name)
+      ClosureFieldMacro   name   -> (w, ClosureFieldMacro   name)
+      ClosurePayloadMacro name   -> (w, ClosurePayloadMacro name)
+      FieldTypeGcptrMacro name   -> (w, FieldTypeGcptrMacro name)
 
 writeHaskellType :: FilePath -> [What Fst] -> IO ()
 writeHaskellType fn ws = atomicWriteFile fn xs
