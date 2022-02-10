@@ -35,8 +35,6 @@ class EventType:
     def __str__(self):
         return '(n={n}, name={name})'.format(n=self.n, name=self.name)
 
-# N.B. all events include an implicit initial CapNo field.
-#
 # When adding a new event type used by GHC you should also update
 # NUM_GHC_EVENT_TAGS in rts/include/rts/EventLogFormat.h.
 event_types = [
