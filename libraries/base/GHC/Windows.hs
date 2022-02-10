@@ -21,6 +21,10 @@
 -----------------------------------------------------------------------------
 
 module GHC.Windows (
+#if defined(js_HOST_ARCH)
+                   ) where
+
+#else
         -- * Types
         BOOL,
         LPBOOL,
@@ -236,3 +240,5 @@ ddwordToDwords n =
 
 dwordsToDdword:: (DWORD,DWORD) -> DDWORD
 dwordsToDdword (hi,low) = (fromIntegral low) .|. (fromIntegral hi `shiftL` finiteBitSize hi)
+
+#endif

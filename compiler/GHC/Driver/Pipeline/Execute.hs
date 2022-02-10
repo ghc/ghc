@@ -46,6 +46,7 @@ import GHC.Utils.Error
 import Data.Maybe
 import GHC.CmmToLlvm.Mangler
 import GHC.SysTools
+import GHC.SysTools.Cpp
 import GHC.Utils.Panic.Plain
 import System.Directory
 import System.FilePath
@@ -72,13 +73,12 @@ import GHC.Settings
 import System.IO
 import GHC.Linker.ExtraObj
 import GHC.Linker.Dynamic
-import Data.Version
 import GHC.Utils.Panic
 import GHC.Unit.Module.Env
 import GHC.Driver.Env.KnotVars
 import GHC.Driver.Config.Finder
 import GHC.Rename.Names
-import GHC.SysTools.Cpp
+import GHC.StgToJS.Linker.Linker (embedJsFile)
 
 import Language.Haskell.Syntax.Module.Name
 import GHC.Unit.Home.ModInfo
@@ -127,6 +127,7 @@ runPhase (T_CmmCpp pipe_env hsc_env input_fn) = do
           })
         input_fn output_fn
   return output_fn
+runPhase (T_Js pipe_env hsc_env _mb_location js_src) = runJsPhase pipe_env hsc_env js_src
 runPhase (T_Cmm pipe_env hsc_env input_fn) = do
   let dflags = hsc_dflags hsc_env
   let next_phase = hscPostBackendPhase HsSrcFile (backend dflags)
@@ -345,11 +346,62 @@ runAsPhase with_cpp pipe_env hsc_env location input_fn = do
 
         return output_fn
 
+
+-- Note [JS Backend .o file procedure]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- The JS backend breaks some of the assumptions on file generation order
+-- because it directly produces .o files. This violation breaks some of the
+-- assumptions on file timestamps, particularly in the postHsc phase. The
+-- postHsc phase for the JS backend is performed in 'runJsPhase'. Consider
+-- what the NCG does:
+--
+-- With other NCG backends we have the following order:
+-- 1. The backend produces a .s file
+-- 2. Then we write the interface file, .hi
+-- 3. Then we generate a .o file in a postHsc phase (calling the asm phase etc.)
+--
+-- For the JS Backend this order is different
+-- 1. The JS Backend _directly_ produces .o files
+-- 2. Then we write the interface file. Notice that this breaks the ordering
+-- of .hi > .o (step 2 and step 3 in the NCG above).
+--
+-- This violation results in timestamp checks which pass on the NCG but fail
+-- in the JS backend. In particular, checks that compare 'ms_obj_date', and
+-- 'ms_iface_date' in 'GHC.Unit.Module.ModSummary'.
+--
+-- Thus to fix this ordering we touch the object files we generated earlier
+-- to ensure these timestamps abide by the proper ordering.
+
+-- | Run the JS Backend postHsc phase.
+runJsPhase :: PipeEnv -> HscEnv -> FilePath -> IO FilePath
+runJsPhase pipe_env hsc_env input_fn = do
+  let dflags     = hsc_dflags   hsc_env
+  let logger     = hsc_logger   hsc_env
+  let tmpfs      = hsc_tmpfs    hsc_env
+  let unit_env   = hsc_unit_env hsc_env
+
+  output_fn <- phaseOutputFilenameNew StopLn pipe_env hsc_env Nothing
+
+  -- if the input filename is the same as the output, then we've probably
+  -- generated the object ourselves. In this case, we touch the object file to
+  -- ensure the timestamp is refreshed, see Note [JS Backend .o file procedure]. If
+  -- they are not the same then we embed the .js file into a .o file with the
+  -- addition of a header
+  if (input_fn /= output_fn)
+    then embedJsFile logger dflags tmpfs unit_env input_fn output_fn
+    else touchObjectFile logger dflags output_fn
+
+  return output_fn
+
+
 applyAssemblerInfoGetter
     :: DefunctionalizedAssemblerInfoGetter
     -> Logger -> DynFlags -> Platform -> IO CompilerInfo
 applyAssemblerInfoGetter StandardAssemblerInfoGetter logger dflags _platform =
     getAssemblerInfo logger dflags
+applyAssemblerInfoGetter JSAssemblerInfoGetter _ _ _ =
+    pure Emscripten
 applyAssemblerInfoGetter DarwinClangAssemblerInfoGetter logger dflags platform =
     if platformOS platform == OSDarwin then
         pure Clang
@@ -361,6 +413,8 @@ applyAssemblerProg
     -> Logger -> DynFlags -> Platform -> [Option] -> IO ()
 applyAssemblerProg StandardAssemblerProg logger dflags _platform =
     runAs logger dflags
+applyAssemblerProg JSAssemblerProg logger dflags _platform =
+    runEmscripten logger dflags
 applyAssemblerProg DarwinClangAssemblerProg logger dflags platform =
     if platformOS platform == OSDarwin then
         runClang logger dflags
@@ -1111,36 +1165,6 @@ linkDynLibCheck logger tmpfs dflags unit_env o_files dep_units = do
       text "    Call hs_init_ghc() from your main() function to set these options.")
   linkDynLib logger tmpfs dflags unit_env o_files dep_units
 
-
-
--- ---------------------------------------------------------------------------
--- Macros (cribbed from Cabal)
-
-generatePackageVersionMacros :: [UnitInfo] -> String
-generatePackageVersionMacros pkgs = concat
-  -- Do not add any C-style comments. See #3389.
-  [ generateMacros "" pkgname version
-  | pkg <- pkgs
-  , let version = unitPackageVersion pkg
-        pkgname = map fixchar (unitPackageNameString pkg)
-  ]
-
-fixchar :: Char -> Char
-fixchar '-' = '_'
-fixchar c   = c
-
-generateMacros :: String -> String -> Version -> String
-generateMacros prefix name version =
-  concat
-  ["#define ", prefix, "VERSION_",name," ",show (showVersion version),"\n"
-  ,"#define MIN_", prefix, "VERSION_",name,"(major1,major2,minor) (\\\n"
-  ,"  (major1) <  ",major1," || \\\n"
-  ,"  (major1) == ",major1," && (major2) <  ",major2," || \\\n"
-  ,"  (major1) == ",major1," && (major2) == ",major2," && (minor) <= ",minor,")"
-  ,"\n\n"
-  ]
-  where
-    (major1:major2:minor:_) = map show (versionBranch version ++ repeat 0)
 
 
 -- -----------------------------------------------------------------------------

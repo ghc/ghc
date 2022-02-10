@@ -156,7 +156,7 @@ test('T2528', normal, compile_and_run, [''])
 # May 2014: seems to work on msys2
 # May 2018: The behavior of printf seems very implementation dependent.
 #     so let's normalise the output.
-test('T4006', normalise_fun(normalise_quotes), compile_and_run, [''])
+test('T4006', [js_broken(22349), normalise_fun(normalise_quotes)], compile_and_run, [''])
 
 test('T5943', normal, compile_and_run, [''])
 test('T5962', normal, compile_and_run, [''])
@@ -167,7 +167,7 @@ test('qsemn001', normal, compile_and_run, [''])
 
 test('T7457', normal, compile_and_run, [''])
 
-test('T7773', when(opsys('mingw32'), skip), compile_and_run, [''])
+test('T7773', [when(opsys('mingw32'), skip), js_broken(22261)], compile_and_run, [''])
 # Andreas says that T7773 will not (and should not) work on Windows
 
 # Tests for kind-polymorphic Category
@@ -179,15 +179,17 @@ test('T7653', [when(opsys('mingw32'), skip),
                omit_ways(prof_ways+['ghci'])], compile_and_run, [''])
 test('T7787', normal, compile_and_run, [''])
 
-test('topHandler01', when(opsys('mingw32'), skip), compile_and_run, [''])
+test('topHandler01', [when(opsys('mingw32'), skip), js_broken(22261)], compile_and_run, [''])
 test('topHandler02',
      [when(opsys('mingw32'), skip),
       omit_ways(['ghci']),
-      signal_exit_code(2)
+      signal_exit_code(2),
+     js_broken(22261)
      ], compile_and_run, [''])
 test('topHandler03',
      [when(opsys('mingw32'), skip), ignore_stderr,
-      signal_exit_code(15)
+      signal_exit_code(15),
+     js_broken(22261)
      ], compile_and_run, [''])
 test('topHandler04',
      [when(opsys('mingw32'), skip),
@@ -197,7 +199,9 @@ test('topHandler04',
 
 test('T8766',
         [ collect_stats('bytes allocated',5)
-        , only_ways(['normal'])],
+        , only_ways(['normal'])
+        , js_broken(22261)
+        ],
       compile_and_run,
       ['-O'])
 
@@ -221,31 +225,36 @@ test('T8089',
      [exit_code(99), run_timeout_multiplier(0.01)],
      compile_and_run, [''])
 test('T8684', expect_broken(8684), compile_and_run, [''])
-test('hWaitForInput-accurate-stdin', [expect_broken_for(16535, threaded_ways), omit_ways(['ghci'])], compile_and_run, [''])
+test('hWaitForInput-accurate-stdin', [js_broken(22349), expect_broken_for(16535, threaded_ways), omit_ways(['ghci'])], compile_and_run, [''])
 test('T9826',normal, compile_and_run,[''])
 test('T9848',
         [ collect_stats('bytes allocated')
-        , only_ways(['normal'])],
+        , only_ways(['normal'])
+        , js_broken(22261)
+        ],
       compile_and_run,
       ['-O'])
 test('T10149', normal, compile_and_run, [''])
 test('T11334a', normal, compile_and_run, [''])
 test('T11555', normal, compile_and_run, [''])
 test('T12494', normal, compile_and_run, [''])
-test('T12852', when(opsys('mingw32'), skip), compile_and_run, [''])
+test('T12852', [when(opsys('mingw32'), skip), js_broken(22374)], compile_and_run, [''])
 test('lazySTexamples', normal, compile_and_run, [''])
 test('T11760', req_smp, compile_and_run, ['-threaded -with-rtsopts=-N2'])
 test('T12874', normal, compile_and_run, [''])
 test('T13191',
         [ collect_stats('bytes allocated', 5)
-        , only_ways(['normal'])],
+        , only_ways(['normal'])
+        , js_broken(22261)
+        ],
       compile_and_run,
       ['-O'])
-test('T13525', when(opsys('mingw32'), skip), compile_and_run, [''])
+test('T13525', [when(opsys('mingw32'), skip), js_broken(22374)], compile_and_run, [''])
 test('T13097', normal, compile_and_run, [''])
 test('functorOperators', normal, compile_and_run, [''])
 test('T3474',
      [collect_stats('max_bytes_used',5),
+      js_broken(22374),
       only_ways(['normal'])],
      compile_and_run, ['-O'])
 test('T14425', normal, compile_and_run, [''])
@@ -254,25 +263,29 @@ test('T13896', normal, compile_and_run, [''])
 # On Windows this test is fragile using the old MIO IO manager due to an
 # apparent flushing bug.
 test('T13167',
-     [when(opsys('mingw32'), only_ways(['winio', 'winio_threaded'])),
-      fragile_for(16536, concurrent_ways)],
+     [ when(opsys('mingw32')
+     , only_ways(['winio', 'winio_threaded']))
+     , fragile_for(16536, concurrent_ways)
+     , js_broken(22261)
+     ],
      compile_and_run, [''])
 test('T15183', normal, compile_and_run, [''])
 test('T15349', [exit_code(1), expect_broken_for(15349, ['ghci'])], compile_and_run, [''])
 test('T16111', exit_code(1), compile_and_run, [''])
 test('T16943a', normal, compile_and_run, [''])
 test('T16943b', normal, compile_and_run, [''])
-test('T17499', [collect_stats('bytes allocated',5)], compile_and_run, ['-O -w'])
+test('T17499', [collect_stats('bytes allocated',5), js_broken(22261)], compile_and_run, ['-O -w'])
 test('T16643', normal, compile_and_run, [''])
 test('clamp', normal, compile_and_run, [''])
 test('T18642',
      [extra_run_opts('+RTS -T -RTS'),
       # The nonmoving GC's residency behavior is very conservative
-      omit_ways(['nonmoving', 'nonmoving_thr', 'nonmoving_thr_sanity'])],
+      omit_ways(['nonmoving', 'nonmoving_thr', 'nonmoving_thr_sanity']),
+      js_broken(22374)],
      compile_and_run, ['-O2'])
 test('T19288', exit_code(1), compile_and_run, [''])
 test('T19719', normal, compile_and_run, [''])
 test('T20107', extra_run_opts('+RTS -M50M'), compile_and_run, ['-package bytestring'])
 test('trace', normal, compile_and_run, [''])
-test('listThreads', normal, compile_and_run, [''])
+test('listThreads', js_broken(22261), compile_and_run, [''])
 test('inits1tails1', normal, compile_and_run, [''])

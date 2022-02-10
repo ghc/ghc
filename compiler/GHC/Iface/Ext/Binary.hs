@@ -21,7 +21,6 @@ import GHC.Settings.Utils         ( maybeRead )
 import GHC.Settings.Config        ( cProjectVersion )
 import GHC.Prelude
 import GHC.Utils.Binary
-import GHC.Iface.Binary           ( getDictFastString )
 import GHC.Data.FastMutInt
 import GHC.Data.FastString        ( FastString )
 import GHC.Types.Name

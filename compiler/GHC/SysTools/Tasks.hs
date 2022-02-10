@@ -159,6 +159,10 @@ runCc mLanguage logger tmpfs dflags args = traceSystoolCommand logger "cc" $ do
                         ,pgm_c dflags,    "Asm Compiler")
           RawObject  -> ("c",             []
                         ,pgm_c dflags,    "C Compiler") -- claim C for lack of a better idea
+          --JS backend shouldn't reach here, so we just pass
+          -- strings to satisfy the totality checker
+          LangJs     -> ("js",            []
+                        ,pgm_c dflags,    "JS Backend Compiler")
   userOpts_c   = getOpts dflags opt_c
   userOpts_cxx = getOpts dflags opt_cxx
 
@@ -220,6 +224,12 @@ runClang logger dflags args = traceSystoolCommand logger "clang" $ do
             text "(or GHC tried to execute clang incorrectly)"
         throwIO err
     )
+
+runEmscripten :: Logger -> DynFlags -> [Option] -> IO ()
+runEmscripten logger dflags args = traceSystoolCommand logger "emcc" $ do
+  let (p,args0) = pgm_a dflags
+      args1     = args0 ++ args
+  runSomething logger "Emscripten" p args1
 
 -- | Figure out which version of LLVM we are running this session
 figureLlvmVersion :: Logger -> DynFlags -> IO (Maybe LlvmVersion)

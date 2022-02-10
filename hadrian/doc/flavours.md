@@ -240,6 +240,11 @@ The supported transformers are listed below:
             e.g., loading libraries during TemplateHaskell evaluations.</td>
     </tr>
     <tr>
+        <td><code>no_dynamic_libs</code></td>
+        <td>Just like `no_dynamic_ghc`, this transformer ensures statically-linked libraries
+        </td>
+    </tr>
+    <tr>
         <td><code>no_profiled_libs</code></td>
         <td>Disables building of libraries in profiled build ways.</td>
     </tr>

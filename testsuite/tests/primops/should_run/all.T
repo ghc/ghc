@@ -8,7 +8,8 @@ test('T4442',
 test('T10481', exit_code(1), compile_and_run, [''])
 test('T10678',
      [ collect_stats('bytes allocated',5),
-       only_ways(['normal'])
+       only_ways(['normal']),
+       js_broken(22360)
      ],
      compile_and_run, ['-O'])
 test('T11296', normal, compile_and_run, [''])
@@ -45,7 +46,7 @@ test('LevPolyPtrEquality2', normal, compile_and_run, [''])
 test('UnliftedArray1', normal, compile_and_run, [''])
 test('UnliftedArray2', normal, compile_and_run, [''])
 test('UnliftedArrayCAS', normal, compile_and_run, [''])
-test('UnliftedIOPort', normal, compile_and_run, [''])
+test('UnliftedIOPort', js_broken(22261), compile_and_run, [''])
 test('UnliftedMutVar1', normal, compile_and_run, [''])
 test('UnliftedMutVar2', normal, compile_and_run, [''])
 test('UnliftedMutVar3', normal, compile_and_run, [''])

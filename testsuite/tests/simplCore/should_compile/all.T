@@ -69,7 +69,7 @@ test('T4306',
      makefile_test, ['T4306'])
 
 test('T4201',
-     normal,
+     js_skip, # Test prints NCG codegen info (LFI, etc.)
      makefile_test, ['T4201'])
 
 test('T3772',
@@ -151,7 +151,8 @@ test('T7702',
       # a large effect on allocation which is hard to separate from the
       # allocation done by the plugin... but a regression allocates > 90mb
       collect_compiler_stats('peak_megabytes_allocated',70),
-      when(opsys('mingw32'), fragile_for(16799, ['normal']))
+      when(opsys('mingw32'), fragile_for(16799, ['normal'])),
+      js_skip
      ],
      compile,
      ['-v0 -package-db T7702plugin/pkg.T7702/local.package.conf -fplugin T7702Plugin -package T7702plugin ' + config.plugin_way_flags])
@@ -176,7 +177,7 @@ test('T5996',
      normal,
      makefile_test, ['T5996'])
 test('T8537', normal, compile, [''])
-test('T8832', normal, makefile_test, ['T8832'])
+test('T8832', js_skip, makefile_test, ['T8832'])
 test('T8848', normal, makefile_test, ['T8848'])
 test('T8848a', only_ways(['optasm']), compile, ['-ddump-rules'])
 test('T8331', only_ways(['optasm']), compile, ['-ddump-rules'])
@@ -198,7 +199,7 @@ test('T10083',
      makefile_test, ['T10083'])
 test('T10689', normal, compile, [''])
 test('T11155',
-     normal,
+     js_broken(22261),
      makefile_test, ['T11155'])
 test('T11232', normal, compile, ['-O2'])
 test('T11562', normal, compile, ['-O2'])
@@ -237,7 +238,7 @@ test('T13170', only_ways(['optasm']), compile, ['-dcore-lint'])
 test('T13317',
      normal,
      makefile_test, ['T13317'])
-test('T13340', normal, makefile_test, ['T13340'])
+test('T13340', js_skip, makefile_test, ['T13340'])
 test('T13338', only_ways(['optasm']), compile, ['-dcore-lint'])
 test('T13367', normal, makefile_test, ['T13367'])
 test('T13417', normal, compile, ['-O'])

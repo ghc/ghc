@@ -1190,7 +1190,7 @@ case $cpu-$vendor in
 			| arc | arceb | arc32 | arc64 \
 			| arm | arm[lb]e | arme[lb] | armv* \
 			| avr | avr32 \
-			| asmjs \
+			| asmjs | js \
 			| ba \
 			| be32 | be64 \
 			| bfin | bpf | bs2000 \
@@ -1711,7 +1711,11 @@ fi
 
 # Now, validate our (potentially fixed-up) OS.
 case $os in
-	# Sometimes we do "kernel-libc", so those need to count as OSes.
+        # GHC specific: added for JS backend support
+        js | ghcjs)
+                ;;
+
+	# Sometimes we do "kernel-abi", so those need to count as OSes.
 	musl* | newlib* | relibc* | uclibc*)
 		;;
 	# Likewise for "kernel-abi"

@@ -172,10 +172,11 @@ nonHsObjects context = do
     asmObjs <- mapM (objectPath context) asmSrcs
     cObjs   <- cObjects context
     cxxObjs <- cxxObjects context
+    jsObjs  <- jsObjects context
     cmmSrcs <- interpretInContext context (getContextData cmmSrcs)
     cmmObjs <- mapM (objectPath context) cmmSrcs
     eObjs   <- extraObjects context
-    return $ asmObjs ++ cObjs ++ cxxObjs ++ cmmObjs ++ eObjs
+    return $ asmObjs ++ cObjs ++ cxxObjs ++ cmmObjs ++ jsObjs ++ eObjs
 
 -- | Return all the Cxx object files needed to build the given library context.
 cxxObjects :: Context -> Action [FilePath]
@@ -191,6 +192,12 @@ cObjects context = do
     return $ if Threaded `wayUnit` way context
         then objs
         else filter ((`notElem` ["Evac_thr", "Scav_thr"]) . takeBaseName) objs
+
+-- | Return all the JS object files to be included in the library.
+jsObjects :: Context -> Action [FilePath]
+jsObjects context = do
+  srcs <- interpretInContext context (getContextData jsSrcs)
+  mapM (objectPath context) srcs
 
 -- | Return extra object files needed to build the given library context. The
 -- resulting list is currently non-empty only when the package from the

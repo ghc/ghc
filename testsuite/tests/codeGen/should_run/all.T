@@ -74,7 +74,7 @@ test('cgrun065', normal, compile_and_run, [''])
 test('cgrun066', normal, compile_and_run, [''])
 test('cgrun067', [extra_files(['Cgrun067A.hs'])], compile_and_run, [''])
 test('cgrun069',
-     [ omit_ways(['ghci'])],
+     [ omit_ways(['ghci']), js_skip],
      multi_compile_and_run,
      ['cgrun069', [('cgrun069_cmm.cmm', '')], ''])
 test('cgrun070', normal, compile_and_run, [''])
@@ -99,7 +99,7 @@ test('T3207', normal, compile_and_run, [''])
 test('T3561', normal, compile_and_run, [''])
 test('T3677', extra_run_opts('+RTS -K8k -RTS'), compile_and_run, [''])
 test('T4441', normal, compile_and_run, [''])
-test('T5149', omit_ways(['ghci']), multi_compile_and_run,
+test('T5149', [omit_ways(['ghci']), js_skip], multi_compile_and_run,
                  ['T5149', [('T5149_cmm.cmm', '')], ''])
 test('T5129',
      # The bug is in simplifier when run with -O1 and above, so only run it
@@ -148,8 +148,8 @@ test('T9013', omit_ways(['ghci']),  # ghci doesn't support unboxed tuples
      compile_and_run, [''])
 test('T9340', normal, compile_and_run, [''])
 test('cgrun074', normal, compile_and_run, [''])
-test('CmmSwitchTest32', unless(wordsize(32), skip), compile_and_run, [''])
-test('CmmSwitchTest64', unless(wordsize(64), skip), compile_and_run, [''])
+test('CmmSwitchTest32', [unless(wordsize(32), skip),js_skip], compile_and_run, [''])
+test('CmmSwitchTest64', [unless(wordsize(64), skip),js_skip], compile_and_run, [''])
 # Skipping WAY=ghci, because it is not broken.
 test('T10245', normal, compile_and_run, [''])
 test('T10246', normal, compile_and_run, [''])
@@ -161,9 +161,15 @@ test('T10414', [only_ways(['threaded2']), extra_ways(['threaded2']), req_smp],
 test('T10521', normal, compile_and_run, [''])
 test('T10521b', normal, compile_and_run, [''])
 test('T10870', when(wordsize(32), skip), compile_and_run, [''])
-test('PopCnt', omit_ways(['ghci']), multi_compile_and_run,
+test('PopCnt',
+  [omit_ways(['ghci'])
+  , js_skip # use Cmm
+  ], multi_compile_and_run,
                  ['PopCnt', [('PopCnt_cmm.cmm', '')], ''])
-test('T12059', normal, compile_and_run, [''])
+test('T12059',
+  [ js_skip # ByteArrays are always pinned with the JS backend
+  ],
+  compile_and_run, [''])
 test('T12433', normal, compile_and_run, [''])
 test('T12622', normal, multimod_compile_and_run, ['T12622', '-O'])
 test('T12757', normal, compile_and_run, [''])
@@ -177,7 +183,9 @@ test('T9577', [ unless(arch('x86_64') or arch('i386'),skip),
 test('T13425', normal, compile_and_run, ['-O'])
 test('castFloatWord', normal, compile_and_run, ['-dcmm-lint'])
 test('T13825-unit',
-     extra_run_opts('"' + config.libdir + '"'),
+     [ extra_run_opts('"' + config.libdir + '"')
+     , js_broken(22362)
+     ],
      compile_and_run,
      ['-package ghc'])
 test('T14619', normal, compile_and_run, [''])

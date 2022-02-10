@@ -10,9 +10,9 @@ test('IOError001', [omit_ways(['ghci']), set_stdin('IOError001.hs')],
 test('IOError002',      normal, compile_and_run, [''])
 test('finalization001', normal, compile_and_run, [''])
 test('hClose001', [], compile_and_run, [''])
-test('hClose002', [normalise_win32_io_errors], compile_and_run, [''])
+test('hClose002', [normalise_win32_io_errors, js_broken(22261)], compile_and_run, [''])
 test('hFileSize001',    normal, compile_and_run, [''])
-test('hFileSize002', [omit_ways(['ghci'])], compile_and_run, [''])
+test('hFileSize002', [omit_ways(['ghci']), js_broken(22261)], compile_and_run, [''])
 test('hFlush001', [], compile_and_run, [''])
 
 test('hGetBuffering001',
@@ -28,14 +28,14 @@ test('hGetPosn001', [], compile_and_run, ['-cpp'])
 test('hIsEOF001',   normal, compile_and_run, [''])
 test('hIsEOF002', [], compile_and_run, ['-cpp'])
 
-test('hReady001', normal, compile_and_run, ['-cpp'])
+test('hReady001', js_broken(22374), compile_and_run, ['-cpp'])
 
 # hReady002 tests that hReady returns False for a pipe that has no
 # data to read.  It relies on piping input from 'sleep 1', which doesn't
 # work for the 'ghci' way because in that case we already pipe input from
 # a script, so hence omit_ways(['ghci'])
 test('hReady002', [cmd_prefix('sleep 1 |'), omit_ways(['ghci']),
-                   multi_cpu_race],
+                   multi_cpu_race, js_broken(22374)],
      compile_and_run, [''])
 
 test('hSeek001', normal, compile_and_run, [''])
@@ -46,7 +46,10 @@ test('hSeek004', [], compile_and_run, ['-cpp'])
 test('hSetBuffering002', set_stdin('hSetBuffering002.hs'), compile_and_run, [''])
 
 test('hSetBuffering003',
-    [omit_ways(['ghci']), set_stdin('hSetBuffering003.hs')],
+    [ omit_ways(['ghci'])
+    , set_stdin('hSetBuffering003.hs')
+    , js_broken(22261)
+    ],
 	compile_and_run, [''])
 
 test('hSetBuffering004', set_stdin('hSetBuffering004.hs'), compile_and_run, [''])
@@ -61,34 +64,35 @@ test('misc001', [extra_run_opts('misc001.hs misc001.out')], compile_and_run,
 
 test('openFile001',  normal, compile_and_run, [''])
 test('openFile002',  [exit_code(1), normalise_win32_io_errors], compile_and_run, [''])
-test('openFile003', [normalise_win32_io_errors], compile_and_run, [''])
+test('openFile003', [normalise_win32_io_errors, js_broken(22374)], compile_and_run, [''])
 test('openFile004', [], compile_and_run, [''])
-test('openFile005', [], compile_and_run, [''])
+test('openFile005', js_broken(22261), compile_and_run, [''])
 test('openFile006', [], compile_and_run, [''])
-test('openFile007', [], compile_and_run, [''])
-test('openFile008', cmd_prefix('ulimit -n 1024; '), compile_and_run, [''])
+test('openFile007', js_broken(22261), compile_and_run, [''])
+test('openFile008', [js_broken(22349), cmd_prefix('ulimit -n 1024; ')], compile_and_run, [''])
 test('openFile009', [], compile_and_run, [''])
 
 test('putStr001',    normal, compile_and_run, [''])
-test('readFile001', [], compile_and_run, [''])
+test('readFile001', js_broken(22261), compile_and_run, [''])
 test('readwrite001', [], compile_and_run, ['-cpp'])
 
 
-test('readwrite002', [omit_ways(['ghci']), set_stdin('readwrite002.hs')],
+test('readwrite002', [omit_ways(['ghci']), set_stdin('readwrite002.hs'), js_broken(22374)],
      compile_and_run, ['-cpp'])
 
 test('readwrite003', [], compile_and_run, [''])
 
 test('hGetBuf001',
-     [
-      when(fast(), skip),
-      expect_fail_if_windows],
+     [ when(fast(), skip)
+     , expect_fail_if_windows
+     , js_broken(22374)
+     ],
      compile_and_run, ['-package unix'])
 
 test('hDuplicateTo001', [fragile_for(16819, concurrent_ways),
                          when(opsys('mingw32'), skip)], compile_and_run, [''])
 
-test('countReaders001', [], compile_and_run, [''])
+test('countReaders001', js_broken(22261), compile_and_run, [''])
 
 test('concio001', [normal, multi_cpu_race],
      makefile_test, ['test.concio001'])
@@ -115,7 +119,7 @@ test('encoding001', [], compile_and_run, [''])
 
 test('encoding002', normal, compile_and_run, [''])
 test('encoding003', normal, compile_and_run, [''])
-test('encoding004', extra_files(['encoded-data/']), compile_and_run, [''])
+test('encoding004', [extra_files(['encoded-data/']), js_broken(22374)], compile_and_run, [''])
 test('encoding005', normal, compile_and_run, [''])
 
 test('environment001', [], makefile_test, ['environment001-test'])

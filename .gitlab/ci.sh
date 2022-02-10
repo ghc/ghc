@@ -65,6 +65,7 @@ Environment variables affecting both build systems:
                     "decreases", or "all")
   HERMETIC          Take measures to avoid looking at anything in \$HOME
   CONFIGURE_ARGS    Arguments passed to configure script.
+  CONFIGURE_WRAPPER Wrapper for the configure script (e.g. Emscripten's emconfigure).
   ENABLE_NUMA       Whether to enable numa support for the build (disabled by default)
   INSTALL_CONFIGURE_ARGS
                     Arguments passed to the binary distribution configure script
@@ -249,6 +250,11 @@ function setup() {
       cp -Rf "$CABAL_CACHE"/* "$CABAL_DIR"
   fi
 
+  case "${CONFIGURE_WRAPPER:-}" in
+    emconfigure) time_it "setup" setup_emscripten ;;
+    *) ;;
+  esac
+
   case $toolchain_source in
     extracted) time_it "setup" setup_toolchain ;;
     *) ;;
@@ -365,6 +371,14 @@ function setup_toolchain() {
   $cabal_install alex --constraint="alex>=$MIN_ALEX_VERSION"
 }
 
+function setup_emscripten() {
+  git clone https://github.com/emscripten-core/emsdk.git
+  cd emsdk
+  ./emsdk install latest
+  ./emsdk activate latest
+  cd ..
+}
+
 function cleanup_submodules() {
   start_section "clean submodules"
   if [ -d .git ]; then
@@ -402,6 +416,11 @@ EOF
 }
 
 function configure() {
+  case "${CONFIGURE_WRAPPER:-}" in
+    emconfigure) source emsdk/emsdk_env.sh ;;
+    *) ;;
+  esac
+
   if [[ -z "${NO_BOOT:-}" ]]; then
     start_section "booting"
     run python3 boot
@@ -421,7 +440,7 @@ function configure() {
   start_section "configuring"
   # See https://stackoverflow.com/questions/7577052 for a rationale for the
   # args[@] symbol-soup below.
-  run ./configure \
+  run ${CONFIGURE_WRAPPER:-} ./configure \
     --enable-tarballs-autodownload \
     "${args[@]+"${args[@]}"}" \
     GHC="$GHC" \
@@ -528,6 +547,11 @@ function make_install_destdir() {
 
 # install the binary distribution in directory $1 to $2.
 function install_bindist() {
+  case "${CONFIGURE_WRAPPER:-}" in
+    emconfigure) source emsdk/emsdk_env.sh ;;
+    *) ;;
+  esac
+
   local bindist="$1"
   local instdir="$2"
   pushd "$bindist"
@@ -545,7 +569,7 @@ function install_bindist() {
           args+=( "--target=$CROSS_TARGET" "--host=$CROSS_TARGET" )
       fi
 
-      run ./configure \
+      run ${CONFIGURE_WRAPPER:-} ./configure \
           --prefix="$instdir" \
           "${args[@]+"${args[@]}"}"
       make_install_destdir "$TOP"/destdir "$instdir"
@@ -575,19 +599,17 @@ function test_hadrian() {
   fi
 
 
-  if [ -n "${CROSS_TARGET:-}" ]; then
-    if [ -n "${CROSS_EMULATOR:-}" ]; then
-      local instdir="$TOP/_build/install"
-      local test_compiler="$instdir/bin/${cross_prefix}ghc$exe"
-      install_bindist _build/bindist/ghc-*/ "$instdir"
-      echo 'main = putStrLn "hello world"' > expected
-      run "$test_compiler" -package ghc "$TOP/.gitlab/hello.hs" -o hello
-      $CROSS_EMULATOR ./hello > actual
-      run diff expected actual
-    else
-      info "Cannot test cross-compiled build without CROSS_EMULATOR being set."
-      return
-    fi
+  if [[ "${CROSS_EMULATOR:-}" == "NOT_SET" ]]; then
+    info "Cannot test cross-compiled build without CROSS_EMULATOR being set."
+    return
+  elif [ -n "${CROSS_TARGET:-}" ]; then
+    local instdir="$TOP/_build/install"
+    local test_compiler="$instdir/bin/${cross_prefix}ghc$exe"
+    install_bindist _build/bindist/ghc-*/ "$instdir"
+    echo 'main = putStrLn "hello world"' > expected
+    run "$test_compiler" -package ghc "$TOP/.gitlab/hello.hs" -o hello
+    ${CROSS_EMULATOR:-} ./hello > actual
+    run diff expected actual
   elif [[ -n "${REINSTALL_GHC:-}" ]]; then
     run_hadrian \
       test \
@@ -598,10 +620,11 @@ function test_hadrian() {
       "runtest.opts+=${RUNTEST_ARGS:-}" || fail "hadrian cabal-install test"
   else
     local instdir="$TOP/_build/install"
-    local test_compiler="$instdir/bin/ghc$exe"
+    local test_compiler="$instdir/bin/${cross_prefix}ghc$exe"
     install_bindist _build/bindist/ghc-*/ "$instdir"
 
-    if [[ "${WINDOWS_HOST}" == "no" ]]; then
+    if [[ "${WINDOWS_HOST}" == "no" ]] && [ -z "${CROSS_TARGET:-}" ]
+    then
       run_hadrian \
         test \
         --test-root-dirs=testsuite/tests/stage1 \
@@ -610,10 +633,14 @@ function test_hadrian() {
       info "STAGE1_TEST=$?"
     fi
 
-    # Ensure the resulting compiler has the correct bignum-flavour
-    test_compiler_backend=$(${test_compiler} -e "GHC.Num.Backend.backendName")
-    if [ $test_compiler_backend != "\"$BIGNUM_BACKEND\"" ]; then
-      fail "Test compiler has a different BIGNUM_BACKEND ($test_compiler_backend) thean requested ($BIGNUM_BACKEND)"
+    # Ensure the resulting compiler has the correct bignum-flavour,
+    # except for cross-compilers as they may not support the interpreter
+    if [ -z "${CROSS_TARGET:-}" ]
+    then
+      test_compiler_backend=$(${test_compiler} -e "GHC.Num.Backend.backendName")
+      if [ $test_compiler_backend != "\"$BIGNUM_BACKEND\"" ]; then
+        fail "Test compiler has a different BIGNUM_BACKEND ($test_compiler_backend) thean requested ($BIGNUM_BACKEND)"
+      fi
     fi
 
     # If we are doing a release job, check the compiler can build a profiled executable

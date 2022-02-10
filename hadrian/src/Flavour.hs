@@ -11,9 +11,12 @@ module Flavour
   , viaLlvmBackend
   , enableProfiledGhc
   , disableDynamicGhcPrograms
+  , disableDynamicLibs
   , disableProfiledLibs
   , enableLinting
   , enableHaddock
+  , useNativeBignum
+  , omitPragmas
 
   , completeSetting
   , applySettings
@@ -39,25 +42,27 @@ import Oracles.Setting
 
 flavourTransformers :: Map String (Flavour -> Flavour)
 flavourTransformers = M.fromList
-    [ "werror" =: werror
-    , "debug_info" =: enableDebugInfo
-    , "ticky_ghc" =: enableTickyGhc
-    , "split_sections" =: splitSections
+    [ "werror"           =: werror
+    , "debug_info"       =: enableDebugInfo
+    , "ticky_ghc"        =: enableTickyGhc
+    , "split_sections"   =: splitSections
     , "thread_sanitizer" =: enableThreadSanitizer
-    , "llvm" =: viaLlvmBackend
-    , "profiled_ghc" =: enableProfiledGhc
-    , "no_dynamic_ghc" =: disableDynamicGhcPrograms
+    , "llvm"             =: viaLlvmBackend
+    , "profiled_ghc"     =: enableProfiledGhc
+    , "no_dynamic_ghc"   =: disableDynamicGhcPrograms
+    , "no_dynamic_libs"  =: disableDynamicLibs
+    , "native_bignum"    =: useNativeBignum
     , "no_profiled_libs" =: disableProfiledLibs
-    , "omit_pragmas" =: omitPragmas
-    , "ipe" =: enableIPE
-    , "fully_static" =: fullyStatic
-    , "collect_timings" =: collectTimings
-    , "assertions" =: enableAssertions
-    , "debug_ghc" =: debugGhc Stage1
+    , "omit_pragmas"     =: omitPragmas
+    , "ipe"              =: enableIPE
+    , "fully_static"     =: fullyStatic
+    , "collect_timings"  =: collectTimings
+    , "assertions"       =: enableAssertions
+    , "debug_ghc"        =: debugGhc Stage1
     , "debug_stage1_ghc" =: debugGhc stage0InTree
-    , "lint" =: enableLinting
-    , "haddock" =: enableHaddock
-    , "late_ccs" =: enableLateCCS
+    , "lint"             =: enableLinting
+    , "haddock"          =: enableHaddock
+    , "late_ccs"         =: enableLateCCS
     ]
   where (=:) = (,)
 
@@ -70,7 +75,7 @@ parseFlavour :: [Flavour]  -- ^ base flavours
 parseFlavour baseFlavours transformers str =
     case P.runParser parser () "" str of
       Left perr -> Left $ unlines $
-                    [ "error parsing flavour specifier: " ++ show perr
+                   [ "error parsing flavour specifier: " ++ show perr
                     , ""
                     , "known flavours:"
                     ] ++
@@ -92,13 +97,14 @@ parseFlavour baseFlavours transformers str =
     baseFlavour =
         P.choice [ f <$ P.try (P.string (name f))
                  | f <- reverse (sortOn name baseFlavours)
-                 ]      -- needed to parse e.g. "quick-debug" before "quick"
+                 ]      -- reverse&sort needed to parse e.g. "quick-debug" before "quick"
 
     flavourTrans :: Parser (Flavour -> Flavour)
     flavourTrans = do
         void $ P.char '+'
         P.choice [ trans <$ P.try (P.string nm)
-                 | (nm, trans) <- M.toList transformers
+                 | (nm, trans) <- reverse $ sortOn fst $ M.toList transformers
+                      -- reverse&sort needed to parse e.g. "ticky_ghc0" before "ticky_ghc"
                  ]
 
 -- | Add arguments to the 'args' of a 'Flavour'.
@@ -137,19 +143,20 @@ enableDebugInfo = addArgs $ notStage0 ? mconcat
 -- | Enable the ticky-ticky profiler in stage2 GHC
 enableTickyGhc :: Flavour -> Flavour
 enableTickyGhc =
-    addArgs $ stage1 ? mconcat
-      [ builder (Ghc CompileHs) ? ticky
-      , builder (Ghc LinkHs) ? ticky
+    addArgs $ orM [stage1, cross] ? mconcat
+      [ builder (Ghc CompileHs) ? tickyArgs
+      , builder (Ghc LinkHs) ? tickyArgs
       ]
-  where
-    ticky = mconcat
-      [ arg "-ticky"
-      , arg "-ticky-allocd"
-      , arg "-ticky-dyn-thunk"
-      -- You generally need STG dumps to interpret ticky profiles
-      , arg "-ddump-to-file"
-      , arg "-ddump-stg-final"
-      ]
+
+tickyArgs :: Args
+tickyArgs = mconcat
+  [ arg "-ticky"
+  , arg "-ticky-allocd"
+  , arg "-ticky-dyn-thunk"
+  -- You generally need STG dumps to interpret ticky profiles
+  , arg "-ddump-to-file"
+  , arg "-ddump-stg-final"
+  ]
 
 -- | Enable Core, STG, and (not C--) linting in all compilations with the stage1 compiler.
 enableLinting :: Flavour -> Flavour
@@ -228,6 +235,16 @@ disableDynamicGhcPrograms :: Flavour -> Flavour
 disableDynamicGhcPrograms flavour = flavour { dynamicGhcPrograms = pure False }
 
 -- | Don't build libraries in profiled 'Way's.
+disableDynamicLibs :: Flavour -> Flavour
+disableDynamicLibs flavour =
+  flavour { libraryWays = prune $ libraryWays flavour
+          }
+  where
+    prune :: Ways -> Ways
+    prune = fmap $ Set.filter (not . wayUnit Dynamic)
+
+
+-- | Don't build libraries in profiled 'Way's.
 disableProfiledLibs :: Flavour -> Flavour
 disableProfiledLibs flavour =
     flavour { libraryWays = prune $ libraryWays flavour
@@ -236,6 +253,11 @@ disableProfiledLibs flavour =
   where
     prune :: Ways -> Ways
     prune = fmap $ Set.filter (not . wayUnit Profiling)
+
+useNativeBignum :: Flavour -> Flavour
+useNativeBignum flavour =
+  flavour { bignumBackend = "native"
+          }
 
 -- | Build stage2 compiler with -fomit-interface-pragmas to reduce
 -- recompilation.

@@ -28,9 +28,9 @@ import GHC.Cmm
 import GHC.Cmm.CLabel
 
 import GHC.Driver.Session
-import GHC.Driver.Config.Finder    (initFinderOpts)
-import GHC.Driver.Config.CmmToAsm  (initNCGConfig)
-import GHC.Driver.Config.CmmToLlvm (initLlvmCgConfig)
+import GHC.Driver.Config.Finder    ( initFinderOpts   )
+import GHC.Driver.Config.CmmToAsm  ( initNCGConfig    )
+import GHC.Driver.Config.CmmToLlvm ( initLlvmCgConfig )
 import GHC.Driver.LlvmConfigCache  (LlvmConfigCache)
 import GHC.Driver.Ppr
 import GHC.Driver.Backend
@@ -45,8 +45,9 @@ import GHC.Utils.TmpFs
 import GHC.Utils.Error
 import GHC.Utils.Outputable
 import GHC.Utils.Logger
-import GHC.Utils.Exception (bracket)
+import GHC.Utils.Exception ( bracket )
 import GHC.Utils.Ppr (Mode(..))
+import GHC.Utils.Panic.Plain ( pgmError )
 
 import GHC.Unit
 import GHC.Unit.Finder      ( mkStubPaths )
@@ -125,6 +126,7 @@ codeOutput logger tmpfs llvm_config dflags unit_state this_mod filenm location g
                                              final_stream
                  ViaCCodeOutput -> outputC logger dflags filenm final_stream pkg_deps
                  LlvmCodeOutput -> outputLlvm logger llvm_config dflags filenm final_stream
+                 JSCodeOutput   -> outputJS logger llvm_config dflags filenm final_stream
         ; stubs_exist <- outputForeignStubs logger tmpfs dflags unit_state this_mod location stubs
         ; return (filenm, stubs_exist, foreign_fps, a)
         }
@@ -215,6 +217,18 @@ outputLlvm logger llvm_config dflags filenm cmm_stream = do
   {-# SCC "llvm_output" #-} doOutput filenm $
     \f -> {-# SCC "llvm_CodeGen" #-}
       llvmCodeGen logger lcg_config f cmm_stream
+
+{-
+************************************************************************
+*                                                                      *
+\subsection{JavaScript}
+*                                                                      *
+************************************************************************
+-}
+outputJS :: Logger -> LlvmConfigCache -> DynFlags -> FilePath -> Stream IO RawCmmGroup a -> IO a
+outputJS _ _ _ _ _ = pgmError $ "codeOutput: Hit JavaScript case. We should never reach here!"
+                              ++ "\nThe JS backend should shortcircuit to StgToJS after Stg."
+                              ++ "\nIf you reached this point then you've somehow made it to Cmm!"
 
 {-
 ************************************************************************

@@ -17,7 +17,10 @@ test('conc069a', only_threaded_ways, compile_and_run, [''])
 # those for now.
 test('conc070', only_threaded_ways, compile_and_run, [''])
 
-test('conc071', omit_ways(concurrent_ways), compile_and_run, [''])
+test('conc071',
+  [ omit_ways(concurrent_ways)
+  , js_skip # JS RTS doesn't report the same cap/locked status
+  ] , compile_and_run, [''])
 test('conc072', only_ways(concurrent_ways), compile_and_run, [''])
 test('conc073', normal, compile_and_run, [''])
 
@@ -42,7 +45,7 @@ test('throwto002', normal, compile_and_run, [''])
 test('throwto003', normal, compile_and_run, [''])
 
 test('mask001', normal, compile_and_run, [''])
-test('mask002', normal, compile_and_run, [''])
+test('mask002', js_broken(22261), compile_and_run, [''])
 
 test('async001', normal, compile_and_run, [''])
 
@@ -86,15 +89,20 @@ test('threadstatus-9333', [fragile_for(16555, ['ghci', 'profthreaded']), omit_wa
 
 test('T9379', normal, compile_and_run, [''])
 
-test('allocLimit1', exit_code(1), compile_and_run, [''])
-test('allocLimit2', normal, compile_and_run, [''])
+# Skip the allocLimit* tests with the JS backend as it doesn't support
+# setThreadAllocationCounter
+
+test('allocLimit1', [exit_code(1), js_skip], compile_and_run, [''])
+test('allocLimit2', js_skip, compile_and_run, [''])
 
 # The non-threaded RTS on Windows doesn't handle throwing exceptions at I/O
 # operations very well, and ends up duplicating the I/O, giving wrong results.
 test('allocLimit3', [ when(opsys('mingw32'), only_ways(threaded_ways)),
+                      js_skip,
                       exit_code(1) ], compile_and_run, [''])
 
 test('allocLimit4', [ extra_run_opts('+RTS -xq300k -RTS'),
+                      js_skip,
                       # ghci consumes part of set limit at startup
                       omit_ways(['ghci']) ],
                     compile_and_run, [''])
@@ -114,21 +122,31 @@ test('conc010', normal, compile_and_run, [''])
 
 # conc012(ghci) needs a smaller stack, or it takes forever
 test('conc012',
-     extra_run_opts('+RTS -K8m -RTS'),
+     [ extra_run_opts('+RTS -K8m -RTS')
+     , js_skip # no stack overflow detection with the JS backend (yet)
+     ],
      compile_and_run, [''])
 
 test('conc013', normal, compile_and_run, [''])
 test('conc014', normal, compile_and_run, [''])
-test('conc015', normal, compile_and_run, [''])
+test('conc015',
+  [ when(arch("js"), fragile(22261)) # delays are flaky with the JS backend when the system is overloaded
+  ], compile_and_run, [''])
 test('conc015a', normal, compile_and_run, [''])
-test('conc016', omit_ways(concurrent_ways), # see comment in conc016.hs
+test('conc016', [omit_ways(concurrent_ways)  # see comment in conc016.hs
+                , js_skip
+                ],
                 compile_and_run, [''])
 test('conc017', normal, compile_and_run, [''])
 test('conc017a', normal, compile_and_run, [''])
 test('conc018', normal, compile_and_run, [''])
 test('conc019', extra_run_opts('+RTS -K16m -RTS'), compile_and_run, [''])
 test('conc020', normal, compile_and_run, [''])
-test('conc021', [ omit_ways(['ghci']), exit_code(1) ], compile_and_run, [''])
+test('conc021',
+  [ omit_ways(['ghci']), exit_code(1)
+  , js_skip # foreign exports not supported yet
+  ],
+  compile_and_run, [''])
 test('conc022', normal, compile_and_run, [''])
 
 test('conc024', normal, compile_and_run, [''])
@@ -147,7 +165,8 @@ test('conc033', normal, compile_and_run, [''])
 test('conc034', [
                  normal,
                  omit_ways(['ghci']),
-                 extra_run_opts('+RTS -C0 -RTS')],
+                 extra_run_opts('+RTS -C0 -RTS'),
+                 js_skip],
 		compile_and_run, [''])
 
 test('conc035', normal, compile_and_run, [''])
@@ -181,13 +200,13 @@ test('foreignInterruptible', [when(fast(), skip),
 test('conc037', only_ways(['threaded1', 'threaded2', 'nonmoving_thr']), compile_and_run, [''])
 test('conc038', only_ways(['threaded1', 'threaded2', 'nonmoving_thr']), compile_and_run, [''])
 
-# Omit for GHCi, uses foreign export
+# Omit for GHCi and for the JS backend, uses foreign export
 # Omit for the threaded ways, because in this case the main thread is allowed to
 # complete, which causes the child thread to be interrupted.
-test('conc039', omit_ways(['ghci'] + threaded_ways), compile_and_run, [''])
+test('conc039', [omit_ways(['ghci'] + threaded_ways), js_skip], compile_and_run, [''])
 
-# Omit for GHCi, uses foreign export
-test('conc040', [exit_code(1), omit_ways(['ghci'])], compile_and_run, [''])
+# Omit for GHCi and for the JS backend, uses foreign export
+test('conc040', [exit_code(1), omit_ways(['ghci']), js_skip], compile_and_run, [''])
 
 # STM-related tests.
 test('conc041', normal, compile_and_run, [''])
@@ -236,6 +255,7 @@ test('hs_try_putmvar001',
      [
      when(opsys('mingw32'),skip), # uses pthread APIs in the C code
      only_ways(['threaded1', 'threaded2', 'nonmoving_thr']),
+     js_skip
      ],
      compile_and_run,
      ['hs_try_putmvar001_c.c'])
@@ -245,6 +265,7 @@ test('hs_try_putmvar001',
 test('hs_try_putmvar002',
      [pre_cmd('$MAKE -s --no-print-directory hs_try_putmvar002_setup'),
       omit_ways(['ghci']),
+      js_skip,
       extra_run_opts('1 8 10000')],
      compile_and_run, ['hs_try_putmvar002_c.c'])
 
@@ -254,6 +275,7 @@ test('hs_try_putmvar003',
      when(opsys('mingw32'),skip), # uses pthread APIs in the C code
      pre_cmd('$MAKE -s --no-print-directory hs_try_putmvar003_setup'),
      only_ways(['threaded1', 'threaded2', 'nonmoving_thr']),
+     js_skip,
      extra_run_opts('1 16 32 100'),
      fragile_for(16361, ['threaded1'])
      ],

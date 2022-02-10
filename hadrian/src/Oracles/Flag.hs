@@ -95,14 +95,15 @@ platformSupportsSharedLibs = do
     wasm          <- anyTargetArch [ "wasm32" ]
     ppc_linux     <- anyTargetPlatform [ "powerpc-unknown-linux" ]
     solaris       <- anyTargetPlatform [ "i386-unknown-solaris2" ]
+    javascript    <- anyTargetArch     [ "js" ]
     solarisBroken <- flag SolarisBrokenShld
-    return $ not (windows || wasm || ppc_linux || solaris && solarisBroken)
+    return $ not (windows || wasm || javascript || ppc_linux || solaris && solarisBroken)
 
 -- | Does the target support threaded RTS?
 targetSupportsThreadedRts :: Action Bool
 targetSupportsThreadedRts = do
-    wasm <- anyTargetArch [ "wasm32" ]
-    return $ not wasm
+    bad_arch <- anyTargetArch [ "wasm32", "js" ]
+    return $ not bad_arch
 
 -- | Does the target support the -N RTS flag?
 targetSupportsSMP :: Action Bool

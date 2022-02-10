@@ -368,9 +368,6 @@ type CFilePath = CString
 type CFilePath = CWString
 #endif
 
-foreign import ccall unsafe "HsBase.h __hscore_open"
-   c_open :: CFilePath -> CInt -> CMode -> IO CInt
-
 -- | The same as 'c_safe_open', but an /interruptible operation/
 -- as described in "Control.Exception"—it respects `uninterruptibleMask`
 -- but not `mask`.
@@ -415,23 +412,6 @@ c_interruptible_open filepath oflags mode =
             interruptible (IO $ \s -> (# yield# s, () #))
       pure open_res
 
--- |
---
--- @since 4.16.0.0
-foreign import ccall interruptible "HsBase.h __hscore_open"
-   c_interruptible_open_ :: CFilePath -> CInt -> CMode -> IO CInt
-
--- | Consult the RTS to find whether it is threaded.
---
--- @since 4.16.0.0
-hostIsThreaded :: Bool
-hostIsThreaded = rtsIsThreaded_ /= 0
-
--- |
---
--- @since 4.16.0.0
-foreign import ccall unsafe "rts_isThreaded" rtsIsThreaded_ :: Int
-
 c_safe_open :: CFilePath -> CInt -> CMode -> IO CInt
 c_safe_open filepath oflags mode =
   getMaskingState >>= \case
@@ -443,6 +423,27 @@ c_safe_open filepath oflags mode =
     Unmasked -> c_interruptible_open_ filepath oflags mode
     _ -> c_safe_open_ filepath oflags mode
 
+-- | Consult the RTS to find whether it is threaded.
+--
+-- @since 4.16.0.0
+hostIsThreaded :: Bool
+hostIsThreaded = rtsIsThreaded_ /= 0
+
+#if !defined(js_HOST_ARCH)
+foreign import ccall unsafe "HsBase.h __hscore_open"
+   c_open :: CFilePath -> CInt -> CMode -> IO CInt
+
+-- |
+--
+-- @since 4.16.0.0
+foreign import ccall interruptible "HsBase.h __hscore_open"
+   c_interruptible_open_ :: CFilePath -> CInt -> CMode -> IO CInt
+
+-- |
+--
+-- @since 4.16.0.0
+foreign import ccall unsafe "rts_isThreaded" rtsIsThreaded_ :: Int
+
 foreign import ccall safe "HsBase.h __hscore_open"
    c_safe_open_ :: CFilePath -> CInt -> CMode -> IO CInt
 
@@ -451,6 +452,145 @@ foreign import ccall unsafe "HsBase.h __hscore_fstat"
 
 foreign import ccall unsafe "HsBase.h __hscore_lstat"
    lstat :: CFilePath -> Ptr CStat -> IO CInt
+
+#endif
+
+#if defined(js_HOST_ARCH)
+
+foreign import javascript unsafe "(() => { return rts_isThreaded; })" rtsIsThreaded_ :: Int
+foreign import javascript interruptible "(($1_1, $2_2, $2, $c) => { return h$base_access($1_1,$2_2,$2,$c); })"
+    c_access :: CString -> CInt -> IO CInt
+foreign import javascript interruptible "(($1_1, $2_2, $2, $c) => { return h$base_chmod($1_1,$2_2,$2,$c); })"
+    c_chmod :: CString -> CMode -> IO CInt
+foreign import javascript interruptible "(($1,$c) => { return h$base_close($1,$c); })"
+    c_close :: CInt -> IO CInt
+foreign import javascript interruptible "(($1, $c) => { return h$base_creat($1,$c); })"
+    c_creat :: CString -> CMode -> IO CInt
+foreign import javascript interruptible "(($1, $c) => { return h$base_dup($1, $c); })"
+    c_dup :: CInt -> IO CInt
+foreign import javascript interruptible "(($1, $2, $c) => { return h$base_dup2($1,$2,$c); })"
+    c_dup2 :: CInt -> CInt -> IO CInt
+foreign import javascript interruptible "(($1,$2_1,$2_2,$c) => { return h$base_fstat($1,$2_1,$2_2,$c); })" -- fixme wrong type
+    c_fstat :: CInt -> Ptr CStat -> IO CInt
+foreign import javascript unsafe "(($1) => { return h$base_isatty($1); })"
+    c_isatty :: CInt -> IO CInt
+foreign import javascript interruptible "(($1,$2_1,$2_2,$3,$c) => { return h$base_lseek($1,$2_1,$2_2,$3,$c); })"
+   c_lseek :: CInt -> COff -> CInt -> IO COff
+foreign import javascript interruptible "(($1_1,$1_2,$2_1,$2_2,$c) => { return h$base_lstat($1_1,$1_2,$2_1,$2_2,$c); })" -- fixme wrong type
+   lstat :: CFilePath -> Ptr CStat -> IO CInt
+foreign import javascript interruptible "(($1_1,$1_2,$2,$3,$c) => { return h$base_open($1_1,$1_2,$2,$3,$c); })"
+   c_open :: CFilePath -> CInt -> CMode -> IO CInt
+foreign import javascript interruptible "(($1_1,$1_2,$2,$3,$c) => { return h$base_open($1_1,$1_2,$2,$3,$c); })"
+   c_interruptible_open_ :: CFilePath -> CInt -> CMode -> IO CInt
+foreign import javascript interruptible "(($1_1,$1_2,$2,$3,$c) => { return h$base_open($1_1,$1_2,$2,$3,$c); })"
+   c_safe_open_ :: CFilePath -> CInt -> CMode -> IO CInt
+foreign import javascript interruptible "(($1,$2_1,$2_2,$3,$c) => { return h$base_read($1,$2_1,$2_2,$3,$c); })"
+   c_read :: CInt -> Ptr Word8 -> CSize -> IO CSsize
+foreign import javascript interruptible "(($1,$2_1,$2_2,$3,$c) => { return h$base_read($1,$2_1,$2_2,$3,$c); })"
+   c_safe_read :: CInt -> Ptr Word8 -> CSize -> IO CSsize
+foreign import javascript interruptible "(($1_1,$1_2,$2_1,$2_2,$c) => { return h$base_stat($1_1,$1_2,$2_1,$2_2,$c); })" -- fixme wrong type
+   c_stat :: CFilePath -> Ptr CStat -> IO CInt
+foreign import javascript unsafe "(($1) => { return h$base_umask($1); })"
+   c_umask :: CMode -> IO CMode
+foreign import javascript interruptible "(($1,$2_1,$2_2,$3,$c) => { return h$base_write($1,$2_1,$2_2,$3,$c); })"
+   c_write :: CInt -> Ptr Word8 -> CSize -> IO CSsize
+foreign import javascript interruptible "(($1,$2_1,$2_2,$3,$c) => { return h$base_write($1,$2_1,$2_2,$3,$c); })"
+   c_safe_write :: CInt -> Ptr Word8 -> CSize -> IO CSsize
+foreign import javascript interruptible "(($1,$2_1,$2_2,$c) => { return h$base_ftruncate($1,$2_1,$2_2,$c); })" -- fixme COff
+   c_ftruncate :: CInt -> FileOffset -> IO CInt
+foreign import javascript interruptible "(($1_1,$1_2,$c) => { return h$base_unlink($1_1,$1_2,$c); })"
+   c_unlink :: CString -> IO CInt
+foreign import javascript unsafe "(() => { return h$base_getpid; })"
+   c_getpid :: IO CPid
+-- foreign import ccall unsafe "HsBase.h fork"
+--   c_fork :: IO CPid
+foreign import javascript interruptible "($1_1,$1_2,$2_1,$2_2,$c) => { return h$base_link($1_1,$1_2,$2_1,$2_2,$c); })"
+   c_link :: CString -> CString -> IO CInt
+foreign import javascript interruptible "(($1_1,$1_2,$2,$c) => { return h$base_mkfifo($1_1,$1_2,$2,$c); })"
+   c_mkfifo :: CString -> CMode -> IO CInt
+foreign import javascript interruptible "(($1_1,$1_2,$c) => { return h$base_pipe($1_1,$1_2,$c); })"
+  c_pipe :: Ptr CInt -> IO CInt
+foreign import javascript unsafe "(($1_1,$1_2) => { return h$base_sigemptyset($1_1,$1_2); })"
+   c_sigemptyset :: Ptr CSigset -> IO CInt
+foreign import javascript unsafe "(($1_1,$1_2,$2) => { return h$base_sigaddset($1_1,$1_2,$2); })"
+   c_sigaddset :: Ptr CSigset -> CInt -> IO CInt
+foreign import javascript unsafe "(($1,$2_1,$2_2,$3_1,$3_2) => { return h$base_sigprocmask($1,$2_1,$2_2,$3_1,$3_2); })"
+   c_sigprocmask :: CInt -> Ptr CSigset -> Ptr CSigset -> IO CInt
+foreign import javascript unsafe "(($1,$2_1,$2_2) => { return h$base_tcgetattr($1,$2_1,$2_2); })"
+   c_tcgetattr :: CInt -> Ptr CTermios -> IO CInt
+foreign import javascript unsafe "(($1,$2,$3_1,$3_2) => { return h$base_tcsetattr($1,$2,$3_1,$3_2); })"
+   c_tcsetattr :: CInt -> CInt -> Ptr CTermios -> IO CInt
+foreign import javascript unsafe "(($1_1,$1_2,$2_1,$2_2) => { return h$base_utime($1_1,$1_2,$2_1,$2_2); })" -- should this be async?
+   c_utime :: CString -> Ptr CUtimbuf -> IO CInt
+foreign import javascript interruptible "(($1,$2_1,$2_2,$3,$c) => { return h$base_waitpid($1,$2_1,$2_2,$3,$c); })"
+   c_waitpid :: CPid -> Ptr CInt -> CInt -> IO CPid
+
+foreign import javascript unsafe "(() => { return h$base_o_rdonly; })"   o_RDONLY   :: CInt
+foreign import javascript unsafe "(() => { return h$base_o_wronly; })"   o_WRONLY   :: CInt
+foreign import javascript unsafe "(() => { return h$base_o_rdwr; })"     o_RDWR     :: CInt
+foreign import javascript unsafe "(() => { return h$base_o_append; })"   o_APPEND   :: CInt
+foreign import javascript unsafe "(() => { return h$base_o_creat; })"    o_CREAT    :: CInt
+foreign import javascript unsafe "(() => { return h$base_o_excl; })"     o_EXCL     :: CInt
+foreign import javascript unsafe "(() => { return h$base_o_trunc; })"    o_TRUNC    :: CInt
+foreign import javascript unsafe "(() => { return h$base_o_noctty; })"   o_NOCTTY   :: CInt
+foreign import javascript unsafe "(() => { return h$base_o_nonblock; })" o_NONBLOCK :: CInt
+foreign import javascript unsafe "(() => { return h$base_o_binary; })"   o_BINARY   :: CInt
+
+foreign import javascript unsafe "(($1) => { return h$base_c_s_isreg($1); })"  c_s_isreg  :: CMode -> CInt
+foreign import javascript unsafe "(($1) => { return h$base_c_s_ischr($1); })"  c_s_ischr  :: CMode -> CInt
+foreign import javascript unsafe "(($1) => { return h$base_c_s_isblk($1); })"  c_s_isblk  :: CMode -> CInt
+foreign import javascript unsafe "(($1) => { return h$base_c_s_isdir($1); })"  c_s_isdir  :: CMode -> CInt
+foreign import javascript unsafe "(($1) => { return h$base_c_s_isfifo($1); })" c_s_isfifo :: CMode -> CInt
+
+s_isreg  :: CMode -> Bool
+s_isreg cm = c_s_isreg cm /= 0
+s_ischr  :: CMode -> Bool
+s_ischr cm = c_s_ischr cm /= 0
+s_isblk  :: CMode -> Bool
+s_isblk cm = c_s_isblk cm /= 0
+s_isdir  :: CMode -> Bool
+s_isdir cm = c_s_isdir cm /= 0
+s_isfifo :: CMode -> Bool
+s_isfifo cm = c_s_isfifo cm /= 0
+
+foreign import javascript unsafe "(() => { return h$base_sizeof_stat; })" sizeof_stat :: Int
+foreign import javascript unsafe "(($1_1,$1_2) => { return h$base_st_mtime($1_1,$1_2); })"    st_mtime :: Ptr CStat -> IO CTime
+foreign import javascript unsafe "(($1_1,$1_2) => { return h$base_st_size($1_1,$1_2); })"     st_size :: Ptr CStat -> IO Int64
+foreign import javascript unsafe "(($1_1,$1_2) => { return h$base_st_mode($1_1,$1_2); })"     st_mode :: Ptr CStat -> IO CMode
+foreign import javascript unsafe "(($1_1,$1_2) => { return h$base_st_dev($1_1,$1_2); })"      st_dev :: Ptr CStat -> IO CDev
+foreign import javascript unsafe "(($1_1,$1_2) => { return h$base_st_ino($1_1,$1_2); })"      st_ino :: Ptr CStat -> IO CIno
+
+foreign import javascript unsafe "(() => { return h$base_echo; })"            const_echo :: CInt
+foreign import javascript unsafe "(() => { return h$base_tcsanow; })"         const_tcsanow :: CInt
+foreign import javascript unsafe "(() => { return h$base_icanon; })"          const_icanon :: CInt
+foreign import javascript unsafe "(() => { return h$base_vmin; })"            const_vmin   :: CInt
+foreign import javascript unsafe "(() => { return h$base_vtime; })"           const_vtime  :: CInt
+foreign import javascript unsafe "(() => { return h$base_sigttou; })"         const_sigttou :: CInt
+foreign import javascript unsafe "(() => { return h$base_sig_block; })"       const_sig_block :: CInt
+foreign import javascript unsafe "(() => { return h$base_sig_setmask; })"     const_sig_setmask :: CInt
+foreign import javascript unsafe "(() => { return h$base_f_getfl; })"         const_f_getfl :: CInt
+foreign import javascript unsafe "(() => { return h$base_f_setfl; })"         const_f_setfl :: CInt
+foreign import javascript unsafe "(() => { return h$base_f_setfd; })"         const_f_setfd :: CInt
+foreign import javascript unsafe "(() => { return h$base_fd_cloexec; })"      const_fd_cloexec :: CLong
+foreign import javascript unsafe "(() => { return h$base_sizeof_termios; })"  sizeof_termios :: Int
+foreign import javascript unsafe "(() => { return h$base_sizeof_sigset_t; })" sizeof_sigset_t :: Int
+foreign import javascript unsafe "(($1_1,$1_2) => { return h$base_lflag($1_1,$1_2); })"           c_lflag :: Ptr CTermios -> IO CTcflag
+foreign import javascript unsafe "(($1_1,$1_2,$2) => { return h$base_poke_lflag($1_1,$1_2,$2); })"      poke_c_lflag :: Ptr CTermios -> CTcflag -> IO ()
+foreign import javascript unsafe "(($1_1,$1_2) => { return h$base_ptr_c_cc($1_1,$1_2); })"        ptr_c_cc  :: Ptr CTermios -> IO (Ptr Word8)
+s_issock :: CMode -> Bool
+s_issock cmode = c_s_issock cmode /= 0
+foreign import javascript unsafe "(($1) => { return h$base_c_s_issock($1); })"          c_s_issock :: CMode -> CInt
+foreign import javascript unsafe "(() => { return h$base_default_buffer_size; })" dEFAULT_BUFFER_SIZE :: Int
+foreign import javascript unsafe "(() => { return h$base_SEEK_CUR; })"            sEEK_CUR :: CInt
+foreign import javascript unsafe "(() => { return h$base_SEEK_SET; })"            sEEK_SET :: CInt
+foreign import javascript unsafe "(() => { return h$base_SEEK_END; })"            sEEK_END :: CInt
+
+-- fixme, unclear if these can be supported, remove?
+foreign import javascript unsafe "(($1, $2) => { return h$base_c_fcntl_read($1,$2); })"  c_fcntl_read  :: CInt -> CInt -> IO CInt
+foreign import javascript unsafe "(($1, $2, $3) => { return h$base_c_fcntl_write($1,$2,$3); })" c_fcntl_write :: CInt -> CInt -> CLong -> IO CInt
+foreign import javascript unsafe "(($1,$2,$3_1,$3_2) => { return h$base_c_fcntl_lock($1,$2,$3_1,$3_2); })"  c_fcntl_lock  :: CInt -> CInt -> Ptr CFLock -> IO CInt
+
+#else
 
 {- Note: Win32 POSIX functions
 Functions that are not part of the POSIX standards were
@@ -576,13 +716,15 @@ foreign import ccall unsafe "HsBase.h getpid"
    c_getpid :: IO CPid
 #endif
 
+#if !defined(js_HOST_ARCH)
 foreign import ccall unsafe "HsBase.h __hscore_stat"
    c_stat :: CFilePath -> Ptr CStat -> IO CInt
 
 foreign import ccall unsafe "HsBase.h __hscore_ftruncate"
    c_ftruncate :: CInt -> COff -> IO CInt
+#endif
 
-#if !defined(mingw32_HOST_OS)
+#if !defined(mingw32_HOST_OS) && !defined(js_HOST_ARCH)
 foreign import capi unsafe "HsBase.h fcntl"
    c_fcntl_read  :: CInt -> CInt -> IO CInt
 
@@ -647,6 +789,7 @@ foreign import ccall unsafe "HsBase.h waitpid"
    c_waitpid :: CPid -> Ptr CInt -> CInt -> IO CPid
 #endif
 
+#if !defined(js_HOST_ARCH)
 -- POSIX flags only:
 foreign import ccall unsafe "HsBase.h __hscore_o_rdonly" o_RDONLY :: CInt
 foreign import ccall unsafe "HsBase.h __hscore_o_wronly" o_WRONLY :: CInt
@@ -723,6 +866,8 @@ foreign import ccall unsafe "__hscore_bufsiz"  dEFAULT_BUFFER_SIZE :: Int
 foreign import capi  unsafe "stdio.h value SEEK_CUR" sEEK_CUR :: CInt
 foreign import capi  unsafe "stdio.h value SEEK_SET" sEEK_SET :: CInt
 foreign import capi  unsafe "stdio.h value SEEK_END" sEEK_END :: CInt
+#endif
+#endif
 
 {-
 Note: Windows types

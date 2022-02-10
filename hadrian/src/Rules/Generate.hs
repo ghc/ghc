@@ -42,15 +42,23 @@ rtsDependencies :: Expr [FilePath]
 rtsDependencies = do
     stage   <- getStage
     rtsPath <- expr (rtsBuildPath stage)
+    jsTarget <- expr isJsTarget
     useSystemFfi <- expr (flag UseSystemFfi)
 
-    let headers =
+    let -- headers common to native and JS RTS
+        common_headers =
             [ "ghcautoconf.h", "ghcplatform.h"
             , "DerivedConstants.h"
-            , "rts" -/- "EventTypes.h"
+            ]
+        -- headers specific to the native RTS
+        native_headers =
+            [ "rts" -/- "EventTypes.h"
             , "rts" -/- "EventLogConstants.h"
             ]
             ++ (if useSystemFfi then [] else libffiHeaderFiles)
+        headers
+          | jsTarget  = common_headers
+          | otherwise = common_headers ++ native_headers
     pure $ ((rtsPath -/- "include") -/-) <$> headers
 
 genapplyDependencies :: Expr [FilePath]

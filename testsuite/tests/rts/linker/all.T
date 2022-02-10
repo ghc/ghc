@@ -20,6 +20,7 @@ test('section_alignment',
 # Test to see if linker scripts link properly to real ELF files
 test('T2615',
      [extra_files(['libfoo_T2615.c', 'libfoo_script_T2615.so']),
+       js_broken(22374),
        when(opsys('mingw32'), skip),
        # OS X doesn't seem to support linker scripts
        when(opsys('darwin'), skip),
@@ -75,9 +76,13 @@ test('T5435_v_gcc',
      makefile_test, ['T5435_v_gcc'])
 test('T5435_dyn_asm',
      [extra_files(['T5435.hs', 'T5435_asm.c']),
+      js_skip, # dynamic linking not supported by the JS backend
       check_stdout(checkDynAsm)],
      makefile_test, ['T5435_dyn_asm'])
-test('T5435_dyn_gcc', extra_files(['T5435.hs', 'T5435_gcc.c']) , makefile_test, ['T5435_dyn_gcc'])
+test('T5435_dyn_gcc',
+     [extra_files(['T5435.hs', 'T5435_gcc.c']),
+      js_skip], # dynamic linking not supported by the JS backend
+     makefile_test, ['T5435_dyn_gcc'])
 
 ######################################
 test('linker_unload',
@@ -94,12 +99,15 @@ test('linker_unload_native',
 
 ######################################
 test('linker_error1', [extra_files(['linker_error.c']),
+                       js_skip, # dynamic linking not supported by the JS backend
                        ignore_stderr], makefile_test, ['linker_error1'])
 
 test('linker_error2', [extra_files(['linker_error.c']),
+                       js_skip, # dynamic linking not supported by the JS backend
                        ignore_stderr], makefile_test, ['linker_error2'])
 
 test('linker_error3', [extra_files(['linker_error.c']),
+                       js_skip, # dynamic linking not supported by the JS backend
                        ignore_stderr], makefile_test, ['linker_error3'])
 
 ######################################
@@ -107,6 +115,7 @@ test('rdynamic', [ unless(opsys('linux') or opsys('mingw32'), skip)
                  # this needs runtime infrastructure to do in ghci:
                  #  '-rdynamic' ghc, load modules only via dlopen(RTLD_BLOBAL) and more.
                  , omit_ways(['ghci'])
+                 , js_broken(22374)
                  ],
      compile_and_run, ['-rdynamic -package ghc'])
 

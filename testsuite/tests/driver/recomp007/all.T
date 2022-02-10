@@ -2,6 +2,8 @@
 # See the patch
 #   "Fix a recompilation checking bug when a package dependency changes"
 
-test('recomp007', [extra_files(['Setup.hs', 'a1/', 'a2/', 'b/'])
+test('recomp007', [ extra_files(['Setup.hs', 'a1/', 'a2/', 'b/'])
                   , when(fast(), skip)
-                  , normalise_slashes], makefile_test, [])
+                  , normalise_slashes
+                  , js_broken(22352)
+                  ], makefile_test, [])

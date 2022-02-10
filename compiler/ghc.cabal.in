@@ -428,6 +428,7 @@ Library
         GHC.Driver.Config.Stg.Ppr
         GHC.Driver.Config.StgToCmm
         GHC.Driver.Config.Tidy
+        GHC.Driver.Config.StgToJS
         GHC.Driver.Env
         GHC.Driver.Env.KnotVars
         GHC.Driver.Env.Types
@@ -478,6 +479,7 @@ Library
         GHC.HsToCore.Foreign.C
         GHC.HsToCore.Foreign.Call
         GHC.HsToCore.Foreign.Decl
+        GHC.HsToCore.Foreign.JavaScript
         GHC.HsToCore.Foreign.Prim
         GHC.HsToCore.Foreign.Utils
         GHC.HsToCore.GuardedRHSs
@@ -521,6 +523,10 @@ Library
         GHC.Iface.Tidy.StaticPtrTable
         GHC.IfaceToCore
         GHC.Iface.Type
+        GHC.JS.Make
+        GHC.JS.Ppr
+        GHC.JS.Syntax
+        GHC.JS.Transform
         GHC.Linker
         GHC.Linker.Dynamic
         GHC.Linker.ExtraObj
@@ -636,6 +642,38 @@ Library
         GHC.StgToCmm.Ticky
         GHC.StgToCmm.Types
         GHC.StgToCmm.Utils
+        GHC.StgToJS
+        GHC.StgToJS.Apply
+        GHC.StgToJS.Arg
+        GHC.StgToJS.Closure
+        GHC.StgToJS.CodeGen
+        GHC.StgToJS.CoreUtils
+        GHC.StgToJS.DataCon
+        GHC.StgToJS.Deps
+        GHC.StgToJS.Expr
+        GHC.StgToJS.ExprCtx
+        GHC.StgToJS.FFI
+        GHC.StgToJS.Heap
+        GHC.StgToJS.Ids
+        GHC.StgToJS.Literal
+        GHC.StgToJS.Monad
+        GHC.StgToJS.Object
+        GHC.StgToJS.Prim
+        GHC.StgToJS.Profiling
+        GHC.StgToJS.Printer
+        GHC.StgToJS.Regs
+        GHC.StgToJS.Rts.Types
+        GHC.StgToJS.Rts.Rts
+        GHC.StgToJS.Sinker
+        GHC.StgToJS.Stack
+        GHC.StgToJS.StaticPtr
+        GHC.StgToJS.StgUtils
+        GHC.StgToJS.Symbols
+        GHC.StgToJS.Types
+        GHC.StgToJS.Utils
+        GHC.StgToJS.Linker.Linker
+        GHC.StgToJS.Linker.Types
+        GHC.StgToJS.Linker.Utils
         GHC.Stg.Unarise
         GHC.SysTools
         GHC.SysTools.Ar

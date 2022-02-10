@@ -9,7 +9,7 @@ module Expression (
 
     -- ** Predicates
     (?), stage, stage0, stage1, stage2, notStage0, threadedBootstrapper,
-     package, notPackage, packageOneOf,
+     package, notPackage, packageOneOf, cross, notCross,
      libraryPackage, builder, way, input, inputs, output, outputs,
 
     -- ** Evaluation
@@ -151,3 +151,9 @@ cabalFlag pred flagName = do
     ifM (toPredicate pred) (arg flagName) (arg $ "-"<>flagName)
 
 infixr 3 `cabalFlag`
+
+cross :: Predicate
+cross = expr (flag CrossCompiling)
+
+notCross :: Predicate
+notCross = notM cross

@@ -11,7 +11,7 @@ module Oracles.Setting (
 
     -- ** Target platform things
     anyTargetPlatform, anyTargetOs, anyTargetArch, anyHostOs,
-    isElfTarget, isOsxTarget, isWinTarget,
+    isElfTarget, isOsxTarget, isWinTarget, isJsTarget,
     ArmVersion(..),
     targetArmVersion,
     ghcWithInterpreter
@@ -256,6 +256,9 @@ anyTargetOs = matchSetting TargetOs
 
 isWinTarget :: Action Bool
 isWinTarget = anyTargetOs ["mingw32"]
+
+isJsTarget :: Action Bool
+isJsTarget = anyTargetArch ["js"]
 
 isOsxTarget :: Action Bool
 isOsxTarget = anyTargetOs ["darwin"]

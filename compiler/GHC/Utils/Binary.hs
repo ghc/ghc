@@ -34,6 +34,7 @@ module GHC.Utils.Binary
     SymbolTable, Dictionary,
 
    BinData(..), dataHandle, handleData,
+   unsafeUnpackBinBuffer,
 
    openBinMem,
 --   closeBin,
@@ -47,8 +48,10 @@ module GHC.Utils.Binary
 
    writeBinMem,
    readBinMem,
+   readBinMemN,
 
    putAt, getAt,
+   forwardPut, forwardPut_, forwardGet,
 
    -- * For writing instances
    putByte,
@@ -71,8 +74,11 @@ module GHC.Utils.Binary
 
    -- * User data
    UserData(..), getUserData, setUserData,
-   newReadState, newWriteState,
+   newReadState, newWriteState, noUserData,
+
+   -- * String table ("dictionary")
    putDictionary, getDictionary, putFS,
+   FSTable, initFSTable, getDictFastString, putDictFastString,
 
    -- * Newtype wrappers
    BinSpan(..), BinSrcSpan(..), BinLocated(..)
@@ -89,10 +95,11 @@ import GHC.Types.Unique.FM
 import GHC.Data.FastMutInt
 import GHC.Utils.Fingerprint
 import GHC.Types.SrcLoc
+import GHC.Types.Unique
 import qualified GHC.Data.Strict as Strict
 
 import Control.DeepSeq
-import Foreign hiding (shiftL, shiftR)
+import Foreign hiding (shiftL, shiftR, void)
 import Data.Array
 import Data.Array.IO
 import Data.Array.Unsafe
@@ -107,7 +114,7 @@ import Data.Set                 ( Set )
 import qualified Data.Set as Set
 import Data.Time
 import Data.List (unfoldr)
-import Control.Monad            ( when, (<$!>), unless, forM_ )
+import Control.Monad            ( when, (<$!>), unless, forM_, void )
 import System.IO as IO
 import System.IO.Unsafe         ( unsafeInterleaveIO )
 import System.IO.Error          ( mkIOError, eofErrorType )
@@ -186,6 +193,12 @@ withBinBuffer (BinMem _ ix_r _ arr_r) action = do
   ix <- readFastMutInt ix_r
   action $ BS.fromForeignPtr arr 0 ix
 
+unsafeUnpackBinBuffer :: ByteString -> IO BinHandle
+unsafeUnpackBinBuffer (BS.BS arr len) = do
+  arr_r <- newIORef arr
+  ix_r <- newFastMutInt 0
+  sz_r <- newFastMutInt len
+  return (BinMem noUserData ix_r sz_r arr_r)
 
 ---------------------------------------------------------------
 -- Bin
@@ -222,7 +235,7 @@ getAt bh p = do seekBin bh p; get bh
 
 openBinMem :: Int -> IO BinHandle
 openBinMem size
- | size <= 0 = error "Data.Binary.openBinMem: size must be >= 0"
+ | size <= 0 = error "GHC.Utils.Binary.openBinMem: size must be >= 0"
  | otherwise = do
    arr <- mallocForeignPtrBytes size
    arr_r <- newIORef arr
@@ -240,6 +253,14 @@ seekBin h@(BinMem _ ix_r sz_r _) (BinPtr !p) = do
         then do expandBin h p; writeFastMutInt ix_r p
         else writeFastMutInt ix_r p
 
+-- | SeekBin but without calling expandBin
+seekBinNoExpand :: BinHandle -> Bin a -> IO ()
+seekBinNoExpand (BinMem _ ix_r sz_r _) (BinPtr !p) = do
+  sz <- readFastMutInt sz_r
+  if (p >= sz)
+        then panic "seekBinNoExpand: seek out of range"
+        else writeFastMutInt ix_r p
+
 writeBinMem :: BinHandle -> FilePath -> IO ()
 writeBinMem (BinMem _ ix_r _ arr_r) fn = do
   h <- openBinaryFile fn WriteMode
@@ -249,16 +270,27 @@ writeBinMem (BinMem _ ix_r _ arr_r) fn = do
   hClose h
 
 readBinMem :: FilePath -> IO BinHandle
--- Return a BinHandle with a totally undefined State
 readBinMem filename = do
-  h <- openBinaryFile filename ReadMode
-  filesize' <- hFileSize h
-  let filesize = fromIntegral filesize'
+  withBinaryFile filename ReadMode $ \h -> do
+    filesize' <- hFileSize h
+    let filesize = fromIntegral filesize'
+    readBinMem_ filesize h
+
+readBinMemN :: Int -> FilePath -> IO (Maybe BinHandle)
+readBinMemN size filename = do
+  withBinaryFile filename ReadMode $ \h -> do
+    filesize' <- hFileSize h
+    let filesize = fromIntegral filesize'
+    if filesize < size
+      then pure Nothing
+      else Just <$> readBinMem_ size h
+
+readBinMem_ :: Int -> Handle -> IO BinHandle
+readBinMem_ filesize h = do
   arr <- mallocForeignPtrBytes filesize
   count <- unsafeWithForeignPtr arr $ \p -> hGetBuf h p filesize
   when (count /= filesize) $
        error ("Binary.readBinMem: only read " ++ show count ++ " bytes")
-  hClose h
   arr_r <- newIORef arr
   ix_r <- newFastMutInt 0
   sz_r <- newFastMutInt filesize
@@ -557,7 +589,9 @@ getSLEB128 bh = do
 -- | Encode the argument in it's full length. This is different from many default
 -- binary instances which make no guarantee about the actual encoding and
 -- might do things use variable length encoding.
-newtype FixedLengthEncoding a = FixedLengthEncoding { unFixedLength :: a }
+newtype FixedLengthEncoding a
+  = FixedLengthEncoding { unFixedLength :: a }
+  deriving (Eq,Ord,Show)
 
 instance Binary (FixedLengthEncoding Word8) where
   put_ h (FixedLengthEncoding x) = putByte h x
@@ -920,6 +954,45 @@ instance Binary (Bin a) where
 
 
 -- -----------------------------------------------------------------------------
+-- Forward reading/writing
+
+-- | "forwardPut put_A put_B" outputs A after B but allows A to be read before B
+-- by using a forward reference
+forwardPut :: BinHandle -> (b -> IO a) -> IO b -> IO (a,b)
+forwardPut bh put_A put_B = do
+  -- write placeholder pointer to A
+  pre_a <- tellBin bh
+  put_ bh pre_a
+
+  -- write B
+  r_b <- put_B
+
+  -- update A's pointer
+  a <- tellBin bh
+  putAt bh pre_a a
+  seekBinNoExpand bh a
+
+  -- write A
+  r_a <- put_A r_b
+  pure (r_a,r_b)
+
+forwardPut_ :: BinHandle -> (b -> IO a) -> IO b -> IO ()
+forwardPut_ bh put_A put_B = void $ forwardPut bh put_A put_B
+
+-- | Read a value stored using a forward reference
+forwardGet :: BinHandle -> IO a -> IO a
+forwardGet bh get_A = do
+    -- read forward reference
+    p <- get bh -- a BinPtr
+    -- store current position
+    p_a <- tellBin bh
+    -- go read the forward value, then seek back
+    seekBinNoExpand bh p
+    r <- get_A
+    seekBinNoExpand bh p_a
+    pure r
+
+-- -----------------------------------------------------------------------------
 -- Lazy reading/writing
 
 lazyPut :: Binary a => BinHandle -> a -> IO ()
@@ -1026,8 +1099,14 @@ newWriteState put_nonbinding_name put_binding_name put_fs
                ud_put_fs   = put_fs
              }
 
-noUserData :: a
-noUserData = undef "UserData"
+noUserData :: UserData
+noUserData = UserData
+  { ud_get_name            = undef "get_name"
+  , ud_get_fs              = undef "get_fs"
+  , ud_put_nonbinding_name = undef "put_nonbinding_name"
+  , ud_put_binding_name    = undef "put_binding_name"
+  , ud_put_fs              = undef "put_fs"
+  }
 
 undef :: String -> a
 undef s = panic ("Binary.UserData: no " ++ s)
@@ -1054,6 +1133,58 @@ getDictionary bh = do
     fs <- getFS bh
     writeArray mut_arr i fs
   unsafeFreeze mut_arr
+
+getDictFastString :: Dictionary -> BinHandle -> IO FastString
+getDictFastString dict bh = do
+    j <- get bh
+    return $! (dict ! fromIntegral (j :: Word32))
+
+
+initFSTable :: BinHandle -> IO (BinHandle, FSTable, IO Int)
+initFSTable bh = do
+  dict_next_ref <- newFastMutInt 0
+  dict_map_ref <- newIORef emptyUFM
+  let bin_dict = FSTable
+        { fs_tab_next = dict_next_ref
+        , fs_tab_map  = dict_map_ref
+        }
+  let put_dict = do
+        fs_count <- readFastMutInt dict_next_ref
+        dict_map  <- readIORef dict_map_ref
+        putDictionary bh fs_count dict_map
+        pure fs_count
+
+  -- BinHandle with FastString writing support
+  let ud = getUserData bh
+  let ud_fs = ud { ud_put_fs = putDictFastString bin_dict }
+  let bh_fs = setUserData bh ud_fs
+
+  return (bh_fs,bin_dict,put_dict)
+
+putDictFastString :: FSTable -> BinHandle -> FastString -> IO ()
+putDictFastString dict bh fs = allocateFastString dict fs >>= put_ bh
+
+allocateFastString :: FSTable -> FastString -> IO Word32
+allocateFastString FSTable { fs_tab_next = j_r
+                           , fs_tab_map  = out_r
+                           } f = do
+    out <- readIORef out_r
+    let !uniq = getUnique f
+    case lookupUFM_Directly out uniq of
+        Just (j, _)  -> return (fromIntegral j :: Word32)
+        Nothing -> do
+           j <- readFastMutInt j_r
+           writeFastMutInt j_r (j + 1)
+           writeIORef out_r $! addToUFM_Directly out uniq (j, f)
+           return (fromIntegral j :: Word32)
+
+-- FSTable is an exact copy of Haddock.InterfaceFile.BinDictionary. We rename to
+-- avoid a collision and copy to avoid a dependency.
+data FSTable = FSTable { fs_tab_next :: !FastMutInt -- The next index to use
+                       , fs_tab_map  :: !(IORef (UniqFM FastString (Int,FastString)))
+                                -- indexed by FastString
+  }
+
 
 ---------------------------------------------------------
 -- The Symbol Table

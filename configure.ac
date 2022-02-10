@@ -333,7 +333,7 @@ AC_SUBST(TablesNextToCode)
 dnl ** Does target have runtime linker support?
 dnl --------------------------------------------------------------
 case "$target" in
-    powerpc64-*|powerpc64le-*|powerpc-ibm-aix*|s390x-ibm-linux|riscv64-*|wasm*)
+    powerpc64-*|powerpc64le-*|powerpc-ibm-aix*|s390x-ibm-linux|riscv64-*|wasm*|js-*)
         TargetHasRTSLinker=NO
         ;;
     *)
@@ -691,8 +691,12 @@ AC_SUBST(CONF_HC_OPTS_STAGE0)
 AC_SUBST(CONF_HC_OPTS_STAGE1)
 AC_SUBST(CONF_HC_OPTS_STAGE2)
 
-dnl Identify C++ standard library flavour and location
-FP_FIND_CXX_STD_LIB
+dnl Identify C++ standard library flavour and location only when _not_ compiling
+dnl the JS backend. The JS backend uses emscripten to wrap c++ utilities which
+dnl fails this check, so we avoid it when compiling to JS.
+if test "$TargetOS" != "ghcjs"; then
+   FP_FIND_CXX_STD_LIB
+fi
 AC_CONFIG_FILES([mk/system-cxx-std-lib-1.0.conf])
 
 dnl ** Set up the variables for the platform in the settings file.

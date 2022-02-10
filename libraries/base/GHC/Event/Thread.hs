@@ -2,7 +2,12 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE BangPatterns, NoImplicitPrelude #-}
 
+#include <ghcplatform.h>
+
 module GHC.Event.Thread
+#if defined(js_HOST_ARCH)
+    ( ) where
+#else
     ( getSystemEventManager
     , getSystemTimerManager
     , ensureIOManagerIsRunning
@@ -17,7 +22,6 @@ module GHC.Event.Thread
     , blockedOnBadFD -- used by RTS
     ) where
 
-#include <ghcplatform.h>
 
 -- TODO: Use new Windows I/O manager
 import Control.Exception (finally, SomeException, toException)
@@ -438,4 +442,6 @@ foreign import ccall unsafe "setIOManagerControlFd"
 
 foreign import ccall unsafe "setTimerManagerControlFd"
    c_setTimerManagerControlFd :: CInt -> IO ()
+#endif
+
 #endif

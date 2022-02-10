@@ -132,6 +132,7 @@ import GHC.Driver.Config.Stg.Pipeline (initStgPipelineOpts)
 import GHC.Driver.Config.StgToCmm  (initStgToCmmConfig)
 import GHC.Driver.Config.Cmm       (initCmmConfig)
 import GHC.Driver.LlvmConfigCache  (initLlvmConfigCache)
+import GHC.Driver.Config.StgToJS  (initStgToJSConfig)
 import GHC.Driver.Config.Diagnostic
 import GHC.Driver.Config.Tidy
 import GHC.Driver.Hooks
@@ -153,6 +154,7 @@ import GHC.Hs.Stats         ( ppSourceStats )
 import GHC.HsToCore
 
 import GHC.StgToByteCode    ( byteCodeGen )
+import GHC.StgToJS          ( stgToJS )
 
 import GHC.IfaceToCore  ( typecheckIface, typecheckWholeCoreBindings )
 
@@ -1789,7 +1791,9 @@ hscGenHardCode hsc_env cgguts location output_filename = do
                     cg_foreign  = foreign_stubs0,
                     cg_foreign_files = foreign_files,
                     cg_dep_pkgs = dependencies,
-                    cg_hpc_info = hpc_info } = cgguts
+                    cg_hpc_info = hpc_info,
+                    cg_spt_entries = spt_entries
+                    } = cgguts
             dflags = hsc_dflags hsc_env
             logger = hsc_logger hsc_env
             hooks  = hsc_hooks hsc_env
@@ -1849,38 +1853,53 @@ hscGenHardCode hsc_env cgguts location output_filename = do
         ------------------  Code generation ------------------
         -- The back-end is streamed: each top-level function goes
         -- from Stg all the way to asm before dealing with the next
-        -- top-level function, so showPass isn't very useful here.
-        -- Hence we have one showPass for the whole backend, the
-        -- next showPass after this will be "Assembler".
-        withTiming logger
-                   (text "CodeGen"<+>brackets (ppr this_mod))
-                   (const ()) $ do
-            cmms <- {-# SCC "StgToCmm" #-}
-                            doCodeGen hsc_env this_mod denv data_tycons
-                                cost_centre_info
-                                stg_binds hpc_info
+        -- top-level function, so withTiming isn't very useful here.
+        -- Hence we have one withTiming for the whole backend, the
+        -- next withTiming after this will be "Assembler" (hard code only).
+        withTiming logger (text "CodeGen"<+>brackets (ppr this_mod)) (const ())
+         $ case backendCodeOutput (backend dflags) of
+            JSCodeOutput ->
+              do
+              let js_config = initStgToJSConfig dflags
+                  cmm_cg_infos  = Nothing
+                  stub_c_exists = Nothing
+                  foreign_fps   = []
 
-            ------------------  Code output -----------------------
-            rawcmms0 <- {-# SCC "cmmToRawCmm" #-}
-                        case cmmToRawCmmHook hooks of
-                            Nothing -> cmmToRawCmm logger profile cmms
-                            Just h  -> h dflags (Just this_mod) cmms
+              putDumpFileMaybe logger Opt_D_dump_stg_final "Final STG:" FormatSTG
+                  (pprGenStgTopBindings (initStgPprOpts dflags) stg_binds)
 
-            let dump a = do
-                  unless (null a) $
-                    putDumpFileMaybe logger Opt_D_dump_cmm_raw "Raw Cmm" FormatCMM (pdoc platform a)
-                  return a
-                rawcmms1 = Stream.mapM dump rawcmms0
+              -- do the unfortunately effectual business
+              stgToJS logger js_config stg_binds this_mod spt_entries foreign_stubs0 cost_centre_info output_filename
+              return (output_filename, stub_c_exists, foreign_fps, Just stg_cg_infos, cmm_cg_infos)
 
-            let foreign_stubs st = foreign_stubs0 `appendStubC` prof_init
-                                                  `appendStubC` cgIPEStub st
+            _          ->
+              do
+              cmms <- {-# SCC "StgToCmm" #-}
+                doCodeGen hsc_env this_mod denv data_tycons
+                cost_centre_info
+                stg_binds hpc_info
 
-            (output_filename, (_stub_h_exists, stub_c_exists), foreign_fps, cmm_cg_infos)
-                <- {-# SCC "codeOutput" #-}
-                  codeOutput logger tmpfs llvm_config dflags (hsc_units hsc_env) this_mod output_filename location
-                  foreign_stubs foreign_files dependencies rawcmms1
-            return  ( output_filename, stub_c_exists, foreign_fps
-                    , Just stg_cg_infos, Just cmm_cg_infos)
+              ------------------  Code output -----------------------
+              rawcmms0 <- {-# SCC "cmmToRawCmm" #-}
+                case cmmToRawCmmHook hooks of
+                  Nothing -> cmmToRawCmm logger profile cmms
+                  Just h  -> h dflags (Just this_mod) cmms
+
+              let dump a = do
+                    unless (null a) $ putDumpFileMaybe logger Opt_D_dump_cmm_raw "Raw Cmm" FormatCMM (pdoc platform a)
+                    return a
+                  rawcmms1 = Stream.mapM dump rawcmms0
+
+              let foreign_stubs st = foreign_stubs0
+                                     `appendStubC` prof_init
+                                     `appendStubC` cgIPEStub st
+
+              (output_filename, (_stub_h_exists, stub_c_exists), foreign_fps, cmm_cg_infos)
+                  <- {-# SCC "codeOutput" #-}
+                    codeOutput logger tmpfs llvm_config dflags (hsc_units hsc_env) this_mod output_filename location
+                    foreign_stubs foreign_files dependencies rawcmms1
+              return  ( output_filename, stub_c_exists, foreign_fps
+                      , Just stg_cg_infos, Just cmm_cg_infos)
 
 
 -- The part of CgGuts that we need for HscInteractive

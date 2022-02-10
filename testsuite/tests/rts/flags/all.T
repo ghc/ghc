@@ -1,3 +1,5 @@
+setTestOpts(js_skip) # JS backend doesn't support native RTS flags
+
 # We ignore ways which depend on passing RTS arguments for simplicity and only
 # run in normal way.
 

@@ -14,6 +14,7 @@ else:
     dyn = '--disable-shared'
 
 test('recompTHpackage', [extra_files(['p', 'q', 'Setup.hs']),
-                   when(fast(), skip)],
+                   when(fast(), skip),
+                   js_broken(22352)],
      run_command,
      ['$MAKE -s --no-print-directory recompTHpackage VANILLA=' + vanilla + ' PROF=' + prof + ' DYN=' + dyn])

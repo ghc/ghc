@@ -1,3 +1,4 @@
+setTestOpts(js_skip)
 
 test('space_leak_001',
      # This could potentially be replaced with

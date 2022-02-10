@@ -2443,6 +2443,8 @@ dynamic_flags_deps = [
         (setDumpFlag Opt_D_dump_core_stats)
   , make_ord_flag defGhcFlag "ddump-asm"
         (setDumpFlag Opt_D_dump_asm)
+  , make_ord_flag defGhcFlag "ddump-js"
+        (setDumpFlag Opt_D_dump_js)
   , make_ord_flag defGhcFlag "ddump-asm-native"
         (setDumpFlag Opt_D_dump_asm_native)
   , make_ord_flag defGhcFlag "ddump-asm-liveness"
@@ -4943,6 +4945,7 @@ data CompilerInfo
    | Clang
    | AppleClang
    | AppleClang51
+   | Emscripten
    | UnknownCC
    deriving Eq
 

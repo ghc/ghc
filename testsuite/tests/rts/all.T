@@ -42,6 +42,7 @@ test('derefnull',
       when(platform('aarch64-apple-darwin'), [ignore_stderr, exit_code(139)]),
       when(opsys('mingw32'), [ignore_stderr, exit_code(11)]),
       when(opsys('mingw32'), [fragile(18548)]),
+      when(platform('js-unknown-ghcjs'), [ignore_stderr, exit_code(1)]),
       # ThreadSanitizer changes the output
       when(have_thread_sanitizer(), skip),
       # since these test are supposed to crash the
@@ -96,10 +97,14 @@ test('outofmem', [ when(opsys('darwin'), skip),
                    # windows, to prevent absolute exhaustion of memory
                    # and subsequent termination (and failure) of unrelated
                    # tests.
+                   js_skip,
+                   # similarly for the JS backend
                    when(opsys('mingw32'), skip),
 		   normalise_errmsg_fun(remove_parenthesis)],
                  makefile_test, ['outofmem'])
-test('outofmem2', normal, makefile_test, ['outofmem2'])
+test('outofmem2',
+  [ js_skip # JS backend doesn't detect heap exhaustion
+  ], makefile_test, ['outofmem2'])
 
 test('T2047',
      [ignore_stdout,
@@ -136,6 +141,7 @@ test('stack003', [ omit_ways(['ghci']), # uses unboxed tuples
 
 # Test that +RTS -K0 (e.g. no stack limit) parses correctly
 test('stack004', [ extra_run_opts('+RTS -K0 -RTS')
+                 , js_broken(22374)
                  , expect_broken_for(14913, ['ghci'])
                  ], compile_and_run, [''])
 
@@ -151,31 +157,44 @@ test('T3424',
      compile_and_run, [''])
 
 # Test for out-of-range heap size
-test('rtsflags001', [ only_ways(['normal']), exit_code(1), extra_run_opts('+RTS -H0m -RTS') ], compile_and_run, [''])
+test('rtsflags001', [ only_ways(['normal']),
+                      exit_code(1),
+                      extra_run_opts('+RTS -H0m -RTS'),
+                      js_skip # JS backend uses its own rts.
+                    ],
+                     compile_and_run, [''])
 
 # Crashed with 7.2 and earlier
-test('rtsflags002', [ only_ways(['normal']) ], compile_and_run, ['-with-rtsopts="-B -B -B"'])
+test('rtsflags002', [ only_ways(['normal']), js_broken(22261) ], compile_and_run, ['-with-rtsopts="-B -B -B"'])
 
 # omit dyn and profiling ways, because we don't build dyn_l or p_l
 # variants of the RTS by default
 test('traceEvent', [ omit_ways(['dyn', 'ghci'] + prof_ways),
-                     extra_run_opts('+RTS -ls -RTS') ],
+                     extra_run_opts('+RTS -ls -RTS'),
+                     js_skip # JS backend has no payload size limit
+                   ],
                    compile_and_run, [''])
 
 test('traceBinaryEvent', [ omit_ways(['dyn', 'ghci'] + prof_ways),
-                           extra_run_opts('+RTS -ls -RTS') ],
+                           extra_run_opts('+RTS -ls -RTS'),
+                           js_skip # traceBinaryEvent not supported
+                           ],
                          compile_and_run, [''])
 
 # Test that -ol flag works as expected
 test('EventlogOutput1',
      [ extra_files(["EventlogOutput.hs"]),
-       omit_ways(['dyn', 'ghci'] + prof_ways) ],
+       omit_ways(['dyn', 'ghci'] + prof_ways),
+       js_skip
+     ],
      makefile_test, ['EventlogOutput1'])
 
 # Test that -ol flag defaults to <program>.eventlog
 test('EventlogOutput2',
      [ extra_files(["EventlogOutput.hs"]),
-       omit_ways(['dyn', 'ghci'] + prof_ways) ],
+       omit_ways(['dyn', 'ghci'] + prof_ways),
+       js_skip
+     ],
      makefile_test, ['EventlogOutput2'])
 
 test('EventlogOutputNull',
@@ -202,12 +221,16 @@ test('T4059', req_c, makefile_test, ['T4059'])
 test('exec_signals',
      [when(opsys('mingw32'), skip),
       pre_cmd('$MAKE -s --no-print-directory exec_signals-prep'),
-      cmd_prefix('./exec_signals_prepare')],
+      cmd_prefix('./exec_signals_prepare'),
+      js_broken(22355)],
      compile_and_run, [''])
 
 test('return_mem_to_os', normal, compile_and_run, [''])
 
-test('T4850', when(opsys('mingw32'), expect_broken(4850)), makefile_test, ['T4850'])
+test('T4850',
+  [ when(opsys('mingw32'), expect_broken(4850))
+  , js_broken(22261) # FFI "dynamic" convention unsupported
+  ], makefile_test, ['T4850'])
 
 def config_T5250(name, opts):
     if not (config.arch in ['i386','x86_64']):
@@ -227,18 +250,22 @@ test('T5423', cmm_src, makefile_test, ['T5423'])
 test('T5993', extra_run_opts('+RTS -k8 -RTS'), compile_and_run, [''])
 
 test('T6006', [ omit_ways(prof_ways + ['ghci']),
-                 pre_cmd('$MAKE -s --no-print-directory T6006_setup') ],
+                 pre_cmd('$MAKE -s --no-print-directory T6006_setup'),
+                 js_skip
+                 ],
                  # The T6006_setup hack is to ensure that we generate
                  # T6006_stub.h before compiling T6006_c.c, which
                  # needs it.
                compile_and_run, ['T6006_c.c -no-hs-main'])
 
-test('T7037', [], makefile_test, ['T7037'])
+test('T7037', js_broken(22374), makefile_test, ['T7037'])
 
 test('T7087', exit_code(1), compile_and_run, [''])
-test('T7160', omit_ways(['nonmoving_thr', 'nonmoving_thr_ghc']), compile_and_run, [''])
+test('T7160', [ omit_ways(['nonmoving_thr', 'nonmoving_thr_ghc'])
+              , js_broken(22261)
+              ], compile_and_run, [''])
 
-test('T7040', [omit_ways(['ghci'])], compile_and_run, ['T7040_c.c'])
+test('T7040', [omit_ways(['ghci']), req_c], compile_and_run, ['T7040_c.c'])
 
 test('T7040_ghci',
      [extra_files(['T7040_c.h']),
@@ -307,16 +334,19 @@ test('T10017', [ when(opsys('mingw32'), skip)
 
 test('T11108', normal, compile_and_run, [''])
 
-test('GcStaticPointers', [when(doing_ghci(), extra_hc_opts('-fobject-code'))],
+test('GcStaticPointers', [ when(doing_ghci()
+                         , extra_hc_opts('-fobject-code'))
+                         , js_broken(22261)
+                         ],
      compile_and_run, [''])
 test('ListStaticPointers', [when(doing_ghci(), extra_hc_opts('-fobject-code'))],
      compile_and_run, [''])
 
 # 251 = RTS exit code for "out of memory"
-test('overflow1', [ exit_code(251), when(wordsize(32), expect_broken(15255)) ],
+test('overflow1', [ js_skip, exit_code(251), when(wordsize(32), expect_broken(15255)) ],
      compile_and_run, [''])
-test('overflow2', [ exit_code(251) ], compile_and_run, [''])
-test('overflow3', [ exit_code(251) ], compile_and_run, [''])
+test('overflow2', [ js_skip, exit_code(251) ], compile_and_run, [''])
+test('overflow3', [ js_skip, exit_code(251) ], compile_and_run, [''])
 
 def grep_stderr(pattern):
     def wrapper(cmd, pattern=pattern):
@@ -326,8 +356,10 @@ def grep_stderr(pattern):
 
 # The ghci way gets confused by the RTS options
 test('T9839_01',
-     [omit_ways(['ghci']), extra_run_opts('+RTS -T-s'), no_check_hp,
-      grep_stderr('given an argument when none was expected')],
+     [ omit_ways(['ghci']), extra_run_opts('+RTS -T-s'), no_check_hp
+     , grep_stderr('given an argument when none was expected')
+     , js_broken(22261)
+     ],
      compile_and_run, [''])
 
 test('T9839_02',
@@ -352,16 +384,19 @@ test('T9839_05',
 # ignore_stderr as RTS reports slightly different error messages
 # in 'epoll' and 'select' backends on reading from EBADF
 # mingw32 skip as UNIX pipe and close(fd) is used to exercise the problem
-test('T10590', [ignore_stderr, when(opsys('mingw32'), skip)], compile_and_run, [''])
+test('T10590', [ ignore_stderr
+               , when(opsys('mingw32'), skip)
+               , js_skip # JS backend doesn't support pipes
+               ], compile_and_run, [''])
 
 # 20000 was easily enough to trigger the bug with 7.10
-test('T10904', [ omit_ways(['ghci']), extra_run_opts('20000') ],
+test('T10904', [ omit_ways(['ghci']), extra_run_opts('20000'), req_c ],
                compile_and_run, ['T10904lib.c'])
 
 test('T10728', [extra_run_opts('+RTS -maxN3 -RTS'), only_ways(['threaded2'])],
                compile_and_run, [''])
 
-test('T9405', [when(opsys('mingw32'), expect_broken(21361))], makefile_test, ['T9405'])
+test('T9405', [when(opsys('mingw32'), expect_broken(21361)), js_broken(22261)], makefile_test, ['T9405'])
 
 test('T11788', [ when(ghc_dynamic(), skip)
                , req_interp
@@ -387,7 +422,8 @@ test('T13617', [ unless(opsys('mingw32'), skip)],
 test('T12903', [ when(opsys('mingw32'), skip)
                , when(opsys('darwin'), skip)
                , when(arch('i386'), fragile(20377))
-               , omit_ways(['ghci', 'profasm'])]
+               , omit_ways(['ghci', 'profasm'])
+               , js_broken(22374)]
                , compile_and_run, [''])
 
 test('T13832', exit_code(1), compile_and_run, ['-threaded'])
@@ -395,7 +431,7 @@ test('T13894', normal, compile_and_run, [''])
 # this test fails with the profasm way on some machines but not others,
 # so we just skip it.
 test('T14497', [omit_ways(['profasm']), multi_cpu_race], compile_and_run, ['-O'])
-test('T14695', [normal, ignore_stderr], makefile_test, ['T14695'])
+test('T14695', [js_broken(22359), ignore_stderr], makefile_test, ['T14695'])
 test('T14702', [ ignore_stdout
                , when(unregisterised(), skip)
                , when(opsys('mingw32'), fragile(18953))
@@ -404,9 +440,14 @@ test('T14702', [ ignore_stdout
                ]
                , compile_and_run, [''])
 
-test('T14900', normal, compile_and_run, ['-package ghc-compact'])
-test('InternalCounters', normal, makefile_test, ['InternalCounters'])
-test('alloccounter1', normal, compile_and_run,
+test('T14900',
+  [ js_skip # Compact regions not supported by the JS backend yet
+  ], compile_and_run, ['-package ghc-compact'])
+
+test('InternalCounters',
+  [ js_skip # JS backend doesn't support internal counters
+  ], makefile_test, ['InternalCounters'])
+test('alloccounter1', js_broken(22261), compile_and_run,
   [
     # avoid allocating stack chunks, which counts as
     # allocation and messes up the results:
@@ -472,19 +513,21 @@ test('T17088',
      [only_ways(['normal']), extra_run_opts('+RTS -c -A256k -RTS')],
      compile_and_run, ['-rtsopts -O2'])
 
-test('T15427', normal, compile_and_run, [''])
+test('T15427', js_broken(22374), compile_and_run, [''])
 
 test('T19481',
      [extra_run_opts('+RTS -T -RTS'),
+      js_broken(22374),
       # memory behavior changes appreciably with the nonmoving collector
       omit_ways(['nonmoving', 'nonmoving_thr', 'nonmoving_thr_sanity'])],
      compile_and_run, [''])
 test('T19381',
      [extra_run_opts('+RTS -T -RTS'),
+      js_broken(22374),
       # memory behavior changes appreciably with the nonmoving collector
       omit_ways(['nonmoving', 'nonmoving_thr', 'nonmoving_thr_sanity'])],
      compile_and_run, [''])
-test('T20199', [ grep_errmsg('Hello') ]
+test('T20199', [ grep_errmsg('Hello'), req_c ]
       , makefile_test, [])
 
 # We need to be precise about the used way here as different ways may lead to
@@ -492,12 +535,30 @@ test('T20199', [ grep_errmsg('Hello') ]
 # test).
 test('cloneMyStack', [req_c,only_ways(['normal']), extra_files(['cloneStackLib.c'])],
      compile_and_run, ['cloneStackLib.c'])
-test('cloneMyStack2', ignore_stdout, compile_and_run, [''])
+
+test('cloneMyStack2',
+  [ ignore_stdout
+  , js_broken(22261) # cloneMyStack# not yet implemented
+  ], compile_and_run, [''])
+
 test('cloneMyStack_retBigStackFrame', [req_c, extra_files(['cloneStackLib.c']), ignore_stdout], compile_and_run, ['cloneStackLib.c'])
+
 test('cloneThreadStack', [req_c, only_ways(['threaded1']), extra_ways(['threaded1']), extra_files(['cloneStackLib.c'])], compile_and_run, ['cloneStackLib.c -threaded'])
-test('decodeMyStack', normal, compile_and_run, ['-finfo-table-map'])
+
+test('decodeMyStack',
+  [ js_broken(22261) # cloneMyStack# not yet implemented
+  ], compile_and_run, ['-finfo-table-map'])
+
 # Options:
 #   - `-kc8K`: Set stack chunk size to it's minimum to provoke underflow stack frames.
-test('decodeMyStack_underflowFrames', [extra_run_opts('+RTS -kc8K -RTS')], compile_and_run, ['-finfo-table-map -rtsopts'])
+test('decodeMyStack_underflowFrames',
+  [ extra_run_opts('+RTS -kc8K -RTS')
+  , js_broken(22261) # cloneMyStack# not yet implemented
+  ], compile_and_run, ['-finfo-table-map -rtsopts'])
+
 # -finfo-table-map intentionally missing
-test('decodeMyStack_emptyListForMissingFlag', [ignore_stdout, ignore_stderr], compile_and_run, [''])
+test('decodeMyStack_emptyListForMissingFlag',
+  [ ignore_stdout
+  , ignore_stderr
+  , js_broken(22261) # cloneMyStack# not yet implemented
+  ], compile_and_run, [''])

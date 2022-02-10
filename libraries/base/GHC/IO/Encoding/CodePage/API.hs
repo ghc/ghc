@@ -32,6 +32,10 @@ import GHC.ForeignPtr (castForeignPtr)
 
 import System.Posix.Internals
 
+#if defined(js_HOST_ARCH)
+mkCodePageEncoding :: String
+mkCodePageEncoding = ""
+#else
 
 c_DEBUG_DUMP :: Bool
 c_DEBUG_DUMP = False
@@ -422,3 +426,5 @@ cpRecode try' is_valid_prefix max_i_size min_o_size iscale oscale = go
             -- Must have interpreted all given bytes successfully
             -- We need to iterate until we have consumed the complete contents of the buffer
             Right wrote_elts -> go (bufferRemove n ibuf) (obuf { bufR = bufR obuf + wrote_elts })
+
+#endif

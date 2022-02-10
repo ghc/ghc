@@ -56,6 +56,7 @@ data ContextData = ContextData
     , cSrcs              :: [String]
     , cxxSrcs            :: [String]
     , cmmSrcs            :: [String]
+    , jsSrcs             :: [String]
     , hcOpts             :: [String]
     , asmOpts            :: [String]
     , ccOpts             :: [String]

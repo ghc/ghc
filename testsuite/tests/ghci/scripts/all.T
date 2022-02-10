@@ -258,7 +258,7 @@ test('T10963', normal, ghci_script, ['T10963.script'])
 test('T11547', normal, ghci_script, ['T11547.script'])
 test('T11721', normal, ghci_script, ['T11721.script'])
 test('T12005', normal, ghci_script, ['T12005.script'])
-test('T12023', normal, makefile_test, [])
+test('T12023', js_broken(22359), makefile_test, [])
 test('T12520', normal, ghci_script, ['T12520.script'])
 test('T12091', [extra_run_opts('-fobject-code')], ghci_script,
      ['T12091.script'])

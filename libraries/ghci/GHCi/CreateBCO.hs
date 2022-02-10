@@ -5,6 +5,7 @@
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE CPP #-}
 
 --
 --  (c) The University of Glasgow 2002-2006
@@ -132,7 +133,12 @@ writePtrsArrayPtr (I# i) (Ptr a#) (PtrsArr arr) = IO $ \s ->
 -- without making a thunk turns out to be surprisingly tricky.
 {-# NOINLINE writeArrayAddr# #-}
 writeArrayAddr# :: MutableArray# s a -> Int# -> Addr# -> State# s -> State# s
+#if defined(js_HOST_ARCH)
+-- Addr# isn't coercible with Any with the JS backend.
+writeArrayAddr# = error "writeArrayAddr#: currently unsupported with the JS backend"
+#else
 writeArrayAddr# marr i addr s = unsafeCoerce# writeArray# marr i addr s
+#endif
 
 writePtrsArrayBCO :: Int -> BCO -> PtrsArr -> IO ()
 writePtrsArrayBCO (I# i) bco (PtrsArr arr) = IO $ \s ->

@@ -42,7 +42,7 @@ module GHC.Driver.Pipeline (
    TPipelineClass, MonadUse(..),
 
    preprocessPipeline, fullPipeline, hscPipeline, hscBackendPipeline, hscPostBackendPipeline,
-   hscGenBackendPipeline, asPipeline, viaCPipeline, cmmCppPipeline, cmmPipeline,
+   hscGenBackendPipeline, asPipeline, viaCPipeline, cmmCppPipeline, cmmPipeline, jsPipeline,
    llvmPipeline, llvmLlcPipeline, llvmManglePipeline, pipelineStart,
 
    -- * Default method of running a pipeline
@@ -62,6 +62,7 @@ import GHC.Driver.Errors
 import GHC.Driver.Errors.Types
 import GHC.Driver.Pipeline.Monad
 import GHC.Driver.Config.Diagnostic
+import GHC.Driver.Config.StgToJS
 import GHC.Driver.Phases
 import GHC.Driver.Pipeline.Execute
 import GHC.Driver.Pipeline.Phases
@@ -80,6 +81,9 @@ import GHC.Linker.ExtraObj
 import GHC.Linker.Static
 import GHC.Linker.Static.Utils
 import GHC.Linker.Types
+
+import GHC.StgToJS.Linker.Linker
+import GHC.StgToJS.Linker.Types (defaultJSLinkConfig)
 
 import GHC.Utils.Outputable
 import GHC.Utils.Error
@@ -364,17 +368,17 @@ link :: GhcLink                 -- ^ interactive or batch
 link ghcLink logger tmpfs hooks dflags unit_env batch_attempt_linking mHscMessage hpt =
   case linkHook hooks of
       Nothing -> case ghcLink of
-          NoLink        -> return Succeeded
-          LinkBinary    -> normal_link
-          LinkStaticLib -> normal_link
-          LinkDynLib    -> normal_link
-          LinkMergedObj -> normal_link
-          LinkInMemory
-              | platformMisc_ghcWithInterpreter $ platformMisc dflags
-              -> -- Not Linking...(demand linker will do the job)
-                 return Succeeded
-              | otherwise
-              -> panicBadLink LinkInMemory
+        NoLink        -> return Succeeded
+        LinkBinary    -> normal_link
+        LinkStaticLib -> normal_link
+        LinkDynLib    -> normal_link
+        LinkMergedObj -> normal_link
+        LinkInMemory
+          | platformMisc_ghcWithInterpreter $ platformMisc dflags
+           -- Not Linking...(demand linker will do the job)
+            -> return Succeeded
+          | otherwise
+            -> panicBadLink LinkInMemory
       Just h  -> h ghcLink dflags batch_attempt_linking hpt
   where
     normal_link = link' logger tmpfs dflags unit_env batch_attempt_linking mHscMessage hpt
@@ -412,7 +416,9 @@ link' logger tmpfs dflags unit_env batch_attempt_linking mHscMessager hpt
             -- the linkables to link
             linkables = map (expectJust "link". homeModInfoObject) home_mod_infos
 
+        debugTraceMsg logger 3 (text "link: hmi ..." $$ vcat (map (ppr . mi_module . hm_iface) home_mod_infos))
         debugTraceMsg logger 3 (text "link: linkables are ..." $$ vcat (map ppr linkables))
+        debugTraceMsg logger 3 (text "link: pkg deps are ..." $$ vcat (map ppr pkg_deps))
 
         -- check for the -no-link flag
         if isNoLink (ghcLink dflags)
@@ -423,7 +429,8 @@ link' logger tmpfs dflags unit_env batch_attempt_linking mHscMessager hpt
         let getOfiles LM{ linkableUnlinked } = map nameOfObject (filter isObject linkableUnlinked)
             obj_files = concatMap getOfiles linkables
             platform  = targetPlatform dflags
-            exe_file  = exeFileName platform staticLink (outputFile_ dflags)
+            arch_os   = platformArchOS platform
+            exe_file  = exeFileName arch_os staticLink (outputFile_ dflags)
 
         linking_needed <- linkingNeeded logger dflags unit_env staticLink linkables pkg_deps
 
@@ -435,12 +442,13 @@ link' logger tmpfs dflags unit_env batch_attempt_linking mHscMessager hpt
 
 
         -- Don't showPass in Batch mode; doLink will do that for us.
-        let link = case ghcLink dflags of
-                LinkBinary    -> linkBinary logger tmpfs
-                LinkStaticLib -> linkStaticLib logger
-                LinkDynLib    -> linkDynLibCheck logger tmpfs
-                other         -> panicBadLink other
-        link dflags unit_env obj_files pkg_deps
+        case ghcLink dflags of
+          LinkBinary
+            | backendUseJSLinker (backend dflags) -> linkJSBinary logger dflags unit_env obj_files pkg_deps
+            | otherwise -> linkBinary logger tmpfs dflags unit_env obj_files pkg_deps
+          LinkStaticLib -> linkStaticLib logger dflags unit_env obj_files pkg_deps
+          LinkDynLib    -> linkDynLibCheck logger tmpfs dflags unit_env obj_files pkg_deps
+          other         -> panicBadLink other
 
         debugTraceMsg logger 3 (text "link: done")
 
@@ -453,6 +461,15 @@ link' logger tmpfs dflags unit_env batch_attempt_linking mHscMessager hpt
         return Succeeded
 
 
+linkJSBinary :: Logger -> DynFlags -> UnitEnv -> [FilePath] -> [UnitId] -> IO ()
+linkJSBinary logger dflags unit_env obj_files pkg_deps = do
+  -- we use the default configuration for now. In the future we may expose
+  -- settings to the user via DynFlags.
+  let lc_cfg   = defaultJSLinkConfig
+  let cfg      = initStgToJSConfig dflags
+  let extra_js = mempty
+  jsLinkBinary lc_cfg cfg extra_js logger dflags unit_env obj_files pkg_deps
+
 linkingNeeded :: Logger -> DynFlags -> UnitEnv -> Bool -> [Linkable] -> [UnitId] -> IO RecompileRequired
 linkingNeeded logger dflags unit_env staticLink linkables pkg_deps = do
         -- if the modification time on the executable is later than the
@@ -460,7 +477,8 @@ linkingNeeded logger dflags unit_env staticLink linkables pkg_deps = do
         -- linking (unless the -fforce-recomp flag was given).
   let platform   = ue_platform unit_env
       unit_state = ue_units unit_env
-      exe_file   = exeFileName platform staticLink (outputFile_ dflags)
+      arch_os    = platformArchOS platform
+      exe_file   = exeFileName arch_os staticLink (outputFile_ dflags)
   e_exe_time <- tryIO $ getModificationUTCTime exe_file
   case e_exe_time of
     Left _  -> return $ NeedsRecompile MustCompile
@@ -544,23 +562,27 @@ compileFile hsc_env stop_phase (src, mb_phase) = do
 
 
 doLink :: HscEnv -> [FilePath] -> IO ()
-doLink hsc_env o_files =
-    let
-        dflags   = hsc_dflags   hsc_env
-        logger   = hsc_logger   hsc_env
-        unit_env = hsc_unit_env hsc_env
-        tmpfs    = hsc_tmpfs    hsc_env
-    in case ghcLink dflags of
-        NoLink        -> return ()
-        LinkBinary    -> linkBinary         logger tmpfs dflags unit_env o_files []
-        LinkStaticLib -> linkStaticLib      logger       dflags unit_env o_files []
-        LinkDynLib    -> linkDynLibCheck    logger tmpfs dflags unit_env o_files []
-        LinkMergedObj
-          | Just out <- outputFile dflags
-          , let objs = [ f | FileOption _ f <- ldInputs dflags ]
-                      -> joinObjectFiles hsc_env (o_files ++ objs) out
-          | otherwise -> panic "Output path must be specified for LinkMergedObj"
-        other         -> panicBadLink other
+doLink hsc_env o_files = do
+  let
+    dflags   = hsc_dflags   hsc_env
+    logger   = hsc_logger   hsc_env
+    unit_env = hsc_unit_env hsc_env
+    tmpfs    = hsc_tmpfs    hsc_env
+
+  case ghcLink dflags of
+    NoLink        -> return ()
+    LinkBinary
+      | backendUseJSLinker (backend dflags)
+                  -> linkJSBinary logger dflags unit_env o_files []
+      | otherwise -> linkBinary logger tmpfs dflags unit_env o_files []
+    LinkStaticLib -> linkStaticLib      logger       dflags unit_env o_files []
+    LinkDynLib    -> linkDynLibCheck    logger tmpfs dflags unit_env o_files []
+    LinkMergedObj
+      | Just out <- outputFile dflags
+      , let objs = [ f | FileOption _ f <- ldInputs dflags ]
+                  -> joinObjectFiles hsc_env (o_files ++ objs) out
+      | otherwise -> panic "Output path must be specified for LinkMergedObj"
+    other         -> panicBadLink other
 
 -----------------------------------------------------------------------------
 -- stub .h and .c files (for foreign export support), and cc files.
@@ -585,6 +607,7 @@ compileForeign hsc_env lang stub_c = do
               LangObjc   -> viaCPipeline Cobjc
               LangObjcxx -> viaCPipeline Cobjcxx
               LangAsm    -> \pe hsc_env ml fp -> asPipeline True pe hsc_env ml fp
+              LangJs     -> \pe hsc_env ml fp -> Just <$> jsPipeline pe hsc_env ml fp
 #if __GLASGOW_HASKELL__ < 811
               RawObject  -> panic "compileForeign: should be unreachable"
 #endif
@@ -608,14 +631,27 @@ compileEmptyStub dflags hsc_env basename location mod_name = do
   -- and https://github.com/haskell/cabal/issues/2257
   let logger = hsc_logger hsc_env
   let tmpfs  = hsc_tmpfs hsc_env
-  empty_stub <- newTempName logger tmpfs (tmpDir dflags) TFL_CurrentModule "c"
   let home_unit = hsc_home_unit hsc_env
-      src = text "int" <+> ppr (mkHomeModule home_unit mod_name) <+> text "= 0;"
-  writeFile empty_stub (showSDoc dflags (pprCode src))
-  let pipe_env = (mkPipeEnv NoStop empty_stub Nothing Persistent) { src_basename = basename}
-      pipeline = viaCPipeline HCc pipe_env hsc_env (Just location) empty_stub
-  _ <- runPipeline (hsc_hooks hsc_env) pipeline
-  return ()
+
+  case backendCodeOutput (backend dflags) of
+    JSCodeOutput -> do
+      empty_stub <- newTempName logger tmpfs (tmpDir dflags) TFL_CurrentModule "js"
+      let src = ppr (mkHomeModule home_unit mod_name) <+> text "= 0;"
+      writeFile empty_stub (showSDoc dflags (pprCode src))
+      let pipe_env = (mkPipeEnv NoStop empty_stub Nothing Persistent) { src_basename = basename}
+          pipeline = Just <$> jsPipeline pipe_env hsc_env (Just location) empty_stub
+      _ <- runPipeline (hsc_hooks hsc_env) pipeline
+      pure ()
+
+    _ -> do
+      empty_stub <- newTempName logger tmpfs (tmpDir dflags) TFL_CurrentModule "c"
+      let src = text "int" <+> ppr (mkHomeModule home_unit mod_name) <+> text "= 0;"
+      writeFile empty_stub (showSDoc dflags (pprCode src))
+      let pipe_env = (mkPipeEnv NoStop empty_stub Nothing Persistent) { src_basename = basename}
+          pipeline = viaCPipeline HCc pipe_env hsc_env (Just location) empty_stub
+      _ <- runPipeline (hsc_hooks hsc_env) pipeline
+      pure ()
+
 
 
 {- Environment Initialisation -}
@@ -818,6 +854,10 @@ cmmPipeline pipe_env hsc_env input_fn = do
     Nothing -> panic "CMM pipeline - produced no .o file"
     Just mo_fn -> use (T_MergeForeign pipe_env hsc_env mo_fn fos)
 
+jsPipeline :: P m => PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> m FilePath
+jsPipeline pipe_env hsc_env location input_fn = do
+  use (T_Js pipe_env hsc_env location input_fn)
+
 hscPostBackendPipeline :: P m => PipeEnv -> HscEnv -> HscSource -> Backend -> Maybe ModLocation -> FilePath -> m (Maybe FilePath)
 hscPostBackendPipeline _ _ HsBootFile _ _ _   = return Nothing
 hscPostBackendPipeline _ _ HsigFile _ _ _     = return Nothing
@@ -833,8 +873,9 @@ applyPostHscPipeline NcgPostHscPipeline =
 applyPostHscPipeline ViaCPostHscPipeline = viaCPipeline HCc
 applyPostHscPipeline LlvmPostHscPipeline =
     \pe he ml fp -> llvmPipeline pe he ml fp
+applyPostHscPipeline JSPostHscPipeline =
+    \pe he ml fp -> Just <$> jsPipeline pe he ml fp
 applyPostHscPipeline NoPostHscPipeline = \_ _ _ _ -> return Nothing
-
 
 -- Pipeline from a given suffix
 pipelineStart :: P m => PipeEnv -> HscEnv -> FilePath -> Maybe Phase -> m (Maybe FilePath)
@@ -870,7 +911,6 @@ pipelineStart pipe_env hsc_env input_fn mb_phase =
    objFromLinkable (_, homeMod_object -> Just (LM _ _ [DotO lnk])) = Just lnk
    objFromLinkable _ = Nothing
 
-
    fromPhase :: P m => Phase -> m (Maybe FilePath)
    fromPhase (Unlit p)  = frontend p
    fromPhase (Cpp p)    = frontend p
@@ -888,6 +928,7 @@ pipelineStart pipe_env hsc_env input_fn mb_phase =
    fromPhase StopLn     = return (Just input_fn)
    fromPhase CmmCpp     = Just <$> cmmCppPipeline pipe_env hsc_env input_fn
    fromPhase Cmm        = Just <$> cmmPipeline pipe_env hsc_env input_fn
+   fromPhase Js         = Just <$> jsPipeline pipe_env hsc_env Nothing input_fn
    fromPhase MergeForeign = panic "fromPhase: MergeForeign"
 
 {-

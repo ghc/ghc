@@ -7,6 +7,7 @@
 
 module GHC.Data.Graph.Directed (
         Graph, graphFromEdgedVerticesOrd, graphFromEdgedVerticesUniq,
+        graphFromVerticesAndAdjacency,
 
         SCC(..), Node(..), flattenSCC, flattenSCCs,
         stronglyConnCompG,
@@ -547,3 +548,21 @@ classifyEdges root getSucc edges =
           ends'' = addToUFM ends' n time''
         in
         (time'' + 1, starts'', ends'')
+
+graphFromVerticesAndAdjacency
+        :: Ord key
+        => [Node key payload]
+        -> [(key, key)]  -- First component is source vertex key,
+                         -- second is target vertex key (thing depended on)
+                         -- Unlike the other interface I insist they correspond to
+                         -- actual vertices because the alternative hides bugs. I can't
+                         -- do the same thing for the other one for backcompat reasons.
+        -> Graph (Node key payload)
+graphFromVerticesAndAdjacency []       _     = emptyGraph
+graphFromVerticesAndAdjacency vertices edges = Graph graph vertex_node (key_vertex . key_extractor)
+  where key_extractor = node_key
+        (bounds, vertex_node, key_vertex, _) = reduceNodesIntoVerticesOrd vertices key_extractor
+        key_vertex_pair (a, b) = (expectJust "graphFromVerticesAndAdjacency" $ key_vertex a,
+                                  expectJust "graphFromVerticesAndAdjacency" $ key_vertex b)
+        reduced_edges = map key_vertex_pair edges
+        graph = buildG bounds reduced_edges

@@ -79,7 +79,7 @@ module GHC.Utils.Ppr (
         lparen, rparen, lbrack, rbrack, lbrace, rbrace,
 
         -- ** Wrapping documents in delimiters
-        parens, brackets, braces, quotes, quote, doubleQuotes,
+        parens, brackets, braces, quotes, squotes, quote, doubleQuotes,
         maybeParens,
 
         -- ** Combining documents
@@ -108,7 +108,7 @@ module GHC.Utils.Ppr (
 
         -- ** GHC-specific rendering
         printDoc, printDoc_,
-        bufLeftRender -- performance hack
+        bufLeftRender, printLeftRender -- performance hack
 
   ) where
 
@@ -462,10 +462,12 @@ hex      n = text ('0' : 'x' : padded)
 parens       :: Doc -> Doc -- ^ Wrap document in @(...)@
 brackets     :: Doc -> Doc -- ^ Wrap document in @[...]@
 braces       :: Doc -> Doc -- ^ Wrap document in @{...}@
-quotes       :: Doc -> Doc -- ^ Wrap document in @\'...\'@
+quotes       :: Doc -> Doc -- ^ Wrap document in @\`...\'@
+squotes      :: Doc -> Doc -- ^ Wrap document in @\'...\'@
 quote        :: Doc -> Doc
 doubleQuotes :: Doc -> Doc -- ^ Wrap document in @\"...\"@
 quotes p       = char '`' <> p <> char '\''
+squotes p      = char '\'' <> p <> char '\''
 quote p        = char '\'' <> p
 doubleQuotes p = char '"' <> p <> char '"'
 parens p       = char '(' <> p <> char ')'
@@ -1170,16 +1172,14 @@ bufLeftRender :: BufHandle -> Doc -> IO ()
 bufLeftRender b doc = layLeft b (reduceDoc doc)
 
 layLeft :: BufHandle -> Doc -> IO ()
-layLeft b _ | b `seq` False  = undefined -- make it strict in b
-layLeft _ NoDoc              = error "layLeft: NoDoc"
+layLeft !_ NoDoc             = error "layLeft: NoDoc"
 layLeft b (Union p q)        = layLeft b $! first p q
 layLeft b (Nest _ p)         = layLeft b $! p
 layLeft b Empty              = bPutChar b '\n'
-layLeft b (NilAbove p)       = p `seq` (bPutChar b '\n' >> layLeft b p)
-layLeft b (TextBeside s _ p) = s `seq` (put b s >> layLeft b p)
+layLeft b (NilAbove p)       = bPutChar b '\n' >> layLeft b p
+layLeft b (TextBeside s _ p) = put b s >> layLeft b p
  where
-    put b _ | b `seq` False = undefined
-    put b (Chr c)    = bPutChar b c
+    put !b (Chr c)   = bPutChar b c
     put b (Str s)    = bPutStr  b s
     put b (PStr s)   = bPutFS   b s
     put b (ZStr s)   = bPutFZS  b s

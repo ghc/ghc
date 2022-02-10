@@ -8,15 +8,15 @@ test('driver014', [extra_files(['A014.hs'])], makefile_test, ['test014'])
 
 test('driver015', [extra_files(['A015.hs'])], makefile_test, ['test015'])
 
-test('driver016', [extra_files(['F016.hs'])], makefile_test, ['test016'])
+test('driver016', [req_ffi_exports, extra_files(['F016.hs'])], makefile_test, ['test016']) # JS backend doesn't support foreign export yet
 
-test('driver017', [extra_files(['F017.hs'])], makefile_test, ['test017'])
+test('driver017', [req_ffi_exports, extra_files(['F017.hs'])], makefile_test, ['test017']) # JS backend doesn't support foreign export yet
 
 test('driver018', [extra_files(['F018.hs'])], makefile_test, ['test018'])
 
 test('driver018a', [extra_files(['F018a.hs'])], makefile_test, ['test018a'])
 
-test('driver019', [extra_files(['F019.hs'])], makefile_test, ['test019'])
+test('driver019', [req_ffi_exports, extra_files(['F019.hs'])], makefile_test, ['test019']) # JS backend doesn't support foreign export yet
 
 test('driver021', [extra_files(['B021/'])], makefile_test, ['test021'])
 
@@ -32,9 +32,9 @@ test('driver025', [extra_files(['B025/'])], makefile_test, ['test025'])
 
 test('driver026', [extra_files(['d026/'])], makefile_test, ['test026'])
 
-test('driver027', [extra_files(['B027/'])], makefile_test, ['test027'])
+test('driver027', [req_ffi_exports, extra_files(['B027/'])], makefile_test, ['test027']) # JS backend doesn't support foreign export yet
 
-test('driver028', [extra_files(['B028/'])], makefile_test, ['test028'])
+test('driver028', [req_ffi_exports, extra_files(['B028/'])], makefile_test, ['test028']) # JS backend doesn't support foreign export yet
 
 test('driver031', [extra_files(['A031.hs'])], makefile_test, ['test031'])
 
@@ -42,9 +42,9 @@ test('driver032', [extra_files(['A032.hs'])], makefile_test, ['test032'])
 
 test('driver033', [extra_files(['A033.hs'])], makefile_test, ['test033'])
 
-test('driver034', [extra_files(['F034.hs'])], makefile_test, ['test034'])
+test('driver034', [req_ffi_exports, extra_files(['F034.hs'])], makefile_test, ['test034']) # JS backend doesn't support foreign export yet
 
-test('driver035', [extra_files(['F035.hs'])], makefile_test, ['test035'])
+test('driver035', [req_ffi_exports, extra_files(['F035.hs'])], makefile_test, ['test035']) # JS backend doesn't support foreign export yet
 
 test('driver041', [extra_files(['B041/'])], makefile_test, ['test041'])
 
@@ -54,9 +54,9 @@ test('driver042stub', [extra_files(['B042stub/'])], makefile_test, ['test042stub
 
 test('driver043', [extra_files(['B043/'])], makefile_test, ['test043'])
 
-test('driver044', [extra_files(['B044/'])], makefile_test, ['test044'])
+test('driver044', [req_ffi_exports, extra_files(['B044/'])], makefile_test, ['test044']) # JS backend doesn't support foreign export yet
 
-test('driver045', [extra_files(['B045/'])], makefile_test, ['test045'])
+test('driver045', [req_ffi_exports, extra_files(['B045/'])], makefile_test, ['test045']) # JS backend doesn't support foreign export yet
 
 test('driver051', [extra_files(['d051_1/', 'd051_2/'])], makefile_test, ['test051'])
 
@@ -64,9 +64,9 @@ test('driver052', [extra_files(['d052_1/', 'd052_2/'])], makefile_test, ['test05
 
 test('driver053', [extra_files(['d053_1/', 'd053_2/'])], makefile_test, ['test053'])
 
-test('driver061a', [extra_files(['A061a.hs']), when(unregisterised(), skip)], makefile_test, ['test061a'])
+test('driver061a', [req_ffi_exports, extra_files(['A061a.hs']), when(unregisterised(), skip)], makefile_test, ['test061a']) # JS backend doesn't support foreign export yet
 
-test('driver061b', [extra_files(['A061b.hs']), when(unregisterised(), skip)], makefile_test, ['test061b'])
+test('driver061b', [req_ffi_exports, extra_files(['A061b.hs']), when(unregisterised(), skip)], makefile_test, ['test061b']) # JS backend doesn't support foreign export yet
 
 
 test('driver062a', [], makefile_test, ['test062a'])
@@ -85,13 +85,13 @@ test('driver066', [extra_files(['A066.hs'])], makefile_test, ['test066'])
 
 test('driver067', [extra_files(['A067.hs'])], makefile_test, ['test067'])
 
-test('driver070', [extra_files(['A070.hs']), when(unregisterised(), skip)], makefile_test, ['test070'])
+test('driver070', [req_ffi_exports, extra_files(['A070.hs']), when(unregisterised(), skip)], makefile_test, ['test070']) # JS backend doesn't support foreign export yet
 
-test('driver071', [extra_files(['A071.hs']), when(unregisterised(), skip)], makefile_test, ['test071'])
+test('driver071', [req_ffi_exports, extra_files(['A071.hs']), when(unregisterised(), skip)], makefile_test, ['test071']) # JS backend doesn't support foreign export yet
 
 test('driver081a', [], makefile_test, ['test081a'])
 
-test('driver081b', [], makefile_test, ['test081b'])
+test('driver081b', [req_ffi_exports], makefile_test, ['test081b']) # JS backend doesn't support foreign export yet
 
 test('driver100', [extra_files(['overlap/'])], makefile_test, ['test100'])
 
@@ -138,10 +138,13 @@ test('T5313',
 test('T2464', normal, compile, [''])
 test('T3674', [], makefile_test, [])
 
-test('rtsopts001', [extra_files(['rtsOpts.hs'])], makefile_test, [])
-test('rtsopts002', normal, makefile_test, [])
+test('rtsopts001',
+  [ extra_files(['rtsOpts.hs'])
+  , js_skip # JS RTS doesn't support -rtsopts
+  ], makefile_test, [])
+test('rtsopts002', js_broken(22370), makefile_test, [])
 
-test('withRtsOpts', [], makefile_test, [])
+test('withRtsOpts', js_broken(22370), makefile_test, [])
 
 test('T3389', when(arch('i386'), expect_broken_for(17256, ['hpc'] + prof_ways)), compile_and_run, [''])
 test('T3364', normalise_fun(normalise_errmsg), makefile_test, [])
@@ -270,14 +273,16 @@ test('json2', normalise_version('base','ghc-prim'), compile, ['-ddump-types -ddu
 test('T16167', [req_interp,exit_code(1)], run_command,
      ['{compiler} -x hs -e ":set prog T16167.hs" -ddump-json T16167.hs'])
 test('T13604', [], makefile_test, [])
-test('T13604a', [], makefile_test, [])
+test('T13604a',
+  [ js_broken(22261) # require HPC support
+  ], makefile_test, [])
 # omitting hpc and profasm because they affect the
 # inlining and unfoldings
 test('inline-check', omit_ways(['hpc', 'profasm'])
                    , compile
 		   , ['-dinline-check foo -O -ddebug-output'])
 
-test('T14452', [], makefile_test, [])
+test('T14452', js_broken(22261), makefile_test, [])
 test('T14923', normal, makefile_test, [])
 test('T15396', normal, compile_and_run, ['-package ghc'])
 test('T16737',
@@ -292,7 +297,7 @@ test('T18369', normal, compile, ['-O'])
 test('T21682', normal, compile_fail, ['-Werror=unrecognised-warning-flags -Wfoo'])
 test('FullGHCVersion', normal, compile_and_run, ['-package ghc-boot'])
 test('OneShotTH', req_th, makefile_test, [])
-test('T17481', normal, makefile_test, [])
+test('T17481', js_broken(22261), makefile_test, [])
 test('T20084', normal, makefile_test, [])
 test('RunMode', [req_interp,extra_files(['RunMode/Test.hs'])], run_command, ['{compiler} --run -iRunMode/ -ignore-dot-ghci RunMode.hs -- hello'])
 test('T20439', normal, run_command,
@@ -310,7 +315,7 @@ test('T16476b', normal, makefile_test, [])
 test('T20569', extra_files(["T20569/"]), makefile_test, [])
 test('T21866', normal, multimod_compile, ['T21866','-no-link'])
 test('T21349', extra_files(['T21349']), makefile_test, [])
-test('T21869', [normal, when(unregisterised(), skip)], makefile_test, [])
+test('T21869', [js_broken(22261), when(unregisterised(), skip)], makefile_test, [])
 test('T22044', normal, makefile_test, [])
 test('T22048', [only_ways(['normal']), grep_errmsg("_rule")], compile, ["-O -fomit-interface-pragmas -ddump-simpl"])
 test('T21722', normal, compile_fail, ['-fno-show-error-context'])

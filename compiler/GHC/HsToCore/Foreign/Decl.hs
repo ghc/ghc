@@ -19,6 +19,7 @@ import GHC.Data.FastString
 import GHC.Tc.Utils.Monad        -- temp
 
 import GHC.HsToCore.Foreign.C
+import GHC.HsToCore.Foreign.JavaScript
 import GHC.HsToCore.Foreign.Utils
 import GHC.HsToCore.Monad
 
@@ -35,7 +36,6 @@ import GHC.Utils.Outputable
 import GHC.Driver.Session
 import GHC.Platform
 import GHC.Data.OrdList
-import GHC.Utils.Panic
 import GHC.Driver.Hooks
 
 import Data.List (unzip4)
@@ -127,8 +127,11 @@ dsFImport :: Id
           -> Coercion
           -> ForeignImport (GhcPass p)
           -> DsM ([Binding], CHeader, CStub)
-dsFImport id co (CImport _ cconv safety mHeader spec) =
-    dsCImport id co spec (unLoc cconv) (unLoc safety) mHeader
+dsFImport id co (CImport _ cconv safety mHeader spec) = do
+  platform <- getPlatform
+  case platformArch platform of
+    ArchJavaScript -> dsJsImport id co spec (unLoc cconv) (unLoc safety) mHeader
+    _              -> dsCImport  id co spec (unLoc cconv) (unLoc safety) mHeader
 
 {-
 ************************************************************************
@@ -163,9 +166,11 @@ dsFExport :: Id                 -- Either the exported Id,
                  , String       -- string describing type to pass to createAdj.
                  , Int          -- size of args to stub function
                  )
-dsFExport fn_id co ext_name cconv is_dyn = case cconv of
-  JavaScriptCallConv -> panic "dsFExport: JavaScript foreign exports not supported yet"
-  _                  -> dsCFExport  fn_id co ext_name cconv is_dyn
+dsFExport fn_id co ext_name cconv is_dyn = do
+  platform <- getPlatform
+  case platformArch platform of
+    ArchJavaScript -> dsJsFExport fn_id co ext_name cconv is_dyn
+    _              -> dsCFExport  fn_id co ext_name cconv is_dyn
 
 
 foreignExportsInitialiser :: Platform -> Module -> [Id] -> CStub

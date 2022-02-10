@@ -15,7 +15,7 @@ test('T18170b', [extra_files(['T18170c.hs']), expect_broken(19893)], multimod_co
 # T18170b isn't actually broken, but it causes a Core Lint error
 # even though the program is (correctly) rejected by the typechecker
 test('T18481', normal, compile, [''])
-test('T18481a', normal, compile, [''])
+test('T18481a', js_broken(22360), compile, [''])
 test('T18534', normal, compile_fail, [''])
 test('T19615', normal, compile_fail, [''])
 test('T19709a', normal, compile_fail, [''])
@@ -30,7 +30,7 @@ test('T20426', normal, compile_fail, [''])
 test('T21239', normal, compile, [''])
 test('T21544', normal, compile, ['-Wno-deprecated-flags'])
 
-test('EtaExpandDataCon', normal, compile, ['-O'])
+test('EtaExpandDataCon', js_broken(22360), compile, ['-O'])
 test('EtaExpandStupid1', normal, compile, ['-Wno-deprecated-flags'])
 test('EtaExpandStupid2', normal, compile_fail, ['-Wno-deprecated-flags'])
 test('LevPolyLet', normal, compile_fail, [''])
@@ -40,10 +40,10 @@ test('RepPolyArgument', normal, compile_fail, [''])
 test('RepPolyArrowCmd', normal, compile_fail, [''])
 test('RepPolyArrowFun', normal, compile_fail, [''])
 test('RepPolyBackpack1', normal, backpack_compile_fail, [''])
-test('RepPolyBackpack2', normal, backpack_run, [''])
+test('RepPolyBackpack2', req_c, backpack_run, [''])
 test('RepPolyBackpack3', normal, backpack_compile_fail, [''])
-test('RepPolyBackpack4', normal, backpack_run, [''])
-test('RepPolyBackpack5', normal, backpack_run, [''])
+test('RepPolyBackpack4', req_c, backpack_run, [''])
+test('RepPolyBackpack5', js_broken(22360), backpack_run, [''])
 test('RepPolyBinder', normal, compile_fail, [''])
 test('RepPolyCase1', normal, compile_fail, [''])
 test('RepPolyClassMethod', normal, compile_fail, [''])
@@ -79,8 +79,8 @@ test('RepPolySum', normal, compile_fail, [''])
 test('RepPolyTuple', normal, compile_fail, [''])
 test('RepPolyTupleSection', normal, compile_fail, [''])
 test('RepPolyUnboxedPatterns', normal, compile_fail, [''])
-test('RepPolyUnliftedDatatype', normal, compile, [''])
-test('RepPolyUnliftedDatatype2', normal, compile, ['-O'])
+test('RepPolyUnliftedDatatype', js_broken(22360), compile, [''])
+test('RepPolyUnliftedDatatype2', js_broken(22261), compile, ['-O'])
 test('RepPolyUnliftedNewtype', normal, compile,
      ['-fno-warn-partial-type-signatures -fno-warn-deprecated-flags'])
 test('RepPolyWildcardPattern', normal, compile_fail, [''])
@@ -95,7 +95,7 @@ test('UnliftedNewtypesLevityBinder', normal, compile_fail, [''])
 ##                                                                           ##
 ## These tests work!                                                         ##
                                                                              ##
-test('T13105', normal, compile, [''])                                        ##
+test('T13105', js_broken(22364), compile, [''])                              ##
 test('T17536b', normal, compile, [''])                                       ##
                                                                              ##
 ## These don't!                                                              ##

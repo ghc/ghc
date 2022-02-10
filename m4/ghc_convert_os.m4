@@ -49,6 +49,9 @@ AC_DEFUN([GHC_CONVERT_OS],[
       wasi)
         $3="wasi"
         ;;
+      ghcjs*)
+        $3="ghcjs"
+        ;;
       *)
         echo "Unknown OS $1"
         exit 1
