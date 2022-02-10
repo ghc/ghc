@@ -1560,10 +1560,13 @@ tcTopSrcDecls _ = panic "tcTopSrcDecls: ValBindsIn"
 
 tcSemigroupWarnings :: TcM ()
 tcSemigroupWarnings = do
-    traceTc "tcSemigroupWarnings" empty
-    let warnFlag = Opt_WarnSemigroup
-    tcPreludeClashWarn warnFlag sappendName
-    tcMissingParentClassWarn warnFlag monoidClassName semigroupClassName
+    mod <- getModule
+    -- ghc-prim doesn't depend on base
+    unless (moduleUnit mod == primUnit) $ do
+      traceTc "tcSemigroupWarnings" empty
+      let warnFlag = Opt_WarnSemigroup
+      tcPreludeClashWarn warnFlag sappendName
+      tcMissingParentClassWarn warnFlag monoidClassName semigroupClassName
 
 
 -- | Warn on local definitions of names that would clash with future Prelude
