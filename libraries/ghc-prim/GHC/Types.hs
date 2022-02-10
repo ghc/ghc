@@ -460,12 +460,12 @@ data RuntimeRep = VecRep VecCount VecElem   -- ^ a SIMD vector type
                 | Int8Rep         -- ^ signed,  8-bit value
                 | Int16Rep        -- ^ signed, 16-bit value
                 | Int32Rep        -- ^ signed, 32-bit value
-                | Int64Rep        -- ^ signed, 64-bit value (on 32-bit only)
+                | Int64Rep        -- ^ signed, 64-bit value
                 | WordRep         -- ^ unsigned, word-sized value
                 | Word8Rep        -- ^ unsigned,  8-bit value
                 | Word16Rep       -- ^ unsigned, 16-bit value
                 | Word32Rep       -- ^ unsigned, 32-bit value
-                | Word64Rep       -- ^ unsigned, 64-bit value (on 32-bit only)
+                | Word64Rep       -- ^ unsigned, 64-bit value
                 | AddrRep         -- ^ A pointer, but /not/ to a Haskell value
                 | FloatRep        -- ^ a 32-bit floating point number
                 | DoubleRep       -- ^ a 64-bit floating point number
