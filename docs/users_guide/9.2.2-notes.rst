@@ -1,9 +1,20 @@
-
-
 .. _release-9-2-2:
 
 Version 9.2.2
 ==============
+
+The significant changes to the various parts of the compiler are listed in the
+following sections.
+
+The :ghc-flag:`LLVM backend <-fllvm>` of this release is to be used with LLVM
+10 or 11.
+
+
+
+Compiler
+--------
+
+- Numerous improvements in compiler performance.
 
 - A fix for GHC's handling of the XDG Base Directory Specification
   (:ghc-ticket:`6077`, :ghc-ticket:`20684`, :ghc-ticket:`20669`,
@@ -23,4 +34,149 @@ Version 9.2.2
     GHC installation which created `~/.ghc/ghci_history`, the history file will be
     written to `$XDG_DATA_HOME/ghc`. If you already have an older GHC installation which
     wrote `~/.ghc/ghci_history`, then GHC will continue to write the history to that file.
+
+- Fix bug in CPR analysis's treatment of join points which may result in
+  runtime crashes (:ghc-ticket:`18824`).
+
+- Link against ``libatomic`` for atomic operations on platforms where this is
+  necessary (:ghc-ticket:`19119`).
+
+- Fix bootstrapping of compiler with GHC 9.2 and later (:ghc-ticket:`19631`)
+
+- Silence non-actionable warnings regarding missed specialisations of class
+  methods (:ghc-ticket:`19592`).
+
+- Fix a race condition in the registration of ticky-ticky profiling 
+  counters, potentially resulting in hangs when ticky-ticky is used in a
+  threaded application (:ghc-ticket:`20451`).
+
+- Introduce a flag, :ghc-flag:`-Wunicode-bidirectional-format-characters`, to
+  warn if Unicode bidirectional formatting are found in Haskell source files.
+
+- Improve the pattern match checker's handling of unlifted data types, eliminating
+  spurious warnings from impossible branches (:ghc-ticket:`20631`).
+
+- Fix a compiler crash due to incorrect in-scope set (:ghc-ticket:`20639`)
+
+- Don't use implicit lifting when deriving a ``Lift`` instances, fixing
+  :ghc-ticket:`20688`.
+
+- Unbox unlifted datatypes fields (:ghc-ticket:`20663`).
+
+- Introduce a flag, :ghc-flag:`-fcheck-prim-bounds`, which adds dynamic bounds
+  checks in the code generated for array primops (:ghc-ticket:`20769`).
+
+- Ensure that the ``indexWord8ArrayAs<Type>#`` family of array primops are
+  lowered correctly on platforms which do not support unaligned memory access
+  (:ghc-ticket:`21015`, :ghc-ticket:`20987`).
+
+- Fix a potential bug where common-block elimination may common-up incompatible
+  load operations (:ghc-ticket:`21016`)
+
+- Eliminate the ``ghc`` library's dependence on ``parsec`` (:ghc-ticket:`21033`).
+
+GHCi
+----
+
+- Fix bug in handling of GHC environment files which lead to unintentional
+  resetting of GHCi's package state (:ghc-ticket:`19650`)
+
+Core libraries
+--------------
+
+- Fix a few bugs in WinIO which might result in heap corruption (:ghc-ticket:`21048`).
+
+- Fix an interaction between WinIO and deadlock detection, resulting in
+  programs potentially hanging in IO (:ghc-ticket:`18382`)
+
+- Add ``CTYPE`` pragmas to all foreign type wrappers (e.g.
+  ``Foreign.C.Types``), ensuring that correct signatures are generated for
+  ``capi`` foreign imports (:ghc-ticket:`15531`).
+
+- Fix incorrect implementation of ``Data.Type.Ord.<:`` (TODO)
+
+- Bump ``stm`` to release 2.5.0.2 (:ghc-ticket:`20575`)
+
+- Avoid using Apple Darwin's broken one-shot kqueue implementation (:ghc-ticket:`20662`)
+
+Build system and packaging
+--------------------------
+
+- Fix generation of binary distribution for cross-compilers with Hadrian (:ghc-ticket:`20267`)
+
+- Don't rely on non-POSIX ``realpath`` utility in Hadrian's binary distribution
+  installation ``Makefile`` (:ghc-ticket:`19963`)
+
+Runtime system
+--------------
+
+- :ghc-ticket:`20577`
+
+- Teach runtime linker to resolve special ``iconv_`` symbols on FreeBSD (:ghc-ticket:`20354`)
+
+- Fix garbage collector statistics produced when run :rts-flag:`-qn 1 <-qn
+  ⟨x⟩>` (:ghc-ticket:`19685`).
+
+- Fix the reporting of elapsed GC time when using the :rts-flag:`non-moving
+  garbage collector <--nonmoving-gc>`. (:ghc-ticket:`20751`)
+
+- Fix a bug where the memory-mapping base address was not updated after creating
+  a mapping, resulting in linking failures (:ghc-ticket:`20734`)
+
+- Eliminate a case in the linker which would result in memory mappings that
+  were simultaneously writable and executable (:ghc-ticket:`20814`).
+
+- Seed ``environ`` in the runtime system's symbol table, ensuring that
+  environment is correctly propagated to loaded objects (:ghc-ticket:`20861`
+  and related tickets)
+
+- Introduce a new flag, :rts-flag:`--null-eventlog-writer`, allowing the
+  eventlog to be enabled while suppressing the usual ``.eventlog`` file output.
+  This can be useful when running programs with a :ref:`custom eventlog writer
+  <event_log_output_api>`.
+
+Included libraries
+------------------
+
+The package database provided with this distribution also contains a number of
+packages other than GHC itself. See the changelogs provided with these packages
+for further change information.
+
+.. ghc-package-list::
+
+    libraries/array/array.cabal:             Dependency of ``ghc`` library
+    libraries/base/base.cabal:               Core library
+    libraries/binary/binary.cabal:           Dependency of ``ghc`` library
+    libraries/bytestring/bytestring.cabal:   Dependency of ``ghc`` library
+    libraries/Cabal/Cabal/Cabal.cabal:       Dependency of ``ghc-pkg`` utility
+    libraries/containers/containers/containers.cabal:   Dependency of ``ghc`` library
+    libraries/deepseq/deepseq.cabal:         Dependency of ``ghc`` library
+    libraries/directory/directory.cabal:     Dependency of ``ghc`` library
+    libraries/exceptions/exceptions.cabal:   Dependency of ``ghc`` and ``haskeline`` library
+    libraries/filepath/filepath.cabal:       Dependency of ``ghc`` library
+    compiler/ghc.cabal:                      The compiler itself
+    libraries/ghci/ghci.cabal:               The REPL interface
+    libraries/ghc-boot/ghc-boot.cabal:       Internal compiler library
+    libraries/ghc-boot-th/ghc-boot-th.cabal: Internal compiler library
+    libraries/ghc-compact/ghc-compact.cabal: Core library
+    libraries/ghc-heap/ghc-heap.cabal:       GHC heap-walking library
+    libraries/ghc-prim/ghc-prim.cabal:       Core library
+    libraries/haskeline/haskeline.cabal:     Dependency of ``ghci`` executable
+    libraries/hpc/hpc.cabal:                 Dependency of ``hpc`` executable
+    libraries/integer-gmp/integer-gmp.cabal: Core library
+    libraries/libiserv/libiserv.cabal:       Internal compiler library
+    libraries/mtl/mtl.cabal:                 Dependency of ``Cabal`` library
+    libraries/parsec/parsec.cabal:           Dependency of ``Cabal`` library
+    libraries/pretty/pretty.cabal:           Dependency of ``ghc`` library
+    libraries/process/process.cabal:         Dependency of ``ghc`` library
+    libraries/stm/stm.cabal:                 Dependency of ``haskeline`` library
+    libraries/template-haskell/template-haskell.cabal:     Core library
+    libraries/terminfo/terminfo.cabal:       Dependency of ``haskeline`` library
+    libraries/text/text.cabal:               Dependency of ``Cabal`` library
+    libraries/time/time.cabal:               Dependency of ``ghc`` library
+    libraries/transformers/transformers.cabal: Dependency of ``ghc`` library
+    libraries/unix/unix.cabal:               Dependency of ``ghc`` library
+    libraries/Win32/Win32.cabal:             Dependency of ``ghc`` library
+    libraries/xhtml/xhtml.cabal:             Dependency of ``haddock`` executable
+
 
