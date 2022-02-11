@@ -1502,6 +1502,15 @@ called from scaleFloat, hence we clamp the scaling parameter.
 We must have a large enough range to cover the maximum difference of
 exponents returned by decodeFloat.
 -}
+
+-- | Used to prevent exponent over/underflow when encoding floating point numbers.
+--   This is also the same as
+--
+--   > \(x,y) -> max (-x) (min x y)
+--
+-- ==== __Example__
+-- >>> clamp (-10) 5
+-- 10
 clamp :: Int -> Int -> Int
 clamp bd k = max (-bd) (min bd k)
 

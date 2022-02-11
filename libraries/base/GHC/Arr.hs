@@ -231,7 +231,16 @@ lessSafeIndex :: Ix i => (i, i) -> Int -> i -> Int
 lessSafeIndex (l,u) _ i = index (l,u) i
 
 -- Don't inline this long error message everywhere!!
-badSafeIndex :: Int -> Int -> Int
+-- | Used to throw exceptions in array bounds-checking functions.
+--
+--   ⚠ This function throws 'SomeException' in all cases.
+--
+-- ==== __Examples__
+-- >>> badSafeIndex 2 5
+-- *** Exception: Error in array index; 2 not in range [0..5)
+badSafeIndex :: Int -- ^ Index searched for.
+             -> Int -- ^ Max bound of the array.
+             -> Int -- ^ This isn't an Int. It's an exception.
 badSafeIndex i' n = errorWithoutStackTrace ("Error in array index; " ++ show i' ++
                         " not in range [0.." ++ show n ++ ")")
 

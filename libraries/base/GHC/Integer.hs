@@ -100,62 +100,238 @@ encodeDoubleInteger = I.integerEncodeDouble#
 decodeDoubleInteger :: Double# -> (# Integer, Int# #)
 decodeDoubleInteger = I.integerDecodeDouble#
 
-
+-- | Used to implement `(+)` for the `Num` typeclass.
+--   This gives the sum of two integers.
+--
+-- ==== __Example__
+-- >>> plusInteger 3 2
+-- 5
+--
+-- >>> (+) 3 2
+-- 5
 plusInteger :: Integer -> Integer -> Integer
 plusInteger = I.integerAdd
 
+-- | Used to implement `(-)` for the `Num` typeclass.
+--   This gives the difference of two integers.
+--
+-- ==== __Example__
+-- >>> minusInteger 3 2
+-- 1
+--
+-- >>> (-) 3 2
+-- 1
 minusInteger :: Integer -> Integer -> Integer
 minusInteger = I.integerSub
 
+-- | Used to implement `(*)` for the `Num` typeclass.
+--   This gives the product of two integers.
+--
+-- ==== __Example__
+-- >>> timesInteger 3 2
+-- 6
+--
+-- >>> (*) 3 2
+-- 6
 timesInteger :: Integer -> Integer -> Integer
 timesInteger = I.integerMul
 
+-- | Used to implement `negate` for the `Num` typeclass.
+--   This changes the sign of whatever integer is passed into it.
+--
+-- ==== __Example__
+-- >>> negateInteger (-6)
+-- 6
+--
+-- >>> negate (-6)
+-- 6
 negateInteger :: Integer -> Integer
 negateInteger = I.integerNegate
 
+-- | Used to implement `abs` for the `Num` typeclass.
+--   This gives the absolute value of whatever integer is passed into it.
+--
+-- ==== __Example__
+-- >>> absInteger (-6)
+-- 6
+--
+-- >>> abs (-6)
+-- 6
 absInteger :: Integer -> Integer
 absInteger = I.integerAbs
 
+-- | Used to implement `signum` for the `Num` typeclass.
+--   This gives 1 for a positive integer, and -1 for a negative integer.
+--
+-- ==== __Example__
+-- >>> signumInteger 5
+-- 1
+--
+-- >>> signum 5
+-- 1
 signumInteger :: Integer -> Integer
 signumInteger = I.integerSignum
 
+-- | Used to implement `divMod` for the `Integral` typeclass.
+--   This gives a tuple equivalent to
+--
+-- >(div x y, mod x y)
+--
+-- ==== __Example__
+-- >>> divModInteger 10 2
+-- (5,0)
+--
+-- >>> divMod 10 2
+-- (5,0)
 divModInteger :: Integer -> Integer -> (# Integer, Integer #)
 divModInteger = I.integerDivMod#
 
+-- | Used to implement `div` for the `Integral` typeclass.
+--   This performs integer division on its two parameters, truncated towards negative infinity.
+--
+-- ==== __Example__
+-- >>> 10 `divInteger` 2
+-- 5
+--
+-- >>> 10 `div` 2
 divInteger :: Integer -> Integer -> Integer
 divInteger = I.integerDiv
 
+-- | Used to implement `mod` for the `Integral` typeclass.
+--   This performs the modulo operation, satisfying
+--
+-- > ((x `div` y) * y) + (x `mod` y) == x
+--
+-- ==== __Example__
+-- >>> 7 `modInteger` 3
+-- 1
+--
+-- >>> 7 `mod` 3
+-- 1
 modInteger :: Integer -> Integer -> Integer
 modInteger = I.integerMod
 
+-- | Used to implement `quotRem` for the `Integral` typeclass.
+--   This gives a tuple equivalent to
+--
+-- > (quot x y, mod x y)
+--
+-- ==== __Example__
+-- >>> quotRemInteger 10 2
+-- (5,0)
+--
+-- >>> quotRem 10 2
+-- (5,0)
 quotRemInteger :: Integer -> Integer -> (# Integer, Integer #)
 quotRemInteger = I.integerQuotRem#
 
+-- | Used to implement `quot` for the `Integral` typeclass.
+--   This performs integer division on its two parameters, truncated towards zero.
+--
+-- ==== __Example__
+-- >>> quotInteger 10 2
+-- 5
+--
+-- >>> quot 10 2
+-- 5
 quotInteger :: Integer -> Integer -> Integer
 quotInteger = I.integerQuot
 
+-- | Used to implement `rem` for the `Integral` typeclass.
+--   This gives the remainder after integer division of its two parameters, satisfying
+--
+-- > ((x `quot` y) * y) + (x `rem` y) == x
+--
+-- ==== __Example__
+-- >>> remInteger 3 2
+-- 1
+--
+-- >>> rem 3 2
+-- 1
 remInteger :: Integer -> Integer -> Integer
 remInteger = I.integerRem
 
-
+-- | Used to implement `(==)` for the `Eq` typeclass.
+--   Outputs `True` if two integers are equal to each other.
+--
+-- ==== __Example__
+-- >>> 6 `eqInteger` 6
+-- True
+--
+-- >>> 6 == 6
+-- True
 eqInteger :: Integer -> Integer -> Bool
 eqInteger = I.integerEq
 
+-- | Used to implement `(/=)` for the `Eq` typeclass.
+--   Outputs `True` if two integers are not equal to each other.
+--
+-- ==== __Example__
+-- >>> 6 `neqInteger` 7
+-- True
+--
+-- >>> 6 /= 7
+-- True
 neqInteger :: Integer -> Integer -> Bool
 neqInteger = I.integerNe
 
+-- | Used to implement `(<=)` for the `Ord` typeclass.
+--   Outputs `True` if the first argument is less than or equal to the second.
+--
+-- ==== __Example__
+-- >>> 3 `leInteger` 5
+-- True
+--
+-- >>> 3 <= 5
+-- True
 leInteger :: Integer -> Integer -> Bool
 leInteger = I.integerLe
 
+-- | Used to implement `(>)` for the `Ord` typeclass.
+--   Outputs `True` if the first argument is greater than the second.
+--
+-- ==== __Example__
+-- >>> 5 `gtInteger` 3
+-- True
+--
+-- >>> 5 > 3
+-- True
 gtInteger :: Integer -> Integer -> Bool
 gtInteger = I.integerGt
 
+-- | Used to implement `(<)` for the `Ord` typeclass.
+--   Outputs `True` if the first argument is less than the second.
+--
+-- ==== __Example__
+-- >>> 3 `ltInteger` 5
+-- True
+--
+-- >>> 3 < 5
+-- True
 ltInteger :: Integer -> Integer -> Bool
 ltInteger = I.integerLt
 
+-- | Used to implement `(>=)` for the `Ord` typeclass.
+--   Outputs `True` if the first argument is greater than or equal to the second.
+--
+-- ==== __Example__
+-- >>> 5 `geInteger` 3
+-- True
+--
+-- >>> 5 >= 3
+-- True
 geInteger :: Integer -> Integer -> Bool
 geInteger = I.integerGe
 
+-- | Used to implement `compare` for the `Integral` typeclass.
+--   This takes two integers, and outputs whether the first is less than, equal to, or greater than the second.
+--
+-- ==== __Example__
+-- >>> compareInteger 2 10
+-- LT
+--
+-- >>> compare 2 10
+-- LT
 compareInteger :: Integer -> Integer -> Ordering
 compareInteger = I.integerCompare
 

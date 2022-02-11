@@ -1629,17 +1629,83 @@ getTag x = dataToTag# x
 {-# INLINE quotRemInt #-}
 {-# INLINE divModInt #-}
 
-quotInt, remInt, divInt, modInt :: Int -> Int -> Int
+-- | Used to implement `quot` for the `Integral` typeclass.
+--   This performs integer division on its two parameters, truncated towards zero.
+--
+-- ==== __Example__
+-- >>> quotInt 10 2
+-- 5
+--
+-- >>> quot 10 2
+-- 5
+quotInt :: Int -> Int -> Int
 (I# x) `quotInt`  (I# y) = I# (x `quotInt#` y)
+-- | Used to implement `rem` for the `Integral` typeclass.
+--   This gives the remainder after integer division of its two parameters, satisfying
+--
+-- > ((x `quot` y) * y) + (x `rem` y) == x
+--
+-- ==== __Example__
+-- >>> remInt 3 2
+-- 1
+--
+-- >>> rem 3 2
+-- 1
+remInt  :: Int -> Int -> Int
 (I# x) `remInt`   (I# y) = I# (x `remInt#`  y)
+-- | Used to implement `div` for the `Integral` typeclass.
+--   This performs integer division on its two parameters, truncated towards negative infinity.
+--
+-- ==== __Example__
+-- >>> 10 `divInt` 2
+-- 5
+--
+-- >>> 10 `div` 2
+-- 5
+divInt  :: Int -> Int -> Int
 (I# x) `divInt`   (I# y) = I# (x `divInt#`  y)
+-- | Used to implement `mod` for the `Integral` typeclass.
+--   This performs the modulo operation, satisfying
+--
+-- > ((x `div` y) * y) + (x `mod` y) == x
+--
+-- ==== __Example__
+-- >>> 7 `modInt` 3
+-- 1
+--
+-- >>> 7 `mod` 3
+-- 1
+modInt  :: Int -> Int -> Int
 (I# x) `modInt`   (I# y) = I# (x `modInt#`  y)
 
+
+-- | Used to implement `quotRem` for the `Integral` typeclass.
+--   This gives a tuple equivalent to
+--
+-- > (quot x y, mod x y)
+--
+-- ==== __Example__
+-- >>> quotRemInt 10 2
+-- (5,0)
+--
+-- >>> quotRem 10 2
+-- (5,0)
 quotRemInt :: Int -> Int -> (Int, Int)
 (I# x) `quotRemInt` (I# y) = case x `quotRemInt#` y of
                              (# q, r #) ->
                                  (I# q, I# r)
 
+-- | Used to implement `divMod` for the `Integral` typeclass.
+--   This gives a tuple equivalent to
+--
+-- > (div x y, mod x y)
+--
+-- ==== __Example__
+-- >>> divModInt 10 2
+-- (5,0)
+--
+-- >>> divMod 10 2
+-- (5,0)
 divModInt :: Int -> Int -> (Int, Int)
 (I# x) `divModInt` (I# y) = case x `divModInt#` y of
                             (# q, r #) -> (I# q, I# r)
