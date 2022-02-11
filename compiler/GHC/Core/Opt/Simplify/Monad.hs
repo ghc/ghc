@@ -28,7 +28,8 @@ import GHC.Types.Id        ( Id, mkSysLocalOrCoVar )
 import GHC.Types.Id.Info   ( IdDetails(..), vanillaIdInfo, setArityInfo )
 import GHC.Core.Type       ( Type, Mult )
 import GHC.Core.FamInstEnv ( FamInstEnv )
-import GHC.Core            ( RuleEnv(..) )
+import GHC.Core            ( RuleEnv(..), RuleBase)
+import GHC.Core.Rules
 import GHC.Core.Utils      ( mkLamTypes )
 import GHC.Core.Coercion.Opt
 import GHC.Types.Unique.Supply
@@ -79,20 +80,23 @@ data SimplTopEnv
   = STE { st_flags     :: DynFlags
         , st_logger    :: !Logger
         , st_max_ticks :: IntWithInf  -- ^ Max #ticks in this simplifier run
-        , st_rules     :: RuleEnv
+        , st_query_rulebase :: IO RuleBase
+          -- ^ The action to retrieve an up-to-date EPS RuleBase
+          -- See Note [Overall plumbing for rules]
+        , st_mod_rules :: RuleEnv
         , st_fams      :: (FamInstEnv, FamInstEnv)
 
         , st_co_opt_opts :: !OptCoercionOpts
             -- ^ Coercion optimiser options
         }
 
-initSmpl :: Logger -> DynFlags -> RuleEnv -> (FamInstEnv, FamInstEnv)
+initSmpl :: Logger -> DynFlags -> IO RuleBase -> RuleEnv -> (FamInstEnv, FamInstEnv)
          -> Int                 -- Size of the bindings, used to limit
                                 -- the number of ticks we allow
          -> SimplM a
          -> IO (a, SimplCount)
 
-initSmpl logger dflags rules fam_envs size m
+initSmpl logger dflags qrb rules fam_envs size m
   = do -- No init count; set to 0
        let simplCount = zeroSimplCount dflags
        (result, count) <- unSM m env simplCount
@@ -100,7 +104,8 @@ initSmpl logger dflags rules fam_envs size m
   where
     env = STE { st_flags = dflags
               , st_logger = logger
-              , st_rules = rules
+              , st_query_rulebase = qrb
+              , st_mod_rules = rules
               , st_max_ticks = computeMaxTicks dflags size
               , st_fams = fam_envs
               , st_co_opt_opts = initOptCoercionOpts dflags
@@ -203,7 +208,9 @@ instance MonadIO SimplM where
       return (x, sc)
 
 getSimplRules :: SimplM RuleEnv
-getSimplRules = SM (\st_env sc -> return (st_rules st_env, sc))
+getSimplRules = SM (\st_env sc -> do
+    eps_rules <- st_query_rulebase st_env
+    return (extendRuleEnv (st_mod_rules st_env) eps_rules, sc))
 
 getFamEnvs :: SimplM (FamInstEnv, FamInstEnv)
 getFamEnvs = SM (\st_env sc -> return (st_fams st_env, sc))

@@ -17,7 +17,7 @@ import GHC.Platform.Ways  ( hasWay, Way(WayProf) )
 
 import GHC.Core
 import GHC.Core.Opt.CSE  ( cseProgram )
-import GHC.Core.Rules   ( mkRuleBase, unionRuleBase,
+import GHC.Core.Rules   ( mkRuleBase,
                           extendRuleBaseList, ruleCheckProgram, addRuleInfo,
                           getRules, initRuleOpts )
 import GHC.Core.Ppr     ( pprCoreBindings, pprCoreExpr )
@@ -591,15 +591,14 @@ simplifyExpr :: HscEnv -- includes spec of what core-to-core passes to do
 simplifyExpr hsc_env expr
   = withTiming logger (text "Simplify [expr]") (const ()) $
     do  { eps <- hscEPS hsc_env ;
-        ; let rule_env  = mkRuleEnv (eps_rule_base eps) []
-              fi_env    = ( eps_fam_inst_env eps
+        ; let fi_env    = ( eps_fam_inst_env eps
                           , extendFamInstEnvList emptyFamInstEnv $
                             snd $ ic_instances $ hsc_IC hsc_env )
               simpl_env = simplEnvForGHCi logger dflags
 
         ; let sz = exprSize expr
 
-        ; (expr', counts) <- initSmpl logger dflags rule_env fi_env sz $
+        ; (expr', counts) <- initSmpl logger dflags (eps_rule_base <$> hscEPS hsc_env) emptyRuleEnv fi_env sz $
                              simplExprGently simpl_env expr
 
         ; Logger.putDumpFileMaybe logger Opt_D_dump_simpl_stats
@@ -726,21 +725,23 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
                      FormatCore
                      (pprCoreBindings tagged_binds);
 
-                -- Get any new rules, and extend the rule base
-                -- See Note [Overall plumbing for rules] in GHC.Core.Rules
-                -- We need to do this regularly, because simplification can
+                -- read_eps_rules:
+                -- We need to read rules from the EPS regularly because simplification can
                 -- poke on IdInfo thunks, which in turn brings in new rules
                 -- behind the scenes.  Otherwise there's a danger we'll simply
                 -- miss the rules for Ids hidden inside imported inlinings
+                -- Hence just before attempting to match rules we read on the EPS
+                -- value and then combine it when the existing rule base.
+                -- See `GHC.Core.Opt.Simplify.Monad.getSimplRules`.
            eps <- hscEPS hsc_env ;
-           let  { rule_base1 = unionRuleBase hpt_rule_base (eps_rule_base eps)
-                ; rule_base2 = extendRuleBaseList rule_base1 rules
+           let  { read_eps_rules = eps_rule_base <$> hscEPS hsc_env
+                ; rule_base = extendRuleBaseList hpt_rule_base rules
                 ; fam_envs = (eps_fam_inst_env eps, fam_inst_env)
                 ; vis_orphs = this_mod : dep_orphs deps } ;
 
                 -- Simplify the program
            ((binds1, rules1), counts1) <-
-             initSmpl logger dflags (mkRuleEnv rule_base2 vis_orphs) fam_envs sz $
+             initSmpl logger dflags read_eps_rules (mkRuleEnv rule_base vis_orphs) fam_envs sz $
                do { (floats, env1) <- {-# SCC "SimplTopBinds" #-}
                                       simplTopBinds simpl_env tagged_binds
 
