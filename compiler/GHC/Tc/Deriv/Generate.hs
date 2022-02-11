@@ -19,7 +19,7 @@
 --
 -- This is where we do all the grimy bindings' generation.
 module GHC.Tc.Deriv.Generate (
-        BagDerivStuff, DerivStuff(..),
+        AuxBindSpec(..),
 
         gen_Eq_binds,
         gen_Ord_binds,
@@ -31,6 +31,7 @@ module GHC.Tc.Deriv.Generate (
         gen_Data_binds,
         gen_Lift_binds,
         gen_Newtype_binds,
+        gen_Newtype_fam_insts,
         mkCoerceClassMethEqn,
         genAuxBinds,
         ordOpTbl, boxConTbl, litConTbl,
@@ -87,8 +88,6 @@ import Data.List  ( find, partition, intersperse )
 import GHC.Data.Maybe ( expectJust )
 import GHC.Unit.Module
 
-type BagDerivStuff = Bag DerivStuff
-
 -- | A declarative description of an auxiliary binding that should be
 -- generated. See @Note [Auxiliary binders]@ for a more detailed description
 -- of how these are used.
@@ -137,23 +136,6 @@ auxBindSpecRdrName (DerivTag2Con      _ tag2con_RDR) = tag2con_RDR
 auxBindSpecRdrName (DerivMaxTag       _ maxtag_RDR)  = maxtag_RDR
 auxBindSpecRdrName (DerivDataDataType _ dataT_RDR _) = dataT_RDR
 auxBindSpecRdrName (DerivDataConstr   _ dataC_RDR _) = dataC_RDR
-
-data DerivStuff     -- Please add this auxiliary stuff
-  = DerivAuxBind AuxBindSpec
-    -- ^ A new, top-level auxiliary binding. Used for deriving 'Eq', 'Ord',
-    --   'Enum', 'Ix', and 'Data'. See Note [Auxiliary binders].
-
-  -- Generics and DeriveAnyClass
-  | DerivFamInst FamInst               -- New type family instances
-    -- ^ A new type family instance. Used for:
-    --
-    -- * @DeriveGeneric@, which generates instances of @Rep(1)@
-    --
-    -- * @DeriveAnyClass@, which can fill in associated type family defaults
-    --
-    -- * @GeneralizedNewtypeDeriving@, which generates instances of associated
-    --   type families for newtypes
-
 
 {-
 ************************************************************************
@@ -214,7 +196,7 @@ for the instance decl, which it probably wasn't, so the decls
 produced don't get through the typechecker.
 -}
 
-gen_Eq_binds :: SrcSpan -> DerivInstTys -> TcM (LHsBinds GhcPs, BagDerivStuff)
+gen_Eq_binds :: SrcSpan -> DerivInstTys -> TcM (LHsBinds GhcPs, Bag AuxBindSpec)
 gen_Eq_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
                                   , dit_rep_tc_args = tycon_args }) = do
     return (method_binds, emptyBag)
@@ -391,7 +373,7 @@ gtResult OrdGE      = true_Expr
 gtResult OrdGT      = true_Expr
 
 ------------
-gen_Ord_binds :: SrcSpan -> DerivInstTys -> TcM (LHsBinds GhcPs, BagDerivStuff)
+gen_Ord_binds :: SrcSpan -> DerivInstTys -> TcM (LHsBinds GhcPs, Bag AuxBindSpec)
 gen_Ord_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
                                    , dit_rep_tc_args = tycon_args }) = do
     return $ if null tycon_data_cons -- No data-cons => invoke bale-out case
@@ -640,7 +622,7 @@ instance ... Enum (Foo ...) where
 For @enumFromTo@ and @enumFromThenTo@, we use the default methods.
 -}
 
-gen_Enum_binds :: SrcSpan -> DerivInstTys -> TcM (LHsBinds GhcPs, BagDerivStuff)
+gen_Enum_binds :: SrcSpan -> DerivInstTys -> TcM (LHsBinds GhcPs, Bag AuxBindSpec)
 gen_Enum_binds loc (DerivInstTys{dit_rep_tc = tycon}) = do
     -- See Note [Auxiliary binders]
     tag2con_RDR <- new_tag2con_rdr_name loc tycon
@@ -657,7 +639,7 @@ gen_Enum_binds loc (DerivInstTys{dit_rep_tc = tycon}) = do
       , enum_from_then tag2con_RDR maxtag_RDR -- [0, 1 ..]
       , from_enum
       ]
-    aux_binds tag2con_RDR maxtag_RDR = listToBag $ map DerivAuxBind
+    aux_binds tag2con_RDR maxtag_RDR = listToBag
       [ DerivTag2Con tycon tag2con_RDR
       , DerivMaxTag  tycon maxtag_RDR
       ]
@@ -730,7 +712,7 @@ gen_Enum_binds loc (DerivInstTys{dit_rep_tc = tycon}) = do
 ************************************************************************
 -}
 
-gen_Bounded_binds :: SrcSpan -> DerivInstTys -> (LHsBinds GhcPs, BagDerivStuff)
+gen_Bounded_binds :: SrcSpan -> DerivInstTys -> (LHsBinds GhcPs, Bag AuxBindSpec)
 gen_Bounded_binds loc (DerivInstTys{dit_rep_tc = tycon})
   | isEnumerationTyCon tycon
   = (listToBag [ min_bound_enum, max_bound_enum ], emptyBag)
@@ -817,14 +799,14 @@ we follow the scheme given in Figure~19 of the Haskell~1.2 report
 (p.~147).
 -}
 
-gen_Ix_binds :: SrcSpan -> DerivInstTys -> TcM (LHsBinds GhcPs, BagDerivStuff)
+gen_Ix_binds :: SrcSpan -> DerivInstTys -> TcM (LHsBinds GhcPs, Bag AuxBindSpec)
 
 gen_Ix_binds loc (DerivInstTys{dit_rep_tc = tycon}) = do
     -- See Note [Auxiliary binders]
     tag2con_RDR <- new_tag2con_rdr_name loc tycon
 
     return $ if isEnumerationTyCon tycon
-      then (enum_ixes tag2con_RDR, listToBag $ map DerivAuxBind
+      then (enum_ixes tag2con_RDR, listToBag
                    [ DerivTag2Con tycon tag2con_RDR
                    ])
       else (single_con_ixes, emptyBag)
@@ -1020,7 +1002,7 @@ we want to be able to parse (Left 3) just fine.
 -}
 
 gen_Read_binds :: (Name -> Fixity) -> SrcSpan -> DerivInstTys
-               -> (LHsBinds GhcPs, BagDerivStuff)
+               -> (LHsBinds GhcPs, Bag AuxBindSpec)
 
 gen_Read_binds get_fixity loc dit@(DerivInstTys{dit_rep_tc = tycon})
   = (listToBag [read_prec, default_readlist, default_readlistprec], emptyBag)
@@ -1204,7 +1186,7 @@ Example
 -}
 
 gen_Show_binds :: (Name -> Fixity) -> SrcSpan -> DerivInstTys
-               -> (LHsBinds GhcPs, BagDerivStuff)
+               -> (LHsBinds GhcPs, Bag AuxBindSpec)
 
 gen_Show_binds get_fixity loc dit@(DerivInstTys{ dit_rep_tc = tycon
                                                , dit_rep_tc_args = tycon_args })
@@ -1377,7 +1359,7 @@ we generate
 gen_Data_binds :: SrcSpan
                -> DerivInstTys
                -> TcM (LHsBinds GhcPs,  -- The method bindings
-                       BagDerivStuff)   -- Auxiliary bindings
+                       Bag AuxBindSpec) -- Auxiliary bindings
 gen_Data_binds loc (DerivInstTys{dit_rep_tc = rep_tc})
   = do { -- See Note [Auxiliary binders]
          dataT_RDR  <- new_dataT_rdr_name loc rep_tc
@@ -1387,7 +1369,7 @@ gen_Data_binds loc (DerivInstTys{dit_rep_tc = rep_tc})
                           , toCon_bind dataC_RDRs, dataTypeOf_bind dataT_RDR ]
                 `unionBags` gcast_binds
                           -- Auxiliary definitions: the data type and constructors
-              , listToBag $ map DerivAuxBind
+              , listToBag
                   ( DerivDataDataType rep_tc dataT_RDR dataC_RDRs
                   : zipWith (\data_con dataC_RDR ->
                                DerivDataConstr data_con dataC_RDR dataT_RDR)
@@ -1642,7 +1624,7 @@ lifting warning in derived code. (See #20688)
 -}
 
 
-gen_Lift_binds :: SrcSpan -> DerivInstTys -> (LHsBinds GhcPs, BagDerivStuff)
+gen_Lift_binds :: SrcSpan -> DerivInstTys -> (LHsBinds GhcPs, Bag AuxBindSpec)
 gen_Lift_binds loc (DerivInstTys{ dit_rep_tc = tycon
                                 , dit_rep_tc_args = tycon_args }) =
   (listToBag [lift_bind, liftTyped_bind], emptyBag)
@@ -1971,17 +1953,18 @@ gen_Newtype_binds :: SrcSpan
                              -- newtype itself)
                   -> [Type]  -- instance head parameters (incl. newtype)
                   -> Type    -- the representation type
-                  -> TcM (LHsBinds GhcPs, [LSig GhcPs], BagDerivStuff)
+                  -> (LHsBinds GhcPs, [LSig GhcPs])
 -- See Note [Newtype-deriving instances]
 gen_Newtype_binds loc' cls inst_tvs inst_tys rhs_ty
-  = do let ats = classATs cls
-           (binds, sigs) = mapAndUnzip mk_bind_and_sig (classMethods cls)
-       atf_insts <- assert (all (not . isDataFamilyTyCon) ats) $
-                    mapM mk_atf_inst ats
-       return ( listToBag binds
-              , sigs
-              , listToBag $ map DerivFamInst atf_insts )
+  = (listToBag binds, sigs)
   where
+    (binds, sigs) = mapAndUnzip mk_bind_and_sig (classMethods cls)
+
+    -- Same as inst_tys, but with the last argument type replaced by the
+    -- representation type.
+    underlying_inst_tys :: [Type]
+    underlying_inst_tys = changeLast inst_tys rhs_ty
+
     locn = noAnnSrcSpan loc'
     loca = noAnnSrcSpan loc'
     -- For each class method, generate its derived binding and instance
@@ -2051,6 +2034,33 @@ gen_Newtype_binds loc' cls inst_tvs inst_tys rhs_ty
                      -- Filter out any inferred arguments, since they can't be
                      -- applied with visible type application.
 
+gen_Newtype_fam_insts :: SrcSpan
+                      -> Class   -- the class being derived
+                      -> [TyVar] -- the tvs in the instance head (this includes
+                                 -- the tvs from both the class types and the
+                                 -- newtype itself)
+                      -> [Type]  -- instance head parameters (incl. newtype)
+                      -> Type    -- the representation type
+                      -> TcM [FamInst]
+-- See Note [GND and associated type families] in GHC.Tc.Deriv
+gen_Newtype_fam_insts loc' cls inst_tvs inst_tys rhs_ty
+  = assert (all (not . isDataFamilyTyCon) ats) $
+    mapM mk_atf_inst ats
+  where
+    -- Same as inst_tys, but with the last argument type replaced by the
+    -- representation type.
+    underlying_inst_tys :: [Type]
+    underlying_inst_tys = changeLast inst_tys rhs_ty
+
+    ats       = classATs cls
+    locn      = noAnnSrcSpan loc'
+    cls_tvs   = classTyVars cls
+    in_scope  = mkInScopeSet $ mkVarSet inst_tvs
+    lhs_env   = zipTyEnv cls_tvs inst_tys
+    lhs_subst = mkTvSubst in_scope lhs_env
+    rhs_env   = zipTyEnv cls_tvs underlying_inst_tys
+    rhs_subst = mkTvSubst in_scope rhs_env
+
     mk_atf_inst :: TyCon -> TcM FamInst
     mk_atf_inst fam_tc = do
         rep_tc_name <- newFamInstTyConName (L locn (tyConName fam_tc))
@@ -2061,12 +2071,6 @@ gen_Newtype_binds loc' cls inst_tvs inst_tys rhs_ty
         checkValidCoAxBranch fam_tc (coAxiomSingleBranch axiom)
         newFamInst SynFamilyInst axiom
       where
-        cls_tvs     = classTyVars cls
-        in_scope    = mkInScopeSet $ mkVarSet inst_tvs
-        lhs_env     = zipTyEnv cls_tvs inst_tys
-        lhs_subst   = mkTvSubst in_scope lhs_env
-        rhs_env     = zipTyEnv cls_tvs underlying_inst_tys
-        rhs_subst   = mkTvSubst in_scope rhs_env
         fam_tvs     = tyConTyVars fam_tc
         rep_lhs_tys = substTyVars lhs_subst fam_tvs
         rep_rhs_tys = substTyVars rhs_subst fam_tvs
@@ -2075,11 +2079,6 @@ gen_Newtype_binds loc' cls inst_tvs inst_tys rhs_ty
         (rep_tvs, rep_cvs) = partition isTyVar rep_tcvs
         rep_tvs'    = scopedSort rep_tvs
         rep_cvs'    = scopedSort rep_cvs
-
-    -- Same as inst_tys, but with the last argument type replaced by the
-    -- representation type.
-    underlying_inst_tys :: [Type]
-    underlying_inst_tys = changeLast inst_tys rhs_ty
 
 nlHsAppType :: LHsExpr GhcPs -> Type -> LHsExpr GhcPs
 nlHsAppType e s = noLocA (HsAppType noSrcSpan e hs_ty)
@@ -2216,25 +2215,13 @@ genAuxBindSpecSig loc spec = case spec of
   where
     mk_sig = mkHsWildCardBndrs . L (noAnnSrcSpan loc) . mkHsImplicitSigType
 
-type SeparateBagsDerivStuff =
-  -- DerivAuxBinds
-  ( Bag (LHsBind GhcPs, LSig GhcPs)
-
-  -- Extra family instances (used by DeriveGeneric, DeriveAnyClass, and
-  -- GeneralizedNewtypeDeriving)
-  , Bag FamInst )
-
--- | Take a 'BagDerivStuff' and partition it into 'SeparateBagsDerivStuff'.
--- Also generate the code for auxiliary bindings based on the declarative
--- descriptions in the supplied 'AuxBindSpec's. See @Note [Auxiliary binders]@.
-genAuxBinds :: DynFlags -> SrcSpan -> BagDerivStuff -> SeparateBagsDerivStuff
-genAuxBinds dflags loc b = (gen_aux_bind_specs b1, b2) where
-  (b1,b2) = partitionBagWith splitDerivAuxBind b
-  splitDerivAuxBind (DerivAuxBind x) = Left x
-  splitDerivAuxBind (DerivFamInst t) = Right t
-
-  gen_aux_bind_specs = snd . foldr gen_aux_bind_spec (emptyOccEnv, emptyBag)
-
+-- | Take a 'Bag' of 'AuxBindSpec's and generate the code for auxiliary
+-- bindings based on the declarative descriptions in the supplied
+-- 'AuxBindSpec's. See @Note [Auxiliary binders]@.
+genAuxBinds :: DynFlags -> SrcSpan -> Bag AuxBindSpec
+            -> Bag (LHsBind GhcPs, LSig GhcPs)
+genAuxBinds dflags loc = snd . foldr gen_aux_bind_spec (emptyOccEnv, emptyBag)
+ where
   -- Perform a CSE-like pass over the generated auxiliary bindings to avoid
   -- code duplication, as described in
   -- Note [Auxiliary binders] (Wrinkle: Reducing code duplication).

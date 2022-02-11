@@ -149,7 +149,7 @@ is a similar algorithm for generating `p <$ x` (for some constant `p`):
   $(coreplace 'a '(tb -> tc) x) = \(y:tb[b/a]) -> $(coreplace 'a' 'tc' (x $(replace 'a 'tb y)))
 -}
 
-gen_Functor_binds :: SrcSpan -> DerivInstTys -> (LHsBinds GhcPs, BagDerivStuff)
+gen_Functor_binds :: SrcSpan -> DerivInstTys -> (LHsBinds GhcPs, Bag AuxBindSpec)
 -- When the argument is phantom, we can use  fmap _ = coerce
 -- See Note [Phantom types with Functor, Foldable, and Traversable]
 gen_Functor_binds loc (DerivInstTys{dit_rep_tc = tycon})
@@ -784,7 +784,7 @@ could surprise users if they switch to other types, but Ryan Scott seems to
 think it's okay to do it for now.
 -}
 
-gen_Foldable_binds :: SrcSpan -> DerivInstTys -> (LHsBinds GhcPs, BagDerivStuff)
+gen_Foldable_binds :: SrcSpan -> DerivInstTys -> (LHsBinds GhcPs, Bag AuxBindSpec)
 -- When the parameter is phantom, we can use foldMap _ _ = mempty
 -- See Note [Phantom types with Functor, Foldable, and Traversable]
 gen_Foldable_binds loc (DerivInstTys{dit_rep_tc = tycon})
@@ -1018,7 +1018,7 @@ removes all such types from consideration.
 See Note [Generated code for DeriveFoldable and DeriveTraversable].
 -}
 
-gen_Traversable_binds :: SrcSpan -> DerivInstTys -> (LHsBinds GhcPs, BagDerivStuff)
+gen_Traversable_binds :: SrcSpan -> DerivInstTys -> (LHsBinds GhcPs, Bag AuxBindSpec)
 -- When the argument is phantom, we can use traverse = pure . coerce
 -- See Note [Phantom types with Functor, Foldable, and Traversable]
 gen_Traversable_binds loc (DerivInstTys{dit_rep_tc = tycon})

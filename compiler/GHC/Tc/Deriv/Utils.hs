@@ -10,10 +10,10 @@
 -- | Error-checking and other utilities for @deriving@ clauses or declarations.
 module GHC.Tc.Deriv.Utils (
         DerivM, DerivEnv(..),
-        DerivSpec(..), pprDerivSpec,
+        DerivSpec(..), pprDerivSpec, setDerivSpecTheta,
         DerivSpecMechanism(..), derivSpecMechanismToStrategy, isDerivSpecStock,
         isDerivSpecNewtype, isDerivSpecAnyClass, isDerivSpecVia,
-        DerivContext(..), OriginativeDerivStatus(..),
+        DerivContext(..), OriginativeDerivStatus(..), StockGenFns(..),
         isStandaloneDeriv, isStandaloneWildcardDeriv, mkDerivOrigin,
         PredOrigin(..), ThetaOrigin(..), mkPredOrigin,
         mkThetaOrigin, mkThetaOriginFromPreds, substPredOrigin,
@@ -28,6 +28,7 @@ import GHC.Data.Bag
 import GHC.Types.Basic
 import GHC.Core.Class
 import GHC.Core.DataCon
+import GHC.Core.FamInstEnv
 import GHC.Driver.Session
 import GHC.Utils.Error
 import GHC.Types.Fixity.Env (lookupFixity)
@@ -179,6 +180,10 @@ pprDerivSpec (DS { ds_loc = l, ds_name = n, ds_tvs = tvs, ds_cls = c,
 instance Outputable theta => Outputable (DerivSpec theta) where
   ppr = pprDerivSpec
 
+-- | Set the 'ds_theta' in a 'DerivSpec'.
+setDerivSpecTheta :: theta' -> DerivSpec theta -> DerivSpec theta'
+setDerivSpecTheta theta ds = ds{ds_theta = theta}
+
 -- | What action to take in order to derive a class instance.
 -- See @Note [DerivEnv and DerivSpecMechanism]@, as well as
 -- @Note [Deriving strategies]@ in "GHC.Tc.Deriv".
@@ -189,28 +194,9 @@ data DerivSpecMechanism
       -- ^ Information about the arguments to the class in the derived
       -- instance, including what type constructor the last argument is
       -- headed by. See @Note [DerivEnv and DerivSpecMechanism]@.
-    , dsm_stock_gen_fn ::
-        SrcSpan -> [Type]       -- inst_tys
-                -> DerivInstTys -- dsm_stock_dit
-                -> TcM (LHsBinds GhcPs, [LSig GhcPs], BagDerivStuff, [Name])
-      -- ^ This function returns four things:
-      --
-      -- 1. @LHsBinds GhcPs@: The derived instance's function bindings
-      --    (e.g., @compare (T x) (T y) = compare x y@)
-      --
-      -- 2. @[LSig GhcPs]@: A list of instance specific signatures/pragmas.
-      --    Most likely INLINE pragmas for class methods.
-      --
-      -- 3. @BagDerivStuff@: Auxiliary bindings needed to support the derived
-      --    instance. As examples, derived 'Generic' instances require
-      --    associated type family instances, and derived 'Eq' and 'Ord'
-      --    instances require top-level @con2tag@ functions.
-      --    See @Note [Auxiliary binders]@ in "GHC.Tc.Deriv.Generate".
-      --
-      -- 4. @[Name]@: A list of Names for which @-Wunused-binds@ should be
-      --    suppressed. This is used to suppress unused warnings for record
-      --    selectors when deriving 'Read', 'Show', or 'Generic'.
-      --    See @Note [Deriving and unused record selectors]@.
+    , dsm_stock_gen_fns :: StockGenFns
+      -- ^ How to generate the instance bindings and associated type family
+      -- instances.
     }
 
     -- | @GeneralizedNewtypeDeriving@
@@ -401,12 +387,60 @@ instance Outputable DerivContext where
 --
 -- See @Note [Deriving strategies]@ in "GHC.Tc.Deriv".
 data OriginativeDerivStatus
-  = CanDeriveStock            -- Stock class, can derive
-      (SrcSpan -> [Type] -> DerivInstTys
-               -> TcM (LHsBinds GhcPs, [LSig GhcPs], BagDerivStuff, [Name]))
+  = CanDeriveStock StockGenFns -- Stock class, can derive
   | StockClassError !DeriveInstanceErrReason -- Stock class, but can't do it
   | CanDeriveAnyClass         -- See Note [Deriving any class]
   | NonDerivableClass -- Cannot derive with either stock or anyclass
+
+-- | Describes how to generate instance bindings ('stock_gen_binds') and
+-- associated type family instances ('stock_gen_fam_insts') for a particular
+-- stock-derived instance.
+data StockGenFns = StockGenFns
+  { stock_gen_binds ::
+         SrcSpan -> DerivInstTys
+      -> TcM (LHsBinds GhcPs, [LSig GhcPs], Bag AuxBindSpec, [Name])
+    -- ^ Describes how to generate instance bindings for a stock-derived
+    -- instance.
+    --
+    -- This function takes two arguments:
+    --
+    -- 1. 'SrcSpan': the source location where the instance is being derived.
+    --    This will eventually be instantiated with the 'ds_loc' field of a
+    --    'DerivSpec'.
+    --
+    -- 2. 'DerivInstTys': information about the argument types to which a
+    --    class is applied in a derived instance. This will eventually be
+    --    instantiated with the 'dsm_stock_dit' field of a
+    --    'DerivSpecMechanism'.
+    --
+    -- This function returns four things:
+    --
+    -- 1. @'LHsBinds' 'GhcPs'@: The derived instance's function bindings
+    --    (e.g., @compare (T x) (T y) = compare x y@)
+    --
+    -- 2. @['LSig' 'GhcPs']@: A list of instance specific signatures/pragmas.
+    --    Most likely @INLINE@ pragmas for class methods.
+    --
+    -- 3. @'Bag' 'AuxBindSpec'@: Auxiliary bindings needed to support the
+    --    derived instance. As examples, derived 'Eq' and 'Ord' instances
+    --    sometimes require top-level @con2tag@ functions.
+    --    See @Note [Auxiliary binders]@ in "GHC.Tc.Deriv.Generate".
+    --
+    -- 4. @['Name']@: A list of Names for which @-Wunused-binds@ should be
+    --    suppressed. This is used to suppress unused warnings for record
+    --    selectors when deriving 'Read', 'Show', or 'Generic'.
+    --    See @Note [Deriving and unused record selectors]@.
+  , stock_gen_fam_insts ::
+         SrcSpan -> DerivInstTys
+      -> TcM [FamInst]
+    -- ^ Describes how to generate associated type family instances for a
+    -- stock-derived instance. This function takes the same arguments as the
+    -- 'stock_gen_binds' function but returns a list of 'FamInst's instead.
+    -- Generating type family instances is done separately from
+    -- 'stock_gen_binds' since the type family instances must be generated
+    -- before the instance bindings can be typechecked. See
+    -- @Note [Staging of tcDeriving]@ in "GHC.Tc.Deriv".
+  }
 
 -- A stock class is one either defined in the Haskell report or for which GHC
 -- otherwise knows how to generate code for (possibly requiring the use of a
@@ -542,58 +576,65 @@ is willing to support it.
 -}
 
 hasStockDeriving
-  :: Class -> Maybe (SrcSpan
-                     -> [Type]
-                     -> DerivInstTys
-                     -> TcM (LHsBinds GhcPs, [LSig GhcPs], BagDerivStuff, [Name]))
+  :: Class -> Maybe StockGenFns
 hasStockDeriving clas
   = assocMaybe gen_list (getUnique clas)
   where
-    gen_list
-      :: [(Unique, SrcSpan
-                   -> [Type]
-                   -> DerivInstTys
-                   -> TcM (LHsBinds GhcPs, [LSig GhcPs], BagDerivStuff, [Name]))]
-    gen_list = [ (eqClassKey,          simpleM gen_Eq_binds)
-               , (ordClassKey,         simpleM gen_Ord_binds)
-               , (enumClassKey,        simpleM gen_Enum_binds)
-               , (boundedClassKey,     simple gen_Bounded_binds)
-               , (ixClassKey,          simpleM gen_Ix_binds)
-               , (showClassKey,        read_or_show gen_Show_binds)
-               , (readClassKey,        read_or_show gen_Read_binds)
-               , (dataClassKey,        simpleM gen_Data_binds)
-               , (functorClassKey,     simple gen_Functor_binds)
-               , (foldableClassKey,    simple gen_Foldable_binds)
-               , (traversableClassKey, simple gen_Traversable_binds)
-               , (liftClassKey,        simple gen_Lift_binds)
-               , (genClassKey,         generic (gen_Generic_binds Gen0))
-               , (gen1ClassKey,        generic (gen_Generic_binds Gen1)) ]
+    gen_list :: [(Unique, StockGenFns)]
+    gen_list =
+      [ (eqClassKey,          mk (simple_bindsM gen_Eq_binds) no_fam_insts)
+      , (ordClassKey,         mk (simple_bindsM gen_Ord_binds) no_fam_insts)
+      , (enumClassKey,        mk (simple_bindsM gen_Enum_binds) no_fam_insts)
+      , (boundedClassKey,     mk (simple_binds gen_Bounded_binds) no_fam_insts)
+      , (ixClassKey,          mk (simple_bindsM gen_Ix_binds) no_fam_insts)
+      , (showClassKey,        mk (read_or_show_binds gen_Show_binds) no_fam_insts)
+      , (readClassKey,        mk (read_or_show_binds gen_Read_binds) no_fam_insts)
+      , (dataClassKey,        mk (simple_bindsM gen_Data_binds) no_fam_insts)
+      , (functorClassKey,     mk (simple_binds gen_Functor_binds) no_fam_insts)
+      , (foldableClassKey,    mk (simple_binds gen_Foldable_binds) no_fam_insts)
+      , (traversableClassKey, mk (simple_binds gen_Traversable_binds) no_fam_insts)
+      , (liftClassKey,        mk (simple_binds gen_Lift_binds) no_fam_insts)
+      , (genClassKey,         mk (generic_binds Gen0) (generic_fam_inst Gen0))
+      , (gen1ClassKey,        mk (generic_binds Gen1) (generic_fam_inst Gen1))
+      ]
 
-    simple gen_fn loc _ dit
-      = let (binds, deriv_stuff) = gen_fn loc dit
-        in return (binds, [], deriv_stuff, [])
+    mk gen_binds_fn gen_fam_insts_fn = StockGenFns
+      { stock_gen_binds     = gen_binds_fn
+      , stock_gen_fam_insts = gen_fam_insts_fn
+      }
+
+    simple_binds gen_fn loc dit
+      = let (binds, aux_specs) = gen_fn loc dit
+        in return (binds, [], aux_specs, [])
 
     -- Like `simple`, but monadic. The only monadic thing that these functions
     -- do is allocate new Uniques, which are used for generating the names of
     -- auxiliary bindings.
     -- See Note [Auxiliary binders] in GHC.Tc.Deriv.Generate.
-    simpleM gen_fn loc _ dit
-      = do { (binds, deriv_stuff) <- gen_fn loc dit
-           ; return (binds, [], deriv_stuff, []) }
+    simple_bindsM gen_fn loc dit
+      = do { (binds, aux_specs) <- gen_fn loc dit
+           ; return (binds, [], aux_specs, []) }
 
-    read_or_show gen_fn loc _ dit
+    read_or_show_binds gen_fn loc dit
       = do { let tc = dit_rep_tc dit
            ; fix_env <- getDataConFixityFun tc
-           ; let (binds, deriv_stuff) = gen_fn fix_env loc dit
-                 field_names          = all_field_names tc
-           ; return (binds, [], deriv_stuff, field_names) }
+           ; let (binds, aux_specs) = gen_fn fix_env loc dit
+                 field_names        = all_field_names tc
+           ; return (binds, [], aux_specs, field_names) }
 
-    generic gen_fn _ inst_tys dit
+    generic_binds gk loc dit
       = do { let tc = dit_rep_tc dit
-           ; fix_env <- getDataConFixityFun tc
-           ; (binds, sigs, faminst) <- gen_fn fix_env inst_tys dit
+           ; (binds, sigs) <- gen_Generic_binds gk loc dit
            ; let field_names = all_field_names tc
-           ; return (binds, sigs, unitBag (DerivFamInst faminst), field_names) }
+           ; return (binds, sigs, emptyBag, field_names) }
+
+    generic_fam_inst gk loc dit
+      = do { let tc = dit_rep_tc dit
+           ; fix_env <- getDataConFixityFun tc
+           ; faminst <- gen_Generic_fam_inst gk fix_env loc dit
+           ; return [faminst] }
+
+    no_fam_insts _ _ = pure []
 
     -- See Note [Deriving and unused record selectors]
     all_field_names = map flSelector . concatMap dataConFieldLabels
@@ -983,9 +1024,10 @@ non_coercible_class cls
 
 ------------------------------------------------------------------
 
-newDerivClsInst :: ThetaType -> DerivSpec theta -> TcM ClsInst
-newDerivClsInst theta (DS { ds_name = dfun_name, ds_overlap = overlap_mode
-                          , ds_tvs = tvs, ds_cls = clas, ds_tys = tys })
+newDerivClsInst :: DerivSpec ThetaType -> TcM ClsInst
+newDerivClsInst (DS { ds_name = dfun_name, ds_overlap = overlap_mode
+                    , ds_tvs = tvs, ds_theta = theta
+                    , ds_cls = clas, ds_tys = tys })
   = newClsInst overlap_mode dfun_name tvs theta clas tys
 
 extendLocalInstEnv :: [ClsInst] -> TcM a -> TcM a
