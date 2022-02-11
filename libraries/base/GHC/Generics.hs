@@ -1428,7 +1428,7 @@ instance (Generic a, Semigroup (Rep a ())) => Semigroup (Generically a) where
   Generically a <> Generically b = Generically (to (from a <> from b :: Rep a ()))
 
 -- | @since 4.17.0.0
-instance (Semigroup a, Generic a, Monoid (Rep a ())) => Monoid (Generically a) where
+instance (Generic a, Monoid (Rep a ())) => Monoid (Generically a) where
   mempty :: Generically a
   mempty = Generically (to (mempty :: Rep a ()))
 
