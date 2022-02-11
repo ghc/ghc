@@ -165,7 +165,7 @@ viaLlvmBackend = addArgs $ notStage0 ? builder Ghc ? arg "-fllvm"
 -- support loading of profiled libraries with the dynamically-linker.
 enableProfiledGhc :: Flavour -> Flavour
 enableProfiledGhc flavour =
-    flavour { rtsWays = addWays [profiling, threadedProfiling, debugProfiling, threadedDebugProfiling] (rtsWays flavour)
+    enableLateCCS flavour { rtsWays = addWays [profiling, threadedProfiling, debugProfiling, threadedDebugProfiling] (rtsWays flavour)
             , libraryWays = addWays [profiling] (libraryWays flavour)
             , ghcProfiled = True
             }
@@ -201,6 +201,12 @@ omitPragmas =
 enableIPE :: Flavour -> Flavour
 enableIPE =
   let Right kv = parseKV "stage1.*.ghc.hs.opts += -finfo-table-map -fdistinct-constructor-tables"
+      Right transformer = applySetting kv
+  in transformer
+
+enableLateCCS :: Flavour -> Flavour
+enableLateCCS =
+  let Right kv = parseKV "stage1.*.ghc.hs.opts += -fprof-late-ccs"
       Right transformer = applySetting kv
   in transformer
 
