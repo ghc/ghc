@@ -665,13 +665,14 @@ simplifyInstanceContexts infer_specs
       | otherwise
       = do {      -- Extend the inst info from the explicit instance decls
                   -- with the current set of solutions, and simplify each RHS
-             inst_specs <- zipWithM newDerivClsInst current_solns infer_specs
+             inst_specs <- zipWithM (\soln -> newDerivClsInst . setDerivSpecTheta soln)
+                                    current_solns infer_specs
            ; new_solns <- checkNoErrs $
                           extendLocalInstEnv inst_specs $
                           mapM gen_soln infer_specs
 
            ; if (current_solns `eqSolution` new_solns) then
-                return [ spec { ds_theta = soln }
+                return [ setDerivSpecTheta soln spec
                        | (spec, soln) <- zip infer_specs current_solns ]
              else
                 iterate_deriv (n+1) new_solns }

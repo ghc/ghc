@@ -12,10 +12,11 @@
 
 -- | The deriving code for the Generic class
 module GHC.Tc.Deriv.Generics
-   (canDoGenerics
+   ( canDoGenerics
    , canDoGenerics1
    , GenericKind(..)
    , gen_Generic_binds
+   , gen_Generic_fam_inst
    , get_gen1_constrained_tys
    )
 where
@@ -76,13 +77,11 @@ For the generic representation we need to generate:
 \end{itemize}
 -}
 
-gen_Generic_binds :: GenericKind -> (Name -> Fixity) -> [Type] -> DerivInstTys
-                  -> TcM (LHsBinds GhcPs, [LSig GhcPs], FamInst)
-gen_Generic_binds gk get_fixity inst_tys dit = do
+gen_Generic_binds :: GenericKind -> SrcSpan -> DerivInstTys
+                  -> TcM (LHsBinds GhcPs, [LSig GhcPs])
+gen_Generic_binds gk loc dit = do
   dflags <- getDynFlags
-  repTyInsts <- tc_mkRepFamInsts gk get_fixity inst_tys dit
-  let (binds, sigs) = mkBindsRep dflags gk dit
-  return (binds, sigs, repTyInsts)
+  return $ mkBindsRep dflags gk loc dit
 
 {-
 ************************************************************************
@@ -332,8 +331,8 @@ gk2gkDC Gen1 dc tc_args = Gen1_DC $ assert (isTyVarTy last_dc_inst_univ)
 
 
 -- Bindings for the Generic instance
-mkBindsRep :: DynFlags -> GenericKind -> DerivInstTys -> (LHsBinds GhcPs, [LSig GhcPs])
-mkBindsRep dflags gk dit@(DerivInstTys{dit_rep_tc = tycon}) = (binds, sigs)
+mkBindsRep :: DynFlags -> GenericKind -> SrcSpan -> DerivInstTys -> (LHsBinds GhcPs, [LSig GhcPs])
+mkBindsRep dflags gk loc dit@(DerivInstTys{dit_rep_tc = tycon}) = (binds, sigs)
       where
         binds = unitBag (mkRdrFunBind (L loc' from01_RDR) [from_eqn])
               `unionBags`
@@ -369,7 +368,6 @@ mkBindsRep dflags gk dit@(DerivInstTys{dit_rep_tc = tycon}) = (binds, sigs)
 
         from_matches  = [mkHsCaseAlt pat rhs | (pat,rhs) <- from_alts]
         to_matches    = [mkHsCaseAlt pat rhs | (pat,rhs) <- to_alts  ]
-        loc           = srcLocSpan (getSrcLoc tycon)
         loc'          = noAnnSrcSpan loc
         loc''         = noAnnSrcSpan loc
         datacons      = tyConDataCons tycon
@@ -388,14 +386,17 @@ mkBindsRep dflags gk dit@(DerivInstTys{dit_rep_tc = tycon}) = (binds, sigs)
 --       type Rep_D a b = ...representation type for D ...
 --------------------------------------------------------------------------------
 
-tc_mkRepFamInsts :: GenericKind      -- Gen0 or Gen1
-                 -> (Name -> Fixity) -- Get the Fixity for a data constructor Name
-                 -> [Type]           -- The type(s) to which Generic(1) is applied
-                                     -- in the generated instance
-                 -> DerivInstTys     -- Information about the last type argument,
-                                     -- including the data type's TyCon
-                 -> TcM FamInst      -- Generated representation0 coercion
-tc_mkRepFamInsts gk get_fixity inst_tys dit@(DerivInstTys{dit_rep_tc = tycon}) =
+gen_Generic_fam_inst :: GenericKind      -- Gen0 or Gen1
+                     -> (Name -> Fixity) -- Get the Fixity for a data constructor Name
+                     -> SrcSpan          -- The current source location
+                     -> DerivInstTys     -- Information about the type(s) to which
+                                         -- Generic(1) is applied in the generated
+                                         -- instance, including the data type's TyCon
+                     -> TcM FamInst      -- Generated representation0 coercion
+gen_Generic_fam_inst gk get_fixity loc
+       dit@(DerivInstTys{ dit_cls_tys = cls_tys
+                        , dit_tc = tc, dit_tc_args = tc_args
+                        , dit_rep_tc = tycon }) =
        -- Consider the example input tycon `D`, where data D a b = D_ a
        -- Also consider `R:DInt`, where { data family D x y :: * -> *
        --                               ; data instance D Int a b = D_ a }
@@ -413,17 +414,18 @@ tc_mkRepFamInsts gk get_fixity inst_tys dit@(DerivInstTys{dit_rep_tc = tycon}) =
            --   instance Generic1 (Bar x :: k -> *)
            -- then:
            --   `arg_k` = k, `inst_ty` = Bar x :: k -> *
-           (arg_ki, inst_ty) = case (gk, inst_tys) of
-             (Gen0, [inst_t])        -> (liftedTypeKind, inst_t)
-             (Gen1, [arg_k, inst_t]) -> (arg_k,          inst_t)
-             _ -> pprPanic "tc_mkRepFamInsts" (ppr inst_tys)
+           arg_ki = case (gk, cls_tys) of
+             (Gen0, [])      -> liftedTypeKind
+             (Gen1, [arg_k]) -> arg_k
+             _ -> pprPanic "gen_Generic_fam_insts" (ppr cls_tys)
+           inst_ty = mkTyConApp tc tc_args
+           inst_tys = cls_tys ++ [inst_ty]
 
        -- `repTy` = D1 ... (C1 ... (S1 ... (Rec0 a))) :: * -> *
      ; repTy <- tc_mkRepTy gk get_fixity dit arg_ki
 
        -- `rep_name` is a name we generate for the synonym
      ; mod <- getModule
-     ; loc <- getSrcSpanM
      ; let tc_occ  = nameOccName (tyConName tycon)
            rep_occ = case gk of Gen0 -> mkGenR tc_occ; Gen1 -> mkGen1R tc_occ
      ; rep_name <- newGlobalBinder mod rep_occ loc

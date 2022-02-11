@@ -197,71 +197,66 @@ tcDeriving deriv_infos deriv_decls
         ; traceTc "tcDeriving" (ppr early_specs)
 
         ; let (infer_specs, given_specs) = splitEarlyDerivSpec early_specs
-        ; insts1 <- mapM genInst given_specs
-        ; insts2 <- mapM genInst infer_specs
+        ; famInsts1 <- concatMapM genFamInsts given_specs
+        ; famInsts2 <- concatMapM genFamInsts infer_specs
+        ; let famInsts = famInsts1 ++ famInsts2
 
         ; dflags <- getDynFlags
         ; logger <- getLogger
-
-        ; let (_, deriv_stuff, fvs) = unzip3 (insts1 ++ insts2)
-        ; loc <- getSrcSpanM
-        ; let (binds, famInsts) = genAuxBinds dflags loc
-                                    (unionManyBags deriv_stuff)
-
-        ; let mk_inst_infos1 = map fstOf3 insts1
-        ; inst_infos1 <- apply_inst_infos mk_inst_infos1 given_specs
 
           -- We must put all the derived type family instances (from both
           -- infer_specs and given_specs) in the local instance environment
           -- before proceeding, or else simplifyInstanceContexts might
           -- get stuck if it has to reason about any of those family instances.
           -- See Note [Staging of tcDeriving]
-        ; tcExtendLocalFamInstEnv (bagToList famInsts) $
+        ; tcExtendLocalFamInstEnv famInsts $
           -- NB: only call tcExtendLocalFamInstEnv once, as it performs
           -- validity checking for all of the family instances you give it.
           -- If the family instances have errors, calling it twice will result
           -- in duplicate error messages!
 
-     do {
-        -- the stand-alone derived instances (@inst_infos1@) are used when
+     do { given_inst_binds <- mapM genInstBinds given_specs
+
+        ; let given_inst_infos = map fstOf3 given_inst_binds
+
+        -- the stand-alone derived instances (@given_inst_infos@) are used when
         -- inferring the contexts for "deriving" clauses' instances
         -- (@infer_specs@)
-        ; final_specs <- extendLocalInstEnv (map iSpec inst_infos1) $
-                         simplifyInstanceContexts infer_specs
+        ; final_infer_specs <-
+            extendLocalInstEnv (map iSpec given_inst_infos) $
+            simplifyInstanceContexts infer_specs
+        ; infer_inst_binds <- mapM genInstBinds final_infer_specs
 
-        ; let mk_inst_infos2 = map fstOf3 insts2
-        ; inst_infos2 <- apply_inst_infos mk_inst_infos2 final_specs
-        ; let inst_infos = inst_infos1 ++ inst_infos2
+        ; let (_, aux_specs, fvs) = unzip3 (given_inst_binds ++ infer_inst_binds)
+        ; loc <- getSrcSpanM
+        ; let aux_binds = genAuxBinds dflags loc (unionManyBags aux_specs)
 
-        ; (inst_info, rn_binds, rn_dus) <- renameDeriv inst_infos binds
+        ; let infer_inst_infos = map fstOf3 infer_inst_binds
+        ; let inst_infos = given_inst_infos ++ infer_inst_infos
+
+        ; (inst_info, rn_aux_binds, rn_dus) <- renameDeriv inst_infos aux_binds
 
         ; unless (isEmptyBag inst_info) $
              liftIO (putDumpFileMaybe logger Opt_D_dump_deriv "Derived instances"
                         FormatHaskell
-                        (ddump_deriving inst_info rn_binds famInsts))
+                        (ddump_deriving inst_info rn_aux_binds famInsts))
 
         ; gbl_env <- tcExtendLocalInstEnv (map iSpec (bagToList inst_info))
                                           getGblEnv
         ; let all_dus = rn_dus `plusDU` usesOnly (NameSet.mkFVs $ concat fvs)
-        ; return (addTcgDUs gbl_env all_dus, inst_info, rn_binds) } }
+        ; return (addTcgDUs gbl_env all_dus, inst_info, rn_aux_binds) } }
   where
     ddump_deriving :: Bag (InstInfo GhcRn) -> HsValBinds GhcRn
-                   -> Bag FamInst             -- ^ Rep type family instances
+                   -> [FamInst]               -- ^ Associated type family instances
                    -> SDoc
-    ddump_deriving inst_infos extra_binds repFamInsts
+    ddump_deriving inst_infos extra_binds famInsts
       =    hang (text "Derived class instances:")
               2 (vcat (map (\i -> pprInstInfoDetails i $$ text "") (bagToList inst_infos))
                  $$ ppr extra_binds)
         $$ hangP (text "Derived type family instances:")
-             (vcat (map pprRepTy (bagToList repFamInsts)))
+             (vcat (map pprRepTy famInsts))
 
     hangP s x = text "" $$ hang s 2 x
-
-    -- Apply the suspended computations given by genInst calls.
-    -- See Note [Staging of tcDeriving]
-    apply_inst_infos :: [ThetaType -> TcM (InstInfo GhcPs)]
-                     -> [DerivSpec ThetaType] -> TcM [InstInfo GhcPs]
-    apply_inst_infos = zipWithM (\f ds -> f (ds_theta ds))
 
 -- Prints the representable type family instance
 pprRepTy :: FamInst -> SDoc
@@ -359,32 +354,18 @@ simplifyInstanceContexts would get called without all the type family instances
 it needed in the environment in order to properly simplify instance like
 the C N instance above.
 
-To avoid this scenario, we carefully structure the order of events in
-tcDeriving. We first call genInst on the standalone derived instance specs and
-the instance specs obtained from deriving clauses. Note that the return type of
-genInst is a triple:
+To avoid this scenario, we generate things in tcDeriving in a specific order:
 
-    TcM (ThetaType -> TcM (InstInfo RdrName), BagDerivStuff, Maybe Name)
-
-The type family instances are in the BagDerivStuff. The first field of the
-triple is a suspended computation which, given an instance context, produces
-the rest of the instance. The fact that it is suspended is important, because
-right now, we don't have ThetaTypes for the instances that use deriving clauses
-(only the standalone-derived ones).
-
-Now we can collect the type family instances and extend the local instance
-environment. At this point, it is safe to run simplifyInstanceContexts on the
-deriving-clause instance specs, which gives us the ThetaTypes for the
-deriving-clause instances. Now we can feed all the ThetaTypes to the
-suspended computations and obtain our InstInfos, at which point
-tcDeriving is done.
-
-An alternative design would be to split up genInst so that the
-family instances are generated separately from the InstInfos. But this would
-require carving up a lot of the GHC deriving internals to accommodate the
-change. On the other hand, we can keep all of the InstInfo and type family
-instance logic together in genInst simply by converting genInst to
-continuation-returning style, so we opt for that route.
+1. First, we generate all of the associated type family instances for derived
+   instances (using `genFamInsts`).
+2. Next, we extend the local instance environment with these type family
+   instances.
+3. Then, we generate the instance bindings for derived instances
+   (using `genInstBinds`).
+4. Finally, for instances generated with `deriving` clauses, we infer the
+   instance contexts (using `simplifyInstanceContexts`). At this point, we
+   already have the necessary type family instances in scope (from step (2)),
+   so this is safe to do.
 
 Note [Why we don't pass rep_tc into deriveTyData]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1361,17 +1342,17 @@ mk_eqn_stock dit
        let isDeriveAnyClassEnabled =
              deriveAnyClassEnabled (xopt LangExt.DeriveAnyClass dflags)
        checkOriginativeSideConditions dit >>= \case
-         CanDeriveStock gen_fn -> mk_eqn_from_mechanism $
-                                  DerivSpecStock { dsm_stock_dit    = dit
-                                                 , dsm_stock_gen_fn = gen_fn }
-         StockClassError why   -> derivingThingFailWith NoGeneralizedNewtypeDeriving why
-         CanDeriveAnyClass     -> derivingThingFailWith NoGeneralizedNewtypeDeriving
-                                    (DerivErrNotStockDeriveable isDeriveAnyClassEnabled)
+         CanDeriveStock gen_fns -> mk_eqn_from_mechanism $
+                                   DerivSpecStock { dsm_stock_dit     = dit
+                                                  , dsm_stock_gen_fns = gen_fns }
+         StockClassError why    -> derivingThingFailWith NoGeneralizedNewtypeDeriving why
+         CanDeriveAnyClass      -> derivingThingFailWith NoGeneralizedNewtypeDeriving
+                                     (DerivErrNotStockDeriveable isDeriveAnyClassEnabled)
          -- In the 'NonDerivableClass' case we can't derive with either stock or anyclass
          -- so we /don't want/ to suggest the user to enabled 'DeriveAnyClass', that's
          -- why we pass 'YesDeriveAnyClassEnabled', so that GHC won't attempt to suggest it.
-         NonDerivableClass     -> derivingThingFailWith NoGeneralizedNewtypeDeriving
-                                    (DerivErrNotStockDeriveable YesDeriveAnyClassEnabled)
+         NonDerivableClass      -> derivingThingFailWith NoGeneralizedNewtypeDeriving
+                                     (DerivErrNotStockDeriveable YesDeriveAnyClassEnabled)
 
 mk_eqn_anyclass :: DerivM EarlyDerivSpec
 mk_eqn_anyclass
@@ -1446,12 +1427,12 @@ mk_eqn_no_strategy = do
             = DerivErrNotStockDeriveable isDeriveAnyClassEnabled
 
       checkOriginativeSideConditions dit >>= \case
-        NonDerivableClass     -> derivingThingFailWith NoGeneralizedNewtypeDeriving dac_error
-        StockClassError why   -> derivingThingFailWith NoGeneralizedNewtypeDeriving why
-        CanDeriveStock gen_fn -> mk_eqn_from_mechanism $
-                                 DerivSpecStock { dsm_stock_dit    = dit
-                                                , dsm_stock_gen_fn = gen_fn }
-        CanDeriveAnyClass     -> mk_eqn_from_mechanism DerivSpecAnyClass
+        NonDerivableClass      -> derivingThingFailWith NoGeneralizedNewtypeDeriving dac_error
+        StockClassError why    -> derivingThingFailWith NoGeneralizedNewtypeDeriving why
+        CanDeriveStock gen_fns -> mk_eqn_from_mechanism $
+                                  DerivSpecStock { dsm_stock_dit     = dit
+                                                 , dsm_stock_gen_fns = gen_fns }
+        CanDeriveAnyClass      -> mk_eqn_from_mechanism DerivSpecAnyClass
 
 {-
 ************************************************************************
@@ -1607,9 +1588,9 @@ mkNewTypeEqn newtype_strat dit@(DerivInstTys { dit_cls_tys     = cls_tys
                         $ TcRnDerivingDefaults cls
                  mk_eqn_from_mechanism DerivSpecAnyClass
                -- CanDeriveStock
-               CanDeriveStock gen_fn -> mk_eqn_from_mechanism $
-                                        DerivSpecStock { dsm_stock_dit    = dit
-                                                       , dsm_stock_gen_fn = gen_fn }
+               CanDeriveStock gen_fns -> mk_eqn_from_mechanism $
+                                         DerivSpecStock { dsm_stock_dit     = dit
+                                                        , dsm_stock_gen_fns = gen_fns }
 
 {-
 Note [Recursive newtypes]
@@ -1816,32 +1797,31 @@ the renamer.  What a great hack!
 \end{itemize}
 -}
 
--- Generate the InstInfo for the required instance
--- plus any auxiliary bindings required
-genInst :: DerivSpec theta
-        -> TcM (ThetaType -> TcM (InstInfo GhcPs), BagDerivStuff, [Name])
--- We must use continuation-returning style here to get the order in which we
--- typecheck family instances and derived instances right.
--- See Note [Staging of tcDeriving]
-genInst spec@(DS { ds_tvs = tvs, ds_mechanism = mechanism
-                 , ds_tys = tys, ds_cls = clas, ds_loc = loc
-                 , ds_standalone_wildcard = wildcard })
-  = do (meth_binds, meth_sigs, deriv_stuff, unusedNames)
-         <- set_span_and_ctxt $
-            genDerivStuff mechanism loc clas tys tvs
-       let mk_inst_info theta = set_span_and_ctxt $ do
-             inst_spec <- newDerivClsInst theta spec
-             doDerivInstErrorChecks2 clas inst_spec theta wildcard mechanism
-             traceTc "newder" (ppr inst_spec)
-             return $ InstInfo
-                       { iSpec   = inst_spec
-                       , iBinds  = InstBindings
-                                     { ib_binds = meth_binds
-                                     , ib_tyvars = map Var.varName tvs
-                                     , ib_pragmas = meth_sigs
-                                     , ib_extensions = extensions
-                                     , ib_derived = True } }
-       return (mk_inst_info, deriv_stuff, unusedNames)
+-- | Generate the 'InstInfo' for the required instance,
+-- plus any auxiliary bindings required (see @Note [Auxiliary binders]@ in
+-- "GHC.Tc.Deriv.Generate") and any additional free variables
+-- that should be marked (see @Note [Deriving and unused record selectors]@
+-- in "GHC.Tc.Deriv.Utils").
+genInstBinds :: DerivSpec ThetaType
+             -> TcM (InstInfo GhcPs, Bag AuxBindSpec, [Name])
+genInstBinds spec@(DS { ds_tvs = tyvars, ds_mechanism = mechanism
+                      , ds_tys = inst_tys, ds_theta = theta, ds_cls = clas
+                      , ds_loc = loc, ds_standalone_wildcard = wildcard })
+  = set_spec_span_and_ctxt spec $
+    do (meth_binds, meth_sigs, aux_specs, unusedNames) <- gen_inst_binds
+       inst_spec <- newDerivClsInst spec
+       doDerivInstErrorChecks2 clas inst_spec theta wildcard mechanism
+       traceTc "newder" (ppr inst_spec)
+       let inst_info =
+             InstInfo
+               { iSpec   = inst_spec
+               , iBinds  = InstBindings
+                             { ib_binds = meth_binds
+                             , ib_tyvars = map Var.varName tyvars
+                             , ib_pragmas = meth_sigs
+                             , ib_extensions = extensions
+                             , ib_derived = True } }
+       return (inst_info, aux_specs, unusedNames)
   where
     extensions :: [LangExt.Extension]
     extensions
@@ -1860,8 +1840,75 @@ genInst spec@(DS { ds_tvs = tvs, ds_mechanism = mechanism
       | otherwise
       = []
 
-    set_span_and_ctxt :: TcM a -> TcM a
-    set_span_and_ctxt = setSrcSpan loc . addErrCtxt (instDeclCtxt3 clas tys)
+    gen_inst_binds :: TcM (LHsBinds GhcPs, [LSig GhcPs], Bag AuxBindSpec, [Name])
+    gen_inst_binds
+      = case mechanism of
+          -- See Note [Bindings for Generalised Newtype Deriving]
+          DerivSpecNewtype { dsm_newtype_rep_ty = rhs_ty}
+            -> gen_newtype_or_via rhs_ty
+
+          -- Try a stock deriver
+          DerivSpecStock { dsm_stock_dit = dit
+                         , dsm_stock_gen_fns =
+                             StockGenFns { stock_gen_binds = gen_fn } }
+            -> gen_fn loc dit
+
+          -- Try DeriveAnyClass
+          DerivSpecAnyClass
+            -> return (emptyBag, [], emptyBag, [])
+               -- No method bindings, signatures, auxiliary bindings or free
+               -- variable names are needed. The only interesting work happens when
+               -- defaulting associated type family instances (see the
+               -- DeriveSpecAnyClass case in genFamInsts below).
+
+          -- Try DerivingVia
+          DerivSpecVia{dsm_via_ty = via_ty}
+            -> gen_newtype_or_via via_ty
+
+    gen_newtype_or_via ty = do
+      let (binds, sigs) = gen_Newtype_binds loc clas tyvars inst_tys ty
+      return (binds, sigs, emptyBag, [])
+
+-- | Generate the associated type family instances for a derived instance.
+genFamInsts :: DerivSpec theta -> TcM [FamInst]
+genFamInsts spec@(DS { ds_tvs = tyvars, ds_mechanism = mechanism
+                     , ds_tys = inst_tys, ds_cls = clas, ds_loc = loc })
+  = set_spec_span_and_ctxt spec $
+    case mechanism of
+      -- See Note [GND and associated type families]
+      DerivSpecNewtype { dsm_newtype_rep_ty = rhs_ty}
+        -> gen_newtype_or_via rhs_ty
+
+      -- Try a stock deriver
+      DerivSpecStock { dsm_stock_dit = dit
+                     , dsm_stock_gen_fns =
+                         StockGenFns { stock_gen_fam_insts = gen_fn } }
+        -> gen_fn loc dit
+
+      -- See Note [DeriveAnyClass and default family instances]
+      DerivSpecAnyClass -> do
+        let mini_env   = mkVarEnv (classTyVars clas `zip` inst_tys)
+            mini_subst = mkTvSubst (mkInScopeSet (mkVarSet tyvars)) mini_env
+        dflags <- getDynFlags
+        tyfam_insts <-
+          -- canDeriveAnyClass should ensure that this code can't be reached
+          -- unless -XDeriveAnyClass is enabled.
+          assertPpr (xopt LangExt.DeriveAnyClass dflags)
+                    (ppr "genFamInsts: bad derived class" <+> ppr clas) $
+          mapM (tcATDefault loc mini_subst emptyNameSet)
+               (classATItems clas)
+        pure $ concat tyfam_insts
+
+      -- Try DerivingVia
+      DerivSpecVia{dsm_via_ty = via_ty}
+        -> gen_newtype_or_via via_ty
+  where
+    gen_newtype_or_via ty = gen_Newtype_fam_insts loc clas tyvars inst_tys ty
+
+-- Set the SrcSpan and error context for an action that uses a DerivSpec.
+set_spec_span_and_ctxt :: DerivSpec theta -> TcM a -> TcM a
+set_spec_span_and_ctxt (DS{ ds_loc = loc, ds_cls = clas, ds_tys = tys }) =
+  setSrcSpan loc . addErrCtxt (instDeclCtxt3 clas tys)
 
 -- Checks:
 --
@@ -2004,47 +2051,6 @@ derivingThingFailWith newtype_deriving msg = do
   err <- derivingThingErrM newtype_deriving msg
   lift $ failWithTc err
 
-genDerivStuff :: DerivSpecMechanism -> SrcSpan -> Class
-              -> [Type] -> [TyVar]
-              -> TcM (LHsBinds GhcPs, [LSig GhcPs], BagDerivStuff, [Name])
-genDerivStuff mechanism loc clas inst_tys tyvars
-  = case mechanism of
-      -- See Note [Bindings for Generalised Newtype Deriving]
-      DerivSpecNewtype { dsm_newtype_rep_ty = rhs_ty}
-        -> gen_newtype_or_via rhs_ty
-
-      -- Try a stock deriver
-      DerivSpecStock { dsm_stock_dit    = dit
-                     , dsm_stock_gen_fn = gen_fn }
-        -> gen_fn loc inst_tys dit
-
-      -- Try DeriveAnyClass
-      DerivSpecAnyClass -> do
-        let mini_env   = mkVarEnv (classTyVars clas `zip` inst_tys)
-            mini_subst = mkTvSubst (mkInScopeSet (mkVarSet tyvars)) mini_env
-        dflags <- getDynFlags
-        tyfam_insts <-
-          -- canDeriveAnyClass should ensure that this code can't be reached
-          -- unless -XDeriveAnyClass is enabled.
-          assertPpr (xopt LangExt.DeriveAnyClass dflags)
-                    (ppr "genDerivStuff: bad derived class" <+> ppr clas) $
-          mapM (tcATDefault loc mini_subst emptyNameSet)
-               (classATItems clas)
-        return ( emptyBag, [] -- No method bindings are needed...
-               , listToBag (map DerivFamInst (concat tyfam_insts))
-               -- ...but we may need to generate binding for associated type
-               -- family default instances.
-               -- See Note [DeriveAnyClass and default family instances]
-               , [] )
-
-      -- Try DerivingVia
-      DerivSpecVia{dsm_via_ty = via_ty}
-        -> gen_newtype_or_via via_ty
-  where
-    gen_newtype_or_via ty = do
-      (binds, sigs, faminsts) <- gen_Newtype_binds loc clas tyvars inst_tys ty
-      return (binds, sigs, faminsts, [])
-
 {-
 Note [Bindings for Generalised Newtype Deriving]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2058,7 +2064,7 @@ The 'deriving C' clause generates, in effect
   instance (C [a], Eq a) => C (N a) where
      f = coerce (f :: [a] -> [a])
 
-This generates a cast for each method, but allows the superclasse to
+This generates a cast for each method, but allows the superclasses to
 be worked out in the usual way.  In this case the superclass (Eq (N
 a)) will be solved by the explicit Eq (N a) instance.  We do *not*
 create the superclasses by casting the superclass dictionaries for the
