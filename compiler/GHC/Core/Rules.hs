@@ -10,7 +10,7 @@
 module GHC.Core.Rules (
         -- ** Constructing
         emptyRuleBase, mkRuleBase, extendRuleBaseList,
-        unionRuleBase, pprRuleBase,
+        unionRuleBase, pprRuleBase, extendRuleEnv,
 
         -- ** Checking rule applications
         ruleCheckProgram,
@@ -136,14 +136,18 @@ Note [Overall plumbing for rules]
   [NB: we are inconsistent here.  We should do the same for external
   packages, but we don't.  Same for type-class instances.]
 
-* So in the outer simplifier loop, we combine (b-d) into a single
+* So in the outer simplifier loop (simplifyPgmIO), we combine (b & c) into a single
   RuleBase, reading
      (b) from the ModGuts,
      (c) from the GHC.Core.Opt.Monad, and
+  just before doing rule matching we read
      (d) from its mutable variable
-  [Of course this means that we won't see new EPS rules that come in
-  during a single simplifier iteration, but that probably does not
-  matter.]
+  and combine it with the results from (b & c).
+
+  In a single simplifier run new rules can be added into the EPS so it matters
+  to keep an up-to-date view of which rules have been loaded. For examples of
+  where this went wrong and caused cryptic performance regressions seee
+  see T19790 and !6735.
 
 
 ************************************************************************
@@ -367,6 +371,9 @@ unionRuleBase rb1 rb2 = plusNameEnv_C (++) rb1 rb2
 extendRuleBase :: RuleBase -> CoreRule -> RuleBase
 extendRuleBase rule_base rule
   = extendNameEnv_Acc (:) Utils.singleton rule_base (ruleIdName rule) rule
+
+extendRuleEnv :: RuleEnv -> RuleBase -> RuleEnv
+extendRuleEnv (RuleEnv rules orphs) rb = (RuleEnv (rules `unionRuleBase` rb) orphs)
 
 pprRuleBase :: RuleBase -> SDoc
 pprRuleBase rules = pprUFM rules $ \rss ->
