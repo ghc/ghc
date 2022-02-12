@@ -567,7 +567,7 @@ ruleCheckPass current_phase pat guts = do
                 (const ()) $ do
         rb <- getRuleBase
         vis_orphs <- getVisibleOrphanMods
-        let rule_fn fn = getRules (RuleEnv rb vis_orphs) fn
+        let rule_fn fn = getRules (RuleEnv [rb] vis_orphs) fn
                           ++ (mg_rules guts)
         let ropts = initRuleOpts dflags
         liftIO $ logDumpMsg logger "Rule check"

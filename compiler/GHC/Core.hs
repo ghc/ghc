@@ -101,7 +101,7 @@ import GHC.Core.Type
 import GHC.Core.Coercion
 import GHC.Types.Name
 import GHC.Types.Name.Set
-import GHC.Types.Name.Env( NameEnv, emptyNameEnv )
+import GHC.Types.Name.Env( NameEnv )
 import GHC.Types.Literal
 import GHC.Types.Tickish
 import GHC.Core.DataCon
@@ -1047,15 +1047,40 @@ type RuleBase = NameEnv [CoreRule]
 -- but it also includes the set of visible orphans we use to filter out orphan
 -- rules which are not visible (even though we can see them...)
 data RuleEnv
-    = RuleEnv { re_base          :: RuleBase
+    = RuleEnv { re_base          :: [RuleBase] -- See Note [Why re_base is a list]
               , re_visible_orphs :: ModuleSet
               }
 
 mkRuleEnv :: RuleBase -> [Module] -> RuleEnv
-mkRuleEnv rules vis_orphs = RuleEnv rules (mkModuleSet vis_orphs)
+mkRuleEnv rules vis_orphs = RuleEnv [rules] (mkModuleSet vis_orphs)
 
 emptyRuleEnv :: RuleEnv
-emptyRuleEnv = RuleEnv emptyNameEnv emptyModuleSet
+emptyRuleEnv = RuleEnv [] emptyModuleSet
+
+{-
+Note [Why re_base is a list]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+In Note [Overall plumbing for rules], it is explained that the final
+RuleBase which we must consider is combined from 4 different sources.
+
+During simplifier runs, the fourth source of rules is constantly being updated
+as new interfaces are loaded into the EPS. Therefore just before we check to see
+if any rules match we get the EPS RuleBase and combine it with the existing RuleBase
+and then perform exactly 1 lookup into the new map.
+
+It is more efficient to avoid combining the environments and store the uncombined
+environments as we can instead perform 1 lookup into each environment and then combine
+the results.
+
+Essentially we use the identity:
+
+> lookupNameEnv n (plusNameEnv_C (++) rb1 rb2)
+>   = lookupNameEnv n rb1 ++ lookupNameEnv n rb2
+
+The latter being more efficient as we don't construct an intermediate
+map.
+-}
 
 -- | A 'CoreRule' is:
 --

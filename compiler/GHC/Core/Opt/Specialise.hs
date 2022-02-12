@@ -739,8 +739,7 @@ spec_import top_env callers rb dict_binds cis@(CIS fn _)
        ; hsc_env <- getHscEnv
        ; eps <- liftIO $ hscEPS hsc_env
        ; vis_orphs <- getVisibleOrphanMods
-       ; let full_rb = unionRuleBase rb (eps_rule_base eps)
-             rules_for_fn = getRules (RuleEnv full_rb vis_orphs) fn
+       ; let rules_for_fn = getRules (RuleEnv [rb, eps_rule_base eps] vis_orphs) fn
 
        ; (rules1, spec_pairs, MkUD { ud_binds = dict_binds1, ud_calls = new_calls })
             <- -- debugTraceMsg (text "specImport1" <+> vcat [ppr fn, ppr good_calls, ppr rhs]) >>
