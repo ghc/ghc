@@ -10,7 +10,7 @@
 module GHC.Core.Rules (
         -- ** Constructing
         emptyRuleBase, mkRuleBase, extendRuleBaseList,
-        unionRuleBase, pprRuleBase, extendRuleEnv,
+        pprRuleBase, extendRuleEnv,
 
         -- ** Checking rule applications
         ruleCheckProgram,
@@ -317,9 +317,9 @@ rulesOfBinds binds = concatMap (concatMap idCoreRules . bindersOf) binds
 getRules :: RuleEnv -> Id -> [CoreRule]
 -- See Note [Where rules are found]
 getRules (RuleEnv { re_base = rule_base, re_visible_orphs = orphs }) fn
-  = idCoreRules fn ++ filter (ruleIsVisible orphs) imp_rules
+  = idCoreRules fn ++ concatMap imp_rules rule_base
   where
-    imp_rules = lookupNameEnv rule_base (idName fn) `orElse` []
+    imp_rules rb = filter (ruleIsVisible orphs) (lookupNameEnv rb (idName fn) `orElse` [])
 
 ruleIsVisible :: ModuleSet -> CoreRule -> Bool
 ruleIsVisible _ BuiltinRule{} = True
@@ -365,15 +365,12 @@ extendRuleBaseList :: RuleBase -> [CoreRule] -> RuleBase
 extendRuleBaseList rule_base new_guys
   = foldl' extendRuleBase rule_base new_guys
 
-unionRuleBase :: RuleBase -> RuleBase -> RuleBase
-unionRuleBase rb1 rb2 = plusNameEnv_C (++) rb1 rb2
-
 extendRuleBase :: RuleBase -> CoreRule -> RuleBase
 extendRuleBase rule_base rule
   = extendNameEnv_Acc (:) Utils.singleton rule_base (ruleIdName rule) rule
 
 extendRuleEnv :: RuleEnv -> RuleBase -> RuleEnv
-extendRuleEnv (RuleEnv rules orphs) rb = (RuleEnv (rules `unionRuleBase` rb) orphs)
+extendRuleEnv (RuleEnv rules orphs) rb = (RuleEnv (rb:rules) orphs)
 
 pprRuleBase :: RuleBase -> SDoc
 pprRuleBase rules = pprUFM rules $ \rss ->
