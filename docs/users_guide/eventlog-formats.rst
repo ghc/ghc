@@ -36,13 +36,14 @@ files.
     cannot be changed.  Tools should ignore extra fields at the
     end of the event record.
 
-The event-log stream begins with a header describing the event types present in
-the file. The header is followed by the event records themselves, each of which
-consist of a 64-bit timestamp
+The event-log stream begins with a header describing the event types (``EventType``) present in
+the file. The header is followed by the event records (``Event``) themselves, each of which
+start with the event type id and a 64-bit timestamp:
 
 .. code-block:: none
 
-    log : EVENT_HEADER_BEGIN
+    EventLog :
+          EVENT_HEADER_BEGIN
           EventType*
           EVENT_HEADER_END
           EVENT_DATA_BEGIN
@@ -51,25 +52,25 @@ consist of a 64-bit timestamp
 
     EventType :
           EVENT_ET_BEGIN
-          Word16         -- unique identifier for this event
-          Int16          -- >=0  size of the event in bytes (minus the header)
+          Word16         -- event type id, unique identifier for this event
+          Int16          -- >=0  size of the event record in bytes (minus the event type id and timestamp fields)
                          -- -1   variable size
-          Word32         -- length of the next field in bytes
-          Word8*         -- string describing the event
-          Word32         -- length of the next field in bytes
+          Word32         -- size of the event description in bytes
+          Word8*         -- event description, UTF8 encoded string describing the event
+          Word32         -- size of the extra info in bytes
           Word8*         -- extra info (for future extensions)
           EVENT_ET_END
 
     Event :
-          Word16         -- event_type
-          Word64         -- time (nanosecs)
-          [Word16]       -- length of the rest (for variable-sized events only)
-          ... extra event-specific info ...
+          Word16         -- event type id, as included in the event log header
+          Word64         -- timestamp (nanoseconds)
+          [Word16]       -- length of the rest (optional, for variable-sized events only)
+          ... event specific info ...
 
 There are two classes of event types:
 
  - *Fixed size*: All event records of a fixed-sized type are of the same
-   length, given in the header event-log header.
+   length, the size given in the header event-log header.
 
  - *Variable size*: Each event record includes a length field.
 
