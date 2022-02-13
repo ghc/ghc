@@ -1,7 +1,7 @@
 
 T4806a.hs:1:1: error:
     Could not load module ‘Data.Map’
-    It is a member of the package ‘containers-0.6.0.1’
+    It is a member of the package ‘containers-0.6.5.1’
     which is unusable because the -ignore-package flag was used to ignore at least one of its dependencies:
-      deepseq-1.4.6.0
+      deepseq-1.4.6.1
     Use -v (or `:set -v` in ghci) to see a list of the files searched for.

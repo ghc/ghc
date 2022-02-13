@@ -9,4 +9,4 @@ FAMILY INSTANCES
   data instance forall {k1} {j :: k1} {k2} {c :: k2}.
                   DF (Proxy c) -- Defined at T15852.hs:10:15
 Dependent modules: []
-Dependent packages: [base-4.16.0.0, ghc-bignum-1.0, ghc-prim-0.8.0]
+Dependent packages: [base-4.16.1.0, ghc-bignum-1.2, ghc-prim-0.8.0]

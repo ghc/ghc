@@ -6,7 +6,7 @@ TYPE CONSTRUCTORS
 PATTERN SYNONYMS
   (:||:) :: forall {a} {b}. a -> b -> (a, b)
 Dependent modules: []
-Dependent packages: [base-4.16.0.0, ghc-bignum-1.0, ghc-prim-0.8.0]
+Dependent packages: [base-4.16.1.0, ghc-bignum-1.2, ghc-prim-0.8.0]
 
 ==================== Tidy Core ====================
 Result size of Tidy Core

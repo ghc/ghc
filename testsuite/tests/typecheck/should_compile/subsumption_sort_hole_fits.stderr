@@ -8,10 +8,10 @@ subsumption_sort_hole_fits.hs:2:5: warning: [-Wtyped-holes (in -Wdefault)]
       Valid hole fits include
         lines :: String -> [String]
           (imported from ‘Prelude’ at subsumption_sort_hole_fits.hs:1:1
-           (and originally defined in ‘base-4.16.0.0:Data.OldList’))
+           (and originally defined in ‘base-4.16.1.0:Data.OldList’))
         words :: String -> [String]
           (imported from ‘Prelude’ at subsumption_sort_hole_fits.hs:1:1
-           (and originally defined in ‘base-4.16.0.0:Data.OldList’))
+           (and originally defined in ‘base-4.16.1.0:Data.OldList’))
         read :: forall a. Read a => String -> a
           with read @[String]
           (imported from ‘Prelude’ at subsumption_sort_hole_fits.hs:1:1
