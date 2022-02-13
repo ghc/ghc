@@ -7,7 +7,7 @@ The significant changes to the various parts of the compiler are listed in the
 following sections.
 
 The :ghc-flag:`LLVM backend <-fllvm>` of this release is to be used with LLVM
-10 or 11.
+9, 10, 11, or 12.
 
 
 
