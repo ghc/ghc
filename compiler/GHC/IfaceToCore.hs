@@ -1713,53 +1713,67 @@ tcLFInfo lfi = case lfi of
       return (LFUnknown fun_flag)
 
 tcUnfolding :: TopLevelFlag -> Name -> Type -> IdInfo -> IfaceUnfolding -> IfL Unfolding
+-- See Note [Lazily checking Unfoldings]
 tcUnfolding toplvl name _ info (IfCoreUnfold stable if_expr)
   = do  { uf_opts <- unfoldingOpts <$> getDynFlags
-        ; mb_expr <- tcPragExpr False toplvl name if_expr
+        ; expr <- tcUnfoldingRhs False toplvl name if_expr
         ; let unf_src | stable    = InlineStable
                       | otherwise = InlineRhs
-        ; return $ case mb_expr of
-            Nothing -> NoUnfolding
-            Just expr -> mkFinalUnfolding uf_opts unf_src strict_sig expr
-        }
+        ; return $ mkFinalUnfolding uf_opts unf_src strict_sig expr }
   where
     -- Strictness should occur before unfolding!
     strict_sig = dmdSigInfo info
 
 tcUnfolding toplvl name _ _ (IfCompulsory if_expr)
-  = do  { mb_expr <- tcPragExpr True toplvl name if_expr
-        ; return (case mb_expr of
-                    Nothing   -> NoUnfolding
-                    Just expr -> mkCompulsoryUnfolding' expr) }
+  = do  { expr <- tcUnfoldingRhs True toplvl name if_expr
+        ; return $ mkCompulsoryUnfolding' expr }
 
 tcUnfolding toplvl name _ _ (IfInlineRule arity unsat_ok boring_ok if_expr)
-  = do  { mb_expr <- tcPragExpr False toplvl name if_expr
-        ; return (case mb_expr of
-                    Nothing   -> NoUnfolding
-                    Just expr -> mkCoreUnfolding InlineStable True expr guidance )}
+  = do  { expr <- tcUnfoldingRhs False toplvl name if_expr
+        ; return $ mkCoreUnfolding InlineStable True expr guidance }
   where
     guidance = UnfWhen { ug_arity = arity, ug_unsat_ok = unsat_ok, ug_boring_ok = boring_ok }
 
 tcUnfolding _toplvl name dfun_ty _ (IfDFunUnfold bs ops)
   = bindIfaceBndrs bs $ \ bs' ->
-    do { mb_ops1 <- forkM_maybe doc $ mapM tcIfaceExpr ops
-       ; return (case mb_ops1 of
-                    Nothing   -> noUnfolding
-                    Just ops1 -> mkDFunUnfolding bs' (classDataCon cls) ops1) }
+    do { ops1 <- forkM doc $ mapM tcIfaceExpr ops
+       ; return $ mkDFunUnfolding bs' (classDataCon cls) ops1 }
   where
     doc = text "Class ops for dfun" <+> ppr name
     (_, _, cls, _) = tcSplitDFunTy dfun_ty
 
-{-
-For unfoldings we try to do the job lazily, so that we never type check
+{- Note [Lazily checking Unfoldings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For unfoldings, we try to do the job lazily, so that we never typecheck
 an unfolding that isn't going to be looked at.
+
+The main idea is that if M.hi has a declaration
+   f :: Int -> Int
+   f = \x. ...A.g...   -- The unfolding for f
+
+then we don't even want to /read/ A.hi unless f's unfolding is actually used; say,
+if f is inlined. But we need to be careful. Even if we don't inline f, we might ask
+hasNoBinding of it (Core Lint does this in GHC.Core.Lint.checkCanEtaExpand),
+and hasNoBinding looks to see if f has a compulsory unfolding.
+So the root Unfolding constructor must be visible: we want to be able to read the 'uf_src'
+field which says whether it is a compulsory unfolding, without forcing the unfolding RHS
+which is stored in 'uf_tmpl'. This matters for efficiency, but not only: if g's unfolding
+mentions f, we must not look at the unfolding RHS for f, as this is precisely what we are
+in the middle of checking (so looking at it would cause a loop).
+
+Conclusion: `tcUnfolding` must return an `Unfolding` whose `uf_src` field is readable without
+forcing the `uf_tmpl` field. In particular, all the functions used at the end of
+`tcUnfolding` (such as `mkFinalUnfolding`, `mkCompulsoryUnfolding'`, `mkCoreUnfolding`) must be
+lazy in `expr`.
+
+Ticket #21139
 -}
 
-tcPragExpr :: Bool  -- Is this unfolding compulsory?
-                    -- See Note [Checking for representation polymorphism] in GHC.Core.Lint
-           -> TopLevelFlag -> Name -> IfaceExpr -> IfL (Maybe CoreExpr)
-tcPragExpr is_compulsory toplvl name expr
-  = forkM_maybe doc $ do
+tcUnfoldingRhs :: Bool -- ^ Is this unfolding compulsory?
+                       -- See Note [Checking for representation polymorphism] in GHC.Core.Lint
+               -> TopLevelFlag -> Name -> IfaceExpr -> IfL CoreExpr
+tcUnfoldingRhs is_compulsory toplvl name expr
+  = forkM doc $ do
     core_expr' <- tcIfaceExpr expr
 
     -- Check for type consistency in the unfolding
