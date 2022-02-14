@@ -444,6 +444,8 @@ compiled program.
     :reverse: -fno-prof-late-ccs
     :category:
 
+    :since: 9.4.1
+
     Adds an automatic ``SCC`` annotation to all top level bindings late in the core pipeline after
     the optimizer has run. This means these cost centres will not interfere with core-level optimizations
     and the resulting profile will be closer to the performance profile of an optimized non-profiled
