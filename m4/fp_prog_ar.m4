@@ -14,7 +14,8 @@ if test -z "$fp_prog_ar"; then
       fp_prog_ar=$(cygpath -m $fp_prog_ar)
     fi
   else
-    AC_CHECK_TARGET_TOOL([fp_prog_ar], [ar])
+    AC_CHECK_TARGET_TOOL([AR], [ar])
+    fp_prog_ar="$AR"
   fi
 fi
 if test -z "$fp_prog_ar"; then
