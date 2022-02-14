@@ -560,6 +560,7 @@ test('T15433b', [extra_files(['T15433_aux.hs'])], multimod_compile, ['T15433b', 
 test('T20711', normal, compile_and_run, [''])
 test('T20868', normal, compile_and_run, [''])
 test('Lift_ByteArray', normal, compile_and_run, [''])
+test('T21077', normal, compile, [''])
 test('T21920', normal, compile_and_run, [''])
 test('T21723', normal, compile_and_run, [''])
 test('T21942', normal, compile_and_run, [''])

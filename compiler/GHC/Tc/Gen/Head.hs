@@ -278,8 +278,8 @@ addArgWrap wrap args
  | otherwise          = EWrap (EHsWrap wrap) : args
 
 splitHsApps :: HsExpr GhcRn
-            -> ( (HsExpr GhcRn, AppCtxt)  -- Head
-               , [HsExprArg 'TcpRn])      -- Args
+            -> TcM ( (HsExpr GhcRn, AppCtxt)  -- Head
+                   , [HsExprArg 'TcpRn])      -- Args
 -- See Note [splitHsApps]
 splitHsApps e = go e (top_ctxt 0 e) []
   where
@@ -291,13 +291,15 @@ splitHsApps e = go e (top_ctxt 0 e) []
     top_ctxt n (HsPragE _ _ fun)           = top_lctxt n fun
     top_ctxt n (HsAppType _ fun _ _)         = top_lctxt (n+1) fun
     top_ctxt n (HsApp _ fun _)             = top_lctxt (n+1) fun
-    top_ctxt n (XExpr (HsExpanded orig _)) = VACall orig      n noSrcSpan
+    top_ctxt n (XExpr x) = case x of
+      ExpansionRn (HsExpanded orig _)     -> VACall orig      n noSrcSpan
+      AddModFinalizers _ fun              -> VACall fun       n noSrcSpan
     top_ctxt n other_fun                   = VACall other_fun n noSrcSpan
 
     top_lctxt n (L _ fun) = top_ctxt n fun
 
     go :: HsExpr GhcRn -> AppCtxt -> [HsExprArg 'TcpRn]
-       -> ((HsExpr GhcRn, AppCtxt), [HsExprArg 'TcpRn])
+       -> TcM ((HsExpr GhcRn, AppCtxt), [HsExprArg 'TcpRn])
     -- Modify the AppCtxt as we walk inwards, so it describes the next argument
     go (HsPar _ _ (L l fun) _)       ctxt args = go fun (set l ctxt) (EWrap (EPar ctxt)     : args)
     go (HsPragE _ p (L l fun))       ctxt args = go fun (set l ctxt) (EPrag      ctxt p     : args)
@@ -305,19 +307,29 @@ splitHsApps e = go e (top_ctxt 0 e) []
     go (HsApp _ (L l fun) arg)       ctxt args = go fun (dec l ctxt) (mkEValArg  ctxt arg   : args)
 
     -- See Note [Looking through HsExpanded]
-    go (XExpr (HsExpanded orig fun)) ctxt args
-      = go fun (VAExpansion orig (appCtxtLoc ctxt))
-               (EWrap (EExpand orig) : args)
+    go (XExpr x) ctxt args
+      = case x of
+          ExpansionRn (HsExpanded orig fun)
+            -> go fun (VAExpansion orig (appCtxtLoc ctxt))
+                      (EWrap (EExpand orig) : args)
+          AddModFinalizers mod_finalizers fun
+            -> do addModFinalizersWithLclEnv mod_finalizers
+                  let orig = HsUntypedSplice
+                               (HsUntypedSpliceTop mod_finalizers fun)
+                               (HsUntypedSpliceExpr
+                                 (error "TODO RGS: What do I put here?")
+                                 (L (error "TODO RGS: Which location?") fun))
+                  go fun (VAExpansion orig (appCtxtLoc ctxt)) (EWrap (EExpand orig) : args)
 
     -- See Note [Desugar OpApp in the typechecker]
     go e@(OpApp _ arg1 (L l op) arg2) _ args
-      = ( (op, VACall op 0 (locA l))
-        ,   mkEValArg (VACall op 1 generatedSrcSpan) arg1
-          : mkEValArg (VACall op 2 generatedSrcSpan) arg2
-          : EWrap (EExpand e)
-          : args )
+      = pure ( (op, VACall op 0 (locA l))
+             ,   mkEValArg (VACall op 1 generatedSrcSpan) arg1
+               : mkEValArg (VACall op 2 generatedSrcSpan) arg2
+               : EWrap (EExpand e)
+               : args )
 
-    go e ctxt args = ((e,ctxt), args)
+    go e ctxt args = pure ((e,ctxt), args)
 
     set :: SrcSpanAnnA -> AppCtxt -> AppCtxt
     set l (VACall f n _)        = VACall f n (locA l)
@@ -749,6 +761,7 @@ where
 
 Note [Looking through HsExpanded]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+TODO RGS: Update me
 When creating an application chain in splitHsApps, we must deal with
      HsExpanded f1 (f `HsApp` e1) `HsApp` e2 `HsApp` e3
 
@@ -765,7 +778,6 @@ It's easy to achieve this: `splitHsApps` unwraps `HsExpanded`.
 ********************************************************************* -}
 
 tcInferAppHead :: (HsExpr GhcRn, AppCtxt)
-               -> [HsExprArg 'TcpRn]
                -> TcM (HsExpr GhcTc, TcSigmaType)
 -- Infer type of the head of an application
 --   i.e. the 'f' in (f e1 ... en)
@@ -776,11 +788,6 @@ tcInferAppHead :: (HsExpr GhcRn, AppCtxt)
 --   * An expression with a type signature (e :: ty)
 -- See Note [Application chains and heads] in GHC.Tc.Gen.App
 --
--- Why do we need the arguments to infer the type of the head of the
--- application? Simply to inform add_head_ctxt about whether or not
--- to put push a new "In the expression..." context. (We don't push a
--- new one if there are no arguments, because we already have.)
---
 -- Note that [] and (,,) are both HsVar:
 --   see Note [Empty lists] and [ExplicitTuple] in GHC.Hs.Expr
 --
@@ -788,28 +795,30 @@ tcInferAppHead :: (HsExpr GhcRn, AppCtxt)
 --     cases are dealt with by splitHsApps.
 --
 -- See Note [tcApp: typechecking applications] in GHC.Tc.Gen.App
-tcInferAppHead (fun,ctxt) args
+tcInferAppHead (fun,ctxt)
   = addHeadCtxt ctxt $
-    do { mb_tc_fun <- tcInferAppHead_maybe fun args
+    do { mb_tc_fun <- tcInferAppHead_maybe fun
        ; case mb_tc_fun of
             Just (fun', fun_sigma) -> return (fun', fun_sigma)
             Nothing -> tcInfer (tcExpr fun) }
 
 tcInferAppHead_maybe :: HsExpr GhcRn
-                     -> [HsExprArg 'TcpRn]
                      -> TcM (Maybe (HsExpr GhcTc, TcSigmaType))
 -- See Note [Application chains and heads] in GHC.Tc.Gen.App
 -- Returns Nothing for a complicated head
-tcInferAppHead_maybe fun args
+tcInferAppHead_maybe fun
   = case fun of
       HsVar _ (L _ nm)          -> Just <$> tcInferId nm
       HsRecSel _ f              -> Just <$> tcInferRecSelId f
       ExprWithTySig _ e hs_ty   -> Just <$> tcExprWithSig e hs_ty
       HsOverLit _ lit           -> Just <$> tcInferOverLit lit
-      HsUntypedSplice (HsUntypedSpliceTop _ e) _
-                                -> tcInferAppHead_maybe e args
       _                         -> return Nothing
 
+-- TODO RGS: Figure out how to adapt Richard's suggestion from
+-- https://gitlab.haskell.org/ghc/ghc/-/merge_requests/7574#note_409921
+-- to this new version of addHeadCtxt, which doesn't have arguments. Perhaps
+-- we should pass the arguments separately? If so, it's not clear to me how
+-- that is meant to interact with the `isGoodSrcSpan` check.
 addHeadCtxt :: AppCtxt -> TcM a -> TcM a
 addHeadCtxt fun_ctxt thing_inside
   | not (isGoodSrcSpan fun_loc)   -- noSrcSpan => no arguments

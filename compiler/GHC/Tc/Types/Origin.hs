@@ -739,7 +739,10 @@ exprCtOrigin (HsTypedSplice {})    = Shouldn'tHappenOrigin "TH typed splice"
 exprCtOrigin (HsUntypedSplice {})  = Shouldn'tHappenOrigin "TH untyped splice"
 exprCtOrigin (HsProc {})         = Shouldn'tHappenOrigin "proc"
 exprCtOrigin (HsStatic {})       = Shouldn'tHappenOrigin "static expression"
-exprCtOrigin (XExpr (HsExpanded a _)) = exprCtOrigin a
+exprCtOrigin (XExpr x) =
+  case x of
+    ExpansionRn (HsExpanded a _) -> exprCtOrigin a
+    AddModFinalizers{}           -> Shouldn'tHappenOrigin "TH splice" -- TODO RGS: Is this right?
 
 -- | Extract a suitable CtOrigin from a MatchGroup
 matchesCtOrigin :: MatchGroup GhcRn (LHsExpr GhcRn) -> CtOrigin

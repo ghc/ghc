@@ -207,7 +207,7 @@ tcExpr e@(OpApp {})              res_ty = tcApp e res_ty
 tcExpr e@(HsAppType {})          res_ty = tcApp e res_ty
 tcExpr e@(ExprWithTySig {})      res_ty = tcApp e res_ty
 tcExpr e@(HsRecSel {})           res_ty = tcApp e res_ty
-tcExpr e@(XExpr (HsExpanded {})) res_ty = tcApp e res_ty
+tcExpr e@(XExpr {})              res_ty = tcApp e res_ty
 
 tcExpr e@(HsOverLit _ lit) res_ty
   = do { mb_res <- tcShortCutLit lit res_ty
@@ -571,6 +571,7 @@ tcExpr (HsProjection _ _) _ = panic "GHC.Tc.Gen.Expr: tcExpr: HsProjection: Not 
 
 -- Here we get rid of it and add the finalizers to the global environment.
 -- See Note [Delaying modFinalizers in untyped splices] in GHC.Rename.Splice.
+-- TODO RGS: Update this
 tcExpr (HsTypedSplice ext splice)   res_ty = tcTypedSplice ext splice res_ty
 tcExpr e@(HsTypedBracket _ body)    res_ty = tcTypedBracket e body res_ty
 
@@ -733,7 +734,7 @@ tcSyntaxOpGen :: CtOrigin
               -> ([TcSigmaTypeFRR] -> [Mult] -> TcM a)
               -> TcM (a, SyntaxExprTc)
 tcSyntaxOpGen orig (SyntaxExprRn op) arg_tys res_ty thing_inside
-  = do { (expr, sigma) <- tcInferAppHead (op, VACall op 0 noSrcSpan) []
+  = do { (expr, sigma) <- tcInferAppHead (op, VACall op 0 noSrcSpan)
              -- Ugh!! But all this code is scheduled for demolition anyway
        ; traceTc "tcSyntaxOpGen" (ppr op $$ ppr expr $$ ppr sigma)
        ; (result, expr_wrap, arg_wraps, res_wrap)

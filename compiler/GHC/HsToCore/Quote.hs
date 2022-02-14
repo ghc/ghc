@@ -1666,11 +1666,18 @@ repE (HsGetField _ e (L _ (DotFieldOcc _ (L _ (FieldLabelString f))))) = do
   e1 <- repLE e
   repGetField e1 f
 repE (HsProjection _ xs) = repProjection (fmap (field_label . unLoc . dfoLabel . unLoc) xs)
-repE (XExpr (HsExpanded orig_expr ds_expr))
-  = do { rebindable_on <- lift $ xoptM LangExt.RebindableSyntax
-       ; if rebindable_on  -- See Note [Quotation and rebindable syntax]
-         then repE ds_expr
-         else repE orig_expr }
+repE (XExpr x) =
+  case x of
+     ExpansionRn (HsExpanded orig_expr ds_expr) ->
+       do { rebindable_on <- lift $ xoptM LangExt.RebindableSyntax
+          ; if rebindable_on  -- See Note [Quotation and rebindable syntax]
+            then repE ds_expr
+            else repE orig_expr }
+     AddModFinalizers{} ->
+       -- TODO RGS: Is this right? I believe so, since there is an invariant
+       -- that no AddModFinalizers should appear inside an HsBracket. Spell
+       -- this out explicitly somewhere.
+       pprPanic "repE XExpr" (ppr x)
 repE e@(HsPragE _ (HsPragSCC {}) _) = notHandled (ThCostCentres e)
 repE e@(HsTypedBracket{})   = notHandled (ThExpressionForm e)
 repE e@(HsUntypedBracket{}) = notHandled (ThExpressionForm e)

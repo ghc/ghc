@@ -2719,7 +2719,7 @@ mkExpandedExpr
   :: HsExpr GhcRn           -- ^ source expression
   -> HsExpr GhcRn           -- ^ expanded expression
   -> HsExpr GhcRn           -- ^ suitably wrapped 'HsExpansion'
-mkExpandedExpr a b = XExpr (HsExpanded a b)
+mkExpandedExpr a b = XExpr (ExpansionRn (HsExpanded a b))
 
 -----------------------------------------
 -- Bits and pieces for RecordDotSyntax.
