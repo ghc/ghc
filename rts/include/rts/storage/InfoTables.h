@@ -70,7 +70,7 @@ typedef struct {
 #define isUNPOINTED(flags) ((flags) &_UPT)
 #define hasSRT(flags)      ((flags) &_SRT)
 
-extern StgWord16 closure_flags[];
+extern const StgWord16 closure_flags[];
 
 #define closureFlags(c)         (closure_flags[get_itbl \
                                     (UNTAG_CONST_CLOSURE(c))->type])

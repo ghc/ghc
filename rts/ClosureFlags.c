@@ -9,7 +9,7 @@
 #include "rts/PosixSource.h"
 #include "Rts.h"
 
-StgWord16 closure_flags[] = {
+const StgWord16 closure_flags[] = {
 
 /* ToDo: some of these flags seem to be duplicated.
  *       - NS is the same as HNF, and the negation of THU
