@@ -26,9 +26,4 @@ void updateIpeMap(void);
 void initIpeMapLock(void);
 void closeIpeMapLock(void);
 
-#if defined(TRACING)
-void traceIPEFromHashTable(void *data STG_UNUSED, StgWord key STG_UNUSED,
-                           const void *value);
-#endif
-
 #include "EndPrivate.h"

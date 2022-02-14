@@ -62,6 +62,17 @@ void initIpeMapLock(void) { initMutex(&ipeMapLock); }
 
 void closeIpeMapLock(void) { closeMutex(&ipeMapLock); }
 
+#if defined(TRACING)
+static void traceIPEFromHashTable(void *data STG_UNUSED, StgWord key STG_UNUSED,
+                           const void *value) {
+    InfoProvEnt *ipe = (InfoProvEnt *)value;
+
+    traceIPE(ipe->info, ipe->prov.table_name, ipe->prov.closure_desc,
+             ipe->prov.ty_desc, ipe->prov.label, ipe->prov.module,
+             ipe->prov.srcloc);
+}
+#endif
+
 void dumpIPEToEventLog(void) {
 #if defined(TRACING)
     ACQUIRE_LOCK(&ipeMapLock);
@@ -90,17 +101,6 @@ void dumpIPEToEventLog(void) {
 #endif
     return;
 }
-
-#if defined(TRACING)
-void traceIPEFromHashTable(void *data STG_UNUSED, StgWord key STG_UNUSED,
-                           const void *value) {
-    InfoProvEnt *ipe = (InfoProvEnt *)value;
-
-    traceIPE(ipe->info, ipe->prov.table_name, ipe->prov.closure_desc,
-             ipe->prov.ty_desc, ipe->prov.label, ipe->prov.module,
-             ipe->prov.srcloc);
-}
-#endif
 
 /* Registering IPEs
 
