@@ -136,7 +136,6 @@ module GHC.Tc.Utils.Monad(
   initIfaceLoadModule,
   getIfModule,
   failIfM,
-  forkM_maybe,
   forkM,
   setImplicitEnvM,
 
@@ -2197,14 +2196,14 @@ failIfM msg = do
 -- | Run thing_inside in an interleaved thread.
 -- It shares everything with the parent thread, so this is DANGEROUS.
 --
--- It returns Nothing if the computation fails
+-- It throws an error if the computation fails
 --
 -- It's used for lazily type-checking interface
 -- signatures, which is pretty benign.
 --
--- See Note [Masking exceptions in forkM_maybe]
-forkM_maybe :: SDoc -> IfL a -> IfL (Maybe a)
-forkM_maybe doc thing_inside
+-- See Note [Masking exceptions in forkM]
+forkM :: SDoc -> IfL a -> IfL a
+forkM doc thing_inside
  = unsafeInterleaveM $ uninterruptibleMaskM_ $
     do { traceIf (text "Starting fork {" <+> doc)
        ; mb_res <- tryM $
@@ -2212,11 +2211,11 @@ forkM_maybe doc thing_inside
                    thing_inside
        ; case mb_res of
             Right r  -> do  { traceIf (text "} ending fork" <+> doc)
-                            ; return (Just r) }
+                            ; return r }
             Left exn -> do {
                 -- Bleat about errors in the forked thread, if -ddump-if-trace is on
                 -- Otherwise we silently discard errors. Errors can legitimately
-                -- happen when compiling interface signatures (see tcInterfaceSigs)
+                -- happen when compiling interface signatures.
                   whenDOptM Opt_D_dump_if_trace $ do
                       logger <- getLogger
                       let msg = hang (text "forkM failed:" <+> doc)
@@ -2225,33 +2224,24 @@ forkM_maybe doc thing_inside
                                          MCFatal
                                          noSrcSpan
                                          $ withPprStyle defaultErrStyle msg
-
                 ; traceIf (text "} ending fork (badly)" <+> doc)
-                ; return Nothing }
+                ; pgmError "Cannot continue after interface file error" }
     }
-
-forkM :: SDoc -> IfL a -> IfL a
-forkM doc thing_inside
- = do   { mb_res <- forkM_maybe doc thing_inside
-        ; return (case mb_res of
-                        Nothing -> pgmError "Cannot continue after interface file error"
-                                   -- pprPanic "forkM" doc
-                        Just r  -> r) }
 
 setImplicitEnvM :: TypeEnv -> IfL a -> IfL a
 setImplicitEnvM tenv m = updLclEnv (\lcl -> lcl
                                      { if_implicits_env = Just tenv }) m
 
 {-
-Note [Masking exceptions in forkM_maybe]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Masking exceptions in forkM]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 When using GHC-as-API it must be possible to interrupt snippets of code
 executed using runStmt (#1381). Since commit 02c4ab04 this is almost possible
 by throwing an asynchronous interrupt to the GHC thread. However, there is a
 subtle problem: runStmt first typechecks the code before running it, and the
 exception might interrupt the type checker rather than the code. Moreover, the
-typechecker might be inside an unsafeInterleaveIO (through forkM_maybe), and
+typechecker might be inside an unsafeInterleaveIO (through forkM), and
 more importantly might be inside an exception handler inside that
 unsafeInterleaveIO. If that is the case, the exception handler will rethrow the
 asynchronous exception as a synchronous exception, and the exception will end
