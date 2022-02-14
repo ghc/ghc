@@ -31,7 +31,7 @@ Compiler
 - Changes to the treatment of :extension:`UnboxedSums`:
 
   - GHC can now parse unboxed sum type constructors ``(# | #)``, ``(# | | #)``,
-    ``(# | | | #)`, etc. Partial applications need to be written in prefix form,
+    ``(# | | | #)``, etc. Partial applications need to be written in prefix form,
     e.g. ``(# | #) Int#``.
 
   - Unboxed sums now require the :extension:`UnboxedSums` extension to be enabled.
@@ -84,12 +84,12 @@ Compiler
   In general :ghc-flag:`-fworker-wrapper-cbv` is very beneficial and can be safely enabled.
   However sadly there are two exceptions. It can break rules for code which made assumptions about
   which functions get a W/W split which now no longer hold.
-  See #20364 for the details. For this reason it isn't enabled by default.
+  See :ghc-ticket:`20364` for the details. For this reason it isn't enabled by default.
   For code which has the proper ``INLINABLE`` (:ref:`inlinable-pragma`) and ``INLINE`` (:ref:`inline-pragma`)
   or that doesn't define any rule-relevant functions this shouldn't happen. The longterm fix here is to
   apply the proper pragmas.
   There is also a known issue where a function taking multiple unlifted arguments can cause excessive
-  spilling (#20334). This seems to be an edge case. But if you think you are hitting this case please
+  spilling (:ghc-ticket:`20334`). This seems to be an edge case. But if you think you are hitting this case please
   comment on the ticket so that we can prioritize it accordingly.
 
 - Support for Sun SPARC architecture has been dropped (:ghc-ticket:`16883`).
@@ -98,20 +98,21 @@ Compiler
   (:ghc-ticket:`6077`, :ghc-ticket:`20684`, :ghc-ticket:`20669`,
   :ghc-ticket:`20660`):
 
-  - For the package database previously in `~/.ghc/<arch-ver>`, we
-    will continue to use the old path if it exists. For example, if the
-    `~/.ghc/x86_64-linux-9.4.1` directory exists, GHC will use that for its
+  - For the package database previously in ``~/.ghc/<arch-ver>``, we will
+    continue to use the old path if it exists. For example, if the
+    ``~/.ghc/x86_64-linux-9.4.1`` directory exists, GHC will use that for its
     user package database. If this directory does not exist, we will use
-    `$XDG_DATA_HOME/ghc/x86_64-linux-9.4.1`. This is in order to give tooling like
-    cabal time to migrate
+    ``$XDG_DATA_HOME/ghc/x86_64-linux-9.4.1``. This is in order to give tooling
+    like cabal time to migrate
 
-  - For GHCi configuration files previously located in `~/.ghc/` like
-    `ghci.conf` and `ghci_history`, we will first check if they exist in
-    `~/.ghc` and use those if they do. However, we will create new files like
-    `ghci_history` only in `$XDG_DATA_HOME/ghc`. So if you don't have a previous
-    GHC installation which created `~/.ghc/ghci_history`, the history file will be
-    written to `$XDG_DATA_HOME/ghc`. If you already have an older GHC installation which
-    wrote `~/.ghc/ghci_history`, then GHC will continue to write the history to that file.
+  - For GHCi configuration files previously located in ``~/.ghc/`` like
+    ``ghci.conf`` and ``ghci_history``, we will first check if they exist in
+    ``~/.ghc`` and use those if they do. However, we will create new files like
+    ``ghci_history`` only in ``$XDG_DATA_HOME/ghc``. So if you don't have a
+    previous GHC installation which created ``~/.ghc/ghci_history``, the
+    history file will be written to ``$XDG_DATA_HOME/ghc``. If you already have
+    an older GHC installation which wrote ``~/.ghc/ghci_history``, then GHC
+    will continue to write the history to that file.
 
 ``base`` library
 ~~~~~~~~~~~~~~~~
