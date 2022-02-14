@@ -194,3 +194,41 @@ void updateIpeMap() {
 
     RELEASE_LOCK(&ipeMapLock);
 }
+
+#if defined(DEBUG)
+static bool dumpOneInfoTable(void *user, StgWord key STG_UNUSED, const void *value) {
+    FILE *f = (FILE *) user;
+    const InfoProvEnt *n = (const InfoProvEnt *) value;
+    const StgInfoTable *info = INFO_PTR_TO_STRUCT(n->info);
+    fprintf(f, "{\"info\": %d", (uintptr_t) info);
+    fprintf(f, ", \"name\": \"%s\"", n->prov.table_name);
+    fprintf(f, ", \"module\": \"%s\"", n->prov.module);
+    fprintf(f, ", \"srcloc\": \"%s\"", n->prov.srcloc);
+    fprintf(f, ", \"type\": \"%s\"", info_type_by_ip(info));
+    if (ip_THUNK(info)) {
+        StgThunkInfoTable *thunk_info = itbl_to_thunk_itbl(info);
+        if (thunk_info->i.srt) {
+            fprintf(f, ", \"srt\": %d", (uintptr_t) GET_SRT(thunk_info));
+        }
+    } else if (ip_STACK_FRAME(info)) {
+        StgRetInfoTable *ret_info = itbl_to_ret_itbl(info);
+        if (ret_info->i.srt) {
+            fprintf(f, ", \"srt\": %d", (uintptr_t) GET_SRT(ret_info));
+        }
+    } else if (ip_HNF(info)) {
+        StgFunInfoTable *fun_info = itbl_to_fun_itbl(info);
+        if (fun_info->i.srt) {
+            fprintf(f, ", \"srt\": %d", (uintptr_t) GET_FUN_SRT(fun_info));
+        }
+    }
+    fprintf(f, "}\n");
+    return true;
+}
+
+void dumpAllInfoTables(char *file) {
+    updateIpeMap();
+    FILE *f = fopen(file, "w");
+    iterHashTable(ipeMap, f, dumpOneInfoTable);
+    fclose(f);
+}
+#endif

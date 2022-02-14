@@ -26,4 +26,8 @@ void updateIpeMap(void);
 void initIpeMapLock(void);
 void closeIpeMapLock(void);
 
+#if defined(DEBUG)
+void dumpAllInfoTables(char *path);
+#endif
+
 #include "EndPrivate.h"
