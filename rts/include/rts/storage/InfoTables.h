@@ -62,6 +62,7 @@ typedef struct {
 #define _UPT (1<<5)  /* unpointed?           */
 #define _SRT (1<<6)  /* has an SRT?          */
 #define _IND (1<<7)  /* is an indirection?   */
+#define _FRM (1<<8)  /* is a stack frame?    */
 
 #define isMUTABLE(flags)   ((flags) &_MUT)
 #define isBITMAP(flags)    ((flags) &_BTM)
@@ -95,6 +96,7 @@ extern const StgWord16 closure_flags[];
 #define ip_UNPOINTED(ip)         (  ipFlags(ip) & _UPT)
 #define ip_SRT(ip)               (  ipFlags(ip) & _SRT)
 #define ip_IND(ip)               (  ipFlags(ip) & _IND)
+#define ip_STACK_FRAME(ip)       (  ipFlags(ip) & _FRM)
 
 /* -----------------------------------------------------------------------------
    Bitmaps
