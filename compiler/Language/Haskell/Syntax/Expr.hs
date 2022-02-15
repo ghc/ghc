@@ -33,7 +33,6 @@ import Language.Haskell.Syntax.Type
 import Language.Haskell.Syntax.Binds
 
 -- others:
-import GHC.Tc.Types.Evidence
 import GHC.Core.DataCon (FieldLabelString)
 import GHC.Types.Name
 import GHC.Types.Basic
@@ -594,23 +593,7 @@ data HsExpr p
   --         'GHC.Parser.Annotation.AnnClose','GHC.Parser.Annotation.AnnCloseQ'
 
   -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
-  | HsBracket    (XBracket p) (HsBracket p)
-
-    -- See Note [Pending Splices]
-  | HsRnBracketOut
-      (XRnBracketOut p)
-      (HsBracket (HsBracketRn p)) -- Output of the renamer is the *original* renamed
-                                  -- expression, plus
-      [PendingRnSplice' p] -- _renamed_ splices to be type checked
-
-  | HsTcBracketOut
-      (XTcBracketOut p)
-      (Maybe QuoteWrapper) -- The wrapper to apply type and dictionary argument
-                           -- to the quote.
-      (HsBracket (HsBracketRn p)) -- Output of the type checker is the *original*
-                                 -- renamed expression, plus
-      [PendingTcSplice' p] -- _typechecked_ splices to be
-                           -- pasted back in by the desugarer
+  | HsBracket  (XBracket p) (HsBracketBody p)
 
   -- | - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen',
   --         'GHC.Parser.Annotation.AnnClose'
@@ -651,9 +634,10 @@ data HsExpr p
 
 -- | The AST used to hard-refer to GhcPass, which was a layer violation. For now,
 -- we paper it over with this new extension point.
-type family HsBracketRn p
-type family PendingRnSplice' p
-type family PendingTcSplice' p
+type family HsDoRn p
+
+-- TODO: Temporary fix for HsBracket GhcTc body should be HsBracket GhcRn
+type family HsBracketBody p
 
 -- ---------------------------------------------------------------------
 

@@ -747,8 +747,7 @@ Thus, we pass @r@ as the scrutinee expression to @matchWrapper@ above.
 
 -- Template Haskell stuff
 
-dsExpr (HsRnBracketOut x _ _)  = dataConCantHappen x
-dsExpr (HsTcBracketOut _ hs_wrapper x ps) = dsBracket hs_wrapper x ps
+dsExpr (HsBracket (HsBracketTc _ hs_wrapper ps) x) = dsBracket hs_wrapper x ps
 dsExpr (HsSpliceE _ s)         = pprPanic "dsExpr:splice" (ppr s)
 
 -- Arrow notation extension
@@ -762,7 +761,6 @@ dsExpr (HsOverLabel x _) = dataConCantHappen x
 dsExpr (OpApp x _ _ _)   = dataConCantHappen x
 dsExpr (SectionL x _ _)  = dataConCantHappen x
 dsExpr (SectionR x _ _)  = dataConCantHappen x
-dsExpr (HsBracket x _)   = dataConCantHappen x
 
 ds_prag_expr :: HsPragE GhcTc -> LHsExpr GhcTc -> DsM CoreExpr
 ds_prag_expr (HsPragSCC _ _ cc) expr = do

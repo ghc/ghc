@@ -639,8 +639,6 @@ addTickHsExpr (ArithSeq ty wit arith_seq) =
 addTickHsExpr (HsPragE x p e) =
         liftM (HsPragE x p) (addTickLHsExpr e)
 addTickHsExpr e@(HsBracket     {})   = return e
-addTickHsExpr e@(HsTcBracketOut  {}) = return e
-addTickHsExpr e@(HsRnBracketOut  {}) = return e
 addTickHsExpr e@(HsSpliceE  {})      = return e
 addTickHsExpr e@(HsGetField {})      = return e
 addTickHsExpr e@(HsProjection {})    = return e
