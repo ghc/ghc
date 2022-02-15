@@ -702,6 +702,8 @@ Library
         GHC.Types.Unique.Set
         GHC.Types.Unique.Supply
         GHC.Types.Var
+        GHC.Types.Var.ArgFlag
+        GHC.Types.Var.Binder
         GHC.Types.Var.Env
         GHC.Types.Var.Set
         GHC.Unit
