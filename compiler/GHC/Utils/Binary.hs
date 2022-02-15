@@ -82,6 +82,8 @@ import GHC.Types.Unique.FM
 import GHC.Data.FastMutInt
 import GHC.Utils.Fingerprint
 import GHC.Types.SrcLoc
+import GHC.Types.Var.ArgFlag
+import GHC.Types.Var.Binder
 import qualified GHC.Data.Strict as Strict
 
 import Control.DeepSeq
@@ -1323,3 +1325,40 @@ instance Binary SrcSpan where
                     return (RealSrcSpan ss sb)
             _ -> do s <- get bh
                     return (UnhelpfulSpan s)
+
+instance Binary Specificity where
+  put_ bh SpecifiedSpec = putByte bh 0
+  put_ bh InferredSpec  = putByte bh 1
+
+  get bh = do
+    h <- getByte bh
+    case h of
+      0 -> return SpecifiedSpec
+      _ -> return InferredSpec
+
+instance Binary ArgFlag where
+  put_ bh Required  = putByte bh 0
+  put_ bh Specified = putByte bh 1
+  put_ bh Inferred  = putByte bh 2
+
+  get bh = do
+    h <- getByte bh
+    case h of
+      0 -> return Required
+      1 -> return Specified
+      _ -> return Inferred
+
+instance Binary AnonArgFlag where
+  put_ bh VisArg   = putByte bh 0
+  put_ bh InvisArg = putByte bh 1
+
+  get bh = do
+    h <- getByte bh
+    case h of
+      0 -> return VisArg
+      _ -> return InvisArg
+
+instance (Binary tv, Binary vis) => Binary (VarBndr tv vis) where
+  put_ bh (Bndr tv vis) = do { put_ bh tv; put_ bh vis }
+
+  get bh = do { tv <- get bh; vis <- get bh; return (Bndr tv vis) }

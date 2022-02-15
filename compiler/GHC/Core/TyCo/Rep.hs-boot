@@ -3,8 +3,9 @@ module GHC.Core.TyCo.Rep where
 
 import GHC.Utils.Outputable ( Outputable )
 import Data.Data  ( Data )
-import {-# SOURCE #-} GHC.Types.Var( Var, ArgFlag, AnonArgFlag )
+import {-# SOURCE #-} GHC.Types.Var ( Var )
 import {-# SOURCE #-} GHC.Core.TyCon ( TyCon )
+import GHC.Types.Var.ArgFlag ( ArgFlag, AnonArgFlag )
 
 data Type
 data Coercion

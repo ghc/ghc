@@ -90,6 +90,7 @@ import GHC.Unit.Module
 import GHC.Unit.Home
 import GHC.Types.SrcLoc
 import GHC.Types.Unique
+import GHC.Types.Var.Binder
 import GHC.Utils.Misc
 import GHC.Data.Maybe
 import GHC.Utils.Binary
@@ -803,3 +804,6 @@ pprPrefixName :: NamedThing a => a -> SDoc
 pprPrefixName thing = pprPrefixVar (isSymOcc (nameOccName name)) (ppr name)
  where
    name = getName thing
+
+instance NamedThing tv => NamedThing (VarBndr tv flag) where
+  getName (Bndr tv _) = getName tv

@@ -5,8 +5,13 @@
 \section{@Vars@: Variables}
 -}
 
-{-# LANGUAGE FlexibleContexts, MultiWayIf, FlexibleInstances, DeriveDataTypeable,
-             PatternSynonyms, BangPatterns #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE BangPatterns #-}
+
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
@@ -105,8 +110,9 @@ import {-# SOURCE #-}   GHC.Builtin.Types ( manyDataConTy )
 import {-# SOURCE #-}   GHC.Types.Name
 import GHC.Types.Unique ( Uniquable, Unique, getKey, getUnique
                         , mkUniqueGrimily, nonDetCmpUnique )
+import GHC.Types.Var.ArgFlag
+import GHC.Types.Var.Binder
 import GHC.Utils.Misc
-import GHC.Utils.Binary
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
@@ -429,207 +435,9 @@ updateVarTypeM upd var
 
 {- *********************************************************************
 *                                                                      *
-*                   ArgFlag
-*                                                                      *
-********************************************************************* -}
-
--- | Argument Flag
---
--- Is something required to appear in source Haskell ('Required'),
--- permitted by request ('Specified') (visible type application), or
--- prohibited entirely from appearing in source Haskell ('Inferred')?
--- See Note [VarBndrs, TyCoVarBinders, TyConBinders, and visibility] in "GHC.Core.TyCo.Rep"
-data ArgFlag = Invisible Specificity
-             | Required
-  deriving (Eq, Ord, Data)
-  -- (<) on ArgFlag means "is less visible than"
-
--- | Whether an 'Invisible' argument may appear in source Haskell.
-data Specificity = InferredSpec
-                   -- ^ the argument may not appear in source Haskell, it is
-                   -- only inferred.
-                 | SpecifiedSpec
-                   -- ^ the argument may appear in source Haskell, but isn't
-                   -- required.
-  deriving (Eq, Ord, Data)
-
-pattern Inferred, Specified :: ArgFlag
-pattern Inferred  = Invisible InferredSpec
-pattern Specified = Invisible SpecifiedSpec
-
-{-# COMPLETE Required, Specified, Inferred #-}
-
--- | Does this 'ArgFlag' classify an argument that is written in Haskell?
-isVisibleArgFlag :: ArgFlag -> Bool
-isVisibleArgFlag af = not (isInvisibleArgFlag af)
-
--- | Does this 'ArgFlag' classify an argument that is not written in Haskell?
-isInvisibleArgFlag :: ArgFlag -> Bool
-isInvisibleArgFlag (Invisible {}) = True
-isInvisibleArgFlag Required       = False
-
-isInferredArgFlag :: ArgFlag -> Bool
--- More restrictive than isInvisibleArgFlag
-isInferredArgFlag (Invisible InferredSpec) = True
-isInferredArgFlag _                        = False
-
--- | Do these denote the same level of visibility? 'Required'
--- arguments are visible, others are not. So this function
--- equates 'Specified' and 'Inferred'. Used for printing.
-sameVis :: ArgFlag -> ArgFlag -> Bool
-sameVis Required      Required      = True
-sameVis (Invisible _) (Invisible _) = True
-sameVis _             _             = False
-
-instance Outputable ArgFlag where
-  ppr Required  = text "[req]"
-  ppr Specified = text "[spec]"
-  ppr Inferred  = text "[infrd]"
-
-instance Binary Specificity where
-  put_ bh SpecifiedSpec = putByte bh 0
-  put_ bh InferredSpec  = putByte bh 1
-
-  get bh = do
-    h <- getByte bh
-    case h of
-      0 -> return SpecifiedSpec
-      _ -> return InferredSpec
-
-instance Binary ArgFlag where
-  put_ bh Required  = putByte bh 0
-  put_ bh Specified = putByte bh 1
-  put_ bh Inferred  = putByte bh 2
-
-  get bh = do
-    h <- getByte bh
-    case h of
-      0 -> return Required
-      1 -> return Specified
-      _ -> return Inferred
-
--- | The non-dependent version of 'ArgFlag'.
--- See Note [AnonArgFlag]
--- Appears here partly so that it's together with its friends ArgFlag
--- and ForallVisFlag, but also because it is used in IfaceType, rather
--- early in the compilation chain
-data AnonArgFlag
-  = VisArg    -- ^ Used for @(->)@: an ordinary non-dependent arrow.
-              --   The argument is visible in source code.
-  | InvisArg  -- ^ Used for @(=>)@: a non-dependent predicate arrow.
-              --   The argument is invisible in source code.
-  deriving (Eq, Ord, Data)
-
-instance Outputable AnonArgFlag where
-  ppr VisArg   = text "[vis]"
-  ppr InvisArg = text "[invis]"
-
-instance Binary AnonArgFlag where
-  put_ bh VisArg   = putByte bh 0
-  put_ bh InvisArg = putByte bh 1
-
-  get bh = do
-    h <- getByte bh
-    case h of
-      0 -> return VisArg
-      _ -> return InvisArg
-
-{- Note [AnonArgFlag]
-~~~~~~~~~~~~~~~~~~~~~
-AnonArgFlag is used principally in the FunTy constructor of Type.
-  FunTy VisArg   t1 t2   means   t1 -> t2
-  FunTy InvisArg t1 t2   means   t1 => t2
-
-However, the AnonArgFlag in a FunTy is just redundant, cached
-information.  In (FunTy { ft_af = af, ft_arg = t1, ft_res = t2 })
-  * if (isPredTy t1 = True)  then af = InvisArg
-  * if (isPredTy t1 = False) then af = VisArg
-where isPredTy is defined in GHC.Core.Type, and sees if t1's
-kind is Constraint.  See GHC.Core.TyCo.Rep
-Note [Types for coercions, predicates, and evidence]
-
-GHC.Core.Utils.mkFunctionType :: Mult -> Type -> Type -> Type
-uses isPredTy to decide the AnonArgFlag for the FunTy.
-
-The term (Lam b e), and coercion (FunCo co1 co2) don't carry
-AnonArgFlags; instead they use mkFunctionType when we want to
-get their types; see mkLamType and coercionLKind/RKind resp.
-This is just an engineering choice; we could cache here too
-if we wanted.
-
-Why bother with all this? After all, we are in Core, where (=>) and
-(->) behave the same.  We maintain this distinction throughout Core so
-that we can cheaply and conveniently determine
-* How to print a type
-* How to split up a type: tcSplitSigmaTy
-* How to specialise it (over type classes; GHC.Core.Opt.Specialise)
-
-For the specialisation point, consider
-(\ (d :: Ord a). blah).  We want to give it type
-           (Ord a => blah_ty)
-with a fat arrow; that is, using mkInvisFunTy, not mkVisFunTy.
-Why?  Because the /specialiser/ treats dictionary arguments specially.
-Suppose we do w/w on 'foo', thus (#11272, #6056)
-   foo :: Ord a => Int -> blah
-   foo a d x = case x of I# x' -> $wfoo @a d x'
-
-   $wfoo :: Ord a => Int# -> blah
-
-Now, at a call we see (foo @Int dOrdInt).  The specialiser will
-specialise this to $sfoo, where
-   $sfoo :: Int -> blah
-   $sfoo x = case x of I# x' -> $wfoo @Int dOrdInt x'
-
-Now we /must/ also specialise $wfoo!  But it wasn't user-written,
-and has a type built with mkLamTypes.
-
-Conclusion: the easiest thing is to make mkLamType build
-            (c => ty)
-when the argument is a predicate type.  See GHC.Core.TyCo.Rep
-Note [Types for coercions, predicates, and evidence]
--}
-
-{- *********************************************************************
-*                                                                      *
 *                   VarBndr, TyCoVarBinder
 *                                                                      *
 ********************************************************************* -}
-
-{- Note [The VarBndr type and its uses]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-VarBndr is polymorphic in both var and visibility fields.
-Currently there are nine different uses of 'VarBndr':
-
-* Var.TyCoVarBinder = VarBndr TyCoVar ArgFlag
-  Binder of a forall-type; see ForAllTy in GHC.Core.TyCo.Rep
-
-* Var.TyVarBinder = VarBndr TyVar ArgFlag
-  Subset of TyCoVarBinder when we are sure the binder is a TyVar
-
-* Var.InvisTVBinder = VarBndr TyVar Specificity
-  Specialised form of TyVarBinder, when ArgFlag = Invisible s
-  See GHC.Core.Type.splitForAllInvisTVBinders
-
-* Var.ReqTVBinder = VarBndr TyVar ()
-  Specialised form of TyVarBinder, when ArgFlag = Required
-  See GHC.Core.Type.splitForAllReqTVBinders
-  This one is barely used
-
-* TyCon.TyConBinder = VarBndr TyVar TyConBndrVis
-  Binders of a TyCon; see TyCon in GHC.Core.TyCon
-
-* TyCon.TyConTyCoBinder = VarBndr TyCoVar TyConBndrVis
-  Binders of a PromotedDataCon
-  See Note [Promoted GADT data constructors] in GHC.Core.TyCon
-
-* IfaceType.IfaceForAllBndr     = VarBndr IfaceBndr ArgFlag
-* IfaceType.IfaceForAllSpecBndr = VarBndr IfaceBndr Specificity
-* IfaceType.IfaceTyConBinder    = VarBndr IfaceBndr TyConBndrVis
--}
-
-data VarBndr var argf = Bndr var argf
-  -- See Note [The VarBndr type and its uses]
-  deriving( Data )
 
 -- | Variable Binder
 --
@@ -642,27 +450,6 @@ type TyCoVarBinder     = VarBndr TyCoVar ArgFlag
 type TyVarBinder       = VarBndr TyVar   ArgFlag
 type InvisTVBinder     = VarBndr TyVar   Specificity
 type ReqTVBinder       = VarBndr TyVar   ()
-
-tyVarSpecToBinders :: [VarBndr a Specificity] -> [VarBndr a ArgFlag]
-tyVarSpecToBinders = map tyVarSpecToBinder
-
-tyVarSpecToBinder :: VarBndr a Specificity -> VarBndr a ArgFlag
-tyVarSpecToBinder (Bndr tv vis) = Bndr tv (Invisible vis)
-
-tyVarReqToBinders :: [VarBndr a ()] -> [VarBndr a ArgFlag]
-tyVarReqToBinders = map tyVarReqToBinder
-
-tyVarReqToBinder :: VarBndr a () -> VarBndr a ArgFlag
-tyVarReqToBinder (Bndr tv _) = Bndr tv Required
-
-binderVar :: VarBndr tv argf -> tv
-binderVar (Bndr v _) = v
-
-binderVars :: [VarBndr tv argf] -> [tv]
-binderVars tvbs = map binderVar tvbs
-
-binderArgFlag :: VarBndr tv argf -> argf
-binderArgFlag (Bndr _ argf) = argf
 
 binderType :: VarBndr TyCoVar argf -> Type
 binderType (Bndr tv _) = varType tv
@@ -689,33 +476,6 @@ mkTyVarBinders vis = map (mkTyVarBinder vis)
 
 isTyVarBinder :: TyCoVarBinder -> Bool
 isTyVarBinder (Bndr v _) = isTyVar v
-
-mapVarBndr :: (var -> var') -> (VarBndr var flag) -> (VarBndr var' flag)
-mapVarBndr f (Bndr v fl) = Bndr (f v) fl
-
-mapVarBndrs :: (var -> var') -> [VarBndr var flag] -> [VarBndr var' flag]
-mapVarBndrs f = map (mapVarBndr f)
-
-lookupVarBndr :: Eq var => var -> [VarBndr var flag] -> Maybe flag
-lookupVarBndr var bndrs = lookup var zipped_bndrs
-  where
-    zipped_bndrs = map (\(Bndr v f) -> (v,f)) bndrs
-
-instance Outputable tv => Outputable (VarBndr tv ArgFlag) where
-  ppr (Bndr v Required)  = ppr v
-  ppr (Bndr v Specified) = char '@' <> ppr v
-  ppr (Bndr v Inferred)  = braces (ppr v)
-
-instance Outputable tv => Outputable (VarBndr tv Specificity) where
-  ppr = ppr . tyVarSpecToBinder
-
-instance (Binary tv, Binary vis) => Binary (VarBndr tv vis) where
-  put_ bh (Bndr tv vis) = do { put_ bh tv; put_ bh vis }
-
-  get bh = do { tv <- get bh; vis <- get bh; return (Bndr tv vis) }
-
-instance NamedThing tv => NamedThing (VarBndr tv flag) where
-  getName (Bndr tv _) = getName tv
 
 {-
 ************************************************************************
