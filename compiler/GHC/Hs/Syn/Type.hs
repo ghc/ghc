@@ -129,9 +129,7 @@ hsExprType (ArithSeq _ mb_overloaded_op asi) = case mb_overloaded_op of
   Nothing -> asi_ty
   where
     asi_ty = arithSeqInfoType asi
-hsExprType (HsBracket v _) = dataConCantHappen v
-hsExprType (HsRnBracketOut v _ _) = dataConCantHappen v
-hsExprType (HsTcBracketOut ty _wrap _bracket _pending) = ty
+hsExprType (HsBracket (HsBracketTc ty _wrap _pending) _) = ty
 hsExprType e@(HsSpliceE{}) = pprPanic "hsExprType: Unexpected HsSpliceE"
                                       (ppr e)
                                       -- Typed splices should have been eliminated during zonking, but we

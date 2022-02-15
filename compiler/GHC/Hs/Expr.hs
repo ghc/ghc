@@ -183,9 +183,37 @@ data HsWrap hs_syn = HsWrap HsWrapper      -- the wrapper
 
 deriving instance (Data (hs_syn GhcTc), Typeable hs_syn) => Data (HsWrap hs_syn)
 
-type instance HsBracketRn (GhcPass _) = GhcRn
-type instance PendingRnSplice' (GhcPass _) = PendingRnSplice
-type instance PendingTcSplice' (GhcPass _) = PendingTcSplice
+type instance HsDoRn (GhcPass _) = GhcRn
+
+-- ---------------------------------------------------------------------
+
+    -- See Note [Pending Splices]
+data HsBracketRn
+  = HsBracketRnTyped
+    (EpAnn [AddEpAnn])
+
+  | HsBracketRnUntyped
+    (EpAnn [AddEpAnn])
+    [PendingRnSplice]  -- Output of the renamer is the *original* renamed
+                       -- expression, plus
+                       -- _renamed_ splices to be type checked
+
+data HsBracketTc = HsBracketTc
+  Type
+  (Maybe QuoteWrapper) -- The wrapper to apply type and dictionary argument
+                       -- to the quote.
+  [PendingTcSplice]    -- Output of the type checker is the *original*
+                       -- renamed expression, plus
+                       -- _typechecked_ splices to be
+                       -- pasted back in by the desugarer
+
+type instance XBracket     GhcPs = EpAnn [AddEpAnn]
+type instance XBracket     GhcRn = HsBracketRn
+type instance XBracket     GhcTc = HsBracketTc
+
+type instance HsBracketBody GhcPs = HsBracket GhcPs
+type instance HsBracketBody GhcRn = HsBracket GhcRn
+type instance HsBracketBody GhcTc = HsBracket GhcRn
 
 -- ---------------------------------------------------------------------
 
@@ -333,18 +361,6 @@ type instance XExprWithTySig GhcTc = NoExtField
 type instance XArithSeq      GhcPs = EpAnn [AddEpAnn]
 type instance XArithSeq      GhcRn = NoExtField
 type instance XArithSeq      GhcTc = PostTcExpr
-
-type instance XBracket       GhcPs = EpAnn [AddEpAnn]
-type instance XBracket       GhcRn = EpAnn [AddEpAnn]
-type instance XBracket       GhcTc = DataConCantHappen
-
-type instance XRnBracketOut  GhcPs = DataConCantHappen
-type instance XRnBracketOut  GhcRn = NoExtField
-type instance XRnBracketOut  GhcTc = DataConCantHappen
-
-type instance XTcBracketOut  GhcPs = DataConCantHappen
-type instance XTcBracketOut  GhcRn = DataConCantHappen
-type instance XTcBracketOut  GhcTc = Type -- Type of the TcBracketOut
 
 type instance XSpliceE       (GhcPass _) = EpAnnCO
 type instance XProc          (GhcPass _) = EpAnn [AddEpAnn]
@@ -641,11 +657,16 @@ ppr_expr (ExprWithTySig _ expr sig)
 ppr_expr (ArithSeq _ _ info) = brackets (ppr info)
 
 ppr_expr (HsSpliceE _ s)         = pprSplice s
-ppr_expr (HsBracket _ b)         = pprHsBracket b
-ppr_expr (HsRnBracketOut _ e []) = ppr e
-ppr_expr (HsRnBracketOut _ e ps) = ppr e $$ text "pending(rn)" <+> ppr ps
-ppr_expr (HsTcBracketOut _ _wrap e []) = ppr e
-ppr_expr (HsTcBracketOut _ _wrap e ps) = ppr e $$ text "pending(tc)" <+> pprIfTc @p (ppr ps)
+ppr_expr (HsBracket b e)
+  = case ghcPass @p of
+    GhcPs -> pprHsBracket e
+    GhcRn -> case b of
+      HsBracketRnTyped _ -> pprHsBracket e
+      HsBracketRnUntyped _ [] -> ppr e
+      HsBracketRnUntyped _ ps -> ppr e $$ text "pending(rn)" <+> ppr ps
+    GhcTc -> case b of
+      HsBracketTc _ty _wrap [] -> ppr e
+      HsBracketTc _ty _wrap ps -> ppr e $$ text "pending(tc)" <+> pprIfTc @p (ppr ps)
 
 ppr_expr (HsProc _ pat (L _ (HsCmdTop _ cmd)))
   = hsep [text "proc", ppr pat, text "->", ppr cmd]
@@ -786,8 +807,6 @@ hsExprNeedsParens prec = go
     go (HsPragE{})                    = prec >= appPrec
     go (HsSpliceE{})                  = False
     go (HsBracket{})                  = False
-    go (HsRnBracketOut{})             = False
-    go (HsTcBracketOut{})             = False
     go (HsProc{})                     = prec > topPrec
     go (HsStatic{})                   = prec >= appPrec
     go (RecordCon{})                  = False

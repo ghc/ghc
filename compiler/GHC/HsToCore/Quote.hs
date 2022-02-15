@@ -1637,8 +1637,6 @@ repE (XExpr (HsExpanded orig_expr ds_expr))
          else repE orig_expr }
 repE e@(HsPragE _ (HsPragSCC {}) _) = notHandled (ThCostCentres e)
 repE e@(HsBracket{}) = notHandled (ThExpressionForm e)
-repE e@(HsRnBracketOut{}) = notHandled (ThExpressionForm e)
-repE e@(HsTcBracketOut{}) = notHandled (ThExpressionForm e)
 repE e@(HsProc{}) = notHandled (ThExpressionForm e)
 
 {- Note [Quotation and rebindable syntax]

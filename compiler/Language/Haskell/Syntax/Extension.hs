@@ -430,8 +430,6 @@ type family XProjection     x
 type family XExprWithTySig  x
 type family XArithSeq       x
 type family XBracket        x
-type family XRnBracketOut   x
-type family XTcBracketOut   x
 type family XSpliceE        x
 type family XProc           x
 type family XStatic         x

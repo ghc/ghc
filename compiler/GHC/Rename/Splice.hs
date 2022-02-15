@@ -107,7 +107,7 @@ rnBracket e br_body
                         ; (body', fvs_e) <-
                           setStage (Brack cur_stage RnPendingTyped) $
                                    rn_bracket cur_stage br_body
-                        ; return (HsBracket noAnn body', fvs_e) }
+                        ; return (HsBracket (HsBracketRnTyped noAnn) body', fvs_e) }
 
             False -> do { traceRn "Renaming untyped TH bracket" empty
                         ; ps_var <- newMutVar []
@@ -117,7 +117,7 @@ rnBracket e br_body
                           setStage (Brack cur_stage (RnPendingUntyped ps_var)) $
                                    rn_bracket cur_stage br_body
                         ; pendings <- readMutVar ps_var
-                        ; return (HsRnBracketOut noExtField body' pendings, fvs_e) }
+                        ; return (HsBracket (HsBracketRnUntyped noAnn pendings) body', fvs_e) }
        }
 
 rn_bracket :: ThStage -> HsBracket GhcPs -> RnM (HsBracket GhcRn, FreeVars)

@@ -778,13 +778,11 @@ zonkExpr env (HsAppType ty e t)
        return (HsAppType new_ty new_e t)
        -- NB: the type is an HsType; can't zonk that!
 
-zonkExpr _ (HsRnBracketOut x _ _) = dataConCantHappen x
-
-zonkExpr env (HsTcBracketOut ty wrap body bs)
+zonkExpr env (HsBracket (HsBracketTc ty wrap bs) body)
   = do wrap' <- traverse zonkQuoteWrap wrap
        bs' <- mapM (zonk_b env) bs
        new_ty <- zonkTcTypeToTypeX env ty
-       return (HsTcBracketOut new_ty wrap' body bs')
+       return (HsBracket (HsBracketTc new_ty wrap' bs') body)
   where
     zonkQuoteWrap (QuoteWrapper ev ty) = do
         let ev' = zonkIdOcc env ev

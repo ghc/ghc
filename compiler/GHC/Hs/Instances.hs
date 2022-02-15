@@ -388,6 +388,10 @@ deriving instance Data (HsBracket GhcPs)
 deriving instance Data (HsBracket GhcRn)
 deriving instance Data (HsBracket GhcTc)
 
+deriving instance Data HsBracketRn
+
+deriving instance Data HsBracketTc
+
 -- deriving instance (DataIdLR p p) => Data (ArithSeqInfo p)
 deriving instance Data (ArithSeqInfo GhcPs)
 deriving instance Data (ArithSeqInfo GhcRn)
