@@ -8,10 +8,17 @@ where
 -- See Note [Depend on GHC.Num.Integer] in GHC.Base
 import GHC.Base ()
 
-data IfaceAppArgs
+data IfaceType' p
+data IfaceAppArgs' p
+data IfaceBndr' p
+data IfaceCoercion' p
 
-data IfaceType
 data IfaceTyCon
 data IfaceTyLit
-data IfaceCoercion
-data IfaceBndr
+
+data TtgIface
+
+type IfaceType = IfaceType' TtgIface
+type IfaceAppArgs = IfaceAppArgs' TtgIface
+type IfaceBndr = IfaceBndr' TtgIface
+type IfaceCoercion = IfaceCoercion' TtgIface

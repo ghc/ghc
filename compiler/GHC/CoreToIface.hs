@@ -138,7 +138,7 @@ toIfaceBndr var
   | isId var  = IfaceIdBndr (toIfaceIdBndr var)
   | otherwise = IfaceTvBndr (toIfaceTvBndr var)
 
-toIfaceBndrX :: VarSet -> Var -> IfaceBndr
+toIfaceBndrX :: VarSet -> Var -> IfaceBndrPpr
 toIfaceBndrX fr var
   | isId var  = IfaceIdBndr (toIfaceIdBndrX fr var)
   | otherwise = IfaceTvBndr (toIfaceTvBndrX fr var)
@@ -164,7 +164,7 @@ toIfaceKind = toIfaceType
 toIfaceType :: Type -> IfaceType
 toIfaceType = toIfaceTypeX emptyVarSet
 
-toIfaceTypeX :: VarSet -> Type -> IfaceType
+toIfaceTypeX :: VarSet -> Type -> IfaceTypePpr
 -- (toIfaceTypeX free ty)
 --    translates the tyvars in 'free' as IfaceFreeTyVars
 --

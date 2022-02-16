@@ -133,6 +133,7 @@ import {-# SOURCE #-} GHC.CoreToIface (toIfaceTyCon, tidyToIfaceTcArgs)
 import GHC.Prelude
 
 import GHC.Iface.Type
+import GHC.Iface.Type.Ppr
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.FVs
 import GHC.Core.TyCo.Ppr

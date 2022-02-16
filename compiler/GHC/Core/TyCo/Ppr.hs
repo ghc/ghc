@@ -44,6 +44,7 @@ import GHC.Core.Class
 import GHC.Types.Var
 
 import GHC.Iface.Type
+import GHC.Iface.Type.Ppr
 
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
@@ -106,17 +107,17 @@ pprKind, pprParendKind :: Kind -> SDoc
 pprKind       = pprType
 pprParendKind = pprParendType
 
-tidyToIfaceTypeStyX :: TidyEnv -> Type -> PprStyle -> IfaceType
+tidyToIfaceTypeStyX :: TidyEnv -> Type -> PprStyle -> IfaceTypePpr
 tidyToIfaceTypeStyX env ty sty
   | userStyle sty = tidyToIfaceTypeX env ty
   | otherwise     = toIfaceTypeX (tyCoVarsOfType ty) ty
      -- in latter case, don't tidy, as we'll be printing uniques.
 
-tidyToIfaceType :: Type -> IfaceType
+tidyToIfaceType :: Type -> IfaceTypePpr
 tidyToIfaceType = tidyToIfaceTypeX emptyTidyEnv
 
-tidyToIfaceTypeX :: TidyEnv -> Type -> IfaceType
--- It's vital to tidy before converting to an IfaceType
+tidyToIfaceTypeX :: TidyEnv -> Type -> IfaceTypePpr
+-- It's vital to tidy before converting to an IfaceTypePpr
 -- or nested binders will become indistinguishable!
 --
 -- Also for the free type variables, tell toIfaceTypeX to
@@ -132,14 +133,14 @@ pprCo, pprParendCo :: Coercion -> SDoc
 pprCo       co = getPprStyle $ \ sty -> pprIfaceCoercion (tidyToIfaceCoSty co sty)
 pprParendCo co = getPprStyle $ \ sty -> pprParendIfaceCoercion (tidyToIfaceCoSty co sty)
 
-tidyToIfaceCoSty :: Coercion -> PprStyle -> IfaceCoercion
+tidyToIfaceCoSty :: Coercion -> PprStyle -> IfaceCoercionPpr
 tidyToIfaceCoSty co sty
   | userStyle sty = tidyToIfaceCo co
   | otherwise     = toIfaceCoercionX (tyCoVarsOfCo co) co
      -- in latter case, don't tidy, as we'll be printing uniques.
 
-tidyToIfaceCo :: Coercion -> IfaceCoercion
--- It's vital to tidy before converting to an IfaceType
+tidyToIfaceCo :: Coercion -> IfaceCoercionPpr
+-- It's vital to tidy before converting to an IfaceTypePpr
 -- or nested binders will become indistinguishable!
 --
 -- Also for the free type variables, tell toIfaceCoercionX to

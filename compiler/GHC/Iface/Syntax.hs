@@ -46,6 +46,7 @@ import GHC.Prelude
 import GHC.Builtin.Names ( unrestrictedFunTyConKey, liftedTypeKindTyConKey )
 import GHC.Types.Unique ( hasKey )
 import GHC.Iface.Type
+import GHC.Iface.Type.Ppr
 import GHC.Iface.Recomp.Binary
 import GHC.Core( IsOrphan, isOrphan )
 import GHC.Types.Demand
@@ -68,6 +69,8 @@ import GHC.Core.TyCon ( Role (..), Injectivity(..), tyConBndrVisArgFlag )
 import GHC.Core.DataCon (SrcStrictness(..), SrcUnpackedness(..))
 import GHC.Builtin.Types ( constraintKindTyConName )
 import GHC.Stg.InferTags.TagSig
+
+import Language.Haskell.Syntax.Extension ( dataConCantHappen )
 
 import GHC.Utils.Lexeme (isLexSym)
 import GHC.Utils.Fingerprint
@@ -1647,7 +1650,7 @@ freeNamesIfAppArgs (IA_Arg t _ ts) = freeNamesIfType t &&& freeNamesIfAppArgs ts
 freeNamesIfAppArgs IA_Nil          = emptyNameSet
 
 freeNamesIfType :: IfaceType -> NameSet
-freeNamesIfType (IfaceFreeTyVar _)    = emptyNameSet
+freeNamesIfType (XIfaceType x)        = dataConCantHappen x
 freeNamesIfType (IfaceTyVar _)        = emptyNameSet
 freeNamesIfType (IfaceAppTy s t)      = freeNamesIfType s &&& freeNamesIfAppArgs t
 freeNamesIfType (IfaceTyConApp tc ts) = freeNamesIfTc tc &&& freeNamesIfAppArgs ts
@@ -1674,9 +1677,8 @@ freeNamesIfCoercion (IfaceAppCo c1 c2)
   = freeNamesIfCoercion c1 &&& freeNamesIfCoercion c2
 freeNamesIfCoercion (IfaceForAllCo _ kind_co co)
   = freeNamesIfCoercion kind_co &&& freeNamesIfCoercion co
-freeNamesIfCoercion (IfaceFreeCoVar _) = emptyNameSet
+freeNamesIfCoercion (XIfaceCoercion x) = dataConCantHappen x
 freeNamesIfCoercion (IfaceCoVarCo _)   = emptyNameSet
-freeNamesIfCoercion (IfaceHoleCo _)    = emptyNameSet
 freeNamesIfCoercion (IfaceAxiomInstCo ax _ cos)
   = unitNameSet ax &&& fnList freeNamesIfCoercion cos
 freeNamesIfCoercion (IfaceUnivCo p _ t1 t2)

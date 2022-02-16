@@ -28,6 +28,8 @@ import Data.Data hiding ( Fixity )
 import Data.Kind (Type)
 import GHC.Utils.Outputable
 
+import Control.DeepSeq
+
 {-
 Note [Trees That Grow]
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -113,6 +115,9 @@ data DataConCantHappen
 
 instance Outputable DataConCantHappen where
   ppr = dataConCantHappen
+
+instance NFData DataConCantHappen where
+  rnf = dataConCantHappen
 
 -- | Eliminate a 'DataConCantHappen'. See Note [Constructor cannot occur].
 dataConCantHappen :: DataConCantHappen -> a
