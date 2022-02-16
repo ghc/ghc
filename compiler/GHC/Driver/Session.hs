@@ -488,9 +488,10 @@ data DynFlags = DynFlags {
   specConstrCount       :: Maybe Int,   -- ^ Max number of specialisations for any one function
   specConstrRecursive   :: Int,         -- ^ Max number of specialisations for recursive types
                                         --   Not optional; otherwise ForceSpecConstr can diverge.
-  binBlobThreshold      :: Word,        -- ^ Binary literals (e.g. strings) whose size is above
+  binBlobThreshold      :: Maybe Word,  -- ^ Binary literals (e.g. strings) whose size is above
                                         --   this threshold will be dumped in a binary file
-                                        --   by the assembler code generator (0 to disable)
+                                        --   by the assembler code generator. 0 and Nothing disables
+                                        --   this feature. See 'GHC.StgToCmm.Config'.
   liberateCaseThreshold :: Maybe Int,   -- ^ Threshold for LiberateCase
   floatLamArgs          :: Maybe Int,   -- ^ Arg count for lambda floating
                                         --   See 'GHC.Core.Opt.Monad.FloatOutSwitches'
@@ -1122,7 +1123,7 @@ defaultDynFlags mySettings llvmConfig =
         simplPhases             = 2,
         maxSimplIterations      = 4,
         ruleCheck               = Nothing,
-        binBlobThreshold        = 500000, -- 500K is a good default (see #16190)
+        binBlobThreshold        = Just 500000, -- 500K is a good default (see #16190)
         maxRelevantBinds        = Just 6,
         maxValidHoleFits   = Just 6,
         maxRefHoleFits     = Just 6,
@@ -2699,8 +2700,9 @@ dynamic_flags_deps = [
                 -- If the number is missing, use 1
 
   , make_ord_flag defFlag "fbinary-blob-threshold"
-      (intSuffix (\n d -> d { binBlobThreshold = fromIntegral n }))
-
+      (intSuffix (\n d -> d { binBlobThreshold = case fromIntegral n of
+                                                    0 -> Nothing
+                                                    x -> Just x}))
   , make_ord_flag defFlag "fmax-relevant-binds"
       (intSuffix (\n d -> d { maxRelevantBinds = Just n }))
   , make_ord_flag defFlag "fno-max-relevant-binds"

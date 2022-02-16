@@ -23,9 +23,15 @@ data StgToCmmConfig = StgToCmmConfig
   , stgToCmmTmpDir        :: !TempDir            -- ^ Temp Dir for files used in compilation
   , stgToCmmContext       :: !SDocContext        -- ^ Context for StgToCmm phase
   , stgToCmmDebugLevel    :: !Int                -- ^ The verbosity of debug messages
-  , stgToCmmBinBlobThresh :: !Word               -- ^ Binary literals (e.g. strings) whose size is above this
-                                                 -- threshold will be dumped in a binary file by the assembler
-                                                 -- code generator (0 to disable)
+  , stgToCmmBinBlobThresh :: !(Maybe Word)        -- ^ Threshold at which Binary literals (e.g. strings)
+                                                 -- are either dumped to a file and a CmmFileEmbed literal
+                                                 -- is emitted (over threshold), or become a CmmString
+                                                 -- Literal (under or at threshold). CmmFileEmbed is only supported
+                                                 -- with the NCG, thus a Just means two things: We have a threshold,
+                                                 -- and will be using the NCG. Conversely, a Nothing implies we are not
+                                                 -- using NCG and disables CmmFileEmbed. See Note
+                                                 -- [Embedding large binary blobs] in GHC.CmmToAsm.Ppr, and
+                                                 -- @cgTopBinding@ in GHC.StgToCmm.
   , stgToCmmMaxInlAllocSize :: !Int              -- ^ Max size, in bytes, of inline array allocations.
   ------------------------------ Ticky Options ----------------------------------
   , stgToCmmDoTicky        :: !Bool              -- ^ Ticky profiling enabled (cf @-ticky@)

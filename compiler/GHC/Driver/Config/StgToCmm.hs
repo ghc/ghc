@@ -22,7 +22,7 @@ initStgToCmmConfig dflags mod = StgToCmmConfig
   , stgToCmmTmpDir        = tmpDir          dflags
   , stgToCmmContext       = initSDocContext dflags defaultDumpStyle
   , stgToCmmDebugLevel    = debugLevel      dflags
-  , stgToCmmBinBlobThresh = binBlobThreshold               dflags
+  , stgToCmmBinBlobThresh = b_blob
   , stgToCmmMaxInlAllocSize = maxInlineAllocSize           dflags
   -- ticky options
   , stgToCmmDoTicky       = gopt Opt_Ticky                 dflags
@@ -63,6 +63,7 @@ initStgToCmmConfig dflags mod = StgToCmmConfig
           bk_end  = backend dflags
           ncg     = bk_end == NCG
           llvm    = bk_end == LLVM
+          b_blob  = if not ncg then Nothing else binBlobThreshold dflags
           x86ish  = case platformArch platform of
                       ArchX86    -> True
                       ArchX86_64 -> True
