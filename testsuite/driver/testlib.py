@@ -2770,14 +2770,6 @@ def summary(t: TestRun, file: TextIO, short=False, color=False) -> None:
         file.write('Framework warnings:\n')
         printTestInfosSummary(file, t.framework_warnings)
 
-    if t.fragile_passes:
-        file.write('Fragile test passes:\n')
-        printTestInfosSummary(file, t.fragile_passes)
-
-    if t.fragile_failures:
-        file.write('Fragile test failures:\n')
-        printTestInfosSummary(file, t.fragile_failures)
-
     if stopping():
         file.write('WARNING: Testsuite run was terminated early\n')
 
