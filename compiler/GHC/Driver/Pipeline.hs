@@ -919,14 +919,4 @@ hscPostBackendPipeline :: TPipelineClass TPhase m => PipeEnv -> HscEnv -> HscSou
 hscPostBackendPipeline _ _ HsBootFile _ _ _   = return Nothing
 hscPostBackendPipeline _ _ HsigFile _ _ _     = return Nothing
 hscPostBackendPipeline pipe_env hsc_env _ bcknd ml input_fn =
-  applyPostHscPipeline (backendPostHscPipeline bcknd) pipe_env hsc_env ml input_fn
-
-
-applyPostHscPipeline
-    :: TPipelineClass TPhase m
-    => DefunctionalizedPostHscPipeline
-    -> PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> m (Maybe FilePath)
-applyPostHscPipeline NcgPostHscPipeline = asPipeline False
-applyPostHscPipeline ViaCPostHscPipeline = viaCPipeline HCc
-applyPostHscPipeline LlvmPostHscPipeline = llvmPipeline
-applyPostHscPipeline NoPostHscPipeline = \_ _ _ _ -> return Nothing
+   (backendPostHscPipeline bcknd) pipe_env hsc_env ml input_fn

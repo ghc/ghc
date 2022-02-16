@@ -27,7 +27,7 @@ module GHC.Tc.Gen.Sig(
 import GHC.Prelude
 
 import GHC.Driver.Session
-import GHC.Driver.Backend
+import GHC.Driver.Backend.Types
 
 import GHC.Hs
 

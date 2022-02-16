@@ -99,7 +99,7 @@ import GHC.Prelude
 
 import GHC.Driver.Plugins
 import GHC.Driver.Session
-import GHC.Driver.Backend
+import GHC.Driver.Backend.Types
 import GHC.Driver.Env
 import GHC.Driver.Errors
 import GHC.Driver.Errors.Types

@@ -48,7 +48,7 @@ module GHC.Runtime.Heap.Layout (
 import GHC.Prelude
 
 import GHC.Types.Basic( ConTagZ )
-import GHC.Driver.Session
+--import GHC.Driver.Session
 import GHC.Platform
 import GHC.Platform.Profile
 import GHC.StgToCmm.Types

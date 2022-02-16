@@ -1,10 +1,11 @@
 module GHC.Driver.Config.StgToCmm
   ( initStgToCmmConfig
+  , PrimitiveImplementation(..)
   ) where
 
 import GHC.StgToCmm.Config
 
-import GHC.Driver.Backend
+import GHC.Driver.Backend.Types
 import GHC.Driver.Session
 import GHC.Platform
 import GHC.Platform.Profile
@@ -80,3 +81,24 @@ initStgToCmmConfig dflags mod = StgToCmmConfig
                                 binBlobThreshold dflags
                             else
                                 0 -- suppress them entirely
+
+
+
+-- | This enumeration type specifies how the back end wishes GHC's
+-- primitives to be implemented.  (Module "GHC.StgToCmm.Prim" provides
+-- a generic implementation of every primitive, but some primitives,
+-- like `IntQuotRemOp`, can be implemented more efficiently by
+-- certain back ends on certain platforms.  For example, by using a
+-- machine instruction that simultaneously computes quotient and remainder.)
+--
+-- For the meaning of each alternative, consult
+-- "GHC.Driver.Config.StgToCmm".  (In a perfect world, type
+-- `PrimitiveImplementation` would be defined there, in the module
+-- that determines its meaning.  But I could not figure out how to do
+-- it without mutual recursion across module boundaries.)
+
+data PrimitiveImplementation
+    = LlvmPrimitives
+    | NcgPrimitives
+    | GenericPrimitives
+  deriving Show

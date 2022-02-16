@@ -28,8 +28,7 @@ import GHC.Types.SourceFile
 import GHC.Unit.Module.Status
 import GHC.Unit.Module.ModIface
 import GHC.Linker.Types
-import GHC.Driver.Backend
-import GHC.Driver.Backend.Refunctionalize
+import GHC.Driver.Backend.Types
 import GHC.Driver.Session
 import GHC.Driver.CmdLine
 import GHC.Unit.Module.ModSummary
@@ -285,8 +284,8 @@ runAsPhase with_cpp pipe_env hsc_env location input_fn = do
         -- LLVM from version 3.0 onwards doesn't support the OS X system
         -- assembler, so we use clang as the assembler instead. (#5636)
         let (as_prog, get_asm_info) =
-                ( applyAssemblerProg $ backendAssemblerProg (backend dflags)
-                , applyAssemblerInfoGetter $ backendAssemblerInfoGetter (backend dflags)
+                ( backendAssemblerProg (backend dflags)
+                , backendAssemblerInfoGetter (backend dflags)
                 )
         asmInfo <- get_asm_info logger dflags platform
 
@@ -989,7 +988,7 @@ doCpp logger tmpfs dflags unit_env raw input_fn output_fn = do
           [ "-D__AVX512F__"  | isAvx512fEnabled  dflags ] ++
           [ "-D__AVX512PF__" | isAvx512pfEnabled dflags ]
 
-    backend_defs <- applyCDefs (backendCDefs $ backend dflags) logger dflags
+    backend_defs <- (backendCDefs $ backend dflags) logger dflags
 
     let th_defs = [ "-D__GLASGOW_HASKELL_TH__" ]
     -- Default CPP defines in Haskell source

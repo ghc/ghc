@@ -62,7 +62,7 @@ import GHC.Core.TyCon.RecWalk
 import GHC.Tc.Utils.TcType
 import GHC.Builtin.Names
 import GHC.Driver.Session
-import GHC.Driver.Backend
+import GHC.Driver.Backend.Types
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import GHC.Platform

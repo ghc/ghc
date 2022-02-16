@@ -20,7 +20,7 @@ module GHC.Driver.Backpack (doBackpack) where
 
 import GHC.Prelude
 
-import GHC.Driver.Backend
+import GHC.Driver.Backend.Types
 -- In a separate module because it hooks into the parser.
 import GHC.Driver.Backpack.Syntax
 import GHC.Driver.Config.Finder (initFinderOpts)

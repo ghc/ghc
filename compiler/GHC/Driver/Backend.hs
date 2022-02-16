@@ -21,16 +21,38 @@ where
 
 import GHC.Prelude
 
+import Data.Set (Set)
+import qualified Data.Set as Set
+import System.IO
+
+import GHC.Cmm
+import {-# SOURCE #-} GHC.CmmToAsm     ( nativeCodeGen )
+import {-# SOURCE #-} GHC.CmmToLlvm ( llvmCodeGen )
+import GHC.CmmToC ( cmmToC )
+import GHC.CmmToLlvm.LlvmVersion
+import GHC.Data.Stream           ( Stream, consume )
 import GHC.Driver.Backend.Types
+import {-# SOURCE #-} GHC.Driver.Config.CmmToAsm  (initNCGConfig)
+import {-# SOURCE #-} GHC.Driver.Config.CmmToLlvm  (initLlvmCgConfig)
+import {-# SOURCE #-} GHC.Driver.Config.StgToCmm
+import GHC.Driver.Flags
 import GHC.Driver.Phases
-
-
-import GHC.Utils.Error
-import GHC.Utils.Outputable
-import GHC.Utils.Panic
-
+import {-# SOURCE #-} GHC.Driver.Pipeline
+import {-# SOURCE #-} GHC.Driver.Session
 import GHC.Driver.Pipeline.Monad
 import GHC.Platform
+import {-# SOURCE #-} GHC.SysTools.Tasks
+import {-# SOURCE #-} GHC.SysTools.Info
+import GHC.Types.Unique.Supply ( mkSplitUniqSupply )
+import GHC.Unit.Module.Location
+import GHC.Unit.Types
+import GHC.Utils.Error
+import GHC.Utils.Exception (bracket)
+import GHC.Utils.Logger
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
+import GHC.Utils.Ppr ( Mode(..) )
+
 
 
 platformDefaultBackend :: Platform -> Backend
@@ -53,8 +75,6 @@ platformNcgSupported platform = if
          ArchPPC_64 {} -> True
          ArchAArch64   -> True
          _             -> False
-
-
 
 
 prototypeBackend, ncgBackend, llvmBackend, viaCBackend, interpreterBackend, noBackend
@@ -106,18 +126,17 @@ prototypeBackend =
             -- | The assembler used on the code that is written by this back end.
             -- A program determined by a combination of back end,
             -- DynFlags, and Platform is run with the given `Option`s.
-            , backendAssemblerProg = StandardAssemblerProg -- \logger dflags _platform -> runAs logger dflags
-            , backendAssemblerInfoGetter = StandardAssemblerInfoGetter
-                -- \logger dflags _platform -> getAssemblerInfo logger dflags
+            , backendAssemblerProg = \logger dflags _platform -> runAs logger dflags
+            , backendAssemblerInfoGetter =
+                \logger dflags _platform -> getAssemblerInfo logger dflags
 
-            , backendCDefs = NoCDefs -- \_ _ -> return []
+            , backendCDefs = \_ _ -> return []
 
 
             ----------------- code generation and compiler driver
 
-            , backendCodeOutput = missing "CodeOutput"
-            , backendPostHscPipeline = NoPostHscPipeline
-                 -- \ _ _ _ _ -> return Nothing
+            , backendCodeOutput = missing "CodeOutput'"
+            , backendPostHscPipeline = \ _ _ _ _ -> return Nothing
 
             , backendNormalSuccessorPhase = missing "NormalSuccessorPhase"
             }
@@ -146,11 +165,29 @@ ncgBackend =
                      , backendSupportsUnsplitProcPoints = True
                      , backendSwappableWithViaC = True
 
-                     , backendCodeOutput = NcgCodeOutput -- outputAsm
-                     , backendPostHscPipeline = NcgPostHscPipeline -- asPipeline False
+                     , backendCodeOutput = outputAsm
+                     , backendPostHscPipeline = asPipeline False
                      , backendNormalSuccessorPhase = As False
                      }
 
+
+outputAsm, outputLlvm, outputC
+          :: Logger
+          -> DynFlags
+          -> Module
+          -> ModLocation
+          -> FilePath
+          -> Set UnitId
+          -> Stream IO RawCmmGroup a
+          -> IO a
+
+outputAsm logger dflags this_mod location filenm _deps cmm_stream = do
+  ncg_uniqs <- mkSplitUniqSupply 'n'
+  debugTraceMsg logger 4 (text "Outputing asm to" <+> text filenm)
+  let ncg_config = initNCGConfig dflags this_mod
+  {-# SCC "OutputAsm" #-} doOutput filenm $
+    \h -> {-# SCC "NativeCodeGen" #-}
+      nativeCodeGen logger ncg_config location h ncg_uniqs cmm_stream
 
 
 -- | LLVM backend.
@@ -177,30 +214,44 @@ llvmBackend =
         -- LLVM from version 3.0 onwards doesn't support the OS X system
         -- assembler, so we use clang as the assembler instead. (#5636)
 
-                     , backendAssemblerProg = DarwinClangAssemblerProg
-                          {-
+                     , backendAssemblerProg =
                          \logger dflags platform ->
                              if platformOS platform == OSDarwin then
                                runClang logger dflags
                              else
                                runAs logger dflags
-                          -}
-                     , backendAssemblerInfoGetter = DarwinClangAssemblerInfoGetter
-{-
+                     , backendAssemblerInfoGetter =
                          \logger dflags platform ->
                              if platformOS platform == OSDarwin then
-                               pure Clang
+                               pure clang
                              else
                                getAssemblerInfo logger dflags
--}
-                     , backendCDefs = LlvmCDefs -- llvmCDefs
-                     , backendCodeOutput = LlvmCodeOutput -- outputLlvm
-                     , backendPostHscPipeline = LlvmPostHscPipeline -- llvmPipeline
-
+                     , backendCDefs = llvmCDefs
+                     , backendCodeOutput = outputLlvm
+                     , backendPostHscPipeline = llvmPipeline
 
                      , backendNormalSuccessorPhase = LlvmOpt
-
                      }
+
+outputLlvm logger dflags _this_mod _location filenm _deps cmm_stream = do
+  lcg_config <- initLlvmCgConfig logger dflags
+  {-# SCC "llvm_output" #-} doOutput filenm $
+    \f -> {-# SCC "llvm_CodeGen" #-}
+      llvmCodeGen logger lcg_config f cmm_stream
+
+llvmCDefs :: Logger -> DynFlags -> IO [String]
+llvmCDefs logger dflags = do
+    llvmVer <- figureLlvmVersion logger dflags
+    return $ case fmap llvmVersionList llvmVer of
+               Just [m] -> [ "-D__GLASGOW_HASKELL_LLVM__=" ++ format (m,0) ]
+               Just (m:n:_) -> [ "-D__GLASGOW_HASKELL_LLVM__=" ++ format (m,n) ]
+               _ -> []
+  where
+    format (major, minor)
+      | minor >= 100 = error "backendCDefs: Unsupported minor version"
+      | otherwise = show (100 * major + minor :: Int) -- Contract is Int
+
+
 
 -- | Via-C backend.
 --
@@ -225,10 +276,28 @@ viaCBackend =
                      , backendGeneratesHc = True
                      , backendHasNativeSwitch = True
 
-                     , backendCodeOutput = ViaCCodeOutput -- outputC
-                     , backendPostHscPipeline = ViaCPostHscPipeline -- viaCPipeline HCc
+                     , backendCodeOutput = outputC
+                     , backendPostHscPipeline = viaCPipeline HCc
                      , backendNormalSuccessorPhase = HCc
                      }
+
+
+outputC logger dflags _module _location filenm unit_deps cmm_stream =
+  withTiming logger (text "C codegen") (\a -> seq a () {- FIXME -}) $ do
+    let pkg_names = map unitIdString (Set.toAscList unit_deps)
+    doOutput filenm $ \ h -> do
+      hPutStr h ("/* GHC_PACKAGES " ++ unwords pkg_names ++ "\n*/\n")
+      hPutStr h "#include \"Stg.h\"\n"
+      let platform = targetPlatform dflags
+          writeC cmm = do
+            let doc = cmmToC platform cmm
+            putDumpFileMaybe logger Opt_D_dump_c_backend
+                          "C backend output"
+                          FormatC
+                          doc
+            let ctx = initSDocContext dflags (PprCode CStyle)
+            printSDocLn ctx LeftMode h doc
+      consume cmm_stream id writeC
 
 
 -- | No code generated (implements -fno-code).
@@ -284,3 +353,6 @@ interpreterBackend = -- implements -fno-code
                      , backendNormalSuccessorPhase = StopLn
                      }
 
+
+doOutput :: String -> (Handle -> IO a) -> IO a
+doOutput filenm = bracket (openFile filenm WriteMode) hClose

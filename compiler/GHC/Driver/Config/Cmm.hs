@@ -5,7 +5,7 @@ module GHC.Driver.Config.Cmm
 import GHC.Cmm.Config
 
 import GHC.Driver.Session
-import GHC.Driver.Backend
+import GHC.Driver.Backend.Types
 
 import GHC.Platform
 

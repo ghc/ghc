@@ -18,7 +18,9 @@ module GHC.HsToCore.Coverage
 import GHC.Prelude as Prelude
 
 import GHC.Driver.Session
-import GHC.Driver.Backend
+import GHC.Driver.Backend.Types
+import GHC.Driver.Ppr
+import GHC.Driver.Env
 
 import qualified GHC.Runtime.Interpreter as GHCi
 import GHCi.RemoteTypes

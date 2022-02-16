@@ -21,7 +21,7 @@ import GHC.Prelude
 import GHC.Driver.Session
 import GHC.Driver.Config
 import GHC.Driver.Env
-import GHC.Driver.Backend
+import GHC.Driver.Backend.Types
 import GHC.Driver.Plugins
 
 import GHC.Hs

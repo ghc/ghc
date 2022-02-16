@@ -25,8 +25,7 @@ import GHC.Cmm.CLabel
 import GHC.Driver.Session
 import GHC.Driver.Config.Finder    (initFinderOpts)
 import GHC.Driver.Ppr
-import GHC.Driver.Backend
-import GHC.Driver.Backend.Refunctionalize
+import GHC.Driver.Backend.Types
 
 import qualified GHC.Data.ShortText as ST
 import GHC.Data.Stream           ( Stream )
@@ -99,7 +98,7 @@ codeOutput logger tmpfs dflags unit_state this_mod filenm location genForeignStu
                 ; return cmm
                 }
 
-        ; a <- applyCodeOutput (backendCodeOutput $ backend dflags)
+        ; a <- (backendCodeOutput $ backend dflags)
                logger dflags this_mod location filenm pkg_deps linted_cmm_stream
         ; let stubs = genForeignStubs a
         ; stubs_exist <- outputForeignStubs logger tmpfs dflags unit_state this_mod location stubs
@@ -277,5 +276,3 @@ ipInitCode do_info_table platform this_mod ents
                          | ipe <- ipes
                          ] ++ [text "NULL"])
       <> semi
-
-

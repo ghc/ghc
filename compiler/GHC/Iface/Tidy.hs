@@ -17,7 +17,7 @@ module GHC.Iface.Tidy (
 import GHC.Prelude
 
 import GHC.Driver.Session
-import GHC.Driver.Backend
+import GHC.Driver.Backend.Types
 import GHC.Driver.Ppr
 import GHC.Driver.Env
 

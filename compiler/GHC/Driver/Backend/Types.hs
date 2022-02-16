@@ -51,14 +51,6 @@
 --
 -- In practice, this ideal is not necessarily achieved:
 --
---   * For reasons described in Note [Backend Defunctionalization],
---     code-generation and post-backend pipeline functions, among other
---     functions, cannot be placed in the `Backend` record itself.
---     Instead, the /names/ of those functions are placed.  Each name is
---     a value constructor in one of the algebraic data types defined in
---     this module.  The named function must then be defined in
---     "GHC.Driver.Backend.Refunctionalize" or in "GHC.Driver.Pipeline".
---
 --   * When a new back end is defined, it's quite possible that the
 --     compiler driver will have to be changed in some way.  Just because
 --     it supports five back ends doesn't mean it will support a sixth
@@ -94,141 +86,34 @@
 
 
 module GHC.Driver.Backend.Types
-   ( -- * Representation of a back end
-     Backend(..)
-     -- * Specialized types of properties
-   , PrimitiveImplementation(..)
-     -- * Functions that appear in back ends
-     -- ** Back-end function for code generation
-   , DefunctionalizedCodeOutput(..)
-     -- ** Back-end functions for assembly
-   , DefunctionalizedPostHscPipeline(..)
-   , DefunctionalizedAssemblerProg(..)
-   , DefunctionalizedAssemblerInfoGetter(..)
-     -- ** Other back-end functions
-   , DefunctionalizedCDefs(..)
+   ( Backend(..)
    )
 
 where
 
 import GHC.Prelude
 
+import Data.Set (Set)
+
+import GHC.Cmm
+import GHC.Data.Stream           ( Stream )
+import {-# SOURCE #-} GHC.Driver.Config.StgToCmm
+import {-# SOURCE #-} GHC.Driver.Env.Types -- HscEnv
 import GHC.Driver.Phases
 import GHC.Driver.Pipeline.Monad
+import {-# SOURCE #-} GHC.Driver.Pipeline.Phases
+import {-# SOURCE #-} GHC.Driver.Session
+import GHC.Platform
+import GHC.Unit.Module.Location
+import GHC.Unit.Types
+import GHC.Utils.CliOption
 import GHC.Utils.Error
+import GHC.Utils.Logger
 
 
--- | This enumeration type specifies how the back end wishes GHC's
--- primitives to be implemented.  (Module "GHC.StgToCmm.Prim" provides
--- a generic implementation of every primitive, but some primitives,
--- like `IntQuotRemOp`, can be implemented more efficiently by
--- certain back ends on certain platforms.  For example, by using a
--- machine instruction that simultaneously computes quotient and remainder.)
---
--- For the meaning of each alternative, consult
--- "GHC.StgToCmm.Config".  (In a perfect world, type
--- `PrimitiveImplementation` would be defined there, in the module
--- that determines its meaning.  But I could not figure out how to do
--- it without mutual recursion across module boundaries.)
-
-data PrimitiveImplementation
-    = LlvmPrimitives
-    | NcgPrimitives
-    | GenericPrimitives
-  deriving Show
-
-
--- | Names a function that runs the assembler, of this type:
---
--- > Logger -> DynFlags -> Platform -> [Option] -> IO ()
-
-data DefunctionalizedAssemblerProg
-  = StandardAssemblerProg
-       -- ^ Use the standard system assembler
-  | DarwinClangAssemblerProg
-       -- ^ If running on Darwin, use the assembler from the @clang@
-       -- toolchain.  Otherwise use the standard system assembler.
-
-
-
--- | Names a function that discover from what toolchain the assembler
--- is coming, of this type:
---
--- > Logger -> DynFlags -> Platform -> IO CompilerInfo
-
-data DefunctionalizedAssemblerInfoGetter
-  = StandardAssemblerInfoGetter
-       -- ^ Interrogate the standard system assembler
-  | DarwinClangAssemblerInfoGetter
-       -- ^ If running on Darwin, return `Clang`; otherwise
-       -- interrogate the standard system assembler.
-
-
--- | Names a function that generates code and writes the results to a
---  file, of this type:
---
---  >    Logger
---  > -> DynFlags
---  > -> Module -- ^ module being compiled
---  > -> ModLocation
---  > -> FilePath -- ^ Where to write output
---  > -> Set UnitId -- ^ dependencies
---  > -> Stream IO RawCmmGroup a -- results from `StgToCmm`
---  > -> IO a
---
--- There will be one function per back end---or more precisely, one
--- function for each back end that writes code to a file.  (The
--- interpreter does not; its output lives only in memory.)
-
-data DefunctionalizedCodeOutput
-  = NcgCodeOutput
-  | ViaCCodeOutput
-  | LlvmCodeOutput
-
-
--- | Names a function that tells the driver what should happen after
--- assembly code is written.  This might include running a C compiler,
--- running LLVM, running an assembler, or various similar activities.
--- The function named has this type:
---
--- >    TPipelineClass TPhase m
--- > => PipeEnv
--- > -> HscEnv
--- > -> Maybe ModLocation
--- > -> FilePath
--- > -> m (Maybe FilePath)
---
--- Unlike the other named functions, which are defined in
--- "GHC.Driver.Backend.Refunctionalize", these functions have to be
--- defined in "GHC.Driver.Pipeline", because they depend on functions
--- defined there and are depended upon by functions defined there.
---
--- There is one function per back end.
-
-data DefunctionalizedPostHscPipeline
-  = NcgPostHscPipeline
-  | ViaCPostHscPipeline
-  | LlvmPostHscPipeline
-  | NoPostHscPipeline -- ^ After code generation, nothing else need happen.
-
--- | Names a function that tells the driver what command-line options
--- to include when invoking a C compiler.  It's meant for @-D@ options that
--- define symbols for the C preprocessor.  Because the exact symbols
--- defined might depend on versions of tools located in the file
--- system (/cough/ LLVM /cough/), the function requires an `IO` action.
--- The function named has this type:
---
--- > Logger -> DynFlags -> IO [String]
-
-data DefunctionalizedCDefs
-  = NoCDefs   -- ^ No additional command-line options are needed
-
-  | LlvmCDefs -- ^ Return command-line options that tell GHC about the
-              -- LLVM version.
 
 
 -- | The properties of and functions performed by a back end.
-
 
 data Backend =
     Backend {
@@ -412,66 +297,69 @@ data Backend =
 
             ----------------- supporting tooling
 
-            -- | This (defunctionalized) function runs the assembler
+            -- | This function runs the assembler
             -- used on the code that is written by this back end.  A
             -- program determined by a combination of back end,
             -- `DynFlags`, and `Platform` is run with the given
             -- `Option`s.
             --
             -- This field is usually defaulted.
-            , backendAssemblerProg :: DefunctionalizedAssemblerProg
-              -- ^ Logger -> DynFlags -> Platform -> [Option] -> IO ()
+            , backendAssemblerProg
+                :: Logger -> DynFlags -> Platform -> [Option] -> IO ()
 
-            -- | This (defunctionalized) function is used to retrieve
+            -- | This function is used to retrieve
             -- an enumeration value that characterizes the C/assembler
             -- part of a toolchain.  The function caches the info in a
             -- mutable variable that is part of the `DynFlags`.
             --
             -- This field is usually defaulted.
-            , backendAssemblerInfoGetter :: DefunctionalizedAssemblerInfoGetter
-                 -- ^ Logger -> DynFlags -> Platform -> IO CompilerInfo
+            , backendAssemblerInfoGetter ::
+                Logger -> DynFlags -> Platform -> IO CompilerInfo
 
 
             -- | When using this back end, it may be necessary or
             -- advisable to pass some `-D` options to a C compiler.
-            -- This (defunctionalized) function produces those
-            -- options, if any.  An IO action may be necessary in
-            -- order to interrogate external tools about what version
-            -- they are, for example.
+            -- This function produces those options, if any.  An IO
+            -- action may be necessary in order to interrogate
+            -- external tools---for example to find out what version
+            -- of LLVM is isntalled.
+            --
             --
             -- This field is usually defaulted.
-            , backendCDefs :: DefunctionalizedCDefs
-               -- ^ Logger -> DynFlags -> IO [String]
+
+            , backendCDefs :: Logger -> DynFlags -> IO [String]
 
 
             ----------------- code generation and compiler driver
 
-            -- | This (defunctionalized) function generates code and
-            -- writes it to a file.  The type of the function is
-            --
-            -- >    Logger
-            -- > -> DynFlags
-            -- > -> Module -- ^ module being compiled
-            -- > -> ModLocation
-            -- > -> FilePath -- ^ Where to write output
-            -- > -> Set UnitId -- ^ dependencies
-            -- > -> Stream IO RawCmmGroup a -- results from `StgToCmm`
-            -- > -> IO a
-            , backendCodeOutput :: DefunctionalizedCodeOutput
+            -- | This function generates code and writes it to a file.
+            -- Not every back end will have one; the function is clled
+            -- only if the back end claims to write code to a file.
 
+            , backendCodeOutput
+                   :: forall a .
+                      Logger
+                   -> DynFlags
+                   -> Module
+                   -> ModLocation
+                   -> FilePath -- ^ Where to write output
+                   -> Set UnitId -- ^ dependencies
+                   -> Stream IO RawCmmGroup a -- results from `StgToCmm`
+                   -> IO a
 
-            -- | This (defunctionalized) function tells the compiler
-            -- driver what else has to be run after code output.
-            -- The type of the function is
-            --
-            -- >
-            -- >    TPipelineClass TPhase m
-            -- > => PipeEnv
-            -- > -> HscEnv
-            -- > -> Maybe ModLocation
-            -- > -> FilePath
-            -- > -> m (Maybe FilePath)
-            , backendPostHscPipeline :: DefunctionalizedPostHscPipeline
+            -- | This function tells the compiler driver what else has
+            -- to be run after code output. This might include running
+            -- a C compiler, running LLVM, running an assembler, or
+            -- various similar activities.
+
+            , backendPostHscPipeline
+                    :: forall m .
+                       TPipelineClass TPhase m
+                    => PipeEnv
+                    -> HscEnv
+                    -> Maybe ModLocation
+                    -> FilePath
+                    -> m (Maybe FilePath)
 
             -- | Somewhere in the compiler driver, when compiling
             -- Haskell source (as opposed to a boot file or a sig
@@ -483,66 +371,8 @@ data Backend =
 
             }
 
-
 -- | The Show instance is for messages *only*.  If code depends on
 -- what's in the string, you deserve what happens to you.
 
 instance Show Backend where
   show = backendDescription
-
-
-----------------------------------------------------------------
---
--- Note [Backend Defunctionalization]
---
--- I had hoped to include code-output and post-hsc-pipeline functions
--- directly in the `Backend` record itself.  But this agenda was derailed
--- by mutual recursion in the types:
---
---   - A `DynFlags` record contains a back end of type `Backend`.
---   - A `Backend` contains a code-output function.
---   - A code-output function takes Cmm as input.
---   - Cmm can include a `CLabel`.
---   - A `CLabel` can have elements that are defined in
---     `GHC.Driver.Session`, where `DynFlags` is defined.
---
--- There is also a nasty issue in the values: a typical post-backend
--- pipeline function both depends on and is depended upon by functions in
--- "GHC.Driver.Pipeline".
---
--- I'm cut the Gordian not by removing the function types from the
--- `Backend` record.  Instead, a function is represented by its /name/.
--- This representation is an example of an old trick called
--- /defunctionalization/, which has been used in both compilers and
--- interpreters for languages with first-class, nested functions.  Here,
--- a function's name is a value of an algebraic data type.  For example,
--- a code-output function is represented by a value of this type:
---
---     data DefunctionalizedCodeOutput
---       = NcgCodeOutput
---       | ViaCCodeOutput
---       | LlvmCodeOutput
---
--- To apply the named function, one uses module
--- "Driver.Backend.Refunctionalize", which exports this function:
---
---     applyCodeOutput
---         :: DefunctionalizedCodeOutput
---         -> Logger
---         -> DynFlags
---         -> Module
---         -> ModLocation
---         -> FilePath
---         -> Set UnitId
---         -> Stream IO RawCmmGroup a
---         -> IO a
---
--- I don't love this solution, but defunctionalization is a standard
--- thing, and it makes the meanings of the enumeration values clear.
---
--- Anyone defining a new back end will need to extend both the
--- `DefunctionalizedCodeOutput` type and the corresponding apply
--- function.
---
-----------------------------------------------------------------
-

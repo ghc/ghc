@@ -49,7 +49,7 @@ import qualified GHC.LanguageExtensions as LangExt
 import GHC.Data.Maybe
 import GHC.Data.Graph.Directed
 
-import GHC.Driver.Backend
+import GHC.Driver.Backend.Types
 import GHC.Driver.Ppr
 import GHC.Driver.Session
 
@@ -365,4 +365,3 @@ msKey :: ModSummary -> ModNodeKeyWithUid
 msKey ms = ModNodeKeyWithUid (ms_mnwib ms) (ms_unitid ms)
 
 type ModNodeKey = ModuleNameWithIsBoot
-
