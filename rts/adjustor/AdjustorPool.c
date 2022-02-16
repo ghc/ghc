@@ -187,7 +187,8 @@ bitmap_set(uint8_t *bitmap, size_t idx, bool value)
     }
 }
 
-static bool
+// N.B. this is unused in non-DEBUG compilers
+static bool STG_UNUSED
 bitmap_get(uint8_t *bitmap, size_t idx)
 {
     size_t word_n = idx / 8;
