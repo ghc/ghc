@@ -77,6 +77,10 @@ AC_DEFUN([FP_SETUP_PROJECT_VERSION],
     ProjectPatchLevel1=`echo $ProjectPatchLevel | sed 's/^\(@<:@^.@:>@*\)\(\.\{0,1\}\(.*\)\)$/\1/'`
     ProjectPatchLevel2=`echo $ProjectPatchLevel | sed 's/^\(@<:@^.@:>@*\)\(\.\{0,1\}\(.*\)\)$/\3/'`
 
+    # The project patchlevel1/2 is zero unless stated otherwise
+    test -z "$ProjectPatchLevel1" && ProjectPatchLevel1=0
+    test -z "$ProjectPatchLevel2" && ProjectPatchLevel2=0
+
     AC_SUBST([ProjectPatchLevel1])
     AC_SUBST([ProjectPatchLevel2])
 
