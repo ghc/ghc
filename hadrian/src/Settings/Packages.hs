@@ -183,10 +183,6 @@ packageArgs = do
         ---------------------------------- rts ---------------------------------
         , package rts ? rtsPackageArgs -- RTS deserves a separate function
 
-        -------------------------------- runGhc --------------------------------
-        , package runGhc ?
-          builder Ghc ? input "**/Main.hs" ?
-          (\version -> ["-cpp", "-DVERSION=" ++ show version]) <$> getSetting ProjectVersion
         ]
 
 ghcBignumArgs :: Args

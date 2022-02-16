@@ -178,10 +178,8 @@ configureArgs cFlags' ldFlags' = do
             not (null values) ?
                 arg ("--configure-option=" ++ key ++ "=" ++ values)
         cFlags   = mconcat [ remove ["-Werror"] cArgs
-                           , getStagedSettingList ConfCcArgs
                            -- See https://github.com/snowleopard/hadrian/issues/523
                            , arg $ "-iquote"
-
                            , arg $ top -/- pkgPath pkg
                            , cFlags'
                            ]
@@ -198,7 +196,6 @@ configureArgs cFlags' ldFlags' = do
         , conf "--with-curses-libraries"  $ arg =<< getSetting CursesLibDir
         , conf "--host"                   $ arg =<< getSetting TargetPlatformFull
         , conf "--with-cc" $ arg =<< getBuilderPath . (Cc CompileC) =<< getStage
-        , notStage0 ? arg "--ghc-option=-ghcversion-file=rts/include/ghcversion.h"
         ]
 
 bootPackageConstraints :: Args

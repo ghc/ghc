@@ -17,6 +17,7 @@ import Settings.Program (programContext)
 import Target
 import Utilities
 import Context.Type
+import Rules.CabalReinstall (findCabalPackageDb)
 import qualified System.Directory as IO
 
 ghcConfigHsPath :: FilePath
@@ -194,6 +195,7 @@ testRules = do
         ccFlags         <- settingsFileSetting SettingsFileSetting_CCompilerFlags
 
         pythonPath      <- builderPath Python
+
 
         -- Set environment variables for test's Makefile.
         -- TODO: Ideally we would define all those env vars in 'env', so that
