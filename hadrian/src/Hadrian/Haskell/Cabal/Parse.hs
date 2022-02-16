@@ -39,6 +39,9 @@ import qualified Distribution.Simple.PackageIndex              as C
 import qualified Distribution.Text                             as C
 import qualified Distribution.Types.LocalBuildInfo             as C
 import qualified Distribution.Types.MungedPackageId            as C
+#if MIN_VERSION_Cabal(3,7,0)
+import qualified Distribution.Simple.PackageDescription                   as C
+#endif
 #if MIN_VERSION_Cabal(3,5,0)
 import qualified Distribution.Utils.Path                       as C
 #endif

@@ -170,6 +170,8 @@ def resolve_dep(dep : BootstrapDep) -> Path:
     elif dep.source == PackageSource.LOCAL:
         if dep.package == 'hadrian':
             sdist_dir = Path(sys.path[0]).parent.resolve()
+        elif dep.package == 'Cabal':
+            sdist_dir = Path(sys.path[0]).parent.parent.resolve() / "libraries" / "Cabal" / "Cabal"
         else:
             raise ValueError(f'Unknown local package {dep.package}')
     return sdist_dir
@@ -335,7 +337,7 @@ def fetch_from_plan(plan : FetchPlan, output_dir : Path):
 def gen_fetch_plan(info : BootstrapInfo) -> FetchPlan :
     sources_dict = {}
     for dep in info.dependencies:
-      if dep.package != 'hadrian':
+      if dep.source == PackageSource.HACKAGE:
         sources_dict[f"{dep.package}-{dep.version}.tar.gz"] = FetchInfo(package_url(dep.package, dep.version), dep.src_sha256)
         if dep.revision is not None:
           sources_dict[f"{dep.package}.cabal"] = FetchInfo(package_cabal_url(dep.package, dep.version, dep.revision), dep.cabal_sha256)
@@ -384,7 +386,7 @@ def main() -> None:
         ghc = find_ghc(args.with_compiler)
         args.deps = Path(sys.path[0]) / f"plan-bootstrap-{ghc.version.replace('.','_')}.json"
         print(f"defaulting bootstrap plan to {args.deps}")
-      # We have a tarball with all the required information, unpack it and use for further 
+      # We have a tarball with all the required information, unpack it and use for further
       elif args.bootstrap_sources is not None and args.command != 'list-sources':
         print(f'Unpacking {args.bootstrap_sources} to {TARBALLS}')
         shutil.unpack_archive(args.bootstrap_sources.resolve(), TARBALLS, 'gztar')
@@ -415,20 +417,20 @@ def main() -> None:
         # In temporary directory, create a directory which we will archive
         tmpdir = TMPDIR.resolve()
         tmpdir.mkdir(parents=True, exist_ok=True)
- 
+
         rootdir = Path(tempfile.mkdtemp(dir=tmpdir))
- 
+
         fetch_from_plan(plan, rootdir)
 
         shutil.copyfile(args.deps, rootdir / 'plan-bootstrap.json')
 
         fmt = 'gztar'
         if platform.system() == 'Windows': fmt = 'zip'
- 
+
         archivename = shutil.make_archive(args.output, fmt, root_dir=rootdir)
 
         print(f'Bootstrap sources saved to {archivename}')
-        print(f'Use `bootstrap.py -d {args.deps} -s {archivename}` to continue')
+        print(f'Use `bootstrap.py -s {archivename}` to continue')
 
     elif(args.command == 'list-sources'):
         plan = gen_fetch_plan(info)

@@ -10,9 +10,6 @@ run() {
   cabal run -v0 hadrian-bootstrap-gen -- "plan-$ver.json" | tee "plan-bootstrap-$ver.json"
 }
 
-run "8_10_1"
-# run "8_10_2" Broken
-run "8_10_3"
-run "8_10_4"
-run "8_10_5"
+run "8_10_7"
 run "9_0_1"
+run "9_2_1"

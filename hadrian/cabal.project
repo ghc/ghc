@@ -1,4 +1,6 @@
 packages: ./
+          ../libraries/Cabal/Cabal
+          ../libraries/Cabal/Cabal-syntax
 
 -- This essentially freezes the build plan for hadrian
 index-state: 2022-01-22T11:45:54Z

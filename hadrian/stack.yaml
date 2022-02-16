@@ -2,6 +2,7 @@ resolver: lts-18.18
 
 packages:
 - '.'
+- '../libraries/Cabal/Cabal'
 
 nix:
    enable: false
