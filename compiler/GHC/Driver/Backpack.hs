@@ -920,7 +920,12 @@ hsModuleToModSummary home_keys pn hsc_src modname
 
     -- Now, what are the dependencies.
     let inst_nodes = map NodeKey_Unit inst_deps
-        mod_nodes  = [k | (_, mnwib) <- msDeps ms, let k = NodeKey_Module (ModNodeKeyWithUid (fmap unLoc mnwib) (moduleUnitId this_mod)), k `elem` home_keys]
+        mod_nodes  =
+          -- hs-boot edge
+          [k | k <- [NodeKey_Module (ModNodeKeyWithUid (GWIB (ms_mod_name ms) IsBoot)  (moduleUnitId this_mod))], NotBoot == isBootSummary ms,  k `elem` home_keys ] ++
+          -- Normal edges
+          [k | (_, mnwib) <- msDeps ms, let k = NodeKey_Module (ModNodeKeyWithUid (fmap unLoc mnwib) (moduleUnitId this_mod)), k `elem` home_keys]
+
 
     return (ModuleNode (mod_nodes ++ inst_nodes) ms)
 

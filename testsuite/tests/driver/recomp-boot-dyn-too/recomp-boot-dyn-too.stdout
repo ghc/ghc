@@ -1,4 +1,4 @@
-[1 of 2] Compiling A                ( A.hs, A.o, A.dyn_o )
-[2 of 2] Compiling B                ( B.hs, B.o, B.dyn_o )
 [1 of 3] Compiling A[boot]          ( A.hs-boot, A.o-boot, A.dyn_o-boot )
-[2 of 3] Compiling B                ( B.hs, B.o, B.dyn_o ) [Source file changed]
+[2 of 3] Compiling A                ( A.hs, A.o, A.dyn_o )
+[3 of 3] Compiling B                ( B.hs, B.o, B.dyn_o )
+[3 of 3] Compiling B                ( B.hs, B.o, B.dyn_o ) [Source file changed]
