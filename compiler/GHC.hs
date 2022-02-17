@@ -1407,22 +1407,13 @@ data ModuleInfo = ModuleInfo {
         -- We don't want HomeModInfo here, because a ModuleInfo applies
         -- to package modules too.
 
+
 -- | Request information about a loaded 'Module'
 getModuleInfo :: GhcMonad m => Module -> m (Maybe ModuleInfo)  -- XXX: Maybe X
 getModuleInfo mdl = withSession $ \hsc_env -> do
-  let mg = hsc_mod_graph hsc_env
-  if mgElemModule mg mdl
+  if moduleUnitId mdl `S.member` hsc_all_home_unit_ids hsc_env
         then liftIO $ getHomeModuleInfo hsc_env mdl
-        else do
-  {- if isHomeModule (hsc_dflags hsc_env) mdl
-        then return Nothing
-        else -} liftIO $ getPackageModuleInfo hsc_env mdl
-   -- ToDo: we don't understand what the following comment means.
-   --    (SDM, 19/7/2011)
-   -- getPackageModuleInfo will attempt to find the interface, so
-   -- we don't want to call it for a home module, just in case there
-   -- was a problem loading the module and the interface doesn't
-   -- exist... hence the isHomeModule test here.  (ToDo: reinstate)
+        else liftIO $ getPackageModuleInfo hsc_env mdl
 
 getPackageModuleInfo :: HscEnv -> Module -> IO (Maybe ModuleInfo)
 getPackageModuleInfo hsc_env mdl
