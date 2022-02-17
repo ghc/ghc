@@ -3,8 +3,3 @@
 T21087b_aux.hs-boot:11:25: error:
     • Class ‘KnownNat’ does not support user-specified instances.
     • In the stand-alone deriving instance for ‘KnownNat Z’
-[3 of 3] Compiling T21087b_aux      ( T21087b_aux.hs, T21087b_aux.o )
-
-T21087b_aux.hs:11:25: error:
-    • Class ‘KnownNat’ does not support user-specified instances.
-    • In the stand-alone deriving instance for ‘KnownNat Z’

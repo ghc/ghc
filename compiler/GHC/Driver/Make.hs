@@ -680,8 +680,6 @@ load' cache how_much mHscMessage mod_graph = do
     liftIO $ debugTraceMsg logger 2 (hang (text "Ready for upsweep")
                                     2 (ppr build_plan))
 
-    let direct_deps = mkDepsMap (mgModSummaries' mod_graph)
-
     n_jobs <- case parMakeCount (hsc_dflags hsc_env) of
                     Nothing -> liftIO getNumProcessors
                     Just n  -> return n
@@ -689,7 +687,7 @@ load' cache how_much mHscMessage mod_graph = do
     setSession $ hscUpdateHUG (unitEnv_map pruneHomeUnitEnv) hsc_env
     hsc_env <- getSession
     (upsweep_ok, hsc_env1, new_cache) <- withDeferredDiagnostics $
-      liftIO $ upsweep n_jobs hsc_env mHscMessage (toCache pruned_cache) direct_deps build_plan
+      liftIO $ upsweep n_jobs hsc_env mHscMessage (toCache pruned_cache) build_plan
     setSession hsc_env1
     fmap (, new_cache) $ case upsweep_ok of
       Failed -> loadFinish upsweep_ok
@@ -994,12 +992,11 @@ type RunMakeM a = ReaderT MakeEnv (MaybeT IO) a
 -- See Note [Upsweep] for a high-level description.
 interpretBuildPlan :: HomeUnitGraph
                    -> M.Map ModNodeKeyWithUid HomeModInfo
-                   -> (NodeKey -> [NodeKey])
                    -> [BuildPlan]
                    -> IO ( Maybe [ModuleGraphNode] -- Is there an unresolved cycle
                          , [MakeAction] -- Actions we need to run in order to build everything
                          , IO [Maybe (Maybe HomeModInfo)]) -- An action to query to get all the built modules at the end.
-interpretBuildPlan hug old_hpt deps_map plan = do
+interpretBuildPlan hug old_hpt plan = do
   hug_var <- newMVar hug
   ((mcycle, plans), build_map) <- runStateT (buildLoop plan) (BuildLoopState M.empty 1 hug_var)
   return (mcycle, plans, collect_results (buildDep build_map))
@@ -1041,7 +1038,7 @@ interpretBuildPlan hug old_hpt deps_map plan = do
       home_mod_map <- getBuildMap
       hug_var <- gets hug_var
       -- 1. Get the transitive dependencies of this module, by looking up in the dependency map
-      let direct_deps = deps_map (mkNodeKey mod)
+      let direct_deps = nodeDependencies False mod
           doc_build_deps = map (expectJust "dep_map" . flip M.lookup home_mod_map) direct_deps
           build_deps = map snd doc_build_deps
       -- 2. Set the default way to build this node, not in a loop here
@@ -1049,11 +1046,10 @@ interpretBuildPlan hug old_hpt deps_map plan = do
             case mod of
               InstantiationNode uid iu ->
                 const Nothing <$> executeInstantiationNode mod_idx n_mods (wait_deps_hug hug_var build_deps) uid iu
-              ModuleNode build_deps ms -> do
+              ModuleNode _build_deps ms -> do
                   let !old_hmi = M.lookup (msKey ms) old_hpt
                       rehydrate_mods = mapMaybe moduleGraphNodeModule <$> rehydrate_nodes
-                      build_deps_vars = map snd $ map (expectJust "build_deps" . flip M.lookup home_mod_map) build_deps
-                  hmi <- executeCompileNode mod_idx n_mods old_hmi (wait_deps_hug hug_var build_deps_vars) rehydrate_mods ms
+                  hmi <- executeCompileNode mod_idx n_mods old_hmi (wait_deps_hug hug_var build_deps) rehydrate_mods ms
                   -- This global MVar is incrementally modified in order to avoid having to
                   -- recreate the HPT before compiling each module which leads to a quadratic amount of work.
                   hsc_env <- asks hsc_env
@@ -1063,9 +1059,8 @@ interpretBuildPlan hug old_hpt deps_map plan = do
                     maybeRehydrateAfter hmi new_hsc rehydrate_mods
                       )
                   return (Just hmi')
-              LinkNode nks uid -> do
-                  let link_deps = map snd $ map (\nk -> expectJust "build_deps_link" . flip M.lookup home_mod_map $ nk) nks
-                  executeLinkNode (wait_deps_hug hug_var link_deps) (mod_idx, n_mods) uid nks
+              LinkNode _nks uid -> do
+                  executeLinkNode (wait_deps_hug hug_var build_deps) (mod_idx, n_mods) uid direct_deps
                   return Nothing
 
 
@@ -1105,11 +1100,10 @@ upsweep
     -> HscEnv -- ^ The base HscEnv, which is augmented for each module
     -> Maybe Messager
     -> M.Map ModNodeKeyWithUid HomeModInfo
-    -> (NodeKey -> [NodeKey]) -- A function which computes the direct dependencies of a NodeKey
     -> [BuildPlan]
     -> IO (SuccessFlag, HscEnv, [HomeModInfo])
-upsweep n_jobs hsc_env mHscMessage old_hpt direct_deps build_plan = do
-    (cycle, pipelines, collect_result) <- interpretBuildPlan (hsc_HUG hsc_env) old_hpt direct_deps build_plan
+upsweep n_jobs hsc_env mHscMessage old_hpt build_plan = do
+    (cycle, pipelines, collect_result) <- interpretBuildPlan (hsc_HUG hsc_env) old_hpt build_plan
     runPipelines n_jobs hsc_env mHscMessage pipelines
     res <- collect_result
 
@@ -1364,14 +1358,6 @@ modNodeMapSingleton k v = ModNodeMap (M.singleton k v)
 modNodeMapUnionWith :: (a -> a -> a) -> ModNodeMap a -> ModNodeMap a -> ModNodeMap a
 modNodeMapUnionWith f (ModNodeMap m) (ModNodeMap n) = ModNodeMap (M.unionWith f m n)
 
--- | Efficiently construct a map from a NodeKey to its list of transitive dependencies
-mkDepsMap :: [ModuleGraphNode] -> (NodeKey -> [NodeKey])
-mkDepsMap nodes =
-  -- Important that we force this before returning a lambda so we can share the module graph
-  -- for each node
-  let !(mg, lookup_node) = moduleGraphNodes False nodes
-  in \nk -> map (mkNodeKey . node_payload) $ outgoingG mg (expectJust "mkDepsMap" (lookup_node nk))
-
 -- | If there are {-# SOURCE #-} imports between strongly connected
 -- components in the topological sort, then those imports can
 -- definitely be replaced by ordinary non-SOURCE imports: if SOURCE
@@ -1459,7 +1445,12 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
           in map Right instantiation_nodes
               ++ maybeToList (linkNodes (instantiation_nodes ++ summaries) uid hue)
 
-        calcDeps ms = [(ms_unitid ms, b, c) | (b, c) <- msDeps ms ]
+        calcDeps ms =
+          -- Add a dependency on the HsBoot file if it exists
+          -- This gets passed to the loopImports function which just ignores it if it
+          -- can't be found.
+          [(ms_unitid ms, NoPkgQual, GWIB (noLoc $ ms_mod_name ms) IsBoot) | NotBoot <- [isBootSummary ms] ] ++
+          [(ms_unitid ms, b, c) | (b, c) <- msDeps ms ]
 
         dflags = hsc_dflags hsc_env
         logger = hsc_logger hsc_env
@@ -1878,7 +1869,7 @@ summariseModule
           -> IO SummariseResult
 
 
-summariseModule hsc_env' home_unit old_summary_map is_boot (L loc wanted_mod) mb_pkg
+summariseModule hsc_env' home_unit old_summary_map is_boot (L _ wanted_mod) mb_pkg
                 maybe_buf excl_mods
   | wanted_mod `elem` excl_mods
   = return NotThere
@@ -1895,12 +1886,9 @@ summariseModule hsc_env' home_unit old_summary_map is_boot (L loc wanted_mod) mb
         found <- findImportedModule hsc_env wanted_mod mb_pkg
         case found of
              Found location mod
-                | isJust (ml_hs_file location) -> do
+                | isJust (ml_hs_file location) ->
                         -- Home package
-                         fresult <- just_found location mod
-                         return $ case fresult of
-                            Left err -> FoundHomeWithError (moduleUnitId mod, err)
-                            Right ms -> FoundHome ms
+                         just_found location mod
                 | VirtUnit iud <- moduleUnit mod
                 , not (isHomeModule home_unit mod)
                   -> return $ FoundInstantiation iud
@@ -1922,8 +1910,14 @@ summariseModule hsc_env' home_unit old_summary_map is_boot (L loc wanted_mod) mb
                 -- It might have been deleted since the Finder last found it
         maybe_h <- fileHashIfExists src_fn
         case maybe_h of
-          Nothing -> return $ Left $ noHsFileErr loc src_fn
-          Just h  -> new_summary_cache_check location' mod src_fn h
+          -- This situation can also happen if we have found the .hs file but the
+          -- .hs-boot file doesn't exist.
+          Nothing -> return NotThere
+          Just h  -> do
+            fresult <- new_summary_cache_check location' mod src_fn h
+            return $ case fresult of
+              Left err -> FoundHomeWithError (moduleUnitId mod, err)
+              Right ms -> FoundHome ms
 
     new_summary_cache_check loc mod src_fn h
       | Just old_summary <- Map.lookup src_fn old_summary_map =
@@ -2111,9 +2105,11 @@ noModError hsc_env loc wanted_mod err
   = mkPlainErrorMsgEnvelope loc $ GhcDriverMessage $ DriverUnknownMessage $ mkPlainError noHints $
     cannotFindModule hsc_env wanted_mod err
 
+{-
 noHsFileErr :: SrcSpan -> String -> DriverMessages
 noHsFileErr loc path
   = singleMessage $ mkPlainErrorMsgEnvelope loc (DriverFileNotFound path)
+  -}
 
 moduleNotFoundErr :: ModuleName -> DriverMessages
 moduleNotFoundErr mod = singleMessage $ mkPlainErrorMsgEnvelope noSrcSpan (DriverModuleNotFound mod)

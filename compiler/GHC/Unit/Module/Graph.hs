@@ -53,7 +53,7 @@ import GHC.Driver.Backend
 import GHC.Driver.Ppr
 import GHC.Driver.Session
 
-import GHC.Types.SourceFile ( hscSourceString, HscSource (HsBootFile) )
+import GHC.Types.SourceFile ( hscSourceString )
 
 import GHC.Unit.Module.ModSummary
 import GHC.Unit.Module.Env
@@ -309,10 +309,8 @@ nodeDependencies drop_hs_boot_nodes = \case
     LinkNode deps _uid -> deps
     InstantiationNode uid iuid ->
       NodeKey_Module . (\mod -> ModNodeKeyWithUid (GWIB mod NotBoot) uid)  <$> uniqDSetToList (instUnitHoles iuid)
-    ModuleNode deps ms ->
-      [ NodeKey_Module $ (ModNodeKeyWithUid (GWIB (ms_mod_name ms) IsBoot) (ms_unitid ms))
-      | not $ drop_hs_boot_nodes || ms_hsc_src ms == HsBootFile
-      ] ++ map drop_hs_boot deps
+    ModuleNode deps _ms ->
+      map drop_hs_boot deps
   where
     -- Drop hs-boot nodes by using HsSrcFile as the key
     hs_boot_key | drop_hs_boot_nodes = NotBoot -- is regular mod or signature
