@@ -12,14 +12,13 @@ module GHC.Unit.Module.Graph
    , extendMG
    , extendMGInst
    , extendMG'
+   , isTemplateHaskellOrQQNonBoot
    , filterToposortToModules
    , mapMG
    , mgModSummaries
    , mgModSummaries'
    , mgLookupModule
    , mgTransDeps
-   , needsTemplateHaskellOrQQ
-   , isTemplateHaskellOrQQNonBoot
    , showModMsg
    , moduleGraphNodeModule
    , moduleGraphNodeModSum
@@ -135,19 +134,7 @@ data ModuleGraph = ModuleGraph
     -- repeated whenever the transitive dependencies need to be calculated (for example, hptInstances)
   , mg_non_boot :: ModuleEnv ModSummary
     -- a map of all non-boot ModSummaries keyed by Modules
-  , mg_needs_th_or_qq :: !Bool
-    -- does any of the modules in mg_mss require TemplateHaskell or
-    -- QuasiQuotes?
   }
-
--- | Determines whether a set of modules requires Template Haskell or
--- Quasi Quotes
---
--- Note that if the session's 'DynFlags' enabled Template Haskell when
--- 'depanal' was called, then each module in the returned module graph will
--- have Template Haskell enabled whether it is actually needed or not.
-needsTemplateHaskellOrQQ :: ModuleGraph -> Bool
-needsTemplateHaskellOrQQ mg = mg_needs_th_or_qq mg
 
 -- | Map a function 'f' over all the 'ModSummaries'.
 -- To preserve invariants 'f' can't change the isBoot status.
@@ -169,15 +156,12 @@ mgModSummaries mg = [ m | ModuleNode _ m <- mgModSummaries' mg ]
 mgModSummaries' :: ModuleGraph -> [ModuleGraphNode]
 mgModSummaries' = mg_mss
 
-mgElemModule :: ModuleGraph -> Module -> Bool
-mgElemModule ModuleGraph{..} m = elemModuleEnv m mg_non_boot
-
 -- | Look up a ModSummary in the ModuleGraph
 mgLookupModule :: ModuleGraph -> Module -> Maybe ModSummary
 mgLookupModule ModuleGraph{..} m = lookupModuleEnv mg_non_boot m
 
 emptyMG :: ModuleGraph
-emptyMG = ModuleGraph [] Map.empty emptyModuleEnv False
+emptyMG = ModuleGraph [] Map.empty emptyModuleEnv
 
 isTemplateHaskellOrQQNonBoot :: ModSummary -> Bool
 isTemplateHaskellOrQQNonBoot ms =
@@ -194,7 +178,6 @@ extendMG ModuleGraph{..} deps ms = ModuleGraph
   , mg_non_boot = case isBootSummary ms of
       IsBoot -> mg_non_boot
       NotBoot -> extendModuleEnv mg_non_boot (ms_mod ms) ms
-  , mg_needs_th_or_qq = mg_needs_th_or_qq || isTemplateHaskellOrQQNonBoot ms
   }
   where
     (gg, _lookup_node) = moduleGraphNodes False (ModuleNode deps ms : mg_mss)
