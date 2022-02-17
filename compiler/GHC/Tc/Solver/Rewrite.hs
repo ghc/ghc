@@ -551,20 +551,20 @@ rewrite_one (FunTy { ft_af = vis, ft_mult = mult, ft_arg = ty1, ft_res = ty2 })
                        (rewrite_one res_rep)
        ; role <- getRole
 
-       ; let arg_rep_co = snd arg_rep_redn
+       ; let arg_rep_co = mkSymCo (snd arg_rep_redn)
                 -- :: arg_rep ~ arg_rep_xi
              arg_ki_co  = mkTyConAppCo Nominal tYPETyCon [arg_rep_co]
                 -- :: TYPE arg_rep ~ TYPE arg_rep_xi
              casted_arg_redn =
                  ( mkCastTy arg_xi arg_ki_co
-                 , mkCoherenceRightCo role arg_xi arg_ki_co arg_co
+                 , mkCoherenceLeftCo role arg_xi arg_ki_co arg_co
                  )
                 -- :: ty1 ~> arg_xi |> arg_ki_co
 
-             res_ki_co  = mkTyConAppCo Nominal tYPETyCon [snd res_rep_redn]
+             res_ki_co  = mkTyConAppCo Nominal tYPETyCon [mkSymCo $ snd res_rep_redn]
              casted_res_redn =
                 ( mkCastTy res_xi res_ki_co
-                , mkCoherenceRightCo role res_xi res_ki_co res_co
+                , mkCoherenceLeftCo role res_xi res_ki_co res_co
                 )
 
           -- We must rewrite the representations, because that's what would
