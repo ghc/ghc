@@ -12,6 +12,7 @@ import Settings
 import Hadrian.Oracles.Cabal
 import Hadrian.Haskell.Cabal.Type
 import System.Directory (canonicalizePath)
+import System.Environment (lookupEnv)
 
 -- | @tool:@ is used by tooling in order to get the arguments necessary
 -- to set up a GHC API session which can compile modules from GHC. When
@@ -48,11 +49,15 @@ mkToolTarget :: [String] -> Package -> Action ()
 mkToolTarget es p = do
     -- This builds automatically generated dependencies. Not sure how to do
     -- this generically yet.
+    putProgressInfo ("Computing arguments for " ++ pkgName p)
     allDeps
     let fake_target = target (Context stage0InTree p (if windowsHost then vanilla else dynamic))
                         (Ghc ToolArgs stage0InTree) [] ["ignored"]
     arg_list <- interpret fake_target getArgs
-    liftIO $ putStrLn (intercalate "\n" (arg_list ++ es))
+    liftIO $ lookupEnv "TOOL_OUTPUT" >>= \case
+      Nothing -> putStrLn (intercalate "\n" (arg_list ++ es))
+      Just out -> writeFile out (intercalate "\n" (arg_list ++ es))
+
 allDeps :: Action ()
 allDeps = do
    do

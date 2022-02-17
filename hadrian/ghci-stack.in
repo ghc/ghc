@@ -4,6 +4,9 @@
 
 set -e
 
+export TOOL_OUTPUT=.hadrian_ghci/ghci_args
+TERM=dumb CABFLAGS=-v0 "hadrian/build-cabal" tool:compiler/GHC.hs -q --build-root=.hadrian_ghci --flavour=ghc-in-ghci $HADRIAN_ARGS
+
 # Replace newlines with spaces, as these otherwise break the ghci invocation on windows.
-GHC_FLAGS="$GHC_FLAGS $(TERM=dumb CABFLAGS=-v0 "hadrian/build-stack" tool-args -q --build-root=.hadrian_ghci --flavour=ghc-in-ghci $HADRIAN_ARGS | tr '\n\r' ' ')"
+GHC_FLAGS="$GHC_FLAGS $(cat $TOOL_OUTPUT | tr '\n\r' ' ')"
 stack exec -- @WithGhc@ --interactive $GHC_FLAGS "$@" -fno-code -fwrite-interface -hidir=.hadrian_ghci/interface -O0 +RTS -A128m
