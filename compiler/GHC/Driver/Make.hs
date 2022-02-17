@@ -18,6 +18,7 @@
 {-# LANGUAGE ApplicativeDo #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE CPP #-}
 
 -- -----------------------------------------------------------------------------
 --
@@ -64,6 +65,7 @@ import qualified GHC.Linker.Loader as Linker
 import GHC.Linker.Types
 
 import GHC.Runtime.Context
+import GHC.Platform.Ways
 
 import GHC.Driver.Config.Finder (initFinderOpts)
 import GHC.Driver.Config.Parser (initParserOpts)
@@ -1445,9 +1447,7 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
        -- for dependencies of modules that have -XTemplateHaskell,
        -- otherwise those modules will fail to compile.
        -- See Note [-fno-code mode] #8025
-       th_enabled_nodes <- case backend dflags of
-                              NoBackend -> enableCodeGenForTH logger tmpfs unit_env all_nodes
-                              _ -> return all_nodes
+       th_enabled_nodes <- enableCodeGenForTH logger tmpfs unit_env all_nodes
        if null all_root_errs
          then return (all_errs, th_enabled_nodes)
          else pure $ (all_root_errs, [])
@@ -1461,7 +1461,6 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
 
         calcDeps ms = [(ms_unitid ms, b, c) | (b, c) <- msDeps ms ]
 
-        dflags = hsc_dflags hsc_env
         logger = hsc_logger hsc_env
         roots  = hsc_targets hsc_env
 
@@ -1648,14 +1647,8 @@ enableCodeGenForTH
   -> [ModuleGraphNode]
   -> IO [ModuleGraphNode]
 enableCodeGenForTH logger tmpfs unit_env =
-  enableCodeGenWhen logger tmpfs condition should_modify TFL_CurrentModule TFL_GhcSession unit_env
+  enableCodeGenWhen logger tmpfs TFL_CurrentModule TFL_GhcSession unit_env
   where
-    condition = isTemplateHaskellOrQQNonBoot
-    should_modify ms@(ModSummary { ms_hspp_opts = dflags }) =
-      backend dflags == NoBackend &&
-      -- Don't enable codegen for TH on indefinite packages; we
-      -- can't compile anything anyway! See #16219.
-      isHomeUnitDefinite (ue_unitHomeUnit (ms_unitid ms) unit_env)
 
 -- | Helper used to implement 'enableCodeGenForTH'.
 -- In particular, this enables
@@ -1666,14 +1659,12 @@ enableCodeGenForTH logger tmpfs unit_env =
 enableCodeGenWhen
   :: Logger
   -> TmpFs
-  -> (ModSummary -> Bool)
-  -> (ModSummary -> Bool)
   -> TempFileLifetime
   -> TempFileLifetime
   -> UnitEnv
   -> [ModuleGraphNode]
   -> IO [ModuleGraphNode]
-enableCodeGenWhen logger tmpfs condition should_modify staticLife dynLife unit_env mod_graph =
+enableCodeGenWhen logger tmpfs staticLife dynLife unit_env mod_graph =
   mapM enable_code_gen mod_graph
   where
     defaultBackendOf ms = platformDefaultBackend (targetPlatform $ ue_unitFlags (ms_unitid ms) unit_env)
@@ -1684,36 +1675,85 @@ enableCodeGenWhen logger tmpfs condition should_modify staticLife dynLife unit_e
         , ms_hsc_src = HsSrcFile
         , ms_hspp_opts = dflags
         } <- ms
-      , should_modify ms
-      , mkNodeKey n `Set.member` needs_codegen_set
-      = do
-        let new_temp_file suf dynsuf = do
-              tn <- newTempName logger tmpfs (tmpDir dflags) staticLife suf
-              let dyn_tn = tn -<.> dynsuf
-              addFilesToClean tmpfs dynLife [dyn_tn]
-              return (tn, dyn_tn)
-          -- We don't want to create .o or .hi files unless we have been asked
-          -- to by the user. But we need them, so we patch their locations in
-          -- the ModSummary with temporary files.
-          --
-        ((hi_file, dyn_hi_file), (o_file, dyn_o_file)) <-
-          -- If ``-fwrite-interface` is specified, then the .o and .hi files
-          -- are written into `-odir` and `-hidir` respectively.  #16670
-          if gopt Opt_WriteInterface dflags
-            then return ((ml_hi_file ms_location, ml_dyn_hi_file ms_location)
-                        , (ml_obj_file ms_location, ml_dyn_obj_file ms_location))
-            else (,) <$> (new_temp_file (hiSuf_ dflags) (dynHiSuf_ dflags))
-                     <*> (new_temp_file (objectSuf_ dflags) (dynObjectSuf_ dflags))
-        let ms' = ms
-              { ms_location =
-                  ms_location { ml_hi_file = hi_file
-                              , ml_obj_file = o_file
-                              , ml_dyn_hi_file = dyn_hi_file
-                              , ml_dyn_obj_file = dyn_o_file }
-              , ms_hspp_opts = updOptLevel 0 $ dflags {backend = defaultBackendOf ms}
-              }
-        pure (ModuleNode deps ms')
+      , mkNodeKey n `Set.member` needs_codegen_set =
+      if | nocode_enable ms -> do
+               let new_temp_file suf dynsuf = do
+                     tn <- newTempName logger tmpfs (tmpDir dflags) staticLife suf
+                     let dyn_tn = tn -<.> dynsuf
+                     addFilesToClean tmpfs dynLife [dyn_tn]
+                     return (tn, dyn_tn)
+                 -- We don't want to create .o or .hi files unless we have been asked
+                 -- to by the user. But we need them, so we patch their locations in
+                 -- the ModSummary with temporary files.
+                 --
+               ((hi_file, dyn_hi_file), (o_file, dyn_o_file)) <-
+                 -- If ``-fwrite-interface` is specified, then the .o and .hi files
+                 -- are written into `-odir` and `-hidir` respectively.  #16670
+                 if gopt Opt_WriteInterface dflags
+                   then return ((ml_hi_file ms_location, ml_dyn_hi_file ms_location)
+                               , (ml_obj_file ms_location, ml_dyn_obj_file ms_location))
+                   else (,) <$> (new_temp_file (hiSuf_ dflags) (dynHiSuf_ dflags))
+                            <*> (new_temp_file (objectSuf_ dflags) (dynObjectSuf_ dflags))
+               let ms' = ms
+                     { ms_location =
+                         ms_location { ml_hi_file = hi_file
+                                     , ml_obj_file = o_file
+                                     , ml_dyn_hi_file = dyn_hi_file
+                                     , ml_dyn_obj_file = dyn_o_file }
+                     , ms_hspp_opts = updOptLevel 0 $ dflags {backend = defaultBackendOf ms}
+                     }
+               -- Recursive call to catch the other cases
+               enable_code_gen (ModuleNode deps ms')
+         | dynamic_too_enable ms -> do
+               let ms' = ms
+                     { ms_hspp_opts = gopt_set (ms_hspp_opts ms) Opt_BuildDynamicToo
+                     }
+               -- Recursive call to catch the other cases
+               enable_code_gen (ModuleNode deps ms')
+         | ext_interp_enable ms -> do
+               let ms' = ms
+                     { ms_hspp_opts = gopt_set (ms_hspp_opts ms) Opt_ExternalInterpreter
+                     }
+               -- Recursive call to catch the other cases
+               enable_code_gen (ModuleNode deps ms')
+
+         | otherwise -> return n
+
     enable_code_gen ms = return ms
+
+    nocode_enable ms@(ModSummary { ms_hspp_opts = dflags }) =
+      backend dflags == NoBackend &&
+      -- Don't enable codegen for TH on indefinite packages; we
+      -- can't compile anything anyway! See #16219.
+      isHomeUnitDefinite (ue_unitHomeUnit (ms_unitid ms) unit_env)
+
+    -- #8180 - when using TemplateHaskell, switch on -dynamic-too so
+    -- the linker can correctly load the object files.  This isn't necessary
+    -- when using -fexternal-interpreter.
+    dynamic_too_enable ms
+      = hostIsDynamic && internalInterpreter &&
+            not isDynWay && not isProfWay &&  not dyn_too_enabled
+      where
+       lcl_dflags   = ms_hspp_opts ms
+       internalInterpreter = not (gopt Opt_ExternalInterpreter lcl_dflags)
+       dyn_too_enabled =  (gopt Opt_BuildDynamicToo lcl_dflags)
+       isDynWay    = hasWay (ways lcl_dflags) WayDyn
+       isProfWay   = hasWay (ways lcl_dflags) WayProf
+
+    -- #16331 - when no "internal interpreter" is available but we
+    -- need to process some TemplateHaskell or QuasiQuotes, we automatically
+    -- turn on -fexternal-interpreter.
+    ext_interp_enable ms = not host_internalInterpreter && internalInterpreter
+      where
+       lcl_dflags   = ms_hspp_opts ms
+#if defined(HAVE_INTERNAL_INTERPRETER)
+       host_internalInterpreter = True
+#else
+       host_internalInterpreter = False
+#endif
+       internalInterpreter = not (gopt Opt_ExternalInterpreter lcl_dflags)
+
+
 
 
     (mg, lookup_node) = moduleGraphNodes False mod_graph
@@ -1723,7 +1763,7 @@ enableCodeGenWhen logger tmpfs condition should_modify staticLife dynLife unit_e
     has_th_set =
       [ mkNodeKey mn
       | mn@(ModuleNode _ ms) <- mod_graph
-      , condition ms
+      , isTemplateHaskellOrQQNonBoot ms
       ]
 
 -- | Populate the Downsweep cache with the root modules.

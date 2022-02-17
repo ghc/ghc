@@ -25,7 +25,6 @@ module GHC (
         runGhc, runGhcT, initGhcMonad,
         printException,
         handleSourceError,
-        needsTemplateHaskellOrQQ,
 
         -- * Flags and settings
         DynFlags(..), GeneralFlag(..), Severity(..), Backend(..), gopt,

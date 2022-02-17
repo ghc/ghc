@@ -108,7 +108,6 @@ import GHC.Unit.Env
 --import GHC.Unit.State
 import GHC.Unit.Module.ModSummary
 import GHC.Unit.Module.ModIface
-import GHC.Unit.Module.Graph (needsTemplateHaskellOrQQ)
 import GHC.Unit.Module.Deps
 import GHC.Unit.Home.ModInfo
 
@@ -252,11 +251,6 @@ compileOne' mHscMessage
        location    = ms_location summary
        input_fn    = expectJust "compile:hs" (ml_hs_file location)
        input_fnpp  = ms_hspp_file summary
-       mod_graph   = hsc_mod_graph hsc_env0
-       needsLinker = needsTemplateHaskellOrQQ mod_graph
-       isDynWay    = hasWay (ways lcl_dflags) WayDyn
-       isProfWay   = hasWay (ways lcl_dflags) WayProf
-       internalInterpreter = not (gopt Opt_ExternalInterpreter lcl_dflags)
 
        pipelineOutput = case bcknd of
          Interpreter -> NoOutputFile
@@ -266,28 +260,13 @@ compileOne' mHscMessage
        logger = hsc_logger hsc_env0
        tmpfs  = hsc_tmpfs hsc_env0
 
-       -- #8180 - when using TemplateHaskell, switch on -dynamic-too so
-       -- the linker can correctly load the object files.  This isn't necessary
-       -- when using -fexternal-interpreter.
-       dflags1 = if hostIsDynamic && internalInterpreter &&
-                    not isDynWay && not isProfWay && needsLinker
-                  then gopt_set lcl_dflags Opt_BuildDynamicToo
-                  else lcl_dflags
-
-       -- #16331 - when no "internal interpreter" is available but we
-       -- need to process some TemplateHaskell or QuasiQuotes, we automatically
-       -- turn on -fexternal-interpreter.
-       dflags2 = if not internalInterpreter && needsLinker
-                 then gopt_set dflags1 Opt_ExternalInterpreter
-                 else dflags1
-
        basename = dropExtension input_fn
 
        -- We add the directory in which the .hs files resides) to the import
        -- path.  This is needed when we try to compile the .hc file later, if it
        -- imports a _stub.h file that we created here.
        current_dir = takeDirectory basename
-       old_paths   = includePaths dflags2
+       old_paths   = includePaths lcl_dflags
        loadAsByteCode
          | Just Target { targetAllowObjCode = obj } <- findTarget summary (hsc_targets hsc_env0)
          , not obj
@@ -300,9 +279,9 @@ compileOne' mHscMessage
          -- was set), force it to generate byte-code. This is NOT transitive and
          -- only applies to direct targets.
          | loadAsByteCode
-         = (Interpreter, gopt_set (dflags2 { backend = Interpreter }) Opt_ForceRecomp)
+         = (Interpreter, gopt_set (lcl_dflags { backend = Interpreter }) Opt_ForceRecomp)
          | otherwise
-         = (backend dflags, dflags2)
+         = (backend dflags, lcl_dflags)
        -- See Note [Filepaths and Multiple Home Units]
        dflags  = dflags3 { includePaths = offsetIncludePaths dflags3 $ addImplicitQuoteInclude old_paths [current_dir] }
        upd_summary = summary { ms_hspp_opts = dflags }
