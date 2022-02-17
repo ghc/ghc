@@ -1,18 +1,15 @@
 
 ==================== Strictness signatures ====================
-StrAnalExample.$trModule:
 StrAnalExample.foo: <1L>
 
 
 
 ==================== Cpr signatures ====================
-StrAnalExample.$trModule:
 StrAnalExample.foo:
 
 
 
 ==================== Strictness signatures ====================
-StrAnalExample.$trModule:
 StrAnalExample.foo: <1L>
 
 

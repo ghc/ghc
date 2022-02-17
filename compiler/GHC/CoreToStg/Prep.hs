@@ -1636,10 +1636,12 @@ tryEtaReducePrep bndrs expr@(App _ _)
   , exprIsHNF remaining_expr   -- Don't turn value into a non-value
                                -- else the behaviour with 'seq' changes
   =
-    -- pprTrace "prep-reduce" (
-    --   text "reduced:" <> ppr remaining_expr $$
-    --   ppr (remaining_args)
-    --   ) $
+    -- pprTrace "prep-reduce" (vcat
+    --   [ text "reduced:" <+> ppr expr
+    --   , text "from" <+> ppr (length args) <+> text "to" <+> ppr n_remaining
+    --   , (case f of Var v -> text "has strict worker:" <+> ppr (idCbvMarkArity v) <+> ppr n_remaining_vals; _ -> empty)
+    --   , ppr remaining_args
+    --   ]) $
     Just remaining_expr
   where
     (f, args) = collectArgs expr

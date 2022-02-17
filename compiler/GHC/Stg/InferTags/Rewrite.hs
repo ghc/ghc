@@ -38,7 +38,6 @@ import GHC.Stg.Syntax as StgSyn
 
 import GHC.Data.Maybe
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 
 import GHC.Utils.Outputable
 import GHC.Utils.Monad.State.Strict
@@ -425,7 +424,7 @@ rewriteApp _ (StgApp f args)
     | Just marks <- idCbvMarks_maybe f
     , relevant_marks <- dropWhileEndLE (not . isMarkedCbv) marks
     , any isMarkedCbv relevant_marks
-    = assert (length relevant_marks <= length args)
+    = assertPpr (length relevant_marks <= length args) (ppr f $$ ppr args $$ ppr relevant_marks)
       unliftArg relevant_marks
 
     where

@@ -28,5 +28,7 @@ h1 f x = f `seq'` if x < 100 then f x else 200
 h2 :: (Int -> Int) -> Int -> Int
 h2 f x = f `seq` if x < 100 then f x else 200
 
+-- | The first argument is evaluated lazily and multiple times, but called every
+-- time it's evaluated.
 h3 :: (Int -> Int) -> Int -> Int
 h3 f x = if x < 100 then f x + f (x+1) else 200

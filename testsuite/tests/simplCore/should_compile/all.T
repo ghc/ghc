@@ -394,15 +394,17 @@ test('T21144',  normal, compile, ['-O'])
 # Key here is that the argument to ifoldl' is eta-reduced in Core to
 #   `/\m. f @(S m)`
 # which will erase completely in STG
-test('T20040', [ grep_errmsg(r'ifoldl\''), expect_broken(20040) ], compile, ['-O -ddump-stg-final -dno-typeable-binds -dsuppress-all -dsuppress-uniques'])
+test('T20040', [ grep_errmsg(r'ifoldl\'') ], compile, ['-O -ddump-stg-final -dno-typeable-binds -dsuppress-all -dsuppress-uniques'])
 
 # Key here is that yes* become visibly trivial due to eta-reduction, while no* are not eta-reduced.
-test('T21261', [ grep_errmsg(r'^(yes|no)') ], compile, ['-O -ddump-simpl -dno-typeable-binds -dsuppress-all -dsuppress-uniques'])
+test('T21261',          [ grep_errmsg(r'^(yes|no)') ], compile, ['-O -ddump-simpl -dno-typeable-binds -dsuppress-all -dsuppress-uniques'])
+test('T21261_pedantic', [ grep_errmsg(r'^(yes|no)') ], compile, ['-O -ddump-simpl -dno-typeable-binds -dsuppress-all -dsuppress-uniques'])
 
 # We expect to see a SPEC rule for $cm
 test('T17966',  [ grep_errmsg(r'SPEC') ], compile, ['-O -ddump-spec'])
 # We expect to see a SPEC rule for $cm
 test('T19644',  [ grep_errmsg(r'SPEC') ], compile, ['-O -ddump-spec'])
-
 test('T21391', normal, compile, ['-O -dcore-lint'])
 test('T21391a', normal, compile, ['-O -dcore-lint'])
+# We don't want to see a thunk allocation for the insertBy expression after CorePrep.
+test('T21392', [ grep_errmsg(r'sat.* :: \[\(.*Unique, .*Int\)\]'), expect_broken(21392) ], compile, ['-O -ddump-prep -dno-typeable-binds -dsuppress-uniques'])

@@ -1,0 +1,26 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 59, types: 63, coercions: 0, joins: 0/0}
+
+lvl = I# 2#
+
+lvl1 = I# 3#
+
+lvl2 = I# 1#
+
+f1 = \ c -> case c lvl2 of { __DEFAULT -> c lvl lvl1 }
+
+no2 = \ c -> f1 (\ x y -> c x y)
+
+lvl3 = I# 4#
+
+$wf2 = \ c -> (# case c lvl2 of { __DEFAULT -> c lvl1 lvl3 } #)
+
+f2 = \ c -> case $wf2 c of { (# ww #) -> Just ww }
+
+no2_lazy
+  = \ c -> case $wf2 (\ x y -> c x y) of { (# ww #) -> Just ww }
+
+
+

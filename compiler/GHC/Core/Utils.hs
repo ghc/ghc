@@ -2409,13 +2409,20 @@ case where `e` is trivial):
     like `g (\x y z. e x y z)` to `g e`, because that diverges when
     `e = \x y. bot`.
 
-    Could we relax to "At least *one call in the same trace* is with n args"?
+    Could we relax to "*At least one call in the same trace* is with n args"?
+    (NB: Strictness analysis can only answer this relaxed question, not the
+     original formulation.)
     Consider what happens for
       ``g2 c = c True `seq` c False 42``
-    Here, `g2` will call `c` with 2 two arguments (if there is a call at all).
-    But it is unsafe to eta-reduce the arg in `g2 (\x y. e x y)` to `g2 e`
+    Here, `g2` will call `c` with 2 arguments (if there is a call at all).
+    But it is unsound to eta-reduce the arg in `g2 (\x y. e x y)` to `g2 e`
     when `e = \x. if x then bot else id`, because the latter will diverge when
     the former would not.
+    On the other hand, with `-fno-pendantic-bottoms` , we will have eta-expanded
+    the definition of `e` and then eta-reduction is sound
+    (see Note [Dealing with bottom]).
+    Consequence: We have to check that `-fpedantic-bottoms` is off; otherwise
+    eta-reduction based on demands is in fact unsound.
 
     See Note [Eta reduction based on evaluation context] for the implementation
     details. This criterion is tested extensively in T21261.

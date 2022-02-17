@@ -2,22 +2,16 @@
 ==================== Strictness signatures ====================
 T21119.$fMyShow(,): <1!A>
 T21119.$fMyShowInt: <1!A>
-T21119.$tc'C:MyShow:
-T21119.$tcMyShow:
-T21119.$trModule:
 T21119.get: <1!P(1!P(L),1!P(L))><1!P(L)><1L>
 T21119.getIO: <1P(1L,ML)><1L><ML><L>
-T21119.indexError: <1C1(L)><1!B><S!S><S!S>b
-T21119.throwIndexError: <MCM(L)><MA><L><L><L>x
+T21119.indexError: <1C1(S)><1!B><S!S><S!S>b
+T21119.throwIndexError: <MC1(L)><MA><L><L><L>x
 
 
 
 ==================== Cpr signatures ====================
 T21119.$fMyShow(,):
 T21119.$fMyShowInt:
-T21119.$tc'C:MyShow:
-T21119.$tcMyShow:
-T21119.$trModule:
 T21119.get:
 T21119.getIO: 1
 T21119.indexError: b
@@ -28,12 +22,9 @@ T21119.throwIndexError: b
 ==================== Strictness signatures ====================
 T21119.$fMyShow(,): <1!A>
 T21119.$fMyShowInt: <1!A>
-T21119.$tc'C:MyShow:
-T21119.$tcMyShow:
-T21119.$trModule:
 T21119.get: <1!P(1!P(L),1!P(L))><1!P(L)><1L>
 T21119.getIO: <1P(1L,ML)><1L><ML><L>
-T21119.indexError: <1C1(L)><1!B><S!S><S!S>b
-T21119.throwIndexError: <MCM(L)><MA><L><L><L>x
+T21119.indexError: <1C1(S)><1!B><S!S><S!S>b
+T21119.throwIndexError: <MC1(L)><MA><L><L><L>x
 
 

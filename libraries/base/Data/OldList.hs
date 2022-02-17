@@ -269,16 +269,16 @@ stripPrefix _ _ = Nothing
 --
 -- >>> elemIndex 4 [0..]
 -- Just 4
-elemIndex       :: Eq a => a -> [a] -> Maybe Int
-elemIndex x     = findIndex (x==)
+elemIndex      :: Eq a => a -> [a] -> Maybe Int
+elemIndex x xs = findIndex (x==) xs -- arity 2 so that we don't get a PAP; #21345
 
 -- | The 'elemIndices' function extends 'elemIndex', by returning the
 -- indices of all elements equal to the query element, in ascending order.
 --
 -- >>> elemIndices 'o' "Hello World"
 -- [4,7]
-elemIndices     :: Eq a => a -> [a] -> [Int]
-elemIndices x   = findIndices (x==)
+elemIndices      :: Eq a => a -> [a] -> [Int]
+elemIndices x xs = findIndices (x==) xs -- arity 2 so that we don't get a PAP; #21345
 
 -- | The 'find' function takes a predicate and a list and returns the
 -- first element in the list matching the predicate, or 'Nothing' if

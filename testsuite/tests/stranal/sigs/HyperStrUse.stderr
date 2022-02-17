@@ -1,18 +1,15 @@
 
 ==================== Strictness signatures ====================
-HyperStrUse.$trModule:
 HyperStrUse.f: <1!P(1!P(L),A)><1L>
 
 
 
 ==================== Cpr signatures ====================
-HyperStrUse.$trModule:
 HyperStrUse.f: 1
 
 
 
 ==================== Strictness signatures ====================
-HyperStrUse.$trModule:
 HyperStrUse.f: <1!P(1!P(L),A)><1L>
 
 

@@ -34,14 +34,18 @@ f5 c = Just (c 1 2 + c 3 4)
 yes2_lazy :: (Int -> Int -> Int) -> Maybe Int
 yes2_lazy c = f5 (\x y -> c x y)
 
-f6 :: (Int -> Int -> Int) -> Maybe Int
-f6 c = Just (c 1 `seq` c 3 4)
-{-# NOINLINE f6 #-}
-no2_lazy :: (Int -> Int -> Int) -> Maybe Int
-no2_lazy c = f6 (\x y -> c x y)
+-- These last two here are disallowed in T21261_pedantic.hs, which activates
+-- -fpedantic-bottoms. It would be unsound to eta reduce these bindings with
+-- -fpedantic-bottoms, but without it's fine to eta reduce:
 
-f7 :: (Int -> Int -> Int) -> Int
-f7 c = c 1 `seq` c 2 3
+f6 :: (Int -> Int -> Int) -> Int
+f6 c = c 1 `seq` c 2 3
+{-# NOINLINE f6 #-}
+yes_non_pedantic :: (Int -> Int -> Int) -> Int
+yes_non_pedantic c = f6 (\x y -> c x y)
+
+f7 :: (Int -> Int -> Int) -> Maybe Int
+f7 c = Just (c 1 `seq` c 3 4)
 {-# NOINLINE f7 #-}
-not_quite_eta :: (Int -> Int -> Int) -> Int
-not_quite_eta c = f7 (\x y -> c x y)
+yes_non_pedantic_lazy :: (Int -> Int -> Int) -> Maybe Int
+yes_non_pedantic_lazy c = f7 (\x y -> c x y)
