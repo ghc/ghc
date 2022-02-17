@@ -74,7 +74,7 @@ module GHC.Core.Coercion (
 
         coToMCo, mkTransMCo, mkTransMCoL, mkTransMCoR, mkCastTyMCo, mkSymMCo,
         mkHomoForAllMCo, mkFunResMCo, mkPiMCos,
-        isReflMCo,
+        isReflMCo, checkReflexiveMCo,
 
         -- ** Coercion variables
         mkCoVar, isCoVar, coVarName, setCoVarName, setCoVarUnique,
@@ -312,6 +312,11 @@ coToMCo :: Coercion -> MCoercion
 -- It's not clear whether or not isReflexiveCo would be better here
 coToMCo co | isReflCo co = MRefl
            | otherwise   = MCo co
+
+checkReflexiveMCo :: MCoercion -> MCoercion
+checkReflexiveMCo MRefl                       = MRefl
+checkReflexiveMCo (MCo co) | isReflexiveCo co = MRefl
+                           | otherwise        = MCo co
 
 -- | Tests if this MCoercion is obviously generalized reflexive
 -- Guaranteed to work very quickly.
