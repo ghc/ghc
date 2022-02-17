@@ -359,6 +359,9 @@ this transformation.  So we try to limit it as much as possible:
 
 Of course both (1) and (2) are readily defeated by disguising the bottoms.
 
+Another place where -fpedantic-bottoms comes up is during eta-reduction.
+See Note [Eta reduction soundness], the bit about -fpedantic-bottoms.
+
 4. Note [Newtype arity]
 ~~~~~~~~~~~~~~~~~~~~~~~~
 Non-recursive newtypes are transparent, and should not get in the way.

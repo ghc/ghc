@@ -1,7 +1,7 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 192, types: 201, coercions: 0, joins: 0/0}
+  = {terms: 166, types: 176, coercions: 0, joins: 0/0}
 
 lvl = I# 3#
 
@@ -27,16 +27,15 @@ no3
   = \ c ->
       case $wf4 (\ x y z -> c x y z) of ww { __DEFAULT -> I# ww }
 
-$wf6 = \ c -> (# case c lvl2 of { __DEFAULT -> c lvl lvl1 } #)
+f6 = \ c -> case c lvl2 of { __DEFAULT -> c lvl3 lvl }
 
-f6 = \ c -> case $wf6 c of { (# ww #) -> Just ww }
+yes_non_pedantic = f6
 
-no2_lazy
-  = \ c -> case $wf6 (\ x y -> c x y) of { (# ww #) -> Just ww }
+$wf7 = \ c -> (# case c lvl2 of { __DEFAULT -> c lvl lvl1 } #)
 
-f7 = \ c -> case c lvl2 of { __DEFAULT -> c lvl3 lvl }
+f7 = \ c -> case $wf7 c of { (# ww #) -> Just ww }
 
-not_quite_eta = \ c -> f7 (\ x y -> c x y)
+yes_non_pedantic_lazy = f7
 
 $wf5
   = \ c ->
@@ -46,8 +45,7 @@ $wf5
 
 f5 = \ c -> case $wf5 c of { (# ww #) -> Just ww }
 
-yes2_lazy
-  = \ c -> case $wf5 (\ x y -> c x y) of { (# ww #) -> Just ww }
+yes2_lazy = f5
 
 $wf3
   = \ c ->

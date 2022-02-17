@@ -1,6 +1,5 @@
 
 ==================== Strictness signatures ====================
-T13380f.$trModule:
 T13380f.f: <1!P(L)><1!P(L)><L>
 T13380f.g: <1!P(L)><ML><L>
 T13380f.h: <1!P(L)><ML><L>
@@ -11,7 +10,6 @@ T13380f.unsafeCall: <L>
 
 
 ==================== Cpr signatures ====================
-T13380f.$trModule:
 T13380f.f: 1(, 1)
 T13380f.g: 1(, 1)
 T13380f.h: 1(, 1)
@@ -22,7 +20,6 @@ T13380f.unsafeCall: 1(, 1)
 
 
 ==================== Strictness signatures ====================
-T13380f.$trModule:
 T13380f.f: <1!P(L)><1!P(L)><L>
 T13380f.g: <1!P(L)><ML><L>
 T13380f.h: <1!P(L)><ML><L>

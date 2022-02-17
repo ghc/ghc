@@ -1,11 +1,5 @@
 
 ==================== Strictness signatures ====================
-T16859.$tc'External:
-T16859.$tc'Internal:
-T16859.$tc'Name:
-T16859.$tcName:
-T16859.$tcNameSort:
-T16859.$trModule:
 T16859.bar: <1!A><L>
 T16859.baz: <1L><1!P(L)><1C1(L)>
 T16859.buz: <1!P(L,L)>
@@ -19,12 +13,6 @@ T16859.n_uniq: <1!P(A,A,L,A)>
 
 
 ==================== Cpr signatures ====================
-T16859.$tc'External:
-T16859.$tc'Internal:
-T16859.$tc'Name:
-T16859.$tcName:
-T16859.$tcNameSort:
-T16859.$trModule:
 T16859.bar: 1
 T16859.baz: 1
 T16859.buz: 1
@@ -38,12 +26,6 @@ T16859.n_uniq: 1
 
 
 ==================== Strictness signatures ====================
-T16859.$tc'External:
-T16859.$tc'Internal:
-T16859.$tc'Name:
-T16859.$tcName:
-T16859.$tcNameSort:
-T16859.$trModule:
 T16859.bar: <1!A><L>
 T16859.baz: <L><1!P(L)><1C1(L)>
 T16859.buz: <1!P(L,L)>

@@ -1,20 +1,17 @@
 
 ==================== Strictness signatures ====================
-T18086.$trModule:
 T18086.m: <L>x
 T18086.panic: <L>x
 
 
 
 ==================== Cpr signatures ====================
-T18086.$trModule:
 T18086.m: b
 T18086.panic: b
 
 
 
 ==================== Strictness signatures ====================
-T18086.$trModule:
 T18086.m: <L>x
 T18086.panic: <L>x
 

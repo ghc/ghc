@@ -12,7 +12,7 @@ lvl = GHC.Num.Integer.IS 1#
 f [InlPrag=OPAQUE] :: forall {t}. Num t => t -> [t]
 [GblId,
  Arity=2,
- Str=<LP(A,LCL(C1(L)),A,A,A,A,MCM(L))><L>,
+ Str=<LP(A,LCS(C1(L)),A,A,A,A,MC1(L))><L>,
  Unf=OtherCon []]
 f = \ (@t) ($dNum :: Num t) (eta :: t) ->
       let {
@@ -72,3 +72,6 @@ OpaqueNoSpecialise.$trModule :: GHC.Types.Module
 OpaqueNoSpecialise.$trModule
   = GHC.Types.Module
       OpaqueNoSpecialise.$trModule3 OpaqueNoSpecialise.$trModule1
+
+
+

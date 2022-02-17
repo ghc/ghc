@@ -1632,7 +1632,10 @@ mkLam env bndrs body cont
 
     -- See Note [Eta reduction based on evaluation context]
     -- NB: cont is never ApplyToVal, otherwise contEvalContext panics
-    eval_sd = contEvalContext cont
+    eval_sd dflags | gopt Opt_PedanticBottoms dflags = topSubDmd
+                       -- See Note [Eta reduction soundness], criterion (S)
+                       -- the bit about -fpedantic-bottoms
+                   | otherwise                       = contEvalContext cont
 
     mkLam' :: DynFlags -> [OutBndr] -> OutExpr -> SimplM OutExpr
     mkLam' dflags bndrs body@(Lam {})
@@ -1656,8 +1659,8 @@ mkLam env bndrs body cont
 
     mkLam' dflags bndrs body
       | gopt Opt_DoEtaReduction dflags
-      -- , pprTrace "try eta" (ppr bndrs $$ ppr body $$ ppr cont $$ ppr eval_sd) True
-      , Just etad_lam <- {-# SCC "tryee" #-} tryEtaReduce bndrs body eval_sd
+      -- , pprTrace "try eta" (ppr bndrs $$ ppr body $$ ppr cont $$ ppr (eval_sd dflags)) True
+      , Just etad_lam <- {-# SCC "tryee" #-} tryEtaReduce bndrs body (eval_sd dflags)
       = do { tick (EtaReduction (head bndrs))
            ; return etad_lam }
 

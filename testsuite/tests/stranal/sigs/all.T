@@ -1,7 +1,7 @@
 # This directory contains tests where we annotate functions with expected
 # type signatures, and verify that these actually those found by the compiler
 
-setTestOpts(extra_hc_opts('-ddump-str-signatures -ddump-cpr-signatures'))
+setTestOpts(extra_hc_opts('-ddump-str-signatures -ddump-cpr-signatures -dno-typeable-binds'))
 
 # We are testing the result of an optimization, so no use
 # running them in various runtimes
@@ -31,5 +31,5 @@ test('T18907', normal, compile, [''])
 test('T13331', normal, compile, [''])
 test('T20746', normal, compile, [''])
 test('T20746b', normal, compile, [''])
-
+test('T21081', normal, compile, [''])
 test('T21119', normal, compile, [''])

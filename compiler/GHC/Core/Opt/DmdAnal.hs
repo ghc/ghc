@@ -407,7 +407,7 @@ dmdAnal' env dmd (App fun arg)
 --         , text "arg dmd =" <+> ppr arg_dmd
 --         , text "arg dmd_ty =" <+> ppr arg_ty
 --         , text "res dmd_ty =" <+> ppr res_ty
---         , text "overall res dmd_ty =" <+> ppr (res_ty `bothDmdType` arg_ty) ])
+--         , text "overall res dmd_ty =" <+> ppr (res_ty `plusDmdType` arg_ty) ])
     WithDmdType (res_ty `plusDmdType` arg_ty) (App fun' arg')
 
 dmdAnal' env dmd (Lam var body)
@@ -441,7 +441,7 @@ dmdAnal' env dmd (Case scrut case_bndr ty [Alt alt bndrs rhs])
         -- What matters is its nested sub-demand!
         -- NB: If case_bndr_dmd is absDmd, boxity will say Unboxed, which is
         -- what we want, because then `seq` will put a `seqDmd` on its scrut.
-        (_ :* case_bndr_sd) = case_bndr_dmd
+        (_ :* case_bndr_sd) = strictifyDmd case_bndr_dmd
         -- Compute demand on the scrutinee
         -- FORCE the result, otherwise thunks will end up retaining the
         -- whole DmdEnv
@@ -514,7 +514,7 @@ dmdAnal' env dmd (Case scrut case_bndr ty alts)
     in
 --    pprTrace "dmdAnal:Case2" (vcat [ text "scrut" <+> ppr scrut
 --                                   , text "scrut_ty" <+> ppr scrut_ty
---                                   , text "alt_tys" <+> ppr alt_tys
+--                                   , text "alt_ty1" <+> ppr alt_ty1
 --                                   , text "alt_ty2" <+> ppr alt_ty2
 --                                   , text "res_ty" <+> ppr res_ty ]) $
     WithDmdType res_ty (Case scrut' case_bndr' ty alts')
@@ -570,7 +570,8 @@ dmdAnalSumAlt env dmd case_bndr (Alt con bndrs rhs)
         (!_scrut_sd, dmds') = addCaseBndrDmd case_bndr_sd dmds
         -- Do not put a thunk into the Alt
         !new_ids            = setBndrsDemandInfo bndrs dmds'
-  = WithDmdType alt_ty (Alt con new_ids rhs')
+  = -- pprTrace "dmdAnalSumAlt" (ppr con $$ ppr case_bndr $$ ppr dmd $$ ppr alt_ty) $
+    WithDmdType alt_ty (Alt con new_ids rhs')
 
 -- Precondition: The SubDemand is not a Call
 -- See Note [Demand on the scrutinee of a product case]
@@ -582,6 +583,7 @@ addCaseBndrDmd :: SubDemand -- On the case binder
                             -- and final demands for the components of the constructor
 addCaseBndrDmd case_sd fld_dmds
   | Just (_, ds) <- viewProd (length fld_dmds) scrut_sd
+  -- , pprTrace "addCaseBndrDmd" (ppr case_sd $$ ppr fld_dmds $$ ppr scrut_sd) True
   = (scrut_sd, ds)
   | otherwise
   = pprPanic "was a call demand" (ppr case_sd $$ ppr fld_dmds) -- See the Precondition
@@ -830,7 +832,8 @@ dmdTransform :: AnalEnv   -- ^ The analysis environment
 dmdTransform env var sd
   -- Data constructors
   | isDataConWorkId var
-  = dmdTransformDataConSig (idArity var) sd
+  = -- pprTraceWith "dmdTransform:DataCon" (\ty -> ppr var $$ ppr sd $$ ppr ty) $
+    dmdTransformDataConSig (idArity var) sd
   -- Dictionary component selectors
   -- Used to be controlled by a flag.
   -- See #18429 for some perf measurements.
@@ -1695,7 +1698,7 @@ dmdFix top_lvl env let_dmd orig_pairs
     -- annotation does not change any more.
     loop :: Int -> [(Id,CoreExpr)] -> (AnalEnv, DmdEnv, [(Id,CoreExpr)])
     loop n pairs = -- pprTrace "dmdFix" (ppr n <+> vcat [ ppr id <+> ppr (idDmdSig id)
-                   --                                     | (id,_)<- pairs]) $
+                   --                                   | (id,_) <- pairs]) $
                    loop' n pairs
 
     loop' n pairs

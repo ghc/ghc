@@ -59,7 +59,7 @@ end Rec }
 f [InlPrag=[2]] :: Int -> (Int, Int) -> Bool
 [GblId,
  Arity=2,
- Str=<1!P(1L)><MP(A,MP(ML))>,
+ Str=<1!P(1L)><MP(A,1P(1L))>,
  Cpr=2,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,

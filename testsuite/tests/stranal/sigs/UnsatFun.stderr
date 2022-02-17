@@ -1,18 +1,16 @@
 
 ==================== Strictness signatures ====================
-UnsatFun.$trModule:
 UnsatFun.f: <1!S><B>b
 UnsatFun.g: <1!S>b
-UnsatFun.g': <ML>
+UnsatFun.g': <MS>
 UnsatFun.g3: <A>
 UnsatFun.h: <1C1(L)>
-UnsatFun.h2: <1L><MCM(L)>
+UnsatFun.h2: <1L><MC1(L)>
 UnsatFun.h3: <1C1(A)>
 
 
 
 ==================== Cpr signatures ====================
-UnsatFun.$trModule:
 UnsatFun.f: b
 UnsatFun.g:
 UnsatFun.g':
@@ -24,13 +22,12 @@ UnsatFun.h3: 1
 
 
 ==================== Strictness signatures ====================
-UnsatFun.$trModule:
 UnsatFun.f: <1!S><B>b
 UnsatFun.g: <1!S>b
-UnsatFun.g': <ML>
+UnsatFun.g': <MS>
 UnsatFun.g3: <A>
 UnsatFun.h: <1C1(L)>
-UnsatFun.h2: <1L><MCM(L)>
+UnsatFun.h2: <1L><MC1(L)>
 UnsatFun.h3: <1C1(A)>
 
 

@@ -1,27 +1,15 @@
 
 ==================== Strictness signatures ====================
-T8569.$tc'Rdata:
-T8569.$tc'Rint:
-T8569.$tcRep:
-T8569.$trModule:
 T8569.addUp: <1L><L>
 
 
 
 ==================== Cpr signatures ====================
-T8569.$tc'Rdata:
-T8569.$tc'Rint:
-T8569.$tcRep:
-T8569.$trModule:
 T8569.addUp:
 
 
 
 ==================== Strictness signatures ====================
-T8569.$tc'Rdata:
-T8569.$tc'Rint:
-T8569.$tcRep:
-T8569.$trModule:
 T8569.addUp: <1L><L>
 
 

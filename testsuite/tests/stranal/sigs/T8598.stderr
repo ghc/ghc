@@ -1,18 +1,15 @@
 
 ==================== Strictness signatures ====================
-T8598.$trModule:
 T8598.fun: <1!P(L)>
 
 
 
 ==================== Cpr signatures ====================
-T8598.$trModule:
 T8598.fun: 1
 
 
 
 ==================== Strictness signatures ====================
-T8598.$trModule:
 T8598.fun: <1!P(L)>
 
 

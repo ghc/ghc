@@ -1,9 +1,5 @@
 
 ==================== Strictness signatures ====================
-DmdAnalGADTs.$tc'A:
-DmdAnalGADTs.$tc'B:
-DmdAnalGADTs.$tcD:
-DmdAnalGADTs.$trModule:
 DmdAnalGADTs.diverges: b
 DmdAnalGADTs.f: <1L>
 DmdAnalGADTs.f': <1L>
@@ -14,10 +10,6 @@ DmdAnalGADTs.hasStrSig: <1!P(L)>
 
 
 ==================== Cpr signatures ====================
-DmdAnalGADTs.$tc'A:
-DmdAnalGADTs.$tc'B:
-DmdAnalGADTs.$tcD:
-DmdAnalGADTs.$trModule:
 DmdAnalGADTs.diverges: b
 DmdAnalGADTs.f:
 DmdAnalGADTs.f': 1
@@ -28,10 +20,6 @@ DmdAnalGADTs.hasStrSig: 1
 
 
 ==================== Strictness signatures ====================
-DmdAnalGADTs.$tc'A:
-DmdAnalGADTs.$tc'B:
-DmdAnalGADTs.$tcD:
-DmdAnalGADTs.$trModule:
 DmdAnalGADTs.diverges: b
 DmdAnalGADTs.f: <1L>
 DmdAnalGADTs.f': <1L>
