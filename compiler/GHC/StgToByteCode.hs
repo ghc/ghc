@@ -784,6 +784,9 @@ findPushSeq (D: rest)
   = (PUSH_APPLY_D, 1, rest)
 findPushSeq (L: rest)
   = (PUSH_APPLY_L, 1, rest)
+findPushSeq argReps
+  | any (`elem` [V16, V32, V64]) argReps
+  = sorry "SIMD vector operations are not available in GHCi"
 findPushSeq _
   = panic "GHC.StgToByteCode.findPushSeq"
 
