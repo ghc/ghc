@@ -3,5 +3,5 @@
 # When run, this program will output a list of arguments which are necessary to
 # load the GHC library component into GHCi. The program is used by `ghcide` in
 # order to automatically set up the correct GHC API session for a project.
-TERM=dumb CABFLAGS=-v0 $PWD/hadrian/build-cabal tool:$1 -q --build-root=.hie-bios --flavour=ghc-in-ghci > $HIE_BIOS_OUTPUT
+TERM=dumb CABFLAGS=-v0 TOOL_OUTPUT=$HIE_BIOS_OUTPUT $PWD/hadrian/build-cabal tool:$1 -q --build-root=.hie-bios --flavour=ghc-in-ghci
 
