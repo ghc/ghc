@@ -16,9 +16,7 @@ module GHC.Unit.Module.Graph
    , mapMG
    , mgModSummaries
    , mgModSummaries'
-   , mgElemModule
    , mgLookupModule
-   , mgBootModules
    , mgTransDeps
    , needsTemplateHaskellOrQQ
    , isTemplateHaskellOrQQNonBoot
@@ -137,8 +135,6 @@ data ModuleGraph = ModuleGraph
     -- repeated whenever the transitive dependencies need to be calculated (for example, hptInstances)
   , mg_non_boot :: ModuleEnv ModSummary
     -- a map of all non-boot ModSummaries keyed by Modules
-  , mg_boot :: ModuleSet
-    -- a set of boot Modules
   , mg_needs_th_or_qq :: !Bool
     -- does any of the modules in mg_mss require TemplateHaskell or
     -- QuasiQuotes?
@@ -164,9 +160,6 @@ mapMG f mg@ModuleGraph{..} = mg
   , mg_non_boot = mapModuleEnv f mg_non_boot
   }
 
-mgBootModules :: ModuleGraph -> ModuleSet
-mgBootModules ModuleGraph{..} = mg_boot
-
 mgTransDeps :: ModuleGraph -> Map.Map NodeKey (Set.Set NodeKey)
 mgTransDeps = mg_trans_deps
 
@@ -184,7 +177,7 @@ mgLookupModule :: ModuleGraph -> Module -> Maybe ModSummary
 mgLookupModule ModuleGraph{..} m = lookupModuleEnv mg_non_boot m
 
 emptyMG :: ModuleGraph
-emptyMG = ModuleGraph [] Map.empty emptyModuleEnv emptyModuleSet False
+emptyMG = ModuleGraph [] Map.empty emptyModuleEnv False
 
 isTemplateHaskellOrQQNonBoot :: ModSummary -> Bool
 isTemplateHaskellOrQQNonBoot ms =
@@ -201,9 +194,6 @@ extendMG ModuleGraph{..} deps ms = ModuleGraph
   , mg_non_boot = case isBootSummary ms of
       IsBoot -> mg_non_boot
       NotBoot -> extendModuleEnv mg_non_boot (ms_mod ms) ms
-  , mg_boot = case isBootSummary ms of
-      NotBoot -> mg_boot
-      IsBoot -> extendModuleSet mg_boot (ms_mod ms)
   , mg_needs_th_or_qq = mg_needs_th_or_qq || isTemplateHaskellOrQQNonBoot ms
   }
   where
