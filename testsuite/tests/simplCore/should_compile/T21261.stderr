@@ -1,0 +1,73 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 192, types: 201, coercions: 0, joins: 0/0}
+
+lvl = I# 3#
+
+lvl1 = I# 4#
+
+lvl2 = I# 1#
+
+f2 = \ c -> case c lvl2 of { __DEFAULT -> c lvl lvl1 }
+
+yes1or2 = f2
+
+lvl3 = I# 2#
+
+$wf4
+  = \ c ->
+      case c lvl2 lvl3 of { __DEFAULT ->
+      case c lvl lvl1 of { __DEFAULT -> 42# }
+      }
+
+f4 = \ c -> case $wf4 c of ww { __DEFAULT -> I# ww }
+
+no3
+  = \ c ->
+      case $wf4 (\ x y z -> c x y z) of ww { __DEFAULT -> I# ww }
+
+$wf6 = \ c -> (# case c lvl2 of { __DEFAULT -> c lvl lvl1 } #)
+
+f6 = \ c -> case $wf6 c of { (# ww #) -> Just ww }
+
+no2_lazy
+  = \ c -> case $wf6 (\ x y -> c x y) of { (# ww #) -> Just ww }
+
+f7 = \ c -> case c lvl2 of { __DEFAULT -> c lvl3 lvl }
+
+not_quite_eta = \ c -> f7 (\ x y -> c x y)
+
+$wf5
+  = \ c ->
+      (# case c lvl2 lvl3 of { I# x ->
+         case c lvl lvl1 of { I# y -> I# (+# x y) }
+         } #)
+
+f5 = \ c -> case $wf5 c of { (# ww #) -> Just ww }
+
+yes2_lazy
+  = \ c -> case $wf5 (\ x y -> c x y) of { (# ww #) -> Just ww }
+
+$wf3
+  = \ c ->
+      case c lvl2 lvl3 of { I# x ->
+      case c lvl lvl1 of { I# y -> +# x y }
+      }
+
+f3 = \ c -> case $wf3 c of ww { __DEFAULT -> I# ww }
+
+yes2 = f3
+
+$wf1
+  = \ c ->
+      case c lvl2 lvl3 of { I# x ->
+      case c lvl lvl1 of { I# y -> +# x y }
+      }
+
+f1 = \ c -> case $wf1 c of ww { __DEFAULT -> I# ww }
+
+yes1 = f1
+
+
+

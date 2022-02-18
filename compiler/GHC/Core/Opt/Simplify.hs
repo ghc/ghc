@@ -352,7 +352,7 @@ simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
                 -- See Note [Floating and type abstraction] in GHC.Core.Opt.Simplify.Utils
 
         -- Simplify the RHS
-        ; let rhs_cont = mkRhsStop (substTy body_env (exprType body))
+        ; let rhs_cont = mkRhsStop (substTy body_env (exprType body)) (idDemandInfo bndr)
         ; (body_floats0, body0) <- {-#SCC "simplExprF" #-} simplExprF body_env body rhs_cont
 
         -- ANF-ise a constructor or PAP rhs
@@ -2205,7 +2205,7 @@ rebuildCall env fun_info
         -- have to be very careful about bogus strictness through
         -- floating a demanded let.
   = do  { arg' <- simplExprC (arg_se `setInScopeFromE` env) arg
-                             (mkLazyArgStop arg_ty (lazyArgContext fun_info))
+                             (mkLazyArgStop arg_ty fun_info)
         ; rebuildCall env (addValArgTo fun_info  arg' fun_ty) cont }
   where
     arg_ty = funArgTy fun_ty
@@ -2671,7 +2671,7 @@ There have been various earlier versions of this patch:
     case_bndr_evald_next _               = False
 
   This patch was part of fixing #7542. See also
-  Note [Eta reduction of an eval'd function] in GHC.Core.Utils.)
+  Note [Eta reduction soundness], criterion (E) in GHC.Core.Utils.)
 
 
 Further notes about case elimination
@@ -4281,5 +4281,3 @@ for the RHS as well as the LHS, but that seems more conservative
 than necesary.  Allowing some inlining might, for example, eliminate
 a binding.
 -}
-
-

@@ -39,7 +39,7 @@ module GHC.Types.Demand (
     -- ** Other @Demand@ operations
     oneifyCard, oneifyDmd, strictifyDmd, strictifyDictDmd, lazifyDmd,
     peelCallDmd, peelManyCalls, mkCalledOnceDmd, mkCalledOnceDmds,
-    mkWorkerDemand,
+    mkWorkerDemand, subDemandIfEvaluated,
     -- ** Extracting one-shot information
     argOneShots, argsOneShots, saturatedByOneShots,
     -- ** Manipulating Boxity of a Demand
@@ -1025,6 +1025,12 @@ peelManyCalls 0 _                          = C_11
 -- See Note [Call demands are relative]
 peelManyCalls n (viewCall -> Just (m, sd)) = m `multCard` peelManyCalls (n-1) sd
 peelManyCalls _ _                          = C_0N
+
+-- | Extract the 'SubDemand' of a 'Demand'.
+-- PRECONDITION: The SubDemand must be used in a context where the expression
+-- denoted by the Demand is under evaluation.
+subDemandIfEvaluated :: Demand -> SubDemand
+subDemandIfEvaluated (_ :* sd) = sd
 
 -- See Note [Demand on the worker] in GHC.Core.Opt.WorkWrap
 mkWorkerDemand :: Int -> Demand
