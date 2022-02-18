@@ -14,11 +14,10 @@
     CSYM(x):
 
 
-#if defined(darwin_HOST_OS)
 /*
- * Note [Adjustor templates live in data section on Darwin]
+ * Note [Adjustor templates live in data section]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
- * Apple Darwin's linker does not allow relocations in the text section; in
+ * Some linkers (namely Apple's ld64 and some ld.lld configurations on Linux) do not allow relocations in the text section; in
  * principle this should be mitigated by only using local symbol references, as
  * described in Note [Adjustors: Local symbol references]. However, for reasons
  * that remain a mystery the assembler produces a relocations regardless.
@@ -26,7 +25,10 @@
  * we will never execute it here; it will always be copied to an executable
  * page first.
  */
+#if defined(darwin_HOST_OS)
 .section __DATA,__data
+#elif defined(linux_HOST_OS)
+.section .data
 #endif
 
 /*
@@ -84,9 +86,11 @@ lcl_complex_ccall_adjustor_context: // See Note [Adjustors: Local symbol referen
 DECLARE_CSYM(complex_ccall_adjustor_end)
 
 
+/* See Note [Adjustor templates live in data section]. */
 #if defined(darwin_HOST_OS)
-/* See Note [Adjustor templates live in data section on Darwin]. */
 .section __TEXT,__text
+#elif defined(linux_HOST_OS)
+.section .text
 #endif
 
 /*
