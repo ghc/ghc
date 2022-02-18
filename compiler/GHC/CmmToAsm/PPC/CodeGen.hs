@@ -33,7 +33,8 @@ import GHC.Cmm.DebugBlock
    ( DebugBlock(..) )
 import GHC.CmmToAsm.Monad
    ( NatM, getNewRegNat, getNewLabelNat
-   , getBlockIdNat, getPicBaseNat, getNewRegPairNat
+   , getBlockIdNat, getPicBaseNat
+   , Reg64(..), RegCode64(..), getNewReg64, localReg64
    , getPicBaseMaybeNat, getPlatform, getConfig
    , getDebugBlock, getFileId
    )
@@ -222,12 +223,15 @@ swizzleRegisterRep :: Register -> Format -> Register
 swizzleRegisterRep (Fixed _ reg code) format = Fixed format reg code
 swizzleRegisterRep (Any _ codefn)     format = Any   format codefn
 
+getLocalRegReg :: LocalReg -> Reg
+getLocalRegReg (LocalReg u pk)
+  = RegVirtual (mkVirtualReg u (cmmTypeFormat pk))
 
 -- | Grab the Reg for a CmmReg
 getRegisterReg :: Platform -> CmmReg -> Reg
 
-getRegisterReg _ (CmmLocal (LocalReg u pk))
-  = RegVirtual $ mkVirtualReg u (cmmTypeFormat pk)
+getRegisterReg _ (CmmLocal local_reg)
+  = getLocalRegReg local_reg
 
 getRegisterReg platform (CmmGlobal mid)
   = case globalRegMaybe platform mid of
@@ -274,16 +278,6 @@ of the VRegUniqueLo form, and the upper-half VReg can be determined
 by applying getHiVRegFromLo to it.
 -}
 
-data ChildCode64        -- a.k.a "Register64"
-      = ChildCode64
-           InstrBlock   -- code
-           Reg          -- the lower 32-bit temporary which contains the
-                        -- result; use getHiVRegFromLo to find the other
-                        -- VRegUnique.  Rules of this simplified insn
-                        -- selection game are therefore that the returned
-                        -- Reg may be modified
-
-
 -- | Compute an expression into a register, but
 --      we don't mind which one it is.
 getSomeReg :: CmmExpr -> NatM (Reg, InstrBlock)
@@ -310,10 +304,8 @@ getI64Amodes addrTree = do
 assignMem_I64Code :: CmmExpr -> CmmExpr -> NatM InstrBlock
 assignMem_I64Code addrTree valueTree = do
         (hi_addr, lo_addr, addr_code) <- getI64Amodes addrTree
-        ChildCode64 vcode rlo <- iselExpr64 valueTree
+        RegCode64 vcode rhi rlo <- iselExpr64 valueTree
         let
-                rhi = getHiVRegFromLo rlo
-
                 -- Big-endian store
                 mov_hi = ST II32 rhi hi_addr
                 mov_lo = ST II32 rlo lo_addr
@@ -321,14 +313,11 @@ assignMem_I64Code addrTree valueTree = do
 
 
 assignReg_I64Code :: CmmReg  -> CmmExpr -> NatM InstrBlock
-assignReg_I64Code (CmmLocal (LocalReg u_dst _)) valueTree = do
-   ChildCode64 vcode r_src_lo <- iselExpr64 valueTree
-   let
-         r_dst_lo = RegVirtual $ mkVirtualReg u_dst II32
-         r_dst_hi = getHiVRegFromLo r_dst_lo
-         r_src_hi = getHiVRegFromLo r_src_lo
-         mov_lo = MR r_dst_lo r_src_lo
-         mov_hi = MR r_dst_hi r_src_hi
+assignReg_I64Code (CmmLocal lreg) valueTree = do
+   RegCode64 vcode r_src_hi r_src_lo <- iselExpr64 valueTree
+   let Reg64 r_dst_hi r_dst_lo = localReg64 lreg
+       mov_lo = MR r_dst_lo r_src_lo
+       mov_hi = MR r_dst_hi r_src_hi
    return (
         vcode `snocOL` mov_lo `snocOL` mov_hi
      )
@@ -337,20 +326,21 @@ assignReg_I64Code _ _
    = panic "assignReg_I64Code(powerpc): invalid lvalue"
 
 
-iselExpr64        :: CmmExpr -> NatM ChildCode64
+iselExpr64        :: CmmExpr -> NatM (RegCode64 InstrBlock)
 iselExpr64 (CmmLoad addrTree ty _) | isWord64 ty = do
     (hi_addr, lo_addr, addr_code) <- getI64Amodes addrTree
-    (rlo, rhi) <- getNewRegPairNat II32
+    Reg64 rhi rlo <- getNewReg64
     let mov_hi = LD II32 rhi hi_addr
         mov_lo = LD II32 rlo lo_addr
-    return $ ChildCode64 (addr_code `snocOL` mov_lo `snocOL` mov_hi)
-                         rlo
+    return $ RegCode64 (addr_code `snocOL` mov_lo `snocOL` mov_hi)
+                         rhi rlo
 
-iselExpr64 (CmmReg (CmmLocal (LocalReg vu ty))) | isWord64 ty
-   = return (ChildCode64 nilOL (RegVirtual $ mkVirtualReg vu II32))
+iselExpr64 (CmmReg (CmmLocal local_reg)) = do
+  let Reg64 hi lo = localReg64 local_reg
+  return (RegCode64 nilOL hi lo)
 
 iselExpr64 (CmmLit (CmmInt i _)) = do
-  (rlo,rhi) <- getNewRegPairNat II32
+  Reg64 rhi rlo <- getNewReg64
   let
         half0 = fromIntegral (fromIntegral i :: Word16)
         half1 = fromIntegral (fromIntegral (i `shiftR` 16) :: Word16)
@@ -363,49 +353,45 @@ iselExpr64 (CmmLit (CmmInt i _)) = do
                 LIS rhi (ImmInt half3),
                 OR rhi rhi (RIImm $ ImmInt half2)
                 ]
-  return (ChildCode64 code rlo)
+  return (RegCode64 code rhi rlo)
 
 iselExpr64 (CmmMachOp (MO_Add _) [e1,e2]) = do
-   ChildCode64 code1 r1lo <- iselExpr64 e1
-   ChildCode64 code2 r2lo <- iselExpr64 e2
-   (rlo,rhi) <- getNewRegPairNat II32
+   RegCode64 code1 r1hi r1lo <- iselExpr64 e1
+   RegCode64 code2 r2hi r2lo <- iselExpr64 e2
+   Reg64 rhi rlo <- getNewReg64
    let
-        r1hi = getHiVRegFromLo r1lo
-        r2hi = getHiVRegFromLo r2lo
         code =  code1 `appOL`
                 code2 `appOL`
                 toOL [ ADDC rlo r1lo r2lo,
                        ADDE rhi r1hi r2hi ]
-   return (ChildCode64 code rlo)
+   return (RegCode64 code rhi rlo)
 
 iselExpr64 (CmmMachOp (MO_Sub _) [e1,e2]) = do
-   ChildCode64 code1 r1lo <- iselExpr64 e1
-   ChildCode64 code2 r2lo <- iselExpr64 e2
-   (rlo,rhi) <- getNewRegPairNat II32
+   RegCode64 code1 r1hi r1lo <- iselExpr64 e1
+   RegCode64 code2 r2hi r2lo <- iselExpr64 e2
+   Reg64 rhi rlo <- getNewReg64
    let
-        r1hi = getHiVRegFromLo r1lo
-        r2hi = getHiVRegFromLo r2lo
         code =  code1 `appOL`
                 code2 `appOL`
                 toOL [ SUBFC rlo r2lo (RIReg r1lo),
                        SUBFE rhi r2hi r1hi ]
-   return (ChildCode64 code rlo)
+   return (RegCode64 code rhi rlo)
 
 iselExpr64 (CmmMachOp (MO_UU_Conv W32 W64) [expr]) = do
     (expr_reg,expr_code) <- getSomeReg expr
-    (rlo, rhi) <- getNewRegPairNat II32
+    Reg64 rhi rlo <- getNewReg64
     let mov_hi = LI rhi (ImmInt 0)
         mov_lo = MR rlo expr_reg
-    return $ ChildCode64 (expr_code `snocOL` mov_lo `snocOL` mov_hi)
-                         rlo
+    return $ RegCode64 (expr_code `snocOL` mov_lo `snocOL` mov_hi)
+                       rhi rlo
 
 iselExpr64 (CmmMachOp (MO_SS_Conv W32 W64) [expr]) = do
     (expr_reg,expr_code) <- getSomeReg expr
-    (rlo, rhi) <- getNewRegPairNat II32
+    Reg64 rhi rlo <- getNewReg64
     let mov_hi = SRA II32 rhi expr_reg (RIImm (ImmInt 31))
         mov_lo = MR rlo expr_reg
-    return $ ChildCode64 (expr_code `snocOL` mov_lo `snocOL` mov_hi)
-                         rlo
+    return $ RegCode64 (expr_code `snocOL` mov_lo `snocOL` mov_hi)
+                       rhi rlo
 iselExpr64 expr
    = do
      platform <- getPlatform
@@ -443,23 +429,23 @@ getRegister' config platform tree@(CmmRegOff _ _)
 getRegister' _ platform (CmmMachOp (MO_UU_Conv W64 W32)
                      [CmmMachOp (MO_U_Shr W64) [x,CmmLit (CmmInt 32 _)]])
  | target32Bit platform = do
-  ChildCode64 code rlo <- iselExpr64 x
+  RegCode64 code _rhi rlo <- iselExpr64 x
   return $ Fixed II32 (getHiVRegFromLo rlo) code
 
 getRegister' _ platform (CmmMachOp (MO_SS_Conv W64 W32)
                      [CmmMachOp (MO_U_Shr W64) [x,CmmLit (CmmInt 32 _)]])
  | target32Bit platform = do
-  ChildCode64 code rlo <- iselExpr64 x
+  RegCode64 code _rhi rlo <- iselExpr64 x
   return $ Fixed II32 (getHiVRegFromLo rlo) code
 
 getRegister' _ platform (CmmMachOp (MO_UU_Conv W64 W32) [x])
  | target32Bit platform = do
-  ChildCode64 code rlo <- iselExpr64 x
+  RegCode64 code _rhi rlo <- iselExpr64 x
   return $ Fixed II32 rlo code
 
 getRegister' _ platform (CmmMachOp (MO_SS_Conv W64 W32) [x])
  | target32Bit platform = do
-  ChildCode64 code rlo <- iselExpr64 x
+  RegCode64 code _rhi rlo <- iselExpr64 x
   return $ Fixed II32 rlo code
 
 getRegister' _ platform (CmmLoad mem pk _)
@@ -927,10 +913,8 @@ condIntCode' :: Bool -> Cond -> Width -> CmmExpr -> CmmExpr -> NatM CondCode
 condIntCode' True cond W64 x y
   | condUnsigned cond
   = do
-      ChildCode64 code_x x_lo <- iselExpr64 x
-      ChildCode64 code_y y_lo <- iselExpr64 y
-      let x_hi = getHiVRegFromLo x_lo
-          y_hi = getHiVRegFromLo y_lo
+      RegCode64 code_x x_hi x_lo <- iselExpr64 x
+      RegCode64 code_y y_hi y_lo <- iselExpr64 y
       end_lbl <- getBlockIdNat
       let code = code_x `appOL` code_y `appOL` toOL
                  [ CMPL II32 x_hi (RIReg y_hi)
@@ -943,10 +927,8 @@ condIntCode' True cond W64 x y
       return (CondCode False cond code)
   | otherwise
   = do
-      ChildCode64 code_x x_lo <- iselExpr64 x
-      ChildCode64 code_y y_lo <- iselExpr64 y
-      let x_hi = getHiVRegFromLo x_lo
-          y_hi = getHiVRegFromLo y_lo
+      RegCode64 code_x x_hi x_lo <- iselExpr64 x
+      RegCode64 code_y y_hi y_lo <- iselExpr64 y
       end_lbl <- getBlockIdNat
       cmp_lo  <- getBlockIdNat
       let code = code_x `appOL` code_y `appOL` toOL
@@ -1143,9 +1125,8 @@ genCCall (PrimTarget (MO_Prefetch_Data _)) _ _
  = return $ nilOL
 
 genCCall (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
- = do platform <- getPlatform
-      let fmt      = intFormat width
-          reg_dst  = getRegisterReg platform (CmmLocal dst)
+ = do let fmt      = intFormat width
+          reg_dst  = getLocalRegReg dst
       (instr, n_code) <- case amop of
             AMO_Add  -> getSomeRegOrImm ADD True reg_dst
             AMO_Sub  -> case n of
@@ -1194,9 +1175,8 @@ genCCall (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
                           return  (op dst dst (RIReg n_reg), n_code)
 
 genCCall (PrimTarget (MO_AtomicRead width)) [dst] [addr]
- = do platform <- getPlatform
-      let fmt      = intFormat width
-          reg_dst  = getRegisterReg platform (CmmLocal dst)
+ = do let fmt      = intFormat width
+          reg_dst  = getLocalRegReg dst
           form     = if widthInBits width == 64 then DS else D
       Amode addr_reg addr_code <- getAmode form addr
       lbl_end <- getBlockIdNat
@@ -1228,14 +1208,13 @@ genCCall (PrimTarget (MO_AtomicWrite width)) [] [addr, val] = do
 genCCall (PrimTarget (MO_Cmpxchg width)) [dst] [addr, old, new]
   | width == W32 || width == W64
   = do
-      platform <- getPlatform
       (old_reg, old_code) <- getSomeReg old
       (new_reg, new_code) <- getSomeReg new
       (addr_reg, addr_code) <- getSomeReg addr
       lbl_retry <- getBlockIdNat
       lbl_eq    <- getBlockIdNat
       lbl_end   <- getBlockIdNat
-      let reg_dst   = getRegisterReg platform (CmmLocal dst)
+      let reg_dst   = getLocalRegReg dst
           code      = toOL
                       [ HWSYNC
                       , BCC ALWAYS lbl_retry Nothing
@@ -1258,15 +1237,14 @@ genCCall (PrimTarget (MO_Cmpxchg width)) [dst] [addr, old, new]
 
 genCCall (PrimTarget (MO_Clz width)) [dst] [src]
  = do platform <- getPlatform
-      let reg_dst = getRegisterReg platform (CmmLocal dst)
+      let reg_dst = getLocalRegReg dst
       if target32Bit platform && width == W64
         then do
-          ChildCode64 code vr_lo <- iselExpr64 src
+          RegCode64 code vr_hi vr_lo <- iselExpr64 src
           lbl1 <- getBlockIdNat
           lbl2 <- getBlockIdNat
           lbl3 <- getBlockIdNat
-          let vr_hi = getHiVRegFromLo vr_lo
-              cntlz = toOL [ CMPL II32 vr_hi (RIImm (ImmInt 0))
+          let cntlz = toOL [ CMPL II32 vr_hi (RIImm (ImmInt 0))
                            , BCC NE lbl2 Nothing
                            , BCC ALWAYS lbl1 Nothing
 
@@ -1309,11 +1287,11 @@ genCCall (PrimTarget (MO_Clz width)) [dst] [src]
 
 genCCall (PrimTarget (MO_Ctz width)) [dst] [src]
  = do platform <- getPlatform
-      let reg_dst = getRegisterReg platform (CmmLocal dst)
+      let reg_dst = getLocalRegReg dst
       if target32Bit platform && width == W64
         then do
           let format = II32
-          ChildCode64 code vr_lo <- iselExpr64 src
+          RegCode64 code vr_hi vr_lo <- iselExpr64 src
           lbl1 <- getBlockIdNat
           lbl2 <- getBlockIdNat
           lbl3 <- getBlockIdNat
@@ -1321,8 +1299,7 @@ genCCall (PrimTarget (MO_Ctz width)) [dst] [src]
           x'' <- getNewRegNat format
           r' <- getNewRegNat format
           cnttzlo <- cnttz format reg_dst vr_lo
-          let vr_hi = getHiVRegFromLo vr_lo
-              cnttz64 = toOL [ CMPL format vr_lo (RIImm (ImmInt 0))
+          let cnttz64 = toOL [ CMPL format vr_lo (RIImm (ImmInt 0))
                              , BCC NE lbl2 Nothing
                              , BCC ALWAYS lbl1 Nothing
 
@@ -1375,38 +1352,38 @@ genCCall (PrimTarget (MO_Ctz width)) [dst] [src]
 genCCall target dest_regs argsAndHints
  = do platform <- getPlatform
       case target of
-        PrimTarget (MO_S_QuotRem  width) -> divOp1 platform True  width
+        PrimTarget (MO_S_QuotRem  width) -> divOp1 True  width
                                                    dest_regs argsAndHints
-        PrimTarget (MO_U_QuotRem  width) -> divOp1 platform False width
+        PrimTarget (MO_U_QuotRem  width) -> divOp1 False width
                                                    dest_regs argsAndHints
-        PrimTarget (MO_U_QuotRem2 width) -> divOp2 platform width dest_regs
+        PrimTarget (MO_U_QuotRem2 width) -> divOp2 width dest_regs
                                                    argsAndHints
-        PrimTarget (MO_U_Mul2 width) -> multOp2 platform width dest_regs
+        PrimTarget (MO_U_Mul2 width) -> multOp2 width dest_regs
                                                 argsAndHints
-        PrimTarget (MO_Add2 _) -> add2Op platform dest_regs argsAndHints
-        PrimTarget (MO_AddWordC _) -> addcOp platform dest_regs argsAndHints
-        PrimTarget (MO_SubWordC _) -> subcOp platform dest_regs argsAndHints
-        PrimTarget (MO_AddIntC width) -> addSubCOp ADDO platform width
+        PrimTarget (MO_Add2 _) -> add2Op dest_regs argsAndHints
+        PrimTarget (MO_AddWordC _) -> addcOp dest_regs argsAndHints
+        PrimTarget (MO_SubWordC _) -> subcOp dest_regs argsAndHints
+        PrimTarget (MO_AddIntC width) -> addSubCOp ADDO width
                                                    dest_regs argsAndHints
-        PrimTarget (MO_SubIntC width) -> addSubCOp SUBFO platform width
+        PrimTarget (MO_SubIntC width) -> addSubCOp SUBFO width
                                                    dest_regs argsAndHints
-        PrimTarget MO_F64_Fabs -> fabs platform dest_regs argsAndHints
-        PrimTarget MO_F32_Fabs -> fabs platform dest_regs argsAndHints
+        PrimTarget MO_F64_Fabs -> fabs dest_regs argsAndHints
+        PrimTarget MO_F32_Fabs -> fabs dest_regs argsAndHints
         _ -> do config <- getConfig
                 genCCall' config (platformToGCP platform)
                        target dest_regs argsAndHints
-        where divOp1 platform signed width [res_q, res_r] [arg_x, arg_y]
-                = do let reg_q = getRegisterReg platform (CmmLocal res_q)
-                         reg_r = getRegisterReg platform (CmmLocal res_r)
+        where divOp1 signed width [res_q, res_r] [arg_x, arg_y]
+                = do let reg_q = getLocalRegReg res_q
+                         reg_r = getLocalRegReg res_r
                      remainderCode width signed reg_q arg_x arg_y
                        <*> pure reg_r
 
-              divOp1 _ _ _ _ _
+              divOp1 _ _ _ _
                 = panic "genCCall: Wrong number of arguments for divOp1"
-              divOp2 platform width [res_q, res_r]
+              divOp2 width [res_q, res_r]
                                     [arg_x_high, arg_x_low, arg_y]
-                = do let reg_q = getRegisterReg platform (CmmLocal res_q)
-                         reg_r = getRegisterReg platform (CmmLocal res_r)
+                = do let reg_q = getLocalRegReg res_q
+                         reg_r = getLocalRegReg res_r
                          fmt   = intFormat width
                          half  = 4 * (formatInBytes fmt)
                      (xh_reg, xh_code) <- getSomeReg arg_x_high
@@ -1543,11 +1520,11 @@ genCCall target dest_regs argsAndHints
                                    , SL fmt reg_q q1 (RIImm (ImmInt half))
                                    , ADD reg_q reg_q (RIReg q0)
                                    ]
-              divOp2 _ _ _ _
+              divOp2 _ _ _
                 = panic "genCCall: Wrong number of arguments for divOp2"
-              multOp2 platform width [res_h, res_l] [arg_x, arg_y]
-                = do let reg_h = getRegisterReg platform (CmmLocal res_h)
-                         reg_l = getRegisterReg platform (CmmLocal res_l)
+              multOp2 width [res_h, res_l] [arg_x, arg_y]
+                = do let reg_h = getLocalRegReg res_h
+                         reg_l = getLocalRegReg res_l
                          fmt = intFormat width
                      (x_reg, x_code) <- getSomeReg arg_x
                      (y_reg, y_code) <- getSomeReg arg_y
@@ -1555,11 +1532,11 @@ genCCall target dest_regs argsAndHints
                             `appOL` toOL [ MULL fmt reg_l x_reg (RIReg y_reg)
                                          , MULHU fmt reg_h x_reg y_reg
                                          ]
-              multOp2 _ _ _ _
+              multOp2 _ _ _
                 = panic "genCall: Wrong number of arguments for multOp2"
-              add2Op platform [res_h, res_l] [arg_x, arg_y]
-                = do let reg_h = getRegisterReg platform (CmmLocal res_h)
-                         reg_l = getRegisterReg platform (CmmLocal res_l)
+              add2Op [res_h, res_l] [arg_x, arg_y]
+                = do let reg_h = getLocalRegReg res_h
+                         reg_l = getLocalRegReg res_l
                      (x_reg, x_code) <- getSomeReg arg_x
                      (y_reg, y_code) <- getSomeReg arg_y
                      return $ y_code `appOL` x_code
@@ -1567,20 +1544,20 @@ genCCall target dest_regs argsAndHints
                                          , ADDC reg_l x_reg y_reg
                                          , ADDZE reg_h reg_h
                                          ]
-              add2Op _ _ _
+              add2Op _ _
                 = panic "genCCall: Wrong number of arguments/results for add2"
 
-              addcOp platform [res_r, res_c] [arg_x, arg_y]
-                = add2Op platform [res_c {-hi-}, res_r {-lo-}] [arg_x, arg_y]
-              addcOp _ _ _
+              addcOp [res_r, res_c] [arg_x, arg_y]
+                = add2Op [res_c {-hi-}, res_r {-lo-}] [arg_x, arg_y]
+              addcOp _ _
                 = panic "genCCall: Wrong number of arguments/results for addc"
 
               -- PowerPC subfc sets the carry for rT = ~(rA) + rB + 1,
               -- which is 0 for borrow and 1 otherwise. We need 1 and 0
               -- so xor with 1.
-              subcOp platform [res_r, res_c] [arg_x, arg_y]
-                = do let reg_r = getRegisterReg platform (CmmLocal res_r)
-                         reg_c = getRegisterReg platform (CmmLocal res_c)
+              subcOp [res_r, res_c] [arg_x, arg_y]
+                = do let reg_r = getLocalRegReg res_r
+                         reg_c = getLocalRegReg res_c
                      (x_reg, x_code) <- getSomeReg arg_x
                      (y_reg, y_code) <- getSomeReg arg_y
                      return $ y_code `appOL` x_code
@@ -1589,11 +1566,11 @@ genCCall target dest_regs argsAndHints
                                          , ADDZE reg_c reg_c
                                          , XOR reg_c reg_c (RIImm (ImmInt 1))
                                          ]
-              subcOp _ _ _
+              subcOp _ _
                 = panic "genCCall: Wrong number of arguments/results for subc"
-              addSubCOp instr platform width [res_r, res_c] [arg_x, arg_y]
-                = do let reg_r = getRegisterReg platform (CmmLocal res_r)
-                         reg_c = getRegisterReg platform (CmmLocal res_c)
+              addSubCOp instr width [res_r, res_c] [arg_x, arg_y]
+                = do let reg_r = getLocalRegReg res_r
+                         reg_c = getLocalRegReg res_c
                      (x_reg, x_code) <- getSomeReg arg_x
                      (y_reg, y_code) <- getSomeReg arg_y
                      return $ y_code `appOL` x_code
@@ -1601,13 +1578,13 @@ genCCall target dest_regs argsAndHints
                                            -- SUBFO argument order reversed!
                                            MFOV (intFormat width) reg_c
                                          ]
-              addSubCOp _ _ _ _ _
+              addSubCOp _ _ _ _
                 = panic "genCall: Wrong number of arguments/results for addC"
-              fabs platform [res] [arg]
-                = do let res_r = getRegisterReg platform (CmmLocal res)
+              fabs [res] [arg]
+                = do let res_r = getLocalRegReg res
                      (arg_reg, arg_code) <- getSomeReg arg
                      return $ arg_code `snocOL` FABS res_r arg_reg
-              fabs _ _ _
+              fabs _ _
                 = panic "genCall: Wrong number of arguments/results for fabs"
 
 -- TODO: replace 'Int' by an enum such as 'PPC_64ABI'
@@ -1817,8 +1794,7 @@ genCCall' config gcp target dest_regs args
                accumCode accumUsed | isWord64 arg_ty
                                      && target32Bit (ncgPlatform config) =
             do
-                ChildCode64 code vr_lo <- iselExpr64 arg
-                let vr_hi = getHiVRegFromLo vr_lo
+                RegCode64 code vr_hi vr_lo <- iselExpr64 arg
 
                 case gcp of
                     GCPAIX ->
@@ -1978,7 +1954,7 @@ genCCall' config gcp target dest_regs args
                                 MR r_dest r4]
                     | otherwise -> unitOL (MR r_dest r3)
                     where rep = cmmRegType platform (CmmLocal dest)
-                          r_dest = getRegisterReg platform (CmmLocal dest)
+                          r_dest = getLocalRegReg dest
                 _ -> panic "genCCall' moveResult: Bad dest_regs"
 
         outOfLineMachOp mop =

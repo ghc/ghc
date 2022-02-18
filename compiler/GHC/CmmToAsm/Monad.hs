@@ -29,7 +29,6 @@ module GHC.CmmToAsm.Monad (
         getBlockIdNat,
         getNewLabelNat,
         getNewRegNat,
-        getNewRegPairNat,
         getPicBaseMaybeNat,
         getPicBaseNat,
         getCfgWeights,
@@ -37,7 +36,11 @@ module GHC.CmmToAsm.Monad (
         getFileId,
         getDebugBlock,
 
-        DwarfFiles
+        DwarfFiles,
+
+        -- * 64-bit registers on 32-bit architectures
+        Reg64(..), RegCode64(..),
+        getNewReg64, localReg64
 )
 
 where
@@ -56,6 +59,8 @@ import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow.Label
 import GHC.Cmm.CLabel           ( CLabel )
 import GHC.Cmm.DebugBlock
+import GHC.Cmm.Expr             (LocalReg (..), isWord64)
+
 import GHC.Data.FastString      ( FastString )
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Supply
@@ -66,6 +71,7 @@ import Control.Monad    ( ap )
 
 import GHC.Utils.Outputable (SDoc, ppr)
 import GHC.Utils.Panic      (pprPanic)
+import GHC.Utils.Misc
 import GHC.CmmToAsm.CFG
 import GHC.CmmToAsm.CFG.Weight
 
@@ -254,14 +260,38 @@ getNewRegNat rep
       return (RegVirtual $ targetMkVirtualReg platform u rep)
 
 
-getNewRegPairNat :: Format -> NatM (Reg,Reg)
-getNewRegPairNat rep
- = do u <- getUniqueNat
-      platform <- getPlatform
-      let vLo = targetMkVirtualReg platform u rep
-      let lo  = RegVirtual $ targetMkVirtualReg platform u rep
-      let hi  = RegVirtual $ getHiVirtualRegFromLo vLo
-      return (lo, hi)
+-- | Two 32-bit regs used as a single virtual 64-bit register
+data Reg64 = Reg64
+  !Reg -- ^ Higher part
+  !Reg -- ^ Lower part
+
+-- | Two 32-bit regs used as a single virtual 64-bit register
+-- and the code to set them appropriately
+data RegCode64 code = RegCode64
+  code -- ^ Code to initialize the registers
+  !Reg -- ^ Higher part
+  !Reg -- ^ Lower part
+
+-- | Return a virtual 64-bit register
+getNewReg64 :: NatM Reg64
+getNewReg64 = do
+  let rep = II32
+  u <- getUniqueNat
+  platform <- getPlatform
+  let vLo = targetMkVirtualReg platform u rep
+  let lo  = RegVirtual $ targetMkVirtualReg platform u rep
+  let hi  = RegVirtual $ getHiVirtualRegFromLo vLo
+  return $ Reg64 hi lo
+
+-- | Convert a 64-bit LocalReg into two virtual 32-bit regs.
+--
+-- Used to handle 64-bit "registers" on 32-bit architectures
+localReg64 :: HasDebugCallStack => LocalReg -> Reg64
+localReg64 (LocalReg vu ty)
+  | isWord64 ty = let lo = RegVirtual (VirtualRegI vu)
+                      hi = getHiVRegFromLo lo
+                  in Reg64 hi lo
+  | otherwise   = pprPanic "localReg64" (ppr ty)
 
 
 getPicBaseMaybeNat :: NatM (Maybe Reg)

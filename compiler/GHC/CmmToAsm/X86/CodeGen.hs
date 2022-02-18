@@ -47,7 +47,8 @@ import GHC.Cmm.DebugBlock
 import GHC.CmmToAsm.PIC
 import GHC.CmmToAsm.Monad
    ( NatM, getNewRegNat, getNewLabelNat, setDeltaNat
-   , getDeltaNat, getBlockIdNat, getPicBaseNat, getNewRegPairNat
+   , getDeltaNat, getBlockIdNat, getPicBaseNat
+   , Reg64(..), RegCode64(..), getNewReg64, localReg64
    , getPicBaseMaybeNat, getDebugBlock, getFileId
    , addImmediateSuccessorNat, updateCfgNat, getConfig, getPlatform
    , getCfgWeights
@@ -375,19 +376,6 @@ data CondCode
         = CondCode Bool Cond InstrBlock
 
 
--- | a.k.a "Register64"
---      Reg is the lower 32-bit temporary which contains the result.
---      Use getHiVRegFromLo to find the other VRegUnique.
---
---      Rules of this simplified insn selection game are therefore that
---      the returned Reg may be modified
---
-data ChildCode64
-   = ChildCode64
-        InstrBlock
-        Reg
-
-
 -- | Register's passed up the tree.  If the stix code forces the register
 --      to live in a pre-decided machine register, it comes out as @Fixed@;
 --      otherwise, it comes out as @Any@, and the parent can decide which
@@ -402,14 +390,15 @@ swizzleRegisterRep :: Register -> Format -> Register
 swizzleRegisterRep (Fixed _ reg code) format = Fixed format reg code
 swizzleRegisterRep (Any _ codefn)     format = Any   format codefn
 
+getLocalRegReg :: LocalReg -> Reg
+getLocalRegReg (LocalReg u pk)
+  = -- by Assuming SSE2, Int,Word,Float,Double all can be register allocated
+    RegVirtual (mkVirtualReg u (cmmTypeFormat pk))
 
 -- | Grab the Reg for a CmmReg
 getRegisterReg :: Platform  -> CmmReg -> Reg
 
-getRegisterReg _   (CmmLocal (LocalReg u pk))
-  = -- by Assuming SSE2, Int,Word,Float,Double all can be register allocated
-   let fmt = cmmTypeFormat pk in
-        RegVirtual (mkVirtualReg u fmt)
+getRegisterReg _   (CmmLocal lreg) = getLocalRegReg lreg
 
 getRegisterReg platform  (CmmGlobal mid)
   = case globalRegMaybe platform mid of
@@ -487,10 +476,8 @@ getSomeReg expr = do
 assignMem_I64Code :: CmmExpr -> CmmExpr -> NatM InstrBlock
 assignMem_I64Code addrTree valueTree = do
   Amode addr addr_code <- getAmode addrTree
-  ChildCode64 vcode rlo <- iselExpr64 valueTree
+  RegCode64 vcode rhi rlo <- iselExpr64 valueTree
   let
-        rhi = getHiVRegFromLo rlo
-
         -- Little-endian store
         mov_lo = MOV II32 (OpReg rlo) (OpAddr addr)
         mov_hi = MOV II32 (OpReg rhi) (OpAddr (fromJust (addrOffset addr 4)))
@@ -498,12 +485,10 @@ assignMem_I64Code addrTree valueTree = do
 
 
 assignReg_I64Code :: CmmReg  -> CmmExpr -> NatM InstrBlock
-assignReg_I64Code (CmmLocal (LocalReg u_dst _)) valueTree = do
-   ChildCode64 vcode r_src_lo <- iselExpr64 valueTree
+assignReg_I64Code (CmmLocal dst) valueTree = do
+   RegCode64 vcode r_src_hi r_src_lo <- iselExpr64 valueTree
    let
-         r_dst_lo = RegVirtual $ mkVirtualReg u_dst II32
-         r_dst_hi = getHiVRegFromLo r_dst_lo
-         r_src_hi = getHiVRegFromLo r_src_lo
+         Reg64 r_dst_hi r_dst_lo = localReg64 dst
          mov_lo = MOV II32 (OpReg r_src_lo) (OpReg r_dst_lo)
          mov_hi = MOV II32 (OpReg r_src_hi) (OpReg r_dst_hi)
    return (
@@ -514,9 +499,9 @@ assignReg_I64Code _ _
    = panic "assignReg_I64Code(i386): invalid lvalue"
 
 
-iselExpr64        :: CmmExpr -> NatM ChildCode64
+iselExpr64 :: HasDebugCallStack => CmmExpr -> NatM (RegCode64 InstrBlock)
 iselExpr64 (CmmLit (CmmInt i _)) = do
-  (rlo,rhi) <- getNewRegPairNat II32
+  Reg64 rhi rlo <- getNewReg64
   let
         r = fromIntegral (fromIntegral i :: Word32)
         q = fromIntegral (fromIntegral (i `shiftR` 32) :: Word32)
@@ -524,91 +509,80 @@ iselExpr64 (CmmLit (CmmInt i _)) = do
                 MOV II32 (OpImm (ImmInteger r)) (OpReg rlo),
                 MOV II32 (OpImm (ImmInteger q)) (OpReg rhi)
                 ]
-  return (ChildCode64 code rlo)
+  return (RegCode64 code rhi rlo)
 
 iselExpr64 (CmmLoad addrTree ty _) | isWord64 ty = do
    Amode addr addr_code <- getAmode addrTree
-   (rlo,rhi) <- getNewRegPairNat II32
+   Reg64 rhi rlo <- getNewReg64
    let
         mov_lo = MOV II32 (OpAddr addr) (OpReg rlo)
         mov_hi = MOV II32 (OpAddr (fromJust (addrOffset addr 4))) (OpReg rhi)
    return (
-            ChildCode64 (addr_code `snocOL` mov_lo `snocOL` mov_hi)
-                        rlo
+            RegCode64 (addr_code `snocOL` mov_lo `snocOL` mov_hi) rhi rlo
      )
 
-iselExpr64 (CmmReg (CmmLocal (LocalReg vu ty))) | isWord64 ty
-   = return (ChildCode64 nilOL (RegVirtual $ mkVirtualReg vu II32))
+iselExpr64 (CmmReg (CmmLocal local_reg)) = do
+  let Reg64 hi lo = localReg64 local_reg
+  return (RegCode64 nilOL hi lo)
 
 -- we handle addition, but rather badly
 iselExpr64 (CmmMachOp (MO_Add _) [e1, CmmLit (CmmInt i _)]) = do
-   ChildCode64 code1 r1lo <- iselExpr64 e1
-   (rlo,rhi) <- getNewRegPairNat II32
+   RegCode64 code1 r1hi r1lo <- iselExpr64 e1
+   Reg64 rhi rlo <- getNewReg64
    let
         r = fromIntegral (fromIntegral i :: Word32)
         q = fromIntegral (fromIntegral (i `shiftR` 32) :: Word32)
-        r1hi = getHiVRegFromLo r1lo
         code =  code1 `appOL`
                 toOL [ MOV II32 (OpReg r1lo) (OpReg rlo),
                        ADD II32 (OpImm (ImmInteger r)) (OpReg rlo),
                        MOV II32 (OpReg r1hi) (OpReg rhi),
                        ADC II32 (OpImm (ImmInteger q)) (OpReg rhi) ]
-   return (ChildCode64 code rlo)
+   return (RegCode64 code rhi rlo)
 
 iselExpr64 (CmmMachOp (MO_Add _) [e1,e2]) = do
-   ChildCode64 code1 r1lo <- iselExpr64 e1
-   ChildCode64 code2 r2lo <- iselExpr64 e2
-   (rlo,rhi) <- getNewRegPairNat II32
+   RegCode64 code1 r1hi r1lo <- iselExpr64 e1
+   RegCode64 code2 r2hi r2lo <- iselExpr64 e2
+   Reg64 rhi rlo <- getNewReg64
    let
-        r1hi = getHiVRegFromLo r1lo
-        r2hi = getHiVRegFromLo r2lo
         code =  code1 `appOL`
                 code2 `appOL`
                 toOL [ MOV II32 (OpReg r1lo) (OpReg rlo),
                        ADD II32 (OpReg r2lo) (OpReg rlo),
                        MOV II32 (OpReg r1hi) (OpReg rhi),
                        ADC II32 (OpReg r2hi) (OpReg rhi) ]
-   return (ChildCode64 code rlo)
+   return (RegCode64 code rhi rlo)
 
 iselExpr64 (CmmMachOp (MO_Sub _) [e1,e2]) = do
-   ChildCode64 code1 r1lo <- iselExpr64 e1
-   ChildCode64 code2 r2lo <- iselExpr64 e2
-   (rlo,rhi) <- getNewRegPairNat II32
+   RegCode64 code1 r1hi r1lo <- iselExpr64 e1
+   RegCode64 code2 r2hi r2lo <- iselExpr64 e2
+   Reg64 rhi rlo <- getNewReg64
    let
-        r1hi = getHiVRegFromLo r1lo
-        r2hi = getHiVRegFromLo r2lo
         code =  code1 `appOL`
                 code2 `appOL`
                 toOL [ MOV II32 (OpReg r1lo) (OpReg rlo),
                        SUB II32 (OpReg r2lo) (OpReg rlo),
                        MOV II32 (OpReg r1hi) (OpReg rhi),
                        SBB II32 (OpReg r2hi) (OpReg rhi) ]
-   return (ChildCode64 code rlo)
+   return (RegCode64 code rhi rlo)
 
 iselExpr64 (CmmMachOp (MO_UU_Conv _ W64) [expr]) = do
-     fn <- getAnyReg expr
-     r_dst_lo <-  getNewRegNat II32
-     let r_dst_hi = getHiVRegFromLo r_dst_lo
-         code = fn r_dst_lo
-     return (
-             ChildCode64 (code `snocOL`
+     code <- getAnyReg expr
+     Reg64 r_dst_hi r_dst_lo <- getNewReg64
+     return $ RegCode64 (code r_dst_lo `snocOL`
                           MOV II32 (OpImm (ImmInt 0)) (OpReg r_dst_hi))
+                          r_dst_hi
                           r_dst_lo
-            )
 
 iselExpr64 (CmmMachOp (MO_SS_Conv W32 W64) [expr]) = do
-     fn <- getAnyReg expr
-     r_dst_lo <-  getNewRegNat II32
-     let r_dst_hi = getHiVRegFromLo r_dst_lo
-         code = fn r_dst_lo
-     return (
-             ChildCode64 (code `snocOL`
+     code <- getAnyReg expr
+     Reg64 r_dst_hi r_dst_lo <- getNewReg64
+     return $ RegCode64 (code r_dst_lo `snocOL`
                           MOV II32 (OpReg r_dst_lo) (OpReg eax) `snocOL`
                           CLTD II32 `snocOL`
                           MOV II32 (OpReg eax) (OpReg r_dst_lo) `snocOL`
                           MOV II32 (OpReg edx) (OpReg r_dst_hi))
+                          r_dst_hi
                           r_dst_lo
-            )
 
 iselExpr64 expr
    = do
@@ -657,23 +631,23 @@ getRegister' platform is32Bit (CmmMachOp (MO_AlignmentCheck align _) [e])
 getRegister' _ is32Bit (CmmMachOp (MO_UU_Conv W64 W32)
                      [CmmMachOp (MO_U_Shr W64) [x,CmmLit (CmmInt 32 _)]])
  | is32Bit = do
-  ChildCode64 code rlo <- iselExpr64 x
-  return $ Fixed II32 (getHiVRegFromLo rlo) code
+  RegCode64 code rhi _rlo <- iselExpr64 x
+  return $ Fixed II32 rhi code
 
 getRegister' _ is32Bit (CmmMachOp (MO_SS_Conv W64 W32)
                      [CmmMachOp (MO_U_Shr W64) [x,CmmLit (CmmInt 32 _)]])
  | is32Bit = do
-  ChildCode64 code rlo <- iselExpr64 x
-  return $ Fixed II32 (getHiVRegFromLo rlo) code
+  RegCode64 code rhi _rlo <- iselExpr64 x
+  return $ Fixed II32 rhi code
 
 getRegister' _ is32Bit (CmmMachOp (MO_UU_Conv W64 W32) [x])
  | is32Bit = do
-  ChildCode64 code rlo <- iselExpr64 x
+  RegCode64 code _rhi rlo <- iselExpr64 x
   return $ Fixed II32 rlo code
 
 getRegister' _ is32Bit (CmmMachOp (MO_SS_Conv W64 W32) [x])
  | is32Bit = do
-  ChildCode64 code rlo <- iselExpr64 x
+  RegCode64 code _rhi rlo <- iselExpr64 x
   return $ Fixed II32 rlo code
 
 getRegister' _ _ (CmmLit lit@(CmmFloat f w)) =
@@ -1876,22 +1850,19 @@ genCondBranch' :: Bool -> BlockId -> BlockId -> BlockId -> CmmExpr
 genCondBranch' is32Bit _bid true false (CmmMachOp mop [e1,e2])
   | is32Bit, Just W64 <- maybeIntComparison mop = do
 
-  -- The resulting registers here are both the lower part of
-  -- the register as well as a way to get at the higher part.
-  ChildCode64 code1 r1 <- iselExpr64 e1
-  ChildCode64 code2 r2 <- iselExpr64 e2
+  RegCode64 code1 r1hi r1lo <- iselExpr64 e1
+  RegCode64 code2 r2hi r2lo <- iselExpr64 e2
   let cond = machOpToCond mop :: Cond
 
   -- we mustn't clobber r1/r2 so we use temporaries
   tmp1 <- getNewRegNat II32
   tmp2 <- getNewRegNat II32
 
-  let cmpCode = intComparison cond true false r1 r2 tmp1 tmp2
+  let cmpCode = intComparison cond true false r1hi r1lo r2hi r2lo tmp1 tmp2
   return $ code1 `appOL` code2 `appOL` cmpCode
 
   where
-    intComparison :: Cond -> BlockId -> BlockId -> Reg -> Reg -> Reg -> Reg -> InstrBlock
-    intComparison cond true false r1_lo r2_lo tmp1 tmp2 =
+    intComparison cond true false r1_hi r1_lo r2_hi r2_lo tmp1 tmp2 =
       case cond of
         -- Impossible results of machOpToCond
         ALWAYS  -> panic "impossible"
@@ -1908,17 +1879,15 @@ genCondBranch' is32Bit _bid true false (CmmMachOp mop [e1,e2])
         GE  -> cmpGE
         GEU -> cmpGE
         -- [x >  y] <==> ![y >= x]
-        GTT -> intComparison GE  false true r2_lo r1_lo tmp1 tmp2
-        GU  -> intComparison GEU false true r2_lo r1_lo tmp1 tmp2
+        GTT -> intComparison GE  false true r2_hi r2_lo r1_hi r1_lo tmp1 tmp2
+        GU  -> intComparison GEU false true r2_hi r2_lo r1_hi r1_lo tmp1 tmp2
         -- [x <= y] <==> [y >= x]
-        LE  -> intComparison GE  true false r2_lo r1_lo tmp1 tmp2
-        LEU -> intComparison GEU true false r2_lo r1_lo tmp1 tmp2
+        LE  -> intComparison GE  true false r2_hi r2_lo r1_hi r1_lo tmp1 tmp2
+        LEU -> intComparison GEU true false r2_hi r2_lo r1_hi r1_lo tmp1 tmp2
         -- [x <  y] <==> ![x >= x]
-        LTT -> intComparison GE  false true r1_lo r2_lo tmp1 tmp2
-        LU  -> intComparison GEU false true r1_lo r2_lo tmp1 tmp2
+        LTT -> intComparison GE  false true r1_hi r1_lo r2_hi r2_lo tmp1 tmp2
+        LU  -> intComparison GEU false true r1_hi r1_lo r2_hi r2_lo tmp1 tmp2
       where
-        r1_hi = getHiVRegFromLo r1_lo
-        r2_hi = getHiVRegFromLo r2_lo
         cmpExact :: OrdList Instr
         cmpExact =
           toOL
@@ -2407,10 +2376,9 @@ genCCall32 addr conv dest_regs args = do
 
             push_arg  arg -- we don't need the hints on x86
               | isWord64 arg_ty = do
-                ChildCode64 code r_lo <- iselExpr64 arg
+                RegCode64 code r_hi r_lo <- iselExpr64 arg
                 delta <- getDeltaNat
                 setDeltaNat (delta - 8)
-                let r_hi = getHiVRegFromLo r_lo
                 return (       code `appOL`
                                toOL [PUSH II32 (OpReg r_hi), DELTA (delta - 4),
                                      PUSH II32 (OpReg r_lo), DELTA (delta - 8),
@@ -2536,7 +2504,7 @@ genCCall32 addr conv dest_regs args = do
                     w  = typeWidth ty
                     b  = widthInBytes w
                     r_dest_hi = getHiVRegFromLo r_dest
-                    r_dest    = getRegisterReg platform (CmmLocal dest)
+                    r_dest    = getLocalRegReg dest
             assign_code many = pprPanic "genForeignCall.assign_code - too many return values:" (ppr many)
 
         return (push_code `appOL`
@@ -3388,10 +3356,8 @@ genCtz64_32
   -> CmmExpr
   -> NatM (InstrBlock, Maybe BlockId)
 genCtz64_32 bid dst src = do
-  ChildCode64 vcode rlo <- iselExpr64 src
-  platform <- ncgPlatform <$> getConfig
-  let rhi     = getHiVRegFromLo rlo
-      dst_r   = getRegisterReg platform (CmmLocal dst)
+  RegCode64 vcode rhi rlo <- iselExpr64 src
+  let dst_r = getLocalRegReg dst
   lbl1 <- getBlockIdNat
   lbl2 <- getBlockIdNat
   tmp_r <- getNewRegNat II64
@@ -3438,8 +3404,7 @@ genCtzGeneric width dst src = do
   code_src <- getAnyReg src
   config <- getConfig
   let bw = widthInBits width
-  let platform = ncgPlatform config
-  let dst_r = getRegisterReg platform (CmmLocal dst)
+  let dst_r = getLocalRegReg dst
   if ncgBmiVersion config >= Just BMI2
   then do
       src_r <- getNewRegNat (intFormat width)
@@ -3709,26 +3674,27 @@ genPrefetchData n src = do
 
 genByteSwap :: Width -> LocalReg -> CmmExpr -> NatM InstrBlock
 genByteSwap width dst src = do
-  platform <- ncgPlatform <$> getConfig
   is32Bit <- is32BitPlatform
-  let dst_r = getRegisterReg platform (CmmLocal dst)
   let format = intFormat width
   case width of
       W64 | is32Bit -> do
-             ChildCode64 vcode rlo <- iselExpr64 src
-             let dst_rhi = getHiVRegFromLo dst_r
-                 rhi     = getHiVRegFromLo rlo
-             return $ vcode `appOL`
-                      toOL [ MOV II32 (OpReg rlo) (OpReg dst_rhi),
-                             MOV II32 (OpReg rhi) (OpReg dst_r),
-                             BSWAP II32 dst_rhi,
-                             BSWAP II32 dst_r ]
-      W16 -> do code_src <- getAnyReg src
-                return $ code_src dst_r `appOL`
-                         unitOL (BSWAP II32 dst_r) `appOL`
-                         unitOL (SHR II32 (OpImm $ ImmInt 16) (OpReg dst_r))
-      _   -> do code_src <- getAnyReg src
-                return $ code_src dst_r `appOL` unitOL (BSWAP format dst_r)
+        let Reg64 dst_hi dst_lo = localReg64 dst
+        RegCode64 vcode rhi rlo <- iselExpr64 src
+        return $ vcode `appOL`
+                 toOL [ MOV II32 (OpReg rlo) (OpReg dst_hi),
+                        MOV II32 (OpReg rhi) (OpReg dst_lo),
+                        BSWAP II32 dst_hi,
+                        BSWAP II32 dst_lo ]
+      W16 -> do
+        let dst_r = getLocalRegReg dst
+        code_src <- getAnyReg src
+        return $ code_src dst_r `appOL`
+                 unitOL (BSWAP II32 dst_r) `appOL`
+                 unitOL (SHR II32 (OpImm $ ImmInt 16) (OpReg dst_r))
+      _   -> do
+        let dst_r = getLocalRegReg dst
+        code_src <- getAnyReg src
+        return $ code_src dst_r `appOL` unitOL (BSWAP format dst_r)
 
 genBitRev :: BlockId -> Width -> CmmFormal -> CmmActual -> NatM InstrBlock
 genBitRev bid width dst src = do
@@ -3806,8 +3772,7 @@ genPext bid width dst src mask = do
   if ncgBmiVersion config >= Just BMI2
     then do
       let format   = intFormat width
-      let platform = ncgPlatform config
-      let dst_r    = getRegisterReg platform (CmmLocal dst)
+      let dst_r    = getLocalRegReg dst
       code_src  <- getAnyReg src
       code_mask <- getAnyReg mask
       src_r     <- getNewRegNat format
@@ -3839,9 +3804,8 @@ genClz bid width dst src = do
       genPrimCCall bid (clzLabel width) [dst] [src]
 
     else do
-      let platform = ncgPlatform config
       code_src <- getAnyReg src
-      let dst_r = getRegisterReg platform (CmmLocal dst)
+      let dst_r = getLocalRegReg dst
       if ncgBmiVersion config >= Just BMI2
         then do
           src_r <- getNewRegNat (intFormat width)
@@ -3879,8 +3843,7 @@ genWordToFloat bid width dst src =
 genAtomicRead :: Width -> LocalReg -> CmmExpr -> NatM InstrBlock
 genAtomicRead width dst addr = do
   load_code <- intLoadCode (MOV (intFormat width)) addr
-  platform <- ncgPlatform <$> getConfig
-  return (load_code (getRegisterReg platform (CmmLocal dst)))
+  return (load_code (getLocalRegReg dst))
 
 genAtomicWrite :: Width -> CmmExpr -> CmmExpr -> NatM InstrBlock
 genAtomicWrite width addr val = do
@@ -3931,10 +3894,8 @@ genXchg width dst addr value = do
 
   Amode amode addr_code <- getSimpleAmode addr
   (newval, newval_code) <- getSomeReg value
-  config <- getConfig
   let format   = intFormat width
-  let platform = ncgPlatform config
-  let dst_r    = getRegisterReg platform (CmmLocal dst)
+  let dst_r    = getLocalRegReg dst
   -- Copy the value into the target register, perform the exchange.
   let code     = toOL
                  [ MOV format (OpReg newval) (OpReg dst_r)
@@ -3947,9 +3908,7 @@ genXchg width dst addr value = do
 
 genFloatAbs :: Width -> LocalReg -> CmmExpr -> NatM InstrBlock
 genFloatAbs width dst src = do
-  config <- getConfig
   let
-    platform = ncgPlatform config
     format = floatFormat width
     const = case width of
       W32 -> CmmInt 0x7fffffff W32
@@ -3958,7 +3917,7 @@ genFloatAbs width dst src = do
   src_code <- getAnyReg src
   Amode amode amode_code <- memConstant (mkAlignment $ widthInBytes width) const
   tmp <- getNewRegNat format
-  let dst_r = getRegisterReg platform (CmmLocal dst)
+  let dst_r = getLocalRegReg dst
   pure $ src_code dst_r `appOL` amode_code `appOL` toOL
            [ MOV format (OpAddr amode) (OpReg tmp)
            , AND format (OpReg tmp) (OpReg dst_r)
@@ -3967,8 +3926,7 @@ genFloatAbs width dst src = do
 
 genFloatSqrt :: Format -> LocalReg -> CmmExpr -> NatM InstrBlock
 genFloatSqrt format dst src = do
-  platform <- ncgPlatform <$> getConfig
-  let dst_r = getRegisterReg platform (CmmLocal dst)
+  let dst_r = getLocalRegReg dst
   src_code <- getAnyReg src
   pure $ src_code dst_r `snocOL` SQRT format (OpReg dst_r) dst_r
 
@@ -4005,13 +3963,12 @@ genAddWithCarry
   -> CmmExpr
   -> NatM InstrBlock
 genAddWithCarry width res_h res_l arg_x arg_y = do
-  platform <- ncgPlatform <$> getConfig
   hCode <- getAnyReg (CmmLit (CmmInt 0 width))
   let format = intFormat width
   lCode <- anyReg =<< trivialCode width (ADD_CC format)
                         (Just (ADD_CC format)) arg_x arg_y
-  let reg_l = getRegisterReg platform (CmmLocal res_l)
-      reg_h = getRegisterReg platform (CmmLocal res_h)
+  let reg_l = getLocalRegReg res_l
+      reg_h = getLocalRegReg res_h
       code = hCode reg_h `appOL`
              lCode reg_l `snocOL`
              ADC format (OpImm (ImmInteger 0)) (OpReg reg_h)
@@ -4027,14 +3984,13 @@ genSignedLargeMul
   -> CmmExpr
   -> NatM (OrdList Instr)
 genSignedLargeMul width res_c res_h res_l arg_x arg_y = do
-  platform <- ncgPlatform <$> getConfig
   (y_reg, y_code) <- getRegOrMem arg_y
   x_code <- getAnyReg arg_x
   reg_tmp <- getNewRegNat II8
   let format = intFormat width
-      reg_h = getRegisterReg platform (CmmLocal res_h)
-      reg_l = getRegisterReg platform (CmmLocal res_l)
-      reg_c = getRegisterReg platform (CmmLocal res_c)
+      reg_h = getLocalRegReg res_h
+      reg_l = getLocalRegReg res_l
+      reg_c = getLocalRegReg res_c
       code = y_code `appOL`
              x_code rax `appOL`
              toOL [ IMUL2 format y_reg
@@ -4053,12 +4009,11 @@ genUnsignedLargeMul
   -> CmmExpr
   -> NatM (OrdList Instr)
 genUnsignedLargeMul width res_h res_l arg_x arg_y = do
-  platform <- ncgPlatform <$> getConfig
   (y_reg, y_code) <- getRegOrMem arg_y
   x_code <- getAnyReg arg_x
   let format = intFormat width
-      reg_h = getRegisterReg platform (CmmLocal res_h)
-      reg_l = getRegisterReg platform (CmmLocal res_l)
+      reg_h = getLocalRegReg res_h
+      reg_l = getLocalRegReg res_l
       code = y_code `appOL`
              x_code rax `appOL`
              toOL [MUL2 format y_reg,
@@ -4088,10 +4043,9 @@ genQuotRem width signed res_q res_r m_arg_x_high arg_x_low arg_y = do
       genQuotRem W16 signed res_q res_r m_arg_x_high_16 arg_x_low_16 arg_y_16
 
     _ -> do
-      platform <- ncgPlatform <$> getConfig
       let format = intFormat width
-          reg_q = getRegisterReg platform (CmmLocal res_q)
-          reg_r = getRegisterReg platform (CmmLocal res_r)
+          reg_q = getLocalRegReg res_q
+          reg_r = getLocalRegReg res_r
           widen | signed    = CLTD format
                 | otherwise = XOR format (OpReg rdx) (OpReg rdx)
           instr | signed    = IDIV
