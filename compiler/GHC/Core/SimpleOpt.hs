@@ -36,7 +36,7 @@ import GHC.Types.Var      ( isNonCoVarId )
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Core.DataCon
-import GHC.Types.Demand( etaConvertDmdSig )
+import GHC.Types.Demand( etaConvertDmdSig, topSubDmd )
 import GHC.Types.Tickish
 import GHC.Core.Coercion.Opt ( optCoercion, OptCoercionOpts (..) )
 import GHC.Core.Type hiding ( substTy, extendTvSubst, extendCvSubst, extendTvSubstList
@@ -295,8 +295,8 @@ simple_opt_expr env expr
        where
          (env', b') = subst_opt_bndr env b
     go_lam env bs' e
-       | Just etad_e <- tryEtaReduce bs e' = etad_e
-       | otherwise                         = mkLams bs e'
+       | Just etad_e <- tryEtaReduce bs e' topSubDmd = etad_e
+       | otherwise                                   = mkLams bs e'
        where
          bs = reverse bs'
          e' = simple_opt_expr env e

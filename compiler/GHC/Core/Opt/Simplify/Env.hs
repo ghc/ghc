@@ -899,10 +899,10 @@ allows us to eta-reduce
         f = \x -> f x
 to
         f = f
-which technically is not sound.   This is very much a corner case, so
-I'm not worried about it.  Another idea is to ensure that f's arity
-never decreases; its arity started as 1, and we should never eta-reduce
-below that.
+which technically is not sound.  We take care of that in point (3) of
+Note [Eta reduction conditions].
+Another idea is to ensure that f's arity never decreases; its arity started as
+1, and we should never eta-reduce below that.
 
 
 Note [Robust OccInfo]
