@@ -10,9 +10,9 @@
 #
 # -----------------------------------------------------------------------------
 
-utils/notes-util_USES_CABAL                   = YES
-utils/notes-util_PACKAGE                      = notes-util
-utils/notes-util_dist-install_PROGNAME        = notes-util
-utils/notes-util_dist-install_INSTALL         = NO
-utils/notes-util_dist-install_INSTALL_INPLACE = YES
-$(eval $(call build-prog,utils/notes-util,dist-install,1))
+linters/lint-whitespace_USES_CABAL                   = YES
+linters/lint-whitespace_PACKAGE                      = lint-whitespace
+linters/lint-whitespace_dist-install_PROGNAME        = lint-whitespace
+linters/lint-whitespace_dist-install_INSTALL         = NO
+linters/lint-whitespace_dist-install_INSTALL_INPLACE = YES
+$(eval $(call build-prog,linters/lint-whitespace,dist-install,1))

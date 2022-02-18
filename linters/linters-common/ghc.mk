@@ -10,8 +10,8 @@
 #
 # -----------------------------------------------------------------------------
 
-dir = utils/notes-util
-TOP = ../..
-include $(TOP)/mk/sub-makefile.mk
-
-FAST_MAKE_OPTS += stage=none
+linters/linters-common_USES_CABAL                   = YES
+linters/linters-common_PACKAGE                      = linters-common
+linters/linters-common_dist-install_INSTALL         = YES
+linters/linters-common_dist-install_INSTALL_INPLACE = YES
+$(eval $(call build-package,linters/linters-common,dist-install,1))

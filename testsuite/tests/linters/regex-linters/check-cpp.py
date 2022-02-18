@@ -37,6 +37,8 @@ for l in linters:
         'images'))
     # Don't lint core spec
     l.add_path_filter(lambda path: not path.name == 'core-spec.pdf')
+    # Don't lint the linter itself
+    l.add_path_filter(lambda path: not path.name == 'check-cpp.py')
 
 if __name__ == '__main__':
     run_linters(linters)

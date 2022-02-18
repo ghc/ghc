@@ -5,6 +5,7 @@ module Rules.Lint
 import Base
 import Settings.Builders.Common
 import System.Directory (findExecutable)
+import System.Exit (exitFailure)
 
 lintRules :: Rules ()
 lintRules = do
@@ -19,8 +20,9 @@ lint lintAction = do
     putBuild "| Running the linter…"
     lintAction
     putSuccess "| Done."
-  else
+  else do
     putFailure "| Please make sure you have the `hlint` executable in your $PATH"
+    liftIO exitFailure
 
 runHLint :: [FilePath] -- ^ include directories
          -> [String]   -- ^ CPP defines

@@ -231,8 +231,12 @@ ifeq "$(COUNT_DEPS)" ""
 COUNT_DEPS := $(abspath $(TOP)/../inplace/bin/count-deps)
 endif
 
-ifeq "$(NOTES_UTIL)" ""
-NOTES_UTIL := $(abspath $(TOP)/../inplace/bin/notes-util)
+ifeq "$(LINT_NOTES)" ""
+LINT_NOTES := $(abspath $(TOP)/../inplace/bin/lint-notes)
+endif
+
+ifeq "$(LINT_WHITESPACE)" ""
+LINT_WHITESPACE := $(abspath $(TOP)/../inplace/bin/lint-whitespace)
 endif
 
 # -----------------------------------------------------------------------------

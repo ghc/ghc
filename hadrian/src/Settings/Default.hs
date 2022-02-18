@@ -87,7 +87,11 @@ stage0Packages = do
              , text
              , transformers
              , unlit
-             , noteLinter
+             , lintersCommon
+             , lintNotes
+             , lintCommitMsg
+             , lintSubmoduleRefs
+             , lintWhitespace
              ]
           ++ [ terminfo | not windowsHost, not cross ]
           ++ [ timeout  | windowsHost                ]

@@ -546,13 +546,15 @@ utils/ghc-pkg/dist-install/package-data.mk: $(fixed_pkg_prev)
 utils/hsc2hs/dist-install/package-data.mk: $(fixed_pkg_prev)
 utils/compare_sizes/dist-install/package-data.mk: $(fixed_pkg_prev)
 utils/runghc/dist-install/package-data.mk: $(fixed_pkg_prev)
-utils/notes-util/dist-install/package-data.mk: $(fixed_pkg_prev)
 utils/iserv/stage2/package-data.mk: $(fixed_pkg_prev)
 utils/iserv/stage2_p/package-data.mk: $(fixed_pkg_prev)
 utils/iserv/stage2_dyn/package-data.mk: $(fixed_pkg_prev)
 ifeq "$(Windows_Host)" "YES"
 utils/gen-dll/dist-install/package-data.mk: $(fixed_pkg_prev)
 endif
+linters/linters-common/dist-install/package-data.mk: $(fixed_pkg_prev)
+linters/lint-notes/dist-install/package-data.mk: $(fixed_pkg_prev) linters/linters-common/dist-install/package-data.mk
+linters/lint-whitespace/dist-install/package-data.mk: $(fixed_pkg_prev) linters/linters-common/dist-install/package-data.mk
 
 # the GHC package doesn't live in libraries/, so we add its dependency manually:
 compiler/stage2/package-data.mk: $(fixed_pkg_prev)
@@ -669,7 +671,6 @@ BUILD_DIRS += utils/hsc2hs
 BUILD_DIRS += utils/ghc-pkg
 BUILD_DIRS += utils/testremove
 BUILD_DIRS += utils/check-ppr
-BUILD_DIRS += utils/notes-util
 BUILD_DIRS += utils/check-exact
 BUILD_DIRS += utils/count-deps
 BUILD_DIRS += utils/ghc-cabal
@@ -679,6 +680,9 @@ BUILD_DIRS += ghc
 BUILD_DIRS += docs/users_guide
 BUILD_DIRS += utils/compare_sizes
 BUILD_DIRS += utils/iserv
+BUILD_DIRS += linters/linters-common
+BUILD_DIRS += linters/lint-notes
+BUILD_DIRS += linters/lint-whitespace
 
 # ----------------------------------------------
 # Actually include the sub-ghc.mk's
@@ -1092,7 +1096,7 @@ BIN_DIST_MK = $(BIN_DIST_PREP_DIR)/bindist.mk
 unix-binary-dist-prep: $(includes_dist-install_H_FILES_GENERATED)
 	$(call removeTrees,bindistprep/)
 	"$(MKDIRHIER)" $(BIN_DIST_PREP_DIR)
-	set -e; for i in packages LICENSE compiler ghc rts libraries utils docs libffi includes driver mk rules Makefile m4 aclocal.m4 config.sub config.guess install-sh llvm-targets llvm-passes ghc.mk inplace distrib/configure.ac distrib/README distrib/INSTALL; do ln -s ../../$$i $(BIN_DIST_PREP_DIR)/; done
+	set -e; for i in packages LICENSE compiler ghc rts libraries linters utils docs libffi includes driver mk rules Makefile m4 aclocal.m4 config.sub config.guess install-sh llvm-targets llvm-passes ghc.mk inplace distrib/configure.ac distrib/README distrib/INSTALL; do ln -s ../../$$i $(BIN_DIST_PREP_DIR)/; done
 	echo "HADDOCK_DOCS       = $(HADDOCK_DOCS)"       >> $(BIN_DIST_MK)
 	echo "BUILD_SPHINX_HTML  = $(BUILD_SPHINX_HTML)"  >> $(BIN_DIST_MK)
 	echo "BUILD_SPHINX_PDF   = $(BUILD_SPHINX_PDF)"   >> $(BIN_DIST_MK)

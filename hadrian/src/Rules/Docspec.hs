@@ -8,6 +8,7 @@ import Base
 import Context.Path
 import Settings.Builders.Common
 import qualified Packages as P
+import System.Exit (exitFailure)
 
 docspecRules :: Rules ()
 docspecRules = do
@@ -21,8 +22,9 @@ docspec lintAction = do
     putBuild "| Running cabal-docspec…"
     lintAction
     putSuccess "| Done."
-  else
+  else do
     putFailure "| Please make sure you have the `cabal-docspec` executable in your $PATH"
+    liftIO exitFailure
 
 base :: Action ()
 base = do

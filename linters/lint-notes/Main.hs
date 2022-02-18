@@ -8,9 +8,9 @@ usage :: IO a
 usage = do
     putStrLn $ unlines
         [ "usage:"
-        , "    ghc-notes <mode>"
-        , "    ghc-notes <mode> @<response-file>"
-        , "    ghc-notes <mode> <file>"
+        , "    lint-notes <mode>"
+        , "    lint-notes <mode> @<response-file>"
+        , "    lint-notes <mode> <file>"
         , ""
         , "valid modes:"
         , "  dump             dump all Note definitions and references"
@@ -51,7 +51,7 @@ main = do
       [mode] -> do
         let excludeList =
               [ "testsuite/tests/linters/notes.stdout"
-              , "utils/notes-util/test" ]
+              , "linters/lint-notes/test" ]
         files <- lines <$> readProcess "git" ["ls-tree", "--name-only", "-r", "HEAD"] ""
         return (parseMode mode, filter (`notElem` excludeList) files)
       _ -> usage

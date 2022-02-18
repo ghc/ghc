@@ -44,17 +44,24 @@ countDepsExtra :: Maybe String
 countDepsExtra = Just "-iutils/count-deps"
 
 noteLinterProgPath, noteLinterSourcePath :: FilePath
-noteLinterProgPath = "test/bin/notes-util" <.> exe
-noteLinterSourcePath = "utils/notes-util/Main.hs"
+noteLinterProgPath = "test/bin/lint-notes" <.> exe
+noteLinterSourcePath = "linters/lint-notes/Main.hs"
 noteLinterExtra :: Maybe String
-noteLinterExtra = Just "-iutils/notes-util"
+noteLinterExtra = Just "-ilinters/lint-notes"
+
+whitespaceLinterProgPath, whitespaceLinterSourcePath :: FilePath
+whitespaceLinterProgPath = "test/bin/lint-whitespace" <.> exe
+whitespaceLinterSourcePath = "linters/lint-whitespace/Main.hs"
+whitespaceLinterExtra :: Maybe String
+whitespaceLinterExtra = Just "-ilinters/lint-whitespace"
 
 checkPrograms :: [(String,FilePath, FilePath, Maybe String, Package, Stage -> Stage)]
 checkPrograms =
     [ ("test:check-ppr",checkPprProgPath, checkPprSourcePath, checkPprExtra, checkPpr, id)
     , ("test:check-exact",checkExactProgPath, checkExactSourcePath, checkExactExtra, checkExact, id)
     , ("test:count-deps",countDepsProgPath, countDepsSourcePath, countDepsExtra, countDeps, id)
-    , ("lint:notes-util", noteLinterProgPath, noteLinterSourcePath, noteLinterExtra, noteLinter, const Stage0)
+    , ("lint:notes", noteLinterProgPath, noteLinterSourcePath, noteLinterExtra, lintNotes, const Stage0)
+    , ("lint:whitespace", whitespaceLinterProgPath, whitespaceLinterSourcePath, whitespaceLinterExtra, lintWhitespace, const Stage0)
     ]
 
 inTreeOutTree :: (Stage -> Action b) -> Action b -> Action b
@@ -213,7 +220,8 @@ testRules = do
             setEnv "CHECK_PPR" (top -/- root -/- checkPprProgPath)
             setEnv "CHECK_EXACT" (top -/- root -/- checkExactProgPath)
             setEnv "COUNT_DEPS" (top -/- root -/- countDepsProgPath)
-            setEnv "NOTES_UTIL" (top -/- root -/- noteLinterProgPath)
+            setEnv "LINT_NOTES" (top -/- root -/- noteLinterProgPath)
+            setEnv "LINT_WHITESPACE" (top -/- root -/- whitespaceLinterProgPath)
 
             -- This lets us bypass the need to generate a config
             -- through Make, which happens in testsuite/mk/boilerplate.mk

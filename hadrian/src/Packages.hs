@@ -9,7 +9,9 @@ module Packages (
     hsc2hs, hp2ps, hpc, hpcBin, integerGmp, integerSimple, iserv, iservProxy,
     libffi, libiserv, mtl, parsec, pretty, primitive, process, remoteIserv, rts,
     runGhc, stm, templateHaskell, terminfo, text, time, timeout, touchy,
-    transformers, unlit, unix, win32, xhtml, noteLinter, ghcPackages, isGhcPackage,
+    transformers, unlit, unix, win32, xhtml,
+    lintersCommon, lintNotes, lintCommitMsg, lintSubmoduleRefs, lintWhitespace,
+    ghcPackages, isGhcPackage,
 
     -- * Package information
     programName, nonHsMainPackage, autogenPath, programPath, timeoutPath,
@@ -39,13 +41,25 @@ ghcPackages =
     , hp2ps, hpc, hpcBin, integerGmp, integerSimple, iserv, libffi, libiserv, mtl
     , parsec, pretty, process, rts, runGhc, stm, templateHaskell
     , terminfo, text, time, touchy, transformers, unlit, unix, win32, xhtml
-    , timeout, noteLinter ]
+    , timeout
+    , lintersCommon
+    , lintNotes, lintCommitMsg, lintSubmoduleRefs, lintWhitespace ]
 
 -- TODO: Optimise by switching to sets of packages.
 isGhcPackage :: Package -> Bool
 isGhcPackage = (`elem` ghcPackages)
 
 -- | Package definitions, see 'Package'.
+array, base, binary, bytestring, cabalSyntax, cabal, checkPpr, checkExact, countDeps,
+  compareSizes, compiler, containers, deepseq, deriveConstants, directory,
+  exceptions, filepath, genapply, genprimopcode, ghc, ghcBignum, ghcBoot, ghcBootTh,
+  ghcCompact, ghcHeap, ghci, ghciWrapper, ghcPkg, ghcPrim, haddock, haskeline, hsc2hs,
+  hp2ps, hpc, hpcBin, integerGmp, integerSimple, iserv, iservProxy, remoteIserv, libffi, libiserv, mtl,
+  parsec, pretty, primitive, process, rts, runGhc, stm, templateHaskell,
+  terminfo, text, time, touchy, transformers, unlit, unix, win32, xhtml,
+  timeout,
+  lintersCommon, lintNotes, lintCommitMsg, lintSubmoduleRefs, lintWhitespace
+    :: Package
 array               = lib  "array"
 base                = lib  "base"
 binary              = lib  "binary"
@@ -108,7 +122,12 @@ unlit               = util "unlit"
 unix                = lib  "unix"
 win32               = lib  "Win32"
 xhtml               = lib  "xhtml"
-noteLinter          = prg  "notes-util"      `setPath` "utils/notes-util"
+
+lintersCommon       = lib     "linters-common"      `setPath` "linters/linters-common"
+lintNotes           = linter  "lint-notes"
+lintCommitMsg       = linter  "lint-commit-msg"
+lintSubmoduleRefs   = linter  "lint-submodule-refs"
+lintWhitespace      = linter  "lint-whitespace"
 
 -- | Construct a library package, e.g. @array@.
 lib :: PackageName -> Package
@@ -125,6 +144,10 @@ prg name = program name name
 -- | Construct a utility package, e.g. @haddock@.
 util :: PackageName -> Package
 util name = program name ("utils" -/- name)
+
+-- | Construct a linter executable program (lives in the \"linters\" subdirectory).
+linter :: PackageName -> Package
+linter name = program name ("linters" -/- name)
 
 -- | Amend a package path if it doesn't conform to a typical pattern.
 setPath :: Package -> FilePath -> Package

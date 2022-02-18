@@ -38,6 +38,12 @@ def get_changed_files(base_commit: str, head_commit: str,
     files = subprocess.check_output(cmd)
     return files.decode('UTF-8').split('\n')
 
+def get_tracked_files(subdir: str = '.'):
+    """ Get the files tracked by git in the given subdirectory. """
+    cmd = ['git', 'ls-tree', '--name-only', '-r', 'HEAD', subdir]
+    files = subprocess.check_output(cmd)
+    return files.decode('UTF-8').split('\n')
+
 Warning = namedtuple('Warning', 'path,line_no,line_content,message')
 
 class Linter(object):
@@ -106,15 +112,19 @@ def run_linters(linters: Sequence[Linter],
     subparser.set_defaults(get_linted_files=lambda args:
                             get_changed_files(args.base, args.head, subdir))
 
-    subparser = subparsers.add_parser('files', help='Lint a range of commits')
+    subparser = subparsers.add_parser('files', help='Lint the given files')
     subparser.add_argument('file', nargs='+', help='File to lint')
     subparser.set_defaults(get_linted_files=lambda args: args.file)
+
+    subparser = subparsers.add_parser('tracked', help="Lint files tracked by Git")
+    subparser.set_defaults(get_linted_files=lambda args:
+                            get_tracked_files(subdir))
 
     args = parser.parse_args()
 
     linted_files = args.get_linted_files(args)
     for path in linted_files:
-        if path.startswith('.gitlab/linters'):
+        if path.startswith('linters'):
             continue
         for linter in linters:
             linter.do_lint(Path(path))
