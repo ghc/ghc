@@ -2,7 +2,7 @@
 T2693.hs:12:15: error:
     • Couldn't match expected type: (a8, b1)
                   with actual type: TFn a6
-      The type variables ‘a6’, ‘a8’, ‘b1’ are ambiguous
+      The type variable ‘a6’ is ambiguous
     • In the first argument of ‘fst’, namely ‘x’
       In the first argument of ‘(+)’, namely ‘fst x’
       In the expression: fst x + fst x
@@ -11,7 +11,7 @@ T2693.hs:12:15: error:
 T2693.hs:12:23: error:
     • Couldn't match expected type: (a8, b2)
                   with actual type: TFn a7
-      The type variables ‘a7’, ‘a8’, ‘b2’ are ambiguous
+      The type variable ‘a7’ is ambiguous
     • In the first argument of ‘fst’, namely ‘x’
       In the second argument of ‘(+)’, namely ‘fst x’
       In the expression: fst x + fst x
@@ -20,7 +20,7 @@ T2693.hs:12:23: error:
 T2693.hs:19:15: error:
     • Couldn't match expected type: (a5, b0)
                   with actual type: TFn a2
-      The type variables ‘a2’, ‘a5’, ‘b0’ are ambiguous
+      The type variable ‘a2’ is ambiguous
     • In the first argument of ‘fst’, namely ‘x’
       In the first argument of ‘(+)’, namely ‘fst x’
       In the expression: fst x + snd x
@@ -29,7 +29,7 @@ T2693.hs:19:15: error:
 T2693.hs:19:23: error:
     • Couldn't match expected type: (a4, a5)
                   with actual type: TFn a3
-      The type variables ‘a3’, ‘a4’, ‘a5’ are ambiguous
+      The type variable ‘a3’ is ambiguous
     • In the first argument of ‘snd’, namely ‘x’
       In the second argument of ‘(+)’, namely ‘snd x’
       In the expression: fst x + snd x
@@ -40,7 +40,7 @@ T2693.hs:29:20: error:
                      with: PVR a1
       Expected: () -> Maybe (PVR a1)
         Actual: () -> Maybe (TFn a0)
-      The type variables ‘a0’, ‘a1’ are ambiguous
+      The type variable ‘a0’ is ambiguous
     • In the first argument of ‘mapM’, namely ‘g’
       In a stmt of a 'do' block: pvs <- mapM g undefined
       In the expression:

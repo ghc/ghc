@@ -316,7 +316,7 @@ and is not implicitly instantiated.
 So in mkProvEvidence we lift (a ~# b) to (a ~ b).  Tiresome, and
 marginally less efficient, if the builder/martcher are not inlined.
 
-See also Note [Lift equality constraints when quantifying] in GHC.Tc.Utils.TcType
+See also Note [Lift equality constraints when quantifying] in GHC.Tc.Solver
 
 Note [Coercions that escape]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -474,7 +474,8 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
            -- Else the error message location is wherever tcCheckPat finished,
            -- namely the right-hand corner of the pattern
         do { arg_id <- tcLookupId arg_name
-           ; wrap <- tcSubTypeSigma GenSigCtxt
+           ; wrap <- tcSubTypeSigma (OccurrenceOf (idName arg_id))
+                                    GenSigCtxt
                                     (idType arg_id)
                                     (substTy subst arg_ty)
                 -- Why do we need tcSubType here?

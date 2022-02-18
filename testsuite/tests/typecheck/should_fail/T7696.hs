@@ -1,3 +1,5 @@
+{-# LANGUAGE NoPolyKinds #-}
+
 module T7696 where
 
 f1 :: (m a, t m)

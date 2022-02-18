@@ -8,7 +8,7 @@ import Data.Kind
 class C (a :: k) where
   type T k :: Type
 
--- This used to fail, with a mysterious error messate
+-- This used to fail, with a mysterious error message
 --    Type indexes must match class instance head
 --      Expected: T (a1 -> Either a1 b1)
 --      Actual: T (a -> Either a b)

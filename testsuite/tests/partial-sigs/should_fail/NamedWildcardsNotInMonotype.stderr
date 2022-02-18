@@ -6,6 +6,12 @@ NamedWildcardsNotInMonotype.hs:5:1: error:
                    forall {a} {w}. (Show a, Eq w, Eq a) => a -> a -> String
         at NamedWildcardsNotInMonotype.hs:5:1-33
       The type variable ‘w0’ is ambiguous
+      Potentially matching instances:
+        instance Eq Ordering -- Defined in ‘GHC.Classes’
+        instance Eq () -- Defined in ‘GHC.Classes’
+        ...plus 22 others
+        ...plus four instances involving out-of-scope types
+        (use -fprint-potential-instances to see them all)
     • In the ambiguity check for the inferred type for ‘foo’
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
       When checking the inferred type

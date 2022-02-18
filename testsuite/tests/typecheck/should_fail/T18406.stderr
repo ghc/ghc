@@ -1,0 +1,5 @@
+
+T18406.hs:8:7: error:
+    • No instance for (C Bool b0) arising from a use of ‘op’
+    • In the expression: op True x
+      In an equation for ‘f’: f x = op True x

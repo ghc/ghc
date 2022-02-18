@@ -1809,9 +1809,14 @@ checkMainType tcg_env
              ctxt      = FunSigCtxt main_name NoRRC
        ; main_id   <- tcLookupId main_name
        ; (io_ty,_) <- getIOType
+       ; let main_ty   = idType main_id
+             eq_orig   = TypeEqOrigin { uo_actual   = main_ty
+                                      , uo_expected = io_ty
+                                      , uo_thing    = Nothing
+                                      , uo_visible  = True }
        ; (_, lie)  <- captureTopConstraints       $
                       setMainCtxt main_name io_ty $
-                      tcSubTypeSigma ctxt (idType main_id) io_ty
+                      tcSubTypeSigma eq_orig ctxt main_ty io_ty
        ; return lie } } } }
 
 checkMain :: Bool  -- False => no 'module M(..) where' header at all

@@ -2,12 +2,12 @@
 tcfail102.hs:1:14: warning: [-Wdeprecated-flags (in -Wdefault)]
     -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
 
-tcfail102.hs:9:15: error:
-    • Could not deduce (Integral (Ratio a)) arising from a use of ‘p’
+tcfail102.hs:9:7: error:
+    • Could not deduce (Integral (Ratio a))
+        arising from a record update
       from the context: Integral a
         bound by the type signature for:
                    f :: forall a. Integral a => P (Ratio a) -> P (Ratio a)
         at tcfail102.hs:8:1-45
-    • In the ‘p’ field of a record
-      In the expression: x {p = p x}
+    • In the expression: x {p = p x}
       In an equation for ‘f’: f x = x {p = p x}

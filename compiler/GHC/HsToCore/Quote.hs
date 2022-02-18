@@ -1844,11 +1844,8 @@ repBinds (HsValBinds _ decs)
         ; return (ss, core_list) }
 
 rep_implicit_param_bind :: LIPBind GhcRn -> MetaM (SrcSpan, Core (M TH.Dec))
-rep_implicit_param_bind (L loc (IPBind _ ename (L _ rhs)))
- = do { name <- case ename of
-                    Left (L _ n) -> rep_implicit_param_name n
-                    Right _ ->
-                        panic "rep_implicit_param_bind: post typechecking"
+rep_implicit_param_bind (L loc (IPBind _ (L _ n) (L _ rhs)))
+ = do { name <- rep_implicit_param_name n
       ; rhs' <- repE rhs
       ; ipb <- repImplicitParamBind name rhs'
       ; return (locA loc, ipb) }

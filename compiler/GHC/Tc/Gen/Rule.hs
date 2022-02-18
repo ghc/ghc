@@ -15,6 +15,7 @@ import GHC.Hs
 import GHC.Tc.Types
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Solver
+import GHC.Tc.Solver.Monad ( runTcS )
 import GHC.Tc.Types.Constraint
 import GHC.Core.Predicate
 import GHC.Tc.Types.Origin
@@ -396,20 +397,24 @@ simplifyRule :: RuleName
 -- NB: This consumes all simple constraints on the LHS, but not
 -- any LHS implication constraints.
 simplifyRule name tc_lvl lhs_wanted rhs_wanted
-  = do {
-       -- Note [The SimplifyRule Plan] step 1
-       -- First solve the LHS and *then* solve the RHS
-       -- Crucially, this performs unifications
-       -- Why clone?  See Note [Simplify cloned constraints]
-       ; lhs_clone <- cloneWC lhs_wanted
-       ; rhs_clone <- cloneWC rhs_wanted
-       ; setTcLevel tc_lvl $
-         runTcSDeriveds    $
-         do { _ <- solveWanteds lhs_clone
-            ; _ <- solveWanteds rhs_clone
-                  -- Why do them separately?
-                  -- See Note [Solve order for RULES]
-            ; return () }
+  = do { setTcLevel tc_lvl $
+         do {  -- Note [The SimplifyRule Plan] step 1
+               -- First solve the LHS and *then* solve the RHS
+               -- Crucially, this performs unifications
+               -- Why clone?  See Note [Simplify cloned constraints]
+               -- This must be in the bumped TcLevel because cloneWC creates
+               -- metavariables for Concrete# constraints. See Note [The Concrete mechanism]
+               -- in GHC.Tc.Utils.Concrete
+            ; lhs_clone <- cloneWC lhs_wanted
+            ; rhs_clone <- cloneWC rhs_wanted
+            ; discardResult     $
+              runTcS            $
+              do {
+                 ; _ <- solveWanteds lhs_clone
+                 ; _ <- solveWanteds rhs_clone
+                       -- Why do them separately?
+                       -- See Note [Solve order for RULES]
+                 ; return () }}
 
        -- Note [The SimplifyRule Plan] step 2
        ; lhs_wanted <- zonkWC lhs_wanted

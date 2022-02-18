@@ -1,18 +1,6 @@
-TYPE SIGNATURES
-  foo ::
-    forall {s} {b} {chain}.
-    Zork s (Z [Char]) b =>
-    Q s (Z [Char]) chain -> ST s ()
-  huh :: forall s a b chain. Zork s a b => Q s a chain -> ST s ()
-  s :: forall t t1. Q t (Z [Char]) t1 -> Q t (Z [Char]) t1
-TYPE CONSTRUCTORS
-  data type Q{3} :: * -> * -> * -> *
-  data type Z{1} :: * -> *
-  class Zork{3} :: * -> * -> * -> Constraint
-COERCION AXIOMS
-  axiom N:Zork :: Zork s a b = forall chain. Q s a chain -> ST s ()
-DATA CONSTRUCTORS
-  Z :: forall a. a -> Z a
-  Node :: forall s a chain. s -> a -> chain -> Q s a chain
-Dependent modules: []
-Dependent packages: [base-4.16.0.0]
+
+tc231.hs:34:9: error:
+    • No instance for (Zork s (Z [Char]) b0)
+        arising from a use of ‘huh’
+    • In the expression: huh (s b)
+      In an equation for ‘foo’: foo b = huh (s b)

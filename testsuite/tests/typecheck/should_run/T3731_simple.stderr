@@ -1,0 +1,16 @@
+
+T3731_simple.hs:19:13: error:
+    • Could not deduce (Default a)
+        arising from a superclass required to satisfy ‘Data a’,
+        arising from a use of ‘dataTypeOf’
+      from the context: Data a
+        bound by the type signature for:
+                   defaultDefaultValue :: forall a. Data a => a
+        at T3731_simple.hs:16:1-34
+    • In the expression: dataTypeOf res
+      In an equation for ‘res’: res = dataTypeOf res
+      In an equation for ‘defaultDefaultValue’:
+          defaultDefaultValue
+            = res
+            where
+                res = dataTypeOf res

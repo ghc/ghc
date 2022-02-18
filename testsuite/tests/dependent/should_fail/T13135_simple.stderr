@@ -1,0 +1,8 @@
+
+T13135_simple.hs:34:11: error:
+    • Couldn't match type ‘SmartFun sig’ with ‘Bool’
+      Expected: Int -> Bool
+        Actual: SmartFun ('SigFun Int sig)
+      The type variable ‘sig’ is ambiguous
+    • In the expression: smartSym
+      In an equation for ‘problem’: problem = smartSym

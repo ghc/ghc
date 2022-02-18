@@ -790,7 +790,7 @@ Important Details:
 - GHC should NEVER report an insoluble CallStack constraint.
 
 - GHC should NEVER infer a CallStack constraint unless one was requested
-  with a partial type signature (See TcType.pickQuantifiablePreds).
+  with a partial type signature (See GHC.Tc.Solver..pickQuantifiablePreds).
 
 - A CallStack (defined in GHC.Stack.Types) is a [(String, SrcLoc)],
   where the String is the name of the binder that is used at the

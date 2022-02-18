@@ -1,5 +1,7 @@
 
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE TypeApplications #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
@@ -15,22 +17,23 @@ module GHC.Tc.Types.Constraint (
         singleCt, listToCts, ctsElts, consCts, snocCts, extendCtsList,
         isEmptyCts,
         isPendingScDict, superClassesMightHelp, getPendingWantedScs,
-        isWantedCt, isDerivedCt, isGivenCt,
-        isUserTypeErrorCt, getUserTypeErrorMsg,
-        ctEvidence, ctLoc, setCtLoc, ctPred, ctFlavour, ctEqRel, ctOrigin,
+        isWantedCt, isGivenCt,
+        isUserTypeError, getUserTypeErrorMsg,
+        ctEvidence, ctLoc, ctPred, ctFlavour, ctEqRel, ctOrigin,
+        ctRewriters,
         ctEvId, mkTcEqPredLikeEv,
         mkNonCanonical, mkNonCanonicalCt, mkGivens,
         mkIrredCt,
         ctEvPred, ctEvLoc, ctEvOrigin, ctEvEqRel,
         ctEvExpr, ctEvTerm, ctEvCoercion, ctEvEvId,
+        ctEvRewriters,
         tyCoVarsOfCt, tyCoVarsOfCts,
         tyCoVarsOfCtList, tyCoVarsOfCtsList,
-        ambigTkvsOfCt,
 
-        CtIrredReason(..), HoleSet, isInsolubleReason,
+        CtIrredReason(..), isInsolubleReason,
 
         CheckTyEqResult, CheckTyEqProblem, cteProblem, cterClearOccursCheck,
-        cteOK, cteImpredicative, cteTypeFamily, cteHoleBlocker,
+        cteOK, cteImpredicative, cteTypeFamily,
         cteInsolubleOccurs, cteSolubleOccurs, cterSetOccursCheckSoluble,
         cterHasNoProblem, cterHasProblem, cterHasOnlyProblem,
         cterRemoveProblem, cterHasOccursCheck, cterFromKind,
@@ -43,10 +46,9 @@ module GHC.Tc.Types.Constraint (
         WantedConstraints(..), insolubleWC, emptyWC, isEmptyWC,
         isSolvedWC, andWC, unionsWC, mkSimpleWC, mkImplicWC,
         addInsols, dropMisleading, addSimples, addImplics, addHoles,
-        tyCoVarsOfWC, dropDerivedWC, dropDerivedSimples,
+        tyCoVarsOfWC,
         tyCoVarsOfWCList, insolubleWantedCt, insolubleEqCt, insolubleCt,
-        isDroppableCt, insolubleImplic,
-        arisesFromGivens,
+        insolubleImplic,
 
         Implication(..), implicationPrototype, checkTelescopeSkol,
         ImplicStatus(..), isInsolubleStatus, isSolvedStatus,
@@ -63,15 +65,22 @@ module GHC.Tc.Types.Constraint (
         -- CtEvidence
         CtEvidence(..), TcEvDest(..),
         mkKindLoc, toKindLoc, mkGivenLoc,
-        isWanted, isGiven, isDerived,
-        ctEvRole, setCtEvPredType,
+        isWanted, isGiven,
+        ctEvRole, setCtEvPredType, setCtEvLoc, arisesFromGivens,
+        tyCoVarsOfCtEvList, tyCoVarsOfCtEv, tyCoVarsOfCtEvsList,
+        ctEvUnique, tcEvDestUnique,
+        isHoleDestPred,
+
+        RewriterSet(..), emptyRewriterSet, isEmptyRewriterSet,
+           -- exported concretely only for anyUnfilledCoercionHoles
+        rewriterSetFromType, rewriterSetFromTypes, rewriterSetFromCo,
+        addRewriterSet,
 
         wrapType,
 
-        CtFlavour(..), ShadowInfo(..), ctFlavourContainsDerived, ctEvFlavour,
+        CtFlavour(..), ctEvFlavour,
         CtFlavourRole, ctEvFlavourRole, ctFlavourRole,
-        eqCanRewrite, eqCanRewriteFR, eqMayRewriteFR,
-        eqCanDischargeFR,
+        eqCanRewrite, eqCanRewriteFR,
 
         -- Pretty printing
         pprEvVarTheta,
@@ -104,6 +113,8 @@ import GHC.Utils.FV
 import GHC.Types.Var.Set
 import GHC.Driver.Session
 import GHC.Types.Basic
+import GHC.Types.Unique
+import GHC.Types.Unique.Set
 
 import GHC.Utils.Outputable
 import GHC.Types.SrcLoc
@@ -113,13 +124,15 @@ import GHC.Utils.Panic
 import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Trace
 
+import Data.Coerce
+import Data.Monoid ( Endo(..) )
+import qualified Data.Semigroup as S
 import Control.Monad ( msum, when )
-import qualified Data.Semigroup ( (<>) )
-import Data.Maybe( mapMaybe )
+import Data.Maybe ( mapMaybe )
 
 -- these are for CheckTyEqResult
 import Data.Word  ( Word8 )
-import Data.List  ( intersperse, partition )
+import Data.List  ( intersperse )
 
 
 
@@ -226,8 +239,6 @@ data Ct
        --     to give best chance of
        --     unification happening; eg if rhs is touchable then lhs is too
        --     Note [TyVar/TyVar orientation] in GHC.Tc.Utils.Unify
-       --   * (TyEq:H) The RHS has no blocking coercion holes. See GHC.Tc.Solver.Canonical
-       --     Note [Equalities with incompatible kinds], wrinkle (2)
       cc_ev     :: CtEvidence, -- See Note [Ct/evidence invariant]
       cc_lhs    :: CanEqLHS,
       cc_rhs    :: Xi,         -- See invariants above
@@ -337,18 +348,9 @@ data CtIrredReason
   = IrredShapeReason
       -- ^ this constraint has a non-canonical shape (e.g. @c Int@, for a variable @c@)
 
-  | HoleBlockerReason HoleSet
-     -- ^ this constraint is blocked on the coercion hole(s) listed
-     -- See Note [Equalities with incompatible kinds] in GHC.Tc.Solver.Canonical
-     -- Wrinkle (4a). Why store the HoleSet? See Wrinkle (2) of that
-     -- same Note.
-     -- INVARIANT: A HoleBlockerReason constraint is a homogeneous equality whose
-     --   left hand side can fit in a CanEqLHS.
-
   | NonCanonicalReason CheckTyEqResult
    -- ^ an equality where some invariant other than (TyEq:H) of 'CEqCan' is not satisfied;
    -- the 'CheckTyEqResult' states exactly why
-   -- INVARIANT: the 'CheckTyEqResult' has some bit set other than cteHoleBlocker
 
   | ReprEqReason
     -- ^ an equality that cannot be decomposed because it is representational.
@@ -369,7 +371,6 @@ data CtIrredReason
 
 instance Outputable CtIrredReason where
   ppr IrredShapeReason          = text "(irred)"
-  ppr (HoleBlockerReason holes) = parens (text "blocked on" <+> ppr holes)
   ppr (NonCanonicalReason cter) = ppr cter
   ppr ReprEqReason              = text "(repr)"
   ppr ShapeMismatchReason       = text "(shape)"
@@ -378,7 +379,6 @@ instance Outputable CtIrredReason where
 -- | Are we sure that more solving will never solve this constraint?
 isInsolubleReason :: CtIrredReason -> Bool
 isInsolubleReason IrredShapeReason          = False
-isInsolubleReason (HoleBlockerReason {})    = False
 isInsolubleReason (NonCanonicalReason cter) = cterIsInsoluble cter
 isInsolubleReason ReprEqReason              = False
 isInsolubleReason ShapeMismatchReason       = True
@@ -406,14 +406,11 @@ cterHasNoProblem _        = False
 -- | An individual problem that might be logged in a 'CheckTyEqResult'
 newtype CheckTyEqProblem = CTEP Word8
 
-cteImpredicative, cteTypeFamily, cteHoleBlocker, cteInsolubleOccurs,
-  cteSolubleOccurs :: CheckTyEqProblem
+cteImpredicative, cteTypeFamily, cteInsolubleOccurs, cteSolubleOccurs :: CheckTyEqProblem
 cteImpredicative   = CTEP (bit 0)   -- forall or (=>) encountered
 cteTypeFamily      = CTEP (bit 1)   -- type family encountered
-cteHoleBlocker     = CTEP (bit 2)   -- blocking coercion hole
-      -- See Note [Equalities with incompatible kinds] in GHC.Tc.Solver.Canonical
-cteInsolubleOccurs = CTEP (bit 3)   -- occurs-check
-cteSolubleOccurs   = CTEP (bit 4)   -- occurs-check under a type function or in a coercion
+cteInsolubleOccurs = CTEP (bit 2)   -- occurs-check
+cteSolubleOccurs   = CTEP (bit 3)   -- occurs-check under a type function or in a coercion
                                     -- must be one bit to the left of cteInsolubleOccurs
 -- See also Note [Insoluble occurs check] in GHC.Tc.Errors
 
@@ -477,7 +474,6 @@ instance Outputable CheckTyEqResult where
     where
       all_bits = [ (cteImpredicative,   "cteImpredicative")
                  , (cteTypeFamily,      "cteTypeFamily")
-                 , (cteHoleBlocker,     "cteHoleBlocker")
                  , (cteInsolubleOccurs, "cteInsolubleOccurs")
                  , (cteSolubleOccurs,   "cteSolubleOccurs") ]
       set_bits = [ text str
@@ -579,15 +575,15 @@ ctEvidence ct = cc_ev ct
 ctLoc :: Ct -> CtLoc
 ctLoc = ctEvLoc . ctEvidence
 
-setCtLoc :: Ct -> CtLoc -> Ct
-setCtLoc ct loc = ct { cc_ev = (cc_ev ct) { ctev_loc = loc } }
-
 ctOrigin :: Ct -> CtOrigin
 ctOrigin = ctLocOrigin . ctLoc
 
 ctPred :: Ct -> PredType
 -- See Note [Ct/evidence invariant]
 ctPred ct = ctEvPred (ctEvidence ct)
+
+ctRewriters :: Ct -> RewriterSet
+ctRewriters = ctEvRewriters . ctEvidence
 
 ctEvId :: Ct -> EvVar
 -- The evidence Id for this Ct
@@ -677,10 +673,19 @@ eqCanEqLHS _ _ = False
 tyCoVarsOfCt :: Ct -> TcTyCoVarSet
 tyCoVarsOfCt = fvVarSet . tyCoFVsOfCt
 
--- | Returns free variables of constraints as a deterministically ordered.
--- list. See Note [Deterministic FV] in "GHC.Utils.FV".
+-- | Returns free variables of constraints as a non-deterministic set
+tyCoVarsOfCtEv :: CtEvidence -> TcTyCoVarSet
+tyCoVarsOfCtEv = fvVarSet . tyCoFVsOfCtEv
+
+-- | Returns free variables of constraints as a deterministically ordered
+-- list. See Note [Deterministic FV] in GHC.Utils.FV.
 tyCoVarsOfCtList :: Ct -> [TcTyCoVar]
 tyCoVarsOfCtList = fvVarList . tyCoFVsOfCt
+
+-- | Returns free variables of constraints as a deterministically ordered
+-- list. See Note [Deterministic FV] in GHC.Utils.FV.
+tyCoVarsOfCtEvList :: CtEvidence -> [TcTyCoVar]
+tyCoVarsOfCtEvList = fvVarList . tyCoFVsOfType . ctEvPred
 
 -- | Returns free variables of constraints as a composable FV computation.
 -- See Note [Deterministic FV] in "GHC.Utils.FV".
@@ -689,6 +694,11 @@ tyCoFVsOfCt ct = tyCoFVsOfType (ctPred ct)
   -- This must consult only the ctPred, so that it gets *tidied* fvs if the
   -- constraint has been tidied. Tidying a constraint does not tidy the
   -- fields of the Ct, only the predicate in the CtEvidence.
+
+-- | Returns free variables of constraints as a composable FV computation.
+-- See Note [Deterministic FV] in GHC.Utils.FV.
+tyCoFVsOfCtEv :: CtEvidence -> FV
+tyCoFVsOfCtEv ct = tyCoFVsOfType (ctEvPred ct)
 
 -- | Returns free variables of a bag of constraints as a non-deterministic
 -- set. See Note [Deterministic FV] in "GHC.Utils.FV".
@@ -700,10 +710,20 @@ tyCoVarsOfCts = fvVarSet . tyCoFVsOfCts
 tyCoVarsOfCtsList :: Cts -> [TcTyCoVar]
 tyCoVarsOfCtsList = fvVarList . tyCoFVsOfCts
 
+-- | Returns free variables of a bag of constraints as a deterministically
+-- ordered list. See Note [Deterministic FV] in GHC.Utils.FV.
+tyCoVarsOfCtEvsList :: [CtEvidence] -> [TcTyCoVar]
+tyCoVarsOfCtEvsList = fvVarList . tyCoFVsOfCtEvs
+
 -- | Returns free variables of a bag of constraints as a composable FV
 -- computation. See Note [Deterministic FV] in "GHC.Utils.FV".
 tyCoFVsOfCts :: Cts -> FV
 tyCoFVsOfCts = foldr (unionFV . tyCoFVsOfCt) emptyFV
+
+-- | Returns free variables of a bag of constraints as a composable FV
+-- computation. See Note [Deterministic FV] in GHC.Utils.FV.
+tyCoFVsOfCtEvs :: [CtEvidence] -> FV
+tyCoFVsOfCtEvs = foldr (unionFV . tyCoFVsOfCtEv) emptyFV
 
 -- | Returns free variables of WantedConstraints as a non-deterministic
 -- set. See Note [Deterministic FV] in "GHC.Utils.FV".
@@ -746,149 +766,10 @@ tyCoFVsOfHole (Hole { hole_ty = ty }) = tyCoFVsOfType ty
 tyCoFVsOfBag :: (a -> FV) -> Bag a -> FV
 tyCoFVsOfBag tvs_of = foldr (unionFV . tvs_of) emptyFV
 
-ambigTkvsOfCt :: Ct -> ([Var],[Var])
-ambigTkvsOfCt ct
-  = partition (`elemVarSet` dep_tkv_set) ambig_tkvs
-  where
-    tkvs       = tyCoVarsOfCtList ct
-    ambig_tkvs = filter isAmbiguousTyVar tkvs
-    dep_tkv_set = tyCoVarsOfTypes (map tyVarKind tkvs)
-
----------------------------
-dropDerivedWC :: WantedConstraints -> WantedConstraints
--- See Note [Dropping derived constraints]
-dropDerivedWC wc@(WC { wc_simple = simples })
-  = wc { wc_simple = dropDerivedSimples simples }
-    -- The wc_impl implications are already (recursively) filtered
-
---------------------------
-dropDerivedSimples :: Cts -> Cts
--- Drop all Derived constraints, but make [W] back into [WD],
--- so that if we re-simplify these constraints we will get all
--- the right derived constraints re-generated.  Forgetting this
--- step led to #12936
-dropDerivedSimples simples = mapMaybeBag dropDerivedCt simples
-
-dropDerivedCt :: Ct -> Maybe Ct
-dropDerivedCt ct
-  = case ctEvFlavour ev of
-      Wanted WOnly -> Just (ct' { cc_ev = ev_wd })
-      Wanted _     -> Just ct'
-      _ | isDroppableCt ct -> Nothing
-        | otherwise        -> Just ct
-  where
-    ev    = ctEvidence ct
-    ev_wd = ev { ctev_nosh = WDeriv }
-    ct'   = setPendingScDict ct -- See Note [Resetting cc_pend_sc]
-
-{- Note [Resetting cc_pend_sc]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When we discard Derived constraints, in dropDerivedSimples, we must
-set the cc_pend_sc flag to True, so that if we re-process this
-CDictCan we will re-generate its derived superclasses. Otherwise
-we might miss some fundeps.  #13662 showed this up.
-
-See Note [The superclass story] in GHC.Tc.Solver.Canonical.
--}
-
-isDroppableCt :: Ct -> Bool
-isDroppableCt ct
-  = isDerived ev && not keep_deriv
-    -- Drop only derived constraints, and then only if they
-    -- obey Note [Dropping derived constraints]
-  where
-    ev   = ctEvidence ct
-    loc  = ctEvLoc ev
-    orig = ctLocOrigin loc
-
-    keep_deriv
-      = case ct of
-          CIrredCan { cc_reason = reason } | isInsolubleReason reason -> keep_eq True
-          _                                                           -> keep_eq False
-
-    keep_eq definitely_insoluble
-       | isGivenOrigin orig    -- Arising only from givens
-       = definitely_insoluble  -- Keep only definitely insoluble
-       | otherwise
-       = case orig of
-           -- See Note [Dropping derived constraints]
-           -- For fundeps, drop wanted/wanted interactions
-           FunDepOrigin2 {} -> True   -- Top-level/Wanted
-           FunDepOrigin1 _ orig1 _ _ orig2 _
-             | g1 || g2  -> True  -- Given/Wanted errors: keep all
-             | otherwise -> False -- Wanted/Wanted errors: discard
-             where
-               g1 = isGivenOrigin orig1
-               g2 = isGivenOrigin orig2
-
-           _ -> False
-
-arisesFromGivens :: Ct -> Bool
-arisesFromGivens ct
-  = case ctEvidence ct of
-      CtGiven {}                   -> True
-      CtWanted {}                  -> False
-      CtDerived { ctev_loc = loc } -> isGivenLoc loc
-
 isGivenLoc :: CtLoc -> Bool
 isGivenLoc loc = isGivenOrigin (ctLocOrigin loc)
 
-{- Note [Dropping derived constraints]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In general we discard derived constraints at the end of constraint solving;
-see dropDerivedWC.  For example
-
- * Superclasses: if we have an unsolved [W] (Ord a), we don't want to
-   complain about an unsolved [D] (Eq a) as well.
-
- * If we have [W] a ~ Int, [W] a ~ Bool, improvement will generate
-   [D] Int ~ Bool, and we don't want to report that because it's
-   incomprehensible. That is why we don't rewrite wanteds with wanteds!
-
- * We might float out some Wanteds from an implication, leaving behind
-   their insoluble Deriveds. For example:
-
-   forall a[2]. [W] alpha[1] ~ Int
-                [W] alpha[1] ~ Bool
-                [D] Int ~ Bool
-
-   The Derived is insoluble, but we very much want to drop it when floating
-   out.
-
-But (tiresomely) we do keep *some* Derived constraints:
-
- * Type holes are derived constraints, because they have no evidence
-   and we want to keep them, so we get the error report
-
- * We keep most derived equalities arising from functional dependencies
-      - Given/Given interactions (subset of FunDepOrigin1):
-        The definitely-insoluble ones reflect unreachable code.
-
-        Others not-definitely-insoluble ones like [D] a ~ Int do not
-        reflect unreachable code; indeed if fundeps generated proofs, it'd
-        be a useful equality.  See #14763.   So we discard them.
-
-      - Given/Wanted interacGiven or Wanted interacting with an
-        instance declaration (FunDepOrigin2)
-
-      - Given/Wanted interactions (FunDepOrigin1); see #9612
-
-      - But for Wanted/Wanted interactions we do /not/ want to report an
-        error (#13506).  Consider [W] C Int Int, [W] C Int Bool, with
-        a fundep on class C.  We don't want to report an insoluble Int~Bool;
-        c.f. "wanteds do not rewrite wanteds".
-
-To distinguish these cases we use the CtOrigin.
-
-NB: we keep *all* derived insolubles under some circumstances:
-
-  * They are looked at by simplifyInfer, to decide whether to
-    generalise.  Example: [W] a ~ Int, [W] a ~ Bool
-    We get [D] Int ~ Bool, and indeed the constraints are insoluble,
-    and we want simplifyInfer to see that, even though we don't
-    ultimately want to generate an (inexplicable) error message from it
-
-
+{-
 ************************************************************************
 *                                                                      *
                     CtEvidence
@@ -902,9 +783,6 @@ isWantedCt = isWanted . ctEvidence
 
 isGivenCt :: Ct -> Bool
 isGivenCt = isGiven . ctEvidence
-
-isDerivedCt :: Ct -> Bool
-isDerivedCt = isDerived . ctEvidence
 
 {- Note [Custom type errors in constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -936,27 +814,24 @@ Eq (F (TypeError msg))  -- Here the type error is nested under a type-function
 -- | A constraint is considered to be a custom type error, if it contains
 -- custom type errors anywhere in it.
 -- See Note [Custom type errors in constraints]
-getUserTypeErrorMsg :: Ct -> Maybe Type
-getUserTypeErrorMsg ct = findUserTypeError (ctPred ct)
+getUserTypeErrorMsg :: PredType -> Maybe Type
+getUserTypeErrorMsg pred = msum $ userTypeError_maybe pred
+                                  : map getUserTypeErrorMsg (subTys pred)
   where
-  findUserTypeError t = msum ( userTypeError_maybe t
-                             : map findUserTypeError (subTys t)
-                             )
-
-  subTys t            = case splitAppTys t of
-                          (t,[]) ->
-                            case splitTyConApp_maybe t of
+   -- Richard thinks this function is very broken. What is subTys
+   -- supposed to be doing? Why are exactly-saturated tyconapps special?
+   -- What stops this from accidentally ripping apart a call to TypeError?
+    subTys t = case splitAppTys t of
+                 (t,[]) ->
+                   case splitTyConApp_maybe t of
                               Nothing     -> []
                               Just (_,ts) -> ts
-                          (t,ts) -> t : ts
+                 (t,ts) -> t : ts
 
-
-
-
-isUserTypeErrorCt :: Ct -> Bool
-isUserTypeErrorCt ct = case getUserTypeErrorMsg ct of
-                         Just _ -> True
-                         _      -> False
+isUserTypeError :: PredType -> Bool
+isUserTypeError pred = case getUserTypeErrorMsg pred of
+                             Just _ -> True
+                             _      -> False
 
 isPendingScDict :: Ct -> Maybe Ct
 -- Says whether this is a CDictCan with cc_pend_sc is True,
@@ -971,12 +846,6 @@ isPendingScInst qci@(QCI { qci_pend_sc = True })
                   = Just (qci { qci_pend_sc = False })
 isPendingScInst _ = Nothing
 
-setPendingScDict :: Ct -> Ct
--- Set the cc_pend_sc flag to True
-setPendingScDict ct@(CDictCan { cc_pend_sc = False })
-                    = ct { cc_pend_sc = True }
-setPendingScDict ct = ct
-
 superClassesMightHelp :: WantedConstraints -> Bool
 -- ^ True if taking superclasses of givens, or of wanteds (to perhaps
 -- expose more equalities or functional dependencies) might help to
@@ -988,7 +857,7 @@ superClassesMightHelp (WC { wc_simple = simples, wc_impl = implics })
        | IC_Unsolved <- ic_status ic = superClassesMightHelp (ic_wanted ic)
        | otherwise                   = False
 
-    might_help_ct ct = isWantedCt ct && not (is_ip ct)
+    might_help_ct ct = not (is_ip ct)
 
     is_ip (CDictCan { cc_class = cls }) = isIPClass cls
     is_ip _                             = False
@@ -1017,16 +886,11 @@ Note that
     implication.  E.g.
         forall a. Ord a => forall b. [W] Eq a
 
-  * Superclasses help only for Wanted constraints.  Derived constraints
-    are not really "unsolved" and we certainly don't want them to
-    trigger superclass expansion. This was a good part of the loop
-    in  #11523
-
-  * Even for Wanted constraints, we say "no" for implicit parameters.
+  * We say "no" for implicit parameters.
     we have [W] ?x::ty, expanding superclasses won't help:
       - Superclasses can't be implicit parameters
       - If we have a [G] ?x:ty2, then we'll have another unsolved
-        [D] ty ~ ty2 (from the functional dependency)
+        [W] ty ~ ty2 (from the functional dependency)
         which will trigger superclass expansion.
 
     It's a bit of a special case, but it's easy to do.  The runtime cost
@@ -1082,13 +946,8 @@ pprCts cts = vcat (map ppr (bagToList cts))
 ************************************************************************
 *                                                                      *
                 Wanted constraints
-     These are forced to be in GHC.Tc.Types because
-           TcLclEnv mentions WantedConstraints
-           WantedConstraint mentions CtLoc
-           CtLoc mentions ErrCtxt
-           ErrCtxt mentions TcM
 *                                                                      *
-v%************************************************************************
+************************************************************************
 -}
 
 data WantedConstraints
@@ -1192,10 +1051,12 @@ insolubleWantedCt :: Ct -> Bool
 --   a) an insoluble constraint as per 'insolubleCt', i.e. either
 --        - an insoluble equality constraint (e.g. Int ~ Bool), or
 --        - a custom type error constraint, TypeError msg :: Constraint
---   b) that does not arise from a Given
+--   b) that does not arise from a Given or a Wanted/Wanted fundep interaction
 --
 -- See Note [Given insolubles].
-insolubleWantedCt ct = insolubleCt ct && not (arisesFromGivens ct)
+insolubleWantedCt ct = insolubleCt ct &&
+                       not (arisesFromGivens ct) &&
+                       not (isWantedWantedFunDepOrigin (ctOrigin ct))
 
 insolubleEqCt :: Ct -> Bool
 -- Returns True of /equality/ constraints
@@ -1282,12 +1143,6 @@ We do /not/ want to set the implication status to IC_Insoluble,
 because that'll suppress reports of [W] C b (f b).  But we
 may not report the insoluble [G] f b ~# b either (see Note [Given errors]
 in GHC.Tc.Errors), so we may fail to report anything at all!  Yikes.
-
-The same applies to Derived constraints that /arise from/ Givens.
-E.g.   f :: (C Int [a]) => blah
-where a fundep means we get
-       [D] Int ~ [a]
-By the same reasoning we must not suppress other errors (#15767)
 
 Bottom line: insolubleWC (called in GHC.Tc.Solver.setImplicationStatus)
              should ignore givens even if they are insoluble.
@@ -1632,12 +1487,6 @@ At the end, we will hopefully have substituted uf1 := F alpha, and we
 will be able to report a more informative error:
     'Can't construct the infinite type beta ~ F alpha beta'
 
-Insoluble constraints *do* include Derived constraints. For example,
-a functional dependency might give rise to [D] Int ~ Bool, and we must
-report that.  If insolubles did not contain Deriveds, reportErrors would
-never see it.
-
-
 ************************************************************************
 *                                                                      *
             Invariant checking (debug only)
@@ -1876,17 +1725,10 @@ data CtEvidence
 
 
   | CtWanted   -- Wanted goal
-      { ctev_pred :: TcPredType     -- See Note [Ct/evidence invariant]
-      , ctev_dest :: TcEvDest       -- See Note [CtEvidence invariants]
-      , ctev_nosh :: ShadowInfo     -- See Note [Constraint flavours]
-      , ctev_loc  :: CtLoc }
-
-  | CtDerived  -- A goal that we don't really have to solve and can't
-               -- immediately rewrite anything other than a derived
-               -- (there's no evidence!) but if we do manage to solve
-               -- it may help in solving other goals.
-      { ctev_pred :: TcPredType
-      , ctev_loc  :: CtLoc }
+      { ctev_pred      :: TcPredType     -- See Note [Ct/evidence invariant]
+      , ctev_dest      :: TcEvDest       -- See Note [CtEvidence invariants]
+      , ctev_loc       :: CtLoc
+      , ctev_rewriters :: RewriterSet }  -- See Note [Wanteds rewrite Wanteds]
 
 ctEvPred :: CtEvidence -> TcPredType
 -- The predicate of a flavor
@@ -1909,6 +1751,14 @@ ctEvRole = eqRelRole . ctEvEqRel
 ctEvTerm :: CtEvidence -> EvTerm
 ctEvTerm ev = EvExpr (ctEvExpr ev)
 
+-- | Extract the set of rewriters from a 'CtEvidence'
+-- See Note [Wanteds rewrite Wanteds]
+-- If the provided CtEvidence is not for a Wanted, just
+-- return an empty set.
+ctEvRewriters :: CtEvidence -> RewriterSet
+ctEvRewriters (CtWanted { ctev_rewriters = rewriters }) = rewriters
+ctEvRewriters _other                                    = emptyRewriterSet
+
 ctEvExpr :: CtEvidence -> EvExpr
 ctEvExpr ev@(CtWanted { ctev_dest = HoleDest _ })
             = Coercion $ ctEvCoercion ev
@@ -1929,34 +1779,64 @@ ctEvEvId :: CtEvidence -> EvVar
 ctEvEvId (CtWanted { ctev_dest = EvVarDest ev }) = ev
 ctEvEvId (CtWanted { ctev_dest = HoleDest h })   = coHoleCoVar h
 ctEvEvId (CtGiven  { ctev_evar = ev })           = ev
-ctEvEvId ctev@(CtDerived {}) = pprPanic "ctEvId:" (ppr ctev)
+
+ctEvUnique :: CtEvidence -> Unique
+ctEvUnique (CtGiven { ctev_evar = ev })    = varUnique ev
+ctEvUnique (CtWanted { ctev_dest = dest }) = tcEvDestUnique dest
+
+tcEvDestUnique :: TcEvDest -> Unique
+tcEvDestUnique (EvVarDest ev_var) = varUnique ev_var
+tcEvDestUnique (HoleDest co_hole) = varUnique (coHoleCoVar co_hole)
+
+setCtEvLoc :: CtEvidence -> CtLoc -> CtEvidence
+setCtEvLoc ctev loc = ctev { ctev_loc = loc }
+
+arisesFromGivens :: Ct -> Bool
+arisesFromGivens ct = isGivenCt ct || isGivenLoc (ctLoc ct)
 
 -- | Set the type of CtEvidence.
 --
 -- This function ensures that the invariants on 'CtEvidence' hold, by updating
 -- the evidence and the ctev_pred in sync with each other.
 -- See Note [CtEvidence invariants]
-setCtEvPredType :: CtEvidence -> Type -> CtEvidence
+setCtEvPredType :: CtEvidence -> PredType -> CtEvidence
 setCtEvPredType old_ctev new_pred = case old_ctev of
     CtGiven { ctev_evar = ev, ctev_loc = loc } ->
       CtGiven { ctev_pred = new_pred
-              , ctev_evar = setVarType ev new_pred
+              , ctev_evar = setVarType ev new_var_type
               , ctev_loc  = loc
               }
-    CtWanted { ctev_dest = dest, ctev_nosh = nosh, ctev_loc = loc } ->
-      CtWanted { ctev_pred = new_pred
-               , ctev_dest = new_dest
-               , ctev_nosh = nosh
-               , ctev_loc  = loc
+    CtWanted { ctev_dest = dest, ctev_loc = loc, ctev_rewriters = rewriters } ->
+      CtWanted { ctev_pred      = new_pred
+               , ctev_dest      = new_dest
+               , ctev_loc       = loc
+               , ctev_rewriters = rewriters
                }
         where
           new_dest = case dest of
-            EvVarDest ev -> EvVarDest (setVarType ev new_pred)
-            HoleDest h   -> HoleDest  (setCoHoleType h new_pred)
-    CtDerived { ctev_loc = loc } ->
-      CtDerived { ctev_pred = new_pred
-                , ctev_loc  = loc
-                }
+            EvVarDest ev -> EvVarDest (setVarType ev new_var_type)
+            HoleDest h   -> HoleDest  (setCoHoleType h new_var_type)
+  where
+    new_var_type
+       -- Gotcha: Concrete# constraints have evidence of a different type
+       -- than the predicate type
+      | SpecialPred ConcretePrimPred new_concrete_ty <- classifyPredType new_pred
+      = mkHeteroPrimEqPred (typeKind new_concrete_ty) k2 new_concrete_ty t2
+
+      | otherwise
+      = new_pred
+
+      where
+         -- This is gross. But it will be short-lived, once we re-design
+         -- Concrete# constraints.
+        old_var = case old_ctev of
+          CtGiven { ctev_evar = evar }          -> evar
+          CtWanted { ctev_dest = HoleDest h }   -> coHoleCoVar h
+          CtWanted { ctev_dest = EvVarDest {} } ->
+            pprPanic "setCtEvPredType" (ppr old_ctev $$ ppr new_pred)
+
+        (_k1, k2, _t1, t2, _role) = coVarKindsTypesRole old_var
+
 
 instance Outputable TcEvDest where
   ppr (HoleDest h)   = text "hole" <> ppr h
@@ -1964,14 +1844,17 @@ instance Outputable TcEvDest where
 
 instance Outputable CtEvidence where
   ppr ev = ppr (ctEvFlavour ev)
-           <+> pp_ev <+> braces (ppr (ctl_depth (ctEvLoc ev)))
+           <+> pp_ev <+> braces (ppr (ctl_depth (ctEvLoc ev)) <> pp_rewriters)
                          -- Show the sub-goal depth too
                <> dcolon <+> ppr (ctEvPred ev)
     where
       pp_ev = case ev of
              CtGiven { ctev_evar = v } -> ppr v
              CtWanted {ctev_dest = d } -> ppr d
-             CtDerived {}              -> text "_"
+
+      rewriters = ctEvRewriters ev
+      pp_rewriters | isEmptyRewriterSet rewriters = empty
+                   | otherwise                    = semi <> ppr rewriters
 
 isWanted :: CtEvidence -> Bool
 isWanted (CtWanted {}) = True
@@ -1981,72 +1864,88 @@ isGiven :: CtEvidence -> Bool
 isGiven (CtGiven {})  = True
 isGiven _ = False
 
-isDerived :: CtEvidence -> Bool
-isDerived (CtDerived {}) = True
-isDerived _              = False
+-- | When creating a constraint for the given predicate, should
+-- it get a 'HoleDest'? True for equalities and Concrete# constraints
+-- only. See Note [The Concrete mechanism] in GHC.Tc.Utils.Concrete
+isHoleDestPred :: PredType -> Bool
+isHoleDestPred pty = case classifyPredType pty of
+  EqPred {}                      -> True
+  SpecialPred ConcretePrimPred _ -> True
+  _                              -> False
+
 
 {-
-%************************************************************************
-%*                                                                      *
-            CtFlavour
-%*                                                                      *
-%************************************************************************
-
-Note [Constraint flavours]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-Constraints come in four flavours:
-
-* [G] Given: we have evidence
-
-* [W] Wanted WOnly: we want evidence
-
-* [D] Derived: any solution must satisfy this constraint, but
-      we don't need evidence for it.  Examples include:
-        - superclasses of [W] class constraints
-        - equalities arising from functional dependencies
-          or injectivity
-
-* [WD] Wanted WDeriv: a single constraint that represents
-                      both [W] and [D]
-  We keep them paired as one both for efficiency
-
-The ctev_nosh field of a Wanted distinguishes between [W] and [WD]
-
-Wanted constraints are born as [WD], but are split into [W] and its
-"shadow" [D] in GHC.Tc.Solver.Monad.maybeEmitShadow.
-
-See Note [The improvement story and derived shadows] in GHC.Tc.Solver.Monad
+************************************************************************
+*                                                                      *
+           RewriterSet
+*                                                                      *
+************************************************************************
 -}
 
-data CtFlavour  -- See Note [Constraint flavours]
-  = Given
-  | Wanted ShadowInfo
-  | Derived
+-- | Stores a set of CoercionHoles that have been used to rewrite a constraint.
+-- See Note [Wanteds rewrite Wanteds].
+newtype RewriterSet = RewriterSet (UniqSet CoercionHole)
+  deriving newtype (Outputable, Semigroup, Monoid)
+
+emptyRewriterSet :: RewriterSet
+emptyRewriterSet = RewriterSet emptyUniqSet
+
+isEmptyRewriterSet :: RewriterSet -> Bool
+isEmptyRewriterSet (RewriterSet set) = isEmptyUniqSet set
+
+addRewriterSet :: RewriterSet -> CoercionHole -> RewriterSet
+addRewriterSet = coerce (addOneToUniqSet @CoercionHole)
+
+-- | Makes a 'RewriterSet' from all the coercion holes that occur in the
+-- given coercion.
+rewriterSetFromCo :: Coercion -> RewriterSet
+rewriterSetFromCo co = appEndo (rewriter_set_from_co co) emptyRewriterSet
+
+-- | Makes a 'RewriterSet' from all the coercion holes that occur in the
+-- given type.
+rewriterSetFromType :: Type -> RewriterSet
+rewriterSetFromType ty = appEndo (rewriter_set_from_ty ty) emptyRewriterSet
+
+-- | Makes a 'RewriterSet' from all the coercion holes that occur in the
+-- given types.
+rewriterSetFromTypes :: [Type] -> RewriterSet
+rewriterSetFromTypes tys = appEndo (rewriter_set_from_tys tys) emptyRewriterSet
+
+rewriter_set_from_ty :: Type -> Endo RewriterSet
+rewriter_set_from_tys :: [Type] -> Endo RewriterSet
+rewriter_set_from_co :: Coercion -> Endo RewriterSet
+(rewriter_set_from_ty, rewriter_set_from_tys, rewriter_set_from_co, _)
+  = foldTyCo folder ()
+  where
+    folder :: TyCoFolder () (Endo RewriterSet)
+    folder = TyCoFolder
+               { tcf_view  = noView
+               , tcf_tyvar = \ _ tv -> rewriter_set_from_ty (tyVarKind tv)
+               , tcf_covar = \ _ cv -> rewriter_set_from_ty (varType cv)
+               , tcf_hole  = \ _ hole -> coerce (`addOneToUniqSet` hole) S.<>
+                                         rewriter_set_from_ty (varType (coHoleCoVar hole))
+               , tcf_tycobinder = \ _ _ _ -> () }
+
+{-
+************************************************************************
+*                                                                      *
+           CtFlavour
+*                                                                      *
+************************************************************************
+-}
+
+data CtFlavour
+  = Given     -- we have evidence
+  | Wanted    -- we want evidence
   deriving Eq
 
-data ShadowInfo
-  = WDeriv   -- [WD] This Wanted constraint has no Derived shadow,
-             -- so it behaves like a pair of a Wanted and a Derived
-  | WOnly    -- [W] It has a separate derived shadow
-             -- See Note [The improvement story and derived shadows] in GHC.Tc.Solver.Monad
-  deriving( Eq )
-
 instance Outputable CtFlavour where
-  ppr Given           = text "[G]"
-  ppr (Wanted WDeriv) = text "[WD]"
-  ppr (Wanted WOnly)  = text "[W]"
-  ppr Derived         = text "[D]"
-
--- | Does this 'CtFlavour' subsumed 'Derived'? True of @[WD]@ and @[D]@.
-ctFlavourContainsDerived :: CtFlavour -> Bool
-ctFlavourContainsDerived (Wanted WDeriv) = True
-ctFlavourContainsDerived Derived         = True
-ctFlavourContainsDerived _               = False
+  ppr Given  = text "[G]"
+  ppr Wanted = text "[W]"
 
 ctEvFlavour :: CtEvidence -> CtFlavour
-ctEvFlavour (CtWanted { ctev_nosh = nosh }) = Wanted nosh
-ctEvFlavour (CtGiven {})                    = Given
-ctEvFlavour (CtDerived {})                  = Derived
+ctEvFlavour (CtWanted {}) = Wanted
+ctEvFlavour (CtGiven {})  = Given
 
 -- | Whether or not one 'Ct' can rewrite another is determined by its
 -- flavour and its equality relation. See also
@@ -2078,11 +1977,11 @@ With the solver handling Coercible constraints like equality constraints,
 the rewrite conditions must take role into account, never allowing
 a representational equality to rewrite a nominal one.
 
-Note [Wanteds do not rewrite Wanteds]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We don't allow Wanteds to rewrite Wanteds, because that can give rise
-to very confusing type error messages.  A good example is #8450.
-Here's another
+Note [Wanteds rewrite Wanteds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Should one Wanted constraint be allowed to rewrite another?
+
+This example (along with #8450) suggests not:
    f :: a -> Bool
    f x = ( [x,'c'], [x,True] ) `seq` True
 Here we get
@@ -2090,79 +1989,134 @@ Here we get
   [W] a ~ Bool
 but we do not want to complain about Bool ~ Char!
 
-Note [Deriveds do rewrite Deriveds]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-However we DO allow Deriveds to rewrite Deriveds, because that's how
-improvement works; see Note [The improvement story and derived shadows] in
-GHC.Tc.Solver.Interact.
+This example suggests yes (indexed-types/should_fail/T4093a):
+  type family Foo a
+  f :: (Foo e ~ Maybe e) => Foo e
+In the ambiguity check, we get
+  [G] g1 :: Foo e ~ Maybe e
+  [W] w1 :: Foo alpha ~ Foo e
+  [W] w2 :: Foo alpha ~ Maybe alpha
+w1 gets rewritten by the Given to become
+  [W] w3 :: Foo alpha ~ Maybe e
+Now, the only way to make progress is to allow Wanteds to rewrite Wanteds.
+Rewriting w3 with w2 gives us
+  [W] w4 :: Maybe alpha ~ Maybe e
+which will soon get us to alpha := e and thence to victory.
 
-However, for now at least I'm only letting (Derived,NomEq) rewrite
-(Derived,NomEq) and not doing anything for ReprEq.  If we have
-    eqCanRewriteFR (Derived, NomEq) (Derived, _)  = True
-then we lose property R2 of Definition [Can-rewrite relation]
-in GHC.Tc.Solver.Monad
-  R2.  If f1 >= f, and f2 >= f,
+TL;DR we want equality saturation.
+
+We thus want Wanteds to rewrite Wanteds in order to accept more programs,
+but we don't want Wanteds to rewrite Wanteds because doing so can create
+inscrutable error messages. We choose to allow the rewriting, but
+every Wanted tracks the set of Wanteds it has been rewritten by. This is
+called a RewriterSet, stored in the ctev_rewriters field of the CtWanted
+constructor of CtEvidence.  (Only Wanteds have RewriterSets.)
+
+Let's continue our first example above:
+
+  inert: [W] w1 :: a ~ Char
+  work:  [W] w2 :: a ~ Bool
+
+Because Wanteds can rewrite Wanteds, w1 will rewrite w2, yielding
+
+  inert: [W] w1 :: a ~ Char
+         [W] w2 {w1}:: Char ~ Bool
+
+The {w1} in the second line of output is the RewriterSet of w1.
+
+A RewriterSet is just a set of unfilled CoercionHoles. This is
+sufficient because only equalities (evidenced by coercion holes) are
+used for rewriting; other (dictionary) constraints cannot ever
+rewrite. The rewriter (in e.g. GHC.Tc.Solver.Rewrite.rewrite) tracks
+and returns a RewriterSet, consisting of the evidence (a CoercionHole)
+for any Wanted equalities used in rewriting.  Then rewriteEvidence and
+rewriteEqEvidence (in GHC.Tc.Solver.Canonical) add this RewriterSet to
+the rewritten constraint's rewriter set.
+
+In error reporting, we simply suppress any errors that have been rewritten by
+/unsolved/ wanteds. This suppression happens in GHC.Tc.Errors.mkErrorItem, which
+uses GHC.Tc.Utils.anyUnfilledCoercionHoles to look through any filled coercion
+holes. The idea is that we wish to report the "root cause" -- the error that
+rewrote all the others.
+
+Worry: It seems possible that *all* unsolved wanteds are rewritten by other
+unsolved wanteds, so that e.g. w1 has w2 in its rewriter set, and w2 has
+w1 in its rewiter set. We are unable to come up with an example of this in
+practice, however, and so we believe this case cannot happen.
+
+Note [Avoiding rewriting cycles]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [inert_eqs: the inert equalities] in GHC.Tc.Solver.InertSet describes
+the can-rewrite relation among CtFlavour/Role pairs, saying which constraints
+can rewrite which other constraints. It puts forth (R2):
+  (R2) If f1 >= f, and f2 >= f,
        then either f1 >= f2 or f2 >= f1
-Consider f1 = (Given, ReprEq)
-         f2 = (Derived, NomEq)
-          f = (Derived, ReprEq)
+The naive can-rewrite relation says that (Given, Representational) can rewrite
+(Wanted, Representational) and that (Wanted, Nominal) can rewrite
+(Wanted, Representational), but neither of (Given, Representational) and
+(Wanted, Nominal) can rewrite the other. This would violate (R2). See also
+Note [Why R2?] in GHC.Tc.Solver.InertSet.
 
-I thought maybe we could never get Derived ReprEq constraints, but
-we can; straight from the Wanteds during improvement. And from a Derived
-ReprEq we could conceivably get a Derived NomEq improvement (by decomposing
-a type constructor with Nomninal role), and hence unify.
+To keep R2, we do not allow (Wanted, Nominal) to rewrite (Wanted, Representational).
+This can, in theory, bite, in this scenario:
 
-This restriction that (Derived, NomEq) cannot rewrite (Derived, ReprEq) bites,
-in an obscure scenario:
-
+  type family F a
   data T a
   type role T nominal
 
-  type family F a
-
-  g :: forall b a. (F a ~ T a, Coercible (F a) (T b)) => ()
-  g = ()
-
-  f :: forall a. (F a ~ T a) => ()
-  f = g @a
-
-The problem is in the body of f. We have
-
-  [G]  F a ~N T a
-  [WD] F alpha ~N T alpha
-  [WD] F alpha ~R T a
-
-The Wanteds aren't of use, so let's just look at Deriveds:
-
   [G] F a ~N T a
-  [D] F alpha ~N T alpha
-  [D] F alpha ~R T a
+  [W] F alpha ~N T alpha
+  [W] F alpha ~R T a
 
 As written, this makes no progress, and GHC errors. But, if we
-allowed D/N to rewrite D/R, the first D could rewrite the second:
+allowed W/N to rewrite W/R, the first W could rewrite the second:
 
   [G] F a ~N T a
-  [D] F alpha ~N T alpha
-  [D] T alpha ~R T a
+  [W] F alpha ~N T alpha
+  [W] T alpha ~R T a
 
-Now we decompose the second D to get
+Now we decompose the second W to get
 
-  [D] alpha ~N a
+  [W] alpha ~N a
 
 noting the role annotation on T. This causes (alpha := a), and then
 everything else unlocks.
 
 What to do? We could "decompose" nominal equalities into nominal-only
 ("NO") equalities and representational ones, where a NO equality rewrites
-only nominals. That is, when considering whether [D] F alpha ~N T alpha
-should rewrite [D] F alpha ~R T a, we could require splitting the first D
-into [D] F alpha ~NO T alpha, [D] F alpha ~R T alpha. Then, we use the R
-half of the split to rewrite the second D, and off we go. This splitting
+only nominals. That is, when considering whether [W] F alpha ~N T alpha
+should rewrite [W] F alpha ~R T a, we could require splitting the first W
+into [W] F alpha ~NO T alpha, [W] F alpha ~R T alpha. Then, we use the R
+half of the split to rewrite the second W, and off we go. This splitting
 would allow the split-off R equality to be rewritten by other equalities,
 thus avoiding the problem in Note [Why R2?] in GHC.Tc.Solver.InertSet.
 
-This infelicity is #19665 and tested in typecheck/should_compile/T19665
-(marked as expect_broken).
+However, note that I said that this bites in theory. That's because no
+known program actually gives rise to this scenario. A direct encoding
+ends up starting with
+
+  [G] F a ~ T a
+  [W] F alpha ~ T alpha
+  [W] Coercible (F alpha) (T a)
+
+where ~ and Coercible denote lifted class constraints. The ~s quickly
+reduce to ~N: good. But the Coercible constraint gets rewritten to
+
+  [W] Coercible (T alpha) (T a)
+
+by the first Wanted. This is because Coercible is a class, and arguments
+in class constraints use *nominal* rewriting, not the representational
+rewriting that is restricted due to (R2). Note that reordering the code
+doesn't help, because equalities (including lifted ones) are prioritized
+over Coercible. Thus, I (Richard E.) see no way to write a program that
+is rejected because of this infelicity. I have not proved it impossible,
+exactly, but my usual tricks have not yielded results.
+
+In the olden days, when we had Derived constraints, this Note was all
+about G/R and D/N both rewriting D/R. Back then, the code in
+typecheck/should_compile/T19665 really did get rejected. But now,
+according to the rewriting of the Coercible constraint, the program
+is accepted.
 
 -}
 
@@ -2175,54 +2129,12 @@ eqCanRewriteFR :: CtFlavourRole -> CtFlavourRole -> Bool
 -- Can fr1 actually rewrite fr2?
 -- Very important function!
 -- See Note [eqCanRewrite]
--- See Note [Wanteds do not rewrite Wanteds]
--- See Note [Deriveds do rewrite Deriveds]
-eqCanRewriteFR (Given,         r1)    (_,       r2)    = eqCanRewrite r1 r2
-eqCanRewriteFR (Wanted WDeriv, NomEq) (Derived, NomEq) = True
-eqCanRewriteFR (Derived,       NomEq) (Derived, NomEq) = True
-eqCanRewriteFR _                      _                = False
-
-eqMayRewriteFR :: CtFlavourRole -> CtFlavourRole -> Bool
--- Is it /possible/ that fr1 can rewrite fr2?
--- This is used when deciding which inerts to kick out,
--- at which time a [WD] inert may be split into [W] and [D]
-eqMayRewriteFR (Wanted WDeriv, NomEq) (Wanted WDeriv, NomEq) = True
-eqMayRewriteFR (Derived,       NomEq) (Wanted WDeriv, NomEq) = True
-eqMayRewriteFR fr1 fr2 = eqCanRewriteFR fr1 fr2
-
-{- Note [eqCanDischarge]
-~~~~~~~~~~~~~~~~~~~~~~~~
-Suppose we have two identical CEqCan equality constraints
-(i.e. both LHS and RHS are the same)
-      (x1:lhs~t) `eqCanDischarge` (xs:lhs~t)
-Can we just drop x2 in favour of x1?
-
-Answer: yes if eqCanDischarge is true.
-
-Note that we do /not/ allow Wanted to discharge Derived.
-We must keep both.  Why?  Because the Derived may rewrite
-other Deriveds in the model whereas the Wanted cannot.
-
-However a Wanted can certainly discharge an identical Wanted.  So
-eqCanDischarge does /not/ define a can-rewrite relation in the
-sense of Definition [Can-rewrite relation] in GHC.Tc.Solver.Monad.
-
-We /do/ say that a [W] can discharge a [WD].  In evidence terms it
-certainly can, and the /caller/ arranges that the otherwise-lost [D]
-is spat out as a new Derived.  -}
-
-eqCanDischargeFR :: CtFlavourRole -> CtFlavourRole -> Bool
--- See Note [eqCanDischarge]
-eqCanDischargeFR (f1,r1) (f2, r2) =  eqCanRewrite r1 r2
-                                  && eqCanDischargeF f1 f2
-
-eqCanDischargeF :: CtFlavour -> CtFlavour -> Bool
-eqCanDischargeF Given   _                  = True
-eqCanDischargeF (Wanted _)      (Wanted _) = True
-eqCanDischargeF (Wanted WDeriv) Derived    = True
-eqCanDischargeF Derived         Derived    = True
-eqCanDischargeF _               _          = False
-
+-- See Note [Wanteds rewrite Wanteds]
+-- See Note [Avoiding rewriting cycles]
+eqCanRewriteFR (Given,  r1)    (_,      r2)     = eqCanRewrite r1 r2
+eqCanRewriteFR (Wanted, NomEq) (Wanted, ReprEq) = False
+eqCanRewriteFR (Wanted, r1)    (Wanted, r2)     = eqCanRewrite r1 r2
+eqCanRewriteFR (Wanted, _)     (Given, _)       = False
 
 {-
 ************************************************************************
@@ -2306,14 +2218,13 @@ subGoalDepthExceeded dflags (SubGoalDepth d)
 The 'CtLoc' gives information about where a constraint came from.
 This is important for decent error message reporting because
 dictionaries don't appear in the original source code.
-type will evolve...
 
 -}
 
-data CtLoc = CtLoc { ctl_origin :: CtOrigin
-                   , ctl_env    :: TcLclEnv
-                   , ctl_t_or_k :: Maybe TypeOrKind  -- OK if we're not sure
-                   , ctl_depth  :: !SubGoalDepth }
+data CtLoc = CtLoc { ctl_origin   :: CtOrigin
+                   , ctl_env      :: TcLclEnv
+                   , ctl_t_or_k   :: Maybe TypeOrKind  -- OK if we're not sure
+                   , ctl_depth    :: !SubGoalDepth }
 
   -- The TcLclEnv includes particularly
   --    source location:  tcl_loc   :: RealSrcSpan
@@ -2333,10 +2244,10 @@ toKindLoc loc = loc { ctl_t_or_k = Just KindLevel }
 
 mkGivenLoc :: TcLevel -> SkolemInfoAnon -> TcLclEnv -> CtLoc
 mkGivenLoc tclvl skol_info env
-  = CtLoc { ctl_origin = GivenOrigin skol_info
-          , ctl_env    = setLclEnvTcLevel env tclvl
-          , ctl_t_or_k = Nothing    -- this only matters for error msgs
-          , ctl_depth  = initialSubGoalDepth }
+  = CtLoc { ctl_origin   = GivenOrigin skol_info
+          , ctl_env      = setLclEnvTcLevel env tclvl
+          , ctl_t_or_k   = Nothing    -- this only matters for error msgs
+          , ctl_depth    = initialSubGoalDepth }
 
 ctLocEnv :: CtLoc -> TcLclEnv
 ctLocEnv = ctl_env

@@ -1,0 +1,5 @@
+
+T20064.hs:14:7: error:
+    • No instance for (C Int b0) arising from a use of ‘meth’
+    • In the expression: meth ab
+      In an equation for ‘foo’: foo = meth ab

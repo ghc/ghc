@@ -1,0 +1,8 @@
+
+T18851b.hs:27:5: error:
+    • Couldn't match type ‘A’ with ‘B’
+        arising from a functional dependency between constraints:
+          ‘C Int B’ arising from a use of ‘f’ at T18851b.hs:27:5
+          ‘C Int A’ arising from a use of ‘f’ at T18851b.hs:27:5
+    • In the expression: f @A @B
+      In an equation for ‘g’: g = f @A @B

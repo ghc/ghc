@@ -5,8 +5,6 @@ T19752.hs:12:10: error:
         bound by the type signature for:
                    f :: forall b. (F b ~ a) => a
         at T19752.hs:12:10-23
-      Expected: forall b. (F b ~ a) => a
-        Actual: forall b. (F b ~ a) => a
       ‘a’ is a rigid type variable bound by
         the type signature for:
           g :: forall a. a

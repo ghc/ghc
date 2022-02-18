@@ -42,6 +42,7 @@ import GHC.Core.TyCon
 import GHC.Core.TyCo.Ppr (pprTyVars)
 import GHC.Core.Type
 import GHC.Tc.Solver
+import GHC.Tc.Solver.Monad ( runTcS )
 import GHC.Tc.Validity (validDerivPred)
 import GHC.Tc.Utils.Unify (buildImplicationFor, checkConstraints)
 import GHC.Builtin.Types (typeToTypeKind)
@@ -788,10 +789,10 @@ simplifyDeriv pred tvs thetas
        -- Simplify the constraints, starting at the same level at which
        -- they are generated (c.f. the call to runTcSWithEvBinds in
        -- simplifyInfer)
-       ; solved_wanteds <- setTcLevel tc_lvl   $
-                           runTcSDeriveds      $
-                           solveWantedsAndDrop $
-                           unionsWC wanteds
+       ; (solved_wanteds, _) <- setTcLevel tc_lvl $
+                                runTcS            $
+                                solveWanteds      $
+                                unionsWC wanteds
 
        -- It's not yet zonked!  Obviously zonk it before peering at it
        ; solved_wanteds <- zonkWC solved_wanteds
@@ -809,16 +810,10 @@ simplifyDeriv pred tvs thetas
              -- constitutes an exotic constraint.
              get_good :: Ct -> Maybe PredType
              get_good ct | validDerivPred skol_set p
-                         , isWantedCt ct
                          = Just p
-                          -- TODO: This is wrong
-                          -- NB re 'isWantedCt': residual_wanted may contain
-                          -- unsolved CtDerived and we stick them into the
-                          -- bad set so that reportUnsolved may decide what
-                          -- to do with them
                          | otherwise
                          = Nothing
-                           where p = ctPred ct
+               where p = ctPred ct
 
        ; traceTc "simplifyDeriv outputs" $
          vcat [ ppr tvs_skols, ppr residual_simple, ppr good ]

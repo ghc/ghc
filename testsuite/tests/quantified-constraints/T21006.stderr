@@ -1,7 +1,7 @@
 
 T21006.hs:14:10: error:
-    • Couldn't match kind ‘Constraint’ with ‘*’
-      When matching types
-        b :: *
-        c :: Constraint
+    • Could not deduce c
+        arising from the superclasses of an instance declaration
+      from the context: (Determines b, Determines c)
+        bound by a quantified context at T21006.hs:14:10-15
     • In the instance declaration for ‘OpCode’

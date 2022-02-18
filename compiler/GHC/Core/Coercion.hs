@@ -122,8 +122,7 @@ module GHC.Core.Coercion (
 
         multToCo,
 
-        hasCoercionHoleTy, hasCoercionHoleCo,
-        HoleSet, coercionHolesOfType, coercionHolesOfCo,
+        hasCoercionHoleTy, hasCoercionHoleCo, hasThisCoercionHoleTy,
 
         setCoHoleType
        ) where
@@ -156,7 +155,6 @@ import GHC.Builtin.Types.Prim
 import GHC.Data.List.SetOps
 import GHC.Data.Maybe
 import GHC.Types.Unique.FM
-import GHC.Types.Unique.Set
 
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
@@ -2725,15 +2723,12 @@ has_co_hole_co :: Coercion -> Monoid.Any
 (has_co_hole_ty, _, has_co_hole_co, _)
   = foldTyCo folder ()
   where
-    folder = TyCoFolder { tcf_view  = const Nothing
+    folder = TyCoFolder { tcf_view  = noView
                         , tcf_tyvar = const2 (Monoid.Any False)
                         , tcf_covar = const2 (Monoid.Any False)
                         , tcf_hole  = const2 (Monoid.Any True)
                         , tcf_tycobinder = const2
                         }
-
-    const2 :: a -> b -> c -> a
-    const2 x _ _ = x
 
 -- | Is there a coercion hole in this type?
 hasCoercionHoleTy :: Type -> Bool
@@ -2743,19 +2738,16 @@ hasCoercionHoleTy = Monoid.getAny . has_co_hole_ty
 hasCoercionHoleCo :: Coercion -> Bool
 hasCoercionHoleCo = Monoid.getAny . has_co_hole_co
 
--- | A set of 'CoercionHole's
-type HoleSet = UniqSet CoercionHole
-
--- | Extract out all the coercion holes from a given type
-coercionHolesOfType :: Type -> UniqSet CoercionHole
-coercionHolesOfCo   :: Coercion -> UniqSet CoercionHole
-(coercionHolesOfType, _, coercionHolesOfCo, _) = foldTyCo folder ()
+hasThisCoercionHoleTy :: Type -> CoercionHole -> Bool
+hasThisCoercionHoleTy ty hole = Monoid.getAny (f ty)
   where
-    folder = TyCoFolder { tcf_view  = const Nothing  -- don't look through synonyms
-                        , tcf_tyvar = \ _ _ -> mempty
-                        , tcf_covar = \ _ _ -> mempty
-                        , tcf_hole  = const unitUniqSet
-                        , tcf_tycobinder = \ _ _ _ -> ()
+    (f, _, _, _) = foldTyCo folder ()
+
+    folder = TyCoFolder { tcf_view  = noView
+                        , tcf_tyvar = const2 (Monoid.Any False)
+                        , tcf_covar = const2 (Monoid.Any False)
+                        , tcf_hole  = \ _ h -> Monoid.Any (getUnique h == getUnique hole)
+                        , tcf_tycobinder = const2
                         }
 
 -- | Set the type of a 'CoercionHole'

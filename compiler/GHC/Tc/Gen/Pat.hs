@@ -1189,8 +1189,8 @@ Wrinkles:
   these unifications.  The *only* thing the unification does is
   to side-effect those unification variables, so that we know
   what type x and y stand for; and cause an error if the equality
-  is not soluble.  It's a bit like a Derived constraint arising
-  from a functional dependency.
+  is not soluble.  It's a bit like a constraint arising
+  from a functional dependency, where we don't use the evidence.
 
 * Exactly the same works for existential arguments
      data T where

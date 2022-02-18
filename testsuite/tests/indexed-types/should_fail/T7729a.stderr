@@ -1,10 +1,9 @@
 
 T7729a.hs:36:26: error:
     • Couldn't match type: BasePrimMonad m
-                     with: t0 (BasePrimMonad m)
+                     with: t0 m0
       Expected: BasePrimMonad (Rand m) a
-        Actual: t0 (BasePrimMonad m) a
-      The type variable ‘t0’ is ambiguous
+        Actual: t0 m0 a
     • In the first argument of ‘liftPrim’, namely ‘(lift x)’
       In the expression: liftPrim (lift x)
       In an equation for ‘liftPrim’: liftPrim x = liftPrim (lift x)

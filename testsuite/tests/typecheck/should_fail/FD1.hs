@@ -14,4 +14,3 @@ instance E a a
 
 plus :: (E a (Int -> Int)) => Int -> a
 plus x y = x + y
-

@@ -3224,11 +3224,6 @@ addConsistencyConstraints :: AssocInstInfo -> TcType -> TcM ()
 --             F c x y a :: Type
 -- Here the first  arg of F should be the same as the third of C
 --  and the fourth arg of F should be the same as the first of C
---
--- We emit /Derived/ constraints (a bit like fundeps) to encourage
--- unification to happen, but without actually reporting errors.
--- If, despite the efforts, corresponding positions do not match,
--- checkConsistentFamInst will complain
 addConsistencyConstraints mb_clsinfo fam_app
   | InClsInst { ai_inst_env = inst_env } <- mb_clsinfo
   , Just (fam_tc, pats) <- tcSplitTyConApp_maybe fam_app
@@ -3236,8 +3231,9 @@ addConsistencyConstraints mb_clsinfo fam_app
                    | (fam_tc_tv, pat) <- tyConTyVars fam_tc `zip` pats
                    , Just cls_ty <- [lookupVarEnv inst_env fam_tc_tv] ]
        ; traceTc "addConsistencyConstraints" (ppr eqs)
-       ; emitDerivedEqs AssocFamPatOrigin eqs }
-    -- Improve inference
+       ; emitWantedEqs AssocFamPatOrigin eqs }
+    -- Improve inference; these equalities will not produce errors.
+    -- See Note [Constraints to ignore] in GHC.Tc.Errors
     -- Any mis-match is reports by checkConsistentFamInst
   | otherwise
   = return ()

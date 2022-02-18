@@ -84,7 +84,7 @@ rewritingPlugin :: TcPlugin
 rewritingPlugin =
   TcPlugin
     { tcPluginInit    = lookupDefs
-    , tcPluginSolve   = \ _ _ _ _ _ -> pure $ TcPluginOk [] []
+    , tcPluginSolve   = \ _ _ _ _ -> pure $ TcPluginOk [] []
     , tcPluginRewrite = rewriter
     , tcPluginStop    = \ _ -> pure ()
     }

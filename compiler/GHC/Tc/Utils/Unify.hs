@@ -556,8 +556,7 @@ tcSubTypePat :: CtOrigin -> UserTypeCtxt
 -- If wrap = tc_sub_type_et t1 t2
 --    => wrap :: t1 ~> t2
 tcSubTypePat inst_orig ctxt (Check ty_actual) ty_expected
-  = do { dflags <- getDynFlags
-       ; tc_sub_type dflags unifyTypeET inst_orig ctxt ty_actual ty_expected }
+  = tc_sub_type unifyTypeET inst_orig ctxt ty_actual ty_expected
 
 tcSubTypePat _ _ (Infer inf_res) ty_expected
   = do { co <- fillInferResult ty_expected inf_res
@@ -584,9 +583,8 @@ tcSubTypeNC :: CtOrigin          -- ^ Used when instantiating
             -> TcM HsWrapper
 tcSubTypeNC inst_orig ctxt m_thing ty_actual res_ty
   = case res_ty of
-      Check ty_expected -> do { dflags <- getDynFlags
-                              ; tc_sub_type dflags (unifyType m_thing) inst_orig ctxt
-                                            ty_actual ty_expected }
+      Check ty_expected -> tc_sub_type (unifyType m_thing) inst_orig ctxt
+                                       ty_actual ty_expected
 
       Infer inf_res -> do { (wrap, rho) <- topInstantiate inst_orig ty_actual
                                    -- See Note [Instantiation of InferResult]
@@ -631,22 +629,18 @@ command. See Note [Implementing :type] in GHC.Tc.Module.
 -}
 
 ---------------
-tcSubTypeSigma :: UserTypeCtxt -> TcSigmaType -> TcSigmaType -> TcM HsWrapper
+tcSubTypeSigma :: CtOrigin       -- where did the actual type arise / why are we
+                                 -- doing this subtype check?
+               -> UserTypeCtxt   -- where did the expected type arise?
+               -> TcSigmaType -> TcSigmaType -> TcM HsWrapper
 -- External entry point, but no ExpTypes on either side
 -- Checks that actual <= expected
 -- Returns HsWrapper :: actual ~ expected
-tcSubTypeSigma ctxt ty_actual ty_expected
-  = do { dflags <- getDynFlags
-       ; tc_sub_type dflags (unifyType Nothing) eq_orig ctxt ty_actual ty_expected }
-  where
-    eq_orig = TypeEqOrigin { uo_actual   = ty_actual
-                           , uo_expected = ty_expected
-                           , uo_thing    = Nothing
-                           , uo_visible  = True }
+tcSubTypeSigma orig ctxt ty_actual ty_expected
+  = tc_sub_type (unifyType Nothing) orig ctxt ty_actual ty_expected
 
 ---------------
-tc_sub_type :: DynFlags
-            -> (TcType -> TcType -> TcM TcCoercionN)  -- How to unify
+tc_sub_type :: (TcType -> TcType -> TcM TcCoercionN)  -- How to unify
             -> CtOrigin       -- Used when instantiating
             -> UserTypeCtxt   -- Used when skolemising
             -> TcSigmaType    -- Actual; a sigma-type
@@ -655,7 +649,7 @@ tc_sub_type :: DynFlags
 -- Checks that actual_ty is more polymorphic than expected_ty
 -- If wrap = tc_sub_type t1 t2
 --    => wrap :: t1 ~> t2
-tc_sub_type dflags unify inst_orig ctxt ty_actual ty_expected
+tc_sub_type unify inst_orig ctxt ty_actual ty_expected
   | definitely_poly ty_expected      -- See Note [Don't skolemise unnecessarily]
   , not (possibly_poly ty_actual)
   = do { traceTc "tc_sub_type (drop to equality)" $
@@ -683,7 +677,7 @@ tc_sub_type dflags unify inst_orig ctxt ty_actual ty_expected
       | (tvs, theta, tau) <- tcSplitSigmaTy ty
       , (tv:_) <- tvs
       , null theta
-      , checkTyVarEq dflags tv tau `cterHasProblem` cteInsolubleOccurs
+      , checkTyVarEq tv tau `cterHasProblem` cteInsolubleOccurs
       = True
       | otherwise
       = False
@@ -1067,7 +1061,7 @@ take care:
   can yield /very/ confusing error messages, because we can get
       [W] C Int b1    -- from f_blah
       [W] C Int b2    -- from g_blan
-  and fundpes can yield [D] b1 ~ b2, even though the two functions have
+  and fundpes can yield [W] b1 ~ b2, even though the two functions have
   literally nothing to do with each other.  #14185 is an example.
   Building an implication keeps them separate.
 -}
@@ -1447,15 +1441,14 @@ uUnfilledVar2 :: CtOrigin
               -> TcTauType      -- Type 2, zonked
               -> TcM Coercion
 uUnfilledVar2 origin t_or_k swapped tv1 ty2
-  = do { dflags  <- getDynFlags
-       ; cur_lvl <- getTcLevel
-       ; go dflags cur_lvl }
+  = do { cur_lvl <- getTcLevel
+       ; go cur_lvl }
   where
-    go dflags cur_lvl
+    go cur_lvl
       | isTouchableMetaTyVar cur_lvl tv1
            -- See Note [Unification preconditions], (UNTOUCHABLE) wrinkles
       , canSolveByUnification (metaTyVarInfo tv1) ty2
-      , cterHasNoProblem (checkTyVarEq dflags tv1 ty2)
+      , cterHasNoProblem (checkTyVarEq tv1 ty2)
            -- See Note [Prevent unification with type families]
       = do { co_k <- uType KindLevel kind_origin (tcTypeKind ty2) (tyVarKind tv1)
            ; traceTc "uUnfilledVar2 ok" $
@@ -1471,7 +1464,8 @@ uUnfilledVar2 origin t_or_k swapped tv1 ty2
                      ; return (mkTcNomReflCo ty2) }
 
              else defer } -- This cannot be solved now.  See GHC.Tc.Solver.Canonical
-                          -- Note [Equalities with incompatible kinds]
+                          -- Note [Equalities with incompatible kinds] for how
+                          -- this will be dealt with in the solver
 
       | otherwise
       = do { traceTc "uUnfilledVar2 not ok" (ppr tv1 $$ ppr ty2)
@@ -1485,14 +1479,20 @@ uUnfilledVar2 origin t_or_k swapped tv1 ty2
 
     defer = unSwap swapped (uType_defer t_or_k origin) ty1 ty2
 
-canSolveByUnification :: MetaInfo -> TcType -> Bool
--- See Note [Unification preconditions, (TYVAR-TV)]
+-- | Checks (TYVAR-TV) and (COERCION-HOLE) of Note [Unification preconditions];
+-- returns True if these conditions are satisfied. But see the Note for other
+-- preconditions, too.
+canSolveByUnification :: MetaInfo -> TcType  -- zonked
+                      -> Bool
+canSolveByUnification _    xi
+  | hasCoercionHoleTy xi   -- (COERCION-HOLE) check
+  = False
 canSolveByUnification info xi
   = case info of
       CycleBreakerTv -> False
       TyVarTv -> case tcGetTyVar_maybe xi of
                    Nothing -> False
-                   Just tv -> case tcTyVarDetails tv of
+                   Just tv -> case tcTyVarDetails tv of -- (TYVAR-TV) wrinkle
                                  MetaTv { mtv_info = info }
                                             -> case info of
                                                  TyVarTv -> True
@@ -1552,7 +1552,7 @@ unify alpha := ty?
 This note only applied to /homogeneous/ equalities, in which both
 sides have the same kind.
 
-There are three reasons not to unify:
+There are four reasons not to unify:
 
 1. (SKOL-ESC) Skolem-escape
    Consider the constraint
@@ -1590,8 +1590,22 @@ There are three reasons not to unify:
 
    * CycleBreakerTv: never unified, except by restoreTyVarCycles.
 
+4. (COERCION-HOLE) Confusing coercion holes
+   Suppose our equality is
+     (alpha :: k) ~ (Int |> {co})
+   where co :: Type ~ k is an unsolved wanted. Note that this
+   equality is homogeneous; both sides have kind k. Unifying here
+   is sensible, but it can lead to very confusing error messages.
+   It's very much like a Wanted rewriting a Wanted. Even worse,
+   unifying a variable essentially turns an equality into a Given,
+   and so we could not use the tracking mechansim in
+   Note [Wanteds rewrite Wanteds] in GHC.Tc.Types.Constraint.
+   We thus simply do not unify in this case.
 
-Needless to say, all three have wrinkles:
+   This is expanded as Wrinkle (2) in Note [Equalities with incompatible kinds]
+   in GHC.Tc.Solver.Canonical.
+
+Needless to say, all there are wrinkles:
 
 * (SKOL-ESC) Promotion.  Given alpha[n] ~ ty, what if beta[k] is free
   in 'ty', where beta is a unification variable, and k>n?  'beta'
@@ -1653,7 +1667,7 @@ So we look for a positive reason to swap, using a three-step test:
   Generally speaking we always try to put a MetaTv on the left
   in preference to SkolemTv or RuntimeUnkTv:
      a) Because the MetaTv may be touchable and can be unified
-     b) Even if it's not touchable, GHC.Tc.Solver.floatEqualities
+     b) Even if it's not touchable, GHC.Tc.Solver.floatConstraints
         looks for meta tyvars on the left
 
   Tie-breaking rules for MetaTvs:
@@ -1909,23 +1923,22 @@ with (forall k. k->*)
 
 ----------------
 {-# NOINLINE checkTyVarEq #-}  -- checkTyVarEq becomes big after the `inline` fires
-checkTyVarEq :: DynFlags -> TcTyVar -> TcType -> CheckTyEqResult
-checkTyVarEq dflags tv ty
-  = inline checkTypeEq dflags (TyVarLHS tv) ty
+checkTyVarEq :: TcTyVar -> TcType -> CheckTyEqResult
+checkTyVarEq tv ty
+  = inline checkTypeEq (TyVarLHS tv) ty
     -- inline checkTypeEq so that the `case`s over the CanEqLHS get blasted away
 
 {-# NOINLINE checkTyFamEq #-}  -- checkTyFamEq becomes big after the `inline` fires
-checkTyFamEq :: DynFlags
-             -> TyCon     -- type function
+checkTyFamEq :: TyCon     -- type function
              -> [TcType]  -- args, exactly saturated
              -> TcType    -- RHS
              -> CheckTyEqResult   -- always drops cteTypeFamily
-checkTyFamEq dflags fun_tc fun_args ty
-  = inline checkTypeEq dflags (TyFamLHS fun_tc fun_args) ty
+checkTyFamEq fun_tc fun_args ty
+  = inline checkTypeEq (TyFamLHS fun_tc fun_args) ty
     `cterRemoveProblem` cteTypeFamily
     -- inline checkTypeEq so that the `case`s over the CanEqLHS get blasted away
 
-checkTypeEq :: DynFlags -> CanEqLHS -> TcType -> CheckTyEqResult
+checkTypeEq :: CanEqLHS -> TcType -> CheckTyEqResult
 -- If cteHasNoProblem (checkTypeEq dflags lhs rhs), then lhs ~ rhs
 -- is a canonical CEqCan.
 --
@@ -1933,8 +1946,7 @@ checkTypeEq :: DynFlags -> CanEqLHS -> TcType -> CheckTyEqResult
 --   (a) a forall type (forall a. blah)
 --   (b) a predicate type (c => ty)
 --   (c) a type family; see Note [Prevent unification with type families]
---   (d) a blocking coercion hole
---   (e) an occurrence of the LHS (occurs check)
+--   (d) an occurrence of the LHS (occurs check)
 --
 -- Note that an occurs-check does not mean "definite error".  For example
 --   type family F a
@@ -1945,20 +1957,18 @@ checkTypeEq :: DynFlags -> CanEqLHS -> TcType -> CheckTyEqResult
 -- certainly can't unify b0 := F b0
 --
 -- For (a), (b), and (c) we check only the top level of the type, NOT
--- inside the kinds of variables it mentions.  For (d) we look deeply
--- in coercions when the LHS is a tyvar (but skip coercions for type family
--- LHSs), and for (e) see Note [CEqCan occurs check] in GHC.Tc.Types.Constraint.
+-- inside the kinds of variables it mentions, and for (d) see
+-- Note [CEqCan occurs check] in GHC.Tc.Types.Constraint.
 --
 -- checkTypeEq is called from
 --    * checkTyFamEq, checkTyVarEq (which inline it to specialise away the
 --      case-analysis on 'lhs')
 --    * checkEqCanLHSFinish, which does not know the form of 'lhs'
-checkTypeEq dflags lhs ty
+checkTypeEq lhs ty
   = go ty
   where
     impredicative    = cteProblem cteImpredicative
     type_family      = cteProblem cteTypeFamily
-    hole_blocker     = cteProblem cteHoleBlocker
     insoluble_occurs = cteProblem cteInsolubleOccurs
     soluble_occurs   = cteProblem cteSolubleOccurs
 
@@ -2029,21 +2039,11 @@ checkTypeEq dflags lhs ty
      -- inferred
     go_co co | TyVarLHS tv <- lhs
              , tv `elemVarSet` tyCoVarsOfCo co
-             = soluble_occurs S.<> maybe_hole_blocker
+             = soluble_occurs
 
         -- Don't check coercions for type families; see commentary at top of function
              | otherwise
-             = maybe_hole_blocker
-      where
-        -- See GHC.Tc.Solver.Canonical Note [Equalities with incompatible kinds]
-        -- Wrinkle (2) about this case in general, Wrinkle (4b) about the check for
-        -- deferred type errors
-        maybe_hole_blocker | not (gopt Opt_DeferTypeErrors dflags)
-                           , hasCoercionHoleCo co
-                           = hole_blocker
-
-                           | otherwise
-                           = cteOK
+             = cteOK
 
     check_tc :: TyCon -> CheckTyEqResult
     check_tc

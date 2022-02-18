@@ -45,6 +45,7 @@ import GHC.Core.Predicate
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Rank
 import GHC.Tc.Errors.Types
+import GHC.Types.Error
 
 -- others:
 import GHC.Iface.Type    ( pprIfaceType, pprIfaceTypeApp )
@@ -219,7 +220,7 @@ checkAmbiguity ctxt ty
        ; allow_ambiguous <- xoptM LangExt.AllowAmbiguousTypes
        ; (_wrap, wanted) <- addErrCtxt (mk_msg allow_ambiguous) $
                             captureConstraints $
-                            tcSubTypeSigma ctxt ty ty
+                            tcSubTypeSigma (AmbiguityCheckOrigin ctxt) ctxt ty ty
        ; simplifyAmbiguityCheck ty wanted
 
        ; traceTc "Done ambiguity check for" (ppr ty) }
@@ -687,7 +688,8 @@ check_type :: ValidityEnv -> Type -> TcM ()
 -- Rank is allowed rank for function args
 -- Rank 0 means no for-alls anywhere
 
-check_type _ (TyVarTy _) = return ()
+check_type _ (TyVarTy _)
+  = return ()
 
 check_type ve (AppTy ty1 ty2)
   = do  { check_type ve ty1
@@ -1079,18 +1081,10 @@ check_pred_help under_syn env dflags ctxt pred
               -- is wrong.  For user written signatures, it'll be rejected by kind-checking
               -- well before we get to validity checking.  For inferred types we are careful
               -- to box such constraints in GHC.Tc.Utils.TcType.pickQuantifiablePreds, as described
-              -- in Note [Lift equality constraints when quantifying] in GHC.Tc.Utils.TcType
+              -- in Note [Lift equality constraints when quantifying] in GHC.Tc.Solver
 
       ForAllPred _ theta head -> check_quant_pred env dflags ctxt pred theta head
       _                       -> return ()
-
-check_eq_pred :: TidyEnv -> DynFlags -> PredType -> TcM ()
-check_eq_pred env dflags pred
-  =         -- Equational constraints are valid in all contexts if type
-            -- families are permitted
-    checkTcM (xopt LangExt.TypeFamilies dflags
-              || xopt LangExt.GADTs dflags)
-             (env, TcRnIllegalEqualConstraints (tidyType env pred))
 
 check_quant_pred :: TidyEnv -> DynFlags -> UserTypeCtxt
                  -> PredType -> ThetaType -> PredType -> TcM ()
@@ -1141,7 +1135,9 @@ check_class_pred :: TidyEnv -> DynFlags -> UserTypeCtxt
 check_class_pred env dflags ctxt pred cls tys
   | isEqPredClass cls    -- (~) and (~~) are classified as classes,
                          -- but here we want to treat them as equalities
-  = check_eq_pred env dflags pred
+  = -- Equational constraints are valid in all contexts, and
+    -- we do not need to check e.g. for FlexibleContexts here, so just do nothing
+    return ()
 
   | isIPClass cls
   = do { check_arity

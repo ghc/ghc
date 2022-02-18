@@ -1,25 +1,29 @@
 
 TH_localname.hs:3:11: error:
-    • Ambiguous type variable ‘m0’ arising from a quotation bracket
-      prevents the constraint ‘(Language.Haskell.TH.Syntax.Quote
-                                  m0)’ from being solved.
+    • Ambiguous type variable ‘t0’ arising from a use of ‘Language.Haskell.TH.Syntax.lift’
+      prevents the constraint ‘(Language.Haskell.TH.Syntax.Lift
+                                  t0)’ from being solved.
       Relevant bindings include
+        y :: t0 (bound at TH_localname.hs:3:6)
         x :: t0 -> m0 Language.Haskell.TH.Syntax.Exp
           (bound at TH_localname.hs:3:1)
-      Probable fix: use a type annotation to specify what ‘m0’ should be.
-      Potentially matching instance:
-        instance Language.Haskell.TH.Syntax.Quote IO
+      Probable fix: use a type annotation to specify what ‘t0’ should be.
+      Potentially matching instances:
+        instance (Language.Haskell.TH.Syntax.Lift a,
+                  Language.Haskell.TH.Syntax.Lift b) =>
+                 Language.Haskell.TH.Syntax.Lift (Either a b)
           -- Defined in ‘Language.Haskell.TH.Syntax’
-        ...plus one instance involving out-of-scope types
+        instance Language.Haskell.TH.Syntax.Lift a =>
+                 Language.Haskell.TH.Syntax.Lift (Maybe a)
+          -- Defined in ‘Language.Haskell.TH.Syntax’
+        ...plus 15 others
+        ...plus 12 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
-    • In the expression:
+    • In the expression: Language.Haskell.TH.Syntax.lift y
+      In the expression:
         [| y |]
         pending(rn) [<y, Language.Haskell.TH.Syntax.lift y>]
       In the expression:
         \ y
           -> [| y |]
              pending(rn) [<y, Language.Haskell.TH.Syntax.lift y>]
-      In an equation for ‘x’:
-          x = \ y
-                -> [| y |]
-                   pending(rn) [<y, Language.Haskell.TH.Syntax.lift y>]

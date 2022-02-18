@@ -10,7 +10,7 @@ plugin = defaultPlugin { tcPlugin = Just . thePlugin }
 thePlugin :: [CommandLineOption] -> TcPlugin
 thePlugin opts = TcPlugin
   { tcPluginInit    = return ()
-  , tcPluginSolve   = \_ _ _ _ _ -> return $ TcPluginOk [] []
+  , tcPluginSolve   = \_ _ _ _ -> return $ TcPluginOk [] []
   , tcPluginRewrite = \_ -> emptyUFM
   , tcPluginStop    = \_ -> return ()
   }

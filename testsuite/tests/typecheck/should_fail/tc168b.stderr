@@ -1,0 +1,16 @@
+
+tc168b.hs:7:1: error:
+    • Could not deduce (C a (u, v0, w0, x0, y0, z0))
+      from the context: C a (u, v, w, x, y, z)
+        bound by the inferred type for ‘g’:
+                   forall {a} {u} {v} {w} {x} {y} {z}.
+                   C a (u, v, w, x, y, z) =>
+                   a -> u
+        at tc168b.hs:7:1-16
+      The type variables ‘v0’, ‘w0’, ‘x0’, ‘y0’, ‘z0’ are ambiguous
+    • In the ambiguity check for the inferred type for ‘g’
+      To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
+      When checking the inferred type
+        g :: forall {a} {u} {v} {w} {x} {y} {z}.
+             C a (u, v, w, x, y, z) =>
+             a -> u

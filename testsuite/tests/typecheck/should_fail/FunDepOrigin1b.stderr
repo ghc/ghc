@@ -1,0 +1,12 @@
+
+FunDepOrigin1b.hs:9:10: error:
+    • No instance for (C Bool (Maybe a0)) arising from a use of ‘op’
+    • In the expression: op True Nothing
+      In the expression: (op True Nothing, op False [])
+      In an equation for ‘foo’: foo _ = (op True Nothing, op False [])
+
+FunDepOrigin1b.hs:9:27: error:
+    • No instance for (C Bool [a1]) arising from a use of ‘op’
+    • In the expression: op False []
+      In the expression: (op True Nothing, op False [])
+      In an equation for ‘foo’: foo _ = (op True Nothing, op False [])

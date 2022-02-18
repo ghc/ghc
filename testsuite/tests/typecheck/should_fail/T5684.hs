@@ -26,33 +26,6 @@ flop1 =  [ op False False    -- (3) Creates a functional dependency which kicks 
                              -- which immediately becomes [S] B Bool alpha
          ]
 
-flop2 =  [ op False False
-         , op True undefined
-         , op 'c' undefined
-         ]
-
-
-flop3 =  [ op 'c' undefined
-         , op True undefined
-         , op False False
-         ]
-
-flop4 =  [ op 'c' undefined
-         , op False False
-         , op True undefined
-         ]
-
-
-flop5 =  [ op True undefined
-         , op 'c' undefined
-         , op False False
-         ]
-
-
-flop6 =  [ op True undefined
-         , op False False
-         , op 'c' undefined
-         ]
 
 
 {- Now, in HEAD we no longer have cached GivenSolved goals in the inerts and hence

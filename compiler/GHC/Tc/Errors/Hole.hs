@@ -18,7 +18,7 @@ module GHC.Tc.Errors.Hole
    , getHoleFitDispConfig
    , HoleFitDispConfig (..)
    , HoleFitSortingAlg (..)
-   , relevantCts
+   , relevantCtEvidence
    , zonkSubs
 
    , sortHoleFitsByGraph
@@ -68,7 +68,8 @@ import Data.List        ( partition, sort, sortOn, nubBy )
 import Data.Graph       ( graphFromEdges, topSort )
 
 
-import GHC.Tc.Solver    ( simplifyTopWanteds, runTcSDerivedsEarlyAbort )
+import GHC.Tc.Solver    ( simplifyTopWanteds )
+import GHC.Tc.Solver.Monad ( runTcSEarlyAbort )
 import GHC.Tc.Utils.Unify ( tcSubTypeSigma )
 
 import GHC.HsToCore.Docs ( extractDocs )
@@ -189,7 +190,7 @@ Here the nested implications are just one level deep, namely:
       Given = $dShow_a1pc :: Show a_a1pa[sk:2]
       Wanted =
         WC {wc_simple =
-              [WD] $dShow_a1pe {0}:: Show a0_a1pd[tau:2] (CDictCan(psc))}
+              [W] $dShow_a1pe {0}:: Show a0_a1pd[tau:2] (CDictCan(psc))}
       Binds = EvBindsVar<a1pi>
       Needed inner = []
       Needed outer = []
@@ -218,7 +219,7 @@ needing to check whether the following constraints are soluble.
           Given = $dShow_a1pc :: Show a_a1pa[sk:2]
           Wanted =
             WC {wc_simple =
-                  [WD] $dShow_a1pe {0}:: Show a0_a1pd[tau:2] (CNonCanonical)}
+                  [W] $dShow_a1pe {0}:: Show a0_a1pd[tau:2] (CNonCanonical)}
           Binds = EvBindsVar<a1pl>
           Needed inner = []
           Needed outer = []
@@ -361,7 +362,7 @@ as is the case in
 
 Here, the hole is given type a0_a1kv[tau:1]. Then, the emitted constraint is:
 
-  [WD] $dShow_a1kw {0}:: Show a0_a1kv[tau:1] (CNonCanonical)
+  [W] $dShow_a1kw {0}:: Show a0_a1kv[tau:1] (CNonCanonical)
 
 However, when there are multiple holes, we need to be more careful. As an
 example, Let's take a look at the following code:
@@ -373,8 +374,8 @@ Here there are two holes, `_a` and `_b`. Suppose _a :: a0_a1pd[tau:2] and
 _b :: a1_a1po[tau:2]. Then, the simple constraints passed to
 findValidHoleFits are:
 
-  [[WD] $dShow_a1pe {0}:: Show a0_a1pd[tau:2] (CNonCanonical),
-    [WD] $dShow_a1pp {0}:: Show a1_a1po[tau:2] (CNonCanonical)]
+  [[W] $dShow_a1pe {0}:: Show a0_a1pd[tau:2] (CNonCanonical),
+    [W] $dShow_a1pp {0}:: Show a1_a1po[tau:2] (CNonCanonical)]
 
 When we are looking for a match for the hole `_a`, we filter the simple
 constraints to the "Relevant constraints", by throwing out any constraints
@@ -402,9 +403,9 @@ a constraint to show that `hole_ty ~ ty`, including any constraints in `ty`. For
 example, if `hole_ty = Int` and `ty = Foldable t => (a -> Bool) -> t a -> Bool`,
 we'd have `(a_a1pa[sk:1] -> Bool) -> t_t2jk[sk:1] a_a1pa[sk:1] -> Bool ~# Int`
 from the coercion, as well as `Foldable t_t2jk[sk:1]`. By adding a flag to
-`TcSEnv` and adding a `runTcSDerivedsEarlyAbort`, we can fail as soon as we hit
+`TcSEnv` and adding a `runTcSEarlyAbort`, we can fail as soon as we hit
 an insoluble constraint. Since we don't need the result in the case that it
-fails, a boolean `False` (i.e. "it didn't work" from `runTcSDerivedsEarlyAbort`)
+fails, a boolean `False` (i.e. "it didn't work" from `runTcSEarlyAbort`)
 is sufficient.
 
 We also check whether the type of the hole is an immutable type variable (i.e.
@@ -552,7 +553,7 @@ getLocalBindings tidy_orig ct_loc
 -- See Note [Valid hole fits include ...]
 findValidHoleFits :: TidyEnv        -- ^ The tidy_env for zonking
                   -> [Implication]  -- ^ Enclosing implications for givens
-                  -> [Ct]
+                  -> [CtEvidence]
                   -- ^ The  unsolved simple constraints in the implication for
                   -- the hole.
                   -> Hole
@@ -569,7 +570,7 @@ findValidHoleFits tidy_env implics simples h@(Hole { hole_sort = ExprHole _
      ; let findVLimit = if sortingAlg > HFSNoSorting then Nothing else maxVSubs
            refLevel = refLevelHoleFits dflags
            hole = TypedHole { th_relevant_cts =
-                                listToBag (relevantCts hole_ty simples)
+                                listToBag (relevantCtEvidence hole_ty simples)
                             , th_implics      = implics
                             , th_hole         = Just h }
            (candidatePlugins, fitPlugins) =
@@ -690,21 +691,20 @@ findValidHoleFits tidy_env implics simples h@(Hole { hole_sort = ExprHole _
 findValidHoleFits env _ _ _ = return (env, noValidHoleFits)
 
 -- See Note [Relevant constraints]
-relevantCts :: Type -> [Ct] -> [Ct]
-relevantCts hole_ty simples = if isEmptyVarSet (fvVarSet hole_fvs) then []
-                              else filter isRelevant simples
-  where ctFreeVarSet :: Ct -> VarSet
-        ctFreeVarSet = fvVarSet . tyCoFVsOfType . ctPred
-        hole_fvs = tyCoFVsOfType hole_ty
+relevantCtEvidence :: Type -> [CtEvidence] -> [CtEvidence]
+relevantCtEvidence hole_ty simples
+  = if isEmptyVarSet (fvVarSet hole_fvs)
+    then []
+    else filter isRelevant simples
+  where hole_fvs = tyCoFVsOfType hole_ty
         hole_fv_set = fvVarSet hole_fvs
-        anyFVMentioned :: Ct -> Bool
-        anyFVMentioned ct = ctFreeVarSet ct `intersectsVarSet` hole_fv_set
         -- We filter out those constraints that have no variables (since
         -- they won't be solved by finding a type for the type variable
         -- representing the hole) and also other holes, since we're not
         -- trying to find hole fits for many holes at once.
-        isRelevant ct = not (isEmptyVarSet (ctFreeVarSet ct))
-                        && anyFVMentioned ct
+        isRelevant ctev = not (isEmptyVarSet fvs) &&
+                          (fvs `intersectsVarSet` hole_fv_set)
+          where fvs = tyCoVarsOfCtEv ctev
 
 -- We zonk the hole fits so that the output aligns with the rest
 -- of the typed hole error message output.
@@ -962,7 +962,7 @@ tcCheckHoleFit (TypedHole {..}) hole_ty ty = discardErrs $
                           -- imp is the innermost implication
                           (imp:_) -> return (ic_tclvl imp)
      ; (wrap, wanted) <- setTcLevel innermost_lvl $ captureConstraints $
-                         tcSubTypeSigma (ExprSigCtxt NoRRC) ty hole_ty
+                         tcSubTypeSigma orig (ExprSigCtxt NoRRC) ty hole_ty
      ; traceTc "Checking hole fit {" empty
      ; traceTc "wanteds are: " $ ppr wanted
      ; if isEmptyWC wanted && isEmptyBag th_relevant_cts
@@ -971,11 +971,12 @@ tcCheckHoleFit (TypedHole {..}) hole_ty ty = discardErrs $
        else do { fresh_binds <- newTcEvBinds
                 -- The relevant constraints may contain HoleDests, so we must
                 -- take care to clone them as well (to avoid #15370).
-               ; cloned_relevants <- mapBagM cloneWanted th_relevant_cts
+               ; cloned_relevants <- mapBagM cloneWantedCtEv th_relevant_cts
                  -- We wrap the WC in the nested implications, for details, see
                  -- Note [Checking hole fits]
                ; let wrapInImpls cts = foldl (flip (setWCAndBinds fresh_binds)) cts th_implics
-                     final_wc  = wrapInImpls $ addSimples wanted cloned_relevants
+                     final_wc  = wrapInImpls $ addSimples wanted $
+                                                          mapBag mkNonCanonical cloned_relevants
                  -- We add the cloned relevants to the wanteds generated
                  -- by the call to tcSubType_NC, for details, see
                  -- Note [Relevant constraints]. There's no need to clone
@@ -983,14 +984,15 @@ tcCheckHoleFit (TypedHole {..}) hole_ty ty = discardErrs $
                  -- call to`tcSubtype_NC`.
                ; traceTc "final_wc is: " $ ppr final_wc
                  -- See Note [Speeding up valid hole-fits]
-               ; (rem, _) <- tryTc $ runTcSDerivedsEarlyAbort $ simplifyTopWanteds final_wc
+               ; (rem, _) <- tryTc $ runTcSEarlyAbort $ simplifyTopWanteds final_wc
                ; traceTc "}" empty
-               ; return (any isSolvedWC rem, wrap)
-               } }
-     where
-       setWCAndBinds :: EvBindsVar         -- Fresh ev binds var.
-                     -> Implication        -- The implication to put WC in.
-                     -> WantedConstraints  -- The WC constraints to put implic.
-                     -> WantedConstraints  -- The new constraints.
-       setWCAndBinds binds imp wc
-         = mkImplicWC $ unitBag $ imp { ic_wanted = wc , ic_binds = binds }
+               ; return (any isSolvedWC rem, wrap) } }
+  where
+    orig = ExprHoleOrigin (hole_occ <$> th_hole)
+
+    setWCAndBinds :: EvBindsVar         -- Fresh ev binds var.
+                  -> Implication        -- The implication to put WC in.
+                  -> WantedConstraints  -- The WC constraints to put implic.
+                  -> WantedConstraints  -- The new constraints.
+    setWCAndBinds binds imp wc
+      = mkImplicWC $ unitBag $ imp { ic_wanted = wc , ic_binds = binds }

@@ -13,5 +13,6 @@ class Continuation c where
 callCont :: Continuation c => c -> (Z c) -> (B c) -> Maybe (F c)
 callCont c z b = rpt (4 :: Int) c z b
     where
+      --rpt :: Int -> c -> Z c -> B c -> F c
         rpt 0 c' z' b' = fromJust (fst <$> (continue c' z' b'))
-        rpt i c' z' b' = let c'' = fromJust (snd <$> (continue c' z' b')) in rpt (i-1) c''
+        rpt i c' z' b' = let c'' = fromJust (snd <$> (continue c' z' b')) in rpt (i-1) c'' -- z'' b''

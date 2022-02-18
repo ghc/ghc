@@ -244,9 +244,9 @@ rnIPBinds (IPBinds _ ip_binds ) = do
     return (IPBinds noExtField ip_binds', plusFVs fvs_s)
 
 rnIPBind :: IPBind GhcPs -> RnM (IPBind GhcRn, FreeVars)
-rnIPBind (IPBind _ ~(Left n) expr) = do
+rnIPBind (IPBind _ n expr) = do
     (expr',fvExpr) <- rnLExpr expr
-    return (IPBind noAnn (Left n) expr', fvExpr)
+    return (IPBind noExtField n expr', fvExpr)
 
 {-
 ************************************************************************

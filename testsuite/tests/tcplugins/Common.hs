@@ -89,7 +89,7 @@ lookupDefs = do
   add                           <- tcLookupTyCon   =<< lookupOrig defs ( mkTcOcc   "Add"      )
   pure ( PluginDefs { .. } )
 
-mkPlugin :: ( [String] -> PluginDefs -> EvBindsVar -> [Ct] -> [Ct] -> [Ct] -> TcPluginM TcPluginSolveResult )
+mkPlugin :: ( [String] -> PluginDefs -> EvBindsVar -> [Ct] -> [Ct] -> TcPluginM TcPluginSolveResult )
          -> ( [String] -> PluginDefs -> UniqFM TyCon TcPluginRewriter )
          -> Plugin
 mkPlugin solve rewrite =
@@ -98,7 +98,7 @@ mkPlugin solve rewrite =
     , pluginRecompile = purePlugin
     }
 
-mkTcPlugin :: ( PluginDefs -> EvBindsVar -> [Ct] -> [Ct] -> [Ct] -> TcPluginM TcPluginSolveResult )
+mkTcPlugin :: ( PluginDefs -> EvBindsVar -> [Ct] -> [Ct] -> TcPluginM TcPluginSolveResult )
            -> ( PluginDefs -> UniqFM TyCon TcPluginRewriter )
            -> TcPlugin
 mkTcPlugin solve rewrite =
@@ -109,8 +109,8 @@ mkTcPlugin solve rewrite =
     , tcPluginStop    = \ _ -> pure ()
     }
 
-don'tSolve :: [String] -> s -> EvBindsVar -> [Ct] -> [Ct] -> [Ct] -> TcPluginM TcPluginSolveResult
-don'tSolve _ _ _ _ _ _ = pure $ TcPluginOk [] []
+don'tSolve :: [String] -> s -> EvBindsVar -> [Ct] -> [Ct] -> TcPluginM TcPluginSolveResult
+don'tSolve _ _ _ _ _ = pure $ TcPluginOk [] []
 
 don'tRewrite :: [String] -> s -> UniqFM TyCon TcPluginRewriter
 don'tRewrite _ _ = emptyUFM

@@ -107,7 +107,6 @@ ref    compiler/GHC/Tc/Utils/Env.hs:1141:0:     Note [Generating fresh names for
 ref    compiler/GHC/Tc/Utils/Env.hs:1192:7:     Note [Placeholder PatSyn kinds]
 ref    compiler/GHC/Tc/Utils/TcMType.hs:793:7:     Note [Kind checking for GADTs]
 ref    compiler/GHC/Tc/Utils/TcType.hs:529:7:     Note [TyVars and TcTyVars]
-ref    compiler/GHC/Tc/Utils/Unify.hs:1489:7:     Note [Unification preconditions, (TYVAR-TV)]
 ref    compiler/GHC/ThToHs.hs:1738:11:     Note [Adding parens for splices]
 ref    compiler/GHC/ThToHs.hs:1749:3:     Note [Adding parens for splices]
 ref    compiler/GHC/Types/Basic.hs:586:17:     Note [Safe Haskell isSafeOverlap]
