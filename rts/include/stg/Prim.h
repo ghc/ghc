@@ -97,10 +97,8 @@ StgWord64 hs_uncheckedShiftRL64  (StgWord64 a, StgInt b);
 StgInt64  hs_uncheckedIShiftRA64 (StgInt64 a,  StgInt b);
 StgInt64  hs_intToInt64    (StgInt    i);
 StgInt    hs_int64ToInt    (StgInt64  i);
-StgWord64 hs_int64ToWord64 (StgInt64  i);
 StgWord64 hs_wordToWord64  (StgWord   w);
 StgWord   hs_word64ToWord  (StgWord64 w);
-StgInt64  hs_word64ToInt64 (StgWord64 w);
 #endif
 
 /* libraries/ghc-prim/cbits/pdep.c */

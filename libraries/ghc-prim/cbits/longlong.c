@@ -79,9 +79,7 @@ HsInt64  hs_uncheckedIShiftRA64 (HsInt64 a,  HsInt b)    {return a >> b;}
 
 HsInt64  hs_intToInt64    (HsInt    i) {return (HsInt64)  i;}
 HsInt    hs_int64ToInt    (HsInt64  i) {return (HsInt)    i;}
-HsWord64 hs_int64ToWord64 (HsInt64  i) {return (HsWord64) i;}
 HsWord64 hs_wordToWord64  (HsWord   w) {return (HsWord64) w;}
 HsWord   hs_word64ToWord  (HsWord64 w) {return (HsWord)   w;}
-HsInt64  hs_word64ToInt64 (HsWord64 w) {return (HsInt64)  w;}
 
 #endif /* SUPPORT_LONG_LONGS */

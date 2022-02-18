@@ -11,22 +11,22 @@ import GHC.Prelude
 
 data Cond
         = ALWAYS        -- What's really used? ToDo
-        | EQQ           -- je/jz -> zf = 1
-        | GE            -- jge
-        | GEU           -- ae
-        | GTT           -- jg
-        | GU            -- ja
-        | LE            -- jle
-        | LEU           -- jbe
-        | LTT           -- jl
-        | LU            -- jb
-        | NE            -- jne
-        | NEG           -- js
-        | POS           -- jns
-        | CARRY         -- jc
-        | OFLO          -- jo
-        | PARITY        -- jp
-        | NOTPARITY     -- jnp
+        | EQQ           -- je/jz -> zf=1
+        | GE            -- jge   -> sf=of
+        | GEU           -- ae    -> cf=0
+        | GTT           -- jg    -> zf=0 && sf=of
+        | GU            -- ja    -> cf=0 && zf=0
+        | LE            -- jle   -> zf=1 || sf/=of
+        | LEU           -- jbe   -> cf=1 || zf=1
+        | LTT           -- jl    -> sf/=of
+        | LU            -- jb    -> cf=1
+        | NE            -- jne   -> zf=0
+        | NEG           -- js    -> sf=1
+        | POS           -- jns   -> sf=0
+        | CARRY         -- jc    -> cf=1
+        | OFLO          -- jo    -> of=1
+        | PARITY        -- jp    -> pf=1
+        | NOTPARITY     -- jnp   -> pf=0
         deriving Eq
 
 condToUnsigned :: Cond -> Cond
