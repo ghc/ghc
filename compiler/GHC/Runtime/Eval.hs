@@ -1063,15 +1063,11 @@ getDictionaryBindings theta = do
   let dict_var = mkVanillaGlobal dictName theta
   loc <- getCtLocM (GivenOrigin (getSkolemInfo unkSkol)) Nothing
 
-  -- Generate a wanted here because at the end of constraint
-  -- solving, most derived constraints get thrown away, which in certain
-  -- cases, notably with quantified constraints makes it impossible to rule
-  -- out instances as invalid. (See #18071)
   return CtWanted {
     ctev_pred = varType dict_var,
     ctev_dest = EvVarDest dict_var,
-    ctev_nosh = WDeriv,
-    ctev_loc = loc
+    ctev_loc = loc,
+    ctev_rewriters = emptyRewriterSet
   }
 
 -- Find instances where the head unifies with the provided type
@@ -1132,13 +1128,19 @@ checkForExistence clsInst mb_inst_tys = do
   -- which otherwise appear as opaque type variables. (See #18262).
   WC { wc_simple = simples, wc_impl = impls } <- simplifyWantedsTcM wanteds
 
-  if allBag allowedSimple simples && solvedImplics impls
-  then return . Just $ substInstArgs tys (bagToList (mapBag ctPred simples)) clsInst
+  -- The simples might contain superclasses. This clutters up the output
+  -- (we want e.g. instance Ord a => Ord (Maybe a), not
+  -- instance (Ord a, Eq a) => Ord (Maybe a)). So we use mkMinimalBySCs
+  let simple_preds = map ctPred (bagToList simples)
+  let minimal_simples = mkMinimalBySCs id simple_preds
+
+  if all allowedSimple minimal_simples && solvedImplics impls
+  then return . Just $ substInstArgs tys minimal_simples clsInst
   else return Nothing
 
   where
-  allowedSimple :: Ct -> Bool
-  allowedSimple ct = isSatisfiablePred (ctPred ct)
+  allowedSimple :: PredType -> Bool
+  allowedSimple pred = isSatisfiablePred pred
 
   solvedImplics :: Bag Implication -> Bool
   solvedImplics impls = allBag (isSolvedStatus . ic_status) impls

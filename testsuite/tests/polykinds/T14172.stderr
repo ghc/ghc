@@ -11,9 +11,11 @@ T14172.hs:7:46: error:
       In the type ‘(a -> f b) -> g a -> f (h _)’
 
 T14172.hs:8:19: error:
-    • Couldn't match type ‘h’ with ‘Compose f'0 g'0’
-        arising from a use of ‘_Wrapping’
-      ‘h’ is a rigid type variable bound by
+    • Couldn't match type ‘a’ with ‘g'1 a'0’
+      Expected: (f'0 a -> f (f'0 b)) -> g a -> f (h a')
+        Actual: (Unwrapped (Compose f'0 g'1 a'0) -> f (Unwrapped (h a')))
+                -> Compose f'0 g'1 a'0 -> f (h a')
+      ‘a’ is a rigid type variable bound by
         the inferred type of
           traverseCompose :: (a -> f b) -> g a -> f (h a')
         at T14172.hs:7:1-47

@@ -3,6 +3,39 @@
 Version 9.4.1
 ==============
 
+Language
+~~~~~~~~
+
+- A small change has been made to the way GHC infers types for definitions
+  with no type signature: GHC will no longer generalize a function over
+  a type variable determined by a functional dependency. For example::
+
+    class C a b | a -> b where
+      op :: a -> b -> ()
+    f x = op True x
+
+  Previously, GHC inferred ``f :: C Bool b => b -> ()``. However, the functional
+  dependency says that only one type could ever be used for ``b``: this function
+  is hardly valid "for all" ``b``\ s. With the change, GHC will reject, looking
+  for the (non-existent) instance for ``C Bool b``.
+
+  If you want to retain the old behavior, add a (backward-compatible) type signature,
+  explicitly requesting this unusual quantification.
+
+- GHC no longer checks for ``-XGADTs`` or ``-XTypeFamilies`` in order to use
+  an equality constraint in a type. This is part of accepted proposal
+  `#371 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0371-non-magical-eq.md>`_.
+
+- There were previously cases around functional dependencies and injective
+  type families where the result of type inference would depend on the order
+  of constraints, as written in a source file. These cases are fundamentally ambiguous.
+  While GHC previously made an arbitrary decision, it now notices the ambiguity
+  and rejects the program. This means that some previously accepted programs are
+  now rejected. The solution is to add a type annotation or type application to
+  resolve the ambiguity.
+
+  This is the fix for :ghc-ticket:`18851`.
+
 Compiler
 ~~~~~~~~
 
@@ -309,3 +342,7 @@ Compiler
   For authors of type-checking plugins, this means you don't need to wrap
   a call to ``newWanted`` in ``setCtLocM`` to create a new Wanted constraint
   with the provided ``CtLoc``.
+
+- GHC no longer carries ``Derived`` constraints. Accordingly, several functions
+  in the plugin architecture that previously passed or received three sets of
+  constraints (givens, deriveds, and wanteds) now work with two such sets.

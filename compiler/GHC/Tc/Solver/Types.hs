@@ -1,14 +1,12 @@
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE PatternSynonyms #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
 -- | Utility types used within the constraint solver
 module GHC.Tc.Solver.Types (
     -- Inert CDictCans
-    DictMap, emptyDictMap, findDictsByClass, addDict, addDictCt,
+    DictMap, emptyDictMap, findDictsByClass, addDict,
     addDictsByClass, delDict, foldDicts, filterDicts, findDict,
     dictsToBag, partitionDicts,
 
@@ -19,9 +17,7 @@ module GHC.Tc.Solver.Types (
     insertTcApp, alterTcApp, filterTcAppMap,
     tcAppMapToBag, foldTcAppMap,
 
-    EqualCtList, pattern EqualCtList,
-    equalCtListToList, filterEqualCtList, unitEqualCtList,
-    listToEqualCtList, addToEqualCtList,
+    EqualCtList, filterEqualCtList, addToEqualCtList
   ) where
 
 import GHC.Prelude
@@ -39,12 +35,10 @@ import GHC.Core.TyCon.Env
 import GHC.Data.Bag
 import GHC.Data.Maybe
 import GHC.Data.TrieMap
+import GHC.Utils.Constants
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-
-import Data.Foldable
-import Data.List.NonEmpty ( NonEmpty(..), nonEmpty, cons )
-import qualified Data.List.NonEmpty as NE
+import GHC.Utils.Panic.Plain
 
 {- *********************************************************************
 *                                                                      *
@@ -157,26 +151,6 @@ delDict m cls tys = delTcApp m (classTyCon cls) tys
 addDict :: DictMap a -> Class -> [Type] -> a -> DictMap a
 addDict m cls tys item = insertTcApp m (classTyCon cls) tys item
 
-addDictCt :: DictMap Ct -> TyCon -> [Type] -> Ct -> DictMap Ct
--- Like addDict, but combines [W] and [D] to [WD]
--- See Note [KeepBoth] in GHC.Tc.Solver.Interact
-addDictCt m tc tys new_ct = alterTcApp m tc tys xt_ct
-  where
-    new_ct_ev = ctEvidence new_ct
-
-    xt_ct :: Maybe Ct -> Maybe Ct
-    xt_ct (Just old_ct)
-      | CtWanted { ctev_nosh = WOnly } <- old_ct_ev
-      , CtDerived {} <- new_ct_ev
-      = Just (old_ct { cc_ev = old_ct_ev { ctev_nosh = WDeriv }})
-      | CtDerived {} <- old_ct_ev
-      , CtWanted { ctev_nosh = WOnly } <- new_ct_ev
-      = Just (new_ct { cc_ev = new_ct_ev { ctev_nosh = WDeriv }})
-      where
-        old_ct_ev = ctEvidence old_ct
-
-    xt_ct _ = Just new_ct
-
 addDictsByClass :: DictMap Ct -> Class -> Bag Ct -> DictMap Ct
 addDictsByClass m cls items
   = extendDTyConEnv m (classTyCon cls) (foldr add emptyTM items)
@@ -213,7 +187,7 @@ We must /not/ solve this from the Given (?x::Int, C a), because of
 the intervening binding for (?x::Int).  #14218.
 
 We deal with this by arranging that we always fail when looking up a
-tuple constraint that hides an implicit parameter. Not that this applies
+tuple constraint that hides an implicit parameter. Note that this applies
   * both to the inert_dicts (lookupInertDict)
   * and to the solved_dicts (looukpSolvedDict)
 An alternative would be not to extend these sets with such tuple
@@ -263,7 +237,7 @@ findFunEq m tc tys = findTcApp m tc tys
 findFunEqsByTyCon :: FunEqMap a -> TyCon -> [a]
 -- Get inert function equation constraints that have the given tycon
 -- in their head.  Not that the constraints remain in the inert set.
--- We use this to check for derived interactions with built-in type-function
+-- We use this to check for wanted interactions with built-in type-function
 -- constructors.
 findFunEqsByTyCon m tc
   | Just tm <- lookupDTyConEnv m tc = foldTM (:) tm []
@@ -281,52 +255,48 @@ insertFunEq m tc tys val = insertTcApp m tc tys val
 *                                                                      *
 ********************************************************************* -}
 
-{- Note [EqualCtList invariants]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{-
+Note [EqualCtList invariants]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     * All are equalities
     * All these equalities have the same LHS
-    * The list is never empty
     * No element of the list can rewrite any other
-    * Derived before Wanted
 
-From the fourth invariant it follows that the list is
-   - A single [G], or
-   - Zero or one [D] or [WD], followed by any number of [W]
-
-The Wanteds can't rewrite anything which is why we put them last
+Accordingly, this list is either empty, contains one element, or
+contains a Given representational equality and a Wanted nominal one.
 -}
 
-newtype EqualCtList = MkEqualCtList (NonEmpty Ct)
-  deriving newtype Outputable
+type EqualCtList = [Ct]
   -- See Note [EqualCtList invariants]
 
--- | Pattern synonym for easy unwrapping. NB: unidirectional to
--- preserve invariants.
-pattern EqualCtList :: NonEmpty Ct -> EqualCtList
-pattern EqualCtList cts <- MkEqualCtList cts
-{-# COMPLETE EqualCtList #-}
-
-unitEqualCtList :: Ct -> EqualCtList
-unitEqualCtList ct = MkEqualCtList (ct :| [])
-
 addToEqualCtList :: Ct -> EqualCtList -> EqualCtList
--- NB: This function maintains the "derived-before-wanted" invariant of EqualCtList,
--- but not the others. See Note [EqualCtList invariants]
-addToEqualCtList ct (MkEqualCtList old_eqs)
-  | isWantedCt ct
-  , eq1 :| eqs <- old_eqs
-  = MkEqualCtList (eq1 :| ct : eqs)
+-- See Note [EqualCtList invariants]
+addToEqualCtList ct old_eqs
+  | debugIsOn
+  = case ct of
+      CEqCan { cc_lhs = TyVarLHS tv } ->
+        let shares_lhs (CEqCan { cc_lhs = TyVarLHS old_tv }) = tv == old_tv
+            shares_lhs _other                                = False
+        in
+        assert (all shares_lhs old_eqs) $
+        assert (null ([ (ct1, ct2) | ct1 <- ct : old_eqs
+                                   , ct2 <- ct : old_eqs
+                                   , let { fr1 = ctFlavourRole ct1
+                                         ; fr2 = ctFlavourRole ct2 }
+                                   , fr1 `eqCanRewriteFR` fr2 ])) $
+        (ct : old_eqs)
+
+      _ -> pprPanic "addToEqualCtList not CEqCan" (ppr ct)
+
   | otherwise
-  = MkEqualCtList (ct `cons` old_eqs)
+  = ct : old_eqs
 
+-- returns Nothing when the new list is empty, to keep the environments smaller
 filterEqualCtList :: (Ct -> Bool) -> EqualCtList -> Maybe EqualCtList
-filterEqualCtList pred (MkEqualCtList cts)
-  = fmap MkEqualCtList (nonEmpty $ NE.filter pred cts)
-
-equalCtListToList :: EqualCtList -> [Ct]
-equalCtListToList (MkEqualCtList cts) = toList cts
-
-listToEqualCtList :: [Ct] -> Maybe EqualCtList
--- NB: This does not maintain invariants other than having the EqualCtList be
--- non-empty
-listToEqualCtList cts = MkEqualCtList <$> nonEmpty cts
+filterEqualCtList pred cts
+  | null new_list
+  = Nothing
+  | otherwise
+  = Just new_list
+  where
+    new_list = filter pred cts

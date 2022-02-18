@@ -11,11 +11,15 @@ module ShouldFail where
 
 -- July 07: I'm changing this from "should fail" to "should succeed"
 -- See Note [Important subtlety in oclose] in GHC.Tc.Instance.FunDeps
+--
+-- June 2021: Changing this back to "should fail".
+-- See https://gitlab.haskell.org/ghc/ghc/-/issues/20064
 
 
 primDup :: Int -> IO Int
 primDup = undefined
 
+--dup :: Call (IO Int) h => () -> Int -> h
 dup () = call primDup
 
 --      call :: Call c h => c -> h

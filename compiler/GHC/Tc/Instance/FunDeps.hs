@@ -5,7 +5,7 @@
 
 -}
 
-
+{-# LANGUAGE DeriveFunctor #-}
 
 -- | Functional dependencies
 --
@@ -18,6 +18,7 @@ module GHC.Tc.Instance.FunDeps
    , checkInstCoverage
    , checkFunDeps
    , pprFundeps
+   , instFD, closeWrtFunDeps
    )
 where
 
@@ -43,6 +44,7 @@ import GHC.Utils.FV
 import GHC.Utils.Error( Validity'(..), Validity, allValid )
 import GHC.Utils.Misc
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain ( assert )
 
 import GHC.Data.Pair             ( Pair(..) )
 import Data.List        ( nubBy )
@@ -118,6 +120,7 @@ data FunDepEqn loc
           , fd_pred1 :: PredType   -- The FunDepEqn arose from
           , fd_pred2 :: PredType   --  combining these two constraints
           , fd_loc   :: loc  }
+    deriving Functor
 
 {-
 Given a bunch of predicates that must hold, such as
@@ -350,7 +353,7 @@ Example
 
 For the coverage condition, we check
    (normal)    fv(t2) `subset` fv(t1)
-   (liberal)   fv(t2) `subset` oclose(fv(t1), theta)
+   (liberal)   fv(t2) `subset` closeWrtFunDeps(fv(t1), theta)
 
 The liberal version  ensures the self-consistency of the instance, but
 it does not guarantee termination. Example:
@@ -363,7 +366,7 @@ it does not guarantee termination. Example:
    instance Mul a b c => Mul a [b] [c] where x .*. v = map (x.*.) v
 
 In the third instance, it's not the case that fv([c]) `subset` fv(a,[b]).
-But it is the case that fv([c]) `subset` oclose( theta, fv(a,[b]) )
+But it is the case that fv([c]) `subset` closeWrtFunDeps( theta, fv(a,[b]) )
 
 But it is a mistake to accept the instance because then this defn:
         f = \ b x y -> if b then x .*. [y] else y
@@ -396,7 +399,7 @@ checkInstCoverage be_liberal clas theta inst_taus
          undetermined_tvs | be_liberal = liberal_undet_tvs
                           | otherwise  = conserv_undet_tvs
 
-         closed_ls_tvs = oclose theta ls_tvs
+         closed_ls_tvs = closeWrtFunDeps theta ls_tvs
          liberal_undet_tvs = (`minusVarSet` closed_ls_tvs) <$> rs_tvs
          conserv_undet_tvs = (`minusVarSet` ls_tvs)        <$> rs_tvs
 
@@ -407,7 +410,7 @@ checkInstCoverage be_liberal clas theta inst_taus
                vcat [ -- text "ls_tvs" <+> ppr ls_tvs
                       -- , text "closed ls_tvs" <+> ppr (closeOverKinds ls_tvs)
                       -- , text "theta" <+> ppr theta
-                      -- , text "oclose" <+> ppr (oclose theta (closeOverKinds ls_tvs))
+                      -- , text "closeWrtFunDeps" <+> ppr (closeWrtFunDeps theta (closeOverKinds ls_tvs))
                       -- , text "rs_tvs" <+> ppr rs_tvs
                       sep [ text "The"
                             <+> ppWhen be_liberal (text "liberal")
@@ -466,17 +469,17 @@ Is the instance OK? Does {l,r,xs} determine v?  Well:
     we get {l,k,xs} -> b
 
   * Note the 'k'!! We must call closeOverKinds on the seed set
-    ls_tvs = {l,r,xs}, BEFORE doing oclose, else the {l,k,xs}->b
+    ls_tvs = {l,r,xs}, BEFORE doing closeWrtFunDeps, else the {l,k,xs}->b
     fundep won't fire.  This was the reason for #10564.
 
-  * So starting from seeds {l,r,xs,k} we do oclose to get
+  * So starting from seeds {l,r,xs,k} we do closeWrtFunDeps to get
     first {l,r,xs,k,b}, via the HMemberM constraint, and then
     {l,r,xs,k,b,v}, via the HasFieldM1 constraint.
 
   * And that fixes v.
 
 However, we must closeOverKinds whenever augmenting the seed set
-in oclose!  Consider #10109:
+in closeWrtFunDeps!  Consider #10109:
 
   data Succ a   -- Succ :: forall k. k -> *
   class Add (a :: k1) (b :: k2) (ab :: k3) | a b -> ab
@@ -492,25 +495,27 @@ the variables free in (Succ {k3} ab).
 Bottom line:
   * closeOverKinds on initial seeds (done automatically
     by tyCoVarsOfTypes in checkInstCoverage)
-  * and closeOverKinds whenever extending those seeds (in oclose)
+  * and closeOverKinds whenever extending those seeds (in closeWrtFunDeps)
 
 Note [The liberal coverage condition]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-(oclose preds tvs) closes the set of type variables tvs,
+(closeWrtFunDeps preds tvs) closes the set of type variables tvs,
 wrt functional dependencies in preds.  The result is a superset
 of the argument set.  For example, if we have
         class C a b | a->b where ...
 then
-        oclose [C (x,y) z, C (x,p) q] {x,y} = {x,y,z}
+        closeWrtFunDeps [C (x,y) z, C (x,p) q] {x,y} = {x,y,z}
 because if we know x and y then that fixes z.
 
 We also use equality predicates in the predicates; if we have an
 assumption `t1 ~ t2`, then we use the fact that if we know `t1` we
 also know `t2` and the other way.
-  eg    oclose [C (x,y) z, a ~ x] {a,y} = {a,y,z,x}
+  eg    closeWrtFunDeps [C (x,y) z, a ~ x] {a,y} = {a,y,z,x}
 
-oclose is used (only) when checking the coverage condition for
-an instance declaration
+closeWrtFunDeps is used
+ - when checking the coverage condition for an instance declaration
+ - when determining which tyvars are unquantifiable during generalization, in
+   GHC.Tc.Solver.decideMonoTyVars.
 
 Note [Equality superclasses]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -521,10 +526,10 @@ Remember from Note [The equality types story] in GHC.Builtin.Types.Prim, that
   * (a ~~ b) is a superclass of (a ~ b)
   * (a ~# b) is a superclass of (a ~~ b)
 
-So when oclose expands superclasses we'll get a (a ~# [b]) superclass.
+So when closeWrtFunDeps expands superclasses we'll get a (a ~# [b]) superclass.
 But that's an EqPred not a ClassPred, and we jolly well do want to
 account for the mutual functional dependencies implied by (t1 ~# t2).
-Hence the EqPred handling in oclose.  See #10778.
+Hence the EqPred handling in closeWrtFunDeps.  See #10778.
 
 Note [Care with type functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -534,7 +539,7 @@ Consider (#12803)
   type family G c d = r | r -> d
 
 Now consider
-  oclose (C (F a b) (G c d)) {a,b}
+  closeWrtFunDeps (C (F a b) (G c d)) {a,b}
 
 Knowing {a,b} fixes (F a b) regardless of the injectivity of F.
 But knowing (G c d) fixes only {d}, because G is only injective
@@ -543,12 +548,14 @@ in its second parameter.
 Hence the tyCoVarsOfTypes/injTyVarsOfTypes dance in tv_fds.
 -}
 
-oclose :: [PredType] -> TyCoVarSet -> TyCoVarSet
+closeWrtFunDeps :: [PredType] -> TyCoVarSet -> TyCoVarSet
 -- See Note [The liberal coverage condition]
-oclose preds fixed_tvs
+closeWrtFunDeps preds fixed_tvs
   | null tv_fds = fixed_tvs -- Fast escape hatch for common case.
-  | otherwise   = fixVarSet extend fixed_tvs
+  | otherwise   = assert (closeOverKinds fixed_tvs == fixed_tvs)
+                $ fixVarSet extend fixed_tvs
   where
+
     extend fixed_tvs = foldl' add fixed_tvs tv_fds
        where
           add fixed_tvs (ls,rs)

@@ -6,6 +6,8 @@ T5287.hs:7:10: error:
                    forall a oops. A a oops => Read (D a)
         at T5287.hs:7:10-31
       The type variable ‘oops0’ is ambiguous
+      Potentially matching instance:
+        instance A Int Bool -- Defined at T5287.hs:13:10
     • In the ambiguity check for an instance declaration
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
       In the instance declaration for ‘Read (D a)’

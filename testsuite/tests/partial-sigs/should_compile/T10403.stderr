@@ -15,17 +15,34 @@ T10403.hs:16:12: warning: [-Wpartial-type-signatures (in -Wdefault)]
 
 T10403.hs:20:7: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’
-        standing for ‘(a1 -> a2) -> B t0 a1 -> H (B t0)’
-      Where: ‘t0’ is an ambiguous type variable
+        standing for ‘(a1 -> a2) -> f0 a1 -> H f0’
+      Where: ‘f0’ is an ambiguous type variable
              ‘a2’, ‘a1’ are rigid type variables bound by
-               the inferred type of h2 :: (a1 -> a2) -> B t0 a1 -> H (B t0)
+               the inferred type of h2 :: (a1 -> a2) -> f0 a1 -> H f0
                at T10403.hs:23:1-41
     • In the type signature: h2 :: _
 
+T10403.hs:23:15: warning: [-Wdeferred-type-errors (in -Wdefault)]
+    • Ambiguous type variable ‘f0’ arising from a use of ‘fmap’
+      prevents the constraint ‘(Functor f0)’ from being solved.
+      Relevant bindings include
+        b :: f0 a1 (bound at T10403.hs:23:6)
+        h2 :: (a1 -> a2) -> f0 a1 -> H f0 (bound at T10403.hs:23:1)
+      Probable fix: use a type annotation to specify what ‘f0’ should be.
+      Potentially matching instances:
+        instance Functor IO -- Defined in ‘GHC.Base’
+        instance Functor (B t) -- Defined at T10403.hs:11:10
+        ...plus 8 others
+        ...plus one instance involving out-of-scope types
+        (use -fprint-potential-instances to see them all)
+    • In the second argument of ‘(.)’, namely ‘fmap (const ())’
+      In the expression: (H . fmap (const ())) (fmap f b)
+      In an equation for ‘h2’: h2 f b = (H . fmap (const ())) (fmap f b)
+
 T10403.hs:29:8: warning: [-Wdeferred-type-errors (in -Wdefault)]
-    • Couldn't match type ‘t0’ with ‘t’
+    • Couldn't match type ‘f0’ with ‘B t’
       Expected: H (B t)
-        Actual: H (B t0)
+        Actual: H f0
     • because type variable ‘t’ would escape its scope
     This (rigid, skolem) type variable is bound by
       the type signature for:

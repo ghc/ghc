@@ -1,27 +1,23 @@
 
-T8227.hs:17:27: error:
-    • Couldn't match expected type: Scalar (V a)
-                  with actual type: Scalar (V (Scalar (V a)))
-                                    -> Scalar (V (Scalar (V a)))
+T8227.hs:24:27: error:
+    • Couldn't match type: Scalar (V a)
+                     with: t0 -> t0
+      Expected: Scalar (V a)
+        Actual: Scalar (V (t0 -> t0)) -> Scalar (V (t0 -> t0))
     • In the expression: arcLengthToParam eps eps
       In an equation for ‘absoluteToParam’:
           absoluteToParam eps seg = arcLengthToParam eps eps
     • Relevant bindings include
-        seg :: a (bound at T8227.hs:17:21)
-        eps :: Scalar (V a) (bound at T8227.hs:17:17)
+        seg :: a (bound at T8227.hs:24:21)
+        eps :: Scalar (V a) (bound at T8227.hs:24:17)
         absoluteToParam :: Scalar (V a) -> a -> Scalar (V a)
-          (bound at T8227.hs:17:1)
+          (bound at T8227.hs:24:1)
 
-T8227.hs:17:44: error:
-    • Couldn't match expected type: Scalar (V (Scalar (V a)))
-                  with actual type: Scalar (V a)
-      NB: ‘Scalar’ is a non-injective type family
-    • In the first argument of ‘arcLengthToParam’, namely ‘eps’
+T8227.hs:24:48: error:
+    • Couldn't match type ‘t0’ with ‘Scalar (V t0)’
+        arising from a type equality Scalar (V a) ~ t0 -> t0
+      The type variable ‘t0’ is ambiguous
+    • In the second argument of ‘arcLengthToParam’, namely ‘eps’
       In the expression: arcLengthToParam eps eps
       In an equation for ‘absoluteToParam’:
           absoluteToParam eps seg = arcLengthToParam eps eps
-    • Relevant bindings include
-        seg :: a (bound at T8227.hs:17:21)
-        eps :: Scalar (V a) (bound at T8227.hs:17:17)
-        absoluteToParam :: Scalar (V a) -> a -> Scalar (V a)
-          (bound at T8227.hs:17:1)

@@ -54,9 +54,9 @@ plugin = mkPlugin solver don'tRewrite
 -- emits a new Wanted equality @ty ~ ()@, and solves the
 -- @MyClass ty@ constraint using it.
 solver :: [String]
-       -> PluginDefs -> EvBindsVar -> [Ct] -> [Ct] -> [Ct]
+       -> PluginDefs -> EvBindsVar -> [Ct] -> [Ct]
        -> TcPluginM TcPluginSolveResult
-solver args defs _ev _gs _ds ws = do
+solver args defs _ev _gs ws = do
   (solved, new) <- unzip . catMaybes <$> traverse ( solveCt defs ) ws
   pure $ TcPluginOk solved new
 

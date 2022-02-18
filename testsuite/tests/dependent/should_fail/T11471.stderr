@@ -10,13 +10,3 @@ T11471.hs:15:10: error:
       In the expression: f (undefined :: Proxy Int#) 3#
       In an equation for ‘bad’: bad = f (undefined :: Proxy Int#) 3#
     • Relevant bindings include bad :: F a (bound at T11471.hs:15:1)
-
-T11471.hs:15:35: error:
-    • Couldn't match a lifted type with an unlifted type
-      When matching types
-        F a :: *
-        Int# :: TYPE 'IntRep
-    • In the second argument of ‘f’, namely ‘3#’
-      In the expression: f (undefined :: Proxy Int#) 3#
-      In an equation for ‘bad’: bad = f (undefined :: Proxy Int#) 3#
-    • Relevant bindings include bad :: F a (bound at T11471.hs:15:1)

@@ -4,7 +4,6 @@ T7729.hs:36:14: error:
                      with: t0 (BasePrimMonad m)
       Expected: t0 (BasePrimMonad m) a -> Rand m a
         Actual: BasePrimMonad (Rand m) a -> Rand m a
-      The type variable ‘t0’ is ambiguous
     • In the first argument of ‘(.)’, namely ‘liftPrim’
       In the expression: liftPrim . lift
       In an equation for ‘liftPrim’: liftPrim = liftPrim . lift

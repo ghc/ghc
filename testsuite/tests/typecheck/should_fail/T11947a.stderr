@@ -6,6 +6,9 @@ T11947a.hs:4:19: error:
                    theFloatDigits :: forall a. RealFloat a => Int
         at T11947a.hs:4:19-46
       The type variable ‘a0’ is ambiguous
+      Potentially matching instances:
+        instance RealFloat Double -- Defined in ‘GHC.Float’
+        instance RealFloat Float -- Defined in ‘GHC.Float’
     • In the ambiguity check for ‘theFloatDigits’
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
       In the type signature:

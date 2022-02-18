@@ -1,9 +1,14 @@
 
 T14325.hs:11:9: error:
-    • Could not deduce (C b (f b)) arising from a use of ‘foo’
-      from the context: C (f b) b
-        bound by the type signature for:
-                   hm3 :: forall (f :: * -> *) b. C (f b) b => b -> f b
+    • Couldn't match type ‘b’ with ‘f b’
+        arising from a superclass required to satisfy ‘C b (f b)’,
+        arising from a use of ‘foo’
+      ‘b’ is a rigid type variable bound by
+        the type signature for:
+          hm3 :: forall (f :: * -> *) b. C (f b) b => b -> f b
         at T14325.hs:10:1-28
     • In the expression: foo x
       In an equation for ‘hm3’: hm3 x = foo x
+    • Relevant bindings include
+        x :: b (bound at T14325.hs:11:5)
+        hm3 :: b -> f b (bound at T14325.hs:11:1)

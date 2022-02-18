@@ -1,0 +1,16 @@
+
+T5684d.hs:12:12: error:
+    • No instance for (B Char b0) arising from a use of ‘op’
+    • In the expression: op 'c' undefined
+      In the expression:
+        [op 'c' undefined, op False False, op True undefined]
+      In an equation for ‘flop4’:
+          flop4 = [op 'c' undefined, op False False, op True undefined]
+
+T5684d.hs:13:12: error:
+    • No instance for (A Bool) arising from a use of ‘op’
+    • In the expression: op False False
+      In the expression:
+        [op 'c' undefined, op False False, op True undefined]
+      In an equation for ‘flop4’:
+          flop4 = [op 'c' undefined, op False False, op True undefined]

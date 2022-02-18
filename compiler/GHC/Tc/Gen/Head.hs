@@ -607,13 +607,14 @@ tcExprSig _ expr sig@(PartialSig { psig_name = name, sig_loc = loc })
                         = ApplyMR
                         | otherwise
                         = NoRestrictions
-       ; (qtvs, givens, ev_binds, _)
-                 <- simplifyInfer tclvl infer_mode [sig_inst] [(name, tau)] wanted
+       ; ((qtvs, givens, ev_binds, _), residual)
+           <- captureConstraints $ simplifyInfer tclvl infer_mode [sig_inst] [(name, tau)] wanted
+       ; emitConstraints residual
 
        ; tau <- zonkTcType tau
        ; let inferred_theta = map evVarPred givens
              tau_tvs        = tyCoVarsOfType tau
-       ; (binders, my_theta) <- chooseInferredQuantifiers inferred_theta
+       ; (binders, my_theta) <- chooseInferredQuantifiers residual inferred_theta
                                    tau_tvs qtvs (Just sig_inst)
        ; let inferred_sigma = mkInfSigmaTy qtvs inferred_theta tau
              my_sigma       = mkInvisForAllTys binders (mkPhiTy  my_theta tau)
@@ -621,7 +622,7 @@ tcExprSig _ expr sig@(PartialSig { psig_name = name, sig_loc = loc })
                  then return idHsWrapper  -- Fast path; also avoids complaint when we infer
                                           -- an ambiguous type and have AllowAmbiguousType
                                           -- e..g infer  x :: forall a. F a -> Int
-                 else tcSubTypeSigma (ExprSigCtxt NoRRC) inferred_sigma my_sigma
+                 else tcSubTypeSigma ExprSigOrigin (ExprSigCtxt NoRRC) inferred_sigma my_sigma
 
        ; traceTc "tcExpSig" (ppr qtvs $$ ppr givens $$ ppr inferred_sigma $$ ppr my_sigma)
        ; let poly_wrap = wrap

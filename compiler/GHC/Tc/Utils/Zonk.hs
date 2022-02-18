@@ -68,7 +68,6 @@ import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
-import GHC.Utils.Constants (debugIsOn)
 
 import GHC.Core.Multiplicity
 import GHC.Core
@@ -511,14 +510,14 @@ zonkLocalBinds env (HsIPBinds x (IPBinds dict_binds binds )) = do
     new_binds <- mapM (wrapLocMA zonk_ip_bind) binds
     let
         env1 = extendIdZonkEnvRec env
-                 [ n | (L _ (IPBind _ (Right n) _)) <- new_binds]
+                 [ n | (L _ (IPBind n _ _)) <- new_binds]
     (env2, new_dict_binds) <- zonkTcEvBinds env1 dict_binds
     return (env2, HsIPBinds x (IPBinds new_dict_binds new_binds))
   where
-    zonk_ip_bind (IPBind x n e)
-        = do n' <- mapIPNameTc (zonkIdBndr env) n
+    zonk_ip_bind (IPBind dict_id n e)
+        = do dict_id' <- zonkIdBndr env dict_id
              e' <- zonkLExpr env e
-             return (IPBind x n' e')
+             return (IPBind dict_id' n e')
 
 ---------------------------------------------
 zonkRecMonoBinds :: ZonkEnv -> LHsBinds GhcTc -> TcM (ZonkEnv, LHsBinds GhcTc)
@@ -1318,13 +1317,6 @@ zonkRecUpdFields env = mapM zonk_rbind
            ; return (L l (fld { hfbLHS = fmap ambiguousFieldOcc new_id
                               , hfbRHS = new_expr })) }
 
--------------------------------------------------------------------------
-mapIPNameTc :: (a -> TcM b) -> Either (LocatedAn NoEpAnns  HsIPName) a
-            -> TcM (Either (LocatedAn NoEpAnns HsIPName) b)
-mapIPNameTc _ (Left x)  = return (Left x)
-mapIPNameTc f (Right x) = do r <- f x
-                             return (Right r)
-
 {-
 ************************************************************************
 *                                                                      *
@@ -1833,6 +1825,13 @@ commitFlexi flexi tv zonked_kind
       SkolemiseFlexi  -> return (mkTyVarTy (mkTyVar name zonked_kind))
 
       DefaultFlexi
+          -- Normally, RuntimeRep variables are defaulted in TcMType.defaultTyVar
+          -- But that sees only type variables that appear in, say, an inferred type
+          -- Defaulting here in the zonker is needed to catch e.g.
+          --    y :: Bool
+          --    y = (\x -> True) undefined
+          -- We need *some* known RuntimeRep for the x and undefined, but no one
+          -- will choose it until we get here, in the zonker.
         | isRuntimeRepTy zonked_kind
         -> do { traceTc "Defaulting flexi tyvar to LiftedRep:" (pprTyVar tv)
               ; return liftedRepTy }
@@ -1877,11 +1876,6 @@ zonkCoHole env hole@(CoercionHole { ch_ref = ref, ch_co_var = cv })
               -- (undeferred) type errors. Originally, I put in a panic
               -- here, but that caused too many uses of `failIfErrsM`.
            Nothing -> do { traceTc "Zonking unfilled coercion hole" (ppr hole)
-                         ; when debugIsOn $
-                           whenNoErrs $
-                           massertPpr False
-                                      (text "Type-correct unfilled coercion hole"
-                                       <+> ppr hole)
                          ; cv' <- zonkCoVar cv
                          ; return $ mkCoVarCo cv' } }
                              -- This will be an out-of-scope variable, but keeping

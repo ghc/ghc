@@ -1535,12 +1535,10 @@ instance ExactPrint (HsIPBinds GhcPs) where
 instance ExactPrint (IPBind GhcPs) where
   getAnnotationEntry (IPBind an _ _) = fromAnn an
 
-  exact (IPBind an (Left lr) rhs) = do
+  exact (IPBind an lr rhs) = do
     markAnnotated lr
     markEpAnn an AnnEqual
     markAnnotated rhs
-
-  exact (IPBind _ (Right _) _) = error $ "ExactPrint IPBind: Right only after typechecker"
 
 -- ---------------------------------------------------------------------
 

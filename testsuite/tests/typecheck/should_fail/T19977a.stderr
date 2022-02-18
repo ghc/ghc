@@ -1,0 +1,13 @@
+
+T19977a.hs:11:7: error:
+    • Could not deduce (Show a) arising from a use of ‘f’
+      from the context: Show [a]
+        bound by the type signature for:
+                   g :: forall a. Show [a] => a -> String
+        at T19977a.hs:10:1-28
+      Possible fix:
+        add (Show a) to the context of
+          the type signature for:
+            g :: forall a. Show [a] => a -> String
+    • In the expression: f x
+      In an equation for ‘g’: g x = f x

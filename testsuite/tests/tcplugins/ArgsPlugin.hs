@@ -56,9 +56,9 @@ plugin = mkPlugin solver don'tRewrite
 -- Solve "MyClass Integer" with a class dictionary that depends on
 -- a plugin argument.
 solver :: [String]
-       -> PluginDefs -> EvBindsVar -> [Ct] -> [Ct] -> [Ct]
+       -> PluginDefs -> EvBindsVar -> [Ct] -> [Ct]
        -> TcPluginM TcPluginSolveResult
-solver args defs _ev _gs _ds ws = do
+solver args defs _ev _gs ws = do
   let
     argsVal :: Integer
     argsVal = case args of

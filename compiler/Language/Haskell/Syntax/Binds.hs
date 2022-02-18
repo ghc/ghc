@@ -601,18 +601,13 @@ type LIPBind id = XRec id (IPBind id)
 
 -- | Implicit parameter bindings.
 --
--- These bindings start off as (Left "x") in the parser and stay
--- that way until after type-checking when they are replaced with
--- (Right d), where "d" is the name of the dictionary holding the
--- evidence for the implicit parameter.
---
 -- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnEqual'
 
 -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 data IPBind id
   = IPBind
         (XCIPBind id)
-        (Either (XRec id HsIPName) (IdP id))
+        (XRec id HsIPName)
         (LHsExpr id)
   | XIPBind !(XXIPBind id)
 

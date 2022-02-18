@@ -1,9 +1,14 @@
 
 T16512a.hs:41:25: error:
-    • Couldn't match type: ListVariadic as (a -> b)
-                     with: a -> ListVariadic as b
+    • Couldn't match type ‘as’ with ‘a : as’
       Expected: AST (ListVariadic (a : as) b)
         Actual: AST (ListVariadic as (a -> b))
+      ‘as’ is a rigid type variable bound by
+        a pattern with constructor:
+          AnApplication :: forall (as :: [*]) b.
+                           AST (ListVariadic as b) -> ASTs as -> AnApplication b,
+        in a case alternative
+        at T16512a.hs:40:9-26
     • In the first argument of ‘AnApplication’, namely ‘g’
       In the expression: AnApplication g (a `ConsAST` as)
       In a case alternative:
@@ -13,4 +18,3 @@ T16512a.hs:41:25: error:
         g :: AST (ListVariadic as (a -> b)) (bound at T16512a.hs:40:23)
         a :: AST a (bound at T16512a.hs:38:15)
         f :: AST (a -> b) (bound at T16512a.hs:38:10)
-        unapply :: AST b -> AnApplication b (bound at T16512a.hs:38:1)

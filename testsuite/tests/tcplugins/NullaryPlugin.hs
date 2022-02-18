@@ -42,9 +42,9 @@ plugin = mkPlugin solver don'tRewrite
 
 -- Solve "Nullary".
 solver :: [String]
-       -> PluginDefs -> EvBindsVar -> [Ct] -> [Ct] -> [Ct]
+       -> PluginDefs -> EvBindsVar -> [Ct] -> [Ct]
        -> TcPluginM TcPluginSolveResult
-solver _args defs _ev _gs _ds ws = do
+solver _args defs _ev _gs ws = do
   solved <- catMaybes <$> traverse ( solveCt defs ) ws
   pure $ TcPluginOk solved []
 

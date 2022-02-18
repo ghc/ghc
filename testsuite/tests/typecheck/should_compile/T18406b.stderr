@@ -1,0 +1,54 @@
+TYPE SIGNATURES
+  foo :: forall a b. C a b => a -> b -> a
+  op :: forall a b. C a b => a -> a
+TYPE CONSTRUCTORS
+  class C{2} :: * -> * -> Constraint
+COERCION AXIOMS
+  axiom Bug.N:C :: forall a b. C a b = a -> a
+Dependent modules: []
+Dependent packages: [base-4.16.0.0]
+
+==================== Typechecker ====================
+Bug.$tcC
+  = GHC.Types.TyCon
+      12754692886077552850##64 18375870125396612007##64 Bug.$trModule
+      (GHC.Types.TrNameS "C"#) 0# $krep
+Bug.$tc'C:C
+  = GHC.Types.TyCon
+      302756782745842909##64 14248103394115774781##64 Bug.$trModule
+      (GHC.Types.TrNameS "'C:C"#) 2# $krep
+$krep [InlPrag=[~]] = GHC.Types.KindRepVar 0
+$krep [InlPrag=[~]] = GHC.Types.KindRepVar 1
+$krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
+$krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
+$krep [InlPrag=[~]] = GHC.Types.KindRepFun GHC.Types.krep$* $krep
+$krep [InlPrag=[~]] = GHC.Types.KindRepFun GHC.Types.krep$* $krep
+$krep [InlPrag=[~]]
+  = GHC.Types.KindRepTyConApp
+      GHC.Types.$tcConstraint [] @GHC.Types.KindRep
+$krep [InlPrag=[~]]
+  = GHC.Types.KindRepTyConApp
+      Bug.$tcC
+      ((:) @GHC.Types.KindRep
+         $krep ((:) @GHC.Types.KindRep $krep [] @GHC.Types.KindRep))
+Bug.$trModule
+  = GHC.Types.Module
+      (GHC.Types.TrNameS "main"#) (GHC.Types.TrNameS "Bug"#)
+AbsBinds [] []
+  {Exports: [foo <= foo
+               wrap: <>]
+   Exported types: foo :: forall a b. C a b => a -> b -> a
+                   [LclId]
+   Binds: foo x y
+            = blah x
+            where
+                AbsBinds [] []
+                  {Exports: [blah <= blah
+                               wrap: <>]
+                   Exported types: blah :: a -> a
+                                   [LclId]
+                   Binds: blah z = [x, z] `seq` op z
+                   Evidence: [EvBinds{[W] $dC = $dC}]}
+   Evidence: [EvBinds{}]}
+
+

@@ -1,8 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables, TypeApplications, TypeFamilies,
              RoleAnnotations, FlexibleContexts, AllowAmbiguousTypes #-}
 
--- See Note [Deriveds do rewrite Deriveds] in GHC.Tc.Types.Constraint
--- for commentary.
+-- See #19665 for commentary.
 
 module T19665 where
 

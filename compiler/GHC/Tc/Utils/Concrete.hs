@@ -15,8 +15,8 @@ import GHC.Core.Coercion
 import GHC.Core.TyCo.Rep
 
 import GHC.Tc.Utils.Monad
-import GHC.Tc.Utils.TcType  ( TcType, mkTyConApp )
-import GHC.Tc.Utils.TcMType ( newCoercionHole, newFlexiTyVarTy )
+import GHC.Tc.Utils.TcType  ( mkTyConApp )
+import GHC.Tc.Utils.TcMType
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Origin ( CtOrigin(..), FRROrigin(..), WpFunOrigin(..) )
@@ -402,11 +402,6 @@ There are, however, some interactions to take into account:
       Examples: backpack/should_run/T13955.bkp, rep-poly/RepPolyBackpack2.
 -}
 
--- | A coercion hole used to store evidence for `Concrete#` constraints.
---
--- See Note [The Concrete mechanism].
-type ConcreteHole = CoercionHole
-
 -- | Evidence for a `Concrete#` constraint:
 -- essentially a 'ConcreteHole' (a coercion hole) that will be filled later,
 -- except:
@@ -458,42 +453,32 @@ hasFixedRuntimeRep frrOrig ty
           -- Create a new Wanted 'Concrete#' constraint and emit it.
           | otherwise
           -> do { loc <- getCtLocM (FixedRuntimeRepOrigin ty frrOrig) (Just KindLevel)
-                ; (hole, ct_ev) <- newConcretePrimWanted loc ki
+                ; (hole, _, ct_ev) <- newConcretePrimWanted loc ki
                 ; emitSimple $ mkNonCanonical ct_ev
                 ; return $ ConcreteHoleEvidence hole } }
   where
     ki :: Kind
     ki = typeKind ty
 
--- | Create a new (initially unfilled) coercion hole,
--- to hold evidence for a @'Concrete#' (ty :: ki)@ constraint.
-newConcreteHole :: Kind -- ^ Kind of the thing we want to ensure is concrete (e.g. 'runtimeRepTy')
-                -> Type -- ^ Thing we want to ensure is concrete (e.g. some 'RuntimeRep')
-                -> TcM ConcreteHole
-newConcreteHole ki ty
-  = do { concrete_ty <- newFlexiTyVarTy ki
-       ; let co_ty = mkHeteroPrimEqPred ki ki ty concrete_ty
-       ; newCoercionHole co_ty }
-
 -- | Create a new 'Concrete#' constraint.
-newConcretePrimWanted :: CtLoc -> Type -> TcM (ConcreteHole, CtEvidence)
+-- Returns the evidence, a metavariable which will be filled in with a
+-- guaranteed-concrete type, and a Wanted CtEvidence
+newConcretePrimWanted :: CtLoc -> Type -> TcM (ConcreteHole, TcType, CtEvidence)
 newConcretePrimWanted loc ty
   = do { let
            ki :: Kind
            ki = typeKind ty
-       ; hole <- newConcreteHole ki ty
+       ; (hole, concrete_ty) <- newConcreteHole ki ty
        ; let
            wantedCtEv :: CtEvidence
            wantedCtEv =
              CtWanted
                { ctev_dest = HoleDest hole
                , ctev_pred = mkTyConApp concretePrimTyCon [ki, ty]
-               , ctev_nosh = WOnly -- WOnly, because Derived Concrete# constraints
-                                   -- aren't useful: solving a Concrete# constraint
-                                   -- can't cause any unification to take place.
+               , ctev_rewriters = emptyRewriterSet
                , ctev_loc  = loc
                }
-        ; return (hole, wantedCtEv) }
+        ; return (hole, concrete_ty, wantedCtEv) }
 
 {-***********************************************************************
 *                                                                       *
