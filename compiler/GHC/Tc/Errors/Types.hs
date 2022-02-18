@@ -1,4 +1,6 @@
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE LambdaCase #-}
+
 module GHC.Tc.Errors.Types (
   -- * Main types
     TcRnMessage(..)
@@ -31,12 +33,14 @@ module GHC.Tc.Errors.Types (
   , associatedTyLastVarInKind
   , AssociatedTyNotParamOverLastTyVar(..)
   , associatedTyNotParamOverLastTyVar
+  , MissingSignature(..)
+  , Exported(..)
 
   , SolverReport(..), SolverReportSupplementary(..)
-  , ReportWithCtxt(..)
-  , ReportErrCtxt(..)
+  , SolverReportWithCtxt(..)
+  , SolverReportErrCtxt(..)
   , getUserGivens, discardProvCtxtGivens
-  , TcReportMsg(..), TcReportInfo(..)
+  , TcSolverReportMsg(..), TcSolverReportInfo(..)
   , CND_Extra(..)
   , mkTcReportWithInfo
   , FitsMbSuppressed(..)
@@ -77,6 +81,7 @@ import GHC.Core.ConLike (ConLike)
 import GHC.Core.DataCon (DataCon)
 import GHC.Core.FamInstEnv (FamInst)
 import GHC.Core.InstEnv (ClsInst)
+import GHC.Core.PatSyn (PatSyn)
 import GHC.Core.TyCon (TyCon, TyConFlavour)
 import GHC.Core.Type (Kind, Type, ThetaType, PredType)
 import GHC.Unit.State (UnitState)
@@ -164,10 +169,10 @@ data TcRnMessage where
   {-| TcRnSolverReport is the constructor used to report unsolved constraints
       after constraint solving, as well as other errors such as hole fit errors.
 
-      See the documentation of the 'TcReportMsg' datatype for an overview
+      See the documentation of the 'TcSolverReportMsg' datatype for an overview
       of the different errors.
   -}
-  TcRnSolverReport :: [ReportWithCtxt]
+  TcRnSolverReport :: [SolverReportWithCtxt]
                    -> DiagnosticReason
                    -> [GhcHint]
                    -> TcRnMessage
@@ -202,7 +207,7 @@ data TcRnMessage where
     Test cases: T7293, T7294, T15558, T17646, T18572, T18610, tcfail167.
   -}
   TcRnInaccessibleCode :: Implication -- ^ The implication containing a contradiction.
-                       -> NE.NonEmpty ReportWithCtxt -- ^ The contradiction(s).
+                       -> NE.NonEmpty SolverReportWithCtxt -- ^ The contradiction(s).
                        -> TcRnMessage
 
   {-| A type which was expected to have a fixed runtime representation
@@ -600,6 +605,27 @@ data TcRnMessage where
     :: Name -- ^ type variable being quantified
     -> Name -- ^ function name
     -> LHsSigWcType GhcRn -> TcRnMessage
+
+  {-| TcRnMissingSignature is a warning that occurs when a top-level binding
+      or a pattern synonym does not have a type signature.
+
+      Controlled by the flags:
+        -Wmissing-signatures
+        -Wmissing-exported-signatures
+        -Wmissing-pattern-synonym-signatures
+        -Wmissing-exported-pattern-synonym-signatures
+        -Wmissing-kind-signatures
+
+      Test cases:
+        T11077 (top-level bindings)
+        T12484 (pattern synonyms)
+        T19564 (kind signatures)
+  -}
+  TcRnMissingSignature :: MissingSignature
+                       -> Exported
+                       -> Bool -- ^ True: -Wmissing-signatures overrides -Wmissing-exported-signatures,
+                               --     or -Wmissing-pattern-synonym-signatures overrides -Wmissing-exported-pattern-synonym-signatures
+                       -> TcRnMessage
 
   {-| TcRnPolymorphicBinderMissingSig is a warning controlled by -Wmissing-local-signatures
       that occurs when a local polymorphic binding lacks a type signature.
@@ -1825,6 +1851,29 @@ associatedTyNotParamOverLastTyVar :: Maybe TyCon -> AssociatedTyNotParamOverLast
 associatedTyNotParamOverLastTyVar (Just tc) = YesAssociatedTyNotParamOverLastTyVar tc
 associatedTyNotParamOverLastTyVar Nothing   = NoAssociatedTyNotParamOverLastTyVar
 
+-- | What kind of thing is missing a type signature?
+--
+-- Used for reporting @"missing signature"@ warnings, see
+-- 'tcRnMissingSignature'.
+data MissingSignature
+  = MissingTopLevelBindingSig Name Type
+  | MissingPatSynSig PatSyn
+  | MissingTyConKindSig
+      TyCon
+      Bool -- ^ whether -XCUSKs is enabled
+
+-- | Is the object we are dealing with exported or not?
+--
+-- Used for reporting @"missing signature"@ warnings, see
+-- 'TcRnMissingSignature'.
+data Exported
+  = IsNotExported
+  | IsExported
+
+instance Outputable Exported where
+  ppr IsNotExported = text "IsNotExported"
+  ppr IsExported    = text "IsExported"
+
 --------------------------------------------------------------------------------
 -- Errors used in GHC.Tc.Errors
 
@@ -1854,7 +1903,7 @@ See 'GHC.Tc.Errors.Types.SolverReport' and 'GHC.Tc.Errors.mkErrorReport'.
 -- See Note [Error report] for details.
 data SolverReport
   = SolverReport
-  { sr_important_msgs :: [ReportWithCtxt]
+  { sr_important_msgs :: [SolverReportWithCtxt]
   , sr_supplementary  :: [SolverReportSupplementary]
   , sr_hints          :: [GhcHint]
   }
@@ -1868,15 +1917,15 @@ data SolverReportSupplementary
   | SupplementaryHoleFits ValidHoleFits
   | SupplementaryCts      [(PredType, RealSrcSpan)]
 
--- | A 'TcReportMsg', together with context (e.g. enclosing implication constraints)
+-- | A 'TcSolverReportMsg', together with context (e.g. enclosing implication constraints)
 -- that are needed in order to report it.
-data ReportWithCtxt =
-  ReportWithCtxt
-    { reportContext :: ReportErrCtxt
+data SolverReportWithCtxt =
+  SolverReportWithCtxt
+    { reportContext :: SolverReportErrCtxt
        -- ^ Context for what we wish to report.
        -- This can change as we enter implications, so is
        -- stored alongside the content.
-    , reportContent :: TcReportMsg
+    , reportContent :: TcSolverReportMsg
       -- ^ The content of the message to report.
     }
 
@@ -1888,9 +1937,9 @@ instance Monoid SolverReport where
     mempty = SolverReport [] [] []
     mappend = (Semigroup.<>)
 
--- | Context needed when reporting a 'TcReportMsg', such as
+-- | Context needed when reporting a 'TcSolverReportMsg', such as
 -- the enclosing implication constraints or whether we are deferring type errors.
-data ReportErrCtxt
+data SolverReportErrCtxt
     = CEC { cec_encl :: [Implication]  -- ^ Enclosing implications
                                        --   (innermost first)
                                        -- ic_skols and givens are tidied, rest are not
@@ -1918,7 +1967,7 @@ data ReportErrCtxt
                                     -- See Note [Suppressing error messages]
       }
 
-getUserGivens :: ReportErrCtxt -> [UserGiven]
+getUserGivens :: SolverReportErrCtxt -> [UserGiven]
 -- One item for each enclosing implication
 getUserGivens (CEC {cec_encl = implics}) = getUserGivensFromImplics implics
 
@@ -1980,7 +2029,7 @@ discardProvCtxtGivens orig givens  -- See Note [discardProvCtxtGivens]
 -- | An error reported after constraint solving.
 -- This is usually, some sort of unsolved constraint error,
 -- but we try to be specific about the precise problem we encountered.
-data TcReportMsg
+data TcSolverReportMsg
   -- NB: this datatype is only a first step in refactoring GHC.Tc.Errors
   -- to use the diagnostic infrastructure (TcRnMessage etc).
   -- If you see possible improvements, please go right ahead!
@@ -1988,7 +2037,7 @@ data TcReportMsg
   -- | Wrap a message with additional information.
   --
   -- Prefer using the 'mkTcReportWithInfo' smart constructor
-  = TcReportWithInfo TcReportMsg (NE.NonEmpty TcReportInfo)
+  = TcReportWithInfo TcSolverReportMsg (NE.NonEmpty TcSolverReportInfo)
 
   -- | Quantified variables appear out of dependency order.
   --
@@ -2174,12 +2223,12 @@ data TcReportMsg
 -- which is then passed on to 'mk_supplementary_ea_msg'.
 data CND_Extra = CND_Extra TypeOrKind Type Type
 
--- | Additional information that can be appended to an existing 'TcReportMsg'.
-data TcReportInfo
+-- | Additional information that can be appended to an existing 'TcSolverReportMsg'.
+data TcSolverReportInfo
   -- NB: this datatype is only a first step in refactoring GHC.Tc.Errors
   -- to use the diagnostic infrastructure (TcRnMessage etc).
   -- It would be better for these constructors to not be so closely tied
-  -- to the constructors of 'TcReportMsg'.
+  -- to the constructors of 'TcSolverReportMsg'.
   -- If you see possible improvements, please go right ahead!
 
   -- | Some type variables remained ambiguous: print them to the user.
@@ -2337,8 +2386,8 @@ data PotentialInstances
   , unifiers :: [ClsInst]
   }
 
--- | Append additional information to a `TcReportMsg`.
-mkTcReportWithInfo :: TcReportMsg -> [TcReportInfo] -> TcReportMsg
+-- | Append additional information to a `TcSolverReportMsg`.
+mkTcReportWithInfo :: TcSolverReportMsg -> [TcSolverReportInfo] -> TcSolverReportMsg
 mkTcReportWithInfo msg []
   = msg
 mkTcReportWithInfo (TcReportWithInfo msg (prev NE.:| prevs)) infos

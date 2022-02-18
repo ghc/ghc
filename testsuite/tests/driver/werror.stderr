@@ -21,7 +21,7 @@ werror.hs:10:1: error: [-Wunused-top-binds (in -Wextra, -Wunused-binds), -Werror
 
 werror.hs:10:1: error: [-Wincomplete-patterns (in -Wextra), -Werror=incomplete-patterns]
     Pattern match(es) are non-exhaustive
-    In an equation for ‘f’: Patterns of type  ‘[a]’ not matched: (_:_)
+    In an equation for ‘f’: Patterns of type ‘[a]’ not matched: (_:_)
 
 werror.hs:11:1: error: [-Woverlapping-patterns (in -Wdefault), -Werror=overlapping-patterns]
     Pattern match is redundant

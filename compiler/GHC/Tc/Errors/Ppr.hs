@@ -29,6 +29,7 @@ import GHC.Core.InstEnv
 import GHC.Core.TyCo.Rep (Type(..))
 import GHC.Core.TyCo.Ppr (pprWithExplicitKindsWhen,
                           pprSourceTyCon, pprTyVars, pprWithTYPE)
+import GHC.Core.PatSyn ( patSynName, pprPatSynType )
 import GHC.Core.Predicate
 import GHC.Core.Type
 
@@ -91,7 +92,7 @@ instance Diagnostic TcRnMessage where
              -> messageWithInfoDiagnosticMessage unit_state err_info (diagnosticMessage msg)
     TcRnSolverReport msgs _ _
       -> mkDecorated $
-           map pprReportWithCtxt msgs
+           map pprSolverReportWithCtxt msgs
     TcRnRedundantConstraints redundants (info, show_info)
       -> mkSimpleDecorated $
          text "Redundant constraint" <> plural redundants <> colon
@@ -101,7 +102,7 @@ instance Diagnostic TcRnMessage where
       -> mkSimpleDecorated $
          hang (text "Inaccessible code in")
            2 (ppr (ic_info implic))
-         $$ vcat (map pprReportWithCtxt (NE.toList contras))
+         $$ vcat (map pprSolverReportWithCtxt (NE.toList contras))
     TcRnTypeDoesNotHaveFixedRuntimeRep ty prov (ErrInfo extra supplementary)
       -> mkDecorated [pprTypeDoesNotHaveFixedRuntimeRep ty prov, extra, supplementary]
     TcRnImplicitLift id_or_name ErrInfo{..}
@@ -230,6 +231,24 @@ instance Diagnostic TcRnMessage where
            hang (text "Can't quantify over" <+> quotes (ppr n))
                 2 (hang (text "bound by the partial type signature:")
                         2 (ppr fn_name <+> dcolon <+> ppr hs_ty))
+    TcRnMissingSignature what _ _ ->
+      mkSimpleDecorated $
+      case what of
+        MissingPatSynSig p ->
+          hang (text "Pattern synonym with no type signature:")
+            2 (text "pattern" <+> pprPrefixName (patSynName p) <+> dcolon <+> pprPatSynType p)
+        MissingTopLevelBindingSig name ty ->
+          hang (text "Top-level binding with no type signature:")
+            2 (pprPrefixName name <+> dcolon <+> pprSigmaType ty)
+        MissingTyConKindSig tc cusks_enabled ->
+          hang msg
+            2 (text "type" <+> pprPrefixName (tyConName tc) <+> dcolon <+> pprKind (tyConKind tc))
+          where
+            msg | cusks_enabled
+                = text "Top-level type constructor with no standalone kind signature or CUSK:"
+                | otherwise
+                = text "Top-level type constructor with no standalone kind signature:"
+
     TcRnPolymorphicBinderMissingSig n ty
       -> mkSimpleDecorated $
            sep [ text "Polymorphic local binding with no type signature:"
@@ -701,6 +720,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnPartialTypeSigBadQuantifier{}
       -> ErrorWithoutFlag
+    TcRnMissingSignature what exported overridden
+      -> WarningWithFlag $ missingSignatureWarningFlag what exported overridden
     TcRnPolymorphicBinderMissingSig{}
       -> WarningWithFlag Opt_WarnMissingLocalSignatures
     TcRnOverloadedSig{}
@@ -936,6 +957,8 @@ instance Diagnostic TcRnMessage where
     TcRnPartialTypeSigTyVarMismatch{}
       -> noHints
     TcRnPartialTypeSigBadQuantifier{}
+      -> noHints
+    TcRnMissingSignature {}
       -> noHints
     TcRnPolymorphicBinderMissingSig{}
       -> noHints
@@ -1230,6 +1253,23 @@ formatExportItemError exportedThing reason =
        , quotes exportedThing
        , text reason ]
 
+-- | What warning flag is associated with the given missing signature?
+missingSignatureWarningFlag :: MissingSignature -> Exported -> Bool -> WarningFlag
+missingSignatureWarningFlag (MissingTopLevelBindingSig {}) exported overridden
+  | IsExported <- exported
+  , not overridden
+  = Opt_WarnMissingExportedSignatures
+  | otherwise
+  = Opt_WarnMissingSignatures
+missingSignatureWarningFlag (MissingPatSynSig {}) exported overridden
+  | IsExported <- exported
+  , not overridden
+  = Opt_WarnMissingExportedPatternSynonymSignatures
+  | otherwise
+  = Opt_WarnMissingPatternSynonymSignatures
+missingSignatureWarningFlag (MissingTyConKindSig {}) _ _
+  = Opt_WarnMissingKindSignatures
+
 useDerivingStrategies :: GhcHint
 useDerivingStrategies =
   useExtensionInOrderTo (text "to pick a different strategy") LangExt.DerivingStrategies
@@ -1439,11 +1479,11 @@ derivErrDiagnosticMessage cls cls_tys mb_strat newtype_deriving pprHerald = \cas
 
 {- *********************************************************************
 *                                                                      *
-              Outputable ReportErrCtxt (for debugging)
+              Outputable SolverReportErrCtxt (for debugging)
 *                                                                      *
 **********************************************************************-}
 
-instance Outputable ReportErrCtxt where
+instance Outputable SolverReportErrCtxt where
   ppr (CEC { cec_binds              = bvar
            , cec_defer_type_errors  = dte
            , cec_expr_holes         = eh
@@ -1464,34 +1504,34 @@ instance Outputable ReportErrCtxt where
 
 {- *********************************************************************
 *                                                                      *
-                    Outputting TcReportMsg errors
+                    Outputting TcSolverReportMsg errors
 *                                                                      *
 **********************************************************************-}
 
--- | Pretty-print a 'ReportWithCtxt', containing a 'TcReportMsg'
--- with its enclosing 'ReportErrCtxt'.
-pprReportWithCtxt :: ReportWithCtxt -> SDoc
-pprReportWithCtxt (ReportWithCtxt { reportContext = ctxt, reportContent = msg })
-   = pprTcReportMsg ctxt msg
+-- | Pretty-print a 'SolverReportWithCtxt', containing a 'TcSolverReportMsg'
+-- with its enclosing 'SolverReportErrCtxt'.
+pprSolverReportWithCtxt :: SolverReportWithCtxt -> SDoc
+pprSolverReportWithCtxt (SolverReportWithCtxt { reportContext = ctxt, reportContent = msg })
+   = pprTcSolverReportMsg ctxt msg
 
--- | Pretty-print a 'TcReportMsg', with its enclosing 'ReportErrCtxt'.
-pprTcReportMsg :: ReportErrCtxt -> TcReportMsg -> SDoc
-pprTcReportMsg ctxt (TcReportWithInfo msg (info :| infos)) =
+-- | Pretty-print a 'TcSolverReportMsg', with its enclosing 'SolverReportErrCtxt'.
+pprTcSolverReportMsg :: SolverReportErrCtxt -> TcSolverReportMsg -> SDoc
+pprTcSolverReportMsg ctxt (TcReportWithInfo msg (info :| infos)) =
   vcat
-    ( pprTcReportMsg ctxt msg
-    : pprTcReportInfo ctxt info
-    : map (pprTcReportInfo ctxt) infos )
-pprTcReportMsg _ (BadTelescope telescope skols) =
+    ( pprTcSolverReportMsg ctxt msg
+    : pprTcSolverReportInfo ctxt info
+    : map (pprTcSolverReportInfo ctxt) infos )
+pprTcSolverReportMsg _ (BadTelescope telescope skols) =
   hang (text "These kind and type variables:" <+> ppr telescope $$
        text "are out of dependency order. Perhaps try this ordering:")
     2 (pprTyVars sorted_tvs)
   where
     sorted_tvs = scopedSort skols
-pprTcReportMsg _ (UserTypeError ty) =
+pprTcSolverReportMsg _ (UserTypeError ty) =
   pprUserTypeErrorTy ty
-pprTcReportMsg ctxt (ReportHoleError hole err) =
+pprTcSolverReportMsg ctxt (ReportHoleError hole err) =
   pprHoleError ctxt hole err
-pprTcReportMsg _ (CannotUnifyWithPolytype ct tv1 ty2) =
+pprTcSolverReportMsg _ (CannotUnifyWithPolytype ct tv1 ty2) =
   vcat [ (if isSkolemTyVar tv1
           then text "Cannot equate type variable"
           else text "Cannot instantiate unification variable")
@@ -1500,7 +1540,7 @@ pprTcReportMsg _ (CannotUnifyWithPolytype ct tv1 ty2) =
   where
     what = text $ levelString $
            ctLocTypeOrKind_maybe (ctLoc ct) `orElse` TypeLevel
-pprTcReportMsg _
+pprTcSolverReportMsg _
   (Mismatch { mismatch_ea = add_ea
             , mismatch_ct = ct
             , mismatch_ty1 = ty1
@@ -1547,7 +1587,7 @@ pprTcReportMsg _
     add_space s1 s2 | null s1   = s2
                     | null s2   = s1
                     | otherwise = s1 ++ (' ' : s2)
-pprTcReportMsg _
+pprTcSolverReportMsg _
   (KindMismatch { kmismatch_what     = thing
                 , kmismatch_expected = exp
                 , kmismatch_actual   = act })
@@ -1563,7 +1603,7 @@ pprTcReportMsg _
               | otherwise       = text "kind" <+> quotes (ppr exp)
 
 
-pprTcReportMsg ctxt
+pprTcSolverReportMsg ctxt
   (TypeEqMismatch { teq_mismatch_ppr_explicit_kinds = ppr_explicit_kinds
                   , teq_mismatch_ct  = ct
                   , teq_mismatch_ty1 = ty1
@@ -1589,17 +1629,17 @@ pprTcReportMsg ctxt
             , quotes (pprWithTYPE act) ]
       | Just nargs_msg <- num_args_msg
       , Right ea_msg <- mk_ea_msg ctxt (Just ct) level orig
-      = nargs_msg $$ pprTcReportMsg ctxt ea_msg
+      = nargs_msg $$ pprTcSolverReportMsg ctxt ea_msg
       | -- pprTrace "check" (ppr ea_looks_same $$ ppr exp $$ ppr act $$ ppr ty1 $$ ppr ty2) $
         ea_looks_same ty1 ty2 exp act
       , Right ea_msg <- mk_ea_msg ctxt (Just ct) level orig
-      = pprTcReportMsg ctxt ea_msg
+      = pprTcSolverReportMsg ctxt ea_msg
       -- The mismatched types are /inside/ exp and act
       | let mismatch_err = Mismatch False ct ty1 ty2
             errs = case mk_ea_msg ctxt Nothing level orig of
               Left ea_info -> [ mkTcReportWithInfo mismatch_err ea_info ]
               Right ea_err -> [ mismatch_err, ea_err ]
-      = vcat $ map (pprTcReportMsg ctxt) errs
+      = vcat $ map (pprTcSolverReportMsg ctxt) errs
 
     ct_loc = ctLoc ct
     orig   = ctOrigin ct
@@ -1620,7 +1660,7 @@ pprTcReportMsg ctxt
              n | n > 0   -- we don't know how many args there are, so don't
                          -- recommend removing args that aren't
                , Just thing <- mb_thing
-               -> Just $ pprTcReportMsg ctxt (ExpectingMoreArguments n thing)
+               -> Just $ pprTcSolverReportMsg ctxt (ExpectingMoreArguments n thing)
              _ -> Nothing
 
       _ -> Nothing
@@ -1628,7 +1668,7 @@ pprTcReportMsg ctxt
     maybe_num_args_msg = num_args_msg `orElse` empty
 
     count_args ty = count isVisibleBinder $ fst $ splitPiTys ty
-pprTcReportMsg _ (FixedRuntimeRepError origs_and_tys) =
+pprTcSolverReportMsg _ (FixedRuntimeRepError origs_and_tys) =
   let
     -- Assemble the error message: pair up each origin with the corresponding type, e.g.
     --   • FixedRuntimeRep origin msg 1 ...
@@ -1643,7 +1683,7 @@ pprTcReportMsg _ (FixedRuntimeRepError origs_and_tys) =
              ,nest 2 $ ppr ty <+> dcolon <+> pprWithTYPE (typeKind ty)]
   in
     vcat $ map (uncurry combine_origin_ty) origs_and_tys
-pprTcReportMsg _ (SkolemEscape ct implic esc_skols) =
+pprTcSolverReportMsg _ (SkolemEscape ct implic esc_skols) =
   let
     esc_doc = sep [ text "because" <+> what <+> text "variable" <> plural esc_skols
                 <+> pprQuotedList esc_skols
@@ -1664,40 +1704,40 @@ pprTcReportMsg _ (SkolemEscape ct implic esc_skols) =
   where
     what = text $ levelString $
            ctLocTypeOrKind_maybe (ctLoc ct) `orElse` TypeLevel
-pprTcReportMsg _ (UntouchableVariable tv implic)
+pprTcSolverReportMsg _ (UntouchableVariable tv implic)
   | Implic { ic_given = given, ic_info = skol_info } <- implic
   = sep [ quotes (ppr tv) <+> text "is untouchable"
         , nest 2 $ text "inside the constraints:" <+> pprEvVarTheta given
         , nest 2 $ text "bound by" <+> ppr skol_info
         , nest 2 $ text "at" <+>
           ppr (getLclEnvLoc (ic_env implic)) ]
-pprTcReportMsg _ (BlockedEquality ct) =
+pprTcSolverReportMsg _ (BlockedEquality ct) =
   vcat [ hang (text "Cannot use equality for substitution:")
            2 (ppr (ctPred ct))
        , text "Doing so would be ill-kinded." ]
-pprTcReportMsg _ (ExpectingMoreArguments n thing) =
+pprTcSolverReportMsg _ (ExpectingMoreArguments n thing) =
   text "Expecting" <+> speakN (abs n) <+>
     more <+> quotes (ppr thing)
   where
     more
      | n == 1    = text "more argument to"
      | otherwise = text "more arguments to" -- n > 1
-pprTcReportMsg ctxt (UnboundImplicitParams (ct :| cts)) =
+pprTcSolverReportMsg ctxt (UnboundImplicitParams (ct :| cts)) =
   let givens = getUserGivens ctxt
   in if null givens
      then addArising (ctOrigin ct) $
             sep [ text "Unbound implicit parameter" <> plural preds
                 , nest 2 (pprParendTheta preds) ]
-     else pprTcReportMsg ctxt (CouldNotDeduce givens (ct :| cts) Nothing)
+     else pprTcSolverReportMsg ctxt (CouldNotDeduce givens (ct :| cts) Nothing)
   where
     preds = map ctPred (ct : cts)
-pprTcReportMsg ctxt (CouldNotDeduce useful_givens (ct :| others) mb_extra)
+pprTcSolverReportMsg ctxt (CouldNotDeduce useful_givens (ct :| others) mb_extra)
   = main_msg $$
      case supplementary of
       Left infos
-        -> vcat (map (pprTcReportInfo ctxt) infos)
+        -> vcat (map (pprTcSolverReportInfo ctxt) infos)
       Right other_msg
-        -> pprTcReportMsg ctxt other_msg
+        -> pprTcSolverReportMsg ctxt other_msg
   where
     main_msg
       | null useful_givens
@@ -1725,21 +1765,21 @@ pprTcReportMsg ctxt (CouldNotDeduce useful_givens (ct :| others) mb_extra)
       = text "Could not deduce" <+> pprParendType wanted
       | otherwise
       = text "Could not deduce:" <+> pprTheta wanteds
-pprTcReportMsg ctxt (AmbiguityPreventsSolvingCt ct ambigs) =
-  pprTcReportInfo ctxt (Ambiguity True ambigs) <+>
+pprTcSolverReportMsg ctxt (AmbiguityPreventsSolvingCt ct ambigs) =
+  pprTcSolverReportInfo ctxt (Ambiguity True ambigs) <+>
   pprArising (ctOrigin ct) $$
   text "prevents the constraint" <+> quotes (pprParendType $ ctPred ct)
   <+> text "from being solved."
-pprTcReportMsg ctxt@(CEC {cec_encl = implics})
+pprTcSolverReportMsg ctxt@(CEC {cec_encl = implics})
   (CannotResolveInstance ct unifiers candidates imp_errs suggs binds)
   =
     vcat
-      [ pprTcReportMsg ctxt no_inst_msg
+      [ pprTcSolverReportMsg ctxt no_inst_msg
       , nest 2 extra_note
       , mb_patsyn_prov `orElse` empty
       , ppWhen (has_ambigs && not (null unifiers && null useful_givens))
         (vcat [ ppUnless lead_with_ambig $
-                  pprTcReportInfo ctxt (Ambiguity False (ambig_kvs, ambig_tvs))
+                  pprTcSolverReportInfo ctxt (Ambiguity False (ambig_kvs, ambig_tvs))
               , pprRelevantBindings binds
               , potential_msg ])
       , ppWhen (isNothing mb_patsyn_prov) $
@@ -1769,7 +1809,7 @@ pprTcReportMsg ctxt@(CEC {cec_encl = implics})
                    && not (null unifiers)
                    && null useful_givens
 
-    no_inst_msg :: TcReportMsg
+    no_inst_msg :: TcSolverReportMsg
     no_inst_msg
       | lead_with_ambig
       = AmbiguityPreventsSolvingCt ct (ambig_kvs, ambig_tvs)
@@ -1826,7 +1866,7 @@ pprTcReportMsg ctxt@(CEC {cec_encl = implics})
       = hang (text "use a standalone 'deriving instance' declaration,")
            2 (text "so you can specify the instance context yourself")
 
-pprTcReportMsg (CEC {cec_encl = implics}) (OverlappingInstances ct matches unifiers) =
+pprTcSolverReportMsg (CEC {cec_encl = implics}) (OverlappingInstances ct matches unifiers) =
   vcat
     [ addArising orig $
         (text "Overlapping instances for"
@@ -1886,7 +1926,7 @@ pprTcReportMsg (CEC {cec_encl = implics}) (OverlappingInstances ct matches unifi
                      Just (clas', tys') -> clas' == clas
                                           && isJust (tcMatchTys tys tys')
                      Nothing -> False
-pprTcReportMsg _ (UnsafeOverlap ct matches unsafe_overlapped) =
+pprTcSolverReportMsg _ (UnsafeOverlap ct matches unsafe_overlapped) =
   vcat [ addArising orig (text "Unsafe overlapping instances for"
                   <+> pprType (mkClassPred clas tys))
        , sep [text "The matching instance is:",
@@ -2093,13 +2133,13 @@ we want to give it a bit of structure.  Here's the plan
 
 {- *********************************************************************
 *                                                                      *
-                    Outputting TcReportInfo
+                    Outputting TcSolverReportInfo
 *                                                                      *
 **********************************************************************-}
 
--- | Pretty-print an informational message, to accompany a 'TcReportMsg'.
-pprTcReportInfo :: ReportErrCtxt -> TcReportInfo -> SDoc
-pprTcReportInfo _ (Ambiguity prepend_msg (ambig_kvs, ambig_tvs)) = msg
+-- | Pretty-print an informational message, to accompany a 'TcSolverReportMsg'.
+pprTcSolverReportInfo :: SolverReportErrCtxt -> TcSolverReportInfo -> SDoc
+pprTcSolverReportInfo _ (Ambiguity prepend_msg (ambig_kvs, ambig_tvs)) = msg
   where
 
     msg |  any isRuntimeUnkSkol ambig_kvs  -- See Note [Runtime skolems]
@@ -2122,21 +2162,21 @@ pprTcReportInfo _ (Ambiguity prepend_msg (ambig_kvs, ambig_tvs)) = msg
       | otherwise -- "The type variable 't0' is ambiguous"
       = text "The" <+> what <+> text "variable" <> plural tkvs
         <+> pprQuotedList tkvs <+> isOrAre tkvs <+> text "ambiguous"
-pprTcReportInfo ctxt (TyVarInfo tv ) =
+pprTcSolverReportInfo ctxt (TyVarInfo tv ) =
   case tcTyVarDetails tv of
     SkolemTv sk_info _ _   -> pprSkols ctxt [(getSkolemInfo sk_info, [tv])]
     RuntimeUnk {} -> quotes (ppr tv) <+> text "is an interactive-debugger skolem"
     MetaTv {}     -> empty
-pprTcReportInfo _ (NonInjectiveTyFam tc) =
+pprTcSolverReportInfo _ (NonInjectiveTyFam tc) =
   text "NB:" <+> quotes (ppr tc)
   <+> text "is a non-injective type family"
-pprTcReportInfo _ (ReportCoercibleMsg msg) =
+pprTcSolverReportInfo _ (ReportCoercibleMsg msg) =
   pprCoercibleMsg msg
-pprTcReportInfo _ (ExpectedActual { ea_expected = exp, ea_actual = act }) =
+pprTcSolverReportInfo _ (ExpectedActual { ea_expected = exp, ea_actual = act }) =
   vcat
     [ text "Expected:" <+> ppr exp
     , text "  Actual:" <+> ppr act ]
-pprTcReportInfo _
+pprTcSolverReportInfo _
   (ExpectedActualAfterTySynExpansion
     { ea_expanded_expected = exp
     , ea_expanded_actual   = act } )
@@ -2144,7 +2184,7 @@ pprTcReportInfo _
       [ text "Type synonyms expanded:"
       , text "Expected type:" <+> ppr exp
       , text "  Actual type:" <+> ppr act ]
-pprTcReportInfo ctxt (WhenMatching cty1 cty2 sub_o mb_sub_t_or_k) =
+pprTcSolverReportInfo ctxt (WhenMatching cty1 cty2 sub_o mb_sub_t_or_k) =
   sdocOption sdocPrintExplicitCoercions $ \printExplicitCoercions ->
     if printExplicitCoercions
        || not (cty1 `pickyEqType` cty2)
@@ -2160,9 +2200,9 @@ pprTcReportInfo ctxt (WhenMatching cty1 cty2 sub_o mb_sub_t_or_k) =
     sub_whats  = text (levelString sub_t_or_k) <> char 's'
     supplementary =
       case mk_supplementary_ea_msg ctxt sub_t_or_k cty1 cty2 sub_o of
-        Left infos -> vcat $ map (pprTcReportInfo ctxt) infos
-        Right msg  -> pprTcReportMsg ctxt msg
-pprTcReportInfo _ (SameOcc same_pkg n1 n2) =
+        Left infos -> vcat $ map (pprTcSolverReportInfo ctxt) infos
+        Right msg  -> pprTcSolverReportMsg ctxt msg
+pprTcSolverReportInfo _ (SameOcc same_pkg n1 n2) =
   text "NB:" <+> (ppr_from same_pkg n1 $$ ppr_from same_pkg n2)
   where
     ppr_from same_pkg nm
@@ -2178,7 +2218,7 @@ pprTcReportInfo _ (SameOcc same_pkg n1 n2) =
         pkg = moduleUnit mod
         mod = nameModule nm
         loc = nameSrcSpan nm
-pprTcReportInfo ctxt (OccursCheckInterestingTyVars (tv :| tvs)) =
+pprTcSolverReportInfo ctxt (OccursCheckInterestingTyVars (tv :| tvs)) =
   hang (text "Type variable kinds:") 2 $
     vcat (map (tyvar_binding . tidyTyCoVarOcc (cec_tidy ctxt))
               (tv:tvs))
@@ -2205,7 +2245,7 @@ pprCoercibleMsg (OutOfScopeNewtypeConstructor tc dc) =
 *                                                                      *
 **********************************************************************-}
 
-pprHoleError :: ReportErrCtxt -> Hole -> HoleError -> SDoc
+pprHoleError :: SolverReportErrCtxt -> Hole -> HoleError -> SDoc
 pprHoleError _ (Hole { hole_ty, hole_occ = occ }) (OutOfScopeHole imp_errs)
   = out_of_scope_msg $$ vcat (map ppr imp_errs)
   where
@@ -2508,7 +2548,7 @@ tidySigSkol env cx ty tv_prs
       | otherwise
       = tidyVarBndr env tv
 
-pprSkols :: ReportErrCtxt -> [(SkolemInfoAnon, [TcTyVar])] -> SDoc
+pprSkols :: SolverReportErrCtxt -> [(SkolemInfoAnon, [TcTyVar])] -> SDoc
 pprSkols ctxt zonked_ty_vars
   =
       let tidy_ty_vars = map (bimap (tidySkolemInfoAnon (cec_tidy ctxt)) id) zonked_ty_vars
@@ -2551,8 +2591,8 @@ skolsSpan skol_tvs = foldr1 combineSrcSpans (map getSrcSpan skol_tvs)
 *                                                                      *
 **********************************************************************-}
 
-mk_supplementary_ea_msg :: ReportErrCtxt -> TypeOrKind
-                        -> Type -> Type -> CtOrigin -> Either [TcReportInfo] TcReportMsg
+mk_supplementary_ea_msg :: SolverReportErrCtxt -> TypeOrKind
+                        -> Type -> Type -> CtOrigin -> Either [TcSolverReportInfo] TcSolverReportMsg
 mk_supplementary_ea_msg ctxt level ty1 ty2 orig
   | TypeEqOrigin { uo_expected = exp, uo_actual = act } <- orig
   , not (ea_looks_same ty1 ty2 exp act)
@@ -2574,7 +2614,7 @@ ea_looks_same ty1 ty2 exp act
       -- when the types really look the same.  However,
       -- (TYPE 'LiftedRep) and Type both print the same way.
 
-mk_ea_msg :: ReportErrCtxt -> Maybe Ct -> TypeOrKind -> CtOrigin -> Either [TcReportInfo] TcReportMsg
+mk_ea_msg :: SolverReportErrCtxt -> Maybe Ct -> TypeOrKind -> CtOrigin -> Either [TcSolverReportInfo] TcSolverReportMsg
 -- Constructs a "Couldn't match" message
 -- The (Maybe Ct) says whether this is the main top-level message (Just)
 --     or a supplementary message (Nothing)

@@ -431,7 +431,7 @@ data TypedThing
 
 -- | Some kind of type variable binder.
 --
--- Used for reporting errors, in 'SkolemInfo' and 'TcReportMsg'.
+-- Used for reporting errors, in 'SkolemInfo' and 'TcSolverReportMsg'.
 data TyVarBndrs
   = forall flag. OutputableBndrFlag flag 'Renamed =>
       HsTyVarBndrsRn [HsTyVarBndr flag GhcRn]
