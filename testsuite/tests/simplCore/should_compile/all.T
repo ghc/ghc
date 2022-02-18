@@ -392,3 +392,10 @@ test('OpaqueNoWW', normal, compile, ['-O -ddump-simpl -dsuppress-uniques'])
 
 test('T21144',  normal, compile, ['-O'])
 
+# Key here is that the argument to ifoldl' is eta-reduced in Core to
+#   `/\m. f @(S m)`
+# which will erase completely in STG
+test('T20040', [ grep_errmsg(r'ifoldl\''), expect_broken(20040) ], compile, ['-O -ddump-stg-final -dno-typeable-binds -dsuppress-all -dsuppress-uniques'])
+
+# Key here is that yes* become visibly trivial due to eta-reduction, while no* are not eta-reduced.
+test('T21261', [ grep_errmsg(r'^(yes|no)') ], compile, ['-O -ddump-simpl -dno-typeable-binds -dsuppress-all -dsuppress-uniques'])

@@ -133,16 +133,24 @@ Key points:
 -}
 
 data SimplCont
-  = Stop                -- Stop[e] = e
-        OutType         -- Type of the <hole>
-        CallCtxt        -- Tells if there is something interesting about
-                        --          the context, and hence the inliner
+  = Stop                -- ^ Stop[e] = e
+        OutType         -- ^ Type of the <hole>
+        CallCtxt        -- ^ Tells if there is something interesting about
+                        --          the syntactic context, and hence the inliner
                         --          should be a bit keener (see interestingCallContext)
                         -- Specifically:
                         --     This is an argument of a function that has RULES
                         --     Inlining the call might allow the rule to fire
                         -- Never ValAppCxt (use ApplyToVal instead)
                         -- or CaseCtxt (use Select instead)
+        SubDemand       -- ^ The evaluation context of e. Tells how e is evaluated.
+                        -- This fuels eta-expansion or eta-reduction without looking
+                        -- at lambda bodies, for example.
+                        --
+                        -- See Note [Eta reduction based on evaluation context]
+                        -- The evaluation context for other SimplConts can be
+                        -- reconstructed with 'contEvalContext'
+
 
   | CastIt              -- (CastIt co K)[e] = K[ e `cast` co ]
         OutCoercion             -- The coercion simplified
@@ -245,7 +253,10 @@ instance Outputable DupFlag where
   ppr Simplified = text "simpl"
 
 instance Outputable SimplCont where
-  ppr (Stop ty interesting) = text "Stop" <> brackets (ppr interesting) <+> ppr ty
+  ppr (Stop ty interesting eval_sd)
+    = text "Stop" <> brackets (sep $ punctuate comma pps) <+> ppr ty
+    where
+      pps = [ppr interesting] ++ [ppr eval_sd | eval_sd /= topSubDmd]
   ppr (CastIt co cont  )    = (text "CastIt" <+> pprOptCo co) $$ ppr cont
   ppr (TickIt t cont)       = (text "TickIt" <+> ppr t) $$ ppr cont
   ppr (ApplyToTy  { sc_arg_ty = ty, sc_cont = cont })
@@ -413,13 +424,15 @@ mkFunRules rs = Just (n_required, rs)
 -}
 
 mkBoringStop :: OutType -> SimplCont
-mkBoringStop ty = Stop ty BoringCtxt
+mkBoringStop ty = Stop ty BoringCtxt topSubDmd
 
-mkRhsStop :: OutType -> SimplCont       -- See Note [RHS of lets] in GHC.Core.Unfold
-mkRhsStop ty = Stop ty RhsCtxt
+mkRhsStop :: OutType -> Demand -> SimplCont       -- See Note [RHS of lets] in GHC.Core.Unfold
+mkRhsStop ty bndr_dmd = Stop ty RhsCtxt (subDemandIfEvaluated bndr_dmd)
 
-mkLazyArgStop :: OutType -> CallCtxt -> SimplCont
-mkLazyArgStop ty cci = Stop ty cci
+mkLazyArgStop :: OutType -> ArgInfo -> SimplCont
+mkLazyArgStop ty fun_info = Stop ty (lazyArgContext fun_info) arg_sd
+  where
+    arg_sd = subDemandIfEvaluated (head (ai_dmds fun_info))
 
 -------------------
 contIsRhsOrArg :: SimplCont -> Bool
@@ -429,9 +442,9 @@ contIsRhsOrArg (StrictArg {})  = True
 contIsRhsOrArg _               = False
 
 contIsRhs :: SimplCont -> Bool
-contIsRhs (Stop _ RhsCtxt) = True
-contIsRhs (CastIt _ k)     = contIsRhs k   -- For f = e |> co, treat e as Rhs context
-contIsRhs _                = False
+contIsRhs (Stop _ RhsCtxt _) = True
+contIsRhs (CastIt _ k)       = contIsRhs k   -- For f = e |> co, treat e as Rhs context
+contIsRhs _                  = False
 
 -------------------
 contIsStop :: SimplCont -> Bool
@@ -458,7 +471,7 @@ contIsTrivial _                                                 = False
 
 -------------------
 contResultType :: SimplCont -> OutType
-contResultType (Stop ty _)                  = ty
+contResultType (Stop ty _ _)                = ty
 contResultType (CastIt _ k)                 = contResultType k
 contResultType (StrictBind { sc_cont = k }) = contResultType k
 contResultType (StrictArg { sc_cont = k })  = contResultType k
@@ -468,7 +481,7 @@ contResultType (ApplyToVal { sc_cont = k }) = contResultType k
 contResultType (TickIt _ k)                 = contResultType k
 
 contHoleType :: SimplCont -> OutType
-contHoleType (Stop ty _)                      = ty
+contHoleType (Stop ty _ _)                    = ty
 contHoleType (TickIt _ k)                     = contHoleType k
 contHoleType (CastIt co _)                    = coercionLKind co
 contHoleType (StrictBind { sc_bndr = b, sc_dup = dup, sc_env = se })
@@ -489,7 +502,7 @@ contHoleType (Select { sc_dup = d, sc_bndr =  b, sc_env = se })
 -- should be scaled if it commutes with E. This appears, in particular, in the
 -- case-of-case transformation.
 contHoleScaling :: SimplCont -> Mult
-contHoleScaling (Stop _ _) = One
+contHoleScaling (Stop _ _ _) = One
 contHoleScaling (CastIt _ k) = contHoleScaling k
 contHoleScaling (StrictBind { sc_bndr = id, sc_cont = k })
   = idMult id `mkMultMul` contHoleScaling k
@@ -534,6 +547,35 @@ contArgs cont
                    -- Do *not* use short-cutting substitution here
                    -- because we want to get as much IdInfo as possible
 
+-- | Describes how the 'SimplCont' will evaluate the hole as a 'SubDemand'.
+-- This can be more insightful than the limited syntactic context that
+-- 'SimplCont' provides, because the 'Stop' constructor might carry a useful
+-- 'SubDemand'.
+-- For example, when simplifying the argument `e` in `f e` and `f` has the
+-- demand signature `<MP(S,A)>`, this function will give you back `P(S,A)` when
+-- simplifying `e`.
+--
+-- PRECONDITION: Don't call with 'ApplyToVal'. We haven't thoroughly thought
+-- about what to do then and no call sites so far seem to care.
+contEvalContext :: SimplCont -> SubDemand
+contEvalContext k = case k of
+  (Stop _ _ sd)              -> sd
+  (TickIt _ k)               -> contEvalContext k
+  (CastIt _ k)               -> contEvalContext k
+  ApplyToTy{sc_cont=k}       -> contEvalContext k
+    --  ApplyToVal{sc_cont=k}      -> mkCalledOnceDmd $ contEvalContext k
+    -- Not 100% sure that's correct, . Here's an example:
+    --   f (e x) and f :: <SCS(C1(L))>
+    -- then what is the evaluation context of 'e' when we simplify it? E.g.,
+    --   simpl e (ApplyToVal x $ Stop "CS(C1(L))")
+    -- then it *should* be "C1(CS(C1(L))", so perhaps correct after all.
+    -- But for now we just panic:
+  ApplyToVal{}               -> pprPanic "contEvalContext" (ppr k)
+  StrictArg{sc_fun=fun_info} -> subDemandIfEvaluated (head (ai_dmds fun_info))
+  StrictBind{sc_bndr=bndr}   -> subDemandIfEvaluated (idDemandInfo bndr)
+  Select{}                   -> topSubDmd
+    -- Perhaps reconstruct the demand on the scrutinee by looking at field
+    -- and case binder dmds, see addCaseBndrDmd. No priority right now.
 
 -------------------
 mkArgInfo :: SimplEnv
@@ -552,7 +594,7 @@ mkArgInfo env fun rules n_val_args call_cont
             , ai_discs = vanilla_discounts }
   | otherwise
   = ArgInfo { ai_fun   = fun
-            , ai_args = []
+            , ai_args  = []
             , ai_rules = fun_rules
             , ai_encl  = interestingArgContext rules call_cont
             , ai_dmds  = add_type_strictness (idType fun) arg_dmds
@@ -749,7 +791,7 @@ interestingCallContext env cont
 
     interesting (StrictArg { sc_fun = fun }) = strictArgContext fun
     interesting (StrictBind {})              = BoringCtxt
-    interesting (Stop _ cci)                 = cci
+    interesting (Stop _ cci _)               = cci
     interesting (TickIt _ k)                 = interesting k
     interesting (ApplyToTy { sc_cont = k })  = interesting k
     interesting (CastIt _ k)                 = interesting k
@@ -800,8 +842,8 @@ interestingArgContext rules call_cont
     go (StrictArg { sc_fun = fun }) = ai_encl fun
     go (StrictBind {})              = False      -- ??
     go (CastIt _ c)                 = go c
-    go (Stop _ RuleArgCtxt)         = True
-    go (Stop _ _)                   = False
+    go (Stop _ RuleArgCtxt _)       = True
+    go (Stop _ _ _)                 = False
     go (TickIt _ c)                 = go c
 
 {- Note [Interesting arguments]
@@ -1611,6 +1653,10 @@ mkLam env bndrs body cont
   where
     mode = getMode env
 
+    -- See Note [Eta reduction based on evaluation context]
+    -- NB: cont is never ApplyToVal, otherwise contEvalContext panics
+    eval_sd = contEvalContext cont
+
     mkLam' :: DynFlags -> [OutBndr] -> OutExpr -> SimplM OutExpr
     mkLam' dflags bndrs body@(Lam {})
       = mkLam' dflags (bndrs ++ bndrs1) body1
@@ -1633,7 +1679,8 @@ mkLam env bndrs body cont
 
     mkLam' dflags bndrs body
       | gopt Opt_DoEtaReduction dflags
-      , Just etad_lam <- {-# SCC "tryee" #-} tryEtaReduce bndrs body
+      -- , pprTrace "try eta" (ppr bndrs $$ ppr body $$ ppr cont $$ ppr eval_sd) True
+      , Just etad_lam <- {-# SCC "tryee" #-} tryEtaReduce bndrs body eval_sd
       = do { tick (EtaReduction (head bndrs))
            ; return etad_lam }
 
