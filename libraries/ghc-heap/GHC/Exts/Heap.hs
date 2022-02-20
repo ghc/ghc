@@ -1,13 +1,10 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE UnboxedTuples #-}
 
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeInType #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE ExplicitForAll #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE UnliftedFFITypes #-}
 
@@ -157,7 +154,7 @@ getClosureDataFromHeapObject x = do
             let infoTablePtr = Ptr infoTableAddr
                 ptrList = [case indexArray# pointersArray i of
                                 (# ptr #) -> Box ptr
-                            | I# i <- [0..(I# (sizeofArray# pointersArray)) - 1]
+                            | I# i <- [0..I# (sizeofArray# pointersArray) - 1]
                             ]
 
             infoTable <- peekItbl infoTablePtr
@@ -204,7 +201,7 @@ getClosureDataFromHeapRepPrim getConDesc decodeCCS itbl heapRep pts = do
         rawHeapWords :: [Word]
         rawHeapWords = [W# (indexWordArray# heapRep i) | I# i <- [0.. end] ]
             where
-            nelems = (I# (sizeofByteArray# heapRep)) `div` wORD_SIZE
+            nelems = I# (sizeofByteArray# heapRep) `div` wORD_SIZE
             end = fromIntegral nelems - 1
 
         -- Just the payload of rawHeapWords (no header).
@@ -236,7 +233,7 @@ getClosureDataFromHeapRepPrim getConDesc decodeCCS itbl heapRep pts = do
                 fail "Expected at least 1 ptr argument to AP"
             -- We expect at least the arity, n_args, and fun fields
             unless (length payloadWords >= 2) $
-                fail $ "Expected at least 2 raw words to AP"
+                fail "Expected at least 2 raw words to AP"
             let splitWord = payloadWords !! 0
             pure $ APClosure itbl
 #if defined(WORDS_BIGENDIAN)
