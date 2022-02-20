@@ -315,14 +315,6 @@ hs_cmpxchg64(StgWord x, StgWord64 old, StgWord64 new)
   return __sync_val_compare_and_swap((volatile StgWord64 *) x, old, new);
 }
 
-extern StgWord hs_cmpxchg2_32(StgWord x, StgWord old_l, StgWord old_h, StgWord new_l, StgWord new_h);
-StgWord
-hs_cmpxchg2_64(StgWord x, StgWord old_l, StgWord old_h, StgWord new_l, StgWord new_h)
-{
-  return __atomic_compare_exchange((__int128 *)x, (__int128 *)&old_l, (__int128 *)&new_l, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
-}
-
-
 // Atomic exchange operations
 
 extern StgWord hs_xchg8(StgWord x, StgWord val);

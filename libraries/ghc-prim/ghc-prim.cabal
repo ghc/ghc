@@ -73,7 +73,7 @@ Library
     if os(linux)
         -- we need libm, but for musl and other's we might need libc, as libm
         -- is just an empty shell.
-        extra-libraries: c, m, atomic
+        extra-libraries: c, m
 
     c-sources:
         cbits/atomic.c

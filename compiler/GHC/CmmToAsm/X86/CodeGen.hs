@@ -2758,23 +2758,44 @@ genCCall' _ is32Bit target dest_regs args bid = do
         _ -> panic "genCCall: Wrong number of arguments/results for imul2"
     (PrimTarget (MO_Cmpxchg2 width), [res_lo, res_hi]) ->
         case args of
-        [dst, old_lo, old_hi, new_lo, new_hi] -> do
-          Amode amode code_dst <- getSimpleAmode is32Bit dst
-          let format = intFormat width
-              cmpxchg = if width == W32 then CMPXCHG8B else CMPXCHG16B
-              reg_res_lo = getRegisterReg platform (CmmLocal res_lo)
-              reg_res_hi = getRegisterReg platform (CmmLocal res_hi)
-              code_res = toOL [ LOCK $ cmpxchg amode
-                              , MOV format (OpReg eax) (OpReg reg_res_lo)
-                              , MOV format (OpReg edx) (OpReg reg_res_hi)
-                              ]
-          code_old_lo <- getAnyReg old_lo
-          code_old_hi <- getAnyReg old_hi
-          code_new_lo <- getAnyReg new_lo
-          code_new_hi <- getAnyReg new_hi
-          return $ code_dst `appOL` code_new_lo ebx `appOL` code_new_hi ecx
-            `appOL` code_old_lo eax `appOL` code_old_hi edx
-            `appOL` code_res
+        [dst, old_lo, old_hi, new_lo, new_hi]
+          | is32Bit -> do
+              Amode amode code_dst <- getSimpleAmode True dst
+              let format = intFormat width
+                  reg_res_lo = getRegisterReg platform (CmmLocal res_lo)
+                  reg_res_hi = getRegisterReg platform (CmmLocal res_hi)
+                  code_res = toOL [ LOCK $ CMPXCHG8B amode
+                                  , MOV format (OpReg eax) (OpReg reg_res_lo)
+                                  , MOV format (OpReg edx) (OpReg reg_res_hi)
+                                  ]
+              (reg_old_lo, code_old_lo) <- getSomeReg old_lo
+              (reg_old_hi, code_old_hi) <- getSomeReg old_hi
+              (reg_new_lo, code_new_lo) <- getSomeReg new_lo
+              (reg_new_hi, code_new_hi) <- getSomeReg new_hi
+              let move_to_regs = toOL [ MOV format (OpReg reg_new_lo) (OpReg ebx)
+                                      , MOV format (OpReg reg_new_hi) (OpReg ecx)
+                                      , MOV format (OpReg reg_old_lo) (OpReg eax)
+                                      , MOV format (OpReg reg_old_hi) (OpReg edx)
+                                      ]
+              return $ code_dst `appOL` code_new_lo `appOL` code_new_hi
+                `appOL` code_old_lo `appOL` code_old_hi `appOL` move_to_regs
+                `appOL` code_res
+          | otherwise -> do
+              Amode amode code_dst <- getAmode dst
+              let format = intFormat width
+                  reg_res_lo = getRegisterReg platform (CmmLocal res_lo)
+                  reg_res_hi = getRegisterReg platform (CmmLocal res_hi)
+                  code_res = toOL [ LOCK $ CMPXCHG16B amode
+                                  , MOV format (OpReg rax) (OpReg reg_res_lo)
+                                  , MOV format (OpReg rdx) (OpReg reg_res_hi)
+                                  ]
+              code_old_lo <- getAnyReg old_lo
+              code_old_hi <- getAnyReg old_hi
+              code_new_lo <- getAnyReg new_lo
+              code_new_hi <- getAnyReg new_hi
+              return $ code_dst `appOL` code_new_lo rbx `appOL` code_new_hi rcx
+                `appOL` code_old_lo rax `appOL` code_old_hi rdx
+                `appOL` code_res
 
         _ -> panic "genCCall: Wrong number of arguments/results for cmpxchg(8|16)b"
 

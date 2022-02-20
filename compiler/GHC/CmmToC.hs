@@ -1000,7 +1000,7 @@ pprCallishMachOp_for_C mop
     where unsupported = panic ("pprCallishMachOp_for_C: " ++ show mop
                             ++ " not supported!")
           dontReach64 = panic ("pprCallishMachOp_for_C: " ++ show mop
-                           ++ " should be not be encountered because the regular primop for this 64-bit operation is used instead.")
+                            ++ " should be not be encountered because the regular primop for this 64-bit operation is used instead.")
 
 -- ---------------------------------------------------------------------
 -- Useful #defines

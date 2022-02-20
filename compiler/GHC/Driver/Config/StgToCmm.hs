@@ -51,6 +51,7 @@ initStgToCmmConfig dflags mod = StgToCmmConfig
   , stgToCmmAllowExtendedAddSubInstrs = (ncg && (x86ish || ppc)) || llvm
   , stgToCmmAllowIntMul2Instr         = (ncg && x86ish) || llvm
   , stgToCmmAllowFabsInstrs           = (ncg && (x86ish || ppc || aarch64)) || llvm
+  , stgToCmmAllowCmpxchg2Instrs       = ncg && x86ish
   -- SIMD flags
   , stgToCmmVecInstrsErr  = vec_err
   , stgToCmmAvx           = isAvxEnabled                   dflags
