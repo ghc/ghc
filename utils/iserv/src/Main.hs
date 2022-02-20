@@ -25,7 +25,6 @@ import Text.Printf
 import Foreign.Ptr (wordPtrToPtr)
 # if defined(__IO_MANAGER_WINIO__)
 import GHC.IO.SubSystem ((<!>))
-import GHC.IO.Handle.Windows (handleToHANDLE)
 import GHC.Event.Windows (associateHandle')
 # endif
 #endif
