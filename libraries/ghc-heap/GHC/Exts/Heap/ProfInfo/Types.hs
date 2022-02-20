@@ -9,7 +9,7 @@ import GHC.Generics
 -- | This is a somewhat faithful representation of StgTSOProfInfo. See
 -- <https://gitlab.haskell.org/ghc/ghc/blob/master/rts/include/rts/storage/TSO.h>
 -- for more details on this data structure.
-data StgTSOProfInfo = StgTSOProfInfo {
+newtype StgTSOProfInfo = StgTSOProfInfo {
     cccs :: Maybe CostCentreStack
 } deriving (Show, Generic, Eq, Ord)
 
