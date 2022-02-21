@@ -2057,7 +2057,9 @@ substForAllCoBndrUsingLC sym sco (LC subst lc_env) tv co
 ty_co_subst :: LiftingContext -> Role -> Type -> Coercion
 ty_co_subst !lc role ty
     -- !lc: making this function strict in lc allows callers to
-    -- pass its two components separately, rather than boxing them
+    -- pass its two components separately, rather than boxing them.
+    -- Unfortunately, Boxity Analysis concludes that we need lc boxed
+    -- because it's used that way in liftCoSubstTyVarBndrUsing.
   = go role ty
   where
     go :: Role -> Type -> Coercion

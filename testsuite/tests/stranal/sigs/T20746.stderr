@@ -1,18 +1,21 @@
 
 ==================== Strictness signatures ====================
-HyperStrUse.$trModule:
-HyperStrUse.f: <1!P(1!P(L),A)><1L>
+Foo.$trModule:
+Foo.f: <MP(A,MCM(L),A)><L>
+Foo.foogle: <L><L>
 
 
 
 ==================== Cpr signatures ====================
-HyperStrUse.$trModule:
-HyperStrUse.f: 1
+Foo.$trModule:
+Foo.f: 1
+Foo.foogle: 1
 
 
 
 ==================== Strictness signatures ====================
-HyperStrUse.$trModule:
-HyperStrUse.f: <1!P(1!P(L),A)><1L>
+Foo.$trModule:
+Foo.f: <MP(A,MCM(L),A)><L>
+Foo.foogle: <L><L>
 
 

@@ -9,6 +9,6 @@ mightThrow n = return n
 -- we don't do worker/wrapper at all
 f :: Bool -> (Int, Int, Int) -> IO (Int, Int, Int)
 f False trp = f True trp
-f True trp@(a,b,c) = do
+f True trp@(~(a,b,c)) = do
   _ <- mightThrow a -- this potentially throwing IO action should not force unboxing of trp
-  return trp
+  return $! trp

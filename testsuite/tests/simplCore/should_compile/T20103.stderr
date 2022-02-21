@@ -11,7 +11,7 @@ lvl = GHC.Types.I# 28#
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 lvl1 :: Int
 [GblId, Unf=OtherCon []]
-lvl1 = GHC.Types.I# 8#
+lvl1 = GHC.Types.I# 7#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 lvl2 :: Int
@@ -75,7 +75,7 @@ lvl10 = GHC.Types.I# 12#
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 lvl11 :: Int
 [GblId, Unf=OtherCon []]
-lvl11 = GHC.Types.I# 7#
+lvl11 = GHC.Types.I# 8#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 lvl12 :: Int
@@ -100,7 +100,7 @@ lvl15 = GHC.CString.unpackCString# lvl14
 
 -- RHS size: {terms: 6, types: 5, coercions: 4, joins: 0/0}
 lvl16 :: CallStack -> ([Char], SrcLoc)
-[GblId, Arity=1, Str=<S>b, Cpr=b, Unf=OtherCon []]
+[GblId, Arity=1, Str=<S!S>b, Cpr=b, Unf=OtherCon []]
 lvl16
   = \ (wild1 :: CallStack) ->
       GHC.List.head1
@@ -115,7 +115,7 @@ T20103.$wfoo [InlPrag=[2], Occ=LoopBreaker]
   :: HasCallStack => GHC.Prim.Int# -> GHC.Prim.Int#
 [GblId[StrictWorker([!, ~])],
  Arity=2,
- Str=<1L><1L>,
+ Str=<SL><1L>,
  Unf=OtherCon []]
 T20103.$wfoo
   = \ ($dIP

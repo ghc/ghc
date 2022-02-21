@@ -1,5 +1,6 @@
 # Only compile with optimisation
-setTestOpts( only_ways(['optasm']) )
+setTestOpts( only_ways(['optasm']))
+setTestOpts( extra_hc_opts('-dno-debug-output') )
 
 test('default', normal, compile, [''])
 test('fact', normal, compile, [''])
@@ -77,8 +78,8 @@ test('T19882b', normal, compile, [''])
 # We want that the 'go' joinrec in the unfolding has been worker/wrappered.
 # So we simply grep for 'jump $wgo' and hope we find more than 2 call sites:
 test('T20510', [ grep_errmsg(r'jump \$wgo') ], compile, ['-dsuppress-uniques -ddump-exitify'])
-test('T20746', normal, compile, ['-dsuppress-uniques -ddump-simpl'])
-test('T20746b', normal, compile, ['-dsuppress-uniques -ddump-simpl -dno-typeable-binds'])
 test('T20817', [ grep_errmsg(r'Str') ], compile, ['-dsuppress-uniques -ddump-stranal'])
 # T21150: Check that t{,1,2} haven't been inlined.
 test('T21150', [ grep_errmsg(r'( t\d? :: Int)') ], compile, ['-dsuppress-uniques -ddump-exitify'])
+# T21128: Check that y is not reboxed in $wtheresCrud
+test('T21128', [ grep_errmsg(r'let { y = I\#') ], multimod_compile, ['T21128', '-v0 -dsuppress-uniques -dsuppress-all -ddump-simpl'])

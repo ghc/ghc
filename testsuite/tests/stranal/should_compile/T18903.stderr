@@ -50,13 +50,13 @@ T18903.h1 = GHC.Types.I# 0#
 h :: Int -> Int
 [GblId,
  Arity=1,
- Str=<1!P(SL)>,
+ Str=<1P(SL)>,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [20] 217 10}]
 h = \ (m :: Int) ->
       case m of wild { GHC.Types.I# ds ->
       let {
-        $wg [InlPrag=NOINLINE, Dmd=MCM(!P(M!L,1!L))]
+        $wg [InlPrag=NOINLINE, Dmd=MCM(!P(M!P(L),1!P(L)))]
           :: GHC.Prim.Int# -> (# Int, Int #)
         [LclId, Arity=1, Str=<1L>, Unf=OtherCon []]
         $wg
