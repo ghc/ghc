@@ -67,6 +67,9 @@ import qualified Data.Set as Set
 import GHC.Unit.Module
 import GHC.Linker.Static.Utils
 
+import Data.Bifunctor
+import Data.Either
+
 -- | A '@ModuleGraphNode@' is a node in the '@ModuleGraph@'.
 -- Edges between nodes mark dependencies arising from module imports
 -- and dependencies arising from backpack instantiations.
@@ -318,11 +321,35 @@ nodeDependencies drop_hs_boot_nodes = \case
     drop_hs_boot (NodeKey_Module (ModNodeKeyWithUid (GWIB mn IsBoot) uid)) = (NodeKey_Module (ModNodeKeyWithUid (GWIB mn hs_boot_key) uid))
     drop_hs_boot x = x
 
-moduleGraphNodes :: Bool -> [ModuleGraphNode]
+-- | Turn a list of graph nodes into an efficient queriable graph.
+-- The first boolean parameter indicates whether nodes corresponding to hs-boot files
+-- should be collapsed into their relevant hs nodes.
+moduleGraphNodes :: Bool
+  -> [ModuleGraphNode]
   -> (Graph SummaryNode, NodeKey -> Maybe SummaryNode)
 moduleGraphNodes drop_hs_boot_nodes summaries =
   (graphFromEdgedVerticesUniq nodes, lookup_node)
   where
+    -- Map from module to extra boot summary dependencies which need to be merged in
+    (boot_summaries, nodes) = bimap Map.fromList id $ partitionEithers (map go numbered_summaries)
+
+      where
+        go (s, key) =
+          case s of
+                ModuleNode __deps ms | isBootSummary ms == IsBoot, drop_hs_boot_nodes
+                  -- Using nodeDependencies here converts dependencies on other
+                  -- boot files to dependencies on dependencies on non-boot files.
+                  -> Left (ms_mod ms, nodeDependencies drop_hs_boot_nodes s)
+                _ -> normal_case
+          where
+           normal_case =
+              let lkup_key = ms_mod <$> moduleGraphNodeModSum s
+                  extra = (lkup_key >>= \key -> Map.lookup key boot_summaries)
+
+              in Right $ DigraphNode s key $ out_edge_keys $
+                      (fromMaybe [] extra
+                        ++ nodeDependencies drop_hs_boot_nodes s)
+
     numbered_summaries = zip summaries [1..]
 
     lookup_node :: NodeKey -> Maybe SummaryNode
@@ -337,17 +364,6 @@ moduleGraphNodes drop_hs_boot_nodes summaries =
                    | node <- nodes
                    , let s = summaryNodeSummary node
                    ]
-
-    -- We use integers as the keys for the SCC algorithm
-    nodes :: [SummaryNode]
-    nodes = [ DigraphNode s key $ out_edge_keys $ nodeDependencies drop_hs_boot_nodes s
-            | (s, key) <- numbered_summaries
-             -- Drop the hi-boot ones if told to do so
-            , case s of
-                InstantiationNode {} -> True
-                LinkNode {} -> True
-                ModuleNode _ ms -> not $ isBootSummary ms == IsBoot && drop_hs_boot_nodes
-            ]
 
     out_edge_keys :: [NodeKey] -> [Int]
     out_edge_keys = mapMaybe lookup_key
