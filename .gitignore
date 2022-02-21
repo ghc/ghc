@@ -51,8 +51,8 @@ confdefs.h
 stage0
 stage1
 stage2
-_build
-_validatebuild
+# Ignore _build, _validatebuild and any other custom build directories headed by _
+_*
 */generated/
 */ghc-stage1
 .shake.*
