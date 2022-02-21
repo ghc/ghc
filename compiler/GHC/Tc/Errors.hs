@@ -1,13 +1,11 @@
 
 {-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE NamedFieldPuns      #-}
-{-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections       #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
-{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ParallelListComp #-}
 
 module GHC.Tc.Errors(
@@ -86,10 +84,9 @@ import Control.Monad    ( unless, when, foldM, forM_ )
 import Data.Foldable    ( toList )
 import Data.Functor     ( (<&>) )
 import Data.Function    ( on )
-import Data.List        ( partition, sort )
+import Data.List        ( partition, sort, sortBy )
 import Data.List.NonEmpty ( NonEmpty(..), (<|) )
 import qualified Data.List.NonEmpty as NE ( map, reverse )
-import Data.List        ( sortBy )
 import Data.Ord         ( comparing )
 import qualified Data.Semigroup as S
 

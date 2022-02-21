@@ -537,8 +537,7 @@ mkFastString str =
 -- The following rule is used to avoid polluting the non-reclaimable FastString
 -- table with transient strings when we only want their encoding.
 {-# RULES
-"bytesFS/mkFastString" forall x. bytesFS (mkFastString x) = utf8EncodeString x
-#-}
+"bytesFS/mkFastString" forall x. bytesFS (mkFastString x) = utf8EncodeString x #-}
 
 -- | Creates a 'FastString' from a UTF-8 encoded @[Word8]@
 mkFastStringByteList :: [Word8] -> FastString

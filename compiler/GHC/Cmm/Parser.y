@@ -214,7 +214,6 @@ import GHC.Platform
 import GHC.Platform.Profile
 
 import GHC.StgToCmm.ExtCode
-import GHC.StgToCmm.Prof
 import GHC.StgToCmm.Heap
 import GHC.StgToCmm.Monad hiding ( getCode, getCodeR, getCodeScoped, emitLabel, emit
                                  , emitStore, emitAssign, emitOutOfLine, withUpdFrameOff

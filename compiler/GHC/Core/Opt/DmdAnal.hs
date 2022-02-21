@@ -1946,8 +1946,7 @@ If we make the dictionary strict then WW can fire turning this into:
 Which *usually* performs better. However if the dictionary is known we
 are far more likely to inline a function applied to the dictionary than
 to inline one applied to a function. Sometimes this makes just enough
-of a difference to stop a function from inlining. This is documented in
-#18421.
+of a difference to stop a function from inlining. This is documented in #18421.
 
 It's somewhat similar to Note [Do not unbox class dictionaries] although
 here our problem is with the inliner, not the specializer.

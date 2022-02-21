@@ -1,5 +1,4 @@
 {-# LANGUAGE CPP, ScopedTypeVariables, TypeFamilies #-}
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DataKinds #-}
 
 module GHC.Stg.Utils

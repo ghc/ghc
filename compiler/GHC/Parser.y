@@ -6,11 +6,8 @@
 --
 -- Author(s): Simon Marlow, Sven Panne 1997, 1998, 1999
 -- ---------------------------------------------------------------------------
-
 {
-{-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
@@ -47,8 +44,6 @@ import Data.Maybe       ( maybeToList )
 import Data.List.NonEmpty ( NonEmpty(..) )
 import qualified Data.List.NonEmpty as NE
 import qualified Prelude -- for happy-generated code
-
-import GHC.Prelude
 
 import GHC.Hs
 

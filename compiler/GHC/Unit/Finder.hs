@@ -5,7 +5,6 @@
 
 
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE MultiWayIf #-}
 
 -- | Module finder
 module GHC.Unit.Finder (

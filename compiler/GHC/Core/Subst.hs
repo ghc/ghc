@@ -748,8 +748,7 @@ This time the call stack looked something like:
 and the rule was
 
 {-# RULES
-"transpose/overlays1" forall xs. transpose (overlays1 xs) = overlays1 (fmap transpose xs)
-#-}
+"transpose/overlays1" forall xs. transpose (overlays1 xs) = overlays1 (fmap transpose xs) #-}
 
 This rule was attached to `transpose`, but also mentions itself in the RHS so we have
 to be careful to not force the `IdInfo` for transpose when dealing with the RHS of the rule.

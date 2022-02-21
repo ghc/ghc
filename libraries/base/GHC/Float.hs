@@ -1612,6 +1612,4 @@ foreign import prim "stg_doubleToWord64zh"
   forall x. naturalToFloat# (NS x) = word2Float# x
 
 "Word# -> Natural -> Double#"
-  forall x. naturalToDouble# (NS x) = word2Double# x
-
-#-}
+  forall x. naturalToDouble# (NS x) = word2Double# x #-}

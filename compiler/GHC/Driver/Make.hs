@@ -2,8 +2,6 @@
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE NondecreasingIndentation #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
@@ -16,9 +14,9 @@
 {-# LANGUAGE GeneralisedNewtypeDeriving #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ApplicativeDo #-}
-{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE RecordWildCards #-}
 
 -- -----------------------------------------------------------------------------
 --
@@ -2437,7 +2435,7 @@ R.hs:        module R where
                 g = ...f...
 ```
 
-## Why we need to rehydrate A's ModIface before compiling R.hs
+== Why we need to rehydrate A's ModIface before compiling R.hs
 
 After compiling A.hs we'll have a TypeEnv in which the Id for `f` has a type
 type uses the AbstractTyCon T; and a TyCon for `S` that also mentions that same
@@ -2457,7 +2455,7 @@ Now `S` will be bound to a thunk that, when forced, will "see" the final binding
 for `T`; see [Tying the knot](https://gitlab.haskell.org/ghc/ghc/-/wikis/commentary/compiler/tying-the-knot).
 But note that this must be done *before* compiling R.hs.
 
-## Why we need to rehydrate A's ModIface after compiling R.hs
+== Why we need to rehydrate A's ModIface after compiling R.hs
 
 When compiling R.hs, the knot-tying stuff above will ensure that `f`'s unfolding
 mentions the `LocalId` for `g`.  But when we finish R, we carefully ensure that
@@ -2468,7 +2466,7 @@ subsequent modules that import A will see a crippled unfolding for `f`.
 
 Solution: rehydrate both R and A's ModIface together, right after completing R.hs.
 
-## Which modules to rehydrate
+~~ Which modules to rehydrate
 
 We only need rehydrate modules that are
 * Below R.hs
@@ -2477,7 +2475,7 @@ We only need rehydrate modules that are
 There might be many unrelated modules (in the home package) that don't need to be
 rehydrated.
 
-## Modules "above" the loop
+== Modules "above" the loop
 
 This dark corner is the subject of #14092.
 

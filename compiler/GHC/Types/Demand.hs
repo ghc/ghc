@@ -215,8 +215,7 @@ Here are reasons for too much optimism:
  * Note [lubBoxity and plusBoxity] describes why we optimistically let Unboxed
    win when combining different case alternatives.
 
-Boxity analysis fixes a number of issues:
-#19871, #19407, #4267, #16859, #18907, #13331
+Boxity analysis fixes a number of issues: #19871, #19407, #4267, #16859, #18907, #13331
 
 Note [Function body boxity and call sites]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

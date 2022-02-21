@@ -420,7 +420,6 @@ rewriteApp True (StgApp f []) = do
                 then setIdTagSig f (TagSig TagProper)
                 else f
     return $! StgApp f' []
-  where
 rewriteApp _ (StgApp f args)
     -- | pprTrace "rewriteAppOther" (ppr f <+> ppr args) False
     -- = undefined

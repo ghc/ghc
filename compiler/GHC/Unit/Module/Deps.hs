@@ -400,13 +400,13 @@ it would recompile nearly every module in your project, just to update this info
 Now, we are a bit more careful about what we store and
 explicitly store transitive information only if it is really needed.
 
-# Direct Information
+~ Direct Information
 
 * dep_direct_mods - Directly imported home package modules
 * dep_direct_pkgs - Directly imported packages
 * dep_plgins      - Directly used plugins
 
-# Transitive Information
+~ Transitive Information
 
 Some features of the compiler require transitive information about what is currently
 being compiled, so that is explicitly stored separately in the form they need.

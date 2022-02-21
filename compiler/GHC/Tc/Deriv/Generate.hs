@@ -70,11 +70,10 @@ import GHC.Builtin.Types.Prim
 import GHC.Builtin.Types
 import GHC.Core.Type
 import GHC.Core.Class
-import GHC.Types.Unique.FM ( lookupUFM )
+import GHC.Types.Unique.FM ( lookupUFM, listToUFM )
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Utils.Misc
-import GHC.Types.Unique.FM ( listToUFM )
 import GHC.Types.Var
 import GHC.Utils.Outputable
 import GHC.Utils.Panic

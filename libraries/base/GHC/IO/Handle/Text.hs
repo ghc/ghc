@@ -551,7 +551,7 @@ lazyBuffersToString CRLF = loop '\0' where
 --  * 'isPermissionError' if another system resource limit would be exceeded.
 
 hPutChar :: Handle -> Char -> IO ()
-hPutChar handle !c = do
+hPutChar handle !c =
     wantWritableHandle "hPutChar" handle $ \ handle_  ->
       hPutcBuffered handle_ c
 

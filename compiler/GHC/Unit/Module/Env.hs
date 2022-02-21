@@ -1,4 +1,3 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 -- | Module environment
 module GHC.Unit.Module.Env
    ( -- * Module mappings

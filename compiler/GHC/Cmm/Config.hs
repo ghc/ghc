@@ -1,7 +1,6 @@
 -- | Cmm compilation configuration
 
 {-# LANGUAGE DerivingStrategies         #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module GHC.Cmm.Config
   ( CmmConfig(..)
