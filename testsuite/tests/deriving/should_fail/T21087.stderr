@@ -1,0 +1,4 @@
+
+T21087.hs:11:25: error:
+    • Class ‘KnownNat’ does not support user-specified instances.
+    • In the stand-alone deriving instance for ‘KnownNat Z’

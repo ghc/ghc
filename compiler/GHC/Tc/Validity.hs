@@ -1385,21 +1385,24 @@ check_special_inst_head dflags is_boot is_sig ctxt clas cls_args
   , not is_boot
   = failWithTc (TcRnAbstractClassInst clas)
 
-  -- For Typeable, don't complain about instances for
-  -- standalone deriving; they are no-ops, and we warn about
-  -- it in GHC.Tc.Deriv.deriveStandalone.
+  -- Complain about hand-written instances of built-in classes
+  -- Typeable, KnownNat, KnownSymbol, Coercible, HasField.
+
+  -- Disallow hand-written Typeable instances, except that we
+  -- allow a standalone deriving declaration: they are no-ops,
+  -- and we warn about them in GHC.Tc.Deriv.deriveStandalone.
   | clas_nm == typeableClassName
   , not is_sig
     -- Note [Instances of built-in classes in signature files]
   , hand_written_bindings
   = failWithTc $ TcRnSpecialClassInst clas False
 
-  -- Handwritten instances of KnownNat/KnownSymbol
-  -- are forbidden outside of signature files (#12837)
-  | clas_nm `elem` [ knownNatClassName, knownSymbolClassName ]
-  , not is_sig
+  -- Handwritten instances of KnownNat/KnownChar/KnownSymbol
+  -- are forbidden outside of signature files (#12837).
+  -- Derived instances are forbidden completely (#21087).
+  | clas_nm `elem` [ knownNatClassName, knownSymbolClassName, knownCharClassName ]
+  , (not is_sig && hand_written_bindings) || derived_instance
     -- Note [Instances of built-in classes in signature files]
-  , hand_written_bindings
   = failWithTc $ TcRnSpecialClassInst clas False
 
   -- For the most part we don't allow
@@ -1438,12 +1441,18 @@ check_special_inst_head dflags is_boot is_sig ctxt clas cls_args
     ty_args = filterOutInvisibleTypes (classTyCon clas) cls_args
 
     hand_written_bindings
-        = case ctxt of
-            InstDeclCtxt stand_alone -> not stand_alone
-            SpecInstCtxt             -> False
-            DerivClauseCtxt          -> False
-            SigmaCtxt                -> False
-            _                        -> True
+      = case ctxt of
+          InstDeclCtxt standalone -> not standalone
+          SpecInstCtxt            -> False
+          DerivClauseCtxt         -> False
+          SigmaCtxt               -> False
+          _                       -> True
+
+    derived_instance
+      = case ctxt of
+            InstDeclCtxt standalone -> standalone
+            DerivClauseCtxt         -> True
+            _                       -> False
 
     check_h98_arg_shape = case ctxt of
                             SpecInstCtxt    -> False
