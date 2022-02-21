@@ -1,0 +1,133 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 137, types: 92, coercions: 4, joins: 0/0}
+
+lvl = "error"#
+
+lvl1 = unpackCString# lvl
+
+$trModule4 = "main"#
+
+lvl2 = unpackCString# $trModule4
+
+$trModule2 = "T21128a"#
+
+lvl3 = unpackCString# $trModule2
+
+lvl4 = "./T21128a.hs"#
+
+lvl5 = unpackCString# lvl4
+
+lvl6 = I# 4#
+
+lvl7 = I# 20#
+
+lvl8 = I# 25#
+
+lvl9 = SrcLoc lvl2 lvl3 lvl5 lvl6 lvl7 lvl6 lvl8
+
+lvl10 = PushCallStack lvl1 lvl9 EmptyCallStack
+
+$windexError
+  = \ @a @b ww eta eta1 eta2 ->
+      error
+        (lvl10 `cast` <Co:4> :: CallStack ~R# (?callStack::CallStack))
+        (++ (ww eta) (++ (ww eta1) (ww eta2)))
+
+indexError
+  = \ @a @b $dShow eta eta1 eta2 ->
+      case $dShow of { C:Show ww ww1 ww2 ->
+      $windexError ww1 eta eta1 eta2
+      }
+
+$trModule3 = TrNameS $trModule4
+
+$trModule1 = TrNameS $trModule2
+
+$trModule = Module $trModule3 $trModule1
+
+$wlvl
+  = \ ww ww1 ww2 ->
+      $windexError $fShowInt_$cshow (I# ww2) (I# ww1) (I# ww)
+
+index
+  = \ l u i ->
+      case l of { I# x ->
+      case i of { I# y ->
+      case <=# x y of {
+        __DEFAULT -> case u of { I# ww -> $wlvl y ww x };
+        1# ->
+          case u of { I# y1 ->
+          case <# y y1 of {
+            __DEFAULT -> $wlvl y y1 x;
+            1# -> I# (-# y x)
+          }
+          }
+      }
+      }
+      }
+
+
+
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 108, types: 47, coercions: 0, joins: 3/4}
+
+$trModule4 = "main"#
+
+$trModule3 = TrNameS $trModule4
+
+$trModule2 = "T21128"#
+
+$trModule1 = TrNameS $trModule2
+
+$trModule = Module $trModule3 $trModule1
+
+i = I# 1#
+
+l = I# 0#
+
+lvl = \ y -> $windexError $fShowInt_$cshow l y l
+
+lvl1 = \ ww y -> $windexError $fShowInt_$cshow (I# ww) y i
+
+$wtheresCrud
+  = \ ww ww1 ->
+      let { y = I# ww1 } in
+      join {
+        lvl2
+          = case <=# ww 1# of {
+              __DEFAULT -> case lvl1 ww y of wild { };
+              1# ->
+                case <# 1# ww1 of {
+                  __DEFAULT -> case lvl1 ww y of wild { };
+                  1# -> -# 1# ww
+                }
+            } } in
+      join {
+        lvl3
+          = case <# 0# ww1 of {
+              __DEFAULT -> case lvl y of wild { };
+              1# -> 0#
+            } } in
+      joinrec {
+        $wgo ww2
+          = case ww2 of wild {
+              __DEFAULT -> jump $wgo (-# wild 1#);
+              0# -> jump lvl3;
+              1# -> jump lvl2
+            }; } in
+      jump $wgo ww
+
+theresCrud
+  = \ x y ->
+      case x of { I# ww ->
+      case y of { I# ww1 ->
+      case $wtheresCrud ww ww1 of ww2 { __DEFAULT -> I# ww2 }
+      }
+      }
+
+
+

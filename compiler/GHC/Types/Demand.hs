@@ -19,7 +19,7 @@ module GHC.Types.Demand (
     Boxity(..),
     Card(C_00, C_01, C_0N, C_10, C_11, C_1N), CardNonAbs, CardNonOnce,
     Demand(AbsDmd, BotDmd, (:*)),
-    SubDemand(Prod, Poly), mkProd, viewProd, unboxSubDemand,
+    SubDemand(Prod, Poly), mkProd, viewProd,
     -- ** Algebra
     absDmd, topDmd, botDmd, seqDmd, topSubDmd,
     -- *** Least upper bound
@@ -37,10 +37,13 @@ module GHC.Types.Demand (
     -- *** Demands used in PrimOp signatures
     lazyApply1Dmd, lazyApply2Dmd, strictOnceApply1Dmd, strictManyApply1Dmd,
     -- ** Other @Demand@ operations
-    oneifyCard, oneifyDmd, strictifyDmd, strictifyDictDmd, mkWorkerDemand,
+    oneifyCard, oneifyDmd, strictifyDmd, strictifyDictDmd, lazifyDmd,
     peelCallDmd, peelManyCalls, mkCalledOnceDmd, mkCalledOnceDmds,
+    mkWorkerDemand,
     -- ** Extracting one-shot information
     argOneShots, argsOneShots, saturatedByOneShots,
+    -- ** Manipulating Boxity of a Demand
+    unboxDeeplyDmd,
 
     -- * Demand environments
     DmdEnv, emptyDmdEnv,
@@ -182,7 +185,6 @@ demand analysis in order to determine whether the box of a strict argument is
 always discarded in the function body, in which case we can pass it unboxed
 without risking regressions such as in 'ann' above. But as soon as one use needs
 the box, we want Boxed to win over any Unboxed uses.
-(We don't adhere to that in 'lubBoxity', see Note [lubBoxity and plusBoxity].)
 
 The demand signature (cf. Note [Demand notation]) will say whether it uses
 its arguments boxed or unboxed. Indeed it does so for every sub-component of
@@ -212,8 +214,9 @@ Here are reasons for too much optimism:
    Note [Unboxed demand on function bodies returning small products] derives
    a heuristic from the former Note, pretending that all call sites of a
    function need returned small products Unboxed.
- * Note [lubBoxity and plusBoxity] describes why we optimistically let Unboxed
-   win when combining different case alternatives.
+ * Note [Boxity for bottoming functions] in DmdAnal makes all bottoming
+   functions unbox their arguments, incurring reboxing in code paths that will
+   diverge anyway. In turn we get more unboxing in hot code paths.
 
 Boxity analysis fixes a number of issues: #19871, #19407, #4267, #16859, #18907, #13331
 
@@ -296,7 +299,7 @@ flags (Options f x) = <huge> `seq` f
 and here we won't unbox 'f' because it has 5 fields (which is larger than the
 default -fdmd-unbox-width threshold).
 
-Why not focus on putting Unboxed demands on all recursive function?
+Why not focus on putting Unboxed demands on *all recursive* function?
 Then we'd unbox
 ```
 flags 0 (Options f x) = <huge> `seq` f
@@ -306,62 +309,77 @@ and that seems hardly useful.
 (NB: Similar to 'f' from Note [Preserving Boxity of results is rarely a win],
 but there we only had 2 fields.)
 
-Note [lubBoxity and plusBoxity]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Should 'Boxed' win in 'lubBoxity' and 'plusBoxity'?
-The first intuition is Yes, because that would be the conservative choice:
-Responding 'Boxed' when there's the slightest chance we might need the box means
-we'll never need to rebox a value.
-
-For 'plusBoxity' the choice of 'boxedWins' is clear: When we need a value to be
-Boxed and Unboxed /in the same trace/, then we clearly need it to be Boxed.
-
-But if we chose 'boxedWins' for 'lubBoxity', we'd regress T3586. Smaller example
+What about the Boxity of *fields* of a small, returned box? Consider
 ```
 sumIO :: Int -> Int -> IO Int
-sumIO 0 !z = return z
+sumIO 0 !z = return z     -- What DmdAnal sees: sumIO 0 z s = z `seq` (# s, z #)
 sumIO n !z = sumIO (n-1) (z+n)
 ```
 We really want 'z' to unbox here. Yet its use in the returned unboxed pair
 is fundamentally a Boxed one! CPR would manage to unbox it, but DmdAnal runs
 before that. There is an Unboxed use in the recursive call to 'go' though.
-So we choose 'unboxedWins' for 'lubBoxity' to collect this win.
+But 'IO Int' returns a small product, and 'Int' is a small product itself.
+So we'll put the RHS of 'sumIO' under sub-demand '!P(L,L!P(L))', indicating that
+*if* we evaluate 'z', we don't need the box later on. And indeed the bang will
+evaluate `z`, so we conclude with a total demand of `1!P(L)` on `z` and unbox
+it.
 
-Choosing 'unboxedWins' is not conservative. There clearly is ample room for
-examples that get worse by our choice. Here's a simple one (from T19871):
-```
-data Huge = H { f1 :: Bool, ... many fields ... }
-update :: Huge -> (Bool, Huge)
-update h@(Huge{f1=True}) = (False, h{f1=False})
-update h                 = (True,  h)
-```
-Here, we decide to unbox 'h' because it's used Unboxed in the first branch.
+Unlike for recursive functions, where we can often speed up the loop by
+unboxing at the cost of a bit of reboxing in the base case, the wins for
+non-recursive functions quickly turn into losses when unboxing too deeply.
+That happens in T11545, T18109 and T18174. Therefore, we deeply unbox recursive
+function bodies but only shallowly unbox non-recursive function bodies (governed
+by the max_depth variable).
 
-Another real-life example (c.f. !7182) is in the code compiled for
-GHC.Core.Unify.  Here the two mutually-recursive functions:
-  * `unify_ty` takes its UMEnv argument boxed, but
-  * `uVar` takes its UMEnv argument unboxed.
-So the UMEnv ends up getting reboxed every time around the loop.
+The implementation is in 'GHC.Core.Opt.DmdAnal.unboxWhenSmall'. It is quite
+vital, guarding for regressions in test cases like #2387, #3586, #16040, #5075
+and #19871.
 
 Note that this is fundamentally working around a phase problem, namely that the
 results of boxity analysis depend on CPR analysis (and vice versa, of course).
+
+Note [unboxedWins]
+~~~~~~~~~~~~~~~~~~
+We used to use '_unboxedWins' below in 'lubBoxity', which was too optimistic.
+
+While it worked around some shortcomings of the phase separation between Boxity
+analysis and CPR analysis, it was a gross hack which caused regressions itself
+that needed all kinds of fixes and workarounds. Examples (from #21119):
+
+  * As #20767 says, L and B were no longer top and bottom of our lattice
+  * In #20746 we unboxed huge Handle types that were never needed boxed in the
+    first place. See Note [deferAfterPreciseException].
+  * It also caused unboxing of huge records where we better shouldn't, for
+    example in T19871.absent.
+  * It became impossible to work with when implementing !7599, mostly due to the
+    chaos that results from #20767.
+
+Conclusion: We should use 'boxedWins' in 'lubBoxity', #21119.
+Fortunately, we could come up with a number of better mechanisms to make up for
+the sometimes huge regressions that would have otherwise incured:
+
+1. A beefed up Note [Unboxed demand on function bodies returning small products]
+   that works recursively fixes most regressions. It's a bit unsound, but
+   pretty well-behaved.
+2. We saw bottoming functions spoil boxity in some less severe cases and
+   countered that with Note [Boxity for bottoming functions].
+
 -}
 
 boxedWins :: Boxity -> Boxity -> Boxity
 boxedWins Unboxed Unboxed = Unboxed
 boxedWins _       !_      = Boxed
 
-unboxedWins :: Boxity -> Boxity -> Boxity
-unboxedWins Boxed Boxed = Boxed
-unboxedWins _     !_    = Unboxed
+_unboxedWins :: Boxity -> Boxity -> Boxity
+-- See Note [unboxedWins]
+_unboxedWins Boxed Boxed = Boxed
+_unboxedWins _     !_    = Unboxed
 
 lubBoxity :: Boxity -> Boxity -> Boxity
 -- See Note [Boxity analysis] for the lattice.
--- See Note [lubBoxity and plusBoxity].
-lubBoxity = unboxedWins
+lubBoxity = boxedWins
 
 plusBoxity :: Boxity -> Boxity -> Boxity
--- See Note [lubBoxity and plusBoxity].
 plusBoxity = boxedWins
 
 {-
@@ -674,11 +692,11 @@ data SubDemand
   = Poly !Boxity !CardNonOnce
   -- ^ Polymorphic demand, the denoted thing is evaluated arbitrarily deep,
   -- with the specified cardinality at every level. The 'Boxity' applies only
-  -- to the outer evaluation context; inner evaluation context can be regarded
-  -- as 'Boxed'. See Note [Boxity in Poly] for why we want it to carry 'Boxity'.
+  -- to the outer evaluation context as well as all inner evaluation context.
+  -- See Note [Boxity in Poly] for why we want it to carry 'Boxity'.
   -- Expands to 'Call' via 'viewCall' and to 'Prod' via 'viewProd'.
   --
-  -- @Poly b n@ is semantically equivalent to @Prod b [n :* Poly Boxed n, ...]@
+  -- @Poly b n@ is semantically equivalent to @Prod b [n :* Poly b n, ...]
   -- or @Call n (Poly Boxed n)@. 'viewCall' and 'viewProd' do these rewrites.
   --
   -- In Note [Demand notation]: @L  === P(L,L,...)@  and @L  === CL(L)@,
@@ -722,27 +740,28 @@ seqSubDmd = Poly Unboxed C_00
 
 -- | The uniform field demand when viewing a 'Poly' as a 'Prod', as in
 -- 'viewProd'.
-polyFieldDmd :: CardNonOnce -> Demand
-polyFieldDmd C_00 = AbsDmd
-polyFieldDmd C_10 = BotDmd
-polyFieldDmd C_0N = topDmd
-polyFieldDmd n    = C_1N :* Poly Boxed C_1N & assertPpr (isCardNonOnce n) (ppr n)
+polyFieldDmd :: Boxity -> CardNonOnce -> Demand
+polyFieldDmd _     C_00 = AbsDmd
+polyFieldDmd _     C_10 = BotDmd
+polyFieldDmd Boxed C_0N = topDmd
+polyFieldDmd b     n    = n :* Poly b n & assertPpr (isCardNonOnce n) (ppr n)
 
 -- | A smart constructor for 'Prod', applying rewrite rules along the semantic
 -- equality @Prod b [n :* Poly Boxed n, ...] === Poly b n@, simplifying to
 -- 'Poly' 'SubDemand's when possible. Examples:
 --
 --   * Rewrites @P(L,L)@ (e.g., arguments @Boxed@, @[L,L]@) to @L@
---   * Rewrites @!P(L,L)@ (e.g., arguments @Unboxed@, @[L,L]@) to @!L@
---   * Does not rewrite @P(1L)@, @P(L!L)@ or @P(L,A)@
+--   * Rewrites @!P(L!L,L!L)@ (e.g., arguments @Unboxed@, @[L!L,L!L]@) to @!L@
+--   * Does not rewrite @P(1L)@, @P(L!L)@, @!P(L)@ or @P(L,A)@
 --
 mkProd :: Boxity -> [Demand] -> SubDemand
 mkProd b ds
   | all (== AbsDmd) ds = Poly b C_00
   | all (== BotDmd) ds = Poly b C_10
-  | dmd@(n :* Poly Boxed m):_ <- ds  -- don't rewrite P(L!L)
-  , n == m                           -- don't rewrite P(1L)
-  , all (== dmd) ds                  -- don't rewrite P(L,A)
+  | dmd@(n :* Poly b2 m):_ <- ds
+  , n == m           -- don't rewrite P(SL)  to S
+  , b == b2          -- don't rewrite P(S!S) to !S
+  , all (== dmd) ds  -- don't rewrite P(L,A) to L
   = Poly b n
   | otherwise          = Prod b ds
 
@@ -756,7 +775,7 @@ viewProd n (Prod b ds)
 -- Note the strict application to replicate: This makes sure we don't allocate
 -- a thunk for it, inlines it and lets case-of-case fire at call sites.
 viewProd n (Poly b card)
-  | let !ds = replicate n $! polyFieldDmd card
+  | let !ds = replicate n $! polyFieldDmd b card
   = Just (b, ds)
 viewProd _ _
   = Nothing
@@ -785,11 +804,17 @@ absDmd = AbsDmd
 botDmd = BotDmd
 seqDmd = C_11 :* seqSubDmd
 
--- | Sets 'Boxity' to 'Unboxed' for non-'Call' sub-demands.
-unboxSubDemand :: SubDemand -> SubDemand
-unboxSubDemand (Poly _ n)  = Poly Unboxed n
-unboxSubDemand (Prod _ ds) = mkProd Unboxed ds
-unboxSubDemand sd@Call{}   = sd
+-- | Sets 'Boxity' to 'Unboxed' for non-'Call' sub-demands and recurses into 'Prod'.
+unboxDeeplySubDmd :: SubDemand -> SubDemand
+unboxDeeplySubDmd (Poly _ n)  = Poly Unboxed n
+unboxDeeplySubDmd (Prod _ ds) = mkProd Unboxed (strictMap unboxDeeplyDmd ds)
+unboxDeeplySubDmd call@Call{} = call
+
+-- | Sets 'Boxity' to 'Unboxed' for the 'Demand', recursing into 'Prod's.
+unboxDeeplyDmd :: Demand -> Demand
+unboxDeeplyDmd AbsDmd   = AbsDmd
+unboxDeeplyDmd BotDmd   = BotDmd
+unboxDeeplyDmd (D n sd) = D n (unboxDeeplySubDmd sd)
 
 -- | Denotes '∪' on 'SubDemand'.
 lubSubDmd :: SubDemand -> SubDemand -> SubDemand
@@ -798,7 +823,7 @@ lubSubDmd (Poly Unboxed C_10) d2                  = d2
 lubSubDmd d1                  (Poly Unboxed C_10) = d1
 -- Handle Prod
 lubSubDmd (Prod b1 ds1) (Poly b2 n2)
-  | let !d = polyFieldDmd n2
+  | let !d = polyFieldDmd b2 n2
   = mkProd (lubBoxity b1 b2) (strictMap (lubDmd d) ds1)
 lubSubDmd (Prod b1 ds1) (Prod b2 ds2)
   | equalLength ds1 ds2
@@ -847,7 +872,7 @@ plusSubDmd (Poly Unboxed C_00) d2                  = d2
 plusSubDmd d1                  (Poly Unboxed C_00) = d1
 -- Handle Prod
 plusSubDmd (Prod b1 ds1) (Poly b2 n2)
-  | let !d = polyFieldDmd n2
+  | let !d = polyFieldDmd b2 n2
   = mkProd (plusBoxity b1 b2) (strictMap (plusDmd d) ds1)
 plusSubDmd (Prod b1 ds1) (Prod b2 ds2)
   | equalLength ds1 ds2
@@ -964,6 +989,18 @@ strictifyDictDmd ty (n :* Prod b ds)
       | otherwise
       = Nothing
 strictifyDictDmd _  dmd = dmd
+
+-- | Make a 'Demand' lazy, setting all lower bounds (outside 'Call's) to 0.
+lazifyDmd :: Demand -> Demand
+lazifyDmd AbsDmd    = AbsDmd
+lazifyDmd BotDmd    = AbsDmd
+lazifyDmd (n :* sd) = multCard C_01 n :* lazifySubDmd sd
+
+-- | Make a 'SubDemand' lazy, setting all lower bounds (outside 'Call's) to 0.
+lazifySubDmd :: SubDemand -> SubDemand
+lazifySubDmd (Poly b n)  = Poly b (multCard C_01 n)
+lazifySubDmd (Prod b sd) = mkProd b (strictMap lazifyDmd sd)
+lazifySubDmd (Call n sd) = mkCall (lubCard C_01 n) sd
 
 -- | Wraps the 'SubDemand' with a one-shot call demand: @d@ -> @C1(d)@.
 mkCalledOnceDmd :: SubDemand -> SubDemand
@@ -1109,8 +1146,8 @@ To support Note [Boxity analysis], it makes sense that 'Prod' carries a
 express an unboxing demand?
 
 'botSubDmd' (B) needs to be the bottom of the lattice, so it needs to be an
-Unboxed demand. Similarly, 'seqSubDmd' (A) is an Unboxed demand.
-So why not say that Polys with absent cardinalities have Unboxed boxity?
+Unboxed demand (and deeply, at that). Similarly, 'seqSubDmd' (A) is an Unboxed
+demand. So why not say that Polys with absent cardinalities have Unboxed boxity?
 That doesn't work, because we also need the boxed equivalents. Here's an example
 for A (function 'absent' in T19871):
 ```
@@ -1124,7 +1161,6 @@ g a = a `seq` f a True
 h True  p       = g p -- SA on p (inherited from g)
 h False p@(x,y) = x+y -- S!P(1!L,1!L) on p
 ```
-(Caveat: Since Unboxed wins in lubBoxity, we'll unbox here anyway.)
 If A is treated as Unboxed, we get reboxing in the call site to 'g'.
 So we obviously would need a Boxed variant of A. Rather than introducing a lot
 of special cases, we just carry the Boxity in 'Poly'. Plus, we could most likely
@@ -1573,12 +1609,10 @@ isTopDmdType :: DmdType -> Bool
 isTopDmdType (DmdType env args div)
   = div == topDiv && null args && isEmptyVarEnv env
 
-{-   Unused
 -- | The demand type of an unspecified expression that is guaranteed to
 -- throw a (precise or imprecise) exception or diverge.
 exnDmdType :: DmdType
 exnDmdType = DmdType emptyDmdEnv [] exnDiv
--}
 
 dmdTypeDepth :: DmdType -> Arity
 dmdTypeDepth = length . dt_args
@@ -1648,23 +1682,7 @@ findIdDemand (DmdType fv _ res) id
 -- Why not 'nopDmdType'? Because then the result of 'e' can never be 'exnDiv'!
 -- That means failure to drop dead-ends, see #18086.
 deferAfterPreciseException :: DmdType -> DmdType
--- deferAfterPreciseException = lubDmdType exnDmdType
-deferAfterPreciseException (DmdType fvs ds r)
-  = DmdType (mapVarEnv defer fvs)
-            (map defer ds)
-            (r `lubDivergence` ExnOrDiv)
-  where
-    defer :: Demand -> Demand
-    defer AbsDmd = AbsDmd
-    defer BotDmd = AbsDmd
-    defer (D n sd) = lubCard n C_00 :* lubSubDmd sd (Poly Boxed C_00)
-
-    -- Roughly:  defer d = d `lubDmd` D C_00 (Poly Boxed C_00)
-    -- It is very important that we `lub` with `Boxed`; see
-    --     Note [deferAfterPreciseException]
-    -- But that formulation fails the assert in :*,
-    --     because (D C_00 (Poly Boxed C_00)) is not a legal demand
-    -- So we write defer out more explicitly here
+deferAfterPreciseException = lubDmdType exnDmdType
 
 -- | See 'keepAliveDmdEnv'.
 keepAliveDmdType :: DmdType -> VarSet -> DmdType
@@ -1686,19 +1704,19 @@ That is, the I/O operation might throw an exception, so that 'rhs' never
 gets reached.  For example, we don't want to be strict in the strict free
 variables of 'rhs'.
 
-So roughly speaking:
+So we have the simple definition
   deferAfterPreciseException = lubDmdType (DmdType emptyDmdEnv [] exnDiv)
 
-But that doesn't work quite right for boxity becasuse
+Historically, when we had `lubBoxity = _unboxedWins` (see Note [unboxedWins]),
+we had a more complicated definition for deferAfterPreciseException to make sure
+it preserved boxity in its argument. That was needed for code like
    case <I/O operation> of
       (# s', r) -> f x
 
-uses `x` *boxed*.  If we `lub` it with `(DmdType emptyDmdEnv [] exnDiv)`
-we'll get an *unboxed* demand on `x`, which led to #20746.  There is
-a fuller example in that ticket.
-
-TL;DR: deferAfterPreciseException is very careful to preserve boxity
-in its argument.
+which uses `x` *boxed*. If we `lub`bed it with `(DmdType emptyDmdEnv [] exnDiv)`
+we'd get an *unboxed* demand on `x` (because we let Unboxed win), which led to
+#20746.
+Nowadays with `lubBoxity = boxedWins` we don't need the complicated definition.
 
 Note [Demand type Divergence]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

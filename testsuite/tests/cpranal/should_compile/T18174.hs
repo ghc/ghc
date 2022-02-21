@@ -41,7 +41,7 @@ dataConWrapper :: (Int, Int) -> Int -> (T, Int)
 dataConWrapper p x = (MkT x p, x+1)
 {-# NOINLINE dataConWrapper #-}
 
--- | Should not unbox the second component, because 'x' won't be available
+-- | Should not unbox the second component, because 'y' won't be available
 -- unboxed. It terminates, though.
 strictField :: T -> (Int, (Int, Int))
 strictField (MkT x y) = (x, y)

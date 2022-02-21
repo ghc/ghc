@@ -891,7 +891,7 @@ dmdAnalRhsSig
 -- to the Id, and augment the environment with the signature as well.
 -- See Note [NOINLINE and strictness]
 dmdAnalRhsSig top_lvl rec_flag env let_dmd id rhs
-  = -- pprTrace "dmdAnalRhsSig" (ppr id $$ ppr let_dmd $$ ppr sig $$ ppr lazy_fv) $
+  = -- pprTrace "dmdAnalRhsSig" (ppr id $$ ppr let_dmd $$ ppr rhs_dmds $$ ppr sig $$ ppr lazy_fv) $
     (final_env, lazy_fv, final_id, final_rhs)
   where
     rhs_arity = idArity id
@@ -904,15 +904,17 @@ dmdAnalRhsSig top_lvl rec_flag env let_dmd id rhs
       -- See Note [Demand analysis for join points]
       -- See Note [Invariants on join points] invariant 2b, in GHC.Core
       --     rhs_arity matches the join arity of the join point
-      = let_dmd
+      -- See Note [Unboxed demand on function bodies returning small products]
+      = unboxedWhenSmall env rec_flag (resultType_maybe id) let_dmd
       | otherwise
       -- See Note [Unboxed demand on function bodies returning small products]
-      = unboxedWhenSmall (ae_opts env) (unboxableResultWidth env id) topSubDmd
+      = unboxedWhenSmall env rec_flag (resultType_maybe id) topSubDmd
 
-    -- See Note [Do not unbox class dictionaries]
     WithDmdType rhs_dmd_ty rhs' = dmdAnal env rhs_dmd rhs
-    DmdType rhs_fv rhs_dmds rhs_div    = rhs_dmd_ty
-    (final_rhs_dmds, final_rhs) = finaliseArgBoxities env id rhs_arity rhs'
+    DmdType rhs_fv rhs_dmds rhs_div = rhs_dmd_ty
+    -- See Note [Do not unbox class dictionaries]
+    -- See Note [Boxity for bottoming functions]
+    (final_rhs_dmds, final_rhs) = finaliseArgBoxities env id rhs_arity rhs' rhs_div
                                   `orElse` (rhs_dmds, rhs')
 
     sig = mkDmdSigForArity rhs_arity (DmdType sig_fv final_rhs_dmds rhs_div)
@@ -942,25 +944,44 @@ dmdAnalRhsSig top_lvl rec_flag env let_dmd id rhs
     -- See Note [Lazy and unleashable free variables]
     !(!lazy_fv, !sig_fv) = partitionVarEnv isWeakDmd rhs_fv2
 
-unboxableResultWidth :: AnalEnv -> Id -> Maybe Arity
-unboxableResultWidth env id
+-- | The result type after applying 'idArity' many arguments. Returns 'Nothing'
+-- when the type doesn't have exactly 'idArity' many arrows.
+resultType_maybe :: Id -> Maybe Type
+resultType_maybe id
   | (pis,ret_ty) <- splitPiTys (idType id)
   , count (not . isNamedBinder) pis == idArity id
-  , Just (tc, _tc_args, _co) <- normSplitTyConApp_maybe (ae_fam_envs env) ret_ty
-  , Just dc <- tyConSingleAlgDataCon_maybe tc
-  , null (dataConExTyCoVars dc) -- Can't unbox results with existentials
-  = Just (dataConRepArity dc)
+  = Just $! ret_ty
   | otherwise
   = Nothing
 
-unboxedWhenSmall :: DmdAnalOpts -> Maybe Arity -> SubDemand -> SubDemand
+unboxedWhenSmall :: AnalEnv -> RecFlag -> Maybe Type -> SubDemand -> SubDemand
 -- See Note [Unboxed demand on function bodies returning small products]
-unboxedWhenSmall opts mb_n sd
-  | Just n <- mb_n
-  , n <= dmd_unbox_width opts
-  = unboxSubDemand sd
-  | otherwise
-  = sd
+unboxedWhenSmall _   _        Nothing       sd = sd
+unboxedWhenSmall env rec_flag (Just ret_ty) sd = go 1 ret_ty sd
+  where
+    -- | Magic constant, bounding the depth of optimistic 'Unboxed' flags. We
+    -- might want to minmax in the future.
+    max_depth | isRec rec_flag = 3 -- So we get at most something as deep as !P(L!P(L!L))
+              | otherwise      = 1 -- Otherwise be unbox too deep in T18109, T18174 and others and get a bunch of stack overflows
+    go :: Int -> Type -> SubDemand -> SubDemand
+    go depth ty sd
+      | depth <= max_depth
+      , Just (tc, tc_args, _co) <- normSplitTyConApp_maybe (ae_fam_envs env) ty
+      , Just dc <- tyConSingleAlgDataCon_maybe tc
+      , null (dataConExTyCoVars dc) -- Can't unbox results with existentials
+      , dataConRepArity dc <= dmd_unbox_width (ae_opts env)
+      , Just (_, ds) <- viewProd (dataConRepArity dc) sd
+      , arg_tys <- map scaledThing $ dataConInstArgTys dc tc_args
+      , equalLength ds arg_tys
+      = mkProd Unboxed $! strictZipWith (go_dmd (depth+1)) arg_tys ds
+      | otherwise
+      = sd
+
+    go_dmd :: Int -> Type -> Demand -> Demand
+    go_dmd depth ty dmd = case dmd of
+      AbsDmd  -> AbsDmd
+      BotDmd  -> BotDmd
+      n :* sd -> n :* go depth ty sd
 
 -- | If given the (local, non-recursive) let-bound 'Id', 'useLetUp' determines
 -- whether we should process the binding up (body before rhs) or down (rhs
@@ -1179,6 +1200,69 @@ Now f's optimised RHS will be \x.a, but if we change g to (error "..")
 (since it is apparently Absent) and then inline (\x. fst g) we get
 disaster.  But regardless, #18638 was a more complicated version of
 this, that actually happened in practice.
+
+Note [Boxity for bottoming functions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+```hs
+indexError :: Show a => (a, a) -> a -> String -> b
+-- Str=<..><1!P(S,S)><1S><S>b
+indexError rng i s = error (show rng ++ show i ++ show s)
+
+get :: (Int, Int) -> Int -> [a] -> a
+get p@(l,u) i xs
+  | l <= i, i < u = xs !! (i-u)
+  | otherwise     = indexError p i "get"
+```
+The hot path of `get` certainly wants to unbox `p` as well as `l` and `u`, but
+the unimportant, diverging error path needs `l` and `u` boxed (although the
+wrapper for `indexError` *will* unbox `p`). This pattern often occurs in
+performance sensitive code that does bounds-checking.
+
+It would be a shame to let `Boxed` win for the fields! So here's what we do:
+While to summarising `indexError`'s boxity signature in `finaliseArgBoxities`,
+we `unboxDeeplyDmd` all its argument demands and are careful not to discard
+excess boxity in the `StopUnboxing` case, to get the signature
+`<1!P(!S,!S)><1!S><S!S>b`.
+
+Then worker/wrapper will not only unbox the pair passed to `indexError` (as it
+would do anyway), demand analysis will also pretend that `indexError` needs `l`
+and `u` unboxed (and the two other args). Which is a lie, because `indexError`'s
+type abstracts over their types and could never unbox them.
+
+The important change is at the *call sites* of `$windexError`: Boxity analysis
+will conclude to unbox `l` and `u`, which *will* incur reboxing of crud that
+should better float to the call site of `$windexError`. There we don't care
+much, because it's in the slow, diverging code path! And that floating often
+happens, but not always. See Note [Reboxed crud for bottoming calls].
+
+Note [Reboxed crud for bottoming calls]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For functions like `get` in Note [Boxity for bottoming functions], it's clear
+that the reboxed crud will be floated inside to the call site of `$windexError`.
+But here's an example where that is not the case:
+```hs
+import GHC.Ix
+
+theresCrud :: Int -> Int -> Int
+theresCrud x y = go x
+  where
+    go 0 = index (0,y) 0
+    go 1 = index (x,y) 1
+    go n = go (n-1)
+    {-# NOINLINE theresCrud #-}
+```
+If you look at the Core, you'll see that `y` will be reboxed and used in the
+two exit join points for the `$windexError` calls, while `x` is only reboxed in the
+exit join point for `index (x,y) 1` (happens in lvl below):
+```
+$wtheresCrud = \ ww ww1 ->
+      let { y = I# ww1 } in
+      join { lvl2 = ... case lvl1 ww y of wild { }; ... } in
+      join { lvl3 = ... case lvl y of wild { }; ... } in
+      ...
+```
+This is currently a bug that we willingly accept and it's documented in #21128.
 -}
 
 {- *********************************************************************
@@ -1442,9 +1526,9 @@ incTopBudget (MkB n bg) = MkB (n+1) bg
 positiveTopBudget :: Budgets -> Bool
 positiveTopBudget (MkB n _) = n >= 0
 
-finaliseArgBoxities :: AnalEnv -> Id -> Arity -> CoreExpr
+finaliseArgBoxities :: AnalEnv -> Id -> Arity -> CoreExpr -> Divergence
                     -> Maybe ([Demand], CoreExpr)
-finaliseArgBoxities env fn arity rhs
+finaliseArgBoxities env fn arity rhs div
   | arity > count isId bndrs  -- Can't find enough binders
   = Nothing  -- This happens if we have   f = g
              -- Then there are no binders; we don't worker/wrapper; and we
@@ -1475,6 +1559,7 @@ finaliseArgBoxities env fn arity rhs
 
     mk_triple :: Id -> (Type,StrictnessMark,Demand)
     mk_triple bndr | is_cls_arg ty = (ty, NotMarkedStrict, trimBoxity dmd)
+                   | is_bot_fn     = (ty, NotMarkedStrict, unboxDeeplyDmd dmd)
                    | otherwise     = (ty, NotMarkedStrict, dmd)
                    where
                      ty  = idType bndr
@@ -1482,6 +1567,8 @@ finaliseArgBoxities env fn arity rhs
 
     -- is_cls_arg: see Note [Do not unbox class dictionaries]
     is_cls_arg arg_ty = is_inlinable_fn && isClassPred arg_ty
+    -- is_bot_fn:  see Note [Boxity for bottoming functions]
+    is_bot_fn         = div == botDiv
 
     go_args :: Budgets -> [(Type,StrictnessMark,Demand)] -> (Budgets, [Demand])
     go_args bg triples = mapAccumL go_arg bg triples
@@ -1489,8 +1576,11 @@ finaliseArgBoxities env fn arity rhs
     go_arg :: Budgets -> (Type,StrictnessMark,Demand) -> (Budgets, Demand)
     go_arg bg@(MkB bg_top bg_inner) (ty, str_mark, dmd@(n :* _))
       = case wantToUnboxArg False fam_envs ty dmd of
-          DropAbsent   -> (bg,                      dmd)
-          StopUnboxing -> (MkB (bg_top-1) bg_inner, trimBoxity dmd)
+          StopUnboxing
+            | not is_bot_fn
+                -- If bot: Keep deep boxity even though WW won't unbox
+                -- See Note [Boxity for bottoming functions]
+            -> (MkB (bg_top-1) bg_inner, trimBoxity dmd)
 
           Unbox DataConPatContext{dcpc_dc=dc, dcpc_tc_args=tc_args} dmds
             -> (MkB (bg_top-1) final_bg_inner, final_dmd)
@@ -1512,7 +1602,7 @@ finaliseArgBoxities env fn arity rhs
                   = (bg_inner', dmd')
                   | otherwise
                   = (bg_inner, trimBoxity dmd)
-          Unlift -> panic "No unlifting in DmdAnal"
+          _ -> (bg, dmd)
 
     add_demands :: [Demand] -> CoreExpr -> CoreExpr
     -- Attach the demands to the outer lambdas of this expression

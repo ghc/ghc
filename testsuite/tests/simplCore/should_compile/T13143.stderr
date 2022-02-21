@@ -98,7 +98,7 @@ end Rec }
 g [InlPrag=[2]] :: Bool -> Bool -> Int -> Int
 [GblId,
  Arity=3,
- Str=<1L><1L><1!L>,
+ Str=<1L><1L><1!P(L)>,
  Cpr=1,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,

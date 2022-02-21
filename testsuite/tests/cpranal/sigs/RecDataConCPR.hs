@@ -95,7 +95,7 @@ type instance E (a,b) = (E a, E b)
 type instance E Char = Blub
 data Blah = Blah (E (Int, (Int, Int))) -- NonRec
 data Blub = Blub (E (Char, Int))       -- Rec
-data Blub2 = Blub2 (E (Bool, Int))       -- Rec, because stuck
+data Blub2 = Blub2 (E (Bool, Int))     -- Unsure, because stuck
 
 blah :: Int -> Blah
 blah n = Blah (chr n, (chr (n+1), chr (n+2)))
@@ -110,8 +110,8 @@ blub2 n = Blub2 (undefined :: E Bool, chr n)
 data BootNonRec1 = BootNonRec1 BootNonRec2 -- in RecDataConCPRa.hs-boot
 data BootRec1 = BootRec1 BootRec2 -- in RecDataConCPRa.hs-boot, recurses back
 
-bootNonRec :: Int -> BootNonRec2 -> BootNonRec1 -- Nothing, thus like NonRec
+bootNonRec :: Int -> BootNonRec2 -> BootNonRec1 -- Unsure, thus like NonRec
 bootNonRec x b2 = BootNonRec1 b2
 
-bootRec :: Int -> BootRec2 -> BootRec1 -- Nothing, thus like NonRec
+bootRec :: Int -> BootRec2 -> BootRec1 -- Unsure, thus like NonRec
 bootRec x b2 = BootRec1 b2
