@@ -14,7 +14,7 @@
 int main(int argc, char** argv) {
     char *binDir;
     char *exePath;
-    char *preArgv[4];
+    char *preArgv[5];
     char *oldPath;
     char *newPath;
     char *base;
@@ -59,8 +59,9 @@ int main(int argc, char** argv) {
 #endif
 
     preArgv[2] = mkString("-B%s/../lib/gcc/%s/%s"    , binDir, base, version);
-    preArgv[3] = mkString("-B%s/../libexec/gcc/%s/%s", binDir, base, version);
+    preArgv[3] = mkString("-B%s/../%s/lib/"          , binDir, base);
+    preArgv[4] = mkString("-B%s/../libexec/gcc/%s/%s", binDir, base, version);
 
-    run(exePath, 4, preArgv, argc - 1, argv + 1, NULL);
+    run(exePath, 5, preArgv, argc - 1, argv + 1, NULL);
 }
 
