@@ -127,6 +127,7 @@ The following flags are simple ways to select standard "packages" of warnings:
         * :ghc-flag:`-Wsafe`
         * :ghc-flag:`-Wimplicit-lift`
         * :ghc-flag:`-Wmissing-kind-signatures`
+        * :ghc-flag:`-Wunticked-promoted-constructors`
 
 .. ghc-flag:: -Weverything
     :shortdesc: enable all warnings supported by GHC
@@ -1648,8 +1649,6 @@ of ``-W(no-)*``.
 
     Will raise two warnings because ``Zero`` and ``Succ`` are not
     written as ``'Zero`` and ``'Succ``.
-
-    This warning is enabled by default in :ghc-flag:`-Wall` mode.
 
 .. ghc-flag:: -Wunused-binds
     :shortdesc: warn about bindings that are unused. Alias for

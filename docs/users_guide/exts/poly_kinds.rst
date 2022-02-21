@@ -318,7 +318,7 @@ signature" for a type constructor? These are the forms:
 
        {-# LANGUAGE UnliftedNewtypes #-}
        newtype N1 where                 -- No; missing kind signature
-       newtype N2 :: TYPE 'IntRep where -- Yes; kind signature present
+       newtype N2 :: TYPE IntRep where  -- Yes; kind signature present
        newtype N3 (a :: Type) where     -- No; missing kind signature
        newtype N4 :: k -> Type where    -- No; `k` is not explicitly quantified
        newtype N5 :: forall (k :: Type). k -> Type where -- Yes; good signature
@@ -711,37 +711,37 @@ would become a *visible* parameter::
 Note that we only look at the *outermost* kind signature to decide which
 variables to quantify implicitly. As a counter-example, consider ``M1``: ::
 
-  type M1 = 'Just ('Nothing :: Maybe k)    -- rejected: k not in scope
+  type M1 = Just (Nothing :: Maybe k)    -- rejected: k not in scope
 
-Here, the kind signature is hidden inside ``'Just``, and there is no outermost
+Here, the kind signature is hidden inside ``Just``, and there is no outermost
 kind signature. We can fix this example by providing an outermost kind signature: ::
 
-  type M2 = 'Just ('Nothing :: Maybe k) :: Maybe (Maybe k)
+  type M2 = Just (Nothing :: Maybe k) :: Maybe (Maybe k)
 
 Here, ``k`` is brought into scope by ``:: Maybe (Maybe k)``.
 
 A kind signature is considered to be outermost regardless of redundant
 parentheses: ::
 
-  type P =    'Nothing :: Maybe a    -- accepted
-  type P = ((('Nothing :: Maybe a))) -- accepted
+  type P =    Nothing :: Maybe a    -- accepted
+  type P = (((Nothing :: Maybe a))) -- accepted
 
 Closed type family instances are subject to the same rules: ::
 
   type family F where
-    F = 'Nothing :: Maybe k            -- accepted
+    F = Nothing :: Maybe k            -- accepted
 
   type family F where
-    F = 'Just ('Nothing :: Maybe k)    -- rejected: k not in scope
+    F = Just (Nothing :: Maybe k)     -- rejected: k not in scope
 
   type family F where
-    F = 'Just ('Nothing :: Maybe k) :: Maybe (Maybe k)  -- accepted
+    F = Just (Nothing :: Maybe k) :: Maybe (Maybe k)  -- accepted
 
   type family F :: Maybe (Maybe k) where
-    F = 'Just ('Nothing :: Maybe k)    -- rejected: k not in scope
+    F = Just (Nothing :: Maybe k)     -- rejected: k not in scope
 
   type family F :: Maybe (Maybe k) where
-    F @k = 'Just ('Nothing :: Maybe k) -- accepted
+    F @k = Just (Nothing :: Maybe k)  -- accepted
 
 Kind variables can also be quantified in *visible* positions. Consider the
 following two examples: ::
@@ -957,16 +957,16 @@ Here is an example of this in action: ::
 
   -- separate module having imported the first
   {-# LANGUAGE NoPolyKinds, DataKinds #-}
-  z = Proxy :: Proxy 'MkCompose
+  z = Proxy :: Proxy MkCompose
 
-In the last line, we use the promoted constructor ``'MkCompose``, which has
+In the last line, we use the promoted constructor ``MkCompose``, which has
 kind ::
 
   forall (a :: Type) (b :: Type) (f :: b -> Type) (g :: a -> b) (x :: a).
     f (g x) -> Compose f g x
 
 Now we must infer a type for ``z``. To do so without generalising over kind
-variables, we must default the kind variables of ``'MkCompose``. We can easily
+variables, we must default the kind variables of ``MkCompose``. We can easily
 default ``a`` and ``b`` to ``Type``, but ``f`` and ``g`` would be ill-kinded if
 defaulted. The definition for ``z`` is thus an error.
 

@@ -1536,7 +1536,7 @@ data TcRnMessage where
                  -> [GhcHint]        -- ^ hints, e.g. enable DataKinds to refer to a promoted data constructor
                  -> TcRnMessage
 
-  {-| TcRnUntickedPromotedConstructor is a warning (controlled with -Wunticked-promoted-constructors
+  {-| TcRnUntickedPromotedConstructor is a warning (controlled with -Wunticked-promoted-constructors)
       that is triggered by an unticked occurrence of a promoted data constructor.
 
       Example:

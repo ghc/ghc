@@ -117,7 +117,7 @@ It is also possible to define a multiplicity-polymorphic field:
 
 While linear fields are generalized (``MkT1 :: forall {m} a. a %m -> T1 a``
 in the previous example), multiplicity-polymorphic fields are not;
-it is not possible to directly use ``MkT3`` as a function ``a -> T3 a 'One``.
+it is not possible to directly use ``MkT3`` as a function ``a -> T3 a One``.
 
 If :extension:`LinearTypes` is disabled, all fields are considered to be linear
 fields, including GADT fields defined with the ``->`` arrow.

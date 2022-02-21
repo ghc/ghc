@@ -83,11 +83,11 @@ The Haskell Report describes that ``*`` (spelled ``Type`` and imported from
 such as ``Int``. Furthermore, type constructors can have kinds with arrows; for
 example, ``Maybe`` has kind ``Type -> Type``. Unboxed types have a kind that
 specifies their runtime representation. For example, the type ``Int#`` has kind
-``TYPE 'IntRep`` and ``Double#`` has kind ``TYPE 'DoubleRep``. These kinds say
+``TYPE IntRep`` and ``Double#`` has kind ``TYPE DoubleRep``. These kinds say
 that the runtime representation of an ``Int#`` is a machine integer, and the
 runtime representation of a ``Double#`` is a machine double-precision floating
 point. In contrast, the kind ``Type`` is actually just a synonym for ``TYPE
-'LiftedRep``. More details of the ``TYPE`` mechanisms appear in the `section
+LiftedRep``. More details of the ``TYPE`` mechanisms appear in the `section
 on runtime representation polymorphism <#runtime-rep>`__.
 
 Given that ``Int#``'s kind is not ``Type``, then it follows that ``Maybe
@@ -326,13 +326,13 @@ of a ``newtype``. For example, the type ::
     newtype A = MkA Int#
 
 is accepted when this extension is enabled. This creates a type
-``A :: TYPE 'IntRep`` and a data constructor ``MkA :: Int# -> A``.
+``A :: TYPE IntRep`` and a data constructor ``MkA :: Int# -> A``.
 Although the kind of ``A`` is inferred by GHC, there is nothing visually
 distinctive about this type that indicated that is it not of kind ``Type``
 like newtypes typically are. `GADTSyntax <#gadt-style>`__ can be used to
 provide a kind signature for additional clarity ::
 
-    newtype A :: TYPE 'IntRep where
+    newtype A :: TYPE IntRep where
       MkA :: Int# -> A
 
 The ``Coercible`` machinery works with unlifted newtypes just like it does with
@@ -362,14 +362,14 @@ instances. In particular, :extension:`UnliftedNewtypes` permits a
 permitted: ::
 
      class Foo a where
-       data FooKey a :: TYPE 'IntRep
+       data FooKey a :: TYPE IntRep
      class Bar (r :: RuntimeRep) where
        data BarType r :: TYPE r
 
      instance Foo Bool where
        newtype FooKey Bool = FooKeyBoolC Int#
-     instance Bar 'WordRep where
-       newtype BarType 'WordRep = BarTypeWordRepC Word#
+     instance Bar WordRep where
+       newtype BarType WordRep = BarTypeWordRepC Word#
 
 It is worth noting that :extension:`UnliftedNewtypes` is *not* required to give
 the data families themselves return kinds involving ``TYPE``, such as the

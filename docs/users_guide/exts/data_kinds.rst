@@ -45,8 +45,8 @@ With :extension:`DataKinds`, the example above can then be rewritten to: ::
     data Nat = Ze | Su Nat
 
     data Vec :: Type -> Nat -> Type where
-      Nil  :: Vec a 'Ze
-      Cons :: a -> Vec a n -> Vec a ('Su n)
+      Nil  :: Vec a Ze
+      Cons :: a -> Vec a n -> Vec a (Su n)
 
 With the improved kind of ``Vec``, things like ``Vec Int Char`` are now
 ill-kinded, and GHC will report an error.
@@ -62,27 +62,26 @@ following types ::
 
     data List a = Nil | Cons a (List a)
 
-    data Pair a b = Pair a b
+    data Pair a b = MkPair a b
 
     data Sum a b = L a | R b
 
-give rise to the following kinds and type constructors (where promoted
-constructors are prefixed by a tick ``'``): ::
+give rise to the following kinds and type constructors: ::
 
     Nat :: Type
-    'Zero :: Nat
-    'Succ :: Nat -> Nat
+    Zero :: Nat
+    Succ :: Nat -> Nat
 
     List :: Type -> Type
-    'Nil  :: forall k. List k
-    'Cons :: forall k. k -> List k -> List k
+    Nil  :: forall k. List k
+    Cons :: forall k. k -> List k -> List k
 
     Pair  :: Type -> Type -> Type
-    'Pair :: forall k1 k2. k1 -> k2 -> Pair k1 k2
+    MkPair :: forall k1 k2. k1 -> k2 -> Pair k1 k2
 
     Sum :: Type -> Type -> Type
-    'L :: k1 -> Sum k1 k2
-    'R :: k2 -> Sum k1 k2
+    L :: k1 -> Sum k1 k2
+    R :: k2 -> Sum k1 k2
 
 Virtually all data constructors, even those with rich kinds, can be promoted.
 There are only a couple of exceptions to this rule:
@@ -108,22 +107,25 @@ There are only a couple of exceptions to this rule:
 Distinguishing between types and constructors
 ---------------------------------------------
 
-In the examples above, all promoted constructors are prefixed with a single
-quote mark ``'``. This mark tells GHC to look in the data constructor namespace
-for a name, not the type (constructor) namespace. Consider ::
+Consider ::
 
     data P = MkP    -- 1
 
     data Prom = P   -- 2
 
-We can thus distinguish the type ``P`` (which has a constructor ``MkP``)
-from the promoted data constructor ``'P`` (of kind ``Prom``).
+The name ``P`` on the type level will refer to the type ``P`` (which has
+a constructor ``MkP``) rather than the promoted data constructor
+``P`` of kind ``Prom``. To refer to the latter, prefix it with a
+single quote mark: ``'P``.
 
-As a convenience, GHC allows you to omit the quote mark when the name is
-unambiguous. However, our experience has shown that the quote mark helps
-to make code more readable and less error-prone. GHC thus supports
-:ghc-flag:`-Wunticked-promoted-constructors` that will warn you if you
-use a promoted data constructor without a preceding quote mark.
+This syntax can be used even if there is no ambiguity (i.e.
+there's no type ``P`` in scope).
+
+GHC supports :ghc-flag:`-Wunticked-promoted-constructors` that warns
+whenever a promoted data constructor is written without a quote mark.
+As of GHC 9.4, this warning is no longer enabled by :ghc-flag:`-Wall`;
+we no longer recommend quote marks as a preferred default
+(see :ghc-ticket:`20531`).
 
 Just as in the case of Template Haskell (:ref:`th-syntax`), GHC gets
 confused if you put a quote mark before a data constructor whose second
@@ -224,11 +226,11 @@ only equality constraints are supported.
 Here is an example of a constrained kind: ::
 
   type family IsTypeLit a where
-    IsTypeLit Nat    = 'True
-    IsTypeLit Symbol = 'True
-    IsTypeLit a      = 'False
+    IsTypeLit Nat    = True
+    IsTypeLit Symbol = True
+    IsTypeLit a      = False
 
-  data T :: forall a. (IsTypeLit a ~ 'True) => a -> Type where
+  data T :: forall a. (IsTypeLit a ~ True) => a -> Type where
     MkNat    :: T 42
     MkSymbol :: T "Don't panic!"
 
