@@ -821,6 +821,26 @@ lubSubDmd _             _            = topSubDmd
 lubDmd :: Demand -> Demand -> Demand
 lubDmd (n1 :* sd1) (n2 :* sd2) = lubCard n1 n2 :* lubSubDmd sd1 sd2
 
+multSubDmd :: Card -> SubDemand -> SubDemand
+multSubDmd C_11 sd           = sd
+-- The following three equations don't have an impact on Demands, only on
+-- Boxity. They are needed so that we don't trigger the assertions in `:*`
+-- when called from `multDmd`.
+multSubDmd C_00 _            = seqSubDmd -- Otherwise `multSubDmd A L == A /= !A`
+multSubDmd C_10 (Poly _ n)   = if isStrict n then botSubDmd else seqSubDmd -- Otherwise `multSubDmd B L == B /= !B`
+multSubDmd C_10 (Call n _)   = if isStrict n then botSubDmd else seqSubDmd -- Otherwise we'd call `mkCall` with absent cardinality
+multSubDmd n    (Poly b m)   = Poly b (multCard n m)
+multSubDmd n    (Call n' sd) = mkCall (multCard n n') sd -- See Note [Call demands are relative]
+multSubDmd n    (Prod b ds)  = mkProd b (strictMap (multDmd n) ds)
+
+multDmd :: Card -> Demand -> Demand
+-- The first two lines compute the same result as the last line, but won't
+-- trigger the assertion in `:*` for input like `multDmd B 1L`, which would call
+-- `B :* A`. We want to return `B` in these cases.
+multDmd C_10 (n :* _)    = if isStrict n then BotDmd else AbsDmd
+multDmd n    (C_10 :* _) = if isStrict n then BotDmd else AbsDmd
+multDmd n    (m :* sd)   = multCard n m :* multSubDmd n sd
+
 -- | Denotes '+' on 'SubDemand'.
 plusSubDmd :: SubDemand -> SubDemand -> SubDemand
 -- Handle seqSubDmd (just an optimisation, the general case would do the same)
@@ -849,23 +869,6 @@ plusSubDmd _            _            = topSubDmd
 -- | Denotes '+' on 'Demand'.
 plusDmd :: Demand -> Demand -> Demand
 plusDmd (n1 :* sd1) (n2 :* sd2) = plusCard n1 n2 :* plusSubDmd sd1 sd2
-
-multSubDmd :: Card -> SubDemand -> SubDemand
-multSubDmd C_11 sd           = sd
-multSubDmd C_00 _            = seqSubDmd
-multSubDmd C_10 (Poly _ n)   = if isStrict n then botSubDmd else seqSubDmd
-multSubDmd C_10 (Call n _)   = if isStrict n then botSubDmd else seqSubDmd
-multSubDmd n    (Poly b m)   = Poly b (multCard n m)
-multSubDmd n    (Call n' sd) = mkCall (multCard n n') sd -- See Note [Call demands are relative]
-multSubDmd n    (Prod b ds)  = mkProd b (strictMap (multDmd n) ds)
-
-multDmd :: Card -> Demand -> Demand
--- The first two lines compute the same result as the last line, but won't
--- trigger the assertion in `:*` for input like `multDmd B 1L`, which would call
--- `B :* A`. We want to return `B` in these cases.
-multDmd C_10 (n :* _)    = if isStrict n then BotDmd else AbsDmd
-multDmd n    (C_10 :* _) = if isStrict n then BotDmd else AbsDmd
-multDmd n    (m :* sd)   = multCard n m :* multSubDmd n sd
 
 -- | Used to suppress pretty-printing of an uninformative demand
 isTopDmd :: Demand -> Bool
