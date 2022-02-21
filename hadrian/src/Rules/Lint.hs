@@ -9,8 +9,16 @@ import System.Exit (exitFailure)
 
 lintRules :: Rules ()
 lintRules = do
+  root <- buildRootRules
   "lint:base" ~> lint base
   "lint:compiler" ~> lint compiler
+  root -/- "libraries" -/- "base" -/- "include" -/- "HsBaseConfig.h" %> \_ ->
+      -- ./configure is called here manually because we need to generate
+      -- HsBaseConfig.h, which is created from HsBaseConfig.h.in. ./configure
+      -- is usually run by Cabal which generates this file but if we do that
+      -- then hadrian thinks it needs to build the stage0 compiler before
+      -- attempting to configure. Therefore we just run it directly here.
+      cmd_ (Cwd "libraries/base") "./configure"
 
 lint :: Action () -> Action ()
 lint lintAction = do
@@ -53,14 +61,7 @@ base = do
   let machDeps     = "rts/include/MachDeps.h"
   let ghcautoconf  = stage1RtsInc </> "ghcautoconf.h"
   let ghcplatform  = stage1RtsInc </> "ghcplatform.h"
-  -- ./configure is called here manually because we need to generate
-  -- HsBaseConfig.h, which is created from HsBaseConfig.h.in. ./configure
-  -- is usually run by Cabal which generates this file but if we do that
-  -- then hadrian thinks it needs to build the stage0 compiler before
-  -- attempting to configure. Therefore we just run it directly everytime,
-  -- which is slower but still faster than building the whole of stage0.
-  cmd_ (Cwd "libraries/base") "./configure"
-  need [ghcautoconf, ghcplatform, machDeps]
+  need [ghcautoconf, ghcplatform, machDeps, "libraries/base/include/HsBaseConfig.h"]
   let includeDirs =
         [ "rts/include"
         , "libraries/base/include"
