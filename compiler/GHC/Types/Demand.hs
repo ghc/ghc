@@ -679,8 +679,13 @@ data SubDemand
   -- as 'Boxed'. See Note [Boxity in Poly] for why we want it to carry 'Boxity'.
   -- Expands to 'Call' via 'viewCall' and to 'Prod' via 'viewProd'.
   --
-  -- @Poly b n@ is semantically equivalent to @Prod b [n :* Poly Boxed n, ...]@
-  -- or @Call n (Poly Boxed n)@. 'viewCall' and 'viewProd' do these rewrites.
+  -- @Poly b n@ is semantically equivalent to @Prod b [n :* Poly Boxed n, ...]@.
+  -- For 'Call', it's a bit more complicated: Only @Poly b C_0N@ is fully
+  -- semantically equivalent to @Call C_0N (Poly Boxed C_0N)@. For other
+  -- cardinalities @n@, we only have @Poly b n <= Call n (Poly Boxed n)@,
+  -- see Note [Do not rewrite CS(S) to S].
+  -- 'viewCall' and 'viewProd' do the expansion of 'Poly's, 'mkProd' and
+  -- 'mkCall' the contraction to 'Poly's (if permitted).
   --
   -- In Note [Demand notation]: @L  === P(L,L,...)@  and @L  === CL(L)@,
   --                            @B  === P(B,B,...)@  and @B  === CB(B)@,
@@ -768,10 +773,10 @@ viewProd _ _
 -- equality @Call n (Poly n) === Poly n@, simplifying to 'Poly' 'SubDemand's
 -- when possible.
 mkCall :: CardNonAbs -> SubDemand -> SubDemand
-mkCall C_1N sd@(Poly Boxed C_1N) = sd
+-- mkCall C_1N sd@(Poly Boxed C_1N) = sd -- See Note [Do not rewrite CS(S) to S]
 mkCall C_0N sd@(Poly Boxed C_0N) = sd
-mkCall n    cd               = assertPpr (isCardNonAbs n) (ppr n $$ ppr cd) $
-                               Call n cd
+mkCall n    cd                   = assertPpr (isCardNonAbs n) (ppr n $$ ppr cd) $
+                                   Call n cd
 
 -- | @viewCall sd@ interprets @sd@ as a 'Call', expanding 'Poly' subdemands as
 -- necessary.
@@ -1089,6 +1094,21 @@ call, in the case where we have *at most zero calls* (e.g. CA(...)), the premise
 is hurt and we can assume that the nested demand is 'botSubDmd'. That ensures
 that @g@ above actually gets the @1P(L)@ demand on its second pair component,
 rather than the lazy @MP(L)@ if we 'lub'bed with an absent demand.
+
+Note [Do not rewrite CS(S) to S]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This problem is tracked in #21085. That ticket establishes that we have
+`CS(S) > S`, otherwise `plusSubDmd` is non-monotone:
+```
+L + S = S = CS(S) < CS(L) = C(L+S)(LuS) = L + CS(S)
+```
+That means that `CS(S) /= S` and we may not do the rewrite from `CS(S)` to `S`
+in `mkCall`. We may still rewrite `S` to `CS(S)` in `viewCall`, which is a
+monotone transition, in that
+```
+viewCall S = CS(S) <= CS(S) = viewCall CS(S)
+```
+We still have `L=CL(L)`, so we are allowed to rewrite it in `mkCall`.
 
 Note [Computing one-shot info]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
