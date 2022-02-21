@@ -114,6 +114,10 @@ Compiler
     an older GHC installation which wrote ``~/.ghc/ghci_history``, then GHC
     will continue to write the history to that file.
 
+- The :ghc-flag:`-Wunticked-promoted-constructors` warning is no longer
+  enabled with :ghc-flag:`-Wall` (:ghc-ticket:`20531`), as a part of
+  long-term push towards Dependent Haskell.
+
 ``base`` library
 ~~~~~~~~~~~~~~~~
 
@@ -209,7 +213,7 @@ Compiler
   and the full type of ``writeSmallArray#`` is: ::
 
         writeSmallArray#
-          :: forall s {l :: Levity} (a :: TYPE ('BoxedRep l)).
+          :: forall s {l :: Levity} (a :: TYPE (BoxedRep l)).
              SmallMutableArray# s a -> Int# -> a -> State# s -> State# s
 
 - ``ArrayArray#` and ``MutableArrayArray#`` have been moved from ``GHC.Prim`` to ``GHC.Exts``.
@@ -221,8 +225,8 @@ Compiler
   representation-polymorphic. For instance: ::
 
         mkWeakNoFinalizer#
-          :: forall {l :: Levity} (a :: TYPE ('BoxedRep l))
-                    {k :: Levity} (b :: TYPE ('BoxedRep k)).
+          :: forall {l :: Levity} (a :: TYPE (BoxedRep l))
+                    {k :: Levity} (b :: TYPE (BoxedRep k)).
              a -> b -> State# RealWorld -> (# State# RealWorld, Weak# b #)
 
   That is, the type signature now quantifies over the ``GHC.Exts.Levity`` of ``a``
@@ -236,7 +240,7 @@ Compiler
 
         catch#
           :: forall {r :: RuntimeRep} (a :: TYPE r)
-                    {l :: Levity} (b :: TYPE ('BoxedRep l)).
+                    {l :: Levity} (b :: TYPE (BoxedRep l)).
               ( State# RealWorld -> (# State# RealWorld, a #) )
           -> ( b -> State# RealWorld -> (# State# RealWorld, a #) )
           -> State# RealWorld -> (# State# RealWorld, a #)

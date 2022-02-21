@@ -27,7 +27,7 @@ Here are the key definitions, all available from ``GHC.Exts``: ::
   type Type = TYPE LiftedRep    -- Type is just an ordinary type synonym
 
 The idea is that we have a new fundamental type constant ``TYPE``, which
-is parameterised by a ``RuntimeRep``. We thus get ``Int# :: TYPE 'IntRep``
+is parameterised by a ``RuntimeRep``. We thus get ``Int# :: TYPE IntRep``
 and ``Bool :: TYPE LiftedRep``. Anything with a type of the form
 ``TYPE x`` can appear to either side of a function arrow ``->``. We can
 thus say that ``->`` has type

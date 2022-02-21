@@ -776,7 +776,6 @@ minusWallOpts
         Opt_WarnOrphans,
         Opt_WarnUnusedDoBind,
         Opt_WarnTrustworthySafe,
-        Opt_WarnUntickedPromotedConstructors,
         Opt_WarnMissingPatternSynonymSignatures,
         Opt_WarnUnusedRecordWildcards,
         Opt_WarnRedundantRecordWildcards,
