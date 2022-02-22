@@ -34,6 +34,7 @@ import Control.Exception (SomeException(..))
 import Data.Maybe
 import Data.Foldable ( foldlM )
 import GHC.Utils.Misc (HasCallStack)
+import Data.List.NonEmpty ( NonEmpty )
 
 infixr 4 `orElse`
 
@@ -50,8 +51,10 @@ firstJust a b = firstJusts [a, b]
 
 -- | Takes a list of @Maybes@ and returns the first @Just@ if there is one, or
 -- @Nothing@ otherwise.
-firstJusts :: [Maybe a] -> Maybe a
+firstJusts :: Foldable f => f (Maybe a) -> Maybe a
 firstJusts = msum
+{-# SPECIALISE firstJusts :: [Maybe a] -> Maybe a #-}
+{-# SPECIALISE firstJusts :: NonEmpty (Maybe a) -> Maybe a #-}
 
 -- | Takes computations returnings @Maybes@; tries each one in order.
 -- The first one to return a @Just@ wins. Returns @Nothing@ if all computations

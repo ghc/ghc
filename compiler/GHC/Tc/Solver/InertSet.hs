@@ -29,7 +29,13 @@ module GHC.Tc.Solver.InertSet (
     partitionInertEqs, partitionFunEqs,
 
     -- * Kick-out
-    kickOutRewritableLHS
+    kickOutRewritableLHS,
+
+    -- * Cycle breaker vars
+    CycleBreakerVarStack,
+    pushCycleBreakerVarStack,
+    insertCycleBreakerBinding,
+    forAllCycleBreakerBindings_
 
   ) where
 
@@ -56,6 +62,11 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
 import Data.List          ( partition )
+import Data.List.NonEmpty ( NonEmpty(..), (<|) )
+import qualified Data.List.NonEmpty as NE
+import GHC.Utils.Panic.Plain
+import GHC.Data.Maybe
+import Control.Monad      ( forM_ )
 
 {-
 ************************************************************************
@@ -224,15 +235,20 @@ instance Outputable WorkList where
 *                                                                      *
 ********************************************************************* -}
 
+type CycleBreakerVarStack = NonEmpty [(TcTyVar, TcType)]
+   -- ^ a stack of (CycleBreakerTv, original family applications) lists
+   -- first element in the stack corresponds to current implication;
+   --   later elements correspond to outer implications
+   -- used to undo the cycle-breaking needed to handle
+   -- Note [Type variable cycles] in GHC.Tc.Solver.Canonical
+   -- Why store the outer implications? For the use in mightEqualLater (only)
+
 data InertSet
   = IS { inert_cans :: InertCans
               -- Canonical Given, Wanted
               -- Sometimes called "the inert set"
 
-       , inert_cycle_breakers :: [(TcTyVar, TcType)]
-              -- a list of CycleBreakerTv / original family applications
-              -- used to undo the cycle-breaking needed to handle
-              -- Note [Type variable cycles] in GHC.Tc.Solver.Canonical
+       , inert_cycle_breakers :: CycleBreakerVarStack
 
        , inert_famapp_cache :: FunEqMap Reduction
               -- Just a hash-cons cache for use when reducing family applications
@@ -273,7 +289,7 @@ emptyInertCans
 emptyInert :: InertSet
 emptyInert
   = IS { inert_cans           = emptyInertCans
-       , inert_cycle_breakers = []
+       , inert_cycle_breakers = [] :| []
        , inert_famapp_cache   = emptyFunEqs
        , inert_solved_dicts   = emptyDictMap }
 
@@ -1553,8 +1569,7 @@ matchableGivens loc_w pred_w inerts@(IS { inert_cans = inert_cans })
 mightEqualLater :: InertSet -> TcPredType -> CtLoc -> TcPredType -> CtLoc -> Bool
 -- See Note [What might equal later?]
 -- Used to implement logic in Note [Instance and Given overlap] in GHC.Tc.Solver.Interact
-mightEqualLater (IS { inert_cycle_breakers = cbvs })
-                given_pred given_loc wanted_pred wanted_loc
+mightEqualLater inert_set given_pred given_loc wanted_pred wanted_loc
   | prohibitedSuperClassSolve given_loc wanted_loc
   = False
 
@@ -1600,10 +1615,8 @@ mightEqualLater (IS { inert_cycle_breakers = cbvs })
       = case metaTyVarInfo tv of
           -- See Examples 8 and 9 in the Note
           CycleBreakerTv
-            | Just tyfam_app <- lookup tv cbvs
-            -> anyFreeVarsOfType mentions_meta_ty_var tyfam_app
-            | otherwise
-            -> pprPanic "mightEqualLater finds an unbound cbv" (ppr tv $$ ppr cbvs)
+            -> anyFreeVarsOfType mentions_meta_ty_var
+                 (lookupCycleBreakerVar tv inert_set)
           _ -> True
       | otherwise
       = False
@@ -1629,3 +1642,45 @@ prohibitedSuperClassSolve from_loc solve_loc
   = given_size >= wanted_size
   | otherwise
   = False
+
+{- *********************************************************************
+*                                                                      *
+    Cycle breakers
+*                                                                      *
+********************************************************************* -}
+
+-- | Return the type family application a CycleBreakerTv maps to.
+lookupCycleBreakerVar :: TcTyVar    -- ^ cbv, must be a CycleBreakerTv
+                      -> InertSet
+                      -> TcType     -- ^ type family application the cbv maps to
+lookupCycleBreakerVar cbv (IS { inert_cycle_breakers = cbvs_stack })
+-- This function looks at every environment in the stack. This is necessary
+-- to avoid #20231. This function (and its one usage site) is the only reason
+-- that we store a stack instead of just the top environment.
+  | Just tyfam_app <- assert (isCycleBreakerTyVar cbv) $
+                      firstJusts (NE.map (lookup cbv) cbvs_stack)
+  = tyfam_app
+  | otherwise
+  = pprPanic "lookupCycleBreakerVar found an unbound cycle breaker" (ppr cbv $$ ppr cbvs_stack)
+
+-- | Push a fresh environment onto the cycle-breaker var stack. Useful
+-- when entering a nested implication.
+pushCycleBreakerVarStack :: CycleBreakerVarStack -> CycleBreakerVarStack
+pushCycleBreakerVarStack = ([] <|)
+
+-- | Add a new cycle-breaker binding to the top environment on the stack.
+insertCycleBreakerBinding :: TcTyVar   -- ^ cbv, must be a CycleBreakerTv
+                          -> TcType    -- ^ cbv's expansion
+                          -> CycleBreakerVarStack -> CycleBreakerVarStack
+insertCycleBreakerBinding cbv expansion (top_env :| rest_envs)
+  = assert (isCycleBreakerTyVar cbv) $
+    ((cbv, expansion) : top_env) :| rest_envs
+
+-- | Perform a monadic operation on all pairs in the top environment
+-- in the stack.
+forAllCycleBreakerBindings_ :: Monad m
+                            => CycleBreakerVarStack
+                            -> (TcTyVar -> TcType -> m ()) -> m ()
+forAllCycleBreakerBindings_ (top_env :| _rest_envs) action
+  = forM_ top_env (uncurry action)
+{-# INLINABLE forAllCycleBreakerBindings_ #-}  -- to allow SPECIALISE later
