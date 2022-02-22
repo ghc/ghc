@@ -684,6 +684,7 @@ mkFExportCBits dflags c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
 
 
 foreignExportsInitialiser :: Module -> [Id] -> CStub
+foreignExportsInitialiser _   []     = mempty
 foreignExportsInitialiser mod hs_fns =
    -- Initialise foreign exports by registering a stable pointer from an
    -- __attribute__((constructor)) function.
