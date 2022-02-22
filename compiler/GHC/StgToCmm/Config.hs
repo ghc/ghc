@@ -35,6 +35,7 @@ data StgToCmmConfig = StgToCmmConfig
                                                  -- join-points (let-no-escape)
   , stgToCmmTickyDynThunk  :: !Bool              -- ^ True indicates ticky uses name-specific counters for
                                                  -- dynamic thunks
+  , stgToCmmTickyTag       :: !Bool              -- ^ True indicates ticky will count number of avoided tag checks by tag inference.
   ---------------------------------- Flags --------------------------------------
   , stgToCmmLoopification  :: !Bool              -- ^ Loopification enabled (cf @-floopification@)
   , stgToCmmAlignCheck     :: !Bool              -- ^ Insert alignment check (cf @-falignment-sanitisation@)

@@ -319,7 +319,7 @@ emitTickyCounterTag unique (NonVoid id) =
   let name = idName id
       ctr_lbl = mkTagHitLabel name unique in
     (>> return ctr_lbl) $
-    ifTicky $ do
+    ifTickyTag $ do
         { platform <- getPlatform
         ; parent <- getTickyCtrLabel
         ; mod_name <- getModuleName
@@ -664,18 +664,18 @@ tickyStackCheck = ifTicky $ bumpTickyCounter (fsLit "STK_CHK_ctr")
 
 -- | Predicted a pointer would be tagged correctly (GHC will crash if not so no miss case)
 tickyTagged :: FCode ()
-tickyTagged         = ifTicky $ bumpTickyCounter (fsLit "TAG_TAGGED_pred")
+tickyTagged         = ifTickyTag $ bumpTickyCounter (fsLit "TAG_TAGGED_pred")
 
 -- | Pass a boolean expr indicating if tag was present.
 tickyUntagged :: CmmExpr -> FCode ()
 tickyUntagged e     = do
-    ifTicky $ bumpTickyCounter (fsLit "TAG_UNTAGGED_pred")
-    ifTicky $ bumpTickyCounterByE (fsLit "TAG_UNTAGGED_miss") e
+    ifTickyTag $ bumpTickyCounter (fsLit "TAG_UNTAGGED_pred")
+    ifTickyTag $ bumpTickyCounterByE (fsLit "TAG_UNTAGGED_miss") e
 
 -- | Called when for `case v of ...` we can avoid entering v based on
 -- tag inference information.
 tickyTagSkip :: Unique -> Id -> FCode ()
-tickyTagSkip unique id = ifTicky $ do
+tickyTagSkip unique id = ifTickyTag $ do
   let ctr_lbl = mkTagHitLabel (idName id) unique
   registerTickyCtr ctr_lbl
   bumpTickyTagSkip ctr_lbl
@@ -691,6 +691,9 @@ runIfFlag f = whenM (f <$> getStgToCmmConfig)
 
 ifTicky :: FCode () -> FCode ()
 ifTicky = runIfFlag stgToCmmDoTicky
+
+ifTickyTag :: FCode () -> FCode ()
+ifTickyTag = runIfFlag stgToCmmTickyTag
 
 ifTickyAllocd :: FCode () -> FCode ()
 ifTickyAllocd = runIfFlag stgToCmmTickyAllocd
