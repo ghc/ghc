@@ -2334,6 +2334,8 @@ dynamic_flags_deps = [
         (NoArg (setGeneralFlag Opt_Ticky_LNE))
   , make_ord_flag defGhcFlag "ticky-dyn-thunk"
         (NoArg (setGeneralFlag Opt_Ticky_Dyn_Thunk))
+  , make_ord_flag defGhcFlag "ticky-tag-checks"
+        (NoArg (setGeneralFlag Opt_Ticky_Tag))
         ------- recompilation checker --------------------------------------
   , make_dep_flag defGhcFlag "recomp"
         (NoArg $ unSetGeneralFlag Opt_ForceRecomp)

@@ -66,7 +66,7 @@ fingerprintDynFlags hsc_env this_mod nameio =
 
         -- Ticky
         ticky =
-          map (`gopt` dflags) [Opt_Ticky, Opt_Ticky_Allocd, Opt_Ticky_LNE, Opt_Ticky_Dyn_Thunk]
+          map (`gopt` dflags) [Opt_Ticky, Opt_Ticky_Allocd, Opt_Ticky_LNE, Opt_Ticky_Dyn_Thunk, Opt_Ticky_Tag]
 
         flags = ((mainis, safeHs, lang, cpp), (paths, prof, ticky, debugLevel, callerCcFilters))
 

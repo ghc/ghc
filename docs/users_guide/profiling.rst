@@ -1740,6 +1740,31 @@ Using “ticky-ticky” profiling (for implementors)
 
     Track allocations of dynamic thunks.
 
+.. ghc-flag:: -ticky-LNE
+    :shortdesc: Treat join point binders similar to thunks/functions.
+    :type: dynamic
+    :category:
+
+    These are not allocated, and can be very performance sensitive so we usually don't
+    want to run ticky counters for these to avoid even worse performance for tickied builds.
+
+    But sometimes having information about these binders is critical. So we have a flag to ticky them
+    anyway.
+
+.. ghc-flag:: -ticky-tag-checks
+    :shortdesc: Emit dummy ticky counters to record how many tag-inference checks tag inference avoided.
+    :type: dynamic
+    :category:
+
+    These dummy counters contain:
+    * The number of avoided tag checks in the entry count.
+    * "infer" as the argument string to distinguish them from regular counters.
+    * The name of the variable we are casing on, as well as a unique to represent the inspection site as one variable might be cased on multiple times.
+      The unique comes first , with the variable coming at the end. Like this: `u10_s98c (Main) at nofib/spectral/simple/Main.hs:677:1 in u10`
+      where `u10` is the variable and `u10_s98c` the unique associated with the inspection site.
+
+    Note that these counters are currently not processed well be eventlog2html. So if you want to check them you will have to use the text based interface.
+
 GHC's ticky-ticky profiler provides a low-level facility for tracking
 entry and allocation counts of particular individual closures.
 Because ticky-ticky profiling requires a certain familiarity with GHC

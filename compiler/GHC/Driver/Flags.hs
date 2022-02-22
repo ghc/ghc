@@ -295,6 +295,7 @@ data GeneralFlag
    | Opt_Ticky_Allocd
    | Opt_Ticky_LNE
    | Opt_Ticky_Dyn_Thunk
+   | Opt_Ticky_Tag
    | Opt_RPath
    | Opt_RelativeDynlibPaths
    | Opt_CompactUnwind               -- ^ @-fcompact-unwind@

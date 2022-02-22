@@ -29,6 +29,7 @@ initStgToCmmConfig dflags mod = StgToCmmConfig
   , stgToCmmTickyAllocd   = gopt Opt_Ticky_Allocd          dflags
   , stgToCmmTickyLNE      = gopt Opt_Ticky_LNE             dflags
   , stgToCmmTickyDynThunk = gopt Opt_Ticky_Dyn_Thunk       dflags
+  , stgToCmmTickyTag      = gopt Opt_Ticky_Tag             dflags
   -- flags
   , stgToCmmLoopification = gopt Opt_Loopification         dflags
   , stgToCmmAlignCheck    = gopt Opt_AlignmentSanitisation dflags
