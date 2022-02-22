@@ -8,7 +8,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 
-{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+{-# OPTIONS_GHC -Wno-incomplete-record-updates -Wno-orphans #-}
 
 -- | Monadic definitions for the constraint solver
 module GHC.Tc.Solver.Monad (
@@ -1098,7 +1098,8 @@ nestImplicTcS ref inner_tclvl (TcS thing_inside)
                    , tcs_abort_on_insoluble = abort_on_insoluble
                    } ->
     do { inerts <- TcM.readTcRef old_inert_var
-       ; let nest_inert = inerts { inert_cycle_breakers = []
+       ; let nest_inert = inerts { inert_cycle_breakers = pushCycleBreakerVarStack
+                                                            (inert_cycle_breakers inerts)
                                  , inert_cans = (inert_cans inerts)
                                                    { inert_given_eqs = False } }
                  -- All other InertSet fields are inherited
@@ -1995,8 +1996,8 @@ breakTyVarCycle_maybe ev cte_result (TyVarLHS lhs_tv) rhs
            ; traceTcS "breakTyVarCycle replacing type family in Given" (ppr new_given)
            ; emitWorkNC [new_given]
            ; updInertTcS $ \is ->
-               is { inert_cycle_breakers = (new_tv, fun_app) :
-                                           inert_cycle_breakers is }
+               is { inert_cycle_breakers = insertCycleBreakerBinding new_tv fun_app
+                                             (inert_cycle_breakers is) }
            ; return $ mkReflRedn Nominal new_ty }
                 -- Why reflexive? See Detail (4) of the Note
 
@@ -2016,8 +2017,9 @@ breakTyVarCycle_maybe _ _ _ _ = return Nothing
 -- See Note [Type variable cycles] in GHC.Tc.Solver.Canonical.
 restoreTyVarCycles :: InertSet -> TcM ()
 restoreTyVarCycles is
-  = forM_ (inert_cycle_breakers is) $ \ (cycle_breaker_tv, orig_ty) ->
-    TcM.writeMetaTyVar cycle_breaker_tv orig_ty
+  = forAllCycleBreakerBindings_ (inert_cycle_breakers is) TcM.writeMetaTyVar
+{-# SPECIALISE forAllCycleBreakerBindings_ ::
+      CycleBreakerVarStack -> (TcTyVar -> TcType -> TcM ()) -> TcM () #-}
 
 -- Unwrap a type synonym only when either:
 --   The type synonym is forgetful, or
