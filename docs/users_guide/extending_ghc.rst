@@ -522,8 +522,8 @@ will print out the name of any top-level non-recursive binding with the
 
     annotationsOn :: Data a => ModGuts -> CoreBndr -> CoreM [a]
     annotationsOn guts bndr = do
-      anns <- getAnnotations deserializeWithData guts
-      return $ lookupWithDefaultUFM anns [] (varUnique bndr)
+      (_, anns) <- getAnnotations deserializeWithData guts
+      return $ lookupWithDefaultUFM_Directly anns [] (varUnique bndr)
 
 Please see the GHC API documentation for more about how to use internal
 APIs, etc.
