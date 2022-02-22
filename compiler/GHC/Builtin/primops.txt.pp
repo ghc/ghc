@@ -2332,7 +2332,7 @@ primop  CasAddrOp_Word64 "atomicCasWord64Addr#" GenPrimOp
 primop  CasAddrOp2_Word "atomicCas2WordAddr#" GenPrimOp
    Addr# -> Word# -> Word# -> Word# -> Word# -> State# s -> (# State# s,
    Word#, Word# #)
-   { Compare and swap on a 2 word-sized and aligned memory location. Expected
+   { Compare-and-swap on a pair of words. The location must be aligned to a word boundary. The expected
      and desired value are passed as two words in little-endian order.
 
      Use as: \s -> atomicCas2WordAddr# location expected_lo expected_hi
