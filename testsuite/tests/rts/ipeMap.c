@@ -30,9 +30,9 @@ int main(int argc, char *argv[]) {
 }
 
 void shouldFindNothingInAnEmptyIPEMap(Capability *cap) {
-    HaskellObj fortyTwo = rts_mkInt(cap, 42);
+    HaskellObj fortyTwo = UNTAG_CLOSURE(rts_mkInt(cap, 42));
 
-    InfoProvEnt *result = lookupIPE((StgInfoTable *)fortyTwo->header.info);
+    InfoProvEnt *result = lookupIPE(get_itbl(fortyTwo));
 
     if (result != NULL) {
         errorBelch("Found entry in an empty IPE map!");
@@ -41,10 +41,10 @@ void shouldFindNothingInAnEmptyIPEMap(Capability *cap) {
 }
 
 HaskellObj shouldFindOneIfItHasBeenRegistered(Capability *cap) {
-    HaskellObj fortyTwo = rts_mkInt(cap, 42);
+    HaskellObj fortyTwo = UNTAG_CLOSURE(rts_mkInt(cap, 42));
 
     InfoProvEnt *provEnt = malloc(sizeof(InfoProvEnt));
-    provEnt->info = (StgInfoTable *)fortyTwo->header.info;
+    provEnt->info = get_itbl(fortyTwo);
     provEnt->prov.table_name = "table_name_42";
     provEnt->prov.closure_desc = "closure_desc_42";
     provEnt->prov.ty_desc = "ty_desc_42";
@@ -55,7 +55,7 @@ HaskellObj shouldFindOneIfItHasBeenRegistered(Capability *cap) {
     InfoProvEnt *ipeList[] = {provEnt, NULL};
 
     registerInfoProvList(ipeList);
-    InfoProvEnt *result = lookupIPE((StgInfoTable *)fortyTwo->header.info);
+    InfoProvEnt *result = lookupIPE(get_itbl(fortyTwo));
 
     if (result == NULL) {
         errorBelch("Found no entry in IPE map!");
@@ -74,10 +74,10 @@ HaskellObj shouldFindOneIfItHasBeenRegistered(Capability *cap) {
 
 void shouldFindTwoIfTwoHaveBeenRegistered(Capability *cap,
                                           HaskellObj fortyTwo) {
-    HaskellObj twentyThree = rts_mkInt(cap, 23);
+  HaskellObj twentyThree = UNTAG_CLOSURE(rts_mkInt8(cap, 23));
 
     InfoProvEnt *provEnt = malloc(sizeof(InfoProvEnt));
-    provEnt->info = (StgInfoTable *)twentyThree->header.info;
+    provEnt->info = get_itbl(twentyThree);
     provEnt->prov.table_name = "table_name_23";
     provEnt->prov.closure_desc = "closure_desc_23";
     provEnt->prov.ty_desc = "ty_desc_23";
@@ -90,9 +90,9 @@ void shouldFindTwoIfTwoHaveBeenRegistered(Capability *cap,
     registerInfoProvList(ipeList);
 
     InfoProvEnt *resultFortyTwo =
-        lookupIPE((StgInfoTable *)fortyTwo->header.info);
+      lookupIPE(get_itbl(fortyTwo));
     InfoProvEnt *resultTwentyThree =
-        lookupIPE((StgInfoTable *)twentyThree->header.info);
+      lookupIPE(get_itbl(twentyThree));
 
     if (resultFortyTwo == NULL || resultTwentyThree == NULL) {
         errorBelch("Found no entry in IPE map!");
@@ -104,10 +104,10 @@ void shouldFindTwoIfTwoHaveBeenRegistered(Capability *cap,
 }
 
 void shouldFindTwoFromTheSameList(Capability *cap) {
-    HaskellObj one = rts_mkInt(cap, 1);
+  HaskellObj one = UNTAG_CLOSURE(rts_mkInt16(cap, 1));
 
     InfoProvEnt *provEntOne = malloc(sizeof(InfoProvEnt));
-    provEntOne->info = (StgInfoTable *)one->header.info;
+    provEntOne->info = get_itbl(one);
     provEntOne->prov.table_name = "table_name_1";
     provEntOne->prov.closure_desc = "closure_desc_1";
     provEntOne->prov.ty_desc = "ty_desc_1";
@@ -115,10 +115,10 @@ void shouldFindTwoFromTheSameList(Capability *cap) {
     provEntOne->prov.module = "module_1";
     provEntOne->prov.srcloc = "srcloc_1";
 
-    HaskellObj two = rts_mkInt(cap, 2);
+    HaskellObj two = UNTAG_CLOSURE(rts_mkInt32(cap, 2));
 
     InfoProvEnt *provEntTwo = malloc(sizeof(InfoProvEnt));
-    provEntTwo->info = (StgInfoTable *)two->header.info;
+    provEntTwo->info = get_itbl(two);
     provEntTwo->prov.table_name = "table_name_2";
     provEntTwo->prov.closure_desc = "closure_desc_2";
     provEntTwo->prov.ty_desc = "ty_desc_2";
@@ -130,8 +130,8 @@ void shouldFindTwoFromTheSameList(Capability *cap) {
 
     registerInfoProvList(ipeList);
 
-    InfoProvEnt *resultOne = lookupIPE((StgInfoTable *)one->header.info);
-    InfoProvEnt *resultTwo = lookupIPE((StgInfoTable *)two->header.info);
+    InfoProvEnt *resultOne = lookupIPE(get_itbl(one));
+    InfoProvEnt *resultTwo = lookupIPE(get_itbl(two));
 
     if (resultOne == NULL || resultOne == NULL) {
         errorBelch("Found no entry in IPE map!");
@@ -143,10 +143,10 @@ void shouldFindTwoFromTheSameList(Capability *cap) {
 }
 
 void shouldFindTheLastEntryOfManyLists(Capability *cap) {
-    HaskellObj three = rts_mkInt(cap, 3);
+    HaskellObj three = UNTAG_CLOSURE(rts_mkInt64(cap, 3));
 
     InfoProvEnt *provEntThree = malloc(sizeof(InfoProvEnt));
-    provEntThree->info = (StgInfoTable *)three->header.info;
+    provEntThree->info = get_itbl(three);
     provEntThree->prov.table_name = "table_name_3";
     provEntThree->prov.closure_desc = "closure_desc_3";
     provEntThree->prov.ty_desc = "ty_desc_3";
@@ -154,10 +154,10 @@ void shouldFindTheLastEntryOfManyLists(Capability *cap) {
     provEntThree->prov.module = "module_3";
     provEntThree->prov.srcloc = "srcloc_3";
 
-    HaskellObj four = rts_mkInt(cap, 4);
+    HaskellObj four = UNTAG_CLOSURE(rts_mkWord8(cap, 4));
 
     InfoProvEnt *provEntFour = malloc(sizeof(InfoProvEnt));
-    provEntFour->info = (StgInfoTable *)four->header.info;
+    provEntFour->info = get_itbl(four);
     provEntFour->prov.table_name = "table_name_4";
     provEntFour->prov.closure_desc = "closure_desc_4";
     provEntFour->prov.ty_desc = "ty_desc_4";
@@ -175,7 +175,7 @@ void shouldFindTheLastEntryOfManyLists(Capability *cap) {
 
     registerInfoProvList(ipeListFour);
 
-    InfoProvEnt *resultFour = lookupIPE((StgInfoTable *)four->header.info);
+    InfoProvEnt *resultFour = lookupIPE(get_itbl(four));
 
     if (resultFour == NULL) {
         errorBelch("Found no entry in IPE map!");
@@ -191,7 +191,7 @@ void shouldDealWithAnEmptyList(Capability *cap, HaskellObj fortyTwo) {
     registerInfoProvList(emptyIpeList);
 
     InfoProvEnt *resultFortyTwo =
-        lookupIPE((StgInfoTable *)fortyTwo->header.info);
+        lookupIPE(get_itbl(fortyTwo));
 
     if (resultFortyTwo == NULL) {
         errorBelch("Found no entry in IPE map!");
