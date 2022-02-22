@@ -1,5 +1,9 @@
 # coding=utf8
 
+def sort_output(str):
+  return '\n'.join(sorted(str.splitlines()))
+
+
 # Note [Disabling ghci-leak-check]
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # The -fno-ghci-leak-check is because this test prints the current GHC settings
@@ -27,7 +31,8 @@ test('ghci009', combined_output, ghci_script, ['ghci009.script'])
 # has a ^C handler installed.
 test('ghci010', skip, ghci_script, ['ghci010.script'])
 
-test('ghci011', normal, ghci_script, ['ghci011.script'])
+#See #21121 for why this output is normalised.
+test('ghci011', [normalise_fun(sort_output)], ghci_script, ['ghci011.script'])
 test('ghci012', normal, ghci_script, ['ghci012.script'])
 test('ghci013', normal, ghci_script, ['ghci013.script'])
 
@@ -158,7 +163,7 @@ test('ghci058', [extra_files(['../shell.hs']),
      ghci_script, ['ghci058.script'])
 test('T7587', normal, ghci_script, ['T7587.script'])
 test('T7688', normal, ghci_script, ['T7688.script'])
-test('T7627', normal, ghci_script, ['T7627.script'])
+test('T7627', [normalise_fun(sort_output)], ghci_script, ['T7627.script'])
 test('T7627b', normal, ghci_script, ['T7627b.script'])
 test('T7586', normal, ghci_script, ['T7586.script'])
 test('T4175', normal, ghci_script, ['T4175.script'])
