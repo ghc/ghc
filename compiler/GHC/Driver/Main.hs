@@ -1602,7 +1602,7 @@ hscSimpleIface' tc_result summary = do
 
 -- | Compile to hard-code.
 hscGenHardCode :: HscEnv -> CgGuts -> ModLocation -> FilePath
-               -> IO (FilePath, Maybe FilePath, [(ForeignSrcLang, FilePath)], CgInfos)
+               -> IO (FilePath, Maybe FilePath, [(ForeignSrcLang, FilePath)], Maybe CgInfos)
                 -- ^ @Just f@ <=> _stub.c is f
 hscGenHardCode hsc_env cgguts location output_filename = do
         let CgGuts{ -- This is the last use of the ModGuts in a compilation.
@@ -1679,7 +1679,7 @@ hscGenHardCode hsc_env cgguts location output_filename = do
                 <- {-# SCC "codeOutput" #-}
                   codeOutput logger tmpfs dflags (hsc_units hsc_env) this_mod output_filename location
                   foreign_stubs foreign_files dependencies rawcmms1
-            return (output_filename, stub_c_exists, foreign_fps, cg_infos)
+            return (output_filename, stub_c_exists, foreign_fps, Just cg_infos)
 
 
 hscInteractive :: HscEnv
