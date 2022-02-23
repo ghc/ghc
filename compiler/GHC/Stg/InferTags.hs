@@ -5,7 +5,7 @@
  -- To permit: type instance XLet 'InferTaggedBinders = XLet 'SomePass
 
 {-# OPTIONS_GHC -Wname-shadowing #-}
-module GHC.Stg.InferTags ( inferTags ) where
+module GHC.Stg.InferTags ( TagSig, inferTags ) where
 
 import GHC.Prelude hiding (id)
 

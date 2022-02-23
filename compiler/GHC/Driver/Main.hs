@@ -165,6 +165,7 @@ import GHC.Tc.Utils.Zonk    ( ZonkFlexi (DefaultFlexi) )
 
 import GHC.Stg.Syntax
 import GHC.Stg.Pipeline ( stg2stg )
+import GHC.Stg.InferTags
 
 import GHC.Builtin.Utils
 import GHC.Builtin.Names
@@ -241,12 +242,11 @@ import Control.DeepSeq (force)
 import Data.Bifunctor (first)
 import GHC.Data.Maybe
 import GHC.Driver.Env.KnotVars
+import GHC.Types.Name.Env (NameEnv)
 import GHC.Types.Name.Set (NonCaffySet)
 import GHC.Driver.GenerateCgIPEStub (generateCgIPEStub)
 import Data.List.NonEmpty (NonEmpty ((:|)))
 
-
-import GHC.Stg.InferTags
 
 {- **********************************************************************
 %*                                                                      *
@@ -1632,11 +1632,11 @@ hscGenHardCode hsc_env cgguts location output_filename = do
                                    core_binds data_tycons
 
         -----------------  Convert to STG ------------------
-        (stg_binds, denv, (caf_ccs, caf_cc_stacks))
+        (stg_binds, denv, (caf_ccs, caf_cc_stacks), export_tag_info)
             <- {-# SCC "CoreToStg" #-}
                withTiming logger
                    (text "CoreToStg"<+>brackets (ppr this_mod))
-                   (\(a, b, (c,d)) -> a `seqList` b `seq` c `seqList` d `seqList` ())
+                   (\(a, b, (c,d), _) -> a `seqList` b `seq` c `seqList` d `seqList` ())
                    (myCoreToStg logger dflags (hsc_IC hsc_env) False this_mod location prepd_binds)
 
         let cost_centre_info =
@@ -1659,6 +1659,7 @@ hscGenHardCode hsc_env cgguts location output_filename = do
                             doCodeGen hsc_env this_mod denv data_tycons
                                 cost_centre_info
                                 stg_binds hpc_info
+                                export_tag_info
 
             ------------------  Code output -----------------------
             rawcmms0 <- {-# SCC "cmmToRawCmm" #-}
@@ -1709,7 +1710,7 @@ hscInteractive hsc_env cgguts location = do
     prepd_binds <- {-# SCC "CorePrep" #-}
                    corePrepPgm hsc_env this_mod location core_binds data_tycons
 
-    (stg_binds, _infotable_prov, _caf_ccs__caf_cc_stacks)
+    (stg_binds, _infotable_prov, _caf_ccs__caf_cc_stacks, _)
       <- {-# SCC "CoreToStg" #-}
           myCoreToStg logger dflags (hsc_IC hsc_env) True this_mod location prepd_binds
     -----------------  Generate byte code ------------------
@@ -1800,24 +1801,19 @@ doCodeGen :: HscEnv -> Module -> InfoTableProvMap -> [TyCon]
           -> CollectedCCs
           -> [CgStgTopBinding] -- ^ Bindings come already annotated with fvs
           -> HpcInfo
+          -> NameEnv TagSig
           -> IO (Stream IO CmmGroupSRTs CgInfos)
          -- Note we produce a 'Stream' of CmmGroups, so that the
          -- backend can be run incrementally.  Otherwise it generates all
          -- the C-- up front, which has a significant space cost.
 doCodeGen hsc_env this_mod denv data_tycons
-              cost_centre_info stg_binds_w_fvs hpc_info = do
+              cost_centre_info stg_binds hpc_info
+              export_tag_info = do
     let dflags     = hsc_dflags hsc_env
         logger     = hsc_logger hsc_env
         hooks      = hsc_hooks  hsc_env
         tmpfs      = hsc_tmpfs  hsc_env
         platform   = targetPlatform dflags
-
-    -- Do tag inference on optimized STG
-    (!stg_post_infer,export_tag_info) <-
-        {-# SCC "StgTagFields" #-} inferTags dflags logger this_mod stg_binds_w_fvs
-
-    putDumpFileMaybe logger Opt_D_dump_stg_final "Final STG:" FormatSTG
-        (pprGenStgTopBindings (initStgPprOpts dflags) stg_post_infer)
 
     let stg_to_cmm dflags mod = case stgToCmmHook hooks of
                         Nothing -> StgToCmm.codeGen logger tmpfs (initStgToCmmConfig dflags mod)
@@ -1825,8 +1821,8 @@ doCodeGen hsc_env this_mod denv data_tycons
 
     let cmm_stream :: Stream IO CmmGroup ModuleLFInfos
         -- See Note [Forcing of stg_binds]
-        cmm_stream = stg_post_infer `seqList` {-# SCC "StgToCmm" #-}
-            stg_to_cmm dflags this_mod denv data_tycons cost_centre_info stg_post_infer hpc_info
+        cmm_stream = stg_binds `seqList` {-# SCC "StgToCmm" #-}
+            stg_to_cmm dflags this_mod denv data_tycons cost_centre_info stg_binds hpc_info
 
         -- codegen consumes a stream of CmmGroup, and produces a new
         -- stream of CmmGroup (not necessarily synchronised: one
@@ -1871,7 +1867,7 @@ myCoreToStgExpr logger dflags ictxt for_bytecode this_mod ml prepd_expr = do
                                 (mkPseudoUniqueE 0)
                                 Many
                                 (exprType prepd_expr)
-    (stg_binds, prov_map, collected_ccs) <-
+    (stg_binds, prov_map, collected_ccs, _) <-
        myCoreToStg logger
                    dflags
                    ictxt
@@ -1886,7 +1882,8 @@ myCoreToStg :: Logger -> DynFlags -> InteractiveContext
             -> Module -> ModLocation -> CoreProgram
             -> IO ( [CgStgTopBinding] -- output program
                   , InfoTableProvMap
-                  , CollectedCCs )  -- CAF cost centre info (declared and used)
+                  , CollectedCCs      -- CAF cost centre info (declared and used)
+                  , NameEnv TagSig )
 myCoreToStg logger dflags ictxt for_bytecode this_mod ml prepd_binds = do
     let (stg_binds, denv, cost_centre_info)
          = {-# SCC "Core2Stg" #-}
@@ -1900,7 +1897,14 @@ myCoreToStg logger dflags ictxt for_bytecode this_mod ml prepd_binds = do
     putDumpFileMaybe logger Opt_D_dump_stg_cg "CodeGenInput STG:" FormatSTG
         (pprGenStgTopBindings (initStgPprOpts dflags) stg_binds_with_fvs)
 
-    return (stg_binds_with_fvs, denv, cost_centre_info)
+    -- Do tag inference on optimized STG
+    (!stg_binds_post_infer, export_tag_info) <-
+        {-# SCC "StgTagFields" #-} inferTags dflags logger this_mod stg_binds_with_fvs
+
+    putDumpFileMaybe logger Opt_D_dump_stg_final "Final STG:" FormatSTG
+        (pprGenStgTopBindings (initStgPprOpts dflags) stg_binds_post_infer)
+
+    return (stg_binds_post_infer, denv, cost_centre_info, export_tag_info)
 
 {- **********************************************************************
 %*                                                                      *
@@ -2046,7 +2050,7 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
     prepd_binds <- {-# SCC "CorePrep" #-}
       liftIO $ corePrepPgm hsc_env this_mod iNTERACTIVELoc core_binds data_tycons
 
-    (stg_binds, _infotable_prov, _caf_ccs__caf_cc_stacks)
+    (stg_binds, _infotable_prov, _caf_ccs__caf_cc_stacks, _)
         <- {-# SCC "CoreToStg" #-}
            liftIO $ myCoreToStg (hsc_logger hsc_env)
                                 (hsc_dflags hsc_env)
