@@ -71,7 +71,7 @@ data Safety
                       --     * No blocking
                       --     * No precise exceptions
                       --
-  deriving ( Eq, Show, Data )
+  deriving ( Eq, Show, Data, Enum )
         -- Show used just for Show Lex.Token, I think
 
 instance Outputable Safety where
@@ -153,9 +153,14 @@ stdcall:        Caller allocates parameters, callee deallocates.
 See: http://www.programmersheaven.com/2/Calling-conventions
 -}
 
--- any changes here should be replicated in  the CallConv type in template haskell
-data CCallConv = CCallConv | CApiConv | StdCallConv | PrimCallConv | JavaScriptCallConv
-  deriving (Eq, Data)
+-- any changes here should be replicated in the CallConv type in template haskell
+data CCallConv
+  = CCallConv
+  | CApiConv
+  | StdCallConv
+  | PrimCallConv
+  | JavaScriptCallConv
+  deriving (Eq, Data, Enum)
 
 instance Outputable CCallConv where
   ppr StdCallConv = text "stdcall"
