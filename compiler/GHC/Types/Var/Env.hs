@@ -54,7 +54,6 @@ module GHC.Types.Var.Env (
         getInScopeVars, lookupInScope, lookupInScope_Directly,
         unionInScope, elemInScopeSet, uniqAway,
         varSetInScope,
-        unsafeGetFreshLocalUnique,
 
         -- * The RnEnv2 type
         RnEnv2,
