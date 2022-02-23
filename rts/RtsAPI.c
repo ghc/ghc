@@ -22,10 +22,6 @@
 
 /* ----------------------------------------------------------------------------
    Building Haskell objects from C datatypes.
-
-   TODO: Currently this code does not tag created pointers,
-         however it is not unsafe (the constructor code will do it)
-         just inefficient.
    ------------------------------------------------------------------------- */
 HaskellObj
 rts_mkChar (Capability *cap, HsChar c)
