@@ -17,25 +17,6 @@ many rules on individual synonym declarations. With the
 *only after expanding type synonyms*. That means that GHC can be very
 much more liberal about type synonyms than Haskell 98.
 
--  You can write a ``forall`` (including overloading) in a type synonym,
-   thus: ::
-
-         type Discard a = forall b. Show b => a -> b -> (a, String)
-
-         f :: Discard a
-         f x y = (x, show y)
-
-         g :: Discard Int -> (Int,String)    -- A rank-2 type
-         g f = f 3 True
-
--  If you also use :extension:`UnboxedTuples`, you can write an unboxed tuple
-   in a type synonym: ::
-
-         type Pr = (# Int, Int #)
-
-         h :: Int -> Pr
-         h x = (# x, x #)
-
 -  You can apply a type synonym to a forall type: ::
 
          type Foo a = a -> a -> Bool
@@ -57,8 +38,7 @@ much more liberal about type synonyms than Haskell 98.
 
          foo :: forall x. x -> [x]
 
-GHC currently does kind checking before expanding synonyms (though even
-that could be changed).
+GHC does kind checking before expanding synonyms.
 
 After expanding type synonyms, GHC does validity checking on types,
 looking for the following malformedness which isn't detected simply by
