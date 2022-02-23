@@ -154,7 +154,7 @@ class (Typeable e, Show e) => Exception e where
     -- | Represent the exception as 'SomeExceptionWithBacktrace'
     -- If @e@ isn't already of type 'SomeExceptionWithBacktrace' this means some kind of wrapping.
     toException   :: e -> SomeExceptionWithBacktrace
-    -- | Extract and cast the exception from it's wrapped representation
+    -- | Extract and cast the exception from its wrapped representation
     -- If the exception cannot be casted to the expected type then the result is 'Nothing'.
     fromException :: SomeExceptionWithBacktrace -> Maybe e
 

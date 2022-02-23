@@ -94,9 +94,9 @@ setDefaultBacktraceMechanisms = writeIORef currentBacktraceMechanisms
 getDefaultBacktraceMechanisms :: IO [BacktraceMechanism]
 getDefaultBacktraceMechanisms = readIORef currentBacktraceMechanisms
 
--- | Collect a list of 'Backtrace' via all current default 'BacktraceMechanism'.
+-- | Collect a list of 'Backtrace's via all current default 'BacktraceMechanism's.
 -- See 'setDefaultBacktraceMechanisms'
-collectBacktraces :: HasCallStack =>IO [Backtrace]
+collectBacktraces :: HasCallStack => IO [Backtrace]
 collectBacktraces = do
     mechs <- getDefaultBacktraceMechanisms
     catMaybes `fmap` mapM collectBacktraces' mechs

@@ -56,8 +56,8 @@ import GHC.Stack.Types
 -- 'Backtrace' backtraces are collected according to the configured
 -- 'BacktraceMechanism's.
 --
--- WARNING: You may want to use 'throwIO' instead so that your pure code
--- stays exception-free.
+-- WARNING: If you are in an `IO` context you may want to rather use 'throwIO'
+-- instead so that your pure code stays exception-free.
 throw :: HasCallStack => forall (r :: RuntimeRep). forall (a :: TYPE r). forall e.
          Exception e => e -> a
 throw e =
