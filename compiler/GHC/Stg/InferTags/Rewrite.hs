@@ -2,18 +2,19 @@
 -- Copyright (c) 2019 Andreas Klebinger
 --
 
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE BangPatterns               #-}
+{-# LANGUAGE CPP                        #-}
+{-# LANGUAGE DataKinds                  #-}
+{-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE FlexibleInstances          #-}
+{-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralisedNewtypeDeriving #-}
+{-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE NamedFieldPuns             #-}
+{-# LANGUAGE RankNTypes                 #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
+{-# LANGUAGE TupleSections              #-}
+{-# LANGUAGE TypeFamilies               #-}
 
 module GHC.Stg.InferTags.Rewrite (rewriteTopBinds)
 where
@@ -49,7 +50,6 @@ import GHC.Stg.InferTags.Types
 import Control.Monad
 import GHC.Types.Basic (CbvMark (NotMarkedCbv, MarkedCbv), isMarkedCbv, TopLevelFlag(..), isTopLevel)
 import GHC.Types.Var.Set
-
 -- import GHC.Utils.Trace
 -- import GHC.Driver.Ppr
 
@@ -371,10 +371,10 @@ rewriteCase (StgCase scrut bndr alt_type alts) =
 rewriteCase _ = panic "Impossible: nodeCase"
 
 rewriteAlt :: InferStgAlt -> RM TgStgAlt
-rewriteAlt (altCon, bndrs, rhs) = do
+rewriteAlt alt@GenStgAlt{alt_con=_, alt_bndrs=bndrs, alt_rhs=rhs} =
     withBinders NotTopLevel bndrs $ do
         !rhs' <- rewriteExpr False rhs
-        return $! (altCon, map fst bndrs, rhs')
+        return $! alt {alt_bndrs = map fst bndrs, alt_rhs = rhs'}
 
 rewriteLet :: InferStgExpr -> RM TgStgExpr
 rewriteLet (StgLet xt bind expr) = do
@@ -450,9 +450,9 @@ rewriteApp _ _ = panic "Impossible"
 mkSeq :: Id -> Id -> TgStgExpr -> TgStgExpr
 mkSeq id bndr !expr =
     -- pprTrace "mkSeq" (ppr (id,bndr)) $
-    let altTy = mkStgAltTypeFromStgAlts bndr [(DEFAULT, [], panic "Not used")]
-    in
-    StgCase (StgApp id []) bndr altTy [(DEFAULT, [], expr)]
+    let altTy = mkStgAltTypeFromStgAlts bndr alt
+        alt   = [GenStgAlt {alt_con = DEFAULT, alt_bndrs = [], alt_rhs = expr}]
+    in StgCase (StgApp id []) bndr altTy alt
 
 -- `mkSeqs args vs mkExpr` will force all vs, and construct
 -- an argument list args' where each v is replaced by it's evaluated

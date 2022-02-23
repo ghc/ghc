@@ -164,5 +164,4 @@ statExpr (StgCase expr _ _ alts)
     stat_alts alts      `combineSE`
     countOne StgCases
   where
-    stat_alts alts
-        = combineSEs (map statExpr [ e | (_,_,e) <- alts ])
+    stat_alts = combineSEs . fmap (statExpr . alt_rhs)

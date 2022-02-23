@@ -124,7 +124,8 @@ collectExpr = go
        return (StgTick tick e')
 
 collectAlt :: StgAlt -> M StgAlt
-collectAlt (ac, bs, e) = (ac, bs, ) <$> collectExpr e
+collectAlt alt = do e' <- collectExpr $ alt_rhs alt
+                    return $! alt { alt_rhs = e' }
 
 -- | Try to find the best source position surrounding a 'StgExpr'. The
 -- heuristic strips ticks from the current expression until it finds one which

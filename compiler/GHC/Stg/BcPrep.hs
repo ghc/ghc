@@ -96,7 +96,7 @@ bcPrepExpr app@StgConApp{} = pure app
 bcPrepExpr app@StgOpApp{} = pure app
 
 bcPrepAlt :: StgAlt -> BcPrepM StgAlt
-bcPrepAlt (ac, bndrs, expr) = (,,) ac bndrs <$> bcPrepExpr expr
+bcPrepAlt (GenStgAlt con bndrs rhs) = GenStgAlt con bndrs <$> bcPrepExpr rhs
 
 bcPrepBind :: StgBinding -> BcPrepM StgBinding
 -- explicitly match all constructors so we get a warning if we miss any

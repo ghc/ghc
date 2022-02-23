@@ -1,10 +1,10 @@
-
 {-# LANGUAGE ConstraintKinds      #-}
 {-# LANGUAGE DataKinds            #-}
 {-# LANGUAGE DeriveDataTypeable   #-}
 {-# LANGUAGE FlexibleContexts     #-}
 {-# LANGUAGE LambdaCase           #-}
 {-# LANGUAGE TypeFamilies         #-}
+{-# LANGUAGE NamedFieldPuns       #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 {-
@@ -23,7 +23,7 @@ module GHC.Stg.Syntax (
         StgArg(..),
 
         GenStgTopBinding(..), GenStgBinding(..), GenStgExpr(..), GenStgRhs(..),
-        GenStgAlt, AltType(..),
+        GenStgAlt(..), AltType(..),
 
         StgPass(..), BinderP, XRhsClosure, XLet, XLetNoEscape,
         NoExtFieldSilent, noExtFieldSilent,
@@ -457,10 +457,11 @@ the TyCon from the constructors or literals (which are guaranteed to have the
 Real McCoy) rather than from the scrutinee type.
 -}
 
-type GenStgAlt pass
-  = (AltCon,          -- alts: data constructor,
-     [BinderP pass],  -- constructor's parameters,
-     GenStgExpr pass) -- ...right-hand side.
+data GenStgAlt pass = GenStgAlt
+  { alt_con          :: !AltCon            -- alts: data constructor,
+  , alt_bndrs        :: ![BinderP pass]    -- constructor's parameters,
+  , alt_rhs          :: !(GenStgExpr pass) -- right-hand side.
+  }
 
 data AltType
   = PolyAlt             -- Polymorphic (a boxed type variable, lifted or unlifted)
@@ -836,11 +837,14 @@ pprStgExpr opts e = case e of
 
 
 pprStgAlt :: OutputablePass pass => StgPprOpts -> Bool -> GenStgAlt pass -> SDoc
-pprStgAlt opts indent (con, params, expr)
-  | indent    = hang altPattern 4 (pprStgExpr opts expr <> semi)
-  | otherwise = sep [altPattern, pprStgExpr opts expr <> semi]
+pprStgAlt opts indent GenStgAlt{alt_con, alt_bndrs, alt_rhs}
+  | indent    = hang altPattern 4 (pprStgExpr opts alt_rhs <> semi)
+  | otherwise = sep [altPattern, pprStgExpr opts alt_rhs <> semi]
     where
-      altPattern = (hsep [ppr con, sep (map (pprBndr CasePatBind) params), text "->"])
+      altPattern = hsep [ ppr alt_con
+                        , sep (map (pprBndr CasePatBind) alt_bndrs)
+                        , text "->"
+                        ]
 
 
 pprStgOp :: StgOp -> SDoc

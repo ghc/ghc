@@ -223,7 +223,7 @@ pprStgBindShort (StgRec bs) =
   char '{' <+> ppr (fst (head bs)) <+> text "= ...; ... }"
 
 pprStgAltShort :: OutputablePass pass => StgPprOpts -> GenStgAlt pass -> SDoc
-pprStgAltShort opts (con, args, expr) =
+pprStgAltShort opts GenStgAlt{alt_con=con, alt_bndrs=args, alt_rhs=expr} =
   ppr con <+> sep (map ppr args) <+> text "->" <+> pprStgExprShort opts expr
 
 pprStgRhsShort :: OutputablePass pass => StgPprOpts -> GenStgRhs pass -> SDoc

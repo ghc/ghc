@@ -42,10 +42,13 @@ mkUnarisedId s t = mkSysLocalM s Many t
 
 -- | Extract the default case alternative
 -- findDefaultStg :: [Alt b] -> ([Alt b], Maybe (Expr b))
-findDefaultStg :: [GenStgAlt p] -> ([(AltCon, [BinderP p], GenStgExpr p)],
-                       Maybe (GenStgExpr p))
-findDefaultStg ((DEFAULT, args, rhs) : alts) = assert( null args ) (alts, Just rhs)
-findDefaultStg alts                        =                     (alts, Nothing)
+findDefaultStg
+  :: [GenStgAlt p]
+  -> ([GenStgAlt p], Maybe (GenStgExpr p))
+findDefaultStg (GenStgAlt{ alt_con    = DEFAULT
+                         , alt_bndrs  = args
+                         , alt_rhs    = rhs} : alts) = assert( null args ) (alts, Just rhs)
+findDefaultStg alts                                  = (alts, Nothing)
 
 mkStgAltTypeFromStgAlts :: forall p. Id -> [GenStgAlt p] -> AltType
 mkStgAltTypeFromStgAlts bndr alts
@@ -80,7 +83,7 @@ mkStgAltTypeFromStgAlts bndr alts
    -- grabbing the one from a constructor alternative
    -- if one exists.
    look_for_better_tycon
-        | (((DataAlt con) ,_, _) : _) <- data_alts =
+        | (DataAlt con : _) <- alt_con <$> data_alts =
                 AlgAlt (dataConTyCon con)
         | otherwise =
                 assert(null data_alts)

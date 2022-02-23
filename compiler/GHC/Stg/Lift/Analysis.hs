@@ -333,8 +333,8 @@ rhsCard bndr
     n :* cd = idDemandInfo bndr
 
 tagSkeletonAlt :: CgStgAlt -> (Skeleton, IdSet, LlStgAlt)
-tagSkeletonAlt (con, bndrs, rhs)
-  = (alt_skel, arg_occs, (con, map BoringBinder bndrs, rhs'))
+tagSkeletonAlt old@GenStgAlt{alt_con=_, alt_bndrs=bndrs, alt_rhs=rhs}
+  = (alt_skel, arg_occs, old {alt_bndrs=fmap BoringBinder bndrs, alt_rhs=rhs'})
   where
     (alt_skel, alt_arg_occs, rhs') = tagSkeletonExpr rhs
     arg_occs = alt_arg_occs `delVarSetList` bndrs

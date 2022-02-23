@@ -884,11 +884,11 @@ doCase d s p scrut bndr alts
 
         -- given an alt, return a discr and code for it.
         codeAlt :: CgStgAlt -> BcM (Discr, BCInstrList)
-        codeAlt (DEFAULT, _, rhs)
+        codeAlt GenStgAlt{alt_con=DEFAULT,alt_bndrs=_,alt_rhs=rhs}
            = do rhs_code <- schemeE d_alts s p_alts rhs
                 return (NoDiscr, rhs_code)
 
-        codeAlt alt@(_, bndrs, rhs)
+        codeAlt alt@GenStgAlt{alt_con=_, alt_bndrs=bndrs, alt_rhs=rhs}
            -- primitive or nullary constructor alt: no need to UNPACK
            | null real_bndrs = do
                 rhs_code <- schemeE d_alts s p_alts rhs
@@ -939,24 +939,25 @@ doCase d s p scrut bndr alts
            where
              real_bndrs = filterOut isTyVar bndrs
 
-        my_discr (DEFAULT, _, _) = NoDiscr {-shouldn't really happen-}
-        my_discr (DataAlt dc, _, _)
-           | isUnboxedTupleDataCon dc || isUnboxedSumDataCon dc
-           = NoDiscr
-           | otherwise
-           = DiscrP (fromIntegral (dataConTag dc - fIRST_TAG))
-        my_discr (LitAlt l, _, _)
-           = case l of LitNumber LitNumInt i  -> DiscrI (fromInteger i)
-                       LitNumber LitNumWord w -> DiscrW (fromInteger w)
-                       LitFloat r   -> DiscrF (fromRational r)
-                       LitDouble r  -> DiscrD (fromRational r)
-                       LitChar i    -> DiscrI (ord i)
-                       _ -> pprPanic "schemeE(StgCase).my_discr" (ppr l)
+        my_discr alt = case alt_con alt of
+            DEFAULT    -> NoDiscr {-shouldn't really happen-}
+            DataAlt dc
+              | isUnboxedTupleDataCon dc || isUnboxedSumDataCon dc
+              -> NoDiscr
+              | otherwise
+              -> DiscrP (fromIntegral (dataConTag dc - fIRST_TAG))
+            LitAlt l -> case l of
+              LitNumber LitNumInt i  -> DiscrI (fromInteger i)
+              LitNumber LitNumWord w -> DiscrW (fromInteger w)
+              LitFloat r             -> DiscrF (fromRational r)
+              LitDouble r            -> DiscrD (fromRational r)
+              LitChar i              -> DiscrI (ord i)
+              _ -> pprPanic "schemeE(StgCase).my_discr" (ppr l)
 
         maybe_ncons
            | not isAlgCase = Nothing
            | otherwise
-           = case [dc | (DataAlt dc, _, _) <- alts] of
+           = case [dc | DataAlt dc <- alt_con <$> alts] of
                 []     -> Nothing
                 (dc:_) -> Just (tyConFamilySize (dataConTyCon dc))
 

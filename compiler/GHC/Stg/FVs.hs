@@ -270,7 +270,8 @@ argsFVs env = foldl' f (emptyVarSet, emptyDVarSet)
     f (fvs,ids) (StgVarArg v) = varFVs env v (fvs, ids)
 
 altFVs :: Env -> StgAlt -> (CgStgAlt, TopFVs, LocalFVs)
-altFVs env (con,bndrs,e)
+altFVs env GenStgAlt{alt_con=con, alt_bndrs=bndrs, alt_rhs=e}
   | (e', top_fvs, lcl_fvs) <- exprFVs (addLocals bndrs env) e
   , let lcl_fvs' = delDVarSetList lcl_fvs bndrs
-  = ((con,bndrs, e'), top_fvs, lcl_fvs')
+  , let newAlt   = GenStgAlt{alt_con=con, alt_bndrs=bndrs, alt_rhs=e'}
+  = (newAlt, top_fvs, lcl_fvs')

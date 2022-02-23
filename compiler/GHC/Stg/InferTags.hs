@@ -333,7 +333,7 @@ inferTagExpr env (StgLetNoEscape ext bind body)
 
 inferTagExpr in_env (StgCase scrut bndr ty alts)
   -- Unboxed tuples get their info from the expression we scrutinise if any
-  | [(DataAlt con, bndrs, rhs)] <- alts
+  | [GenStgAlt{alt_con=DataAlt con, alt_bndrs=bndrs, alt_rhs=rhs}] <- alts
   , isUnboxedTupleDataCon con
   , Just infos <- scrut_infos bndrs
   , let bndrs' = zipWithEqual "inferTagExpr" mk_bndr bndrs infos
@@ -350,7 +350,9 @@ inferTagExpr in_env (StgCase scrut bndr ty alts)
     --   text "bndr:" <> ppr bndr $$
     --   text "infos" <> ppr infos $$
     --   text "out_bndrs" <> ppr bndrs') $
-    (info, StgCase scrut' (noSig in_env bndr) ty [(DataAlt con, bndrs', rhs')])
+    (info, StgCase scrut' (noSig in_env bndr) ty [GenStgAlt{ alt_con=DataAlt con
+                                                           , alt_bndrs=bndrs'
+                                                           , alt_rhs=rhs'}])
 
   | null alts -- Empty case, but I might just be paranoid.
   = -- pprTrace "inferCase2" empty $
@@ -362,11 +364,14 @@ inferTagExpr in_env (StgCase scrut bndr ty alts)
         case_env = extendSigEnv in_env [bndr']
 
         (infos, alts')
-          = unzip [ (info, (con, bndrs', rhs'))
-                  | (con, bndrs, rhs) <- alts
+          = unzip [ (info, g {alt_bndrs=bndrs', alt_rhs=rhs'})
+                  | g@GenStgAlt{ alt_con = con
+                               , alt_bndrs = bndrs
+                               , alt_rhs   = rhs
+                               } <- alts
                   , let (alt_env,bndrs') = addAltBndrInfo case_env con bndrs
                         (info, rhs') = inferTagExpr alt_env rhs
-                         ]
+                  ]
         alt_info = foldr combineAltInfo TagTagged infos
     in ( alt_info, StgCase scrut' bndr' ty alts')
   where

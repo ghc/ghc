@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -455,7 +456,7 @@ coreToStgExpr (Case scrut bndr _ alts)
        ; alts2 <- extendVarEnvCts [(bndr, LambdaBound)] (mapM vars_alt alts)
        ; return (StgCase scrut2 bndr (mkStgAltType bndr alts) alts2) }
   where
-    vars_alt :: CoreAlt -> CtsM (AltCon, [Var], StgExpr)
+    vars_alt :: CoreAlt -> CtsM StgAlt
     vars_alt (Alt con binders rhs)
       | DataAlt c <- con, c == unboxedUnitDataCon
       = -- This case is a bit smelly.
@@ -463,14 +464,18 @@ coreToStgExpr (Case scrut bndr _ alts)
         -- where a nullary tuple is mapped to (State# World#)
         assert (null binders) $
         do { rhs2 <- coreToStgExpr rhs
-           ; return (DEFAULT, [], rhs2)  }
+           ; return GenStgAlt{alt_con=DEFAULT,alt_bndrs=mempty,alt_rhs=rhs2}
+           }
       | otherwise
       = let     -- Remove type variables
             binders' = filterStgBinders binders
         in
         extendVarEnvCts [(b, LambdaBound) | b <- binders'] $ do
         rhs2 <- coreToStgExpr rhs
-        return (con, binders', rhs2)
+        return $! GenStgAlt{ alt_con   = con
+                           , alt_bndrs = binders'
+                           , alt_rhs   = rhs2
+                           }
 
 coreToStgExpr (Let bind body) = coreToStgLet bind body
 coreToStgExpr e               = pprPanic "coreToStgExpr" (ppr e)

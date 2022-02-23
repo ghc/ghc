@@ -245,15 +245,20 @@ lintStgExpr (StgCase scrut bndr alts_type alts) = do
 
 lintAlt
     :: (OutputablePass a, BinderP a ~ Id)
-    => (AltCon, [Id], GenStgExpr a) -> LintM ()
+    => GenStgAlt a -> LintM ()
 
-lintAlt (DEFAULT, _, rhs) =
-    lintStgExpr rhs
+lintAlt GenStgAlt{ alt_con   = DEFAULT
+                 , alt_bndrs = _
+                 , alt_rhs   = rhs} = lintStgExpr rhs
 
-lintAlt (LitAlt _, _, rhs) =
-    lintStgExpr rhs
+lintAlt GenStgAlt{ alt_con   = LitAlt _
+                 , alt_bndrs = _
+                 , alt_rhs   = rhs} = lintStgExpr rhs
 
-lintAlt (DataAlt _, bndrs, rhs) = do
+lintAlt GenStgAlt{ alt_con   = DataAlt _
+                 , alt_bndrs = bndrs
+                 , alt_rhs   = rhs} =
+  do
     mapM_ checkPostUnariseBndr bndrs
     addInScopeVars bndrs (lintStgExpr rhs)
 

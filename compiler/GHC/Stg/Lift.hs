@@ -249,5 +249,7 @@ liftExpr (StgLetNoEscape scope bind body)
         Just bind' -> pure (StgLetNoEscape noExtFieldSilent bind' body')
 
 liftAlt :: LlStgAlt -> LiftM OutStgAlt
-liftAlt (con, infos, rhs) = withSubstBndrs (map binderInfoBndr infos) $ \bndrs' ->
-  (,,) con bndrs' <$> liftExpr rhs
+liftAlt alt@GenStgAlt{alt_con=_, alt_bndrs=infos, alt_rhs=rhs} =
+  withSubstBndrs (map binderInfoBndr infos) $ \bndrs' ->
+    do !rhs' <- liftExpr rhs
+       return $! alt {alt_bndrs = bndrs', alt_rhs = rhs'}

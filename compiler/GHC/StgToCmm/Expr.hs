@@ -459,7 +459,7 @@ job we deleted the hacks.
 
 cgCase (StgApp v []) _ (PrimAlt _) alts
   | isVoidRep (idPrimRep v)  -- See Note [Scrutinising VoidRep]
-  , [(DEFAULT, _, rhs)] <- alts
+  , [GenStgAlt{alt_con=DEFAULT, alt_bndrs=_, alt_rhs=rhs}] <- alts
   = cgExpr rhs
 
 {- Note [Dodgy unsafeCoerce 1]
@@ -652,9 +652,10 @@ chooseReturnBndrs :: Id -> AltType -> [CgStgAlt] -> [NonVoid Id]
 chooseReturnBndrs bndr (PrimAlt _) _alts
   = assertNonVoidIds [bndr]
 
-chooseReturnBndrs _bndr (MultiValAlt n) [(_, ids, _)]
+chooseReturnBndrs _bndr (MultiValAlt n) [alt]
   = assertPpr (ids `lengthIs` n) (ppr n $$ ppr ids $$ ppr _bndr) $
     assertNonVoidIds ids     -- 'bndr' is not assigned!
+    where ids = alt_bndrs alt
 
 chooseReturnBndrs bndr (AlgAlt _) _alts
   = assertNonVoidIds [bndr]  -- Only 'bndr' is assigned
@@ -669,11 +670,11 @@ chooseReturnBndrs _ _ _ = panic "chooseReturnBndrs"
 cgAlts :: (GcPlan,ReturnKind) -> NonVoid Id -> AltType -> [CgStgAlt]
        -> FCode ReturnKind
 -- At this point the result of the case are in the binders
-cgAlts gc_plan _bndr PolyAlt [(_, _, rhs)]
-  = maybeAltHeapCheck gc_plan (cgExpr rhs)
+cgAlts gc_plan _bndr PolyAlt [alt]
+  = maybeAltHeapCheck gc_plan (cgExpr $ alt_rhs alt)
 
-cgAlts gc_plan _bndr (MultiValAlt _) [(_, _, rhs)]
-  = maybeAltHeapCheck gc_plan (cgExpr rhs)
+cgAlts gc_plan _bndr (MultiValAlt _) [alt]
+  = maybeAltHeapCheck gc_plan (cgExpr $ alt_rhs alt)
         -- Here bndrs are *already* in scope, so don't rebind them
 
 cgAlts gc_plan bndr (PrimAlt _) alts
@@ -942,7 +943,7 @@ cgAltRhss gc_plan bndr alts = do
   let
     base_reg = idToReg platform bndr
     cg_alt :: CgStgAlt -> FCode (AltCon, CmmAGraphScoped)
-    cg_alt (con, bndrs, rhs)
+    cg_alt GenStgAlt{alt_con=con, alt_bndrs=bndrs, alt_rhs=rhs}
       = getCodeScoped             $
         maybeAltHeapCheck gc_plan $
         do { _ <- bindConArgs con base_reg (assertNonVoidIds bndrs)
