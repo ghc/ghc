@@ -6,6 +6,7 @@ Records
 .. toctree::
     :maxdepth: 1
 
+    record_field_resolution
     traditional_record_syntax
     field_selectors_and_type_applications
     disambiguate_record_fields
