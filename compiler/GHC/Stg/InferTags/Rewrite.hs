@@ -25,7 +25,7 @@ import GHC.Types.Name
 import GHC.Types.Unique.Supply
 import GHC.Types.Unique.FM
 import GHC.Types.RepType
-import GHC.Unit.Types (Module)
+import GHC.Unit.Types (Module, isInteractiveModule)
 
 import GHC.Core.DataCon
 import GHC.Core (AltCon(..) )
@@ -220,6 +220,8 @@ isTagged v = do
         True
             | isUnliftedType (idType v)
             -> return True
+            | isInteractiveModule this_mod
+            -> return False
             | otherwise -> do -- Local binding
                 !s <- getMap
                 let !sig = lookupWithDefaultUFM s (pprPanic "unknown Id:" (ppr v)) v
