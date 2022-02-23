@@ -703,6 +703,8 @@ data RuleMatchEnv
        , rv_fltR  :: Subst           -- Renamings for floated let-bindings
                                      --   (domain disjoint from envR of rv_lcl)
                                      -- See Note [Matching lets]
+                                     -- N.B. The InScopeSet of rv_fltR is always ignored;
+                                     -- see (4) in Note [Matching lets].
        , rv_unf :: IdUnfoldingFun
        }
 
@@ -959,7 +961,10 @@ match renv subst e1 (Let bind e2) mco
   | otherwise
   = Nothing
   where
-    (flt_subst', bind') = substBind (rv_fltR renv) bind
+    in_scope  = rnInScopeSet (rv_lcl renv) `extendInScopeSetList` rs_bndrs subst
+                -- in_scope: see (4) in Note [Matching lets]
+    flt_subst = rv_fltR renv `setInScope` in_scope
+    (flt_subst', bind') = substBind flt_subst bind
     new_bndrs           = bindersOf bind'
 
 ------------------------  Lambdas ---------------------
@@ -1319,7 +1324,6 @@ Hence, (a) the guard (not (isLocallyBoundR v2))
 
 Note [Tick annotations in RULE matching]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 We used to unconditionally look through ticks in both template and
 expression being matched. This is actually illegal for counting or
 cost-centre-scoped ticks, because we have no place to put them without
@@ -1335,6 +1339,7 @@ ignored by the matcher. See Note [Simplifying rules] in
 GHC.Core.Opt.Simplify.Utils for details.
 
 cf Note [Tick annotations in call patterns] in GHC.Core.Opt.SpecConstr
+
 
 Note [Matching lets]
 ~~~~~~~~~~~~~~~~~~~~
@@ -1354,38 +1359,55 @@ part of the target expression outside the let binding; e.g.
 Here we obviously cannot float the let-binding for w.  Hence the
 use of okToFloat.
 
-There are a couple of tricky points.
-  (a) What if floating the binding captures a variable?
+There are a couple of tricky points:
+  (a) What if floating the binding captures a variable that is
+      free in the entire expression?
         f (let v = x+1 in v) v
       --> NOT!
         let v = x+1 in f (x+1) v
 
-  (b) What if two non-nested let bindings bind the same variable?
+  (b) What if the let shadows a local binding?
+        f (\v -> (v, let v = x+1 in (v,v))
+      --> NOT!
+        let v = x+1 in f (\v -> (v, (v,v)))
+
+  (c) What if two non-nested let bindings bind the same variable?
         f (let v = e1 in b1) (let v = e2 in b2)
       --> NOT!
         let v = e1 in let v = e2 in (f b2 b2)
-      See testsuite test "T4814".
+      See testsuite test `T4814`.
 
 Our cunning plan is this:
-  * Along with the growing substitution for template variables
-    we maintain a growing set of floated let-bindings (rs_binds)
-    plus the set of variables thus bound (rs_bndrs).
+  (1) Along with the growing substitution for template variables
+      we maintain a growing set of floated let-bindings (rs_binds)
+      plus the set of variables thus bound (rs_bndrs).
 
-  * The RnEnv2 in the MatchEnv binds only the local binders
-    in the term (lambdas, case), not the floated let-bndrs.
+  (2) The RnEnv2 in the MatchEnv binds only the local binders
+      in the term (lambdas, case), not the floated let-bndrs.
 
-  * When we encounter a let in the term to be matched, we use
-    okToFloat check that does not mention any locally bound (lambda,
-    case) variables.  If so we fail.
+  (3) When we encounter a `let` in the term to be matched, in the Let
+      case of `match`, we use `okToFloat` to check that it does not mention any
+      locally bound (lambda, case) variables.  If so we fail.
 
-  * We use GHC.Core.Subst.substBind to freshen the binding, using an
-    in-scope set that is the original in-scope variables plus the
-    rs_bndrs (currently floated let-bindings).  So in (a) above
-    we'll freshen the 'v' binding; in (b) above we'll freshen
-    the *second* 'v' binding.
+  (4) In the Let case of `match`, we use GHC.Core.Subst.substBind to
+      freshen the binding (which, remember (3), mentions no locally
+      bound variables), in a lexically-scoped way (via rv_fltR in
+      MatchEnv).
 
-  * We apply that freshening substitution, in a lexically-scoped
-    way to the term, although lazily; this is the rv_fltR field.
+      The subtle point is that we want an in-scope set for this
+      substitution that includes /two/ sets:
+      * The in-scope variables at this point, so that we avoid using
+        those local names for the floated binding; points (a) and (b) above.
+      * All "earlier" floated bindings, so that we avoid using the
+        same name for two different floated bindings; point (c) above.
+
+      Because we have to compute the in-scope set here, the in-scope set
+      stored in `rv_fltR` is always ignored; we leave it only because it's
+      convenient to have `rv_fltR :: Subst` (with an always-ignored `InScopeSet`)
+      rather than storing three separate substitutions.
+
+  (5) We apply that freshening substitution, in a lexically-scoped
+      way to the term, although lazily; this is the rv_fltR field.
 
 See #4814, which is an issue resulting from getting this wrong.
 
