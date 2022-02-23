@@ -59,7 +59,7 @@ module GHC.Types.Name.Occurrence (
         mkMatcherOcc, mkBuilderOcc,
         mkDefaultMethodOcc, isDefaultMethodOcc, isTypeableBindOcc,
         mkNewTyCoOcc, mkClassOpAuxOcc,
-        mkCon2TagOcc, mkTag2ConOcc, mkMaxTagOcc,
+        mkTag2ConOcc, mkMaxTagOcc,
         mkClassDataConOcc, mkDictOcc, mkIPOcc,
         mkSpecOcc, mkForeignExportOcc, mkRepEqOcc,
         mkGenR, mkGen1R,
@@ -620,7 +620,7 @@ mkDataConWrapperOcc, mkWorkerOcc,
         mkGenR, mkGen1R,
         mkDataConWorkerOcc, mkNewTyCoOcc,
         mkInstTyCoOcc, mkEqPredCoOcc, mkClassOpAuxOcc,
-        mkCon2TagOcc, mkTag2ConOcc, mkMaxTagOcc, mkDataTOcc, mkDataCOcc,
+        mkTag2ConOcc, mkMaxTagOcc, mkDataTOcc, mkDataCOcc,
         mkTyConRepOcc
    :: OccName -> OccName
 
@@ -643,7 +643,6 @@ mkEqPredCoOcc       = mk_simple_deriv tcName   "$co"
 
 -- Used in derived instances for the names of auxiliary bindings.
 -- See Note [Auxiliary binders] in GHC.Tc.Deriv.Generate.
-mkCon2TagOcc        = mk_simple_deriv varName  "$con2tag_"
 mkTag2ConOcc        = mk_simple_deriv varName  "$tag2con_"
 mkMaxTagOcc         = mk_simple_deriv varName  "$maxtag_"
 mkDataTOcc          = mk_simple_deriv varName  "$t"
