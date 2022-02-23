@@ -1364,7 +1364,7 @@ There are a couple of tricky points.
         f (let v = e1 in b1) (let v = e2 in b2)
       --> NOT!
         let v = e1 in let v = e2 in (f b2 b2)
-      See testsuite test "RuleFloatLet".
+      See testsuite test "T4814".
 
 Our cunning plan is this:
   * Along with the growing substitution for template variables
@@ -1387,6 +1387,7 @@ Our cunning plan is this:
   * We apply that freshening substitution, in a lexically-scoped
     way to the term, although lazily; this is the rv_fltR field.
 
+See #4814, which is an issue resulting from getting this wrong.
 
 Note [Matching cases]
 ~~~~~~~~~~~~~~~~~~~~~
