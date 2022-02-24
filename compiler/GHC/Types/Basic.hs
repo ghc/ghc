@@ -84,7 +84,7 @@ module GHC.Types.Basic (
         InlinePragma(..), defaultInlinePragma, alwaysInlinePragma,
         neverInlinePragma, dfunInlinePragma,
         isDefaultInlinePragma,
-        isInlinePragma, isInlinablePragma, isAnyInlinePragma,
+        isInlinePragma, isInlinablePragma, isNoInlinePragma, isAnyInlinePragma,
         inlinePragmaSpec, inlinePragmaSat,
         inlinePragmaActivation, inlinePragmaRuleMatchInfo,
         setInlinePragmaActivation, setInlinePragmaRuleMatchInfo,
@@ -1457,6 +1457,11 @@ isInlinablePragma :: InlinePragma -> Bool
 isInlinablePragma prag = case inl_inline prag of
                            Inlinable -> True
                            _         -> False
+
+isNoInlinePragma :: InlinePragma -> Bool
+isNoInlinePragma prag = case inl_inline prag of
+                          NoInline     -> True
+                          _            -> False
 
 isAnyInlinePragma :: InlinePragma -> Bool
 -- INLINE or INLINABLE
