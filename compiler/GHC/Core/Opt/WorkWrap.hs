@@ -12,6 +12,7 @@ import GHC.Prelude
 import GHC.Core.Opt.Arity  ( manifestArity )
 import GHC.Core
 import GHC.Core.Unfold.Make
+import GHC.Core.SimpleOpt
 import GHC.Core.Utils  ( exprType, exprIsHNF )
 import GHC.Core.FVs    ( exprFreeVars )
 import GHC.Types.Var
@@ -505,7 +506,7 @@ tryWW   :: DynFlags
 tryWW dflags fam_envs is_rec fn_id rhs
   -- See Note [Worker-wrapper for NOINLINE functions]
 
-  | Just stable_unf <- certainlyWillInline uf_opts fn_info
+  | Just stable_unf <- certainlyWillInline uf_opts fn_info rhs
   = return [ (fn_id `setIdUnfolding` stable_unf, rhs) ]
         -- See Note [Don't w/w INLINE things]
         -- See Note [Don't w/w inline small non-loop-breaker things]
@@ -634,7 +635,7 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds div cpr rhs
             Nothing -> return [(fn_id, rhs)]
 
             Just stuff
-              | let opt_wwd_rhs = simpleOptExpr (wo_simple_opts ww_opts) rhs
+              | let opt_wwd_rhs = simpleOptExpr (initSimpleOpts dflags) rhs
                   -- We need to stabilise the WW'd (and optimised) RHS below
               , Just stable_unf <- certainlyWillInline uf_opts fn_info opt_wwd_rhs
               ->  return [ (fn_id `setIdUnfolding` stable_unf, rhs) ]
@@ -646,6 +647,7 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds div cpr rhs
                     ; return (mkWWBindPair dflags fn_id fn_info arity rhs
                                            work_uniq div stuff) } }
   where
+    uf_opts      = unfoldingOpts dflags
     rhs_fvs = exprFreeVars rhs
     arity   = arityInfo fn_info
             -- The arity is set by the simplifier using exprEtaExpandArity

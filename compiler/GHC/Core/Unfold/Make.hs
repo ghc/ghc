@@ -355,7 +355,7 @@ certainlyWillInline opts fn_info rhs'
         --    See Note [certainlyWillInline: INLINABLE]
     do_cunf size args src' tmpl'
       | arityInfo fn_info > 0  -- See Note [certainlyWillInline: be careful of thunks]
-      , not (isDeadEndSig (dmdSigInfo fn_info))
+      , not (isDeadEndSig (strictnessInfo fn_info))
               -- Do not unconditionally inline a bottoming functions even if
               -- it seems smallish. We've carefully lifted it out to top level,
               -- so we don't want to re-inline it.
