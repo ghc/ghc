@@ -154,4 +154,4 @@ test('EmptyCase007', [],  compile, [overlapping_incomplete])
 test('EmptyCase008', [],  compile, [overlapping_incomplete])
 test('EmptyCase009', [],  compile, [overlapping_incomplete])
 test('EmptyCase010', [],  compile, [overlapping_incomplete])
-
+test('T19271', [],  compile, [overlapping_incomplete])

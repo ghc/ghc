@@ -1,0 +1,9 @@
+
+T19271.hs:11:5: warning: [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In a case alternative:
+        Patterns of type ‘Roles’ not matched:
+            RolesUnsubscribed _
+            RolesPartner _
+            RolesAnonymousClient _
+            RolesAnonymousVendor _
