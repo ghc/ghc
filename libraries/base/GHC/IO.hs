@@ -207,16 +207,34 @@ mplusIO m n = m `catchException` \ (_ :: IOError) -> n
 -- Although 'throwIO' has a type that is an instance of the type of 'throw', the
 -- two functions are subtly different:
 --
--- > throw e   `seq` x  ===> throw e
--- > throwIO e `seq` x  ===> x
+-- > throw e   `seq` ()  ===> throw e
+-- > throwIO e `seq` ()  ===> ()
 --
 -- The first example will cause the exception @e@ to be raised,
 -- whereas the second one won\'t.  In fact, 'throwIO' will only cause
 -- an exception to be raised when it is used within the 'IO' monad.
+--
 -- The 'throwIO' variant should be used in preference to 'throw' to
 -- raise an exception within the 'IO' monad because it guarantees
--- ordering with respect to other 'IO' operations, whereas 'throw'
--- does not.
+-- ordering with respect to other operations, whereas 'throw'
+-- does not. We say that 'throwIO' throws *precise* exceptions and
+-- 'throw', 'error', etc. all throw *imprecise* exceptions.
+-- For example
+--
+-- > throw e + error "boom" ===> error "boom"
+-- > throw e + error "boom" ===> throw e
+--
+-- are both valid reductions and the compiler may pick any (loop, even), whereas
+--
+-- > throwIO e >> error "boom" ===> throwIO e
+--
+-- will always throw @e@ when executed.
+--
+-- See also the
+-- [GHC wiki page on precise exceptions](https://gitlab.haskell.org/ghc/ghc/-/wikis/exceptions/precise-exceptions)
+-- for a more technical introduction to how GHC optimises around precise vs.
+-- imprecise exceptions.
+--
 throwIO :: Exception e => e -> IO a
 throwIO e = IO (raiseIO# (toException e))
 
