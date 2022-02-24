@@ -706,9 +706,9 @@ gtWord64, geWord64, ltWord64, leWord64 :: Word64 -> Word64 -> Bool
 
 -- | @since 2.01
 instance Num Word64 where
-    (W64# x#) + (W64# y#)  = W64# (int64ToWord64# (word64ToInt64# x# `plusInt64#` word64ToInt64# y#))
-    (W64# x#) - (W64# y#)  = W64# (int64ToWord64# (word64ToInt64# x# `subInt64#` word64ToInt64# y#))
-    (W64# x#) * (W64# y#)  = W64# (int64ToWord64# (word64ToInt64# x# `timesInt64#` word64ToInt64# y#))
+    (W64# x#) + (W64# y#)  = W64# (x# `plusWord64#` y#)
+    (W64# x#) - (W64# y#)  = W64# (x# `subWord64#` y#)
+    (W64# x#) * (W64# y#)  = W64# (x# `timesWord64#` y#)
     negate (W64# x#)       = W64# (int64ToWord64# (negateInt64# (word64ToInt64# x#)))
     abs x                  = x
     signum 0               = 0
