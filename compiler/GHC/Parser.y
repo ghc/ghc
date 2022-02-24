@@ -2563,7 +2563,7 @@ sigdecl :: { LHsDecl GhcPs }
 
         | pattern_synonym_sig   { sL1 $1 . SigD noExtField . unLoc $ $1 }
 
-        | '{-# COMPLETE' con_list opt_tyconsig  '#-}'
+        | '{-# COMPLETE' qcon_list opt_tyconsig  '#-}'
                 {% let (dcolon, tc) = $3
                    in acsA
                        (\cs -> sLL $1 $>
@@ -3523,6 +3523,11 @@ con_list :: { Located [LocatedN RdrName] }
 con_list : con                  { sL1N $1 [$1] }
          | con ',' con_list     {% do { h <- addTrailingCommaN $1 (gl $2)
                                       ; return (sLL (reLocN $1) $> (h : unLoc $3)) }}
+
+qcon_list :: { Located [LocatedN RdrName] }
+qcon_list : qcon                  { sL1N $1 [$1] }
+          | qcon ',' qcon_list    {% do { h <- addTrailingCommaN $1 (gl $2)
+                                        ; return (sLL (reLocN $1) $> (h : unLoc $3)) }}
 
 -- See Note [ExplicitTuple] in GHC.Hs.Expr
 sysdcon_nolist :: { LocatedN DataCon }  -- Wired in data constructors
