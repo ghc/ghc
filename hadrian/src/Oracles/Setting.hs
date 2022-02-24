@@ -132,7 +132,7 @@ data SettingsFileSetting
 -- | Look up the value of a 'Setting' in @cfg/system.config@, tracking the
 -- result.
 setting :: Setting -> Action String
-setting key = lookupValueOrError configFile $ case key of
+setting key = lookupSystemConfig $ case key of
     BuildArch          -> "build-arch"
     BuildOs            -> "build-os"
     BuildPlatform      -> "build-platform"
@@ -185,7 +185,7 @@ setting key = lookupValueOrError configFile $ case key of
 -- | Look up the value of a 'SettingList' in @cfg/system.config@, tracking the
 -- result.
 settingList :: SettingList -> Action [String]
-settingList key = fmap words $ lookupValueOrError configFile $ case key of
+settingList key = fmap words $ lookupSystemConfig $ case key of
     ConfCcArgs        stage -> "conf-cc-args-"         ++ stageString stage
     ConfCppArgs       stage -> "conf-cpp-args-"        ++ stageString stage
     ConfGccLinkerArgs stage -> "conf-gcc-linker-args-" ++ stageString stage
@@ -197,7 +197,7 @@ settingList key = fmap words $ lookupValueOrError configFile $ case key of
 -- result.
 -- See Note [tooldir: How GHC finds mingw on Windows]
 settingsFileSetting :: SettingsFileSetting -> Action String
-settingsFileSetting key = lookupValueOrError configFile $ case key of
+settingsFileSetting key = lookupSystemConfig $ case key of
     SettingsFileSetting_CCompilerCommand -> "settings-c-compiler-command"
     SettingsFileSetting_HaskellCPPCommand -> "settings-haskell-cpp-command"
     SettingsFileSetting_HaskellCPPFlags -> "settings-haskell-cpp-flags"
