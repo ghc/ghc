@@ -7,7 +7,7 @@ module Rules.Generate (
 import Base
 import qualified Context
 import Expression
-import Hadrian.Oracles.TextFile (lookupValueOrError)
+import Hadrian.Oracles.TextFile (lookupSystemConfig)
 import Oracles.Flag
 import Oracles.ModuleFiles
 import Oracles.Setting
@@ -292,7 +292,7 @@ generateSettings :: Expr String
 generateSettings = do
     ctx <- getContext
     settings <- traverse sequence $
-        [ ("GCC extra via C opts", expr $ lookupValueOrError configFile "gcc-extra-via-c-opts")
+        [ ("GCC extra via C opts", expr $ lookupSystemConfig "gcc-extra-via-c-opts")
         , ("C compiler command", expr $ settingsFileSetting SettingsFileSetting_CCompilerCommand)
         , ("C compiler flags", expr $ settingsFileSetting SettingsFileSetting_CCompilerFlags)
         , ("C++ compiler flags", expr $ settingsFileSetting SettingsFileSetting_CxxCompilerFlags)
@@ -302,14 +302,14 @@ generateSettings = do
         , ("Haskell CPP flags", expr $ settingsFileSetting SettingsFileSetting_HaskellCPPFlags)
         , ("ld command", expr $ settingsFileSetting SettingsFileSetting_LdCommand)
         , ("ld flags", expr $ settingsFileSetting SettingsFileSetting_LdFlags)
-        , ("ld supports compact unwind", expr $ lookupValueOrError configFile "ld-has-no-compact-unwind")
-        , ("ld supports build-id", expr $ lookupValueOrError configFile "ld-has-build-id")
-        , ("ld supports filelist", expr $ lookupValueOrError configFile "ld-has-filelist")
-        , ("ld is GNU ld", expr $ lookupValueOrError configFile "ld-is-gnu-ld")
+        , ("ld supports compact unwind", expr $ lookupSystemConfig "ld-has-no-compact-unwind")
+        , ("ld supports build-id", expr $ lookupSystemConfig "ld-has-build-id")
+        , ("ld supports filelist", expr $ lookupSystemConfig "ld-has-filelist")
+        , ("ld is GNU ld", expr $ lookupSystemConfig "ld-is-gnu-ld")
         , ("Merge objects command", expr $ settingsFileSetting SettingsFileSetting_MergeObjectsCommand)
         , ("Merge objects flags", expr $ settingsFileSetting SettingsFileSetting_MergeObjectsFlags)
         , ("ar command", expr $ settingsFileSetting SettingsFileSetting_ArCommand)
-        , ("ar flags", expr $ lookupValueOrError configFile "ar-args")
+        , ("ar flags", expr $ lookupSystemConfig "ar-args")
         , ("ar supports at file", expr $ yesNo <$> flag ArSupportsAtFile)
         , ("ranlib command", expr $ settingsFileSetting SettingsFileSetting_RanlibCommand)
         , ("otool command", expr $ settingsFileSetting SettingsFileSetting_OtoolCommand)
@@ -323,13 +323,13 @@ generateSettings = do
         , ("target platform string", getSetting TargetPlatform)
         , ("target os", getSetting TargetOsHaskell)
         , ("target arch", getSetting TargetArchHaskell)
-        , ("target word size", expr $ lookupValueOrError configFile "target-word-size")
-        , ("target word big endian", expr $ lookupValueOrError configFile "target-word-big-endian")
-        , ("target has GNU nonexec stack", expr $ lookupValueOrError configFile "target-has-gnu-nonexec-stack")
-        , ("target has .ident directive", expr $ lookupValueOrError configFile "target-has-ident-directive")
-        , ("target has subsections via symbols", expr $ lookupValueOrError configFile "target-has-subsections-via-symbols")
-        , ("target has RTS linker", expr $ lookupValueOrError configFile "target-has-rts-linker")
-        , ("target has libm", expr $  lookupValueOrError configFile "target-has-libm")
+        , ("target word size", expr $ lookupSystemConfig "target-word-size")
+        , ("target word big endian", expr $ lookupSystemConfig "target-word-big-endian")
+        , ("target has GNU nonexec stack", expr $ lookupSystemConfig "target-has-gnu-nonexec-stack")
+        , ("target has .ident directive", expr $ lookupSystemConfig "target-has-ident-directive")
+        , ("target has subsections via symbols", expr $ lookupSystemConfig "target-has-subsections-via-symbols")
+        , ("target has RTS linker", expr $ lookupSystemConfig "target-has-rts-linker")
+        , ("target has libm", expr $  lookupSystemConfig "target-has-libm")
         , ("Unregisterised", expr $ yesNo <$> flag GhcUnregisterised)
         , ("LLVM target", getSetting LlvmTarget)
         , ("LLVM llc command", expr $ settingsFileSetting SettingsFileSetting_LlcCommand)

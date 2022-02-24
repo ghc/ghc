@@ -11,7 +11,7 @@
 -- to read configuration or package metadata files and cache the parsing.
 -----------------------------------------------------------------------------
 module Hadrian.Oracles.TextFile (
-    lookupValue, lookupValueOrEmpty, lookupValueOrError, lookupValues,
+    lookupValue, lookupValueOrEmpty, lookupValueOrError, lookupSystemConfig, lookupValues,
     lookupValuesOrEmpty, lookupValuesOrError, lookupDependencies, textFileOracle
     ) where
 
@@ -22,6 +22,7 @@ import Data.List
 import Development.Shake
 import Development.Shake.Classes
 import Development.Shake.Config
+import Base
 
 import Hadrian.Utilities
 
@@ -35,10 +36,16 @@ lookupValueOrEmpty :: FilePath -> String -> Action String
 lookupValueOrEmpty file key = fromMaybe "" <$> lookupValue file key
 
 -- | Like 'lookupValue' but raises an error if the key is not found.
-lookupValueOrError :: FilePath -> String -> Action String
-lookupValueOrError file key = fromMaybe (error msg) <$> lookupValue file key
+lookupValueOrError :: Maybe String -> FilePath -> String -> Action String
+lookupValueOrError helper file key = fromMaybe (error msg) <$> lookupValue file key
   where
-    msg = "Key " ++ quote key ++ " not found in file " ++ quote file
+    msg = unlines $ ["Key " ++ quote key ++ " not found in file " ++ quote file]
+                    ++ maybeToList helper
+
+lookupSystemConfig :: String -> Action String
+lookupSystemConfig = lookupValueOrError (Just configError) configFile
+  where
+    configError = "Perhaps you need to rerun ./configure"
 
 -- | Lookup a list of values in a text file, tracking the result. Each line of
 -- the file is expected to have @key value1 value2 ...@ format.

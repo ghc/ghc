@@ -49,7 +49,7 @@ flag f = do
             BootstrapThreadedRts -> "bootstrap-threaded-rts"
             BootstrapEventLoggingRts -> "bootstrap-event-logging-rts"
             UseLibffiForAdjustors -> "use-libffi-for-adjustors"
-    value <- lookupValueOrError configFile key
+    value <- lookupSystemConfig key
     when (value `notElem` ["YES", "NO", ""]) . error $ "Configuration flag "
         ++ quote (key ++ " = " ++ value) ++ " cannot be parsed."
     return $ value == "YES"

@@ -49,7 +49,7 @@ data TestSetting = TestHostOS
 testSetting :: TestSetting -> Action String
 testSetting key = do
     file <- testConfigFile
-    lookupValueOrError file $ case key of
+    lookupValueOrError Nothing file $ case key of
         TestHostOS                -> "HostOS"
         TestWORDSIZE              -> "WORDSIZE"
         TestTARGETPLATFORM        -> "TARGETPLATFORM"
@@ -77,7 +77,7 @@ testSetting key = do
 testRTSSettings :: Action [String]
 testRTSSettings = do
     file <- testConfigFile
-    words <$> lookupValueOrError file "GhcRTSWays"
+    words <$> lookupValueOrError Nothing file "GhcRTSWays"
 
 absoluteBuildRoot :: Action FilePath
 absoluteBuildRoot = (fixAbsolutePathOnWindows  =<< liftIO . makeAbsolute =<< buildRoot)
