@@ -24,6 +24,8 @@ packageArgs = do
 
     cursesIncludeDir <- getSetting CursesIncludeDir
     cursesLibraryDir <- getSetting CursesLibDir
+    ffiIncludeDir  <- getSetting FfiIncludeDir
+    ffiLibraryDir  <- getSetting FfiLibDir
 
     mconcat
         --------------------------------- base ---------------------------------
@@ -132,7 +134,8 @@ packageArgs = do
           -- the Stage1 libraries, as we already know that the bootstrap
           -- compiler comes with the same versions as the one we are building.
           --
-            builder (Cabal Flags) ? ifM stage0
+            builder (Cabal Setup) ? cabalExtraDirs ffiIncludeDir ffiLibraryDir
+          , builder (Cabal Flags) ? ifM stage0
               (andM [cross, bootCross] `cabalFlag` "internal-interpreter")
               (arg "internal-interpreter")
 
@@ -250,7 +253,6 @@ rtsPackageArgs = package rts ? do
     path           <- getBuildPath
     top            <- expr topDirectory
     useSystemFfi   <- expr $ flag UseSystemFfi
-    libffiName     <- expr libffiLibraryName
     ffiIncludeDir  <- getSetting FfiIncludeDir
     ffiLibraryDir  <- getSetting FfiLibDir
     libdwIncludeDir   <- getSetting LibdwIncludeDir
@@ -277,8 +279,6 @@ rtsPackageArgs = package rts ? do
 
     let cArgs = mconcat
           [ rtsWarnings
-          , flag UseSystemFfi ? not (null ffiIncludeDir) ? arg ("-I" ++ ffiIncludeDir)
-          , flag WithLibdw ? not (null libdwIncludeDir) ? arg ("-I" ++ libdwIncludeDir)
           , arg "-fomit-frame-pointer"
           -- RTS *must* be compiled with optimisations. The INLINE_HEADER macro
           -- requires that functions are inlined to work as expected. Inlining
@@ -372,6 +372,7 @@ rtsPackageArgs = package rts ? do
         , builder (Cabal Setup) ? mconcat
               [ cabalExtraDirs libdwIncludeDir libdwLibraryDir
               , cabalExtraDirs libnumaIncludeDir libnumaLibraryDir
+              , useSystemFfi ? cabalExtraDirs ffiIncludeDir ffiLibraryDir
               ]
         , builder (Cc FindCDependencies) ? cArgs
         , builder (Ghc CompileCWithGhc) ? map ("-optc" ++) <$> cArgs
@@ -379,11 +380,7 @@ rtsPackageArgs = package rts ? do
         , builder Ghc ? ghcArgs
 
         , builder HsCpp ? pure
-          [ "-DTOP="             ++ show top
-          , "-DFFI_INCLUDE_DIR=" ++ show ffiIncludeDir
-          , "-DFFI_LIB_DIR="     ++ show ffiLibraryDir
-          , "-DFFI_LIB="         ++ show libffiName
-          , "-DLIBDW_LIB_DIR="   ++ show libdwLibraryDir ]
+          [ "-DTOP="             ++ show top ]
 
         , builder HsCpp ? flag WithLibdw ? arg "-DUSE_LIBDW"
         , builder HsCpp ? flag HaveLibMingwEx ? arg "-DHAVE_LIBMINGWEX" ]

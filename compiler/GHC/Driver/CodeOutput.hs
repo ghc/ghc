@@ -199,6 +199,15 @@ outputLlvm logger dflags filenm cmm_stream =
 ************************************************************************
 -}
 
+{-
+Note [Packaging libffi headers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The C code emitted by GHC for libffi adjustors must depend upon the ffi_arg type,
+defined in <ffi.h>. For this reason, we must ensure that <ffi.h> is available
+in binary distributions. To do so, we install these headers as part of the
+`rts` package.
+-}
+
 outputForeignStubs
     :: Logger
     -> TmpFs

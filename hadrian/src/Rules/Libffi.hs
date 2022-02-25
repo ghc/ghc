@@ -95,6 +95,9 @@ libffiName' dynamic = (if dynamic     then ""      else "C")
 libffiLibrary :: FilePath
 libffiLibrary = "inst/lib/libffi.a"
 
+-- | These are the headers that we must package with GHC since foreign export
+-- adjustor code produced by GHC depends upon them.
+-- See Note [Packaging libffi headers] in GHC.Driver.CodeOutput.
 libffiHeaderFiles :: [FilePath]
 libffiHeaderFiles = ["ffi.h", "ffitarget.h"]
 
