@@ -31,9 +31,7 @@ See also: #5240, #6063, #10110
 
 Before 'runLink', we need to be sure to get the relevant information
 about the linker we're using at runtime to see if we need any extra
-options. For example, GNU ld requires '--reduce-memory-overheads' and
-'--hash-size=31' in order to use reasonable amounts of memory (see
-trac #5240.) But this isn't supported in GNU gold.
+options.
 
 Generally, the linker changing from what was detected at ./configure
 time has always been possible using -pgml, but on Linux it can happen
@@ -127,13 +125,8 @@ getLinkerInfo' logger dflags = do
       -- Try to grab the info from the process output.
       parseLinkerInfo stdo _stde _exitc
         | any ("GNU ld" `isPrefixOf`) stdo =
-          -- GNU ld specifically needs to use less memory. This especially
-          -- hurts on small object files. #5240.
           -- Set DT_NEEDED for all shared libraries. #10110.
-          -- TODO: Investigate if these help or hurt when using split sections.
-          return (GnuLD $ map Option ["-Wl,--hash-size=31",
-                                      "-Wl,--reduce-memory-overheads",
-                                      -- ELF specific flag
+          return (GnuLD $ map Option [-- ELF specific flag
                                       -- see Note [ELF needed shared libs]
                                       "-Wl,--no-as-needed"])
 
@@ -173,12 +166,9 @@ getLinkerInfo' logger dflags = do
         -- Process creation is also fairly expensive on win32, so
         -- we short-circuit here.
         return $ GnuLD $ map Option
-          [ -- Reduce ld memory usage
-            "-Wl,--hash-size=31"
-          , "-Wl,--reduce-memory-overheads"
-            -- Emit gcc stack checks
+          [ -- Emit gcc stack checks
             -- See Note [Windows stack allocations]
-          , "-fstack-check"
+           "-fstack-check"
             -- Force static linking of libGCC
             -- See Note [Windows static libGCC]
           , "-static-libgcc" ]
