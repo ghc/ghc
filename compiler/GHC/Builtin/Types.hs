@@ -43,6 +43,9 @@ module GHC.Builtin.Types (
         -- * Double
         doubleTyCon, doubleDataCon, doubleTy, doubleTyConName,
 
+        -- * ByteArray
+        byteArrayTyCon, byteArrayDataCon, byteArrayTy, byteArrayTyConName,
+
         -- * Float
         floatTyCon, floatDataCon, floatTy, floatTyConName,
 
@@ -290,6 +293,7 @@ wiredInTyCons = [ -- Units are not treated like other tuples, because they
 
                 , anyTyCon
                 , boolTyCon
+                , byteArrayTyCon
                 , charTyCon
                 , stringTyCon
                 , doubleTyCon
@@ -419,6 +423,10 @@ floatTyConName     = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Float")  
 floatDataConName   = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "F#")     floatDataConKey  floatDataCon
 doubleTyConName    = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Double") doubleTyConKey   doubleTyCon
 doubleDataConName  = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "D#")     doubleDataConKey doubleDataCon
+
+byteArrayTyConName, byteArrayDataConName :: Name
+byteArrayTyConName = mkWiredInTyConName   UserSyntax  bYTE_ARRAY (fsLit "ByteArray") byteArrayTyConKey byteArrayTyCon
+byteArrayDataConName = mkWiredInDataConName UserSyntax  bYTE_ARRAY (fsLit "ByteArray") byteArrayDataConKey byteArrayDataCon
 
 -- Any
 
@@ -1797,7 +1805,18 @@ boxing_constr_env
 For a handful of primitive types (Int, Char, Word, Float, Double),
 we can readily box and an unboxed version (Int#, Char# etc) using
 the corresponding data constructor.  This is useful in a couple
-of places, notably let-floating -}
+of places, notably let-floating.
+
+Note that you have to be quite careful what you put in here because the compiler
+can introduce references to these constructors before they are defined.
+For example, ByteArray wraps a ByteArray# but can't be used as a boxing constructor
+because it is defined in `base`, which depends on `ghc-bignum` which uses ByteArray#
+and so the compiler introduces references to ByteArray too early.
+
+A future improvement might be to guard the use of a boxing constructor to packages
+whose dependencies include the boxing constructor.
+
+-}
 
 
 charTy :: Type
@@ -1875,6 +1894,20 @@ doubleTyCon = pcTyCon doubleTyConName
 
 doubleDataCon :: DataCon
 doubleDataCon = pcDataCon doubleDataConName [] [doublePrimTy] doubleTyCon
+
+-- Byte Array
+
+byteArrayTy :: Type
+byteArrayTy = mkTyConTy byteArrayTyCon
+
+byteArrayTyCon :: TyCon
+byteArrayTyCon = pcTyCon byteArrayTyConName
+                      Nothing []
+                      [byteArrayDataCon]
+
+byteArrayDataCon :: DataCon
+byteArrayDataCon = pcDataCon byteArrayDataConName [] [byteArrayPrimTy] byteArrayTyCon
+
 
 {-
 ************************************************************************

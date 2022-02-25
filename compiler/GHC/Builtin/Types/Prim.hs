@@ -59,6 +59,8 @@ module GHC.Builtin.Types.Prim(
         floatPrimTyCon,         floatPrimTy, floatPrimTyConName,
         doublePrimTyCon,        doublePrimTy, doublePrimTyConName,
 
+        byteArrayPrimTyConName,
+
         statePrimTyCon,         mkStatePrimTy,
         realWorldTyCon,         realWorldTy, realWorldStatePrimTy,
 

@@ -755,6 +755,8 @@ toCType = f False
            -- (which is marshalled like a Ptr)
            | Just byteArrayPrimTyCon        == tyConAppTyConPicky_maybe t
               = (Nothing, text "const void*")
+           | Just byteArrayTyCon        == tyConAppTyConPicky_maybe t
+              = (Nothing, text "const void*")
            | Just mutableByteArrayPrimTyCon == tyConAppTyConPicky_maybe t
               = (Nothing, text "void*")
            -- Otherwise we don't know the C type. If we are allowing

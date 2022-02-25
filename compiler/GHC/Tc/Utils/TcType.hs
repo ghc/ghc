@@ -2246,7 +2246,7 @@ boxedMarshalableTyCon tc
                          , word32TyConKey, word64TyConKey
                          , floatTyConKey, doubleTyConKey
                          , ptrTyConKey, funPtrTyConKey
-                         , charTyConKey
+                         , charTyConKey, byteArrayTyConKey
                          , stablePtrTyConKey
                          , boolTyConKey
                          ]

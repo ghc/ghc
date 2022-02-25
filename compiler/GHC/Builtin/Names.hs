@@ -543,7 +543,7 @@ gHC_PRIM, gHC_PRIM_PANIC, gHC_PRIM_EXCEPTION,
     aRROW, gHC_DESUGAR, rANDOM, gHC_EXTS,
     cONTROL_EXCEPTION_BASE, gHC_TYPEERROR, gHC_TYPELITS, gHC_TYPELITS_INTERNAL,
     gHC_TYPENATS, gHC_TYPENATS_INTERNAL,
-    dATA_COERCE, dEBUG_TRACE, uNSAFE_COERCE :: Module
+    dATA_COERCE, dEBUG_TRACE, uNSAFE_COERCE, bYTE_ARRAY :: Module
 
 gHC_PRIM        = mkPrimModule (fsLit "GHC.Prim")   -- Primitive types and values
 gHC_PRIM_PANIC  = mkPrimModule (fsLit "GHC.Prim.Panic")
@@ -611,6 +611,7 @@ gHC_TYPENATS_INTERNAL = mkBaseModule (fsLit "GHC.TypeNats.Internal")
 dATA_COERCE     = mkBaseModule (fsLit "Data.Coerce")
 dEBUG_TRACE     = mkBaseModule (fsLit "Debug.Trace")
 uNSAFE_COERCE   = mkBaseModule (fsLit "Unsafe.Coerce")
+bYTE_ARRAY      = mkBaseModule (fsLit "Data.Array.Byte")
 
 gHC_SRCLOC :: Module
 gHC_SRCLOC = mkBaseModule (fsLit "GHC.SrcLoc")
@@ -1782,7 +1783,7 @@ addrPrimTyConKey, arrayPrimTyConKey, boolTyConKey,
     ratioTyConKey, rationalTyConKey, realWorldTyConKey, stablePtrPrimTyConKey,
     stablePtrTyConKey, eqTyConKey, heqTyConKey, ioPortPrimTyConKey,
     smallArrayPrimTyConKey, smallMutableArrayPrimTyConKey,
-    stringTyConKey :: Unique
+    stringTyConKey, byteArrayTyConKey :: Unique
 addrPrimTyConKey                        = mkPreludeTyConUnique  1
 arrayPrimTyConKey                       = mkPreludeTyConUnique  3
 boolTyConKey                            = mkPreludeTyConUnique  4
@@ -1824,6 +1825,7 @@ stablePtrPrimTyConKey                   = mkPreludeTyConUnique 38
 stablePtrTyConKey                       = mkPreludeTyConUnique 39
 eqTyConKey                              = mkPreludeTyConUnique 40
 heqTyConKey                             = mkPreludeTyConUnique 41
+byteArrayTyConKey                       = mkPreludeTyConUnique 42
 
 statePrimTyConKey, stableNamePrimTyConKey, stableNameTyConKey,
     mutVarPrimTyConKey, ioTyConKey,
@@ -2089,6 +2091,9 @@ ordLTDataConKey, ordEQDataConKey, ordGTDataConKey :: Unique
 ordLTDataConKey                         = mkPreludeDataConUnique 27
 ordEQDataConKey                         = mkPreludeDataConUnique 28
 ordGTDataConKey                         = mkPreludeDataConUnique 29
+
+byteArrayDataConKey :: Unique
+byteArrayDataConKey                     = mkPreludeDataConUnique 30
 
 
 coercibleDataConKey                     = mkPreludeDataConUnique 32
