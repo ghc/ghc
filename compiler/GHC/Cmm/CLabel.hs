@@ -33,9 +33,6 @@ module GHC.Cmm.CLabel (
         mkBytesLabel,
 
         mkLocalBlockLabel,
-        mkLocalClosureLabel,
-        mkLocalInfoTableLabel,
-        mkLocalClosureTableLabel,
 
         mkBlockInfoTableLabel,
 
@@ -587,14 +584,6 @@ mkRednCountsLabel name = IdLabel name NoCafRefs (IdTickyInfo TickyRednCounts)
 mkTagHitLabel :: Name -> Unique -> CLabel
 mkTagHitLabel name !uniq = IdLabel name NoCafRefs (IdTickyInfo (TickyInferedTag uniq))
 
--- These have local & (possibly) external variants:
-mkLocalClosureLabel      :: Name -> CafInfo -> CLabel
-mkLocalInfoTableLabel    :: Name -> CafInfo -> CLabel
-mkLocalClosureTableLabel :: Name -> CafInfo -> CLabel
-mkLocalClosureLabel   !name !c  = IdLabel name  c Closure
-mkLocalInfoTableLabel   name c  = IdLabel name  c LocalInfoTable
-mkLocalClosureTableLabel name c = IdLabel name  c ClosureTable
-
 mkClosureLabel              :: Name -> CafInfo -> CLabel
 mkInfoTableLabel            :: Name -> CafInfo -> CLabel
 mkEntryLabel                :: Name -> CafInfo -> CLabel
@@ -602,7 +591,10 @@ mkClosureTableLabel         :: Name -> CafInfo -> CLabel
 mkConInfoTableLabel         :: Name -> ConInfoTableLocation -> CLabel
 mkBytesLabel                :: Name -> CLabel
 mkClosureLabel name         c     = IdLabel name c Closure
-mkInfoTableLabel name       c     = IdLabel name c InfoTable
+-- | Decicdes between external and local labels based on the names externality.
+mkInfoTableLabel name       c
+  | isExternalName name = IdLabel name c InfoTable
+  | otherwise           = IdLabel name c LocalInfoTable
 mkEntryLabel name           c     = IdLabel name c Entry
 mkClosureTableLabel name    c     = IdLabel name c ClosureTable
 -- Special case for the normal 'DefinitionSite' case so that the 'ConInfoTable' application can be floated to a CAF.

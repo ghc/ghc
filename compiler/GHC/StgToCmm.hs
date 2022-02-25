@@ -235,8 +235,8 @@ mkModuleInit cost_centre_info this_mod hpc_info
 cgEnumerationTyCon :: TyCon -> FCode ()
 cgEnumerationTyCon tycon
   = do platform <- getPlatform
-       emitRODataLits (mkLocalClosureTableLabel (tyConName tycon) NoCafRefs)
-             [ CmmLabelOff (mkLocalClosureLabel (dataConName con) NoCafRefs)
+       emitRODataLits (mkClosureTableLabel (tyConName tycon) NoCafRefs)
+             [ CmmLabelOff (mkClosureLabel (dataConName con) NoCafRefs)
                            (tagForCon platform con)
              | con <- tyConDataCons tycon]
 

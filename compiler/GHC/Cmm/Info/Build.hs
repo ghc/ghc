@@ -757,7 +757,7 @@ getStaticFuns decls =
   , Just (id, _) <- [cit_clo info]
   , let rep = cit_rep info
   , isStaticRep rep && isFunRep rep
-  , let !lbl = mkLocalClosureLabel (idName id) (idCafInfo id)
+  , let !lbl = mkClosureLabel (idName id) (idCafInfo id)
   ]
 
 
@@ -1219,7 +1219,7 @@ updInfoSRTs profile srt_env funSRTEnv caffy (CmmProc top_info top_l live g)
              HeapRep sta ptrs nptrs ty ->
                HeapRep sta (ptrs + length srtEntries) nptrs ty
              _other -> panic "maybeStaticFun"
-          lbl = mkLocalClosureLabel (idName id) caf_info
+          lbl = mkClosureLabel (idName id) caf_info
         in
           Just (newInfo, mkDataLits (Section Data lbl) lbl fields)
       | otherwise = Nothing

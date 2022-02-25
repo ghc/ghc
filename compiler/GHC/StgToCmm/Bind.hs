@@ -81,7 +81,7 @@ cgTopRhsClosure :: Platform
                 -> (CgIdInfo, FCode ())
 
 cgTopRhsClosure platform rec id ccs upd_flag args body =
-  let closure_label = mkLocalClosureLabel (idName id) (idCafInfo id)
+  let closure_label = mkClosureLabel (idName id) (idCafInfo id)
       cg_id_info    = litIdInfo platform id lf_info (CmmLabel closure_label)
       lf_info       = mkClosureLFInfo platform id TopLevel [] upd_flag args
   in (cg_id_info, gen_code lf_info closure_label)
