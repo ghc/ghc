@@ -7,7 +7,7 @@
 -- License     :  BSD-style (see the file LICENSE)
 --
 -- Maintainer  :  R.Paterson@city.ac.uk
--- Stability   :  experimental
+-- Stability   :  stable
 -- Portability :  portable
 --
 -- Class of monads based on @IO@.

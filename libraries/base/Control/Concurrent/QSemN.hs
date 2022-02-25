@@ -8,7 +8,7 @@
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
 -- 
 -- Maintainer  :  libraries@haskell.org
--- Stability   :  experimental
+-- Stability   :  stable
 -- Portability :  non-portable (concurrency)
 --
 -- Quantity semaphores in which each thread may wait for an arbitrary

@@ -9,7 +9,7 @@
 --                (c) Oregon Graduate Institute of Science and Technology, 2002
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
 -- Maintainer  :  libraries@haskell.org
--- Stability   :  experimental
+-- Stability   :  stable
 -- Portability :  portable
 --
 -- Monadic fixpoints.

@@ -9,7 +9,7 @@
 -- License     :  BSD-style (see the file LICENSE)
 --
 -- Maintainer  :  libraries@haskell.org
--- Stability   :  experimental
+-- Stability   :  stable
 -- Portability :  portable
 --
 -- Liftings of the Prelude classes 'Eq', 'Ord', 'Read' and 'Show' to

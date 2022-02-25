@@ -13,7 +13,7 @@
 -- License     :  BSD-style (see the LICENSE file in the distribution)
 --
 -- Maintainer  :  ashley@semantic.org
--- Stability   :  experimental
+-- Stability   :  stable
 -- Portability :  portable
 
 -- https://gitlab.haskell.org/ghc/ghc/issues/1773

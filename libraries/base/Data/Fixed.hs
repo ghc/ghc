@@ -10,7 +10,7 @@
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
 --
 -- Maintainer  :  Ashley Yakeley <ashley@semantic.org>
--- Stability   :  experimental
+-- Stability   :  stable
 -- Portability :  portable
 --
 -- This module defines a \"Fixed\" type for fixed-precision arithmetic.
