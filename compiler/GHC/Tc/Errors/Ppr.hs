@@ -10,6 +10,10 @@ module GHC.Tc.Errors.Ppr
   --
   , tidySkolemInfo
   , tidySkolemInfoAnon
+  --
+  , withHsDocContext
+  , pprHsDocContext
+  , inHsDocContext
   )
   where
 
@@ -164,6 +168,53 @@ instance Diagnostic TcRnMessage where
       -> mkSimpleDecorated $ text "Illegal use of punning for field" <+> quotes (ppr fld)
     TcRnIllegalWildcardsInRecord fld_part
       -> mkSimpleDecorated $ text "Illegal `..' in record" <+> pprRecordFieldPart fld_part
+    TcRnIllegalWildcardInType mb_name bad mb_ctxt
+      -> mkSimpleDecorated $ vcat [ main_msg, context_msg ]
+      where
+        main_msg :: SDoc
+        main_msg = case bad of
+          WildcardNotLastInConstraint ->
+            hang notAllowed 2 constraint_hint_msg
+          ExtraConstraintWildcardNotAllowed allow_sole ->
+            case allow_sole of
+              SoleExtraConstraintWildcardNotAllowed ->
+                notAllowed
+              SoleExtraConstraintWildcardAllowed ->
+                hang notAllowed 2 sole_msg
+          WildcardsNotAllowedAtAll ->
+            notAllowed
+        context_msg :: SDoc
+        context_msg = case mb_ctxt of
+          Just ctxt -> nest 2 (text "in" <+> pprHsDocContext ctxt)
+          _         -> empty
+        notAllowed, what, wildcard, how :: SDoc
+        notAllowed = what <+> quotes wildcard <+> how
+        wildcard = case mb_name of
+          Nothing   -> pprAnonWildCard
+          Just name -> ppr name
+        what
+          | Just _ <- mb_name
+          = text "Named wildcard"
+          | ExtraConstraintWildcardNotAllowed {} <- bad
+          = text "Extra-constraint wildcard"
+          | otherwise
+          = text "Wildcard"
+        how = case bad of
+          WildcardNotLastInConstraint
+            -> text "not allowed in a constraint"
+          _ -> text "not allowed"
+        constraint_hint_msg :: SDoc
+        constraint_hint_msg
+          | Just _ <- mb_name
+          = vcat [ text "Extra-constraint wildcards must be anonymous"
+                 , nest 2 (text "e.g  f :: (Eq a, _) => blah") ]
+          | otherwise
+          = vcat [ text "except as the last top-level constraint of a type signature"
+                 , nest 2 (text "e.g  f :: (Eq a, _) => blah") ]
+        sole_msg :: SDoc
+        sole_msg =
+          vcat [ text "except as the sole constraint"
+               , nest 2 (text "e.g., deriving instance _ => Eq (Foo a)") ]
     TcRnDuplicateFieldName fld_part dups
       -> mkSimpleDecorated $
            hsep [text "duplicate field name",
@@ -691,6 +742,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnIllegalWildcardsInRecord{}
       -> ErrorWithoutFlag
+    TcRnIllegalWildcardInType{}
+      -> ErrorWithoutFlag
     TcRnDuplicateFieldName{}
       -> ErrorWithoutFlag
     TcRnIllegalViewPattern{}
@@ -927,6 +980,8 @@ instance Diagnostic TcRnMessage where
       -> [suggestExtension LangExt.NamedFieldPuns]
     TcRnIllegalWildcardsInRecord{}
       -> [suggestExtension LangExt.RecordWildCards]
+    TcRnIllegalWildcardInType{}
+      -> noHints
     TcRnDuplicateFieldName{}
       -> noHints
     TcRnIllegalViewPattern{}
@@ -2811,3 +2866,46 @@ expandSynonymsToMatch ty1 ty2 = (ty1_ret, ty2_ret)
     sameShapes (CastTy ty1 _)   ty2              = sameShapes ty1 ty2
     sameShapes ty1              (CastTy ty2 _)   = sameShapes ty1 ty2
     sameShapes _                _                = False
+
+{-
+************************************************************************
+*                                                                      *
+\subsection{Contexts for renaming errors}
+*                                                                      *
+************************************************************************
+-}
+
+withHsDocContext :: HsDocContext -> SDoc -> SDoc
+withHsDocContext ctxt doc = doc $$ inHsDocContext ctxt
+
+inHsDocContext :: HsDocContext -> SDoc
+inHsDocContext ctxt = text "In" <+> pprHsDocContext ctxt
+
+pprHsDocContext :: HsDocContext -> SDoc
+pprHsDocContext (GenericCtx doc)      = doc
+pprHsDocContext (TypeSigCtx doc)      = text "the type signature for" <+> doc
+pprHsDocContext (StandaloneKindSigCtx doc) = text "the standalone kind signature for" <+> doc
+pprHsDocContext PatCtx                = text "a pattern type-signature"
+pprHsDocContext SpecInstSigCtx        = text "a SPECIALISE instance pragma"
+pprHsDocContext DefaultDeclCtx        = text "a `default' declaration"
+pprHsDocContext DerivDeclCtx          = text "a deriving declaration"
+pprHsDocContext (RuleCtx name)        = text "the rewrite rule" <+> doubleQuotes (ftext name)
+pprHsDocContext (TyDataCtx tycon)     = text "the data type declaration for" <+> quotes (ppr tycon)
+pprHsDocContext (FamPatCtx tycon)     = text "a type pattern of family instance for" <+> quotes (ppr tycon)
+pprHsDocContext (TySynCtx name)       = text "the declaration for type synonym" <+> quotes (ppr name)
+pprHsDocContext (TyFamilyCtx name)    = text "the declaration for type family" <+> quotes (ppr name)
+pprHsDocContext (ClassDeclCtx name)   = text "the declaration for class" <+> quotes (ppr name)
+pprHsDocContext ExprWithTySigCtx      = text "an expression type signature"
+pprHsDocContext TypBrCtx              = text "a Template-Haskell quoted type"
+pprHsDocContext HsTypeCtx             = text "a type argument"
+pprHsDocContext HsTypePatCtx          = text "a type argument in a pattern"
+pprHsDocContext GHCiCtx               = text "GHCi input"
+pprHsDocContext (SpliceTypeCtx hs_ty) = text "the spliced type" <+> quotes (ppr hs_ty)
+pprHsDocContext ClassInstanceCtx      = text "GHC.Tc.Gen.Splice.reifyInstances"
+
+pprHsDocContext (ForeignDeclCtx name)
+   = text "the foreign declaration for" <+> quotes (ppr name)
+pprHsDocContext (ConDeclCtx [name])
+   = text "the definition of data constructor" <+> quotes (ppr name)
+pprHsDocContext (ConDeclCtx names)
+   = text "the definition of data constructors" <+> interpp'SP names

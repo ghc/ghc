@@ -48,15 +48,15 @@ import GHC.Core.TyCo.FVs ( tyCoVarsOfTypeList )
 import GHC.Driver.Session
 import GHC.Hs
 import GHC.Rename.Env
-import GHC.Rename.Utils  ( HsDocContext(..), inHsDocContext, withHsDocContext
-                         , mapFvRn, pprHsDocContext, bindLocalNamesFV
+import GHC.Rename.Utils  ( mapFvRn, bindLocalNamesFV
                          , typeAppErr, newLocalBndrRn, checkDupRdrNamesN
                          , checkShadowedRdrNames, warnForallIdentifier )
 import GHC.Rename.Fixity ( lookupFieldFixityRn, lookupFixityRn
                          , lookupTyFixityRn )
 import GHC.Rename.Unbound ( notInScopeErr, WhereLooking(WL_LocalOnly) )
 import GHC.Tc.Errors.Types
-import GHC.Tc.Errors.Ppr ( pprScopeError )
+import GHC.Tc.Errors.Ppr ( pprScopeError
+                         , inHsDocContext, withHsDocContext, pprHsDocContext )
 import GHC.Tc.Utils.Monad
 import GHC.Types.Name.Reader
 import GHC.Builtin.Names
@@ -291,10 +291,11 @@ checkExtraConstraintWildCard :: RnTyKiEnv -> HsContext GhcPs -> RnM ()
 -- Check that extra-constraints are allowed at all, and
 -- if so that it's an anonymous wildcard
 checkExtraConstraintWildCard env hs_ctxt
-  = checkWildCard env mb_bad
+  = checkWildCard env Nothing mb_bad
   where
     mb_bad | not (extraConstraintWildCardsAllowed env)
-           = Just base_msg
+           = Just $ ExtraConstraintWildcardNotAllowed
+                      SoleExtraConstraintWildcardNotAllowed
              -- Currently, we do not allow wildcards in their full glory in
              -- standalone deriving declarations. We only allow a single
              -- extra-constraints wildcard à la:
@@ -306,17 +307,10 @@ checkExtraConstraintWildCard env hs_ctxt
              --   deriving instance (Eq a, _) => Eq (Foo a)
            | DerivDeclCtx {} <- rtke_ctxt env
            , not (null hs_ctxt)
-           = Just deriv_decl_msg
+           = Just $ ExtraConstraintWildcardNotAllowed
+                      SoleExtraConstraintWildcardAllowed
            | otherwise
            = Nothing
-
-    base_msg = text "Extra-constraint wildcard" <+> quotes pprAnonWildCard
-                   <+> text "not allowed"
-
-    deriv_decl_msg
-      = hang base_msg
-           2 (vcat [ text "except as the sole constraint"
-                   , nest 2 (text "e.g., deriving instance _ => Eq (Foo a)") ])
 
 extraConstraintWildCardsAllowed :: RnTyKiEnv -> Bool
 extraConstraintWildCardsAllowed env
@@ -840,46 +834,39 @@ rnHsTyOp env overall_ty (L loc op)
        ; return (l_op', unitFV op') }
 
 --------------
-notAllowed :: SDoc -> SDoc
-notAllowed doc
-  = text "Wildcard" <+> quotes doc <+> text "not allowed"
-
-checkWildCard :: RnTyKiEnv -> Maybe SDoc -> RnM ()
-checkWildCard env (Just doc)
-  = addErr $ TcRnUnknownMessage $ mkPlainError noHints $
-     vcat [doc, nest 2 (text "in" <+> pprHsDocContext (rtke_ctxt env))]
-checkWildCard _ Nothing
+checkWildCard :: RnTyKiEnv
+              -> Maybe Name -- ^ name of the wildcard,
+                            -- or 'Nothing' for an anonymous wildcard
+              -> Maybe BadAnonWildcardContext
+              -> RnM ()
+checkWildCard env mb_name (Just bad)
+  = addErr $ TcRnIllegalWildcardInType mb_name bad (Just $ rtke_ctxt env)
+checkWildCard _ _ Nothing
   = return ()
 
 checkAnonWildCard :: RnTyKiEnv -> RnM ()
 -- Report an error if an anonymous wildcard is illegal here
 checkAnonWildCard env
-  = checkWildCard env mb_bad
+  = checkWildCard env Nothing mb_bad
   where
-    mb_bad :: Maybe SDoc
+    mb_bad :: Maybe BadAnonWildcardContext
     mb_bad | not (wildCardsAllowed env)
-           = Just (notAllowed pprAnonWildCard)
+           = Just WildcardsNotAllowedAtAll
            | otherwise
            = case rtke_what env of
                RnTypeBody      -> Nothing
-               RnTopConstraint -> Just constraint_msg
-               RnConstraint    -> Just constraint_msg
-
-    constraint_msg = hang
-                         (notAllowed pprAnonWildCard <+> text "in a constraint")
-                        2 hint_msg
-    hint_msg = vcat [ text "except as the last top-level constraint of a type signature"
-                    , nest 2 (text "e.g  f :: (Eq a, _) => blah") ]
+               RnTopConstraint -> Just WildcardNotLastInConstraint
+               RnConstraint    -> Just WildcardNotLastInConstraint
 
 checkNamedWildCard :: RnTyKiEnv -> Name -> RnM ()
 -- Report an error if a named wildcard is illegal here
 checkNamedWildCard env name
-  = checkWildCard env mb_bad
+  = checkWildCard env (Just name) mb_bad
   where
     mb_bad | not (name `elemNameSet` rtke_nwcs env)
            = Nothing  -- Not a wildcard
            | not (wildCardsAllowed env)
-           = Just (notAllowed (ppr name))
+           = Just WildcardsNotAllowedAtAll
            | otherwise
            = case rtke_what env of
                RnTypeBody      -> Nothing   -- Allowed
@@ -887,8 +874,7 @@ checkNamedWildCard env name
                   -- f :: (Eq _a) => _a -> Int
                   -- g :: (_a, _b) => T _a _b -> Int
                   -- The named tyvars get filled in from elsewhere
-               RnConstraint    -> Just constraint_msg
-    constraint_msg = notAllowed (ppr name) <+> text "in a constraint"
+               RnConstraint    -> Just WildcardNotLastInConstraint
 
 wildCardsAllowed :: RnTyKiEnv -> Bool
 -- ^ In what contexts are wildcards permitted

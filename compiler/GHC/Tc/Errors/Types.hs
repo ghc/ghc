@@ -26,6 +26,8 @@ module GHC.Tc.Errors.Types (
   , DeriveInstanceBadConstructor(..)
   , HasWildcard(..)
   , hasWildcard
+  , BadAnonWildcardContext(..)
+  , SoleExtraConstraintWildcardAllowed(..)
   , DeriveGenericsErrReason(..)
   , HasAssociatedDataFamInsts(..)
   , hasAssociatedDataFamInsts
@@ -35,6 +37,7 @@ module GHC.Tc.Errors.Types (
   , associatedTyNotParamOverLastTyVar
   , MissingSignature(..)
   , Exported(..)
+  , HsDocContext(..)
 
   , ErrorItem(..), errorItemOrigin, errorItemEqRel, errorItemPred, errorItemCtLoc
 
@@ -92,6 +95,7 @@ import GHC.Unit.Module.Name (ModuleName)
 import GHC.Types.Basic
 import GHC.Utils.Misc (filterOut)
 import qualified GHC.LanguageExtensions as LangExt
+import GHC.Data.FastString (FastString)
 
 import qualified Data.List.NonEmpty as NE
 import           Data.Typeable hiding (TyCon)
@@ -425,6 +429,69 @@ data TcRnMessage where
      Test cases: parser/should_fail/RecordWildCardsFail
   -}
   TcRnIllegalWildcardsInRecord :: !RecordFieldPart -> TcRnMessage
+
+  {-| TcRnIllegalWildcardInType is an error that occurs
+      when a wildcard appears in a type in a location in which
+      wildcards aren't allowed.
+
+      Examples:
+
+        Type synonyms:
+
+          type T = _
+
+        Class declarations and instances:
+
+          class C _
+          instance C _
+
+        Standalone kind signatures:
+
+          type D :: _
+          data D
+
+      Test cases:
+        ExtraConstraintsWildcardInTypeSplice2
+        ExtraConstraintsWildcardInTypeSpliceUsed
+        ExtraConstraintsWildcardNotLast
+        ExtraConstraintsWildcardTwice
+        NestedExtraConstraintsWildcard
+        NestedNamedExtraConstraintsWildcard
+        PartialClassMethodSignature
+        PartialClassMethodSignature2
+        T12039
+        T13324_fail1
+        UnnamedConstraintWildcard1
+        UnnamedConstraintWildcard2
+        WildcardInADT1
+        WildcardInADT2
+        WildcardInADT3
+        WildcardInADTContext1
+        WildcardInDefault
+        WildcardInDefaultSignature
+        WildcardInDeriving
+        WildcardInForeignExport
+        WildcardInForeignImport
+        WildcardInGADT1
+        WildcardInGADT2
+        WildcardInInstanceHead
+        WildcardInInstanceSig
+        WildcardInNewtype
+        WildcardInPatSynSig
+        WildcardInStandaloneDeriving
+        WildcardInTypeFamilyInstanceRHS
+        WildcardInTypeSynonymRHS
+        saks_fail003
+        T15433a
+  -}
+
+  TcRnIllegalWildcardInType
+    :: Maybe Name
+        -- ^ the wildcard name, or 'Nothing' for an anonymous wildcard
+    -> !BadAnonWildcardContext
+    -> !(Maybe HsDocContext)
+    -> TcRnMessage
+
 
   {-| TcRnDuplicateFieldName is an error that occurs whenever
       there are duplicate field names in a record.
@@ -1812,6 +1879,19 @@ hasWildcard :: Bool -> HasWildcard
 hasWildcard True  = YesHasWildcard
 hasWildcard False = NoHasWildcard
 
+-- | A context in which we don't allow anonymous wildcards.
+data BadAnonWildcardContext
+  = WildcardNotLastInConstraint
+  | ExtraConstraintWildcardNotAllowed
+      SoleExtraConstraintWildcardAllowed
+  | WildcardsNotAllowedAtAll
+
+-- | Whether a sole extra-constraint wildcard is allowed,
+-- e.g. @_ => ..@ as opposed to @( .., _ ) => ..@.
+data SoleExtraConstraintWildcardAllowed
+  = SoleExtraConstraintWildcardNotAllowed
+  | SoleExtraConstraintWildcardAllowed
+
 -- | A type representing whether or not the input type has associated data family instances.
 data HasAssociatedDataFamInsts
   = YesHasAdfs
@@ -2483,3 +2563,38 @@ pprRelevantBindings (RelevantBindings bds ran_out_of_fuel) =
 discardMsg :: SDoc
 discardMsg = text "(Some bindings suppressed;" <+>
              text "use -fmax-relevant-binds=N or -fno-max-relevant-binds)"
+
+
+{-
+************************************************************************
+*                                                                      *
+\subsection{Contexts for renaming errors}
+*                                                                      *
+************************************************************************
+-}
+
+-- AZ:TODO: Change these all to be Name instead of RdrName.
+--          Merge TcType.UserTypeContext in to it.
+data HsDocContext
+  = TypeSigCtx SDoc
+  | StandaloneKindSigCtx SDoc
+  | PatCtx
+  | SpecInstSigCtx
+  | DefaultDeclCtx
+  | ForeignDeclCtx (LocatedN RdrName)
+  | DerivDeclCtx
+  | RuleCtx FastString
+  | TyDataCtx (LocatedN RdrName)
+  | TySynCtx (LocatedN RdrName)
+  | TyFamilyCtx (LocatedN RdrName)
+  | FamPatCtx (LocatedN RdrName)    -- The patterns of a type/data family instance
+  | ConDeclCtx [LocatedN Name]
+  | ClassDeclCtx (LocatedN RdrName)
+  | ExprWithTySigCtx
+  | TypBrCtx
+  | HsTypeCtx
+  | HsTypePatCtx
+  | GHCiCtx
+  | SpliceTypeCtx (LHsType GhcPs)
+  | ClassInstanceCtx
+  | GenericCtx SDoc

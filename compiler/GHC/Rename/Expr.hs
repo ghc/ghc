@@ -38,7 +38,7 @@ import GHC.Tc.Utils.Monad
 import GHC.Unit.Module ( getModule, isInteractiveModule )
 import GHC.Rename.Env
 import GHC.Rename.Fixity
-import GHC.Rename.Utils ( HsDocContext(..), bindLocalNamesFV, checkDupNames
+import GHC.Rename.Utils ( bindLocalNamesFV, checkDupNames
                         , bindLocalNames
                         , mapMaybeFvRn, mapFvRn
                         , warnUnusedLocalBinds, typeAppErr

@@ -91,7 +91,6 @@ import GHC.Tc.Utils.Backpack
 import GHC.Rename.Splice ( rnTopSpliceDecls, traceSplice, SpliceInfo(..) )
 import GHC.Rename.HsType
 import GHC.Rename.Expr
-import GHC.Rename.Utils  ( HsDocContext(..) )
 import GHC.Rename.Fixity ( lookupFixityRn )
 import GHC.Rename.Names
 import GHC.Rename.Env

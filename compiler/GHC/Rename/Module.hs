@@ -28,15 +28,16 @@ import GHC.Types.Name.Reader
 import GHC.Rename.HsType
 import GHC.Rename.Bind
 import GHC.Rename.Env
-import GHC.Rename.Utils ( HsDocContext(..), mapFvRn, bindLocalNames
+import GHC.Rename.Utils ( mapFvRn, bindLocalNames
                         , checkDupRdrNamesN, bindLocalNamesFV
                         , checkShadowedRdrNames, warnUnusedTypePatterns
                         , newLocalBndrsRn
-                        , withHsDocContext, noNestedForallsContextsErr
+                        , noNestedForallsContextsErr
                         , addNoNestedForallsContextsErr, checkInferredVars, warnForallIdentifier )
 import GHC.Rename.Unbound ( mkUnboundName, notInScopeErr, WhereLooking(WL_Global) )
 import GHC.Rename.Names
 import GHC.Tc.Errors.Types
+import GHC.Tc.Errors.Ppr (withHsDocContext)
 import GHC.Tc.Gen.Annotation ( annCtxt )
 import GHC.Tc.Utils.Monad
 

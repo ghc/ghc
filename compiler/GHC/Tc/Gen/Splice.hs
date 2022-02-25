@@ -83,7 +83,6 @@ import GHC.Runtime.Interpreter
 import GHC.Rename.Splice( traceSplice, SpliceInfo(..))
 import GHC.Rename.Expr
 import GHC.Rename.Env
-import GHC.Rename.Utils  ( HsDocContext(..) )
 import GHC.Rename.Fixity ( lookupFixityRn_help )
 import GHC.Rename.HsType
 

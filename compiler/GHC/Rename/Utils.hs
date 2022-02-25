@@ -21,8 +21,6 @@ module GHC.Rename.Utils (
         badQualBndrErr, typeAppErr, badFieldConErr,
         wrapGenSpan, genHsVar, genLHsVar, genHsApp, genHsApps, genAppType,
         genHsIntegralLit, genHsTyLit,
-        HsDocContext(..), pprHsDocContext,
-        inHsDocContext, withHsDocContext,
 
         newLocalBndrRn, newLocalBndrsRn,
 
@@ -43,6 +41,7 @@ import GHC.Core.Type
 import GHC.Hs
 import GHC.Types.Name.Reader
 import GHC.Tc.Errors.Types
+import GHC.Tc.Errors.Ppr (withHsDocContext)
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Monad
 import GHC.Types.Error
@@ -677,72 +676,3 @@ genHsIntegralLit lit = wrapGenSpan $ HsLit noAnn (HsInt noExtField lit)
 
 genHsTyLit :: FastString -> HsType GhcRn
 genHsTyLit = HsTyLit noExtField . HsStrTy NoSourceText
-
-{-
-************************************************************************
-*                                                                      *
-\subsection{Contexts for renaming errors}
-*                                                                      *
-************************************************************************
--}
-
--- AZ:TODO: Change these all to be Name instead of RdrName.
---          Merge TcType.UserTypeContext in to it.
-data HsDocContext
-  = TypeSigCtx SDoc
-  | StandaloneKindSigCtx SDoc
-  | PatCtx
-  | SpecInstSigCtx
-  | DefaultDeclCtx
-  | ForeignDeclCtx (LocatedN RdrName)
-  | DerivDeclCtx
-  | RuleCtx FastString
-  | TyDataCtx (LocatedN RdrName)
-  | TySynCtx (LocatedN RdrName)
-  | TyFamilyCtx (LocatedN RdrName)
-  | FamPatCtx (LocatedN RdrName)    -- The patterns of a type/data family instance
-  | ConDeclCtx [LocatedN Name]
-  | ClassDeclCtx (LocatedN RdrName)
-  | ExprWithTySigCtx
-  | TypBrCtx
-  | HsTypeCtx
-  | HsTypePatCtx
-  | GHCiCtx
-  | SpliceTypeCtx (LHsType GhcPs)
-  | ClassInstanceCtx
-  | GenericCtx SDoc   -- Maybe we want to use this more!
-
-withHsDocContext :: HsDocContext -> SDoc -> SDoc
-withHsDocContext ctxt doc = doc $$ inHsDocContext ctxt
-
-inHsDocContext :: HsDocContext -> SDoc
-inHsDocContext ctxt = text "In" <+> pprHsDocContext ctxt
-
-pprHsDocContext :: HsDocContext -> SDoc
-pprHsDocContext (GenericCtx doc)      = doc
-pprHsDocContext (TypeSigCtx doc)      = text "the type signature for" <+> doc
-pprHsDocContext (StandaloneKindSigCtx doc) = text "the standalone kind signature for" <+> doc
-pprHsDocContext PatCtx                = text "a pattern type-signature"
-pprHsDocContext SpecInstSigCtx        = text "a SPECIALISE instance pragma"
-pprHsDocContext DefaultDeclCtx        = text "a `default' declaration"
-pprHsDocContext DerivDeclCtx          = text "a deriving declaration"
-pprHsDocContext (RuleCtx name)        = text "the rewrite rule" <+> doubleQuotes (ftext name)
-pprHsDocContext (TyDataCtx tycon)     = text "the data type declaration for" <+> quotes (ppr tycon)
-pprHsDocContext (FamPatCtx tycon)     = text "a type pattern of family instance for" <+> quotes (ppr tycon)
-pprHsDocContext (TySynCtx name)       = text "the declaration for type synonym" <+> quotes (ppr name)
-pprHsDocContext (TyFamilyCtx name)    = text "the declaration for type family" <+> quotes (ppr name)
-pprHsDocContext (ClassDeclCtx name)   = text "the declaration for class" <+> quotes (ppr name)
-pprHsDocContext ExprWithTySigCtx      = text "an expression type signature"
-pprHsDocContext TypBrCtx              = text "a Template-Haskell quoted type"
-pprHsDocContext HsTypeCtx             = text "a type argument"
-pprHsDocContext HsTypePatCtx          = text "a type argument in a pattern"
-pprHsDocContext GHCiCtx               = text "GHCi input"
-pprHsDocContext (SpliceTypeCtx hs_ty) = text "the spliced type" <+> quotes (ppr hs_ty)
-pprHsDocContext ClassInstanceCtx      = text "GHC.Tc.Gen.Splice.reifyInstances"
-
-pprHsDocContext (ForeignDeclCtx name)
-   = text "the foreign declaration for" <+> quotes (ppr name)
-pprHsDocContext (ConDeclCtx [name])
-   = text "the definition of data constructor" <+> quotes (ppr name)
-pprHsDocContext (ConDeclCtx names)
-   = text "the definition of data constructors" <+> interpp'SP names

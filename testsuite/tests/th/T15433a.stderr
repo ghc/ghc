@@ -1,0 +1,5 @@
+
+T15433a.hs:7:11: error:
+    • Wildcard ‘_’ not allowed
+    • In the type ‘(_)’
+      In the type declaration for ‘T’

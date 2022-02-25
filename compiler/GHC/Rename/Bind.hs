@@ -42,7 +42,7 @@ import GHC.Rename.Pat
 import GHC.Rename.Names
 import GHC.Rename.Env
 import GHC.Rename.Fixity
-import GHC.Rename.Utils ( HsDocContext(..), mapFvRn
+import GHC.Rename.Utils ( mapFvRn
                         , checkDupRdrNames, checkDupRdrNamesN
                         , warnUnusedLocalBinds
                         , warnForallIdentifier

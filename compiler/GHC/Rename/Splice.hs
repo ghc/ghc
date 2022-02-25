@@ -22,7 +22,7 @@ import GHC.Tc.Utils.Monad
 import GHC.Driver.Env.Types
 
 import GHC.Rename.Env
-import GHC.Rename.Utils   ( HsDocContext(..), newLocalBndrRn )
+import GHC.Rename.Utils   ( newLocalBndrRn )
 import GHC.Rename.Unbound ( isUnboundName )
 import GHC.Rename.Module  ( rnSrcDecls, findSplice )
 import GHC.Rename.Pat     ( rnPat )

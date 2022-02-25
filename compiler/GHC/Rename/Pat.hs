@@ -52,7 +52,7 @@ import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Zonk   ( hsOverLitName )
 import GHC.Rename.Env
 import GHC.Rename.Fixity
-import GHC.Rename.Utils    ( HsDocContext(..), newLocalBndrRn, bindLocalNames
+import GHC.Rename.Utils    ( newLocalBndrRn, bindLocalNames
                            , warnUnusedMatches, newLocalBndrRn
                            , checkUnusedRecordWildcard
                            , checkDupNames, checkDupAndShadowedNames

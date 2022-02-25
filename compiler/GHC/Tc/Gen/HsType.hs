@@ -2231,10 +2231,20 @@ tcAnonWildCardOcc is_extra (TcTyMode { mode_holes = Just (hole_lvl, hole_mode) }
                      HM_VTA     -> False
                      HM_TyAppPat -> False
 
-tcAnonWildCardOcc _ mode ty _
--- mode_holes is Nothing.  Should not happen, because renamer
--- should already have rejected holes in unexpected places
-  = pprPanic "tcWildCardOcc" (ppr mode $$ ppr ty)
+tcAnonWildCardOcc is_extra _ _ _
+-- mode_holes is Nothing. This means we have an anonymous wildcard
+-- in an unexpected place. The renamer rejects these wildcards in 'checkAnonWildcard',
+-- but it is possible for a wildcard to be introduced by a Template Haskell splice,
+-- as per #15433. To account for this, we throw a generic catch-all error message.
+  = failWith $ TcRnIllegalWildcardInType Nothing reason Nothing
+    where
+      reason =
+        case is_extra of
+          YesExtraConstraint ->
+            ExtraConstraintWildcardNotAllowed
+              SoleExtraConstraintWildcardNotAllowed
+          NoExtraConstraint  ->
+            WildcardsNotAllowedAtAll
 
 {- Note [Wildcard names]
 ~~~~~~~~~~~~~~~~~~~~~~~~
