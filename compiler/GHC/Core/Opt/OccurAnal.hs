@@ -857,14 +857,14 @@ occAnalRec env lvl (CyclicSCC details_s) (body_uds, binds)
     (final_uds, loop_breaker_nodes) = mkLoopBreakerNodes env lvl body_uds details_s
 
     ------------------------------
-    active_rule_fvs :: VarSet
-    active_rule_fvs = mapUnionVarSet nd_active_rule_fvs details_s
+    weak_fvs :: VarSet
+    weak_fvs = mapUnionVarSet nd_weak_fvs details_s
 
     ---------------------------
     -- Now reconstruct the cycle
     pairs :: [(Id,CoreExpr)]
-    pairs | all_simple = reOrderNodes   0 active_rule_fvs loop_breaker_nodes []
-          | otherwise  = loopBreakNodes 0 active_rule_fvs loop_breaker_nodes []
+    pairs | all_simple = reOrderNodes   0 weak_fvs loop_breaker_nodes []
+          | otherwise  = loopBreakNodes 0 weak_fvs loop_breaker_nodes []
           -- In the common case when all are "simple" (no rules at all)
           -- the loop_breaker_nodes will include all the scope edges
           -- so a SCC computation would yield a single CyclicSCC result;
@@ -954,8 +954,7 @@ There is a last nasty wrinkle.  Suppose we have
 
           h = h_rhs
           g = h
-          ...more...
-    }
+          ...more... }
 
 Remember that we simplify the RULES before any RHS (see Note
 [Rules are visible in their own rec group] above).
@@ -979,7 +978,11 @@ So q must remain in scope in the output program!
 We "solve" this by:
 
     Make q a "weak" loop breaker (OccInfo = IAmLoopBreaker True)
-    iff q is a mentioned in the RHS of an active RULE in the Rec group
+    iff q is a mentioned in the RHS of any RULE (active on not)
+    in the Rec group
+
+Note the "active or not" comment; even if a RULE is inactive, we
+want its RHS free vars to stay alive (#20820)!
 
 A normal "strong" loop breaker has IAmLoopBreaker False.  So:
 
@@ -995,8 +998,8 @@ Annoyingly, since we simplify the rules *first* we'll never inline
 q into p's RULE.  That trivial binding for q will hang around until
 we discard the rule.  Yuk.  But it's rare.
 
- Note [Rules and loop breakers]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Rules and loop breakers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When we form the loop-breaker graph (Step 4 in Note [Recursive
 bindings: the grand plan]), we must be careful about RULEs.
 
@@ -1016,7 +1019,7 @@ Hence, if
     h has a RULE that mentions f
 
 then we *must* choose f to be a loop breaker.  Example: see Note
-[Specialisation rules]. So out plan is this:
+[Specialisation rules]. So our plan is this:
 
    Take the free variables of f's RHS, and augment it with all the
    variables reachable by a transitive sequence RULES from those
@@ -1322,8 +1325,13 @@ data Details
                                 -- If all nodes are simple we don't need a loop-breaker
                                 -- dep-anal before reconstructing.
 
+       , nd_weak_fvs :: IdSet    -- Variables bound in this Rec group that are free
+                                 -- in the RHS of any rule (active or not) for this bndr
+                                 -- See Note [Weak loop breakers]
+
        , nd_active_rule_fvs :: IdSet    -- Variables bound in this Rec group that are free
                                         -- in the RHS of an active rule for this bndr
+                                        -- See Note [Rules and loop breakers]
 
        , nd_score :: NodeScore
   }
@@ -1368,6 +1376,7 @@ makeNode env imp_rule_edges bndr_set (bndr, rhs)
                  , nd_uds             = scope_uds
                  , nd_inl             = inl_fvs
                  , nd_simple          = null rules_w_uds && null imp_rule_info
+                 , nd_weak_fvs        = weak_fvs
                  , nd_active_rule_fvs = active_rule_fvs
                  , nd_score           = pprPanic "makeNodeDetails" (ppr bndr) }
 
@@ -1425,6 +1434,7 @@ makeNode env imp_rule_edges bndr_set (bndr, rhs)
     rule_uds = foldr add_rule_uds imp_rule_uds rules_w_uds
     add_rule_uds (_, l, r) uds = l `andUDs` r `andUDs` uds
 
+    -------- active_rule_fvs ------------
     active_rule_fvs = foldr add_active_rule imp_rule_fvs rules_w_uds
     add_active_rule (rule, _, rhs_uds) fvs
       | is_active (ruleActivation rule)
@@ -1432,6 +1442,10 @@ makeNode env imp_rule_edges bndr_set (bndr, rhs)
       | otherwise
       = fvs
 
+    -------- weak_fvs ------------
+    -- See Note [Weak loop breakers]
+    weak_fvs = foldr add_rule emptyVarSet rules_w_uds
+    add_rule (_, _, rhs_uds) fvs = udFreeVars bndr_set rhs_uds `unionVarSet` fvs
 
 mkLoopBreakerNodes :: OccEnv -> TopLevelFlag
                    -> UsageDetails   -- for BODY of let
