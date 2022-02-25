@@ -955,7 +955,7 @@ match renv subst e1 (Let bind e2) mco
   | otherwise
   = Nothing
   where
-    (flt_subst', bind') = substBind (rv_fltR renv `extendInScopeList` rs_bndrs subst) bind
+    (flt_subst', bind') = substBind (rv_fltR renv) bind
     new_bndrs           = bindersOf bind'
 
 ------------------------  Lambdas ---------------------
