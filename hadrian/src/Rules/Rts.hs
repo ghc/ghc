@@ -28,6 +28,7 @@ rtsRules = priority 3 $ do
         let buildPath = root -/- buildDir (rtsContext stage)
 
         -- Header files
+        -- See Note [Packaging libffi headers] in GHC.Driver.CodeOutput.
         forM_ libffiHeaderFiles $ \header ->
             buildPath -/- "include" -/- header %> copyLibffiHeader stage
 
@@ -46,6 +47,8 @@ withLibffi stage action = needLibffi stage
 
 -- | Copy a header files wither from the system libffi or from the libffi
 -- build dir to the rts build dir.
+--
+-- See Note [Packaging libffi headers] in GHC.Driver.CodeOutput.
 copyLibffiHeader :: Stage -> FilePath -> Action ()
 copyLibffiHeader stage header = do
     useSystemFfi <- flag UseSystemFfi
