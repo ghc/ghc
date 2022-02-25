@@ -57,7 +57,6 @@ runTestGhcFlags = do
 
 data TestCompilerArgs = TestCompilerArgs{
     hasDynamicRts, hasThreadedRts :: Bool
- ,   libWays           :: Set.Set Way
  ,   hasDynamic        :: Bool
  ,   leadingUnderscore :: Bool
  ,   withNativeCodeGen :: Bool
@@ -86,7 +85,6 @@ inTreeCompilerArgs stg = do
     (hasDynamicRts, hasThreadedRts) <- do
       ways <- interpretInContext (Context stg rts vanilla) getRtsWays
       return (dynamic `elem` ways, threaded `elem` ways)
-    libWays <- interpretInContext (Context stg compiler vanilla) getLibraryWays
     -- MP: We should be able to vary if stage1/stage2 is dynamic, ie a dynamic stage1
     -- should be able to built a static stage2?
     hasDynamic          <- flavour >>= dynamicGhcPrograms
@@ -126,14 +124,13 @@ ghcConfigPath = "test/ghcconfig"
 
 -- | If the compiler is out-of-tree then we have to query the compiler to work out
 -- facts about it.
-outOfTreeCompilerArgs :: String -> Action TestCompilerArgs
-outOfTreeCompilerArgs testGhc = do
+outOfTreeCompilerArgs :: Action TestCompilerArgs
+outOfTreeCompilerArgs = do
     root <- buildRoot
     need [root -/- ghcConfigPath]
     (hasDynamicRts, hasThreadedRts) <- do
       ways <- testRTSSettings
       return ("dyn" `elem` ways, "thr" `elem` ways)
-    libWays <- inferLibraryWays testGhc
     hasDynamic          <- getBooleanSetting TestGhcDynamic
     leadingUnderscore   <- getBooleanSetting TestLeadingUnderscore
     withNativeCodeGen   <- getBooleanSetting TestGhcWithNativeCodeGen
@@ -162,9 +159,8 @@ outOfTreeCompilerArgs testGhc = do
 -- thing
 assertSameCompilerArgs :: Stage -> Action ()
 assertSameCompilerArgs stg = do
-  test_ghc <- testCompiler <$> userSetting defaultTestArgs
   in_args  <- inTreeCompilerArgs stg
-  out_args <- outOfTreeCompilerArgs test_ghc
+  out_args <- outOfTreeCompilerArgs
   -- The assertion to check we calculated the right thing
   when (in_args /= out_args) $ putFailure $ unlines $
     [ "Hadrian assertion failure: in-tree arguments don't match out-of-tree arguments."
@@ -190,7 +186,7 @@ runTestBuilderArgs = builder Testsuite ? do
     TestCompilerArgs{..} <- expr $
       case stageOfTestCompiler testGhc of
         Just stg -> inTreeCompilerArgs stg
-        Nothing  -> outOfTreeCompilerArgs testGhc
+        Nothing  -> outOfTreeCompilerArgs
 
     -- MP: TODO, these should be queried from the test compiler?
     bignumBackend <- getBignumBackend
@@ -219,8 +215,6 @@ runTestBuilderArgs = builder Testsuite ? do
 
     let asBool :: String -> Bool -> String
         asBool s b = s ++ show b
-
-        hasLibWay w = elem w libWays
 
     -- TODO: set CABAL_MINIMAL_BUILD/CABAL_PLUGIN_BUILD
     mconcat [ arg $ "testsuite/driver/runtests.py"
@@ -256,9 +250,6 @@ runTestBuilderArgs = builder Testsuite ? do
             , arg "-e", arg $ "ghc_compiler_always_flags=" ++ quote ghcFlags
             , arg "-e", arg $ asBool "ghc_with_dynamic_rts="  (hasDynamicRts)
             , arg "-e", arg $ asBool "ghc_with_threaded_rts=" (hasThreadedRts)
-            , arg "-e", arg $ asBool "config.have_vanilla="   (hasLibWay vanilla)
-            , arg "-e", arg $ asBool "config.have_dynamic="   (hasLibWay dynamic)
-            , arg "-e", arg $ asBool "config.have_profiling=" (hasLibWay profiling)
             , arg "-e", arg $ asBool "config.have_fast_bignum=" (bignumBackend /= "native" && not bignumCheck)
             , arg "-e", arg $ asBool "ghc_with_smp=" withSMP
 
@@ -360,58 +351,3 @@ setTestSpeed :: TestSpeed -> String
 setTestSpeed TestSlow   = "0"
 setTestSpeed TestNormal = "1"
 setTestSpeed TestFast   = "2"
-
--- | The purpose of this function is, given a compiler
---   (stage 1, 2, 3 or an external one), to infer the ways
---   that the libraries have been built in.
---
---   While we have this data readily available for in-tree compilers
---   that we build (through the 'Flavour'), that is not the case for
---   out-of-tree compilers that we may want to test, as is the case when
---   we are running './validate --hadrian' (it packages up a binary
---   distribution, installs it somewhere near and tests it).
---
---   We therefore proceed in a way that works regardless of whether we are
---   dealing with an in-tree compiler or not: we ask the GHC's install
---   ghc-pkg to give us the library directory of its @ghc-prim@ package and
---   look at what ways are available for the interface file of the
---   @GHC.PrimopWrappers@ module, like the Make build system does in
---   @testsuite\/mk\/test.mk@ to compute @HAVE_DYNAMIC@, @HAVE_VANILLA@
---   and @HAVE_PROFILING@:
---
---   - if we find @PrimopWrappers.hi@, we have the vanilla way;
---   - if we find @PrimopWrappers.dyn_hi@, we have the dynamic way;
---   - if we find @PrimopWrappers.p_hi@, we have the profiling way.
-inferLibraryWays :: String -> Action (Set.Set Way)
-inferLibraryWays compiler = do
-  bindir <- getBinaryDirectory compiler
-  Stdout ghcPrimLibdirDirty <- cmd
-    [bindir </> "ghc-pkg" <.> exe]
-    ["field", "ghc-prim", "library-dirs", "--simple-output"]
-  let ghcPrimLibdir = fixup ghcPrimLibdirDirty
-  ways <- Set.fromList . catMaybes <$> traverse (lookForWay ghcPrimLibdir) candidateWays
-  return ways
-
-  where lookForWay dir (hifile, w) = do
-          exists <- doesFileExist (dir -/- hifile)
-          if exists then return (Just w) else return Nothing
-
-        candidateWays =
-          [ ("GHC/PrimopWrappers.hi", vanilla)
-          , ("GHC/PrimopWrappers.dyn_hi", dynamic)
-          , ("GHC/PrimopWrappers.p_hi", profiling)
-          ]
-
-        -- If the ghc is in a directory with spaces in a path component,
-        -- 'dir' is prefixed and suffixed with double quotes.
-        -- In all cases, there is a \n at the end.
-        -- This function cleans it all up.
-        fixup = removeQuotes . removeNewline
-
-        removeNewline path
-          | "\n" `isSuffixOf` path = init path
-          | otherwise              = path
-
-        removeQuotes path
-          | "\"" `isPrefixOf` path && "\"" `isSuffixOf` path = tail (init path)
-          | otherwise                                        = path

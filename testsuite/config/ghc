@@ -37,10 +37,6 @@ if ghc_with_native_codegen:
     config.compile_ways.append('optasm')
     config.run_ways.append('optasm')
 
-if config.have_profiling:
-    config.compile_ways.append('profasm')
-    config.run_ways.append('profasm')
-
 if config.have_interp:
     config.run_ways.append('ghci')
 
@@ -59,9 +55,6 @@ if ghc_with_dynamic_rts:
 if windows:
     config.supports_dynamic_hs = False
     config.stdcxx_impl = 'c++'
-
-if (config.have_profiling and ghc_with_threaded_rts):
-    config.run_ways.append('profthreaded')
 
 # WinIO I/O manager for Windows
 if windows:
@@ -209,6 +202,40 @@ def get_compiler_info():
 
     # See Note [Replacing backward slashes in config.libdir].
     config.libdir = config.libdir.replace('\\', '/')
+
+    def test_compile(flags) -> bool:
+        """
+        Check whether GHC can compile in the given way.
+        This is used as a proxy to determine, e.g., whether
+        profiled libraries were built.
+        """
+        import tempfile
+        import textwrap
+        with tempfile.TemporaryDirectory() as d:
+            src = Path(d) / 'test.hs'
+            src.write_text(textwrap.dedent('''
+                module Main where
+                main = putStrLn "Hello World!"
+            '''))
+            p = subprocess.run(
+                    '{} -v0 {} -o test '.format(config.compiler, src) + ' '.join(flags),
+                    shell=True,
+                    cwd=d,
+                    stderr=None if config.verbose >= 2 else subprocess.DEVNULL)
+            res = p.returncode
+            return res == 0
+
+    config.have_vanilla = test_compile([])
+    config.have_dynamic = test_compile(['-dynamic'])
+    config.have_profiling = test_compile(['-prof'])
+
+    if config.have_profiling:
+        config.compile_ways.append('profasm')
+        config.run_ways.append('profasm')
+
+    if config.have_profiling and ghc_with_threaded_rts:
+        config.run_ways.append('profthreaded')
+        ghc_env['HAVE_PROFILING'] = 'YES'
 
     # See Note [WayFlags]
     if config.ghc_dynamic:
