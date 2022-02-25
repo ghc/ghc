@@ -2981,12 +2981,18 @@ commonly used commands.
 
     Infers and prints the type of ⟨expression⟩.  For polymorphic types
     it instantiates the 'inferred' forall quantifiers (but not the
-    'specified' ones; see :ref:`inferred-vs-specified`), solves constraints, and re-generalises.
+    'specified' ones; see :ref:`inferred-vs-specified`), solves constraints,
+    re-generalises, and then reduces type families as much as possible.
 
     .. code-block:: none
 
 	*X> :type length
 	length :: Foldable t => t a -> Int
+
+    Type family reduction is skipped if the function is not fully instantiated,
+    as this has been observed to give more intuitive results.
+    You may want to use :ghci-cmd:`:info` if you are not applying any arguments,
+    as that will return the original type of the function without instantiating.
 
 .. ghci-cmd:: :type +d; ⟨expression⟩
 

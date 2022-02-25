@@ -2576,14 +2576,12 @@ tcRnExpr hsc_env mode rdr_expr
                         mkPhiTy (map idType dicts) res_ty } ;
     ty <- zonkTcType all_expr_ty ;
 
-    -- We normalise type families, so that the type of an expression is the
-    -- same as of a bound expression (GHC.Tc.Gen.Bind.mkInferredPolyId). See Trac
-    -- #10321 for further discussion.
+    -- See Note [Normalising the type in :type]
     fam_envs <- tcGetFamInstEnvs ;
-    -- normaliseType returns a coercion which we discard, so the Role is
-    -- irrelevant
-    return (reductionReducedType (normaliseType fam_envs Nominal ty))
-    }
+    let { normalised_type = reductionReducedType $ normaliseType fam_envs Nominal ty
+          -- normaliseType returns a coercion which we discard, so the Role is irrelevant.
+        ; final_type = if isSigmaTy res_ty then ty else normalised_type } ;
+    return final_type }
   where
     -- Optionally instantiate the type of the expression
     -- See Note [TcRnExprMode]
@@ -2608,6 +2606,31 @@ and not        forall {b}. Int -> b -> Int
 
 Solution: use tcInferSigma, which in turn uses tcInferApp, which
 has a special case for application chains.
+
+Note [Normalising the type in :type]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In :t <expr> we usually normalise the type (to simplify type functions)
+before displaying the result.  Reason (see #10321): otherwise we may show
+types like
+    <expr> :: Vec (1+2) Int
+rather than the simpler
+    <expr> :: Vec 3 Int
+In GHC.Tc.Gen.Bind.mkInferredPolyId we normalise for a very similar reason.
+
+However this normalisation is less helpful when <expr> is just
+an identifier, whose user-written type happens to contain type-function
+applications.  E.g. (#20974)
+    test :: F [Monad, A, B] m => m ()
+where F is a type family.  If we say `:t test`, we'd prefer to see
+the type family un-expanded.
+
+We adopt the following ad-hoc solution: if the type inferred for <expr>
+(before generalisation, namely res_ty) is a SigmaType (i.e. is not
+fully instantiated) then do not normalise; otherwise normalise.
+This is not ideal; for example, suppose  x :: F Int.  Then
+  :t x
+would be normalised because `F Int` is not a SigmaType.  But
+anything here is ad-hoc, and it's a user-sought improvement.
 -}
 
 --------------------------
