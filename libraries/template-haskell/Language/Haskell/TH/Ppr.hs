@@ -478,8 +478,15 @@ ppr_overlap o = text $
 
 ppr_data :: Doc -> Cxt -> Maybe Name -> Doc -> Maybe Kind -> [Con] -> [DerivClause]
          -> Doc
-ppr_data maybeInst ctxt t argsDoc ksig cs decs
-  = sep [text "data" <+> maybeInst
+ppr_data = ppr_typedef "data"
+
+ppr_newtype :: Doc -> Cxt -> Maybe Name -> Doc -> Maybe Kind -> Con -> [DerivClause]
+            -> Doc
+ppr_newtype maybeInst ctxt t argsDoc ksig c decs = ppr_typedef "newtype" maybeInst ctxt t argsDoc ksig [c] decs
+
+ppr_typedef :: String -> Doc -> Cxt -> Maybe Name -> Doc -> Maybe Kind -> [Con] -> [DerivClause] -> Doc
+ppr_typedef data_or_newtype maybeInst ctxt t argsDoc ksig cs decs
+  = sep [text data_or_newtype <+> maybeInst
             <+> pprCxt ctxt
             <+> case t of
                  Just n -> pprName' Applied n <+> argsDoc
@@ -511,24 +518,6 @@ ppr_data maybeInst ctxt t argsDoc ksig cs decs
                 Nothing -> empty
                 Just k  -> dcolon <+> ppr k
 
-ppr_newtype :: Doc -> Cxt -> Maybe Name -> Doc -> Maybe Kind -> Con -> [DerivClause]
-            -> Doc
-ppr_newtype maybeInst ctxt t argsDoc ksig c decs
-  = sep [text "newtype" <+> maybeInst
-            <+> pprCxt ctxt
-            <+> case t of
-                 Just n -> ppr n <+> argsDoc
-                 Nothing -> argsDoc
-            <+> ksigDoc,
-         nest 2 (char '=' <+> ppr c),
-         if null decs
-           then empty
-           else nest nestDepth
-                $ vcat $ map ppr_deriv_clause decs]
-  where
-    ksigDoc = case ksig of
-                Nothing -> empty
-                Just k  -> dcolon <+> ppr k
 
 ppr_deriv_clause :: DerivClause -> Doc
 ppr_deriv_clause (DerivClause ds ctxt)
