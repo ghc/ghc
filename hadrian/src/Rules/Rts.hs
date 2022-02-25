@@ -25,10 +25,6 @@ rtsRules = priority 3 $ do
     forM_ [Stage1 ..] $ \ stage -> do
         let buildPath = root -/- buildDir (rtsContext stage)
 
-        -- Header files
-        forM_ libffiHeaderFiles $ \header ->
-            buildPath -/- "include" -/- header %> copyLibffiHeader stage
-
         -- Static libraries.
         buildPath -/- "libCffi*.a"     %> copyLibffiStatic stage
 
@@ -121,7 +117,7 @@ needRtsLibffiTargets stage = do
     let headers = fmap ((rtsPath -/- "include") -/-) libffiHeaderFiles
 
     if useSystemFfi
-    then return headers
+    then return []
     else do
         -- Need Libffi
         -- This returns the dynamic library files (in the Libffi build dir).

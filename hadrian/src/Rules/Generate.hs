@@ -46,7 +46,6 @@ rtsDependencies = do
             , "rts" -/- "EventTypes.h"
             , "rts" -/- "EventLogConstants.h"
             ]
-            ++ libffiHeaderFiles
     pure $ ((rtsPath -/- "include") -/-) <$> headers
 
 genapplyDependencies :: Expr [FilePath]
