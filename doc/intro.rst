@@ -59,8 +59,8 @@ in mind:
 Obtaining Haddock
 -----------------
 
-Distributions (source & binary) of Haddock can be obtained from its `web
-site <http://www.haskell.org/haddock/>`__.
+Haddock is distributed with GHC distributions, and will automatically be provided if you use 
+`ghcup <https://www.haskell.org/ghcup>`__, for instance.
 
 Up-to-date sources can also be obtained from our public GitHub
 repository. The Haddock sources are at
@@ -72,77 +72,38 @@ License
 The following license covers this documentation, and the Haddock source
 code, except where otherwise indicated.
 
-    Copyright 2002-2010, Simon Marlow. All rights reserved.
+    Copyright (c) 2002-2010, Simon Marlow
+    All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
-    modification, are permitted provided that the following conditions
-    are met:
+    modification, are permitted provided that the following conditions are
+    met:
 
-    -  Redistributions of source code must retain the above copyright
+    1. Redistributions of source code must retain the above copyright
        notice, this list of conditions and the following disclaimer.
 
-    -  Redistributions in binary form must reproduce the above copyright
-       notice, this list of conditions and the following disclaimer in
-       the documentation and/or other materials provided with the
+    2. Redistributions in binary form must reproduce the above copyright
+       notice, this list of conditions and the following disclaimer in the
+       documentation and/or other materials provided with the
        distribution.
 
-    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS "AS IS" AND ANY
-    EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-    IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
-    PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS BE
-    LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
-    CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
-    SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
-    BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
-    LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
-    NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-    SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+    "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+    LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+    A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+    OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+    SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+    LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+    DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+    THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+    (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 Contributors
 ------------
 
-Haddock was originally written by Simon Marlow. Since it is an open
-source project, many people have contributed to its development over the
-years. Below is a list of contributors in alphabetical order that we
-hope is somewhat complete. If you think you are missing from this list,
-please contact us.
-
--  Ashley Yakeley
--  Benjamin Franksen
--  Brett Letner
--  Clemens Fruhwirth
--  Conal Elliott
--  David Waern
--  Duncan Coutts
--  George Pollard
--  George Russel
--  Hal Daume
--  Ian Lynagh
--  Isaac Dupree
--  Joachim Breitner
--  Krasimir Angelov
--  Lennart Augustsson
--  Luke Plant
--  Malcolm Wallace
--  Manuel Chakravarty
--  Marcin Szamotulski
--  Mark Lentczner
--  Mark Shields
--  Mateusz Kowalczyk
--  Mike Thomas
--  Neil Mitchell
--  Oliver Brown
--  Roman Cheplyaka
--  Ross Paterson
--  Sigbjorn Finne
--  Simon Hengel
--  Simon Marlow
--  Simon Peyton-Jones
--  Stefan O'Rear
--  Sven Panne
--  Thomas Schilling
--  Wolfgang Jeltsch
--  Yitzchak Gale
+A list of contributors to the project can be seen at
+``https://github.com/haskell/haddock/graphs/contributors``.
 
 Acknowledgements
 ----------------
