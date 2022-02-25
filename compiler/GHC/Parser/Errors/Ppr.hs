@@ -306,6 +306,8 @@ instance Diagnostic PsMessage where
       -> mkSimpleDecorated $ text "Not a record constructor:" <+> ppr p
     PsErrIllegalUnboxedStringInPat lit
       -> mkSimpleDecorated $ text "Illegal unboxed string literal in pattern:" $$ ppr lit
+    PsErrIllegalUnboxedFloatingLitInPat lit
+      -> mkSimpleDecorated $ text "Illegal unboxed floating point literal in pattern:" $$ ppr lit
     PsErrDoNotationInPat
       -> mkSimpleDecorated $ text "do-notation in pattern"
     PsErrIfThenElseInPat
@@ -551,6 +553,7 @@ instance Diagnostic PsMessage where
     PsErrUnexpectedKindAppInDataCon{}             -> ErrorWithoutFlag
     PsErrInvalidRecordCon{}                       -> ErrorWithoutFlag
     PsErrIllegalUnboxedStringInPat{}              -> ErrorWithoutFlag
+    PsErrIllegalUnboxedFloatingLitInPat{}         -> ErrorWithoutFlag
     PsErrDoNotationInPat{}                        -> ErrorWithoutFlag
     PsErrIfThenElseInPat                          -> ErrorWithoutFlag
     PsErrLambdaCaseInPat                          -> ErrorWithoutFlag
@@ -679,6 +682,7 @@ instance Diagnostic PsMessage where
     PsErrUnexpectedKindAppInDataCon{}             -> noHints
     PsErrInvalidRecordCon{}                       -> noHints
     PsErrIllegalUnboxedStringInPat{}              -> noHints
+    PsErrIllegalUnboxedFloatingLitInPat{}         -> noHints
     PsErrDoNotationInPat{}                        -> noHints
     PsErrIfThenElseInPat                          -> noHints
     PsErrLambdaCaseInPat                          -> noHints

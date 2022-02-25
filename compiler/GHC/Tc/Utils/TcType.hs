@@ -78,7 +78,7 @@ module GHC.Tc.Utils.TcType (
   pickyEqType, tcEqType, tcEqKind, tcEqTypeNoKindCheck, tcEqTypeVis,
   tcEqTyConApps,
   isSigmaTy, isRhoTy, isRhoExpTy, isOverloadedTy,
-  isFloatingTy, isDoubleTy, isFloatTy, isIntTy, isWordTy, isStringTy,
+  isFloatingPrimTy, isDoubleTy, isFloatTy, isIntTy, isWordTy, isStringTy,
   isIntegerTy, isNaturalTy,
   isBoolTy, isUnitTy, isCharTy,
   isTauTy, isTauTyCon, tcIsTyVarTy, tcIsForAllTy,
@@ -1999,11 +1999,15 @@ isOverloadedTy (ForAllTy _  ty)             = isOverloadedTy ty
 isOverloadedTy (FunTy { ft_af = InvisArg }) = True
 isOverloadedTy _                            = False
 
-isFloatTy, isDoubleTy, isIntegerTy, isNaturalTy,
+isFloatTy, isDoubleTy,
+    isFloatPrimTy, isDoublePrimTy,
+    isIntegerTy, isNaturalTy,
     isIntTy, isWordTy, isBoolTy,
     isUnitTy, isCharTy, isAnyTy :: Type -> Bool
 isFloatTy      = is_tc floatTyConKey
 isDoubleTy     = is_tc doubleTyConKey
+isFloatPrimTy  = is_tc floatPrimTyConKey
+isDoublePrimTy = is_tc doublePrimTyConKey
 isIntegerTy    = is_tc integerTyConKey
 isNaturalTy    = is_tc naturalTyConKey
 isIntTy        = is_tc intTyConKey
@@ -2013,9 +2017,15 @@ isUnitTy       = is_tc unitTyConKey
 isCharTy       = is_tc charTyConKey
 isAnyTy        = is_tc anyTyConKey
 
--- | Does a type represent a floating-point number?
-isFloatingTy :: Type -> Bool
-isFloatingTy ty = isFloatTy ty || isDoubleTy ty
+-- | Is the type inhabited by machine floating-point numbers?
+--
+-- Used to check that we don't use floating-point literal patterns
+-- in Core.
+--
+-- See #9238 and Note [Rules for floating-point comparisons]
+-- in GHC.Core.Opt.ConstantFold.
+isFloatingPrimTy :: Type -> Bool
+isFloatingPrimTy ty = isFloatPrimTy ty || isDoublePrimTy ty
 
 -- | Is a type 'String'?
 isStringTy :: Type -> Bool

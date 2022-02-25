@@ -30,7 +30,7 @@ import GHC.Driver.Ppr
 import GHC.Driver.Env
 import GHC.Driver.Config.Diagnostic
 
-import GHC.Tc.Utils.TcType   ( isFloatingTy, isTyFamFree )
+import GHC.Tc.Utils.TcType ( isFloatingPrimTy, isTyFamFree )
 import GHC.Unit.Module.ModGuts
 import GHC.Runtime.Context
 
@@ -1413,7 +1413,7 @@ lintCaseExpr scrut var alt_ty alts =
      -- See Note [Rules for floating-point comparisons] in GHC.Core.Opt.ConstantFold
      ; let isLitPat (Alt (LitAlt _) _  _) = True
            isLitPat _                     = False
-     ; checkL (not $ isFloatingTy scrut_ty && any isLitPat alts)
+     ; checkL (not $ isFloatingPrimTy scrut_ty && any isLitPat alts)
          (text "Lint warning: Scrutinising floating-point expression with literal pattern in case analysis (see #9238)."
           $$ text "scrut" <+> ppr scrut)
 

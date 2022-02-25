@@ -1,0 +1,37 @@
+*** Core Lint errors : in result of Desugar (before optimization) ***
+T21115b.hs:9:1: warning:
+    Lint warning: Scrutinising floating-point expression with literal pattern in case analysis (see #9238).
+    scrut ds
+    In the RHS of foo :: Double# -> Int#
+    In the body of lambda with binder ds :: Double#
+    In the body of letrec with binders fail :: (# #) -> Int#
+    In the body of letrec with binders fail :: (# #) -> Int#
+    Substitution: [TCvSubst
+                     In scope: InScope {}
+                     Type env: []
+                     Co env: []]
+*** Offending Program ***
+Rec {
+$trModule = Module (TrNameS "main"#) (TrNameS "T21115b"#)
+
+foo
+  = \ ds ->
+      let {
+        fail
+          = \ ds ->
+              case patError "T21115b.hs:(10,4)-(15,4)|case"# of wild { } } in
+      let { fail = \ ds -> 5# } in
+      case ds of ds {
+        __DEFAULT -> fail void#;
+        0.0## -> 2#;
+        2.0## -> 3#
+      }
+end Rec }
+
+*** End of Offense ***
+
+
+<no location info>: error: 
+Compilation had errors
+
+

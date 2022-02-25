@@ -507,7 +507,7 @@ checked by Core Lint.
 5. Floating-point values must not be scrutinised against literals.
    See #9238 and Note [Rules for floating-point comparisons]
    in GHC.Core.Opt.ConstantFold for rationale.  Checked in lintCaseExpr;
-   see the call to isFloatingTy.
+   see the call to isFloatingPrimTy.
 
 6. The 'ty' field of (Case scrut bndr ty alts) is the type of the
    /entire/ case expression.  Checked in lintAltExpr.

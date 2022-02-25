@@ -1812,7 +1812,7 @@ instance DisambECP (PatBuilder GhcPs) where
   mkHsParPV l lpar p rpar   = return $ L (noAnnSrcSpan l) (PatBuilderPar lpar p rpar)
   mkHsVarPV v@(getLoc -> l) = return $ L (na2la l) (PatBuilderVar v)
   mkHsLitPV lit@(L l a) = do
-    checkUnboxedStringLitPat lit
+    checkUnboxedLitPat lit
     return $ L l (PatBuilderPat (LitPat noExtField a))
   mkHsOverLitPV (L l a) = return $ L l (PatBuilderOverLit a)
   mkHsWildCardPV l = return $ L l (PatBuilderPat (WildPat noExtField))
@@ -1862,13 +1862,31 @@ instance DisambECP (PatBuilder GhcPs) where
   mkSumOrTuplePV = mkSumOrTuplePat
   rejectPragmaPV _ = return ()
 
-checkUnboxedStringLitPat :: Located (HsLit GhcPs) -> PV ()
-checkUnboxedStringLitPat (L loc lit) =
+-- | Ensure that a literal pattern isn't of type Addr#, Float#, Double#.
+checkUnboxedLitPat :: Located (HsLit GhcPs) -> PV ()
+checkUnboxedLitPat (L loc lit) =
   case lit of
-    HsStringPrim _ _  -- Trac #13260
+    -- Don't allow primitive string literal patterns.
+    -- See #13260.
+    HsStringPrim {}
       -> addFatalError $ mkPlainErrorMsgEnvelope loc $
                            (PsErrIllegalUnboxedStringInPat lit)
-    _ -> return ()
+
+   -- Don't allow Float#/Double# literal patterns.
+   -- See #9238 and Note [Rules for floating-point comparisons]
+   -- in GHC.Core.Opt.ConstantFold.
+    _ | is_floating_lit lit
+      -> addFatalError $ mkPlainErrorMsgEnvelope loc $
+                           (PsErrIllegalUnboxedFloatingLitInPat lit)
+
+      | otherwise
+      -> return ()
+
+  where
+    is_floating_lit :: HsLit GhcPs -> Bool
+    is_floating_lit (HsFloatPrim  {}) = True
+    is_floating_lit (HsDoublePrim {}) = True
+    is_floating_lit _                 = False
 
 mkPatRec ::
   LocatedA (PatBuilder GhcPs) ->

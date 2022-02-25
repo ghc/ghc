@@ -506,9 +506,9 @@ to convert it to the needed type `Word8`.
 
 tidyLitPat :: HsLit GhcTc -> Pat GhcTc
 -- Result has only the following HsLits:
---      HsIntPrim, HsWordPrim, HsCharPrim, HsFloatPrim
---      HsDoublePrim, HsStringPrim, HsString
---  * HsInteger, HsRat, HsInt can't show up in LitPats
+--      HsIntPrim, HsWordPrim, HsCharPrim, HsString
+--  * HsInteger, HsRat, HsInt, as well as HsStringPrim,
+--    HsFloatPrim and HsDoublePrim can't show up in LitPats
 --  * We get rid of HsChar right here
 tidyLitPat (HsChar src c) = unLoc (mkCharLitPat src c)
 tidyLitPat (HsString src s)

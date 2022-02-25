@@ -1,0 +1,4 @@
+
+T21115.hs:10:5: error:
+    Illegal unboxed floating point literal in pattern:
+    0.0##

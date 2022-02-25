@@ -235,6 +235,9 @@ data PsMessage
    -- | Illegal unboxed string literal in pattern
    | PsErrIllegalUnboxedStringInPat !(HsLit GhcPs)
 
+   -- | Illegal primitive floating point literal in pattern
+   | PsErrIllegalUnboxedFloatingLitInPat !(HsLit GhcPs)
+
    -- | Do-notation in pattern
    | PsErrDoNotationInPat
 
