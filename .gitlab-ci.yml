@@ -945,6 +945,8 @@ test-cabal-reinstall-x86_64-linux-deb10:
     REINSTALL_GHC: "yes"
     BUILD_FLAVOUR: validate
     TEST_ENV: "x86_64-linux-deb10-cabal-install"
+  rules:
+    - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
 
 #################################
 # x86_64-linux-deb11
@@ -1297,6 +1299,11 @@ source-tarball:
     - ./hadrian/build source-dist
     - mv _build/source-dist/*.xz  .
     - python3 ./hadrian/bootstrap/bootstrap.py -w $GHC fetch -o hadrian-bootstrap-sources-$GHC_VERSION
+  rules:
+    - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
+
+
+
 
 test-bootstrap:
   stage: full-build
@@ -1323,6 +1330,8 @@ test-bootstrap:
     TEST_ENV: "x86_64-linux-deb10-hadrian"
     BIN_DIST_NAME: "ghc-x86_64-deb10-linux"
     BUILD_FLAVOUR: "validate"
+  rules:
+    - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
 
 
 ############################################################
