@@ -96,34 +96,12 @@ else
 RUNTEST_OPTS += -e "config.leading_underscore=False"
 endif
 
-GHC_PRIM_LIBDIR := $(subst library-dirs: ,,"$(shell "$(GHC_PKG)" field ghc-prim library-dirs --simple-output)")
-HAVE_VANILLA := $(shell if [ -f "$(subst \,/,$(GHC_PRIM_LIBDIR))/GHC/PrimopWrappers.hi" ]; then echo YES; else echo NO; fi)
-HAVE_DYNAMIC := $(shell if [ -f "$(subst \,/,$(GHC_PRIM_LIBDIR))/GHC/PrimopWrappers.dyn_hi" ]; then echo YES; else echo NO; fi)
-HAVE_PROFILING := $(shell if [ -f "$(subst \,/,$(GHC_PRIM_LIBDIR))/GHC/PrimopWrappers.p_hi" ]; then echo YES; else echo NO; fi)
 HAVE_GDB := $(shell if gdb --version > /dev/null 2> /dev/null; then echo YES; else echo NO; fi)
 HAVE_READELF := $(shell if readelf --version > /dev/null 2> /dev/null; then echo YES; else echo NO; fi)
 
 # we need a better way to find which backend is selected and if --check flag is
 # used
 BIGNUM_GMP := $(shell "$(GHC_PKG)" field ghc-bignum exposed-modules | grep GMP)
-
-ifeq "$(HAVE_VANILLA)" "YES"
-RUNTEST_OPTS += -e config.have_vanilla=True
-else
-RUNTEST_OPTS += -e config.have_vanilla=False
-endif
-
-ifeq "$(HAVE_DYNAMIC)" "YES"
-RUNTEST_OPTS += -e config.have_dynamic=True
-else
-RUNTEST_OPTS += -e config.have_dynamic=False
-endif
-
-ifeq "$(HAVE_PROFILING)" "YES"
-RUNTEST_OPTS += -e config.have_profiling=True
-else
-RUNTEST_OPTS += -e config.have_profiling=False
-endif
 
 ifeq "$(filter thr, $(GhcRTSWays))" "thr"
 RUNTEST_OPTS += -e ghc_with_threaded_rts=True
