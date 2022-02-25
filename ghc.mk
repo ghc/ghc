@@ -474,6 +474,10 @@ endif
 # and executables. This flag disables the latter.
 libraries/haskeline_CONFIGURE_OPTS += --flags=-examples
 
+# Disable text's dependency on simdutf due to packaging considerations
+# described in #20724.
+libraries/text_CONFIGURE_OPTS += --flags=-simdutf
+
 libraries/ghc-bignum_CONFIGURE_OPTS += -f $(BIGNUM_BACKEND)
 
 ifeq "$(BIGNUM_BACKEND)" "gmp"
