@@ -340,3 +340,4 @@ test('T19650',
      ],
      ghci_script,
      ['T19650.script'])
+test('T20974', normal, ghci_script, ['T20974.script'])
