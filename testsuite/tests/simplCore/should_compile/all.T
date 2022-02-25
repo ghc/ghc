@@ -374,3 +374,8 @@ test('T20200KG', [extra_files(['T20200KGa.hs', 'T20200KG.hs-boot'])], multimod_c
 test('T20639', normal, compile, ['-O2'])
 test('T20894', normal, compile, ['-dcore-lint -O1 -ddebug-output'])
 test('T19790',  normal, compile, ['-O -ddump-rule-firings'])
+
+# This one had a Lint failure due to an occurrence analysis bug
+# -O0 is needed to trigger it because that switches rules off,
+# which (before the fix) lost crucial dependencies
+test('T20820',  normal, compile, ['-O0'])
