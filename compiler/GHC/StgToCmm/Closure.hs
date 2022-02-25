@@ -848,23 +848,14 @@ mkClosureInfoTableLabel platform id lf_info
         LFThunk _ _ upd_flag (ApThunk arity) _
                       -> mkApInfoTableLabel platform upd_flag arity
 
-        LFThunk{}     -> std_mk_lbl name cafs
-        LFReEntrant{} -> std_mk_lbl name cafs
+        LFThunk{}     -> mkInfoTableLabel name cafs
+        LFReEntrant{} -> mkInfoTableLabel name cafs
         _other        -> panic "closureInfoTableLabel"
 
   where
     name = idName id
 
-    std_mk_lbl | is_local  = mkLocalInfoTableLabel
-               | otherwise = mkInfoTableLabel
-
     cafs     = idCafInfo id
-    is_local = isDataConWorkId id
-       -- Make the _info pointer for the implicit datacon worker
-       -- binding local. The reason we can do this is that importing
-       -- code always either uses the _closure or _con_info. By the
-       -- invariants in "GHC.CoreToStg.Prep" anything else gets eta expanded.
-
 
 -- | thunkEntryLabel is a local help function, not exported.  It's used from
 -- getCallMethod.
