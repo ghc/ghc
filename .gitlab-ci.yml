@@ -929,6 +929,57 @@ nightly-x86_64-linux-deb10-llvm:
     BUILD_FLAVOUR: perf-llvm
     TEST_ENV: "x86_64-linux-deb10-llvm"
 
+####################################
+# Testing reinstallable ghc codepath
+####################################
+
+test-cabal-reinstall-x86_64-linux-deb10:
+  extends: .validate-linux-hadrian
+  stage: full-build
+  before_script:
+    - ./boot
+    - ./configure
+    - "cabal update --index=$HACKAGE_INDEX_STATE --project-file=cabal.project-reinstall"
+  variables:
+    REINSTALL_GHC: "yes"
+    BUILD_FLAVOUR: validate
+    TEST_ENV: "x86_64-linux-deb10-cabal-install"
+  rules:
+    - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
+
+#################################
+# x86_64-linux-deb11
+#################################
+
+.build-x86_64-linux-deb11:
+  extends: .validate-linux
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb11:$DOCKER_REV"
+  variables:
+    TEST_ENV: "x86_64-linux-deb11"
+    BIN_DIST_PREP_TAR_COMP: "./ghc-x86_64-deb11-linux.tar.xz"
+  cache:
+    key: linux-x86_64-deb11-$CACHE_REV
+
+# Disabled to reduce CI load
+.validate-x86_64-linux-deb11:
+  extends: .build-x86_64-linux-deb11
+  stage: full-build
+  artifacts:
+    when: always
+    expire_in: 2 week
+
+release-x86_64-linux-deb11:
+  <<: *release
+  extends: .build-x86_64-linux-deb11
+  stage: full-build
+
+nightly-x86_64-linux-deb11:
+  <<: *nightly
+  extends: .build-x86_64-linux-deb11
+  stage: full-build
+  variables:
+    TEST_TYPE: slowtest
+
 #################################
 # x86_64-linux-ubuntu 20.04
 #################################
@@ -1253,6 +1304,11 @@ source-tarball:
     - ./hadrian/build source-dist
     - mv _build/source-dist/*.xz  .
     - python3 ./hadrian/bootstrap/bootstrap.py -w $GHC fetch -o hadrian-bootstrap-sources-$GHC_VERSION
+  rules:
+    - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
+
+
+
 
 test-bootstrap:
   stage: full-build
@@ -1279,6 +1335,8 @@ test-bootstrap:
     TEST_ENV: "x86_64-linux-deb10-hadrian"
     BIN_DIST_NAME: "ghc-x86_64-deb10-linux"
     BUILD_FLAVOUR: "validate"
+  rules:
+    - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
 
 
 ############################################################
