@@ -11,7 +11,8 @@ module GHC.Tc.Utils.Concrete
 
 import GHC.Prelude
 
-import GHC.Core.Coercion
+import GHC.Core.Coercion   ( multToCo )
+import GHC.Core.Type       ( isConcrete, typeKind )
 import GHC.Core.TyCo.Rep
 
 import GHC.Tc.Utils.Monad
@@ -26,7 +27,7 @@ import GHC.Builtin.Types.Prim ( concretePrimTyCon )
 
 import GHC.Types.Basic      ( TypeOrKind(KindLevel) )
 
-import GHC.Core.Type  ( isConcrete, typeKind )
+
 
 {- Note [Concrete overview]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~

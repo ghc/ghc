@@ -30,7 +30,7 @@ import GHC.Driver.Ppr
 import GHC.Driver.Env
 import GHC.Driver.Config.Diagnostic
 
-import GHC.Tc.Utils.TcType ( isFloatingTy, isTyFamFree )
+import GHC.Tc.Utils.TcType   ( isFloatingTy, isTyFamFree )
 import GHC.Unit.Module.ModGuts
 import GHC.Runtime.Context
 
@@ -551,10 +551,10 @@ hence the `TopLevelFlag` on `tcPragExpr` in GHC.IfaceToCore.
 
 -}
 
-lintUnfolding :: Bool               -- True <=> is a compulsory unfolding
+lintUnfolding :: Bool             -- ^ True <=> is a compulsory unfolding
               -> DynFlags
               -> SrcLoc
-              -> VarSet             -- Treat these as in scope
+              -> VarSet           -- ^ Treat these as in scope
               -> CoreExpr
               -> Maybe (Bag SDoc) -- Nothing => OK
 
@@ -847,7 +847,10 @@ lintCoreExpr :: CoreExpr -> LintM (LintedType, UsageEnv)
 -- See Note [GHC Formalism]
 
 lintCoreExpr (Var var)
-  = lintIdOcc var 0
+  = do
+      var_pair@(var_ty, _) <- lintIdOcc var 0
+      checkCanEtaExpand (Var var) [] var_ty
+      return var_pair
 
 lintCoreExpr (Lit lit)
   = return (literalType lit, zeroUE)
@@ -937,8 +940,10 @@ lintCoreExpr e@(App _ _)
        ; lintCoreArgs app_ty rest }
 
   | otherwise
-  = do { pair <- lintCoreFun fun (length args)
-       ; lintCoreArgs pair args }
+  = do { fun_pair <- lintCoreFun fun (length args)
+       ; app_pair@(app_ty, _) <- lintCoreArgs fun_pair args
+       ; checkCanEtaExpand fun args app_ty
+       ; return app_pair}
   where
     (fun, args) = collectArgs e
 
@@ -1078,6 +1083,78 @@ checkJoinOcc var n_args
          mkBadJumpMsg var join_arity_occ n_args } } }
 
   | otherwise
+  = return ()
+
+-- | This function checks that we are able to perform eta expansion for
+-- functions with no binding, in order to satisfy invariant I3
+-- from Note [Representation polymorphism invariants] in GHC.Core.
+checkCanEtaExpand :: CoreExpr   -- ^ the function (head of the application) we are checking
+                  -> [CoreArg]  -- ^ the arguments to the application
+                  -> LintedType -- ^ the instantiated type of the overall application
+                  -> LintM ()
+checkCanEtaExpand (Var fun_id) args app_ty
+  | hasNoBinding fun_id
+  = checkL (null bad_arg_tys) err_msg
+    where
+      arity :: Arity
+      arity = idArity fun_id
+
+      nb_val_args :: Int
+      nb_val_args = count isValArg args
+
+      -- Check the remaining argument types, past the
+      -- given arguments and up to the arity of the 'Id'.
+      -- Returns the types that couldn't be determined to have
+      -- a fixed RuntimeRep.
+      check_args :: [Type] -> [Type]
+      check_args = go (nb_val_args + 1)
+        where
+          go :: Int    -- ^ index of the argument (starting from 1)
+             -> [Type] -- ^ arguments
+             -> [Type] -- ^ value argument types that could not be
+                       -- determined to have a fixed runtime representation
+          go i _
+            | i > arity
+            = []
+          go _ []
+            -- The Arity of an Id should never exceed the number of value arguments
+            -- that can be read off from the Id's type.
+            -- See Note [Arity and function types] in GHC.Types.Id.Info.
+            = pprPanic "checkCanEtaExpand: arity larger than number of value arguments apparent in type"
+                $ vcat
+                  [ text "fun_id =" <+> ppr fun_id
+                  , text "arity =" <+> ppr arity
+                  , text "app_ty =" <+> ppr app_ty
+                  , text "args = " <+> ppr args
+                  , text "nb_val_args =" <+> ppr nb_val_args ]
+          go i (ty : bndrs)
+            | typeHasFixedRuntimeRep ty
+            = go (i+1) bndrs
+            | otherwise
+            = ty : go (i+1) bndrs
+
+      bad_arg_tys :: [Type]
+      bad_arg_tys = check_args . map fst $ getRuntimeArgTys app_ty
+        -- We use 'getRuntimeArgTys' to find all the argument types,
+        -- including those hidden under newtypes. For example,
+        -- if `FunNT a b` is a newtype around `a -> b`, then
+        -- when checking
+        --
+        -- foo :: forall r (a :: TYPE r) (b :: TYPE r) c. a -> FunNT b c
+        --
+        -- we should check that the instantiations of BOTH `a` AND `b`
+        -- have a fixed runtime representation.
+
+      err_msg :: SDoc
+      err_msg
+        = vcat [ text "Cannot eta expand" <+> quotes (ppr fun_id)
+               , text "The following type" <> plural bad_arg_tys
+                 <+> doOrDoes bad_arg_tys <+> text "not have a fixed runtime representation:"
+               , nest 2 $ vcat $ map ppr_ty_ki bad_arg_tys ]
+
+      ppr_ty_ki :: Type -> SDoc
+      ppr_ty_ki ty = bullet <+> ppr ty <+> dcolon <+> ppr (typeKind ty)
+checkCanEtaExpand _ _ _
   = return ()
 
 -- Check that the usage of var is consistent with var itself, and pop the var
@@ -2673,6 +2750,44 @@ We plan to fix this issue in the very near future.
 For now, -dcore-lint enables only linting output of the desugarer,
 and full Linear Lint has to be enabled separately with -dlinear-core-lint.
 Ticket #19165 concerns enabling Linear Lint with -dcore-lint.
+
+Note [checkCanEtaExpand]
+~~~~~~~~~~~~~~~~~~~~~~~~
+The checkCanEtaExpand function is responsible for enforcing invariant I3
+from Note [Representation polymorphism invariants] in GHC.Core: in any
+partial application `f e_1 .. e_n`, if `f` has no binding, we must be able to
+eta expand `f` to match the declared arity of `f`.
+
+Wrinkle 1: eta-expansion and newtypes
+
+  Most of the time, when we have a partial application `f e_1 .. e_n`
+  in which `f` is `hasNoBinding`, we eta-expand it up to its arity
+  as follows:
+
+    \ x_{n+1} ... x_arity -> f e_1 .. e_n x_{n+1} ... x_arity
+
+  However, we might need to insert casts if some of the arguments
+  that `f` takes are under a newtype.
+  For example, suppose `f` `hasNoBinding`, has arity 1 and type
+
+    f :: forall r (a :: TYPE r). Identity (a -> a)
+
+  then we eta-expand the nullary application `f` to
+
+    ( \ x -> f x ) |> co
+
+  where
+
+    co :: ( forall r (a :: TYPE r). a -> a ) ~# ( forall r (a :: TYPE r). Identity (a -> a) )
+
+  In this case we would have to perform a representation-polymorphism check on the instantiation
+  of `a`.
+
+Wrinkle 2: 'hasNoBinding' and laziness
+
+  It's important that we able to compute 'hasNoBinding' for an 'Id' without ever forcing
+  the unfolding of the 'Id'. Otherwise, we could end up with a loop, as outlined in
+    Note [Lazily checking Unfoldings] in GHC.IfaceToCore.
 -}
 
 instance Applicative LintM where
@@ -2711,8 +2826,11 @@ data LintLocInfo
   | InCo   Coercion     -- Inside a coercion
   | InAxiom (CoAxiom Branched)   -- Inside a CoAxiom
 
-initL :: DynFlags -> LintFlags -> [Var]
-       -> LintM a -> WarnsAndErrs    -- Warnings and errors
+initL :: DynFlags
+      -> LintFlags
+      -> [Var]              -- ^ 'Id's that should be treated as being in scope
+      -> LintM a            -- ^ Action to run
+      -> WarnsAndErrs
 initL dflags flags vars m
   = case unLintM m env (emptyBag, emptyBag) of
       (Just _, errs) -> errs

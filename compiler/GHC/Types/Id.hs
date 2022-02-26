@@ -579,7 +579,20 @@ hasNoBinding id = case Var.idDetails id of
                         PrimOpId _       -> True    -- See Note [Eta expanding primops] in GHC.Builtin.PrimOps
                         FCallId _        -> True
                         DataConWorkId dc -> isUnboxedTupleDataCon dc || isUnboxedSumDataCon dc
-                        _                -> isCompulsoryUnfolding (idUnfolding id)
+                        _                -> isCompulsoryUnfolding (realIdUnfolding id)
+  -- Note: this function must be very careful not to force
+  -- any of the fields that aren't the 'uf_src' field of
+  -- the 'Unfolding' of the 'Id'. This is because these fields are computed
+  -- in terms of the 'uf_tmpl' field, which is not available
+  -- until we have finished Core Lint for the unfolding, which calls 'hasNoBinding'
+  -- in 'checkCanEtaExpand'.
+  --
+  -- In particular, calling 'idUnfolding' rather than 'realIdUnfolding' here can
+  -- force the 'uf_tmpl' field, because 'zapUnfolding' forces the 'uf_is_value' field,
+  -- and this field is usually computed in terms of the 'uf_tmpl' field,
+  -- so we will force that as well.
+  --
+  -- See Note [Lazily checking Unfoldings] in GHC.IfaceToCore.
 
 isImplicitId :: Id -> Bool
 -- ^ 'isImplicitId' tells whether an 'Id's info is implied by other

@@ -1,0 +1,18 @@
+<no location info>: warning:
+    Cannot eta expand ‘coerce’
+    The following type does not have a fixed runtime representation:
+      • a :: TYPE k
+    Substitution: [TCvSubst
+                     In scope: InScope {a q}
+                     Type env: []
+                     Co env: []]
+in coerce BAD 1
+<no location info>: warning:
+    Cannot eta expand ‘coerce’
+    The following type does not have a fixed runtime representation:
+      • a :: TYPE q
+    Substitution: [TCvSubst
+                     In scope: InScope {a q}
+                     Type env: []
+                     Co env: []]
+in coerce BAD 2

@@ -557,19 +557,56 @@ where the type variable `r :: RuntimeRep` abstracts over the runtime representat
 of values of type `b`.
 
 To ensure that programs containing representation-polymorphism remain compilable,
-we enforce two invariants (the representation-polymorphism invariants),
-as per "Levity Polymorphism" [PLDI'17]:
+we enforce the following representation-polymorphism invariants:
+
+The paper "Levity Polymorphism" [PLDI'17] states the first two invariants:
 
   I1. The type of a bound variable must have a fixed runtime representation
       (except for join points: See Note [Invariants on join points])
   I2. The type of a function argument must have a fixed runtime representation.
 
-For example
-  \(r::RuntimeRep). \(a::TYPE r). \(x::a). e
-is illegal because x's type has kind (TYPE r), which has 'r' free.
-We thus wouldn't know how to compile this lambda abstraction.
+On top of these two invariants, GHC's internal eta-expansion mechanism also requires:
 
-In practice, we currently require something slightly stronger than a fixed runtime
+  I3. In any partial application `f e_1 .. e_n`, where `f` is `hasNoBinding`,
+      it must be the case that the application can be eta-expanded to match
+      the arity of `f`.
+      See Note [checkCanEtaExpand] in GHC.Core.Lint for more details.
+
+Example of I1:
+
+  \(r::RuntimeRep). \(a::TYPE r). \(x::a). e
+
+    This contravenes I1 because x's type has kind (TYPE r), which has 'r' free.
+    We thus wouldn't know how to compile this lambda abstraction.
+
+Example of I2:
+
+  f (undefined :: (a :: TYPE r))
+
+    This contravenes I2: we are applying the function `f` to a value
+    with an unknown runtime representation.
+
+Examples of I3:
+
+  myUnsafeCoerce# :: forall {r1} (a :: TYPE r1) {r2} (b :: TYPE r2). a -> b
+  myUnsafeCoerce# = unsafeCoerce#
+
+    This contravenes I3: we are instantiating `unsafeCoerce#` without any
+    value arguments, and with a remaining argument type, `a`, which does not
+    have a fixed runtime representation.
+    But `unsafeCorce#` has no binding (see Note [Wiring in unsafeCoerce#]
+    in GHC.HsToCore).  So before code-generation we must saturate it
+    by eta-expansion (see GHC.CoreToStg.Prep.maybeSaturate), thus
+       myUnsafeCoerce# = \x. unsafeCoerce# x
+    But we can't do that because now the \x binding would violate I1.
+
+  bar :: forall (a :: TYPE) r (b :: TYPE r). a -> b
+  bar = unsafeCoerce#
+
+    OK: eta expand to `\ (x :: Type) -> unsafeCoerce# x`,
+    and `x` has a fixed RuntimeRep.
+
+Note that we currently require something slightly stronger than a fixed runtime
 representation: we check whether bound variables and function arguments have a
 /fixed RuntimeRep/ in the sense of Note [Fixed RuntimeRep] in GHC.Tc.Utils.Concrete.
 See Note [Representation polymorphism checking] in GHC.Tc.Utils.Concrete

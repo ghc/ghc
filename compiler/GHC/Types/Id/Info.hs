@@ -526,7 +526,35 @@ noCafIdInfo  = vanillaIdInfo `setCafInfo`    NoCafRefs
 For locally-defined Ids, the code generator maintains its own notion
 of their arities; so it should not be asking...  (but other things
 besides the code-generator need arity info!)
+
+Note [Arity and function types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The arity of an 'Id' must never exceed the number of arguments that
+can be read off from the 'Id's type, possibly after expanding newtypes.
+
+Examples:
+
+  f1 :: forall a. a -> a
+
+    idArity f1 <= 1: only one value argument, of type 'a'
+
+  f2 :: forall a. Show a => Int -> a
+
+    idArity f2 <= 2: two value arguments, of types 'Show a' and 'Int'.
+
+
+  newtype Id a = MkId a
+  f3 :: forall b. Id (Int -> b)
+
+    idArity f3 <= 1: there is one value argument, of type 'Int', hidden under the newtype.
+
+  newtype RecFun = MkRecFun (Int -> RecFun)
+  f4 :: RecFun
+
+    no constraint on the arity of f4: we can unwrap as many layers of the newtype as we want,
+    to get arbitrarily many arguments of type 'Int'.
 -}
+
 
 -- | Arity Information
 --
@@ -538,6 +566,10 @@ besides the code-generator need arity info!)
 --
 -- The arity might increase later in the compilation process, if
 -- an extra lambda floats up to the binding site.
+--
+-- /Invariant:/ the 'Arity' of an 'Id' must never exceed the number of
+-- value arguments that appear in the type of the 'Id'.
+-- See Note [Arity and function types].
 type ArityInfo = Arity
 
 -- | It is always safe to assume that an 'Id' has an arity of 0

@@ -1518,9 +1518,9 @@ because that has different strictness.  Hence the use of 'allLazy'.
 Note [Eta expansion of hasNoBinding things in CorePrep]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 maybeSaturate deals with eta expanding to saturate things that can't deal with
-unsaturated applications (identified by 'hasNoBinding', currently just
-foreign calls, unboxed tuple/sum constructors and strict workers).
-See Note [Strict Worker Ids]
+unsaturated applications (identified by 'hasNoBinding', currently
+foreign calls, unboxed tuple/sum constructors, and representation-polymorphic
+primitives such as 'coerce' and 'unsafeCoerce#').
 
 Historical Note: Note that eta expansion in CorePrep used to be very fragile
 due to the "prediction" of CAFfyness that we used to make during tidying.

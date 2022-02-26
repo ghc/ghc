@@ -55,6 +55,7 @@ module GHC.Core.Type (
         splitForAllTyCoVar_maybe, splitForAllTyCoVar,
         splitForAllTyVar_maybe, splitForAllCoVar_maybe,
         splitPiTy_maybe, splitPiTy, splitPiTys,
+        getRuntimeArgTys,
         mkTyConBindersPreferAnon,
         mkPiTy, mkPiTys,
         piResultTy, piResultTys,
@@ -275,7 +276,9 @@ import {-# SOURCE #-} GHC.Core.Coercion
    , mkKindCo, mkSubCo
    , decomposePiCos, coercionKind, coercionLKind
    , coercionRKind, coercionType
-   , isReflexiveCo, seqCo )
+   , isReflexiveCo, seqCo
+   , topNormaliseNewType_maybe
+   )
 
 -- others
 import GHC.Utils.Misc
@@ -2134,6 +2137,46 @@ splitPiTys ty = split ty ty []
                                       = split res res (Anon af (Scaled w arg) : bs)
     split orig_ty ty bs | Just ty' <- coreView ty = split orig_ty ty' bs
     split orig_ty _                bs = (reverse bs, orig_ty)
+
+-- | Extracts a list of run-time arguments from a function type,
+-- looking through newtypes to the right of arrows.
+--
+-- Examples:
+--
+-- @
+--    newtype Identity a = I a
+--
+--    getRuntimeArgTys (Int -> Bool -> Double) == [(Int, VisArg), (Bool, VisArg)]
+--    getRuntimeArgTys (Identity Int -> Bool -> Double) == [(Identity Int, VisArg), (Bool, VisArg)]
+--    getRuntimeArgTys (Int -> Identity (Bool -> Identity Double)) == [(Int, VisArg), (Bool, VisArg)]
+--    getRuntimeArgTys (forall a. Show a => Identity a -> a -> Int -> Bool) == [(Show a, InvisArg), (Identity a, VisArg),(a, VisArg),(Int, VisArg)]
+-- @
+--
+-- Note that, in the last case, the returned types might mention an out-of-scope
+-- type variable. This function is used only when we really care about the /kinds/
+-- of the returned types, so this is OK.
+--
+-- **Warning**: this function can return an infinite list. For example:
+--
+-- @
+--   newtype N a = MkN (a -> N a)
+--   getRuntimeArgTys (N a) == repeat (a, VisArg)
+-- @
+getRuntimeArgTys :: Type -> [(Type, AnonArgFlag)]
+getRuntimeArgTys = go
+  where
+    go :: Type -> [(Type, AnonArgFlag)]
+    go (ForAllTy _ res)
+      = go res
+    go (FunTy { ft_arg = arg, ft_res = res, ft_af = af })
+      = (arg, af) : go res
+    go ty
+      | Just ty' <- coreView ty
+      = go ty'
+      | Just (_,ty') <- topNormaliseNewType_maybe ty
+      = go ty'
+      | otherwise
+      = []
 
 -- | Like 'splitPiTys' but split off only /named/ binders
 --   and returns 'TyCoVarBinder's rather than 'TyCoBinder's

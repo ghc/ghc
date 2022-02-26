@@ -558,8 +558,8 @@ hasFixedRuntimeRep_remainingValArgs applied_args app_res_rho = \case
     nb_applied_val_args :: Int
     nb_applied_val_args = countVisAndInvisValArgs applied_args
 
-    arg_tys :: [TyCoBinder]
-    arg_tys = fst $ splitPiTys app_res_rho
+    arg_tys :: [(Type,AnonArgFlag)]
+    arg_tys = getRuntimeArgTys app_res_rho
     -- We do not need to zonk app_res_rho first, because the number of arrows
     -- in the (possibly instantiated) inferred type of the function will
     -- be at least the arity of the function.
@@ -569,11 +569,11 @@ hasFixedRuntimeRep_remainingValArgs applied_args app_res_rho = \case
       traceTc "tcApp remainingValArgs check_thing" (debug_msg thing arity)
       go (nb_applied_vis_val_args + 1) (nb_applied_val_args + 1) arg_tys
       where
-        go :: Int -- ^ visible value argument index
-                  -- (only used to report the argument position in error messages)
-           -> Int -- ^ value argument index
+        go :: Int -- ^ visible value argument index, starting from 1
+                  -- only used to report the argument position in error messages
+           -> Int -- ^ value argument index, starting from 1
                   -- used to count up to the arity to ensure we don't check too many argument types
-           -> [TyCoBinder]
+           -> [(Type, AnonArgFlag)] -- ^ run-time argument types
            -> TcM ()
         go _ i_val _
           | i_val > arity
@@ -582,15 +582,13 @@ hasFixedRuntimeRep_remainingValArgs applied_args app_res_rho = \case
           -- Should never happen: it would mean that the arity is higher
           -- than the number of arguments apparent from the type
           = pprPanic "hasFixedRuntimeRep_remainingValArgs" (debug_msg thing arity)
-        go i_visval !i_val (Anon af (Scaled _ arg_ty) : tys)
+        go i_visval !i_val ((arg_ty, af) : tys)
           = case af of
               InvisArg ->
                 go i_visval (i_val + 1) tys
               VisArg   -> do
                 _concrete_ev <- hasFixedRuntimeRep (mk_frr_orig i_visval) arg_ty
                 go (i_visval + 1) (i_val + 1) tys
-        go i_visval i_val (_: tys)
-          = go i_visval i_val tys
 
     -- A message containing all the relevant info, in case this functions
     -- needs to be debugged again at some point.
@@ -600,7 +598,6 @@ hasFixedRuntimeRep_remainingValArgs applied_args app_res_rho = \case
         [ text "thing =" <+> ppr thing
         , text "arity =" <+> ppr arity
         , text "applied_args =" <+> ppr applied_args
-        , text "nb_applied_vis_val_args =" <+> ppr nb_applied_vis_val_args
         , text "nb_applied_val_args =" <+> ppr nb_applied_val_args
         , text "arg_tys =" <+> ppr arg_tys ]
 

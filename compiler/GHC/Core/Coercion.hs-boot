@@ -51,3 +51,7 @@ coercionKind :: Coercion -> Pair Type
 coercionLKind :: Coercion -> Type
 coercionRKind :: Coercion -> Type
 coercionType :: Coercion -> Type
+
+topNormaliseNewType_maybe :: Type -> Maybe (Coercion, Type)
+  -- used to look through newtypes to the right of
+  -- function arrows, in 'GHC.Core.Type.getRuntimeArgTys'
