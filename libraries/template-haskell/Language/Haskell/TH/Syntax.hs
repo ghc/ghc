@@ -2108,6 +2108,7 @@ data Bytes = Bytes
    { bytesPtr    :: ForeignPtr Word8 -- ^ Pointer to the data
    , bytesOffset :: Word             -- ^ Offset from the pointer
    , bytesSize   :: Word             -- ^ Number of bytes
+
    -- Maybe someday:
    -- , bytesAlignement  :: Word -- ^ Alignement constraint
    -- , bytesReadOnly    :: Bool -- ^ Shall we embed into a read-only
