@@ -4,6 +4,8 @@
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE Trustworthy #-}
 
+{-# OPTIONS_HADDOCK not-home #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Bits
