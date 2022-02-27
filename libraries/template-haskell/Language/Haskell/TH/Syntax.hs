@@ -2390,7 +2390,7 @@ data Dec
 data Overlap = Overlappable   -- ^ May be overlapped by more specific instances
              | Overlapping    -- ^ May overlap a more general instance
              | Overlaps       -- ^ Both 'Overlapping' and 'Overlappable'
-             | Incoherent     -- ^ Both 'Overlappable' and 'Overlappable', and
+             | Incoherent     -- ^ Both 'Overlapping' and 'Overlappable', and
                               -- pick an arbitrary one if multiple choices are
                               -- available.
   deriving( Show, Eq, Ord, Data, Generic )
