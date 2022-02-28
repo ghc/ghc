@@ -80,4 +80,5 @@ test('T20510', [ grep_errmsg(r'jump \$wgo') ], compile, ['-dsuppress-uniques -dd
 test('T20746', normal, compile, ['-dsuppress-uniques -ddump-simpl'])
 test('T20746b', normal, compile, ['-dsuppress-uniques -ddump-simpl -dno-typeable-binds'])
 test('T20817', [ grep_errmsg(r'Str') ], compile, ['-dsuppress-uniques -ddump-stranal'])
-
+# T21150: Check that t{,1,2} haven't been inlined.
+test('T21150', [ grep_errmsg(r'( t\d? :: Int)') ], compile, ['-dsuppress-uniques -ddump-exitify'])

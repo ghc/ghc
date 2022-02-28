@@ -217,7 +217,7 @@ data GeneralFlag
    | Opt_CmmControlFlow
    | Opt_AsmShortcutting
    | Opt_OmitYields
-   | Opt_FunToThunk               -- allow GHC.Core.Opt.WorkWrap.Utils.mkWorkerArgs to remove all value lambdas
+   | Opt_FunToThunk               -- deprecated
    | Opt_DictsStrict                     -- be strict in argument dictionaries
    | Opt_DmdTxDictSel              -- ^ deprecated, no effect and behaviour is now default.
                                    -- Allowed switching of a special demand transformer for dictionary selectors

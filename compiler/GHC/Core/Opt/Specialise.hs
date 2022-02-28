@@ -1519,7 +1519,7 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
                  -- Maybe add a void arg to the specialised function,
                  -- to avoid unlifted bindings
                  -- See Note [Specialisations Must Be Lifted]
-                 -- C.f. GHC.Core.Opt.WorkWrap.Utils.mkWorkerArgs
+                 -- C.f. GHC.Core.Opt.WorkWrap.Utils.needsVoidWorkerArg
                  add_void_arg = isUnliftedType spec_fn_ty1 && not (isJoinId fn)
                  (spec_bndrs, spec_rhs, spec_fn_ty)
                    | add_void_arg = ( voidPrimId : spec_bndrs1

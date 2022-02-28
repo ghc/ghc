@@ -8,7 +8,8 @@ A library for the ``worker\/wrapper'' back-end to the strictness analyser
 {-# LANGUAGE ViewPatterns #-}
 
 module GHC.Core.Opt.WorkWrap.Utils
-   ( WwOpts(..), initWwOpts, mkWwBodies, mkWWstr, mkWWstr_one, mkWorkerArgs
+   ( WwOpts(..), initWwOpts, mkWwBodies, mkWWstr, mkWWstr_one
+   , needsVoidWorkerArg, addVoidWorkerArg
    , DataConPatContext(..)
    , UnboxingDecision(..), wantToUnboxArg
    , findTypeShape, IsRecDataConResult(..), isRecDataCon
@@ -141,7 +142,6 @@ data WwOpts
   { wo_fam_envs          :: !FamInstEnvs
   , wo_simple_opts       :: !SimpleOpts
   , wo_cpr_anal          :: !Bool
-  , wo_fun_to_thunk      :: !Bool
 
   -- Used for absent argument error message
   , wo_module            :: !Module
@@ -155,7 +155,6 @@ initWwOpts this_mod dflags fam_envs = MkWwOpts
   { wo_fam_envs          = fam_envs
   , wo_simple_opts       = initSimpleOpts dflags
   , wo_cpr_anal          = gopt Opt_CprAnal dflags
-  , wo_fun_to_thunk      = gopt Opt_FunToThunk dflags
   , wo_module            = this_mod
   , wo_unlift_strict     = gopt Opt_WorkerWrapperUnlift dflags
   }
@@ -240,11 +239,14 @@ mkWwBodies opts fun_id arg_vars res_ty demands res_cpr
         ; let (work_args, work_marks) = unzip work_args_cbv
 
         -- Do CPR w/w.  See Note [Always do CPR w/w]
-        ; (useful2, wrap_fn_cpr, work_fn_cpr, cpr_res_ty)
+        ; (useful2, wrap_fn_cpr, work_fn_cpr)
               <- mkWWcpr_entry opts res_ty' res_cpr
 
-        ; let (work_lam_args, work_call_args, work_call_cbv) = mkWorkerArgs fun_id (wo_fun_to_thunk opts)
-                                                                 work_args work_marks cpr_res_ty
+        ; let (work_lam_args, work_call_args, work_call_cbv)
+                | needsVoidWorkerArg fun_id arg_vars work_args
+                = addVoidWorkerArg work_args work_marks
+                | otherwise
+                = (work_args, work_args, work_marks)
 
               call_work work_fn  = mkVarApps (Var work_fn) work_call_args
               call_rhs fn_rhs = mkAppsBeta fn_rhs fn_args
@@ -347,9 +349,19 @@ function for the worker:
     of the fun body in the next run of the Simplifier, but CoreLint will complain
     in the meantime, so zap it.
 
-We zap in mkWwBodies because we need the zapped variables both when binding them
-in mkWWstr (mkAbsentFiller, specifically) and in mkWorkerArgs, where we produce
-the call to the fun body.
+We zap in mkWwBodies because we need the zapped variables when binding them in
+mkWWstr (mkAbsentFiller, specifically).
+
+Note [Do not split void functions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this rather common form of binding:
+        $j = \x:Void# -> ...no use of x...
+
+Since x is not used it'll be marked as absent.  But there is no point
+in w/w-ing because we'll simply add (\y:Void#), see addVoidWorkerArg.
+
+If x has a more interesting type (eg Int, or Int#), there *is* a point
+in w/w so that we don't pass the argument at all.
 
 ************************************************************************
 *                                                                      *
@@ -369,44 +381,29 @@ add a void argument.  E.g.
 We use the state-token type which generates no code.
 -}
 
--- | Prevent a function from becoming a thunk by adding a void argument if
--- required.
-mkWorkerArgs :: Id      -- The wrapper Id
-             -> Bool    -- Allow fun->thunk conversion.
-             -> [Var]
-             -> [CbvMark]
-             -> Type    -- Type of body
-             -> ([Var], -- Lambda bound args
-                 [Var], -- Args at call site
-                 [CbvMark] -- cbv semantics for the worker args.
-                 )
-mkWorkerArgs wrap_id fun_to_thunk args cbv_marks res_ty
-    | not (isJoinId wrap_id) -- Join Ids never need an extra arg
-    , not (any isId args)    -- No existing value lambdas
-    , needs_a_value_lambda   -- and we need to add one
-    = (args ++ [voidArgId], args ++ [voidPrimId], cbv_marks ++ [NotMarkedCbv])
+-- | Whether the worker needs an additional `Void#` arg as per
+-- Note [Protecting the last value argument] or
+-- Note [Preserving float barriers].
+needsVoidWorkerArg :: Id -> [Var] -> [Var] -> Bool
+needsVoidWorkerArg fn_id wrap_args work_args
+  =  not (isJoinId fn_id) && no_value_arg -- See Note [Protecting the last value argument]
+  || needs_float_barrier                  -- See Note [Preserving float barriers]
+  where
+    no_value_arg        = all (not . isId) work_args
+    is_float_barrier v  = isId v && hasNoOneShotInfo (idOneShotInfo v)
+    wrap_had_barrier    = any is_float_barrier wrap_args
+    work_has_barrier    = any is_float_barrier work_args
+    needs_float_barrier = wrap_had_barrier && not work_has_barrier
 
-    | otherwise
-    = (args, args, cbv_marks)
-    where
-      -- If fun_to_thunk is False we always keep at least one value
-      --   argument: see Note [Protecting the last value argument]
-      -- If it is True, we only need to keep a value argument if
-      --   the result type is (or might be) unlifted, in which case
-      --   dropping the last arg would mean we wrongly used call-by-value
-      needs_a_value_lambda
-        = not fun_to_thunk
-          || might_be_unlifted
-
-      -- Might the result be lifted?
-      --     False => definitely lifted
-      --     True  => might be unlifted
-      -- We may encounter a representation-polymorphic result, in which case we
-      -- conservatively assume that we have laziness that needs
-      -- preservation. See #15186.
-      might_be_unlifted = case isLiftedType_maybe res_ty of
-                            Just lifted -> not lifted
-                            Nothing     -> True
+-- | Inserts a `Void#` arg before the first value argument (but after leading type args).
+addVoidWorkerArg :: [Var] -> [CbvMark]
+                 -> ([Var],     -- Lambda bound args
+                     [Var],     -- Args at call site
+                     [CbvMark]) -- cbv semantics for the worker args.
+addVoidWorkerArg work_args cbv_marks
+  = (ty_args ++ voidArgId:rest, ty_args ++ voidPrimId:rest, NotMarkedCbv:cbv_marks)
+  where
+    (ty_args, rest) = break isId work_args
 
 {-
 Note [Protecting the last value argument]
@@ -414,13 +411,71 @@ Note [Protecting the last value argument]
 If the user writes (\_ -> E), they might be intentionally disallowing
 the sharing of E. Since absence analysis and worker-wrapper are keen
 to remove such unused arguments, we add in a void argument to prevent
-the function from becoming a thunk.
+the function from becoming a thunk.  Three reasons why turning a function
+into a thunk might be bad:
 
-The user can avoid adding the void argument with the -ffun-to-thunk
-flag. However, this can create sharing, which may be bad in two ways. 1) It can
-create a space leak. 2) It can prevent inlining *under a lambda*. If w/w
-removes the last argument from a function f, then f now looks like a thunk, and
-so f can't be inlined *under a lambda*.
+1) It can create a space leak. e.g.
+      f x = let y () = [1..x]
+            in (sum (y ()) + length (y ()))
+   As written it'll calculate [1..x] twice, and avoid keeping a big
+   list around.  (Of course let-floating may introduce the leak; but
+   at least w/w doesn't.)
+
+2) It can prevent inlining *under a lambda*. e.g.
+       g = \y. [1..100]
+       f = \t. g ()
+   Here we can inline g under the \t.  But we won't if we remove the \y.
+
+3) It can create an unlifted binding.  E.g.
+       g :: Int -> Int#
+       g = \x. 30#
+   Removing the \x would leave an unlifted binding.
+
+NB: none of these apply to a join point.
+
+Note [Preserving float barriers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+```
+let
+  t = sum [0..x]
+  f a{os} b[Dmd=A] c{os} = ... t ...
+in f 1 2 3 + f 4 5 6
+```
+Here, we would like to drop the argument `b` because it's absent. But doing so
+leaves behind only one-shot lambdas, `$wf a{os} c{os} = ...`, and then the
+Simplifier will inline `t` into `$wf`, because `$wf` says "I'm only called
+once". That's bad, because we lost sharing of `t`! Similarly, FloatIn would
+happily float `t` into `$wf`, see Note [Floating in past a lambda group].
+
+Why does floating happen after dropping `b` but not before? Because `b` was the
+only non-one-shot value lambda left, acting as our "float barrier".
+
+Definition:  A float barrier is a non-one-shot value lambda.
+Key insight: If `f` had a float barrier, `$wf` has to have one, too.
+
+To this end, in `needsVoidWorkerArg`, we check whether the wrapper had a float
+barrier and if the worker has none so far. If that is the case, we add a `Void#`
+argument at the end as an artificial float barrier.
+
+The issue is tracked in #21150. It came up when compiling GHC itself, in
+GHC.Tc.Gen.Bind.mkEdges. There the key_map thunk was inlined after WW dropped a
+leading absent non-one-shot arg. Here are some example wrapper arguments of
+which some are absent or one-shot and the resulting worker arguments:
+
+  * \a{Abs}.\b{os}.\c{os}... ==> \b{os}.\c{os}.\(_::Void#)...
+    Wrapper arg `a` was the only float barrier and had been dropped. Hence Void#
+  * \a{Abs,os}.\b{os}.\c... ==> \b{os}.\c...
+    Worker arg `c` is a float barrier.
+  * \a.\b{Abs}.\c{os}... ==> \a.\c{os}...
+    Worker arg `a` is a float barrier.
+  * \a{os}.\b{Abs,os}.\c{os}... ==> \a{os}.\c{os}...
+    Wrapper didn't have a float barrier, no need for Void#.
+  * \a{Abs,os}.... ==> ... (no value lambda left)
+    This examples simply demonstrates that preserving float barriers is not
+    enough to subsume Note [Protecting the last value argument].
+
+Executable examples in T21150.
 
 Note [Join points and beta-redexes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1301,12 +1356,10 @@ mkWWcpr_entry
   -> Cpr                               -- CPR analysis results
   -> UniqSM (Bool,            -- Is w/w'ing useful?
              CoreExpr -> CoreExpr,     -- New wrapper. 'nop_fn' if not useful
-             CoreExpr -> CoreExpr,     -- New worker.  'nop_fn' if not useful
-             Type)                     -- Type of worker's body.
-                                       -- Just the input body_ty if not useful
+             CoreExpr -> CoreExpr)     -- New worker.  'nop_fn' if not useful
 -- ^ Entrypoint to CPR W/W. See Note [Worker/wrapper for CPR] for an overview.
 mkWWcpr_entry opts body_ty body_cpr
-  | not (wo_cpr_anal opts) = return (badWorker, nop_fn, nop_fn, body_ty)
+  | not (wo_cpr_anal opts) = return (badWorker, nop_fn, nop_fn)
   | otherwise = do
     -- Part (1)
     res_bndr <- mk_res_bndr body_ty
@@ -1322,10 +1375,9 @@ mkWWcpr_entry opts body_ty body_cpr
     -- Stacking unboxer (work_fn) and builder (wrap_fn) together
     let wrap_fn      = unbox_transit_tup rebuilt_result                 -- 3 2
         work_fn body = bind_res_bndr body (work_unpack_res transit_tup) -- 1 2 3
-        work_body_ty = exprType transit_tup
     return $ if not useful
-                then (badWorker, nop_fn, nop_fn, body_ty)
-                else (goodWorker, wrap_fn, work_fn, work_body_ty)
+                then (badWorker, nop_fn, nop_fn)
+                else (goodWorker, wrap_fn, work_fn)
 
 -- | Part (1) of Note [Worker/wrapper for CPR].
 mk_res_bndr :: Type -> UniqSM Id

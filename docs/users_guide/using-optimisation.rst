@@ -561,8 +561,7 @@ by saying ``-fno-wombat``.
         them.
 
 .. ghc-flag:: -ffun-to-thunk
-    :shortdesc: Allow worker-wrapper to convert a function closure into a thunk
-        if the function does not use any of its arguments. Off by default.
+    :shortdesc: *(deprecated)* superseded by -ffull-laziness.
     :type: dynamic
     :reverse: -fno-fun-to-thunk
     :category:
@@ -573,6 +572,16 @@ by saying ``-fno-wombat``.
     remove them all, lest it turn a function closure into a thunk,
     thereby perhaps creating a space leak and/or disrupting inlining.
     This flag allows worker/wrapper to remove *all* value lambdas.
+
+    This flag was ineffective in the presence of :ghc-flag:`-ffull-laziness`,
+    which would flout a thunk out of a constant worker function *even though*
+    :ghc-flag:`-ffun-to-thunk` was off.
+
+    Hence use of this flag is deprecated since GHC 9.4.1 and we rather suggest
+    to pass ``-fno-full-laziness`` instead. That implies there's no way for
+    worker/wrapper to turn a function into a thunk in the presence of
+    ``-fno-full-laziness``. If that is inconvenient for you, please leave a
+    comment `on the issue tracker (#21204) <https://gitlab.haskell.org/ghc/ghc/-/issues/21204>`__.
 
 .. ghc-flag:: -fignore-asserts
     :shortdesc: Ignore assertions in the source. Implied by :ghc-flag:`-O`.
