@@ -30,7 +30,7 @@ import GHC.Core.Utils
 import GHC.Core.Unfold
 import GHC.Core.FVs     ( exprsFreeVarsList )
 import GHC.Core.Opt.Monad
-import GHC.Core.Opt.WorkWrap.Utils ( isWorkerSmallEnough, mkWorkerArgs )
+import GHC.Core.Opt.WorkWrap.Utils
 import GHC.Core.DataCon
 import GHC.Core.Coercion hiding( substCo )
 import GHC.Core.Rules
@@ -1771,20 +1771,25 @@ spec_one env fn arg_bndrs body (call_pat, rule_number)
 
                 -- And build the results
         ; let spec_body_ty   = exprType spec_body
-              (spec_lam_args1, spec_sig, spec_arity, spec_join_arity)
+              (spec_lam_args1, spec_sig, spec_arity1, spec_join_arity1)
                   = calcSpecInfo fn call_pat extra_bndrs
                   -- Annotate the variables with the strictness information from
                   -- the function (see Note [Strictness information in worker binders])
 
-              (spec_lam_args, spec_call_args,_) = mkWorkerArgs fn False
-                                                    spec_lam_args1 []
-                                                    spec_body_ty
-                -- mkWorkerArgs: usual w/w hack to avoid generating
-                -- a spec_rhs of unlifted type and no args.
-                -- Unlike W/W we don't turn functions into strict workers
-                -- immediately here instead letting tidy handle this.
-                -- For this reason we can ignore the cbv marks.
-                -- See Note [Strict Worker Ids]. See Note [Tag Inference].
+              (spec_lam_args, spec_call_args, spec_arity, spec_join_arity)
+                  | needsVoidWorkerArg fn arg_bndrs spec_lam_args1
+                  , (spec_lam_args, spec_call_args, _) <- addVoidWorkerArg spec_lam_args1 []
+                      -- needsVoidWorkerArg: usual w/w hack to avoid generating
+                      -- a spec_rhs of unlifted type and no args.
+                      -- Unlike W/W we don't turn functions into strict workers
+                      -- immediately here instead letting tidy handle this.
+                      -- For this reason we can ignore the cbv marks.
+                      -- See Note [Strict Worker Ids]. See Note [Tag Inference].
+                  , !spec_arity      <- spec_arity1 + 1
+                  , !spec_join_arity <- fmap (+ 1) spec_join_arity1
+                  = (spec_lam_args,  spec_call_args, spec_arity,  spec_join_arity)
+                  | otherwise
+                  = (spec_lam_args1, spec_lam_args1, spec_arity1, spec_join_arity1)
 
               spec_id    = mkLocalId spec_name Many
                                      (mkLamTypes spec_lam_args spec_body_ty)

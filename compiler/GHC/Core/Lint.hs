@@ -174,7 +174,7 @@ In the desugarer, it's very very convenient to be able to say (in effect)
         let a = Type Bool in
         let x::a = True in <body>
 That is, use a type let.  See Note [Core type and coercion invariant] in "GHC.Core".
-One place it is used is in mkWorkerArgs; see Note [Join points and beta-redexes]
+One place it is used is in mkWwBodies; see Note [Join points and beta-redexes]
 in GHC.Core.Opt.WorkWrap.Utils.  (Maybe there are other "clients" of this feature; I'm not sure).
 
 * Hence when linting <body> we need to remember that a=Int, else we

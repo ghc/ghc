@@ -900,18 +900,6 @@ the original function.
 The demand on the worker is then calculated using mkWorkerDemand, and always of
 the form [Demand=<L,1*(C1(...(C1(U))))>]
 
-
-Note [Do not split void functions]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider this rather common form of binding:
-        $j = \x:Void# -> ...no use of x...
-
-Since x is not used it'll be marked as absent.  But there is no point
-in w/w-ing because we'll simply add (\y:Void#), see GHC.Core.Opt.WorkWrap.Utils.mkWorerArgs.
-
-If x has a more interesting type (eg Int, or Int#), there *is* a point
-in w/w so that we don't pass the argument at all.
-
 Note [Thunk splitting]
 ~~~~~~~~~~~~~~~~~~~~~~
 Suppose x is used strictly; never mind whether it has the CPR

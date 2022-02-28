@@ -3379,7 +3379,8 @@ fFlagsDeps = [
   flagSpec "ignore-optim-changes"             Opt_IgnoreOptimChanges,
   flagSpec "ignore-hpc-changes"               Opt_IgnoreHpcChanges,
   flagSpec "full-laziness"                    Opt_FullLaziness,
-  flagSpec "fun-to-thunk"                     Opt_FunToThunk,
+  depFlagSpec' "fun-to-thunk"                 Opt_FunToThunk
+      (useInstead "-f" "full-laziness"),
   flagSpec "gen-manifest"                     Opt_GenManifest,
   flagSpec "ghci-history"                     Opt_GhciHistory,
   flagSpec "ghci-leak-check"                  Opt_GhciLeakCheck,
