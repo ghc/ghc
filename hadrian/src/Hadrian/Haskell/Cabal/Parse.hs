@@ -216,19 +216,14 @@ resolveContextData context@Context {..} = do
     -- Configure the package with the GHC for this stage
     (compiler, platform) <- configurePackageGHC package stage
 
-    flagList <- interpret (target context (Cabal Flags stage) [] []) =<< args <$> flavour
-    let flags = foldr addFlag mempty flagList
-          where
-            addFlag :: String -> C.FlagAssignment -> C.FlagAssignment
-            addFlag ('-':name) = C.insertFlagAssignment (C.mkFlagName name) False
-            addFlag ('+':name) = C.insertFlagAssignment (C.mkFlagName name) True
-            addFlag name       = C.insertFlagAssignment (C.mkFlagName name) True
-
-    let (Right (pd,_)) = C.finalizePD flags C.defaultComponentRequestedSpec
-                         (const True) platform (C.compilerInfo compiler) [] gpd
 
     cPath <- Context.contextPath context
     lbi <- liftIO $ C.getPersistBuildConfig cPath
+
+    let flags = C.flagAssignment lbi
+
+        (Right (pd,_)) = C.finalizePD flags C.defaultComponentRequestedSpec
+                         (const True) platform (C.compilerInfo compiler) [] gpd
 
     -- Note: the @cPath@ is ignored. The path that's used is the 'buildDir' path
     -- from the local build info @lbi@.
