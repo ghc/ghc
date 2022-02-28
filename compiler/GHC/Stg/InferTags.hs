@@ -82,6 +82,8 @@ and will be tagged with `001` or `010` respectively.
 It will never point to a thunk, nor will it be tagged `000` (meaning "might be a thunk").
 NB: Note that the proper tag for some objects is indeed `000`. Currently this is the case for PAPs.
 
+This works analogous to how `StrictWorkerId`s work. See also Note [Strict Worker Ids].
+
 Why do we care? Because if we have code like:
 
 case strictPair of
@@ -118,6 +120,8 @@ evaluated will allocate the constructor.
 
 So we do our best to establish that `x` is already tagged (which it almost always is)
 to avoid this cost. In my benchmarks I haven't seen any cases where this causes regressions.
+
+Note that there are similar constraints around Note [Strict Worker Ids].
 
 Note [How untagged pointers can end up in strict fields]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

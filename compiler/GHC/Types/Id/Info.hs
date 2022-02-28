@@ -178,6 +178,8 @@ data IdDetails
   | JoinId JoinArity (Maybe [CbvMark])
         -- ^ An 'Id' for a join point taking n arguments
         -- Note [Join points] in "GHC.Core"
+        -- Can also work as a StrictWorkerId if given `CbvMark`s.
+        -- See Note [Strict Worker Ids]
   | StrictWorkerId [CbvMark]
         -- ^ An 'Id' for a worker function, which expects some arguments to be
         -- passed both evaluated and tagged.
@@ -186,11 +188,11 @@ data IdDetails
 
 {- Note [Strict Worker Ids]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
-StrictWorkerId essentially constrains the calling convention for the given Id.
-It requires arguments marked as tagged to be passed properly evaluated+*tagged*.
+A StrictWorkerId essentially constrains the calling convention for the given Id.
+It requires arguments marked as `MarkedCbv` to be passed evaluated+*properly tagged*.
 
-While we were always able to express the fact that an argument is evaluated
-via attaching a evaldUnfolding to the functions arguments there used to be
+While we were always able to express the fact that an argument is evaluated once we
+entered it's RHS via attaching a evaldUnfolding to it there used to be
 no way to express that an lifted argument is already properly tagged once we jump
 into the RHS.
 This means when branching on a value the RHS always needed to perform
@@ -200,7 +202,20 @@ already ruling out thunks).
 StrictWorkerIds give us this additional expressiveness which we use to improve
 runtime. This is all part of the TagInference work. See also Note [Tag Inference].
 
-What we do is:
+The invariants around the arguments of Strict Worker Ids are then:
+
+* In any call `(f e1 .. en)`, if `f`'s i'th argument is marked `MarkedCbv`,
+  then the caller must ensure that the i'th argument
+  * points directly to the value (and hence is certainly evaluated before the call)
+  * is a properly tagged pointer to that value
+
+* The following functions (and only these functions) have `CbvMarks`:
+  * Any `StrictWorkerId`
+  * Some `JoinId` bindings.
+
+This works analogous to the Strict Field Invariant. See also Note [Strict Field Invariant].
+
+To make this work what we do is:
 * If we think a function might benefit from passing certain arguments unlifted
   for performance reasons we attach an evaldUnfolding to these arguments.
 * Either during W/W, but at latest during Tidy VanillaIds with arguments that
