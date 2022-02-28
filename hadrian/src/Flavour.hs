@@ -47,6 +47,7 @@ flavourTransformers = M.fromList
     , "ipe" =: enableIPE
     , "fully_static" =: fullyStatic
     , "collect_timings" =: collectTimings
+    , "assertions" =: enableAssertions
     ]
   where (=:) = (,)
 
@@ -207,6 +208,13 @@ enableIPE =
 enableLateCCS :: Flavour -> Flavour
 enableLateCCS =
   let Right kv = parseKV "stage1.*.ghc.hs.opts += -fprof-late-ccs"
+      Right transformer = applySetting kv
+  in transformer
+
+-- | Enable assertions for the stage2 compiler
+enableAssertions :: Flavour -> Flavour
+enableAssertions =
+  let Right kv = parseKV "stage1.*.ghc.hs.opts += -DDEBUG"
       Right transformer = applySetting kv
   in transformer
 
