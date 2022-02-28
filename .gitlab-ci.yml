@@ -315,7 +315,11 @@ hlint-ghc-and-base:
       - "$BIN_DIST_NAME.tar.xz"
       - junit.xml
 
-.validate-linux-hadrian:
+#################################
+# x86_64-linux-deb10
+#################################
+
+.build-x86_64-linux-deb10-hadrian:
   extends: .validate-hadrian
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV"
   variables:
@@ -335,32 +339,22 @@ hlint-ghc-and-base:
   tags:
     - x86_64-linux
 
-# Verify that Hadrian builds with stack. Note that we don't actually perform a
-# build of GHC itself; we merely test that the Hadrian executable builds and
-# works (by invoking `hadrian --version`).
-stack-hadrian-build:
-  extends: .validate-linux-hadrian
-  stage: quick-build
-  script:
-    - .gitlab/ci.sh setup
-    - .gitlab/ci.sh configure
-    - hadrian/build-stack --version
 
 validate-x86_64-linux-deb10-hadrian:
-  extends: .validate-linux-hadrian
+  extends: .build-x86_64-linux-deb10-hadrian
   stage: full-build
   rules:
     - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
 
 validate-x86_64-linux-deb10-unreg-hadrian:
-  extends: .validate-linux-hadrian
+  extends: .build-x86_64-linux-deb10-hadrian
   stage: full-build
   variables:
     CONFIGURE_ARGS: --enable-unregisterised
     TEST_ENV: "x86_64-linux-deb10-unreg-hadrian"
 
 validate-x86_64-linux-deb10-no_tntc-hadrian:
-  extends: .validate-linux-hadrian
+  extends: .build-x86_64-linux-deb10-hadrian
   stage: full-build
   when: manual
   variables:
@@ -368,7 +362,7 @@ validate-x86_64-linux-deb10-no_tntc-hadrian:
     TEST_ENV: "x86_64-linux-deb10-no_tntc-hadrian"
 
 .build-x86_64-linux-deb10-hadrian-cross-aarch64:
-  extends: .validate-linux-hadrian
+  extends: .build-x86_64-linux-deb10-hadrian
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV"
   variables:
     BIN_DIST_NAME: "ghc-x86_64-deb10-linux"
@@ -385,6 +379,119 @@ nightly-x86_64-linux-deb10-hadrian-cross-aarch64:
   <<: *nightly
   extends: .build-x86_64-linux-deb10-hadrian-cross-aarch64
   stage: full-build
+
+
+release-x86_64-linux-deb10:
+  <<: *release
+  extends: .build-x86_64-linux-deb10-hadrian
+  stage: full-build
+
+nightly-x86_64-linux-deb10:
+  <<: *nightly
+  extends: .build-x86_64-linux-deb10-hadrian
+  stage: full-build
+  variables:
+    TEST_TYPE: slowtest
+
+# N.B. Has DEBUG assertions enabled in stage2
+validate-x86_64-linux-deb10-debug:
+  extends: .build-x86_64-linux-deb10-hadrian
+  stage: full-build
+  variables:
+    # Slow-validate builds stage1 and stage2 compilers with -DDEBUG
+    BUILD_FLAVOUR: slow-validate
+    # Override validate flavour default; see #16890.
+    BUILD_SPHINX_PDF: "YES"
+    TEST_TYPE: slowtest
+    TEST_ENV: "x86_64-linux-deb10-debug"
+    BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-deb10-linux-debug.tar.xz"
+    HADDOCK_HYPERLINKED_SOURCES: "yes"
+    # Numa enabled for this build so at least one build tests the libnuma build.
+    # It could be any job but luckily for deb10-debug, I choose it.
+    ENABLE_NUMA: 1
+  artifacts:
+    when: always
+    expire_in: 2 week
+
+validate-x86_64-linux-deb10-integer-simple:
+  extends: .build-x86_64-linux-deb10-hadrian
+  stage: full-build
+  variables:
+    BUILD_FLAVOUR: validate
+    BIGNUM_BACKEND: native
+    TEST_ENV: "x86_64-linux-deb10-integer-simple"
+    BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-deb10-linux-integer-simple.tar.xz"
+  rules:
+    - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
+
+nightly-x86_64-linux-deb10-integer-simple:
+  <<: *nightly
+  extends: .build-x86_64-linux-deb10-hadrian
+  stage: full-build
+  variables:
+    BIGNUM_BACKEND: native
+    TEST_ENV: "x86_64-linux-deb10-integer-simple"
+    TEST_TYPE: slowtest
+
+.build-x86_64-linux-deb10-tsan:
+  extends: .build-x86_64-linux-deb10-hadrian
+  stage: full-build
+  variables:
+    TEST_ENV: "x86_64-linux-deb10-tsan"
+    BUILD_FLAVOUR: "default+thread_sanitizer"
+    TSAN_OPTIONS: "suppressions=$CI_PROJECT_DIR/rts/.tsan-suppressions"
+    # Haddock is large enough to make TSAN choke without massive quantities of
+    # memory.
+    HADRIAN_ARGS: "--docs=none"
+
+nightly-x86_64-linux-deb10-tsan:
+  <<: *nightly
+  extends: .build-x86_64-linux-deb10-tsan
+
+validate-x86_64-linux-deb10-tsan:
+  extends: .build-x86_64-linux-deb10-tsan
+  when: manual
+
+validate-x86_64-linux-deb10-dwarf:
+  extends: .build-x86_64-linux-deb10-hadrian
+  stage: full-build
+  variables:
+    CONFIGURE_ARGS: "--enable-dwarf-unwind"
+    BUILD_FLAVOUR: validate+debug_info
+    TEST_ENV: "x86_64-linux-deb10-dwarf"
+    BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-deb10-linux-dwarf.tar.xz"
+  rules:
+    - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
+
+release-x86_64-linux-deb10-dwarf:
+  <<: *release
+  extends: .build-x86_64-linux-deb10-hadrian
+  stage: full-build
+  variables:
+    CONFIGURE_ARGS: "--enable-dwarf-unwind"
+    BUILD_FLAVOUR: perf+debug_info
+    TEST_ENV: "x86_64-linux-deb10-dwarf-perf"
+    BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-deb10-linux-dwarf.tar.xz"
+  artifacts:
+    when: always
+    expire_in: 1 year
+
+validate-x86_64-linux-deb10-llvm:
+  extends: .build-x86_64-linux-deb10-hadrian
+  stage: full-build
+  rules:
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*LLVM backend.*/'
+  variables:
+    BUILD_FLAVOUR: validate+llvm
+    TEST_ENV: "x86_64-linux-deb10-llvm"
+
+nightly-x86_64-linux-deb10-llvm:
+  <<: *nightly
+  extends: .build-x86_64-linux-deb10-hadrian
+  stage: full-build
+  variables:
+    BUILD_FLAVOUR: validate+llvm
+    TEST_ENV: "x86_64-linux-deb10-llvm"
 
 
 ############################################################
@@ -418,6 +525,21 @@ hadrian-ghc-in-ghci:
     key: hadrian-ghci-$CACHE_REV
     paths:
       - cabal-cache
+
+############################################################
+# stack-hadrian-build
+############################################################
+
+# Verify that Hadrian builds with stack. Note that we don't actually perform a
+# build of GHC itself; we merely test that the Hadrian executable builds and
+# works (by invoking `hadrian --version`).
+stack-hadrian-build:
+  extends: hadrian-ghc-in-ghci
+  stage: quick-build
+  script:
+    - .gitlab/ci.sh setup
+    - .gitlab/ci.sh configure
+    - hadrian/build-stack --version
 
 ############################################################
 # Validation via Pipelines (make)
@@ -795,147 +917,13 @@ release-i386-linux-deb9:
   <<: *release
   extends: .build-i386-linux-deb9
 
-#################################
-# x86_64-linux-deb10
-#################################
-
-.build-x86_64-linux-deb10:
-  extends: .validate-linux
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV"
-  variables:
-    TEST_ENV: "x86_64-linux-deb10"
-    BIN_DIST_PREP_TAR_COMP: "./ghc-x86_64-deb10-linux.tar.xz"
-  cache:
-    key: linux-x86_64-deb10-$CACHE_REV
-
-# Disabled to reduce CI load
-.validate-x86_64-linux-deb10:
-  extends: .build-x86_64-linux-deb10
-  stage: full-build
-  artifacts:
-    when: always
-    expire_in: 2 week
-
-release-x86_64-linux-deb10:
-  <<: *release
-  extends: .build-x86_64-linux-deb10
-  stage: full-build
-
-nightly-x86_64-linux-deb10:
-  <<: *nightly
-  extends: .build-x86_64-linux-deb10
-  stage: full-build
-  variables:
-    TEST_TYPE: slowtest
-
-# N.B. Has DEBUG assertions enabled in stage2
-validate-x86_64-linux-deb10-debug:
-  extends: .build-x86_64-linux-deb10
-  stage: full-build
-  variables:
-    BUILD_FLAVOUR: validate
-    # Ensure that stage2 also has DEBUG enabled
-    ValidateSpeed: SLOW
-    # Override validate flavour default; see #16890.
-    BUILD_SPHINX_PDF: "YES"
-    TEST_TYPE: slowtest
-    TEST_ENV: "x86_64-linux-deb10-debug"
-    BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-deb10-linux-debug.tar.xz"
-    HADDOCK_HYPERLINKED_SOURCES: "yes"
-    # Numa enabled for this build so at least one build tests the libnuma build.
-    # It could be any job but luckily for deb10-debug, I choose it.
-    ENABLE_NUMA: 1
-  artifacts:
-    when: always
-    expire_in: 2 week
-
-validate-x86_64-linux-deb10-integer-simple:
-  extends: .build-x86_64-linux-deb10
-  stage: full-build
-  variables:
-    BUILD_FLAVOUR: validate
-    BIGNUM_BACKEND: native
-    TEST_ENV: "x86_64-linux-deb10-integer-simple-validate"
-    BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-deb10-linux-integer-simple.tar.xz"
-  rules:
-    - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
-
-nightly-x86_64-linux-deb10-integer-simple:
-  <<: *nightly
-  extends: .build-x86_64-linux-deb10
-  stage: full-build
-  variables:
-    BIGNUM_BACKEND: native
-    TEST_ENV: "x86_64-linux-deb10-integer-simple"
-    TEST_TYPE: slowtest
-
-.build-x86_64-linux-deb10-tsan:
-  extends: .validate-linux-hadrian
-  stage: full-build
-  variables:
-    TEST_ENV: "x86_64-linux-deb10-tsan"
-    BUILD_FLAVOUR: "default+thread_sanitizer"
-    TSAN_OPTIONS: "suppressions=$CI_PROJECT_DIR/rts/.tsan-suppressions"
-    # Haddock is large enough to make TSAN choke without massive quantities of
-    # memory.
-    HADRIAN_ARGS: "--docs=none"
-
-nightly-x86_64-linux-deb10-tsan:
-  <<: *nightly
-  extends: .build-x86_64-linux-deb10-tsan
-
-validate-x86_64-linux-deb10-tsan:
-  extends: .build-x86_64-linux-deb10-tsan
-  when: manual
-
-validate-x86_64-linux-deb10-dwarf:
-  extends: .build-x86_64-linux-deb10
-  stage: full-build
-  variables:
-    CONFIGURE_ARGS: "--enable-dwarf-unwind"
-    BUILD_FLAVOUR: dwarf
-    TEST_ENV: "x86_64-linux-deb10-dwarf"
-    BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-deb10-linux-dwarf.tar.xz"
-  rules:
-    - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
-
-release-x86_64-linux-deb10-dwarf:
-  <<: *release
-  extends: .build-x86_64-linux-deb10
-  stage: full-build
-  variables:
-    CONFIGURE_ARGS: "--enable-dwarf-unwind"
-    BUILD_FLAVOUR: dwarf
-    IGNORE_PERF_FAILURES: "all"
-    TEST_ENV: "x86_64-linux-deb10-dwarf"
-    BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-deb10-linux-dwarf.tar.xz"
-  artifacts:
-    when: always
-    expire_in: 1 year
-
-validate-x86_64-linux-deb10-llvm:
-  extends: .build-x86_64-linux-deb10
-  stage: full-build
-  rules:
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*LLVM backend.*/'
-  variables:
-    BUILD_FLAVOUR: perf-llvm
-    TEST_ENV: "x86_64-linux-deb10-llvm"
-
-nightly-x86_64-linux-deb10-llvm:
-  <<: *nightly
-  extends: .build-x86_64-linux-deb10
-  stage: full-build
-  variables:
-    BUILD_FLAVOUR: perf-llvm
-    TEST_ENV: "x86_64-linux-deb10-llvm"
 
 ####################################
 # Testing reinstallable ghc codepath
 ####################################
 
 test-cabal-reinstall-x86_64-linux-deb10:
-  extends: .validate-linux-hadrian
+  extends: .build-x86_64-linux-deb10-hadrian
   stage: full-build
   before_script:
     - ./boot
@@ -1015,7 +1003,7 @@ release-x86_64-linux-ubuntu2004:
 #################################
 
 .build-x86_64-linux-alpine-hadrian:
-  extends: .validate-linux-hadrian
+  extends: .build-x86_64-linux-deb10-hadrian
   stage: full-build
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-alpine3_12:$DOCKER_REV"
   # There are currently a few failing tests
