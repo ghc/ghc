@@ -219,7 +219,9 @@ The supported transformers are listed below:
             It is recommended that you use this in conjunction with `no_dynamic_ghc` since
             GHC does not support loading of profiled libraries with the
             dynamic linker. You should use a flavour that builds profiling libs and rts,
-            i.e. not <code>quick</code>.</td>
+            i.e. not <code>quick</code>.
+
+            This flag adds cost centres with the -fprof-late-ccs flag. </td>
     </tr>
     <tr>
         <td><code>no_dynamic_ghc</code></td>
@@ -239,6 +241,10 @@ The supported transformers are listed below:
     <tr>
         <td><code>ipe</code></td>
         <td>Build the stage2 libraries with IPE debugging information for use with -hi profiling.</td>
+    </tr>
+    <tr>
+        <td><code>assertions</code></td>
+        <td>Build the stage2 compiler with assertions enabled. </td>
     </tr>
     <tr>
         <td><code>fully_static</code></td>
