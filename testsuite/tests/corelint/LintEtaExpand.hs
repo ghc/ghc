@@ -68,11 +68,11 @@ test_exprs  =
       mkApps (Var coerceId)
         [ Type runtimeRep1Ty ]
   , ("raise# OK", ) $
-      -- raise# @Lifted @Int @LiftedRep @(z -> z), where z :: TYPE r
+      -- raise# @Lifted @LiftedRep @Int @(z -> z), where z :: TYPE r
       mkApps (Var $ primOpId RaiseOp)
         [ Type liftedDataConTy
-        , Type intTy
         , Type liftedRepTy
+        , Type intTy
         , Type $ mkVisFunTyMany openAlphaTy openAlphaTy
         ]
   ]

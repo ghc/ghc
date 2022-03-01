@@ -38,7 +38,7 @@ module GHC.Core.Utils (
         diffBinds,
 
         -- * Lambdas and eta reduction
-        tryEtaReduce,
+        tryEtaReduce, canEtaReduceToArity,
 
         -- * Manipulating data constructors and types
         exprToType, exprToCoercion_maybe,
@@ -2448,17 +2448,10 @@ tryEtaReduce bndrs body
     ok_fun _fun                = False
 
     ---------------
-    ok_fun_id fun = -- There are arguments to reduce
+    ok_fun_id fun = -- There are arguments to reduce...
                     fun_arity fun >= incoming_arity &&
-                    -- We always want args for join points so
-                    -- we should never eta-reduce to a trivial expression.
-                    -- See Note [Invariants on join points] in GHC.Core, and #20599
-                    not (isJoinId fun) &&
-                    -- And the function doesn't require visible arguments as part of
-                    -- it's calling convention. See Note [Strict Worker Ids]
-                    idCbvMarkArity fun == 0
-
-
+                    -- ... and the function can be eta reduced to arity 0
+                    canEtaReduceToArity fun 0 0
     ---------------
     fun_arity fun             -- See Note [Arity care]
        | isLocalId fun
@@ -2504,6 +2497,28 @@ tryEtaReduce bndrs body
        = Just (co', t:ticks)
 
     ok_arg _ _ _ _ = Nothing
+
+-- | Can we eta-reduce the given function to the specified arity?
+-- See Note [Eta reduction conditions].
+canEtaReduceToArity :: Id -> JoinArity -> Arity -> Bool
+canEtaReduceToArity fun dest_join_arity dest_arity =
+  not $
+        hasNoBinding fun
+       -- Don't undersaturate functions with no binding.
+
+    ||  ( isJoinId fun && dest_join_arity < idJoinArity fun )
+       -- Don't undersaturate join points.
+       -- See Note [Invariants on join points] in GHC.Core, and #20599
+
+    || ( dest_arity < idCbvMarkArity fun )
+       -- Don't undersaturate StrictWorkerIds.
+       -- See Note [Strict Worker Ids] in GHC.CoreToStg.Prep.
+
+    ||  isLinearType (idType fun)
+       -- Don't perform eta reduction on linear types.
+       -- If `f :: A %1-> B` and `g :: A -> B`,
+       -- then `g x = f x` is OK but `g = f` is not.
+       -- See Note [Eta reduction conditions].
 
 {-
 Note [Eta reduction of an eval'd function]

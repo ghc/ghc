@@ -2467,8 +2467,8 @@ tcGhciStmts stmts
 
       ; traceTc "GHC.Tc.Module.tcGhciStmts: done" empty
 
-      -- rec_expr is the expression
-      --      returnIO @ [()] [unsafeCoerce# () x, ..,  unsafeCorece# () z]
+      -- ret_expr is the expression
+      --      returnIO @[()] [unsafeCoerce# () x, ..,  unsafeCoerce# () z]
       --
       -- Despite the inconvenience of building the type applications etc,
       -- this *has* to be done in type-annotated post-typecheck form

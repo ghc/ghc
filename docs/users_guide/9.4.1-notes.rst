@@ -151,6 +151,10 @@ Compiler
   enabled with :ghc-flag:`-Wall` (:ghc-ticket:`20531`), as a part of
   long-term push towards Dependent Haskell.
 
+- In GHCi, the :ghci-cmd:`:type` command no longer instantiates quantified
+  type variables when given a polymorphic type. (It used to instantiate
+  inferred type variables.)
+
 ``base`` library
 ~~~~~~~~~~~~~~~~
 
@@ -240,13 +244,13 @@ Compiler
   For example, the full type of ``newMutVar#`` is now: ::
 
         newMutVar#
-          :: forall s {l :: Levity} (a :: TYPE (BoxedRep l)).
+          :: forall {l :: Levity} s (a :: TYPE (BoxedRep l)).
              a -> State# s -> (# State# s, MVar# s a #)
 
   and the full type of ``writeSmallArray#`` is: ::
 
         writeSmallArray#
-          :: forall s {l :: Levity} (a :: TYPE (BoxedRep l)).
+          :: forall {l :: Levity} s (a :: TYPE (BoxedRep l)).
              SmallMutableArray# s a -> Int# -> a -> State# s -> State# s
 
 - ``ArrayArray#` and ``MutableArrayArray#`` have been moved from ``GHC.Prim`` to ``GHC.Exts``.
@@ -258,8 +262,9 @@ Compiler
   representation-polymorphic. For instance: ::
 
         mkWeakNoFinalizer#
-          :: forall {l :: Levity} (a :: TYPE (BoxedRep l))
-                    {k :: Levity} (b :: TYPE (BoxedRep k)).
+          :: forall {l :: Levity} {k :: Levity}
+                    (a :: TYPE (BoxedRep l))
+                    (b :: TYPE (BoxedRep k)).
              a -> b -> State# RealWorld -> (# State# RealWorld, Weak# b #)
 
   That is, the type signature now quantifies over the ``GHC.Exts.Levity`` of ``a``
@@ -272,8 +277,9 @@ Compiler
   than before. For example, ``catch#`` now has type: ::
 
         catch#
-          :: forall {r :: RuntimeRep} (a :: TYPE r)
-                    {l :: Levity} (b :: TYPE (BoxedRep l)).
+          :: forall {r :: RuntimeRep} {l :: Levity}
+                    (a :: TYPE r)
+                    (b :: TYPE (BoxedRep l)).
               ( State# RealWorld -> (# State# RealWorld, a #) )
           -> ( b -> State# RealWorld -> (# State# RealWorld, a #) )
           -> State# RealWorld -> (# State# RealWorld, a #)
@@ -289,8 +295,9 @@ Compiler
   Note in particular that ``raise#`` is now both representation-polymorphic
   (with an inferred `RuntimeRep` argument) and levity-polymorphic, with type: ::
 
-      raise# :: forall {l :: Levity} (a :: TYPE (BoxedRep l))
-                       {r :: RuntimeRep} (b :: TYPE r).
+      raise# :: forall {l :: Levity} {r :: RuntimeRep}
+                       (a :: TYPE (BoxedRep l))
+                       (b :: TYPE r).
                 a -> b
 
 - ``fork#`` and ``forkOn#`` are now representation-polymorphic. For example, ``fork#``
@@ -304,8 +311,9 @@ Compiler
   both levity-polymorphic and heterogeneous: ::
 
         reallyUnsafePtrEquality#
-          :: forall {l :: Levity} (a :: TYPE (BoxedRep l))
-                    {k :: Levity} (b :: TYPE (BoxedRep k))
+          :: forall {l :: Levity} {k :: Levity}
+                    (a :: TYPE (BoxedRep l))
+                    (b :: TYPE (BoxedRep k))
           . a -> b -> Int#
 
   This means that ``GHC.Exts.reallyUnsafePtrEquality#`` can be used

@@ -62,7 +62,8 @@ instance Functor (URec Int) -- Defined in ‘GHC.Generics’
 instance Functor (URec Word) -- Defined in ‘GHC.Generics’
 instance Functor V1 -- Defined in ‘GHC.Generics’
 datatypeName
-  ∷ ∀ d k1 (t ∷ ★ → (k1 → ★) → k1 → ★) (f ∷ k1 → ★) (a ∷ k1).
+  ∷ ∀ {k} (d ∷ k) k1 (t ∷ k → (k1 → ★) → k1 → ★) (f ∷ k1 → ★)
+      (a ∷ k1).
     Datatype d ⇒
     t d f a → [Char]
 type Datatype :: ∀ {k}. k → Constraint

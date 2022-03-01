@@ -96,7 +96,7 @@
 
   ```
   newMutVar#
-    :: forall s {l :: Levity} (a :: TYPE (BoxedRep l)).
+    :: forall {l :: Levity} s (a :: TYPE (BoxedRep l)).
        a -> State# s -> (# State# s, MVar# s a #)
   ```
 
@@ -104,7 +104,7 @@
 
   ```
   writeSmallArray#
-    :: forall s {l :: Levity} (a :: TYPE ('BoxedRep l)).
+    :: forall {l :: Levity} s (a :: TYPE ('BoxedRep l)).
        SmallMutableArray# s a -> Int# -> a -> State# s -> State# s
   ```
 
@@ -117,8 +117,9 @@
 
   ```
   mkWeakNoFinalizer#
-    :: forall {l :: Levity} (a :: TYPE ('BoxedRep l))
-              {k :: Levity} (b :: TYPE ('BoxedRep k)).
+    :: forall {l :: Levity} {k :: Levity}
+              (a :: TYPE ('BoxedRep l))
+              (b :: TYPE ('BoxedRep k)).
        a -> b -> State# RealWorld -> (# State# RealWorld, Weak# b #)
   ```
 
@@ -133,8 +134,9 @@
 
   ```
   catch#
-    :: forall {r :: RuntimeRep} (a :: TYPE r)
-              {l :: Levity} (b :: TYPE ('BoxedRep l)).
+    :: forall {r :: RuntimeRep} {l :: Levity}
+              (a :: TYPE r)
+              (b :: TYPE ('BoxedRep l)).
         ( State# RealWorld -> (# State# RealWorld, a #) )
     -> ( b -> State# RealWorld -> (# State# RealWorld, a #) )
     -> State# RealWorld -> (# State# RealWorld, a #)
@@ -152,8 +154,9 @@
   (with an inferred `RuntimeRep` argument) and levity-polymorphic, with type:
 
   ```
-  raise# :: forall {l :: Levity} (a :: TYPE (BoxedRep l))
-                   {r :: RuntimeRep} (b :: TYPE r).
+  raise# :: forall {l :: Levity} {r :: RuntimeRep}
+                   (a :: TYPE (BoxedRep l))
+                   (b :: TYPE r).
             a -> b
   ```
 
@@ -169,8 +172,9 @@
 
   ```
   reallyUnsafePtrEquality#
-    :: forall {l :: Levity} (a :: TYPE (BoxedRep l))
-              {k :: Levity} (b :: TYPE (BoxedRep k))
+    :: forall {l :: Levity} {k :: Levity}
+              (a :: TYPE (BoxedRep l))
+              (b :: TYPE (BoxedRep k))
     . a -> b -> Int#
   ```
 

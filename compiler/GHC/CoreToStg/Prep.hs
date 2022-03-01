@@ -1054,9 +1054,9 @@ cpeApp top_env expr
             (Var f)
             args
         | Just KeepAliveOp <- isPrimOpId_maybe f
-        , CpeApp (Type arg_rep)
-          : CpeApp (Type arg_ty)
+        , CpeApp (Type arg_lev)
           : CpeApp (Type _result_rep)
+          : CpeApp (Type arg_ty)
           : CpeApp (Type result_ty)
           : CpeApp arg
           : CpeApp s0
@@ -1070,13 +1070,14 @@ cpeApp top_env expr
                   _          -> cpe_app env k (CpeApp s0 : rest)
              ; let touchId = primOpId TouchOp
                    expr = Case k' y result_ty [Alt DEFAULT [] rhs]
-                   rhs = let scrut = mkApps (Var touchId) [Type arg_rep, Type arg_ty, arg, Var realWorldPrimId]
+                   rhs = let scrut = mkApps (Var touchId) [Type arg_lev, Type arg_ty, arg, Var realWorldPrimId]
                          in Case scrut s2 result_ty [Alt DEFAULT [] (Var y)]
              ; (floats', expr') <- cpeBody env expr
              ; return (floats `appendFloats` floats', expr')
              }
         | Just KeepAliveOp <- isPrimOpId_maybe f
-        = panic "invalid keepAlive# application"
+        = pprPanic "invalid keepAlive# application" $
+            vcat [ text "args:" <+> ppr args ]
 
     -- runRW# magic
     cpe_app env (Var f) (CpeApp _runtimeRep@Type{} : CpeApp _type@Type{} : CpeApp arg : rest)
@@ -1651,16 +1652,7 @@ tryEtaReducePrep bndrs expr@(App _ _)
     ok bndr (Var arg) = bndr == arg
     ok _    _         = False
 
-    -- We can't eta reduce something which must be saturated.
-    ok_to_eta_reduce (Var f) =  not (hasNoBinding f) &&
-                                not (isLinearType (idType f)) && -- Unsure why this is unsafe.
-                                (not (isJoinId f) || idJoinArity f <= n_remaining) &&
-                                -- Don't undersaturate join points.
-                                -- See Note [Invariants on join points] in GHC.Core, and #20599
-                                (idCbvMarkArity f <= n_remaining_vals)
-                                -- Similar for StrictWorkerIds. See Note [Strict Worker Ids]
-
-
+    ok_to_eta_reduce (Var f) = canEtaReduceToArity f n_remaining n_remaining_vals
     ok_to_eta_reduce _       = False -- Safe. ToDo: generalise
 
 

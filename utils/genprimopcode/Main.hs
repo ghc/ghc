@@ -502,8 +502,10 @@ gen_latex_doc (Info defaults entries)
                    foralls = if tvars == [] then "" else "%forall " ++ (tbinds tvars)
                    tvars = tvars_of typ
                    tbinds [] = ". "
-                   tbinds ("o":tbs) = "(o::?) " ++ (tbinds tbs)
-                   tbinds ("p":tbs) = "(p::?) " ++ (tbinds tbs)
+                   tbinds ("o":tbs) = "(o::TYPE q) " ++ (tbinds tbs)
+                   tbinds ("p":tbs) = "(p::TYPE r) " ++ (tbinds tbs)
+                   tbinds ("v":tbs) = "(v::TYPE (BoxedRep l)) " ++ (tbinds tbs)
+                   tbinds ("w":tbs) = "(w::TYPE (BoxedRep k)) " ++ (tbinds tbs)
                    tbinds (tv:tbs) = tv ++ " " ++ (tbinds tbs)
            tvars_of (TyF t1 t2) = tvars_of t1 `union` tvars_of t2
            tvars_of (TyC t1 t2) = tvars_of t1 `union` tvars_of t2
@@ -639,12 +641,14 @@ gen_wrappers (Info _ entries)
         f spec = let args = map (\n -> "a" ++ show n) [1 .. arity (ty spec)]
                      src_name = wrap (name spec)
                      lhs = src_name ++ " " ++ unwords args
-                     rhs = "(GHC.Prim." ++ name spec ++ ") " ++ unwords args
+                     rhs = wrapQual (name spec) ++ " " ++ unwords args
                  in ["{-# NOINLINE " ++ src_name ++ " #-}",
                      src_name ++ " :: " ++ pprTy (ty spec),
                      lhs ++ " = " ++ rhs]
         wrap nm | isLower (head nm) = nm
                 | otherwise = "(" ++ nm ++ ")"
+        wrapQual nm | isLower (head nm) = "GHC.Prim." ++ nm
+                    | otherwise         = "(GHC.Prim." ++ nm ++ ")"
 
         dodgy spec
            = name spec `elem`
@@ -837,25 +841,74 @@ mkPOI_RHS_text i
                  _ -> error "Type error in comparison op"
         GenPrimOp
            -> let (argTys, resTy) = flatTys (ty i)
-                  tvs = nub (tvsIn (ty i))
+                  tvs = tvsIn (ty i)
+                  (infBndrs,bndrs) = ppTyVarBinders tvs
               in
                   "mkGenPrimOp " ++ sl_name i ++ " "
-                      ++ listify (map ppTyVar tvs) ++ " "
+                      ++ listify (infBndrs ++ bndrs) ++ " "
                       ++ listify (map ppType argTys) ++ " "
                       ++ "(" ++ ppType resTy ++ ")"
 
 sl_name :: Entry -> String
 sl_name i = "(fsLit \"" ++ name i ++ "\") "
 
-ppTyVar :: String -> String
-ppTyVar "a" = "alphaTyVarSpec"
-ppTyVar "b" = "betaTyVarSpec"
-ppTyVar "c" = "gammaTyVarSpec"
-ppTyVar "s" = "deltaTyVarSpec"
-ppTyVar "o" = "runtimeRep1TyVarInf, openAlphaTyVarSpec"
-ppTyVar "p" = "runtimeRep2TyVarInf, openBetaTyVarSpec"
-ppTyVar "v" = "levity1TyVarInf, levPolyAlphaTyVarSpec"
-ppTyVar "w" = "levity2TyVarInf, levPolyBetaTyVarSpec"
+
+-- | A 'PrimOpTyVarBndr' specifies the textual name of a built-in 'TyVarBinder'
+-- (usually from "GHC.Builtin.Types.Prim"), in the 'primOpTyVarBinder' field.
+--
+-- The kind of the type variable stored in the 'primOpTyVarBinder' field
+-- might also depend on some other type variables, for example in
+-- @a :: TYPE r@, the kind of @a@ depends on @r@.
+--
+-- Invariant: if the kind of the type variable stored in the 'primOpTyyVarBinder'
+-- field depends on other type variables, such variables must be inferred type variables
+-- and they must be stored in the associated 'inferredTyVarBinders' field.
+data PrimOpTyVarBinder
+   = PrimOpTyVarBinder
+   { inferredTyVarBinders :: [TyVarBinder]
+   , primOpTyVarBinder    :: TyVarBinder }
+
+nonDepTyVarBinder :: TyVarBinder -> PrimOpTyVarBinder
+nonDepTyVarBinder bndr
+  = PrimOpTyVarBinder
+    { inferredTyVarBinders = []
+    , primOpTyVarBinder    = bndr }
+
+-- | Pretty-print a collection of type variables,
+-- putting all the inferred type variables first,
+-- and removing any duplicate type variables.
+--
+-- This assumes that such a re-ordering makes sense: the kinds of the inferred
+-- type variables may not depend on any of the other type variables.
+ppTyVarBinders :: [TyVar] -> ([TyVarBinder], [TyVarBinder])
+ppTyVarBinders names = case go names of { (infs, bndrs) -> (nub infs, nub bndrs) }
+  where
+     go [] = ([], [])
+     go (tv:tvs)
+       | PrimOpTyVarBinder
+          { inferredTyVarBinders = infs
+          , primOpTyVarBinder    = bndr }
+            <- ppTyVar tv
+       , (other_infs, bndrs) <- ppTyVarBinders tvs
+       = (infs ++ other_infs, bndr : bndrs)
+
+ppTyVar :: TyVar -> PrimOpTyVarBinder
+ppTyVar "a" = nonDepTyVarBinder "alphaTyVarSpec"
+ppTyVar "b" = nonDepTyVarBinder "betaTyVarSpec"
+ppTyVar "c" = nonDepTyVarBinder "gammaTyVarSpec"
+ppTyVar "s" = nonDepTyVarBinder "deltaTyVarSpec"
+ppTyVar "o" = PrimOpTyVarBinder
+              { inferredTyVarBinders = ["runtimeRep1TyVarInf"]
+              , primOpTyVarBinder    = "openAlphaTyVarSpec" }
+ppTyVar "p" = PrimOpTyVarBinder
+              { inferredTyVarBinders = ["runtimeRep2TyVarInf"]
+              , primOpTyVarBinder    = "openBetaTyVarSpec" }
+ppTyVar "v" = PrimOpTyVarBinder
+              { inferredTyVarBinders = ["levity1TyVarInf"]
+              , primOpTyVarBinder    = "levPolyAlphaTyVarSpec" }
+ppTyVar "w" = PrimOpTyVarBinder
+              { inferredTyVarBinders = ["levity2TyVarInf"]
+              , primOpTyVarBinder    = "levPolyBetaTyVarSpec" }
 ppTyVar _   = error "Unknown type var"
 -- o, p, v and w have a special meaning. See primops.txt.pp
 -- Note [Levity and representation polymorphic primops]

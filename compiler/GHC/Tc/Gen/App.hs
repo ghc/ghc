@@ -754,18 +754,23 @@ tcInstFun do_ql inst_final (rn_fun, fun_ctxt) fun_sigma rn_args
           HsUnboundVar {} -> True
           _               -> False
 
-    inst_all :: ArgFlag -> Bool
+    inst_all, inst_inferred, inst_none :: ArgFlag -> Bool
     inst_all (Invisible {}) = True
     inst_all Required       = False
 
-    inst_inferred :: ArgFlag -> Bool
     inst_inferred (Invisible InferredSpec)  = True
     inst_inferred (Invisible SpecifiedSpec) = False
     inst_inferred Required                  = False
 
+    inst_none _ = False
+
     inst_fun :: [HsExprArg 'TcpRn] -> ArgFlag -> Bool
     inst_fun [] | inst_final  = inst_all
-                | otherwise   = inst_inferred
+                | otherwise   = inst_none
+                -- Using `inst_none` for `:type` avoids
+                -- `forall {r1} (a :: TYPE r1) {r2} (b :: TYPE r2). a -> b`
+                -- turning into `forall a {r2} (b :: TYPE r2). a -> b`.
+                -- See #21088.
     inst_fun (EValArg {} : _) = inst_all
     inst_fun _                = inst_inferred
 

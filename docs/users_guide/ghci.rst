@@ -2979,10 +2979,10 @@ commonly used commands.
 
 .. ghci-cmd:: :type; ⟨expression⟩
 
-    Infers and prints the type of ⟨expression⟩.  For polymorphic types
-    it instantiates the 'inferred' forall quantifiers (but not the
-    'specified' ones; see :ref:`inferred-vs-specified`), solves constraints,
-    re-generalises, and then reduces type families as much as possible.
+    Infers and prints the type of ⟨expression⟩, solving constraints and
+    reducing type families as much as possible.
+    For polymorphic types, it does not instantiate any forall quantified
+    variables.
 
     .. code-block:: none
 
@@ -2992,7 +2992,7 @@ commonly used commands.
     Type family reduction is skipped if the function is not fully instantiated,
     as this has been observed to give more intuitive results.
     You may want to use :ghci-cmd:`:info` if you are not applying any arguments,
-    as that will return the original type of the function without instantiating.
+    as that will return the original type of the function.
 
 .. ghci-cmd:: :type +d; ⟨expression⟩
 
