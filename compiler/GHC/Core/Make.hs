@@ -824,7 +824,9 @@ tYPE_ERROR_ID                   = mkRuntimeErrorId typeErrorName
 --       argument would require allocating a thunk.
 --
 --    4. it can't be CAFFY because that would mean making some non-CAFFY
---       definitions that use unboxed sums CAFFY in unarise.
+--       definitions that use unboxed sums CAFFY in unarise. We work around
+--       this by declaring the absentSumFieldError as non-CAFfy, as described
+--       in Note [Wired-in exceptions are not CAFfy].
 --
 --       Getting this wrong causes hard-to-debug runtime issues, see #15038.
 --
@@ -857,6 +859,21 @@ tYPE_ERROR_ID                   = mkRuntimeErrorId typeErrorName
 --   bug. Unlike (say) pattern-match errors, it cannot be caused by a user
 --   error. That's why it is OK for it to be un-catchable.
 --
+
+-- Note [Wired-in exceptions are not CAFfy]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- mkExceptionId claims that all exceptions are not CAFfy, despite the fact
+-- that their closures' code may in fact contain CAF references. We get away
+-- with this lie because the RTS ensures that all exception closures are
+-- considered live by the GC by creating StablePtrs during initialization.
+-- The lie is necessary to avoid unduly growing SRTs as these exceptions are
+-- sufficiently common to warrant special treatment.
+--
+-- At some point we could consider removing this optimisation as it is quite
+-- fragile, but we do want to be careful to avoid adding undue cost. Unboxed
+-- sums in particular are intended to be used in performance-critical contexts.
+--
+-- See #15038, #21141.
 
 absentSumFieldErrorName
    = mkWiredInIdName
@@ -899,6 +916,9 @@ rAISE_UNDERFLOW_ID        = mkExceptionId raiseUnderflowName
 rAISE_DIVZERO_ID          = mkExceptionId raiseDivZeroName
 
 -- | Exception with type \"forall a. a\"
+--
+-- Any exceptions added via this function needs to be added to
+-- the RTS's initBuiltinGcRoots() function.
 mkExceptionId :: Name -> Id
 mkExceptionId name
   = mkVanillaGlobalWithInfo name
@@ -906,7 +926,8 @@ mkExceptionId name
       (vanillaIdInfo `setStrictnessInfo` mkClosedStrictSig [] botDiv
                      `setCprInfo` mkCprSig 0 botCpr
                      `setArityInfo` 0
-                     `setCafInfo` NoCafRefs) -- #15038
+                     `setCafInfo` NoCafRefs)
+                        -- See Note [Wired-in exceptions are not CAFfy]
 
 mkRuntimeErrorId :: Name -> Id
 -- Error function

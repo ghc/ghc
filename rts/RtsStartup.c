@@ -213,6 +213,12 @@ static void initBuiltinGcRoots(void)
 #else
     getStablePtr((StgPtr)processRemoteCompletion_closure);
 #endif
+
+    /* See Note [Wired-in exceptions are not CAFfy] in GHC.Core.Make. */
+    getStablePtr((StgPtr)absentSumFieldError_closure);
+    getStablePtr((StgPtr)raiseUnderflowException_closure);
+    getStablePtr((StgPtr)raiseOverflowException_closure);
+    getStablePtr((StgPtr)raiseDivZeroException_closure);
 }
 
 void
