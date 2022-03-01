@@ -2,7 +2,7 @@
 module Settings.Builders.RunTest (runTestBuilderArgs, runTestGhcFlags) where
 
 import Hadrian.Utilities
-import System.Environment
+import System.Environment hiding (getArgs)
 
 import CommandLine
 import Oracles.TestSettings
@@ -12,6 +12,7 @@ import qualified Data.Set    as Set
 import Flavour
 import qualified Context.Type as C
 import System.Directory (findExecutable)
+import Hadrian.Target (target)
 
 getTestSetting :: TestSetting -> Expr String
 getTestSetting key = expr $ testSetting key
@@ -95,7 +96,14 @@ inTreeCompilerArgs stg = expr $ do
     withInterpreter     <- ghcWithInterpreter
     unregisterised      <- flag GhcUnregisterised
     withSMP             <- targetSupportsSMP
-    debugged            <- ghcDebugged <$> flavour
+    -- --info reports "Debug on = YES" if debugIsOn = True which is set by passing -DDEBUG to
+    -- "compiler/GHC/Utils/Constants.hs"
+    debug_args            <-
+      interpret (target (Context stg compiler vanilla)
+                        (Ghc CompileHs stg)
+                        ["compiler" -/- "GHC" -/- "Utils" -/- "Constants.hs"] [""])
+                        getArgs
+    let debugged = "-DDEBUG" `elem` debug_args
     profiled            <- ghcProfiled <$> flavour
 
     os          <- setting HostOs
