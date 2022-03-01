@@ -37,7 +37,7 @@ import GHC.Rename.Utils ( mapFvRn, bindLocalNames
 import GHC.Rename.Unbound ( mkUnboundName, notInScopeErr, WhereLooking(WL_Global) )
 import GHC.Rename.Names
 import GHC.Tc.Errors.Types
-import GHC.Tc.Errors.Ppr (withHsDocContext)
+import GHC.Tc.Errors.Ppr (withHsDocContext, pprScopeError )
 import GHC.Tc.Gen.Annotation ( annCtxt )
 import GHC.Tc.Utils.Monad
 
@@ -68,7 +68,6 @@ import GHC.Data.Graph.Directed ( SCC, flattenSCC, flattenSCCs, Node(..)
 import GHC.Types.Unique.Set
 import GHC.Data.OrdList
 import qualified GHC.LanguageExtensions as LangExt
-import GHC.Tc.Errors.Ppr (pprScopeError)
 
 import Control.Monad
 import Control.Arrow ( first )

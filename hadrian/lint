@@ -1,5 +1,3 @@
 #!/usr/bin/env bash
 
-"hadrian/build" "$@" test --test-root-dirs="testsuite/tests/linters"
-  # hlint targets disabled as they do not currently run on CI.
-  # lint:compiler lint:base
+"hadrian/build" "$@" test --test-root-dirs="testsuite/tests/linters" lint:compiler lint:base

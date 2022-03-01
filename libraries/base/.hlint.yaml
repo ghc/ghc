@@ -23,7 +23,7 @@
 # lints that we otherwise want applied elsewhere. Such exceptions are listed
 # below.
 
-- ignore: {name: Unused LANGUAGE pragma, within: [GHC.IO.Encoding.CodePage, GHC.IO.Handle.Lock.Windows, GHC.Event.KQueue]}
+- ignore: {name: Unused LANGUAGE pragma, within: [GHC.IO.Encoding.CodePage, GHC.IO.Handle.Lock.Windows, GHC.Event.KQueue, GHC.Generics]}
 - ignore: {name: Redundant do, within: [GHC.IO.Handle.Text.commitBuffer]}
-- ignore: {name: Use fewer imports, within: [GHC.Windows]}
-- ignore: {name: Use fewer imports, within: [GHC.Event.Control]}
+- ignore: {name: Use fewer imports, within: [GHC.Windows, GHC.Event.Control]}
+- ignore: {name: Use fewer LANGUAGE pragmas, within: [GHC.IO.Handle.Lock.LinuxOFD]}

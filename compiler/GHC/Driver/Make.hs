@@ -1636,7 +1636,6 @@ enableCodeGenForTH
   -> IO [ModuleGraphNode]
 enableCodeGenForTH logger tmpfs unit_env =
   enableCodeGenWhen logger tmpfs TFL_CurrentModule TFL_GhcSession unit_env
-  where
 
 -- | Helper used to implement 'enableCodeGenForTH'.
 -- In particular, this enables

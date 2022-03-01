@@ -12,7 +12,7 @@ lintRules = do
   root <- buildRootRules
   "lint:base" ~> lint base
   "lint:compiler" ~> lint compiler
-  root -/- "libraries" -/- "base" -/- "include" -/- "HsBaseConfig.h" %> \_ ->
+  "libraries" -/- "base" -/- "include" -/- "HsBaseConfig.h" %> \_ ->
       -- ./configure is called here manually because we need to generate
       -- HsBaseConfig.h, which is created from HsBaseConfig.h.in. ./configure
       -- is usually run by Cabal which generates this file but if we do that

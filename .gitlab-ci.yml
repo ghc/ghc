@@ -281,6 +281,7 @@ lint-submods-branch:
 
 hlint-ghc-and-base:
   extends: .lint-params
+  image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
   variables:
     BUILD_FLAVOUR: default
   script:
@@ -288,7 +289,6 @@ hlint-ghc-and-base:
     - .gitlab/ci.sh configure
     - .gitlab/ci.sh run_hadrian lint:base
     - .gitlab/ci.sh run_hadrian lint:compiler
-  allow_failure: true
 
 ############################################################
 # Validation via Pipelines (hadrian)
