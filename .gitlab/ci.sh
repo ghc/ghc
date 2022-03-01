@@ -382,7 +382,6 @@ function prepare_build_mk() {
   if [[ -z "$BUILD_FLAVOUR" ]]; then fail "BUILD_FLAVOUR is not set"; fi
   if [[ -z ${BUILD_SPHINX_HTML:-} ]]; then BUILD_SPHINX_HTML=YES; fi
   if [[ -z ${BUILD_SPHINX_PDF:-} ]]; then BUILD_SPHINX_PDF=YES; fi
-  if [[ -z ${BIGNUM_BACKEND:-} ]]; then BIGNUM_BACKEND=gmp; fi
 
   cat > mk/build.mk <<EOF
 BIGNUM_BACKEND=${BIGNUM_BACKEND}
@@ -557,6 +556,12 @@ function test_hadrian() {
     shell ls
     shell ls _build/stage-cabal/bin
 
+    # Ensure the resulting compiler has the correct bignum-flavour
+    test_compiler_backend=$(${test_compiler} -e "GHC.Num.Backend.backendName")
+    if [ $test_compiler_backend != "\"$BIGNUM_BACKEND\"" ]; then
+      fail "Test compiler has a different BIGNUM_BACKEND ($test_compiler_backend) thean requested ($BIGNUM_BACKEND)"
+    fi
+
     run_hadrian \
       test \
       --summary-junit=./junit.xml \
@@ -613,7 +618,6 @@ function run_hadrian() {
   if [ -z "${BUILD_FLAVOUR:-}" ]; then
     fail "BUILD_FLAVOUR not set"
   fi
-  if [ -z "${BIGNUM_BACKEND:-}" ]; then BIGNUM_BACKEND="gmp"; fi
   read -r -a args <<< "${HADRIAN_ARGS:-}"
   if [ -n "${VERBOSE:-}" ]; then args+=("-V"); fi
   # Before running the compiler, unset variables gitlab env vars as these
@@ -703,6 +707,8 @@ fi
 if [ -n "${IGNORE_PERF_FAILURES:-}" ]; then
   RUNTEST_ARGS="--ignore-perf-failures=$IGNORE_PERF_FAILURES"
 fi
+
+if [[ -z ${BIGNUM_BACKEND:-} ]]; then BIGNUM_BACKEND=gmp; fi
 
 determine_metric_baseline
 
