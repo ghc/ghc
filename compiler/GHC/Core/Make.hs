@@ -849,59 +849,94 @@ tYPE_ERROR_ID                   = mkRuntimeErrorId typeErrorName
 -- Note [aBSENT_SUM_FIELD_ERROR_ID]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- Unboxed sums are transformed into unboxed tuples in GHC.Stg.Unarise.mkUbxSum
--- and fields that can't be reached are filled with rubbish values. It's easy to
--- come up with rubbish literal values: we use 0 (ints/words) and 0.0
--- (floats/doubles). Coming up with a rubbish pointer value is more delicate:
+-- and fields that can't be reached are filled with rubbish values.
+-- For instance, consider the case of the program:
+--
+--     f :: (# Int | Float# #) -> Int
+--     f = ...
+--
+--     x = f (# | 2.0## #)
+--
+-- Unarise will represent f's unboxed sum argument as a tuple (# Int#, Int,
+-- Float# #), where Int# is a tag. Consequently, `x` will be rewritten to:
+--
+--     x = f (# 2#, ???, 2.0## #)
+--
+-- We must come up with some rubbish literal to use in place of `???`. In the
+-- case of unboxed integer types this is easy: we can simply use 0 for
+-- Int#/Word# and 0.0 Float#/Double#.
+--
+-- However, coming up with a rubbish pointer value is more delicate as the
+-- value must satisfy the following requirements:
 --
 --    1. it needs to be a valid closure pointer for the GC (not a NULL pointer)
 --
---    2. it is never used in Core, only in STG; and even then only for filling a
---       GC-ptr slot in an unboxed sum (see GHC.Stg.Unarise.ubxSumRubbishArg).
---       So all we need is a pointer, and its levity doesn't matter. Hence we
---       can safely give it the (lifted) type:
+--    2. it can't take arguments because it's used in unarise and applying an
+--       argument would require allocating a thunk, which is both difficult to
+--       do and costly.
 --
---             absentSumFieldError :: forall a. a
---
---       despite the fact that Unarise might instantiate it at non-lifted
---       types.
---
---    3. it can't take arguments because it's used in unarise and applying an
---       argument would require allocating a thunk.
---
---    4. it can't be CAFFY because that would mean making some non-CAFFY
---       definitions that use unboxed sums CAFFY in unarise.
+--    3. it shouldn't be CAFfy since this would make otherwise non-CAFfy
+--       bindings CAFfy, incurring a cost in GC performance. Given that unboxed
+--       sums are intended to be used in performance-critical code, this is to
+--       We work-around this by declaring the absentSumFieldError as non-CAFfy,
+--       as described in Note [Wired-in exceptions are not CAFfy].
 --
 --       Getting this wrong causes hard-to-debug runtime issues, see #15038.
 --
---    5. it can't be defined in `base` package.
---
---       Defining `absentSumFieldError` in `base` package introduces a
---       dependency on `base` for any code using unboxed sums. It became an
---       issue when we wanted to use unboxed sums in boot libraries used by
+--    4. it can't be defined in `base` package.  Afterall, not all code which
+--       uses unboxed sums uses depends upon `base`.  Specifically, this became
+--       an issue when we wanted to use unboxed sums in boot libraries used by
 --       `base`, see #17791.
 --
+-- To fill this role we define `ghc-prim:GHC.Prim.Panic.absentSumFieldError`
+-- with the type:
 --
--- * Most runtime-error functions throw a proper Haskell exception, which can be
---   caught in the usual way. But these functions are defined in
---   `base:Control.Exception.Base`, hence, they cannot be directly invoked in
---   any library compiled before `base`.  Only exceptions that have been wired
---   in the RTS can be thrown (indirectly, via a call into the RTS) by libraries
---   compiled before `base`.
+--    absentSumFieldError :: forall a. a
 --
---   However wiring exceptions in the RTS is a bit annoying because we need to
---   explicitly import exception closures via their mangled symbol name (e.g.
---   `import CLOSURE base_GHCziIOziException_heapOverflow_closure`) in Cmm files
---   and every imported symbol must be indicated to the linker in a few files
---   (`package.conf`, `rts.cabal`, `win32/libHSbase.def`, `Prelude.h`...). It
---   explains why exceptions are only wired in the RTS when necessary.
+-- Note that this type is something of a lie since Unarise may use it at an
+-- unlifted type. However, this lie is benign as absent sum fields are examined
+-- only by the GC, which does not care about levity..
 --
--- * `absentSumFieldError` is defined in ghc-prim:GHC.Prim.Panic, hence, it can
---   be invoked in libraries compiled before `base`. It does not throw a Haskell
---   exception; instead, it calls `stg_panic#`, which immediately halts
---   execution.  A runtime invocation of `absentSumFieldError` indicates a GHC
---   bug. Unlike (say) pattern-match errors, it cannot be caused by a user
---   error. That's why it is OK for it to be un-catchable.
+-- When entered, this closure calls `stg_panic#`, which immediately halts
+-- execution and cannot be caught. This is in contrast to most other runtime
+-- errors, which are thrown as proper Haskell exceptions. This design is
+-- intentional since entering an absent sum field is an indication that
+-- something has gone horribly wrong, very likely due to a compiler bug.
 --
+
+-- Note [Wired-in exceptions are not CAFfy]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- GHC has logic wiring-in a small number of exceptions, which may be thrown in
+-- generated code. Specifically, these are implemented via closures (defined
+-- in `GHC.Prim.Exception` in `ghc-prim`) which, when entered, raise the desired
+-- exception. For instance, in the case of OverflowError we have
+--
+--     raiseOverflow :: forall a. a
+--     raiseOverflow = runRW# (\s ->
+--         case raiseOverflow# s of
+--           (# _, _ #) -> let x = x in x)
+--
+-- where `raiseOverflow#` is defined in the rts/Exception.cmm.
+--
+-- Note that `raiseOverflow` and friends, being top-level thunks, are CAFs.
+-- Normally, this would be reflected in their IdInfo; however, as these
+-- functions are widely used and CAFfyness is transitive, we very much want to
+-- avoid declaring them as CAFfy. This is especially true in especially in
+-- performance-critical code like that using unboxed sums and
+-- absentSumFieldError.
+--
+-- Consequently, `mkExceptionId` instead declares the exceptions to be
+-- non-CAFfy and rather ensure in the RTS (in `initBuiltinGcRoots` in
+-- rts/RtsStartup.c) that these closures remain reachable by creating a
+-- StablePtr to each. Note that we are using the StablePtr mechanism not
+-- because we need a StablePtr# object, but rather because the stable pointer
+-- table is a source of GC roots.
+--
+-- At some point we could consider removing this optimisation as it is quite
+-- fragile, but we do want to be careful to avoid adding undue cost. Unboxed
+-- sums in particular are intended to be used in performance-critical contexts.
+--
+-- See #15038, #21141.
 
 absentSumFieldErrorName
    = mkWiredInIdName
@@ -943,12 +978,16 @@ rAISE_OVERFLOW_ID         = mkExceptionId raiseOverflowName
 rAISE_UNDERFLOW_ID        = mkExceptionId raiseUnderflowName
 rAISE_DIVZERO_ID          = mkExceptionId raiseDivZeroName
 
--- | Non-CAFFY Exception with type \"forall a. a\"
+-- | Exception with type \"forall a. a\"
+--
+-- Any exceptions added via this function needs to be added to
+-- the RTS's initBuiltinGcRoots() function.
 mkExceptionId :: Name -> Id
 mkExceptionId name
   = mkVanillaGlobalWithInfo name
       (mkSpecForAllTys [alphaTyVar] (mkTyVarTy alphaTyVar)) -- forall a . a
-      (divergingIdInfo [] `setCafInfo` NoCafRefs) -- No CAFs: #15038
+      (divergingIdInfo [] `setCafInfo` NoCafRefs)
+         -- See Note [Wired-in exceptions are not CAFfy]
 
 mkRuntimeErrorId :: Name -> Id
 -- Error function
