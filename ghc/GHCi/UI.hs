@@ -135,6 +135,8 @@ import Prelude hiding ((<>))
 import GHC.Utils.Exception as Exception hiding (catch, mask, handle)
 import Foreign hiding (void)
 import GHC.Stack hiding (SrcLoc(..))
+import GHC.Unit.Env
+import GHC.Unit.Home.ModInfo
 
 import System.Directory
 import System.Environment
@@ -1655,8 +1657,8 @@ changeDirectory dir = do
   graph <- GHC.getModuleGraph
   when (not (null $ GHC.mgModSummaries graph)) $
         liftIO $ putStrLn "Warning: changing directory causes all loaded modules to be unloaded,\nbecause the search path has changed."
-  -- delete targets and all eventually defined breakpoints (#1620)
-  clearAllTargets
+  -- delete defined breakpoints and clear the interface file cache (#1620)
+  clearCaches
   setContextAfterLoad False Nothing
   GHC.workingDirectoryChanged
   dir' <- expandPath dir
@@ -2030,7 +2032,7 @@ loadModule' files = do
   let load_module = do
         -- unload first
         _ <- GHC.abandonAll
-        clearAllTargets
+        clearCaches
 
         GHC.setTargets targets
         doLoadAndCollectInfo False LoadAllTargets
@@ -3150,8 +3152,8 @@ newDynFlags interactive_only minus_opts = do
           when (verbosity dflags2 > 0) $
             liftIO . putStrLn $
               "package flags have changed, resetting and loading new packages..."
-          -- delete targets and all eventually defined breakpoints. (#1620)
-          clearAllTargets
+          -- Clear caches and eventually defined breakpoints. (#1620)
+          clearCaches
           when must_reload $ do
             let units = preloadUnits (hsc_units hsc_env)
             liftIO $ Loader.loadPackages interp hsc_env units
@@ -4446,6 +4448,22 @@ discardInterfaceCache :: GhciMonad m => m ()
 discardInterfaceCache = do
    modifyGHCiState $ (\st -> st { hmiCache = [] })
 
+clearHPTs :: GhciMonad m => m ()
+clearHPTs = do
+  let pruneHomeUnitEnv hme = hme { homeUnitEnv_hpt = emptyHomePackageTable }
+      discardMG hsc = hsc { hsc_mod_graph = GHC.emptyMG }
+  modifySession (discardMG . discardIC . hscUpdateHUG (unitEnv_map pruneHomeUnitEnv))
+
+
+-- The unused package warning doesn't make sense once the targets get out of
+-- sync with the package flags. See #21110
+-- Therefore if it's turned on, the warnings are issued until the module context
+-- changes (via :load or :cd), at which stage the package flags are not going to change
+-- but the loaded modules will probably not use all the specified packages so the
+-- warning becomes spurious. At that point the warning is silently disabled.
+disableUnusedPackages :: GhciMonad m => m ()
+disableUnusedPackages = newDynFlags False ["-Wno-unused-packages"]
+
 deleteBreak :: GhciMonad m => Int -> m ()
 deleteBreak identity = do
    st <- getGHCiState
@@ -4636,12 +4654,13 @@ wantNameFromInterpretedModule noCanDo str and_then =
                                 text " is not interpreted"
                else and_then n
 
-clearAllTargets :: GhciMonad m => m ()
-clearAllTargets = discardActiveBreakPoints
-                >> discardInterfaceCache
-                >> GHC.setTargets []
-                >> GHC.load LoadAllTargets
-                >> pure ()
+clearCaches :: GhciMonad m => m ()
+clearCaches = discardActiveBreakPoints
+              >> discardInterfaceCache
+              >> disableUnusedPackages
+              >> clearHPTs
+
+
 
 -- Split up a string with an eventually qualified declaration name into 3 components
 --   1. module name
