@@ -214,6 +214,16 @@ static void initBuiltinGcRoots(void)
 #else
     getStablePtr((StgPtr)processRemoteCompletion_closure);
 #endif
+
+    /*
+     * See Note [Wired-in exceptions are not CAFfy] in GHC.Core.Make.
+     * These are precisely the functions for which we construct `Id`s using
+     * GHC.Core.Make.mkExceptionId.
+     */
+    getStablePtr((StgPtr)absentSumFieldError_closure);
+    getStablePtr((StgPtr)raiseUnderflowException_closure);
+    getStablePtr((StgPtr)raiseOverflowException_closure);
+    getStablePtr((StgPtr)raiseDivZeroException_closure);
 }
 
 void
