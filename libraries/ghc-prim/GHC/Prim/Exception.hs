@@ -26,6 +26,8 @@ default () -- Double and Integer aren't available yet
 -- precision numbers (Natural,Integer). It can't depend on `base` package to
 -- raise exceptions in a normal way because it would create a dependency
 -- cycle (base <-> bignum package). See #14664
+--
+-- See also: Note [Wired-in exceptions are not CAFfy] in GHC.Core.Make.
 
 foreign import prim "stg_raiseOverflowzh" raiseOverflow# :: State# RealWorld -> (# State# RealWorld, (# #) #)
 foreign import prim "stg_raiseUnderflowzh" raiseUnderflow# :: State# RealWorld -> (# State# RealWorld, (# #) #)
