@@ -177,6 +177,45 @@ hs_restoreConsoleCP (void)
    Starting up the RTS
    -------------------------------------------------------------------------- */
 
+static void initBuiltinGcRoots(void)
+{
+    /* Add some GC roots for things in the base package that the RTS
+     * knows about.  We don't know whether these turn out to be CAFs
+     * or refer to CAFs, but we have to assume that they might.
+     *
+     * Because these stable pointers will retain any CAF references in
+     * these closures `Id`s of these can be safely marked as non-CAFFY
+     * in the compiler.
+     */
+    getStablePtr((StgPtr)runIO_closure);
+    getStablePtr((StgPtr)runNonIO_closure);
+    getStablePtr((StgPtr)flushStdHandles_closure);
+
+    getStablePtr((StgPtr)runFinalizerBatch_closure);
+
+    getStablePtr((StgPtr)stackOverflow_closure);
+    getStablePtr((StgPtr)heapOverflow_closure);
+    getStablePtr((StgPtr)unpackCString_closure);
+    getStablePtr((StgPtr)blockedIndefinitelyOnMVar_closure);
+    getStablePtr((StgPtr)nonTermination_closure);
+    getStablePtr((StgPtr)blockedIndefinitelyOnSTM_closure);
+    getStablePtr((StgPtr)allocationLimitExceeded_closure);
+    getStablePtr((StgPtr)cannotCompactFunction_closure);
+    getStablePtr((StgPtr)cannotCompactPinned_closure);
+    getStablePtr((StgPtr)cannotCompactMutable_closure);
+    getStablePtr((StgPtr)nestedAtomically_closure);
+    getStablePtr((StgPtr)runSparks_closure);
+    getStablePtr((StgPtr)ensureIOManagerIsRunning_closure);
+    getStablePtr((StgPtr)interruptIOManager_closure);
+    getStablePtr((StgPtr)ioManagerCapabilitiesChanged_closure);
+#if !defined(mingw32_HOST_OS)
+    getStablePtr((StgPtr)blockedOnBadFD_closure);
+    getStablePtr((StgPtr)runHandlersPtr_closure);
+#else
+    getStablePtr((StgPtr)processRemoteCompletion_closure);
+#endif
+}
+
 void
 hs_init(int *argc, char **argv[])
 {
@@ -317,41 +356,8 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
     /* initialise the stable name table */
     initStableNameTable();
 
-    /* Add some GC roots for things in the base package that the RTS
-     * knows about.  We don't know whether these turn out to be CAFs
-     * or refer to CAFs, but we have to assume that they might.
-     *
-     * Because these stable pointers will retain any CAF references in
-     * these closures `Id`s of these can be safely marked as non-CAFFY
-     * in the compiler.
-     */
-    getStablePtr((StgPtr)runIO_closure);
-    getStablePtr((StgPtr)runNonIO_closure);
-    getStablePtr((StgPtr)flushStdHandles_closure);
-
-    getStablePtr((StgPtr)runFinalizerBatch_closure);
-
-    getStablePtr((StgPtr)stackOverflow_closure);
-    getStablePtr((StgPtr)heapOverflow_closure);
-    getStablePtr((StgPtr)unpackCString_closure);
-    getStablePtr((StgPtr)blockedIndefinitelyOnMVar_closure);
-    getStablePtr((StgPtr)nonTermination_closure);
-    getStablePtr((StgPtr)blockedIndefinitelyOnSTM_closure);
-    getStablePtr((StgPtr)allocationLimitExceeded_closure);
-    getStablePtr((StgPtr)cannotCompactFunction_closure);
-    getStablePtr((StgPtr)cannotCompactPinned_closure);
-    getStablePtr((StgPtr)cannotCompactMutable_closure);
-    getStablePtr((StgPtr)nestedAtomically_closure);
-    getStablePtr((StgPtr)runSparks_closure);
-    getStablePtr((StgPtr)ensureIOManagerIsRunning_closure);
-    getStablePtr((StgPtr)interruptIOManager_closure);
-    getStablePtr((StgPtr)ioManagerCapabilitiesChanged_closure);
-#if !defined(mingw32_HOST_OS)
-    getStablePtr((StgPtr)blockedOnBadFD_closure);
-    getStablePtr((StgPtr)runHandlersPtr_closure);
-#else
-    getStablePtr((StgPtr)processRemoteCompletion_closure);
-#endif
+    /* create StablePtrs for builtin GC roots*/
+    initBuiltinGcRoots();
 
     /*
      * process any foreign exports which were registered while loading the
