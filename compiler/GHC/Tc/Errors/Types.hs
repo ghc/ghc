@@ -1,5 +1,4 @@
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE LambdaCase #-}
 
 module GHC.Tc.Errors.Types (
   -- * Main types

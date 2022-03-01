@@ -1,7 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
 
 {-# LANGUAGE NondecreasingIndentation #-}
-{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE GADTs #-}
 
 {-# OPTIONS_GHC -fprof-auto-top #-}
