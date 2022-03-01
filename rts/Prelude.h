@@ -19,6 +19,12 @@
 #define PRELUDE_CLOSURE(i)    extern StgClosure DLL_IMPORT_DATA_VARNAME(i)
 #endif
 
+/* See Note [Wired-in exceptions are not CAFfy] in GHC.Core.Make. */
+PRELUDE_CLOSURE(ghczmprim_GHCziPrimziPanic_absentSumFieldError_closure);
+PRELUDE_CLOSURE(ghczmprim_GHCziPrimziException_raiseUnderflow_closure);
+PRELUDE_CLOSURE(ghczmprim_GHCziPrimziException_raiseOverflow_closure);
+PRELUDE_CLOSURE(ghczmprim_GHCziPrimziException_raiseDivZZero_closure);
+
 /* Define canonical names so we can abstract away from the actual
  * modules these names are defined in.
  */
@@ -111,6 +117,10 @@ PRELUDE_INFO(base_GHCziStable_StablePtr_con_info);
 #define nonTermination_closure    DLL_IMPORT_DATA_REF(base_ControlziExceptionziBase_nonTermination_closure)
 #define nestedAtomically_closure  DLL_IMPORT_DATA_REF(base_ControlziExceptionziBase_nestedAtomically_closure)
 #define doubleReadException  DLL_IMPORT_DATA_REF(base_GHCziIOPort_doubleReadException_closure)
+#define absentSumFieldError_closure DLL_IMPORT_DATA_REF(ghczmprim_GHCziPrimziPanic_absentSumFieldError_closure)
+#define raiseUnderflowException_closure DLL_IMPORT_DATA_REF(ghczmprim_GHCziPrimziException_raiseUnderflow_closure)
+#define raiseOverflowException_closure DLL_IMPORT_DATA_REF(ghczmprim_GHCziPrimziException_raiseOverflow_closure)
+#define raiseDivZeroException_closure DLL_IMPORT_DATA_REF(ghczmprim_GHCziPrimziException_raiseDivZZero_closure)
 
 #define blockedOnBadFD_closure    DLL_IMPORT_DATA_REF(base_GHCziEventziThread_blockedOnBadFD_closure)
 
