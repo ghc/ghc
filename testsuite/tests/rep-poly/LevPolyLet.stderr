@@ -1,6 +1,7 @@
 
 LevPolyLet.hs:17:7: error:
-    • The binder ‘x’ does not have a fixed runtime representation:
+    • The binder ‘x’ does not have a fixed runtime representation.
+      Its type is:
         a :: TYPE ('BoxedRep v)
     • In the expression: let x = f 42 in undefined
       In an equation for ‘example’: example f = let x = f 42 in undefined

@@ -2,7 +2,8 @@
 T17817.hs:16:10: error:
     • Unsaturated use of a representation-polymorphic primitive function.
       The first argument of ‘mkWeak#’
-      does not have a fixed runtime representation:
+      does not have a fixed runtime representation.
+      Its type is:
         a :: TYPE ('BoxedRep l)
     • In the expression: mkWeak#
       In an equation for ‘primop’: primop = mkWeak#

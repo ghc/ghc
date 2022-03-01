@@ -941,7 +941,7 @@ callStackOriginFS orig               = mkFastString (showSDocUnsafe (pprCtO orig
 
 Note [Reporting representation-polymorphism errors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When we emit a 'Concrete#' Wanted constraint using GHC.Tc.Utils.Concrete.hasFixedRuntimeRep,
+When we emit new Wanted constraints using GHC.Tc.Utils.Concrete.hasFixedRuntimeRep,
 we provide a 'CtOrigin' using the 'FixedRuntimeRepOrigin' constructor of,
 which keeps track of two things:
   - the type which we want to ensure has a fixed runtime representation,
@@ -949,8 +949,8 @@ which keeps track of two things:
     a function application, a record update, ...
 
 If the constraint goes unsolved, we report it as follows:
-  - we detect that the unsolved Wanted is a Concrete# constraint in
-    GHC.Tc.Errors.reportWanteds using is_FRR,
+  - we detect that the unsolved Wanted has an 'FRROrigin' 'CtOrigin'
+    in GHC.Tc.Errors.reportWanteds using is_FRR,
   - we assemble an error message in GHC.Tc.Errors.mkFRRErr.
 
 For example, if we try to write the program
@@ -958,11 +958,10 @@ For example, if we try to write the program
   foo :: forall r1 r2 (a :: TYPE r1) (b :: TYPE r2). a -> b -> ()
   foo x y = ()
 
-we will get two unsolved Concrete# wanted constraints, namely
-'Concrete# r1' and 'Concrete# r2', and their 'CtOrigin's will be:
+we will get two unsolved Wanted constraints, namely
 
-  FixedRuntimeRepOrigin a (FRRVarPattern x)
-  FixedRuntimeRepOrigin b (FRRVarPattern y)
+  r1 ~# concrete_tv1, with 'CtOrigin' FixedRuntimeRepOrigin a (FRRVarPattern x)
+  r2 ~# concrete_tv2, with 'CtOrigin' FixedRuntimeRepOrigin b (FRRVarPattern y)
 
 These constraints will be processed in tandem by mkFRRErr,
 producing an error message of the form:
@@ -976,19 +975,18 @@ producing an error message of the form:
         b :: TYPE r2
 -}
 
--- | Where are we checking that a type has a fixed runtime representation?
--- Equivalently: what is the origin of an emitted 'Concrete#' constraint?
+-- | In what context are we checking that a type has a fixed runtime representation?
 data FRROrigin
 
   -- | Function arguments must have a fixed runtime representation.
   --
   -- Test case: RepPolyApp.
-  = FRRApp !(HsExpr GhcRn)
+  = FRRApp !(HsExpr GhcTc)
 
   -- | Record fields in record updates must have a fixed runtime representation.
   --
   -- Test case: RepPolyRecordUpdate.
-  | FRRRecordUpdate !RdrName !(HsExpr GhcRn)
+  | FRRRecordUpdate !RdrName !(HsExpr GhcTc)
 
   -- | Variable binders must have a fixed runtime representation.
   --
@@ -1074,23 +1072,18 @@ data FRROrigin
 -- which is not fixed. That information is added by 'GHC.Tc.Errors.mkFRRErr'.
 pprFRROrigin :: FRROrigin -> SDoc
 pprFRROrigin (FRRApp arg)
-  = sep [ text "The function argument"
-        , nest 2 $ quotes (ppr arg)
-        , text "does not have a fixed runtime representation"]
+  = vcat [ text "The function argument"
+         , nest 2 $ quotes (ppr arg) ]
 pprFRROrigin (FRRRecordUpdate lbl _arg)
   = hsep [ text "The record update at field"
-         , quotes (ppr lbl)
-         , text "does not have a fixed runtime representation"]
+         , quotes (ppr lbl) ]
 pprFRROrigin (FRRBinder binder)
   = hsep [ text "The binder"
-         , quotes (ppr binder)
-         , text "does not have a fixed runtime representation"]
+         , quotes (ppr binder) ]
 pprFRROrigin (FRRMatch matchCtxt i)
-  = vcat [ text "The type of the" <+> speakNth i <+> text "pattern in the" <+> pprMatchContextNoun matchCtxt
-         , text "does not have a fixed runtime representation"]
+  = text "The" <+> speakNth i <+> text "pattern in the" <+> pprMatchContextNoun matchCtxt
 pprFRROrigin (FRRDataConArg con i)
-  = sep [ text "The" <+> what
-        , text "does not have a fixed runtime representation"]
+  = text "The" <+> what
   where
     what :: SDoc
     what
@@ -1100,36 +1093,29 @@ pprFRROrigin (FRRDataConArg con i)
       = text "data constructor argument in" <+> speakNth i <+> text "position"
 pprFRROrigin (FRRNoBindingResArg fn i)
   = vcat [ text "Unsaturated use of a representation-polymorphic primitive function."
-         , text "The" <+> speakNth i <+> text "argument of" <+> quotes (ppr $ getName fn)
-         , text "does not have a fixed runtime representation" ]
+         , text "The" <+> speakNth i <+> text "argument of" <+> quotes (ppr $ getName fn) ]
 pprFRROrigin (FRRTupleArg i)
-  = hsep [ text "The tuple argument in" <+> speakNth i <+> text "position"
-         , text "does not have a fixed runtime representation"]
+  = text "The tuple argument in" <+> speakNth i <+> text "position"
 pprFRROrigin (FRRTupleSection i)
-  = hsep [ text "The tuple section does not have a fixed runtime representation"
-         , text "in the" <+> speakNth i <+> text "position" ]
+  = text "The" <+> speakNth i <+> text "component of the tuple section"
 pprFRROrigin FRRUnboxedSum
-  = hsep [ text "The unboxed sum result type"
-         , text "does not have a fixed runtime representation"]
+  = text "The unboxed sum"
 pprFRROrigin (FRRBodyStmt stmtOrig i)
   = vcat [ text "The" <+> speakNth i <+> text "argument to (>>)" <> comma
-         , text "arising from the" <+> ppr stmtOrig <> comma
-         , text "does not have a fixed runtime representation" ]
+         , text "arising from the" <+> ppr stmtOrig <> comma ]
 pprFRROrigin FRRBodyStmtGuard
   = vcat [ text "The argument to" <+> quotes (text "guard") <> comma
-         , text "arising from the" <+> ppr MonadComprehension <> comma
-         , text "does not have a fixed runtime representation" ]
+         , text "arising from the" <+> ppr MonadComprehension <> comma ]
 pprFRROrigin (FRRBindStmt stmtOrig)
   = vcat [ text "The first argument to (>>=)" <> comma
-         , text "arising from the" <+> ppr stmtOrig <> comma
-         , text "does not have a fixed runtime representation" ]
+         , text "arising from the" <+> ppr stmtOrig <> comma ]
 pprFRROrigin FRRBindStmtGuard
-  = hsep [ text "The return type of the bind statement"
-         , text "does not have a fixed runtime representation" ]
+  = hsep [ text "The body of the bind statement" ]
 pprFRROrigin (FRRArrow arrowOrig)
   = pprFRRArrowOrigin arrowOrig
 pprFRROrigin (FRRWpFun wpFunOrig)
-  = pprWpFunOrigin wpFunOrig
+  = hsep [ text "The function argument"
+         , pprWpFunOrigin wpFunOrig ]
 
 instance Outputable FRROrigin where
   ppr = pprFRROrigin
@@ -1188,27 +1174,22 @@ data FRRArrowOrigin
 
 pprFRRArrowOrigin :: FRRArrowOrigin -> SDoc
 pprFRRArrowOrigin (ArrowCmdResTy cmd)
-  = vcat [ hang (text "The arrow command") 2 (quotes (ppr cmd))
-         , text "does not have a fixed runtime representation" ]
+  = vcat [ hang (text "The arrow command") 2 (quotes (ppr cmd)) ]
 pprFRRArrowOrigin (ArrowCmdApp fun arg)
-  = vcat [ text "In the arrow command application of"
+  = vcat [ text "The argument in the arrow command application of"
          , nest 2 (quotes (ppr fun))
          , text "to"
-         , nest 2 (quotes (ppr arg)) <> comma
-         , text "the argument does not have a fixed runtime representation" ]
+         , nest 2 (quotes (ppr arg)) ]
 pprFRRArrowOrigin (ArrowCmdArrApp fun arg ho_app)
-  = vcat [ text "In the" <+> pprHsArrType ho_app <+> text "of"
+  = vcat [ text "The function un the" <+> pprHsArrType ho_app <+> text "of"
          , nest 2 (quotes (ppr fun))
          , text "to"
-         , nest 2 (quotes (ppr arg)) <> comma
-         , text "the function does not have a fixed runtime representation" ]
+         , nest 2 (quotes (ppr arg)) ]
 pprFRRArrowOrigin (ArrowCmdLam i)
-  = vcat [ text "The" <+> speakNth i <+> text "pattern of the arrow command abstraction"
-         , text "does not have a fixed runtime representation" ]
+  = vcat [ text "The" <+> speakNth i <+> text "pattern of the arrow command abstraction" ]
 pprFRRArrowOrigin (ArrowFun fun)
   = vcat [ text "The return type of the arrow function"
-         , nest 2 (quotes (ppr fun))
-         , text "does not have a fixed runtime representation" ]
+         , nest 2 (quotes (ppr fun)) ]
 
 instance Outputable FRRArrowOrigin where
   ppr = pprFRRArrowOrigin
@@ -1231,16 +1212,16 @@ data WpFunOrigin
 
 pprWpFunOrigin :: WpFunOrigin -> SDoc
 pprWpFunOrigin (WpFunSyntaxOp orig)
-  = vcat [ text "When checking a rebindable syntax operator arising from"
+  = vcat [ text "of a rebindable syntax operator arising from"
          , nest 2 (ppr orig) ]
 pprWpFunOrigin (WpFunViewPat expr)
-  = vcat [ text "When checking the view pattern function:"
+  = vcat [ text "of the view pattern function"
          , nest 2 (ppr expr) ]
 pprWpFunOrigin (WpFunFunTy fun_ty)
-  = vcat [ text "When inferring the argument type of a function with type"
+  = vcat [ text "of the inferred argument type of a function with type"
          , nest 2 (ppr fun_ty) ]
 pprWpFunOrigin (WpFunFunExpTy fun_ty)
-  = vcat [ text "When inferring the argument type of a function with expected type"
+  = vcat [ text "of the inferred argument type of a function with expected type"
          , nest 2 (ppr fun_ty) ]
 
 instance Outputable WpFunOrigin where

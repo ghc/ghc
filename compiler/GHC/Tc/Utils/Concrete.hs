@@ -1,9 +1,13 @@
 {-# LANGUAGE MultiWayIf #-}
 
+-- | Checking for representation-polymorphism using the Concrete mechanism.
+--
+-- This module contains the logic for enforcing the representation-polymorphism
+-- invariants by way of emitting constraints.
 module GHC.Tc.Utils.Concrete
-  ( -- * Creating/emitting 'Concrete#' constraints
+  ( -- * Ensuring that a type has a fixed runtime representation
     hasFixedRuntimeRep
-  , newConcretePrimWanted
+  , hasFixedRuntimeRep_MustBeRefl
     -- * HsWrapper: checking for representation-polymorphism
   , mkWpFun
   )
@@ -11,28 +15,38 @@ module GHC.Tc.Utils.Concrete
 
 import GHC.Prelude
 
-import GHC.Core.Coercion   ( multToCo )
-import GHC.Core.Type       ( isConcrete, typeKind )
-import GHC.Core.TyCo.Rep
+import GHC.Builtin.Types       ( unliftedTypeKindTyCon, liftedTypeKindTyCon )
 
-import GHC.Tc.Utils.Monad
-import GHC.Tc.Utils.TcType  ( mkTyConApp )
-import GHC.Tc.Utils.TcMType
-import GHC.Tc.Types.Constraint
-import GHC.Tc.Types.Evidence
-import GHC.Tc.Types.Origin ( CtOrigin(..), FRROrigin(..), WpFunOrigin(..) )
+import GHC.Core.Coercion       ( Role(..), multToCo )
+import GHC.Core.Predicate      ( mkIsReflPrimPred )
+import GHC.Core.TyCo.Rep       ( Type(TyConApp), Scaled(..)
+                               , mkTyVarTy, scaledThing )
+import GHC.Core.Type           ( isConcrete, typeKind )
 
-import GHC.Builtin.Types      ( unliftedTypeKindTyCon, liftedTypeKindTyCon )
-import GHC.Builtin.Types.Prim ( concretePrimTyCon )
+import GHC.Tc.Types            ( TcM, ThStage(Brack), PendingStuff(TcPending) )
+import GHC.Tc.Types.Constraint ( mkNonCanonical )
+import GHC.Tc.Types.Evidence   ( TcCoercion, HsWrapper(..)
+                               , mkTcFunCo, mkTcRepReflCo, mkTcSymCo )
+import GHC.Tc.Types.Origin     ( CtOrigin(..), FRROrigin(..), WpFunOrigin(..) )
+import GHC.Tc.Utils.Monad      ( emitSimple, getStage )
+import GHC.Tc.Utils.TcType     ( TcType, TcKind, TcTyVar, MetaInfo(ConcreteTv) )
+import GHC.Tc.Utils.TcMType    ( newAnonMetaTyVar, newWanted, emitWantedEq )
 
-import GHC.Types.Basic      ( TypeOrKind(KindLevel) )
+import GHC.Types.Basic         ( TypeOrKind(..) )
 
-
+import GHC.Utils.Misc          ( HasDebugCallStack )
+import GHC.Utils.Outputable
+import GHC.Utils.Panic         ( assertPpr )
 
 {- Note [Concrete overview]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Special predicates of the form `Concrete# ty` are used
-to check, in the typechecker, that certain types have a fixed runtime representation.
+GHC ensures that certain types have a fixed runtime representation in the
+typechecker, by emitting certain constraints.
+Emitting constraints to be solved later allows us to accept more programs:
+if we directly inspected the type (using e.g. `typePrimRep`), we might not
+have enough information available (e.g. if the type has kind `TYPE r` for
+a metavariable `r` which has not yet been filled in.)
+
 We give here an overview of the various moving parts, to serve
 as a central point of reference for this topic.
 
@@ -50,20 +64,26 @@ as a central point of reference for this topic.
     So, instead of checking immediately, we emit a constraint.
 
   * What does it mean for a type to be concrete?
-    Note [Concrete types]
+    Note [Concrete types] explains what it means for a type to be concrete.
+
+    To compute which representation to use for a type, `typePrimRep` expects
+    its kind to be concrete: something specific like `BoxedRep Lifted` or
+    `IntRep`; certainly not a type involving type variables or type families.
+
+  * What constraints do we emit?
     Note [The Concrete mechanism]
 
-    The predicate 'Concrete# ty' is satisfied when we can produce
-    a coercion
+    Instead of simply checking that a type `ty` is concrete (i.e. computing
+    'isConcrete`), we emit an equality constraint:
 
-      co :: ty ~ concrete_ty
+       co :: ty ~# concrete_ty
 
-    where 'concrete_ty' consists only of concrete types (no type variables,
-    no type families).
+    where 'concrete_ty' is a concrete metavariable: a metavariable whose 'MetaInfo'
+    is 'ConcreteTv', signifying that it can only be unified with a concrete type.
 
-    The first note explains more precisely what it means for a type to be concrete.
-    The second note explains how this relates to the `Concrete#` predicate,
-    and explains that the implementation is happening in two phases (PHASE 1 and PHASE 2).
+    The Note explains that this allows us to accept more programs. The Note
+    also explains that the implementation is happening in two phases
+    (PHASE 1 and PHASE 2).
     In PHASE 1 (the current implementation) we only allow trivial evidence
     of the form `co = Refl`.
 
@@ -72,42 +92,29 @@ as a central point of reference for this topic.
 
     We currently enforce the representation-polymorphism invariants by checking
     that binders and function arguments have a "fixed RuntimeRep".
-    That is, `ty :: ki` has a "fixed RuntimeRep" if we can solve `Concrete# ki`.
 
     This is slightly less general than we might like, as this rules out
     types with kind `TYPE (BoxedRep l)`: we know that this will be represented
     by a pointer, which should be enough to go on in many situations.
 
-  * When do we emit 'Concrete#' constraints?
+  * When do we emit these constraints?
     Note [hasFixedRuntimeRep]
 
-    We introduce 'Concrete#' constraints to satisfy the representation-polymorphism
+    We introduce constraints to satisfy the representation-polymorphism
     invariants outlined in Note [Representation polymorphism invariants] in GHC.Core,
     which mostly amounts to the following two cases:
 
       - checking that a binder has a fixed runtime representation,
       - checking that a function argument has a fixed runtime representation.
 
-    The note explains precisely how we emit these 'Concrete#' constraints.
+    The Note explains precisely how and where these constraints are emitted.
 
-  * How do we solve Concrete# constraints?
-    Note [Solving Concrete# constraints] in GHC.Tc.Instance.Class
-
-    Concrete# constraints are solved through two mechanisms,
-    which are both explained further in the note:
-
-      - by decomposing them, e.g. `Concrete# (TYPE r)` is turned
-        into `Concrete# r` (canonicalisation of `Concrete#` constraints),
-      - by using 'Concrete' instances (top-level interactions).
-        The note explains that the evidence we get from using such 'Concrete'
-        instances can only ever be Refl, even in PHASE 2.
-
-  * Reporting unsolved Concrete# constraints
+  * Reporting unsolved constraints
     Note [Reporting representation-polymorphism errors] in GHC.Tc.Types.Origin
 
-    When we emit a 'Concrete#' constraint, we also provide a 'FRROrigin'
-    which gives context about the check being done. This origin gets reported
-    to the user if we end up with an unsolved Wanted 'Concrete#' constraint.
+    When we emit a constraint to enforce a fixed representation, we also provide
+    a 'FRROrigin' which gives context about the check being done. This origin gets
+    reported to the user if we end up with such an an unsolved Wanted constraint.
 
 Note [Representation polymorphism checking]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -157,17 +164,12 @@ has a fixed runtime representation, both in the typechecker:
      See Note [Concrete overview] in GHC.Tc.Utils.Concrete for an overview
      of the various moving parts.
 
-     The idea is that, to guarantee that a type (rr :: RuntimeRep) is
-     representation-monomorphic, we emit a 'Concrete# rr' Wanted constraint.
-     If GHC can solve this constraint, it means 'rr' is monomorphic, and we
-     are OK to proceed. Otherwise, we report this unsolved Wanted in the form
-     of a representation-polymorphism error. The different contexts in which
-     such constraints arise are enumerated in 'FRROrigin'.
-
 Note [Concrete types]
 ~~~~~~~~~~~~~~~~~~~~~
-Definition: a type is /concrete/
-            iff it consists of a tree of concrete type constructors
+Definition: a type is /concrete/ iff it is:
+            - a concrete type constructor (as defined below), or
+            - a concrete type variable (see Note [ConcreteTv] below), or
+            - an application of a concrete type to another concrete type
             See GHC.Core.Type.isConcrete
 
 Definition: a /concrete type constructor/ is defined by
@@ -182,69 +184,57 @@ Definition: a /concrete type constructor/ is defined by
 Examples of concrete types:
    Lifted, BoxedRep Lifted, TYPE (BoxedRep Lifted) are all concrete
 Examples of non-concrete types
-   F Int, TYPE (F Int), TYPE r, a Int
+   F Int, TYPE (F Int), TYPE r, a[sk]
    NB: (F Int) is not concrete because F is a type function
+
+The recursive definition of concreteness entails the following property:
+
+Concrete Congruence Property (CCP)
+  All sub-trees of a concrete type tree are concrete.
+
+The following property also holds due to the invariant that the kind of a
+concrete metavariable is itself concrete (see Note [ConcreteTv]):
+
+Concrete Kinds Property (CKP)
+  The kind of a concrete type is concrete.
+
+The CCP and the CKP taken together mean that we never have to inspect
+in kinds to check concreteness.
+
+Note [ConcreteTv]
+~~~~~~~~~~~~~~~~~
+A concrete metavariable is a metavariable whose 'MetaInfo' is 'ConcreteTv'.
+Similar to 'TyVarTv's which are type variables which can only be unified with
+other type variables, a 'ConcreteTv' type variable is a type variable which can
+only be unified with a concrete type (in the sense of Note [Concrete types]).
+
+INVARIANT: the kind of a concrete metavariable is concrete.
+
+This invariant is upheld at the time of creation of a new concrete metavariable.
+
+Concrete metavariables are useful for representation-polymorphism checks:
+they allow us to refer to a type whose representation is not yet known but will
+be figured out by the typechecker (see Note [The Concrete mechanism]).
 
 Note [The Concrete mechanism]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-As explained in (2) in Note [Representation polymorphism checking],
-to check (ty :: ki) has a fixed runtime representation,
-we emit a `Concrete# ki` constraint, where
+To check (ty :: ki) has a fixed runtime representation, we proceed as follows:
 
-  Concrete# :: forall k. k -> TupleRep '[]
+  - Create a new concrete metavariable `concrete_tv`, i.e. a metavariable
+    with 'ConcreteTv' 'MetaInfo' (see Note [ConcreteTv]).
 
-Such constraints get solved by decomposition, as per
-  Note [Canonical Concrete# constraints] in GHC.Tc.Solver.Canonical.
-When unsolved Wanted `Concrete#` constraints remain after typechecking,
-we report them as representation-polymorphism errors, using `GHC.Tc.Types.Origin.FRROrigin`
-to inform the user of the context in which a fixed-runtime-rep check arose.
+  - Emit an equality constraint:
 
---------------
--- EVIDENCE --
---------------
+      ki ~# concrete_tv
 
-The evidence for a 'Concrete# ty' constraint is a nominal coercion
+    The origin for such an equality constraint uses
+    `GHC.Tc.Types.Origin.FRROrigin`, so that we can report the appropriate
+    representation-polymorphism error if any such constraint goes unsolved.
 
-  co :: ty ~# concrete_ty
-
-where 'concrete_ty' consists only of (non-synonym) type constructors and applications
-(after expanding any vanilla type synonyms).
-
-  OK:
-
-    TYPE FloatRep
-    TYPE (BoxedRep Lifted)
-    Type
-    TYPE (TupleRep '[ FloatRep, SumRep '[ IntRep, IntRep ] ])
-
-  Not OK:
-
-    Type variables:
-
-      ty
-      TYPE r
-      TYPE (BoxedRep l)
-
-    Type family applications:
-
-      TYPE (Id FloatRep)
-
-This is so that we can compute the 'PrimRep's needed to represent the type
-using 'runtimeRepPrimRep', which expects to be able to read off the 'RuntimeRep',
-as per Note [Getting from RuntimeRep to PrimRep] in GHC.Types.RepType.
-
-Note that the evidence for a `Concrete#` constraint isn't a typeclass dictionary:
-like with `(~#)`, the evidence is an (unlifted) nominal coercion, which justifies defining
-
-  Concrete# :: forall k. k -> TYPE (TupleRep '[])
-
-We still need a constraint that users can write in their own programs,
-so much like `(~#)` and `(~)` we also define:
-
-  Concrete :: forall k. k -> Constraint
-
-The need for user-facing 'Concrete' constraints is detailed in
-  Note [Concrete and Concrete#] in GHC.Builtin.Types.
+To solve `ki ~# concrete_ki`, we must unify `concrete_tv := concrete_ki`,
+where `concrete_ki` is some concrete type. We can then compute `kindPrimRep`
+on `concrete_ki` to compute the representation: this means `ty` indeed
+has a fixed runtime representation.
 
 -------------------------
 -- PHASE 1 and PHASE 2 --
@@ -252,15 +242,20 @@ The need for user-facing 'Concrete' constraints is detailed in
 
 The Concrete mechanism is being implemented in two separate phases.
 
-In PHASE 1 (currently implemented), we never allow a 'Concrete#' constraint
-to be rewritten (see e.g. GHC.Tc.Solver.Canonical.canConcretePrim).
-The only allowable evidence term is Refl, which forbids any program
-that requires type family evaluation in order to determine that a 'RuntimeRep' is fixed.
-N.B.: we do not currently check that this invariant is upheld: as we are discarding the
-evidence in PHASE 1, we no longer have access to the coercion after constraint solving
-(which is the point at which we would want to check that the filled in evidence is Refl).
+In PHASE 1 (currently implemented), we enforce that we only solve the emitted
+constraints `co :: ki ~# concrete_tv` with `Refl`. This forbids any program
+which requires type family evaluation in order to determine that a 'RuntimeRep'
+is fixed. We do this using the `IsRefl#` special predicate (see Note [IsRefl#]);
+we only solve `IsRefl# a b` if `a` and `b` are equal (after zonking, but not rewriting).
+This means that it is safe to not use the coercion `co` anywhere in the program.
+PHASE 1 corresponds to calls to `hasFixedRuntimeRep_MustBeRefl` in the code: on top
+of emitting a constraint of the form `ki ~# concrete_tv`, we also emit
+`IsRefl# ki concrete_tv` to ensure we only solve the equality constraint using
+reflexivity.
 
-In PHASE 2 (future work), we lift this restriction. To illustrate what this entails,
+In PHASE 2, we lift this restriction. This means we replace a call to
+`hasFixedRuntimeRep_MustBeRefl` with a call to `hasFixedRuntimeRep`, and insert the
+obtained coercion in the typechecked result. To illustrate what this entails,
 recall that the code generator needs to be able to compute 'PrimRep's, so that it
 can put function arguments in the correct registers, etc.
 As a result, we must insert additional casts in Core to ensure that no type family
@@ -275,7 +270,7 @@ explicitly visible:
 
   f = /\ ( a :: F Int ). \ ( x :: ( a |> kco ) ). some_expression
 
-where 'kco' is the evidence for `Concrete# (F Int)`, for example if `F Int = TYPE Int#`
+where 'kco' is the appropriate coercion; for example if `F Int = TYPE Int#`
 this would be:
 
   kco :: F Int ~# TYPE Int#
@@ -289,12 +284,9 @@ Note [Fixed RuntimeRep]
 ~~~~~~~~~~~~~~~~~~~~~~~
 Definition:
   a type `ty :: ki` has a /fixed RuntimeRep/
-  iff we can solve `Concrete# ki`
-
-In PHASE 1 (see Note [The Concrete mechanism]), this is equivalent to:
-
-  a type `ty :: ki` has a /fixed RuntimeRep/
-  iff `ki` is a concrete type (in the sense of Note [Concrete types]).
+    <=>
+  there exists a concrete type `concrete_ty` (in the sense of Note [Concrete types])
+  such that we can solve `ki ~# concrete_ty`.
 
 This definition is crafted to be useful to satisfy the invariants of
 Core; see Note [Representation polymorphism invariants] in GHC.Core.
@@ -312,10 +304,11 @@ Kinds are Calling Conventions [ICFP'20], but this suffices for now.
 Note [hasFixedRuntimeRep]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 The 'hasFixedRuntimeRep' function is responsible for taking a type 'ty'
-and emitting a 'Concrete#' constraint to ensure that 'ty' has a fixed `RuntimeRep`,
+and emitting a constraint to ensure that 'ty' has a fixed `RuntimeRep`,
 as outlined in Note [The Concrete mechanism].
 
-To do so, we compute the kind 'ki' of 'ty' and emit a 'Concrete# ki' constraint,
+To do so, we compute the kind 'ki' of 'ty', create a new concrete metavariable
+`concrete_tv` of kind `ki`, and emit a constraint `ki ~# concrete_tv`,
 which will only be solved if we can prove that 'ty' indeed has a fixed RuntimeRep.
 
   [Wrinkle: Typed Template Haskell]
@@ -350,136 +343,134 @@ which will only be solved if we can prove that 'ty' indeed has a fixed RuntimeRe
 
     Test case: rep-poly/T18170a.
 
-Note [Solving Concrete# constraints]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The representation polymorphism checks emit 'Concrete# ty' constraints,
-as explained in Note [hasFixedRuntimeRep] in GHC.Tc.Utils.Concrete.
+Note [IsRefl#]
+~~~~~~~~~~~~~~
+`IsRefl# :: forall k. k -> k -> TYPE (TupleRep '[])` is a constraint with no
+evidence. `IsRefl# a b' can be solved precisely when `a` and `b` are equal (up to zonking,
+but __without__ any rewriting).
 
-The main mechanism through which a `Concrete# ty` constraint is solved
-is to directly inspect 'ty' to check that it is a concrete type
-such as 'TYPE IntRep' or `TYPE (TupleRep '[ TupleRep '[], FloatRep ])`,
-and not, e.g., a skolem type variable.
+That is, if we have a type family `F` with `F Int` reducing to `Int`, we __cannot__ solve
+`IsRefl# (F Int) Int`.
 
-There are, however, some interactions to take into account:
+What is the point of such a constraint? As outlined in Note [The Concrete mechanism],
+to check `ty :: ki` has a fixed RuntimeRep we create a concrete metavariable `concrete_tv`
+and emit a Wanted equality constraint
 
-  1. Decomposition.
+  {co_hole} :: ki ~# concrete_tv
 
-      The solving of `Concrete#` constraints works recursively.
-      For example, to solve a Wanted `Concrete# (TYPE r)` constraint,
-      we decompose it, emitting a new `Concrete# @RuntimeRep r` Wanted constraint,
-      and use it to solve the original `Concrete# (TYPE r)` constraint.
-      This happens in the canonicaliser -- see GHC.Tc.Solver.Canonical.canDecomposableConcretePrim.
-
-      Note that Decomposition fully solves `Concrete# ty` whenever `ty` is a
-      concrete type.   For example:
-
-          Concrete# (TYPE (BoxedRep Lifted))
-          ==> (decompose)
-          Concrete# (BoxedRep Lifted)
-          ==> (decompose)
-          Concrete# Lifted
-          ==> (decompose)
-          <nothing, since Lifted is nullary>
-
-  2. Rewriting.
-
-      In PHASE 1 (as per Note [The Concrete mechanism] in GHC.Tc.Utils.Concrete),
-      we don't have to worry about a 'Concrete#' constraint being rewritten.
-      We only need to zonk: if e.g. a metavariable, `alpha`, gets unified with `IntRep`,
-      we should be able to solve `Concrete# alpha`.
-
-      In PHASE 2, we will need to proceed as in GHC.Tc.Solver.Canonical.canClass:
-      if we have a constraint `Concrete# (F ty1)` and a coercion witnessing the reduction of
-      `F`, say `co :: F ty1 ~# ty2`, then we will solve `Concrete# (F ty1)` in terms of `Concrete# ty2`,
-      by rewriting the evidence for `Concrete# ty2` using `co` (see GHC.Tc.Solver.Canonical.rewriteEvidence).
-
-  3. Backpack
-
-      Abstract 'TyCon's in Backpack signature files are always considered to be concrete.
-      This is because of the strong restrictions around how abstract types are allowed
-      to be implemented, as laid out in Note [Synonyms implement abstract data] in GHC.Tc.Module.
-      In particular, no variables or type family applications are allowed.
-
-      Examples: backpack/should_run/T13955.bkp, rep-poly/RepPolyBackpack2.
+Then, when we fill in the coercion hole with a coercion `co`, we must make use of it
+(as that Note explains). If we don't, then we can only safely discard it if it is
+reflexive. Therefore, whenever we perform a representation polymorphism check but also
+discard the resulting coercion, we also emit a special constraint `IsRefl# ki concrete_tv`.
+See 'hasFixedRuntimeRep_MustBeRefl', which calls 'hasFixedRuntimeRep', and thenemits
+an 'IsRefl#' constraint to ensure that discarding the coercion is safe.
 -}
 
--- | Evidence for a `Concrete#` constraint:
--- essentially a 'ConcreteHole' (a coercion hole) that will be filled later,
--- except:
+-- | Like 'hasFixedRuntimeRep', but we insist that the obtained coercion must be 'Refl'.
 --
---   - we might already have the evidence now; no point in creating a coercion hole
---     in that case;
---   - we sometimes skip the check entirely, e.g. in Typed Template Haskell
---     (see [Wrinkle: Typed Template Haskell] in Note [hasFixedRuntimeRep]).
-data ConcreteEvidence
-  = ConcreteReflEvidence
-    -- ^ We have evidence right now: don't bother creating a 'ConcreteHole'.
-  | ConcreteTypedTHNoEvidence
-    -- ^ We don't emit 'Concrete#' constraints in Typed Template Haskell.
-    -- See [Wrinkle: Typed Template Haskell] in Note [hasFixedRuntimeRep].
-  | ConcreteHoleEvidence ConcreteHole
-    -- ^ The general form of evidence: a 'ConcreteHole' that should be
-    -- filled in later by the constraint solver, as per
-    -- Note [Solving Concrete# constraints].
+-- This is useful if we are not actually going to use the coercion returned
+-- from 'hasFixedRuntimeRep'; it would generally be unsound to allow a non-reflexive
+-- coercion but not actually make use of it in a cast. See Note [IsRefl#].
+--
+-- The goal is to eliminate all uses of this function and replace them with
+-- 'hasFixedRuntimeRep', making use of the returned coercion.
+hasFixedRuntimeRep_MustBeRefl :: FRROrigin -> TcType -> TcM ()
+hasFixedRuntimeRep_MustBeRefl frr_orig ty
+  = do { -- STEP 1: check that the type has a fixed 'RuntimeRep'.
+         mb_co <- hasFixedRuntimeRep frr_orig ty
+         -- STEP 2: ensure that we only solve using a reflexive coercion.
+       ; case mb_co of
+           -- If the coercion is immediately reflexive: we're OK.
+       { Nothing -> return ()
+           -- Otherwise: emit an @IsRefl#@ constraint.
+           -- This means we are free to discard the coercion.
+       ; Just (ki, _co, concrete_kv) ->
+    do { isRefl_ctev <- newWanted (FixedRuntimeRepOrigin ty frr_orig)
+                                  (Just KindLevel) $
+                          mkIsReflPrimPred ki (mkTyVarTy concrete_kv)
+       ; emitSimple $ mkNonCanonical isRefl_ctev } } }
 
--- | Check that the kind of the provided type is of the form
--- @TYPE rep@ for a __fixed__ 'RuntimeRep' @rep@.
+-- | Given a type @ty :: ki@, this function ensures that @ty@
+-- has a __fixed__ 'RuntimeRep', by emitting a new equality constraint
+-- @ki ~ concrete_tv@ for a concrete metavariable @concrete_tv@.
 --
--- If this isn't immediately obvious, for instance if the 'RuntimeRep'
--- is hidden under a type-family application such as
---
--- > ty :: TYPE (F x)
---
--- this function will emit a new Wanted 'Concrete#' constraint.
-hasFixedRuntimeRep :: FRROrigin -> Type -> TcM ConcreteEvidence
-hasFixedRuntimeRep frrOrig ty
-
-  -- Shortcut: check for 'Type' and 'UnliftedType' type synonyms.
-  | TyConApp tc [] <- ki
-  , tc == liftedTypeKindTyCon || tc == unliftedTypeKindTyCon
-  = return ConcreteReflEvidence
-
-  | otherwise
+-- Returns a coercion @co :: ki ~# concrete_tv@ as evidence.
+-- If @ty@ obviously has a fixed 'RuntimeRep', e.g @ki = IntRep@,
+-- then this function immediately returns 'Nothing'
+-- instead of emitting a new constraint.
+hasFixedRuntimeRep :: FRROrigin -- ^ Context to be reported to the user
+                                -- if the type ends up not having a fixed
+                                -- 'RuntimeRep' (unsolved Wanted constraint).
+                   -> TcType    -- ^ The type to check (we only look at its kind).
+                   -> TcM (Maybe (TcType, TcCoercion, TcTyVar) )
+                        -- ^ @Just ( ki, co, concrete_tv )@
+                        -- where @co :: ki ~# concrete_ty@ is evidence that
+                        -- the type @ty :: ki@ has a fixed 'RuntimeRep',
+                        -- or 'Nothing' if 'ki' responds 'True' to 'isConcrete',
+                        -- (i.e. we can take @co = Refl@).
+hasFixedRuntimeRep frr_orig ty
   = do { th_stage <- getStage
        ; if
-          -- We have evidence for 'Concrete# ty' right now:
-          -- no need to emit a constraint/create an evidence hole.
-          | isConcrete ki
-          -> return ConcreteReflEvidence
+          -- Shortcut: check for 'Type' and 'UnliftedType' type synonyms.
+          | TyConApp tc [] <- ki
+          , tc == liftedTypeKindTyCon || tc == unliftedTypeKindTyCon
+          -> return Nothing
 
           -- See [Wrinkle: Typed Template Haskell] in Note [hasFixedRuntimeRep].
           | Brack _ (TcPending {}) <- th_stage
-          -> return ConcreteTypedTHNoEvidence
+          -> return Nothing
 
-          -- Create a new Wanted 'Concrete#' constraint and emit it.
           | otherwise
-          -> do { loc <- getCtLocM (FixedRuntimeRepOrigin ty frrOrig) (Just KindLevel)
-                ; (hole, _, ct_ev) <- newConcretePrimWanted loc ki
-                ; emitSimple $ mkNonCanonical ct_ev
-                ; return $ ConcreteHoleEvidence hole } }
+          -- Ensure that the kind 'ki' of 'ty' is concrete.
+          -> emitNewConcreteWantedEq_maybe orig ki
+              -- NB: the kind of 'ki' is 'Data.Kind.Type', which is concrete.
+              -- This means that the invariant required to call
+              -- 'newConcreteTyVar' is satisfied.
+       }
   where
-    ki :: Kind
+    ki :: TcKind
     ki = typeKind ty
+    orig :: CtOrigin
+    orig = FixedRuntimeRepOrigin ty frr_orig
 
--- | Create a new 'Concrete#' constraint.
--- Returns the evidence, a metavariable which will be filled in with a
--- guaranteed-concrete type, and a Wanted CtEvidence
-newConcretePrimWanted :: CtLoc -> Type -> TcM (ConcreteHole, TcType, CtEvidence)
-newConcretePrimWanted loc ty
-  = do { let
-           ki :: Kind
-           ki = typeKind ty
-       ; (hole, concrete_ty) <- newConcreteHole ki ty
-       ; let
-           wantedCtEv :: CtEvidence
-           wantedCtEv =
-             CtWanted
-               { ctev_dest = HoleDest hole
-               , ctev_pred = mkTyConApp concretePrimTyCon [ki, ty]
-               , ctev_rewriters = emptyRewriterSet
-               , ctev_loc  = loc
-               }
-        ; return (hole, concrete_ty, wantedCtEv) }
+-- | Create a new metavariable, of the given kind, which can only be unified
+-- with a concrete type.
+--
+-- Invariant: the kind must be concrete, as per Note [ConcreteTv].
+-- This is checked with an assertion.
+newConcreteTyVar :: HasDebugCallStack => TcKind -> TcM TcTyVar
+newConcreteTyVar kind =
+  assertPpr (isConcrete kind)
+    (text "newConcreteTyVar: non-concrete kind" <+> ppr kind)
+  $ newAnonMetaTyVar ConcreteTv kind
+
+-- | Create a new concrete metavariable @concrete_tv@ and emit a new non-canonical Wanted
+-- equality constraint @ty ~# concrete_tv@ with the given 'CtOrigin'.
+--
+-- Short-cut: if the type responds 'True' to 'isConcrete', then
+-- we already know it is concrete, so don't emit any new constraints,
+-- and return 'Nothing'.
+--
+-- Invariant: the kind of the supplied type must be concrete.
+--
+-- We also assume the provided type is already at the kind-level.
+--(This only matters for error messages.)
+emitNewConcreteWantedEq_maybe :: CtOrigin -> TcType -> TcM (Maybe (TcType, TcCoercion, TcTyVar))
+emitNewConcreteWantedEq_maybe orig ty
+  -- The input type is already concrete: no need to do anything.
+  -- Return 'Nothing', indicating that reflexivity is valid evidence.
+  | isConcrete ty
+  = return Nothing
+  -- Otherwise: create a new concrete metavariable and emit a new Wanted equality constraint.
+  | otherwise
+  = do { concrete_tv <- newConcreteTyVar ki
+       ; co <- emitWantedEq orig KindLevel Nominal ty (mkTyVarTy concrete_tv)
+                        --       ^^^^^^^^^ we assume 'ty' is at the kind level.
+                        -- (For representation polymorphism checks, we are always checking a kind.)
+       ; return $ Just (ty, co, concrete_tv) }
+  where
+    ki :: TcKind
+    ki = typeKind ty
 
 {-***********************************************************************
 *                                                                       *
@@ -489,9 +480,9 @@ newConcretePrimWanted loc ty
 
 -- | Smart constructor to create a 'WpFun' 'HsWrapper'.
 --
--- Might emit a 'Concrete#' constraint, to check for
--- representation polymorphism. This is necessary, as 'WpFun' will desugar to
--- a lambda abstraction, whose binder must have a fixed runtime representation.
+-- Might emit new Wanted constraints to check for representation polymorphism.
+-- This is necessary, as 'WpFun' will desugar to a lambda abstraction,
+-- whose binder must have a fixed runtime representation.
 mkWpFun :: HsWrapper -> HsWrapper
         -> Scaled TcType -- ^ the "from" type of the first wrapper
         -> TcType        -- ^ either type of the second wrapper (used only when the
@@ -503,5 +494,8 @@ mkWpFun WpHole       (WpCast co2) (Scaled w t1) _  _ = return $ WpCast (mkTcFunC
 mkWpFun (WpCast co1) WpHole       (Scaled w _)  t2 _ = return $ WpCast (mkTcFunCo Representational (multToCo w) (mkTcSymCo co1) (mkTcRepReflCo t2))
 mkWpFun (WpCast co1) (WpCast co2) (Scaled w _)  _  _ = return $ WpCast (mkTcFunCo Representational (multToCo w) (mkTcSymCo co1) co2)
 mkWpFun co1          co2          t1            _  wpFunOrig
-  = do { _concrete_ev <- hasFixedRuntimeRep (FRRWpFun wpFunOrig) (scaledThing t1)
+  = do { hasFixedRuntimeRep_MustBeRefl (FRRWpFun wpFunOrig) (scaledThing t1)
        ; return $ WpFun co1 co2 t1 }
+
+  -- NB: feel free to move this function elsewhere if you find a better place
+  -- for it (which doesn't create any cyclic imports).

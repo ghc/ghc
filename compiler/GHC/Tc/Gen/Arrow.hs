@@ -22,7 +22,7 @@ import GHC.Hs.Syn.Type
 import GHC.Tc.Errors.Types
 import GHC.Tc.Gen.Match
 import GHC.Tc.Gen.Head( tcCheckId )
-import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep )
+import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep_MustBeRefl )
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Gen.Bind
@@ -146,7 +146,7 @@ tcCmd  :: CmdEnv -> LHsCmd GhcRn -> CmdType -> TcM (LHsCmd GhcTc)
 tcCmd env (L loc cmd) cmd_ty@(_, res_ty)
   = setSrcSpan (locA loc) $ do
         { cmd' <- tc_cmd env cmd cmd_ty
-        ; _concrete_ev <- hasFixedRuntimeRep (FRRArrow $ ArrowCmdResTy cmd) res_ty
+        ; hasFixedRuntimeRep_MustBeRefl (FRRArrow $ ArrowCmdResTy cmd) res_ty
         ; return (L loc cmd') }
 
 tc_cmd :: CmdEnv -> HsCmd GhcRn  -> CmdType -> TcM (HsCmd GhcTc)
@@ -223,9 +223,9 @@ tc_cmd env cmd@(HsCmdArrApp _ fun arg ho_app lr) (_, res_ty)
 
         ; arg' <- tcCheckMonoExpr arg arg_ty
 
-        ; _concrete_ev <- hasFixedRuntimeRep
-                        (FRRArrow $ ArrowCmdArrApp (unLoc fun) (unLoc arg) ho_app)
-                        fun_ty
+        ; hasFixedRuntimeRep_MustBeRefl
+            (FRRArrow $ ArrowCmdArrApp (unLoc fun) (unLoc arg) ho_app)
+            fun_ty
 
         ; return (HsCmdArrApp fun_ty fun' arg' ho_app lr) }
   where
@@ -251,9 +251,9 @@ tc_cmd env cmd@(HsCmdApp x fun arg) (cmd_stk, res_ty)
     do  { arg_ty <- newOpenFlexiTyVarTy
         ; fun'   <- tcCmd env fun (mkPairTy arg_ty cmd_stk, res_ty)
         ; arg'   <- tcCheckMonoExpr arg arg_ty
-        ; _concrete_ev <- hasFixedRuntimeRep
-                        (FRRArrow $ ArrowCmdApp (unLoc fun) (unLoc arg))
-                        arg_ty
+        ; hasFixedRuntimeRep_MustBeRefl
+            (FRRArrow $ ArrowCmdApp (unLoc fun) (unLoc arg))
+            arg_ty
         ; return (HsCmdApp x fun' arg') }
 
 -------------------------------------------
@@ -283,12 +283,11 @@ tc_cmd env
                                          , m_grhss = grhss' })
               arg_tys = map (unrestricted . hsLPatType) pats'
 
-        ; _concrete_evs <-
-              zipWithM
-                (\ (Scaled _ arg_ty) i ->
-                  hasFixedRuntimeRep (FRRArrow $ ArrowCmdLam i) arg_ty)
-                arg_tys
-                [1..]
+        ; zipWithM_
+            (\ (Scaled _ arg_ty) i ->
+              hasFixedRuntimeRep_MustBeRefl (FRRArrow $ ArrowCmdLam i) arg_ty)
+            arg_tys
+            [1..]
 
         ; let
               cmd' = HsCmdLam x (MG { mg_alts = L l [match']

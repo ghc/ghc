@@ -2,7 +2,8 @@
 T12709.hs:28:13: error:
     • The function argument
         ‘1’
-      does not have a fixed runtime representation:
+      does not have a fixed runtime representation.
+      Its type is:
         a :: TYPE rep
     • In the first argument of ‘(+)’, namely ‘1’
       In the first argument of ‘(+)’, namely ‘1 + 2’
@@ -11,7 +12,8 @@ T12709.hs:28:13: error:
 T12709.hs:28:17: error:
     • The function argument
         ‘2’
-      does not have a fixed runtime representation:
+      does not have a fixed runtime representation.
+      Its type is:
         a :: TYPE rep
     • In the second argument of ‘(+)’, namely ‘2’
       In the first argument of ‘(+)’, namely ‘1 + 2’
@@ -20,7 +22,8 @@ T12709.hs:28:17: error:
 T12709.hs:28:21: error:
     • The function argument
         ‘3’
-      does not have a fixed runtime representation:
+      does not have a fixed runtime representation.
+      Its type is:
         a :: TYPE rep
     • In the second argument of ‘(+)’, namely ‘3’
       In the first argument of ‘(+)’, namely ‘1 + 2 + 3’
@@ -29,7 +32,8 @@ T12709.hs:28:21: error:
 T12709.hs:28:25: error:
     • The function argument
         ‘4’
-      does not have a fixed runtime representation:
+      does not have a fixed runtime representation.
+      Its type is:
         a :: TYPE rep
     • In the second argument of ‘(+)’, namely ‘4’
       In the expression: 1 + 2 + 3 + 4

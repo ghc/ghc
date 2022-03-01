@@ -1,6 +1,7 @@
 
 RepPolySum.hs:11:9: error:
-    • The unboxed sum result type does not have a fixed runtime representation:
+    • The unboxed sum does not have a fixed runtime representation.
+      Its type is:
         (# Int# | a #) :: TYPE ('SumRep '[ 'IntRep, rep])
     • In the expression: (# | bar () #)
       In an equation for ‘foo’:
@@ -11,7 +12,8 @@ RepPolySum.hs:11:9: error:
                 bar _ = undefined
 
 RepPolySum.hs:20:9: error:
-    • The unboxed sum result type does not have a fixed runtime representation:
+    • The unboxed sum does not have a fixed runtime representation.
+      Its type is:
         (# Int# | a #) :: TYPE ('SumRep '[ 'IntRep, rep])
     • In the expression: (# 17# | #)
       In an equation for ‘baz’: baz _ = (# 17# | #)

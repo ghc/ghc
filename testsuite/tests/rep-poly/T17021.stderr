@@ -1,0 +1,13 @@
+
+T17021.hs:18:9: error:
+    • The function argument
+        ‘42’
+      does not have a fixed runtime representation.
+      Its type is:
+        Int :: TYPE (Id LiftedRep)
+      NB: GHC does not (yet) support rewriting in runtime representations.
+      Please comment on GHC ticket #13105 if this is causing you trouble.
+      <https://gitlab.haskell.org/ghc/ghc/-/issues/13105>
+    • In the first argument of ‘MkT’, namely ‘42’
+      In the expression: MkT 42
+      In an equation for ‘f’: f = MkT 42

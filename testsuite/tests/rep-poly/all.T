@@ -3,15 +3,12 @@ test('T11473', normal, compile_fail, [''])
 test('T11724', normal, compile_fail, [''])
 test('T12709', normal, compile_fail, [''])
 test('T12973', normal, compile_fail, [''])
-test('T13105', expect_broken(17201), compile, [''])
 test('T13233', normal, compile_fail, [''])
 test('T13929', normal, compile_fail, [''])
 test('T14561', normal, compile_fail, [''])
 test('T14561b', normal, compile_fail, [''])
 test('T14765', normal, compile_fail, [''])
-test('T17021', expect_broken(17201), compile, [''])
 test('T17360', normal, compile_fail, [''])
-test('T17536b', expect_broken(17201), compile, [''])
 test('T17817', normal, compile_fail, [''])
 test('T18170a', [extra_files(['T18170c.hs'])], multimod_compile, ['T18170a.hs', '-v0'])
 test('T18170b', [extra_files(['T18170c.hs']), expect_broken(19893)], multimod_compile_fail, ['T18170b.hs', '-v0'])
@@ -28,7 +25,6 @@ test('T20277', normal, compile_fail, [''])
 test('T20330a', normal, compile, [''])
 test('T20330b', normal, compile, [''])
 test('T20363', normal, compile, [''])
-test('T20363b', expect_broken(17201), compile, [''])
 test('T20423', normal, compile_fail, [''])
 test('T20423b', normal, compile_fail, [''])
 test('T20426', normal, compile_fail, [''])
@@ -69,7 +65,6 @@ test('RepPolyRecordUpdate', normal, compile_fail, [''])
 test('RepPolyRightSection', normal, compile_fail, [''])
 test('RepPolyRule1', normal, compile_fail, [''])
 test('RepPolyRule2', normal, compile_fail, [''])
-test('RepPolyRule3', expect_broken(17201), compile, [''])
 test('RepPolySum', normal, compile_fail, [''])
 test('RepPolyTuple', normal, compile_fail, [''])
 test('RepPolyTupleSection', normal, compile_fail, [''])
@@ -80,3 +75,17 @@ test('RepPolyWrappedVar', normal, compile_fail, [''])
 test('RepPolyWrappedVar2', normal, compile, [''])
 test('UnliftedNewtypesCoerceFail', normal, compile_fail, [''])
 test('UnliftedNewtypesLevityBinder', normal, compile_fail, [''])
+
+######################################################################
+## The following tests require rewriting in RuntimeReps,            ##
+## i.e. PHASE 2 of the FixedRuntimeRep plan.                        ##
+##                                                                  ##
+## For the moment, we check that we get the expected error message, ##
+## as we want to reject these in the typechecker instead of getting ##
+## a compiler crash.                                                ##
+test('T13105', normal, compile_fail, [''])                          ##
+test('T17021', normal, compile_fail, [''])                          ##
+test('T17536b', normal, compile_fail, [''])                         ##
+test('T20363b', normal, compile_fail, [''])                         ##
+test('RepPolyRule3', normal, compile_fail, [''])                    ##
+######################################################################

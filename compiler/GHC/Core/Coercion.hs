@@ -20,7 +20,8 @@ module GHC.Core.Coercion (
         Role(..), ltRole,
 
         -- ** Functions over coercions
-        coVarTypes, coVarKind, coVarKindsTypesRole, coVarRole,
+        coVarRType, coVarLType, coVarTypes,
+        coVarKind, coVarKindsTypesRole, coVarRole,
         coercionType, mkCoercionType,
         coercionKind, coercionLKind, coercionRKind,coercionKinds,
         coercionRole, coercionKindRole,

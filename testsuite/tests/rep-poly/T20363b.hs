@@ -51,4 +51,4 @@ test1c :: Int
 test1c = test1b ( MkNT (# #) )
 
 test2c :: () -> Addr#
-test2c _ = test1b ( MkNT (# nullAddr#, (# #) #) )
+test2c _ = test2b ( MkNT (# nullAddr#, (# #) #) )

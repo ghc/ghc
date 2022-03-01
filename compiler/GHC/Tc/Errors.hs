@@ -82,7 +82,6 @@ import qualified GHC.Data.Strict as Strict
 
 import Control.Monad    ( unless, when, foldM, forM_ )
 import Data.Foldable    ( toList )
-import Data.Functor     ( (<&>) )
 import Data.Function    ( on )
 import Data.List        ( partition, sort, sortBy )
 import Data.List.NonEmpty ( NonEmpty(..), (<|) )
@@ -638,11 +637,23 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
 
     is_user_type_error item _ = isUserTypeError (errorItemPred item)
 
-    is_homo_equality _ (EqPred _ ty1 ty2) = tcTypeKind ty1 `tcEqType` tcTypeKind ty2
-    is_homo_equality _ _                  = False
+    is_homo_equality item (EqPred _ ty1 ty2)
+      | FixedRuntimeRepOrigin {} <- errorItemOrigin item
+      -- Constraints with FixedRuntimeRep origin must be reported using mkFRRErr.
+      = False
+      | otherwise
+      = tcTypeKind ty1 `tcEqType` tcTypeKind ty2
+    is_homo_equality _ _
+      = False
 
-    is_equality _ (EqPred {}) = True
-    is_equality _ _           = False
+    is_equality item (EqPred {})
+      | FixedRuntimeRepOrigin {} <- errorItemOrigin item
+      -- Constraints with FixedRuntimeRep origin must be reported using mkFRRErr.
+      = False
+      | otherwise
+      = True
+    is_equality _ _
+      = False
 
     is_dict _ (ClassPred {}) = True
     is_dict _ _              = False
@@ -650,7 +661,7 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
     is_ip _ (ClassPred cls _) = isIPClass cls
     is_ip _ _                 = False
 
-    is_FRR item (SpecialPred ConcretePrimPred _)
+    is_FRR item _
       | FixedRuntimeRepOrigin {} <- errorItemOrigin item
       = True
     is_FRR _ _
@@ -1040,7 +1051,9 @@ addDeferredBinding ctxt err (EI { ei_evdest = Just dest, ei_pred = item_ty
              -> do { -- See Note [Deferred errors for coercion holes]
                      let co_var = coHoleCoVar hole
                    ; addTcEvBind ev_binds_var $ mkWantedEvBind co_var err_tm
-                   ; fillCoercionHole hole (mkTcCoVarCo co_var) }}
+                   ; fillCoercionHole hole (mkTcCoVarCo co_var) }
+           NoDest
+             -> return () }
 addDeferredBinding _ _ _ = return ()    -- Do not set any evidence for Given
 
 mkErrorTerm :: SolverReportErrCtxt -> CtLoc -> Type  -- of the error term
@@ -1426,32 +1439,39 @@ mkIPErr ctxt items
 
 ----------------
 
--- | Create a user-facing error message for unsolved @'Concrete#' ki@
--- Wanted constraints arising from representation-polymorphism checks.
+-- | Report a representation-polymorphism error to the user: `ty` should have
+-- a fixed runtime representation, but doesn't.
 --
 -- See Note [Reporting representation-polymorphism errors] in GHC.Tc.Types.Origin.
 mkFRRErr :: SolverReportErrCtxt -> [ErrorItem] -> TcM SolverReport
 mkFRRErr ctxt items
-  = do { -- Zonking/tidying.
-       ; origs <-
-           -- Zonk/tidy the 'CtOrigin's.
+  = do { -- Zonk and tidy the error items.
+       ; (_tidy_env, tidied_origins) <-
            zonkTidyOrigins (cec_tidy ctxt) (map errorItemOrigin items)
-             <&>
-           -- Then remove duplicates: only retain one 'CtOrigin' per representation-polymorphic type.
-           (nubOrdBy (nonDetCmpType `on` (snd . frr_orig_and_type)) . snd)
-        -- Obtain all the errors we want to report (constraints with FixedRuntimeRep origin),
-        -- with the corresponding types:
-        --   ty1 :: TYPE rep1, ty2 :: TYPE rep2, ...
-       ; let origs_and_tys = map frr_orig_and_type origs
-
-       ; return $ important ctxt $ FixedRuntimeRepError origs_and_tys }
+         -- Then remove duplicates: only retain one 'CtOrigin' per representation-polymorphic type.
+       ; let frr_infos =
+              nubOrdBy (nonDetCmpType `on` frrInfo_type) $
+                zipWith frr_info tidied_origins (map errorItemPred items)
+       ; return $ important ctxt $ FixedRuntimeRepError frr_infos }
   where
 
-    frr_orig_and_type :: CtOrigin -> (FRROrigin, Type)
-    frr_orig_and_type (FixedRuntimeRepOrigin ty frr_orig) = (frr_orig, ty)
-    frr_orig_and_type orig
-      = pprPanic "mkFRRErr: not a FixedRuntimeRep origin"
-          (text "origin =" <+> ppr orig)
+    frr_info :: CtOrigin -> PredType -> FixedRuntimeRepErrorInfo
+    frr_info orig pty
+      | FixedRuntimeRepOrigin ty frr_orig <- orig
+      = FixedRuntimeRepErrorInfo
+        { frrInfo_origin     = frr_orig
+        , frrInfo_type       = ty
+        , frrInfo_isReflPrim = isIsReflPrimPred (classifyPredType pty)
+            -- NB: it's useful to categorise the error messages depending on
+            -- whether they were triggered by an 'IsRefl#' constraint or not,
+            -- so that we can print an extra explanatory message to the user.
+            --
+            -- See Note [The Concrete mechanism] in GHC.Tc.Utils.Concrete.
+        }
+      | otherwise
+      = pprPanic "mkFRRErr: not a FixedRuntimeRep origin" $
+          vcat [ text "origin:" <+> ppr orig
+               , text "pty:"    <+> ppr pty ]
 
 {-
 Note [Constraints include ...]

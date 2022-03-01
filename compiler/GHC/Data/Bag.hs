@@ -146,7 +146,7 @@ catBagMaybes bs = foldr add emptyBag bs
     add Nothing rs = rs
     add (Just x) rs = x `consBag` rs
 
-partitionBag :: (a -> Bool) -> Bag a -> (Bag a {- Satisfy predictate -},
+partitionBag :: (a -> Bool) -> Bag a -> (Bag a {- Satisfy predicate -},
                                          Bag a {- Don't -})
 partitionBag _    EmptyBag = (EmptyBag, EmptyBag)
 partitionBag pred b@(UnitBag val)

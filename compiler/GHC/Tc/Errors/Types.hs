@@ -46,6 +46,7 @@ module GHC.Tc.Errors.Types (
   , SolverReportErrCtxt(..)
   , getUserGivens, discardProvCtxtGivens
   , TcSolverReportMsg(..), TcSolverReportInfo(..)
+  , FixedRuntimeRepErrorInfo(..)
   , CND_Extra(..)
   , mkTcReportWithInfo
   , FitsMbSuppressed(..)
@@ -2239,7 +2240,7 @@ data TcSolverReportMsg
    -- i.e. an unsolved `Concrete# ty` constraint.
    --
    -- See 'FRROrigin' for more information.
-  | FixedRuntimeRepError [(FRROrigin, Type)]
+  | FixedRuntimeRepError [FixedRuntimeRepErrorInfo]
 
   -- | A skolem type variable escapes its scope.
   --
@@ -2345,6 +2346,20 @@ data TcSolverReportMsg
     { unsafeOverlap_item    :: ErrorItem
     , unsafeOverlap_matches :: [ClsInst]
     , unsafeOverlapped      :: [ClsInst] }
+
+-- | Stores the information we have when performing a
+-- representation-polymorphism check.
+data FixedRuntimeRepErrorInfo
+  = FixedRuntimeRepErrorInfo
+    { frrInfo_origin     :: !FRROrigin
+        -- ^ Context for the representation-polymorphism check.
+    , frrInfo_type       :: !Type
+       -- ^ The type which we are insisting must have a fixed runtime representation.
+    , frrInfo_isReflPrim :: !Bool }
+        -- ^ Was this check due to 'IsRefl#', i.e. it's a PHASE 1 check?
+        --
+        -- See Note [The Concrete mechanism] in GHC.Tc.Utils.Concrete.
+
 
 -- | Additional information to be given in a 'CouldNotDeduce' message,
 -- which is then passed on to 'mk_supplementary_ea_msg'.

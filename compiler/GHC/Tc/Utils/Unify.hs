@@ -1479,9 +1479,9 @@ uUnfilledVar2 origin t_or_k swapped tv1 ty2
 
     defer = unSwap swapped (uType_defer t_or_k origin) ty1 ty2
 
--- | Checks (TYVAR-TV) and (COERCION-HOLE) of Note [Unification preconditions];
--- returns True if these conditions are satisfied. But see the Note for other
--- preconditions, too.
+-- | Checks (TYVAR-TV), (COERCION-HOLE) and (CONCRETE) of
+-- Note [Unification preconditions]; returns True if these conditions
+-- are satisfied. But see the Note for other preconditions, too.
 canSolveByUnification :: MetaInfo -> TcType  -- zonked
                       -> Bool
 canSolveByUnification _    xi
@@ -1490,15 +1490,18 @@ canSolveByUnification _    xi
 canSolveByUnification info xi
   = case info of
       CycleBreakerTv -> False
-      TyVarTv -> case tcGetTyVar_maybe xi of
-                   Nothing -> False
-                   Just tv -> case tcTyVarDetails tv of -- (TYVAR-TV) wrinkle
-                                 MetaTv { mtv_info = info }
-                                            -> case info of
-                                                 TyVarTv -> True
-                                                 _       -> False
-                                 SkolemTv {} -> True
-                                 RuntimeUnk  -> True
+      ConcreteTv     -> isConcrete xi -- (CONCRETE) check
+      TyVarTv ->
+        case tcGetTyVar_maybe xi of
+           Nothing -> False
+           Just tv ->
+             case tcTyVarDetails tv of -- (TYVAR-TV) wrinkle
+                SkolemTv {} -> True
+                RuntimeUnk  -> True
+                MetaTv { mtv_info = info } ->
+                  case info of
+                    TyVarTv -> True
+                    _       -> False
       _ -> True
 
 swapOverTyVars :: Bool -> TcTyVar -> TcTyVar -> Bool
@@ -1541,8 +1544,9 @@ lhsPriority tv
       MetaTv { mtv_info = info } -> case info of
                                      CycleBreakerTv -> 0
                                      TyVarTv        -> 1
-                                     TauTv          -> 2
-                                     RuntimeUnkTv   -> 3
+                                     ConcreteTv     -> 2
+                                     TauTv          -> 3
+                                     RuntimeUnkTv   -> 4
 
 {- Note [Unification preconditions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1552,7 +1556,7 @@ unify alpha := ty?
 This note only applied to /homogeneous/ equalities, in which both
 sides have the same kind.
 
-There are four reasons not to unify:
+There are five reasons not to unify:
 
 1. (SKOL-ESC) Skolem-escape
    Consider the constraint
@@ -1590,7 +1594,16 @@ There are four reasons not to unify:
 
    * CycleBreakerTv: never unified, except by restoreTyVarCycles.
 
-4. (COERCION-HOLE) Confusing coercion holes
+4. (CONCRETE) A ConcreteTv can only unify with a concrete type,
+    by definition.
+
+    That is, if we have `rr[conc] ~ F Int`, we can't unify
+    `rr` with `F Int`, so we hold off on unifying.
+    Note however that the equality might get rewritten; for instance
+    if we can rewrite `F Int` to a concrete type, say `FloatRep`,
+    then we will have `rr[conc] ~ FloatRep` and we can unify `rr ~ FloatRep`.
+
+5. (COERCION-HOLE) Confusing coercion holes
    Suppose our equality is
      (alpha :: k) ~ (Int |> {co})
    where co :: Type ~ k is an unsolved wanted. Note that this
@@ -1604,6 +1617,7 @@ There are four reasons not to unify:
 
    This is expanded as Wrinkle (2) in Note [Equalities with incompatible kinds]
    in GHC.Tc.Solver.Canonical.
+
 
 Needless to say, all there are wrinkles:
 
@@ -1678,12 +1692,16 @@ So we look for a positive reason to swap, using a three-step test:
        a TyVarTv with a TauTv, because then the TyVarTv could (transitively)
        get a non-tyvar type. So give these a low priority: 1.
 
+  - ConcreteTv: These are like TauTv, except they can only unify with
+    a concrete type. So we want to be able to write to them, but not quite
+    as much as TauTvs: 2.
+
   - TauTv: This is the common case; we want these on the left so that they
-       can be written to: 2.
+       can be written to: 3.
 
   - RuntimeUnkTv: These aren't really meta-variables used in type inference,
        but just a convenience in the implementation of the GHCi debugger.
-       Eagerly write to these: 3. See Note [RuntimeUnkTv] in
+       Eagerly write to these: 4. See Note [RuntimeUnkTv] in
        GHC.Runtime.Heap.Inspect.
 
 * Names. If the level and priority comparisons are all

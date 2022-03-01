@@ -2,7 +2,8 @@
 RepPolyDoBind.hs:26:3: error:
     • The first argument to (>>=),
       arising from the ‘do’ statement,
-      does not have a fixed runtime representation:
+      does not have a fixed runtime representation.
+      Its type is:
         ma0 :: TYPE rep
     • In a stmt of a 'do' block: a <- undefined
       In the expression:

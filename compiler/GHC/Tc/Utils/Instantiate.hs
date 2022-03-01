@@ -97,7 +97,7 @@ import GHC.Unit.External
 
 import Data.List ( mapAccumL )
 import qualified Data.List.NonEmpty as NE
-import Control.Monad( when, unless, void )
+import Control.Monad( when, unless )
 import Data.Function ( on )
 
 {-
@@ -825,7 +825,7 @@ hasFixedRuntimeRepRes std_nm user_expr ty = mapM_ do_check mb_arity
    do_check :: Arity -> TcM ()
    do_check arity =
      let res_ty = nTimes arity (snd . splitPiTy) ty
-     in void $ hasFixedRuntimeRep (FRRArrow $ ArrowFun user_expr) res_ty
+     in hasFixedRuntimeRep_MustBeRefl (FRRArrow $ ArrowFun user_expr) res_ty
    mb_arity :: Maybe Arity
    mb_arity -- arity of the arrow operation, counting type-level arguments
      | std_nm == arrAName     -- result used as an argument in, e.g., do_premap

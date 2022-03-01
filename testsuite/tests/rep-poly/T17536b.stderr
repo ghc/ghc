@@ -1,0 +1,22 @@
+
+T17536b.hs:19:7: error:
+    • The first pattern in the lambda abstraction
+      does not have a fixed runtime representation.
+      Its type is:
+        a :: TYPE r
+      NB: GHC does not (yet) support rewriting in runtime representations.
+      Please comment on GHC ticket #13105 if this is causing you trouble.
+      <https://gitlab.haskell.org/ghc/ghc/-/issues/13105>
+    • In the expression: \ _ -> 0
+      In an equation for ‘g’: g L = \ _ -> 0
+
+T17536b.hs:20:7: error:
+    • The first pattern in the lambda abstraction
+      does not have a fixed runtime representation.
+      Its type is:
+        a :: TYPE r
+      NB: GHC does not (yet) support rewriting in runtime representations.
+      Please comment on GHC ticket #13105 if this is causing you trouble.
+      <https://gitlab.haskell.org/ghc/ghc/-/issues/13105>
+    • In the expression: \ _ -> 3#
+      In an equation for ‘g’: g U = \ _ -> 3#

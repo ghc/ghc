@@ -1,6 +1,8 @@
 
 RepPolyTupleSection.hs:11:7: error:
-    • The tuple section does not have a fixed runtime representation in the second position:
+    • The second component of the tuple section
+      does not have a fixed runtime representation.
+      Its type is:
         a :: TYPE r
     • In the expression: (# 3#, #)
       In an equation for ‘foo’: foo = (# 3#, #)

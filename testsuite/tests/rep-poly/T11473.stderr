@@ -1,13 +1,15 @@
 
 T11473.hs:19:1: error:
-    The type of the first pattern in the equation for ‘hello’
-    does not have a fixed runtime representation:
+    The first pattern in the equation for ‘hello’
+    does not have a fixed runtime representation.
+    Its type is:
       a :: TYPE r
 
 T11473.hs:19:17: error:
     • The function argument
         ‘x’
-      does not have a fixed runtime representation:
+      does not have a fixed runtime representation.
+      Its type is:
         a :: TYPE r
     • In the first argument of ‘boxed’, namely ‘x’
       In the expression: boxed x

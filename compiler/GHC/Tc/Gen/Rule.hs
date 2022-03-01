@@ -397,24 +397,21 @@ simplifyRule :: RuleName
 -- NB: This consumes all simple constraints on the LHS, but not
 -- any LHS implication constraints.
 simplifyRule name tc_lvl lhs_wanted rhs_wanted
-  = do { setTcLevel tc_lvl $
-         do {  -- Note [The SimplifyRule Plan] step 1
-               -- First solve the LHS and *then* solve the RHS
-               -- Crucially, this performs unifications
-               -- Why clone?  See Note [Simplify cloned constraints]
-               -- This must be in the bumped TcLevel because cloneWC creates
-               -- metavariables for Concrete# constraints. See Note [The Concrete mechanism]
-               -- in GHC.Tc.Utils.Concrete
-            ; lhs_clone <- cloneWC lhs_wanted
-            ; rhs_clone <- cloneWC rhs_wanted
-            ; discardResult     $
-              runTcS            $
-              do {
-                 ; _ <- solveWanteds lhs_clone
-                 ; _ <- solveWanteds rhs_clone
-                       -- Why do them separately?
-                       -- See Note [Solve order for RULES]
-                 ; return () }}
+  = do {
+       -- Note [The SimplifyRule Plan] step 1
+       -- First solve the LHS and *then* solve the RHS
+       -- Crucially, this performs unifications
+       -- Why clone?  See Note [Simplify cloned constraints]
+       ; lhs_clone <- cloneWC lhs_wanted
+       ; rhs_clone <- cloneWC rhs_wanted
+       ; setTcLevel tc_lvl $
+         discardResult     $
+         runTcS            $
+         do { _ <- solveWanteds lhs_clone
+            ; _ <- solveWanteds rhs_clone
+                  -- Why do them separately?
+                  -- See Note [Solve order for RULES]
+            ; return () }
 
        -- Note [The SimplifyRule Plan] step 2
        ; lhs_wanted <- zonkWC lhs_wanted
@@ -443,6 +440,7 @@ simplifyRule name tc_lvl lhs_wanted rhs_wanted
                              do { ev_id <- newEvVar pred
                                 ; fillCoercionHole hole (mkTcCoVarCo ev_id)
                                 ; return ev_id }
+          NoDest -> pprPanic "mk_quant_ev: NoDest" (ppr ct)
     mk_quant_ev ct = pprPanic "mk_quant_ev" (ppr ct)
 
 
@@ -489,10 +487,8 @@ getRuleQuantCts wc
         | not (ok_eq t1 t2)
         -> False        -- Note [RULE quantification over equalities]
       SpecialPred {}
-        -- RULES must never quantify over special predicates, as that
-        -- would leak internal GHC implementation details to the user.
-        --
-        -- Tests (for Concrete# predicates): RepPolyRule{1,2,3}.
+        -- Rules should not quantify over special predicates, as these
+        -- are a GHC implementation detail.
         -> False
       _ -> tyCoVarsOfCt ct `disjointVarSet` skol_tvs
 

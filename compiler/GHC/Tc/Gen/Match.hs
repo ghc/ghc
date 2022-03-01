@@ -49,7 +49,7 @@ import GHC.Tc.Gen.Head( tcCheckId )
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Gen.Bind
-import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep )
+import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep_MustBeRefl )
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Evidence
@@ -227,10 +227,10 @@ tcMatches ctxt pat_tys rhs_ty (MG { mg_alts = L l matches
   = do { tcEmitBindingUsage bottomUE
        ; pat_tys <- mapM scaledExpTypeToType pat_tys
        ; rhs_ty  <- expTypeToType rhs_ty
-       ; _concrete_evs <- zipWithM
-                       (\ i (Scaled _ pat_ty) ->
-                         hasFixedRuntimeRep (FRRMatch (mc_what ctxt) i) pat_ty)
-                       [1..] pat_tys
+       ; zipWithM_
+            (\ i (Scaled _ pat_ty) ->
+                 hasFixedRuntimeRep_MustBeRefl (FRRMatch (mc_what ctxt) i) pat_ty)
+            [1..] pat_tys
        ; return (MG { mg_alts = L l []
                     , mg_ext = MatchGroupTc pat_tys rhs_ty
                     , mg_origin = origin }) }
@@ -241,10 +241,10 @@ tcMatches ctxt pat_tys rhs_ty (MG { mg_alts = L l matches
        ; tcEmitBindingUsage $ supUEs usages
        ; pat_tys  <- mapM readScaledExpType pat_tys
        ; rhs_ty   <- readExpType rhs_ty
-       ; _concrete_evs <- zipWithM
-                       (\ i (Scaled _ pat_ty) ->
-                         hasFixedRuntimeRep (FRRMatch (mc_what ctxt) i) pat_ty)
-                       [1..] pat_tys
+       ; zipWithM_
+            (\ i (Scaled _ pat_ty) ->
+                hasFixedRuntimeRep_MustBeRefl (FRRMatch (mc_what ctxt) i) pat_ty)
+            [1..] pat_tys
        ; return (MG { mg_alts   = L l matches'
                     , mg_ext    = MatchGroupTc pat_tys rhs_ty
                     , mg_origin = origin }) }
@@ -440,7 +440,7 @@ tcGuardStmt ctxt (BindStmt _ pat rhs) res_ty thing_inside
           -- two multiplicity to still be the same.
           (rhs', rhs_ty) <- tcScalingUsage Many $ tcInferRhoNC rhs
                                    -- Stmt has a context already
-        ; _concrete_ev <- hasFixedRuntimeRep FRRBindStmtGuard rhs_ty
+        ; hasFixedRuntimeRep_MustBeRefl FRRBindStmtGuard rhs_ty
         ; (pat', thing)  <- tcCheckPat_O (StmtCtxt ctxt) (lexprCtOrigin rhs)
                                          pat (unrestricted rhs_ty) $
                             thing_inside res_ty
@@ -602,7 +602,7 @@ tcMcStmt ctxt (BindStmt xbsrn pat rhs) res_ty thing_inside
                                      thing_inside (mkCheckExpType new_res_ty)
                   ; return (rhs_ty, rhs', pat_mult, pat', thing, new_res_ty) }
 
-        ; _concrete_ev <- hasFixedRuntimeRep (FRRBindStmt MonadComprehension) rhs_ty
+        ; hasFixedRuntimeRep_MustBeRefl (FRRBindStmt MonadComprehension) rhs_ty
 
         -- If (but only if) the pattern can fail, typecheck the 'fail' operator
         ; fail_op' <- fmap join . forM (xbsrn_failOp xbsrn) $ \fail ->
@@ -638,9 +638,9 @@ tcMcStmt _ (BodyStmt _ rhs then_op guard_op) res_ty thing_inside
                   ; thing <- tcScalingUsage fun_mult $ thing_inside (mkCheckExpType new_res_ty)
                   ; return (thing, rhs', rhs_ty, new_res_ty, test_ty, guard_op') }
 
-        ; _evTerm1 <- hasFixedRuntimeRep FRRBodyStmtGuard test_ty
-        ; _evTerm2 <- hasFixedRuntimeRep (FRRBodyStmt MonadComprehension 1) rhs_ty
-        ; _evTerm3 <- hasFixedRuntimeRep (FRRBodyStmt MonadComprehension 2) new_res_ty
+        ; hasFixedRuntimeRep_MustBeRefl FRRBodyStmtGuard test_ty
+        ; hasFixedRuntimeRep_MustBeRefl (FRRBodyStmt MonadComprehension 1) rhs_ty
+        ; hasFixedRuntimeRep_MustBeRefl (FRRBodyStmt MonadComprehension 2) new_res_ty
 
         ; return (BodyStmt rhs_ty rhs' then_op' guard_op', thing) }
 
@@ -876,7 +876,7 @@ tcDoStmt ctxt (BindStmt xbsrn pat rhs) res_ty thing_inside
                                       thing_inside (mkCheckExpType new_res_ty)
                    ; return (rhs_ty, rhs', pat_mult, pat', new_res_ty, thing) }
 
-        ; _concrete_ev <- hasFixedRuntimeRep (FRRBindStmt DoNotation) rhs_ty
+        ; hasFixedRuntimeRep_MustBeRefl (FRRBindStmt DoNotation) rhs_ty
 
         -- If (but only if) the pattern can fail, typecheck the 'fail' operator
         ; fail_op' <- fmap join . forM (xbsrn_failOp xbsrn) $ \fail ->
@@ -910,8 +910,8 @@ tcDoStmt _ (BodyStmt _ rhs then_op _) res_ty thing_inside
                do { rhs' <- tcScalingUsage rhs_mult $ tcCheckMonoExprNC rhs rhs_ty
                   ; thing <- tcScalingUsage fun_mult $ thing_inside (mkCheckExpType new_res_ty)
                   ; return (rhs', rhs_ty, new_res_ty, thing) }
-        ; _evTerm1 <- hasFixedRuntimeRep (FRRBodyStmt DoNotation 1) rhs_ty
-        ; _evTerm2 <- hasFixedRuntimeRep (FRRBodyStmt DoNotation 2) new_res_ty
+        ; hasFixedRuntimeRep_MustBeRefl (FRRBodyStmt DoNotation 1) rhs_ty
+        ; hasFixedRuntimeRep_MustBeRefl (FRRBodyStmt DoNotation 2) new_res_ty
         ; return (BodyStmt rhs_ty rhs' then_op' noSyntaxExpr, thing) }
 
 tcDoStmt ctxt (RecStmt { recS_stmts = L l stmts, recS_later_ids = later_names

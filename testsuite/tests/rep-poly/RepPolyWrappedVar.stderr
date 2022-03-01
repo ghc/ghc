@@ -2,7 +2,8 @@
 RepPolyWrappedVar.hs:15:10: error:
     • Unsaturated use of a representation-polymorphic primitive function.
       The first argument of ‘mkWeak#’
-      does not have a fixed runtime representation:
+      does not have a fixed runtime representation.
+      Its type is:
         a :: TYPE ('BoxedRep l)
     • In the expression: mkWeak# @a @Int @Bool
       In an equation for ‘primop’: primop = mkWeak# @a @Int @Bool

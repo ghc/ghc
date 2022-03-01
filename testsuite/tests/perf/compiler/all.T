@@ -167,7 +167,7 @@ test('T9872d',
      [''])
 test ('T8095',
       [ only_ways(['normal']),
-        collect_compiler_stats('bytes allocated',1) ],
+        collect_compiler_stats('bytes allocated',2) ],
       compile,
       ['-v0 -O'])
 test ('T13386',

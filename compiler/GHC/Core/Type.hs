@@ -279,6 +279,7 @@ import {-# SOURCE #-} GHC.Core.Coercion
    , isReflexiveCo, seqCo
    , topNormaliseNewType_maybe
    )
+import {-# SOURCE #-} GHC.Tc.Utils.TcType ( isConcreteTyVar )
 
 -- others
 import GHC.Utils.Misc
@@ -3549,11 +3550,8 @@ distinct uniques, they are treated as equal at all times except
 during type inference.
 -}
 
--- | Tests whether the given kind is a constructor tree
--- (that is, constructors at every node).
---
--- E.g.  @False@ for @TYPE k@, @TYPE (F Int)@
---       @True@ for @TYPE 'LiftedRep@
+-- | Checks that a kind of the form 'Type', 'Constraint'
+-- or @'TYPE r@ is concrete. See 'isConcrete'.
 --
 -- __Precondition:__ The type has kind @('TYPE' blah)@.
 isFixedRuntimeRepKind :: HasDebugCallStack => Kind -> Bool
@@ -3564,19 +3562,24 @@ isFixedRuntimeRepKind k
   where
     _is_type = classifiesTypeWithValues k
 
--- | Tests whether the given type is a constructor tree,
--- consisting only of concrete type constructors and applications.
+-- | Tests whether the given type is concrete, i.e. it
+-- whether it consists only of concrete type constructors,
+-- concrete type variables, and applications.
+--
+-- See Note [Concrete types] in GHC.Tc.Utils.Concrete.
 isConcrete :: Type -> Bool
 isConcrete = go
   where
     go ty | Just ty' <- coreView ty = go ty'
-    go TyVarTy{}           = False
-    go AppTy{}             = False  -- it can't be a TyConApp
+    go (TyVarTy tv)        = isConcreteTyVar tv
+    go (AppTy ty1 ty2)     = go ty1 && go ty2
     go (TyConApp tc tys)
       | isConcreteTyCon tc = all go tys
       | otherwise          = False
     go ForAllTy{}          = False
     go (FunTy _ w t1 t2)   = go w && go t1 && go t2
+      -- NB: no need to check the kinds of 't1' and 't2'.
+      -- See Note [Concrete types] in GHC.Tc.Utils.Concrete.
     go LitTy{}             = True
     go CastTy{}            = False
     go CoercionTy{}        = False

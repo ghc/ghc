@@ -1,5 +1,6 @@
 
 T17360.hs:11:1: error:
-    The type of the first pattern in the equation for ‘foo’
-    does not have a fixed runtime representation:
+    The first pattern in the equation for ‘foo’
+    does not have a fixed runtime representation.
+    Its type is:
       Id a :: TYPE r

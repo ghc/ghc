@@ -1,5 +1,6 @@
 
 RepPolyWildcardPattern.hs:6:1: error:
-    The type of the first pattern in the equation for ‘foo’
-    does not have a fixed runtime representation:
+    The first pattern in the equation for ‘foo’
+    does not have a fixed runtime representation.
+    Its type is:
       a :: TYPE rep

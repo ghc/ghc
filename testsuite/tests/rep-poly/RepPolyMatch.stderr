@@ -1,7 +1,8 @@
 
 RepPolyMatch.hs:11:9: error:
-    • The type of the first pattern in the case alternative
-      does not have a fixed runtime representation:
+    • The first pattern in the case alternative
+      does not have a fixed runtime representation.
+      Its type is:
         a :: TYPE rep
     • In the expression: \case
       In an equation for ‘match’: match = \case

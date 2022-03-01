@@ -1788,7 +1788,6 @@ checkInstTermination theta head_pred
    check foralld_tvs pred
      = case classifyPredType pred of
          EqPred {}      -> return ()  -- See #4200.
-         SpecialPred {} -> return ()
          IrredPred {}   -> check2 foralld_tvs pred (sizeType pred)
          ClassPred cls tys
            | isTerminatingClass cls
@@ -1807,6 +1806,10 @@ checkInstTermination theta head_pred
            -> check (foralld_tvs `extendVarSetList` tvs) head_pred'
               -- Termination of the quantified predicate itself is checked
               -- when the predicates are individually checked for validity
+         SpecialPred {} ->
+           pprPanic "checkInstTermination: unexpected special constraint" $
+             vcat [ text "pred:" <+> ppr pred
+                  , text "theta:" <+> ppr theta ]
 
    check2 foralld_tvs pred pred_size
      | not (null bad_tvs)     = failWithTc $ TcRnUnknownMessage $ mkPlainError noHints $

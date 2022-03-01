@@ -2,7 +2,8 @@
 T19709b.hs:11:14: error:
     • The function argument
         ‘(error @Any "e2")’
-      does not have a fixed runtime representation:
+      does not have a fixed runtime representation.
+      Its type is:
         a0 :: TYPE Any
     • In the first argument of ‘levfun’, namely ‘(error @Any "e2")’
       In the first argument of ‘seq’, namely ‘levfun (error @Any "e2")’

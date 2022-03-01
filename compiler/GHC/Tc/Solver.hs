@@ -1193,7 +1193,7 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
 --------------------
 emitResidualConstraints :: TcLevel -> EvBindsVar
                         -> [(Name, TcTauType)]
-                        -> VarSet -> [TcTyVar] -> [EvVar]
+                        -> CoVarSet -> [TcTyVar] -> [EvVar]
                         -> WantedConstraints -> TcM ()
 -- Emit the remaining constraints from the RHS.
 emitResidualConstraints rhs_tclvl ev_binds_var
@@ -1204,7 +1204,11 @@ emitResidualConstraints rhs_tclvl ev_binds_var
   | otherwise
   = do { wanted_simple <- TcM.zonkSimples (wc_simple wanteds)
        ; let (outer_simple, inner_simple) = partitionBag is_mono wanted_simple
-             is_mono ct = isWantedCt ct && ctEvId ct `elemVarSet` co_vars
+             is_mono ct
+               | Just ct_ev_id <- wantedEvId_maybe ct
+               = ct_ev_id `elemVarSet` co_vars
+               | otherwise
+               = False
              -- Reason for the partition:
              -- see Note [Emitting the residual implication in simplifyInfer]
 
@@ -1561,7 +1565,7 @@ decideQuantification
   -> [PredType]            -- Candidate theta; already zonked
   -> TcM ( [TcTyVar]       -- Quantify over these (skolems)
          , [PredType]      -- and this context (fully zonked)
-         , VarSet)
+         , CoVarSet)
 -- See Note [Deciding quantification]
 decideQuantification skol_info infer_mode rhs_tclvl name_taus psigs candidates
   = do { -- Step 1: find the mono_tvs
@@ -1810,11 +1814,9 @@ defaultTyVarsAndSimplify rhs_tclvl mono_tvs candidates
     simplify_cand [] = return []
        -- see Note [Unconditionally resimplify constraints when quantifying]
     simplify_cand candidates
-      = do { WC { wc_simple = simples } <- setTcLevel rhs_tclvl $
-             do { wanteds <- newWanteds DefaultOrigin candidates
-                   -- build wanteds at bumped level because newConcreteHole
-                   -- whips up fresh metavariables
-                ; simplifyWantedsTcM wanteds }
+      = do { clone_wanteds <- newWanteds DefaultOrigin candidates
+           ; WC { wc_simple = simples } <- setTcLevel rhs_tclvl $
+                                           simplifyWantedsTcM clone_wanteds
               -- Discard evidence; simples is fully zonked
 
            ; let new_candidates = ctsPreds simples

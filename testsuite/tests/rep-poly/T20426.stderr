@@ -1,5 +1,6 @@
 
 T20426.hs:15:1: error:
-    The type of the first pattern in the equation for ‘getInt#’
-    does not have a fixed runtime representation:
+    The first pattern in the equation for ‘getInt#’
+    does not have a fixed runtime representation.
+    Its type is:
       LPGADT l :: TYPE ('BoxedRep l)

@@ -1,6 +1,7 @@
 
 RepPolyPatBind.hs:18:5: error:
-    • The binder ‘x’ does not have a fixed runtime representation:
+    • The binder ‘x’ does not have a fixed runtime representation.
+      Its type is:
         a :: TYPE rep
     • In the expression:
         let

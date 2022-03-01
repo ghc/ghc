@@ -1,7 +1,8 @@
 
 UnliftedNewtypesLevityBinder.hs:16:7: error:
     • The newtype constructor argument
-      does not have a fixed runtime representation:
+      does not have a fixed runtime representation.
+      Its type is:
         a :: TYPE r
     • In the expression: IdentC
       In an equation for ‘bad’: bad = IdentC

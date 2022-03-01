@@ -429,7 +429,9 @@ interactWithInertsStage wi
              CEqCan       {} -> interactEq      ics wi
              CIrredCan    {} -> interactIrred   ics wi
              CDictCan     {} -> interactDict    ics wi
-             CSpecialCan  {} -> continueWith wi -- cannot have Special Givens, so nothing to interact with
+             CSpecialCan { cc_special_pred = spec } ->
+               case spec of
+                 IsReflPrimPred {} -> continueWith wi -- cannot have IsRefl# Givens, so nothing to interact with
              _ -> pprPanic "interactWithInerts" (ppr wi) }
                 -- CNonCanonical have been canonicalised
 
@@ -1891,12 +1893,13 @@ topReactionsStage work_item
            CEqCan {} ->
              doTopReactEq work_item
 
-           CSpecialCan {} ->
-             -- No top-level interactions for special constraints.
-             continueWith work_item
-
            CIrredCan {} ->
              doTopReactOther work_item
+
+           CSpecialCan { cc_special_pred = spec } ->
+             case spec of
+               IsReflPrimPred {} -> continueWith work_item
+               -- No top-level interactions for IsRefl# constraints.
 
            -- Any other work item does not react with any top-level equations
            _  -> continueWith work_item }

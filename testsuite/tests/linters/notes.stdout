@@ -100,7 +100,6 @@ ref    compiler/GHC/Tc/Types.hs:1154:28:     Note [Don't promote data constructo
 ref    compiler/GHC/Tc/Types.hs:1230:36:     Note [Bindings with closed types]
 ref    compiler/GHC/Tc/Types.hs:1466:47:     Note [Care with plugin imports]
 ref    compiler/GHC/Tc/Types/Constraint.hs:238:34:     Note [NonCanonical Semantics]
-ref    compiler/GHC/Tc/Utils/Concrete.hs:246:2:     Note [Concrete and Concrete#]
 ref    compiler/GHC/Tc/Utils/Env.hs:556:7:     Note [Bindings with closed types]
 ref    compiler/GHC/Tc/Utils/Env.hs:1128:7:     Note [Generating fresh names for ccall wrapper]
 ref    compiler/GHC/Tc/Utils/Env.hs:1141:0:     Note [Generating fresh names for FFI wrappers]

@@ -2,7 +2,8 @@
 RepPolyApp.hs:11:11: error:
     • The function argument
         ‘(undefined :: a)’
-      does not have a fixed runtime representation:
+      does not have a fixed runtime representation.
+      Its type is:
         a :: TYPE rep
     • In the first argument of ‘f’, namely ‘(undefined :: a)’
       In the expression: f (undefined :: a)

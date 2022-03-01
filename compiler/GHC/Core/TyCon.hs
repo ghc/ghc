@@ -2495,8 +2495,8 @@ isConcreteTyConFlavour = \case
   SumFlavour               -> True
   DataTypeFlavour          -> True
   NewtypeFlavour           -> True
-  AbstractTypeFlavour      -> True  -- See (3) in Note [Solving Concrete# constraints] in GHC.Tc.Utils.Concrete
-  DataFamilyFlavour {}     -> False -- See
+  AbstractTypeFlavour      -> True  -- See Note [Concrete types] in GHC.Tc.Utils.Concrete
+  DataFamilyFlavour {}     -> False
   OpenTypeFamilyFlavour {} -> False
   ClosedTypeFamilyFlavour  -> False
   TypeSynonymFlavour       -> False

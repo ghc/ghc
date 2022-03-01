@@ -19,7 +19,7 @@ module GHC.Core.Predicate (
   mkHeteroPrimEqPred, mkHeteroReprPrimEqPred,
 
   -- Special predicates
-  SpecialPred(..), specialPredTyCon,
+  SpecialPred(..), mkIsReflPrimPred, isIsReflPrimPred,
 
   -- Class predicates
   mkClassPred, isDictTy,
@@ -34,12 +34,14 @@ module GHC.Core.Predicate (
 
   -- Evidence variables
   DictId, isEvVar, isDictId
+
   ) where
 
 import GHC.Prelude
 
 import GHC.Core.Type
 import GHC.Core.Class
+import GHC.Core.TyCo.Ppr ( pprParendType )
 import GHC.Core.TyCon
 import GHC.Core.TyCon.RecWalk
 import GHC.Types.Var
@@ -47,7 +49,7 @@ import GHC.Core.Coercion
 import GHC.Core.Multiplicity ( scaledThing )
 
 import GHC.Builtin.Names
-import GHC.Builtin.Types.Prim ( concretePrimTyCon )
+import GHC.Builtin.Types.Prim ( isReflPrimTyCon )
 
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
@@ -77,13 +79,8 @@ data Pred
 
   -- | A special predicate, used internally in GHC.
   --
-  -- The meaning of the type argument is dictated by the 'SpecialPred'
-  -- specified in the first agument; see the documentation of 'SpecialPred' for more info.
-  --
-  -- Example: @Concrete# rep@, used for representation-polymorphism checks
-  -- within GHC. See Note [The Concrete mechanism] in GHC.Tc.Utils.Concrete.
-  -- (This is the only example currently. More to come: see GHC ticket #20000.)
-  | SpecialPred SpecialPred Type
+  -- See #20000.
+  | SpecialPred SpecialPred
 
   -- NB: There is no TuplePred case
   --     Tuple predicates like (Eq a, Ord b) are just treated
@@ -96,9 +93,9 @@ classifyPredType ev_ty = case splitTyConApp_maybe ev_ty of
       | tc `hasKey` eqReprPrimTyConKey -> EqPred ReprEq ty1 ty2
       | tc `hasKey` eqPrimTyConKey     -> EqPred NomEq ty1 ty2
 
-    Just (tc, [_ki, ty])
-      | tc `hasKey` concretePrimTyConKey
-      -> SpecialPred ConcretePrimPred ty
+    Just (tc, [_ki, lhs, rhs])
+      | tc `hasKey` isReflPrimTyConKey
+      -> SpecialPred (IsReflPrimPred lhs rhs)
 
     Just (tc, tys)
       | Just clas <- tyConClass_maybe tc
@@ -203,25 +200,19 @@ predTypeEqRel ty
 -- (such as `KnownNat`, `Typeable`, `Coercible`, ...), as special predicates
 -- can't be expressed as typeclasses, as they hold evidence of a different kind.
 data SpecialPred
-  -- | A @Concrete#@ predicate, to check for representation polymorphism.
-  --
-  -- When the first argument to the 'SpecialPred' data constructor of 'Pred'
-  -- is 'ConcretePrimPred', the second argument is the type we are inspecting
-  -- to decide whether it is concrete. That is, it refers to the
-  -- second argument of the 'Concrete#' 'TyCon'. Recall that this 'TyCon' has kind
-  --
-  -- > forall k. k -> TupleRep '[]
-  --
-  -- See Note [The Concrete mechanism] in GHC.Tc.Utils.Concrete for further details.
-  = ConcretePrimPred
-  deriving stock Eq
+  -- | 'IsRefl#'.
+  = IsReflPrimPred Type Type
 
 instance Outputable SpecialPred where
-  ppr ConcretePrimPred = text "Concrete#"
+  ppr (IsReflPrimPred l r) =
+    text "IsRefl#" <+> pprParendType l <+> pprParendType r
 
--- | Obtain the 'TyCon' associated with a special predicate.
-specialPredTyCon :: SpecialPred -> TyCon
-specialPredTyCon ConcretePrimPred = concretePrimTyCon
+mkIsReflPrimPred :: Type -> Type -> PredType
+mkIsReflPrimPred lhs rhs = mkTyConApp isReflPrimTyCon [typeKind lhs, lhs, rhs]
+
+isIsReflPrimPred :: Pred -> Bool
+isIsReflPrimPred (SpecialPred (IsReflPrimPred {})) = True
+isIsReflPrimPred _ = False
 
 {-------------------------------------------
 Predicates on PredType

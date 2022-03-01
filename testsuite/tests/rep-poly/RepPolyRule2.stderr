@@ -2,7 +2,8 @@
 RepPolyRule2.hs:17:55: error:
     • The function argument
         ‘x’
-      does not have a fixed runtime representation:
+      does not have a fixed runtime representation.
+      Its type is:
         a :: TYPE (F rep)
     • In the first argument of ‘f’, namely ‘x’
       In the expression: f x

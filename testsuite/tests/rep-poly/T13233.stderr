@@ -1,7 +1,8 @@
 
 T13233.hs:14:11: error:
     • The data constructor argument in first position
-      does not have a fixed runtime representation:
+      does not have a fixed runtime representation.
+      Its type is:
         a :: TYPE rep
     • In the first argument of ‘bar’, namely ‘(#,#)’
       In the expression: bar (#,#)
@@ -9,10 +10,12 @@ T13233.hs:14:11: error:
 
 T13233.hs:22:16: error:
     • • The data constructor argument in first position
-        does not have a fixed runtime representation:
+        does not have a fixed runtime representation.
+        Its type is:
           a :: TYPE rep1
       • The data constructor argument in second position
-        does not have a fixed runtime representation:
+        does not have a fixed runtime representation.
+        Its type is:
           b :: TYPE rep2
     • In the first argument of ‘obscure’, namely ‘(#,#)’
       In the expression: obscure (#,#)

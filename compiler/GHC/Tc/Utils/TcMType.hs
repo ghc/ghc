@@ -197,12 +197,14 @@ newEvVar ty = do { name <- newSysName (predTypeOccName ty)
 -- | Create a new Wanted constraint with the given 'CtLoc'.
 newWantedWithLoc :: CtLoc -> PredType -> TcM CtEvidence
 newWantedWithLoc loc pty
-  = do d <- case classifyPredType pty of
-              EqPred {} -> HoleDest  <$> newCoercionHole pty
-              SpecialPred ConcretePrimPred ty ->
-                HoleDest <$> (fst <$> newConcreteHole (typeKind ty) ty)
-              _ -> EvVarDest <$> newEvVar pty
-       return $ CtWanted { ctev_dest      = d
+  = do dst <- case classifyPredType pty of
+                EqPred {}
+                  -> HoleDest <$> newCoercionHole pty
+                SpecialPred s
+                  -> case s of
+                      IsReflPrimPred {} -> return NoDest
+                _ -> EvVarDest <$> newEvVar pty
+       return $ CtWanted { ctev_dest      = dst
                          , ctev_pred      = pty
                          , ctev_loc       = loc
                          , ctev_rewriters = emptyRewriterSet }
@@ -228,9 +230,6 @@ cloneWantedCtEv :: CtEvidence -> TcM CtEvidence
 cloneWantedCtEv ctev@(CtWanted { ctev_pred = pty, ctev_dest = HoleDest _ })
   | isEqPrimPred pty
   = do { co_hole <- newCoercionHole pty
-       ; return (ctev { ctev_dest = HoleDest co_hole }) }
-  | SpecialPred ConcretePrimPred ty <- classifyPredType pty
-  = do { (co_hole, _) <- newConcreteHole (typeKind ty) ty
        ; return (ctev { ctev_dest = HoleDest co_hole }) }
   | otherwise
   = pprPanic "cloneWantedCtEv" (ppr pty)
@@ -333,9 +332,9 @@ predTypeOccName ty = case classifyPredType ty of
     EqPred {}       -> mkVarOccFS (fsLit "co")
     IrredPred {}    -> mkVarOccFS (fsLit "irred")
     ForAllPred {}   -> mkVarOccFS (fsLit "df")
-    SpecialPred special_pred _ ->
-      case special_pred of
-        ConcretePrimPred -> mkVarOccFS (fsLit "concr")
+    SpecialPred s    ->
+      case s of
+        IsReflPrimPred {} -> mkVarOccFS (fsLit "rfl")
 
 -- | Create a new 'Implication' with as many sensible defaults for its fields
 -- as possible. Note that the 'ic_tclvl', 'ic_binds', and 'ic_info' fields do
@@ -865,6 +864,7 @@ metaInfoToTyVarName  meta_info =
        TyVarTv        -> fsLit "a"
        RuntimeUnkTv   -> fsLit "r"
        CycleBreakerTv -> fsLit "b"
+       ConcreteTv     -> fsLit "c"
 
 newAnonMetaTyVar :: MetaInfo -> Kind -> TcM TcTyVar
 newAnonMetaTyVar mi = newNamedAnonMetaTyVar (metaInfoToTyVarName mi) mi
@@ -2712,9 +2712,10 @@ tidyEvVar env var = updateIdTypeAndMult (tidyType env) var
 -- If it isn't, throw a representation-polymorphism error appropriate
 -- for the context (as specified by the 'FixedRuntimeRepProvenance').
 --
--- Unlike the other representation polymorphism checks, which emit
--- 'Concrete#' constraints, this function does not emit any constraints,
--- as it has enough information to immediately make a decision.
+-- Unlike the other representation polymorphism checks, which can emit
+-- new Wanted constraints to be solved by the constraint solver, this function
+-- does not emit any constraints: it has enough information to immediately
+-- make a decision.
 --
 -- See (1) in Note [Representation polymorphism checking] in GHC.Tc.Utils.Concrete
 checkTypeHasFixedRuntimeRep :: FixedRuntimeRepProvenance -> Type -> TcM ()

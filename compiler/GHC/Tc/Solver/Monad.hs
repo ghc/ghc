@@ -168,7 +168,6 @@ import GHC.Tc.Types.Constraint
 import GHC.Tc.Utils.Unify
 import GHC.Core.Predicate
 import GHC.Types.Unique.Set (nonDetEltsUniqSet)
-import GHC.Utils.Panic.Plain
 
 import Control.Monad
 import GHC.Utils.Monad
@@ -735,7 +734,7 @@ removeInertCt is ct =
     CQuantCan {}     -> panic "removeInertCt: CQuantCan"
     CIrredCan {}     -> panic "removeInertCt: CIrredEvCan"
     CNonCanonical {} -> panic "removeInertCt: CNonCanonical"
-    CSpecialCan _ special_pred _ ->
+    CSpecialCan { cc_special_pred = special_pred } ->
       pprPanic "removeInertCt" (ppr "CSpecialCan" <+> parens (ppr special_pred))
 
 -- | Looks up a family application in the inerts.
@@ -1690,7 +1689,8 @@ setWantedEq :: HasDebugCallStack => TcEvDest -> Coercion -> TcS ()
 setWantedEq (HoleDest hole) co
   = do { useVars (coVarsOfCo co)
        ; fillCoercionHole hole co }
-setWantedEq (EvVarDest ev) _ = pprPanic "setWantedEq" (ppr ev)
+setWantedEq (EvVarDest ev) _ = pprPanic "setWantedEq: EvVarDest" (ppr ev)
+setWantedEq NoDest         _ = panic "setWantedEq: NoDest"
 
 -- | Good for both equalities and non-equalities
 setWantedEvTerm :: TcEvDest -> EvTerm -> TcS ()
@@ -1706,6 +1706,8 @@ setWantedEvTerm (HoleDest hole) tm
 
 setWantedEvTerm (EvVarDest ev_id) tm
   = setEvBind (mkWantedEvBind ev_id tm)
+setWantedEvTerm NoDest tm
+  = pprPanic "setWantedEvTerm: NoDest" (ppr tm)
 
 {- Note [Yukky eq_sel for a HoleDest]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1773,7 +1775,8 @@ emitNewWantedEq loc rewriters role ty1 ty2
        ; updWorkListTcS (extendWorkListEq (mkNonCanonical ev))
        ; return co }
 
--- | Make a new equality CtEvidence
+-- | Create a new Wanted constraint holding a coercion hole
+-- for an equality between the two types at the given 'Role'.
 newWantedEq :: CtLoc -> RewriterSet -> Role -> TcType -> TcType
             -> TcS (CtEvidence, Coercion)
 newWantedEq loc rewriters role ty1 ty2
@@ -1787,7 +1790,9 @@ newWantedEq loc rewriters role ty1 ty2
   where
     pty = mkPrimEqPredRole role ty1 ty2
 
--- no equalities here. Use newWantedEq instead
+-- | Create a new Wanted constraint holding an evidence variable.
+--
+-- Don't use this for equality constraints: use 'newWantedEq' instead.
 newWantedEvVarNC :: CtLoc -> RewriterSet
                  -> TcPredType -> TcS CtEvidence
 -- Don't look up in the solved/inerts; we know it's not there
@@ -1800,11 +1805,19 @@ newWantedEvVarNC loc rewriters pty
                           , ctev_loc       = loc
                           , ctev_rewriters = rewriters })}
 
+-- | Like 'newWantedEvVarNC', except it might look up in the inert set
+-- to see if an inert already exists, and uses that instead of creating
+-- a new Wanted constraint.
+--
+-- Don't use this for equality constraints: this function is only for
+-- constraints with 'EvVarDest'.
 newWantedEvVar :: CtLoc -> RewriterSet
                -> TcPredType -> TcS MaybeNew
 -- For anything except ClassPred, this is the same as newWantedEvVarNC
 newWantedEvVar loc rewriters pty
-  = assert (not (isHoleDestPred pty)) $
+  = assertPpr (not (isEqPrimPred pty))
+      (vcat [ text "newWantedEvVar: HoleDestPred"
+            , text "pty:" <+> ppr pty ]) $
     do { mb_ct <- lookupInInerts loc pty
        ; case mb_ct of
             Just ctev
@@ -1813,16 +1826,24 @@ newWantedEvVar loc rewriters pty
             _ -> do { ctev <- newWantedEvVarNC loc rewriters pty
                     ; return (Fresh ctev) } }
 
+-- | Create a new Wanted constraint, potentially looking up
+-- non-equality constraints in the cache instead of creating
+-- a new one from scratch.
+--
+-- Deals with both equality and non-equality constraints.
 newWanted :: CtLoc -> RewriterSet -> PredType -> TcS MaybeNew
--- Deals with both equalities and non equalities. Tries to look
--- up non-equalities in the cache
 newWanted loc rewriters pty
   | Just (role, ty1, ty2) <- getEqPredTys_maybe pty
   = Fresh . fst <$> newWantedEq loc rewriters role ty1 ty2
   | otherwise
   = newWantedEvVar loc rewriters pty
 
--- deals with both equalities and non equalities. Doesn't do any cache lookups.
+-- | Create a new Wanted constraint.
+--
+-- Deals with both equality and non-equality constraints.
+--
+-- Does not attempt to re-use non-equality constraints that already
+-- exist in the inert set.
 newWantedNC :: CtLoc -> RewriterSet -> PredType -> TcS CtEvidence
 newWantedNC loc rewriters pty
   | Just (role, ty1, ty2) <- getEqPredTys_maybe pty

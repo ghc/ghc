@@ -100,7 +100,7 @@ module GHC.Builtin.Types.Prim(
         eqPhantPrimTyCon,       -- ty1 ~P# ty2  (at role Phantom)
         equalityTyCon,
 
-        concretePrimTyCon,
+        isReflPrimTyCon,
 
         -- * SIMD
 #include "primop-vector-tys-exports.hs-incl"
@@ -165,7 +165,7 @@ unexposedPrimTyCons
   = [ eqPrimTyCon
     , eqReprPrimTyCon
     , eqPhantPrimTyCon
-    , concretePrimTyCon
+    , isReflPrimTyCon
     ]
 
 -- | Primitive 'TyCon's that are defined in, and exported from, GHC.Prim.
@@ -239,7 +239,7 @@ charPrimTyConName, intPrimTyConName, int8PrimTyConName, int16PrimTyConName, int3
   weakPrimTyConName, threadIdPrimTyConName,
   eqPrimTyConName, eqReprPrimTyConName, eqPhantPrimTyConName,
   stackSnapshotPrimTyConName,
-  concretePrimTyConName :: Name
+  isReflPrimTyConName :: Name
 charPrimTyConName             = mkPrimTc (fsLit "Char#") charPrimTyConKey charPrimTyCon
 intPrimTyConName              = mkPrimTc (fsLit "Int#") intPrimTyConKey  intPrimTyCon
 int8PrimTyConName             = mkPrimTc (fsLit "Int8#") int8PrimTyConKey int8PrimTyCon
@@ -277,7 +277,7 @@ stackSnapshotPrimTyConName    = mkPrimTc (fsLit "StackSnapshot#") stackSnapshotP
 bcoPrimTyConName              = mkPrimTc (fsLit "BCO") bcoPrimTyConKey bcoPrimTyCon
 weakPrimTyConName             = mkPrimTc (fsLit "Weak#") weakPrimTyConKey weakPrimTyCon
 threadIdPrimTyConName         = mkPrimTc (fsLit "ThreadId#") threadIdPrimTyConKey threadIdPrimTyCon
-concretePrimTyConName         = mkPrimTc (fsLit "Concrete#") concretePrimTyConKey concretePrimTyCon
+isReflPrimTyConName           = mkPrimTc (fsLit "IsRefl#") isReflPrimTyConKey isReflPrimTyCon
 
 {-
 ************************************************************************
@@ -1070,22 +1070,23 @@ equalityTyCon Phantom          = eqPhantPrimTyCon
 
 {- *********************************************************************
 *                                                                      *
-                 The Concrete mechanism
+                         IsRefl#
 *                                                                      *
 ********************************************************************* -}
 
--- See Note [The Concrete mechanism] in GHC.Tc.Utils.Concrete.
-
--- type Concrete# :: forall k. k -> TYPE (TupleRep '[])
-
-concretePrimTyCon :: TyCon
-concretePrimTyCon =
-  mkPrimTyCon concretePrimTyConName binders res_kind roles
+-- | The 'TyCon' for the 'IsRefl#' constraint.
+--
+-- @type IsRefl# :: forall k. k -> k -> TYPE (TupleRep '[])@
+--
+-- See Note [IsRefl#] in GHC.Tc.Utils.Concrete.
+isReflPrimTyCon :: TyCon
+isReflPrimTyCon =
+  mkPrimTyCon isReflPrimTyConName binders res_kind roles
     where
-      -- Kind :: forall k. k -> TYPE (TupleRep '[])
-      binders = mkTemplateTyConBinders [liftedTypeKind] (\[k] -> [k])
+      -- Kind :: forall k. k -> k-> TYPE (TupleRep '[])
+      binders = mkTemplateTyConBinders [liftedTypeKind] (\[k] -> [k, k])
       res_kind = unboxedTupleKind []
-      roles   = [Nominal, Nominal]
+      roles   = [Nominal, Nominal, Nominal]
 
 {- *********************************************************************
 *                                                                      *

@@ -21,7 +21,7 @@ module GHC.Tc.Types.Constraint (
         isUserTypeError, getUserTypeErrorMsg,
         ctEvidence, ctLoc, ctPred, ctFlavour, ctEqRel, ctOrigin,
         ctRewriters,
-        ctEvId, mkTcEqPredLikeEv,
+        ctEvId, wantedEvId_maybe, mkTcEqPredLikeEv,
         mkNonCanonical, mkNonCanonicalCt, mkGivens,
         mkIrredCt,
         ctEvPred, ctEvLoc, ctEvOrigin, ctEvEqRel,
@@ -69,7 +69,6 @@ module GHC.Tc.Types.Constraint (
         ctEvRole, setCtEvPredType, setCtEvLoc, arisesFromGivens,
         tyCoVarsOfCtEvList, tyCoVarsOfCtEv, tyCoVarsOfCtEvsList,
         ctEvUnique, tcEvDestUnique,
-        isHoleDestPred,
 
         RewriterSet(..), emptyRewriterSet, isEmptyRewriterSet,
            -- exported concretely only for anyUnfilledCoercionHoles
@@ -255,17 +254,13 @@ data Ct
       --     look like this, with the payload in an
       --     auxiliary type
 
-  -- | A special canonical constraint.
+  -- | A special canonical constraint:
+  -- a constraint that is used internally by GHC's typechecker.
   --
-  -- When the 'SpecialPred' is 'ConcretePrimPred':
-  --
-  --   - `cc_ev` is Wanted,
-  --   - `cc_xi = ty`, where `ty` cannot be decomposed any further.
-  -- See Note [Canonical Concrete# constraints] in GHC.Tc.Solver.Canonical.
+  -- See #20000.
   | CSpecialCan {
       cc_ev           :: CtEvidence,
-      cc_special_pred :: SpecialPred,
-      cc_xi           :: Xi
+      cc_special_pred :: SpecialPred
     }
 
 ------------
@@ -585,9 +580,25 @@ ctPred ct = ctEvPred (ctEvidence ct)
 ctRewriters :: Ct -> RewriterSet
 ctRewriters = ctEvRewriters . ctEvidence
 
-ctEvId :: Ct -> EvVar
+ctEvId :: HasDebugCallStack => Ct -> EvVar
 -- The evidence Id for this Ct
 ctEvId ct = ctEvEvId (ctEvidence ct)
+
+-- | Returns the evidence 'Id' for the argument 'Ct'
+-- when this 'Ct' is a 'Wanted' which can hold evidence
+-- (i.e. doesn't have 'NoDest' 'TcEvDest').
+--
+-- Returns 'Nothing' otherwise.
+wantedEvId_maybe :: Ct -> Maybe EvVar
+wantedEvId_maybe ct
+  = case ctEvidence ct of
+    ctev@(CtWanted { ctev_dest = dst })
+      | NoDest <- dst
+      -> Nothing
+      | otherwise
+      -> Just $ ctEvEvId ctev
+    CtGiven {}
+      -> Nothing
 
 -- | Makes a new equality predicate with the same role as the given
 -- evidence.
@@ -1647,9 +1658,8 @@ wrapType ty skols givens = mkSpecForAllTys skols $ mkPhiTy givens ty
 Note [CtEvidence invariants]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The `ctev_pred` field of a `CtEvidence` is a just a cache for the type
-of the evidence.  More precisely:
+of the evidence. More precisely:
 
-More precisely:
 * For Givens, `ctev_pred` = `varType ctev_evar`
 * For Wanteds, `ctev_pred` = `evDestType ctev_dest`
 
@@ -1706,8 +1716,10 @@ So a Given has EvVar inside it rather than (as previously) an EvTerm.
 -}
 
 -- | A place for type-checking evidence to go after it is generated.
--- Wanted equalities are always HoleDest; other wanteds are always
--- EvVarDest.
+--
+--  - Wanted equalities use HoleDest,
+--  - IsRefl# constraints use NoDest,
+--  - other Wanteds use EvVarDest.
 data TcEvDest
   = EvVarDest EvVar         -- ^ bind this var to the evidence
               -- EvVarDest is always used for non-type-equalities
@@ -1716,6 +1728,9 @@ data TcEvDest
   | HoleDest  CoercionHole  -- ^ fill in this hole with the evidence
               -- HoleDest is always used for type-equalities
               -- See Note [Coercion holes] in GHC.Core.TyCo.Rep
+
+  | NoDest  -- ^ we don't need to record any evidence.
+            -- This is used for 'IsRefl#' constraints.
 
 data CtEvidence
   = CtGiven    -- Truly given, not depending on subgoals
@@ -1759,7 +1774,7 @@ ctEvRewriters :: CtEvidence -> RewriterSet
 ctEvRewriters (CtWanted { ctev_rewriters = rewriters }) = rewriters
 ctEvRewriters _other                                    = emptyRewriterSet
 
-ctEvExpr :: CtEvidence -> EvExpr
+ctEvExpr :: HasDebugCallStack => CtEvidence -> EvExpr
 ctEvExpr ev@(CtWanted { ctev_dest = HoleDest _ })
             = Coercion $ ctEvCoercion ev
 ctEvExpr ev = evId (ctEvEvId ev)
@@ -1775,10 +1790,12 @@ ctEvCoercion (CtWanted { ctev_dest = dest })
 ctEvCoercion ev
   = pprPanic "ctEvCoercion" (ppr ev)
 
-ctEvEvId :: CtEvidence -> EvVar
+ctEvEvId :: HasDebugCallStack => CtEvidence -> EvVar
 ctEvEvId (CtWanted { ctev_dest = EvVarDest ev }) = ev
 ctEvEvId (CtWanted { ctev_dest = HoleDest h })   = coHoleCoVar h
 ctEvEvId (CtGiven  { ctev_evar = ev })           = ev
+ctEvEvId wt@(CtWanted { ctev_dest = NoDest })
+  = pprPanic "ctEvEvId: NoDest" (ppr wt)
 
 ctEvUnique :: CtEvidence -> Unique
 ctEvUnique (CtGiven { ctev_evar = ev })    = varUnique ev
@@ -1787,6 +1804,7 @@ ctEvUnique (CtWanted { ctev_dest = dest }) = tcEvDestUnique dest
 tcEvDestUnique :: TcEvDest -> Unique
 tcEvDestUnique (EvVarDest ev_var) = varUnique ev_var
 tcEvDestUnique (HoleDest co_hole) = varUnique (coHoleCoVar co_hole)
+tcEvDestUnique NoDest = panic "tcEvDestUnique: NoDest"
 
 setCtEvLoc :: CtEvidence -> CtLoc -> CtEvidence
 setCtEvLoc ctev loc = ctev { ctev_loc = loc }
@@ -1798,12 +1816,13 @@ arisesFromGivens ct = isGivenCt ct || isGivenLoc (ctLoc ct)
 --
 -- This function ensures that the invariants on 'CtEvidence' hold, by updating
 -- the evidence and the ctev_pred in sync with each other.
--- See Note [CtEvidence invariants]
-setCtEvPredType :: CtEvidence -> PredType -> CtEvidence
-setCtEvPredType old_ctev new_pred = case old_ctev of
+-- See Note [CtEvidence invariants].
+setCtEvPredType :: HasDebugCallStack => CtEvidence -> Type -> CtEvidence
+setCtEvPredType old_ctev new_pred
+  = case old_ctev of
     CtGiven { ctev_evar = ev, ctev_loc = loc } ->
       CtGiven { ctev_pred = new_pred
-              , ctev_evar = setVarType ev new_var_type
+              , ctev_evar = setVarType ev new_pred
               , ctev_loc  = loc
               }
     CtWanted { ctev_dest = dest, ctev_loc = loc, ctev_rewriters = rewriters } ->
@@ -1814,33 +1833,14 @@ setCtEvPredType old_ctev new_pred = case old_ctev of
                }
         where
           new_dest = case dest of
-            EvVarDest ev -> EvVarDest (setVarType ev new_var_type)
-            HoleDest h   -> HoleDest  (setCoHoleType h new_var_type)
-  where
-    new_var_type
-       -- Gotcha: Concrete# constraints have evidence of a different type
-       -- than the predicate type
-      | SpecialPred ConcretePrimPred new_concrete_ty <- classifyPredType new_pred
-      = mkHeteroPrimEqPred (typeKind new_concrete_ty) k2 new_concrete_ty t2
-
-      | otherwise
-      = new_pred
-
-      where
-         -- This is gross. But it will be short-lived, once we re-design
-         -- Concrete# constraints.
-        old_var = case old_ctev of
-          CtGiven { ctev_evar = evar }          -> evar
-          CtWanted { ctev_dest = HoleDest h }   -> coHoleCoVar h
-          CtWanted { ctev_dest = EvVarDest {} } ->
-            pprPanic "setCtEvPredType" (ppr old_ctev $$ ppr new_pred)
-
-        (_k1, k2, _t1, t2, _role) = coVarKindsTypesRole old_var
-
+            EvVarDest ev -> EvVarDest (setVarType ev new_pred)
+            HoleDest h   -> HoleDest  (setCoHoleType h new_pred)
+            NoDest       -> NoDest
 
 instance Outputable TcEvDest where
   ppr (HoleDest h)   = text "hole" <> ppr h
   ppr (EvVarDest ev) = ppr ev
+  ppr NoDest         = text "NoDest"
 
 instance Outputable CtEvidence where
   ppr ev = ppr (ctEvFlavour ev)
@@ -1863,16 +1863,6 @@ isWanted _ = False
 isGiven :: CtEvidence -> Bool
 isGiven (CtGiven {})  = True
 isGiven _ = False
-
--- | When creating a constraint for the given predicate, should
--- it get a 'HoleDest'? True for equalities and Concrete# constraints
--- only. See Note [The Concrete mechanism] in GHC.Tc.Utils.Concrete
-isHoleDestPred :: PredType -> Bool
-isHoleDestPred pty = case classifyPredType pty of
-  EqPred {}                      -> True
-  SpecialPred ConcretePrimPred _ -> True
-  _                              -> False
-
 
 {-
 ************************************************************************

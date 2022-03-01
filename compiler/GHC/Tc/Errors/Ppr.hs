@@ -1722,21 +1722,44 @@ pprTcSolverReportMsg ctxt
     maybe_num_args_msg = num_args_msg `orElse` empty
 
     count_args ty = count isVisibleBinder $ fst $ splitPiTys ty
-pprTcSolverReportMsg _ (FixedRuntimeRepError origs_and_tys) =
-  let
+pprTcSolverReportMsg _ (FixedRuntimeRepError frr_infos) =
+  vcat (map make_msg frr_infos) $$ mustBeRefl_msg
+  where
     -- Assemble the error message: pair up each origin with the corresponding type, e.g.
     --   • FixedRuntimeRep origin msg 1 ...
     --       a :: TYPE r1
     --   • FixedRuntimeRep origin msg 2 ...
     --       b :: TYPE r2
-    combine_origin_ty :: FRROrigin -> Type -> SDoc
-    combine_origin_ty frr_orig ty =
-      -- Add bullet points if there is more than one error.
-      (if length origs_and_tys > 1 then (bullet <+>) else id) $
-        vcat [pprFRROrigin frr_orig <> colon
-             ,nest 2 $ ppr ty <+> dcolon <+> pprWithTYPE (typeKind ty)]
-  in
-    vcat $ map (uncurry combine_origin_ty) origs_and_tys
+    make_msg :: FixedRuntimeRepErrorInfo -> SDoc
+    make_msg
+      (FixedRuntimeRepErrorInfo
+        { frrInfo_origin = frr_orig
+        , frrInfo_type   = ty })
+      =
+        -- Add bullet points if there is more than one error.
+        (if length frr_infos > 1 then (bullet <+>) else id) $
+          vcat [ sep [ pprFRROrigin frr_orig
+                     , text "does not have a fixed runtime representation." ]
+               , text "Its type is:"
+               , nest 2 $ ppr ty <+> dcolon <+> pprWithTYPE (typeKind ty) ]
+
+    -- In PHASE 1 of FixedRuntimeRep, we don't allow rewriting in hasFixedRuntimeRep,
+    -- so we add a special message to explain this to the user.
+    --
+    -- See Note [The Concrete mechanism] in GHC.Tc.Utils.Concrete.
+    give_mustBeRefl_msg :: Bool
+    give_mustBeRefl_msg = all frrInfo_isReflPrim frr_infos
+
+    mustBeRefl_msg :: SDoc
+    mustBeRefl_msg
+      | give_mustBeRefl_msg
+      = vcat
+         [ text "NB: GHC does not (yet) support rewriting in runtime representations."
+         , text "Please comment on GHC ticket #13105 if this is causing you trouble."
+         , text "<https://gitlab.haskell.org/ghc/ghc/-/issues/13105>" ]
+      | otherwise
+      = empty
+
 pprTcSolverReportMsg _ (SkolemEscape item implic esc_skols) =
   let
     esc_doc = sep [ text "because" <+> what <+> text "variable" <> plural esc_skols

@@ -41,6 +41,7 @@ module GHC.Tc.Utils.TcType (
   MetaDetails(Flexi, Indirect), MetaInfo(..), skolemSkolInfo,
   isImmutableTyVar, isSkolemTyVar, isMetaTyVar,  isMetaTyVarTy, isTyVarTy,
   tcIsTcTyVar, isTyVarTyVar, isOverlappableTyVar,  isTyConableTyVar,
+  isConcreteTyVar,
   isAmbiguousTyVar, isCycleBreakerTyVar, metaTyVarRef, metaTyVarInfo,
   isFlexi, isIndirect, isRuntimeUnkSkol,
   metaTyVarTcLevel, setMetaTyVarTcLevel, metaTyVarTcLevel_maybe,
@@ -566,20 +567,26 @@ data MetaDetails
   | Indirect TcType
 
 data MetaInfo
-   = TauTv         -- This MetaTv is an ordinary unification variable
+   = TauTv         -- ^ This MetaTv is an ordinary unification variable
                    -- A TauTv is always filled in with a tau-type, which
                    -- never contains any ForAlls.
 
-   | TyVarTv       -- A variant of TauTv, except that it should not be
+   | TyVarTv       -- ^ A variant of TauTv, except that it should not be
                    --   unified with a type, only with a type variable
                    -- See Note [TyVarTv] in GHC.Tc.Utils.TcMType
 
-   | RuntimeUnkTv  -- A unification variable used in the GHCi debugger.
+   | RuntimeUnkTv  -- ^ A unification variable used in the GHCi debugger.
                    -- It /is/ allowed to unify with a polytype, unlike TauTv
 
    | CycleBreakerTv  -- Used to fix occurs-check problems in Givens
                      -- See Note [Type variable cycles] in
                      -- GHC.Tc.Solver.Canonical
+
+   | ConcreteTv
+        -- ^ A unification variable that can only be unified
+        -- with a concrete type, in the sense of
+        -- Note [Concrete types] in GHC.Tc.Utils.Concrete.
+        -- See Note [ConcreteTv] in GHC.Tc.Utils.Concrete.
 
 instance Outputable MetaDetails where
   ppr Flexi         = text "Flexi"
@@ -590,6 +597,7 @@ instance Outputable MetaInfo where
   ppr TyVarTv        = text "tyv"
   ppr RuntimeUnkTv   = text "rutv"
   ppr CycleBreakerTv = text "cbv"
+  ppr ConcreteTv     = text "conc"
 
 {- *********************************************************************
 *                                                                      *
@@ -1078,6 +1086,18 @@ isCycleBreakerTyVar tv
   , MetaTv { mtv_info = CycleBreakerTv } <- tcTyVarDetails tv
   = True
 
+  | otherwise
+  = False
+
+-- | Is this type variable a concrete type variable, i.e.
+-- it is a metavariable with 'ConcreteTv' 'MetaInfo'?
+--
+-- Works with both 'TyVar' and 'TcTyVar'.
+isConcreteTyVar :: TcTyVar -> Bool
+isConcreteTyVar tv
+  | isTcTyVar tv
+  , MetaTv { mtv_info = ConcreteTv } <- tcTyVarDetails tv
+  = True
   | otherwise
   = False
 
@@ -1892,7 +1912,9 @@ isImprovementPred ty
       ClassPred cls _    -> classHasFds cls
       IrredPred {}       -> True -- Might have equalities after reduction?
       ForAllPred {}      -> False
-      SpecialPred {}     -> False
+      SpecialPred s      ->
+        case s of
+          IsReflPrimPred {} -> False
 
 {- Note [Expanding superclasses]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

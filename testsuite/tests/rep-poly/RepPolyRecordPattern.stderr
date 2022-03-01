@@ -1,10 +1,12 @@
 
 RepPolyRecordPattern.hs:7:35: error:
-    The type of the first pattern in the equation for ‘fld’
-    does not have a fixed runtime representation:
+    The first pattern in the equation for ‘fld’
+    does not have a fixed runtime representation.
+    Its type is:
       X a :: TYPE rep
 
 RepPolyRecordPattern.hs:13:1: error:
-    The type of the first pattern in the equation for ‘upd’
-    does not have a fixed runtime representation:
+    The first pattern in the equation for ‘upd’
+    does not have a fixed runtime representation.
+    Its type is:
       X a :: TYPE rep

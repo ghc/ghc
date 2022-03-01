@@ -36,7 +36,7 @@ import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Utils.Instantiate
-import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep )
+import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep_MustBeRefl )
 import GHC.Tc.Instance.Family ( tcGetFamInstEnvs, tcLookupDataFamInst_maybe )
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Utils.TcMType
@@ -587,7 +587,7 @@ hasFixedRuntimeRep_remainingValArgs applied_args app_res_rho = \case
               InvisArg ->
                 go i_visval (i_val + 1) tys
               VisArg   -> do
-                _concrete_ev <- hasFixedRuntimeRep (mk_frr_orig i_visval) arg_ty
+                hasFixedRuntimeRep_MustBeRefl (mk_frr_orig i_visval) arg_ty
                 go (i_visval + 1) (i_val + 1) tys
 
     -- A message containing all the relevant info, in case this functions
@@ -678,10 +678,10 @@ tcEValArg :: AppCtxt -> EValArg 'TcpInst -> TcSigmaType -> TcM (LHsExpr GhcTc)
 tcEValArg ctxt (ValArg larg@(L arg_loc arg)) exp_arg_sigma
   = addArgCtxt ctxt larg $
     do { arg' <- tcPolyExpr arg (mkCheckExpType exp_arg_sigma)
-       ; _concrete_ev <- hasFixedRuntimeRep (FRRApp arg) exp_arg_sigma
+       ; hasFixedRuntimeRep_MustBeRefl (FRRApp arg') exp_arg_sigma
        ; return (L arg_loc arg') }
 
-tcEValArg ctxt (ValArgQL { va_expr = larg@(L arg_loc arg)
+tcEValArg ctxt (ValArgQL { va_expr = larg@(L arg_loc _)
                          , va_fun = (inner_fun, fun_ctxt)
                          , va_args = inner_args
                          , va_ty = app_res_rho }) exp_arg_sigma
@@ -689,10 +689,10 @@ tcEValArg ctxt (ValArgQL { va_expr = larg@(L arg_loc arg)
     do { traceTc "tcEValArgQL {" (vcat [ ppr inner_fun <+> ppr inner_args ])
        ; tc_args <- tcValArgs True inner_args
        ; co      <- unifyType Nothing app_res_rho exp_arg_sigma
-       ; _concrete_ev <- hasFixedRuntimeRep (FRRApp arg) exp_arg_sigma
-       ; traceTc "tcEValArg }" empty
-       ; return (L arg_loc $ mkHsWrapCo co $
-                 rebuildHsApps inner_fun fun_ctxt tc_args) }
+       ; let arg' = mkHsWrapCo co $ rebuildHsApps inner_fun fun_ctxt tc_args
+       ; hasFixedRuntimeRep_MustBeRefl (FRRApp arg') exp_arg_sigma
+       ; traceTc "tcEValArgQL }" empty
+       ; return (L arg_loc arg') }
 
 {- *********************************************************************
 *                                                                      *

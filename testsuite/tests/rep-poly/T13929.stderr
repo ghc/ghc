@@ -1,8 +1,12 @@
 
 T13929.hs:29:24: error:
-    • • The tuple argument in first position does not have a fixed runtime representation:
+    • • The tuple argument in first position
+        does not have a fixed runtime representation.
+        Its type is:
           GUnboxed f rf :: TYPE rf
-      • The tuple argument in second position does not have a fixed runtime representation:
+      • The tuple argument in second position
+        does not have a fixed runtime representation.
+        Its type is:
           GUnboxed g rg :: TYPE rg
     • In the expression: (# gunbox x, gunbox y #)
       In an equation for ‘gunbox’:
@@ -11,7 +15,8 @@ T13929.hs:29:24: error:
         ‘GUnbox (f :*: g) ('TupleRep '[rf, rg])’
 
 T13929.hs:33:21: error:
-    • The unboxed sum result type does not have a fixed runtime representation:
+    • The unboxed sum does not have a fixed runtime representation.
+      Its type is:
         GUnboxed (f :+: g) ('SumRep '[rf, rg]) :: TYPE ('SumRep '[rf, rg])
     • In the expression: (# gunbox l | #)
       In an equation for ‘gunbox’: gunbox (L1 l) = (# gunbox l | #)
@@ -19,7 +24,8 @@ T13929.hs:33:21: error:
         ‘GUnbox (f :+: g) ('SumRep '[rf, rg])’
 
 T13929.hs:34:21: error:
-    • The unboxed sum result type does not have a fixed runtime representation:
+    • The unboxed sum does not have a fixed runtime representation.
+      Its type is:
         GUnboxed (f :+: g) ('SumRep '[rf, rg]) :: TYPE ('SumRep '[rf, rg])
     • In the expression: (# | gunbox r #)
       In an equation for ‘gunbox’: gunbox (R1 r) = (# | gunbox r #)

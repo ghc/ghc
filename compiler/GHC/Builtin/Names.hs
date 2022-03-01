@@ -1835,7 +1835,7 @@ statePrimTyConKey, stableNamePrimTyConKey, stableNameTyConKey,
     funPtrTyConKey, tVarPrimTyConKey, eqPrimTyConKey,
     eqReprPrimTyConKey, eqPhantPrimTyConKey,
     compactPrimTyConKey, stackSnapshotPrimTyConKey,
-    concretePrimTyConKey :: Unique
+    isReflPrimTyConKey :: Unique
 statePrimTyConKey                       = mkPreludeTyConUnique 50
 stableNamePrimTyConKey                  = mkPreludeTyConUnique 51
 stableNameTyConKey                      = mkPreludeTyConUnique 52
@@ -1864,7 +1864,7 @@ funPtrTyConKey                          = mkPreludeTyConUnique 78
 tVarPrimTyConKey                        = mkPreludeTyConUnique 79
 compactPrimTyConKey                     = mkPreludeTyConUnique 80
 stackSnapshotPrimTyConKey               = mkPreludeTyConUnique 81
-concretePrimTyConKey                    = mkPreludeTyConUnique 82
+isReflPrimTyConKey                      = mkPreludeTyConUnique 82
 
 eitherTyConKey :: Unique
 eitherTyConKey                          = mkPreludeTyConUnique 84

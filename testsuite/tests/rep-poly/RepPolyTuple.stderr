@@ -1,6 +1,8 @@
 
 RepPolyTuple.hs:11:9: error:
-    • The tuple argument in first position does not have a fixed runtime representation:
+    • The tuple argument in first position
+      does not have a fixed runtime representation.
+      Its type is:
         a :: TYPE r
     • In the expression: (# bar (), bar (), bar () #)
       In an equation for ‘foo’:

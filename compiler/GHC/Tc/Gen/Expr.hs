@@ -40,7 +40,7 @@ import GHC.Types.Error
 import GHC.Core.Multiplicity
 import GHC.Core.UsageEnv
 import GHC.Tc.Errors.Types
-import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep, mkWpFun )
+import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep_MustBeRefl, mkWpFun )
 import GHC.Tc.Utils.Instantiate
 import GHC.Tc.Gen.App
 import GHC.Tc.Gen.Head
@@ -353,7 +353,7 @@ tcExpr (ExplicitSum _ alt arity expr) res_ty
        -- This should cause an error, even though (17# :: Int#)
        -- is not representation-polymorphic: we don't know how
        -- wide the concrete representation of the sum type will be.
-       ; _concrete_ev <- hasFixedRuntimeRep FRRUnboxedSum res_ty
+       ; hasFixedRuntimeRep_MustBeRefl FRRUnboxedSum res_ty
        ; return $ mkHsWrapCo coi (ExplicitSum arg_tys' alt arity expr' ) }
 
 
@@ -954,11 +954,11 @@ tcTupArgs args tys
     go :: Int -> HsTupArg GhcRn -> TcType -> TcM (HsTupArg GhcTc)
     go i (Missing {})     arg_ty
       = do { mult <- newFlexiTyVarTy multiplicityTy
-           ; _concrete_ev <- hasFixedRuntimeRep (FRRTupleSection i) arg_ty
+           ; hasFixedRuntimeRep_MustBeRefl (FRRTupleSection i) arg_ty
            ; return (Missing (Scaled mult arg_ty)) }
     go i (Present x expr) arg_ty
       = do { expr' <- tcCheckPolyExpr expr arg_ty
-           ; _concrete_ev <- hasFixedRuntimeRep (FRRTupleArg i) arg_ty
+           ; hasFixedRuntimeRep_MustBeRefl (FRRTupleArg i) arg_ty
            ; return (Present x expr') }
 
 ---------------------------
@@ -1386,9 +1386,8 @@ tcRecordField con_like flds_w_tys (L loc (FieldOcc sel_name lbl)) rhs
   | Just field_ty <- assocMaybe flds_w_tys sel_name
       = addErrCtxt (fieldCtxt field_lbl) $
         do { rhs' <- tcCheckPolyExprNC rhs field_ty
-           ; _concrete_ev <-
-                hasFixedRuntimeRep (FRRRecordUpdate (unLoc lbl) (unLoc rhs))
-                  field_ty
+           ; hasFixedRuntimeRep_MustBeRefl (FRRRecordUpdate (unLoc lbl) (unLoc rhs'))
+                field_ty
            ; let field_id = mkUserLocal (nameOccName sel_name)
                                         (nameUnique sel_name)
                                         Many field_ty (locA loc)

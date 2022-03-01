@@ -1,0 +1,26 @@
+
+RepPolyRule3.hs:17:59: error:
+    • The function argument
+        ‘x’
+      does not have a fixed runtime representation.
+      Its type is:
+        a :: TYPE (F 'WordRep)
+      NB: GHC does not (yet) support rewriting in runtime representations.
+      Please comment on GHC ticket #13105 if this is causing you trouble.
+      <https://gitlab.haskell.org/ghc/ghc/-/issues/13105>
+    • In the first argument of ‘g’, namely ‘x’
+      In the expression: g x
+      When checking the rewrite rule "g_id"
+
+RepPolyRule3.hs:23:54: error:
+    • The function argument
+        ‘x’
+      does not have a fixed runtime representation.
+      Its type is:
+        a :: TYPE (F 'WordRep)
+      NB: GHC does not (yet) support rewriting in runtime representations.
+      Please comment on GHC ticket #13105 if this is causing you trouble.
+      <https://gitlab.haskell.org/ghc/ghc/-/issues/13105>
+    • In the first argument of ‘h’, namely ‘x’
+      In the expression: h x
+      When checking the rewrite rule "h_id"

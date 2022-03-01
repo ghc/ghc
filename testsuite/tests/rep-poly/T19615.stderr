@@ -2,7 +2,8 @@
 T19615.hs:17:20: error:
     • The function argument
         ‘(f x)’
-      does not have a fixed runtime representation:
+      does not have a fixed runtime representation.
+      Its type is:
         b :: TYPE r'
     • In the first argument of ‘lift'’, namely ‘(f x)’
       In the expression: lift' (f x) id
