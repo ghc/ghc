@@ -127,7 +127,6 @@ class (Bifunctor t, Bifoldable t) => Bitraversable t where
   --
   -- @since 4.10.0.0
   bitraverse :: Applicative f => (a -> f c) -> (b -> f d) -> t a b -> f (t c d)
-  bitraverse f g = bisequenceA . bimap f g
 
 -- | Alias for 'bisequence'.
 --
