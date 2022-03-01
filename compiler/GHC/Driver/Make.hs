@@ -61,7 +61,6 @@ import GHC.Runtime.Interpreter
 import qualified GHC.Linker.Loader as Linker
 import GHC.Linker.Types
 
-import GHC.Runtime.Context
 import GHC.Platform.Ways
 
 import GHC.Driver.Config.Finder (initFinderOpts)
@@ -107,7 +106,6 @@ import GHC.Types.SourceFile
 import GHC.Types.SourceError
 import GHC.Types.SrcLoc
 import GHC.Types.Unique.FM
-import GHC.Types.Name
 import GHC.Types.PkgQual
 
 import GHC.Unit
@@ -706,29 +704,6 @@ loadFinish all_ok
   = do modifySession discardIC
        return all_ok
 
--- | Discard the contents of the InteractiveContext, but keep the DynFlags and
--- the loaded plugins.  It will also keep ic_int_print and ic_monad if their
--- names are from external packages.
-discardIC :: HscEnv -> HscEnv
-discardIC hsc_env
-  = hsc_env { hsc_IC = empty_ic { ic_int_print = new_ic_int_print
-                                , ic_monad     = new_ic_monad
-                                , ic_plugins   = old_plugins
-                                } }
-  where
-  -- Force the new values for ic_int_print and ic_monad to avoid leaking old_ic
-  !new_ic_int_print = keep_external_name ic_int_print
-  !new_ic_monad = keep_external_name ic_monad
-  !old_plugins = ic_plugins old_ic
-  dflags = ic_dflags old_ic
-  old_ic = hsc_IC hsc_env
-  empty_ic = emptyInteractiveContext dflags
-  keep_external_name ic_name
-    | nameIsFromExternalPackage home_unit old_name = old_name
-    | otherwise = ic_name empty_ic
-    where
-    home_unit = hsc_home_unit hsc_env
-    old_name = ic_name old_ic
 
 -- | If there is no -o option, guess the name of target executable
 -- by using top-level source file name as a base.

@@ -2085,7 +2085,7 @@ of ``-W(no-)*``.
         data Foo = Foo { f :: Int } | Bar
 
 .. ghc-flag:: -Wunused-packages
-    :shortdesc: warn when package is requested on command line, but was never loaded.
+    :shortdesc: warn when package is requested on command line, but not needed.
     :type: dynamic
     :reverse: -Wno-unused-packages
     :category:
@@ -2094,11 +2094,15 @@ of ``-W(no-)*``.
 
     The option :ghc-flag:`-Wunused-packages` warns about packages, specified on
     command line via :ghc-flag:`-package ⟨pkg⟩` or
-    :ghc-flag:`-package-id ⟨unit-id⟩`, but were not loaded during compilation.
-    Usually it means that you have an unused dependency.
+    :ghc-flag:`-package-id ⟨unit-id⟩`, but were not needed during compilation.
+    If the warning fires it means the specified package wasn't needed for
+    compilation.
 
-    You may want to enable this warning on a clean build or enable :ghc-flag:`-fforce-recomp`
-    in order to get reliable results.
+    This warning interacts poorly with GHCi because most invocations will pass
+    a large number of ``-package`` arguments on the initial load. Therefore if
+    you modify the targets using ``:load`` or ``:cd`` then the warning will be
+    silently disabled if it's enabled (see :ghc-ticket:`21110`).
+
 
 .. ghc-flag:: -Winvalid-haddock
     :shortdesc: warn when a Haddock comment occurs in an invalid position
