@@ -945,7 +945,17 @@ lintCoreExpr e@(App _ _)
        ; checkCanEtaExpand fun args app_ty
        ; return app_pair}
   where
-    (fun, args) = collectArgs e
+    (fun, args, _source_ticks) = collectArgsTicks tickishFloatable e
+      -- We must look through source ticks to avoid #21152, for example:
+      --
+      -- reallyUnsafePtrEquality
+      --   = \ @a ->
+      --       (src<loc> reallyUnsafePtrEquality#)
+      --         @Lifted @a @Lifted @a
+      --
+      -- To do this, we use `collectArgsTicks tickishFloatable` to match
+      -- the eta expansion behaviour, as per Note [Eta expansion and source notes]
+      -- in GHC.Core.Opt.Arity.
 
 lintCoreExpr (Lam var expr)
   = markAllJoinsBad $
