@@ -15,7 +15,6 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ApplicativeDo #-}
 {-# LANGUAGE MultiWayIf #-}
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE RecordWildCards #-}
 
 -- -----------------------------------------------------------------------------
@@ -151,7 +150,7 @@ import Control.Concurrent.STM
 import Control.Monad.Trans.Maybe
 import GHC.Runtime.Loader
 import GHC.Rename.Names
-
+import GHC.Utils.Constants
 
 -- -----------------------------------------------------------------------------
 -- Loading the program
@@ -1741,14 +1740,9 @@ enableCodeGenWhen logger tmpfs staticLife dynLife unit_env mod_graph =
     -- #16331 - when no "internal interpreter" is available but we
     -- need to process some TemplateHaskell or QuasiQuotes, we automatically
     -- turn on -fexternal-interpreter.
-    ext_interp_enable ms = not host_internalInterpreter && internalInterpreter
+    ext_interp_enable ms = not ghciSupported && internalInterpreter
       where
        lcl_dflags   = ms_hspp_opts ms
-#if defined(HAVE_INTERNAL_INTERPRETER)
-       host_internalInterpreter = True
-#else
-       host_internalInterpreter = False
-#endif
        internalInterpreter = not (gopt Opt_ExternalInterpreter lcl_dflags)
 
 
