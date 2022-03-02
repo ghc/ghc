@@ -200,7 +200,7 @@ ann doc instr {- debugIsOn -} = ANN doc instr
 -- never end up being forced.
 annExpr :: CmmExpr -> Instr -> Instr
 annExpr e instr {- debugIsOn -} = ANN (text . show $ e) instr
--- annExpr e instr {- | debugIsOn -} = ANN (pprExpr genericPlatform e) instr
+-- annExpr e instr {- debugIsOn -} = ANN (pprExpr genericPlatform e) instr
 -- annExpr _ instr = instr
 {-# INLINE annExpr #-}
 

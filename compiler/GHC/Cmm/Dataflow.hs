@@ -151,8 +151,8 @@ fixpointAnalysis direction lattice do_block entry blockmap = loop start
     join       = fact_join lattice
 
     loop
-        :: IntHeap     -- ^ Worklist, i.e., blocks to process
-        -> FactBase f  -- ^ Current result (increases monotonically)
+        :: IntHeap     -- Worklist, i.e., blocks to process
+        -> FactBase f  -- Current result (increases monotonically)
         -> FactBase f
     loop todo !fbase1 | Just (index, todo1) <- IntSet.minView todo =
         let block = block_arr ! index
@@ -218,9 +218,9 @@ fixpointRewrite dir lattice do_block entry blockmap = loop start blockmap
     join       = fact_join lattice
 
     loop
-        :: IntHeap            -- ^ Worklist, i.e., blocks to process
-        -> LabelMap (Block node C C)  -- ^ Rewritten blocks.
-        -> FactBase f         -- ^ Current facts.
+        :: IntHeap                    -- Worklist, i.e., blocks to process
+        -> LabelMap (Block node C C)  -- Rewritten blocks.
+        -> FactBase f                 -- Current facts.
         -> UniqSM (LabelMap (Block node C C), FactBase f)
     loop todo !blocks1 !fbase1
       | Just (index, todo1) <- IntSet.minView todo = do

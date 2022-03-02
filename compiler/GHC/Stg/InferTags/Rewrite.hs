@@ -420,7 +420,7 @@ rewriteApp True (StgApp f []) = do
                 else f
     return $! StgApp f' []
 rewriteApp _ (StgApp f args)
-    -- | pprTrace "rewriteAppOther" (ppr f <+> ppr args) False
+    -- pprTrace "rewriteAppOther" (ppr f <+> ppr args) False
     -- = undefined
     | Just marks <- idCbvMarks_maybe f
     , relevant_marks <- dropWhileEndLE (not . isMarkedCbv) marks

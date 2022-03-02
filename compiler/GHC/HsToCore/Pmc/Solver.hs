@@ -147,7 +147,7 @@ updRcm f (RCM vanilla pragmas)
 -- Ex.: @vanillaCompleteMatchTC 'Maybe' ==> Just ("Maybe", {'Just','Nothing'})@
 vanillaCompleteMatchTC :: TyCon -> Maybe CompleteMatch
 vanillaCompleteMatchTC tc =
-  let -- | TYPE acts like an empty data type on the term-level (#14086), but
+  let -- TYPE acts like an empty data type on the term-level (#14086), but
       -- it is a PrimTyCon, so tyConDataCons_maybe returns Nothing. Hence a
       -- special case.
       mb_dcs | tc == tYPETyCon = Just []
@@ -173,7 +173,7 @@ addConLikeMatches (PatSynCon _)    rcm = addCompleteMatches rcm
 addTyConMatches :: TyCon -> ResidualCompleteMatches -> DsM ResidualCompleteMatches
 addTyConMatches tc rcm = add_tc_match <$> addCompleteMatches rcm
   where
-    -- | Add the vanilla COMPLETE set from the data defn, if any. But only if
+    -- Add the vanilla COMPLETE set from the data defn, if any. But only if
     -- it's not already present.
     add_tc_match rcm
       = rcm{rcm_vanilla = rcm_vanilla rcm <|> vanillaCompleteMatchTC tc}
@@ -722,7 +722,7 @@ addNotConCt nabla x nalt = do
     Just x  -> markDirty x nabla'
     Nothing -> nabla'
   where
-    -- | Update `x`'s 'VarInfo' entry. Fail ('MaybeT') if contradiction,
+    -- Update `x`'s 'VarInfo' entry. Fail ('MaybeT') if contradiction,
     -- otherwise return updated entry and `Just x'` if `x` should be marked dirty,
     -- where `x'` is the representative of `x`.
     go :: VarInfo -> MaybeT DsM (Maybe Id, VarInfo)
@@ -846,7 +846,7 @@ addCoreCt nabla x e = do
   -- lift $ tracePm "addCoreCt" (ppr x <+> dcolon <+> ppr (idType x) $$ ppr e $$ ppr e')
   execStateT (core_expr x e') nabla
   where
-    -- | Takes apart a 'CoreExpr' and tries to extract as much information about
+    -- Takes apart a 'CoreExpr' and tries to extract as much information about
     -- literals and constructor applications as possible.
     core_expr :: Id -> CoreExpr -> StateT Nabla (MaybeT DsM) ()
     -- TODO: Handle newtypes properly, by wrapping the expression in a DataCon
@@ -887,7 +887,7 @@ addCoreCt nabla x e = do
         -- up substituting inside a forall or lambda (i.e. seldom)
         -- so using exprFreeVars seems fine.   See MR !1647.
 
-    -- | The @e@ in @let x = e@ had no familiar form. But we can still see if
+    -- The @e@ in @let x = e@ had no familiar form. But we can still see if
     -- see if we already encountered a constraint @let y = e'@ with @e'@
     -- semantically equivalent to @e@, in which case we may add the constraint
     -- @x ~ y@.
@@ -903,7 +903,7 @@ addCoreCt nabla x e = do
       core_expr x e
       pure x
 
-    -- | Look at @let x = K taus theta es@ and generate the following
+    -- Look at @let x = K taus theta es@ and generate the following
     -- constraints (assuming universals were dropped from @taus@ before):
     --   1. @x ≁ ⊥@ if 'K' is not a Newtype constructor.
     --   2. @a_1 ~ tau_1, ..., a_n ~ tau_n@ for fresh @a_i@
@@ -930,7 +930,7 @@ addCoreCt nabla x e = do
       -- 4. @x ~ K as ys@
       pm_alt_con_app x (PmAltConLike (RealDataCon dc)) ex_tvs arg_ids
 
-    -- | Adds a literal constraint, i.e. @x ~ 42@.
+    -- Adds a literal constraint, i.e. @x ~ 42@.
     -- Also we assume that literal expressions won't diverge, so this
     -- will add a @x ~/ ⊥@ constraint.
     pm_lit :: Id -> PmLit -> StateT Nabla (MaybeT DsM) ()
@@ -938,7 +938,7 @@ addCoreCt nabla x e = do
       modifyT $ \nabla -> addNotBotCt nabla x
       pm_alt_con_app x (PmAltLit lit) [] []
 
-    -- | Adds the given constructor application as a solution for @x@.
+    -- Adds the given constructor application as a solution for @x@.
     pm_alt_con_app :: Id -> PmAltCon -> [TyVar] -> [Id] -> StateT Nabla (MaybeT DsM) ()
     pm_alt_con_app x con tvs args = modifyT $ \nabla -> addConCt nabla x con tvs args
 
@@ -1836,7 +1836,7 @@ generateInhabitingPatterns mode (x:xs) n nabla = do
       | otherwise
       -> generateInhabitingPatterns mode xs n nabla
   where
-    -- | Tries to instantiate a variable by possibly following the chain of
+    -- Tries to instantiate a variable by possibly following the chain of
     -- newtypes and then instantiating to all ConLikes of the wrapped type's
     -- minimal residual COMPLETE set.
     try_instantiate :: Id -> [Id] -> Int -> Nabla -> DsM [Nabla]
@@ -1868,7 +1868,7 @@ generateInhabitingPatterns mode (x:xs) n nabla = do
                 then generateInhabitingPatterns mode xs n newty_nabla -- bot is still possible. Display a wildcard!
                 else pure nablas'
 
-    -- | Instantiates a chain of newtypes, beginning at @x@.
+    -- Instantiates a chain of newtypes, beginning at @x@.
     -- Turns @x nabla [T,U,V]@ to @(y, nabla')@, where @nabla'@ we has the fact
     -- @x ~ T (U (V y))@.
     instantiate_newtype_chain :: Id -> Nabla -> [(Type, DataCon, Type)] -> MaybeT DsM (Id, Nabla)

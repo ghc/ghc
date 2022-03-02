@@ -1661,7 +1661,7 @@ emitPrimOp cfg primop =
     CmmMachOp (mop rep (wordWidth platform)) [CmmMachOp (mop (wordWidth platform) rep) [arg]]
     where [arg] = args
 
-  -- | These primops are implemented by CallishMachOps, because they sometimes
+  -- These primops are implemented by CallishMachOps, because they sometimes
   -- turn into foreign calls depending on the backend.
   opCallish :: [CmmExpr] -> CallishMachOp -> PrimopCmmEmit
   opCallish args prim = opIntoRegs $ \[res] -> emitPrimCall [res] prim args
@@ -1683,7 +1683,7 @@ emitPrimOp cfg primop =
       PW4 -> opCallish args callish
       PW8 -> opTranslate args $ mkMop W64
 
-  -- | Basically a "manual" case, rather than one of the common repetitive forms
+  -- Basically a "manual" case, rather than one of the common repetitive forms
   -- above. The results are a parameter to the returned function so we know the
   -- choice of variant never depends on them.
   opCallishHandledLater

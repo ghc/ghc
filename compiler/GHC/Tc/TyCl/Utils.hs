@@ -971,14 +971,14 @@ mkOneRecordSelector all_cons idDetails fl has_sel
     eq_subst = mkTvSubstPrs (map eqSpecPair eq_spec)
     -- inst_tys corresponds to one of the following:
     --
-    -- * The arguments to the user-written return type (for GADT constructors).
-    --   In this scenario, eq_subst provides a mapping from the universally
-    --   quantified type variables to the argument types. Note that eq_subst
-    --   does not need to be applied to any other part of the DataCon
-    --   (see Note [The dcEqSpec domain invariant] in GHC.Core.DataCon).
-    -- * The universally quantified type variables
-    --   (for Haskell98-style constructors and pattern synonyms). In these
-    --   scenarios, eq_subst is an empty substitution.
+    --  * The arguments to the user-written return type (for GADT constructors).
+    --    In this scenario, eq_subst provides a mapping from the universally
+    --    quantified type variables to the argument types. Note that eq_subst
+    --    does not need to be applied to any other part of the DataCon
+    --    (see Note [The dcEqSpec domain invariant] in GHC.Core.DataCon).
+    --  * The universally quantified type variables
+    --    (for Haskell98-style constructors and pattern synonyms). In these
+    --    scenarios, eq_subst is an empty substitution.
     inst_tys = substTyVars eq_subst univ_tvs
 
     unit_rhs = mkLHsTupleExpr [] noExtField

@@ -97,7 +97,7 @@ dmdAnalProgram opts fam_envs rules binds
     add_exported_uses :: AnalEnv -> DmdType -> [Id] -> DmdType
     add_exported_uses env = foldl' (add_exported_use env)
 
-    -- | If @e@ is denoted by @dmd_ty@, then @add_exported_use _ dmd_ty id@
+    -- If @e@ is denoted by @dmd_ty@, then @add_exported_use _ dmd_ty id@
     -- corresponds to the demand type of @(id, e)@, but is a lot more direct.
     -- See Note [Analysing top-level bindings].
     add_exported_use :: AnalEnv -> DmdType -> Id -> DmdType
@@ -959,7 +959,7 @@ unboxedWhenSmall :: AnalEnv -> RecFlag -> Maybe Type -> SubDemand -> SubDemand
 unboxedWhenSmall _   _        Nothing       sd = sd
 unboxedWhenSmall env rec_flag (Just ret_ty) sd = go 1 ret_ty sd
   where
-    -- | Magic constant, bounding the depth of optimistic 'Unboxed' flags. We
+    -- Magic constant, bounding the depth of optimistic 'Unboxed' flags. We
     -- might want to minmax in the future.
     max_depth | isRec rec_flag = 3 -- So we get at most something as deep as !P(L!P(L!L))
               | otherwise      = 1 -- Otherwise be unbox too deep in T18109, T18174 and others and get a bunch of stack overflows

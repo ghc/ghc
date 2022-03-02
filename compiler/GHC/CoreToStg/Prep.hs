@@ -1136,7 +1136,7 @@ cpeApp top_env expr
            ; (app, floats,unsat_ticks) <- rebuild_app env args fun' fun_floats [] Nothing
            ; mb_saturate Nothing app floats unsat_ticks (val_args args) }
 
-    -- | Count the number of value arguments.
+    -- Count the number of value arguments.
     val_args :: [ArgInfo] -> Int
     val_args args = go args 0
       where

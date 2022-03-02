@@ -1438,7 +1438,7 @@ hscCheckSafe' m l = do
                       $ mkErrorMsgEnvelope l (pkgQual state)
                       $ GhcDriverMessage $ DriverCannotImportUnsafeModule m
 
-    -- | Check the package a module resides in is trusted. Safe compiled
+    -- Check the package a module resides in is trusted. Safe compiled
     -- modules are trusted without requiring that their package is trusted. For
     -- trustworthy modules, modules in the home package are trusted but
     -- otherwise we check the package trust flag.

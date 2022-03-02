@@ -611,9 +611,9 @@ checkPatSynParent parent NoParent gname
     selErr = exportErrCtxt "pattern synonym record selector"
 
     handle_pat_syn :: SDoc
-                   -> TyCon      -- ^ Parent TyCon
-                   -> PatSyn     -- ^ Corresponding bundled PatSyn
-                                 --   and pretty printed origin
+                   -> TyCon      -- Parent TyCon
+                   -> PatSyn     -- Corresponding bundled PatSyn
+                                 -- and pretty printed origin
                    -> TcM ()
     handle_pat_syn doc ty_con pat_syn
 

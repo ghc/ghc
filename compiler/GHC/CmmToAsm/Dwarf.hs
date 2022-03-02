@@ -245,7 +245,7 @@ procToFrame initUws blk
           where uws'   = addDefaultUnwindings initUws uws
                 nested = concatMap flatten blocks
 
-        -- | If the current procedure has an info table, then we also say that
+        -- If the current procedure has an info table, then we also say that
         -- its first block has one to ensure that it gets the necessary -1
         -- offset applied to its start address.
         -- See Note [Info Offset] in "GHC.CmmToAsm.Dwarf.Types".

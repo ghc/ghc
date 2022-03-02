@@ -455,7 +455,7 @@ checkCanonicalInstances cls poly_ty mbinds = do
         "https://gitlab.haskell.org/ghc/ghc/-/wikis/proposal/semigroup-monoid"
 
   where
-    -- | Warn about unsound/non-canonical 'Applicative'/'Monad' instance
+    -- Warn about unsound/non-canonical 'Applicative'/'Monad' instance
     -- declarations. Specifically, the following conditions are verified:
     --
     -- In 'Monad' instances declarations:
@@ -501,7 +501,7 @@ checkCanonicalInstances cls poly_ty mbinds = do
 
       | otherwise = return ()
 
-    -- | Check whether Monoid(mappend) is defined in terms of
+    -- Check whether Monoid(mappend) is defined in terms of
     -- Semigroup((<>)) (and not the other way round). Specifically,
     -- the following conditions are verified:
     --
@@ -540,7 +540,7 @@ checkCanonicalInstances cls poly_ty mbinds = do
 
       | otherwise = return ()
 
-    -- | test whether MatchGroup represents a trivial \"lhsName = rhsName\"
+    -- test whether MatchGroup represents a trivial \"lhsName = rhsName\"
     -- binding, and return @Just rhsName@ if this is the case
     isAliasMG :: MatchGroup GhcRn (LHsExpr GhcRn) -> Maybe Name
     isAliasMG MG {mg_alts = (L _ [L _ (Match { m_pats = []

@@ -385,9 +385,9 @@ linearRA
                 , [NatBasicBlock instr])        --   fresh blocks of fixup code.
 linearRA block_live block_id = go [] []
   where
-    go :: [instr]                              -- ^ accumulator for instructions already processed.
-       -> [NatBasicBlock instr]                -- ^ accumulator for blocks of fixup code.
-       -> [LiveInstr instr]                    -- ^ liveness annotated instructions in this block.
+    go :: [instr]                              -- accumulator for instructions already processed.
+       -> [NatBasicBlock instr]                -- accumulator for blocks of fixup code.
+       -> [LiveInstr instr]                    -- liveness annotated instructions in this block.
        -> RegM freeRegs
                ( [instr]                       --   instructions after register allocation
                , [NatBasicBlock instr] )       --   fresh blocks of fixup code.

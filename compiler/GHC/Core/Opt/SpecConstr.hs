@@ -2454,7 +2454,7 @@ argToPat1 _env _in_scope _val_env arg _arg_occ arg_str
 setStrUnfolding :: Id -> StrictnessMark  -> Id
 -- setStrUnfolding id str = id
 setStrUnfolding id str
-  -- | pprTrace "setStrUnfolding"
+  -- pprTrace "setStrUnfolding"
   --   (ppr id <+> ppr (isMarkedCbv str) $$
   --    ppr (idType id) $$
   --    text "boxed:" <> ppr (isBoxedType (idType id)) $$

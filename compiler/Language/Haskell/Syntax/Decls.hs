@@ -436,6 +436,13 @@ data TyClDecl pass
              , tcdFixity   :: LexicalFixity        -- ^ Fixity used in the declaration
              , tcdDataDefn :: HsDataDefn pass }
 
+    -- | - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnClass',
+    --           'GHC.Parser.Annotation.AnnWhere','GHC.Parser.Annotation.AnnOpen',
+    --           'GHC.Parser.Annotation.AnnClose'
+    --   - The tcdFDs will have 'GHC.Parser.Annotation.AnnVbar',
+    --                          'GHC.Parser.Annotation.AnnComma'
+    --                          'GHC.Parser.Annotation.AnnRarrow'
+    -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
   | ClassDecl { tcdCExt    :: XClassDecl pass,         -- ^ Post renamer, FVs
                 tcdCtxt    :: Maybe (LHsContext pass), -- ^ Context...
                 tcdLName   :: LIdP pass,               -- ^ Name of the class
@@ -448,14 +455,6 @@ data TyClDecl pass
                 tcdATDefs  :: [LTyFamDefltDecl pass],   -- ^ Associated type defaults
                 tcdDocs    :: [LDocDecl pass]           -- ^ Haddock docs
     }
-        -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnClass',
-        --           'GHC.Parser.Annotation.AnnWhere','GHC.Parser.Annotation.AnnOpen',
-        --           'GHC.Parser.Annotation.AnnClose'
-        --   - The tcdFDs will have 'GHC.Parser.Annotation.AnnVbar',
-        --                          'GHC.Parser.Annotation.AnnComma'
-        --                          'GHC.Parser.Annotation.AnnRarrow'
-
-        -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
   | XTyClDecl !(XXTyClDecl pass)
 
 data FunDep pass
@@ -1368,6 +1367,10 @@ data FamEqn pass rhs
 type LClsInstDecl pass = XRec pass (ClsInstDecl pass)
 
 -- | Class Instance Declaration
+--  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnInstance',
+--           'GHC.Parser.Annotation.AnnWhere',
+--           'GHC.Parser.Annotation.AnnOpen','GHC.Parser.Annotation.AnnClose',
+-- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 data ClsInstDecl pass
   = ClsInstDecl
       { cid_ext     :: XCClsInstDecl pass
@@ -1384,12 +1387,6 @@ data ClsInstDecl pass
 
         -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
       }
-    -- ^
-    --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnInstance',
-    --           'GHC.Parser.Annotation.AnnWhere',
-    --           'GHC.Parser.Annotation.AnnOpen','GHC.Parser.Annotation.AnnClose',
-
-    -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
   | XClsInstDecl !(XXClsInstDecl pass)
 
 ----------------- Instances of all kinds -------------

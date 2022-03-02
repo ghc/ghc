@@ -247,7 +247,7 @@ tcDeriving deriv_infos deriv_decls
         ; return (addTcgDUs gbl_env all_dus, inst_info, rn_aux_binds) } }
   where
     ddump_deriving :: Bag (InstInfo GhcRn) -> HsValBinds GhcRn
-                   -> [FamInst]               -- ^ Associated type family instances
+                   -> [FamInst]               -- Associated type family instances
                    -> SDoc
     ddump_deriving inst_infos extra_binds famInsts
       =    hang (text "Derived class instances:")

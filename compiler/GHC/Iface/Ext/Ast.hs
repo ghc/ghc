@@ -725,7 +725,7 @@ instance HiePass p => HasType (LocatedA (HsExpr (GhcPass p))) where
       fallback :: HieM [HieAST Type]
       fallback = makeNodeA e spn
 
-      -- | Skip computing the type of some expressions for performance reasons.
+      -- Skip computing the type of some expressions for performance reasons.
       --
       -- See impact on Haddock output (esp. missing type annotations or links)
       -- before skipping more kinds of expressions. See impact on Haddock

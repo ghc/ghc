@@ -1284,7 +1284,7 @@ checkBootTyCon is_boot tc1 tc2
     --
     -- See also 'HowAbstract' and Note [Skolem abstract data].
 
-    -- | Given @type T tvs = ty@, where @ty@ decomposes into @tc2' args@,
+    -- Given @type T tvs = ty@, where @ty@ decomposes into @tc2' args@,
     -- check that this synonym is an acceptable implementation of @tc1@.
     -- See Note [Synonyms implement abstract data]
     checkSynAbsData :: [TyVar] -> Type -> TyCon -> [Type] -> Maybe SDoc
@@ -1715,9 +1715,9 @@ tcMissingParentClassWarn warnFlag isName shouldName
        }}
   where
     -- Check whether the desired superclass exists in a given environment.
-    checkShouldInst :: Class   -- ^ Class of existing instance
-                    -> Class   -- ^ Class there should be an instance of
-                    -> ClsInst -- ^ Existing instance
+    checkShouldInst :: Class   -- Class of existing instance
+                    -> Class   -- Class there should be an instance of
+                    -> ClsInst -- Existing instance
                     -> TcM ()
     checkShouldInst isClass shouldClass isInst
       = do { instEnv <- tcGetInstEnvs

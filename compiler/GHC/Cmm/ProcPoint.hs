@@ -213,7 +213,7 @@ extendPPSet platform g blocks procPoints =
                                 ProcPoint -> 1
                                 ReachedBy ps -> setSize ps
                 block_procpoints = nreached (entryLabel b)
-                -- | Looking for a successor of b that is reached by
+                -- Looking for a successor of b that is reached by
                 -- more proc points than b and is not already a proc
                 -- point.  If found, it can become a proc point.
                 newId succ_id = not (setMember succ_id procPoints') &&

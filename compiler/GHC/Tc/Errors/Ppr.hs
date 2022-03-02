@@ -526,9 +526,10 @@ instance Diagnostic TcRnMessage where
                                                 quotes (ppr_name child))
                                             2 (pprNameProvenance gre))
 
-        -- DuplicateRecordFields means that nameOccName might be a mangled
-        -- $sel-prefixed thing, in which case show the correct OccName alone
-        -- (but otherwise show the Name so it will have a module qualifier)
+        -- DuplicateRecordFields means that nameOccName might be a
+        -- mangled $sel-prefixed thing, in which case show the correct OccName
+        -- alone (but otherwise show the Name so it will have a module
+        -- qualifier)
         ppr_name (FieldGreName fl) | flIsOverloaded fl = ppr fl
                                    | otherwise         = ppr (flSelector fl)
         ppr_name (NormalGreName name) = ppr name
@@ -2984,8 +2985,8 @@ expandSynonymsToMatch ty1 ty2 = (ty1_ret, ty2_ret)
   where
     (ty1_ret, ty2_ret) = go ty1 ty2
 
-    -- | Returns (type synonym expanded version of first type,
-    --            type synonym expanded version of second type)
+    -- Returns (type synonym expanded version of first type,
+    --          type synonym expanded version of second type)
     go :: Type -> Type -> (Type, Type)
     go t1 t2
       | t1 `pickyEqType` t2 =
@@ -3039,7 +3040,7 @@ expandSynonymsToMatch ty1 ty2 = (ty1_ret, ty2_ret)
             (if t1_exps > t2_exps then drop dif t1_exp_tys else t1_exp_tys)
             (if t2_exps > t1_exps then drop dif t2_exp_tys else t2_exp_tys)
 
-    -- | Expand the top layer type synonyms repeatedly, collect expansions in a
+    -- Expand the top layer type synonyms repeatedly, collect expansions in a
     -- list. The list does not include the original type.
     --
     -- Example, if you have:
@@ -3059,7 +3060,7 @@ expandSynonymsToMatch ty1 ty2 = (ty1_ret, ty2_ret)
     tyExpansions :: Type -> [Type]
     tyExpansions = unfoldr (\t -> (\x -> (x, x)) `fmap` tcView t)
 
-    -- | Drop the type pairs until types in a pair look alike (i.e. the outer
+    -- Drop the type pairs until types in a pair look alike (i.e. the outer
     -- constructors are the same).
     followExpansions :: [(Type, Type)] -> (Type, Type)
     followExpansions [] = pprPanic "followExpansions" empty

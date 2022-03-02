@@ -569,11 +569,11 @@ hasFixedRuntimeRep_remainingValArgs applied_args app_res_rho = \case
       traceTc "tcApp remainingValArgs check_thing" (debug_msg thing arity)
       go (nb_applied_vis_val_args + 1) (nb_applied_val_args + 1) arg_tys
       where
-        go :: Int -- ^ visible value argument index, starting from 1
+        go :: Int -- visible value argument index, starting from 1
                   -- only used to report the argument position in error messages
-           -> Int -- ^ value argument index, starting from 1
+           -> Int -- value argument index, starting from 1
                   -- used to count up to the arity to ensure we don't check too many argument types
-           -> [(Type, AnonArgFlag)] -- ^ run-time argument types
+           -> [(Type, AnonArgFlag)] -- run-time argument types
            -> TcM ()
         go _ i_val _
           | i_val > arity
