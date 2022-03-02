@@ -1076,16 +1076,20 @@ release-x86_64-linux-centos7:
 # x86_64-linux-fedora33
 #################################
 
+# The standard fedora33 job is a perf compiler so we do at least one build on CI with release
+# settings (and can test -O2)
+
 .build-x86_64-linux-fedora33:
-  extends: .validate-linux
+  extends: .validate-linux-hadrian
   stage: full-build
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora33:$DOCKER_REV"
   variables:
     # LLVM 10 is not available for Fedora33
     LLC: /bin/false
     OPT: /bin/false
-    TEST_ENV: "x86_64-linux-fedora33"
-    BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-fedora33-linux.tar.xz"
+    TEST_ENV: "x86_64-linux-fedora33-perf"
+    BIN_DIST_NAME: "ghc-x86_64-fedora33-linux"
+    BUILD_FLAVOUR: perf
   cache:
     key: linux-x86_64-fedora33-$CACHE_REV
   artifacts:
@@ -1109,9 +1113,9 @@ release-x86_64-linux-fedora33-dwarf:
   extends: .build-x86_64-linux-fedora33
   variables:
     CONFIGURE_ARGS: "--enable-dwarf-unwind"
-    BUILD_FLAVOUR: dwarf
+    BUILD_FLAVOUR: perf+debug_info
     IGNORE_PERF_FAILURES: "all"
-    BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-fedora33-linux-dwarf.tar.xz"
+    BIN_DIST_NAME: "ghc-x86_64-fedora33-linux-dwarf"
     TEST_ENV: "x86_64-linux-fedora33-dwarf"
 
 ############################################################
