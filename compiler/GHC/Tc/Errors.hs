@@ -403,7 +403,7 @@ warnRedundantConstraints ctxt env info ev_vars
               -- and we don't want to say it twice. Seems a bit ad-hoc
  = report_redundant_msg False
  where
-   report_redundant_msg :: Bool -- ^ whether to add "In ..." to the diagnostic
+   report_redundant_msg :: Bool -- whether to add "In ..." to the diagnostic
                         -> TcRn ()
    report_redundant_msg show_info
      = do { lcl_env <- getLclEnv

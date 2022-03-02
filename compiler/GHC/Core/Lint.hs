@@ -1119,9 +1119,9 @@ checkCanEtaExpand (Var fun_id) args app_ty
       check_args :: [Type] -> [Type]
       check_args = go (nb_val_args + 1)
         where
-          go :: Int    -- ^ index of the argument (starting from 1)
-             -> [Type] -- ^ arguments
-             -> [Type] -- ^ value argument types that could not be
+          go :: Int    -- index of the argument (starting from 1)
+             -> [Type] -- arguments
+             -> [Type] -- value argument types that could not be
                        -- determined to have a fixed runtime representation
           go i _
             | i > arity

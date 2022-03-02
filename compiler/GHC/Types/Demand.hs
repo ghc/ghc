@@ -979,7 +979,7 @@ strictifyDictDmd ty (n :* Prod b ds)
   = C_1N :* mkProd b (zipWith strictifyDictDmd field_tys ds)
       -- main idea: ensure it's strict
   where
-    -- | Return a TyCon and a list of field types if the given
+    -- Return a TyCon and a list of field types if the given
     -- type is a non-newtype dictionary type
     as_non_newtype_dict ty
       | Just (tycon, _arg_tys, _data_con, map scaledThing -> inst_con_arg_tys)

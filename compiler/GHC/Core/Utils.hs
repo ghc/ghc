@@ -332,9 +332,9 @@ mkTick t orig_expr = mkTick' id id orig_expr
   -- non-counting part having laxer placement properties.
   canSplit = tickishCanSplit t && tickishPlace (mkNoCount t) /= tickishPlace t
 
-  mkTick' :: (CoreExpr -> CoreExpr) -- ^ apply after adding tick (float through)
-          -> (CoreExpr -> CoreExpr) -- ^ apply before adding tick (float with)
-          -> CoreExpr               -- ^ current expression
+  mkTick' :: (CoreExpr -> CoreExpr) -- apply after adding tick (float through)
+          -> (CoreExpr -> CoreExpr) -- apply before adding tick (float with)
+          -> CoreExpr               -- current expression
           -> CoreExpr
   mkTick' top rest expr = case expr of
 

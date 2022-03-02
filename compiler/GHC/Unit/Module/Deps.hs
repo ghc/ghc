@@ -270,7 +270,7 @@ data Usage
             -- if we directly imported it (and hence we depend on its export list)
         usg_safe :: IsSafeImport
             -- ^ Was this module imported as a safe import
-    }                                           -- ^ Module from the current package
+    }
   -- | A file upon which the module depends, e.g. a CPP #include, or using TH's
   -- 'addDependentFile'
   | UsageFile {

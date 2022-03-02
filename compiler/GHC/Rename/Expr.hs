@@ -542,7 +542,8 @@ rnExpr e@(HsStatic _ expr) = do
     let fvExpr' = filterNameSet (nameIsLocalOrFrom mod) fvExpr
     return (HsStatic fvExpr' expr', fvExpr)
 
-{- *********************************************************************
+{-
+************************************************************************
 *                                                                      *
         Arrow notation
 *                                                                      *
@@ -557,7 +558,8 @@ rnExpr (HsProc x pat body)
 rnExpr other = pprPanic "rnExpr: unexpected expression" (ppr other)
         -- HsWrap
 
-{- *********************************************************************
+{-
+************************************************************************
 *                                                                      *
         Operator sections
 *                                                                      *

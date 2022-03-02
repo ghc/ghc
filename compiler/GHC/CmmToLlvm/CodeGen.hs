@@ -1738,7 +1738,7 @@ genMachOp_slow opt op [x, y] = case op of
               [vx',vy'] -> doExprW ty $ binOp vx' vy'
               _         -> panic "genMachOp_slow: binCastLlvmOp"
 
-        -- | Need to use EOption here as Cmm expects word size results from
+        -- Need to use EOption here as Cmm expects word size results from
         -- comparisons while LLVM return i1. Need to extend to llvmWord type
         -- if expected. See Note [Literals and branch conditions].
         genBinComp opt cmp = do
@@ -1761,7 +1761,7 @@ genMachOp_slow opt op [x, y] = case op of
 
         genCastBinMach ty op = binCastLlvmOp ty (LlvmOp op)
 
-        -- | Detect if overflow will occur in signed multiply of the two
+        -- Detect if overflow will occur in signed multiply of the two
         -- CmmExpr's. This is the LLVM assembly equivalent of the NCG
         -- implementation. Its much longer due to type information/safety.
         -- This should actually compile to only about 3 asm instructions.

@@ -232,7 +232,7 @@ data ConPatTc
     , -- | Bindings involving those dictionaries
       cpt_binds :: TcEvBinds
 
-    , -- ^ Extra wrapper to pass to the matcher
+    , -- | Extra wrapper to pass to the matcher
       -- Only relevant for pattern-synonyms;
       --   ignored for data cons
       cpt_wrap  :: HsWrapper

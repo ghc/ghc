@@ -268,9 +268,9 @@ assignColors
 assignColors colors graph ks
         = assignColors' colors graph [] ks
 
- where  assignColors' :: UniqFM cls (UniqSet color)       -- ^ map of (node class -> set of colors available for this class).
-                        -> Graph k cls color            -- ^ the graph
-                        -> [k]                          -- ^ nodes to assign a color to.
+ where  assignColors' :: UniqFM cls (UniqSet color)     -- map of (node class -> set of colors available for this class).
+                        -> Graph k cls color            -- the graph
+                        -> [k]                          -- nodes to assign a color to.
                         -> [k]
                         -> ( Graph k cls color          -- the colored graph
                         , [k])
@@ -303,9 +303,9 @@ assignColors colors graph ks
 selectColor
         :: ( Uniquable k, Uniquable cls, Uniquable color
            , Outputable cls)
-        => UniqFM cls (UniqSet color)       -- ^ map of (node class -> set of colors available for this class).
-        -> Graph k cls color            -- ^ the graph
-        -> k                            -- ^ key of the node to select a color for.
+        => UniqFM cls (UniqSet color)   -- map of (node class -> set of colors available for this class).
+        -> Graph k cls color            -- the graph
+        -> k                            -- key of the node to select a color for.
         -> Maybe color
 
 selectColor colors graph u

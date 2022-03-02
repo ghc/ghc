@@ -1404,7 +1404,7 @@ lookupThInstName th_type = do
         <+> ppr_th th_type
         <+> text "to add documentation to"
 
-    -- | Get the name of the class for the instance we are documenting
+    -- Get the name of the class for the instance we are documenting
     -- > inst_cls_name (Monad Maybe) == Monad
     -- > inst_cls_name C = C
     inst_cls_name :: TH.Type -> TcM TH.Name
@@ -1443,7 +1443,7 @@ lookupThInstName th_type = do
         <+> ppr_th th_type
         <+> text "is supposed to be"
 
-    -- | Basically does the opposite of 'mkThAppTs'
+    -- Basically does the opposite of 'mkThAppTs'
     -- > inst_arg_types (Monad Maybe) == [Maybe]
     -- > inst_arg_types C == []
     inst_arg_types :: TH.Type -> [TH.Type]

@@ -1645,13 +1645,14 @@ data ArithSeqInfo id
 -- Context of a pattern match. This is more subtle than it would seem. See Note
 -- [Varieties of pattern matches].
 data HsMatchContext p
-  = FunRhs { mc_fun        :: LIdP p    -- ^ function binder of @f@
-           , mc_fixity     :: LexicalFixity -- ^ fixing of @f@
-           , mc_strictness :: SrcStrictness -- ^ was @f@ banged?
-                                            -- See Note [FunBind vs PatBind]
-           }
-                                -- ^A pattern matching on an argument of a
-                                -- function binding
+  = FunRhs
+    -- ^ A pattern matching on an argument of a
+    -- function binding
+      { mc_fun        :: LIdP p    -- ^ function binder of @f@
+      , mc_fixity     :: LexicalFixity -- ^ fixing of @f@
+      , mc_strictness :: SrcStrictness -- ^ was @f@ banged?
+                                       -- See Note [FunBind vs PatBind]
+      }
   | LambdaExpr                  -- ^Patterns of a lambda
   | CaseAlt                     -- ^Patterns and guards on a case alternative
   | IfAlt                       -- ^Guards of a multi-way if alternative

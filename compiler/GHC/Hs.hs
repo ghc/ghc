@@ -68,7 +68,16 @@ import Data.Data hiding ( Fixity )
 --
 -- All we actually declare here is the top-level structure for a module.
 data HsModule
-  = HsModule {
+  =  -- | 'GHC.Parser.Annotation.AnnKeywordId's
+     --
+     --  - 'GHC.Parser.Annotation.AnnModule','GHC.Parser.Annotation.AnnWhere'
+     --
+     --  - 'GHC.Parser.Annotation.AnnOpen','GHC.Parser.Annotation.AnnSemi',
+     --    'GHC.Parser.Annotation.AnnClose' for explicit braces and semi around
+     --    hsmodImports,hsmodDecls if this style is used.
+
+     -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
+    HsModule {
       hsmodAnn :: EpAnn AnnsModule,
       hsmodLayout :: LayoutInfo,
         -- ^ Layout info for the module.
@@ -112,15 +121,6 @@ data HsModule
 
         -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
    }
-     -- ^ 'GHC.Parser.Annotation.AnnKeywordId's
-     --
-     --  - 'GHC.Parser.Annotation.AnnModule','GHC.Parser.Annotation.AnnWhere'
-     --
-     --  - 'GHC.Parser.Annotation.AnnOpen','GHC.Parser.Annotation.AnnSemi',
-     --    'GHC.Parser.Annotation.AnnClose' for explicit braces and semi around
-     --    hsmodImports,hsmodDecls if this style is used.
-
-     -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 
 deriving instance Data HsModule
 

@@ -603,7 +603,7 @@ mkSelfBootInfo iface mds
        return $ SelfBoot { sb_mds = mds
                          , sb_tcs = mkNameSet tcs }
   where
-    -- | Retuerns @True@ if, when you call 'tcIfaceDecl' on
+    -- Retuerns @True@ if, when you call 'tcIfaceDecl' on
     -- this 'IfaceDecl', an ATyCon would be returned.
     -- NB: This code assumes that a TyCon cannot be implicit.
     isIfaceTyCon IfaceId{}      = False

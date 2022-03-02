@@ -712,7 +712,7 @@ optHsPatterns weights (CmmProc info _lab _live graph) cfg =
     increaseBackEdgeWeight (g_entry graph) $ cfg
   where
 
-    -- | Increase the weight of all backedges in the CFG
+    -- Increase the weight of all backedges in the CFG
     -- this helps to make loop jumpbacks the heaviest edges
     increaseBackEdgeWeight :: BlockId -> CFG -> CFG
     increaseBackEdgeWeight root cfg =
@@ -725,7 +725,7 @@ optHsPatterns weights (CmmProc info _lab _live graph) cfg =
         in  foldl'  (\cfg edge -> updateEdgeWeight update edge cfg)
                     cfg backedges
 
-    -- | Since we cant fall through info tables we penalize these.
+    -- Since we cant fall through info tables we penalize these.
     penalizeInfoTables :: LabelMap a -> CFG -> CFG
     penalizeInfoTables info cfg =
         mapWeights fupdate cfg
@@ -736,7 +736,7 @@ optHsPatterns weights (CmmProc info _lab _live graph) cfg =
           = weight - (fromIntegral $ infoTablePenalty weights)
           | otherwise = weight
 
-    -- | If a block has two successors, favour the one with fewer
+    -- If a block has two successors, favour the one with fewer
     -- predecessors and/or the one allowing fall through.
     favourFewerPreds :: CFG -> CFG
     favourFewerPreds cfg =

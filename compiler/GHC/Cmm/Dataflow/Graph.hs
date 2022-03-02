@@ -154,13 +154,13 @@ revPostorderFrom graph start = go start_worklist setEmpty []
   where
     start_worklist = lookup_for_descend start Nil
 
-    -- To compute the postorder we need to "visit" a block (mark as done)
-    -- *after* visiting all its successors. So we need to know whether we
-    -- already processed all successors of each block (and @NonLocal@ allows
-    -- arbitrary many successors). So we use an explicit stack with an extra bit
+    -- To compute the postorder we need to "visit" a block (mark as done) *after*
+    -- visiting all its successors. So we need to know whether we already
+    -- processed all successors of each block (and @NonLocal@ allows arbitrary
+    -- many successors). So we use an explicit stack with an extra bit
     -- of information:
-    -- * @ConsTodo@ means to explore the block if it wasn't visited before
-    -- * @ConsMark@ means that all successors were already done and we can add
+    -- - @ConsTodo@ means to explore the block if it wasn't visited before
+    -- - @ConsMark@ means that all successors were already done and we can add
     --   the block to the result.
     --
     -- NOTE: We add blocks to the result list in postorder, but we *prepend*

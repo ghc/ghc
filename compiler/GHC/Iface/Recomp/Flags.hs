@@ -28,9 +28,8 @@ import System.FilePath (normalise)
 -- the finger print on important fields in @DynFlags@ so that
 -- the recompilation checker can use this fingerprint.
 --
--- NB: The 'Module' parameter is the 'Module' recorded by the
--- *interface* file, not the actual 'Module' according to our
--- 'DynFlags'.
+-- NB: The 'Module' parameter is the 'Module' recorded by the *interface*
+-- file, not the actual 'Module' according to our 'DynFlags'.
 fingerprintDynFlags :: HscEnv -> Module
                     -> (BinHandle -> Name -> IO ())
                     -> IO Fingerprint
@@ -43,7 +42,7 @@ fingerprintDynFlags hsc_env this_mod nameio =
         safeHs   = setSafeMode safeHaskell
         -- oflags   = sort $ filter filterOFlags $ flags dflags
 
-        -- *all* the extension flags and the language
+        -- all the extension flags and the language
         lang = (fmap fromEnum language,
                 map fromEnum $ EnumSet.toList extensionFlags)
 

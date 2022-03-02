@@ -661,7 +661,7 @@ wantToUnboxResult fam_envs ty cpr
   = StopUnboxing
 
   where
-    -- | See Note [non-algebraic or open body type warning]
+    -- See Note [non-algebraic or open body type warning]
     open_body_ty_warning = warnPprTrace True "wantToUnboxResult: non-algebraic or open body type" (ppr ty) Nothing
 
 isLinear :: Scaled a -> Bool
@@ -1296,8 +1296,7 @@ isRecDataCon fam_envs fuel orig_dc
     go_tc_app :: IntWithInf -> TyConSet -> TyCon -> [Type] -> IsRecDataConResult
     go_tc_app fuel visited_tcs tc tc_args =
       case tyConDataCons_maybe tc of
-        --- | pprTrace "tc_app" (vcat [ppr tc, ppr tc_args]) False -> undefined
-
+      --- | pprTrace "tc_app" (vcat [ppr tc, ppr tc_args]) False = undefined
         _ | Just (HetReduction (Reduction _ rhs) _) <- topReduceTyFamApp_maybe fam_envs tc tc_args
           -- This is the only place where we look at tc_args, which might have
           -- See Note [Detecting recursive data constructors], point (C) and (5)

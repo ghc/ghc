@@ -556,15 +556,15 @@ tryWW ww_opts is_rec fn_id rhs
   -- CPR information in GHC.Core.Opt.CprAnal.cprAnalBind, it actually
   -- isn't. That is because we would still perform w/w when:
   --
-  -- * An argument is used strictly, and -fworker-wrapper-cbv is
+  -- - An argument is used strictly, and -fworker-wrapper-cbv is
   --   enabled, or,
-  -- * When demand analysis marks an argument as absent.
+  -- - When demand analysis marks an argument as absent.
   --
   -- In a debug build we do assert that boxity and CPR information
   -- are actually stripped, since we want to prevent callers of OPAQUE
   -- things to do reboxing. See:
-  -- * Note [The OPAQUE pragma and avoiding the reboxing of arguments]
-  -- * Note [The OPAQUE pragma and avoiding the reboxing of results]
+  -- - Note [The OPAQUE pragma and avoiding the reboxing of arguments]
+  -- - Note [The OPAQUE pragma and avoiding the reboxing of results]
   | isOpaquePragma (inlinePragInfo fn_info)
   = assertPpr (onlyBoxedArguments (dmdSigInfo fn_info) &&
                isTopCprSig (cprSigInfo fn_info))

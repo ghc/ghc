@@ -131,11 +131,11 @@ exitifyRec in_scope pairs
     -- variables bound on the way and lifts it out as a join point.
     --
     -- ExitifyM is a state monad to keep track of floated binds
-    go :: [Var]           -- ^ Variables that are in-scope here, but
+    go :: [Var]           -- Variables that are in-scope here, but
                           -- not in scope at the joinrec; that is,
                           -- we must potentially abstract over them.
                           -- Invariant: they are kept in dependency order
-       -> CoreExprWithFVs -- ^ Current expression in tail position
+       -> CoreExprWithFVs -- Current expression in tail position
        -> ExitifyM CoreExpr
 
     -- We first look at the expression (no matter what it shape is)
