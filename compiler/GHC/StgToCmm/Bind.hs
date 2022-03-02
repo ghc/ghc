@@ -672,7 +672,7 @@ setupUpdate :: ClosureInfo -> LocalReg -> FCode () -> FCode ()
         -- so that the cost centre in the original closure can still be
         -- extracted by a subsequent enterCostCentre
 setupUpdate closure_info node body
-  | not (lfUpdatable (closureLFInfo closure_info))
+  | not (closureUpdReqd closure_info)
   = body
 
   | not (isStaticClosure closure_info)
