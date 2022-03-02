@@ -267,6 +267,10 @@ unsafeEqualityProof = case unsafeEqualityProof @a @b of UnsafeRefl -> UnsafeRefl
 --      (which have different kinds!) because it's really just a newtype.
 --      Note: there is /no guarantee, at all/ that this behavior will be supported
 --      into perpetuity.
+--
+--
+--   For safe zero-cost coercions you can instead use the 'Data.Coerce.coerce' function from
+--   "Data.Coerce".
 unsafeCoerce :: forall (a :: Type) (b :: Type) . a -> b
 unsafeCoerce x = case unsafeEqualityProof @a @b of UnsafeRefl -> x
 
