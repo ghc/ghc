@@ -906,25 +906,14 @@ tYPE_ERROR_ID                   = mkRuntimeErrorId typeErrorName
 --
 -- where `raiseOverflow#` is defined in the rts/Exception.cmm.
 --
--- Note that `raiseOverflow` and friends, being top-level thunks, are CAFs.
--- Normally, this would be reflected in their IdInfo; however, as these
--- functions are widely used and CAFfyness is transitive, we very much want to
--- avoid declaring them as CAFfy. This is especially true in especially in
--- performance-critical code like that using unboxed sums and
--- absentSumFieldError.
+-- Being top-level thunks, one might be tempted to believe that `raiseOverflow`
+-- and friends must be CAFs. However, the code generator is smart enough to
+-- notice that they have diverging demand signatures and consequently they can
+-- be declared to be non-updatable. This is very helpful as CAFfyness is
+-- transitive and these functions are very widely used.
 --
--- Consequently, `mkExceptionId` instead declares the exceptions to be
--- non-CAFfy and rather ensure in the RTS (in `initBuiltinGcRoots` in
--- rts/RtsStartup.c) that these closures remain reachable by creating a
--- StablePtr to each. Note that we are using the StablePtr mechanism not
--- because we need a StablePtr# object, but rather because the stable pointer
--- table is a source of GC roots.
---
--- At some point we could consider removing this optimisation as it is quite
--- fragile, but we do want to be careful to avoid adding undue cost. Unboxed
--- sums in particular are intended to be used in performance-critical contexts.
---
--- See #15038, #21141.
+-- See #15038, #21141 for relevant discussion regarding wired-in exceptions and
+-- CAFfyness.
 
 absentSumFieldErrorName
    = mkWiredInIdName

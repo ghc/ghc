@@ -714,6 +714,24 @@ coreToPreStgRhs expr@(Lam _ _) =
           return (PreStgRhs args' body')
 coreToPreStgRhs expr = PreStgRhs [] <$> coreToStgExpr expr
 
+{- Note [Don't update dead-end thunks]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider a program like
+
+    x = error "hello"
+
+Should `x` be updateable? If we can prove that answering "no" doesn't result in
+a loss of sharing then it is useful to do so as we can avoid the cost of
+pushing an update frame and, if `x` if a top-level, eliminate a CAF.
+
+In the case of `x`, we know from demand analysis that it unconditionally
+diverges (that is, is a "dead-end" thunk). Since `x` diverges, it will by
+definition never be updated, even if we declare it to be updateable.
+Consequently, we can safely declare it as non-updatable (or, as the code
+generator calls it, SingleEntry) without losing sharing (since there is no
+result that might be shared).
+-}
+
 -- Generate a top-level RHS. Any new cost centres generated for CAFs will be
 -- appended to `CollectedCCs` argument.
 mkTopStgRhs :: DynFlags -> Module -> CollectedCCs
@@ -755,6 +773,8 @@ mkTopStgRhs dflags this_mod ccs bndr (PreStgRhs bndrs rhs)
     (ticks, unticked_rhs) = stripStgTicksTop (not . tickishIsCode) rhs
 
     upd_flag | isUsedOnceDmd (idDemandInfo bndr) = SingleEntry
+             | isDeadEndId bndr                  = SingleEntry
+               -- See Note [Don't update dead-end thunks]
              | otherwise                         = Updatable
 
     -- CAF cost centres generated for -fcaf-all
@@ -801,6 +821,8 @@ mkStgRhs bndr (PreStgRhs bndrs rhs)
     (ticks, unticked_rhs) = stripStgTicksTop (not . tickishIsCode) rhs
 
     upd_flag | isUsedOnceDmd (idDemandInfo bndr) = SingleEntry
+             | isDeadEndId bndr                  = SingleEntry
+               -- See Note [Don't update dead-end thunks]
              | otherwise                         = Updatable
 
   {-
