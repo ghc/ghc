@@ -511,6 +511,8 @@ toCName dflags i = showSDoc dflags (pprCode CStyle (ppr (idName i)))
 For each @foreign export@ function, a C stub function is generated.
 The C stub constructs the application of the exported Haskell function
 using the hugs/ghc rts invocation API.
+
+See Note [runIO is referred to by foreign export stubs] in rts/RtsStartup.c.
 -}
 
 mkFExportCBits :: DynFlags
