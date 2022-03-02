@@ -56,6 +56,7 @@ import GHC.Data.FastString
 import Data.List ( mapAccumL )
 import Control.Monad
 import qualified Data.Semigroup as S
+import GHC.Builtin.Names (constraintKindTyConKey, liftedTypeKindTyConKey)
 
 {-
 
@@ -397,8 +398,8 @@ complete. This means that, sometimes, a closed type family does not reduce
 when it should. See test case indexed-types/should_fail/Overlap15 for an
 example.
 
-Note [Unificiation result]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Unification result]
+~~~~~~~~~~~~~~~~~~~~~~~~~
 When unifying t1 ~ t2, we return
 * Unifiable s, if s is a substitution such that s(t1) is syntactically the
   same as s(t2), modulo type-synonym expansion.
@@ -522,7 +523,7 @@ tcUnifyTyKis bind_fn tys1 tys2
 -- return the final result. See Note [Fine-grained unification]
 type UnifyResult = UnifyResultM TCvSubst
 
--- | See Note [Unificiation result]
+-- | See Note [Unification result]
 data UnifyResultM a = Unifiable a        -- the subst that unifies the types
                     | MaybeApart MaybeApartReason
                                  a       -- the subst has as much as we know
@@ -531,19 +532,25 @@ data UnifyResultM a = Unifiable a        -- the subst that unifies the types
                     | SurelyApart
                     deriving Functor
 
--- | Why are two types 'MaybeApart'? 'MARTypeFamily' takes precedence:
+-- | Why are two types 'MaybeApart'? 'MARInfinite' takes precedence:
 -- This is used (only) in Note [Infinitary substitution in lookup] in GHC.Core.InstEnv
+-- As of Feb 2022, we never differentiate between MARTypeFamily and MARTypeVsConstraint;
+-- it's really only MARInfinite that's interesting here.
 data MaybeApartReason = MARTypeFamily   -- ^ matching e.g. F Int ~? Bool
                       | MARInfinite     -- ^ matching e.g. a ~? Maybe a
+                      | MARTypeVsConstraint  -- ^ matching Type ~? Constraint
+                                             -- See Note [coreView vs tcView] in GHC.Core.Type
 
 instance Outputable MaybeApartReason where
-  ppr MARTypeFamily = text "MARTypeFamily"
-  ppr MARInfinite   = text "MARInfinite"
+  ppr MARTypeFamily       = text "MARTypeFamily"
+  ppr MARInfinite         = text "MARInfinite"
+  ppr MARTypeVsConstraint = text "MARTypeVsConstraint"
 
 instance Semigroup MaybeApartReason where
   -- see end of Note [Unification result] for why
-  MARTypeFamily <> r = r
-  MARInfinite   <> _ = MARInfinite
+  MARTypeFamily       <> r = r
+  MARInfinite         <> _ = MARInfinite
+  MARTypeVsConstraint <> r = r
 
 instance Applicative UnifyResultM where
   pure  = Unifiable
@@ -1052,13 +1059,22 @@ unify_ty :: UMEnv
 -- See Note [Specification of unification]
 -- Respects newtypes, PredTypes
 -- See Note [Computing equality on types] in GHC.Core.Type
-unify_ty env ty1 ty2 kco
+unify_ty _env (TyConApp tc1 []) (TyConApp tc2 []) _kco
   -- See Note [Comparing nullary type synonyms] in GHC.Core.Type.
-  | TyConApp tc1 [] <- ty1
-  , TyConApp tc2 [] <- ty2
-  , tc1 == tc2                = return ()
+  | tc1 == tc2
+  = return ()
 
-    -- TODO: More commentary needed here
+  -- See Note [coreView vs tcView] in GHC.Core.Type.
+  | tc1 `hasKey` constraintKindTyConKey
+  , tc2 `hasKey` liftedTypeKindTyConKey
+  = maybeApart MARTypeVsConstraint
+
+  | tc2 `hasKey` constraintKindTyConKey
+  , tc1 `hasKey` liftedTypeKindTyConKey
+  = maybeApart MARTypeVsConstraint
+
+unify_ty env ty1 ty2 kco
+    -- Now handle the cases we can "look through": synonyms and casts.
   | Just ty1' <- tcView ty1   = unify_ty env ty1' ty2 kco
   | Just ty2' <- tcView ty2   = unify_ty env ty1 ty2' kco
   | CastTy ty1' co <- ty1     = if um_unif env

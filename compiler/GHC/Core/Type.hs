@@ -379,21 +379,10 @@ while coreView is used during e.g. optimisation passes.
 
 See also #11715, which tracks removing this inconsistency.
 
-The inconsistency actually leads to a potential soundness bug, in that
-Constraint and Type are considered *apart* by the type family engine.
-To wit, we can write
-
-  type family F a
-  type instance F Type = Bool
-  type instance F Constraint = Int
-
-and (because Type ~# Constraint in Core), thus build a coercion between
-Int and Bool. I (Richard E) conjecture that this never happens in practice,
-but it's very uncomfortable. This, essentially, is the root problem
-underneath #11715, which is quite resistant to an easy fix. The best
-idea is to have roles in kind coercions, but that has yet to be implemented.
-See also "A Role for Dependent Types in Haskell", ICFP 2019, which describes
-how roles in kinds might work out.
+In order to prevent users from discerning between Type and Constraint
+(which could create inconsistent axioms -- see #21092), we say that
+Type and Constraint are not SurelyApart in the pure unifier. See
+GHC.Core.Unify.unify_ty, where this case produces MaybeApart.
 
 One annoying consequence of this inconsistency is that we can get ill-kinded
 updates to metavariables. #20356 is a case in point. Simplifying somewhat,

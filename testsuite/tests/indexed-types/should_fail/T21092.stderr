@@ -1,0 +1,5 @@
+
+T21092.hs:8:15: error:
+    Conflicting family instance declarations:
+      F (*) = Int -- Defined at T21092.hs:8:15
+      F Constraint = Bool -- Defined at T21092.hs:9:15
