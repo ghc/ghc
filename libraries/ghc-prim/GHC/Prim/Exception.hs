@@ -5,6 +5,9 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE EmptyCase #-}
 
+{-# OPTIONS_GHC -O1 #-}
+    -- See Note [Wired-in exceptions are not CAFfy]
+
 -- | Primitive exceptions.
 module GHC.Prim.Exception
    ( raiseOverflow

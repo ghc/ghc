@@ -909,8 +909,15 @@ tYPE_ERROR_ID                   = mkRuntimeErrorId typeErrorName
 -- Being top-level thunks, one might be tempted to believe that `raiseOverflow`
 -- and friends must be CAFs. However, the code generator is smart enough to
 -- notice that they have diverging demand signatures and consequently they can
--- be declared to be non-updatable. This is very helpful as CAFfyness is
--- transitive and these functions are very widely used.
+-- be declared to be non-updatable.
+--
+-- Since `raiseOverflow` and friends are not themselves CAFs and do not depend
+-- on other CAFfy bindings, we can safely declare them to be non-CAFfy.  This
+-- is very helpful as CAFfyness is transitive and these functions are very
+-- widely used.  However, in order for this trick to work we must ensure that
+-- we do not zap demand signatures, as would happen when compiling with -O0.
+-- Consequently, we must compile `GHC.Prim.Exception` with -O1, which we
+-- achieve with an OPTIONS_GHC pragma.
 --
 -- See #15038, #21141 for relevant discussion regarding wired-in exceptions and
 -- CAFfyness.
