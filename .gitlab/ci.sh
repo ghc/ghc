@@ -485,6 +485,9 @@ function build_hadrian() {
   if [ -z "${BIN_DIST_NAME:-}" ]; then
     fail "BIN_DIST_NAME not set"
   fi
+  if [ -n "${BIN_DIST_PREP_TAR_COMP:-}" ]; then
+    fail "BIN_DIST_PREP_TAR_COMP must not be set for hadrian (you mean BIN_DIST_NAME)"
+  fi
 
   # N.B. First build Hadrian, unsetting MACOSX_DEPLOYMENT_TARGET which may warn
   # if the bootstrap libraries were built with a different version expectation.
