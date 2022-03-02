@@ -204,6 +204,31 @@ From a semantic point of view:
    (b) large or a redex, then it would not be substituted, and the rule
    would not fire.
 
+-  GHC will never match a forall'd variable in a template with an expression
+   which contains locally bound variables. For example, it is permitted to write
+   a rule which contains a case expression::
+
+        {-# RULES
+          "test/case-tup" forall (x :: (Int, Int)) (y :: Int) (z :: Int).
+            test (case x of (l, r) -> y) z = case x of (l, r) -> test y z
+          #-}
+
+   But the rule will not match when ``y`` contains either of ``l`` or ``r`` because
+   they are locally bound. Therefore the following application will fail to trigger
+   the rule::
+
+        prog :: (Int, Int) -> (Int, Int)
+        prog x = test (case x of (p, q) -> p) 0
+
+   because ``y`` would have to match against ``p`` (which is locally bound)
+   but it will fire for::
+
+        prog :: (Int, Int) -> (Int, Int)
+        prog x = test (case x of (p, q) -> 0) 0
+
+   because ``y`` can match against ``0``.
+
+
 .. _rules-inline:
 
 How rules interact with ``INLINE``/``NOINLINE`` pragmas
