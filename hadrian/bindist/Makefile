@@ -190,6 +190,9 @@ install_docs:
 		cp -R $$i "$(docdir)/"; \
 	done
 
+	$(INSTALL_DATA) docs-utils/prologue.txt "$(docdir)/html/libraries/"
+	$(INSTALL_SCRIPT) docs-utils/gen_contents_index "$(docdir)/html/libraries/"
+
 BINARY_NAMES=$(shell ls ./wrappers/)
 install_wrappers: install_bin_libdir
 	@echo "Installing wrapper scripts"
