@@ -583,9 +583,7 @@ primop Word32NeOp "neWord32#" Compare Word32# -> Word32# -> Int#
 
 ------------------------------------------------------------------------
 section "Int64#"
-        {Operations on 64-bit unsigned words. This type is only used
-         if plain {\tt Int\#} has less than 64 bits. In any case, the operations
-         are not primops; they are implemented (if needed) as ccalls instead.}
+        {Operations on 64-bit signed words.}
 ------------------------------------------------------------------------
 
 primtype Int64#
@@ -629,9 +627,7 @@ primop Int64NeOp "neInt64#" Compare Int64# -> Int64# -> Int#
 
 ------------------------------------------------------------------------
 section "Word64#"
-        {Operations on 64-bit unsigned words. This type is only used
-         if plain {\tt Word\#} has less than 64 bits. In any case, the operations
-         are not primops; they are implemented (if needed) as ccalls instead.}
+        {Operations on 64-bit unsigned words.}
 ------------------------------------------------------------------------
 
 primtype Word64#
