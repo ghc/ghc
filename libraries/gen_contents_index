@@ -32,7 +32,18 @@ then
     [ -d dist-haddock ] || mkdir dist-haddock
     cd dist-haddock
 
-    HADDOCK=../../inplace/bin/haddock
+    if [ -e ../../inplace/bin/haddock ]
+    then
+      # Make #17527
+      HADDOCK=../../inplace/bin/haddock
+    elif [ -e ../../../../../bin/haddock ]
+    then
+      # Hadrian
+      HADDOCK=../../../../../bin/haddock
+    else
+      echo "Haddock not found"
+      exit 1
+    fi
     # Exclude Cabal package-tests, which may run haddock
     HADDOCK_FILES=`find ../ -name *.haddock | grep -v 'PackageTests' | sort`
     HADDOCK_ARGS="-p ../prologue.txt"
