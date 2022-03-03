@@ -227,6 +227,9 @@ bindistRules = do
         -- included in the bindist in the past (part of the problem in #18669).
         whenM (liftIO (IO.doesDirectoryExist (root -/- "docs"))) $ do
           copyDirectory (root -/- "docs") bindistFilesDir
+          copyFile ("libraries" -/- "prologue.txt") (bindistFilesDir -/- "docs-utils" -/- "prologue.txt")
+          copyFile ("libraries" -/- "gen_contents_index") (bindistFilesDir -/- "docs-utils" -/- "gen_contents_index" )
+
         when windowsHost $ do
           copyDirectory (root -/- "mingw") bindistFilesDir
           -- we use that opportunity to delete the .stamp file that we use
