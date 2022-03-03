@@ -531,6 +531,11 @@ delVarEnv        = delFromUFM
 minusVarEnv      = minusUFM
 plusVarEnv       = plusUFM
 plusVarEnvList   = plusUFMList
+-- lookupVarEnv is very hot (in part due to being called by substTyVar),
+-- if it's not inlined than the mere allocation of the Just constructor causes
+-- perf benchmarks to regress by 2% in some cases. See #21159, !7638 and containers#821
+-- for some more explanation about what exactly went wrong.
+{-# INLINE lookupVarEnv #-}
 lookupVarEnv     = lookupUFM
 lookupVarEnv_Directly = lookupUFM_Directly
 filterVarEnv     = filterUFM
