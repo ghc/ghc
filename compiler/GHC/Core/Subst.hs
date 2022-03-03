@@ -66,6 +66,7 @@ import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import Data.List (mapAccumL)
+import GHC.Driver.Ppr
 
 
 
@@ -253,10 +254,10 @@ lookupIdSubst (Subst in_scope ids _ _) v
   | not (isLocalId v) = Var v
   | Just e  <- lookupVarEnv ids       v = e
   | Just v' <- lookupInScope in_scope v = Var v'
-        -- Vital! See Note [Extending the Subst]
-        -- If v isn't in the InScopeSet, we panic, because
-        -- it's a bad bug and we reallly want to know
-  | otherwise = pprPanic "lookupIdSubst" (ppr v $$ ppr in_scope)
+
+  | otherwise = WARN( True, text "GHC.Core.Subst.lookupIdSubst" <+> ppr v
+                             $$ ppr in_scope)
+                Var v
 
 -- | Find the substitution for a 'TyVar' in the 'Subst'
 lookupTCvSubst :: Subst -> TyVar -> Type
