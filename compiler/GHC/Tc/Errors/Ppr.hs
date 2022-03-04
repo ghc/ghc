@@ -1818,30 +1818,36 @@ pprTcSolverReportMsg ctxt (CouldNotDeduce useful_givens (item :| others) mb_extr
   where
     main_msg
       | null useful_givens
-      = addArising orig no_instance_msg
+      = addArising orig (no_instance_msg <+> missing)
       | otherwise
-      = vcat [ addArising orig no_deduce_msg
-             , vcat (pp_givens useful_givens) ]
+      = vcat (addArising orig (no_deduce_msg <+> missing)
+              : pp_givens useful_givens)
+
     supplementary = case mb_extra of
       Nothing
         -> Left []
       Just (CND_Extra level ty1 ty2)
         -> mk_supplementary_ea_msg ctxt level ty1 ty2 orig
-    (wanted, wanteds) = (errorItemPred item, map errorItemPred others)
     orig = errorItemOrigin item
-    no_instance_msg
-      | null others
-      , Just (tc, _) <- splitTyConApp_maybe wanted
-      , isClassTyCon tc
-      -- Don't say "no instance" for a constraint such as "c" for a type variable c.
-      = text "No instance for" <+> pprParendType wanted
-      | otherwise
-      = text "Could not solve:" <+> pprTheta wanteds
-    no_deduce_msg
-      | null others
-      = text "Could not deduce" <+> pprParendType wanted
-      | otherwise
-      = text "Could not deduce:" <+> pprTheta wanteds
+    wanteds = map errorItemPred (item:others)
+
+    no_instance_msg =
+      case wanteds of
+        [wanted] | Just (tc, _) <- splitTyConApp_maybe wanted
+                 -- Don't say "no instance" for a constraint such as "c" for a type variable c.
+                 , isClassTyCon tc -> text "No instance for"
+        _ -> text "Could not solve:"
+
+    no_deduce_msg =
+      case wanteds of
+        [_wanted] -> text "Could not deduce"
+        _         -> text "Could not deduce:"
+
+    missing =
+      case wanteds of
+        [wanted] -> pprParendType wanted
+        _        -> pprTheta wanteds
+
 pprTcSolverReportMsg ctxt (AmbiguityPreventsSolvingCt item ambigs) =
   pprTcSolverReportInfo ctxt (Ambiguity True ambigs) <+>
   pprArising (errorItemOrigin item) $$
