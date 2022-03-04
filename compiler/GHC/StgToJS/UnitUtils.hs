@@ -7,10 +7,12 @@ module GHC.StgToJS.UnitUtils
   )
 where
 
-import GHC.Prelude
+
 import GHC.Data.ShortText as ST
 import GHC.Unit.Module
 import GHC.Utils.Encoding
+
+import GHC.Prelude
 
 unitModuleString :: Module -> String
 unitModuleString mod = mconcat
@@ -19,8 +21,8 @@ unitModuleString mod = mconcat
   , moduleNameString (moduleName mod)
   ]
 
--- | the global linkable unit of a module exports this symbol, depend on it to include that unit
---   (used for cost centres)
+-- | the global linkable unit of a module exports this symbol, depend on it to
+--   include that unit (used for cost centres)
 moduleGlobalSymbol :: Module -> ShortText
 moduleGlobalSymbol m = mconcat
   [ "h$"

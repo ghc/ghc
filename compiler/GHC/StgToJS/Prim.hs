@@ -961,7 +961,10 @@ fetchOpByteArray op tgt src i v = mconcat
   , i3_ src i |= op tgt v
   ]
 
--- lifted arrays
+--------------------------------------------------------------------------------
+--                            Lifted Arrays
+--------------------------------------------------------------------------------
+-- | lifted arrays
 cloneArray :: JExpr -> JExpr -> Maybe JExpr -> JExpr -> JStat
 cloneArray tgt src mb_offset len = mconcat
   [ tgt |= ApplExpr (src .^ "slice") [start, end]
@@ -980,30 +983,6 @@ newByteArray :: JExpr -> JExpr -> JStat
 newByteArray tgt len =
   tgt |= app "h$newByteArray" [len]
 
-math :: JExpr
-math = var "Math"
-
-math_ :: ShortText -> [JExpr] -> JExpr
-math_ op args = ApplExpr (math .^ op) args
-
-math_log, math_sin, math_cos, math_tan, math_exp, math_acos, math_asin, math_atan,
-  math_abs, math_pow, math_sqrt, math_asinh, math_acosh, math_atanh
-  :: [JExpr] -> JExpr
-math_log   = math_ "log"
-math_sin   = math_ "sin"
-math_cos   = math_ "cos"
-math_tan   = math_ "tan"
-math_exp   = math_ "exp"
-math_acos  = math_ "acos"
-math_asin  = math_ "asin"
-math_atan  = math_ "atan"
-math_abs   = math_ "abs"
-math_pow   = math_ "pow"
---math_sign  = math_ "sign"
-math_sqrt  = math_ "sqrt"
-math_asinh = math_ "asinh"
-math_acosh = math_ "acosh"
-math_atanh = math_ "atanh"
 
 -- e|0  (32 bit signed integer truncation)
 trunc :: JExpr -> JExpr

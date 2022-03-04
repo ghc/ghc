@@ -5,8 +5,12 @@ module GHC.StgToJS.Regs
   , Special(..)
   , sp
   , stack
-  , r1
+  , r1, r2, r3, r4
   , StgRet (..)
+  , jsRegToInt
+  , intToJSReg
+  , maxReg
+  , minReg
   )
 where
 
@@ -20,6 +24,18 @@ import qualified GHC.Data.ShortText as ST
 import Data.Array
 import Data.Char
 
+-- FIXME: Perf: Jeff (2022,03): as far as I can tell, we never pattern match on
+-- these registers and make heavy use of the Enum, Bounded, and Ix, instances.
+-- This heavily implies to me that we should be using something like: StgReg =
+-- StgReg { unStgReg :: Int8# } and then store two nibbles in a single byte. Not
+-- only would this be more memory efficient, but it would also allow for
+-- optimizations such as pointer tagging and avoiding chasing the info table,
+-- although I'm not sure if this would really benefit the backend as currently
+-- written. Other than that a newtype wrapper with a custom bounded instance
+-- (hand written or deriving via) would be better. In almost all functions that
+-- take an StgReg we use either the Bounded or the Enum methods, thus we likely
+-- don't gain anything from having these registers explicitly represented in
+-- data constructors.
 -- | General purpose "registers"
 --
 -- The JS backend arbitrarily supports 128 registers
@@ -75,9 +91,26 @@ sp = toJExpr Sp
 stack :: JExpr
 stack = toJExpr Stack
 
-r1 :: JExpr
+r1, r2, r3, r4 :: JExpr
 r1 = toJExpr R1
+r2 = toJExpr R2
+r3 = toJExpr R3
+r4 = toJExpr R4
 
+
+-- FIXME: Jeff (2022,03): remove these serialization functions after adding a
+-- StgReg type with a proper bounded and enum instance
+jsRegToInt :: StgReg -> Int
+jsRegToInt = (+1) . fromEnum
+
+intToJSReg :: Int -> StgReg
+intToJSReg r = toEnum (r - 1)
+
+maxReg :: Int
+maxReg = jsRegToInt maxBound
+
+minReg :: Int
+minReg = jsRegToInt minBound
 ---------------------------------------------------
 -- caches
 ---------------------------------------------------

@@ -68,6 +68,7 @@ import qualified Data.List as L
 import qualified Data.Set as S
 import qualified Data.Map as M
 import Control.Monad
+import Control.Arrow ((&&&))
 
 genExpr :: HasDebugCallStack => ExprCtx -> CgStgExpr -> G (JStat, ExprResult)
 genExpr ctx stg = case stg of
@@ -169,7 +170,7 @@ genBindLne :: HasDebugCallStack
 genBindLne ctx bndr = do
   vis  <- map (\(x,y,_) -> (x,y)) <$>
             optimizeFree oldFrameSize (newLvs++map fst updBinds)
-  declUpds <- mconcat <$> mapM (fmap (\x -> x ||= null_) . jsIdI . fst) updBinds
+  declUpds <- mconcat <$> mapM (fmap (||= null_) . jsIdI . fst) updBinds
   let newFrameSize = oldFrameSize + length vis
       ctx' = ctx
         { ctxLne        = addListToUniqSet (ctxLne ctx) bound
@@ -181,8 +182,8 @@ genBindLne ctx bndr = do
   where
     oldFrame     = ctxLneFrame ctx
     oldFrameSize = length oldFrame
-    isOldLv i    = i `elementOfUniqSet` (ctxLne ctx) ||
-                   i `elem` (map fst oldFrame)
+    isOldLv i    = i `elementOfUniqSet` ctxLne ctx ||
+                   i `elem` map fst oldFrame
     live         = liveVars $ mkDVarSet $ stgLneLive' bndr
     newLvs       = filter (not . isOldLv) (dVarSetElems live)
     binds = case bndr of
@@ -210,7 +211,7 @@ genEntryLne ctx i rhs@(StgRhsClosure _ext _cc update args body) =
       myOffset    =
         maybe (panic "genEntryLne: updatable binder not found in let-no-escape frame")
               ((payloadSize-) . fst)
-              (listToMaybe $ filter ((==i).fst.snd) (zip [0..] frame))
+              (L.find ((==i) . fst . snd) (zip [0..] frame))
       bh | isUpdatable update =
              jVar (\x -> mconcat
               [ x |= ApplExpr (var "h$bh_lne") [Sub sp (toJExpr myOffset), toJExpr (payloadSize+1)]
@@ -244,7 +245,7 @@ genEntryLne ctx i (StgRhsCon cc con _mu _ticks args) = resetSlots $ do
 
 -- generate the entry function for a local closure
 genEntry :: HasDebugCallStack => ExprCtx -> Id -> CgStgRhs -> G ()
-genEntry _ _i (StgRhsCon {}) = return () -- mempty -- error "local data entry"
+genEntry _ _i StgRhsCon {} = return () -- mempty -- error "local data entry"
 genEntry ctx i rhs@(StgRhsClosure _ext cc {-_bi live-} upd_flag args body) = resetSlots $ do
   let live = stgLneLiveExpr rhs -- error "fixme" -- probably find live vars in body
   ll    <- loadLiveFun live
@@ -544,7 +545,7 @@ genRet ctx e at as l = withNewIdent f
     lneLive    = maximum $ 0 : map (fromMaybe 0 . lookupUFM (ctxLneFrameBs ctx)) allRefs
     ctx'       = adjustCtxStack lneLive ctx
     lneVars    = map fst $ take lneLive (ctxLneFrame ctx)
-    isLne i    = i `elem` lneVars || i `elementOfUniqSet` (ctxLne ctx)
+    isLne i    = i `elem` lneVars || i `elementOfUniqSet` ctxLne ctx
     nonLne     = filter (not . isLne) (dVarSetElems l)
 
     f :: Ident -> G JStat
@@ -562,8 +563,7 @@ genRet ctx e at as l = withNewIdent f
                     ri
                     (fixedLayout . reverse $
                        map (stackSlotType . fst3) free
-                       ++ if prof then [ObjV] else []
-                       ++ map stackSlotType lneVars)
+                       ++ if prof then [ObjV] else map stackSlotType lneVars)
                     CIStackFrame
                     sr
       emitToplevel $ r ||= toJExpr (JFunc [] fun')
@@ -600,7 +600,7 @@ genAlts ctx e at me alts = do
   (st, er) <- case at of
 
     PolyAlt -> case alts of
-      [alt] -> (\b -> (branch_stat b, branch_result b)) <$> mkAlgBranch ctx e alt
+      [alt] -> (branch_stat &&& branch_result) <$> mkAlgBranch ctx e alt
       _     -> panic "genAlts: multiple polyalt"
 
     PrimAlt _tc
@@ -885,24 +885,28 @@ allocDynAll haveDecl middle cls = do
     middle' = fromMaybe mempty middle
 
     makeObjs :: G JStat
-    makeObjs = do
+    makeObjs =
       fmap mconcat $ forM cls $ \(i,f,_,cc) -> do
-        ccs <- maybeToList <$> costCentreStackLbl cc
-        pure $ mconcat
-          [ dec i
-          , toJExpr i |= if csInlineAlloc settings
-              then ValExpr (jhFromList $ [ (closureEntry_ , f)
-                                         , (closureExtra1_, null_)
-                                         , (closureExtra2_, null_)
-                                         , (closureMeta_  , zero_)
-                                         ]
-                               ++ fmap (\cid -> ("cc", ValExpr (JVar cid))) ccs)
-              else ApplExpr (var "h$c") (f : fmap (\cid -> ValExpr (JVar cid)) ccs)
-          ]
+      ccs <- maybeToList <$> costCentreStackLbl cc
+      pure $ mconcat
+        [ dec i
+        , toJExpr i |= if csInlineAlloc settings
+            then ValExpr (jhFromList $ [ (closureEntry_ , f)
+                                       , (closureExtra1_, null_)
+                                       , (closureExtra2_, null_)
+                                       , (closureMeta_  , zero_)
+                                       ]
+                             ++ fmap (\cid -> ("cc", ValExpr (JVar cid))) ccs)
+            else ApplExpr (var "h$c") (f : fmap (ValExpr . JVar) ccs)
+        ]
 
     fillObjs = mconcat $ map fillObj cls
     fillObj (i,_,es,_)
-      | csInlineAlloc settings || length es > 24 =
+      | csInlineAlloc settings || length es > 24 = -- FIXME (Jeff, 2022/03): the call to length means `es`
+                                                   -- should be something other than
+                                                   -- a list. Also why is 24
+                                                   -- important? And 24 should be a
+                                                   -- constant such as `fooThreshold`
           case es of
             []      -> mempty
             [ex]    -> toJExpr i .^ closureExtra1_ |= toJExpr ex
@@ -931,7 +935,8 @@ allocDynAll haveDecl middle cls = do
 
     dec i | haveDecl  = DeclStat i
           | otherwise = mempty
-    checkObjs | csAssertRts settings  = mconcat $ map (\(i,_,_,_) -> (ApplStat (ValExpr (JVar (TxtI "h$checkObj")))) (((:) (toJExpr i)) []){-[j| h$checkObj(`i`); |]-}) cls
+    checkObjs | csAssertRts settings  = mconcat $
+                map (\(i,_,_,_) -> ApplStat (ValExpr (JVar (TxtI "h$checkObj"))) [toJExpr i] {-[j| h$checkObj(`i`); |]-}) cls
               | otherwise = mempty
 
   objs <- makeObjs

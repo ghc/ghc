@@ -1,11 +1,23 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings    #-}
+
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+-- only for ToStat ClosureInfo
+
+-- FIXME: Jeff (2022,03): fix this orphan instance. the problem is that the
+-- toStat ClosureInfo requires the helper function @closureInfoStat@ which in
+-- turn requires numerous helper functions that are in this file. Thus, if we
+-- moved this instance to StgToJS.Types then we'll create a module import cycle.
+
 
 -- | Core utils
 module GHC.StgToJS.CoreUtils where
 
 import GHC.Prelude
 
+import GHC.JS.Make
 import GHC.JS.Syntax
+
 import GHC.StgToJS.Types
 
 import GHC.Stg.Syntax
@@ -27,6 +39,9 @@ import GHC.Types.Id
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+
+import qualified Data.Bits as Bits
+import GHC.Data.ShortText
 
 -- | can we unbox C x to x, only if x is represented as a Number
 isUnboxableCon :: DataCon -> Bool
@@ -246,5 +261,83 @@ alignPrimReps (r:rs) vs = case (primRepSize r,vs) of
 alignIdPrimReps :: Outputable a => Id -> [a] -> [(PrimRep, [a])]
 alignIdPrimReps i = alignPrimReps (idPrimReps i)
 
+
 alignIdExprs :: Id -> [JExpr] -> [TypedExpr]
 alignIdExprs i es = fmap (uncurry TypedExpr) (alignIdPrimReps i es)
+
+closureInfoStat :: Bool -> ClosureInfo -> JStat
+closureInfoStat debug (ClosureInfo obj rs name layout CIThunk srefs) =
+    setObjInfoL debug obj rs layout Thunk name 0 srefs
+closureInfoStat debug (ClosureInfo obj rs name layout (CIFun arity nregs) srefs) =
+    setObjInfoL debug obj rs layout Fun name (mkArityTag arity nregs) srefs
+closureInfoStat debug (ClosureInfo obj rs name layout (CICon con) srefs) =
+    setObjInfoL debug obj rs layout Con name con srefs
+closureInfoStat debug (ClosureInfo obj rs name layout CIBlackhole srefs)   =
+    setObjInfoL debug obj rs layout Blackhole name 0 srefs
+closureInfoStat debug (ClosureInfo obj rs name layout CIPap srefs)  =
+    setObjInfoL debug obj rs layout Pap name 0 srefs
+closureInfoStat debug (ClosureInfo obj rs name layout CIStackFrame srefs) =
+    setObjInfoL debug obj rs layout StackFrame name 0 srefs
+
+setObjInfoL :: Bool        -- ^ debug: output symbol names
+            -> ShortText   -- ^ the object name
+            -> CIRegs      -- ^ things in registers
+            -> CILayout    -- ^ layout of the object
+            -> ClosureType -- ^ closure type
+            -> ShortText   -- ^ object name, for printing
+            -> Int         -- ^ `a' argument, depends on type (arity, conid)
+            -> CIStatic    -- ^ static refs
+            -> JStat
+setObjInfoL debug obj rs CILayoutVariable t n a =
+  setObjInfo debug obj t n [] a (-1) rs
+setObjInfoL debug obj rs (CILayoutUnknown size) t n a =
+  setObjInfo debug obj t n xs a size rs
+    where
+      xs  = toTypeList (replicate size ObjV)
+setObjInfoL debug obj rs (CILayoutFixed size layout) t n a =
+  setObjInfo debug obj t n xs a size rs
+    where
+      xs   = toTypeList layout
+
+setObjInfo :: Bool        -- ^ debug: output all symbol names
+           -> ShortText   -- ^ the thing to modify
+           -> ClosureType -- ^ closure type
+           -> ShortText   -- ^ object name, for printing
+           -> [Int]       -- ^ list of item types in the object, if known (free variables, datacon fields)
+           -> Int         -- ^ extra 'a' parameter, for constructor tag or arity
+           -> Int         -- ^ object size, -1 (number of vars) for unknown
+           -> CIRegs      -- ^ things in registers [VarType]  -- ^ things in registers
+           -> CIStatic    -- ^ static refs
+           -> JStat
+setObjInfo debug obj t name fields a size regs static
+   | debug     = appS "h$setObjInfo" [ var obj
+                                     , toJExpr t
+                                     , toJExpr name
+                                     , toJExpr fields
+                                     , toJExpr a
+                                     , toJExpr size
+                                     , toJExpr (regTag regs)
+                                     , toJExpr static
+                                     ] -- error "setObjInfo1" -- [j| h$setObjInfo(`TxtI obj`, `t`, `name`, `fields`, `a`, `size`, `regTag regs`, `static`); |]
+   | otherwise = appS "h$o" [ var obj
+                            , toJExpr t
+                            , toJExpr a
+                            , toJExpr size
+                            , toJExpr (regTag regs)
+                            , toJExpr static
+                            ] -- error "setObjInfo2" -- [j| h$o(`TxtI obj`,`t`,`a`,`size`,`regTag regs`,`static`); |]
+  where
+    regTag CIRegsUnknown       = -1
+    regTag (CIRegs skip types) =
+      let nregs = sum $ map varSize types
+      in  skip + (nregs `Bits.shiftL` 8)
+
+-- | note: the statements only work after all top-level objects have been created
+instance ToStat ClosureInfo where
+  toStat = closureInfoStat False
+
+mkArityTag :: Int -> Int -> Int
+mkArityTag arity registers = arity Bits..|. (registers `Bits.shiftL` 8)
+
+toTypeList :: [VarType] -> [Int]
+toTypeList = concatMap (\x -> replicate (varSize x) (fromEnum x))

@@ -6,6 +6,7 @@ module GHC.StgToJS.DataCon
   , allocCon
   , allocUnboxedCon
   , allocDynamicE
+  , allocDynamic
   )
 where
 

@@ -1,3 +1,6 @@
+{-# LANGUAGE DerivingStrategies         #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
 module GHC.StgToJS.Types where
 
 import GHC.Prelude
@@ -16,7 +19,7 @@ import GHC.Types.ForeignCall
 import GHC.Types.SrcLoc
 
 import GHC.Utils.Monad.State.Strict
-import GHC.Utils.Outputable (Outputable (..), text)
+import GHC.Utils.Outputable (Outputable (..), text, SDocContext)
 
 import GHC.Data.ShortText
 
@@ -52,6 +55,7 @@ data GenGroupState = GenGroupState
   }
 
 data StgToJSConfig = StgToJSConfig
+  -- flags
   { csInlinePush      :: !Bool
   , csInlineBlackhole :: !Bool
   , csInlineLoadRegs  :: !Bool
@@ -63,6 +67,8 @@ data StgToJSConfig = StgToJSConfig
   , csTraceForeign    :: !Bool
   , csProf            :: !Bool -- ^ Profiling enabled
   , csRuntimeAssert   :: !Bool -- ^ Enable runtime assertions
+  -- settings
+  , csContext         :: !SDocContext
   }
 
 data ClosureInfo = ClosureInfo
@@ -104,10 +110,19 @@ data CIType
   | CIStackFrame
   deriving (Eq, Ord)
 
-data CIStatic
-  = -- CIStaticParent { staticParent :: Ident } -- ^ static refs are stored in parent in fungroup
-    CIStaticRefs   { staticRefs :: [ShortText] } -- ^ list of refs that need to be kept alive
-  deriving (Eq, Ord)
+-- | Static references that must be kept alive
+newtype CIStatic = CIStaticRefs { staticRefs :: [ShortText] }
+  deriving stock   (Eq, Ord)
+  deriving newtype (Semigroup, Monoid)
+
+-- TODO: Jeff (2022,03): Make ToJExpr derivable? will need Default Signatures
+-- and depends on the increase in compilation time
+
+-- | static refs: array = references, null = nothing to report
+--   note: only works after all top-level objects have been created
+instance ToJExpr CIStatic where
+  toJExpr (CIStaticRefs [])  = null_ -- [je| null |]
+  toJExpr (CIStaticRefs rs)  = toJExpr (map TxtI rs)
 
 -- function argument and free variable types
 data VarType
@@ -122,6 +137,9 @@ data VarType
   | ObjV     -- some JS object, user supplied, be careful around these, can be anything
   | ArrV     -- boxed array
   deriving (Eq, Ord, Enum, Bounded)
+
+instance ToJExpr VarType where
+  toJExpr = toJExpr . fromEnum
 
 data IdType
   = IdPlain
@@ -247,8 +265,8 @@ data ExprResult
   | ExprInline (Maybe [JExpr])
   deriving (Eq, Ord, Show)
 
-data ExprValData = ExprValData [JExpr]
-  deriving (Eq, Ord, Show)
+newtype ExprValData = ExprValData [JExpr]
+  deriving newtype (Eq, Ord, Show)
 
 
 

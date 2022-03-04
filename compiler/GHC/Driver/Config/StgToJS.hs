@@ -3,14 +3,18 @@ module GHC.Driver.Config.StgToJS
   )
 where
 
-import GHC.Prelude
+import GHC.StgToJS.Types
+
 import GHC.Driver.Session
 import GHC.Platform.Ways
-import GHC.StgToJS.Types
+import GHC.Utils.Outputable
+
+import GHC.Prelude
 
 -- | Initialize StgToJS settings from DynFlags
 initStgToJSConfig :: DynFlags -> StgToJSConfig
 initStgToJSConfig dflags = StgToJSConfig
+  -- flags
   { csInlinePush      = False
   , csInlineBlackhole = False
   , csInlineLoadRegs  = False
@@ -22,4 +26,6 @@ initStgToJSConfig dflags = StgToJSConfig
   , csTraceForeign    = False
   , csProf            = ways dflags `hasWay` WayProf
   , csRuntimeAssert   = False
+  -- settings
+  , csContext         = initSDocContext dflags defaultDumpStyle
   }

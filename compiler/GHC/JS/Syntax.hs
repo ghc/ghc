@@ -1,4 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -9,7 +8,6 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE PatternSynonyms #-}
@@ -70,6 +68,12 @@ import qualified GHC.Data.ShortText as ST
 import GHC.Data.ShortText (ShortText)
 import GHC.Utils.Monad.State.Strict
 
+-- FIXME: Jeff (2022,03): This state monad is strict, but uses a lazy list as
+-- the state, since the strict state monad evaluates to WHNF, this state monad
+-- will only evaluate to the first cons cell, i.e., we will be spine strict but
+-- store possible huge thunks. This isn't a problem as long as we use this list
+-- as a stack, but if we don't then any kind of Functor or Traverse operation
+-- over this state will become yield a lot of thunks.
 newtype IdentSupply a
   = IS {runIdentSupply :: State [Ident] a}
   deriving Typeable
@@ -100,7 +104,11 @@ instance Show a => Show (IdentSupply a) where
     show x = "(" ++ show (pseudoSaturate x) ++ ")"
 
 
--- | Statements
+--------------------------------------------------------------------------------
+--                            Statements
+--------------------------------------------------------------------------------
+-- FIXME (Jeff, 2022/03): statements according to what version of the standard?
+-- | JavaScript statements
 data JStat
   = DeclStat   Ident
   | ReturnStat JExpr
@@ -141,7 +149,13 @@ appendJStat mx my = case (mx,my) of
 
 
 
--- TODO: annotate expressions with type
+--------------------------------------------------------------------------------
+--                            Expressions
+--------------------------------------------------------------------------------
+-- FIXME (Jeff, 2022/03): Expressions according to what version of the standard?
+-- FIXME: annotate expressions with type. This is an EDSL of JS ASTs in Haskell.
+-- There are many approaches to leveraging the GHCs type system for correctness
+-- guarentees in EDSLs and we should use them
 -- | Expressions
 data JExpr
   = ValExpr    JVal
@@ -213,6 +227,9 @@ pattern Int x = ValExpr (JInt x)
 pattern String :: ShortText -> JExpr
 pattern String x = ValExpr (JStr x)
 
+--------------------------------------------------------------------------------
+--                            Values
+--------------------------------------------------------------------------------
 -- | Values
 data JVal
   = JVar     Ident
@@ -231,6 +248,9 @@ instance Outputable JVal where
 
 instance NFData JVal
 
+--------------------------------------------------------------------------------
+--                            Operators
+--------------------------------------------------------------------------------
 data JOp
   = EqOp            -- ==
   | StrictEqOp      -- ===
@@ -294,6 +314,12 @@ instance Ord SaneDouble where
 instance Show SaneDouble where
     show (SaneDouble x) = show x
 
+--------------------------------------------------------------------------------
+--                            Identifiers
+--------------------------------------------------------------------------------
+-- We use ShortText for identifier in JS backend
+
 -- | Identifiers
 newtype Ident = TxtI { itxt:: ShortText}
  deriving (Show, Typeable, Ord, Eq, Generic, NFData)
+
