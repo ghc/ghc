@@ -25,6 +25,7 @@
 module GHC.Err( absentErr, error, errorWithoutStackTrace, undefined ) where
 import GHC.Types (Char, RuntimeRep)
 import GHC.Stack.Types
+import GHC.CString
 import GHC.Prim
 import {-# SOURCE #-} GHC.Exception
   ( errorCallWithCallStackException
@@ -38,6 +39,7 @@ error s = raise# (errorCallWithCallStackException s ?callStack)
           -- '?callStack' here, but 'GHC.Stack.callStack' depends on
           -- 'GHC.Stack.popCallStack', which is partial and depends on
           -- 'error'.. Do as I say, not as I do.
+{-# NOINLINE error #-}
 
 -- | A variant of 'error' that does not produce a stack trace.
 --
@@ -45,6 +47,78 @@ error s = raise# (errorCallWithCallStackException s ?callStack)
 errorWithoutStackTrace :: forall (r :: RuntimeRep). forall (a :: TYPE r).
                           [Char] -> a
 errorWithoutStackTrace s = raise# (errorCallException s)
+{-# NOINLINE errorWithoutStackTrace #-}
+
+{- Note [Ensuring that `error` isn't CAFfy]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+`error` expressions are quite common and consequently we want to ensure that
+they don't incur a high cost. For this reason, we take pains to ensure that
+common uses of `error` (e.g. applications to string literals) are not CAFfy.
+For instance, consider a program like:
+
+    head :: [a] -> a
+    head (x:_) = x
+    head _     = error "head: empty list"
+
+The simplifier would typically float out the `error` application and its
+argument to the top-level, resulting in:
+
+    head = \xs -> case xs of 
+                    x : _ -> x
+                    []    -> lvl1
+    lvl1 = error lvl2
+    lvl2 = unpackCString# "uh oh"
+
+While the code generator is smart enough not to make `lvl1` a CAF (see Note
+[Don't update dead-end thunks] in GHC.CoreToStg), `lvl1`, and therefore `head`,
+is nevertheless CAFfy on account of the dependence on `lvl2`, which is a CAF.
+
+We avoid this by rewriting `error (unpackCString# lit)` to `errorCString lit`, ensuring that the literal does not become a CAF. This has a few happy effects:
+
+ * it significantly reduces SRT sizes and consequently the amount of work that
+   the GC must do.
+
+ * it avoids increasing code size due to String closures which are ultimately
+   in cold paths.
+
+-}
+
+errorCString
+    :: forall (r :: RuntimeRep). forall (a :: TYPE r).
+       HasCallStack => Addr# -> a
+errorCString s = error (unpackCString# s)
+{-# NOINLINE errorCString #-}
+
+errorCStringUtf8
+    :: forall (r :: RuntimeRep). forall (a :: TYPE r).
+       HasCallStack => Addr# -> a
+errorCStringUtf8 s = error (unpackCStringUtf8# s)
+{-# NOINLINE errorCStringUtf8 #-}
+
+errorWithoutStackTraceCString
+    :: forall (r :: RuntimeRep). forall (a :: TYPE r).
+       Addr# -> a
+errorWithoutStackTraceCString s = errorWithoutStackTrace (unpackCString# s)
+{-# NOINLINE errorWithoutStackTraceCString #-}
+
+errorWithoutStackTraceCStringUtf8
+    :: forall (r :: RuntimeRep). forall (a :: TYPE r).
+       Addr# -> a
+errorWithoutStackTraceCStringUtf8 s = errorWithoutStackTrace (unpackCStringUtf8# s)
+{-# NOINLINE errorWithoutStackTraceCStringUtf8 #-}
+
+{-# RULES
+"errorWithoutStackTrace/unpackCString#"
+   forall s. errorWithoutStackTrace (unpackCString# s) = errorWithoutStackTraceCString s
+"errorWithoutStackTrace/unpackCStringUtf8#"
+   forall s. errorWithoutStackTrace (unpackCStringUtf8# s) = errorWithoutStackTraceCStringUtf8 s
+
+"error/unpackCString#"
+   forall s. error (unpackCString# s) = errorCString s
+
+"error/unpackCStringUtf8#"
+   forall s. error (unpackCStringUtf8# s) = errorCStringUtf8 s
+#-}
 
 
 -- Note [Errors in base]
