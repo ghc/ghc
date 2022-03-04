@@ -231,7 +231,7 @@ test('T365',
 test('T9360a', req_interp, run_command, ['{compiler} --interactive -e "" -ignore-dot-ghci'])
 test('T9360b', req_interp, run_command, ['{compiler} -e "" --interactive -ignore-dot-ghci'])
 
-test('T10970', normal, compile_and_run, [''])
+test('T10970', [normalise_version('containers')], compile_and_run, [''])
 test('T4931', normal, compile_and_run, [''])
 test('T11182', normal, compile_and_run, [''])
 test('T11381', normal, compile_fail, [''])
