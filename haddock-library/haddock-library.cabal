@@ -41,7 +41,7 @@ common lib-defaults
   build-depends:
     , base         >= 4.5     && < 4.17
     , containers   ^>= 0.4.2.1 || ^>= 0.5.0.0 || ^>= 0.6.0.1
-    , text         ^>= 1.2.3.0
+    , text         ^>= 1.2.3.0 || ^>= 2.0
     , parsec       ^>= 3.1.13.0
 
   ghc-options: -funbox-strict-fields -Wall
