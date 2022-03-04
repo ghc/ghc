@@ -104,3 +104,8 @@ test('T15570',
    #   warning: integer constant is so large that it is unsigned
 
 test('T18614', normal, compile, [''])
+
+check_error_not_caffy = 'TODO'
+test('T21169', normal,
+     multimod_compile_filter,
+     ['T21169', '-O -c -ddump-cafanal', check_error_not_caffy])
