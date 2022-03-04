@@ -1048,10 +1048,29 @@ getRegister' _ is32Bit (CmmMachOp mop [x, y]) = -- dyadic MachOps
 
     --------------------
     add_code :: Width -> CmmExpr -> CmmExpr -> NatM Register
+    -- x + imm
     add_code rep x (CmmLit (CmmInt y _))
         | is32BitInteger y
         , rep /= W8 -- LEA doesn't support byte size (#18614)
         = add_int rep x y
+    -- x + (y << imm)
+    add_code rep x y
+        -- Byte size is not supported and 16bit size is slow when computed via LEA
+        | rep /= W8 && rep /= W16
+        -- 2^3 = 8 is the highest multiplicator supported by LEA.
+        , Just (x,y,shift_bits) <- get_shift x y
+        = add_shiftL rep x y (fromIntegral shift_bits)
+        where
+          -- x + (y << imm)
+          get_shift x (CmmMachOp (MO_Shl _w) [y, CmmLit (CmmInt shift_bits _)])
+            | shift_bits <= 3
+            = Just (x, y, shift_bits)
+          -- (y << imm) + x
+          get_shift (CmmMachOp (MO_Shl _w) [y, CmmLit (CmmInt shift_bits _)]) x
+            | shift_bits <= 3
+            = Just (x, y, shift_bits)
+          get_shift _ _
+            = Nothing
     add_code rep x y = trivialCode rep (ADD format) (Just (ADD format)) x y
       where format = intFormat rep
     -- TODO: There are other interesting patterns we want to replace
@@ -1066,6 +1085,7 @@ getRegister' _ is32Bit (CmmMachOp mop [x, y]) = -- dyadic MachOps
     sub_code rep x y = trivialCode rep (SUB (intFormat rep)) Nothing x y
 
     -- our three-operand add instruction:
+    add_int :: (Width -> CmmExpr -> Integer -> NatM Register)
     add_int width x y = do
         (x_reg, x_code) <- getSomeReg x
         let
@@ -1075,6 +1095,22 @@ getRegister' _ is32Bit (CmmMachOp mop [x, y]) = -- dyadic MachOps
                = x_code `snocOL`
                  LEA format
                         (OpAddr (AddrBaseIndex (EABaseReg x_reg) EAIndexNone imm))
+                        (OpReg dst)
+        --
+        return (Any format code)
+
+    -- x + (y << shift_bits) using LEA
+    add_shiftL :: (Width -> CmmExpr -> CmmExpr -> Int -> NatM Register)
+    add_shiftL width x y shift_bits = do
+        (x_reg, x_code) <- getSomeReg x
+        (y_reg, y_code) <- getSomeReg y
+        let
+            format = intFormat width
+            imm = ImmInt 0
+            code dst
+               = (x_code `appOL` y_code) `snocOL`
+                 LEA format
+                        (OpAddr (AddrBaseIndex (EABaseReg x_reg) (EAIndex y_reg (2 ^ shift_bits)) imm))
                         (OpReg dst)
         --
         return (Any format code)
