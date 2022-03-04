@@ -14,6 +14,7 @@ module GHC.StgToJS.Monad
   , updateThunk
   , updateThunk'
   , liftToGlobal
+  , bhStats
   -- * IDs
   , withNewIdent
   , makeIdent
@@ -23,6 +24,7 @@ module GHC.StgToJS.Monad
   , jsIdN
   , jsIdI
   , jsIdIN
+  , jsIdIdent'
   , jsIdV
   , jsEnId
   , jsEnIdI
@@ -55,6 +57,7 @@ module GHC.StgToJS.Monad
   , push'
   , adjSpN
   , adjSpN'
+  , adjSp'
   , adjSp
   , pushNN
   , pushNN'
@@ -218,6 +221,25 @@ jsIdIN i n = jsIdIdent i (Just n) IdPlain
 
 jsIdN :: Id -> Int -> G JExpr
 jsIdN i n = ValExpr . JVar <$> jsIdIdent i (Just n) IdPlain
+
+-- uncached
+jsIdIdent' :: Id -> Maybe Int -> IdType -> G Ident
+jsIdIdent' i mn suffix0 = do
+  (prefix, u) <- mkPrefixU
+  let i' = (\x -> ST.pack $ "h$"++prefix++x++mns++suffix++u) . zEncodeString $ name
+  i' `seq` return (TxtI i')
+    where
+      suffix = idTypeSuffix suffix0
+      mns = maybe "" (('_':).show) mn
+      name = ('.':) . nameStableString . localiseName . getName $ i
+
+      mkPrefixU :: G (String, String)
+      mkPrefixU
+        | isExportedId i, Just x <- (nameModule_maybe . getName) i = do
+           let xstr = unitModuleString x
+           return (zEncodeString xstr, "")
+        | otherwise = (,('_':) . encodeUnique . getKey . getUnique $ i) . ('$':)
+                    . zEncodeString . unitModuleString <$> State.gets gsModule
 
 -- entry id
 jsEnId :: Id -> G JExpr

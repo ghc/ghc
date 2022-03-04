@@ -19,6 +19,8 @@ module GHC.StgToJS.Profiling
   , profiling
   , ifProfiling
   , ifProfilingM
+  -- * helpers
+  , profStat
   )
 where
 
@@ -124,6 +126,9 @@ ifProfilingM m = do
     prof <- profiling
     if prof then m else return mempty
 
+-- | If profiling is enabled, then use input JStat, else ignore
+profStat :: StgToJSConfig -> JStat -> JStat
+profStat cfg e = if csProf cfg then e else mempty
 --------------------------------------------------------------------------------
 -- Generating cost-centre and cost-centre stack variables
 
