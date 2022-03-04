@@ -1,5 +1,5 @@
 
 T17332.hs:13:7: error:
-    • Could not solve: () arising from a use of ‘MkDict’
+    • Could not solve: a arising from a use of ‘MkDict’
     • In the expression: MkDict
       In an equation for ‘aux’: aux = MkDict
