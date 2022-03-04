@@ -27,7 +27,7 @@
  */
 #if defined(darwin_HOST_OS)
 .section __DATA,__data
-#elif defined(linux_HOST_OS)
+#else
 .section .data
 #endif
 
@@ -89,7 +89,7 @@ DECLARE_CSYM(complex_ccall_adjustor_end)
 /* See Note [Adjustor templates live in data section]. */
 #if defined(darwin_HOST_OS)
 .section __TEXT,__text
-#elif defined(linux_HOST_OS)
+#else
 .section .text
 #endif
 
