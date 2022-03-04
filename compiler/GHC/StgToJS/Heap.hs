@@ -26,6 +26,8 @@ module GHC.StgToJS.Heap
   , closureMeta_
   , closureExtra1_
   , closureExtra2_
+  -- * Javascript Type literals
+  , jTyObject
   )
 where
 
@@ -35,6 +37,87 @@ import GHC.JS.Syntax
 import GHC.JS.Make
 import GHC.StgToJS.Types
 import GHC.Data.ShortText (ShortText)
+
+-- Note [JS heap objects]
+-- ~~~~~~~~~~~~~~~~~~~~~~
+--
+-- TODO: add more details from https://www.haskell.org/haskell-symposium/2013/ghcjs.pdf
+--
+-- Objects on the heap ("closures") are represented as JavaScript objects with
+-- the following fields:
+--
+--  { f: function -- entry function
+--  , m: meta     -- meta data
+--  , d1: x       -- closure specific fields
+--  , d2: y
+--  }
+--
+-- The object returned when entering heap objects (closure.f) has the following
+-- fields:
+--
+--  { t: closure type
+--  , a: constructor tag / fun arity
+--  }
+--
+-- THUNK =
+--  { f  = returns the object reduced to WHNF
+--  , m  = ?
+--  , d1 = ?
+--  , d2 = ?
+--  }
+--
+-- FUN =
+--  { f  = function itself
+--  , m  = ?
+--  , d1 = free variable 1
+--  , d2 = free variable 2
+--  }
+--
+-- PAP =
+--  { f  = ?
+--  , m  = ?
+--  , d1 = ?
+--  , d2 =
+--    { d1 = PAP arity
+--    }
+--  }
+--
+-- CON =
+--  { f  = entry function of the datacon worker
+--  , m  = 0
+--  , d1 = first arg
+--  , d2 = arity = 2: second arg
+--         arity > 2: { d1, d2, ...} object with remaining args (starts with "d1 = x2"!)
+--  }
+--
+-- BLACKHOLE =
+--  { f  = h$blackhole
+--  , m  = ?
+--  , d1 = owning TSO
+--  , d2 = waiters array
+--  }
+--
+-- STACKFRAME =
+--  { f  = ?
+--  , m  = ?
+--  , d1 = ?
+--  , d2 = ?
+--  }
+
+-- FIXME: Jeff (2022,03): These helpers are a classic case of using a newtype
+-- over a type synonym to leverage GHC's type checker. Basically we never want
+-- to mix these up, and so we should have:
+--------------------------------------
+-- newtype ClosureEntry  = ClosureEntry  { unClosureEntry  :: ShortText }
+-- newtype ClosureExtra1 = ClosureExtra1 { unClosureExtra1 :: ShortText }
+-- newtype ClosureExtra2 = ClosureExtra2 { unClosureExtra2 :: ShortText }
+-- newtype ClosureMeta   = ClosureMeta   { unClosureMeta   :: ShortText }
+--------------------------------------
+-- especially since any bugs which result from confusing these will be catastrophic and hard to debug
+-- also NOTE: if ClosureExtra<N> is truly unbounded then we should have:
+-- newtype ClosureExtras = ClosureExtras { unClosureExtras :: [ShortText] }
+-- or use an Array and amortize increasing the arrays size when needed; depending
+-- on its use case in the RTS of course
 
 closureEntry_ :: ShortText
 closureEntry_ = "f"
@@ -57,7 +140,8 @@ entryConTag_ = "a"
 entryFunArity_ :: ShortText
 entryFunArity_ = "a"
 
-
+jTyObject :: JExpr
+jTyObject = jString "object"
 
 closureType :: JExpr -> JExpr
 closureType = entryClosureType . entry

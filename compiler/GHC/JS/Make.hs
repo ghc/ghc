@@ -1,4 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
@@ -6,13 +5,15 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE BlockArguments #-}
-{-# LANGUAGE PatternSynonyms #-}
+
+{-# OPTIONS_GHC -fno-warn-orphans #-} -- only for Num, Fractional on JExpr
 
 -- | Helpers to create JS syntax values
 module GHC.JS.Make
   ( ToJExpr (..)
   , ToStat (..)
   , var
+  , jString
   -- * Literals
   , null_
   , undefined_
@@ -31,8 +32,9 @@ module GHC.JS.Make
   , (||=), (|=), (.==.), (.===.), (.!=.), (.!==.), (.!)
   , (.>.), (.>=.), (.<.), (.<=.)
   , (.<<.), (.>>.), (.>>>.)
-  , (.||.), (.&&.)
+  , (.|.), (.||.), (.&&.)
   , if_, if10, if01, ifS, ifBlockS
+  , jwhenS
   , app, appS, returnS
   , jLam, jVar, jFor, jForIn, jForEachIn, jTryCatchFinally
   , loop, loopBlockS
@@ -46,10 +48,15 @@ module GHC.JS.Make
   , returnStack, assignAllEqual, assignAll
   , declAssignAll
   , nullStat, (.^)
+  -- * Math functions
+  , math_log, math_sin, math_cos, math_tan, math_exp, math_acos, math_asin,
+    math_atan, math_abs, math_pow, math_sqrt, math_asinh, math_acosh, math_atanh
+  -- * Statement helpers
+  , decl
   )
 where
 
-import GHC.Prelude
+import GHC.Prelude hiding ((.|.))
 
 import GHC.JS.Syntax
 
@@ -69,7 +76,6 @@ import GHC.Utils.Misc
 {--------------------------------------------------------------------
   ToJExpr Class
 --------------------------------------------------------------------}
-
 
 -- | Things that can be marshalled into javascript values.
 -- Instantiate for any necessary data structures.
@@ -201,17 +207,25 @@ jTryCatchFinally s f s2 = UnsatBlock . IS $ do
 var :: ShortText -> JExpr
 var = ValExpr . JVar . TxtI
 
+-- | Convert a ShortText to a Javascript String
+jString :: ShortText -> JExpr
+jString = toJExpr
+
 jFor :: (ToJExpr a, ToStat b) => JStat -> a -> JStat -> b -> JStat
 jFor before p after b = BlockStat [before, WhileStat False (toJExpr p) b']
     where b' = case toStat b of
                  BlockStat xs -> BlockStat $ xs ++ [after]
                  x -> BlockStat [x,after]
 
+-- | construct a js declaration with the given identifier
+decl :: Ident -> JStat
+decl i = DeclStat i
+
 jhEmpty :: M.Map k JExpr
 jhEmpty = M.empty
 
 jhSingle :: (Ord k, ToJExpr a) => k -> a -> M.Map k JExpr
-jhSingle k v = jhAdd k v $ jhEmpty
+jhSingle k v = jhAdd k v jhEmpty
 
 jhAdd :: (Ord k, ToJExpr a) => k -> a -> M.Map k JExpr -> M.Map k JExpr
 jhAdd  k v m = M.insert k (toJExpr v) m
@@ -244,7 +258,8 @@ infixl 6 .==., .===., .!=., .!==.
 
 infixl 7 .>., .>=., .<., .<=.
 
-(.||.), (.&&.)  :: JExpr -> JExpr -> JExpr
+(.|.), (.||.), (.&&.)  :: JExpr -> JExpr -> JExpr
+(.|.)   = InfixExpr BOrOp
 (.||.)  = InfixExpr LOrOp
 (.&&.)  = InfixExpr LAndOp
 
@@ -268,6 +283,10 @@ if_ e1 e2 e3 = IfExpr e1 e2 e3
 ifS :: JExpr -> JStat -> JStat -> JStat
 ifS e s1 s2 = IfStat e s1 s2
 
+-- if(e) { s1 } else {  }
+jwhenS :: JExpr -> JStat -> JStat
+jwhenS cond block = ifS cond block mempty
+
 -- if(e) { s1 } else { s2 }
 ifBlockS :: JExpr -> [JStat] -> [JStat] -> JStat
 ifBlockS e s1 s2 = IfStat e (mconcat s1) (mconcat s2)
@@ -280,6 +299,7 @@ if10 e = IfExpr e one_ zero_
 if01 :: JExpr -> JExpr
 if01 e = IfExpr e zero_ one_
 
+-- | an expression application; app f xs <==> f(xs)
 app :: ShortText -> [JExpr] -> JExpr
 app f xs = ApplExpr (var f) xs
 
@@ -459,4 +479,43 @@ takeOneIdent = do
       return x
     _ -> error "takeOneIdent: empty list"
 
+--------------------------------------------------------------------------------
+--                            Math functions
+--------------------------------------------------------------------------------
+math :: JExpr
+math = var "Math"
 
+math_ :: ShortText -> [JExpr] -> JExpr
+math_ op args = ApplExpr (math .^ op) args
+
+math_log, math_sin, math_cos, math_tan, math_exp, math_acos, math_asin, math_atan,
+  math_abs, math_pow, math_sqrt, math_asinh, math_acosh, math_atanh, math_sign
+  :: [JExpr] -> JExpr
+math_log   = math_ "log"
+math_sin   = math_ "sin"
+math_cos   = math_ "cos"
+math_tan   = math_ "tan"
+math_exp   = math_ "exp"
+math_acos  = math_ "acos"
+math_asin  = math_ "asin"
+math_atan  = math_ "atan"
+math_abs   = math_ "abs"
+math_pow   = math_ "pow"
+math_sign  = math_ "sign"
+math_sqrt  = math_ "sqrt"
+math_asinh = math_ "asinh"
+math_acosh = math_ "acosh"
+math_atanh = math_ "atanh"
+
+instance Num JExpr where
+    x + y = InfixExpr AddOp x y
+    x - y = InfixExpr SubOp x y
+    x * y = InfixExpr MulOp x y
+    abs x    = math_abs [x]
+    negate x = UOpExpr NegOp x
+    signum x = math_sign [x]
+    fromInteger x = ValExpr (JInt x)
+
+instance Fractional JExpr where
+    x / y = InfixExpr DivOp x y
+    fromRational x = ValExpr (JDouble (realToFrac x))
