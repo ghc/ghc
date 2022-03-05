@@ -735,6 +735,10 @@ validate-armv7-linux-deb10:
     when: always
     expire_in: 2 week
 
+release-armv7-linux-deb10:
+  <<: *release
+  extends: .build-armv7-linux-deb10
+
 nightly-armv7-linux-deb10:
   <<: *nightly
   extends: .build-armv7-linux-deb10
