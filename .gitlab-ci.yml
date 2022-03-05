@@ -984,7 +984,7 @@ release-x86_64-linux-alpine-integer-simple:
     - .release
   variables:
     BIGNUM_BACKEND: native
-    HADRIAN_ARGS: "--docs=no-sphinx --integer-simple"
+    HADRIAN_ARGS: "--docs=no-sphinx"
     BUILD_FLAVOUR: "static"
 
 release-x86_64-linux-alpine-integer-gmp:
