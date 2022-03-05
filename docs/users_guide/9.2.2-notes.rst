@@ -33,7 +33,8 @@ Compiler
     `ghci_history` only in `$XDG_DATA_HOME/ghc`. So if you don't have a previous
     GHC installation which created `~/.ghc/ghci_history`, the history file will be
     written to `$XDG_DATA_HOME/ghc`. If you already have an older GHC installation which
-    wrote `~/.ghc/ghci_history`, then GHC will continue to write the history to that file.
+    wrote `~/.ghc/ghci_history`, then GHC will continue to write the history to
+    that file.
 
 - Fix bug in CPR analysis's treatment of join points which may result in
   runtime crashes (:ghc-ticket:`18824`).
@@ -74,6 +75,16 @@ Compiler
   load operations (:ghc-ticket:`21016`)
 
 - Eliminate the ``ghc`` library's dependence on ``parsec`` (:ghc-ticket:`21033`).
+
+- Introduced :ghc-flag:`-fcompact-unwind` , enabling the generation of compact
+  unwinding information on Apple Darwin targets (:ghc-ticket:`11829`).
+
+- Fix a bug where some exception closures could be inappropriately garbage
+  collected, resulting in crashes (:ghc-ticket:`21141`)
+
+- Fix a variety of bugs in the AArch64 code generator's handling of
+  sub-word-size values (:ghc-ticket:`19993`, :ghc-ticket:`20637`,
+  :ghc-ticket:`20638`).
 
 GHCi
 ----
