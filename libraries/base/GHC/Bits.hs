@@ -583,6 +583,7 @@ instance Bits Natural where
      | otherwise = naturalShiftR x (fromIntegral (negate i))
    testBit x i   = naturalTestBit x (fromIntegral i)
    zeroBits      = naturalZero
+   setBit x i    = naturalSetBit x (fromIntegral i)
    clearBit x i  = x `xor` (bit i .&. x)
 
    bit (I# i)  = naturalBit# (int2Word# i)

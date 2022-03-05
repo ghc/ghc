@@ -1045,6 +1045,7 @@ bigNatClearBit# a n
 
 -- | BigNat set bit
 bigNatSetBit# :: BigNat# -> Word# -> BigNat#
+{-# NOINLINE bigNatSetBit# #-}
 bigNatSetBit# a n
    -- check the current bit value
    | isTrue# (bigNatTestBit# a n) = a

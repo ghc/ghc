@@ -3,6 +3,7 @@
 ## 1.3
 
 - Expose backendName
+- Add `naturalSetBit[#]` (#21173)
 
 ## 1.2
 
