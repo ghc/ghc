@@ -310,21 +310,25 @@ type Alt = (LPat GhcPs, LHsExpr GhcPs)
 -- Generic1 (Gen1).
 data GenericKind = Gen0 | Gen1
 
--- as above, but with a payload of the TyCon's name for "the" parameter
-data GenericKind_ = Gen0_ | Gen1_ TyVar
-
--- as above, but using a single datacon's name for "the" parameter
+-- Like 'GenericKind', but with a payload of a datacon's last universally
+-- quantified 'TyVar' in the 'Generic1' case.
+--
+-- Note that for GADTs, the last TyVar's Name will be different in each data
+-- constructor, so it is not correct to simply use the last TyVar in
+-- 'tyConTyVars' in 'Gen1_DC'. (See #21185 for an example of what would happen
+-- if you tried.)
 data GenericKind_DC = Gen0_DC | Gen1_DC TyVar
 
-forgetArgVar :: GenericKind_DC -> GenericKind
-forgetArgVar Gen0_DC   = Gen0
-forgetArgVar Gen1_DC{} = Gen1
-
--- When working only within a single datacon, "the" parameter's name should
--- match that datacon's name for it.
-gk2gkDC :: GenericKind_ -> DataCon -> GenericKind_DC
-gk2gkDC Gen0_   _ = Gen0_DC
-gk2gkDC Gen1_{} d = Gen1_DC $ last $ dataConUnivTyVars d
+-- Construct a 'GenericKind_DC', retrieving the last universally quantified
+-- type variable of a 'DataCon' in the 'Generic1' case.
+gk2gkDC :: GenericKind -> DataCon -> [Type] -> GenericKind_DC
+gk2gkDC Gen0 _  _       = Gen0_DC
+gk2gkDC Gen1 dc tc_args = Gen1_DC $ assert (isTyVarTy last_dc_inst_univ)
+                                  $ getTyVar "gk2gkDC" last_dc_inst_univ
+  where
+    dc_inst_univs = dataConInstUnivs dc tc_args
+    last_dc_inst_univ = assert (not (null dc_inst_univs)) $
+                        last dc_inst_univs
 
 
 -- Bindings for the Generic instance
@@ -376,12 +380,7 @@ mkBindsRep dflags gk dit@(DerivInstTys{dit_rep_tc = tycon}) = (binds, sigs)
 
         -- Recurse over the sum first
         from_alts, to_alts :: [Alt]
-        (from_alts, to_alts) = mkSum gk_ (1 :: US) dit datacons
-          where gk_ = case gk of
-                  Gen0 -> Gen0_
-                  Gen1 -> assert (tyvars `lengthAtLeast` 1) $
-                          Gen1_ (last tyvars)
-                    where tyvars = tyConTyVars tycon
+        (from_alts, to_alts) = mkSum gk (1 :: US) dit datacons
 
 --------------------------------------------------------------------------------
 -- The type synonym instance and synonym
@@ -419,14 +418,8 @@ tc_mkRepFamInsts gk get_fixity inst_tys dit@(DerivInstTys{dit_rep_tc = tycon}) =
              (Gen1, [arg_k, inst_t]) -> (arg_k,          inst_t)
              _ -> pprPanic "tc_mkRepFamInsts" (ppr inst_tys)
 
-           gk_ = case gk of
-             Gen0 -> Gen0_
-             Gen1 -> assert (not $ null all_tyvars)
-                     Gen1_ $ last all_tyvars
-             where all_tyvars = tyConTyVars tycon
-
        -- `repTy` = D1 ... (C1 ... (S1 ... (Rec0 a))) :: * -> *
-     ; repTy <- tc_mkRepTy gk_ get_fixity dit arg_ki
+     ; repTy <- tc_mkRepTy gk get_fixity dit arg_ki
 
        -- `rep_name` is a name we generate for the synonym
      ; mod <- getModule
@@ -435,23 +428,12 @@ tc_mkRepFamInsts gk get_fixity inst_tys dit@(DerivInstTys{dit_rep_tc = tycon}) =
            rep_occ = case gk of Gen0 -> mkGenR tc_occ; Gen1 -> mkGen1R tc_occ
      ; rep_name <- newGlobalBinder mod rep_occ loc
 
-       -- If deriving Generic1, make sure to substitute the last type variable
-       -- with Any in the generated Rep1 instance. This avoids issues like what
-       -- is documented in the "wrinkle" section of
-       -- Note [Generating a correctly typed Rep instance].
-     ; let env = case gk_ of
-                   Gen0_ -> emptyTvSubstEnv
-                   Gen1_ last_tv
-                     -> zipTyEnv [last_tv] [anyTypeOfKind (tyVarKind last_tv)]
-           in_scope   = mkInScopeSet (tyCoVarsOfTypes inst_tys)
-           subst      = mkTvSubst in_scope env
-           repTy'     = substTyUnchecked  subst repTy
-           tcv'       = tyCoVarsOfTypeList inst_ty
-           (tv', cv') = partition isTyVar tcv'
-           tvs'       = scopedSort tv'
-           cvs'       = scopedSort cv'
-           axiom      = mkSingleCoAxiom Nominal rep_name tvs' [] cvs'
-                                        fam_tc inst_tys repTy'
+     ; let tcv      = tyCoVarsOfTypeList inst_ty
+           (tv, cv) = partition isTyVar tcv
+           tvs      = scopedSort tv
+           cvs      = scopedSort cv
+           axiom    = mkSingleCoAxiom Nominal rep_name tvs [] cvs
+                                      fam_tc inst_tys repTy
 
      ; newFamInst SynFamilyInst axiom  }
 
@@ -524,8 +506,8 @@ argTyFold argVar (ArgTyAlg {ata_rec0 = mkRec0,
             else mkComp phi `fmap` go beta -- It must be a composition.
 
 
-tc_mkRepTy ::  -- Gen0_ or Gen1_, for Rep or Rep1
-               GenericKind_
+tc_mkRepTy ::  -- Gen0 or Gen1, for Rep or Rep1
+               GenericKind
                -- Get the Fixity for a data constructor Name
             -> (Name -> Fixity)
                -- Information about the last type argument to Generic(1)
@@ -535,7 +517,8 @@ tc_mkRepTy ::  -- Gen0_ or Gen1_, for Rep or Rep1
             -> Kind
                -- Generated representation0 type
             -> TcM Type
-tc_mkRepTy gk_ get_fixity dit@(DerivInstTys{dit_rep_tc = tycon}) k =
+tc_mkRepTy gk get_fixity dit@(DerivInstTys{ dit_rep_tc = tycon
+                                          , dit_rep_tc_args = tycon_args }) k =
   do
     d1      <- tcLookupTyCon d1TyConName
     c1      <- tcLookupTyCon c1TyConName
@@ -583,7 +566,8 @@ tc_mkRepTy gk_ get_fixity dit@(DerivInstTys{dit_rep_tc = tycon}) k =
         mkD    a   = mkTyConApp d1 [ k, metaDataTy, sumP (tyConDataCons a) ]
         mkC      a = mkTyConApp c1 [ k
                                    , metaConsTy a
-                                   , prod (derivDataConInstArgTys a dit)
+                                   , prod (gk2gkDC gk a tycon_args)
+                                          (derivDataConInstArgTys a dit)
                                           (dataConSrcBangs    a)
                                           (dataConImplBangs   a)
                                           (dataConFieldLabels a)]
@@ -592,28 +576,38 @@ tc_mkRepTy gk_ get_fixity dit@(DerivInstTys{dit_rep_tc = tycon}) k =
         -- Sums and products are done in the same way for both Rep and Rep1
         sumP l = foldBal mkSum' (mkTyConApp v1 [k]) . map mkC $ l
         -- The Bool is True if this constructor has labelled fields
-        prod :: [Type] -> [HsSrcBang] -> [HsImplBang] -> [FieldLabel] -> Type
-        prod l sb ib fl = foldBal mkProd (mkTyConApp u1 [k])
+        prod :: GenericKind_DC -> [Type] -> [HsSrcBang] -> [HsImplBang] -> [FieldLabel] -> Type
+        prod gk_ l sb ib fl = foldBal mkProd (mkTyConApp u1 [k])
                                   [ assert (null fl || lengthExceeds fl j) $
-                                    arg t sb' ib' (if null fl
-                                                      then Nothing
-                                                      else Just (fl !! j))
+                                    arg gk_ t sb' ib' (if null fl
+                                                       then Nothing
+                                                       else Just (fl !! j))
                                   | (t,sb',ib',j) <- zip4 l sb ib [0..] ]
 
-        arg :: Type -> HsSrcBang -> HsImplBang -> Maybe FieldLabel -> Type
-        arg t (HsSrcBang _ su ss) ib fl = mkS fl su ss ib $ case gk_ of
+        arg :: GenericKind_DC -> Type -> HsSrcBang -> HsImplBang -> Maybe FieldLabel -> Type
+        arg gk_ t (HsSrcBang _ su ss) ib fl = mkS fl su ss ib $ case gk_ of
             -- Here we previously used Par0 if t was a type variable, but we
             -- realized that we can't always guarantee that we are wrapping-up
             -- all type variables in Par0. So we decided to stop using Par0
             -- altogether, and use Rec0 all the time.
-                      Gen0_        -> mkRec0 t
-                      Gen1_ argVar -> argPar argVar t
+                      Gen0_DC        -> mkRec0 t
+                      Gen1_DC argVar -> argPar argVar t
           where
             -- Builds argument representation for Rep1 (more complicated due to
             -- the presence of composition).
-            argPar argVar = argTyFold argVar $ ArgTyAlg
+            argPar argVar =
+              let -- If deriving Generic1, make sure to substitute the last
+                  -- type variable with Any in the generated Rep1 instance.
+                  -- This avoids issues like what is documented in the
+                  -- "wrinkle" section of
+                  -- Note [Generating a correctly typed Rep instance].
+                  env      = zipTyEnv [argVar] [anyTypeOfKind (tyVarKind argVar)]
+                  in_scope = mkInScopeSet (tyCoVarsOfTypes tycon_args)
+                  subst    = mkTvSubst in_scope env in
+
+              substTy subst . argTyFold argVar (ArgTyAlg
               {ata_rec0 = mkRec0, ata_par1 = mkPar1,
-               ata_rec1 = mkRec1, ata_comp = mkComp comp k}
+               ata_rec1 = mkRec1, ata_comp = mkComp comp k})
 
         tyConName_user = case tyConFamInst_maybe tycon of
                            Just (ptycon, _) -> tyConName ptycon
@@ -713,7 +707,7 @@ mkBoxTy uAddr uChar uDouble uFloat uInt uWord rec0 k ty
 -- Dealing with sums
 --------------------------------------------------------------------------------
 
-mkSum :: GenericKind_ -- Generic or Generic1?
+mkSum :: GenericKind  -- Generic or Generic1?
       -> US           -- Base for generating unique names
       -> DerivInstTys -- Information about the last type argument to Generic(1)
       -> [DataCon]    -- The data constructors
@@ -728,23 +722,24 @@ mkSum _ _ _ [] = ([from_alt], [to_alt])
                -- These M1s are meta-information for the datatype
 
 -- Datatype with at least one constructor
-mkSum gk_ us dit datacons =
+mkSum gk us dit datacons =
   -- switch the payload of gk_ to be datacon-centric instead of tycon-centric
- unzip [ mk1Sum (gk2gkDC gk_ d) us i (length datacons) dit d
+ unzip [ mk1Sum gk us i (length datacons) dit d
            | (d,i) <- zip datacons [1..] ]
 
 -- Build the sum for a particular constructor
-mk1Sum :: GenericKind_DC -- Generic or Generic1?
-       -> US             -- Base for generating unique names
-       -> Int            -- The index of this constructor
-       -> Int            -- Total number of constructors
-       -> DerivInstTys   -- Information about the last type argument to Generic(1)
-       -> DataCon        -- The data constructor
-       -> (Alt,          -- Alternative for the T->Trep "from" function
-           Alt)          -- Alternative for the Trep->T "to" function
-mk1Sum gk_ us i n dit datacon = (from_alt, to_alt)
+mk1Sum :: GenericKind  -- Generic or Generic1?
+       -> US           -- Base for generating unique names
+       -> Int          -- The index of this constructor
+       -> Int          -- Total number of constructors
+       -> DerivInstTys -- Information about the last type argument to Generic(1)
+       -> DataCon      -- The data constructor
+       -> (Alt,        -- Alternative for the T->Trep "from" function
+           Alt)        -- Alternative for the Trep->T "to" function
+mk1Sum gk us i n dit@(DerivInstTys{dit_rep_tc_args = tc_args}) datacon
+  = (from_alt, to_alt)
   where
-    gk = forgetArgVar gk_
+    gk_ = gk2gkDC gk datacon tc_args
 
     -- Existentials already excluded
     argTys = derivDataConInstArgTys datacon dit
