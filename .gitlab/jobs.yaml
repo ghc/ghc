@@ -1,0 +1,3755 @@
+### THIS IS A GENERATED FILE, DO NOT MODIFY DIRECTLY
+{
+  "aarch64-darwin-validate": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "2 weeks",
+      "paths": [
+        "ghc-aarch64-darwin-validate.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "aarch64-darwin-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": null,
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "when": "always"
+      }
+    ],
+    "script": [
+      "find libraries -name config.sub -exec cp config.sub {} \\;",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "aarch64-darwin"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-aarch64-darwin-validate",
+      "BUILD_FLAVOUR": "validate",
+      "CONFIGURE_ARGS": "--with-intree-gmp --with-system-libffi ",
+      "HADRIAN_ARGS": "--docs=no-sphinx",
+      "LANG": "en_US.UTF-8",
+      "MACOSX_DEPLOYMENT_TARGET": "11.0",
+      "NIX_SYSTEM": "aarch64-darwin",
+      "TEST_ENV": "aarch64-darwin-validate"
+    }
+  },
+  "aarch64-linux-deb10-validate": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "2 weeks",
+      "paths": [
+        "ghc-aarch64-linux-deb10-validate.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "aarch64-linux-deb10-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/aarch64-linux-deb10:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "when": "always"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "aarch64-linux"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-aarch64-linux-deb10-validate",
+      "BUILD_FLAVOUR": "validate",
+      "CONFIGURE_ARGS": "",
+      "TEST_ENV": "aarch64-linux-deb10-validate"
+    }
+  },
+  "armv7-linux-deb10-validate": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": true,
+    "artifacts": {
+      "expire_in": "2 weeks",
+      "paths": [
+        "ghc-armv7-linux-deb10-validate.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "armv7-linux-deb10-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/armv7-linux-deb10:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"disabled\" != \"disabled\")",
+        "when": "always"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "armv7-linux"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-armv7-linux-deb10-validate",
+      "BUILD_FLAVOUR": "validate",
+      "CONFIGURE_ARGS": "",
+      "TEST_ENV": "armv7-linux-deb10-validate"
+    }
+  },
+  "i386-linux-deb9-validate": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "2 weeks",
+      "paths": [
+        "ghc-i386-linux-deb9-validate.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "i386-linux-deb9-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/i386-linux-deb9:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "when": "always"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "x86_64-linux"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-i386-linux-deb9-validate",
+      "BUILD_FLAVOUR": "validate",
+      "CONFIGURE_ARGS": "",
+      "TEST_ENV": "i386-linux-deb9-validate"
+    }
+  },
+  "nightly-aarch64-darwin-validate": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "8 weeks",
+      "paths": [
+        "ghc-aarch64-darwin-validate.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "aarch64-darwin-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": null,
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "when": "always"
+      }
+    ],
+    "script": [
+      "find libraries -name config.sub -exec cp config.sub {} \\;",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "aarch64-darwin"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-aarch64-darwin-validate",
+      "BUILD_FLAVOUR": "validate",
+      "CONFIGURE_ARGS": "--with-intree-gmp --with-system-libffi ",
+      "HADRIAN_ARGS": "--docs=no-sphinx",
+      "LANG": "en_US.UTF-8",
+      "MACOSX_DEPLOYMENT_TARGET": "11.0",
+      "NIX_SYSTEM": "aarch64-darwin",
+      "TEST_ENV": "aarch64-darwin-validate",
+      "XZ_OPT": "-9"
+    }
+  },
+  "nightly-aarch64-linux-deb10-validate": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "8 weeks",
+      "paths": [
+        "ghc-aarch64-linux-deb10-validate.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "aarch64-linux-deb10-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/aarch64-linux-deb10:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "when": "always"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "aarch64-linux"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-aarch64-linux-deb10-validate",
+      "BUILD_FLAVOUR": "validate",
+      "CONFIGURE_ARGS": "",
+      "TEST_ENV": "aarch64-linux-deb10-validate",
+      "XZ_OPT": "-9"
+    }
+  },
+  "nightly-armv7-linux-deb10-validate": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": true,
+    "artifacts": {
+      "expire_in": "8 weeks",
+      "paths": [
+        "ghc-armv7-linux-deb10-validate.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "armv7-linux-deb10-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/armv7-linux-deb10:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "when": "always"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "armv7-linux"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-armv7-linux-deb10-validate",
+      "BUILD_FLAVOUR": "validate",
+      "CONFIGURE_ARGS": "",
+      "TEST_ENV": "armv7-linux-deb10-validate",
+      "XZ_OPT": "-9"
+    }
+  },
+  "nightly-i386-linux-deb9-validate": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "8 weeks",
+      "paths": [
+        "ghc-i386-linux-deb9-validate.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "i386-linux-deb9-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/i386-linux-deb9:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "when": "always"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "x86_64-linux"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-i386-linux-deb9-validate",
+      "BUILD_FLAVOUR": "validate",
+      "CONFIGURE_ARGS": "",
+      "TEST_ENV": "i386-linux-deb9-validate",
+      "XZ_OPT": "-9"
+    }
+  },
+  "nightly-x86_64-darwin-validate": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "8 weeks",
+      "paths": [
+        "ghc-x86_64-darwin-validate.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "x86_64-darwin-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": null,
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "when": "always"
+      }
+    ],
+    "script": [
+      "find libraries -name config.sub -exec cp config.sub {} \\;",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "x86_64-darwin-m1"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-x86_64-darwin-validate",
+      "BUILD_FLAVOUR": "validate",
+      "CONFIGURE_ARGS": "--with-intree-gmp --with-system-libffi ",
+      "HADRIAN_ARGS": "--docs=no-sphinx",
+      "LANG": "en_US.UTF-8",
+      "MACOSX_DEPLOYMENT_TARGET": "10.10",
+      "NIX_SYSTEM": "x86_64-darwin",
+      "TEST_ENV": "x86_64-darwin-validate",
+      "XZ_OPT": "-9",
+      "ac_cv_func_clock_gettime": "no",
+      "ac_cv_func_utimensat": "no"
+    }
+  },
+  "nightly-x86_64-freebsd-validate": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": true,
+    "artifacts": {
+      "expire_in": "8 weeks",
+      "paths": [
+        "ghc-x86_64-freebsd-validate.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "x86_64-freebsd-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": null,
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "when": "always"
+      }
+    ],
+    "script": [
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "x86_64-freebsd"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-x86_64-freebsd-validate",
+      "BUILD_FLAVOUR": "validate",
+      "CABAL_INSTALL_VERSION": "3.2.0.0",
+      "CONFIGURE_ARGS": "--with-gmp-includes=/usr/local/include --with-gmp-libraries=/usr/local/lib --with-iconv-includes=/usr/local/include --with-iconv-libraries=/usr/local/lib ",
+      "GHC_VERSION": "8.10.1",
+      "HADRIAN_ARGS": "--docs=no-sphinx",
+      "TEST_ENV": "x86_64-freebsd-validate",
+      "XZ_OPT": "-9"
+    }
+  },
+  "nightly-x86_64-linux-alpine3_12-int_native-validate+fully_static": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": true,
+    "artifacts": {
+      "expire_in": "8 weeks",
+      "paths": [
+        "ghc-x86_64-linux-alpine3_12-int_native-validate+fully_static.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "x86_64-linux-alpine3_12-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-alpine3_12:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "when": "always"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "x86_64-linux"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "native",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-alpine3_12-int_native-validate+fully_static",
+      "BROKEN_TESTS": "encoding004 T10458 ghcilink002 linker_unload_native",
+      "BUILD_FLAVOUR": "validate+fully_static",
+      "CONFIGURE_ARGS": "--disable-ld-override ",
+      "HADRIAN_ARGS": "--docs=no-sphinx",
+      "INSTALL_CONFIGURE_ARGS": "--disable-ld-override",
+      "TEST_ENV": "x86_64-linux-alpine3_12-int_native-validate+fully_static",
+      "XZ_OPT": "-9"
+    }
+  },
+  "nightly-x86_64-linux-alpine3_12-validate+fully_static": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": true,
+    "artifacts": {
+      "expire_in": "8 weeks",
+      "paths": [
+        "ghc-x86_64-linux-alpine3_12-validate+fully_static.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "x86_64-linux-alpine3_12-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-alpine3_12:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "when": "always"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "x86_64-linux"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-alpine3_12-validate+fully_static",
+      "BROKEN_TESTS": "encoding004 T10458 ghcilink002 linker_unload_native",
+      "BUILD_FLAVOUR": "validate+fully_static",
+      "CONFIGURE_ARGS": "--disable-ld-override ",
+      "HADRIAN_ARGS": "--docs=no-sphinx",
+      "INSTALL_CONFIGURE_ARGS": "--disable-ld-override",
+      "TEST_ENV": "x86_64-linux-alpine3_12-validate+fully_static",
+      "XZ_OPT": "-9"
+    }
+  },
+  "nightly-x86_64-linux-centos7-validate": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "8 weeks",
+      "paths": [
+        "ghc-x86_64-linux-centos7-validate.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "x86_64-linux-centos7-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-centos7:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "when": "always"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "x86_64-linux"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-centos7-validate",
+      "BUILD_FLAVOUR": "validate",
+      "CONFIGURE_ARGS": "",
+      "TEST_ENV": "x86_64-linux-centos7-validate",
+      "XZ_OPT": "-9"
+    }
+  },
+  "nightly-x86_64-linux-deb10-int_native-validate": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "8 weeks",
+      "paths": [
+        "ghc-x86_64-linux-deb10-int_native-validate.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "x86_64-linux-deb10-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "when": "always"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "x86_64-linux"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "native",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-int_native-validate",
+      "BUILD_FLAVOUR": "validate",
+      "CONFIGURE_ARGS": "",
+      "TEST_ENV": "x86_64-linux-deb10-int_native-validate",
+      "XZ_OPT": "-9"
+    }
+  },
+  "nightly-x86_64-linux-deb10-no_tntc-validate": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "8 weeks",
+      "paths": [
+        "ghc-x86_64-linux-deb10-no_tntc-validate.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "x86_64-linux-deb10-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "when": "always"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "x86_64-linux"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-no_tntc-validate",
+      "BUILD_FLAVOUR": "validate",
+      "CONFIGURE_ARGS": "--disable-tables-next-to-code",
+      "TEST_ENV": "x86_64-linux-deb10-no_tntc-validate",
+      "XZ_OPT": "-9"
+    }
+  },
+  "nightly-x86_64-linux-deb10-numa-slow-validate": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "8 weeks",
+      "paths": [
+        "ghc-x86_64-linux-deb10-numa-slow-validate.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "x86_64-linux-deb10-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "when": "always"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "x86_64-linux"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-numa-slow-validate",
+      "BUILD_FLAVOUR": "slow-validate",
+      "CONFIGURE_ARGS": "",
+      "ENABLE_NUMA": "1",
+      "TEST_ENV": "x86_64-linux-deb10-numa-slow-validate",
+      "XZ_OPT": "-9"
+    }
+  },
+  "nightly-x86_64-linux-deb10-unreg-validate": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "8 weeks",
+      "paths": [
+        "ghc-x86_64-linux-deb10-unreg-validate.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "x86_64-linux-deb10-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "when": "always"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "x86_64-linux"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-unreg-validate",
+      "BUILD_FLAVOUR": "validate",
+      "CONFIGURE_ARGS": "--enable-unregisterised",
+      "TEST_ENV": "x86_64-linux-deb10-unreg-validate",
+      "XZ_OPT": "-9"
+    }
+  },
+  "nightly-x86_64-linux-deb10-validate": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "8 weeks",
+      "paths": [
+        "ghc-x86_64-linux-deb10-validate.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "x86_64-linux-deb10-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "when": "always"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "x86_64-linux"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-validate",
+      "BUILD_FLAVOUR": "validate",
+      "CONFIGURE_ARGS": "",
+      "TEST_ENV": "x86_64-linux-deb10-validate",
+      "XZ_OPT": "-9"
+    }
+  },
+  "nightly-x86_64-linux-deb10-validate+debug_info": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "8 weeks",
+      "paths": [
+        "ghc-x86_64-linux-deb10-validate+debug_info.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "x86_64-linux-deb10-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "when": "always"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "x86_64-linux"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-validate+debug_info",
+      "BUILD_FLAVOUR": "validate+debug_info",
+      "CONFIGURE_ARGS": "",
+      "TEST_ENV": "x86_64-linux-deb10-validate+debug_info",
+      "XZ_OPT": "-9"
+    }
+  },
+  "nightly-x86_64-linux-deb10-validate+llvm": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "8 weeks",
+      "paths": [
+        "ghc-x86_64-linux-deb10-validate+llvm.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "x86_64-linux-deb10-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "when": "always"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "x86_64-linux"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-validate+llvm",
+      "BUILD_FLAVOUR": "validate+llvm",
+      "CONFIGURE_ARGS": "",
+      "TEST_ENV": "x86_64-linux-deb10-validate+llvm",
+      "XZ_OPT": "-9"
+    }
+  },
+  "nightly-x86_64-linux-deb10-validate+thread_sanitizer": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "8 weeks",
+      "paths": [
+        "ghc-x86_64-linux-deb10-validate+thread_sanitizer.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "x86_64-linux-deb10-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "when": "always"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "x86_64-linux"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-validate+thread_sanitizer",
+      "BUILD_FLAVOUR": "validate+thread_sanitizer",
+      "CONFIGURE_ARGS": "",
+      "HADRIAN_ARGS": "--docs=none",
+      "TEST_ENV": "x86_64-linux-deb10-validate+thread_sanitizer",
+      "TSAN_OPTIONS": "suppressions=$CI_PROJECT_DIR/rts/.tsan-suppressions",
+      "XZ_OPT": "-9"
+    }
+  },
+  "nightly-x86_64-linux-deb11-validate": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "8 weeks",
+      "paths": [
+        "ghc-x86_64-linux-deb11-validate.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "x86_64-linux-deb11-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb11:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "when": "always"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "x86_64-linux"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-deb11-validate",
+      "BUILD_FLAVOUR": "validate",
+      "CONFIGURE_ARGS": "",
+      "TEST_ENV": "x86_64-linux-deb11-validate",
+      "XZ_OPT": "-9"
+    }
+  },
+  "nightly-x86_64-linux-fedora33-perf": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "8 weeks",
+      "paths": [
+        "ghc-x86_64-linux-fedora33-perf.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "x86_64-linux-fedora33-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora33:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "when": "always"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "x86_64-linux"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-fedora33-perf",
+      "BUILD_FLAVOUR": "perf",
+      "CONFIGURE_ARGS": "",
+      "LLC": "/bin/false",
+      "OPT": "/bin/false",
+      "TEST_ENV": "x86_64-linux-fedora33-perf",
+      "XZ_OPT": "-9"
+    }
+  },
+  "nightly-x86_64-linux-fedora33-validate+debug_info": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "8 weeks",
+      "paths": [
+        "ghc-x86_64-linux-fedora33-validate+debug_info.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "x86_64-linux-fedora33-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora33:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "when": "always"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "x86_64-linux"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-fedora33-validate+debug_info",
+      "BUILD_FLAVOUR": "validate+debug_info",
+      "CONFIGURE_ARGS": "",
+      "LLC": "/bin/false",
+      "OPT": "/bin/false",
+      "TEST_ENV": "x86_64-linux-fedora33-validate+debug_info",
+      "XZ_OPT": "-9"
+    }
+  },
+  "nightly-x86_64-linux-ubuntu20_04-validate": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "8 weeks",
+      "paths": [
+        "ghc-x86_64-linux-ubuntu20_04-validate.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "x86_64-linux-ubuntu20_04-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-ubuntu20_04:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "when": "always"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "x86_64-linux"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-ubuntu20_04-validate",
+      "BUILD_FLAVOUR": "validate",
+      "CONFIGURE_ARGS": "",
+      "TEST_ENV": "x86_64-linux-ubuntu20_04-validate",
+      "XZ_OPT": "-9"
+    }
+  },
+  "nightly-x86_64-windows-int_native-validate": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "8 weeks",
+      "paths": [
+        "ghc-x86_64-windows-int_native-validate.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "x86_64-windows-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": null,
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "when": "always"
+      }
+    ],
+    "script": [
+      "bash .gitlab/ci.sh setup",
+      "bash .gitlab/ci.sh configure",
+      "bash .gitlab/ci.sh build_hadrian",
+      "bash .gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "new-x86_64-windows"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "native",
+      "BIN_DIST_NAME": "ghc-x86_64-windows-int_native-validate",
+      "BUILD_FLAVOUR": "validate",
+      "CABAL_INSTALL_VERSION": "3.2.0.0",
+      "CONFIGURE_ARGS": "",
+      "GHC_VERSION": "8.10.4",
+      "HADRIAN_ARGS": "--docs=no-sphinx",
+      "LANG": "en_US.UTF-8",
+      "MSYSTEM": "MINGW64",
+      "SPHINXBUILD": "/mingw64/bin/sphinx-build.exe",
+      "TEST_ENV": "x86_64-windows-int_native-validate",
+      "XZ_OPT": "-9"
+    }
+  },
+  "nightly-x86_64-windows-validate": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "8 weeks",
+      "paths": [
+        "ghc-x86_64-windows-validate.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "x86_64-windows-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": null,
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "when": "always"
+      }
+    ],
+    "script": [
+      "bash .gitlab/ci.sh setup",
+      "bash .gitlab/ci.sh configure",
+      "bash .gitlab/ci.sh build_hadrian",
+      "bash .gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "new-x86_64-windows"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-x86_64-windows-validate",
+      "BUILD_FLAVOUR": "validate",
+      "CABAL_INSTALL_VERSION": "3.2.0.0",
+      "CONFIGURE_ARGS": "",
+      "GHC_VERSION": "8.10.4",
+      "HADRIAN_ARGS": "--docs=no-sphinx",
+      "LANG": "en_US.UTF-8",
+      "MSYSTEM": "MINGW64",
+      "SPHINXBUILD": "/mingw64/bin/sphinx-build.exe",
+      "TEST_ENV": "x86_64-windows-validate",
+      "XZ_OPT": "-9"
+    }
+  },
+  "release-aarch64-darwin-perf": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "1 year",
+      "paths": [
+        "ghc-aarch64-darwin-perf.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "aarch64-darwin-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": null,
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "when": "always"
+      }
+    ],
+    "script": [
+      "find libraries -name config.sub -exec cp config.sub {} \\;",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "aarch64-darwin"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-aarch64-darwin-perf",
+      "BUILD_FLAVOUR": "perf",
+      "CONFIGURE_ARGS": "--with-intree-gmp --with-system-libffi ",
+      "HADRIAN_ARGS": "--docs=no-sphinx",
+      "IGNORE_PERF_FAILURES": "all",
+      "LANG": "en_US.UTF-8",
+      "MACOSX_DEPLOYMENT_TARGET": "11.0",
+      "NIX_SYSTEM": "aarch64-darwin",
+      "TEST_ENV": "aarch64-darwin-perf",
+      "XZ_OPT": "-9"
+    }
+  },
+  "release-aarch64-linux-deb10-perf": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "1 year",
+      "paths": [
+        "ghc-aarch64-linux-deb10-perf.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "aarch64-linux-deb10-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/aarch64-linux-deb10:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "when": "always"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "aarch64-linux"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-aarch64-linux-deb10-perf",
+      "BUILD_FLAVOUR": "perf",
+      "CONFIGURE_ARGS": "",
+      "IGNORE_PERF_FAILURES": "all",
+      "TEST_ENV": "aarch64-linux-deb10-perf",
+      "XZ_OPT": "-9"
+    }
+  },
+  "release-armv7-linux-deb10-perf": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": true,
+    "artifacts": {
+      "expire_in": "1 year",
+      "paths": [
+        "ghc-armv7-linux-deb10-perf.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "armv7-linux-deb10-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/armv7-linux-deb10:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "when": "always"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "armv7-linux"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-armv7-linux-deb10-perf",
+      "BUILD_FLAVOUR": "perf",
+      "CONFIGURE_ARGS": "",
+      "IGNORE_PERF_FAILURES": "all",
+      "TEST_ENV": "armv7-linux-deb10-perf",
+      "XZ_OPT": "-9"
+    }
+  },
+  "release-i386-linux-deb9-perf": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "1 year",
+      "paths": [
+        "ghc-i386-linux-deb9-perf.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "i386-linux-deb9-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/i386-linux-deb9:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "when": "always"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "x86_64-linux"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-i386-linux-deb9-perf",
+      "BUILD_FLAVOUR": "perf",
+      "CONFIGURE_ARGS": "",
+      "IGNORE_PERF_FAILURES": "all",
+      "TEST_ENV": "i386-linux-deb9-perf",
+      "XZ_OPT": "-9"
+    }
+  },
+  "release-x86_64-darwin-perf": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "1 year",
+      "paths": [
+        "ghc-x86_64-darwin-perf.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "x86_64-darwin-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": null,
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "when": "always"
+      }
+    ],
+    "script": [
+      "find libraries -name config.sub -exec cp config.sub {} \\;",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "x86_64-darwin-m1"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-x86_64-darwin-perf",
+      "BUILD_FLAVOUR": "perf",
+      "CONFIGURE_ARGS": "--with-intree-gmp --with-system-libffi ",
+      "HADRIAN_ARGS": "--docs=no-sphinx",
+      "IGNORE_PERF_FAILURES": "all",
+      "LANG": "en_US.UTF-8",
+      "MACOSX_DEPLOYMENT_TARGET": "10.10",
+      "NIX_SYSTEM": "x86_64-darwin",
+      "TEST_ENV": "x86_64-darwin-perf",
+      "XZ_OPT": "-9",
+      "ac_cv_func_clock_gettime": "no",
+      "ac_cv_func_utimensat": "no"
+    }
+  },
+  "release-x86_64-freebsd-perf": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": true,
+    "artifacts": {
+      "expire_in": "1 year",
+      "paths": [
+        "ghc-x86_64-freebsd-perf.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "x86_64-freebsd-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": null,
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "when": "always"
+      }
+    ],
+    "script": [
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "x86_64-freebsd"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-x86_64-freebsd-perf",
+      "BUILD_FLAVOUR": "perf",
+      "CABAL_INSTALL_VERSION": "3.2.0.0",
+      "CONFIGURE_ARGS": "--with-gmp-includes=/usr/local/include --with-gmp-libraries=/usr/local/lib --with-iconv-includes=/usr/local/include --with-iconv-libraries=/usr/local/lib ",
+      "GHC_VERSION": "8.10.1",
+      "HADRIAN_ARGS": "--docs=no-sphinx",
+      "IGNORE_PERF_FAILURES": "all",
+      "TEST_ENV": "x86_64-freebsd-perf",
+      "XZ_OPT": "-9"
+    }
+  },
+  "release-x86_64-linux-alpine3_12-int_native-perf+fully_static": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": true,
+    "artifacts": {
+      "expire_in": "1 year",
+      "paths": [
+        "ghc-x86_64-linux-alpine3_12-int_native-perf+fully_static.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "x86_64-linux-alpine3_12-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-alpine3_12:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "when": "always"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "x86_64-linux"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "native",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-alpine3_12-int_native-perf+fully_static",
+      "BROKEN_TESTS": "encoding004 T10458 ghcilink002 linker_unload_native",
+      "BUILD_FLAVOUR": "perf+fully_static",
+      "CONFIGURE_ARGS": "--disable-ld-override ",
+      "HADRIAN_ARGS": "--docs=no-sphinx",
+      "IGNORE_PERF_FAILURES": "all",
+      "INSTALL_CONFIGURE_ARGS": "--disable-ld-override",
+      "TEST_ENV": "x86_64-linux-alpine3_12-int_native-perf+fully_static",
+      "XZ_OPT": "-9"
+    }
+  },
+  "release-x86_64-linux-alpine3_12-perf+fully_static": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": true,
+    "artifacts": {
+      "expire_in": "1 year",
+      "paths": [
+        "ghc-x86_64-linux-alpine3_12-perf+fully_static.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "x86_64-linux-alpine3_12-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-alpine3_12:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "when": "always"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "x86_64-linux"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-alpine3_12-perf+fully_static",
+      "BROKEN_TESTS": "encoding004 T10458 ghcilink002 linker_unload_native",
+      "BUILD_FLAVOUR": "perf+fully_static",
+      "CONFIGURE_ARGS": "--disable-ld-override ",
+      "HADRIAN_ARGS": "--docs=no-sphinx",
+      "IGNORE_PERF_FAILURES": "all",
+      "INSTALL_CONFIGURE_ARGS": "--disable-ld-override",
+      "TEST_ENV": "x86_64-linux-alpine3_12-perf+fully_static",
+      "XZ_OPT": "-9"
+    }
+  },
+  "release-x86_64-linux-centos7-perf": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "1 year",
+      "paths": [
+        "ghc-x86_64-linux-centos7-perf.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "x86_64-linux-centos7-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-centos7:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "when": "always"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "x86_64-linux"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-centos7-perf",
+      "BUILD_FLAVOUR": "perf",
+      "CONFIGURE_ARGS": "",
+      "IGNORE_PERF_FAILURES": "all",
+      "TEST_ENV": "x86_64-linux-centos7-perf",
+      "XZ_OPT": "-9"
+    }
+  },
+  "release-x86_64-linux-deb10-perf": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "1 year",
+      "paths": [
+        "ghc-x86_64-linux-deb10-perf.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "x86_64-linux-deb10-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "when": "always"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "x86_64-linux"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-perf",
+      "BUILD_FLAVOUR": "perf",
+      "CONFIGURE_ARGS": "",
+      "IGNORE_PERF_FAILURES": "all",
+      "TEST_ENV": "x86_64-linux-deb10-perf",
+      "XZ_OPT": "-9"
+    }
+  },
+  "release-x86_64-linux-deb10-perf+debug_info": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "1 year",
+      "paths": [
+        "ghc-x86_64-linux-deb10-perf+debug_info.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "x86_64-linux-deb10-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "when": "always"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "x86_64-linux"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-perf+debug_info",
+      "BUILD_FLAVOUR": "perf+debug_info",
+      "CONFIGURE_ARGS": "",
+      "IGNORE_PERF_FAILURES": "all",
+      "TEST_ENV": "x86_64-linux-deb10-perf+debug_info",
+      "XZ_OPT": "-9"
+    }
+  },
+  "release-x86_64-linux-deb11-perf": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "1 year",
+      "paths": [
+        "ghc-x86_64-linux-deb11-perf.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "x86_64-linux-deb11-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb11:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "when": "always"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "x86_64-linux"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-deb11-perf",
+      "BUILD_FLAVOUR": "perf",
+      "CONFIGURE_ARGS": "",
+      "IGNORE_PERF_FAILURES": "all",
+      "TEST_ENV": "x86_64-linux-deb11-perf",
+      "XZ_OPT": "-9"
+    }
+  },
+  "release-x86_64-linux-fedora33-perf": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "1 year",
+      "paths": [
+        "ghc-x86_64-linux-fedora33-perf.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "x86_64-linux-fedora33-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora33:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "when": "always"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "x86_64-linux"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-fedora33-perf",
+      "BUILD_FLAVOUR": "perf",
+      "CONFIGURE_ARGS": "",
+      "IGNORE_PERF_FAILURES": "all",
+      "LLC": "/bin/false",
+      "OPT": "/bin/false",
+      "TEST_ENV": "x86_64-linux-fedora33-perf",
+      "XZ_OPT": "-9"
+    }
+  },
+  "release-x86_64-linux-fedora33-perf+debug_info": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "1 year",
+      "paths": [
+        "ghc-x86_64-linux-fedora33-perf+debug_info.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "x86_64-linux-fedora33-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora33:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "when": "always"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "x86_64-linux"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-fedora33-perf+debug_info",
+      "BUILD_FLAVOUR": "perf+debug_info",
+      "CONFIGURE_ARGS": "",
+      "IGNORE_PERF_FAILURES": "all",
+      "LLC": "/bin/false",
+      "OPT": "/bin/false",
+      "TEST_ENV": "x86_64-linux-fedora33-perf+debug_info",
+      "XZ_OPT": "-9"
+    }
+  },
+  "release-x86_64-linux-ubuntu20_04-perf": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "1 year",
+      "paths": [
+        "ghc-x86_64-linux-ubuntu20_04-perf.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "x86_64-linux-ubuntu20_04-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-ubuntu20_04:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "when": "always"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "x86_64-linux"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-ubuntu20_04-perf",
+      "BUILD_FLAVOUR": "perf",
+      "CONFIGURE_ARGS": "",
+      "IGNORE_PERF_FAILURES": "all",
+      "TEST_ENV": "x86_64-linux-ubuntu20_04-perf",
+      "XZ_OPT": "-9"
+    }
+  },
+  "release-x86_64-windows-int_native-perf": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "1 year",
+      "paths": [
+        "ghc-x86_64-windows-int_native-perf.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "x86_64-windows-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": null,
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "when": "always"
+      }
+    ],
+    "script": [
+      "bash .gitlab/ci.sh setup",
+      "bash .gitlab/ci.sh configure",
+      "bash .gitlab/ci.sh build_hadrian",
+      "bash .gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "new-x86_64-windows"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "native",
+      "BIN_DIST_NAME": "ghc-x86_64-windows-int_native-perf",
+      "BUILD_FLAVOUR": "perf",
+      "CABAL_INSTALL_VERSION": "3.2.0.0",
+      "CONFIGURE_ARGS": "",
+      "GHC_VERSION": "8.10.4",
+      "HADRIAN_ARGS": "--docs=no-sphinx",
+      "IGNORE_PERF_FAILURES": "all",
+      "LANG": "en_US.UTF-8",
+      "MSYSTEM": "MINGW64",
+      "SPHINXBUILD": "/mingw64/bin/sphinx-build.exe",
+      "TEST_ENV": "x86_64-windows-int_native-perf",
+      "XZ_OPT": "-9"
+    }
+  },
+  "release-x86_64-windows-perf": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "1 year",
+      "paths": [
+        "ghc-x86_64-windows-perf.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "x86_64-windows-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": null,
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "when": "always"
+      }
+    ],
+    "script": [
+      "bash .gitlab/ci.sh setup",
+      "bash .gitlab/ci.sh configure",
+      "bash .gitlab/ci.sh build_hadrian",
+      "bash .gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "new-x86_64-windows"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-x86_64-windows-perf",
+      "BUILD_FLAVOUR": "perf",
+      "CABAL_INSTALL_VERSION": "3.2.0.0",
+      "CONFIGURE_ARGS": "",
+      "GHC_VERSION": "8.10.4",
+      "HADRIAN_ARGS": "--docs=no-sphinx",
+      "IGNORE_PERF_FAILURES": "all",
+      "LANG": "en_US.UTF-8",
+      "MSYSTEM": "MINGW64",
+      "SPHINXBUILD": "/mingw64/bin/sphinx-build.exe",
+      "TEST_ENV": "x86_64-windows-perf",
+      "XZ_OPT": "-9"
+    }
+  },
+  "x86_64-darwin-validate": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "2 weeks",
+      "paths": [
+        "ghc-x86_64-darwin-validate.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "x86_64-darwin-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": null,
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "when": "always"
+      }
+    ],
+    "script": [
+      "find libraries -name config.sub -exec cp config.sub {} \\;",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "x86_64-darwin-m1"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-x86_64-darwin-validate",
+      "BUILD_FLAVOUR": "validate",
+      "CONFIGURE_ARGS": "--with-intree-gmp --with-system-libffi ",
+      "HADRIAN_ARGS": "--docs=no-sphinx",
+      "LANG": "en_US.UTF-8",
+      "MACOSX_DEPLOYMENT_TARGET": "10.10",
+      "NIX_SYSTEM": "x86_64-darwin",
+      "TEST_ENV": "x86_64-darwin-validate",
+      "ac_cv_func_clock_gettime": "no",
+      "ac_cv_func_utimensat": "no"
+    }
+  },
+  "x86_64-freebsd-validate": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": true,
+    "artifacts": {
+      "expire_in": "2 weeks",
+      "paths": [
+        "ghc-x86_64-freebsd-validate.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "x86_64-freebsd-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": null,
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && ($CI_MERGE_REQUEST_LABELS =~ /.*FreeBSD.*/) && (\"true\" == \"true\")",
+        "when": "always"
+      }
+    ],
+    "script": [
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "x86_64-freebsd"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-x86_64-freebsd-validate",
+      "BUILD_FLAVOUR": "validate",
+      "CABAL_INSTALL_VERSION": "3.2.0.0",
+      "CONFIGURE_ARGS": "--with-gmp-includes=/usr/local/include --with-gmp-libraries=/usr/local/lib --with-iconv-includes=/usr/local/include --with-iconv-libraries=/usr/local/lib ",
+      "GHC_VERSION": "8.10.1",
+      "HADRIAN_ARGS": "--docs=no-sphinx",
+      "TEST_ENV": "x86_64-freebsd-validate"
+    }
+  },
+  "x86_64-linux-alpine3_12-int_native-validate+fully_static": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": true,
+    "artifacts": {
+      "expire_in": "2 weeks",
+      "paths": [
+        "ghc-x86_64-linux-alpine3_12-int_native-validate+fully_static.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "x86_64-linux-alpine3_12-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-alpine3_12:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"disabled\" != \"disabled\")",
+        "when": "always"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "x86_64-linux"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "native",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-alpine3_12-int_native-validate+fully_static",
+      "BROKEN_TESTS": "encoding004 T10458 ghcilink002 linker_unload_native",
+      "BUILD_FLAVOUR": "validate+fully_static",
+      "CONFIGURE_ARGS": "--disable-ld-override ",
+      "HADRIAN_ARGS": "--docs=no-sphinx",
+      "INSTALL_CONFIGURE_ARGS": "--disable-ld-override",
+      "TEST_ENV": "x86_64-linux-alpine3_12-int_native-validate+fully_static"
+    }
+  },
+  "x86_64-linux-alpine3_12-validate+fully_static": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": true,
+    "artifacts": {
+      "expire_in": "2 weeks",
+      "paths": [
+        "ghc-x86_64-linux-alpine3_12-validate+fully_static.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "x86_64-linux-alpine3_12-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-alpine3_12:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "when": "always"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "x86_64-linux"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-alpine3_12-validate+fully_static",
+      "BROKEN_TESTS": "encoding004 T10458 ghcilink002 linker_unload_native",
+      "BUILD_FLAVOUR": "validate+fully_static",
+      "CONFIGURE_ARGS": "--disable-ld-override ",
+      "HADRIAN_ARGS": "--docs=no-sphinx",
+      "INSTALL_CONFIGURE_ARGS": "--disable-ld-override",
+      "TEST_ENV": "x86_64-linux-alpine3_12-validate+fully_static"
+    }
+  },
+  "x86_64-linux-centos7-validate": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "2 weeks",
+      "paths": [
+        "ghc-x86_64-linux-centos7-validate.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "x86_64-linux-centos7-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-centos7:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"disabled\" != \"disabled\")",
+        "when": "always"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "x86_64-linux"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-centos7-validate",
+      "BUILD_FLAVOUR": "validate",
+      "CONFIGURE_ARGS": "",
+      "TEST_ENV": "x86_64-linux-centos7-validate"
+    }
+  },
+  "x86_64-linux-deb10-int_native-validate": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "2 weeks",
+      "paths": [
+        "ghc-x86_64-linux-deb10-int_native-validate.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "x86_64-linux-deb10-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "when": "always"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "x86_64-linux"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "native",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-int_native-validate",
+      "BUILD_FLAVOUR": "validate",
+      "CONFIGURE_ARGS": "",
+      "TEST_ENV": "x86_64-linux-deb10-int_native-validate"
+    }
+  },
+  "x86_64-linux-deb10-no_tntc-validate": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "2 weeks",
+      "paths": [
+        "ghc-x86_64-linux-deb10-no_tntc-validate.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "x86_64-linux-deb10-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "allow_failure": true,
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "when": "manual"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "x86_64-linux"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-no_tntc-validate",
+      "BUILD_FLAVOUR": "validate",
+      "CONFIGURE_ARGS": "--disable-tables-next-to-code",
+      "TEST_ENV": "x86_64-linux-deb10-no_tntc-validate"
+    }
+  },
+  "x86_64-linux-deb10-numa-slow-validate": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "2 weeks",
+      "paths": [
+        "ghc-x86_64-linux-deb10-numa-slow-validate.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "x86_64-linux-deb10-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "when": "always"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "x86_64-linux"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-numa-slow-validate",
+      "BUILD_FLAVOUR": "slow-validate",
+      "CONFIGURE_ARGS": "",
+      "ENABLE_NUMA": "1",
+      "TEST_ENV": "x86_64-linux-deb10-numa-slow-validate"
+    }
+  },
+  "x86_64-linux-deb10-unreg-validate": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "2 weeks",
+      "paths": [
+        "ghc-x86_64-linux-deb10-unreg-validate.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "x86_64-linux-deb10-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "when": "always"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "x86_64-linux"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-unreg-validate",
+      "BUILD_FLAVOUR": "validate",
+      "CONFIGURE_ARGS": "--enable-unregisterised",
+      "TEST_ENV": "x86_64-linux-deb10-unreg-validate"
+    }
+  },
+  "x86_64-linux-deb10-validate": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "2 weeks",
+      "paths": [
+        "ghc-x86_64-linux-deb10-validate.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "x86_64-linux-deb10-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"disabled\" != \"disabled\")",
+        "when": "always"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "x86_64-linux"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-validate",
+      "BUILD_FLAVOUR": "validate",
+      "CONFIGURE_ARGS": "",
+      "TEST_ENV": "x86_64-linux-deb10-validate"
+    }
+  },
+  "x86_64-linux-deb10-validate+debug_info": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "2 weeks",
+      "paths": [
+        "ghc-x86_64-linux-deb10-validate+debug_info.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "x86_64-linux-deb10-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "when": "always"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "x86_64-linux"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-validate+debug_info",
+      "BUILD_FLAVOUR": "validate+debug_info",
+      "CONFIGURE_ARGS": "",
+      "TEST_ENV": "x86_64-linux-deb10-validate+debug_info"
+    }
+  },
+  "x86_64-linux-deb10-validate+llvm": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "2 weeks",
+      "paths": [
+        "ghc-x86_64-linux-deb10-validate+llvm.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "x86_64-linux-deb10-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && ($CI_MERGE_REQUEST_LABELS =~ /.*LLVM backend.*/) && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "when": "always"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "x86_64-linux"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-validate+llvm",
+      "BUILD_FLAVOUR": "validate+llvm",
+      "CONFIGURE_ARGS": "",
+      "TEST_ENV": "x86_64-linux-deb10-validate+llvm"
+    }
+  },
+  "x86_64-linux-deb10-validate+thread_sanitizer": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "2 weeks",
+      "paths": [
+        "ghc-x86_64-linux-deb10-validate+thread_sanitizer.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "x86_64-linux-deb10-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "allow_failure": true,
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "when": "manual"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "x86_64-linux"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-validate+thread_sanitizer",
+      "BUILD_FLAVOUR": "validate+thread_sanitizer",
+      "CONFIGURE_ARGS": "",
+      "HADRIAN_ARGS": "--docs=none",
+      "TEST_ENV": "x86_64-linux-deb10-validate+thread_sanitizer",
+      "TSAN_OPTIONS": "suppressions=$CI_PROJECT_DIR/rts/.tsan-suppressions"
+    }
+  },
+  "x86_64-linux-deb11-validate": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "2 weeks",
+      "paths": [
+        "ghc-x86_64-linux-deb11-validate.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "x86_64-linux-deb11-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb11:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"disabled\" != \"disabled\")",
+        "when": "always"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "x86_64-linux"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-deb11-validate",
+      "BUILD_FLAVOUR": "validate",
+      "CONFIGURE_ARGS": "",
+      "TEST_ENV": "x86_64-linux-deb11-validate"
+    }
+  },
+  "x86_64-linux-fedora33-perf": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "2 weeks",
+      "paths": [
+        "ghc-x86_64-linux-fedora33-perf.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "x86_64-linux-fedora33-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora33:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "when": "always"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "x86_64-linux"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-fedora33-perf",
+      "BUILD_FLAVOUR": "perf",
+      "CONFIGURE_ARGS": "",
+      "LLC": "/bin/false",
+      "OPT": "/bin/false",
+      "TEST_ENV": "x86_64-linux-fedora33-perf"
+    }
+  },
+  "x86_64-linux-fedora33-validate+debug_info": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "2 weeks",
+      "paths": [
+        "ghc-x86_64-linux-fedora33-validate+debug_info.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "x86_64-linux-fedora33-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora33:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"disabled\" != \"disabled\")",
+        "when": "always"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "x86_64-linux"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-fedora33-validate+debug_info",
+      "BUILD_FLAVOUR": "validate+debug_info",
+      "CONFIGURE_ARGS": "",
+      "LLC": "/bin/false",
+      "OPT": "/bin/false",
+      "TEST_ENV": "x86_64-linux-fedora33-validate+debug_info"
+    }
+  },
+  "x86_64-linux-ubuntu20_04-validate": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "2 weeks",
+      "paths": [
+        "ghc-x86_64-linux-ubuntu20_04-validate.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "x86_64-linux-ubuntu20_04-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-ubuntu20_04:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"disabled\" != \"disabled\")",
+        "when": "always"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "x86_64-linux"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-ubuntu20_04-validate",
+      "BUILD_FLAVOUR": "validate",
+      "CONFIGURE_ARGS": "",
+      "TEST_ENV": "x86_64-linux-ubuntu20_04-validate"
+    }
+  },
+  "x86_64-windows-int_native-validate": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "2 weeks",
+      "paths": [
+        "ghc-x86_64-windows-int_native-validate.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "x86_64-windows-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": null,
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"disabled\" != \"disabled\")",
+        "when": "always"
+      }
+    ],
+    "script": [
+      "bash .gitlab/ci.sh setup",
+      "bash .gitlab/ci.sh configure",
+      "bash .gitlab/ci.sh build_hadrian",
+      "bash .gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "new-x86_64-windows"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "native",
+      "BIN_DIST_NAME": "ghc-x86_64-windows-int_native-validate",
+      "BUILD_FLAVOUR": "validate",
+      "CABAL_INSTALL_VERSION": "3.2.0.0",
+      "CONFIGURE_ARGS": "",
+      "GHC_VERSION": "8.10.4",
+      "HADRIAN_ARGS": "--docs=no-sphinx",
+      "LANG": "en_US.UTF-8",
+      "MSYSTEM": "MINGW64",
+      "SPHINXBUILD": "/mingw64/bin/sphinx-build.exe",
+      "TEST_ENV": "x86_64-windows-int_native-validate"
+    }
+  },
+  "x86_64-windows-validate": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "2 weeks",
+      "paths": [
+        "ghc-x86_64-windows-validate.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      }
+    },
+    "cache": {
+      "key": "x86_64-windows-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": null,
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "when": "always"
+      }
+    ],
+    "script": [
+      "bash .gitlab/ci.sh setup",
+      "bash .gitlab/ci.sh configure",
+      "bash .gitlab/ci.sh build_hadrian",
+      "bash .gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "new-x86_64-windows"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-x86_64-windows-validate",
+      "BUILD_FLAVOUR": "validate",
+      "CABAL_INSTALL_VERSION": "3.2.0.0",
+      "CONFIGURE_ARGS": "",
+      "GHC_VERSION": "8.10.4",
+      "HADRIAN_ARGS": "--docs=no-sphinx",
+      "LANG": "en_US.UTF-8",
+      "MSYSTEM": "MINGW64",
+      "SPHINXBUILD": "/mingw64/bin/sphinx-build.exe",
+      "TEST_ENV": "x86_64-windows-validate"
+    }
+  }
+}
