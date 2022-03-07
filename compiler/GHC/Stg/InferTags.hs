@@ -186,6 +186,8 @@ As it makes little difference for runtime performance I've treated functions as 
 it made the code simpler. But besides implementation complexity there isn't any reason
 why we couldn't be more rigourous in dealing with functions.
 
+NB: It turned out because of #21193 option two wouldn't really have been an option anyway.
+
 Note [Tag inference debugging]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 There is a flag -dtag-inference-checks which inserts various

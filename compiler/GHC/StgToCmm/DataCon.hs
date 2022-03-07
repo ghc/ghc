@@ -212,7 +212,8 @@ buildDynCon' binder mn actually_bound ccs con args
           ; let ticky_name | actually_bound = Just binder
                            | otherwise = Nothing
 
-          ; checkConArgsDyn (text "TagCheck failed - con_alloc:" <> ppr binder) con (map fromNonVoid args)
+          ; checkConArgsDyn (hang (text "TagCheck failed on constructor application.") 4 $
+                                   text "On binder:" <> ppr binder $$ text "Constructor:" <> ppr con) con (map fromNonVoid args)
           ; hp_plus_n <- allocDynClosure ticky_name info_tbl lf_info
                                           use_cc blame_cc args_w_offsets
           ; return (mkRhsInit platform reg lf_info hp_plus_n) }
