@@ -2241,6 +2241,9 @@ tcUserStmt :: GhciLStmt GhcPs -> TcM (PlanResult, FixityEnv)
 -- An expression typed at the prompt is treated very specially
 tcUserStmt (L loc (BodyStmt _ expr _ _))
   = do  { (rn_expr, fvs) <- checkNoErrs (rnLExpr expr)
+
+        ; dumpOptTcRn Opt_D_dump_rn_ast "Renamer" FormatHaskell
+            (showAstData NoBlankSrcSpan NoBlankEpAnnotations rn_expr)
                -- Don't try to typecheck if the renamer fails!
         ; ghciStep <- getGhciStepIO
         ; uniq <- newUnique
@@ -2336,6 +2339,9 @@ tcUserStmt (L loc (BodyStmt _ expr _ _))
                     runPlans $ if generate_it
                                  then no_it_plans
                                  else it_plans
+
+        ; dumpOptTcRn Opt_D_dump_tc_ast "Typechecker AST" FormatHaskell
+              (showAstData NoBlankSrcSpan NoBlankEpAnnotations plan)
 
         ; fix_env <- getFixityEnv
         ; return (plan, fix_env) }
