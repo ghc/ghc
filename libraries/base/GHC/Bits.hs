@@ -581,10 +581,11 @@ instance Bits Natural where
    shift x i
      | i >= 0    = naturalShiftL x (fromIntegral i)
      | otherwise = naturalShiftR x (fromIntegral (negate i))
-   testBit x i   = naturalTestBit x (fromIntegral i)
-   zeroBits      = naturalZero
-   setBit x i    = naturalSetBit x (fromIntegral i)
-   clearBit x i  = x `xor` (bit i .&. x)
+   testBit x i       = naturalTestBit x (fromIntegral i)
+   zeroBits          = naturalZero
+   setBit x i        = naturalSetBit x (fromIntegral i)
+   clearBit x i      = naturalClearBit x (fromIntegral i)
+   complementBit x i = naturalComplementBit x (fromIntegral i)
 
    bit (I# i)  = naturalBit# (int2Word# i)
    popCount x  = I# (word2Int# (naturalPopCount# x))

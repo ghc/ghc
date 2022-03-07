@@ -1070,9 +1070,24 @@ bigNatSetBit# a n
 
 -- | Reverse the given bit
 bigNatComplementBit# :: BigNat# -> Word# -> BigNat#
-bigNatComplementBit# bn i
-  | isTrue# (bigNatTestBit# bn i) = bigNatClearBit# bn i
-  | True                          = bigNatSetBit#   bn i
+bigNatComplementBit# a n =
+   let
+      !sz = wordArraySize# a
+      !nw = word2Int# (n `uncheckedShiftRL#` WORD_SIZE_BITS_SHIFT#)
+      !nb = word2Int# (n `and#` WORD_SIZE_BITS_MASK##)
+      d   = nw +# 1# -# sz
+   in if
+      -- result BigNat will have more limbs
+      | isTrue# (d ># 0#)
+      -> withNewWordArray# (nw +# 1#) \mwa s ->
+            case mwaArrayCopy# mwa 0# a 0# sz s of
+               s' -> case mwaFill# mwa 0## (int2Word# sz) (int2Word# (d -# 1#)) s' of
+                  s'' -> writeWordArray# mwa nw (bitW# nb) s''
+
+      | nv <- bigNatIndex# a nw `xor#` bitW# nb
+      -> withNewWordArrayTrimmed# sz \mwa s ->
+            case mwaArrayCopy# mwa 0# a 0# sz s of
+               s' -> writeWordArray# mwa nw nv s'
 
 -------------------------------------------------
 -- Log operations

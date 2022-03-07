@@ -432,6 +432,28 @@ naturalSetBit# (NB n) i                       = NB (bigNatSetBit# n i)
 naturalSetBit :: Natural -> Word -> Natural
 naturalSetBit !n (W# i) = naturalSetBit# n i
 
+-- | @since 1.3
+naturalClearBit# :: Natural -> Word# -> Natural
+naturalClearBit# x@(NS n) i
+  | isTrue# (i `ltWord#` WORD_SIZE_IN_BITS##) = NS (n `and#` not# (1## `uncheckedShiftL#` word2Int# i))
+  | True                                      = x
+naturalClearBit# (NB n) i                     = naturalFromBigNat# (bigNatClearBit# n i)
+
+-- | @since 1.3
+naturalClearBit :: Natural -> Word -> Natural
+naturalClearBit !n (W# i) = naturalClearBit# n i
+
+-- | @since 1.3
+naturalComplementBit# :: Natural -> Word# -> Natural
+naturalComplementBit# (NS n) i
+  | isTrue# (i `ltWord#` WORD_SIZE_IN_BITS##) = NS (n `xor#` (1## `uncheckedShiftL#` word2Int# i))
+  | True                                      = NB (bigNatSetBit# (bigNatFromWord# n) i)
+naturalComplementBit# (NB n) i                = naturalFromBigNat# (bigNatComplementBit# n i)
+
+-- | @since 1.3
+naturalComplementBit :: Natural -> Word -> Natural
+naturalComplementBit !n (W# i) = naturalComplementBit# n i
+
 -- | Compute greatest common divisor.
 naturalGcd :: Natural -> Natural -> Natural
 {-# NOINLINE naturalGcd #-}
