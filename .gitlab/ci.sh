@@ -406,6 +406,7 @@ function configure() {
 }
 
 function build_make() {
+  check_release_build
   prepare_build_mk
   if [[ -z "$BIN_DIST_PREP_TAR_COMP" ]]; then
     fail "BIN_DIST_PREP_TAR_COMP is not set"
@@ -444,11 +445,27 @@ function determine_metric_baseline() {
   info "Using $PERF_BASELINE_COMMIT for performance metric baseline..."
 }
 
+# If RELEASE_JOB = yes then we skip builds with a validate flavour.
+# This has the effect of
+#  (1) Skipping validate jobs when trying to do release builds
+#  (2) Ensured we don't accidentally build release builds with validate flavour.
+#
+# We should never try to build a validate build in a release pipeline so this is
+# very defensive in case we have made a mistake somewhere.
+function check_release_build() {
+  if [ -z "${RELEASE_JOB:-}" ] && [["${BUILD_FLAVOUR:-}" == *"validate"* ]]then
+    info "Exiting build because this is a validate build in a release job"
+    exit 0;
+  fi
+}
+
 function test_make() {
   if [ -n "${CROSS_TARGET:-}" ]; then
     info "Can't test cross-compiled build."
     return
   fi
+
+  check_release_build
 
   run "$MAKE" test_bindist TEST_PREP=YES
   run "$MAKE" V=0 VERBOSE=1 test \
@@ -461,6 +478,8 @@ function build_hadrian() {
   if [ -z "${BIN_DIST_NAME:-}" ]; then
     fail "BIN_DIST_NAME not set"
   fi
+
+  check_release_build
 
   # N.B. First build Hadrian, unsetting MACOSX_DEPLOYMENT_TARGET which may warn
   # if the bootstrap libraries were built with a different version expectation.
@@ -475,6 +494,8 @@ function test_hadrian() {
     info "Can't test cross-compiled build."
     return
   fi
+
+  check_release_build
 
   # Ensure that statically-linked builds are actually static
   if [[ "${BUILD_FLAVOUR}" = *static* ]]; then
