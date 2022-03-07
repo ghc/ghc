@@ -43,7 +43,8 @@ module GHC.Parser.Annotation (
   AnnSortKey(..),
 
   -- ** Trailing annotations in lists
-  TrailingAnn(..), addTrailingAnnToA, addTrailingAnnToL, addTrailingCommaToN,
+  TrailingAnn(..), trailingAnnToAddEpAnn,
+  addTrailingAnnToA, addTrailingAnnToL, addTrailingCommaToN,
 
   -- ** Utilities for converting between different 'GenLocated' when
   -- ** we do not care about the annotations.
@@ -801,6 +802,11 @@ data AnnSortKey
 
 -- ---------------------------------------------------------------------
 
+-- | Convert a 'TrailingAnn' to an 'AddEpAnn'
+trailingAnnToAddEpAnn :: TrailingAnn -> AddEpAnn
+trailingAnnToAddEpAnn (AddSemiAnn ss)    = AddEpAnn AnnSemi ss
+trailingAnnToAddEpAnn (AddCommaAnn ss)   = AddEpAnn AnnComma ss
+trailingAnnToAddEpAnn (AddVbarAnn ss)    = AddEpAnn AnnVbar ss
 
 -- | Helper function used in the parser to add a 'TrailingAnn' items
 -- to an existing annotation.
