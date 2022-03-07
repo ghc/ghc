@@ -27,6 +27,8 @@ module Debug.Trace (
         traceId,
         traceShow,
         traceShowId,
+        traceWith,
+        traceShowWith,
         traceStack,
         traceIO,
         traceM,
@@ -36,6 +38,7 @@ module Debug.Trace (
         -- * Eventlog tracing
         -- $eventlog_tracing
         traceEvent,
+        traceEventWith,
         traceEventIO,
         flushEventLog,
 
@@ -164,6 +167,31 @@ traceShowId :: Show a => a -> a
 traceShowId a = trace (show a) a
 
 {-|
+Like 'trace', but outputs the result of calling a function on the argument.
+
+>>> traceWith fst ("hello","world")
+hello
+("hello","world")
+
+@since 4.17.0.0
+-}
+traceWith :: (a -> String) -> a -> a
+traceWith f a = trace (f a) a
+
+{-|
+Like 'traceWith', but uses 'show' on the result of the function to convert it to
+a 'String'.
+
+>>> traceShowWith length [1,2,3]
+3
+[1,2,3]
+
+@since 4.17.0.0
+-}
+traceShowWith :: Show b => (a -> b) -> a -> a
+traceShowWith f = traceWith (show . f)
+
+{-|
 Like 'trace' but returning unit in an arbitrary 'Applicative' context. Allows
 for convenient use in do-notation.
 
@@ -271,6 +299,13 @@ traceEventIO :: String -> IO ()
 traceEventIO msg =
   GHC.Foreign.withCString utf8 msg $ \(Ptr p) -> IO $ \s ->
     case traceEvent# p s of s' -> (# s', () #)
+
+-- | Like 'traceEvent', but emits the result of calling a function on its
+-- argument.
+--
+-- @since 4.17.0.0
+traceEventWith :: (a -> String) -> a -> a
+traceEventWith f a = traceEvent (f a) a
 
 -- $markers
 --
