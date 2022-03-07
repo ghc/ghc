@@ -1163,21 +1163,21 @@ nightly-x86_64-windows:
   <<: *nightly
   extends: .build-x86_64-windows-make
   stage: full-build
-  variables:
-    BUILD_FLAVOUR: "validate"
 
 # Normal Windows validate builds lack profiled libraries; that won't do for
 # releases.
 release-x86_64-windows:
-  <<: *release
-  extends: .build-x86_64-windows-hadrian
+  extends:
+      - .build-x86_64-windows-hadrian
+      - .release
   variables:
     # --skip-perf is incompatible with IGNORE_PERF_FAILURES.
     IGNORE_PERF_FAILURES: ""
 
 release-x86_64-windows-integer-simple:
-  <<: *release
-  extends: .build-x86_64-windows-hadrian
+  extends:
+    - .build-x86_64-windows-hadrian
+    - .release
   variables:
     BIGNUM_BACKEND: native
     BIN_DIST_NAME: "ghc-x86_64-mingw32-unknown-nogmp"
