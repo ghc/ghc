@@ -69,9 +69,6 @@ import GHC.Types.Unique.DFM
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
-#if defined(CAN_LOAD_DLL)
-import GHC.Utils.Constants (isWindowsHost, isDarwinHost)
-#endif
 import GHC.Utils.Error
 import GHC.Utils.Logger
 import GHC.Utils.TmpFs
@@ -1295,23 +1292,6 @@ unload_wkr interp keep_linkables pls@LoaderState{..}  = do
                 -- letting go of them (plus of course depopulating
                 -- the symbol table which is done in the main body)
 
--- If this package is already part of the GHCi binary, we'll already
--- have the right DLLs for this package loaded, so don't try to
--- load them again.
---
--- But on Win32 we must load them 'again'; doing so is a harmless no-op
--- as far as the loader is concerned, but it does initialise the list
--- of DLL handles that rts/Linker.c maintains, and that in turn is
--- used by lookupSymbol.  So we must call addDLL for each library
--- just to get the DLL handle into the list.
-#if defined(CAN_LOAD_DLL)
-partOfGHCi :: [PackageName]
-partOfGHCi
- | isWindowsHost || isDarwinHost = []
- | otherwise = map (PackageName . mkFastString)
-                   ["base", "template-haskell", "editline"]
-#endif
-
 showLS :: LibrarySpec -> String
 showLS (Objects nms)  = "(static) [" ++ intercalate ", " nms ++ "]"
 showLS (Archive nm)   = "(static archive) " ++ nm
@@ -1429,16 +1409,14 @@ loadPackage interp hsc_env pkg
         maybePutSDoc logger
             (text "Loading unit " <> pprUnitInfoForUser pkg <> text " ... ")
 
-        -- See comments with partOfGHCi
 #if defined(CAN_LOAD_DLL)
-        when (unitPackageName pkg `notElem` partOfGHCi) $ do
-            loadFrameworks interp platform pkg
-            -- See Note [Crash early load_dyn and locateLib]
-            -- Crash early if can't load any of `known_dlls`
-            mapM_ (load_dyn interp hsc_env True) known_dlls
-            -- For remaining `dlls` crash early only when there is surely
-            -- no package's DLL around ... (not is_dyn)
-            mapM_ (load_dyn interp hsc_env (not is_dyn) . platformSOName platform) dlls
+        loadFrameworks interp platform pkg
+        -- See Note [Crash early load_dyn and locateLib]
+        -- Crash early if can't load any of `known_dlls`
+        mapM_ (load_dyn interp hsc_env True) known_dlls
+        -- For remaining `dlls` crash early only when there is surely
+        -- no package's DLL around ... (not is_dyn)
+        mapM_ (load_dyn interp hsc_env (not is_dyn) . platformSOName platform) dlls
 #endif
         -- After loading all the DLLs, we can load the static objects.
         -- Ordering isn't important here, because we do one final link
