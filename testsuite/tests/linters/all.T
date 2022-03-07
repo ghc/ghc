@@ -9,7 +9,6 @@ def normalise_nos(s):
 def has_ls_files() -> bool:
   try:
     files = subprocess.check_output(['git', 'ls-files']).splitlines()
-    print (b"hie.yaml" in files)
     return b"hie.yaml" in files
   except subprocess.CalledProcessError:
     return False
