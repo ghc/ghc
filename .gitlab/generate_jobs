@@ -1,0 +1,7 @@
+#! /usr/bin/env nix-shell
+#! nix-shell -i bash -p cabal-install ghc jq
+
+cd "$(dirname "${BASH_SOURCE[0]}")"
+tmp=$(mktemp)
+./gen_ci.hs $tmp
+cat $tmp | jq | tee jobs.yaml

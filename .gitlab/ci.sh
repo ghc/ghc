@@ -238,6 +238,7 @@ function cabal_update() {
   "$CABAL" update --index="$HACKAGE_INDEX_STATE"
 }
 
+
 # Extract GHC toolchain
 function setup() {
   echo "=== TIMINGS ===" > ci-timings
@@ -473,7 +474,8 @@ function determine_metric_baseline() {
 #  (1) Skipping validate jobs when trying to do release builds
 #  (2) Ensured we don't accidentally build release builds with validate flavour.
 function check_release_build() {
-  if [ -z "${RELEASE_JOB:-}" ] && [["${BUILD_FLAVOUR:-}" == *"validate"* ]]then
+  if [ "${RELEASE_JOB:-}" == "yes" ] && [[ "${BUILD_FLAVOUR:-}" == *"validate"* ]]
+  then
     info "Exiting build because this is a validate build in a release job"
     exit 0;
   fi
