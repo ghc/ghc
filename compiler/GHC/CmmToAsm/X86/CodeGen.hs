@@ -2773,18 +2773,52 @@ maybePromoteCArg platform wto arg
 -- -----------------------------------------------------------------------------
 -- Generating a table-branch
 
+{-
+Note [Sub-word subtlety during jump-table indexing]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Offset the index by the start index of the jump table.
+It's important that we do this *before* the widening below. To see
+why, consider a switch with a sub-word, signed discriminant such as:
+
+    switch [-5...+2] x::I16 {
+        case -5: ...
+        ...
+        case +2: ...
+    }
+
+Consider what happens if we offset *after* widening in the case that
+x=-4:
+
+                                         // x == -4 == 0xfffc::I16
+    indexWidened = UU_Conv(x);           // == 0xfffc::I64
+    indexExpr    = indexWidened - (-5);  // == 0x10000::I64
+
+This index is clearly nonsense given that the jump table only has
+eight entries.
+
+By contrast, if we widen *after* we offset then we get the correct
+index (1),
+
+                                         // x == -4 == 0xfffc::I16
+    indexOffset  = x - (-5);             // == 1::I16
+    indexExpr    = UU_Conv(indexOffset); // == 1::I64
+
+See #21186.
+-}
+
 genSwitch :: CmmExpr -> SwitchTargets -> NatM InstrBlock
 
 genSwitch expr targets = do
   config <- getConfig
   let platform = ncgPlatform config
-      -- We widen to a native-width register because we cannot use arbitry sizes
+      expr_w = cmmExprWidth platform expr
+      indexExpr0 = cmmOffset platform expr offset
+      -- We widen to a native-width register because we cannot use arbitrary sizes
       -- in x86 addressing modes.
-      exprWidened = CmmMachOp
-        (MO_UU_Conv (cmmExprWidth platform expr)
-                    (platformWordWidth platform))
-        [expr]
-      indexExpr = cmmOffset platform exprWidened offset
+      -- See Note [Sub-word subtlety during jump-table indexing].
+      indexExpr = CmmMachOp
+        (MO_UU_Conv expr_w (platformWordWidth platform))
+        [indexExpr0]
   if ncgPIC config
   then do
         (reg,e_code) <- getNonClobberedReg indexExpr

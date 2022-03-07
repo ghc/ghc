@@ -2143,12 +2143,14 @@ genSwitch config expr targets
                     ]
         return code
   where
-    indexExpr = cmmOffset platform exprWidened offset
+    -- See Note [Sub-word subtlety during jump-table indexing] in
+    -- GHC.CmmToAsm.X86.CodeGen for why we must first offset, then widen.
+    indexExpr0 = cmmOffset platform expr offset
     -- We widen to a native-width register to santize the high bits
-    exprWidened = CmmMachOp
-      (MO_UU_Conv (cmmExprWidth platform expr)
-                  (platformWordWidth platform))
-      [expr]
+    indexExpr = CmmMachOp
+      (MO_UU_Conv expr_w (platformWordWidth platform))
+      [indexExpr0]
+    expr_w = cmmExprWidth platform expr
     (offset, ids) = switchTargetsToTable targets
     platform      = ncgPlatform config
 
