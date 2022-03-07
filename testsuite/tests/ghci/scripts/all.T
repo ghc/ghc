@@ -366,4 +366,4 @@ test('T20974', normal, ghci_script, ['T20974.script'])
 test('T21088', normal, ghci_script, ['T21088.script'])
 test('T21110', [extra_files(['T21110A.hs'])], ghci_script,
                 ['T21110.script'])
-
+test('T17830', [filter_stdout_lines(r'======.*')], ghci_script, ['T17830.script'])
