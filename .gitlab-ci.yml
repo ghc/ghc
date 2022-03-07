@@ -265,9 +265,6 @@ lint-submods-branch:
     - export PATH="/opt/toolchain/bin:$PATH"
     # workaround for docker permissions
     - sudo chown ghc:ghc -R .
-    - git submodule sync --recursive
-    - git submodule update --init --recursive
-    - git checkout .gitmodules
     - .gitlab/ci.sh setup
   after_script:
     - .gitlab/ci.sh save_cache
@@ -297,7 +294,9 @@ hlint-ghc-and-base:
 .validate-hadrian:
   variables:
     BUILD_FLAVOUR: "validate"
+
   script:
+    - sudo chown ghc:ghc -R .
     - .gitlab/ci.sh setup
     - .gitlab/ci.sh configure
     - .gitlab/ci.sh build_hadrian
@@ -326,14 +325,11 @@ hlint-ghc-and-base:
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV"
   variables:
     TEST_ENV: "x86_64-linux-deb10-make"
+    BUILD_FLAVOUR: "validate"
     BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-deb10-linux.tar.gz"
   before_script:
     # workaround for docker permissions
     - sudo chown ghc:ghc -R .
-    - git submodule sync --recursive
-    - git submodule update --init --recursive
-    - git checkout .gitmodules
-    - "git fetch https://gitlab.haskell.org/ghc/ghc-performance-notes.git refs/notes/perf:refs/notes/perf || true"
   after_script:
     - .gitlab/ci.sh save_cache
     - .gitlab/ci.sh clean
@@ -357,17 +353,12 @@ validate-x86_64-linux-deb10-make:
   variables:
     TEST_ENV: "x86_64-linux-deb10-validate"
     BIN_DIST_NAME: "ghc-x86_64-deb10-linux"
-  before_script:
-    # workaround for docker permissions
-    - sudo chown ghc:ghc -R .
-    - git submodule sync --recursive
-    - git submodule update --init --recursive
-    - git checkout .gitmodules
-    - "git fetch https://gitlab.haskell.org/ghc/ghc-performance-notes.git refs/notes/perf:refs/notes/perf || true"
+
   after_script:
     - .gitlab/ci.sh save_cache
     - .gitlab/ci.sh clean
     - cat ci-timings
+
   tags:
     - x86_64-linux
 
@@ -539,9 +530,6 @@ hadrian-ghc-in-ghci:
   before_script:
     # workaround for docker permissions
     - sudo chown ghc:ghc -R .
-    - git submodule sync --recursive
-    - git submodule update --init --recursive
-    - git checkout .gitmodules
   variables:
     GHC_FLAGS: -Werror
   tags:

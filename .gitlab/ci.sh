@@ -238,6 +238,7 @@ function cabal_update() {
   "$CABAL" update --index="$HACKAGE_INDEX_STATE"
 }
 
+
 # Extract GHC toolchain
 function setup() {
   echo "=== TIMINGS ===" > ci-timings
