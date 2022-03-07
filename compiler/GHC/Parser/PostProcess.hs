@@ -37,6 +37,7 @@ module GHC.Parser.PostProcess (
         setRdrNameSpace,
         fromSpecTyVarBndr, fromSpecTyVarBndrs,
         annBinds,
+        fixValbindsAnn,
 
         cvBindGroup,
         cvBindsAndSigs,
@@ -470,6 +471,11 @@ patch_anchor :: RealSrcSpan -> Anchor -> Anchor
 patch_anchor r1 (Anchor r0 op) = Anchor r op
   where
     r = if srcSpanStartLine r0 < 0 then r1 else r0
+
+fixValbindsAnn :: EpAnn AnnList -> EpAnn AnnList
+fixValbindsAnn EpAnnNotUsed = EpAnnNotUsed
+fixValbindsAnn (EpAnn anchor (AnnList ma o c r t) cs)
+  = (EpAnn (widenAnchor anchor (map trailingAnnToAddEpAnn t)) (AnnList ma o c r t) cs)
 
 {- **********************************************************************
 
@@ -1002,7 +1008,6 @@ checkTyClHdr is_cls ty
     newAnns (SrcSpanAnn EpAnnNotUsed l) (EpAnn as (AnnParen _ o c) cs) =
       let
         lr = combineRealSrcSpans (realSrcSpan l) (anchor as)
-        -- lr = widenAnchorR as (realSrcSpan l)
         an = (EpAnn (Anchor lr UnchangedAnchor) (NameAnn NameParens o (EpaSpan $ realSrcSpan l) c []) cs)
       in SrcSpanAnn an (RealSrcSpan lr Strict.Nothing)
     newAnns _ EpAnnNotUsed = panic "missing AnnParen"

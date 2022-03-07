@@ -173,6 +173,7 @@ test('PprUnicodeSyntax', [ignore_stderr, req_ppr_deps], makefile_test, ['PprUnic
 test('PprCommentPlacement2', [ignore_stderr, req_ppr_deps], makefile_test, ['PprCommentPlacement2'])
 
 test('Test20243', [ignore_stderr, req_ppr_deps], makefile_test, ['Test20243'])
+test('Test20247', [ignore_stderr, req_ppr_deps], makefile_test, ['Test20247'])
 test('Test20258', [ignore_stderr, req_ppr_deps], makefile_test, ['Test20258'])
 test('Test20297', [ignore_stderr, req_ppr_deps], makefile_test, ['Test20297'])
 test('Test20846', [ignore_stderr, req_ppr_deps], makefile_test, ['Test20846'])

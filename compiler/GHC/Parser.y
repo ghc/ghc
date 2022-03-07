@@ -1791,7 +1791,7 @@ binds   ::  { Located (HsLocalBinds GhcPs) }
                                                 -- No type declarations
         : decllist          {% do { val_binds <- cvBindGroup (unLoc $ snd $ unLoc $1)
                                   ; cs <- getCommentsFor (gl $1)
-                                  ; return (sL1 $1 $ HsValBinds (EpAnn (glR $1) (fst $ unLoc $1) cs) val_binds)} }
+                                  ; return (sL1 $1 $ HsValBinds (fixValbindsAnn $ EpAnn (glR $1) (fst $ unLoc $1) cs) val_binds)} }
 
         | '{'            dbinds '}'     {% acs (\cs -> (L (comb3 $1 $2 $3)
                                              $ HsIPBinds (EpAnn (glR $1) (AnnList (Just$ glR $2) (Just $ moc $1) (Just $ mcc $3) [] []) cs) (IPBinds noExtField (reverse $ unLoc $2)))) }
