@@ -316,6 +316,38 @@ hlint-ghc-and-base:
       - junit.xml
 
 #################################
+# x86_64-linux-deb10-make
+#################################
+
+# One job still using Make for now but we don't produce any release bindists with it.
+
+.build-x86_64-linux-deb10-make:
+  extends: .validate
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV"
+  variables:
+    TEST_ENV: "x86_64-linux-deb10-make"
+    BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-deb10-linux.tar.gz"
+  before_script:
+    # workaround for docker permissions
+    - sudo chown ghc:ghc -R .
+    - git submodule sync --recursive
+    - git submodule update --init --recursive
+    - git checkout .gitmodules
+    - "git fetch https://gitlab.haskell.org/ghc/ghc-performance-notes.git refs/notes/perf:refs/notes/perf || true"
+  after_script:
+    - .gitlab/ci.sh save_cache
+    - .gitlab/ci.sh clean
+    - cat ci-timings
+  tags:
+    - x86_64-linux
+
+validate-x86_64-linux-deb10-make:
+  extends: .build-x86_64-linux-deb10-make
+  stage: full-build
+  rules:
+    - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
+
+#################################
 # x86_64-linux-deb10
 #################################
 
@@ -323,7 +355,7 @@ hlint-ghc-and-base:
   extends: .validate-hadrian
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV"
   variables:
-    TEST_ENV: "x86_64-linux-deb10-hadrian"
+    TEST_ENV: "x86_64-linux-deb10-validate"
     BIN_DIST_NAME: "ghc-x86_64-deb10-linux"
   before_script:
     # workaround for docker permissions
@@ -351,7 +383,7 @@ validate-x86_64-linux-deb10-unreg-hadrian:
   stage: full-build
   variables:
     CONFIGURE_ARGS: --enable-unregisterised
-    TEST_ENV: "x86_64-linux-deb10-unreg-hadrian"
+    TEST_ENV: "x86_64-linux-deb10-unreg-validate"
 
 validate-x86_64-linux-deb10-no_tntc-hadrian:
   extends: .build-x86_64-linux-deb10-hadrian
@@ -359,7 +391,7 @@ validate-x86_64-linux-deb10-no_tntc-hadrian:
   when: manual
   variables:
     CONFIGURE_ARGS: --disable-tables-next-to-code
-    TEST_ENV: "x86_64-linux-deb10-no_tntc-hadrian"
+    TEST_ENV: "x86_64-linux-deb10-no_tntc-validate"
 
 .build-x86_64-linux-deb10-hadrian-cross-aarch64:
   extends: .build-x86_64-linux-deb10-hadrian
@@ -383,6 +415,8 @@ nightly-x86_64-linux-deb10-hadrian-cross-aarch64:
 
 release-x86_64-linux-deb10:
   <<: *release
+  variables:
+    TEST_ENV: "x86_64-linux-deb10-perf"
   extends: .build-x86_64-linux-deb10-hadrian
   stage: full-build
 
@@ -419,7 +453,7 @@ validate-x86_64-linux-deb10-integer-simple:
   variables:
     BUILD_FLAVOUR: validate
     BIGNUM_BACKEND: native
-    TEST_ENV: "x86_64-linux-deb10-integer-simple"
+    TEST_ENV: "x86_64-linux-deb10-int_native"
     BIN_DIST_NAME: "ghc-x86_64-deb10-linux-integer-simple.tar.xz"
   rules:
     - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
@@ -437,7 +471,7 @@ nightly-x86_64-linux-deb10-integer-simple:
   extends: .build-x86_64-linux-deb10-hadrian
   stage: full-build
   variables:
-    TEST_ENV: "x86_64-linux-deb10-tsan"
+    TEST_ENV: "x86_64-linux-deb10-validate-tsan"
     BUILD_FLAVOUR: "default+thread_sanitizer"
     TSAN_OPTIONS: "suppressions=$CI_PROJECT_DIR/rts/.tsan-suppressions"
     # Haddock is large enough to make TSAN choke without massive quantities of
@@ -483,7 +517,7 @@ validate-x86_64-linux-deb10-llvm:
     - if: '$CI_MERGE_REQUEST_LABELS =~ /.*LLVM backend.*/'
   variables:
     BUILD_FLAVOUR: validate+llvm
-    TEST_ENV: "x86_64-linux-deb10-llvm"
+    TEST_ENV: "x86_64-linux-deb10-llvm-validate"
 
 nightly-x86_64-linux-deb10-llvm:
   <<: *nightly
@@ -491,7 +525,7 @@ nightly-x86_64-linux-deb10-llvm:
   stage: full-build
   variables:
     BUILD_FLAVOUR: validate+llvm
-    TEST_ENV: "x86_64-linux-deb10-llvm"
+    TEST_ENV: "x86_64-linux-deb10-llvm-validate"
 
 
 ############################################################
@@ -575,7 +609,7 @@ stack-hadrian-build:
 
 .build-x86_64-freebsd:
   stage: full-build
-  extends: .validate
+  extends: .validate-hadrian
   tags:
     - x86_64-freebsd
   allow_failure: true
@@ -587,8 +621,8 @@ stack-hadrian-build:
     CONFIGURE_ARGS: "--with-gmp-includes=/usr/local/include --with-gmp-libraries=/usr/local/lib --with-iconv-includes=/usr/local/include --with-iconv-libraries=/usr/local/lib"
     GHC_VERSION: "8.10.1"
     CABAL_INSTALL_VERSION: "3.2.0.0"
-    BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-portbld-freebsd.tar.xz"
-    TEST_ENV: "x86_64-freebsd"
+    BIN_DIST_NAME: "ghc-x86_64-portbld-freebsd"
+    TEST_ENV: "x86_64-freebsd-validate"
     BUILD_FLAVOUR: "validate"
   after_script:
     - .gitlab/ci.sh save_cache
@@ -615,37 +649,9 @@ nightly-x86_64-freebsd:
 
 release-x86_64-freebsd:
   <<: *release
-  extends: .build-x86_64-freebsd
-
-.build-x86_64-freebsd-hadrian:
-  extends: .validate-hadrian
-  tags:
-    - x86_64-freebsd
-  allow_failure: true
   variables:
-    CONFIGURE_ARGS: "--with-gmp-includes=/usr/local/include --with-gmp-libraries=/usr/local/lib --with-iconv-includes=/usr/local/include --with-iconv-libraries=/usr/local/lib"
-    HADRIAN_ARGS: "--docs=no-sphinx"
-    GHC_VERSION: 8.6.3
-    CABAL_INSTALL_VERSION: 3.0.0.0
-    BIN_DIST_NAME: "ghc-x86_64-portbld-freebsd"
-    TEST_ENV: "x86_64-freebsd-hadrian"
-    BUILD_FLAVOUR: "validate"
-  after_script:
-    - .gitlab/ci.sh save_cache
-    - .gitlab/ci.sh clean
-    - cat ci-timings
-  artifacts:
-    when: always
-    expire_in: 2 week
-  cache:
-    key: "freebsd-$GHC_VERSION-$CACHE_REV"
-    paths:
-      - cabal-cache
-      - toolchain
-
-# Disabled due to lack of builder capacity
-.validate-x86_64-freebsd-hadrian:
-  extends: .build-x86_64-freebsd-hadrian
+    TEST_ENV: "x86_64-freebsd-perf"
+  extends: .build-x86_64-freebsd
 
 #################################
 # x86_64-darwin
@@ -676,7 +682,7 @@ release-x86_64-freebsd:
     # WARNING: this is overridden in the shell.nix, see shell.nix!
     CONFIGURE_ARGS: "--with-intree-gmp --with-system-libffi"
     HADRIAN_ARGS: "--docs=no-sphinx"
-    TEST_ENV: "x86_64-darwin-hadrian"
+    TEST_ENV: "x86_64-darwin-validate"
     BIN_DIST_NAME: "ghc-x86_64-apple-darwin"
     # Due to #19025
     IGNORE_PERF_FAILURES: "all"
@@ -707,6 +713,8 @@ validate-x86_64-darwin:
 
 release-x86_64-darwin:
   <<: *release
+  variables:
+    TEST_ENV: "x86_64-darwin-perf"
   extends: .build-x86_64-darwin
 
 #################################
@@ -730,7 +738,7 @@ release-x86_64-darwin:
     CONFIGURE_ARGS: "--with-intree-gmp --with-system-libffi"
     HADRIAN_ARGS: "--docs=no-sphinx"
     BIN_DIST_NAME: "ghc-arm64-apple-darwin"
-    TEST_ENV: "aarch64-darwin-hadrian"
+    TEST_ENV: "aarch64-darwin-validate"
     # Capi_Ctype_001 Capi_Ctype_002 T12010: Due to #20393
     BROKEN_TESTS: "Capi_Ctype_001 Capi_Ctype_002 T12010"
 
@@ -760,10 +768,12 @@ validate-aarch64-darwin:
 
 release-aarch64-darwin:
   <<: *release
+  variables:
+    TEST_ENV: "aarch64-darwin-perf"
   extends: .build-aarch64-darwin
 
 .validate-linux:
-  extends: .validate
+  extends: .validate-hadrian
   tags:
     - x86_64-linux
   variables:
@@ -790,8 +800,8 @@ release-aarch64-darwin:
   image: "registry.gitlab.haskell.org/ghc/ci-images/aarch64-linux-deb10:$DOCKER_REV"
   allow_failure: false
   variables:
-    TEST_ENV: "aarch64-linux-deb10"
-    BIN_DIST_PREP_TAR_COMP: "ghc-aarch64-linux-deb10.tar.xz"
+    TEST_ENV: "aarch64-linux-deb10-validate"
+    BIN_DIST_NAME: "ghc-aarch64-linux-deb10"
   cache:
     key: linux-aarch64-deb10-$CACHE_REV
   tags:
@@ -813,6 +823,8 @@ nightly-aarch64-linux-deb10:
 
 release-aarch64-linux-deb10:
   <<: *release
+  variables:
+    TEST_ENV: "aarch64-linux-deb10-perf"
   extends: .build-aarch64-linux-deb10
 
 .build-aarch64-linux-deb10-llvm:
@@ -820,9 +832,9 @@ release-aarch64-linux-deb10:
   stage: full-build
   variables:
   variables:
-    TEST_ENV: "aarch64-linux-deb10-llvm"
-    BIN_DIST_PREP_TAR_COMP: "ghc-aarch64-linux-deb10-llvm.tar.xz"
-    BUILD_FLAVOUR: perf-llvm
+    BIN_DIST_NAME: "ghc-aarch64-linux-deb10-llvm"
+    TEST_ENV: "aarch64-linux-deb10-llvm-perf"
+    BUILD_FLAVOUR: perf+llvm
   tags:
     - aarch64-linux
 
@@ -830,9 +842,10 @@ validate-aarch64-linux-deb10-llvm:
   <<: *nightly
   extends: .build-aarch64-linux-deb10-llvm
   variables:
+    TEST_ENV: "aarch64-linux-deb10-llvm-validate"
     CONFIGURE_ARGS: "CC=/opt/llvm/bin/clang"
     RUNTEST_ARGS: "--way=llvm"
-    BUILD_FLAVOUR: perf-llvm
+    BUILD_FLAVOUR: perf+llvm
     # No docs, for this build, slows it down unncessarily.
     # We build docs on other platforms already anyway.
     BUILD_SPHINX_HTML: "NO"
@@ -854,8 +867,8 @@ validate-aarch64-linux-deb10-llvm:
   # Due to linker issues
   allow_failure: true
   variables:
-    TEST_ENV: "armv7-linux-deb10"
-    BIN_DIST_PREP_TAR_COMP: "ghc-armv7-linux-deb10.tar.xz"
+    TEST_ENV: "armv7-linux-deb10-validate"
+    BIN_DIST_NAME: "ghc-armv7-linux-deb10"
     CONFIGURE_ARGS: "--host=armv7-linux-gnueabihf --build=armv7-linux-gnueabihf --target=armv7-linux-gnueabihf"
     # N.B. We disable ld.lld explicitly here because it appears to fail
     # non-deterministically on ARMv7. See #18280.
@@ -881,6 +894,8 @@ nightly-armv7-linux-deb10:
 
 release-armv7-linux-deb10:
   <<: *release
+  variables:
+    TEST_ENV: "armv7-linux-deb10-perf"
   extends: .build-armv7-linux-deb10
 
 #################################
@@ -892,8 +907,8 @@ release-armv7-linux-deb10:
   stage: full-build
   image: "registry.gitlab.haskell.org/ghc/ci-images/i386-linux-deb9:$DOCKER_REV"
   variables:
-    TEST_ENV: "i386-linux-deb9"
-    BIN_DIST_PREP_TAR_COMP: "ghc-i386-deb9-linux.tar.xz"
+    TEST_ENV: "i386-linux-deb9-validate"
+    BIN_DIST_NAME: "ghc-i386-deb9-linux.tar.xz"
   cache:
     key: linux-i386-deb9-$CACHE_REV
 
@@ -913,6 +928,8 @@ nightly-i386-linux-deb9:
 
 release-i386-linux-deb9:
   <<: *release
+  variables:
+    TEST_ENV: "i386-linux-deb9-perf"
   extends: .build-i386-linux-deb9
 
 
@@ -942,8 +959,8 @@ test-cabal-reinstall-x86_64-linux-deb10:
   extends: .validate-linux
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb11:$DOCKER_REV"
   variables:
-    TEST_ENV: "x86_64-linux-deb11"
-    BIN_DIST_PREP_TAR_COMP: "./ghc-x86_64-deb11-linux.tar.xz"
+    TEST_ENV: "x86_64-linux-deb11-validate"
+    BIN_DIST_NAME: "./ghc-x86_64-deb11-linux.tar.xz"
   cache:
     key: linux-x86_64-deb11-$CACHE_REV
 
@@ -957,6 +974,8 @@ test-cabal-reinstall-x86_64-linux-deb10:
 
 release-x86_64-linux-deb11:
   <<: *release
+  variables:
+    TEST_ENV: "x86_64-linux-deb11-perf"
   extends: .build-x86_64-linux-deb11
   stage: full-build
 
@@ -976,8 +995,8 @@ nightly-x86_64-linux-deb11:
   stage: full-build
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-ubuntu20_04:$DOCKER_REV"
   variables:
-    TEST_ENV: "x86_64-linux-ubuntu2004"
-    BIN_DIST_PREP_TAR_COMP: "./ghc-x86_64-ubuntu2004-linux.tar.xz"
+    TEST_ENV: "x86_64-linux-ubuntu2004-validate"
+    BIN_DIST_NAME: "./ghc-x86_64-ubuntu2004-linux.tar.xz"
   cache:
     key: linux-x86_64-ubuntu2004-$CACHE_REV
 
@@ -994,6 +1013,8 @@ nightly-x86_64-linux-ubuntu2004:
 
 release-x86_64-linux-ubuntu2004:
   <<: *release
+  variables:
+    TEST_ENV: "x86_64-linux-ubuntu2004-perf"
   extends: .build-x86_64-linux-ubuntu2004
 
 #################################
@@ -1007,7 +1028,7 @@ release-x86_64-linux-ubuntu2004:
   # There are currently a few failing tests
   allow_failure: true
   variables:
-    TEST_ENV: "x86_64-linux-alpine"
+    TEST_ENV: "x86_64-linux-alpine-validate"
     BUILD_FLAVOUR: "validate+fully_static"
     BIN_DIST_NAME: "ghc-x86_64-alpine-linux"
     # Can't use ld.gold due to #13958.
@@ -1034,6 +1055,7 @@ release-x86_64-linux-alpine-integer-simple:
   <<: *release
   extends: .build-x86_64-linux-alpine-hadrian
   variables:
+    TEST_ENV: "x86_64-linux-alpine-int_native-perf"
     BIGNUM_BACKEND: native
     BUILD_FLAVOUR: "perf+fully_static"
 
@@ -1041,6 +1063,7 @@ release-x86_64-linux-alpine-integer-gmp:
   <<: *release
   extends: .build-x86_64-linux-alpine-hadrian
   variables:
+    TEST_ENV: "x86_64-linux-alpine-int_gmp-perf"
     BIGNUM_BACKEND: gmp
     BUILD_FLAVOUR: "perf+fully_static"
 
@@ -1060,16 +1083,19 @@ nightly-x86_64-linux-alpine:
     # The sphinx release shipped with Centos 7 fails to build out documentation
     BUILD_SPHINX_HTML: "NO"
     BUILD_SPHINX_PDF: "NO"
-    TEST_ENV: "x86_64-linux-centos7"
+    TEST_ENV: "x86_64-linux-centos7-validate"
     IGNORE_PERF_FAILURES: "all"
-    BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-centos7-linux.tar.xz"
+    BIN_DIST_NAME: "ghc-x86_64-centos7-linux"
     # CentOS seems to default to ascii
     LANG: "en_US.UTF-8"
+
   cache:
     key: linux-x86_64-centos7-$CACHE_REV
 
 release-x86_64-linux-centos7:
   <<: *release
+  variables:
+    TEST_ENV: "x86_64-linux-centos7-perf"
   extends: .build-x86_64-linux-centos7
 
 #################################
@@ -1080,7 +1106,7 @@ release-x86_64-linux-centos7:
 # settings (and can test -O2)
 
 .build-x86_64-linux-fedora33:
-  extends: .validate-linux-hadrian
+  extends: .validate-linux
   stage: full-build
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora33:$DOCKER_REV"
   variables:
@@ -1105,6 +1131,7 @@ validate-x86_64-linux-fedora33:
 
 release-x86_64-linux-fedora33:
   <<: *release
+  # NB: TEST_ENV not overriden here because fedora33 job is always a perf job.
   extends: .build-x86_64-linux-fedora33
 
 
@@ -1174,7 +1201,7 @@ release-x86_64-linux-fedora33-dwarf:
   extends: .build-windows-hadrian
   variables:
     MSYSTEM: MINGW64
-    TEST_ENV: "x86_64-windows"
+    TEST_ENV: "x86_64-windows-validate"
     BIN_DIST_NAME: "ghc-x86_64-unknown-mingw32"
   cache:
     key: "x86_64-windows-$CACHE_REV"
@@ -1182,41 +1209,9 @@ release-x86_64-linux-fedora33-dwarf:
 validate-x86_64-windows-hadrian:
   extends: .build-x86_64-windows-hadrian
 
-.build-windows-make:
-  extends: .build-windows
-  stage: full-build
-  variables:
-    BUILD_FLAVOUR: "quick"
-    BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-mingw32.tar.xz"
-  script:
-    - bash .gitlab/ci.sh configure
-    - bash .gitlab/ci.sh build_make
-    - bash .gitlab/ci.sh test_make
-  tags:
-    - new-x86_64-windows
-    - test
-  artifacts:
-    when: always
-    expire_in: 2 week
-    reports:
-      junit: junit.xml
-    paths:
-      # N.B. variable interpolation apparently doesn't work on Windows so
-      # this can't be $BIN_DIST_PREP_TAR_COMP
-      - "ghc-x86_64-mingw32.tar.xz"
-      - junit.xml
-
-.build-x86_64-windows-make:
-  extends: .build-windows-make
-  variables:
-    MSYSTEM: MINGW64
-    TEST_ENV: "x86_64-windows"
-  cache:
-    key: "x86_64-windows-$CACHE_REV"
-
 nightly-x86_64-windows:
   <<: *nightly
-  extends: .build-x86_64-windows-make
+  extends: .build-x86_64-windows-hadrian
   stage: full-build
   variables:
     BUILD_FLAVOUR: "validate"
@@ -1225,12 +1220,15 @@ nightly-x86_64-windows:
 # releases.
 release-x86_64-windows:
   <<: *release
+  variables:
+    TEST_ENV: "x86_64-windows-perf"
   extends: .build-x86_64-windows-hadrian
 
 release-x86_64-windows-integer-simple:
   <<: *release
   extends: .build-x86_64-windows-hadrian
   variables:
+    TEST_ENV: "x86_64-windows-int_native-perf"
     BIGNUM_BACKEND: native
     BIN_DIST_NAME: "ghc-x86_64-mingw32-unknown-nogmp"
 
@@ -1317,7 +1315,7 @@ test-bootstrap:
     - popd
     - rm -Rf test-bootstrap
   variables:
-    TEST_ENV: "x86_64-linux-deb10-hadrian"
+    TEST_ENV: "x86_64-linux-deb10-validate"
     BIN_DIST_NAME: "ghc-x86_64-deb10-linux"
     BUILD_FLAVOUR: "validate"
   rules:
