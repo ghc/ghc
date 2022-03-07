@@ -35,11 +35,13 @@ import GHC.Utils.Panic (pprPanic)
 import GHC.Utils.Panic.Plain (panic)
 import GHC.Stg.Syntax
 import GHC.StgToCmm.Closure
+import GHC.Cmm.Switch (mkSwitchTargets)
+import GHC.Cmm.Info (cmmGetClosureType)
 import GHC.Types.RepType (dataConRuntimeRepStrictness)
 import GHC.Types.Basic
 import GHC.Data.FastString (mkFastString)
-import GHC.Cmm.Info (cmmGetClosureType)
-import GHC.Cmm.Utils (mkWordCLit)
+
+import qualified Data.Map as M
 
 -- | Check all arguments marked as already tagged for a function
 -- are tagged by inserting runtime checks.
@@ -91,20 +93,42 @@ emitTagAssertion onWhat fun = do
   -- If there is no tag check if we are dealing with a PAP
   ; emitLabel lno_tag
   ; emitComment (mkFastString "closereTypeCheck")
-  ; align_check <- stgToCmmAlignCheck <$> getStgToCmmConfig
-  ; profile <- getProfile
-  ; let closure_ty = cmmGetClosureType profile align_check fun
-  ; ty_reg <- newTemp (bWord platform)
-  ; emitAssign (CmmLocal ty_reg) closure_ty
-  ; emit $ mkCbranch (cmmEqWord platform
-                        (CmmReg $ CmmLocal ty_reg)
-                        (CmmLit $ mkWordCLit platform PAP))
-                      lret lbarf (Just True)
+  ; needsArgTag fun lbarf lret
 
   ; emitLabel lbarf
   ; emitBarf ("Tag inference failed on:" ++ onWhat)
   ; emitLabel lret
   }
+
+-- | Jump to the first block if the argument closure is subject
+--   to tagging requirements. Otherwise jump to the 2nd one.
+needsArgTag :: CmmExpr -> BlockId -> BlockId -> FCode ()
+needsArgTag closure fail lpass = do
+  profile <- getProfile
+  align_check <- stgToCmmAlignCheck <$> getStgToCmmConfig
+  let clo_ty_e = cmmGetClosureType profile align_check closure
+  -- The ENTER macro doesn't evaluate FUN/PAP/BCO objects. So we
+  -- have to accept them not being tagged. See #21193
+  -- See Note [TagInfo of functions]
+  let targets = mkSwitchTargets
+        False
+        (INVALID_OBJECT, N_CLOSURE_TYPES)
+        (Just fail)
+        (M.fromList [(PAP,lpass)
+                    ,(BCO,lpass)
+                    ,(FUN,lpass)
+                    ,(FUN_1_0,lpass)
+                    ,(FUN_0_1,lpass)
+                    ,(FUN_2_0,lpass)
+                    ,(FUN_1_1,lpass)
+                    ,(FUN_0_2,lpass)
+                    ,(FUN_STATIC,lpass)
+                    ])
+
+  emit $ mkSwitch clo_ty_e targets
+
+  emit $ mkBranch lpass
+
 
 emitArgTagCheck :: SDoc -> [CbvMark] -> [Id] -> FCode ()
 emitArgTagCheck info marks args = whenCheckTags $ do
@@ -138,7 +162,7 @@ checkArg msg MarkedCbv arg = whenCheckTags $
       if taggedCgInfo info
           then return ()
           else case (cg_loc info) of
-            CmmLoc loc -> emitTagAssertion (showPprUnsafe msg) loc
+            CmmLoc loc -> emitTagAssertion (showPprUnsafe $ msg <+> text "arg:" <> ppr arg) loc
             LneLoc {} -> panic "LNE-arg"
 
 -- Check that argument is properly tagged.
