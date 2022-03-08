@@ -638,9 +638,8 @@ staticLitsToWords platform = go . foldMap decomposeMultiWord
     -- single-word (or smaller) literals.
     decomposeMultiWord :: CmmLit -> [CmmLit]
     decomposeMultiWord (CmmFloat n W64)
-      -- This will produce a W64 integer, which will then be broken up further
-      -- on the next iteration on 32-bit platforms.
-      = [doubleToWord64 n]
+      | W32 <- wordWidth platform = decomposeMultiWord (doubleToWord64 n)
+      | otherwise = [doubleToWord64 n]
     decomposeMultiWord (CmmFloat n W32)
       = [floatToWord32 n]
     decomposeMultiWord (CmmInt n W64)
