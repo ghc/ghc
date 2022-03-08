@@ -167,7 +167,11 @@ not-interruptible:
       when: always
 
 
+############################################################
+# Validate jobs
+############################################################
 
+include: 'out'
 
 ############################################################
 # tool linting
@@ -287,237 +291,6 @@ hlint-ghc-and-base:
     - .gitlab/ci.sh run_hadrian lint:compiler
   allow_failure: true
 
-############################################################
-# Validation via Pipelines (hadrian)
-############################################################
-
-.validate-hadrian:
-  variables:
-    BUILD_FLAVOUR: "validate"
-
-  script:
-    - sudo chown ghc:ghc -R .
-    - .gitlab/ci.sh setup
-    - .gitlab/ci.sh configure
-    - .gitlab/ci.sh build_hadrian
-    - .gitlab/ci.sh test_hadrian
-  cache:
-    key: hadrian-$CACHE_REV
-    paths:
-      - cabal-cache
-  dependencies: []
-  artifacts:
-    reports:
-      junit: junit.xml
-    expire_in: 2 week
-    paths:
-      - "$BIN_DIST_NAME.tar.xz"
-      - junit.xml
-
-#################################
-# x86_64-linux-deb10-make
-#################################
-
-# One job still using Make for now but we don't produce any release bindists with it.
-
-.build-x86_64-linux-deb10-make:
-  extends: .validate
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV"
-  variables:
-    TEST_ENV: "x86_64-linux-deb10-make"
-    BUILD_FLAVOUR: "validate"
-    BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-deb10-linux.tar.gz"
-  before_script:
-    # workaround for docker permissions
-    - sudo chown ghc:ghc -R .
-  after_script:
-    - .gitlab/ci.sh save_cache
-    - .gitlab/ci.sh clean
-    - cat ci-timings
-  tags:
-    - x86_64-linux
-
-validate-x86_64-linux-deb10-make:
-  extends: .build-x86_64-linux-deb10-make
-  stage: full-build
-  rules:
-    - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
-
-#################################
-# x86_64-linux-deb10
-#################################
-
-.build-x86_64-linux-deb10-hadrian:
-  extends: .validate-hadrian
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV"
-  variables:
-    TEST_ENV: "x86_64-linux-deb10-validate"
-    BIN_DIST_NAME: "ghc-x86_64-deb10-linux"
-
-  after_script:
-    - .gitlab/ci.sh save_cache
-    - .gitlab/ci.sh clean
-    - cat ci-timings
-
-  tags:
-    - x86_64-linux
-
-
-validate-x86_64-linux-deb10-hadrian:
-  extends: .build-x86_64-linux-deb10-hadrian
-  stage: full-build
-  rules:
-    - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
-
-validate-x86_64-linux-deb10-unreg-hadrian:
-  extends: .build-x86_64-linux-deb10-hadrian
-  stage: full-build
-  variables:
-    CONFIGURE_ARGS: --enable-unregisterised
-    TEST_ENV: "x86_64-linux-deb10-unreg-validate"
-
-validate-x86_64-linux-deb10-no_tntc-hadrian:
-  extends: .build-x86_64-linux-deb10-hadrian
-  stage: full-build
-  when: manual
-  variables:
-    CONFIGURE_ARGS: --disable-tables-next-to-code
-    TEST_ENV: "x86_64-linux-deb10-no_tntc-validate"
-
-.build-x86_64-linux-deb10-hadrian-cross-aarch64:
-  extends: .build-x86_64-linux-deb10-hadrian
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV"
-  variables:
-    BIN_DIST_NAME: "ghc-x86_64-deb10-linux"
-    CONFIGURE_ARGS: --with-intree-gmp
-    CROSS_TARGET: "aarch64-linux-gnu"
-
-validate-x86_64-linux-deb10-hadrian-cross-aarch64:
-  extends: .build-x86_64-linux-deb10-hadrian-cross-aarch64
-  stage: full-build
-  rules:
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*cross-compilation.*/'
-
-nightly-x86_64-linux-deb10-hadrian-cross-aarch64:
-  <<: *nightly
-  extends: .build-x86_64-linux-deb10-hadrian-cross-aarch64
-  stage: full-build
-
-
-release-x86_64-linux-deb10:
-  <<: *release
-  variables:
-    TEST_ENV: "x86_64-linux-deb10-perf"
-  extends: .build-x86_64-linux-deb10-hadrian
-  stage: full-build
-
-nightly-x86_64-linux-deb10:
-  <<: *nightly
-  extends: .build-x86_64-linux-deb10-hadrian
-  stage: full-build
-  variables:
-    TEST_TYPE: slowtest
-
-# N.B. Has DEBUG assertions enabled in stage2
-validate-x86_64-linux-deb10-debug:
-  extends: .build-x86_64-linux-deb10-hadrian
-  stage: full-build
-  variables:
-    # Slow-validate builds stage1 and stage2 compilers with -DDEBUG
-    BUILD_FLAVOUR: slow-validate
-    # Override validate flavour default; see #16890.
-    BUILD_SPHINX_PDF: "YES"
-    TEST_TYPE: slowtest
-    TEST_ENV: "x86_64-linux-deb10-debug"
-    BIN_DIST_NAME: "ghc-x86_64-deb10-linux-debug"
-    HADDOCK_HYPERLINKED_SOURCES: "yes"
-    # Numa enabled for this build so at least one build tests the libnuma build.
-    # It could be any job but luckily for deb10-debug, I choose it.
-    ENABLE_NUMA: 1
-  artifacts:
-    when: always
-    expire_in: 2 week
-
-validate-x86_64-linux-deb10-integer-simple:
-  extends: .build-x86_64-linux-deb10-hadrian
-  stage: full-build
-  variables:
-    BUILD_FLAVOUR: validate
-    BIGNUM_BACKEND: native
-    TEST_ENV: "x86_64-linux-deb10-int_native"
-    BIN_DIST_NAME: "ghc-x86_64-deb10-linux-integer-simple.tar.xz"
-  rules:
-    - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
-
-nightly-x86_64-linux-deb10-integer-simple:
-  <<: *nightly
-  extends: .build-x86_64-linux-deb10-hadrian
-  stage: full-build
-  variables:
-    BIGNUM_BACKEND: native
-    TEST_ENV: "x86_64-linux-deb10-integer-simple"
-    TEST_TYPE: slowtest
-
-.build-x86_64-linux-deb10-tsan:
-  extends: .build-x86_64-linux-deb10-hadrian
-  stage: full-build
-  variables:
-    TEST_ENV: "x86_64-linux-deb10-validate-tsan"
-    BUILD_FLAVOUR: "default+thread_sanitizer"
-    TSAN_OPTIONS: "suppressions=$CI_PROJECT_DIR/rts/.tsan-suppressions"
-    # Haddock is large enough to make TSAN choke without massive quantities of
-    # memory.
-    HADRIAN_ARGS: "--docs=none"
-
-nightly-x86_64-linux-deb10-tsan:
-  <<: *nightly
-  extends: .build-x86_64-linux-deb10-tsan
-
-validate-x86_64-linux-deb10-tsan:
-  extends: .build-x86_64-linux-deb10-tsan
-  when: manual
-
-validate-x86_64-linux-deb10-dwarf:
-  extends: .build-x86_64-linux-deb10-hadrian
-  stage: full-build
-  variables:
-    CONFIGURE_ARGS: "--enable-dwarf-unwind"
-    BUILD_FLAVOUR: validate+debug_info
-    TEST_ENV: "x86_64-linux-deb10-dwarf-validate"
-    BIN_DIST_NAME: "ghc-x86_64-deb10-linux-dwarf"
-  rules:
-    - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
-
-release-x86_64-linux-deb10-dwarf:
-  <<: *release
-  extends: .build-x86_64-linux-deb10-hadrian
-  stage: full-build
-  variables:
-    CONFIGURE_ARGS: "--enable-dwarf-unwind"
-    BUILD_FLAVOUR: perf+debug_info
-    TEST_ENV: "x86_64-linux-deb10-dwarf-perf"
-    BIN_DIST_NAME: "ghc-x86_64-deb10-linux-dwarf"
-  artifacts:
-    when: always
-    expire_in: 1 year
-
-validate-x86_64-linux-deb10-llvm:
-  extends: .build-x86_64-linux-deb10-hadrian
-  stage: full-build
-  rules:
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*LLVM backend.*/'
-  variables:
-    BUILD_FLAVOUR: validate+llvm
-    TEST_ENV: "x86_64-linux-deb10-llvm-validate"
-
-nightly-x86_64-linux-deb10-llvm:
-  <<: *nightly
-  extends: .build-x86_64-linux-deb10-hadrian
-  stage: full-build
-  variables:
-    BUILD_FLAVOUR: validate+llvm
-    TEST_ENV: "x86_64-linux-deb10-llvm-validate"
-
 
 ############################################################
 # GHC-in-GHCi (Hadrian)
@@ -591,335 +364,6 @@ stack-hadrian-build:
       - junit.xml
       - performance-metrics.tsv
 
-#################################
-# x86_64-freebsd
-#################################
-
-.build-x86_64-freebsd:
-  stage: full-build
-  extends: .validate-hadrian
-  tags:
-    - x86_64-freebsd
-  allow_failure: true
-  variables:
-    # N.B. we use iconv from ports as I see linker errors when we attempt
-    # to use the "native" iconv embedded in libc as suggested by the
-    # porting guide [1].
-    # [1] https://www.freebsd.org/doc/en/books/porters-handbook/using-iconv.html)
-    CONFIGURE_ARGS: "--with-gmp-includes=/usr/local/include --with-gmp-libraries=/usr/local/lib --with-iconv-includes=/usr/local/include --with-iconv-libraries=/usr/local/lib"
-    GHC_VERSION: "8.10.1"
-    CABAL_INSTALL_VERSION: "3.2.0.0"
-    BIN_DIST_NAME: "ghc-x86_64-portbld-freebsd"
-    TEST_ENV: "x86_64-freebsd-validate"
-    BUILD_FLAVOUR: "validate"
-  after_script:
-    - .gitlab/ci.sh save_cache
-    - .gitlab/ci.sh clean
-    - cat ci-timings
-  artifacts:
-    when: always
-    expire_in: 2 week
-  cache:
-    key: "freebsd-$GHC_VERSION-$CACHE_REV"
-    paths:
-      - cabal-cache
-      - toolchain
-
-# Conditional due to lack of builder capacity
-validate-x86_64-freebsd:
-  extends: .build-x86_64-freebsd
-  rules:
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*FreeBSD.*/'
-
-nightly-x86_64-freebsd:
-  <<: *nightly
-  extends: .build-x86_64-freebsd
-
-release-x86_64-freebsd:
-  <<: *release
-  variables:
-    TEST_ENV: "x86_64-freebsd-perf"
-  extends: .build-x86_64-freebsd
-
-#################################
-# x86_64-darwin
-#################################
-
-.build-x86_64-darwin:
-  extends: .validate-hadrian
-  stage: full-build
-  tags:
-    - x86_64-darwin-m1
-
-  variables:
-    NIX_SYSTEM: x86_64-darwin
-    BUILD_FLAVOUR: "validate"
-    MACOSX_DEPLOYMENT_TARGET: "10.10"
-    # Only Sierra and onwards supports clock_gettime. See #12858
-    ac_cv_func_clock_gettime: "no"
-    # Only newer OS Xs support utimensat. See #17895
-    ac_cv_func_utimensat: "no"
-
-    TEST_TYPE: test
-    MAKE_ARGS: "-Werror"
-    # we run on M1's for now, getconf can't be built with nix yet,
-    # and we use a pure shell, so we can't/shouldn't use /usr/bin/getconf
-    # inside th shell.
-    CPUS: 8
-    LANG: "en_US.UTF-8"
-    # WARNING: this is overridden in the shell.nix, see shell.nix!
-    CONFIGURE_ARGS: "--with-intree-gmp --with-system-libffi"
-    HADRIAN_ARGS: "--docs=no-sphinx"
-    TEST_ENV: "x86_64-darwin-validate"
-    BIN_DIST_NAME: "ghc-x86_64-apple-darwin"
-    # Due to #19025
-    IGNORE_PERF_FAILURES: "all"
-
-  script: |
-    # fix up config.sub in libraries for the time.
-    # aarch64-darwin is not supported in older config.sub's
-    find libraries -name config.sub -exec cp config.sub {} \;
-
-    .gitlab/ci.sh setup
-    .gitlab/ci.sh configure
-    .gitlab/ci.sh build_hadrian
-    .gitlab/ci.sh test_hadrian
-    .gitlab/ci.sh save_cache
-
-  after_script:
-    - .gitlab/ci.sh clean
-    - cat ci-timings
-
-  artifacts:
-    when: always
-    expire_in: 2 week
-
-validate-x86_64-darwin:
-  extends: .build-x86_64-darwin
-  rules:
-    - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
-
-release-x86_64-darwin:
-  <<: *release
-  variables:
-    TEST_ENV: "x86_64-darwin-perf"
-  extends: .build-x86_64-darwin
-
-#################################
-# aarch64-darwin
-#################################
-
-.build-aarch64-darwin:
-  extends: .validate-hadrian
-  stage: full-build
-  tags:
-    - aarch64-darwin-m1
-  variables:
-    NIX_SYSTEM: aarch64-darwin
-    BUILD_FLAVOUR: "validate"
-    TEST_TYPE: test
-    MAKE_ARGS: "-Werror"
-    MACOSX_DEPLOYMENT_TARGET: "11.0"
-    CPUS: 8
-    LANG: "en_US.UTF-8"
-    # WARNING: this is overridden in the shell.nix, see shell.nix!
-    CONFIGURE_ARGS: "--with-intree-gmp --with-system-libffi"
-    HADRIAN_ARGS: "--docs=no-sphinx"
-    BIN_DIST_NAME: "ghc-arm64-apple-darwin"
-    TEST_ENV: "aarch64-darwin-validate"
-    # Capi_Ctype_001 Capi_Ctype_002 T12010: Due to #20393
-    BROKEN_TESTS: "Capi_Ctype_001 Capi_Ctype_002 T12010"
-
-  script: |
-    # fix up config.sub in libraries for the time.
-    # aarch64-darwin is not supported in older config.sub's
-    find libraries -name config.sub -exec cp config.sub {} \;
-
-    .gitlab/ci.sh setup
-    .gitlab/ci.sh configure
-    .gitlab/ci.sh build_hadrian
-    .gitlab/ci.sh test_hadrian
-    .gitlab/ci.sh save_cache
-
-  after_script:
-    - .gitlab/ci.sh clean
-    - cat ci-timings
-
-  artifacts:
-    when: always
-    expire_in: 2 week
-
-validate-aarch64-darwin:
-  extends: .build-aarch64-darwin
-  rules:
-    - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
-
-release-aarch64-darwin:
-  <<: *release
-  variables:
-    TEST_ENV: "aarch64-darwin-perf"
-  extends: .build-aarch64-darwin
-
-.validate-linux:
-  extends: .validate-hadrian
-  tags:
-    - x86_64-linux
-  variables:
-    BUILD_FLAVOUR: "validate"
-  before_script:
-    # workaround for docker permissions
-    - sudo chown ghc:ghc -R .
-  after_script:
-    - cp -Rf $HOME/.cabal cabal-cache
-    - cat ci-timings
-  cache:
-    key: linux-$CACHE_REV
-    paths:
-      - cabal-cache
-      - toolchain
-
-#################################
-# aarch64-linux-deb10
-#################################
-
-.build-aarch64-linux-deb10:
-  extends: .validate-linux
-  stage: full-build
-  image: "registry.gitlab.haskell.org/ghc/ci-images/aarch64-linux-deb10:$DOCKER_REV"
-  allow_failure: false
-  variables:
-    TEST_ENV: "aarch64-linux-deb10-validate"
-    BIN_DIST_NAME: "ghc-aarch64-linux-deb10"
-  cache:
-    key: linux-aarch64-deb10-$CACHE_REV
-  tags:
-    - aarch64-linux
-
-validate-aarch64-linux-deb10:
-  extends: .build-aarch64-linux-deb10
-  artifacts:
-    when: always
-    expire_in: 2 week
-  rules:
-    - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
-
-nightly-aarch64-linux-deb10:
-  <<: *nightly
-  extends: .build-aarch64-linux-deb10
-  variables:
-    TEST_TYPE: slowtest
-
-release-aarch64-linux-deb10:
-  <<: *release
-  variables:
-    TEST_ENV: "aarch64-linux-deb10-perf"
-  extends: .build-aarch64-linux-deb10
-
-.build-aarch64-linux-deb10-llvm:
-  extends: .build-aarch64-linux-deb10
-  stage: full-build
-  variables:
-  variables:
-    BIN_DIST_NAME: "ghc-aarch64-linux-deb10-llvm"
-    TEST_ENV: "aarch64-linux-deb10-llvm-perf"
-    BUILD_FLAVOUR: perf+llvm
-  tags:
-    - aarch64-linux
-
-validate-aarch64-linux-deb10-llvm:
-  <<: *nightly
-  extends: .build-aarch64-linux-deb10-llvm
-  variables:
-    TEST_ENV: "aarch64-linux-deb10-llvm-validate"
-    CONFIGURE_ARGS: "CC=/opt/llvm/bin/clang"
-    RUNTEST_ARGS: "--way=llvm"
-    BUILD_FLAVOUR: perf+llvm
-    # No docs, for this build, slows it down unncessarily.
-    # We build docs on other platforms already anyway.
-    BUILD_SPHINX_HTML: "NO"
-    BUILD_SPHINX_INFO: "NO"
-    BUILD_SPHINX_PDF: "NO"
-    BUILD_SPHINX_MAN: "NO"
-  artifacts:
-    when: always
-    expire_in: 2 week
-
-#################################
-# armv7-linux-deb10
-#################################
-
-.build-armv7-linux-deb10:
-  extends: .validate-linux
-  stage: full-build
-  image: "registry.gitlab.haskell.org/ghc/ci-images/armv7-linux-deb10:$DOCKER_REV"
-  # Due to linker issues
-  allow_failure: true
-  variables:
-    TEST_ENV: "armv7-linux-deb10-validate"
-    BIN_DIST_NAME: "ghc-armv7-linux-deb10"
-    CONFIGURE_ARGS: "--host=armv7-linux-gnueabihf --build=armv7-linux-gnueabihf --target=armv7-linux-gnueabihf"
-    # N.B. We disable ld.lld explicitly here because it appears to fail
-    # non-deterministically on ARMv7. See #18280.
-    LD: "ld.gold"
-    GccUseLdOpt: "-fuse-ld=gold"
-  cache:
-    key: linux-armv7-deb10-$CACHE_REV
-  tags:
-    - armv7-linux
-
-# Disabled as the build takes over 4 hours
-.validate-armv7-linux-deb10:
-  extends: .build-armv7-linux-deb10
-  artifacts:
-    when: always
-    expire_in: 2 week
-
-nightly-armv7-linux-deb10:
-  <<: *nightly
-  extends: .build-armv7-linux-deb10
-  variables:
-    TEST_TYPE: slowtest
-
-release-armv7-linux-deb10:
-  <<: *release
-  variables:
-    TEST_ENV: "armv7-linux-deb10-perf"
-  extends: .build-armv7-linux-deb10
-
-#################################
-# i386-linux-deb9
-#################################
-
-.build-i386-linux-deb9:
-  extends: .validate-linux
-  stage: full-build
-  image: "registry.gitlab.haskell.org/ghc/ci-images/i386-linux-deb9:$DOCKER_REV"
-  variables:
-    TEST_ENV: "i386-linux-deb9-validate"
-    BIN_DIST_NAME: "ghc-i386-deb9-linux.tar.xz"
-  cache:
-    key: linux-i386-deb9-$CACHE_REV
-
-validate-i386-linux-deb9:
-  extends: .build-i386-linux-deb9
-  artifacts:
-    when: always
-    expire_in: 2 week
-  rules:
-    - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
-
-nightly-i386-linux-deb9:
-  <<: *nightly
-  extends: .build-i386-linux-deb9
-  variables:
-    TEST_TYPE: slowtest
-
-release-i386-linux-deb9:
-  <<: *release
-  variables:
-    TEST_ENV: "i386-linux-deb9-perf"
-  extends: .build-i386-linux-deb9
-
 
 ####################################
 # Testing reinstallable ghc codepath
@@ -939,325 +383,44 @@ test-cabal-reinstall-x86_64-linux-deb10:
   rules:
     - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
 
-#################################
-# x86_64-linux-deb11
-#################################
-
-.build-x86_64-linux-deb11:
-  extends: .validate-linux
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb11:$DOCKER_REV"
-  variables:
-    TEST_ENV: "x86_64-linux-deb11-validate"
-    BIN_DIST_NAME: "./ghc-x86_64-deb11-linux.tar.xz"
-  cache:
-    key: linux-x86_64-deb11-$CACHE_REV
-
-# Disabled to reduce CI load
-.validate-x86_64-linux-deb11:
-  extends: .build-x86_64-linux-deb11
-  stage: full-build
-  artifacts:
-    when: always
-    expire_in: 2 week
-
-release-x86_64-linux-deb11:
-  <<: *release
-  variables:
-    TEST_ENV: "x86_64-linux-deb11-perf"
-  extends: .build-x86_64-linux-deb11
-  stage: full-build
-
-nightly-x86_64-linux-deb11:
-  <<: *nightly
-  extends: .build-x86_64-linux-deb11
-  stage: full-build
-  variables:
-    TEST_TYPE: slowtest
-
-#################################
-# x86_64-linux-ubuntu 20.04
-#################################
-
-.build-x86_64-linux-ubuntu2004:
-  extends: .validate-linux
-  stage: full-build
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-ubuntu20_04:$DOCKER_REV"
-  variables:
-    TEST_ENV: "x86_64-linux-ubuntu2004-validate"
-    BIN_DIST_NAME: "./ghc-x86_64-ubuntu2004-linux.tar.xz"
-  cache:
-    key: linux-x86_64-ubuntu2004-$CACHE_REV
-
-# Disabled to alleviate CI load
-.validate-x86_64-linux-ubuntu2004:
-  extends: .build-x86_64-linux-ubuntu2004
-  stage: full-build
-
-nightly-x86_64-linux-ubuntu2004:
-  <<: *nightly
-  extends: .build-x86_64-linux-ubuntu2004
-  variables:
-    TEST_TYPE: slowtest
-
-release-x86_64-linux-ubuntu2004:
-  <<: *release
-  variables:
-    TEST_ENV: "x86_64-linux-ubuntu2004-perf"
-  extends: .build-x86_64-linux-ubuntu2004
-
-#################################
-# x86_64-linux-alpine
-#################################
-
-.build-x86_64-linux-alpine-hadrian:
-  extends: .build-x86_64-linux-deb10-hadrian
-  stage: full-build
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-alpine3_12:$DOCKER_REV"
-  # There are currently a few failing tests
-  allow_failure: true
-  variables:
-    TEST_ENV: "x86_64-linux-alpine-validate"
-    BUILD_FLAVOUR: "validate+fully_static"
-    BIN_DIST_NAME: "ghc-x86_64-alpine-linux"
-    # Can't use ld.gold due to #13958.
-    CONFIGURE_ARGS: "--disable-ld-override"
-    INSTALL_CONFIGURE_ARGS: "--disable-ld-override"
-    HADRIAN_ARGS: "--docs=no-sphinx"
-    # encoding004: due to lack of locale support
-    # T10458, ghcilink002: due to #17869
-    # linker_unload_native: due to musl not supporting any means of probing dynlib dependencies
-    #   (see Note [Object unloading]).
-    BROKEN_TESTS: "encoding004 T10458 ghcilink002 linker_unload_native"
-  cache:
-    key: linux-x86_64-alpine-$CACHE_REV
-  artifacts:
-    when: always
-    expire_in: 2 week
-
-validate-x86_64-linux-alpine-hadrian:
-  extends: .build-x86_64-linux-alpine-hadrian
-  rules:
-    - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
-
-release-x86_64-linux-alpine-integer-simple:
-  <<: *release
-  extends: .build-x86_64-linux-alpine-hadrian
-  variables:
-    TEST_ENV: "x86_64-linux-alpine-int_native-perf"
-    BIGNUM_BACKEND: native
-    BUILD_FLAVOUR: "perf+fully_static"
-
-release-x86_64-linux-alpine-integer-gmp:
-  <<: *release
-  extends: .build-x86_64-linux-alpine-hadrian
-  variables:
-    TEST_ENV: "x86_64-linux-alpine-int_gmp-perf"
-    BIGNUM_BACKEND: gmp
-    BUILD_FLAVOUR: "perf+fully_static"
-
-nightly-x86_64-linux-alpine:
-  <<: *nightly
-  extends: .build-x86_64-linux-alpine-hadrian
-
-#################################
-# x86_64-linux-centos7
-#################################
-
-.build-x86_64-linux-centos7:
-  extends: .validate-linux
-  stage: full-build
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-centos7:$DOCKER_REV"
-  variables:
-    # The sphinx release shipped with Centos 7 fails to build out documentation
-    BUILD_SPHINX_HTML: "NO"
-    BUILD_SPHINX_PDF: "NO"
-    TEST_ENV: "x86_64-linux-centos7-validate"
-    IGNORE_PERF_FAILURES: "all"
-    BIN_DIST_NAME: "ghc-x86_64-centos7-linux"
-    # CentOS seems to default to ascii
-    LANG: "en_US.UTF-8"
-
-  cache:
-    key: linux-x86_64-centos7-$CACHE_REV
-
-release-x86_64-linux-centos7:
-  <<: *release
-  variables:
-    TEST_ENV: "x86_64-linux-centos7-perf"
-  extends: .build-x86_64-linux-centos7
-
-#################################
-# x86_64-linux-fedora33
-#################################
-
-# The standard fedora33 job is a perf compiler so we do at least one build on CI with release
-# settings (and can test -O2)
-
-.build-x86_64-linux-fedora33:
-  extends: .validate-linux
-  stage: full-build
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora33:$DOCKER_REV"
-  variables:
-    # LLVM 10 is not available for Fedora33
-    LLC: /bin/false
-    OPT: /bin/false
-    TEST_ENV: "x86_64-linux-fedora33-perf"
-    BIN_DIST_NAME: "ghc-x86_64-fedora33-linux"
-    BUILD_FLAVOUR: perf
-  cache:
-    key: linux-x86_64-fedora33-$CACHE_REV
-  artifacts:
-    when: always
-    # These are used for head.hackage jobs therefore we keep them around for
-    # longer.
-    expire_in: 8 week
-
-validate-x86_64-linux-fedora33:
-  extends: .build-x86_64-linux-fedora33
-  rules:
-    - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
-
-release-x86_64-linux-fedora33:
-  <<: *release
-  # NB: TEST_ENV not overriden here because fedora33 job is always a perf job.
-  extends: .build-x86_64-linux-fedora33
-
-
-release-x86_64-linux-fedora33-dwarf:
-  <<: *release
-  extends: .build-x86_64-linux-fedora33
-  variables:
-    CONFIGURE_ARGS: "--enable-dwarf-unwind"
-    BUILD_FLAVOUR: perf+debug_info
-    IGNORE_PERF_FAILURES: "all"
-    BIN_DIST_NAME: "ghc-x86_64-fedora33-linux-dwarf"
-    TEST_ENV: "x86_64-linux-fedora33-dwarf"
-
-############################################################
-# Validation via Pipelines (Windows)
-############################################################
-
-.build-windows:
-  before_script:
-    - git clean -xdf
-
-    # Setup toolchain
-    - bash .gitlab/ci.sh setup
-  after_script:
-    - bash .gitlab/ci.sh save_cache
-    - bash .gitlab/ci.sh clean
-    - type ci-timings
-  dependencies: []
-  variables:
-    #FORCE_SYMLINKS: 1
-    LANG: "en_US.UTF-8"
-    SPHINXBUILD: "/mingw64/bin/sphinx-build.exe"
-    CABAL_INSTALL_VERSION: "3.2.0.0"
-    GHC_VERSION: "8.10.4"
-  cache:
-    paths:
-      - cabal-cache
-      - toolchain
-      - ghc-tarballs
-
-.build-windows-hadrian:
-  extends: .build-windows
-  stage: full-build
-  variables:
-    BUILD_FLAVOUR: "validate"
-    # skipping perf tests for now since we build a quick-flavoured GHC,
-    # which might result in some broken perf tests?
-    HADRIAN_ARGS: "--docs=no-sphinx --skip-perf"
-
-  script:
-    - bash .gitlab/ci.sh configure
-    - bash .gitlab/ci.sh build_hadrian
-    - bash .gitlab/ci.sh test_hadrian
-  tags:
-    - new-x86_64-windows
-    - test
-  artifacts:
-    reports:
-      junit: junit.xml
-    expire_in: 2 week
-    when: always
-    paths:
-      - "$BIN_DIST_NAME.tar.xz"
-      - junit.xml
-
-.build-x86_64-windows-hadrian:
-  extends: .build-windows-hadrian
-  variables:
-    MSYSTEM: MINGW64
-    TEST_ENV: "x86_64-windows-validate"
-    BIN_DIST_NAME: "ghc-x86_64-unknown-mingw32"
-  cache:
-    key: "x86_64-windows-$CACHE_REV"
-
-validate-x86_64-windows-hadrian:
-  extends: .build-x86_64-windows-hadrian
-
-nightly-x86_64-windows:
-  <<: *nightly
-  extends: .build-x86_64-windows-hadrian
-  stage: full-build
-  variables:
-    BUILD_FLAVOUR: "validate"
-
-# Normal Windows validate builds lack profiled libraries; that won't do for
-# releases.
-release-x86_64-windows:
-  <<: *release
-  variables:
-    TEST_ENV: "x86_64-windows-perf"
-  extends: .build-x86_64-windows-hadrian
-
-release-x86_64-windows-integer-simple:
-  <<: *release
-  extends: .build-x86_64-windows-hadrian
-  variables:
-    TEST_ENV: "x86_64-windows-int_native-perf"
-    BIGNUM_BACKEND: native
-    BIN_DIST_NAME: "ghc-x86_64-mingw32-unknown-nogmp"
-
 
 ############################################################
 # Packaging
 ############################################################
 
-doc-tarball:
-  stage: packaging
-  needs: [validate-x86_64-linux-deb10-debug, validate-x86_64-windows-hadrian, validate-x86_64-linux-deb10-unreg-hadrian]
-  tags:
-    - x86_64-linux
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV"
-  dependencies:
-    - validate-x86_64-linux-deb10-debug
-    - validate-x86_64-windows-hadrian
-  variables:
-    LINUX_BINDIST: "ghc-x86_64-deb10-linux-debug.tar.xz"
-    WINDOWS_BINDIST: "ghc-x86_64-unknown-mingw32.tar.xz"
-  artifacts:
-    paths:
-      - haddock.html.tar.xz
-      - libraries.html.tar.xz
-      - users_guide.html.tar.xz
-      - index.html
-      - "*.pdf"
-  script:
-    - |
-      if [ ! -f "$LINUX_BINDIST" ]; then
-        echo "Error: $LINUX_BINDIST does not exist. Did the Debian 9 job fail?"
-        exit 1
-      fi
-      if [ ! -f "$WINDOWS_BINDIST" ]; then
-        echo "Error: $WINDOWS_BINDIST does not exist. Did the 64-bit Windows job fail?"
-        exit 1
-      fi
-    - rm -Rf docs
-    - bash -ex distrib/mkDocs/mkDocs $LINUX_BINDIST $WINDOWS_BINDIST
-    - ls -lh
-    - mv docs/*.tar.xz docs/index.html .
+      #doc-tarball:
+      #  stage: packaging
+      #  needs: [validate-x86_64-linux-deb10-debug, validate-x86_64-windows-hadrian, validate-x86_64-linux-deb10-unreg-hadrian]
+      #  tags:
+      #    - x86_64-linux
+      #  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV"
+      #  dependencies:
+      #    - validate-x86_64-linux-deb10-debug
+      #    - validate-x86_64-windows-hadrian
+      #  variables:
+      #    LINUX_BINDIST: "ghc-x86_64-deb10-linux-debug.tar.xz"
+      #    WINDOWS_BINDIST: "ghc-x86_64-unknown-mingw32.tar.xz"
+      #  artifacts:
+      #    paths:
+      #      - haddock.html.tar.xz
+      #      - libraries.html.tar.xz
+      #      - users_guide.html.tar.xz
+      #      - index.html
+      #      - "*.pdf"
+      #  script:
+      #    - |
+      #      if [ ! -f "$LINUX_BINDIST" ]; then
+      #        echo "Error: $LINUX_BINDIST does not exist. Did the Debian 9 job fail?"
+      #        exit 1
+      #      fi
+      #      if [ ! -f "$WINDOWS_BINDIST" ]; then
+      #        echo "Error: $WINDOWS_BINDIST does not exist. Did the 64-bit Windows job fail?"
+      #        exit 1
+      #      fi
+      #    - rm -Rf docs
+      #    - bash -ex distrib/mkDocs/mkDocs $LINUX_BINDIST $WINDOWS_BINDIST
+      #    - ls -lh
+      #    - mv docs/*.tar.xz docs/index.html .
 
 source-tarball:
   stage: full-build
@@ -1277,8 +440,6 @@ source-tarball:
     - python3 ./hadrian/bootstrap/bootstrap.py -w $GHC fetch -o hadrian-bootstrap-sources-$GHC_VERSION
   rules:
     - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
-
-
 
 
 test-bootstrap:
@@ -1322,7 +483,7 @@ test-bootstrap:
 
 .hackage:
   stage: testing
-  needs: [doc-tarball]
+  needs: [] #[doc-tarball]
   variables:
     UPSTREAM_PROJECT_PATH: "$CI_PROJECT_PATH"
     UPSTREAM_PROJECT_ID: "$CI_PROJECT_ID"
@@ -1366,116 +527,116 @@ nightly-hackage-perf:
 # Nofib testing
 ############################################################
 
-perf-nofib:
-  # Dependencies used by perf-nofib can't be built when some compiler changes
-  # aren't (yet) supported by head.hackage.
-  # Hence we allow this job to fail.
-  allow_failure: true
-  stage: testing
-  needs: [validate-x86_64-linux-deb10-dwarf, doc-tarball]
-  dependencies:
-    - validate-x86_64-linux-deb10-dwarf
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV"
-  rules:
-    - if: $CI_MERGE_REQUEST_ID
-    - if: '$CI_COMMIT_BRANCH == "master"'
-    - if: '$CI_COMMIT_BRANCH =~ /ghc-[0.9]+\.[0-9]+/'
-  tags:
-    - x86_64-linux
-  before_script:
-    - cd nofib
-    - "cabal update --index=$HACKAGE_INDEX_STATE --project-file=cabal.project.head-hackage"
-  script:
-    - root=$(pwd)/ghc
-    - |
-      mkdir tmp
-      tar -xf ../ghc-x86_64-deb10-linux-dwarf.tar.xz -C tmp
-      pushd tmp/ghc-*/
-      ./configure --prefix=$root
-      make install
-      popd
-      rm -Rf tmp
-    - export PATH=$root/bin:$PATH
-    - cabal install -w "$root/bin/ghc" --lib regex-compat unboxed-ref parallel random-1.2.1 --allow-newer --package-env local.env --project-file=cabal.project.head-hackage
-    - export GHC_ENVIRONMENT="$(pwd)/local.env"
-    - "make HC=$root/bin/ghc BOOT_HC=$root/bin/ghc boot mode=fast -j$CPUS"
-    - "make HC=$root/bin/ghc BOOT_HC=$root/bin/ghc EXTRA_RUNTEST_OPTS='-cachegrind +RTS -V0 -RTS' NoFibRuns=1 mode=fast -j$CPUS 2>&1 | tee nofib.log"
-  artifacts:
-    expire_in: 12 week
-    when: always
-    paths:
-      - nofib/nofib.log
-  rules:
-    - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
+      #perf-nofib:
+      #  # Dependencies used by perf-nofib can't be built when some compiler changes
+      #  # aren't (yet) supported by head.hackage.
+      #  # Hence we allow this job to fail.
+      #  allow_failure: true
+      #  stage: testing
+      #  needs: [] #[validate-x86_64-linux-deb10-dwarf] #doc-tarball]
+      #  dependencies:
+      #    - validate-x86_64-linux-deb10-dwarf
+      #  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV"
+      #  rules:
+      #    - if: $CI_MERGE_REQUEST_ID
+      #    - if: '$CI_COMMIT_BRANCH == "master"'
+      #    - if: '$CI_COMMIT_BRANCH =~ /ghc-[0.9]+\.[0-9]+/'
+      #  tags:
+      #    - x86_64-linux
+      #  before_script:
+      #    - cd nofib
+      #    - "cabal update --index=$HACKAGE_INDEX_STATE --project-file=cabal.project.head-hackage"
+      #  script:
+      #    - root=$(pwd)/ghc
+      #    - |
+      #      mkdir tmp
+      #      tar -xf ../ghc-x86_64-deb10-linux-dwarf.tar.xz -C tmp
+      #      pushd tmp/ghc-*/
+      #      ./configure --prefix=$root
+      #      make install
+      #      popd
+      #      rm -Rf tmp
+      #    - export PATH=$root/bin:$PATH
+      #    - cabal install -w "$root/bin/ghc" --lib regex-compat unboxed-ref parallel random-1.2.1 --allow-newer --package-env local.env --project-file=cabal.project.head-hackage
+      #    - export GHC_ENVIRONMENT="$(pwd)/local.env"
+      #    - "make HC=$root/bin/ghc BOOT_HC=$root/bin/ghc boot mode=fast -j$CPUS"
+      #    - "make HC=$root/bin/ghc BOOT_HC=$root/bin/ghc EXTRA_RUNTEST_OPTS='-cachegrind +RTS -V0 -RTS' NoFibRuns=1 mode=fast -j$CPUS 2>&1 | tee nofib.log"
+      #  artifacts:
+      #    expire_in: 12 week
+      #    when: always
+      #    paths:
+      #      - nofib/nofib.log
+      #  rules:
+      #    - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
 
 ############################################################
 # Ad-hoc performance testing
 ############################################################
 
-perf:
-  stage: testing
-  needs: [validate-x86_64-linux-deb10-dwarf, doc-tarball]
-  dependencies:
-    - validate-x86_64-linux-deb10-dwarf
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV"
-  rules:
-    - if: $CI_MERGE_REQUEST_ID
-    - if: '$CI_COMMIT_BRANCH == "master"'
-    - if: '$CI_COMMIT_BRANCH =~ /ghc-[0.9]+\.[0-9]+/'
-  tags:
-    - x86_64-linux-perf
-  script:
-    - root=$(pwd)/ghc
-    - |
-      mkdir tmp
-      tar -xf ghc-x86_64-deb10-linux-dwarf.tar.xz -C tmp
-      pushd tmp/ghc-*/
-      ./configure --prefix=$root
-      make install
-      popd
-      rm -Rf tmp
-    - export BOOT_HC=$(which ghc)
-    - export HC=$root/bin/ghc
-    - .gitlab/ci.sh perf_test
-  artifacts:
-    expire_in: 2 year
-    when: always
-    paths:
-      - out
-  rules:
-    - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
+      #perf:
+      #  stage: testing
+      #  needs: [validate-x86_64-linux-deb10-dwarf, doc-tarball]
+      #  dependencies:
+      #    - validate-x86_64-linux-deb10-dwarf
+      #  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV"
+      #  rules:
+      #    - if: $CI_MERGE_REQUEST_ID
+      #    - if: '$CI_COMMIT_BRANCH == "master"'
+      #    - if: '$CI_COMMIT_BRANCH =~ /ghc-[0.9]+\.[0-9]+/'
+      #  tags:
+      #    - x86_64-linux-perf
+      #  script:
+      #    - root=$(pwd)/ghc
+      #    - |
+      #      mkdir tmp
+      #      tar -xf ghc-x86_64-deb10-linux-dwarf.tar.xz -C tmp
+      #      pushd tmp/ghc-*/
+      #      ./configure --prefix=$root
+      #      make install
+      #      popd
+      #      rm -Rf tmp
+      #    - export BOOT_HC=$(which ghc)
+      #    - export HC=$root/bin/ghc
+      #    - .gitlab/ci.sh perf_test
+      #  artifacts:
+      #    expire_in: 2 year
+      #    when: always
+      #    paths:
+      #      - out
+      #  rules:
+      #    - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
 
 
 ############################################################
 # Documentation deployment via GitLab Pages
 ############################################################
 
-pages:
-  stage: deploy
-  needs: [doc-tarball]
-  dependencies:
-    - doc-tarball
-  image: ghcci/x86_64-linux-deb9:0.2
-  # See #18973
-  allow_failure: true
-  tags:
-    - x86_64-linux
-  script:
-    - mkdir -p public/doc
-    - tar -xf haddock.html.tar.xz -C public/doc
-    - tar -xf libraries.html.tar.xz -C public/doc
-    - tar -xf users_guide.html.tar.xz -C public/doc
-    - |
-      cat >public/index.html <<EOF
-      <!DOCTYPE HTML>
-      <meta charset="UTF-8">
-      <meta http-equiv="refresh" content="1; url=doc/">
-      EOF
-    - cp -f index.html public/doc
-  rules:
-    # N.B. only run this on ghc/ghc since the deployed pages are quite large
-    # and we only serve GitLab Pages for ghc/ghc.
-    - if: '$CI_COMMIT_BRANCH == "master" && $CI_PROJECT_NAMESPACE == "ghc"'
-  artifacts:
-    paths:
-      - public
+      #pages:
+      #  stage: deploy
+      #  needs: [doc-tarball]
+      #  dependencies:
+      #    - doc-tarball
+      #  image: ghcci/x86_64-linux-deb9:0.2
+      #  # See #18973
+      #  allow_failure: true
+      #  tags:
+      #    - x86_64-linux
+      #  script:
+      #    - mkdir -p public/doc
+      #    - tar -xf haddock.html.tar.xz -C public/doc
+      #    - tar -xf libraries.html.tar.xz -C public/doc
+      #    - tar -xf users_guide.html.tar.xz -C public/doc
+      #    - |
+      #      cat >public/index.html <<EOF
+      #      <!DOCTYPE HTML>
+      #      <meta charset="UTF-8">
+      #      <meta http-equiv="refresh" content="1; url=doc/">
+      #      EOF
+      #    - cp -f index.html public/doc
+      #  rules:
+      #    # N.B. only run this on ghc/ghc since the deployed pages are quite large
+      #    # and we only serve GitLab Pages for ghc/ghc.
+      #    - if: '$CI_COMMIT_BRANCH == "master" && $CI_PROJECT_NAMESPACE == "ghc"'
+      #  artifacts:
+      #    paths:
+      #      - public
