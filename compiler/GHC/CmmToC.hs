@@ -269,7 +269,6 @@ pprStmt platform stmt =
         hargs    = zip args arg_hints
 
         need_cdecl
-          | Just _align <- machOpMemcpyishAlign op = True
           | MO_ResumeThread  <- op                 = True
           | MO_SuspendThread <- op                 = True
           | otherwise                              = False
@@ -931,10 +930,10 @@ pprCallishMachOp_for_C mop
         MO_F32_Fabs     -> text "fabsf"
         MO_ReadBarrier  -> text "load_load_barrier"
         MO_WriteBarrier -> text "write_barrier"
-        MO_Memcpy _     -> text "memcpy"
-        MO_Memset _     -> text "memset"
-        MO_Memmove _    -> text "memmove"
-        MO_Memcmp _     -> text "memcmp"
+        MO_Memcpy _     -> text "__builtin_memcpy"
+        MO_Memset _     -> text "__builtin_memset"
+        MO_Memmove _    -> text "__builtin_memmove"
+        MO_Memcmp _     -> text "__builtin_memcmp"
 
         MO_SuspendThread -> text "suspendThread"
         MO_ResumeThread  -> text "resumeThread"
