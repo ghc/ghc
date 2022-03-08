@@ -53,15 +53,12 @@ import GHC.Utils.Trace
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
-import Control.Monad.ST
 import Data.Char
 import Data.List (intersperse)
 import Data.Map (Map)
-import Data.Word
 import qualified Data.Map as Map
 import Control.Monad (ap)
-import qualified Data.Array.Unsafe as U ( castSTUArray )
-import Data.Array.ST
+import GHC.Float
 
 -- --------------------------------------------------------------------------
 -- Now do some real work
@@ -1410,28 +1407,10 @@ pprStringInCStyle s = doubleQuotes (text (concatMap charToC (BS.unpack s)))
 -- can safely initialise to static locations.
 
 floatToWord32 :: Rational -> CmmLit
-floatToWord32 r
-  = runST $ do
-        arr <- newArray_ ((0::Int),0)
-        writeArray arr 0 (fromRational r)
-        arr' <- castFloatToWord32Array arr
-        w32 <- readArray arr' 0
-        return (CmmInt (toInteger w32) W32)
-  where
-    castFloatToWord32Array :: STUArray s Int Float -> ST s (STUArray s Int Word32)
-    castFloatToWord32Array = U.castSTUArray
+floatToWord32 r = CmmInt (toInteger (castFloatToWord32 (fromRational r))) W32
 
 doubleToWord64 :: Rational -> CmmLit
-doubleToWord64 r
-  = runST $ do
-        arr <- newArray_ ((0::Int),1)
-        writeArray arr 0 (fromRational r)
-        arr' <- castDoubleToWord64Array arr
-        w64 <- readArray arr' 0
-        return $ CmmInt (toInteger w64) W64
-  where
-    castDoubleToWord64Array :: STUArray s Int Double -> ST s (STUArray s Int Word64)
-    castDoubleToWord64Array = U.castSTUArray
+doubleToWord64 r = CmmInt (toInteger (castDoubleToWord64 (fromRational r))) W64
 
 
 -- ---------------------------------------------------------------------------
