@@ -89,11 +89,28 @@ type instance XXValBindsLR (GhcPass pL) (GhcPass pR)
 -- ---------------------------------------------------------------------
 
 type instance XFunBind    (GhcPass pL) GhcPs = NoExtField
-type instance XFunBind    (GhcPass pL) GhcRn = NameSet    -- Free variables
-type instance XFunBind    (GhcPass pL) GhcTc = HsWrapper  -- See comments on FunBind.fun_ext
+type instance XFunBind    (GhcPass pL) GhcRn = NameSet
+          -- ^ After the renamer (but before the type-checker), the FunBind
+          -- extension field contains the locally-bound free variables of this
+          -- defn. See Note [Bind free vars]
+type instance XFunBind    (GhcPass pL) GhcTc = HsWrapper
+          -- ^ After the type-checker, the FunBind extension field contains a
+          -- coercion from the type of the MatchGroup to the type of the Id.
+          -- Example:
+          --
+          -- @
+          --      f :: Int -> forall a. a -> a
+          --      f x y = y
+          -- @
+          --
+          -- Then the MatchGroup will have type (Int -> a' -> a')
+          -- (with a free type variable a').  The coercion will take
+          -- a CoreExpr of this type and convert it to a CoreExpr of
+          -- type         Int -> forall a'. a' -> a'
+          -- Notice that the coercion captures the free a'.
 
 type instance XPatBind    GhcPs (GhcPass pR) = EpAnn [AddEpAnn]
-type instance XPatBind    GhcRn (GhcPass pR) = NameSet -- Free variables
+type instance XPatBind    GhcRn (GhcPass pR) = NameSet -- ^ See Note [Bind free vars]
 type instance XPatBind    GhcTc (GhcPass pR) = Type    -- Type of the GRHSs
 
 type instance XVarBind    (GhcPass pL) (GhcPass pR) = NoExtField
@@ -105,7 +122,7 @@ type instance XABE       (GhcPass p) = NoExtField
 type instance XXABExport (GhcPass p) = DataConCantHappen
 
 type instance XPSB         (GhcPass idL) GhcPs = EpAnn [AddEpAnn]
-type instance XPSB         (GhcPass idL) GhcRn = NameSet
+type instance XPSB         (GhcPass idL) GhcRn = NameSet -- ^ Post renaming, FVs. See Note [Bind free vars]
 type instance XPSB         (GhcPass idL) GhcTc = NameSet
 
 type instance XXPatSynBind (GhcPass idL) (GhcPass idR) = DataConCantHappen
@@ -319,8 +336,8 @@ variables.  The action happens in GHC.Tc.Gen.Bind.mkExport.
 
 Note [Bind free vars]
 ~~~~~~~~~~~~~~~~~~~~~
-The bind_fvs field of FunBind and PatBind records the free variables
-of the definition.  It is used for the following purposes
+The extension fields of FunBind, PatBind and PatSynBind at GhcRn records the free
+variables of the definition.  It is used for the following purposes:
 
 a) Dependency analysis prior to type checking
     (see GHC.Tc.Gen.Bind.tc_group)
@@ -334,10 +351,10 @@ c) Deciding whether the binding can be used in static forms
 
 Specifically,
 
-  * bind_fvs includes all free vars that are defined in this module
+  * it includes all free vars that are defined in this module
     (including top-level things and lexically scoped type variables)
 
-  * bind_fvs excludes imported vars; this is just to keep the set smaller
+  * it excludes imported vars; this is just to keep the set smaller
 
   * Before renaming, and after typechecking, the field is unused;
     it's just an error thunk

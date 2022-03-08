@@ -206,23 +206,6 @@ data HsBindLR idL idR
 
         fun_ext :: XFunBind idL idR,
 
-          -- ^ After the renamer (but before the type-checker), this contains the
-          -- locally-bound free variables of this defn. See Note [Bind free vars]
-          --
-          -- After the type-checker, this contains a coercion from the type of
-          -- the MatchGroup to the type of the Id. Example:
-          --
-          -- @
-          --      f :: Int -> forall a. a -> a
-          --      f x y = y
-          -- @
-          --
-          -- Then the MatchGroup will have type (Int -> a' -> a')
-          -- (with a free type variable a').  The coercion will take
-          -- a CoreExpr of this type and convert it to a CoreExpr of
-          -- type         Int -> forall a'. a' -> a'
-          -- Notice that the coercion captures the free a'.
-
         fun_id :: LIdP idL, -- Note [fun_id in Match] in GHC.Hs.Expr
 
         fun_matches :: MatchGroup idR (LHsExpr idR),  -- ^ The payload
@@ -244,7 +227,7 @@ data HsBindLR idL idR
 
   -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
   | PatBind {
-        pat_ext    :: XPatBind idL idR, -- ^ See Note [Bind free vars]
+        pat_ext    :: XPatBind idL idR,
         pat_lhs    :: LPat idL,
         pat_rhs    :: GRHSs idR (LHsExpr idR),
         pat_ticks  :: ([CoreTickish], [[CoreTickish]])
@@ -331,8 +314,7 @@ data ABExport p
 
 -- | Pattern Synonym binding
 data PatSynBind idL idR
-  = PSB { psb_ext  :: XPSB idL idR,            -- ^ Post renaming, FVs.
-                                               -- See Note [Bind free vars]
+  = PSB { psb_ext  :: XPSB idL idR,
           psb_id   :: LIdP idL,                -- ^ Name of the pattern synonym
           psb_args :: HsPatSynDetails idR,     -- ^ Formal parameter names
           psb_def  :: LPat idR,                -- ^ Right-hand side
@@ -546,31 +528,6 @@ The abe_wrap field deals with impedance-matching between
     (/\a b. case tup a b of { (f,g) -> f })
 and the thing we really want, which may have fewer type
 variables.  The action happens in GHC.Tc.Gen.Bind.mkExport.
-
-Note [Bind free vars]
-~~~~~~~~~~~~~~~~~~~~~
-The bind_fvs field of FunBind and PatBind records the free variables
-of the definition.  It is used for the following purposes
-
-a) Dependency analysis prior to type checking
-    (see GHC.Tc.Gen.Bind.tc_group)
-
-b) Deciding whether we can do generalisation of the binding
-    (see GHC.Tc.Gen.Bind.decideGeneralisationPlan)
-
-c) Deciding whether the binding can be used in static forms
-    (see GHC.Tc.Gen.Expr.checkClosedInStaticForm for the HsStatic case and
-     GHC.Tc.Gen.Bind.isClosedBndrGroup).
-
-Specifically,
-
-  * bind_fvs includes all free vars that are defined in this module
-    (including top-level things and lexically scoped type variables)
-
-  * bind_fvs excludes imported vars; this is just to keep the set smaller
-
-  * Before renaming, and after typechecking, the field is unused;
-    it's just an error thunk
 -}
 
 
