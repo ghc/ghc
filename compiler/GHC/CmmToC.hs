@@ -357,7 +357,7 @@ pprSwitch platform e ids
     caseify (_     , _    ) = panic "pprSwitch: switch with no cases!"
 
     def | Just l <- mbdef = text "default: goto" <+> pprBlockId l <> semi
-        | otherwise       = empty
+        | otherwise       = text "default: __builtin_unreachable();"
 
 -- ---------------------------------------------------------------------
 -- Expressions.
