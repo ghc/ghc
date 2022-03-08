@@ -469,6 +469,17 @@ function determine_metric_baseline() {
   fi
 }
 
+function check_msys2_deps() {
+  # Ensure that GHC on Windows doesn't have any dynamic dependencies on msys2
+  case "$(uname)" in
+    MSYS_*|MINGW*)
+      sysroot="$(cygpath "$SYSTEMROOT")"
+      PATH="$sysroot/System32:$sysroot;$sysroot/Wbem" $@ \
+          || fail "'$@' failed; there may be unwanted dynamic dependencies."
+      ;;
+  esac
+}
+
 # If RELEASE_JOB = yes then we skip builds with a validate flavour.
 # This has the effect of
 #  (1) Skipping validate jobs when trying to do release builds
@@ -490,6 +501,7 @@ function test_make() {
     return
   fi
 
+  check_msys2_deps inplace/bin/ghc-stage2 --version
   check_release_build
 
   run "$MAKE" test_bindist TEST_PREP=YES TEST_PROF=${RELEASE_JOB:-}
@@ -529,6 +541,7 @@ function test_hadrian() {
     return
   fi
 
+  check_msys2_deps _build/stage1/bin/ghc --version
   check_release_build
 
   # Ensure that statically-linked builds are actually static
