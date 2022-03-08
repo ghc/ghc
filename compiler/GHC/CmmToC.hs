@@ -645,7 +645,9 @@ staticLitsToWords platform = go . foldMap decomposeMultiWord
       = [floatToWord32 n]
     decomposeMultiWord (CmmInt n W64)
       | W32 <- wordWidth platform
-      = [CmmInt hi W32, CmmInt lo W32]
+      = case platformByteOrder platform of
+          BigEndian -> [CmmInt hi W32, CmmInt lo W32]
+          LittleEndian -> [CmmInt lo W32, CmmInt hi W32]
       where
         hi = n `shiftR` 32
         lo = n .&. 0xffffffff
