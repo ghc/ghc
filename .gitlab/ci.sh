@@ -608,6 +608,7 @@ function run_perf_test() {
 
 function save_cache () {
   info "Storing cabal cache from $CABAL_DIR to $CABAL_CACHE..."
+  rm -Rf "$CABAL_CACHE"
   cp -Rf "$CABAL_DIR" "$CABAL_CACHE"
 }
 
