@@ -181,7 +181,7 @@ ghc-linters:
     BUILD_FLAVOUR: default
   script:
     - .gitlab/ci.sh configure
-    - .gitlab/ci.sh run_hadrian test --test-root-dirs="testsuite/tests/linters"
+    - timeout 10m .gitlab/ci.sh run_hadrian test --test-root-dirs="testsuite/tests/linters"
   dependencies: []
   rules:
     - if: $CI_MERGE_REQUEST_ID
