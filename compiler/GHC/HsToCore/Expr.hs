@@ -747,8 +747,9 @@ Thus, we pass @r@ as the scrutinee expression to @matchWrapper@ above.
 
 -- Template Haskell stuff
 
-dsExpr (HsBracket (HsBracketTc _ hs_wrapper ps) x) = dsBracket hs_wrapper x ps
-dsExpr (HsSpliceE _ s)         = pprPanic "dsExpr:splice" (ppr s)
+dsExpr (HsBracket (HsBracketTc _ hs_wrapper ps) (XBracket x)) = dsBracket hs_wrapper x ps -- See Note [Type-checking untyped brackets] in GHC.Hs.Expr
+dsExpr (HsBracket (HsBracketTc _ _ ps) _) = pprPanic "dsExpr:bracket" (ppr ps)
+dsExpr (HsSpliceE _ s)                    = pprPanic "dsExpr:splice" (ppr s)
 
 -- Arrow notation extension
 dsExpr (HsProc _ pat cmd) = dsProcExpr pat cmd

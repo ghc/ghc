@@ -207,13 +207,9 @@ data HsBracketTc = HsBracketTc
                        -- _typechecked_ splices to be
                        -- pasted back in by the desugarer
 
-type instance XBracket     GhcPs = EpAnn [AddEpAnn]
-type instance XBracket     GhcRn = HsBracketRn
-type instance XBracket     GhcTc = HsBracketTc
-
-type instance HsBracketBody GhcPs = HsBracket GhcPs
-type instance HsBracketBody GhcRn = HsBracket GhcRn
-type instance HsBracketBody GhcTc = HsBracket GhcRn
+type instance XBracket GhcPs = EpAnn [AddEpAnn]
+type instance XBracket GhcRn = HsBracketRn
+type instance XBracket GhcTc = HsBracketTc
 
 -- ---------------------------------------------------------------------
 
@@ -1669,12 +1665,13 @@ bracket code.  So for example
     [| f $(g x) |]
 looks like
 
-    HsBracket (HsApp (HsVar "f") (HsSpliceE _ (g x)))
+    HsBracket _ (HsApp (HsVar "f") (HsSpliceE _ (g x)))
 
 which the renamer rewrites to
 
-    HsRnBracketOut (HsApp (HsVar f) (HsSpliceE sn (g x)))
-                   [PendingRnSplice UntypedExpSplice sn (g x)]
+    HsBracket
+        (HsBracketRnUnTyped _ [PendingRnSplice UntypedExpSplice sn (g x)])
+        (HsApp (HsVar f) (HsSpliceE sn (g x)))
 
 * The 'sn' is the Name of the splice point, the SplicePointName
 
@@ -1776,6 +1773,29 @@ ppr_splice :: (OutputableBndrId p)
 ppr_splice herald n e trail
     = herald <> whenPprDebug (brackets (ppr n)) <> ppr e <> trail
 
+{-
+Note [Type-checking untyped brackets]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When we type-check an untyped bracket, the actual bracket (the second argument
+of the HsBracket constructor in HsExpr) is kept in the renaming pass.
+
+Given that
+
+  HsExpr p = ...
+    | HsBracket (XBracket p) (HsBracket p)
+
+When p = GhcPs we should have HsExpr GhcPs and HsBracket GhcPs
+When p = GhcRn we should have HsExpr GhcRn and HsBracket GhcRn
+However, when p = GhcRn we should have HsExpr GhcTc and HsBracket GhcRn
+
+To work around this, the HsBracket extension constructor (XBracket !(XXBracket p)),
+when p = GhcTc, is used to hold the needed HsBracket GhcRn
+
+Note that a typed bracket is just fine: you'll see in tcTypedBracket that
+_tc_expr is just thrown away. It will comfortably come to rest inside a TExpBr
+(of type HsBracket GhcTc).
+-}
+
 type instance XExpBr      (GhcPass _) = NoExtField
 type instance XPatBr      (GhcPass _) = NoExtField
 type instance XDecBrL     (GhcPass _) = NoExtField
@@ -1783,14 +1803,17 @@ type instance XDecBrG     (GhcPass _) = NoExtField
 type instance XTypBr      (GhcPass _) = NoExtField
 type instance XVarBr      (GhcPass _) = NoExtField
 type instance XTExpBr     (GhcPass _) = NoExtField
-type instance XXBracket   (GhcPass _) = DataConCantHappen
+type instance XXBracket   GhcPs = DataConCantHappen
+type instance XXBracket   GhcRn = DataConCantHappen
+type instance XXBracket   GhcTc = HsBracket GhcRn   -- See Note [Type-checking untyped brackets]
 
 instance OutputableBndrId p
           => Outputable (HsBracket (GhcPass p)) where
   ppr = pprHsBracket
 
 
-pprHsBracket :: (OutputableBndrId p) => HsBracket (GhcPass p) -> SDoc
+pprHsBracket :: forall p. (OutputableBndrId p)
+             => HsBracket (GhcPass p) -> SDoc
 pprHsBracket (ExpBr _ e)   = thBrackets empty (ppr e)
 pprHsBracket (PatBr _ p)   = thBrackets (char 'p') (ppr p)
 pprHsBracket (DecBrG _ gp) = thBrackets (char 'd') (ppr gp)
@@ -1801,6 +1824,12 @@ pprHsBracket (VarBr _ True n)
 pprHsBracket (VarBr _ False n)
   = text "''" <> pprPrefixOcc (unLoc n)
 pprHsBracket (TExpBr _ e)  = thTyBrackets (ppr e)
+pprHsBracket (XBracket b)  = case ghcPass @p of
+#if __GLASGOW_HASKELL__ <= 900
+    GhcPs -> dataConCantHappen b
+    GhcRn -> dataConCantHappen b
+#endif
+    GhcTc -> pprHsBracket b
 
 thBrackets :: SDoc -> SDoc -> SDoc
 thBrackets pp_kind pp_body = char '[' <> pp_kind <> vbar <+>

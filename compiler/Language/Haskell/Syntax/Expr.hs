@@ -593,7 +593,7 @@ data HsExpr p
   --         'GHC.Parser.Annotation.AnnClose','GHC.Parser.Annotation.AnnCloseQ'
 
   -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
-  | HsBracket  (XBracket p) (HsBracketBody p)
+  | HsBracket  (XBracket p) (HsBracket p)
 
   -- | - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen',
   --         'GHC.Parser.Annotation.AnnClose'
@@ -635,9 +635,6 @@ data HsExpr p
 -- | The AST used to hard-refer to GhcPass, which was a layer violation. For now,
 -- we paper it over with this new extension point.
 type family HsDoRn p
-
--- TODO: Temporary fix for HsBracket GhcTc body should be HsBracket GhcRn
-type family HsBracketBody p
 
 -- ---------------------------------------------------------------------
 
