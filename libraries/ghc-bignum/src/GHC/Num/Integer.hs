@@ -637,7 +637,7 @@ integerOr a b = case a of
                IS -1# -> IS -1#
                IS  y  -> IS (orI# x y)
                IP  y
-                  | isTrue# (x >=# 0#) -> integerFromBigNat# (bigNatOrWord# y (int2Word# x))
+                  | isTrue# (x >=# 0#) -> IP (bigNatOrWord# y (int2Word# x))
                   | True               -> integerFromBigNatNeg#
                                              (bigNatAddWord#
                                                 (bigNatAndNot -- use De Morgan's laws
@@ -660,7 +660,7 @@ integerOr a b = case a of
                                                 1##)
    IP  x  -> case b of
                IS _ -> integerOr b a
-               IP y -> integerFromBigNat# (bigNatOr x y)
+               IP y -> IP (bigNatOr x y)
                IN y -> integerFromBigNatNeg#
                         (bigNatAddWord#
                            (bigNatAndNot -- use De Morgan's laws
