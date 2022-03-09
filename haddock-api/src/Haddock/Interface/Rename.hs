@@ -191,8 +191,8 @@ renameDocumentation (Documentation mDoc mWarning) =
   Documentation <$> mapM renameDoc mDoc <*> mapM renameDoc mWarning
 
 
-renameLDocHsSyn :: LHsDocString -> RnM LHsDocString
-renameLDocHsSyn = return
+renameLDocHsSyn :: Located (WithHsDocIdentifiers HsDocString a) -> RnM (Located (WithHsDocIdentifiers HsDocString b))
+renameLDocHsSyn (L l doc) = return (L l (WithHsDocIdentifiers (hsDocString doc) []))
 
 
 renameDoc :: Traversable t => t (Wrap Name) -> RnM (t (Wrap DocName))
@@ -316,6 +316,7 @@ renameType t = case t of
   HsExplicitTupleTy _ b   -> HsExplicitTupleTy noAnn <$> mapM renameLType b
   HsSpliceTy _ s          -> renameHsSpliceTy s
   HsWildCardTy _          -> pure (HsWildCardTy noAnn)
+
 
 renameSigType :: HsSigType GhcRn -> RnM (HsSigType DocNameI)
 renameSigType (HsSig { sig_bndrs = bndrs, sig_body = body }) = do
@@ -511,7 +512,7 @@ renameCon decl@(ConDeclH98 { con_name = lname, con_ex_tvs = ltyvars
       ltyvars'  <- mapM renameLTyVarBndr ltyvars
       lcontext' <- traverse renameLContext lcontext
       details'  <- renameH98Details details
-      mbldoc'   <- mapM renameLDocHsSyn mbldoc
+      mbldoc'   <- mapM (renameLDocHsSyn) mbldoc
       return (decl { con_ext = noExtField, con_name = lname', con_ex_tvs = ltyvars'
                    , con_mb_cxt = lcontext'
                    , con_forall = forall_ -- Remove when #18311 is fixed

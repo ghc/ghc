@@ -136,12 +136,12 @@ attachToExportItem index expInfo getInstDoc getFixity export =
                                , expItemSubDocs = subDocs
                                } = e { expItemFixities =
       nubByName fst $ expItemFixities e ++
-      [ (n',f) | n <- getMainDeclBinder d
+      [ (n',f) | n <- getMainDeclBinder emptyOccEnv d
                , n' <- n : (map fst subDocs ++ patsyn_names)
                , f <- maybeToList (getFixity n')
       ] }
       where
-        patsyn_names = concatMap (getMainDeclBinder . fst) patsyns
+        patsyn_names = concatMap (getMainDeclBinder emptyOccEnv . fst) patsyns
 
     attachFixities e = e
     -- spanName: attach the location to the name that is the same file as the instance location

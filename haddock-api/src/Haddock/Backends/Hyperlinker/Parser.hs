@@ -355,10 +355,7 @@ classify tok =
     ITeof                  -> TkUnknown
 
     ITlineComment       {} -> TkComment
-    ITdocCommentNext    {} -> TkComment
-    ITdocCommentPrev    {} -> TkComment
-    ITdocCommentNamed   {} -> TkComment
-    ITdocSection        {} -> TkComment
+    ITdocComment        {} -> TkComment
     ITdocOptions        {} -> TkComment
 
     -- The lexer considers top-level pragmas as comments (see `pragState` in

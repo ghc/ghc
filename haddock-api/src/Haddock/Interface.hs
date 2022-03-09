@@ -146,7 +146,7 @@ createIfaces verbosity modules flags instIfaceMap = do
   let
     installHaddockPlugin :: HscEnv -> HscEnv
     installHaddockPlugin hsc_env =
-      let 
+      let
         old_plugins = hsc_plugins hsc_env
         new_plugins = old_plugins { staticPlugins = haddockPlugin : staticPlugins old_plugins }
         hsc_env'    = hsc_env { hsc_plugins = new_plugins }
@@ -362,7 +362,7 @@ processModule1 verbosity flags ifaces inst_ifaces hsc_env mod_summary tc_gbl_env
       ]
         where
           formatName :: SrcSpan -> HsDecl GhcRn -> String
-          formatName loc n = p (getMainDeclBinder n) ++ case loc of
+          formatName loc n = p (getMainDeclBinder emptyOccEnv n) ++ case loc of
             RealSrcSpan rss _ -> " (" ++ unpackFS (srcSpanFile rss) ++ ":" ++
               show (srcSpanStartLine rss) ++ ")"
             _ -> ""

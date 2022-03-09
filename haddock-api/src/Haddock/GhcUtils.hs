@@ -96,7 +96,7 @@ ifTrueJust True  = Just
 ifTrueJust False = const Nothing
 
 sigName :: LSig GhcRn -> [IdP GhcRn]
-sigName (L _ sig) = sigNameNoLoc sig
+sigName (L _ sig) = sigNameNoLoc emptyOccEnv sig
 
 -- | Was this signature given by the user?
 isUserLSig :: forall p. UnXRec p => LSig p -> Bool
@@ -193,7 +193,7 @@ getMainDeclBinderI (ValD _ d) =
   case collectHsBindBinders CollNoDictBinders d of
     []       -> []
     (name:_) -> [name]
-getMainDeclBinderI (SigD _ d) = sigNameNoLoc d
+getMainDeclBinderI (SigD _ d) = sigNameNoLoc emptyOccEnv d
 getMainDeclBinderI (ForD _ (ForeignImport _ name _ _)) = [unLoc name]
 getMainDeclBinderI (ForD _ (ForeignExport _ _ _ _)) = []
 getMainDeclBinderI _ = []
