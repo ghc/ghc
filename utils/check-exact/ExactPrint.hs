@@ -1845,8 +1845,6 @@ instance ExactPrint (HsExpr GhcPs) where
   getAnnotationEntry (ExprWithTySig an _ _)       = fromAnn an
   getAnnotationEntry (ArithSeq an _ _)            = fromAnn an
   getAnnotationEntry (HsBracket an _)             = fromAnn an
-  getAnnotationEntry (HsRnBracketOut{})           = NoEntryVal
-  getAnnotationEntry (HsTcBracketOut{})           = NoEntryVal
   getAnnotationEntry (HsSpliceE an _)             = fromAnn an
   getAnnotationEntry (HsProc an _ _)              = fromAnn an
   getAnnotationEntry (HsStatic an _)              = fromAnn an
