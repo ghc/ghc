@@ -28,40 +28,40 @@ ghcConfigProgPath = "test/bin/ghc-config" <.> exe
 checkPprProgPath, checkPprSourcePath :: FilePath
 checkPprProgPath = "test/bin/check-ppr" <.> exe
 checkPprSourcePath = "utils/check-ppr/Main.hs"
-checkPprExtra :: Maybe String
-checkPprExtra = Nothing
+checkPprExtra :: [String]
+checkPprExtra = []
 
 checkExactProgPath, checkExactSourcePath :: FilePath
 checkExactProgPath = "test/bin/check-exact" <.> exe
 checkExactSourcePath = "utils/check-exact/Main.hs"
-checkExactExtra :: Maybe String
-checkExactExtra = Just "-iutils/check-exact"
+checkExactExtra :: [String]
+checkExactExtra = ["-iutils/check-exact"]
 
 countDepsProgPath, countDepsSourcePath :: FilePath
 countDepsProgPath = "test/bin/count-deps" <.> exe
 countDepsSourcePath = "utils/count-deps/Main.hs"
-countDepsExtra :: Maybe String
-countDepsExtra = Just "-iutils/count-deps"
+countDepsExtra :: [String]
+countDepsExtra = ["-iutils/count-deps"]
 
 noteLinterProgPath, noteLinterSourcePath :: FilePath
 noteLinterProgPath = "test/bin/lint-notes" <.> exe
 noteLinterSourcePath = "linters/lint-notes/Main.hs"
-noteLinterExtra :: Maybe String
-noteLinterExtra = Just "-ilinters/lint-notes"
+noteLinterExtra :: [String]
+noteLinterExtra = ["-ilinters/lint-notes"]
 
 whitespaceLinterProgPath, whitespaceLinterSourcePath :: FilePath
 whitespaceLinterProgPath = "test/bin/lint-whitespace" <.> exe
 whitespaceLinterSourcePath = "linters/lint-whitespace/Main.hs"
-whitespaceLinterExtra :: Maybe String
-whitespaceLinterExtra = Just "-ilinters/lint-whitespace"
+whitespaceLinterExtra :: [String]
+whitespaceLinterExtra = ["-ilinters/lint-whitespace", "-ilinters/linters-common"]
 
-checkPrograms :: [(String,FilePath, FilePath, Maybe String, Package, Stage -> Stage)]
+checkPrograms :: [(String,FilePath, FilePath, [String], Package, Stage -> Stage, [Package] -> [Package])]
 checkPrograms =
-    [ ("test:check-ppr",checkPprProgPath, checkPprSourcePath, checkPprExtra, checkPpr, id)
-    , ("test:check-exact",checkExactProgPath, checkExactSourcePath, checkExactExtra, checkExact, id)
-    , ("test:count-deps",countDepsProgPath, countDepsSourcePath, countDepsExtra, countDeps, id)
-    , ("lint:notes", noteLinterProgPath, noteLinterSourcePath, noteLinterExtra, lintNotes, const Stage0)
-    , ("lint:whitespace", whitespaceLinterProgPath, whitespaceLinterSourcePath, whitespaceLinterExtra, lintWhitespace, const Stage0)
+    [ ("test:check-ppr",checkPprProgPath, checkPprSourcePath, checkPprExtra, checkPpr, id, id)
+    , ("test:check-exact",checkExactProgPath, checkExactSourcePath, checkExactExtra, checkExact, id, id)
+    , ("test:count-deps",countDepsProgPath, countDepsSourcePath, countDepsExtra, countDeps, id, id)
+    , ("lint:notes", noteLinterProgPath, noteLinterSourcePath, noteLinterExtra, lintNotes, const Stage0, id)
+    , ("lint:whitespace", whitespaceLinterProgPath, whitespaceLinterSourcePath, whitespaceLinterExtra, lintWhitespace, const Stage0, filter (/= lintersCommon))
     ]
 
 inTreeOutTree :: (Stage -> Action b) -> Action b -> Action b
@@ -121,7 +121,7 @@ testRules = do
     -- Rules for building check-ppr, check-exact and
     -- check-ppr-annotations with the compiler we are going to test
     -- (in-tree or out-of-tree).
-    forM_ checkPrograms $ \(name, progPath, sourcePath, mextra, progPkg, mod_stage) -> do
+    forM_ checkPrograms $ \(name, progPath, sourcePath, mextra, progPkg, mod_stage, mod_pkgs) -> do
         name ~> need [root -/- progPath]
         root -/- progPath %> \path -> do
             need [ sourcePath ]
@@ -139,14 +139,14 @@ testRules = do
             -- otherwise, build it by directly invoking ghc
               Nothing -> do
                 top <- topDirectory
-                depsPkgs <- packageDependencies <$> readPackageData progPkg
+                depsPkgs <- mod_pkgs . packageDependencies <$> readPackageData progPkg
                 bindir <- getBinaryDirectory testGhc
                 debugged <- ghcDebugged <$> flavour
                 dynPrograms <- dynamicGhcPrograms =<< flavour
                 cmd [bindir </> "ghc" <.> exe] $
                     concatMap (\p -> ["-package", pkgName p]) depsPkgs ++
                     ["-o", top -/- path, top -/- sourcePath] ++
-                    (maybe [] (\e -> [e]) mextra) ++
+                    mextra ++
                     -- If GHC is build with debug options, then build check-ppr
                     -- also with debug options.  This allows, e.g., to print debug
                     -- messages of various RTS subsystems while using check-ppr.
@@ -246,9 +246,9 @@ isOkToBuild :: TestArgs -> String -> Bool
 isOkToBuild args target
    = stageOf (testCompiler args) `elem` [Just Stage1, Just Stage2]
   || testHasInTreeFiles args
-  || target `elem` map fst6 checkPrograms
+  || target `elem` map fst7 checkPrograms
   where
-    fst6 (a,_,_,_,_, _) = a
+    fst7 (a,_,_,_,_,_,_) = a
 
 -- | Build the timeout program.
 -- See: https://github.com/ghc/ghc/blob/master/testsuite/timeout/Makefile#L23
