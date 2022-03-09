@@ -582,6 +582,107 @@ integerTestBit# (IN x) i
 integerTestBit :: Integer -> Word -> Bool
 integerTestBit !i (W# n) = isTrue# (integerTestBit# i n)
 
+-- | Set the /n/-th bit.
+--
+-- Fake 2's complement for negative values (might be slow)
+--
+-- @since 1.3
+integerSetBit# :: Integer -> Word# -> Integer
+integerSetBit# n@(IS x) i
+   | isTrue# (i `ltWord#` (WORD_SIZE_IN_BITS## `minusWord#` 1##))
+   = IS (x `orI#` uncheckedIShiftL# 1# (word2Int# i))
+   | isTrue# (x >=# 0#)
+   = IP (bigNatSetBit# (bigNatFromWord# (int2Word# x)) i)
+   | True
+   = n
+integerSetBit# (IP x) i = IP (bigNatSetBit# x i)
+integerSetBit# (IN x) i = integerFromBigNatNeg#
+                             (bigNatAddWord#
+                                (bigNatClearBit#
+                                   (bigNatSubWordUnsafe# x 1##)
+                                   i)
+                                1##)
+
+-- | Set the /n/-th bit.
+--
+-- Fake 2's complement for negative values (might be slow)
+--
+-- @since 1.3
+integerSetBit :: Integer -> Word -> Integer
+integerSetBit !i (W# n) = integerSetBit# i n
+
+-- | Clear the /n/-th bit.
+--
+-- Fake 2's complement for negative values (might be slow)
+--
+-- @since 1.3
+integerClearBit# :: Integer -> Word# -> Integer
+integerClearBit# n@(IS x) i
+   | isTrue# (i `ltWord#` (WORD_SIZE_IN_BITS## `minusWord#` 1##))
+   = IS (x `andI#` notI# (uncheckedIShiftL# 1# (word2Int# i)))
+   | isTrue# (x >=# 0#)
+   = n
+   | True
+   = IN (bigNatAddWord#
+           (bigNatSetBit#
+             (bigNatFromWord#
+                (minusWord#
+                   (int2Word# (negateInt# x))
+                   1##))
+             i)
+           1##)
+integerClearBit# (IP x) i = integerFromBigNat# (bigNatClearBit# x i)
+integerClearBit# (IN x) i = IN (bigNatAddWord#
+                                  (bigNatSetBit#
+                                     (bigNatSubWordUnsafe# x 1##)
+                                     i)
+                                  1##)
+
+-- | Clear the /n/-th bit.
+--
+-- Fake 2's complement for negative values (might be slow)
+--
+-- @since 1.3
+integerClearBit :: Integer -> Word -> Integer
+integerClearBit !i (W# n) = integerClearBit# i n
+
+-- | Reverse the /n/-th bit.
+--
+-- Fake 2's complement for negative values (might be slow)
+--
+-- @since 1.3
+integerComplementBit# :: Integer -> Word# -> Integer
+integerComplementBit# (IS x) i
+   | isTrue# (i `ltWord#` (WORD_SIZE_IN_BITS## `minusWord#` 1##))
+   = IS (x `xorI#` uncheckedIShiftL# 1# (word2Int# i))
+   | isTrue# (x >=# 0#)
+   = IP (bigNatSetBit# (bigNatFromWord# (int2Word# x)) i)
+   | True
+   = integerFromBigNatNeg#
+        (bigNatAddWord#
+          (bigNatSetBit#
+             (bigNatFromWord#
+                (minusWord#
+                   (int2Word# (negateInt# x))
+                   1##))
+             i)
+        1##)
+integerComplementBit# (IP x) i = integerFromBigNat# (bigNatComplementBit# x i)
+integerComplementBit# (IN x) i = integerFromBigNatNeg#
+                                    (bigNatAddWord#
+                                       (bigNatComplementBit#
+                                          (bigNatSubWordUnsafe# x 1##)
+                                          i)
+                                       1##)
+
+-- | Reverse the /n/-th bit.
+--
+-- Fake 2's complement for negative values (might be slow)
+--
+-- @since 1.3
+integerComplementBit :: Integer -> Word -> Integer
+integerComplementBit !i (W# n) = integerComplementBit# i n
+
 -- | Shift-right operation
 --
 -- Fake 2's complement for negative values (might be slow)

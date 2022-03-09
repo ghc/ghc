@@ -551,8 +551,11 @@ instance Bits Integer where
       | otherwise           = overflowError
    shift x i | i >= 0    = integerShiftL x (fromIntegral i)
              | otherwise = integerShiftR x (fromIntegral (negate i))
-   testBit x i = integerTestBit x (fromIntegral i)
-   zeroBits    = integerZero
+   testBit x i       = integerTestBit x (fromIntegral i)
+   zeroBits          = integerZero
+   setBit x i        = integerSetBit x (fromIntegral i)
+   clearBit x i      = integerClearBit x (fromIntegral i)
+   complementBit x i = integerComplementBit x (fromIntegral i)
 
    bit (I# i)  = integerBit# (int2Word# i)
    popCount x  = I# (integerPopCount# x)

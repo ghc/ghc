@@ -4,6 +4,7 @@
 
 - Expose backendName
 - Add `naturalSetBit[#]` (#21173), `naturalClearBit[#]` (#21175), `naturalComplementBit[#]` (#21181)
+- Add `integerSetBit[#]`, `integerClearBit[#]`, `integerComplementBit[#]` (#21176)
 
 ## 1.2
 
