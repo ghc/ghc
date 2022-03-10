@@ -417,7 +417,7 @@ hsc2hsWrapper = do
   ldFlags <- map ("--lflag=" <>) <$> settingList (ConfGccLinkerArgs Stage1)
   wrapper <- drop 4 . lines <$> liftIO (readFile "utils/hsc2hs/hsc2hs.wrapper")
   return $ unlines
-    ( "HSC2HS_EXTRA=\"" <> unwords ccArgs <> unwords ldFlags <> "\""
+    ( "HSC2HS_EXTRA=\"" <> unwords (ccArgs ++ ldFlags) <> "\""
     : "tflag=\"--template=$libdir/template-hsc.h\""
     : "Iflag=\"-I$includedir/\""
     : wrapper )
