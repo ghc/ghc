@@ -1630,12 +1630,12 @@ gen_Lift_binds loc (DerivInstTys{ dit_rep_tc = tycon
   (listToBag [lift_bind, liftTyped_bind], emptyBag)
   where
     lift_bind      = mkFunBindEC 1 loc lift_RDR (nlHsApp pure_Expr)
-                                 (map (pats_etc mk_exp mk_usplice liftName) data_cons)
+                                 (map (pats_etc mk_untyped_bracket mk_usplice liftName) data_cons)
     liftTyped_bind = mkFunBindEC 1 loc liftTyped_RDR (nlHsApp unsafeCodeCoerce_Expr . nlHsApp pure_Expr)
-                                 (map (pats_etc mk_texp mk_tsplice liftTypedName) data_cons)
+                                 (map (pats_etc mk_typed_bracket mk_tsplice liftTypedName) data_cons)
 
-    mk_exp = ExpBr noExtField
-    mk_texp = TExpBr noExtField
+    mk_untyped_bracket = HsUntypedBracket noAnn . ExpBr noExtField
+    mk_typed_bracket = HsTypedBracket noAnn . TExpBr noExtField
 
     mk_usplice = HsUntypedSplice EpAnnNotUsed DollarSplice
     mk_tsplice = HsTypedSplice EpAnnNotUsed DollarSplice
@@ -1648,7 +1648,7 @@ gen_Lift_binds loc (DerivInstTys{ dit_rep_tc = tycon
             data_con_RDR = getRdrName data_con
             con_arity    = dataConSourceArity data_con
             as_needed    = take con_arity as_RDRs
-            lift_Expr    = noLocA (HsBracket noAnn (mk_bracket br_body))
+            lift_Expr    = noLocA (mk_bracket br_body)
             br_body      = nlHsApps (Exact (dataConName data_con))
                                     (map lift_var as_needed)
 

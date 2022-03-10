@@ -861,9 +861,8 @@ tcExpr (HsSpliceE _ (HsSpliced _ mod_finalizers (HsSplicedExpr expr)))
   = do addModFinalizersWithLclEnv mod_finalizers
        tcExpr expr res_ty
 tcExpr (HsSpliceE _ splice)          res_ty = tcSpliceExpr splice res_ty
-tcExpr e@(HsBracket brack body)           res_ty = case brack of
-  HsBracketRnTyped _     -> tcTypedBracket e body res_ty
-  HsBracketRnUntyped _ ps -> tcUntypedBracket e body ps res_ty
+tcExpr e@(HsTypedBracket _ body) res_ty = tcTypedBracket e body res_ty
+tcExpr e@(HsUntypedBracket (_, ps) body) res_ty = tcUntypedBracket e body ps res_ty
 
 {-
 ************************************************************************

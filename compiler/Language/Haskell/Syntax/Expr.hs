@@ -593,7 +593,8 @@ data HsExpr p
   --         'GHC.Parser.Annotation.AnnClose','GHC.Parser.Annotation.AnnCloseQ'
 
   -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
-  | HsBracket  (XBracket p) (HsBracket p)
+  | HsTypedBracket   (XTypedBracket p)   (HsTypedBracket p)
+  | HsUntypedBracket (XUntypedBracket p) (HsUntypedBracket p)
 
   -- | - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen',
   --         'GHC.Parser.Annotation.AnnClose'
@@ -1604,22 +1605,22 @@ data UntypedSpliceFlavour
   | UntypedDeclSplice
   deriving Data
 
--- | Haskell Bracket
-data HsBracket p
-  = ExpBr  (XExpBr p)   (LHsExpr p)    -- [|  expr  |]
+-- | Haskell Typed Bracket
+data HsTypedBracket p
+  = TExpBr (XTExpBr p) (LHsExpr p)    -- [|| texp ||]
+  | XTypedBracket !(XXTypedBracket p) -- Extension point; see Note [Trees That Grow]
+                                      -- in Language.Haskell.Syntax.Extension
+-- | Haskell Untyped Bracket
+data HsUntypedBracket p
+  = ExpBr  (XExpBr p)   (LHsExpr p)   -- [|  expr  |]
   | PatBr  (XPatBr p)   (LPat p)      -- [p| pat   |]
   | DecBrL (XDecBrL p)  [LHsDecl p]   -- [d| decls |]; result of parser
   | DecBrG (XDecBrG p)  (HsGroup p)   -- [d| decls |]; result of renamer
   | TypBr  (XTypBr p)   (LHsType p)   -- [t| type  |]
   | VarBr  (XVarBr p)   Bool (LIdP p)
                                 -- True: 'x, False: ''T
-  | TExpBr (XTExpBr p) (LHsExpr p)    -- [||  expr  ||]
-  | XBracket !(XXBracket p)           -- Extension point; see Note [Trees That Grow]
-                                      -- in Language.Haskell.Syntax.Extension
-
-isTypedBracket :: HsBracket id -> Bool
-isTypedBracket (TExpBr {}) = True
-isTypedBracket _           = False
+  | XUntypedBracket !(XXUntypedBracket p) -- Extension point; see Note [Trees That Grow]
+                                          -- in Language.Haskell.Syntax.Extension
 
 {-
 ************************************************************************

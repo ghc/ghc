@@ -10,23 +10,23 @@ import GHC.Tc.Utils.TcType   ( ExpRhoType )
 import GHC.Types.Annotations ( Annotation, CoreAnnTarget )
 import GHC.Hs.Extension ( GhcRn, GhcPs, GhcTc )
 
-import GHC.Hs     ( HsSplice, HsBracket, HsExpr, LHsExpr, LHsType, LPat,
-                    LHsDecl, ThModFinalizers )
+import GHC.Hs     ( HsSplice, HsTypedBracket, HsUntypedBracket, HsExpr,
+                    LHsExpr, LHsType, LPat, LHsDecl, ThModFinalizers )
 import qualified Language.Haskell.TH as TH
 
 tcSpliceExpr :: HsSplice GhcRn
              -> ExpRhoType
              -> TcM (HsExpr GhcTc)
 
+tcTypedBracket :: HsExpr GhcRn
+               -> HsTypedBracket GhcRn
+               -> ExpRhoType
+               -> TcM (HsExpr GhcTc)
 tcUntypedBracket :: HsExpr GhcRn
-                 -> HsBracket GhcRn
+                 -> HsUntypedBracket GhcRn
                  -> [PendingRnSplice]
                  -> ExpRhoType
                  -> TcM (HsExpr GhcTc)
-tcTypedBracket :: HsExpr GhcRn
-               -> HsBracket GhcRn
-               -> ExpRhoType
-               -> TcM (HsExpr GhcTc)
 
 runTopSplice :: DelayedSplice -> TcM (HsExpr GhcTc)
 
