@@ -1845,7 +1845,8 @@ instance ExactPrint (HsExpr GhcPs) where
   getAnnotationEntry (HsProjection an _)          = fromAnn an
   getAnnotationEntry (ExprWithTySig an _ _)       = fromAnn an
   getAnnotationEntry (ArithSeq an _ _)            = fromAnn an
-  getAnnotationEntry (HsBracket an _)             = fromAnn an
+  getAnnotationEntry (HsTypedBracket an _)        = fromAnn an
+  getAnnotationEntry (HsUntypedBracket an _)      = fromAnn an
   getAnnotationEntry (HsSpliceE an _)             = fromAnn an
   getAnnotationEntry (HsProc an _ _)              = fromAnn an
   getAnnotationEntry (HsStatic an _)              = fromAnn an
@@ -2034,26 +2035,32 @@ instance ExactPrint (HsExpr GhcPs) where
     markEpAnn an AnnCloseS -- ']'
 
 
-  exact (HsBracket an (ExpBr _ e)) = do
+  exact (HsTypedBracket an (TExpBr _ e)) = do
+    markLocatedAALS an id AnnOpen (Just "[||")
+    markLocatedAALS an id AnnOpenE (Just "[e||")
+    markAnnotated e
+    markLocatedAALS an id AnnClose (Just "||]")
+
+  exact (HsUntypedBracket an (ExpBr _ e)) = do
     markEpAnn an AnnOpenEQ -- "[|"
     markEpAnn an AnnOpenE  -- "[e|" -- optional
     markAnnotated e
     markEpAnn an AnnCloseQ -- "|]"
-  exact (HsBracket an (PatBr _ e)) = do
+  exact (HsUntypedBracket an (PatBr _ e)) = do
     markLocatedAALS an id AnnOpen (Just "[p|")
     markAnnotated e
     markEpAnn an AnnCloseQ -- "|]"
-  exact (HsBracket an (DecBrL _ e)) = do
+  exact (HsUntypedBracket an (DecBrL _ e)) = do
     markLocatedAALS an id AnnOpen (Just "[d|")
     markAnnotated e
     markEpAnn an AnnCloseQ -- "|]"
-  -- -- exact (HsBracket an (DecBrG _ _)) =
+  -- -- exact (HsUntypedBracket an (DecBrG _ _)) =
   -- --   traceM "warning: DecBrG introduced after renamer"
-  exact (HsBracket an (TypBr _ e)) = do
+  exact (HsUntypedBracket an (TypBr _ e)) = do
     markLocatedAALS an id AnnOpen (Just "[t|")
     markAnnotated e
     markEpAnn an AnnCloseQ -- "|]"
-  exact (HsBracket an (VarBr _ b e)) = do
+  exact (HsUntypedBracket an (VarBr _ b e)) = do
     if b
       then do
         markEpAnn an AnnSimpleQuote
@@ -2061,11 +2068,6 @@ instance ExactPrint (HsExpr GhcPs) where
       else do
         markEpAnn an AnnThTyQuote
         markAnnotated e
-  exact (HsBracket an (TExpBr _ e)) = do
-    markLocatedAALS an id AnnOpen (Just "[||")
-    markLocatedAALS an id AnnOpenE (Just "[e||")
-    markAnnotated e
-    markLocatedAALS an id AnnClose (Just "||]")
 
 
   -- exact x@(HsRnBracketOut{})           = withPpr x

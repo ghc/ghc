@@ -47,7 +47,7 @@ import GHC.Rename.Utils ( bindLocalNamesFV, checkDupNames
                         , genHsVar, genLHsVar, genHsApp, genHsApps
                         , genAppType )
 import GHC.Rename.Unbound ( reportUnboundName )
-import GHC.Rename.Splice  ( rnBracket, rnSpliceExpr, checkThLocalName )
+import GHC.Rename.Splice  ( rnTypedBracket, rnUntypedBracket, rnSpliceExpr, checkThLocalName )
 import GHC.Rename.HsType
 import GHC.Rename.Pat
 import GHC.Driver.Session
@@ -337,7 +337,8 @@ rnExpr (HsProjection _ fs)
 
 ------------------------------------------
 -- Template Haskell extensions
-rnExpr e@(HsBracket _ br_body) = rnBracket e br_body
+rnExpr e@(HsTypedBracket _ br_body)   = rnTypedBracket e br_body
+rnExpr e@(HsUntypedBracket _ br_body) = rnUntypedBracket e br_body
 
 rnExpr (HsSpliceE _ splice) = rnSpliceExpr splice
 

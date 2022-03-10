@@ -187,17 +187,6 @@ type instance HsDoRn (GhcPass _) = GhcRn
 
 -- ---------------------------------------------------------------------
 
-    -- See Note [Pending Splices]
-data HsBracketRn
-  = HsBracketRnTyped
-    (EpAnn [AddEpAnn])
-
-  | HsBracketRnUntyped
-    (EpAnn [AddEpAnn])
-    [PendingRnSplice]  -- Output of the renamer is the *original* renamed
-                       -- expression, plus
-                       -- _renamed_ splices to be type checked
-
 data HsBracketTc = HsBracketTc
   Type
   (Maybe QuoteWrapper) -- The wrapper to apply type and dictionary argument
@@ -207,9 +196,16 @@ data HsBracketTc = HsBracketTc
                        -- _typechecked_ splices to be
                        -- pasted back in by the desugarer
 
-type instance XBracket GhcPs = EpAnn [AddEpAnn]
-type instance XBracket GhcRn = HsBracketRn
-type instance XBracket GhcTc = HsBracketTc
+type instance XTypedBracket GhcPs = EpAnn [AddEpAnn]
+type instance XTypedBracket GhcRn = EpAnn [AddEpAnn]
+type instance XTypedBracket GhcTc = HsBracketTc
+type instance XUntypedBracket GhcPs = EpAnn [AddEpAnn]
+type instance XUntypedBracket GhcRn = (EpAnn [AddEpAnn], [PendingRnSplice])
+                       -- See Note [Pending Splices]
+                       -- Output of the renamer is the *original* renamed
+                       -- expression, plus
+                       -- _renamed_ splices to be type checked
+type instance XUntypedBracket GhcTc = HsBracketTc
 
 -- ---------------------------------------------------------------------
 
@@ -653,13 +649,19 @@ ppr_expr (ExprWithTySig _ expr sig)
 ppr_expr (ArithSeq _ _ info) = brackets (ppr info)
 
 ppr_expr (HsSpliceE _ s)         = pprSplice s
-ppr_expr (HsBracket b e)
+ppr_expr (HsTypedBracket b e)
   = case ghcPass @p of
-    GhcPs -> pprHsBracket e
+    GhcPs -> thTyBrackets (ppr e)
+    GhcRn -> thTyBrackets (ppr e)
+    GhcTc -> case b of
+      HsBracketTc _ty _wrap [] -> thTyBrackets (ppr e)
+      HsBracketTc _ty _wrap ps -> thTyBrackets (ppr e) $$ text "pending(tc)" <+> pprIfTc @p (ppr ps)
+ppr_expr (HsUntypedBracket b e)
+  = case ghcPass @p of
+    GhcPs -> ppr e
     GhcRn -> case b of
-      HsBracketRnTyped _ -> pprHsBracket e
-      HsBracketRnUntyped _ [] -> ppr e
-      HsBracketRnUntyped _ ps -> ppr e $$ text "pending(rn)" <+> ppr ps
+      (_, []) -> ppr e
+      (_, ps) -> ppr e $$ text "pending(rn)" <+> ppr ps
     GhcTc -> case b of
       HsBracketTc _ty _wrap [] -> ppr e
       HsBracketTc _ty _wrap ps -> ppr e $$ text "pending(tc)" <+> pprIfTc @p (ppr ps)
@@ -802,7 +804,8 @@ hsExprNeedsParens prec = go
     go (ArithSeq{})                   = False
     go (HsPragE{})                    = prec >= appPrec
     go (HsSpliceE{})                  = False
-    go (HsBracket{})                  = False
+    go (HsTypedBracket{})             = False
+    go (HsUntypedBracket{})           = False
     go (HsProc{})                     = prec > topPrec
     go (HsStatic{})                   = prec >= appPrec
     go (RecordCon{})                  = False
@@ -1665,12 +1668,12 @@ bracket code.  So for example
     [| f $(g x) |]
 looks like
 
-    HsBracket _ (HsApp (HsVar "f") (HsSpliceE _ (g x)))
+    HsUntypedBracket _ (HsApp (HsVar "f") (HsSpliceE _ (g x)))
 
 which the renamer rewrites to
 
-    HsBracket
-        (HsBracketRnUnTyped _ [PendingRnSplice UntypedExpSplice sn (g x)])
+    HsUntypedBracket
+        (_, [PendingRnSplice UntypedExpSplice sn (g x)])
         (HsApp (HsVar f) (HsSpliceE sn (g x)))
 
 * The 'sn' is the Name of the splice point, the SplicePointName
@@ -1777,59 +1780,71 @@ ppr_splice herald n e trail
 Note [Type-checking untyped brackets]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When we type-check an untyped bracket, the actual bracket (the second argument
-of the HsBracket constructor in HsExpr) is kept in the renaming pass.
+of the HsUntypedBracket constructor in HsExpr) is kept in the renaming pass.
 
 Given that
 
   HsExpr p = ...
-    | HsBracket (XBracket p) (HsBracket p)
+    | HsUntypedBracket (XUntypedBracket p) (HsUntypedBracket p)
 
-When p = GhcPs we should have HsExpr GhcPs and HsBracket GhcPs
-When p = GhcRn we should have HsExpr GhcRn and HsBracket GhcRn
-However, when p = GhcRn we should have HsExpr GhcTc and HsBracket GhcRn
+When p = GhcPs we should have HsExpr GhcPs and HsUntypedBracket GhcPs
+When p = GhcRn we should have HsExpr GhcRn and HsUntypedBracket GhcRn
+However, when p = GhcTc we should have HsExpr GhcTc and HsUntypedBracket GhcRn
 
-To work around this, the HsBracket extension constructor (XBracket !(XXBracket p)),
-when p = GhcTc, is used to hold the needed HsBracket GhcRn
+To work around this, the HsUntypedBracket extension constructor (XUntypedBracket !(XXUntypedBracket p)),
+when p = GhcTc, is used to hold the needed HsUntypedBracket GhcRn
 
 Note that a typed bracket is just fine: you'll see in tcTypedBracket that
 _tc_expr is just thrown away. It will comfortably come to rest inside a TExpBr
 (of type HsBracket GhcTc).
 -}
 
-type instance XExpBr      (GhcPass _) = NoExtField
-type instance XPatBr      (GhcPass _) = NoExtField
-type instance XDecBrL     (GhcPass _) = NoExtField
-type instance XDecBrG     (GhcPass _) = NoExtField
-type instance XTypBr      (GhcPass _) = NoExtField
-type instance XVarBr      (GhcPass _) = NoExtField
-type instance XTExpBr     (GhcPass _) = NoExtField
-type instance XXBracket   GhcPs = DataConCantHappen
-type instance XXBracket   GhcRn = DataConCantHappen
-type instance XXBracket   GhcTc = HsBracket GhcRn   -- See Note [Type-checking untyped brackets]
+type instance XTExpBr        (GhcPass _) = NoExtField
+type instance XXTypedBracket GhcPs       = DataConCantHappen
+type instance XXTypedBracket GhcRn       = DataConCantHappen
+type instance XXTypedBracket GhcTc       = HsTypedBracket GhcRn     -- romes TODO: See Note [Desugaring typed brackets]
+
+type instance XExpBr           (GhcPass _) = NoExtField
+type instance XPatBr           (GhcPass _) = NoExtField
+type instance XDecBrL          (GhcPass _) = NoExtField
+type instance XDecBrG          (GhcPass _) = NoExtField
+type instance XTypBr           (GhcPass _) = NoExtField
+type instance XVarBr           (GhcPass _) = NoExtField
+type instance XXUntypedBracket GhcPs       = DataConCantHappen
+type instance XXUntypedBracket GhcRn       = DataConCantHappen
+type instance XXUntypedBracket GhcTc       = HsUntypedBracket GhcRn -- See Note [Type-checking untyped brackets]
 
 instance OutputableBndrId p
-          => Outputable (HsBracket (GhcPass p)) where
-  ppr = pprHsBracket
-
-
-pprHsBracket :: forall p. (OutputableBndrId p)
-             => HsBracket (GhcPass p) -> SDoc
-pprHsBracket (ExpBr _ e)   = thBrackets empty (ppr e)
-pprHsBracket (PatBr _ p)   = thBrackets (char 'p') (ppr p)
-pprHsBracket (DecBrG _ gp) = thBrackets (char 'd') (ppr gp)
-pprHsBracket (DecBrL _ ds) = thBrackets (char 'd') (vcat (map ppr ds))
-pprHsBracket (TypBr _ t)   = thBrackets (char 't') (ppr t)
-pprHsBracket (VarBr _ True n)
-  = char '\'' <> pprPrefixOcc (unLoc n)
-pprHsBracket (VarBr _ False n)
-  = text "''" <> pprPrefixOcc (unLoc n)
-pprHsBracket (TExpBr _ e)  = thTyBrackets (ppr e)
-pprHsBracket (XBracket b)  = case ghcPass @p of
+          => Outputable (HsTypedBracket (GhcPass p)) where
+  ppr (TExpBr _ e)      = thTyBrackets (ppr e)
+  ppr (XTypedBracket b) = case ghcPass @p of
 #if __GLASGOW_HASKELL__ <= 900
-    GhcPs -> dataConCantHappen b
-    GhcRn -> dataConCantHappen b
+      GhcPs -> dataConCantHappen b
+      GhcRn -> dataConCantHappen b
 #endif
-    GhcTc -> pprHsBracket b
+      GhcTc | (TExpBr _ e) <- b -> thTyBrackets (ppr e)
+
+instance OutputableBndrId p
+          => Outputable (HsUntypedBracket (GhcPass p)) where
+  ppr = pprHsUntypedBracket
+    where
+      pprHsUntypedBracket :: forall p. (OutputableBndrId p)
+                   => HsUntypedBracket (GhcPass p) -> SDoc
+      pprHsUntypedBracket (ExpBr _ e)   = thBrackets empty (ppr e)
+      pprHsUntypedBracket (PatBr _ p)   = thBrackets (char 'p') (ppr p)
+      pprHsUntypedBracket (DecBrG _ gp) = thBrackets (char 'd') (ppr gp)
+      pprHsUntypedBracket (DecBrL _ ds) = thBrackets (char 'd') (vcat (map ppr ds))
+      pprHsUntypedBracket (TypBr _ t)   = thBrackets (char 't') (ppr t)
+      pprHsUntypedBracket (VarBr _ True n)
+        = char '\'' <> pprPrefixOcc (unLoc n)
+      pprHsUntypedBracket (VarBr _ False n)
+        = text "''" <> pprPrefixOcc (unLoc n)
+      pprHsUntypedBracket (XUntypedBracket b)  = case ghcPass @p of
+      #if __GLASGOW_HASKELL__ <= 900
+          GhcPs -> dataConCantHappen b
+          GhcRn -> dataConCantHappen b
+      #endif
+          GhcTc -> pprHsUntypedBracket b
 
 thBrackets :: SDoc -> SDoc -> SDoc
 thBrackets pp_kind pp_body = char '[' <> pp_kind <> vbar <+>

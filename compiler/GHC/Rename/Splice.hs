@@ -6,7 +6,7 @@
 module GHC.Rename.Splice (
         rnTopSpliceDecls,
         rnSpliceType, rnSpliceExpr, rnSplicePat, rnSpliceDecl,
-        rnBracket,
+        rnTypedBracket, rnUntypedBracket,
         checkThLocalName
         , traceSplice, SpliceInfo(..)
   ) where
@@ -73,9 +73,9 @@ import qualified GHC.LanguageExtensions as LangExt
 ************************************************************************
 -}
 
-rnBracket :: HsExpr GhcPs -> HsBracket GhcPs -> RnM (HsExpr GhcRn, FreeVars)
-rnBracket e br_body
-  = addErrCtxt (quotationCtxtDoc br_body) $
+rnTypedBracket :: HsExpr GhcPs -> HsTypedBracket GhcPs -> RnM (HsExpr GhcRn, FreeVars)
+rnTypedBracket e (TExpBr ext br_body)
+  = addErrCtxt (typedQuotationCtxtDoc br_body) $
     do { -- Check that -XTemplateHaskellQuotes is enabled and available
          thQuotesEnabled <- xoptM LangExt.TemplateHaskellQuotes
        ; unless thQuotesEnabled $
@@ -87,13 +87,11 @@ rnBracket e br_body
          -- Check for nested brackets
        ; cur_stage <- getStage
        ; case cur_stage of
-           { Splice Typed   -> checkTc (isTypedBracket br_body)
-                                       illegalUntypedBracket
-           ; Splice Untyped -> checkTc (not (isTypedBracket br_body))
-                                       illegalTypedBracket
+           { Splice Typed   -> return ()
+           ; Splice Untyped -> failWithTc illegalTypedBracket
            ; RunSplice _    ->
                -- See Note [RunSplice ThLevel] in GHC.Tc.Types.
-               pprPanic "rnBracket: Renaming bracket when running a splice"
+               pprPanic "rnTypedBracket: Renaming typed bracket when running a splice"
                         (ppr e)
            ; Comp           -> return ()
            ; Brack {}       -> failWithTc illegalBracket
@@ -102,26 +100,54 @@ rnBracket e br_body
          -- Brackets are desugared to code that mentions the TH package
        ; recordThUse
 
-       ; case isTypedBracket br_body of
-            True  -> do { traceRn "Renaming typed TH bracket" empty
-                        ; (body', fvs_e) <-
-                          setStage (Brack cur_stage RnPendingTyped) $
-                                   rn_bracket cur_stage br_body
-                        ; return (HsBracket (HsBracketRnTyped noAnn) body', fvs_e) }
+       ; traceRn "Renaming typed TH bracket" empty
+       ; (body', fvs_e) <- setStage (Brack cur_stage RnPendingTyped) $ rnLExpr br_body
 
-            False -> do { traceRn "Renaming untyped TH bracket" empty
-                        ; ps_var <- newMutVar []
-                        ; (body', fvs_e) <-
-                          -- See Note [Rebindable syntax and Template Haskell]
-                          unsetXOptM LangExt.RebindableSyntax $
-                          setStage (Brack cur_stage (RnPendingUntyped ps_var)) $
-                                   rn_bracket cur_stage br_body
-                        ; pendings <- readMutVar ps_var
-                        ; return (HsBracket (HsBracketRnUntyped noAnn pendings) body', fvs_e) }
+       ; return (HsTypedBracket noAnn (TExpBr ext body'), fvs_e)
+
        }
 
-rn_bracket :: ThStage -> HsBracket GhcPs -> RnM (HsBracket GhcRn, FreeVars)
-rn_bracket outer_stage br@(VarBr x flg rdr_name)
+rnUntypedBracket :: HsExpr GhcPs -> HsUntypedBracket GhcPs -> RnM (HsExpr GhcRn, FreeVars)
+rnUntypedBracket e br_body
+  = addErrCtxt (untypedQuotationCtxtDoc br_body) $
+    do { -- Check that -XTemplateHaskellQuotes is enabled and available
+         thQuotesEnabled <- xoptM LangExt.TemplateHaskellQuotes
+       ; unless thQuotesEnabled $
+           failWith ( TcRnUnknownMessage $ mkPlainError noHints $ vcat
+                      [ text "Syntax error on" <+> ppr e
+                      , text ("Perhaps you intended to use TemplateHaskell"
+                              ++ " or TemplateHaskellQuotes") ] )
+
+         -- Check for nested brackets
+       ; cur_stage <- getStage
+       ; case cur_stage of
+           { Splice Typed   -> failWithTc illegalUntypedBracket
+           ; Splice Untyped -> return ()
+           ; RunSplice _    ->
+               -- See Note [RunSplice ThLevel] in GHC.Tc.Types.
+               pprPanic "rnUntypedBracket: Renaming untyped bracket when running a splice"
+                        (ppr e)
+           ; Comp           -> return ()
+           ; Brack {}       -> failWithTc illegalBracket
+           }
+
+         -- Brackets are desugared to code that mentions the TH package
+       ; recordThUse
+
+       ; traceRn "Renaming untyped TH bracket" empty
+       ; ps_var <- newMutVar []
+       ; (body', fvs_e) <-
+         -- See Note [Rebindable syntax and Template Haskell]
+         unsetXOptM LangExt.RebindableSyntax $
+         setStage (Brack cur_stage (RnPendingUntyped ps_var)) $
+                  rn_utbracket cur_stage br_body
+       ; pendings <- readMutVar ps_var
+       ; return (HsUntypedBracket (noAnn, pendings) body', fvs_e)
+
+       }
+
+rn_utbracket :: ThStage -> HsUntypedBracket GhcPs -> RnM (HsUntypedBracket GhcRn, FreeVars)
+rn_utbracket outer_stage br@(VarBr x flg rdr_name)
   = do { name <- lookupOccRn (unLoc rdr_name)
        ; check_namespace flg name
        ; this_mod <- getModule
@@ -137,7 +163,7 @@ rn_bracket outer_stage br@(VarBr x flg rdr_name)
                              | isTopLevel top_lvl
                              -> when (isExternalName name) (keepAlive name)
                              | otherwise
-                             -> do { traceRn "rn_bracket VarBr"
+                             -> do { traceRn "rn_utbracket VarBr"
                                       (ppr name <+> ppr bind_lvl
                                                 <+> ppr outer_stage)
                                    ; checkTc (thLevel outer_stage + 1 == bind_lvl)
@@ -146,16 +172,16 @@ rn_bracket outer_stage br@(VarBr x flg rdr_name)
                     }
        ; return (VarBr x flg (noLocA name), unitFV name) }
 
-rn_bracket _ (ExpBr x e) = do { (e', fvs) <- rnLExpr e
-                            ; return (ExpBr x e', fvs) }
+rn_utbracket _ (ExpBr x e) = do { (e', fvs) <- rnLExpr e
+                                ; return (ExpBr x e', fvs) }
 
-rn_bracket _ (PatBr x p)
+rn_utbracket _ (PatBr x p)
   = rnPat ThPatQuote p $ \ p' -> return (PatBr x p', emptyFVs)
 
-rn_bracket _ (TypBr x t) = do { (t', fvs) <- rnLHsType TypBrCtx t
-                              ; return (TypBr x t', fvs) }
+rn_utbracket _ (TypBr x t) = do { (t', fvs) <- rnLHsType TypBrCtx t
+                                ; return (TypBr x t', fvs) }
 
-rn_bracket _ (DecBrL x decls)
+rn_utbracket _ (DecBrL x decls)
   = do { group <- groupDecls decls
        ; gbl_env  <- getGblEnv
        ; let new_gbl_env = gbl_env { tcg_dus = emptyDUs }
@@ -165,7 +191,7 @@ rn_bracket _ (DecBrL x decls)
                               rnSrcDecls group
 
               -- Discard the tcg_env; it contains only extra info about fixity
-        ; traceRn "rn_bracket dec" (ppr (tcg_dus tcg_env) $$
+        ; traceRn "rn_utbracket dec" (ppr (tcg_dus tcg_env) $$
                    ppr (duUses (tcg_dus tcg_env)))
         ; return (DecBrG x group', duUses (tcg_dus tcg_env)) }
   where
@@ -181,10 +207,8 @@ rn_bracket _ (DecBrL x decls)
                   }
            }}
 
-rn_bracket _ (DecBrG {}) = panic "rn_bracket: unexpected DecBrG"
+rn_utbracket _ (DecBrG {}) = panic "rn_ut_bracket: unexpected DecBrG"
 
-rn_bracket _ (TExpBr x e) = do { (e', fvs) <- rnLExpr e
-                               ; return (TExpBr x e', fvs) }
 
 -- | Ensure that we are not using a term-level name in a type-level namespace
 -- or vice-versa. Throws a 'TcRnIncorrectNameSpace' error if there is a problem.
@@ -195,8 +219,13 @@ check_namespace is_single_tick nm
   where
     ns = nameNameSpace nm
 
-quotationCtxtDoc :: HsBracket GhcPs -> SDoc
-quotationCtxtDoc br_body
+typedQuotationCtxtDoc :: LHsExpr GhcPs -> SDoc
+typedQuotationCtxtDoc br_body
+  = hang (text "In the Template Haskell typed quotation")
+         2 (thTyBrackets . ppr $ br_body)
+
+untypedQuotationCtxtDoc :: HsUntypedBracket GhcPs -> SDoc
+untypedQuotationCtxtDoc br_body
   = hang (text "In the Template Haskell quotation")
          2 (ppr br_body)
 
@@ -213,7 +242,7 @@ illegalUntypedBracket :: TcRnMessage
 illegalUntypedBracket = TcRnUnknownMessage $ mkPlainError noHints $
     text "Untyped brackets may only appear in untyped splices."
 
-quotedNameStageErr :: HsBracket GhcPs -> TcRnMessage
+quotedNameStageErr :: HsUntypedBracket GhcPs -> TcRnMessage
 quotedNameStageErr br
   = TcRnUnknownMessage $ mkPlainError noHints $
     sep [ text "Stage error: the non-top-level quoted name" <+> ppr br

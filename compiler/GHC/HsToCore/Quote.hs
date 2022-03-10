@@ -27,7 +27,7 @@
 -- a Royal Pain (triggers other recompilation).
 -----------------------------------------------------------------------------
 
-module GHC.HsToCore.Quote( dsBracket ) where
+module GHC.HsToCore.Quote( dsTypedBracket, dsUntypedBracket ) where
 
 import GHC.Prelude
 import GHC.Platform
@@ -157,37 +157,52 @@ getPlatform :: MetaM Platform
 getPlatform = targetPlatform <$> getDynFlags
 
 -----------------------------------------------------------------------------
-dsBracket :: Maybe QuoteWrapper -- ^ This is Nothing only when we are dealing with a VarBr
-          -> HsBracket GhcRn
-          -> [PendingTcSplice]
-          -> DsM CoreExpr
--- See Note [Desugaring Brackets]
--- Returns a CoreExpr of type (M TH.Exp)
--- The quoted thing is parameterised over Name, even though it has
--- been type checked.  We don't want all those type decorations!
-
-dsBracket wrap brack splices
-  = do_brack brack
-
+dsTypedBracket   :: Maybe QuoteWrapper
+                 -> HsTypedBracket GhcRn
+                 -> [PendingTcSplice]
+                 -> DsM CoreExpr
+dsTypedBracket wrap (TExpBr _ exp) splices
+  = runOverloaded $ do { MkC e1 <- repLE exp ; return e1 }
   where
+    -- ROMES: TODO: factoring this method out requires many imports for its explicit type, is it worth it?
     runOverloaded act = do
       -- In the overloaded case we have to get given a wrapper, it is just
       -- for variable quotations that there is no wrapper, because they
       -- have a simple type.
       mw <- mkMetaWrappers (expectJust "runOverloaded" wrap)
-      runReaderT (mapReaderT (dsExtendMetaEnv new_bit) act) mw
+      runReaderT (mapReaderT (dsExtendMetaEnv (new_bit splices)) act) mw
 
+dsUntypedBracket :: Maybe QuoteWrapper -- ^ This is Nothing only when we are dealing with a VarBr
+                 -> HsUntypedBracket GhcRn
+                 -> [PendingTcSplice]
+                 -> DsM CoreExpr
+-- See Note [Desugaring Brackets]
+-- Returns a CoreExpr of type (M TH.Exp)
+-- The quoted thing is parameterised over Name, even though it has
+-- been type checked.  We don't want all those type decorations!
 
-    new_bit = mkNameEnv [(n, DsSplice (unLoc e))
-                        | PendingTcSplice n e <- splices]
+dsUntypedBracket wrap brack splices
+  = do_brack brack
+  where
+    -- ROMES: TODO: factoring this method out requires many imports for its explicit type, is it worth it?
+    runOverloaded act = do
+      -- In the overloaded case we have to get given a wrapper, it is just
+      -- for variable quotations that there is no wrapper, because they
+      -- have a simple type.
+      mw <- mkMetaWrappers (expectJust "runOverloaded" wrap)
+      runReaderT (mapReaderT (dsExtendMetaEnv (new_bit splices)) act) mw
 
     do_brack (VarBr _ _ n) = do { MkC e1  <- lookupOccDsM (unLoc n) ; return e1 }
     do_brack (ExpBr _ e)   = runOverloaded $ do { MkC e1  <- repLE e     ; return e1 }
     do_brack (PatBr _ p)   = runOverloaded $ do { MkC p1  <- repTopP p   ; return p1 }
     do_brack (TypBr _ t)   = runOverloaded $ do { MkC t1  <- repLTy t    ; return t1 }
     do_brack (DecBrG _ gp) = runOverloaded $ do { MkC ds1 <- repTopDs gp ; return ds1 }
-    do_brack (DecBrL {})   = panic "dsBracket: unexpected DecBrL"
-    do_brack (TExpBr _ e)  = runOverloaded $ do { MkC e1  <- repLE e     ; return e1 }
+    do_brack (DecBrL {})   = panic "dsUntypedBracket: unexpected DecBrL"
+
+new_bit :: [PendingTcSplice] -> NameEnv DsMetaVal
+new_bit splices = mkNameEnv [(n, DsSplice (unLoc e))
+                    | PendingTcSplice n e <- splices]
+
 
 {-
 Note [Desugaring Brackets]
@@ -1636,7 +1651,8 @@ repE (XExpr (HsExpanded orig_expr ds_expr))
          then repE ds_expr
          else repE orig_expr }
 repE e@(HsPragE _ (HsPragSCC {}) _) = notHandled (ThCostCentres e)
-repE e@(HsBracket{}) = notHandled (ThExpressionForm e)
+repE e@(HsTypedBracket{})   = notHandled (ThExpressionForm e)
+repE e@(HsUntypedBracket{}) = notHandled (ThExpressionForm e)
 repE e@(HsProc{}) = notHandled (ThExpressionForm e)
 
 {- Note [Quotation and rebindable syntax]

@@ -429,7 +429,8 @@ type family XGetField       x
 type family XProjection     x
 type family XExprWithTySig  x
 type family XArithSeq       x
-type family XBracket        x
+type family XTypedBracket   x
+type family XUntypedBracket x
 type family XSpliceE        x
 type family XProc           x
 type family XStatic         x
@@ -470,15 +471,17 @@ type family XSpliced       x
 type family XXSplice       x
 
 -- -------------------------------------
--- HsBracket type families
-type family XExpBr      x
-type family XPatBr      x
-type family XDecBrL     x
-type family XDecBrG     x
-type family XTypBr      x
-type family XVarBr      x
-type family XTExpBr     x
-type family XXBracket   x
+-- HsTypedBracket type families
+type family XTExpBr          x
+type family XXTypedBracket   x
+-- HsUntypedBracket type families
+type family XExpBr           x
+type family XPatBr           x
+type family XDecBrL          x
+type family XDecBrG          x
+type family XTypBr           x
+type family XVarBr           x
+type family XXUntypedBracket x
 
 -- -------------------------------------
 -- HsCmdTop type families
