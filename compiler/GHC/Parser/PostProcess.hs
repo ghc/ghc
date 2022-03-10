@@ -1869,14 +1869,14 @@ checkUnboxedLitPat (L loc lit) =
     -- Don't allow primitive string literal patterns.
     -- See #13260.
     HsStringPrim {}
-      -> addFatalError $ mkPlainErrorMsgEnvelope loc $
+      -> addError $ mkPlainErrorMsgEnvelope loc $
                            (PsErrIllegalUnboxedStringInPat lit)
 
    -- Don't allow Float#/Double# literal patterns.
    -- See #9238 and Note [Rules for floating-point comparisons]
    -- in GHC.Core.Opt.ConstantFold.
     _ | is_floating_lit lit
-      -> addFatalError $ mkPlainErrorMsgEnvelope loc $
+      -> addError $ mkPlainErrorMsgEnvelope loc $
                            (PsErrIllegalUnboxedFloatingLitInPat lit)
 
       | otherwise
