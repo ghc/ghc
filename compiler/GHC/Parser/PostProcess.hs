@@ -39,6 +39,7 @@ module GHC.Parser.PostProcess (
         fromSpecTyVarBndr, fromSpecTyVarBndrs,
         annBinds,
         fixValbindsAnn,
+        stmtsAnchor, stmtsLoc,
 
         cvBindGroup,
         cvBindsAndSigs,
@@ -477,6 +478,18 @@ fixValbindsAnn :: EpAnn AnnList -> EpAnn AnnList
 fixValbindsAnn EpAnnNotUsed = EpAnnNotUsed
 fixValbindsAnn (EpAnn anchor (AnnList ma o c r t) cs)
   = (EpAnn (widenAnchor anchor (map trailingAnnToAddEpAnn t)) (AnnList ma o c r t) cs)
+
+-- | The 'Anchor' for a stmtlist is based on either the location or
+-- the first semicolon annotion.
+stmtsAnchor :: Located (OrdList AddEpAnn,a) -> Anchor
+stmtsAnchor (L l ((ConsOL (AddEpAnn _ (EpaSpan r)) _), _))
+  = widenAnchorR (Anchor (realSrcSpan l) UnchangedAnchor) r
+stmtsAnchor (L l _) = Anchor (realSrcSpan l) UnchangedAnchor
+
+stmtsLoc :: Located (OrdList AddEpAnn,a) -> SrcSpan
+stmtsLoc (L l ((ConsOL aa _), _))
+  = widenSpan l [aa]
+stmtsLoc (L l _) = l
 
 {- **********************************************************************
 

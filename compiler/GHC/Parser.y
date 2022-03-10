@@ -3318,10 +3318,10 @@ apats  :: { [LPat GhcPs] }
 -- Statement sequences
 
 stmtlist :: { forall b. DisambECP b => PV (LocatedL [LocatedA (Stmt GhcPs (LocatedA b))]) }
-        : '{'           stmts '}'       { $2 >>= \ $2 -> amsrl
-                                          (sLL $1 $> (reverse $ snd $ unLoc $2)) (AnnList (Just $ glR $2) (Just $ moc $1) (Just $ mcc $3) (fromOL $ fst $ unLoc $2) []) }
+        : '{'           stmts '}'       { $2 >>= \ $2 ->
+                                          amsrl (sLL $1 $> (reverse $ snd $ unLoc $2)) (AnnList (Just $ stmtsAnchor $2) (Just $ moc $1) (Just $ mcc $3) (fromOL $ fst $ unLoc $2) []) }
         |     vocurly   stmts close     { $2 >>= \ $2 -> amsrl
-                                          (L (gl $2) (reverse $ snd $ unLoc $2)) (AnnList (Just $ glR $2) Nothing Nothing (fromOL $ fst $ unLoc $2) []) }
+                                          (L (stmtsLoc $2) (reverse $ snd $ unLoc $2)) (AnnList (Just $ stmtsAnchor $2) Nothing Nothing (fromOL $ fst $ unLoc $2) []) }
 
 --      do { ;; s ; s ; ; s ;; }
 -- The last Stmt should be an expression, but that's hard to enforce
