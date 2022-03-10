@@ -394,6 +394,7 @@ import GHC.Types.Name.Ppr
 import GHC.Types.TypeEnv
 import GHC.Types.BreakInfo
 import GHC.Types.PkgQual
+import GHC.EnvironmentFiles
 
 import GHC.Unit
 import GHC.Unit.Env
@@ -423,8 +424,7 @@ import Control.Applicative ((<|>))
 import Control.Monad.Catch as MC
 
 import GHC.Data.Maybe
-import System.IO.Error  ( isDoesNotExistError )
-import System.Environment ( getEnv, getProgName )
+import System.Environment ( getProgName )
 import System.Directory
 import Data.List (isPrefixOf)
 import qualified Data.Set as S
@@ -885,6 +885,20 @@ parseDynamicFlags logger dflags cmdline = do
   let logger1 = setLogFlags logger (initLogFlags dflags1)
   dflags2 <- liftIO $ interpretPackageEnv logger1 dflags1
   return (dflags2, leftovers, warns)
+
+interpretPackageEnv :: Logger -> DynFlags -> IO DynFlags
+interpretPackageEnv logger dflags = do
+  let output = compilationProgressMsg logger
+  mb_env <- findPackageEnv (output . text)
+                   (packageEnv dflags)
+                   (gopt Opt_HideAllPackages dflags)
+                   (programName dflags)
+                   (platformArchOS (targetPlatform dflags))
+  return $ case mb_env of
+    Nothing -> dflags
+    Just pkg_env -> snd (runCmdLine (runEwM (setFlagsFromEnvFile pkg_env)) dflags)
+
+
 
 -- | Parse command line arguments that look like files.
 -- First normalises its arguments and then splits them into source files
@@ -1843,142 +1857,6 @@ parser str dflags filename =
          let (warns,_) = getPsMessages pst in
          (GhcPsMessage <$> warns, Right rdr_module)
 
--- -----------------------------------------------------------------------------
--- | Find the package environment (if one exists)
---
--- We interpret the package environment as a set of package flags; to be
--- specific, if we find a package environment file like
---
--- > clear-package-db
--- > global-package-db
--- > package-db blah/package.conf.d
--- > package-id id1
--- > package-id id2
---
--- we interpret this as
---
--- > [ -hide-all-packages
--- > , -clear-package-db
--- > , -global-package-db
--- > , -package-db blah/package.conf.d
--- > , -package-id id1
--- > , -package-id id2
--- > ]
---
--- There's also an older syntax alias for package-id, which is just an
--- unadorned package id
---
--- > id1
--- > id2
---
-interpretPackageEnv :: Logger -> DynFlags -> IO DynFlags
-interpretPackageEnv logger dflags = do
-    mPkgEnv <- runMaybeT $ msum $ [
-                   getCmdLineArg >>= \env -> msum [
-                       probeNullEnv env
-                     , probeEnvFile env
-                     , probeEnvName env
-                     , cmdLineError env
-                     ]
-                 , getEnvVar >>= \env -> msum [
-                       probeNullEnv env
-                     , probeEnvFile env
-                     , probeEnvName env
-                     , envError     env
-                     ]
-                 , notIfHideAllPackages >> msum [
-                       findLocalEnvFile >>= probeEnvFile
-                     , probeEnvName defaultEnvName
-                     ]
-                 ]
-    case mPkgEnv of
-      Nothing ->
-        -- No environment found. Leave DynFlags unchanged.
-        return dflags
-      Just "-" -> do
-        -- Explicitly disabled environment file. Leave DynFlags unchanged.
-        return dflags
-      Just envfile -> do
-        content <- readFile envfile
-        compilationProgressMsg logger (text "Loaded package environment from " <> text envfile)
-        let (_, dflags') = runCmdLine (runEwM (setFlagsFromEnvFile envfile content)) dflags
-
-        return dflags'
-  where
-    -- Loading environments (by name or by location)
-
-    archOS = platformArchOS (targetPlatform dflags)
-
-    namedEnvPath :: String -> MaybeT IO FilePath
-    namedEnvPath name = do
-     appdir <- versionedAppDir (programName dflags) archOS
-     return $ appdir </> "environments" </> name
-
-    probeEnvName :: String -> MaybeT IO FilePath
-    probeEnvName name = probeEnvFile =<< namedEnvPath name
-
-    probeEnvFile :: FilePath -> MaybeT IO FilePath
-    probeEnvFile path = do
-      guard =<< liftMaybeT (doesFileExist path)
-      return path
-
-    probeNullEnv :: FilePath -> MaybeT IO FilePath
-    probeNullEnv "-" = return "-"
-    probeNullEnv _   = mzero
-
-    -- Various ways to define which environment to use
-
-    getCmdLineArg :: MaybeT IO String
-    getCmdLineArg = MaybeT $ return $ packageEnv dflags
-
-    getEnvVar :: MaybeT IO String
-    getEnvVar = do
-      mvar <- liftMaybeT $ MC.try $ getEnv "GHC_ENVIRONMENT"
-      case mvar of
-        Right var -> return var
-        Left err  -> if isDoesNotExistError err then mzero
-                                                else liftMaybeT $ throwIO err
-
-    notIfHideAllPackages :: MaybeT IO ()
-    notIfHideAllPackages =
-      guard (not (gopt Opt_HideAllPackages dflags))
-
-    defaultEnvName :: String
-    defaultEnvName = "default"
-
-    -- e.g. .ghc.environment.x86_64-linux-7.6.3
-    localEnvFileName :: FilePath
-    localEnvFileName = ".ghc.environment" <.> versionedFilePath archOS
-
-    -- Search for an env file, starting in the current dir and looking upwards.
-    -- Fail if we get to the users home dir or the filesystem root. That is,
-    -- we don't look for an env file in the user's home dir. The user-wide
-    -- env lives in ghc's versionedAppDir/environments/default
-    findLocalEnvFile :: MaybeT IO FilePath
-    findLocalEnvFile = do
-        curdir  <- liftMaybeT getCurrentDirectory
-        homedir <- tryMaybeT getHomeDirectory
-        let probe dir | isDrive dir || dir == homedir
-                      = mzero
-            probe dir = do
-              let file = dir </> localEnvFileName
-              exists <- liftMaybeT (doesFileExist file)
-              if exists
-                then return file
-                else probe (takeDirectory dir)
-        probe curdir
-
-    -- Error reporting
-
-    cmdLineError :: String -> MaybeT IO a
-    cmdLineError env = liftMaybeT . throwGhcExceptionIO . CmdLineError $
-      "Package environment " ++ show env ++ " not found"
-
-    envError :: String -> MaybeT IO a
-    envError env = liftMaybeT . throwGhcExceptionIO . CmdLineError $
-         "Package environment "
-      ++ show env
-      ++ " (specified in GHC_ENVIRONMENT) not found"
 
 -- | An error thrown if the GHC API is used in an incorrect fashion.
 newtype GhcApiError = GhcApiError String

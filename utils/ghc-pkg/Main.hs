@@ -30,13 +30,16 @@
 
 module Main (main) where
 
+import GHC.EnvironmentFiles
+import GHC.Platform.ArchOS
+import GHC.AppDir
+import Control.Monad.Trans.Maybe
 import qualified GHC.Unit.Database as GhcPkg
 import GHC.Unit.Database hiding (mkMungePathUrl)
 import GHC.HandleEncoding
 import GHC.BaseDir (getBaseDir)
 import GHC.Settings.Utils (getTargetArchOS, maybeReadFuzzy)
 import GHC.Platform.Host (hostPlatformArchOS)
-import GHC.UniqueSubdir (uniqueSubdir)
 import qualified GHC.Data.ShortText as ST
 import GHC.Version ( cProjectVersion )
 import qualified Distribution.Simple.PackageIndex as PackageIndex
@@ -58,8 +61,8 @@ import Distribution.Simple.Utils (toUTF8BS, writeUTF8File, readUTF8File)
 import qualified Data.Version as Version
 import System.FilePath as FilePath
 import qualified System.FilePath.Posix as FilePath.Posix
-import System.Directory ( getXdgDirectory, createDirectoryIfMissing, getAppUserDataDirectory,
-                          getModificationTime, XdgDirectory ( XdgData ) )
+import System.Directory ( createDirectoryIfMissing,
+                          getModificationTime )
 import Text.Printf
 
 import Prelude
@@ -123,6 +126,9 @@ anyM p (x:xs) = do
     then return True
     else anyM p xs
 
+getPackageEnv :: (String -> IO ()) -> Maybe FilePath -> ArchOS -> IO (Maybe PackageEnvironment)
+getPackageEnv logger mb_db target_os = findPackageEnv logger mb_db False "ghc" target_os
+
 -- -----------------------------------------------------------------------------
 -- Entry point
 
@@ -130,7 +136,6 @@ main :: IO ()
 main = do
   configureHandleEncoding
   args <- getArgs
-
   case getOpt Permute (flags ++ deprecFlags) args of
         (cli,_,[]) | FlagHelp `elem` cli -> do
            prog <- getProgramName
@@ -156,6 +161,7 @@ data Flag
   | FlagConfig FilePath
   | FlagGlobalConfig FilePath
   | FlagUserConfig FilePath
+  | FlagPackageEnv FilePath
   | FlagForce
   | FlagForceFiles
   | FlagMultiInstance
@@ -189,6 +195,8 @@ flags = [
         "location of the user package database (use instead of default)",
   Option [] ["no-user-package-conf"] (NoArg FlagNoUserDb)
         "never read the user package database (DEPRECATED)",
+  Option [] ["package-env"] (ReqArg FlagPackageEnv "FILE/DIR")
+        "use the specified package environment file",
   Option [] ["force"] (NoArg FlagForce)
          "ignore missing dependencies, directories, and libraries",
   Option [] ["force-files"] (NoArg FlagForceFiles)
@@ -590,6 +598,20 @@ allPackagesInStack = concatMap packages
 stackUpTo :: FilePath -> PackageDBStack -> PackageDBStack
 stackUpTo to_modify = dropWhile ((/= to_modify) . location)
 
+-- An environment file provides a complete specification about the visible packages
+parseEnvironmentFile :: PackageEnvironment -> ([String], Bool, Bool)
+parseEnvironmentFile (PackageEnvironment env) = foldl' go start_state env
+  where
+    start_state = ([], False, False)
+
+    go _ ClearPackageDb = start_state
+    go (dbs, gbl, lcl) (PackageDb s) = (s:dbs, gbl, lcl)
+    go (dbs, _, lcl) GlobalPackageDb = (dbs, True, lcl)
+    go (dbs, gbl, _) UserPackageDb = (dbs, gbl, True)
+    -- Ignore package ids
+    go db_env _ = db_env
+
+
 getPkgDatabases :: Verbosity
                 -> GhcPkg.DbOpenMode mode DbModifySelector
                 -> Bool    -- use the user db
@@ -626,6 +648,8 @@ getPkgDatabases verbosity mode use_user use_cache expand_vars my_flags = do
                        Just path -> return path
         fs -> return (last fs)
 
+
+
   -- The value of the $topdir variable used in some package descriptions
   -- Note that the way we calculate this is slightly different to how it
   -- is done in ghc itself. We rely on the convention that the global
@@ -634,6 +658,26 @@ getPkgDatabases verbosity mode use_user use_cache expand_vars my_flags = do
 
   let no_user_db = FlagNoUserDb `elem` my_flags
 
+  -- See Note [Settings file] about this file, and why we need GHC to share it with us.
+  let settingsFile = top_dir </> "settings"
+  exists_settings_file <- doesFileExist settingsFile
+  targetArchOS <- case exists_settings_file of
+    False -> do
+      warn $ "WARNING: settings file doesn't exist " ++ show settingsFile
+      warn "cannot know target platform so guessing target == host (native compiler)."
+      pure hostPlatformArchOS
+    True -> do
+      settingsStr <- readFile settingsFile
+      mySettings <- case maybeReadFuzzy settingsStr of
+        Just s -> pure $ Map.fromList s
+        -- It's excusable to not have a settings file (for now at
+        -- least) but completely inexcusable to have a malformed one.
+        Nothing -> die $ "Can't parse settings file " ++ show settingsFile
+      case getTargetArchOS settingsFile mySettings of
+        Right archOS -> pure archOS
+        Left e -> die e
+
+
   -- get the location of the user package database, and create it if necessary
   -- getXdgDirectory can fail (e.g. if $HOME isn't set)
 
@@ -641,45 +685,9 @@ getPkgDatabases verbosity mode use_user use_cache expand_vars my_flags = do
     case [ f | FlagUserConfig f <- my_flags ] of
       _ | no_user_db -> return Nothing
       [] -> do
-        -- See Note [Settings file] about this file, and why we need GHC to share it with us.
-        let settingsFile = top_dir </> "settings"
-        exists_settings_file <- doesFileExist settingsFile
-        targetArchOS <- case exists_settings_file of
-          False -> do
-            warn $ "WARNING: settings file doesn't exist " ++ show settingsFile
-            warn "cannot know target platform so guessing target == host (native compiler)."
-            pure hostPlatformArchOS
-          True -> do
-            settingsStr <- readFile settingsFile
-            mySettings <- case maybeReadFuzzy settingsStr of
-              Just s -> pure $ Map.fromList s
-              -- It's excusable to not have a settings file (for now at
-              -- least) but completely inexcusable to have a malformed one.
-              Nothing -> die $ "Can't parse settings file " ++ show settingsFile
-            case getTargetArchOS settingsFile mySettings of
-              Right archOS -> pure archOS
-              Left e -> die e
-        let subdir = uniqueSubdir targetArchOS
 
-            getFirstSuccess :: [IO a] -> IO (Maybe a)
-            getFirstSuccess [] = pure Nothing
-            getFirstSuccess (a:as) = tryIO a >>= \case
-              Left _ -> getFirstSuccess as
-              Right d -> pure (Just d)
-        -- The appdir used to be in ~/.ghc but to respect the XDG specification
-        -- we want to move it under $XDG_DATA_HOME/
-        -- However, old tooling (like cabal) might still write package environments
-        -- to the old directory, so we prefer that if a subdirectory of ~/.ghc
-        -- with the correct target and GHC version exists.
-        --
-        -- i.e. if ~/.ghc/$UNIQUE_SUBDIR exists we prefer that
-        -- otherwise we use $XDG_DATA_HOME/$UNIQUE_SUBDIR
-        --
-        -- UNIQUE_SUBDIR is typically a combination of the target platform and GHC version
-        m_appdir <- getFirstSuccess $ map (fmap (</> subdir))
-          [ getAppUserDataDirectory "ghc"  -- this is ~/.ghc/
-          , getXdgDirectory XdgData "ghc"  -- this is $XDG_DATA_HOME/
-          ]
+        m_appdir <- runMaybeT $ versionedAppDir "ghc" targetArchOS
+
         case m_appdir of
           Nothing -> return Nothing
           Just dir -> do
@@ -688,13 +696,32 @@ getPkgDatabases verbosity mode use_user use_cache expand_vars my_flags = do
               Just f  -> return (Just (f, True))
       fs -> return (Just (last fs, True))
 
+  let mb_packageenv = listToMaybe [ fp | FlagPackageEnv fp <- my_flags ]
+      output s = if verbosity /= Silent then info s else return ()
+  package_env <- getPackageEnv output mb_packageenv targetArchOS
+
   -- If the user database exists, and for "use_user" commands (which includes
   -- "ghc-pkg check" and all commands that modify the db) we will attempt to
   -- use the user db.
-  let sys_databases
+  let default_sys_databases
         | Just (user_conf,user_exists) <- mb_user_conf,
           use_user || user_exists = [user_conf, global_conf]
         | otherwise               = [global_conf]
+
+      pkg_env_sys_databases pkg_flags =
+        let (pkg_dbs, gbl, lcl) = parseEnvironmentFile pkg_flags
+            lcl_db
+              | Just (user_conf, user_exists) <- mb_user_conf
+              , lcl
+              , use_user || user_exists = Just user_conf
+              | otherwise = Nothing
+            gbl_db | gbl = Just global_conf
+                   | otherwise = Nothing
+        in pkg_dbs ++ catMaybes [lcl_db, gbl_db]
+
+  let sys_databases = case package_env of
+                       Nothing -> default_sys_databases
+                       Just env_flags -> pkg_env_sys_databases env_flags
 
   e_pkg_path <- tryIO (System.Environment.getEnv "GHC_PACKAGE_PATH")
   let env_stack =

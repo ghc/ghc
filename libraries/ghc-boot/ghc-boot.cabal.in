@@ -55,6 +55,8 @@ Library
             GHC.Settings.Utils
             GHC.UniqueSubdir
             GHC.Version
+            GHC.AppDir
+            GHC.EnvironmentFiles
 
     -- reexport modules from ghc-boot-th so that packages don't have to import
     -- both ghc-boot and ghc-boot-th. It makes the dependency graph easier to
@@ -76,6 +78,7 @@ Library
                    directory  >= 1.2 && < 1.4,
                    filepath   >= 1.3 && < 1.5,
                    deepseq    >= 1.4 && < 1.5,
+                   transformers,
                    ghc-boot-th == @ProjectVersionMunged@
     if !os(windows)
         build-depends:

@@ -70,3 +70,5 @@ readRawSetting settingsFile settings key = case Map.lookup key settings of
     Just v -> Right v
     Nothing -> Left $ "Failed to read " ++ show key ++ " value " ++ show xs
   Nothing -> Left $ "No entry for " ++ show key ++ " in " ++ show settingsFile
+
+

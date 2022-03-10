@@ -34,7 +34,8 @@ Executable ghc-pkg
                    Cabal-syntax,
                    binary,
                    ghc-boot,
-                   bytestring
+                   bytestring,
+                   transformers
     if !os(windows) && flag(terminfo)
         Build-Depends: terminfo
         Cpp-Options: -DWITH_TERMINFO
