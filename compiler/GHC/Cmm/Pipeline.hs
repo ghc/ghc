@@ -58,6 +58,14 @@ cmmPipeline hsc_env srtInfo prog = do
      return (srtInfo, cmms)
 
 
+-- | The Cmm pipeline for a single 'CmmDecl'. Returns:
+--
+--   - in the case of a 'CmmProc': 'Left' of the resulting (possibly
+--     proc-point-split) 'CmmDecl's and their 'CafEnv'. CAF analysis
+--     necessarily happens *before* proc-point splitting, as described in Note
+--     [SRTs].
+--
+--   - in the case of a `CmmData`, the unmodified 'CmmDecl' and a 'CAFSet' containing
 cpsTop :: Logger -> Platform -> CmmConfig -> CmmDecl -> IO (Either (CAFEnv, [CmmDecl]) (CAFSet, CmmDecl))
 cpsTop _logger platform _ p@(CmmData _ statics) = return (Right (cafAnalData platform statics, p))
 cpsTop logger platform cfg proc =
