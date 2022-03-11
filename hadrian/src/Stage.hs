@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 module Stage (Stage (..), stageString) where
 
 import Development.Shake.Classes
@@ -28,4 +29,8 @@ instance NFData   Stage
 
 -- | Prettyprint a 'Stage'.
 stageString :: Stage -> String
-stageString stage = "stage" ++ show (fromEnum stage)
+stageString = \case
+  Stage0 -> "stage0"
+  Stage1 -> "stage1"
+  Stage2 -> "stage2"
+  Stage3 -> "stage3"
