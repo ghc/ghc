@@ -147,6 +147,12 @@ void move_STACK (StgStack *src, StgStack *dest);
   bits = link_field & 3;
   if ((bits | prev_static_flag) != 3) { ... }
 
+  However, this mechanism for tracking liveness has an important implication:
+  once a static object becomes unreachable it must never become reachable again.
+  One would think that this can by definition never happen but in the past SRT
+  generation bugs have caused precisely this behavior with disasterous results.
+  See Note [No static object resurrection] in GHC.Cmm.Info.Build for details.
+
   -------------------------------------------------------------------------- */
 
 #define STATIC_BITS 3
