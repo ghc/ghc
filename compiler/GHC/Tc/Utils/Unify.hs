@@ -44,13 +44,12 @@ import GHC.Prelude
 import GHC.Hs
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Ppr( debugPprType )
-import GHC.Tc.Utils.Concrete ( mkWpFun )
+import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep_MustBeRefl )
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Instantiate
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.TcType
-
 
 import GHC.Core.Type
 import GHC.Core.Coercion
@@ -86,19 +85,29 @@ import qualified Data.Semigroup as S ( (<>) )
 *                                                                      *
 ********************************************************************* -}
 
--- | matchActualFunTySigma does looks for just one function arrow
---   returning an uninstantiated sigma-type
+-- | 'matchActualFunTySigma' looks for just one function arrow,
+-- returning an uninstantiated sigma-type.
+--
+-- Invariant: the returned argument type has a fixed RuntimeRep
+-- as per Note [Fixed RuntimeRep] in GHC.Tc.Utils.Concrete.
+-- See Note [Return arguments with a fixed RuntimeRep].
 matchActualFunTySigma
-  :: SDoc -- See Note [Herald for matchExpectedFunTys]
-  -> Maybe TypedThing             -- The thing with type TcSigmaType
-  -> (Arity, [Scaled TcSigmaType]) -- Total number of value args in the call, and
-                                   -- types of values args to which function has
-                                   --   been applied already (reversed)
-                                   -- Both are used only for error messages)
-  -> TcRhoType                     -- Type to analyse: a TcRhoType
-  -> TcM (HsWrapper, Scaled TcSigmaType, TcSigmaType)
--- The /argument/ is a RhoType
--- The /result/   is an (uninstantiated) SigmaType
+  :: ExpectedFunTyOrigin
+      -- ^ See Note [Herald for matchExpectedFunTys]
+  -> Maybe TypedThing
+      -- ^ The thing with type TcSigmaType
+  -> (Arity, [Scaled TcSigmaType])
+      -- ^ Total number of value args in the call, and
+      -- types of values args to which function has
+      --   been applied already (reversed)
+      -- Both are used only for error messages)
+  -> TcRhoType
+      -- ^ Type to analyse: a TcRhoType
+  -> TcM (HsWrapper, Scaled TcSigmaTypeFRR, TcSigmaType)
+-- This function takes in a type to analyse (a RhoType) and returns
+-- an argument type and a result type (splitting apart a function arrow).
+-- The returned argument type is a SigmaType with a fixed RuntimeRep;
+-- as explained in Note [Return arguments with a fixed RuntimeRep].
 --
 -- See Note [matchActualFunTy error handling] for the first three arguments
 
@@ -118,12 +127,13 @@ matchActualFunTySigma herald mb_thing err_info fun_ty
     -- hide the forall inside a meta-variable
     go :: TcRhoType   -- The type we're processing, perhaps after
                       -- expanding any type synonym
-       -> TcM (HsWrapper, Scaled TcSigmaType, TcSigmaType)
+       -> TcM (HsWrapper, Scaled TcSigmaTypeFRR, TcSigmaType)
     go ty | Just ty' <- tcView ty = go ty'
 
     go (FunTy { ft_af = af, ft_mult = w, ft_arg = arg_ty, ft_res = res_ty })
       = assert (af == VisArg) $
-        return (idHsWrapper, Scaled w arg_ty, res_ty)
+      do { hasFixedRuntimeRep_MustBeRefl (FRRExpectedFunTy herald 0) arg_ty
+         ; return (idHsWrapper, Scaled w arg_ty, res_ty) }
 
     go ty@(TyVarTy tv)
       | isMetaTyVar tv
@@ -156,6 +166,7 @@ matchActualFunTySigma herald mb_thing err_info fun_ty
            ; mult <- newFlexiTyVarTy multiplicityTy
            ; let unif_fun_ty = mkVisFunTy mult arg_ty res_ty
            ; co <- unifyType mb_thing fun_ty unif_fun_ty
+           ; hasFixedRuntimeRep_MustBeRefl (FRRExpectedFunTy herald 0) arg_ty
            ; return (mkWpCastN co, Scaled mult arg_ty, res_ty) }
 
     ------------
@@ -187,14 +198,18 @@ in the error message.
 Ugh!
 -}
 
--- Like 'matchExpectedFunTys', but used when you have an "actual" type,
--- for example in function application
-matchActualFunTysRho :: SDoc   -- See Note [Herald for matchExpectedFunTys]
+-- | Like 'matchExpectedFunTys', but used when you have an "actual" type,
+-- for example in function application.
+--
+-- INVARIANT: the returned arguemnt types all have a fixed RuntimeRep
+-- in the sense of Note [Fixed RuntimeRep] in GHC.Tc.Utils.Concrete.
+-- See Note [Return arguments with a fixed RuntimeRep].
+matchActualFunTysRho :: ExpectedFunTyOrigin -- ^ See Note [Herald for matchExpectedFunTys]
                      -> CtOrigin
-                     -> Maybe TypedThing -- the thing with type TcSigmaType
+                     -> Maybe TypedThing -- ^ the thing with type TcSigmaType
                      -> Arity
                      -> TcSigmaType
-                     -> TcM (HsWrapper, [Scaled TcSigmaType], TcRhoType)
+                     -> TcM (HsWrapper, [Scaled TcSigmaTypeFRR], TcRhoType)
 -- If    matchActualFunTysRho n ty = (wrap, [t1,..,tn], res_ty)
 -- then  wrap : ty ~> (t1 -> ... -> tn -> res_ty)
 --       and res_ty is a RhoType
@@ -216,7 +231,9 @@ matchActualFunTysRho herald ct_orig mb_thing n_val_args_wanted fun_ty
                                                  (n_val_args_wanted, so_far)
                                                  fun_ty
            ; (wrap_res, arg_tys, res_ty)   <- go (n-1) (arg_ty1:so_far) res_ty1
-           ; wrap_fun2 <- mkWpFun idHsWrapper wrap_res arg_ty1 res_ty (WpFunFunTy fun_ty)
+           ; let wrap_fun2 = mkWpFun idHsWrapper wrap_res arg_ty1 res_ty
+           -- NB: arg_ty1 comes from matchActualFunTySigma, so it has
+           -- a fixed RuntimeRep as neede to call mkWpFun.
            ; return (wrap_fun2 <.> wrap_fun1, arg_ty1:arg_tys, res_ty) }
 
 {-
@@ -281,16 +298,73 @@ This function must be written CPS'd because it needs to fill in the
 ExpTypes produced for arguments before it can fill in the ExpType
 passed in.
 
+Note [Return arguments with a fixed RuntimeRep]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The functions
+
+  - matchExpectedFunTys,
+  - matchActualFunTySigma,
+  - matchActualFunTysRho,
+
+peel off argument types, as explained in Note [matchExpectedFunTys].
+It's important that these functions return argument types that have
+a fixed runtime representation, otherwise we would be in violation
+of the representation-polymorphism invariants of
+Note [Representation polymorphism invariants] in GHC.Core.
+
+This is why all these functions have an additional invariant,
+that the argument types they return all have a fixed RuntimeRep,
+in the sense of Note [Fixed RuntimeRep] in GHC.Tc.Utils.Concrete.
+
+Example:
+
+  Suppose we have
+
+    type F :: Type -> RuntimeRep
+    type family F a where { F Int = LiftedRep }
+
+    type Dual :: Type -> Type
+    type family Dual a where
+      Dual a = a -> ()
+
+    f :: forall (a :: TYPE (F Int)). Dual a
+    f = \ x -> ()
+
+  The body of `f` is a lambda abstraction, so we must be able to split off
+  one argument type from its type. This is handled by `matchExpectedFunTys`
+  (see 'GHC.Tc.Gen.Match.tcMatchLambda'). We end up with desugared Core that
+  looks like this:
+
+    f :: forall (a :: TYPE (F Int)). Dual (a |> (TYPE F[0]))
+    f = \ @(a :: TYPE (F Int)) ->
+          (\ (x :: (a |> (TYPE F[0]))) -> ())
+          `cast`
+          (Sub (Sym (Dual[0] <(a |> (TYPE F[0]))>)))
+
+  Two important transformations took place:
+
+    1. We inserted casts around the argument type to ensure that it has
+       a fixed runtime representation, as required by invariant (I1) from
+       Note [Representation polymorphism invariants] in GHC.Core.
+    2. We inserted a cast around the whole lambda to make everything line up
+       with the type signature.
 -}
 
--- Use this one when you have an "expected" type.
+-- | Use this function to split off arguments types when you have an
+-- \"expected\" type.
+--
 -- This function skolemises at each polytype.
+--
+-- Invariant: this function only applies the provided function
+-- to a list of argument types which all have a fixed RuntimeRep
+-- in the sense of Note [Fixed RuntimeRep] in GHC.Tc.Utils.Concrete.
+-- See Note [Return arguments with a fixed RuntimeRep].
 matchExpectedFunTys :: forall a.
-                       SDoc   -- See Note [Herald for matchExpectedFunTys]
+                       ExpectedFunTyOrigin -- See Note [Herald for matchExpectedFunTys]
                     -> UserTypeCtxt
                     -> Arity
                     -> ExpRhoType      -- Skolemised
-                    -> ([Scaled ExpSigmaType] -> ExpRhoType -> TcM a)
+                    -> ([Scaled ExpSigmaTypeFRR] -> ExpRhoType -> TcM a)
                     -> TcM (HsWrapper, a)
 -- If    matchExpectedFunTys n ty = (_, wrap)
 -- then  wrap : (t1 -> ... -> tn -> ty_r) ~> ty,
@@ -320,9 +394,13 @@ matchExpectedFunTys herald ctx arity orig_ty thing_inside
 
     go acc_arg_tys n (FunTy { ft_mult = mult, ft_af = af, ft_arg = arg_ty, ft_res = res_ty })
       = assert (af == VisArg) $
-        do { (wrap_res, result) <- go ((Scaled mult $ mkCheckExpType arg_ty) : acc_arg_tys)
+        do { let arg_pos = length acc_arg_tys -- for error messages only
+           ; hasFixedRuntimeRep_MustBeRefl (FRRExpectedFunTy herald arg_pos) arg_ty
+           ; (wrap_res, result) <- go ((Scaled mult $ mkCheckExpType arg_ty) : acc_arg_tys)
                                       (n-1) res_ty
-           ; fun_wrap <- mkWpFun idHsWrapper wrap_res (Scaled mult arg_ty) res_ty (WpFunFunExpTy orig_ty)
+           ; let fun_wrap = mkWpFun idHsWrapper wrap_res (Scaled mult arg_ty) res_ty
+             -- NB: we are ensuring that arg_ty has a fixed RuntimeRep,
+             -- so we satisfy the precondition that mkWpFun requires.
            ; return ( fun_wrap, result ) }
 
     go acc_arg_tys n ty@(TyVarTy tv)
@@ -351,12 +429,17 @@ matchExpectedFunTys herald ctx arity orig_ty thing_inside
                           defer acc_arg_tys n (mkCheckExpType ty)
 
     ------------
-    defer :: [Scaled ExpSigmaType] -> Arity -> ExpRhoType -> TcM (HsWrapper, a)
+    defer :: [Scaled ExpSigmaTypeFRR] -> Arity -> ExpRhoType -> TcM (HsWrapper, a)
     defer acc_arg_tys n fun_ty
       = do { more_arg_tys <- replicateM n (mkScaled <$> newFlexiTyVarTy multiplicityTy <*> newInferExpType)
            ; res_ty       <- newInferExpType
            ; result       <- thing_inside (reverse acc_arg_tys ++ more_arg_tys) res_ty
            ; more_arg_tys <- mapM (\(Scaled m t) -> Scaled m <$> readExpType t) more_arg_tys
+           ; zipWithM_
+               ( \ i (Scaled _ arg_ty) ->
+                 hasFixedRuntimeRep_MustBeRefl (FRRExpectedFunTy herald i) arg_ty )
+               [0..]
+               more_arg_tys
            ; res_ty       <- readExpType res_ty
            ; let unif_fun_ty = mkVisFunTys more_arg_tys res_ty
            ; wrap <- tcSubType AppOrigin ctx unif_fun_ty fun_ty
@@ -364,7 +447,7 @@ matchExpectedFunTys herald ctx arity orig_ty thing_inside
            ; return (wrap, result) }
 
     ------------
-    mk_ctxt :: [Scaled ExpSigmaType] -> TcType -> TidyEnv -> TcM (TidyEnv, SDoc)
+    mk_ctxt :: [Scaled ExpSigmaTypeFRR] -> TcType -> TidyEnv -> TcM (TidyEnv, SDoc)
     mk_ctxt arg_tys res_ty env
       = mkFunTysMsg env herald arg_tys' res_ty arity
       where
@@ -372,7 +455,9 @@ matchExpectedFunTys herald ctx arity orig_ty thing_inside
                    reverse arg_tys
             -- this is safe b/c we're called from "go"
 
-mkFunTysMsg :: TidyEnv -> SDoc -> [Scaled TcType] -> TcType -> Arity
+mkFunTysMsg :: TidyEnv
+            -> ExpectedFunTyOrigin
+            -> [Scaled TcType] -> TcType -> Arity
             -> TcM (TidyEnv, SDoc)
 mkFunTysMsg env herald arg_tys res_ty n_val_args_in_call
   = do { (env', fun_rho) <- zonkTidyTcType env $
@@ -391,7 +476,8 @@ mkFunTysMsg env herald arg_tys res_ty n_val_args_in_call
 
        ; return (env', msg) }
  where
-  full_herald = herald <+> speakNOf n_val_args_in_call (text "value argument")
+  full_herald = pprExpectedFunTyHerald herald
+            <+> speakNOf n_val_args_in_call (text "value argument")
 
 ----------------------
 matchExpectedListTy :: TcRhoType -> TcM (TcCoercionN, TcRhoType)

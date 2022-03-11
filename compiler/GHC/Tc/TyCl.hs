@@ -4515,7 +4515,7 @@ checkNewDataCon con
 
         ; unlifted_newtypes <- xoptM LangExt.UnliftedNewtypes
         ; let allowedArgType =
-                unlifted_newtypes || isLiftedType_maybe (scaledThing arg_ty1) == Just True
+                unlifted_newtypes || typeLevity_maybe (scaledThing arg_ty1) == Just Lifted
         ; checkTc allowedArgType $ TcRnUnknownMessage $ mkPlainError noHints $ vcat
           [ text "A newtype cannot have an unlifted argument type"
           , text "Perhaps you intended to use UnliftedNewtypes"

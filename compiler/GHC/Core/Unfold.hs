@@ -522,7 +522,9 @@ sizeExpr opts !bOMB_OUT_SIZE top_args expr
 
                 -- unboxed variables, inline primops and unsafe foreign calls
                 -- are all "inline" things:
-          is_inline_scrut (Var v) = isUnliftedType (idType v)
+          is_inline_scrut (Var v) =
+            isUnliftedType (idType v)
+              -- isUnliftedType is OK here: scrutinees have a fixed RuntimeRep (search for FRRCase)
           is_inline_scrut scrut
               | (Var f, _) <- collectArgs scrut
                 = case idDetails f of
@@ -581,6 +583,7 @@ sizeExpr opts !bOMB_OUT_SIZE top_args expr
       |  isTyVar bndr                 -- Doesn't exist at runtime
       || isJoinId bndr                -- Not allocated at all
       || isUnliftedType (idType bndr) -- Doesn't live in heap
+           -- OK to call isUnliftedType: binders have a fixed RuntimeRep (search for FRRBinder)
       = 0
       | otherwise
       = 10

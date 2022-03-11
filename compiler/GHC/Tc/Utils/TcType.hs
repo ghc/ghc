@@ -22,12 +22,16 @@
 module GHC.Tc.Utils.TcType (
   --------------------------------
   -- Types
-  TcType, TcSigmaType, TcRhoType, TcTauType, TcPredType, TcThetaType,
+  TcType, TcSigmaType, TcSigmaTypeFRR,
+  TcRhoType, TcTauType, TcPredType, TcThetaType,
   TcTyVar, TcTyVarSet, TcDTyVarSet, TcTyCoVarSet, TcDTyCoVarSet,
   TcKind, TcCoVar, TcTyCoVar, TcTyVarBinder, TcInvisTVBinder, TcReqTVBinder,
   TcTyCon, MonoTcTyCon, PolyTcTyCon, TcTyConBinder, KnotTied,
 
-  ExpType(..), InferResult(..), ExpSigmaType, ExpRhoType, mkCheckExpType,
+  ExpType(..), InferResult(..),
+  ExpSigmaType, ExpSigmaTypeFRR,
+  ExpRhoType,
+  mkCheckExpType,
 
   SyntaxOpType(..), synKnownType, mkSynFunTys,
 
@@ -354,6 +358,19 @@ type TcTyConBinder = TyConBinder -- With skolem TcTyVars
 type TcPredType     = PredType
 type TcThetaType    = ThetaType
 type TcSigmaType    = TcType
+
+-- | A 'TcSigmaTypeFRR' is a 'TcSigmaType' which has a fixed 'RuntimeRep'
+-- in the sense of Note [Fixed RuntimeRep] in GHC.Tc.Utils.Concrete.
+--
+-- In particular, this means that:
+--
+-- - 'GHC.Types.RepType.typePrimRep' does not panic,
+-- - 'GHC.Core.typeLevity_maybe' does not return 'Nothing'.
+--
+-- This property is important in functions such as 'matchExpectedFunTys', where
+-- we want to provide argument types which have a known runtime representation.
+-- See Note [Return arguments with a fixed RuntimeRep.
+type TcSigmaTypeFRR = TcSigmaType
 type TcRhoType      = TcType  -- Note [TcRhoType]
 type TcTauType      = TcType
 type TcKind         = Kind
@@ -427,8 +444,10 @@ data InferResult
          -- The type that fills in this hole should be a Type,
          -- that is, its kind should be (TYPE rr) for some rr
 
-type ExpSigmaType = ExpType
-type ExpRhoType   = ExpType
+type ExpSigmaType    = ExpType
+-- | Like 'TcSigmaTypeFRR', but for an expected type.
+type ExpSigmaTypeFRR = ExpType
+type ExpRhoType      = ExpType
 
 instance Outputable ExpType where
   ppr (Check ty) = text "Check" <> braces (ppr ty)

@@ -35,7 +35,6 @@ import GHC.Rename.Utils
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Zonk
 import GHC.Tc.Gen.Sig( TcPragEnv, lookupPragEnv, addInlinePrags )
-import GHC.Tc.Utils.Concrete ( mkWpFun )
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Instantiate
 import GHC.Types.Error
@@ -44,6 +43,7 @@ import GHC.Types.Var
 import GHC.Types.Name
 import GHC.Types.Name.Reader
 import GHC.Core.Multiplicity
+import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep_MustBeRefl )
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Validity( arityErr )
@@ -83,7 +83,7 @@ import GHC.Data.List.SetOps ( getNth )
 
 tcLetPat :: (Name -> Maybe TcId)
          -> LetBndrSpec
-         -> LPat GhcRn -> Scaled ExpSigmaType
+         -> LPat GhcRn -> Scaled ExpSigmaTypeFRR
          -> TcM a
          -> TcM (LPat GhcTc, a)
 tcLetPat sig_fn no_gen pat pat_ty thing_inside
@@ -99,9 +99,9 @@ tcLetPat sig_fn no_gen pat pat_ty thing_inside
 
 -----------------
 tcPats :: HsMatchContext GhcTc
-       -> [LPat GhcRn]            -- Patterns,
-       -> [Scaled ExpSigmaType]         --   and their types
-       -> TcM a                  --   and the checker for the body
+       -> [LPat GhcRn]             -- ^ atterns
+       -> [Scaled ExpSigmaTypeFRR] -- ^ types of the patterns
+       -> TcM a                    -- ^ checker for the body
        -> TcM ([LPat GhcTc], a)
 
 -- This is the externally-callable wrapper function
@@ -130,7 +130,7 @@ tcInferPat ctxt pat thing_inside
     penv = PE { pe_lazy = False, pe_ctxt = LamPat ctxt, pe_orig = PatOrigin }
 
 tcCheckPat :: HsMatchContext GhcTc
-           -> LPat GhcRn -> Scaled TcSigmaType
+           -> LPat GhcRn -> Scaled TcSigmaTypeFRR
            -> TcM a                     -- Checker for body
            -> TcM (LPat GhcTc, a)
 tcCheckPat ctxt = tcCheckPat_O ctxt PatOrigin
@@ -138,7 +138,7 @@ tcCheckPat ctxt = tcCheckPat_O ctxt PatOrigin
 -- | A variant of 'tcPat' that takes a custom origin
 tcCheckPat_O :: HsMatchContext GhcTc
              -> CtOrigin              -- ^ origin to use if the type needs inst'ing
-             -> LPat GhcRn -> Scaled TcSigmaType
+             -> LPat GhcRn -> Scaled TcSigmaTypeFRR
              -> TcM a                 -- Checker for body
              -> TcM (LPat GhcTc, a)
 tcCheckPat_O ctxt orig pat (Scaled pat_mult pat_ty) thing_inside
@@ -204,7 +204,7 @@ inPatBind (PE { pe_ctxt = LamPat {} }) = False
 *                                                                      *
 ********************************************************************* -}
 
-tcPatBndr :: PatEnv -> Name -> Scaled ExpSigmaType -> TcM (HsWrapper, TcId)
+tcPatBndr :: PatEnv -> Name -> Scaled ExpSigmaTypeFRR -> TcM (HsWrapper, TcId)
 -- (coi, xp) = tcPatBndr penv x pat_ty
 -- Then coi : pat_ty ~ typeof(xp)
 --
@@ -331,7 +331,7 @@ tcMultiple tc_pat penv args thing_inside
         ; loop penv args }
 
 --------------------
-tc_lpat :: Scaled ExpSigmaType
+tc_lpat :: Scaled ExpSigmaTypeFRR
         -> Checker (LPat GhcRn) (LPat GhcTc)
 tc_lpat pat_ty penv (L span pat) thing_inside
   = setSrcSpanA span $
@@ -339,7 +339,7 @@ tc_lpat pat_ty penv (L span pat) thing_inside
                                           thing_inside
         ; return (L span pat', res) }
 
-tc_lpats :: [Scaled ExpSigmaType]
+tc_lpats :: [Scaled ExpSigmaTypeFRR]
          -> Checker [LPat GhcRn] [LPat GhcTc]
 tc_lpats tys penv pats
   = assertPpr (equalLength pats tys) (ppr pats $$ ppr tys) $
@@ -352,7 +352,7 @@ tc_lpats tys penv pats
 checkManyPattern :: Scaled a -> TcM HsWrapper
 checkManyPattern pat_ty = tcSubMult NonLinearPatternOrigin Many (scaledMult pat_ty)
 
-tc_pat  :: Scaled ExpSigmaType
+tc_pat  :: Scaled ExpSigmaTypeFRR
         -- ^ Fully refined result type
         -> Checker (Pat GhcRn) (Pat GhcTc)
         -- ^ Translated pattern
@@ -430,7 +430,7 @@ tc_pat pat_ty penv ps_pat thing_inside = case ps_pat of
                -- Note [View patterns and polymorphism]
 
          -- Expression must be a function
-        ; let herald = text "A view pattern expression expects"
+        ; let herald = ExpectedFunTyViewPat $ unLoc expr
         ; (expr_wrap1, Scaled _mult inf_arg_ty, inf_res_sigma)
             <- matchActualFunTySigma herald (Just . HsExprRnThing $ unLoc expr) (1,[]) expr_ty
                -- See Note [View patterns and polymorphism]
@@ -445,10 +445,12 @@ tc_pat pat_ty penv ps_pat thing_inside = case ps_pat of
 
         ; let Scaled w h_pat_ty = pat_ty
         ; pat_ty <- readExpType h_pat_ty
-        ; expr_wrap2' <- mkWpFun expr_wrap2 idHsWrapper
-                            (Scaled w pat_ty) inf_res_sigma (WpFunViewPat $ unLoc expr)
-        -- expr_wrap2' :: (inf_arg_ty -> inf_res_sigma) "->"
-        --                (pat_ty -> inf_res_sigma)
+        ; let expr_wrap2' = mkWpFun expr_wrap2 idHsWrapper
+                              (Scaled w pat_ty) inf_res_sigma
+          -- expr_wrap2' :: (inf_arg_ty -> inf_res_sigma) "->"
+          --                (pat_ty -> inf_res_sigma)
+          -- NB: pat_ty comes from matchActualFunTySigma, so it has a
+          -- fixed RuntimeRep, as needed to call mkWpFun.
         ; let
               expr_wrap = expr_wrap2' <.> expr_wrap1 <.> mult_wrap
 
@@ -855,7 +857,7 @@ same name, leading to shadowing.
 --       with scrutinee of type (T ty)
 
 tcConPat :: PatEnv -> LocatedN Name
-         -> Scaled ExpSigmaType    -- Type of the pattern
+         -> Scaled ExpSigmaTypeFRR    -- Type of the pattern
          -> HsConPatDetails GhcRn -> TcM a
          -> TcM (Pat GhcTc, a)
 tcConPat penv con_lname@(L _ con_name) pat_ty arg_pats thing_inside
@@ -881,7 +883,7 @@ warnMonoLocalBinds
        }
 
 tcDataConPat :: PatEnv -> LocatedN Name -> DataCon
-             -> Scaled ExpSigmaType        -- Type of the pattern
+             -> Scaled ExpSigmaTypeFRR        -- Type of the pattern
              -> HsConPatDetails GhcRn -> TcM a
              -> TcM (Pat GhcTc, a)
 tcDataConPat penv (L con_span con_name) data_con pat_ty_scaled
@@ -925,15 +927,28 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty_scaled
               pat_mult = scaledMult pat_ty_scaled
               arg_tys_scaled = map (scaleScaled pat_mult) arg_tys'
 
-        ; traceTc "tcConPat" (vcat [ ppr con_name
-                                   , pprTyVars univ_tvs
-                                   , pprTyVars ex_tvs
-                                   , ppr eq_spec
-                                   , ppr theta
-                                   , pprTyVars ex_tvs'
-                                   , ppr ctxt_res_tys
-                                   , ppr arg_tys'
-                                   , ppr arg_pats ])
+        -- This check is necessary to uphold the invariant that 'tcConArgs'
+        -- is given argument types with a fixed runtime representation.
+        -- See test case T20363.
+        ; zipWithM_
+            ( \ i arg_sty ->
+              hasFixedRuntimeRep_MustBeRefl
+                (FRRDataConArg Pattern data_con i)
+                (scaledThing arg_sty)
+            )
+            [1..]
+            arg_tys'
+
+        ; traceTc "tcConPat" (vcat [ text "con_name:" <+> ppr con_name
+                                   , text "univ_tvs:" <+> pprTyVars univ_tvs
+                                   , text "ex_tvs:" <+> pprTyVars ex_tvs
+                                   , text "eq_spec:" <+> ppr eq_spec
+                                   , text "theta:" <+> ppr theta
+                                   , text "ex_tvs':" <+> pprTyVars ex_tvs'
+                                   , text "ctxt_res_tys:" <+> ppr ctxt_res_tys
+                                   , text "pat_ty:" <+> ppr pat_ty
+                                   , text "arg_tys':" <+> ppr arg_tys'
+                                   , text "arg_pats" <+> ppr arg_pats ])
         ; if null ex_tvs && null eq_spec && null theta
           then do { -- The common case; no class bindings etc
                     -- (see Note [Arrows and patterns])
@@ -979,7 +994,7 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty_scaled
         } }
 
 tcPatSynPat :: PatEnv -> LocatedN Name -> PatSyn
-            -> Scaled ExpSigmaType         -- Type of the pattern
+            -> Scaled ExpSigmaType         -- ^ Type of the pattern
             -> HsConPatDetails GhcRn -> TcM a
             -> TcM (Pat GhcTc, a)
 tcPatSynPat penv (L con_span con_name) pat_syn pat_ty arg_pats thing_inside
@@ -1028,6 +1043,18 @@ tcPatSynPat penv (L con_span con_name) pat_syn pat_ty arg_pats thing_inside
                       -- see Note [Call-stack tracing of pattern synonyms]
         ; traceTc "instCall" (ppr req_wrap)
 
+          -- Pattern synonyms can never have representation-polymorphic argument types,
+          -- as checked in 'GHC.Tc.Gen.Sig.tcPatSynSig' (see use of 'FixedRuntimeRepPatSynSigArg').
+          -- (If you want to lift this restriction, use 'hasFixedRuntimeRep' here, to match
+          -- 'tcDataConPat'.)
+        ; let
+            bad_arg_tys :: [(Int, Scaled Type)]
+            bad_arg_tys = filter (\ (_, Scaled _ arg_ty) -> typeLevity_maybe arg_ty == Nothing)
+                        $ zip [0..] arg_tys'
+        ; massertPpr (null bad_arg_tys) $
+            vcat [ text "tcPatSynPat: pattern arguments do not have a fixed RuntimeRep"
+                 , text "bad_arg_tys:" <+> ppr bad_arg_tys ]
+
         ; traceTc "checkConstraints {" Outputable.empty
         ; (ev_binds, (arg_pats', res))
              <- checkConstraints (getSkolemInfo skol_info) ex_tvs' prov_dicts' $
@@ -1073,7 +1100,7 @@ and Note [Solving CallStack constraints] in GHC.Tc.Solver.Types
 ----------------------------
 -- | Convenient wrapper for calling a matchExpectedXXX function
 matchExpectedPatTy :: (TcRhoType -> TcM (TcCoercionN, a))
-                    -> PatEnv -> ExpSigmaType -> TcM (HsWrapper, a)
+                    -> PatEnv -> ExpSigmaTypeFRR -> TcM (HsWrapper, a)
 -- See Note [Matching polytyped patterns]
 -- Returns a wrapper : pat_ty ~R inner_ty
 matchExpectedPatTy inner_match (PE { pe_orig = orig }) pat_ty
@@ -1085,13 +1112,14 @@ matchExpectedPatTy inner_match (PE { pe_orig = orig }) pat_ty
 
 ----------------------------
 matchExpectedConTy :: PatEnv
-                   -> TyCon      -- The TyCon that this data
-                                 -- constructor actually returns
-                                 -- In the case of a data family this is
-                                 -- the /representation/ TyCon
-                   -> Scaled ExpSigmaType  -- The type of the pattern; in the
-                                           -- case of a data family this would
-                                           -- mention the /family/ TyCon
+                   -> TyCon
+                       -- ^ The TyCon that this data constructor actually returns.
+                       -- In the case of a data family, this is
+                       -- the /representation/ TyCon.
+                   -> Scaled ExpSigmaTypeFRR
+                       -- ^ The type of the pattern.
+                       -- In the case of a data family, this would
+                       -- mention the /family/ TyCon
                    -> TcM (HsWrapper, [TcSigmaType])
 -- See Note [Matching constructor patterns]
 -- Returns a wrapper : pat_ty "->" T ty1 ... tyn
@@ -1212,7 +1240,7 @@ Wrinkles:
 -}
 
 tcConArgs :: ConLike
-          -> [Scaled TcSigmaType]
+          -> [Scaled TcSigmaTypeFRR]
           -> TCvSubst            -- Instantiating substitution for constructor type
           -> Checker (HsConPatDetails GhcRn) (HsConPatDetails GhcTc)
 tcConArgs con_like arg_tys tenv penv con_args thing_inside = case con_args of

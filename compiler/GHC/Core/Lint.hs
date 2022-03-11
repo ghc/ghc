@@ -634,7 +634,7 @@ lintLetBind top_lvl rec_flag binder rhs rhs_ty
         -- Check the let/app invariant
         -- See Note [Core let/app invariant] in GHC.Core
        ; checkL ( isJoinId binder
-               || not (isUnliftedType binder_ty)
+               || mightBeLiftedType binder_ty
                || (isNonRec rec_flag && exprOkForSpeculation rhs)
                || isDataConWorkId binder || isDataConWrapId binder -- until #17521 is fixed
                || exprIsTickedString rhs)
@@ -1280,14 +1280,14 @@ lintCoreArg (fun_ty, fun_ue) arg
        ; flags <- getLintFlags
 
        ; when (lf_check_fixed_rep flags) $
-         -- Only do these checks if lf_check_fixed_rep is on,
-         -- because otherwise isUnliftedType panics
+         -- Only check that 'arg_ty' has a fixed RuntimeRep
+         -- if 'lf_check_fixed_rep' is on.
          do { checkL (typeHasFixedRuntimeRep arg_ty)
                      (text "Argument does not have a fixed runtime representation"
                       <+> ppr arg <+> dcolon
                       <+> parens (ppr arg_ty <+> dcolon <+> ppr (typeKind arg_ty)))
 
-            ; checkL (not (isUnliftedType arg_ty) || exprOkForSpeculation arg)
+            ; checkL (mightBeLiftedType arg_ty || exprOkForSpeculation arg)
                      (mkLetAppMsg arg) }
 
        ; lintValApp arg fun_ty arg_ty fun_ue arg_ue }

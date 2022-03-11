@@ -450,6 +450,7 @@ tidy1 v _ (LazyPat _ pat)
     -- Doing this check during type-checking is unsatisfactory because we may
     -- not fully know the zonked types yet. We sure do here.
   = do  { let unlifted_bndrs = filter (isUnliftedType . idType) (collectPatBinders CollNoDictBinders pat)
+            -- NB: the binders can't be representation-polymorphic, so we're OK to call isUnliftedType
         ; unless (null unlifted_bndrs) $
           putSrcSpanDs (getLocA pat) $
           diagnosticDs (DsLazyPatCantBindVarsOfUnliftedType unlifted_bndrs)

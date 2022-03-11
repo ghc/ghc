@@ -1,6 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE PolyKinds #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
@@ -8,16 +9,16 @@
 -- | Describes the provenance of types as they flow through the type-checker.
 -- The datatypes here are mainly used for error message generation.
 module GHC.Tc.Types.Origin (
-  -- UserTypeCtxt
+  -- * UserTypeCtxt
   UserTypeCtxt(..), pprUserTypeCtxt, isSigMaybe,
   ReportRedundantConstraints(..), reportRedundantConstraints,
   redundantConstraintsSpan,
 
-  -- SkolemInfo
+  -- * SkolemInfo
   SkolemInfo(..), SkolemInfoAnon(..), mkSkolemInfo, getSkolemInfo, pprSigSkolInfo, pprSkolInfo,
   unkSkol, unkSkolAnon,
 
-  -- CtOrigin
+  -- * CtOrigin
   CtOrigin(..), exprCtOrigin, lexprCtOrigin, matchesCtOrigin, grhssCtOrigin,
   isVisibleOrigin, toInvisibleOrigin,
   pprCtOrigin, isGivenOrigin, isWantedWantedFunDepOrigin,
@@ -25,16 +26,16 @@ module GHC.Tc.Types.Origin (
 
   TypedThing(..), TyVarBndrs(..),
 
-  -- CtOrigin and CallStack
+  -- * CtOrigin and CallStack
   isPushCallStackOrigin, callStackOriginFS,
-  -- FixedRuntimeRep origin
+  -- * FixedRuntimeRep origin
   FRROrigin(..), pprFRROrigin,
   StmtOrigin(..),
 
-  -- Arrow command origin
+  -- * Arrow command origin
   FRRArrowOrigin(..), pprFRRArrowOrigin,
-  -- HsWrapper WpFun origin
-  WpFunOrigin(..), pprWpFunOrigin,
+  -- * ExpectedFunTy origin
+  ExpectedFunTyOrigin(..), pprExpectedFunTyOrigin, pprExpectedFunTyHerald,
 
   ) where
 
@@ -993,24 +994,21 @@ data FRROrigin
   -- Test cases: LevPolyLet, RepPolyPatBind.
   | FRRBinder !Name
 
-  -- | The type of a pattern in a match group must have a fixed runtime representation.
+  -- | The type of the scrutinee in a case statement must have a
+  -- fixed runtime representation.
   --
-  -- This rules out:
-  --   - individual patterns which don't have a fixed runtime representation,
-  --   - a representation-polymorphic empty case statement,
-  --   - representation-polymorphic GADT pattern matches
-  --     in which individual pattern types have a fixed runtime representation.
-  --
-  -- Test cases: RepPolyRecordPattern, RepPolyUnboxedPatterns,
-  --             RepPolyBinder, RepPolyWildcardPattern, RepPolyMatch,
-  --             RepPolyNPlusK, RepPolyPatBind, T20426.
-  | FRRMatch !(HsMatchContext GhcTc) !Int
+  -- Test cases: RepPolyCase{1,2}.
+  | FRRCase
 
   -- | An instantiation of a newtype/data constructor in which
-  -- one of the remaining arguments types does not have a fixed runtime representation.
+  -- an argument type does not have a fixed runtime representation.
   --
-  -- Test case: UnliftedNewtypesLevityBinder.
-  | FRRDataConArg !DataCon !Int
+  -- The argument can either be an expression or a pattern.
+  --
+  -- Test cases:
+  --  Expression: UnliftedNewtypesLevityBinder.
+  --     Pattern: T20363.
+  | FRRDataConArg !ExprOrPat !DataCon !Int
 
   -- | An instantiation of an 'Id' with no binding (e.g. `coerce`, `unsafeCoerce#`)
   -- in which one of the remaining arguments types does not have a fixed runtime representation.
@@ -1061,10 +1059,14 @@ data FRROrigin
   -- See 'FRRArrowOrigin' for more details.
   | FRRArrow !FRRArrowOrigin
 
-  -- | A representation-polymorphic check arising from an 'HsWrapper'.
+  -- | A representation-polymorphic check arising from a call
+  -- to 'matchExpectedFunTys' or 'matchActualFunTySigma'.
   --
-  -- See 'WpFunOrigin' for more details.
-  | FRRWpFun !WpFunOrigin
+  -- See 'ExpectedFunTyOrigin' for more details.
+  | FRRExpectedFunTy
+      !ExpectedFunTyOrigin
+      !Int
+        -- ^ argument position (0-indexed)
 
 -- | Print the context for a @FixedRuntimeRep@ representation-polymorphism check.
 --
@@ -1072,25 +1074,28 @@ data FRROrigin
 -- which is not fixed. That information is added by 'GHC.Tc.Errors.mkFRRErr'.
 pprFRROrigin :: FRROrigin -> SDoc
 pprFRROrigin (FRRApp arg)
-  = vcat [ text "The function argument"
-         , nest 2 $ quotes (ppr arg) ]
+  = sep [ text "The function argument"
+        , nest 2 $ quotes (ppr arg) ]
 pprFRROrigin (FRRRecordUpdate lbl _arg)
-  = hsep [ text "The record update at field"
-         , quotes (ppr lbl) ]
+  = sep [ text "The record update at field"
+        , quotes (ppr lbl) ]
 pprFRROrigin (FRRBinder binder)
-  = hsep [ text "The binder"
-         , quotes (ppr binder) ]
-pprFRROrigin (FRRMatch matchCtxt i)
-  = text "The" <+> speakNth i <+> text "pattern in the" <+> pprMatchContextNoun matchCtxt
-pprFRROrigin (FRRDataConArg con i)
+  = sep [ text "The binder"
+        , quotes (ppr binder) ]
+pprFRROrigin FRRCase
+  = text "The scrutinee of the case statement"
+pprFRROrigin (FRRDataConArg expr_or_pat con i)
   = text "The" <+> what
   where
-    what :: SDoc
+    arg, what :: SDoc
+    arg = case expr_or_pat of
+      Expression -> text "argument"
+      Pattern    -> text "pattern"
     what
       | isNewDataCon con
-      = text "newtype constructor argument"
+      = text "newtype constructor" <+> arg
       | otherwise
-      = text "data constructor argument in" <+> speakNth i <+> text "position"
+      = text "data constructor" <+> arg <+> text "in" <+> speakNth i <+> text "position"
 pprFRROrigin (FRRNoBindingResArg fn i)
   = vcat [ text "Unsaturated use of a representation-polymorphic primitive function."
          , text "The" <+> speakNth i <+> text "argument of" <+> quotes (ppr $ getName fn) ]
@@ -1110,12 +1115,11 @@ pprFRROrigin (FRRBindStmt stmtOrig)
   = vcat [ text "The first argument to (>>=)" <> comma
          , text "arising from the" <+> ppr stmtOrig <> comma ]
 pprFRROrigin FRRBindStmtGuard
-  = hsep [ text "The body of the bind statement" ]
+  = sep [ text "The body of the bind statement" ]
 pprFRROrigin (FRRArrow arrowOrig)
   = pprFRRArrowOrigin arrowOrig
-pprFRROrigin (FRRWpFun wpFunOrig)
-  = hsep [ text "The function argument"
-         , pprWpFunOrigin wpFunOrig ]
+pprFRROrigin (FRRExpectedFunTy funTyOrig zero_indexed_arg)
+  = pprExpectedFunTyOrigin funTyOrig (zero_indexed_arg + 1)
 
 instance Outputable FRROrigin where
   ppr = pprFRROrigin
@@ -1166,6 +1170,15 @@ data FRRArrowOrigin
   -- Test cases: none.
   | ArrowCmdLam !Int
 
+  -- | The scrutinee type in an arrow command case or lambda-case
+  -- statement does not have a fixed runtime representation.
+  --
+  -- Test cases: none.
+  | ArrowCmdCase { isCmdLamCase :: Bool
+                    -- ^ Whether this is a lambda-case (True)
+                    -- or a normal case (False)
+                 }
+
   -- | The overall type of an arrow proc expression does not have
   -- a fixed runtime representation.
   --
@@ -1181,12 +1194,19 @@ pprFRRArrowOrigin (ArrowCmdApp fun arg)
          , text "to"
          , nest 2 (quotes (ppr arg)) ]
 pprFRRArrowOrigin (ArrowCmdArrApp fun arg ho_app)
-  = vcat [ text "The function un the" <+> pprHsArrType ho_app <+> text "of"
+  = vcat [ text "The function in the" <+> pprHsArrType ho_app <+> text "of"
          , nest 2 (quotes (ppr fun))
          , text "to"
          , nest 2 (quotes (ppr arg)) ]
 pprFRRArrowOrigin (ArrowCmdLam i)
   = vcat [ text "The" <+> speakNth i <+> text "pattern of the arrow command abstraction" ]
+pprFRRArrowOrigin (ArrowCmdCase { isCmdLamCase = is_lam_case })
+  = text "The scrutinee of the arrow" <+> what <+> text "command"
+  where
+    what :: SDoc
+    what = if is_lam_case
+           then text "lambda-case"
+           else text "case"
 pprFRRArrowOrigin (ArrowFun fun)
   = vcat [ text "The return type of the arrow function"
          , nest 2 (quotes (ppr fun)) ]
@@ -1196,33 +1216,87 @@ instance Outputable FRRArrowOrigin where
 
 {- *********************************************************************
 *                                                                      *
-              FixedRuntimeRep: HsWrapper WpFun origin
+              FixedRuntimeRep: ExpectedFunTy origin
 *                                                                      *
 ********************************************************************* -}
 
--- | While typechecking a 'WpFun' 'HsWrapper', in which context
--- did a representation polymorphism check arise?
+-- | In what context are we calling 'matchExpectedFunTys'
+-- or 'matchActualFunTySigma'?
 --
--- See 'FRROrigin' for more general origins of representation polymorphism checks.
-data WpFunOrigin
-  = WpFunSyntaxOp !CtOrigin
-  | WpFunViewPat  !(HsExpr GhcRn)
-  | WpFunFunTy    !Type
-  | WpFunFunExpTy !ExpType
+-- Used for two things:
+--
+--  1. Reporting error messages which explain that a function has been
+--     given an unexpected number of arguments.
+--     Uses 'pprExpectedFunTyHerald'.
+--     See Note [Herald for matchExpectedFunTys] in GHC.Tc.Utils.Unify.
+--
+--  2. Reporting representation-polymorphism errors when a function argument
+--     doesn't have a fixed RuntimeRep as per Note [Fixed RuntimeRep]
+--     in GHC.Tc.Utils.Concrete.
+--     Uses 'pprExpectedFunTyOrigin'.
+--     See 'FRROrigin' for more general origins of representation polymorphism checks.
+data ExpectedFunTyOrigin
+  = ExpectedFunTySyntaxOp !CtOrigin !(HsExpr GhcRn)
+  | ExpectedFunTyViewPat  !(HsExpr GhcRn)
+  | forall (p :: Pass)
+      . (OutputableBndrId p)
+      => ExpectedFunTyArg
+          !TypedThing
+            -- ^ function
+          !(HsExpr (GhcPass p))
+            -- ^ argument
+  | ExpectedFunTyMatches  !TypedThing !(MatchGroup GhcRn (LHsExpr GhcRn))
+  | ExpectedFunTyLam      !(MatchGroup GhcRn (LHsExpr GhcRn))
+  | ExpectedFunTyLamCase  !(HsExpr GhcRn)
 
-pprWpFunOrigin :: WpFunOrigin -> SDoc
-pprWpFunOrigin (WpFunSyntaxOp orig)
-  = vcat [ text "of a rebindable syntax operator arising from"
-         , nest 2 (ppr orig) ]
-pprWpFunOrigin (WpFunViewPat expr)
-  = vcat [ text "of the view pattern function"
-         , nest 2 (ppr expr) ]
-pprWpFunOrigin (WpFunFunTy fun_ty)
-  = vcat [ text "of the inferred argument type of a function with type"
-         , nest 2 (ppr fun_ty) ]
-pprWpFunOrigin (WpFunFunExpTy fun_ty)
-  = vcat [ text "of the inferred argument type of a function with expected type"
-         , nest 2 (ppr fun_ty) ]
+pprExpectedFunTyOrigin :: ExpectedFunTyOrigin
+                       -> Int -- ^ argument position (starting at 1)
+                       -> SDoc
+pprExpectedFunTyOrigin funTy_origin i =
+  case funTy_origin of
+    ExpectedFunTySyntaxOp orig op ->
+      vcat [ sep [ the_arg_of
+                 , text "the rebindable syntax operator"
+                 , quotes (ppr op) ]
+           , nest 2 (ppr orig) ]
+    ExpectedFunTyViewPat expr ->
+      vcat [ the_arg_of <+> text "the view pattern"
+           , nest 2 (ppr expr) ]
+    ExpectedFunTyArg fun arg ->
+      sep [ text "The argument"
+          , quotes (ppr arg)
+          , text "of"
+          , quotes (ppr fun) ]
+    ExpectedFunTyMatches fun (MG { mg_alts = L _ alts })
+      | null alts
+      -> the_arg_of <+> quotes (ppr fun)
+      | otherwise
+      -> text "The" <+> speakNth i <+> text "pattern in the equation" <> plural alts
+     <+> text "for" <+> quotes (ppr fun)
+    ExpectedFunTyLam {} ->
+      text "The binder of the lambda expression"
+    ExpectedFunTyLamCase {} ->
+      text "The binder of the lambda-case expression"
+  where
+    the_arg_of :: SDoc
+    the_arg_of = text "The" <+> speakNth i <+> text "argument of"
 
-instance Outputable WpFunOrigin where
-  ppr = pprWpFunOrigin
+pprExpectedFunTyHerald :: ExpectedFunTyOrigin -> SDoc
+pprExpectedFunTyHerald (ExpectedFunTySyntaxOp {})
+  = text "This rebindable syntax expects a function with"
+pprExpectedFunTyHerald (ExpectedFunTyViewPat {})
+  = text "A view pattern expression expects"
+pprExpectedFunTyHerald (ExpectedFunTyArg fun _)
+  = sep [ text "The function" <+> quotes (ppr fun)
+        , text "is applied to" ]
+pprExpectedFunTyHerald (ExpectedFunTyMatches fun (MG { mg_alts = L _ alts }))
+  = text "The equation" <> plural alts <+> text "for" <+> quotes (ppr fun) <+> hasOrHave alts
+pprExpectedFunTyHerald (ExpectedFunTyLam match)
+  = sep [ text "The lambda expression" <+>
+                   quotes (pprSetDepth (PartWay 1) $
+                           pprMatches match)
+        -- The pprSetDepth makes the lambda abstraction print briefly
+        , text "has" ]
+pprExpectedFunTyHerald (ExpectedFunTyLamCase expr)
+  = sep [ text "The function" <+> quotes (ppr expr)
+        , text "requires" ]

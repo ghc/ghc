@@ -27,7 +27,7 @@ import GHC.Core.Utils
 import GHC.Core.FVs
 import GHC.Core.Type
 
-import GHC.Types.Basic      ( RecFlag(..), isRec )
+import GHC.Types.Basic      ( RecFlag(..), isRec, Levity(Unlifted) )
 import GHC.Types.Id         ( isOneShotBndr, idType, isJoinId, isJoinId_maybe )
 import GHC.Types.Tickish
 import GHC.Types.Var
@@ -448,6 +448,7 @@ bindings are:
 
 fiExpr platform to_drop (_, AnnCase scrut case_bndr _ [AnnAlt con alt_bndrs rhs])
   | isUnliftedType (idType case_bndr)
+     -- binders have a fixed RuntimeRep so it's OK to call isUnliftedType
   , exprOkForSideEffects (deAnnotate scrut)
       -- See Note [Floating primops]
   = wrapFloats shared_binds $
@@ -592,7 +593,7 @@ noFloatIntoRhs is_rec bndr rhs
 
 noFloatIntoArg :: CoreExprWithFVs' -> Type -> Bool
 noFloatIntoArg expr expr_ty
-  | isUnliftedType expr_ty
+  | Just Unlifted <- typeLevity_maybe expr_ty
   = True  -- See Note [Do not destroy the let/app invariant]
 
    | AnnLam bndr e <- expr

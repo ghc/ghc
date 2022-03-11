@@ -5,12 +5,10 @@ T11473.hs:19:1: error:
     Its type is:
       a :: TYPE r
 
-T11473.hs:19:17: error:
-    • The function argument
-        ‘x’
+T11473.hs:19:11: error:
+    • The argument ‘x’ of ‘boxed’
       does not have a fixed runtime representation.
       Its type is:
         a :: TYPE r
-    • In the first argument of ‘boxed’, namely ‘x’
-      In the expression: boxed x
+    • In the expression: boxed x
       In an equation for ‘hello’: hello x = boxed x

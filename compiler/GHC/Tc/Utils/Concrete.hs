@@ -8,8 +8,6 @@ module GHC.Tc.Utils.Concrete
   ( -- * Ensuring that a type has a fixed runtime representation
     hasFixedRuntimeRep
   , hasFixedRuntimeRep_MustBeRefl
-    -- * HsWrapper: checking for representation-polymorphism
-  , mkWpFun
   )
  where
 
@@ -17,17 +15,15 @@ import GHC.Prelude
 
 import GHC.Builtin.Types       ( unliftedTypeKindTyCon, liftedTypeKindTyCon )
 
-import GHC.Core.Coercion       ( Role(..), multToCo )
+import GHC.Core.Coercion       ( Role(..) )
 import GHC.Core.Predicate      ( mkIsReflPrimPred )
-import GHC.Core.TyCo.Rep       ( Type(TyConApp), Scaled(..)
-                               , mkTyVarTy, scaledThing )
+import GHC.Core.TyCo.Rep       ( Type(TyConApp), mkTyVarTy )
 import GHC.Core.Type           ( isConcrete, typeKind )
 
 import GHC.Tc.Types            ( TcM, ThStage(Brack), PendingStuff(TcPending) )
 import GHC.Tc.Types.Constraint ( mkNonCanonical )
-import GHC.Tc.Types.Evidence   ( TcCoercion, HsWrapper(..)
-                               , mkTcFunCo, mkTcRepReflCo, mkTcSymCo )
-import GHC.Tc.Types.Origin     ( CtOrigin(..), FRROrigin(..), WpFunOrigin(..) )
+import GHC.Tc.Types.Evidence   ( TcCoercion )
+import GHC.Tc.Types.Origin     ( CtOrigin(..), FRROrigin(..) )
 import GHC.Tc.Utils.Monad      ( emitSimple, getStage )
 import GHC.Tc.Utils.TcType     ( TcType, TcKind, TcTyVar, MetaInfo(ConcreteTv) )
 import GHC.Tc.Utils.TcMType    ( newAnonMetaTyVar, newWanted, emitWantedEq )
@@ -471,31 +467,3 @@ emitNewConcreteWantedEq_maybe orig ty
   where
     ki :: TcKind
     ki = typeKind ty
-
-{-***********************************************************************
-*                                                                       *
-                 HsWrapper
-*                                                                       *
-***********************************************************************-}
-
--- | Smart constructor to create a 'WpFun' 'HsWrapper'.
---
--- Might emit new Wanted constraints to check for representation polymorphism.
--- This is necessary, as 'WpFun' will desugar to a lambda abstraction,
--- whose binder must have a fixed runtime representation.
-mkWpFun :: HsWrapper -> HsWrapper
-        -> Scaled TcType -- ^ the "from" type of the first wrapper
-        -> TcType        -- ^ either type of the second wrapper (used only when the
-                         -- second wrapper is the identity)
-        -> WpFunOrigin   -- ^ what caused you to want a WpFun?
-        -> TcM HsWrapper
-mkWpFun WpHole       WpHole       _             _  _ = return $ WpHole
-mkWpFun WpHole       (WpCast co2) (Scaled w t1) _  _ = return $ WpCast (mkTcFunCo Representational (multToCo w) (mkTcRepReflCo t1) co2)
-mkWpFun (WpCast co1) WpHole       (Scaled w _)  t2 _ = return $ WpCast (mkTcFunCo Representational (multToCo w) (mkTcSymCo co1) (mkTcRepReflCo t2))
-mkWpFun (WpCast co1) (WpCast co2) (Scaled w _)  _  _ = return $ WpCast (mkTcFunCo Representational (multToCo w) (mkTcSymCo co1) co2)
-mkWpFun co1          co2          t1            _  wpFunOrig
-  = do { hasFixedRuntimeRep_MustBeRefl (FRRWpFun wpFunOrig) (scaledThing t1)
-       ; return $ WpFun co1 co2 t1 }
-
-  -- NB: feel free to move this function elsewhere if you find a better place
-  -- for it (which doesn't create any cyclic imports).

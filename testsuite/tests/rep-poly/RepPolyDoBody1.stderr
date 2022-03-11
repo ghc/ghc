@@ -1,12 +1,12 @@
 
 RepPolyDoBody1.hs:24:3: error:
-    • • The first argument to (>>),
-        arising from the ‘do’ statement,
+    • • The first argument of the rebindable syntax operator ‘(>>)’
+          arising from a do statement
         does not have a fixed runtime representation.
         Its type is:
           ma :: TYPE rep
-      • The second argument to (>>),
-        arising from the ‘do’ statement,
+      • The first argument of the rebindable syntax operator ‘(>>)’
+          arising from a do statement
         does not have a fixed runtime representation.
         Its type is:
           mb0 :: TYPE rep

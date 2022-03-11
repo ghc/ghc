@@ -4,3 +4,11 @@ RepPolyNewtypePat1.hs:16:1: error:
     does not have a fixed runtime representation.
     Its type is:
       X a :: TYPE rep
+
+RepPolyNewtypePat1.hs:16:6: error:
+    • The newtype constructor pattern
+      does not have a fixed runtime representation.
+      Its type is:
+        a :: TYPE rep
+    • In the pattern: MkX bndr_a
+      In an equation for ‘bar’: bar (MkX bndr_a) = bndr_a

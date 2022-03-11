@@ -630,6 +630,7 @@ wantToUnboxArg do_unlifting fam_envs ty dmd@(n :* sd)
   , isStrUsedDmd dmd
   , not (isFunTy ty)
   , not (isUnliftedType ty) -- Already unlifted!
+    -- NB: function arguments have a fixed RuntimeRep, so it's OK to call isUnliftedType here
   = Unlift
 
   | otherwise
@@ -915,7 +916,7 @@ mkAbsentFiller :: WwOpts -> Id -> Maybe CoreExpr
 mkAbsentFiller opts arg
   -- The lifted case: Bind 'absentError' for a nice panic message if we are
   -- wrong (like we were in #11126). See (1) in Note [Absent fillers]
-  | not (isUnliftedType arg_ty)
+  | mightBeLiftedType arg_ty
   , not is_strict, not is_evald -- See (2) in Note [Absent fillers]
   = Just (mkAbsentErrorApp arg_ty msg)
 

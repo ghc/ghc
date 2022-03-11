@@ -96,7 +96,8 @@ import GHC.Types.Tickish
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Unique
-import GHC.Types.Basic     ( Arity, CbvMark(..), isMarkedCbv )
+import GHC.Types.Basic     ( Arity, CbvMark(..), Levity(..)
+                           , isMarkedCbv )
 import GHC.Types.Unique.Set
 
 import GHC.Data.FastString
@@ -524,7 +525,8 @@ bindNonRec bndr rhs body
 -- | Tests whether we have to use a @case@ rather than @let@ binding for this expression
 -- as per the invariants of 'CoreExpr': see "GHC.Core#let_app_invariant"
 needsCaseBinding :: Type -> CoreExpr -> Bool
-needsCaseBinding ty rhs = isUnliftedType ty && not (exprOkForSpeculation rhs)
+needsCaseBinding ty rhs =
+  mightBeUnliftedType ty && not (exprOkForSpeculation rhs)
         -- Make a case expression instead of a let
         -- These can arise either from the desugarer,
         -- or from beta reductions: (\x.e) (x +# y)
@@ -1590,6 +1592,7 @@ expr_ok primop_ok (Case scrut bndr _ alts)
   =  -- See Note [exprOkForSpeculation: case expressions]
      expr_ok primop_ok scrut
   && isUnliftedType (idType bndr)
+      -- OK to call isUnliftedType: binders always have a fixed RuntimeRep
   && all (\(Alt _ _ rhs) -> expr_ok primop_ok rhs) alts
   && altsAreExhaustive alts
 
@@ -1646,7 +1649,7 @@ app_ok primop_ok fun args
 
       _  -- Unlifted types
          -- c.f. the Var case of exprIsHNF
-         | isUnliftedType (idType fun)
+         | Just Unlifted <- typeLevity_maybe (idType fun)
          -> assertPpr (n_val_args == 0) (ppr fun $$ ppr args)
             True  -- Our only unlifted types are Int# etc, so will have
                   -- no value args.  The assert is just to check this.
@@ -1671,8 +1674,10 @@ app_ok primop_ok fun args
     primop_arg_ok :: TyBinder -> CoreExpr -> Bool
     primop_arg_ok (Named _) _ = True   -- A type argument
     primop_arg_ok (Anon _ ty) arg      -- A term argument
-       | isUnliftedType (scaledThing ty) = expr_ok primop_ok arg
-       | otherwise         = True  -- See Note [Primops with lifted arguments]
+       | Just Lifted <- typeLevity_maybe (scaledThing ty)
+       = True -- See Note [Primops with lifted arguments]
+       | otherwise
+       = expr_ok primop_ok arg
 
 -----------------------------
 altsAreExhaustive :: [Alt b] -> Bool
@@ -1917,7 +1922,7 @@ exprIsHNFlike is_con is_con_unf = is_hnf_like
         -- We don't look through loop breakers here, which is a bit conservative
         -- but otherwise I worry that if an Id's unfolding is just itself,
         -- we could get an infinite loop
-      || isUnliftedType (idType v)
+      || ( typeLevity_maybe (idType v) == Just Unlifted )
         -- Unlifted binders are always evaluated (#20140)
 
     is_hnf_like (Lit l)          = not (isLitRubbish l)
@@ -2684,15 +2689,20 @@ computeCbvInfo id rhs =
         map fst .
           -- Starting at the end, drop all non-cbv marks, and marks applied to unlifted types
           dropWhileEndLE (\(m,v) -> not (isMarkedCbv m) || isUnliftedType (idType v)) $
+            -- NB: function arguments must have a fixed RuntimeRep, so isUnliftedType can't crash.
           zip marks val_args
 
     mkCbvMarks :: ([Id]) -> [CbvMark]
     mkCbvMarks = map mkMark
       where
         cbv_arg arg = isEvaldUnfolding (idUnfolding arg)
-        mkMark arg = if cbv_arg arg && (not $ isUnliftedType (idType arg))
-          then MarkedCbv
-          else NotMarkedCbv
+        mkMark arg
+          | cbv_arg arg
+          , not $ isUnliftedType (idType arg)
+            -- NB: isUnliftedType can't crash here as function arguments have a fixed RuntimeRep
+          = MarkedCbv
+          | otherwise
+          = NotMarkedCbv
     -- If we determined earlier one an argument should be passed cbv it should
     -- still be so here.
     checkMarks id new_marks

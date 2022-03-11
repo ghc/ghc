@@ -1,6 +1,6 @@
 
 T17536b.hs:19:7: error:
-    • The first pattern in the lambda abstraction
+    • The binder of the lambda expression
       does not have a fixed runtime representation.
       Its type is:
         a :: TYPE r
@@ -11,7 +11,7 @@ T17536b.hs:19:7: error:
       In an equation for ‘g’: g L = \ _ -> 0
 
 T17536b.hs:20:7: error:
-    • The first pattern in the lambda abstraction
+    • The binder of the lambda expression
       does not have a fixed runtime representation.
       Its type is:
         a :: TYPE r

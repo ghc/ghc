@@ -8,7 +8,7 @@
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE UnliftedNewtypes #-}
 
-module T20363 where
+module T20363_show_co where
 
 import GHC.Exts
 

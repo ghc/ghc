@@ -544,6 +544,8 @@ mk_strict_superclasses rec_clss (CtGiven { ctev_evar = evar, ctev_loc = loc })
 
     do_one_given sel_id
       | isUnliftedType sc_pred
+         -- NB: class superclasses are never representation-polymorphic,
+         -- so isUnliftedType is OK here.
       , not (null tvs && null theta)
       = -- See Note [Equality superclasses in quantified constraints]
         return []

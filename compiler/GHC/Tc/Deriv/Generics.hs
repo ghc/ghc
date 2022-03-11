@@ -183,7 +183,7 @@ canDoGenerics dit@(DerivInstTys{dit_rep_tc = tc})
 
         -- Nor can we do the job if it's an existential data constructor,
         -- Nor if the args are polymorphic types (I don't think)
-    bad_arg_type ty = (isUnliftedType ty && not (allowedUnliftedTy ty))
+    bad_arg_type ty = (mightBeUnliftedType ty && not (allowedUnliftedTy ty))
                       || not (isTauTy ty)
 
 -- Returns True the Type argument is an unlifted type which has a

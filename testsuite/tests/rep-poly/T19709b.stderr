@@ -1,10 +1,13 @@
 
-T19709b.hs:11:14: error:
-    • The function argument
-        ‘(error @Any "e2")’
+T19709b.hs:11:7: error:
+    • The argument ‘(error @Any "e2")’ of ‘levfun’
       does not have a fixed runtime representation.
       Its type is:
         a0 :: TYPE Any
-    • In the first argument of ‘levfun’, namely ‘(error @Any "e2")’
-      In the first argument of ‘seq’, namely ‘levfun (error @Any "e2")’
+    • In the first argument of ‘seq’, namely ‘levfun (error @Any "e2")’
       In the expression: levfun (error @Any "e2") `seq` return []
+      In the expression:
+        let
+          levfun :: forall (r :: RuntimeRep) (a :: TYPE r). a -> ()
+          levfun = error "e1"
+        in levfun (error @Any "e2") `seq` return []

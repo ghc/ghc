@@ -1,20 +1,8 @@
 
 T12973.hs:13:7: error:
-    • The function argument
-        ‘3’
+    • The argument ‘3’ of ‘(+)’
       does not have a fixed runtime representation.
       Its type is:
         a :: TYPE r
-    • In the first argument of ‘(+)’, namely ‘3’
-      In the expression: 3 + 4
-      In an equation for ‘foo’: foo = 3 + 4
-
-T12973.hs:13:11: error:
-    • The function argument
-        ‘4’
-      does not have a fixed runtime representation.
-      Its type is:
-        a :: TYPE r
-    • In the second argument of ‘(+)’, namely ‘4’
-      In the expression: 3 + 4
+    • In the expression: 3 + 4
       In an equation for ‘foo’: foo = 3 + 4

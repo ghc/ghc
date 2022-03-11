@@ -991,6 +991,8 @@ isUnliftedHsBind bind
   = any is_unlifted_id (collectHsBindBinders CollNoDictBinders bind)
   where
     is_unlifted_id id = isUnliftedType (idType id)
+      -- bindings always have a fixed RuntimeRep, so it's OK
+      -- to call isUnliftedType here
 
 -- | Is a binding a strict variable or pattern bind (e.g. @!x = ...@)?
 isBangedHsBind :: HsBind GhcTc -> Bool

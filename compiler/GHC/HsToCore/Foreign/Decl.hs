@@ -820,6 +820,8 @@ getPrimTyOf ty
      Just (_, _, data_con, [Scaled _ prim_ty]) ->
         assert (dataConSourceArity data_con == 1) $
         assertPpr (isUnliftedType prim_ty) (ppr prim_ty)
+          -- NB: it's OK to call isUnliftedType here, as we don't allow
+          -- representation-polymorphic types in foreign import/export declarations
         prim_ty
      _other -> pprPanic "GHC.HsToCore.Foreign.Decl.getPrimTyOf" (ppr ty)
   where

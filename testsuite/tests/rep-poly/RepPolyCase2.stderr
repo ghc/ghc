@@ -1,0 +1,11 @@
+
+RepPolyCase2.hs:33:7: error:
+    • The scrutinee of the case statement
+      does not have a fixed runtime representation.
+      Its type is:
+        Unbox Int :: TYPE (Rep Int)
+      NB: GHC does not (yet) support rewriting in runtime representations.
+      Please comment on GHC ticket #13105 if this is causing you trouble.
+      <https://gitlab.haskell.org/ghc/ghc/-/issues/13105>
+    • In the expression: case unbox (3 :: Int) of _ -> ()
+      In an equation for ‘x’: x _ = case unbox (3 :: Int) of _ -> ()

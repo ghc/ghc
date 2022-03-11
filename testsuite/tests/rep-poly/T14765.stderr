@@ -1,10 +1,10 @@
 
-T14765.hs:11:31: error:
-    • The function argument
-        ‘(k proxy#)’
+T14765.hs:11:29: error:
+    • The argument ‘(k proxy#)’ of ‘f’
       does not have a fixed runtime representation.
       Its type is:
         r :: TYPE rep
-    • In the first argument of ‘f’, namely ‘(k proxy#)’
-      In the second argument of ‘fold’, namely ‘(f (k proxy#) x)’
+    • In the second argument of ‘fold’, namely ‘(f (k proxy#) x)’
       In the expression: fold f (f (k proxy#) x) xs
+      In an equation for ‘fold’:
+          fold f k (x : xs) = fold f (f (k proxy#) x) xs

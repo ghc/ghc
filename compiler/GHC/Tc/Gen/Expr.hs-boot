@@ -1,7 +1,8 @@
 module GHC.Tc.Gen.Expr where
 import GHC.Hs              ( HsExpr, LHsExpr, SyntaxExprRn
                            , SyntaxExprTc )
-import GHC.Tc.Utils.TcType ( TcRhoType, TcSigmaType, SyntaxOpType
+import GHC.Tc.Utils.TcType ( TcRhoType, TcSigmaType, TcSigmaTypeFRR
+                           , SyntaxOpType
                            , ExpType, ExpRhoType, ExpSigmaType )
 import GHC.Tc.Types        ( TcM )
 import GHC.Tc.Types.Origin ( CtOrigin )
@@ -32,13 +33,13 @@ tcSyntaxOp :: CtOrigin
            -> SyntaxExprRn
            -> [SyntaxOpType]           -- ^ shape of syntax operator arguments
            -> ExpType                  -- ^ overall result type
-           -> ([TcSigmaType] -> [Mult] -> TcM a) -- ^ Type check any arguments
+           -> ([TcSigmaTypeFRR] -> [Mult] -> TcM a) -- ^ Type check any arguments
            -> TcM (a, SyntaxExprTc)
 
 tcSyntaxOpGen :: CtOrigin
               -> SyntaxExprRn
               -> [SyntaxOpType]
               -> SyntaxOpType
-              -> ([TcSigmaType] -> [Mult] -> TcM a)
+              -> ([TcSigmaTypeFRR] -> [Mult] -> TcM a)
               -> TcM (a, SyntaxExprTc)
 

@@ -1,0 +1,8 @@
+
+RepPolyCase1.hs:14:7: error:
+    • The scrutinee of the case statement
+      does not have a fixed runtime representation.
+      Its type is:
+        a :: TYPE r
+    • In the expression: case bar @a () of {}
+      In an equation for ‘x’: x _ = case bar @a () of {}

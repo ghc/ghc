@@ -1741,8 +1741,43 @@ pprTcSolverReportMsg _ (FixedRuntimeRepError frr_infos) =
         (if length frr_infos > 1 then (bullet <+>) else id) $
           vcat [ sep [ pprFRROrigin frr_orig
                      , text "does not have a fixed runtime representation." ]
-               , text "Its type is:"
-               , nest 2 $ ppr ty <+> dcolon <+> pprWithTYPE (typeKind ty) ]
+               , type_printout ty ]
+
+    -- Don't print out the type (only the kind), if the type includes
+    -- a confusing cast, unless the user passed -fprint-explicit-coercions.
+    --
+    -- Example:
+    --
+    --   In T20363, we have a representation-polymorphism error with a type
+    --   of the form
+    --
+    --     ( (# #) |> co ) :: TYPE NilRep
+    --
+    --   where NilRep is a nullary type family application which reduces to TupleRep '[].
+    --   We prefer avoiding showing the cast to the user, but we also don't want to
+    --   print the confusing:
+    --
+    --     (# #) :: TYPE NilRep
+    --
+    --  So in this case we simply don't print the type, only the kind.
+    confusing_cast :: Type -> Bool
+    confusing_cast ty =
+      case ty of
+        CastTy inner_ty _
+          -- A confusing cast is one that is responsible
+          -- for a representation-polymorphism error.
+          -> isConcrete (typeKind inner_ty)
+        _ -> False
+
+    type_printout :: Type -> SDoc
+    type_printout ty =
+      sdocOption sdocPrintExplicitCoercions $ \ show_coercions ->
+        if confusing_cast ty && not show_coercions
+        then vcat [ text "Its kind is:"
+                  , nest 2 $ pprWithTYPE (typeKind ty)
+                  , text "(Use -fprint-explicit-coercions to see the full type.)" ]
+        else vcat [ text "Its type is:"
+                  , nest 2 $ ppr ty <+> dcolon <+> pprWithTYPE (typeKind ty) ]
 
     -- In PHASE 1 of FixedRuntimeRep, we don't allow rewriting in hasFixedRuntimeRep,
     -- so we add a special message to explain this to the user.

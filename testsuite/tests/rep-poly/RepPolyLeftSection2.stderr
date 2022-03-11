@@ -1,10 +1,8 @@
 
 RepPolyLeftSection2.hs:14:11: error:
-    • The function argument
-        ‘undefined’
+    • The argument ‘undefined’ of ‘f’
       does not have a fixed runtime representation.
       Its type is:
         a :: TYPE r
-    • In the expression: undefined
-      In the expression: undefined `f`
+    • In the expression: undefined `f`
       In an equation for ‘test1’: test1 = (undefined `f`)

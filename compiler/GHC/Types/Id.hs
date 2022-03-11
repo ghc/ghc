@@ -1069,7 +1069,7 @@ transferPolyIdInfo old_id abstract_wrt new_id
       = Nothing
       | isId v
       , isEvaldUnfolding (idUnfolding v)
-      , not (isUnliftedType $ idType v)
+      , mightBeLiftedType (idType v)
       = Just MarkedCbv
       | otherwise = Just NotMarkedCbv
     transfer new_info = new_info `setArityInfo` new_arity

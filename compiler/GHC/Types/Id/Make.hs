@@ -1007,6 +1007,8 @@ dataConSrcToImplBang _ _ _ (HsSrcBang _ _ SrcLazy)
 dataConSrcToImplBang bang_opts fam_envs arg_ty
                      (HsSrcBang _ unpk_prag SrcStrict)
   | isUnliftedType (scaledThing arg_ty)
+    -- NB: non-newtype data constructors can't have representation-polymorphic fields
+    -- so this is OK.
   = HsLazy  -- For !Int#, say, use HsLazy
             -- See Note [Data con wrappers and unlifted types]
 

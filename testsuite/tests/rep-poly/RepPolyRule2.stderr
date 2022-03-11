@@ -1,10 +1,8 @@
 
-RepPolyRule2.hs:17:55: error:
-    • The function argument
-        ‘x’
+RepPolyRule2.hs:17:53: error:
+    • The argument ‘x’ of ‘f’
       does not have a fixed runtime representation.
       Its type is:
         a :: TYPE (F rep)
-    • In the first argument of ‘f’, namely ‘x’
-      In the expression: f x
+    • In the expression: f x
       When checking the rewrite rule "f_id"

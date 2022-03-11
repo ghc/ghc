@@ -1,7 +1,7 @@
 
 RepPolyDoBody2.hs:23:3: error:
-    • The second argument to (>>),
-      arising from the ‘do’ statement,
+    • The first argument of the rebindable syntax operator ‘(>>)’
+        arising from a do statement
       does not have a fixed runtime representation.
       Its type is:
         mb0 :: TYPE rep

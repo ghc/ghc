@@ -1,12 +1,24 @@
 
 RepPolyRecordPattern.hs:7:35: error:
-    The first pattern in the equation for ‘fld’
-    does not have a fixed runtime representation.
-    Its type is:
-      X a :: TYPE rep
+    • The newtype constructor pattern
+      does not have a fixed runtime representation.
+      Its type is:
+        a :: TYPE rep
+    • The first pattern in the equation for ‘fld’
+      does not have a fixed runtime representation.
+      Its type is:
+        X a :: TYPE rep
 
 RepPolyRecordPattern.hs:13:1: error:
     The first pattern in the equation for ‘upd’
     does not have a fixed runtime representation.
     Its type is:
       X a :: TYPE rep
+
+RepPolyRecordPattern.hs:13:7: error:
+    • The newtype constructor pattern
+      does not have a fixed runtime representation.
+      Its type is:
+        a :: TYPE rep
+    • In the pattern: MkX bndr_a
+      In an equation for ‘upd’: upd (MkX bndr_a) = bndr_a

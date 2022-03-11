@@ -46,6 +46,7 @@ import GHC.Utils.Monad (allM)
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Data.Bag
+import GHC.Types.Basic (Levity(..))
 import GHC.Types.CompleteMatch
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.DSet
@@ -674,7 +675,7 @@ addPhiTmCt nabla (PhiNotBotCt x)           = addNotBotCt nabla x
 filterUnliftedFields :: PmAltCon -> [Id] -> [Id]
 filterUnliftedFields con args =
   [ arg | (arg, bang) <- zipEqual "addPhiCt" args (pmAltConImplBangs con)
-        , isBanged bang || isUnliftedType (idType arg) ]
+        , isBanged bang || typeLevity_maybe (idType arg) == Just Unlifted ]
 
 -- | Adds the constraint @x ~ ⊥@, e.g. that evaluation of a particular 'Id' @x@
 -- surely diverges. Quite similar to 'addConCt', only that it only cares about
@@ -685,11 +686,12 @@ addBotCt nabla@MkNabla{ nabla_tm_st = ts@TmSt{ ts_facts=env } } x = do
   case bot of
     IsNotBot -> mzero      -- There was x ≁ ⊥. Contradiction!
     IsBot    -> pure nabla -- There already is x ~ ⊥. Nothing left to do
-    MaybeBot ->            -- We add x ~ ⊥
+    MaybeBot               -- We add x ~ ⊥
+      | Just Unlifted <- typeLevity_maybe (idType x)
       -- Case (3) in Note [Strict fields and variables of unlifted type]
-      if isUnliftedType (idType x)
-        then mzero -- unlifted vars can never be ⊥
-        else do
+      -> mzero -- unlifted vars can never be ⊥
+      | otherwise
+      -> do
           let vi' = vi{ vi_bot = IsBot }
           pure nabla{ nabla_tm_st = ts{ts_facts = addToUSDFM env y vi' } }
 
@@ -1355,15 +1357,13 @@ isDataConTriviallyInhabited :: DataCon -> Bool
 isDataConTriviallyInhabited dc
   | isTyConTriviallyInhabited (dataConTyCon dc) = True
 isDataConTriviallyInhabited dc =
-  null (dataConTheta dc) &&         -- (1)
-  null (dataConImplBangs dc) &&     -- (2)
-  null (dataConUnliftedFieldTys dc) -- (3)
+  null (dataConTheta dc) &&                -- (1)
+  null (dataConImplBangs dc) &&            -- (2)
+  null (dataConMightBeUnliftedFieldTys dc) -- (3)
 
-dataConUnliftedFieldTys :: DataCon -> [Type]
-dataConUnliftedFieldTys =
-  -- A representation-polymorphic field requires an inhabitation test, hence compare to
-  -- @Just True@
-  filter ((== Just True) . isLiftedType_maybe) . map scaledThing . dataConOrigArgTys
+dataConMightBeUnliftedFieldTys :: DataCon -> [Type]
+dataConMightBeUnliftedFieldTys =
+  filter mightBeUnliftedType . map scaledThing . dataConOrigArgTys
 
 isTyConTriviallyInhabited :: TyCon -> Bool
 isTyConTriviallyInhabited tc = elementOfUniqSet (getUnique tc) triviallyInhabitedTyConKeys
@@ -1401,7 +1401,7 @@ compareConLikeTestability (RealDataCon a) (RealDataCon b) = mconcat
     -- the unlikely bogus case of an unlifted field that has a bang.
     unlifted_or_strict_fields :: DataCon -> Int
     unlifted_or_strict_fields dc = fast_length (dataConImplBangs dc)
-                                 + fast_length (dataConUnliftedFieldTys dc)
+                                 + fast_length (dataConMightBeUnliftedFieldTys dc)
 
 -- | @instCon fuel nabla (x::match_ty) K@ tries to instantiate @x@ to @K@ by
 -- adding the proper constructor constraint.

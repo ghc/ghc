@@ -6,7 +6,7 @@ RepPolyUnboxedPatterns.hs:8:1: error:
       (# a, b #) :: TYPE ('TupleRep '[rep1, rep2])
 
 RepPolyUnboxedPatterns.hs:11:1: error:
-    The first pattern in the equation for ‘bar’
+    The first pattern in the equations for ‘bar’
     does not have a fixed runtime representation.
     Its type is:
       (# a | b #) :: TYPE ('SumRep '[rep1, rep2])

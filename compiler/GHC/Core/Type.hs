@@ -121,12 +121,13 @@ module GHC.Core.Type (
         tyConAppNeedsKindSig,
 
         -- *** Levity and boxity
-        isLiftedType_maybe,
+        typeLevity_maybe,
         isLiftedTypeKind, isUnliftedTypeKind, isBoxedTypeKind, pickyIsLiftedTypeKind,
-        isLiftedRuntimeRep, isUnliftedRuntimeRep, isLiftedRuntimeRep_maybe,
+        isLiftedRuntimeRep, isUnliftedRuntimeRep, runtimeRepLevity_maybe,
         isBoxedRuntimeRep,
         isLiftedLevity, isUnliftedLevity,
-        isUnliftedType, isBoxedType, mightBeUnliftedType, isUnboxedTupleType, isUnboxedSumType,
+        isUnliftedType, isBoxedType, isUnboxedTupleType, isUnboxedSumType,
+        mightBeLiftedType, mightBeUnliftedType,
         isStateType,
         isAlgType, isDataFamilyAppType,
         isPrimitiveType, isStrictType,
@@ -733,25 +734,25 @@ isBoxedRuntimeRep_maybe rep
 --
 -- @isLiftedRuntimeRep rr@ returns:
 --
---   * @Just True @ if @rr@ is @LiftedRep :: RuntimeRep@
---   * @Just False@ if @rr@ is definitely not lifted, e.g. @IntRep@
---   * @Nothing   @ if not known (e.g. it's a type variable or a type family application).
-isLiftedRuntimeRep_maybe :: Type -> Maybe Bool
-isLiftedRuntimeRep_maybe rep
+--   * @Just Lifted@ if @rr@ is @LiftedRep :: RuntimeRep@
+--   * @Just Unlifted@ if @rr@ is definitely unlifted, e.g. @IntRep@
+--   * @Nothing@ if not known (e.g. it's a type variable or a type family application).
+runtimeRepLevity_maybe :: Type -> Maybe Levity
+runtimeRepLevity_maybe rep
   | TyConApp rr_tc args <- coreFullView rep
   , isPromotedDataCon rr_tc =
       -- NB: args might be non-empty e.g. TupleRep [r1, .., rn]
       if (rr_tc `hasKey` boxedRepDataConKey)
         then case args of
-          [lev] | isLiftedLevity   lev -> Just True
-                | isUnliftedLevity lev -> Just False
+          [lev] | isLiftedLevity   lev -> Just Lifted
+                | isUnliftedLevity lev -> Just Unlifted
           _                            -> Nothing
-        else Just False
+        else Just Unlifted
         -- Avoid searching all the unlifted RuntimeRep type cons
         -- In the RuntimeRep data type, only LiftedRep is lifted
         -- But be careful of type families (F tys) :: RuntimeRep,
         -- hence the isPromotedDataCon rr_tc
-isLiftedRuntimeRep_maybe _ = Nothing
+runtimeRepLevity_maybe _ = Nothing
 
 -- | Check whether a type of kind 'RuntimeRep' is lifted.
 --
@@ -761,11 +762,8 @@ isLiftedRuntimeRep_maybe _ = Nothing
 --  * False of type variables, type family applications,
 --    and of other reps such as @IntRep :: RuntimeRep@.
 isLiftedRuntimeRep :: Type -> Bool
-isLiftedRuntimeRep rep
-  | Just True <- isLiftedRuntimeRep_maybe rep
-  = True
-  | otherwise
-  = False
+isLiftedRuntimeRep rep =
+  runtimeRepLevity_maybe rep == Just Lifted
 
 -- | Check whether a type of kind 'RuntimeRep' is unlifted.
 --
@@ -774,11 +772,8 @@ isLiftedRuntimeRep rep
 --  * False of 'LiftedRep',
 --  * False for type variables and type family applications.
 isUnliftedRuntimeRep :: Type -> Bool
-isUnliftedRuntimeRep rep
-  | Just False <- isLiftedRuntimeRep_maybe rep
-  = True
-  | otherwise
-  = False
+isUnliftedRuntimeRep rep =
+  runtimeRepLevity_maybe rep == Just Unlifted
 
 -- | An INLINE helper for functions such as 'isLiftedLevity' and 'isUnliftedLevity'.
 --
@@ -2453,18 +2448,17 @@ buildSynTyCon name binders res_kind roles rhs
 ************************************************************************
 -}
 
--- | Returns Just True if this type is surely lifted, Just False
--- if it is surely unlifted, Nothing if we can't be sure (i.e., it is
--- representation-polymorphic), and panics if the kind does not have the shape
--- TYPE r.
-isLiftedType_maybe :: HasDebugCallStack => Type -> Maybe Bool
-isLiftedType_maybe ty = case coreFullView (getRuntimeRep ty) of
-  ty' | isLiftedRuntimeRep ty'  -> Just True
-      | isUnliftedRuntimeRep ty' -> Just False
-  TyConApp {}                   -> Just False  -- Everything else is unlifted
-  _                             -> Nothing     -- representation-polymorphic
+-- | Tries to compute the 'Levity' of the given type. Returns either
+-- a definite 'Levity', or 'Nothing' if we aren't sure (e.g. the
+-- type is representation-polymorphic).
+--
+-- Panics if the kind does not have the shape @TYPE r@.
+typeLevity_maybe :: HasDebugCallStack => Type -> Maybe Levity
+typeLevity_maybe ty = runtimeRepLevity_maybe (getRuntimeRep ty)
 
--- | See "Type#type_classification" for what an unlifted type is.
+-- | Is the given type definitely unlifted?
+-- See "Type#type_classification" for what an unlifted type is.
+--
 -- Panics on representation-polymorphic types; See 'mightBeUnliftedType' for
 -- a more approximate predicate that behaves better in the presence of
 -- representation polymorphism.
@@ -2474,9 +2468,12 @@ isUnliftedType :: HasDebugCallStack => Type -> Bool
         -- I found bindings like these were getting floated to the top level.
         -- They are pretty bogus types, mind you.  It would be better never to
         -- construct them
-isUnliftedType ty
-  = not (isLiftedType_maybe ty `orElse`
-         pprPanic "isUnliftedType" (ppr ty <+> dcolon <+> ppr (typeKind ty)))
+isUnliftedType ty =
+  case typeLevity_maybe ty of
+    Just Lifted   -> False
+    Just Unlifted -> True
+    Nothing       ->
+      pprPanic "isUnliftedType" (ppr ty <+> dcolon <+> ppr (typeKind ty))
 
 -- | State token type.
 isStateType :: Type -> Bool
@@ -2487,14 +2484,19 @@ isStateType ty
 
 -- | Returns:
 --
+-- * 'False' if the type is /guaranteed/ unlifted or
+-- * 'True' if it lifted, OR we aren't sure
+--    (e.g. in a representation-polymorphic case)
+mightBeLiftedType :: Type -> Bool
+mightBeLiftedType = mightBeLifted . typeLevity_maybe
+
+-- | Returns:
+--
 -- * 'False' if the type is /guaranteed/ lifted or
 -- * 'True' if it is unlifted, OR we aren't sure
 --    (e.g. in a representation-polymorphic case)
 mightBeUnliftedType :: Type -> Bool
-mightBeUnliftedType ty
-  = case isLiftedType_maybe ty of
-      Just is_lifted -> not is_lifted
-      Nothing -> True
+mightBeUnliftedType = mightBeUnlifted . typeLevity_maybe
 
 -- | See "Type#type_classification" for what a boxed type is.
 -- Panics on representation-polymorphic types; See 'mightBeUnliftedType' for

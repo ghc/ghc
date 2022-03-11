@@ -675,14 +675,17 @@ tcInferOverLit lit@(OverLit { ol_val = val
     --   where fromInteger is gotten by looking up from_name, and
     --   the (3 :: Integer) is returned by mkOverLit
     -- Ditto the string literal "foo" to (fromString ("foo" :: String))
-    do { from_id <- tcLookupId from_name
-       ; (wrap1, from_ty) <- topInstantiate orig (idType from_id)
-
+    do { hs_lit <- mkOverLit val
+       ; from_id <- tcLookupId from_name
+       ; (wrap1, from_ty) <- topInstantiate (LiteralOrigin lit) (idType from_id)
+       ; let
+           thing    = NameThing from_name
+           mb_thing = Just thing
+           herald   = ExpectedFunTyArg thing (HsLit noAnn hs_lit)
        ; (wrap2, sarg_ty, res_ty) <- matchActualFunTySigma herald mb_thing
                                                            (1, []) from_ty
-       ; hs_lit <- mkOverLit val
-       ; co <- unifyType mb_thing (hsLitType hs_lit) (scaledThing sarg_ty)
 
+       ; co <- unifyType mb_thing (hsLitType hs_lit) (scaledThing sarg_ty)
        ; let lit_expr = L (l2l loc) $ mkHsWrapCo co $
                         HsLit noAnn hs_lit
              from_expr = mkHsWrap (wrap2 <.> wrap1) $
@@ -692,12 +695,6 @@ tcInferOverLit lit@(OverLit { ol_val = val
                                              , ol_witness = witness
                                              , ol_type = res_ty } }
        ; return (HsOverLit noAnn lit', res_ty) }
-  where
-    orig     = LiteralOrigin lit
-    mb_thing = Just (NameThing from_name)
-    herald   = sep [ text "The function" <+> quotes (ppr from_name)
-                 , text "is applied to"]
-
 
 {- *********************************************************************
 *                                                                      *

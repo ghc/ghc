@@ -269,6 +269,8 @@ splitRecFloats fs
   = go [] [] (bagToList fs)
   where
     go ul_prs prs (FloatLet (NonRec b r) : fs) | isUnliftedType (idType b)
+                                               -- NB: isUnliftedType is OK here as binders always
+                                               -- have a fixed RuntimeRep.
                                                , not (isJoinId b)
                                                = go ((b,r):ul_prs) prs fs
                                                | otherwise

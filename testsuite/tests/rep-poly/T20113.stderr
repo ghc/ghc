@@ -1,6 +1,10 @@
 
-T20113.hs:4:35: error:
-    The first pattern in the equation for ‘$sel:y_fld:MkY’
-    does not have a fixed runtime representation.
-    Its type is:
-      Y a :: TYPE rep
+T20113.hs:7:35: error:
+    • The newtype constructor pattern
+      does not have a fixed runtime representation.
+      Its type is:
+        a :: TYPE rep
+    • The first pattern in the equation for ‘$sel:y_fld:MkY’
+      does not have a fixed runtime representation.
+      Its type is:
+        Y a :: TYPE rep

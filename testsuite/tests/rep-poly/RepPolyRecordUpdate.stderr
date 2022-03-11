@@ -1,9 +1,13 @@
 
 RepPolyRecordUpdate.hs:7:35: error:
-    The first pattern in the equation for ‘fld’
-    does not have a fixed runtime representation.
-    Its type is:
-      X a :: TYPE rep
+    • The newtype constructor pattern
+      does not have a fixed runtime representation.
+      Its type is:
+        a :: TYPE rep
+    • The first pattern in the equation for ‘fld’
+      does not have a fixed runtime representation.
+      Its type is:
+        X a :: TYPE rep
 
 RepPolyRecordUpdate.hs:13:9: error:
     • The record update at field ‘fld’

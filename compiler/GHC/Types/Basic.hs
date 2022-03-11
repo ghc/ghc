@@ -104,6 +104,10 @@ module GHC.Types.Basic (
 
         TypeOrKind(..), isTypeLevel, isKindLevel,
 
+        Levity(..), mightBeLifted, mightBeUnlifted,
+
+        ExprOrPat(..),
+
         NonStandardDefaultingStrategy(..),
         DefaultingStrategy(..), defaultNonStandardTyVars,
 
@@ -1836,6 +1840,48 @@ isTypeLevel KindLevel = False
 isKindLevel :: TypeOrKind -> Bool
 isKindLevel TypeLevel = False
 isKindLevel KindLevel = True
+
+{- *********************************************************************
+*                                                                      *
+                     Levity information
+*                                                                      *
+********************************************************************* -}
+
+data Levity
+  = Lifted
+  | Unlifted
+  deriving Eq
+
+instance Outputable Levity where
+  ppr Lifted   = text "Lifted"
+  ppr Unlifted = text "Unlifted"
+
+mightBeLifted :: Maybe Levity -> Bool
+mightBeLifted (Just Unlifted) = False
+mightBeLifted _               = True
+
+mightBeUnlifted :: Maybe Levity -> Bool
+mightBeUnlifted (Just Lifted) = False
+mightBeUnlifted _             = True
+
+{- *********************************************************************
+*                                                                      *
+                     Expressions vs Patterns
+*                                                                      *
+********************************************************************* -}
+
+-- | Are we dealing with an expression or a pattern?
+--
+-- Used only for the textual output of certain error messages;
+-- see the 'FRRDataConArg' constructor of 'FRROrigin'.
+data ExprOrPat
+  = Expression
+  | Pattern
+  deriving Eq
+
+instance Outputable ExprOrPat where
+  ppr Expression = text "expression"
+  ppr Pattern    = text "pattern"
 
 {- *********************************************************************
 *                                                                      *

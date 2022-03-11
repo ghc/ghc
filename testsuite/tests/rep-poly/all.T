@@ -24,7 +24,6 @@ test('T20113', normal, compile_fail, [''])
 test('T20277', normal, compile_fail, [''])
 test('T20330a', normal, compile, [''])
 test('T20330b', normal, compile, [''])
-test('T20363', normal, compile, [''])
 test('T20423', normal, compile_fail, [''])
 test('T20423b', normal, compile_fail, [''])
 test('T20426', normal, compile_fail, [''])
@@ -40,12 +39,14 @@ test('RepPolyBackpack3', normal, backpack_compile_fail, [''])
 test('RepPolyBackpack4', normal, backpack_run, [''])
 test('RepPolyBackpack5', normal, backpack_run, [''])
 test('RepPolyBinder', normal, compile_fail, [''])
+test('RepPolyCase1', normal, compile_fail, [''])
 test('RepPolyClassMethod', normal, compile_fail, [''])
 test('RepPolyDeferred', normal, compile_fail, [''])
 test('RepPolyDoBind', normal, compile_fail, [''])
 test('RepPolyDoBody1', normal, compile_fail, [''])
 test('RepPolyDoBody2', normal, compile_fail, [''])
 test('RepPolyDoReturn', normal, compile, [''])
+test('RepPolyFFI', normal, compile, [''])
 test('RepPolyLeftSection1', normal, compile, [''])
 test('RepPolyLeftSection2', normal, compile_fail, [''])
 test('RepPolyMagic', normal, compile_fail, [''])
@@ -70,6 +71,7 @@ test('RepPolyTuple', normal, compile_fail, [''])
 test('RepPolyTupleSection', normal, compile_fail, [''])
 test('RepPolyUnboxedPatterns', normal, compile_fail, [''])
 test('RepPolyUnliftedDatatype', normal, compile, [''])
+test('RepPolyUnliftedDatatype2', normal, compile, ['-O'])
 test('RepPolyWildcardPattern', normal, compile_fail, [''])
 test('RepPolyWrappedVar', normal, compile_fail, [''])
 test('RepPolyWrappedVar2', normal, compile, [''])
@@ -86,6 +88,10 @@ test('UnliftedNewtypesLevityBinder', normal, compile_fail, [''])
 test('T13105', normal, compile_fail, [''])                          ##
 test('T17021', normal, compile_fail, [''])                          ##
 test('T17536b', normal, compile_fail, [''])                         ##
+test('T20363', normal, compile_fail, [''])                          ##
+test('T20363_show_co', normal, compile_fail                         ##
+    , ['-fprint-explicit-coercions'])                               ##
 test('T20363b', normal, compile_fail, [''])                         ##
+test('RepPolyCase2', normal, compile_fail, [''])                    ##
 test('RepPolyRule3', normal, compile_fail, [''])                    ##
 ######################################################################

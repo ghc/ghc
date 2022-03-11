@@ -574,25 +574,40 @@ When we transform to
 
 Its not wrong to drop it on the floor, but better to keep it.
 
-Note [Cast w/w: unlifted]
-~~~~~~~~~~~~~~~~~~~~~~~~~
-BUT don't do cast worker/wrapper if 'e' has an unlifted type.
-This *can* happen:
+Note [Preserve RuntimeRep info in cast w/w]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We must not do cast w/w when the presence of the coercion is needed in order
+to determine the runtime representation.
 
-     foo :: Int = (error (# Int,Int #) "urk")
-                  `cast` CoUnsafe (# Int,Int #) Int
+Example:
 
-If do the makeTrivial thing to the error call, we'll get
-    foo = case error (# Int,Int #) "urk" of v -> v `cast` ...
-But 'v' isn't in scope!
+  Suppose we have a type family:
 
-These strange casts can happen as a result of case-of-case
-        bar = case (case x of { T -> (# 2,3 #); F -> error "urk" }) of
-                (# p,q #) -> p+q
+    type F :: RuntimeRep
+    type family F where
+      F = LiftedRep
 
-NOTE: Nowadays we don't use casts for these error functions;
-instead, we use (case erorr ... of {}). So I'm not sure
-this Note makes much sense any more.
+  together with a type `ty :: TYPE F` and a top-level binding
+
+    a :: ty |> TYPE F[0]
+
+  The kind of `ty |> TYPE F[0]` is `LiftedRep`, so `a` is a top-level lazy binding.
+  However, were we to apply cast w/w, we would get:
+
+    b :: ty
+    b = ...
+
+    a :: ty |> TYPE F[0]
+    a = b `cast` GRefl (TYPE F[0])
+
+  Now we are in trouble because `ty :: TYPE F` does not have a known runtime
+  representation, because we need to be able to reduce the nullary type family
+  application `F` to find that out.
+
+Conclusion: only do cast w/w when doing so would not lose the RuntimeRep
+information. That is, when handling `Cast rhs co`, don't attempt cast w/w
+unless the kind of the type of rhs is concrete, in the sense of
+Note [Concrete types] in GHC.Tc.Utils.Concrete.
 -}
 
 tryCastWorkerWrapper :: SimplEnv -> TopLevelFlag
@@ -606,8 +621,9 @@ tryCastWorkerWrapper env top_lvl old_bndr occ_info bndr (Cast rhs co)
                         --            a DFunUnfolding in mk_worker_unfolding
   , not (exprIsTrivial rhs)        -- Not x = y |> co; Wrinkle 1
   , not (hasInlineUnfolding info)  -- Not INLINE things: Wrinkle 4
-  , not (isUnliftedType rhs_ty)    -- Not if rhs has an unlifted type;
-                                   --     see Note [Cast w/w: unlifted]
+  , isConcrete (typeKind rhs_ty)   -- Don't peel off a cast if doing so would
+                                   -- lose the underlying runtime representation.
+                                   -- See Note [Preserve RuntimeRep info in cast w/w]
   = do  { (rhs_floats, work_rhs) <- prepareRhs env top_lvl occ_fs rhs
         ; uniq <- getUniqueM
         ; let work_name = mkSystemVarName uniq occ_fs
@@ -2850,6 +2866,7 @@ doCaseToLet scrut case_bndr
   = isTyCoArg scrut        -- Note [Core type and coercion invariant]
 
   | isUnliftedType (idType case_bndr)
+    -- OK to call isUnliftedType: scrutinees always have a fixed RuntimeRep (see FRRCase)
   = exprOkForSpeculation scrut
 
   | otherwise  -- Scrut has a lifted type

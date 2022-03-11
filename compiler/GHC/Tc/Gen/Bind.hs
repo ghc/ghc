@@ -1212,7 +1212,7 @@ tcMonoBinds is_rec sig_fn no_gen
     do { (grhss', pat_ty) <- tcInfer $ \ exp_ty ->
                              tcGRHSsPat grhss exp_ty
 
-       ; let exp_pat_ty :: Scaled ExpSigmaType
+       ; let exp_pat_ty :: Scaled ExpSigmaTypeFRR
              exp_pat_ty = unrestricted (mkCheckExpType pat_ty)
        ; (pat', mbis) <- tcLetPat (const Nothing) no_gen pat exp_pat_ty $
                          mapM lookupMBI bndrs
@@ -1342,7 +1342,7 @@ mono_id in the first place.
 data TcMonoBind         -- Half completed; LHS done, RHS not done
   = TcFunBind  MonoBindInfo  SrcSpan (MatchGroup GhcRn (LHsExpr GhcRn))
   | TcPatBind [MonoBindInfo] (LPat GhcTc) (GRHSs GhcRn (LHsExpr GhcRn))
-              TcSigmaType
+              TcSigmaTypeFRR
 
 tcLhs :: TcSigFun -> LetBndrSpec -> HsBind GhcRn -> TcM TcMonoBind
 -- Only called with plan InferGen (LetBndrSpec = LetLclBndr)

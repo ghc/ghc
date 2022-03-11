@@ -1,7 +1,7 @@
 
 RepPolyMcBody.hs:30:16: error:
-    • The first argument to (>>),
-      arising from the monad comprehension,
+    • The first argument of the rebindable syntax operator ‘(>>)’
+        arising from a statement in a monad comprehension
       does not have a fixed runtime representation.
       Its type is:
         ma0 :: TYPE rep

@@ -8,42 +8,19 @@ RepPolyBackpack1.bkp:17:5: error:
     Its type is:
       Number l :: TYPE (Rep l)
 
-RepPolyBackpack1.bkp:17:22: error:
-    • The function argument
-        ‘x’
+RepPolyBackpack1.bkp:17:17: error:
+    • The argument ‘x’ of ‘plus’
       does not have a fixed runtime representation.
       Its type is:
         Number l :: TYPE (Rep l)
-    • In the first argument of ‘plus’, namely ‘x’
-      In the expression: plus x (multiply x y)
+    • In the expression: plus x (multiply x y)
       In an equation for ‘funcA’: funcA x y = plus x (multiply x y)
 
-RepPolyBackpack1.bkp:17:24: error:
-    • The function argument
-        ‘(multiply x y)’
+RepPolyBackpack1.bkp:17:25: error:
+    • The argument ‘x’ of ‘multiply’
       does not have a fixed runtime representation.
       Its type is:
         Number l :: TYPE (Rep l)
     • In the second argument of ‘plus’, namely ‘(multiply x y)’
       In the expression: plus x (multiply x y)
       In an equation for ‘funcA’: funcA x y = plus x (multiply x y)
-
-RepPolyBackpack1.bkp:17:34: error:
-    • The function argument
-        ‘x’
-      does not have a fixed runtime representation.
-      Its type is:
-        Number l :: TYPE (Rep l)
-    • In the first argument of ‘multiply’, namely ‘x’
-      In the second argument of ‘plus’, namely ‘(multiply x y)’
-      In the expression: plus x (multiply x y)
-
-RepPolyBackpack1.bkp:17:36: error:
-    • The function argument
-        ‘y’
-      does not have a fixed runtime representation.
-      Its type is:
-        Number l :: TYPE (Rep l)
-    • In the second argument of ‘multiply’, namely ‘y’
-      In the second argument of ‘plus’, namely ‘(multiply x y)’
-      In the expression: plus x (multiply x y)

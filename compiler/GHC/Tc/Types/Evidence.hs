@@ -8,7 +8,7 @@ module GHC.Tc.Types.Evidence (
   -- * HsWrapper
   HsWrapper(..),
   (<.>), mkWpTyApps, mkWpEvApps, mkWpEvVarApps, mkWpTyLams,
-  mkWpLams, mkWpLet, mkWpCastN, mkWpCastR, collectHsWrapBinders,
+  mkWpLams, mkWpLet, mkWpFun, mkWpCastN, mkWpCastR, collectHsWrapBinders,
   idHsWrapper, isIdHsWrapper,
   pprHsWrapper, hsWrapDictBinders,
 
@@ -280,6 +280,24 @@ instance Monoid HsWrapper where
 WpHole <.> c = c
 c <.> WpHole = c
 c1 <.> c2    = c1 `WpCompose` c2
+
+-- | Smart constructor to create a 'WpFun' 'HsWrapper'.
+--
+-- PRECONDITION: the "from" type of the first wrapper must have a
+-- fixed RuntimeRep (see Note [Fixed RuntimeRep] in GHC.Tc.Utils.Concrete).
+mkWpFun :: HsWrapper -> HsWrapper
+        -> Scaled TcType -- ^ the "from" type of the first wrapper
+                         -- MUST have a fixed RuntimeRep
+        -> TcType        -- ^ either type of the second wrapper (used only when the
+                         -- second wrapper is the identity)
+        -> HsWrapper
+  -- NB: can't check that the argument type has a fixed RuntimeRep with an assertion,
+  -- as we will only be able to know that after typechecking.
+mkWpFun WpHole       WpHole       _             _  = WpHole
+mkWpFun WpHole       (WpCast co2) (Scaled w t1) _  = WpCast (mkTcFunCo Representational (multToCo w) (mkTcRepReflCo t1) co2)
+mkWpFun (WpCast co1) WpHole       (Scaled w _)  t2 = WpCast (mkTcFunCo Representational (multToCo w) (mkTcSymCo co1) (mkTcRepReflCo t2))
+mkWpFun (WpCast co1) (WpCast co2) (Scaled w _)  _  = WpCast (mkTcFunCo Representational (multToCo w) (mkTcSymCo co1) co2)
+mkWpFun co1          co2          t1            _  = WpFun co1 co2 t1
 
 mkWpCastR :: TcCoercionR -> HsWrapper
 mkWpCastR co

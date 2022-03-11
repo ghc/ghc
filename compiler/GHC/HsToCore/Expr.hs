@@ -161,6 +161,7 @@ ds_val_bind (is_rec, binds) body
         ; (force_vars,prs) <- dsLHsBinds binds
         ; let body' = foldr seqVar body force_vars
         ; assertPpr (not (any (isUnliftedType . idType . fst) prs)) (ppr is_rec $$ ppr binds) $
+          -- NB: bindings have a fixed RuntimeRep, so it's OK to call isUnliftedType
           case prs of
             [] -> return body
             _  -> return (Let (Rec prs) body') }

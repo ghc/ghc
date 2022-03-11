@@ -22,7 +22,7 @@ module GHC.Tc.Gen.App
 
 import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcPolyExpr )
 
-import GHC.Types.Basic ( Arity )
+import GHC.Types.Basic ( Arity, ExprOrPat(Expression) )
 import GHC.Types.Id ( idArity, idName, hasNoBinding )
 import GHC.Types.Name ( isWiredInName )
 import GHC.Types.Var
@@ -547,7 +547,7 @@ hasFixedRuntimeRep_remainingValArgs applied_args app_res_rho = \case
   -- (4): Unboxed tuples and unboxed sums
     || isUnboxedTupleDataCon con
     || isUnboxedSumDataCon con
-    -> check_thing con (dataConRepArity con) (FRRDataConArg con)
+    -> check_thing con (dataConRepArity con) (FRRDataConArg Expression con)
 
   _ -> return ()
 
@@ -673,12 +673,11 @@ tcValArgs do_ql args
            ; return (eva { eva_arg    = ValArg arg'
                          , eva_arg_ty = Scaled mult arg_ty }) }
 
-tcEValArg :: AppCtxt -> EValArg 'TcpInst -> TcSigmaType -> TcM (LHsExpr GhcTc)
+tcEValArg :: AppCtxt -> EValArg 'TcpInst -> TcSigmaTypeFRR -> TcM (LHsExpr GhcTc)
 -- Typecheck one value argument of a function call
 tcEValArg ctxt (ValArg larg@(L arg_loc arg)) exp_arg_sigma
   = addArgCtxt ctxt larg $
     do { arg' <- tcPolyExpr arg (mkCheckExpType exp_arg_sigma)
-       ; hasFixedRuntimeRep_MustBeRefl (FRRApp arg') exp_arg_sigma
        ; return (L arg_loc arg') }
 
 tcEValArg ctxt (ValArgQL { va_expr = larg@(L arg_loc _)
@@ -690,7 +689,6 @@ tcEValArg ctxt (ValArgQL { va_expr = larg@(L arg_loc _)
        ; tc_args <- tcValArgs True inner_args
        ; co      <- unifyType Nothing app_res_rho exp_arg_sigma
        ; let arg' = mkHsWrapCo co $ rebuildHsApps inner_fun fun_ctxt tc_args
-       ; hasFixedRuntimeRep_MustBeRefl (FRRApp arg') exp_arg_sigma
        ; traceTc "tcEValArgQL }" empty
        ; return (L arg_loc arg') }
 
@@ -741,9 +739,6 @@ tcInstFun do_ql inst_final (rn_fun, fun_ctxt) fun_sigma rn_args
           VAExpansion orig _ -> addExprCtxt orig thing_inside
           VACall {}          -> thing_inside
 
-    herald = sep [ text "The function" <+> quotes (ppr rn_fun)
-                 , text "is applied to"]
-
     -- Count value args only when complaining about a function
     -- applied to too many value args
     -- See Note [Herald for matchExpectedFunTys] in GHC.Tc.Utils.Unify.
@@ -776,8 +771,8 @@ tcInstFun do_ql inst_final (rn_fun, fun_ctxt) fun_sigma rn_args
 
     -----------
     go, go1 :: Delta
-            -> [HsExprArg 'TcpInst]  -- Accumulator, reversed
-            -> [Scaled TcSigmaType]  -- Value args to which applied so far
+            -> [HsExprArg 'TcpInst]     -- Accumulator, reversed
+            -> [Scaled TcSigmaTypeFRR]  -- Value args to which applied so far
             -> TcSigmaType -> [HsExprArg 'TcpRn]
             -> TcM (Delta, [HsExprArg 'TcpInst], TcSigmaType)
 
@@ -873,10 +868,12 @@ tcInstFun do_ql inst_final (rn_fun, fun_ctxt) fun_sigma rn_args
 
     -- Rule IARG from Fig 4 of the QL paper:
     go1 delta acc so_far fun_ty
-        (eva@(EValArg { eva_arg = ValArg arg, eva_ctxt = ctxt })  : rest_args)
-      = do { (wrap, arg_ty, res_ty) <- matchActualFunTySigma herald
-                                          (Just $ HsExprRnThing rn_fun)
-                                          (n_val_args, so_far) fun_ty
+        (eva@(EValArg { eva_arg = ValArg arg, eva_ctxt = ctxt }) : rest_args)
+      = do { (wrap, arg_ty, res_ty) <-
+                matchActualFunTySigma
+                  (ExpectedFunTyArg (HsExprRnThing rn_fun) (unLoc arg))
+                  (Just $ HsExprRnThing rn_fun)
+                  (n_val_args, so_far) fun_ty
           ; (delta', arg') <- if do_ql
                               then addArgCtxt ctxt arg $
                                    -- Context needed for constraints
@@ -1053,8 +1050,8 @@ Wrinkles:
 
 ----------------
 quickLookArg :: Delta
-             -> LHsExpr GhcRn       -- Argument
-             -> Scaled TcSigmaType  -- Type expected by the function
+             -> LHsExpr GhcRn          -- ^ Argument
+             -> Scaled TcSigmaTypeFRR  -- ^ Type expected by the function
              -> TcM (Delta, EValArg 'TcpInst)
 -- See Note [Quick Look at value arguments]
 --
@@ -1093,7 +1090,7 @@ isGuardedTy ty
   | Just {} <- tcSplitAppTy_maybe ty        = True
   | otherwise                               = False
 
-quickLookArg1 :: Bool -> Delta -> LHsExpr GhcRn -> TcSigmaType
+quickLookArg1 :: Bool -> Delta -> LHsExpr GhcRn -> TcSigmaTypeFRR
               -> TcM (Delta, EValArg 'TcpInst)
 quickLookArg1 guarded delta larg@(L _ arg) arg_ty
   = do { let (fun@(rn_fun, fun_ctxt), rn_args) = splitHsApps arg

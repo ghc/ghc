@@ -669,7 +669,10 @@ tc_patsyn_finish :: LocatedN Name   -- ^ PatSyn Name
                  -> TcPragEnv
                  -> ([TcInvisTVBinder], [PredType], TcEvBinds, [EvVar])
                  -> ([TcInvisTVBinder], [TcType], [PredType], [EvTerm])
-                 -> ([LHsExpr GhcTc], [TcType])  -- ^ Pattern arguments and types
+                 -> ([LHsExpr GhcTc], [TcType])
+                   -- ^ Pattern arguments and types.
+                   -- These must have a fixed RuntimeRep as per
+                   -- Note [Fixed RuntimeRep] in GHC.Tc.Utils.Concrete.
                  -> TcType            -- ^ Pattern type
                  -> [FieldLabel]      -- ^ Selector names
                  -- ^ Whether fields, empty if not record PatSyn
@@ -869,6 +872,8 @@ mkPatSynBuilder dir (L _ name)
   = do { builder_name <- newImplicitBinder name mkBuilderOcc
        ; let theta          = req_theta ++ prov_theta
              need_dummy_arg = isUnliftedType pat_ty && null arg_tys && null theta
+                              -- NB: pattern arguments cannot be representation-polymorphic,
+                              -- as checked in 'tcPatSynSig'. So 'isUnliftedType' is OK here.
              builder_sigma  = add_void need_dummy_arg $
                               mkInvisForAllTys univ_bndrs $
                               mkInvisForAllTys ex_bndrs $

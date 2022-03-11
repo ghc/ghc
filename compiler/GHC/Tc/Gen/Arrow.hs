@@ -163,12 +163,18 @@ tc_cmd env (HsCmdLet x tkLet binds tkIn (L body_loc body)) res_ty
 tc_cmd env in_cmd@(HsCmdCase x scrut matches) (stk, res_ty)
   = addErrCtxt (cmdCtxt in_cmd) $ do
       (scrut', scrut_ty) <- tcInferRho scrut
+      hasFixedRuntimeRep_MustBeRefl
+        (FRRArrow $ ArrowCmdCase { isCmdLamCase = False })
+        scrut_ty
       matches' <- tcCmdMatches env scrut_ty matches (stk, res_ty)
       return (HsCmdCase x scrut' matches')
 
 tc_cmd env in_cmd@(HsCmdLamCase x matches) (stk, res_ty)
   = addErrCtxt (cmdCtxt in_cmd) $ do
       (co, [scrut_ty], stk') <- matchExpectedCmdArgs 1 stk
+      hasFixedRuntimeRep_MustBeRefl
+        (FRRArrow $ ArrowCmdCase { isCmdLamCase = True })
+        scrut_ty
       matches' <- tcCmdMatches env scrut_ty matches (stk', res_ty)
       return (mkHsCmdWrap (mkWpCastN co) (HsCmdLamCase x matches'))
 
@@ -365,7 +371,9 @@ tc_cmd _ cmd _
 -- | Typechecking for case command alternatives. Used for both
 -- 'HsCmdCase' and 'HsCmdLamCase'.
 tcCmdMatches :: CmdEnv
-             -> TcType                           -- ^ type of the scrutinee
+             -> TcType -- ^ Type of the scrutinee.
+                       -- Must have a fixed RuntimeRep as per
+                       -- Note [Fixed RuntimeRep] in GHC.Tc.Utils.Concrete
              -> MatchGroup GhcRn (LHsCmd GhcRn)  -- ^ case alternatives
              -> CmdType
              -> TcM (MatchGroup GhcTc (LHsCmd GhcTc))

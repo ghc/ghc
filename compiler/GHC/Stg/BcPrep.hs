@@ -126,8 +126,7 @@ bcPrep us bnds = evalState (mapM bcPrepTopLvl bnds) (BcPrepM_State us)
 -- Is this Id a not-necessarily-lifted join point?
 -- See Note [Not-necessarily-lifted join points], step 1
 isNNLJoinPoint :: Id -> Bool
-isNNLJoinPoint x = isJoinId x &&
-                   Just True /= isLiftedType_maybe (idType x)
+isNNLJoinPoint x = isJoinId x && mightBeUnliftedType (idType x)
 
 -- Update an Id's type to take a Void# argument.
 -- Precondition: the Id is a not-necessarily-lifted join point.

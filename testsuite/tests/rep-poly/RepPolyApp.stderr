@@ -1,10 +1,8 @@
 
-RepPolyApp.hs:11:11: error:
-    • The function argument
-        ‘(undefined :: a)’
+RepPolyApp.hs:11:9: error:
+    • The argument ‘(undefined :: a)’ of ‘f’
       does not have a fixed runtime representation.
       Its type is:
         a :: TYPE rep
-    • In the first argument of ‘f’, namely ‘(undefined :: a)’
-      In the expression: f (undefined :: a)
+    • In the expression: f (undefined :: a)
       In an equation for ‘foo’: foo f = f (undefined :: a)

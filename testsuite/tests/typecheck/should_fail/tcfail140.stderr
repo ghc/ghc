@@ -34,5 +34,5 @@ tcfail140.hs:17:8: error:
 
 tcfail140.hs:20:1: error:
     • Couldn't match expected type ‘Int’ with actual type ‘p0 -> Bool’
-    • The equation(s) for ‘g’ have two value arguments,
+    • The equation for ‘g’ has two value arguments,
         but its type ‘Int -> Int’ has only one

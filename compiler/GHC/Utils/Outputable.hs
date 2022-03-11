@@ -44,7 +44,8 @@ module GHC.Utils.Outputable (
         fsep, fcat,
         hang, hangNotEmpty, punctuate, ppWhen, ppUnless,
         ppWhenOption, ppUnlessOption,
-        speakNth, speakN, speakNOf, plural, singular, isOrAre, doOrDoes, itsOrTheir, thisOrThese,
+        speakNth, speakN, speakNOf, plural, singular,
+        isOrAre, doOrDoes, itsOrTheir, thisOrThese, hasOrHave,
         unicodeSyntax,
 
         coloured, keyword,
@@ -1470,3 +1471,8 @@ itsOrTheir _   = text "their"
 thisOrThese :: [a] -> SDoc
 thisOrThese [_] = text "This"
 thisOrThese _   = text "These"
+
+-- | @"has"@ or @"have"@ depending on the length of a list.
+hasOrHave :: [a] -> SDoc
+hasOrHave [_] = text "has"
+hasOrHave _   = text "have"

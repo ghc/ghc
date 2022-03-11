@@ -22,7 +22,7 @@ RepPolyArrowFun.hs:29:9: error:
       In an equation for ‘foo’: foo _ = proc x -> undefined -< x
 
 RepPolyArrowFun.hs:29:19: error:
-    • The function un the first order arrow application of
+    • The function in the first order arrow application of
         ‘undefined’
       to
         ‘x’

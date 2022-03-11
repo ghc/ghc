@@ -526,6 +526,8 @@ unitLetFloat bind = assert (all (not . isJoinId) (bindersOf bind)) $
           -- See Note [Core top-level string literals] in GHC.Core.
       | exprOkForSpeculation rhs = FltOkSpec  -- Unlifted, and lifted but ok-for-spec (eg HNF)
       | otherwise                = assertPpr (not (isUnliftedType (idType bndr))) (ppr bndr)
+                                   -- NB: binders always have a fixed RuntimeRep, so calling
+                                   -- isUnliftedType is OK here
                                    FltCareful
       -- Unlifted binders can only be let-bound if exprOkForSpeculation holds
 

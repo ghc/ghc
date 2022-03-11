@@ -2458,7 +2458,7 @@ setStrUnfolding id str
   | not (isId id) || isEvaldUnfolding (idUnfolding id)
   = id
   | isMarkedStrict str
-  , not (isUnliftedType (idType id)) -- Pointless to stick an evald unfolding on unlifted types
+  , not $ isUnliftedType (idType id) -- Pointless to stick an evald unfolding on unlifted types
   = -- trace "setStrUnfolding2" $
     assert (isId id) $
     assert (not $ hasCoreUnfolding $ idUnfolding id) $

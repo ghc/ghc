@@ -2167,7 +2167,7 @@ tcRnStmt hsc_env rdr_stmt
 
         -- None of the Ids should be of unboxed type, because we
         -- cast them all to HValues in the end!
-    mapM_ bad_unboxed (filter (isUnliftedType . idType) zonked_ids) ;
+    mapM_ bad_unboxed (filter (mightBeUnliftedType . idType) zonked_ids) ;
 
     traceTc "tcs 1" empty ;
     this_mod <- getModule ;

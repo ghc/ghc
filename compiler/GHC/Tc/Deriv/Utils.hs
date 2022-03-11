@@ -911,7 +911,7 @@ cond_args cls _ dit@(DerivInstTys{dit_rep_tc = rep_tc})
   where
     bad_args = [ arg_ty | con <- tyConDataCons rep_tc
                         , arg_ty <- derivDataConInstArgTys con dit
-                        , isLiftedType_maybe arg_ty /= Just True
+                        , mightBeUnliftedType arg_ty
                         , not (ok_ty arg_ty) ]
 
     cls_key = classKey cls

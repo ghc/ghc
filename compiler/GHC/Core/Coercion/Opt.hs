@@ -150,6 +150,7 @@ optCoercion' env co
   where
     lc = mkSubstLiftingContext env
 
+
 type NormalCo    = Coercion
   -- Invariants:
   --  * The substitution has been fully applied

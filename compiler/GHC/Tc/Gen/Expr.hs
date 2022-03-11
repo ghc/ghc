@@ -40,7 +40,7 @@ import GHC.Types.Error
 import GHC.Core.Multiplicity
 import GHC.Core.UsageEnv
 import GHC.Tc.Errors.Types
-import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep_MustBeRefl, mkWpFun )
+import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep_MustBeRefl )
 import GHC.Tc.Utils.Instantiate
 import GHC.Tc.Gen.App
 import GHC.Tc.Gen.Head
@@ -262,22 +262,15 @@ tcExpr (HsLam _ match) res_ty
         ; return (mkHsWrap wrap (HsLam noExtField match')) }
   where
     match_ctxt = MC { mc_what = LambdaExpr, mc_body = tcBody }
-    herald = sep [ text "The lambda expression" <+>
-                   quotes (pprSetDepth (PartWay 1) $
-                           pprMatches match),
-                        -- The pprSetDepth makes the abstraction print briefly
-                   text "has"]
+    herald = ExpectedFunTyLam match
 
 tcExpr e@(HsLamCase x matches) res_ty
   = do { (wrap, matches')
-           <- tcMatchLambda msg match_ctxt matches res_ty
-           -- The laziness annotation is because we don't want to fail here
-           -- if there are multiple arguments
+           <- tcMatchLambda herald match_ctxt matches res_ty
        ; return (mkHsWrap wrap $ HsLamCase x matches') }
   where
-    msg = sep [ text "The function" <+> quotes (ppr e)
-              , text "requires"]
     match_ctxt = MC { mc_what = CaseAlt, mc_body = tcBody }
+    herald = ExpectedFunTyLamCase e
 
 
 
@@ -391,6 +384,7 @@ tcExpr (HsCase x scrut matches) res_ty
         ; (scrut', scrut_ty) <- tcScalingUsage mult $ tcInferRho scrut
 
         ; traceTc "HsCase" (ppr scrut_ty)
+        ; hasFixedRuntimeRep_MustBeRefl FRRCase scrut_ty
         ; matches' <- tcMatchesCase match_ctxt (Scaled mult scrut_ty) matches res_ty
         ; return (HsCase x scrut' matches') }
  where
@@ -945,7 +939,12 @@ arithSeqEltType (Just fl) res_ty
        ; return (idHsWrapper, elt_mult, elt_ty, Just fl') }
 
 ----------------
-tcTupArgs :: [HsTupArg GhcRn] -> [TcSigmaType] -> TcM [HsTupArg GhcTc]
+tcTupArgs :: [HsTupArg GhcRn]
+          -> [TcSigmaType]
+              -- ^ Argument types.
+              -- This function ensures they all have
+              -- a fixed runtime representation.
+          -> TcM [HsTupArg GhcTc]
 tcTupArgs args tys
   = do massert (equalLength args tys)
        checkTupSize (length args)
@@ -984,14 +983,14 @@ tcSyntaxOpGen :: CtOrigin
               -> SyntaxExprRn
               -> [SyntaxOpType]
               -> SyntaxOpType
-              -> ([TcSigmaType] -> [Mult] -> TcM a)
+              -> ([TcSigmaTypeFRR] -> [Mult] -> TcM a)
               -> TcM (a, SyntaxExprTc)
 tcSyntaxOpGen orig (SyntaxExprRn op) arg_tys res_ty thing_inside
   = do { (expr, sigma) <- tcInferAppHead (op, VACall op 0 noSrcSpan) []
              -- Ugh!! But all this code is scheduled for demolition anyway
        ; traceTc "tcSyntaxOpGen" (ppr op $$ ppr expr $$ ppr sigma)
        ; (result, expr_wrap, arg_wraps, res_wrap)
-           <- tcSynArgA orig sigma arg_tys res_ty $
+           <- tcSynArgA orig op sigma arg_tys res_ty $
               thing_inside
        ; traceTc "tcSyntaxOpGen" (ppr op $$ ppr expr $$ ppr sigma )
        ; return (result, SyntaxExprTc { syn_expr = mkHsWrap expr_wrap expr
@@ -1012,12 +1011,13 @@ two tcSynArgs.
 -- works on "expected" types, skolemising where necessary
 -- See Note [tcSynArg]
 tcSynArgE :: CtOrigin
+          -> HsExpr GhcRn -- ^ the operator to check (for error messages only)
           -> TcSigmaType
           -> SyntaxOpType                -- ^ shape it is expected to have
-          -> ([TcSigmaType] -> [Mult] -> TcM a) -- ^ check the arguments
+          -> ([TcSigmaTypeFRR] -> [Mult] -> TcM a) -- ^ check the arguments
           -> TcM (a, HsWrapper)
            -- ^ returns a wrapper :: (type of right shape) "->" (type passed in)
-tcSynArgE orig sigma_ty syn_ty thing_inside
+tcSynArgE orig op sigma_ty syn_ty thing_inside
   = do { (skol_wrap, (result, ty_wrapper))
            <- tcSkolemise GenSigCtxt sigma_ty
                 (\ rho_ty -> go rho_ty syn_ty)
@@ -1055,18 +1055,20 @@ tcSynArgE orig sigma_ty syn_ty thing_inside
                                    pprCtOrigin orig)
 
                      ; let arg_mult = scaledMult arg_ty
-                     ; tcSynArgA orig arg_tc_ty [] arg_shape $
+                     ; tcSynArgA orig op arg_tc_ty [] arg_shape $
                        \ arg_results arg_res_mults ->
-                       tcSynArgE orig res_tc_ty res_shape $
+                       tcSynArgE orig op res_tc_ty res_shape $
                        \ res_results res_res_mults ->
                        do { result <- thing_inside (arg_results ++ res_results) ([arg_mult] ++ arg_res_mults ++ res_res_mults)
                           ; return (result, arg_tc_ty, res_tc_ty, arg_mult) }}
 
-           ; fun_wrap <- mkWpFun (arg_wrapper2 <.> arg_wrapper1) res_wrapper
-                              (Scaled op_mult arg_ty) res_ty (WpFunSyntaxOp orig)
+           ; let fun_wrap = mkWpFun (arg_wrapper2 <.> arg_wrapper1) res_wrapper
+                              (Scaled op_mult arg_ty) res_ty
+               -- NB: arg_ty comes from matchExpectedFunTys, so it has a
+               -- fixed RuntimeRep, as needed to call mkWpFun.
            ; return (result, match_wrapper <.> fun_wrap) }
       where
-        herald = text "This rebindable syntax expects a function with"
+        herald = ExpectedFunTySyntaxOp orig op
 
     go rho_ty (SynType the_ty)
       = do { wrap   <- tcSubTypePat orig GenSigCtxt the_ty rho_ty
@@ -1076,15 +1078,16 @@ tcSynArgE orig sigma_ty syn_ty thing_inside
 -- works on "actual" types, instantiating where necessary
 -- See Note [tcSynArg]
 tcSynArgA :: CtOrigin
+          -> HsExpr GhcRn -- ^ the operator we are checking (for error messages)
           -> TcSigmaType
           -> [SyntaxOpType]              -- ^ argument shapes
           -> SyntaxOpType                -- ^ result shape
-          -> ([TcSigmaType] -> [Mult] -> TcM a) -- ^ check the arguments
+          -> ([TcSigmaTypeFRR] -> [Mult] -> TcM a) -- ^ check the arguments
           -> TcM (a, HsWrapper, [HsWrapper], HsWrapper)
             -- ^ returns a wrapper to be applied to the original function,
             -- wrappers to be applied to arguments
             -- and a wrapper to be applied to the overall expression
-tcSynArgA orig sigma_ty arg_shapes res_shape thing_inside
+tcSynArgA orig op sigma_ty arg_shapes res_shape thing_inside
   = do { (match_wrapper, arg_tys, res_ty)
            <- matchActualFunTysRho herald orig Nothing
                                    (length arg_shapes) sigma_ty
@@ -1095,22 +1098,22 @@ tcSynArgA orig sigma_ty arg_shapes res_shape thing_inside
               thing_inside (arg_results ++ res_results) (map scaledMult arg_tys ++ arg_res_mults)
        ; return (result, match_wrapper, arg_wrappers, res_wrapper) }
   where
-    herald = text "This rebindable syntax expects a function with"
+    herald = ExpectedFunTySyntaxOp orig op
 
-    tc_syn_args_e :: [TcSigmaType] -> [SyntaxOpType]
-                  -> ([TcSigmaType] -> [Mult] -> TcM a)
+    tc_syn_args_e :: [TcSigmaTypeFRR] -> [SyntaxOpType]
+                  -> ([TcSigmaTypeFRR] -> [Mult] -> TcM a)
                   -> TcM (a, [HsWrapper])
                     -- the wrappers are for arguments
     tc_syn_args_e (arg_ty : arg_tys) (arg_shape : arg_shapes) thing_inside
       = do { ((result, arg_wraps), arg_wrap)
-               <- tcSynArgE     orig arg_ty  arg_shape  $ \ arg1_results arg1_mults ->
-                  tc_syn_args_e      arg_tys arg_shapes $ \ args_results args_mults ->
+               <- tcSynArgE     orig  op arg_ty  arg_shape  $ \ arg1_results arg1_mults ->
+                  tc_syn_args_e          arg_tys arg_shapes $ \ args_results args_mults ->
                   thing_inside (arg1_results ++ args_results) (arg1_mults ++ args_mults)
            ; return (result, arg_wrap : arg_wraps) }
     tc_syn_args_e _ _ thing_inside = (, []) <$> thing_inside [] []
 
-    tc_syn_arg :: TcSigmaType -> SyntaxOpType
-               -> ([TcSigmaType] -> TcM a)
+    tc_syn_arg :: TcSigmaTypeFRR -> SyntaxOpType
+               -> ([TcSigmaTypeFRR] -> TcM a)
                -> TcM (a, HsWrapper)
                   -- the wrapper applies to the overall result
     tc_syn_arg res_ty SynAny thing_inside

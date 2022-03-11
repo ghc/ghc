@@ -121,8 +121,7 @@ tcMatchesFun fun_id matches exp_ty
   where
     fun_name = idName (unLoc fun_id)
     arity  = matchGroupArity matches
-    herald = text "The equation(s) for"
-             <+> quotes (ppr fun_name) <+> text "have"
+    herald = ExpectedFunTyMatches (NameThing fun_name) matches
     ctxt   = GenSigCtxt  -- Was: FunSigCtxt fun_name True
                          -- But that's wrong for f :: Int -> forall a. blah
     what   = FunRhs { mc_fun = fun_id, mc_fixity = Prefix, mc_strictness = strictness }
@@ -145,10 +144,10 @@ parser guarantees that each equation has exactly one argument.
 -}
 
 tcMatchesCase :: (AnnoBody body) =>
-                TcMatchCtxt body                         -- Case context
-             -> Scaled TcSigmaType                       -- Type of scrutinee
-             -> MatchGroup GhcRn (LocatedA (body GhcRn)) -- The case alternatives
-             -> ExpRhoType                    -- Type of whole case expressions
+                TcMatchCtxt body      -- ^ Case context
+             -> Scaled TcSigmaTypeFRR -- ^ Type of scrutinee
+             -> MatchGroup GhcRn (LocatedA (body GhcRn)) -- ^ The case alternatives
+             -> ExpRhoType                               -- ^ Type of the whole case expression
              -> TcM (MatchGroup GhcTc (LocatedA (body GhcTc)))
                 -- Translated alternatives
                 -- wrapper goes from MatchGroup's ty to expected ty
@@ -156,7 +155,7 @@ tcMatchesCase :: (AnnoBody body) =>
 tcMatchesCase ctxt (Scaled scrut_mult scrut_ty) matches res_ty
   = tcMatches ctxt [Scaled scrut_mult (mkCheckExpType scrut_ty)] res_ty matches
 
-tcMatchLambda :: SDoc -- see Note [Herald for matchExpectedFunTys] in GHC.Tc.Utils.Unify
+tcMatchLambda :: ExpectedFunTyOrigin -- see Note [Herald for matchExpectedFunTys] in GHC.Tc.Utils.Unify
               -> TcMatchCtxt HsExpr
               -> MatchGroup GhcRn (LHsExpr GhcRn)
               -> ExpRhoType
@@ -213,8 +212,8 @@ type AnnoBody body
 
 -- | Type-check a MatchGroup.
 tcMatches :: (AnnoBody body ) => TcMatchCtxt body
-          -> [Scaled ExpSigmaType]      -- Expected pattern types
-          -> ExpRhoType          -- Expected result-type of the Match.
+          -> [Scaled ExpSigmaTypeFRR] -- ^ Expected pattern types.
+          -> ExpRhoType               -- ^ Expected result-type of the Match.
           -> MatchGroup GhcRn (LocatedA (body GhcRn))
           -> TcM (MatchGroup GhcTc (LocatedA (body GhcTc)))
 
@@ -227,10 +226,6 @@ tcMatches ctxt pat_tys rhs_ty (MG { mg_alts = L l matches
   = do { tcEmitBindingUsage bottomUE
        ; pat_tys <- mapM scaledExpTypeToType pat_tys
        ; rhs_ty  <- expTypeToType rhs_ty
-       ; zipWithM_
-            (\ i (Scaled _ pat_ty) ->
-                 hasFixedRuntimeRep_MustBeRefl (FRRMatch (mc_what ctxt) i) pat_ty)
-            [1..] pat_tys
        ; return (MG { mg_alts = L l []
                     , mg_ext = MatchGroupTc pat_tys rhs_ty
                     , mg_origin = origin }) }
@@ -241,10 +236,6 @@ tcMatches ctxt pat_tys rhs_ty (MG { mg_alts = L l matches
        ; tcEmitBindingUsage $ supUEs usages
        ; pat_tys  <- mapM readScaledExpType pat_tys
        ; rhs_ty   <- readExpType rhs_ty
-       ; zipWithM_
-            (\ i (Scaled _ pat_ty) ->
-                hasFixedRuntimeRep_MustBeRefl (FRRMatch (mc_what ctxt) i) pat_ty)
-            [1..] pat_tys
        ; return (MG { mg_alts   = L l matches'
                     , mg_ext    = MatchGroupTc pat_tys rhs_ty
                     , mg_origin = origin }) }
