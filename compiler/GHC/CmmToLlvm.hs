@@ -65,7 +65,7 @@ llvmCodeGen logger cfg h cmm_stream
          when (not (llvmVersionSupported ver) && doWarn) $ putMsg logger $
            "You are using an unsupported version of LLVM!" $$
            "Currently only" <+> text (llvmVersionStr supportedLlvmVersionLowerBound) <+>
-           "to" <+> text (llvmVersionStr supportedLlvmVersionUpperBound) <+> "is supported." <+>
+           "up to" <+> text (llvmVersionStr supportedLlvmVersionUpperBound) <+> "(non inclusive) is supported." <+>
            "System LLVM version: " <> text (llvmVersionStr ver) $$
            "We will try though..."
          let isS390X = platformArch (llvmCgPlatform cfg)  == ArchS390X
