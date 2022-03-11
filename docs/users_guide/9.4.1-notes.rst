@@ -42,7 +42,7 @@ Compiler
 - New :ghc-flag:`-Wredundant-strictness-flags` that checks for strictness flags
   (``!``) applied to unlifted types, which are always strict.
 
-- New :ghc-flag:`-fprof-late-ccs` that adds automatic CCS annotations to all
+- New :ghc-flag:`-fprof-late` that adds automatic CCS annotations to all
   top level functions *after* core optimisation have been run.
 
 - A new type of plugin: defaulting plugins. These plugins can propose
