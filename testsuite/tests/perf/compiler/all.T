@@ -175,6 +175,11 @@ test ('T13386',
         collect_compiler_stats('bytes allocated',1) ],
       compile,
       ['-v0 -O0'])
+
+#########
+# The following tests are very sensitive
+# to coercion optimisation.
+
 test ('T15703',
       [ only_ways(['normal']),
         collect_compiler_stats('bytes allocated',1)
@@ -182,6 +187,19 @@ test ('T15703',
       ],
       multimod_compile,
       ['T15703', '-v0 -O'])
+
+test ('CoOpt_Read',
+      [ collect_compiler_stats('bytes allocated',2) ],
+      compile,
+      ['-v0 -O'])
+
+test('CoOpt_Singletons',
+     [ collect_compiler_stats('bytes allocated',2) ],
+     compile,
+     ['-v0 -O'])
+
+#########
+
 test ('LargeRecord',
       [ only_ways(['normal']),
         collect_compiler_stats('bytes allocated',1)
@@ -614,8 +632,8 @@ test('hard_hole_fits', # Testing multiple hole-fits with lots in scope for #1687
 test('T16875',  # Testing one hole-fit with a lot in scope for #16875
      collect_compiler_stats('bytes allocated', 2),
      compile, ['-fdefer-type-errors -fno-max-valid-hole-fits -package ghc'])
+
 test ('T20261',
       [collect_compiler_stats('all')],
       compile,
       [''])
-
