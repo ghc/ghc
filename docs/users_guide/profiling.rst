@@ -438,10 +438,10 @@ compiled program.
     or the :rts-flag:`-xc` RTS flag (:ref:`rts-options-debugging`) for more
     details.
 
-.. ghc-flag:: -fprof-late-ccs
+.. ghc-flag:: -fprof-late
     :shortdesc: Auto-add ``SCC``\\ s to all top level bindings *after* the optimizer has run.
     :type: dynamic
-    :reverse: -fno-prof-late-ccs
+    :reverse: -fno-prof-late
     :category:
 
     :since: 9.4.1
