@@ -2929,7 +2929,7 @@ aexp2   :: { ECP }
                                                                                          else [mu AnnOpenEQ $1,mu AnnCloseQ $3]) cs) (ExpBr noExtField $2)) }
         | '[||' exp '||]'     {% runPV (unECP $2) >>= \ $2 ->
                                  fmap ecpFromExp $
-                                 acsA (\cs -> sLL $1 $> $ HsTypedBracket (EpAnn (glR $1) (if (hasE $1) then [mj AnnOpenE $1,mc $3] else [mo $1,mc $3]) cs) (TExpBr noExtField $2)) }
+                                 acsA (\cs -> sLL $1 $> $ HsTypedBracket (EpAnn (glR $1) (if (hasE $1) then [mj AnnOpenE $1,mc $3] else [mo $1,mc $3]) cs) $2) }
         | '[t|' ktype '|]'    {% fmap ecpFromExp $
                                  acsA (\cs -> sLL $1 $> $ HsUntypedBracket (EpAnn (glR $1) [mo $1,mu AnnCloseQ $3] cs) (TypBr noExtField $2)) }
         | '[p|' infixexp '|]' {% (checkPattern <=< runPV) (unECP $2) >>= \p ->

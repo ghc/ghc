@@ -163,8 +163,8 @@ import Data.Proxy    ( Proxy (..) )
 ************************************************************************
 -}
 
-tcTypedBracket   :: HsExpr GhcRn -> HsTypedBracket GhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
-tcUntypedBracket :: HsExpr GhcRn -> HsUntypedBracket GhcRn -> [PendingRnSplice] -> ExpRhoType
+tcTypedBracket   :: HsExpr GhcRn -> LHsExpr GhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
+tcUntypedBracket :: HsExpr GhcRn -> HsQuote GhcRn -> [PendingRnSplice] -> ExpRhoType
                  -> TcM (HsExpr GhcTc)
 tcSpliceExpr     :: HsSplice GhcRn  -> ExpRhoType -> TcM (HsExpr GhcTc)
         -- None of these functions add constraints to the LIE
@@ -184,8 +184,8 @@ runAnnotation     :: CoreAnnTarget -> LHsExpr GhcRn -> TcM Annotation
 -}
 
 -- See Note [How brackets and nested splices are handled]
-tcTypedBracket rn_expr e@(TExpBr ext expr) res_ty
-  = addErrCtxt (quotationCtxtDoc e) $
+tcTypedBracket rn_expr expr res_ty
+  = addErrCtxt (quotationCtxtDoc expr) $
     do { cur_stage <- getStage
        ; ps_ref <- newMutVar []
        ; lie_var <- getConstraintVar   -- Any constraints arising from nested splices
@@ -200,13 +200,20 @@ tcTypedBracket rn_expr e@(TExpBr ext expr) res_ty
        -- brackets.
        ; let wrapper = QuoteWrapper ev_var m_var
        -- Typecheck expr to make sure it is valid,
-       -- Throw away the typechecked expression but return its type.
+       --
+       -- romes TODO: The following is not actually that true: ppr_expr in
+       -- GHC.Hs.Expr uses this (and for untyped brackets the supposedly not
+       -- used type is also used).
+       -- If it isn't to be used, should the types enforce that?
+       --
+       -- The typechecked expression won't be used, but we return it with its type.
+       --   (See Note [The life cycle of a TH quotation] in GHC.Hs.Expr)
        -- We'll typecheck it again when we splice it in somewhere
-       ; (_tc_expr, expr_ty) <- setStage (Brack cur_stage (TcPending ps_ref lie_var wrapper)) $
-                                tcScalingUsage Many $
-                                -- Scale by Many, TH lifting is currently nonlinear (#18465)
-                                tcInferRhoNC expr
-                                -- NC for no context; tcBracket does that
+       ; (tc_expr, expr_ty) <- setStage (Brack cur_stage (TcPending ps_ref lie_var wrapper)) $
+                               tcScalingUsage Many $
+                               -- Scale by Many, TH lifting is currently nonlinear (#18465)
+                               tcInferRhoNC expr
+                               -- NC for no context; tcBracket does that
        ; let rep = getRuntimeRep expr_ty
        ; meta_ty <- tcTExpTy m_var expr_ty
        ; ps' <- readMutVar ps_ref
@@ -216,7 +223,7 @@ tcTypedBracket rn_expr e@(TExpBr ext expr) res_ty
                        rn_expr
                        (unLoc (mkHsApp (mkLHsWrap (applyQuoteWrapper wrapper)
                                                   (nlHsTyApp codeco [rep, expr_ty]))
-                                      (noLocA (HsTypedBracket (HsBracketTc bracket_ty (Just wrapper) ps') (XTypedBracket (TExpBr ext expr))))))
+                                      (noLocA (HsTypedBracket (HsBracketTc expr bracket_ty (Just wrapper) ps') tc_expr))))
                        meta_ty res_ty }
 
 -- See Note [Typechecking Overloaded Quotes]
@@ -242,7 +249,7 @@ tcUntypedBracket rn_expr brack ps res_ty
        -- Unify the overall type of the bracket with the expected result
        -- type
        ; tcWrapResultO BracketOrigin rn_expr
-            (HsUntypedBracket (HsBracketTc expected_type brack_info ps') (XUntypedBracket brack))
+            (HsUntypedBracket (HsBracketTc brack expected_type brack_info ps') (XQuote brack))
             expected_type res_ty
 
        }
@@ -264,7 +271,7 @@ emitQuoteWanted m_var =  do
 -- | Compute the expected type of a quotation, and also the QuoteWrapper in
 -- the case where it is an overloaded quotation. All quotation forms are
 -- overloaded aprt from Variable quotations ('foo)
-brackTy :: HsUntypedBracket GhcRn -> TcM (Maybe QuoteWrapper, Type)
+brackTy :: HsQuote GhcRn -> TcM (Maybe QuoteWrapper, Type)
 brackTy b =
   let mkTy n = do
         -- New polymorphic type variable for the bracket
@@ -324,10 +331,10 @@ tcTExpTy m_ty exp_ty
              , text "The type of a Typed Template Haskell expression must" <+>
                text "not have any quantification." ]
 
-quotationCtxtDoc :: HsTypedBracket GhcRn -> SDoc
+quotationCtxtDoc :: LHsExpr GhcRn -> SDoc
 quotationCtxtDoc br_body
   = hang (text "In the Template Haskell quotation")
-         2 (ppr br_body)
+         2 (thTyBrackets . ppr $ br_body)
 
 
   -- The whole of the rest of the file is the else-branch (ie stage2 only)
@@ -377,6 +384,7 @@ The life cycle of a typed bracket:
         * Result is a HsTcBracketOut rn_brack pending_splices
           where rn_brack is the incoming renamed bracket
 
+-- romes TODO update note
 The life cycle of a un-typed bracket:
    * Starts as HsBracket
 

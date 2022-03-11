@@ -746,14 +746,11 @@ Thus, we pass @r@ as the scrutinee expression to @matchWrapper@ above.
 -- Here is where we desugar the Template Haskell brackets and escapes
 
 -- Template Haskell stuff
+-- See Note [The life cycle of a TH quotation]
 
-dsExpr (HsTypedBracket (HsBracketTc _ hs_wrapper ps) (XTypedBracket x)) = dsTypedBracket hs_wrapper x ps
-                                -- ^ See Note [Desugaring typed brackets] in GHC.Hs.Expr on why XTypedBracket -- romes TODO:
-dsExpr (HsTypedBracket (HsBracketTc _ _ ps) _) = pprPanic "dsExpr:typed_bracket" (ppr ps)
-dsExpr (HsUntypedBracket (HsBracketTc _ hs_wrapper ps) (XUntypedBracket x)) = dsUntypedBracket hs_wrapper x ps
-                                -- ^ See Note [Type-checking untyped brackets] in GHC.Hs.Expr on why XUntypedBracket
-dsExpr (HsUntypedBracket (HsBracketTc _ _ ps) _) = pprPanic "dsExpr:untyped_bracket" (ppr ps)
-dsExpr (HsSpliceE _ s)                    = pprPanic "dsExpr:splice" (ppr s)
+dsExpr (HsTypedBracket (HsBracketTc x _ hs_wrapper ps) _) = dsTypedBracket hs_wrapper x ps
+dsExpr (HsUntypedBracket (HsBracketTc x _ hs_wrapper ps) _) = dsUntypedBracket hs_wrapper x ps
+dsExpr (HsSpliceE _ s) = pprPanic "dsExpr:splice" (ppr s)
 
 -- Arrow notation extension
 dsExpr (HsProc _ pat cmd) = dsProcExpr pat cmd

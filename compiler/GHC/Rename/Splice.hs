@@ -73,8 +73,8 @@ import qualified GHC.LanguageExtensions as LangExt
 ************************************************************************
 -}
 
-rnTypedBracket :: HsExpr GhcPs -> HsTypedBracket GhcPs -> RnM (HsExpr GhcRn, FreeVars)
-rnTypedBracket e (TExpBr ext br_body)
+rnTypedBracket :: HsExpr GhcPs -> LHsExpr GhcPs -> RnM (HsExpr GhcRn, FreeVars)
+rnTypedBracket e br_body
   = addErrCtxt (typedQuotationCtxtDoc br_body) $
     do { -- Check that -XTemplateHaskellQuotes is enabled and available
          thQuotesEnabled <- xoptM LangExt.TemplateHaskellQuotes
@@ -103,11 +103,11 @@ rnTypedBracket e (TExpBr ext br_body)
        ; traceRn "Renaming typed TH bracket" empty
        ; (body', fvs_e) <- setStage (Brack cur_stage RnPendingTyped) $ rnLExpr br_body
 
-       ; return (HsTypedBracket noAnn (TExpBr ext body'), fvs_e)
+       ; return (HsTypedBracket noAnn body', fvs_e)
 
        }
 
-rnUntypedBracket :: HsExpr GhcPs -> HsUntypedBracket GhcPs -> RnM (HsExpr GhcRn, FreeVars)
+rnUntypedBracket :: HsExpr GhcPs -> HsQuote GhcPs -> RnM (HsExpr GhcRn, FreeVars)
 rnUntypedBracket e br_body
   = addErrCtxt (untypedQuotationCtxtDoc br_body) $
     do { -- Check that -XTemplateHaskellQuotes is enabled and available
@@ -146,7 +146,7 @@ rnUntypedBracket e br_body
 
        }
 
-rn_utbracket :: ThStage -> HsUntypedBracket GhcPs -> RnM (HsUntypedBracket GhcRn, FreeVars)
+rn_utbracket :: ThStage -> HsQuote GhcPs -> RnM (HsQuote GhcRn, FreeVars)
 rn_utbracket outer_stage br@(VarBr x flg rdr_name)
   = do { name <- lookupOccRn (unLoc rdr_name)
        ; check_namespace flg name
@@ -224,7 +224,7 @@ typedQuotationCtxtDoc br_body
   = hang (text "In the Template Haskell typed quotation")
          2 (thTyBrackets . ppr $ br_body)
 
-untypedQuotationCtxtDoc :: HsUntypedBracket GhcPs -> SDoc
+untypedQuotationCtxtDoc :: HsQuote GhcPs -> SDoc
 untypedQuotationCtxtDoc br_body
   = hang (text "In the Template Haskell quotation")
          2 (ppr br_body)
@@ -242,7 +242,7 @@ illegalUntypedBracket :: TcRnMessage
 illegalUntypedBracket = TcRnUnknownMessage $ mkPlainError noHints $
     text "Untyped brackets may only appear in untyped splices."
 
-quotedNameStageErr :: HsUntypedBracket GhcPs -> TcRnMessage
+quotedNameStageErr :: HsQuote GhcPs -> TcRnMessage
 quotedNameStageErr br
   = TcRnUnknownMessage $ mkPlainError noHints $
     sep [ text "Stage error: the non-top-level quoted name" <+> ppr br
