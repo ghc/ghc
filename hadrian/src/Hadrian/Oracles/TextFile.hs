@@ -24,8 +24,6 @@ import Development.Shake.Classes
 import Development.Shake.Config
 import Base
 
-import Hadrian.Utilities
-
 -- | Lookup a value in a text file, tracking the result. Each line of the file
 -- is expected to have @key = value@ format.
 lookupValue :: FilePath -> String -> Action (Maybe String)

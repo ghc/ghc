@@ -52,10 +52,7 @@ import Hadrian.Haskell.Cabal
 import Hadrian.Haskell.Cabal.Type
 import Hadrian.Oracles.Cabal
 import Hadrian.Oracles.ArgsHash
-import Settings.Builders.Common (packageDatabaseArgs )
 import Hadrian.Target
-import Oracles.Setting (setting, Setting(..))
-import Rules.Generate
 
 import Base
 import Builder
