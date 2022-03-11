@@ -27,8 +27,15 @@ instance Show WayUnit where
         Logging   -> "l"
         Dynamic   -> "dyn"
 
+-- TODO: get rid of non-derived Read instance
 instance Read WayUnit where
-    readsPrec _ s = [(unit, "") | unit <- [minBound ..], show unit == s]
+    readsPrec _ = \case
+        "thr"   -> [(Threaded,"")]
+        "debug" -> [(Debug,"")]
+        "p"     -> [(Profiling,"")]
+        "l"     -> [(Logging,"")]
+        "dyn"   -> [(Dynamic,"")]
+        _       -> []
 
 -- | Collection of 'WayUnit's that stands for the different ways source code
 -- is to be built.
