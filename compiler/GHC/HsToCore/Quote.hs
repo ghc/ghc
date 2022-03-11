@@ -158,13 +158,13 @@ getPlatform = targetPlatform <$> getDynFlags
 
 -----------------------------------------------------------------------------
 dsTypedBracket   :: Maybe QuoteWrapper
-                 -> HsTypedBracket GhcRn
+                 -> LHsExpr GhcRn      -- See Note [The life cycle of a TH quotation]
                  -> [PendingTcSplice]
                  -> DsM CoreExpr
-dsTypedBracket wrap (TExpBr _ exp) splices
+dsTypedBracket wrap exp splices
   = runOverloaded $ do { MkC e1 <- repLE exp ; return e1 }
   where
-    -- ROMES: TODO: factoring this method out requires many imports for its explicit type, is it worth it?
+    -- romes TODO: factoring this method out requires many imports for its explicit type, is it worth it?
     runOverloaded act = do
       -- In the overloaded case we have to get given a wrapper, it is just
       -- for variable quotations that there is no wrapper, because they
@@ -173,7 +173,7 @@ dsTypedBracket wrap (TExpBr _ exp) splices
       runReaderT (mapReaderT (dsExtendMetaEnv (new_bit splices)) act) mw
 
 dsUntypedBracket :: Maybe QuoteWrapper -- ^ This is Nothing only when we are dealing with a VarBr
-                 -> HsUntypedBracket GhcRn
+                 -> HsQuote GhcRn      -- See Note [The life cycle of a TH quotation]
                  -> [PendingTcSplice]
                  -> DsM CoreExpr
 -- See Note [Desugaring Brackets]
@@ -184,7 +184,7 @@ dsUntypedBracket :: Maybe QuoteWrapper -- ^ This is Nothing only when we are dea
 dsUntypedBracket wrap brack splices
   = do_brack brack
   where
-    -- ROMES: TODO: factoring this method out requires many imports for its explicit type, is it worth it?
+    -- romes TODO: factoring this method out requires many imports for its explicit type, is it worth it?
     runOverloaded act = do
       -- In the overloaded case we have to get given a wrapper, it is just
       -- for variable quotations that there is no wrapper, because they

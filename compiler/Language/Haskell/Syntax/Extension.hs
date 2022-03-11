@@ -471,17 +471,14 @@ type family XSpliced       x
 type family XXSplice       x
 
 -- -------------------------------------
--- HsTypedBracket type families
-type family XTExpBr          x
-type family XXTypedBracket   x
--- HsUntypedBracket type families
-type family XExpBr           x
-type family XPatBr           x
-type family XDecBrL          x
-type family XDecBrG          x
-type family XTypBr           x
-type family XVarBr           x
-type family XXUntypedBracket x
+-- HsQuoteBracket type families
+type family XExpBr  x
+type family XPatBr  x
+type family XDecBrL x
+type family XDecBrG x
+type family XTypBr  x
+type family XVarBr  x
+type family XXQuote x
 
 -- -------------------------------------
 -- HsCmdTop type families

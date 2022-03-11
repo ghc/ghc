@@ -1184,10 +1184,10 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
         [ toHie expr
         ]
       HsTypedBracket xbracket b -> case hiePass @p of
-        HieRn | _ <- xbracket ->
-            [ toHie b
-            ]
-        HieTc | HsBracketTc _ _ p <- xbracket ->
+        HieRn ->
+          [ toHie b
+          ]
+        HieTc | HsBracketTc _ _ _ p <- xbracket ->
           [ toHie b
           , toHie p
           ]
@@ -1196,7 +1196,7 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
             [ toHie b
             , toHie p
             ]
-        HieTc | HsBracketTc _ _ p <- xbracket ->
+        HieTc | HsBracketTc _ _ _ p <- xbracket ->
           [ toHie b
           , toHie p
           ]
@@ -1859,10 +1859,7 @@ instance ToHie (LocatedA (SpliceDecl GhcRn)) where
         [ toHie splice
         ]
 
-instance ToHie (HsTypedBracket a) where
-  toHie _ = pure []
-
-instance ToHie (HsUntypedBracket a) where
+instance ToHie (HsQuote a) where
   toHie _ = pure []
 
 instance ToHie PendingRnSplice where

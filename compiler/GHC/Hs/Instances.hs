@@ -383,17 +383,12 @@ deriving instance Data (HsSplicedThing GhcPs)
 deriving instance Data (HsSplicedThing GhcRn)
 deriving instance Data (HsSplicedThing GhcTc)
 
--- deriving instance (DataIdLR p p) => Data (HsTypedBracket p)
-deriving instance Data (HsTypedBracket GhcPs)
-deriving instance Data (HsTypedBracket GhcRn)
-deriving instance Data (HsTypedBracket GhcTc)
+-- deriving instance (DataIdLR p p) => Data (HsQuote p)
+deriving instance Data (HsQuote GhcPs)
+deriving instance Data (HsQuote GhcRn)
+deriving instance Data (HsQuote GhcTc)
 
--- deriving instance (DataIdLR p p) => Data (HsUntypedBracket p)
-deriving instance Data (HsUntypedBracket GhcPs)
-deriving instance Data (HsUntypedBracket GhcRn)
-deriving instance Data (HsUntypedBracket GhcTc)
-
-deriving instance Data HsBracketTc
+deriving instance Data thing => Data (HsBracketTc thing)
 
 -- deriving instance (DataIdLR p p) => Data (ArithSeqInfo p)
 deriving instance Data (ArithSeqInfo GhcPs)
