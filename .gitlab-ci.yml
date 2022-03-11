@@ -422,7 +422,7 @@ doc-tarball:
       optional: true
     - job: nightly-x86_64-linux-deb10-validate
       optional: true
-    - job: release-x86_64-linux-deb10-release
+    - job: release-x86_64-linux-deb10-perf
       optional: true
 
     - job: x86_64-windows-validate
