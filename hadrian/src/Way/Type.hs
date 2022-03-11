@@ -42,8 +42,8 @@ instance Read WayUnit where
 newtype Way = Way IntSet
 
 instance Binary Way where
-    put = put . show
-    get = fmap read get
+    put (Way w) = put w
+    get = Way <$> get
 
 instance Hashable Way where
     hashWithSalt salt = hashWithSalt salt . show
