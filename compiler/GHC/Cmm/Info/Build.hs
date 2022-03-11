@@ -367,8 +367,41 @@ Here we could use C = {A} and therefore [Inline] C = A.
 -}
 
 -- ---------------------------------------------------------------------
-{- Note [Invalid optimisation: shortcutting]
+{-
+Note [No static object resurrection]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The "static flag" mechanism (see Note [STATIC_LINK fields] in smStorage.h) that
+the GC uses to track liveness of static objects assumes that unreachable
+objects will never become reachable again (i.e. are never "resurrected").
+Breaking this assumption can result in extremely subtle GC soundness issues
+(e.g. #15544, #20959).
 
+Guaranteeing that this assumption is not violated requires that all CAFfy
+static objects reachable from the object's code are reachable from its SRT.  In
+the past we have gotten this wrong in a few ways:
+
+ * shortcutting references to FUN_STATICs to instead point to the FUN_STATIC's
+   SRT. This lead to #15544 and is described in more detail in Note [Invalid
+   optimisation: shortcutting].
+
+ * omitting references to static data constructor applications. This previously
+   happened due to an oversight (#20959): when generating an SRT for a
+   recursive group we would drop references to the CAFfy static data
+   constructors.
+
+To see why we cannot allow object resurrection, see the examples in the
+above-mentioned Notes.
+
+If a static closure definitely does not transitively refer to any CAFs, then it
+*may* be advertised as not-CAFfy in the interface file and consequently *may*
+be omitted from SRTs. Regardless of whether the closure is advertised as CAFfy
+or non-CAFfy, its STATIC_LINK field *must* be set to 3, so that it never
+appears on the static closure list.
+-}
+
+{-
+Note [Invalid optimisation: shortcutting]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 You might think that if we have something like
 
 A's SRT = {B}
@@ -392,12 +425,12 @@ Consider these cases:
    point to B, so that it keeps B alive.
 
 2. B is a function.  This is the tricky one. The reason we can't
-shortcut in this case is that we aren't allowed to resurrect static
-objects.
+   shortcut in this case is that we aren't allowed to resurrect static
+   objects for the reason described in Note [No static object resurrection].
+   We noticed this in #15544.
 
-== How does this cause a problem? ==
+The particular case that cropped up when we tried this in #15544 was:
 
-The particular case that cropped up when we tried this was #15544.
 - A is a thunk
 - B is a static function
 - X is a CAF
@@ -414,16 +447,10 @@ The particular case that cropped up when we tried this was #15544.
 - In practice, the GC thinks that B has already been visited, and so
   doesn't visit X, and catastrophe ensues.
 
-== Isn't this caused by the RET_FUN business? ==
 
-Maybe, but could you prove that RET_FUN is the only way that
-resurrection can occur?
-
-So, no shortcutting.
 
 Note [Ticky labels in SRT analysis]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 Raw Cmm data (CmmStaticsRaw) can't contain pointers so they're considered
 non-CAFFY in SRT analysis and we update the SRTMap mapping them to `Nothing`
 (meaning they're not CAFFY).
@@ -468,6 +495,9 @@ deriving newtype instance OutputableP env CLabel => OutputableP env CAFLabel
 
 type CAFSet = Set CAFLabel
 type CAFEnv = LabelMap CAFSet
+
+-- | Records the CAFfy references of a set of static data decls.
+type DataCAFEnv = Map CLabel CAFSet
 
 mkCAFLabel :: Platform -> CLabel -> CAFLabel
 mkCAFLabel platform lbl = CAFLabel (toClosureLbl platform lbl)
@@ -783,7 +813,7 @@ doSRTs dflags moduleSRTInfo procs data_ = do
 
   -- Ignore the original grouping of decls, and combine all the
   -- CAFEnvs into a single CAFEnv.
-  let static_data_env :: Map CLabel CAFSet
+  let static_data_env :: DataCAFEnv
       static_data_env =
         Map.fromList $
         flip map data_ $
@@ -795,9 +825,6 @@ doSRTs dflags moduleSRTInfo procs data_ = do
               case static of
                 CmmStatics lbl _ _ _ -> (lbl, set)
                 CmmStaticsRaw lbl _ -> (lbl, set)
-
-      static_data :: Set CLabel
-      static_data = Map.keysSet static_data_env
 
       (proc_envs, procss) = unzip procs
       cafEnv = mapUnions proc_envs
@@ -837,10 +864,10 @@ doSRTs dflags moduleSRTInfo procs data_ = do
       (result, moduleSRTInfo') =
         initUs_ us $
         flip runStateT moduleSRTInfo $ do
-          nonCAFs <- mapM (doSCC dflags staticFuns static_data) sccs
+          nonCAFs <- mapM (doSCC dflags staticFuns static_data_env) sccs
           cAFs <- forM cafsWithSRTs $ \(l, cafLbl, cafs) ->
             oneSRT dflags staticFuns [BlockLabel l] [cafLbl]
-                   True{-is a CAF-} cafs static_data
+                   True{-is a CAF-} cafs static_data_env
           return (nonCAFs ++ cAFs)
 
       (srt_declss, pairs, funSRTs, has_caf_refs) = unzip4 result
@@ -883,7 +910,7 @@ doSRTs dflags moduleSRTInfo procs data_ = do
 doSCC
   :: DynFlags
   -> LabelMap CLabel -- which blocks are static function entry points
-  -> Set CLabel -- static data
+  -> DataCAFEnv      -- ^ static data
   -> SCC (SomeLabel, CAFLabel, Set CAFLabel)
   -> StateT ModuleSRTInfo UniqSM
         ( [CmmDeclSRTs]          -- generated SRTs
@@ -892,14 +919,14 @@ doSCC
         , Bool                   -- Whether the group has CAF references
         )
 
-doSCC dflags staticFuns static_data (AcyclicSCC (l, cafLbl, cafs)) =
-  oneSRT dflags staticFuns [l] [cafLbl] False cafs static_data
+doSCC dflags staticFuns static_data_env (AcyclicSCC (l, cafLbl, cafs)) =
+  oneSRT dflags staticFuns [l] [cafLbl] False cafs static_data_env
 
-doSCC dflags staticFuns static_data (CyclicSCC nodes) = do
+doSCC dflags staticFuns static_data_env (CyclicSCC nodes) = do
   -- build a single SRT for the whole cycle, see Note [recursive SRTs]
   let (lbls, caf_lbls, cafsets) = unzip3 nodes
       cafs = Set.unions cafsets
-  oneSRT dflags staticFuns lbls caf_lbls False cafs static_data
+  oneSRT dflags staticFuns lbls caf_lbls False cafs static_data_env
 
 
 {- Note [recursive SRTs]
@@ -911,19 +938,24 @@ else, so we lose nothing by having a single SRT.
 
 However, there are a couple of wrinkles to be aware of.
 
-* The Set CAFLabel for this SRT will contain labels in the group
-itself. The SRTMap will therefore not contain entries for these labels
-yet, so we can't turn them into SRTEntries using resolveCAF. BUT we
-can just remove recursive references from the Set CAFLabel before
-generating the SRT - the SRT will still contain all the CAFLabels that
-we need to refer to from this group's SRT.
+* The Set CAFfyLabel for this SRT will contain labels in the group
+  itself. The SRTMap will therefore not contain entries for these labels
+  yet, so we can't turn them into SRTEntries using resolveCAF. BUT we
+  can just remove recursive references from the Set CAFLabel before
+  generating the SRT - the group SRT will consist of the union of the SRTs of
+  each of group's constituents minus recursive references.
 
-* That is, EXCEPT for static function closures. For the same reason
-described in Note [Invalid optimisation: shortcutting], we cannot omit
-references to static function closures.
-  - But, since we will merge the SRT with one of the static function
-    closures (see [FUN]), we can omit references to *that* static
-    function closure from the SRT.
+* That is, EXCEPT for static function closures and static data constructor
+  applications. For the same reason described in Note [No static object
+  resurrection], we cannot omit references to static function closures and
+  constructor applications.
+
+  But, since we will merge the SRT with one of the static function
+  closures (see [FUN]), we can omit references to *that* static
+  function closure from the SRT.
+
+* Similarly, we must reintroduce recursive references to static data
+  constructor applications into the group's SRT.
 -}
 
 -- | Build an SRT for a set of blocks
@@ -934,7 +966,7 @@ oneSRT
   -> [CAFLabel]                 -- labels for those blocks
   -> Bool                       -- True <=> this SRT is for a CAF
   -> Set CAFLabel               -- SRT for this set
-  -> Set CLabel                 -- Static data labels in this group
+  -> DataCAFEnv                 -- Static data labels in this group
   -> StateT ModuleSRTInfo UniqSM
        ( [CmmDeclSRTs]                -- SRT objects we built
        , [(Label, CLabel)]            -- SRT fields for these blocks' itbls
@@ -942,7 +974,7 @@ oneSRT
        , Bool                         -- Whether the group has CAF references
        )
 
-oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
+oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data_env = do
   topSRT <- get
 
   let
@@ -962,7 +994,10 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
         [] -> (Nothing, [])
         ((l,b):xs) -> (Just (l,b), map fst xs)
 
-    -- Remove recursive references from the SRT
+    -- Remove recursive references from the SRT as described in
+    -- Note [recursive SRTs]. We carefully reintroduce references to static
+    -- functions and data constructor applications below, as is necessary due
+    -- to Note [No static object resurrection].
     nonRec :: Set CAFLabel
     nonRec = cafs `Set.difference` Set.fromList caf_lbls
 
@@ -984,7 +1019,7 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
       text "nonRec:"          <+> pdoc platform nonRec $$
       text "lbls:"            <+> pdoc platform lbls $$
       text "caf_lbls:"        <+> pdoc platform caf_lbls $$
-      text "static_data:"     <+> pdoc platform static_data $$
+      text "static_data_env:" <+> pdoc platform static_data_env $$
       text "cafs:"            <+> pdoc platform cafs $$
       text "blockids:"        <+> ppr blockids $$
       text "maybeFunClosure:" <+> pdoc platform maybeFunClosure $$
@@ -1011,7 +1046,7 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
                  foldl' (\srt_map cafLbl@(CAFLabel clbl) ->
                           -- Only map static data to Nothing (== not CAFFY). For CAFFY
                           -- statics we refer to the static itself instead of a SRT.
-                          if not (Set.member clbl static_data) || isNothing srtEntry then
+                          if not (Map.member clbl static_data_env) || isNothing srtEntry then
                             Map.insert cafLbl srtEntry srt_map
                           else
                             srt_map)
@@ -1021,7 +1056,7 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
                state{ moduleSRTMap = srt_map }
 
     allStaticData =
-      all (\(CAFLabel clbl) -> Set.member clbl static_data) caf_lbls
+      all (\(CAFLabel clbl) -> Map.member clbl static_data_env) caf_lbls
 
   if Set.null filtered0 then do
     srtTraceM "oneSRT: empty" (pdoc platform caf_lbls)
@@ -1032,7 +1067,16 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
     -- references in the group. See Note [recursive SRTs].
     let allBelow_funs =
           Set.fromList (map (SRTEntry . toClosureLbl platform) otherFunLabels)
-    let filtered = filtered0 `Set.union` allBelow_funs
+    -- We must also ensure that all CAFfy static data constructor applications
+    -- are included. See Note [recursive SRTs] and #20959.
+    let allBelow_data =
+          Set.fromList
+          [ SRTEntry $ toClosureLbl platform lbl
+          | DeclLabel lbl <- lbls
+          , Just refs <- pure $ Map.lookup lbl static_data_env
+          , not $ Set.null refs
+          ]
+    let filtered = filtered0 `Set.union` allBelow_funs `Set.union` allBelow_data
     srtTraceM "oneSRT" (text "filtered:"      <+> pdoc platform filtered $$
                         text "allBelow_funs:" <+> pdoc platform allBelow_funs)
     case Set.toList filtered of
