@@ -417,19 +417,28 @@ test-cabal-reinstall-x86_64-linux-deb10:
 
 doc-tarball:
   stage: packaging
-  needs: [ x86_64-linux-deb10-numa-slow-validate
-         , x86_64-windows-validate
-         , x86_64-linux-deb10-unreg-validate ]
+  needs:
+    - job: x86_64-linux-deb10-numa-slow-validate
+      optional: true
+    - job: nightly-x86_64-linux-deb10-validate
+      optional: true
+    - job: release-x86_64-linux-deb10-release
+      optional: true
+
+    - job: x86_64-windows-validate
+      optional: true
+    - job: nightly-x86_64-windows-validate
+      optional: true
+    - job: release-x86_64-windows-perf
+      optional: true
+
   tags:
     - x86_64-linux
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV"
-  dependencies:
-    - x86_64-linux-deb10-numa-slow-validate
-    - x86_64-windows-validate
-    - x86_64-linux-deb10-unreg-validate
+  dependencies: null
   variables:
-    LINUX_BINDIST: "ghc-x86_64-linux-deb10-numa-slow-validate.tar.xz"
-    WINDOWS_BINDIST: "ghc-x86_64-windows-validate.tar.xz"
+    LINUX_BINDIST: "ghc-x86_64-linux-deb10.tar.xz"
+    WINDOWS_BINDIST: "ghc-x86_64-windows.tar.xz"
   artifacts:
     paths:
       - haddock.html.tar.xz
@@ -439,6 +448,13 @@ doc-tarball:
       - "*.pdf"
   script:
     - |
+      mv "ghc-x86_64-linux-deb10-numa-slow-validate.tar.xz" "$LINUX_BINDIST"
+        || mv "ghc-x86_64-linux-deb10-validate.tar.xz" "$LINUX_BINDIST"
+        || mv "ghc-x86_64-linux-deb10-perf.tar.xz" "$LINUX_BINDIST"
+        || true
+      mv "ghc-x86_64-windows-validate.tar.xz" "$WINDOWS_BINDIST"
+        || mv "ghc-x86-windows-perf.tar.xz" "$WINDOWS_BINDIST"
+        || true
       if [ ! -f "$LINUX_BINDIST" ]; then
         echo "Error: $LINUX_BINDIST does not exist. Did the Debian 9 job fail?"
         exit 1
@@ -478,7 +494,7 @@ test-bootstrap:
   tags:
     - x86_64-linux
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV"
-  dependencies: [source-tarball]
+  dependencies: null
   script:
     - mkdir test-bootstrap
     - tar -xf ghc-*[0-9]-src.tar.xz -C test-bootstrap
@@ -563,9 +579,16 @@ perf-nofib:
   # Hence we allow this job to fail.
   allow_failure: true
   stage: testing
-  needs: [x86_64-linux-fedora33-perf, doc-tarball]
-  dependencies:
-    - x86_64-linux-fedora33-perf
+  needs:
+    - job: x86_64-linux-fedora33-perf
+      optional: true
+    - job: nightly-x86_64-linux-fedora33-perf
+      optional: true
+    - job: release-x86_64-linux-fedora33-perf
+      optional: true
+
+    - job: doc-tarball
+      optional: false
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora33:$DOCKER_REV"
   rules:
     - if: $CI_MERGE_REQUEST_ID
@@ -605,9 +628,16 @@ perf-nofib:
 
 perf:
   stage: testing
-  needs: [x86_64-linux-fedora33-perf, doc-tarball]
-  dependencies:
-    - x86_64-linux-fedora33-perf
+  needs:
+    - job: x86_64-linux-fedora33-perf
+      optional: true
+    - job: nightly-x86_64-linux-fedora33-perf
+      optional: true
+    - job: release-x86_64-linux-fedora33-perf
+      optional: true
+    - job: doc-tarball
+      optional: false
+  dependencies: null
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora33:$DOCKER_REV"
   rules:
     - if: $CI_MERGE_REQUEST_ID
@@ -644,8 +674,7 @@ perf:
 pages:
   stage: deploy
   needs: [doc-tarball]
-  dependencies:
-    - doc-tarball
+  dependencies: null
   image: ghcci/x86_64-linux-deb9:0.2
   # See #18973
   allow_failure: true
