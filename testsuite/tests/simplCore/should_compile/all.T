@@ -389,3 +389,6 @@ test('OpaqueNoSpecConstr', normal, compile, ['-O -ddump-simpl -dsuppress-uniques
 test('OpaqueNoSpecialise', normal, compile, ['-O -ddump-simpl -dsuppress-uniques'])
 test('OpaqueNoStrictArgWW', normal, compile, ['-O -fworker-wrapper-cbv -ddump-simpl -dsuppress-uniques'])
 test('OpaqueNoWW', normal, compile, ['-O -ddump-simpl -dsuppress-uniques'])
+
+test('T21144',  normal, compile, ['-O'])
+
