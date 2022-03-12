@@ -40,10 +40,11 @@ import GHC.Core.Opt.Arity ( typeArity )
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
-import GHC.Data.Maybe         ( isJust, orElse )
+import GHC.Data.Maybe
 import GHC.Builtin.PrimOps
 import GHC.Builtin.Types.Prim ( realWorldStatePrimTy )
 import GHC.Types.Unique.Set
+import GHC.Types.Unique.MemoFun
 
 import GHC.Utils.Trace
 _ = pprTrace -- Tired of commenting out the import all the time
@@ -428,8 +429,9 @@ dmdAnal' env dmd (Lam var body)
 
 dmdAnal' env dmd (Case scrut case_bndr ty [Alt alt bndrs rhs])
   -- Only one alternative.
-  -- If it's a DataAlt, it should be the only constructor of the type.
-  | is_single_data_alt alt
+  -- If it's a DataAlt, it should be the only constructor of the type and we
+  -- can consider its field demands when analysing the scrutinee.
+  | want_precise_field_dmds alt
   = let
         WithDmdType rhs_ty rhs'           = dmdAnal env dmd rhs
         WithDmdType alt_ty1 fld_dmds      = findBndrsDmds env rhs_ty bndrs
@@ -454,10 +456,9 @@ dmdAnal' env dmd (Case scrut case_bndr ty [Alt alt bndrs rhs])
           -- __DEFAULT and literal alts. Simply add demands and discard the
           -- evaluation cardinality, as we evaluate the scrutinee exactly once.
           = assert (null bndrs) (bndrs, case_bndr_sd)
-        fam_envs                 = ae_fam_envs env
         alt_ty3
           -- See Note [Precise exceptions and strictness analysis] in "GHC.Types.Demand"
-          | exprMayThrowPreciseException fam_envs scrut
+          | exprMayThrowPreciseException (ae_fam_envs env) scrut
           = deferAfterPreciseException alt_ty2
           | otherwise
           = alt_ty2
@@ -474,8 +475,12 @@ dmdAnal' env dmd (Case scrut case_bndr ty [Alt alt bndrs rhs])
 --                                   , text "res_ty" <+> ppr res_ty ]) $
     WithDmdType res_ty (Case scrut' case_bndr' ty [Alt alt bndrs' rhs'])
     where
-      is_single_data_alt (DataAlt dc) = isJust $ tyConSingleAlgDataCon_maybe $ dataConTyCon dc
-      is_single_data_alt _            = True
+      want_precise_field_dmds alt = case alt of
+        (DataAlt dc)
+          | Nothing <- tyConSingleAlgDataCon_maybe $ dataConTyCon dc -> False
+          | DefinitelyRecursive <- ae_rec_dc env dc                  -> False
+              -- See Note [Demand analysis for recursive data constructors]
+        _                                                            -> True
 
 
 
@@ -689,12 +694,29 @@ to the Divergence lattice, but in practice it turned out to be hard to untaint
 from 'topDiv' to 'conDiv', leading to bugs, performance regressions and
 complexity that didn't justify the single fixed testcase T13380c.
 
+Note [Demand analysis for recursive data constructors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+T11545 features a single-product, recursive data type
+  data A = A A A ... A
+    deriving Eq
+Naturally, `(==)` is deeply strict in `A` and in fact will never terminate. That
+leads to very large (exponential in the depth) demand signatures and fruitless
+churn in boxity analysis, demand analysis and worker/wrapper.
+So we detect `A` as a recursive data constructor
+(see Note [Detecting recursive data constructors]) analysing `case x of A ...`
+and simply assume L for the demand on field binders, which is the same code
+path as we take for sum types.
+Combined with the B demand on the case binder, we get the very small demand
+signature <1S><1S>b on `(==)`. This improves ghc/alloc performance on T11545
+tenfold! See also Note [CPR for recursive data constructors] which describes the
+sibling mechanism in CPR analysis.
+
 Note [Demand on the scrutinee of a product case]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When figuring out the demand on the scrutinee of a product case,
 we use the demands of the case alternative, i.e. id_dmds.
 But note that these include the demand on the case binder;
-see Note [Demand on case-alternative binders] in GHC.Types.Demand.
+see Note [Demand on case-alternative binders].
 This is crucial. Example:
    f x = case x of y { (a,b) -> k y a }
 If we just take scrut_demand = 1P(L,A), then we won't pass x to the
@@ -1484,6 +1506,9 @@ finaliseArgBoxities env fn arity rhs
                      -- isStrict: see Note [No lazy, Unboxed demands in demand signature]
                      -- isMarkedStrict: see Note [Unboxing evaluated arguments]
                   , positiveTopBudget bg_inner'
+                  , NonRecursiveOrUnsure <- ae_rec_dc env dc
+                     -- See Note [Which types are unboxed?]
+                     -- and Note [Demand analysis for recursive data constructors]
                   = (bg_inner', dmd')
                   | otherwise
                   = (bg_inner, trimBoxity dmd)
@@ -1817,12 +1842,15 @@ demand put on them (topDmd), and add that to the "lazy_fv" returned by "dmdFix".
 
 
 data AnalEnv = AE
-   { ae_opts      :: !DmdAnalOpts -- ^ Analysis options
-   , ae_sigs      :: !SigEnv
-   , ae_virgin    :: !Bool -- ^ True on first iteration only
-                           -- See Note [Initialising strictness]
-   , ae_fam_envs  :: !FamInstEnvs
-   }
+  { ae_opts      :: !DmdAnalOpts
+  -- ^ Analysis options
+  , ae_sigs      :: !SigEnv
+  , ae_virgin    :: !Bool
+  -- ^ True on first iteration only. See Note [Initialising strictness]
+  , ae_fam_envs  :: !FamInstEnvs
+  , ae_rec_dc    :: DataCon -> IsRecDataConResult
+  -- ^ Memoised result of 'GHC.Core.Opt.WorkWrap.Utils.isRecDataCon'
+  }
 
         -- We use the se_env to tell us whether to
         -- record info about a variable in the DmdEnv
@@ -1845,6 +1873,7 @@ emptyAnalEnv opts fam_envs
          , ae_sigs         = emptySigEnv
          , ae_virgin       = True
          , ae_fam_envs     = fam_envs
+         , ae_rec_dc       = memoiseUniqueFun (isRecDataCon fam_envs 3)
          }
 
 emptySigEnv :: SigEnv
