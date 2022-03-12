@@ -237,10 +237,7 @@ insertCppComments (L l p) cs = L l p'
 -- ---------------------------------------------------------------------
 
 ghcCommentText :: LEpaComment -> String
-ghcCommentText (L _ (GHC.EpaComment (EpaDocCommentNext s) _))  = s
-ghcCommentText (L _ (GHC.EpaComment (EpaDocCommentPrev s) _))  = s
-ghcCommentText (L _ (GHC.EpaComment (EpaDocCommentNamed s) _)) = s
-ghcCommentText (L _ (GHC.EpaComment (EpaDocSection _ s) _))    = s
+ghcCommentText (L _ (GHC.EpaComment (EpaDocComment s) _))      = exactPrintHsDocString s
 ghcCommentText (L _ (GHC.EpaComment (EpaDocOptions s) _))      = s
 ghcCommentText (L _ (GHC.EpaComment (EpaLineComment s) _))     = s
 ghcCommentText (L _ (GHC.EpaComment (EpaBlockComment s) _))    = s

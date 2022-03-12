@@ -686,8 +686,8 @@ pprConDecl (ConDeclH98 { con_name = L _ con
                        , con_mb_cxt = mcxt
                        , con_args = args
                        , con_doc = doc })
-  = sep [ ppr_mbDoc doc
-        , pprHsForAll (mkHsForAllInvisTele noAnn ex_tvs) mcxt
+  = pprMaybeWithDoc doc $
+    sep [ pprHsForAll (mkHsForAllInvisTele noAnn ex_tvs) mcxt
         , ppr_details args ]
   where
     -- In ppr_details: let's not print the multiplicities (they are always 1, by
@@ -703,7 +703,7 @@ pprConDecl (ConDeclH98 { con_name = L _ con
 pprConDecl (ConDeclGADT { con_names = cons, con_bndrs = L _ outer_bndrs
                         , con_mb_cxt = mcxt, con_g_args = args
                         , con_res_ty = res_ty, con_doc = doc })
-  = ppr_mbDoc doc <+> ppr_con_names cons <+> dcolon
+  = pprMaybeWithDoc doc $ ppr_con_names cons <+> dcolon
     <+> (sep [pprHsOuterSigTyVarBndrs outer_bndrs <+> pprLHsContext mcxt,
               sep (ppr_args args ++ [ppr res_ty]) ])
   where
@@ -1172,7 +1172,7 @@ type instance Anno (DataFamInstDecl (GhcPass p)) = SrcSpanAnnA
 type instance Anno (FamEqn (GhcPass p) _) = SrcSpanAnnA
 type instance Anno (ClsInstDecl (GhcPass p)) = SrcSpanAnnA
 type instance Anno (InstDecl (GhcPass p)) = SrcSpanAnnA
-type instance Anno DocDecl = SrcSpanAnnA
+type instance Anno (DocDecl (GhcPass p)) = SrcSpanAnnA
 type instance Anno (DerivDecl (GhcPass p)) = SrcSpanAnnA
 type instance Anno OverlapMode = SrcSpanAnnP
 type instance Anno (DerivStrategy (GhcPass p)) = SrcAnn NoEpAnns

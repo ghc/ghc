@@ -2,9 +2,12 @@
 ==================== Parser ====================
 module ShouldCompile where
 data A
-  = " A comment that documents the first constructor" A |
-    " comment for B " B |
-    " comment for C  " C |
+  = -- | A comment that documents the first constructor
+    A |
+    -- | comment for B 
+    B |
+    -- | comment for C  
+    C |
     D
 
 

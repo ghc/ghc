@@ -7,6 +7,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
                                       -- in module Language.Haskell.Syntax.Extension
 {-# LANGUAGE ViewPatterns #-}
@@ -150,7 +151,8 @@ data HsDecl p
   | RuleD      (XRuleD p)      (RuleDecls p)     -- ^ Rule declaration
   | SpliceD    (XSpliceD p)    (SpliceDecl p)    -- ^ Splice declaration
                                                  -- (Includes quasi-quotes)
-  | DocD       (XDocD p)       (DocDecl)  -- ^ Documentation comment declaration
+  | DocD       (XDocD p)       (DocDecl p)       -- ^ Documentation comment
+                                                 -- declaration
   | RoleAnnotD (XRoleAnnotD p) (RoleAnnotDecl p) -- ^Role annotation declaration
   | XHsDecl    !(XXHsDecl p)
 
@@ -1064,8 +1066,8 @@ data ConDecl pass
       , con_g_args  :: HsConDeclGADTDetails pass -- ^ Arguments; never infix
       , con_res_ty  :: LHsType pass              -- ^ Result type
 
-      , con_doc     :: Maybe LHsDocString
-          -- ^ A possible Haddock comment.
+      , con_doc     :: Maybe (LHsDoc pass) -- ^ A possible Haddock
+                                                 -- comment.
       }
 
   | ConDeclH98
@@ -1081,8 +1083,7 @@ data ConDecl pass
       , con_mb_cxt :: Maybe (LHsContext pass)         -- ^ User-written context (if any)
       , con_args   :: HsConDeclH98Details pass        -- ^ Arguments; can be infix
 
-      , con_doc       :: Maybe LHsDocString
-          -- ^ A possible Haddock comment.
+      , con_doc    :: Maybe (LHsDoc pass) -- ^ A possible Haddock comment.
       }
   | XConDecl !(XXConDecl pass)
 
@@ -1706,21 +1707,22 @@ pprFullRuleName (L _ (st, n)) = pprWithSourceText st (doubleQuotes $ ftext n)
 -}
 
 -- | Located Documentation comment Declaration
-type LDocDecl pass = XRec pass (DocDecl)
+type LDocDecl pass = XRec pass (DocDecl pass)
 
 -- | Documentation comment Declaration
-data DocDecl
-  = DocCommentNext HsDocString
-  | DocCommentPrev HsDocString
-  | DocCommentNamed String HsDocString
-  | DocGroup Int HsDocString
-  deriving Data
+data DocDecl pass
+  = DocCommentNext (LHsDoc pass)
+  | DocCommentPrev (LHsDoc pass)
+  | DocCommentNamed String (LHsDoc pass)
+  | DocGroup Int (LHsDoc pass)
+
+deriving instance (Data pass, Data (IdP pass)) => Data (DocDecl pass)
 
 -- Okay, I need to reconstruct the document comments, but for now:
-instance Outputable DocDecl where
+instance Outputable (DocDecl name) where
   ppr _ = text "<document comment>"
 
-docDeclDoc :: DocDecl -> HsDocString
+docDeclDoc :: DocDecl pass -> LHsDoc pass
 docDeclDoc (DocCommentNext d) = d
 docDeclDoc (DocCommentPrev d) = d
 docDeclDoc (DocCommentNamed _ d) = d
@@ -1751,8 +1753,9 @@ data WarnDecls pass = Warnings { wd_ext      :: XWarnings pass
 type LWarnDecl pass = XRec pass (WarnDecl pass)
 
 -- | Warning pragma Declaration
-data WarnDecl pass = Warning (XWarning pass) [LIdP pass] WarningTxt
+data WarnDecl pass = Warning (XWarning pass) [LIdP pass] (WarningTxt pass)
                    | XWarnDecl !(XXWarnDecl pass)
+
 
 {-
 ************************************************************************

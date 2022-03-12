@@ -32,8 +32,6 @@ import Parsers
 
 import GHC.Parser.Lexer
 import GHC.Data.FastString
-import GHC.Types.SrcLoc
-
 
 -- ---------------------------------------------------------------------
 
@@ -276,9 +274,6 @@ main = do
    _ -> putStrLn usage
 
 deriving instance Data Token
-deriving instance Data PsSpan
-deriving instance Data BufSpan
-deriving instance Data BufPos
 
 writeBinFile :: FilePath -> String -> IO()
 writeBinFile fpath x = withBinaryFile fpath WriteMode (\h -> hSetEncoding h utf8 >> hPutStr h x)

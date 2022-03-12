@@ -107,8 +107,16 @@
           (Just
            (L
             { T17544_kw.hs:15:10-35 }
-            (HsDocString
-             " Bad comment for MkFoo")))))]
+            (WithHsDocIdentifiers
+             (MultiLineDocString
+              (HsDocStringNext)
+              (:|
+               (L
+                { T17544_kw.hs:15:14-35 }
+                (HsDocStringChunk
+                 " Bad comment for MkFoo"))
+               []))
+             [])))))]
        []))))
   ,(L
     (SrcSpanAnn (EpAnn
@@ -210,8 +218,16 @@
           (Just
            (L
             { T17544_kw.hs:18:13-38 }
-            (HsDocString
-             " Bad comment for MkBar")))))]
+            (WithHsDocIdentifiers
+             (MultiLineDocString
+              (HsDocStringNext)
+              (:|
+               (L
+                { T17544_kw.hs:18:17-38 }
+                (HsDocStringChunk
+                 " Bad comment for MkBar"))
+               []))
+             [])))))]
        []))))
   ,(L
     (SrcSpanAnn (EpAnn
@@ -306,13 +322,31 @@
       [(L
         (SrcSpanAnn (EpAnnNotUsed) { T17544_kw.hs:22:5-34 })
         (DocCommentNext
-         (HsDocString
-          " Bad comment for clsmethod")))])))]
+         (L
+          { T17544_kw.hs:22:5-34 }
+          (WithHsDocIdentifiers
+           (MultiLineDocString
+            (HsDocStringNext)
+            (:|
+             (L
+              { T17544_kw.hs:22:9-34 }
+              (HsDocStringChunk
+               " Bad comment for clsmethod"))
+             []))
+           []))))])))]
   (Nothing)
   (Just
    (L
     { T17544_kw.hs:12:3-33 }
-    (HsDocString
-     " Bad comment for the module")))))
+    (WithHsDocIdentifiers
+     (MultiLineDocString
+      (HsDocStringNext)
+      (:|
+       (L
+        { T17544_kw.hs:12:7-33 }
+        (HsDocStringChunk
+         " Bad comment for the module"))
+       []))
+     [])))))
 
 

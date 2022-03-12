@@ -1,6 +1,6 @@
 
 ==================== Parser ====================
-"Module description"
+-- |Module description
 module A where
 
 

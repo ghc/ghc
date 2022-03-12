@@ -1,6 +1,10 @@
 
 ==================== Parser ====================
 module T15206 where
-data Point = " a 2D point" Point !Int " x coord" !Int " y coord"
+data Point
+  = -- | a 2D point
+    Point -- | x coord
+          !Int -- | y coord
+               !Int
 
 

@@ -72,7 +72,7 @@ data ModGuts
         mg_foreign   :: !ForeignStubs,   -- ^ Foreign exports declared in this module
         mg_foreign_files :: ![(ForeignSrcLang, FilePath)],
         -- ^ Files to be compiled with the C compiler
-        mg_warns     :: !Warnings,       -- ^ Warnings declared in the module
+        mg_warns     :: !(Warnings GhcRn),  -- ^ Warnings declared in the module
         mg_anns      :: [Annotation],    -- ^ Annotations declared in this module
         mg_complete_matches :: [CompleteMatch], -- ^ Complete Matches
         mg_hpc_info  :: !HpcInfo,        -- ^ Coverage tick boxes in the module
@@ -97,9 +97,7 @@ data ModGuts
                                                 -- See Note [Trust Own Package]
                                                 -- in "GHC.Rename.Names"
 
-        mg_doc_hdr       :: !(Maybe HsDocString), -- ^ Module header.
-        mg_decl_docs     :: !DeclDocMap,     -- ^ Docs on declarations.
-        mg_arg_docs      :: !ArgDocMap       -- ^ Docs on arguments.
+        mg_docs         :: !(Maybe Docs)       -- ^ Documentation.
     }
 
 mg_mnwib :: ModGuts -> ModuleNameWithIsBoot

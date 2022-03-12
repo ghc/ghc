@@ -152,6 +152,7 @@ prepareTree dest = do
         , (Stage0, compiler,      "GHC/Cmm/Lexer.x",    "GHC/Cmm/Lexer.hs")
         , (Stage0, compiler,      "GHC/Parser.y",       "GHC/Parser.hs")
         , (Stage0, compiler,      "GHC/Parser/Lexer.x", "GHC/Parser/Lexer.hs")
+        , (Stage0, compiler,      "GHC/Parser/HaddockLex.x", "GHC/Parser/HaddockLex.hs")
         , (Stage0, hpcBin,        "HpcParser.y",        "HpcParser.hs")
         , (Stage0, genprimopcode, "Parser.y",           "Parser.hs")
         , (Stage0, genprimopcode, "Lexer.x",            "Lexer.hs")

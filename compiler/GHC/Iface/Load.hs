@@ -21,7 +21,7 @@ module GHC.Iface.Load (
         -- RnM/TcM functions
         loadModuleInterface, loadModuleInterfaces,
         loadSrcInterface, loadSrcInterface_maybe,
-        loadInterfaceForName, loadInterfaceForNameMaybe, loadInterfaceForModule,
+        loadInterfaceForName, loadInterfaceForModule,
 
         -- IfM functions
         loadInterface,
@@ -348,15 +348,6 @@ loadInterfaceForName doc name
             ; massertPpr (not (nameIsLocalOrFrom this_mod name)) (ppr name <+> parens doc) }
       ; assertPpr (isExternalName name) (ppr name) $
         initIfaceTcRn $ loadSysInterface doc (nameModule name) }
-
--- | Only loads the interface for external non-local names.
-loadInterfaceForNameMaybe :: SDoc -> Name -> TcRn (Maybe ModIface)
-loadInterfaceForNameMaybe doc name
-  = do { this_mod <- getModule
-       ; if nameIsLocalOrFrom this_mod name || not (isExternalName name)
-         then return Nothing
-         else Just <$> (initIfaceTcRn $ loadSysInterface doc (nameModule name))
-       }
 
 -- | Loads the interface for a given Module.
 loadInterfaceForModule :: SDoc -> Module -> TcRn ModIface
@@ -1025,7 +1016,7 @@ ghcPrimIface
         mi_decls    = [],
         mi_fixities = fixities,
         mi_final_exts = (mi_final_exts empty_iface){ mi_fix_fn = mkIfaceFixCache fixities },
-        mi_decl_docs = ghcPrimDeclDocs -- See Note [GHC.Prim Docs]
+        mi_docs = Just ghcPrimDeclDocs -- See Note [GHC.Prim Docs]
         }
   where
     empty_iface = emptyFullModIface gHC_PRIM
@@ -1142,9 +1133,7 @@ pprModIface unit_state iface@ModIface{ mi_final_exts = exts }
         , pprTrustInfo (mi_trust iface)
         , pprTrustPkg (mi_trust_pkg iface)
         , vcat (map ppr (mi_complete_matches iface))
-        , text "module header:" $$ nest 2 (ppr (mi_doc_hdr iface))
-        , text "declaration docs:" $$ nest 2 (ppr (mi_decl_docs iface))
-        , text "arg docs:" $$ nest 2 (ppr (mi_arg_docs iface))
+        , text "docs:" $$ nest 2 (ppr (mi_docs iface))
         , text "extensible fields:" $$ nest 2 (pprExtensibleFields (mi_ext_fields iface))
         ]
   where
@@ -1209,13 +1198,13 @@ pprTrustInfo trust = text "trusted:" <+> ppr trust
 pprTrustPkg :: Bool -> SDoc
 pprTrustPkg tpkg = text "require own pkg trusted:" <+> ppr tpkg
 
-instance Outputable Warnings where
+instance Outputable (Warnings pass) where
     ppr = pprWarns
 
-pprWarns :: Warnings -> SDoc
+pprWarns :: Warnings pass -> SDoc
 pprWarns NoWarnings         = Outputable.empty
 pprWarns (WarnAll txt)  = text "Warn all" <+> ppr txt
-pprWarns (WarnSome prs) = text "Warnings"
+pprWarns (WarnSome prs) = text "Warnings:"
                         <+> vcat (map pprWarning prs)
     where pprWarning (name, txt) = ppr name <+> ppr txt
 

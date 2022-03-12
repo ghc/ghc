@@ -1,32 +1,32 @@
 Data1 :: * 	-- Type constructor defined at ghci065.hs:14:1
- This is the haddock comment of a data declaration for Data1.
+-- | This is the haddock comment of a data declaration for Data1.
 Val2a :: Data2 	-- Data constructor defined at ghci065.hs:16:14
- This is the haddock comment of a data value for Val2a
+-- ^ This is the haddock comment of a data value for Val2a
 Val2b :: Data2 	-- Data constructor defined at ghci065.hs:17:14
- This is the haddock comment of a data value for Val2b
+-- ^ This is the haddock comment of a data value for Val2b
 Data3 :: * 	-- Type constructor defined at ghci065.hs:20:1
- This is the haddock comment of a data declaration for Data3.
+-- | This is the haddock comment of a data declaration for Data3.
 Data4 :: Int -> Data4
   	-- Data constructor defined at ghci065.hs:25:3
- This is the haddock comment of a data constructor for Data4.
+-- | This is the haddock comment of a data constructor for Data4.
 dupeField :: DupeFields2 -> Int
   	-- Identifier defined at ghci065.hs:32:9
- This is the second haddock comment of a duplicate record field.
+-- ^ This is the second haddock comment of a duplicate record field.
 
 dupeField :: DupeFields1 -> Int
   	-- Identifier defined at ghci065.hs:28:9
- This is the first haddock comment of a duplicate record field.
+-- ^ This is the first haddock comment of a duplicate record field.
 func1 :: Int -> Int -> Int
   	-- Identifier defined at ghci065.hs:41:1
- This is the haddock comment of a function declaration for func1.
+-- | This is the haddock comment of a function declaration for func1.
 <has no documentation>
 func3 :: Int -> Int -> Int
   	-- Identifier defined at ghci065.hs:50:1
- This is the haddock comment of a function declaration for func3.
- Here's multiple line comment for func3.
+-- | This is the haddock comment of a function declaration for func3.
+-- Here's multiple line comment for func3.
 PatSyn :: Int 	-- Pattern synonym defined at ghci065.hs:54:1
- This is the haddock comment of a pattern synonym
+-- | This is the haddock comment of a pattern synonym
 TyCl :: k -> Constraint 	-- Class defined at ghci065.hs:57:1
- This is the haddock comment of a type class
+-- | This is the haddock comment of a type class
 TyFam :: * -> * 	-- Type constructor defined at ghci065.hs:60:1
- This is the haddock comment of a type family
+-- | This is the haddock comment of a type family

@@ -27,6 +27,7 @@ module GHC.Core.InstEnv (
         memberInstEnv,
         instIsVisible,
         classInstances, instanceBindFun,
+        classNameInstances,
         instanceCantMatch, roughMatchTcs,
         isOverlappable, isOverlapping, isIncoherent
     ) where
@@ -435,8 +436,8 @@ instEnvElts :: InstEnv -> [ClsInst]
 instEnvElts (InstEnv rm) = elemsRM rm
   -- See Note [InstEnv determinism]
 
-instEnvEltsForClass :: InstEnv -> Class -> [ClsInst]
-instEnvEltsForClass (InstEnv rm) cls = lookupRM [RML_KnownTc (className cls)] rm
+instEnvEltsForClass :: InstEnv -> Name -> [ClsInst]
+instEnvEltsForClass (InstEnv rm) cls_nm = lookupRM [RML_KnownTc cls_nm] rm
 
 -- N.B. this is not particularly efficient but used only by GHCi.
 instEnvClasses :: InstEnv -> UniqDSet Class
@@ -457,7 +458,10 @@ instIsVisible vis_mods ispec
                | otherwise                   -> True
 
 classInstances :: InstEnvs -> Class -> [ClsInst]
-classInstances (InstEnvs { ie_global = pkg_ie, ie_local = home_ie, ie_visible = vis_mods }) cls
+classInstances envs cls = classNameInstances envs (className cls)
+
+classNameInstances :: InstEnvs -> Name -> [ClsInst]
+classNameInstances (InstEnvs { ie_global = pkg_ie, ie_local = home_ie, ie_visible = vis_mods }) cls
   = get home_ie ++ get pkg_ie
   where
     get :: InstEnv -> [ClsInst]

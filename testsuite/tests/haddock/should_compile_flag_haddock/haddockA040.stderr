@@ -6,8 +6,11 @@ data family U a
 <document comment>
 data instance U ()
   = UUnit
-  deriving (Eq " Comment on the derived  Eq   (U ())  instance",
-            Ord " Comment on the derived  Ord  (U ())  instance",
-            Show " Comment on the derived  Show (U ())  instance")
+  deriving (-- | Comment on the derived  Eq   (U ())  instance
+            Eq,
+            -- | Comment on the derived  Ord  (U ())  instance
+            Ord,
+            -- | Comment on the derived  Show (U ())  instance
+            Show)
 
 

@@ -1,5 +1,5 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE BangPatterns, MagicHash, UnboxedTuples #-}
+{-# LANGUAGE BangPatterns, MagicHash, UnboxedTuples, MultiWayIf #-}
 {-# OPTIONS_GHC -O2 -fno-warn-name-shadowing #-}
 -- We always optimise this, otherwise performance of a non-optimised
 -- compiler is severely affected. This module used to live in the `ghc`

@@ -1,40 +1,147 @@
-module header:
-  Just " `elem`, 'print',
+docs:
+  Just module header:
+         Just text:
+                {-| `elem`, 'print',
 `Unknown',
 '<>', ':=:', 'Bool'
-"
-declaration docs:
-  elem:
-    " '()', 'elem'."
-  D:
-    " A datatype."
-  D0:
-    " A constructor for 'D'. '"
-  D1:
-    " Another constructor"
-  P:
-    " A class"
-  p:
-    " A class method"
-  $fShowD:
-    " 'Show' instance"
-  D':
-    " Another datatype...
-
- ...with two docstrings."
-  D:R:FInt:
-    " A type family instance"
-  F:
-    " A type family"
-arg docs:
-  add:
-    0:
-      " First summand for 'add'"
-    1:
-      " Second summand"
-    2:
-      " Sum"
-  p:
-    0:
-      " An argument"
+-}
+              identifiers:
+                {DocsInHiFile.hs:2:3-6}
+                Data.Foldable.elem
+                {DocsInHiFile.hs:2:3-6}
+                elem
+                {DocsInHiFile.hs:2:11-15}
+                System.IO.print
+                {DocsInHiFile.hs:4:2-3}
+                GHC.Base.<>
+                {DocsInHiFile.hs:4:15-18}
+                GHC.Types.Bool
+       declaration docs:
+         [elem -> [text:
+                     -- | '()', 'elem'.
+                   identifiers:
+                     {DocsInHiFile.hs:14:13-16}
+                     Data.Foldable.elem
+                     {DocsInHiFile.hs:14:13-16}
+                     elem],
+          D -> [text:
+                  -- | A datatype.
+                identifiers:],
+          D0 -> [text:
+                   -- ^ A constructor for 'D'. '
+                 identifiers:
+                   {DocsInHiFile.hs:20:32}
+                   D],
+          D1 -> [text:
+                   -- ^ Another constructor
+                 identifiers:],
+          P -> [text:
+                  -- | A class
+                identifiers:],
+          p -> [text:
+                  -- | A class method
+                identifiers:],
+          $fShowD -> [text:
+                        -- ^ 'Show' instance
+                      identifiers:
+                        {DocsInHiFile.hs:22:25-28}
+                        GHC.Show.Show],
+          D' -> [text:
+                   -- | Another datatype...
+                 identifiers:,
+                 text:
+                   -- ^ ...with two docstrings.
+                 identifiers:],
+          D:R:FInt -> [text:
+                         -- | A type family instance
+                       identifiers:],
+          F -> [text:
+                  -- | A type family
+                identifiers:]]
+       arg docs:
+         [add -> 0:
+                   text:
+                     -- ^ First summand for 'add'
+                   identifiers:
+                     {DocsInHiFile.hs:25:36-38}
+                     add
+                 1:
+                   text:
+                     -- ^ Second summand
+                   identifiers:
+                 2:
+                   text:
+                     -- ^ Sum
+                   identifiers:,
+          p -> 0:
+                 text:
+                   -- ^ An argument
+                 identifiers:]
+       documentation structure:
+         avails:
+           [elem]
+         avails:
+           [D{D, D0, D1}]
+         avails:
+           [add]
+         avails:
+           [P{P, p}]
+         avails:
+           [GHC.Show.Show{GHC.Show.Show, GHC.Show.show, GHC.Show.showList,
+                          GHC.Show.showsPrec}]
+       named chunks:
+       haddock options:
+       language:
+         Nothing
+       language extensions:
+         MonomorphismRestriction
+         MonoLocalBinds
+         RelaxedPolyRec
+         ForeignFunctionInterface
+         ImplicitPrelude
+         ScopedTypeVariables
+         BangPatterns
+         TypeFamilies
+         NamedFieldPuns
+         GADTSyntax
+         DoAndIfThenElse
+         ConstraintKinds
+         PolyKinds
+         InstanceSigs
+         StandaloneDeriving
+         DeriveDataTypeable
+         DeriveFunctor
+         DeriveTraversable
+         DeriveFoldable
+         DeriveGeneric
+         DeriveLift
+         TypeSynonymInstances
+         FlexibleContexts
+         FlexibleInstances
+         ConstrainedClassMethods
+         MultiParamTypeClasses
+         ExistentialQuantification
+         EmptyDataDecls
+         KindSignatures
+         GeneralizedNewtypeDeriving
+         PostfixOperators
+         TupleSections
+         PatternGuards
+         RankNTypes
+         TypeOperators
+         ExplicitNamespaces
+         ExplicitForAll
+         TraditionalRecordSyntax
+         BinaryLiterals
+         HexFloatLiterals
+         EmptyCase
+         NamedWildCards
+         TypeApplications
+         EmptyDataDeriving
+         NumericUnderscores
+         StarIsType
+         ImportQualifiedPost
+         StandaloneKindSignatures
+         FieldSelectors
 extensible fields:
+

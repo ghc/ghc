@@ -1,118 +1,290 @@
-module header:
-  Just "This is the new module header"
-declaration docs:
-  Tup2:
-    "Matches a tuple of (a, a)"
-  f:
-    "The meaning of life"
-  g:
-    "Some documentation"
-  qux:
-    "This is qux"
-  sin:
-    "15"
-  wd1:
-    "1"
-  wd17:
-    "17"
-  wd18:
-    "18"
-  wd2:
-    "2"
-  wd20:
-    "20"
-  wd8:
-    "8"
-  C:
-    "A new class"
-  Corge:
-    "This is a newtype record constructor"
-  runCorge:
-    "This is the newtype record constructor's argument"
-  E:
-    "A type family"
-  Foo:
-    "A new data type"
-  Foo:
-    "A new constructor"
-  Pretty:
-    "My cool class"
-  prettyPrint:
-    "Prettily prints the object"
-  Quux:
-    "This is Quux"
-  Quux1:
-    "This is Quux1"
-  Quux2:
-    "This is Quux2"
-  Quuz:
-    "This is a record constructor"
-  quuz1_a:
-    "This is the record constructor's argument"
-  WD10:
-    "10"
-  WD11Bool:
-    "This is a newtype instance constructor"
-  WD11Int:
-    "This is a data instance constructor"
-  WD12:
-    "12"
-  WD3:
-    "3"
-  WD4:
-    "4"
-  WD5:
-    "5"
-  WD6:
-    "6"
-  $fCTYPEFoo:
-    "7"
-  $fCTYPEInt:
-    "A new instance"
-  $fCTYPE[]:
-    "Another new instance"
-  $fDka:
-    "Another new instance"
-  $fF:
-    "14"
-  D:R:EBool:
-    "A type family instance"
-  D:R:WD11Bool0:
-    "This is a newtype instance"
-  D:R:WD11Foo0:
-    "11"
-  D:R:WD11Int0:
-    "This is a data instance"
-  D:R:WD13Foo:
-    "13"
-arg docs:
-  Tup2:
-    0:
-      "The thing to match twice"
-  h:
-    0:
-      "Your favourite number"
-    1:
-      "Your least favourite Boolean"
-    2:
-      "A return value"
-  qux:
-    0:
-      "Arg uno"
-    1:
-      "Arg dos"
-  Quux1:
-    0:
-      "I am an integer"
-  Quux2:
-    0:
-      "I am a string"
-    1:
-      "I am a bool"
-  WD11Bool:
-    0:
-      "This is a newtype instance constructor argument"
-  WD11Int:
-    0:
-      "This is a data instance constructor argument"
+docs:
+  Just module header:
+         Just text:
+                -- |This is the new module header
+              identifiers:
+       declaration docs:
+         [Tup2 -> [text:
+                     -- |Matches a tuple of (a, a)
+                   identifiers:],
+          f -> [text:
+                  -- |The meaning of life
+                identifiers:],
+          g -> [text:
+                  -- |Some documentation
+                identifiers:],
+          qux -> [text:
+                    -- |This is qux
+                  identifiers:],
+          sin -> [text:
+                    -- |15
+                  identifiers:],
+          wd1 -> [text:
+                    -- |1
+                  identifiers:],
+          wd17 -> [text:
+                     -- |17
+                   identifiers:],
+          wd18 -> [text:
+                     -- |18
+                   identifiers:],
+          wd2 -> [text:
+                    -- |2
+                  identifiers:],
+          wd20 -> [text:
+                     -- |20
+                   identifiers:],
+          wd8 -> [text:
+                    -- |8
+                  identifiers:],
+          C -> [text:
+                  -- |A new class
+                identifiers:],
+          Corge -> [text:
+                      -- |This is a newtype record constructor
+                    identifiers:],
+          runCorge -> [text:
+                         -- |This is the newtype record constructor's argument
+                       identifiers:],
+          E -> [text:
+                  -- |A type family
+                identifiers:],
+          Foo -> [text:
+                    -- |A new data type
+                  identifiers:],
+          Foo -> [text:
+                    -- |A new constructor
+                  identifiers:],
+          Pretty -> [text:
+                       -- |My cool class
+                     identifiers:],
+          prettyPrint -> [text:
+                            -- |Prettily prints the object
+                          identifiers:],
+          Quux -> [text:
+                     -- |This is Quux
+                   identifiers:],
+          Quux1 -> [text:
+                      -- |This is Quux1
+                    identifiers:],
+          Quux2 -> [text:
+                      -- |This is Quux2
+                    identifiers:],
+          Quuz -> [text:
+                     -- |This is a record constructor
+                   identifiers:],
+          quuz1_a -> [text:
+                        -- |This is the record constructor's argument
+                      identifiers:],
+          WD10 -> [text:
+                     -- |10
+                   identifiers:],
+          WD11Bool -> [text:
+                         -- |This is a newtype instance constructor
+                       identifiers:],
+          WD11Int -> [text:
+                        -- |This is a data instance constructor
+                      identifiers:],
+          WD12 -> [text:
+                     -- |12
+                   identifiers:],
+          WD3 -> [text:
+                    -- |3
+                  identifiers:],
+          WD4 -> [text:
+                    -- |4
+                  identifiers:],
+          WD5 -> [text:
+                    -- |5
+                  identifiers:],
+          WD6 -> [text:
+                    -- |6
+                  identifiers:],
+          $fCTYPEFoo -> [text:
+                           -- |7
+                         identifiers:],
+          $fCTYPEInt -> [text:
+                           -- |A new instance
+                         identifiers:],
+          $fCTYPE[] -> [text:
+                          -- |Another new instance
+                        identifiers:],
+          $fDka -> [text:
+                      -- |Another new instance
+                    identifiers:],
+          $fF -> [text:
+                    -- |14
+                  identifiers:],
+          D:R:EBool -> [text:
+                          -- |A type family instance
+                        identifiers:],
+          D:R:WD11Bool0 -> [text:
+                              -- |This is a newtype instance
+                            identifiers:],
+          D:R:WD11Foo0 -> [text:
+                             -- |11
+                           identifiers:],
+          D:R:WD11Int0 -> [text:
+                             -- |This is a data instance
+                           identifiers:],
+          D:R:WD13Foo -> [text:
+                            -- |13
+                          identifiers:]]
+       arg docs:
+         [Tup2 -> 0:
+                    text:
+                      -- |The thing to match twice
+                    identifiers:,
+          h -> 0:
+                 text:
+                   -- ^Your favourite number
+                 identifiers:
+               1:
+                 text:
+                   -- |Your least favourite Boolean
+                 identifiers:
+               2:
+                 text:
+                   -- ^A return value
+                 identifiers:,
+          qux -> 1:
+                   text:
+                     -- |Arg dos
+                   identifiers:,
+          Quux1 -> 0:
+                     text:
+                       -- |I am an integer
+                     identifiers:,
+          Quux2 -> 1:
+                     text:
+                       -- |I am a bool
+                     identifiers:,
+          WD11Bool -> 0:
+                        text:
+                          -- |This is a newtype instance constructor argument
+                        identifiers:,
+          WD11Int -> 0:
+                       text:
+                         -- |This is a data instance constructor argument
+                       identifiers:]
+       documentation structure:
+         avails:
+           [f]
+         avails:
+           [Foo{Foo, Foo}]
+         avails:
+           [g]
+         avails:
+           [h]
+         avails:
+           [C{C}]
+         avails:
+           [D{D}]
+         avails:
+           [E{E}]
+         avails:
+           [i]
+         avails:
+           [WD11{WD11, WD11Bool, WD11Int, WD11Foo}]
+         avails:
+           [WD13{WD13}]
+         avails:
+           [wd8]
+         avails:
+           [F{F}]
+         avails:
+           [wd1]
+         avails:
+           [wd2]
+         avails:
+           [WD3{WD3, WD3}]
+         avails:
+           [WD4{WD4, WD4}]
+         avails:
+           [WD5{WD5}]
+         avails:
+           [WD6{WD6}]
+         avails:
+           [WD10{WD10}]
+         avails:
+           [WD12{WD12}]
+         avails:
+           [sin]
+         avails:
+           [wd17]
+         avails:
+           [wd18]
+         avails:
+           [wd20]
+         avails:
+           [Pretty{Pretty, prettyPrint}]
+         avails:
+           [Corge{Corge, runCorge, Corge}]
+         avails:
+           [Quuz{Quuz, quuz1_a, Quuz}]
+         avails:
+           [Quux{Quux, Quux2, Quux1}]
+         avails:
+           [Tup2]
+         avails:
+           [qux]
+       named chunks:
+       haddock options:
+       language:
+         Nothing
+       language extensions:
+         MonomorphismRestriction
+         MonoLocalBinds
+         RelaxedPolyRec
+         ForeignFunctionInterface
+         TemplateHaskell
+         TemplateHaskellQuotes
+         ImplicitPrelude
+         ScopedTypeVariables
+         BangPatterns
+         TypeFamilies
+         NamedFieldPuns
+         GADTSyntax
+         DoAndIfThenElse
+         ConstraintKinds
+         PolyKinds
+         DataKinds
+         InstanceSigs
+         StandaloneDeriving
+         DeriveDataTypeable
+         DeriveFunctor
+         DeriveTraversable
+         DeriveFoldable
+         DeriveGeneric
+         DeriveLift
+         TypeSynonymInstances
+         FlexibleContexts
+         FlexibleInstances
+         ConstrainedClassMethods
+         MultiParamTypeClasses
+         ExistentialQuantification
+         EmptyDataDecls
+         KindSignatures
+         GeneralizedNewtypeDeriving
+         PostfixOperators
+         TupleSections
+         PatternGuards
+         RankNTypes
+         TypeOperators
+         ExplicitNamespaces
+         ExplicitForAll
+         TraditionalRecordSyntax
+         BinaryLiterals
+         HexFloatLiterals
+         EmptyCase
+         PatternSynonyms
+         NamedWildCards
+         TypeApplications
+         EmptyDataDeriving
+         NumericUnderscores
+         StarIsType
+         ImportQualifiedPost
+         StandaloneKindSignatures
+         FieldSelectors
 extensible fields:
+

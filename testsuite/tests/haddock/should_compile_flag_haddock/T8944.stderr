@@ -3,7 +3,9 @@
 module T8944 where
 import Data.Maybe ()
 import Data.Functor ()
-data F = F () " Comment for the first argument" ()
+data F
+  = F -- | Comment for the first argument
+      () ()
 
 
 

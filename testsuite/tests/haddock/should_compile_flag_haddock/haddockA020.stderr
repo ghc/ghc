@@ -1,7 +1,7 @@
 
 ==================== Parser ====================
 module A (
-        " bla bla", " blabla ", x, <IEGroup: 2>, " qweljqwelkqjwelqjkq"
+         bla bla,  blabla , x, <IEGroup: 2>,  qweljqwelkqjwelqjkq
     ) where
 x = True
 

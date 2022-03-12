@@ -25,6 +25,6 @@ data HoleFit =
           , hfRefLvl :: Int
           , hfWrap :: [TcType]
           , hfMatches :: [TcType]
-          , hfDoc :: Maybe HsDocString
+          , hfDoc :: Maybe [HsDocString]
           }
  | RawHoleFit SDoc

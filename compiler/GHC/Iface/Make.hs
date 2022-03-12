@@ -125,12 +125,10 @@ mkPartialIface hsc_env mod_details mod_summary
          , mg_hpc_info     = hpc_info
          , mg_safe_haskell = safe_mode
          , mg_trust_pkg    = self_trust
-         , mg_doc_hdr      = doc_hdr
-         , mg_decl_docs    = decl_docs
-         , mg_arg_docs     = arg_docs
+         , mg_docs         = docs
          }
   = mkIface_ hsc_env this_mod hsc_src used_th deps rdr_env fix_env warns hpc_info self_trust
-             safe_mode usages doc_hdr decl_docs arg_docs mod_summary mod_details
+             safe_mode usages docs mod_summary mod_details
 
 -- | Fully instantiate an interface. Adds fingerprints and potentially code
 -- generator produced information.
@@ -222,34 +220,32 @@ mkIfaceTc hsc_env safe_mode mod_details mod_summary
           usages <- mkUsageInfo hsc_env this_mod (imp_mods imports) used_names
                       dep_files merged needed_links needed_pkgs
 
-          (doc_hdr', doc_map, arg_map) <- extractDocs tc_result
+          docs <- extractDocs (ms_hspp_opts mod_summary) tc_result
 
           let partial_iface = mkIface_ hsc_env
                    this_mod hsc_src
                    used_th deps rdr_env
                    fix_env warns hpc_info
                    (imp_trust_own_pkg imports) safe_mode usages
-                   doc_hdr' doc_map arg_map mod_summary
+                   docs mod_summary
                    mod_details
 
           mkFullIface hsc_env partial_iface Nothing
 
 mkIface_ :: HscEnv -> Module -> HscSource
          -> Bool -> Dependencies -> GlobalRdrEnv
-         -> NameEnv FixItem -> Warnings -> HpcInfo
+         -> NameEnv FixItem -> Warnings GhcRn -> HpcInfo
          -> Bool
          -> SafeHaskellMode
          -> [Usage]
-         -> Maybe HsDocString
-         -> DeclDocMap
-         -> ArgDocMap
+         -> Maybe Docs
          -> ModSummary
          -> ModDetails
          -> PartialModIface
 mkIface_ hsc_env
          this_mod hsc_src used_th deps rdr_env fix_env src_warns
          hpc_info pkg_trust_req safe_mode usages
-         doc_hdr decl_docs arg_docs mod_summary
+         docs mod_summary
          ModDetails{  md_insts     = insts,
                       md_fam_insts = fam_insts,
                       md_rules     = rules,
@@ -322,9 +318,7 @@ mkIface_ hsc_env
           mi_trust       = trust_info,
           mi_trust_pkg   = pkg_trust_req,
           mi_complete_matches = icomplete_matches,
-          mi_doc_hdr     = doc_hdr,
-          mi_decl_docs   = decl_docs,
-          mi_arg_docs    = arg_docs,
+          mi_docs        = docs,
           mi_final_exts  = (),
           mi_ext_fields  = emptyExtensibleFields,
           mi_src_hash = ms_hs_hash mod_summary

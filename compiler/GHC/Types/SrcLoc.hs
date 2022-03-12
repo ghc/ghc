@@ -82,6 +82,7 @@ module GHC.Types.SrcLoc (
         getLoc, unLoc,
         unRealSrcSpan, getRealSrcSpan,
         pprLocated,
+        pprLocatedAlways,
 
         -- ** Modifying Located
         mapLoc,
@@ -106,6 +107,7 @@ module GHC.Types.SrcLoc (
         psSpanEnd,
         mkSrcSpanPs,
         combineRealSrcSpans,
+        psLocatedToLocated,
 
         -- * Layout information
         LayoutInfo(..),
@@ -222,7 +224,7 @@ data RealSrcLoc
 -- We use 'BufPos' in in GHC.Parser.PostProcess.Haddock to associate Haddock
 -- comments with parts of the AST using location information (#17544).
 newtype BufPos = BufPos { bufPos :: Int }
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Data)
 
 -- | Source Location
 data SrcLoc
@@ -371,7 +373,7 @@ data RealSrcSpan
 -- | StringBuffer Source Span
 data BufSpan =
   BufSpan { bufSpanStart, bufSpanEnd :: {-# UNPACK #-} !BufPos }
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Data)
 
 instance Semigroup BufSpan where
   BufSpan start1 end1 <> BufSpan start2 end2 =
@@ -730,7 +732,7 @@ pprUserRealSpan show_path (RealSrcSpan' src_path sline scol eline ecol)
 
 -- | We attach SrcSpans to lots of things, so let's have a datatype for it.
 data GenLocated l e = L l e
-  deriving (Eq, Ord, Data, Functor, Foldable, Traversable)
+  deriving (Eq, Ord, Show, Data, Functor, Foldable, Traversable)
 
 type Located = GenLocated SrcSpan
 type RealLocated = GenLocated RealSrcSpan
@@ -797,6 +799,12 @@ pprLocated (L l e) =
                 -- Print spans without the file name etc
                 whenPprDebug (braces (ppr l))
              $$ ppr e
+
+-- | Always prints the location, even without -dppr-debug
+pprLocatedAlways :: (Outputable l, Outputable e) => GenLocated l e -> SDoc
+pprLocatedAlways (L l e) =
+     braces (ppr l)
+  $$ ppr e
 
 {-
 ************************************************************************
@@ -865,9 +873,12 @@ data PsLoc
 
 data PsSpan
   = PsSpan { psRealSpan :: !RealSrcSpan, psBufSpan :: !BufSpan }
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Data)
 
 type PsLocated = GenLocated PsSpan
+
+psLocatedToLocated :: PsLocated a -> Located a
+psLocatedToLocated (L sp a) = L (mkSrcSpanPs sp) a
 
 advancePsLoc :: PsLoc -> Char -> PsLoc
 advancePsLoc (PsLoc real_loc buf_loc) c =

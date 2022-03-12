@@ -10,6 +10,7 @@
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+{-# LANGUAGE NamedFieldPuns #-}
 
 {-
 (c) The University of Glasgow 2006
@@ -110,6 +111,7 @@ import GHC.Types.Error
 import GHC.Types.Fixity as Hs
 import GHC.Types.Annotations
 import GHC.Types.Name
+import GHC.Types.Unique.Map
 import GHC.Serialized
 
 import GHC.Unit.Finder
@@ -154,6 +156,9 @@ import qualified Data.Map as Map
 import Data.Typeable ( typeOf, Typeable, TypeRep, typeRep )
 import Data.Data (Data)
 import Data.Proxy    ( Proxy (..) )
+import GHC.Parser.HaddockLex (lexHsDoc)
+import GHC.Parser (parseIdentifier)
+import GHC.Rename.Doc (rnHsDoc)
 
 {-
 ************************************************************************
@@ -1307,7 +1312,10 @@ instance TH.Quasi TcM where
     unless is_local $ failWithTc $ TcRnUnknownMessage $ mkPlainError noHints $ text
       "Can't add documentation to" <+> ppr_loc doc_loc <+>
       text "as it isn't inside the current module"
-    updTcRef th_doc_var (Map.insert resolved_doc_loc s)
+    let ds = mkGeneratedHsDocString s
+        hd = lexHsDoc parseIdentifier ds
+    hd' <- rnHsDoc hd
+    updTcRef th_doc_var (Map.insert resolved_doc_loc hd')
     where
       resolve_loc (TH.DeclDoc n) = DeclDoc <$> lookupThName n
       resolve_loc (TH.ArgDoc n i) = ArgDoc <$> lookupThName n <*> pure i
@@ -1331,40 +1339,41 @@ instance TH.Quasi TcM where
   qGetDoc (TH.InstDoc t) = lookupThInstName t >>= lookupDeclDoc
   qGetDoc (TH.ArgDoc n i) = lookupThName n >>= lookupArgDoc i
   qGetDoc TH.ModuleDoc = do
-    (moduleDoc, _, _) <- getGblEnv >>= extractDocs
-    return (fmap unpackHDS moduleDoc)
+    df <- getDynFlags
+    docs <- getGblEnv >>= extractDocs df
+    return (renderHsDocString . hsDocString <$> (docs_mod_hdr =<< docs))
 
 -- | Looks up documentation for a declaration in first the current module,
 -- otherwise tries to find it in another module via 'hscGetModuleInterface'.
 lookupDeclDoc :: Name -> TcM (Maybe String)
 lookupDeclDoc nm = do
-  (_, DeclDocMap declDocs, _) <- getGblEnv >>= extractDocs
-  fam_insts <- tcg_fam_insts <$> getGblEnv
-  traceTc "lookupDeclDoc" (ppr nm <+> ppr declDocs <+> ppr fam_insts)
-  case Map.lookup nm declDocs of
-    Just doc -> pure $ Just (unpackHDS doc)
+  df <- getDynFlags
+  Docs{docs_decls} <- fmap (fromMaybe emptyDocs) $ getGblEnv >>= extractDocs df
+  case lookupUniqMap docs_decls nm of
+    Just doc -> pure $ Just (renderHsDocStrings $ map hsDocString doc)
     Nothing -> do
       -- Wasn't in the current module. Try searching other external ones!
       mIface <- getExternalModIface nm
       case mIface of
-        Nothing -> pure Nothing
-        Just ModIface { mi_decl_docs = DeclDocMap dmap } ->
-          pure $ unpackHDS <$> Map.lookup nm dmap
+        Just ModIface { mi_docs = Just Docs{docs_decls = dmap} } ->
+          pure $ renderHsDocStrings . map hsDocString <$> lookupUniqMap dmap nm
+        _ -> pure Nothing
 
 -- | Like 'lookupDeclDoc', looks up documentation for a function argument. If
 -- it can't find any documentation for a function in this module, it tries to
 -- find it in another module.
 lookupArgDoc :: Int -> Name -> TcM (Maybe String)
 lookupArgDoc i nm = do
-  (_, _, ArgDocMap argDocs) <- getGblEnv >>= extractDocs
-  case Map.lookup nm argDocs of
-    Just m -> pure $ unpackHDS <$> IntMap.lookup i m
+  df <- getDynFlags
+  Docs{docs_args = argDocs} <- fmap (fromMaybe emptyDocs) $ getGblEnv >>= extractDocs df
+  case lookupUniqMap argDocs nm of
+    Just m -> pure $ renderHsDocString . hsDocString <$> IntMap.lookup i m
     Nothing -> do
       mIface <- getExternalModIface nm
       case mIface of
-        Nothing -> pure Nothing
-        Just ModIface { mi_arg_docs = ArgDocMap amap } ->
-          pure $ unpackHDS <$> (Map.lookup nm amap >>= IntMap.lookup i)
+        Just ModIface { mi_docs = Just Docs{docs_args = amap} } ->
+          pure $ renderHsDocString . hsDocString <$> (lookupUniqMap amap nm >>= IntMap.lookup i)
+        _ -> pure Nothing
 
 -- | Returns the module a Name belongs to, if it is isn't local.
 getExternalModIface :: Name -> TcM (Maybe ModIface)

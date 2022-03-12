@@ -65,6 +65,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Id.Make
 import GHC.Types.Unique.FM
+import GHC.Types.Unique.Map
 import GHC.Types.TyThing
 import GHC.Types.Unique ( isValidKnownKeyUnique )
 
@@ -80,7 +81,6 @@ import GHC.Data.List.SetOps
 import Control.Applicative ((<|>))
 import Data.List        ( intercalate , find )
 import Data.Maybe
-import qualified Data.Map as Map
 
 {-
 ************************************************************************
@@ -244,15 +244,15 @@ ghcPrimExports
    [ availTC n [n] []
    | tc <- exposedPrimTyCons, let n = tyConName tc  ]
 
-ghcPrimDeclDocs :: DeclDocMap
-ghcPrimDeclDocs = DeclDocMap $ Map.fromList $ mapMaybe findName primOpDocs
+ghcPrimDeclDocs :: Docs
+ghcPrimDeclDocs = emptyDocs { docs_decls = listToUniqMap $ mapMaybe findName primOpDocs }
   where
     names = map idName ghcPrimIds ++
             map idName allThePrimOpIds ++
             map tyConName exposedPrimTyCons
     findName (nameStr, doc)
       | Just name <- find ((nameStr ==) . getOccString) names
-      = Just (name, mkHsDocString doc)
+      = Just (name, [WithHsDocIdentifiers (mkGeneratedHsDocString doc) []])
       | otherwise = Nothing
 
 {-

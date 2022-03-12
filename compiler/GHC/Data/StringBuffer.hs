@@ -26,6 +26,7 @@ module GHC.Data.StringBuffer
         hPutStringBuffer,
         appendStringBuffers,
         stringToStringBuffer,
+        stringBufferFromByteString,
 
         -- * Inspection
         nextChar,
@@ -67,6 +68,10 @@ import System.IO
 import System.IO.Unsafe         ( unsafePerformIO )
 import GHC.IO.Encoding.UTF8     ( mkUTF8 )
 import GHC.IO.Encoding.Failure  ( CodingFailureMode(IgnoreCodingFailure) )
+
+import qualified Data.ByteString.Internal as BS
+import qualified Data.ByteString as BS
+import Data.ByteString ( ByteString )
 
 import GHC.Exts
 
@@ -198,6 +203,15 @@ stringToStringBuffer str =
     pokeArray (ptr `plusPtr` size :: Ptr Word8) [0,0,0]
     -- sentinels for UTF-8 decoding
   return (StringBuffer buf size 0)
+
+-- | Convert a UTF-8 encoded 'ByteString' into a 'StringBuffer. This really
+-- relies on the internals of both 'ByteString' and 'StringBuffer'.
+--
+-- /O(n)/ (but optimized into a @memcpy@ by @bytestring@ under the hood)
+stringBufferFromByteString :: ByteString -> StringBuffer
+stringBufferFromByteString bs =
+  let BS.PS fp off len = BS.append bs (BS.pack [0,0,0])
+  in StringBuffer { buf = fp, len = len - 3, cur = off }
 
 -- -----------------------------------------------------------------------------
 -- Grab a character

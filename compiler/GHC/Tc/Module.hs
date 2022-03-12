@@ -95,6 +95,7 @@ import GHC.Rename.Fixity ( lookupFixityRn )
 import GHC.Rename.Names
 import GHC.Rename.Env
 import GHC.Rename.Module
+import GHC.Rename.Doc
 
 import GHC.Iface.Syntax   ( ShowSub(..), showToHeader )
 import GHC.Iface.Type     ( ShowForAllFlag(..) )
@@ -292,22 +293,23 @@ tcRnModuleTcRnM hsc_env mod_sum
           tcg_env <- {-# SCC "tcRnImports" #-}
                      tcRnImports hsc_env all_imports
 
-       ;  -- Don't need to rename the Haddock documentation,
-          -- it's not parsed by GHC anymore.
-          -- Make sure to do this before 'tcRnSrcDecls', because we need the
-          -- module header when we're splicing TH, since it can be accessed via
-          -- 'getDoc'.
-          tcg_env <- return (tcg_env
-                              { tcg_doc_hdr = maybe_doc_hdr })
-
+        -- Put a version of the header without identifier info into the tcg_env
+        -- Make sure to do this before 'tcRnSrcDecls', because we need the
+        -- module header when we're splicing TH, since it can be accessed via
+        -- 'getDoc'.
+        -- We will rename it properly after renaming everything else so that
+        -- haddock can link the identifiers
+        ; tcg_env <- return (tcg_env
+                              { tcg_doc_hdr = fmap (\(WithHsDocIdentifiers str _) -> WithHsDocIdentifiers str [])
+                                                                                 <$> maybe_doc_hdr })
         ; -- If the whole module is warned about or deprecated
           -- (via mod_deprec) record that in tcg_warns. If we do thereby add
           -- a WarnAll, it will override any subsequent deprecations added to tcg_warns
-          let { tcg_env1 = case mod_deprec of
-                             Just (L _ txt) ->
-                               tcg_env {tcg_warns = WarnAll txt}
-                             Nothing            -> tcg_env
-              }
+        ; tcg_env1 <- case mod_deprec of
+                             Just (L _ txt) -> do { txt' <- rnWarningTxt txt
+                                                  ; pure $ tcg_env {tcg_warns = WarnAll txt'}
+                                                  }
+                             Nothing            -> pure tcg_env
         ; setGblEnv tcg_env1
           $ do { -- Rename and type check the declarations
                  traceRn "rn1a" empty
@@ -337,11 +339,17 @@ tcRnModuleTcRnM hsc_env mod_sum
                         -- because the latter might add new bindings for
                         -- boot_dfuns, which may be mentioned in imported
                         -- unfoldings.
-                        -- Report unused names
+                      ; -- Report unused names
                         -- Do this /after/ typeinference, so that when reporting
                         -- a function with no type signature we can give the
                         -- inferred type
-                        reportUnusedNames tcg_env hsc_src
+                      ; reportUnusedNames tcg_env hsc_src
+
+                      -- Rename the module header properly after we have renamed everything else
+                      ; maybe_doc_hdr <- traverse rnLHsDoc maybe_doc_hdr;
+                      ; tcg_env <- return (tcg_env
+                                            { tcg_doc_hdr = maybe_doc_hdr })
+
                       ; -- add extra source files to tcg_dependent_files
                         addDependentFiles src_files
                         -- Ensure plugins run with the same tcg_env that we pass in
@@ -3174,7 +3182,7 @@ runRenamerPlugin gbl_env hs_group = do
 -- exception/signal an error.
 type RenamedStuff =
         (Maybe (HsGroup GhcRn, [LImportDecl GhcRn], Maybe [(LIE GhcRn, Avails)],
-                Maybe LHsDocString))
+                Maybe (LHsDoc GhcRn)))
 
 -- | Extract the renamed information from TcGblEnv.
 getRenamedStuff :: TcGblEnv -> RenamedStuff

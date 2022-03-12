@@ -76,6 +76,7 @@ module GHC.Parser.Lexer (
    commentToAnnotation,
    HdkComment(..),
    warnopt,
+   adjustChar,
    addPsMessage
   ) where
 
@@ -87,6 +88,8 @@ import Control.Monad
 import Control.Applicative
 import Data.Char
 import Data.List (stripPrefix, isInfixOf, partition)
+import Data.List.NonEmpty ( NonEmpty(..) )
+import qualified Data.List.NonEmpty as NE
 import Data.Maybe
 import Data.Word
 import Debug.Trace (trace)
@@ -134,34 +137,34 @@ import GHC.Parser.Errors.Ppr ()
 
 -- NB: The logic behind these definitions is also reflected in "GHC.Utils.Lexeme"
 -- Any changes here should likely be reflected there.
-$unispace    = \x05 -- Trick Alex into handling Unicode. See [Unicode in Alex].
+$unispace    = \x05 -- Trick Alex into handling Unicode. See Note [Unicode in Alex].
 $nl          = [\n\r\f]
 $whitechar   = [$nl\v\ $unispace]
 $white_no_nl = $whitechar # \n -- TODO #8424
 $tab         = \t
 
 $ascdigit  = 0-9
-$unidigit  = \x03 -- Trick Alex into handling Unicode. See [Unicode in Alex].
+$unidigit  = \x03 -- Trick Alex into handling Unicode. See Note [Unicode in Alex].
 $decdigit  = $ascdigit -- exactly $ascdigit, no more no less.
 $digit     = [$ascdigit $unidigit]
 
 $special   = [\(\)\,\;\[\]\`\{\}]
 $ascsymbol = [\!\#\$\%\&\*\+\.\/\<\=\>\?\@\\\^\|\-\~\:]
-$unisymbol = \x04 -- Trick Alex into handling Unicode. See [Unicode in Alex].
+$unisymbol = \x04 -- Trick Alex into handling Unicode. See Note [Unicode in Alex].
 $symbol    = [$ascsymbol $unisymbol] # [$special \_\"\']
 
-$unilarge  = \x01 -- Trick Alex into handling Unicode. See [Unicode in Alex].
+$unilarge  = \x01 -- Trick Alex into handling Unicode. See Note [Unicode in Alex].
 $asclarge  = [A-Z]
 $large     = [$asclarge $unilarge]
 
-$unismall  = \x02 -- Trick Alex into handling Unicode. See [Unicode in Alex].
+$unismall  = \x02 -- Trick Alex into handling Unicode. See Note [Unicode in Alex].
 $ascsmall  = [a-z]
 $small     = [$ascsmall $unismall \_]
 
-$uniidchar = \x07 -- Trick Alex into handling Unicode. See [Unicode in Alex].
+$uniidchar = \x07 -- Trick Alex into handling Unicode. See Note [Unicode in Alex].
 $idchar    = [$small $large $digit $uniidchar \']
 
-$unigraphic = \x06 -- Trick Alex into handling Unicode. See [Unicode in Alex].
+$unigraphic = \x06 -- Trick Alex into handling Unicode. See Note [Unicode in Alex].
 $graphic   = [$small $large $symbol $digit $idchar $special $unigraphic \"\']
 
 $binit     = 0-1
@@ -230,7 +233,7 @@ $tab          { warnTab }
 -- are). We also rule out nested Haddock comments, if the -haddock flag is
 -- set.
 
-"{-" / { isNormalComment } { nested_comment lexToken }
+"{-" / { isNormalComment } { nested_comment }
 
 -- Single-line comments are a bit tricky.  Haskell 98 says that two or
 -- more dashes followed by a symbol should be parsed as a varsym, so we
@@ -364,12 +367,12 @@ $tab          { warnTab }
 <0> {
   -- In the "0" mode we ignore these pragmas
   "{-#"  $whitechar* $pragmachar+ / { known_pragma fileHeaderPrags }
-                     { nested_comment lexToken }
+                     { nested_comment }
 }
 
 <0,option_prags> {
   "{-#"  { warnThen PsWarnUnrecognisedPragma
-                    (nested_comment lexToken) }
+                    (nested_comment ) }
 }
 
 -- '0' state: ordinary lexemes
@@ -883,13 +886,11 @@ data Token
   | ITeof                        -- ^ end of file token
 
   -- Documentation annotations. See Note [PsSpan in Comments]
-  | ITdocCommentNext  String     PsSpan -- ^ something beginning @-- |@
-  | ITdocCommentPrev  String     PsSpan -- ^ something beginning @-- ^@
-  | ITdocCommentNamed String     PsSpan -- ^ something beginning @-- $@
-  | ITdocSection      Int String PsSpan -- ^ a section heading
-  | ITdocOptions      String     PsSpan -- ^ doc options (prune, ignore-exports, etc)
-  | ITlineComment     String     PsSpan -- ^ comment starting by "--"
-  | ITblockComment    String     PsSpan -- ^ comment in {- -}
+  | ITdocComment   HsDocString PsSpan -- ^ The HsDocString contains more details about what
+                                      -- this is and how to pretty print it
+  | ITdocOptions   String      PsSpan -- ^ doc options (prune, ignore-exports, etc)
+  | ITlineComment  String      PsSpan -- ^ comment starting by "--"
+  | ITblockComment String      PsSpan -- ^ comment in {- -}
 
   deriving Show
 
@@ -1280,16 +1281,23 @@ alexOrPred p1 p2 userState in1 len in2
   = p1 userState in1 len in2 || p2 userState in1 len in2
 
 multiline_doc_comment :: Action
-multiline_doc_comment span buf _len = withLexedDocType (worker "")
+multiline_doc_comment span buf _len = {-# SCC "multiline_doc_comment" #-} withLexedDocType worker
   where
-    worker commentAcc input docType checkNextLine = case alexGetChar' input of
-      Just ('\n', input')
-        | checkNextLine -> case checkIfCommentLine input' of
-          Just input -> worker ('\n':commentAcc) input docType checkNextLine
-          Nothing -> docCommentEnd input commentAcc docType buf span
-        | otherwise -> docCommentEnd input commentAcc docType buf span
-      Just (c, input) -> worker (c:commentAcc) input docType checkNextLine
-      Nothing -> docCommentEnd input commentAcc docType buf span
+    worker input@(AI start_loc _) docType checkNextLine = go start_loc "" [] input
+      where
+        go start_loc curLine prevLines input@(AI end_loc _) = case alexGetChar' input of
+            Just ('\n', input')
+              | checkNextLine -> case checkIfCommentLine input' of
+                Just input@(AI next_start _) ->  go next_start "" (locatedLine : prevLines) input -- Start a new line
+                Nothing -> endComment
+              | otherwise -> endComment
+            Just (c, input) -> go start_loc (c:curLine) prevLines input
+            Nothing -> endComment
+          where
+            lineSpan = mkSrcSpanPs $ mkPsSpan start_loc end_loc
+            locatedLine = L lineSpan (mkHsDocStringChunk $ reverse curLine)
+            commentLines = NE.reverse $ locatedLine :| prevLines
+            endComment = docCommentEnd input (docType (\dec -> MultiLineDocString dec commentLines)) buf span
 
     -- Check if the next line of input belongs to this doc comment as well.
     -- A doc comment continues onto the next line when the following
@@ -1331,15 +1339,43 @@ lineCommentToken span buf len = do
   nested comments require traversing by hand, they can't be parsed
   using regular expressions.
 -}
-nested_comment :: P (PsLocated Token) -> Action
-nested_comment cont span buf len = do
+nested_comment :: Action
+nested_comment span buf len = {-# SCC "nested_comment" #-} do
+  l <- getLastLocComment
+  let endComment input (L _ comment) = commentEnd lexToken input (Nothing, ITblockComment comment l) buf span
   input <- getInput
-  go (reverse $ lexemeToString buf len) (1::Int) input
+  -- Include decorator in comment
+  let start_decorator = reverse $ lexemeToString buf len
+  nested_comment_logic endComment start_decorator input span
+
+nested_doc_comment :: Action
+nested_doc_comment span buf _len = {-# SCC "nested_doc_comment" #-} withLexedDocType worker
   where
-    go commentAcc 0 input = do
-      l <- getLastLocComment
-      let finalizeComment str = (Nothing, ITblockComment str l)
-      commentEnd cont input commentAcc finalizeComment buf span
+    worker input docType _checkNextLine = nested_comment_logic endComment "" input span
+      where
+        endComment input lcomment
+          = docCommentEnd input (docType (\d -> NestedDocString d (mkHsDocStringChunk . dropTrailingDec <$> lcomment))) buf span
+
+        dropTrailingDec [] = []
+        dropTrailingDec "-}" = ""
+        dropTrailingDec (x:xs) = x:dropTrailingDec xs
+
+{-# INLINE nested_comment_logic #-}
+-- | Includes the trailing '-}' decorators
+-- drop the last two elements with the callback if you don't want them to be included
+nested_comment_logic
+  :: (AlexInput -> Located String -> P (PsLocated Token))  -- ^ Continuation that gets the rest of the input and the lexed comment
+  -> String -- ^ starting value for accumulator (reversed) - When we want to include a decorator '{-' in the comment
+  -> AlexInput
+  -> PsSpan
+  -> P (PsLocated Token)
+nested_comment_logic endComment commentAcc input span = go commentAcc (1::Int) input
+  where
+    go commentAcc 0 input@(AI end_loc _) = do
+      let comment = reverse commentAcc
+          cspan = mkSrcSpanPs $ mkPsSpan (psSpanStart span) end_loc
+          lcomment = L cspan comment
+      endComment input lcomment
     go commentAcc n input = case alexGetChar' input of
       Nothing -> errBrace input (psRealSpan span)
       Just ('-',input) -> case alexGetChar' input of
@@ -1357,31 +1393,6 @@ nested_comment cont span buf len = do
                            go (parsedAcc ++ '\n':commentAcc) n input
         Just (_,_)   -> go ('\n':commentAcc) n input
       Just (c,input) -> go (c:commentAcc) n input
-
-nested_doc_comment :: Action
-nested_doc_comment span buf _len = withLexedDocType (go "")
-  where
-    go commentAcc input docType _ = case alexGetChar' input of
-      Nothing -> errBrace input (psRealSpan span)
-      Just ('-',input) -> case alexGetChar' input of
-        Nothing -> errBrace input (psRealSpan span)
-        Just ('\125',input) ->
-          docCommentEnd input commentAcc docType buf span
-        Just (_,_) -> go ('-':commentAcc) input docType False
-      Just ('\123', input) -> case alexGetChar' input of
-        Nothing  -> errBrace input (psRealSpan span)
-        Just ('-',input) -> do
-          setInput input
-          let cont = do input <- getInput; go commentAcc input docType False
-          nested_comment cont span buf _len
-        Just (_,_) -> go ('\123':commentAcc) input docType False
-      -- See Note [Nested comment line pragmas]
-      Just ('\n',input) -> case alexGetChar' input of
-        Nothing  -> errBrace input (psRealSpan span)
-        Just ('#',_) -> do (parsedAcc,input) <- parseNestedPragma input
-                           go (parsedAcc ++ '\n':commentAcc) input docType False
-        Just (_,_)   -> go ('\n':commentAcc) input docType False
-      Just (c,input) -> go (c:commentAcc) input docType False
 
 -- See Note [Nested comment line pragmas]
 parseNestedPragma :: AlexInput -> P (String,AlexInput)
@@ -1429,7 +1440,8 @@ return control to parseNestedPragma by returning the ITcomment_line_prag token.
 See #314 for more background on the bug this fixes.
 -}
 
-withLexedDocType :: (AlexInput -> (String -> (HdkComment, Token)) -> Bool -> P (PsLocated Token))
+{-# INLINE withLexedDocType #-}
+withLexedDocType :: (AlexInput -> ((HsDocStringDecorator -> HsDocString) -> (HdkComment, Token)) -> Bool -> P (PsLocated Token))
                  -> P (PsLocated Token)
 withLexedDocType lexDocComment = do
   input@(AI _ buf) <- getInput
@@ -1439,7 +1451,9 @@ withLexedDocType lexDocComment = do
     -- line of input might also belong to this doc comment.
     '|' -> lexDocComment input (mkHdkCommentNext l) True
     '^' -> lexDocComment input (mkHdkCommentPrev l) True
-    '$' -> lexDocComment input (mkHdkCommentNamed l) True
+    '$' -> case lexDocName input of
+       Nothing -> do setInput input; lexToken -- eof reached, lex it normally
+       Just (name, input) -> lexDocComment input (mkHdkCommentNamed l name) True
     '*' -> lexDocSection l 1 input
     _ -> panic "withLexedDocType: Bad doc type"
  where
@@ -1448,18 +1462,28 @@ withLexedDocType lexDocComment = do
       Just (_,   _)     -> lexDocComment input (mkHdkCommentSection l n) False
       Nothing -> do setInput input; lexToken -- eof reached, lex it normally
 
-mkHdkCommentNext, mkHdkCommentPrev :: PsSpan -> String -> (HdkComment, Token)
-mkHdkCommentNext loc str = (HdkCommentNext (mkHsDocString str), ITdocCommentNext str loc)
-mkHdkCommentPrev loc str = (HdkCommentPrev (mkHsDocString str), ITdocCommentPrev str loc)
+    lexDocName :: AlexInput -> Maybe (String, AlexInput)
+    lexDocName = go ""
+      where
+        go acc input = case alexGetChar' input of
+          Just (c, input')
+            | isSpace c -> Just (reverse acc, input)
+            | otherwise -> go (c:acc) input'
+          Nothing -> Nothing
 
-mkHdkCommentNamed :: PsSpan -> String -> (HdkComment, Token)
-mkHdkCommentNamed loc str =
-  let (name, rest) = break isSpace str
-  in (HdkCommentNamed name (mkHsDocString rest), ITdocCommentNamed str loc)
+mkHdkCommentNext, mkHdkCommentPrev  :: PsSpan -> (HsDocStringDecorator -> HsDocString) -> (HdkComment, Token)
+mkHdkCommentNext loc mkDS =  (HdkCommentNext ds,ITdocComment ds loc)
+  where ds = mkDS HsDocStringNext
+mkHdkCommentPrev loc mkDS =  (HdkCommentPrev ds,ITdocComment ds loc)
+  where ds = mkDS HsDocStringPrevious
 
-mkHdkCommentSection :: PsSpan -> Int -> String -> (HdkComment, Token)
-mkHdkCommentSection loc n str =
-  (HdkCommentSection n (mkHsDocString str), ITdocSection n str loc)
+mkHdkCommentNamed :: PsSpan -> String -> (HsDocStringDecorator -> HsDocString) -> (HdkComment, Token)
+mkHdkCommentNamed loc name mkDS = (HdkCommentNamed name ds, ITdocComment ds loc)
+  where ds = mkDS (HsDocStringNamed name)
+
+mkHdkCommentSection :: PsSpan -> Int -> (HsDocStringDecorator -> HsDocString) -> (HdkComment, Token)
+mkHdkCommentSection loc n mkDS = (HdkCommentSection n ds, ITdocComment ds loc)
+  where ds = mkDS (HsDocStringGroup n)
 
 -- RULES pragmas turn on the forall and '.' keywords, and we turn them
 -- off again at the end of the pragma.
@@ -1503,34 +1527,30 @@ endPrag span _buf _len = do
 -- it writes the wrong token length to the parser state. This function is
 -- called afterwards, so it can just update the state.
 
+{-# INLINE commentEnd #-}
 commentEnd :: P (PsLocated Token)
            -> AlexInput
-           -> String
-           -> (String -> (Maybe HdkComment, Token))
+           -> (Maybe HdkComment, Token)
            -> StringBuffer
            -> PsSpan
            -> P (PsLocated Token)
-commentEnd cont input commentAcc finalizeComment buf span = do
+commentEnd cont input (m_hdk_comment, hdk_token) buf span = do
   setInput input
   let (AI loc nextBuf) = input
-      comment = reverse commentAcc
       span' = mkPsSpan (psSpanStart span) loc
       last_len = byteDiff buf nextBuf
   span `seq` setLastToken span' last_len
-  let (m_hdk_comment, hdk_token) = finalizeComment comment
   whenIsJust m_hdk_comment $ \hdk_comment ->
     P $ \s -> POk (s {hdk_comments = hdk_comments s `snocOL` L span' hdk_comment}) ()
   b <- getBit RawTokenStreamBit
   if b then return (L span' hdk_token)
        else cont
 
-docCommentEnd :: AlexInput -> String -> (String -> (HdkComment, Token)) -> StringBuffer ->
+{-# INLINE docCommentEnd #-}
+docCommentEnd :: AlexInput -> (HdkComment, Token) -> StringBuffer ->
                  PsSpan -> P (PsLocated Token)
-docCommentEnd input commentAcc docType buf span = do
-  let finalizeComment str =
-        let (hdk_comment, token) = docType str
-        in (Just hdk_comment, token)
-  commentEnd lexToken input commentAcc finalizeComment buf span
+docCommentEnd input (hdk_comment, tok) buf span
+  = commentEnd lexToken input (Just hdk_comment, tok) buf span
 
 errBrace :: AlexInput -> RealSrcSpan -> P a
 errBrace (AI end _) span =
@@ -2331,8 +2351,10 @@ data ParserOpts = ParserOpts
 pWarningFlags :: ParserOpts -> EnumSet WarningFlag
 pWarningFlags opts = diag_warning_flags (pDiagOpts opts)
 
--- | Haddock comment as produced by the lexer. These are accumulated in
--- 'PState' and then processed in "GHC.Parser.PostProcess.Haddock".
+-- | Haddock comment as produced by the lexer. These are accumulated in 'PState'
+-- and then processed in "GHC.Parser.PostProcess.Haddock". The location of the
+-- 'HsDocString's spans over the contents of the docstring - i.e. it does not
+-- include the decorator ("-- |", "{-|" etc.)
 data HdkComment
   = HdkCommentNext HsDocString
   | HdkCommentPrev HsDocString
@@ -2596,6 +2618,7 @@ alexGetByte (AI loc s)
         loc'   = advancePsLoc loc c
         byte   = adjustChar c
 
+{-# INLINE alexGetChar' #-}
 -- This version does not squash unicode characters, it is used when
 -- lexing strings.
 alexGetChar' :: AlexInput -> Maybe (Char,AlexInput)
@@ -3386,8 +3409,7 @@ reportLexError loc1 loc2 buf f
 lexTokenStream :: ParserOpts -> StringBuffer -> RealSrcLoc -> ParseResult [Located Token]
 lexTokenStream opts buf loc = unP go initState{ options = opts' }
     where
-    new_exts  = xunset HaddockBit        -- disable Haddock
-                $ xunset UsePosPragsBit  -- parse LINE/COLUMN pragmas as tokens
+    new_exts  =   xunset UsePosPragsBit  -- parse LINE/COLUMN pragmas as tokens
                 $ xset RawTokenStreamBit -- include comments
                 $ pExtsBitmap opts
     opts'     = opts { pExtsBitmap = new_exts }
@@ -3407,7 +3429,7 @@ fileHeaderPrags = Map.fromList([("options", lex_string_prag IToptions_prag),
                                  ("include", lex_string_prag ITinclude_prag)])
 
 ignoredPrags = Map.fromList (map ignored pragmas)
-               where ignored opt = (opt, nested_comment lexToken)
+               where ignored opt = (opt, nested_comment)
                      impls = ["hugs", "nhc98", "jhc", "yhc", "catch", "derive"]
                      options_pragmas = map ("options_" ++) impls
                      -- CFILES is a hugs-only thing.
@@ -3553,13 +3575,10 @@ allocateFinalComments ss comment_q mheader_comments =
       Strict.Just _ -> (mheader_comments, [], comment_q' ++ newAnns)
 
 commentToAnnotation :: RealLocated Token -> LEpaComment
-commentToAnnotation (L l (ITdocCommentNext s ll))  = mkLEpaComment l ll (EpaDocCommentNext s)
-commentToAnnotation (L l (ITdocCommentPrev s ll))  = mkLEpaComment l ll (EpaDocCommentPrev s)
-commentToAnnotation (L l (ITdocCommentNamed s ll)) = mkLEpaComment l ll (EpaDocCommentNamed s)
-commentToAnnotation (L l (ITdocSection n s ll))    = mkLEpaComment l ll (EpaDocSection n s)
-commentToAnnotation (L l (ITdocOptions s ll))      = mkLEpaComment l ll (EpaDocOptions s)
-commentToAnnotation (L l (ITlineComment s ll))     = mkLEpaComment l ll (EpaLineComment s)
-commentToAnnotation (L l (ITblockComment s ll))    = mkLEpaComment l ll (EpaBlockComment s)
+commentToAnnotation (L l (ITdocComment s ll))   = mkLEpaComment l ll (EpaDocComment s)
+commentToAnnotation (L l (ITdocOptions s ll))   = mkLEpaComment l ll (EpaDocOptions s)
+commentToAnnotation (L l (ITlineComment s ll))  = mkLEpaComment l ll (EpaLineComment s)
+commentToAnnotation (L l (ITblockComment s ll)) = mkLEpaComment l ll (EpaBlockComment s)
 commentToAnnotation _                           = panic "commentToAnnotation"
 
 -- see Note [PsSpan in Comments]
@@ -3569,12 +3588,9 @@ mkLEpaComment l ll tok = L (realSpanAsAnchor l) (EpaComment tok (psRealSpan ll))
 -- ---------------------------------------------------------------------
 
 isComment :: Token -> Bool
-isComment (ITlineComment     _ _)   = True
-isComment (ITblockComment    _ _)   = True
-isComment (ITdocCommentNext  _ _)   = True
-isComment (ITdocCommentPrev  _ _)   = True
-isComment (ITdocCommentNamed _ _)   = True
-isComment (ITdocSection      _ _ _) = True
-isComment (ITdocOptions      _ _)   = True
-isComment _ = False
+isComment (ITlineComment  _ _) = True
+isComment (ITblockComment _ _) = True
+isComment (ITdocComment   _ _) = True
+isComment (ITdocOptions   _ _) = True
+isComment _                    = False
 }

@@ -591,7 +591,7 @@ data TcGblEnv
         tcg_binds     :: LHsBinds GhcTc,     -- Value bindings in this module
         tcg_sigs      :: NameSet,            -- ...Top-level names that *lack* a signature
         tcg_imp_specs :: [LTcSpecPrag],      -- ...SPECIALISE prags for imported Ids
-        tcg_warns     :: Warnings,           -- ...Warnings and deprecations
+        tcg_warns     :: (Warnings GhcRn), -- ...Warnings and deprecations
         tcg_anns      :: [Annotation],       -- ...Annotations
         tcg_tcs       :: [TyCon],            -- ...TyCons and Classes
         tcg_ksigs     :: NameSet,            -- ...Top-level TyCon names that *lack* a signature
@@ -601,7 +601,7 @@ data TcGblEnv
         tcg_fords     :: [LForeignDecl GhcTc], -- ...Foreign import & exports
         tcg_patsyns   :: [PatSyn],            -- ...Pattern synonyms
 
-        tcg_doc_hdr   :: Maybe LHsDocString, -- ^ Maybe Haddock header docs
+        tcg_doc_hdr   :: Maybe (LHsDoc GhcRn), -- ^ Maybe Haddock header docs
         tcg_hpc       :: !AnyHpcUsage,       -- ^ @True@ if any part of the
                                              --  prog uses hpc instrumentation.
            -- NB. BangPattern is to fix a leak, see #15111
@@ -1873,4 +1873,4 @@ data DocLoc = DeclDoc Name
 
 -- | The current collection of docs that Template Haskell has built up via
 -- putDoc.
-type THDocs = Map DocLoc String
+type THDocs = Map DocLoc (HsDoc GhcRn)

@@ -259,6 +259,7 @@ gen_hs_source (Info defaults entries) =
                 -- and we don't want a complaint that the constraint is redundant
                 -- Remember, this silly file is only for Haddock's consumption
 
+        ++ "{-# OPTIONS_HADDOCK print-explicit-runtime-reps #-}"
         ++ "module GHC.Prim (\n"
         ++ unlines (map (("        " ++) . hdr) entries')
         ++ ") where\n"

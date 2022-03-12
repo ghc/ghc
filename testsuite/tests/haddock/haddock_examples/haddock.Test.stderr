@@ -17,76 +17,90 @@ visible a = a
 [3 of 3] Compiling Test             ( Test.hs, Test.o )
 
 ==================== Parser ====================
-"
- Module      :  Test
- Copyright   :  (c) Simon Marlow 2002
- License     :  BSD-style
-
- Maintainer  :  libraries@haskell.org
- Stability   :  provisional
- Portability :  portable
-
- This module illustrates & tests most of the features of Haddock.
- Testing references from the description: 'T', 'f', 'g', 'Visible.visible'.
-"
+-- |
+-- Module      :  Test
+-- Copyright   :  (c) Simon Marlow 2002
+-- License     :  BSD-style
+--
+-- Maintainer  :  libraries@haskell.org
+-- Stability   :  provisional
+-- Portability :  portable
+--
+-- This module illustrates & tests most of the features of Haddock.
+-- Testing references from the description: 'T', 'f', 'g', 'Visible.visible'.
+--
 module Test (
         <IEGroup: 1>, <IEGroup: 2>, T(..), T2, T3(..), T4(..), T5(..),
         T6(..), N1(..), N2(..), N3(..), N4, N5(..), N6(..), N7(..),
         <IEGroup: 2>, R(..), R1(..),
-        " test that we can export record selectors on their own:", p, q, u,
+         test that we can export record selectors on their own:, p, q, u,
         <IEGroup: 1>, C(a, b), D(..), E, F(..),
-        " Test that we can export a class method on its own:", a,
+         Test that we can export a class method on its own:, a,
         <IEGroup: 1>, f, g, <IEGroup: 1>, <IEDocNamed: aux1>,
         <IEDocNamed: aux2>, <IEDocNamed: aux3>, <IEDocNamed: aux4>,
         <IEDocNamed: aux5>, <IEDocNamed: aux6>, <IEDocNamed: aux7>,
         <IEDocNamed: aux8>, <IEDocNamed: aux9>, <IEDocNamed: aux10>,
         <IEDocNamed: aux11>, <IEDocNamed: aux12>,
-        " This is some inline documentation in the export list
+         This is some inline documentation in the export list
 
  > a code block using bird-tracks
  > each line must begin with > (which isn't significant unless it
- > is at the beginning of the line).",
+ > is at the beginning of the line).,
         <IEGroup: 1>, module Hidden, <IEGroup: 1>, module Visible,
-        " nested-style doc comments ", <IEGroup: 1>, Ex(..), <IEGroup: 1>,
-        k, l, m, o, <IEGroup: 1>, <IEGroup: 2>,
-        "
+         nested-style doc comments , <IEGroup: 1>, Ex(..), <IEGroup: 1>, k,
+        l, m, o, <IEGroup: 1>, <IEGroup: 2>,
+        
  > a literal line
 
  $ a non /literal/ line $
-", f'
+, f'
     ) where
 import Hidden
 import Visible
 <document comment>
 data T a b
-  = " This comment describes the 'A' constructor"
+  = -- | This comment describes the 'A' constructor
     A Int (Maybe Float) |
-    " This comment describes the 'B' constructor"
+    -- | This comment describes the 'B' constructor
     B (T a b, T Int Float)
 <document comment>
 data T2 a b = T2 a b
 <document comment>
 data T3 a b = A1 a | B1 b
 data T4 a b = A2 a | B2 b
-data T5 a b = " documents 'A3'" A3 a | " documents 'B3'" B3 b
+data T5 a b
+  = -- | documents 'A3'
+    A3 a |
+    -- | documents 'B3'
+    B3 b
 <document comment>
 data T6
-  = " This is the doc for 'A4'" A4 |
-    " This is the doc for 'B4'" B4 |
-    " This is the doc for 'C4'" C4
+  = -- | This is the doc for 'A4'
+    A4 |
+    -- | This is the doc for 'B4'
+    B4 |
+    -- | This is the doc for 'C4'
+    C4
 <document comment>
 newtype N1 a = N1 a
 <document comment>
 newtype N2 a b = N2 {n :: a b}
 <document comment>
-newtype N3 a b = N3 {n3 :: a b " this is the 'n3' field"}
+newtype N3 a b
+  = N3 {-- | this is the 'n3' field
+        n3 :: a b}
 <document comment>
 newtype N4 a b = N4 a
 newtype N5 a b
-  = N5 {n5 :: a b " no docs on the datatype or the constructor"}
-newtype N6 a b = " docs on the constructor only" N6 {n6 :: a b}
+  = N5 {-- | no docs on the datatype or the constructor
+        n5 :: a b}
+newtype N6 a b
+  = -- | docs on the constructor only
+    N6 {n6 :: a b}
 <document comment>
-newtype N7 a b = " The 'N7' constructor" N7 {n7 :: a b}
+newtype N7 a b
+  = -- | The 'N7' constructor
+    N7 {n7 :: a b}
 class (D a) => C a where
   a :: IO a
   b :: [a]
@@ -109,20 +123,26 @@ class F a where
   ff :: a
 <document comment>
 data R
-  = " This is the 'C1' record constructor, with the following fields:"
-    C1 {p :: Int " This comment applies to the 'p' field",
-        q :: forall a. a -> a " This comment applies to the 'q' field",
-        r, s :: Int " This comment applies to both 'r' and 's'"} |
-    " This is the 'C2' record constructor, also with some fields:"
+  = -- | This is the 'C1' record constructor, with the following fields:
+    C1 {-- | This comment applies to the 'p' field
+        p :: Int,
+        -- | This comment applies to the 'q' field
+        q :: forall a. a -> a,
+        -- | This comment applies to both 'r' and 's'
+        r, s :: Int} |
+    -- | This is the 'C2' record constructor, also with some fields:
     C2 {t :: T1
              -> (T2 Int Int) -> (T3 Bool Bool) -> (T4 Float Float) -> T5 () (),
         u, v :: Int}
 <document comment>
 data R1
-  = " This is the 'C3' record constructor"
-    C3 {s1 :: Int " The 's1' record selector",
-        s2 :: Int " The 's2' record selector",
-        s3 :: Int " The 's3' record selector"}
+  = -- | This is the 'C3' record constructor
+    C3 {-- | The 's1' record selector
+        s1 :: Int,
+        -- | The 's2' record selector
+        s2 :: Int,
+        -- | The 's3' record selector
+        s3 :: Int}
 <document comment>
 <document comment>
 <document comment>
@@ -153,27 +173,44 @@ data Ex a
     Ex4 (forall a. a -> a)
 <document comment>
 k ::
-  T () () " This argument has type 'T'"
-  -> (T2 Int Int) " This argument has type 'T2 Int Int'"
-     -> (T3 Bool Bool
-         -> T4 Float Float) " This argument has type @T3 Bool Bool -> T4 Float Float@"
-        -> T5 () () " This argument has a very long description that should
- hopefully cause some wrapping to happen when it is finally
- rendered by Haddock in the generated HTML page."
-           -> IO () " This is the result type"
-l :: (Int, Int, Float) " takes a triple" -> Int " returns an 'Int'"
+  -- | This argument has type 'T'
+  T () ()
+  -> -- | This argument has type 'T2 Int Int'
+     (T2 Int Int)
+     -> -- | This argument has type @T3 Bool Bool -> T4 Float Float@
+        (T3 Bool Bool -> T4 Float Float)
+        -> -- | This argument has a very long description that should
+-- hopefully cause some wrapping to happen when it is finally
+-- rendered by Haddock in the generated HTML page.
+           T5 () ()
+           -> -- | This is the result type
+              IO ()
+l ::
+  -- | takes a triple
+  (Int, Int, Float)
+  -> -- | returns an 'Int'
+     Int
 <document comment>
 m ::
   R
-  -> N1 () " one of the arguments" -> IO Int " and the return value"
+  -> -- | one of the arguments
+     N1 ()
+     -> -- | and the return value
+        IO Int
 <document comment>
 newn ::
-  R " one of the arguments, an 'R'"
-  -> N1 () " one of the arguments" -> IO Int
+  -- | one of the arguments, an 'R'
+  R
+  -> -- | one of the arguments
+     N1 ()
+     -> IO Int
 newn = undefined
 <document comment>
 foreign import ccall unsafe "header.h" o
-  :: Float " The input float" -> IO Float " The output float"
+  :: -- | The input float
+     Float
+     -> -- | The output float
+        IO Float
 <document comment>
 newp :: Int
 newp = undefined

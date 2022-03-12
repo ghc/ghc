@@ -109,7 +109,7 @@ data ModIfaceBackend = ModIfaceBackend
     -- other fields and are not put into the interface file.
     -- Not really produced by the backend but there is no need to create them
     -- any earlier.
-  , mi_warn_fn :: !(OccName -> Maybe WarningTxt)
+  , mi_warn_fn :: !(OccName -> Maybe (WarningTxt GhcRn))
     -- ^ Cached lookup for 'mi_warns'
   , mi_fix_fn :: !(OccName -> Maybe Fixity)
     -- ^ Cached lookup for 'mi_fixities'
@@ -184,7 +184,7 @@ data ModIface_ (phase :: ModIfacePhase)
                 -- ^ Fixities
                 -- NOT STRICT!  we read this field lazily from the interface file
 
-        mi_warns    :: Warnings,
+        mi_warns    :: (Warnings GhcRn),
                 -- ^ Warnings
                 -- NOT STRICT!  we read this field lazily from the interface file
 
@@ -235,14 +235,11 @@ data ModIface_ (phase :: ModIfacePhase)
                 -- See Note [Trust Own Package] in GHC.Rename.Names
         mi_complete_matches :: ![IfaceCompleteMatch],
 
-        mi_doc_hdr :: Maybe HsDocString,
-                -- ^ Module header.
-
-        mi_decl_docs :: DeclDocMap,
-                -- ^ Docs on declarations.
-
-        mi_arg_docs :: ArgDocMap,
-                -- ^ Docs on arguments.
+        mi_docs :: Maybe Docs,
+                -- ^ Docstrings and related data for use by haddock, the ghci
+                -- @:doc@ command, and other tools.
+                --
+                -- @Just _@ @<=>@ the module was built with @-haddock@.
 
         mi_final_exts :: !(IfaceBackendExts phase),
                 -- ^ Either `()` or `ModIfaceBackend` for
@@ -359,9 +356,7 @@ instance Binary ModIface where
                  mi_trust     = trust,
                  mi_trust_pkg = trust_pkg,
                  mi_complete_matches = complete_matches,
-                 mi_doc_hdr   = doc_hdr,
-                 mi_decl_docs = decl_docs,
-                 mi_arg_docs  = arg_docs,
+                 mi_docs      = docs,
                  mi_ext_fields = _ext_fields, -- Don't `put_` this in the instance so we
                                               -- can deal with it's pointer in the header
                                               -- when we write the actual file
@@ -405,9 +400,7 @@ instance Binary ModIface where
         put_ bh trust
         put_ bh trust_pkg
         put_ bh complete_matches
-        lazyPut bh doc_hdr
-        lazyPut bh decl_docs
-        lazyPut bh arg_docs
+        lazyPutMaybe bh docs
 
    get bh = do
         mod         <- get bh
@@ -438,9 +431,7 @@ instance Binary ModIface where
         trust       <- get bh
         trust_pkg   <- get bh
         complete_matches <- get bh
-        doc_hdr     <- lazyGet bh
-        decl_docs   <- lazyGet bh
-        arg_docs    <- lazyGet bh
+        docs        <- lazyGetMaybe bh
         return (ModIface {
                  mi_module      = mod,
                  mi_sig_of      = sig_of,
@@ -464,9 +455,7 @@ instance Binary ModIface where
                  mi_trust_pkg   = trust_pkg,
                         -- And build the cached values
                  mi_complete_matches = complete_matches,
-                 mi_doc_hdr     = doc_hdr,
-                 mi_decl_docs   = decl_docs,
-                 mi_arg_docs    = arg_docs,
+                 mi_docs        = docs,
                  mi_ext_fields  = emptyExtensibleFields, -- placeholder because this is dealt
                                                          -- with specially when the file is read
                  mi_final_exts = ModIfaceBackend {
@@ -510,9 +499,7 @@ emptyPartialModIface mod
                mi_trust       = noIfaceTrustInfo,
                mi_trust_pkg   = False,
                mi_complete_matches = [],
-               mi_doc_hdr     = Nothing,
-               mi_decl_docs   = emptyDeclDocMap,
-               mi_arg_docs    = emptyArgDocMap,
+               mi_docs        = Nothing,
                mi_final_exts  = (),
                mi_ext_fields  = emptyExtensibleFields
              }
@@ -554,11 +541,11 @@ emptyIfaceHashCache _occ = Nothing
 -- avoid major space leaks.
 instance (NFData (IfaceBackendExts (phase :: ModIfacePhase)), NFData (IfaceDeclExts (phase :: ModIfacePhase))) => NFData (ModIface_ phase) where
   rnf (ModIface f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12
-                f13 f14 f15 f16 f17 f18 f19 f20 f21 f22 f23 f24 f25) =
+                f13 f14 f15 f16 f17 f18 f19 f20 f21 f22 f23) =
     rnf f1 `seq` rnf f2 `seq` f3 `seq` f4 `seq` f5 `seq` f6 `seq` rnf f7 `seq` f8 `seq`
     f9 `seq` rnf f10 `seq` rnf f11 `seq` f12 `seq` rnf f13 `seq` rnf f14 `seq` rnf f15 `seq`
     rnf f16 `seq` f17 `seq` rnf f18 `seq` rnf f19 `seq` f20 `seq` f21 `seq` f22 `seq` rnf f23
-    `seq` rnf f24 `seq` f25 `seq` ()
+    `seq` ()
 
 instance NFData (ModIfaceBackend) where
   rnf (ModIfaceBackend f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13)

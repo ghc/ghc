@@ -50,7 +50,6 @@ haddockBuilderArgs = mconcat
             , arg $ "-B" ++ root -/- stageString Stage1 -/- "lib"
             , arg $ "--lib=" ++ root -/- stageString Stage1 -/- "lib"
             , arg $ "--odir=" ++ takeDirectory output
-            , arg "--no-tmp-comp-dir"
             , arg $ "--dump-interface=" ++ output
             , arg "--html"
             , arg "--hyperlinked-source"

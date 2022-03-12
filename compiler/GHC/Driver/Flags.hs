@@ -21,18 +21,22 @@ where
 
 import GHC.Prelude
 import GHC.Utils.Outputable
+import GHC.Utils.Binary
 import GHC.Data.EnumSet as EnumSet
 
 import Control.Monad (guard)
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Maybe (fromMaybe,mapMaybe)
 
-
 data Language = Haskell98 | Haskell2010 | GHC2021
    deriving (Eq, Enum, Show, Bounded)
 
 instance Outputable Language where
     ppr = text . show
+
+instance Binary Language where
+  put_ bh = put_ bh . fromEnum
+  get bh = toEnum <$> get bh
 
 -- | Debugging flags
 data DumpFlag

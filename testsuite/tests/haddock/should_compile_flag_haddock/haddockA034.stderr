@@ -2,6 +2,9 @@
 ==================== Parser ====================
 module Hi where
 <document comment>
-data Hi where " This is a GADT constructor." Hi :: () -> Hi
+data Hi
+  where
+    -- | This is a GADT constructor.
+    Hi :: () -> Hi
 
 

@@ -48,6 +48,7 @@ import GHC.Core.TyCo.FVs ( tyCoVarsOfTypeList )
 import GHC.Driver.Session
 import GHC.Hs
 import GHC.Rename.Env
+import GHC.Rename.Doc
 import GHC.Rename.Utils  ( mapFvRn, bindLocalNamesFV
                          , typeAppErr, newLocalBndrRn, checkDupRdrNamesN
                          , checkShadowedRdrNames, warnForallIdentifier )
@@ -733,7 +734,8 @@ rnHsTyKi _ (HsSpliceTy _ sp)
 
 rnHsTyKi env (HsDocTy x ty haddock_doc)
   = do { (ty', fvs) <- rnLHsTyKi env ty
-       ; return (HsDocTy x ty' haddock_doc, fvs) }
+       ; haddock_doc' <- rnLHsDoc haddock_doc
+       ; return (HsDocTy x ty' haddock_doc', fvs) }
 
 -- See Note [Renaming HsCoreTys]
 rnHsTyKi env (XHsType ty)
@@ -1271,7 +1273,8 @@ rnField fl_env env (L l (ConDeclField _ names ty haddock_doc))
   = do { mapM_ (\(L _ (FieldOcc _ rdr_name)) -> warnForallIdentifier rdr_name) names
        ; let new_names = map (fmap (lookupField fl_env)) names
        ; (new_ty, fvs) <- rnLHsTyKi env ty
-       ; return (L l (ConDeclField noAnn new_names new_ty haddock_doc)
+       ; haddock_doc' <- traverse rnLHsDoc haddock_doc
+       ; return (L l (ConDeclField noAnn new_names new_ty haddock_doc')
                 , fvs) }
 
 lookupField :: FastStringEnv FieldLabel -> FieldOcc GhcPs -> FieldOcc GhcRn

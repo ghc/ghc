@@ -1902,9 +1902,9 @@ docCmd s  = do
 
 data DocComponents =
   DocComponents
-    { docs      :: Maybe HsDocString   -- ^ subject's haddocks
+    { docs      :: Maybe [HsDoc GhcRn]   -- ^ subject's haddocks
     , sigAndLoc :: Maybe SDoc          -- ^ type signature + category + location
-    , argDocs   :: IntMap HsDocString -- ^ haddocks for arguments
+    , argDocs   :: IntMap (HsDoc GhcRn) -- ^ haddocks for arguments
     }
 
 buildDocComponents :: GHC.GhcMonad m => String -> Name -> m DocComponents
@@ -1945,7 +1945,7 @@ pprDocs docs
   | otherwise = pprDoc <$> nonEmptyDocs
   where
     empty DocComponents{docs = mb_decl_docs, argDocs = arg_docs}
-      = isNothing mb_decl_docs && null arg_docs
+      = maybe True null mb_decl_docs && null arg_docs
     nonEmptyDocs = filter (not . empty) docs
 
 -- TODO: also print arg docs.
@@ -1958,7 +1958,7 @@ pprDoc DocComponents{sigAndLoc = mb_sig_loc, docs = mb_decl_docs} =
   where
     formatDoc doc =
       vcat [ fromMaybe empty mb_sig_loc -- print contextual info (#19055)
-           , text $ unpackHDS doc
+           , pprHsDocStrings $ map hsDocString doc
            ]
 
 handleGetDocsFailure :: GHC.GhcMonad m => GetDocsFailure -> m a

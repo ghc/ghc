@@ -1,0 +1,70 @@
+docs:
+  Just module header:
+         Nothing
+       declaration docs:
+         []
+       arg docs:
+         []
+       documentation structure:
+         re-exported module(s): [Data.Functor.Identity]
+           []
+         re-exported module(s): [Data.Maybe]
+           [GHC.Maybe.Maybe{GHC.Maybe.Maybe, GHC.Maybe.Nothing,
+                            GHC.Maybe.Just},
+            Data.Maybe.maybe]
+         re-exported module(s): [Data.Tuple]
+           [Data.Tuple.swap, Data.Tuple.curry, Data.Tuple.fst, Data.Tuple.snd,
+            Data.Tuple.uncurry]
+       named chunks:
+       haddock options:
+       language:
+         Nothing
+       language extensions:
+         MonomorphismRestriction
+         RelaxedPolyRec
+         ForeignFunctionInterface
+         ImplicitPrelude
+         ScopedTypeVariables
+         BangPatterns
+         NamedFieldPuns
+         GADTSyntax
+         DoAndIfThenElse
+         ConstraintKinds
+         PolyKinds
+         InstanceSigs
+         StandaloneDeriving
+         DeriveDataTypeable
+         DeriveFunctor
+         DeriveTraversable
+         DeriveFoldable
+         DeriveGeneric
+         DeriveLift
+         TypeSynonymInstances
+         FlexibleContexts
+         FlexibleInstances
+         ConstrainedClassMethods
+         MultiParamTypeClasses
+         ExistentialQuantification
+         EmptyDataDecls
+         KindSignatures
+         GeneralizedNewtypeDeriving
+         PostfixOperators
+         TupleSections
+         PatternGuards
+         RankNTypes
+         TypeOperators
+         ExplicitForAll
+         TraditionalRecordSyntax
+         BinaryLiterals
+         HexFloatLiterals
+         EmptyCase
+         NamedWildCards
+         TypeApplications
+         EmptyDataDeriving
+         NumericUnderscores
+         StarIsType
+         ImportQualifiedPost
+         StandaloneKindSignatures
+         FieldSelectors
+extensible fields:
+

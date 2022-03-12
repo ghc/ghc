@@ -1,8 +1,10 @@
 
 ==================== Parser ====================
-" Module header documentation"
+-- | Module header documentation
 module Comments_and_CPP_include where
 <document comment>
-data T = " Comment on MkT" MkT
+data T
+  = -- | Comment on MkT
+    MkT
 
 

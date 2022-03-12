@@ -1,7 +1,7 @@
 
 ==================== Parser ====================
 module A (
-        " bla bla", " blabla "
+         bla bla,  blabla 
     ) where
 
 

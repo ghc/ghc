@@ -119,7 +119,7 @@ import GHC.Data.Bag
 import GHC.Data.FastString
 
 import Data.Data
-import Data.List (sort, sortBy, find)
+import Data.List (sortBy, sortOn, find)
 import Data.Maybe
 
 import qualified Data.Map as Map
@@ -472,7 +472,7 @@ setEntryDP' (L (SrcSpanAnn (EpAnn (Anchor r _) an (EpaComments [])) l) a) dp
            (EpAnn (Anchor r (MovedAnchor dp)) an (EpaComments []))
            l) a
 setEntryDP' (L (SrcSpanAnn (EpAnn (Anchor r _) an cs) l) a) dp
-  = case sort (priorComments cs) of
+  = case sortAnchorLocated (priorComments cs) of
       [] ->
         L (SrcSpanAnn
                (EpAnn (Anchor r (MovedAnchor dp)) an cs)
@@ -631,11 +631,11 @@ balanceCommentsFB (L lf (FunBind x n (MG mx (L lm matches) o) t)) second = do
   -- + move the trailing ones to the last match.
   let
     split = splitCommentsEnd (realSrcSpan $ locA lf) (epAnnComments $ ann lf)
-    split2 = splitCommentsStart (realSrcSpan $ locA lf)  (EpaComments (sort $ priorComments split))
+    split2 = splitCommentsStart (realSrcSpan $ locA lf)  (EpaComments (sortAnchorLocated $ priorComments split))
 
-    before = sort $ priorComments split2
-    middle = sort $ getFollowingComments split2
-    after  = sort $ getFollowingComments split
+    before = sortAnchorLocated $ priorComments split2
+    middle = sortAnchorLocated $ getFollowingComments split2
+    after  = sortAnchorLocated $ getFollowingComments split
 
     lf' = setCommentsSrcAnn lf (EpaComments before)
   logTr $ "balanceCommentsFB (before, after): " ++ showAst (before, after)
@@ -736,7 +736,7 @@ balanceComments' la1 la2 = do
   logTr $ "balanceComments': (loc1,loc2)=" ++ showGhc (ss2range loc1,ss2range loc2)
   logTr $ "balanceComments': (anc1)=" ++ showAst (anc1)
   logTr $ "balanceComments': (cs1s)=" ++ showAst (cs1s)
-  logTr $ "balanceComments': (sort cs1f)=" ++ showAst (sort cs1f)
+  logTr $ "balanceComments': (sort cs1f)=" ++ showAst (sortOn fst cs1f)
   logTr $ "balanceComments': (cs1stay,cs1move)=" ++ showAst (cs1stay,cs1move)
   logTr $ "balanceComments': (an1',an2')=" ++ showAst (an1',an2')
   return (la1', la2')
@@ -762,8 +762,8 @@ balanceComments' la1 la2 = do
     -- Need to also check for comments more closely attached to la1,
     -- ie trailing on the same line
     (move'',stay') = break (simpleBreak 0) (trailingCommentsDeltas (anchorFromLocatedA la1) (map snd stay''))
-    move = sort $ map snd (cs1move ++ move'' ++ move')
-    stay = sort $ map snd (cs1stay ++ stay')
+    move = sortAnchorLocated $ map snd (cs1move ++ move'' ++ move')
+    stay = sortAnchorLocated $ map snd (cs1stay ++ stay')
 
     an1' = setCommentsSrcAnn (getLoc la1) (EpaCommentsBalanced (map snd cs1p) move)
     an2' = setCommentsSrcAnn (getLoc la2) (EpaCommentsBalanced stay (map snd cs2f))
@@ -785,7 +785,7 @@ trailingCommentsDeltas anc (la@(L l _):las)
 -- AZ:TODO: this is identical to commentsDeltas
 priorCommentsDeltas :: RealSrcSpan -> [LEpaComment]
                     -> [(Int, LEpaComment)]
-priorCommentsDeltas anc cs = go anc (reverse $ sort cs)
+priorCommentsDeltas anc cs = go anc (reverse $ sortAnchorLocated cs)
   where
     go :: RealSrcSpan -> [LEpaComment] -> [(Int, LEpaComment)]
     go _ [] = []
@@ -839,8 +839,8 @@ moveLeadingComments (L la a) lb = (L la' a, lb')
   `debug` ("moveLeadingComments: (before, after, la', lb'):" ++ showAst (before, after, la', lb'))
   where
     split = splitCommentsEnd (realSrcSpan $ locA la) (epAnnComments $ ann la)
-    before = sort $ priorComments split
-    after = sort $ getFollowingComments split
+    before = sortAnchorLocated $ priorComments split
+    after = sortAnchorLocated $ getFollowingComments split
 
     -- TODO: need to set an entry delta on lb' to zero, and move the
     -- original spacing to the first comment.
@@ -917,7 +917,7 @@ balanceSameLineComments (L la (Match anm mctxt pats (GRHSs x grhss lb))) = do
 
           gac = addCommentOrigDeltas $ epAnnComments ga
           gfc = getFollowingComments gac
-          gac' = setFollowingComments gac (sort $ gfc ++ move)
+          gac' = setFollowingComments gac (sortAnchorLocated $ gfc ++ move)
           ga' = (EpAnn anc an gac')
 
           an1' = setCommentsSrcAnn la cs1

@@ -29,6 +29,7 @@ module GHC.Utils.Misc (
         mapFst, mapSnd, chkAppend,
         mapAndUnzip, mapAndUnzip3,
         filterOut, partitionWith,
+        mapAccumM,
 
         dropWhileEndLE, spanEnd, last2, lastMaybe, onJust,
 
@@ -542,6 +543,15 @@ mapLastM :: Functor f => (a -> f a) -> [a] -> f [a]
 mapLastM _ [] = panic "mapLastM: empty list"
 mapLastM f [x] = (\x' -> [x']) <$> f x
 mapLastM f (x:xs) = (x:) <$> mapLastM f xs
+
+mapAccumM :: (Monad m) => (r -> a -> m (r, b)) -> r -> [a] -> m (r, [b])
+mapAccumM f = go
+  where
+    go acc [] = pure (acc,[])
+    go acc (x:xs) = do
+      (acc',y) <- f acc x
+      (acc'',ys) <- go acc' xs
+      pure (acc'', y:ys)
 
 whenNonEmpty :: Applicative m => [a] -> (NonEmpty a -> m ()) -> m ()
 whenNonEmpty []     _ = pure ()
