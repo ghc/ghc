@@ -2034,7 +2034,7 @@ instance ExactPrint (HsExpr GhcPs) where
     markEpAnn an AnnCloseS -- ']'
 
 
-  exact (HsTypedBracket an (TExpBr _ e)) = do
+  exact (HsTypedBracket an e) = do
     markLocatedAALS an id AnnOpen (Just "[||")
     markLocatedAALS an id AnnOpenE (Just "[e||")
     markAnnotated e
@@ -2069,8 +2069,6 @@ instance ExactPrint (HsExpr GhcPs) where
         markAnnotated e
 
 
-  -- exact x@(HsRnBracketOut{})           = withPpr x
-  -- exact x@(HsTcBracketOut{})           = withPpr x
   exact (HsSpliceE _ sp) = markAnnotated sp
 
   exact (HsProc an p c) = do
