@@ -676,6 +676,7 @@ Worker/wrapper will unbox
 
   1. A strict data type argument, that
        * is an algebraic data type (not a newtype)
+       * is not recursive (as per 'isRecDataCon')
        * has a single constructor (thus is a "product")
        * that may bind existentials
      We can transform
@@ -687,6 +688,7 @@ Worker/wrapper will unbox
 
   2. The constructed result of a function, if
        * its type is an algebraic data type (not a newtype)
+       * is not recursive (as per 'isRecDataCon')
        * (might have multiple constructors, in contrast to (1))
        * the applied data constructor *does not* bind existentials
      We can transform
@@ -1244,15 +1246,17 @@ combineIRDCRs = foldl' combineIRDCR NonRecursiveOrUnsure
 
 -- | @isRecDataCon _ fuel dc@, where @tc = dataConTyCon dc@ returns
 --
---   * @Just Recursive@ if the analysis found that @tc@ is reachable through one
---     of @dc@'s fields
---   * @Just NonRecursive@ if the analysis found that @tc@ is not reachable
---     through one of @dc@'s fields
---   * @Nothing@ is returned in two cases. The first is when @fuel /= Infinity@
---     and @f@ expansions of nested data TyCons were not enough to prove
+--   * @DefinitelyRecursive@ if the analysis found that @tc@ is reachable
+--     through one of @dc@'s @arg_tys@.
+--   * @NonRecursiveOrUnsure@ if the analysis found that @tc@ is not reachable
+--     through one of @dc@'s fields (so surely non-recursive).
+--   * @NonRecursiveOrUnsure@ when @fuel /= Infinity@
+--     and @fuel@ expansions of nested data TyCons were not enough to prove
 --     non-recursivenss, nor arrive at an occurrence of @tc@ thus proving
---     recursiveness. The other is when we hit an abstract TyCon (one without
+--     recursiveness. (So not sure if non-recursive.)
+--   * @NonRecursiveOrUnsure@ when we hit an abstract TyCon (one without
 --     visible DataCons), such as those imported from .hs-boot files.
+--     Similarly for stuck type and data families.
 --
 -- If @fuel = 'Infinity'@ and there are no boot files involved, then the result
 -- is never @Nothing@ and the analysis is a depth-first search. If @fuel = 'Int'
@@ -1266,16 +1270,16 @@ isRecDataCon fam_envs fuel dc
   | isTupleDataCon dc || isUnboxedSumDataCon dc
   = NonRecursiveOrUnsure
   | otherwise
-  = -- pprTrace "isRecDataCon" (ppr dc <+> dcolon <+> ppr (dataConRepType dc) $$ ppr fuel $$ ppr answer)
-    answer
+  = -- pprTraceWith "isRecDataCon" (\answer -> ppr dc <+> dcolon <+> ppr (dataConRepType dc) $$ ppr fuel $$ ppr answer) $
+    go_dc fuel (setRecTcMaxBound 1 initRecTc) dc
   where
-    answer = go_dc fuel (setRecTcMaxBound 1 initRecTc) dc
+    _pp_dc_ty = ppr dc
     (<||>) = combineIRDCR
 
     go_dc :: IntWithInf -> RecTcChecker -> DataCon -> IsRecDataConResult
     go_dc fuel rec_tc dc =
-      combineIRDCRs [ go_arg_ty fuel rec_tc (scaledThing arg_ty)
-                    | arg_ty <- dataConRepArgTys dc ]
+      combineIRDCRs [ go_arg_ty fuel rec_tc arg_ty
+                    | arg_ty <- map scaledThing (dataConRepArgTys dc) ]
 
     go_arg_ty :: IntWithInf -> RecTcChecker -> Type -> IsRecDataConResult
     go_arg_ty fuel rec_tc ty
@@ -1304,9 +1308,6 @@ isRecDataCon fam_envs fuel dc
     go_tc_app fuel rec_tc tc tc_args
       --- | pprTrace "tc_app" (vcat [ppr tc, ppr tc_args]) False = undefined
 
-      | tc == dataConTyCon dc
-      = DefinitelyRecursive -- loop found!
-
       | isPrimTyCon tc
       = NonRecursiveOrUnsure
 
@@ -1320,8 +1321,14 @@ isRecDataCon fam_envs fuel dc
       -- This is the only place where we look at tc_args
       -- See Note [Detecting recursive data constructors], point (5)
       = case topReduceTyFamApp_maybe fam_envs tc tc_args of
-          Just (HetReduction (Reduction _ rhs) _) -> go_arg_ty fuel rec_tc rhs
-          Nothing                                 -> DefinitelyRecursive -- we hit this case for 'Any'
+          Just (HetReduction (Reduction _ rhs) _) ->
+            go_arg_ty fuel rec_tc rhs
+          Nothing ->
+            NonRecursiveOrUnsure -- NB: We simply give up here. Better return
+                                 -- Unsure, as for abstract TyCons, point (7)
+
+      | tc == dataConTyCon dc
+      = DefinitelyRecursive -- loop found!
 
       | otherwise
       = assertPpr (isAlgTyCon tc) (ppr tc <+> ppr dc) $

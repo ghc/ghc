@@ -4,6 +4,7 @@ module GHC.Utils.Trace
   , pprTraceM
   , pprTraceDebug
   , pprTraceIt
+  , pprTraceWith
   , pprSTrace
   , pprTraceException
   , warnPprTrace

@@ -24,7 +24,7 @@ Category: Development
 Build-Type: Custom
 
 extra-source-files:
-    GHC/Builtin/primops.txt.pp 
+    GHC/Builtin/primops.txt.pp
     GHC/Builtin/bytearray-ops.txt.pp
     Unique.h
     CodeGen.Platform.h
@@ -707,6 +707,7 @@ Library
         GHC.Types.Unique.DSet
         GHC.Types.Unique.FM
         GHC.Types.Unique.Map
+        GHC.Types.Unique.MemoFun
         GHC.Types.Unique.SDFM
         GHC.Types.Unique.Set
         GHC.Types.Unique.Supply

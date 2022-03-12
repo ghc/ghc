@@ -2,7 +2,7 @@
 ==================== Cpr signatures ====================
 RecDataConCPR.blah: 1(1(, 1))
 RecDataConCPR.blub:
-RecDataConCPR.blub2:
+RecDataConCPR.blub2: 1(1)
 RecDataConCPR.bootNonRec: 1
 RecDataConCPR.bootRec: 1
 RecDataConCPR.f: 1

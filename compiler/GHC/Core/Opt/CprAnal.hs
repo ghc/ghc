@@ -20,6 +20,7 @@ import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Demand
 import GHC.Types.Cpr
+import GHC.Types.Unique.MemoFun
 
 import GHC.Core.FamInstEnv
 import GHC.Core.DataCon
@@ -343,7 +344,7 @@ cprTransform env id args
   = fst $ cprAnalApp env rhs args
   -- DataCon worker
   | Just con <- isDataConWorkId_maybe id
-  = cprTransformDataConWork (ae_fam_envs env) con args
+  = cprTransformDataConWork env con args
   -- Imported function
   | otherwise
   = applyCprTy (getCprSig (idCprSig id)) (length args)
@@ -361,20 +362,17 @@ cprTransformBespoke id args
 -- | Get a (possibly nested) 'CprType' for an application of a 'DataCon' worker,
 -- given a saturated number of 'CprType's for its field expressions.
 -- Implements the Nested part of Note [Nested CPR].
-cprTransformDataConWork :: FamInstEnvs -> DataCon -> [(CprType, CoreArg)] -> CprType
-cprTransformDataConWork fam_envs con args
+cprTransformDataConWork :: AnalEnv -> DataCon -> [(CprType, CoreArg)] -> CprType
+cprTransformDataConWork env con args
   | null (dataConExTyCoVars con)  -- No existentials
   , wkr_arity <= mAX_CPR_SIZE -- See Note [Trimming to mAX_CPR_SIZE]
   , args `lengthIs` wkr_arity
-  , isRecDataCon fam_envs fuel con /= DefinitelyRecursive -- See Note [CPR for recursive data constructors]
+  , ae_rec_dc env con /= DefinitelyRecursive -- See Note [CPR for recursive data constructors]
   -- , pprTrace "cprTransformDataConWork" (ppr con <+> ppr wkr_arity <+> ppr args) True
   = CprType 0 (ConCpr (dataConTag con) (strictZipWith extract_nested_cpr args wkr_str_marks))
   | otherwise
   = topCprType
   where
-    fuel = 3 -- If we can unbox more than 3 constructors to find a
-             -- recursive occurrence, then we can just as well unbox it
-             -- See Note [CPR for recursive data constructors], point (4)
     wkr_arity = dataConRepArity con
     wkr_str_marks = dataConRepStrictness con
     -- See Note [Nested CPR]
@@ -563,6 +561,8 @@ data AnalEnv
   -- iteration. See Note [Initialising strictness] in "GHC.Core.Opt.DmdAnal"
   , ae_fam_envs :: FamInstEnvs
   -- ^ Needed when expanding type families and synonyms of product types.
+  , ae_rec_dc :: DataCon -> IsRecDataConResult
+  -- ^ Memoised result of 'GHC.Core.Opt.WorkWrap.Utils.isRecDataCon'
   }
 
 instance Outputable AnalEnv where
@@ -594,7 +594,11 @@ emptyAnalEnv fam_envs
   { ae_sigs = SE emptyUnVarSet emptyVarEnv
   , ae_virgin = True
   , ae_fam_envs = fam_envs
-  }
+  , ae_rec_dc = memoiseUniqueFun (isRecDataCon fam_envs fuel)
+  } where
+    fuel = 3 -- If we can unbox more than 3 constructors to find a
+             -- recursive occurrence, then we can just as well unbox it
+             -- See Note [CPR for recursive data constructors], point (4)
 
 modifySigEnv :: (SigEnv -> SigEnv) -> AnalEnv -> AnalEnv
 modifySigEnv f env = env { ae_sigs = f (ae_sigs env) }
@@ -1022,6 +1026,7 @@ constructor's type constructor. A few perhaps surprising points:
      as when we run out of fuel. If there is ever a recursion through an
      abstract TyCon, then it's not part of the same function we are looking at,
      so we can treat it as if it wasn't recursive.
+     We handle stuck type and data families much the same.
 
 Here are a few examples of data constructors or data types with a single data
 con and the answers of our function:
@@ -1046,10 +1051,10 @@ con and the answers of our function:
       E Char = Blub
     data Blah = Blah (E (Int, (Int, Int)))     NonRec  (see point (5))
     data Blub = Blub (E (Char, Int))           Rec
-    data Blub2 = Blub2 (E (Bool, Int))     }   Rec, because stuck
+    data Blub2 = Blub2 (E (Bool, Int))     }   Unsure, because stuck (see point (7))
 
   { data T1 = T1 T2; data T2 = T2 T3;
-    ... data T5 = T5 T1                    }   Nothing (out of fuel)  (see point (4))
+    ... data T5 = T5 T1                    }   Unsure (out of fuel)  (see point (4))
 
   { module A where -- A.hs-boot
       data T
@@ -1057,7 +1062,7 @@ con and the answers of our function:
       import {-# SOURCE #-} A
       data U = MkU T
       f :: T -> U
-      f t = MkU t                              Nothing (T is abstract)  (see point (7))
+      f t = MkU t                              Unsure (T is abstract)  (see point (7))
     module A where -- A.hs
       import B
       data T = MkT U }
