@@ -44,6 +44,7 @@ import Control.Monad
 import GHC.Driver.Session
 import GHC.Parser.PostProcess ( setRdrNameSpace )
 import Data.Either            ( partitionEithers )
+import GHC.Rename.Doc
 
 {-
 ************************************************************************
@@ -316,12 +317,12 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                             , ( L loc (IEModuleContents noExtField lmod)
                               , new_exports))) }
 
-    exports_from_item acc@(ExportAccum occs mods) (L loc ie)
-        | Just new_ie <- lookup_doc_ie ie
-        = return (Just (acc, (L loc new_ie, [])))
-
-        | otherwise
-        = do (new_ie, avail) <- lookup_ie ie
+    exports_from_item acc@(ExportAccum occs mods) (L loc ie) = do
+        m_new_ie <- lookup_doc_ie ie
+        case m_new_ie of
+          Just new_ie -> return (Just (acc, (L loc new_ie, [])))
+          Nothing -> do
+             (new_ie, avail) <- lookup_ie ie
              if isUnboundName (ieName new_ie)
                   then return Nothing    -- Avoid error cascade
                   else do
@@ -396,11 +397,15 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
              return (L (locA l) name, non_flds, flds)
 
     -------------
-    lookup_doc_ie :: IE GhcPs -> Maybe (IE GhcRn)
-    lookup_doc_ie (IEGroup _ lev doc) = Just (IEGroup noExtField lev doc)
-    lookup_doc_ie (IEDoc _ doc)       = Just (IEDoc noExtField doc)
-    lookup_doc_ie (IEDocNamed _ str)  = Just (IEDocNamed noExtField str)
-    lookup_doc_ie _ = Nothing
+    lookup_doc_ie :: IE GhcPs -> RnM (Maybe (IE GhcRn))
+    lookup_doc_ie (IEGroup _ lev doc) = do
+      doc' <- rnLHsDoc doc
+      pure $ Just (IEGroup noExtField lev doc')
+    lookup_doc_ie (IEDoc _ doc)       = do
+      doc' <- rnLHsDoc doc
+      pure $ Just (IEDoc noExtField doc')
+    lookup_doc_ie (IEDocNamed _ str)  = pure $ Just (IEDocNamed noExtField str)
+    lookup_doc_ie _ = pure Nothing
 
     -- In an export item M.T(A,B,C), we want to treat the uses of
     -- A,B,C as if they were M.A, M.B, M.C

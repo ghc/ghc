@@ -24,7 +24,7 @@ module GHC.Tc.Utils.Env(
         tcLookupDataCon, tcLookupPatSyn, tcLookupConLike,
         tcLookupLocatedGlobalId, tcLookupLocatedTyCon,
         tcLookupLocatedClass, tcLookupAxiom,
-        lookupGlobal, ioLookupDataCon,
+        lookupGlobal, lookupGlobal_maybe, ioLookupDataCon,
         addTypecheckedBinds,
 
         -- Local environment

@@ -3,7 +3,7 @@
 
 DeprU.hs:3:1: warning: [-Wdeprecations (in -Wdefault)]
     Module ‘DeprM’ is deprecated:
-      Here can be your menacing deprecation warning!
+      "Here can be your menacing deprecation warning!"
 
 DeprU.hs:6:5: warning: [-Wdeprecations (in -Wdefault)]
     In the use of ‘f’ (imported from DeprM):

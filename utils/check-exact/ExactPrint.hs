@@ -43,7 +43,7 @@ import Control.Monad.RWS
 import Data.Data ( Data )
 import Data.Foldable
 import Data.Typeable
-import Data.List ( partition, sort, sortBy)
+import Data.List ( partition, sortBy)
 import Data.List.NonEmpty ( NonEmpty )
 import Data.Maybe ( isJust )
 
@@ -52,6 +52,7 @@ import Data.Void
 import Lookup
 import Utils
 import Types
+import Data.Ord
 
 -- import Debug.Trace
 
@@ -586,7 +587,7 @@ markAnnKw (EpAnn _ a _) f kw = markKwA kw (f a)
 
 markAnnKwAll :: EpAnn a -> (a -> [EpaLocation]) -> AnnKeywordId -> EPP ()
 markAnnKwAll EpAnnNotUsed  _ _  = return ()
-markAnnKwAll (EpAnn _ a _) f kw = mapM_ (markKwA kw) (sort (f a))
+markAnnKwAll (EpAnn _ a _) f kw = mapM_ (markKwA kw) (sortBy (comparing unsafeGetEpaLoc) (f a))
 
 markAnnKwM :: EpAnn a -> (a -> Maybe EpaLocation) -> AnnKeywordId -> EPP ()
 markAnnKwM EpAnnNotUsed  _ _ = return ()
@@ -609,12 +610,20 @@ markEpAnn' (EpAnn _ a _) f kw = mark (f a) kw
 
 markEpAnnAll :: EpAnn ann -> (ann -> [AddEpAnn]) -> AnnKeywordId -> EPP ()
 markEpAnnAll EpAnnNotUsed _ _ = return ()
-markEpAnnAll (EpAnn _ a _) f kw = mapM_ markKw (sort anns)
+markEpAnnAll (EpAnn _ a _) f kw = mapM_ markKw (sortBy (comparing unsafeGetEpAnnLoc) anns)
   where
     anns = filter (\(AddEpAnn ka _) -> ka == kw) (f a)
 
+unsafeGetEpAnnLoc :: AddEpAnn -> RealSrcSpan
+unsafeGetEpAnnLoc (AddEpAnn _ ss) = unsafeGetEpaLoc ss
+
+
+unsafeGetEpaLoc :: EpaLocation -> RealSrcSpan
+unsafeGetEpaLoc (EpaSpan real) = real
+unsafeGetEpaLoc (EpaDelta _ _) = error "DELTA"
+
 markAnnAll :: [AddEpAnn] -> AnnKeywordId -> EPP ()
-markAnnAll a kw = mapM_ markKw (sort anns)
+markAnnAll a kw = mapM_ markKw (sortBy (comparing unsafeGetEpAnnLoc) anns)
   where
     anns = filter (\(AddEpAnn ka _) -> ka == kw) a
 
@@ -658,7 +667,7 @@ markAnnList' reallyTrail ann action = do
   debugM $ "markAnnList : " ++ showPprUnsafe (p, ann)
   mapM_ markAddEpAnn (al_open ann)
   unless reallyTrail $ markTrailing (al_trailing ann) -- Only makes sense for HsModule.
-  markAnnAll (sort $ al_rest ann) AnnSemi
+  markAnnAll (sortBy (comparing unsafeGetEpAnnLoc) $ al_rest ann) AnnSemi
   action
   mapM_ markAddEpAnn (al_close ann)
   debugM $ "markAnnList: calling markTrailing with:" ++ showPprUnsafe (al_trailing ann)
@@ -731,7 +740,7 @@ instance ExactPrint ModuleName where
 
 -- ---------------------------------------------------------------------
 
-instance ExactPrint (LocatedP WarningTxt) where
+instance ExactPrint (LocatedP (WarningTxt GhcPs)) where
   getAnnotationEntry = entryFromLocatedA
   exact (L (SrcSpanAnn an _) (WarningTxt (L _ src) ws)) = do
     markAnnOpenP an src "{-# WARNING"
@@ -798,7 +807,11 @@ instance ExactPrint (ImportDecl GhcPs) where
 
 instance ExactPrint HsDocString where
   getAnnotationEntry _ = NoEntryVal
-  exact = withPpr -- TODO:AZ use annotations
+  exact = printStringAdvance . exactPrintHsDocString
+
+instance ExactPrint a => ExactPrint (WithHsDocIdentifiers a GhcPs) where
+  getAnnotationEntry _ = NoEntryVal
+  exact = exact . hsDocString
 
 -- ---------------------------------------------------------------------
 
@@ -1088,18 +1101,14 @@ instance ExactPrint (SpliceDecl GhcPs) where
 
 -- ---------------------------------------------------------------------
 
-instance ExactPrint DocDecl where
+instance ExactPrint (DocDecl GhcPs) where
   getAnnotationEntry = const NoEntryVal
 
-  exact v =
-    let str =
-          case v of
-            (DocCommentNext ds)     -> unpackHDS ds
-            (DocCommentPrev ds)     -> unpackHDS ds
-            (DocCommentNamed _s ds) -> unpackHDS ds
-            (DocGroup _i ds)        -> unpackHDS ds
-    in
-      printStringAdvance str
+  exact v = case v of
+    (DocCommentNext ds)     -> exact ds
+    (DocCommentPrev ds)     -> exact ds
+    (DocCommentNamed _s ds) -> exact ds
+    (DocGroup _i ds)        -> exact ds
 
 -- ---------------------------------------------------------------------
 
@@ -3044,9 +3053,9 @@ instance (ExactPrint a) => ExactPrint (LocatedC a) where
     --   Just (UnicodeSyntax, rs) -> markKw' AnnDarrowU rs
     --   Just (NormalSyntax,  rs) -> markKw' AnnDarrow  rs
     --   Nothing -> pure ()
-    mapM_ (markKwA AnnOpenP) (sort opens)
+    mapM_ (markKwA AnnOpenP) (sortBy (comparing unsafeGetEpaLoc) opens)
     markAnnotated a
-    mapM_ (markKwA AnnCloseP) (sort closes)
+    mapM_ (markKwA AnnCloseP) (sortBy (comparing unsafeGetEpaLoc) closes)
     case ma of
       Just (UnicodeSyntax, r) -> markKwA AnnDarrowU r
       Just (NormalSyntax,  r) -> markKwA AnnDarrow  r
@@ -3136,7 +3145,11 @@ markTrailing :: [TrailingAnn] -> EPP ()
 markTrailing ts = do
   p <- getPosP
   debugM $ "markTrailing:" ++ showPprUnsafe (p,ts)
-  mapM_ markKwT (sort ts)
+  mapM_ markKwT (sortBy (comparing (unsafeGetEpaLoc . k)) ts)
+  where
+    k (AddSemiAnn l) = l
+    k (AddCommaAnn l) = l
+    k (AddVbarAnn l) = l
 
 -- ---------------------------------------------------------------------
 

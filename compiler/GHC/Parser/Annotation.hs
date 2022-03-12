@@ -93,6 +93,7 @@ import Data.Semigroup
 import GHC.Data.FastString
 import GHC.Types.Name
 import GHC.Types.SrcLoc
+import GHC.Hs.DocString
 import GHC.Utils.Binary
 import GHC.Utils.Outputable hiding ( (<>) )
 import GHC.Utils.Panic
@@ -358,14 +359,11 @@ data EpaComment =
     -- and the start of this location is used for the spacing when
     -- exact printing the comment.
     }
-    deriving (Eq, Ord, Data, Show)
+    deriving (Eq, Data, Show)
 
 data EpaCommentTok =
   -- Documentation annotations
-    EpaDocCommentNext  String     -- ^ something beginning '-- |'
-  | EpaDocCommentPrev  String     -- ^ something beginning '-- ^'
-  | EpaDocCommentNamed String     -- ^ something beginning '-- $'
-  | EpaDocSection      Int String -- ^ a section heading
+    EpaDocComment      HsDocString -- ^ a docstring that can be pretty printed using pprHsDocString
   | EpaDocOptions      String     -- ^ doc options (prune, ignore-exports, etc)
   | EpaLineComment     String     -- ^ comment starting by "--"
   | EpaBlockComment    String     -- ^ comment in {- -}
@@ -376,7 +374,7 @@ data EpaCommentTok =
   -- should be removed in favour of capturing it in the location for
   -- 'Located HsModule' in the parser.
 
-    deriving (Eq, Ord, Data, Show)
+    deriving (Eq, Data, Show)
 -- Note: these are based on the Token versions, but the Token type is
 -- defined in GHC.Parser.Lexer and bringing it in here would create a loop
 
@@ -407,12 +405,12 @@ data AddEpAnn = AddEpAnn AnnKeywordId EpaLocation deriving (Data,Eq)
 -- sort the relative order.
 data EpaLocation = EpaSpan !RealSrcSpan
                  | EpaDelta !DeltaPos ![LEpaComment]
-               deriving (Data,Eq,Ord)
+               deriving (Data,Eq)
 
 -- | Tokens embedded in the AST have an EpaLocation, unless they come from
 -- generated code (e.g. by TH).
 data TokenLocation = NoTokenLoc | TokenLoc !EpaLocation
-               deriving (Data,Eq,Ord)
+               deriving (Data,Eq)
 
 -- | Spacing between output items when exact printing.  It captures
 -- the spacing from the current print position on the page to the
@@ -459,9 +457,6 @@ instance Outputable EpaLocation where
 
 instance Outputable AddEpAnn where
   ppr (AddEpAnn kw ss) = text "AddEpAnn" <+> ppr kw <+> ppr ss
-
-instance Ord AddEpAnn where
-  compare (AddEpAnn kw1 loc1) (AddEpAnn kw2 loc2) = compare (loc1, kw1) (loc2,kw2)
 
 -- ---------------------------------------------------------------------
 
@@ -640,7 +635,7 @@ data TrailingAnn
   = AddSemiAnn EpaLocation    -- ^ Trailing ';'
   | AddCommaAnn EpaLocation   -- ^ Trailing ','
   | AddVbarAnn EpaLocation    -- ^ Trailing '|'
-  deriving (Data, Eq, Ord)
+  deriving (Data, Eq)
 
 instance Outputable TrailingAnn where
   ppr (AddSemiAnn ss)    = text "AddSemiAnn"    <+> ppr ss

@@ -156,8 +156,16 @@
                    {OccName: Int}))))
                (L
                 { T17544.hs:7:5-23 }
-                (HsDocString
-                 " comment on Int"))))))))))]
+                (WithHsDocIdentifiers
+                 (MultiLineDocString
+                  (HsDocStringPrevious)
+                  (:|
+                   (L
+                    { T17544.hs:7:9-23 }
+                    (HsDocStringChunk
+                     " comment on Int"))
+                   []))
+                 []))))))))))]
       {Bag(LocatedA (HsBind GhcPs)):
        []}
       []
@@ -286,8 +294,18 @@
       [(L
         (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:11:3-20 })
         (DocCommentPrev
-         (HsDocString
-          " comment on f2")))])))
+         (L
+          { T17544.hs:11:3-20 }
+          (WithHsDocIdentifiers
+           (MultiLineDocString
+            (HsDocStringPrevious)
+            (:|
+             (L
+              { T17544.hs:11:7-20 }
+              (HsDocStringChunk
+               " comment on f2"))
+             []))
+           []))))])))
   ,(L
     (SrcSpanAnn (EpAnn
                  (Anchor
@@ -414,8 +432,18 @@
     (DocD
      (NoExtField)
      (DocCommentPrev
-      (HsDocString
-       " comment on C3"))))
+      (L
+       { T17544.hs:15:1-18 }
+       (WithHsDocIdentifiers
+        (MultiLineDocString
+         (HsDocStringPrevious)
+         (:|
+          (L
+           { T17544.hs:15:5-18 }
+           (HsDocStringChunk
+            " comment on C3"))
+          []))
+        [])))))
   ,(L
     (SrcSpanAnn (EpAnn
                  (Anchor
@@ -2182,8 +2210,18 @@
     (DocD
      (NoExtField)
      (DocCommentPrev
-      (HsDocString
-       " comment on class instance C10 Int"))))]
+      (L
+       { T17544.hs:56:1-38 }
+       (WithHsDocIdentifiers
+        (MultiLineDocString
+         (HsDocStringPrevious)
+         (:|
+          (L
+           { T17544.hs:56:5-38 }
+           (HsDocStringChunk
+            " comment on class instance C10 Int"))
+          []))
+        [])))))]
   (Nothing)
   (Nothing)))
 

@@ -1005,7 +1005,7 @@ pprConDeclFields fields = braces (sep (punctuate comma (map ppr_fld fields)))
   where
     ppr_fld (L _ (ConDeclField { cd_fld_names = ns, cd_fld_type = ty,
                                  cd_fld_doc = doc }))
-        = ppr_names ns <+> dcolon <+> ppr ty <+> ppr_mbDoc doc
+        = pprMaybeWithDoc doc (ppr_names ns <+> dcolon <+> ppr ty)
 
     ppr_names :: [LFieldOcc (GhcPass p)] -> SDoc
     ppr_names [n] = pprPrefixOcc n
@@ -1094,10 +1094,7 @@ ppr_mono_ty (HsParTy _ ty)
   --    toHsType doesn't put in any HsParTys, so we may still need them
 
 ppr_mono_ty (HsDocTy _ ty doc)
-  -- AZ: Should we add parens?  Should we introduce "-- ^"?
-  = ppr_mono_lty ty <+> ppr (unLoc doc)
-  -- we pretty print Haddock comments on types as if they were
-  -- postfix operators
+  = pprWithDoc doc $ ppr_mono_lty ty
 
 ppr_mono_ty (XHsType t) = ppr t
 

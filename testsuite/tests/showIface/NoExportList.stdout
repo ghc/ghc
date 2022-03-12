@@ -1,0 +1,98 @@
+docs:
+  Just module header:
+         Just text:
+                -- | Module header
+              identifiers:
+       declaration docs:
+         [fα -> [text:
+                   -- ^ Documentation for 'R'\'s 'fα' field.
+                 identifiers:
+                   {NoExportList.hs:13:38}
+                   R
+                   {NoExportList.hs:13:38}
+                   R
+                   {NoExportList.hs:13:45-46}
+                   fα],
+          $fEqR -> [text:
+                      -- | A very lazy Eq instance
+                    identifiers:]]
+       arg docs:
+         []
+       documentation structure:
+         section heading, level 1:
+           text:
+             -- * Types
+           identifiers:
+         documentation chunk:
+           text:
+             -- $types
+--
+-- Actually we have only one type.
+           identifiers:
+         avails:
+           [R{R, fβ, fα, R}]
+         section heading, level 1:
+           text:
+             -- * Functions
+           identifiers:
+         documentation chunk:
+           text:
+             -- $functions
+--
+-- We have them too.
+           identifiers:
+         avails:
+           [add]
+       named chunks:
+       haddock options:
+       language:
+         Nothing
+       language extensions:
+         MonomorphismRestriction
+         RelaxedPolyRec
+         ForeignFunctionInterface
+         ImplicitPrelude
+         ScopedTypeVariables
+         BangPatterns
+         NamedFieldPuns
+         GADTSyntax
+         DoAndIfThenElse
+         ConstraintKinds
+         PolyKinds
+         InstanceSigs
+         StandaloneDeriving
+         DeriveDataTypeable
+         DeriveFunctor
+         DeriveTraversable
+         DeriveFoldable
+         DeriveGeneric
+         DeriveLift
+         TypeSynonymInstances
+         FlexibleContexts
+         FlexibleInstances
+         ConstrainedClassMethods
+         MultiParamTypeClasses
+         ExistentialQuantification
+         EmptyDataDecls
+         KindSignatures
+         GeneralizedNewtypeDeriving
+         PostfixOperators
+         TupleSections
+         PatternGuards
+         RankNTypes
+         TypeOperators
+         ExplicitForAll
+         TraditionalRecordSyntax
+         BinaryLiterals
+         HexFloatLiterals
+         EmptyCase
+         NamedWildCards
+         TypeApplications
+         EmptyDataDeriving
+         NumericUnderscores
+         StarIsType
+         ImportQualifiedPost
+         StandaloneKindSignatures
+         FieldSelectors
+extensible fields:
+

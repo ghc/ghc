@@ -66,7 +66,6 @@ endif
 	"$$(TOP)/$$(INPLACE_BIN)/haddock" \
 		--verbosity=0 \
 		--odir="$1/$2/doc/html/$$($1_PACKAGE)" \
-		--no-tmp-comp-dir \
 		--dump-interface=$$($$($1_PACKAGE)-$$($1_$2_VERSION)_HADDOCK_FILE) \
 		--html \
 		--hoogle \
@@ -82,12 +81,6 @@ endif
 		$$($1_$2_EXTRA_HADDOCK_SRCS) \
 		$$(EXTRA_HADDOCK_OPTS) \
 		+RTS -t"$$(TOP)/testsuite/tests/perf/haddock/$$($1_PACKAGE).t" --machine-readable
-
-# --no-tmp-comp-dir above is important: it saves a few minutes in a
-# validate.  This flag lets Haddock use the pre-compiled object files
-# for the package rather than rebuilding the modules of the package in
-# a temporary directory.  Haddock needs to build the package when it
-# uses the Template Haskell or Annotations extensions, for example.
 
 # Make the haddocking depend on the library .a file, to ensure
 # that we wait until the library is fully built before we haddock it

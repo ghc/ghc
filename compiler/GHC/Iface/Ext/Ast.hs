@@ -205,7 +205,7 @@ call and just recurse directly in to the subexpressions.
 -- These synonyms match those defined in compiler/GHC.hs
 type RenamedSource     = ( HsGroup GhcRn, [LImportDecl GhcRn]
                          , Maybe [(LIE GhcRn, Avails)]
-                         , Maybe LHsDocString )
+                         , Maybe (LHsDoc GhcRn) )
 type TypecheckedSource = LHsBinds GhcTc
 
 
@@ -316,12 +316,13 @@ getCompressedAsts ts rs top_ev_binds insts tcs =
 
 enrichHie :: TypecheckedSource -> RenamedSource -> Bag EvBind -> [ClsInst] -> [TyCon]
   -> HieASTs Type
-enrichHie ts (hsGrp, imports, exports, _) ev_bs insts tcs =
+enrichHie ts (hsGrp, imports, exports, docs) ev_bs insts tcs =
   runIdentity $ flip evalStateT initState $ flip runReaderT SourceInfo $ do
     tasts <- toHie $ fmap (BC RegularBind ModuleScope) ts
     rasts <- processGrp hsGrp
     imps <- toHie $ filter (not . ideclImplicit . unLoc) imports
     exps <- toHie $ fmap (map $ IEC Export . fst) exports
+    docs <- toHie docs
     -- Add Instance bindings
     forM_ insts $ \i ->
       addUnlocatedEvBind (is_dfun i) (EvidenceVarBind (EvInstBind False (is_cls_nm i)) ModuleScope Nothing)
@@ -341,6 +342,7 @@ enrichHie ts (hsGrp, imports, exports, _) ev_bs insts tcs =
           , rasts
           , imps
           , exps
+          , docs
           ]
 
         modulify (HiePath file) xs' = do
@@ -387,6 +389,7 @@ enrichHie ts (hsGrp, imports, exports, _) ev_bs insts tcs =
       , toHie $ hs_warnds grp
       , toHie $ hs_annds grp
       , toHie $ hs_ruleds grp
+      , toHie $ hs_docs grp
       ]
 
 getRealSpanA :: SrcSpanAnn' ann -> Maybe Span
@@ -1596,7 +1599,8 @@ instance ToHie a => ToHie (HsScaled GhcRn a) where
 instance ToHie (LocatedA (ConDecl GhcRn)) where
   toHie (L span decl) = concatM $ makeNode decl (locA span) : case decl of
       ConDeclGADT { con_names = names, con_bndrs = L outer_bndrs_loc outer_bndrs
-                  , con_mb_cxt = ctx, con_g_args = args, con_res_ty = typ } ->
+                  , con_mb_cxt = ctx, con_g_args = args, con_res_ty = typ
+                  , con_doc = doc} ->
         [ toHie $ map (C (Decl ConDec $ getRealSpanA span)) names
         , case outer_bndrs of
             HsOuterImplicit{hso_ximplicit = imp_vars} ->
@@ -1607,6 +1611,7 @@ instance ToHie (LocatedA (ConDecl GhcRn)) where
         , toHie ctx
         , toHie args
         , toHie typ
+        , toHie doc
         ]
         where
           rhsScope = combineScopes argsScope tyScope
@@ -1617,11 +1622,13 @@ instance ToHie (LocatedA (ConDecl GhcRn)) where
           tyScope = mkLScopeA typ
           resScope = ResolvedScopes [ctxScope, rhsScope]
       ConDeclH98 { con_name = name, con_ex_tvs = qvars
-                 , con_mb_cxt = ctx, con_args = dets } ->
+                 , con_mb_cxt = ctx, con_args = dets
+                 , con_doc = doc} ->
         [ toHie $ C (Decl ConDec $ getRealSpan (locA span)) name
         , toHie $ tvScopes (ResolvedScopes []) rhsScope qvars
         , toHie ctx
         , toHie dets
+        , toHie doc
         ]
         where
           rhsScope = combineScopes ctxScope argsScope
@@ -1780,8 +1787,9 @@ instance ToHie (LocatedA (HsType GhcRn)) where
       HsSpliceTy _ a ->
         [ toHie $ L span a
         ]
-      HsDocTy _ a _ ->
+      HsDocTy _ a doc ->
         [ toHie a
+        , toHie doc
         ]
       HsBangTy _ _ ty ->
         [ toHie ty
@@ -1832,9 +1840,10 @@ instance ToHie (LocatedC [LocatedA (HsType GhcRn)]) where
 
 instance ToHie (LocatedA (ConDeclField GhcRn)) where
   toHie (L span field) = concatM $ makeNode field (locA span) : case field of
-      ConDeclField _ fields typ _ ->
+      ConDeclField _ fields typ doc ->
         [ toHie $ map (RFC RecFieldDecl (getRealSpan $ loc typ)) fields
         , toHie typ
+        , toHie doc
         ]
 
 instance ToHie (LHsExpr a) => ToHie (ArithSeqInfo a) where
@@ -2088,8 +2097,8 @@ instance ToHie (IEContext (LocatedA (IE GhcRn))) where
       IEModuleContents _ n ->
         [ toHie $ IEC c n
         ]
-      IEGroup _ _ _ -> []
-      IEDoc _ _ -> []
+      IEGroup _ _ d -> [toHie d]
+      IEDoc _ d -> [toHie d]
       IEDocNamed _ _ -> []
 
 instance ToHie (IEContext (LIEWrappedName Name)) where
@@ -2109,3 +2118,13 @@ instance ToHie (IEContext (Located FieldLabel)) where
       [ makeNode lbl span
       , toHie $ C (IEThing c) $ L span (flSelector lbl)
       ]
+
+instance ToHie (LocatedA (DocDecl GhcRn)) where
+  toHie (L span d) = concatM $ makeNodeA d span : case d of
+    DocCommentNext d -> [ toHie d ]
+    DocCommentPrev d -> [ toHie d ]
+    DocCommentNamed _ d -> [ toHie d ]
+    DocGroup _ d -> [ toHie d ]
+
+instance ToHie (LHsDoc GhcRn) where
+  toHie (L span d@(WithHsDocIdentifiers _ ids)) = concatM $ makeNode d span : [toHie $ map (C Use) ids]

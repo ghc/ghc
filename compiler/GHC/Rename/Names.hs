@@ -2163,14 +2163,14 @@ missingImportListWarn :: ModuleName -> SDoc
 missingImportListWarn mod
   = text "The module" <+> quotes (ppr mod) <+> text "does not have an explicit import list"
 
-moduleWarn :: ModuleName -> WarningTxt -> SDoc
+moduleWarn :: ModuleName -> WarningTxt GhcRn -> SDoc
 moduleWarn mod (WarningTxt _ txt)
   = sep [ text "Module" <+> quotes (ppr mod) <> colon,
-          nest 2 (vcat (map (ppr . sl_fs . unLoc) txt)) ]
+          nest 2 (vcat (map (ppr . hsDocString . unLoc) txt)) ]
 moduleWarn mod (DeprecatedTxt _ txt)
   = sep [ text "Module" <+> quotes (ppr mod)
                                 <+> text "is deprecated:",
-          nest 2 (vcat (map (ppr . sl_fs . unLoc) txt)) ]
+          nest 2 (vcat (map (ppr . hsDocString . unLoc) txt)) ]
 
 packageImportErr :: TcRnMessage
 packageImportErr

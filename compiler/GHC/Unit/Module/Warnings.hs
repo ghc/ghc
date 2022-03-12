@@ -1,4 +1,8 @@
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE StandaloneDeriving #-}
 
 -- | Warnings for a module
 module GHC.Unit.Module.Warnings
@@ -16,25 +20,31 @@ import GHC.Prelude
 import GHC.Types.SourceText
 import GHC.Types.Name.Occurrence
 import GHC.Types.SrcLoc
+import GHC.Hs.Doc
+import GHC.Hs.Extension
 
 import GHC.Utils.Outputable
 import GHC.Utils.Binary
+
+import Language.Haskell.Syntax.Extension
 
 import Data.Data
 
 -- | Warning Text
 --
 -- reason/explanation from a WARNING or DEPRECATED pragma
-data WarningTxt
+data WarningTxt pass
    = WarningTxt
       (Located SourceText)
-      [Located StringLiteral]
+      [Located (WithHsDocIdentifiers StringLiteral pass)]
    | DeprecatedTxt
       (Located SourceText)
-      [Located StringLiteral]
-   deriving (Eq, Data)
+      [Located (WithHsDocIdentifiers StringLiteral pass)]
 
-instance Outputable WarningTxt where
+deriving instance Eq (IdP pass) => Eq (WarningTxt pass)
+deriving instance (Data pass, Data (IdP pass)) => Data (WarningTxt pass)
+
+instance Outputable (WarningTxt pass) where
     ppr (WarningTxt    lsrc ws)
       = case unLoc lsrc of
           NoSourceText   -> pp_ws ws
@@ -45,7 +55,7 @@ instance Outputable WarningTxt where
           NoSourceText   -> pp_ws ds
           SourceText src -> text src <+> pp_ws ds <+> text "#-}"
 
-instance Binary WarningTxt where
+instance Binary (WarningTxt GhcRn) where
     put_ bh (WarningTxt s w) = do
             putByte bh 0
             put_ bh s
@@ -66,7 +76,7 @@ instance Binary WarningTxt where
                       return (DeprecatedTxt s d)
 
 
-pp_ws :: [Located StringLiteral] -> SDoc
+pp_ws :: [Located (WithHsDocIdentifiers StringLiteral pass)] -> SDoc
 pp_ws [l] = ppr $ unLoc l
 pp_ws ws
   = text "["
@@ -74,19 +84,19 @@ pp_ws ws
     <+> text "]"
 
 
-pprWarningTxtForMsg :: WarningTxt -> SDoc
+pprWarningTxtForMsg :: WarningTxt p -> SDoc
 pprWarningTxtForMsg (WarningTxt    _ ws)
-                     = doubleQuotes (vcat (map (ftext . sl_fs . unLoc) ws))
+                     = doubleQuotes (vcat (map (ftext . sl_fs . hsDocString . unLoc) ws))
 pprWarningTxtForMsg (DeprecatedTxt _ ds)
                      = text "Deprecated:" <+>
-                       doubleQuotes (vcat (map (ftext . sl_fs . unLoc) ds))
+                       doubleQuotes (vcat (map (ftext . sl_fs . hsDocString . unLoc) ds))
 
 
 -- | Warning information for a module
-data Warnings
+data Warnings pass
   = NoWarnings                          -- ^ Nothing deprecated
-  | WarnAll WarningTxt                  -- ^ Whole module deprecated
-  | WarnSome [(OccName,WarningTxt)]     -- ^ Some specific things deprecated
+  | WarnAll (WarningTxt pass)                  -- ^ Whole module deprecated
+  | WarnSome [(OccName,WarningTxt pass)]     -- ^ Some specific things deprecated
 
      -- Only an OccName is needed because
      --    (1) a deprecation always applies to a binding
@@ -108,9 +118,10 @@ data Warnings
      --
      --        this is in contrast with fixity declarations, where we need to map
      --        a Name to its fixity declaration.
-  deriving( Eq )
 
-instance Binary Warnings where
+deriving instance Eq (IdP pass) => Eq (Warnings pass)
+
+instance Binary (Warnings GhcRn) where
     put_ bh NoWarnings     = putByte bh 0
     put_ bh (WarnAll t) = do
             putByte bh 1
@@ -129,15 +140,15 @@ instance Binary Warnings where
                       return (WarnSome aa)
 
 -- | Constructs the cache for the 'mi_warn_fn' field of a 'ModIface'
-mkIfaceWarnCache :: Warnings -> OccName -> Maybe WarningTxt
+mkIfaceWarnCache :: Warnings p -> OccName -> Maybe (WarningTxt p)
 mkIfaceWarnCache NoWarnings  = \_ -> Nothing
 mkIfaceWarnCache (WarnAll t) = \_ -> Just t
 mkIfaceWarnCache (WarnSome pairs) = lookupOccEnv (mkOccEnv pairs)
 
-emptyIfaceWarnCache :: OccName -> Maybe WarningTxt
+emptyIfaceWarnCache :: OccName -> Maybe (WarningTxt p)
 emptyIfaceWarnCache _ = Nothing
 
-plusWarns :: Warnings -> Warnings -> Warnings
+plusWarns :: Warnings p -> Warnings p -> Warnings p
 plusWarns d NoWarnings = d
 plusWarns NoWarnings d = d
 plusWarns _ (WarnAll t) = WarnAll t

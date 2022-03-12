@@ -41,7 +41,8 @@ module GHC.Types.Unique.Map (
     lookupWithDefaultUniqMap,
     anyUniqMap,
     allUniqMap,
-    nonDetEltsUniqMap
+    nonDetEltsUniqMap,
+    nonDetFoldUniqMap
     -- Non-deterministic functions omitted
 ) where
 
@@ -208,3 +209,6 @@ allUniqMap f (UniqMap m) = allUFM (f . snd) m
 
 nonDetEltsUniqMap :: UniqMap k a -> [(k, a)]
 nonDetEltsUniqMap (UniqMap m) = nonDetEltsUFM m
+
+nonDetFoldUniqMap :: ((k, a) -> b -> b) -> b -> UniqMap k a -> b
+nonDetFoldUniqMap go z (UniqMap m) = foldUFM go z m

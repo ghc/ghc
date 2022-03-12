@@ -1,7 +1,12 @@
 
 ==================== Parser ====================
 module ShouldCompile where
-test2 :: a " doc1 " -> b " doc2 " -> a " doc 3 "
+test2 ::
+  -- | doc1 
+  a
+  -> b {-^ doc2 -}
+     -> -- | doc 3 
+        a
 test2 x y = x
 
 

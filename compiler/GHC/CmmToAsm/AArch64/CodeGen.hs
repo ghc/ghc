@@ -171,7 +171,7 @@ basicBlockCodeGen block = do
 -- -----------------------------------------------------------------------------
 -- | Utilities
 ann :: SDoc -> Instr -> Instr
-ann doc instr {- | debugIsOn -} = ANN doc instr
+ann doc instr {- debugIsOn -} = ANN doc instr
 -- ann _ instr = instr
 {-# INLINE ann #-}
 
@@ -199,7 +199,7 @@ ann doc instr {- | debugIsOn -} = ANN doc instr
 -- forced until we actually force them, and without -dppr-debug they should
 -- never end up being forced.
 annExpr :: CmmExpr -> Instr -> Instr
-annExpr e instr {- | debugIsOn -} = ANN (text . show $ e) instr
+annExpr e instr {- debugIsOn -} = ANN (text . show $ e) instr
 -- annExpr e instr {- | debugIsOn -} = ANN (pprExpr genericPlatform e) instr
 -- annExpr _ instr = instr
 {-# INLINE annExpr #-}

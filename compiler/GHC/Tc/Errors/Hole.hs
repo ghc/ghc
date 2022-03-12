@@ -73,14 +73,18 @@ import GHC.Tc.Solver.Monad ( runTcSEarlyAbort )
 import GHC.Tc.Utils.Unify ( tcSubTypeSigma )
 
 import GHC.HsToCore.Docs ( extractDocs )
-import qualified Data.Map as Map
-import GHC.Hs.Doc      ( unpackHDS, DeclDocMap(..) )
+import GHC.Hs.Doc
 import GHC.Unit.Module.ModIface ( ModIface_(..) )
-import GHC.Iface.Load  ( loadInterfaceForNameMaybe )
+import GHC.Iface.Load  ( loadInterfaceForName )
 
 import GHC.Builtin.Utils (knownKeyNames)
 
 import GHC.Tc.Errors.Hole.FitTypes
+import qualified Data.Set as Set
+import GHC.Types.SrcLoc
+import GHC.Utils.Trace (warnPprTrace)
+import GHC.Data.FastString (unpackFS)
+import GHC.Types.Unique.Map
 
 
 {-
@@ -456,21 +460,40 @@ addHoleFitDocs :: [HoleFit] -> TcM [HoleFit]
 addHoleFitDocs fits =
   do { showDocs <- goptM Opt_ShowDocsOfHoleFits
      ; if showDocs
-       then do { (_, DeclDocMap lclDocs, _) <- getGblEnv >>= extractDocs
-               ; mapM (upd lclDocs) fits }
+       then do { dflags <- getDynFlags
+               ; mb_local_docs <- extractDocs dflags =<< getGblEnv
+               ; (mods_without_docs, fits') <- mapAccumM (upd mb_local_docs) Set.empty fits
+               ; report mods_without_docs
+               ; return fits' }
        else return fits }
   where
    msg = text "GHC.Tc.Errors.Hole addHoleFitDocs"
-   lookupInIface name (ModIface { mi_decl_docs = DeclDocMap dmap })
-     = Map.lookup name dmap
-   upd lclDocs fit@(HoleFit {hfCand = cand}) =
-        do { let name = getName cand
-           ; doc <- if hfIsLcl fit
-                    then pure (Map.lookup name lclDocs)
-                    else do { mbIface <- loadInterfaceForNameMaybe msg name
-                            ; return $ mbIface >>= lookupInIface name }
-           ; return $ fit {hfDoc = doc} }
-   upd _ fit = return fit
+   upd mb_local_docs mods_without_docs fit@(HoleFit {hfCand = cand}) =
+     let name = getName cand in
+     do { mb_docs <- if hfIsLcl fit
+                     then pure mb_local_docs
+                     else mi_docs <$> loadInterfaceForName msg name
+        ; case mb_docs of
+            { Nothing -> return (Set.insert (nameOrigin name) mods_without_docs, fit)
+            ; Just docs -> do
+                { let doc = lookupUniqMap (docs_decls docs) name
+                ; return $ (mods_without_docs, fit {hfDoc = map hsDocString <$> doc}) }}}
+   upd _ mods_without_docs fit = pure (mods_without_docs, fit)
+   nameOrigin name = case nameModule_maybe name of
+     Just m  -> Right m
+     Nothing ->
+       Left $ case nameSrcLoc name of
+         RealSrcLoc r _ -> unpackFS $ srcLocFile r
+         UnhelpfulLoc s -> unpackFS $ s
+   report mods = do
+     { let warning =
+             text "WARNING: Couldn't find any documentation for the following modules:" $+$
+             nest 2
+                  (fsep (punctuate comma
+                                   (either text ppr <$> Set.toList mods)) $+$
+                   text "Make sure the modules are compiled with '-haddock'.")
+     ; warnPprTrace (not $ Set.null mods)"addHoleFitDocs" warning (pure ())
+     }
 
 -- For pretty printing hole fits, we display the name and type of the fit,
 -- with added '_' to represent any extra arguments in case of a non-zero
@@ -517,9 +540,7 @@ pprHoleFit (HFDC sWrp sWrpVars sTy sProv sMs) (HoleFit {..}) =
                                      then occDisp <+> tyApp
                                      else tyAppVars
        docs = case hfDoc of
-                Just d -> text "{-^" <>
-                          (vcat . map text . lines . unpackHDS) d
-                          <> text "-}"
+                Just d -> pprHsDocStrings d
                 _ -> empty
        funcInfo = ppWhen (has hfMatches && sTy) $
                     text "where" <+> occDisp <+> tyDisp

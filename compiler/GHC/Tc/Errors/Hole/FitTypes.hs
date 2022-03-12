@@ -87,7 +87,7 @@ data HoleFit =
           , hfWrap :: [TcType] -- ^ The wrapper for the match.
           , hfMatches :: [TcType]
           -- ^ What the refinement variables got matched with, if anything
-          , hfDoc :: Maybe HsDocString
+          , hfDoc :: Maybe [HsDocString]
           -- ^ Documentation of this HoleFit, if available.
           }
  | RawHoleFit SDoc

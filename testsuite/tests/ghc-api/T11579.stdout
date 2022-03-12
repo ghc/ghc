@@ -1,1 +1,1 @@
-HdkCommentNamed "bar" (HsDocString " some\n named chunk")
+HdkCommentNamed "bar" (MultiLineDocString (HsDocStringNamed "bar") (L (RealSrcSpan SrcSpanOneLine "Foo.hs" 1 8 13 (Just (BufSpan {bufSpanStart = BufPos {bufPos = 7}, bufSpanEnd = BufPos {bufPos = 12}}))) (HsDocStringChunk " some") :| [L (RealSrcSpan SrcSpanOneLine "Foo.hs" 2 3 15 (Just (BufSpan {bufSpanStart = BufPos {bufPos = 15}, bufSpanEnd = BufPos {bufPos = 27}}))) (HsDocStringChunk " named chunk")]))

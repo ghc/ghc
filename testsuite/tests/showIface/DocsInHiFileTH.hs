@@ -24,8 +24,8 @@ do
   Just "A constructor" <- getDoc (DeclDoc 'Foo)
   putDoc (DeclDoc ''Foo) "A new data type"
   putDoc (DeclDoc 'Foo) "A new constructor"
-  Just "A new data type" <- getDoc (DeclDoc ''Foo)
   Just "A new constructor" <- getDoc (DeclDoc 'Foo)
+  Just "A new data type" <- getDoc (DeclDoc ''Foo)
   pure []
 
 -- |Some documentation

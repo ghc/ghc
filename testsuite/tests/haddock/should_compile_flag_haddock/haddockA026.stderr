@@ -2,7 +2,13 @@
 ==================== Parser ====================
 module ShouldCompile where
 test ::
-  (Eq a) => [a] " doc1" -> forall b. [b] " doc2 " -> [a] " doc3"
+  (Eq a) =>
+  -- | doc1
+  [a]
+  -> forall b.
+     [b] {-^ doc2 -}
+     -> -- | doc3
+        [a]
 test xs ys = xs
 
 

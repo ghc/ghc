@@ -3,8 +3,11 @@
 module ShouldCompile where
 data R a
   = R {field1 :: a,
-       field2 :: a " comment for field2",
-       field3 :: a " comment for field3",
-       field4 :: a " comment for field4 "}
+       -- | comment for field2
+       field2 :: a,
+       -- | comment for field3
+       field3 :: a,
+       {-| comment for field4 -}
+       field4 :: a}
 
 

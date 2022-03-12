@@ -841,7 +841,7 @@ data HsType pass
       -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 
   | HsDocTy             (XDocTy pass)
-                        (LHsType pass) LHsDocString -- A documented type
+                        (LHsType pass) (LHsDoc pass) -- A documented type
       -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : None
 
       -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
@@ -1046,7 +1046,7 @@ data ConDeclField pass  -- Record fields have Haddock docs on them
                    cd_fld_names :: [LFieldOcc pass],
                                    -- ^ See Note [ConDeclField passs]
                    cd_fld_type :: LBangType pass,
-                   cd_fld_doc  :: Maybe LHsDocString }
+                   cd_fld_doc  :: Maybe (LHsDoc pass)}
       -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnDcolon'
 
       -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation

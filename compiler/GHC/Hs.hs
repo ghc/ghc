@@ -96,7 +96,7 @@ data HsModule
         -- downstream.
       hsmodDecls :: [LHsDecl GhcPs],
         -- ^ Type, class, value, and interface signature decls
-      hsmodDeprecMessage :: Maybe (LocatedP WarningTxt),
+      hsmodDeprecMessage :: Maybe (LocatedP (WarningTxt GhcPs)),
         -- ^ reason\/explanation for warning/deprecation of this module
         --
         --  - 'GHC.Parser.Annotation.AnnKeywordId's : 'GHC.Parser.Annotation.AnnOpen'
@@ -104,7 +104,7 @@ data HsModule
         --
 
         -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
-      hsmodHaddockModHeader :: Maybe LHsDocString
+      hsmodHaddockModHeader :: Maybe (LHsDoc GhcPs)
         -- ^ Haddock module info and description, unparsed
         --
         --  - 'GHC.Parser.Annotation.AnnKeywordId's : 'GHC.Parser.Annotation.AnnOpen'
@@ -133,13 +133,13 @@ data AnnsModule
 instance Outputable HsModule where
 
     ppr (HsModule _ _ Nothing _ imports decls _ mbDoc)
-      = pp_mb mbDoc $$ pp_nonnull imports
-                    $$ pp_nonnull decls
+      = pprMaybeWithDoc mbDoc $ pp_nonnull imports
+                             $$ pp_nonnull decls
 
     ppr (HsModule _ _ (Just name) exports imports decls deprec mbDoc)
-      = vcat [
-            pp_mb mbDoc,
-            case exports of
+      = pprMaybeWithDoc mbDoc $
+        vcat
+          [ case exports of
               Nothing -> pp_header (text "where")
               Just es -> vcat [
                            pp_header lparen,
@@ -155,10 +155,6 @@ instance Outputable HsModule where
            Just d -> vcat [ pp_modname, ppr d, rest ]
 
         pp_modname = text "module" <+> ppr name
-
-pp_mb :: Outputable t => Maybe t -> SDoc
-pp_mb (Just x) = ppr x
-pp_mb Nothing  = empty
 
 pp_nonnull :: Outputable t => [t] -> SDoc
 pp_nonnull [] = empty

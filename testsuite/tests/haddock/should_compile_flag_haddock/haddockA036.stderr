@@ -2,13 +2,21 @@
 ==================== Parser ====================
 module ConstructorFields where
 data Foo
-  = " doc on `Bar` constructor" Bar Int String |
-    " doc on the `Baz` constructor"
-    Baz Int " doc on the `Int` field of `Baz`" String " doc on the `String` field of `Baz`" |
-    " doc on the `:+` constructor" Int :+ String |
-    " doc on the `:*` constructor"
-    Int " doc on the `Int` field of the `:*` constructor" :* String " doc on the `String` field of the `:*` constructor" |
-    " doc on the `Boo` record constructor" Boo {x :: ()} |
-    " doc on the `Boa` record constructor" Boa {y :: ()}
+  = -- | doc on `Bar` constructor
+    Bar Int String |
+    -- | doc on the `Baz` constructor
+    Baz -- | doc on the `Int` field of `Baz`
+        Int -- | doc on the `String` field of `Baz`
+            String |
+    -- | doc on the `:+` constructor
+    Int :+ String |
+    -- | doc on the `:*` constructor
+    -- | doc on the `Int` field of the `:*` constructor
+    Int :* -- | doc on the `String` field of the `:*` constructor
+           String |
+    -- | doc on the `Boo` record constructor
+    Boo {x :: ()} |
+    -- | doc on the `Boa` record constructor
+    Boa {y :: ()}
 
 

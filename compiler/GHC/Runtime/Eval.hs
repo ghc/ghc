@@ -108,6 +108,7 @@ import GHC.Types.Unique.Supply
 import GHC.Types.Unique.DSet
 import GHC.Types.TyThing
 import GHC.Types.BreakInfo
+import GHC.Types.Unique.Map
 
 import GHC.Unit
 import GHC.Unit.Module.Graph
@@ -121,7 +122,6 @@ import Data.Either
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import Data.List (find,intercalate)
-import qualified Data.Map as Map
 import Control.Monad
 import Control.Monad.Catch as MC
 import Data.Array
@@ -909,7 +909,7 @@ parseName str = withSession $ \hsc_env -> liftIO $
 
 getDocs :: GhcMonad m
         => Name
-        -> m (Either GetDocsFailure (Maybe HsDocString, IntMap HsDocString))
+        -> m (Either GetDocsFailure (Maybe [HsDoc GhcRn], IntMap (HsDoc GhcRn)))
            -- TODO: What about docs for constructors etc.?
 getDocs name =
   withSession $ \hsc_env -> do
@@ -919,14 +919,14 @@ getDocs name =
          if isInteractiveModule mod
            then pure (Left InteractiveName)
            else do
-             ModIface { mi_doc_hdr = mb_doc_hdr
-                      , mi_decl_docs = DeclDocMap dmap
-                      , mi_arg_docs = ArgDocMap amap
-                      } <- liftIO $ hscGetModuleInterface hsc_env mod
-             if isNothing mb_doc_hdr && Map.null dmap && Map.null amap
-               then pure (Left (NoDocsInIface mod compiled))
-               else pure (Right ( Map.lookup name dmap
-                                , Map.findWithDefault mempty name amap))
+             iface <- liftIO $ hscGetModuleInterface hsc_env mod
+             case mi_docs iface of
+               Nothing -> pure (Left (NoDocsInIface mod compiled))
+               Just Docs { docs_decls = decls
+                         , docs_args = args
+                         } ->
+                 pure (Right ( lookupUniqMap decls name
+                             , fromMaybe mempty $ lookupUniqMap args name))
   where
     compiled =
       -- TODO: Find a more direct indicator.
@@ -935,16 +935,12 @@ getDocs name =
         UnhelpfulLoc {} -> True
 
 -- | Failure modes for 'getDocs'.
-
--- TODO: Find a way to differentiate between modules loaded without '-haddock'
--- and modules that contain no docs.
 data GetDocsFailure
 
     -- | 'nameModule_maybe' returned 'Nothing'.
   = NameHasNoModule Name
 
-    -- | This is probably because the module was loaded without @-haddock@,
-    -- but it's also possible that the entire module contains no documentation.
+    -- | The module was loaded without @-haddock@,
   | NoDocsInIface
       Module
       Bool -- ^ 'True': The module was compiled.
@@ -958,11 +954,6 @@ instance Outputable GetDocsFailure where
     quotes (ppr name) <+> text "has no module where we could look for docs."
   ppr (NoDocsInIface mod compiled) = vcat
     [ text "Can't find any documentation for" <+> ppr mod <> char '.'
-    , text "This is probably because the module was"
-        <+> text (if compiled then "compiled" else "loaded")
-        <+> text "without '-haddock',"
-    , text "but it's also possible that the module contains no documentation."
-    , text ""
     , if compiled
         then text "Try re-compiling with '-haddock'."
         else text "Try running ':set -haddock' and :load the file again."

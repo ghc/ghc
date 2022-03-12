@@ -1583,7 +1583,7 @@ warnIfDeprecated gre@(GRE { gre_imp = iss })
         extra | imp_mod == moduleName name_mod = Outputable.empty
               | otherwise = text ", but defined in" <+> ppr name_mod
 
-lookupImpDeprec :: ModIface -> GlobalRdrElt -> Maybe WarningTxt
+lookupImpDeprec :: ModIface -> GlobalRdrElt -> Maybe (WarningTxt GhcRn)
 lookupImpDeprec iface gre
   = mi_warn_fn (mi_final_exts iface) (greOccName gre) `mplus`  -- Bleat if the thing,
     case gre_par gre of                      -- or its parent, is warn'd

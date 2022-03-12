@@ -1,0 +1,69 @@
+docs:
+  Just module header:
+         Nothing
+       declaration docs:
+         []
+       arg docs:
+         []
+       documentation structure:
+         re-exported module(s): [Inner0]
+           [Inner0.inner0_0]
+         re-exported module(s): [Inner1]
+           [Inner1.inner1_1]
+         avails:
+           [Inner2.inner2_0]
+         re-exported module(s): [Inner3, Inner4]
+           [Inner3.inner3_0, Inner4.inner4_1]
+       named chunks:
+       haddock options:
+       language:
+         Nothing
+       language extensions:
+         MonomorphismRestriction
+         RelaxedPolyRec
+         ForeignFunctionInterface
+         ImplicitPrelude
+         ScopedTypeVariables
+         BangPatterns
+         NamedFieldPuns
+         GADTSyntax
+         DoAndIfThenElse
+         ConstraintKinds
+         PolyKinds
+         InstanceSigs
+         StandaloneDeriving
+         DeriveDataTypeable
+         DeriveFunctor
+         DeriveTraversable
+         DeriveFoldable
+         DeriveGeneric
+         DeriveLift
+         TypeSynonymInstances
+         FlexibleContexts
+         FlexibleInstances
+         ConstrainedClassMethods
+         MultiParamTypeClasses
+         ExistentialQuantification
+         EmptyDataDecls
+         KindSignatures
+         GeneralizedNewtypeDeriving
+         PostfixOperators
+         TupleSections
+         PatternGuards
+         RankNTypes
+         TypeOperators
+         ExplicitForAll
+         TraditionalRecordSyntax
+         BinaryLiterals
+         HexFloatLiterals
+         EmptyCase
+         NamedWildCards
+         TypeApplications
+         EmptyDataDeriving
+         NumericUnderscores
+         StarIsType
+         ImportQualifiedPost
+         StandaloneKindSignatures
+         FieldSelectors
+extensible fields:
+

@@ -70,6 +70,7 @@ allDeps = do
     need [ root -/- dir -/- "GHC" -/- "Settings" -/- "Config.hs" ]
     need [ root -/- dir -/- "GHC" -/- "Parser.hs" ]
     need [ root -/- dir -/- "GHC" -/- "Parser" -/- "Lexer.hs" ]
+    need [ root -/- dir -/- "GHC" -/- "Parser" -/- "HaddockLex.hs" ]
     need [ root -/- dir -/- "GHC" -/- "Cmm" -/- "Parser.hs" ]
     need [ root -/- dir -/- "GHC" -/- "Cmm" -/- "Lexer.hs"  ]
 

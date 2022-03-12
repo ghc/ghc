@@ -1,6 +1,8 @@
 
 ==================== Parser ====================
 module HaddockTySyn where
-type T = Int " Comment on type synonym RHS"
+type T =
+    -- | Comment on type synonym RHS
+    Int
 
 

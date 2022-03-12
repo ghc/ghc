@@ -66,6 +66,8 @@ module GHC.Utils.Binary
    -- * Lazy Binary I/O
    lazyGet,
    lazyPut,
+   lazyGetMaybe,
+   lazyPutMaybe,
 
    -- * User data
    UserData(..), getUserData, setUserData,
@@ -94,15 +96,19 @@ import qualified Data.ByteString.Internal as BS
 import qualified Data.ByteString.Unsafe   as BS
 import Data.IORef
 import Data.Char                ( ord, chr )
+import Data.List.NonEmpty       ( NonEmpty(..))
+import qualified Data.List.NonEmpty as NonEmpty
+import Data.Set                 ( Set )
+import qualified Data.Set as Set
 import Data.Time
 import Data.List (unfoldr)
-import Data.Set (Set)
-import qualified Data.Set as Set
 import Control.Monad            ( when, (<$!>), unless, forM_ )
 import System.IO as IO
 import System.IO.Unsafe         ( unsafeInterleaveIO )
 import System.IO.Error          ( mkIOError, eofErrorType )
 import GHC.Real                 ( Ratio(..) )
+import Data.IntMap (IntMap)
+import qualified Data.IntMap as IntMap
 #if MIN_VERSION_base(4,15,0)
 import GHC.ForeignPtr           ( unsafeWithForeignPtr )
 #endif
@@ -635,9 +641,15 @@ instance Binary a => Binary [a] where
             loop n = do a <- get bh; as <- loop (n-1); return (a:as)
         loop len
 
-instance Binary a => Binary (Set a) where
-    put_ bh a = put_ bh (Set.toAscList a)
-    get bh    = Set.fromDistinctAscList <$> get bh
+-- | This instance doesn't rely on the determinism of the keys' 'Ord' instance,
+-- so it works e.g. for 'Name's too.
+instance (Binary a, Ord a) => Binary (Set a) where
+  put_ bh s = put_ bh (Set.toList s)
+  get bh = Set.fromList <$> get bh
+
+instance Binary a => Binary (NonEmpty a) where
+    put_ bh = put_ bh . NonEmpty.toList
+    get bh = NonEmpty.fromList <$> get bh
 
 instance (Ix a, Binary a, Binary b) => Binary (Array a b) where
     put_ bh arr = do
@@ -926,6 +938,25 @@ lazyGet bh = do
         getAt bh { _off_r = off_r } p_a
     seekBin bh p -- skip over the object for now
     return a
+
+-- | Serialize the constructor strictly but lazily serialize a value inside a
+-- 'Just'.
+--
+-- This way we can check for the presence of a value without deserializing the
+-- value itself.
+lazyPutMaybe :: Binary a => BinHandle -> Maybe a -> IO ()
+lazyPutMaybe bh Nothing  = putWord8 bh 0
+lazyPutMaybe bh (Just x) = do
+  putWord8 bh 1
+  lazyPut bh x
+
+-- | Deserialize a value serialized by 'lazyPutMaybe'.
+lazyGetMaybe :: Binary a => BinHandle -> IO (Maybe a)
+lazyGetMaybe bh = do
+  h <- getWord8 bh
+  case h of
+    0 -> pure Nothing
+    _ -> Just <$> lazyGet bh
 
 -- -----------------------------------------------------------------------------
 -- UserData
@@ -1323,3 +1354,11 @@ instance Binary SrcSpan where
                     return (RealSrcSpan ss sb)
             _ -> do s <- get bh
                     return (UnhelpfulSpan s)
+
+--------------------------------------------------------------------------------
+-- Instances for the containers package
+--------------------------------------------------------------------------------
+
+instance (Binary v) => Binary (IntMap v) where
+  put_ bh m = put_ bh (IntMap.toList m)
+  get bh = IntMap.fromList <$> get bh
