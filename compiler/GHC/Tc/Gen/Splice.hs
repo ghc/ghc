@@ -199,13 +199,7 @@ tcTypedBracket rn_expr expr res_ty
        -- Bundle them together so they can be used in GHC.HsToCore.Quote for desugaring
        -- brackets.
        ; let wrapper = QuoteWrapper ev_var m_var
-       -- Typecheck expr to make sure it is valid,
-       --
-       -- romes TODO: The following is not actually that true: ppr_expr in
-       -- GHC.Hs.Expr uses this (and for untyped brackets the supposedly not
-       -- used type is also used).
-       -- If it isn't to be used, should the types enforce that?
-       --
+       -- Typecheck expr to make sure it is valid.
        -- The typechecked expression won't be used, but we return it with its type.
        --   (See Note [The life cycle of a TH quotation] in GHC.Hs.Expr)
        -- We'll typecheck it again when we splice it in somewhere
@@ -249,7 +243,7 @@ tcUntypedBracket rn_expr brack ps res_ty
        -- Unify the overall type of the bracket with the expected result
        -- type
        ; tcWrapResultO BracketOrigin rn_expr
-            (HsUntypedBracket (HsBracketTc brack expected_type brack_info ps') (XQuote brack))
+            (HsUntypedBracket (HsBracketTc brack expected_type brack_info ps') (XQuote noExtField))
             expected_type res_ty
 
        }
