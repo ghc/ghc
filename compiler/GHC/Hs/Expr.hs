@@ -197,6 +197,9 @@ the latter is cluttered with the typechecker's elaboration that should
 not appear in the TH syntax tree. So in (HsExpr GhcTc) tree, we must
 have a (HsExpr GhcRn) for the quotation itself.
 
+As such, when typechecking both typed and untyped brackets,
+we keep a /renamed/ bracket in the extension field.
+
 Here is the life cycle of a /typed/ quote [|| e ||]:
 
   In this pass      We need this information
@@ -208,6 +211,9 @@ Here is the life cycle of a /typed/ quote [|| e ||]:
             - [PendingTcSplice]
             - The type of the quote
             - Maybe QuoteWrapper
+            - The typechecked expression :: HsExpr GhcTc
+                - NB: At the moment, GHC doesn't /need/ the typechecked
+                expression. Desugaring is done over the renamed expression.
 
 Here is the life cycle of an /untyped/ quote, which can be
 an expression [| e |], pattern [| p |], type [| t |] etc
@@ -224,6 +230,35 @@ We combine these four into HsQuote = Expr + Pat + Type + Var
             - [PendingTcSplice]
             - The type of the quote
             - Maybe QuoteWrapper
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When typechecking /typed/ brackets, we typecheck the /typed/ expression that's
+quoted, constructing an `HsTypedBracket GhcTc` with all the described above needed
+information in the `GhcTc` pass.
+
+When typechecking /untyped/ brackets, we cannot typecheck the /untyped/
+expression + pattern + type + etc that's quoted (called `HsQuote`), but,
+despite the /untyped quotation/, we **do** typecheck the "encompassing"
+`HsUntypedBracket` expression:
+
+    Consider an expression quote, `[| e |]`, its type is `forall m . Quote m => m Exp`,
+    even though `e` cannot be typechecked.
+    (See Note [Typechecking Overloaded Quotes] in GHC.Tc.Gen.Splice)
+
+Since we cannot typecheck `HsQuote`, we shouldn't ever be able to construct
+`HsQuote GhcTc` (that's OK, because we also never need `HsQuote GhcTc`);
+However, `HsQuote GhcTc` is a field of `HsUntypedBracket GhcTc`, so making
+`HsQuote GhcTc` impossible to construct would make `HsUntypedBracket GhcTc`
+impossible to construct too, which is undesireable.
+
+Our solution to enforce at the type level that the `HsUntypedBracket GhcTc`
+field for `HsQuote GhcTc` doesn't exist is to make `HsQuote GhcTc` isomorphic to
+`NoExtField` by using TTG field extensions to make all constructors, except
+for `XQuote` (which takes `NoExtField`), unconstructable, with `DataConCantHappen`.
+
+As for `HsQuote`, this means `HsQuote GhcTc` is unconstructable except if it's
+to be a non-existent field in some constructor.
 -}
 
 data HsBracketTc thing = HsBracketTc
@@ -705,8 +740,8 @@ ppr_expr (HsUntypedBracket b e)
       (_, []) -> ppr e
       (_, ps) -> ppr e $$ text "pending(rn)" <+> ppr ps
     GhcTc -> case b of
-      HsBracketTc _  _ty _wrap [] -> ppr e
-      HsBracketTc _  _ty _wrap ps -> ppr e $$ text "pending(tc)" <+> pprIfTc @p (ppr ps)
+      HsBracketTc rne  _ty _wrap [] -> ppr rne
+      HsBracketTc rne  _ty _wrap ps -> ppr rne $$ text "pending(tc)" <+> pprIfTc @p (ppr ps)
 
 ppr_expr (HsProc _ pat (L _ (HsCmdTop _ cmd)))
   = hsep [text "proc", ppr pat, text "->", ppr cmd]
@@ -1819,15 +1854,30 @@ ppr_splice herald n e trail
     = herald <> whenPprDebug (brackets (ppr n)) <> ppr e <> trail
 
 
-type instance XExpBr  (GhcPass _) = NoExtField
-type instance XPatBr  (GhcPass _) = NoExtField
-type instance XDecBrL (GhcPass _) = NoExtField
-type instance XDecBrG (GhcPass _) = NoExtField
-type instance XTypBr  (GhcPass _) = NoExtField
-type instance XVarBr  (GhcPass _) = NoExtField
+type instance XExpBr  GhcPs       = NoExtField
+type instance XPatBr  GhcPs       = NoExtField
+type instance XDecBrL GhcPs       = NoExtField
+type instance XDecBrG GhcPs       = NoExtField
+type instance XTypBr  GhcPs       = NoExtField
+type instance XVarBr  GhcPs       = NoExtField
 type instance XXQuote GhcPs       = DataConCantHappen
+
+type instance XExpBr  GhcRn       = NoExtField
+type instance XPatBr  GhcRn       = NoExtField
+type instance XDecBrL GhcRn       = NoExtField
+type instance XDecBrG GhcRn       = NoExtField
+type instance XTypBr  GhcRn       = NoExtField
+type instance XVarBr  GhcRn       = NoExtField
 type instance XXQuote GhcRn       = DataConCantHappen
-type instance XXQuote GhcTc       = HsQuote GhcRn -- See Note [The life cycle of a TH quotation]
+
+-- See Note [The life cycle of a TH quotation]
+type instance XExpBr  GhcTc       = DataConCantHappen
+type instance XPatBr  GhcTc       = DataConCantHappen
+type instance XDecBrL GhcTc       = DataConCantHappen
+type instance XDecBrG GhcTc       = DataConCantHappen
+type instance XTypBr  GhcTc       = DataConCantHappen
+type instance XVarBr  GhcTc       = DataConCantHappen
+type instance XXQuote GhcTc       = NoExtField
 
 instance OutputableBndrId p
           => Outputable (HsQuote (GhcPass p)) where
@@ -1849,7 +1899,7 @@ instance OutputableBndrId p
           GhcPs -> dataConCantHappen b
           GhcRn -> dataConCantHappen b
 #endif
-          GhcTc -> pprHsQuote b
+          GhcTc -> ppr () -- romes TODO: so what do we do when we want to pretty print an HsQuote GhcTc? probably some pprPanic right? that's unfortunate...
 
 thBrackets :: SDoc -> SDoc -> SDoc
 thBrackets pp_kind pp_body = char '[' <> pp_kind <> vbar <+>
