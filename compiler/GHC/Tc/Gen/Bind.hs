@@ -637,15 +637,13 @@ tcPolyCheck prag_fn
                              , fun_ext     = wrap_gen <.> wrap_res
                              , fun_tick    = tick }
 
-             export = ABE { abe_ext   = noExtField
-                          , abe_wrap  = idHsWrapper
+             export = ABE { abe_wrap  = idHsWrapper
                           , abe_poly  = poly_id
                           , abe_mono  = poly_id2
                           , abe_prags = SpecPrags spec_prags }
 
-             abs_bind = L bind_loc $
-                        AbsBinds { abs_ext      = noExtField
-                                 , abs_tvs      = []
+             abs_bind = L bind_loc $ XHsBindsLR $
+                        AbsBinds { abs_tvs      = []
                                  , abs_ev_vars  = []
                                  , abs_ev_binds = []
                                  , abs_exports  = [export]
@@ -732,9 +730,8 @@ tcPolyInfer rec_tc prag_fn tc_sig_fn mono bind_list
 
        ; loc <- getSrcSpanM
        ; let poly_ids = map abe_poly exports
-             abs_bind = L (noAnnSrcSpan loc) $
-                        AbsBinds { abs_ext = noExtField
-                                 , abs_tvs = qtvs
+             abs_bind = L (noAnnSrcSpan loc) $ XHsBindsLR $
+                        AbsBinds { abs_tvs = qtvs
                                  , abs_ev_vars = givens, abs_ev_binds = [ev_binds]
                                  , abs_exports = exports, abs_binds = binds'
                                  , abs_sig = False }
@@ -750,7 +747,7 @@ mkExport :: TcPragEnv
                                         --          when typechecking the bindings
          -> [TyVar] -> TcThetaType      -- Both already zonked
          -> MonoBindInfo
-         -> TcM (ABExport GhcTc)
+         -> TcM ABExport
 -- Only called for generalisation plan InferGen, not by CheckGen or NoGen
 --
 -- mkExport generates exports with
@@ -803,8 +800,7 @@ mkExport prag_fn residual insoluble qtvs theta
 
         ; localSigWarn poly_id mb_sig
 
-        ; return (ABE { abe_ext = noExtField
-                      , abe_wrap = wrap
+        ; return (ABE { abe_wrap = wrap
                         -- abe_wrap :: (forall qtvs. theta => mono_ty) ~ idType poly_id
                       , abe_poly  = poly_id
                       , abe_mono  = mono_id

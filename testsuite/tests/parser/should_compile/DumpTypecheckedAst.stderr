@@ -1514,92 +1514,91 @@
          (HsTok))))))))
  ,(L
    (SrcSpanAnn (EpAnnNotUsed) { DumpTypecheckedAst.hs:19:1-23 })
-   (AbsBinds
-    (NoExtField)
-    []
-    []
-    [(ABE
-      (NoExtField)
-      {Var: main}
-      {Var: main}
-      (WpHole)
-      (SpecPrags
-       []))]
-    [({abstract:TcEvBinds})]
-    {Bag(LocatedA (HsBind Var)):
-     [(L
-       (SrcSpanAnn (EpAnn
-                    (Anchor
-                     { DumpTypecheckedAst.hs:19:1-23 }
-                     (UnchangedAnchor))
-                    (AnnListItem
-                     [])
-                    (EpaComments
-                     [])) { DumpTypecheckedAst.hs:19:1-23 })
-       (FunBind
-        (WpHole)
-        (L
-         (SrcSpanAnn (EpAnnNotUsed) { DumpTypecheckedAst.hs:19:1-4 })
-         {Var: main})
-        (MG
-         (MatchGroupTc
-          []
-          (TyConApp
-           ({abstract:TyCon})
-           [(TyConApp
-             ({abstract:TyCon})
-             [])]))
+   (XHsBindsLR
+    (AbsBinds
+     []
+     []
+     [(ABE
+       {Var: main}
+       {Var: main}
+       (WpHole)
+       (SpecPrags
+        []))]
+     [({abstract:TcEvBinds})]
+     {Bag(LocatedA (HsBind Var)):
+      [(L
+        (SrcSpanAnn (EpAnn
+                     (Anchor
+                      { DumpTypecheckedAst.hs:19:1-23 }
+                      (UnchangedAnchor))
+                     (AnnListItem
+                      [])
+                     (EpaComments
+                      [])) { DumpTypecheckedAst.hs:19:1-23 })
+        (FunBind
+         (WpHole)
          (L
-          (SrcSpanAnn (EpAnnNotUsed) { DumpTypecheckedAst.hs:19:1-23 })
-          [(L
-            (SrcSpanAnn (EpAnnNotUsed) { DumpTypecheckedAst.hs:19:1-23 })
-            (Match
-             (EpAnnNotUsed)
-             (FunRhs
-              (L
-               (SrcSpanAnn (EpAnnNotUsed) { DumpTypecheckedAst.hs:19:1-4 })
-               {Var: main})
-              (Prefix)
-              (NoSrcStrict))
-             []
-             (GRHSs
-              (EpaComments
-               [])
-              [(L
-                (SrcSpanAnn
-                 (EpAnnNotUsed)
-                 { DumpTypecheckedAst.hs:19:6-23 })
-                (GRHS
-                 (EpAnnNotUsed)
-                 []
-                 (L
-                  (SrcSpanAnn (EpAnnNotUsed) { DumpTypecheckedAst.hs:19:8-23 })
-                  (HsApp
-                   (EpAnnNotUsed)
-                   (L
-                    (SrcSpanAnn (EpAnnNotUsed) { DumpTypecheckedAst.hs:19:8-15 })
-                    (HsVar
-                     (NoExtField)
-                     (L
-                      (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
-                      {Var: putStrLn})))
-                   (L
-                    (SrcSpanAnn (EpAnnNotUsed) { DumpTypecheckedAst.hs:19:17-23 })
-                    (HsLit
-                     (EpAnn
-                      (Anchor
-                       { DumpTypecheckedAst.hs:19:17-23 }
-                       (UnchangedAnchor))
-                      (NoEpAnns)
-                      (EpaComments
-                       []))
-                     (HsString
-                      (SourceText "hello")
-                      {FastString: "hello"})))))))]
-              (EmptyLocalBinds
-               (NoExtField)))))])
-         (FromSource))
-        []))]}
-    (False)))]}
+          (SrcSpanAnn (EpAnnNotUsed) { DumpTypecheckedAst.hs:19:1-4 })
+          {Var: main})
+         (MG
+          (MatchGroupTc
+           []
+           (TyConApp
+            ({abstract:TyCon})
+            [(TyConApp
+              ({abstract:TyCon})
+              [])]))
+          (L
+           (SrcSpanAnn (EpAnnNotUsed) { DumpTypecheckedAst.hs:19:1-23 })
+           [(L
+             (SrcSpanAnn (EpAnnNotUsed) { DumpTypecheckedAst.hs:19:1-23 })
+             (Match
+              (EpAnnNotUsed)
+              (FunRhs
+               (L
+                (SrcSpanAnn (EpAnnNotUsed) { DumpTypecheckedAst.hs:19:1-4 })
+                {Var: main})
+               (Prefix)
+               (NoSrcStrict))
+              []
+              (GRHSs
+               (EpaComments
+                [])
+               [(L
+                 (SrcSpanAnn
+                  (EpAnnNotUsed)
+                  { DumpTypecheckedAst.hs:19:6-23 })
+                 (GRHS
+                  (EpAnnNotUsed)
+                  []
+                  (L
+                   (SrcSpanAnn (EpAnnNotUsed) { DumpTypecheckedAst.hs:19:8-23 })
+                   (HsApp
+                    (EpAnnNotUsed)
+                    (L
+                     (SrcSpanAnn (EpAnnNotUsed) { DumpTypecheckedAst.hs:19:8-15 })
+                     (HsVar
+                      (NoExtField)
+                      (L
+                       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+                       {Var: putStrLn})))
+                    (L
+                     (SrcSpanAnn (EpAnnNotUsed) { DumpTypecheckedAst.hs:19:17-23 })
+                     (HsLit
+                      (EpAnn
+                       (Anchor
+                        { DumpTypecheckedAst.hs:19:17-23 }
+                        (UnchangedAnchor))
+                       (NoEpAnns)
+                       (EpaComments
+                        []))
+                      (HsString
+                       (SourceText "hello")
+                       {FastString: "hello"})))))))]
+               (EmptyLocalBinds
+                (NoExtField)))))])
+          (FromSource))
+         []))]}
+     (False))))]}
 
 

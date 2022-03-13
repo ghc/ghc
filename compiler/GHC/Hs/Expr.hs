@@ -1629,6 +1629,9 @@ instance Data DelayedSplice where
   toConstr  a   = mkConstr (dataTypeOf a) "DelayedSplice" [] Data.Prefix
   dataTypeOf a  = mkDataType "HsExpr.DelayedSplice" [toConstr a]
 
+-- See Note [Pending Splices]
+type SplicePointName = Name
+
 -- | Pending Renamer Splice
 data PendingRnSplice
   = PendingRnSplice UntypedSpliceFlavour SplicePointName (LHsExpr GhcRn)

@@ -143,7 +143,7 @@ ds_val_bind (NonRecursive, hsbinds) body
 
             ; dsUnliftedBind bind body }
   where
-    is_polymorphic (AbsBinds { abs_tvs = tvs, abs_ev_vars = evs })
+    is_polymorphic (XHsBindsLR (AbsBinds { abs_tvs = tvs, abs_ev_vars = evs }))
                      = not (null tvs && null evs)
     is_polymorphic _ = False
 
@@ -177,10 +177,10 @@ ds_val_bind (is_rec, binds) body
 
 ------------------
 dsUnliftedBind :: HsBind GhcTc -> CoreExpr -> DsM CoreExpr
-dsUnliftedBind (AbsBinds { abs_tvs = [], abs_ev_vars = []
-               , abs_exports = exports
-               , abs_ev_binds = ev_binds
-               , abs_binds = lbinds }) body
+dsUnliftedBind (XHsBindsLR (AbsBinds { abs_tvs = [], abs_ev_vars = []
+                                     , abs_exports = exports
+                                     , abs_ev_binds = ev_binds
+                                     , abs_binds = lbinds })) body
   = do { let body1 = foldr bind_export body exports
              bind_export export b = bindNonRec (abe_poly export) (Var (abe_mono export)) b
        ; body2 <- foldlM (\body lbind -> dsUnliftedBind (unLoc lbind) body)

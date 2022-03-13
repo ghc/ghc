@@ -191,13 +191,8 @@ type family XXValBindsLR x x'
 type family XFunBind    x x'
 type family XPatBind    x x'
 type family XVarBind    x x'
-type family XAbsBinds   x x'
 type family XPatSynBind x x'
 type family XXHsBindsLR x x'
-
--- ABExport type families
-type family XABE x
-type family XXABExport x
 
 -- PatSynBind type families
 type family XPSB x x'

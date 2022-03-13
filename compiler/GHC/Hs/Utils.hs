@@ -20,17 +20,19 @@ just attach noSrcSpan to everything.
 
 -}
 
-
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE PatternSynonyms #-}
-{-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE ViewPatterns #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
@@ -151,7 +153,6 @@ import GHC.Utils.Panic
 import Data.Either
 import Data.Function
 import Data.List ( partition, deleteBy )
-import Data.Proxy
 
 {-
 ************************************************************************
@@ -978,7 +979,7 @@ BUT we have a special case when abs_sig is true;
 -- information, see Note [Strict binds checks] is GHC.HsToCore.Binds.
 isUnliftedHsBind :: HsBind GhcTc -> Bool  -- works only over typechecked binds
 isUnliftedHsBind bind
-  | AbsBinds { abs_exports = exports, abs_sig = has_sig } <- bind
+  | XHsBindsLR (AbsBinds { abs_exports = exports, abs_sig = has_sig }) <- bind
   = if has_sig
     then any (is_unlifted_id . abe_poly) exports
     else any (is_unlifted_id . abe_mono) exports
@@ -993,7 +994,7 @@ isUnliftedHsBind bind
 
 -- | Is a binding a strict variable or pattern bind (e.g. @!x = ...@)?
 isBangedHsBind :: HsBind GhcTc -> Bool
-isBangedHsBind (AbsBinds { abs_binds = binds })
+isBangedHsBind (XHsBindsLR (AbsBinds { abs_binds = binds }))
   = anyBag (isBangedHsBind . unLoc) binds
 isBangedHsBind (FunBind {fun_matches = matches})
   | [L _ match] <- unLoc $ mg_alts matches
@@ -1023,7 +1024,7 @@ collectHsIdBinders flag = collect_hs_val_binders True flag
 
 collectHsValBinders :: CollectPass (GhcPass idL)
                     => CollectFlag (GhcPass idL)
-                    -> HsValBindsLR (GhcPass idL) (GhcPass idR)
+                    -> HsValBindsLR (GhcPass idL) idR
                     -> [IdP (GhcPass idL)]
 collectHsValBinders flag = collect_hs_val_binders False flag
 
@@ -1050,7 +1051,7 @@ collectHsBindListBinders flag = foldr (collect_bind False flag . unXRec @p) []
 collect_hs_val_binders :: CollectPass (GhcPass idL)
                        => Bool
                        -> CollectFlag (GhcPass idL)
-                       -> HsValBindsLR (GhcPass idL) (GhcPass idR)
+                       -> HsValBindsLR (GhcPass idL) idR
                        -> [IdP (GhcPass idL)]
 collect_hs_val_binders ps flag = \case
     ValBinds _ binds _              -> collect_binds ps flag binds []
@@ -1078,18 +1079,15 @@ collect_bind :: forall p idR. CollectPass p
              -> HsBindLR p idR
              -> [IdP p]
              -> [IdP p]
-collect_bind _ flag (PatBind { pat_lhs = p })           acc = collect_lpat flag p acc
-collect_bind _ _ (FunBind { fun_id = f })            acc = unXRec @p f : acc
-collect_bind _ _ (VarBind { var_id = f })            acc = f : acc
-collect_bind _ _ (AbsBinds { abs_exports = dbinds }) acc = map abe_poly dbinds ++ acc
-        -- I don't think we want the binders from the abe_binds
-
-        -- binding (hence see AbsBinds) is in zonking in GHC.Tc.Utils.Zonk
+collect_bind _ _    (FunBind { fun_id = f })         acc = unXRec @p f : acc
+collect_bind _ flag (PatBind { pat_lhs = p })        acc = collect_lpat flag p acc
+collect_bind _ _    (VarBind { var_id = f })         acc = f : acc
 collect_bind omitPatSyn _ (PatSynBind _ (PSB { psb_id = ps })) acc
   | omitPatSyn                  = acc
   | otherwise                   = unXRec @p ps : acc
 collect_bind _ _ (PatSynBind _ (XPatSynBind _)) acc = acc
-collect_bind _ _ (XHsBindsLR _) acc = acc
+collect_bind _ _ (XHsBindsLR b) acc = collectXXHsBindsLR @p @idR b acc
+
 
 collectMethodBinders :: forall idL idR. UnXRec idL => LHsBindsLR idL idR -> [LIdP idL]
 -- ^ Used exclusively for the bindings of an instance decl which are all
@@ -1110,14 +1108,14 @@ collectLStmtsBinders
 collectLStmtsBinders flag = concatMap (collectLStmtBinders flag)
 
 collectStmtsBinders
-  :: (CollectPass (GhcPass idL))
+  :: CollectPass (GhcPass idL)
   => CollectFlag (GhcPass idL)
   -> [StmtLR (GhcPass idL) (GhcPass idR) body]
   -> [IdP (GhcPass idL)]
 collectStmtsBinders flag = concatMap (collectStmtBinders flag)
 
 collectLStmtBinders
-  :: (CollectPass (GhcPass idL))
+  :: CollectPass (GhcPass idL)
   => CollectFlag (GhcPass idL)
   -> LStmtLR (GhcPass idL) (GhcPass idR) body
   -> [IdP (GhcPass idL)]
@@ -1176,7 +1174,7 @@ data CollectFlag p where
     -- | Collect evidence binders
     CollWithDictBinders :: CollectFlag GhcTc
 
-collect_lpat :: forall p. (CollectPass p)
+collect_lpat :: forall p. CollectPass p
              => CollectFlag p
              -> LPat p
              -> [IdP p]
@@ -1203,7 +1201,7 @@ collect_pat flag pat bndrs = case pat of
   NPat {}               -> bndrs
   NPlusKPat _ n _ _ _ _ -> unXRec @p n : bndrs
   SigPat _ pat _        -> collect_lpat flag pat bndrs
-  XPat ext              -> collectXXPat (Proxy @p) flag ext bndrs
+  XPat ext              -> collectXXPat @p flag ext bndrs
   SplicePat _ (HsSpliced _ _ (HsSplicedPat pat))
                         -> collect_pat flag pat bndrs
   SplicePat _ _         -> bndrs
@@ -1230,10 +1228,11 @@ add_ev_bndr (EvBind { eb_lhs = b }) bs | isId b    = b:bs
 -- In particular, Haddock already makes use of this, with an instance for its 'DocNameI' pass so that
 -- it can reuse the code in GHC for collecting binders.
 class UnXRec p => CollectPass p where
-  collectXXPat :: Proxy p -> CollectFlag p -> XXPat p -> [IdP p] -> [IdP p]
+  collectXXPat :: CollectFlag p -> XXPat p -> [IdP p] -> [IdP p]
+  collectXXHsBindsLR :: forall pR. XXHsBindsLR p pR -> [IdP p] -> [IdP p]
 
 instance IsPass p => CollectPass (GhcPass p) where
-  collectXXPat _ flag ext =
+  collectXXPat flag ext =
     case ghcPass @p of
       GhcPs -> dataConCantHappen ext
       GhcRn
@@ -1242,6 +1241,16 @@ instance IsPass p => CollectPass (GhcPass p) where
       GhcTc -> case ext of
         CoPat _ pat _      -> collect_pat flag pat
         ExpansionPat _ pat -> collect_pat flag pat
+  collectXXHsBindsLR ext =
+    case ghcPass @p of
+      GhcPs -> dataConCantHappen ext
+      GhcRn -> dataConCantHappen ext
+      GhcTc -> case ext of
+        AbsBinds { abs_exports = dbinds } -> (map abe_poly dbinds ++)
+        -- I don't think we want the binders from the abe_binds
+
+        -- binding (hence see AbsBinds) is in zonking in GHC.Tc.Utils.Zonk
+
 
 {-
 Note [Dictionary binders in ConPatOut]

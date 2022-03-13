@@ -267,12 +267,11 @@ instance ModifyState Id where
   addSubstitution mono poly hs =
     hs{name_remapping = extendNameEnv (name_remapping hs) (varName mono) poly}
 
-modifyState :: ModifyState (IdP p) => [ABExport p] -> HieState -> HieState
+modifyState :: [ABExport] -> HieState -> HieState
 modifyState = foldr go id
   where
     go ABE{abe_poly=poly,abe_mono=mono} f
       = addSubstitution mono poly . f
-    go _ f = f
 
 type HieM = ReaderT NodeOrigin (State HieState)
 
@@ -847,21 +846,27 @@ instance HiePass p => ToHie (BindContext (LocatedA (HsBind (GhcPass p)))) where
       VarBind{var_rhs = expr} ->
         [ toHie expr
         ]
-      AbsBinds{ abs_exports = xs, abs_binds = binds
-              , abs_ev_binds = ev_binds
-              , abs_ev_vars = ev_vars } ->
-        [  lift (modify (modifyState xs)) >> -- Note [Name Remapping]
-                (toHie $ fmap (BC context scope) binds)
-        , toHie $ map (L span . abe_wrap) xs
-        , toHie $
-            map (EvBindContext (mkScopeA span) (getRealSpanA span)
-                . L span) ev_binds
-        , toHie $
-            map (C (EvidenceVarBind EvSigBind
-                                    (mkScopeA span)
-                                    (getRealSpanA span))
-                . L span) ev_vars
-        ]
+      XHsBindsLR ext -> case hiePass @p of
+#if __GLASGOW_HASKELL__ < 811
+        HieRn -> dataConCantHappen ext
+#endif
+        HieTc
+          | AbsBinds{ abs_exports = xs, abs_binds = binds
+                    , abs_ev_binds = ev_binds
+                    , abs_ev_vars = ev_vars } <- ext
+          ->
+            [  lift (modify (modifyState xs)) >> -- Note [Name Remapping]
+                    (toHie $ fmap (BC context scope) binds)
+            , toHie $ map (L span . abe_wrap) xs
+            , toHie $
+                map (EvBindContext (mkScopeA span) (getRealSpanA span)
+                    . L span) ev_binds
+            , toHie $
+                map (C (EvidenceVarBind EvSigBind
+                                        (mkScopeA span)
+                                        (getRealSpanA span))
+                    . L span) ev_vars
+            ]
       PatSynBind _ psb ->
         [ toHie $ L (locA span) psb -- PatSynBinds only occur at the top level
         ]

@@ -1321,14 +1321,13 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
                     -- Newtype dfuns just inline unconditionally,
                     -- so don't attempt to specialise them
 
-             export = ABE { abe_ext  = noExtField
-                          , abe_wrap = idHsWrapper
+             export = ABE { abe_wrap = idHsWrapper
                           , abe_poly = dfun_id_w_prags
                           , abe_mono = self_dict
                           , abe_prags = dfun_spec_prags }
                           -- NB: see Note [SPECIALISE instance pragmas]
-             main_bind = AbsBinds { abs_ext = noExtField
-                                  , abs_tvs = inst_tyvars
+             main_bind = XHsBindsLR $
+                         AbsBinds { abs_tvs = inst_tyvars
                                   , abs_ev_vars = dfun_ev_vars
                                   , abs_exports = [export]
                                   , abs_ev_binds = []
@@ -1475,14 +1474,13 @@ tcSuperClasses dfun_id cls tyvars dfun_evs inst_tys dfun_ev_binds sc_theta
            ; let sc_top_ty = mkInfForAllTys tyvars $
                              mkPhiTy (map idType dfun_evs) sc_pred
                  sc_top_id = mkLocalId sc_top_name Many sc_top_ty
-                 export = ABE { abe_ext  = noExtField
-                              , abe_wrap = idHsWrapper
+                 export = ABE { abe_wrap = idHsWrapper
                               , abe_poly = sc_top_id
                               , abe_mono = sc_ev_id
                               , abe_prags = noSpecPrags }
                  local_ev_binds = TcEvBinds ev_binds_var
-                 bind = AbsBinds { abs_ext      = noExtField
-                                 , abs_tvs      = tyvars
+                 bind = XHsBindsLR $
+                        AbsBinds { abs_tvs      = tyvars
                                  , abs_ev_vars  = dfun_evs
                                  , abs_exports  = [export]
                                  , abs_ev_binds = [dfun_ev_binds, local_ev_binds]
@@ -1910,15 +1908,14 @@ tcMethodBody clas tyvars dfun_ev_vars inst_tys
        ; spec_prags     <- tcSpecPrags global_meth_id prags
 
         ; let specs  = mk_meth_spec_prags global_meth_id spec_inst_prags spec_prags
-              export = ABE { abe_ext   = noExtField
-                           , abe_poly  = global_meth_id
+              export = ABE { abe_poly  = global_meth_id
                            , abe_mono  = local_meth_id
                            , abe_wrap  = idHsWrapper
                            , abe_prags = specs }
 
               local_ev_binds = TcEvBinds ev_binds_var
-              full_bind = AbsBinds { abs_ext      = noExtField
-                                   , abs_tvs      = tyvars
+              full_bind = XHsBindsLR $
+                          AbsBinds { abs_tvs      = tyvars
                                    , abs_ev_vars  = dfun_ev_vars
                                    , abs_exports  = [export]
                                    , abs_ev_binds = [dfun_ev_binds, local_ev_binds]
@@ -1968,14 +1965,13 @@ tcMethodBodyHelp hs_sig_fn sel_id local_meth_id meth_bind
 
        ; (tc_bind, [inner_id]) <- tcPolyCheck no_prag_fn inner_meth_sig meth_bind
 
-       ; let export = ABE { abe_ext   = noExtField
-                          , abe_poly  = local_meth_id
+       ; let export = ABE { abe_poly  = local_meth_id
                           , abe_mono  = inner_id
                           , abe_wrap  = hs_wrap
                           , abe_prags = noSpecPrags }
 
-       ; return (unitBag $ L (getLoc meth_bind) $
-                 AbsBinds { abs_ext = noExtField, abs_tvs = [], abs_ev_vars = []
+       ; return (unitBag $ L (getLoc meth_bind) $ XHsBindsLR $
+                 AbsBinds { abs_tvs = [], abs_ev_vars = []
                           , abs_exports = [export]
                           , abs_binds = tc_bind, abs_ev_binds = []
                           , abs_sig = True }) }

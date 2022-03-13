@@ -201,10 +201,12 @@ dsHsBind dflags (PatBind { pat_lhs = pat, pat_rhs = grhss
                            else []
         ; return (force_var', sel_binds) }
 
-dsHsBind dflags (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dicts
-                          , abs_exports = exports
-                          , abs_ev_binds = ev_binds
-                          , abs_binds = binds, abs_sig = has_sig })
+dsHsBind
+  dflags
+  (XHsBindsLR (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dicts
+                        , abs_exports = exports
+                        , abs_ev_binds = ev_binds
+                        , abs_binds = binds, abs_sig = has_sig }))
   = do { ds_binds <- addTyCs FromSource (listToBag dicts) $
                      dsLHsBinds binds
              -- addTyCs: push type constraints deeper
@@ -220,7 +222,7 @@ dsHsBind _ (PatSynBind{}) = panic "dsHsBind: PatSynBind"
 
 -----------------------
 dsAbsBinds :: DynFlags
-           -> [TyVar] -> [EvVar] -> [ABExport GhcTc]
+           -> [TyVar] -> [EvVar] -> [ABExport]
            -> [CoreBind]                -- Desugared evidence bindings
            -> ([Id], [(Id,CoreExpr)])   -- Desugared value bindings
            -> Bool                      -- Single binding with signature
@@ -271,7 +273,7 @@ dsAbsBinds dflags tyvars dicts exports
     --    lcl_id{inl-prag} = rhs  -- Auxiliary binds
     --    gbl_id = lcl_id |> co   -- Main binds
   | null tyvars, null dicts
-  = do { let mk_main :: ABExport GhcTc -> DsM (Id, CoreExpr)
+  = do { let mk_main :: ABExport -> DsM (Id, CoreExpr)
              mk_main (ABE { abe_poly = gbl_id, abe_mono = lcl_id
                           , abe_wrap = wrap })
                      -- No SpecPrags (no dicts)
@@ -360,7 +362,7 @@ dsAbsBinds dflags tyvars dicts exports
             [] lcls
 
     -- find exports or make up new exports for force variables
-    get_exports :: [Id] -> DsM ([Id], [ABExport GhcTc])
+    get_exports :: [Id] -> DsM ([Id], [ABExport])
     get_exports lcls =
       foldM (\(glbls, exports) lcl ->
               case lookupVarEnv global_env lcl of
@@ -373,8 +375,7 @@ dsAbsBinds dflags tyvars dicts exports
     mk_export local =
       do global <- newSysLocalDs Many
                      (exprType (mkLams tyvars (mkLams dicts (Var local))))
-         return (ABE { abe_ext   = noExtField
-                     , abe_poly  = global
+         return (ABE { abe_poly  = global
                      , abe_mono  = local
                      , abe_wrap  = WpHole
                      , abe_prags = SpecPrags [] })

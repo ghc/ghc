@@ -1616,9 +1616,6 @@ data HsSplicedThing id
     | HsSplicedPat  (Pat id)    -- ^ Haskell Spliced Pattern
 
 
--- See Note [Pending Splices]
-type SplicePointName = Name
-
 data UntypedSpliceFlavour
   = UntypedExpSplice
   | UntypedPatSplice

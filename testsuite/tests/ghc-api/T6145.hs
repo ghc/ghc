@@ -37,7 +37,7 @@ main = do
         removeFile "Test.hs"
         print ok
     where
-      isDataCon (L _ (AbsBinds { abs_binds = bs }))
+      isDataCon (L _ (XHsBindsLR (AbsBinds { abs_binds = bs })))
         = not (isEmptyBag (filterBag isDataCon bs))
       isDataCon (L l (f@FunBind {}))
         | (MG _ (L _ (m:_)) _) <- fun_matches f,

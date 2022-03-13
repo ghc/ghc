@@ -304,13 +304,12 @@ tcDefMeth clas tyvars this_dict binds_in hs_sig_fn prag_fn
                   tcPolyCheck no_prag_fn local_dm_sig
                               (L bind_loc lm_bind)
 
-       ; let export = ABE { abe_ext   = noExtField
-                          , abe_poly  = global_dm_id
+       ; let export = ABE { abe_poly  = global_dm_id
                           , abe_mono  = local_dm_id
                           , abe_wrap  = idHsWrapper
                           , abe_prags = IsDefaultMethod }
-             full_bind = AbsBinds { abs_ext      = noExtField
-                                  , abs_tvs      = tyvars
+             full_bind = XHsBindsLR $
+                         AbsBinds { abs_tvs      = tyvars
                                   , abs_ev_vars  = [this_dict]
                                   , abs_exports  = [export]
                                   , abs_ev_binds = [ev_binds]

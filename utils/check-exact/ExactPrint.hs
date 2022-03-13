@@ -1298,7 +1298,6 @@ instance ExactPrint (HsBind GhcPs) where
   getAnnotationEntry FunBind{} = NoEntryVal
   getAnnotationEntry PatBind{} = NoEntryVal
   getAnnotationEntry VarBind{} = NoEntryVal
-  getAnnotationEntry AbsBinds{} = NoEntryVal
   getAnnotationEntry PatSynBind{} = NoEntryVal
 
   exact (FunBind _ _ matches _) = do
