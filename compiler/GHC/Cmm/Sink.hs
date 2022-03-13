@@ -384,8 +384,12 @@ cmm_sink_sp.
 -- liveness analysis doesn't track those (yet) so we can't.
 --
 shouldSink :: Platform -> CmmNode e x -> Maybe Assignment
-shouldSink platform (CmmAssign (CmmLocal r) e) | no_local_regs = Just (r, e, exprMem platform e)
+shouldSink platform (CmmAssign var e) | is_renamed_global var = Nothing
+                                      | (CmmLocal r) <- var
+                                      , no_local_regs = Just (r, e, exprMem platform e)
   where no_local_regs = True -- foldRegsUsed (\_ _ -> False) True e
+        is_renamed_global (CmmGlobal {}) = True
+        is_renamed_global _ = False
 shouldSink _ _other = Nothing
 
 --
