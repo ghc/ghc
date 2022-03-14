@@ -35,123 +35,123 @@
         (Prefix)
         (HsDataDefn
          (NoExtField)
-         (DataType)
          (Nothing)
          (Nothing)
          (Nothing)
-         [(L
-           (SrcSpanAnn (EpAnn
-                        (Anchor
-                         { T14189.hs:6:15-20 }
-                         (UnchangedAnchor))
-                        (AnnListItem
-                         [(AddVbarAnn
-                           (EpaSpan { T14189.hs:6:22 }))])
-                        (EpaComments
-                         [])) { T14189.hs:6:15-20 })
-           (ConDeclH98
-            (EpAnnNotUsed)
-            (L
-             (SrcSpanAnn (EpAnnNotUsed) { T14189.hs:6:15-16 })
-             {Name: T14189.MT})
-            (False)
-            []
-            (Nothing)
-            (PrefixCon
-             []
-             [(HsScaled
-               (HsLinearArrow
-                (HsPct1
-                 (L
-                  (NoTokenLoc)
-                  (HsTok))
-                 (L
-                  (NoTokenLoc)
-                  (HsNormalTok))))
-               (L
-                (SrcSpanAnn (EpAnnNotUsed) { T14189.hs:6:18-20 })
-                (HsTyVar
-                 (EpAnnNotUsed)
-                 (NotPromoted)
-                 (L
-                  (SrcSpanAnn (EpAnnNotUsed) { T14189.hs:6:18-20 })
-                  {Name: GHC.Types.Int}))))])
-            (Nothing)))
-         ,(L
-           (SrcSpanAnn (EpAnn
-                        (Anchor
-                         { T14189.hs:6:24-25 }
-                         (UnchangedAnchor))
-                        (AnnListItem
-                         [(AddVbarAnn
-                           (EpaSpan { T14189.hs:6:27 }))])
-                        (EpaComments
-                         [])) { T14189.hs:6:24-25 })
-           (ConDeclH98
-            (EpAnnNotUsed)
-            (L
-             (SrcSpanAnn (EpAnnNotUsed) { T14189.hs:6:24-25 })
-             {Name: T14189.NT})
-            (False)
-            []
-            (Nothing)
-            (PrefixCon
-             []
-             [])
-            (Nothing)))
-         ,(L
-           (SrcSpanAnn (EpAnnNotUsed) { T14189.hs:6:29-42 })
-           (ConDeclH98
-            (EpAnnNotUsed)
-            (L
-             (SrcSpanAnn (EpAnnNotUsed) { T14189.hs:6:29 })
-             {Name: T14189.F})
-            (False)
-            []
-            (Nothing)
-            (RecCon
+         (DataTypeCons
+          [(L
+            (SrcSpanAnn (EpAnn
+                         (Anchor
+                          { T14189.hs:6:15-20 }
+                          (UnchangedAnchor))
+                         (AnnListItem
+                          [(AddVbarAnn
+                            (EpaSpan { T14189.hs:6:22 }))])
+                         (EpaComments
+                          [])) { T14189.hs:6:15-20 })
+            (ConDeclH98
+             (EpAnnNotUsed)
              (L
-              (SrcSpanAnn (EpAnn
-                           (Anchor
-                            { T14189.hs:6:31 }
-                            (UnchangedAnchor))
-                           (AnnList
-                            (Just
-                             (Anchor
-                              { T14189.hs:6:33-40 }
-                              (UnchangedAnchor)))
-                            (Just
-                             (AddEpAnn AnnOpenC (EpaSpan { T14189.hs:6:31 })))
-                            (Just
-                             (AddEpAnn AnnCloseC (EpaSpan { T14189.hs:6:42 })))
-                            []
-                            [])
-                           (EpaComments
-                            [])) { T14189.hs:6:31-42 })
-              [(L
-                (SrcSpanAnn (EpAnnNotUsed) { T14189.hs:6:33-40 })
-                (ConDeclField
-                 (EpAnnNotUsed)
-                 [(L
-                   (SrcSpanAnn
+              (SrcSpanAnn (EpAnnNotUsed) { T14189.hs:6:15-16 })
+              {Name: T14189.MT})
+             (False)
+             []
+             (Nothing)
+             (PrefixCon
+              []
+              [(HsScaled
+                (HsLinearArrow
+                 (HsPct1
+                  (L
+                   (NoTokenLoc)
+                   (HsTok))
+                  (L
+                   (NoTokenLoc)
+                   (HsNormalTok))))
+                (L
+                 (SrcSpanAnn (EpAnnNotUsed) { T14189.hs:6:18-20 })
+                 (HsTyVar
+                  (EpAnnNotUsed)
+                  (NotPromoted)
+                  (L
+                   (SrcSpanAnn (EpAnnNotUsed) { T14189.hs:6:18-20 })
+                   {Name: GHC.Types.Int}))))])
+             (Nothing)))
+          ,(L
+            (SrcSpanAnn (EpAnn
+                         (Anchor
+                          { T14189.hs:6:24-25 }
+                          (UnchangedAnchor))
+                         (AnnListItem
+                          [(AddVbarAnn
+                            (EpaSpan { T14189.hs:6:27 }))])
+                         (EpaComments
+                          [])) { T14189.hs:6:24-25 })
+            (ConDeclH98
+             (EpAnnNotUsed)
+             (L
+              (SrcSpanAnn (EpAnnNotUsed) { T14189.hs:6:24-25 })
+              {Name: T14189.NT})
+             (False)
+             []
+             (Nothing)
+             (PrefixCon
+              []
+              [])
+             (Nothing)))
+          ,(L
+            (SrcSpanAnn (EpAnnNotUsed) { T14189.hs:6:29-42 })
+            (ConDeclH98
+             (EpAnnNotUsed)
+             (L
+              (SrcSpanAnn (EpAnnNotUsed) { T14189.hs:6:29 })
+              {Name: T14189.F})
+             (False)
+             []
+             (Nothing)
+             (RecCon
+              (L
+               (SrcSpanAnn (EpAnn
+                            (Anchor
+                             { T14189.hs:6:31 }
+                             (UnchangedAnchor))
+                            (AnnList
+                             (Just
+                              (Anchor
+                               { T14189.hs:6:33-40 }
+                               (UnchangedAnchor)))
+                             (Just
+                              (AddEpAnn AnnOpenC (EpaSpan { T14189.hs:6:31 })))
+                             (Just
+                              (AddEpAnn AnnCloseC (EpaSpan { T14189.hs:6:42 })))
+                             []
+                             [])
+                            (EpaComments
+                             [])) { T14189.hs:6:31-42 })
+               [(L
+                 (SrcSpanAnn (EpAnnNotUsed) { T14189.hs:6:33-40 })
+                 (ConDeclField
+                  (EpAnnNotUsed)
+                  [(L
+                    (SrcSpanAnn
+                     (EpAnnNotUsed)
+                     { T14189.hs:6:33 })
+                    (FieldOcc
+                     {Name: T14189.f}
+                     (L
+                      (SrcSpanAnn (EpAnnNotUsed) { T14189.hs:6:33 })
+                      (Unqual
+                       {OccName: f}))))]
+                  (L
+                   (SrcSpanAnn (EpAnnNotUsed) { T14189.hs:6:38-40 })
+                   (HsTyVar
                     (EpAnnNotUsed)
-                    { T14189.hs:6:33 })
-                   (FieldOcc
-                    {Name: T14189.f}
+                    (NotPromoted)
                     (L
-                     (SrcSpanAnn (EpAnnNotUsed) { T14189.hs:6:33 })
-                     (Unqual
-                      {OccName: f}))))]
-                 (L
-                  (SrcSpanAnn (EpAnnNotUsed) { T14189.hs:6:38-40 })
-                  (HsTyVar
-                   (EpAnnNotUsed)
-                   (NotPromoted)
-                   (L
-                    (SrcSpanAnn (EpAnnNotUsed) { T14189.hs:6:38-40 })
-                    {Name: GHC.Types.Int})))
-                 (Nothing)))]))
-            (Nothing)))]
+                     (SrcSpanAnn (EpAnnNotUsed) { T14189.hs:6:38-40 })
+                     {Name: GHC.Types.Int})))
+                  (Nothing)))]))
+             (Nothing)))])
          [])))]
      []
      []

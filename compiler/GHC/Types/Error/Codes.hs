@@ -136,7 +136,6 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "DsRuleLhsTooComplicated"                       = 69441
   GhcDiagnosticCode "DsRuleIgnoredDueToConstructor"                 = 00828
   GhcDiagnosticCode "DsRuleBindersNotBound"                         = 40548
-  GhcDiagnosticCode "DsMultipleConForNewtype"                       = 05380
   GhcDiagnosticCode "DsLazyPatCantBindVarsOfUnliftedType"           = 17879
   GhcDiagnosticCode "DsNotYetHandledByTH"                           = 65904
   GhcDiagnosticCode "DsAggregatedViewExpressions"                   = 19551
@@ -267,6 +266,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "PsErrParseRightOpSectionInPat"                 = 72516
   GhcDiagnosticCode "PsErrIllegalGadtRecordMultiplicity"            = 37475
   GhcDiagnosticCode "PsErrInvalidCApiImport"                        = 72744
+  GhcDiagnosticCode "PsErrMultipleConForNewtype"                    = 05380
 
   -- Driver diagnostic codes
   GhcDiagnosticCode "DriverMissingHomeModules"                      = 32850

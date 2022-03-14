@@ -60,6 +60,7 @@ import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 import qualified Data.ByteString as BS
 import Control.Monad( unless, ap )
 import Control.Applicative( (<|>) )
+import Data.List.NonEmpty( NonEmpty (..), nonEmpty )
 import Data.Maybe( catMaybes, isNothing )
 import Language.Haskell.TH as TH hiding (sigP)
 import Language.Haskell.TH.Syntax as TH
@@ -290,10 +291,10 @@ cvtDec (DataD ctxt tc tvs ksig constrs derivs)
         ; cons' <- mapM cvtConstr constrs
         ; derivs' <- cvtDerivs derivs
         ; let defn = HsDataDefn { dd_ext = noExtField
-                                , dd_ND = DataType, dd_cType = Nothing
+                                , dd_cType = Nothing
                                 , dd_ctxt = mkHsContextMaybe ctxt'
                                 , dd_kindSig = ksig'
-                                , dd_cons = cons', dd_derivs = derivs' }
+                                , dd_cons = DataTypeCons cons', dd_derivs = derivs' }
         ; returnJustLA $ TyClD noExtField $
           DataDecl { tcdDExt = noAnn
                    , tcdLName = tc', tcdTyVars = tvs'
@@ -306,10 +307,10 @@ cvtDec (NewtypeD ctxt tc tvs ksig constr derivs)
         ; con' <- cvtConstr constr
         ; derivs' <- cvtDerivs derivs
         ; let defn = HsDataDefn { dd_ext = noExtField
-                                , dd_ND = NewType, dd_cType = Nothing
+                                , dd_cType = Nothing
                                 , dd_ctxt = mkHsContextMaybe ctxt'
                                 , dd_kindSig = ksig'
-                                , dd_cons = [con']
+                                , dd_cons = NewTypeCon con'
                                 , dd_derivs = derivs' }
         ; returnJustLA $ TyClD noExtField $
           DataDecl { tcdDExt = noAnn
@@ -377,10 +378,10 @@ cvtDec (DataInstD ctxt bndrs tys ksig constrs derivs)
        ; cons' <- mapM cvtConstr constrs
        ; derivs' <- cvtDerivs derivs
        ; let defn = HsDataDefn { dd_ext = noExtField
-                               , dd_ND = DataType, dd_cType = Nothing
+                               , dd_cType = Nothing
                                , dd_ctxt = mkHsContextMaybe ctxt'
                                , dd_kindSig = ksig'
-                               , dd_cons = cons', dd_derivs = derivs' }
+                               , dd_cons = DataTypeCons cons', dd_derivs = derivs' }
 
        ; returnJustLA $ InstD noExtField $ DataFamInstD
            { dfid_ext = noExtField
@@ -398,10 +399,10 @@ cvtDec (NewtypeInstD ctxt bndrs tys ksig constr derivs)
        ; con' <- cvtConstr constr
        ; derivs' <- cvtDerivs derivs
        ; let defn = HsDataDefn { dd_ext = noExtField
-                               , dd_ND = NewType, dd_cType = Nothing
+                               , dd_cType = Nothing
                                , dd_ctxt = mkHsContextMaybe ctxt'
                                , dd_kindSig = ksig'
-                               , dd_cons = [con'], dd_derivs = derivs' }
+                               , dd_cons = NewTypeCon con', dd_derivs = derivs' }
        ; returnJustLA $ InstD noExtField $ DataFamInstD
            { dfid_ext = noExtField
            , dfid_inst = DataFamInstDecl { dfid_eqn =
@@ -679,26 +680,24 @@ cvtConstr (ForallC tvs ctxt con)
       where
         all_tvs = tvs' ++ ex_tvs
 
-cvtConstr (GadtC [] _strtys _ty)
-  = failWith (text "GadtC must have at least one constructor name")
-
-cvtConstr (GadtC c strtys ty)
-  = do  { c'      <- mapM cNameN c
+cvtConstr (GadtC c strtys ty) = case nonEmpty c of
+    Nothing -> failWith (text "GadtC must have at least one constructor name")
+    Just c -> do
+        { c'      <- mapM cNameN c
         ; args    <- mapM cvt_arg strtys
         ; ty'     <- cvtType ty
         ; mk_gadt_decl c' (PrefixConGADT $ map hsLinear args) ty'}
 
-cvtConstr (RecGadtC [] _varstrtys _ty)
-  = failWith (text "RecGadtC must have at least one constructor name")
-
-cvtConstr (RecGadtC c varstrtys ty)
-  = do  { c'       <- mapM cNameN c
+cvtConstr (RecGadtC c varstrtys ty) = case nonEmpty c of
+    Nothing -> failWith (text "RecGadtC must have at least one constructor name")
+    Just c -> do
+        { c'       <- mapM cNameN c
         ; ty'      <- cvtType ty
         ; rec_flds <- mapM cvt_id_arg varstrtys
         ; lrec_flds <- returnLA rec_flds
         ; mk_gadt_decl c' (RecConGADT lrec_flds noHsUniTok) ty' }
 
-mk_gadt_decl :: [LocatedN RdrName] -> HsConDeclGADTDetails GhcPs -> LHsType GhcPs
+mk_gadt_decl :: NonEmpty (LocatedN RdrName) -> HsConDeclGADTDetails GhcPs -> LHsType GhcPs
              -> CvtM (LConDecl GhcPs)
 mk_gadt_decl names args res_ty
   = do bndrs <- returnLA mkHsOuterImplicit

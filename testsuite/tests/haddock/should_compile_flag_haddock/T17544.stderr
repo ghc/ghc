@@ -836,70 +836,72 @@
            (Prefix)
            (HsDataDefn
             (NoExtField)
-            (DataType)
             (Nothing)
             (Nothing)
             (Nothing)
-            [(L
-              (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:25:5-18 })
-              (ConDeclGADT
-               (EpAnn
-                (Anchor
-                 { T17544.hs:25:5-18 }
-                 (UnchangedAnchor))
-                []
-                (EpaComments
-                 []))
-               [(L
-                 (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:25:5-8 })
-                 (Unqual
-                  {OccName: MkD5}))]
-               (L
-                (TokenLoc
-                 (EpaSpan { T17544.hs:25:10-11 }))
-                (HsNormalTok))
-               (L
-                (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:25:13-18 })
-                (HsOuterImplicit
-                 (NoExtField)))
-               (Nothing)
-               (PrefixConGADT
-                [])
-               (L
-                (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:25:13-18 })
-                (HsAppTy
-                 (NoExtField)
+            (DataTypeCons
+             [(L
+               (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:25:5-18 })
+               (ConDeclGADT
+                (EpAnn
+                 (Anchor
+                  { T17544.hs:25:5-18 }
+                  (UnchangedAnchor))
+                 []
+                 (EpaComments
+                  []))
+                (:|
                  (L
-                  (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:25:13-14 })
-                  (HsTyVar
-                   (EpAnn
-                    (Anchor
-                     { T17544.hs:25:13-14 }
-                     (UnchangedAnchor))
-                    []
-                    (EpaComments
-                     []))
-                   (NotPromoted)
-                   (L
-                    (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:25:13-14 })
-                    (Unqual
-                     {OccName: D5}))))
-                 (L
-                  (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:25:16-18 })
-                  (HsTyVar
-                   (EpAnn
-                    (Anchor
-                     { T17544.hs:25:16-18 }
-                     (UnchangedAnchor))
-                    []
-                    (EpaComments
-                     []))
-                   (NotPromoted)
-                   (L
-                    (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:25:16-18 })
-                    (Unqual
-                     {OccName: Int}))))))
-               (Nothing)))]
+                  (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:25:5-8 })
+                  (Unqual
+                   {OccName: MkD5}))
+                 [])
+                (L
+                 (TokenLoc
+                  (EpaSpan { T17544.hs:25:10-11 }))
+                 (HsNormalTok))
+                (L
+                 (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:25:13-18 })
+                 (HsOuterImplicit
+                  (NoExtField)))
+                (Nothing)
+                (PrefixConGADT
+                 [])
+                (L
+                 (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:25:13-18 })
+                 (HsAppTy
+                  (NoExtField)
+                  (L
+                   (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:25:13-14 })
+                   (HsTyVar
+                    (EpAnn
+                     (Anchor
+                      { T17544.hs:25:13-14 }
+                      (UnchangedAnchor))
+                     []
+                     (EpaComments
+                      []))
+                    (NotPromoted)
+                    (L
+                     (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:25:13-14 })
+                     (Unqual
+                      {OccName: D5}))))
+                  (L
+                   (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:25:16-18 })
+                   (HsTyVar
+                    (EpAnn
+                     (Anchor
+                      { T17544.hs:25:16-18 }
+                      (UnchangedAnchor))
+                     []
+                     (EpaComments
+                      []))
+                    (NotPromoted)
+                    (L
+                     (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:25:16-18 })
+                     (Unqual
+                      {OccName: Int}))))))
+                (Nothing)))])
             []))))]
        (Nothing)))))
   ,(L
@@ -1102,70 +1104,72 @@
            (Prefix)
            (HsDataDefn
             (NoExtField)
-            (DataType)
             (Nothing)
             (Nothing)
             (Nothing)
-            [(L
-              (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:31:5-18 })
-              (ConDeclGADT
-               (EpAnn
-                (Anchor
-                 { T17544.hs:31:5-18 }
-                 (UnchangedAnchor))
-                []
-                (EpaComments
-                 []))
-               [(L
-                 (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:31:5-8 })
-                 (Unqual
-                  {OccName: MkD6}))]
-               (L
-                (TokenLoc
-                 (EpaSpan { T17544.hs:31:10-11 }))
-                (HsNormalTok))
-               (L
-                (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:31:13-18 })
-                (HsOuterImplicit
-                 (NoExtField)))
-               (Nothing)
-               (PrefixConGADT
-                [])
-               (L
-                (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:31:13-18 })
-                (HsAppTy
-                 (NoExtField)
+            (DataTypeCons
+             [(L
+               (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:31:5-18 })
+               (ConDeclGADT
+                (EpAnn
+                 (Anchor
+                  { T17544.hs:31:5-18 }
+                  (UnchangedAnchor))
+                 []
+                 (EpaComments
+                  []))
+                (:|
                  (L
-                  (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:31:13-14 })
-                  (HsTyVar
-                   (EpAnn
-                    (Anchor
-                     { T17544.hs:31:13-14 }
-                     (UnchangedAnchor))
-                    []
-                    (EpaComments
-                     []))
-                   (NotPromoted)
-                   (L
-                    (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:31:13-14 })
-                    (Unqual
-                     {OccName: D6}))))
-                 (L
-                  (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:31:16-18 })
-                  (HsTyVar
-                   (EpAnn
-                    (Anchor
-                     { T17544.hs:31:16-18 }
-                     (UnchangedAnchor))
-                    []
-                    (EpaComments
-                     []))
-                   (NotPromoted)
-                   (L
-                    (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:31:16-18 })
-                    (Unqual
-                     {OccName: Int}))))))
-               (Nothing)))]
+                  (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:31:5-8 })
+                  (Unqual
+                   {OccName: MkD6}))
+                 [])
+                (L
+                 (TokenLoc
+                  (EpaSpan { T17544.hs:31:10-11 }))
+                 (HsNormalTok))
+                (L
+                 (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:31:13-18 })
+                 (HsOuterImplicit
+                  (NoExtField)))
+                (Nothing)
+                (PrefixConGADT
+                 [])
+                (L
+                 (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:31:13-18 })
+                 (HsAppTy
+                  (NoExtField)
+                  (L
+                   (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:31:13-14 })
+                   (HsTyVar
+                    (EpAnn
+                     (Anchor
+                      { T17544.hs:31:13-14 }
+                      (UnchangedAnchor))
+                     []
+                     (EpaComments
+                      []))
+                    (NotPromoted)
+                    (L
+                     (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:31:13-14 })
+                     (Unqual
+                      {OccName: D6}))))
+                  (L
+                   (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:31:16-18 })
+                   (HsTyVar
+                    (EpAnn
+                     (Anchor
+                      { T17544.hs:31:16-18 }
+                      (UnchangedAnchor))
+                     []
+                     (EpaComments
+                      []))
+                    (NotPromoted)
+                    (L
+                     (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:31:16-18 })
+                     (Unqual
+                      {OccName: Int}))))))
+                (Nothing)))])
             []))))]
        (Nothing)))))
   ,(L
@@ -1368,70 +1372,72 @@
            (Prefix)
            (HsDataDefn
             (NoExtField)
-            (DataType)
             (Nothing)
             (Nothing)
             (Nothing)
-            [(L
-              (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:37:5-18 })
-              (ConDeclGADT
-               (EpAnn
-                (Anchor
-                 { T17544.hs:37:5-18 }
-                 (UnchangedAnchor))
-                []
-                (EpaComments
-                 []))
-               [(L
-                 (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:37:5-8 })
-                 (Unqual
-                  {OccName: MkD7}))]
-               (L
-                (TokenLoc
-                 (EpaSpan { T17544.hs:37:10-11 }))
-                (HsNormalTok))
-               (L
-                (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:37:13-18 })
-                (HsOuterImplicit
-                 (NoExtField)))
-               (Nothing)
-               (PrefixConGADT
-                [])
-               (L
-                (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:37:13-18 })
-                (HsAppTy
-                 (NoExtField)
+            (DataTypeCons
+             [(L
+               (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:37:5-18 })
+               (ConDeclGADT
+                (EpAnn
+                 (Anchor
+                  { T17544.hs:37:5-18 }
+                  (UnchangedAnchor))
+                 []
+                 (EpaComments
+                  []))
+                (:|
                  (L
-                  (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:37:13-14 })
-                  (HsTyVar
-                   (EpAnn
-                    (Anchor
-                     { T17544.hs:37:13-14 }
-                     (UnchangedAnchor))
-                    []
-                    (EpaComments
-                     []))
-                   (NotPromoted)
-                   (L
-                    (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:37:13-14 })
-                    (Unqual
-                     {OccName: D7}))))
-                 (L
-                  (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:37:16-18 })
-                  (HsTyVar
-                   (EpAnn
-                    (Anchor
-                     { T17544.hs:37:16-18 }
-                     (UnchangedAnchor))
-                    []
-                    (EpaComments
-                     []))
-                   (NotPromoted)
-                   (L
-                    (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:37:16-18 })
-                    (Unqual
-                     {OccName: Int}))))))
-               (Nothing)))]
+                  (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:37:5-8 })
+                  (Unqual
+                   {OccName: MkD7}))
+                 [])
+                (L
+                 (TokenLoc
+                  (EpaSpan { T17544.hs:37:10-11 }))
+                 (HsNormalTok))
+                (L
+                 (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:37:13-18 })
+                 (HsOuterImplicit
+                  (NoExtField)))
+                (Nothing)
+                (PrefixConGADT
+                 [])
+                (L
+                 (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:37:13-18 })
+                 (HsAppTy
+                  (NoExtField)
+                  (L
+                   (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:37:13-14 })
+                   (HsTyVar
+                    (EpAnn
+                     (Anchor
+                      { T17544.hs:37:13-14 }
+                      (UnchangedAnchor))
+                     []
+                     (EpaComments
+                      []))
+                    (NotPromoted)
+                    (L
+                     (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:37:13-14 })
+                     (Unqual
+                      {OccName: D7}))))
+                  (L
+                   (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:37:16-18 })
+                   (HsTyVar
+                    (EpAnn
+                     (Anchor
+                      { T17544.hs:37:16-18 }
+                      (UnchangedAnchor))
+                     []
+                     (EpaComments
+                      []))
+                    (NotPromoted)
+                    (L
+                     (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:37:16-18 })
+                     (Unqual
+                      {OccName: Int}))))))
+                (Nothing)))])
             []))))]
        (Nothing)))))
   ,(L
@@ -1634,70 +1640,72 @@
            (Prefix)
            (HsDataDefn
             (NoExtField)
-            (DataType)
             (Nothing)
             (Nothing)
             (Nothing)
-            [(L
-              (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:43:5-18 })
-              (ConDeclGADT
-               (EpAnn
-                (Anchor
-                 { T17544.hs:43:5-18 }
-                 (UnchangedAnchor))
-                []
-                (EpaComments
-                 []))
-               [(L
-                 (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:43:5-8 })
-                 (Unqual
-                  {OccName: MkD8}))]
-               (L
-                (TokenLoc
-                 (EpaSpan { T17544.hs:43:10-11 }))
-                (HsNormalTok))
-               (L
-                (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:43:13-18 })
-                (HsOuterImplicit
-                 (NoExtField)))
-               (Nothing)
-               (PrefixConGADT
-                [])
-               (L
-                (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:43:13-18 })
-                (HsAppTy
-                 (NoExtField)
+            (DataTypeCons
+             [(L
+               (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:43:5-18 })
+               (ConDeclGADT
+                (EpAnn
+                 (Anchor
+                  { T17544.hs:43:5-18 }
+                  (UnchangedAnchor))
+                 []
+                 (EpaComments
+                  []))
+                (:|
                  (L
-                  (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:43:13-14 })
-                  (HsTyVar
-                   (EpAnn
-                    (Anchor
-                     { T17544.hs:43:13-14 }
-                     (UnchangedAnchor))
-                    []
-                    (EpaComments
-                     []))
-                   (NotPromoted)
-                   (L
-                    (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:43:13-14 })
-                    (Unqual
-                     {OccName: D8}))))
-                 (L
-                  (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:43:16-18 })
-                  (HsTyVar
-                   (EpAnn
-                    (Anchor
-                     { T17544.hs:43:16-18 }
-                     (UnchangedAnchor))
-                    []
-                    (EpaComments
-                     []))
-                   (NotPromoted)
-                   (L
-                    (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:43:16-18 })
-                    (Unqual
-                     {OccName: Int}))))))
-               (Nothing)))]
+                  (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:43:5-8 })
+                  (Unqual
+                   {OccName: MkD8}))
+                 [])
+                (L
+                 (TokenLoc
+                  (EpaSpan { T17544.hs:43:10-11 }))
+                 (HsNormalTok))
+                (L
+                 (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:43:13-18 })
+                 (HsOuterImplicit
+                  (NoExtField)))
+                (Nothing)
+                (PrefixConGADT
+                 [])
+                (L
+                 (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:43:13-18 })
+                 (HsAppTy
+                  (NoExtField)
+                  (L
+                   (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:43:13-14 })
+                   (HsTyVar
+                    (EpAnn
+                     (Anchor
+                      { T17544.hs:43:13-14 }
+                      (UnchangedAnchor))
+                     []
+                     (EpaComments
+                      []))
+                    (NotPromoted)
+                    (L
+                     (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:43:13-14 })
+                     (Unqual
+                      {OccName: D8}))))
+                  (L
+                   (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:43:16-18 })
+                   (HsTyVar
+                    (EpAnn
+                     (Anchor
+                      { T17544.hs:43:16-18 }
+                      (UnchangedAnchor))
+                     []
+                     (EpaComments
+                      []))
+                    (NotPromoted)
+                    (L
+                     (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:43:16-18 })
+                     (Unqual
+                      {OccName: Int}))))))
+                (Nothing)))])
             []))))]
        (Nothing)))))
   ,(L
@@ -1900,70 +1908,72 @@
            (Prefix)
            (HsDataDefn
             (NoExtField)
-            (DataType)
             (Nothing)
             (Nothing)
             (Nothing)
-            [(L
-              (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:49:5-18 })
-              (ConDeclGADT
-               (EpAnn
-                (Anchor
-                 { T17544.hs:49:5-18 }
-                 (UnchangedAnchor))
-                []
-                (EpaComments
-                 []))
-               [(L
-                 (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:49:5-8 })
-                 (Unqual
-                  {OccName: MkD9}))]
-               (L
-                (TokenLoc
-                 (EpaSpan { T17544.hs:49:10-11 }))
-                (HsNormalTok))
-               (L
-                (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:49:13-18 })
-                (HsOuterImplicit
-                 (NoExtField)))
-               (Nothing)
-               (PrefixConGADT
-                [])
-               (L
-                (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:49:13-18 })
-                (HsAppTy
-                 (NoExtField)
+            (DataTypeCons
+             [(L
+               (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:49:5-18 })
+               (ConDeclGADT
+                (EpAnn
+                 (Anchor
+                  { T17544.hs:49:5-18 }
+                  (UnchangedAnchor))
+                 []
+                 (EpaComments
+                  []))
+                (:|
                  (L
-                  (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:49:13-14 })
-                  (HsTyVar
-                   (EpAnn
-                    (Anchor
-                     { T17544.hs:49:13-14 }
-                     (UnchangedAnchor))
-                    []
-                    (EpaComments
-                     []))
-                   (NotPromoted)
-                   (L
-                    (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:49:13-14 })
-                    (Unqual
-                     {OccName: D9}))))
-                 (L
-                  (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:49:16-18 })
-                  (HsTyVar
-                   (EpAnn
-                    (Anchor
-                     { T17544.hs:49:16-18 }
-                     (UnchangedAnchor))
-                    []
-                    (EpaComments
-                     []))
-                   (NotPromoted)
-                   (L
-                    (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:49:16-18 })
-                    (Unqual
-                     {OccName: Int}))))))
-               (Nothing)))]
+                  (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:49:5-8 })
+                  (Unqual
+                   {OccName: MkD9}))
+                 [])
+                (L
+                 (TokenLoc
+                  (EpaSpan { T17544.hs:49:10-11 }))
+                 (HsNormalTok))
+                (L
+                 (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:49:13-18 })
+                 (HsOuterImplicit
+                  (NoExtField)))
+                (Nothing)
+                (PrefixConGADT
+                 [])
+                (L
+                 (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:49:13-18 })
+                 (HsAppTy
+                  (NoExtField)
+                  (L
+                   (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:49:13-14 })
+                   (HsTyVar
+                    (EpAnn
+                     (Anchor
+                      { T17544.hs:49:13-14 }
+                      (UnchangedAnchor))
+                     []
+                     (EpaComments
+                      []))
+                    (NotPromoted)
+                    (L
+                     (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:49:13-14 })
+                     (Unqual
+                      {OccName: D9}))))
+                  (L
+                   (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:49:16-18 })
+                   (HsTyVar
+                    (EpAnn
+                     (Anchor
+                      { T17544.hs:49:16-18 }
+                      (UnchangedAnchor))
+                     []
+                     (EpaComments
+                      []))
+                    (NotPromoted)
+                    (L
+                     (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:49:16-18 })
+                     (Unqual
+                      {OccName: Int}))))))
+                (Nothing)))])
             []))))]
        (Nothing)))))
   ,(L
@@ -2166,70 +2176,72 @@
            (Prefix)
            (HsDataDefn
             (NoExtField)
-            (DataType)
             (Nothing)
             (Nothing)
             (Nothing)
-            [(L
-              (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:55:5-20 })
-              (ConDeclGADT
-               (EpAnn
-                (Anchor
-                 { T17544.hs:55:5-20 }
-                 (UnchangedAnchor))
-                []
-                (EpaComments
-                 []))
-               [(L
-                 (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:55:5-9 })
-                 (Unqual
-                  {OccName: MkD10}))]
-               (L
-                (TokenLoc
-                 (EpaSpan { T17544.hs:55:11-12 }))
-                (HsNormalTok))
-               (L
-                (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:55:14-20 })
-                (HsOuterImplicit
-                 (NoExtField)))
-               (Nothing)
-               (PrefixConGADT
-                [])
-               (L
-                (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:55:14-20 })
-                (HsAppTy
-                 (NoExtField)
+            (DataTypeCons
+             [(L
+               (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:55:5-20 })
+               (ConDeclGADT
+                (EpAnn
+                 (Anchor
+                  { T17544.hs:55:5-20 }
+                  (UnchangedAnchor))
+                 []
+                 (EpaComments
+                  []))
+                (:|
                  (L
-                  (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:55:14-16 })
-                  (HsTyVar
-                   (EpAnn
-                    (Anchor
-                     { T17544.hs:55:14-16 }
-                     (UnchangedAnchor))
-                    []
-                    (EpaComments
-                     []))
-                   (NotPromoted)
-                   (L
-                    (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:55:14-16 })
-                    (Unqual
-                     {OccName: D10}))))
-                 (L
-                  (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:55:18-20 })
-                  (HsTyVar
-                   (EpAnn
-                    (Anchor
-                     { T17544.hs:55:18-20 }
-                     (UnchangedAnchor))
-                    []
-                    (EpaComments
-                     []))
-                   (NotPromoted)
-                   (L
-                    (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:55:18-20 })
-                    (Unqual
-                     {OccName: Int}))))))
-               (Nothing)))]
+                  (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:55:5-9 })
+                  (Unqual
+                   {OccName: MkD10}))
+                 [])
+                (L
+                 (TokenLoc
+                  (EpaSpan { T17544.hs:55:11-12 }))
+                 (HsNormalTok))
+                (L
+                 (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:55:14-20 })
+                 (HsOuterImplicit
+                  (NoExtField)))
+                (Nothing)
+                (PrefixConGADT
+                 [])
+                (L
+                 (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:55:14-20 })
+                 (HsAppTy
+                  (NoExtField)
+                  (L
+                   (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:55:14-16 })
+                   (HsTyVar
+                    (EpAnn
+                     (Anchor
+                      { T17544.hs:55:14-16 }
+                      (UnchangedAnchor))
+                     []
+                     (EpaComments
+                      []))
+                    (NotPromoted)
+                    (L
+                     (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:55:14-16 })
+                     (Unqual
+                      {OccName: D10}))))
+                  (L
+                   (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:55:18-20 })
+                   (HsTyVar
+                    (EpAnn
+                     (Anchor
+                      { T17544.hs:55:18-20 }
+                      (UnchangedAnchor))
+                     []
+                     (EpaComments
+                      []))
+                    (NotPromoted)
+                    (L
+                     (SrcSpanAnn (EpAnnNotUsed) { T17544.hs:55:18-20 })
+                     (Unqual
+                      {OccName: Int}))))))
+                (Nothing)))])
             []))))]
        (Nothing)))))
   ,(L

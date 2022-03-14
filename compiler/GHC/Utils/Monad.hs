@@ -161,8 +161,9 @@ mapSndM :: (Applicative m, Traversable f) => (b -> m c) -> f (a,b) -> m (f (a,c)
 mapSndM = traverse . traverse
 
 -- | Monadic version of concatMap
-concatMapM :: Monad m => (a -> m [b]) -> [a] -> m [b]
+concatMapM :: (Monad m, Traversable f) => (a -> m [b]) -> f a -> m [b]
 concatMapM f xs = liftM concat (mapM f xs)
+{-# SPECIALIZE concatMapM :: (Monad m) => (a -> m [b]) -> [a] -> m [b] #-}
 
 -- | Applicative version of mapMaybe
 mapMaybeM :: Applicative m => (a -> m (Maybe b)) -> [a] -> m [b]

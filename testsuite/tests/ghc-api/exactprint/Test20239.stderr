@@ -107,219 +107,219 @@
         (Prefix)
         (HsDataDefn
          (NoExtField)
-         (DataType)
          (Nothing)
          (Nothing)
          (Nothing)
-         [(L
-           (SrcSpanAnn (EpAnn
-                        (Anchor
-                         { Test20239.hs:4:36-55 }
-                         (UnchangedAnchor))
-                        (AnnListItem
-                         [(AddVbarAnn
-                           (EpaSpan { Test20239.hs:6:34 }))])
-                        (EpaComments
-                         [])) { Test20239.hs:4:36-55 })
-           (ConDeclH98
-            (EpAnn
-             (Anchor
-              { Test20239.hs:4:36-55 }
-              (UnchangedAnchor))
+         (DataTypeCons
+          [(L
+            (SrcSpanAnn (EpAnn
+                         (Anchor
+                          { Test20239.hs:4:36-55 }
+                          (UnchangedAnchor))
+                         (AnnListItem
+                          [(AddVbarAnn
+                            (EpaSpan { Test20239.hs:6:34 }))])
+                         (EpaComments
+                          [])) { Test20239.hs:4:36-55 })
+            (ConDeclH98
+             (EpAnn
+              (Anchor
+               { Test20239.hs:4:36-55 }
+               (UnchangedAnchor))
+              []
+              (EpaComments
+               []))
+             (L
+              (SrcSpanAnn (EpAnnNotUsed) { Test20239.hs:4:36-49 })
+              (Unqual
+               {OccName: MigrationQuery}))
+             (False)
              []
-             (EpaComments
-              []))
-            (L
-             (SrcSpanAnn (EpAnnNotUsed) { Test20239.hs:4:36-49 })
-             (Unqual
-              {OccName: MigrationQuery}))
-            (False)
-            []
-            (Nothing)
-            (PrefixCon
+             (Nothing)
+             (PrefixCon
+              []
+              [(HsScaled
+                (HsLinearArrow
+                 (HsPct1
+                  (L
+                   (NoTokenLoc)
+                   (HsTok))
+                  (L
+                   (NoTokenLoc)
+                   (HsNormalTok))))
+                (L
+                 (SrcSpanAnn (EpAnnNotUsed) { Test20239.hs:4:51-55 })
+                 (HsTyVar
+                  (EpAnn
+                   (Anchor
+                    { Test20239.hs:4:51-55 }
+                    (UnchangedAnchor))
+                   []
+                   (EpaComments
+                    []))
+                  (NotPromoted)
+                  (L
+                   (SrcSpanAnn (EpAnnNotUsed) { Test20239.hs:4:51-55 })
+                   (Unqual
+                    {OccName: Query})))))])
+             (Nothing)))
+          ,(L
+            (SrcSpanAnn (EpAnnNotUsed) { Test20239.hs:6:36-86 })
+            (ConDeclH98
+             (EpAnn
+              (Anchor
+               { Test20239.hs:6:36-86 }
+               (UnchangedAnchor))
+              []
+              (EpaComments
+               []))
+             (L
+              (SrcSpanAnn (EpAnnNotUsed) { Test20239.hs:6:36-48 })
+              (Unqual
+               {OccName: MigrationCode}))
+             (False)
              []
-             [(HsScaled
-               (HsLinearArrow
-                (HsPct1
-                 (L
-                  (NoTokenLoc)
-                  (HsTok))
-                 (L
-                  (NoTokenLoc)
-                  (HsNormalTok))))
-               (L
-                (SrcSpanAnn (EpAnnNotUsed) { Test20239.hs:4:51-55 })
-                (HsTyVar
-                 (EpAnn
-                  (Anchor
-                   { Test20239.hs:4:51-55 }
-                   (UnchangedAnchor))
-                  []
-                  (EpaComments
-                   []))
-                 (NotPromoted)
-                 (L
-                  (SrcSpanAnn (EpAnnNotUsed) { Test20239.hs:4:51-55 })
-                  (Unqual
-                   {OccName: Query})))))])
-            (Nothing)))
-         ,(L
-           (SrcSpanAnn (EpAnnNotUsed) { Test20239.hs:6:36-86 })
-           (ConDeclH98
-            (EpAnn
-             (Anchor
-              { Test20239.hs:6:36-86 }
-              (UnchangedAnchor))
-             []
-             (EpaComments
-              []))
-            (L
-             (SrcSpanAnn (EpAnnNotUsed) { Test20239.hs:6:36-48 })
-             (Unqual
-              {OccName: MigrationCode}))
-            (False)
-            []
-            (Nothing)
-            (PrefixCon
-             []
-             [(HsScaled
-               (HsLinearArrow
-                (HsPct1
-                 (L
-                  (NoTokenLoc)
-                  (HsTok))
-                 (L
-                  (NoTokenLoc)
-                  (HsNormalTok))))
-               (L
-                (SrcSpanAnn (EpAnnNotUsed) { Test20239.hs:6:50-86 })
-                (HsParTy
-                 (EpAnn
-                  (Anchor
-                   { Test20239.hs:6:50 }
-                   (UnchangedAnchor))
-                  (AnnParen
-                   (AnnParens)
-                   (EpaSpan { Test20239.hs:6:50 })
-                   (EpaSpan { Test20239.hs:6:86 }))
-                  (EpaComments
-                   []))
-                 (L
-                  (SrcSpanAnn (EpAnnNotUsed) { Test20239.hs:6:51-85 })
-                  (HsFunTy
-                   (EpAnn
-                    (Anchor
-                     { Test20239.hs:6:51-60 }
-                     (UnchangedAnchor))
-                    (NoEpAnns)
-                    (EpaComments
-                     []))
-                   (HsUnrestrictedArrow
+             (Nothing)
+             (PrefixCon
+              []
+              [(HsScaled
+                (HsLinearArrow
+                 (HsPct1
+                  (L
+                   (NoTokenLoc)
+                   (HsTok))
+                  (L
+                   (NoTokenLoc)
+                   (HsNormalTok))))
+                (L
+                 (SrcSpanAnn (EpAnnNotUsed) { Test20239.hs:6:50-86 })
+                 (HsParTy
+                  (EpAnn
+                   (Anchor
+                    { Test20239.hs:6:50 }
+                    (UnchangedAnchor))
+                   (AnnParen
+                    (AnnParens)
+                    (EpaSpan { Test20239.hs:6:50 })
+                    (EpaSpan { Test20239.hs:6:86 }))
+                   (EpaComments
+                    []))
+                  (L
+                   (SrcSpanAnn (EpAnnNotUsed) { Test20239.hs:6:51-85 })
+                   (HsFunTy
+                    (EpAnn
+                     (Anchor
+                      { Test20239.hs:6:51-60 }
+                      (UnchangedAnchor))
+                     (NoEpAnns)
+                     (EpaComments
+                      []))
+                    (HsUnrestrictedArrow
+                     (L
+                      (TokenLoc
+                       (EpaSpan { Test20239.hs:6:62-63 }))
+                      (HsNormalTok)))
                     (L
-                     (TokenLoc
-                      (EpaSpan { Test20239.hs:6:62-63 }))
-                     (HsNormalTok)))
-                   (L
-                    (SrcSpanAnn (EpAnnNotUsed) { Test20239.hs:6:51-60 })
-                    (HsTyVar
-                     (EpAnn
-                      (Anchor
-                       { Test20239.hs:6:51-60 }
-                       (UnchangedAnchor))
-                      []
-                      (EpaComments
-                       []))
-                     (NotPromoted)
-                     (L
-                      (SrcSpanAnn (EpAnnNotUsed) { Test20239.hs:6:51-60 })
-                      (Unqual
-                       {OccName: Connection}))))
-                   (L
-                    (SrcSpanAnn (EpAnnNotUsed) { Test20239.hs:6:65-85 })
-                    (HsAppTy
-                     (NoExtField)
-                     (L
-                      (SrcSpanAnn (EpAnnNotUsed) { Test20239.hs:6:65-66 })
-                      (HsTyVar
-                       (EpAnn
-                        (Anchor
-                         { Test20239.hs:6:65-66 }
-                         (UnchangedAnchor))
-                        []
-                        (EpaComments
-                         []))
-                       (NotPromoted)
-                       (L
-                        (SrcSpanAnn (EpAnnNotUsed) { Test20239.hs:6:65-66 })
-                        (Unqual
-                         {OccName: IO}))))
-                     (L
-                      (SrcSpanAnn (EpAnnNotUsed) { Test20239.hs:6:68-85 })
-                      (HsParTy
-                       (EpAnn
-                        (Anchor
-                         { Test20239.hs:6:68 }
-                         (UnchangedAnchor))
-                        (AnnParen
-                         (AnnParens)
-                         (EpaSpan { Test20239.hs:6:68 })
-                         (EpaSpan { Test20239.hs:6:85 }))
-                        (EpaComments
-                         []))
-                       (L
-                        (SrcSpanAnn (EpAnnNotUsed) { Test20239.hs:6:69-84 })
-                        (HsAppTy
-                         (NoExtField)
-                         (L
-                          (SrcSpanAnn (EpAnnNotUsed) { Test20239.hs:6:69-81 })
-                          (HsAppTy
-                           (NoExtField)
-                           (L
-                            (SrcSpanAnn (EpAnnNotUsed) { Test20239.hs:6:69-74 })
-                            (HsTyVar
-                             (EpAnn
-                              (Anchor
-                               { Test20239.hs:6:69-74 }
-                               (UnchangedAnchor))
-                              []
-                              (EpaComments
-                               []))
-                             (NotPromoted)
-                             (L
-                              (SrcSpanAnn (EpAnnNotUsed) { Test20239.hs:6:69-74 })
-                              (Unqual
-                               {OccName: Either}))))
-                           (L
-                            (SrcSpanAnn (EpAnnNotUsed) { Test20239.hs:6:76-81 })
-                            (HsTyVar
-                             (EpAnn
-                              (Anchor
-                               { Test20239.hs:6:76-81 }
-                               (UnchangedAnchor))
-                              []
-                              (EpaComments
-                               []))
-                             (NotPromoted)
-                             (L
-                              (SrcSpanAnn (EpAnnNotUsed) { Test20239.hs:6:76-81 })
-                              (Unqual
-                               {OccName: String}))))))
-                         (L
-                          (SrcSpanAnn (EpAnnNotUsed) { Test20239.hs:6:83-84 })
-                          (HsTupleTy
-                           (EpAnn
-                            (Anchor
-                             { Test20239.hs:6:83 }
-                             (UnchangedAnchor))
-                            (AnnParen
-                             (AnnParens)
-                             (EpaSpan { Test20239.hs:6:83 })
-                             (EpaSpan { Test20239.hs:6:84 }))
-                            (EpaComments
-                             []))
-                           (HsBoxedOrConstraintTuple)
-                           [])))))))))))))])
-            (Nothing)))]
+                     (SrcSpanAnn (EpAnnNotUsed) { Test20239.hs:6:51-60 })
+                     (HsTyVar
+                      (EpAnn
+                       (Anchor
+                        { Test20239.hs:6:51-60 }
+                        (UnchangedAnchor))
+                       []
+                       (EpaComments
+                        []))
+                      (NotPromoted)
+                      (L
+                       (SrcSpanAnn (EpAnnNotUsed) { Test20239.hs:6:51-60 })
+                       (Unqual
+                        {OccName: Connection}))))
+                    (L
+                     (SrcSpanAnn (EpAnnNotUsed) { Test20239.hs:6:65-85 })
+                     (HsAppTy
+                      (NoExtField)
+                      (L
+                       (SrcSpanAnn (EpAnnNotUsed) { Test20239.hs:6:65-66 })
+                       (HsTyVar
+                        (EpAnn
+                         (Anchor
+                          { Test20239.hs:6:65-66 }
+                          (UnchangedAnchor))
+                         []
+                         (EpaComments
+                          []))
+                        (NotPromoted)
+                        (L
+                         (SrcSpanAnn (EpAnnNotUsed) { Test20239.hs:6:65-66 })
+                         (Unqual
+                          {OccName: IO}))))
+                      (L
+                       (SrcSpanAnn (EpAnnNotUsed) { Test20239.hs:6:68-85 })
+                       (HsParTy
+                        (EpAnn
+                         (Anchor
+                          { Test20239.hs:6:68 }
+                          (UnchangedAnchor))
+                         (AnnParen
+                          (AnnParens)
+                          (EpaSpan { Test20239.hs:6:68 })
+                          (EpaSpan { Test20239.hs:6:85 }))
+                         (EpaComments
+                          []))
+                        (L
+                         (SrcSpanAnn (EpAnnNotUsed) { Test20239.hs:6:69-84 })
+                         (HsAppTy
+                          (NoExtField)
+                          (L
+                           (SrcSpanAnn (EpAnnNotUsed) { Test20239.hs:6:69-81 })
+                           (HsAppTy
+                            (NoExtField)
+                            (L
+                             (SrcSpanAnn (EpAnnNotUsed) { Test20239.hs:6:69-74 })
+                             (HsTyVar
+                              (EpAnn
+                               (Anchor
+                                { Test20239.hs:6:69-74 }
+                                (UnchangedAnchor))
+                               []
+                               (EpaComments
+                                []))
+                              (NotPromoted)
+                              (L
+                               (SrcSpanAnn (EpAnnNotUsed) { Test20239.hs:6:69-74 })
+                               (Unqual
+                                {OccName: Either}))))
+                            (L
+                             (SrcSpanAnn (EpAnnNotUsed) { Test20239.hs:6:76-81 })
+                             (HsTyVar
+                              (EpAnn
+                               (Anchor
+                                { Test20239.hs:6:76-81 }
+                                (UnchangedAnchor))
+                               []
+                               (EpaComments
+                                []))
+                              (NotPromoted)
+                              (L
+                               (SrcSpanAnn (EpAnnNotUsed) { Test20239.hs:6:76-81 })
+                               (Unqual
+                                {OccName: String}))))))
+                          (L
+                           (SrcSpanAnn (EpAnnNotUsed) { Test20239.hs:6:83-84 })
+                           (HsTupleTy
+                            (EpAnn
+                             (Anchor
+                              { Test20239.hs:6:83 }
+                              (UnchangedAnchor))
+                             (AnnParen
+                              (AnnParens)
+                              (EpaSpan { Test20239.hs:6:83 })
+                              (EpaSpan { Test20239.hs:6:84 }))
+                             (EpaComments
+                              []))
+                            (HsBoxedOrConstraintTuple)
+                            [])))))))))))))])
+             (Nothing)))])
          []))))))]))
 
 

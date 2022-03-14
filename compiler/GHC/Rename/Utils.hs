@@ -37,7 +37,7 @@ module GHC.Rename.Utils (
 where
 
 
-import GHC.Prelude
+import GHC.Prelude hiding (unzip)
 
 import GHC.Core.Type
 import GHC.Hs
@@ -68,6 +68,7 @@ import GHC.Settings.Constants ( mAX_TUPLE_SIZE, mAX_CTUPLE_SIZE )
 import qualified Data.List.NonEmpty as NE
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Data.Bag
+import qualified Data.List as List
 
 {-
 *********************************************************
@@ -327,10 +328,17 @@ addFvRn :: FreeVars -> RnM (thing, FreeVars) -> RnM (thing, FreeVars)
 addFvRn fvs1 thing_inside = do { (res, fvs2) <- thing_inside
                                ; return (res, fvs1 `plusFV` fvs2) }
 
-mapFvRn :: (a -> RnM (b, FreeVars)) -> [a] -> RnM ([b], FreeVars)
-mapFvRn f xs = do stuff <- mapM f xs
-                  case unzip stuff of
-                      (ys, fvs_s) -> return (ys, plusFVs fvs_s)
+mapFvRn :: Traversable f => (a -> RnM (b, FreeVars)) -> f a -> RnM (f b, FreeVars)
+mapFvRn f xs = do
+    stuff <- mapM f xs
+    case unzip stuff of
+        (ys, fvs_s) -> return (ys, foldl' (flip plusFV) emptyFVs fvs_s)
+{-# SPECIALIZE mapFvRn :: (a -> RnM (b, FreeVars)) -> [a] -> RnM ([b], FreeVars) #-}
+
+unzip :: Functor f => f (a, b) -> (f a, f b)
+unzip = \ xs -> (fmap fst xs, fmap snd xs)
+{-# NOINLINE [1] unzip #-}
+{-# RULES "unzip/List" unzip = List.unzip #-}
 
 mapMaybeFvRn :: (a -> RnM (b, FreeVars)) -> Maybe a -> RnM (Maybe b, FreeVars)
 mapMaybeFvRn _ Nothing = return (Nothing, emptyFVs)

@@ -463,6 +463,8 @@ data PsMessage
 
    | PsErrInvalidCApiImport
 
+   | PsErrMultipleConForNewtype !RdrName !Int
+
    deriving Generic
 
 -- | Extra details about a parse error, which helps

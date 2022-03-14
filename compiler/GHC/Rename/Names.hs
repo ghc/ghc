@@ -96,6 +96,7 @@ import Data.Ord         ( comparing )
 import Data.List        ( partition, (\\), find, sortBy, groupBy, sortOn )
 import Data.Function    ( on )
 import qualified Data.Set as S
+import Data.Foldable    ( toList )
 import System.FilePath  ((</>))
 
 import System.IO
@@ -982,7 +983,7 @@ getLocalNonValBinders fixity_env
                                         , con_g_args = RecConGADT flds _ }))
             = [ ( find_con_name rdr
                  , concatMap find_con_decl_flds (unLoc flds))
-              | L _ rdr <- rdrs ]
+              | L _ rdr <- toList rdrs ]
 
         find_con_flds _ = []
 

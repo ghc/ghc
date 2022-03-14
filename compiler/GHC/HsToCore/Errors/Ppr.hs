@@ -114,8 +114,6 @@ instance Diagnostic DsMessage where
             | isTyVar b = text "type variable" <+> quotes (ppr b)
             | isEvVar b = text "constraint"    <+> quotes (ppr (varType b))
             | otherwise = text "variable"      <+> quotes (ppr b)
-    DsMultipleConForNewtype names
-      -> mkSimpleDecorated $ text "Multiple constructors for newtype:" <+> pprQuotedList names
     DsLazyPatCantBindVarsOfUnliftedType unlifted_bndrs
       -> mkSimpleDecorated $
           hang (text "A lazy (~) pattern cannot bind variables of unlifted type." $$
@@ -226,7 +224,6 @@ instance Diagnostic DsMessage where
     DsRuleLhsTooComplicated{}                   -> WarningWithoutFlag
     DsRuleIgnoredDueToConstructor{}             -> WarningWithoutFlag
     DsRuleBindersNotBound{}                     -> WarningWithoutFlag
-    DsMultipleConForNewtype{}                   -> ErrorWithoutFlag
     DsLazyPatCantBindVarsOfUnliftedType{}       -> ErrorWithoutFlag
     DsNotYetHandledByTH{}                       -> ErrorWithoutFlag
     DsAggregatedViewExpressions{}               -> WarningWithoutFlag
@@ -263,7 +260,6 @@ instance Diagnostic DsMessage where
     DsRuleLhsTooComplicated{}                   -> noHints
     DsRuleIgnoredDueToConstructor{}             -> noHints
     DsRuleBindersNotBound{}                     -> noHints
-    DsMultipleConForNewtype{}                   -> noHints
     DsLazyPatCantBindVarsOfUnliftedType{}       -> noHints
     DsNotYetHandledByTH{}                       -> noHints
     DsAggregatedViewExpressions{}               -> noHints

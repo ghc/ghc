@@ -27,7 +27,7 @@ module GHC.Hs.Decls (
   -- * Toplevel declarations
   HsDecl(..), LHsDecl, HsDataDefn(..), HsDeriving, LHsFunDep,
   HsDerivingClause(..), LHsDerivingClause, DerivClauseTys(..), LDerivClauseTys,
-  NewOrData(..), newOrDataToFlavour,
+  NewOrData, newOrDataToFlavour, anyLConIsGadt,
   StandaloneKindSig(..), LStandaloneKindSig, standaloneKindSigName,
 
   -- ** Class or type declarations
@@ -43,7 +43,8 @@ module GHC.Hs.Decls (
   tyClDeclLName, tyClDeclTyVars,
   hsDeclHasCusk, famResultKindSignature,
   FamilyDecl(..), LFamilyDecl,
-  FunDep(..),
+  FunDep(..), ppDataDefnHeader,
+  pp_vanilla_decl_head,
 
   -- ** Instance declarations
   InstDecl(..), LInstDecl, FamilyInfo(..),
@@ -132,6 +133,7 @@ import GHC.Types.ForeignCall
 import GHC.Data.Bag
 import GHC.Data.Maybe
 import Data.Data (Data)
+import Data.Foldable (toList)
 
 {-
 ************************************************************************
@@ -399,10 +401,10 @@ countTyClDecls decls
     count isNewTy        decls,  -- ...instances
     count isFamilyDecl   decls)
  where
-   isDataTy DataDecl{ tcdDataDefn = HsDataDefn { dd_ND = DataType } } = True
+   isDataTy DataDecl{ tcdDataDefn = HsDataDefn { dd_cons = DataTypeCons _ } } = True
    isDataTy _                                                       = False
 
-   isNewTy DataDecl{ tcdDataDefn = HsDataDefn { dd_ND = NewType } } = True
+   isNewTy DataDecl{ tcdDataDefn = HsDataDefn { dd_cons = NewTypeCon _ } } = True
    isNewTy _                                                      = False
 
 -- FIXME: tcdName is commonly used by both GHC and third-party tools, so it
@@ -501,8 +503,8 @@ pprTyClDeclFlavour (ClassDecl {})   = text "class"
 pprTyClDeclFlavour (SynDecl {})     = text "type"
 pprTyClDeclFlavour (FamDecl { tcdFam = FamilyDecl { fdInfo = info }})
   = pprFlavour info <+> text "family"
-pprTyClDeclFlavour (DataDecl { tcdDataDefn = HsDataDefn { dd_ND = nd } })
-  = ppr nd
+pprTyClDeclFlavour (DataDecl { tcdDataDefn = HsDataDefn { dd_cons = nd } })
+  = ppr (dataDefnConsNewOrData nd)
 
 instance OutputableBndrId p => Outputable (FunDep (GhcPass p)) where
   ppr = pprFunDep
@@ -665,9 +667,10 @@ type instance XConDeclH98  (GhcPass _) = EpAnn [AddEpAnn]
 
 type instance XXConDecl (GhcPass _) = DataConCantHappen
 
+-- Codomain could be 'NonEmpty', but at the moment all users need a list.
 getConNames :: ConDecl GhcRn -> [LocatedN Name]
 getConNames ConDeclH98  {con_name  = name}  = [name]
-getConNames ConDeclGADT {con_names = names} = names
+getConNames ConDeclGADT {con_names = names} = toList names
 
 -- | Return @'Just' fields@ if a data constructor declaration uses record
 -- syntax (i.e., 'RecCon'), where @fields@ are the field selectors.
@@ -685,21 +688,17 @@ hsConDeclTheta :: Maybe (LHsContext (GhcPass p)) -> [LHsType (GhcPass p)]
 hsConDeclTheta Nothing            = []
 hsConDeclTheta (Just (L _ theta)) = theta
 
-pp_data_defn :: (OutputableBndrId p)
-                  => (Maybe (LHsContext (GhcPass p)) -> SDoc)   -- Printing the header
-                  -> HsDataDefn (GhcPass p)
-                  -> SDoc
-pp_data_defn pp_hdr (HsDataDefn { dd_ND = new_or_data, dd_ctxt = context
-                                , dd_cType = mb_ct
-                                , dd_kindSig = mb_sig
-                                , dd_cons = condecls, dd_derivs = derivings })
-  | null condecls
-  = ppr new_or_data <+> pp_ct <+> pp_hdr context <+> pp_sig
-    <+> pp_derivings derivings
-
-  | otherwise
-  = hang (ppr new_or_data <+> pp_ct  <+> pp_hdr context <+> pp_sig)
-       2 (pp_condecls condecls $$ pp_derivings derivings)
+ppDataDefnHeader
+ :: (OutputableBndrId p)
+ => (Maybe (LHsContext (GhcPass p)) -> SDoc)   -- Printing the header
+ -> HsDataDefn (GhcPass p)
+ -> SDoc
+ppDataDefnHeader pp_hdr HsDataDefn
+  { dd_ctxt = context
+  , dd_cType = mb_ct
+  , dd_kindSig = mb_sig
+  , dd_cons = condecls }
+  = ppr (dataDefnConsNewOrData condecls) <+> pp_ct <+> pp_hdr context <+> pp_sig
   where
     pp_ct = case mb_ct of
                Nothing   -> empty
@@ -707,6 +706,20 @@ pp_data_defn pp_hdr (HsDataDefn { dd_ND = new_or_data, dd_ctxt = context
     pp_sig = case mb_sig of
                Nothing   -> empty
                Just kind -> dcolon <+> ppr kind
+
+pp_data_defn :: (OutputableBndrId p)
+                  => (Maybe (LHsContext (GhcPass p)) -> SDoc)   -- Printing the header
+                  -> HsDataDefn (GhcPass p)
+                  -> SDoc
+pp_data_defn pp_hdr defn@HsDataDefn
+  { dd_cons = condecls
+  , dd_derivs = derivings }
+  | null condecls
+  = ppDataDefnHeader pp_hdr defn <+> pp_derivings derivings
+
+  | otherwise
+  = hang (ppDataDefnHeader pp_hdr defn) 2 (pp_condecls (toList condecls) $$ pp_derivings derivings)
+  where
     pp_derivings ds = vcat (map ppr ds)
 
 instance OutputableBndrId p
@@ -720,15 +733,10 @@ instance OutputableBndrId p
 
 pp_condecls :: forall p. OutputableBndrId p => [LConDecl (GhcPass p)] -> SDoc
 pp_condecls cs
-  | gadt_syntax                  -- In GADT syntax
+  | anyLConIsGadt cs             -- In GADT syntax
   = hang (text "where") 2 (vcat (map ppr cs))
   | otherwise                    -- In H98 syntax
   = equals <+> sep (punctuate (text " |") (map ppr cs))
-  where
-    gadt_syntax = case cs of
-      []                      -> False
-      (L _ ConDeclH98{}  : _) -> False
-      (L _ ConDeclGADT{} : _) -> True
 
 instance (OutputableBndrId p) => Outputable (ConDecl (GhcPass p)) where
     ppr = pprConDecl
@@ -756,7 +764,7 @@ pprConDecl (ConDeclH98 { con_name = L _ con
 pprConDecl (ConDeclGADT { con_names = cons, con_bndrs = L _ outer_bndrs
                         , con_mb_cxt = mcxt, con_g_args = args
                         , con_res_ty = res_ty, con_doc = doc })
-  = pprMaybeWithDoc doc $ ppr_con_names cons <+> dcolon
+  = pprMaybeWithDoc doc $ ppr_con_names (toList cons) <+> dcolon
     <+> (sep [pprHsOuterSigTyVarBndrs outer_bndrs <+> pprLHsContext mcxt,
               sep (ppr_args args ++ [ppr res_ty]) ])
   where
@@ -850,9 +858,9 @@ pprDataFamInstDecl top_lvl (DataFamInstDecl { dfid_eqn =
                   -- pp_data_defn pretty-prints the kind sig. See #14817.
 
 pprDataFamInstFlavour :: DataFamInstDecl (GhcPass p) -> SDoc
-pprDataFamInstFlavour (DataFamInstDecl { dfid_eqn =
-                       (FamEqn { feqn_rhs = HsDataDefn { dd_ND = nd }})})
-  = ppr nd
+pprDataFamInstFlavour DataFamInstDecl
+  { dfid_eqn = FamEqn { feqn_rhs = HsDataDefn { dd_cons = cons }}}
+  = ppr (dataDefnConsNewOrData cons)
 
 pprHsFamInstLHS :: (OutputableBndrId p)
    => IdP (GhcPass p)
@@ -931,6 +939,14 @@ newOrDataToFlavour DataType = DataTypeFlavour
 instance Outputable NewOrData where
   ppr NewType  = text "newtype"
   ppr DataType = text "data"
+
+-- At the moment we only call this with @f = '[]'@ and @f = 'DataDefnCons'@.
+anyLConIsGadt :: Foldable f => f (GenLocated l (ConDecl pass)) -> Bool
+anyLConIsGadt xs = case toList xs of
+    L _ ConDeclGADT {} : _ -> True
+    _ -> False
+{-# SPECIALIZE anyLConIsGadt :: [GenLocated l (ConDecl pass)] -> Bool #-}
+{-# SPECIALIZE anyLConIsGadt :: DataDefnCons (GenLocated l (ConDecl pass)) -> Bool #-}
 
 {-
 ************************************************************************

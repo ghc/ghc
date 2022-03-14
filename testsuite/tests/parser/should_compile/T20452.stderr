@@ -98,31 +98,31 @@
       (Prefix)
       (HsDataDefn
        (NoExtField)
-       (DataType)
        (Nothing)
        (Nothing)
        (Nothing)
-       [(L
-         (SrcSpanAnn (EpAnnNotUsed) { T20452.hs:5:26-31 })
-         (ConDeclH98
-          (EpAnn
-           (Anchor
-            { T20452.hs:5:26-31 }
-            (UnchangedAnchor))
+       (DataTypeCons
+        [(L
+          (SrcSpanAnn (EpAnnNotUsed) { T20452.hs:5:26-31 })
+          (ConDeclH98
+           (EpAnn
+            (Anchor
+             { T20452.hs:5:26-31 }
+             (UnchangedAnchor))
+            []
+            (EpaComments
+             []))
+           (L
+            (SrcSpanAnn (EpAnnNotUsed) { T20452.hs:5:26-31 })
+            (Unqual
+             {OccName: Proxy1}))
+           (False)
            []
-           (EpaComments
-            []))
-          (L
-           (SrcSpanAnn (EpAnnNotUsed) { T20452.hs:5:26-31 })
-           (Unqual
-            {OccName: Proxy1}))
-          (False)
-          []
-          (Nothing)
-          (PrefixCon
-           []
-           [])
-          (Nothing)))]
+           (Nothing)
+           (PrefixCon
+            []
+            [])
+           (Nothing)))])
        []))))
   ,(L
     (SrcSpanAnn (EpAnn
@@ -187,31 +187,31 @@
       (Prefix)
       (HsDataDefn
        (NoExtField)
-       (DataType)
        (Nothing)
        (Nothing)
        (Nothing)
-       [(L
-         (SrcSpanAnn (EpAnnNotUsed) { T20452.hs:6:26-31 })
-         (ConDeclH98
-          (EpAnn
-           (Anchor
-            { T20452.hs:6:26-31 }
-            (UnchangedAnchor))
+       (DataTypeCons
+        [(L
+          (SrcSpanAnn (EpAnnNotUsed) { T20452.hs:6:26-31 })
+          (ConDeclH98
+           (EpAnn
+            (Anchor
+             { T20452.hs:6:26-31 }
+             (UnchangedAnchor))
+            []
+            (EpaComments
+             []))
+           (L
+            (SrcSpanAnn (EpAnnNotUsed) { T20452.hs:6:26-31 })
+            (Unqual
+             {OccName: Proxy2}))
+           (False)
            []
-           (EpaComments
-            []))
-          (L
-           (SrcSpanAnn (EpAnnNotUsed) { T20452.hs:6:26-31 })
-           (Unqual
-            {OccName: Proxy2}))
-          (False)
-          []
-          (Nothing)
-          (PrefixCon
-           []
-           [])
-          (Nothing)))]
+           (Nothing)
+           (PrefixCon
+            []
+            [])
+           (Nothing)))])
        []))))
   ,(L
     (SrcSpanAnn (EpAnn

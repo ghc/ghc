@@ -79,63 +79,65 @@
       (Prefix)
       (HsDataDefn
        (NoExtField)
-       (DataType)
        (Nothing)
        (Nothing)
        (Nothing)
-       [(L
-         (SrcSpanAnn (EpAnnNotUsed) { T17544_kw.hs:16:9-20 })
-         (ConDeclGADT
-          (EpAnn
-           (Anchor
-            { T17544_kw.hs:16:9-20 }
-            (UnchangedAnchor))
-           []
-           (EpaComments
-            []))
-          [(L
-            (SrcSpanAnn (EpAnnNotUsed) { T17544_kw.hs:16:9-13 })
-            (Unqual
-             {OccName: MkFoo}))]
-          (L
-           (TokenLoc
-            (EpaSpan { T17544_kw.hs:16:15-16 }))
-           (HsNormalTok))
-          (L
-           (SrcSpanAnn (EpAnnNotUsed) { T17544_kw.hs:16:18-20 })
-           (HsOuterImplicit
-            (NoExtField)))
-          (Nothing)
-          (PrefixConGADT
-           [])
-          (L
-           (SrcSpanAnn (EpAnnNotUsed) { T17544_kw.hs:16:18-20 })
-           (HsTyVar
-            (EpAnn
-             (Anchor
-              { T17544_kw.hs:16:18-20 }
-              (UnchangedAnchor))
-             []
-             (EpaComments
-              []))
-            (NotPromoted)
+       (DataTypeCons
+        [(L
+          (SrcSpanAnn (EpAnnNotUsed) { T17544_kw.hs:16:9-20 })
+          (ConDeclGADT
+           (EpAnn
+            (Anchor
+             { T17544_kw.hs:16:9-20 }
+             (UnchangedAnchor))
+            []
+            (EpaComments
+             []))
+           (:|
             (L
-             (SrcSpanAnn (EpAnnNotUsed) { T17544_kw.hs:16:18-20 })
+             (SrcSpanAnn (EpAnnNotUsed) { T17544_kw.hs:16:9-13 })
              (Unqual
-              {OccName: Foo}))))
-          (Just
+              {OccName: MkFoo}))
+            [])
            (L
-            { T17544_kw.hs:15:10-35 }
-            (WithHsDocIdentifiers
-             (MultiLineDocString
-              (HsDocStringNext)
-              (:|
-               (L
-                { T17544_kw.hs:15:14-35 }
-                (HsDocStringChunk
-                 " Bad comment for MkFoo"))
+            (TokenLoc
+             (EpaSpan { T17544_kw.hs:16:15-16 }))
+            (HsNormalTok))
+           (L
+            (SrcSpanAnn (EpAnnNotUsed) { T17544_kw.hs:16:18-20 })
+            (HsOuterImplicit
+             (NoExtField)))
+           (Nothing)
+           (PrefixConGADT
+            [])
+           (L
+            (SrcSpanAnn (EpAnnNotUsed) { T17544_kw.hs:16:18-20 })
+            (HsTyVar
+             (EpAnn
+              (Anchor
+               { T17544_kw.hs:16:18-20 }
+               (UnchangedAnchor))
+              []
+              (EpaComments
                []))
-             [])))))]
+             (NotPromoted)
+             (L
+              (SrcSpanAnn (EpAnnNotUsed) { T17544_kw.hs:16:18-20 })
+              (Unqual
+               {OccName: Foo}))))
+           (Just
+            (L
+             { T17544_kw.hs:15:10-35 }
+             (WithHsDocIdentifiers
+              (MultiLineDocString
+               (HsDocStringNext)
+               (:|
+                (L
+                 { T17544_kw.hs:15:14-35 }
+                 (HsDocStringChunk
+                  " Bad comment for MkFoo"))
+                []))
+              [])))))])
        []))))
   ,(L
     (SrcSpanAnn (EpAnn
@@ -167,11 +169,11 @@
       (Prefix)
       (HsDataDefn
        (NoExtField)
-       (NewType)
        (Nothing)
        (Nothing)
        (Nothing)
-       [(L
+       (NewTypeCon
+        (L
          (SrcSpanAnn (EpAnnNotUsed) { T17544_kw.hs:19:9-26 })
          (ConDeclGADT
           (EpAnn
@@ -181,10 +183,12 @@
            []
            (EpaComments
             []))
-          [(L
+          (:|
+           (L
             (SrcSpanAnn (EpAnnNotUsed) { T17544_kw.hs:19:9-13 })
             (Unqual
-             {OccName: MkBar}))]
+             {OccName: MkBar}))
+           [])
           (L
            (TokenLoc
             (EpaSpan { T17544_kw.hs:19:15-16 }))
@@ -250,7 +254,7 @@
                 (HsDocStringChunk
                  " Bad comment for MkBar"))
                []))
-             [])))))]
+             []))))))
        []))))
   ,(L
     (SrcSpanAnn (EpAnn

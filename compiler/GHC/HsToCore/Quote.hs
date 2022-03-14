@@ -98,6 +98,7 @@ import Data.List.NonEmpty ( NonEmpty(..) )
 import Data.Function
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Class
+import Data.Foldable ( toList )
 
 data MetaWrappers = MetaWrappers {
       -- Applies its argument to a type argument `m` and dictionary `Quote m`
@@ -517,17 +518,16 @@ repDataDefn :: Core TH.Name
             -> HsDataDefn GhcRn
             -> MetaM (Core (M TH.Dec))
 repDataDefn tc opts
-          (HsDataDefn { dd_ND = new_or_data, dd_ctxt = cxt, dd_kindSig = ksig
+          (HsDataDefn { dd_ctxt = cxt, dd_kindSig = ksig
                       , dd_cons = cons, dd_derivs = mb_derivs })
   = do { cxt1     <- repLContext cxt
        ; derivs1  <- repDerivs mb_derivs
-       ; case (new_or_data, cons) of
-           (NewType, [con])  -> do { con'  <- repC con
+       ; case cons of
+           NewTypeCon con  -> do { con'  <- repC con
                                    ; ksig' <- repMaybeLTy ksig
                                    ; repNewtype cxt1 tc opts ksig' con'
                                                 derivs1 }
-           (NewType, _) -> lift $ failWithDs (DsMultipleConForNewtype (getConNames $ unLoc $ head cons))
-           (DataType, _) -> do { ksig' <- repMaybeLTy ksig
+           DataTypeCons cons -> do { ksig' <- repMaybeLTy ksig
                                ; consL <- mapM repC cons
                                ; cons1 <- coreListM conTyConName consL
                                ; repData cxt1 tc opts ksig' cons1
@@ -2704,7 +2704,7 @@ repH98DataCon con details
              arg_vtys <- repRecConArgs ips
              rep2 recCName [unC con', unC arg_vtys]
 
-repGadtDataCons :: [LocatedN Name]
+repGadtDataCons :: NonEmpty (LocatedN Name)
                 -> HsConDeclGADTDetails GhcRn
                 -> LHsType GhcRn
                 -> MetaM (Core (M TH.Con))
@@ -2714,11 +2714,11 @@ repGadtDataCons cons details res_ty
            PrefixConGADT ps -> do
              arg_tys <- repPrefixConArgs ps
              res_ty' <- repLTy res_ty
-             rep2 gadtCName [ unC (nonEmptyCoreList cons'), unC arg_tys, unC res_ty']
+             rep2 gadtCName [ unC (nonEmptyCoreList' cons'), unC arg_tys, unC res_ty']
            RecConGADT ips _ -> do
              arg_vtys <- repRecConArgs ips
              res_ty'  <- repLTy res_ty
-             rep2 recGadtCName [unC (nonEmptyCoreList cons'), unC arg_vtys,
+             rep2 recGadtCName [unC (nonEmptyCoreList' cons'), unC arg_vtys,
                                 unC res_ty']
 
 -- TH currently only supports linear constructors.
@@ -3001,6 +3001,8 @@ nonEmptyCoreList :: [Core a] -> Core [a]
 nonEmptyCoreList []           = panic "coreList: empty argument"
 nonEmptyCoreList xs@(MkC x:_) = MkC (mkListExpr (exprType x) (map unC xs))
 
+nonEmptyCoreList' :: NonEmpty (Core a) -> Core [a]
+nonEmptyCoreList' xs@(MkC x:|_) = MkC (mkListExpr (exprType x) (toList $ fmap unC xs))
 
 coreStringLit :: MonadThings m => String -> m (Core String)
 coreStringLit s = do { z <- mkStringExpr s; return(MkC z) }

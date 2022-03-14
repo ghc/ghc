@@ -69,7 +69,9 @@ import qualified Data.ByteString as BS
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Data                  ( Data, Typeable )
+import Data.Foldable              ( toList )
 import Data.Functor.Identity      ( Identity(..) )
+import Data.List.NonEmpty         ( NonEmpty(..) )
 import Data.Void                  ( Void, absurd )
 import Control.Monad              ( forM_ )
 import Control.Monad.Trans.State.Strict
@@ -556,6 +558,9 @@ instance HasLoc a => HasLoc [a] where
   loc [] = noSrcSpan
   loc xs = foldl1' combineSrcSpans $ map loc xs
 
+instance HasLoc a => HasLoc (DataDefnCons a) where
+  loc = loc . toList
+
 instance (HasLoc a, HiePass p) => HasLoc (FamEqn (GhcPass p) a) where
   loc (FamEqn _ a outer_bndrs b _ c) = case outer_bndrs of
     HsOuterImplicit{} ->
@@ -587,6 +592,12 @@ instance ToHie Void where
   toHie v = absurd v
 
 instance (ToHie a) => ToHie [a] where
+  toHie = concatMapM toHie
+
+instance (ToHie a) => ToHie (NonEmpty a) where
+  toHie = concatMapM toHie
+
+instance (ToHie a) => ToHie (DataDefnCons a) where
   toHie = concatMapM toHie
 
 instance (ToHie a) => ToHie (Bag a) where
@@ -1474,8 +1485,8 @@ instance ToHie (LocatedA (TyClDecl GhcRn)) where
           quant_scope = mkLScopeA $ fromMaybe (noLocA []) $ dd_ctxt defn
           rhs_scope = sig_sc `combineScopes` con_sc `combineScopes` deriv_sc
           sig_sc = maybe NoScope mkLScopeA $ dd_kindSig defn
-          con_sc = foldr combineScopes NoScope $ map mkLScopeA $ dd_cons defn
-          deriv_sc = foldr combineScopes NoScope $ map mkLScopeA $ dd_derivs defn
+          con_sc = foldr combineScopes NoScope $ mkLScopeA <$> dd_cons defn
+          deriv_sc = foldr combineScopes NoScope $ mkLScopeA <$> dd_derivs defn
       ClassDecl { tcdCtxt = context
                 , tcdLName = name
                 , tcdTyVars = vars
@@ -1568,7 +1579,7 @@ instance ToHie (LocatedAn NoEpAnns (InjectivityAnn GhcRn)) where
         ]
 
 instance ToHie (HsDataDefn GhcRn) where
-  toHie (HsDataDefn _ _ ctx _ mkind cons derivs) = concatM
+  toHie (HsDataDefn _ ctx _ mkind cons derivs) = concatM
     [ toHie ctx
     , toHie mkind
     , toHie cons
@@ -1611,7 +1622,7 @@ instance ToHie (LocatedA (ConDecl GhcRn)) where
       ConDeclGADT { con_names = names, con_bndrs = L outer_bndrs_loc outer_bndrs
                   , con_mb_cxt = ctx, con_g_args = args, con_res_ty = typ
                   , con_doc = doc} ->
-        [ toHie $ map (C (Decl ConDec $ getRealSpanA span)) names
+        [ toHie $ C (Decl ConDec $ getRealSpanA span) <$> names
         , case outer_bndrs of
             HsOuterImplicit{hso_ximplicit = imp_vars} ->
               bindingsOnly $ map (C $ TyVarBind (mkScopeA outer_bndrs_loc) resScope)

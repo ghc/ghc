@@ -2,8 +2,10 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -30,7 +32,7 @@ module Language.Haskell.Syntax.Decls (
   -- * Toplevel declarations
   HsDecl(..), LHsDecl, HsDataDefn(..), HsDeriving, LHsFunDep, FunDep(..),
   HsDerivingClause(..), LHsDerivingClause, DerivClauseTys(..), LDerivClauseTys,
-  NewOrData(..),
+  NewOrData(..), DataDefnCons(..), dataDefnConsNewOrData,
   StandaloneKindSig(..), LStandaloneKindSig,
 
   -- ** Class or type declarations
@@ -118,6 +120,9 @@ import Data.Int
 import Data.Bool
 import Prelude (Show)
 import qualified Data.List
+import Data.Foldable
+import Data.Traversable
+import Data.List.NonEmpty (NonEmpty (..))
 
 {-
 ************************************************************************
@@ -873,7 +878,6 @@ data HsDataDefn pass   -- The payload of a data type defn
     --  data/newtype instance T [a] = <constrs>
     -- @
     HsDataDefn { dd_ext    :: XCHsDataDefn pass,
-                 dd_ND     :: NewOrData,
                  dd_ctxt   :: Maybe (LHsContext pass), -- ^ Context
                  dd_cType  :: Maybe (XRec pass CType),
                  dd_kindSig:: Maybe (LHsKind pass),
@@ -884,7 +888,7 @@ data HsDataDefn pass   -- The payload of a data type defn
                      --
                      -- Always @Nothing@ for H98-syntax decls
 
-                 dd_cons   :: [LConDecl pass],
+                 dd_cons   :: DataDefnCons (LConDecl pass),
                      -- ^ Data constructors
                      --
                      -- For @data T a = T1 | T2 a@
@@ -981,10 +985,22 @@ terms. However, partial standalone kind signatures are not a proper replacement
 for CUSKs, so this would be a separate feature.
 -}
 
+-- | When we only care whether a data-type declaration is `data` or `newtype`, but not what constructors it has
 data NewOrData
   = NewType                     -- ^ @newtype Blah ...@
   | DataType                    -- ^ @data Blah ...@
-  deriving( Eq, Data )                -- Needed because Demand derives Eq
+  deriving ( Eq, Data )                -- Needed because Demand derives Eq
+
+-- | Whether a data-type declaration is `data` or `newtype`, and its constructors
+data DataDefnCons a
+  = NewTypeCon a                     -- ^ @newtype Blah ...@
+  | DataTypeCons [a]                    -- ^ @data Blah ...@
+  deriving ( Eq, Data, Foldable, Functor, Traversable )                -- Needed because Demand derives Eq
+
+dataDefnConsNewOrData :: DataDefnCons a -> NewOrData
+dataDefnConsNewOrData = \ case
+    NewTypeCon _ -> NewType
+    DataTypeCons _ -> DataType
 
 -- | Located data Constructor Declaration
 type LConDecl pass = XRec pass (ConDecl pass)
@@ -1021,7 +1037,7 @@ type LConDecl pass = XRec pass (ConDecl pass)
 data ConDecl pass
   = ConDeclGADT
       { con_g_ext   :: XConDeclGADT pass
-      , con_names   :: [LIdP pass]
+      , con_names   :: NonEmpty (LIdP pass)
       , con_dcolon  :: !(LHsUniToken "::" "∷" pass)
       -- The following fields describe the type after the '::'
       -- See Note [GADT abstract syntax]

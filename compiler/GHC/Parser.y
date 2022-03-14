@@ -12,6 +12,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE LambdaCase #-}
 
 -- | This module provides the generated Happy parser for Haskell. It exports
 -- a number of parsers which may be used in any library that uses the GHC API.
@@ -1660,7 +1661,7 @@ pattern_synonym_sig :: { LSig GhcPs }
         : 'pattern' con_list '::' sigtype
                    {% acsA (\cs -> sLL $1 (reLoc $>)
                                 $ PatSynSig (EpAnn (glR $1) (AnnSig (mu AnnDcolon $3) [mj AnnPattern $1]) cs)
-                                  (unLoc $2) $4) }
+                                  (toList $ unLoc $2) $4) }
 
 qvarcon :: { LocatedN RdrName }
         : qvar                          { $1 }
@@ -3544,10 +3545,9 @@ con     :: { LocatedN RdrName }
                                          (NameAnn NameParens (glAA $1) (glNRR $2) (glAA $3) []) }
         | sysdcon               { L (getLoc $1) $ nameRdrName (dataConName (unLoc $1)) }
 
-con_list :: { Located [LocatedN RdrName] }
-con_list : con                  { sL1N $1 [$1] }
-         | con ',' con_list     {% do { h <- addTrailingCommaN $1 (gl $2)
-                                      ; return (sLL (reLocN $1) $> (h : unLoc $3)) }}
+con_list :: { Located (NonEmpty (LocatedN RdrName)) }
+con_list : con                  { sL1N $1 (pure $1) }
+         | con ',' con_list     {% sLL (reLocN $1) $> . (:| toList (unLoc $3)) <\$> addTrailingCommaN $1 (gl $2) }
 
 qcon_list :: { Located [LocatedN RdrName] }
 qcon_list : qcon                  { sL1N $1 [$1] }

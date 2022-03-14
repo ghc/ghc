@@ -503,6 +503,12 @@ instance Diagnostic PsMessage where
             ]
     PsErrInvalidCApiImport {} -> mkSimpleDecorated $ vcat [ text "Wrapper stubs can't be used with CApiFFI."]
 
+    PsErrMultipleConForNewtype tycon n -> mkSimpleDecorated $ vcat
+      [ sep
+          [ text "A newtype must have exactly one constructor,"
+          , nest 2 $ text "but" <+> quotes (ppr tycon) <+> text "has" <+> speakN n ]
+      , text "In the newtype declaration for" <+> quotes (ppr tycon) ]
+
   diagnosticReason  = \case
     PsUnknownMessage m                            -> diagnosticReason m
     PsHeaderMessage  m                            -> psHeaderMessageReason m
@@ -619,6 +625,7 @@ instance Diagnostic PsMessage where
     PsErrParseRightOpSectionInPat{}               -> ErrorWithoutFlag
     PsErrIllegalGadtRecordMultiplicity{}          -> ErrorWithoutFlag
     PsErrInvalidCApiImport {}                     -> ErrorWithoutFlag
+    PsErrMultipleConForNewtype {}                 -> ErrorWithoutFlag
 
   diagnosticHints  = \case
     PsUnknownMessage m                            -> diagnosticHints m
@@ -788,6 +795,7 @@ instance Diagnostic PsMessage where
     PsErrInvalidPackageName{}                     -> noHints
     PsErrIllegalGadtRecordMultiplicity{}          -> noHints
     PsErrInvalidCApiImport {}                     -> noHints
+    PsErrMultipleConForNewtype {}                 -> noHints
 
   diagnosticCode = constructorCode
 

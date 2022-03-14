@@ -16,7 +16,7 @@ module GHC.Rename.Module (
         rnSrcDecls, addTcgDUs, findSplice, rnWarningTxt
     ) where
 
-import GHC.Prelude
+import GHC.Prelude hiding ( head )
 
 import {-# SOURCE #-} GHC.Rename.Expr( rnLExpr )
 import {-# SOURCE #-} GHC.Rename.Splice ( rnSpliceDecl, rnTopSpliceDecls )
@@ -72,9 +72,10 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
 import Control.Arrow ( first )
+import Data.Foldable ( toList )
 import Data.List ( mapAccumL )
 import qualified Data.List.NonEmpty as NE
-import Data.List.NonEmpty ( NonEmpty(..) )
+import Data.List.NonEmpty ( NonEmpty(..), head )
 import Data.Maybe ( isNothing, fromMaybe, mapMaybe )
 import qualified Data.Set as Set ( difference, fromList, toList, null )
 import Data.Function ( on )
@@ -1819,11 +1820,11 @@ rnTyClDecl (SynDecl { tcdLName = tycon, tcdTyVars = tyvars,
 rnTyClDecl (DataDecl
     { tcdLName = tycon, tcdTyVars = tyvars,
       tcdFixity = fixity,
-      tcdDataDefn = defn@HsDataDefn{ dd_ND = new_or_data
-                                   , dd_kindSig = kind_sig} })
+      tcdDataDefn = defn@HsDataDefn{ dd_cons = cons, dd_kindSig = kind_sig} })
   = do { tycon' <- lookupLocatedTopConstructorRnN tycon
        ; let kvs = extractDataDefnKindVars defn
              doc = TyDataCtx tycon
+             new_or_data = dataDefnConsNewOrData cons
        ; traceRn "rntycl-data" (ppr tycon <+> ppr kvs)
        ; bindHsQTyVars doc Nothing kvs tyvars $ \ tyvars' no_rhs_kvs ->
     do { (defn', fvs) <- rnDataDefn doc defn
@@ -1940,8 +1941,7 @@ rnTySyn doc rhs = rnLHsType doc rhs
 
 rnDataDefn :: HsDocContext -> HsDataDefn GhcPs
            -> RnM (HsDataDefn GhcRn, FreeVars)
-rnDataDefn doc (HsDataDefn { dd_ND = new_or_data, dd_cType = cType
-                           , dd_ctxt = context, dd_cons = condecls
+rnDataDefn doc (HsDataDefn { dd_cType = cType, dd_ctxt = context, dd_cons = condecls
                            , dd_kindSig = m_sig, dd_derivs = derivs })
   = do  { -- DatatypeContexts (i.e., stupid contexts) can't be combined with
           -- GADT syntax. See Note [The stupid context] in GHC.Core.DataCon.
@@ -1966,17 +1966,14 @@ rnDataDefn doc (HsDataDefn { dd_ND = new_or_data, dd_cType = cType
 
         ; let all_fvs = fvs1 `plusFV` fvs3 `plusFV`
                         con_fvs `plusFV` sig_fvs
-        ; return ( HsDataDefn { dd_ext = noExtField
-                              , dd_ND = new_or_data, dd_cType = cType
+        ; return ( HsDataDefn { dd_ext = noExtField, dd_cType = cType
                               , dd_ctxt = context', dd_kindSig = m_sig'
                               , dd_cons = condecls'
                               , dd_derivs = derivs' }
                  , all_fvs )
         }
   where
-    h98_style = case condecls of  -- Note [Stupid theta]
-                     (L _ (ConDeclGADT {}))                    : _ -> False
-                     _                                             -> True
+    h98_style = not $ anyLConIsGadt condecls  -- Note [Stupid theta]
 
     rn_derivs ds
       = do { deriv_strats_ok <- xoptM LangExt.DerivingStrategies
@@ -2312,7 +2309,7 @@ are no data constructors we allow h98_style = True
 ***************************************************** -}
 
 -----------------
-rnConDecls :: [LConDecl GhcPs] -> RnM ([LConDecl GhcRn], FreeVars)
+rnConDecls :: DataDefnCons (LConDecl GhcPs) -> RnM (DataDefnCons (LConDecl GhcRn), FreeVars)
 rnConDecls = mapFvRn (wrapLocFstMA rnConDecl)
 
 rnConDecl :: ConDecl GhcPs -> RnM (ConDecl GhcRn, FreeVars)
@@ -2370,7 +2367,7 @@ rnConDecl (ConDeclGADT { con_names   = names
                 extractConDeclGADTDetailsTyVars args        $
                 extractHsTysRdrTyVars [res_ty] []
 
-        ; let ctxt = ConDeclCtx new_names
+        ; let ctxt = ConDeclCtx (toList new_names)
 
         ; bindHsOuterTyVarBndrs ctxt Nothing implicit_bndrs outer_bndrs $ \outer_bndrs' ->
     do  { (new_cxt, fvs1)    <- rnMbContext ctxt mcxt

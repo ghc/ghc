@@ -230,23 +230,23 @@ mkTyData loc' new_or_data cType (L _ (mcxt, tycl_hdr))
        ; tyvars <- checkTyVars (ppr new_or_data) equalsDots tc tparams
        ; cs <- getCommentsFor (locA loc) -- Get any remaining comments
        ; let anns' = addAnns (EpAnn (spanAsAnchor $ locA loc) annsIn emptyComments) ann cs
-       ; defn <- mkDataDefn new_or_data cType mcxt ksig data_cons maybe_deriv
+       ; data_cons <- checkNewOrData (locA loc) (unLoc tc) new_or_data data_cons
+       ; defn <- mkDataDefn cType mcxt ksig data_cons maybe_deriv
        ; return (L loc (DataDecl { tcdDExt = anns',
                                    tcdLName = tc, tcdTyVars = tyvars,
                                    tcdFixity = fixity,
                                    tcdDataDefn = defn })) }
 
-mkDataDefn :: NewOrData
-           -> Maybe (LocatedP CType)
+mkDataDefn :: Maybe (LocatedP CType)
            -> Maybe (LHsContext GhcPs)
            -> Maybe (LHsKind GhcPs)
-           -> [LConDecl GhcPs]
+           -> DataDefnCons (LConDecl GhcPs)
            -> HsDeriving GhcPs
            -> P (HsDataDefn GhcPs)
-mkDataDefn new_or_data cType mcxt ksig data_cons maybe_deriv
+mkDataDefn cType mcxt ksig data_cons maybe_deriv
   = do { checkDatatypeContext mcxt
        ; return (HsDataDefn { dd_ext = noExtField
-                            , dd_ND = new_or_data, dd_cType = cType
+                            , dd_cType = cType
                             , dd_ctxt = mcxt
                             , dd_cons = data_cons
                             , dd_kindSig = ksig
@@ -327,7 +327,8 @@ mkDataFamInst loc new_or_data cType (mcxt, bndrs, tycl_hdr)
   = do { (tc, tparams, fixity, ann) <- checkTyClHdr False tycl_hdr
        ; cs <- getCommentsFor loc -- Add any API Annotations to the top SrcSpan
        ; let fam_eqn_ans = addAnns (EpAnn (spanAsAnchor loc) ann cs) anns emptyComments
-       ; defn <- mkDataDefn new_or_data cType mcxt ksig data_cons maybe_deriv
+       ; data_cons <- checkNewOrData loc (unLoc tc) new_or_data data_cons
+       ; defn <- mkDataDefn cType mcxt ksig data_cons maybe_deriv
        ; return (L (noAnnSrcSpan loc) (DataFamInstD noExtField (DataFamInstDecl
                   (FamEqn { feqn_ext    = fam_eqn_ans
                           , feqn_tycon  = tc
@@ -752,7 +753,7 @@ mkConDeclH98 ann name mb_forall mb_cxt args
 --   records whether this is a prefix or record GADT constructor. See
 --   Note [GADT abstract syntax] in "GHC.Hs.Decls" for more details.
 mkGadtDecl :: SrcSpan
-           -> [LocatedN RdrName]
+           -> NonEmpty (LocatedN RdrName)
            -> LHsUniToken "::" "∷" GhcPs
            -> LHsSigType GhcPs
            -> P (LConDecl GhcPs)
@@ -2620,6 +2621,12 @@ mkOpaquePragma src
                  , inl_act    = NeverActive
                  , inl_rule   = FunLike
                  }
+
+checkNewOrData :: SrcSpan -> RdrName -> NewOrData -> [a] -> P (DataDefnCons a)
+checkNewOrData span name = curry $ \ case
+    (NewType, [a]) -> pure $ NewTypeCon a
+    (DataType, as) -> pure $ DataTypeCons as
+    (NewType, as) -> addFatalError $ mkPlainErrorMsgEnvelope span $ PsErrMultipleConForNewtype name (length as)
 
 -----------------------------------------------------------------------------
 -- utilities for foreign declarations

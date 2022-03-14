@@ -28,6 +28,7 @@ import GHC.Parser.Annotation
 import Control.Applicative
 import Control.Monad.IO.Class
 import Data.Bifunctor (first)
+import Data.Foldable (toList)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IM
 import Data.Map.Strict (Map)
@@ -366,13 +367,13 @@ subordinates env instMap decl = case decl of
              -> [(Name, [HsDoc GhcRn], IntMap (HsDoc GhcRn))]
     dataSubs dd = constrs ++ fields  ++ derivs
       where
-        cons = map unLoc $ (dd_cons dd)
+        cons = unLoc <$> dd_cons dd
         constrs = [ ( unLoc cname
                     , maybeToList $ fmap unLoc $ con_doc c
                     , conArgDocs c)
-                  | c <- cons, cname <- getConNames c ]
+                  | c <- toList cons, cname <- getConNames c ]
         fields  = [ (foExt n, maybeToList $ fmap unLoc doc, IM.empty)
-                  | Just flds <- map getRecConArgs_maybe cons
+                  | Just flds <- toList $ fmap getRecConArgs_maybe cons
                   , (L _ (ConDeclField _ ns _ doc)) <- (unLoc flds)
                   , (L _ n) <- ns ]
         derivs  = [ (instName, [unLoc doc], IM.empty)

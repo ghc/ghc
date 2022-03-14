@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -212,10 +213,10 @@ isListComp = isDoComprehensionContext
 
 -- ---------------------------------------------------------------------
 
-isGadt :: [LConDecl (GhcPass p)] -> Bool
-isGadt [] = False
-isGadt ((L _ (ConDeclGADT{})):_) = True
-isGadt _ = False
+isGadt :: Foldable f => f (LConDecl (GhcPass p)) -> Bool
+isGadt = any $ \ case
+    L _ ConDeclGADT {} -> True
+    _ -> False
 
 -- ---------------------------------------------------------------------
 

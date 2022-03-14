@@ -79,7 +79,6 @@ import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import GHC.Types.SrcLoc
 import GHC.Utils.Misc
 import GHC.Data.BooleanFormula ( isUnsatisfied, pprBooleanFormulaNice )
@@ -674,8 +673,7 @@ tcDataFamInstDecl mb_clsinfo tv_skol_env
              , feqn_pats   = hs_pats
              , feqn_tycon  = lfam_name@(L _ fam_name)
              , feqn_fixity = fixity
-             , feqn_rhs    = HsDataDefn { dd_ND      = new_or_data
-                                        , dd_cType   = cType
+             , feqn_rhs    = HsDataDefn { dd_cType   = cType
                                         , dd_ctxt    = hs_ctxt
                                         , dd_cons    = hs_cons
                                         , dd_kindSig = m_ksig
@@ -688,10 +686,11 @@ tcDataFamInstDecl mb_clsinfo tv_skol_env
 
        -- Check that the family declaration is for the right kind
        ; checkTc (isDataFamilyTyCon fam_tc) (wrongKindOfFamily fam_tc)
-       ; gadt_syntax <- dataDeclChecks fam_name new_or_data hs_ctxt hs_cons
+       ; gadt_syntax <- dataDeclChecks fam_name hs_ctxt hs_cons
           -- Do /not/ check that the number of patterns = tyConArity fam_tc
           -- See [Arity of data families] in GHC.Core.FamInstEnv
        ; skol_info <- mkSkolemInfo FamInstSkol
+       ; let new_or_data = dataDefnConsNewOrData hs_cons
        ; (qtvs, pats, tc_res_kind, stupid_theta)
              <- tcDataFamInstHeader mb_clsinfo skol_info fam_tc outer_bndrs fixity
                                     hs_ctxt hs_pats m_ksig new_or_data
@@ -767,19 +766,17 @@ tcDataFamInstDecl mb_clsinfo tv_skol_env
            do { data_cons <- tcExtendTyVarEnv (binderVars tc_ty_binders) $
                   -- For H98 decls, the tyvars scope
                   -- over the data constructors
-                  tcConDecls new_or_data (DDataInstance orig_res_ty)
-                             rec_rep_tc tc_ty_binders tc_res_kind
-                             hs_cons
+                  tcConDecls (DDataInstance orig_res_ty) rec_rep_tc tc_ty_binders tc_res_kind
+                      hs_cons
 
               ; rep_tc_name <- newFamInstTyConName lfam_name pats
               ; axiom_name  <- newFamInstAxiomName lfam_name [pats]
-              ; tc_rhs <- case new_or_data of
-                     DataType -> return $
+              ; tc_rhs <- case data_cons of
+                     DataTypeCons data_cons -> return $
                         mkLevPolyDataTyConRhs
                           (isFixedRuntimeRepKind res_kind)
                           data_cons
-                     NewType  -> assert (not (null data_cons)) $
-                                 mkNewTyConRhs rep_tc_name rec_rep_tc (head data_cons)
+                     NewTypeCon data_con -> mkNewTyConRhs rep_tc_name rec_rep_tc data_con
 
               ; let ax_rhs = mkTyConApp rep_tc (mkTyVarTys zonked_post_eta_qtvs)
                     axiom  = mkSingleCoAxiom Representational axiom_name
@@ -893,7 +890,6 @@ tcDataFamInstHeader
     -> NewOrData
     -> TcM ([TcTyVar], [TcType], TcKind, TcThetaType)
          -- All skolem TcTyVars, all zonked so it's clear what the free vars are
-
 -- The "header" of a data family instance is the part other than
 -- the data constructors themselves
 --    e.g.  data instance D [a] :: * -> * where ...

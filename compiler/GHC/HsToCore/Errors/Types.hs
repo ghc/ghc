@@ -122,8 +122,6 @@ data DsMessage
                           !CoreExpr
                           -- ^ The optimised LHS
 
-  | DsMultipleConForNewtype [LocatedN Name]
-
   | DsLazyPatCantBindVarsOfUnliftedType [Var]
 
   | DsNotYetHandledByTH !ThRejectionReason

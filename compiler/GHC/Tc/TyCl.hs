@@ -102,9 +102,11 @@ import GHC.Utils.Misc
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
 import Control.Monad
+import Data.Foldable ( toList, traverse_ )
 import Data.Functor.Identity
 import Data.List ( partition)
 import Data.List.NonEmpty ( NonEmpty(..) )
+import qualified Data.List.NonEmpty as NE
 import qualified Data.Set as Set
 import Data.Tuple( swap )
 
@@ -1286,7 +1288,7 @@ mk_prom_err_env (DataDecl { tcdLName = L _ name
   = unitNameEnv name (APromotionErr TyConPE)
     `plusNameEnv`
     mkNameEnv [ (con, APromotionErr RecDataConPE)
-              | L _ con' <- cons
+              | L _ con' <- toList cons
               , L _ con  <- getConNames con' ]
 
 mk_prom_err_env decl
@@ -1355,14 +1357,13 @@ getInitialKind strategy
 getInitialKind strategy
     (DataDecl { tcdLName = L _ name
               , tcdTyVars = ktvs
-              , tcdDataDefn = HsDataDefn { dd_kindSig = m_sig
-                                         , dd_ND = new_or_data } })
-  = do  { let flav = newOrDataToFlavour new_or_data
+              , tcdDataDefn = HsDataDefn { dd_kindSig = m_sig, dd_cons = cons } })
+  = do  { let flav = newOrDataToFlavour (dataDefnConsNewOrData cons)
               ctxt = DataKindCtxt name
         ; tc <- kcDeclHeader strategy name flav ktvs $
                 case m_sig of
                   Just ksig -> TheKind <$> tcLHsKindSig ctxt ksig
-                  Nothing   -> return $ dataDeclDefaultResultKind strategy new_or_data
+                  Nothing   -> return $ dataDeclDefaultResultKind strategy (dataDefnConsNewOrData cons)
         ; return [tc] }
 
 getInitialKind InitialKindInfer (FamDecl { tcdFam = decl })
@@ -1570,8 +1571,7 @@ kcTyClDecl :: TyClDecl GhcRn -> MonoTcTyCon -> TcM ()
 -- - In this function, those TcTyVars are unified with other kind variables during
 --   kind inference (see [How TcTyCons work])
 
-kcTyClDecl (DataDecl { tcdLName    = (L _ _name), tcdDataDefn = defn }) tycon
-  | HsDataDefn { dd_ctxt = ctxt, dd_cons = cons, dd_ND = new_or_data } <- defn
+kcTyClDecl (DataDecl { tcdLName    = (L _ _name), tcdDataDefn = HsDataDefn { dd_ctxt = ctxt, dd_cons = cons } }) tycon
   = tcExtendNameTyVarEnv (tcTyConScopedTyVars tycon) $
        -- NB: binding these tyvars isn't necessary for GADTs, but it does no
        -- harm.  For GADTs, each data con brings its own tyvars into scope,
@@ -1579,7 +1579,7 @@ kcTyClDecl (DataDecl { tcdLName    = (L _ _name), tcdDataDefn = defn }) tycon
        -- (conceivably) shadowed.
     do { traceTc "kcTyClDecl" (ppr tycon $$ ppr (tyConTyVars tycon) $$ ppr (tyConResKind tycon))
        ; _ <- tcHsContext ctxt
-       ; kcConDecls new_or_data (tyConResKind tycon) cons
+       ; kcConDecls (dataDefnConsNewOrData cons) (tyConResKind tycon) cons
        }
 
 kcTyClDecl (SynDecl { tcdLName = L _ _name, tcdRhs = rhs }) tycon
@@ -1634,14 +1634,14 @@ kcConGADTArgs new_or_data res_kind con_args = case con_args of
   RecConGADT (L _ flds) _ -> kcConArgTys new_or_data res_kind $
                              map (hsLinear . cd_fld_type . unLoc) flds
 
-kcConDecls :: NewOrData
+kcConDecls :: Foldable f
+           => NewOrData
            -> TcKind             -- The result kind signature
                                --   Used only in H98 case
-           -> [LConDecl GhcRn] -- The data constructors
+           -> f (LConDecl GhcRn) -- The data constructors
            -> TcM ()
 -- See Note [kcConDecls: kind-checking data type decls]
-kcConDecls new_or_data tc_res_kind cons
-  = mapM_ (wrapLocMA_ (kcConDecl new_or_data tc_res_kind)) cons
+kcConDecls new_or_data tc_res_kind = traverse_ (wrapLocMA_ (kcConDecl new_or_data tc_res_kind))
 
 -- Kind check a data constructor. In additional to the data constructor,
 -- we also need to know about whether or not its corresponding type was
@@ -1658,7 +1658,7 @@ kcConDecl :: NewOrData
 kcConDecl new_or_data tc_res_kind (ConDeclH98
   { con_name = name, con_ex_tvs = ex_tvs
   , con_mb_cxt = ex_ctxt, con_args = args })
-  = addErrCtxt (dataConCtxt [name]) $
+  = addErrCtxt (dataConCtxt (NE.singleton name)) $
     discardResult                   $
     bindExplicitTKBndrs_Tv ex_tvs $
     do { _ <- tcHsContext ex_ctxt
@@ -2873,7 +2873,7 @@ tcDataDefn :: SDoc -> RolesInfo -> Name
            -> HsDataDefn GhcRn -> TcM (TyCon, [DerivInfo])
   -- NB: not used for newtype/data instances (whether associated or not)
 tcDataDefn err_ctxt roles_info tc_name
-           (HsDataDefn { dd_ND = new_or_data, dd_cType = cType
+           (HsDataDefn { dd_cType = cType
                        , dd_ctxt = ctxt
                        , dd_kindSig = mb_ksig  -- Already in tc's kind
                                                -- via inferInitialKinds
@@ -2885,12 +2885,12 @@ tcDataDefn err_ctxt roles_info tc_name
        --    - for H98 constructors only, the ConDecl
        -- But it does no harm to bring them into scope
        -- over GADT ConDecls as well; and it's awkward not to
-    do { gadt_syntax <- dataDeclChecks tc_name new_or_data ctxt cons
+    do { gadt_syntax <- dataDeclChecks tc_name ctxt cons
 
        ; tcg_env <- getGblEnv
        ; let hsc_src = tcg_src tcg_env
        ; unless (mk_permissive_kind hsc_src cons) $
-         checkDataKindSig (DataDeclSort new_or_data) res_kind
+         checkDataKindSig (DataDeclSort (dataDefnConsNewOrData cons)) res_kind
 
        ; stupid_tc_theta <- pushLevelAndSolveEqualities skol_info tc_bndrs $
                             tcHsContext ctxt
@@ -2918,8 +2918,7 @@ tcDataDefn err_ctxt roles_info tc_name
        ; res_kind       <- zonkTcTypeToTypeX   ze res_kind
 
        ; tycon <- fixM $ \ rec_tycon -> do
-             { data_cons <- tcConDecls new_or_data DDataType rec_tycon
-                                       tc_bndrs res_kind cons
+             { data_cons <- tcConDecls DDataType rec_tycon tc_bndrs res_kind cons
              ; tc_rhs    <- mk_tc_rhs hsc_src rec_tycon data_cons
              ; tc_rep_nm <- newTyConRepName tc_name
 
@@ -2943,7 +2942,7 @@ tcDataDefn err_ctxt roles_info tc_name
        ; return (tycon, [deriv_info]) }
   where
     skol_info = TyConSkol flav tc_name
-    flav = newOrDataToFlavour new_or_data
+    flav = newOrDataToFlavour (dataDefnConsNewOrData cons)
 
     -- Abstract data types in hsig files can have arbitrary kinds,
     -- because they may be implemented by type synonyms
@@ -2953,23 +2952,21 @@ tcDataDefn err_ctxt roles_info tc_name
     -- so one could not have, say, a data family instance in an hsig file that
     -- has kind `Bool`. Therefore, this check need only occur in the code that
     -- typechecks data type declarations.
-    mk_permissive_kind HsigFile [] = True
+    mk_permissive_kind HsigFile (DataTypeCons []) = True
     mk_permissive_kind _ _ = False
 
     -- In an hs-boot or a signature file,
     -- a 'data' declaration with no constructors
     -- indicates a nominally distinct abstract data type.
-    mk_tc_rhs (isHsBootOrSig -> True) _ []
+    mk_tc_rhs (isHsBootOrSig -> True) _ (DataTypeCons [])
       = return AbstractTyCon
 
-    mk_tc_rhs _ tycon data_cons
-      = case new_or_data of
-          DataType -> return $
+    mk_tc_rhs _ tycon data_cons = case data_cons of
+          DataTypeCons data_cons -> return $
                         mkLevPolyDataTyConRhs
                           (isFixedRuntimeRepKind (tyConResKind tycon))
                           data_cons
-          NewType  -> assert (not (null data_cons)) $
-                      mkNewTyConRhs tc_name tycon (head data_cons)
+          NewTypeCon data_con -> mkNewTyConRhs tc_name tycon data_con
 
 -------------------------
 kcTyFamInstEqn :: TcTyCon -> LTyFamInstEqn GhcRn -> TcM ()
@@ -3312,25 +3309,19 @@ that 'a' must have that kind, and to bring 'k' into scope.
 ************************************************************************
 -}
 
-dataDeclChecks :: Name -> NewOrData
-               -> Maybe (LHsContext GhcRn) -> [LConDecl GhcRn]
+dataDeclChecks :: Name
+               -> Maybe (LHsContext GhcRn) -> DataDefnCons (LConDecl GhcRn)
                -> TcM Bool
-dataDeclChecks tc_name new_or_data mctxt cons
+dataDeclChecks tc_name mctxt cons
   = do { let stupid_theta = fromMaybeContext mctxt
          -- Check that we don't use GADT syntax in H98 world
        ;  gadtSyntax_ok <- xoptM LangExt.GADTSyntax
-       ; let gadt_syntax = consUseGadtSyntax cons
+       ; let gadt_syntax = anyLConIsGadt cons
        ; checkTc (gadtSyntax_ok || not gadt_syntax) (badGadtDecl tc_name)
 
            -- Check that the stupid theta is empty for a GADT-style declaration.
            -- See Note [The stupid context] in GHC.Core.DataCon.
        ; checkTc (null stupid_theta || not gadt_syntax) (badStupidTheta tc_name)
-
-         -- Check that a newtype has exactly one constructor
-         -- Do this before checking for empty data decls, so that
-         -- we don't suggest -XEmptyDataDecls for newtypes
-       ; checkTc (new_or_data == DataType || isSingleton cons)
-                (newtypeConError tc_name (length cons))
 
          -- Check that there's at least one condecl,
          -- or else we're reading an hs-boot file, or -XEmptyDataDecls
@@ -3340,12 +3331,6 @@ dataDeclChecks tc_name new_or_data mctxt cons
                  (emptyConDeclsErr tc_name)
        ; return gadt_syntax }
 
-
------------------------------------
-consUseGadtSyntax :: [LConDecl GhcRn] -> Bool
-consUseGadtSyntax (L _ (ConDeclGADT {}) : _) = True
-consUseGadtSyntax _                          = False
-                 -- All constructors have same shape
 
 -----------------------------------
 data DataDeclInfo
@@ -3360,18 +3345,29 @@ mkDDHeaderTy dd_info rep_tycon tc_bndrs
                    mkTyVarTys (binderVars tc_bndrs)
       DDataInstance header_ty -> header_ty
 
-tcConDecls :: NewOrData
-           -> DataDeclInfo
+-- We use `concatMapDataDefnConsTcM` here, since the following is illegal:
+-- @newtype T a where T1, T2 :: a -> T a@
+-- It would be represented as a single 'ConDeclGadt' with multiple names, which is valid for 'data', but not 'newtype'.
+-- So when 'tcConDecl' expands the 'ConDecl' per each name it has, if we are type-checking a 'newtype' declaration, we
+-- must fail if it returns more than one.
+tcConDecls :: DataDeclInfo
            -> KnotTied TyCon            -- Representation TyCon
            -> [TcTyConBinder]           -- Binders of representation TyCon
            -> TcKind                    -- Result kind
-           -> [LConDecl GhcRn] -> TcM [DataCon]
-tcConDecls new_or_data dd_info rep_tycon tmpl_bndrs res_kind
-  = concatMapM $ addLocMA $
-    tcConDecl new_or_data dd_info rep_tycon tmpl_bndrs res_kind
-              (mkTyConTagMap rep_tycon)
+           -> DataDefnCons (LConDecl GhcRn) -> TcM (DataDefnCons DataCon)
+tcConDecls dd_info rep_tycon tmpl_bndrs res_kind
+  = concatMapDataDefnConsTcM (tyConName rep_tycon) $ \ new_or_data ->
+    addLocMA $ tcConDecl new_or_data dd_info rep_tycon tmpl_bndrs res_kind (mkTyConTagMap rep_tycon)
     -- mkTyConTagMap: it's important that we pay for tag allocation here,
     -- once per TyCon. See Note [Constructor tag allocation], fixes #14657
+
+-- 'concatMap' for 'DataDefnCons', but fail if the given function returns multiple values and the argument is a 'NewTypeCon'.
+concatMapDataDefnConsTcM :: Name -> (NewOrData -> a -> TcM (NonEmpty b)) -> DataDefnCons a -> TcM (DataDefnCons b)
+concatMapDataDefnConsTcM name f = \ case
+    NewTypeCon a -> f NewType a >>= \ case
+        b:|[] -> pure (NewTypeCon b)
+        bs -> failWithTc $ newtypeConError name (length bs)
+    DataTypeCons as -> DataTypeCons <$> concatMapM (fmap toList . f DataType) as
 
 tcConDecl :: NewOrData
           -> DataDeclInfo
@@ -3380,14 +3376,14 @@ tcConDecl :: NewOrData
           -> TcKind           -- Result kind
           -> NameEnv ConTag
           -> ConDecl GhcRn
-          -> TcM [DataCon]
+          -> TcM (NonEmpty DataCon)
 
 tcConDecl new_or_data dd_info rep_tycon tc_bndrs res_kind tag_map
           (ConDeclH98 { con_name = lname@(L _ name)
                       , con_ex_tvs = explicit_tkv_nms
                       , con_mb_cxt = hs_ctxt
                       , con_args = hs_args })
-  = addErrCtxt (dataConCtxt [lname]) $
+  = addErrCtxt (dataConCtxt (NE.singleton lname)) $
     do { -- NB: the tyvars from the declaration header are in scope
 
          -- Get hold of the existential type variables
@@ -3475,7 +3471,7 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs res_kind tag_map
                   --      constructor type signature into the data constructor;
                   --      that way checkValidDataCon can complain if it's wrong.
 
-       ; return [dc] }
+       ; return (NE.singleton dc) }
 
 tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
   -- NB: don't use res_kind here, as it's ill-scoped. Instead,
@@ -3486,7 +3482,7 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
                        , con_res_ty = hs_res_ty })
   = addErrCtxt (dataConCtxt names) $
     do { traceTc "tcConDecl 1 gadt" (ppr names)
-       ; let (L _ name : _) = names
+       ; let L _ name :| _ = names
        ; skol_info <- mkSkolemInfo (DataConSkol name)
        ; (tclvl, wanted, (outer_bndrs, (ctxt, arg_tys, res_ty, field_lbls, stricts)))
            <- pushLevelAndSolveEqualitiesX "tcConDecl:GADT" $
@@ -4345,7 +4341,7 @@ checkFieldCompat fld con1 con2 res1 res2 fty1 fty2
 checkValidDataCon :: DynFlags -> Bool -> TyCon -> DataCon -> TcM ()
 checkValidDataCon dflags existential_ok tc con
   = setSrcSpan con_loc $
-    addErrCtxt (dataConCtxt [L (noAnnSrcSpan con_loc) con_name]) $
+    addErrCtxt (dataConCtxt (NE.singleton (L (noAnnSrcSpan con_loc) con_name))) $
     do  { let tc_tvs      = tyConTyVars tc
               res_ty_tmpl = mkFamilyTyConApp tc (mkTyVarTys tc_tvs)
               arg_tys     = dataConOrigArgTys con
@@ -5239,13 +5235,13 @@ fieldTypeMisMatch field_name con1 con2
     sep [text "Constructors" <+> ppr con1 <+> text "and" <+> ppr con2,
          text "give different types for field", quotes (ppr field_name)]
 
-dataConCtxt :: [LocatedN Name] -> SDoc
-dataConCtxt cons = text "In the definition of data constructor" <> plural cons
-                   <+> ppr_cons cons
+dataConCtxt :: NonEmpty (LocatedN Name) -> SDoc
+dataConCtxt cons = text "In the definition of data constructor" <> plural (toList cons)
+                   <+> ppr_cons (toList cons)
 
-dataConResCtxt :: [LocatedN Name] -> SDoc
-dataConResCtxt cons = text "In the result type of data constructor" <> plural cons
-                      <+> ppr_cons cons
+dataConResCtxt :: NonEmpty (LocatedN Name) -> SDoc
+dataConResCtxt cons = text "In the result type of data constructor" <> plural (toList cons)
+                      <+> ppr_cons (toList cons)
 
 ppr_cons :: [LocatedN Name] -> SDoc
 ppr_cons [con] = quotes (ppr con)

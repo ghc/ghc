@@ -48,7 +48,7 @@ Alternative approaches that did not work properly:
 -}
 module GHC.Parser.PostProcess.Haddock (addHaddockToModule) where
 
-import GHC.Prelude hiding (mod)
+import GHC.Prelude hiding (head, mod)
 
 import GHC.Hs
 
@@ -60,6 +60,7 @@ import Data.Semigroup
 import Data.Foldable
 import Data.Traversable
 import Data.Maybe
+import Data.List.NonEmpty (head)
 import Control.Monad
 import Control.Monad.Trans.State.Strict
 import Control.Monad.Trans.Reader
@@ -584,7 +585,7 @@ instance HasHaddock (HsDataDefn GhcPs) where
     --      = MkT1 Int Bool  -- ^ Comment on MkT1
     --      | MkT2 Char Int  -- ^ Comment on MkT2
     --
-    dd_cons' <- addHaddock (dd_cons defn)
+    dd_cons' <- traverse addHaddock (dd_cons defn)
 
     -- Process the deriving clauses:
     --

@@ -2742,14 +2742,14 @@ exactDataDefn :: EpAnn [AddEpAnn]
               -> HsDataDefn GhcPs
               -> EPP ()
 exactDataDefn an exactHdr
-                 (HsDataDefn { dd_ND = new_or_data, dd_ctxt = context
+                 (HsDataDefn { dd_ctxt = context
                              , dd_cType = mb_ct
                              , dd_kindSig = mb_sig
                              , dd_cons = condecls, dd_derivs = derivings }) = do
   annotationsToComments (epAnnAnns an) [AnnOpenP, AnnCloseP]
-  if new_or_data == DataType
-    then markEpAnn an AnnData
-    else markEpAnn an AnnNewtype
+  markEpAnn an $ case condecls of
+    DataTypeCons _ -> AnnData
+    NewTypeCon _ -> AnnNewtype
   markEpAnn an AnnInstance -- optional
   mapM_ markAnnotated mb_ct
   exactHdr context
@@ -2760,7 +2760,7 @@ exactDataDefn an exactHdr
       markAnnotated kind
   when (isGadt condecls) $ markEpAnn an AnnWhere
   markEpAnn an AnnOpenC
-  exact_condecls an condecls
+  exact_condecls an (toList condecls)
   markEpAnn an AnnCloseC
   mapM_ markAnnotated derivings
   return ()

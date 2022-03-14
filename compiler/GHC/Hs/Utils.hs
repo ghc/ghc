@@ -147,6 +147,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
 import Data.Either
+import Data.Foldable ( toList )
 import Data.Function
 import Data.List ( partition, deleteBy )
 
@@ -1439,7 +1440,7 @@ hsDataDefnBinders :: IsPass p
                   => HsDataDefn (GhcPass p)
                   -> ([LocatedA (IdP (GhcPass p))], [LFieldOcc (GhcPass p)])
 hsDataDefnBinders (HsDataDefn { dd_cons = cons })
-  = hsConDeclsBinders cons
+  = hsConDeclsBinders (toList cons)
   -- See Note [Binders in family instances]
 
 -------------------
@@ -1466,7 +1467,7 @@ hsConDeclsBinders cons
            -- remove only the first occurrence of any seen field in order to
            -- avoid circumventing detection of duplicate fields (#9156)
            ConDeclGADT { con_names = names, con_g_args = args }
-             -> (map (L loc . unLoc) names ++ ns, flds ++ fs)
+             -> (toList (L loc . unLoc <$> names) ++ ns, flds ++ fs)
              where
                 (remSeen', flds) = get_flds_gadt remSeen args
                 (ns, fs) = go remSeen' rs
