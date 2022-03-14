@@ -22,7 +22,7 @@ module GHC.Utils.Monad.EtaReader (
     mapEtaReader,
     withEtaReader,
     -- * The EtaReaderT monad transformer
-    EtaReaderT(EtaReaderT),
+    EtaReaderT(NoEtaReaderT, EtaReaderT),
     runEtaReaderT,
     mapEtaReaderT,
     withEtaReaderT,
@@ -42,7 +42,6 @@ import Control.Monad.Signatures
 import Control.Monad.Trans.Class
 import Data.Functor.Contravariant
 import Data.Functor.Identity
-import Data.Coerce
 
 import Control.Applicative
 import Control.Monad
@@ -93,22 +92,21 @@ withEtaReader = withEtaReaderT
 
 -- | 'Control.Monad.Trans.Reader.ReaderT', but eta-expanded.
 -- See Note [The one-shot state monad trick] in GHC.Utils.Monad.
-newtype EtaReaderT r m a = EtaReaderT' (r -> m a)
-    deriving (Generic, Generic1)
+newtype EtaReaderT r m a
+  = NoEtaReaderT { runEtaReaderT :: r -> m a }
+  -- ^ Using 'NoEtaReaderT' will *not* try to eagerly eta-expand the wrapped function.
+  -- Sometimes this is desirable,
+  deriving (Generic, Generic1)
 
 -- This pattern synonym makes the monad eta-expand,
 -- which as a very beneficial effect on compiler performance
 -- See #18202.
 -- See Note [The one-shot state monad trick] in GHC.Utils.Monad
 pattern EtaReaderT :: (r -> m a) -> EtaReaderT r m a
-pattern EtaReaderT m <- EtaReaderT' m
+pattern EtaReaderT m <- NoEtaReaderT m
   where
-    EtaReaderT m = EtaReaderT' (oneShot $ \r -> m r)
+    EtaReaderT m = NoEtaReaderT (oneShot $ \r -> m r)
 {-# COMPLETE EtaReaderT #-}
-
-runEtaReaderT :: EtaReaderT r m a -> r -> m a
-runEtaReaderT = coerce
-{-# INLINE runEtaReaderT #-}
 
 -- | Transform the computation inside a @EtaReaderT@.
 --

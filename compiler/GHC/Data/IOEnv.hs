@@ -116,7 +116,7 @@ runIOEnv env (IOEnv m) = runEtaReaderT m env
   -- thunks.  Sigh.
 
 fixM :: (a -> IOEnv env a) -> IOEnv env a
-fixM f = IOEnv (EtaReaderT (\ env -> fixIO (\ r -> runIOEnv env (f r))))
+fixM f = IOEnv (NoEtaReaderT (\ env -> fixIO (\ r -> runIOEnv env (f r))))
 
 
 ---------------------------
@@ -128,7 +128,7 @@ tryM :: IOEnv env r -> IOEnv env (Either IOEnvFailure r)
 -- to UserErrors.  But, say, pattern-match failures in GHC itself should
 -- not be caught here, else they'll be reported as errors in the program
 -- begin compiled!
-tryM (IOEnv (EtaReaderT thing)) = IOEnv (EtaReaderT (\ env -> tryIOEnvFailure (thing env)))
+tryM (IOEnv (EtaReaderT thing)) = IOEnv (NoEtaReaderT (\ env -> tryIOEnvFailure (thing env)))
 
 tryIOEnvFailure :: IO a -> IO (Either IOEnvFailure a)
 tryIOEnvFailure = try
@@ -137,7 +137,7 @@ tryAllM :: IOEnv env r -> IOEnv env (Either SomeException r)
 -- Catch *all* synchronous exceptions
 -- This is used when running a Template-Haskell splice, when
 -- even a pattern-match failure is a programmer error
-tryAllM (IOEnv (EtaReaderT thing)) = IOEnv (EtaReaderT (\ env -> safeTry (thing env)))
+tryAllM (IOEnv (EtaReaderT thing)) = IOEnv (NoEtaReaderT (\ env -> safeTry (thing env)))
 
 -- | Like 'try', but doesn't catch asynchronous exceptions
 safeTry :: IO a -> IO (Either SomeException a)
@@ -155,14 +155,14 @@ safeTry act = do
         throwIO e
 
 tryMostM :: IOEnv env r -> IOEnv env (Either SomeException r)
-tryMostM (IOEnv (EtaReaderT thing)) = IOEnv (EtaReaderT (\ env -> tryMost (thing env)))
+tryMostM (IOEnv (EtaReaderT thing)) = IOEnv (NoEtaReaderT (\ env -> tryMost (thing env)))
 
 ---------------------------
 unsafeInterleaveM :: IOEnv env a -> IOEnv env a
-unsafeInterleaveM (IOEnv (EtaReaderT m)) = IOEnv (EtaReaderT (\ env -> unsafeInterleaveIO (m env)))
+unsafeInterleaveM (IOEnv (EtaReaderT m)) = IOEnv (NoEtaReaderT (\ env -> unsafeInterleaveIO (m env)))
 
 uninterruptibleMaskM_ :: IOEnv env a -> IOEnv env a
-uninterruptibleMaskM_ (IOEnv (EtaReaderT m)) = IOEnv (EtaReaderT (\ env -> uninterruptibleMask_ (m env)))
+uninterruptibleMaskM_ (IOEnv (EtaReaderT m)) = IOEnv (NoEtaReaderT (\ env -> uninterruptibleMask_ (m env)))
 
 ----------------------------------------------------------------------
 -- Accessing input/output
