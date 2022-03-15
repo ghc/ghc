@@ -1,0 +1,35 @@
+
+T21130.hs:10:6: error:
+     Found hole: _ :: t0 -> Int
+      Where: ‘t0’ is an ambiguous type variable
+     In the expression: (_ f) :: Int
+      In an equation for ‘x’: x = (_ f) :: Int
+     Relevant bindings include x :: Int (bound at T21130.hs:10:1)
+      Valid hole fits include
+        head :: forall a. [a] -> a
+          with head @Int
+          (imported from ‘Prelude’ at T21130.hs:2:8-13
+           (and originally defined in ‘GHC.List’))
+        last :: forall a. [a] -> a
+          with last @Int
+          (imported from ‘Prelude’ at T21130.hs:2:8-13
+           (and originally defined in ‘GHC.List’))
+         read :: forall a. Read a => String -> a
+           with read @Int
+          (imported from ‘Prelude’ at T21130.hs:2:8-13
+           (and originally defined in ‘Text.Read’))
+
+T21130.hs:10:8: error:
+     Ambiguous type variable ‘t0’ arising from a use of ‘f’
+      prevents the constraint ‘(Enum (Item t0))’ from being solved.
+      Probable fix: use a type annotation to specify what ‘t0’ should be.
+      These potential instances exist:
+        instance Enum Ordering -- Defined in ‘GHC.Enum’
+        instance Enum Integer -- Defined in ‘GHC.Enum’
+        instance Enum () -- Defined in ‘GHC.Enum’
+        ...plus 7 others
+        ...plus N instances involving out-of-scope types
+         (use -fprint-potential-instances to see them all)
+     In the first argument of ‘_’, namely ‘f’
+       In the expression: (_ f) :: Int
+      In an equation for ‘x’: x = (_ f) :: Int

@@ -199,7 +199,7 @@ newWanteds orig = mapM (newWanted orig Nothing)
 
 cloneWanted :: Ct -> TcM Ct
 cloneWanted ct
-  | ev@(CtWanted { ctev_pred = pty }) <- ctEvidence ct
+  | ev@(CtWanted { ctev_pred = pty, ctev_dest = HoleDest _ }) <- ctEvidence ct
   = do { co_hole <- newCoercionHole pty
        ; return (mkNonCanonical (ev { ctev_dest = HoleDest co_hole })) }
   | otherwise
