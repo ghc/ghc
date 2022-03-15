@@ -28,7 +28,8 @@ module GHC.Driver.Session (
         FatalMessager, FlushOut(..),
         ProfAuto(..),
         glasgowExtsFlags,
-        hasPprDebug, hasNoDebugOutput, hasNoStateHack, hasNoOptCoercion,
+        hasPprDebug, hasNoDebugOutput, hasNoStateHack,
+        hasNoOptCoercion, hasKeepDCoercions,
         dopt, dopt_set, dopt_unset,
         gopt, gopt_set, gopt_unset, setGeneralFlag', unSetGeneralFlag',
         wopt, wopt_set, wopt_unset,
@@ -1435,6 +1436,8 @@ hasNoStateHack = gopt Opt_G_NoStateHack
 hasNoOptCoercion :: DynFlags -> Bool
 hasNoOptCoercion = gopt Opt_G_NoOptCoercion
 
+hasKeepDCoercions :: DynFlags -> Bool
+hasKeepDCoercions = gopt Opt_G_KeepDCoercions
 
 -- | Test whether a 'DumpFlag' is set
 dopt :: DumpFlag -> DynFlags -> Bool
@@ -2300,6 +2303,8 @@ dynamic_flags_deps = [
         (NoArg (setGeneralFlag Opt_G_NoStateHack))
   , make_ord_flag defGhcFlag "fno-opt-coercion"
         (NoArg (setGeneralFlag Opt_G_NoOptCoercion))
+  , make_ord_flag defGhcFlag "fkeep-dcoercions"
+        (NoArg (setGeneralFlag Opt_G_KeepDCoercions))
   , make_ord_flag defGhcFlag "with-rtsopts"
         (HasArg setRtsOpts)
   , make_ord_flag defGhcFlag "rtsopts"
@@ -3929,6 +3934,7 @@ optLevelFlags -- see Note [Documenting optimisation flags]
 
     , ([0],     Opt_IgnoreInterfacePragmas)
     , ([0],     Opt_OmitInterfacePragmas)
+    , ([0],     Opt_G_KeepDCoercions)
 
     , ([1,2],   Opt_CoreConstantFolding)
 

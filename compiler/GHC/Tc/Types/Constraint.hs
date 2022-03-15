@@ -1904,7 +1904,10 @@ rewriterSetFromTypes tys = appEndo (rewriter_set_from_tys tys) emptyRewriterSet
 rewriter_set_from_ty :: Type -> Endo RewriterSet
 rewriter_set_from_tys :: [Type] -> Endo RewriterSet
 rewriter_set_from_co :: Coercion -> Endo RewriterSet
-(rewriter_set_from_ty, rewriter_set_from_tys, rewriter_set_from_co, _)
+(rewriter_set_from_ty,
+  rewriter_set_from_tys,
+  rewriter_set_from_co , _,
+  _, _)
   = foldTyCo folder ()
   where
     folder :: TyCoFolder () (Endo RewriterSet)

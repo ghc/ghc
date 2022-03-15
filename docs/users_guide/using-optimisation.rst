@@ -763,6 +763,21 @@ by saying ``-fno-wombat``.
 
     Turn off the coercion optimiser.
 
+.. ghc-flag:: -fkeep-dcoercions
+    :shortdesc: Keep directed coercions in the coercion optimiser
+    :type: dynamic
+    :category:
+
+    :default: Keep with :ghc-flag:`-O0`, don't keep otherwise.
+
+    Keep directed coercions in the coercion optimiser, instead of turning
+    them into coercions. Only applies when coercion optimisation is enabled.
+    Turning this flag on will ensure that coercions borne from type family reduction
+    remain small, but it means the coercion optimiser is less able to optimise them.
+    If your program crucially relies on coercion optimisation
+    (i.e. enabling :ghc-flag:`-fno-opt-coercion` causes a significant regression in compile-time),
+    then you might want to NOT enable this flag.
+
 .. ghc-flag:: -fno-pre-inlining
     :shortdesc: Turn off pre-inlining
     :type: dynamic

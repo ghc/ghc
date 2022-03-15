@@ -293,7 +293,13 @@ data RewriteEnv
        -- ^ At what role are we rewriting?
        --
        -- See Note [Rewriter EqRels] in GHC.Tc.Solver.Rewrite
-       , re_rewriters :: !(TcRef RewriterSet)  -- ^ See Note [Wanteds rewrite Wanteds]
+       , re_rewriters :: !(TcRef RewriterSet)
+       -- ^ See Note [Wanteds rewrite Wanteds]
+
+       , re_followed :: !(TcRef TyVarSet)
+       -- ^ Used to keep track of which metavariables we have followed.
+       --
+       -- See Note [The Hydration invariant in the rewriter] in GHC.Tc.Solver.Rewrite.
        }
 -- RewriteEnv is mostly used in @GHC.Tc.Solver.Rewrite@, but it is defined
 -- here so that it can also be passed to rewriting plugins.

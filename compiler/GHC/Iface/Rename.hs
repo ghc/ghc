@@ -689,12 +689,14 @@ rnIfaceCo (IfaceCoVarCo lcl) = IfaceCoVarCo <$> pure lcl
 rnIfaceCo (IfaceHoleCo lcl)  = IfaceHoleCo  <$> pure lcl
 rnIfaceCo (IfaceAxiomInstCo n i cs)
     = IfaceAxiomInstCo <$> rnIfaceGlobal n <*> pure i <*> mapM rnIfaceCo cs
+rnIfaceCo (IfaceHydrateDCo r t1 dco)
+    = IfaceHydrateDCo r <$> rnIfaceType t1 <*> rnIfaceDCo dco
 rnIfaceCo (IfaceUnivCo s r t1 t2)
-    = IfaceUnivCo s r <$> rnIfaceType t1 <*> rnIfaceType t2
+    = IfaceUnivCo <$> rnIfaceProv rnIfaceCo s <*> pure r <*> rnIfaceType t1 <*> rnIfaceType t2
 rnIfaceCo (IfaceSymCo c)
     = IfaceSymCo <$> rnIfaceCo c
-rnIfaceCo (IfaceTransCo c1 c2)
-    = IfaceTransCo <$> rnIfaceCo c1 <*> rnIfaceCo c2
+rnIfaceCo (IfaceTransCo co1 co2)
+    = IfaceTransCo <$> rnIfaceCo co1 <*> rnIfaceCo co2
 rnIfaceCo (IfaceInstCo c1 c2)
     = IfaceInstCo <$> rnIfaceCo c1 <*> rnIfaceCo c2
 rnIfaceCo (IfaceNthCo d c) = IfaceNthCo d <$> rnIfaceCo c
@@ -703,6 +705,42 @@ rnIfaceCo (IfaceSubCo c) = IfaceSubCo <$> rnIfaceCo c
 rnIfaceCo (IfaceAxiomRuleCo ax cos)
     = IfaceAxiomRuleCo ax <$> mapM rnIfaceCo cos
 rnIfaceCo (IfaceKindCo c) = IfaceKindCo <$> rnIfaceCo c
+
+rnIfaceDCo :: Rename IfaceDCoercion
+rnIfaceDCo IfaceReflDCo
+  = return IfaceReflDCo
+rnIfaceDCo (IfaceGReflRightDCo co)
+  = IfaceGReflRightDCo <$> rnIfaceCo co
+rnIfaceDCo (IfaceGReflLeftDCo  co)
+  = IfaceGReflLeftDCo  <$> rnIfaceCo co
+rnIfaceDCo (IfaceTyConAppDCo dcos)
+  = IfaceTyConAppDCo <$> mapM rnIfaceDCo dcos
+rnIfaceDCo (IfaceAppDCo dco1 dco2)
+  = IfaceAppDCo <$> rnIfaceDCo dco1 <*> rnIfaceDCo dco2
+rnIfaceDCo (IfaceForAllDCo bndr dco1 dco2)
+  = IfaceForAllDCo <$> rnIfaceBndr bndr <*> rnIfaceDCo dco1 <*> rnIfaceDCo dco2
+rnIfaceDCo (IfaceCoVarDCo lcl)
+  = return (IfaceCoVarDCo lcl)
+rnIfaceDCo (IfaceFreeCoVarDCo c)
+  = return (IfaceFreeCoVarDCo c)
+rnIfaceDCo (IfaceAxiomInstDCo ax)
+  = return (IfaceAxiomInstDCo ax)
+rnIfaceDCo (IfaceStepsDCo steps)
+  = return (IfaceStepsDCo steps)
+rnIfaceDCo (IfaceTransDCo co1 co2)
+  = IfaceTransDCo <$> rnIfaceDCo co1 <*> rnIfaceDCo co2
+rnIfaceDCo (IfaceDehydrateCo co)
+  = IfaceDehydrateCo <$> rnIfaceCo co
+rnIfaceDCo (IfaceUnivDCo prov rhs)
+  = IfaceUnivDCo <$> rnIfaceProv rnIfaceDCo prov <*> rnIfaceType rhs
+rnIfaceDCo (IfaceSubDCo dco)
+  = IfaceSubDCo <$> rnIfaceDCo dco
+
+rnIfaceProv :: Rename iface_co -> Rename (IfaceUnivCoProv iface_co)
+rnIfaceProv rn_thing (IfacePhantomProv    iface_co) = IfacePhantomProv    <$> rn_thing iface_co
+rnIfaceProv rn_thing (IfaceProofIrrelProv iface_co) = IfaceProofIrrelProv <$> rn_thing iface_co
+rnIfaceProv _        (IfacePluginProv str)          = return (IfacePluginProv str)
+rnIfaceProv _        (IfaceCorePrepProv homo)       = return (IfaceCorePrepProv homo)
 
 rnIfaceTyCon :: Rename IfaceTyCon
 rnIfaceTyCon (IfaceTyCon n info)

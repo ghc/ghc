@@ -24,6 +24,7 @@ module GHC.CoreToIface
     , tidyToIfaceTcArgs
       -- * Coercions
     , toIfaceCoercion, toIfaceCoercionX
+    , toIfaceDCoercionX
       -- * Pattern synonyms
     , patSynToIfaceDecl
       -- * Expressions
@@ -271,10 +272,14 @@ toIfaceCoercion :: Coercion -> IfaceCoercion
 toIfaceCoercion = toIfaceCoercionX emptyVarSet
 
 toIfaceCoercionX :: VarSet -> Coercion -> IfaceCoercion
+toIfaceDCoercionX :: VarSet -> DCoercion -> IfaceDCoercion
 -- (toIfaceCoercionX free ty)
 --    translates the tyvars in 'free' as IfaceFreeTyVars
-toIfaceCoercionX fr co
-  = go co
+toIfaceCoercionX = fst . toIfaceCoercionDCoercion
+toIfaceDCoercionX = snd . toIfaceCoercionDCoercion
+
+toIfaceCoercionDCoercion :: VarSet -> (Coercion -> IfaceCoercion, DCoercion -> IfaceDCoercion)
+toIfaceCoercionDCoercion fr = (go, go_dco)
   where
     go_mco MRefl     = IfaceMRefl
     go_mco (MCo co)  = IfaceMCo $ go co
@@ -297,7 +302,8 @@ toIfaceCoercionX fr co
     go (SubCo co)           = IfaceSubCo (go co)
     go (AxiomRuleCo co cs)  = IfaceAxiomRuleCo (coaxrName co) (map go cs)
     go (AxiomInstCo c i cs) = IfaceAxiomInstCo (coAxiomName c) i (map go cs)
-    go (UnivCo p r t1 t2)   = IfaceUnivCo (go_prov p) r
+    go (HydrateDCo r t dco _)= IfaceHydrateDCo r (toIfaceTypeX fr t) (go_dco dco)
+    go (UnivCo p r t1 t2)   = IfaceUnivCo (go_prov go p) r
                                           (toIfaceTypeX fr t1)
                                           (toIfaceTypeX fr t2)
     go (TyConAppCo r tc cos)
@@ -313,11 +319,34 @@ toIfaceCoercionX fr co
                           where
                             fr' = fr `delVarSet` tv
 
-    go_prov :: UnivCoProvenance -> IfaceUnivCoProv
-    go_prov (PhantomProv co)    = IfacePhantomProv (go co)
-    go_prov (ProofIrrelProv co) = IfaceProofIrrelProv (go co)
-    go_prov (PluginProv str)    = IfacePluginProv str
-    go_prov (CorePrepProv b)    = IfaceCorePrepProv b
+
+    go_dco ReflDCo             = IfaceReflDCo
+    go_dco (GReflRightDCo co)  = IfaceGReflRightDCo (go co)
+    go_dco (GReflLeftDCo  co)  = IfaceGReflLeftDCo  (go co)
+    go_dco (CoVarDCo cv)
+      -- See [TcTyVars in IfaceType] in GHC.Iface.Type
+      | cv `elemVarSet` fr     = IfaceFreeCoVarDCo cv
+      | otherwise              = IfaceCoVarDCo (toIfaceCoVar cv)
+    go_dco (AppDCo co1 co2)    = IfaceAppDCo  (go_dco co1) (go_dco co2)
+    go_dco (TransDCo co1 co2)  = IfaceTransDCo (go_dco co1) (go_dco co2)
+    go_dco (AxiomInstDCo ax)   = IfaceAxiomInstDCo (coAxiomName ax)
+    go_dco (StepsDCo n)        = IfaceStepsDCo n
+    go_dco (TyConAppDCo cos)   = IfaceTyConAppDCo (map go_dco cos)
+    go_dco (SubDCo dco)        = IfaceSubDCo (go_dco dco)
+    go_dco (DehydrateCo co)    = IfaceDehydrateCo (go co)
+    go_dco (ForAllDCo tv k co) = IfaceForAllDCo (toIfaceBndr tv)
+                                                (toIfaceDCoercionX fr' k)
+                                                (toIfaceDCoercionX fr' co)
+                          where
+                            fr' = fr `delVarSet` tv
+
+    go_dco (UnivDCo p rhs)     = IfaceUnivDCo (go_prov go_dco p) (toIfaceTypeX fr rhs)
+
+    go_prov :: (co -> iface_co) -> UnivCoProvenance co -> IfaceUnivCoProv iface_co
+    go_prov to_iface (PhantomProv co)    = IfacePhantomProv (to_iface co)
+    go_prov to_iface (ProofIrrelProv co) = IfaceProofIrrelProv (to_iface co)
+    go_prov _        (PluginProv str)    = IfacePluginProv str
+    go_prov _        (CorePrepProv b)    = IfaceCorePrepProv b
 
 toIfaceTcArgs :: TyCon -> [Type] -> IfaceAppArgs
 toIfaceTcArgs = toIfaceTcArgsX emptyVarSet

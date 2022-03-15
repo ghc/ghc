@@ -6,6 +6,7 @@ Type and Coercion - friends' interface
 
 
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE GADTs #-}
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
 -- | Substitution into types and coercions.
@@ -37,17 +38,19 @@ module GHC.Core.TyCo.Subst
         substTyUnchecked, substTysUnchecked, substScaledTysUnchecked, substThetaUnchecked,
         substTyWithUnchecked, substScaledTyUnchecked,
         substCoUnchecked, substCoWithUnchecked,
+        substDCoUnchecked,
         substTyWithInScope,
         substTys, substScaledTys, substTheta,
         lookupTyVar,
         substCo, substCos, substCoVar, substCoVars, lookupCoVar,
+        substDCo,
         cloneTyVarBndr, cloneTyVarBndrs,
         substVarBndr, substVarBndrs,
         substTyVarBndr, substTyVarBndrs,
         substCoVarBndr,
         substTyVar, substTyVars, substTyCoVars,
         substTyCoBndr,
-        substForAllCoBndr,
+        substForAllCoBndr, substForAllDCoBndr,
         substVarBndrUsing, substForAllCoBndrUsing,
         checkValidSubst, isValidTCvSubst,
   ) where
@@ -63,7 +66,13 @@ import {-# SOURCE #-} GHC.Core.Coercion
    , mkAxiomInstCo, mkAppCo, mkGReflCo
    , mkInstCo, mkLRCo, mkTyConAppCo
    , mkCoercionType
-   , coercionKind, coercionLKind, coVarKindsTypesRole )
+   , mkTyConAppDCo
+   , mkAppDCo, mkForAllDCo, mkReflDCo, mkTransDCo
+   , mkGReflRightDCo, mkGReflLeftDCo
+   , mkHydrateDCo, mkDehydrateCo, mkUnivDCo
+   , followDCo
+   , coercionKind, coercionLKind, coVarKindsTypesRole)
+import GHC.Core.Coercion.Axiom (Role(..))
 import {-# SOURCE #-} GHC.Core.TyCo.Ppr ( pprTyVar )
 
 import GHC.Core.TyCo.Rep
@@ -632,8 +641,8 @@ isValidTCvSubst (TCvSubst in_scope tenv cenv) =
 
 -- | This checks if the substitution satisfies the invariant from
 -- Note [The substitution invariant].
-checkValidSubst :: HasDebugCallStack => TCvSubst -> [Type] -> [Coercion] -> a -> a
-checkValidSubst subst@(TCvSubst in_scope tenv cenv) tys cos a
+checkValidSubst :: HasDebugCallStack => TCvSubst -> [Type] -> [Coercion] -> [DCoercion] -> a -> a
+checkValidSubst subst@(TCvSubst in_scope tenv cenv) tys cos dcos a
   = assertPpr (isValidTCvSubst subst)
               (text "in_scope" <+> ppr in_scope $$
                text "tenv" <+> ppr tenv $$
@@ -641,13 +650,15 @@ checkValidSubst subst@(TCvSubst in_scope tenv cenv) tys cos a
                text "cenv" <+> ppr cenv $$
                text "cenvFVs" <+> ppr (shallowTyCoVarsOfCoVarEnv cenv) $$
                text "tys" <+> ppr tys $$
-               text "cos" <+> ppr cos) $
+               text "cos" <+> ppr cos $$
+               text "dcos" <+> ppr dcos) $
     assertPpr tysCosFVsInScope
               (text "in_scope" <+> ppr in_scope $$
                text "tenv" <+> ppr tenv $$
                text "cenv" <+> ppr cenv $$
                text "tys" <+> ppr tys $$
                text "cos" <+> ppr cos $$
+               text "dcos" <+> ppr dcos $$
                text "needInScope" <+> ppr needInScope)
     a
   where
@@ -655,7 +666,8 @@ checkValidSubst subst@(TCvSubst in_scope tenv cenv) tys cos a
     -- It's OK to use nonDetKeysUFM here, because we only use this list to
     -- remove some elements from a set
   needInScope = (shallowTyCoVarsOfTypes tys `unionVarSet`
-                 shallowTyCoVarsOfCos cos)
+                 shallowTyCoVarsOfCos cos `unionVarSet`
+                 shallowTyCoVarsOfDCos dcos)
                 `delListFromUniqSet_Directly` substDomain
   tysCosFVsInScope = needInScope `varSetInScope` in_scope
 
@@ -666,7 +678,7 @@ checkValidSubst subst@(TCvSubst in_scope tenv cenv) tys cos a
 substTy :: HasDebugCallStack => TCvSubst -> Type  -> Type
 substTy subst ty
   | isEmptyTCvSubst subst = ty
-  | otherwise             = checkValidSubst subst [ty] [] $
+  | otherwise             = checkValidSubst subst [ty] [] [] $
                             subst_ty subst ty
 
 -- | Substitute within a 'Type' disabling the sanity checks.
@@ -691,12 +703,12 @@ substScaledTyUnchecked subst scaled_ty = mapScaledType (substTyUnchecked subst) 
 substTys :: HasDebugCallStack => TCvSubst -> [Type] -> [Type]
 substTys subst tys
   | isEmptyTCvSubst subst = tys
-  | otherwise = checkValidSubst subst tys [] $ map (subst_ty subst) tys
+  | otherwise = checkValidSubst subst tys [] [] $ map (subst_ty subst) tys
 
 substScaledTys :: HasDebugCallStack => TCvSubst -> [Scaled Type] -> [Scaled Type]
 substScaledTys subst scaled_tys
   | isEmptyTCvSubst subst = scaled_tys
-  | otherwise = checkValidSubst subst (map scaledMult scaled_tys ++ map scaledThing scaled_tys) [] $
+  | otherwise = checkValidSubst subst (map scaledMult scaled_tys ++ map scaledThing scaled_tys) [] [] $
                 map (mapScaledType (subst_ty subst)) scaled_tys
 
 -- | Substitute within several 'Type's disabling the sanity checks.
@@ -786,13 +798,31 @@ lookupTyVar (TCvSubst _ tenv _) tv
   = assert (isTyVar tv )
     lookupVarEnv tenv tv
 
+-- | Substitute within a 'DCoercion'
+-- The substitution has to satisfy the invariants described in
+-- Note [The substitution invariant].
+substDCo :: HasDebugCallStack => TCvSubst -> DCoercion -> DCoercion
+substDCo subst dco
+  | isEmptyTCvSubst subst = dco
+  | otherwise = checkValidSubst subst [] [] [dco] $ subst_dco subst dco
+
+-- | Substitute within a 'DCoercion' disabling sanity checks.
+-- The problems that the sanity checks in substCo catch are described in
+-- Note [The substitution invariant].
+-- The goal of #11371 is to migrate all the calls of substDCoUnchecked to
+-- substDCo and remove this function. Please don't use in new code.
+substDCoUnchecked :: TCvSubst -> DCoercion -> DCoercion
+substDCoUnchecked subst co
+  | isEmptyTCvSubst subst = co
+  | otherwise = subst_dco subst co
+
 -- | Substitute within a 'Coercion'
 -- The substitution has to satisfy the invariants described in
 -- Note [The substitution invariant].
 substCo :: HasDebugCallStack => TCvSubst -> Coercion -> Coercion
 substCo subst co
   | isEmptyTCvSubst subst = co
-  | otherwise = checkValidSubst subst [] [co] $ subst_co subst co
+  | otherwise = checkValidSubst subst [] [co] [] $ subst_co subst co
 
 -- | Substitute within a 'Coercion' disabling sanity checks.
 -- The problems that the sanity checks in substCo catch are described in
@@ -810,18 +840,23 @@ substCoUnchecked subst co
 substCos :: HasDebugCallStack => TCvSubst -> [Coercion] -> [Coercion]
 substCos subst cos
   | isEmptyTCvSubst subst = cos
-  | otherwise = checkValidSubst subst [] cos $ map (subst_co subst) cos
+  | otherwise = checkValidSubst subst [] cos [] $ map (subst_co subst) cos
 
 subst_co :: TCvSubst -> Coercion -> Coercion
-subst_co subst co
-  = go co
+subst_co = fst . subst_co_dco
+
+subst_dco :: TCvSubst -> DCoercion -> DCoercion
+subst_dco = snd . subst_co_dco
+
+subst_co_dco :: TCvSubst -> (Coercion -> Coercion, DCoercion -> DCoercion)
+subst_co_dco subst = (go, go_dco)
   where
     go_ty :: Type -> Type
     go_ty = subst_ty subst
 
     go_mco :: MCoercion -> MCoercion
     go_mco MRefl    = MRefl
-    go_mco (MCo co) = MCo (go co)
+    go_mco (MCo co) = MCo $! go co
 
     go :: Coercion -> Coercion
     go (Refl ty)             = mkNomReflCo $! (go_ty ty)
@@ -836,10 +871,13 @@ subst_co subst co
     go (FunCo r w co1 co2)   = ((mkFunCo r $! go w) $! go co1) $! go co2
     go (CoVarCo cv)          = substCoVar subst cv
     go (AxiomInstCo con ind cos) = mkAxiomInstCo con ind $! map go cos
-    go (UnivCo p r t1 t2)    = (((mkUnivCo $! go_prov p) $! r) $!
+    go (HydrateDCo r ty dco rty) = (((mkHydrateDCo $! r) $! go_ty ty) $! go_dco dco) $! Just (go_ty rty)
+      -- Here we can either substitute the RHS or recompute it from the rest of the information.
+
+    go (UnivCo p r t1 t2)    = (((mkUnivCo $! go_prov go p) $! r) $!
                                 (go_ty t1)) $! (go_ty t2)
     go (SymCo co)            = mkSymCo $! (go co)
-    go (TransCo co1 co2)     = (mkTransCo $! (go co1)) $! (go co2)
+    go (TransCo co1 co2)     = (mkTransCo $! go co1) $! go co2
     go (NthCo r d co)        = mkNthCo r d $! (go co)
     go (LRCo lr co)          = mkLRCo lr $! (go co)
     go (InstCo co arg)       = (mkInstCo $! (go co)) $! go arg
@@ -849,10 +887,30 @@ subst_co subst co
                                 in cs1 `seqList` AxiomRuleCo c cs1
     go (HoleCo h)            = HoleCo $! go_hole h
 
-    go_prov (PhantomProv kco)    = PhantomProv (go kco)
-    go_prov (ProofIrrelProv kco) = ProofIrrelProv (go kco)
-    go_prov p@(PluginProv _)     = p
-    go_prov p@(CorePrepProv _)   = p
+    go_dco :: DCoercion -> DCoercion
+    go_dco ReflDCo                = mkReflDCo
+    go_dco (GReflRightDCo co)     = mkGReflRightDCo $! go co
+    go_dco (GReflLeftDCo  co)     = mkGReflLeftDCo  $! go co
+    go_dco (TyConAppDCo args)     = let args' = map go_dco args
+                                    in  args' `seqList` mkTyConAppDCo args'
+    go_dco (AppDCo co arg)        = (mkAppDCo $! go_dco co) $! go_dco arg
+    go_dco (CoVarDCo cv)          = mkDehydrateCo $! substCoVar subst cv
+    go_dco dco@AxiomInstDCo{}     = dco
+    go_dco dco@StepsDCo{}         = dco
+    go_dco (TransDCo co1 co2)     = (mkTransDCo $! go_dco co1) $! go_dco co2
+    go_dco (DehydrateCo co)       = mkDehydrateCo $! go co
+    go_dco (ForAllDCo tv kind_dco co)
+      = case substForAllDCoBndrUnchecked subst tv kind_dco of
+         (subst', tv', kind_dco') ->
+          ((mkForAllDCo $! tv') $! kind_dco') $! subst_dco subst' co
+    go_dco (UnivDCo prov rhs)     = (mkUnivDCo (go_prov go_dco prov)) $! go_ty rhs
+    go_dco (SubDCo dco)           = SubDCo $ go_dco dco
+
+    go_prov :: (co -> co) -> UnivCoProvenance co -> UnivCoProvenance co
+    go_prov do_subst (PhantomProv kco)    = PhantomProv $! do_subst kco
+    go_prov do_subst (ProofIrrelProv kco) = ProofIrrelProv $! do_subst kco
+    go_prov _        p@(PluginProv _)     = p
+    go_prov _        p@(CorePrepProv _)   = p
 
     -- See Note [Substituting in a coercion hole]
     go_hole h@(CoercionHole { ch_co_var = cv })
@@ -861,7 +919,12 @@ subst_co subst co
 substForAllCoBndr :: TCvSubst -> TyCoVar -> KindCoercion
                   -> (TCvSubst, TyCoVar, Coercion)
 substForAllCoBndr subst
-  = substForAllCoBndrUsing False (substCo subst) subst
+  = substForAllCoBndrUsing Co False (substTy subst) (substCo subst) subst
+
+substForAllDCoBndr :: TCvSubst -> TyCoVar -> KindDCoercion
+                  -> (TCvSubst, TyCoVar, DCoercion)
+substForAllDCoBndr subst
+  = substForAllCoBndrUsing DCo False (substTy subst) (substDCo subst) subst
 
 -- | Like 'substForAllCoBndr', but disables sanity checks.
 -- The problems that the sanity checks in substCo catch are described in
@@ -871,50 +934,71 @@ substForAllCoBndr subst
 substForAllCoBndrUnchecked :: TCvSubst -> TyCoVar -> KindCoercion
                            -> (TCvSubst, TyCoVar, Coercion)
 substForAllCoBndrUnchecked subst
-  = substForAllCoBndrUsing False (substCoUnchecked subst) subst
+  = substForAllCoBndrUsing Co False (substTyUnchecked subst) (substCoUnchecked subst) subst
+
+substForAllDCoBndrUnchecked :: TCvSubst -> TyCoVar -> KindDCoercion
+                           -> (TCvSubst, TyCoVar, DCoercion)
+substForAllDCoBndrUnchecked subst
+  = substForAllCoBndrUsing DCo False (substTyUnchecked subst) (substDCoUnchecked subst) subst
+
 
 -- See Note [Sym and ForAllCo]
-substForAllCoBndrUsing :: Bool  -- apply sym to binder?
-                       -> (Coercion -> Coercion)  -- transformation to kind co
-                       -> TCvSubst -> TyCoVar -> KindCoercion
-                       -> (TCvSubst, TyCoVar, KindCoercion)
-substForAllCoBndrUsing sym sco subst old_var
-  | isTyVar old_var = substForAllCoTyVarBndrUsing sym sco subst old_var
-  | otherwise       = substForAllCoCoVarBndrUsing sym sco subst old_var
+substForAllCoBndrUsing :: CoOrDCo kco
+                       -> Bool  -- apply sym to binder?
+                       -> (Type -> Type)
+                       -> (kco -> kco)  -- transformation to kind co
+                       -> TCvSubst -> TyCoVar -> kco
+                       -> (TCvSubst, TyCoVar, kco)
+substForAllCoBndrUsing co_or_dco sym sty sco subst old_var
+  | isTyVar old_var = substForAllCoTyVarBndrUsing co_or_dco sym sty sco subst old_var
+  | otherwise       = substForAllCoCoVarBndrUsing co_or_dco sym sty sco subst old_var
 
-substForAllCoTyVarBndrUsing :: Bool  -- apply sym to binder?
-                            -> (Coercion -> Coercion)  -- transformation to kind co
-                            -> TCvSubst -> TyVar -> KindCoercion
-                            -> (TCvSubst, TyVar, KindCoercion)
-substForAllCoTyVarBndrUsing sym sco (TCvSubst in_scope tenv cenv) old_var old_kind_co
+substForAllCoTyVarBndrUsing :: CoOrDCo kco
+                            -> Bool  -- apply sym to binder?
+                            -> (Type -> Type) -- transformation to types
+                            -> (kco -> kco)  -- transformation to kind co
+                            -> TCvSubst -> TyVar -> kco
+                            -> (TCvSubst, TyVar, kco)
+substForAllCoTyVarBndrUsing co_or_dco sym sty sco (TCvSubst in_scope tenv cenv) old_var old_kind_co
   = assert (isTyVar old_var )
     ( TCvSubst (in_scope `extendInScopeSet` new_var) new_env cenv
     , new_var, new_kind_co )
   where
     new_env | no_change && not sym = delVarEnv tenv old_var
             | sym       = extendVarEnv tenv old_var $
-                          TyVarTy new_var `CastTy` new_kind_co
+                          mk_cast (TyVarTy new_var) new_kind_co
             | otherwise = extendVarEnv tenv old_var (TyVarTy new_var)
 
-    no_kind_change = noFreeVarsOfCo old_kind_co
+    no_kind_change = case co_or_dco of
+      Co  -> noFreeVarsOfCo old_kind_co
+      DCo -> noFreeVarsOfDCo old_kind_co
+    mk_cast = case co_or_dco of
+      Co  -> CastTy
+      DCo -> \ ty dco -> CastTy ty (mkHydrateDCo Nominal new_ki1 dco Nothing)
+            -- SLD TODO: Hydration invariant?
+
     no_change = no_kind_change && (new_var == old_var)
 
     new_kind_co | no_kind_change = old_kind_co
                 | otherwise      = sco old_kind_co
 
-    new_ki1 = coercionLKind new_kind_co
+    new_ki1 = case co_or_dco of
+      Co  -> coercionLKind new_kind_co
     -- We could do substitution to (tyVarKind old_var). We don't do so because
     -- we already substituted new_kind_co, which contains the kind information
     -- we want. We don't want to do substitution once more. Also, in most cases,
     -- new_kind_co is a Refl, in which case coercionKind is really fast.
+      DCo -> sty (tyVarKind old_var)
 
     new_var  = uniqAway in_scope (setTyVarKind old_var new_ki1)
 
-substForAllCoCoVarBndrUsing :: Bool  -- apply sym to binder?
-                            -> (Coercion -> Coercion)  -- transformation to kind co
-                            -> TCvSubst -> CoVar -> KindCoercion
-                            -> (TCvSubst, CoVar, KindCoercion)
-substForAllCoCoVarBndrUsing sym sco (TCvSubst in_scope tenv cenv)
+substForAllCoCoVarBndrUsing :: CoOrDCo kco
+                            -> Bool  -- apply sym to binder?
+                            -> (Type -> Type) -- transformation to types
+                            -> (kco -> kco)  -- transformation to kind co
+                            -> TCvSubst -> CoVar -> kco
+                            -> (TCvSubst, CoVar, kco)
+substForAllCoCoVarBndrUsing co_or_dco sym sty sco (TCvSubst in_scope tenv cenv)
                             old_var old_kind_co
   = assert (isCoVar old_var )
     ( TCvSubst (in_scope `extendInScopeSet` new_var) tenv new_cenv
@@ -923,13 +1007,21 @@ substForAllCoCoVarBndrUsing sym sco (TCvSubst in_scope tenv cenv)
     new_cenv | no_change && not sym = delVarEnv cenv old_var
              | otherwise = extendVarEnv cenv old_var (mkCoVarCo new_var)
 
-    no_kind_change = noFreeVarsOfCo old_kind_co
+    no_kind_change = case co_or_dco of
+      Co  -> noFreeVarsOfCo old_kind_co
+      DCo -> noFreeVarsOfDCo old_kind_co
     no_change = no_kind_change && (new_var == old_var)
 
     new_kind_co | no_kind_change = old_kind_co
                 | otherwise      = sco old_kind_co
 
-    Pair h1 h2 = coercionKind new_kind_co
+    Pair h1 h2 = case co_or_dco of
+      Co  -> coercionKind new_kind_co
+      DCo ->
+        let l_ty = sty (varType old_var)
+            r_ty = followDCo Nominal l_ty new_kind_co
+              -- SLD TODO: Hydration invariant satisfied?
+        in Pair l_ty r_ty
 
     new_var       = uniqAway in_scope $ mkCoVar (varName old_var) new_var_type
     new_var_type  | sym       = h2

@@ -7,18 +7,21 @@ module GHC.Core.Reduction
      -- * Reductions
      Reduction(..), ReductionN, ReductionR, HetReduction(..),
      Reductions(..),
-     mkReduction, mkReductions, mkHetReduction, coercionRedn,
-     reductionOriginalType,
-     downgradeRedn, mkSubRedn,
+     mkReduction, mkReductions, mkHetReduction, mkDehydrateCoercionRedn,
+     mkHydrateReductionDCoercion,
+     mkSubRedn,
      mkTransRedn, mkCoherenceRightRedn, mkCoherenceRightMRedn,
      mkCastRedn1, mkCastRedn2,
      mkReflRedn, mkGReflRightRedn, mkGReflRightMRedn,
      mkGReflLeftRedn, mkGReflLeftMRedn,
      mkAppRedn, mkAppRedns, mkFunRedn,
      mkForAllRedn, mkHomoForAllRedn, mkTyConAppRedn, mkClassPredRedn,
+     mkTyConAppRedn_MightBeSynonym,
      mkProofIrrelRedn, mkReflCoRedn,
-     homogeniseHetRedn,
+     homogeniseHetRedn, homogeniseRedn,
      unzipRedns,
+     mkReflRedns,
+     mkReflDCos,
 
      -- * Rewriting type arguments
      ArgsReductions(..),
@@ -28,10 +31,10 @@ module GHC.Core.Reduction
 
 import GHC.Prelude
 
-import GHC.Core.Class      ( Class(classTyCon) )
+import GHC.Core.Class      ( Class(..) )
 import GHC.Core.Coercion
 import GHC.Core.Predicate  ( mkClassPred )
-import GHC.Core.TyCon      ( TyCon )
+import GHC.Core.TyCon      ( TyCon, expandSynTyCon_maybe )
 import GHC.Core.Type
 
 import GHC.Data.Pair       ( Pair(Pair) )
@@ -44,6 +47,8 @@ import GHC.Utils.Misc      ( HasDebugCallStack, equalLength )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic     ( assertPpr, panic )
 
+import Data.List           ( zipWith4 )
+
 {-
 %************************************************************************
 %*                                                                      *
@@ -53,55 +58,457 @@ import GHC.Utils.Panic     ( assertPpr, panic )
 
 Note [The Reduction type]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
-Many functions in the type-checker rewrite a type, using Given type equalitie
-or type-family reductions, and return a Reduction, which is just a pair of the
-coercion and the RHS type of the coercion:
-  data Reduction = Reduction Coercion !Type
+Many functions in the type-checker rewrite a type, using Given type equalities
+or type-family reductions, and return a Reduction:
+
+  data Reduction = Reduction Type Coercion !Type
+
+When we rewrite ty at role r, producing Reduction ty' dco xi, we guarantee:
+
+  RW1: ty' is equal to ty (up to zonking)
+  RW2: followDCo r ty' dco is equal to xi (up to zonking)
+
+In particular, this means that `dco :: ty' ~r xi`. Note that we need to use ty',
+and not ty, to satisfy RW2; see Note [The Hydration invariant] in GHC.Core.Coercion.
+It could be the case that `followDCo r ty dco` crashes, e.g. if `ty` is a metavariable
+and `dco = TyConAppDCo ..`. This is why we store the LHS type in the Reduction too.
 
 The order of the arguments to the constructor serves as a reminder
 of what the Type is.  In
-    Reduction co ty
-`ty` appears to the right of `co`, reminding us that we must have:
-    co :: unrewritten_ty ~ ty
+
+    Reduction ty' dco xi
+
+the original type ty appears to the left, and the result appears on the right,
+reminding us that we must have:
+
+  dco :: ty' ~r xi
 
 Example functions that use this datatype:
+
    GHC.Core.FamInstEnv.topNormaliseType_maybe
      :: FamInstEnvs -> Type -> Maybe Reduction
    GHC.Tc.Solver.Rewrite.rewrite
      :: CtEvidence -> TcType -> TcS Reduction
 
 Having Reduction as a data type, with a strict Type field, rather than using
-a pair (Coercion,Type) gives several advantages (see #20161)
+a tuple (with all fields lazy), gives several advantages (see #20161)
 * The strictness in Type improved performance in rewriting of type families
   (around 2.5% improvement in T9872),
 * Compared to the situation before, it gives improved consistency around
   orientation of rewritings, as a Reduction is always left-to-right
   (the coercion's RHS type is always the type stored in the 'Reduction').
   No more 'mkSymCo's needed to convert between left-to-right and right-to-left.
-
-One could imagine storing the LHS type of the coercion in the Reduction as well,
-but in fact `reductionOriginalType` is very seldom used, so it's not worth it.
 -}
 
 -- | A 'Reduction' is the result of an operation that rewrites a type @ty_in@.
--- The 'Reduction' includes the rewritten type @ty_out@ and a 'Coercion' @co@
--- such that @co :: ty_in ~ ty_out@, where the role of the coercion is determined
--- by the context. That is, the LHS type of the coercion is the original type
--- @ty_in@, while its RHS type is the rewritten type @ty_out@.
+-- The 'Reduction' includes:
 --
--- A Reduction is always homogeneous, unless it is wrapped inside a 'HetReduction',
--- which separately stores the kind coercion.
+--  - an input type @ty_in'@, equal to @ty_in@ up to zonking,
+--  - a directed coercion @dco@,
+--  - the rewritten type @ty_out@
+--
+-- such that @dco :: ty_in' ~ ty_out@, where the role @r@ of the coercion is determined
+-- by the context.
+--
+-- Invariant: it is always valid to call @followDCo r ty_in' dco@, as per
+-- Note [The Hydration invariant] in GHC.Core.Coercion.
 --
 -- See Note [The Reduction type].
 data Reduction =
   Reduction
-    { reductionCoercion    :: Coercion
-    , reductionReducedType :: !Type
+    { reductionOriginalType :: Type
+    , reductionDCoercion    :: DCoercion
+    , reductionReducedType  :: !Type
     }
 -- N.B. the 'Coercion' field must be lazy: see for instance GHC.Tc.Solver.Rewrite.rewrite_tyvar2
 -- which returns an error in the 'Coercion' field when dealing with a Derived constraint
 -- (which is OK as this Coercion gets ignored later).
 -- We might want to revisit the strictness once Deriveds are removed.
+
+-- | A 'Reduction' in which the 'Coercion' has 'Nominal' role.
+type ReductionN = Reduction
+
+-- | A 'Reduction' in which the 'Coercion' has 'Representational' role.
+type ReductionR = Reduction
+
+-- | Create a 'Reduction' from a pair of a 'Coercion' and a 'Type.
+--
+-- Pre-condition: the RHS type of the coercion matches the provided type
+-- (perhaps up to zonking).
+--
+-- Use 'coercionRedn' when you only have the coercion.
+mkReduction :: Type -> DCoercion -> Type -> Reduction
+mkReduction lty co rty = Reduction lty co rty
+{-# INLINE mkReduction #-}
+
+instance Outputable Reduction where
+  ppr redn =
+    braces $ vcat
+      [ text " reductionReducedType:" <+> ppr (reductionReducedType redn)
+      , text "   reductionDCoercion:" <+> ppr (reductionDCoercion redn)
+      ]
+
+-- | Turn a 'Coercion' into a 'Reduction'
+-- by inspecting the LHS and RHS types of the coercion, and dehydrating.
+--
+-- Prefer using 'mkReduction' wherever possible to avoid doing these indirections.
+mkDehydrateCoercionRedn :: Coercion -> Reduction
+mkDehydrateCoercionRedn co =
+  Reduction (coercionLKind co) (mkDehydrateCo co) (coercionRKind co)
+{-# INLINE mkDehydrateCoercionRedn #-}
+
+-- | Hydrate the 'DCoercion' stored inside a 'Reduction' into a full-fledged 'Coercion'.
+mkHydrateReductionDCoercion :: HasDebugCallStack => Role -> Reduction -> Coercion
+mkHydrateReductionDCoercion r (Reduction lty dco rty) = mkHydrateDCo r lty dco (Just rty)
+  -- N.B.: we use the LHS type stored in the 'Reduction' to ensure
+  -- we satisfy the Hydration invariant of Note [The Hydration invariant]
+  -- in GHC.Core.Coercion.
+{-# INLINE mkHydrateReductionDCoercion #-}
+
+-- | Downgrade the role of the directed coercion stored in the 'Reduction',
+-- from 'Nominal' to 'Representational'.
+mkSubRedn :: Reduction -> Reduction
+mkSubRedn redn@(Reduction lhs dco rhs)
+  = redn { reductionDCoercion = mkSubDCo lhs dco rhs }
+{-# INLINE mkSubRedn #-}
+
+-- | Compose two reductions.
+--
+-- Assumes that forming a composite is valid, i.e. the RHS type of
+-- the first directed coercion equals, up to zonking,
+-- the LHS type of the second directed coercion.
+--
+-- Warning: this function is not guaranteed to preserve the Hydration invariant
+-- as required by Note [The Reduction type]. You must manually ensure this
+-- invariant.
+mkTransRedn :: Reduction -> Reduction -> Reduction
+mkTransRedn (Reduction ty1 dco1 _) (Reduction _ dco2 ty2)
+  = Reduction ty1 (dco1 `mkTransDCo` dco2) ty2
+{-# INLINE mkTransRedn #-}
+
+-- | The reflexive reduction.
+mkReflRedn :: Type -> Reduction
+mkReflRedn ty = mkReduction ty mkReflDCo ty
+{-# INLINE mkReflRedn #-}
+
+-- | Create a 'Reduction' from a kind cast, in which
+-- the casted type is the rewritten type.
+--
+-- Given @ty :: k1@, @mco :: k1 ~ k2@,
+-- produces the 'Reduction' @ty ~res_co~> (ty |> mco)@
+-- at the given 'Role'.
+mkGReflRightRedn :: Type -> CoercionN -> Reduction
+mkGReflRightRedn ty co
+  = mkReduction
+      ty
+      (mkGReflRightDCo co)
+      (mkCastTy ty co)
+{-# INLINE mkGReflRightRedn #-}
+
+-- | Create a 'Reduction' from a kind cast, in which
+-- the casted type is the rewritten type.
+--
+-- Given @ty :: k1@, @mco :: k1 ~ k2@,
+-- produces the 'Reduction' @ty ~res_co~> (ty |> mco)@
+-- at the given 'Role'.
+mkGReflRightMRedn :: Type -> MCoercionN -> Reduction
+mkGReflRightMRedn ty MRefl
+  = mkReflRedn ty
+mkGReflRightMRedn ty (MCo kco)
+  = mkReduction
+      ty
+      (mkGReflRightDCo kco)
+      (mkCastTy ty kco)
+{-# INLINE mkGReflRightMRedn #-}
+
+-- | Create a 'Reduction' from a kind cast, in which
+-- the casted type is the original (non-rewritten) type.
+--
+-- Given @ty :: k1@, @mco :: k1 ~ k2@,
+-- produces the 'Reduction' @(ty |> mco) ~res_co~> ty@
+-- at the given 'Role'.
+mkGReflLeftRedn :: Type -> CoercionN -> Reduction
+mkGReflLeftRedn ty co
+  = mkReduction
+      (mkCastTy ty co)
+      (mkGReflLeftDCo co)
+      ty
+{-# INLINE mkGReflLeftRedn #-}
+
+-- | Create a 'Reduction' from a kind cast, in which
+-- the casted type is the original (non-rewritten) type.
+--
+-- Given @ty :: k1@, @mco :: k1 ~ k2@,
+-- produces the 'Reduction' @(ty |> mco) ~res_co~> ty@
+-- at the given 'Role'.
+mkGReflLeftMRedn :: Type -> MCoercionN -> Reduction
+mkGReflLeftMRedn ty MRefl
+  = mkReflRedn ty
+mkGReflLeftMRedn ty (MCo kco)
+  = mkReduction
+      (mkCastTy ty kco)
+      (mkGReflLeftDCo kco)
+      ty
+{-# INLINE mkGReflLeftMRedn #-}
+
+-- | Apply a cast to the result of a 'Reduction'.
+--
+-- Given a 'Reduction' @ty1 ~co1~> (ty2 :: k2)@ and a kind coercion @kco@
+-- with LHS kind @k2@, produce a new 'Reduction' @ty1 ~co2~> ( ty2 |> kco )@
+-- of the given 'Role' (which must match the role of the coercion stored
+-- in the 'Reduction' argument).
+mkCoherenceRightRedn :: Reduction -> CoercionN -> Reduction
+mkCoherenceRightRedn (Reduction ty1 co1 ty2) kco
+  = mkReduction
+      ty1
+      (mkCoherenceRightDCo kco co1)
+      (mkCastTy ty2 kco)
+{-# INLINE mkCoherenceRightRedn #-}
+
+-- | Apply a cast to the result of a 'Reduction', using an 'MCoercionN'.
+--
+-- Given a 'Reduction' @ty1 ~co1~> (ty2 :: k2)@ and a kind coercion @mco@
+-- with LHS kind @k2@, produce a new 'Reduction' @ty1 ~co2~> ( ty2 |> mco )@
+-- of the given 'Role' (which must match the role of the coercion stored
+-- in the 'Reduction' argument).
+mkCoherenceRightMRedn :: Reduction -> MCoercionN -> Reduction
+mkCoherenceRightMRedn redn MRefl = redn
+mkCoherenceRightMRedn (Reduction ty1 co1 ty2) (MCo kco)
+  = mkReduction
+      ty1
+      (mkCoherenceRightDCo kco co1)
+      (mkCastTy ty2 kco)
+{-# INLINE mkCoherenceRightMRedn #-}
+
+-- | Apply a cast to a 'Reduction', casting both the original and the reduced type.
+--
+-- Given @cast_co@ and 'Reduction' @ty ~co~> xi@, this function returns
+-- the 'Reduction' @(ty |> cast_co) ~return_co~> (xi |> cast_co)@
+-- of the given 'Role' (which must match the role of the coercion stored
+-- in the 'Reduction' argument).
+--
+-- Pre-condition: the 'Type' passed in is the same as the LHS type
+-- of the coercion stored in the 'Reduction'.
+mkCastRedn1 :: CoercionN -- ^ coercion to cast with
+            -> Reduction  -- ^ rewritten type, with rewriting coercion
+            -> Reduction
+mkCastRedn1 cast_co (Reduction ty dco xi)
+  -- co :: ty ~r ty'
+  -- return_co :: (ty |> cast_co) ~r (ty' |> cast_co)
+  = mkReduction
+      (mkCastTy ty cast_co)
+      (castDCoercionKind1 dco cast_co)
+      (mkCastTy xi cast_co)
+{-# INLINE mkCastRedn1 #-}
+
+-- | Apply casts on both sides of a 'Reduction' (of the given 'Role').
+--
+-- Use 'mkCastRedn1' when you want to cast both the original and reduced types
+-- in a 'Reduction' using the same coercion.
+--
+-- Pre-condition: the 'Type' passed in is the same as the LHS type
+-- of the coercion stored in the 'Reduction'.
+mkCastRedn2 :: CoercionN -- ^ coercion to cast with on the left
+            -> Reduction -- ^ rewritten type, with rewriting coercion
+            -> CoercionN -- ^ coercion to cast with on the right
+            -> Reduction
+mkCastRedn2 cast_co (Reduction ty nco nty) cast_co'
+  = mkReduction
+      (mkCastTy ty cast_co)
+      (castDCoercionKind2 nco cast_co cast_co')
+      (mkCastTy nty cast_co')
+{-# INLINE mkCastRedn2 #-}
+
+-- | Apply one 'Reduction' to another.
+--
+-- Combines 'mkAppCo' and 'mkAppTy`.
+mkAppRedn :: Reduction -> Reduction -> Reduction
+mkAppRedn (Reduction lty1 co1 rty1) (Reduction lty2 co2 rty2)
+  = mkReduction
+      (mkAppTy lty1 lty2)
+      (mkAppDCo co1 co2)
+      (mkAppTy rty1 rty2)
+{-# INLINE mkAppRedn #-}
+
+-- | Create a function 'Reduction'.
+--
+-- Combines 'mkFunCo' and 'mkFunTy'.
+mkFunRedn :: AnonArgFlag
+          -> ReductionN -- ^ multiplicity reduction
+          -> DCoercionN -- ^ argument 'RuntimeRep' coercion
+          -> DCoercionN -- ^ result 'RuntimeRep' coercion
+          -> Reduction  -- ^ argument reduction
+          -> Reduction  -- ^ result reduction
+          -> Reduction
+mkFunRedn vis
+  (Reduction w_lty w_co w_rty)
+  arg_repco
+  res_repco
+  (Reduction arg_lty arg_co arg_rty)
+  (Reduction res_lty res_co res_rty)
+    = mkReduction
+        (mkFunTy vis w_lty arg_lty res_lty)
+        (mkFunDCo w_co arg_repco res_repco arg_co res_co)
+        (mkFunTy vis w_rty arg_rty res_rty)
+{-# INLINE mkFunRedn #-}
+
+-- | Create a 'Reduction' associated to a Π type,
+-- from a kind 'Reduction' and a body 'Reduction'.
+--
+-- Combines 'mkForAllCo' and 'mkForAllTy'.
+mkForAllRedn :: ArgFlag
+             -> TyVar
+             -> ReductionN -- ^ kind reduction
+             -> Reduction  -- ^ body reduction
+             -> Reduction
+mkForAllRedn vis tv1 (Reduction _ h rki) (Reduction lty co rty)
+  = mkReduction
+      (mkForAllTy tv1 vis lty)
+      (mkForAllDCo tv1 h co)
+      (mkForAllTy tv2 vis rty)
+  where
+    tv2 = setTyVarKind tv1 rki
+{-# INLINE mkForAllRedn #-}
+
+-- | Create a 'Reduction' of a quantified type from a
+-- 'Reduction' of the body.
+--
+-- Combines 'mkHomoForAllCos' and 'mkForAllTys'.
+mkHomoForAllRedn :: [TyVarBinder] -> Reduction -> Reduction
+mkHomoForAllRedn bndrs (Reduction ty1 co ty2)
+  = mkReduction
+      (mkForAllTys bndrs ty1)
+      (mkHomoForAllDCos (binderVars bndrs) co)
+      (mkForAllTys bndrs ty2)
+{-# INLINE mkHomoForAllRedn #-}
+
+-- | Create a 'Reduction' from a coercion between coercions.
+--
+-- Combines 'mkProofIrrelCo' and 'mkCoercionTy'.
+mkProofIrrelRedn :: Coercion   -- ^ lhs_co
+                 -> DCoercionN -- ^ dco :: lhs_co ~ rhs_co
+                 -> Coercion   -- ^ rhs_co
+                 -> Reduction
+mkProofIrrelRedn g1 co g2
+  = mkReduction
+      lhs_co
+      (mkProofIrrelDCo co rhs_co)
+      rhs_co
+  where
+    lhs_co = mkCoercionTy g1
+    rhs_co = mkCoercionTy g2
+{-# INLINE mkProofIrrelRedn #-}
+
+-- | Create a reflexive 'Reduction' whose LHS and RHS is the given 'Coercion',
+-- with the specified 'Role'.
+mkReflCoRedn :: Coercion -> Reduction
+mkReflCoRedn co = mkReduction co_ty mkReflDCo co_ty
+  where
+    co_ty = mkCoercionTy co
+{-# INLINE mkReflCoRedn #-}
+
+-- | A collection of 'Reduction's where the coercions and the types are stored separately.
+--
+-- Use 'unzipRedns' to obtain 'Reductions' from a list of 'Reduction's.
+--
+-- This datatype is used in 'mkAppRedns', 'mkClassPredRedns' and 'mkTyConAppRedn',
+-- which expect separate types and coercions.
+--
+-- Invariant: given @Reductions lhs_tys dcos rhs_tys@, and an ambient role @r@,
+-- we can obtain the @rhs_tys@ by following the directed coercions starting from the repsective
+-- @lhs_tys@. Equivalent, @zipWith (followDCo r) lhs_tys dcos@ is equal (up to zonking) to @rhs_tys@.
+data Reductions = Reductions [Type] [DCoercion] [Type]
+
+instance Outputable Reductions where
+  ppr (Reductions ltys dcos rtys) = parens (text "Reductions" <+> ppr ltys <+> ppr dcos <+> ppr rtys)
+
+-- | Create 'Reductions' from individual lists of coercions and types.
+--
+-- The lists should be of the same length, and the RHS type of each coercion
+-- should match the specified type in the other list.
+mkReductions :: [Type] -> [DCoercion] -> [Type] -> Reductions
+mkReductions tys1 cos tys2 = Reductions tys1 cos tys2
+{-# INLINE mkReductions #-}
+
+mkReflRedns :: [Type] -> Reductions
+mkReflRedns tys = mkReductions tys (mkReflDCos tys) tys
+{-# INLINE mkReflRedns #-}
+
+mkReflDCos :: [Type] -> [DCoercion]
+mkReflDCos tys = replicate (length tys) mkReflDCo
+{-# INLINE mkReflDCos #-}
+
+-- | Combines 'mkAppCos' and 'mkAppTys'.
+mkAppRedns :: Reduction -> Reductions -> Reduction
+mkAppRedns (Reduction ty1 co ty2) (Reductions tys1 cos tys2)
+  = mkReduction (mkAppTys ty1 tys1) (mkAppDCos co cos) (mkAppTys ty2 tys2)
+{-# INLINE mkAppRedns #-}
+
+-- | 'TyConAppCo' for 'Reduction's: combines 'mkTyConAppCo' and `mkTyConApp`.
+--
+-- Use this when you know the 'TyCon' is not a type synonym. If it might be,
+-- use 'mkTyConAppRedn_MightBeSynonym'.
+mkTyConAppRedn :: TyCon -> Reductions -> Reduction
+mkTyConAppRedn tc (Reductions tys1 cos tys2)
+  = mkReduction (mkTyConApp tc tys1) (mkTyConAppDCo cos) (mkTyConApp tc tys2)
+{-# INLINE mkTyConAppRedn #-}
+
+-- | 'TyConAppCo' for 'Reduction's: combines 'mkTyConAppCo' and `mkTyConApp`.
+--
+-- Use 'mkTyConAppRedn' if the 'TyCon' is definitely not a type synonym.
+mkTyConAppRedn_MightBeSynonym :: Role -> TyCon -> Reductions -> Reduction
+mkTyConAppRedn_MightBeSynonym role tc redns@(Reductions tys1 dcos tys2)
+  -- 'mkTyConAppCo' handles synomyms by using substitution lifting.
+  -- We don't have that for directed coercions, so we use hydrate/dehydrate
+  -- so that we can call 'liftCoSubst'.
+  -- In the future, it might be desirable to implement substitution lifting
+  -- for directed coercions to avoid this (and a similar issue in simplifyArgsWorker).
+  | Just (tv_dco_prs, rhs_ty, leftover_dcos) <- expandSynTyCon_maybe tc dcos
+  , let tv_co_prs = zipWith4 hydrate (tyConRolesX role tc) tys1 tv_dco_prs tys2
+  = mkReduction
+      (mkTyConApp tc tys1)
+      (mkAppDCos (mkDehydrateCo $ liftCoSubst role (mkLiftingContext tv_co_prs) rhs_ty) leftover_dcos)
+      (mkTyConApp tc tys2)
+  | otherwise = mkTyConAppRedn tc redns
+  where
+    hydrate r l (tv,dco) t = (tv, mkHydrateDCo r l dco (Just t))
+    -- N.B.: we are hydrating using the LHS argument types,
+    -- which are stored in 'Reductions'.
+    -- This upholds the necessary hydration invariant from
+    -- Note [The Hydration invariant] in GHC.Core.Coercion.
+    {-# INLINE hydrate #-}
+{-# INLINE mkTyConAppRedn_MightBeSynonym #-}
+
+-- | Reduce the arguments of a 'Class' 'TyCon'.
+mkClassPredRedn :: Class -> Reductions -> Reduction
+mkClassPredRedn cls (Reductions tys1 cos tys2)
+  = mkReduction
+      (mkClassPred cls tys1)
+      (mkTyConAppDCo cos)
+      (mkClassPred cls tys2)
+{-# INLINE mkClassPredRedn #-}
+
+-- | Obtain 'Reductions' from a list of 'Reduction's by unzipping.
+unzipRedns :: [Reduction] -> Reductions
+unzipRedns = foldr accRedn (Reductions [] [] [])
+  where
+    accRedn :: Reduction -> Reductions -> Reductions
+    accRedn (Reduction ty co xi) (Reductions tys cos xis)
+      = Reductions (ty:tys) (co:cos) (xi:xis)
+{-# INLINE unzipRedns #-}
+-- NB: this function is currently used in two locations:
+--
+-- - GHC.Tc.Gen.Foreign.normaliseFfiType', with one call of the form:
+--
+--   unzipRedns <$> zipWithM f tys roles
+--
+-- - GHC.Tc.Solver.Monad.breakTyVarCycle_maybe, with two calls of the form:
+--
+--   unzipRedns <$> mapM f tys
+--
+-- It is possible to write 'mapAndUnzipM' functions to handle these cases,
+-- but the above locations aren't performance critical, so it was deemed
+-- to not be worth it.
 
 -- | Stores a heterogeneous reduction.
 --
@@ -144,338 +551,25 @@ mkHetReduction redn mco = HetReduction redn mco
 -- this returns the homogeneous reduction:
 --
 -- > hco :: ty ~ ( xi |> sym kco )
-homogeniseHetRedn :: Role -> HetReduction -> Reduction
-homogeniseHetRedn role (HetReduction redn kco)
-  = mkCoherenceRightMRedn role redn (mkSymMCo kco)
+homogeniseHetRedn :: HetReduction -> Reduction
+homogeniseHetRedn (HetReduction redn kco)
+  = mkCoherenceRightMRedn redn (mkSymMCo kco)
 {-# INLINE homogeniseHetRedn #-}
 
--- | Create a 'Reduction' from a pair of a 'Coercion' and a 'Type.
+-- | Homogenise a reduction.
 --
--- Pre-condition: the RHS type of the coercion matches the provided type
--- (perhaps up to zonking).
+-- Given @redn = Reduction co xi@ and kind coercion @kco@, with
 --
--- Use 'coercionRedn' when you only have the coercion.
-mkReduction :: Coercion -> Type -> Reduction
-mkReduction co ty = Reduction co ty
-{-# INLINE mkReduction #-}
-
-instance Outputable Reduction where
-  ppr redn =
-    braces $ vcat
-      [ text "reductionOriginalType:" <+> ppr (reductionOriginalType redn)
-      , text " reductionReducedType:" <+> ppr (reductionReducedType redn)
-      , text "    reductionCoercion:" <+> ppr (reductionCoercion redn)
-      ]
-
--- | A 'Reduction' in which the 'Coercion' has 'Nominal' role.
-type ReductionN = Reduction
-
--- | A 'Reduction' in which the 'Coercion' has 'Representational' role.
-type ReductionR = Reduction
-
--- | Get the original, unreduced type corresponding to a 'Reduction'.
+-- >  co :: ty ~ xi
+-- > kco :: typeKind(ty) ~ typeKind(xi)
 --
--- This is obtained by computing the LHS kind of the stored coercion,
--- which may be slow.
-reductionOriginalType :: Reduction -> Type
-reductionOriginalType = coercionLKind . reductionCoercion
-{-# INLINE reductionOriginalType #-}
-
--- | Turn a 'Coercion' into a 'Reduction'
--- by inspecting the RHS type of the coercion.
+-- this returns the homogeneous reduction:
 --
--- Prefer using 'mkReduction' when you already know
--- the RHS type of the coercion, to avoid computing it anew.
-coercionRedn :: Coercion -> Reduction
-coercionRedn co = Reduction co (coercionRKind co)
-{-# INLINE coercionRedn #-}
-
--- | Downgrade the role of the coercion stored in the 'Reduction'.
-downgradeRedn :: Role -- ^ desired role
-              -> Role -- ^ current role
-              -> Reduction
-              -> Reduction
-downgradeRedn new_role old_role redn@(Reduction co _)
-  = redn { reductionCoercion = downgradeRole new_role old_role co }
-{-# INLINE downgradeRedn #-}
-
--- | Downgrade the role of the coercion stored in the 'Reduction',
--- from 'Nominal' to 'Representational'.
-mkSubRedn :: Reduction -> Reduction
-mkSubRedn redn@(Reduction co _) = redn { reductionCoercion = mkSubCo co }
-{-# INLINE mkSubRedn #-}
-
--- | Compose a reduction with a coercion on the left.
---
--- Pre-condition: the provided coercion's RHS type must match the LHS type
--- of the coercion that is stored in the reduction.
-mkTransRedn :: Coercion -> Reduction -> Reduction
-mkTransRedn co1 redn@(Reduction co2 _)
-  = redn { reductionCoercion = co1 `mkTransCo` co2 }
-{-# INLINE mkTransRedn #-}
-
--- | The reflexive reduction.
-mkReflRedn :: Role -> Type -> Reduction
-mkReflRedn r ty = mkReduction (mkReflCo r ty) ty
-
--- | Create a 'Reduction' from a kind cast, in which
--- the casted type is the rewritten type.
---
--- Given @ty :: k1@, @mco :: k1 ~ k2@,
--- produces the 'Reduction' @ty ~res_co~> (ty |> mco)@
--- at the given 'Role'.
-mkGReflRightRedn :: Role -> Type -> CoercionN -> Reduction
-mkGReflRightRedn role ty co
-  = mkReduction
-      (mkGReflRightCo role ty co)
-      (mkCastTy ty co)
-{-# INLINE mkGReflRightRedn #-}
-
--- | Create a 'Reduction' from a kind cast, in which
--- the casted type is the rewritten type.
---
--- Given @ty :: k1@, @mco :: k1 ~ k2@,
--- produces the 'Reduction' @ty ~res_co~> (ty |> mco)@
--- at the given 'Role'.
-mkGReflRightMRedn :: Role -> Type -> MCoercionN -> Reduction
-mkGReflRightMRedn role ty mco
-  = mkReduction
-      (mkGReflRightMCo role ty mco)
-      (mkCastTyMCo ty mco)
-{-# INLINE mkGReflRightMRedn #-}
-
--- | Create a 'Reduction' from a kind cast, in which
--- the casted type is the original (non-rewritten) type.
---
--- Given @ty :: k1@, @mco :: k1 ~ k2@,
--- produces the 'Reduction' @(ty |> mco) ~res_co~> ty@
--- at the given 'Role'.
-mkGReflLeftRedn :: Role -> Type -> CoercionN -> Reduction
-mkGReflLeftRedn role ty co
-  = mkReduction
-      (mkGReflLeftCo role ty co)
-      ty
-{-# INLINE mkGReflLeftRedn #-}
-
--- | Create a 'Reduction' from a kind cast, in which
--- the casted type is the original (non-rewritten) type.
---
--- Given @ty :: k1@, @mco :: k1 ~ k2@,
--- produces the 'Reduction' @(ty |> mco) ~res_co~> ty@
--- at the given 'Role'.
-mkGReflLeftMRedn :: Role -> Type -> MCoercionN -> Reduction
-mkGReflLeftMRedn role ty mco
-  = mkReduction
-      (mkGReflLeftMCo role ty mco)
-      ty
-{-# INLINE mkGReflLeftMRedn #-}
-
--- | Apply a cast to the result of a 'Reduction'.
---
--- Given a 'Reduction' @ty1 ~co1~> (ty2 :: k2)@ and a kind coercion @kco@
--- with LHS kind @k2@, produce a new 'Reduction' @ty1 ~co2~> ( ty2 |> kco )@
--- of the given 'Role' (which must match the role of the coercion stored
--- in the 'Reduction' argument).
-mkCoherenceRightRedn :: Role -> Reduction -> CoercionN -> Reduction
-mkCoherenceRightRedn r (Reduction co1 ty2) kco
-  = mkReduction
-      (mkCoherenceRightCo r ty2 kco co1)
-      (mkCastTy ty2 kco)
-{-# INLINE mkCoherenceRightRedn #-}
-
--- | Apply a cast to the result of a 'Reduction', using an 'MCoercionN'.
---
--- Given a 'Reduction' @ty1 ~co1~> (ty2 :: k2)@ and a kind coercion @mco@
--- with LHS kind @k2@, produce a new 'Reduction' @ty1 ~co2~> ( ty2 |> mco )@
--- of the given 'Role' (which must match the role of the coercion stored
--- in the 'Reduction' argument).
-mkCoherenceRightMRedn :: Role -> Reduction -> MCoercionN -> Reduction
-mkCoherenceRightMRedn r (Reduction co1 ty2) kco
-  = mkReduction
-      (mkCoherenceRightMCo r ty2 kco co1)
-      (mkCastTyMCo ty2 kco)
-{-# INLINE mkCoherenceRightMRedn #-}
-
--- | Apply a cast to a 'Reduction', casting both the original and the reduced type.
---
--- Given @cast_co@ and 'Reduction' @ty ~co~> xi@, this function returns
--- the 'Reduction' @(ty |> cast_co) ~return_co~> (xi |> cast_co)@
--- of the given 'Role' (which must match the role of the coercion stored
--- in the 'Reduction' argument).
---
--- Pre-condition: the 'Type' passed in is the same as the LHS type
--- of the coercion stored in the 'Reduction'.
-mkCastRedn1 :: Role
-            -> Type      -- ^ original type
-            -> CoercionN -- ^ coercion to cast with
-            -> Reduction -- ^ rewritten type, with rewriting coercion
-            -> Reduction
-mkCastRedn1 r ty cast_co (Reduction co xi)
-  -- co :: ty ~r ty'
-  -- return_co :: (ty |> cast_co) ~r (ty' |> cast_co)
-  = mkReduction
-      (castCoercionKind1 co r ty xi cast_co)
-      (mkCastTy xi cast_co)
-{-# INLINE mkCastRedn1 #-}
-
--- | Apply casts on both sides of a 'Reduction' (of the given 'Role').
---
--- Use 'mkCastRedn1' when you want to cast both the original and reduced types
--- in a 'Reduction' using the same coercion.
---
--- Pre-condition: the 'Type' passed in is the same as the LHS type
--- of the coercion stored in the 'Reduction'.
-mkCastRedn2 :: Role
-            -> Type      -- ^ original type
-            -> CoercionN -- ^ coercion to cast with on the left
-            -> Reduction -- ^ rewritten type, with rewriting coercion
-            -> CoercionN -- ^ coercion to cast with on the right
-            -> Reduction
-mkCastRedn2 r ty cast_co (Reduction nco nty) cast_co'
-  = mkReduction
-      (castCoercionKind2 nco r ty nty cast_co cast_co')
-      (mkCastTy nty cast_co')
-{-# INLINE mkCastRedn2 #-}
-
--- | Apply one 'Reduction' to another.
---
--- Combines 'mkAppCo' and 'mkAppTy`.
-mkAppRedn :: Reduction -> Reduction -> Reduction
-mkAppRedn (Reduction co1 ty1) (Reduction co2 ty2)
-  = mkReduction (mkAppCo co1 co2) (mkAppTy ty1 ty2)
-{-# INLINE mkAppRedn #-}
-
--- | Create a function 'Reduction'.
---
--- Combines 'mkFunCo' and 'mkFunTy'.
-mkFunRedn :: Role
-          -> AnonArgFlag
-          -> ReductionN -- ^ multiplicity reduction
-          -> Reduction  -- ^ argument reduction
-          -> Reduction  -- ^ result reduction
-          -> Reduction
-mkFunRedn r vis
-  (Reduction w_co w_ty)
-  (Reduction arg_co arg_ty)
-  (Reduction res_co res_ty)
-    = mkReduction
-        (mkFunCo r w_co arg_co res_co)
-        (mkFunTy vis w_ty arg_ty res_ty)
-{-# INLINE mkFunRedn #-}
-
--- | Create a 'Reduction' associated to a Π type,
--- from a kind 'Reduction' and a body 'Reduction'.
---
--- Combines 'mkForAllCo' and 'mkForAllTy'.
-mkForAllRedn :: ArgFlag
-             -> TyVar
-             -> ReductionN -- ^ kind reduction
-             -> Reduction  -- ^ body reduction
-             -> Reduction
-mkForAllRedn vis tv1 (Reduction h ki') (Reduction co ty)
-  = mkReduction
-      (mkForAllCo tv1 h co)
-      (mkForAllTy tv2 vis ty)
-  where
-    tv2 = setTyVarKind tv1 ki'
-{-# INLINE mkForAllRedn #-}
-
--- | Create a 'Reduction' of a quantified type from a
--- 'Reduction' of the body.
---
--- Combines 'mkHomoForAllCos' and 'mkForAllTys'.
-mkHomoForAllRedn :: [TyVarBinder] -> Reduction -> Reduction
-mkHomoForAllRedn bndrs (Reduction co ty)
-  = mkReduction
-      (mkHomoForAllCos (binderVars bndrs) co)
-      (mkForAllTys bndrs ty)
-{-# INLINE mkHomoForAllRedn #-}
-
--- | Create a 'Reduction' from a coercion between coercions.
---
--- Combines 'mkProofIrrelCo' and 'mkCoercionTy'.
-mkProofIrrelRedn :: Role      -- ^ role of the created coercion, "r"
-                 -> CoercionN -- ^ co :: phi1 ~N phi2
-                 -> Coercion  -- ^ g1 :: phi1
-                 -> Coercion  -- ^ g2 :: phi2
-                 -> Reduction -- ^ res_co :: g1 ~r g2
-mkProofIrrelRedn role co g1 g2
-  = mkReduction
-      (mkProofIrrelCo role co g1 g2)
-      (mkCoercionTy g2)
-{-# INLINE mkProofIrrelRedn #-}
-
--- | Create a reflexive 'Reduction' whose RHS is the given 'Coercion',
--- with the specified 'Role'.
-mkReflCoRedn :: Role -> Coercion -> Reduction
-mkReflCoRedn role co
-  = mkReduction
-      (mkReflCo role co_ty)
-      co_ty
-  where
-    co_ty = mkCoercionTy co
-{-# INLINE mkReflCoRedn #-}
-
--- | A collection of 'Reduction's where the coercions and the types are stored separately.
---
--- Use 'unzipRedns' to obtain 'Reductions' from a list of 'Reduction's.
---
--- This datatype is used in 'mkAppRedns', 'mkClassPredRedns' and 'mkTyConAppRedn',
--- which expect separate types and coercions.
---
--- Invariant: the two stored lists are of the same length,
--- and the RHS type of each coercion is the corresponding type.
-data Reductions = Reductions [Coercion] [Type]
-
--- | Create 'Reductions' from individual lists of coercions and types.
---
--- The lists should be of the same length, and the RHS type of each coercion
--- should match the specified type in the other list.
-mkReductions :: [Coercion] -> [Type] -> Reductions
-mkReductions cos tys = Reductions cos tys
-{-# INLINE mkReductions #-}
-
--- | Combines 'mkAppCos' and 'mkAppTys'.
-mkAppRedns :: Reduction -> Reductions -> Reduction
-mkAppRedns (Reduction co ty) (Reductions cos tys)
-  = mkReduction (mkAppCos co cos) (mkAppTys ty tys)
-{-# INLINE mkAppRedns #-}
-
--- | 'TyConAppCo' for 'Reduction's: combines 'mkTyConAppCo' and `mkTyConApp`.
-mkTyConAppRedn :: Role -> TyCon -> Reductions -> Reduction
-mkTyConAppRedn role tc (Reductions cos tys)
-  = mkReduction (mkTyConAppCo role tc cos) (mkTyConApp tc tys)
-{-# INLINE mkTyConAppRedn #-}
-
--- | Reduce the arguments of a 'Class' 'TyCon'.
-mkClassPredRedn :: Class -> Reductions -> Reduction
-mkClassPredRedn cls (Reductions cos tys)
-  = mkReduction
-      (mkTyConAppCo Nominal (classTyCon cls) cos)
-      (mkClassPred cls tys)
-{-# INLINE mkClassPredRedn #-}
-
--- | Obtain 'Reductions' from a list of 'Reduction's by unzipping.
-unzipRedns :: [Reduction] -> Reductions
-unzipRedns = foldr accRedn (Reductions [] [])
-  where
-    accRedn :: Reduction -> Reductions -> Reductions
-    accRedn (Reduction co xi) (Reductions cos xis)
-      = Reductions (co:cos) (xi:xis)
-{-# INLINE unzipRedns #-}
--- NB: this function is currently used in two locations:
---
--- - GHC.Tc.Gen.Foreign.normaliseFfiType', with one call of the form:
---
---   unzipRedns <$> zipWithM f tys roles
---
--- - GHC.Tc.Solver.Monad.breakTyVarCycle_maybe, with two calls of the form:
---
---   unzipRedns <$> mapM f tys
---
--- It is possible to write 'mapAndUnzipM' functions to handle these cases,
--- but the above locations aren't performance critical, so it was deemed
--- to not be worth it.
+-- > hco :: ty ~ ( xi |> sym kco )
+homogeniseRedn :: Reduction -> MCoercionN -> Reduction
+homogeniseRedn redn mco
+  = mkCoherenceRightMRedn redn (mkSymMCo mco)
+{-# INLINE homogeniseRedn #-}
 
 {-
 %************************************************************************
@@ -777,6 +871,9 @@ data ArgsReductions =
   -- The strictness annotations and UNPACK pragma here are crucial
   -- to getting good performance in simplifyArgsWorker's tight loop.
 
+instance Outputable ArgsReductions where
+  ppr (ArgsReductions redns kco) = parens (text "ArgsReductions" <+> ppr redns <+> ppr kco)
+
 -- This is shared between the rewriter and the normaliser in GHC.Core.FamInstEnv.
 -- See Note [simplifyArgsWorker]
 {-# INLINE simplifyArgsWorker #-}
@@ -802,10 +899,10 @@ simplifyArgsWorker :: HasDebugCallStack
 -- function is all about. That is, (f xi_1 ... xi_n), where xi_i are the returned arguments,
 -- *is* well kinded.
 simplifyArgsWorker orig_ki_binders orig_inner_ki orig_fvs
-                   orig_roles orig_simplified_args
+                   orig_roles redns
   = go orig_lc
        orig_ki_binders orig_inner_ki
-       orig_roles orig_simplified_args
+       orig_roles redns
   where
     orig_lc = emptyLiftingContext $ mkInScopeSet orig_fvs
 
@@ -819,7 +916,7 @@ simplifyArgsWorker orig_ki_binders orig_inner_ki orig_fvs
         -- The !lc makes the function strict in the lifting context
         -- which means GHC can unbox that pair.  A modest win.
       = ArgsReductions
-          (mkReductions [] [])
+          (mkReductions [] [] [])
           kind_co
       where
         final_kind = mkPiTys binders inner_ki
@@ -838,28 +935,35 @@ simplifyArgsWorker orig_ki_binders orig_inner_ki orig_fvs
          -- The bangs here have been observed to improve performance
          -- significantly in optimized builds; see #18502
          let !kind_co = liftCoSubst Nominal lc (tyCoBinderType binder)
-             !(Reduction casted_co casted_xi)
-                      = mkCoherenceRightRedn role arg_redn kind_co
+             !(Reduction arg_ty casted_co casted_xi)
+                      = mkCoherenceRightRedn arg_redn kind_co
          -- now, extend the lifting context with the new binding
              !new_lc | Just tv <- tyCoBinderVar_maybe binder
-                     = extendLiftingContextAndInScope lc tv casted_co
+                     = extendLiftingContextAndInScope lc tv
+                       (mkHydrateDCo role arg_ty casted_co (Just casted_xi))
+                     -- NB: this is the crucial place where we need the hydration invariant,
+                     -- which is satisfied here as we use the LHS type stored in a 'Reduction'.
+                     -- See Note [The Reduction type], as well as
+                     -- Note [The Hydration invariant] in GHC.Core.Coercion.
+                     -- This could be avoided if we had substitution lifting for directed coercions.
+                     -- See also mkTyConAppRedn_MightBeSynonym, which is the other place where
+                     -- we need this.
                      | otherwise
                      = lc
-             !(ArgsReductions (Reductions cos xis) final_kind_co)
+             !(ArgsReductions (Reductions arg_tys cos xis) final_kind_co)
                = go new_lc binders inner_ki roles arg_redns
          in ArgsReductions
-              (Reductions (casted_co:cos) (casted_xi:xis))
+              (Reductions (arg_ty:arg_tys) (casted_co:cos) (casted_xi:xis))
               final_kind_co
 
     -- See Note [Last case in simplifyArgsWorker]
     go lc [] inner_ki roles arg_redns
       = let co1 = liftCoSubst Nominal lc inner_ki
             co1_kind              = coercionKind co1
-            unrewritten_tys       = map reductionOriginalType arg_redns
-            (arg_cos, res_co)     = decomposePiCos co1 co1_kind unrewritten_tys
+            (arg_cos, res_co)     = decomposePiCos co1 co1_kind (map reductionOriginalType arg_redns)
             casted_args           = assertPpr (equalLength arg_redns arg_cos)
                                               (ppr arg_redns $$ ppr arg_cos)
-                                  $ zipWith3 mkCoherenceRightRedn roles arg_redns arg_cos
+                                  $ zipWith mkCoherenceRightRedn arg_redns arg_cos
                -- In general decomposePiCos can return fewer cos than tys,
                -- but not here; because we're well typed, there will be enough
                -- binders. Note that decomposePiCos does substitutions, so even

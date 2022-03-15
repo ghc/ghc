@@ -97,7 +97,8 @@ defaultSimpleOpts :: SimpleOpts
 defaultSimpleOpts = SimpleOpts
    { so_uf_opts = defaultUnfoldingOpts
    , so_co_opts = OptCoercionOpts
-      { optCoercionEnabled = False }
+      { optCoercionOpts = Nothing }
+         -- Nothing <=> no coercion optimisation
    }
 
 simpleOptExpr :: HasDebugCallStack => SimpleOpts -> CoreExpr -> CoreExpr

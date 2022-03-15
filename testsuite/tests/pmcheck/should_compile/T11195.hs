@@ -33,7 +33,7 @@ optForAllCoBndr = undefined
 opt_trans :: InScopeSet -> NormalCo -> NormalCo -> NormalCo
 opt_trans = undefined
 
-opt_univ :: LiftingContext -> SymFlag -> UnivCoProvenance -> Role
+opt_univ :: LiftingContext -> SymFlag -> UnivCoProvenance Coercion -> Role
          -> Type -> Type -> Coercion
 opt_univ = undefined
 

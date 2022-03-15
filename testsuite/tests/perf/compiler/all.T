@@ -169,7 +169,7 @@ test ('T8095',
       [ only_ways(['normal']),
         collect_compiler_stats('bytes allocated',2) ],
       compile,
-      ['-v0 -O'])
+      ['-v0 -O -fkeep-dcoercions'])
 test ('T13386',
       [ only_ways(['normal']),
         collect_compiler_stats('bytes allocated',1) ],
@@ -206,7 +206,7 @@ test ('LargeRecord',
       , extra_files(['SuperRecord.hs'])
       ],
       multimod_compile,
-      ['LargeRecord', '-v0 -O'])
+      ['LargeRecord', '-v0 -O -fkeep-dcoercions'])
 
 test('T9961',
      [ only_ways(['normal']),
@@ -244,7 +244,7 @@ test('T12227',
      ],
      compile,
      # Use `-M1G` to prevent memory thrashing with ghc-8.0.1.
-     ['-O2 -ddump-hi -ddump-to-file +RTS -M1G'])
+     ['-O2 -fkeep-dcoercions -ddump-hi -ddump-to-file +RTS -M1G'])
 
 test('T12425',
      [ only_ways(['optasm']),

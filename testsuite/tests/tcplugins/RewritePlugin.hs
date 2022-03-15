@@ -14,7 +14,7 @@ import GHC.Builtin.Types
 import GHC.Core
   ( Expr(Coercion) )
 import GHC.Core.Coercion
-  ( Coercion, mkUnivCo )
+  ( DCoercion, mkUnivDCo )
 import GHC.Core.Predicate
   ( EqRel(NomEq), Pred(EqPred)
   , classifyPredType
@@ -80,8 +80,7 @@ rewriteAdd _ _ _ _ = pure TcPluginNoRewrite
 
 
 mkTyFamReduction :: TyCon -> [ Type ] -> Type -> Reduction
-mkTyFamReduction tyCon args res = Reduction co res
+mkTyFamReduction tyCon args res = Reduction (mkTyConApp tyCon args) dco res
   where
-    co :: Coercion
-    co = mkUnivCo ( PluginProv "RewritePlugin" ) Nominal
-           ( mkTyConApp tyCon args ) res
+    dco :: DCoercion
+    dco = mkUnivDCo (PluginProv "RewritePlugin") res

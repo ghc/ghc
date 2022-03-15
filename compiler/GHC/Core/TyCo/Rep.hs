@@ -1,5 +1,6 @@
 
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE GADTs #-}
 
 {-# OPTIONS_HADDOCK not-home #-}
 
@@ -41,6 +42,9 @@ module GHC.Core.TyCo.Rep (
         CoercionN, CoercionR, CoercionP, KindCoercion,
         MCoercion(..), MCoercionR, MCoercionN,
 
+        DCoercion(..), DCoercionN, KindDCoercion,
+        CoOrDCo(..),
+
         -- * Functions over types
         mkNakedTyConTy, mkTyVarTy, mkTyVarTys,
         mkTyCoVarTy, mkTyCoVarTys,
@@ -68,7 +72,7 @@ module GHC.Core.TyCo.Rep (
         TyCoFolder(..), foldTyCo, noView,
 
         -- * Sizes
-        typeSize, coercionSize, provSize,
+        typeSize, coercionSize, dcoercionSize, provSize,
 
         -- * Multiplicities
         Scaled(..), scaledMult, scaledThing, mapScaledType, Mult
@@ -76,7 +80,7 @@ module GHC.Core.TyCo.Rep (
 
 import GHC.Prelude
 
-import {-# SOURCE #-} GHC.Core.TyCo.Ppr ( pprType, pprCo, pprTyLit )
+import {-# SOURCE #-} GHC.Core.TyCo.Ppr ( pprType, pprCo, pprParendCo, pprDCo, pprTyLit )
 
    -- Transitively pulls in a LOT of stuff, better to break the loop
 
@@ -1122,70 +1126,136 @@ data Coercion
 
   -- These ones mirror the shape of types
   = -- Refl :: _ -> N
-    -- A special case reflexivity for a very common case: Nominal reflexivity
-    -- If you need Representational, use (GRefl Representational ty MRefl)
-    --                               not (SubCo (Refl ty))
-    Refl Type  -- See Note [Refl invariant]
+    -- See Note [Refl invariant]
+    Refl Type
+      -- ^ A nominal reflexive coercion.
+      --
+      -- If you need a representational reflexive coercion,
+      -- use @GRefl Representational ty MRefl@ and not @SubCo (Refl ty)@.
 
   -- GRefl :: "e" -> _ -> Maybe N -> e
   -- See Note [Generalized reflexive coercion]
-  | GRefl Role Type MCoercionN  -- See Note [Refl invariant]
-          -- Use (Refl ty), not (GRefl Nominal ty MRefl)
-          -- Use (GRefl Representational _ _), not (SubCo (GRefl Nominal _ _))
+  -- See Note [Refl invariant]
+  | GRefl Role Type MCoercionN
+    -- ^ A generalised reflexive coercion, which also includes a kind coercion.
+    -- Use @Refl ty@, not @GRefl Nominal ty MRefl@.
+    -- Use @GRefl Representational _ _@, not @SubCo (GRefl Nominal _ _)@.
 
-  -- These ones simply lift the correspondingly-named
+  -- The following constructors simply lift the correspondingly-named
   -- Type constructors into Coercions
 
   -- TyConAppCo :: "e" -> _ -> ?? -> e
   -- See Note [TyConAppCo roles]
-  | TyConAppCo Role TyCon [Coercion]    -- lift TyConApp
-               -- The TyCon is never a synonym;
-               -- we expand synonyms eagerly
-               -- But it can be a type function
-               -- TyCon is never a saturated (->); use FunCo instead
+  | TyConAppCo Role TyCon [Coercion]
+    -- ^ Application of a 'TyCon' to coercions, e.g. 'TyConApp' but for coercions.
+    --
+    -- The 'TyCon' is never a synonym (we expand synonyms eagerly),
+    -- but it can be a type family.
+    --
+    -- The 'TyCon' should never be a saturated function arrow;
+    -- use 'FunCo' instead.
 
-  | AppCo Coercion CoercionN             -- lift AppTy
-          -- AppCo :: e -> N -> e
+  -- AppCo :: e -> N -> e
+  | AppCo Coercion CoercionN
+    -- ^ Apply a coercion to another (necessarily nominal) coercion.
+    --
+    -- Like 'AppTy', but for coercions.
 
+  -- ForAllCo :: _ -> N -> e -> e
   -- See Note [Forall coercions]
   | ForAllCo TyCoVar KindCoercion Coercion
-         -- ForAllCo :: _ -> N -> e -> e
+    -- ^ Quantify over a type or coercion variable appearing in the body
+    -- of a coercion.
+    --
+    -- Like 'ForAllTy', but for coercions.
 
-  | FunCo Role CoercionN Coercion Coercion         -- lift FunTy
-         -- FunCo :: "e" -> N -> e -> e -> e
-         -- Note: why doesn't FunCo have a AnonArgFlag, like FunTy?
-         -- Because the AnonArgFlag has no impact on Core; it is only
-         -- there to guide implicit instantiation of Haskell source
-         -- types, and that is irrelevant for coercions, which are
-         -- Core-only.
+  -- FunCo :: "e" -> N -> e -> e -> e
+  | FunCo Role CoercionN Coercion Coercion
+    -- ^ Create a function coercion from:
+    --
+    --  - a multiplicity coercion (nominal),
+    --  - an argument coercion,
+    --  - a result coercion.
+    --
+    -- Like 'FunTy', but for coercions.
+    --
+    -- Always use this instead of @TyConAppCo (->)@.
 
-  -- These are special
-  | CoVarCo CoVar      -- :: _ -> (N or R)
-                       -- result role depends on the tycon of the variable's type
+    -- Note: why doesn't FunCo have a AnonArgFlag, like FunTy?
+    -- Because the AnonArgFlag has no impact on Core; it is only
+    -- there to guide implicit instantiation of Haskell source
+    -- types, and that is irrelevant for coercions, which are
+    -- Core-only.
 
-    -- AxiomInstCo :: e -> _ -> ?? -> e
+  -- :: _ -> (N or R)
+  -- result role depends on the tycon of the variable's type
+  | CoVarCo CoVar
+    -- ^ A coercion variable.
+
+  -- AxiomInstCo :: e -> _ -> ?? -> e
+  -- See also [CoAxiom index]
   | AxiomInstCo (CoAxiom Branched) BranchIndex [Coercion]
-     -- See also [CoAxiom index]
-     -- The coercion arguments always *precisely* saturate
-     -- arity of (that branch of) the CoAxiom. If there are
-     -- any left over, we use AppCo.
-     -- See [Coercion axioms applied to coercions]
-     -- The roles of the argument coercions are determined
-     -- by the cab_roles field of the relevant branch of the CoAxiom
+    -- ^ Apply a coercion axiom to argument coercions.
+    --
+    -- Examples: a type family reduction, or unwrapping a newtype.
+    --
+    -- The roles of the argument coercions are determined
+    -- by the 'cab_roles' field of the relevant branch of the 'CoAxiom'
+    --
+    -- The argument coercions must *precisely* saturate the corresponding
+    -- branch of the the 'CoAxiom'. If there are any left over, we use 'AppCo'
+    -- for them.
+    -- See [Coercion axioms applied to coercions]
 
   | AxiomRuleCo CoAxiomRule [Coercion]
-    -- AxiomRuleCo is very like AxiomInstCo, but for a CoAxiomRule
-    -- The number coercions should match exactly the expectations
-    -- of the CoAxiomRule (i.e., the rule is fully saturated).
+    -- ^ Apply a 'CoAxiomRule' to argument coercions.
+    -- Like 'AxiomInstCo', but for 'CoAxiomRule' instead of 'CoAxiom'.
+    --
+    -- The roles of the argument coercions are determined by the
+    -- 'coaxrAsmpRoles' field of the 'CoAxiomRule'.
+    --
+    -- The number of coercions should match exactly the expectations
+    -- of the 'CoAxiomRule' (i.e., the rule is fully saturated).
+    -- If there are any left-over coercions past the arity,
+    -- we use 'AppCo' for them.
 
-  | UnivCo UnivCoProvenance Role Type Type
-      -- :: _ -> "e" -> _ -> _ -> e
+  | HydrateDCo
+    -- ^ Embed a directed coercion into a coercion, by specifying
+    -- the LHS type and role of the directed coercion.
+    --
+    -- The RHS type is also cached, as we often already know the RHS,
+    -- which avoids us computing it anew using 'followDCo'.
+      Role -- ^ `r`
+      Type -- ^ `lhs`: LHS type of the directed coercion
+      DCoercion
+      Type -- ^ Cached RHS type of the directed coercion.
+           -- Can be computed from `r` and `lhs` using 'followDCo'.
 
-  | SymCo Coercion             -- :: e -> e
-  | TransCo Coercion Coercion  -- :: e -> e -> e
+  -- :: _ -> "e" -> _ -> _ -> e
+  | UnivCo (UnivCoProvenance Coercion) Role Type Type
+    -- ^ A universal coercion between the two specified types, at the given role.
+    --
+    -- See 'UnivCoProvenance'.
 
-  | NthCo  Role Int Coercion     -- Zero-indexed; decomposes (T t0 ... tn)
-    -- :: "e" -> _ -> e0 -> e (inverse of TyConAppCo, see Note [TyConAppCo roles])
+  -- :: e -> e
+  | SymCo Coercion
+    -- ^ Symmetry: given a coercion @co :: lhs ~e rhs@,
+    -- @SymCo co :: rhs ~e lhs@.
+
+  -- :: e -> e -> e
+  | TransCo Coercion Coercion
+    -- ^ Compose two coercions.
+    --
+    -- Given @co1 :: lhs ~e mid@ and @co2 :: mid ~e rhs@, the composite is
+    -- @co1 ; co2 :: lhs ~e rhs@. (We use the notation @;@ instead of @`TransCo`@.)
+
+  -- :: "e" -> _ -> e0 -> e (inverse of TyConAppCo, see Note [TyConAppCo roles])
+  | NthCo Role Int Coercion
+    -- ^ Decompose a 'TyConAppCo' by projecting out the argument coercion with
+    -- the given index (starting at 0).
+    --
+    -- Example: @NthCo Nominal 1 (Either co1 co2)@ picks out @co2@.
+    --
     -- Using NthCo on a ForAllCo gives an N coercion always
     -- See Note [NthCo and newtypes]
     --
@@ -1193,22 +1263,33 @@ data Coercion
     -- That is: the role of the entire coercion is redundantly cached here.
     -- See Note [NthCo Cached Roles]
 
+  -- :: _ -> N -> N
   | LRCo   LeftOrRight CoercionN     -- Decomposes (t_left t_right)
-    -- :: _ -> N -> N
+    -- ^ Decompose an 'AppCo'. @LRCo lr (co_l co_r)@ picks out
+    -- @co_l@ or @co_r@.
+
+  -- :: e -> N -> e
+  -- See Note [InstCo roles]
   | InstCo Coercion CoercionN
-    -- :: e -> N -> e
-    -- See Note [InstCo roles]
+    -- ^ Instantiate a @forall@ with a specific (nominal) coercion.
+    --
+    -- Example: @InstCo (qco :: (forall a. bco1) ~e (forall b. bco2)) (co :: x1 ~ x2)@
+    -- results in a coercion of kind @res :: bco1 [a -> x1] ~e bco2 [b -> x2]@.
 
-  -- Extract a kind coercion from a (heterogeneous) type coercion
-  -- NB: all kind coercions are Nominal
+  -- :: e -> N
   | KindCo Coercion
-     -- :: e -> N
+    -- ^ Extract a kind coercion from a (heterogeneous) type coercion
+    -- NB: all kind coercions are Nominal
 
-  | SubCo CoercionN                  -- Turns a ~N into a ~R
-    -- :: N -> R
+  -- :: N -> R
+  | SubCo CoercionN
+    -- ^ Turn a 'Norminal' coercion into a 'Representational' one.
 
-  | HoleCo CoercionHole              -- ^ See Note [Coercion holes]
-                                     -- Only present during typechecking
+  | HoleCo CoercionHole
+    -- ^ A 'CoercionHole': a mutable cell holding a coercion, used during typechecking.
+    -- The typechecker fills these in, in the process of typechecking.
+    -- See Note [Coercion holes]
+
   deriving Data.Data
 
 type CoercionN = Coercion       -- always nominal
@@ -1232,7 +1313,7 @@ type MCoercionN = MCoercion
 
 instance Outputable MCoercion where
   ppr MRefl    = text "MRefl"
-  ppr (MCo co) = text "MCo" <+> ppr co
+  ppr (MCo co) = text "MCo" <+> pprParendCo co
 
 {- Note [Refl invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1587,6 +1668,151 @@ A more nuanced treatment might be able to relax this condition
 somewhat, by checking if t1 and/or t2 use their bound variables
 in nominal ways. If not, having w be representational is OK.
 
+Note [Directed coercions]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+A directed coercion is a compact representation of a coercion, used to avoid
+storing a large amount of extra types in coercions in the rewriter.
+
+Recall that a coercion always contains enough information for us to be
+able to retrieve its role and its left and right hand side types.
+
+Examples:
+
+  Refl ty
+    coercionRole: Nominal
+    coercionLKind: ty
+    coercionRKind: ty
+
+  TyConAppCo r tc cos
+    coercionRole: r
+    coercionLKind: mkTyConApp tc (map coercionLKind cos)
+    coercionRKind: mkTyConApp tc (map coercionRKind cos)
+
+In practice, this means that when rewriting type family applications,
+coercions end up storing large amounts of extra information:
+
+  type family a + b where
+    Zero   + b = b
+    Succ a + b = Succ (a + b)
+
+Reducing 5 + 0 gives rise to a coercion of the form
+
+  +[1] <Succ (Succ (Succ (Succ Zero)))> <Zero>
+  ; (Succ (+[1] <Succ (Succ (Succ Zero))> <Zero>
+      ; (Succ (+[1] <Succ (Succ Zero)> <Zero>
+          ; (Succ (+[1] <Succ Zero> <Zero>
+              ; (Succ (+[1] <Zero> <Zero>
+                  ; (Succ (+[0] <Zero>))))))))))
+
+Compare this to the corresponding directed coercion, where we don't store
+so many types:
+
+  Steps 1
+  ; (TyConApp (Steps 1
+      ; (TyConApp (Steps 1
+          ; (TyConApp (Steps 1
+              ; (TyConApp (Steps 1
+                  ; (TyConApp (Steps 1))))))))))
+
+To achieve this, we sacrifice being able to query what the LHS type of a
+directed coercion is. Instead, this information must be provided as an
+input. More specifically, when we have:
+
+  dco :: lhs ~r rhs
+
+We understand that the role `r` and the LHS type `lhs` are **inputs**,
+from which we are able to compute the RHS type `rhs`.
+(This is what the function followDCo does.)
+This allows us to get away with storing less information in a directed
+coercion than in an undirected coercion, while still retaining the ability
+to run Core Lint on our program.
+-}
+
+type DCoercionN    = DCoercion
+type KindDCoercion = DCoercionN
+
+-- | A directed coercion is a more compact representation of a coercion,
+-- which is used in the rewriter to avoid producing quadratically large
+-- coercions.
+--
+-- For a directed coercion @dco :: lhs ~r rhs@, we think of the role @r@
+-- and the LHS type @lhs@ as /inputs/. Only once this context is given
+-- are we able to compute the RHS type @rhs@.
+--
+-- See Note [Directed coercions].
+data DCoercion
+
+  = ReflDCo
+    -- ^ 'ReflCo' for 'DCoercion'.
+  | GReflRightDCo CoercionN
+    -- ^ 'GReflCo' for 'DCoercion'.
+  | GReflLeftDCo  CoercionN
+    -- ^ @GReflLeftDCo mco@ corresponds to @SymCo (GReflCo mco)@.
+    --
+    -- We need this alongside @GReflRightDCo@ because we don't have
+    -- symmetry for directed coercions.
+
+    -- TODO: remove GReflLeftDCo? We could use @GReflRightDCo (mkSymMCo mco)@.
+
+  | TyConAppDCo [DCoercion]
+    -- ^ 'TyConAppCo' for 'DCoercion'.
+    --
+    -- NB: we use 'TyConAppDCo' for functions too,
+    -- unlike coercions which have 'TyConAppCo' and 'FunCo'.
+
+  | AppDCo DCoercion DCoercionN
+    -- ^ 'AppCo' for 'DCoercion'.
+
+  | ForAllDCo TyCoVar KindDCoercion DCoercion
+    -- ^ 'ForAllCo' for 'DCoercion'.
+
+  | CoVarDCo CoVar
+    -- ^ 'CoVarCo' for 'DCoercion'.
+
+  | AxiomInstDCo (CoAxiom Branched)
+    -- ^ 'AxiomInstCo' for 'DCoercion', but specialised
+    -- to open type family coercion axioms.
+    --
+    -- For newtypes and closed type families, we use the more
+    -- compact 'StepsDCo'.
+
+  | StepsDCo !Int
+    -- ^ @StepsDCo n@ means: \"take n successive reduction steps\",
+    -- where a reduction step could be using a closed type family equation
+    -- or using a newtype axiom.
+
+  | UnivDCo
+      (UnivCoProvenance DCoercion)
+      Type -- ^ RHS type
+    -- ^ 'UnivCo' for 'DCoercion'. We only need to store the RHS type,
+    -- as the LHS type and role will be provided by context.
+
+  | TransDCo DCoercion DCoercion
+    -- ^ 'TransCo' for 'DCoercion'.
+
+  | SubDCo DCoercion
+    -- ^ 'SubCo' for 'DCoercion'.
+
+  | DehydrateCo Coercion
+  -- ^ Embed a coercion inside a directed coercion, e.g. \"forget\"
+  -- that we can compute its LHS type and role without context.
+
+  deriving Data.Data
+
+instance Outputable DCoercion where
+  ppr = pprDCo
+
+-- | A convenient GADT for handling 'Coercion' and 'DCoercion'
+-- at the same time.
+data CoOrDCo co_or_dco where
+  Co  :: CoOrDCo Coercion
+  DCo :: CoOrDCo DCoercion
+
+instance Outputable (CoOrDCo co_or_dco) where
+  ppr Co  = text "Co"
+  ppr DCo = text "DCo"
+
+{-
 
 %************************************************************************
 %*                                                                      *
@@ -1611,24 +1837,24 @@ role and kind, which is done in the UnivCo constructor.
 -- as a totally independent coercion form; their only commonality is
 -- that they don't tell you what types they coercion between. (That info
 -- is in the 'UnivCo' constructor of 'Coercion'.
-data UnivCoProvenance
-  = PhantomProv KindCoercion -- ^ See Note [Phantom coercions]. Only in Phantom
-                             -- roled coercions
+data UnivCoProvenance kco
+  = PhantomProv kco -- ^ See Note [Phantom coercions]. Only in Phantom
+                    -- roled coercions
 
-  | ProofIrrelProv KindCoercion  -- ^ From the fact that any two coercions are
-                                 --   considered equivalent. See Note [ProofIrrelProv].
-                                 -- Can be used in Nominal or Representational coercions
+  | ProofIrrelProv kco  -- ^ From the fact that any two coercions are
+                        --   considered equivalent. See Note [ProofIrrelProv].
+                        -- Can be used in Nominal or Representational coercions
 
   | PluginProv String  -- ^ From a plugin, which asserts that this coercion
                        --   is sound. The string is for the use of the plugin.
 
-  | CorePrepProv       -- See Note [Unsafe coercions] in GHC.Core.CoreToStg.Prep
+  | CorePrepProv       -- ^ See Note [Unsafe coercions] in GHC.Core.CoreToStg.Prep
       Bool   -- True  <=> the UnivCo must be homogeneously kinded
              -- False <=> allow hetero-kinded, e.g. Int ~ Int#
 
   deriving Data.Data
 
-instance Outputable UnivCoProvenance where
+instance Outputable (UnivCoProvenance kco) where
   ppr (PhantomProv _)    = text "(phantom)"
   ppr (ProofIrrelProv _) = text "(proof irrel.)"
   ppr (PluginProv str)   = parens (text "plugin" <+> brackets (text str))
@@ -1884,14 +2110,17 @@ data TyCoFolder env a
       }
 
 {-# INLINE foldTyCo  #-}  -- See Note [Specialising foldType]
-foldTyCo :: Monoid a => TyCoFolder env a -> env
-         -> (Type -> a, [Type] -> a, Coercion -> a, [Coercion] -> a)
+foldTyCo :: forall env a. Monoid a => TyCoFolder env a -> env
+         -> ( Type -> a, [Type] -> a
+            , Coercion -> a, [Coercion] -> a
+            , DCoercion -> a, [DCoercion] -> a
+            )
 foldTyCo (TyCoFolder { tcf_view       = view
                      , tcf_tyvar      = tyvar
                      , tcf_tycobinder = tycobinder
                      , tcf_covar      = covar
                      , tcf_hole       = cohole }) env
-  = (go_ty env, go_tys env, go_co env, go_cos env)
+  = (go_ty env, go_tys env, go_co env, go_cos env, go_dco env, go_dcos env)
   where
     go_ty env ty | Just ty' <- view ty = go_ty env ty'
     go_ty env (TyVarTy tv)      = tyvar env tv
@@ -1925,10 +2154,12 @@ foldTyCo (TyCoFolder { tcf_view       = view
     go_co env (CoVarCo cv)            = covar env cv
     go_co env (AxiomInstCo _ _ args)  = go_cos env args
     go_co env (HoleCo hole)           = cohole env hole
-    go_co env (UnivCo p _ t1 t2)      = go_prov env p `mappend` go_ty env t1
-                                                      `mappend` go_ty env t2
+    go_co env (HydrateDCo _ t1 dco _t2)= go_ty env t1 `mappend` go_dco env dco
+    go_co env (UnivCo p _ t1 t2)      = go_prov go_co env p
+                                          `mappend` go_ty env t1
+                                          `mappend` go_ty env t2
     go_co env (SymCo co)              = go_co env co
-    go_co env (TransCo c1 c2)         = go_co env c1 `mappend` go_co env c2
+    go_co env (TransCo co1 co2)       = go_co env co1 `mappend` go_co env co2
     go_co env (AxiomRuleCo _ cos)     = go_cos env cos
     go_co env (NthCo _ _ co)          = go_co env co
     go_co env (LRCo _ co)             = go_co env co
@@ -1941,10 +2172,32 @@ foldTyCo (TyCoFolder { tcf_view       = view
       where
         env' = tycobinder env tv Inferred
 
-    go_prov env (PhantomProv co)    = go_co env co
-    go_prov env (ProofIrrelProv co) = go_co env co
-    go_prov _   (PluginProv _)      = mempty
-    go_prov _   (CorePrepProv _)    = mempty
+    go_dcos _   []     = mempty
+    go_dcos env (c:cs) = go_dco env c `mappend` go_dcos env cs
+
+    go_dco _   ReflDCo                  = mempty
+    go_dco env (GReflRightDCo co)       = go_co env co
+    go_dco env (GReflLeftDCo co)        = go_co env co
+    go_dco env (TyConAppDCo args)       = go_dcos env args
+    go_dco env (AppDCo c1 c2)           = go_dco env c1 `mappend` go_dco env c2
+    go_dco env (CoVarDCo cv)            = covar env cv
+    go_dco _   AxiomInstDCo{}           = mempty
+    go_dco _   StepsDCo{}               = mempty
+    go_dco env (TransDCo co1 co2)       = go_dco env co1 `mappend` go_dco env co2
+    go_dco env (SubDCo dco)             = go_dco env dco
+    go_dco env (DehydrateCo co)         = go_co env co
+    go_dco env (ForAllDCo tv kind_dco co)
+      = go_dco env kind_dco `mappend` go_ty env (varType tv)
+                            `mappend` go_dco env' co
+      where
+        env' = tycobinder env tv Inferred
+    go_dco env (UnivDCo prov t2)       = go_prov go_dco env prov `mappend` go_ty env t2
+
+    go_prov :: (env ->co -> a) -> env -> UnivCoProvenance co -> a
+    go_prov do_fold env (PhantomProv co)    = do_fold env co
+    go_prov do_fold env (ProofIrrelProv co) = do_fold env co
+    go_prov _       _   (PluginProv _)      = mempty
+    go_prov _       _   (CorePrepProv _)    = mempty
 
 -- | A view function that looks through nothing.
 noView :: Type -> Maybe Type
@@ -1991,7 +2244,8 @@ coercionSize (FunCo _ w co1 co2) = 1 + coercionSize co1 + coercionSize co2
 coercionSize (CoVarCo _)         = 1
 coercionSize (HoleCo _)          = 1
 coercionSize (AxiomInstCo _ _ args) = 1 + sum (map coercionSize args)
-coercionSize (UnivCo p _ t1 t2)  = 1 + provSize p + typeSize t1 + typeSize t2
+coercionSize (HydrateDCo _ t1 dco t2) = 1 + typeSize t1 + dcoercionSize dco + typeSize t2
+coercionSize (UnivCo p _ t1 t2)  = 1 + provSize coercionSize p + typeSize t1 + typeSize t2
 coercionSize (SymCo co)          = 1 + coercionSize co
 coercionSize (TransCo co1 co2)   = 1 + coercionSize co1 + coercionSize co2
 coercionSize (NthCo _ _ co)      = 1 + coercionSize co
@@ -2001,11 +2255,26 @@ coercionSize (KindCo co)         = 1 + coercionSize co
 coercionSize (SubCo co)          = 1 + coercionSize co
 coercionSize (AxiomRuleCo _ cs)  = 1 + sum (map coercionSize cs)
 
-provSize :: UnivCoProvenance -> Int
-provSize (PhantomProv co)    = 1 + coercionSize co
-provSize (ProofIrrelProv co) = 1 + coercionSize co
-provSize (PluginProv _)      = 1
-provSize (CorePrepProv _)    = 1
+dcoercionSize :: DCoercion -> Int
+dcoercionSize ReflDCo            = 1
+dcoercionSize (GReflRightDCo co) = 1 + coercionSize co
+dcoercionSize (GReflLeftDCo  co) = 1 + coercionSize co
+dcoercionSize (TyConAppDCo args) = 1 + sum (map dcoercionSize args)
+dcoercionSize (AppDCo co arg)    = dcoercionSize co + dcoercionSize arg
+dcoercionSize (ForAllDCo _ h co) = 1 + dcoercionSize co + dcoercionSize h
+dcoercionSize (CoVarDCo _)       = 1
+dcoercionSize AxiomInstDCo{}     = 1
+dcoercionSize StepsDCo{}         = 1
+dcoercionSize (TransDCo co1 co2) = 1 + dcoercionSize co1 + dcoercionSize co2
+dcoercionSize (SubDCo co)        = 1 + dcoercionSize co
+dcoercionSize (DehydrateCo co)   = 1 + coercionSize co
+dcoercionSize (UnivDCo prov rhs) = 1 + provSize dcoercionSize prov + typeSize rhs
+
+provSize :: (co -> Int) -> UnivCoProvenance co -> Int
+provSize co_size (PhantomProv co)    = 1 + co_size co
+provSize co_size (ProofIrrelProv co) = 1 + co_size co
+provSize _       (PluginProv _)      = 1
+provSize _       (CorePrepProv _)    = 1
 
 {-
 ************************************************************************

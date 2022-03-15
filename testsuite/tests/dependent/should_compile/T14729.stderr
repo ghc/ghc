@@ -1,5 +1,7 @@
 TYPE SIGNATURES
-  x :: forall (x :: Bool). P (F Int) (x |> Sym (T14729.D:R:FInt[0]))
+  x ::
+    forall (x :: Bool).
+    P (F Int) (x |> Sym (Hydrate nominal (F Int) T14729.D:R:FInt))
   y :: forall {x :: Bool}. P Bool x
 TYPE CONSTRUCTORS
   type family F{1} :: * -> *
