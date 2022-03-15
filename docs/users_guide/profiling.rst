@@ -1788,6 +1788,7 @@ ticky counters and the quality of the profile.
     :category:
 
     These dummy counters contain:
+
     * The number of avoided tag checks in the entry count.
     * "infer" as the argument string to distinguish them from regular counters.
     * The name of the variable we are casing on, as well as a unique to represent the inspection site as one variable might be cased on multiple times.
@@ -1854,11 +1855,11 @@ Name-specific counters provide the following information about a closure.
 The FVs and Args information is encoded using a small DSL.
 
 +------------------+---------------------------------------------------+
-|Classification    |Description                                       |
+|Classification    |Description                                        |
 +==================+===================================================+
-|+                 |dictionary                                       |
+|\+                |dictionary                                         |
 +------------------+---------------------------------------------------+
-|\>                |function                                         |
+|\>                |function                                           |
 +------------------+---------------------------------------------------+
 |{C,I,F,D,W}       |   char, int, float, double, word                  |
 +------------------+---------------------------------------------------+
@@ -1878,9 +1879,9 @@ The FVs and Args information is encoded using a small DSL.
 +------------------+---------------------------------------------------+
 |M                 | Multi constructor type                            |
 +------------------+---------------------------------------------------+
-|.                 |other type                                        |
+|.                 |other type                                         |
 +------------------+---------------------------------------------------+
-|-                 |reserved for others to mark as "uninteresting"   |
+|\-                |reserved for others to mark as "uninteresting"     |
 +------------------+---------------------------------------------------+
 
 In particular note that you can use the ticky profiler to see any function
