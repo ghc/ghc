@@ -285,6 +285,7 @@ dsExpr e@(XExpr ext_expr_tc)
         do { assert (exprType e2 `eqType` boolTy)
             mkBinaryTickBox ixT ixF e2
           }
+      HsUntypedBracketTc (HsBracketTc x _ hs_wrapper ps) -> dsUntypedBracket hs_wrapper x ps
 
 dsExpr (NegApp _ (L loc
                     (HsOverLit _ lit@(OverLit { ol_val = HsIntegral i})))
@@ -749,7 +750,7 @@ Thus, we pass @r@ as the scrutinee expression to @matchWrapper@ above.
 -- See Note [The life cycle of a TH quotation]
 
 dsExpr (HsTypedBracket (HsBracketTc x _ hs_wrapper ps) _) = dsTypedBracket hs_wrapper x ps
-dsExpr (HsUntypedBracket (HsBracketTc x _ hs_wrapper ps) _) = dsUntypedBracket hs_wrapper x ps
+dsExpr (HsUntypedBracket _ _) = pprPanic "dsExpr:untypedBracket" undefined
 dsExpr (HsSpliceE _ s) = pprPanic "dsExpr:splice" (ppr s)
 
 -- Arrow notation extension

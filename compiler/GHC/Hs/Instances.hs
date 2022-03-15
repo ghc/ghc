@@ -386,7 +386,7 @@ deriving instance Data (HsSplicedThing GhcTc)
 -- deriving instance (DataIdLR p p) => Data (HsQuote p)
 deriving instance Data (HsQuote GhcPs)
 deriving instance Data (HsQuote GhcRn)
-deriving instance Data (HsQuote GhcTc)
+deriving instance Data (HsQuote GhcTc) -- romes TODO: See, this is unfortunate, when XUntypedBracket Tc == DataConCantHappen there's no way to have HsQuote
 
 deriving instance Data thing => Data (HsBracketTc thing)
 

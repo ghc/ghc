@@ -793,20 +793,6 @@ zonkExpr env (HsTypedBracket (HsBracketTc hsb_thing ty wrap bs) body)
     zonk_b env' (PendingTcSplice n e) = do e' <- zonkLExpr env' e
                                            return (PendingTcSplice n e')
 
-zonkExpr env (HsUntypedBracket (HsBracketTc hsb_thing ty wrap bs) body)
-  = do wrap' <- traverse zonkQuoteWrap wrap
-       bs' <- mapM (zonk_b env) bs
-       new_ty <- zonkTcTypeToTypeX env ty
-       return (HsUntypedBracket (HsBracketTc hsb_thing new_ty wrap' bs') body)
-  where
-    zonkQuoteWrap (QuoteWrapper ev ty) = do
-        let ev' = zonkIdOcc env ev
-        ty' <- zonkTcTypeToTypeX env ty
-        return (QuoteWrapper ev' ty')
-
-    zonk_b env' (PendingTcSplice n e) = do e' <- zonkLExpr env' e
-                                           return (PendingTcSplice n e')
-
 zonkExpr env (HsSpliceE _ (XSplice (HsSplicedT s))) =
   runTopSplice s >>= zonkExpr env
 
@@ -949,6 +935,21 @@ zonkExpr env (XExpr (ConLikeTc con tvs tys))
     -- Only the multiplicity can contain unification variables
     -- The tvs come straight from the data-con, and so are strictly redundant
     -- See Wrinkles of Note [Typechecking data constructors] in GHC.Tc.Gen.Head
+
+zonkExpr env (XExpr (HsUntypedBracketTc (HsBracketTc hsb_thing ty wrap bs)))
+  = do wrap' <- traverse zonkQuoteWrap wrap
+       bs' <- mapM (zonk_b env) bs
+       new_ty <- zonkTcTypeToTypeX env ty
+       return (XExpr $ HsUntypedBracketTc (HsBracketTc hsb_thing new_ty wrap' bs'))
+  where
+    zonkQuoteWrap (QuoteWrapper ev ty) = do
+        let ev' = zonkIdOcc env ev
+        ty' <- zonkTcTypeToTypeX env ty
+        return (QuoteWrapper ev' ty')
+
+    zonk_b env' (PendingTcSplice n e) = do e' <- zonkLExpr env' e
+                                           return (PendingTcSplice n e')
+
 
 zonkExpr _ expr = pprPanic "zonkExpr" (ppr expr)
 

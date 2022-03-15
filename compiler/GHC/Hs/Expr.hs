@@ -248,16 +248,16 @@ data HsBracketTc thing = HsBracketTc
                        -- _typechecked_ splices to be
                        -- pasted back in by the desugarer
 
-type instance XTypedBracket GhcPs = EpAnn [AddEpAnn]
-type instance XTypedBracket GhcRn = EpAnn [AddEpAnn]
-type instance XTypedBracket GhcTc = HsBracketTc (LHsExpr GhcRn) -- See Note [The life cycle of a TH quotation]
+type instance XTypedBracket GhcPs   = EpAnn [AddEpAnn]
+type instance XTypedBracket GhcRn   = EpAnn [AddEpAnn]
+type instance XTypedBracket GhcTc   = HsBracketTc (LHsExpr GhcRn)  -- See Note [The life cycle of a TH quotation]
 type instance XUntypedBracket GhcPs = EpAnn [AddEpAnn]
 type instance XUntypedBracket GhcRn = (EpAnn [AddEpAnn], [PendingRnSplice])
                        -- See Note [Pending Splices]
                        -- Output of the renamer is the *original* renamed
                        -- expression, plus
                        -- _renamed_ splices to be type checked
-type instance XUntypedBracket GhcTc = HsBracketTc (HsQuote GhcRn) -- See Note [The life cycle of a TH quotation]
+type instance XUntypedBracket GhcTc = DataConCantHappen -- See Note [The life cycle of a TH quotation]
 
 -- ---------------------------------------------------------------------
 
@@ -507,6 +507,9 @@ data XXExprGhcTc
      Int                                -- module-local tick number for False
      (LHsExpr GhcTc)                    -- sub-expression
 
+  ---------------------------------------
+  -- Haskell untyped brackets during typechecking
+  | HsUntypedBracketTc (HsBracketTc (HsQuote GhcRn)) -- See Note [The life cycle of a TH quotation]
 
 {- *********************************************************************
 *                                                                      *
@@ -716,9 +719,7 @@ ppr_expr (HsUntypedBracket b e)
     GhcRn -> case b of
       (_, []) -> ppr e
       (_, ps) -> ppr e $$ text "pending(rn)" <+> ppr ps
-    GhcTc -> case b of
-      HsBracketTc rne  _ty _wrap [] -> ppr rne
-      HsBracketTc rne  _ty _wrap ps -> ppr rne $$ text "pending(tc)" <+> pprIfTc @p (ppr ps)
+    GhcTc -> dataConCantHappen b
 
 ppr_expr (HsProc _ pat (L _ (HsCmdTop _ cmd)))
   = hsep [text "proc", ppr pat, text "->", ppr cmd]
@@ -759,6 +760,10 @@ instance Outputable XXExprGhcTc where
             text ">(",
             ppr exp, text ")"]
 
+  ppr (HsUntypedBracketTc b) = case b of
+    HsBracketTc rne  _ty _wrap [] -> ppr rne
+    HsBracketTc rne  _ty _wrap ps -> ppr rne $$ text "pending(tc)" <+> ppr ps
+
 ppr_infix_expr :: forall p. (OutputableBndrId p) => HsExpr (GhcPass p) -> Maybe SDoc
 ppr_infix_expr (HsVar _ (L _ v))    = Just (pprInfixOcc v)
 ppr_infix_expr (HsRecSel _ f)       = Just (pprInfixOcc f)
@@ -780,6 +785,7 @@ ppr_infix_expr_tc (ExpansionExpr (HsExpanded a _)) = ppr_infix_expr a
 ppr_infix_expr_tc (ConLikeTc {})                   = Nothing
 ppr_infix_expr_tc (HsTick {})                      = Nothing
 ppr_infix_expr_tc (HsBinTick {})                   = Nothing
+ppr_infix_expr_tc (HsUntypedBracketTc {})          = Nothing
 
 ppr_apps :: (OutputableBndrId p)
          => HsExpr (GhcPass p)
@@ -879,6 +885,7 @@ hsExprNeedsParens prec = go
     go_x_tc (ConLikeTc {})                   = False
     go_x_tc (HsTick _ (L _ e))               = hsExprNeedsParens prec e
     go_x_tc (HsBinTick _ _ (L _ e))          = hsExprNeedsParens prec e
+    go_x_tc (HsUntypedBracketTc {})          = False
 
     go_x_rn :: HsExpansion (HsExpr GhcRn) (HsExpr GhcRn) -> Bool
     go_x_rn (HsExpanded a _) = hsExprNeedsParens prec a
@@ -921,6 +928,7 @@ isAtomicHsExpr (XExpr x)
     go_x_tc (ConLikeTc {})                   = True
     go_x_tc (HsTick {}) = False
     go_x_tc (HsBinTick {}) = False
+    go_x_tc (HsUntypedBracketTc {}) = False
 
     go_x_rn (HsExpanded a _) = isAtomicHsExpr a
 
@@ -1837,7 +1845,6 @@ type instance XDecBrL GhcPs       = NoExtField
 type instance XDecBrG GhcPs       = NoExtField
 type instance XTypBr  GhcPs       = NoExtField
 type instance XVarBr  GhcPs       = NoExtField
-type instance XXQuote GhcPs       = DataConCantHappen
 
 type instance XExpBr  GhcRn       = NoExtField
 type instance XPatBr  GhcRn       = NoExtField
@@ -1845,7 +1852,6 @@ type instance XDecBrL GhcRn       = NoExtField
 type instance XDecBrG GhcRn       = NoExtField
 type instance XTypBr  GhcRn       = NoExtField
 type instance XVarBr  GhcRn       = NoExtField
-type instance XXQuote GhcRn       = DataConCantHappen
 
 -- See Note [Constructing HsQuote GhcTc]
 type instance XExpBr  GhcTc       = DataConCantHappen
@@ -1854,7 +1860,7 @@ type instance XDecBrL GhcTc       = DataConCantHappen
 type instance XDecBrG GhcTc       = DataConCantHappen
 type instance XTypBr  GhcTc       = DataConCantHappen
 type instance XVarBr  GhcTc       = DataConCantHappen
-type instance XXQuote GhcTc       = ()
+type instance XXQuote (GhcPass _) = DataConCantHappen
 
 instance OutputableBndrId p
           => Outputable (HsQuote (GhcPass p)) where
@@ -1871,12 +1877,6 @@ instance OutputableBndrId p
         = char '\'' <> pprPrefixOcc (unLoc n)
       pprHsQuote (VarBr _ False n)
         = text "''" <> pprPrefixOcc (unLoc n)
-      pprHsQuote (XQuote b)  = case ghcPass @p of
-#if __GLASGOW_HASKELL__ <= 900
-          GhcPs -> dataConCantHappen b
-          GhcRn -> dataConCantHappen b
-#endif
-          GhcTc -> ppr () -- romes TODO: so what do we do when we want to pretty print an HsQuote GhcTc? probably some pprPanic right? that's unfortunate...
 
 thBrackets :: SDoc -> SDoc -> SDoc
 thBrackets pp_kind pp_body = char '[' <> pp_kind <> vbar <+>

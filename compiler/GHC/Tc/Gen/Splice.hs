@@ -249,7 +249,7 @@ tcUntypedBracket rn_expr brack ps res_ty
        -- Unify the overall type of the bracket with the expected result
        -- type
        ; tcWrapResultO BracketOrigin rn_expr
-            (HsUntypedBracket (HsBracketTc brack expected_type brack_info ps') (XQuote ()))
+            (XExpr (HsUntypedBracketTc (HsBracketTc brack expected_type brack_info ps')))
             expected_type res_ty
 
        }

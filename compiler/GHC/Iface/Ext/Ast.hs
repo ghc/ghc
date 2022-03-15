@@ -1196,10 +1196,7 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
             [ toHie b
             , toHie p
             ]
-        HieTc | HsBracketTc _ _ _ p <- xbracket ->
-          [ toHie b
-          , toHie p
-          ]
+        HieTc -> []
       HsSpliceE _ x ->
         [ toHie $ L mspan x
         ]
@@ -1220,6 +1217,9 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
                   ]
              HsBinTick _ _ expr
                -> [ toHie expr
+                  ]
+             HsUntypedBracketTc (HsBracketTc _ _ _ p)
+               -> [ toHie p
                   ]
         | otherwise -> []
 

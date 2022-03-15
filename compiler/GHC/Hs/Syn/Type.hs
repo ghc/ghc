@@ -130,7 +130,7 @@ hsExprType (ArithSeq _ mb_overloaded_op asi) = case mb_overloaded_op of
   where
     asi_ty = arithSeqInfoType asi
 hsExprType (HsTypedBracket   (HsBracketTc _ ty _wrap _pending) _) = ty
-hsExprType (HsUntypedBracket (HsBracketTc _ ty _wrap _pending) _) = ty
+hsExprType e@(HsUntypedBracket _ _) = pprPanic "hsExprType: Unexpected HsUntypedBracket" (ppr e)
 hsExprType e@(HsSpliceE{}) = pprPanic "hsExprType: Unexpected HsSpliceE"
                                       (ppr e)
                                       -- Typed splices should have been eliminated during zonking, but we
@@ -144,6 +144,7 @@ hsExprType (XExpr (ExpansionExpr (HsExpanded _ tc_e))) = hsExprType tc_e
 hsExprType (XExpr (ConLikeTc con _ _)) = conLikeType con
 hsExprType (XExpr (HsTick _ e)) = lhsExprType e
 hsExprType (XExpr (HsBinTick _ _ e)) = lhsExprType e
+hsExprType (XExpr (HsUntypedBracketTc (HsBracketTc _ ty _ _))) = ty
 
 arithSeqInfoType :: ArithSeqInfo GhcTc -> Type
 arithSeqInfoType asi = mkListTy $ case asi of
