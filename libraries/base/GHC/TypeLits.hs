@@ -40,6 +40,7 @@ module GHC.TypeLits
   , N.SomeNat(..), SomeSymbol(..), SomeChar(..)
   , someNatVal, someSymbolVal, someCharVal
   , N.sameNat, sameSymbol, sameChar
+  , symbolDict, charDict
   , OrderingI(..)
   , N.cmpNat, cmpSymbol, cmpChar
 
@@ -261,6 +262,12 @@ cmpChar x y = case compare (charVal x) (charVal y) of
 
 newtype SSymbol (s :: Symbol) = SSymbol String
 
+-- Actual type after having been patched in desugaring:
+--   symbolDict :: forall (s::Symbol). SSymbol s -> KnownSymbol s
+-- DO NOT USE THIS FUNCTION -- COMPILER INTERNAL
+symbolDict :: ()
+symbolDict = ()
+
 -- See Note [withDict] in "GHC.HsToCore.Expr" in GHC
 withSSymbol :: forall a b.
                (KnownSymbol a => Proxy a -> b)
@@ -268,6 +275,12 @@ withSSymbol :: forall a b.
 withSSymbol f x y = withDict @(SSymbol a) @(KnownSymbol a) x f y
 
 newtype SChar (s :: Char) = SChar Char
+
+-- Actual type after having been patched in desugaring:
+--   charDict :: forall (c::Char). SChar c -> KnownChar c
+-- DO NOT USE THIS FUNCTION -- COMPILER INTERNAL
+charDict :: ()
+charDict = ()
 
 -- See Note [withDict] in "GHC.HsToCore.Expr" in GHC
 withSChar :: forall a b.

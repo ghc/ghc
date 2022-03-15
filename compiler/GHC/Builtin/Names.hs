@@ -429,6 +429,8 @@ basicKnownKeyNames
 
         -- Type-level naturals
         knownNatClassName, knownSymbolClassName, knownCharClassName,
+        sNatTyConName, sSymbolTyConName, sCharTyConName,
+        natDictName, symbolDictName, charDictName,
 
         -- Overloaded labels
         fromLabelClassOpName,
@@ -1570,13 +1572,19 @@ randomClassName     = clsQual rANDOM (fsLit "Random")        randomClassKey
 randomGenClassName  = clsQual rANDOM (fsLit "RandomGen")     randomGenClassKey
 isStringClassName   = clsQual dATA_STRING (fsLit "IsString") isStringClassKey
 
--- Type-level naturals
-knownNatClassName :: Name
-knownNatClassName     = clsQual gHC_TYPENATS (fsLit "KnownNat") knownNatClassNameKey
-knownSymbolClassName :: Name
+-- Type-level literals
+knownNatClassName, sNatTyConName, natDictName :: Name
+knownNatClassName  = clsQual gHC_TYPENATS (fsLit "KnownNat") knownNatClassNameKey
+sNatTyConName      = tcQual gHC_TYPENATS (fsLit "SNat") sNatTyConKey
+natDictName        = varQual gHC_TYPENATS (fsLit "natDict") natDictIdKey
+knownSymbolClassName, sSymbolTyConName, symbolDictName :: Name
 knownSymbolClassName  = clsQual gHC_TYPELITS (fsLit "KnownSymbol") knownSymbolClassNameKey
-knownCharClassName :: Name
+sSymbolTyConName      = tcQual gHC_TYPELITS (fsLit "SSymbol") sSymbolTyConKey
+symbolDictName        = varQual gHC_TYPELITS (fsLit "symbolDict") symbolDictIdKey
+knownCharClassName, sCharTyConName, charDictName :: Name
 knownCharClassName  = clsQual gHC_TYPELITS (fsLit "KnownChar") knownCharClassNameKey
+sCharTyConName      = tcQual gHC_TYPELITS (fsLit "SChar") sCharTyConKey
+charDictName        = varQual gHC_TYPELITS (fsLit "charDict") charDictIdKey
 
 -- Overloaded labels
 fromLabelClassOpName :: Name
@@ -2021,6 +2029,7 @@ typeSymbolKindConNameKey, typeCharKindConNameKey,
   , typeNatLogTyFamNameKey
   , typeConsSymbolTyFamNameKey, typeUnconsSymbolTyFamNameKey
   , typeCharToNatTyFamNameKey, typeNatToCharTyFamNameKey
+  , sSymbolTyConKey, sCharTyConKey, sNatTyConKey
   :: Unique
 typeSymbolKindConNameKey  = mkPreludeTyConUnique 400
 typeCharKindConNameKey    = mkPreludeTyConUnique 401
@@ -2039,6 +2048,9 @@ typeConsSymbolTyFamNameKey = mkPreludeTyConUnique 413
 typeUnconsSymbolTyFamNameKey = mkPreludeTyConUnique 414
 typeCharToNatTyFamNameKey = mkPreludeTyConUnique 415
 typeNatToCharTyFamNameKey = mkPreludeTyConUnique 416
+sNatTyConKey = mkPreludeTyConUnique 417
+sSymbolTyConKey = mkPreludeTyConUnique 418
+sCharTyConKey = mkPreludeTyConUnique 419
 
 {-
 ************************************************************************
@@ -2510,10 +2522,16 @@ unsafeEqualityProofIdKey, unsafeCoercePrimIdKey :: Unique
 unsafeEqualityProofIdKey = mkPreludeMiscIdUnique 570
 unsafeCoercePrimIdKey    = mkPreludeMiscIdUnique 571
 
+-- KnownNat, KnownSymbol, KnownChar dictionary functions
+natDictIdKey, symbolDictIdKey, charDictIdKey :: Unique
+natDictIdKey = mkPreludeMiscIdUnique 572
+symbolDictIdKey = mkPreludeMiscIdUnique 573
+charDictIdKey = mkPreludeMiscIdUnique 574
+
 -- HasField class ops
 getFieldClassOpKey, setFieldClassOpKey :: Unique
-getFieldClassOpKey = mkPreludeMiscIdUnique 572
-setFieldClassOpKey = mkPreludeMiscIdUnique 573
+getFieldClassOpKey = mkPreludeMiscIdUnique 575
+setFieldClassOpKey = mkPreludeMiscIdUnique 576
 
 ------------------------------------------------------
 -- ghc-bignum uses 600-699 uniques

@@ -475,37 +475,23 @@ mkDictSelId name clas
              scaledThing (getNth arg_tys val_index)
                -- See Note [Type classes and linear types]
 
-    base_info = noCafIdInfo
-                `setArityInfo`          1
-                `setDmdSigInfo`     strict_sig
-                `setCprSigInfo`            topCprSig
-                `setLevityInfoWithType` sel_ty
-
-    info | new_tycon
-         = base_info `setInlinePragInfo` alwaysInlinePragma
-                     `setUnfoldingInfo`  mkInlineUnfoldingWithArity 1
-                                           defaultSimpleOpts
-                                           (mkDictSelRhs clas val_index)
-                   -- See Note [Single-method classes] in GHC.Tc.TyCl.Instance
-                   -- for why alwaysInlinePragma
-
-         | otherwise
-         = base_info `setRuleInfo` mkRuleInfo [rule]
-                     `setInlinePragInfo` neverInlinePragma
-                     `setUnfoldingInfo`  mkInlineUnfoldingWithArity 1
-                                           defaultSimpleOpts
-                                           (mkDictSelRhs clas val_index)
-                   -- Add a magic BuiltinRule, but no unfolding
-                   -- so that the rule is always available to fire.
-                   -- See Note [ClassOp/DFun selection] in GHC.Tc.TyCl.Instance
+    info = noCafIdInfo `setArityInfo`          1
+                       `setDmdSigInfo`         strict_sig
+                       `setCprSigInfo`         topCprSig
+                       `setLevityInfoWithType` sel_ty
+                       `setRuleInfo`           mkRuleInfo [rule]
+                         -- Add a magic BuiltinRule, but no unfolding
+                         -- so that the rule is always available to fire.
+                         -- See Note [ClassOp/DFun selection] in GHC.Tc.TyCl.Instance
 
     -- This is the built-in rule that goes
     --      op (dfT d1 d2) --->  opT d1 d2
+    -- See Note [ClassOp/DFun selection] in GHC.Tc.TyCl.Instance
     rule = BuiltinRule { ru_name = fsLit "Class op " `appendFS`
                                      occNameFS (getOccName name)
                        , ru_fn    = name
                        , ru_nargs = n_ty_args + 1
-                       , ru_try   = dictSelRule val_index n_ty_args }
+                       , ru_try   = dictSelRule new_tycon val_index n_ty_args }
 
         -- The strictness signature is of the form U(AAAVAAAA) -> T
         -- where the V depends on which item we are selecting
@@ -545,18 +531,26 @@ mkDictSelRhs clas val_index
                                 -- varToCoreExpr needed for equality superclass selectors
                                 --   sel a b d = case x of { MkC _ (g:a~b) _ -> CO g }
 
-dictSelRule :: Int -> Arity -> RuleFun
--- Tries to persuade the argument to look like a constructor
--- application, using exprIsConApp_maybe, and then selects
--- from it
---       sel_i t1..tk (D t1..tk op1 ... opm) = opi
+dictSelRule :: Bool -> Int -> Arity -> RuleFun
+-- ^ Tries to persuade the argument to look like a constructor application, using
+-- exprIsConApp_maybe or exprIsNewtypeDict_maybe, and then selects from it
 --
-dictSelRule val_index n_ty_args _ id_unf _ args
-  | (dict_arg : _) <- drop n_ty_args args
-  , Just (_, floats, _, _, con_args) <- exprIsConApp_maybe id_unf dict_arg
-  = Just (wrapFloats floats $ getNth con_args val_index)
-  | otherwise
-  = Nothing
+-- > sel_i t1..tk (D t1..tk op1 ... opm) = opi
+--
+-- Where D is the (Newtype or Datatype) DataCon worker of the type class.
+--
+-- See Note [ClassOp/DFun selection]
+-- and Note [Unfolding DFuns]
+dictSelRule new_tycon val_index n_ty_args _ env _ args =
+  case drop n_ty_args args of
+    (dict_arg:_) -- See Note [Extra args in the target]
+      | new_tycon -- newtype dictionary
+      , Just (_dc, _arg_tys, [op]) <- exprIsNewtypeDict_maybe env dict_arg
+      -> Just op
+      | not new_tycon
+      , Just (_, floats, _, _, con_args) <- exprIsConApp_maybe env dict_arg
+      -> Just (wrapFloats floats $ getNth con_args val_index)
+    _ -> Nothing
 
 {-
 ************************************************************************
@@ -1321,16 +1315,13 @@ mkFCallId uniq fcall ty
 
     info = noCafIdInfo
            `setArityInfo`          arity
-           `setDmdSigInfo`     strict_sig
-           `setCprSigInfo`            topCprSig
+           `setDmdSigInfo`         nopSig -- See #11076
+           `setCprSigInfo`         topCprSig
            `setLevityInfoWithType` ty
 
     (bndrs, _) = tcSplitPiTys ty
     arity      = count isAnonTyCoBinder bndrs
-    strict_sig = mkClosedDmdSig (replicate arity topDmd) topDiv
-    -- the call does not claim to be strict in its arguments, since they
-    -- may be lifted (foreign import prim) and the called code doesn't
-    -- necessarily force them. See #11076.
+
 {-
 ************************************************************************
 *                                                                      *

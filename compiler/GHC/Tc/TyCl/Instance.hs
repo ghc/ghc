@@ -49,11 +49,10 @@ import GHC.Tc.Deriv
 import GHC.Tc.Utils.Env
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Utils.Unify
-import GHC.Core        ( Expr(..), mkApps, mkVarApps, mkLams )
+import GHC.Core        ( Expr(..), mkVarApps )
 import GHC.Core.Make   ( nO_METHOD_BINDING_ERROR_ID )
-import GHC.Core.Unfold.Make ( mkInlineUnfoldingWithArity, mkDFunUnfolding )
+import GHC.Core.Unfold.Make ( mkDFunUnfolding )
 import GHC.Core.Type
-import GHC.Core.SimpleOpt
 import GHC.Core.Predicate( classMethodInstTy )
 import GHC.Tc.Types.Evidence
 import GHC.Core.TyCon
@@ -194,6 +193,10 @@ inline both 'op2' and 'df'.  But neither is keen to inline without having
 seen the other's result; and it's very easy to get code bloat (from the
 big intermediate) if you inline a bit too much.
 
+Additionally, upon reflection on #21229, eager inlining and the potential for
+reboxing MkD can lead to unsound type class specialisation.
+See Note [Do not inline dictionary selectors].
+
 Instead we use a cunning trick.
  * We arrange that 'df' and 'op2' NEVER inline.
 
@@ -229,17 +232,46 @@ class-op selector.
 
    axiom Co:C a :: C a ~ (a->a)
 
-   op :: forall a. C a -> (a -> a)
-   op a d = d |> (Co:C a)
+   sel :: forall a. C a -> (a -> a)
+   sel a d = d |> (Co:C a)
 
    MkC :: forall a. (a->a) -> C a
    MkC = /\a.\op. op |> (sym Co:C a)
 
-The clever RULE stuff doesn't work now, because ($df a d) isn't
-a constructor application, so exprIsConApp_maybe won't return
-Just <blah>.
+But we have to come up with a different way to make the clever RULE stuff in
+'GHC.Types.Id.Make.dictSelRule' work, because `$df a d` isn't a constructor
+application, so 'exprIsConApp_maybe' won't return Just <blah>.
+Hence in case of a newtype dictionary, dictSelRule will delegate to a bespoke
+function, 'GHC.Core.Opt.SimpleOpt.exprIsNewtypeDict_maybe'.
 
-Instead, we simply rely on the fact that casts are cheap:
+This strategy will will add extra indirections to every use of non-inlined
+dictionaries, like in
+
+   sel :: forall a. C a -> (a -> a)
+   sel a d = d |> co
+   $fCInt :: C Int
+   $fCInt = $cop_Int @Int |> sym co
+   g :: C a => ...
+   g $dC = ... sel $dC a ...
+   ... g $fCInt ...
+
+Consider `g $fCInt`. Inside `g`, the (known) call `sel $dC a` won't inline
+and we first jump to `sel`, then indirectly call `$dC |> co`, which ends up in
+`$cop_Int`. It would be better to eliminate the first known jump and indirectly
+call `$cop_Int` immediately.
+See #4138 for a more concrete example. But the regression reported there wasn't
+due to the indirection, so we simply live with that minor inconvenience.
+We *could* inline `sel` in CorePrep in the future,
+see Note [Inlining in CorePrep].
+
+Historical Note
+---------------
+We used to solve the RULE issue differently, by making both the selector and the
+DFun inline for newtype dictionaries.
+But that violated Note [Do not inline dictionary selectors], leading
+to #21229, so the following ideas are only of historic interest:
+
+We'd arrange DFun and dict selector to INLINE, as follows
 
    $df :: forall a. C a => C [a]
    {-# INLINE df #-}  -- NB: INLINE this
@@ -311,6 +343,58 @@ Here $cp1 is the code that generates the superclass for C [a].  The
 issue is this: we must not eta-expand $cp1 either, or else $fDeepSeq[]
 and then $cdeepSeq will inline there, which is definitely wrong.  Like
 on the dfun, we solve this by adding an INLINE pragma to $cp1.
+
+Note [Do not inline dictionary selectors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Do not inline dictionary selectors. Partly for the good reasons (code bloat)
+given in Note [ClassOp/DFun selection], but also because it is *unsound* in
+the presence of Specialise. In #21229 we had
+
+  class Sing a where sing :: Bool
+  instance Sing Int  where sing = True
+  instance Sing Char where sing = False
+
+  f :: forall a. Sing a => ...
+  g :: forall a. Sing a => ...
+  g @a $dSing = case sing $dSing of wild {
+    True  -> f @Int $fSingInt
+    False -> f @a   $dSing }
+
+and at the time, we'd eagerly inline `sing` (as described in the historic part
+of Note [Single-method classes]), and then with binder swap and the inlining of
+the alt-specific unfolding of the case binder `wild` in gentle Simplification,
+we'd get
+
+  g @a $dSing = case $dSing |> co of wild {
+    True  -> f @Int (True |> sym co)
+    False -> f @a   (False |> sym co) }
+
+And this is a program we don't want, because here `$dSing` has been "reboxed" in
+the `False` case. That in turn led Specialise to cough up a specialisation
+  forall a d. f @a d = f_spec
+that claims to work for all types `a`.  That is obviously unsound:
+the specialisation only works for types `a` whose `Sing` instance is `False`.
+For example, it would be unsound to rewrite `f @Int d` to `f_spec`.
+
+Solution: do not inline the dictionary selector `sing`.  Then the program
+  g @a $dSing = case sing $dSing of wild {
+    True  -> f @Int $fSingInt
+    False -> f @a   $dSing }
+does not simplify any further, nor do we get bogus specialisations of `f`.
+
+To demonstrate that conceptually this is not specific to the newtype
+representation of Note [Single-method classes], suppose we used a datatype
+representation of single-method classes, but we inlined the dictionary selector:
+
+  g @a $dSing =
+    case $dSing of wild { Sing sing ->
+    case sing of {
+      True  -> f @Int (Sing True)
+      False -> f @a   (Sing False) } }
+
+Note the reboxing of `Sing`. Normally, the Simplifier won't rebox like this
+because it increases allocations, but it surely would be allowed to do so. And
+if it did, it would similarly wreak havoc in Specialise.
 
 Note [Subtle interaction of recursion and overlap]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1313,13 +1397,8 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
              inst_tv_tys = mkTyVarTys inst_tyvars
              arg_wrapper = mkWpEvVarApps dfun_ev_vars <.> mkWpTyApps inst_tv_tys
 
-             is_newtype = isNewTyCon class_tc
              dfun_id_w_prags = addDFunPrags dfun_id sc_meth_ids
-             dfun_spec_prags
-                | is_newtype = SpecPrags []
-                | otherwise  = SpecPrags spec_inst_prags
-                    -- Newtype dfuns just inline unconditionally,
-                    -- so don't attempt to specialise them
+             dfun_spec_prags = SpecPrags spec_inst_prags
 
              export = ABE { abe_wrap = idHsWrapper
                           , abe_poly = dfun_id_w_prags
@@ -1352,18 +1431,9 @@ addDFunPrags :: DFunId -> [Id] -> DFunId
 -- the DFunId rather than from the skolem pieces that the typechecker
 -- is messing with.
 addDFunPrags dfun_id sc_meth_ids
- | is_newtype
-  = dfun_id `setIdUnfolding`  mkInlineUnfoldingWithArity 0 defaultSimpleOpts con_app
-            `setInlinePragma` alwaysInlinePragma { inl_sat = Just 0 }
- | otherwise
  = dfun_id `setIdUnfolding`  mkDFunUnfolding dfun_bndrs dict_con dict_args
            `setInlinePragma` dfunInlinePragma
  where
-   con_app    = mkLams dfun_bndrs $
-                mkApps (Var (dataConWrapId dict_con)) dict_args
-                -- This application will satisfy the Core invariants
-                -- from Note [Representation polymorphism invariants] in GHC.Core,
-                -- because typeclass method types are never unlifted.
    dict_args  = map Type inst_tys ++
                 [mkVarApps (Var id) dfun_bndrs | id <- sc_meth_ids]
 
@@ -1372,7 +1442,6 @@ addDFunPrags dfun_id sc_meth_ids
    dfun_bndrs  = dfun_tvs ++ ev_ids
    clas_tc     = classTyCon clas
    [dict_con]  = tyConDataCons clas_tc
-   is_newtype  = isNewTyCon clas_tc
 
 wrapId :: HsWrapper -> Id -> HsExpr GhcTc
 wrapId wrapper id = mkHsWrap wrapper (HsVar noExtField (noLocA id))

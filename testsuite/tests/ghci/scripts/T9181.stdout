@@ -29,6 +29,8 @@ data GHC.TypeLits.SomeSymbol
 type GHC.TypeLits.UnconsSymbol :: GHC.Types.Symbol
                                   -> Maybe (Char, GHC.Types.Symbol)
 type family GHC.TypeLits.UnconsSymbol a
+GHC.TypeLits.charDict ::
+  GHC.TypeLits.SChar a -> GHC.TypeLits.KnownChar a
 GHC.TypeLits.charVal :: GHC.TypeLits.KnownChar n => proxy n -> Char
 GHC.TypeLits.charVal' ::
   GHC.TypeLits.KnownChar n => GHC.Prim.Proxy# n -> Char
@@ -51,6 +53,8 @@ GHC.TypeLits.sameSymbol ::
 GHC.TypeLits.someCharVal :: Char -> GHC.TypeLits.SomeChar
 GHC.TypeLits.someNatVal :: Integer -> Maybe GHC.TypeNats.SomeNat
 GHC.TypeLits.someSymbolVal :: String -> GHC.TypeLits.SomeSymbol
+GHC.TypeLits.symbolDict ::
+  GHC.TypeLits.SSymbol a -> GHC.TypeLits.KnownSymbol a
 GHC.TypeLits.symbolVal ::
   GHC.TypeLits.KnownSymbol n => proxy n -> String
 GHC.TypeLits.symbolVal' ::

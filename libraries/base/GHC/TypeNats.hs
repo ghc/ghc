@@ -30,6 +30,7 @@ module GHC.TypeNats
   , SomeNat(..)
   , someNatVal
   , sameNat
+  , natDict
 
     -- * Functions on type literals
   , type (<=), type (<=?), type (+), type (*), type (^), type (-)
@@ -244,6 +245,12 @@ cmpNat x y = case compare (natVal x) (natVal y) of
 -- PRIVATE:
 
 newtype SNat    (n :: Nat)    = SNat    Natural
+
+-- Actual type after having been patched in desugaring:
+--   natDict :: forall (n::Nat). SNat n -> KnownNat n
+-- DO NOT USE THIS FUNCTION -- COMPILER INTERNAL
+natDict :: ()
+natDict = ()
 
 -- See Note [withDict] in "GHC.HsToCore.Expr" in GHC
 withSNat :: forall a b.

@@ -49,7 +49,7 @@ module GHC.Types.Id (
         recordSelectorTyCon_maybe,
 
         -- ** Modifying an Id
-        setIdName, setIdUnique, GHC.Types.Id.setIdType, setIdMult,
+        setIdName, setIdUnique, GHC.Types.Id.setIdType, setIdMult, setIdDetails,
         updateIdTypeButNotMult, updateIdTypeAndMult, updateIdTypeAndMultM,
         setIdExported, setIdNotExported,
         globaliseId, localiseId,

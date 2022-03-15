@@ -14,7 +14,7 @@ module GHC.Core.SimpleOpt (
         joinPointBinding_maybe, joinPointBindings_maybe,
 
         -- ** Predicates on expressions
-        exprIsConApp_maybe, exprIsLiteral_maybe, exprIsLambda_maybe,
+        exprIsConApp_maybe, exprIsNewtypeDict_maybe, exprIsLiteral_maybe, exprIsLambda_maybe,
 
     ) where
 
@@ -32,7 +32,7 @@ import GHC.Core.Opt.OccurAnal( occurAnalyseExpr, occurAnalysePgm, zapLambdaBndrs
 import GHC.Types.Literal
 import GHC.Types.Id
 import GHC.Types.Id.Info  ( realUnfoldingInfo, setUnfoldingInfo, setRuleInfo, IdInfo (..) )
-import GHC.Types.Var      ( isNonCoVarId )
+import GHC.Types.Var      ( isNonCoVarId, DFunId )
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Core.DataCon
@@ -1153,7 +1153,7 @@ exprIsConApp_maybe (in_scope, id_unf) expr
        = go (Left (substInScope sub))
             floats
             (lookupIdSubst sub v)
-            cont
+           cont
 
     go (Left in_scope) floats (Var fun) cont@(CC args co)
 
@@ -1173,12 +1173,7 @@ exprIsConApp_maybe (in_scope, id_unf) expr
         -- Look through dictionary functions; see Note [Unfolding DFuns]
         | DFunUnfolding { df_bndrs = bndrs, df_con = con, df_args = dfun_args } <- unfolding
         , bndrs `equalLength` args    -- See Note [DFun arity check]
-        , let in_scope' = extend_in_scope (exprsFreeVars dfun_args)
-              subst = mkOpenSubst in_scope' (bndrs `zip` args)
-              -- We extend the in-scope set here to silence warnings from
-              -- substExpr when it finds not-in-scope Ids in dfun_args.
-              -- simplOptExpr initialises the in-scope set with exprFreeVars,
-              -- but that doesn't account for DFun unfoldings
+        , let subst = mkDFunArgsSubst in_scope fun unfolding args
         = succeedWith in_scope floats $
           pushCoDataCon con (map (substExpr subst) dfun_args) co
 
@@ -1189,7 +1184,7 @@ exprIsConApp_maybe (in_scope, id_unf) expr
         -- CPR'd workers getting inlined back into their wrappers,
         | idArity fun == 0
         , Just rhs <- expandUnfolding_maybe unfolding
-        , let in_scope' = extend_in_scope (exprFreeVars rhs)
+        , let in_scope' = extendInScopeUnfoldingFVs in_scope fun unfolding
         = go (Left in_scope') floats rhs cont
 
         -- See Note [exprIsConApp_maybe on literal strings]
@@ -1201,11 +1196,6 @@ exprIsConApp_maybe (in_scope, id_unf) expr
           dealWithStringLiteral fun str co
         where
           unfolding = id_unf fun
-          extend_in_scope unf_fvs
-            | isLocalId fun = in_scope `extendInScopeSetSet` unf_fvs
-            | otherwise     = in_scope
-            -- A GlobalId has no (LocalId) free variables; and the
-            -- in-scope set tracks only LocalIds
 
     go _ _ _ _ = Nothing
 
@@ -1260,6 +1250,101 @@ dealWithStringLiteral fun str co =
 
       in pushCoDataCon consDataCon [Type charTy, char_expr, rest] co
 
+-- | Extends the InScopeSet with the free vars of 'CoreUnfolding' or 'DFunUnfolding'
+-- of the 'Id'.
+extendInScopeUnfoldingFVs :: InScopeSet -> Id -> Unfolding -> InScopeSet
+extendInScopeUnfoldingFVs in_scope id unfolding = case unfolding of
+  -- Optimisation: A GlobalId has no (LocalId) free variables; and the in-scope
+  -- set tracks only LocalIds
+  _ | isGlobalId id -> in_scope
+  DFunUnfolding{df_bndrs=bndrs, df_args=args} ->
+    in_scope `extendInScopeSetSet` (exprsFreeVars args `delVarSetList` bndrs)
+  CoreUnfolding{uf_tmpl=rhs} ->
+    in_scope `extendInScopeSetSet` exprFreeVars rhs
+  _                 -> in_scope
+
+exprIsNewtypeDict_maybe :: InScopeEnv -> CoreExpr -> Maybe (DataCon, [Type], [CoreExpr])
+-- ^ First see Note [Unfolding DFuns]
+-- and Note [Single-method classes].
+-- 'exprIsNewtypeDict_maybe' detects the situation when `e` expands (modulo
+-- unfoldings) to a DFun app like `$fC[] @Int $fCInt :: C Int -> C [Int]`, in
+-- which case it returns the expression `$cop[] @Int $fCInt`, where
+-- ```
+-- axiom Co:C a :: C a ~ (a->a)
+-- sel :: forall a. C a -> (a -> a)
+-- sel = /\a.\d. d |> co
+-- MkC :: forall a. (a->a) -> C a
+-- MkC = /\a.\op. op |> sym co
+--
+-- $fC[] :: forall a. C a -> C [a] -- DFunId
+-- $fC[] = /\a. \$da. MkC @[a] ($cop[] @a $da)
+--   where $cop[] = ...
+-- ```
+-- NB: `$fC[]` is a 'DFunId' and carries a 'DFunUnfolding' that looks
+-- like `{df_bndrs=[a, $da], df_args=[@[a], $cop[] @a $da], df_con=MkC}`.
+exprIsNewtypeDict_maybe (in_scope, id_unf) expr =
+  -- pprTraceWith "exprIsNewtypeDict_maybe" (\answer -> ppr e $$ ppr answer) $
+  go in_scope expr (CC [] (mkRepReflCo (exprType expr)))
+  where
+    go :: InScopeSet -> CoreExpr -> ConCont -> Maybe (DataCon, [Type], [CoreExpr])
+    go in_scope expr cc@(CC args co) = case expr of
+
+      App f a -> go in_scope f (CC (a:args) co)
+
+      Cast e co_inner -- See Note [Push coercions in exprIsConApp_maybe]
+        | Just (args', m_co_inner') <- pushCoArgs co_inner args
+        -> case m_co_inner' of
+             MCo co_inner' -> go in_scope e (CC args' (co_inner' `mkTransCo` co))
+             MRefl         -> go in_scope e (CC args' co)
+
+      Var fun
+        -- See Note [Unfolding DFuns]
+        -- fun=$fC[], args=[@Int, $fCInt]
+        | DFunUnfolding { df_bndrs = bndrs, df_con = con, df_args = df_args } <- unfolding
+        -- df_bndrs=[a, $da], df_args=[@[a], $cop[] @a $da], df_con=MkC
+        , isNewDataCon con
+        , bndrs `equalLength` args   -- See Note [DFun arity check]
+        , let subst = mkDFunArgsSubst in_scope fun unfolding args
+        -- => subst=[a:->Int,$da:->$fCInt].
+        -- Then subst($cop[] @a $da)=$cop[] @Int $fCInt
+        -> pushCoDataCon con (map (substExpr subst) df_args) co
+
+        | Just rhs <- expandUnfolding_maybe unfolding
+             -- Try looking through CoreUnfoldings. See the case in
+             -- exprIsConApp_maybe above
+        , let in_scope' = extendInScopeUnfoldingFVs in_scope fun unfolding
+        -> go in_scope' rhs cc
+        where
+          unfolding = id_unf fun
+
+      _ -> Nothing
+
+-- | `mkDFunArgsSubst in_scope dfun unf args` returns a substitution
+-- `df_bndrs |-> args`, where `df_bndrs` are the binders of the `DFunUnfolding`
+-- `unf` of `dfun`.
+--
+-- Crucially, it takes care to come up with the right `InScopeSet` in the
+-- the returned `Subst`.
+mkDFunArgsSubst :: InScopeSet -> DFunId -> Unfolding -> [CoreArg] -> Subst
+mkDFunArgsSubst in_scope dfun unf args =
+    assert (bndrs `equalLength` args) $ mkOpenSubst in_scope' (bndrs `zip` args)
+    where
+      bndrs = case unf of
+        DFunUnfolding{df_bndrs=bndrs} -> bndrs
+        _                             -> pprPanic "mkDFunArgsSubst" $ vcat
+                                           [ text "unf was not a DFunUnfolding"
+                                           , ppr dfun
+                                           , ppr unf ]
+      -- We extend the in-scope set here to silence warnings from
+      -- substExpr when it finds not-in-scope LocalIds in df_args.
+      -- NB: Even though simplOptExpr initialises the in_scope with
+      -- exprFreeVars, that doesn't account for DFun unfoldings.
+      --
+      -- Add the df_bndrs *and* the free vars of the unfolding to the
+      -- InScopeSet. mkOpenSubst doesn't add them by itself.
+      in_scope' = extendInScopeUnfoldingFVs in_scope dfun unf
+                    `extendInScopeSetList` bndrs
+
 {-
 Note [Unfolding DFuns]
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -1269,9 +1354,13 @@ DFuns look like
   df a b d_a d_b = MkEqD (a,b) ($c1 a b d_a d_b)
                                ($c2 a b d_a d_b)
 
+(Where 'MkEqD' is a DataCon worker, which might be that of a newtype in case of
+Note [Single-method classes].)
 So to split it up we just need to apply the ops $c1, $c2 etc
 to the very same args as the dfun.  It takes a little more work
 to compute the type arguments to the dictionary constructor.
+exprIsConApp_maybe      unfolds datatype DFuns,
+exprIsNewtypeDict_maybe unfolds newtype  DFuns.
 
 Note [DFun arity check]
 ~~~~~~~~~~~~~~~~~~~~~~~

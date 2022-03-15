@@ -1879,7 +1879,7 @@ allLazyNested is_rec (Floats IfUnboxedOk _) = isNonRec is_rec
 -- ---------------------------------------------------------------------------
 
 {- Note [Inlining in CorePrep]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 There is a subtle but important invariant that must be upheld in the output
 of CorePrep: there are no "trivial" updatable thunks.  Thus, this Core
 is impermissible:
@@ -2302,4 +2302,3 @@ mkConvertNumLiteral hsc_env = do
 
 
    return convertNumLit
-

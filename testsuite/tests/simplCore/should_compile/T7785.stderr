@@ -1,8 +1,408 @@
 
-==================== Tidy Core rules ====================
-"SPEC shared @[]"
-    forall ($dMyFunctor :: MyFunctor []) (irred :: Domain [] Int).
-      shared @[] $dMyFunctor irred
-      = bar_$sshared
+==================== Specialise ====================
+Result size of Specialise
+  = {terms: 293, types: 99, coercions: 11, joins: 0/2}
+
+-- RHS size: {terms: 5, types: 10, coercions: 0, joins: 0/0}
+$cmyfmap_aG0
+  :: forall a b. (Domain [] a, Domain [] b) => (a -> b) -> [a] -> [b]
+[LclId,
+ Arity=4,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=True)}]
+$cmyfmap_aG0
+  = \ (@a_aG3) (@b_aG4) _ [Occ=Dead] _ [Occ=Dead] ->
+      map @a_aG3 @b_aG4
+
+-- RHS size: {terms: 1, types: 0, coercions: 3, joins: 0/0}
+Foo.$fMyFunctor[] [InlPrag=CONLIKE] :: MyFunctor []
+[LclIdX[DFunId(nt)],
+ Arity=4,
+ Unf=DFun: \ -> Foo.C:MyFunctor TYPE: [] $cmyfmap_aG0]
+Foo.$fMyFunctor[]
+  = $cmyfmap_aG0
+    `cast` (Sym (Foo.N:MyFunctor[0] <[]>_N)
+            :: (forall a b.
+                (Domain [] a, Domain [] b) =>
+                (a -> b) -> [a] -> [b])
+               ~R# MyFunctor [])
+
+-- RHS size: {terms: 114, types: 12, coercions: 0, joins: 0/1}
+$sshared_sHu :: Domain [] Int => [Int] -> [Int]
+[LclId, Arity=1]
+$sshared_sHu
+  = \ (irred_azD :: Domain [] Int) ->
+      let {
+        f_sHt :: [Int] -> [Int]
+        [LclId]
+        f_sHt
+          = myfmap
+              @[]
+              Foo.$fMyFunctor[]
+              @Int
+              @Int
+              irred_azD
+              irred_azD
+              GHC.Num.$fNumInt_$cnegate } in
+      \ (x_X4N :: [Int]) ->
+        f_sHt
+          (f_sHt
+             (f_sHt
+                (f_sHt
+                   (f_sHt
+                      (f_sHt
+                         (f_sHt
+                            (f_sHt
+                               (f_sHt
+                                  (f_sHt
+                                     (f_sHt
+                                        (f_sHt
+                                           (f_sHt
+                                              (f_sHt
+                                                 (f_sHt
+                                                    (f_sHt
+                                                       (f_sHt
+                                                          (f_sHt
+                                                             (f_sHt
+                                                                (f_sHt
+                                                                   (f_sHt
+                                                                      (f_sHt
+                                                                         (f_sHt
+                                                                            (f_sHt
+                                                                               (f_sHt
+                                                                                  (f_sHt
+                                                                                     (f_sHt
+                                                                                        (f_sHt
+                                                                                           (f_sHt
+                                                                                              (f_sHt
+                                                                                                 (f_sHt
+                                                                                                    (f_sHt
+                                                                                                       (f_sHt
+                                                                                                          (f_sHt
+                                                                                                             (f_sHt
+                                                                                                                (f_sHt
+                                                                                                                   (f_sHt
+                                                                                                                      (f_sHt
+                                                                                                                         (f_sHt
+                                                                                                                            (f_sHt
+                                                                                                                               (f_sHt
+                                                                                                                                  (f_sHt
+                                                                                                                                     (f_sHt
+                                                                                                                                        (f_sHt
+                                                                                                                                           (f_sHt
+                                                                                                                                              (f_sHt
+                                                                                                                                                 (f_sHt
+                                                                                                                                                    (f_sHt
+                                                                                                                                                       (f_sHt
+                                                                                                                                                          (f_sHt
+                                                                                                                                                             (f_sHt
+                                                                                                                                                                (f_sHt
+                                                                                                                                                                   (f_sHt
+                                                                                                                                                                      (f_sHt
+                                                                                                                                                                         (f_sHt
+                                                                                                                                                                            (f_sHt
+                                                                                                                                                                               (f_sHt
+                                                                                                                                                                                  (f_sHt
+                                                                                                                                                                                     (f_sHt
+                                                                                                                                                                                        (f_sHt
+                                                                                                                                                                                           (f_sHt
+                                                                                                                                                                                              (f_sHt
+                                                                                                                                                                                                 (f_sHt
+                                                                                                                                                                                                    (f_sHt
+                                                                                                                                                                                                       (f_sHt
+                                                                                                                                                                                                          (f_sHt
+                                                                                                                                                                                                             (f_sHt
+                                                                                                                                                                                                                (f_sHt
+                                                                                                                                                                                                                   (f_sHt
+                                                                                                                                                                                                                      (f_sHt
+                                                                                                                                                                                                                         (f_sHt
+                                                                                                                                                                                                                            (f_sHt
+                                                                                                                                                                                                                               (f_sHt
+                                                                                                                                                                                                                                  (f_sHt
+                                                                                                                                                                                                                                     (f_sHt
+                                                                                                                                                                                                                                        (f_sHt
+                                                                                                                                                                                                                                           (f_sHt
+                                                                                                                                                                                                                                              (f_sHt
+                                                                                                                                                                                                                                                 (f_sHt
+                                                                                                                                                                                                                                                    (f_sHt
+                                                                                                                                                                                                                                                       (f_sHt
+                                                                                                                                                                                                                                                          (f_sHt
+                                                                                                                                                                                                                                                             (f_sHt
+                                                                                                                                                                                                                                                                (f_sHt
+                                                                                                                                                                                                                                                                   (f_sHt
+                                                                                                                                                                                                                                                                      (f_sHt
+                                                                                                                                                                                                                                                                         (f_sHt
+                                                                                                                                                                                                                                                                            (f_sHt
+                                                                                                                                                                                                                                                                               (f_sHt
+                                                                                                                                                                                                                                                                                  (f_sHt
+                                                                                                                                                                                                                                                                                     (f_sHt
+                                                                                                                                                                                                                                                                                        (f_sHt
+                                                                                                                                                                                                                                                                                           (f_sHt
+                                                                                                                                                                                                                                                                                              (f_sHt
+                                                                                                                                                                                                                                                                                                 (f_sHt
+                                                                                                                                                                                                                                                                                                    (f_sHt
+                                                                                                                                                                                                                                                                                                       (f_sHt
+                                                                                                                                                                                                                                                                                                          (f_sHt
+                                                                                                                                                                                                                                                                                                             (f_sHt
+                                                                                                                                                                                                                                                                                                                (f_sHt
+                                                                                                                                                                                                                                                                                                                   (f_sHt
+                                                                                                                                                                                                                                                                                                                      (f_sHt
+                                                                                                                                                                                                                                                                                                                         (f_sHt
+                                                                                                                                                                                                                                                                                                                            (f_sHt
+                                                                                                                                                                                                                                                                                                                               (f_sHt
+                                                                                                                                                                                                                                                                                                                                  x_X4N))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
+
+-- RHS size: {terms: 116, types: 16, coercions: 0, joins: 0/1}
+shared
+  :: forall (f :: * -> *).
+     (MyFunctor f, Domain f Int) =>
+     f Int -> f Int
+[LclIdX,
+ Arity=2,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=NEVER},
+ RULES: "SPEC shared @[]"
+            forall ($dMyFunctor_sHr :: MyFunctor []).
+              shared @[] $dMyFunctor_sHr
+              = $sshared_sHu]
+shared
+  = \ (@(f_azB :: * -> *))
+      ($dMyFunctor_azC :: MyFunctor f_azB)
+      (irred_azD :: Domain f_azB Int) ->
+      let {
+        f_sHq :: f_azB Int -> f_azB Int
+        [LclId]
+        f_sHq
+          = myfmap
+              @f_azB
+              $dMyFunctor_azC
+              @Int
+              @Int
+              irred_azD
+              irred_azD
+              GHC.Num.$fNumInt_$cnegate } in
+      \ (x_X4N :: f_azB Int) ->
+        f_sHq
+          (f_sHq
+             (f_sHq
+                (f_sHq
+                   (f_sHq
+                      (f_sHq
+                         (f_sHq
+                            (f_sHq
+                               (f_sHq
+                                  (f_sHq
+                                     (f_sHq
+                                        (f_sHq
+                                           (f_sHq
+                                              (f_sHq
+                                                 (f_sHq
+                                                    (f_sHq
+                                                       (f_sHq
+                                                          (f_sHq
+                                                             (f_sHq
+                                                                (f_sHq
+                                                                   (f_sHq
+                                                                      (f_sHq
+                                                                         (f_sHq
+                                                                            (f_sHq
+                                                                               (f_sHq
+                                                                                  (f_sHq
+                                                                                     (f_sHq
+                                                                                        (f_sHq
+                                                                                           (f_sHq
+                                                                                              (f_sHq
+                                                                                                 (f_sHq
+                                                                                                    (f_sHq
+                                                                                                       (f_sHq
+                                                                                                          (f_sHq
+                                                                                                             (f_sHq
+                                                                                                                (f_sHq
+                                                                                                                   (f_sHq
+                                                                                                                      (f_sHq
+                                                                                                                         (f_sHq
+                                                                                                                            (f_sHq
+                                                                                                                               (f_sHq
+                                                                                                                                  (f_sHq
+                                                                                                                                     (f_sHq
+                                                                                                                                        (f_sHq
+                                                                                                                                           (f_sHq
+                                                                                                                                              (f_sHq
+                                                                                                                                                 (f_sHq
+                                                                                                                                                    (f_sHq
+                                                                                                                                                       (f_sHq
+                                                                                                                                                          (f_sHq
+                                                                                                                                                             (f_sHq
+                                                                                                                                                                (f_sHq
+                                                                                                                                                                   (f_sHq
+                                                                                                                                                                      (f_sHq
+                                                                                                                                                                         (f_sHq
+                                                                                                                                                                            (f_sHq
+                                                                                                                                                                               (f_sHq
+                                                                                                                                                                                  (f_sHq
+                                                                                                                                                                                     (f_sHq
+                                                                                                                                                                                        (f_sHq
+                                                                                                                                                                                           (f_sHq
+                                                                                                                                                                                              (f_sHq
+                                                                                                                                                                                                 (f_sHq
+                                                                                                                                                                                                    (f_sHq
+                                                                                                                                                                                                       (f_sHq
+                                                                                                                                                                                                          (f_sHq
+                                                                                                                                                                                                             (f_sHq
+                                                                                                                                                                                                                (f_sHq
+                                                                                                                                                                                                                   (f_sHq
+                                                                                                                                                                                                                      (f_sHq
+                                                                                                                                                                                                                         (f_sHq
+                                                                                                                                                                                                                            (f_sHq
+                                                                                                                                                                                                                               (f_sHq
+                                                                                                                                                                                                                                  (f_sHq
+                                                                                                                                                                                                                                     (f_sHq
+                                                                                                                                                                                                                                        (f_sHq
+                                                                                                                                                                                                                                           (f_sHq
+                                                                                                                                                                                                                                              (f_sHq
+                                                                                                                                                                                                                                                 (f_sHq
+                                                                                                                                                                                                                                                    (f_sHq
+                                                                                                                                                                                                                                                       (f_sHq
+                                                                                                                                                                                                                                                          (f_sHq
+                                                                                                                                                                                                                                                             (f_sHq
+                                                                                                                                                                                                                                                                (f_sHq
+                                                                                                                                                                                                                                                                   (f_sHq
+                                                                                                                                                                                                                                                                      (f_sHq
+                                                                                                                                                                                                                                                                         (f_sHq
+                                                                                                                                                                                                                                                                            (f_sHq
+                                                                                                                                                                                                                                                                               (f_sHq
+                                                                                                                                                                                                                                                                                  (f_sHq
+                                                                                                                                                                                                                                                                                     (f_sHq
+                                                                                                                                                                                                                                                                                        (f_sHq
+                                                                                                                                                                                                                                                                                           (f_sHq
+                                                                                                                                                                                                                                                                                              (f_sHq
+                                                                                                                                                                                                                                                                                                 (f_sHq
+                                                                                                                                                                                                                                                                                                    (f_sHq
+                                                                                                                                                                                                                                                                                                       (f_sHq
+                                                                                                                                                                                                                                                                                                          (f_sHq
+                                                                                                                                                                                                                                                                                                             (f_sHq
+                                                                                                                                                                                                                                                                                                                (f_sHq
+                                                                                                                                                                                                                                                                                                                   (f_sHq
+                                                                                                                                                                                                                                                                                                                      (f_sHq
+                                                                                                                                                                                                                                                                                                                         (f_sHq
+                                                                                                                                                                                                                                                                                                                            (f_sHq
+                                                                                                                                                                                                                                                                                                                               (f_sHq
+                                                                                                                                                                                                                                                                                                                                  x_X4N))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
+
+-- RHS size: {terms: 8, types: 4, coercions: 4, joins: 0/0}
+foo :: [Int] -> [Int]
+[LclIdX,
+ Arity=1,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 60 0}]
+foo
+  = \ (xs_axd :: [Int]) ->
+      shared
+        @[]
+        Foo.$fMyFunctor[]
+        (GHC.Classes.(%%)
+         `cast` (Sub (Sym (Foo.D:R:Domain[]a[0] <Int>_N))
+                 :: (() :: Constraint) ~R# Domain [] Int))
+        (GHC.Types.: @Int (GHC.Types.I# 0#) xs_axd)
+
+-- RHS size: {terms: 8, types: 4, coercions: 4, joins: 0/0}
+bar :: [Int] -> [Int]
+[LclIdX,
+ Arity=1,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 60 10}]
+bar
+  = \ (xs_axe :: [Int]) ->
+      GHC.Types.:
+        @Int
+        (GHC.Types.I# 0#)
+        (shared
+           @[]
+           Foo.$fMyFunctor[]
+           (GHC.Classes.(%%)
+            `cast` (Sub (Sym (Foo.D:R:Domain[]a[0] <Int>_N))
+                    :: (() :: Constraint) ~R# Domain [] Int))
+           xs_axe)
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$trModule_sHj :: GHC.Prim.Addr#
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+$trModule_sHj = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$trModule_sHk :: GHC.Types.TrName
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+$trModule_sHk = GHC.Types.TrNameS $trModule_sHj
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$trModule_sHl :: GHC.Prim.Addr#
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+$trModule_sHl = "Foo"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$trModule_sHm :: GHC.Types.TrName
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+$trModule_sHm = GHC.Types.TrNameS $trModule_sHl
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+Foo.$trModule :: GHC.Types.Module
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+Foo.$trModule = GHC.Types.Module $trModule_sHk $trModule_sHm
+
+-- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
+$krep_aGA [InlPrag=[~]] :: GHC.Types.KindRep
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+$krep_aGA
+  = GHC.Types.KindRepTyConApp
+      GHC.Types.$tcConstraint (GHC.Types.[] @GHC.Types.KindRep)
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+$krep_aGz [InlPrag=[~]] :: GHC.Types.KindRep
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+$krep_aGz = GHC.Types.KindRepFun GHC.Types.krep$*Arr* $krep_aGA
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$tcMyFunctor_sHn :: GHC.Prim.Addr#
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 40 0}]
+$tcMyFunctor_sHn = "MyFunctor"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$tcMyFunctor_sHo :: GHC.Types.TrName
+[LclId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+$tcMyFunctor_sHo = GHC.Types.TrNameS $tcMyFunctor_sHn
+
+-- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
+Foo.$tcMyFunctor :: GHC.Types.TyCon
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+Foo.$tcMyFunctor
+  = GHC.Types.TyCon
+      12837160846121910345##64
+      787075802864859973##64
+      Foo.$trModule
+      $tcMyFunctor_sHo
+      0#
+      $krep_aGz
+
 
 

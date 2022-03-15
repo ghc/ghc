@@ -272,6 +272,9 @@ defining singleton values.  Here is the key stuff from GHC.TypeNats
 
   newtype SNat (n :: Nat) = SNat Natural
 
+  natDict :: forall (n :: Nat). SNat n -> KnownNat n
+  natDict n = MkKnownNat n -- private!
+
 Conceptually, this class has infinitely many instances:
 
   instance KnownNat 0       where natSing = SNat 0
@@ -281,11 +284,19 @@ Conceptually, this class has infinitely many instances:
 
 In practice, we solve `KnownNat` predicates in the type-checker
 (see GHC.Tc.Solver.Interact) because we can't have infinitely many instances.
-The evidence (aka "dictionary") for `KnownNat` is of the form `EvLit (EvNum n)`.
+The evidence (aka "dictionary") for `KnownNat` is of the form
+`EvExpr "natDict (SNat n)"`, where `natDict` is a private definition in
+GHC.TypeNats, given above for completeness.
+
+`natDict` acts as the DFun of the `instance KnownNat n where ...` that the
+type-checker implements. We can't define `natDict` in Haskell, because
+  * its type constructs a `KnownNat n` of Constraint kind, as well as
+  * its definition uses the inaccessible dictionary constructor `MkKnownNat`
+So we patch it, see Note [Wiring in Type-literal DFuns].
 
 We make the following assumptions about dictionaries in GHC:
   1. The "dictionary" for classes with a single method---like `KnownNat`---is
-     a newtype for the type of the method, so using a evidence amounts
+     a newtype for the type of the method, so using it as evidence amounts
      to a coercion, and
   2. Newtypes use the same representation as their definition types.
 
@@ -360,7 +371,7 @@ matchKnownNat :: DynFlags
                            -- See Note [Shortcut solving: overlap]
               -> Class -> [Type] -> TcM ClsInstResult
 matchKnownNat dflags _ clas [ty]     -- clas = KnownNat
-  | Just n <- isNumLitTy ty  = makeLitDict clas ty (mkNaturalExpr (targetPlatform dflags) n)
+  | Just n <- isNumLitTy ty  = makeLitDict natDictName clas ty (mkNaturalExpr (targetPlatform dflags) n)
 matchKnownNat df sc clas tys = matchInstEnv df sc clas tys
  -- See Note [Fabricating Evidence for Literals in Backpack] for why
  -- this lookup into the instance environment is required.
@@ -372,7 +383,7 @@ matchKnownSymbol :: DynFlags
 matchKnownSymbol _ _ clas [ty]  -- clas = KnownSymbol
   | Just s <- isStrLitTy ty = do
         et <- mkStringExprFS s
-        makeLitDict clas ty et
+        makeLitDict symbolDictName clas ty et
 matchKnownSymbol df sc clas tys = matchInstEnv df sc clas tys
  -- See Note [Fabricating Evidence for Literals in Backpack] for why
  -- this lookup into the instance environment is required.
@@ -382,12 +393,12 @@ matchKnownChar :: DynFlags
                               -- See Note [Shortcut solving: overlap]
                  -> Class -> [Type] -> TcM ClsInstResult
 matchKnownChar _ _ clas [ty]  -- clas = KnownChar
-  | Just s <- isCharLitTy ty = makeLitDict clas ty (mkCharExpr s)
+  | Just s <- isCharLitTy ty = makeLitDict charDictName clas ty (mkCharExpr s)
 matchKnownChar df sc clas tys = matchInstEnv df sc clas tys
  -- See Note [Fabricating Evidence for Literals in Backpack] for why
  -- this lookup into the instance environment is required.
 
-makeLitDict :: Class -> Type -> EvExpr -> TcM ClsInstResult
+makeLitDict :: Name -> Class -> Type -> EvExpr -> TcM ClsInstResult
 -- makeLitDict adds a coercion that will convert the literal into a dictionary
 -- of the appropriate type.  See Note [KnownNat & KnownSymbol and EvLit]
 -- in GHC.Tc.Types.Evidence.  The coercion happens in 2 steps:
@@ -398,19 +409,21 @@ makeLitDict :: Class -> Type -> EvExpr -> TcM ClsInstResult
 --     The process is mirrored for Symbols:
 --     String    -> SSymbol n
 --     SSymbol n -> KnownSymbol n
-makeLitDict clas ty et
-    | Just (_, co_dict) <- tcInstNewTyCon_maybe (classTyCon clas) [ty]
-          -- co_dict :: KnownNat n ~ SNat n
-    , [ meth ]   <- classMethods clas
+makeLitDict sing_dfun_name clas ty et
+    | [ meth ]   <- classMethods clas
     , Just tcRep <- tyConAppTyCon_maybe (classMethodTy meth)
                     -- If the method type is forall n. KnownNat n => SNat n
                     -- then tcRep is SNat
     , Just (_, co_rep) <- tcInstNewTyCon_maybe tcRep [ty]
           -- SNat n ~ Integer
-    , let ev_tm = mkEvCast et (mkTcSymCo (mkTcTransCo co_dict co_rep))
-    = return $ OneInst { cir_new_theta = []
-                       , cir_mk_ev     = \_ -> ev_tm
-                       , cir_what      = BuiltinInstance }
+    = do { sing_dfun <- tcLookupId sing_dfun_name
+         ; let EvExpr sing_val = mkEvCast et (mkTcSymCo co_rep)
+                 -- n |> sym co_rep
+               ev_tm           = evDFunApp sing_dfun [ty] [sing_val]
+                 -- natDict @ty (n |> sym co_rep)
+         ; return $ OneInst { cir_new_theta = []
+                            , cir_mk_ev     = \_ -> ev_tm
+                            , cir_what      = BuiltinInstance } }
 
     | otherwise
     = pprPanic "makeLitDict" $

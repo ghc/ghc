@@ -605,15 +605,15 @@ The trick is to
      unsafeCoerce# :: ..a suitable type signature..
      unsafeCoerce# = error "urk"
 
-* Magically over-write its RHS here in the desugarer, in
+* Magically over-write its type and RHS here in the desugarer, in
   patchMagicDefns.  This update can be done with full access to the
   DsM monad, and hence, dsLookupGlobal. We thus do not have to wire in
   all the entities used internally, a potentially big win.
 
-  This step should not change the Name or type of the Id.
+  This step should not change the Name of the Id.
 
-Because an Id stores its unfolding directly (as opposed to in the second
-component of a (Id, CoreExpr) pair), the patchMagicDefns function returns
+Because an Id has a type and stores its unfolding directly (as opposed to in the
+second component of a (Id, CoreExpr) pair), the patchMagicDefns function returns
 a new Id to use.
 
 Here are the moving parts:
@@ -668,6 +668,23 @@ simply look up the UnsafeEquality GADT in the environment, leaving us
 only to wire in unsafeCoerce# directly.
 
 Wrinkle: see Note [Always expose compulsory unfoldings] in GHC.Iface.Tidy
+
+Note [Wiring in Type-literal DFuns]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [KnownNat & KnownSymbol and EvLit] explains that we need DFuns of the form
+
+  natDict :: forall (n :: Nat). SNat n -> KnownNat n
+  natDict n = MkKnownNat n
+
+in, e.g., GHC.TypeNats. Unfortunately, we can write neither `natDict`'s type nor
+its definition in source Haskell. Hence we make `natDict` a known-key name
+and follow the steps in Note [Patching magic definitions]. To that purpose, we
+write in GHC.TypeNats
+
+  natDict :: ()
+  natDict = ()
+
+and patch both its type and its definition in the Desugarer.
 -}
 
 
@@ -689,9 +706,8 @@ patchMagicDefn orig_pair@(orig_id, orig_rhs)
   | Just mk_magic_pair <- lookupNameEnv magicDefnsEnv (getName orig_id)
   = do { magic_pair@(magic_id, _) <- mk_magic_pair orig_id orig_rhs
 
-       -- Patching should not change the Name or the type of the Id
+       -- Patching should not change the Name
        ; massert (getUnique magic_id == getUnique orig_id)
-       ; massert (varType magic_id `eqType` varType orig_id)
 
        ; return magic_pair }
   | otherwise
@@ -700,7 +716,14 @@ patchMagicDefn orig_pair@(orig_id, orig_rhs)
 magicDefns :: [(Name,    Id -> CoreExpr     -- old Id and RHS
                       -> DsM (Id, CoreExpr) -- new Id and RHS
                )]
-magicDefns = [ (unsafeCoercePrimName, mkUnsafeCoercePrimPair) ]
+magicDefns =
+  -- unsafeCoerce
+  [ (unsafeCoercePrimName, mkUnsafeCoercePrimPair)
+  -- Type-literal DFuns
+  , (natDictName,    mkSingDictPair naturalTy      sNatTyConName    knownNatClassName)
+  , (symbolDictName, mkSingDictPair typeSymbolKind sSymbolTyConName knownSymbolClassName)
+  , (charDictName,   mkSingDictPair charTy         sCharTyConName   knownCharClassName)
+  ]
 
 magicDefnsEnv :: NameEnv (Id -> CoreExpr -> DsM (Id, CoreExpr))
 magicDefnsEnv = mkNameEnv magicDefns
@@ -772,3 +795,33 @@ mkUnsafeCoercePrimPair _old_id old_expr
 
              id   = mkExportedVanillaId unsafeCoercePrimName ty `setIdInfo` info
        ; return (id, old_expr) }
+
+mkSingDictPair :: Kind -> Name -> Name
+                    -- e.g., naturalType, sNatTyConName, knownNatClassName
+               -> Id -> CoreExpr -> DsM (Id, CoreExpr)
+-- See Note [Wiring in Type-literal DFuns] for the defn we are creating here
+mkSingDictPair nat_ki sNat_name knownNat_name old_id _old_expr = do
+  -- The var names in the code and the comments assume the example of
+  -- Natural/SNat/KnownNat
+  knownNat_tc <- dsLookupTyCon knownNat_name
+  sNat_tc     <- dsLookupTyCon sNat_name
+  let [n]         = mkTemplateTyVars [nat_ki]             -- n :: Nat
+      snat_ty     = mkTyConApp sNat_tc [mkTyVarTy n]      -- SNat n
+      [snat]      = mkTemplateLocals [snat_ty]            -- snat :: SNat n
+      knownNat_ty = mkTyConApp knownNat_tc [mkTyVarTy n]  -- KnownNat n
+      ty          = mkSpecForAllTy n $      -- forall (n::Nat).
+                    mkVisFunTyMany snat_ty  --  SNat n ->
+                    knownNat_ty             --  KnownNat n
+
+      [dict_con] = tyConDataCons knownNat_tc
+      unf = mkDFunUnfolding [n, snat] dict_con [Type (mkTyVarTy n), Var snat]
+
+      info = noCafIdInfo `setArityInfo` 1
+      is_newtype = True
+      id = old_id `setIdType`       ty
+                  `setIdInfo`       info
+                  `setIdDetails`    DFunId is_newtype
+                  `setIdUnfolding`  unf
+                  `setInlinePragma` dfunInlinePragma
+      Just expr = maybeUnfoldingTemplate unf
+  return (id, expr)

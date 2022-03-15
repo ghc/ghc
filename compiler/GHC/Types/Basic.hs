@@ -1559,12 +1559,16 @@ inlineSpecSource spec = case spec of
                             NoInline  z      -> z
                             NoUserInlinePrag -> NoSourceText
 
--- A DFun has an always-active inline activation so that
+-- A DFun has an always-active noinline activation so that
 -- exprIsConApp_maybe can "see" its unfolding
 -- (However, its actual Unfolding is a DFunUnfolding, which is
 --  never inlined other than via exprIsConApp_maybe.)
-dfunInlinePragma   = defaultInlinePragma { inl_act  = AlwaysActive
-                                         , inl_rule = ConLike }
+-- See Note [Do not inline dictionary selectors]
+dfunInlinePragma = InlinePragma { inl_src    = NoSourceText
+                                , inl_act    = AlwaysActive
+                                , inl_rule   = ConLike
+                                , inl_inline = NoInline NoSourceText
+                                , inl_sat    = Nothing }
 
 isDefaultInlinePragma :: InlinePragma -> Bool
 isDefaultInlinePragma (InlinePragma { inl_act = activation

@@ -136,7 +136,9 @@ test('T5366',
 test('T7796', [], makefile_test, ['T7796'])
 test('T5550', omit_ways(prof_ways), compile, [''])
 test('T7865', normal, makefile_test, ['T7865'])
-test('T7785', only_ways(['optasm']), compile, ['-ddump-rules'])
+# T7785: Check that we generate the specialising RULE. Might not be listed in
+#        -ddump-rules because of Note [Trimming auto-rules], hence grep
+test('T7785', [ only_ways(['optasm']), grep_errmsg(r'RULE') ], compile, ['-ddump-spec'])
 test('T7702',
      [extra_files(['T7702plugin']),
       pre_cmd('$MAKE -s --no-print-directory -C T7702plugin package.T7702 TOP={top}'),
