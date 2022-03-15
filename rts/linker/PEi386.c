@@ -429,6 +429,16 @@ void freePreloadObjectFile_PEi386(ObjectCode *oc)
             HeapFree(code_heap, 0, oc->info->image);
             oc->info->image = NULL;
         }
+
+        /* Release the unwinder information.
+           See Note [Exception Unwinding].  */
+        if (oc->info->xdata) {
+            if (!RtlDeleteFunctionTable (oc->info->xdata->start))
+              debugBelch ("Unable to remove Exception handlers for %" PATH_FMT,
+                          oc->fileName);
+            oc->info->xdata = NULL;
+            oc->info->pdata = NULL;
+        }
         if (oc->info->ch_info)
            stgFree (oc->info->ch_info);
         stgFree (oc->info);
@@ -1438,11 +1448,21 @@ ocGetNames_PEi386 ( ObjectCode* oc )
 
       if (   0 == strncmp(".stab"     , section.info->name, 5 )
           || 0 == strncmp(".stabstr"  , section.info->name, 8 )
-          || 0 == strncmp(".pdata"    , section.info->name, 6 )
-          || 0 == strncmp(".xdata"    , section.info->name, 6 )
           || 0 == strncmp(".debug"    , section.info->name, 6 )
           || 0 == strncmp(".rdata$zzz", section.info->name, 10))
           kind = SECTIONKIND_DEBUG;
+
+      /* Exception Unwind information. See Note [Exception Unwinding].  */
+      if (0 == strncmp(".xdata"    , section.info->name, 6 )) {
+          kind = SECTIONKIND_EXCEPTION_UNWIND;
+          oc->info->xdata = &oc->sections[i];
+      }
+
+      /* Exception handler tables, See Note [Exception Unwinding].  */
+      if (0 == strncmp(".pdata"    , section.info->name, 6 )) {
+          kind = SECTIONKIND_EXCEPTION_TABLE;
+          oc->info->pdata = &oc->sections[i];
+      }
 
       if (0==strncmp(".idata", section.info->name, 6))
           kind = SECTIONKIND_IMPORT;
@@ -1786,7 +1806,7 @@ ocResolve_PEi386 ( ObjectCode* oc )
 
       /* Ignore sections called which contain stabs debugging information. */
       if (section.kind == SECTIONKIND_DEBUG)
-           continue;
+        continue;
 
       noRelocs = section.info->noRelocs;
       for (j = 0; j < noRelocs; j++) {
@@ -1924,6 +1944,27 @@ ocResolve_PEi386 ( ObjectCode* oc )
          }
 
       }
+
+      /* Register the exceptions inside this OC.
+         See Note [Exception Unwinding].  */
+      if (section.kind == SECTIONKIND_EXCEPTION_TABLE) {
+#if defined(x86_64_HOST_ARCH)
+          unsigned numEntries = section.size / sizeof(RUNTIME_FUNCTION);
+          if (numEntries == 0)
+            continue;
+
+          /* Now register the exception handler for the range and point it
+             to the unwind data.  */
+          if (!RtlAddFunctionTable (section.start, numEntries, (uintptr_t)__image_base)) {
+            sysErrorBelch("Unable to register Exception handler for %p for "
+                          "section %s in %" PATH_FMT " (Win32 error %lu)",
+                          section.start, section.info->name, oc->fileName,
+                          GetLastError());
+            releaseOcInfo (oc);
+            return false;
+          }
+#endif /* x86_64_HOST_ARCH.  */
+      }
    }
 
    IF_DEBUG(linker, debugBelch("completed %" PATH_FMT "\n", oc->fileName));
@@ -1943,6 +1984,77 @@ ocResolve_PEi386 ( ObjectCode* oc )
   relocation constant 0x03.
 
   See #9907
+*/
+
+/*
+  Note [Exception Unwinding]
+  ~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+  Exception Unwinding on Windows is handle using two named sections.
+
+  .pdata: Exception registration tables.
+
+  The .pdata section contains an array of function table entries that are used
+  for exception handling.  The entries must be sorted according to the
+  function addresses (the first field in each structure) before being emitted
+  into the final image.  It is pointed to by the exception table entry in the
+  image data directory. For x64 each entry contains:
+
+  Offset    Size    Field              Description
+  0         4       Begin Address      The RVA of the corresponding function.
+  4         4       End Address        The RVA of the end of the function.
+  8         4       Unwind Information The RVA of the unwind information.
+
+  Note that these are RVAs even after being resolved by the linker, they are
+  however ImageBase relative rather than PC relative.  These are typically
+  filled in by an ADDR32NB relocation.  On disk the section looks like:
+
+    Function Table #6 (4)
+
+            Begin     End       Info
+
+    00000000 00000000  000001A1  00000000
+    0000000C 000001A1  000001BF  00000034
+    00000018 000001BF  00000201  00000040
+    00000024 00000201  0000021F  0000004C
+
+    RELOCATIONS #6
+                                                    Symbol    Symbol
+    Offset    Type              Applied To         Index     Name
+    --------  ----------------  -----------------  --------  ------
+    00000000  ADDR32NB                   00000000         E  .text
+    00000004  ADDR32NB                   000001A1         E  .text
+    00000008  ADDR32NB                   00000000        16  .xdata
+    0000000C  ADDR32NB                   000001A1         E  .text
+    00000010  ADDR32NB                   000001BF         E  .text
+    00000014  ADDR32NB                   00000034        16  .xdata
+    00000018  ADDR32NB                   000001BF         E  .text
+    0000001C  ADDR32NB                   00000201         E  .text
+    00000020  ADDR32NB                   00000040        16  .xdata
+    00000024  ADDR32NB                   00000201         E  .text
+    00000028  ADDR32NB                   0000021F         E  .text
+    0000002C  ADDR32NB                   0000004C        16  .xdata
+
+  This means that if we leave it up to the relocation processing to
+  do the work we don't need to do anything special here. Note that
+  every single function will have an entry in this table regardless
+  whether they have an unwind code or not.  The reason for this is
+  that unwind handlers can be chained, and such another function
+  may have registered an overlapping region.
+
+  .xdata: Exception unwind codes.
+
+  This section contains an array of entries telling the unwinder how
+  to do unwinding.  They are pointed to by the .pdata table enteries
+  from the Info field.  Each entry is very complicated but for now
+  what is important is that the addresses are resolved by the relocs
+  for us.
+
+  Once we have resolved .pdata and .xdata we can simply pass the
+  content of .pdata on to RtlAddFunctionTable and the OS will do
+  the rest.  When we're unloading the object we have to unregister
+  them using RtlDeleteFunctionTable.
+
 */
 
 bool

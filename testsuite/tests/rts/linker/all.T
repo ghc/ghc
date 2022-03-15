@@ -119,3 +119,11 @@ test('T7072',
 		unless(opsys('linux'), skip), 
 		req_rts_linker], 
 	makefile_test, ['T7072'])
+
+
+test('T20918',
+	[extra_files(['T20918_v.cc']),
+		unless(opsys('mingw32'), skip),
+		req_rts_linker],
+	makefile_test, ['T20918'])
+

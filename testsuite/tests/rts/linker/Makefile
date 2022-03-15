@@ -119,3 +119,8 @@ T7072:
 	"$(TEST_HC)" -c T7072-main.c -o T7072-main.o
 	"$(TEST_HC)" T7072-main.c -o T7072-main -no-hs-main -debug
 	./T7072-main T7072-obj.o
+
+.PHONY: T20918
+T20918:
+	"$(TEST_CC)" -c T20918_v.cc -o T20918_v.o
+	echo hello | '$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE) T20918_v.o T20918.hs -lstdc++

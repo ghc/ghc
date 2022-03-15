@@ -23,6 +23,8 @@ struct ObjectCodeFormatInfo {
     size_t trampoline;
     Section* init;
     Section* finit;
+    Section* pdata;
+    Section* xdata;
     COFF_HEADER_INFO* ch_info;
     char* str_tab;
     COFF_symbol* symbols;

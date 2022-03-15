@@ -82,6 +82,10 @@ typedef
           SECTIONKIND_OTHER,
           /* Section contains debug information. e.g. .debug$.  */
           SECTIONKIND_DEBUG,
+          /* Section contains exception table. e.g. .pdata.  */
+          SECTIONKIND_EXCEPTION_TABLE,
+          /* Section contains unwind info. e.g. .xdata.  */
+          SECTIONKIND_EXCEPTION_UNWIND,
           /* Section belongs to an import section group. e.g. .idata$.  */
           SECTIONKIND_IMPORT,
           /* Section defines an import library entry, e.g. idata$7.  */
