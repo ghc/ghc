@@ -15,11 +15,12 @@
 {-# LANGUAGE UnboxedTuples #-}
 
 module Data.Array.Byte (
-  ByteArray(..)
+  ByteArray(..),
+  MutableByteArray(..),
 ) where
 
 import Data.Bits ((.&.), unsafeShiftR)
-import Data.Data (mkNoRepType, Data(..))
+import Data.Data (mkNoRepType, Data(..), Typeable)
 import qualified Data.Foldable as F
 import Data.Semigroup
 import GHC.Show (intToDigit)
@@ -39,6 +40,16 @@ import GHC.Word (Word8(..))
 -- @since 4.17.0.0
 data ByteArray = ByteArray ByteArray#
 
+-- | Boxed wrapper for 'MutableByteArray#'.
+--
+-- Since 'MutableByteArray#' is an unlifted type and not a member of kind 'Data.Kind.Type',
+-- things like @[MutableByteArray#]@ or @IO MutableByteArray#@ are ill-typed. To work around this
+-- inconvenience this module provides a standard boxed wrapper, inhabiting 'Data.Kind.Type'.
+-- Clients are expected to use 'MutableByteArray' in higher-level APIs,
+-- but wrap and unwrap 'MutableByteArray' internally as they please
+-- and use functions from "GHC.Exts".
+--
+-- @since 4.17.0.0
 data MutableByteArray s = MutableByteArray (MutableByteArray# s)
 
 -- | Create a new mutable byte array of the specified size in bytes.
@@ -121,6 +132,11 @@ instance Data ByteArray where
   gunfold _ _ = error "gunfold"
   dataTypeOf _ = mkNoRepType "Data.Array.Byte.ByteArray"
 
+instance Typeable s => Data (MutableByteArray s) where
+  toConstr _ = error "toConstr"
+  gunfold _ _ = error "gunfold"
+  dataTypeOf _ = mkNoRepType "Data.Array.Byte.MutableByteArray"
+
 instance Show ByteArray where
   showsPrec _ ba =
       showString "[" . go 0
@@ -159,6 +175,10 @@ instance Eq ByteArray where
     where
       n1 = sizeofByteArray ba1
       n2 = sizeofByteArray ba2
+
+instance Eq (MutableByteArray s) where
+  (==) (MutableByteArray arr#) (MutableByteArray brr#)
+    = isTrue# (sameMutableByteArray# arr# brr#)
 
 -- | Non-lexicographic ordering. This compares the lengths of
 -- the byte arrays first and uses a lexicographic ordering if
