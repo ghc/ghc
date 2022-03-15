@@ -191,7 +191,7 @@ else
 RUNTEST_OPTS += -e config.have_RTS_linker=False
 endif
 
-RUNTEST_OPTS += -e config.libdir="\"$(GhcLibdir)\""
+RUNTEST_OPTS += -e config.libdir="r\"$(GhcLibdir)\""
 
 ifeq "$(WINDOWS)" "YES"
 RUNTEST_OPTS += -e windows=True
