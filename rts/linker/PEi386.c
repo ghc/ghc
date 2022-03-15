@@ -1895,11 +1895,16 @@ ocResolve_PEi386 ( ObjectCode* oc )
                    break;
                }
             case 2: /* R_X86_64_32 (ELF constant 10) - IMAGE_REL_AMD64_ADDR32 (PE constant 2) */
-            case 3: /* R_X86_64_32S (ELF constant 11) - IMAGE_REL_AMD64_ADDR32NB (PE constant 3) */
+            case 3: /* IMAGE_REL_AMD64_ADDR32NB (PE constant 3) */
             case 17: /* R_X86_64_32S ELF constant, no PE mapping. See note [ELF constant in PE file] */
                {
                    uint64_t v;
                    v = S + A;
+
+                   /* If IMAGE_REL_AMD64_ADDR32NB then subtract the image base.  */
+                   if (reloc->Type == 3)
+                     v -= (uint64_t)__image_base;
+
                    // N.B. in the case of the sign-extended relocations we must ensure that v
                    // fits in a signed 32-bit value. See #15808.
                    if (((int64_t) v > (int64_t) INT32_MAX) || ((int64_t) v < (int64_t) INT32_MIN)) {
@@ -1908,6 +1913,11 @@ ocResolve_PEi386 ( ObjectCode* oc )
                        S = makeSymbolExtra_PEi386(oc, symIndex, S, (char *)symbol);
                        /* And retry */
                        v = S + A;
+
+                       /* If IMAGE_REL_AMD64_ADDR32NB then subtract the image base.  */
+                       if (reloc->Type == 3)
+                         v -= (uint64_t)__image_base;
+
                        if (((int64_t) v > (int64_t) INT32_MAX) || ((int64_t) v < (int64_t) INT32_MIN)) {
                            barf("IMAGE_REL_AMD64_ADDR32[NB]: High bits are set in %zx for %s",
                                 v, (char *)symbol);
