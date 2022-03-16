@@ -73,16 +73,21 @@ import qualified GHC.LanguageExtensions as LangExt
 ************************************************************************
 -}
 
-rnTypedBracket :: HsExpr GhcPs -> LHsExpr GhcPs -> RnM (HsExpr GhcRn, FreeVars)
-rnTypedBracket e br_body
-  = addErrCtxt (typedQuotationCtxtDoc br_body) $
-    do { -- Check that -XTemplateHaskellQuotes is enabled and available
-         thQuotesEnabled <- xoptM LangExt.TemplateHaskellQuotes
+-- Check that -XTemplateHaskellQuotes is enabled and available
+checkForTemplateHaskellQuotes :: HsExpr GhcPs ->  RnM ()
+checkForTemplateHaskellQuotes e =
+    do { thQuotesEnabled <- xoptM LangExt.TemplateHaskellQuotes
        ; unless thQuotesEnabled $
            failWith ( TcRnUnknownMessage $ mkPlainError noHints $ vcat
                       [ text "Syntax error on" <+> ppr e
                       , text ("Perhaps you intended to use TemplateHaskell"
                               ++ " or TemplateHaskellQuotes") ] )
+       }
+
+rnTypedBracket :: HsExpr GhcPs -> LHsExpr GhcPs -> RnM (HsExpr GhcRn, FreeVars)
+rnTypedBracket e br_body
+  = addErrCtxt (typedQuotationCtxtDoc br_body) $
+    do { checkForTemplateHaskellQuotes e
 
          -- Check for nested brackets
        ; cur_stage <- getStage
@@ -103,20 +108,14 @@ rnTypedBracket e br_body
        ; traceRn "Renaming typed TH bracket" empty
        ; (body', fvs_e) <- setStage (Brack cur_stage RnPendingTyped) $ rnLExpr br_body
 
-       ; return (HsTypedBracket noAnn body', fvs_e)
+       ; return (HsTypedBracket noExtField body', fvs_e)
 
        }
 
 rnUntypedBracket :: HsExpr GhcPs -> HsQuote GhcPs -> RnM (HsExpr GhcRn, FreeVars)
 rnUntypedBracket e br_body
   = addErrCtxt (untypedQuotationCtxtDoc br_body) $
-    do { -- Check that -XTemplateHaskellQuotes is enabled and available
-         thQuotesEnabled <- xoptM LangExt.TemplateHaskellQuotes
-       ; unless thQuotesEnabled $
-           failWith ( TcRnUnknownMessage $ mkPlainError noHints $ vcat
-                      [ text "Syntax error on" <+> ppr e
-                      , text ("Perhaps you intended to use TemplateHaskell"
-                              ++ " or TemplateHaskellQuotes") ] )
+    do { checkForTemplateHaskellQuotes e
 
          -- Check for nested brackets
        ; cur_stage <- getStage
@@ -142,7 +141,7 @@ rnUntypedBracket e br_body
          setStage (Brack cur_stage (RnPendingUntyped ps_var)) $
                   rn_utbracket cur_stage br_body
        ; pendings <- readMutVar ps_var
-       ; return (HsUntypedBracket (noAnn, pendings) body', fvs_e)
+       ; return (HsUntypedBracket pendings body', fvs_e)
 
        }
 
