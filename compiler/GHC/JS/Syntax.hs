@@ -135,6 +135,8 @@ type JsLabel = ShortText
 instance Semigroup JStat where
   (<>) = appendJStat
 
+-- FIXME (Sylvain, 2022/03): should we use OrdList instead of lists in
+-- BlockStat?
 instance Monoid JStat where
   mempty = BlockStat []
 

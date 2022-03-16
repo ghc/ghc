@@ -87,12 +87,18 @@ import GHC.StgToJS.CodeGen
 --  , d2 = free variable 2
 --  }
 --
+-- There are two different kinds of partial application:
+--  - pap_r   : pre-generated PAP that contains r registers
+--  - pap_gen : generic PAP, contains any number of registers
+--
 -- PAP =
 --  { f  = ?
 --  , m  = ?
---  , d1 = ?
+--  , d1 = function
 --  , d2 =
---    { d1 = PAP arity
+--    { d1 & 0xff = number of args (PAP arity)
+--    , d1 >> 8   = number of registers (r for h$pap_r)
+--    , d2, d3... = args (r)
 --    }
 --  }
 --
