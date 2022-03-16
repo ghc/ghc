@@ -236,7 +236,12 @@ outputForeignStubs
 outputForeignStubs logger tmpfs dflags unit_state mod location stubs
  = do
    let stub_h = mkStubPaths (initFinderOpts dflags) (moduleName mod) location
-   stub_c <- newTempName logger tmpfs (tmpDir dflags) TFL_CurrentModule "c"
+
+   -- We place the stub source in a temporary directory so that we have control
+   -- over its filename and therefore the name of the object file that it
+   -- ultimately produces. See Note [No object joining on Windows] for why.
+   tmp_dir <- newTempDir logger tmpfs (tmpDir dflags)
+   let stub_c = tmp_dir </> takeFileName (ml_obj_file location) ++ "$stubs.c"
 
    case stubs of
      NoStubs ->
