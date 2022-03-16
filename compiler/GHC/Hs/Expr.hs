@@ -200,87 +200,77 @@ have a (HsExpr GhcRn) for the quotation itself.
 As such, when typechecking both typed and untyped brackets,
 we keep a /renamed/ bracket in the extension field.
 
-Here is the life cycle of a /typed/ quote [|| e ||]:
+The HsBracketTc, the GhcTc ext field for both brackets, contains:
+  - The renamed quote :: HsQuote GhcRn -- for the desugarer
+  - [PendingTcSplice]
+  - The type of the quote
+  - Maybe QuoteWrapper
 
-  In this pass      We need this information
+Note that (HsBracketTc) stores the untyped (HsQuote GhcRn) for both typed and
+untyped brackets. They are treated uniformly by the desugarer, and we can
+easily construct untyped brackets from typed ones (with ExpBr).
+
+Typed quotes
+~~~~~~~~~~~~
+Here is the life cycle of a /typed/ quote [|| e ||], whose datacon is
+  HsTypedBracket   (XTypedBracket p)   (LHsExpr p)
+
+  In pass p   (XTypedBracket p)       (LHsExpr p)
   -------------------------------------------
-  GhcPs   The parsed expression  :: HsExpr GhcPs
-  GhcRn   The renamed expression :: HsExpr GhcRn
-  GhcTc   Four things:
-            - The renamed expression :: HsExpr GhcRn
-            - [PendingTcSplice]
-            - The type of the quote
-            - Maybe QuoteWrapper
-            - The typechecked expression :: HsExpr GhcTc
-                - NB: At the moment, GHC doesn't /need/ the typechecked
-                expression. Desugaring is done over the renamed expression.
+  GhcPs   Annotations only            LHsExpr GhcPs
+  GhcRn   Annotations only            LHsExpr GhcRn
+  GhcTc   HsBracketTc                 LHsExpr GhcTc: unused!
 
-Here is the life cycle of an /untyped/ quote, which can be
-an expression [| e |], pattern [| p |], type [| t |] etc
-We combine these four into HsQuote = Expr + Pat + Type + Var
+Note that in the GhcTc tree, the second field (HsExpr GhcTc)
+is entirely unused; the desugarer uses the (HsExpr GhcRn) from the
+first field.
 
-  In this pass      We need this information
-  -------------------------------------------
-  GhcPs   The parsed quote :: HsQuote GhcPs
-  GhcRn   Two things:
-            - The renamed quote :: HsQuote GhcRn
-            - [PendingRnSplice]
-  GhcTc   Four things:
-            - The renamed quote :: HsQuote GhcRn
-            - [PendingTcSplice]
-            - The type of the quote
-            - Maybe QuoteWrapper
+Untyped quotes
+~~~~~~~~~~~~~~
+Here is the life cycle of an /untyped/ quote, whose datacon is
+   HsUntypedBracket (XUntypedBracket p) (HsQuote p)
 
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Here HsQuote is a sum-type of expressions [| e |], patterns [| p |],
+types [| t |] etc.
 
-When typechecking /typed/ brackets, we typecheck the /typed/ expression that's
-quoted, constructing an `HsTypedBracket GhcTc` with all the described above needed
-information in the `GhcTc` pass.
+  In pass p   (XUntypedBracket p)          (HsQuote p)
+  -------------------------------------------------------
+  GhcPs   Annotations only                 HsQuote GhcPs
+  GhcRn   Annotations, [PendingRnSplice]   HsQuote GhcRn
+  GhcTc   HsBracketTc                      HsQuote GhcTc: unused!
 
-When typechecking /untyped/ brackets, we cannot typecheck the /untyped/
-expression + pattern + type + etc that's quoted (called `HsQuote`), but,
-despite the /untyped quotation/, we **do** typecheck the "encompassing"
-`HsUntypedBracket` expression:
+The difficulty is: the typechecker does not typecheck the body of an
+untyped quote, so how do we make a (HsQuote GhcTc) to put in the
+second field?
 
-    Consider an expression quote, `[| e |]`, its type is `forall m . Quote m => m Exp`,
-    even though `e` cannot be typechecked.
-    (See Note [Typechecking Overloaded Quotes] in GHC.Tc.Gen.Splice)
+Answer: we use the extension constructor of HsQuote, XQuote, and make
+all the other constructors into DataConCantHappen.  That is, the only
+non-bottom value of type (HsQuote GhcTc) is (XQuote noExtField). Hence
+the instances
+  type instance XExpBr GhcTc = DataConCantHappen
+  ...etc...
 
-Since we cannot typecheck `HsQuote`, we shouldn't ever be able to construct
-`HsQuote GhcTc` (that's OK, because we also never need `HsQuote GhcTc`);
-However, `HsQuote GhcTc` is a field of `HsUntypedBracket GhcTc`, so making
-`HsQuote GhcTc` impossible to construct would make `HsUntypedBracket GhcTc`
-impossible to construct too, which is undesireable.
-
-Our solution to enforce at the type level that the `HsUntypedBracket GhcTc`
-field for `HsQuote GhcTc` doesn't exist is to make `HsQuote GhcTc` isomorphic to
-`NoExtField` by using TTG field extensions to make all constructors, except
-for `XQuote` (which takes `NoExtField`), unconstructable, with `DataConCantHappen`.
-
-As for `HsQuote`, this means `HsQuote GhcTc` is unconstructable except if it's
-to be a non-existent field in some constructor.
+See the related Note [How brackets and nested splices are handled] in GHC.Tc.Gen.Splice
 -}
 
-data HsBracketTc thing = HsBracketTc
-  thing
-  Type
-  (Maybe QuoteWrapper) -- The wrapper to apply type and dictionary argument
-                       -- to the quote.
-  [PendingTcSplice]    -- Output of the type checker is the *original*
-                       -- renamed expression, plus
-                       -- _typechecked_ splices to be
-                       -- pasted back in by the desugarer
+data HsBracketTc = HsBracketTc
+  { brack_renamed_quote   :: (HsQuote GhcRn)      -- See Note [The life cycle of a TH quotation]
+  , brack_ty              :: Type
+  , brack_quote_wrapper   :: (Maybe QuoteWrapper) -- The wrapper to apply type and dictionary argument to the quote.
+  , brack_pending_splices :: [PendingTcSplice]    -- Output of the type checker is the *original*
+                                                  -- renamed expression, plus
+                                                  -- _typechecked_ splices to be
+                                                  -- pasted back in by the desugarer
+  }
 
 type instance XTypedBracket GhcPs = EpAnn [AddEpAnn]
-type instance XTypedBracket GhcRn = EpAnn [AddEpAnn]
-type instance XTypedBracket GhcTc = HsBracketTc (LHsExpr GhcRn) -- See Note [The life cycle of a TH quotation]
+type instance XTypedBracket GhcRn = NoExtField
+type instance XTypedBracket GhcTc = HsBracketTc
 type instance XUntypedBracket GhcPs = EpAnn [AddEpAnn]
-type instance XUntypedBracket GhcRn = (EpAnn [AddEpAnn], [PendingRnSplice])
-                       -- See Note [Pending Splices]
-                       -- Output of the renamer is the *original* renamed
-                       -- expression, plus
-                       -- _renamed_ splices to be type checked
-type instance XUntypedBracket GhcTc = HsBracketTc (HsQuote GhcRn) -- See Note [The life cycle of a TH quotation]
+type instance XUntypedBracket GhcRn = [PendingRnSplice] -- See Note [Pending Splices]
+                                                        -- Output of the renamer is the *original* renamed expression,
+                                                        -- plus _renamed_ splices to be type checked
+type instance XUntypedBracket GhcTc = HsBracketTc
 
 -- ---------------------------------------------------------------------
 
@@ -725,23 +715,20 @@ ppr_expr (ArithSeq _ _ info) = brackets (ppr info)
 
 ppr_expr (HsSpliceE _ s)         = pprSplice s
 
--- romes TODO: refactor common
 ppr_expr (HsTypedBracket b e)
   = case ghcPass @p of
     GhcPs -> thTyBrackets (ppr e)
     GhcRn -> thTyBrackets (ppr e)
-    GhcTc -> case b of
-      HsBracketTc _  _ty _wrap [] -> thTyBrackets (ppr e)
-      HsBracketTc _  _ty _wrap ps -> thTyBrackets (ppr e) $$ text "pending(tc)" <+> pprIfTc @p (ppr ps)
-ppr_expr (HsUntypedBracket b e)
+    GhcTc | HsBracketTc _  _ty _wrap ps <- b ->
+      thTyBrackets (ppr e) `ppr_with_pending_tc_splices` ps
+ppr_expr (HsUntypedBracket b q)
   = case ghcPass @p of
-    GhcPs -> ppr e
+    GhcPs -> ppr q
     GhcRn -> case b of
-      (_, []) -> ppr e
-      (_, ps) -> ppr e $$ text "pending(rn)" <+> ppr ps
-    GhcTc -> case b of
-      HsBracketTc rne  _ty _wrap [] -> ppr rne
-      HsBracketTc rne  _ty _wrap ps -> ppr rne $$ text "pending(tc)" <+> pprIfTc @p (ppr ps)
+      [] -> ppr q
+      ps -> ppr q $$ text "pending(rn)" <+> ppr ps
+    GhcTc | HsBracketTc rnq  _ty _wrap ps <- b ->
+      ppr rnq `ppr_with_pending_tc_splices` ps
 
 ppr_expr (HsProc _ pat (L _ (HsCmdTop _ cmd)))
   = hsep [text "proc", ppr pat, text "->", ppr cmd]
@@ -1745,22 +1732,22 @@ bracket code.  So for example
     [| f $(g x) |]
 looks like
 
-    HsUntypedBracket _ (HsApp (HsVar "f") (HsSpliceE _ (g x)))
+    HsUntypedBracket _ (HsApp (HsVar "f") (HsSpliceE _ (HsUntypedSplice sn (g x)))
 
 which the renamer rewrites to
 
     HsUntypedBracket
-        (_, [PendingRnSplice UntypedExpSplice sn (g x)])
-        (HsApp (HsVar f) (HsSpliceE sn (g x)))
+        [PendingRnSplice UntypedExpSplice sn (g x)]
+        (HsApp (HsVar f) (HsSpliceE _ (HsUntypedSplice sn (g x)))
 
 * The 'sn' is the Name of the splice point, the SplicePointName
 
 * The PendingRnExpSplice gives the splice that splice-point name maps to;
   and the typechecker can now conveniently find these sub-expressions
 
-* The other copy of the splice, in the second argument of HsSpliceE
-                                in the renamed first arg of HsRnBracketOut
-  is used only for pretty printing
+* Note that a nested splice, such as the `$(g x)` now appears twice:
+  - In the PendingRnSplice: this is the version that will later be typechecked
+  - In the HsSpliceE in the body of the bracket. This copy is used only for pretty printing.
 
 There are four varieties of pending splices generated by the renamer,
 distinguished by their UntypedSpliceFlavour
@@ -1791,13 +1778,6 @@ checker:
 
   * Pending *typed* expression splices, (PendingTcSplice), e.g.,
         [||1 + $$(f 2)||]
-
-It would be possible to eliminate HsRnBracketOut and use HsBracketOut for the
-output of the renamer. However, when pretty printing the output of the renamer,
-e.g., in a type error message, we *do not* want to print out the pending
-splices. In contrast, when pretty printing the output of the type checker, we
-*do* want to print the pending splices. So splitting them up seems to make
-sense, although I hate to add another constructor to HsExpr.
 -}
 
 instance OutputableBndrId p
@@ -1899,7 +1879,8 @@ instance OutputableBndrId p
           GhcPs -> dataConCantHappen b
           GhcRn -> dataConCantHappen b
 #endif
-          GhcTc -> ppr () -- romes TODO: so what do we do when we want to pretty print an HsQuote GhcTc? probably some pprPanic right? that's unfortunate...
+          GhcTc -> pprPanic "pprHsQuote: `HsQuote GhcTc` shouldn't exist" (ppr b)
+                   -- See Note [The life cycle of a TH quotation]
 
 thBrackets :: SDoc -> SDoc -> SDoc
 thBrackets pp_kind pp_body = char '[' <> pp_kind <> vbar <+>
@@ -1913,6 +1894,10 @@ instance Outputable PendingRnSplice where
 
 instance Outputable PendingTcSplice where
   ppr (PendingTcSplice n e) = pprPendingSplice n e
+
+ppr_with_pending_tc_splices :: SDoc -> [PendingTcSplice] -> SDoc
+ppr_with_pending_tc_splices x [] = x
+ppr_with_pending_tc_splices x ps = x $$ text "pending(tc)" <+> ppr ps
 
 {-
 ************************************************************************

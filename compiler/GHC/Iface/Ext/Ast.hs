@@ -1192,9 +1192,9 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
           , toHie p
           ]
       HsUntypedBracket xbracket b -> case hiePass @p of
-        HieRn | (_, p) <- xbracket ->
+        HieRn ->
             [ toHie b
-            , toHie p
+            , toHie xbracket
             ]
         HieTc | HsBracketTc _ _ _ p <- xbracket ->
           [ toHie b

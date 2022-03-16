@@ -27,7 +27,7 @@
 -- a Royal Pain (triggers other recompilation).
 -----------------------------------------------------------------------------
 
-module GHC.HsToCore.Quote( dsTypedBracket, dsUntypedBracket ) where
+module GHC.HsToCore.Quote( dsBracket ) where
 
 import GHC.Prelude
 import GHC.Platform
@@ -157,40 +157,27 @@ getPlatform :: MetaM Platform
 getPlatform = targetPlatform <$> getDynFlags
 
 -----------------------------------------------------------------------------
-dsTypedBracket   :: Maybe QuoteWrapper
-                 -> LHsExpr GhcRn      -- See Note [The life cycle of a TH quotation]
-                 -> [PendingTcSplice]
-                 -> DsM CoreExpr
-dsTypedBracket wrap exp splices
-  = runOverloaded $ do { MkC e1 <- repLE exp ; return e1 }
-  where
-    -- romes TODO: factoring this method out requires many imports for its explicit type, is it worth it?
-    runOverloaded act = do
-      -- In the overloaded case we have to get given a wrapper, it is just
-      -- for variable quotations that there is no wrapper, because they
-      -- have a simple type.
-      mw <- mkMetaWrappers (expectJust "runOverloaded" wrap)
-      runReaderT (mapReaderT (dsExtendMetaEnv (new_bit splices)) act) mw
-
-dsUntypedBracket :: Maybe QuoteWrapper -- ^ This is Nothing only when we are dealing with a VarBr
-                 -> HsQuote GhcRn      -- See Note [The life cycle of a TH quotation]
-                 -> [PendingTcSplice]
-                 -> DsM CoreExpr
+dsBracket :: Maybe QuoteWrapper -- ^ This is Nothing only when we are dealing with a VarBr
+          -> HsQuote GhcRn      -- See Note [The life cycle of a TH quotation]
+          -> [PendingTcSplice]
+          -> DsM CoreExpr
 -- See Note [Desugaring Brackets]
 -- Returns a CoreExpr of type (M TH.Exp)
 -- The quoted thing is parameterised over Name, even though it has
 -- been type checked.  We don't want all those type decorations!
 
-dsUntypedBracket wrap brack splices
+dsBracket wrap brack splices
   = do_brack brack
   where
-    -- romes TODO: factoring this method out requires many imports for its explicit type, is it worth it?
     runOverloaded act = do
       -- In the overloaded case we have to get given a wrapper, it is just
       -- for variable quotations that there is no wrapper, because they
       -- have a simple type.
       mw <- mkMetaWrappers (expectJust "runOverloaded" wrap)
-      runReaderT (mapReaderT (dsExtendMetaEnv (new_bit splices)) act) mw
+      runReaderT (mapReaderT (dsExtendMetaEnv new_bit) act) mw
+
+    new_bit = mkNameEnv [(n, DsSplice (unLoc e))
+                        | PendingTcSplice n e <- splices]
 
     do_brack (VarBr _ _ n) = do { MkC e1  <- lookupOccDsM (unLoc n) ; return e1 }
     do_brack (ExpBr _ e)   = runOverloaded $ do { MkC e1  <- repLE e     ; return e1 }
@@ -198,10 +185,6 @@ dsUntypedBracket wrap brack splices
     do_brack (TypBr _ t)   = runOverloaded $ do { MkC t1  <- repLTy t    ; return t1 }
     do_brack (DecBrG _ gp) = runOverloaded $ do { MkC ds1 <- repTopDs gp ; return ds1 }
     do_brack (DecBrL {})   = panic "dsUntypedBracket: unexpected DecBrL"
-
-new_bit :: [PendingTcSplice] -> NameEnv DsMetaVal
-new_bit splices = mkNameEnv [(n, DsSplice (unLoc e))
-                    | PendingTcSplice n e <- splices]
 
 
 {-

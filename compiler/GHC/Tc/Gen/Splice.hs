@@ -213,11 +213,11 @@ tcTypedBracket rn_expr expr res_ty
        ; ps' <- readMutVar ps_ref
        ; codeco <- tcLookupId unsafeCodeCoerceName
        ; bracket_ty <- mkAppTy m_var <$> tcMetaTy expTyConName
-       ; tcWrapResultO (Shouldn'tHappenOrigin "TExpBr") -- romes TODO: What is Shouldn'tHappenOrigin? Is this still accurate?
+       ; tcWrapResultO (Shouldn'tHappenOrigin "TH typed bracket expression")
                        rn_expr
                        (unLoc (mkHsApp (mkLHsWrap (applyQuoteWrapper wrapper)
                                                   (nlHsTyApp codeco [rep, expr_ty]))
-                                      (noLocA (HsTypedBracket (HsBracketTc expr bracket_ty (Just wrapper) ps') tc_expr))))
+                                      (noLocA (HsTypedBracket (HsBracketTc (ExpBr noExtField expr) bracket_ty (Just wrapper) ps') tc_expr))))
                        meta_ty res_ty }
 
 -- See Note [Typechecking Overloaded Quotes]
@@ -244,6 +244,7 @@ tcUntypedBracket rn_expr brack ps res_ty
        -- type
        ; tcWrapResultO BracketOrigin rn_expr
             (HsUntypedBracket (HsBracketTc brack expected_type brack_info ps') (XQuote noExtField))
+                -- (XQuote noExtField): see Note [The life cycle of a TH quotation] in GHC.Hs.Expr
             expected_type res_ty
 
        }
@@ -362,44 +363,46 @@ Remember, there are two forms of bracket
    and untyped   [|  e  |]
 
 The life cycle of a typed bracket:
-   * Starts as HsBracket
+   * Starts as HsTypedBracket
 
    * When renaming:
         * Set the ThStage to (Brack s RnPendingTyped)
         * Rename the body
-        * Result is still a HsBracket
+        * Result is a HsTypedBracket
 
    * When typechecking:
         * Set the ThStage to (Brack s (TcPending ps_var lie_var))
-        * Typecheck the body, and throw away the elaborated result
+        * Typecheck the body, and keep the elaborated result (despite never using it!)
         * Nested splices (which must be typed) are typechecked, and
           the results accumulated in ps_var; their constraints
           accumulate in lie_var
-        * Result is a HsTcBracketOut rn_brack pending_splices
-          where rn_brack is the incoming renamed bracket
+        * Result is a HsTypedBracket (HsBracketTc rn_brack ty quote_wrapper pending_splices) tc_brack
+          where rn_brack is the untyped renamed exp quote constructed from the typed renamed expression :: HsQuote GhcRn
 
--- romes TODO update note
 The life cycle of a un-typed bracket:
-   * Starts as HsBracket
+   * Starts as HsUntypedBracket
 
    * When renaming:
         * Set the ThStage to (Brack s (RnPendingUntyped ps_var))
         * Rename the body
         * Nested splices (which must be untyped) are renamed, and the
           results accumulated in ps_var
-        * Result is still (HsRnBracketOut rn_body pending_splices)
+        * Result is a HsUntypedBracket pending_splices rn_body
 
-   * When typechecking a HsRnBracketOut
+   * When typechecking:
         * Typecheck the pending_splices individually
         * Ignore the body of the bracket; just check that the context
           expects a bracket of that type (e.g. a [p| pat |] bracket should
           be in a context needing a (Q Pat)
-        * Result is a HsTcBracketOut rn_brack pending_splices
-          where rn_brack is the incoming renamed bracket
+        * Result is a HsUntypedBracket (HsBracketTc rn_brack ty quote_wrapper pending_splices) (XQuote noExtField)
+          where rn_brack is the incoming renamed bracket :: HsQuote GhcRn
+          and (XQuote noExtField) stands for the removal of the `HsQuote GhcTc` field (since `HsQuote GhcTc` isn't possible)
 
+See the related Note [The life cycle of a TH quotation]
 
 In both cases, desugaring happens like this:
-  * HsTcBracketOut is desugared by GHC.HsToCore.Quote.dsBracket.  It
+  * Hs*Bracket is desugared by GHC.HsToCore.Quote.dsBracket using the renamed
+    expression held in `HsBracketTc` (`type instance X*Bracket GhcTc = HsBracketTc`). It
 
       a) Extends the ds_meta environment with the PendingSplices
          attached to the bracket
@@ -421,11 +424,11 @@ In both cases, desugaring happens like this:
 
 Example:
     Source:       f = [| Just $(g 3) |]
-      The [| |] part is a HsBracket
+      The [| |] part is a HsUntypedBracket GhcPs
 
     Typechecked:  f = [| Just ${s7}(g 3) |]{s7 = g Int 3}
-      The [| |] part is a HsBracketOut, containing *renamed*
-        (not typechecked) expression
+      The [| |] part is a HsUntypedBracket GhcTc, containing *renamed*
+        (not typechecked) expression (see Note [The life cycle of a TH quotation])
       The "s7" is the "splice point"; the (g Int 3) part
         is a typechecked expression
 

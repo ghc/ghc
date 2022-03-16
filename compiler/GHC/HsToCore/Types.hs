@@ -85,7 +85,7 @@ data DsMetaVal
                        -- The Id has type THSyntax.Var
 
   | DsSplice (HsExpr GhcTc) -- These bindings are introduced by
-                            -- the PendingSplices on a HsBracketOut
+                            -- the PendingSplices on a Hs*Bracket
 
 -- | Desugaring monad. See also 'TcM'.
 type DsM = TcRnIf DsGblEnv DsLclEnv

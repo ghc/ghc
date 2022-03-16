@@ -539,13 +539,13 @@ hard_hole_fits.hs:40:34: warning: [-Wtyped-holes (in -Wdefault)]
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
            (and originally defined in ‘GHC.Enum’))
 
-hard_hole_fits.hs:41:28: warning: [-Wtyped-holes (in -Wdefault)]
+hard_hole_fits.hs:41:33: warning: [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int
-    • In an equation for ‘testMe’: testMe (HsBracket xb hb) = _
+    • In an equation for ‘testMe’: testMe (HsTypedBracket xb hb) = _
     • Relevant bindings include
-        hb :: HsBracket GhcPs (bound at hard_hole_fits.hs:41:22)
-        xb :: Language.Haskell.Syntax.Extension.XBracket GhcPs
-          (bound at hard_hole_fits.hs:41:19)
+        hb :: LHsExpr GhcPs (bound at hard_hole_fits.hs:41:27)
+        xb :: Language.Haskell.Syntax.Extension.XTypedBracket GhcPs
+          (bound at hard_hole_fits.hs:41:24)
         testMe :: HsExpr GhcPs -> Int (bound at hard_hole_fits.hs:14:1)
       Valid hole fits include
         maxBound :: forall a. Bounded a => a
@@ -557,16 +557,13 @@ hard_hole_fits.hs:41:28: warning: [-Wtyped-holes (in -Wdefault)]
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
            (and originally defined in ‘GHC.Enum’))
 
-hard_hole_fits.hs:42:40: warning: [-Wtyped-holes (in -Wdefault)]
+hard_hole_fits.hs:42:35: warning: [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int
-    • In an equation for ‘testMe’:
-          testMe (HsRnBracketOut xrbo hb prss) = _
+    • In an equation for ‘testMe’: testMe (HsUntypedBracket xb hb) = _
     • Relevant bindings include
-        prss :: [PendingRnSplice' GhcPs] (bound at hard_hole_fits.hs:42:32)
-        hb :: HsBracket (HsBracketRn GhcPs)
-          (bound at hard_hole_fits.hs:42:29)
-        xrbo :: Language.Haskell.Syntax.Extension.XRnBracketOut GhcPs
-          (bound at hard_hole_fits.hs:42:24)
+        hb :: HsQuote GhcPs (bound at hard_hole_fits.hs:42:29)
+        xb :: Language.Haskell.Syntax.Extension.XUntypedBracket GhcPs
+          (bound at hard_hole_fits.hs:42:26)
         testMe :: HsExpr GhcPs -> Int (bound at hard_hole_fits.hs:14:1)
       Valid hole fits include
         maxBound :: forall a. Bounded a => a
@@ -578,18 +575,13 @@ hard_hole_fits.hs:42:40: warning: [-Wtyped-holes (in -Wdefault)]
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
            (and originally defined in ‘GHC.Enum’))
 
-hard_hole_fits.hs:43:43: warning: [-Wtyped-holes (in -Wdefault)]
+hard_hole_fits.hs:43:29: warning: [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int
-    • In an equation for ‘testMe’:
-          testMe (HsTcBracketOut xtbo hb ptss as) = _
+    • In an equation for ‘testMe’: testMe (HsSpliceE xse hs) = _
     • Relevant bindings include
-        as :: [PendingTcSplice' GhcPs] (bound at hard_hole_fits.hs:43:37)
-        ptss :: HsBracket (HsBracketRn GhcPs)
-          (bound at hard_hole_fits.hs:43:32)
-        hb :: Maybe GHC.Tc.Types.Evidence.QuoteWrapper
-          (bound at hard_hole_fits.hs:43:29)
-        xtbo :: Language.Haskell.Syntax.Extension.XTcBracketOut GhcPs
-          (bound at hard_hole_fits.hs:43:24)
+        hs :: HsSplice GhcPs (bound at hard_hole_fits.hs:43:23)
+        xse :: Language.Haskell.Syntax.Extension.XSpliceE GhcPs
+          (bound at hard_hole_fits.hs:43:19)
         testMe :: HsExpr GhcPs -> Int (bound at hard_hole_fits.hs:14:1)
       Valid hole fits include
         maxBound :: forall a. Bounded a => a
@@ -603,31 +595,13 @@ hard_hole_fits.hs:43:43: warning: [-Wtyped-holes (in -Wdefault)]
 
 hard_hole_fits.hs:44:29: warning: [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int
-    • In an equation for ‘testMe’: testMe (HsSpliceE xse hs) = _
-    • Relevant bindings include
-        hs :: HsSplice GhcPs (bound at hard_hole_fits.hs:44:23)
-        xse :: Language.Haskell.Syntax.Extension.XSpliceE GhcPs
-          (bound at hard_hole_fits.hs:44:19)
-        testMe :: HsExpr GhcPs -> Int (bound at hard_hole_fits.hs:14:1)
-      Valid hole fits include
-        maxBound :: forall a. Bounded a => a
-          with maxBound @Int
-          (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
-        minBound :: forall a. Bounded a => a
-          with minBound @Int
-          (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
-           (and originally defined in ‘GHC.Enum’))
-
-hard_hole_fits.hs:45:29: warning: [-Wtyped-holes (in -Wdefault)]
-    • Found hole: _ :: Int
     • In an equation for ‘testMe’: testMe (HsProc xp pat gl) = _
     • Relevant bindings include
-        gl :: LHsCmdTop GhcPs (bound at hard_hole_fits.hs:45:23)
+        gl :: LHsCmdTop GhcPs (bound at hard_hole_fits.hs:44:23)
         pat :: Language.Haskell.Syntax.Pat.LPat GhcPs
-          (bound at hard_hole_fits.hs:45:19)
+          (bound at hard_hole_fits.hs:44:19)
         xp :: Language.Haskell.Syntax.Extension.XProc GhcPs
-          (bound at hard_hole_fits.hs:45:16)
+          (bound at hard_hole_fits.hs:44:16)
         testMe :: HsExpr GhcPs -> Int (bound at hard_hole_fits.hs:14:1)
       Valid hole fits include
         maxBound :: forall a. Bounded a => a
@@ -639,13 +613,13 @@ hard_hole_fits.hs:45:29: warning: [-Wtyped-holes (in -Wdefault)]
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
            (and originally defined in ‘GHC.Enum’))
 
-hard_hole_fits.hs:46:27: warning: [-Wtyped-holes (in -Wdefault)]
+hard_hole_fits.hs:45:27: warning: [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int
     • In an equation for ‘testMe’: testMe (HsStatic xs gl) = _
     • Relevant bindings include
-        gl :: LHsExpr GhcPs (bound at hard_hole_fits.hs:46:21)
+        gl :: LHsExpr GhcPs (bound at hard_hole_fits.hs:45:21)
         xs :: Language.Haskell.Syntax.Extension.XStatic GhcPs
-          (bound at hard_hole_fits.hs:46:18)
+          (bound at hard_hole_fits.hs:45:18)
         testMe :: HsExpr GhcPs -> Int (bound at hard_hole_fits.hs:14:1)
       Valid hole fits include
         maxBound :: forall a. Bounded a => a
@@ -657,16 +631,16 @@ hard_hole_fits.hs:46:27: warning: [-Wtyped-holes (in -Wdefault)]
           (imported from ‘Prelude’ at hard_hole_fits.hs:8:8-20
            (and originally defined in ‘GHC.Enum’))
 
-hard_hole_fits.hs:47:1: warning: [-Woverlapping-patterns (in -Wdefault)]
+hard_hole_fits.hs:46:1: warning: [-Woverlapping-patterns (in -Wdefault)]
     Pattern match is redundant
     In an equation for ‘testMe’: testMe (XExpr xe) = ...
 
-hard_hole_fits.hs:47:21: warning: [-Wtyped-holes (in -Wdefault)]
+hard_hole_fits.hs:46:21: warning: [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int
     • In an equation for ‘testMe’: testMe (XExpr xe) = _
     • Relevant bindings include
         xe :: Language.Haskell.Syntax.Extension.XXExpr GhcPs
-          (bound at hard_hole_fits.hs:47:15)
+          (bound at hard_hole_fits.hs:46:15)
         testMe :: HsExpr GhcPs -> Int (bound at hard_hole_fits.hs:14:1)
       Valid hole fits include
         maxBound :: forall a. Bounded a => a

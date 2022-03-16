@@ -748,8 +748,8 @@ Thus, we pass @r@ as the scrutinee expression to @matchWrapper@ above.
 -- Template Haskell stuff
 -- See Note [The life cycle of a TH quotation]
 
-dsExpr (HsTypedBracket (HsBracketTc x _ hs_wrapper ps) _) = dsTypedBracket hs_wrapper x ps
-dsExpr (HsUntypedBracket (HsBracketTc x _ hs_wrapper ps) _) = dsUntypedBracket hs_wrapper x ps
+dsExpr (HsTypedBracket   (HsBracketTc q _ hs_wrapper ps) _) = dsBracket hs_wrapper q ps
+dsExpr (HsUntypedBracket (HsBracketTc q _ hs_wrapper ps) _) = dsBracket hs_wrapper q ps
 dsExpr (HsSpliceE _ s) = pprPanic "dsExpr:splice" (ppr s)
 
 -- Arrow notation extension
