@@ -211,5 +211,5 @@ libraryTargets includeGhciLib context@Context {..} = do
                 else return False
     extra    <- extraTargets context
     return $ [ libFile ]
-          ++ [ ghciLib | ghci ]
+          ++ [ ghciLib | ghci && False ]
           ++ extra

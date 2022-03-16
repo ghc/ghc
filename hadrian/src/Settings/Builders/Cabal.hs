@@ -90,7 +90,7 @@ libraryArgs = do
            then  "--enable-library-profiling"
            else "--disable-library-profiling"
          , if (hasVanilla || hasProfiling) &&
-              package /= rts && withGhci && not dynPrograms
+              package /= rts && withGhci && not dynPrograms && False
            then  "--enable-library-for-ghci"
            else "--disable-library-for-ghci"
          , if hasDynamic
