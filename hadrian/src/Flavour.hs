@@ -207,7 +207,7 @@ enableIPE =
 
 enableLateCCS :: Flavour -> Flavour
 enableLateCCS =
-  let Right kv = parseKV "stage1.*.ghc.hs.opts += -fprof-late-ccs"
+  let Right kv = parseKV "stage1.*.ghc.hs.opts += -fprof-late"
       Right transformer = applySetting kv
   in transformer
 
