@@ -135,7 +135,7 @@ hsSigTypeI = sig_body . unLoc
 
 mkEmptySigType :: LHsType GhcRn -> LHsSigType GhcRn
 -- Dubious, because the implicit binders are empty even
--- though the type might have free varaiables
+-- though the type might have free variables
 mkEmptySigType lty@(L loc ty) = L loc $ case ty of
   HsForAllTy { hst_tele = HsForAllInvis { hsf_invis_bndrs = bndrs }
              , hst_body = body }

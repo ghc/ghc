@@ -1,5 +1,5 @@
 {-# LANGUAGE Haskell2010 #-}
--- Tests that the identifers/operators are properly linked even when:
+-- Tests that the identifiers/operators are properly linked even when:
 --
 --   * backquoted, parenthesized, vanilla
 --   * qualified, not-qualified

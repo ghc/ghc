@@ -177,7 +177,7 @@ specialChar = "_/<@\"&'`# "
 
 -- | Plain, regular parser for text. Called as one of the last parsers
 -- to ensure that we have already given a chance to more meaningful parsers
--- before capturing their characers.
+-- before capturing their characters.
 string' :: Parser (DocH mod a)
 string' = DocString . unescape . T.unpack <$> takeWhile1_ (`notElem` specialChar)
   where
@@ -710,7 +710,7 @@ stripSpace = fromMaybe <*> mapM strip'
                  Just (' ',t') -> Just t'
                  _ -> Nothing
 
--- | Parses examples. Examples are a paragraph level entitity (separated by an empty line).
+-- | Parses examples. Examples are a paragraph level entity (separated by an empty line).
 -- Consecutive examples are accepted.
 examples :: Parser (DocH mod a)
 examples = DocExamples <$> (many (try (skipHorizontalSpace *> "\n")) *> go)

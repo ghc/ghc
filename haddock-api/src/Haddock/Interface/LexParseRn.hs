@@ -167,7 +167,7 @@ rename dflags gre = rn
 -- 'GlobalReaderEnv' during 'rename') in an appropriate doc. Currently
 -- we simply monospace the identifier in most cases except when the
 -- identifier is qualified: if the identifier is qualified then we can
--- still try to guess and generate anchors accross modules but the
+-- still try to guess and generate anchors across modules but the
 -- users shouldn't rely on this doing the right thing. See tickets
 -- #253 and #375 on the confusion this causes depending on which
 -- default we pick in 'rename'.

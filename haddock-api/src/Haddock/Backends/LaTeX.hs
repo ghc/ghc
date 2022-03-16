@@ -1389,7 +1389,7 @@ bold ltx = text "\\textbf" <> braces ltx
 
 -- TODO: @verbatim@ is too much since
 --
---   * Haddock supports markup _inside_ of codeblocks. Right now, the LaTeX
+--   * Haddock supports markup _inside_ of code blocks. Right now, the LaTeX
 --     representing that markup gets printed verbatim
 --   * Verbatim environments are not supported everywhere (example: not nested
 --     inside a @tabulary@ environment)

@@ -114,7 +114,7 @@ parHtmlMarkup qual insertAnchors ppId = Markup {
 
 -- | We use this intermediate type to transform the input 'Doc' tree
 -- in an arbitrary way before rendering, such as grouping some
--- elements. This is effectivelly a hack to prevent the 'Doc' type
+-- elements. This is effectively a hack to prevent the 'Doc' type
 -- from changing if it is possible to recover the layout information
 -- we won't need after the fact.
 data Hack a id =
