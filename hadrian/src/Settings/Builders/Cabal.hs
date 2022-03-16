@@ -139,6 +139,7 @@ libraryArgs = do
     package     <- getPackage
     withGhci    <- expr ghcWithInterpreter
     dynPrograms <- expr (flavour >>= dynamicGhcPrograms)
+    ghciObjsSupported <- expr platformSupportsGhciObjects
     let ways = flavourWays ++ [contextWay]
         hasVanilla = vanilla `elem` ways
         hasProfiling = any (wayUnit Profiling) ways
@@ -149,7 +150,8 @@ libraryArgs = do
          , if hasProfiling
            then  "--enable-library-profiling"
            else "--disable-library-profiling"
-         , if (hasVanilla || hasProfiling) &&
+         , if ghciObjsSupported &&
+              (hasVanilla || hasProfiling) &&
               package /= rts && withGhci && not dynPrograms
            then  "--enable-library-for-ghci"
            else "--disable-library-for-ghci"
