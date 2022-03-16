@@ -72,13 +72,13 @@ allocUnboxedCon con = \case
 
 allocDynamicE :: StgToJSConfig -> JExpr -> [JExpr] -> Maybe JExpr -> JExpr
 allocDynamicE s entry free cc
-  | csInlineAlloc s || length free > 24 =
-      ValExpr . jhFromList $ [ (closureEntry_ , entry)
-                             , (closureExtra1_, fillObj1)
-                             , (closureExtra2_, fillObj2)
-                             , (closureMeta_  , ValExpr (JInt 0))
-                             ] ++
-                             maybe [] (\cid -> [("cc", cid)]) cc
+  | csInlineAlloc s || length free > 24 = newClosure $ Closure
+      { clEntry  = entry
+      , clExtra1 = fillObj1
+      , clExtra2 = fillObj2
+      , clMeta   = ValExpr (JInt 0)
+      , clCC     = cc
+      }
   | otherwise = ApplExpr allocFun (toJExpr entry : free ++ maybeToList cc)
   where
     allocFun = allocClsA (length free)

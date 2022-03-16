@@ -4,7 +4,7 @@
 
 -----------------------------------------------------------------------------
 -- |
--- Module      :  GHC.JS.Rts.Apply
+-- Module      :  GHC.StgToJS.Rts.Apply
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file LICENSE)
 --
@@ -17,17 +17,18 @@
 -- FIXME: Jeff (2022,03): Add more details
 -----------------------------------------------------------------------------
 
-module GHC.JS.Rts.Types where
-
-import           GHC.JS.Make
-import           GHC.JS.Syntax
-import           GHC.StgToJS.Regs
-import           GHC.StgToJS.Types
-
-import           GHC.Utils.Monad.State.Strict
-import qualified GHC.Data.ShortText as T
+module GHC.StgToJS.Rts.Types where
 
 import GHC.Prelude
+
+import GHC.JS.Make
+import GHC.JS.Syntax
+import GHC.StgToJS.Regs
+import GHC.StgToJS.Types
+
+import GHC.Utils.Monad.State.Strict
+import qualified GHC.Data.ShortText as T
+
 
 
 traceRts :: StgToJSConfig -> JExpr -> JStat

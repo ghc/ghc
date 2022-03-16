@@ -512,9 +512,6 @@ Library
         GHC.JS.Ppr
         GHC.JS.Syntax
         GHC.JS.Transform
-        GHC.JS.Rts.Types
-        GHC.JS.Rts.Apply
-        GHC.JS.Rts.Rts
         GHC.Linker
         GHC.Linker.Dynamic
         GHC.Linker.ExtraObj
@@ -643,6 +640,9 @@ Library
         GHC.StgToJS.Prim
         GHC.StgToJS.Profiling
         GHC.StgToJS.Regs
+        GHC.StgToJS.Rts.Types
+        GHC.StgToJS.Rts.Apply
+        GHC.StgToJS.Rts.Rts
         GHC.StgToJS.Sinker
         GHC.StgToJS.StaticPtr
         GHC.StgToJS.StgUtils
