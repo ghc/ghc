@@ -81,7 +81,6 @@ import {-# SOURCE #-} GHC.Core.TyCo.Ppr ( pprType, pprCo, pprTyLit )
    -- Transitively pulls in a LOT of stuff, better to break the loop
 
 -- friends:
-import GHC.Iface.Type
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Core.TyCon

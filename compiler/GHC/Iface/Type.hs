@@ -74,7 +74,7 @@ import {-# SOURCE #-} GHC.Builtin.Types
                                  , tupleTyConName
                                  , manyDataConTyCon, oneDataConTyCon
                                  , liftedRepTyCon, liftedDataConTyCon )
-import {-# SOURCE #-} GHC.Core.Type ( isRuntimeRepTy, isMultiplicityTy, isLevityTy )
+import GHC.Core.Type ( isRuntimeRepTy, isMultiplicityTy, isLevityTy )
 
 import GHC.Core.TyCon hiding ( pprPromotionQuote )
 import GHC.Core.Coercion.Axiom
