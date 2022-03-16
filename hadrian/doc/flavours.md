@@ -221,7 +221,7 @@ The supported transformers are listed below:
             dynamic linker. You should use a flavour that builds profiling libs and rts,
             i.e. not <code>quick</code>.
 
-            This flag adds cost centres with the -fprof-late-ccs flag. </td>
+            This flag adds cost centres with the -fprof-late flag. </td>
     </tr>
     <tr>
         <td><code>no_dynamic_ghc</code></td>
