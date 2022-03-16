@@ -82,6 +82,7 @@ import GHC.Unit.Module.Env
 import GHC.Driver.Env.KnotVars
 import GHC.Driver.Config.Finder
 import GHC.Rename.Names
+import qualified Data.ByteString.Lazy.Char8 as BSL
 
 newtype HookedUse a = HookedUse { runHookedUse :: (Hooks, PhaseHook) -> IO a }
   deriving (Functor, Applicative, Monad, MonadIO, MonadThrow, MonadCatch) via (ReaderT (Hooks, PhaseHook) IO)
@@ -1152,9 +1153,37 @@ joinObjectFiles hsc_env o_files output_fn
      else
           ld_r (map (GHC.SysTools.FileOption "") o_files)
 
-  | otherwise = do
-  withAtomicRename output_fn $ \tmp_ar ->
-      liftIO $ runAr logger dflags Nothing $ map Option $ ["rc", tmp_ar] ++ o_files
+  | otherwise =
+    withAtomicRename output_fn $ \tmp_ar -> do
+      let -- Check whether a file is an archive and, if so, extract and list its
+          -- constituents.
+          getMembers :: FilePath -> IO [FilePath]
+          getMembers file = do
+            is_ar <- isArchive file
+            if is_ar
+              then do
+                dir <- liftIO $ newTempDir logger tmpfs (tmpDir dflags)
+                liftIO $ runAr logger dflags (Just dir) $ map Option $ ["x", file]
+                ents <- liftIO $ listDirectory dir
+                return $ map (dir </>) ents
+              else
+                return [file]
+
+          isArchive :: FilePath -> IO Bool
+          isArchive file = do
+            contents <- BSL.readFile file
+            let magic = BSL.pack "!<arch>\n"
+            return $ magic `BSL.isPrefixOf` contents
+
+      members <- concat <$> mapM getMembers o_files
+      out_dir <- liftIO $ newTempDir logger tmpfs (tmpDir dflags)
+      let uniqueNames :: [(FilePath, FilePath)]
+          uniqueNames =
+            [ (f, out_dir </> ("f"++show n++takeExtension f))
+            | (f, n) <- zip members [0..]
+            ]
+      sequence_ $ map (uncurry copyFile) uniqueNames
+      liftIO $ runAr logger dflags Nothing $ map Option $ ["qcLs", tmp_ar] ++ map snd uniqueNames
   where
     can_merge_objs = False -- XXX
     dflags = hsc_dflags hsc_env
