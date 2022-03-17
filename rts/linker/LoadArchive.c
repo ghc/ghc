@@ -246,6 +246,7 @@ HsInt loadArchive_ (pathchar *path)
     char *image = NULL;
     HsInt retcode = 0;
     int memberSize;
+    int memberIdx = 0;
     FILE *f = NULL;
     int n;
     size_t thisFileNameSize = (size_t)-1; /* shut up bogus GCC warning */
@@ -517,11 +518,14 @@ HsInt loadArchive_ (pathchar *path)
                 }
             }
 
-            int size = pathlen(path) + thisFileNameSize + 3;
-            archiveMemberName = stgMallocBytes(size * pathsize,
-                                               "loadArchive(file)");
-            pathprintf(archiveMemberName, size, WSTR("%" PATH_FMT "(%.*s)"),
-                       path, (int)thisFileNameSize, fileName);
+            int size = pathprintf(NULL, 0, WSTR("%" PATH_FMT "(#%d:%.*s)"),
+                                  path, memberIdx, (int)thisFileNameSize, fileName);
+            // I don't understand why this extra +1 is needed here; pathprintf
+            // should have given us the correct length but in practice it seems
+            // to be one byte short on Win32.
+            archiveMemberName = stgMallocBytes((size+1+1) * sizeof(pathchar), "loadArchive(file)");
+            pathprintf(archiveMemberName, size+1, WSTR("%" PATH_FMT "(#%d:%.*s)"),
+                       path, memberIdx, (int)thisFileNameSize, fileName);
 
             ObjectCode *oc = mkOc(STATIC_OBJECT, path, image, memberSize, false, archiveMemberName,
                                   misalignment);
@@ -604,6 +608,7 @@ while reading filename from `%" PATH_FMT "'", path);
             }
             DEBUG_LOG("successfully read one pad byte\n");
         }
+        memberIdx ++;
         DEBUG_LOG("reached end of archive loading while loop\n");
     }
     retcode = 1;
