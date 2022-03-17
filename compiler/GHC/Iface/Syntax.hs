@@ -1728,6 +1728,7 @@ freeNamesIfProv free_names (IfacePhantomProv co)    = free_names co
 freeNamesIfProv free_names (IfaceProofIrrelProv co) = free_names co
 freeNamesIfProv _          (IfacePluginProv _)      = emptyNameSet
 freeNamesIfProv _          (IfaceCorePrepProv _)    = emptyNameSet
+freeNamesIfProv _          (IfaceZappedProv {})     = emptyNameSet
 
 freeNamesIfVarBndr :: VarBndr IfaceBndr vis -> NameSet
 freeNamesIfVarBndr (Bndr bndr _) = freeNamesIfBndr bndr

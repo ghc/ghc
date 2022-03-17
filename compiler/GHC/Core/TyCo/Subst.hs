@@ -911,6 +911,10 @@ subst_co_dco subst = (go, go_dco)
     go_prov do_subst (ProofIrrelProv kco) = ProofIrrelProv $! do_subst kco
     go_prov _        p@(PluginProv _)     = p
     go_prov _        p@(CorePrepProv _)   = p
+    go_prov _        (ZappedProv cvs)     = ZappedProv $! nonDetStrictFoldVarSet subst_gather emptyVarSet cvs
+        where
+          subst_gather cv acc
+            = acc `unionVarSet` shallowCoVarsOfCo (substCoVar subst cv)
 
     -- See Note [Substituting in a coercion hole]
     go_hole h@(CoercionHole { ch_co_var = cv })

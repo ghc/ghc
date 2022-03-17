@@ -170,6 +170,7 @@ synonymTyConsOfType ty
      go_prov syns (ProofIrrelProv co)  = syns co
      go_prov _    (PluginProv _)       = emptyNameEnv
      go_prov _    (CorePrepProv _)     = emptyNameEnv
+     go_prov _    (ZappedProv _)       = emptyNameEnv
 
      go_tc tc | isTypeSynonymTyCon tc = unitNameEnv (tyConName tc) tc
               | otherwise             = emptyNameEnv

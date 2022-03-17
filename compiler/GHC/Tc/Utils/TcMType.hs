@@ -1637,6 +1637,10 @@ collect_cand_qtvs_co_dco orig_ty bound dv = (go_co dv, go_dco dv)
     go_prov collect dv (ProofIrrelProv co) = collect dv co
     go_prov _       dv (PluginProv _)      = return dv
     go_prov _       dv (CorePrepProv _)    = return dv
+    go_prov _       dv (ZappedProv cvs)    = nonDetStrictFoldVarSet zt_cv (return dv) cvs
+
+    zt_cv :: CoVar -> TcM CandidatesQTvs -> TcM CandidatesQTvs
+    zt_cv cv mdvs = do { dvs <- mdvs; go_cv dvs cv }
 
     go_cv :: CandidatesQTvs -> CoVar -> TcM CandidatesQTvs
     go_cv dv@(DV { dv_cvs = cvs }) cv

@@ -418,6 +418,7 @@ orphNamesOfProv orph_names (PhantomProv co)    = orph_names co
 orphNamesOfProv orph_names (ProofIrrelProv co) = orph_names co
 orphNamesOfProv _          (PluginProv _)      = emptyNameSet
 orphNamesOfProv _          (CorePrepProv _)    = emptyNameSet
+orphNamesOfProv _          (ZappedProv _)      = emptyNameSet
 
 orphNamesOfCos :: [Coercion] -> NameSet
 orphNamesOfCos = orphNamesOfThings orphNamesOfCo

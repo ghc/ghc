@@ -23,6 +23,10 @@ module GHC.Core.TyCo.FVs
         tyCoVarsOfCoList,
         tyCoVarsOfDCoList,
 
+        shallowCoVarsOfType, shallowCoVarsOfTypes,
+        shallowCoVarsOfCo, shallowCoVarsOfCos,
+        shallowCoVarsOfDCo, shallowCoVarsOfDCos,
+
         almostDevoidCoVarOfCo,
         almostDevoidCoVarOfDCo,
 
@@ -59,6 +63,7 @@ import GHC.Types.Var
 import GHC.Utils.FV
 
 import GHC.Types.Unique.FM
+import GHC.Types.Unique.Set ( nonDetEltsUniqSet )
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Utils.Misc
@@ -373,7 +378,8 @@ shallow_co  :: Coercion   -> Endo TyCoVarSet
 shallow_cos :: [Coercion] -> Endo TyCoVarSet
 shallow_dco  :: DCoercion   -> Endo TyCoVarSet
 shallow_dcos :: [DCoercion] -> Endo TyCoVarSet
-(shallow_ty, shallow_tys, shallow_co, shallow_cos, shallow_dco, shallow_dcos) = foldTyCo shallowTcvFolder emptyVarSet
+(shallow_ty, shallow_tys, shallow_co, shallow_cos, shallow_dco, shallow_dcos)
+  = foldTyCo shallowTcvFolder emptyVarSet
 
 shallowTcvFolder :: TyCoFolder TyCoVarSet (Endo TyCoVarSet)
 shallowTcvFolder = TyCoFolder { tcf_view = noView
@@ -389,6 +395,48 @@ shallowTcvFolder = TyCoFolder { tcf_view = noView
     do_bndr is tcv _ = extendVarSet is tcv
     do_hole _ _  = mempty   -- Ignore coercion holes
 
+shallowCoVarsOfType :: Type -> CoVarSet
+-- See Note [Free variables of types]
+shallowCoVarsOfType ty = runTyCoVars (shallow_cv_ty ty)
+
+shallowCoVarsOfTypes :: [Type] -> CoVarSet
+shallowCoVarsOfTypes tys = runTyCoVars (shallow_cv_tys tys)
+
+shallowCoVarsOfCo :: Coercion -> CoVarSet
+shallowCoVarsOfCo co = runTyCoVars (shallow_cv_co co)
+
+shallowCoVarsOfCos :: [Coercion] -> CoVarSet
+shallowCoVarsOfCos cos = runTyCoVars (shallow_cv_cos cos)
+
+shallowCoVarsOfDCo :: DCoercion -> CoVarSet
+shallowCoVarsOfDCo dco = runTyCoVars (shallow_cv_dco dco)
+
+shallowCoVarsOfDCos :: [DCoercion] -> CoVarSet
+shallowCoVarsOfDCos dcos = runTyCoVars (shallow_cv_dcos dcos)
+
+shallow_cv_ty  :: Type       -> Endo CoVarSet
+shallow_cv_tys :: [Type]     -> Endo CoVarSet
+shallow_cv_co  :: Coercion   -> Endo CoVarSet
+shallow_cv_cos :: [Coercion] -> Endo CoVarSet
+shallow_cv_dco  :: DCoercion   -> Endo CoVarSet
+shallow_cv_dcos :: [DCoercion] -> Endo CoVarSet
+(shallow_cv_ty, shallow_cv_tys, shallow_cv_co, shallow_cv_cos, shallow_cv_dco, shallow_cv_dcos)
+  = foldTyCo shallowCvFolder emptyVarSet
+
+shallowCvFolder :: TyCoFolder CoVarSet (Endo CoVarSet)
+shallowCvFolder = TyCoFolder { tcf_view = noView
+                             , tcf_tyvar = do_tv, tcf_covar = do_cv
+                             , tcf_hole  = do_hole, tcf_tycobinder = do_bndr }
+  where
+    do_tv _ _  = mempty
+    do_cv is v = Endo do_it
+      where
+        do_it acc | v `elemVarSet` is  = acc
+                  | v `elemVarSet` acc = acc
+                  | otherwise          = acc `extendVarSet` v
+
+    do_bndr is tcv _ = extendVarSet is tcv
+    do_hole is hole = do_cv is (coHoleCoVar hole)
 
 {- *********************************************************************
 *                                                                      *
@@ -670,6 +718,7 @@ tyCoFVsOfProv tyCoFVs_of_co (PhantomProv co)    fv_cand in_scope acc = tyCoFVs_o
 tyCoFVsOfProv tyCoFVs_of_co (ProofIrrelProv co) fv_cand in_scope acc = tyCoFVs_of_co co fv_cand in_scope acc
 tyCoFVsOfProv _             (PluginProv _)      fv_cand in_scope acc = emptyFV fv_cand in_scope acc
 tyCoFVsOfProv _             (CorePrepProv _)    fv_cand in_scope acc = emptyFV fv_cand in_scope acc
+tyCoFVsOfProv _             (ZappedProv cvs)    fv_cand in_scope acc = mkFVs (nonDetEltsUniqSet cvs) fv_cand in_scope acc
 
 tyCoFVsOfCos :: [Coercion] -> FV
 tyCoFVsOfCos []       fv_cand in_scope acc = emptyFV fv_cand in_scope acc
@@ -800,6 +849,7 @@ almost_devoid_co_var_of_prov almost_devoid_co (ProofIrrelProv co) cv
   = almost_devoid_co co cv
 almost_devoid_co_var_of_prov _ (PluginProv _)   _ = True
 almost_devoid_co_var_of_prov _ (CorePrepProv _) _ = True
+almost_devoid_co_var_of_prov _ (ZappedProv cvs) cv = not (cv `elemVarSet` cvs)
 
 almost_devoid_co_var_of_type :: Type -> CoVar -> Bool
 almost_devoid_co_var_of_type (TyVarTy _) _ = True

@@ -29,7 +29,7 @@ module GHC.Driver.Session (
         ProfAuto(..),
         glasgowExtsFlags,
         hasPprDebug, hasNoDebugOutput, hasNoStateHack,
-        hasNoOptCoercion, hasKeepDCoercions,
+        hasNoOptCoercion, hasKeepDCoercions, hasZapDCoercions,
         dopt, dopt_set, dopt_unset,
         gopt, gopt_set, gopt_unset, setGeneralFlag', unSetGeneralFlag',
         wopt, wopt_set, wopt_unset,
@@ -1439,6 +1439,9 @@ hasNoOptCoercion = gopt Opt_G_NoOptCoercion
 hasKeepDCoercions :: DynFlags -> Bool
 hasKeepDCoercions = gopt Opt_G_KeepDCoercions
 
+hasZapDCoercions :: DynFlags -> Bool
+hasZapDCoercions = gopt Opt_G_ZapDCoercions
+
 -- | Test whether a 'DumpFlag' is set
 dopt :: DumpFlag -> DynFlags -> Bool
 dopt f dflags = (f `EnumSet.member` dumpFlags dflags)
@@ -2305,6 +2308,12 @@ dynamic_flags_deps = [
         (NoArg (setGeneralFlag Opt_G_NoOptCoercion))
   , make_ord_flag defGhcFlag "fkeep-dcoercions"
         (NoArg (setGeneralFlag Opt_G_KeepDCoercions))
+  , make_ord_flag defGhcFlag "fzap-dcoercions"
+        (NoArg (setGeneralFlag Opt_G_ZapDCoercions))
+  , make_ord_flag defGhcFlag "fno-keep-dcoercions"
+        (NoArg (unSetGeneralFlag Opt_G_KeepDCoercions))
+  , make_ord_flag defGhcFlag "fno-zap-dcoercions"
+        (NoArg (unSetGeneralFlag Opt_G_ZapDCoercions))
   , make_ord_flag defGhcFlag "with-rtsopts"
         (HasArg setRtsOpts)
   , make_ord_flag defGhcFlag "rtsopts"
@@ -3825,6 +3834,7 @@ impliedGFlags = [(Opt_DeferTypeErrors, turnOn, Opt_DeferTypedHoles)
                 ,(Opt_DeferTypeErrors, turnOn, Opt_DeferOutOfScopeVariables)
                 ,(Opt_DoLinearCoreLinting, turnOn, Opt_DoCoreLinting)
                 ,(Opt_Strictness, turnOn, Opt_WorkerWrapper)
+                ,(Opt_DoCoreLinting, turnOff, Opt_G_ZapDCoercions)
                 ] ++ validHoleFitsImpliedGFlags
 
 -- General flags that are switched on/off when other general flags are switched
@@ -3934,7 +3944,8 @@ optLevelFlags -- see Note [Documenting optimisation flags]
 
     , ([0],     Opt_IgnoreInterfacePragmas)
     , ([0],     Opt_OmitInterfacePragmas)
-    , ([0],     Opt_G_KeepDCoercions)
+ -- , ([0],     Opt_G_KeepDCoercions)
+    , ([0,1,2], Opt_G_ZapDCoercions)
 
     , ([1,2],   Opt_CoreConstantFolding)
 
@@ -3993,6 +4004,7 @@ disableUnusedBinds = mapM_ unSetWarningFlag unusedBindsFlags
 enableDLint :: DynP ()
 enableDLint = do
     mapM_ setGeneralFlag dLintFlags
+    unSetGeneralFlag Opt_G_ZapDCoercions
     addWayDynP WayDebug
   where
     dLintFlags :: [GeneralFlag]

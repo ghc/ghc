@@ -667,6 +667,7 @@ expandTypeSynonyms ty
     go_prov do_subst (ProofIrrelProv co) = ProofIrrelProv $ do_subst co
     go_prov _        p@(PluginProv _)    = p
     go_prov _        p@(CorePrepProv _)  = p
+    go_prov _        p@(ZappedProv _)    = p
 
       -- the "False" and "const" are to accommodate the type of
       -- substForAllCoBndrUsing, which is general enough to
@@ -932,7 +933,7 @@ mapTyCo mapper
         -> (go_ty (), go_tys (), go_co (), go_cos ())
 
 {-# INLINE mapTyCoX #-}  -- See Note [Specialising mappers]
-mapTyCoX :: Monad m => TyCoMapper env m
+mapTyCoX :: forall m env. Monad m => TyCoMapper env m
          -> ( env -> Type       -> m Type
             , env -> [Type]     -> m [Type]
             , env -> Coercion   -> m Coercion
@@ -987,7 +988,7 @@ mapTyCoX (TyCoMapper { tcm_tyvar = tyvar
     go_co env (CoVarCo cv)        = covar env cv
     go_co env (HoleCo hole)       = cohole env hole
     go_co env (HydrateDCo r t1 dco t2) = mkHydrateDCo r <$> go_ty env t1 <*> go_dco env dco <*> (Just <$> go_ty env t2)
-    go_co env (UnivCo p r t1 t2)  = mkUnivCo <$> go_prov (go_co env) p <*> pure r
+    go_co env (UnivCo p r t1 t2)  = mkUnivCo <$> go_prov go_co env p <*> pure r
                                     <*> go_ty env t1 <*> go_ty env t2
     go_co env (SymCo co)          = mkSymCo <$> go_co env co
     go_co env (TransCo c1 c2)     = mkTransCo <$> go_co env c1 <*> go_co env c2
@@ -1041,13 +1042,22 @@ mapTyCoX (TyCoMapper { tcm_tyvar = tyvar
            ; co' <- go_dco env' co
            ; return $ mkForAllDCo tv' kind_dco' co' }
         -- See Note [Efficiency for ForAllCo case of mapTyCoX]
-    go_dco env (UnivDCo p rhs)     = mkUnivDCo <$> go_prov (go_dco env) p <*> go_ty env rhs
+    go_dco env (UnivDCo p rhs)     = mkUnivDCo <$> go_prov go_dco env p <*> go_ty env rhs
     go_dco env (SubDCo dco)        = SubDCo <$> go_dco env dco
 
-    go_prov go (PhantomProv co)    = PhantomProv    <$> go co
-    go_prov go (ProofIrrelProv co) = ProofIrrelProv <$> go co
-    go_prov _  p@(PluginProv _)    = return p
-    go_prov _  p@(CorePrepProv _)  = return p
+    go_prov :: (env -> co -> m co) -> env -> UnivCoProvenance co -> m (UnivCoProvenance co)
+    go_prov go env (PhantomProv co)    = PhantomProv    <$> go env co
+    go_prov go env (ProofIrrelProv co) = ProofIrrelProv <$> go env co
+    go_prov _  _   p@(PluginProv _)    = return p
+    go_prov _  _   p@(CorePrepProv _)  = return p
+    go_prov _  env (ZappedProv cvs)
+      = ZappedProv <$>
+         nonDetStrictFoldVarSet (go_cv env) (return emptyVarSet) cvs
+
+    go_cv env v mcvs = do { cvs <- mcvs
+                          ; co  <- covar env v
+                          ; return (tyCoVarsOfCo co `unionVarSet` cvs) }
+
 
 
 {-
@@ -3511,6 +3521,7 @@ occCheckExpand vs_to_avoid ty
     go_prov prov_go (ProofIrrelProv co) = ProofIrrelProv <$> prov_go co
     go_prov _       p@(PluginProv _)    = return p
     go_prov _       p@(CorePrepProv _)  = return p
+    go_prov _       p@(ZappedProv _)    = return p
 
 
 {-
@@ -3580,6 +3591,7 @@ tyConsOfType ty
      go_prov get_tycons (PhantomProv co)    = get_tycons co
      go_prov get_tycons (ProofIrrelProv co) = get_tycons co
      go_prov _          (PluginProv _)      = emptyUniqSet
+     go_prov _          (ZappedProv _)      = emptyUniqSet
      go_prov _          (CorePrepProv _)    = emptyUniqSet
         -- this last case can happen from the tyConsOfType used from
         -- checkTauTvUpdate

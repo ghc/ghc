@@ -768,7 +768,7 @@ by saying ``-fno-wombat``.
     :type: dynamic
     :category:
 
-    :default: Keep with :ghc-flag:`-O0`, don't keep otherwise.
+    :default: Don't keep directed coercions.
 
     Keep directed coercions in the coercion optimiser, instead of turning
     them into coercions. Only applies when coercion optimisation is enabled.
@@ -777,6 +777,15 @@ by saying ``-fno-wombat``.
     If your program crucially relies on coercion optimisation
     (i.e. enabling :ghc-flag:`-fno-opt-coercion` causes a significant regression in compile-time),
     then you might want to NOT enable this flag.
+
+.. ghc-flag:: -fzap-dcoercions
+    :shortdesc: Zap directed coercions in the coercion optimiser
+    :type: dynamic
+    :category:
+
+    :default: Zap directed coercions.
+
+    Zap directed coercions in the coercion optimiser. Takes precedence over :ghc-flag:`-fkeep-dcoercions`.
 
 .. ghc-flag:: -fno-pre-inlining
     :shortdesc: Turn off pre-inlining

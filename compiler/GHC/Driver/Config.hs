@@ -25,10 +25,13 @@ initOptCoercionOpts dflags = OptCoercionOpts
        = if hasNoOptCoercion dflags
          then Nothing
          else
-            let dco_method =
-                 if hasKeepDCoercions dflags
-                 then OptDCos { skipDCoOpt = True }
-                 else HydrateDCos
+            let dco_method
+                  | hasZapDCoercions dflags
+                  = ZapDCos
+                  | hasKeepDCoercions dflags
+                  = OptDCos { skipDCoOpt = True }
+                  | otherwise
+                  = HydrateDCos
             in Just dco_method
    }
 

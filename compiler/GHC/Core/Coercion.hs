@@ -1390,6 +1390,8 @@ expandProv _ _ (PluginProv str)
   = PluginProv str
 expandProv _ _ (CorePrepProv homo)
   = CorePrepProv homo
+expandProv _ _ (ZappedProv cvs)
+  = ZappedProv cvs
 
 mkDehydrateCo :: Coercion -> DCoercion
 mkDehydrateCo co | isReflCo co       = ReflDCo
@@ -2085,6 +2087,7 @@ setNominalRole_maybe_prov prov = case prov of
   ProofIrrelProv _ -> Just prov -- it's always safe
   PluginProv _     -> Nothing   -- who knows? This choice is conservative.
   CorePrepProv _   -> Just prov
+  ZappedProv   _   -> Just prov
 
 -- | Make a phantom coercion between two types. The coercion passed
 -- in must be a nominal coercion between the kinds of the
@@ -2201,6 +2204,7 @@ promoteCoercion co = case co of
     UnivCo (ProofIrrelProv kco) _ _ _ -> kco
     UnivCo (PluginProv _)       _ _ _ -> mkKindCo co
     UnivCo (CorePrepProv _)     _ _ _ -> mkKindCo co
+    UnivCo (ZappedProv _)       _ _ _ -> mkKindCo co
 
     HydrateDCo {} -> mkKindCo co
 
@@ -3099,6 +3103,7 @@ seqProv seq_co (PhantomProv co)    = seq_co co
 seqProv seq_co (ProofIrrelProv co) = seq_co co
 seqProv _      (PluginProv _)      = ()
 seqProv _      (CorePrepProv _)    = ()
+seqProv _      (ZappedProv cvs)    = seqVarSet cvs
 
 seqCos :: [Coercion] -> ()
 seqCos []       = ()

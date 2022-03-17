@@ -24,6 +24,7 @@ import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.FVs (tyCoVarsOfTypesWellScoped, tyCoVarsOfTypeList)
 
 import GHC.Types.Name hiding (varName)
+import GHC.Types.Unique.Set (mapUniqSet)
 import GHC.Types.Var
 import GHC.Types.Var.Env
 import GHC.Utils.Misc (strictMap)
@@ -277,6 +278,7 @@ tidyCoDCo env@(_, subst) = (go, go_dco)
     go_prov do_tidy (ProofIrrelProv co) = ProofIrrelProv $! do_tidy co
     go_prov _       p@(PluginProv _)    = p
     go_prov _       p@(CorePrepProv _)  = p
+    go_prov _       (ZappedProv cvs)    = ZappedProv $! mapUniqSet go_cv cvs
 
     go_cv cv = lookupVarEnv subst cv `orElse` cv
 

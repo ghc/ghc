@@ -4,7 +4,6 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE ViewPatterns #-}
 
 module GHC.Core.Coercion.Opt
    ( optCoercion
@@ -18,6 +17,7 @@ import GHC.Prelude
 
 import GHC.Tc.Utils.TcType   ( exactTyCoVarsOfType )
 
+import GHC.Core.TyCo.FVs ( shallowCoVarsOfType, shallowCoVarsOfCo, shallowCoVarsOfDCo )
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Subst
 import GHC.Core.Coercion
@@ -42,7 +42,7 @@ import GHC.Utils.Trace
 
 import Control.Monad   ( zipWithM )
 import qualified Data.Kind ( Type )
-
+import Data.List ( zipWith4 )
 {-
 %************************************************************************
 %*                                                                      *
@@ -143,15 +143,18 @@ newtype OptCoercionOpts = OptCoercionOpts
 
 data OptDCoMethod
   = HydrateDCos
-      -- ^ Turn directed coercions back into full-fledge coercions in the
-      -- coerction optimiser, so that they can be fully optimised.
+      -- ^ Turn directed coercions back into fully-fledged coercions in the
+      -- coercion optimiser, so that they can be fully optimised.
   | OptDCos
       -- ^ Optimise directed coercions with the (currently limited)
-      -- forms of optimisation avaiable for directed coercions.
+      -- forms of optimisation available for directed coercions.
       { skipDCoOpt :: !Bool
         -- ^ Whether to skip optimisation of directed coercions entirely
-        -- when possible.
-        }
+        -- (when possible).
+      }
+  | ZapDCos
+      -- ^ Zap directed coercions, storing only the RHS type
+      -- and the free variables of the coercion.
 
 data OptCoParams =
   OptCoParams { optDCoMethod :: !OptDCoMethod }
@@ -191,6 +194,97 @@ optCoercion' opts env co
   where
     lc = mkSubstLiftingContext env
 
+zapCoercion :: Coercion -> Coercion
+zapCoercion co = case co of
+  _
+    | isReflexiveCo co
+    -> mkReflCo r l_ty
+  GRefl r ty (MCo co) ->
+    GRefl r ty (MCo $ zapCoercion co)
+  FunCo r w arg res ->
+    mkFunCo r
+      (zapCoercion w)
+      (zapCoercion arg)
+      (zapCoercion res)
+  TyConAppCo r tc arg_cos ->
+    mkTyConAppCo r tc (map zapCoercion arg_cos)
+  AppCo lco rco ->
+    mkAppCo (zapCoercion lco) (zapCoercion rco)
+  ForAllCo tv kco bco ->
+    mkForAllCo tv (zapCoercion kco) (zapCoercion bco)
+  SymCo co ->
+    mkSymCo $ zapCoercion co
+  SubCo co ->
+    mkSubCo $ zapCoercion co
+  CoVarCo {} ->
+    co
+  AxiomInstCo ax br cos ->
+    AxiomInstCo ax br (map zapCoercion cos)
+  AxiomRuleCo ax cos ->
+    AxiomRuleCo ax (map zapCoercion cos)
+  UnivCo {} ->
+    co
+  HydrateDCo r l_ty dco r_ty ->
+    mkHydrateDCo r l_ty (zapDCoercion r l_ty dco r_ty) (Just r_ty)
+  _ -> zapped_co
+    --if coercionSize zapped_co < coercionSize co
+    --then zapped_co
+    --else co
+  where
+    (Pair l_ty r_ty, r) = {-# SCC "zapCo_coercionKindRole" #-} coercionKindRole co
+    zapped_co = UnivCo (ZappedProv cvs) r l_ty r_ty
+    cvs = {-# SCC "zapCo_shallowCoVars" #-} shallowCoVarsOfCo co
+
+zapDCoercion :: Role -> Type -> DCoercion -> Type -> DCoercion
+zapDCoercion r l_ty dco r_ty = case dco of
+  _
+    | isReflexiveDCo r l_ty dco r_ty
+    -> mkReflDCo
+  GReflRightDCo co ->
+    GReflRightDCo (zapCoercion co)
+  GReflLeftDCo co ->
+    GReflLeftDCo (zapCoercion co)
+  TyConAppDCo dcos
+    | TyConApp tc  l_args <- l_ty
+    , TyConApp tc' r_args <- r_ty
+    , tc == tc'
+    -> mkTyConAppDCo $
+        zipWith4 zapDCoercion
+          (tyConRolesX r tc) l_args dcos r_args
+  AppDCo dco1 dco2
+    | AppTy lty1 lty2 <- l_ty
+    , AppTy rty1 rty2 <- r_ty
+    -> mkAppDCo
+        (zapDCoercion r       lty1 dco1 rty1)
+        (zapDCoercion Nominal lty2 dco2 rty2)
+  ForAllDCo tv kco bco
+    | ForAllTy (Bndr l_tv _) l_body <- l_ty
+    , ForAllTy (Bndr r_tv _) r_body <- r_ty
+    -> mkForAllDCo tv
+         (zapDCoercion Nominal (tyVarKind l_tv) kco (tyVarKind r_tv))
+         (zapDCoercion r       l_body           bco r_body)
+  SubDCo dco ->
+    mkSubDCo l_ty (zapDCoercion Nominal l_ty dco r_ty) r_ty
+  CoVarDCo {} ->
+    dco
+  AxiomInstDCo {} ->
+    dco
+  StepsDCo {} ->
+    dco
+  UnivDCo {} ->
+    dco
+  DehydrateCo co ->
+    DehydrateCo (zapCoercion co)
+  _ -> zapped_dco
+    --if dcoercionSize zapped_dco < dcoercionSize dco
+    --then zapped_dco
+    --else dco
+  where
+    cvs = {-# SCC "zapDCo_shallowCoVars" #-}
+           shallowCoVarsOfType l_ty
+           `unionVarSet`
+           shallowCoVarsOfDCo dco
+    zapped_dco = UnivDCo (ZappedProv cvs) r_ty
 
 type NormalCo    = Coercion
   -- Invariants:
@@ -376,19 +470,27 @@ opt_co4 opts env sym rep r (AxiomInstCo con ind cos)
 opt_co4 opts env@(LC _ _lift_co_env) sym rep r (HydrateDCo _r lhs_ty dco rhs_ty)
   = case optDCoMethod opts of
       HydrateDCos ->
-        opt_co4 opts env sym rep r (hydrateOneLayerDCo r lhs_ty dco)
+        {-# SCC "opt_co4_hydrate" #-}
+          opt_co4 opts env sym rep r $
+          hydrateOneLayerDCo r lhs_ty dco
+      ZapDCos ->
+        {-# SCC "opt_co4_zap" #-}
+        opt_co4 (opts { optDCoMethod = HydrateDCos }) env sym rep r $
+        HydrateDCo r lhs_ty (zapDCoercion r lhs_ty dco rhs_ty) rhs_ty
       OptDCos { skipDCoOpt = do_skip }
         | do_skip && isEmptyVarEnv _lift_co_env
         -> let res = substCo (lcTCvSubst env) (HydrateDCo r lhs_ty dco rhs_ty)
-        in assert (r == _r) $
+        in {-# SCC "opt_co4_skip" #-}
+           assert (r == _r) $
            wrapSym sym $
            wrapRole rep r $
            res
         | otherwise
-        -> assert (r == _r) $
-             wrapSym sym $
-             (\ (lhs', dco') -> mkHydrateDCo r' lhs' dco' (Just rhs')) $
-             opt_dco4_wrap "HydrateDCo" opts env rep r lhs_ty dco
+        -> {-# SCC "opt_co4_dco" #-}
+           assert (r == _r) $
+           wrapSym sym $
+           (\ (lhs', dco') -> mkHydrateDCo r' lhs' dco' (Just rhs')) $
+           opt_dco4_wrap "HydrateDCo" opts env rep r lhs_ty dco
   where
     rhs' = substTyUnchecked (lcSubstRight env) rhs_ty
     r'   = chooseRole rep r
@@ -744,6 +846,13 @@ opt_univ co_or_dco opts env sym prov role oty1 oty2
                               opts env sym False Nominal kco
       PluginProv str     -> PluginProv str
       CorePrepProv homo  -> CorePrepProv homo
+      ZappedProv cvs     -> ZappedProv $ nonDetStrictFoldVarSet subst_gather emptyVarSet cvs
+        where
+          subst_gather cv acc
+            | Just co <- lookupCoVar (lcTCvSubst env) cv
+            = acc `unionVarSet` shallowCoVarsOfCo co -- SLD TODO: De-duplicate with subst_co_dco
+            | otherwise
+            = acc `extendVarSet` cv
 
 -------------
 opt_transList :: HasDebugCallStack => OptCoParams -> InScopeSet -> [NormalCo] -> [NormalCo] -> [NormalCo]

@@ -95,6 +95,7 @@ import GHC.Core.Coercion.Axiom
 import {-# SOURCE #-} GHC.Builtin.Types ( manyDataConTy )
 import GHC.Types.Basic ( LeftOrRight(..), pickLR )
 import GHC.Types.Unique ( Uniquable(..) )
+import GHC.Types.Unique.Set ( nonDetEltsUniqSet )
 import GHC.Utils.Outputable
 import GHC.Data.FastString
 import GHC.Utils.Misc
@@ -1852,6 +1853,9 @@ data UnivCoProvenance kco
       Bool   -- True  <=> the UnivCo must be homogeneously kinded
              -- False <=> allow hetero-kinded, e.g. Int ~ Int#
 
+  | ZappedProv
+      CoVarSet
+
   deriving Data.Data
 
 instance Outputable (UnivCoProvenance kco) where
@@ -1859,6 +1863,7 @@ instance Outputable (UnivCoProvenance kco) where
   ppr (ProofIrrelProv _) = text "(proof irrel.)"
   ppr (PluginProv str)   = parens (text "plugin" <+> brackets (text str))
   ppr (CorePrepProv _)   = text "(CorePrep)"
+  ppr (ZappedProv _)     = text "(zapped)"
 
 -- | A coercion to be filled in by the type-checker. See Note [Coercion holes]
 data CoercionHole
@@ -2193,11 +2198,18 @@ foldTyCo (TyCoFolder { tcf_view       = view
         env' = tycobinder env tv Inferred
     go_dco env (UnivDCo prov t2)       = go_prov go_dco env prov `mappend` go_ty env t2
 
-    go_prov :: (env ->co -> a) -> env -> UnivCoProvenance co -> a
+    {-# INLINE go_prov #-}
+    go_prov :: (env -> co -> a) -> env -> UnivCoProvenance co -> a
     go_prov do_fold env (PhantomProv co)    = do_fold env co
     go_prov do_fold env (ProofIrrelProv co) = do_fold env co
     go_prov _       _   (PluginProv _)      = mempty
     go_prov _       _   (CorePrepProv _)    = mempty
+    go_prov _       env (ZappedProv cvs)    = go_cvs env (nonDetEltsUniqSet cvs)
+
+    go_cvs _   []       = mempty
+    go_cvs env (cv:cvs) = covar env cv `mappend` go_cvs env cvs
+      -- NB. Explicit recursion here is much better than nonDetStrictFoldVarSet.
+      -- Test case T9198 is very sensitive to this difference.
 
 -- | A view function that looks through nothing.
 noView :: Type -> Maybe Type
@@ -2275,6 +2287,7 @@ provSize co_size (PhantomProv co)    = 1 + co_size co
 provSize co_size (ProofIrrelProv co) = 1 + co_size co
 provSize _       (PluginProv _)      = 1
 provSize _       (CorePrepProv _)    = 1
+provSize _       (ZappedProv cvs)    = 1 + sizeVarSet cvs
 
 {-
 ************************************************************************

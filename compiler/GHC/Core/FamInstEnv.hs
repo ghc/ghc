@@ -1502,8 +1502,7 @@ normalise_var_bndr tcvar
   = do { lc1 <- getLC
        ; env <- getEnv
        ; let
-           do_normalise ki = do { redn <- normalise_type ki; return redn }
-           callback lc ki  = runNormM (do_normalise ki) env lc Nominal
+           callback lc ki = runNormM (normalise_type ki) env lc Nominal
        ; return $ liftCoSubstVarBndrUsing (mkHydrateReductionDCoercion Nominal)
                     callback lc1 tcvar }
 

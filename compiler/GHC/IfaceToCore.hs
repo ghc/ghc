@@ -1460,6 +1460,13 @@ tcIfaceUnivCoProv tc_co (IfacePhantomProv kco)    = PhantomProv <$> tc_co kco
 tcIfaceUnivCoProv tc_co (IfaceProofIrrelProv kco) = ProofIrrelProv <$> tc_co kco
 tcIfaceUnivCoProv _     (IfacePluginProv str)     = return $ PluginProv str
 tcIfaceUnivCoProv _     (IfaceCorePrepProv b)     = return $ CorePrepProv b
+tcIfaceUnivCoProv _     (IfaceZappedProv cvs fcvs)=
+  do { massertPpr (null fcvs) $
+         vcat [ text "tcIfaceUnivCoProv (ZappedProv): fcvs is not empty"
+              , text "fcvs:" <+> ppr fcvs
+              , text "cvs:" <+> ppr cvs ]
+     ; cvs <- mkVarSet <$> mapM tcIfaceLclId cvs
+     ; return (ZappedProv cvs) }
 
 {-
 ************************************************************************

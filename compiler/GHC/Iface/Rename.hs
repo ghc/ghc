@@ -741,6 +741,12 @@ rnIfaceProv rn_thing (IfacePhantomProv    iface_co) = IfacePhantomProv    <$> rn
 rnIfaceProv rn_thing (IfaceProofIrrelProv iface_co) = IfaceProofIrrelProv <$> rn_thing iface_co
 rnIfaceProv _        (IfacePluginProv str)          = return (IfacePluginProv str)
 rnIfaceProv _        (IfaceCorePrepProv homo)       = return (IfaceCorePrepProv homo)
+rnIfaceProv _        (IfaceZappedProv cvs fcvs) =
+  assertPpr (null fcvs)
+    (vcat [ text "rnIfaceProv (ZappedProv): fcvs is not empty"
+          , text "fcvs:" <+> ppr fcvs
+          , text "cvs:" <+> ppr cvs ]) $
+  return (IfaceZappedProv cvs fcvs)
 
 rnIfaceTyCon :: Rename IfaceTyCon
 rnIfaceTyCon (IfaceTyCon n info)

@@ -2257,7 +2257,6 @@ lintCoercion (UnivCo prov r ty1 ty2)
                 _          -> return ()
             }
 
-
 lintCoercion (SymCo co)
   = do { co' <- lintCoercion co
        ; return (SymCo co') }
@@ -2576,6 +2575,15 @@ lintProv co_or_dco r ty1 ty2 prov = case prov of
     return $ PluginProv str
   CorePrepProv homo ->
     return $ CorePrepProv homo
+
+  ZappedProv cvs ->
+    do { subst <- getTCvSubst
+       ; mapM_
+           (checkTyCoVarInScope "coercion" subst)
+           (nonDetEltsUniqSet cvs)
+         -- Don't bother to return substituted cvs;
+         -- they don't matter to Lint
+       ; return (ZappedProv cvs) }
 
   where
     k1, k2 :: LintedKind

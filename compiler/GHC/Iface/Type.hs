@@ -416,6 +416,7 @@ data IfaceUnivCoProv iface_co
   | IfaceProofIrrelProv iface_co
   | IfacePluginProv String
   | IfaceCorePrepProv Bool            -- See defn of CorePrepProv
+  | IfaceZappedProv [IfLclName] [Var] -- See Note [Free tyvars in IfaceType]
 
 {- Note [Holes in IfaceCoercion]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -634,6 +635,7 @@ substIfaceType env ty
     go_prov do_subst (IfaceProofIrrelProv co) = IfaceProofIrrelProv (do_subst co)
     go_prov _        co@(IfacePluginProv _)   = co
     go_prov _        co@(IfaceCorePrepProv _) = co
+    go_prov _        co@(IfaceZappedProv {})  = co
 
 substIfaceAppArgs :: IfaceTySubst -> IfaceAppArgs -> IfaceAppArgs
 substIfaceAppArgs env args
@@ -1898,6 +1900,8 @@ pprIfaceUnivCoProv _ (IfacePluginProv s)
   = text "plugin" <+> doubleQuotes (text s)
 pprIfaceUnivCoProv _ (IfaceCorePrepProv _)
   = text "CorePrep"
+pprIfaceUnivCoProv _ (IfaceZappedProv cvs fcvs)
+  = hang (text "zap") 2 (sep [ppr cvs, ppr fcvs])
 
 -------------------
 instance Outputable IfaceTyCon where
@@ -2350,6 +2354,13 @@ instance Binary iface_co => Binary (IfaceUnivCoProv iface_co) where
   put_ bh (IfaceCorePrepProv a) = do
           putByte bh 4
           put_ bh a
+  put_ bh (IfaceZappedProv cvs fcvs) = do
+          massertPpr (null fcvs) $
+            vcat [ text "put IfaceZappedProv: fcvs is not empty"
+                 , text "fcvs:" <+> ppr fcvs
+                 , text "cvs:" <+> ppr cvs ]
+          putByte bh 5
+          put_ bh cvs
 
   get bh = do
       tag <- getByte bh
@@ -2362,6 +2373,8 @@ instance Binary iface_co => Binary (IfaceUnivCoProv iface_co) where
                    return $ IfacePluginProv a
            4 -> do a <- get bh
                    return (IfaceCorePrepProv a)
+           5 -> do a <- get bh
+                   return (IfaceZappedProv a [])
            _ -> panic ("get IfaceUnivCoProv " ++ show tag)
 
 

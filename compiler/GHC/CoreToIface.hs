@@ -78,6 +78,7 @@ import GHC.Types.Var.Set
 import GHC.Types.Tickish
 import GHC.Types.Demand ( isTopSig )
 import GHC.Types.Cpr ( topCprSig )
+import GHC.Types.Unique.Set (nonDetEltsUniqSet)
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -347,6 +348,13 @@ toIfaceCoercionDCoercion fr = (go, go_dco)
     go_prov to_iface (ProofIrrelProv co) = IfaceProofIrrelProv (to_iface co)
     go_prov _        (PluginProv str)    = IfacePluginProv str
     go_prov _        (CorePrepProv b)    = IfaceCorePrepProv b
+    go_prov _        (ZappedProv cvs)    = IfaceZappedProv
+                                              (map toIfaceCoVar $ nonDetEltsUniqSet bound_cvs)
+                                              (nonDetEltsUniqSet free_cvs)
+                                            -- We only care about the sets (e.g. to check membership),
+                                            -- so order (and hence non-determinism) doesn't matter here.
+      where
+        (free_cvs, bound_cvs) = partitionVarSet (`elemVarSet` fr) cvs
 
 toIfaceTcArgs :: TyCon -> [Type] -> IfaceAppArgs
 toIfaceTcArgs = toIfaceTcArgsX emptyVarSet
