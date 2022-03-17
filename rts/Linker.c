@@ -1116,7 +1116,7 @@ freePreloadObjectFile (ObjectCode *oc)
  */
 void freeObjectCode (ObjectCode *oc)
 {
-    IF_DEBUG(linker, debugBelch("freeObjectCode: %" PATH_FMT, oc->fileName));
+    IF_DEBUG(linker, ocDebugBelch(oc, "start\n"));
 
     if (oc->type == DYNAMIC_OBJECT) {
 #if defined(OBJFORMAT_ELF)
@@ -1481,7 +1481,7 @@ HsInt loadOc (ObjectCode* oc)
 {
    int r;
 
-   IF_DEBUG(linker, debugBelch("loadOc: start (%" PATH_FMT ")\n", oc->fileName));
+   IF_DEBUG(linker, ocDebugBelch(oc, "start\n"));
 
    /* verify the in-memory image */
 #  if defined(OBJFORMAT_ELF)
@@ -1494,7 +1494,7 @@ HsInt loadOc (ObjectCode* oc)
    barf("loadObj: no verify method");
 #  endif
    if (!r) {
-       IF_DEBUG(linker, debugBelch("loadOc: ocVerifyImage_* failed\n"));
+       IF_DEBUG(linker, ocDebugBelch(oc, "ocVerifyImage_* failed\n"));
        return r;
    }
 
@@ -1520,14 +1520,14 @@ HsInt loadOc (ObjectCode* oc)
    r = ocAllocateExtras_MachO ( oc );
    if (!r) {
        IF_DEBUG(linker,
-                debugBelch("loadOc: ocAllocateExtras_MachO failed\n"));
+                ocDebugBelch(oc, "ocAllocateExtras_MachO failed\n"));
        return r;
    }
 #  elif defined(OBJFORMAT_ELF)
    r = ocAllocateExtras_ELF ( oc );
    if (!r) {
        IF_DEBUG(linker,
-                debugBelch("loadOc: ocAllocateExtras_ELF failed\n"));
+                ocDebugBelch(oc, "ocAllocateExtras_ELF failed\n"));
        return r;
    }
 #  endif
@@ -1544,7 +1544,7 @@ HsInt loadOc (ObjectCode* oc)
    barf("loadObj: no getNames method");
 #  endif
    if (!r) {
-       IF_DEBUG(linker, debugBelch("loadOc: ocGetNames_* failed\n"));
+       IF_DEBUG(linker, ocDebugBelch(oc, "ocGetNames_* failed\n"));
        return r;
    }
 
@@ -1559,7 +1559,7 @@ HsInt loadOc (ObjectCode* oc)
            oc->status = OBJECT_LOADED;
        }
    }
-   IF_DEBUG(linker, debugBelch("loadOc: done (%" PATH_FMT ").\n", oc->fileName));
+   IF_DEBUG(linker, ocDebugBelch(oc, "done\n"));
 
    return 1;
 }
@@ -1600,6 +1600,7 @@ int ocTryLoad (ObjectCode* oc) {
         }
     }
 
+    IF_DEBUG(linker, ocDebugBelch(oc, "resolving\n"));
 #   if defined(OBJFORMAT_ELF)
     r = ocResolve_ELF ( oc );
 #   elif defined(OBJFORMAT_PEi386)
@@ -1611,6 +1612,7 @@ int ocTryLoad (ObjectCode* oc) {
 #   endif
     if (!r) { return r; }
 
+    IF_DEBUG(linker, ocDebugBelch(oc, "protecting mappings\n"));
 #if defined(NEED_SYMBOL_EXTRAS)
     ocProtectExtras(oc);
 #endif
@@ -1624,7 +1626,7 @@ int ocTryLoad (ObjectCode* oc) {
 
     // run init/init_array/ctors/mod_init_func
 
-    IF_DEBUG(linker, debugBelch("ocTryLoad: ocRunInit start\n"));
+    IF_DEBUG(linker, ocDebugBelch(oc, "running initializers\n"));
 
     // See Note [Tracking foreign exports] in ForeignExports.c
     foreignExportsLoadingObject(oc);
@@ -1641,6 +1643,7 @@ int ocTryLoad (ObjectCode* oc) {
 
     if (!r) { return r; }
 
+    IF_DEBUG(linker, ocDebugBelch(oc, "resolved\n"));
     oc->status = OBJECT_RESOLVED;
 
     return 1;
@@ -1911,19 +1914,19 @@ initSegment (Segment *s, void *start, size_t size, SegmentProt prot, int n_secti
 void freeSegments (ObjectCode *oc)
 {
     if (oc->segments != NULL) {
-        IF_DEBUG(linker, debugBelch("freeSegments: freeing %d segments\n", oc->n_segments));
+        IF_DEBUG(linker, ocDebugBelch(oc, "freeing %d segments\n", oc->n_segments));
 
         for (int i = 0; i < oc->n_segments; i++) {
             Segment *s = &oc->segments[i];
 
-            IF_DEBUG(linker, debugBelch("freeSegments: freeing segment %d at %p size %zu\n",
-                                        i, s->start, s->size));
+            IF_DEBUG(linker, ocDebugBelch(oc, "freeing segment %d at %p size %zu\n",
+                                          i, s->start, s->size));
 
             stgFree(s->sections_idx);
             s->sections_idx = NULL;
 
             if (0 == s->size) {
-                IF_DEBUG(linker, debugBelch("freeSegment: skipping segment of 0 size\n"));
+                IF_DEBUG(linker, ocDebugBelch(oc, "skipping segment of 0 size\n"));
                 continue;
             } else {
 #if RTS_LINKER_USE_MMAP
