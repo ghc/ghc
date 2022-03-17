@@ -98,11 +98,11 @@
    Note [runtime-linker-phases]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
    Broadly the behavior of the runtime linker can be
-   split into the following four phases:
+   split into the following five phases:
 
    - Indexing (e.g. ocVerifyImage and ocGetNames)
-   - Initialization (e.g. ocResolve and ocRunInit)
-   - Resolve (e.g. resolveObjs())
+   - Initialization (e.g. ocResolve)
+   - RunInit (e.g. ocRunInit)
    - Lookup (e.g. lookupSymbol)
 
    This is to enable lazy loading of symbols. Eager loading is problematic
@@ -132,14 +132,22 @@
 
    * During resolve we attempt to resolve all the symbols needed for the
      initial link. This essentially means, that for any ObjectCode given
-     directly to the command-line we perform lookupSymbols on the required
-     symbols. lookupSymbols may trigger the loading of additional ObjectCode
-     if required.
+     directly to the command-line we perform lookupSymbol on the required
+     symbols. lookupSymbol may trigger the loading of additional ObjectCode
+     if required. After resolving an object we mark its text as executable and
+     not writable.
 
      This phase will produce ObjectCode with status `OBJECT_RESOLVED` if
      the previous status was `OBJECT_NEEDED`.
 
-   * lookupSymbols is used to lookup any symbols required, both during initial
+   * During RunInit we run the initializers ("constructors") of the objects
+     that are in `OBJECT_RESOLVED` state and move them to `OBJECT_READY` state.
+     This must be in a separate phase since we must ensure that all needed
+     objects have been fully resolved before we can run their initializers.
+     This is particularly tricky in the presence of cyclic dependencies (see
+     #21253).
+
+   * lookupSymbol is used to lookup any symbols required, both during initial
      link and during statement and expression compilations in the REPL.
      Declaration of e.g. a foreign import, will eventually call lookupSymbol
      which will either fail (symbol unknown) or succeed (and possibly trigger a
@@ -170,8 +178,11 @@ StrHashTable *symhash;
 Mutex linker_mutex;
 #endif
 
-/* Generic wrapper function to try and Resolve and RunInit oc files */
-int ocTryLoad( ObjectCode* oc );
+/* Generic wrapper function to try and resolve oc files */
+static int ocTryLoad( ObjectCode* oc );
+/* Run initializers */
+static int ocRunInit( ObjectCode* oc );
+static int runPendingInitializers (void);
 
 static void ghciRemoveSymbolTable(StrHashTable *table, const SymbolName* key,
     ObjectCode *owner)
@@ -282,6 +293,7 @@ int ghciInsertSymbolTable(
       return 1;
    }
    else if (  pinfo->owner
+           && pinfo->owner->status != OBJECT_READY
            && pinfo->owner->status != OBJECT_RESOLVED
            && pinfo->owner->status != OBJECT_NEEDED)
    {
@@ -296,7 +308,9 @@ int ghciInsertSymbolTable(
            This is essentially emulating the behavior of a linker wherein it will always
            link in object files that are .o file arguments, but only take object files
            from archives as needed. */
-       if (owner && (owner->status == OBJECT_NEEDED || owner->status == OBJECT_RESOLVED)) {
+       if (owner && (owner->status == OBJECT_NEEDED
+                     || owner->status == OBJECT_RESOLVED
+                     || owner->status == OBJECT_READY)) {
            pinfo->value = data;
            pinfo->owner = owner;
            pinfo->strength = strength;
@@ -991,6 +1005,10 @@ SymbolAddr* lookupSymbol( SymbolName* lbl )
         IF_DEBUG(linker, printLoadedObjects());
         fflush(stderr);
     }
+
+    if (!runPendingInitializers()) {
+        errorBelch("lookupSymbol: Failed to run initializers.");
+    }
     RELEASE_LOCK(&linker_mutex);
     return r;
 }
@@ -1624,12 +1642,24 @@ int ocTryLoad (ObjectCode* oc) {
     m32_allocator_flush(oc->rw_m32);
 #endif
 
-    // run init/init_array/ctors/mod_init_func
+    IF_DEBUG(linker, ocDebugBelch(oc, "resolved\n"));
+    oc->status = OBJECT_RESOLVED;
+
+    return 1;
+}
+
+// run init/init_array/ctors/mod_init_func
+int ocRunInit(ObjectCode *oc)
+{
+    if (oc->status != OBJECT_RESOLVED) {
+        return 1;
+    }
 
     IF_DEBUG(linker, ocDebugBelch(oc, "running initializers\n"));
 
     // See Note [Tracking foreign exports] in ForeignExports.c
     foreignExportsLoadingObject(oc);
+    int r;
 #if defined(OBJFORMAT_ELF)
     r = ocRunInit_ELF ( oc );
 #elif defined(OBJFORMAT_PEi386)
@@ -1642,10 +1672,22 @@ int ocTryLoad (ObjectCode* oc) {
     foreignExportsFinishedLoadingObject();
 
     if (!r) { return r; }
+    oc->status = OBJECT_READY;
 
-    IF_DEBUG(linker, ocDebugBelch(oc, "resolved\n"));
-    oc->status = OBJECT_RESOLVED;
+    return 1;
+}
 
+int runPendingInitializers (void)
+{
+    for (ObjectCode *oc = objects; oc; oc = oc->next) {
+        int r = ocRunInit(oc);
+        if (!r) {
+            errorBelch("Could not run initializers of Object Code %" PATH_FMT ".\n", OC_INFORMATIVE_FILENAME(oc));
+            IF_DEBUG(linker, printLoadedObjects());
+            fflush(stderr);
+            return r;
+        }
+    }
     return 1;
 }
 
@@ -1660,13 +1702,16 @@ static HsInt resolveObjs_ (void)
 
     for (ObjectCode *oc = objects; oc; oc = oc->next) {
         int r = ocTryLoad(oc);
-        if (!r)
-        {
+        if (!r) {
             errorBelch("Could not load Object Code %" PATH_FMT ".\n", OC_INFORMATIVE_FILENAME(oc));
             IF_DEBUG(linker, printLoadedObjects());
             fflush(stderr);
             return r;
         }
+    }
+
+    if (!runPendingInitializers()) {
+        return 0;
     }
 
 #if defined(PROFILING)

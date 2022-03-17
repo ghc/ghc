@@ -52,6 +52,7 @@ typedef enum {
     OBJECT_LOADED,
     OBJECT_NEEDED,
     OBJECT_RESOLVED,
+    OBJECT_READY,
     OBJECT_UNLOADED,
     OBJECT_DONT_RESOLVE,
     OBJECT_NOT_LOADED     /* The object was either never loaded or has been
