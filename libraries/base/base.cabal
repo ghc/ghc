@@ -336,7 +336,14 @@ Library
         GHC.IO.Handle.Lock.NoOp
         GHC.IO.Handle.Lock.Windows
         GHC.StaticPtr.Internal
+        GHC.Event.Arr
+        GHC.Event.Array
+        GHC.Event.Internal
         GHC.Event.Internal.Types
+        GHC.Event.IntTable
+        GHC.Event.IntVar
+        GHC.Event.PSQ
+        GHC.Event.Unique
         -- GHC.IOPort -- TODO: hide again after debug
         System.Environment.ExecutablePath
         System.CPUTime.Utils
@@ -409,12 +416,6 @@ Library
             GHC.IO.Windows.Encoding
             GHC.IO.Windows.Paths
         other-modules:
-            GHC.Event.Arr
-            GHC.Event.Array
-            GHC.Event.IntTable
-            GHC.Event.IntVar
-            GHC.Event.PSQ
-            GHC.Event.Unique
             System.CPUTime.Windows
         c-sources:
             cbits/Win32Utils.c
@@ -425,20 +426,13 @@ Library
         exposed-modules:
             GHC.Event
         other-modules:
-            GHC.Event.Arr
-            GHC.Event.Array
             GHC.Event.Control
             GHC.Event.EPoll
-            GHC.Event.IntTable
-            GHC.Event.IntVar
-            GHC.Event.Internal
             GHC.Event.KQueue
             GHC.Event.Manager
-            GHC.Event.PSQ
             GHC.Event.Poll
             GHC.Event.Thread
             GHC.Event.TimerManager
-            GHC.Event.Unique
 
             System.CPUTime.Posix.ClockGetTime
             System.CPUTime.Posix.Times
