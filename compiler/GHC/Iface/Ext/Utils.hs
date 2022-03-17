@@ -296,8 +296,9 @@ getNameBindingInClass
   -> Maybe Span
 getNameBindingInClass n sp asts = do
   ast <- M.lookup (HiePath (srcSpanFile sp)) asts
+  clsNode <- selectLargestContainedBy sp ast
   getFirst $ foldMap First $ do
-    child <- flattenAst ast
+    child <- flattenAst clsNode
     dets <- maybeToList
       $ M.lookup (Right n) $ sourcedNodeIdents $ sourcedNodeInfo child
     let binding = foldMap (First . getBindSiteFromContext) (identInfo dets)
