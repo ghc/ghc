@@ -217,3 +217,5 @@ test('CallConv', [when(unregisterised(), skip),
                   when(arch('aarch64'), extra_hc_opts('CallConv_aarch64.s'))],
      compile_and_run, [''])
 test('T21186', normal, compile_and_run, [''])
+test('T20640a', normal, compile_and_run, [''])
+test('T20640b', normal, compile_and_run, [''])
