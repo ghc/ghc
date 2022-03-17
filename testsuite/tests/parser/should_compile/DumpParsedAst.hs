@@ -1,5 +1,5 @@
 {-# LANGUAGE Haskell2010 #-}
-{-# LANGUAGE DataKinds, PolyKinds, TypeOperators, TypeFamilies
+{-# LANGUAGE DataKinds, GADTs, PolyKinds, RankNTypes, TypeOperators, TypeFamilies
              , TypeApplications, TypeInType #-}
 
 module DumpParsedAst where
@@ -16,5 +16,9 @@ data T f (a :: k) = MkT (f a)
 
 type family F1 (a :: k) (f :: k -> Type) :: Type where
   F1 @Peano a f = T @Peano f a
+
+data family Nat :: k -> k -> Type
+newtype instance Nat (a :: k -> Type) :: (k -> Type) -> Type where
+  Nat :: (forall xx. f xx -> g xx) -> Nat f g
 
 main = putStrLn "hello"

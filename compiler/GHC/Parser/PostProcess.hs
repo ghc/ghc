@@ -746,8 +746,7 @@ mkGadtDecl loc names ty annsIn = do
        let (anns, cs, arg_types, res_type) = splitHsFunType body_ty
        return (PrefixConGADT arg_types, res_type, anns, cs)
 
-  let an = case outer_bndrs of
-        _                -> EpAnn (spanAsAnchor loc) (annsIn ++ annsa) (cs Semi.<> csa)
+  let an = EpAnn (spanAsAnchor loc) (annsIn ++ annsa) (cs Semi.<> csa)
 
   pure $ L l ConDeclGADT
                      { con_g_ext  = an
