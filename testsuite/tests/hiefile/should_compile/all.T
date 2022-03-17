@@ -21,3 +21,4 @@ test('Constructors', normal,                   compile, ['-fno-code -fwrite-ide-
 test('Scopes',       normal,                   compile, ['-fno-code -fwrite-ide-info -fvalidate-ide-info'])
 # See https://gitlab.haskell.org/ghc/ghc/-/issues/18425 and https://gitlab.haskell.org/ghc/ghc/-/merge_requests/2464#note_301989
 test('ScopesBug',    expect_broken(18425),     compile, ['-fno-code -fwrite-ide-info -fvalidate-ide-info'])
+test('T18425',       normal,     compile, ['-fno-code -fwrite-ide-info -fvalidate-ide-info'])

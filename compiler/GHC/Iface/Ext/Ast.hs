@@ -1574,7 +1574,7 @@ instance ToHie (Located [LocatedAn NoEpAnns (HsDerivingClause GhcRn)]) where
 instance ToHie (LocatedAn NoEpAnns (HsDerivingClause GhcRn)) where
   toHie (L span cl) = concatM $ makeNodeA cl span : case cl of
       HsDerivingClause _ strat dct ->
-        [ toHie strat
+        [ toHie (RS (mkLScopeA dct) <$> strat)
         , toHie dct
         ]
 
@@ -1583,12 +1583,12 @@ instance ToHie (LocatedC (DerivClauseTys GhcRn)) where
       DctSingle _ ty -> [ toHie $ TS (ResolvedScopes []) ty ]
       DctMulti _ tys -> [ toHie $ map (TS (ResolvedScopes [])) tys ]
 
-instance ToHie (LocatedAn NoEpAnns (DerivStrategy GhcRn)) where
-  toHie (L span strat) = concatM $ makeNodeA strat span : case strat of
+instance ToHie (RScoped (LocatedAn NoEpAnns (DerivStrategy GhcRn))) where
+  toHie (RS sc (L span strat)) = concatM $ makeNodeA strat span : case strat of
       StockStrategy _ -> []
       AnyclassStrategy _ -> []
       NewtypeStrategy _ -> []
-      ViaStrategy s -> [ toHie (TS (ResolvedScopes []) s) ]
+      ViaStrategy s -> [ toHie (TS (ResolvedScopes [sc]) s) ]
 
 instance ToHie (LocatedP OverlapMode) where
   toHie (L span _) = locOnly (locA span)
@@ -1967,7 +1967,7 @@ instance ToHie (LocatedA (DerivDecl GhcRn)) where
   toHie (L span decl) = concatM $ makeNodeA decl span : case decl of
       DerivDecl _ typ strat overlap ->
         [ toHie $ TS (ResolvedScopes []) typ
-        , toHie strat
+        , toHie $ (RS (mkScopeA span) <$> strat)
         , toHie overlap
         ]
 
