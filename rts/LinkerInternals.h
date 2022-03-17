@@ -356,6 +356,12 @@ struct _ObjectCode {
       (OC)->fileName                            \
     )
 
+#define ocDebugBelch(oc, s, ...) \
+    debugBelch("%s(%" PATH_FMT ": " s, \
+               __func__, \
+               OC_INFORMATIVE_FILENAME(oc), \
+               ##__VA_ARGS__)
+
 
 #if defined(THREADED_RTS)
 extern Mutex linker_mutex;
