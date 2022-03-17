@@ -224,7 +224,7 @@ eval:
         CONSTR_1_1: {
 
         (should) = ccall shouldCompact(compact "ptr", p "ptr");
-        if (should == SHOULDCOMPACT_IN_CNF) { P_[pp] = p; return(); }
+        if (should == SHOULDCOMPACT_IN_CNF) { P_[pp] = tag | p; return(); }
 
       constructor:
 
@@ -274,7 +274,7 @@ eval:
 
         (should) = ccall shouldCompact(compact "ptr", p "ptr");
         if (should == SHOULDCOMPACT_IN_CNF ||
-            should == SHOULDCOMPACT_STATIC) { P_[pp] = p; return(); }
+            should == SHOULDCOMPACT_STATIC) { P_[pp] = tag | p; return(); }
 
         goto constructor;
     }}
