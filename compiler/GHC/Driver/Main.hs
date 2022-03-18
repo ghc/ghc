@@ -450,8 +450,6 @@ hscParse' mod_summary
         PFailed pst ->
             handleWarningsThrowErrors (getPsMessages pst)
         POk pst rdr_module -> do
-            let (warns, errs) = getPsMessages pst
-            logDiagnostics (GhcPsMessage <$> warns)
             liftIO $ putDumpFileMaybe logger Opt_D_dump_parsed "Parser"
                         FormatHaskell (ppr rdr_module)
             liftIO $ putDumpFileMaybe logger Opt_D_dump_parsed_ast "Parser AST"
@@ -460,7 +458,6 @@ hscParse' mod_summary
                                                    rdr_module)
             liftIO $ putDumpFileMaybe logger Opt_D_source_stats "Source Statistics"
                         FormatText (ppSourceStats False rdr_module)
-            when (not $ isEmptyMessages errs) $ throwErrors (GhcPsMessage <$> errs)
 
             -- To get the list of extra source files, we take the list
             -- that the parser gave us,
@@ -496,9 +493,15 @@ hscParse' mod_summary
 
             -- apply parse transformation of plugins
             let applyPluginAction p opts
-                  = parsedResultAction p opts mod_summary
+                  = uncurry (parsedResultAction p opts mod_summary)
             hsc_env <- getHscEnv
-            withPlugins (hsc_plugins hsc_env) applyPluginAction res
+            (transformed, (warns, errs)) <-
+              withPlugins (hsc_plugins hsc_env) applyPluginAction (res, getPsMessages pst)
+
+            logDiagnostics (GhcPsMessage <$> warns)
+            unless (isEmptyMessages errs) $ throwErrors (GhcPsMessage <$> errs)
+
+            return transformed
 
 checkBidirectionFormatChars :: PsLoc -> StringBuffer -> Maybe (NonEmpty (PsLoc, Char, String))
 checkBidirectionFormatChars start_loc sb

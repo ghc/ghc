@@ -28,10 +28,11 @@ plugin = defaultPlugin { parsedResultAction = parsedPlugin
                        }
 
 parsedPlugin :: [CommandLineOption] -> ModSummary -> HsParsedModule
-                  -> Hsc HsParsedModule
-parsedPlugin [name, "parse"] _ pm
-  = return $ pm { hpm_module = removeParsedBinding name (hpm_module pm) }
-parsedPlugin _ _ pm = return pm
+             -> (Messages PsWarning, Messages PsError)
+             -> Hsc (HsParsedModule, (Messages PsWarning, Messages PsError))
+parsedPlugin [name, "parse"] _ pm msgs
+  = return (pm { hpm_module = removeParsedBinding name (hpm_module pm) }, msgs)
+parsedPlugin _ _ pm msgs = return (pm, msgs)
 
 removeParsedBinding :: String -> Located HsModule
                          -> Located HsModule

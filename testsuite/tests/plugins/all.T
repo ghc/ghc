@@ -277,3 +277,15 @@ test('plugins-order-pragma',
       pre_cmd('$MAKE -s --no-print-directory -C plugin-recomp package.plugins01 TOP={top}')
       ],
      makefile_test, [])
+
+test('T20803a',
+     [extra_files(['T20803-plugin/']),
+      pre_cmd('$MAKE -s --no-print-directory -C T20803-plugin package.T20803a TOP={top}')],
+     compile,
+     ['-package-db T20803-plugin/pkg.T20803a/local.package.conf -fplugin FixErrorsPlugin -package T20803-plugin ' + config.plugin_way_flags])
+
+test('T20803b',
+     [extra_files(['T20803-plugin/']),
+      pre_cmd('$MAKE -s --no-print-directory -C T20803-plugin package.T20803b TOP={top}')],
+     compile_fail,
+     ['-package-db T20803-plugin/pkg.T20803b/local.package.conf -fplugin AddErrorPlugin -package T20803-plugin ' + config.plugin_way_flags])

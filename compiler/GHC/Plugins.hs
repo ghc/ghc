@@ -58,6 +58,9 @@ module GHC.Plugins
    , module GHC.Unit.Module.ModIface
    , module GHC.Types.Meta
    , module GHC.Types.SourceError
+   , module GHC.Parser.Errors.Types
+   , module GHC.Types.Error
+   , module GHC.Hs
    , -- * Getting 'Name's
      thNameToGhcName
    )
@@ -139,6 +142,11 @@ import GHC.ThToHs       ( thRdrNameGuesses )
 import GHC.Tc.Utils.Env ( lookupGlobal )
 
 import GHC.Tc.Errors.Hole.FitTypes
+
+-- For parse result plugins
+import GHC.Parser.Errors.Types ( PsWarning, PsError )
+import GHC.Types.Error         ( Messages )
+import GHC.Hs                  ( HsParsedModule )
 
 import qualified Language.Haskell.TH as TH
 

@@ -26,12 +26,13 @@ plugin = defaultPlugin { parsedResultAction = parsedPlugin
                        }
 
 parsedPlugin :: [CommandLineOption] -> ModSummary -> HsParsedModule
-                  -> Hsc HsParsedModule
-parsedPlugin opts _ pm
+             -> (Messages PsWarning, Messages PsError)
+             -> Hsc (HsParsedModule, (Messages PsWarning, Messages PsError))
+parsedPlugin opts _ pm msgs
   = do liftIO $ putStrLn $ "parsePlugin(" ++ intercalate "," opts ++ ")"
        -- TODO: Remove #20791
        liftIO $ hFlush stdout
-       return pm
+       return (pm, msgs)
 
 renamedAction :: [CommandLineOption]
                     -> TcGblEnv -> HsGroup GhcRn

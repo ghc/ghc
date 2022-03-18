@@ -182,3 +182,10 @@ plugins-order-pragma:
 	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) --make -v0 plugins-order-pragma.hs -package-db plugin-recomp/pkg.plugins01/local.package.conf -fplugin ImpurePlugin
 	./plugins-order-pragma
 
+.PHONY: T20803a
+T20803a:
+	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) --make -v0 T20803a.hs -package-db T20803-plugin/pkg.T20803a/local.package.conf
+
+.PHONY: T20803b
+T20803b:
+	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) --make -v0 T20803b.hs -package-db T20803-plugin/pkg.T20803b/local.package.conf
