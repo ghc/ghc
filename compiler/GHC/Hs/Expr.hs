@@ -183,8 +183,6 @@ data HsWrap hs_syn = HsWrap HsWrapper      -- the wrapper
 
 deriving instance (Data (hs_syn GhcTc), Typeable hs_syn) => Data (HsWrap hs_syn)
 
-type instance HsDoRn (GhcPass _) = GhcRn
-
 -- ---------------------------------------------------------------------
 
 {-
