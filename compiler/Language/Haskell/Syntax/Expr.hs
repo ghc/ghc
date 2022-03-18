@@ -633,10 +633,6 @@ data HsExpr p
   -- general idea, and Note [Rebindable syntax and HsExpansion] in GHC.Hs.Expr
   -- for an example of how we use it.
 
--- | The AST used to hard-refer to GhcPass, which was a layer violation. For now,
--- we paper it over with this new extension point.
-type family HsDoRn p
-
 -- ---------------------------------------------------------------------
 
 data DotFieldOcc p
