@@ -627,6 +627,7 @@ Library
         GHC.StgToJS
         GHC.StgToJS.Apply
         GHC.StgToJS.Arg
+        GHC.StgToJS.Closure
         GHC.StgToJS.CodeGen
         GHC.StgToJS.CoreUtils
         GHC.StgToJS.DataCon
@@ -641,7 +642,6 @@ Library
         GHC.StgToJS.Profiling
         GHC.StgToJS.Regs
         GHC.StgToJS.Rts.Types
-        GHC.StgToJS.Rts.Apply
         GHC.StgToJS.Rts.Rts
         GHC.StgToJS.Sinker
         GHC.StgToJS.StaticPtr

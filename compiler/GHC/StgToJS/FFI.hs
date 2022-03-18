@@ -81,14 +81,14 @@ parseFFIPattern :: Bool  -- ^ catch exception and convert them to haskell except
 parseFFIPattern catchExcep async jscc pat t es as
   | catchExcep = do
       c <- parseFFIPatternA async jscc pat t es as
+      -- Generate:
+      --  try {
+      --    `c`;
+      --  } catch(except) {
+      --    return h$throwJSException(except);
+      --  }
       let ex = TxtI "except"
       return (TryStat c ex (ReturnStat (ApplExpr (var "h$throwJSException") [toJExpr ex])) mempty)
-       {-[j| try {
-                   `c`;
-                 } catch(e) {
-                   return h$throwJSException(e);
-                 }
-               |]-}
   | otherwise  = parseFFIPatternA async jscc pat t es as
 
 parseFFIPatternA :: Bool  -- ^ async

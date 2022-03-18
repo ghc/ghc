@@ -629,8 +629,8 @@ bhStats :: StgToJSConfig -> Bool -> JStat
 bhStats s pushUpd = mconcat
   [ if pushUpd then push' s [r1, var "h$upd_frame"] else mempty
   , toJExpr R1 .^ closureEntry_  |= var "h$blackhole"
-  , toJExpr R1 .^ closureExtra1_ |= var "h$currentThread"
-  , toJExpr R1 .^ closureExtra2_ |= null_ -- will be filled with waiters array
+  , toJExpr R1 .^ closureField1_ |= var "h$currentThread"
+  , toJExpr R1 .^ closureField2_ |= null_ -- will be filled with waiters array
   ]
 
 updateThunk :: G JStat
