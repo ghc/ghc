@@ -38,68 +38,70 @@ import GHC.Utils.Panic
 import qualified GHC.Utils.Monad.State.Strict as State
 
 genStaticArg :: HasDebugCallStack => StgArg -> G [StaticArg]
-genStaticArg (StgLitArg l) = map StaticLitArg <$> genStaticLit l
-genStaticArg a@(StgVarArg i) = do
-  unFloat <- State.gets gsUnfloated
-  case lookupUFM unFloat i of
-    Nothing -> reg
-    Just expr -> unfloated expr
-   where
-     r = uTypeVt . stgArgType $ a
-     reg
-       | isVoid r            =
-           return []
-       | i == trueDataConId  =
-           return [StaticLitArg (BoolLit True)]
-       | i == falseDataConId =
-           return [StaticLitArg (BoolLit False)]
-       | isMultiVar r        =
-           map (\(TxtI t) -> StaticObjArg t) <$> mapM (jsIdIN i) [1..varSize r] -- this seems wrong, not an obj?
-       | otherwise           = (\(TxtI it) -> [StaticObjArg it]) <$> jsIdI i
+genStaticArg a = case a of
+  StgLitArg l -> map StaticLitArg <$> genStaticLit l
+  StgVarArg i -> do
+    unFloat <- State.gets gsUnfloated
+    case lookupUFM unFloat i of
+      Nothing -> reg
+      Just expr -> unfloated expr
+     where
+       r = uTypeVt . stgArgType $ a
+       reg
+         | isVoid r            =
+             return []
+         | i == trueDataConId  =
+             return [StaticLitArg (BoolLit True)]
+         | i == falseDataConId =
+             return [StaticLitArg (BoolLit False)]
+         | isMultiVar r        =
+             map (\(TxtI t) -> StaticObjArg t) <$> mapM (jsIdIN i) [1..varSize r] -- this seems wrong, not an obj?
+         | otherwise           = (\(TxtI it) -> [StaticObjArg it]) <$> jsIdI i
 
-     unfloated :: CgStgExpr -> G [StaticArg]
-     unfloated (StgLit l) = map StaticLitArg <$> genStaticLit l
-     unfloated (StgConApp dc _n args _)
-       | isBoolDataCon dc || isUnboxableCon dc =
-           (:[]) . allocUnboxedConStatic dc . concat <$> mapM genStaticArg args -- fixme what is allocunboxedcon?
-       | null args = (\(TxtI t) -> [StaticObjArg t]) <$> jsIdI (dataConWorkId dc)
-       | otherwise = do
-           as       <- concat <$> mapM genStaticArg args
-           (TxtI e) <- enterDataConI dc
-           return [StaticConArg e as]
-     unfloated x = pprPanic "genArg: unexpected unfloated expression" (pprStgExpr panicStgPprOpts x)
+       unfloated :: CgStgExpr -> G [StaticArg]
+       unfloated (StgLit l) = map StaticLitArg <$> genStaticLit l
+       unfloated (StgConApp dc _n args _)
+         | isBoolDataCon dc || isUnboxableCon dc =
+             (:[]) . allocUnboxedConStatic dc . concat <$> mapM genStaticArg args -- fixme what is allocunboxedcon?
+         | null args = (\(TxtI t) -> [StaticObjArg t]) <$> jsIdI (dataConWorkId dc)
+         | otherwise = do
+             as       <- concat <$> mapM genStaticArg args
+             (TxtI e) <- enterDataConI dc
+             return [StaticConArg e as]
+       unfloated x = pprPanic "genArg: unexpected unfloated expression" (pprStgExpr panicStgPprOpts x)
 
 genArg :: HasDebugCallStack => StgArg -> G [JExpr]
-genArg (StgLitArg l) = genLit l
-genArg a@(StgVarArg i) = do
-  unFloat <- State.gets gsUnfloated
-  case lookupUFM unFloat i of
-    Nothing -> reg
-    Just expr -> unfloated expr
-   where
-     -- if our argument is a joinid, it can be an unboxed tuple
-     r :: HasDebugCallStack => VarType
-     r = uTypeVt . stgArgType $ a
-     reg
-       | isVoid r     = return []
-       | i == trueDataConId  = return [true_]
-       | i == falseDataConId = return [false_]
-       | isMultiVar r = mapM (jsIdN i) [1..varSize r]
-       | otherwise    = (:[]) <$> jsId i
+genArg a = case a of
+  StgLitArg l -> genLit l
+  StgVarArg i -> do
+    unFloat <- State.gets gsUnfloated
+    case lookupUFM unFloat i of
+      Nothing -> reg
+      Just expr -> unfloated expr
+     where
+       -- if our argument is a joinid, it can be an unboxed tuple
+       r :: HasDebugCallStack => VarType
+       r = uTypeVt . stgArgType $ a
+       reg
+         | isVoid r     = return []
+         | i == trueDataConId  = return [true_]
+         | i == falseDataConId = return [false_]
+         | isMultiVar r = mapM (jsIdN i) [1..varSize r]
+         | otherwise    = (:[]) <$> jsId i
 
-     unfloated :: HasDebugCallStack => CgStgExpr -> G [JExpr]
-     unfloated = \case
-      StgLit l -> genLit l
-      StgConApp dc _n args _
-       | isBoolDataCon dc || isUnboxableCon dc
-       -> (:[]) . allocUnboxedCon dc . concat <$> mapM genArg args
-       | null args -> (:[]) <$> jsId (dataConWorkId dc)
-       | otherwise -> do
-           as <- concat <$> mapM genArg args
-           e  <- enterDataCon dc
-           cs <- getSettings
-           return [allocDynamicE cs e as Nothing] -- FIXME: ccs
-      x -> pprPanic "genArg: unexpected unfloated expression" (pprStgExpr panicStgPprOpts x)
+       unfloated :: HasDebugCallStack => CgStgExpr -> G [JExpr]
+       unfloated = \case
+        StgLit l -> genLit l
+        StgConApp dc _n args _
+         | isBoolDataCon dc || isUnboxableCon dc
+         -> (:[]) . allocUnboxedCon dc . concat <$> mapM genArg args
+         | null args -> (:[]) <$> jsId (dataConWorkId dc)
+         | otherwise -> do
+             as <- concat <$> mapM genArg args
+             e  <- enterDataCon dc
+             cs <- getSettings
+             return [allocDynamicE cs e as Nothing] -- FIXME: ccs
+        x -> pprPanic "genArg: unexpected unfloated expression" (pprStgExpr panicStgPprOpts x)
 
 genIdArg :: HasDebugCallStack => Id -> G [JExpr]
 genIdArg i = genArg (StgVarArg i)
