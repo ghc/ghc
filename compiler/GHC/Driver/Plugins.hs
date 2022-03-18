@@ -63,12 +63,15 @@ import GHC.Unit.Module
 import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.ModSummary
 
+import GHC.Parser.Errors.Types (PsWarning, PsError)
+
 import qualified GHC.Tc.Types
 import GHC.Tc.Types ( TcGblEnv, IfM, TcM, tcg_rn_decls, tcg_rn_exports  )
 import GHC.Tc.Errors.Hole.FitTypes ( HoleFitPluginR )
 
 import GHC.Core.Opt.Monad ( CoreToDo, CoreM )
 import GHC.Hs
+import GHC.Types.Error (Messages)
 import GHC.Utils.Fingerprint
 import GHC.Utils.Outputable (Outputable(..), text, (<+>))
 
@@ -119,9 +122,13 @@ data Plugin = Plugin {
   , pluginRecompile :: [CommandLineOption] -> IO PluginRecompile
     -- ^ Specify how the plugin should affect recompilation.
   , parsedResultAction :: [CommandLineOption] -> ModSummary -> HsParsedModule
-                            -> Hsc HsParsedModule
+                       -> (Messages PsWarning, Messages PsError)
+                       -> Hsc (HsParsedModule, (Messages PsWarning, Messages PsError))
     -- ^ Modify the module when it is parsed. This is called by
-    -- "GHC.Driver.Main" when the parsing is successful.
+    -- "GHC.Driver.Main" when the parser has produced no or only non-fatal
+    -- errors.
+    -- Compilation will fail if the messages produced by this function contain
+    -- any errors.
   , renamedResultAction :: [CommandLineOption] -> TcGblEnv
                                 -> HsGroup GhcRn -> TcM (TcGblEnv, HsGroup GhcRn)
     -- ^ Modify each group after it is renamed. This is called after each
@@ -230,7 +237,7 @@ defaultPlugin = Plugin {
       , driverPlugin          = const return
       , pluginRecompile       = impurePlugin
       , renamedResultAction   = \_ env grp -> return (env, grp)
-      , parsedResultAction    = \_ _ -> return
+      , parsedResultAction    = \_ _ mod msgs -> return (mod, msgs)
       , typeCheckResultAction = \_ _ -> return
       , spliceRunAction       = \_ -> return
       , interfaceLoadAction   = \_ -> return

@@ -1,0 +1,13 @@
+Name:           T20803-plugin
+Version:        0.1
+Synopsis:       For testing
+Build-Type:     Simple
+Cabal-Version:  >= 1.10
+
+Library
+    Extensions:     CPP
+    Default-language: GHC2021
+    Build-Depends: base, ghc
+    Exposed-Modules:
+        FixErrorsPlugin
+        AddErrorPlugin

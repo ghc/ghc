@@ -755,13 +755,22 @@ in the source code as well as the original syntax tree of the compiled module.
 ::
 
     parsed :: [CommandLineOption] -> ModSummary -> HsParsedModule
-                -> Hsc HsParsedModule
+                -> (Messages PsWarning, Messages PsError)
+                -> Hsc (HsParsedModule, (Messages PsWarning, Messages PsError)
 
 The ``ModSummary`` contains useful
 meta-information about the compiled module. The ``HsParsedModule`` contains the
 lexical and syntactical information we mentioned before. The result that you
 return will change the result of the parsing. If you don't want to change the
 result, just return the ``HsParsedModule`` that you received as the argument.
+
+If the parser encounters any errors that prevent an AST from being constructed,
+the plugin will not be run, but other kinds of errors, as well as warnings,
+will be given to the plugin via the ``Messages`` tuple. This allows you to
+modify, remove, and add warnings or errors before they are displayed to the
+user, although in most cases, you will likely want to return the tuple
+unmodified. The parsing pass will fail if the returned ``Messages PsError``
+collection is not empty after all parsing plugins have been run.
 
 Type checked representation
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -874,7 +883,7 @@ displayed.
     import Control.Monad.IO.Class
     import GHC.Driver.Session (getDynFlags)
     import GHC.Driver.Plugins
-    import GHC.Driver.Types
+    import GHC.Plugins
     import GHC.Tc.Types
     import Language.Haskell.Syntax.Extension
     import GHC.Hs.Decls
@@ -893,11 +902,15 @@ displayed.
       , interfaceLoadAction = interfaceLoadPlugin
       }
 
-    parsedPlugin :: [CommandLineOption] -> ModSummary -> HsParsedModule -> Hsc HsParsedModule
-    parsedPlugin _ _ pm
-      = do dflags <- getDynFlags
+    parsedPlugin :: [CommandLineOption] -> ModSummary -> HsParsedModule
+                 -> (Messages PsWarning, Messages PsError)
+                 -> Hsc (HsParsedModule, (Messages PsWarning, Messages PsError))
+    parsedPlugin _ _ pm msgs@(warns, errs)
+         = do dflags <- getDynFlags
            liftIO $ putStrLn $ "parsePlugin: \n" ++ (showSDoc dflags $ ppr $ hpm_module pm)
-           return pm
+           liftIO $ putStrLn $ "parsePlugin warnings: \n" ++ (showSDoc dflags $ ppr warns)
+           liftIO $ putStrLn $ "parsePlugin errors: \n" ++ (showSDoc dflags $ ppr errs)
+           return (pm, msgs)
 
     renamedAction :: [CommandLineOption] -> TcGblEnv -> HsGroup GhcRn -> TcM (TcGblEnv, HsGroup GhcRn)
     renamedAction _ tc gr = do
@@ -945,6 +958,10 @@ output:
     module A where
     a = ()
     $(return [])
+    parsePlugin warnings:
+
+    parsePlugin errors:
+
     typeCheckPlugin (rn): a = ()
     interface loaded: Language.Haskell.TH.Lib.Internal
     meta: return []
