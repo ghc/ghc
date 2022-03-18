@@ -337,7 +337,8 @@ scavenge_PAP_payload (StgClosure *fun, StgClosure **payload, StgWord size)
     StgWord bitmap;
     const StgFunInfoTable *fun_info;
 
-    fun_info = get_fun_itbl(UNTAG_CONST_CLOSURE(fun));
+    fun = UNTAG_CLOSURE(fun);
+    fun_info = get_fun_itbl(fun);
     ASSERT(fun_info->i.type != PAP);
     p = (StgPtr)payload;
 
