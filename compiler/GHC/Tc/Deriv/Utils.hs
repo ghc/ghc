@@ -989,8 +989,8 @@ cond_stdOK deriv_ctxt permissive dflags
          InferContext wildcard
            | null data_cons -- 1.
            , not permissive
-           -> checkFlag LangExt.EmptyDataDeriving dflags dit `orValid`
-              NotValid (no_cons_why rep_tc)
+           , not (xopt LangExt.EmptyDataDeriving dflags)
+           -> NotValid (no_cons_why rep_tc)
            | not (null con_whys)
            -> NotValid $ DerivErrBadConstructor (Just $ has_wildcard wildcard) con_whys
            | otherwise

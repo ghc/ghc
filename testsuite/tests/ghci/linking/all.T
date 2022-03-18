@@ -1,8 +1,7 @@
 test('ghcilink001',
      [extra_files(['TestLink.hs', 'f.c']),
       when(ghc_dynamic(), expect_fail), # dynamic ghci can't load '.a's
-      unless(doing_ghci, skip),
-      extra_clean(['dir001/*','dir001'])],
+      unless(doing_ghci, skip)],
      makefile_test, ['ghcilink001'])
 
 test('ghcilink002', [extra_files(['TestLink.hs', 'f.c']),
@@ -62,8 +61,7 @@ test('T11531',
 test('T14708',
      [extra_files(['T14708.hs', 'add.c']),
       unless(doing_ghci, skip),
-      unless(ghc_dynamic(), skip),
-      extra_clean(['T14708scratch/*', 'T14708'])],
+      unless(ghc_dynamic(), skip)],
      makefile_test, ['T14708'])
 
 test('T15729',

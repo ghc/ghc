@@ -87,8 +87,7 @@ test('T4321',
 
 test('T3736', [], makefile_test, ['T3736'])
 test('T3738',
-     [extra_clean(['T3738a.hi', 'T3738a.o']),
-      collect_runtime_residency(1),
+     [collect_runtime_residency(1),
       collect_stats('bytes allocated',8),
       only_ways(['normal']),
       ],
@@ -106,9 +105,7 @@ test('T2902', [], makefile_test, ['T2902'])
 test('T149',
      [ # expect_broken(149),
        # working (2 Jul 2013, x86-64/Linux)
-      extra_clean(['T149_A',    'T149_B',
-                   'T149_A.hi', 'T149_B.hi',
-                   'T149_A.o',  'T149_B.o'])],
+     ],
      makefile_test, ['T149'])
 
 test('T5113',
@@ -168,7 +165,6 @@ test('T5237',
 
 test('T5536',
      [collect_stats('bytes allocated',1),
-     extra_clean(['T5536.data']),
      ignore_stdout,
      only_ways(['normal'])
      ],
@@ -207,7 +203,6 @@ test('T7436b',
 
 test('T7797',
       [collect_stats('bytes allocated',5),
-      extra_clean(['T7797a.hi', 'T7797a.o']),
       only_ways(['normal'])
       ],
      compile_and_run,

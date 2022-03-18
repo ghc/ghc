@@ -217,8 +217,7 @@ test('T9961',
 
 test('T9233',
     [ only_ways(['normal']),
-      collect_compiler_stats('bytes allocated', 1),
-      extra_clean(['T9233a.hi', 'T9233a.o'])
+      collect_compiler_stats('bytes allocated', 1)
     ],
     multimod_compile,
     ['T9233', '-v0 -O2 -fno-spec-constr'])
@@ -272,7 +271,6 @@ test('T12234',
 test('T12545',
      [ only_ways(['normal']),
        collect_compiler_stats('bytes allocated', 10), #
-       extra_clean(['T12545a.hi', 'T12545a.o'])
      ],
      multimod_compile,
      ['T12545', '-v0'] )
@@ -503,7 +501,6 @@ test('T14683',
 test ('T9630',
       [ collect_compiler_residency(15),
         collect_compiler_stats('bytes allocated', 2),
-        extra_clean(['T9630a.hi', 'T9630a.o']),
       ],
       multimod_compile,
       ['T9630', '-v0 -O'])
@@ -544,7 +541,6 @@ test ('T16473',
 
 test('T17516',
       [ collect_compiler_stats('bytes allocated', 5),
-        extra_clean(['T17516A.hi', 'T17516A.o'])
       ],
       multimod_compile,
       ['T17516', '-O -v0'])

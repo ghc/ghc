@@ -250,7 +250,6 @@ test('T5250', [extra_files(['spalign.c']),
                 when(platform('i386-unknown-mingw32'), expect_fail),
                 when(platform('i386-unknown-linux'),
                             expect_broken_for(4211,['llvm'])),
-                extra_clean(['spalign.o']),
                 omit_ways(['ghci']) ],
               compile_and_run, ['spalign.c'])
 
@@ -259,7 +258,6 @@ test('T5423', [], makefile_test, ['T5423'])
 test('T5993', extra_run_opts('+RTS -k8 -RTS'), compile_and_run, [''])
 
 test('T6006', [ omit_ways(prof_ways + ['ghci']),
-                 extra_clean(['T6006_c.o']),
                  pre_cmd('$MAKE -s --no-print-directory T6006_setup') ],
                  # The T6006_setup hack is to ensure that we generate
                  # T6006_stub.h before compiling T6006_c.c, which
@@ -314,7 +312,6 @@ test('T8242', [ req_smp, only_ways(threaded_ways), ignore_stdout ],
 
 test('T8124', [ only_ways(threaded_ways), omit_ways(['ghci']),
                  when(opsys('mingw32'), skip), # uses pthreads
-                 extra_clean(['T8124_c.o']),
                  pre_cmd('$MAKE -s --no-print-directory T8124_setup') ],
                  # The T8124_setup hack is to ensure that we generate
                  # T8124_stub.h before compiling T8124_c.c, which

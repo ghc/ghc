@@ -9,7 +9,6 @@ test('fed001', normal, compile_and_run, [''])
 # Omit GHCi for these two, as they use foreign export
 test('ffi001', omit_ways(['ghci']), compile_and_run, [''])
 test('ffi002', [ omit_ways(['ghci']),
-                 extra_clean(['ffi002_c.o']),
                  pre_cmd('$MAKE -s --no-print-directory ffi002_setup') ],
                  # The ffi002_setup hack is to ensure that we generate
                  # ffi002_stub.h before compiling ffi002_c.c, which
@@ -104,8 +103,7 @@ test('T1288_ghci',
 test('T2276', [omit_ways(['ghci'])], compile_and_run, ['T2276_c.c'])
 test('T2276_ghci', [ only_ways(['ghci']),
                      when(opsys('darwin'), skip), # stdcall not supported on OS X
-                     pre_cmd('$MAKE -s --no-print-directory T2276_ghci_setup'),
-                     extra_clean(['T2276_ghci_c.o']) ],
+                     pre_cmd('$MAKE -s --no-print-directory T2276_ghci_setup') ],
                    compile_and_run, ['-fobject-code T2276_ghci_c.o'])
 
 test('T2469', normal, compile_and_run, ['-optc-std=gnu99'])
@@ -141,7 +139,6 @@ test('T4221', [omit_ways(['ghci'])], compile_and_run, ['T4221_c.c'])
 
 test('T5402', [ omit_ways(['ghci']),
                 exit_code(42),
-                extra_clean(['T5402_main.o']),
                   # The T5402_setup hack is to ensure that we generate
                   # T5402_stub.h before compiling T5402_main.c, which
                   # needs it.
@@ -149,7 +146,6 @@ test('T5402', [ omit_ways(['ghci']),
               compile_and_run, ["-no-hs-main T5402_main.c"])
 
 test('T5594', [ omit_ways(['ghci']),
-                extra_clean(['T5594_c.o']),
                 pre_cmd('$MAKE -s --no-print-directory T5594_setup') ],
                 # The T5594_setup hack is to ensure that we generate
                 # T5594_stub.h before compiling T5594_c.c, which
@@ -180,7 +176,6 @@ test('T8083', [omit_ways(['ghci'])], compile_and_run, ['T8083_c.c'])
 test('T9274', [omit_ways(['ghci'])], compile_and_run, [''])
 
 test('ffi023', [ omit_ways(['ghci']),
-                extra_clean(['ffi023_c.o']),
                 extra_run_opts('1000 4'),
                 pre_cmd('$MAKE -s --no-print-directory ffi023_setup') ],
                 # The ffi023_setup hack is to ensure that we generate

@@ -74,7 +74,7 @@ test('T4201',
 
 test('T3772',
 #      only_ways(['optasm']),
-     extra_clean(['T3772_A.hi', 'T3772_A.o']),
+     normal,
      makefile_test, ['T3772'])
 
 test('EvalTest',

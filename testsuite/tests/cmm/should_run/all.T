@@ -6,7 +6,6 @@ test('HooplPostorder',
 test('cmp64',
      [    extra_run_opts('"' + config.libdir + '"')
      ,    omit_ways(['ghci'])
-     ,    extra_clean('cmp64_cmm.o')
      ],
      multi_compile_and_run,
      ['cmp64', [('cmp64_cmm.cmm', '')], '-O'])
@@ -14,7 +13,6 @@ test('cmp64',
 
 # test('T17516',
 #       [ collect_compiler_stats('bytes allocated', 5),
-#         extra_clean(['T17516A.hi', 'T17516A.o'])
 #       ],
 #       multimod_compile,
 #       ['T17516', '-O -v0'])
@@ -22,7 +20,6 @@ test('cmp64',
 test('ByteSwitch',
      [    extra_run_opts('"' + config.libdir + '"')
      ,    omit_ways(['ghci'])
-     ,    extra_clean('ByteSwitch_cmm.o')
      ],
      multi_compile_and_run,
      ['ByteSwitch', [('ByteSwitch_cmm.cmm', '')], ''])
