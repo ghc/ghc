@@ -34,12 +34,13 @@ import GHC.JS.Syntax
 import GHC.JS.Make
 import GHC.JS.Transform
 
+import GHC.StgToJS.Apply
+import GHC.StgToJS.Closure
 import GHC.StgToJS.Heap
 import GHC.StgToJS.Monad
 import GHC.StgToJS.Profiling
 import GHC.StgToJS.Regs
 import GHC.StgToJS.Types
-import GHC.StgToJS.Rts.Apply
 
 import qualified GHC.Data.ShortText as T
 
@@ -109,30 +110,30 @@ closureConstructors :: StgToJSConfig -> JStat
 closureConstructors s = BlockStat
   [ declClsConstr "h$c" ["f"] $ Closure
       { clEntry  = var "f"
-      , clExtra1 = null_
-      , clExtra2 = null_
+      , clField1 = null_
+      , clField2 = null_
       , clMeta   = 0
       , clCC     = ccVal
       }
     -- FIXME: same as h$c, maybe remove one of them?
   , declClsConstr "h$c0" ["f"] $ Closure
       { clEntry  = var "f"
-      , clExtra1 = null_
-      , clExtra2 = null_
+      , clField1 = null_
+      , clField2 = null_
       , clMeta   = 0
       , clCC     = ccVal
       }
   , declClsConstr "h$c1" ["f", "x1"] $ Closure
       { clEntry  = var "f"
-      , clExtra1 = var "x1"
-      , clExtra2 = null_
+      , clField1 = var "x1"
+      , clField2 = null_
       , clMeta   = 0
       , clCC     = ccVal
       }
   , declClsConstr "h$c2" ["f", "x1", "x2"] $ Closure
       { clEntry  = var "f"
-      , clExtra1 = var "x1"
-      , clExtra2 = var "v2"
+      , clField1 = var "x1"
+      , clField2 = var "v2"
       , clMeta   = 0
       , clCC     = ccVal
       }
@@ -206,8 +207,8 @@ closureConstructors s = BlockStat
         -- args are: f x1 x2 .. xn [cc]
         args   = TxtI "f" : addCCArg' (map (TxtI . T.pack . ('x':) . show) [(1::Int)..n])
         fun    = JFunc args funBod
-        -- x1 goes into closureExtra1. All the other args are bundled into an
-        -- object in closureExtra2: { d1 = x2, d2 = x3, ... }
+        -- x1 goes into closureField1. All the other args are bundled into an
+        -- object in closureField2: { d1 = x2, d2 = x3, ... }
         --
         -- FIXME (Sylvain 2022-03): share code and comment with mkDataFill
         extra_args = ValExpr . JHash . M.fromList $ zip
@@ -220,8 +221,8 @@ closureConstructors s = BlockStat
             [ checkC
             , x |= newClosure Closure
                { clEntry  = var "f"
-               , clExtra1 = var "x1"
-               , clExtra2 = extra_args
+               , clField1 = var "x1"
+               , clField2 = extra_args
                , clMeta   = 0
                , clCC     = ccVal
                }
@@ -438,8 +439,8 @@ rts' s =
           -- function application to one argument
           , closure (ClosureInfo "h$ap1_e" (CIRegs 0 [PtrV]) "apply1" (CILayoutFixed 2 [PtrV, PtrV]) CIThunk mempty)
                (jVar $ \d1 d2 ->
-                   mconcat [ d1 |= closureExtra1 r1
-                           , d2 |= closureExtra2 r1
+                   mconcat [ d1 |= closureField1 r1
+                           , d2 |= closureField2 r1
                            , appS "h$bh" []
                            , profStat s enterCostCentreThunk
                            , r1 |= d1
@@ -449,9 +450,9 @@ rts' s =
           -- function application to two arguments
           , closure (ClosureInfo "h$ap2_e" (CIRegs 0 [PtrV]) "apply2" (CILayoutFixed 3 [PtrV, PtrV, PtrV]) CIThunk mempty)
                (jVar $ \d1 d2 d3 ->
-                   mconcat [ d1 |= closureExtra1 r1
-                           , d2 |= closureExtra2 r1 .^ "d1" -- FIXME (Sylvain 2022-03): extra args are named like closureExtraN... not so good! Find something else
-                           , d3 |= closureExtra2 r1 .^ "d2"
+                   mconcat [ d1 |= closureField1 r1
+                           , d2 |= closureField2 r1 .^ "d1" -- FIXME (Sylvain 2022-03): extra args are named like closureFieldN... not so good! Find something else
+                           , d3 |= closureField2 r1 .^ "d2"
                            , appS "h$bh" []
                            , profStat s enterCostCentreThunk
                            , r1 |= d1
@@ -462,10 +463,10 @@ rts' s =
           -- function application to three arguments
           , closure (ClosureInfo "h$ap3_e" (CIRegs 0 [PtrV]) "apply3" (CILayoutFixed 4 [PtrV, PtrV, PtrV, PtrV]) CIThunk mempty)
                (jVar $ \d1 d2 d3 d4 ->
-                   mconcat [ d1 |= closureExtra1 r1
-                           , d2 |= closureExtra2 r1 .^ "d1"
-                           , d3 |= closureExtra2 r1 .^ "d2"
-                           , d4 |= closureExtra2 r1 .^ "d3"
+                   mconcat [ d1 |= closureField1 r1
+                           , d2 |= closureField2 r1 .^ "d1"
+                           , d3 |= closureField2 r1 .^ "d2"
+                           , d4 |= closureField2 r1 .^ "d3"
                            , appS "h$bh" []
                            , r1 |= d1
                            , r2 |= d2
@@ -476,47 +477,47 @@ rts' s =
           -- select first field
           , closure (ClosureInfo "h$select1_e" (CIRegs 0 [PtrV]) "select1" (CILayoutFixed 1 [PtrV]) CIThunk mempty)
                (jVar $ \t ->
-                   mconcat [ t |= closureExtra1 r1
+                   mconcat [ t |= closureField1 r1
                            , adjSp' 3
                            , stack .! (sp - 2) |= r1
                            , stack .! (sp - 1) |= var "h$upd_frame"
                            , stack .! sp |= var "h$select1_ret"
                            , closureEntry  r1 |= var "h$blackhole"
-                           , closureExtra1 r1 |= var "h$currentThread"
-                           , closureExtra2 r1 |= null_
+                           , closureField1 r1 |= var "h$currentThread"
+                           , closureField2 r1 |= null_
                            , r1 |= t
                            , returnS (app "h$ap_0_0_fast" [])
                            ])
           , closure (ClosureInfo "h$select1_ret" (CIRegs 0 [PtrV]) "select1ret" (CILayoutFixed 0 []) CIStackFrame mempty)
-               ((r1 |= closureExtra1 r1)
+               ((r1 |= closureField1 r1)
                 <> adjSpN' 1
                 <> returnS (app "h$ap_0_0_fast" [])
                )
           -- select second field of a two-field constructor
           , closure (ClosureInfo "h$select2_e" (CIRegs 0 [PtrV]) "select2" (CILayoutFixed 1 [PtrV]) CIThunk mempty)
                (jVar $ \t ->
-                   mconcat [t |= closureExtra1 r1
+                   mconcat [t |= closureField1 r1
                            , adjSp' 3
                            , stack .! (sp - 2) |= r1
                            , stack .! (sp - 1) |= var "h$upd_frame"
                            , stack .! sp |= var "h$select2_ret"
                            , closureEntry  r1 |= var "h$blackhole"
-                           , closureExtra1 r1 |= var "h$currentThread"
-                           , closureExtra2 r1 |= null_
+                           , closureField1 r1 |= var "h$currentThread"
+                           , closureField2 r1 |= null_
                            , r1 |= t
                            , returnS (app "h$ap_0_0_fast" [])
                            ]
                   )
           , closure (ClosureInfo "h$select2_ret" (CIRegs 0 [PtrV]) "select2ret" (CILayoutFixed 0 []) CIStackFrame mempty)
-                        $ mconcat [ r1 |= closureExtra2 r1
+                        $ mconcat [ r1 |= closureField2 r1
                                   , adjSpN' 1
                                   , returnS (app "h$ap_0_0_fast" [])
                                   ]
           -- a thunk that just raises a synchronous exception
           , closure (ClosureInfo "h$raise_e" (CIRegs 0 [PtrV]) "h$raise_e" (CILayoutFixed 0 []) CIThunk mempty)
-               (returnS (app "h$throw" [closureExtra1 r1, false_]))
+               (returnS (app "h$throw" [closureField1 r1, false_]))
           , closure (ClosureInfo "h$raiseAsync_e" (CIRegs 0 [PtrV]) "h$raiseAsync_e" (CILayoutFixed 0 []) CIThunk mempty)
-               (returnS  (app "h$throw" [closureExtra1 r1, true_]))
+               (returnS  (app "h$throw" [closureField1 r1, true_]))
           , closure (ClosureInfo "h$raiseAsync_frame" (CIRegs 0 []) "h$raiseAsync_frame" (CILayoutFixed 1 []) CIStackFrame mempty)
                (jVar $ \ex ->
                    mconcat [ ex |= stack .! (sp - 1)
@@ -535,7 +536,7 @@ rts' s =
           , rtsApply s
           , closureTypes
           , closure (ClosureInfo "h$runio_e" (CIRegs 0 [PtrV]) "runio" (CILayoutFixed 1 [PtrV]) CIThunk mempty)
-                        $ mconcat [ r1 |= closureExtra1 r1
+                        $ mconcat [ r1 |= closureField1 r1
                                   , stack .! PreInc sp |= var "h$ap_1_0"
                                   , returnS (var "h$ap_1_0")
                                   ]
@@ -582,10 +583,10 @@ rts' s =
                             , appS "h$log" [app "h$collectProps" [r1]]
                             , jwhenS ((r1 .^ "f") .&&. (r1 .^ "f" .^ "n"))
                                         (appS "h$log" [jString "name: " + r1 .^ "f" .^ "n"])
-                            , jwhenS (ApplExpr (r1 .^ "hasOwnProperty") [jString closureExtra1_])
-                                        (appS "h$log" [jString "d1: " + closureExtra1 r1])
-                            , jwhenS (ApplExpr (r1 .^ "hasOwnProperty") [jString closureExtra2_])
-                                        (appS "h$log" [jString "d2: " + closureExtra2 r1])
+                            , jwhenS (ApplExpr (r1 .^ "hasOwnProperty") [jString closureField1_])
+                                        (appS "h$log" [jString "d1: " + closureField1 r1])
+                            , jwhenS (ApplExpr (r1 .^ "hasOwnProperty") [jString closureField2_])
+                                        (appS "h$log" [jString "d2: " + closureField2 r1])
                             , jwhenS (r1 .^ "f") $ mconcat
                                 [ re |= New (app "RegExp" [jString "([^\\n]+)\\n(.|\\n)*"])
                                 , appS "h$log" [jString "function"
@@ -597,7 +598,7 @@ rts' s =
                             ])
           , closure (ClosureInfo "h$resume_e" (CIRegs 0 [PtrV]) "resume" (CILayoutFixed 0 []) CIThunk mempty)
                   (jVar $ \ss ->
-                      mconcat [ss |= closureExtra1 r1
+                      mconcat [ss |= closureField1 r1
                               , updateThunk' s
                               , loop 0 (.<. ss .^ "length") (\i -> (stack .! (sp+1+i) |= ss .! i)
                                                                    <> postIncrS i)
@@ -622,13 +623,13 @@ rts' s =
                  <> returnS (stack .! sp))
           , closure (ClosureInfo "h$unboxFFIResult" (CIRegs 0 [PtrV]) "unboxFFI" (CILayoutFixed 0 []) CIStackFrame mempty)
                (jVar $ \d ->
-                   mconcat [d |= closureExtra1 r1
+                   mconcat [d |= closureField1 r1
                            , loop 0 (.<. d .^ "length") (\i -> appS "h$setReg" [i + 1, d .! i] <> postIncrS i)
                            , adjSpN' 1
                            , returnS (stack .! sp)
                            ])
           , closure (ClosureInfo "h$unbox_e" (CIRegs 0 [PtrV]) "unboxed value" (CILayoutFixed 1 [DoubleV]) CIThunk mempty)
-               ((r1 |= closureExtra1 r1) <> returnS (stack .! sp))
+               ((r1 |= closureField1 r1) <> returnS (stack .! sp))
           , closure (ClosureInfo "h$retryInterrupted" (CIRegs 0 [ObjV]) "retry interrupted operation" (CILayoutFixed 1 [ObjV]) CIStackFrame mempty)
                (jVar $ \a ->
                    mconcat [ a |= stack .! (sp - 1)
@@ -698,7 +699,7 @@ rts' s =
                                     ])
           , closure (ClosureInfo "h$lazy_e" (CIRegs 0 [PtrV]) "generic lazy value" (CILayoutFixed 0 []) CIThunk mempty)
                         (jVar $ \x ->
-                            mconcat [x |= ApplExpr (closureExtra1 r1) []
+                            mconcat [x |= ApplExpr (closureField1 r1) []
                                     , appS "h$bh" []
                                     , profStat s enterCostCentreThunk
                                     , r1 |= x

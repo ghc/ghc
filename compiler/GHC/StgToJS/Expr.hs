@@ -352,17 +352,17 @@ loadLiveFun l = do
    l' <- concat <$> mapM genIdsI l
    case l' of
      []  -> return mempty
-     [v] -> return (v ||= r1 .^ closureExtra1_)
+     [v] -> return (v ||= r1 .^ closureField1_)
      [v1,v2] -> return $ mconcat
-                        [ v1 ||= r1 .^ closureExtra1_
-                        , v2 ||= r1 .^ closureExtra2_
+                        [ v1 ||= r1 .^ closureField1_
+                        , v2 ||= r1 .^ closureField2_
                         ]
      (v:vs)  -> do
        d <- makeIdent
        let l'' = mconcat . zipWith (loadLiveVar $ toJExpr d) [(1::Int)..] $ vs
        return $ mconcat
-               [ v ||= r1 .^ closureExtra1_
-               , d ||= r1 .^ closureExtra2_
+               [ v ||= r1 .^ closureField1_
+               , d ||= r1 .^ closureField2_
                , l''
                ]
   where
@@ -403,8 +403,8 @@ genUpdFrame u i
 bhSingleEntry :: StgToJSConfig -> JStat
 bhSingleEntry _settings = mconcat
   [ r1 .^ closureEntry_  |= var "h$blackholeTrap"
-  , r1 .^ closureExtra1_ |= undefined_
-  , r1 .^ closureExtra2_ |= undefined_
+  , r1 .^ closureField1_ |= undefined_
+  , r1 .^ closureField2_ |= undefined_
   ]
 
 genStaticRefsRhs :: CgStgRhs -> G CIStatic
@@ -818,14 +818,14 @@ loadParams from args = do
   as <- concat <$> zipWithM (\a u -> map (,u) <$> genIdsI a) args use
   return $ case as of
     []                 -> mempty
-    [(x,u)]            -> loadIfUsed (from .^ closureExtra1_) x  u
+    [(x,u)]            -> loadIfUsed (from .^ closureField1_) x  u
     [(x1,u1),(x2,u2)]  -> mconcat
-                            [ loadIfUsed (from .^ closureExtra1_) x1 u1
-                            , loadIfUsed (from .^ closureExtra2_) x2 u2
+                            [ loadIfUsed (from .^ closureField1_) x1 u1
+                            , loadIfUsed (from .^ closureField2_) x2 u2
                             ]
     ((x,u):xs)         -> mconcat
-                            [ loadIfUsed (from .^ closureExtra1_) x u
-                            , jVar (\d -> mconcat [ d |= from .^ closureExtra2_
+                            [ loadIfUsed (from .^ closureField1_) x u
+                            , jVar (\d -> mconcat [ d |= from .^ closureField2_
                                                   , loadConVarsIfUsed d xs
                                                   ])
                             ]
@@ -892,8 +892,8 @@ allocDynAll haveDecl middle cls = do
         [ dec i
         , toJExpr i |= if csInlineAlloc settings
             then ValExpr (jhFromList $ [ (closureEntry_ , f)
-                                       , (closureExtra1_, null_)
-                                       , (closureExtra2_, null_)
+                                       , (closureField1_, null_)
+                                       , (closureField2_, null_)
                                        , (closureMeta_  , zero_)
                                        ]
                              ++ fmap (\cid -> ("cc", ValExpr (JVar cid))) ccs)
@@ -909,25 +909,25 @@ allocDynAll haveDecl middle cls = do
                                                    -- constant such as `fooThreshold`
           case es of
             []      -> mempty
-            [ex]    -> toJExpr i .^ closureExtra1_ |= toJExpr ex
+            [ex]    -> toJExpr i .^ closureField1_ |= toJExpr ex
             [e1,e2] -> mconcat
-                        [ toJExpr i .^ closureExtra1_ |= toJExpr e1
-                        , toJExpr i .^ closureExtra2_ |= toJExpr e2
+                        [ toJExpr i .^ closureField1_ |= toJExpr e1
+                        , toJExpr i .^ closureField2_ |= toJExpr e2
                         ]
             (ex:es)  -> mconcat
-                        [ toJExpr i .^ closureExtra1_ |= toJExpr ex
-                        , toJExpr i .^ closureExtra2_ |= toJExpr (jhFromList (zip dataFieldNames es))
+                        [ toJExpr i .^ closureField1_ |= toJExpr ex
+                        , toJExpr i .^ closureField2_ |= toJExpr (jhFromList (zip dataFieldNames es))
                         ]
       | otherwise = case es of
             []      -> mempty
-            [ex]    -> toJExpr i .^ closureExtra1_ |= ex
+            [ex]    -> toJExpr i .^ closureField1_ |= ex
             [e1,e2] -> mconcat
-                        [ toJExpr i .^ closureExtra1_ |= e1
-                        , toJExpr i .^ closureExtra2_ |= e2
+                        [ toJExpr i .^ closureField1_ |= e1
+                        , toJExpr i .^ closureField2_ |= e2
                         ]
             (ex:es)  -> mconcat
-                        [ toJExpr i .^ closureExtra1_ |= ex
-                        , toJExpr i .^ closureExtra2_ |= fillFun es
+                        [ toJExpr i .^ closureField1_ |= ex
+                        , toJExpr i .^ closureField2_ |= fillFun es
                         ]
 
     fillFun [] = null_

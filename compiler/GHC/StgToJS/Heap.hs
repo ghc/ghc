@@ -1,6 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE RecordWildCards #-}
 
 module GHC.StgToJS.Heap
   ( closureType
@@ -19,24 +18,19 @@ module GHC.StgToJS.Heap
   , conTag'
   , closureEntry
   , closureMeta
-  , closureExtra1
-  , closureExtra2
+  , closureField1
+  , closureField2
   , closureCC
   , funArity
   , funArity'
   , papArity
   , funOrPapArity
-  , Closure (..)
-  , newClosure
-  , assignClosure
-  , CopyCC (..)
-  , copyClosure
   -- * Field names
   , closureEntry_
   , closureMeta_
   , closureCC_
-  , closureExtra1_
-  , closureExtra2_
+  , closureField1_
+  , closureField2_
   -- * Javascript Type literals
   , jTyObject
   )
@@ -48,8 +42,6 @@ import GHC.JS.Syntax
 import GHC.JS.Make
 import GHC.StgToJS.Types
 import GHC.Data.ShortText (ShortText)
-
-import Data.Monoid
 
 -- FIXME: Jeff (2022,03): These helpers are a classic case of using a newtype
 -- over a type synonym to leverage GHC's type checker. Basically we never want
@@ -69,11 +61,11 @@ import Data.Monoid
 closureEntry_ :: ShortText
 closureEntry_ = "f"
 
-closureExtra1_ :: ShortText
-closureExtra1_ = "d1"
+closureField1_ :: ShortText
+closureField1_ = "d1"
 
-closureExtra2_ :: ShortText
-closureExtra2_ = "d2"
+closureField2_ :: ShortText
+closureField2_ = "d2"
 
 closureMeta_ :: ShortText
 closureMeta_ = "m"
@@ -148,12 +140,12 @@ closureCC :: JExpr -> JExpr
 closureCC p = p .^ closureCC_
 
 -- | Get closure extra field 1
-closureExtra1 :: JExpr -> JExpr
-closureExtra1 p = p .^ closureExtra1_
+closureField1 :: JExpr -> JExpr
+closureField1 p = p .^ closureField1_
 
 -- | Get closure extra field 2
-closureExtra2 :: JExpr -> JExpr
-closureExtra2 p = p .^ closureExtra2_
+closureField2 :: JExpr -> JExpr
+closureField2 p = p .^ closureField2_
 
 -- number of  arguments (arity & 0xff = arguments, arity >> 8 = number of registers)
 funArity :: JExpr -> JExpr
@@ -165,7 +157,7 @@ funArity' f = f .^ entryFunArity_
 
 -- arity of a partial application
 papArity :: JExpr -> JExpr
-papArity cp = closureExtra1 (closureExtra2 cp)
+papArity cp = closureField1 (closureField2 cp)
 
 funOrPapArity
   :: JExpr       -- ^ heap object
@@ -176,47 +168,3 @@ funOrPapArity c = \case
              (toJExpr (papArity c))
   Just f  -> ((IfExpr (toJExpr (isFun' f))) (toJExpr (funArity' f)))
              (toJExpr (papArity c))
-
--- | Used to pass arguments to newClosure with some safety
-data Closure = Closure
-  { clEntry  :: JExpr
-  , clExtra1 :: JExpr
-  , clExtra2 :: JExpr
-  , clMeta   :: JExpr
-  , clCC     :: Maybe JExpr
-  }
-
-newClosure :: Closure -> JExpr
-newClosure Closure{..} =
-  let xs = [ (closureEntry_ , clEntry)
-           , (closureExtra1_, clExtra1)
-           , (closureExtra2_, clExtra2)
-           , (closureMeta_  , clMeta)
-           ]
-  in case clCC of
-    -- CC field is optional (probably to minimize code size as we could assign
-    -- null_, but we get the same effect implicitly)
-    Nothing -> ValExpr (jhFromList xs)
-    Just cc -> ValExpr (jhFromList $ (closureCC_,cc) : xs)
-
-assignClosure :: JExpr -> Closure -> JStat
-assignClosure t Closure{..} = BlockStat
-  [ closureEntry  t |= clEntry
-  , closureExtra1 t |= clExtra1
-  , closureExtra2 t |= clExtra2
-  , closureMeta   t |= clMeta
-  ] <> case clCC of
-      Nothing -> mempty
-      Just cc -> closureCC t |= cc
-
-data CopyCC = CopyCC | DontCopyCC
-
-copyClosure :: CopyCC -> JExpr -> JExpr -> JStat
-copyClosure copy_cc t s = BlockStat
-  [ closureEntry  t |= closureEntry  s
-  , closureExtra1 t |= closureExtra1 s
-  , closureExtra2 t |= closureExtra2 s
-  , closureMeta   t |= closureMeta   s
-  ] <> case copy_cc of
-      DontCopyCC -> mempty
-      CopyCC     -> closureCC t |= closureCC s
