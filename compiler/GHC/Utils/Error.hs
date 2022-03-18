@@ -11,7 +11,7 @@
 
 module GHC.Utils.Error (
         -- * Basic types
-        Validity'(..), Validity, andValid, allValid, getInvalids, orValid,
+        Validity'(..), Validity, andValid, allValid, getInvalids,
         Severity(..),
 
         -- * Messages
@@ -211,10 +211,6 @@ allValid (v : vs) = v `andValid` allValid vs
 
 getInvalids :: [Validity' a] -> [a]
 getInvalids vs = [d | NotValid d <- vs]
-
-orValid :: Validity' a -> Validity' a -> Validity' a
-orValid IsValid _ = IsValid
-orValid _       v = v
 
 -- -----------------------------------------------------------------------------
 -- Collecting up messages for later ordering and printing.

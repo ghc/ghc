@@ -11,7 +11,7 @@ module GHC.Types.RepType
     isZeroBitTy,
 
     -- * Type representation for the code generator
-    typePrimRep, typePrimRep1, typeMonoPrimRep_maybe,
+    typePrimRep, typePrimRep1,
     runtimeRepPrimRep, typePrimRepArgs,
     PrimRep(..), primRepToType,
     countFunRepArgs, countConRepArgs, dataConRuntimeRepStrictness,
@@ -32,7 +32,7 @@ import GHC.Core.TyCon
 import GHC.Core.TyCon.RecWalk
 import GHC.Core.TyCo.Rep
 import GHC.Core.Type
-import {-# SOURCE #-} GHC.Builtin.Types ( anyTypeOfKind, runtimeRepTy
+import {-# SOURCE #-} GHC.Builtin.Types ( anyTypeOfKind
   , vecRepDataConTyCon
   , liftedRepTy, unliftedRepTy, zeroBitRepTy
   , intRepDataConTy
@@ -544,14 +544,6 @@ typePrimRep1 ty = case typePrimRep ty of
   [rep] -> rep
   _     -> pprPanic "typePrimRep1" (ppr ty $$ ppr (typePrimRep ty))
 
--- | Like 'typePrimRep', but returns 'Nothing' instead of panicking, when
---
---    * The @ty@ was not of form @TYPE rep@
---    * @rep@ was not monomorphic
---
-typeMonoPrimRep_maybe :: Type -> Maybe [PrimRep]
-typeMonoPrimRep_maybe ty = getRuntimeRep_maybe ty >>= runtimeRepMonoPrimRep_maybe
-
 -- | Find the runtime representation of a 'TyCon'. Defined here to
 -- avoid module loops. Returns a list of the register shapes necessary.
 -- See also Note [Getting from RuntimeRep to PrimRep]
@@ -583,18 +575,6 @@ kindPrimRep doc (TyConApp typ [runtime_rep])
     runtimeRepPrimRep doc runtime_rep
 kindPrimRep doc ki
   = pprPanic "kindPrimRep" (ppr ki $$ doc)
-
--- | Take a type of kind RuntimeRep and extract the list of 'PrimRep' that
--- it encodes if it's a monomorphic rep. Otherwise returns 'Nothing'.
--- See also Note [Getting from RuntimeRep to PrimRep]
-runtimeRepMonoPrimRep_maybe :: HasDebugCallStack => Type -> Maybe [PrimRep]
-runtimeRepMonoPrimRep_maybe rr_ty
-  | Just (rr_dc, args) <- splitTyConApp_maybe rr_ty
-  , assertPpr (runtimeRepTy `eqType` typeKind rr_ty) (ppr rr_ty) True
-  , RuntimeRep fun <- tyConRuntimeRepInfo rr_dc
-  = Just (fun args)
-  | otherwise
-  = Nothing -- not mono rep
 
 -- | Take a type of kind RuntimeRep and extract the list of 'PrimRep' that
 -- it encodes. See also Note [Getting from RuntimeRep to PrimRep]

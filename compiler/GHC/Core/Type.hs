@@ -1428,13 +1428,13 @@ applyTysX :: [TyVar] -> Type -> [Type] -> Type
 -- applyTyxX beta-reduces (/\tvs. body_ty) arg_tys
 -- Assumes that (/\tvs. body_ty) is closed
 applyTysX tvs body_ty arg_tys
-  = assertPpr (arg_tys `lengthAtLeast` n_tvs) pp_stuff $
+  = assertPpr (tvs `leLength` arg_tys) pp_stuff $
     assertPpr (tyCoVarsOfType body_ty `subVarSet` mkVarSet tvs) pp_stuff $
-    mkAppTys (substTyWith tvs (take n_tvs arg_tys) body_ty)
-             (drop n_tvs arg_tys)
+    mkAppTys (substTyWith tvs arg_tys_prefix body_ty)
+             arg_tys_rest
   where
     pp_stuff = vcat [ppr tvs, ppr body_ty, ppr arg_tys]
-    n_tvs = length tvs
+    (arg_tys_prefix, arg_tys_rest) = splitAtList tvs arg_tys
 
 
 

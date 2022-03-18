@@ -29,8 +29,7 @@ test('T2615',
        when(opsys('openbsd'), expect_broken(20869)),
        pre_cmd('$MAKE -s --no-print-directory T2615-prep'),
        # Add current directory to dlopen search path
-       cmd_prefix('LD_LIBRARY_PATH=$LD_LIBRARY_PATH:. '),
-       extra_clean(['libfoo_T2615.so', 'libfoo_T2615.o'])],
+       cmd_prefix('LD_LIBRARY_PATH=$LD_LIBRARY_PATH:. ')],
      compile_and_run,
      ['-package ghc'])
 
@@ -56,8 +55,6 @@ def checkDynAsm(actual_file, normaliser):
 # in a different order (but all entries within a section
 # do get loaded in a deterministic order). So we test each
 # separately now.
-# These should have extra_clean() arguments, but I need
-# to somehow extract out the name of DLLs to do that
 test('T5435_v_asm_a',
      [extra_files(['T5435.hs', 'T5435_asm.c']),
       req_rts_linker,

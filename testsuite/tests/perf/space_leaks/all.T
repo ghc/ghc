@@ -22,8 +22,7 @@ test('T4334',
 
 test('T2762',
      [collect_runtime_residency(2),
-      only_ways(['normal']),
-      extra_clean(['T2762A.hi', 'T2762A.o'])],
+      only_ways(['normal'])],
      compile_and_run, ['-O'])
 
 test('T4018',

@@ -1131,7 +1131,7 @@ Needless to say, there are some wrinkles:
      of the form @TYPE rep@ where @rep@ is not (and doesn't contain) a variable.
      Why? Because if we don't know its representation (e.g. size in memory,
      register class), we don't know what or how much rubbish to emit in codegen.
-     'typeMonoPrimRep_maybe' returns 'Nothing' in this case and we simply fall
+     'mkLitRubbish' returns 'Nothing' in this case and we simply fall
      back to passing the original parameter to the worker.
 
      Note that currently this case should not occur, because binders always

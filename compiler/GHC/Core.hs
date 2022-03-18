@@ -46,8 +46,8 @@ module GHC.Core (
         collectNBinders,
         collectArgs, stripNArgs, collectArgsTicks, flattenBinds,
 
-        exprToType, exprToCoercion_maybe,
-        applyTypeToArg, wrapLamBody,
+        exprToType,
+        wrapLamBody,
 
         isValArg, isTypeArg, isCoArg, isTyCoArg, valArgCount, valBndrCount,
         isRuntimeArg, isRuntimeVar,
@@ -1904,21 +1904,11 @@ These are defined here to avoid a module loop between GHC.Core.Utils and GHC.Cor
 
 -}
 
-applyTypeToArg :: Type -> CoreExpr -> Type
--- ^ Determines the type resulting from applying an expression with given type
--- to a given argument expression
-applyTypeToArg fun_ty arg = piResultTy fun_ty (exprToType arg)
-
 -- | If the expression is a 'Type', converts. Otherwise,
 -- panics. NB: This does /not/ convert 'Coercion' to 'CoercionTy'.
 exprToType :: CoreExpr -> Type
 exprToType (Type ty)     = ty
 exprToType _bad          = pprPanic "exprToType" empty
-
--- | If the expression is a 'Coercion', converts.
-exprToCoercion_maybe :: CoreExpr -> Maybe Coercion
-exprToCoercion_maybe (Coercion co) = Just co
-exprToCoercion_maybe _             = Nothing
 
 {-
 ************************************************************************

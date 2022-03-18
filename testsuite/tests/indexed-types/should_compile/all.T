@@ -127,8 +127,6 @@ test('T4160', normal, compile, [''])
 test('IndTypesPerf',
      [ # expect_broken(5224),
        # unbroken temporarily: #5227
-       extra_clean(['IndTypesPerf.o', 'IndTypesPerf.hi',
-                    'IndTypesPerfMerge.o', 'IndTypesPerfMerge.hi'])
      ] ,
      makefile_test, ['IndTypesPerf'])
 
