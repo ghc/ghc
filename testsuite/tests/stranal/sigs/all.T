@@ -33,3 +33,4 @@ test('T20746', normal, compile, [''])
 test('T20746b', normal, compile, [''])
 
 test('T21119', normal, compile, [''])
+test('T21257', normal, compile, [''])

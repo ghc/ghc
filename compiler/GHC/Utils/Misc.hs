@@ -14,7 +14,7 @@
 --
 module GHC.Utils.Misc (
         -- * Miscellaneous higher-order functions
-        applyWhen, nTimes, const2,
+        applyWhen, applyWhenJust, nTimes, const2,
 
         -- * General list processing
         zipEqual, zipWithEqual, zipWith3Equal, zipWith4Equal,
@@ -172,8 +172,15 @@ infixr 9 `thenCmp`
 
 -- | Apply a function iff some condition is met.
 applyWhen :: Bool -> (a -> a) -> a -> a
-applyWhen True f x = f x
-applyWhen _    _ x = x
+applyWhen True f = f
+applyWhen _    _ = id
+{-# INLINE applyWhen #-}
+
+-- | Apply a function iff a 'Maybe' is 'Just'.
+applyWhenJust :: Maybe b -> (b -> a -> a) -> a -> a
+applyWhenJust (Just b) f = f b
+applyWhenJust _        _ = id
+{-# INLINE applyWhenJust #-}
 
 -- | Apply a function @n@ times to a given value.
 nTimes :: Int -> (a -> a) -> (a -> a)

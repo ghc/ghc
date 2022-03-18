@@ -335,18 +335,26 @@ dmdAnalBindLetDown top_lvl env dmd bind anal_body = case bind of
         -- the vanilla call demand seem to be due to (b).  So we don't
         -- bother to re-analyse the RHS.
 
--- | Mimic the effect of 'GHC.Core.Prep.mkFloat', turning non-trivial argument
--- expressions/RHSs into a proper let-bound thunk (lifted) or a case (with
--- unlifted scrutinee).
-anticipateANF :: CoreExpr -> Card -> Card
-anticipateANF e n
-  | exprIsTrivial e                               = n -- trivial expr won't have a binding
+-- | Mimic the effect of 'GHC.Core.Prep.mkFloat', which turns a non-trivial
+-- argument expression/RHS into a proper let-bound, memoised thunk (lifted) or a
+-- case (with unlifted scrutinee).
+anticipateANF :: CoreExpr -> Card -> DmdType -> DmdType
+-- This code is *very* dense! See Note [Anticipating ANF in demand analysis] for
+-- an overview.
+anticipateANF e n_many dmd_ty
+  -- See Note [Trivial bindings in demand analysis]:
+  | Just v <- getIdFromTrivialExpr_maybe e -- when e is `v |> co`;
+  = adjustFvDemand (\(n:*sd) -> multCard n_many n :* sd) v $
+    multDmdType (oneifyCard n_many) dmd_ty
+
+  -- See Note [Call-by-value in demand analysis]:
   | Just Unlifted <- typeLevity_maybe (exprType e)
-  , not (isAbs n && exprOkForSpeculation e)       = case_bind n
-  | otherwise                                     = let_bind  n
-  where
-    case_bind _ = C_11       -- evaluated exactly once
-    let_bind    = oneifyCard -- evaluated at most once
+  , not (isAbs n_many && exprOkForSpeculation e)
+  = multDmdType C_11                dmd_ty -- case-bind => evaluated exactly once
+
+  -- See Note [Call-by-need in demand analysis]:
+  | otherwise
+  = multDmdType (oneifyCard n_many) dmd_ty -- let-bind  => evaluated at most once
 
 -- Do not process absent demands
 -- Otherwise act like in a normal demand analysis
@@ -357,11 +365,11 @@ dmdAnalStar :: AnalEnv
             -> (PlusDmdArg, CoreExpr)
 dmdAnalStar env (n :* sd) e
   -- NB: (:*) expands AbsDmd and BotDmd as needed
+  -- We need to analyse even in the absent case.
+  -- See Note [Always analyse in virgin pass]
   | WithDmdType dmd_ty e' <- dmdAnal env sd e
-  , n' <- anticipateANF e n
-      -- See Note [Anticipating ANF in demand analysis]
-      -- and Note [Analysing with absent demand]
-  = (toPlusDmdArg $ multDmdType n' dmd_ty, e')
+  -- See Note [Anticipating ANF in demand analysis]
+  = (discardDmdArgs $ anticipateANF e n dmd_ty, e')
 
 -- Main Demand Analsysis machinery
 dmdAnal, dmdAnal' :: AnalEnv
@@ -470,7 +478,7 @@ dmdAnal' env dmd (Case scrut case_bndr ty [Alt alt bndrs rhs])
           = alt_ty2
 
         WithDmdType scrut_ty scrut' = dmdAnal env scrut_sd scrut
-        res_ty             = alt_ty3 `plusDmdType` toPlusDmdArg scrut_ty
+        res_ty             = alt_ty3 `plusDmdType` discardDmdArgs scrut_ty
     in
 --    pprTrace "dmdAnal:Case1" (vcat [ text "scrut" <+> ppr scrut
 --                                   , text "dmd" <+> ppr dmd
@@ -515,7 +523,7 @@ dmdAnal' env dmd (Case scrut case_bndr ty alts)
           = deferAfterPreciseException alt_ty1
           | otherwise
           = alt_ty1
-        res_ty               = alt_ty2 `plusDmdType` toPlusDmdArg scrut_ty
+        res_ty               = alt_ty2 `plusDmdType` discardDmdArgs scrut_ty
 
     in
 --    pprTrace "dmdAnal:Case2" (vcat [ text "scrut" <+> ppr scrut
@@ -569,7 +577,7 @@ dmdAnalSumAlt :: AnalEnv -> SubDemand -> Id -> Alt Var -> WithDmdType (Alt Var)
 dmdAnalSumAlt env dmd case_bndr (Alt con bndrs rhs)
   | WithDmdType rhs_ty rhs' <- dmdAnal env dmd rhs
   , WithDmdType alt_ty dmds <- findBndrsDmds env rhs_ty bndrs
-  , let (_ :* case_bndr_sd) = findIdDemand alt_ty case_bndr
+  , let (_ :* case_bndr_sd) = lookupFvDemand alt_ty case_bndr
         -- See Note [Demand on case-alternative binders]
         -- we can't use the scrut_sd, because it says 'Prod' and we'll use
         -- topSubDmd anyway for scrutinees of sum types.
@@ -597,95 +605,269 @@ addCaseBndrDmd case_sd fld_dmds
 {-
 Note [Anticipating ANF in demand analysis]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When analysing non-complex (e.g., trivial) thunks and complex function
-arguments, we have to pretend that the expression is really in administrative
-normal form (ANF), the conversion to which is done by CorePrep.
+Demand information is very operational by nature: It estimates how *often* parts
+of an expression are evaluated relative to some context.
+But this kind of operational information only becomes apparent in a language
+that is in administrative normal form (ANF), where every non-trivial argument
+will be let- or case-bound, depending on whether it is lifted (call-by-need) or
+not (call-by-value). E.g.,
+```
+f (g x) ===> let y = g x in f y                   (if `y` is lifted)
+f (g x) ===> case g x of y { __DEFAULT -> f y }   (if `y` is not lifted)
+```
+In GHC, this conversion is done in CorePrep to mediate the translation to STG,
+which requires ANF. Thus, CorePrep/CoreToStg is The Place that casts the
+operational semantics in stone. It is important that demand analysis does a
+good job at anticipating the translation.
 
+There are multiple parts to this, all implemented in 'dmdAnalStar' and
+'anticipateANF', used for thunk RHS and argument expressions alike:
+
+  * Both call-by-need and call-by-value facilitate memoisation, in that the
+    argument is evaluated to WHNF (at most) once.
+    See Note [Call-by-need in demand analysis] for how the general mechanism
+    works for call-by-need and then Note [Call-by-value in demand analysis] for
+    the extension to unlifted arguments.
+  * The elimination of indirections described in Note [Inlining in CorePrep]
+    (is an optimisation that) means that trivial let-bindings (and arguments)
+    will not memoise whatsoever and we have to account for that with a very
+    special case in 'aniticipateANF'.
+    See Note [Trivial bindings in demand analysis].
+
+A bit more abstractly, if
+```
+dmdAnal "e" "sd" = (dmd_ty@{x1:->d1,...,xn:->dn}, e')
+```
+then `dmd_ty` lists the correct demands for when the bindings of x1..xn are
+enclosing `e`, e.g., `\x1[Dmd=d1]..\xn[Dmd=dn].e`.
+'dmdAnalStar' is our tool for lifting this information into function application
+context `f _`, where `n:*sd` describes the demand that `f`
+puts on its argument. Thus, if
+```
+dmdAnalStar "e" "n:*sd" = (dmd_ty'@{x1:->d1',...,xn:->dn'}, e')
+```
+then `\x1[Dmd=d1']..\xn[Dmd=dn'].f e` should be an accurate demand annotation.
+
+Note [Call-by-need in demand analysis]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+As the overview Note [Anticipating ANF in demand analysis] points out,
+memoisation in call-by-need of args `f e` as well as thunks `let x=e in ...`
+are implemented by the same mechanism. In demand analysis, it is taken care of
+in 'dmdAnalStar' and 'anticipateANF' in particular.
+("Star" because of the judgment form |-^* in Fig. 4 of the cardinality paper).
+
+This Note explains the 'multDmdType' and the 'oneifyCard' in the lifted,
+non-trivial case of 'aniticipateANF'.
+
+multDmdType
+-----------
+Consider the case of a function application `f (x+y)`, where `f` has demand
+signature `<ML>`. When we analyse the application, we will call 'dmdAnalStar'
+like `dmdAnalStar "x+y" "ML". That will first analyse `x+y` sub-demand `L`
+(which is notation for `Poly C_0N`). All sub-demands are head-strict, and we get
+```
+  (dmd_ty@"{x:->1L,y:->1L}", e') = dmdAnal "x+y" "L"
+```
+This `dmd_ty` denotes what `x+y` evaluates when it is itself evaluated
+according to `L`, exactly once. As a result, `dmd_ty` says it's strict in `x`
+and `y`. But `f` is in fact lazy in its argument, so we have to transform
+`dmd_ty` in some way.
+How we transform is determined by the eval cardinality `n` (`M` in this case):
+
+  * If `n` is lazy (lower bound 0) as in the example, we have to lazify all
+    demands in the demand type. In the example: `{x:->ML,y:->ML}`.
+  * If `n` is absent (upper bound 0), for example when `f` had signature `<A>`,
+    the sub-demand component is still head-strict and `dmdAnal` will report
+    the same demand type `{x:->1L,y:->1L}`. But since `n` was absent, we have
+    to turn all the demands into `A`, `{x:->A,y:->A}`. Or yet better: Simply
+    return an empty demand type `{}`.
+    (Although we can guess the demand type of `e` here without looking
+     at `e`, we still want to analyse `e` to get the accurate annotated `e'` and
+     also because of Note [Always analyse in virgin pass].)
+
+Both of these operations are neatly expressed by *multiplication* of a demand
+by a cardinality: In the "lazy" case (`M`/`C_01`), `M*1L = (M*1)L = ML`.
+The first `*` is 'multDmd', the second one is 'multCard'. Multiplication
+operates on lower and upper bounds separately. In the absent case (`A`/`C_00`),
+we get `A*1L=(A*1)L=AL=A` (the latter rewrite is because absent demands have no
+sub-demand whatsoever). It also works as expected for `B`/`C_10` and `1`/`C_11`.
+Multiplication by the latter is a no-op (and implemented as such), because `1`
+is the neutral element of multiplication.
+
+Hence the use of 'multDmdType', which expands to 'multDmd' on free variables.
+
+oneifyCard
+----------
+There is one problem though: Multiplication does the wrong thing for
+"used many times" (upper bound = ω). Consider what happens if `f` had signature
+`<L>` (`L`=`C_0N`): We end up with the exact same call to `dmdAnal` as for `ML`,
+but when we multiply `{x:->1L,y:->1L}` with `L`, we get back `{x:->L,y:->L}`.
+But that is too conservative! After all, the evaluation of `x+y` will be
+memoised, thus `x` and `y` should be evaluated only once and the correct
+demand type is `{x:->ML,y:->ML}`, the same as in the `<ML>` case from the
+beginning of the Note.
+
+Thus, before we multiply the demand type, we restrict `n` to the interval
+`[0,1]` with `oneifyCard`.
+
+Historical Note: The cardinality paper implements the oneify step for LetUp,
+but for arguments it multiplies with full `L` instead (in the |-^* rule), which
+loses precision.
+
+Surprisingly, the code for trivial bindings does quite the same
+`multDmdType (oneifyCard n)`, although no memoisation happens there. That
+deserves a separate explanation, though.
+See Note [Trivial bindings in demand analysis].
+
+Note [Call-by-value in demand analysis]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+As the overview Note [Anticipating ANF in demand analysis] points out,
+non-trivial lifted arguments end up being let-bound while non-trivial unlifted
+arguments end up being case-bound. More concretely,
+```hs
+data UBox a :: UnliftedType where MkUBox :: a -> T a
+f :: Bool -> UBox Int -> Int
+f False b            = 42
+f True  b@(MkUBox n) = n
+g :: Int -> ...
+g x = ... f False (x `seq` MkUBox 43) ...
+```
+We should see that `g` is strict in `x` here. The demand signature of `f` is
+`<1L><L>`, e.g., lazy in the unlifted `b` arg. Indeed that is a fitting
+description of the semantics of `f`, but because `UBox` has unlifted kind we
+will use call-by-value for that argument and all *call sites* will evaluate
+`b` before jumping to `f`. In this case, that also entails `seq`ing `x`, hence
+`g` is strict in `x` although `f` is lazy in `b`.
+
+Solution: Compared to Note [Call-by-need in demand analysis], which mimics
+let-binding by multiplying with `oneifyCard n`, the unlifted case mimics
+case-binding by multiplying with `C_11`, unconditionally.
+(Doing so is actually a no-op on the demand type, but I like how the resulting
+code is very clear about the difference between the lifted and unlifted case.)
+
+But there's more. What if we have (occurs in testcase spec-inline)
+```hs
+f :: Bool -> Int# -> Int#
+f True _ = 0#
+f _    n = f True (n -# 1#)
+```
+Then `n -# 1#` is not trivial (so Note [Trivial bindings in demand analysis]
+does not apply), so will ultimately be case-bound. As a result, demand analysis
+will say that `f` puts a "used" demand `M` or `L` on `n`. But in fact, if
+we assumed let-binding instead for the ok-for-speculation expression `n -# 1#`,
+we'd see that we can drop `n` altogether, because it would become absent!
+So we case-bind non-trivial but ok-for-spec unlifted args only when they are not
+absent and otherwise try let-binding instead.
+
+Can we also propagate absence on unlifted args in the not ok-for-spec case? No.
+#9254 is why:
+```
+f :: (() -> (# Int#, () #)) -> ()
+     -- Strictness signature is
+     --    <1C1(P(A,1L))>
+     -- I.e. calls k, but discards first component of result
+f k = case k () of (# _, r #) -> r
+
+g :: Int -> ()
+g y = f (\n -> (# case y of I# y2 -> y2, n #))
+```
+Here, f's strictness signature says (correctly) that it calls its argument
+function and ignores the first component of its result.
+But in function g, we *will* evaluate the `case y of ...`, because it has type
+Int#. So in the program as written, `y` will be evaluated. Hence we must
+record this usage of `y`, else `g` will say `y` is absent, and will w/w so
+that `y` is bound to an absent filler (see Note [Absent fillers]), leading
+to a crash when `y` is evaluated.
+
+It would be OK to propagate absence to `y` if worker/wrapper
+was smart enough to replace the absent argument `case y of I# y2 -> y2` with a
+suitable absent filler such as `RUBBISH[IntRep] @Int#`. We have to play safe
+until that is the case. This improvment is tracked in #21383.
+
+Note [Trivial bindings in demand analysis]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
 ```
-f x = let y = x |> co in y `seq` y `seq` ()
+f x = let y = x |> co in fst y `seq` y `seq` ()
 ```
-E.g., 'y' is a let-binding with a trivial RHS. That may occur if 'y' can't be
-inlined, for example. Now, is 'x' used once? It may appear as if that is the
-case, since its only occurrence is in 'y's memoised RHS. But actually, CorePrep
-will *not* allocate a thunk for 'y', because it is trivial and could just
-re-use the memoisation mechanism of 'x'! By saying that 'x' is used once it
-becomes a single-entry thunk and a call to 'f' will evaluate it twice.
-The same applies to trivial arguments, e.g., `f z` really evaluates `z` twice.
-
-So, somewhat counter-intuitively, trivial arguments and let RHSs will *not* be
-memoised. On the other hand, evaluation of non-trivial arguments and let RHSs
-*will* be memoised. In fact, consider the effect of conversion to ANF on complex
-function arguments (as done by 'GHC.Core.Prep.mkFloat'):
+Here, `x` only occurs in the trivial RHS of `y`. What is the demand on `x`?
+1P(1L,A)? Wrong! It's SP(1L,A), because `y` will be inlined in CorePrep as per
+Note [Inlining in CorePrep]. The reasoning is that we can eliminate the
+indirection of `y` to `x`, because `x` is still memoised. In STG, we'd get
 ```
-f2 (g2 x) ===> let y = g2 x in f2 y                   (if `y` is lifted)
-f3 (g3 x) ===> case g3 x of y { __DEFAULT -> f3 y }   (if `y` is not lifted)
+f x = case fst x of { __DEFAULT -> case x of { __DEFAULT -> () } }
 ```
-So if a lifted argument like `g2 x` is complex enough, it will be memoised.
-Regardless how many times 'f2' evaluates its parameter, the argument will be
-evaluated at most once to WHNF.
-Similarly, when an unlifted argument like `g3 x` is complex enough, we will
-evaluate it *exactly* once to WHNF, no matter how 'f3' evaluates its parameter.
+And clearly `x` is eval'd multiple times here.
 
-Note that any evaluation beyond WHNF is not affected by memoisation. So this
-Note affects the outer 'Card' of a 'Demand', but not its nested 'SubDemand'.
-'anticipateANF' predicts the effect of case-binding and let-binding complex
-arguments, as well as the lack of memoisation for trivial let RHSs.
-In particular, this takes care of the gripes in
-Note [Analysing with absent demand] relating to unlifted types.
+Here's the train of thought to find the simplest definition of 'dmdAnalStar'
+that accomodates this special case (annotated exprs are omitted):
 
-Note [Analysing with absent demand]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Suppose we analyse an expression with demand A.  The "A" means
-"absent", so this expression will never be needed. What should happen?
-There are several wrinkles:
+  * Simply define
+    ```
+    dmdAnalStar (x |> co) (n:*sd) = {x:->n:*sd}
+    ```
+    But that won't work if `x` has a demand signature mentioning other free
+    variables.
 
-* We *do* want to analyse the expression regardless.
-  Reason: Note [Always analyse in virgin pass]
+  * So how about
+    ```
+    dmdAnalStar (x |> co) (n:*sd) = {x:->n:*sd,y:->dy,z:->dz}
+      where
+        {x:->_:*sd,y:->dy,z:->dz} = dmdAnal (x |> co) sd
+    ```
+    E.g., return the result of 'dmdAnal', but replace `x`'s eval card before.
+    That won't work either! Here's a counter-example (from T21257)
+    ```
+    data T = MkT
+    notBot :: T -> (T -> T -> T) -> T
+    notBot x h = h f f -- h :: <L><L>
+      where
+        f :: T
+        f = x `seq` f
+    ```
+    `f` has demand signature `{x:->S}b`, but `h` might not always evaluate `f`.
+    For example, passing `\_ _ -> MkT` as `h` won't.
+    Thus, we should not give `notBot` a strictness signature like `<S><...>b`,
+    yet that is exactly what we would be doing with the 'dmdAnalStar' above!
+    When analysing the arg to `h` with `dmdAnalStar f L`, we would get
+    `dmdAnal f L = {f:->1L,x:->S}b`, because `f`'s demand signature has
+    threshold arity 0 and hence applies unaltered at sub-demand `L`.
+    Then we'd return `{f:->L,x:->S}b` from 'dmdAnalStar' and that is wrong.
 
-  But we can post-process the results to ignore all the usage
-  demands coming back. This is done by 'multDmdType' with the appropriate
-  (absent) evaluation cardinality A or B.
+    NB: We should be lazyfing the demand type before returning it!
+    A similar argument can be made for when `h :: <A><A>`, in which case we
+    don't want to see that `x` is used at all (`notBot2` in T21257).
 
-* Nevertheless, which sub-demand should we pick for analysis?
-  Since the demand was absent, any would do. Worker/wrapper will replace
-  absent bindings with an absent filler anyway, so annotations in the RHS
-  of an absent binding don't matter much.
-  Picking 'botSubDmd' would be the most useful, but would also look a bit
-  misleading in the Core output of DmdAnal, because all nested annotations would
-  be bottoming. Better pick 'seqSubDmd', so that we annotate many of those
-  nested bindings with A themselves.
+  * The `notBot*` family of examples demonstrates that in fact we need to
+    do the *exact same* `multDmdType (oneifyCard n) dmd_ty` sequence as we do in
+    Note [Call-by-need in demand analysis] and afterwards bump up the
+    evaluation cardinality of the trivial var:
+    ```
+    dmdAnalStar (x |> co) (n:*sd) = {x:->n*dx,y:->n1*dy,z:->n1*dz}
+      where
+        n1 = n ∩ C_01
+        {x:->dx,y:->dy,z:->dz} = dmdAnal (x |> co) sd
+    ```
+    where `*` is 'multDmd' and `:*` is a pattern synonym of 'Demand'.
+    NB: We multiply all FV demands with `n1` and `x`'s demand with the original
+    `n` (whether or not we also multiply it with `n1` doesn't matter).
 
-* Since we allow unlifted arguments that are not ok-for-speculation,
-  we need to be extra careful in the following situation, because unlifted
-  values are evaluated even if they are not used. Example from #9254:
-     f :: (() -> (# Int#, () #)) -> ()
-          -- Strictness signature is
-          --    <1C1(P(A,1L))>
-          -- I.e. calls k, but discards first component of result
-     f k = case k () of (# _, r #) -> r
+  * But `n*dx` in the last bullet is too conservative, as T21257 points out.
+    There we have `f :: <LP(ML,ML)>` and a call site `g pr = f pr`. We'd
+    certainly expect `g` to get the same signature as `f`! But from the call to
+    'dmdAnal' we get `{pr:->1P(ML,ML)}` (e.g., `1P(ML,ML)` corresponds to `dx`
+    above) and if we multiply the whole that by `n=L`, we get `LP(LL,LL)=L`.
+    So it is vital that we really only multiply the evaluation cardinality by
+    `n`, e.g., `(L*1)P(ML,ML)=LP(ML,ML)`.
 
-     g :: Int -> ()
-     g y = f (\n -> (# case y of I# y2 -> y2, n #))
-
-  Here, f's strictness signature says (correctly) that it calls its argument
-  function and ignores the first component of its result.
-
-  But in function g, we *will* evaluate the 'case y of ...', because it has type
-  Int#. So in the program as written, 'y' will be evaluated. Hence we must
-  record this usage of 'y', else 'g' will say 'y' is absent, and will w/w so
-  that 'y' is bound to an absent filler (see Note [Absent fillers]), leading
-  to a crash when 'y' is evaluated.
-
-  Now, worker/wrapper could be smarter and replace `case y of I# y2 -> y2`
-  with a suitable absent filler such as `RUBBISH[IntRep] @Int#`.
-  But as long as worker/wrapper isn't equipped to do so, we must be cautious,
-  and follow Note [Anticipating ANF in demand analysis]. That is, in
-  'dmdAnalStar', we will set the evaluation cardinality to C_11, anticipating
-  the case binding of the complex argument `case y of I# y2 -> y2`. This
-  cardinlities' only effect is in the call to 'multDmdType', where it makes sure
-  that the demand on the arg's free variable 'y' is not absent and strict, so
-  that it is ultimately passed unboxed to 'g'.
+In conclusion:
+```
+dmdAnalStar (x |> co) (n:*sd) = {x:->(n*m):*sdx,y:->n1*dy,z:->n1*dz}
+  where
+    n1 = n ∩ C_01
+    {x:->m:*sdx,y:->dy,z:->dz} = dmdAnal (x |> co) sd
+```
+This solution satisfies all known use cases.
 
 Note [Always analyse in virgin pass]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1923,7 +2105,7 @@ annotateLamIdBndr env dmd_ty id
     WithDmdType main_ty new_id
   where
     new_id  = setIdDemandInfo id dmd
-    main_ty = addDemand dmd dmd_ty'
+    main_ty = addArgDemand dmd dmd_ty'
     WithDmdType dmd_ty' dmd = findBndrDmd env dmd_ty id
 
 {- Note [NOINLINE and strictness]
@@ -2083,7 +2265,7 @@ findBndrDmd env dmd_ty id
     dmd' = strictify $
            trimToType starting_dmd (findTypeShape fam_envs id_ty)
 
-    (dmd_ty', starting_dmd) = peelFV dmd_ty id
+    (dmd_ty', starting_dmd) = peelFvDemand dmd_ty id
 
     id_ty = idType id
 

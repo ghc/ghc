@@ -1,0 +1,42 @@
+
+==================== Strictness signatures ====================
+T21257.$tc'T:
+T21257.$tcT:
+T21257.$trModule:
+T21257.absent: <A>
+T21257.absentUnlifted: <1L><A>
+T21257.g: <LP(ML,ML)>
+T21257.g2: <ML><ML>
+T21257.h: <SP(1L,A)>
+T21257.notBot: <L><1C1(C1(L))>
+T21257.notBot2: <A>
+
+
+
+==================== Cpr signatures ====================
+T21257.$tc'T:
+T21257.$tcT:
+T21257.$trModule:
+T21257.absent:
+T21257.absentUnlifted:
+T21257.g: 1
+T21257.g2: 1
+T21257.h:
+T21257.notBot:
+T21257.notBot2:
+
+
+
+==================== Strictness signatures ====================
+T21257.$tc'T:
+T21257.$tcT:
+T21257.$trModule:
+T21257.absent: <A>
+T21257.absentUnlifted: <1L><A>
+T21257.g: <LP(ML,ML)>
+T21257.g2: <ML><ML>
+T21257.h: <1P(1L,A)>
+T21257.notBot: <L><1C1(C1(L))>
+T21257.notBot2: <A>
+
+
