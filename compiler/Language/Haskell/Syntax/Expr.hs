@@ -1533,6 +1533,25 @@ that we can pretty-print it correctly.
 ************************************************************************
 -}
 
+{-
+Note [Quasi-quote overview]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The "quasi-quote" extension is described by Geoff Mainland's paper
+"Why it's nice to be quoted: quasiquoting for Haskell" (Haskell
+Workshop 2007).
+
+Briefly, one writes
+        [p| stuff |]
+and the arbitrary string "stuff" gets parsed by the parser 'p', whose
+type should be Language.Haskell.TH.Quote.QuasiQuoter.  'p' must be
+defined in another module, because we are going to run it here.  It's
+a bit like a TH splice:
+        $(p "stuff")
+
+However, you can do this in patterns as well as terms.  Because of this,
+the splice is run by the *renamer* rather than the type checker.
+-}
+
 -- | Haskell Splice
 data HsSplice id
    = HsTypedSplice       --  $$z  or $$(f 4)
@@ -1547,7 +1566,7 @@ data HsSplice id
         (IdP id)         -- A unique name to identify this splice point
         (LHsExpr id)     -- See Note [Pending Splices]
 
-   | HsQuasiQuote        -- See Note [Quasi-quote overview] in GHC.Tc.Gen.Splice
+   | HsQuasiQuote        -- See Note [Quasi-quote overview]
         (XQuasiQuote id)
         (IdP id)         -- Splice point
         (IdP id)         -- Quoter
