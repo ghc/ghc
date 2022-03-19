@@ -1617,13 +1617,6 @@ data HsSplicedThing id
     | HsSplicedPat  (Pat id)    -- ^ Haskell Spliced Pattern
 
 
-data UntypedSpliceFlavour
-  = UntypedExpSplice
-  | UntypedPatSplice
-  | UntypedTypeSplice
-  | UntypedDeclSplice
-  deriving Data
-
 -- | Haskell (Untyped) Quote = Expr + Pat + Type + Var
 data HsQuote p
   = ExpBr  (XExpBr p)   (LHsExpr p)   -- [|  expr  |]
