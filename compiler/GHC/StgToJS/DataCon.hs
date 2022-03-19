@@ -70,9 +70,13 @@ allocUnboxedCon con = \case
     | isUnboxableCon con -> x
   xs -> pprPanic "allocUnboxedCon: not an unboxed constructor" (ppr (con,xs))
 
-allocDynamicE :: StgToJSConfig -> JExpr -> [JExpr] -> Maybe JExpr -> JExpr
-allocDynamicE s entry free cc
-  | csInlineAlloc s || length free > 24 = newClosure $ Closure
+allocDynamicE :: Bool          -- ^ csInlineAlloc from StgToJSConfig
+              -> JExpr
+              -> [JExpr]
+              -> Maybe JExpr
+              -> JExpr
+allocDynamicE  inline_alloc entry free cc
+  | inline_alloc || length free > 24 = newClosure $ Closure
       { clEntry  = entry
       , clField1 = fillObj1
       , clField2 = fillObj2
@@ -92,7 +96,7 @@ allocDynamicE s entry free cc
 
 allocDynamic :: StgToJSConfig -> Bool -> Ident -> JExpr -> [JExpr] -> Maybe JExpr -> JStat
 allocDynamic s haveDecl to entry free cc =
-  dec to `mappend` (toJExpr to |= allocDynamicE s entry free cc)
+  dec to `mappend` (toJExpr to |= allocDynamicE (csInlineAlloc s) entry free cc)
     where
       dec i | haveDecl  = DeclStat i
             | otherwise = mempty

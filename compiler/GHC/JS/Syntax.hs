@@ -48,6 +48,8 @@ module GHC.JS.Syntax
   , pseudoSaturate
   -- * Utility
   , SaneDouble(..)
+  -- * Keywords
+  , isJsKeyword
   ) where
 
 import GHC.Prelude
@@ -56,16 +58,18 @@ import Control.DeepSeq
 
 import Data.Function
 import qualified Data.Map as M
+import qualified Data.Set as Set
 import Data.Data
 import Data.Word
 import qualified Data.Semigroup as Semigroup
 
 import GHC.Generics
 
+import Data.Binary
 import GHC.Utils.Outputable (Outputable (..))
 import qualified GHC.Utils.Outputable as O
 import qualified GHC.Data.ShortText as ST
-import GHC.Data.ShortText (ShortText)
+import GHC.Data.ShortText (ShortText())
 import GHC.Utils.Monad.State.Strict
 
 -- FIXME: Jeff (2022,03): This state monad is strict, but uses a lazy list as
@@ -319,9 +323,35 @@ instance Show SaneDouble where
 --------------------------------------------------------------------------------
 --                            Identifiers
 --------------------------------------------------------------------------------
--- We use ShortText for identifier in JS backend
+-- We use ShortText for identifiers in JS backend
 
 -- | Identifiers
 newtype Ident = TxtI { itxt:: ShortText}
- deriving (Show, Typeable, Ord, Eq, Generic, NFData)
+ deriving stock (Show, Typeable, Ord, Eq, Generic)
+ deriving newtype (Binary, NFData) -- FIXME: Jeff (2022,03): ShortText uses Data.Binary
+                                   -- rather than GHC.Utils.Binary. What is the
+                                   -- difference? See related FIXME in StgToJS.Object
 
+
+--------------------------------------------------------------------------------
+--                            JS Keywords
+--------------------------------------------------------------------------------
+-- | The set of Javascript keywords
+jsKeywords :: Set.Set Ident
+jsKeywords = Set.fromList $ TxtI <$>
+           [ "break", "case", "catch", "continue", "debugger"
+           , "default", "delete", "do", "else", "finally", "for"
+           , "function", "if", "in", "instanceof", "new", "return"
+           , "switch", "this", "throw", "try", "typeof", "var", "void"
+           , "while", "with"
+           , "class", "enum", "export", "extends", "import", "super"
+           , "const"
+           , "implements", "interface", "let", "package", "private"
+           , "protected"
+           , "public", "static", "yield"
+           , "null", "true", "false"
+           ]
+
+-- | Check if provided Ident is a JS keyword
+isJsKeyword :: Ident -> Bool
+isJsKeyword = flip Set.member jsKeywords

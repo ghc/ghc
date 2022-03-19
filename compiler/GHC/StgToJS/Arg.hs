@@ -1,5 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 
+{-# OPTIONS_GHC -fno-warn-orphans #-} -- For ToJExpr StaticArg, see FIXME
 module GHC.StgToJS.Arg
   ( genArg
   , genStaticArg
@@ -78,30 +79,30 @@ genArg a = case a of
     case lookupUFM unFloat i of
       Nothing -> reg
       Just expr -> unfloated expr
-     where
-       -- if our argument is a joinid, it can be an unboxed tuple
-       r :: HasDebugCallStack => VarType
-       r = uTypeVt . stgArgType $ a
-       reg
-         | isVoid r     = return []
-         | i == trueDataConId  = return [true_]
-         | i == falseDataConId = return [false_]
-         | isMultiVar r = mapM (jsIdN i) [1..varSize r]
-         | otherwise    = (:[]) <$> jsId i
+   where
+     -- if our argument is a joinid, it can be an unboxed tuple
+     r :: HasDebugCallStack => VarType
+     r = uTypeVt . stgArgType $ a
+     reg
+       | isVoid r     = return []
+       | i == trueDataConId  = return [true_]
+       | i == falseDataConId = return [false_]
+       | isMultiVar r = mapM (jsIdN i) [1..varSize r]
+       | otherwise    = (:[]) <$> jsId i
 
-       unfloated :: HasDebugCallStack => CgStgExpr -> G [JExpr]
-       unfloated = \case
-        StgLit l -> genLit l
-        StgConApp dc _n args _
-         | isBoolDataCon dc || isUnboxableCon dc
-         -> (:[]) . allocUnboxedCon dc . concat <$> mapM genArg args
-         | null args -> (:[]) <$> jsId (dataConWorkId dc)
-         | otherwise -> do
-             as <- concat <$> mapM genArg args
-             e  <- enterDataCon dc
-             cs <- getSettings
-             return [allocDynamicE cs e as Nothing] -- FIXME: ccs
-        x -> pprPanic "genArg: unexpected unfloated expression" (pprStgExpr panicStgPprOpts x)
+     unfloated :: HasDebugCallStack => CgStgExpr -> G [JExpr]
+     unfloated = \case
+      StgLit l -> genLit l
+      StgConApp dc _n args _
+       | isBoolDataCon dc || isUnboxableCon dc
+       -> (:[]) . allocUnboxedCon dc . concat <$> mapM genArg args
+       | null args -> (:[]) <$> jsId (dataConWorkId dc)
+       | otherwise -> do
+           as <- concat <$> mapM genArg args
+           e  <- enterDataCon dc
+           inl_alloc <- csInlineAlloc <$> getSettings
+           return [allocDynamicE inl_alloc e as Nothing] -- FIXME: ccs
+      x -> pprPanic "genArg: unexpected unfloated expression" (pprStgExpr panicStgPprOpts x)
 
 genIdArg :: HasDebugCallStack => Id -> G [JExpr]
 genIdArg i = genArg (StgVarArg i)
@@ -192,3 +193,16 @@ allocateStaticList xs a@(StgVarArg i)
           pprPanic "allocateStaticList: invalid argument (tail)" (ppr (xs, r))
 allocateStaticList _ _ = panic "allocateStaticList: unexpected literal in list"
 
+-- FIXME: Jeff (2022,03): Fix this orphan instance. It is consumed by
+-- Linker.Linker but requires allocDynamicE, hence its presence in this file. If
+-- we put it in StgToJS.Types (where StaticArg is defined) then we'll end up in
+-- an obvious module cycle. We could put it in DataCon but then we lose cohesion
+-- in that module (i.e., why should the DataCon module be exporting this
+-- instance?). It seems to be that this module should be the one that defines
+-- StaticArg, but I leave that for a refactor later.
+instance ToJExpr StaticArg where
+  toJExpr (StaticLitArg l) = toJExpr l
+  toJExpr (StaticObjArg t) = ValExpr (JVar (TxtI t))
+  toJExpr (StaticConArg c args) =
+    -- FIXME: cost-centre stack
+    allocDynamicE False (ValExpr . JVar . TxtI $ c) (map toJExpr args) Nothing

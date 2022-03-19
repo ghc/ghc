@@ -1,32 +1,53 @@
-{-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE TypeSynonymInstances #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE Rank2Types #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE FlexibleInstances          #-}
+{-# LANGUAGE LambdaCase                 #-}
+{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE Rank2Types                 #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
+{-# LANGUAGE TupleSections              #-}
 
--- | Serialization/deserialization of binary .o files for the JavaScript backend
+-- only for DB.Binary instances on Module see FIXME below
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  GHC.StgToJS.Object
+-- Copyright   :  (c) The University of Glasgow 2001
+-- License     :  BSD-style (see the file LICENSE)
 --
--- The .o files contain dependency information and generated code.
+-- Maintainer  :  Sylvain Henry  <sylvain.henry@iohk.io>
+--                Jeffrey Young  <jeffrey.young@iohk.io>
+--                Luite Stegeman <luite.stegeman@iohk.io>
+--                Josh Meredith  <josh.meredith@iohk.io>
+-- Stability   :  experimental
 --
--- All strings are mapped to a central string table, which helps reduce
--- file size and gives us efficient hash consing on read
+--  Serialization/deserialization of binary .o files for the JavaScript backend
+--  The .o files contain dependency information and generated code.
+--  All strings are mapped to a central string table, which helps reduce
+--  file size and gives us efficient hash consing on read
 --
--- Binary intermediate JavaScript object files:
---  serialized [Text] -> ([ClosureInfo], JStat) blocks
+--  Binary intermediate JavaScript object files:
+--   serialized [Text] -> ([ClosureInfo], JStat) blocks
 --
--- file layout:
---  - header ["GHCJSOBJ", length of symbol table, length of dependencies, length of index]
---  - compiler version tag
---  - symbol table
---  - dependency info
---  - closureinfo index
---  - closureinfo data (offsets described by index)
---
+--  file layout:
+--   - header ["GHCJSOBJ", length of symbol table, length of dependencies, length of index]
+--   - compiler version tag
+--   - symbol table
+--   - dependency info
+--   - closureinfo index
+--   - closureinfo data (offsets described by index)
+
+-- FIXME: Jeff (2022,03): There are orphan instances for DB.Binary Module and
+-- ModuleName. These are needed in StgToJS.Linker.Types for @Base@ serialization
+-- in @putBase@. We end up in this situation because Base now holds a @Module@
+-- type instead of GHCJS's previous @Package@ type. In addition to this GHC uses
+-- GHC.Utils.Binary for binary instances rather than Data.Binary (even though
+-- Data.Binary is a boot lib) so to fix the situation we must:
+-- - 1. Choose to use GHC.Utils.Binary or Data.Binary
+-- - 2. Remove Objectable since this is redundant
+-- - 3. Adapt the Linker types, like Base to the new Binary methods
+-----------------------------------------------------------------------------
+
 module GHC.StgToJS.Object
   ( object
   , object'
@@ -47,7 +68,11 @@ module GHC.StgToJS.Object
   , Header(..), getHeader, moduleNameTag
   , SymbolTable
   , ObjUnit (..)
-  , Deps (..), BlockDeps (..)
+  -- FIXME: Jeff (2022,03): These exports are just for Base use in Linker.Types
+  , Objectable(..)
+  , PutS
+  -- end exports for Linker.Types
+  , Deps (..), BlockDeps (..), DepsLocation (..)
   , ExpFun (..), ExportedFun (..)
   , versionTag, versionTagLength
   )
@@ -112,8 +137,14 @@ data Deps = Deps
   { depsModule          :: !Module                 -- ^ module
   , depsRequired        :: !IntSet                 -- ^ blocks that always need to be linked when this object is loaded (e.g. everything that contains initializer code or foreign exports)
   , depsHaskellExported :: !(Map ExportedFun Int)  -- ^ exported Haskell functions -> block
-  , depsBlocks          :: !(Array Int  BlockDeps) -- ^ info about each block
+  , depsBlocks          :: !(Array Int BlockDeps)  -- ^ info about each block
   } deriving (Generic)
+
+-- | Where are the dependencies
+data DepsLocation = ObjectFile  FilePath           -- ^ In an object file at path
+                  | ArchiveFile FilePath           -- ^ In a Ar file at path
+                  | InMemory    String ByteString  -- ^ In memory
+                  deriving (Eq, Show)
 
 data BlockDeps = BlockDeps
   { blockBlockDeps       :: [Int]         -- ^ dependencies on blocks in this object
@@ -368,7 +399,7 @@ readDepsEither name bs =
 
 
 -- | call with contents of the file
-readDeps :: String -> ByteString -> Deps
+readDeps :: String -> B.ByteString -> Deps
 readDeps name bs =
   case readDepsEither name bs of
     Left err -> error ("readDeps: not a valid GHCJS object: " ++ name ++ "\n   " ++ err)
@@ -736,6 +767,34 @@ instance Objectable Module where
   put (Module unit mod_name) = put unit >> put mod_name
   get = Module <$> get <*> get
 
+instance DB.Binary Module where
+  put (Module unit mod_name) = DB.put unit >> DB.put mod_name
+  get = Module <$> DB.get <*> DB.get
+
+instance DB.Binary ModuleName where
+  put (ModuleName fs) = DB.put fs
+  get = ModuleName <$> DB.get
+
+instance DB.Binary Unit where
+  put = \case
+    RealUnit (Definite uid) -> DB.put (0 :: Int) >> DB.put uid
+    VirtUnit uid            -> DB.put (1 :: Int) >> DB.put uid
+    HoleUnit                -> DB.put (2 :: Int)
+  get = DB.get >>= \case
+    (0 :: Int) -> RealUnit . Definite <$> DB.get
+    1          -> VirtUnit              <$> DB.get
+    _          -> pure HoleUnit
+
+instance DB.Binary UnitId where
+  put (UnitId fs) = DB.put fs
+  get = UnitId <$> DB.get
+
+instance DB.Binary InstantiatedUnit where
+  put indef = do
+    DB.put (instUnitInstanceOf indef)
+    DB.put (instUnitInsts indef)
+  get = mkInstantiatedUnitSorted <$> DB.get <*> DB.get
+
 instance Objectable ModuleName where
   put (ModuleName fs) = put fs
   get = ModuleName <$> get
@@ -753,6 +812,10 @@ instance Objectable Unit where
 instance Objectable FastString where
   put fs = put (unpackFS fs)
   get = mkFastString <$> get
+
+instance DB.Binary FastString where
+  put fs = DB.put (unpackFS fs)
+  get = mkFastString <$> DB.get
 
 instance Objectable UnitId where
   put (UnitId fs) = put fs
