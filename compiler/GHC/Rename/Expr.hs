@@ -47,7 +47,7 @@ import GHC.Rename.Utils ( bindLocalNamesFV, checkDupNames
                         , genHsVar, genLHsVar, genHsApp, genHsApps
                         , genAppType )
 import GHC.Rename.Unbound ( reportUnboundName )
-import GHC.Rename.Splice  ( rnTypedBracket, rnUntypedBracket, rnSpliceExpr, checkThLocalName )
+import GHC.Rename.Splice  ( rnTypedBracket, rnUntypedBracket, rnTypedSplice, rnUntypedSpliceExpr, checkThLocalName )
 import GHC.Rename.HsType
 import GHC.Rename.Pat
 import GHC.Driver.Session
@@ -375,7 +375,8 @@ rnExpr (HsProjection _ fs)
 rnExpr e@(HsTypedBracket _ br_body)   = rnTypedBracket e br_body
 rnExpr e@(HsUntypedBracket _ br_body) = rnUntypedBracket e br_body
 
-rnExpr (HsSpliceE _ splice) = rnSpliceExpr splice
+rnExpr (HsTypedSplice   _ splice) = rnTypedSplice splice
+rnExpr (HsUntypedSplice _ splice) = rnUntypedSpliceExpr splice
 
 ---------------------------------------------
 --      Sections

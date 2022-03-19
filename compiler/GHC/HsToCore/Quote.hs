@@ -157,35 +157,31 @@ getPlatform :: MetaM Platform
 getPlatform = targetPlatform <$> getDynFlags
 
 -----------------------------------------------------------------------------
-dsBracket :: Maybe QuoteWrapper -- ^ This is Nothing only when we are dealing with a VarBr
-          -> HsQuote GhcRn      -- See Note [The life cycle of a TH quotation]
-          -> [PendingTcSplice]
-          -> DsM CoreExpr
+dsBracket :: HsBracketTc -> DsM CoreExpr
 -- See Note [Desugaring Brackets]
 -- Returns a CoreExpr of type (M TH.Exp)
 -- The quoted thing is parameterised over Name, even though it has
 -- been type checked.  We don't want all those type decorations!
 
-dsBracket wrap brack splices
-  = do_brack brack
+dsBracket (HsBracketTc { hsb_wrap = mb_wrap, hsb_splices = splices, hsb_quote = quote })
+  = case quote of
+      VarBr _ _ n -> do { MkC e1  <- lookupOccDsM (unLoc n) ; return e1 }
+      ExpBr _ e   -> runOverloaded $ do { MkC e1  <- repLE e     ; return e1 }
+      PatBr _ p   -> runOverloaded $ do { MkC p1  <- repTopP p   ; return p1 }
+      TypBr _ t   -> runOverloaded $ do { MkC t1  <- repLTy t    ; return t1 }
+      DecBrG _ gp -> runOverloaded $ do { MkC ds1 <- repTopDs gp ; return ds1 }
+      DecBrL {}   -> panic "dsUntypedBracket: unexpected DecBrL"
   where
-    runOverloaded act = do
+    Just wrap = mb_wrap  -- Not used in VarBr case
       -- In the overloaded case we have to get given a wrapper, it is just
-      -- for variable quotations that there is no wrapper, because they
+      -- the VarBr case that there is no wrapper, because they
       -- have a simple type.
-      mw <- mkMetaWrappers (expectJust "runOverloaded" wrap)
-      runReaderT (mapReaderT (dsExtendMetaEnv new_bit) act) mw
+
+    runOverloaded act = do { mw <- mkMetaWrappers wrap
+                           ; runReaderT (mapReaderT (dsExtendMetaEnv new_bit) act) mw }
 
     new_bit = mkNameEnv [(n, DsSplice (unLoc e))
                         | PendingTcSplice n e <- splices]
-
-    do_brack (VarBr _ _ n) = do { MkC e1  <- lookupOccDsM (unLoc n) ; return e1 }
-    do_brack (ExpBr _ e)   = runOverloaded $ do { MkC e1  <- repLE e     ; return e1 }
-    do_brack (PatBr _ p)   = runOverloaded $ do { MkC p1  <- repTopP p   ; return p1 }
-    do_brack (TypBr _ t)   = runOverloaded $ do { MkC t1  <- repLTy t    ; return t1 }
-    do_brack (DecBrG _ gp) = runOverloaded $ do { MkC ds1 <- repTopDs gp ; return ds1 }
-    do_brack (DecBrL {})   = panic "dsUntypedBracket: unexpected DecBrL"
-
 
 {-
 Note [Desugaring Brackets]
@@ -1413,7 +1409,8 @@ repTy (HsKindSig _ t k)     = do
                                 t1 <- repLTy t
                                 k1 <- repLTy k
                                 repTSig t1 k1
-repTy (HsSpliceTy _ splice)      = repSplice splice
+repTy (HsSpliceTy (HsUntypedSpliceNested n) _) = rep_splice n
+repTy t@(HsSpliceTy (HsUntypedSpliceTop _ _) _) = pprPanic "repTy: top level splice" (ppr t)
 repTy (HsExplicitListTy _ _ tys) = do
                                     tys1 <- repLTys tys
                                     repTPromotedList tys1
@@ -1460,13 +1457,8 @@ repRole (L _ Nothing)                 = rep2_nw inferRName []
 --              Splices
 -----------------------------------------------------------------------------
 
-repSplice :: HsSplice GhcRn -> MetaM (Core a)
 -- See Note [How brackets and nested splices are handled] in GHC.Tc.Gen.Splice
 -- We return a CoreExpr of any old type; the context should know
-repSplice (HsTypedSplice   _ _ n _) = rep_splice n
-repSplice (HsUntypedSplice _ _ n _) = rep_splice n
-repSplice (HsQuasiQuote _ n _ _ _)  = rep_splice n
-repSplice e@(HsSpliced {})          = pprPanic "repSplice" (ppr e)
 
 rep_splice :: Name -> MetaM (Core a)
 rep_splice splice_name
@@ -1634,7 +1626,9 @@ repE (ArithSeq _ _ aseq) =
                              ds3 <- repLE e3
                              repFromThenTo ds1 ds2 ds3
 
-repE (HsSpliceE _ splice)  = repSplice splice
+repE (HsTypedSplice n _) = rep_splice n
+repE (HsUntypedSplice (HsUntypedSpliceNested n) _)  = rep_splice n
+repE e@(HsUntypedSplice (HsUntypedSpliceTop _ _) _) = pprPanic "repE: top level splice" (ppr e)
 repE (HsStatic _ e)        = repLE e >>= rep2 staticEName . (:[]) . unC
 repE (HsUnboundVar _ uv)   = do
                                occ   <- occNameLit uv
@@ -2101,7 +2095,8 @@ repP p@(NPat _ (L _ l) (Just _) _)
 repP (SigPat _ p t) = do { p' <- repLP p
                          ; t' <- repLTy (hsPatSigType t)
                          ; repPsig p' t' }
-repP (SplicePat _ splice) = repSplice splice
+repP (SplicePat (HsUntypedSpliceNested n) _) = rep_splice n
+repP p@(SplicePat (HsUntypedSpliceTop _ _) _) = pprPanic "repP: top level splice" (ppr p)
 repP other = notHandled (ThExoticPattern other)
 
 ----------------------------------------------------------

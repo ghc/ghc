@@ -487,9 +487,10 @@ dsExpr (RecordUpd x _ _) = dataConCantHappen x
 -- Template Haskell stuff
 -- See Note [The life cycle of a TH quotation]
 
-dsExpr (HsTypedBracket   (HsBracketTc q _ hs_wrapper ps) _) = dsBracket hs_wrapper q ps
-dsExpr (HsUntypedBracket (HsBracketTc q _ hs_wrapper ps) _) = dsBracket hs_wrapper q ps
-dsExpr (HsSpliceE _ s) = pprPanic "dsExpr:splice" (ppr s)
+dsExpr (HsTypedBracket   bracket_tc _) = dsBracket bracket_tc
+dsExpr (HsUntypedBracket bracket_tc _) = dsBracket bracket_tc
+dsExpr (HsTypedSplice   _   s) = pprPanic "dsExpr:typed splice" (pprTypedSplice Nothing s)
+dsExpr (HsUntypedSplice ext _) = dataConCantHappen ext
 
 -- Arrow notation extension
 dsExpr (HsProc _ pat cmd) = dsProcExpr pat cmd

@@ -66,7 +66,7 @@ module Language.Haskell.Syntax.Decls (
   -- ** @default@ declarations
   DefaultDecl(..), LDefaultDecl,
   -- ** Template haskell declaration splice
-  SpliceExplicitFlag(..),
+  SpliceDecoration(..),
   SpliceDecl(..), LSpliceDecl,
   -- ** Foreign function interface declarations
   ForeignDecl(..), LForeignDecl, ForeignImport(..), ForeignExport(..),
@@ -95,7 +95,7 @@ module Language.Haskell.Syntax.Decls (
 import GHC.Prelude
 
 import {-# SOURCE #-} Language.Haskell.Syntax.Expr
-  ( HsExpr, HsSplice )
+  ( HsExpr, HsUntypedSplice )
         -- Because Expr imports Decls via HsBracket
 
 import Language.Haskell.Syntax.Binds
@@ -245,9 +245,20 @@ type LSpliceDecl pass = XRec pass (SpliceDecl pass)
 data SpliceDecl p
   = SpliceDecl                  -- Top level splice
         (XSpliceDecl p)
-        (XRec p (HsSplice p))
-        SpliceExplicitFlag
+        (XRec p (HsUntypedSplice p))
+        SpliceDecoration -- Whether $( ) variant found, for pretty printing
   | XSpliceDecl !(XXSpliceDecl p)
+
+-- | A splice can appear with various decorations wrapped around it. This data
+-- type captures explicitly how it was originally written, for use in the pretty
+-- printer.
+data SpliceDecoration
+  = DollarSplice  -- ^ $splice
+  | BareSplice    -- ^ bare splice
+  deriving (Data, Eq, Show)
+
+instance Outputable SpliceDecoration where
+  ppr x = text $ show x
 
 {-
 ************************************************************************

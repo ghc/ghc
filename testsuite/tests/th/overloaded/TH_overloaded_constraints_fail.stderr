@@ -6,8 +6,8 @@ TH_overloaded_constraints_fail.hs:20:14: error:
     • In the expression: idQ
       In the expression:
         [| $(idQ) $(qq) |]
-        pending(rn) [<splice, qq>, <splice, idQ>]
+        pending(rn) [<spn, qq>, <spn, idQ>]
       In an equation for ‘quote’:
           quote
             = [| $(idQ) $(qq) |]
-              pending(rn) [<splice, qq>, <splice, idQ>]
+              pending(rn) [<spn, qq>, <spn, idQ>]

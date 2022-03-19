@@ -125,13 +125,14 @@ hsExprType (ArithSeq _ mb_overloaded_op asi) = case mb_overloaded_op of
   Nothing -> asi_ty
   where
     asi_ty = arithSeqInfoType asi
-hsExprType (HsTypedBracket   (HsBracketTc _ ty _wrap _pending) _) = ty
-hsExprType (HsUntypedBracket (HsBracketTc _ ty _wrap _pending) _) = ty
-hsExprType e@(HsSpliceE{}) = pprPanic "hsExprType: Unexpected HsSpliceE"
-                                      (ppr e)
+hsExprType (HsTypedBracket   (HsBracketTc { hsb_ty = ty }) _) = ty
+hsExprType (HsUntypedBracket (HsBracketTc { hsb_ty = ty }) _) = ty
+hsExprType e@(HsTypedSplice{}) = pprPanic "hsExprType: Unexpected HsTypedSplice"
+                                          (ppr e)
                                       -- Typed splices should have been eliminated during zonking, but we
                                       -- can't use `dataConCantHappen` since they are still present before
                                       -- than in the typechecked AST.
+hsExprType (HsUntypedSplice ext _) = dataConCantHappen ext
 hsExprType (HsProc _ _ lcmd_top) = lhsCmdTopType lcmd_top
 hsExprType (HsStatic (_, ty) _s) = ty
 hsExprType (HsPragE _ _ e) = lhsExprType e

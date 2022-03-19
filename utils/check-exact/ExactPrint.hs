@@ -1859,7 +1859,8 @@ instance ExactPrint (HsExpr GhcPs) where
   getAnnotationEntry (ArithSeq an _ _)            = fromAnn an
   getAnnotationEntry (HsTypedBracket an _)        = fromAnn an
   getAnnotationEntry (HsUntypedBracket an _)      = fromAnn an
-  getAnnotationEntry (HsSpliceE an _)             = fromAnn an
+  getAnnotationEntry (HsTypedSplice (_, an) _)    = fromAnn an
+  getAnnotationEntry (HsUntypedSplice an _)       = fromAnn an
   getAnnotationEntry (HsProc an _ _)              = fromAnn an
   getAnnotationEntry (HsStatic an _)              = fromAnn an
   getAnnotationEntry (HsPragE{})                  = NoEntryVal
@@ -2082,8 +2083,10 @@ instance ExactPrint (HsExpr GhcPs) where
         markEpAnn an AnnThTyQuote
         markAnnotated e
 
-
-  exact (HsSpliceE _ sp) = markAnnotated sp
+  exact (HsTypedSplice (_, an) e)  = do
+    markEpAnn an AnnDollarDollar
+    markAnnotated e
+  exact (HsUntypedSplice _ sp) = markAnnotated sp
 
   exact (HsProc an p c) = do
     debugM $ "HsProc start"
@@ -2161,29 +2164,15 @@ instance ExactPrint (HsPragE GhcPs) where
 
 -- ---------------------------------------------------------------------
 
-instance ExactPrint (HsSplice GhcPs) where
-  getAnnotationEntry (HsTypedSplice an _ _ _)   = fromAnn an
-  getAnnotationEntry (HsUntypedSplice an _ _ _) = fromAnn an
-  getAnnotationEntry (HsQuasiQuote _ _ _ _ _)   = NoEntryVal
-  getAnnotationEntry (HsSpliced _ _ _)          = NoEntryVal
+instance ExactPrint (HsUntypedSplice GhcPs) where
+  getAnnotationEntry (HsUntypedSpliceExpr an _) = fromAnn an
+  getAnnotationEntry (HsQuasiQuote _ _ _)       = NoEntryVal
 
-  exact (HsTypedSplice an DollarSplice _n e) = do
-    markEpAnn an AnnDollarDollar
-    markAnnotated e
-
-  -- = ppr_splice (text "$$") n e empty
-  -- exact (HsTypedSplice _ BareSplice _ _ )
-  -- = panic "Bare typed splice"  -- impossible
-  exact (HsUntypedSplice an decoration _n b) = do
-    when (decoration == DollarSplice) $ markEpAnn an AnnDollar
+  exact (HsUntypedSpliceExpr an b) = do
+    markEpAnn an AnnDollar
     markAnnotated b
 
-  -- exact (HsUntypedSplice _ DollarSplice n e)
-  -- = ppr_splice (text "$")  n e empty
-  -- exact (HsUntypedSplice _ BareSplice n e)
-  -- = ppr_splice empty  n e empty
-
-  exact (HsQuasiQuote _ _ q ss fs) = do
+  exact (HsQuasiQuote _ q (L (SrcSpanAnn _ ss) fs)) = do
     -- The quasiquote string does not honour layout offsets. Store
     -- the colOffset for now.
     -- TODO: use local?
@@ -2195,10 +2184,6 @@ instance ExactPrint (HsSplice GhcPs) where
     setLayoutOffsetP oldOffset
     p <- getPosP
     debugM $ "HsQuasiQuote:after:(p,ss)=" ++ show (p,ss2range ss)
-
-  -- exact (HsSpliced _ _ thing)         = ppr thing
-  -- exact (XSplice x)                   = case ghcPass @p of
-  exact x = error $ "exact HsSplice for:" ++ showAst x
 
 -- ---------------------------------------------------------------------
 

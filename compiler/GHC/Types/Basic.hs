@@ -101,8 +101,6 @@ module GHC.Types.Basic (
 
         IntWithInf, infinity, treatZeroAsInf, subWithInf, mkIntWithInf, intGtLimit,
 
-        SpliceExplicitFlag(..),
-
         TypeOrKind(..), isTypeLevel, isKindLevel,
 
         Levity(..), mightBeLifted, mightBeUnlifted,
@@ -1876,11 +1874,6 @@ treatZeroAsInf n = Int n
 -- | Inject any integer into an 'IntWithInf'
 mkIntWithInf :: Int -> IntWithInf
 mkIntWithInf = Int
-
-data SpliceExplicitFlag
-          = ExplicitSplice | -- ^ <=> $(f x y)
-            ImplicitSplice   -- ^ <=> f x y,  i.e. a naked top level expression
-    deriving Data
 
 {- *********************************************************************
 *                                                                      *

@@ -58,7 +58,7 @@ module Language.Haskell.Syntax.Type (
 
 import GHC.Prelude
 
-import {-# SOURCE #-} Language.Haskell.Syntax.Expr ( HsSplice )
+import {-# SOURCE #-} Language.Haskell.Syntax.Expr ( HsUntypedSplice )
 
 import Language.Haskell.Syntax.Extension
 
@@ -836,7 +836,7 @@ data HsType pass
       -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 
   | HsSpliceTy          (XSpliceTy pass)
-                        (HsSplice pass)   -- Includes quasi-quotes
+                        (HsUntypedSplice pass)   -- Includes quasi-quotes
       -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen' @'$('@,
       --         'GHC.Parser.Annotation.AnnClose' @')'@
 

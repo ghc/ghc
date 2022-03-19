@@ -2625,15 +2625,15 @@ explicit_activation :: { ([AddEpAnn],Activation) }  -- In brackets
 -----------------------------------------------------------------------------
 -- Expressions
 
-quasiquote :: { Located (HsSplice GhcPs) }
+quasiquote :: { Located (HsUntypedSplice GhcPs) }
         : TH_QUASIQUOTE   { let { loc = getLoc $1
                                 ; ITquasiQuote (quoter, quote, quoteSpan) = unLoc $1
                                 ; quoterId = mkUnqual varName quoter }
-                            in sL1 $1 (mkHsQuasiQuote quoterId (mkSrcSpanPs quoteSpan) quote) }
+                            in sL1 $1 (HsQuasiQuote noExtField quoterId (L (noAnnSrcSpan (mkSrcSpanPs quoteSpan)) quote)) }
         | TH_QQUASIQUOTE  { let { loc = getLoc $1
                                 ; ITqQuasiQuote (qual, quoter, quote, quoteSpan) = unLoc $1
                                 ; quoterId = mkQual varName (qual, quoter) }
-                            in sL1 $1 (mkHsQuasiQuote quoterId (mkSrcSpanPs quoteSpan) quote) }
+                            in sL1 $1 (HsQuasiQuote noExtField quoterId (L (noAnnSrcSpan (mkSrcSpanPs quoteSpan)) quote)) }
 
 exp   :: { ECP }
         : infixexp '::' ctype
@@ -2926,7 +2926,7 @@ aexp2   :: { ECP }
 
         -- Template Haskell Extension
         | splice_untyped { ECP $ pvA $ mkHsSplicePV $1 }
-        | splice_typed   { ecpFromExp $ mapLoc (HsSpliceE noAnn) (reLocA $1) }
+        | splice_typed   { ecpFromExp $ mapLoc (uncurry HsTypedSplice) (reLocA $1) }
 
         | SIMPLEQUOTE  qvar     {% fmap ecpFromExp $ acsA (\cs -> sLL $1 (reLocN $>) $ HsUntypedBracket (EpAnn (glR $1) [mj AnnSimpleQuote $1] cs) (VarBr noExtField True  $2)) }
         | SIMPLEQUOTE  qcon     {% fmap ecpFromExp $ acsA (\cs -> sLL $1 (reLocN $>) $ HsUntypedBracket (EpAnn (glR $1) [mj AnnSimpleQuote $1] cs) (VarBr noExtField True  $2)) }
@@ -2964,19 +2964,19 @@ projection
         | PREFIX_PROJ field  {% acs (\cs -> sLL $1 $> ((sLLa $1 $> $ DotFieldOcc (EpAnn (glR $1) (AnnFieldLabel (Just $ glAA $1)) cs) (reLocA $2)) :| [])) }
 
 splice_exp :: { LHsExpr GhcPs }
-        : splice_untyped { mapLoc (HsSpliceE noAnn) (reLocA $1) }
-        | splice_typed   { mapLoc (HsSpliceE noAnn) (reLocA $1) }
+        : splice_untyped { mapLoc (HsUntypedSplice noAnn) (reLocA $1) }
+        | splice_typed   { mapLoc (uncurry HsTypedSplice) (reLocA $1) }
 
-splice_untyped :: { Located (HsSplice GhcPs) }
+splice_untyped :: { Located (HsUntypedSplice GhcPs) }
         -- See Note [Whitespace-sensitive operator parsing] in GHC.Parser.Lexer
         : PREFIX_DOLLAR aexp2   {% runPV (unECP $2) >>= \ $2 ->
-                                   acs (\cs -> sLLlA $1 $> $ mkUntypedSplice (EpAnn (glR $1) [mj AnnDollar $1] cs) DollarSplice $2) }
+                                   acs (\cs -> sLLlA $1 $> $ HsUntypedSpliceExpr (EpAnn (glR $1) [mj AnnDollar $1] cs) $2) }
 
-splice_typed :: { Located (HsSplice GhcPs) }
+splice_typed :: { Located ((EpAnnCO, EpAnn [AddEpAnn]), LHsExpr GhcPs) }
         -- See Note [Whitespace-sensitive operator parsing] in GHC.Parser.Lexer
         : PREFIX_DOLLAR_DOLLAR aexp2
                                 {% runPV (unECP $2) >>= \ $2 ->
-                                   acs (\cs -> sLLlA $1 $> $ mkTypedSplice (EpAnn (glR $1) [mj AnnDollarDollar $1] cs) DollarSplice $2) }
+                                   acs (\cs -> sLLlA $1 $> $ ((noAnn, EpAnn (glR $1) [mj AnnDollarDollar $1] cs), $2)) }
 
 cmdargs :: { [LHsCmdTop GhcPs] }
         : cmdargs acmd                  { $2 : $1 }

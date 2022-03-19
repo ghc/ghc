@@ -2545,8 +2545,8 @@ add gp loc (SpliceD _ splice@(SpliceDecl _ _ flag)) ds
   = do { -- We've found a top-level splice.  If it is an *implicit* one
          -- (i.e. a naked top level expression)
          case flag of
-           ExplicitSplice -> return ()
-           ImplicitSplice -> do { th_on <- xoptM LangExt.TemplateHaskell
+           DollarSplice -> return ()
+           BareSplice -> do { th_on <- xoptM LangExt.TemplateHaskell
                                 ; unless th_on $ setSrcSpan (locA loc) $
                                   failWith badImplicitSplice }
 

@@ -31,7 +31,7 @@ module Language.Haskell.Syntax.Pat (
 
 import GHC.Prelude
 
-import {-# SOURCE #-} Language.Haskell.Syntax.Expr (SyntaxExpr, LHsExpr, HsSplice)
+import {-# SOURCE #-} Language.Haskell.Syntax.Expr (SyntaxExpr, LHsExpr, HsUntypedSplice)
 
 -- friends:
 import Language.Haskell.Syntax.Lit
@@ -161,7 +161,7 @@ data Pat p
 
   -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
   | SplicePat       (XSplicePat p)
-                    (HsSplice p)    -- ^ Splice Pattern (Includes quasi-quotes)
+                    (HsUntypedSplice p)    -- ^ Splice Pattern (Includes quasi-quotes)
 
         ------------ Literal and n+k patterns ---------------
   | LitPat          (XLitPat p)

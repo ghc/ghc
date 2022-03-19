@@ -53,7 +53,7 @@ import GHC.Prelude
 import Language.Haskell.Syntax.Pat
 import Language.Haskell.Syntax.Expr ( HsExpr )
 
-import {-# SOURCE #-} GHC.Hs.Expr (pprLExpr, pprSplice)
+import {-# SOURCE #-} GHC.Hs.Expr (pprLExpr, pprUntypedSplice, HsUntypedSpliceResult(..))
 
 -- friends:
 import GHC.Hs.Binds
@@ -137,7 +137,7 @@ type instance XViewPat GhcTc = Type
   -- (= the argument type of the view function), for hsPatType.
 
 type instance XSplicePat GhcPs = NoExtField
-type instance XSplicePat GhcRn = NoExtField
+type instance XSplicePat GhcRn = HsUntypedSpliceResult (Pat GhcRn) -- See Note [Lifecycle of a splice] in GHC.Hs.Expr
 type instance XSplicePat GhcTc = DataConCantHappen
 
 type instance XLitPat    (GhcPass _) = NoExtField
@@ -319,7 +319,12 @@ pprPat (NPlusKPat _ n k _ _ _)  = hcat [ppr_n, char '+', ppr k]
                   GhcPs -> ppr n
                   GhcRn -> ppr n
                   GhcTc -> ppr n
-pprPat (SplicePat _ splice)     = pprSplice splice
+pprPat (SplicePat ext splice)   =
+    case ghcPass @p of
+      GhcPs -> pprUntypedSplice True Nothing splice
+      GhcRn | HsUntypedSpliceNested n <- ext -> pprUntypedSplice True (Just n) splice
+      GhcRn | HsUntypedSpliceTop _ p  <- ext -> ppr p
+      GhcTc -> dataConCantHappen ext
 pprPat (SigPat _ pat ty)        = ppr pat <+> dcolon <+> ppr ty
 pprPat (ListPat _ pats)         = brackets (interpp'SP pats)
 pprPat (TuplePat _ pats bx)

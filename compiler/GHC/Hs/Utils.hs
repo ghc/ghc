@@ -89,10 +89,6 @@ module GHC.Hs.Utils(
   unitRecStmtTc,
   mkLetStmt,
 
-  -- * Template Haskell
-  mkUntypedSplice, mkTypedSplice,
-  mkHsQuasiQuote,
-
   -- * Collecting binders
   isUnliftedHsBind, isBangedHsBind,
 
@@ -450,19 +446,6 @@ mkLetStmt anns binds = LetStmt anns binds
 -- variable, and we don't know the fixity yet.
 mkHsOpApp :: LHsExpr GhcPs -> IdP GhcPs -> LHsExpr GhcPs -> HsExpr GhcPs
 mkHsOpApp e1 op e2 = OpApp noAnn e1 (noLocA (HsVar noExtField (noLocA op))) e2
-
-unqualSplice :: RdrName
-unqualSplice = mkRdrUnqual (mkVarOccFS (fsLit "splice"))
-
-mkUntypedSplice :: EpAnn [AddEpAnn] -> SpliceDecoration -> LHsExpr GhcPs -> HsSplice GhcPs
-mkUntypedSplice ann hasParen e = HsUntypedSplice ann hasParen unqualSplice e
-
-mkTypedSplice :: EpAnn [AddEpAnn] -> SpliceDecoration -> LHsExpr GhcPs -> HsSplice GhcPs
-mkTypedSplice ann hasParen e = HsTypedSplice ann hasParen unqualSplice e
-
-mkHsQuasiQuote :: RdrName -> SrcSpan -> FastString -> HsSplice GhcPs
-mkHsQuasiQuote quoter span quote
-  = HsQuasiQuote noExtField unqualSplice quoter span quote
 
 mkHsString :: String -> HsLit (GhcPass p)
 mkHsString s = HsString NoSourceText (mkFastString s)
@@ -1216,9 +1199,7 @@ collect_pat flag pat bndrs = case pat of
   NPlusKPat _ n _ _ _ _ -> unXRec @p n : bndrs
   SigPat _ pat _        -> collect_lpat flag pat bndrs
   XPat ext              -> collectXXPat @p flag ext bndrs
-  SplicePat _ (HsSpliced _ _ (HsSplicedPat pat))
-                        -> collect_pat flag pat bndrs
-  SplicePat _ _         -> bndrs
+  SplicePat ext _       -> collectXSplicePat @p flag ext bndrs
   -- See Note [Dictionary binders in ConPatOut]
   ConPat {pat_args=ps}  -> case flag of
     CollNoDictBinders   -> foldr (collect_lpat flag) bndrs (hsConPatArgs ps)
@@ -1244,6 +1225,7 @@ add_ev_bndr (EvBind { eb_lhs = b }) bs | isId b    = b:bs
 class UnXRec p => CollectPass p where
   collectXXPat :: CollectFlag p -> XXPat p -> [IdP p] -> [IdP p]
   collectXXHsBindsLR :: forall pR. XXHsBindsLR p pR -> [IdP p] -> [IdP p]
+  collectXSplicePat :: CollectFlag p -> XSplicePat p -> [IdP p] -> [IdP p]
 
 instance IsPass p => CollectPass (GhcPass p) where
   collectXXPat flag ext =
@@ -1264,6 +1246,13 @@ instance IsPass p => CollectPass (GhcPass p) where
         -- I don't think we want the binders from the abe_binds
 
         -- binding (hence see AbsBinds) is in zonking in GHC.Tc.Utils.Zonk
+
+  collectXSplicePat flag ext =
+      case ghcPass @p of
+        GhcPs -> id
+        GhcRn | (HsUntypedSpliceTop _ pat) <- ext -> collect_pat flag pat
+        GhcRn | (HsUntypedSpliceNested _)  <- ext -> id
+        GhcTc -> dataConCantHappen ext
 
 
 {-
