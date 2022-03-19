@@ -16,8 +16,8 @@ Derived class instances:
       = [| T14682.Foo
              $(Language.Haskell.TH.Syntax.lift a1)
              $(Language.Haskell.TH.Syntax.lift a2) |]
-        pending(rn) [<a2, Language.Haskell.TH.Syntax.lift a2>,
-                     <a1, Language.Haskell.TH.Syntax.lift a1>]
+        pending(rn) [<spn, Language.Haskell.TH.Syntax.lift a2>,
+                     <spn, Language.Haskell.TH.Syntax.lift a1>]
     Language.Haskell.TH.Syntax.liftTyped (T14682.Foo a1 a2)
       = [|| T14682.Foo
               $$(Language.Haskell.TH.Syntax.liftTyped a1)

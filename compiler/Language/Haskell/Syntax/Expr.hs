@@ -46,12 +46,8 @@ import GHC.Data.FastString
 
 -- libraries:
 import Data.Data hiding (Fixity(..))
-import qualified Data.Data as Data (Fixity(..))
 
 import Data.List.NonEmpty ( NonEmpty )
-
-import GHCi.RemoteTypes ( ForeignRef )
-import qualified Language.Haskell.TH as TH (Q)
 
 {- Note [RecordDotSyntax field updates]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -603,7 +599,8 @@ data HsExpr p
   --         'GHC.Parser.Annotation.AnnClose'
 
   -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
-  | HsSpliceE  (XSpliceE p) (HsSplice p)
+  | HsTypedSplice    (XTypedSplice p)   (LHsExpr p) -- `$$z` or `$$(f 4)`
+  | HsUntypedSplice  (XUntypedSplice p) (HsUntypedSplice p)
 
   -----------------------------------------------------------
   -- Arrow notation extension
@@ -1542,87 +1539,29 @@ Workshop 2007).
 
 Briefly, one writes
         [p| stuff |]
-and the arbitrary string "stuff" gets parsed by the parser 'p', whose
-type should be Language.Haskell.TH.Quote.QuasiQuoter.  'p' must be
-defined in another module, because we are going to run it here.  It's
-a bit like a TH splice:
-        $(p "stuff")
+and the arbitrary string "stuff" gets parsed by the parser 'p', whose type
+should be Language.Haskell.TH.Quote.QuasiQuoter.  'p' must be defined in
+another module, because we are going to run it here.  It's a bit like an
+/untyped/ TH splice where the parser is applied the "stuff" as a string, thus:
+     $(p "stuff")
 
-However, you can do this in patterns as well as terms.  Because of this,
-the splice is run by the *renamer* rather than the type checker.
+Notice that it's an /untyped/ TH splice: it can occur in patterns and types, as well
+as in expressions; and it runs in the renamer.
 -}
 
 -- | Haskell Splice
-data HsSplice id
-   = HsTypedSplice       --  $$z  or $$(f 4)
-        (XTypedSplice id)
-        SpliceDecoration -- Whether $$( ) variant found, for pretty printing
-        (IdP id)         -- A unique name to identify this splice point
-        (LHsExpr id)     -- See Note [Pending Splices]
+data HsUntypedSplice id
+   = HsUntypedSpliceExpr --  $z  or $(f 4)
+        (XUntypedSpliceExpr id)
+        (LHsExpr id)
 
-   | HsUntypedSplice     --  $z  or $(f 4)
-        (XUntypedSplice id)
-        SpliceDecoration -- Whether $( ) variant found, for pretty printing
-        (IdP id)         -- A unique name to identify this splice point
-        (LHsExpr id)     -- See Note [Pending Splices]
-
-   | HsQuasiQuote        -- See Note [Quasi-quote overview]
+   | HsQuasiQuote            -- See Note [Quasi-quote overview]
         (XQuasiQuote id)
-        (IdP id)         -- Splice point
-        (IdP id)         -- Quoter
-        SrcSpan          -- The span of the enclosed string
-        FastString       -- The enclosed string
+        (IdP id)             -- The quoter (the bit between `[` and `|`)
+        (XRec id FastString) -- The enclosed string
 
-   -- AZ:TODO: use XSplice instead of HsSpliced
-   | HsSpliced  -- See Note [Delaying modFinalizers in untyped splices] in
-                -- GHC.Rename.Splice.
-                -- This is the result of splicing a splice. It is produced by
-                -- the renamer and consumed by the typechecker. It lives only
-                -- between the two.
-        (XSpliced id)
-        ThModFinalizers     -- TH finalizers produced by the splice.
-        (HsSplicedThing id) -- The result of splicing
-   | XSplice !(XXSplice id) -- Extension point; see Note [Trees That Grow]
-                            -- in Language.Haskell.Syntax.Extension
-
--- | A splice can appear with various decorations wrapped around it. This data
--- type captures explicitly how it was originally written, for use in the pretty
--- printer.
-data SpliceDecoration
-  = DollarSplice  -- ^ $splice or $$splice
-  | BareSplice    -- ^ bare splice
-  deriving (Data, Eq, Show)
-
-instance Outputable SpliceDecoration where
-  ppr x = text $ show x
-
-
-isTypedSplice :: HsSplice id -> Bool
-isTypedSplice (HsTypedSplice {}) = True
-isTypedSplice _                  = False   -- Quasi-quotes are untyped splices
-
--- | Finalizers produced by a splice with
--- 'Language.Haskell.TH.Syntax.addModFinalizer'
---
--- See Note [Delaying modFinalizers in untyped splices] in GHC.Rename.Splice. For how
--- this is used.
---
-newtype ThModFinalizers = ThModFinalizers [ForeignRef (TH.Q ())]
-
--- A Data instance which ignores the argument of 'ThModFinalizers'.
-instance Data ThModFinalizers where
-  gunfold _ z _ = z $ ThModFinalizers []
-  toConstr  a   = mkConstr (dataTypeOf a) "ThModFinalizers" [] Data.Prefix
-  dataTypeOf a  = mkDataType "HsExpr.ThModFinalizers" [toConstr a]
-
--- | Haskell Spliced Thing
---
--- Values that can result from running a splice.
-data HsSplicedThing id
-    = HsSplicedExpr (HsExpr id) -- ^ Haskell Spliced Expression
-    | HsSplicedTy   (HsType id) -- ^ Haskell Spliced Type
-    | HsSplicedPat  (Pat id)    -- ^ Haskell Spliced Pattern
-
+   | XUntypedSplice !(XXUntypedSplice id) -- Extension point; see Note [Trees That Grow]
+                                          -- in Language.Haskell.Syntax.Extension
 
 -- | Haskell (Untyped) Quote = Expr + Pat + Type + Var
 data HsQuote p

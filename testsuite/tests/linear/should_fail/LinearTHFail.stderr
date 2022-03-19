@@ -5,7 +5,7 @@ LinearTHFail.hs:8:3: error:
     • In an equation for ‘f’:
           f x
             = [| Just $x |]
-              pending(rn) [<splice, x>]
+              pending(rn) [<spn, x>]
 
 LinearTHFail.hs:11:3: error:
     • Couldn't match type ‘'Many’ with ‘'One’

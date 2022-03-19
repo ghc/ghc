@@ -373,15 +373,16 @@ deriving instance Data (HsMatchContext GhcPs)
 deriving instance Data (HsMatchContext GhcRn)
 deriving instance Data (HsMatchContext GhcTc)
 
--- deriving instance (DataIdLR p p) => Data (HsSplice p)
-deriving instance Data (HsSplice GhcPs)
-deriving instance Data (HsSplice GhcRn)
-deriving instance Data (HsSplice GhcTc)
+-- deriving instance (DataIdLR p p) => Data (HsUntypedSplice p)
+deriving instance Data (HsUntypedSplice GhcPs)
+deriving instance Data (HsUntypedSplice GhcRn)
+deriving instance Data (HsUntypedSplice GhcTc)
 
--- deriving instance (DataIdLR p p) => Data (HsSplicedThing p)
-deriving instance Data (HsSplicedThing GhcPs)
-deriving instance Data (HsSplicedThing GhcRn)
-deriving instance Data (HsSplicedThing GhcTc)
+deriving instance Data (HsUntypedSpliceResult (HsExpr GhcRn))
+
+deriving instance Data (HsUntypedSpliceResult (Pat GhcRn))
+
+deriving instance Data (HsUntypedSpliceResult (HsType GhcRn))
 
 -- deriving instance (DataIdLR p p) => Data (HsQuote p)
 deriving instance Data (HsQuote GhcPs)

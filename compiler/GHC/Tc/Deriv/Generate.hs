@@ -1661,8 +1661,8 @@ gen_Lift_binds loc (DerivInstTys{ dit_rep_tc = tycon
     mk_untyped_bracket = HsUntypedBracket noAnn . ExpBr noExtField
     mk_typed_bracket = HsTypedBracket noAnn
 
-    mk_usplice = HsUntypedSplice EpAnnNotUsed DollarSplice
-    mk_tsplice = HsTypedSplice EpAnnNotUsed DollarSplice
+    mk_tsplice = HsTypedSplice (EpAnnNotUsed, noAnn)
+    mk_usplice = HsUntypedSplice EpAnnNotUsed . HsUntypedSpliceExpr noAnn
     data_cons = getPossibleDataCons tycon tycon_args
 
     pats_etc mk_bracket mk_splice lift_name data_con
@@ -1677,7 +1677,7 @@ gen_Lift_binds loc (DerivInstTys{ dit_rep_tc = tycon
                                     (map lift_var as_needed)
 
             lift_var :: RdrName -> LHsExpr (GhcPass 'Parsed)
-            lift_var x   = noLocA (HsSpliceE EpAnnNotUsed (mk_splice x (nlHsPar (mk_lift_expr x))))
+            lift_var x   = noLocA (mk_splice (nlHsPar (mk_lift_expr x)))
 
             mk_lift_expr :: RdrName -> LHsExpr (GhcPass 'Parsed)
             mk_lift_expr x = nlHsApps (Exact lift_name) [nlHsVar x]

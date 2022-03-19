@@ -91,7 +91,7 @@ import GHC.Prelude
 
 import Language.Haskell.Syntax.Type
 
-import {-# SOURCE #-} GHC.Hs.Expr ( pprSplice )
+import {-# SOURCE #-} GHC.Hs.Expr ( pprUntypedSplice, HsUntypedSpliceResult(..) )
 
 import Language.Haskell.Syntax.Extension
 import GHC.Hs.Extension
@@ -303,7 +303,7 @@ type instance XKindSig         (GhcPass _) = EpAnn [AddEpAnn]
 type instance XAppKindTy       (GhcPass _) = SrcSpan -- Where the `@` lives
 
 type instance XSpliceTy        GhcPs = NoExtField
-type instance XSpliceTy        GhcRn = NoExtField
+type instance XSpliceTy        GhcRn = HsUntypedSpliceResult (HsType GhcRn)
 type instance XSpliceTy        GhcTc = Kind
 
 type instance XDocTy           (GhcPass _) = EpAnn [AddEpAnn]
@@ -1008,7 +1008,7 @@ ppr_mono_lty :: OutputableBndrId p
              => LHsType (GhcPass p) -> SDoc
 ppr_mono_lty ty = ppr_mono_ty (unLoc ty)
 
-ppr_mono_ty :: (OutputableBndrId p) => HsType (GhcPass p) -> SDoc
+ppr_mono_ty :: forall p. (OutputableBndrId p) => HsType (GhcPass p) -> SDoc
 ppr_mono_ty (HsForAllTy { hst_tele = tele, hst_body = ty })
   = sep [pprHsForAll tele Nothing, ppr_mono_lty ty]
 
@@ -1036,7 +1036,12 @@ ppr_mono_ty (HsKindSig _ ty kind)
   = ppr_mono_lty ty <+> dcolon <+> ppr kind
 ppr_mono_ty (HsListTy _ ty)       = brackets (ppr_mono_lty ty)
 ppr_mono_ty (HsIParamTy _ n ty)   = (ppr n <+> dcolon <+> ppr_mono_lty ty)
-ppr_mono_ty (HsSpliceTy _ s)      = pprSplice s
+ppr_mono_ty (HsSpliceTy ext s)    =
+    case ghcPass @p of
+      GhcPs -> pprUntypedSplice True Nothing s
+      GhcRn | HsUntypedSpliceNested n <- ext -> pprUntypedSplice True (Just n) s
+      GhcRn | HsUntypedSpliceTop _ t  <- ext -> ppr t
+      GhcTc -> pprUntypedSplice True Nothing s
 ppr_mono_ty (HsExplicitListTy _ prom tys)
   | isPromoted prom = quote $ brackets (maybeAddSpace tys $ interpp'SP tys)
   | otherwise       = brackets (interpp'SP tys)

@@ -783,10 +783,9 @@ zonkExpr env (HsTypedBracket hsb_tc body)
 zonkExpr env (HsUntypedBracket hsb_tc body)
   = (\x -> HsUntypedBracket x body) <$> zonkBracket env hsb_tc
 
-zonkExpr env (HsSpliceE _ (XSplice (HsSplicedT s))) =
-  runTopSplice s >>= zonkExpr env
+zonkExpr env (HsTypedSplice s _) = runTopSplice s >>= zonkExpr env
 
-zonkExpr _ e@(HsSpliceE _ _) = pprPanic "zonkExpr: HsSpliceE" (ppr e)
+zonkExpr _ e@(HsUntypedSplice _ _) = pprPanic "zonkExpr: HsUntypedSplice" (ppr e)
 
 zonkExpr _ (OpApp x _ _ _) = dataConCantHappen x
 

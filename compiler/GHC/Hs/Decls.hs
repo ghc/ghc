@@ -69,7 +69,7 @@ module GHC.Hs.Decls (
   -- ** @default@ declarations
   DefaultDecl(..), LDefaultDecl,
   -- ** Template haskell declaration splice
-  SpliceExplicitFlag(..),
+  SpliceDecoration(..),
   SpliceDecl(..), LSpliceDecl,
   -- ** Foreign function interface declarations
   ForeignDecl(..), LForeignDecl, ForeignImport(..), ForeignExport(..),
@@ -104,7 +104,7 @@ import GHC.Prelude
 
 import Language.Haskell.Syntax.Decls
 
-import {-# SOURCE #-} GHC.Hs.Expr ( pprExpr, pprSpliceDecl )
+import {-# SOURCE #-} GHC.Hs.Expr ( pprExpr, pprUntypedSplice )
         -- Because Expr imports Decls via HsBracket
 
 import GHC.Hs.Binds
@@ -313,7 +313,8 @@ type instance XXSpliceDecl     (GhcPass _) = DataConCantHappen
 
 instance OutputableBndrId p
        => Outputable (SpliceDecl (GhcPass p)) where
-   ppr (SpliceDecl _ (L _ e) f) = pprSpliceDecl e f
+  ppr (SpliceDecl _ (L _ e) DollarSplice) = pprUntypedSplice True Nothing e
+  ppr (SpliceDecl _ (L _ e) BareSplice)   = pprUntypedSplice False Nothing e
 
 {-
 ************************************************************************

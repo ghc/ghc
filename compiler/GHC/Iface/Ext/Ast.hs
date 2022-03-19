@@ -377,8 +377,9 @@ enrichHie ts (hsGrp, imports, exports, docs) ev_bs insts tcs =
 
     let asts = HieASTs $ resolveTyVarScopes asts'
     return asts
-  where
-    processGrp grp = concatM
+
+processGrp :: HsGroup GhcRn -> HieM [HieAST Type]
+processGrp grp = concatM
       [ toHie $ fmap (RS ModuleScope ) hs_valds grp
       , toHie $ hs_splcds grp
       , toHie $ hs_tyclds grp
@@ -798,7 +799,7 @@ class ( HiePass (NoGhcTcPass p)
       , Data (AmbiguousFieldOcc (GhcPass p))
       , Data (HsCmdTop (GhcPass p))
       , Data (GRHS (GhcPass p) (LocatedA (HsCmd (GhcPass p))))
-      , Data (HsSplice (GhcPass p))
+      , Data (HsUntypedSplice (GhcPass p))
       , Data (HsLocalBinds (GhcPass p))
       , Data (FieldOcc (GhcPass p))
       , Data (HsTupArg (GhcPass p))
@@ -1202,11 +1203,14 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
             [ toHie b
             , toHie xbracket
             ]
-        HieTc | HsBracketTc _ _ _ p <- xbracket ->
-          [ toHie b
+        HieTc | HsBracketTc q _ _ p <- xbracket ->
+          [ toHie q
           , toHie p
           ]
-      HsSpliceE _ x ->
+      HsTypedSplice _ x ->
+        [ toHie x
+        ]
+      HsUntypedSplice _ x ->
         [ toHie $ L mspan x
         ]
       HsGetField {} -> []
@@ -1871,14 +1875,19 @@ instance ToHie (LocatedA (SpliceDecl GhcRn)) where
         [ toHie splice
         ]
 
-instance ToHie (HsQuote a) where
-  toHie _ = pure []
+instance ToHie (HsQuote GhcRn) where
+  toHie (ExpBr _ e)  = toHie e
+  toHie (PatBr _ b)  = toHie (PS Nothing NoScope NoScope b)
+  toHie (DecBrL {} ) = pure []
+  toHie (DecBrG _ decls) = processGrp decls
+  toHie (TypBr _ ty) = toHie ty
+  toHie (VarBr {} )  = pure []
 
 instance ToHie PendingRnSplice where
-  toHie _ = pure []
+  toHie (PendingRnSplice _ _ e) = toHie e
 
 instance ToHie PendingTcSplice where
-  toHie _ = pure []
+  toHie (PendingTcSplice _ e) = toHie e
 
 instance ToHie (LBooleanFormula (LocatedN Name)) where
   toHie (L span form) = concatM $ makeNode form (locA span) : case form of
@@ -1898,25 +1907,14 @@ instance ToHie (LBooleanFormula (LocatedN Name)) where
 instance ToHie (LocatedAn NoEpAnns HsIPName) where
   toHie (L span e) = makeNodeA e span
 
-instance HiePass p => ToHie (LocatedA (HsSplice (GhcPass p))) where
+instance HiePass p => ToHie (LocatedA (HsUntypedSplice (GhcPass p))) where
   toHie (L span sp) = concatM $ makeNodeA sp span : case sp of
-      HsTypedSplice _ _ _ expr ->
+      HsUntypedSpliceExpr _ expr ->
         [ toHie expr
         ]
-      HsUntypedSplice _ _ _ expr ->
-        [ toHie expr
+      HsQuasiQuote _ _ ispanFs ->
+        [ locOnly (getLocA ispanFs)
         ]
-      HsQuasiQuote _ _ _ ispan _ ->
-        [ locOnly ispan
-        ]
-      HsSpliced _ _ _ ->
-        []
-      XSplice x -> case hiePass @p of
-#if __GLASGOW_HASKELL__ < 811
-                     HieRn -> dataConCantHappen x
-#endif
-                     HieTc -> case x of
-                                HsSplicedT _ -> []
 
 instance ToHie (LocatedA (RoleAnnotDecl GhcRn)) where
   toHie (L span annot) = concatM $ makeNodeA annot span : case annot of

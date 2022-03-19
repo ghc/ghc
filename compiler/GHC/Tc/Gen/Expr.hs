@@ -27,7 +27,7 @@ module GHC.Tc.Gen.Expr
 
 import GHC.Prelude
 
-import {-# SOURCE #-}   GHC.Tc.Gen.Splice( tcSpliceExpr, tcTypedBracket, tcUntypedBracket )
+import {-# SOURCE #-}   GHC.Tc.Gen.Splice( tcTypedSplice, tcTypedBracket, tcUntypedBracket )
 
 import GHC.Hs
 import GHC.Hs.Syn.Type
@@ -565,17 +565,18 @@ tcExpr (HsProjection _ _) _ = panic "GHC.Tc.Gen.Expr: tcExpr: HsProjection: Not 
 ************************************************************************
 -}
 
--- HsSpliced is an annotation produced by 'GHC.Rename.Splice.rnSpliceExpr'.
 -- Here we get rid of it and add the finalizers to the global environment.
---
 -- See Note [Delaying modFinalizers in untyped splices] in GHC.Rename.Splice.
-tcExpr (HsSpliceE _ (HsSpliced _ mod_finalizers (HsSplicedExpr expr)))
-       res_ty
-  = do addModFinalizersWithLclEnv mod_finalizers
-       tcExpr expr res_ty
-tcExpr (HsSpliceE _ splice)          res_ty = tcSpliceExpr splice res_ty
-tcExpr e@(HsTypedBracket _ body) res_ty = tcTypedBracket e body res_ty
+tcExpr (HsTypedSplice ext splice)   res_ty = tcTypedSplice ext splice res_ty
+tcExpr e@(HsTypedBracket _ body)    res_ty = tcTypedBracket e body res_ty
+
 tcExpr e@(HsUntypedBracket ps body) res_ty = tcUntypedBracket e body ps res_ty
+tcExpr (HsUntypedSplice splice _)   res_ty
+  = case splice of
+      HsUntypedSpliceTop mod_finalizers expr
+        -> do { addModFinalizersWithLclEnv mod_finalizers
+              ; tcExpr expr res_ty }
+      HsUntypedSpliceNested {} -> panic "tcExpr: invalid nested splice"
 
 {-
 ************************************************************************

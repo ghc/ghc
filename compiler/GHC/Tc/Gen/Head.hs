@@ -482,7 +482,7 @@ tcInferAppHead_maybe fun args
       HsRecSel _ f              -> Just <$> tcInferRecSelId f
       ExprWithTySig _ e hs_ty   -> Just <$> tcExprWithSig e hs_ty
       HsOverLit _ lit           -> Just <$> tcInferOverLit lit
-      HsSpliceE _ (HsSpliced _ _ (HsSplicedExpr e))
+      HsUntypedSplice (HsUntypedSpliceTop _ e) _
                                 -> tcInferAppHead_maybe e args
       _                         -> return Nothing
 
