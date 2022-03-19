@@ -1721,6 +1721,13 @@ instance Data DelayedSplice where
 -- See Note [Pending Splices]
 type SplicePointName = Name
 
+data UntypedSpliceFlavour
+  = UntypedExpSplice
+  | UntypedPatSplice
+  | UntypedTypeSplice
+  | UntypedDeclSplice
+  deriving Data
+
 -- | Pending Renamer Splice
 data PendingRnSplice
   = PendingRnSplice UntypedSpliceFlavour SplicePointName (LHsExpr GhcRn)
