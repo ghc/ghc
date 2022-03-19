@@ -486,11 +486,18 @@ data HsExpr p
   --         'GHC.Parser.Annotation.AnnClose' @'}'@
 
   -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
-  | RecordUpd
-      { rupd_ext  :: XRecordUpd p
+  | RecordUpdField
+      { rupd_ext  :: XRecordUpdField p
       , rupd_expr :: LHsExpr p
-      , rupd_flds :: Either [LHsRecUpdField p] [LHsRecUpdProj p]
+      , rupd_flds :: [LHsRecUpdField p]
       }
+
+  | RecordUpdProj
+      { rupd_ext  :: XRecordUpdProj p
+      , rupd_expr :: LHsExpr p
+      , rupd_flds :: [LHsRecUpdProj p]
+      }
+
   -- For a type family, the arg types are of the *instance* tycon,
   -- not the family tycon
 

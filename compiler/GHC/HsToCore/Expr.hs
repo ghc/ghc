@@ -580,12 +580,9 @@ we want, namely
 
 -}
 
-dsExpr RecordUpd { rupd_flds = Right _} =
-  -- Not possible due to elimination in the renamer. See Note
-  -- [Handling overloaded and rebindable constructs]
-  panic "The impossible happened"
-dsExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = Left fields
-                       , rupd_ext = RecordUpdTc
+dsExpr expr@(RecordUpdField { rupd_ext = e } = dataConCantHappen e
+dsExpr expr@(RecordUpdProj { rupd_expr = record_expr, rupd_flds = fields
+                           , rupd_ext = RecordUpdTc
                            { rupd_cons = cons_to_upd
                            , rupd_in_tys = in_inst_tys
                            , rupd_out_tys = out_inst_tys

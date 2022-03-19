@@ -424,9 +424,13 @@ type instance XRecordCon     GhcPs = EpAnn [AddEpAnn]
 type instance XRecordCon     GhcRn = NoExtField
 type instance XRecordCon     GhcTc = PostTcExpr   -- Instantiated constructor function
 
-type instance XRecordUpd     GhcPs = EpAnn [AddEpAnn]
-type instance XRecordUpd     GhcRn = NoExtField
-type instance XRecordUpd     GhcTc = RecordUpdTc
+type instance XRecordUpdField GhcPs = EpAnn [AddEpAnn]
+type instance XRecordUpdField GhcRn = NoExtField
+type instance XRecordUpdField GhcTc = RecordUpdTc
+
+type instance XRecordUpdProj GhcPs = EpAnn [AddEpAnn]
+type instance XRecordUpdProj GhcRn = NoExtField
+type instance XRecordUpdProj GhcTc = DataConCantHappen
 
 type instance XGetField     GhcPs = EpAnnCO
 type instance XGetField     GhcRn = NoExtField
