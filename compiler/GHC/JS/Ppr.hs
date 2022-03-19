@@ -6,7 +6,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE BlockArguments #-}
-{-# LANGUAGE PatternSynonyms #-}
 
 -- | Pretty-printing JavaScript
 module GHC.JS.Ppr
@@ -19,6 +18,10 @@ module GHC.JS.Ppr
   , RenderJs(..)
   , jsToDoc
   , pprStringLit
+  , flattenBlocks
+  , braceNest
+  , braceNest'
+  , braceNest''
   )
 where
 
@@ -78,6 +81,12 @@ braceNest x = char '{' <+> nest 2 x $$ char '}'
 
 braceNest' :: Doc -> Doc
 braceNest' x = nest 2 (char '{' $+$ x) $$ char '}'
+
+-- FIXME: Jeff (2022,03): better naming of braceNest'' functions. Stop the
+-- madness!
+-- somewhat more compact (egyptian style) braces
+braceNest'' :: Doc -> Doc
+braceNest'' x = nest 2 (char '{' $$ x) $$ char '}'
 
 class JsToDoc a where jsToDocR :: RenderJs -> a -> Doc
 instance JsToDoc JStat where jsToDocR r = renderJsS r r
