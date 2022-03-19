@@ -1888,13 +1888,13 @@ instance ToHie (LocatedAn NoEpAnns HsIPName) where
 
 instance HiePass p => ToHie (LocatedA (HsSplice (GhcPass p))) where
   toHie (L span sp) = concatM $ makeNodeA sp span : case sp of
-      HsTypedSplice _ _ _ expr ->
+      HsTypedSplice _ _ expr ->
         [ toHie expr
         ]
-      HsUntypedSplice _ _ _ expr ->
+      HsUntypedSplice _ _ expr ->
         [ toHie expr
         ]
-      HsQuasiQuote _ _ _ ispan _ ->
+      HsQuasiQuote _ ispan _ ->
         [ locOnly ispan
         ]
       HsSpliced _ _ _ ->

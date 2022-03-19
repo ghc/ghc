@@ -599,7 +599,7 @@ That effort is tracked in #14838.
 ************************************************************************
 -}
 
-tcSpliceExpr splice@(HsTypedSplice _ _ name expr) res_ty
+tcSpliceExpr splice@(HsTypedSplice (_, name) _ expr) res_ty
   = addErrCtxt (spliceCtxtDoc splice) $
     setSrcSpan (getLocA expr)    $ do
     { stage <- getStage

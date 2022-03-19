@@ -1550,19 +1550,15 @@ data HsSplice id
    = HsTypedSplice       --  $$z  or $$(f 4)
         (XTypedSplice id)
         SpliceDecoration -- Whether $$( ) variant found, for pretty printing
-        (IdP id)         -- A unique name to identify this splice point
         (LHsExpr id)     -- See Note [Pending Splices]
 
    | HsUntypedSplice     --  $z  or $(f 4)
         (XUntypedSplice id)
         SpliceDecoration -- Whether $( ) variant found, for pretty printing
-        (IdP id)         -- A unique name to identify this splice point
         (LHsExpr id)     -- See Note [Pending Splices]
 
    | HsQuasiQuote        -- See Note [Quasi-quote overview]
         (XQuasiQuote id)
-        (IdP id)         -- Splice point
-        (IdP id)         -- Quoter
         SrcSpan          -- The span of the enclosed string
         FastString       -- The enclosed string
 

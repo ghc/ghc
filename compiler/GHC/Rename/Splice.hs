@@ -361,10 +361,10 @@ runRnSplice flavour run_meta ppr_res splice
             Just h  -> h splice
 
        ; let the_expr = case splice' of
-                HsUntypedSplice _ _ _ e   ->  e
-                HsQuasiQuote _ _ q qs str -> mkQuasiQuoteExpr flavour q qs str
-                HsTypedSplice {}          -> pprPanic "runRnSplice" (ppr splice)
-                HsSpliced {}              -> pprPanic "runRnSplice" (ppr splice)
+                HsUntypedSplice _ _ e      ->  e
+                HsQuasiQuote (_, q) qs str -> mkQuasiQuoteExpr flavour q qs str
+                HsTypedSplice {}           -> pprPanic "runRnSplice" (ppr splice)
+                HsSpliced {}               -> pprPanic "runRnSplice" (ppr splice)
 
              -- Typecheck the expression
        ; meta_exp_ty   <- tcMetaTy meta_ty_name
@@ -403,9 +403,9 @@ runRnSplice flavour run_meta ppr_res splice
 makePending :: UntypedSpliceFlavour
             -> HsSplice GhcRn
             -> PendingRnSplice
-makePending flavour (HsUntypedSplice _ _ n e)
+makePending flavour (HsUntypedSplice (_, n) _ e)
   = PendingRnSplice flavour n e
-makePending flavour (HsQuasiQuote _ n quoter q_span quote)
+makePending flavour (HsQuasiQuote (n, quoter) q_span quote)
   = PendingRnSplice flavour n (mkQuasiQuoteExpr flavour quoter q_span quote)
 makePending _ splice@(HsTypedSplice {})
   = pprPanic "makePending" (ppr splice)
@@ -436,19 +436,19 @@ mkQuasiQuoteExpr flavour quoter q_span' quote
 ---------------------
 rnSplice :: HsSplice GhcPs -> RnM (HsSplice GhcRn, FreeVars)
 -- Not exported...used for all
-rnSplice (HsTypedSplice x hasParen splice_name expr)
+rnSplice (HsTypedSplice (x, splice_name) hasParen expr)
   = do  { loc  <- getSrcSpanM
         ; n' <- newLocalBndrRn (L (noAnnSrcSpan loc) splice_name)
         ; (expr', fvs) <- rnLExpr expr
-        ; return (HsTypedSplice x hasParen n' expr', fvs) }
+        ; return (HsTypedSplice (x, n') hasParen expr', fvs) }
 
-rnSplice (HsUntypedSplice x hasParen splice_name expr)
+rnSplice (HsUntypedSplice (x, splice_name) hasParen expr)
   = do  { loc  <- getSrcSpanM
         ; n' <- newLocalBndrRn (L (noAnnSrcSpan loc) splice_name)
         ; (expr', fvs) <- rnLExpr expr
-        ; return (HsUntypedSplice x hasParen n' expr', fvs) }
+        ; return (HsUntypedSplice (x, n') hasParen expr', fvs) }
 
-rnSplice (HsQuasiQuote x splice_name quoter q_loc quote)
+rnSplice (HsQuasiQuote (splice_name, quoter) q_loc quote)
   = do  { loc  <- getSrcSpanM
         ; splice_name' <- newLocalBndrRn (L (noAnnSrcSpan loc) splice_name)
 
@@ -458,7 +458,7 @@ rnSplice (HsQuasiQuote x splice_name quoter q_loc quote)
         ; when (nameIsLocalOrFrom this_mod quoter') $
           checkThLocalName quoter'
 
-        ; return (HsQuasiQuote x splice_name' quoter' q_loc quote
+        ; return (HsQuasiQuote (splice_name', quoter') q_loc quote
                                                              , unitFV quoter') }
 
 rnSplice splice@(HsSpliced {}) = pprPanic "rnSplice" (ppr splice)

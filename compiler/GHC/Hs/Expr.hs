@@ -1688,9 +1688,15 @@ pprQuals quals = interpp'SP quals
 
 newtype HsSplicedT = HsSplicedT DelayedSplice deriving (Data)
 
-type instance XTypedSplice   (GhcPass _) = EpAnn [AddEpAnn]
-type instance XUntypedSplice (GhcPass _) = EpAnn [AddEpAnn]
-type instance XQuasiQuote    (GhcPass _) = NoExtField
+-- (IdP id): A unique name to identify this splice point
+type instance XTypedSplice   (GhcPass p) = (EpAnn [AddEpAnn], IdP (GhcPass p))
+
+-- (IdP id): A unique name to identify this splice point
+type instance XUntypedSplice (GhcPass p) = (EpAnn [AddEpAnn], IdP (GhcPass p))
+
+type instance XQuasiQuote    (GhcPass p) = ( (IdP (GhcPass p))   -- Splice point
+                                           , (IdP (GhcPass p)) ) -- Quoter
+
 type instance XSpliced       (GhcPass _) = NoExtField
 type instance XXSplice       GhcPs       = DataConCantHappen
 type instance XXSplice       GhcRn       = DataConCantHappen
@@ -1808,19 +1814,19 @@ pprSpliceDecl e ImplicitSplice   = ppr_splice_decl e
 
 ppr_splice_decl :: (OutputableBndrId p)
                 => HsSplice (GhcPass p) -> SDoc
-ppr_splice_decl (HsUntypedSplice _ _ n e) = ppr_splice empty n e empty
+ppr_splice_decl (HsUntypedSplice (_, n) _ e) = ppr_splice empty n e empty
 ppr_splice_decl e = pprSplice e
 
 pprSplice :: forall p. (OutputableBndrId p) => HsSplice (GhcPass p) -> SDoc
-pprSplice (HsTypedSplice _ DollarSplice n e)
+pprSplice (HsTypedSplice (_, n) DollarSplice e)
   = ppr_splice (text "$$") n e empty
-pprSplice (HsTypedSplice _ BareSplice _ _ )
+pprSplice (HsTypedSplice _ BareSplice _ )
   = panic "Bare typed splice"  -- impossible
-pprSplice (HsUntypedSplice _ DollarSplice n e)
+pprSplice (HsUntypedSplice (_, n) DollarSplice e)
   = ppr_splice (text "$")  n e empty
-pprSplice (HsUntypedSplice _ BareSplice n e)
+pprSplice (HsUntypedSplice (_, n) BareSplice e)
   = ppr_splice empty  n e empty
-pprSplice (HsQuasiQuote _ n q _ s)      = ppr_quasi n q s
+pprSplice (HsQuasiQuote (n, q) _ s)      = ppr_quasi n q s
 pprSplice (HsSpliced _ _ thing)         = ppr thing
 pprSplice (XSplice x)                   = case ghcPass @p of
 #if __GLASGOW_HASKELL__ < 811

@@ -1451,10 +1451,10 @@ repRole (L _ Nothing)                 = rep2_nw inferRName []
 repSplice :: HsSplice GhcRn -> MetaM (Core a)
 -- See Note [How brackets and nested splices are handled] in GHC.Tc.Gen.Splice
 -- We return a CoreExpr of any old type; the context should know
-repSplice (HsTypedSplice   _ _ n _) = rep_splice n
-repSplice (HsUntypedSplice _ _ n _) = rep_splice n
-repSplice (HsQuasiQuote _ n _ _ _)  = rep_splice n
-repSplice e@(HsSpliced {})          = pprPanic "repSplice" (ppr e)
+repSplice (HsTypedSplice   (_, n) _ _) = rep_splice n
+repSplice (HsUntypedSplice (_, n) _ _) = rep_splice n
+repSplice (HsQuasiQuote    (n, _) _ _) = rep_splice n
+repSplice e@(HsSpliced {})             = pprPanic "repSplice" (ppr e)
 
 rep_splice :: Name -> MetaM (Core a)
 rep_splice splice_name

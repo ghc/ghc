@@ -444,14 +444,14 @@ unqualSplice :: RdrName
 unqualSplice = mkRdrUnqual (mkVarOccFS (fsLit "splice"))
 
 mkUntypedSplice :: EpAnn [AddEpAnn] -> SpliceDecoration -> LHsExpr GhcPs -> HsSplice GhcPs
-mkUntypedSplice ann hasParen e = HsUntypedSplice ann hasParen unqualSplice e
+mkUntypedSplice ann hasParen e = HsUntypedSplice (ann, unqualSplice) hasParen e
 
 mkTypedSplice :: EpAnn [AddEpAnn] -> SpliceDecoration -> LHsExpr GhcPs -> HsSplice GhcPs
-mkTypedSplice ann hasParen e = HsTypedSplice ann hasParen unqualSplice e
+mkTypedSplice ann hasParen e = HsTypedSplice (ann, unqualSplice) hasParen e
 
 mkHsQuasiQuote :: RdrName -> SrcSpan -> FastString -> HsSplice GhcPs
 mkHsQuasiQuote quoter span quote
-  = HsQuasiQuote noExtField unqualSplice quoter span quote
+  = HsQuasiQuote (unqualSplice, quoter) span quote
 
 mkHsString :: String -> HsLit (GhcPass p)
 mkHsString s = HsString NoSourceText (mkFastString s)

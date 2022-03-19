@@ -1637,8 +1637,8 @@ gen_Lift_binds loc (DerivInstTys{ dit_rep_tc = tycon
     mk_untyped_bracket = HsUntypedBracket noAnn . ExpBr noExtField
     mk_typed_bracket = HsTypedBracket noAnn
 
-    mk_usplice = HsUntypedSplice EpAnnNotUsed DollarSplice
-    mk_tsplice = HsTypedSplice EpAnnNotUsed DollarSplice
+    mk_usplice = flip HsUntypedSplice DollarSplice . (,) EpAnnNotUsed
+    mk_tsplice = flip HsTypedSplice DollarSplice . (,) EpAnnNotUsed
     data_cons = getPossibleDataCons tycon tycon_args
 
     pats_etc mk_bracket mk_splice lift_name data_con
