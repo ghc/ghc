@@ -443,7 +443,7 @@ newtype BuildProgressColour = BuildProgressColour String
 
 -- | By default, Hadrian tries to figure out if the current terminal
 --   supports colors using this function. The default can be overridden
---   by suppling @--[no-]color@.
+--   by supplying @--[no-]color@.
 shouldUseColor :: IO Bool
 shouldUseColor =
   (&&) <$> IO.hIsTerminalDevice IO.stdout

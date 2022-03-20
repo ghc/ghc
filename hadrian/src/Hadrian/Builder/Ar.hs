@@ -38,7 +38,7 @@ args :: (ShakeValue c, ShakeValue b) => ArMode -> Args c b
 args Pack   = mconcat [ arg "q", arg =<< getOutput, getInputs ]
 args Unpack = mconcat [ arg "x", arg =<< getInput ]
 
--- This count includes "q" and the output file argumentes in 'args'. This is
+-- This count includes "q" and the output file arguments in 'args'. This is
 -- only relevant for the 'Pack' @ar@ mode.
 arFlagsCount :: Int
 arFlagsCount = 2

@@ -321,7 +321,7 @@ ghcVersionStage _      = setting ProjectVersion
 
 -- | The file suffix used for libraries of a given build 'Way'. For example,
 -- @_p.a@ corresponds to a static profiled library, and @-ghc7.11.20141222.so@
--- is a dynamic vanilly library. Why do we need GHC version number in the
+-- is a dynamic vanilla library. Why do we need GHC version number in the
 -- dynamic suffix? Here is a possible reason: dynamic libraries are placed in a
 -- single giant directory in the load path of the dynamic linker, and hence we
 -- must distinguish different versions of GHC. In contrast, static libraries

@@ -44,7 +44,7 @@ getWay = way <$> getContext
 getStagedSettingList :: (Stage -> SettingList) -> Args Context b
 getStagedSettingList f = getSettingList . f =<< getStage
 
--- | Path to the directory containg the final artifact in a given 'Context'.
+-- | Path to the directory containing the final artifact in a given 'Context'.
 libPath :: Context -> Action FilePath
 libPath Context {..} = buildRoot <&> (-/- (stageString stage -/- "lib"))
 
